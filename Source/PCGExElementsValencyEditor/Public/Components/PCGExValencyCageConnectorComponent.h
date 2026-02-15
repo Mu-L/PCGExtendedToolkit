@@ -57,7 +57,7 @@ public:
 	TArray<FInstancedStruct> ConstraintOverrides;
 
 	/** How instance overrides interact with type-level default constraints */
-	UPROPERTY(EditAnywhere, Category = "Connector|Constraints", meta=(EditCondition="ConstraintOverrides.Num() > 0"))
+	UPROPERTY(EditAnywhere, Category = "Connector|Constraints", meta=(DisplayAfter="ConstraintOverrides"))
 	EPCGExConstraintOverrideMode OverrideMode = EPCGExConstraintOverrideMode::Append;
 
 	// ========== Mesh Integration ==========

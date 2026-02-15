@@ -477,12 +477,12 @@ struct PCGEXELEMENTSVALENCY_API FPCGExValencyModuleConnector
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	EPCGExConnectorPolarity Polarity = EPCGExConnectorPolarity::Universal;
 
-	/** Per-instance constraint overrides */
-	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint", ExcludeBaseStruct))
+	/** Per-instance constraint overrides (set by builder from cage connector component) */
+	UPROPERTY()
 	TArray<FInstancedStruct> ConstraintOverrides;
 
 	/** How instance overrides interact with type-level default constraints */
-	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(EditCondition="ConstraintOverrides.Num() > 0"))
+	UPROPERTY()
 	EPCGExConstraintOverrideMode OverrideMode = EPCGExConstraintOverrideMode::Append;
 
 	/** Orbital index this connector maps to (assigned during compilation, runtime only) */
