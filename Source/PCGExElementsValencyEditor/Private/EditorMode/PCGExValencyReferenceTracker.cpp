@@ -7,6 +7,7 @@
 #include "Cages/PCGExValencyCage.h"
 #include "Cages/PCGExValencyCagePattern.h"
 #include "Cages/PCGExValencyAssetPalette.h"
+#include "PCGExValencyEditorCommon.h"
 #include "Volumes/ValencyContextVolume.h"
 
 // Note: PCGExValencyCage.h and PCGExValencyCagePattern.h still needed for
@@ -49,12 +50,12 @@ void FValencyReferenceTracker::RebuildDependencyGraph()
 		// Regular cages: MirrorSources dependencies
 		if (APCGExValencyCage* Cage = Cast<APCGExValencyCage>(CagePtr.Get()))
 		{
-			for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+			for (const FPCGExMirrorSource& Entry : Cage->MirrorSources)
 			{
-				if (Source)
+				if (Entry.Source)
 				{
 					// Source is depended upon by Cage
-					TArray<TWeakObjectPtr<AActor>>& Dependents = DependentsMap.FindOrAdd(Source);
+					TArray<TWeakObjectPtr<AActor>>& Dependents = DependentsMap.FindOrAdd(Entry.Source);
 					Dependents.AddUnique(Cage);
 				}
 			}
@@ -92,11 +93,11 @@ void FValencyReferenceTracker::OnMirrorSourcesChanged(APCGExValencyCage* Cage)
 	RemoveAllEdgesFrom(Cage);
 
 	// Add new edges based on current MirrorSources
-	for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+	for (const FPCGExMirrorSource& Entry : Cage->MirrorSources)
 	{
-		if (Source)
+		if (Entry.Source)
 		{
-			AddDependency(Cage, Source);
+			AddDependency(Cage, Entry.Source);
 		}
 	}
 }
@@ -238,11 +239,11 @@ bool FValencyReferenceTracker::DependsOn(AActor* ActorA, AActor* ActorB) const
 	// Start from ActorA's dependencies (what it references)
 	if (APCGExValencyCage* Cage = Cast<APCGExValencyCage>(ActorA))
 	{
-		for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+		for (const FPCGExMirrorSource& Entry : Cage->MirrorSources)
 		{
-			if (Source)
+			if (Entry.Source)
 			{
-				ToCheck.Add(Source);
+				ToCheck.Add(Entry.Source);
 			}
 		}
 	}
@@ -264,11 +265,11 @@ bool FValencyReferenceTracker::DependsOn(AActor* ActorA, AActor* ActorB) const
 		// Add Current's dependencies
 		if (APCGExValencyCage* Cage = Cast<APCGExValencyCage>(Current))
 		{
-			for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+			for (const FPCGExMirrorSource& Entry : Cage->MirrorSources)
 			{
-				if (Source && !Visited.Contains(Source))
+				if (Entry.Source && !Visited.Contains(Entry.Source.Get()))
 				{
-					ToCheck.Add(Source);
+					ToCheck.Add(Entry.Source);
 				}
 			}
 		}

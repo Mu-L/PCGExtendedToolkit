@@ -7,6 +7,7 @@
 #include "Cages/PCGExValencyCageNull.h"
 #include "Cages/PCGExValencyCagePattern.h"
 #include "Cages/PCGExValencyAssetPalette.h"
+#include "PCGExValencyEditorCommon.h"
 #include "Components/PCGExValencyCageConnectorComponent.h"
 #include "PCGExPropertyCollectionComponent.h"
 #include "Volumes/ValencyContextVolume.h"
@@ -287,8 +288,17 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 		TArray<FPCGExValencyAssetEntry> AssetEntries = GetEffectiveAssetEntries(Cage);
 		if (AssetEntries.Num() == 0)
 		{
-			PCGEX_VALENCY_VERBOSE(Building, "  Cage '%s': NO ASSETS - skipping", *Cage->GetCageDisplayName());
-			// Skip cages with no assets
+			if (Cage->bIsTemplate)
+			{
+				PCGEX_VALENCY_VERBOSE(Building, "  Cage '%s': Template cage (no assets expected) - skipping module creation.",
+					*Cage->GetCageDisplayName());
+			}
+			else
+			{
+				PCGEX_VALENCY_INFO(Building, "  Cage '%s': NO ASSETS after mirror resolution (own=%d, mirrors=%d) - skipping. Cages connected to this one will have missing neighbors.",
+					*Cage->GetCageDisplayName(), Cage->GetAllAssetEntries().Num(), Cage->MirrorSources.Num());
+			}
+			// Skip cages with no assets (template or otherwise — no module to create)
 			continue;
 		}
 
@@ -386,7 +396,60 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 
 		const int32 AutoExtractedCount = Data.Connectors.Num();
 
-		// Phase 2: Collect connector components (can override auto-extracted)
+		// Phase 2: Inherit connectors from mirror sources (medium priority)
+		for (const FPCGExMirrorSource& MirrorEntry : Cage->MirrorSources)
+		{
+			if (!MirrorEntry.IsValid() || !MirrorEntry.ShouldMirror(EPCGExMirrorContent::Connectors))
+			{
+				continue;
+			}
+
+			AActor* SourceActor = MirrorEntry.Source;
+
+			// Collect inheritable connectors from source
+			TArray<UPCGExValencyCageConnectorComponent*> SourceConnectors;
+			if (APCGExValencyCageBase* SourceCage = Cast<APCGExValencyCageBase>(SourceActor))
+			{
+				SourceCage->GetConnectorComponents(SourceConnectors);
+			}
+
+			for (const UPCGExValencyCageConnectorComponent* SrcConn : SourceConnectors)
+			{
+				if (!SrcConn || !SrcConn->bEnabled || !SrcConn->bInheritable) continue;
+
+				// Conflict resolution: existing (auto-extracted) takes precedence
+				bool bAlreadyExists = false;
+				for (const FPCGExValencyModuleConnector& Existing : Data.Connectors)
+				{
+					if (Existing.Identifier == SrcConn->Identifier)
+					{
+						bAlreadyExists = true;
+						break;
+					}
+				}
+
+				if (!bAlreadyExists)
+				{
+					FPCGExValencyModuleConnector InheritedConn;
+					InheritedConn.Identifier = SrcConn->Identifier;
+					InheritedConn.ConnectorType = SrcConn->ConnectorType;
+					InheritedConn.LocalOffset = SrcConn->GetConnectorLocalTransform();
+					InheritedConn.bOverrideOffset = true;
+					InheritedConn.Polarity = SrcConn->Polarity;
+					InheritedConn.ConstraintOverrides = SrcConn->ConstraintOverrides;
+					InheritedConn.OverrideMode = SrcConn->OverrideMode;
+					InheritedConn.OrbitalIndex = -1;
+
+					Data.Connectors.Add(InheritedConn);
+					PCGEX_VALENCY_VERBOSE(Building, "    Inherited connector '%s' from mirror source '%s'",
+						*SrcConn->Identifier.ToString(), *SourceActor->GetName());
+				}
+			}
+		}
+
+		const int32 InheritedCount = Data.Connectors.Num() - AutoExtractedCount;
+
+		// Phase 3: Collect local connector components (highest priority — can override both)
 		TArray<UPCGExValencyCageConnectorComponent*> ConnectorComponents;
 		Cage->GetConnectorComponents(ConnectorComponents);
 
@@ -416,7 +479,7 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 				}
 			}
 
-			// Check if this component overrides an auto-extracted connector
+			// Check if this component overrides an existing connector (auto-extracted or inherited)
 			int32 ExistingIndex = INDEX_NONE;
 			for (int32 i = 0; i < Data.Connectors.Num(); ++i)
 			{
@@ -429,21 +492,23 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 
 			if (ExistingIndex != INDEX_NONE)
 			{
-				// Connector with this name already exists (from auto-extraction)
+				// Connector with this name already exists (from auto-extraction or inheritance)
 				if (ConnectorComp->bOverrideAutoExtracted)
 				{
-					// Replace the auto-extracted connector with component data
+					// Replace the existing connector with local component data
 					FPCGExValencyModuleConnector& ExistingConnector = Data.Connectors[ExistingIndex];
 					ExistingConnector.ConnectorType = ConnectorComp->ConnectorType;
 					ExistingConnector.LocalOffset = SocketTransform;
 					ExistingConnector.bOverrideOffset = true;
 					ExistingConnector.Polarity = ConnectorComp->Polarity;
-					PCGEX_VALENCY_VERBOSE(Building, "    Connector component '%s' overrides auto-extracted",
+					ExistingConnector.ConstraintOverrides = ConnectorComp->ConstraintOverrides;
+					ExistingConnector.OverrideMode = ConnectorComp->OverrideMode;
+					PCGEX_VALENCY_VERBOSE(Building, "    Connector component '%s' overrides existing",
 						*ConnectorComp->Identifier.ToString());
 				}
 				else
 				{
-					PCGEX_VALENCY_VERBOSE(Building, "    Connector component '%s' skipped (auto-extracted takes precedence)",
+					PCGEX_VALENCY_VERBOSE(Building, "    Connector component '%s' skipped (existing takes precedence)",
 						*ConnectorComp->Identifier.ToString());
 				}
 			}
@@ -456,6 +521,8 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 				ModuleConnector.LocalOffset = SocketTransform;
 				ModuleConnector.bOverrideOffset = true;
 				ModuleConnector.Polarity = ConnectorComp->Polarity;
+				ModuleConnector.ConstraintOverrides = ConnectorComp->ConstraintOverrides;
+				ModuleConnector.OverrideMode = ConnectorComp->OverrideMode;
 				ModuleConnector.OrbitalIndex = -1;
 
 				Data.Connectors.Add(ModuleConnector);
@@ -463,8 +530,8 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 		}
 
 		const int32 ComponentCount = ConnectorComponents.Num();
-		PCGEX_VALENCY_VERBOSE(Building, "  Cage '%s': %d connectors total (%d auto-extracted, %d from components)",
-			*Cage->GetCageDisplayName(), Data.Connectors.Num(), AutoExtractedCount, ComponentCount);
+		PCGEX_VALENCY_VERBOSE(Building, "  Cage '%s': %d connectors total (%d auto-extracted, %d inherited, %d from components)",
+			*Cage->GetCageDisplayName(), Data.Connectors.Num(), AutoExtractedCount, InheritedCount, ComponentCount);
 
 		// Compute orbital mask from connections
 		const TArray<FPCGExValencyCageOrbital>& Orbitals = Cage->GetOrbitals();
@@ -981,11 +1048,11 @@ void UPCGExValencyBondingRulesBuilder::ValidateRules(
 
 				if (!Neighbors || Neighbors->Num() == 0)
 				{
-					// Skip warning if this orbital connects to a boundary (null cage)
-					if (!LayerConfig->IsBoundaryOrbital(i))
+					// Skip warning if this orbital is a boundary or wildcard (both legitimately have no specific neighbors)
+					if (!LayerConfig->IsBoundaryOrbital(i) && !LayerConfig->IsWildcardOrbital(i))
 					{
 						OutResult.Warnings.Add(FText::Format(
-							LOCTEXT("OrbitalNoNeighbors", "Module '{0}', orbital '{1}' has no valid neighbors defined."),
+							LOCTEXT("OrbitalNoNeighbors", "Module '{0}', orbital '{1}' has no valid neighbors defined. The connected cage may have no assets."),
 							FText::FromString(Module.Asset.GetAssetName()),
 							FText::FromName(OrbitalName)
 						));
@@ -1028,8 +1095,8 @@ TArray<FPCGExValencyAssetEntry> UPCGExValencyBondingRulesBuilder::GetEffectiveAs
 	TSet<const AActor*> VisitedSources;
 	VisitedSources.Add(Cage);
 
-	// Lambda to collect entries from a source (with optional recursion)
-	TFunction<void(AActor*, bool)> CollectFromSource = [&](AActor* Source, bool bRecursive)
+	// Lambda to collect entries from a source with per-type flags
+	TFunction<void(AActor*, uint8, uint8)> CollectFromSource = [&](AActor* Source, uint8 MirrorFlags, uint8 RecursiveFlags)
 	{
 		if (!Source)
 		{
@@ -1043,6 +1110,29 @@ TArray<FPCGExValencyAssetEntry> UPCGExValencyBondingRulesBuilder::GetEffectiveAs
 		}
 		VisitedSources.Add(Source);
 
+		// Only collect assets if Assets flag is set
+		if (!(MirrorFlags & static_cast<uint8>(EPCGExMirrorContent::Assets)))
+		{
+			// Still need to recurse for nested sources even if we don't collect assets here
+			if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
+			{
+				if (SourceCage->MirrorSources.Num() > 0)
+				{
+					for (const FPCGExMirrorSource& NestedEntry : SourceCage->MirrorSources)
+					{
+						if (!NestedEntry.IsValid()) continue;
+						const uint8 ChildMirror = RecursiveFlags & NestedEntry.MirrorFlags;
+						const uint8 ChildRecurse = RecursiveFlags & NestedEntry.RecursiveFlags;
+						if (ChildMirror & static_cast<uint8>(EPCGExMirrorContent::Assets))
+						{
+							CollectFromSource(NestedEntry.Source, ChildMirror, ChildRecurse);
+						}
+					}
+				}
+			}
+			return;
+		}
+
 		TArray<FPCGExValencyAssetEntry> SourceEntries;
 
 		// Check if it's a cage
@@ -1052,12 +1142,18 @@ TArray<FPCGExValencyAssetEntry> UPCGExValencyBondingRulesBuilder::GetEffectiveAs
 			PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source CAGE '%s': %d assets", *SourceCage->GetCageDisplayName(), SourceEntries.Num());
 
 			// Recursively collect from cage's mirror sources
-			if (bRecursive && SourceCage->MirrorSources.Num() > 0)
+			if (SourceCage->MirrorSources.Num() > 0)
 			{
 				PCGEX_VALENCY_VERBOSE(Mirror, "      Recursing into %d nested mirror sources", SourceCage->MirrorSources.Num());
-				for (const TObjectPtr<AActor>& NestedSource : SourceCage->MirrorSources)
+				for (const FPCGExMirrorSource& NestedEntry : SourceCage->MirrorSources)
 				{
-					CollectFromSource(NestedSource, SourceCage->bRecursiveMirror);
+					if (!NestedEntry.IsValid()) continue;
+					const uint8 ChildMirror = RecursiveFlags & NestedEntry.MirrorFlags;
+					const uint8 ChildRecurse = RecursiveFlags & NestedEntry.RecursiveFlags;
+					if (ChildMirror & static_cast<uint8>(EPCGExMirrorContent::Assets))
+					{
+						CollectFromSource(NestedEntry.Source, ChildMirror, ChildRecurse);
+					}
 				}
 			}
 		}
@@ -1092,9 +1188,10 @@ TArray<FPCGExValencyAssetEntry> UPCGExValencyBondingRulesBuilder::GetEffectiveAs
 	};
 
 	// Collect from all mirror sources
-	for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+	for (const FPCGExMirrorSource& Entry : Cage->MirrorSources)
 	{
-		CollectFromSource(Source, Cage->bRecursiveMirror);
+		if (!Entry.IsValid()) continue;
+		CollectFromSource(Entry.Source, Entry.MirrorFlags, Entry.RecursiveFlags);
 	}
 
 	PCGEX_VALENCY_VERBOSE(Mirror, "  GetEffectiveAssetEntries for '%s': TOTAL %d assets (after mirror resolution)",
@@ -1155,8 +1252,8 @@ TArray<FInstancedStruct> UPCGExValencyBondingRulesBuilder::GetEffectivePropertie
 	TSet<const AActor*> VisitedSources;
 	VisitedSources.Add(Cage);
 
-	// Lambda to collect properties from a source (with optional recursion)
-	TFunction<void(AActor*, bool)> CollectFromSource = [&](AActor* Source, bool bRecursive)
+	// Lambda to collect properties from a source with per-type flags
+	TFunction<void(AActor*, uint8, uint8)> CollectFromSource = [&](AActor* Source, uint8 MirrorFlags, uint8 RecursiveFlags)
 	{
 		if (!Source)
 		{
@@ -1168,33 +1265,47 @@ TArray<FInstancedStruct> UPCGExValencyBondingRulesBuilder::GetEffectivePropertie
 		}
 		VisitedSources.Add(Source);
 
-		// Check if it's a cage
-		if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
+		// Only collect properties if Properties flag is set
+		if (MirrorFlags & static_cast<uint8>(EPCGExMirrorContent::Properties))
 		{
-			CollectPropertiesFromActor(SourceCage, AllProperties);
-			PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source CAGE '%s': collecting properties", *SourceCage->GetCageDisplayName());
-
-			// Recursively collect from cage's mirror sources
-			if (bRecursive && SourceCage->MirrorSources.Num() > 0)
+			// Check if it's a cage
+			if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
 			{
-				for (const TObjectPtr<AActor>& NestedSource : SourceCage->MirrorSources)
-				{
-					CollectFromSource(NestedSource, SourceCage->bRecursiveMirror);
-				}
+				CollectPropertiesFromActor(SourceCage, AllProperties);
+				PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source CAGE '%s': collecting properties", *SourceCage->GetCageDisplayName());
+			}
+			// Check if it's an asset palette
+			else if (const APCGExValencyAssetPalette* SourcePalette = Cast<APCGExValencyAssetPalette>(Source))
+			{
+				CollectPropertiesFromActor(SourcePalette, AllProperties);
+				PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source PALETTE '%s': collecting properties", *SourcePalette->GetPaletteDisplayName());
 			}
 		}
-		// Check if it's an asset palette
-		else if (const APCGExValencyAssetPalette* SourcePalette = Cast<APCGExValencyAssetPalette>(Source))
+
+		// Recurse into nested mirror sources if this is a cage
+		if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
 		{
-			CollectPropertiesFromActor(SourcePalette, AllProperties);
-			PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source PALETTE '%s': collecting properties", *SourcePalette->GetPaletteDisplayName());
+			if (SourceCage->MirrorSources.Num() > 0)
+			{
+				for (const FPCGExMirrorSource& NestedEntry : SourceCage->MirrorSources)
+				{
+					if (!NestedEntry.IsValid()) continue;
+					const uint8 ChildMirror = RecursiveFlags & NestedEntry.MirrorFlags;
+					const uint8 ChildRecurse = RecursiveFlags & NestedEntry.RecursiveFlags;
+					if (ChildMirror & static_cast<uint8>(EPCGExMirrorContent::Properties))
+					{
+						CollectFromSource(NestedEntry.Source, ChildMirror, ChildRecurse);
+					}
+				}
+			}
 		}
 	};
 
 	// Collect from all mirror sources
-	for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+	for (const FPCGExMirrorSource& Entry : Cage->MirrorSources)
 	{
-		CollectFromSource(Source, Cage->bRecursiveMirror);
+		if (!Entry.IsValid()) continue;
+		CollectFromSource(Entry.Source, Entry.MirrorFlags, Entry.RecursiveFlags);
 	}
 
 	PCGEX_VALENCY_VERBOSE(Mirror, "  GetEffectiveProperties for '%s': TOTAL %d properties (after mirror resolution)",
@@ -1229,8 +1340,8 @@ TArray<FName> UPCGExValencyBondingRulesBuilder::GetEffectiveTags(const APCGExVal
 	TSet<const AActor*> VisitedSources;
 	VisitedSources.Add(Cage);
 
-	// Lambda to collect tags from a source (with optional recursion)
-	TFunction<void(AActor*, bool)> CollectFromSource = [&](AActor* Source, bool bRecursive)
+	// Lambda to collect tags from a source with per-type flags
+	TFunction<void(AActor*, uint8, uint8)> CollectFromSource = [&](AActor* Source, uint8 MirrorFlags, uint8 RecursiveFlags)
 	{
 		if (!Source)
 		{
@@ -1242,37 +1353,50 @@ TArray<FName> UPCGExValencyBondingRulesBuilder::GetEffectiveTags(const APCGExVal
 		}
 		VisitedSources.Add(Source);
 
-		// Collect actor tags from source
-		for (const FName& Tag : Source->Tags)
+		// Only collect tags if Tags flag is set
+		if (MirrorFlags & static_cast<uint8>(EPCGExMirrorContent::Tags))
 		{
-			AllTags.AddUnique(Tag);
-		}
-
-		// Check if it's a cage - recurse if needed
-		if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
-		{
-			PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source CAGE '%s': collecting %d tags", *SourceCage->GetCageDisplayName(), SourceCage->Tags.Num());
-
-			// Recursively collect from cage's mirror sources
-			if (bRecursive && SourceCage->MirrorSources.Num() > 0)
+			// Collect actor tags from source
+			for (const FName& Tag : Source->Tags)
 			{
-				for (const TObjectPtr<AActor>& NestedSource : SourceCage->MirrorSources)
-				{
-					CollectFromSource(NestedSource, SourceCage->bRecursiveMirror);
-				}
+				AllTags.AddUnique(Tag);
+			}
+
+			// Check if it's a cage - log
+			if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
+			{
+				PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source CAGE '%s': collecting %d tags", *SourceCage->GetCageDisplayName(), SourceCage->Tags.Num());
+			}
+			else if (const APCGExValencyAssetPalette* SourcePalette = Cast<APCGExValencyAssetPalette>(Source))
+			{
+				PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source PALETTE '%s': collecting %d tags", *SourcePalette->GetPaletteDisplayName(), SourcePalette->Tags.Num());
 			}
 		}
-		// Check if it's an asset palette
-		else if (const APCGExValencyAssetPalette* SourcePalette = Cast<APCGExValencyAssetPalette>(Source))
+
+		// Recurse into nested mirror sources if this is a cage
+		if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
 		{
-			PCGEX_VALENCY_VERBOSE(Mirror, "    Mirror source PALETTE '%s': collecting %d tags", *SourcePalette->GetPaletteDisplayName(), SourcePalette->Tags.Num());
+			if (SourceCage->MirrorSources.Num() > 0)
+			{
+				for (const FPCGExMirrorSource& NestedEntry : SourceCage->MirrorSources)
+				{
+					if (!NestedEntry.IsValid()) continue;
+					const uint8 ChildMirror = RecursiveFlags & NestedEntry.MirrorFlags;
+					const uint8 ChildRecurse = RecursiveFlags & NestedEntry.RecursiveFlags;
+					if (ChildMirror & static_cast<uint8>(EPCGExMirrorContent::Tags))
+					{
+						CollectFromSource(NestedEntry.Source, ChildMirror, ChildRecurse);
+					}
+				}
+			}
 		}
 	};
 
 	// Collect from all mirror sources
-	for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+	for (const FPCGExMirrorSource& Entry : Cage->MirrorSources)
 	{
-		CollectFromSource(Source, Cage->bRecursiveMirror);
+		if (!Entry.IsValid()) continue;
+		CollectFromSource(Entry.Source, Entry.MirrorFlags, Entry.RecursiveFlags);
 	}
 
 	PCGEX_VALENCY_VERBOSE(Mirror, "  GetEffectiveTags for '%s': TOTAL %d tags (after mirror resolution)",

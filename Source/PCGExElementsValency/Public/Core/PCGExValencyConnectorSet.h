@@ -85,10 +85,42 @@ namespace PCGExValencyConnector
 }
 
 /**
+ * How instance constraint overrides interact with type-level defaults.
+ */
+UENUM(BlueprintType)
+enum class EPCGExConstraintOverrideMode : uint8
+{
+	Append  UMETA(DisplayName = "Append",  ToolTip = "Run type defaults first, then instance constraints continue the pipeline"),
+	Replace UMETA(DisplayName = "Replace", ToolTip = "Skip type defaults, use only instance constraints")
+};
+
+/**
+ * Constraint role — determines how a constraint participates in the placement pipeline.
+ */
+UENUM(BlueprintType)
+enum class EPCGExConstraintRole : uint8
+{
+	Generator UMETA(DisplayName = "Generator", ToolTip = "Produces multiple transform variants from a base"),
+	Modifier  UMETA(DisplayName = "Modifier",  ToolTip = "Applies offset/jitter to each variant"),
+	Filter    UMETA(DisplayName = "Filter",    ToolTip = "Rejects invalid variants"),
+	Preset    UMETA(DisplayName = "Preset",    ToolTip = "Expands to inline sub-pipeline"),
+	Branch    UMETA(DisplayName = "Branch",    ToolTip = "Conditional fork-join")
+};
+
+// Forward declaration
+struct FPCGExConstraintContext;
+
+/**
  * Base struct for connector constraints.
  * Subclass to define specific constraint types (angular range, surface offset, volume, etc.).
  * Constraints can be set as type-level defaults on FPCGExValencyConnectorEntry
  * and overridden per-instance on FPCGExValencyModuleConnector.
+ *
+ * Each constraint has a role (Generator/Modifier/Filter) that determines its place
+ * in the placement pipeline:
+ * 1. Generators produce N transform variants from a base transform
+ * 2. Modifiers apply offsets to each variant
+ * 3. Filters reject invalid variants
  */
 USTRUCT(BlueprintType)
 struct PCGEXELEMENTSVALENCY_API FPCGExConnectorConstraint
@@ -96,6 +128,73 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConnectorConstraint
 	GENERATED_BODY()
 
 	virtual ~FPCGExConnectorConstraint() = default;
+
+	/** Whether this constraint is active */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint")
+	bool bEnabled = true;
+
+	/** Get the role of this constraint in the placement pipeline */
+	virtual EPCGExConstraintRole GetRole() const { return EPCGExConstraintRole::Filter; }
+
+	/** Max number of variants this constraint can produce (generators only) */
+	virtual int32 GetMaxVariants() const { return 1; }
+
+	/** Generate transform variants from the base attachment transform (generators only) */
+	virtual void GenerateVariants(
+		const FPCGExConstraintContext& Context,
+		FRandomStream& Random,
+		TArray<FTransform>& OutVariants) const
+	{
+	}
+
+	/** Apply modification to a transform in-place (modifiers only) */
+	virtual void ApplyModification(
+		const FPCGExConstraintContext& Context,
+		FTransform& InOutTransform,
+		FRandomStream& Random) const
+	{
+	}
+
+	/** Check if a candidate transform is valid (filters only). Return false to reject. */
+	virtual bool IsValid(
+		const FPCGExConstraintContext& Context,
+		const FTransform& CandidateTransform) const
+	{
+		return true;
+	}
+};
+
+/**
+ * Intermediate base for Generator constraints.
+ * Subclass this when creating constraints that produce multiple transform variants.
+ */
+USTRUCT(BlueprintType, meta=(Hidden))
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraintGenerator : public FPCGExConnectorConstraint
+{
+	GENERATED_BODY()
+	virtual EPCGExConstraintRole GetRole() const override final { return EPCGExConstraintRole::Generator; }
+};
+
+/**
+ * Intermediate base for Modifier constraints.
+ * Subclass this when creating constraints that apply offsets/jitter to variants.
+ */
+USTRUCT(BlueprintType, meta=(Hidden))
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraintModifier : public FPCGExConnectorConstraint
+{
+	GENERATED_BODY()
+	virtual EPCGExConstraintRole GetRole() const override final { return EPCGExConstraintRole::Modifier; }
+};
+
+/**
+ * Intermediate base for Filter constraints.
+ * Subclass this when creating constraints that reject invalid variants.
+ */
+USTRUCT(BlueprintType, meta=(Hidden))
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraintFilter : public FPCGExConnectorConstraint
+{
+	GENERATED_BODY()
+	virtual EPCGExConstraintRole GetRole() const override final { return EPCGExConstraintRole::Filter; }
 };
 
 /**
@@ -141,7 +240,7 @@ struct PCGEXELEMENTSVALENCY_API FPCGExValencyConnectorEntry
 	FLinearColor DebugColor = FLinearColor::White;
 
 	/** Default constraints applied to all connectors of this type (can be overridden per-instance) */
-	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint"))
+	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint", ExcludeBaseStruct))
 	TArray<FInstancedStruct> DefaultConstraints;
 
 #if WITH_EDITORONLY_DATA
@@ -378,17 +477,13 @@ struct PCGEXELEMENTSVALENCY_API FPCGExValencyModuleConnector
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	EPCGExConnectorPolarity Polarity = EPCGExConnectorPolarity::Universal;
 
-	/** Per-instance constraint overrides (if non-empty, replaces type-level DefaultConstraints) */
-	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint"))
+	/** Per-instance constraint overrides (set by builder from cage connector component) */
+	UPROPERTY()
 	TArray<FInstancedStruct> ConstraintOverrides;
 
-	/**
-	 * Get the effective constraints for this connector instance.
-	 * Returns ConstraintOverrides if non-empty, otherwise falls back to the type's DefaultConstraints.
-	 * @param ConnectorSet The connector set containing type-level default constraints
-	 * @return Reference to the effective constraints array
-	 */
-	const TArray<FInstancedStruct>& GetEffectiveConstraints(const UPCGExValencyConnectorSet* ConnectorSet) const;
+	/** How instance overrides interact with type-level default constraints */
+	UPROPERTY()
+	EPCGExConstraintOverrideMode OverrideMode = EPCGExConstraintOverrideMode::Append;
 
 	/** Orbital index this connector maps to (assigned during compilation, runtime only) */
 	int32 OrbitalIndex = -1;

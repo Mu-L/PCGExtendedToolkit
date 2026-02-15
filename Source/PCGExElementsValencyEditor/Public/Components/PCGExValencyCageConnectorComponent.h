@@ -50,6 +50,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Connector")
 	bool bEnabled = true;
 
+	/** Whether this connector is inherited by cages that mirror this cage's connectors */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Connector")
+	bool bInheritable = true;
+
+	// ========== Constraints ==========
+
+	/** Per-instance constraint overrides */
+	UPROPERTY(EditAnywhere, Category = "Connector|Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint", ExcludeBaseStruct))
+	TArray<FInstancedStruct> ConstraintOverrides;
+
+	/** How instance overrides interact with type-level default constraints */
+	UPROPERTY(EditAnywhere, Category = "Connector|Constraints", meta=(DisplayAfter="ConstraintOverrides"))
+	EPCGExConstraintOverrideMode OverrideMode = EPCGExConstraintOverrideMode::Append;
+
 	// ========== Mesh Integration ==========
 
 	/** Optional reference to a mesh socket name to inherit transform from. */

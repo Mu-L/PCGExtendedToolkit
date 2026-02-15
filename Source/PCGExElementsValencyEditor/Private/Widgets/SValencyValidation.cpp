@@ -198,16 +198,36 @@ void SValencyValidation::ValidateCages()
 			Messages.Add(Msg);
 		}
 
-		// Check regular cages for no assets
+		// Check regular cages for no assets and empty mirror entries
 		if (const APCGExValencyCage* RegularCage = Cast<APCGExValencyCage>(Cage))
 		{
-			if (RegularCage->GetAllAssetEntries().Num() == 0)
+			if (RegularCage->GetAllAssetEntries().Num() == 0 && !RegularCage->bIsTemplate)
 			{
 				auto Msg = MakeShared<FValencyValidationMessage>();
 				Msg->Severity = FValencyValidationMessage::ESeverity::Warning;
 				Msg->SourceActor = Cage;
 				Msg->SourceName = CageName;
 				Msg->Message = TEXT("No registered assets");
+				Messages.Add(Msg);
+			}
+
+			// Check for empty (unassigned) mirror source entries
+			int32 EmptyMirrorCount = 0;
+			for (const FPCGExMirrorSource& MirrorEntry : RegularCage->MirrorSources)
+			{
+				if (!MirrorEntry.IsValid())
+				{
+					EmptyMirrorCount++;
+				}
+			}
+			if (EmptyMirrorCount > 0)
+			{
+				auto Msg = MakeShared<FValencyValidationMessage>();
+				Msg->Severity = FValencyValidationMessage::ESeverity::Info;
+				Msg->SourceActor = Cage;
+				Msg->SourceName = CageName;
+				Msg->Message = FString::Printf(TEXT("%d mirror source %s unassigned"),
+					EmptyMirrorCount, EmptyMirrorCount == 1 ? TEXT("entry") : TEXT("entries"));
 				Messages.Add(Msg);
 			}
 		}
@@ -301,14 +321,14 @@ void SValencyValidation::ValidateScene()
 	{
 		if (const APCGExValencyCage* Cage = Cast<APCGExValencyCage>(CagePtr.Get()))
 		{
-			for (const TObjectPtr<AActor>& Source : Cage->MirrorSources)
+			for (const FPCGExMirrorSource& MirrorEntry : Cage->MirrorSources)
 			{
-				if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source.Get()))
+				if (const APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(MirrorEntry.Source.Get()))
 				{
 					// Check if the source also mirrors us
-					for (const TObjectPtr<AActor>& SourceSource : SourceCage->MirrorSources)
+					for (const FPCGExMirrorSource& SourceMirrorEntry : SourceCage->MirrorSources)
 					{
-						if (SourceSource.Get() == Cage)
+						if (SourceMirrorEntry.Source.Get() == Cage)
 						{
 							auto Msg = MakeShared<FValencyValidationMessage>();
 							Msg->Severity = FValencyValidationMessage::ESeverity::Warning;

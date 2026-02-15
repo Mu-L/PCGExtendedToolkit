@@ -396,9 +396,12 @@ void APCGExValencyCagePattern::RefreshGhostMeshes()
 			AllEntries.Append(SourceCage->GetAllAssetEntries());
 
 			// Recursively collect from cage's mirror sources
-			for (const TObjectPtr<AActor>& MirrorSource : SourceCage->MirrorSources)
+			for (const FPCGExMirrorSource& MirrorEntry : SourceCage->MirrorSources)
 			{
-				CollectFromSource(MirrorSource);
+				if (MirrorEntry.Source)
+				{
+					CollectFromSource(MirrorEntry.Source);
+				}
 			}
 		}
 		else if (APCGExValencyAssetPalette* SourcePalette = Cast<APCGExValencyAssetPalette>(Source))

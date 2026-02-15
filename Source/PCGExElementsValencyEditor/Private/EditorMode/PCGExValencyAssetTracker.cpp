@@ -389,9 +389,9 @@ void FPCGExValencyAssetTracker::FindCagesThatMirror(APCGExValencyCage* SourceCag
 			}
 
 			// Check if this cage mirrors the source cage
-			for (const TObjectPtr<AActor>& MirrorSource : Cage->MirrorSources)
+			for (const FPCGExMirrorSource& MirrorEntry : Cage->MirrorSources)
 			{
-				if (MirrorSource == SourceCage)
+				if (MirrorEntry.Source == SourceCage)
 				{
 					OutMirroringCages.Add(Cage);
 					break;

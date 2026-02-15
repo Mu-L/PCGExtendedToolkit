@@ -9,6 +9,21 @@
 #include "Editor/UnrealEdEngine.h"
 #include "EditorMode/PCGExValencyEditorModeToolkit.h"
 #include "EditorMode/PCGExValencyCageConnectorVisualizer.h"
+#include "EditorMode/PCGExConstraintVisualizer.h"
+#include "EditorMode/Constraints/PCGExConstraintVis_AngularRange.h"
+#include "EditorMode/Constraints/PCGExConstraintVis_SurfaceOffset.h"
+#include "EditorMode/Constraints/PCGExConstraintVis_VolumeOffset.h"
+#include "EditorMode/Constraints/PCGExConstraintVis_HemisphereOffset.h"
+#include "EditorMode/Constraints/PCGExConstraintVis_Preset.h"
+#include "EditorMode/Constraints/PCGExConstraintVis_Branch.h"
+#include "EditorMode/Constraints/PCGExConstraintVis_ContextCondition.h"
+#include "Growth/Constraints/PCGExConstraint_AngularRange.h"
+#include "Growth/Constraints/PCGExConstraint_SurfaceOffset.h"
+#include "Growth/Constraints/PCGExConstraint_VolumeOffset.h"
+#include "Growth/Constraints/PCGExConstraint_HemisphereOffset.h"
+#include "Growth/Constraints/PCGExConstraintPreset.h"
+#include "Growth/Constraints/PCGExConstraint_Branch.h"
+#include "Growth/Constraints/PCGExConstraint_ContextCondition.h"
 #include "Components/PCGExValencyCageConnectorComponent.h"
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
 #include "Details/PCGExValencyConnectorCompatibilityCustomization.h"
@@ -26,6 +41,18 @@ void FPCGExElementsValencyEditorModule::StartupModule()
 		GUnrealEd->RegisterComponentVisualizer(
 			UPCGExValencyCageConnectorComponent::StaticClass()->GetFName(),
 			MakeShareable(new FPCGExValencyCageConnectorVisualizer()));
+	}
+
+	// Register constraint visualizers
+	{
+		FConstraintVisualizerRegistry& Registry = FConstraintVisualizerRegistry::Get();
+		Registry.Register<FPCGExConstraint_AngularRange, FAngularRangeVisualizer>();
+		Registry.Register<FPCGExConstraint_SurfaceOffset, FSurfaceOffsetVisualizer>();
+		Registry.Register<FPCGExConstraint_VolumeOffset, FVolumeOffsetVisualizer>();
+		Registry.Register<FPCGExConstraint_HemisphereOffset, FHemisphereOffsetVisualizer>();
+		Registry.Register<FPCGExConstraint_Preset, FPresetVisualizer>();
+		Registry.Register<FPCGExConstraint_Branch, FBranchVisualizer>();
+		Registry.Register<FPCGExConstraint_ContextCondition, FContextConditionVisualizer>();
 	}
 
 	// Property customizations

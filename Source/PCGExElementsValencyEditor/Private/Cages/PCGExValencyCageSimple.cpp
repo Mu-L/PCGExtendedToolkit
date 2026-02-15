@@ -61,6 +61,9 @@ void APCGExValencyCageSimple::PostEditChangeProperty(FPropertyChangedEvent& Prop
 	{
 		UpdateDebugShapeDimensions();
 	}
+
+	// Update shape color after any property change (content state may have changed via mirror sources, assets, etc.)
+	UpdateDebugShapeColor();
 }
 
 void APCGExValencyCageSimple::RecreateDebugShape()
@@ -118,6 +121,8 @@ void APCGExValencyCageSimple::RecreateDebugShape()
 		DebugShapeComponent->ShapeColor = FColor(128, 128, 255);
 		DebugShapeComponent->bHiddenInGame = true;
 		DebugShapeComponent->RegisterComponent();
+
+		UpdateDebugShapeColor();
 	}
 }
 
@@ -225,6 +230,64 @@ FBox APCGExValencyCageSimple::GetBoundingBox() const
 	default:
 		return FBox(CageLocation, CageLocation);
 	}
+}
+
+void APCGExValencyCageSimple::OnAssetRegistrationChanged()
+{
+	Super::OnAssetRegistrationChanged();
+	UpdateDebugShapeColor();
+}
+
+void APCGExValencyCageSimple::UpdateDebugShapeColor()
+{
+	if (!DebugShapeComponent)
+	{
+		return;
+	}
+
+	const bool bHasDirectAssets = (ManualAssetEntries.Num() > 0 || ScannedAssetEntries.Num() > 0);
+
+	if (bHasDirectAssets)
+	{
+		// Has own assets — normal blue
+		DebugShapeComponent->ShapeColor = FColor(128, 128, 255);
+	}
+	else if (bIsTemplate)
+	{
+		// Intentional template — teal (distinct from both "has assets" blue and "empty" gray)
+		DebugShapeComponent->ShapeColor = FColor(80, 200, 180);
+	}
+	else if (MirrorSources.Num() > 0)
+	{
+		// Has mirror entries — check if any are valid
+		bool bHasValidMirror = false;
+		for (const FPCGExMirrorSource& Entry : MirrorSources)
+		{
+			if (Entry.IsValid())
+			{
+				bHasValidMirror = true;
+				break;
+			}
+		}
+
+		if (bHasValidMirror)
+		{
+			// Content via mirrors — slightly different blue (lighter, cyan-ish)
+			DebugShapeComponent->ShapeColor = FColor(100, 160, 220);
+		}
+		else
+		{
+			// Mirror entries exist but all unassigned — amber (pending setup)
+			DebugShapeComponent->ShapeColor = FColor(200, 180, 100);
+		}
+	}
+	else
+	{
+		// Completely empty — dimmed gray
+		DebugShapeComponent->ShapeColor = FColor(160, 160, 160);
+	}
+
+	DebugShapeComponent->MarkRenderStateDirty();
 }
 
 void APCGExValencyCageSimple::SetDebugComponentsVisible(bool bVisible)
