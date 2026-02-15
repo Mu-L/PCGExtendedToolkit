@@ -123,10 +123,10 @@ protected:
 	int32 SelectWeightedRandom(const TArray<int32>& CandidateModules);
 
 	/**
-	 * Pre-load all constraint preset assets referenced by module connectors.
-	 * Called during Initialize() to avoid per-connector blocking loads during growth.
+	 * Pre-load all constraint preset assets and build the resolver's flatten cache.
+	 * Called during Initialize() to avoid per-connector work during growth.
 	 */
-	void PreloadConstraintPresets();
+	void BuildConstraintCache();
 
 	// ========== State ==========
 

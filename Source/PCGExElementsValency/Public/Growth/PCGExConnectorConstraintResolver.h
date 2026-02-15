@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -9,6 +9,7 @@
 struct FPCGExOpenConnector;
 struct FPCGExConnectorConstraint;
 class UPCGExValencyConnectorSet;
+class UPCGExConstraintPreset;
 enum class EPCGExConstraintRole : uint8;
 
 /**
@@ -47,11 +48,13 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraintContext
 	int32 PlacedCount = 0;
 };
 
-class UPCGExConstraintPreset;
-
 /**
  * Runs the constraint pipeline in list order: each constraint is dispatched by role.
  * Produces candidate transforms for module placement.
+ *
+ * Supports a pre-flatten cache: call CacheConstraintList() for all known constraint
+ * lists during initialization. Resolve() then uses cached flattened arrays,
+ * eliminating per-call recursion, cycle detection, and FInstancedStruct copies.
  */
 struct PCGEXELEMENTSVALENCY_API FPCGExConstraintResolver
 {
@@ -59,55 +62,68 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraintResolver
 	int32 MaxCandidates = 16;
 
 	/**
+	 * Pre-flatten a constraint list into the cache.
+	 * Call during initialization for each unique constraint list.
+	 * Recursively discovers and caches Branch sub-pipeline presets.
+	 */
+	void CacheConstraintList(const TArray<FInstancedStruct>& Source);
+
+	/**
 	 * Run the full constraint pipeline (ordered execution).
-	 * Pre-flattens presets, then iterates in list order dispatching by role.
+	 * Executes each constraint list sequentially; the pool carries over between lists.
+	 * Caller builds the list order based on override modes (e.g. parent defaults,
+	 * parent overrides, child defaults, child overrides).
 	 * @param Context Evaluation context (parent/child transforms, connector info)
-	 * @param Constraints Array of FInstancedStruct containing FPCGExConnectorConstraint subclasses
+	 * @param ConstraintLists Ordered sequence of constraint arrays to execute
 	 * @param Random Seeded random stream for deterministic evaluation
 	 * @param OutCandidates Output candidate transforms (first = preferred)
 	 */
 	void Resolve(
 		const FPCGExConstraintContext& Context,
-		TConstArrayView<FInstancedStruct> Constraints,
+		TConstArrayView<const TArray<FInstancedStruct>*> ConstraintLists,
 		FRandomStream& Random,
 		TArray<FTransform>& OutCandidates) const;
 
-	/**
-	 * Merge parent + child constraints by concatenation.
-	 * Parent constraints execute first, child constraints append after.
-	 */
-	static void MergeConstraints(
-		TConstArrayView<FInstancedStruct> ParentConstraints,
-		TConstArrayView<FInstancedStruct> ChildConstraints,
-		TArray<FInstancedStruct>& OutMerged);
+private:
+	/** Cached constraint pointer arrays — source FInstancedStruct data outlives the resolver. */
+	using FConstraintPtrArray = TArray<const FPCGExConnectorConstraint*>;
 
-	/**
-	 * Apply a single constraint step to the variant pool.
-	 * Used by the main pipeline and branch sub-pipelines.
-	 */
+	/** Get cached pointer array for a constraint list. Returns empty if not cached. */
+	TConstArrayView<const FPCGExConnectorConstraint*> GetCached(const TArray<FInstancedStruct>& Source) const;
+
+	/** Get cached pointer array for a preset asset. Returns empty if not cached. */
+	TConstArrayView<const FPCGExConnectorConstraint*> GetCachedPreset(const UPCGExConstraintPreset* Preset) const;
+
+	/** Cache a branch arm's preset (recursive: discovers nested branches). */
+	void CacheBranchPreset(const UPCGExConstraintPreset* Preset);
+
+	/** Scan cached constraint pointers for branches and cache their sub-pipeline presets. */
+	void CacheBranchesIn(TConstArrayView<const FPCGExConnectorConstraint*> Constraints);
+
+	/** Run the ordered pipeline on a cached pointer array. */
+	void RunPipeline(
+		const FPCGExConstraintContext& Context,
+		TConstArrayView<const FPCGExConnectorConstraint*> Constraints,
+		FRandomStream& Random,
+		TArray<FTransform>& Pool) const;
+
+	/** Apply a single Generator/Modifier/Filter step to the pool. */
 	static void ApplyConstraintStep(
 		const FPCGExConnectorConstraint* Constraint,
 		const FPCGExConstraintContext& Context,
 		FRandomStream& Random,
 		TArray<FTransform>& Pool,
-		int32 MaxCandidates);
+		int32 InMaxCandidates);
 
-	/**
-	 * Flatten presets by recursively expanding FPCGExConstraint_Preset entries.
-	 * Cycle-detects via VisitedPresets set.
-	 */
-	static void FlattenPresets(
+	/** Collect constraint pointers from FInstancedStruct source, expanding presets recursively. */
+	static void CollectConstraints(
 		TConstArrayView<FInstancedStruct> Input,
-		TArray<FInstancedStruct>& OutFlattened,
+		FConstraintPtrArray& OutConstraints,
 		TSet<const UPCGExConstraintPreset*>& VisitedPresets);
 
-	/**
-	 * Run the ordered pipeline on a pre-flattened constraint list.
-	 * Shared between main Resolve() and branch sub-pipelines.
-	 */
-	void RunPipeline(
-		const FPCGExConstraintContext& Context,
-		TConstArrayView<FInstancedStruct> Constraints,
-		FRandomStream& Random,
-		TArray<FTransform>& Pool) const;
+	/** Cached constraint pointers keyed by source array address. */
+	TMap<const TArray<FInstancedStruct>*, FConstraintPtrArray> Cache;
+
+	/** Cached constraint pointers for preset assets. */
+	TMap<const UPCGExConstraintPreset*, FConstraintPtrArray> PresetCache;
 };

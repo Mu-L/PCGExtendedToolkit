@@ -50,6 +50,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Connector")
 	bool bEnabled = true;
 
+	// ========== Constraints ==========
+
+	/** Per-instance constraint overrides */
+	UPROPERTY(EditAnywhere, Category = "Connector|Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint", ExcludeBaseStruct))
+	TArray<FInstancedStruct> ConstraintOverrides;
+
+	/** How instance overrides interact with type-level default constraints */
+	UPROPERTY(EditAnywhere, Category = "Connector|Constraints", meta=(EditCondition="ConstraintOverrides.Num() > 0"))
+	EPCGExConstraintOverrideMode OverrideMode = EPCGExConstraintOverrideMode::Append;
+
 	// ========== Mesh Integration ==========
 
 	/** Optional reference to a mesh socket name to inherit transform from. */

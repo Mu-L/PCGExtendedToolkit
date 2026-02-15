@@ -85,6 +85,16 @@ namespace PCGExValencyConnector
 }
 
 /**
+ * How instance constraint overrides interact with type-level defaults.
+ */
+UENUM(BlueprintType)
+enum class EPCGExConstraintOverrideMode : uint8
+{
+	Append  UMETA(DisplayName = "Append",  ToolTip = "Run type defaults first, then instance constraints continue the pipeline"),
+	Replace UMETA(DisplayName = "Replace", ToolTip = "Skip type defaults, use only instance constraints")
+};
+
+/**
  * Constraint role — determines how a constraint participates in the placement pipeline.
  */
 UENUM(BlueprintType)
@@ -158,7 +168,7 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConnectorConstraint
  * Intermediate base for Generator constraints.
  * Subclass this when creating constraints that produce multiple transform variants.
  */
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, meta=(Hidden))
 struct PCGEXELEMENTSVALENCY_API FPCGExConstraintGenerator : public FPCGExConnectorConstraint
 {
 	GENERATED_BODY()
@@ -169,7 +179,7 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraintGenerator : public FPCGExConnect
  * Intermediate base for Modifier constraints.
  * Subclass this when creating constraints that apply offsets/jitter to variants.
  */
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, meta=(Hidden))
 struct PCGEXELEMENTSVALENCY_API FPCGExConstraintModifier : public FPCGExConnectorConstraint
 {
 	GENERATED_BODY()
@@ -180,7 +190,7 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraintModifier : public FPCGExConnecto
  * Intermediate base for Filter constraints.
  * Subclass this when creating constraints that reject invalid variants.
  */
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, meta=(Hidden))
 struct PCGEXELEMENTSVALENCY_API FPCGExConstraintFilter : public FPCGExConnectorConstraint
 {
 	GENERATED_BODY()
@@ -230,7 +240,7 @@ struct PCGEXELEMENTSVALENCY_API FPCGExValencyConnectorEntry
 	FLinearColor DebugColor = FLinearColor::White;
 
 	/** Default constraints applied to all connectors of this type (can be overridden per-instance) */
-	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint"))
+	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint", ExcludeBaseStruct))
 	TArray<FInstancedStruct> DefaultConstraints;
 
 #if WITH_EDITORONLY_DATA
@@ -467,17 +477,13 @@ struct PCGEXELEMENTSVALENCY_API FPCGExValencyModuleConnector
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	EPCGExConnectorPolarity Polarity = EPCGExConnectorPolarity::Universal;
 
-	/** Per-instance constraint overrides (if non-empty, replaces type-level DefaultConstraints) */
-	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint"))
+	/** Per-instance constraint overrides */
+	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint", ExcludeBaseStruct))
 	TArray<FInstancedStruct> ConstraintOverrides;
 
-	/**
-	 * Get the effective constraints for this connector instance.
-	 * Returns ConstraintOverrides if non-empty, otherwise falls back to the type's DefaultConstraints.
-	 * @param ConnectorSet The connector set containing type-level default constraints
-	 * @return Reference to the effective constraints array
-	 */
-	const TArray<FInstancedStruct>& GetEffectiveConstraints(const UPCGExValencyConnectorSet* ConnectorSet) const;
+	/** How instance overrides interact with type-level default constraints */
+	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(EditCondition="ConstraintOverrides.Num() > 0"))
+	EPCGExConstraintOverrideMode OverrideMode = EPCGExConstraintOverrideMode::Append;
 
 	/** Orbital index this connector maps to (assigned during compilation, runtime only) */
 	int32 OrbitalIndex = -1;

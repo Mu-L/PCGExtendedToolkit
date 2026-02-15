@@ -14,14 +14,14 @@
  * Reusable constraint pipeline fragment as a data asset.
  * Contains a list of constraints that can be inline-expanded by the resolver.
  */
-UCLASS(BlueprintType, DisplayName="[PCGEx] Constraint Preset")
+UCLASS(BlueprintType, DisplayName="[PCGEx] Valency | Constraint Preset")
 class PCGEXELEMENTSVALENCY_API UPCGExConstraintPreset : public UDataAsset
 {
 	GENERATED_BODY()
 
 public:
 	/** Constraints in this preset (executed in list order when expanded) */
-	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint"))
+	UPROPERTY(EditAnywhere, Category = "Constraints", meta=(BaseStruct="/Script/PCGExElementsValency.PCGExConnectorConstraint", ExcludeBaseStruct))
 	TArray<FInstancedStruct> Constraints;
 };
 

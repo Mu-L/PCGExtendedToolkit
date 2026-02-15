@@ -24,7 +24,7 @@ void FPCGExValencyGrowthOperation::Initialize(
 	DistributionTracker.Initialize(CompiledRules);
 	ConstraintResolver.MaxCandidates = InBudget.MaxCandidatesPerConnector;
 
-	PreloadConstraintPresets();
+	BuildConstraintCache();
 }
 
 void FPCGExValencyGrowthOperation::Grow(TArray<FPCGExPlacedModule>& OutPlaced)
@@ -196,28 +196,50 @@ bool FPCGExValencyGrowthOperation::TryPlaceModule(
 	TArray<FPCGExPlacedModule>& OutPlaced,
 	TArray<FPCGExOpenConnector>& OutFrontier)
 {
-	// Collect effective constraints from both parent and child sides
 	const TConstArrayView<FPCGExValencyModuleConnector> ParentConnectors =
 		CompiledRules->GetModuleConnectors(OutPlaced[Connector.PlacedModuleIndex].ModuleIndex);
-	const FPCGExValencyModuleConnector& ParentModuleConnector = ParentConnectors[Connector.ConnectorIndex];
+	const FPCGExValencyModuleConnector& ParentMC = ParentConnectors[Connector.ConnectorIndex];
 
 	const TConstArrayView<FPCGExValencyModuleConnector> ChildConnectors =
 		CompiledRules->GetModuleConnectors(ModuleIndex);
-	const FPCGExValencyModuleConnector& ChildModuleConnector = ChildConnectors[ChildConnectorIndex];
+	const FPCGExValencyModuleConnector& ChildMC = ChildConnectors[ChildConnectorIndex];
 
-	const TArray<FInstancedStruct>& ParentConstraints = ParentModuleConnector.GetEffectiveConstraints(ConnectorSet);
-	const TArray<FInstancedStruct>& ChildConstraints = ChildModuleConnector.GetEffectiveConstraints(ConnectorSet);
+	// Build ordered constraint pipeline based on override modes
+	TArray<const TArray<FInstancedStruct>*, TInlineAllocator<4>> ConstraintLists;
 
-	// Fast path: no constraints on either side -> single transform (current behavior, zero overhead)
-	if (ParentConstraints.IsEmpty() && ChildConstraints.IsEmpty())
+	auto AddConstraintLists = [&ConstraintLists, this](const FPCGExValencyModuleConnector& MC)
+	{
+		const int32 TypeIdx = ConnectorSet->FindConnectorTypeIndex(MC.ConnectorType);
+		const TArray<FInstancedStruct>* Defaults =
+			ConnectorSet->ConnectorTypes.IsValidIndex(TypeIdx)
+				? &ConnectorSet->ConnectorTypes[TypeIdx].DefaultConstraints
+				: nullptr;
+		const bool bHasDefaults = Defaults && Defaults->Num() > 0;
+		const bool bHasOverrides = MC.ConstraintOverrides.Num() > 0;
+
+		if (bHasOverrides)
+		{
+			if (MC.OverrideMode == EPCGExConstraintOverrideMode::Append && bHasDefaults)
+			{
+				ConstraintLists.Add(Defaults);
+			}
+			ConstraintLists.Add(&MC.ConstraintOverrides);
+		}
+		else if (bHasDefaults)
+		{
+			ConstraintLists.Add(Defaults);
+		}
+	};
+
+	AddConstraintLists(ParentMC);
+	AddConstraintLists(ChildMC);
+
+	// Fast path: no constraints on either side -> single transform (zero overhead)
+	if (ConstraintLists.IsEmpty())
 	{
 		const FTransform WorldTransform = ComputeAttachmentTransform(Connector, ModuleIndex, ChildConnectorIndex);
 		return TryPlaceModuleAt(Connector, ModuleIndex, ChildConnectorIndex, WorldTransform, OutPlaced, OutFrontier);
 	}
-
-	// Merge constraints (parent wins on type collision)
-	TArray<FInstancedStruct> Merged;
-	FPCGExConstraintResolver::MergeConstraints(ParentConstraints, ChildConstraints, Merged);
 
 	// Build context
 	const FTransform BaseTransform = ComputeAttachmentTransform(Connector, ModuleIndex, ChildConnectorIndex);
@@ -225,7 +247,7 @@ bool FPCGExValencyGrowthOperation::TryPlaceModule(
 	FPCGExConstraintContext ConstraintContext;
 	ConstraintContext.ParentConnectorWorld = Connector.WorldTransform;
 	ConstraintContext.BaseAttachment = BaseTransform;
-	ConstraintContext.ChildConnectorLocal = ChildModuleConnector.GetEffectiveOffset(ConnectorSet);
+	ConstraintContext.ChildConnectorLocal = ChildMC.GetEffectiveOffset(ConnectorSet);
 	ConstraintContext.OpenConnector = &Connector;
 	ConstraintContext.ChildModuleIndex = ModuleIndex;
 	ConstraintContext.ChildConnectorIndex = ChildConnectorIndex;
@@ -237,9 +259,9 @@ bool FPCGExValencyGrowthOperation::TryPlaceModule(
 	FRandomStream ConstraintRandom(
 		RandomStream.GetCurrentSeed() ^ (static_cast<uint32>(Budget->CurrentTotal) << 16) ^ static_cast<uint32>(Connector.ConnectorIndex));
 
-	// Resolve candidates through the constraint pipeline
+	// Resolve candidates through ordered pipeline (uses pre-cached pointer arrays)
 	TArray<FTransform> Candidates;
-	ConstraintResolver.Resolve(ConstraintContext, Merged, ConstraintRandom, Candidates);
+	ConstraintResolver.Resolve(ConstraintContext, ConstraintLists, ConstraintRandom, Candidates);
 
 	// Try each candidate until one fits
 	for (const FTransform& CandidateTransform : Candidates)
@@ -357,14 +379,14 @@ int32 FPCGExValencyGrowthOperation::SelectWeightedRandom(const TArray<int32>& Ca
 	return CandidateModules.Num() - 1;
 }
 
-void FPCGExValencyGrowthOperation::PreloadConstraintPresets()
+void FPCGExValencyGrowthOperation::BuildConstraintCache()
 {
 	if (!CompiledRules || !ConnectorSet) { return; }
 
-	// Collect all soft references to constraint presets from all module connectors
+	// Phase 1: Collect and batch pre-load all soft references to constraint presets
 	TSet<FSoftObjectPath> PresetPaths;
 
-	auto CollectFromConstraints = [&PresetPaths](const TArray<FInstancedStruct>& Constraints)
+	auto CollectPresetPaths = [&PresetPaths](const TArray<FInstancedStruct>& Constraints)
 	{
 		for (const FInstancedStruct& Instance : Constraints)
 		{
@@ -394,27 +416,46 @@ void FPCGExValencyGrowthOperation::PreloadConstraintPresets()
 		}
 	};
 
+	// Scan both type-level defaults and per-instance overrides for preset references
+	for (const FPCGExValencyConnectorEntry& Entry : ConnectorSet->ConnectorTypes)
+	{
+		CollectPresetPaths(Entry.DefaultConstraints);
+	}
+
 	for (int32 ModuleIdx = 0; ModuleIdx < CompiledRules->ModuleCount; ++ModuleIdx)
 	{
 		const TConstArrayView<FPCGExValencyModuleConnector> Connectors = CompiledRules->GetModuleConnectors(ModuleIdx);
-		for (const FPCGExValencyModuleConnector& Connector : Connectors)
+		for (const FPCGExValencyModuleConnector& MC : Connectors)
 		{
-			const TArray<FInstancedStruct>& Constraints = Connector.GetEffectiveConstraints(ConnectorSet);
-			CollectFromConstraints(Constraints);
+			if (MC.ConstraintOverrides.Num() > 0)
+			{
+				CollectPresetPaths(MC.ConstraintOverrides);
+			}
 		}
 	}
 
-	// Also collect from connector set's default constraints
-	for (const FPCGExValencyConnectorEntry& Entry : ConnectorSet->ConnectorTypes)
-	{
-		CollectFromConstraints(Entry.DefaultConstraints);
-	}
-
-	// Batch pre-load all discovered preset paths
 	if (!PresetPaths.IsEmpty())
 	{
 		const TSharedPtr<TSet<FSoftObjectPath>> PathsPtr = MakeShared<TSet<FSoftObjectPath>>(MoveTemp(PresetPaths));
 		PCGExHelpers::LoadBlocking_AnyThread(PathsPtr);
+	}
+
+	// Phase 2: Build pointer cache for all constraint arrays independently
+	for (const FPCGExValencyConnectorEntry& Entry : ConnectorSet->ConnectorTypes)
+	{
+		ConstraintResolver.CacheConstraintList(Entry.DefaultConstraints);
+	}
+
+	for (int32 ModuleIdx = 0; ModuleIdx < CompiledRules->ModuleCount; ++ModuleIdx)
+	{
+		const TConstArrayView<FPCGExValencyModuleConnector> Connectors = CompiledRules->GetModuleConnectors(ModuleIdx);
+		for (const FPCGExValencyModuleConnector& MC : Connectors)
+		{
+			if (MC.ConstraintOverrides.Num() > 0)
+			{
+				ConstraintResolver.CacheConstraintList(MC.ConstraintOverrides);
+			}
+		}
 	}
 }
 

@@ -438,6 +438,8 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 					ExistingConnector.LocalOffset = SocketTransform;
 					ExistingConnector.bOverrideOffset = true;
 					ExistingConnector.Polarity = ConnectorComp->Polarity;
+					ExistingConnector.ConstraintOverrides = ConnectorComp->ConstraintOverrides;
+					ExistingConnector.OverrideMode = ConnectorComp->OverrideMode;
 					PCGEX_VALENCY_VERBOSE(Building, "    Connector component '%s' overrides auto-extracted",
 						*ConnectorComp->Identifier.ToString());
 				}
@@ -456,6 +458,8 @@ void UPCGExValencyBondingRulesBuilder::CollectCageData(
 				ModuleConnector.LocalOffset = SocketTransform;
 				ModuleConnector.bOverrideOffset = true;
 				ModuleConnector.Polarity = ConnectorComp->Polarity;
+				ModuleConnector.ConstraintOverrides = ConnectorComp->ConstraintOverrides;
+				ModuleConnector.OverrideMode = ConnectorComp->OverrideMode;
 				ModuleConnector.OrbitalIndex = -1;
 
 				Data.Connectors.Add(ModuleConnector);
