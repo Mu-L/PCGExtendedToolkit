@@ -50,6 +50,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Connector")
 	bool bEnabled = true;
 
+	/** Whether this connector is inherited by cages that mirror this cage's connectors */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Connector")
+	bool bInheritable = true;
+
 	// ========== Constraints ==========
 
 	/** Per-instance constraint overrides */

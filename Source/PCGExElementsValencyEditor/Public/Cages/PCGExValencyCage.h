@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "PCGExValencyCageBase.h"
+#include "PCGExValencyEditorCommon.h"
 #include "Core/PCGExValencyCommon.h"
 
 #include "PCGExValencyCage.generated.h"
@@ -28,6 +29,7 @@ public:
 	APCGExValencyCage();
 
 	//~ Begin AActor Interface
+	virtual void PostLoad() override;
 	virtual void PostEditMove(bool bFinished) override;
 	//~ End AActor Interface
 
@@ -57,18 +59,12 @@ public:
 
 	/**
 	 * Mirror sources - cages or asset palettes whose content this cage references.
-	 * Assets from all sources are combined with this cage's orbital configuration.
-	 * Supports both APCGExValencyCage and APCGExValencyAssetPalette actors.
+	 * Each entry controls which content types (assets, connectors, properties, tags)
+	 * to mirror and which to resolve recursively.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cage|Mirror", meta = (AllowedClasses = "/Script/PCGExElementsValencyEditor.PCGExValencyCage, /Script/PCGExElementsValencyEditor.PCGExValencyAssetPalette", PCGEX_ValencyGhostRefresh))
-	TArray<TObjectPtr<AActor>> MirrorSources;
-
-	/**
-	 * When enabled, mirror sources are resolved recursively.
-	 * If source A mirrors source B, assets from B are also included.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cage|Mirror", meta=(PCGEX_ValencyRebuild, PCGEX_ValencyGhostRefresh))
-	bool bRecursiveMirror = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cage|Mirror",
+		meta=(TitleProperty="Source", PCGEX_ValencyGhostRefresh))
+	TArray<FPCGExMirrorSource> MirrorSources;
 
 	/**
 	 * Whether to show ghost preview meshes when mirroring.
@@ -95,6 +91,15 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cage|Module", meta=(PCGEX_ValencyRebuild))
 	FName ModuleName;
+
+	/**
+	 * Mark this cage as a template (boilerplate for connectors, properties, tags).
+	 * Template cages are intentionally empty — they exist only to provide inheritable
+	 * content to other cages via mirror sources. No module is created for them,
+	 * and "no assets" warnings are suppressed in both build output and validation.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cage|Module", meta=(PCGEX_ValencyRebuild))
+	bool bIsTemplate = false;
 
 	/**
 	 * Default behavior for orbitals without explicit connections.

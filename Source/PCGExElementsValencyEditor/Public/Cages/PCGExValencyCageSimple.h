@@ -71,12 +71,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cage|Detection", meta = (EditCondition = "DetectionShape == EPCGExValencyCageShape::Cylinder", EditConditionHides, ClampMin = "0.0"))
 	float CylinderHalfHeight = 50.0f;
 
+	//~ Begin APCGExValencyAssetContainerBase Interface
+	virtual void OnAssetRegistrationChanged() override;
+	//~ End APCGExValencyAssetContainerBase Interface
+
 protected:
 	/** Recreate the debug shape component for the current DetectionShape */
 	void RecreateDebugShape();
 
 	/** Update the current debug shape's dimensions */
 	void UpdateDebugShapeDimensions();
+
+	/** Update the debug shape color based on cage content state */
+	void UpdateDebugShapeColor();
 
 	/** Current debug visualization component (type depends on DetectionShape) */
 	UPROPERTY(Transient, VisibleAnywhere, Category = "Cage|Debug")

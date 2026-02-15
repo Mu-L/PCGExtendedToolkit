@@ -209,9 +209,9 @@ namespace PCGExValencyAssetUtils
 				continue;
 			}
 
-			for (const TObjectPtr<AActor>& MirrorSource : Cage->MirrorSources)
+			for (const FPCGExMirrorSource& MirrorEntry : Cage->MirrorSources)
 			{
-				if (MirrorSource == Source)
+				if (MirrorEntry.Source == Source)
 				{
 					OutCages.Add(Cage);
 					break;

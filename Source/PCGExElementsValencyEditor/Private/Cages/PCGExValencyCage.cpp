@@ -26,6 +26,19 @@ APCGExValencyCage::APCGExValencyCage()
 
 #pragma region APCGExValencyCage
 
+void APCGExValencyCage::PostLoad()
+{
+	Super::PostLoad();
+
+	// Purge stale mirror source entries (null Source from old serialized data format)
+	const int32 Before = MirrorSources.Num();
+	MirrorSources.RemoveAll([](const FPCGExMirrorSource& Entry) { return !Entry.IsValid(); });
+	if (MirrorSources.Num() < Before)
+	{
+		PCGEX_VALENCY_INFO(Mirror, "Cage '%s': Purged %d stale mirror source entries on load", *GetCageDisplayName(), Before - MirrorSources.Num());
+	}
+}
+
 void APCGExValencyCage::PostEditMove(bool bFinished)
 {
 	// Capture current scanned assets before Super (which may trigger volume membership changes)
@@ -77,9 +90,9 @@ FString APCGExValencyCage::GetCageDisplayName() const
 	if (MirrorSources.Num() > 0)
 	{
 		int32 ValidCount = 0;
-		for (const TObjectPtr<AActor>& Source : MirrorSources)
+		for (const FPCGExMirrorSource& Entry : MirrorSources)
 		{
-			if (Source)
+			if (Entry.IsValid())
 			{
 				ValidCount++;
 			}
@@ -88,6 +101,14 @@ FString APCGExValencyCage::GetCageDisplayName() const
 		{
 			return FString::Printf(TEXT("Cage (Mirror: %d sources)"), ValidCount);
 		}
+
+		// Has entries but all are empty/placeholder
+		return FString::Printf(TEXT("Cage (Mirror: %d pending)"), MirrorSources.Num());
+	}
+
+	if (bIsTemplate)
+	{
+		return TEXT("Cage (Template)");
 	}
 
 	return TEXT("Cage (Empty)");
@@ -314,38 +335,42 @@ void APCGExValencyCage::OnPostEditChangeProperty(FPropertyChangedEvent& Property
 	{
 		PCGEX_VALENCY_INFO(Mirror, "Cage '%s': MirrorSources changed, validating %d entries", *GetCageDisplayName(), MirrorSources.Num());
 
-		// Validate and filter MirrorSources - only allow cages and palettes
+		// Validate MirrorSources - only remove genuinely invalid entries (self-reference, wrong type)
+		// Do NOT remove entries with null Source — those are valid placeholders or newly added entries
 		int32 RemovedCount = 0;
 		for (int32 i = MirrorSources.Num() - 1; i >= 0; --i)
 		{
-			AActor* Source = MirrorSources[i];
-			if (Source)
+			AActor* Source = MirrorSources[i].Source;
+			if (!Source)
 			{
-				// Check if it's a valid type (cage or palette, but not self)
-				const bool bIsCage = Source->IsA<APCGExValencyCage>();
-				const bool bIsPalette = Source->IsA<APCGExValencyAssetPalette>();
-				const bool bIsSelf = (Source == this);
+				// Skip null entries — user may be setting up a placeholder or just added a new entry
+				continue;
+			}
 
-				if (bIsSelf || (!bIsCage && !bIsPalette))
+			// Check if it's a valid type (cage or palette, but not self)
+			const bool bIsCage = Source->IsA<APCGExValencyCage>();
+			const bool bIsPalette = Source->IsA<APCGExValencyAssetPalette>();
+			const bool bIsSelf = (Source == this);
+
+			if (bIsSelf || (!bIsCage && !bIsPalette))
+			{
+				MirrorSources.RemoveAt(i);
+				RemovedCount++;
+
+				if (bIsSelf)
 				{
-					MirrorSources.RemoveAt(i);
-					RemovedCount++;
-
-					if (bIsSelf)
-					{
-						PCGEX_VALENCY_WARNING(Mirror, "  Cage '%s': Cannot mirror self - removed", *GetCageDisplayName());
-					}
-					else
-					{
-						PCGEX_VALENCY_WARNING(Mirror, "  Cage '%s': Invalid mirror source '%s' (type: %s) - must be Cage or AssetPalette",
-							*GetCageDisplayName(), *Source->GetName(), *Source->GetClass()->GetName());
-					}
+					PCGEX_VALENCY_WARNING(Mirror, "  Cage '%s': Cannot mirror self - removed", *GetCageDisplayName());
 				}
 				else
 				{
-					PCGEX_VALENCY_VERBOSE(Mirror, "  Valid mirror source: '%s' (%s)",
-						*Source->GetName(), bIsCage ? TEXT("Cage") : TEXT("Palette"));
+					PCGEX_VALENCY_WARNING(Mirror, "  Cage '%s': Invalid mirror source '%s' (type: %s) - must be Cage or AssetPalette",
+						*GetCageDisplayName(), *Source->GetName(), *Source->GetClass()->GetName());
 				}
+			}
+			else
+			{
+				PCGEX_VALENCY_VERBOSE(Mirror, "  Valid mirror source: '%s' (%s)",
+					*Source->GetName(), bIsCage ? TEXT("Cage") : TEXT("Palette"));
 			}
 		}
 
@@ -392,14 +417,20 @@ void APCGExValencyCage::RefreshGhostMeshes()
 	TArray<FPCGExValencyAssetEntry> AllEntries;
 	TSet<AActor*> VisitedSources; // Prevent infinite recursion
 
-	// Lambda to collect entries from a source (with optional recursion)
-	TFunction<void(AActor*)> CollectFromSource = [&](AActor* Source)
+	// Lambda to collect entries from a source with per-type flags
+	TFunction<void(AActor*, uint8, uint8)> CollectFromSource = [&](AActor* Source, uint8 MirrorFlags, uint8 RecursiveFlags)
 	{
 		if (!Source || Source == this || VisitedSources.Contains(Source))
 		{
 			return;
 		}
 		VisitedSources.Add(Source);
+
+		// Only collect assets if Assets flag is set
+		if (!(MirrorFlags & static_cast<uint8>(EPCGExMirrorContent::Assets)))
+		{
+			return;
+		}
 
 		// Check if it's a cage
 		if (APCGExValencyCage* SourceCage = Cast<APCGExValencyCage>(Source))
@@ -408,11 +439,17 @@ void APCGExValencyCage::RefreshGhostMeshes()
 			AllEntries.Append(SourceCage->GetAllAssetEntries());
 
 			// Recursively collect from cage's mirror sources
-			if (bRecursiveMirror)
+			if (SourceCage->MirrorSources.Num() > 0)
 			{
-				for (const TObjectPtr<AActor>& NestedSource : SourceCage->MirrorSources)
+				for (const FPCGExMirrorSource& NestedEntry : SourceCage->MirrorSources)
 				{
-					CollectFromSource(NestedSource);
+					if (!NestedEntry.IsValid()) continue;
+					const uint8 ChildMirror = RecursiveFlags & NestedEntry.MirrorFlags;
+					const uint8 ChildRecurse = RecursiveFlags & NestedEntry.RecursiveFlags;
+					if (ChildMirror & static_cast<uint8>(EPCGExMirrorContent::Assets))
+					{
+						CollectFromSource(NestedEntry.Source, ChildMirror, ChildRecurse);
+					}
 				}
 			}
 		}
@@ -424,9 +461,10 @@ void APCGExValencyCage::RefreshGhostMeshes()
 	};
 
 	// Collect from all mirror sources
-	for (const TObjectPtr<AActor>& Source : MirrorSources)
+	for (const FPCGExMirrorSource& Entry : MirrorSources)
 	{
-		CollectFromSource(Source);
+		if (!Entry.IsValid()) continue;
+		CollectFromSource(Entry.Source, Entry.MirrorFlags, Entry.RecursiveFlags);
 	}
 
 	if (AllEntries.Num() == 0)

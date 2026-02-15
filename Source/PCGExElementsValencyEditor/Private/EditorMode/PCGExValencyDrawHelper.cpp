@@ -87,11 +87,11 @@ void FPCGExValencyDrawHelper::DrawCage(FPrimitiveDrawInterface* PDI, const APCGE
 	// Draw mirror connections if this cage mirrors other actors
 	if (const APCGExValencyCage* RegularCage = Cast<APCGExValencyCage>(Cage))
 	{
-		for (const TObjectPtr<AActor>& SourceActor : RegularCage->MirrorSources)
+		for (const FPCGExMirrorSource& MirrorEntry : RegularCage->MirrorSources)
 		{
-			if (SourceActor)
+			if (MirrorEntry.Source)
 			{
-				DrawMirrorConnection(PDI, RegularCage, SourceActor);
+				DrawMirrorConnection(PDI, RegularCage, MirrorEntry.Source);
 			}
 		}
 	}

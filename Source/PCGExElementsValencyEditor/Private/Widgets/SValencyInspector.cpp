@@ -1599,9 +1599,9 @@ TSharedRef<SWidget> SValencyInspector::MakeRelatedSection(APCGExValencyCageBase*
 					FText::AsNumber(RegularCage->MirrorSources.Num())))
 			];
 
-			for (const TObjectPtr<AActor>& Source : RegularCage->MirrorSources)
+			for (const FPCGExMirrorSource& MirrorEntry : RegularCage->MirrorSources)
 			{
-				if (AActor* SourceActor = Source.Get())
+				if (AActor* SourceActor = MirrorEntry.Source.Get())
 				{
 					TWeakObjectPtr<AActor> WeakActor(SourceActor);
 					Section->AddSlot().AutoHeight()
