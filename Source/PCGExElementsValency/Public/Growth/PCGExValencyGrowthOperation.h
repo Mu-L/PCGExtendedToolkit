@@ -122,6 +122,12 @@ protected:
 	 */
 	int32 SelectWeightedRandom(const TArray<int32>& CandidateModules);
 
+	/**
+	 * Pre-load all constraint preset assets referenced by module connectors.
+	 * Called during Initialize() to avoid per-connector blocking loads during growth.
+	 */
+	void PreloadConstraintPresets();
+
 	// ========== State ==========
 
 	const FPCGExValencyBondingRulesCompiled* CompiledRules = nullptr;

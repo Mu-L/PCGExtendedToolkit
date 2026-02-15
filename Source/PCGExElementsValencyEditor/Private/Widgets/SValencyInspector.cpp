@@ -795,8 +795,10 @@ TSharedRef<SWidget> SValencyInspector::BuildConnectorContent(UPCGExValencyCageCo
 							switch (Constraint->GetRole())
 							{
 							case EPCGExConstraintRole::Generator: RoleStr = TEXT("Gen"); break;
-							case EPCGExConstraintRole::Modifier: RoleStr = TEXT("Mod"); break;
-							case EPCGExConstraintRole::Filter: RoleStr = TEXT("Flt"); break;
+							case EPCGExConstraintRole::Modifier:  RoleStr = TEXT("Mod"); break;
+							case EPCGExConstraintRole::Filter:    RoleStr = TEXT("Flt"); break;
+							case EPCGExConstraintRole::Preset:    RoleStr = TEXT("Pre"); break;
+							case EPCGExConstraintRole::Branch:    RoleStr = TEXT("Br");  break;
 							}
 						}
 

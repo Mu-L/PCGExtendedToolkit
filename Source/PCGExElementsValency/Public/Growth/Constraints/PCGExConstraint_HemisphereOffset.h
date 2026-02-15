@@ -14,15 +14,13 @@
  * along the parent connector's forward direction.
  */
 USTRUCT(BlueprintType, DisplayName="Hemisphere Offset")
-struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_HemisphereOffset : public FPCGExConnectorConstraint
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_HemisphereOffset : public FPCGExConstraintModifier
 {
 	GENERATED_BODY()
 
 	/** Radius of the hemisphere */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (ClampMin = 0))
 	float Radius = 10.0f;
-
-	virtual EPCGExConstraintRole GetRole() const override { return EPCGExConstraintRole::Modifier; }
 
 	virtual void ApplyModification(
 		const FPCGExConstraintContext& Context,

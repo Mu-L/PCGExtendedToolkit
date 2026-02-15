@@ -92,7 +92,9 @@ enum class EPCGExConstraintRole : uint8
 {
 	Generator UMETA(DisplayName = "Generator", ToolTip = "Produces multiple transform variants from a base"),
 	Modifier  UMETA(DisplayName = "Modifier",  ToolTip = "Applies offset/jitter to each variant"),
-	Filter    UMETA(DisplayName = "Filter",    ToolTip = "Rejects invalid variants")
+	Filter    UMETA(DisplayName = "Filter",    ToolTip = "Rejects invalid variants"),
+	Preset    UMETA(DisplayName = "Preset",    ToolTip = "Expands to inline sub-pipeline"),
+	Branch    UMETA(DisplayName = "Branch",    ToolTip = "Conditional fork-join")
 };
 
 // Forward declaration
@@ -150,6 +152,39 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConnectorConstraint
 	{
 		return true;
 	}
+};
+
+/**
+ * Intermediate base for Generator constraints.
+ * Subclass this when creating constraints that produce multiple transform variants.
+ */
+USTRUCT(BlueprintType)
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraintGenerator : public FPCGExConnectorConstraint
+{
+	GENERATED_BODY()
+	virtual EPCGExConstraintRole GetRole() const override final { return EPCGExConstraintRole::Generator; }
+};
+
+/**
+ * Intermediate base for Modifier constraints.
+ * Subclass this when creating constraints that apply offsets/jitter to variants.
+ */
+USTRUCT(BlueprintType)
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraintModifier : public FPCGExConnectorConstraint
+{
+	GENERATED_BODY()
+	virtual EPCGExConstraintRole GetRole() const override final { return EPCGExConstraintRole::Modifier; }
+};
+
+/**
+ * Intermediate base for Filter constraints.
+ * Subclass this when creating constraints that reject invalid variants.
+ */
+USTRUCT(BlueprintType)
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraintFilter : public FPCGExConnectorConstraint
+{
+	GENERATED_BODY()
+	virtual EPCGExConstraintRole GetRole() const override final { return EPCGExConstraintRole::Filter; }
 };
 
 /**

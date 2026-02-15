@@ -3,6 +3,10 @@
 
 #include "Growth/PCGExValencyGrowthOperation.h"
 
+#include "Growth/Constraints/PCGExConstraintPreset.h"
+#include "Growth/Constraints/PCGExConstraint_Branch.h"
+#include "Helpers/PCGExStreamingHelpers.h"
+
 #pragma region FPCGExValencyGrowthOperation
 
 void FPCGExValencyGrowthOperation::Initialize(
@@ -19,6 +23,8 @@ void FPCGExValencyGrowthOperation::Initialize(
 	RandomStream.Initialize(InSeed);
 	DistributionTracker.Initialize(CompiledRules);
 	ConstraintResolver.MaxCandidates = InBudget.MaxCandidatesPerConnector;
+
+	PreloadConstraintPresets();
 }
 
 void FPCGExValencyGrowthOperation::Grow(TArray<FPCGExPlacedModule>& OutPlaced)
@@ -223,6 +229,9 @@ bool FPCGExValencyGrowthOperation::TryPlaceModule(
 	ConstraintContext.OpenConnector = &Connector;
 	ConstraintContext.ChildModuleIndex = ModuleIndex;
 	ConstraintContext.ChildConnectorIndex = ChildConnectorIndex;
+	ConstraintContext.Depth = Connector.Depth;
+	ConstraintContext.CumulativeWeight = Connector.CumulativeWeight;
+	ConstraintContext.PlacedCount = Budget->CurrentTotal;
 
 	// Seed deterministic random for this specific connector evaluation
 	FRandomStream ConstraintRandom(
@@ -346,6 +355,67 @@ int32 FPCGExValencyGrowthOperation::SelectWeightedRandom(const TArray<int32>& Ca
 	}
 
 	return CandidateModules.Num() - 1;
+}
+
+void FPCGExValencyGrowthOperation::PreloadConstraintPresets()
+{
+	if (!CompiledRules || !ConnectorSet) { return; }
+
+	// Collect all soft references to constraint presets from all module connectors
+	TSet<FSoftObjectPath> PresetPaths;
+
+	auto CollectFromConstraints = [&PresetPaths](const TArray<FInstancedStruct>& Constraints)
+	{
+		for (const FInstancedStruct& Instance : Constraints)
+		{
+			const FPCGExConnectorConstraint* Constraint = Instance.GetPtr<FPCGExConnectorConstraint>();
+			if (!Constraint) { continue; }
+
+			if (Constraint->GetRole() == EPCGExConstraintRole::Preset)
+			{
+				const auto* PresetConstraint = static_cast<const FPCGExConstraint_Preset*>(Constraint);
+				if (!PresetConstraint->Preset.IsNull())
+				{
+					PresetPaths.Add(PresetConstraint->Preset.ToSoftObjectPath());
+				}
+			}
+			else if (Constraint->GetRole() == EPCGExConstraintRole::Branch)
+			{
+				const auto* BranchConstraint = static_cast<const FPCGExConstraint_Branch*>(Constraint);
+				if (!BranchConstraint->OnPass.IsNull())
+				{
+					PresetPaths.Add(BranchConstraint->OnPass.ToSoftObjectPath());
+				}
+				if (!BranchConstraint->OnFail.IsNull())
+				{
+					PresetPaths.Add(BranchConstraint->OnFail.ToSoftObjectPath());
+				}
+			}
+		}
+	};
+
+	for (int32 ModuleIdx = 0; ModuleIdx < CompiledRules->ModuleCount; ++ModuleIdx)
+	{
+		const TConstArrayView<FPCGExValencyModuleConnector> Connectors = CompiledRules->GetModuleConnectors(ModuleIdx);
+		for (const FPCGExValencyModuleConnector& Connector : Connectors)
+		{
+			const TArray<FInstancedStruct>& Constraints = Connector.GetEffectiveConstraints(ConnectorSet);
+			CollectFromConstraints(Constraints);
+		}
+	}
+
+	// Also collect from connector set's default constraints
+	for (const FPCGExValencyConnectorEntry& Entry : ConnectorSet->ConnectorTypes)
+	{
+		CollectFromConstraints(Entry.DefaultConstraints);
+	}
+
+	// Batch pre-load all discovered preset paths
+	if (!PresetPaths.IsEmpty())
+	{
+		const TSharedPtr<TSet<FSoftObjectPath>> PathsPtr = MakeShared<TSet<FSoftObjectPath>>(MoveTemp(PresetPaths));
+		PCGExHelpers::LoadBlocking_AnyThread(PathsPtr);
+	}
 }
 
 #pragma endregion

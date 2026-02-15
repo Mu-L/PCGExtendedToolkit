@@ -34,10 +34,23 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraintContext
 
 	/** Index of the child's connector being used for attachment */
 	int32 ChildConnectorIndex = -1;
+
+	// --- Growth state (populated by growth operation) ---
+
+	/** Distance from seed (0 = seed itself) */
+	int32 Depth = 0;
+
+	/** Sum of module weights from seed to here */
+	float CumulativeWeight = 0.0f;
+
+	/** Total placed module count at this point */
+	int32 PlacedCount = 0;
 };
 
+class UPCGExConstraintPreset;
+
 /**
- * Runs the constraint pipeline: generate -> modify -> filter.
+ * Runs the constraint pipeline in list order: each constraint is dispatched by role.
  * Produces candidate transforms for module placement.
  */
 struct PCGEXELEMENTSVALENCY_API FPCGExConstraintResolver
@@ -46,7 +59,8 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraintResolver
 	int32 MaxCandidates = 16;
 
 	/**
-	 * Run the full constraint pipeline.
+	 * Run the full constraint pipeline (ordered execution).
+	 * Pre-flattens presets, then iterates in list order dispatching by role.
 	 * @param Context Evaluation context (parent/child transforms, connector info)
 	 * @param Constraints Array of FInstancedStruct containing FPCGExConnectorConstraint subclasses
 	 * @param Random Seeded random stream for deterministic evaluation
@@ -59,13 +73,41 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraintResolver
 		TArray<FTransform>& OutCandidates) const;
 
 	/**
-	 * Merge parent + child constraints. Parent wins on type collision.
-	 * @param ParentConstraints Constraints from the parent connector
-	 * @param ChildConstraints Constraints from the child connector
-	 * @param OutMerged Output merged constraint list
+	 * Merge parent + child constraints by concatenation.
+	 * Parent constraints execute first, child constraints append after.
 	 */
 	static void MergeConstraints(
 		TConstArrayView<FInstancedStruct> ParentConstraints,
 		TConstArrayView<FInstancedStruct> ChildConstraints,
 		TArray<FInstancedStruct>& OutMerged);
+
+	/**
+	 * Apply a single constraint step to the variant pool.
+	 * Used by the main pipeline and branch sub-pipelines.
+	 */
+	static void ApplyConstraintStep(
+		const FPCGExConnectorConstraint* Constraint,
+		const FPCGExConstraintContext& Context,
+		FRandomStream& Random,
+		TArray<FTransform>& Pool,
+		int32 MaxCandidates);
+
+	/**
+	 * Flatten presets by recursively expanding FPCGExConstraint_Preset entries.
+	 * Cycle-detects via VisitedPresets set.
+	 */
+	static void FlattenPresets(
+		TConstArrayView<FInstancedStruct> Input,
+		TArray<FInstancedStruct>& OutFlattened,
+		TSet<const UPCGExConstraintPreset*>& VisitedPresets);
+
+	/**
+	 * Run the ordered pipeline on a pre-flattened constraint list.
+	 * Shared between main Resolve() and branch sub-pipelines.
+	 */
+	void RunPipeline(
+		const FPCGExConstraintContext& Context,
+		TConstArrayView<FInstancedStruct> Constraints,
+		FRandomStream& Random,
+		TArray<FTransform>& Pool) const;
 };

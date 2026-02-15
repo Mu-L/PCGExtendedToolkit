@@ -14,15 +14,13 @@
  * The box is oriented in the parent connector's local space.
  */
 USTRUCT(BlueprintType, DisplayName="Volume Offset")
-struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_VolumeOffset : public FPCGExConnectorConstraint
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_VolumeOffset : public FPCGExConstraintModifier
 {
 	GENERATED_BODY()
 
 	/** Half-extent of the offset box in each axis (connector-local space) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (ClampMin = 0))
 	FVector Extent = FVector(10.0f);
-
-	virtual EPCGExConstraintRole GetRole() const override { return EPCGExConstraintRole::Modifier; }
 
 	virtual void ApplyModification(
 		const FPCGExConstraintContext& Context,

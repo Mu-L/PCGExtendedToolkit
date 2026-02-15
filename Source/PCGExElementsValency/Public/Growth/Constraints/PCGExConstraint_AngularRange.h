@@ -16,7 +16,7 @@
  * defined by a center angle and half-width.
  */
 USTRUCT(BlueprintType, DisplayName="Angular Range")
-struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_AngularRange : public FPCGExConnectorConstraint
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_AngularRange : public FPCGExConstraintGenerator
 {
 	GENERATED_BODY()
 
@@ -43,7 +43,6 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_AngularRange : public FPCGExCon
 	float GetMinAngle() const { return CenterAngleDegrees - HalfWidthDegrees; }
 	float GetMaxAngle() const { return CenterAngleDegrees + HalfWidthDegrees; }
 
-	virtual EPCGExConstraintRole GetRole() const override { return EPCGExConstraintRole::Generator; }
 	virtual int32 GetMaxVariants() const override { return Steps; }
 
 	virtual void GenerateVariants(

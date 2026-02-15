@@ -14,7 +14,7 @@
  * on the connector face plane.
  */
 USTRUCT(BlueprintType, DisplayName="Surface Offset")
-struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_SurfaceOffset : public FPCGExConnectorConstraint
+struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_SurfaceOffset : public FPCGExConstraintModifier
 {
 	GENERATED_BODY()
 
@@ -25,8 +25,6 @@ struct PCGEXELEMENTSVALENCY_API FPCGExConstraint_SurfaceOffset : public FPCGExCo
 	/** Height of the offset rectangle (along connector's up axis) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (ClampMin = 0))
 	float Height = 10.0f;
-
-	virtual EPCGExConstraintRole GetRole() const override { return EPCGExConstraintRole::Modifier; }
 
 	virtual void ApplyModification(
 		const FPCGExConstraintContext& Context,
