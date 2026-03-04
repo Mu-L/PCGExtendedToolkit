@@ -136,7 +136,7 @@ private:
 
 	// Detail panel management
 	void UpdateDetailForSelection();
-	void SyncStructToCollection(const FProperty* ChangedMemberProperty);
+	void SyncStructToCollection(const FProperty* ChangedMemberProperty, const FProperty* ChangedLeafProperty);
 	void OnDetailPropertyChanged(const FPropertyChangedEvent& Event);
 	bool bIsSyncing = false;
 	bool bIsBatchOperation = false;
