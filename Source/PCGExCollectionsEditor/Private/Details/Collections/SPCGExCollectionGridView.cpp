@@ -1145,9 +1145,9 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 	}
 
 	// ── Step 2: Try to narrow to a specific sub-property ─────────────────
-	// When the changed member is a struct (e.g. Variations), diff its sub-properties
-	// so we propagate only the single field the user actually edited, instead of
-	// overwriting the entire struct on every other selected entry.
+	// When the changed member is a struct (e.g. Variations), we want to propagate
+	// only the single field the user actually edited, instead of overwriting the
+	// entire struct on every other selected entry.
 	// Must happen BEFORE the full struct copy below so we can diff against PrimaryPtr.
 	const FProperty* SubPropToPropagate = nullptr;
 	int32 SubPropAbsoluteOffset = INDEX_NONE;
@@ -1158,25 +1158,55 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 		if (StructProp && StructProp->Struct)
 		{
 			const int32 MemberOff = PropToPropagate->GetOffset_ForInternal();
-			for (TFieldIterator<FProperty> It(StructProp->Struct); It; ++It)
+
+			// Primary strategy: use Event.Property to directly identify the changed
+			// sub-property. This is reliable regardless of PrimaryPtr sync state.
+			if (ChangedLeafProperty && ChangedLeafProperty != PropToPropagate)
 			{
-				const FProperty* SubProp = *It;
-				const int32 SubOff = SubProp->GetOffset_ForInternal();
-				if (!SubProp->Identical(PrimaryPtr + MemberOff + SubOff, SrcData + MemberOff + SubOff))
+				for (TFieldIterator<FProperty> It(StructProp->Struct); It; ++It)
 				{
-					SubPropToPropagate = SubProp;
-					SubPropAbsoluteOffset = MemberOff + SubOff;
-					break;
+					if (*It == ChangedLeafProperty)
+					{
+						SubPropToPropagate = ChangedLeafProperty;
+						SubPropAbsoluteOffset = MemberOff + ChangedLeafProperty->GetOffset_ForInternal();
+						break;
+					}
+				}
+			}
+
+			// Fallback: diff sub-properties between pre-copy primary and edited source
+			if (!SubPropToPropagate)
+			{
+				for (TFieldIterator<FProperty> It(StructProp->Struct); It; ++It)
+				{
+					const FProperty* SubProp = *It;
+					const int32 SubOff = SubProp->GetOffset_ForInternal();
+					if (!SubProp->Identical(PrimaryPtr + MemberOff + SubOff, SrcData + MemberOff + SubOff))
+					{
+						SubPropToPropagate = SubProp;
+						SubPropAbsoluteOffset = MemberOff + SubOff;
+						break;
+					}
 				}
 			}
 		}
 	}
 
-	// ── Step 3: Copy entire struct back to the primary entry ─────────────
+	// ── Step 3: Check if the member actually changed ────────────────────
+	// Guards against duplicate/re-entrant events (e.g. from PostEditChange())
+	// where PrimaryPtr was already synced — a coarse fallback would overwrite
+	// the fine-grained copy that the first event applied correctly.
+	// Must be checked BEFORE the full struct copy overwrites PrimaryPtr.
+	const bool bMemberChanged = PropToPropagate &&
+		!PropToPropagate->Identical(
+			PrimaryPtr + PropToPropagate->GetOffset_ForInternal(),
+			SrcData + PropToPropagate->GetOffset_ForInternal());
+
+	// ── Step 4: Copy entire struct back to the primary entry ─────────────
 	EntryStruct->CopyScriptStruct(PrimaryPtr, SrcData);
 
-	// ── Step 4: Propagate to other selected entries ──────────────────────
-	if (SelectedIndices.Num() > 1 && (SubPropToPropagate || PropToPropagate))
+	// ── Step 5: Propagate to other selected entries ──────────────────────
+	if (bMemberChanged && SelectedIndices.Num() > 1 && (SubPropToPropagate || PropToPropagate))
 	{
 		TArray<int32> Selected = GetSelectedIndices();
 		for (int32 OtherIndex : Selected)
