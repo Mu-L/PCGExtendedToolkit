@@ -1110,13 +1110,47 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 
 	Coll->Modify();
 
+	// Resolve which top-level member property to propagate to other selected entries.
+	// ChangedMemberProperty may be null or point to a property inside an external struct
+	// (e.g. when PropertyOverrides values are edited through AddExternalStructureProperty),
+	// so we verify it's a direct member of the entry struct first.
+	const FProperty* PropToPropagate = nullptr;
+
+	if (ChangedMemberProperty)
+	{
+		for (TFieldIterator<FProperty> It(EntryStruct); It; ++It)
+		{
+			if (*It == ChangedMemberProperty)
+			{
+				PropToPropagate = ChangedMemberProperty;
+				break;
+			}
+		}
+	}
+
+	// If not a direct member (or null), diff the pre-copy primary data against the
+	// edited source to find which top-level member actually changed.
+	if (!PropToPropagate && SelectedIndices.Num() > 1)
+	{
+		for (TFieldIterator<FProperty> It(EntryStruct); It; ++It)
+		{
+			const FProperty* Prop = *It;
+			const int32 Off = Prop->GetOffset_ForInternal();
+			if (!Prop->Identical(PrimaryPtr + Off, SrcData + Off))
+			{
+				PropToPropagate = Prop;
+				break;
+			}
+		}
+	}
+
 	// Copy entire struct back to the primary entry (it's the editing copy)
 	EntryStruct->CopyScriptStruct(PrimaryPtr, SrcData);
 
 	// For multi-select: propagate ONLY the changed property to other entries
-	if (ChangedMemberProperty)
+	if (PropToPropagate)
 	{
-		const int32 Offset = ChangedMemberProperty->GetOffset_ForInternal();
+		const int32 Offset = PropToPropagate->GetOffset_ForInternal();
 		TArray<int32> Selected = GetSelectedIndices();
 		for (int32 OtherIndex : Selected)
 		{
@@ -1124,7 +1158,7 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 			uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
 			if (OtherPtr)
 			{
-				ChangedMemberProperty->CopyCompleteValue(OtherPtr + Offset, SrcData + Offset);
+				PropToPropagate->CopyCompleteValue(OtherPtr + Offset, SrcData + Offset);
 			}
 		}
 	}
