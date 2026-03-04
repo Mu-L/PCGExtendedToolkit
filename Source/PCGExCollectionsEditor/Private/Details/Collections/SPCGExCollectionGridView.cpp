@@ -1093,7 +1093,7 @@ void SPCGExCollectionGridView::UpdateDetailForSelection()
 	}
 }
 
-void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMemberProperty)
+void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMemberProperty, const FProperty* ChangedLeafProperty)
 {
 	if (!CurrentStructScope.IsValid() || CurrentDetailIndex == INDEX_NONE) { return; }
 
@@ -1110,7 +1110,7 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 
 	Coll->Modify();
 
-	// Resolve which top-level member property to propagate to other selected entries.
+	// ── Step 1: Resolve which top-level member property changed ──────────
 	// ChangedMemberProperty may be null or point to a property inside an external struct
 	// (e.g. when PropertyOverrides values are edited through AddExternalStructureProperty),
 	// so we verify it's a direct member of the entry struct first.
@@ -1144,20 +1144,56 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 		}
 	}
 
-	// Copy entire struct back to the primary entry (it's the editing copy)
+	// ── Step 2: Try to narrow to a specific sub-property ─────────────────
+	// When the changed member is a struct (e.g. Variations), diff its sub-properties
+	// so we propagate only the single field the user actually edited, instead of
+	// overwriting the entire struct on every other selected entry.
+	// Must happen BEFORE the full struct copy below so we can diff against PrimaryPtr.
+	const FProperty* SubPropToPropagate = nullptr;
+	int32 SubPropAbsoluteOffset = INDEX_NONE;
+
+	if (PropToPropagate && SelectedIndices.Num() > 1)
+	{
+		const FStructProperty* StructProp = CastField<FStructProperty>(PropToPropagate);
+		if (StructProp && StructProp->Struct)
+		{
+			const int32 MemberOff = PropToPropagate->GetOffset_ForInternal();
+			for (TFieldIterator<FProperty> It(StructProp->Struct); It; ++It)
+			{
+				const FProperty* SubProp = *It;
+				const int32 SubOff = SubProp->GetOffset_ForInternal();
+				if (!SubProp->Identical(PrimaryPtr + MemberOff + SubOff, SrcData + MemberOff + SubOff))
+				{
+					SubPropToPropagate = SubProp;
+					SubPropAbsoluteOffset = MemberOff + SubOff;
+					break;
+				}
+			}
+		}
+	}
+
+	// ── Step 3: Copy entire struct back to the primary entry ─────────────
 	EntryStruct->CopyScriptStruct(PrimaryPtr, SrcData);
 
-	// For multi-select: propagate ONLY the changed property to other entries
-	if (PropToPropagate)
+	// ── Step 4: Propagate to other selected entries ──────────────────────
+	if (SelectedIndices.Num() > 1 && (SubPropToPropagate || PropToPropagate))
 	{
-		const int32 Offset = PropToPropagate->GetOffset_ForInternal();
 		TArray<int32> Selected = GetSelectedIndices();
 		for (int32 OtherIndex : Selected)
 		{
 			if (OtherIndex == CurrentDetailIndex) { continue; }
 			uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
-			if (OtherPtr)
+			if (!OtherPtr) { continue; }
+
+			if (SubPropToPropagate)
 			{
+				// Fine-grained: copy only the specific sub-property that changed
+				SubPropToPropagate->CopyCompleteValue(OtherPtr + SubPropAbsoluteOffset, SrcData + SubPropAbsoluteOffset);
+			}
+			else
+			{
+				// Coarse: copy the entire top-level member
+				const int32 Offset = PropToPropagate->GetOffset_ForInternal();
 				PropToPropagate->CopyCompleteValue(OtherPtr + Offset, SrcData + Offset);
 			}
 		}
@@ -1169,7 +1205,7 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 void SPCGExCollectionGridView::OnDetailPropertyChanged(const FPropertyChangedEvent& Event)
 {
 	bIsSyncing = true;
-	SyncStructToCollection(Event.MemberProperty);
+	SyncStructToCollection(Event.MemberProperty, Event.Property);
 	bIsSyncing = false;
 
 	// Check if category changed — need to rebuild groups
