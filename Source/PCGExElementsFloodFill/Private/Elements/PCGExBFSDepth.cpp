@@ -82,7 +82,6 @@ namespace PCGExBFSDepth
 		if (Context->SeedsDataFacade->GetNum() <= 0) { return false; }
 		
 		Depths.Init(-1, NumNodes);
-		Distances.Init(-1.0, NumNodes);
 		Seeded.Init(0, NumNodes);
 
 		if (Settings->bUseOctreeSearch) { Cluster->RebuildOctree(Settings->SeedPicking.PickingMethod); }
@@ -147,6 +146,9 @@ namespace PCGExBFSDepth
 		}
 
 		const TArray<PCGExClusters::FNode>& Nodes = *Cluster->Nodes;
+		const bool bComputeDistance = DistanceData != nullptr;
+
+		if (bComputeDistance) { Distances.Init(-1.0, Nodes.Num()); }
 
 		// Initialize all seeds at depth 0
 		TArray<int32> Queue;
@@ -155,41 +157,65 @@ namespace PCGExBFSDepth
 		for (const int32 SeedIdx : CollectedSeeds)
 		{
 			Depths[SeedIdx] = 0;
-			Distances[SeedIdx] = 0.0;
+			if (DepthData) { DepthData[Nodes[SeedIdx].PointIndex] = 0; }
+
+			if (bComputeDistance)
+			{
+				Distances[SeedIdx] = 0.0;
+				DistanceData[Nodes[SeedIdx].PointIndex] = 0.0;
+			}
+
 			Queue.Add(SeedIdx);
 		}
 
-		// BFS
+		// BFS — branched to avoid sqrt when distance output is disabled
 		int32 Head = 0;
-		while (Head < Queue.Num())
+
+		if (bComputeDistance)
 		{
-			const int32 CurrentIdx = Queue[Head++];
-			const PCGExClusters::FNode& Current = Nodes[CurrentIdx];
-
-			for (const PCGExGraphs::FLink& Lk : Current.Links)
+			while (Head < Queue.Num())
 			{
-				if (Depths[Lk.Node] != -1) { continue; }
+				const int32 CurrentIdx = Queue[Head++];
+				const PCGExClusters::FNode& Current = Nodes[CurrentIdx];
+				const FVector CurrentPos = Cluster->GetPos(CurrentIdx);
+				const int32 NextDepth = Depths[CurrentIdx] + 1;
+				const double CurrentDist = Distances[CurrentIdx];
 
-				const double EdgeLen = FVector::Distance(Cluster->GetPos(CurrentIdx), Cluster->GetPos(Lk.Node));
-				Depths[Lk.Node] = Depths[CurrentIdx] + 1;
-				Distances[Lk.Node] = Distances[CurrentIdx] + EdgeLen;
-				Queue.Add(Lk.Node);
+				for (const PCGExGraphs::FLink& Lk : Current.Links)
+				{
+					if (Depths[Lk.Node] != -1) { continue; }
+
+					const int32 NeighborPointIdx = Nodes[Lk.Node].PointIndex;
+					const double NewDist = CurrentDist + FVector::Distance(CurrentPos, Cluster->GetPos(Lk.Node));
+
+					Depths[Lk.Node] = NextDepth;
+					Distances[Lk.Node] = NewDist;
+
+					if (DepthData) { DepthData[NeighborPointIdx] = NextDepth; }
+					DistanceData[NeighborPointIdx] = NewDist;
+
+					Queue.Add(Lk.Node);
+				}
 			}
 		}
-
-		// Write outputs in parallel
-		StartParallelLoopForRange(Nodes.Num());
-	}
-
-	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
-	{
-		const TArray<PCGExClusters::FNode>& Nodes = *Cluster->Nodes;
-
-		PCGEX_SCOPE_LOOP(Index)
+		else
 		{
-			const int32 PointIndex = Nodes[Index].PointIndex;
-			PCGEX_OUTPUT_VALUE(Depth, PointIndex, Depths[Index])
-			PCGEX_OUTPUT_VALUE(Distance, PointIndex, Distances[Index])
+			while (Head < Queue.Num())
+			{
+				const int32 CurrentIdx = Queue[Head++];
+				const PCGExClusters::FNode& Current = Nodes[CurrentIdx];
+				const int32 NextDepth = Depths[CurrentIdx] + 1;
+
+				for (const PCGExGraphs::FLink& Lk : Current.Links)
+				{
+					if (Depths[Lk.Node] != -1) { continue; }
+
+					Depths[Lk.Node] = NextDepth;
+					if (DepthData) { DepthData[Nodes[Lk.Node].PointIndex] = NextDepth; }
+
+					Queue.Add(Lk.Node);
+				}
+			}
 		}
 	}
 
@@ -220,9 +246,8 @@ namespace PCGExBFSDepth
 
 		PCGEX_TYPED_PROCESSOR
 
-#define PCGEX_FWD_BFS(_NAME, _TYPE, _DEFAULT_VALUE) TypedProcessor->_NAME##Writer = _NAME##Writer;
-		PCGEX_FOREACH_FIELD_BFS_DEPTH(PCGEX_FWD_BFS)
-#undef PCGEX_FWD_BFS
+		if (DepthWriter) { TypedProcessor->DepthData = StaticCastSharedPtr<PCGExData::TArrayBuffer<int32>>(DepthWriter)->GetOutValues()->GetData(); }
+		if (DistanceWriter) { TypedProcessor->DistanceData = StaticCastSharedPtr<PCGExData::TArrayBuffer<double>>(DistanceWriter)->GetOutValues()->GetData(); }
 
 		return true;
 	}

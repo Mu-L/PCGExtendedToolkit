@@ -106,10 +106,10 @@ namespace PCGExBFSDepth
 		{
 		}
 
-		PCGEX_FOREACH_FIELD_BFS_DEPTH(PCGEX_OUTPUT_DECL)
+		int32* DepthData = nullptr;
+		double* DistanceData = nullptr;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
 
 		void RunBFS();
 	};
