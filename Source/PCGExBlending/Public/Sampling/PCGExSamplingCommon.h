@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Helpers/PCGExMetaHelpers.h"
 
 UENUM()
 enum class EPCGExRangeType : uint8
