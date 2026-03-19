@@ -432,6 +432,16 @@ namespace PCGExClusters
 				WrapperCell->Data.Area = 0;
 				WrapperCell->Data.Compactness = 0;
 
+				// Infer Seed from first two distinct consecutive nodes
+				for (int32 i = 0; i < WrapperCell->Nodes.Num() - 1; ++i)
+				{
+					if (WrapperCell->Nodes[i] != WrapperCell->Nodes[i + 1])
+					{
+						WrapperCell->Seed = FLink(WrapperCell->Nodes[i], Cluster->GetNode(WrapperCell->Nodes[i])->GetEdgeIndex(WrapperCell->Nodes[i + 1]));
+						break;
+					}
+				}
+
 				WrapperCell->bBuiltSuccessfully = true;
 			}
 		}
