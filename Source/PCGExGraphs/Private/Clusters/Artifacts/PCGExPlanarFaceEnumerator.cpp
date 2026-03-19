@@ -781,6 +781,16 @@ namespace PCGExClusters
 			return ECellResult::WrongAspect;
 		}
 
+		// Infer Seed from first two distinct consecutive nodes
+		for (int32 i = 0; i < OutCell->Nodes.Num() - 1; ++i)
+		{
+			if (OutCell->Nodes[i] != OutCell->Nodes[i + 1])
+			{
+				OutCell->Seed = FLink(OutCell->Nodes[i], Cluster->GetNode(OutCell->Nodes[i])->GetEdgeIndex(OutCell->Nodes[i + 1]));
+				break;
+			}
+		}
+
 		OutCell->bBuiltSuccessfully = true;
 		return ECellResult::Success;
 	}
