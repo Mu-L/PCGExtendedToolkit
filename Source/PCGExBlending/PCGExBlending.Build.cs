@@ -1,14 +1,15 @@
 // Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
+using System;
 using System.IO;
 using UnrealBuildTool;
 
 public class PCGExBlending : ModuleRules
 {
 	public PCGExBlending(ReadOnlyTargetRules Target) : base(Target)
-	{;
-		bool bNoPCH = File.Exists(Path.Combine(ModuleDirectory, "..", "..", "Config", ".noPCH")); 
+	{; 
+		bool bNoPCH = Environment.GetEnvironmentVariable("PCGEX_NO_PCH") == "1" || File.Exists(Path.Combine(ModuleDirectory, "..", "..", "Config", ".noPCH")); 
 		PCHUsage = bNoPCH ? PCHUsageMode.NoPCHs : PCHUsageMode.UseExplicitOrSharedPCHs;
 		
 		bUseUnity = true;                                                                                                     
