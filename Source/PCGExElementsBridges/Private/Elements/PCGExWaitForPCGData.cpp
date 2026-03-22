@@ -109,6 +109,18 @@ void UPCGExWaitForPCGDataSettings::PostEditChangeProperty(FPropertyChangedEvent&
 		EDITOR_RefreshPins();
 	}
 }
+
+void UPCGExWaitForPCGDataSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	
+	PCGEX_UPDATE_TO_DATA_VERSION(1, 76, 0)
+	{
+		// TODO : Reconstruct cached pins from old outputs
+		// CachedPinEx -> Read from OutputPins
+	}
+	
+	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
 #endif
 
 bool UPCGExWaitForPCGDataSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
@@ -125,7 +137,7 @@ TArray<FPCGPinProperties> UPCGExWaitForPCGDataSettings::OutputPinProperties() co
 
 	if (bOutputRoaming) { PCGEX_PIN_ANY(RoamingPin, "Roaming data that isn't part of the template output but still exists.", Normal) }
 
-	PinProperties.Append(CachedPins);
+	PinProperties.Append(CachedPinsEx);
 
 	return PinProperties;
 }
@@ -135,7 +147,7 @@ void UPCGExWaitForPCGDataSettings::EDITOR_RefreshPins()
 {
 	Modify(true);
 
-	GetTargetGraphPins(CachedPins); // Force-refresh cached pins
+	GetTargetGraphPins(CachedPinsEx); // Force-refresh cached pins
 
 	FPropertyChangedEvent EmptyEvent(nullptr);
 	PostEditChangeProperty(EmptyEvent);
@@ -205,7 +217,7 @@ bool FPCGExWaitForPCGDataElement::Boot(FPCGExContext* InContext) const
 	PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReferenceAttribute)
 	if (Settings->TemplateInput == EPCGExDataInputValueType::Attribute) { PCGEX_VALIDATE_NAME(Settings->TemplateGraphAttributeName) }
 
-	for (FPCGPinProperties Pin : Settings->CachedPins)
+	for (FPCGPinProperties Pin : Settings->CachedPinsEx)
 	{
 		Context->AllLabels.Add(Pin.Label);
 
