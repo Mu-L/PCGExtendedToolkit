@@ -302,7 +302,7 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 			};
 		}
 		{
-			PCGEX_SCHEDULING_SCOPE(TaskManager)
+			PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager)
 			for (const TSharedPtr<FFacadePreloader>& Preloader : Preloaders) { Preloader->StartLoading(TaskManager, InParentHandle); }
 		}
 	}

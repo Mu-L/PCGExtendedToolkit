@@ -215,7 +215,7 @@ bool FPCGExMergePointsElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 		if (!Context->MergeLists.IsEmpty())
 		{
 			TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
-			PCGEX_SCHEDULING_SCOPE(TaskManager, true)
+			PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
 			for (const TSharedPtr<FPCGExMergeList>& List : Context->MergeLists) { List->Write(TaskManager); }
 		}
 	}
