@@ -86,8 +86,8 @@ namespace PCGExMT
 		virtual void OnEnd(bool bWasCancelled);
 	};
 
-#define PCGEX_ASYNC_SCHEDULING_SCOPE(_MANAGER, ...) PCGExMT::FSchedulingScope SchedulingScope(_MANAGER); if(!SchedulingScope.Token.IsValid()) { return __VA_ARGS__; }
-#define PCGEX_ASYNC_SCHEDULING_SCOPE_BODY(_MANAGER, _FAIL_BODY) PCGExMT::FSchedulingScope SchedulingScope(_MANAGER); if(!SchedulingScope.Token.IsValid()) _FAIL_BODY
+#define PCGEX_ASYNC_SCHEDULING_SCOPE_BODY(_MANAGER) PCGExMT::FSchedulingScope SchedulingScope(_MANAGER); if(!SchedulingScope.Token.IsValid())
+#define PCGEX_ASYNC_SCHEDULING_SCOPE(_MANAGER, ...) PCGEX_ASYNC_SCHEDULING_SCOPE_BODY(_MANAGER){ return __VA_ARGS__; }
 
 	struct PCGEXCORE_API FSchedulingScope
 	{
