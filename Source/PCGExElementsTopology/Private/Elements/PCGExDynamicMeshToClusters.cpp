@@ -76,6 +76,7 @@ namespace PCGExDynMeshToCluster
 			const FPCGExGeoMeshImportDetails& ImportDetails = Context->ImportDetails;
 
 			bool bWantsColor = false;
+			TArray<FVector4f> AvgColors;
 			TArray<TSharedPtr<PCGExData::TBuffer<FVector2D>>> UVChannelsWriters;
 			TArray<int32> UVChannels;
 			TArray<FPCGAttributeIdentifier> UVIdentifiers;
@@ -84,9 +85,8 @@ namespace PCGExDynMeshToCluster
 
 			if (Context->bWantsImport)
 			{
-				// Check color availability
-				TArray<FVector4f> TempColors;
-				if (ImportDetails.bImportVertexColor && Mesh->GetAveragedVertexColors(TempColors))
+				// Check color availability (computed once, reused in vertex write loops below)
+				if (ImportDetails.bImportVertexColor && Mesh->GetAveragedVertexColors(AvgColors))
 				{
 					Allocations |= EPCGPointNativeProperties::Color;
 					bWantsColor = true;
@@ -138,8 +138,6 @@ namespace PCGExDynMeshToCluster
 
 				if (bWantsColor)
 				{
-					TArray<FVector4f> AvgColors;
-					Mesh->GetAveragedVertexColors(AvgColors);
 					TPCGValueRange<FVector4> OutColors = VtxPoints->GetColorValueRange(false);
 
 					if (NumUVChannels)
@@ -221,9 +219,6 @@ namespace PCGExDynMeshToCluster
 
 				if (bWantsColor || NumUVChannels)
 				{
-					TArray<FVector4f> AvgColors;
-					if (bWantsColor) { Mesh->GetAveragedVertexColors(AvgColors); }
-
 					TArray<TArray<FVector2f>> AllUVs;
 					if (NumUVChannels)
 					{
@@ -396,11 +391,7 @@ bool FPCGExDynamicMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, c
 
 	PCGEX_ON_ASYNC_STATE_READY(PCGExMath::Geo::States::State_ExtractingMesh)
 	{
-		// All graph builders have compiled. Stage outputs.
-		Context->VtxCollection->StageOutputs();
-		Context->EdgeCollection->StageOutputs();
-
-		// Forward tags from input entries to output vtx/edge data.
+		// Forward tags from input entries to output vtx/edge data before staging.
 		// Each GraphBuilder at index i corresponds to InputEntries[i].
 		// VtxCollection entries are added in task order via Emplace_GetRef with IOIndex set.
 		for (const TSharedPtr<PCGExData::FPointIO>& VtxIO : Context->VtxCollection->Pairs)
@@ -411,6 +402,12 @@ bool FPCGExDynamicMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, c
 				VtxIO->Tags->Append(Context->InputEntries[Idx].Tags);
 			}
 		}
+
+		// Stage outputs (Sort by IOIndex happens inside)
+		Context->VtxCollection->StageOutputs();
+		Context->EdgeCollection->StageOutputs();
+
+		Context->GraphBuilders.Empty();
 
 		Context->Done();
 	}

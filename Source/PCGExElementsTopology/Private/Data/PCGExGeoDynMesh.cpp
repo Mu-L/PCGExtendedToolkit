@@ -33,7 +33,7 @@ namespace PCGExMesh
 				const bool bInPrecise)
 				: Vertices(InVertices),
 				  RawIndices(InRawIndices),
-				  HashTolerance(PCGEx::SafeTolerance(InTolerance)),
+				  HashTolerance(InTolerance),
 				  bPrecise(bInPrecise)
 			{
 				Data.Reserve(EstimatedSize);
@@ -112,9 +112,9 @@ namespace PCGExMesh
 			const uint32 B = MeshLookup.Add_GetIdx(Mesh.GetVertex(Tri.B), Tri.B);
 			const uint32 C = MeshLookup.Add_GetIdx(Mesh.GetVertex(Tri.C), Tri.C);
 
-			if (!VertexIDToDenseIndex.Contains(Tri.A)) { VertexIDToDenseIndex.Add(Tri.A, A); }
-			if (!VertexIDToDenseIndex.Contains(Tri.B)) { VertexIDToDenseIndex.Add(Tri.B, B); }
-			if (!VertexIDToDenseIndex.Contains(Tri.C)) { VertexIDToDenseIndex.Add(Tri.C, C); }
+			VertexIDToDenseIndex.Add(Tri.A, A);
+			VertexIDToDenseIndex.Add(Tri.B, B);
+			VertexIDToDenseIndex.Add(Tri.C, C);
 
 			if (A != B) { Edges.Add(PCGEx::H64U(A, B)); }
 			if (B != C) { Edges.Add(PCGEx::H64U(B, C)); }
@@ -191,9 +191,9 @@ namespace PCGExMesh
 			const uint32 B = MeshLookup.Add_GetIdx(Mesh.GetVertex(SrcTri.B), SrcTri.B);
 			const uint32 C = MeshLookup.Add_GetIdx(Mesh.GetVertex(SrcTri.C), SrcTri.C);
 
-			if (!VertexIDToDenseIndex.Contains(SrcTri.A)) { VertexIDToDenseIndex.Add(SrcTri.A, A); }
-			if (!VertexIDToDenseIndex.Contains(SrcTri.B)) { VertexIDToDenseIndex.Add(SrcTri.B, B); }
-			if (!VertexIDToDenseIndex.Contains(SrcTri.C)) { VertexIDToDenseIndex.Add(SrcTri.C, C); }
+			VertexIDToDenseIndex.Add(SrcTri.A, A);
+			VertexIDToDenseIndex.Add(SrcTri.B, B);
+			VertexIDToDenseIndex.Add(SrcTri.C, C);
 
 			if (A == B || B == C || C == A) { continue; }
 
