@@ -1040,7 +1040,7 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 
 			{
 				FWriteScopeLock WriteScopeLock(BufferLock);
-				PCGEX_SCHEDULING_SCOPE(TaskManager)
+				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager)
 
 				for (int i = 0; i < Buffers.Num(); i++)
 				{
