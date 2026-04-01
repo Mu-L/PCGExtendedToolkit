@@ -6,6 +6,7 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGVolumeData.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Math/PCGExMathBounds.h"
 #include "GameFramework/Volume.h"
 
@@ -17,7 +18,27 @@
 bool UPCGExVolumeFilterFactory::Init(FPCGExContext* InContext)
 {
 	if (!Super::Init(InContext)) { return false; }
+
+	bAllShorthandsConstant = Config.ExtraRadius.CanSupportDataOnly()
+		&& (!Config.bUsePenetrationThreshold || Config.PenetrationThreshold.CanSupportDataOnly());
+
 	return true;
+}
+
+bool UPCGExVolumeFilterFactory::DomainCheck()
+{
+	return Config.ExtraRadius.CanSupportDataOnly()
+		&& (!Config.bUsePenetrationThreshold || Config.PenetrationThreshold.CanSupportDataOnly());
+}
+
+bool UPCGExVolumeFilterFactory::SupportsProxyEvaluation() const
+{
+	return bAllShorthandsConstant;
+}
+
+bool UPCGExVolumeFilterFactory::SupportsCollectionEvaluation() const
+{
+	return bOnlyUseDataDomain;
 }
 
 TSharedPtr<PCGExPointFilter::IFilter> UPCGExVolumeFilterFactory::CreateFilter() const
@@ -75,35 +96,43 @@ bool PCGExPointFilter::FVolumeFilter::Init(FPCGExContext* InContext, const TShar
 	CheckType = Cfg.CheckType;
 	BoundsSource = Cfg.BoundsSource;
 	RadiusSource = Cfg.RadiusSource;
-	ConstantRadius = Cfg.ConstantRadius;
 	bInvert = Cfg.bInvert;
-	bNeedsRadius = PCGExPointFilter::NeedsRadius(CheckType);
-	bUsePenetrationThreshold = Cfg.bUsePenetrationThreshold && bNeedsRadius;
+	bUsePenetrationThreshold = Cfg.bUsePenetrationThreshold;
 	PenetrationMode = Cfg.PenetrationMode;
-	PenetrationThreshold = Cfg.PenetrationThreshold;
+
+	ExtraRadius = Cfg.ExtraRadius.GetValueSetting();
+	if (!ExtraRadius->Init(InPointDataFacade)) { return false; }
+
+	if (bUsePenetrationThreshold)
+	{
+		PenetrationThresholdValue = Cfg.PenetrationThreshold.GetValueSetting();
+		if (!PenetrationThresholdValue->Init(InPointDataFacade)) { return false; }
+	}
 
 	return true;
 }
 
+double PCGExPointFilter::FVolumeFilter::GetEffectiveRadius(const FBox& LocalBox, const int32 PointIndex) const
+{
+	const double BoundsRadius = ComputeRadius(LocalBox, RadiusSource);
+	const double Radius = BoundsRadius + ExtraRadius->Read(PointIndex);
+
+	if (!bUsePenetrationThreshold) { return Radius; }
+
+	const double Threshold = PenetrationThresholdValue->Read(PointIndex);
+	return ComputeEffectiveRadius(Radius, true, PenetrationMode, Threshold);
+}
+
 bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const double EffectiveRadius) const
 {
-	// IsOutsideOrIntersects needs to track whether any volume fully contains the point,
-	// because we keep iterating to look for intersections even after finding containment.
 	bool bFoundInside = false;
 
 	for (const FCachedVolume& Volume : *CachedVolumes)
 	{
 		if (!Volume.VolumeActor.IsValid()) { continue; }
 
-		// AABB early-out: skip volumes whose bounding box (expanded by radius) doesn't contain the point
-		if (bNeedsRadius)
-		{
-			if (!Volume.WorldBounds.ExpandBy(EffectiveRadius).IsInside(Position)) { continue; }
-		}
-		else
-		{
-			if (!Volume.WorldBounds.IsInside(Position)) { continue; }
-		}
+		// AABB early-out
+		if (!Volume.WorldBounds.ExpandBy(EffectiveRadius).IsInside(Position)) { continue; }
 
 		float DistToSurface = 0.0f;
 		const bool bPointInside = Volume.VolumeActor->EncompassesPoint(Position, 0.0f, &DistToSurface);
@@ -111,7 +140,7 @@ bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const d
 		switch (CheckType)
 		{
 		case EPCGExVolumeCheckType::IsInside:
-			if (bPointInside) { return !bInvert; }
+			if (bPointInside || DistToSurface <= EffectiveRadius) { return !bInvert; }
 			break;
 
 		case EPCGExVolumeCheckType::Intersects:
@@ -122,10 +151,6 @@ bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const d
 			if (bPointInside || DistToSurface <= EffectiveRadius) { return !bInvert; }
 			break;
 
-		case EPCGExVolumeCheckType::IsOutside:
-			if (bPointInside) { return bInvert; }
-			break;
-
 		case EPCGExVolumeCheckType::IsOutsideOrIntersects:
 			if (!bPointInside && DistToSurface <= EffectiveRadius) { return !bInvert; }
 			if (bPointInside) { bFoundInside = true; }
@@ -133,37 +158,33 @@ bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const d
 		}
 	}
 
-	// Fell through all volumes
-	switch (CheckType)
+	// No volume matched
+	if (CheckType == EPCGExVolumeCheckType::IsOutsideOrIntersects)
 	{
-	case EPCGExVolumeCheckType::IsOutside:
-		return !bInvert;
-	case EPCGExVolumeCheckType::IsOutsideOrIntersects:
 		return bFoundInside ? bInvert : !bInvert;
-	default:
-		return bInvert;
 	}
+
+	return bInvert;
 }
 
 bool PCGExPointFilter::FVolumeFilter::Test(const PCGExData::FProxyPoint& Point) const
 {
 	const FVector Position = Point.GetTransform().GetLocation();
-
-	if (!bNeedsRadius) { return TestPoint(Position, 0.0); }
-
-	const double Radius = ComputeRadius(PCGExMath::GetLocalBounds(Point, BoundsSource), RadiusSource, ConstantRadius);
-	return TestPoint(Position, ComputeEffectiveRadius(Radius, bUsePenetrationThreshold, PenetrationMode, PenetrationThreshold));
+	const FBox LocalBox = PCGExMath::GetLocalBounds(Point, BoundsSource);
+	const double BoundsRadius = ComputeRadius(LocalBox, RadiusSource);
+	const double Radius = BoundsRadius + ExtraRadius->Read(0);
+	const double EffRadius = bUsePenetrationThreshold
+		                         ? ComputeEffectiveRadius(Radius, true, PenetrationMode, PenetrationThresholdValue->Read(0))
+		                         : Radius;
+	return TestPoint(Position, EffRadius);
 }
 
 bool PCGExPointFilter::FVolumeFilter::Test(const int32 PointIndex) const
 {
 	const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
 	const FVector Position = Point.GetTransform().GetLocation();
-
-	if (!bNeedsRadius) { return TestPoint(Position, 0.0); }
-
-	const double Radius = ComputeRadius(PCGExMath::GetLocalBounds(Point, BoundsSource), RadiusSource, ConstantRadius);
-	return TestPoint(Position, ComputeEffectiveRadius(Radius, bUsePenetrationThreshold, PenetrationMode, PenetrationThreshold));
+	const FBox LocalBox = PCGExMath::GetLocalBounds(Point, BoundsSource);
+	return TestPoint(Position, GetEffectiveRadius(LocalBox, PointIndex));
 }
 
 bool PCGExPointFilter::FVolumeFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
@@ -215,7 +236,6 @@ FString UPCGExVolumeFilterProviderSettings::GetDisplayName() const
 	case EPCGExVolumeCheckType::IsInside: return TEXT("Is Inside");
 	case EPCGExVolumeCheckType::Intersects: return TEXT("Intersects");
 	case EPCGExVolumeCheckType::IsInsideOrIntersects: return TEXT("Is Inside or Intersects");
-	case EPCGExVolumeCheckType::IsOutside: return TEXT("Is Outside");
 	case EPCGExVolumeCheckType::IsOutsideOrIntersects: return TEXT("Is Outside or Intersects");
 	}
 }

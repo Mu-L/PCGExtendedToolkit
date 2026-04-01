@@ -9,6 +9,7 @@
 
 #include "Core/PCGExPointFilter.h"
 #include "PCGExFilterCommon.h"
+#include "Details/PCGExInputShorthandsDetails.h"
 
 #include "PCGExVolumeFilter.generated.h"
 
@@ -18,11 +19,10 @@ class UPCGVolumeData;
 UENUM()
 enum class EPCGExVolumeCheckType : uint8
 {
-	IsInside             = 0 UMETA(DisplayName = "Is Inside", Tooltip="Point center is inside any volume", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside Volume"),
-	Intersects           = 1 UMETA(DisplayName = "Intersects", Tooltip="Point sphere overlaps any volume boundary (not inside)", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Intersects Volume"),
-	IsInsideOrIntersects = 2 UMETA(DisplayName = "Is Inside or Intersects", Tooltip="Point is inside OR sphere overlaps any volume", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside Intersects Volume"),
-	IsOutside            = 3 UMETA(DisplayName = "Is Outside", Tooltip="Point center is outside ALL volumes", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Outside Volume"),
-	IsOutsideOrIntersects = 4 UMETA(DisplayName = "Is Outside or Intersects", Tooltip="Point is outside all volumes OR sphere overlaps any volume boundary", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Outside Intersects Volume"),
+	IsInside              = 0 UMETA(DisplayName = "Is Inside", Tooltip="Point (or sphere) overlaps any volume", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside Volume"),
+	Intersects            = 1 UMETA(DisplayName = "Intersects", Tooltip="Point sphere overlaps the volume boundary but center is outside", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Intersects Volume"),
+	IsInsideOrIntersects  = 2 UMETA(DisplayName = "Is Inside or Intersects", Tooltip="Point is inside OR sphere overlaps any volume", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside Intersects Volume"),
+	IsOutsideOrIntersects = 3 UMETA(DisplayName = "Is Outside or Intersects", Tooltip="Point is outside all volumes OR sphere overlaps any volume boundary", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Outside Intersects Volume"),
 };
 
 UENUM()
@@ -32,7 +32,6 @@ enum class EPCGExVolumeRadiusSource : uint8
 	MaxExtent     = 1 UMETA(DisplayName = "Max Extent", Tooltip="Largest axis of the local bounds half-extent"),
 	AverageExtent = 2 UMETA(DisplayName = "Average Extent", Tooltip="Average of the three half-extent axes"),
 	DiagonalHalf  = 3 UMETA(DisplayName = "Diagonal Half", Tooltip="Half the diagonal of the local bounds box"),
-	Constant      = 4 UMETA(DisplayName = "Constant", Tooltip="Use a constant radius value"),
 };
 
 UENUM()
@@ -50,12 +49,7 @@ namespace PCGExPointFilter
 		TWeakObjectPtr<AVolume> VolumeActor = nullptr;
 	};
 
-	FORCEINLINE static bool NeedsRadius(const EPCGExVolumeCheckType InCheckType)
-	{
-		return InCheckType != EPCGExVolumeCheckType::IsInside && InCheckType != EPCGExVolumeCheckType::IsOutside;
-	}
-
-	FORCEINLINE static double ComputeRadius(const FBox& LocalBox, const EPCGExVolumeRadiusSource Source, const double ConstantValue)
+	FORCEINLINE static double ComputeRadius(const FBox& LocalBox, const EPCGExVolumeRadiusSource Source)
 	{
 		const FVector Extent = LocalBox.GetExtent();
 		switch (Source)
@@ -69,8 +63,6 @@ namespace PCGExPointFilter
 			return (Extent.X + Extent.Y + Extent.Z) / 3.0;
 		case EPCGExVolumeRadiusSource::DiagonalHalf:
 			return Extent.Size();
-		case EPCGExVolumeRadiusSource::Constant:
-			return ConstantValue;
 		}
 	}
 
@@ -96,16 +88,16 @@ struct FPCGExVolumeFilterConfig
 	EPCGExVolumeCheckType CheckType = EPCGExVolumeCheckType::IsInside;
 
 	/** Bounds to use on input points for deriving the sphere radius. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="CheckType == EPCGExVolumeCheckType::Intersects || CheckType == EPCGExVolumeCheckType::IsInsideOrIntersects || CheckType == EPCGExVolumeCheckType::IsOutsideOrIntersects", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExPointBoundsSource BoundsSource = EPCGExPointBoundsSource::ScaledBounds;
 
 	/** How to derive the sphere radius from the point's bounds box. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="CheckType == EPCGExVolumeCheckType::Intersects || CheckType == EPCGExVolumeCheckType::IsInsideOrIntersects || CheckType == EPCGExVolumeCheckType::IsOutsideOrIntersects", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExVolumeRadiusSource RadiusSource = EPCGExVolumeRadiusSource::MaxExtent;
 
-	/** Constant radius value when RadiusSource is set to Constant. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="(CheckType == EPCGExVolumeCheckType::Intersects || CheckType == EPCGExVolumeCheckType::IsInsideOrIntersects || CheckType == EPCGExVolumeCheckType::IsOutsideOrIntersects) && RadiusSource == EPCGExVolumeRadiusSource::Constant", EditConditionHides, ClampMin=0))
-	double ConstantRadius = 100.0;
+	/** Extra radius added to the bounds-derived radius. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	FPCGExInputShorthandSelectorDouble ExtraRadius = FPCGExInputShorthandSelectorDouble(FName("ExtraRadius"), 0.0);
 
 	/** If enabled, intersection tests require a minimum penetration depth to pass. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, InlineEditConditionToggle))
@@ -116,8 +108,8 @@ struct FPCGExVolumeFilterConfig
 	EPCGExVolumePenetrationMode PenetrationMode = EPCGExVolumePenetrationMode::Discrete;
 
 	/** Minimum penetration to pass. Discrete = world units, Relative = 0..1 ratio of radius. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bUsePenetrationThreshold", ClampMin=0))
-	double PenetrationThreshold = 10.0;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Penetration Threshold", EditCondition="bUsePenetrationThreshold", HideEditConditionToggle))
+	FPCGExInputShorthandSelectorDouble PenetrationThreshold = FPCGExInputShorthandSelectorDouble(FName("PenetrationThreshold"), 10.0);
 
 	/** If enabled, invert the result of the test. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -139,8 +131,10 @@ public:
 	TArray<PCGExPointFilter::FCachedVolume> CachedVolumes;
 
 	virtual bool Init(FPCGExContext* InContext) override;
+	virtual bool DomainCheck() override;
 
-	virtual bool SupportsProxyEvaluation() const override { return true; }
+	virtual bool SupportsProxyEvaluation() const override;
+	virtual bool SupportsCollectionEvaluation() const override;
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
@@ -148,6 +142,9 @@ public:
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
 
 	virtual void BeginDestroy() override;
+
+private:
+	bool bAllShorthandsConstant = true;
 };
 
 namespace PCGExPointFilter
@@ -175,13 +172,14 @@ namespace PCGExPointFilter
 		EPCGExPointBoundsSource BoundsSource = EPCGExPointBoundsSource::ScaledBounds;
 		EPCGExVolumeRadiusSource RadiusSource = EPCGExVolumeRadiusSource::MaxExtent;
 		EPCGExVolumePenetrationMode PenetrationMode = EPCGExVolumePenetrationMode::Discrete;
-		double ConstantRadius = 100.0;
-		double PenetrationThreshold = 10.0;
 		bool bInvert = false;
-		bool bNeedsRadius = false;
 		bool bUsePenetrationThreshold = false;
 
+		TSharedPtr<PCGExDetails::TSettingValue<double>> ExtraRadius;
+		TSharedPtr<PCGExDetails::TSettingValue<double>> PenetrationThresholdValue;
+
 		bool TestPoint(const FVector& Position, double EffectiveRadius) const;
+		double GetEffectiveRadius(const FBox& LocalBox, int32 PointIndex) const;
 	};
 }
 
