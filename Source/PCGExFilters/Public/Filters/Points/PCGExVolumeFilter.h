@@ -9,6 +9,7 @@
 
 #include "Core/PCGExPointFilter.h"
 #include "PCGExFilterCommon.h"
+#include "PCGExOctree.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 
 #include "PCGExVolumeFilter.generated.h"
@@ -129,6 +130,7 @@ public:
 	FPCGExVolumeFilterConfig Config;
 
 	TArray<PCGExPointFilter::FCachedVolume> CachedVolumes;
+	TSharedPtr<PCGExOctree::FItemOctree> Octree;
 
 	virtual bool Init(FPCGExContext* InContext) override;
 	virtual bool DomainCheck() override;
@@ -168,6 +170,7 @@ namespace PCGExPointFilter
 
 	private:
 		const TArray<FCachedVolume>* CachedVolumes = nullptr;
+		const PCGExOctree::FItemOctree* Octree = nullptr;
 		EPCGExVolumeCheckType CheckType = EPCGExVolumeCheckType::IsInside;
 		EPCGExPointBoundsSource BoundsSource = EPCGExPointBoundsSource::ScaledBounds;
 		EPCGExVolumeRadiusSource RadiusSource = EPCGExVolumeRadiusSource::MaxExtent;

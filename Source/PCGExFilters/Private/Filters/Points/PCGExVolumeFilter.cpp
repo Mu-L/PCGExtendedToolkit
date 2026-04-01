@@ -72,12 +72,20 @@ PCGExFactories::EPreparationResult UPCGExVolumeFilterFactory::Prepare(FPCGExCont
 		return PCGExFactories::EPreparationResult::MissingData;
 	}
 
+	// Build octree from cached volume bounds
+	FBox OctreeBounds(ForceInit);
+	for (const PCGExPointFilter::FCachedVolume& Entry : CachedVolumes) { OctreeBounds += Entry.WorldBounds; }
+
+	Octree = MakeShared<PCGExOctree::FItemOctree>(OctreeBounds.GetCenter(), OctreeBounds.GetExtent().Length());
+	for (int32 i = 0; i < CachedVolumes.Num(); i++) { Octree->AddElement(PCGExOctree::FItem(i, CachedVolumes[i].WorldBounds)); }
+
 	return Result;
 }
 
 void UPCGExVolumeFilterFactory::BeginDestroy()
 {
 	CachedVolumes.Empty();
+	Octree.Reset();
 	Super::BeginDestroy();
 }
 
@@ -90,7 +98,8 @@ bool PCGExPointFilter::FVolumeFilter::Init(FPCGExContext* InContext, const TShar
 	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
 
 	CachedVolumes = &TypedFilterFactory->CachedVolumes;
-	if (!CachedVolumes || CachedVolumes->IsEmpty()) { return false; }
+	Octree = TypedFilterFactory->Octree.Get();
+	if (!CachedVolumes || CachedVolumes->IsEmpty() || !Octree) { return false; }
 
 	const FPCGExVolumeFilterConfig& Cfg = TypedFilterFactory->Config;
 	CheckType = Cfg.CheckType;
@@ -126,41 +135,43 @@ double PCGExPointFilter::FVolumeFilter::GetEffectiveRadius(const FBox& LocalBox,
 bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const double EffectiveRadius) const
 {
 	bool bFoundInside = false;
+	bool bMatched = false;
 
-	for (const FCachedVolume& Volume : *CachedVolumes)
-	{
-		if (!Volume.VolumeActor.IsValid()) { continue; }
-
-		// AABB early-out
-		if (!Volume.WorldBounds.ExpandBy(EffectiveRadius).IsInside(Position)) { continue; }
-
-		// Let the engine handle sphere-volume overlap directly — more robust
-		// than manual distance comparison for brush collision geometry.
-		// DistToSurface = distance from point center to nearest surface (0 when inside).
-		float DistToSurface = 0.0f;
-		const bool bSphereOverlaps = Volume.VolumeActor->EncompassesPoint(Position, static_cast<float>(EffectiveRadius), &DistToSurface);
-		const bool bPointInside = DistToSurface < KINDA_SMALL_NUMBER;
-
-		switch (CheckType)
+	Octree->FindElementsWithBoundsTest(
+		FBoxCenterAndExtent(Position, FVector(EffectiveRadius)),
+		[&](const PCGExOctree::FItem& Item)
 		{
-		case EPCGExVolumeCheckType::IsInside:
-			if (bPointInside) { return !bInvert; }
-			break;
+			if (bMatched) { return; } // Already resolved for non-aggregate checks
 
-		case EPCGExVolumeCheckType::Intersects:
-			if (bSphereOverlaps && !bPointInside) { return !bInvert; }
-			break;
+			const FCachedVolume& Volume = (*CachedVolumes)[Item.Index];
+			if (!Volume.VolumeActor.IsValid()) { return; }
 
-		case EPCGExVolumeCheckType::IsInsideOrIntersects:
-			if (bSphereOverlaps) { return !bInvert; }
-			break;
+			float DistToSurface = 0.0f;
+			const bool bSphereOverlaps = Volume.VolumeActor->EncompassesPoint(Position, static_cast<float>(EffectiveRadius), &DistToSurface);
+			const bool bPointInside = DistToSurface < KINDA_SMALL_NUMBER;
 
-		case EPCGExVolumeCheckType::IsOutsideOrIntersects:
-			if (bSphereOverlaps && !bPointInside) { return !bInvert; }
-			if (bPointInside) { bFoundInside = true; }
-			break;
-		}
-	}
+			switch (CheckType)
+			{
+			case EPCGExVolumeCheckType::IsInside:
+				if (bPointInside) { bMatched = true; }
+				break;
+
+			case EPCGExVolumeCheckType::Intersects:
+				if (bSphereOverlaps && !bPointInside) { bMatched = true; }
+				break;
+
+			case EPCGExVolumeCheckType::IsInsideOrIntersects:
+				if (bSphereOverlaps) { bMatched = true; }
+				break;
+
+			case EPCGExVolumeCheckType::IsOutsideOrIntersects:
+				if (bSphereOverlaps && !bPointInside) { bMatched = true; }
+				else if (bPointInside) { bFoundInside = true; }
+				break;
+			}
+		});
+
+	if (bMatched) { return !bInvert; }
 
 	// No volume matched
 	if (CheckType == EPCGExVolumeCheckType::IsOutsideOrIntersects)
