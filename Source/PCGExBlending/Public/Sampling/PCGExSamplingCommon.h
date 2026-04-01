@@ -18,6 +18,7 @@ enum class EPCGExSurfaceSource : uint8
 {
 	All             = 0 UMETA(DisplayName = "Any surface", ToolTip="Any surface within range will be tested"),
 	ActorReferences = 1 UMETA(DisplayName = "Actor Reference", ToolTip="Only a list of actor surfaces will be included."),
+	Primitives      = 2 UMETA(DisplayName = "Primitives", ToolTip="Only the provided primitive components will be tested."),
 };
 
 

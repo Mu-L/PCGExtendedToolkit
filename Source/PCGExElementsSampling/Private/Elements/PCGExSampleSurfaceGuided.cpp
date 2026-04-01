@@ -5,6 +5,7 @@
 
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGPrimitiveData.h"
 #include "Kismet/GameplayStatics.h"
 #include "PhysicsEngine/PhysicsSettings.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
@@ -46,6 +47,7 @@ TArray<FPCGPinProperties> UPCGExSampleSurfaceGuidedSettings::InputPinProperties(
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
 	if (SurfaceSource == EPCGExSurfaceSource::ActorReferences) { PCGEX_PIN_POINT(PCGExSampling::Labels::SourceActorReferencesLabel, "Points with actor reference paths.", Required) }
+	if (SurfaceSource == EPCGExSurfaceSource::Primitives) { PCGEX_PIN_PRIMITIVES(FName("Primitives"), TEXT("Primitive data to test against."), Required) }
 	if (bWriteRenderMat && bExtractTextureParameters) { PCGEX_PIN_FACTORIES(PCGExTexture::SourceTexLabel, "External texture params definitions.", Required, FPCGExDataTypeInfoTexParam::AsId()) }
 	return PinProperties;
 }
@@ -79,8 +81,8 @@ bool FPCGExSampleSurfaceGuidedElement::Boot(FPCGExContext* InContext) const
 		for (const TObjectPtr<const UPCGExTexParamFactoryData>& Factory : Context->TexParamsFactories) { PCGEX_VALIDATE_NAME_C(InContext, Factory->Config.TextureIDAttributeName) }
 	}
 
-	Context->bUseInclude = Settings->SurfaceSource == EPCGExSurfaceSource::ActorReferences;
-	if (Context->bUseInclude)
+	Context->bUseInclude = Settings->SurfaceSource != EPCGExSurfaceSource::All;
+	if (Settings->SurfaceSource == EPCGExSurfaceSource::ActorReferences)
 	{
 		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReference)
 		Context->ActorReferenceDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExSampling::Labels::SourceActorReferencesLabel, false, true);
@@ -88,6 +90,26 @@ bool FPCGExSampleSurfaceGuidedElement::Boot(FPCGExContext* InContext) const
 
 		if (!PCGExSampling::Helpers::GetIncludedActors(Context, Context->ActorReferenceDataFacade.ToSharedRef(), Settings->ActorReference, Context->IncludedActors))
 		{
+			return false;
+		}
+	}
+	else if (Settings->SurfaceSource == EPCGExSurfaceSource::Primitives)
+	{
+		const TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(FName("Primitives"));
+		for (const FPCGTaggedData& TaggedData : Inputs)
+		{
+			const UPCGPrimitiveData* PrimitiveData = Cast<UPCGPrimitiveData>(TaggedData.Data);
+			if (!PrimitiveData) { continue; }
+
+			UPrimitiveComponent* Component = PrimitiveData->GetComponent().Get();
+			if (!IsValid(Component)) { continue; }
+
+			Context->IncludedPrimitives.Add(Component);
+		}
+
+		if (Context->IncludedPrimitives.IsEmpty())
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Missing primitive data."));
 			return false;
 		}
 	}
@@ -363,6 +385,55 @@ namespace PCGExSampleSurfaceGuided
 			bool bSuccess = false;
 			FHitResult HitResult;
 			TArray<FHitResult> HitResults;
+
+			if (Settings->SurfaceSource == EPCGExSurfaceSource::Primitives)
+			{
+				double ClosestDistSq = MAX_dbl;
+
+				for (UPrimitiveComponent* Primitive : Context->IncludedPrimitives)
+				{
+					if (!IsValid(Primitive)) { continue; }
+
+					FHitResult TempHit;
+					bool bHit = false;
+
+					switch (Context->CollisionSettings.TraceMode)
+					{
+					case EPCGExTraceMode::Line:
+						bHit = Primitive->LineTraceComponent(TempHit, Origin, End, CollisionParams);
+						break;
+					case EPCGExTraceMode::Sphere:
+						{
+							const double Radius = SphereRadiusGetter->Read(Index);
+							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+							bHit = Primitive->SweepComponent(TempHit, Origin, End, FQuat::Identity, Shape, CollisionParams.bTraceComplex);
+						}
+						break;
+					case EPCGExTraceMode::Box:
+						{
+							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+							bHit = Primitive->SweepComponent(TempHit, Origin, End, FQuat::Identity, Shape, CollisionParams.bTraceComplex);
+						}
+						break;
+					}
+
+					if (bHit)
+					{
+						const double DistSq = FVector::DistSquared(Origin, TempHit.ImpactPoint);
+						if (DistSq < ClosestDistSq)
+						{
+							ClosestDistSq = DistSq;
+							HitResult = TempHit;
+							bSuccess = true;
+						}
+					}
+				}
+
+				if (bSuccess) { ProcessTraceResult(Scope, HitResult, Index, Origin, Direction, MutablePoint); }
+				if (!bSuccess) { SamplingFailed(); }
+				continue;
+			}
 
 			auto ProcessMultipleTraceResult = [&]()
 			{
