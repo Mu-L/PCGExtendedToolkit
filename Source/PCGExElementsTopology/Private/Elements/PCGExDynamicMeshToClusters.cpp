@@ -8,6 +8,7 @@
 #include "Clusters/PCGExClusterCommon.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExGeoDynMesh.h"

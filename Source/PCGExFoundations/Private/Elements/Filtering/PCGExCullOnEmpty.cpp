@@ -32,7 +32,7 @@ FPCGElementPtr UPCGExCullOnEmptySettings::CreateElement() const
 	return MakeShared<FPCGExCullOnEmptyElement>();
 }
 
-namespace CullOnEmpty
+namespace PCGExCullOnEmpty
 {
 	static bool IsDataNonEmpty(const UPCGData* Data)
 	{
@@ -72,7 +72,7 @@ bool FPCGExCullOnEmptyElement::ExecuteInternal(FPCGContext* Context) const
 
 	for (const FPCGTaggedData& TaggedData : Inputs)
 	{
-		if (CullOnEmpty::IsDataNonEmpty(TaggedData.Data))
+		if (PCGExCullOnEmpty::IsDataNonEmpty(TaggedData.Data))
 		{
 			FPCGTaggedData& Output = Context->OutputData.TaggedData.Add_GetRef(TaggedData);
 			Output.Pin = PCGPinConstants::DefaultOutputLabel;
