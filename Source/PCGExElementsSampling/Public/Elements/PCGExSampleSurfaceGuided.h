@@ -318,6 +318,7 @@ struct FPCGExSampleSurfaceGuidedContext final : FPCGExPointsProcessorContext
 	bool bExtractTextureParams = false;
 
 	TMap<AActor*, int32> IncludedActors;
+	TArray<UPrimitiveComponent*> IncludedPrimitives;
 
 	FPCGExCollisionDetails CollisionSettings;
 

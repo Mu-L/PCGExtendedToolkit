@@ -422,7 +422,7 @@ namespace PCGExMatching
 
 	void FTargetsHandler::StartLoading(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<PCGExMT::IAsyncHandleGroup>& InParentHandle) const
 	{
-		PCGEX_SCHEDULING_SCOPE(TaskManager,);
+		PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager,);
 		TargetsPreloader->StartLoading(TaskManager, InParentHandle);
 	}
 }
