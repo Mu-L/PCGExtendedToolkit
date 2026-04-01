@@ -134,25 +134,29 @@ bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const d
 		// AABB early-out
 		if (!Volume.WorldBounds.ExpandBy(EffectiveRadius).IsInside(Position)) { continue; }
 
+		// Let the engine handle sphere-volume overlap directly — more robust
+		// than manual distance comparison for brush collision geometry.
+		// DistToSurface = distance from point center to nearest surface (0 when inside).
 		float DistToSurface = 0.0f;
-		const bool bPointInside = Volume.VolumeActor->EncompassesPoint(Position, 0.0f, &DistToSurface);
+		const bool bSphereOverlaps = Volume.VolumeActor->EncompassesPoint(Position, static_cast<float>(EffectiveRadius), &DistToSurface);
+		const bool bPointInside = DistToSurface < KINDA_SMALL_NUMBER;
 
 		switch (CheckType)
 		{
 		case EPCGExVolumeCheckType::IsInside:
-			if (bPointInside || DistToSurface <= EffectiveRadius) { return !bInvert; }
+			if (bPointInside) { return !bInvert; }
 			break;
 
 		case EPCGExVolumeCheckType::Intersects:
-			if (!bPointInside && DistToSurface <= EffectiveRadius) { return !bInvert; }
+			if (bSphereOverlaps && !bPointInside) { return !bInvert; }
 			break;
 
 		case EPCGExVolumeCheckType::IsInsideOrIntersects:
-			if (bPointInside || DistToSurface <= EffectiveRadius) { return !bInvert; }
+			if (bSphereOverlaps) { return !bInvert; }
 			break;
 
 		case EPCGExVolumeCheckType::IsOutsideOrIntersects:
-			if (!bPointInside && DistToSurface <= EffectiveRadius) { return !bInvert; }
+			if (bSphereOverlaps && !bPointInside) { return !bInvert; }
 			if (bPointInside) { bFoundInside = true; }
 			break;
 		}
