@@ -275,6 +275,7 @@ switch (_OPTION){ \
 #define PCGEX_PIN_FACTORIES(_LABEL, _TOOLTIP, _STATUS, _FACTORY_TYPEID) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, EPCGDataType::Param); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
 #define PCGEX_PIN_TEXTURES(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, EPCGDataType::BaseTexture); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
 #define PCGEX_PIN_VOLUMES(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, EPCGDataType::Volume); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
+#define PCGEX_PIN_PRIMITIVES(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, EPCGDataType::Primitive); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
 
 // --- Single-Connection Pins (only one input allowed) ---
 #define PCGEX_PIN_ANY_SINGLE(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, EPCGDataType::Any, false, false); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
@@ -297,6 +298,7 @@ switch (_OPTION){ \
 #define PCGEX_PIN_FACTORIES(_LABEL, _TOOLTIP, _STATUS, _FACTORY_TYPEID) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, _FACTORY_TYPEID); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
 #define PCGEX_PIN_TEXTURES(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, FPCGDataTypeInfoBaseTexture2D::AsId()); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
 #define PCGEX_PIN_VOLUMES(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, FPCGDataTypeInfoVolume::AsId()); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
+#define PCGEX_PIN_PRIMITIVES(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, FPCGDataTypeInfoPrimitive::AsId()); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
 
 // --- Single-Connection Pins (only one input allowed) ---
 #define PCGEX_PIN_ANY_SINGLE(_LABEL, _TOOLTIP, _STATUS) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, FPCGDataTypeInfo::AsId(), false, false); PCGEX_PIN_TOOLTIP(_TOOLTIP) PCGEX_PIN_STATUS(_STATUS) }
