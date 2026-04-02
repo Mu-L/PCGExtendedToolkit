@@ -10,6 +10,7 @@
 #include "Details/PCGExFilterDetails.h"
 #include "Filters/Points/PCGExPolyPathFilterFactory.h"
 #include "Fitting/PCGExFitting.h"
+#include "Math/PCGExWinding.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
 #include "PCGExSplineToPath.generated.h"
@@ -53,6 +54,10 @@ public:
 	/** Sample inputs.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Sampling", meta=(PCG_Overridable))
 	EPCGExSplineSamplingIncludeMode SampleInputs = EPCGExSplineSamplingIncludeMode::All;
+
+	/** Enforce a specific winding order on closed-loop paths. Open splines are unaffected. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	EPCGExWindingMutation Winding = EPCGExWindingMutation::Unchanged;
 
 	/** Write the spline arrive tangent to an attribute. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, InlineEditConditionToggle))

@@ -26,7 +26,7 @@ public class PCGExtendedToolkit : ModuleRules
 	{
 		bool bNoPCH = Environment.GetEnvironmentVariable("PCGEX_NO_PCH") == "1" || File.Exists(Path.Combine(ModuleDirectory, "..", "..", "Config", ".noPCH")); 
 		PCHUsage = bNoPCH ? PCHUsageMode.NoPCHs : PCHUsageMode.UseExplicitOrSharedPCHs;
-		bUseUnity = true;                                                                                                     
+		bUseUnity = true;
 		MinSourceFilesForUnityBuildOverride = 4;
 		PrecompileForTargets = PrecompileTargetsType.Any;
 
