@@ -5,11 +5,14 @@
 
 
 #include "Helpers/PCGExRandomHelpers.h"
+#include "Curve/CurveUtil.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGSplineData.h"
+#include "Math/PCGExBestFitPlane.h"
+#include "Math/PCGExProjectionDetails.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Paths/PCGExPathsHelpers.h"
 
@@ -44,10 +47,38 @@ namespace PCGExSplineToPath
 
 			const int32 NumSegments = Spline.GetNumberOfSplineSegments();
 			const double TotalLength = Spline.GetSplineLength();
+			const int32 NumPoints = Spline.bClosedLoop ? NumSegments : NumSegments + 1;
 
 			UPCGBasePointData* MutablePoints = PointDataFacade->Source->GetOut();
 			const int32 LastIndex = Spline.bClosedLoop ? NumSegments - 1 : NumSegments;
-			PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, Spline.bClosedLoop ? NumSegments : NumSegments + 1, EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed);
+			PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumPoints, EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed);
+
+			// Detect winding and determine if we need to reverse the output order
+			bool bReverse = false;
+			if (Spline.bClosedLoop && Settings->Winding != EPCGExWindingMutation::Unchanged)
+			{
+				const PCGExMath::FBestFitPlane FitPlane(
+					NumSegments,
+					[&Spline](const int32 Idx) -> FVector
+					{
+						const double Dist = Spline.GetDistanceAlongSplineAtSplinePoint(Idx);
+						return Spline.GetLocationAtDistanceAlongSpline(Dist, ESplineCoordinateSpace::World);
+					});
+
+				FPCGExGeo2DProjectionDetails WindingProjection;
+				WindingProjection.Init(FitPlane);
+
+				TArray<FVector2D> Projected;
+				Projected.SetNum(NumSegments);
+				for (int32 Idx = 0; Idx < NumSegments; Idx++)
+				{
+					const double Dist = Spline.GetDistanceAlongSplineAtSplinePoint(Idx);
+					Projected[Idx] = FVector2D(WindingProjection.Project(Spline.GetLocationAtDistanceAlongSpline(Dist, ESplineCoordinateSpace::World)));
+				}
+
+				const bool bIsClockwise = UE::Geometry::CurveUtil::SignedArea2<double, FVector2D>(Projected) < 0;
+				bReverse = !PCGExMath::IsWinded(Settings->Winding, bIsClockwise);
+			}
 
 			PCGEX_FOREACH_FIELD_SPLINETOPATH(PCGEX_OUTPUT_DECL)
 
@@ -99,25 +130,34 @@ namespace PCGExSplineToPath
 
 			for (int i = 0; i < NumSegments; i++)
 			{
-				const double LengthAtPoint = Spline.GetDistanceAlongSplineAtSplinePoint(i);
+				const int32 ReadIndex = bReverse ? (NumSegments - 1 - i) : i;
+				const double LengthAtPoint = Spline.GetDistanceAlongSplineAtSplinePoint(ReadIndex);
 				const FTransform SplineTransform = Spline.GetTransform();
 
 				ApplyTransform(i, Spline.GetTransformAtDistanceAlongSpline(LengthAtPoint, ESplineCoordinateSpace::Type::World, true));
 
-				int32 PtType = -1;
-
 				PCGEX_OUTPUT_VALUE(LengthAtPoint, i, LengthAtPoint);
 				PCGEX_OUTPUT_VALUE(Alpha, i, LengthAtPoint / TotalLength);
-				PCGEX_OUTPUT_VALUE(ArriveTangent, i, SplineTransform.TransformVector(SplinePositions.Points[i].ArriveTangent));
-				PCGEX_OUTPUT_VALUE(LeaveTangent, i, SplineTransform.TransformVector(SplinePositions.Points[i].LeaveTangent));
-				PCGEX_OUTPUT_VALUE(PointType, i, GetPointType(SplinePositions.Points[i].InterpMode));
+
+				if (bReverse)
+				{
+					PCGEX_OUTPUT_VALUE(ArriveTangent, i, -SplineTransform.TransformVector(SplinePositions.Points[ReadIndex].LeaveTangent));
+					PCGEX_OUTPUT_VALUE(LeaveTangent, i, -SplineTransform.TransformVector(SplinePositions.Points[ReadIndex].ArriveTangent));
+				}
+				else
+				{
+					PCGEX_OUTPUT_VALUE(ArriveTangent, i, SplineTransform.TransformVector(SplinePositions.Points[ReadIndex].ArriveTangent));
+					PCGEX_OUTPUT_VALUE(LeaveTangent, i, SplineTransform.TransformVector(SplinePositions.Points[ReadIndex].LeaveTangent));
+				}
+
+				PCGEX_OUTPUT_VALUE(PointType, i, GetPointType(SplinePositions.Points[ReadIndex].InterpMode));
 			}
 
 			PCGExPaths::Helpers::SetClosedLoop(PointDataFacade->GetOut(), Spline.bClosedLoop);
 
 			if (!Spline.bClosedLoop)
 			{
-				ApplyTransform(MutablePoints->GetNumPoints() - 1, Spline.GetTransformAtDistanceAlongSpline(TotalLength, ESplineCoordinateSpace::Type::World, true));
+				ApplyTransform(NumPoints - 1, Spline.GetTransformAtDistanceAlongSpline(TotalLength, ESplineCoordinateSpace::Type::World, true));
 
 				PCGEX_OUTPUT_VALUE(LengthAtPoint, LastIndex, TotalLength);
 				PCGEX_OUTPUT_VALUE(Alpha, LastIndex, 1);
@@ -164,6 +204,9 @@ namespace PCGExSplineToPath
 						{
 							TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(SourceAttr, SplineData->Metadata);
 							InAccessor->GetRange(InRange, 0, *Keys.Get());
+
+							// Reverse carried-over attributes to match the reversed point order
+							if (bReverse && !Identity.InDataDomain()) { Algo::Reverse(InRange); }
 						}
 						else
 						{

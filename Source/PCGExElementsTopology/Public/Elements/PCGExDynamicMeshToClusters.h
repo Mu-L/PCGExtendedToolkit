@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExCoreSettingsCache.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExSettings.h"
 #include "Core/PCGExElement.h"

@@ -50,6 +50,7 @@ public class PCGExElementsClustersRefine : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"PhysicsCore",
 				"GeometryCore",
 				"GeometryFramework",
 			}

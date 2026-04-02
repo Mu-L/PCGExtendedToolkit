@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGPin.h"
 #include "PCGExCoreMacros.h"
+#include "PCGExCoreSettingsCache.h"
 #include "Core/PCGExSettings.h"
 
 #include "PCGExCullOnEmpty.generated.h"
