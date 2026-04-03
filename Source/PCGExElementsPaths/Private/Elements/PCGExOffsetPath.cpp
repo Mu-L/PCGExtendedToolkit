@@ -174,19 +174,19 @@ namespace PCGExOffsetPath
 			{
 				const int32 PrevIndex = Path->SafePointIndex(Index - 1);
 				const FVector PlaneDir = ((OffsetDirection ? OffsetDirection->Get(PrevIndex) : DirectionGetter->Read(PrevIndex)) * DirectionFactor).GetSafeNormal();
-				const FVector PlaneOrigin = Path->GetPos_Unsafe(PrevIndex) + (PlaneDir * OffsetGetter->Read(PrevIndex));
+				const FVector PlaneOrigin = Path->GetPos_Unsafe(PrevIndex) + (PlaneDir * Offset);
 
 				const FVector A = Path->GetPos_Unsafe(Index) + (Dir * Offset);
-				const double Dot = FMath::Clamp(FMath::Abs(FVector::DotProduct(Path->DirToPrevPoint(Index), Path->DirToNextPoint(Index))), 0, 1);
+				const FVector NextDir = Path->DirToNextPoint(Index);
+				const double Denom = FMath::Abs(FVector::DotProduct(NextDir, PlaneDir));
 
-
-				if (FMath::IsNearlyZero(1 - Dot))
+				if (Denom < 0.01)
 				{
 					OutTransforms[Index].SetLocation(A);
 				}
 				else
 				{
-					const FVector Candidate = FMath::LinePlaneIntersection(A, A + Path->DirToNextPoint(Index) * 10, PlaneOrigin, PlaneDir * -1);
+					const FVector Candidate = FMath::LinePlaneIntersection(A, A + NextDir * 10, PlaneOrigin, PlaneDir * -1);
 					if (Candidate.ContainsNaN()) { OutTransforms[Index].SetLocation(A); }
 					else { OutTransforms[Index].SetLocation(Candidate); }
 				}
