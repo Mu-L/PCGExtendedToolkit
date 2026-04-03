@@ -81,6 +81,7 @@ enum class EPCGExStringComparison : uint8
 	Contains              = 10 UMETA(DisplayName = " Contains ", Tooltip="Operand A contains Operand B"),
 	StartsWith            = 11 UMETA(DisplayName = " Starts With ", Tooltip="Operand A starts with Operand B"),
 	EndsWith              = 12 UMETA(DisplayName = " Ends With ", Tooltip="Operand A ends with Operand B"),
+	Matches               = 13 UMETA(DisplayName = " Matches", Tooltip="Wildcard matching. Supports * or ? as wildcards.")
 };
 
 UENUM()
@@ -90,6 +91,7 @@ enum class EPCGExStringMatchMode : uint8
 	Contains   = 1 UMETA(DisplayName = "Contains", ToolTip=""),
 	StartsWith = 2 UMETA(DisplayName = "Starts with", ToolTip=""),
 	EndsWith   = 3 UMETA(DisplayName = "Ends with", ToolTip=""),
+	Matches    = 4 UMETA(DisplayName = "Matches", ToolTip="Wildcard matching. Supports * or ? as wildcards."),
 };
 
 UENUM()
@@ -112,6 +114,9 @@ namespace PCGExCompare
 
 	PCGEXCORE_API
 	bool Compare(const EPCGExStringComparison Method, const FString& A, const FString& B);
+	
+	PCGEXCORE_API
+	bool Compare(const EPCGExStringMatchMode Method, const FString& A, const FString& B);
 
 #pragma region Numeric comparisons ops
 
