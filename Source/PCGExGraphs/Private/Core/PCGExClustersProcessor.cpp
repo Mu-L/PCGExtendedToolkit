@@ -135,7 +135,7 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			// Initialize first batch or end work
 			if (CurrentBatchIndex == -1)
 			{
-				PCGEX_SCHEDULING_SCOPE(GetTaskManager(), false)
+				PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
 				AdvanceBatch(NextStateId);
 				return false;
 			}
@@ -147,7 +147,7 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			SetState(PCGExClusterMT::MTState_ClusterCompletingWork);
 			if (!CurrentBatch->bSkipCompletion)
 			{
-				PCGEX_SCHEDULING_SCOPE(GetTaskManager(), false)
+				PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
 				CurrentBatch->CompleteWork();
 				return false;
 			}
@@ -155,7 +155,7 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 
 		PCGEX_ON_ASYNC_STATE_READY_INTERNAL(PCGExClusterMT::MTState_ClusterCompletingWork)
 		{
-			PCGEX_SCHEDULING_SCOPE(GetTaskManager(), false)
+			PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
 			AdvanceBatch(NextStateId);
 			return false;
 		}
@@ -170,7 +170,7 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			SetState(PCGExClusterMT::MTState_ClusterCompletingWork);
 			if (!bSkipClusterBatchCompletionStep)
 			{
-				PCGEX_SCHEDULING_SCOPE(TaskManager, true)
+				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
 				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches) { Batch->CompleteWork(); }
 				return false;
 			}
@@ -183,7 +183,7 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			if (bDoClusterBatchWritingStep)
 			{
 				SetState(PCGExClusterMT::MTState_ClusterWriting);
-				PCGEX_SCHEDULING_SCOPE(TaskManager, true)
+				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
 				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches) { Batch->Write(); }
 				return false;
 			}
@@ -279,7 +279,7 @@ bool FPCGExClustersProcessorContext::StartProcessingClusters(FBatchProcessingVal
 	if (!bDaisyChainClusterBatches)
 	{
 		SetState(PCGExClusterMT::MTState_ClusterProcessing);
-		PCGEX_SCHEDULING_SCOPE(GetTaskManager(), true)
+		PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), true)
 		for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
 		{
 			PCGExClusterMT::ScheduleBatch(GetTaskManager(), Batch, bScopedIndexLookupBuild);
@@ -319,7 +319,7 @@ void FPCGExClustersProcessorContext::AdvanceBatch(const PCGExCommon::ContextStat
 	{
 		CurrentBatch = Batches[CurrentBatchIndex];
 		SetState(PCGExClusterMT::MTState_ClusterProcessing);
-		PCGEX_SCHEDULING_SCOPE(GetTaskManager(),)
+		PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(),)
 		ScheduleBatch(GetTaskManager(), CurrentBatch, bScopedIndexLookupBuild);
 	}
 }

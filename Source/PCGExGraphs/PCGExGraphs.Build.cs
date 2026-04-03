@@ -20,7 +20,7 @@ public class PCGExGraphs : ModuleRules
 			PrivatePCHHeaderFile = "Public/PCGExGraphsPCH.h";
 			SharedPCHHeaderFile = "Public/PCGExGraphsPCH.h";
 		}
-		bUseUnity = true;                                                                                                     
+		bUseUnity = true;
 		MinSourceFilesForUnityBuildOverride = 4;
 		PrecompileForTargets = PrecompileTargetsType.Any;
 

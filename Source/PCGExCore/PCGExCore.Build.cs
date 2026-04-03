@@ -56,6 +56,7 @@ public class PCGExCore : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"PhysicsCore",
 				"GeometryCore",
 				"GeometryFramework",
 				"GeometryAlgorithms"

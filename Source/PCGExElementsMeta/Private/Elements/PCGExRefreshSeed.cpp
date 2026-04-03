@@ -57,7 +57,7 @@ bool FPCGExRefreshSeedElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 		Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
 		
 		const TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
-		PCGEX_SCHEDULING_SCOPE(Context->GetTaskManager(), false)
+		PCGEX_ASYNC_SCHEDULING_SCOPE(Context->GetTaskManager(), false)
 		while (Context->AdvancePointsIO(false))
 		{
 			PCGEX_LAUNCH(FPCGExRefreshSeedTask, Settings->Base + Context->CurrentIO->IOIndex, Context->CurrentIO)

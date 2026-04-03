@@ -24,7 +24,7 @@ public class PCGExFoundations : ModuleRules
 		bUseUnity = true;
 		MinSourceFilesForUnityBuildOverride = 4;
 		PrecompileForTargets = PrecompileTargetsType.Any;
-		//IWYUSupport = IWYUSupport.Full;
+		IWYUSupport = IWYUSupport.Full;
 
 		PublicIncludePaths.AddRange(
 			new string[]
@@ -59,6 +59,7 @@ public class PCGExFoundations : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"PhysicsCore",
 				"GeometryCore",
 				"GeometryFramework",
 				"PropertyPath"

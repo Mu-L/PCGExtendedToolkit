@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"
 #include "Components/PrimitiveComponent.h"
+#include "Data/PCGPrimitiveData.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExData.h"
@@ -38,6 +39,7 @@ TArray<FPCGPinProperties> UPCGExSampleNearestSurfaceSettings::InputPinProperties
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
 	if (SurfaceSource == EPCGExSurfaceSource::ActorReferences) { PCGEX_PIN_POINT(PCGExSampling::Labels::SourceActorReferencesLabel, "Points with actor reference paths.", Required) }
+	if (SurfaceSource == EPCGExSurfaceSource::Primitives) { PCGEX_PIN_PRIMITIVES(FName("Primitives"), TEXT("Primitive data to test against."), Required) }
 	return PinProperties;
 }
 
@@ -58,8 +60,8 @@ bool FPCGExSampleNearestSurfaceElement::Boot(FPCGExContext* InContext) const
 
 	PCGEX_FOREACH_FIELD_NEARESTSURFACE(PCGEX_OUTPUT_VALIDATE_NAME)
 
-	Context->bUseInclude = Settings->SurfaceSource == EPCGExSurfaceSource::ActorReferences;
-	if (Context->bUseInclude)
+	Context->bUseInclude = Settings->SurfaceSource != EPCGExSurfaceSource::All;
+	if (Settings->SurfaceSource == EPCGExSurfaceSource::ActorReferences)
 	{
 		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReference)
 
@@ -87,6 +89,26 @@ bool FPCGExSampleNearestSurfaceElement::Boot(FPCGExContext* InContext) const
 
 		Context->IncludedPrimitives.Reserve(IncludedPrimitiveSet.Num());
 		Context->IncludedPrimitives.Append(IncludedPrimitiveSet.Array());
+	}
+	else if (Settings->SurfaceSource == EPCGExSurfaceSource::Primitives)
+	{
+		const TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(FName("Primitives"));
+		for (const FPCGTaggedData& TaggedData : Inputs)
+		{
+			const UPCGPrimitiveData* PrimitiveData = Cast<UPCGPrimitiveData>(TaggedData.Data);
+			if (!PrimitiveData) { continue; }
+
+			UPrimitiveComponent* Component = PrimitiveData->GetComponent().Get();
+			if (!IsValid(Component)) { continue; }
+
+			Context->IncludedPrimitives.Add(Component);
+		}
+
+		if (Context->IncludedPrimitives.IsEmpty())
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Missing primitive data."));
+			return false;
+		}
 	}
 
 	Context->CollisionSettings = Settings->CollisionSettings;
@@ -229,7 +251,7 @@ namespace PCGExSampleNearestSurface
 				for (const FOverlapResult& Overlap : OutOverlaps)
 				{
 					//if (!Overlap.bBlockingHit) { continue; }
-					if (Context->bUseInclude && !Context->IncludedActors.Contains(Overlap.GetActor())) { continue; }
+					if (!Context->IncludedActors.IsEmpty() && !Context->IncludedActors.Contains(Overlap.GetActor())) { continue; }
 
 					FVector OutClosestLocation;
 					const float Distance = Overlap.Component->GetClosestPointOnCollision(Origin, OutClosestLocation);
@@ -311,7 +333,7 @@ namespace PCGExSampleNearestSurface
 			};
 
 
-			if (Settings->SurfaceSource == EPCGExSurfaceSource::ActorReferences)
+			if (Context->bUseInclude)
 			{
 				for (const UPrimitiveComponent* Primitive : Context->IncludedPrimitives)
 				{

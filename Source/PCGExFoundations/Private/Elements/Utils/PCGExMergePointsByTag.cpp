@@ -303,7 +303,7 @@ bool FPCGExMergePointsByTagElement::AdvanceWork(FPCGExContext* InContext, const 
 		Context->SetState(PCGExCommon::States::State_Writing);
 
 		TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
-		PCGEX_SCHEDULING_SCOPE(TaskManager, true)
+		PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
 		for (const TSharedPtr<PCPGExMergePointsByTag::FMergeList>& List : Context->MergeLists) { List->Write(TaskManager); }
 	}
 

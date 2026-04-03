@@ -23,38 +23,16 @@ bool FPCGExNameFiltersDetails::Test(const FString& Name) const
 	{
 	default: ;
 	case EPCGExAttributeFilter::All: return true;
-	case EPCGExAttributeFilter::Exclude: for (const TPair<FString, EPCGExStringMatchMode>& Filter : Matches)
+	case EPCGExAttributeFilter::Include:
+	case EPCGExAttributeFilter::Exclude:
 		{
-			switch (Filter.Value)
+			const bool bResult = FilterMode == EPCGExAttributeFilter::Include;
+			for (const TPair<FString, EPCGExStringMatchMode>& Filter : Matches)
 			{
-			case EPCGExStringMatchMode::Equals: if (Filter.Key == Name) { return false; }
-				break;
-			case EPCGExStringMatchMode::Contains: if (Name.Contains(Filter.Key)) { return false; }
-				break;
-			case EPCGExStringMatchMode::StartsWith: if (Name.StartsWith(Filter.Key)) { return false; }
-				break;
-			case EPCGExStringMatchMode::EndsWith: if (Name.EndsWith(Filter.Key)) { return false; }
-				break;
-			default: ;
+				if (PCGExCompare::Compare(Filter.Value, Name, Filter.Key)) { return bResult; }
 			}
+			return !bResult;
 		}
-		return true;
-	case EPCGExAttributeFilter::Include: for (const TPair<FString, EPCGExStringMatchMode>& Filter : Matches)
-		{
-			switch (Filter.Value)
-			{
-			case EPCGExStringMatchMode::Equals: if (Filter.Key == Name) { return true; }
-				break;
-			case EPCGExStringMatchMode::Contains: if (Name.Contains(Filter.Key)) { return true; }
-				break;
-			case EPCGExStringMatchMode::StartsWith: if (Name.StartsWith(Filter.Key)) { return true; }
-				break;
-			case EPCGExStringMatchMode::EndsWith: if (Name.EndsWith(Filter.Key)) { return true; }
-				break;
-			default: ;
-			}
-		}
-		return false;
 	}
 }
 
