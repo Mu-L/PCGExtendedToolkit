@@ -7,6 +7,8 @@
 #include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
