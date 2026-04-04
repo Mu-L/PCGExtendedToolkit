@@ -635,6 +635,8 @@ namespace PCGExSampleSurfaceGuided
 
 		const PCGExMesh::FMeshData& Data = MeshData[MIndex];
 
+		if (!Data.HasColor()) { return; }
+
 		const int32 Index0 = Data.Indices[FIndex * 3 + 0];
 		const int32 Index1 = Data.Indices[FIndex * 3 + 1];
 		const int32 Index2 = Data.Indices[FIndex * 3 + 2];

@@ -791,12 +791,18 @@ namespace PCGExMT
 			Callback();
 			return;
 		}
-		
+
 		AsyncTask(ENamedThreads::GameThread, Callback);
 	}
 
 	void ExecuteOnMainThreadAndWait(FExecuteCallback&& Callback)
 	{
+		if (IsInGameThread())
+		{
+			Callback();
+			return;
+		}
+		
 		// We're not in the game thread, we need to dispatch loading to the main thread
 		// and wait in the current one
 		const FGraphEventRef Task = FFunctionGraphTask::CreateAndDispatchWhenReady(

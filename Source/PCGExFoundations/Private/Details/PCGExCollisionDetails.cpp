@@ -16,16 +16,23 @@
 
 void FPCGExCollisionDetails::Init(FPCGExContext* InContext)
 {
-	World = InContext->GetWorld();
-
-	if (bIgnoreActors)
+	PCGExMT::ExecuteOnMainThreadAndWait([CtxHandle = InContext->GetOrCreateHandle(), this]
 	{
-		const TFunction<bool(const AActor*)> BoundsCheck = [](const AActor*) -> bool { return true; };
-		const TFunction<bool(const AActor*)> SelfIgnoreCheck = [](const AActor*) -> bool { return true; };
-		IgnoredActors = PCGActorSelector::FindActors(IgnoredActorSelector, InContext->GetComponent(), BoundsCheck, SelfIgnoreCheck);
-	}
+		PCGEX_SHARED_CONTEXT_VOID(CtxHandle);
+		World = SharedContext.Get()->GetWorld();
 
-	if (bIgnoreSelf) { IgnoredActors.Add(InContext->GetComponent()->GetOwner()); }
+		const UPCGComponent* Comp = SharedContext.Get()->GetComponent();
+
+		if (bIgnoreActors)
+		{
+			const TFunction<bool(const AActor*)> BoundsCheck = [](const AActor*) -> bool { return true; };
+			const TFunction<bool(const AActor*)> SelfIgnoreCheck = [](const AActor*) -> bool { return true; };
+
+			IgnoredActors = PCGActorSelector::FindActors(IgnoredActorSelector, Comp, BoundsCheck, SelfIgnoreCheck);
+		}
+
+		if (bIgnoreSelf) { IgnoredActors.Add(Comp->GetOwner()); }
+	});
 }
 
 void FPCGExCollisionDetails::Update(FCollisionQueryParams& InCollisionParams) const
