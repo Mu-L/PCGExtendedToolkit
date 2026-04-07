@@ -7,6 +7,8 @@
 #include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
@@ -21,7 +23,7 @@ bool UPCGExEdgeLengthFilterFactory::RegisterConsumableAttributesWithData(FPCGExC
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.ThresholdInput == EPCGExInputValueType::Attribute, Config.ThresholdAttribute, Consumable)
-
+	
 	return true;
 }
 
@@ -36,6 +38,8 @@ namespace PCGExEdgeLength
 	{
 		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
 
+		TConstPCGValueRange<FTransform> VtxTransforms = InPointDataFacade->Source->GetIn()->GetConstTransformValueRange();
+						
 		Threshold = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
 		if (!Threshold->Init(PointDataFacade)) { return false; }
 
