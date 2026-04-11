@@ -7,6 +7,7 @@
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Data/PCGBasePointData.h"
+#include "Factories/PCGExFactories.h"
 #include "Data/PCGPolyLineData.h"
 #include "Metadata/PCGMetadata.h"
 
