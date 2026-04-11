@@ -46,6 +46,7 @@ class UPCGExOffsetPathSettings : public UPCGExPathProcessorSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	PCGEX_NODE_INFOS(PathOffset, "Path : Offset", "Offset paths points.");
 #endif
 
@@ -64,45 +65,57 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	EPCGExOffsetMethod OffsetMethod = EPCGExOffsetMethod::Slide;
 
-	/** Offset type.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
-	EPCGExInputValueType OffsetInput = EPCGExInputValueType::Constant;
+	/** Size of the offset in the selected direction **/
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	FPCGExInputShorthandSelectorDouble Offset = FPCGExInputShorthandSelectorDouble(FName("@Last"), 1.0, false);
 
-	/** Fetch the offset size from a local attribute. The regular Size parameter then act as a scale.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Offset (Attr)", EditCondition="OffsetInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector OffsetAttribute;
+#pragma region DEPRECATED
+	
+	UPROPERTY()
+	EPCGExInputValueType OffsetInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	/** Offset size.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Offset", EditCondition="OffsetInput == EPCGExInputValueType::Constant", EditConditionHides))
-	double OffsetConstant = 1.0;
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector OffsetAttribute_DEPRECATED;
 
-	PCGEX_SETTING_VALUE_DECL(Offset, double)
+	UPROPERTY()
+	double OffsetConstant_DEPRECATED = 1.0;
+
+#pragma endregion
+		
+	/** Offset scale.*/
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Scale"))
+	FPCGExInputShorthandSelectorDouble OffsetScale = FPCGExInputShorthandSelectorDouble(FName("$Scale"), 1.0, false);
 
 	/** Scale offset direction & distance using point scale.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bApplyPointScaleToOffset = false;
-
-	/** Up vector used to calculate Offset direction.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	FVector UpVectorConstant = PCGEX_CORE_SETTINGS.WorldUp;
-
-	/** Direction Vector type.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
-	EPCGExInputValueType DirectionType = EPCGExInputValueType::Constant;
-
-	/** Fetch the direction vector from a local point attribute. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Direction (Attr)", EditCondition="DirectionType != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector DirectionAttribute;
-
+	
 	/** Type of arithmetic path point offset direction.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Direction", EditCondition="OffsetMethod == EPCGExOffsetMethod::Slide && DirectionType == EPCGExInputValueType::Constant", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Direction", EditCondition="OffsetMethod == EPCGExOffsetMethod::Slide", EditConditionHides))
 	EPCGExPathNormalDirection DirectionConstant = EPCGExPathNormalDirection::AverageNormal;
+	
+	/** Custom offset direction **/
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OffsetMethod == EPCGExOffsetMethod::Slide && DirectionConstant == EPCGExPathNormalDirection::Custom", EditConditionHides))
+	FPCGExInputShorthandSelectorVector Direction = FPCGExInputShorthandSelectorVector(FName("$Rotation.Left"), FVector::UpVector, true);
 
 	/** Inverts offset direction. Can also be achieved by using negative offset values, but this enable consistent inversion no matter the input.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bInvertDirection = false;
+	
+	/** Up vector used to calculate Offset direction.*/
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	FVector UpVectorConstant = PCGEX_CORE_SETTINGS.WorldUp;
+	
+#pragma region DEPRECATED
+	
+	UPROPERTY()
+	EPCGExInputValueType DirectionType_DEPRECATED = EPCGExInputValueType::Constant;
 
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector DirectionAttribute_DEPRECATED;
 
+#pragma endregion
+	
 	/** Adjust aspect in tight angles */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OffsetMethod == EPCGExOffsetMethod::Slide"))
 	EPCGExOffsetAdjustment Adjustment = EPCGExOffsetAdjustment::SmoothAuto;
@@ -148,7 +161,8 @@ namespace PCGExOffsetPath
 		FVector Up = FVector::UpVector;
 
 		TSharedPtr<PCGExDetails::TSettingValue<double>> OffsetGetter;
-		TSharedPtr<PCGExData::TBuffer<FVector>> DirectionGetter;
+		TSharedPtr<PCGExDetails::TSettingValue<double>> OffsetScaleGetter;
+		TSharedPtr<PCGExDetails::TSettingValue<FVector>> DirectionGetter;
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)

@@ -26,15 +26,15 @@ UPCGExPathSolidifySettings::UPCGExPathSolidifySettings(const FObjectInitializer&
 
 #if WITH_EDITOR
 
-void UPCGExPathSolidifySettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExPathSolidifySettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	PCGEX_UPDATE_TO_DATA_VERSION(1, 70, 11)
 	{
 #define PCGEX_COPY_TO(_SOURCE, _TARGET)\
-		_TARGET##Axis.Radius = Radius##_SOURCE##Constant_DEPRECATED;\
-		_TARGET##Axis.RadiusAttribute = Radius##_SOURCE##SourceAttribute_DEPRECATED;\
-		if(bWriteRadius##_SOURCE##_DEPRECATED){ _TARGET##Axis.RadiusInput = static_cast<EPCGExInputValueToggle>(Radius##_SOURCE##Input##_DEPRECATED); }\
-		else{_TARGET##Axis.RadiusInput = EPCGExInputValueToggle::Disabled;}
+_TARGET##Axis.Radius = Radius##_SOURCE##Constant_DEPRECATED;\
+_TARGET##Axis.RadiusAttribute = Radius##_SOURCE##SourceAttribute_DEPRECATED;\
+if(bWriteRadius##_SOURCE##_DEPRECATED){ _TARGET##Axis.RadiusInput = static_cast<EPCGExInputValueToggle>(Radius##_SOURCE##Input##_DEPRECATED); }\
+else{_TARGET##Axis.RadiusInput = EPCGExInputValueToggle::Disabled;}
 
 		if (SolidificationAxis_DEPRECATED == EPCGExMinimalAxis::X)
 		{
@@ -57,7 +57,22 @@ void UPCGExPathSolidifySettings::ApplyDeprecation(UPCGNode* InOutNode)
 #undef PCGEX_COPY_TO
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	PCGEX_UPDATE_TO_DATA_VERSION(1, 75, 7)
+	{
+		// Rewire Normal
+		PCGEX_SHORTHAND_RENAME_PIN(NormalAttribute, UNDEFINED, NormalValue)
+		InOutNode->RenameInputPin(FName(TEXT("InvertDirection")), FName(TEXT("NormalValue/Flip")));
+
+		NormalValue.Update(NormalType_DEPRECATED, NormalAttribute_DEPRECATED, FVector::UpVector);
+		NormalValue.bFlip = bInvertDirection_DEPRECATED;
+		
+		// Rewire Solidification lerp
+		PCGEX_SHORTHAND_RENAME_PIN(SolidificationLerpAttribute, SolidificationLerpConstant, SolidificationLerp)
+		SolidificationLerp.Update(SolidificationLerpInput_DEPRECATED, SolidificationLerpAttribute_DEPRECATED, SolidificationLerpConstant_DEPRECATED);
+
+	}
+
+	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
 #endif
@@ -70,8 +85,6 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(PathSolidify)
 
 PCGEX_SETTING_VALUE_IMPL_TOGGLE(FPCGExPathSolidificationAxisDetails, Flip, bool, FlipInput, FlipAttributeName, bFlip, false)
 PCGEX_SETTING_VALUE_IMPL_BOOL(FPCGExPathSolidificationRadiusDetails, Radius, double, RadiusInput == EPCGExInputValueToggle::Attribute, RadiusAttribute, Radius)
-
-PCGEX_SETTING_VALUE_IMPL(UPCGExPathSolidifySettings, SolidificationLerp, double, SolidificationLerpInput, SolidificationLerpAttribute, SolidificationLerpConstant)
 
 bool FPCGExPathSolidifyElement::Boot(FPCGExContext* InContext) const
 {
@@ -144,19 +157,16 @@ namespace PCGExPathSolidify
 
 		const FVector Up = PCGEX_CORE_SETTINGS.WorldUp;
 
-		if (Settings->NormalType == EPCGExInputValueType::Attribute)
+		if (Settings->Normal == EPCGExPathNormalDirection::Custom)
 		{
-			NormalGetter = PointDataFacade->GetBroadcaster<FVector>(Settings->NormalAttribute, true);
-			if (!NormalGetter)
-			{
-				PCGEX_LOG_INVALID_SELECTOR_C(ExecutionContext, Cross Direction, Settings->NormalAttribute)
-				return false;
-			}
+			NormalGetter = Settings->NormalValue.GetValueSetting();
+			if (!NormalGetter->Init(PointDataFacade)) { return false; }
 		}
 		else
 		{
 			switch (Settings->Normal)
 			{
+			default:
 			case EPCGExPathNormalDirection::Normal: PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeNormal>(false, Up));
 				break;
 			case EPCGExPathNormalDirection::Binormal: PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Up));
@@ -210,7 +220,7 @@ namespace PCGExPathSolidify
 
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::BoundsMin | EPCGPointNativeProperties::BoundsMax);
 
-		SolidificationLerp = Settings->GetValueSettingSolidificationLerp();
+		SolidificationLerp = Settings->SolidificationLerp.GetValueSetting();
 		if (!SolidificationLerp->Init(PointDataFacade, false)) { return false; }
 
 		Path->ComputeAllEdgeExtra();

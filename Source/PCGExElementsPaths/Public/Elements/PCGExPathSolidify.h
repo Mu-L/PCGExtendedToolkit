@@ -93,8 +93,8 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	PCGEX_NODE_INFOS(PathSolidify, "Path : Solidify", "Solidify a path.");
-	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 #endif
 
 protected:
@@ -167,34 +167,44 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Tertiary"))
 	FPCGExPathSolidificationRadiusDetails TertiaryAxis;
 
-	/** How should the cross direction (Cross) be computed.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
-	EPCGExInputValueType NormalType = EPCGExInputValueType::Constant;
-
-	/** Fetch the cross direction vector from a local point attribute. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Normal (Attr)", EditCondition="NormalType != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector NormalAttribute;
-
+	
 	/** Type of arithmetic path point cross direction.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Normal", EditCondition="NormalType == EPCGExInputValueType::Constant", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Normal", EditCondition="NormalType_DEPRECATED == EPCGExInputValueType::Constant", EditConditionHides))
 	EPCGExPathNormalDirection Normal = EPCGExPathNormalDirection::Normal;
 
-	/** Inverts normal direction.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName=" └─ Invert Direction", EditCondition="NormalType != EPCGExInputValueType::Constant", EditConditionHides))
-	bool bInvertDirection = false;
+	/** Custom offset direction **/
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Normal == EPCGExPathNormalDirection::Custom", EditConditionHides))
+	FPCGExInputShorthandSelectorDirection NormalValue = FPCGExInputShorthandSelectorDirection(FName("$Rotation.Up"), FVector::UpVector, true);
 
+#pragma region DEPRECATED
+
+	UPROPERTY()
+	EPCGExInputValueType NormalType_DEPRECATED = EPCGExInputValueType::Constant;
+
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector NormalAttribute_DEPRECATED;
+
+	UPROPERTY()
+	bool bInvertDirection_DEPRECATED = false;
+
+#pragma endregion
+
+	/** Solidification Lerp.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	EPCGExInputValueType SolidificationLerpInput = EPCGExInputValueType::Constant;
+	FPCGExInputShorthandSelectorDouble SolidificationLerp = FPCGExInputShorthandSelectorDouble(FName("@Last"), 0, false);
+	
+#pragma region DEPRECATED
+	
+	UPROPERTY()
+	EPCGExInputValueType SolidificationLerpInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	/** Solidification Lerp attribute .*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Solidification Lerp (Attr)", EditCondition="SolidificationLerpInput == EPCGExInputValueType::Attribute", EditConditionHides))
-	FPCGAttributePropertyInputSelector SolidificationLerpAttribute;
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector SolidificationLerpAttribute_DEPRECATED;
 
-	/** Solidification Lerp constant.*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Solidification Lerp", EditCondition="SolidificationLerpInput == EPCGExInputValueType::Constant", EditConditionHides))
-	double SolidificationLerpConstant = 0;
+	UPROPERTY()
+	double SolidificationLerpConstant_DEPRECATED = 0;
 
-	PCGEX_SETTING_VALUE_DECL(SolidificationLerp, double)
+#pragma endregion
 
 #pragma region DEPRECATED
 
@@ -281,7 +291,7 @@ namespace PCGExPathSolidify
 		TSharedPtr<PCGExPaths::FPath> Path;
 		TSharedPtr<PCGExPaths::FPathEdgeLength> PathLength;
 		TSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>> PathNormal;
-		TSharedPtr<PCGExData::TBuffer<FVector>> NormalGetter;
+		TSharedPtr<PCGExDetails::TSettingValue<FVector>> NormalGetter;
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
