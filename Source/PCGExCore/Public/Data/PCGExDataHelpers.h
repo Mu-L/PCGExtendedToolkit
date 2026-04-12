@@ -86,11 +86,13 @@ extern template void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeIdentifi
 	 * @param SourceFacade Source facade with pending writable buffer values
 	 * @param TargetIO Target point IO to write values to
 	 * @param SourcePointIndices Maps target point index i -> source point index SourcePointIndices[i]
+	 * @param IgnoreList List of names to skip
 	 */
 	PCGEXCORE_API void CopyBuffersValues(
 		const TSharedPtr<FFacade>& SourceFacade,
 		const TSharedPtr<FFacade>& TargetIO,
-		const TArray<int32>& SourcePointIndices);
+		const TArray<int32>& SourcePointIndices,
+		const TSet<FName>* IgnoreList = nullptr);
 
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
 extern template bool TryReadDataValue<_TYPE>(FPCGExContext* InContext, const UPCGData* InData, const FPCGAttributePropertyInputSelector& InSelector, _TYPE& OutValue, const bool bQuiet); \

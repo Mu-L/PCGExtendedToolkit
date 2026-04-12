@@ -167,19 +167,23 @@ public:
 
 	/** Criteria used to partition paths into separate outputs. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(DisplayName=" ├─ Partition over", EditCondition="PathOutput == EPCGExFloodFillPathOutput::Partitions"))
-	EPCGExFloodFillPathPartitions PathPartitions = EPCGExFloodFillPathPartitions::Length;
+	EPCGExFloodFillPathPartitions PathPartitions = EPCGExFloodFillPathPartitions::Depth;
 
 	/** Sort direction for partitioned output paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(DisplayName=" └─ Sorting", EditCondition="PathOutput == EPCGExFloodFillPathOutput::Partitions"))
-	EPCGExSortDirection PartitionSorting = EPCGExSortDirection::Ascending;
+	EPCGExSortDirection PartitionSorting = EPCGExSortDirection::Descending;
 
-	/** Write the normalized path depth (0-1) on output paths, relative to the full unpartitioned path length. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(PCG_Overridable, EditCondition="PathOutput != EPCGExFloodFillPathOutput::None"))
+	/** Write the normalized path depth (0-1) on output paths. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(PCG_Overridable, InlineEditConditionToggle, EditCondition="PathOutput != EPCGExFloodFillPathOutput::None"))
 	bool bWriteNormalizedPathDepth = false;
 
 	/** Name of the 'double' attribute to write normalized path depth to.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(DisplayName="Normalized Path Depth", PCG_Overridable, EditCondition="bWriteNormalizedPathDepth && PathOutput != EPCGExFloodFillPathOutput::None"))
 	FName NormalizedPathDepthAttributeName = FName("NormalizedPathDepth");
+
+	/** How to normalize the path depth. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(PCG_NotOverridable, EditCondition="bWriteNormalizedPathDepth && PathOutput != EPCGExFloodFillPathOutput::None"))
+	EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode = EPCGExFloodFillNormalizedPathDepthMode::FullPath;
 
 	/** Copy seed point attributes as tags on output paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(EditCondition="PathOutput != EPCGExFloodFillPathOutput::None"))

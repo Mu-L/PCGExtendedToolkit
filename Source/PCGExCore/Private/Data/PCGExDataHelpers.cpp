@@ -15,14 +15,18 @@ namespace PCGExData::Helpers
 	void CopyBuffersValues(
 		const TSharedPtr<FFacade>& SourceFacade,
 		const TSharedPtr<FFacade>& TargetFacade,
-		const TArray<int32>& SourcePointIndices)
+		const TArray<int32>& SourcePointIndices,
+		const TSet<FName>* IgnoreList)
 	{
 		for (const TSharedPtr<IBuffer>& SrcBuffer : SourceFacade->Buffers)
 		{
-			if (!SrcBuffer || !SrcBuffer->IsWritable() || !SrcBuffer->IsEnabled()) { continue; }
+			if (!SrcBuffer || !SrcBuffer->IsWritable() || !SrcBuffer->IsEnabled() ||
+				(IgnoreList && IgnoreList->Contains(SrcBuffer->Identifier.Name)))
+			{
+				continue;
+			}
 
 			EPCGMetadataTypes SrcType = SrcBuffer->GetTypeId();
-
 			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritable(SrcType, SrcBuffer->Identifier.Name, EBufferInit::Inherit);
 			if (!DstBuffer) { continue; }
 

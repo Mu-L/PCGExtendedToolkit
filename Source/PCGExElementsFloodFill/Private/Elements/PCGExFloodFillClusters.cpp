@@ -352,12 +352,13 @@ namespace PCGExClusterDiffusion
 		const FName NormPathDepthName = Settings->bWriteNormalizedPathDepth && Settings->PathOutput != EPCGExFloodFillPathOutput::None
 			                                ? Settings->NormalizedPathDepthAttributeName
 			                                : NAME_None;
+		const EPCGExFloodFillNormalizedPathDepthMode NormPathDepthMode = Settings->NormalizedPathDepthMode;
 
 		if (Settings->PathOutput == EPCGExFloodFillPathOutput::Full)
 		{
 			// Output full path, rather straightforward
 			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, PathsTaskGroup)
-			PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, NormPathDepthName](const int32 Index, const PCGExMT::FScope& Scope)
+			PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, NormPathDepthName, NormPathDepthMode](const int32 Index, const PCGExMT::FScope& Scope)
 			{
 				PCGEX_ASYNC_THIS
 				TSharedPtr<PCGExFloodFill::FDiffusion> Diff = This->Diffusions[Index];
@@ -367,7 +368,9 @@ namespace PCGExClusterDiffusion
 						*Diff,
 						Diff->Captured[EndpointIndex].Node->Index,
 						Diff->Captured[EndpointIndex].Depth,
+						Diff->GetMaxDepth(),
 						NormPathDepthName,
+						NormPathDepthMode,
 						This->Context->SeedAttributesToPathTags,
 						This->Context->SeedsDataFacade.ToSharedRef());
 				}
@@ -378,7 +381,7 @@ namespace PCGExClusterDiffusion
 		}
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, PathsTaskGroup)
-		PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, SortOver = Settings->PathPartitions, SortOrder = Settings->PartitionSorting, NormPathDepthName](const int32 Index, const PCGExMT::FScope& Scope)
+		PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, SortOver = Settings->PathPartitions, SortOrder = Settings->PartitionSorting, NormPathDepthName, NormPathDepthMode](const int32 Index, const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
 			TSharedPtr<PCGExFloodFill::FDiffusion> Diff = This->Diffusions[Index];
@@ -440,7 +443,9 @@ namespace PCGExClusterDiffusion
 					*Diff,
 					PathIndices,
 					EndpointDepth,
+					Diff->GetMaxDepth(),
 					NormPathDepthName,
+					NormPathDepthMode,
 					This->Context->SeedAttributesToPathTags,
 					This->Context->SeedsDataFacade.ToSharedRef());
 			}

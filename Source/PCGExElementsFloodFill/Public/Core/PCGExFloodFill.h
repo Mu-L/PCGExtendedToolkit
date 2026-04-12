@@ -22,6 +22,14 @@ class UPCGExFillControlsFactoryData;
 class FPCGExFillControlOperation;
 
 UENUM()
+enum class EPCGExFloodFillNormalizedPathDepthMode : uint8
+{
+	FullDiffusion = 0 UMETA(DisplayName = "Full Diffusion", ToolTip="Normalize by the diffusion's max depth. Absolute position within the entire diffusion (0 at seed, 1 at the deepest captured node)."),
+	FullPath      = 1 UMETA(DisplayName = "Full Path", ToolTip="Normalize by the full unpartitioned path depth. Partitioned segments preserve their position in the original path (e.g. 0.4-0.7)."),
+	Partition     = 2 UMETA(DisplayName = "Partition", ToolTip="Normalize per-partition. Each path segment goes from 0 to 1 regardless of its position in the full path."),
+};
+
+UENUM()
 enum class EPCGExFloodFillSettingSource : uint8
 {
 	Seed = 0 UMETA(DisplayName = "Seed", ToolTip="Read values from seed point."),
@@ -291,7 +299,9 @@ namespace PCGExFloodFill
 			const FDiffusion& Diffusion,
 			int32 EndpointNodeIndex,
 			int32 EndpointDepth,
+			int32 MaxDiffusionDepth,
 			FName NormalizedPathDepthName,
+			EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 			const FPCGExAttributeToTagDetails& SeedTags,
 			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade);
 
@@ -299,11 +309,21 @@ namespace PCGExFloodFill
 			const FDiffusion& Diffusion,
 			TArray<int32>& PathIndices,
 			int32 EndpointDepth,
+			int32 MaxDiffusionDepth,
 			FName NormalizedPathDepthName,
+			EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 			const FPCGExAttributeToTagDetails& SeedTags,
 			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade);
 
 	protected:
+		void WriteNormalizedPathDepth(
+			const TSharedRef<PCGExData::FFacade>& PathFacade,
+			const TArray<int32>& PathIndices,
+			int32 EndpointDepth,
+			int32 MaxDiffusionDepth,
+			FName NormalizedPathDepthName,
+			EPCGExFloodFillNormalizedPathDepthMode Mode);
+
 		TSharedRef<PCGExClusters::FCluster> Cluster;
 		TSharedRef<PCGExData::FFacade> VtxDataFacade;
 		TSharedRef<PCGExData::FPointIOCollection> Paths;
