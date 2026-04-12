@@ -408,6 +408,15 @@ namespace PCGExClusterDiffusion
 				break;
 			}
 
+			// Cascade mode: per-diffusion array tracking hierarchical falloff values by vtx point index
+			// 1.0 at seed, 0.0 at leaves, branches inherit parent value and lerp to 0
+			TArray<double> CascadeValues;
+			const bool bCascade = NormPathDepthMode == EPCGExFloodFillNormalizedPathDepthMode::Cascade && This->DiffusionDepths;
+			if (bCascade)
+			{
+				CascadeValues.Init(-1.0, This->VtxDataFacade->GetNum());
+			}
+
 			for (const int32 EndpointIndex : Endpoints)
 			{
 				PathIndices.Reset();
@@ -439,6 +448,43 @@ namespace PCGExClusterDiffusion
 					}
 				}
 
+				// Compute cascade values for this partition before writing
+				// PathIndices are in endpoint(leaf)-first order here (not yet reversed)
+				if (bCascade && PathIndices.Num() >= 2)
+				{
+					const TArray<int32>& Depths = *This->DiffusionDepths;
+
+					// Last point in pre-reversal order = closest to seed (branch point or seed itself)
+					const int32 BranchVtxIdx = PathIndices.Last();
+					// First point in pre-reversal order = leaf endpoint
+					const int32 LeafVtxIdx = PathIndices[0];
+
+					const int32 BranchDepth = Depths[BranchVtxIdx];
+					const int32 LeafDepth = Depths[LeafVtxIdx];
+					const int32 DepthRange = LeafDepth - BranchDepth;
+
+					// Branch point value: read from previous partition, or 1.0 if seed (first occurrence)
+					const double BranchValue = CascadeValues[BranchVtxIdx] >= 0.0 ? CascadeValues[BranchVtxIdx] : 1.0;
+
+					if (DepthRange > 0)
+					{
+						const double InvRange = 1.0 / static_cast<double>(DepthRange);
+						for (int32 i = 0; i < PathIndices.Num(); i++)
+						{
+							const int32 VtxIdx = PathIndices[i];
+							const double T = static_cast<double>(Depths[VtxIdx] - BranchDepth) * InvRange;
+							CascadeValues[VtxIdx] = BranchValue * (1.0 - T);
+						}
+					}
+					else
+					{
+						for (int32 i = 0; i < PathIndices.Num(); i++)
+						{
+							CascadeValues[PathIndices[i]] = BranchValue;
+						}
+					}
+				}
+
 				This->PathWriter->WritePartitionedPath(
 					*Diff,
 					PathIndices,
@@ -447,7 +493,8 @@ namespace PCGExClusterDiffusion
 					NormPathDepthName,
 					NormPathDepthMode,
 					This->Context->SeedAttributesToPathTags,
-					This->Context->SeedsDataFacade.ToSharedRef());
+					This->Context->SeedsDataFacade.ToSharedRef(),
+					bCascade ? &CascadeValues : nullptr);
 			}
 		};
 

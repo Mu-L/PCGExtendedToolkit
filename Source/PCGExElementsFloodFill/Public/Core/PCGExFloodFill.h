@@ -27,6 +27,7 @@ enum class EPCGExFloodFillNormalizedPathDepthMode : uint8
 	FullDiffusion = 0 UMETA(DisplayName = "Full Diffusion", ToolTip="Normalize by the diffusion's max depth. Absolute position within the entire diffusion (0 at seed, 1 at the deepest captured node)."),
 	FullPath      = 1 UMETA(DisplayName = "Full Path", ToolTip="Normalize by the full unpartitioned path depth. Partitioned segments preserve their position in the original path (e.g. 0.4-0.7)."),
 	Partition     = 2 UMETA(DisplayName = "Partition", ToolTip="Normalize per-partition. Each path segment goes from 0 to 1 regardless of its position in the full path."),
+	Cascade       = 3 UMETA(DisplayName = "Cascade", ToolTip="Hierarchical falloff. Longest paths get the full gradient (1 at seed, 0 at leaf). Branches inherit the parent value at the branch point and fall off to 0 at their own leaf. Requires partitioned output sorted by depth descending."),
 };
 
 UENUM()
@@ -313,7 +314,8 @@ namespace PCGExFloodFill
 			FName NormalizedPathDepthName,
 			EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 			const FPCGExAttributeToTagDetails& SeedTags,
-			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade);
+			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade,
+			const TArray<double>* CascadeValues = nullptr);
 
 	protected:
 		void WriteNormalizedPathDepth(
@@ -322,7 +324,8 @@ namespace PCGExFloodFill
 			int32 EndpointDepth,
 			int32 MaxDiffusionDepth,
 			FName NormalizedPathDepthName,
-			EPCGExFloodFillNormalizedPathDepthMode Mode);
+			EPCGExFloodFillNormalizedPathDepthMode Mode,
+			const TArray<double>* CascadeValues = nullptr);
 
 		TSharedRef<PCGExClusters::FCluster> Cluster;
 		TSharedRef<PCGExData::FFacade> VtxDataFacade;

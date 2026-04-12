@@ -287,7 +287,8 @@ namespace PCGExFloodFill
 		const int32 EndpointDepth,
 		const int32 MaxDiffusionDepth,
 		const FName NormalizedPathDepthName,
-		const EPCGExFloodFillNormalizedPathDepthMode Mode)
+		const EPCGExFloodFillNormalizedPathDepthMode Mode,
+		const TArray<double>* CascadeValues)
 	{
 		if (NormalizedPathDepthName == NAME_None || !DiffusionDepths || PathIndices.IsEmpty()) { return; }
 
@@ -332,6 +333,16 @@ namespace PCGExFloodFill
 					{
 						NormBuffer->SetValue(i, static_cast<double>(Depths[PathIndices[i]] - MinDepth) * InvRange);
 					}
+				}
+			}
+			break;
+
+		case EPCGExFloodFillNormalizedPathDepthMode::Cascade:
+			if (CascadeValues)
+			{
+				for (int32 i = 0; i < PathIndices.Num(); i++)
+				{
+					NormBuffer->SetValue(i, (*CascadeValues)[PathIndices[i]]);
 				}
 			}
 			break;
@@ -399,7 +410,8 @@ namespace PCGExFloodFill
 		const FName NormalizedPathDepthName,
 		const EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 		const FPCGExAttributeToTagDetails& SeedTags,
-		const TSharedRef<PCGExData::FFacade>& SeedsDataFacade)
+		const TSharedRef<PCGExData::FFacade>& SeedsDataFacade,
+		const TArray<double>* CascadeValues)
 	{
 		if (PathIndices.Num() < 2) { return; }
 
@@ -418,10 +430,10 @@ namespace PCGExFloodFill
 		// Copy pending writable buffer values from vtx to path
 		PCGExData::Helpers::CopyBuffersValues(VtxDataFacade, PathFacade, PathIndices, &PCGExClusters::Labels::ProtectedClusterAttributes);
 
-		WriteNormalizedPathDepth(PathFacade, PathIndices, EndpointDepth, MaxDiffusionDepth, NormalizedPathDepthName, NormalizedPathDepthMode);
+		WriteNormalizedPathDepth(PathFacade, PathIndices, EndpointDepth, MaxDiffusionDepth, NormalizedPathDepthName, NormalizedPathDepthMode, CascadeValues);
 
 		PCGExClusters::Helpers::CleanupClusterData(PathIO);
-		
+
 		PathFacade->WriteFastest(TaskManager);
 		SeedTags.Tag(SeedsDataFacade->GetInPoint(Diffusion.SeedIndex), PathIO);
 
