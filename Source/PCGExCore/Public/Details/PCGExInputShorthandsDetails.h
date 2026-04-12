@@ -32,7 +32,9 @@ struct PCGEXCORE_API FPCGExInputShorthandBase
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	EPCGExInputValueType Input = EPCGExInputValueType::Constant;
 
-	void RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const{}
+	void RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
+	{
+	}
 };
 
 #define PCGEX_ATTRIBUTE_TOGGLE_DECL const bool bDefaultToAttribute = false
@@ -284,7 +286,6 @@ struct PCGEXCORE_API FPCGExInputShorthandSelectorBase : public FPCGExInputShorth
 	/** Attribute or property selector to read from when Input is set to Attribute. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGAttributePropertyInputSelector Attribute;
-	
 };
 
 USTRUCT(BlueprintType)
@@ -296,7 +297,6 @@ struct PCGEXCORE_API FPCGExInputShorthandSelectorBoolean : public FPCGExInputSho
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool Constant = false;
-	
 };
 
 USTRUCT(BlueprintType)

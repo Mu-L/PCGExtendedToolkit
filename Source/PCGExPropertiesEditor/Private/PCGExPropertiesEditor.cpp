@@ -56,7 +56,7 @@ void FPCGExPropertiesEditorModule::StartupModule()
 
 	// Register FPCGExPropertyCompiled customization for all 17 concrete types
 	// This hides PropertyName field (shown in entry header) and only shows value fields
-	#define REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(TypeName) \
+#define REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(TypeName) \
 		PropertyModule.RegisterCustomPropertyTypeLayout( \
 			FPCGExProperty_##TypeName::StaticStruct()->GetFName(), \
 			FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyCompiledCustomization::MakeInstance) \
@@ -80,7 +80,7 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(SoftClassPath)
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(Enum)
 
-	#undef REGISTER_PROPERTY_COMPILED_CUSTOMIZATION
+#undef REGISTER_PROPERTY_COMPILED_CUSTOMIZATION
 }
 
 #undef LOCTEXT_NAMESPACE

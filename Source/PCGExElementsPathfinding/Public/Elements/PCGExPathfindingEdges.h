@@ -50,7 +50,7 @@ public:
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 	//~End UObject interface
-	
+
 	/** Controls how goals are picked.*/
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = Settings, Instanced, meta = (PCG_Overridable, NoResetToDefault, ShowOnlyInnerProperties))
 	TObjectPtr<UPCGExGoalPicker> GoalPicker;
@@ -80,9 +80,9 @@ public:
 	TObjectPtr<UPCGExSearchInstancedFactory> SearchAlgorithm;
 
 	/** Scoring mode for combining multiple heuristics */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)                                                                    
-	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage; 
-	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
+	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage;
+
 	/** Copy seed point attributes as tags on output paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging & Forwarding")
 	FPCGExAttributeToTagDetails SeedAttributesToPathTags;

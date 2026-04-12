@@ -317,7 +317,7 @@ namespace PCGExFindContoursBounded
 			AllCells,
 			CellsConstraints.ToSharedRef(),
 			Context->BoundsFilter,
-			bNeedOutside,  // Only include outside faces if user wants them
+			bNeedOutside, // Only include outside faces if user wants them
 			&FailedCells,
 			true);
 		WrapperCell = CellsConstraints->WrapperCell;

@@ -150,7 +150,9 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 
 				// Skip metadata properties
 				if (PropName == TEXT("PropertyName") || PropName == TEXT("HeaderId") || PropName == TEXT("OutputBuffer"))
+				{
 					continue;
+				}
 
 				ChildBuilder.AddExternalStructureProperty(StructOnScope, PropName);
 			}

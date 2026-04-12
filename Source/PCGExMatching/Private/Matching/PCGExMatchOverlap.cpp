@@ -27,7 +27,7 @@ bool FPCGExMatchOverlap::PrepareForMatchableSources(FPCGExContext* InContext, co
 	}
 
 	// Compute overall bounds for octree initialization
-	FBox OverallBounds(EForceInit::ForceInit);
+	FBox OverallBounds(ForceInit);
 
 	for (int32 i = 0; i < NumSources; i++)
 	{
@@ -35,7 +35,7 @@ bool FPCGExMatchOverlap::PrepareForMatchableSources(FPCGExContext* InContext, co
 
 		// Get bounds from data
 		const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(TaggedData.Data);
-		FBox DataBounds = SpatialData ? SpatialData->GetBounds() : FBox(EForceInit::ForceInit);
+		FBox DataBounds = SpatialData ? SpatialData->GetBounds() : FBox(ForceInit);
 
 		// Pre-compute expanded bounds
 		if (Config.ExpansionMode != EPCGExMatchOverlapExpansionMode::None && DataBounds.IsValid)
@@ -186,7 +186,7 @@ bool FPCGExMatchOverlap::Test(const PCGExData::FConstPoint& InTargetElement, con
 bool UPCGExMatchOverlapFactory::WantsPoints()
 {
 	return !PCGExMetaHelpers::IsDataDomainAttribute(Config.Expansion.Attribute) ||
-	       (Config.bUseMinOverlapRatio && !PCGExMetaHelpers::IsDataDomainAttribute(Config.MinOverlapRatio.Attribute));
+		(Config.bUseMinOverlapRatio && !PCGExMetaHelpers::IsDataDomainAttribute(Config.MinOverlapRatio.Attribute));
 }
 
 PCGEX_MATCH_RULE_BOILERPLATE(Overlap)

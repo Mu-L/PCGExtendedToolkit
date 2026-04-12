@@ -49,7 +49,7 @@ namespace PCGExClusters
 		bIsLocalTangent = false;
 
 		const TArray<FNode>& Nodes = *Cluster->Nodes;
-		const TArray<PCGExGraphs::FEdge>& Edges = *Cluster->Edges;
+		const TArray<FEdge>& Edges = *Cluster->Edges;
 		PCGEx::FIndexLookup* NodeLookup = Cluster->NodeIndexLookup.Get();
 		const int32 NumEdges = Edges.Num();
 		const int32 NumNodes = Nodes.Num();
@@ -63,7 +63,7 @@ namespace PCGExClusters
 
 		for (int32 EdgeIdx = 0; EdgeIdx < NumEdges; ++EdgeIdx)
 		{
-			const PCGExGraphs::FEdge& Edge = Edges[EdgeIdx];
+			const FEdge& Edge = Edges[EdgeIdx];
 			// Edge.Start and Edge.End are POINT indices, convert to node indices
 			const int32 NodeA = NodeLookup->Get(Edge.Start);
 			const int32 NodeB = NodeLookup->Get(Edge.End);
@@ -156,7 +156,7 @@ namespace PCGExClusters
 		bIsLocalTangent = true;
 
 		const TArray<FNode>& Nodes = *Cluster->Nodes;
-		const TArray<PCGExGraphs::FEdge>& Edges = *Cluster->Edges;
+		const TArray<FEdge>& Edges = *Cluster->Edges;
 		PCGEx::FIndexLookup* NodeLookup = Cluster->NodeIndexLookup.Get();
 		const int32 NumEdges = Edges.Num();
 		const int32 NumNodes = Nodes.Num();
@@ -170,7 +170,7 @@ namespace PCGExClusters
 
 		for (int32 EdgeIdx = 0; EdgeIdx < NumEdges; ++EdgeIdx)
 		{
-			const PCGExGraphs::FEdge& Edge = Edges[EdgeIdx];
+			const FEdge& Edge = Edges[EdgeIdx];
 			const int32 NodeA = NodeLookup->Get(Edge.Start);
 			const int32 NodeB = NodeLookup->Get(Edge.End);
 
@@ -223,7 +223,7 @@ namespace PCGExClusters
 			});
 		}
 
-		// Step 3: Link "next" pointers (identical logic — topology is topology)
+		// Step 3: Link "next" pointers (identical logic -- topology is topology)
 		for (int32 HEIdx = 0; HEIdx < HalfEdges.Num(); ++HEIdx)
 		{
 			FHalfEdge& HE = HalfEdges[HEIdx];
@@ -343,7 +343,7 @@ namespace PCGExClusters
 
 		// Wrapper detection:
 		// Normal/BestFit: CCW face (inverted winding) with largest area = unbounded exterior
-		// LocalTangent: no topological exterior — wrapper = largest-area cell (heuristic)
+		// LocalTangent: no topological exterior -- wrapper = largest-area cell (heuristic)
 		auto IsWrapperCandidate = [this](const FCell& Cell) -> bool
 		{
 			return bIsLocalTangent ? true : !Cell.Data.bIsClockwise;
@@ -706,7 +706,7 @@ namespace PCGExClusters
 		{
 			// Compute best-fit plane from the face nodes' 3D positions
 			PCGExMath::FBestFitPlane FacePlane(NumUniqueNodes,
-				[&](int32 i) { return Cluster->GetPos(FaceNodes[i]); });
+			                                   [&](int32 i) { return Cluster->GetPos(FaceNodes[i]); });
 			FaceProjection.Init(FacePlane);
 
 			for (int32 i = 0; i < NumOutputNodes; ++i)

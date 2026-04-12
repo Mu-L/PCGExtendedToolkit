@@ -131,7 +131,7 @@ namespace PCGExCompare
 			TArray<FString> FlattenedTags = InTags->FlattenToArray();
 			for (const FString& Tag : FlattenedTags)
 			{
-				if (Compare(MatchMode,Tag, Query)) { return true; }
+				if (Compare(MatchMode, Tag, Query)) { return true; }
 			}
 		}
 
@@ -142,7 +142,7 @@ namespace PCGExCompare
 	{
 		for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : InTags->ValueTags)
 		{
-			if (Compare(MatchMode,Pair.Key, Query)) { OutValues.Add(Pair.Value); }
+			if (Compare(MatchMode, Pair.Key, Query)) { OutValues.Add(Pair.Value); }
 		}
 
 		return !OutValues.IsEmpty();

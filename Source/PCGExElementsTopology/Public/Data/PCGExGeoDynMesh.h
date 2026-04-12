@@ -18,7 +18,7 @@ namespace PCGExMesh
 	/**
 	 * Extracts geometry from a FDynamicMesh3 into FGeoMesh arrays.
 	 * Sibling to FGeoStaticMesh but operates on dynamic meshes.
-	 * Does NOT own the source mesh — it must remain valid during extraction.
+	 * Does NOT own the source mesh -- it must remain valid during extraction.
 	 */
 	class PCGEXELEMENTSTOPOLOGY_API FGeoDynMesh : public FGeoMesh
 	{

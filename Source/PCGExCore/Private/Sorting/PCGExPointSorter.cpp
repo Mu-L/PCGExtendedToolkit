@@ -102,7 +102,7 @@ namespace PCGExSorting
 		return NumRules > 0;
 	}
 
-	template<typename FacadeArrayType>
+	template <typename FacadeArrayType>
 	bool FSorter::InitFacadesInternal(FPCGExContext* InContext, const FacadeArrayType& InDataFacades)
 	{
 		int32 MaxIndex = 0;

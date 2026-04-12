@@ -57,7 +57,7 @@ void UPCGExLevelStreamingDynamic::OnLevelLoadedChanged(ULevel* Level)
 			Actor->Destroy();
 			continue;
 		}
-		
+
 		if (GeneratedFolderPath != NAME_None)
 		{
 			Actor->SetFolderPath(GeneratedFolderPath);
@@ -98,7 +98,7 @@ void UPCGExLevelStreamingLevelInstance::OnLevelLoadedChanged(ULevel* Level)
 			Actor->Destroy();
 			continue;
 		}
-		
+
 		if (GeneratedFolder != NAME_None)
 		{
 			Actor->SetFolderPath(GeneratedFolder);
@@ -305,7 +305,7 @@ namespace PCGExStagingLoadLevel
 		UWorld* World = Request.Params.World;
 		if (!World) { return; }
 
-		// Resolve actor class — user override or our default
+		// Resolve actor class -- user override or our default
 		UClass* ActorClass = Settings->LevelInstanceClass.Get();
 		if (!ActorClass) { ActorClass = APCGExLevelInstance::StaticClass(); }
 
@@ -381,7 +381,7 @@ namespace PCGExStagingLoadLevel
 			// Compute folder path once (game thread, safe to access actor labels)
 			ComputeFolderPath();
 
-			// ALevelInstance actors persist across save/load — skip for runtime components
+			// ALevelInstance actors persist across save/load -- skip for runtime components
 			// whose output is transient and would otherwise leave stale actors in the level.
 			bUseLevelInstance = Settings->bSpawnAsLevelInstance
 				&& SourceComponent->GenerationTrigger != EPCGComponentGenerationTrigger::GenerateAtRuntime;

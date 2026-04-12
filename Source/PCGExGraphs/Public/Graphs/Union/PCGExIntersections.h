@@ -67,7 +67,11 @@ namespace PCGExGraphs
 		~FUnionNode() = default;
 
 		FORCEINLINE FVector GetCenter() const { return CenterAccum / static_cast<double>(FuseCount); }
-		FORCEINLINE void Accumulate(const FVector& Position) { CenterAccum += Position; FuseCount++; }
+		FORCEINLINE void Accumulate(const FVector& Position)
+		{
+			CenterAccum += Position;
+			FuseCount++;
+		}
 	};
 
 	PCGEX_OCTREE_SEMANTICS(FUnionNode, { return Element->Bounds;}, { return A->Index == B->Index; })

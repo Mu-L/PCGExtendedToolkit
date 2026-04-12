@@ -361,7 +361,7 @@ namespace PCGExMath::OBB
 		}
 	}
 
-	template<typename FilterFn>
+	template <typename FilterFn>
 	bool FDynamicCollection::OverlapsImpl(const FOBB& Candidate, int32 SkipIndex, FilterFn&& Filter) const
 	{
 		// 1. Octree query (entries 0..OctreeCount-1)
@@ -374,9 +374,9 @@ namespace PCGExMath::OBB
 			Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
 			{
 				const int32 i = Item.Index;
-				if (i == SkipIndex) { return true; } // Continue
+				if (i == SkipIndex) { return true; }                             // Continue
 				if (ValidMask.IsValidIndex(i) && !ValidMask[i]) { return true; } // Skip invalid
-				if (!Filter(i)) { return true; } // Custom filter says skip
+				if (!Filter(i)) { return true; }                                 // Custom filter says skip
 
 				if (SphereOverlap(GetBounds(i), Candidate.Bounds)
 					&& SATOverlap(GetOBB(i), Candidate))
@@ -416,7 +416,7 @@ namespace PCGExMath::OBB
 	bool FDynamicCollection::OverlapsFiltered(const FOBB& Candidate, int32 SkipIndex, TFunctionRef<bool(int32)> ShouldSkip) const
 	{
 		// ShouldSkip receives the stored module index (Bounds.Index), not the entry index.
-		// Filter returns true to KEEP, false to SKIP — inverted from ShouldSkip.
+		// Filter returns true to KEEP, false to SKIP -- inverted from ShouldSkip.
 		return OverlapsImpl(Candidate, SkipIndex, [this, &ShouldSkip](int32 i) { return !ShouldSkip(GetBounds(i).Index); });
 	}
 

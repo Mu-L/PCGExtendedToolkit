@@ -16,7 +16,7 @@ class PCGEXELEMENTSCLUSTERSEDITOR_API SPCGExEdgeEndpointsCompareNumPreview : pub
 public:
 	SLATE_BEGIN_ARGS(SPCGExEdgeEndpointsCompareNumPreview)
 			: _Comparison(EPCGExComparison::StrictlyGreater)
-			, _bInvert(false)
+			  , _bInvert(false)
 		{
 		}
 

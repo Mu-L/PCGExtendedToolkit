@@ -53,7 +53,6 @@ public:
 	PCGEX_FACTORY_TYPE_ID(FPCGExDataTypeInfoBlendOp)
 	//~End UPCGSettings
 
-public:
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 
 	virtual FName GetMainOutputPin() const override { return PCGExBlending::Labels::OutputBlendingLabel; }

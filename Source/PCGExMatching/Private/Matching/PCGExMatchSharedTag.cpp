@@ -99,7 +99,11 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 				{
 					if (TSharedPtr<PCGExData::IDataValue> CandidateValue = CandidateTags->GetValue(Pair.Key))
 					{
-						if (Pair.Value->SameValue(CandidateValue)) { bResult = true; break; }
+						if (Pair.Value->SameValue(CandidateValue))
+						{
+							bResult = true;
+							break;
+						}
 					}
 				}
 			}
@@ -108,7 +112,11 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 				// Check raw tags
 				for (const FString& Tag : TargetTags->RawTags)
 				{
-					if (CandidateTags->RawTags.Contains(Tag)) { bResult = true; break; }
+					if (CandidateTags->RawTags.Contains(Tag))
+					{
+						bResult = true;
+						break;
+					}
 				}
 
 				// Check value tag names (ignoring values)
@@ -116,7 +124,11 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 				{
 					for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : TargetTags->ValueTags)
 					{
-						if (CandidateTags->ValueTags.Contains(Pair.Key)) { bResult = true; break; }
+						if (CandidateTags->ValueTags.Contains(Pair.Key))
+						{
+							bResult = true;
+							break;
+						}
 					}
 				}
 			}
@@ -134,7 +146,11 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 				for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : CandidateTags->ValueTags)
 				{
 					TSharedPtr<PCGExData::IDataValue> TargetValue = TargetTags->GetValue(Pair.Key);
-					if (!TargetValue || !Pair.Value->SameValue(TargetValue)) { bResult = false; break; }
+					if (!TargetValue || !Pair.Value->SameValue(TargetValue))
+					{
+						bResult = false;
+						break;
+					}
 				}
 
 				// All candidate raw tags must exist in target
@@ -142,7 +158,11 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 				{
 					for (const FString& Tag : CandidateTags->RawTags)
 					{
-						if (!TargetTags->RawTags.Contains(Tag)) { bResult = false; break; }
+						if (!TargetTags->RawTags.Contains(Tag))
+						{
+							bResult = false;
+							break;
+						}
 					}
 				}
 			}
@@ -151,7 +171,11 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 				// All candidate raw tags must exist in target
 				for (const FString& Tag : CandidateTags->RawTags)
 				{
-					if (!TargetTags->RawTags.Contains(Tag)) { bResult = false; break; }
+					if (!TargetTags->RawTags.Contains(Tag))
+					{
+						bResult = false;
+						break;
+					}
 				}
 
 				// All candidate value tag names must exist in target (ignoring values)
@@ -159,7 +183,11 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 				{
 					for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : CandidateTags->ValueTags)
 					{
-						if (!TargetTags->ValueTags.Contains(Pair.Key)) { bResult = false; break; }
+						if (!TargetTags->ValueTags.Contains(Pair.Key))
+						{
+							bResult = false;
+							break;
+						}
 					}
 				}
 			}
@@ -176,8 +204,8 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 bool UPCGExMatchSharedTagFactory::WantsPoints()
 {
 	return Config.Mode == EPCGExTagMatchMode::Specific &&
-	       Config.TagNameInput == EPCGExInputValueType::Attribute &&
-	       !PCGExMetaHelpers::IsDataDomainAttribute(Config.TagNameAttribute);
+		Config.TagNameInput == EPCGExInputValueType::Attribute &&
+		!PCGExMetaHelpers::IsDataDomainAttribute(Config.TagNameAttribute);
 }
 
 PCGEX_MATCH_RULE_BOILERPLATE(SharedTag)

@@ -217,5 +217,4 @@ namespace PCGExTypeOps
 		const ITypeOpsBase* Ops = FTypeOpsRegistry::Get<T>();
 		return Ops->ComputeHash(&Value);
 	}
-	
 }

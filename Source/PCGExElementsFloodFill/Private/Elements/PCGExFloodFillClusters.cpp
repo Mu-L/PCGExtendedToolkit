@@ -63,7 +63,7 @@ bool FPCGExClusterDiffusionElement::Boot(FPCGExContext* InContext) const
 
 	PCGEX_CONTEXT_AND_SETTINGS(ClusterDiffusion)
 	PCGEX_FOREACH_FIELD_CLUSTER_DIFF(PCGEX_OUTPUT_VALIDATE_NAME)
-	
+
 	PCGExFactories::GetInputFactories<UPCGExBlendOpFactory>(Context, PCGExBlending::Labels::SourceBlendingLabel, Context->BlendingFactories, {PCGExFactories::EType::Blending}, false);
 
 	// Fill controls are optional
@@ -455,7 +455,7 @@ namespace PCGExClusterDiffusion
 	FBatch::FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges)
 		: TBatch(InContext, InVtx, InEdges)
 	{
-		FPCGExClusterDiffusionContext* Ctx =static_cast<FPCGExClusterDiffusionContext*>(InContext); 
+		FPCGExClusterDiffusionContext* Ctx = static_cast<FPCGExClusterDiffusionContext*>(InContext);
 		// Only request heuristics if the deprecated pin is connected
 		// Modern approach is to use 'Heuristics Scoring' fill control instead
 		SetWantsHeuristics(Ctx->GetHasValidHeuristics(), EPCGExHeuristicScoreMode::WeightedAverage);

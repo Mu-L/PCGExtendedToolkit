@@ -63,8 +63,8 @@ namespace PCGExGraphs::Helpers
 
 				if ((!StartPointIndexPtr || !EndPointIndexPtr))
 				{
-					FPlatformAtomics::InterlockedExchange(&bValid, 1);
-					return;
+				FPlatformAtomics::InterlockedExchange(&bValid, 1);
+				return;
 				}
 
 				OutEdges[i] = FEdge(i, *StartPointIndexPtr, *EndPointIndexPtr, i, EdgeIOIndex);

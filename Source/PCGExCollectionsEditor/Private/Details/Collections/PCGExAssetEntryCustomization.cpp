@@ -364,100 +364,102 @@ TSharedRef<SWidget> FPCGExActorEntryCustomization::GetAssetPicker(
 	TSharedPtr<IPropertyHandle> DeltaSourceActorNameHandle = PropertyHandle->GetChildHandle(FName("DeltaSourceActorName"));
 
 	return SNew(SHorizontalBox)
-		PCGEX_ENTRY_INDEX
+			PCGEX_ENTRY_INDEX
 
-		// SubCollection picker (when bIsSubCollection)
-		+ SHorizontalBox::Slot()
-		.FillWidth(1)
-		.MinWidth(200)
-		.Padding(2, 0)
-		[
-			SNew(SBox)
-			.ToolTipText(SubCollection->GetToolTipText())
-			PCGEX_SUBCOLLECTION_VISIBLE
+			// SubCollection picker (when bIsSubCollection)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1)
+			.MinWidth(200)
+			.Padding(2, 0)
 			[
-				SubCollection->CreatePropertyValueWidget()
-			]
-		]
-
-		// Actor class picker + pick button below (when !bIsSubCollection AND no delta source)
-		+ SHorizontalBox::Slot()
-		.FillWidth(1)
-		.MinWidth(200)
-		.Padding(2, 0)
-		[
-			SNew(SBox)
-			.Visibility_Lambda([IsSubCollectionHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle]()
-			{
-				bool bSub = false;
-				IsSubCollectionHandle->GetValue(bSub);
-				if (bSub) { return EVisibility::Collapsed; }
-				return PCGExActorEntryCustomization::HasDeltaSource(DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
-					? EVisibility::Collapsed : EVisibility::Visible;
-			})
-			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot()
-				.AutoHeight()
+				SNew(SBox)
+				.ToolTipText(SubCollection->GetToolTipText())
+				PCGEX_SUBCOLLECTION_VISIBLE
 				[
-					AssetHandle->CreatePropertyValueWidget()
-				]
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.HAlign(HAlign_Left)
-				.Padding(0, 2, 0, 0)
-				[
-					PCGExActorEntryCustomization::MakePickButton(ActorClassHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
+					SubCollection->CreatePropertyValueWidget()
 				]
 			]
-		]
 
-		// Delta source display (when !bIsSubCollection AND has delta source)
-		+ SHorizontalBox::Slot()
-		.FillWidth(1)
-		.Padding(2, 0)
-		[
-			SNew(SBox)
-			.Visibility_Lambda([IsSubCollectionHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle]()
-			{
-				bool bSub = false;
-				IsSubCollectionHandle->GetValue(bSub);
-				if (bSub) { return EVisibility::Collapsed; }
-				return PCGExActorEntryCustomization::HasDeltaSource(DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
-					? EVisibility::Visible : EVisibility::Collapsed;
-			})
+			// Actor class picker + pick button below (when !bIsSubCollection AND no delta source)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1)
+			.MinWidth(200)
+			.Padding(2, 0)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.FillWidth(1)
-				.VAlign(VAlign_Center)
-				.Padding(2, 0)
+				SNew(SBox)
+				.Visibility_Lambda([IsSubCollectionHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle]()
+				{
+					bool bSub = false;
+					IsSubCollectionHandle->GetValue(bSub);
+					if (bSub) { return EVisibility::Collapsed; }
+					return PCGExActorEntryCustomization::HasDeltaSource(DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
+						       ? EVisibility::Collapsed
+						       : EVisibility::Visible;
+				})
 				[
-					DeltaSourceLevelHandle->CreatePropertyValueWidget()
-				]
-				+ SHorizontalBox::Slot()
-				.FillWidth(1)
-				.VAlign(VAlign_Center)
-				.Padding(2, 0)
-				[
-					DeltaSourceActorNameHandle->CreatePropertyValueWidget()
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				.Padding(2, 0)
-				[
-					PCGExActorEntryCustomization::MakePickButton(ActorClassHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.VAlign(VAlign_Center)
-				.Padding(2, 0)
-				[
-					PCGExActorEntryCustomization::MakeGoToButton(DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					[
+						AssetHandle->CreatePropertyValueWidget()
+					]
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					.HAlign(HAlign_Left)
+					.Padding(0, 2, 0, 0)
+					[
+						PCGExActorEntryCustomization::MakePickButton(ActorClassHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
+					]
 				]
 			]
-		];
+
+			// Delta source display (when !bIsSubCollection AND has delta source)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1)
+			.Padding(2, 0)
+			[
+				SNew(SBox)
+				.Visibility_Lambda([IsSubCollectionHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle]()
+				{
+					bool bSub = false;
+					IsSubCollectionHandle->GetValue(bSub);
+					if (bSub) { return EVisibility::Collapsed; }
+					return PCGExActorEntryCustomization::HasDeltaSource(DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
+						       ? EVisibility::Visible
+						       : EVisibility::Collapsed;
+				})
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.FillWidth(1)
+					.VAlign(VAlign_Center)
+					.Padding(2, 0)
+					[
+						DeltaSourceLevelHandle->CreatePropertyValueWidget()
+					]
+					+ SHorizontalBox::Slot()
+					.FillWidth(1)
+					.VAlign(VAlign_Center)
+					.Padding(2, 0)
+					[
+						DeltaSourceActorNameHandle->CreatePropertyValueWidget()
+					]
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					.Padding(2, 0)
+					[
+						PCGExActorEntryCustomization::MakePickButton(ActorClassHandle, DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
+					]
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					.Padding(2, 0)
+					[
+						PCGExActorEntryCustomization::MakeGoToButton(DeltaSourceLevelHandle, DeltaSourceActorNameHandle)
+					]
+				]
+			];
 }
 
 void FPCGExActorEntryCustomization::CustomizeChildren(
@@ -476,13 +478,13 @@ void FPCGExActorEntryCustomization::CustomizeChildren(
 	if (!DeltaSourceLevelHandle.IsValid() || !DeltaSourceActorNameHandle.IsValid()) { return; }
 
 	ChildBuilder.AddCustomRow(FText::FromString("Delta Source"))
-		.Visibility(MakeAttributeLambda([IsSubCollectionHandle]()
-		{
-			bool bIsSubCollection = false;
-			if (IsSubCollectionHandle.IsValid()) { IsSubCollectionHandle->GetValue(bIsSubCollection); }
-			return bIsSubCollection ? EVisibility::Collapsed : EVisibility::Visible;
-		}))
-		.NameContent()
+	            .Visibility(MakeAttributeLambda([IsSubCollectionHandle]()
+	            {
+		            bool bIsSubCollection = false;
+		            if (IsSubCollectionHandle.IsValid()) { IsSubCollectionHandle->GetValue(bIsSubCollection); }
+		            return bIsSubCollection ? EVisibility::Collapsed : EVisibility::Visible;
+	            }))
+	            .NameContent()
 		[
 			DeltaSourceLevelHandle->CreatePropertyValueWidget()
 		]
@@ -547,81 +549,83 @@ TSharedRef<SWidget> FPCGExPCGDataAssetEntryCustomization::GetAssetPicker(TShared
 	TSharedPtr<IPropertyHandle> LevelHandle = PropertyHandle->GetChildHandle(FName("Level"));
 
 	return SNew(SHorizontalBox)
-		PCGEX_ENTRY_INDEX
+			PCGEX_ENTRY_INDEX
 
-		// Source dropdown (hidden when subcollection)
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
-		.VAlign(VAlign_Center)
-		.Padding(2, 0)
-		[
-			SNew(SBox)
-			.ToolTipText(SourceHandle->GetToolTipText())
-			PCGEX_SUBCOLLECTION_COLLAPSED
+			// Source dropdown (hidden when subcollection)
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.Padding(2, 0)
 			[
-				PCGExEnumCustomization::CreateRadioGroup(SourceHandle, TEXT("EPCGExDataAssetEntrySource"))
+				SNew(SBox)
+				.ToolTipText(SourceHandle->GetToolTipText())
+				PCGEX_SUBCOLLECTION_COLLAPSED
+				[
+					PCGExEnumCustomization::CreateRadioGroup(SourceHandle, TEXT("EPCGExDataAssetEntrySource"))
+				]
 			]
-		]
 
-		// SubCollection picker
-		+ SHorizontalBox::Slot()
-		.FillWidth(1)
-		.MinWidth(200)
-		.Padding(2, 0)
-		[
-			SNew(SBox)
-			.ToolTipText(SubCollection->GetToolTipText())
-			PCGEX_SUBCOLLECTION_VISIBLE
+			// SubCollection picker
+			+ SHorizontalBox::Slot()
+			.FillWidth(1)
+			.MinWidth(200)
+			.Padding(2, 0)
 			[
-				SubCollection->CreatePropertyValueWidget()
+				SNew(SBox)
+				.ToolTipText(SubCollection->GetToolTipText())
+				PCGEX_SUBCOLLECTION_VISIBLE
+				[
+					SubCollection->CreatePropertyValueWidget()
+				]
 			]
-		]
 
-		// DataAsset picker (when !subcollection && Source == DataAsset)
-		+ SHorizontalBox::Slot()
-		.FillWidth(1)
-		.MinWidth(200)
-		.Padding(2, 0)
-		[
-			SNew(SBox)
-			.ToolTipText(DataAssetHandle->GetToolTipText())
-			.Visibility_Lambda([IsSubCollectionHandle, SourceHandle]()
-			{
-				bool bIsSubCollection = false;
-				IsSubCollectionHandle->GetValue(bIsSubCollection);
-				if (bIsSubCollection) { return EVisibility::Collapsed; }
-				uint8 SourceValue = 0;
-				SourceHandle->GetValue(SourceValue);
-				return static_cast<EPCGExDataAssetEntrySource>(SourceValue) == EPCGExDataAssetEntrySource::DataAsset
-					? EVisibility::Visible : EVisibility::Collapsed;
-			})
+			// DataAsset picker (when !subcollection && Source == DataAsset)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1)
+			.MinWidth(200)
+			.Padding(2, 0)
 			[
-				DataAssetHandle->CreatePropertyValueWidget()
+				SNew(SBox)
+				.ToolTipText(DataAssetHandle->GetToolTipText())
+				.Visibility_Lambda([IsSubCollectionHandle, SourceHandle]()
+				{
+					bool bIsSubCollection = false;
+					IsSubCollectionHandle->GetValue(bIsSubCollection);
+					if (bIsSubCollection) { return EVisibility::Collapsed; }
+					uint8 SourceValue = 0;
+					SourceHandle->GetValue(SourceValue);
+					return static_cast<EPCGExDataAssetEntrySource>(SourceValue) == EPCGExDataAssetEntrySource::DataAsset
+						       ? EVisibility::Visible
+						       : EVisibility::Collapsed;
+				})
+				[
+					DataAssetHandle->CreatePropertyValueWidget()
+				]
 			]
-		]
 
-		// Level picker (when !subcollection && Source == Level)
-		+ SHorizontalBox::Slot()
-		.FillWidth(1)
-		.MinWidth(200)
-		.Padding(2, 0)
-		[
-			SNew(SBox)
-			.ToolTipText(LevelHandle->GetToolTipText())
-			.Visibility_Lambda([IsSubCollectionHandle, SourceHandle]()
-			{
-				bool bIsSubCollection = false;
-				IsSubCollectionHandle->GetValue(bIsSubCollection);
-				if (bIsSubCollection) { return EVisibility::Collapsed; }
-				uint8 SourceValue = 0;
-				SourceHandle->GetValue(SourceValue);
-				return static_cast<EPCGExDataAssetEntrySource>(SourceValue) == EPCGExDataAssetEntrySource::Level
-					? EVisibility::Visible : EVisibility::Collapsed;
-			})
+			// Level picker (when !subcollection && Source == Level)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1)
+			.MinWidth(200)
+			.Padding(2, 0)
 			[
-				LevelHandle->CreatePropertyValueWidget()
-			]
-		];
+				SNew(SBox)
+				.ToolTipText(LevelHandle->GetToolTipText())
+				.Visibility_Lambda([IsSubCollectionHandle, SourceHandle]()
+				{
+					bool bIsSubCollection = false;
+					IsSubCollectionHandle->GetValue(bIsSubCollection);
+					if (bIsSubCollection) { return EVisibility::Collapsed; }
+					uint8 SourceValue = 0;
+					SourceHandle->GetValue(SourceValue);
+					return static_cast<EPCGExDataAssetEntrySource>(SourceValue) == EPCGExDataAssetEntrySource::Level
+						       ? EVisibility::Visible
+						       : EVisibility::Collapsed;
+				})
+				[
+					LevelHandle->CreatePropertyValueWidget()
+				]
+			];
 }
 
 #pragma endregion

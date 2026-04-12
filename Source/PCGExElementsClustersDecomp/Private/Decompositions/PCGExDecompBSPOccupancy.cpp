@@ -84,7 +84,7 @@ void FPCGExDecompBSPOccupancy::SplitRecursive(
 
 	if (!FindBestSplit(Grid, Region, OccupiedCount, SplitAxis, SplitPos))
 	{
-		// No good split — make this a leaf
+		// No good split -- make this a leaf
 		const int32 CellID = NextCellID++;
 		for (int32 Z = Region.Min.Z; Z <= Region.Max.Z; Z++)
 		{
@@ -182,9 +182,18 @@ bool FPCGExDecompBSPOccupancy::FindBestSplit(
 					int32 X, Y, Z;
 					switch (Axis)
 					{
-					case 0: X = SliceCoord; Y = A; Z = B; break;
-					case 1: X = A; Y = SliceCoord; Z = B; break;
-					default: X = A; Y = B; Z = SliceCoord; break;
+					case 0: X = SliceCoord;
+						Y = A;
+						Z = B;
+						break;
+					case 1: X = A;
+						Y = SliceCoord;
+						Z = B;
+						break;
+					default: X = A;
+						Y = B;
+						Z = SliceCoord;
+						break;
 					}
 
 					if (Grid.IsOccupied(X, Y, Z)) { SliceOccupancy[S]++; }

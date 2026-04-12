@@ -16,10 +16,10 @@ class PCGEXCOREEDITOR_API SPCGExDotComparisonPreview : public SLeafWidget
 public:
 	SLATE_BEGIN_ARGS(SPCGExDotComparisonPreview)
 			: _Comparison(EPCGExComparison::EqualOrGreater)
-			, _bUnsigned(false)
-			, _ComparisonThreshold(0.5)
-			, _ComparisonTolerance(0.0)
-			, _bShowThreshold(true)
+			  , _bUnsigned(false)
+			  , _ComparisonThreshold(0.5)
+			  , _ComparisonTolerance(0.0)
+			  , _bShowThreshold(true)
 		{
 		}
 

@@ -8,7 +8,7 @@
 
 class UPCGExAssetCollection;
 
-/** Level collection editor — minimal reference implementation. */
+/** Level collection editor -- minimal reference implementation. */
 class FPCGExLevelCollectionEditor : public FPCGExAssetCollectionEditor
 {
 public:

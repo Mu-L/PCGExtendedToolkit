@@ -17,11 +17,11 @@ class PCGEXELEMENTSCLUSTERSEDITOR_API SPCGExEdgeNeighborsCountPreview : public S
 public:
 	SLATE_BEGIN_ARGS(SPCGExEdgeNeighborsCountPreview)
 			: _Mode(EPCGExRefineEdgeThresholdMode::Sum)
-			, _Comparison(EPCGExComparison::StrictlyGreater)
-			, _ThresholdConstant(2)
-			, _Tolerance(0)
-			, _bInvert(false)
-			, _bShowThreshold(true)
+			  , _Comparison(EPCGExComparison::StrictlyGreater)
+			  , _ThresholdConstant(2)
+			  , _Tolerance(0)
+			  , _bInvert(false)
+			  , _bShowThreshold(true)
 		{
 		}
 

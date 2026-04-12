@@ -17,9 +17,9 @@
 UENUM(BlueprintType)
 enum class EPCGExFloodFillThresholdSource : uint8
 {
-	EdgeScore      UMETA(DisplayName = "Edge Score", ToolTip = "Current edge's heuristic score"),
-	GlobalScore    UMETA(DisplayName = "Global Score", ToolTip = "Heuristic distance from seed to candidate"),
-	ScoreDelta     UMETA(DisplayName = "Score Delta", ToolTip = "Change in score from previous candidate"),
+	EdgeScore UMETA(DisplayName = "Edge Score", ToolTip = "Current edge's heuristic score"),
+	GlobalScore UMETA(DisplayName = "Global Score", ToolTip = "Heuristic distance from seed to candidate"),
+	ScoreDelta UMETA(DisplayName = "Score Delta", ToolTip = "Change in score from previous candidate"),
 };
 
 USTRUCT(BlueprintType)
@@ -34,9 +34,9 @@ struct FPCGExFillControlConfigHeuristicsThreshold : public FPCGExFillControlConf
 	}
 
 	/** Scoring mode for combining multiple heuristics */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)                                                                    
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage;
-	
+
 	/** Threshold input type. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	EPCGExInputValueType ThresholdInput = EPCGExInputValueType::Constant;

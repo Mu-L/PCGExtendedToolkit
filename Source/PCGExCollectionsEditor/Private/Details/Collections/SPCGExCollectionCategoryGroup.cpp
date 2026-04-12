@@ -208,10 +208,10 @@ void SPCGExCollectionCategoryGroup::AddTile(const TSharedRef<SWidget>& TileWidge
 	if (TilesWrapBox.IsValid())
 	{
 		TilesWrapBox->AddSlot()
-			.Padding(2.f)
-			[
-				TileWidget
-			];
+		            .Padding(2.f)
+		[
+			TileWidget
+		];
 	}
 }
 

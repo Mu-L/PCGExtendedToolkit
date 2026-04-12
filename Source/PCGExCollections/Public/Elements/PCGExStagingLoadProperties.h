@@ -38,9 +38,8 @@ protected:
 	virtual bool SupportsDataStealing() const override { return true; }
 
 public:
-	
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
-	
+
 	/**
 	 * Properties to output as point attributes.
 	 * Property names must match properties defined in the source collection.

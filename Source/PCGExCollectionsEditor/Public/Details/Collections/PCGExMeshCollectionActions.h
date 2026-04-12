@@ -43,10 +43,12 @@ public:
 	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(0, 255, 255)); }
 	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("A weighted collection of static meshes with optional material overrides."); }
 	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExMeshCollection::StaticClass(); }
+
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{
-		static const auto Categories = { FAssetCategoryPath(INVTEXT("PCGEx")) / INVTEXT("Collections") };
+		static const auto Categories = {FAssetCategoryPath(INVTEXT("PCGEx")) / INVTEXT("Collections")};
 		return Categories;
 	}
+
 	virtual EAssetCommandResult OpenAssets(const FAssetOpenArgs& OpenArgs) const override;
 };

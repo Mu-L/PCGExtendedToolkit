@@ -24,10 +24,10 @@ void FPCGExMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager
 	if (IOs.IsEmpty()) { return; }
 
 	FPCGExMergePointsContext* Ctx = TaskManager->GetContext<FPCGExMergePointsContext>();
-	const TSharedPtr<PCGExData::FPointIO> CompositeIO = Ctx->MainPoints->Emplace_GetRef( IOs[0], PCGExData::EIOInit::New);
-	
-	if (!CompositeIO){return;}
-	
+	const TSharedPtr<PCGExData::FPointIO> CompositeIO = Ctx->MainPoints->Emplace_GetRef(IOs[0], PCGExData::EIOInit::New);
+
+	if (!CompositeIO) { return; }
+
 	CompositeDataFacade = MakeShared<PCGExData::FFacade>(CompositeIO.ToSharedRef());
 
 	Merger = MakeShared<FPCGExPointIOMerger>(CompositeDataFacade.ToSharedRef());

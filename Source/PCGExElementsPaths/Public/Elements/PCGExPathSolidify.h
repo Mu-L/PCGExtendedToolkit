@@ -167,7 +167,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Tertiary"))
 	FPCGExPathSolidificationRadiusDetails TertiaryAxis;
 
-	
+
 	/** Type of arithmetic path point cross direction.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Normal", EditCondition="NormalType_DEPRECATED == EPCGExInputValueType::Constant", EditConditionHides))
 	EPCGExPathNormalDirection Normal = EPCGExPathNormalDirection::Normal;
@@ -192,9 +192,9 @@ public:
 	/** Solidification Lerp.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExInputShorthandSelectorDouble SolidificationLerp = FPCGExInputShorthandSelectorDouble(FName("@Last"), 0, false);
-	
+
 #pragma region DEPRECATED
-	
+
 	UPROPERTY()
 	EPCGExInputValueType SolidificationLerpInput_DEPRECATED = EPCGExInputValueType::Constant;
 

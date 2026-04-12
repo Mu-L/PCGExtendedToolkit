@@ -80,7 +80,7 @@ struct FPCGExPartitonRuleConfig : public FPCGExInputConfig
 	EPCGExPartitionFilterMode FilterMode = EPCGExPartitionFilterMode::Floor;
 
 	/** Value used for modulo operation when FilterMode is set to Modulo. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="FilterMode==EPCGExPartitionFilterMode::Modulo", EditConditionHides, ClampMin=1))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="FilterMode == EPCGExPartitionFilterMode::Modulo", EditConditionHides, ClampMin=1))
 	int32 ModuloValue = 10;
 
 	/** Whether to clamp the partition key to a specific range. */

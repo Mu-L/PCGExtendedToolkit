@@ -92,7 +92,7 @@ void FPCGExWeightedPropertyOverridesCustomization::CustomizeChildren(
 	});
 
 	OverridesArrayHandle->SetOnPropertyValueChanged(RefreshDelegate);
-	// No SetOnChildPropertyValueChanged — see FPCGExPropertyOverridesCustomization for rationale.
+	// No SetOnChildPropertyValueChanged -- see FPCGExPropertyOverridesCustomization for rationale.
 
 	// Iterate override entries - hide array controls
 	uint32 NumElements = 0;

@@ -133,12 +133,12 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 }
 
 void FPCGExAssetCollectionToSetElement::ProcessEntry(
-FPCGExContext* InContext,
-	const FPCGExAssetCollectionEntry* InEntry, 
-	TArray<const FPCGExAssetCollectionEntry*>& OutEntries, 
-	const bool bOmitInvalidAndEmpty, 
-	const bool bNoDuplicates, 
-	const EPCGExSubCollectionToSet SubHandling, 
+	FPCGExContext* InContext,
+	const FPCGExAssetCollectionEntry* InEntry,
+	TArray<const FPCGExAssetCollectionEntry*>& OutEntries,
+	const bool bOmitInvalidAndEmpty,
+	const bool bNoDuplicates,
+	const EPCGExSubCollectionToSet SubHandling,
 	TSet<uint64>& GUIDS)
 {
 	if (bNoDuplicates) { if (OutEntries.Contains(InEntry)) { return; } }

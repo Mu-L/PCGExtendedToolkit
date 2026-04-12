@@ -29,9 +29,10 @@ public:
 	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(195, 0, 40)); }
 	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("A library of named bitmask values for tagging and adjacency testing."); }
 	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExBitmaskCollection::StaticClass(); }
+
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{
-		static const auto Categories = { FAssetCategoryPath(INVTEXT("PCGEx")) };
+		static const auto Categories = {FAssetCategoryPath(INVTEXT("PCGEx"))};
 		return Categories;
 	}
 };

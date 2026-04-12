@@ -32,15 +32,15 @@ bool SPCGExEdgeNeighborsCountPreview::Evaluate(
 	switch (InMode)
 	{
 	case EPCGExRefineEdgeThresholdMode::Sum:
-		bPass = PCGExCompare::Compare(InComparison, FromCount + ToCount, Threshold, static_cast<double>(InTolerance));
+		bPass = PCGExCompare::Compare(InComparison, FromCount + ToCount, Threshold, InTolerance);
 		break;
 	case EPCGExRefineEdgeThresholdMode::Any:
-		bPass = PCGExCompare::Compare(InComparison, FromCount, Threshold, static_cast<double>(InTolerance)) ||
-			PCGExCompare::Compare(InComparison, ToCount, Threshold, static_cast<double>(InTolerance));
+		bPass = PCGExCompare::Compare(InComparison, FromCount, Threshold, InTolerance) ||
+			PCGExCompare::Compare(InComparison, ToCount, Threshold, InTolerance);
 		break;
 	case EPCGExRefineEdgeThresholdMode::Both:
-		bPass = PCGExCompare::Compare(InComparison, FromCount, Threshold, static_cast<double>(InTolerance)) &&
-			PCGExCompare::Compare(InComparison, ToCount, Threshold, static_cast<double>(InTolerance));
+		bPass = PCGExCompare::Compare(InComparison, FromCount, Threshold, InTolerance) &&
+			PCGExCompare::Compare(InComparison, ToCount, Threshold, InTolerance);
 		break;
 	default:
 		bPass = false;
@@ -106,7 +106,7 @@ int32 SPCGExEdgeNeighborsCountPreview::PaintAttributeMode(
 	const float ContentWidth = LocalSize.X - 2.0f * Padding;
 	const float PanelWidth = (ContentWidth - (NumPanels - 1) * PanelGap) / NumPanels;
 	const float EdgeY = LocalSize.Y * 0.5f;
-	const float EdgeMargin = 20.0f;
+	constexpr float EdgeMargin = 20.0f;
 
 	for (int32 Panel = 0; Panel < NumPanels; ++Panel)
 	{
@@ -119,7 +119,7 @@ int32 SPCGExEdgeNeighborsCountPreview::PaintAttributeMode(
 		DrawFilledCircle(OutDrawElements, LayerId + 1, AllottedGeometry, EndPos, EndpointRadius, AttributeModeColor);
 
 		// Muted stubs
-		const int32 StubCounts[NumPanels] = {3, 2, 4};
+		constexpr int32 StubCounts[NumPanels] = {3, 2, 4};
 		DrawNeighborStubs(OutDrawElements, LayerId + 2, AllottedGeometry, StartPos, StubCounts[Panel], true);
 		DrawNeighborStubs(OutDrawElements, LayerId + 2, AllottedGeometry, EndPos, StubCounts[Panel], false);
 	}
@@ -164,22 +164,28 @@ int32 SPCGExEdgeNeighborsCountPreview::OnPaint(
 	int32 ToCounts[3];
 	if (T <= 1)
 	{
-		FromCounts[0] = 1; ToCounts[0] = 1;
-		FromCounts[1] = 2; ToCounts[1] = 1;
-		FromCounts[2] = 3; ToCounts[2] = 1;
+		FromCounts[0] = 1;
+		ToCounts[0] = 1;
+		FromCounts[1] = 2;
+		ToCounts[1] = 1;
+		FromCounts[2] = 3;
+		ToCounts[2] = 1;
 	}
 	else
 	{
-		FromCounts[0] = T;                       ToCounts[0] = FMath::Max(1, T - 1);
-		FromCounts[1] = FMath::Max(1, T + 1);   ToCounts[1] = 1;
-		FromCounts[2] = FMath::Max(1, T - 1);   ToCounts[2] = FMath::Max(1, T - 1);
+		FromCounts[0] = T;
+		ToCounts[0] = FMath::Max(1, T - 1);
+		FromCounts[1] = FMath::Max(1, T + 1);
+		ToCounts[1] = 1;
+		FromCounts[2] = FMath::Max(1, T - 1);
+		ToCounts[2] = FMath::Max(1, T - 1);
 	}
 
 	constexpr int32 NumPanels = 3;
 	const float ContentWidth = LocalSize.X - 2.0f * Padding;
 	const float PanelWidth = (ContentWidth - (NumPanels - 1) * PanelGap) / NumPanels;
 	const float EdgeY = LocalSize.Y * 0.55f;
-	const float EdgeMargin = 22.0f;
+	constexpr float EdgeMargin = 22.0f;
 	const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Regular", 7);
 
 	for (int32 Panel = 0; Panel < NumPanels; ++Panel)
@@ -241,8 +247,8 @@ int32 SPCGExEdgeNeighborsCountPreview::OnPaint(
 		else
 		{
 			// Per-endpoint comparison indicators (small checkmark/cross above each endpoint)
-			const bool bFromPass = PCGExCompare::Compare(CurrentComparison, FC, T, static_cast<double>(CurrentTolerance));
-			const bool bToPass = PCGExCompare::Compare(CurrentComparison, TC, T, static_cast<double>(CurrentTolerance));
+			const bool bFromPass = PCGExCompare::Compare(CurrentComparison, FC, T, CurrentTolerance);
+			const bool bToPass = PCGExCompare::Compare(CurrentComparison, TC, T, CurrentTolerance);
 
 			const FLinearColor FromIndColor = bFromPass ? EndpointPassColor : EndpointFailColor;
 			const FLinearColor ToIndColor = bToPass ? EndpointPassColor : EndpointFailColor;

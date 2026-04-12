@@ -42,10 +42,12 @@ public:
 	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(255, 156, 0)); }
 	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("A weighted collection of level assets."); }
 	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExLevelCollection::StaticClass(); }
+
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{
-		static const auto Categories = { FAssetCategoryPath(INVTEXT("PCGEx")) / INVTEXT("Collections") };
+		static const auto Categories = {FAssetCategoryPath(INVTEXT("PCGEx")) / INVTEXT("Collections")};
 		return Categories;
 	}
+
 	virtual EAssetCommandResult OpenAssets(const FAssetOpenArgs& OpenArgs) const override;
 };

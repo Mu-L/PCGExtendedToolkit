@@ -80,13 +80,13 @@ namespace PCGExBFSDepth
 		if (!IProcessor::Process(InTaskManager)) { return false; }
 
 		if (Context->SeedsDataFacade->GetNum() <= 0) { return false; }
-		
+
 		Depths.Init(-1, NumNodes);
 		Seeded.Init(0, NumNodes);
 
 		if (Settings->bUseOctreeSearch) { Cluster->RebuildOctree(Settings->SeedPicking.PickingMethod); }
 
-		
+
 		PCGEX_ASYNC_GROUP_CHKD(TaskManager, SeedPickingGroup)
 
 		SeedPickingGroup->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
@@ -126,7 +126,6 @@ namespace PCGExBFSDepth
 			}
 		};
 
-		
 
 		SeedPickingGroup->StartSubLoops(Context->SeedsDataFacade->GetNum(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize);
 
@@ -180,7 +179,7 @@ namespace PCGExBFSDepth
 			Queue.Add(NodeIdx);
 		}
 
-		// BFS — branched to avoid sqrt when distance output is disabled
+		// BFS -- branched to avoid sqrt when distance output is disabled
 		int32 Head = 0;
 
 		if (bComputeDistance)
@@ -205,7 +204,11 @@ namespace PCGExBFSDepth
 
 					if (DepthData) { DepthData[NeighborPointIdx] = NextDepth; }
 					DistanceData[NeighborPointIdx] = NewDist;
-					if (bTrackSeedOwner) { SeedOwners[Lk.Node] = SeedOwners[CurrentIdx]; SeedIndexData[NeighborPointIdx] = SeedOwners[CurrentIdx]; }
+					if (bTrackSeedOwner)
+					{
+						SeedOwners[Lk.Node] = SeedOwners[CurrentIdx];
+						SeedIndexData[NeighborPointIdx] = SeedOwners[CurrentIdx];
+					}
 
 					Queue.Add(Lk.Node);
 				}
@@ -225,7 +228,11 @@ namespace PCGExBFSDepth
 
 					Depths[Lk.Node] = NextDepth;
 					if (DepthData) { DepthData[Nodes[Lk.Node].PointIndex] = NextDepth; }
-					if (bTrackSeedOwner) { SeedOwners[Lk.Node] = SeedOwners[CurrentIdx]; SeedIndexData[Nodes[Lk.Node].PointIndex] = SeedOwners[CurrentIdx]; }
+					if (bTrackSeedOwner)
+					{
+						SeedOwners[Lk.Node] = SeedOwners[CurrentIdx];
+						SeedIndexData[Nodes[Lk.Node].PointIndex] = SeedOwners[CurrentIdx];
+					}
 
 					Queue.Add(Lk.Node);
 				}

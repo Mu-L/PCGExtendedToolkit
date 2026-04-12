@@ -22,8 +22,8 @@ struct PCGEXCORE_API FPCGExFittingVariations
 		const FVector& InScaleMin, const FVector& InScaleMax,
 		const EPCGExVariationSnapping InSnapScale, const FVector& InScaleSnap, const bool bInUniformScale)
 		: OffsetMin(InOffsetMin), OffsetMax(InOffsetMax), SnapPosition(InSnapPosition), OffsetSnap(InOffsetSnap), bAbsoluteOffset(bInAbsoluteOffset)
-		, RotationMin(InRotationMin), RotationMax(InRotationMax), SnapRotation(InSnapRotation), RotationSnap(InRotationSnap), AbsoluteRotation(InAbsoluteRotation)
-		, ScaleMin(InScaleMin), ScaleMax(InScaleMax), SnapScale(InSnapScale), ScaleSnap(InScaleSnap), bUniformScale(bInUniformScale)
+		  , RotationMin(InRotationMin), RotationMax(InRotationMax), SnapRotation(InSnapRotation), RotationSnap(InRotationSnap), AbsoluteRotation(InAbsoluteRotation)
+		  , ScaleMin(InScaleMin), ScaleMax(InScaleMax), SnapScale(InSnapScale), ScaleSnap(InScaleSnap), bUniformScale(bInUniformScale)
 	{
 	}
 

@@ -44,7 +44,7 @@ namespace PCGExMath
 
 			// Find largest eigenvalue/eigenvector using power iteration (primary axis)
 			// Try different starting vectors in case one aligns with a zero-variance direction
-			const FVector StartVectors[3] = { FVector(1, 0, 0), FVector(0, 1, 0), FVector(0, 0, 1) };
+			const FVector StartVectors[3] = {FVector(1, 0, 0), FVector(0, 1, 0), FVector(0, 0, 1)};
 			FVector V0 = StartVectors[0];
 
 			for (int32 StartIdx = 0; StartIdx < 3; StartIdx++)
@@ -114,7 +114,9 @@ namespace PCGExMath
 			}
 
 			// Sort axes by variance (largest to smallest) with index tie-breaker for determinism
-			OutSwizzle[0] = 0; OutSwizzle[1] = 1; OutSwizzle[2] = 2;
+			OutSwizzle[0] = 0;
+			OutSwizzle[1] = 1;
+			OutSwizzle[2] = 2;
 			Algo::Sort(TArrayView<int32>(OutSwizzle, 3), [&](const int32 A, const int32 B)
 			{
 				if (Variance[A] != Variance[B]) { return Variance[A] > Variance[B]; }

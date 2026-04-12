@@ -269,7 +269,7 @@ namespace PCGExMath::OBB
 		void MaybeRebuildOctree();
 
 		/** Templated overlap implementation for code reuse. */
-		template<typename FilterFn>
+		template <typename FilterFn>
 		bool OverlapsImpl(const FOBB& Candidate, int32 SkipIndex, FilterFn&& Filter) const;
 	};
 }

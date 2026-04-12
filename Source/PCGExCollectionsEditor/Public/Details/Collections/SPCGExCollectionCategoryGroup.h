@@ -29,20 +29,20 @@ class SPCGExCollectionCategoryGroup : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SPCGExCollectionCategoryGroup)
-		: _EntryCount(0)
-		, _bIsCollapsed(false)
-	{
-	}
+			: _EntryCount(0)
+			  , _bIsCollapsed(false)
+		{
+		}
 
-	SLATE_ARGUMENT(FName, CategoryName)
-	SLATE_ARGUMENT(int32, EntryCount)
-	SLATE_ARGUMENT(bool, bIsCollapsed)
-	SLATE_EVENT(FOnCategoryRenamed, OnCategoryRenamed)
-	SLATE_EVENT(FOnTileDropOnCategory, OnTileDropOnCategory)
-	SLATE_EVENT(FOnAssetDropOnCategory, OnAssetDropOnCategory)
-	SLATE_EVENT(FOnAddToCategory, OnAddToCategory)
-	SLATE_EVENT(FOnCategoryExpansionChanged, OnExpansionChanged)
-	SLATE_EVENT(FOnTileReorderInCategory, OnTileReorderInCategory)
+		SLATE_ARGUMENT(FName, CategoryName)
+		SLATE_ARGUMENT(int32, EntryCount)
+		SLATE_ARGUMENT(bool, bIsCollapsed)
+		SLATE_EVENT(FOnCategoryRenamed, OnCategoryRenamed)
+		SLATE_EVENT(FOnTileDropOnCategory, OnTileDropOnCategory)
+		SLATE_EVENT(FOnAssetDropOnCategory, OnAssetDropOnCategory)
+		SLATE_EVENT(FOnAddToCategory, OnAddToCategory)
+		SLATE_EVENT(FOnCategoryExpansionChanged, OnExpansionChanged)
+		SLATE_EVENT(FOnTileReorderInCategory, OnTileReorderInCategory)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);

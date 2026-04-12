@@ -139,11 +139,11 @@ protected:
 
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 	static void ProcessEntry(
-	FPCGExContext* InContext,
-		const FPCGExAssetCollectionEntry* InEntry, 
-		TArray<const FPCGExAssetCollectionEntry*>& OutEntries, 
-		const bool bOmitInvalidAndEmpty, 
-		const bool bNoDuplicates, 
+		FPCGExContext* InContext,
+		const FPCGExAssetCollectionEntry* InEntry,
+		TArray<const FPCGExAssetCollectionEntry*>& OutEntries,
+		const bool bOmitInvalidAndEmpty,
+		const bool bNoDuplicates,
 		const EPCGExSubCollectionToSet SubHandling,
 		TSet<uint64>& GUIDS);
 };

@@ -361,7 +361,10 @@ namespace PCGExClipper2Lib
 	                                   const Point64 s2a, const Point64 s2b)
 	{
 		//ignore segments sharing an end-point
-		if (s1a == s2a || s1b == s2a || s1b == s2b) return IntersectKind::none;
+		if (s1a == s2a || s1b == s2a || s1b == s2b)
+		{
+			return IntersectKind::none;
+		}
 
 		double dy1 = static_cast<double>(s1b.y - s1a.y);
 		double dx1 = static_cast<double>(s1b.x - s1a.x);

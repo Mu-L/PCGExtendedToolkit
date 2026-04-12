@@ -56,11 +56,11 @@ namespace PCGExAssetCollectionEditor
  *
  * To create a custom collection editor:
  * 1. Subclass this editor and override the tile picker virtuals:
- *    - GetTilePickerPropertyName() — return the FName of the asset property on your entry struct (e.g., "StaticMesh")
- *    - GetTilePickerAllowedClass() — return the UClass* for the asset picker filter
- *    - BuildTilePickerWidget() — (optional) fully custom picker widget per tile
+ *    - GetTilePickerPropertyName() -- return the FName of the asset property on your entry struct (e.g., "StaticMesh")
+ *    - GetTilePickerAllowedClass() -- return the UClass* for the asset picker filter
+ *    - BuildTilePickerWidget() -- (optional) fully custom picker widget per tile
  * 2. Override CreateTabs() / BuildEditorToolbar() / BuildAssetHeaderToolbar() for custom tabs and toolbar buttons.
- * 3. Register via FAssetTypeActions_Base::OpenAssetEditor — create a TSharedRef<YourEditor>, call InitEditor().
+ * 3. Register via FAssetTypeActions_Base::OpenAssetEditor -- create a TSharedRef<YourEditor>, call InitEditor().
  *
  * See FPCGExMeshCollectionEditor, FPCGExActorCollectionEditor, etc. for reference implementations.
  */

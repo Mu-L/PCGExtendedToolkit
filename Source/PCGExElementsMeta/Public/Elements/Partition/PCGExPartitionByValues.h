@@ -15,11 +15,12 @@ namespace PCGExPartition
 	/** Simple struct representing a contiguous range of points belonging to a partition */
 	struct FPartitionRange
 	{
-		int32 Start = 0;  // First index in SortedIndices
-		int32 Count = 0;  // Number of points in this partition
+		int32 Start = 0;    // First index in SortedIndices
+		int32 Count = 0;    // Number of points in this partition
 		int32 IOIndex = -1; // Output index (assigned during output creation)
 
 		FPartitionRange() = default;
+
 		FPartitionRange(const int32 InStart, const int32 InCount)
 			: Start(InStart), Count(InCount)
 		{

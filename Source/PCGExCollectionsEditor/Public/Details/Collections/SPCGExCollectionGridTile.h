@@ -13,14 +13,15 @@ class SBox;
 class SBorder;
 class UPCGExAssetCollection;
 class SWidgetSwitcher;
-template <typename OptionType> class SComboBox;
+template <typename OptionType>
+class SComboBox;
 
 using FThumbnailCacheMap = TMap<FSoftObjectPath, TSharedPtr<FAssetThumbnail>>;
 
 DECLARE_DELEGATE_RetVal_ThreeParams(TSharedRef<SWidget>, FOnGetTilePickerWidget,
-	TWeakObjectPtr<UPCGExAssetCollection> /*Collection*/,
-	int32 /*EntryIndex*/,
-	FSimpleDelegate /*OnAssetChanged*/);
+                                    TWeakObjectPtr<UPCGExAssetCollection> /*Collection*/,
+                                    int32 /*EntryIndex*/,
+                                    FSimpleDelegate /*OnAssetChanged*/);
 DECLARE_DELEGATE_TwoParams(FOnTileClicked, int32 /*EntryIndex*/, const FPointerEvent& /*MouseEvent*/);
 DECLARE_DELEGATE_RetVal_TwoParams(FReply, FOnTileDragDetected, int32 /*EntryIndex*/, const FPointerEvent& /*MouseEvent*/);
 
@@ -37,25 +38,25 @@ class PCGEXCOLLECTIONSEDITOR_API SPCGExCollectionGridTile : public SCompoundWidg
 {
 public:
 	SLATE_BEGIN_ARGS(SPCGExCollectionGridTile)
-		: _TileSize(128.f)
-		, _EntryIndex(INDEX_NONE)
-		, _CategoryIndex(INDEX_NONE)
-		, _ThumbnailCachePtr(nullptr)
-	{
-	}
+			: _TileSize(128.f)
+			  , _EntryIndex(INDEX_NONE)
+			  , _CategoryIndex(INDEX_NONE)
+			  , _ThumbnailCachePtr(nullptr)
+		{
+		}
 
-	SLATE_ARGUMENT(TSharedPtr<FAssetThumbnailPool>, ThumbnailPool)
-	SLATE_ARGUMENT(FOnGetTilePickerWidget, OnGetPickerWidget)
-	SLATE_ARGUMENT(float, TileSize)
-	SLATE_ARGUMENT(TWeakObjectPtr<UPCGExAssetCollection>, Collection)
-	SLATE_ARGUMENT(int32, EntryIndex)
-	SLATE_ARGUMENT(int32, CategoryIndex)
-	SLATE_ARGUMENT(TSharedPtr<TArray<TSharedPtr<FName>>>, CategoryOptions)
-	SLATE_ARGUMENT(FThumbnailCacheMap*, ThumbnailCachePtr)
-	SLATE_ARGUMENT(bool*, BatchFlagPtr)
-	SLATE_EVENT(FOnTileClicked, OnTileClicked)
-	SLATE_EVENT(FOnTileDragDetected, OnTileDragDetected)
-	SLATE_EVENT(FSimpleDelegate, OnTileCategoryChanged)
+		SLATE_ARGUMENT(TSharedPtr<FAssetThumbnailPool>, ThumbnailPool)
+		SLATE_ARGUMENT(FOnGetTilePickerWidget, OnGetPickerWidget)
+		SLATE_ARGUMENT(float, TileSize)
+		SLATE_ARGUMENT(TWeakObjectPtr<UPCGExAssetCollection>, Collection)
+		SLATE_ARGUMENT(int32, EntryIndex)
+		SLATE_ARGUMENT(int32, CategoryIndex)
+		SLATE_ARGUMENT(TSharedPtr<TArray<TSharedPtr<FName>>>, CategoryOptions)
+		SLATE_ARGUMENT(FThumbnailCacheMap*, ThumbnailCachePtr)
+		SLATE_ARGUMENT(bool*, BatchFlagPtr)
+		SLATE_EVENT(FOnTileClicked, OnTileClicked)
+		SLATE_EVENT(FOnTileDragDetected, OnTileDragDetected)
+		SLATE_EVENT(FSimpleDelegate, OnTileCategoryChanged)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -98,7 +99,7 @@ private:
 	FOnTileDragDetected OnTileDragDetected;
 	FSimpleDelegate OnTileCategoryChanged;
 
-	// Batch flag — pointer to grid view's bIsBatchOperation (suppresses OnObjectModified during tile edits)
+	// Batch flag -- pointer to grid view's bIsBatchOperation (suppresses OnObjectModified during tile edits)
 	bool* BatchFlagPtr = nullptr;
 
 	// Cached state for short-circuiting RefreshThumbnail when nothing visual changed
