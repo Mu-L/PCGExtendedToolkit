@@ -88,7 +88,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 };
 
 /** Concrete collection for UPCGDataAsset references with optional level-sourced entries. */
-UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | PCGDataAsset")
+UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | PCGDataAsset", meta=(ToolTip = "A weighted collection of PCG Data Assets."))
 class PCGEXCOLLECTIONS_API UPCGExPCGDataAssetCollection : public UPCGExAssetCollection
 {
 	GENERATED_BODY()

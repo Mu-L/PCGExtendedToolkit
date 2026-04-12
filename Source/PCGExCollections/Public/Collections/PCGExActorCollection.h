@@ -79,7 +79,7 @@ struct PCGEXCOLLECTIONS_API FPCGExActorCollectionEntry : public FPCGExAssetColle
 
 /** Concrete collection for actor classes. Minimal extension of the base -- no extra
  *  global settings beyond what UPCGExAssetCollection provides. */
-UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | Actor")
+UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | Actor", meta=(ToolTip = "A weighted collection of actor classes for spawning."))
 class PCGEXCOLLECTIONS_API UPCGExActorCollection : public UPCGExAssetCollection
 {
 	GENERATED_BODY()

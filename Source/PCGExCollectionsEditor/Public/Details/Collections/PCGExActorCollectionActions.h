@@ -1,13 +1,16 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AssetTypeActions_Base.h"
+#include "AssetDefinitionDefault.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Engine/World.h"
 #include "AssetRegistry/AssetData.h"
+#include "PCGExDataAssetFactory.h"
+
+#include "PCGExActorCollectionActions.generated.h"
 
 class UPackage;
 
@@ -20,16 +23,29 @@ namespace PCGExActorCollectionActions
 		bool bIsNewCollection = false);
 };
 
-/** Asset type actions for actor collections — reference implementation. */
-class FPCGExActorCollectionActions : public FAssetTypeActions_Base
+UCLASS()
+class UPCGExActorCollectionFactory : public UPCGExDataAssetFactoryBase
 {
-public:
-	virtual FText GetName() const override;
-	virtual FString GetObjectDisplayName(UObject* Object) const override;
-	virtual UClass* GetSupportedClass() const override;
-	virtual FColor GetTypeColor() const override;
-	virtual uint32 GetCategories() override;
-	virtual bool HasActions(const TArray<UObject*>& InObjects) const override;
+	GENERATED_BODY()
 
-	virtual void OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor) override;
+public:
+	UPCGExActorCollectionFactory() { SupportedClass = UPCGExActorCollection::StaticClass(); }
+};
+
+UCLASS()
+class UAssetDefinition_PCGExActorCollection : public UAssetDefinitionDefault
+{
+	GENERATED_BODY()
+
+public:
+	virtual FText GetAssetDisplayName() const override { return INVTEXT("Actor Collection"); }
+	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(67, 142, 245)); }
+	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("A weighted collection of actor classes for spawning."); }
+	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExActorCollection::StaticClass(); }
+	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
+	{
+		static const auto Categories = { FAssetCategoryPath(INVTEXT("PCGEx")) / INVTEXT("Collections") };
+		return Categories;
+	}
+	virtual EAssetCommandResult OpenAssets(const FAssetOpenArgs& OpenArgs) const override;
 };

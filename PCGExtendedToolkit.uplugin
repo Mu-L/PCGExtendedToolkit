@@ -151,13 +151,16 @@
       ]
     },
     {
-      "Name": "PCGExElementsClustersEditor",
-      "Type": "Editor",
+      "Name": "PCGExElementsClustersDecomp",
+      "Type": "Runtime",
       "LoadingPhase": "Default",
       "PlatformAllowList": [
         "Win64",
         "Mac",
-        "Linux"
+        "IOS",
+        "Android",
+        "Linux",
+        "LinuxArm64"
       ]
     },
     {
@@ -174,20 +177,17 @@
       ]
     },
     {
-      "Name": "PCGExElementsClustersRefine",
-      "Type": "Runtime",
+      "Name": "PCGExElementsClustersEditor",
+      "Type": "Editor",
       "LoadingPhase": "Default",
       "PlatformAllowList": [
         "Win64",
         "Mac",
-        "IOS",
-        "Android",
-        "Linux",
-        "LinuxArm64"
+        "Linux"
       ]
     },
     {
-      "Name": "PCGExElementsClustersDecomp",
+      "Name": "PCGExElementsClustersRefine",
       "Type": "Runtime",
       "LoadingPhase": "Default",
       "PlatformAllowList": [
@@ -236,6 +236,16 @@
         "Android",
         "Linux",
         "LinuxArm64"
+      ]
+    },
+    {
+      "Name": "PCGExElementsMetaEditor",
+      "Type": "Editor",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64",
+        "Mac",
+        "Linux"
       ]
     },
     {

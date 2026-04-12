@@ -143,44 +143,12 @@ namespace PCGExActorCollectionActions
 	}
 }
 
-FText FPCGExActorCollectionActions::GetName() const
+EAssetCommandResult UAssetDefinition_PCGExActorCollection::OpenAssets(const FAssetOpenArgs& OpenArgs) const
 {
-	return INVTEXT("PCGEx Collection | Actor");
-}
-
-FString FPCGExActorCollectionActions::GetObjectDisplayName(UObject* Object) const
-{
-	return Object->GetName();
-}
-
-UClass* FPCGExActorCollectionActions::GetSupportedClass() const
-{
-	return UPCGExActorCollection::StaticClass();
-}
-
-FColor FPCGExActorCollectionActions::GetTypeColor() const
-{
-	return FColor(67, 142, 245);
-}
-
-uint32 FPCGExActorCollectionActions::GetCategories()
-{
-	return EAssetTypeCategories::Misc;
-}
-
-bool FPCGExActorCollectionActions::HasActions(const TArray<UObject*>& InObjects) const
-{
-	return false;
-}
-
-void FPCGExActorCollectionActions::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
-{
-	for (UObject* Obj : InObjects)
+	for (UPCGExActorCollection* Collection : OpenArgs.LoadObjects<UPCGExActorCollection>())
 	{
-		if (UPCGExActorCollection* Collection = Cast<UPCGExActorCollection>(Obj))
-		{
-			TSharedRef<FPCGExActorCollectionEditor> Editor = MakeShared<FPCGExActorCollectionEditor>();
-			Editor->InitEditor(Collection, EToolkitMode::Standalone, EditWithinLevelEditor);
-		}
+		TSharedRef<FPCGExActorCollectionEditor> Editor = MakeShared<FPCGExActorCollectionEditor>();
+		Editor->InitEditor(Collection, OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost);
 	}
+	return EAssetCommandResult::Handled;
 }
