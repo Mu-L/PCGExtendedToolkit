@@ -79,6 +79,19 @@ extern template void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeIdentifi
 	template <typename T>
 	bool TryGetSettingDataValue(const TSharedPtr<FPointIO>& InIO, const EPCGExInputValueType Input, const FPCGAttributePropertyInputSelector& InSelector, const T& InConstant, T& OutValue, const bool bQuiet = false);
 
+	/**
+	 * Copy all pending writable buffer values from a source facade to a target FPointIO.
+	 * Creates a temporary facade for the target, creates matching writable buffers,
+	 * copies values using type-erased GetVoid/SetVoid, and commits synchronously.
+	 * @param SourceFacade Source facade with pending writable buffer values
+	 * @param TargetIO Target point IO to write values to
+	 * @param SourcePointIndices Maps target point index i -> source point index SourcePointIndices[i]
+	 */
+	PCGEXCORE_API void CopyBuffersValues(
+		const TSharedPtr<FFacade>& SourceFacade,
+		const TSharedPtr<FFacade>& TargetIO,
+		const TArray<int32>& SourcePointIndices);
+
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
 extern template bool TryReadDataValue<_TYPE>(FPCGExContext* InContext, const UPCGData* InData, const FPCGAttributePropertyInputSelector& InSelector, _TYPE& OutValue, const bool bQuiet); \
 extern template bool TryReadDataValue<_TYPE>(FPCGExContext* InContext, const UPCGData* InData, const FName& InName, _TYPE& OutValue, const bool bQuiet); \

@@ -322,6 +322,8 @@ namespace PCGExClusterDiffusion
 				const int32 TargetIndex = Indices[i];
 
 				PCGEX_OUTPUT_VALUE(DiffusionDepth, TargetIndex, Candidate.Depth);
+				PCGEX_OUTPUT_VALUE(NormalizedDiffusionDepth, TargetIndex, Diffusion->GetMaxDepth() > 0 ? static_cast<double>(Candidate.Depth) / static_cast<double>(Diffusion->GetMaxDepth()) : 0.0);
+				if (DiffusionDepths) { (*DiffusionDepths)[TargetIndex] = Candidate.Depth; }
 				PCGEX_OUTPUT_VALUE(DiffusionDistance, TargetIndex, Candidate.PathDistance);
 				PCGEX_OUTPUT_VALUE(DiffusionOrder, TargetIndex, i);
 				PCGEX_OUTPUT_VALUE(DiffusionEnding, TargetIndex, Diffusion->Endpoints.Contains(Candidate.CaptureIndex));
@@ -345,13 +347,17 @@ namespace PCGExClusterDiffusion
 		}
 
 		// Create the path writer for output
-		PathWriter = MakeShared<PCGExFloodFill::FDiffusionPathWriter>(Cluster.ToSharedRef(), VtxDataFacade, Context->Paths.ToSharedRef());
+		PathWriter = MakeShared<PCGExFloodFill::FDiffusionPathWriter>(Cluster.ToSharedRef(), VtxDataFacade, Context->Paths.ToSharedRef(), TaskManager, DiffusionDepths);
+
+		const FName NormPathDepthName = Settings->bWriteNormalizedPathDepth && Settings->PathOutput != EPCGExFloodFillPathOutput::None
+			                                ? Settings->NormalizedPathDepthAttributeName
+			                                : NAME_None;
 
 		if (Settings->PathOutput == EPCGExFloodFillPathOutput::Full)
 		{
 			// Output full path, rather straightforward
 			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, PathsTaskGroup)
-			PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE](const int32 Index, const PCGExMT::FScope& Scope)
+			PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, NormPathDepthName](const int32 Index, const PCGExMT::FScope& Scope)
 			{
 				PCGEX_ASYNC_THIS
 				TSharedPtr<PCGExFloodFill::FDiffusion> Diff = This->Diffusions[Index];
@@ -360,6 +366,8 @@ namespace PCGExClusterDiffusion
 					This->PathWriter->WriteFullPath(
 						*Diff,
 						Diff->Captured[EndpointIndex].Node->Index,
+						Diff->Captured[EndpointIndex].Depth,
+						NormPathDepthName,
 						This->Context->SeedAttributesToPathTags,
 						This->Context->SeedsDataFacade.ToSharedRef());
 				}
@@ -370,7 +378,7 @@ namespace PCGExClusterDiffusion
 		}
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, PathsTaskGroup)
-		PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, SortOver = Settings->PathPartitions, SortOrder = Settings->PartitionSorting](const int32 Index, const PCGExMT::FScope& Scope)
+		PathsTaskGroup->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, SortOver = Settings->PathPartitions, SortOrder = Settings->PartitionSorting, NormPathDepthName](const int32 Index, const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
 			TSharedPtr<PCGExFloodFill::FDiffusion> Diff = This->Diffusions[Index];
@@ -402,6 +410,7 @@ namespace PCGExClusterDiffusion
 				PathIndices.Reset();
 
 				const int32 EndpointNodeIndex = Captured[EndpointIndex].Node->Index;
+				const int32 EndpointDepth = Captured[EndpointIndex].Depth;
 
 				int32 PathNodeIndex = PCGEx::NH64A(Diff->TravelStack->Get(EndpointNodeIndex));
 				int32 PathEdgeIndex = -1;
@@ -430,6 +439,8 @@ namespace PCGExClusterDiffusion
 				This->PathWriter->WritePartitionedPath(
 					*Diff,
 					PathIndices,
+					EndpointDepth,
+					NormPathDepthName,
 					This->Context->SeedAttributesToPathTags,
 					This->Context->SeedsDataFacade.ToSharedRef());
 			}
@@ -499,6 +510,13 @@ namespace PCGExClusterDiffusion
 		InfluencesCount = MakeShared<TArray<int8>>();
 		InfluencesCount->Init(0, VtxDataFacade->GetNum());
 
+		// Lightweight depth array for NormalizedPathDepth (no buffer overhead)
+		if (Settings->bWriteNormalizedPathDepth && Settings->PathOutput != EPCGExFloodFillPathOutput::None)
+		{
+			DiffusionDepths = MakeShared<TArray<int32>>();
+			DiffusionDepths->Init(0, VtxDataFacade->GetNum());
+		}
+
 		// Diffusion rate
 
 		FillRate = PCGExDetails::MakeSettingValue<int32>(Settings->Diffusion.FillRateInput, Settings->Diffusion.FillRateAttribute, Settings->Diffusion.FillRateConstant);
@@ -517,6 +535,7 @@ namespace PCGExClusterDiffusion
 
 		TypedProcessor->BlendOpsManager = BlendOpsManager;
 		TypedProcessor->InfluencesCount = InfluencesCount;
+		TypedProcessor->DiffusionDepths = DiffusionDepths;
 
 		TypedProcessor->FillRate = FillRate;
 

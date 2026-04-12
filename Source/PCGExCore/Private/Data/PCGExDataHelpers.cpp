@@ -4,6 +4,7 @@
 #include "Data/PCGExDataHelpers.h"
 
 #include "PCGExLog.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExSubSelection.h"
 #include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExMetaHelpers.h"
@@ -11,6 +12,41 @@
 
 namespace PCGExData::Helpers
 {
+	void CopyBuffersValues(
+		const TSharedPtr<FFacade>& SourceFacade,
+		const TSharedPtr<FFacade>& TargetFacade,
+		const TArray<int32>& SourcePointIndices)
+	{
+		for (const TSharedPtr<IBuffer>& SrcBuffer : SourceFacade->Buffers)
+		{
+			if (!SrcBuffer || !SrcBuffer->IsWritable() || !SrcBuffer->IsEnabled()) { continue; }
+
+			EPCGMetadataTypes SrcType = SrcBuffer->GetTypeId();
+
+			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritable(SrcType, SrcBuffer->Identifier.Name, EBufferInit::Inherit);
+			if (!DstBuffer) { continue; }
+
+			PCGExMetaHelpers::ExecuteWithRightType(SrcType, [&](auto DummyValue)
+			{
+				using T = decltype(DummyValue);
+				if (SrcBuffer->GetUnderlyingDomain() == EDomainType::Elements)
+				{
+					TArray<T>& SrcValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(SrcBuffer)->GetOutValues().Get();
+					TArray<T>& DstValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(DstBuffer)->GetOutValues().Get();
+
+					for (int32 i = 0; i < SourcePointIndices.Num(); i++)
+					{
+						DstValues[i] = SrcValues[SourcePointIndices[i]];
+					}
+				}
+				else
+				{
+					// TODO 
+				}
+			});
+		}
+	}
+
 	template <typename T>
 	T ReadDataValue(const FPCGMetadataAttribute<T>* Attribute)
 	{

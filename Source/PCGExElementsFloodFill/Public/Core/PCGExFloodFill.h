@@ -210,6 +210,8 @@ namespace PCGExFloodFill
 		~FDiffusion() = default;
 
 		FORCEINLINE const FDiffusionConfig& GetConfig() const { return Config; }
+		FORCEINLINE int32 GetMaxDepth() const { return MaxDepth; }
+		FORCEINLINE double GetMaxDistance() const { return MaxDistance; }
 
 		int32 GetSettingsIndex(EPCGExFloodFillSettingSource Source) const;
 
@@ -281,31 +283,23 @@ namespace PCGExFloodFill
 		FDiffusionPathWriter(
 			const TSharedRef<PCGExClusters::FCluster>& InCluster,
 			const TSharedRef<PCGExData::FFacade>& InVtxDataFacade,
-			const TSharedRef<PCGExData::FPointIOCollection>& InPaths);
+			const TSharedRef<PCGExData::FPointIOCollection>& InPaths,
+			const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
+			const TSharedPtr<TArray<int32>>& InDiffusionDepths);
 
-		/**
-		 * Write a full path from seed to endpoint by traversing the diffusion's TravelStack.
-		 * @param Diffusion The diffusion that captured the path
-		 * @param EndpointNodeIndex The node index of the path endpoint
-		 * @param SeedTags Tag details for copying seed attributes to path tags
-		 * @param SeedsDataFacade Facade for the seed points data
-		 */
 		void WriteFullPath(
 			const FDiffusion& Diffusion,
 			int32 EndpointNodeIndex,
+			int32 EndpointDepth,
+			FName NormalizedPathDepthName,
 			const FPCGExAttributeToTagDetails& SeedTags,
 			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade);
 
-		/**
-		 * Write a partitioned path from pre-computed point indices.
-		 * @param Diffusion The diffusion that captured the path
-		 * @param PathIndices Pre-computed path as point indices (will be reversed internally)
-		 * @param SeedTags Tag details for copying seed attributes to path tags
-		 * @param SeedsDataFacade Facade for the seed points data
-		 */
 		void WritePartitionedPath(
 			const FDiffusion& Diffusion,
 			TArray<int32>& PathIndices,
+			int32 EndpointDepth,
+			FName NormalizedPathDepthName,
 			const FPCGExAttributeToTagDetails& SeedTags,
 			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade);
 
@@ -313,5 +307,7 @@ namespace PCGExFloodFill
 		TSharedRef<PCGExClusters::FCluster> Cluster;
 		TSharedRef<PCGExData::FFacade> VtxDataFacade;
 		TSharedRef<PCGExData::FPointIOCollection> Paths;
+		TSharedPtr<PCGExMT::FTaskManager> TaskManager;
+		TSharedPtr<TArray<int32>> DiffusionDepths;
 	};
 }
