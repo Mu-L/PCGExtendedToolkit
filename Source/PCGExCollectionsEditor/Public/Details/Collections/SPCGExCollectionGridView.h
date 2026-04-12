@@ -24,9 +24,12 @@ class SPCGExCollectionCategoryGroup;
 enum class EPCGExStructuralRefreshFlags : uint8
 {
 	None           = 0,
-	ClearSelection = 1 << 0, // Reset selection state
-	ScrollToEnd    = 1 << 1, // Scroll to bottom after refresh
+	ClearSelection = 1 << 0,
+	// Reset selection state
+	ScrollToEnd = 1 << 1,
+	// Scroll to bottom after refresh
 };
+
 ENUM_CLASS_FLAGS(EPCGExStructuralRefreshFlags);
 
 /**
@@ -35,21 +38,21 @@ ENUM_CLASS_FLAGS(EPCGExStructuralRefreshFlags);
  * Right pane: IStructureDetailsView showing only the selected entry struct.
  *
  * This widget is created automatically by FPCGExAssetCollectionEditor::CreateGridTab().
- * Custom collection editors normally don't need to subclass this directly — override the
+ * Custom collection editors normally don't need to subclass this directly -- override the
  * editor's tile picker virtuals instead (GetTilePickerPropertyName, BuildTilePickerWidget).
  */
 class PCGEXCOLLECTIONSEDITOR_API SPCGExCollectionGridView : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SPCGExCollectionGridView)
-		: _TileSize(128.f)
-	{
-	}
+			: _TileSize(128.f)
+		{
+		}
 
-	SLATE_ARGUMENT(UPCGExAssetCollection*, Collection)
-	SLATE_ARGUMENT(TSharedPtr<FAssetThumbnailPool>, ThumbnailPool)
-	SLATE_ARGUMENT(FOnGetTilePickerWidget, OnGetPickerWidget)
-	SLATE_ARGUMENT(float, TileSize)
+		SLATE_ARGUMENT(UPCGExAssetCollection*, Collection)
+		SLATE_ARGUMENT(TSharedPtr<FAssetThumbnailPool>, ThumbnailPool)
+		SLATE_ARGUMENT(FOnGetTilePickerWidget, OnGetPickerWidget)
+		SLATE_ARGUMENT(float, TileSize)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -100,7 +103,7 @@ private:
 	// Collapse state (persists across rebuilds)
 	TSet<FName> CollapsedCategories;
 
-	// Detail panel — IStructureDetailsView for editing a single entry struct
+	// Detail panel -- IStructureDetailsView for editing a single entry struct
 	TSharedPtr<IStructureDetailsView> StructDetailView;
 	TSharedPtr<FStructOnScope> CurrentStructScope;
 	int32 CurrentDetailIndex = INDEX_NONE;
@@ -165,6 +168,7 @@ private:
 		void* ArrayData = nullptr;
 		bool IsValid() const { return ArrayProp && ArrayData; }
 	};
+
 	FEntriesArrayAccess GetEntriesAccess() const;
 
 	// Incremental layout refresh (tile reuse, no flash)

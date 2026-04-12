@@ -281,6 +281,7 @@ namespace PCGExClusterMT
 		bool RequiresGraphBuilder() const { return bRequiresGraphBuilder; }
 		bool WantsHeuristics() const { return bWantsHeuristics; }
 		EPCGExHeuristicScoreMode GetHeuristicsScoreMode() const { return HeuristicsScoreMode; }
+
 		virtual void SetWantsHeuristics(const bool bRequired, const EPCGExHeuristicScoreMode ScoreMode)
 		{
 			bWantsHeuristics = bRequired;

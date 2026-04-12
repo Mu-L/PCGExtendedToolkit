@@ -159,7 +159,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 
 			// Customize the row to show checkbox + label in NameContent and value widget in ValueContent
 			Row.CustomWidget()
-				.NameContent()
+			   .NameContent()
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot()
@@ -200,7 +200,9 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 
 			// Skip metadata properties
 			if (PropName == TEXT("PropertyName") || PropName == TEXT("HeaderId") || PropName == TEXT("OutputBuffer"))
+			{
 				continue;
+			}
 
 			// Add each property as a child row with enabled state
 			IDetailPropertyRow& PropRow = *ChildBuilder.AddExternalStructureProperty(StructOnScope, PropName);

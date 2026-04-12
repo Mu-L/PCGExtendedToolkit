@@ -52,7 +52,7 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	virtual void ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
-	
+
 	PCGEX_NODE_INFOS(SampleNearestSurface, "Sample : Nearest Surface", "Find the closest point on the nearest collidable surface.");
 	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }
 #endif
@@ -78,7 +78,7 @@ public:
 	FName ActorReference = FName("ActorReference");
 
 #pragma region DEPRECATED
-	
+
 	UPROPERTY()
 	double MaxDistance_DEPRECATED = 1000;
 
@@ -89,11 +89,11 @@ public:
 	FPCGAttributePropertyInputSelector LocalMaxDistance_DEPRECATED;
 
 #pragma endregion
-	
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Sampling", meta=(PCG_Overridable))
 	FPCGExInputShorthandSelectorDoubleAbs Distance = FPCGExInputShorthandSelectorDoubleAbs(FName("Distance"), 1000, false);
-	
-		
+
+
 	/** Whether and how to apply sampled result directly (not mutually exclusive with output)*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Sampling", meta=(PCG_NotOverridable))
 	FPCGExApplySamplingDetails ApplySampling;

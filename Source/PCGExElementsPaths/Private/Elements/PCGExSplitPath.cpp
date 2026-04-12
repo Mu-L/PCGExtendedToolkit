@@ -393,10 +393,14 @@ namespace PCGExSplitPath
 			if (SubPaths.Num() > 1)
 			{
 				if (Settings->SplitAction == EPCGExPathSplitAction::Partition || Settings->SplitAction == EPCGExPathSplitAction::Switch)
-				bWrapLastPath = SubPaths[0].Start == 0 && SubPaths.Last().End == -1
-					&& PointFilterCache[0] == PointFilterCache[PointDataFacade->GetNum() - 1];
-			else
-				bWrapLastPath = SubPaths[0].Start == 0 && SubPaths.Last().End == -1 && !PointFilterCache[0];
+				{
+					bWrapLastPath = SubPaths[0].Start == 0 && SubPaths.Last().End == -1
+						&& PointFilterCache[0] == PointFilterCache[PointDataFacade->GetNum() - 1];
+				}
+				else
+				{
+					bWrapLastPath = SubPaths[0].Start == 0 && SubPaths.Last().End == -1 && !PointFilterCache[0];
+				}
 			}
 
 			if (SubPaths.Num() > 1 || SubPaths[0].End != -1 || SubPaths[0].Start != 0)

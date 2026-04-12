@@ -27,7 +27,7 @@ namespace PCGExPackActorData
 /**
  * Executed once per point
  */
-UCLASS(Blueprintable, BlueprintType, Abstract, MinimalAPI, DisplayName = "[PCGEx] Custom Actor Data Packer")
+UCLASS(Blueprintable, BlueprintType, Abstract, MinimalAPI, DisplayName = "[PCGEx] Custom Actor Data Packer", meta=(ToolTip = "Custom logic for packing actor component data onto PCG points."))
 class UPCGExCustomActorDataPacker : public UPCGExInstancedFactory
 {
 	GENERATED_BODY()

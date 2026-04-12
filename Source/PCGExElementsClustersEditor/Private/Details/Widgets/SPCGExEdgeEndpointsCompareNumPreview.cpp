@@ -32,15 +32,15 @@ int32 SPCGExEdgeEndpointsCompareNumPreview::OnPaint(
 
 	// 3 Panels: Start>End, Start==End, Start<End
 	constexpr int32 NumPanels = 3;
-	const double StartVals[NumPanels] = {7.0, 5.0, 3.0};
-	const double EndVals[NumPanels] = {3.0, 5.0, 7.0};
+	constexpr double StartVals[NumPanels] = {7.0, 5.0, 3.0};
+	constexpr double EndVals[NumPanels] = {3.0, 5.0, 7.0};
 
 	const float ContentWidth = LocalSize.X - 2.0f * Padding;
 	const float PanelWidth = (ContentWidth - (NumPanels - 1) * PanelGap) / NumPanels;
 	const float EdgeY = LocalSize.Y * 0.62f;
-	const float EdgeMargin = 20.0f;
-	const float MaxBarHeight = 35.0f;
-	const float MaxValue = 7.0f;
+	constexpr float EdgeMargin = 20.0f;
+	constexpr float MaxBarHeight = 35.0f;
+	constexpr float MaxValue = 7.0f;
 	const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Regular", 7);
 
 	for (int32 Panel = 0; Panel < NumPanels; ++Panel)
@@ -68,9 +68,9 @@ int32 SPCGExEdgeEndpointsCompareNumPreview::OnPaint(
 		// Draw value bars above endpoints
 		const float StartBarH = static_cast<float>(SVal / MaxValue) * MaxBarHeight;
 		const float EndBarH = static_cast<float>(EVal / MaxValue) * MaxBarHeight;
-		const float BarWidth = 6.0f;
+		constexpr float BarWidth = 6.0f;
 
-		const FLinearColor BarColor = EndpointNeutralColor;
+		constexpr FLinearColor BarColor = EndpointNeutralColor;
 		DrawFilledRect(OutDrawElements, LayerId + 1, AllottedGeometry,
 		               FVector2D(StartPos.X - BarWidth * 0.5, EdgeY - EndpointRadius - StartBarH),
 		               FVector2D(BarWidth, StartBarH), BarColor);

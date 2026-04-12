@@ -268,7 +268,7 @@ namespace PCGExFindAllCellsBounded
 			AllCells,
 			CellsConstraints.ToSharedRef(),
 			Context->BoundsFilter,
-			bNeedOutside,  // Only include outside faces if user wants them
+			bNeedOutside, // Only include outside faces if user wants them
 			bNeedFailedCells ? &FailedCells : nullptr,
 			Settings->Constraints.bOmitWrappingBounds);
 

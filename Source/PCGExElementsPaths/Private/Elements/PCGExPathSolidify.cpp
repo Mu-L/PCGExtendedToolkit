@@ -65,11 +65,10 @@ else{_TARGET##Axis.RadiusInput = EPCGExInputValueToggle::Disabled;}
 
 		NormalValue.Update(NormalType_DEPRECATED, NormalAttribute_DEPRECATED, FVector::UpVector);
 		NormalValue.bFlip = bInvertDirection_DEPRECATED;
-		
+
 		// Rewire Solidification lerp
 		PCGEX_SHORTHAND_RENAME_PIN(SolidificationLerpAttribute, SolidificationLerpConstant, SolidificationLerp)
 		SolidificationLerp.Update(SolidificationLerpInput_DEPRECATED, SolidificationLerpAttribute_DEPRECATED, SolidificationLerpConstant_DEPRECATED);
-
 	}
 
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

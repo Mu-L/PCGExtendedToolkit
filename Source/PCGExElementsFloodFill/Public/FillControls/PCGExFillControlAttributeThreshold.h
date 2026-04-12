@@ -96,7 +96,6 @@ public:
 #endif
 	//~End UPCGSettings
 
-public:
 	/** Control Config.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
 	FPCGExFillControlConfigAttributeThreshold Config;

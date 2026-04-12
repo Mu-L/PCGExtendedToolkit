@@ -318,7 +318,7 @@ void FPCGExDecompMaxBoxes::MergeAdjacentCells(
 				const int32 MergedVolume = MSize.X * MSize.Y * MSize.Z;
 				if (MergedVolume != InfoA->Count + InfoB->Count) { continue; }
 
-				// Valid merge — absorb B into A
+				// Valid merge -- absorb B into A
 				for (int32 Flat = 0; Flat < Grid.TotalVoxels; Flat++)
 				{
 					if (VoxelCellIDs[Flat] == CellB) { VoxelCellIDs[Flat] = CellA; }

@@ -92,7 +92,7 @@ namespace PCGExSocketStaging
 
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
 		if (!EntryHashGetter) { return false; }
-		
+
 		SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, PointDataFacade->GetNum());
 
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);

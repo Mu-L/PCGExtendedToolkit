@@ -23,12 +23,12 @@ UPCGExActorCollection::UPCGExActorCollection(const FObjectInitializer& ObjectIni
 	const auto& Settings = PCGEX_COLLECTIONS_SETTINGS;
 
 	UClass* EvalClass = Settings.DefaultBoundsEvaluatorClass
-		? Settings.DefaultBoundsEvaluatorClass.Get()
-		: UPCGExDefaultBoundsEvaluator::StaticClass();
+		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
+		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
 
 	BoundsEvaluator = Cast<UPCGExBoundsEvaluator>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("BoundsEvaluator"),
-			UPCGExBoundsEvaluator::StaticClass(), EvalClass, false, false));
+		                                         UPCGExBoundsEvaluator::StaticClass(), EvalClass, false, false));
 }
 
 #pragma region FPCGExActorCollectionEntry
@@ -110,8 +110,8 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		TempActor->GetComponents(PCGComps);
 		bHasPCGComponent = !PCGComps.IsEmpty();
 		CachedPCGGraph = (bHasPCGComponent && PCGComps[0]->GetGraph())
-			? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
-			: nullptr;
+			                 ? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
+			                 : nullptr;
 
 		// Hide the actor to ensure it doesn't affect gameplay or rendering
 		TempActor->SetActorHiddenInGame(true);
@@ -164,14 +164,14 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 				}
 				else
 				{
-					UE_LOG(LogPCGEx, Warning, TEXT("Delta source actor class mismatch — expected '%s', found '%s'"),
-						*Actor.ToSoftObjectPath().ToString(), *FSoftClassPath(FoundActor->GetClass()).ToString());
+					UE_LOG(LogPCGEx, Warning, TEXT("Delta source actor class mismatch -- expected '%s', found '%s'"),
+					       *Actor.ToSoftObjectPath().ToString(), *FSoftClassPath(FoundActor->GetClass()).ToString());
 				}
 			}
 			else
 			{
 				UE_LOG(LogPCGEx, Warning, TEXT("Delta source actor '%s' not found in level '%s'"),
-					*DeltaSourceActorName.ToString(), *DeltaSourceLevel.ToSoftObjectPath().ToString());
+				       *DeltaSourceActorName.ToString(), *DeltaSourceLevel.ToSoftObjectPath().ToString());
 			}
 		}
 

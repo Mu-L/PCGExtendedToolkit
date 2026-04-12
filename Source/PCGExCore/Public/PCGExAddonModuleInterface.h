@@ -14,6 +14,7 @@ public:
 	virtual void ShutdownModule() override;
 
 #if WITH_EDITOR
+
 protected:
 	virtual void SelfRegisterToEditor();
 #endif

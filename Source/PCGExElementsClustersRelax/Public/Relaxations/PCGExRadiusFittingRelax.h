@@ -28,7 +28,7 @@ public:
 	}
 
 	virtual void RegisterPrimaryBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
-	
+
 	/** Type of Velocity */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExInputValueType RadiusInput = EPCGExInputValueType::Attribute;

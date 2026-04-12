@@ -19,14 +19,14 @@ class PCGEXELEMENTSCLUSTERSEDITOR_API SPCGExAdjacencyPreview : public SLeafWidge
 public:
 	SLATE_BEGIN_ARGS(SPCGExAdjacencyPreview)
 			: _Mode(EPCGExAdjacencyTestMode::Some)
-			, _Consolidation(EPCGExAdjacencyGatherMode::Individual)
-			, _ThresholdComparison(EPCGExComparison::NearlyEqual)
-			, _ThresholdType(EPCGExMeanMeasure::Discrete)
-			, _DiscreteThreshold(1)
-			, _RelativeThreshold(0.5)
-			, _Rounding(EPCGExRelativeThresholdRoundingMode::Round)
-			, _ThresholdTolerance(0)
-			, _bShowThreshold(true)
+			  , _Consolidation(EPCGExAdjacencyGatherMode::Individual)
+			  , _ThresholdComparison(EPCGExComparison::NearlyEqual)
+			  , _ThresholdType(EPCGExMeanMeasure::Discrete)
+			  , _DiscreteThreshold(1)
+			  , _RelativeThreshold(0.5)
+			  , _Rounding(EPCGExRelativeThresholdRoundingMode::Round)
+			  , _ThresholdTolerance(0)
+			  , _bShowThreshold(true)
 		{
 		}
 
@@ -65,7 +65,7 @@ private:
 	TAttribute<int32> ThresholdTolerance;
 	TAttribute<bool> bShowThreshold;
 
-	/** Draw the "Some" mode panels — threshold-based counting. */
+	/** Draw the "Some" mode panels -- threshold-based counting. */
 	int32 PaintSomeMode(
 		FSlateWindowElementList& OutDrawElements,
 		const FGeometry& AllottedGeometry,

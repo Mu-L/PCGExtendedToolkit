@@ -9,7 +9,6 @@
 
 namespace PCGExMath
 {
-	
 	FBox GetLocalBounds(const PCGExData::FConstPoint& Point, const EPCGExPointBoundsSource Source)
 	{
 		switch (Source)

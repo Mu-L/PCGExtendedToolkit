@@ -343,15 +343,15 @@ namespace PCGExGraphs
 		// NumExportedEdges non-deterministic when Node.Links order varies (parallel insertion).
 		// Count valid edges per node directly from Links - parallelizable and cache-friendly.
 		PCGEX_PARALLEL_FOR(
-			OutValidNodes.Num(), 
-			
+			OutValidNodes.Num(),
+
 			const int32 NodeIdx = OutValidNodes[i];
 			FNode& Node = Nodes[NodeIdx];
 			Node.NumExportedEdges = 0;
 			for (const FLink& Lk : Node.Links)
 			{
-				const FEdge& Edge = Edges[Lk.Edge];
-				if (Edge.bValid && Nodes[Edge.Other(NodeIdx)].bValid) { Node.NumExportedEdges++; }
+			const FEdge& Edge = Edges[Lk.Edge];
+			if (Edge.bValid && Nodes[Edge.Other(NodeIdx)].bValid) { Node.NumExportedEdges++; }
 			}
 		)
 	}

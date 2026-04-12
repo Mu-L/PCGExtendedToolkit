@@ -161,7 +161,7 @@ namespace PCGExFindAllCellsBounded
 		TArray<FString> CellTagsOutside;
 
 		// Hole expansion tracking
-		TSet<int32> ExcludedFaceIndices; // Faces excluded due to hole expansion
+		TSet<int32> ExcludedFaceIndices;           // Faces excluded due to hole expansion
 		TMap<int32, TSet<int32>> CellAdjacencyMap; // Cached adjacency
 
 	public:

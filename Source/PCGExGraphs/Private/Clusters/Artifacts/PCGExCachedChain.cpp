@@ -184,7 +184,7 @@ namespace PCGExClusters
 				}
 
 				// For closed loops, extend the walk to include the wrap-around back to the seed.
-				// The Links array doesn't contain the seed node — the closure is implicit via bIsClosedLoop.
+				// The Links array doesn't contain the seed node -- the closure is implicit via bIsClosedLoop.
 				// We walk it explicitly so breakpoints at/near the seed are handled correctly.
 				TArray<FLink> ExtendedLinks;
 				const TArray<FLink>& WalkLinks = [&]() -> const TArray<FLink>&
@@ -207,15 +207,15 @@ namespace PCGExClusters
 				// For closed loops, Seed.Edge was overwritten with the closing edge during BuildChain.
 				// The first segment needs the original edge from seed to first link (Links[0].Edge).
 				int32 SegmentSeedEdge = (SourceChain->bIsClosedLoop && !SourceChain->Links.IsEmpty())
-				                        ? SourceChain->Links[0].Edge
-				                        : SourceChain->Seed.Edge;
+					                        ? SourceChain->Links[0].Edge
+					                        : SourceChain->Seed.Edge;
 
 				const int32 OriginalSeedPI = Cluster->GetNodePointIndex(SourceChain->Seed.Node);
 				const bool bOriginalSeedIsBreakpoint = BreakpointsRef.IsValidIndex(OriginalSeedPI) && BreakpointsRef[OriginalSeedPI];
 				bool bSegmentStartIsBreakpoint = bOriginalSeedIsBreakpoint;
 
 				// For closed loops where the seed is NOT a breakpoint, the seed is an arbitrary
-				// binary node — not a structural endpoint. We need to merge the first and last
+				// binary node -- not a structural endpoint. We need to merge the first and last
 				// emitted segments to rejoin the chain across that arbitrary split point.
 				const bool bNeedsMerge = SourceChain->bIsClosedLoop && !bOriginalSeedIsBreakpoint;
 				int32 FirstEmittedIndex = -1;
@@ -285,7 +285,7 @@ namespace PCGExClusters
 					}
 					else if (bNeedsMerge)
 					{
-						// Closed loop with no breakpoints in any link — pass through unchanged
+						// Closed loop with no breakpoints in any link -- pass through unchanged
 						OutChains.Add(SourceChain);
 					}
 					else
@@ -295,8 +295,8 @@ namespace PCGExClusters
 
 						// Check for closed loop (only if source was a closed loop and no breakpoints hit)
 						NewChain->bIsClosedLoop = SourceChain->bIsClosedLoop &&
-						                          SegmentSeedNode == SourceChain->Seed.Node &&
-						                          !bSegmentStartIsBreakpoint;
+							SegmentSeedNode == SourceChain->Seed.Node &&
+							!bSegmentStartIsBreakpoint;
 
 						// Determine if this is a leaf chain (topology only, not breakpoints)
 						const FNode* StartNode = Cluster->GetNode(SegmentSeedNode);

@@ -121,7 +121,6 @@ public:
 	bool bQuietTooFewBinsWarning = false;
 
 	virtual bool GetSortingRules(FPCGExContext* InContext, TArray<FPCGExSortRuleConfig>& OutRules) const;
-
 };
 
 struct FPCGExBinPackingContext final : FPCGExPointsProcessorContext

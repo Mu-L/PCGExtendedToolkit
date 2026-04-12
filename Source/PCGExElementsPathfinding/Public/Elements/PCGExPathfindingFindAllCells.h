@@ -123,7 +123,7 @@ namespace PCGExFindAllCells
 
 		// Hole expansion tracking
 		TMap<int32, TSet<int32>> CellAdjacencyMap;
-		TSet<int32> ExcludedFaceIndices;  // Face indices to exclude due to holes or growth
+		TSet<int32> ExcludedFaceIndices; // Face indices to exclude due to holes or growth
 
 	public:
 		TSharedPtr<PCGExClusters::FCellConstraints> CellsConstraints;

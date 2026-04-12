@@ -131,9 +131,8 @@ namespace PCGExBuildCellDiagram
 	class FProcessor final : public PCGExClusterMT::TProcessor<FPCGExBuildCellDiagramContext, UPCGExBuildCellDiagramSettings>
 	{
 	protected:
-		
 		TSharedPtr<PCGExData::FFacade> CentroidFacade;
-		
+
 		TSharedPtr<PCGExClusters::FProjectedPointSet> Holes;
 		TArray<TSharedPtr<PCGExClusters::FCell>> ValidCells;
 		TSharedPtr<PCGExGraphs::FGraphBuilder> GraphBuilder;
@@ -141,13 +140,12 @@ namespace PCGExBuildCellDiagram
 		// Cell adjacency
 		TMap<int32, TSet<int32>> CellAdjacencyMap;
 		TMap<int32, int32> FaceIndexToOutputIndex; // Maps face index to output point index
-		
-		TSharedPtr<PCGExBlending::FUnionBlender> UnionBlender; 
-			
+
+		TSharedPtr<PCGExBlending::FUnionBlender> UnionBlender;
+
 		TSharedPtr<PCGExData::TBuffer<double>> AreaWriter = nullptr;
 		TSharedPtr<PCGExData::TBuffer<double>> CompactnessWriter = nullptr;
 		TSharedPtr<PCGExData::TBuffer<int32>> NumNodesWriter = nullptr;
-
 
 	public:
 		TSharedPtr<PCGExClusters::FCellConstraints> CellsConstraints;
@@ -163,7 +161,7 @@ namespace PCGExBuildCellDiagram
 
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
 		virtual void OnRangeProcessingComplete() override;
-				
+
 		virtual void Cleanup() override;
 	};
 }

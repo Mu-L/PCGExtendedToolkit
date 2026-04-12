@@ -28,7 +28,7 @@ public:
 #endif
 
 	virtual void PostLoad() override;
-	
+
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 protected:
@@ -38,11 +38,11 @@ protected:
 
 	UPROPERTY()
 	bool bCachedSupportsDataStealing = false;
-	
+
 	UPROPERTY()
 	bool bCachedSupportsInitPolicy = false;
-	
-	
+
+
 	//~Begin UPCGExPointsProcessorSettings
 public:
 	/** If enabled, will pre-allocate all data on a single thread to avoid contention. Not all nodes support this. */

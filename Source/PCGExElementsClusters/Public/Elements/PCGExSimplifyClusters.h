@@ -89,7 +89,7 @@ public:
 	/**  Edge Union Data */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExEdgeUnionMetadataDetails EdgeUnionData;
-	
+
 	/** Defines how fused point properties and attributes are merged together for Edges (When an edge is the result of a simplification). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Data Blending", meta=(PCG_Overridable))
 	FPCGExBlendingDetails EdgeBlendingDetails;

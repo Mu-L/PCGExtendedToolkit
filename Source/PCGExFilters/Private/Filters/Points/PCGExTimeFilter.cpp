@@ -184,7 +184,9 @@ namespace PCGExPointFilter
 		if (InverseMatcher)
 		{
 			if (!InverseMatcher->BuildPerPointExclude(PointDataFacade->Source->GetInPoint(PointIndex), *TypedFilterFactory->Datas, PerPointExclude))
-			{ return bNoMatchResult; }
+			{
+				return bNoMatchResult;
+			}
 			MatchExclude = &PerPointExclude;
 		}
 

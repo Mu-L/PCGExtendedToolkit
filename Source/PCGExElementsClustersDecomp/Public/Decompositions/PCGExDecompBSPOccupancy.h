@@ -77,7 +77,7 @@ public:
 	EPCGExDecompTransformSpace TransformSpace = EPCGExDecompTransformSpace::Raw;
 
 	/** Custom transform for grid alignment. Only used when TransformSpace = Custom. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="TransformSpace==EPCGExDecompTransformSpace::Custom", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="TransformSpace == EPCGExDecompTransformSpace::Custom", EditConditionHides))
 	FTransform CustomTransform = FTransform::Identity;
 
 	/** How to determine the voxel grid resolution. */
@@ -85,7 +85,7 @@ public:
 	EPCGExDecompVoxelSizeMode VoxelSizeMode = EPCGExDecompVoxelSizeMode::EdgeInferred;
 
 	/** Manual voxel size. Only used when VoxelSizeMode = Manual. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="VoxelSizeMode==EPCGExDecompVoxelSizeMode::Manual", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="VoxelSizeMode == EPCGExDecompVoxelSizeMode::Manual", EditConditionHides))
 	FVector VoxelSize = FVector(100.0);
 
 	/** Maximum BSP recursion depth. */
@@ -103,12 +103,12 @@ public:
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
 	PCGEX_CREATE_DECOMPOSITION_OPERATION(DecompBSPOccupancy, {
-		Operation->TransformSpace = TransformSpace;
-		Operation->CustomTransform = CustomTransform;
-		Operation->VoxelSizeMode = VoxelSizeMode;
-		Operation->VoxelSize = VoxelSize;
-		Operation->MaxDepth = MaxDepth;
-		Operation->MinVoxelsPerCell = MinVoxelsPerCell;
-		Operation->GapWeight = GapWeight;
-	})
+	                                     Operation->TransformSpace = TransformSpace;
+	                                     Operation->CustomTransform = CustomTransform;
+	                                     Operation->VoxelSizeMode = VoxelSizeMode;
+	                                     Operation->VoxelSize = VoxelSize;
+	                                     Operation->MaxDepth = MaxDepth;
+	                                     Operation->MinVoxelsPerCell = MinVoxelsPerCell;
+	                                     Operation->GapWeight = GapWeight;
+	                                     })
 };

@@ -158,93 +158,93 @@ void FPCGExActorCollectionEditor::BuildAddMenuContent(const TSharedRef<SVertical
 #define PCGEX_CURRENT_COLLECTION if (UPCGExActorCollection* Collection = Cast<UPCGExActorCollection>(EditedCollection.Get()))
 
 	MenuBox->AddSlot()
-		.AutoHeight()
-		.Padding(4, 0, 4, 4)
-		[
-			SNew(SButton)
-			.Text(INVTEXT("Add Selected Actors"))
-			.OnClicked_Lambda(
-				[this]()
+	       .AutoHeight()
+	       .Padding(4, 0, 4, 4)
+	[
+		SNew(SButton)
+		.Text(INVTEXT("Add Selected Actors"))
+		.OnClicked_Lambda(
+			[this]()
+			{
+				PCGEX_CURRENT_COLLECTION
 				{
-					PCGEX_CURRENT_COLLECTION
+					USelection* Selection = GEditor->GetSelectedActors();
+					if (!Selection || Selection->Num() == 0) { return FReply::Handled(); }
+
+					Collection->Modify();
+
+					for (int32 i = 0; i < Selection->Num(); ++i)
 					{
-						USelection* Selection = GEditor->GetSelectedActors();
-						if (!Selection || Selection->Num() == 0) { return FReply::Handled(); }
-
-						Collection->Modify();
-
-						for (int32 i = 0; i < Selection->Num(); ++i)
+						if (AActor* Actor = Cast<AActor>(Selection->GetSelectedObject(i)))
 						{
-							if (AActor* Actor = Cast<AActor>(Selection->GetSelectedObject(i)))
-							{
-								AddOrUpdateActorEntry(Collection, Actor);
-							}
+							AddOrUpdateActorEntry(Collection, Actor);
 						}
-
-						Collection->MarkPackageDirty();
-						FCoreUObjectDelegates::BroadcastOnObjectModified(Collection);
 					}
-					return FReply::Handled();
-				})
-			.ToolTipText(INVTEXT("Add currently selected actors from the viewport to this collection.\nExisting entries with matching delta source are updated."))
-		];
+
+					Collection->MarkPackageDirty();
+					FCoreUObjectDelegates::BroadcastOnObjectModified(Collection);
+				}
+				return FReply::Handled();
+			})
+		.ToolTipText(INVTEXT("Add currently selected actors from the viewport to this collection.\nExisting entries with matching delta source are updated."))
+	];
 
 	TSharedPtr<SEditableTextBox> NameSearchBox;
 
 	MenuBox->AddSlot()
-		.AutoHeight()
-		.Padding(4, 0, 4, 4)
+	       .AutoHeight()
+	       .Padding(4, 0, 4, 4)
+	[
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot()
+		.FillWidth(1.0f)
+		.VAlign(VAlign_Center)
 		[
-			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot()
-			  .FillWidth(1.0f)
-			  .VAlign(VAlign_Center)
-			[
-				SAssignNew(NameSearchBox, SEditableTextBox)
-				.HintText(INVTEXT("Actor name..."))
-			]
-			+ SHorizontalBox::Slot()
-			  .AutoWidth()
-			  .VAlign(VAlign_Center)
-			  .Padding(4, 0, 0, 0)
-			[
-				SNew(SButton)
-				.Text(INVTEXT("Search"))
-				.OnClicked_Lambda(
-					[this, NameSearchBox]()
+			SAssignNew(NameSearchBox, SEditableTextBox)
+			.HintText(INVTEXT("Actor name..."))
+		]
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.VAlign(VAlign_Center)
+		.Padding(4, 0, 0, 0)
+		[
+			SNew(SButton)
+			.Text(INVTEXT("Search"))
+			.OnClicked_Lambda(
+				[this, NameSearchBox]()
+				{
+					if (!NameSearchBox.IsValid() || NameSearchBox->GetText().IsEmpty()) { return FReply::Handled(); }
+
+					PCGEX_CURRENT_COLLECTION
 					{
-						if (!NameSearchBox.IsValid() || NameSearchBox->GetText().IsEmpty()) { return FReply::Handled(); }
+						const FString SearchTerm = NameSearchBox->GetText().ToString();
+						UWorld* World = GEditor->GetEditorWorldContext().World();
+						if (!World || !World->PersistentLevel) { return FReply::Handled(); }
 
-						PCGEX_CURRENT_COLLECTION
+						Collection->Modify();
+						int32 Added = 0;
+
+						for (AActor* Actor : World->PersistentLevel->Actors)
 						{
-							const FString SearchTerm = NameSearchBox->GetText().ToString();
-							UWorld* World = GEditor->GetEditorWorldContext().World();
-							if (!World || !World->PersistentLevel) { return FReply::Handled(); }
-
-							Collection->Modify();
-							int32 Added = 0;
-
-							for (AActor* Actor : World->PersistentLevel->Actors)
+							if (!Actor) { continue; }
+							if (Actor->GetFName().ToString().Contains(SearchTerm, ESearchCase::IgnoreCase))
 							{
-								if (!Actor) { continue; }
-								if (Actor->GetFName().ToString().Contains(SearchTerm, ESearchCase::IgnoreCase))
-								{
-									AddOrUpdateActorEntry(Collection, Actor);
-									Added++;
-								}
-							}
-
-							if (Added > 0)
-							{
-								Collection->MarkPackageDirty();
-								FCoreUObjectDelegates::BroadcastOnObjectModified(Collection);
+								AddOrUpdateActorEntry(Collection, Actor);
+								Added++;
 							}
 						}
-						return FReply::Handled();
-					})
-				.ToolTipText(INVTEXT("Search for actors by name in the current level and add matching ones."))
-			]
-		];
+
+						if (Added > 0)
+						{
+							Collection->MarkPackageDirty();
+							FCoreUObjectDelegates::BroadcastOnObjectModified(Collection);
+						}
+					}
+					return FReply::Handled();
+				})
+			.ToolTipText(INVTEXT("Search for actors by name in the current level and add matching ones."))
+		]
+	];
 
 #undef PCGEX_CURRENT_COLLECTION
 }

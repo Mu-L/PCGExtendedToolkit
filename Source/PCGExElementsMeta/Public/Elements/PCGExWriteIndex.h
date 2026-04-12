@@ -41,7 +41,7 @@ protected:
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
-	
+
 	/** Whether to write the index of the point on the point. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bOutputPointIndex = true;

@@ -46,7 +46,7 @@ namespace PCGExPointFilter
 {
 	struct FCachedVolume
 	{
-		FBox WorldBounds = FBox(EForceInit::ForceInit);
+		FBox WorldBounds = FBox(ForceInit);
 		TWeakObjectPtr<AVolume> VolumeActor = nullptr;
 	};
 

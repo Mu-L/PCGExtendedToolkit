@@ -128,7 +128,7 @@ namespace PCGExFindClusterHull
 
 			PCGEX_MAKE_SHARED(OBBFacade, PCGExData::FFacade, OBBPointIO.ToSharedRef())
 			PCGExClusters::ProcessCellsAsOBBPoints(Cluster, HullArray, OBBFacade,
-				Context->Artifacts, TaskManager);
+			                                       Context->Artifacts, TaskManager);
 		}
 
 		// Output to Paths if enabled

@@ -15,9 +15,9 @@
 UENUM(BlueprintType)
 enum class EPCGExAccumulationMode : uint8
 {
-	Sum     UMETA(DisplayName = "Sum", ToolTip = "Add attribute values along the path"),
-	Max     UMETA(DisplayName = "Maximum", ToolTip = "Track maximum value encountered"),
-	Min     UMETA(DisplayName = "Minimum", ToolTip = "Track minimum value encountered"),
+	Sum UMETA(DisplayName = "Sum", ToolTip = "Add attribute values along the path"),
+	Max UMETA(DisplayName = "Maximum", ToolTip = "Track maximum value encountered"),
+	Min UMETA(DisplayName = "Minimum", ToolTip = "Track minimum value encountered"),
 	Average UMETA(DisplayName = "Average", ToolTip = "Running average along path"),
 };
 
@@ -111,7 +111,6 @@ public:
 #endif
 	//~End UPCGSettings
 
-public:
 	/** Control Config.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
 	FPCGExFillControlConfigAttributeAccumulation Config;

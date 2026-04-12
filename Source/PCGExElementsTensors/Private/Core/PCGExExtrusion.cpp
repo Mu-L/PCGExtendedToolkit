@@ -480,8 +480,8 @@ namespace PCGExExtrusion
 
 		// Validate path - use callback if available, otherwise default to >= 2 points
 		const bool bIsValid = Callbacks.OnValidatePath
-			? Callbacks.OnValidatePath(ExtrudedPoints.Num())
-			: (ExtrudedPoints.Num() >= 2);
+			                      ? Callbacks.OnValidatePath(ExtrudedPoints.Num())
+			                      : (ExtrudedPoints.Num() >= 2);
 
 		if (!bIsValid)
 		{

@@ -16,9 +16,9 @@
 UENUM(BlueprintType)
 enum class EPCGExFloodFillBudgetSource : uint8
 {
-	PathScore      UMETA(DisplayName = "Path Score", ToolTip = "Accumulated heuristic score along path"),
+	PathScore UMETA(DisplayName = "Path Score", ToolTip = "Accumulated heuristic score along path"),
 	CompositeScore UMETA(DisplayName = "Composite Score", ToolTip = "Total combined score"),
-	PathDistance   UMETA(DisplayName = "Path Distance", ToolTip = "Accumulated spatial distance"),
+	PathDistance UMETA(DisplayName = "Path Distance", ToolTip = "Accumulated spatial distance"),
 };
 
 USTRUCT(BlueprintType)
@@ -33,9 +33,9 @@ struct FPCGExFillControlConfigHeuristicsBudget : public FPCGExFillControlConfigB
 	}
 
 	/** Scoring mode for combining multiple heuristics */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)                                                                    
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage;
-	
+
 	/** Maximum accumulated heuristic cost allowed before stopping. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	EPCGExInputValueType MaxBudgetInput = EPCGExInputValueType::Constant;

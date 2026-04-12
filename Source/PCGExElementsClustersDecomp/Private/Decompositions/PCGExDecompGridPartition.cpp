@@ -28,7 +28,7 @@ bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
 	const FVector BoundsMin = Bounds.Min;
 
 	// Quantize each node position to a grid cell
-	TMap<FIntVector, int32> CellMap; // GridCoord -> CellID
+	TMap<FIntVector, int32> CellMap;      // GridCoord -> CellID
 	TMap<int32, TArray<int32>> CellNodes; // CellID -> NodeIndices
 
 	int32 NextCellID = 0;
@@ -77,7 +77,7 @@ bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
 				if (Pair.Value.Num() < MinNodesPerCell) { SmallCells.Add(Pair.Key); }
 			}
 
-			if (SmallCells.Num() == 0 || SmallCells.Num() == CellNodes.Num()) { break; } // All small or none small — stop
+			if (SmallCells.Num() == 0 || SmallCells.Num() == CellNodes.Num()) { break; } // All small or none small -- stop
 
 			for (const int32 SmallCellID : SmallCells)
 			{

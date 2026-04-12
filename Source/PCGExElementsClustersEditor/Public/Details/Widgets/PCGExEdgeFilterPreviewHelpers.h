@@ -11,23 +11,23 @@
 namespace PCGExEdgeFilterPreview
 {
 	// Endpoint colors
-	static const FLinearColor EndpointPassColor(0.1f, 0.6f, 0.2f, 0.85f);
-	static const FLinearColor EndpointFailColor(0.6f, 0.15f, 0.15f, 0.7f);
-	static const FLinearColor EndpointNeutralColor(0.7f, 0.7f, 0.7f, 0.8f);
+	static constexpr FLinearColor EndpointPassColor(0.1f, 0.6f, 0.2f, 0.85f);
+	static constexpr FLinearColor EndpointFailColor(0.6f, 0.15f, 0.15f, 0.7f);
+	static constexpr FLinearColor EndpointNeutralColor(0.7f, 0.7f, 0.7f, 0.8f);
 
 	// Edge line
-	static const FLinearColor EdgeLineColor(0.5f, 0.5f, 0.5f, 0.6f);
+	static constexpr FLinearColor EdgeLineColor(0.5f, 0.5f, 0.5f, 0.6f);
 
 	// Panel backgrounds
-	static const FLinearColor PanelPassBg(0.1f, 0.3f, 0.1f, 0.15f);
-	static const FLinearColor PanelFailBg(0.3f, 0.1f, 0.1f, 0.15f);
+	static constexpr FLinearColor PanelPassBg(0.1f, 0.3f, 0.1f, 0.15f);
+	static constexpr FLinearColor PanelFailBg(0.3f, 0.1f, 0.1f, 0.15f);
 
 	// Labels
-	static const FLinearColor LabelColor(0.6f, 0.6f, 0.6f, 0.8f);
-	static const FLinearColor AttributeModeColor(0.3f, 0.3f, 0.3f, 0.3f);
+	static constexpr FLinearColor LabelColor(0.6f, 0.6f, 0.6f, 0.8f);
+	static constexpr FLinearColor AttributeModeColor(0.3f, 0.3f, 0.3f, 0.3f);
 
 	// Neighbor stubs
-	static const FLinearColor NeighborStubColor(0.4f, 0.5f, 0.6f, 0.5f);
+	static constexpr FLinearColor NeighborStubColor(0.4f, 0.5f, 0.6f, 0.5f);
 
 	// Sizes
 	static constexpr float EndpointRadius = 6.0f;
@@ -51,7 +51,7 @@ namespace PCGExEdgeFilterPreview
 	{
 		const FSlateRenderTransform& RenderTransform = AllottedGeometry.GetAccumulatedRenderTransform();
 		const FColor VertColor = Color.ToFColor(true);
-		const FColor NoColor(0, 0, 0, 0);
+		constexpr FColor NoColor(0, 0, 0, 0);
 
 		TArray<FSlateVertex> Vertices;
 		TArray<SlateIndex> Indices;
@@ -91,7 +91,7 @@ namespace PCGExEdgeFilterPreview
 	{
 		const FSlateRenderTransform& RenderTransform = AllottedGeometry.GetAccumulatedRenderTransform();
 		const FColor VertColor = Color.ToFColor(true);
-		const FColor NoColor(0, 0, 0, 0);
+		constexpr FColor NoColor(0, 0, 0, 0);
 
 		const FVector2D TR = TopLeft + FVector2D(Size.X, 0);
 		const FVector2D BL = TopLeft + FVector2D(0, Size.Y);

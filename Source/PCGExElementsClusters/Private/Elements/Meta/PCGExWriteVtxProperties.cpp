@@ -148,7 +148,7 @@ namespace PCGExWriteVtxProperties
 					: PCGExMath::FBestFitPlane();
 
 			const FTransform BFPT = BestFitPlane.GetTransform(Settings->AxisOrder);
-			
+
 			if (VtxNormalWriter) { VtxNormalWriter->SetValue(Node.PointIndex, BFPT.GetUnitAxis(NormalAxis)); }
 
 			if (Settings->bMutateVtxToOOB)

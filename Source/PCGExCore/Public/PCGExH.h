@@ -13,7 +13,11 @@ namespace PCGEx
 		uint64 Key = 0;
 
 		FIndexKey() = default;
-		FIndexKey(const int32 InIndex, const uint64 InKey) : Index(InIndex), Key(InKey) {}
+
+		FIndexKey(const int32 InIndex, const uint64 InKey)
+			: Index(InIndex), Key(InKey)
+		{
+		}
 	};
 
 	template <typename, typename = void>
@@ -174,8 +178,8 @@ namespace PCGEx
 	{
 		const FVector P = Position * 1000.0;
 		return (static_cast<uint64>(static_cast<int64>(P.X)) << 42) ^
-		       (static_cast<uint64>(static_cast<int64>(P.Y)) << 21) ^
-		        static_cast<uint64>(static_cast<int64>(P.Z));
+			(static_cast<uint64>(static_cast<int64>(P.Y)) << 21) ^
+			static_cast<uint64>(static_cast<int64>(P.Z));
 	}
 
 	template <typename S, typename T>

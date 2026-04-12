@@ -183,8 +183,8 @@ namespace PCGExStagingLoadLevel
 
 		FLevelSpawnRequest(UWorld* InWorld, const FString& InPackageName, const FSoftObjectPath& InLevelPath, const FTransform& InTransform, const int32 InPointIndex)
 			: PointIndex(InPointIndex)
-			, LevelPath(InLevelPath)
-			, Params(InWorld, InPackageName, InTransform)
+			  , LevelPath(InLevelPath)
+			  , Params(InWorld, InPackageName, InTransform)
 		{
 		}
 	};

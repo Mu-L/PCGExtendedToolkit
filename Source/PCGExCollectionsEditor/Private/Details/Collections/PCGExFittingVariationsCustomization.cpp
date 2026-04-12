@@ -161,7 +161,7 @@ void FPCGExFittingVariationsCustomization::CustomizeChildren(
 		[
 			SNew(SVerticalBox)
 
-			// X — [min]:[max] [step?]
+			// X -- [min]:[max] [step?]
 			+ SVerticalBox::Slot()
 			.AutoHeight()
 			.Padding(0, 1)
@@ -349,7 +349,12 @@ void FPCGExFittingVariationsCustomization::CustomizeChildren(
 			.Padding(0, 1)
 			[
 				SNew(SHorizontalBox)
-				.IsEnabled_Lambda([UniformScaleHandle]() { bool bUniform = false; UniformScaleHandle->GetValue(bUniform); return !bUniform; })
+				.IsEnabled_Lambda([UniformScaleHandle]()
+				{
+					bool bUniform = false;
+					UniformScaleHandle->GetValue(bUniform);
+					return !bUniform;
+				})
 				PCGEX_SMALL_LABEL(" Y")
 				+ SHorizontalBox::Slot().Padding(1).FillWidth(2)
 				[
@@ -364,7 +369,12 @@ void FPCGExFittingVariationsCustomization::CustomizeChildren(
 			.Padding(0, 1)
 			[
 				SNew(SHorizontalBox)
-				.IsEnabled_Lambda([UniformScaleHandle]() { bool bUniform = false; UniformScaleHandle->GetValue(bUniform); return !bUniform; })
+				.IsEnabled_Lambda([UniformScaleHandle]()
+				{
+					bool bUniform = false;
+					UniformScaleHandle->GetValue(bUniform);
+					return !bUniform;
+				})
 				PCGEX_SMALL_LABEL(" Z")
 				+ SHorizontalBox::Slot().Padding(1).FillWidth(2)
 				[

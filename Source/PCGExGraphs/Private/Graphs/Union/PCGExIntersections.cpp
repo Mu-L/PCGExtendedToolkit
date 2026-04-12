@@ -206,7 +206,11 @@ namespace PCGExGraphs
 
 		// Spatial sort nodes by Morton hash for deterministic ordering
 		const int32 N = Nodes.Num();
-		if (N <= 1) { bNodesSorted = true; return; }
+		if (N <= 1)
+		{
+			bNodesSorted = true;
+			return;
+		}
 
 		// 1. Compute Morton hash for each node center
 		TArray<PCGEx::FIndexKey> MortonHash;
@@ -526,8 +530,8 @@ namespace PCGExGraphs
 
 			const FVector Position = Transforms[Node.PointIndex].GetLocation();
 
-			if (!EdgeProxy->Box.IsInside(Position)) { return; } // Refine octree broad-phase
-			if (IEdge.Contains(Node.PointIndex)) { return; }    // Skip own endpoints
+			if (!EdgeProxy->Box.IsInside(Position)) { return; }                             // Refine octree broad-phase
+			if (IEdge.Contains(Node.PointIndex)) { return; }                                // Skip own endpoints
 			if (!EdgeProxy->FindSplit(Node.PointIndex, InIntersections, Split)) { return; } // Not within tolerance
 
 			// Reject nodes that belong to the same source IO as this edge (self-intersection filter)

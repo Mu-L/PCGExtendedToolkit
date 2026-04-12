@@ -27,9 +27,8 @@ protected:
 	//~End UPCGSettings
 
 public:
-	
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
-	
+
 	/** List of attributes to delete. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
 	FPCGExCarryOverDetails Filters;

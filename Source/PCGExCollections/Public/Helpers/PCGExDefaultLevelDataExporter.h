@@ -17,9 +17,12 @@ class UStaticMeshComponent;
 UENUM()
 enum class EPCGExActorExportType : uint8
 {
-	Mesh  = 0, // Has UStaticMeshComponent with valid mesh
-	Actor = 1, // No static mesh → export as actor class reference
-	Skip  = 2, // Exclude entirely
+	Mesh = 0,
+	// Has UStaticMeshComponent with valid mesh
+	Actor = 1,
+	// No static mesh → export as actor class reference
+	Skip = 2,
+	// Exclude entirely
 };
 
 /**

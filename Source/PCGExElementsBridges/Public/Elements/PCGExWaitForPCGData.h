@@ -54,8 +54,8 @@ namespace PCGExWaitForPCGData
 		void InitFrom(const UPCGExWaitForPCGDataSettings* Settings);
 	};
 
-	/** Generation trigger action configuration — alias to shared type in PCGExPCGInterop */
-	struct FGenerationConfig : public PCGExPCGInterop::FGenerationConfig
+	/** Generation trigger action configuration -- alias to shared type in PCGExPCGInterop */
+	struct FGenerationConfig : PCGExPCGInterop::FGenerationConfig
 	{
 		void InitFrom(const UPCGExWaitForPCGDataSettings* Settings);
 	};
@@ -327,7 +327,7 @@ namespace PCGExWaitForPCGData
 	};
 
 	//
-	// Generation Watcher — alias to shared type in PCGExPCGInterop
+	// Generation Watcher -- alias to shared type in PCGExPCGInterop
 	//
 	using FGenerationWatcher = PCGExPCGInterop::FGenerationWatcher;
 

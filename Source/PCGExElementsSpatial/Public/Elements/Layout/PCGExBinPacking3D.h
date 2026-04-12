@@ -146,7 +146,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Packing", meta = (PCG_Overridable))
 	bool bAbsolutePadding = true;
 
-	
+
 	//
 	// Settings|Load Bearing
 	//
@@ -170,7 +170,7 @@ public:
 	/** Per-item minimum fraction of base area that must be supported (0 = any contact, 1 = full base). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Packing", meta = (PCG_Overridable, EditCondition="bRequireSupport"))
 	FPCGExInputShorthandSelectorDouble01 MinSupportRatio = FPCGExInputShorthandSelectorDouble01(FName("MinSupportRatio"), 0.2);
-	
+
 	//
 	// Settings|Objectives
 	//
@@ -236,7 +236,6 @@ public:
 	bool bQuietTooFewBinsWarning = false;
 
 	virtual bool GetSortingRules(FPCGExContext* InContext, TArray<FPCGExSortRuleConfig>& OutRules) const;
-
 };
 
 ///

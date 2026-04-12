@@ -143,44 +143,12 @@ namespace PCGExMeshCollectionActions
 	}
 }
 
-FText FPCGExMeshCollectionActions::GetName() const
+EAssetCommandResult UAssetDefinition_PCGExMeshCollection::OpenAssets(const FAssetOpenArgs& OpenArgs) const
 {
-	return INVTEXT("PCGEx Collection | Mesh");
-}
-
-FString FPCGExMeshCollectionActions::GetObjectDisplayName(UObject* Object) const
-{
-	return Object->GetName();
-}
-
-UClass* FPCGExMeshCollectionActions::GetSupportedClass() const
-{
-	return UPCGExMeshCollection::StaticClass();
-}
-
-FColor FPCGExMeshCollectionActions::GetTypeColor() const
-{
-	return FColor(0, 255, 255);
-}
-
-uint32 FPCGExMeshCollectionActions::GetCategories()
-{
-	return EAssetTypeCategories::Misc;
-}
-
-bool FPCGExMeshCollectionActions::HasActions(const TArray<UObject*>& InObjects) const
-{
-	return false;
-}
-
-void FPCGExMeshCollectionActions::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
-{
-	for (UObject* Obj : InObjects)
+	for (UPCGExMeshCollection* Collection : OpenArgs.LoadObjects<UPCGExMeshCollection>())
 	{
-		if (UPCGExMeshCollection* Collection = Cast<UPCGExMeshCollection>(Obj))
-		{
-			TSharedRef<FPCGExMeshCollectionEditor> Editor = MakeShared<FPCGExMeshCollectionEditor>();
-			Editor->InitEditor(Collection, EToolkitMode::Standalone, EditWithinLevelEditor);
-		}
+		TSharedRef<FPCGExMeshCollectionEditor> Editor = MakeShared<FPCGExMeshCollectionEditor>();
+		Editor->InitEditor(Collection, OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost);
 	}
+	return EAssetCommandResult::Handled;
 }

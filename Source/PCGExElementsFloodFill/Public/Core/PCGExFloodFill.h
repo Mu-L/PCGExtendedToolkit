@@ -87,7 +87,6 @@ struct PCGEXELEMENTSFLOODFILL_API FPCGExFloodFillFlowDetails
 	/** Diffusion rate constant. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Fill Rate", EditCondition="FillRateInput == EPCGExInputValueType::Constant", EditConditionHides, ClampMin=0))
 	int32 FillRateConstant = 1;
-
 };
 
 namespace PCGExData
@@ -157,7 +156,11 @@ namespace PCGExFloodFill
 		EPCGExFloodFillPrioritization Mode = EPCGExFloodFillPrioritization::Heuristics;
 
 		FCandidateHeapComparator() = default;
-		explicit FCandidateHeapComparator(EPCGExFloodFillPrioritization InMode) : Mode(InMode) {}
+
+		explicit FCandidateHeapComparator(EPCGExFloodFillPrioritization InMode)
+			: Mode(InMode)
+		{
+		}
 
 		FORCEINLINE bool operator()(const FCandidate& A, const FCandidate& B) const
 		{
@@ -168,11 +171,9 @@ namespace PCGExFloodFill
 				if (A.Score == B.Score) { return A.Depth < B.Depth; }
 				return A.Score < B.Score;
 			}
-			else // Depth
-			{
-				if (A.Depth == B.Depth) { return A.Score < B.Score; }
-				return A.Depth < B.Depth;
-			}
+			// Depth
+			if (A.Depth == B.Depth) { return A.Score < B.Score; }
+			return A.Depth < B.Depth;
 		}
 	};
 
@@ -189,7 +190,7 @@ namespace PCGExFloodFill
 		double MaxDistance = 0;
 
 		TSharedPtr<FFillControlsHandler> FillControlsHandler;
-		FDiffusionConfig Config; // Local config snapshot, set by FFillControlsHandler::PrepareForDiffusions
+		FDiffusionConfig Config;                 // Local config snapshot, set by FFillControlsHandler::PrepareForDiffusions
 		FCandidateHeapComparator HeapComparator; // Cached comparator for heap operations
 
 	public:

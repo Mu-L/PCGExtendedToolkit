@@ -382,7 +382,7 @@ namespace PCGExPathStitch
 
 						if (BridgeDir.IsNearlyZero())
 						{
-							// Endpoints coincident — bridge direction undefined, fall back to segment alignment
+							// Endpoints coincident -- bridge direction undefined, fall back to segment alignment
 							Alignment = SegmentDot;
 						}
 						else
@@ -391,12 +391,12 @@ namespace PCGExPathStitch
 							const double BridgeDotB = FVector::DotProduct(OtherSeg.Direction * -1, BridgeDir);
 
 							const double BridgeScore = Settings->BridgeScoring == EPCGExStitchBridgeScoring::Minimum
-								? FMath::Min(BridgeDotA, BridgeDotB)
-								: (BridgeDotA + BridgeDotB) * 0.5;
+								                           ? FMath::Min(BridgeDotA, BridgeDotB)
+								                           : (BridgeDotA + BridgeDotB) * 0.5;
 
 							Alignment = Settings->AlignmentMode == EPCGExStitchAlignmentMode::Bridge
-								? BridgeScore
-								: FMath::Min(SegmentDot, BridgeScore);
+								            ? BridgeScore
+								            : FMath::Min(SegmentDot, BridgeScore);
 						}
 					}
 
@@ -410,7 +410,7 @@ namespace PCGExPathStitch
 			CollectFromEndpoint(false);
 		}
 
-		// Phase 2: Sort — best alignment (when enabled), then closest, with deterministic tiebreaker
+		// Phase 2: Sort -- best alignment (when enabled), then closest, with deterministic tiebreaker
 
 		const bool bSortByAlignment = Settings->bDoRequireAlignment;
 		Candidates.Sort([bSortByAlignment](const FStitchCandidate& X, const FStitchCandidate& Y)

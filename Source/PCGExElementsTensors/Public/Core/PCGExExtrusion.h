@@ -30,37 +30,54 @@ namespace PCGExExtrusion
 	/** Extrusion state - tracks where in the lifecycle an extrusion is */
 	enum class EExtrusionState : uint8
 	{
-		Probing,    // Searching for valid start position (when starting in stop filter)
-		Extruding,  // Actively adding points to path
-		Completed,  // Finalized successfully, path is valid
-		Stopped     // Hit termination condition, no longer advancing
+		Probing,
+		// Searching for valid start position (when starting in stop filter)
+		Extruding,
+		// Actively adding points to path
+		Completed,
+		// Finalized successfully, path is valid
+		Stopped // Hit termination condition, no longer advancing
 	};
 
 	/** Reason why an extrusion stopped - flags can be combined */
 	enum class EStopReason : uint16
 	{
-		None              = 0,
-		Iterations        = 1 << 0, // Ran out of iterations
-		MaxLength         = 1 << 1, // Hit max path length
-		MaxPointCount     = 1 << 2, // Hit max point count
-		StopFilter        = 1 << 3, // Hit stop filter boundary
-		ExternalPath      = 1 << 4, // Intersected external path
-		SelfIntersection  = 1 << 5, // Intersected another extrusion
-		SelfMerge         = 1 << 6, // Merged with another extrusion
-		ClosedLoop        = 1 << 7, // Detected closed loop back to origin
-		SamplingFailed    = 1 << 8  // Tensor sampling returned no result
+		None       = 0,
+		Iterations = 1 << 0,
+		// Ran out of iterations
+		MaxLength = 1 << 1,
+		// Hit max path length
+		MaxPointCount = 1 << 2,
+		// Hit max point count
+		StopFilter = 1 << 3,
+		// Hit stop filter boundary
+		ExternalPath = 1 << 4,
+		// Intersected external path
+		SelfIntersection = 1 << 5,
+		// Intersected another extrusion
+		SelfMerge = 1 << 6,
+		// Merged with another extrusion
+		ClosedLoop = 1 << 7,
+		// Detected closed loop back to origin
+		SamplingFailed = 1 << 8 // Tensor sampling returned no result
 	};
+
 	ENUM_CLASS_FLAGS(EStopReason)
 
 	/** Feature flags - determines which checks are enabled at runtime */
 	enum class EExtrusionFlags : uint32
 	{
-		None           = 0,
-		Bounded        = 1 << 0, // Stop filters are enabled
-		ClosedLoop     = 1 << 1, // Check for closed loops
-		AllowsChildren = 1 << 2, // Allow child extrusions after stopping
-		CollisionCheck = 1 << 3, // Check for path intersections
+		None    = 0,
+		Bounded = 1 << 0,
+		// Stop filters are enabled
+		ClosedLoop = 1 << 1,
+		// Check for closed loops
+		AllowsChildren = 1 << 2,
+		// Allow child extrusions after stopping
+		CollisionCheck = 1 << 3,
+		// Check for path intersections
 	};
+
 	ENUM_CLASS_FLAGS(EExtrusionFlags)
 
 	constexpr bool HasFlag(const EExtrusionFlags Flags, EExtrusionFlags Flag)
@@ -226,8 +243,8 @@ namespace PCGExExtrusion
 		bool bIsFollowUp = false;
 
 		//~ Shared resources (set by owner)
-		TSharedPtr<TArray<TSharedPtr<PCGExPaths::FPath>>> SolidPaths;      // For self-intersection (grows as extrusions complete)
-		TArray<TSharedPtr<PCGExPaths::FPath>>* ExternalPaths = nullptr;    // For external path intersection
+		TSharedPtr<TArray<TSharedPtr<PCGExPaths::FPath>>> SolidPaths;   // For self-intersection (grows as extrusions complete)
+		TArray<TSharedPtr<PCGExPaths::FPath>>* ExternalPaths = nullptr; // For external path intersection
 		TSharedPtr<PCGExTensor::FTensorsHandler> TensorsHandler;
 		TSharedPtr<PCGExPointFilter::FManager> StopFilters;
 
@@ -254,8 +271,8 @@ namespace PCGExExtrusion
 		void Complete();
 
 		//~ Collision interface
-		PCGExMath::FSegment GetHeadSegment() const;           // Segment between last two inserted points
-		PCGExMath::FSegment GetCurrentHeadSegment() const;    // Segment from last inserted point to current head position
+		PCGExMath::FSegment GetHeadSegment() const;        // Segment between last two inserted points
+		PCGExMath::FSegment GetCurrentHeadSegment() const; // Segment from last inserted point to current head position
 		PCGExMath::FClosestPosition FindCrossing(const PCGExMath::FSegment& InSegment, bool& OutIsLastSegment, PCGExMath::FClosestPosition& OutClosestPosition, int32 TruncateSearch = 0) const;
 		bool TryMerge(const PCGExMath::FSegment& InSegment, const PCGExMath::FClosestPosition& InMerge);
 
