@@ -36,7 +36,7 @@ namespace PCGExGraphs
 		NodesUnion = MakeShared<PCGExData::FUnionMetadata>();
 		EdgesUnion = MakeShared<PCGExData::FUnionMetadata>();
 
-		if (FuseDetails.FuseMethod == EPCGExFuseMethod::Octree)
+		if (FuseDetails.GetEffectiveMethod() == EPCGExFuseMethod::Octree)
 		{
 			Octree = MakeUnique<FUnionNodeOctree>(Bounds.GetCenter(), Bounds.GetExtent().Length() + 10);
 		}
