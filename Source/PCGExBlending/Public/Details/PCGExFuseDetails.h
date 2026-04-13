@@ -113,6 +113,8 @@ struct PCGEXBLENDING_API FPCGExFuseDetails : public FPCGExSourceFuseDetails
 
 	virtual bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InDataFacade) override;
 
+	EPCGExFuseMethod GetEffectiveMethod() const;
+
 	uint64 GetGridKey(const FVector& Location, const int32 PointIndex) const;
 	FBox GetOctreeBox(const FVector& Location, const int32 PointIndex) const;
 
