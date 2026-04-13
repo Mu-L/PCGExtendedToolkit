@@ -11,9 +11,7 @@
 #endif
 
 #include "Elements/Partition/PCGExModularPartitionByValues.h"
-#include "AssetTypeActions_Base.h"
-#include "Elements/PCGExPackActorData.h"
-#include "PCGExCoreEditor/Public/PCGExAssetTypesMacros.h"
+#include "Styling/AppStyle.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExElementsMetaModule"
@@ -36,9 +34,7 @@ void FPCGExElementsMetaModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>
 	PCGEX_START_PCG_REGISTRATION
 	PCGEX_REGISTER_DATA_TYPE(PartitionRule, PartitionRule)
 
-	PCGEX_ASSET_TYPE_ACTION_BASIC(
-		ActorDataPacker, "PCGEx Actor Data Packer", UPCGExCustomActorDataPacker,
-		FColor(195, 124, 40), EAssetTypeCategories::Misc)
+	// ActorDataPacker: UAssetDefinition in PCGExtendedToolkitEditor handles color/category
 }
 #endif
 

@@ -8,7 +8,7 @@
 
 class UPCGExAssetCollection;
 
-/** PCGDataAsset collection editor — reference implementation with custom tile picker widget. */
+/** PCGDataAsset collection editor -- reference implementation with custom tile picker widget. */
 class FPCGExPCGDataAssetCollectionEditor : public FPCGExAssetCollectionEditor
 {
 public:

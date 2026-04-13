@@ -548,7 +548,7 @@ namespace PCGExSampleNearestPath
 
 					float Lerp = 0;
 					const int32 EdgeIndex = Path->GetClosestEdge(Time, Lerp);
-					const FTransform SampleTransform = Path->GetTransformAtInputKey(static_cast<float>(EdgeIndex + Lerp));
+					const FTransform SampleTransform = Path->GetTransformAtInputKey(EdgeIndex + Lerp);
 
 					SampleTarget(EdgeIndex, Lerp, Path, SampleTransform);
 				});

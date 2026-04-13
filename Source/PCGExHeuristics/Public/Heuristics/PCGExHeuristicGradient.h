@@ -42,11 +42,11 @@ struct FPCGExHeuristicGradientConfig : public FPCGExHeuristicConfigBase
 	bool bNormalizeByDistance = false;
 
 	/** Expected minimum gradient value for normalization. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Mode==EPCGExGradientMode::AvoidChange||Mode==EPCGExGradientMode::SeekChange"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Mode == EPCGExGradientMode::AvoidChange || Mode == EPCGExGradientMode::SeekChange"))
 	double MinGradient = 0;
 
 	/** Expected maximum gradient value for normalization. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Mode==EPCGExGradientMode::AvoidChange||Mode==EPCGExGradientMode::SeekChange"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Mode == EPCGExGradientMode::AvoidChange || Mode == EPCGExGradientMode::SeekChange"))
 	double MaxGradient = 1;
 };
 

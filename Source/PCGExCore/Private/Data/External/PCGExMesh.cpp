@@ -67,7 +67,9 @@ namespace PCGExMesh
 			bool bEnableVertexMerge = true;
 
 		public:
-			virtual ~IMeshLookup() {};
+			virtual ~IMeshLookup()
+			{
+			};
 			/* Primary vertex hash */
 			TMap<uint64, int32> Data;
 

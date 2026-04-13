@@ -43,7 +43,7 @@ namespace PCGExMT
 	class FTaskManager;
 }
 
-template<typename T>
+template <typename T>
 class FPCGMetadataAttribute;
 
 namespace PCGExData

@@ -43,8 +43,8 @@ namespace PCGExSorting
 
 		// Tag-based sorting
 		bool bUseDataTag = false;
-		double CachedTagValue = 0.0;                // For single-facade sorting
-		TArray<double> CachedTagValues;             // For multi-facade sorting (indexed by Facade->Idx)
+		double CachedTagValue = 0.0;    // For single-facade sorting
+		TArray<double> CachedTagValues; // For multi-facade sorting (indexed by Facade->Idx)
 	};
 
 	class PCGEXCORE_API FSorter : public TSharedFromThis<FSorter>
@@ -63,7 +63,7 @@ namespace PCGExSorting
 		void UpdateCachedState();
 
 		// Internal helper for facade Init (avoids code duplication)
-		template<typename FacadeArrayType>
+		template <typename FacadeArrayType>
 		bool InitFacadesInternal(FPCGExContext* InContext, const FacadeArrayType& InDataFacades);
 
 	public:

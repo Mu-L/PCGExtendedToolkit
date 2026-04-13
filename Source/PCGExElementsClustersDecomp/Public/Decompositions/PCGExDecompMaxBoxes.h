@@ -74,7 +74,7 @@ public:
 	EPCGExDecompTransformSpace TransformSpace = EPCGExDecompTransformSpace::Raw;
 
 	/** Custom transform for grid alignment. Only used when TransformSpace = Custom. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="TransformSpace==EPCGExDecompTransformSpace::Custom", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="TransformSpace == EPCGExDecompTransformSpace::Custom", EditConditionHides))
 	FTransform CustomTransform = FTransform::Identity;
 
 	/** How to determine the voxel grid resolution. */
@@ -82,7 +82,7 @@ public:
 	EPCGExDecompVoxelSizeMode VoxelSizeMode = EPCGExDecompVoxelSizeMode::EdgeInferred;
 
 	/** Manual voxel size. Only used when VoxelSizeMode = Manual. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="VoxelSizeMode==EPCGExDecompVoxelSizeMode::Manual", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="VoxelSizeMode == EPCGExDecompVoxelSizeMode::Manual", EditConditionHides))
 	FVector VoxelSize = FVector(100.0);
 
 	/** Maximum dimensions for output cells in world units. Extracted boxes larger than this are subdivided. */
@@ -102,12 +102,12 @@ public:
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
 	PCGEX_CREATE_DECOMPOSITION_OPERATION(DecompMaxBoxes, {
-		Operation->TransformSpace = TransformSpace;
-		Operation->CustomTransform = CustomTransform;
-		Operation->VoxelSizeMode = VoxelSizeMode;
-		Operation->VoxelSize = VoxelSize;
-		Operation->MaxCellSize = MaxCellSize;
-		Operation->MinVoxelsPerCell = MinVoxelsPerCell;
-		Operation->Balance = Balance;
-	})
+	                                     Operation->TransformSpace = TransformSpace;
+	                                     Operation->CustomTransform = CustomTransform;
+	                                     Operation->VoxelSizeMode = VoxelSizeMode;
+	                                     Operation->VoxelSize = VoxelSize;
+	                                     Operation->MaxCellSize = MaxCellSize;
+	                                     Operation->MinVoxelsPerCell = MinVoxelsPerCell;
+	                                     Operation->Balance = Balance;
+	                                     })
 };

@@ -38,13 +38,10 @@ namespace PCGExClusters
 	class FCluster;
 }
 
-namespace PCGExCells
+namespace PCGExCells::OutputLabels
 {
-	namespace OutputLabels
-	{
-		const FName Paths = FName("Paths");
-		const FName CellBounds = FName("CellBounds");
-	}
+	const FName Paths = FName("Paths");
+	const FName CellBounds = FName("CellBounds");
 }
 
 ///
@@ -66,6 +63,7 @@ enum class EPCGExCellTriageFlags : uint8
 	Touching = 1 << 1 UMETA(DisplayName = "Touching", ToolTip="Output cells touching/intersecting the bounds"),
 	Outside  = 1 << 2 UMETA(DisplayName = "Outside", ToolTip="Output cells fully outside the bounds"),
 };
+
 ENUM_CLASS_FLAGS(EPCGExCellTriageFlags)
 
 UENUM()
@@ -377,7 +375,7 @@ struct PCGEXGRAPHS_API FPCGExCellOBBAttributesDetails
 	/** If enabled, use precise min box fit. **/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bUseMinBoxFit = false;
-	
+
 	/** Axis order for OBB transform orientation */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	EPCGExAxisOrder AxisOrder = EPCGExAxisOrder::XYZ;

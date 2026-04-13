@@ -65,21 +65,21 @@ void FPCGExMeshCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolba
 				[this]() -> TSharedRef<SWidget>
 				{
 					return
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot()
-						  .AutoHeight()
-						  .Padding(4)
-						[
-							SNew(SButton)
-							.Text(INVTEXT("Disable All Collisions"))
-							.OnClicked_Lambda(
-								[this]()
-								{
-									PCGEX_CURRENT_COLLECTION { Collection->EDITOR_DisableCollisions(); }
-									return FReply::Handled();
-								})
-							.ToolTipText(INVTEXT("Disable collision on all assets within that collection."))
-						];
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(4)
+							[
+								SNew(SButton)
+								.Text(INVTEXT("Disable All Collisions"))
+								.OnClicked_Lambda(
+									[this]()
+									{
+										PCGEX_CURRENT_COLLECTION { Collection->EDITOR_DisableCollisions(); }
+										return FReply::Handled();
+									})
+								.ToolTipText(INVTEXT("Disable collision on all assets within that collection."))
+							];
 				})
 		);
 
@@ -97,65 +97,65 @@ void FPCGExMeshCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolba
 				[this]() -> TSharedRef<SWidget>
 				{
 					return
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot()
-						  .AutoHeight()
-						  .Padding(4)
-						[
-							SNew(SButton)
-							.OnClicked_Lambda(
-								[this]()
-								{
-									PCGEX_CURRENT_COLLECTION { Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Global); }
-									return FReply::Handled();
-								})
-							.ToolTipText(INVTEXT("Set all entry Descriptor to \"Inherit from collection\".\nEach entry will inherit from the collection global descriptors.\nNOTE: Local settings are preserved, just hidden."))
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(4)
 							[
-								SNew(SHorizontalBox)
-								+ SHorizontalBox::Slot()
-								  .AutoWidth()
-								  .VAlign(VAlign_Center)
-								  .Padding(0, 0, 6, 0)
+								SNew(SButton)
+								.OnClicked_Lambda(
+									[this]()
+									{
+										PCGEX_CURRENT_COLLECTION { Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Global); }
+										return FReply::Handled();
+									})
+								.ToolTipText(INVTEXT("Set all entry Descriptor to \"Inherit from collection\".\nEach entry will inherit from the collection global descriptors.\nNOTE: Local settings are preserved, just hidden."))
 								[
-									SNew(SImage).Image(FAppStyle::Get().GetBrush("PCGEx.ActionIcon.CollectionRule"))
-								]
-								+ SHorizontalBox::Slot()
-								  .FillWidth(1.0f)
-								  .VAlign(VAlign_Center)
-								[
-									SNew(STextBlock).Text(INVTEXT("Inherit from Collection"))
+									SNew(SHorizontalBox)
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.VAlign(VAlign_Center)
+									.Padding(0, 0, 6, 0)
+									[
+										SNew(SImage).Image(FAppStyle::Get().GetBrush("PCGEx.ActionIcon.CollectionRule"))
+									]
+									+ SHorizontalBox::Slot()
+									.FillWidth(1.0f)
+									.VAlign(VAlign_Center)
+									[
+										SNew(STextBlock).Text(INVTEXT("Inherit from Collection"))
+									]
 								]
 							]
-						]
-						+ SVerticalBox::Slot()
-						  .AutoHeight()
-						  .Padding(4, 0, 4, 4)
-						[
-							SNew(SButton)
-							.OnClicked_Lambda(
-								[this]()
-								{
-									PCGEX_CURRENT_COLLECTION { Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Local); }
-									return FReply::Handled();
-								})
-							.ToolTipText(INVTEXT("Set all entry Descriptor to \"Local\".\nEach entry manages its own descriptors.\nNOTE: This will restore previous local settings."))
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(4, 0, 4, 4)
 							[
-								SNew(SHorizontalBox)
-								+ SHorizontalBox::Slot()
-								  .AutoWidth()
-								  .VAlign(VAlign_Center)
-								  .Padding(0, 0, 6, 0)
+								SNew(SButton)
+								.OnClicked_Lambda(
+									[this]()
+									{
+										PCGEX_CURRENT_COLLECTION { Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Local); }
+										return FReply::Handled();
+									})
+								.ToolTipText(INVTEXT("Set all entry Descriptor to \"Local\".\nEach entry manages its own descriptors.\nNOTE: This will restore previous local settings."))
 								[
-									SNew(SImage).Image(FAppStyle::Get().GetBrush("PCGEx.ActionIcon.EntryRule"))
+									SNew(SHorizontalBox)
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.VAlign(VAlign_Center)
+									.Padding(0, 0, 6, 0)
+									[
+										SNew(SImage).Image(FAppStyle::Get().GetBrush("PCGEx.ActionIcon.EntryRule"))
+									]
+									+ SHorizontalBox::Slot()
+									.FillWidth(1.0f)
+									.VAlign(VAlign_Center)
+									[
+										SNew(STextBlock).Text(INVTEXT("Local per Entry"))
+									]
 								]
-								+ SHorizontalBox::Slot()
-								  .FillWidth(1.0f)
-								  .VAlign(VAlign_Center)
-								[
-									SNew(STextBlock).Text(INVTEXT("Local per Entry"))
-								]
-							]
-						];
+							];
 				})
 		);
 	}

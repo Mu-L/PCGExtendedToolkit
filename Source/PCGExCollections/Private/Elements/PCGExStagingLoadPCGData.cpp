@@ -172,14 +172,14 @@ namespace PCGExPCGDataAssetLoader
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
 			TPCGValueRange<FTransform> OutTransforms = Data->GetTransformValueRange();
-			
-			PCGEX_PARALLEL_FOR(OutTransforms.Num(), OutTransforms[i] *= Transform; )
-			
+
+			PCGEX_PARALLEL_FOR(OutTransforms.Num(), OutTransforms[i] *= Transform;)
+
 			const auto* Settings = TaskManager->GetContext()->GetInputSettings<UPCGExPCGDataAssetLoaderSettings>();
 			if (Settings->bRefreshSeeds)
 			{
 				TPCGValueRange<int32> OutSeeds = Data->GetSeedValueRange(true);
-				PCGEX_PARALLEL_FOR(OutSeeds.Num(), OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation()); )
+				PCGEX_PARALLEL_FOR(OutSeeds.Num(), OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation());)
 			}
 		}
 	};
@@ -268,19 +268,19 @@ namespace PCGExPCGDataAssetLoader
 
 		if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
 		{
-			if (bOmitIfEmpty && PointData->IsEmpty()){ return FSpatialTransformResult(); }
+			if (bOmitIfEmpty && PointData->IsEmpty()) { return FSpatialTransformResult(); }
 			return FSpatialTransformResult(MakeShared<FTransformPoints>(InTransform, PointData));
 		}
 
 		if (UPCGSplineData* SplineData = Cast<UPCGSplineData>(InData))
 		{
-			if (bOmitIfEmpty && !SplineData->GetNumSegments()){ return FSpatialTransformResult(); }
+			if (bOmitIfEmpty && !SplineData->GetNumSegments()) { return FSpatialTransformResult(); }
 			return FSpatialTransformResult(MakeShared<FTransformSpline>(InTransform, SplineData));
 		}
 
 		if (UPCGPolyLineData* PolyLineData = Cast<UPCGPolyLineData>(InData))
 		{
-			if (bOmitIfEmpty && !PolyLineData->GetNumSegments()){ return FSpatialTransformResult(); }
+			if (bOmitIfEmpty && !PolyLineData->GetNumSegments()) { return FSpatialTransformResult(); }
 			return FSpatialTransformResult(MakeShared<FTransformPolyline>(InTransform, PolyLineData));
 		}
 
@@ -462,16 +462,16 @@ bool FPCGExPCGDataAssetLoaderElement::AdvanceWork(FPCGExContext* InContext, cons
 
 	// Mark unused pins as inactive
 	int32 PinIndex = 0;
-	
+
 	// Check default pin
 	if (!Context->OutputByPin.Contains(PCGExPCGDataAssetLoader::OutputPinDefault) ||
 		Context->OutputByPin[PCGExPCGDataAssetLoader::OutputPinDefault].IsEmpty())
 	{
 		Context->OutputData.InactiveOutputPinBitmask |= (1ULL << 0);
 	}
-	
+
 	PinIndex++;
-	
+
 	for (const FPCGPinProperties& CustomPin : Settings->CustomOutputPins)
 	{
 		if (!CustomPin.Label.IsNone())

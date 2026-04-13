@@ -79,15 +79,14 @@ protected:
 	//~End UPCGSettings
 
 public:
-	
 	/** If enabled, allows you to filter which targets get inserted into which paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	FPCGExMatchingDetails DataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Sampling);
-	
+
 	/** If enabled, each target can only be inserted into one path (the closest one). Otherwise, a target may be inserted into multiple paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
 	bool bExclusiveTargets = false;
-	
+
 	/** If enabled, inserted points will be snapped to the path. Otherwise, they retain their original position. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bSnapToPath = false;
@@ -111,7 +110,7 @@ public:
 	/** Limit how many points can be inserted per edge. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
 	bool bLimitInsertsPerEdge = false;
-	
+
 	/** How to interpret the limit value. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Limits", meta=(PCG_NotOverridable, EditCondition="bLimitInsertsPerEdge", EditConditionHides))
 	EPCGExInsertLimitMode LimitMode = EPCGExInsertLimitMode::Discrete;
@@ -132,7 +131,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Limits", meta=(PCG_Overridable, EditCondition="bPreventCollocation", EditConditionHides, ClampMin=0))
 	double CollocationTolerance = 1.0;
 
-	
+
 	/** Blending applied on inserted points using path's prev and next point. */
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = Settings, Instanced, meta=(PCG_Overridable, ShowOnlyInnerProperties, NoResetToDefault))
 	TObjectPtr<UPCGExSubPointsBlendInstancedFactory> Blending;
@@ -284,8 +283,8 @@ namespace PCGExPathInsert
 	// Compact candidate for parallel gathering (16 bytes vs 76 bytes for full candidate)
 	struct FCompactCandidate
 	{
-		int32 TargetFlatIndex = -1;  // Reconstruct IO/PointIndex from prefix sums
-		int32 EdgeIndex = -1;        // -1 for pre-path, NumEdges for post-path
+		int32 TargetFlatIndex = -1; // Reconstruct IO/PointIndex from prefix sums
+		int32 EdgeIndex = -1;       // -1 for pre-path, NumEdges for post-path
 		float Alpha = 0;
 		float Distance = 0;
 	};

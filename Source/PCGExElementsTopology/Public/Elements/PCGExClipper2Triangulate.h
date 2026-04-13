@@ -98,6 +98,7 @@ struct FPCGExStagedMeshOutput
 	int32 OrderIndex = 0;
 
 	FPCGExStagedMeshOutput() = default;
+
 	FPCGExStagedMeshOutput(UPCGDynamicMeshData* InMeshData, const TSet<FString>& InTags, int32 InOrderIndex)
 		: MeshData(InMeshData), Tags(InTags), OrderIndex(InOrderIndex)
 	{

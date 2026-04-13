@@ -121,9 +121,9 @@ public:
 	FPCGExNodeSelectionDetails SeedPicking = FPCGExNodeSelectionDetails(200);
 
 	/** Scoring mode for combining multiple heuristics */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)                                                                    
-	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage; 
-	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
+	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage;
+
 	/** Controls how iterative growth is managed. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	EPCGExGrowthIterationMode GrowthMode = EPCGExGrowthIterationMode::Parallel;

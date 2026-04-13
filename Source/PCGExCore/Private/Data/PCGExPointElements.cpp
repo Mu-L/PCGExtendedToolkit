@@ -204,7 +204,13 @@ namespace PCGExData
 
 	// FConstPoint getters
 	const FTransform& FConstPoint::GetTransform() const { return Data->GetTransform(Index); }
-	void FConstPoint::GetTransformNoScale(FTransform& OutTransform) const { OutTransform = Data->GetTransform(Index); OutTransform.SetScale3D(FVector::OneVector); }
+
+	void FConstPoint::GetTransformNoScale(FTransform& OutTransform) const
+	{
+		OutTransform = Data->GetTransform(Index);
+		OutTransform.SetScale3D(FVector::OneVector);
+	}
+
 	FVector FConstPoint::GetLocation() const { return Data->GetTransform(Index).GetLocation(); }
 	FVector FConstPoint::GetScale3D() const { return Data->GetTransform(Index).GetScale3D(); }
 	FQuat FConstPoint::GetRotation() const { return Data->GetTransform(Index).GetRotation(); }
@@ -215,7 +221,13 @@ namespace PCGExData
 	FVector FConstPoint::GetScaledExtents() const { return Data->GetScaledExtents(Index); }
 	FBox FConstPoint::GetLocalBounds() const { return Data->GetLocalBounds(Index); }
 	FBox FConstPoint::GetLocalDensityBounds() const { return Data->GetLocalDensityBounds(Index); }
-	FBox FConstPoint::GetScaledBounds() const { const FVector Scale3D = Data->GetTransform(Index).GetScale3D(); return FBox(Data->GetBoundsMin(Index) * Scale3D, Data->GetBoundsMax(Index) * Scale3D); }
+
+	FBox FConstPoint::GetScaledBounds() const
+	{
+		const FVector Scale3D = Data->GetTransform(Index).GetScale3D();
+		return FBox(Data->GetBoundsMin(Index) * Scale3D, Data->GetBoundsMax(Index) * Scale3D);
+	}
+
 	float FConstPoint::GetSteepness() const { return Data->GetSteepness(Index); }
 	float FConstPoint::GetDensity() const { return Data->GetDensity(Index); }
 	int64 FConstPoint::GetMetadataEntry() const { return Data->GetMetadataEntry(Index); }
@@ -231,7 +243,13 @@ namespace PCGExData
 
 	// FMutablePoint getters
 	const FTransform& FMutablePoint::GetTransform() const { return Data->GetTransform(Index); }
-	void FMutablePoint::GetTransformNoScale(FTransform& OutTransform) const { OutTransform = Data->GetTransform(Index); OutTransform.SetScale3D(FVector::OneVector); }
+
+	void FMutablePoint::GetTransformNoScale(FTransform& OutTransform) const
+	{
+		OutTransform = Data->GetTransform(Index);
+		OutTransform.SetScale3D(FVector::OneVector);
+	}
+
 	FVector FMutablePoint::GetLocation() const { return Data->GetTransform(Index).GetLocation(); }
 	FVector FMutablePoint::GetScale3D() const { return Data->GetTransform(Index).GetScale3D(); }
 	FQuat FMutablePoint::GetRotation() const { return Data->GetTransform(Index).GetRotation(); }
@@ -242,7 +260,13 @@ namespace PCGExData
 	FVector FMutablePoint::GetScaledExtents() const { return Data->GetScaledExtents(Index); }
 	FBox FMutablePoint::GetLocalBounds() const { return Data->GetLocalBounds(Index); }
 	FBox FMutablePoint::GetLocalDensityBounds() const { return Data->GetLocalDensityBounds(Index); }
-	FBox FMutablePoint::GetScaledBounds() const { const FVector Scale3D = Data->GetTransform(Index).GetScale3D(); return FBox(Data->GetBoundsMin(Index) * Scale3D, Data->GetBoundsMax(Index) * Scale3D); }
+
+	FBox FMutablePoint::GetScaledBounds() const
+	{
+		const FVector Scale3D = Data->GetTransform(Index).GetScale3D();
+		return FBox(Data->GetBoundsMin(Index) * Scale3D, Data->GetBoundsMax(Index) * Scale3D);
+	}
+
 	float FMutablePoint::GetSteepness() const { return Data->GetSteepness(Index); }
 	float FMutablePoint::GetDensity() const { return Data->GetDensity(Index); }
 	int64 FMutablePoint::GetMetadataEntry() const { return Data->GetMetadataEntry(Index); }

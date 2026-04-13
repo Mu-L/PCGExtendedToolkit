@@ -15,7 +15,7 @@ namespace PCGExActorDelta
 	 * Each instanced component is diffed against its archetype.
 	 * Returns empty array if actor and all components match defaults exactly.
 	 *
-	 * Format is opaque — use ApplyPropertyDelta to deserialize.
+	 * Format is opaque -- use ApplyPropertyDelta to deserialize.
 	 */
 	PCGEXCOLLECTIONS_API TArray<uint8> SerializeActorDelta(AActor* Actor);
 

@@ -9,14 +9,14 @@
 
 namespace PCGExDotPreviewConstants
 {
-	static const FLinearColor PassColor(0.1f, 0.6f, 0.2f, 0.5f);
-	static const FLinearColor FailColor(0.15f, 0.05f, 0.05f, 0.4f);
-	static const FLinearColor ThresholdColor(1.0f, 1.0f, 1.0f, 0.9f);
-	static const FLinearColor ToleranceColor(1.0f, 1.0f, 0.3f, 0.6f);
-	static const FLinearColor ArcOutlineColor(0.5f, 0.5f, 0.5f, 0.6f);
-	static const FLinearColor ReferenceArrowColor(0.7f, 0.7f, 1.0f, 0.9f);
-	static const FLinearColor LabelColor(0.6f, 0.6f, 0.6f, 0.8f);
-	static const FLinearColor AttributeModeColor(0.3f, 0.3f, 0.3f, 0.3f);
+	static constexpr FLinearColor PassColor(0.1f, 0.6f, 0.2f, 0.5f);
+	static constexpr FLinearColor FailColor(0.15f, 0.05f, 0.05f, 0.4f);
+	static constexpr FLinearColor ThresholdColor(1.0f, 1.0f, 1.0f, 0.9f);
+	static constexpr FLinearColor ToleranceColor(1.0f, 1.0f, 0.3f, 0.6f);
+	static constexpr FLinearColor ArcOutlineColor(0.5f, 0.5f, 0.5f, 0.6f);
+	static constexpr FLinearColor ReferenceArrowColor(0.7f, 0.7f, 1.0f, 0.9f);
+	static constexpr FLinearColor LabelColor(0.6f, 0.6f, 0.6f, 0.8f);
+	static constexpr FLinearColor AttributeModeColor(0.3f, 0.3f, 0.3f, 0.3f);
 }
 
 void SPCGExDotComparisonPreview::Construct(const FArguments& InArgs)
@@ -65,7 +65,7 @@ void SPCGExDotComparisonPreview::DrawArcFan(
 
 	const FSlateRenderTransform& RenderTransform = AllottedGeometry.GetAccumulatedRenderTransform();
 	const FColor VertColor = Color.ToFColor(true);
-	const FColor NoColor(0, 0, 0, 0);
+	constexpr FColor NoColor(0, 0, 0, 0);
 
 	TArray<FSlateVertex> Vertices;
 	TArray<SlateIndex> Indices;
@@ -229,7 +229,7 @@ int32 SPCGExDotComparisonPreview::OnPaint(
 		const FColor FailVC = PCGExDotPreviewConstants::FailColor.ToFColor(true);
 
 		// Always draw both halves (right + left mirror)
-		const int32 MaxTris = ArcSegments * 2;
+		constexpr int32 MaxTris = ArcSegments * 2;
 		TArray<FSlateVertex> PassVerts, FailVerts;
 		TArray<SlateIndex> PassIdx, FailIdx;
 		PassVerts.Reserve(MaxTris * 3);
@@ -237,10 +237,10 @@ int32 SPCGExDotComparisonPreview::OnPaint(
 		PassIdx.Reserve(MaxTris * 3);
 		FailIdx.Reserve(MaxTris * 3);
 
-		const FColor NoCol(0, 0, 0, 0);
+		constexpr FColor NoCol(0, 0, 0, 0);
 
 		auto EmitTri = [&RT, &NoCol](TArray<FSlateVertex>& V, TArray<SlateIndex>& I,
-		                              const FVector2D& A, const FVector2D& B, const FVector2D& C, const FColor& Col)
+		                             const FVector2D& A, const FVector2D& B, const FVector2D& C, const FColor& Col)
 		{
 			const SlateIndex Base = static_cast<SlateIndex>(V.Num());
 			V.Add(FSlateVertex::Make(RT, FVector2f(A), FVector2f::ZeroVector, Col, NoCol));
@@ -255,7 +255,7 @@ int32 SPCGExDotComparisonPreview::OnPaint(
 		// dot = cos(θ): 1 at 0°, 0 at 90°, -1 at 180°
 		// Evaluate handles unsigned internally via abs(dot), so the bottom half
 		// naturally mirrors the top half when unsigned is on.
-		const double AngleStep = UE_PI / ArcSegments;
+		constexpr double AngleStep = UE_PI / ArcSegments;
 		for (int32 i = 0; i < ArcSegments; ++i)
 		{
 			const double A0 = AngleStep * i;
@@ -352,8 +352,8 @@ int32 SPCGExDotComparisonPreview::OnPaint(
 				TolHighDot = FMath::Clamp(TolHighComp * 2.0 - 1.0, -1.0, 1.0);
 			}
 
-			const double TolLowAngle = FMath::Acos(TolHighDot);  // Higher dot = smaller angle
-			const double TolHighAngle = FMath::Acos(TolLowDot);  // Lower dot = larger angle
+			const double TolLowAngle = FMath::Acos(TolHighDot); // Higher dot = smaller angle
+			const double TolHighAngle = FMath::Acos(TolLowDot); // Lower dot = larger angle
 
 			// Right side tolerance lines
 			DrawRadialLine(OutDrawElements, LayerId + 2, AllottedGeometry, ArcCenter, TolLowAngle, ArcRadius + 2.0, PCGExDotPreviewConstants::ToleranceColor, 1.0f);

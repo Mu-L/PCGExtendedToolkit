@@ -17,8 +17,9 @@ namespace PCGExClusters
 UENUM()
 enum class EClusterCacheType : uint8
 {
-	PreBuild,      // Configured in GraphBuilderDetails, built at compile time
-	Opportunistic  // Computed by processors, cached for downstream reuse
+	PreBuild,
+	// Configured in GraphBuilderDetails, built at compile time
+	Opportunistic // Computed by processors, cached for downstream reuse
 };
 
 namespace PCGExClusters

@@ -50,7 +50,7 @@ struct PCGEXCORE_API FPCGExGeo2DProjectionDetails
 
 	UPROPERTY()
 	bool bSupportLocalTangent = false;
-	
+
 	/** How to determine the projection plane. Normal uses explicit vector, BestFit computes from points. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	EPCGExProjectionMethod Method = EPCGExProjectionMethod::Normal;

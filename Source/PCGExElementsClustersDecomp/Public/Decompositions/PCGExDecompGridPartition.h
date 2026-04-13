@@ -41,7 +41,7 @@ public:
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
 	PCGEX_CREATE_DECOMPOSITION_OPERATION(DecompGridPartition, {
-		Operation->CellSize = CellSize;
-		Operation->MinNodesPerCell = MinNodesPerCell;
-	})
+	                                     Operation->CellSize = CellSize;
+	                                     Operation->MinNodesPerCell = MinNodesPerCell;
+	                                     })
 };

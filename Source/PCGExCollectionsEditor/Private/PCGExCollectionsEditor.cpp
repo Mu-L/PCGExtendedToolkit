@@ -5,6 +5,7 @@
 
 #include "AssetToolsModule.h"
 #include "ContentBrowserMenuContexts.h"
+#include "Editor.h"
 #include "PCGExAssetTypesMacros.h"
 #include "PCGExCollectionsEditorMenuUtils.h"
 #include "PropertyEditorModule.h"
@@ -34,7 +35,6 @@ void FPCGExCollectionsEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO("PCGExAssetGrammarDetails", FPCGExAssetGrammarCustomization)
 
 #define PCGEX_REGISTER_ENTRY_CUSTOMIZATION(_CLASS, _NAME)\
-	FAssetToolsModule::GetModule().Get().RegisterAssetTypeActions(MakeShared<FPCGEx##_CLASS##CollectionActions>());\
 	PCGEX_REGISTER_CUSTO("PCGEx"#_CLASS"CollectionEntry", FPCGEx##_CLASS##EntryCustomization)
 
 	PCGEX_FOREACH_ENTRY_TYPE_ALL(PCGEX_REGISTER_ENTRY_CUSTOMIZATION)

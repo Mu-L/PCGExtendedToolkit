@@ -11,8 +11,13 @@ namespace PCGExRegex
 	/** Lightweight wrapper around FRegexPattern. Compile once in Init(), call Test() per point. */
 	struct FPattern
 	{
-		FPattern() {}
-		~FPattern() {}
+		FPattern()
+		{
+		}
+
+		~FPattern()
+		{
+		}
 
 		/** Compiles the given pattern string. Returns false if the pattern is invalid. */
 		bool Compile(const FString& InPattern)
@@ -25,7 +30,7 @@ namespace PCGExRegex
 		bool Test(const FString& Subject) const
 		{
 			check(CompiledPattern.IsValid());
-			::FRegexMatcher Matcher(*CompiledPattern, Subject);
+			FRegexMatcher Matcher(*CompiledPattern, Subject);
 			return Matcher.FindNext();
 		}
 

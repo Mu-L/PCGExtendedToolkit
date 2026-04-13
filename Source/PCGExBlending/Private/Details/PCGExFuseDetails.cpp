@@ -113,6 +113,15 @@ bool FPCGExFuseDetails::Init(FPCGExContext* InContext, const TSharedPtr<PCGExDat
 	return true;
 }
 
+EPCGExFuseMethod FPCGExFuseDetails::GetEffectiveMethod() const
+{
+	if (bSupportLocalTolerance && ToleranceInput != EPCGExInputValueType::Constant)
+	{
+		return EPCGExFuseMethod::Octree;
+	}
+	return FuseMethod;
+}
+
 uint64 FPCGExFuseDetails::GetGridKey(const FVector& Location, const int32 PointIndex) const
 {
 	return PCGEx::SH3(Location + VoxelGridOffset, PCGEx::SafeTolerance(ToleranceGetter->Read(PointIndex)));

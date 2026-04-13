@@ -22,10 +22,10 @@ PCGEX_IMPLEMENT_MODULE(FPCGExPropertiesModule, PCGExProperties)
 // even if the user changes the property type or renames it.
 FPCGExPropertySchema::FPCGExPropertySchema()
 {
-	#if WITH_EDITOR
+#if WITH_EDITOR
 	HeaderId = GetTypeHash(FGuid::NewGuid());
 	Property.InitializeAs<FPCGExProperty_Float>();
-	#endif
+#endif
 }
 
 #pragma endregion
@@ -135,7 +135,7 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 
 	// Build map by HeaderId (stable identity)
 	TMap<int32, FPCGExPropertyOverrideEntry> ExistingById;
-	#if WITH_EDITOR
+#if WITH_EDITOR
 	for (FPCGExPropertyOverrideEntry& Entry : OldOverrides)
 	{
 		if (const FPCGExProperty* Prop = Entry.Value.GetPtr<FPCGExProperty>())
@@ -146,7 +146,7 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 			}
 		}
 	}
-	#endif
+#endif
 
 	// Rebuild array to match schema exactly (parallel arrays)
 	Overrides.Reset(Schema.Num());
@@ -159,13 +159,13 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 		FPCGExPropertyOverrideEntry& NewEntry = Overrides.AddDefaulted_GetRef();
 		FPCGExPropertyOverrideEntry* Existing = nullptr;
 
-		#if WITH_EDITOR
+#if WITH_EDITOR
 		// Match by HeaderId (stable across rename/reorder/type change!)
 		if (SchemaData->HeaderId != 0)
 		{
 			Existing = ExistingById.Find(SchemaData->HeaderId);
 		}
-		#endif
+#endif
 
 		if (Existing)
 		{

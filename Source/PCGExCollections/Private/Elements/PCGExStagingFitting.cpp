@@ -33,7 +33,7 @@ void UPCGExStagingFittingSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPi
 	{
 		PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceCollectionMapLabel, "Collection map information from, or merged from, Staging nodes.", Required)
 	}
-	
+
 	Super::InputPinPropertiesBeforeFilters(PinProperties);
 }
 

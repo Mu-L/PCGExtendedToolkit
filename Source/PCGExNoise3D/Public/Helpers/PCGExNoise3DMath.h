@@ -268,6 +268,5 @@ namespace PCGExNoise3D
 		{
 			return Min + (Value * 0.5 + 0.5) * (Max - Min);
 		}
-		
 	}
 }

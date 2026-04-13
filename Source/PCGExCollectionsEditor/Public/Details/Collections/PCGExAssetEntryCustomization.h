@@ -74,7 +74,7 @@ PCGEX_FOREACH_ENTRY_TYPE(PCGEX_SUBCOLLECTION_ENTRY_BOILERPLATE_DECL)
 
 #undef PCGEX_SUBCOLLECTION_ENTRY_BOILERPLATE_DECL
 
-/** Custom customization for Actor entries — inlines delta source fields with Pick/GoTo buttons. */
+/** Custom customization for Actor entries -- inlines delta source fields with Pick/GoTo buttons. */
 class FPCGExActorEntryCustomization : public FPCGExEntryHeaderCustomizationBase
 {
 public:
@@ -90,7 +90,7 @@ protected:
 		IPropertyTypeCustomizationUtils& CustomizationUtils) override;
 };
 
-/** Custom customization for PCGDataAsset entries — inlines Source dropdown and shows the relevant picker. */
+/** Custom customization for PCGDataAsset entries -- inlines Source dropdown and shows the relevant picker. */
 class FPCGExPCGDataAssetEntryCustomization : public FPCGExAssetEntryCustomization
 {
 public:

@@ -37,7 +37,7 @@ public:
 	}
 
 	virtual void RegisterPrimaryBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
-	
+
 	/** How extents are determined */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExInputValueType ExtentsInput = EPCGExInputValueType::Attribute;

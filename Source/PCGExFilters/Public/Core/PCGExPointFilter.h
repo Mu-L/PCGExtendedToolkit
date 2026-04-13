@@ -275,8 +275,8 @@ namespace PCGExPointFilter
 
 	protected:
 		const TSet<PCGExFactories::EType>* SupportedFactoriesTypes = nullptr;
-		TArray<TSharedPtr<IFilter>> ManagedFilters;       // Owns the filter instances
-		TArray<const IFilter*> Stack;                      // Raw pointers for cache-friendly iteration in Test()
+		TArray<TSharedPtr<IFilter>> ManagedFilters; // Owns the filter instances
+		TArray<const IFilter*> Stack;               // Raw pointers for cache-friendly iteration in Test()
 
 		virtual bool InitFilter(FPCGExContext* InContext, const TSharedPtr<IFilter>& Filter);
 		virtual bool PostInit(FPCGExContext* InContext);
@@ -307,7 +307,7 @@ UCLASS(Abstract, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Data"
 class PCGEXFILTERS_API UPCGExFilterCollectionFactoryData : public UPCGExPointFilterFactoryData
 {
 	GENERATED_BODY()
-	
+
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoFilterCollection)
 

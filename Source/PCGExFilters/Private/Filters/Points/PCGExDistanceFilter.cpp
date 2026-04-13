@@ -162,7 +162,9 @@ bool PCGExPointFilter::FDistanceFilter::Test(const int32 PointIndex) const
 	{
 		PerPointExclude = IgnoreList;
 		if (!InverseMatcher->BuildPerPointExclude(PointDataFacade->Source->GetInPoint(PointIndex), TargetCandidates, PerPointExclude))
-		{ return bNoMatchResult; }
+		{
+			return bNoMatchResult;
+		}
 		ExcludePtr = &PerPointExclude;
 	}
 

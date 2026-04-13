@@ -6,9 +6,10 @@
 
 #include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExUnionBlender.h"
-#include "Async/ParallelFor.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Core/PCGExUnionData.h"
 #include "Data/PCGExData.h"
+#include "Math/PCGExBestFitPlane.h"
 #include "PCGExGraphs/Public/Graphs/Union/PCGExIntersections.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFusePointsElement"
@@ -155,6 +156,94 @@ namespace PCGExFusePoints
 			if (IsUnionWriter) { IsUnionWriter->SetValue(Index, WeightedPoints.Num() > 1); }
 			if (UnionSizeWriter) { UnionSizeWriter->SetValue(Index, WeightedPoints.Num()); }
 		}
+
+		if (Settings->FusedBoundsMode != EPCGExFusedBoundsMode::None)
+		{
+			UPCGBasePointData* OutData = PointDataFacade->GetOut();
+			const UPCGBasePointData* InData = PointDataFacade->GetIn();
+			TPCGValueRange<FVector> OutBoundsMin = OutData->GetBoundsMinValueRange(false);
+			TPCGValueRange<FVector> OutBoundsMax = OutData->GetBoundsMaxValueRange(false);
+			TConstPCGValueRange<FTransform> InTransforms = InData->GetConstTransformValueRange();
+			const EPCGExPointBoundsSource BoundsSource = Settings->BoundsSource;
+			const double MinExtent = Settings->MinBoundsExtent;
+
+			auto EnforceMinExtent = [MinExtent](FBox& Bounds)
+			{
+				if (MinExtent <= 0) { return; }
+				const FVector HalfMin(MinExtent);
+				const FVector Center = Bounds.GetCenter();
+				const FVector HalfSize = Bounds.GetExtent();
+				const FVector EnforcedHalf = FVector::Max(HalfSize, HalfMin);
+				Bounds = FBox(Center - EnforcedHalf, Center + EnforcedHalf);
+			};
+
+			auto AccumulateBounds = [&](FBox& Bounds, const FTransform& InvTransform, const PCGExData::FElement& Element)
+			{
+				const FVector PointPos = InTransforms[Element.Index].GetLocation();
+				switch (BoundsSource)
+				{
+				default:
+				case EPCGExPointBoundsSource::ScaledBounds:
+					Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(PointPos), InData->GetScaledExtents(Element.Index)).GetBox();
+					break;
+				case EPCGExPointBoundsSource::DensityBounds:
+					Bounds += InData->GetDensityBounds(Element.Index).GetBox().TransformBy(InvTransform);
+					break;
+				case EPCGExPointBoundsSource::Bounds:
+					Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(PointPos), InData->GetExtents(Element.Index)).GetBox();
+					break;
+				case EPCGExPointBoundsSource::Center:
+					Bounds += InvTransform.TransformPosition(PointPos);
+					break;
+				}
+			};
+
+			if (Settings->FusedBoundsMode == EPCGExFusedBoundsMode::AABB)
+			{
+				const FTransform Identity = FTransform::Identity;
+
+				PCGEX_SCOPE_LOOP(Index)
+				{
+					const FVector FusedPosition = Transforms[Index].GetLocation();
+					const TSharedPtr<PCGExData::IUnionData>& UnionEntry = UnionGraph->NodesUnion->Entries[Index];
+
+					FBox Bounds(ForceInit);
+					for (const PCGExData::FElement& Element : UnionEntry->Elements) { AccumulateBounds(Bounds, Identity, Element); }
+					EnforceMinExtent(Bounds);
+
+					OutBoundsMin[Index] = Bounds.Min - FusedPosition;
+					OutBoundsMax[Index] = Bounds.Max - FusedPosition;
+				}
+			}
+			else // OBB
+			{
+				const EPCGExAxisOrder AxisOrder = Settings->AxisOrder;
+
+				PCGEX_SCOPE_LOOP(Index)
+				{
+					const TSharedPtr<PCGExData::IUnionData>& UnionEntry = UnionGraph->NodesUnion->Entries[Index];
+					const TArray<PCGExData::FElement> ElementsArray = UnionEntry->Elements.Array();
+					const int32 NumElements = ElementsArray.Num();
+
+					const PCGExMath::FBestFitPlane BestFitPlane(NumElements, [&](const int32 i) -> FVector
+					{
+						return InTransforms[ElementsArray[i].Index].GetLocation();
+					});
+
+					const FTransform OBBTransform = BestFitPlane.GetTransform(AxisOrder);
+					const FTransform InvTransform = OBBTransform.Inverse();
+
+					FBox Bounds(ForceInit);
+					for (const PCGExData::FElement& Element : ElementsArray) { AccumulateBounds(Bounds, InvTransform, Element); }
+					EnforceMinExtent(Bounds);
+
+					Transforms[Index].SetRotation(OBBTransform.GetRotation());
+					Transforms[Index].SetLocation(OBBTransform.GetLocation());
+					OutBoundsMin[Index] = Bounds.Min;
+					OutBoundsMax[Index] = Bounds.Max;
+				}
+			}
+		}
 	}
 
 	void FProcessor::CompleteWork()
@@ -162,6 +251,9 @@ namespace PCGExFusePoints
 		const int32 NumUnionNodes = UnionGraph->Nodes.Num();
 
 		UPCGBasePointData* OutData = PointDataFacade->GetOut();
+
+		EPCGPointNativeProperties Allocations = PointDataFacade->GetAllocations();
+
 		PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutData, NumUnionNodes, PointDataFacade->GetAllocations());
 
 		if (Settings->Mode == EPCGExFusedPointOutput::MostCentral)
@@ -169,27 +261,120 @@ namespace PCGExFusePoints
 			TArray<int32>& IdxMapping = PointDataFacade->Source->GetIdxMapping(NumUnionNodes);
 			const PCGPointOctree::FPointOctree& Octree = PointDataFacade->GetIn()->GetPointOctree();
 			const TConstPCGValueRange<FTransform> OutTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
-			ParallelFor(NumUnionNodes, [&](int32 Index)
-			{
-				const FVector Center = UnionGraph->Nodes[Index]->GetCenter();
+
+
+			PCGEX_PARALLEL_FOR(
+				NumUnionNodes,
+
+				const FVector Center = UnionGraph->Nodes[i]->GetCenter();
 				double BestDist = MAX_dbl;
 				int32 BestIndex = -1;
 
 				Octree.FindNearbyElements(Center, [&](const PCGPointOctree::FPointRef& PointRef)
-				{
+					{
 					const double Dist = FVector::DistSquared(Center, OutTransforms[PointRef.Index].GetLocation());
 					if (Dist < BestDist)
 					{
-						BestDist = Dist;
-						BestIndex = PointRef.Index;
+					BestDist = Dist;
+					BestIndex = PointRef.Index;
 					}
-				});
+					});
 
-				if (BestIndex == -1) { BestIndex = UnionGraph->Nodes[Index]->Point.Index; }
-				IdxMapping[Index] = BestIndex;
-			});
+				if (BestIndex == -1) { BestIndex = UnionGraph->Nodes[i]->Point.Index; }
+				IdxMapping[i] = BestIndex;
+			);
 
 			PointDataFacade->Source->ConsumeIdxMapping(PointDataFacade->GetAllocations());
+
+			if (Settings->FusedBoundsMode != EPCGExFusedBoundsMode::None)
+			{
+				const UPCGBasePointData* InData = PointDataFacade->GetIn();
+				TPCGValueRange<FTransform> OutTransformsMut = OutData->GetTransformValueRange(false);
+				TPCGValueRange<FVector> OutBoundsMin = OutData->GetBoundsMinValueRange(true);
+				TPCGValueRange<FVector> OutBoundsMax = OutData->GetBoundsMaxValueRange(true);
+				TConstPCGValueRange<FTransform> InTransforms = InData->GetConstTransformValueRange();
+				const EPCGExPointBoundsSource BoundsSource = Settings->BoundsSource;
+				const double MinExtent = Settings->MinBoundsExtent;
+
+				auto EnforceMinExtent = [MinExtent](FBox& Bounds)
+				{
+					if (MinExtent <= 0) { return; }
+					const FVector HalfMin(MinExtent);
+					const FVector Center = Bounds.GetCenter();
+					const FVector HalfSize = Bounds.GetExtent();
+					const FVector EnforcedHalf = FVector::Max(HalfSize, HalfMin);
+					Bounds = FBox(Center - EnforcedHalf, Center + EnforcedHalf);
+				};
+
+				auto AccumulateBounds = [&](FBox& Bounds, const FTransform& InvTransform, const PCGExData::FElement& Element)
+				{
+					const FVector PointPos = InTransforms[Element.Index].GetLocation();
+					switch (BoundsSource)
+					{
+					default:
+					case EPCGExPointBoundsSource::ScaledBounds:
+						Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(PointPos), InData->GetScaledExtents(Element.Index)).GetBox();
+						break;
+					case EPCGExPointBoundsSource::DensityBounds:
+						Bounds += InData->GetDensityBounds(Element.Index).GetBox().TransformBy(InvTransform);
+						break;
+					case EPCGExPointBoundsSource::Bounds:
+						Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(PointPos), InData->GetExtents(Element.Index)).GetBox();
+						break;
+					case EPCGExPointBoundsSource::Center:
+						Bounds += InvTransform.TransformPosition(PointPos);
+						break;
+					}
+				};
+
+				if (Settings->FusedBoundsMode == EPCGExFusedBoundsMode::AABB)
+				{
+					const FTransform Identity = FTransform::Identity;
+
+					PCGEX_PARALLEL_FOR(
+						NumUnionNodes,
+					
+						const FVector FusedPosition = OutTransformsMut[i].GetLocation();
+						const TSharedPtr<PCGExData::IUnionData>& UnionEntry = UnionGraph->NodesUnion->Entries[i];
+
+						FBox Bounds(ForceInit);
+						for (const PCGExData::FElement& Element : UnionEntry->Elements) { AccumulateBounds(Bounds, Identity, Element); }
+						EnforceMinExtent(Bounds);
+
+						OutBoundsMin[i] = Bounds.Min - FusedPosition;
+						OutBoundsMax[i] = Bounds.Max - FusedPosition;
+					);
+				}
+				else // OBB
+				{
+					const EPCGExAxisOrder AxisOrder = Settings->AxisOrder;
+
+					PCGEX_PARALLEL_FOR(
+						NumUnionNodes,
+					
+						const TSharedPtr<PCGExData::IUnionData>& UnionEntry = UnionGraph->NodesUnion->Entries[i];
+						const TArray<PCGExData::FElement> ElementsArray = UnionEntry->Elements.Array();
+						const int32 NumElements = ElementsArray.Num();
+
+						const PCGExMath::FBestFitPlane BestFitPlane(NumElements, [&](const int32 e) -> FVector
+						{
+							return InTransforms[ElementsArray[e].Index].GetLocation();
+						});
+
+						const FTransform OBBTransform = BestFitPlane.GetTransform(AxisOrder);
+						const FTransform InvTransform = OBBTransform.Inverse();
+
+						FBox Bounds(ForceInit);
+						for (const PCGExData::FElement& Element : ElementsArray) { AccumulateBounds(Bounds, InvTransform, Element); }
+						EnforceMinExtent(Bounds);
+
+						OutTransformsMut[i].SetRotation(OBBTransform.GetRotation());
+						OutTransformsMut[i].SetLocation(OBBTransform.GetLocation());
+						OutBoundsMin[i] = Bounds.Min;
+						OutBoundsMax[i] = Bounds.Max;
+					);
+				}
+			}
 
 			return;
 		}

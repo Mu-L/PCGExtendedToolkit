@@ -55,7 +55,7 @@ struct PCGEXCOLLECTIONS_API FPCGExLevelCollectionEntry : public FPCGExAssetColle
 };
 
 /** Concrete collection for level/world assets. */
-UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | Level")
+UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | Level", meta=(ToolTip = "A weighted collection of level assets."))
 class PCGEXCOLLECTIONS_API UPCGExLevelCollection : public UPCGExAssetCollection
 {
 	GENERATED_BODY()

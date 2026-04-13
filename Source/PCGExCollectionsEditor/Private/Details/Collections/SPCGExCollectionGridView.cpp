@@ -223,7 +223,7 @@ void SPCGExCollectionGridView::RebuildCategoryCache()
 	SortedCategoryNames.Add(NAME_None);
 	if (!bHasUncategorized)
 	{
-		CategoryToEntryIndices.Add(NAME_None); // Empty array — still shows group
+		CategoryToEntryIndices.Add(NAME_None); // Empty array -- still shows group
 	}
 
 	// Build visual order (flattened index list for shift-click range selection)
@@ -288,23 +288,23 @@ void SPCGExCollectionGridView::RebuildGroupedLayout()
 		TSharedPtr<SPCGExCollectionCategoryGroup> Group;
 
 		GroupScrollBox->AddSlot()
-			.Padding(0, 2)
-			[
-				SAssignNew(Group, SPCGExCollectionCategoryGroup)
-				.CategoryName(CatName)
-				.EntryCount(EntryCount)
-				.bIsCollapsed(bIsCollapsed)
-				.OnCategoryRenamed(FOnCategoryRenamed::CreateSP(this, &SPCGExCollectionGridView::OnCategoryRenamed))
-				.OnTileDropOnCategory(FOnTileDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileDropOnCategory))
-				.OnAssetDropOnCategory(FOnAssetDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnAssetDropOnCategory))
-				.OnAddToCategory(FOnAddToCategory::CreateSP(this, &SPCGExCollectionGridView::OnAddToCategory))
-				.OnExpansionChanged(FOnCategoryExpansionChanged::CreateSP(this, &SPCGExCollectionGridView::OnCategoryExpansionChanged))
-				.OnTileReorderInCategory(FOnTileReorderInCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileReorderInCategory))
-			];
+		              .Padding(0, 2)
+		[
+			SAssignNew(Group, SPCGExCollectionCategoryGroup)
+			.CategoryName(CatName)
+			.EntryCount(EntryCount)
+			.bIsCollapsed(bIsCollapsed)
+			.OnCategoryRenamed(FOnCategoryRenamed::CreateSP(this, &SPCGExCollectionGridView::OnCategoryRenamed))
+			.OnTileDropOnCategory(FOnTileDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileDropOnCategory))
+			.OnAssetDropOnCategory(FOnAssetDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnAssetDropOnCategory))
+			.OnAddToCategory(FOnAddToCategory::CreateSP(this, &SPCGExCollectionGridView::OnAddToCategory))
+			.OnExpansionChanged(FOnCategoryExpansionChanged::CreateSP(this, &SPCGExCollectionGridView::OnCategoryExpansionChanged))
+			.OnTileReorderInCategory(FOnTileReorderInCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileReorderInCategory))
+		];
 
 		CategoryGroupWidgets.Add(CatName, Group);
 
-		// Skip tile creation for collapsed categories (lazy — created on expand)
+		// Skip tile creation for collapsed categories (lazy -- created on expand)
 		if (bIsCollapsed || !Indices) { continue; }
 
 		// Create tiles for this category
@@ -406,23 +406,23 @@ void SPCGExCollectionGridView::IncrementalCategoryRefresh()
 		TSharedPtr<SPCGExCollectionCategoryGroup> Group;
 
 		GroupScrollBox->AddSlot()
-			.Padding(0, 2)
-			[
-				SAssignNew(Group, SPCGExCollectionCategoryGroup)
-				.CategoryName(CatName)
-				.EntryCount(EntryCount)
-				.bIsCollapsed(bIsCollapsed)
-				.OnCategoryRenamed(FOnCategoryRenamed::CreateSP(this, &SPCGExCollectionGridView::OnCategoryRenamed))
-				.OnTileDropOnCategory(FOnTileDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileDropOnCategory))
-				.OnAssetDropOnCategory(FOnAssetDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnAssetDropOnCategory))
-				.OnAddToCategory(FOnAddToCategory::CreateSP(this, &SPCGExCollectionGridView::OnAddToCategory))
-				.OnExpansionChanged(FOnCategoryExpansionChanged::CreateSP(this, &SPCGExCollectionGridView::OnCategoryExpansionChanged))
-				.OnTileReorderInCategory(FOnTileReorderInCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileReorderInCategory))
-			];
+		              .Padding(0, 2)
+		[
+			SAssignNew(Group, SPCGExCollectionCategoryGroup)
+			.CategoryName(CatName)
+			.EntryCount(EntryCount)
+			.bIsCollapsed(bIsCollapsed)
+			.OnCategoryRenamed(FOnCategoryRenamed::CreateSP(this, &SPCGExCollectionGridView::OnCategoryRenamed))
+			.OnTileDropOnCategory(FOnTileDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileDropOnCategory))
+			.OnAssetDropOnCategory(FOnAssetDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnAssetDropOnCategory))
+			.OnAddToCategory(FOnAddToCategory::CreateSP(this, &SPCGExCollectionGridView::OnAddToCategory))
+			.OnExpansionChanged(FOnCategoryExpansionChanged::CreateSP(this, &SPCGExCollectionGridView::OnCategoryExpansionChanged))
+			.OnTileReorderInCategory(FOnTileReorderInCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileReorderInCategory))
+		];
 
 		CategoryGroupWidgets.Add(CatName, Group);
 
-		// Skip tile creation for collapsed categories (lazy — created on expand)
+		// Skip tile creation for collapsed categories (lazy -- created on expand)
 		if (bIsCollapsed || !Indices) { continue; }
 
 		for (int32 CatIdx = 0; CatIdx < Indices->Num(); ++CatIdx)
@@ -467,7 +467,7 @@ void SPCGExCollectionGridView::IncrementalCategoryRefresh()
 
 void SPCGExCollectionGridView::StructuralRefresh(EPCGExStructuralRefreshFlags Flags)
 {
-	// Don't clear ActiveTiles here — IncrementalCategoryRefresh snapshots them for tile reuse
+	// Don't clear ActiveTiles here -- IncrementalCategoryRefresh snapshots them for tile reuse
 
 	if (EnumHasAnyFlags(Flags, EPCGExStructuralRefreshFlags::ClearSelection))
 	{
@@ -491,7 +491,7 @@ void SPCGExCollectionGridView::RefreshGrid()
 {
 	RebuildCategoryCache();
 
-	// Prune selection — remove indices that are no longer valid
+	// Prune selection -- remove indices that are no longer valid
 	const int32 Num = Collection.IsValid() ? Collection->NumEntries() : 0;
 	for (auto It = SelectedIndices.CreateIterator(); It; ++It)
 	{
@@ -639,13 +639,13 @@ void SPCGExCollectionGridView::OnTileCategoryChanged()
 	{
 		bPendingCategoryRefresh = true;
 		RegisterActiveTimer(0.f, FWidgetActiveTimerDelegate::CreateLambda(
-			[this](double, float) -> EActiveTimerReturnType
-			{
-				bPendingCategoryRefresh = false;
-				IncrementalCategoryRefresh();
-				UpdateDetailForSelection();
-				return EActiveTimerReturnType::Stop;
-			}));
+			                    [this](double, float) -> EActiveTimerReturnType
+			                    {
+				                    bPendingCategoryRefresh = false;
+				                    IncrementalCategoryRefresh();
+				                    UpdateDetailForSelection();
+				                    return EActiveTimerReturnType::Stop;
+			                    }));
 	}
 }
 
@@ -673,7 +673,7 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 
 		// Step 2: If a drop position was given, reorder within target category
 		// InsertBeforeLocalIndex was computed against the ORIGINAL tiles in the target
-		// category (i.e. the non-dragged entries), so use it directly — no adjustment needed.
+		// category (i.e. the non-dragged entries), so use it directly -- no adjustment needed.
 		if (InsertBeforeLocalIndex != INDEX_NONE && EntryStruct && Access.IsValid())
 		{
 			RebuildCategoryCache();
@@ -832,7 +832,7 @@ void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 	{
 		FScopedTransaction Transaction(INVTEXT("Add Entry to Category"));
 
-		// Suppress staging rebuild — nothing to stage on an empty entry
+		// Suppress staging rebuild -- nothing to stage on an empty entry
 		const bool bWasAutoRebuild = Coll->bAutoRebuildStaging;
 		Coll->bAutoRebuildStaging = false;
 
@@ -979,7 +979,7 @@ void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TAr
 	}
 	bIsBatchOperation = false;
 
-	// Copy affected indices — CatIndices pointer is invalidated by IncrementalCategoryRefresh
+	// Copy affected indices -- CatIndices pointer is invalidated by IncrementalCategoryRefresh
 	const TArray<int32> AffectedIndices(*CatIndices);
 
 	IncrementalCategoryRefresh();
@@ -1151,7 +1151,8 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 	// propagate only changed sub-properties / array elements.
 	TArray<uint8> MemberSnapshot;
 	const FStructProperty* StructMember = PropToPropagate
-		? CastField<FStructProperty>(PropToPropagate) : nullptr;
+		                                      ? CastField<FStructProperty>(PropToPropagate)
+		                                      : nullptr;
 
 	if (StructMember && SelectedIndices.Num() > 1)
 	{
@@ -1264,7 +1265,7 @@ void SPCGExCollectionGridView::PropagateChangedProperties(
 
 			if (OldHelper.Num() != NewHelper.Num() || NewHelper.Num() != DstHelper.Num())
 			{
-				// Size mismatch — must copy entire array
+				// Size mismatch -- must copy entire array
 				Prop->CopyCompleteValue(DstData + Offset, NewData + Offset);
 			}
 			else
@@ -1296,7 +1297,7 @@ void SPCGExCollectionGridView::PropagateChangedProperties(
 		}
 		else
 		{
-			// Leaf property — copy directly
+			// Leaf property -- copy directly
 			Prop->CopyCompleteValue(DstData + Offset, NewData + Offset);
 		}
 	}
@@ -1308,7 +1309,7 @@ void SPCGExCollectionGridView::OnDetailPropertyChanged(const FPropertyChangedEve
 	SyncStructToCollection(Event.MemberProperty, Event.Property);
 	bIsSyncing = false;
 
-	// Check if category changed — need to rebuild groups
+	// Check if category changed -- need to rebuild groups
 	static const FName CategoryPropertyName = GET_MEMBER_NAME_CHECKED(FPCGExAssetCollectionEntry, Category);
 	if (Event.MemberProperty && Event.MemberProperty->GetFName() == CategoryPropertyName)
 	{
@@ -1317,13 +1318,13 @@ void SPCGExCollectionGridView::OnDetailPropertyChanged(const FPropertyChangedEve
 		{
 			bPendingCategoryRefresh = true;
 			RegisterActiveTimer(0.f, FWidgetActiveTimerDelegate::CreateLambda(
-				[this](double, float) -> EActiveTimerReturnType
-				{
-					bPendingCategoryRefresh = false;
-					IncrementalCategoryRefresh();
-					UpdateDetailForSelection();
-					return EActiveTimerReturnType::Stop;
-				}));
+				                    [this](double, float) -> EActiveTimerReturnType
+				                    {
+					                    bPendingCategoryRefresh = false;
+					                    IncrementalCategoryRefresh();
+					                    UpdateDetailForSelection();
+					                    return EActiveTimerReturnType::Stop;
+				                    }));
 		}
 		return;
 	}
@@ -1401,7 +1402,7 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 	{
 		FScopedTransaction Transaction(INVTEXT("Add Collection Entry"));
 
-		// Suppress staging rebuild — nothing to stage on an empty entry
+		// Suppress staging rebuild -- nothing to stage on an empty entry
 		const bool bWasAutoRebuild = Coll->bAutoRebuildStaging;
 		Coll->bAutoRebuildStaging = false;
 
@@ -1580,47 +1581,47 @@ void SPCGExCollectionGridView::OnObjectModified(UObject* Object)
 	if (bIsSyncing || bIsBatchOperation) { return; }
 	if (bPendingExternalRefresh) { return; } // Already scheduled
 
-	// Defer to next tick — Modify() fires BEFORE changes are applied,
+	// Defer to next tick -- Modify() fires BEFORE changes are applied,
 	// so the entry count / data hasn't been updated yet.
 	bPendingExternalRefresh = true;
 	RegisterActiveTimer(0.f, FWidgetActiveTimerDelegate::CreateLambda(
-		[this](double, float) -> EActiveTimerReturnType
-		{
-			bPendingExternalRefresh = false;
+		                    [this](double, float) -> EActiveTimerReturnType
+		                    {
+			                    bPendingExternalRefresh = false;
 
-			if (bIsSyncing || bIsBatchOperation) { return EActiveTimerReturnType::Stop; }
+			                    if (bIsSyncing || bIsBatchOperation) { return EActiveTimerReturnType::Stop; }
 
-			const int32 CurrentCount = Collection.IsValid() ? Collection->NumEntries() : 0;
-			if (CurrentCount != VisualOrder.Num())
-			{
-				// Entry count changed externally — rebuild staging for new entries
-				if (UPCGExAssetCollection* Coll = Collection.Get())
-				{
-					bIsBatchOperation = true;
-					Coll->EDITOR_RebuildStagingData();
-					bIsBatchOperation = false;
-				}
-				StructuralRefresh();
-			}
-			else
-			{
-				// Data changed but count same (staging rebuild, sort, etc.)
-				UpdateDetailForSelection();
+			                    const int32 CurrentCount = Collection.IsValid() ? Collection->NumEntries() : 0;
+			                    if (CurrentCount != VisualOrder.Num())
+			                    {
+				                    // Entry count changed externally -- rebuild staging for new entries
+				                    if (UPCGExAssetCollection* Coll = Collection.Get())
+				                    {
+					                    bIsBatchOperation = true;
+					                    Coll->EDITOR_RebuildStagingData();
+					                    bIsBatchOperation = false;
+				                    }
+				                    StructuralRefresh();
+			                    }
+			                    else
+			                    {
+				                    // Data changed but count same (staging rebuild, sort, etc.)
+				                    UpdateDetailForSelection();
 
-				// Refresh tile thumbnails in case staging paths changed
-				for (const auto& Pair : ActiveTiles)
-				{
-					if (Pair.Value.IsValid())
-					{
-						Pair.Value->RefreshThumbnail();
-					}
-				}
+				                    // Refresh tile thumbnails in case staging paths changed
+				                    for (const auto& Pair : ActiveTiles)
+				                    {
+					                    if (Pair.Value.IsValid())
+					                    {
+						                    Pair.Value->RefreshThumbnail();
+					                    }
+				                    }
 
-				// Also do category refresh in case categories changed
-				IncrementalCategoryRefresh();
-			}
-			return EActiveTimerReturnType::Stop;
-		}));
+				                    // Also do category refresh in case categories changed
+				                    IncrementalCategoryRefresh();
+			                    }
+			                    return EActiveTimerReturnType::Stop;
+		                    }));
 }
 
 void SPCGExCollectionGridView::OnScrolled(float ScrollOffset)

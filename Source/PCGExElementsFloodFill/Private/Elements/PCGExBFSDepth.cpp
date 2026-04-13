@@ -80,13 +80,22 @@ namespace PCGExBFSDepth
 		if (!IProcessor::Process(InTaskManager)) { return false; }
 
 		if (Context->SeedsDataFacade->GetNum() <= 0) { return false; }
-		
+
 		Depths.Init(-1, NumNodes);
 		Seeded.Init(0, NumNodes);
 
+		if (NormalizedDepthData)
+		{
+			Parents.Init(-1, NumNodes);
+			ChildCount.Init(0, NumNodes);
+
+			// Init sentinel for cascade: -1.0 = unset
+			for (int32 i = 0; i < VtxDataFacade->GetNum(); i++) { NormalizedDepthData[i] = -1.0; }
+		}
+
 		if (Settings->bUseOctreeSearch) { Cluster->RebuildOctree(Settings->SeedPicking.PickingMethod); }
 
-		
+
 		PCGEX_ASYNC_GROUP_CHKD(TaskManager, SeedPickingGroup)
 
 		SeedPickingGroup->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
@@ -126,7 +135,6 @@ namespace PCGExBFSDepth
 			}
 		};
 
-		
 
 		SeedPickingGroup->StartSubLoops(Context->SeedsDataFacade->GetNum(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize);
 
@@ -148,6 +156,7 @@ namespace PCGExBFSDepth
 		const TArray<PCGExClusters::FNode>& Nodes = *Cluster->Nodes;
 		const bool bComputeDistance = DistanceData != nullptr;
 		const bool bTrackSeedOwner = SeedIndexData != nullptr;
+		const bool bTrackParents = !Parents.IsEmpty();
 
 		if (bComputeDistance) { Distances.Init(-1.0, Nodes.Num()); }
 		if (bTrackSeedOwner) { SeedOwners.Init(-1, Nodes.Num()); }
@@ -180,7 +189,7 @@ namespace PCGExBFSDepth
 			Queue.Add(NodeIdx);
 		}
 
-		// BFS — branched to avoid sqrt when distance output is disabled
+		// BFS -- branched to avoid sqrt when distance output is disabled
 		int32 Head = 0;
 
 		if (bComputeDistance)
@@ -201,11 +210,21 @@ namespace PCGExBFSDepth
 					const double NewDist = CurrentDist + FVector::Distance(CurrentPos, Cluster->GetPos(Lk.Node));
 
 					Depths[Lk.Node] = NextDepth;
+					MaxBFSDepth = FMath::Max(MaxBFSDepth, NextDepth);
 					Distances[Lk.Node] = NewDist;
+					if (bTrackParents)
+					{
+						Parents[Lk.Node] = CurrentIdx;
+						ChildCount[CurrentIdx]++;
+					}
 
 					if (DepthData) { DepthData[NeighborPointIdx] = NextDepth; }
 					DistanceData[NeighborPointIdx] = NewDist;
-					if (bTrackSeedOwner) { SeedOwners[Lk.Node] = SeedOwners[CurrentIdx]; SeedIndexData[NeighborPointIdx] = SeedOwners[CurrentIdx]; }
+					if (bTrackSeedOwner)
+					{
+						SeedOwners[Lk.Node] = SeedOwners[CurrentIdx];
+						SeedIndexData[NeighborPointIdx] = SeedOwners[CurrentIdx];
+					}
 
 					Queue.Add(Lk.Node);
 				}
@@ -224,13 +243,121 @@ namespace PCGExBFSDepth
 					if (Depths[Lk.Node] != -1) { continue; }
 
 					Depths[Lk.Node] = NextDepth;
+					MaxBFSDepth = FMath::Max(MaxBFSDepth, NextDepth);
+					if (bTrackParents)
+					{
+						Parents[Lk.Node] = CurrentIdx;
+						ChildCount[CurrentIdx]++;
+					}
 					if (DepthData) { DepthData[Nodes[Lk.Node].PointIndex] = NextDepth; }
-					if (bTrackSeedOwner) { SeedOwners[Lk.Node] = SeedOwners[CurrentIdx]; SeedIndexData[Nodes[Lk.Node].PointIndex] = SeedOwners[CurrentIdx]; }
+					if (bTrackSeedOwner)
+					{
+						SeedOwners[Lk.Node] = SeedOwners[CurrentIdx];
+						SeedIndexData[Nodes[Lk.Node].PointIndex] = SeedOwners[CurrentIdx];
+					}
 
 					Queue.Add(Lk.Node);
 				}
 			}
 		}
+
+		if (NormalizedDepthData) { ComputeNormalizedDepth(); }
+	}
+
+	void FProcessor::ComputeNormalizedDepth()
+	{
+		const TArray<PCGExClusters::FNode>& Nodes = *Cluster->Nodes;
+		const int32 TotalNodes = Nodes.Num();
+
+		if (MaxBFSDepth <= 0) { return; }
+
+		if (Settings->NormalizedDepthMode == EPCGExBFSNormalizedDepthMode::Global)
+		{
+			// Simple depth / MaxDepth — parallelizable
+			const double InvMax = 1.0 / static_cast<double>(MaxBFSDepth);
+			PCGEX_PARALLEL_FOR(
+				TotalNodes,
+				if (Depths[i] >= 0) { NormalizedDepthData[Nodes[i].PointIndex] = static_cast<double>(Depths[i]) * InvMax; }
+			);
+			return;
+		}
+
+		// Cascade mode: hierarchical falloff through BFS tree
+		// 1.0 at seeds, 0.0 at leaves, branches inherit and decay
+		// NormalizedDepthData was pre-initialized to -1.0 as sentinel for "unset"
+
+		// Collect leaf nodes (no BFS children, but reachable)
+		TArray<int32> Leaves;
+		Leaves.Reserve(TotalNodes / 4);
+		for (int32 i = 0; i < TotalNodes; i++)
+		{
+			if (Depths[i] >= 0 && ChildCount[i] == 0) { Leaves.Add(i); }
+		}
+
+		// Sort by depth descending (longest branches first for priority)
+		Leaves.Sort([this](const int32 A, const int32 B) { return Depths[A] > Depths[B]; });
+
+		// Reusable path buffer — avoids per-leaf allocation
+		TArray<int32> Path;
+		Path.Reserve(MaxBFSDepth + 1);
+
+		for (const int32 LeafIdx : Leaves)
+		{
+			Path.Reset();
+
+			// Trace from leaf back to seed via parent pointers
+			int32 Current = LeafIdx;
+			while (Current != -1)
+			{
+				Path.Add(Current);
+				Current = Parents[Current];
+			}
+			// Path[0]=leaf, Path.Last()=seed
+
+			if (Path.Num() < 2) { continue; }
+
+			// Find the branch point: walk from seed end, first node already set
+			double BranchValue = 1.0;
+			int32 BranchDepth = 0;
+			for (int32 i = Path.Num() - 1; i >= 0; i--)
+			{
+				const double Existing = NormalizedDepthData[Nodes[Path[i]].PointIndex];
+				if (Existing >= 0.0)
+				{
+					BranchValue = Existing;
+					BranchDepth = Depths[Path[i]];
+					break;
+				}
+			}
+
+			const int32 DepthRange = Depths[LeafIdx] - BranchDepth;
+
+			if (DepthRange > 0)
+			{
+				const double InvRange = 1.0 / static_cast<double>(DepthRange);
+				for (const int32 NodeIdx : Path)
+				{
+					const int32 PtIdx = Nodes[NodeIdx].PointIndex;
+					if (NormalizedDepthData[PtIdx] >= 0.0) { continue; } // Already set by a longer branch
+					const double T = static_cast<double>(Depths[NodeIdx] - BranchDepth) * InvRange;
+					NormalizedDepthData[PtIdx] = BranchValue * (1.0 - T);
+				}
+			}
+			else
+			{
+				for (const int32 NodeIdx : Path)
+				{
+					const int32 PtIdx = Nodes[NodeIdx].PointIndex;
+					if (NormalizedDepthData[PtIdx] < 0.0) { NormalizedDepthData[PtIdx] = BranchValue; }
+				}
+			}
+		}
+
+		// Clamp remaining -1.0 sentinels to 0.0 (unreachable nodes)
+		PCGEX_PARALLEL_FOR(
+			VtxDataFacade->GetNum(),
+			if (NormalizedDepthData[i] < 0.0) { NormalizedDepthData[i] = 0.0; }
+		);
 	}
 
 #pragma endregion
@@ -249,6 +376,11 @@ namespace PCGExBFSDepth
 		{
 			const TSharedRef<PCGExData::FFacade>& OutputFacade = VtxDataFacade;
 			PCGEX_FOREACH_FIELD_BFS_DEPTH(PCGEX_OUTPUT_INIT)
+
+			if (Settings->bWriteNormalizedDepth)
+			{
+				NormalizedDepthWriter = OutputFacade->GetWritable<double>(Settings->NormalizedDepthAttributeName, 0.0, true, PCGExData::EBufferInit::New);
+			}
 		}
 
 		TBatch<FProcessor>::OnProcessingPreparationComplete();
@@ -263,6 +395,7 @@ namespace PCGExBFSDepth
 		if (DepthWriter) { TypedProcessor->DepthData = StaticCastSharedPtr<PCGExData::TArrayBuffer<int32>>(DepthWriter)->GetOutValues()->GetData(); }
 		if (DistanceWriter) { TypedProcessor->DistanceData = StaticCastSharedPtr<PCGExData::TArrayBuffer<double>>(DistanceWriter)->GetOutValues()->GetData(); }
 		if (SeedIndexWriter) { TypedProcessor->SeedIndexData = StaticCastSharedPtr<PCGExData::TArrayBuffer<int32>>(SeedIndexWriter)->GetOutValues()->GetData(); }
+		if (NormalizedDepthWriter) { TypedProcessor->NormalizedDepthData = StaticCastSharedPtr<PCGExData::TArrayBuffer<double>>(NormalizedDepthWriter)->GetOutValues()->GetData(); }
 
 		return true;
 	}

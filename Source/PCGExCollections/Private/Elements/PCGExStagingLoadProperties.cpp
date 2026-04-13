@@ -117,7 +117,7 @@ namespace PCGExStagingLoadProperties
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			if (!PointFilterCache[Index]) { continue; }
-			
+
 			const uint64 Hash = EntryHashGetter->Read(Index);
 			if (Hash != 0)
 			{
@@ -125,7 +125,7 @@ namespace PCGExStagingLoadProperties
 			}
 		}
 	}
-	
+
 	void FProcessor::BuildPropertyCaches()
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExStagingLoadProperties::BuildPropertyCaches);
@@ -246,12 +246,12 @@ namespace PCGExStagingLoadProperties
 			// For each property, lookup cached source and write
 			for (const auto& CachePair : PropertyCaches)
 			{
-				const FPropertyCache& Cache = CachePair.Value;
+			const FPropertyCache& Cache = CachePair.Value;
 
-				if (const FPCGExProperty* const* SourcePtr = Cache.SourceByHash.Find(Hash))
-				{
-					Cache.WriterPtr->WriteOutputFrom(i, *SourcePtr);
-				}
+			if (const FPCGExProperty* const* SourcePtr = Cache.SourceByHash.Find(Hash))
+			{
+			Cache.WriterPtr->WriteOutputFrom(i, *SourcePtr);
+			}
 			}
 		)
 

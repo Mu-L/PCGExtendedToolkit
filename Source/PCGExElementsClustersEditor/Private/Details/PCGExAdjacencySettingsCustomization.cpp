@@ -43,69 +43,69 @@ void FPCGExAdjacencySettingsCustomization::CustomizeChildren(
 {
 	// 1. Insert the preview widget as the first custom row
 	ChildBuilder.AddCustomRow(FText::FromString(TEXT("Preview")))
-		.WholeRowContent()
+	            .WholeRowContent()
+	[
+		SNew(SBox)
+		.HeightOverride(140.0f)
 		[
-			SNew(SBox)
-			.HeightOverride(140.0f)
-			[
-				SAssignNew(PreviewWidget, SPCGExAdjacencyPreview)
-				.Mode_Lambda([this]() -> EPCGExAdjacencyTestMode
-				{
-					uint8 Value = 0;
-					if (ModeHandle.IsValid()) { ModeHandle->GetValue(Value); }
-					return static_cast<EPCGExAdjacencyTestMode>(Value);
-				})
-				.Consolidation_Lambda([this]() -> EPCGExAdjacencyGatherMode
-				{
-					uint8 Value = 0;
-					if (ConsolidationHandle.IsValid()) { ConsolidationHandle->GetValue(Value); }
-					return static_cast<EPCGExAdjacencyGatherMode>(Value);
-				})
-				.ThresholdComparison_Lambda([this]() -> EPCGExComparison
-				{
-					uint8 Value = 0;
-					if (ThresholdComparisonHandle.IsValid()) { ThresholdComparisonHandle->GetValue(Value); }
-					return static_cast<EPCGExComparison>(Value);
-				})
-				.ThresholdType_Lambda([this]() -> EPCGExMeanMeasure
-				{
-					uint8 Value = 0;
-					if (ThresholdTypeHandle.IsValid()) { ThresholdTypeHandle->GetValue(Value); }
-					return static_cast<EPCGExMeanMeasure>(Value);
-				})
-				.DiscreteThreshold_Lambda([this]() -> int32
-				{
-					int32 Value = 1;
-					if (DiscreteThresholdHandle.IsValid()) { DiscreteThresholdHandle->GetValue(Value); }
-					return Value;
-				})
-				.RelativeThreshold_Lambda([this]() -> double
-				{
-					double Value = 0.5;
-					if (RelativeThresholdHandle.IsValid()) { RelativeThresholdHandle->GetValue(Value); }
-					return Value;
-				})
-				.Rounding_Lambda([this]() -> EPCGExRelativeThresholdRoundingMode
-				{
-					uint8 Value = 0;
-					if (RoundingHandle.IsValid()) { RoundingHandle->GetValue(Value); }
-					return static_cast<EPCGExRelativeThresholdRoundingMode>(Value);
-				})
-				.ThresholdTolerance_Lambda([this]() -> int32
-				{
-					int32 Value = 0;
-					if (ThresholdToleranceHandle.IsValid()) { ThresholdToleranceHandle->GetValue(Value); }
-					return Value;
-				})
-				.bShowThreshold_Lambda([this]() -> bool
-				{
-					if (!ThresholdInputHandle.IsValid()) { return true; }
-					uint8 InputType = 0;
-					ThresholdInputHandle->GetValue(InputType);
-					return InputType == 0; // 0 = Constant
-				})
-			]
-		];
+			SAssignNew(PreviewWidget, SPCGExAdjacencyPreview)
+			.Mode_Lambda([this]() -> EPCGExAdjacencyTestMode
+			{
+				uint8 Value = 0;
+				if (ModeHandle.IsValid()) { ModeHandle->GetValue(Value); }
+				return static_cast<EPCGExAdjacencyTestMode>(Value);
+			})
+			.Consolidation_Lambda([this]() -> EPCGExAdjacencyGatherMode
+			{
+				uint8 Value = 0;
+				if (ConsolidationHandle.IsValid()) { ConsolidationHandle->GetValue(Value); }
+				return static_cast<EPCGExAdjacencyGatherMode>(Value);
+			})
+			.ThresholdComparison_Lambda([this]() -> EPCGExComparison
+			{
+				uint8 Value = 0;
+				if (ThresholdComparisonHandle.IsValid()) { ThresholdComparisonHandle->GetValue(Value); }
+				return static_cast<EPCGExComparison>(Value);
+			})
+			.ThresholdType_Lambda([this]() -> EPCGExMeanMeasure
+			{
+				uint8 Value = 0;
+				if (ThresholdTypeHandle.IsValid()) { ThresholdTypeHandle->GetValue(Value); }
+				return static_cast<EPCGExMeanMeasure>(Value);
+			})
+			.DiscreteThreshold_Lambda([this]() -> int32
+			{
+				int32 Value = 1;
+				if (DiscreteThresholdHandle.IsValid()) { DiscreteThresholdHandle->GetValue(Value); }
+				return Value;
+			})
+			.RelativeThreshold_Lambda([this]() -> double
+			{
+				double Value = 0.5;
+				if (RelativeThresholdHandle.IsValid()) { RelativeThresholdHandle->GetValue(Value); }
+				return Value;
+			})
+			.Rounding_Lambda([this]() -> EPCGExRelativeThresholdRoundingMode
+			{
+				uint8 Value = 0;
+				if (RoundingHandle.IsValid()) { RoundingHandle->GetValue(Value); }
+				return static_cast<EPCGExRelativeThresholdRoundingMode>(Value);
+			})
+			.ThresholdTolerance_Lambda([this]() -> int32
+			{
+				int32 Value = 0;
+				if (ThresholdToleranceHandle.IsValid()) { ThresholdToleranceHandle->GetValue(Value); }
+				return Value;
+			})
+			.bShowThreshold_Lambda([this]() -> bool
+			{
+				if (!ThresholdInputHandle.IsValid()) { return true; }
+				uint8 InputType = 0;
+				ThresholdInputHandle->GetValue(InputType);
+				return InputType == 0; // 0 = Constant
+			})
+		]
+	];
 
 	// 2. Add all child properties normally (EditCondition metadata handles visibility)
 	uint32 NumChildren = 0;

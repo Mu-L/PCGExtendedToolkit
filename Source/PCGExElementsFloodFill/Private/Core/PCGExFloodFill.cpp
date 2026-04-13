@@ -4,6 +4,7 @@
 #include "Core/PCGExFloodFill.h"
 
 #include "Clusters/PCGExCluster.h"
+#include "Clusters/PCGExClustersHelpers.h"
 #include "Containers/PCGExHashLookup.h"
 #include "Core/PCGExBlendOpsManager.h"
 #include "Data/PCGExData.h"
@@ -12,7 +13,9 @@
 
 #include "Core/PCGExFillControlOperation.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
+#include "Data/PCGExDataHelpers.h"
 #include "Paths/PCGExPathsCommon.h"
+#include "Paths/PCGExPathsHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFloodFill"
 #define PCGEX_NAMESPACE FloodFill
@@ -267,16 +270,92 @@ namespace PCGExFloodFill
 	FDiffusionPathWriter::FDiffusionPathWriter(
 		const TSharedRef<PCGExClusters::FCluster>& InCluster,
 		const TSharedRef<PCGExData::FFacade>& InVtxDataFacade,
-		const TSharedRef<PCGExData::FPointIOCollection>& InPaths)
+		const TSharedRef<PCGExData::FPointIOCollection>& InPaths,
+		const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
+		const TSharedPtr<TArray<int32>>& InDiffusionDepths)
 		: Cluster(InCluster)
 		  , VtxDataFacade(InVtxDataFacade)
 		  , Paths(InPaths)
+		  , TaskManager(InTaskManager)
+		  , DiffusionDepths(InDiffusionDepths)
 	{
+	}
+
+	void FDiffusionPathWriter::WriteNormalizedPathDepth(
+		const TSharedRef<PCGExData::FFacade>& PathFacade,
+		const TArray<int32>& PathIndices,
+		const int32 EndpointDepth,
+		const int32 MaxDiffusionDepth,
+		const FName NormalizedPathDepthName,
+		const EPCGExFloodFillNormalizedPathDepthMode Mode,
+		const TArray<double>* CascadeValues)
+	{
+		if (NormalizedPathDepthName == NAME_None || !DiffusionDepths || PathIndices.IsEmpty()) { return; }
+
+		TSharedPtr<PCGExData::TBuffer<double>> NormBuffer = PathFacade->GetWritable<double>(FPCGAttributeIdentifier(NormalizedPathDepthName), 0.0, true, PCGExData::EBufferInit::New);
+		if (!NormBuffer) { return; }
+
+		const TArray<int32>& Depths = *DiffusionDepths;
+
+		switch (Mode)
+		{
+		case EPCGExFloodFillNormalizedPathDepthMode::FullDiffusion:
+			if (MaxDiffusionDepth > 0)
+			{
+				const double InvMax = 1.0 / static_cast<double>(MaxDiffusionDepth);
+				for (int32 i = 0; i < PathIndices.Num(); i++)
+				{
+					NormBuffer->SetValue(i, static_cast<double>(Depths[PathIndices[i]]) * InvMax);
+				}
+			}
+			break;
+
+		case EPCGExFloodFillNormalizedPathDepthMode::FullPath:
+			if (EndpointDepth > 0)
+			{
+				const double InvEndpoint = 1.0 / static_cast<double>(EndpointDepth);
+				for (int32 i = 0; i < PathIndices.Num(); i++)
+				{
+					NormBuffer->SetValue(i, static_cast<double>(Depths[PathIndices[i]]) * InvEndpoint);
+				}
+			}
+			break;
+
+		case EPCGExFloodFillNormalizedPathDepthMode::Partition:
+			{
+				const int32 MinDepth = Depths[PathIndices[0]];
+				const int32 MaxDepth = Depths[PathIndices.Last()];
+				const int32 Range = MaxDepth - MinDepth;
+				if (Range > 0)
+				{
+					const double InvRange = 1.0 / static_cast<double>(Range);
+					for (int32 i = 0; i < PathIndices.Num(); i++)
+					{
+						NormBuffer->SetValue(i, static_cast<double>(Depths[PathIndices[i]] - MinDepth) * InvRange);
+					}
+				}
+			}
+			break;
+
+		case EPCGExFloodFillNormalizedPathDepthMode::Cascade:
+			if (CascadeValues)
+			{
+				for (int32 i = 0; i < PathIndices.Num(); i++)
+				{
+					NormBuffer->SetValue(i, (*CascadeValues)[PathIndices[i]]);
+				}
+			}
+			break;
+		}
 	}
 
 	void FDiffusionPathWriter::WriteFullPath(
 		const FDiffusion& Diffusion,
 		const int32 EndpointNodeIndex,
+		const int32 EndpointDepth,
+		const int32 MaxDiffusionDepth,
+		const FName NormalizedPathDepthName,
+		const EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 		const FPCGExAttributeToTagDetails& SeedTags,
 		const TSharedRef<PCGExData::FFacade>& SeedsDataFacade)
 	{
@@ -302,11 +381,22 @@ namespace PCGExFloodFill
 
 		// Create a copy of the final vtx, so we get all the goodies
 		TSharedPtr<PCGExData::FPointIO> PathIO = Paths->Emplace_GetRef(VtxDataFacade->Source->GetOut(), PCGExData::EIOInit::New);
-		PathIO->DeleteAttribute(PCGExPaths::Labels::ClosedLoopIdentifier);
+		PCGExPaths::Helpers::SetClosedLoop(PathIO, false);
 
 		(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(PathIO->GetOut(), PathIndices.Num(), VtxDataFacade->Source->GetIn()->GetAllocatedProperties());
 		PathIO->InheritPoints(PathIndices, 0);
 
+		//Create a facade so we can do some manipulations
+		TSharedRef<PCGExData::FFacade> PathFacade = MakeShared<PCGExData::FFacade>(PathIO.ToSharedRef());
+
+		// Copy pending writable buffer values from vtx to path
+		PCGExData::Helpers::CopyBuffersValues(VtxDataFacade, PathFacade, PathIndices, &PCGExClusters::Labels::ProtectedClusterAttributes);
+
+		WriteNormalizedPathDepth(PathFacade, PathIndices, EndpointDepth, MaxDiffusionDepth, NormalizedPathDepthName, NormalizedPathDepthMode);
+
+		PCGExClusters::Helpers::CleanupClusterData(PathIO);
+		
+		PathFacade->WriteFastest(TaskManager);
 		SeedTags.Tag(SeedsDataFacade->GetInPoint(Diffusion.SeedIndex), PathIO);
 
 		PathIO->IOIndex = Diffusion.SeedIndex * 1000000 + VtxDataFacade->Source->IOIndex * 1000000 + EndpointNodeIndex;
@@ -315,8 +405,13 @@ namespace PCGExFloodFill
 	void FDiffusionPathWriter::WritePartitionedPath(
 		const FDiffusion& Diffusion,
 		TArray<int32>& PathIndices,
+		const int32 EndpointDepth,
+		const int32 MaxDiffusionDepth,
+		const FName NormalizedPathDepthName,
+		const EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 		const FPCGExAttributeToTagDetails& SeedTags,
-		const TSharedRef<PCGExData::FFacade>& SeedsDataFacade)
+		const TSharedRef<PCGExData::FFacade>& SeedsDataFacade,
+		const TArray<double>* CascadeValues)
 	{
 		if (PathIndices.Num() < 2) { return; }
 
@@ -324,11 +419,22 @@ namespace PCGExFloodFill
 
 		// Create a copy of the final vtx, so we get all the goodies
 		TSharedPtr<PCGExData::FPointIO> PathIO = Paths->Emplace_GetRef(VtxDataFacade->Source->GetOut(), PCGExData::EIOInit::New);
-		PathIO->DeleteAttribute(PCGExPaths::Labels::ClosedLoopIdentifier);
+		PCGExPaths::Helpers::SetClosedLoop(PathIO, false);
 
 		(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(PathIO->GetOut(), PathIndices.Num(), VtxDataFacade->Source->GetIn()->GetAllocatedProperties());
 		PathIO->InheritPoints(PathIndices, 0);
 
+		//Create a facade so we can do some manipulations
+		TSharedRef<PCGExData::FFacade> PathFacade = MakeShared<PCGExData::FFacade>(PathIO.ToSharedRef());
+
+		// Copy pending writable buffer values from vtx to path
+		PCGExData::Helpers::CopyBuffersValues(VtxDataFacade, PathFacade, PathIndices, &PCGExClusters::Labels::ProtectedClusterAttributes);
+
+		WriteNormalizedPathDepth(PathFacade, PathIndices, EndpointDepth, MaxDiffusionDepth, NormalizedPathDepthName, NormalizedPathDepthMode, CascadeValues);
+
+		PCGExClusters::Helpers::CleanupClusterData(PathIO);
+
+		PathFacade->WriteFastest(TaskManager);
 		SeedTags.Tag(SeedsDataFacade->GetInPoint(Diffusion.SeedIndex), PathIO);
 
 		PathIO->IOIndex = Diffusion.SeedIndex * 1000000 + VtxDataFacade->Source->IOIndex * 1000000 + PathIndices[0];

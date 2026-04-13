@@ -30,20 +30,20 @@ UPCGExDefaultLevelDataExporter::UPCGExDefaultLevelDataExporter(const FObjectInit
 	const auto& Settings = PCGEX_COLLECTIONS_SETTINGS;
 
 	UClass* FilterClass = Settings.DefaultContentFilterClass
-		? Settings.DefaultContentFilterClass.Get()
-		: UPCGExDefaultActorContentFilter::StaticClass();
+		                      ? Settings.DefaultContentFilterClass.Get()
+		                      : UPCGExDefaultActorContentFilter::StaticClass();
 
 	UClass* EvalClass = Settings.DefaultBoundsEvaluatorClass
-		? Settings.DefaultBoundsEvaluatorClass.Get()
-		: UPCGExDefaultBoundsEvaluator::StaticClass();
+		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
+		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
 
 	ContentFilter = Cast<UPCGExActorContentFilter>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("ContentFilter"),
-			UPCGExActorContentFilter::StaticClass(), FilterClass, false, false));
+		                                         UPCGExActorContentFilter::StaticClass(), FilterClass, false, false));
 
 	BoundsEvaluator = Cast<UPCGExBoundsEvaluator>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("BoundsEvaluator"),
-			UPCGExBoundsEvaluator::StaticClass(), EvalClass, false, false));
+		                                         UPCGExBoundsEvaluator::StaticClass(), EvalClass, false, false));
 }
 
 EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Actor, UStaticMeshComponent*& OutMeshComponent) const
@@ -102,7 +102,7 @@ namespace PCGExDefaultLevelDataExporterInternal
 		for (int32 i = 0; i < NumPoints; i++)
 		{
 			MetaEntries[i] = Meta->AddEntryPlaceholder();
-			DelayedEntries[i] = MakeTuple(MetaEntries[i], int64(-1));
+			DelayedEntries[i] = MakeTuple(MetaEntries[i], static_cast<int64>(-1));
 		}
 
 		Meta->AddDelayedEntries(DelayedEntries);
@@ -229,7 +229,6 @@ namespace PCGExDefaultLevelDataExporterInternal
 
 		return VariantIdx;
 	}
-
 }
 
 bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset)
@@ -596,7 +595,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 			TPCGValueRange<int64> MetaEntries = MeshPointData->GetMetadataEntryValueRange();
 
 			FPCGMetadataAttribute<int64>* EntryHashAttr = Meta->CreateAttribute<int64>(
-				PCGExCollections::Labels::Tag_EntryIdx, int64(0), false, true);
+				PCGExCollections::Labels::Tag_EntryIdx, static_cast<int64>(0), false, true);
 
 			if (EntryHashAttr)
 			{
@@ -607,7 +606,8 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 					if (!Info) { continue; }
 
 					const int16 SecIdx = (bCaptureMaterialOverrides && Point.MaterialVariantIndex > 0)
-						? static_cast<int16>(Point.MaterialVariantIndex) : static_cast<int16>(-1);
+						                     ? static_cast<int16>(Point.MaterialVariantIndex)
+						                     : static_cast<int16>(-1);
 
 					const uint64 Hash = Packer.GetPickIdx(EmbeddedMeshCollection, static_cast<int16>(Info->EntryIndex), SecIdx);
 					EntryHashAttr->SetValue(MetaEntries[i], static_cast<int64>(Hash));
@@ -622,7 +622,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 			TPCGValueRange<int64> MetaEntries = ActorPointData->GetMetadataEntryValueRange();
 
 			FPCGMetadataAttribute<int64>* EntryHashAttr = Meta->CreateAttribute<int64>(
-				PCGExCollections::Labels::Tag_EntryIdx, int64(0), false, true);
+				PCGExCollections::Labels::Tag_EntryIdx, static_cast<int64>(0), false, true);
 
 			if (EntryHashAttr)
 			{
@@ -634,7 +634,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 					const FActorClassInfo* Info = ActorClassInfoMap.Find(Key);
 					if (!Info) { continue; }
 
-					const uint64 Hash = Packer.GetPickIdx(EmbeddedActorCollection, static_cast<int16>(Info->EntryIndex), static_cast<int16>(-1));
+					const uint64 Hash = Packer.GetPickIdx(EmbeddedActorCollection, static_cast<int16>(Info->EntryIndex), -1);
 					EntryHashAttr->SetValue(MetaEntries[i], static_cast<int64>(Hash));
 				}
 			}

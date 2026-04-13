@@ -127,7 +127,7 @@ public:
 	/** Output Object Oriented Bounds. Note that this only accounts for positions and will ignore point bounds. **/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bOutputOrientedBoundingBox = false;
-	
+
 	/** If enabled, use precise min box fit. **/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" ├─ Precise Fit", EditCondition="bOutputOrientedBoundingBox", EditConditionHides))
 	bool bUseMinBoxFit = true;
@@ -135,7 +135,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName=" └─ Axis Order", EditCondition="bOutputOrientedBoundingBox", EditConditionHides))
 	EPCGExAxisOrder AxisOrder = EPCGExAxisOrder::XYZ;
 
-	/** Overlap overlap test mode */
+	/** Which point bounds should be used */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExPointBoundsSource BoundsSource = EPCGExPointBoundsSource::ScaledBounds;
 

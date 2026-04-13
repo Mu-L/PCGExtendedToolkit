@@ -186,8 +186,8 @@ namespace PCGExBinPacking3D
 		{
 			// L==W, H different: square prism along Z
 			// Unique: (L,L,H), (H,L,L), (L,H,L) -> 3 orientations
-			OutRotations.Add(FRotator(90, 0, 0));  // (H,W,L) = (H,L,L)
-			OutRotations.Add(FRotator(0, 0, 90));  // (L,H,W) = (L,H,L)
+			OutRotations.Add(FRotator(90, 0, 0)); // (H,W,L) = (H,L,L)
+			OutRotations.Add(FRotator(0, 0, 90)); // (L,H,W) = (L,H,L)
 			return;
 		}
 
@@ -195,8 +195,8 @@ namespace PCGExBinPacking3D
 		{
 			// L==H, W different: square prism along Y
 			// Unique: (L,W,L), (L,L,W), (W,L,L) -> 3 orientations
-			OutRotations.Add(FRotator(0, 0, 90));  // (L,H,W) = (L,L,W)
-			OutRotations.Add(FRotator(0, 90, 0));  // (W,L,H) = (W,L,L)
+			OutRotations.Add(FRotator(0, 0, 90)); // (L,H,W) = (L,L,W)
+			OutRotations.Add(FRotator(0, 90, 0)); // (W,L,H) = (W,L,L)
 			return;
 		}
 
@@ -204,17 +204,17 @@ namespace PCGExBinPacking3D
 		{
 			// W==H, L different: square prism along X
 			// Unique: (L,W,W), (W,L,W), (W,W,L) -> 3 orientations
-			OutRotations.Add(FRotator(0, 90, 0));   // (W,L,H) = (W,L,W)
-			OutRotations.Add(FRotator(90, 90, 0));   // (W,H,L) = (W,W,L)
+			OutRotations.Add(FRotator(0, 90, 0));  // (W,L,H) = (W,L,W)
+			OutRotations.Add(FRotator(90, 90, 0)); // (W,H,L) = (W,W,L)
 			return;
 		}
 
 		// All dimensions different: 6 unique orientations
-		OutRotations.Add(FRotator(0, 0, 90));    // (L,H,W)
-		OutRotations.Add(FRotator(0, 90, 0));    // (W,L,H)
-		OutRotations.Add(FRotator(90, 90, 0));   // (W,H,L)
-		OutRotations.Add(FRotator(0, 90, 90));   // (H,L,W)
-		OutRotations.Add(FRotator(90, 0, 0));    // (H,W,L)
+		OutRotations.Add(FRotator(0, 0, 90));  // (L,H,W)
+		OutRotations.Add(FRotator(0, 90, 0));  // (W,L,H)
+		OutRotations.Add(FRotator(90, 90, 0)); // (W,H,L)
+		OutRotations.Add(FRotator(0, 90, 90)); // (H,L,W)
+		OutRotations.Add(FRotator(90, 0, 0));  // (H,W,L)
 	}
 
 	void FBP3DRotationHelper::GetRotationsToTest(EPCGExBP3DRotationMode Mode, TArray<FRotator>& OutRotations)

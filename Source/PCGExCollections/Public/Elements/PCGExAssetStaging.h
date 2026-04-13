@@ -69,9 +69,9 @@ public:
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
-	
+
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
-	
+
 protected:
 	virtual bool SupportsDataStealing() const override { return true; }
 
@@ -180,11 +180,10 @@ public:
 	/** Suppress warnings when the asset collection is empty or has no valid entries. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors")
 	bool bQuietEmptyCollectionError = false;
-	
+
 #if WITH_EDITOR
 	FString GetDisplayName() const;
-#endif	
-	
+#endif
 };
 
 struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext

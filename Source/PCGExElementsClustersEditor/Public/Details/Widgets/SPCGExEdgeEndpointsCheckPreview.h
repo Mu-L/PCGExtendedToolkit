@@ -16,8 +16,8 @@ class PCGEXELEMENTSCLUSTERSEDITOR_API SPCGExEdgeEndpointsCheckPreview : public S
 public:
 	SLATE_BEGIN_ARGS(SPCGExEdgeEndpointsCheckPreview)
 			: _Mode(EPCGExEdgeEndpointsCheckMode::Both)
-			, _Expects(EPCGExFilterResult::Pass)
-			, _bInvert(false)
+			  , _Expects(EPCGExFilterResult::Pass)
+			  , _bInvert(false)
 		{
 		}
 

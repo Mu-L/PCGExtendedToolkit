@@ -639,8 +639,7 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 						if (TransformMode == PCGExClipper2::ETransformRestoration::Unproject)
 						{
 							const FPCGExGeo2DProjectionDetails* Projection = GetProjection(
-								PrevSrc != INDEX_NONE ? static_cast<uint32>(PrevSrc) :
-								NextSrc != INDEX_NONE ? static_cast<uint32>(NextSrc) : 0);
+								PrevSrc != INDEX_NONE ? static_cast<uint32>(PrevSrc) : NextSrc != INDEX_NONE ? static_cast<uint32>(NextSrc) : 0);
 
 							FVector UnprojectedPos(
 								static_cast<double>(Pt.x) * InvScale,

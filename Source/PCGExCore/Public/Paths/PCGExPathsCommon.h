@@ -38,6 +38,7 @@ enum class EPCGExPathNormalDirection : uint8
 	Normal        = 0 UMETA(DisplayName = "Normal", ToolTip="..."),
 	Binormal      = 1 UMETA(DisplayName = "Binormal", ToolTip="..."),
 	AverageNormal = 2 UMETA(DisplayName = "Average Normal", ToolTip="..."),
+	Custom        = 10 UMETA(DisplayName = "Custom", ToolTip="..."),
 };
 
 UENUM()

@@ -65,7 +65,7 @@ namespace PCGExActorDelta
 		}
 
 		/** Serialize only the properties that differ from Defaults into OutBytes.
-		 *  Skips entirely if nothing differs — avoids the ~13-byte terminator overhead
+		 *  Skips entirely if nothing differs -- avoids the ~13-byte terminator overhead
 		 *  that SerializeTaggedProperties writes even when no properties are emitted. */
 		static void SerializeObjectDelta(
 			UObject* Object,
@@ -131,7 +131,7 @@ namespace PCGExActorDelta
 			if (!Archetype || Archetype == Component) { continue; }
 
 			// Components from CreateDefaultSubobject/Blueprint SCS have an archetype that
-			// lives on the actor CDO — these give a meaningful per-actor baseline to diff
+			// lives on the actor CDO -- these give a meaningful per-actor baseline to diff
 			// against. Engine-managed components (scene root, etc.) have the raw class CDO
 			// as archetype instead; skip those as they have no user-defined baseline.
 			if (Archetype == Component->GetClass()->GetDefaultObject()) { continue; }
@@ -144,7 +144,7 @@ namespace PCGExActorDelta
 
 			if (!CompBytes.IsEmpty())
 			{
-				ComponentDeltas.Add({ Component->GetFName(), MoveTemp(CompBytes) });
+				ComponentDeltas.Add({Component->GetFName(), MoveTemp(CompBytes)});
 			}
 		}
 
@@ -204,7 +204,7 @@ namespace PCGExActorDelta
 			Internal::DeserializeObjectDelta(Actor, ActorBytes);
 		}
 
-		// Component deltas — matched by subobject name
+		// Component deltas -- matched by subobject name
 		if (Reader.Tell() + static_cast<int64>(sizeof(uint32)) > TotalSize) { return; }
 
 		uint32 CompCount = 0;

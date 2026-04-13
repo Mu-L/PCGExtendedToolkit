@@ -123,7 +123,7 @@ namespace PCGExClusters
 		return false;
 	}
 
-	int32 FProjectedPointSet::Num() const{ return PointDataFacade->GetNum(); }
+	int32 FProjectedPointSet::Num() const { return PointDataFacade->GetNum(); }
 
 	FCellConstraints::FCellConstraints(const FPCGExCellConstraintsDetails& InDetails)
 	{
@@ -244,7 +244,7 @@ namespace PCGExClusters
 			return;
 		}
 
-		// LocalTangent: no topological wrapper — identify wrapper as the largest-area cell
+		// LocalTangent: no topological wrapper -- identify wrapper as the largest-area cell
 		if (Enumerator->IsLocalTangent())
 		{
 			const TArray<FRawFace>& RawFaces = Enumerator->EnumerateRawFaces();

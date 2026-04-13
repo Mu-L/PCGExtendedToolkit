@@ -80,7 +80,7 @@ public:
 	EPCGExCellSeedOwnership SeedOwnership = EPCGExCellSeedOwnership::SeedOrder;
 
 	/** Sort direction when using Best Candidate ownership. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Sort Direction", EditCondition="SeedOwnership==EPCGExCellSeedOwnership::BestCandidate", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Sort Direction", EditCondition="SeedOwnership == EPCGExCellSeedOwnership::BestCandidate", EditConditionHides))
 	EPCGExSortDirection SortDirection = EPCGExSortDirection::Ascending;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
@@ -183,9 +183,9 @@ namespace PCGExFindContours
 		TArray<TSharedPtr<PCGExData::FPointIO>> CellsIOIndices;
 
 		// Expansion tracking
-		TMap<int32, PCGExClusters::FCellExpansionData> CellExpansionMap; // FaceIndex -> ExpansionData
+		TMap<int32, PCGExClusters::FCellExpansionData> CellExpansionMap;  // FaceIndex -> ExpansionData
 		TMap<int32, TSharedPtr<PCGExClusters::FCell>> FaceIndexToCellMap; // FaceIndex -> Cell
-		TMap<int32, TSet<int32>> CellAdjacencyMap; // Cached adjacency
+		TMap<int32, TSet<int32>> CellAdjacencyMap;                        // Cached adjacency
 
 	public:
 		TSharedPtr<PCGExClusters::FCellConstraints> CellsConstraints;

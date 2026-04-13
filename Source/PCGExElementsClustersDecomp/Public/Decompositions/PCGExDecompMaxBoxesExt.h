@@ -133,7 +133,7 @@ public:
 	EPCGExDecompTransformSpace TransformSpace = EPCGExDecompTransformSpace::Raw;
 
 	/** Custom transform for grid alignment. Only used when TransformSpace = Custom. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="TransformSpace==EPCGExDecompTransformSpace::Custom", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="TransformSpace == EPCGExDecompTransformSpace::Custom", EditConditionHides))
 	FTransform CustomTransform = FTransform::Identity;
 
 	/** How to determine the voxel grid resolution. */
@@ -141,7 +141,7 @@ public:
 	EPCGExDecompVoxelSizeMode VoxelSizeMode = EPCGExDecompVoxelSizeMode::EdgeInferred;
 
 	/** Manual voxel size. Only used when VoxelSizeMode = Manual. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="VoxelSizeMode==EPCGExDecompVoxelSizeMode::Manual", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="VoxelSizeMode == EPCGExDecompVoxelSizeMode::Manual", EditConditionHides))
 	FVector VoxelSize = FVector(100.0);
 
 	/** Maximum dimensions for output cells in world units. Extracted boxes larger than this are subdivided. */
@@ -174,15 +174,15 @@ public:
 
 	/** How strongly weights influence box extraction scoring.
 	 *  0 = ignore weights, 1 = linear influence. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight", meta=(PCG_Overridable, ClampMin="0", EditCondition="Weight.Input==EPCGExInputValueType::Attribute", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight", meta=(PCG_Overridable, ClampMin="0", EditCondition="Weight.Input == EPCGExInputValueType::Attribute", EditConditionHides))
 	double WeightInfluence = 1.0;
 
 	/** How weights affect the extraction algorithm. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight", meta=(PCG_Overridable, EditCondition="Weight.Input==EPCGExInputValueType::Attribute", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight", meta=(PCG_Overridable, EditCondition="Weight.Input == EPCGExInputValueType::Attribute", EditConditionHides))
 	EPCGExDecompWeightMode WeightMode = EPCGExDecompWeightMode::Multiplier;
 
 	/** For Priority mode: minimum average weight for a box to be extracted in the first pass. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight", meta=(PCG_Overridable, ClampMin="0", ClampMax="1", EditCondition="Weight.Input==EPCGExInputValueType::Attribute&&WeightMode==EPCGExDecompWeightMode::Priority", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight", meta=(PCG_Overridable, ClampMin="0", ClampMax="1", EditCondition="Weight.Input == EPCGExInputValueType::Attribute && WeightMode == EPCGExDecompWeightMode::Priority", EditConditionHides))
 	double PriorityThreshold = 0.5;
 
 	// --- Preferred Volume Range ---
@@ -216,22 +216,22 @@ public:
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
 	PCGEX_CREATE_DECOMPOSITION_OPERATION(DecompMaxBoxesExt, {
-		Operation->TransformSpace = TransformSpace;
-		Operation->CustomTransform = CustomTransform;
-		Operation->VoxelSizeMode = VoxelSizeMode;
-		Operation->VoxelSize = VoxelSize;
-		Operation->MaxCellSize = MaxCellSize;
-		Operation->MinVoxelsPerCell = MinVoxelsPerCell;
-		Operation->Balance = Balance;
-		Operation->AxisBias = AxisBias;
-		Operation->Weight = Weight;
-		Operation->WeightInfluence = WeightInfluence;
-		Operation->WeightMode = WeightMode;
-		Operation->PriorityThreshold = PriorityThreshold;
-		Operation->PreferredMinVolume = PreferredMinVolume;
-		Operation->PreferredMaxVolume = PreferredMaxVolume;
-		Operation->VolumePreferenceWeight = VolumePreferenceWeight;
-		Operation->bUseHeuristicMergeGating = bUseHeuristicMergeGating;
-		Operation->MergeScoreThreshold = MergeScoreThreshold;
-	})
+	                                     Operation->TransformSpace = TransformSpace;
+	                                     Operation->CustomTransform = CustomTransform;
+	                                     Operation->VoxelSizeMode = VoxelSizeMode;
+	                                     Operation->VoxelSize = VoxelSize;
+	                                     Operation->MaxCellSize = MaxCellSize;
+	                                     Operation->MinVoxelsPerCell = MinVoxelsPerCell;
+	                                     Operation->Balance = Balance;
+	                                     Operation->AxisBias = AxisBias;
+	                                     Operation->Weight = Weight;
+	                                     Operation->WeightInfluence = WeightInfluence;
+	                                     Operation->WeightMode = WeightMode;
+	                                     Operation->PriorityThreshold = PriorityThreshold;
+	                                     Operation->PreferredMinVolume = PreferredMinVolume;
+	                                     Operation->PreferredMaxVolume = PreferredMaxVolume;
+	                                     Operation->VolumePreferenceWeight = VolumePreferenceWeight;
+	                                     Operation->bUseHeuristicMergeGating = bUseHeuristicMergeGating;
+	                                     Operation->MergeScoreThreshold = MergeScoreThreshold;
+	                                     })
 };
