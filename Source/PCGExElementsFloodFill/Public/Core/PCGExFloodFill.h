@@ -22,6 +22,15 @@ class UPCGExFillControlsFactoryData;
 class FPCGExFillControlOperation;
 
 UENUM()
+enum class EPCGExFloodFillNormalizedPathDepthMode : uint8
+{
+	FullDiffusion = 0 UMETA(DisplayName = "Full Diffusion", ToolTip="Normalize by the diffusion's max depth. Absolute position within the entire diffusion (0 at seed, 1 at the deepest captured node)."),
+	FullPath      = 1 UMETA(DisplayName = "Full Path", ToolTip="Normalize by the full unpartitioned path depth. Partitioned segments preserve their position in the original path (e.g. 0.4-0.7)."),
+	Partition     = 2 UMETA(DisplayName = "Partition", ToolTip="Normalize per-partition. Each path segment goes from 0 to 1 regardless of its position in the full path."),
+	Cascade       = 3 UMETA(DisplayName = "Cascade", ToolTip="Hierarchical falloff. Longest paths get the full gradient (1 at seed, 0 at leaf). Branches inherit the parent value at the branch point and fall off to 0 at their own leaf. Requires partitioned output sorted by depth descending."),
+};
+
+UENUM()
 enum class EPCGExFloodFillSettingSource : uint8
 {
 	Seed = 0 UMETA(DisplayName = "Seed", ToolTip="Read values from seed point."),
@@ -210,6 +219,8 @@ namespace PCGExFloodFill
 		~FDiffusion() = default;
 
 		FORCEINLINE const FDiffusionConfig& GetConfig() const { return Config; }
+		FORCEINLINE int32 GetMaxDepth() const { return MaxDepth; }
+		FORCEINLINE double GetMaxDistance() const { return MaxDistance; }
 
 		int32 GetSettingsIndex(EPCGExFloodFillSettingSource Source) const;
 
@@ -281,37 +292,45 @@ namespace PCGExFloodFill
 		FDiffusionPathWriter(
 			const TSharedRef<PCGExClusters::FCluster>& InCluster,
 			const TSharedRef<PCGExData::FFacade>& InVtxDataFacade,
-			const TSharedRef<PCGExData::FPointIOCollection>& InPaths);
+			const TSharedRef<PCGExData::FPointIOCollection>& InPaths,
+			const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
+			const TSharedPtr<TArray<int32>>& InDiffusionDepths);
 
-		/**
-		 * Write a full path from seed to endpoint by traversing the diffusion's TravelStack.
-		 * @param Diffusion The diffusion that captured the path
-		 * @param EndpointNodeIndex The node index of the path endpoint
-		 * @param SeedTags Tag details for copying seed attributes to path tags
-		 * @param SeedsDataFacade Facade for the seed points data
-		 */
 		void WriteFullPath(
 			const FDiffusion& Diffusion,
 			int32 EndpointNodeIndex,
+			int32 EndpointDepth,
+			int32 MaxDiffusionDepth,
+			FName NormalizedPathDepthName,
+			EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 			const FPCGExAttributeToTagDetails& SeedTags,
 			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade);
 
-		/**
-		 * Write a partitioned path from pre-computed point indices.
-		 * @param Diffusion The diffusion that captured the path
-		 * @param PathIndices Pre-computed path as point indices (will be reversed internally)
-		 * @param SeedTags Tag details for copying seed attributes to path tags
-		 * @param SeedsDataFacade Facade for the seed points data
-		 */
 		void WritePartitionedPath(
 			const FDiffusion& Diffusion,
 			TArray<int32>& PathIndices,
+			int32 EndpointDepth,
+			int32 MaxDiffusionDepth,
+			FName NormalizedPathDepthName,
+			EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode,
 			const FPCGExAttributeToTagDetails& SeedTags,
-			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade);
+			const TSharedRef<PCGExData::FFacade>& SeedsDataFacade,
+			const TArray<double>* CascadeValues = nullptr);
 
 	protected:
+		void WriteNormalizedPathDepth(
+			const TSharedRef<PCGExData::FFacade>& PathFacade,
+			const TArray<int32>& PathIndices,
+			int32 EndpointDepth,
+			int32 MaxDiffusionDepth,
+			FName NormalizedPathDepthName,
+			EPCGExFloodFillNormalizedPathDepthMode Mode,
+			const TArray<double>* CascadeValues = nullptr);
+
 		TSharedRef<PCGExClusters::FCluster> Cluster;
 		TSharedRef<PCGExData::FFacade> VtxDataFacade;
 		TSharedRef<PCGExData::FPointIOCollection> Paths;
+		TSharedPtr<PCGExMT::FTaskManager> TaskManager;
+		TSharedPtr<TArray<int32>> DiffusionDepths;
 	};
 }

@@ -14,6 +14,7 @@
 
 #define PCGEX_FOREACH_FIELD_CLUSTER_DIFF(MACRO)\
 MACRO(DiffusionDepth, int32, -1)\
+MACRO(NormalizedDiffusionDepth, double, 0)\
 MACRO(DiffusionOrder, int32, -1)\
 MACRO(DiffusionDistance, double, 0)\
 MACRO(DiffusionEnding, bool, false)
@@ -121,6 +122,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(DisplayName="Diffusion Depth", PCG_Overridable, EditCondition="bWriteDiffusionDepth"))
 	FName DiffusionDepthAttributeName = FName("DiffusionDepth");
 
+	/** Write the normalized diffusion depth (0-1), relative to the diffusion's max depth. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
+	bool bWriteNormalizedDiffusionDepth = false;
+
+	/** Name of the 'double' attribute to write normalized diffusion depth to.*/
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(DisplayName="Normalized Diffusion Depth", PCG_Overridable, EditCondition="bWriteNormalizedDiffusionDepth"))
+	FName NormalizedDiffusionDepthAttributeName = FName("NormalizedDiffusionDepth");
+
 	/** Write the final diffusion order. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteDiffusionOrder = false;
@@ -158,11 +167,23 @@ public:
 
 	/** Criteria used to partition paths into separate outputs. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(DisplayName=" ├─ Partition over", EditCondition="PathOutput == EPCGExFloodFillPathOutput::Partitions"))
-	EPCGExFloodFillPathPartitions PathPartitions = EPCGExFloodFillPathPartitions::Length;
+	EPCGExFloodFillPathPartitions PathPartitions = EPCGExFloodFillPathPartitions::Depth;
 
 	/** Sort direction for partitioned output paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(DisplayName=" └─ Sorting", EditCondition="PathOutput == EPCGExFloodFillPathOutput::Partitions"))
-	EPCGExSortDirection PartitionSorting = EPCGExSortDirection::Ascending;
+	EPCGExSortDirection PartitionSorting = EPCGExSortDirection::Descending;
+
+	/** Write the normalized path depth (0-1) on output paths. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(PCG_Overridable, InlineEditConditionToggle, EditCondition="PathOutput != EPCGExFloodFillPathOutput::None"))
+	bool bWriteNormalizedPathDepth = false;
+
+	/** Name of the 'double' attribute to write normalized path depth to.*/
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(DisplayName="Normalized Path Depth", PCG_Overridable, EditCondition="bWriteNormalizedPathDepth && PathOutput != EPCGExFloodFillPathOutput::None"))
+	FName NormalizedPathDepthAttributeName = FName("NormalizedPathDepth");
+
+	/** How to normalize the path depth. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(PCG_NotOverridable, EditCondition="bWriteNormalizedPathDepth && PathOutput != EPCGExFloodFillPathOutput::None"))
+	EPCGExFloodFillNormalizedPathDepthMode NormalizedPathDepthMode = EPCGExFloodFillNormalizedPathDepthMode::FullPath;
 
 	/** Copy seed point attributes as tags on output paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(EditCondition="PathOutput != EPCGExFloodFillPathOutput::None"))
@@ -230,6 +251,7 @@ namespace PCGExClusterDiffusion
 
 		TSharedPtr<PCGExFloodFill::FFillControlsHandler> FillControlsHandler;
 		TSharedPtr<PCGExFloodFill::FDiffusionPathWriter> PathWriter;
+		TSharedPtr<TArray<int32>> DiffusionDepths; // Vtx point index -> diffusion depth, for NormalizedPathDepth
 		TSharedPtr<PCGExDetails::TSettingValue<int32>> FillRate;
 
 		TSharedPtr<PCGExMT::TScopedNumericValue<double>> MaxDistanceValue;
@@ -270,6 +292,7 @@ namespace PCGExClusterDiffusion
 	protected:
 		TSharedPtr<TArray<int8>> InfluencesCount;
 		TSharedPtr<PCGExBlending::FBlendOpsManager> BlendOpsManager;
+		TSharedPtr<TArray<int32>> DiffusionDepths; // Vtx point index -> diffusion depth, for NormalizedPathDepth
 		TSharedPtr<PCGExDetails::TSettingValue<int32>> FillRate;
 
 	public:
