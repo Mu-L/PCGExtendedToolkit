@@ -174,7 +174,7 @@ public:
 	EPCGExSortDirection PartitionSorting = EPCGExSortDirection::Descending;
 
 	/** Write the normalized path depth (0-1) on output paths. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(PCG_Overridable, InlineEditConditionToggle, EditCondition="PathOutput != EPCGExFloodFillPathOutput::None"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs - Paths", meta=(PCG_Overridable, EditCondition="PathOutput != EPCGExFloodFillPathOutput::None"))
 	bool bWriteNormalizedPathDepth = false;
 
 	/** Name of the 'double' attribute to write normalized path depth to.*/
