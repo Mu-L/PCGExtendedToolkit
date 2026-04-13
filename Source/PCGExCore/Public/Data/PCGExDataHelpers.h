@@ -14,6 +14,7 @@ struct FPCGExContext;
 namespace PCGExData
 {
 	class FPointIO;
+	class FFacade;
 }
 
 namespace PCGExData::Helpers
