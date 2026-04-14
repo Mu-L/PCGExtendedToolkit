@@ -9,7 +9,7 @@
  * Customizes FPCGExPropertyCompiled-derived structs when displayed in PropertyOverrides arrays.
  * Shows the PropertyName as the row label and only exposes the Value field for editing.
  */
-class FPCGExPropertyCompiledCustomization : public IPropertyTypeCustomization
+class PCGEXPROPERTIESEDITOR_API FPCGExPropertyCompiledCustomization : public IPropertyTypeCustomization
 {
 public:
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();

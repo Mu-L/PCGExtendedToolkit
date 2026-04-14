@@ -52,6 +52,7 @@ void UPCGExTupleSettings::PostEditChangeProperty(struct FPropertyChangedEvent& P
 
 	if (!bNeedsSync && !bNeedsUIRefresh)
 	{
+		DirtyCache();
 		Super::PostEditChangeProperty(PropertyChangedEvent);
 		return; // Skip processing
 	}
@@ -76,6 +77,8 @@ void UPCGExTupleSettings::PostEditChangeProperty(struct FPropertyChangedEvent& P
 			FCoreUObjectDelegates::OnObjectPropertyChanged.Broadcast(this, RefreshEvent);
 		}
 	}
+	
+	DirtyCache();
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }

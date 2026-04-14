@@ -78,7 +78,6 @@ void FPCGExMaterialOverrideEntryCustomization::CustomizeHeader(
 	TSharedPtr<IPropertyHandle> SlotIndexHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExMaterialOverrideEntry, SlotIndex));
 	TSharedPtr<IPropertyHandle> MaterialHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExMaterialOverrideEntry, Material));
 
-
 	HeaderRow.NameContent()
 		[
 			SNew(SVerticalBox)
