@@ -363,7 +363,7 @@ namespace PCGExFindContours
 
 				PCGEX_MAKE_SHARED(OBBFacade, PCGExData::FFacade, OBBPointIO.ToSharedRef())
 				PCGExClusters::ProcessCellsAsOBBPoints(Cluster, WrapperArray, OBBFacade,
-					Context->Artifacts, TaskManager);
+				                                       Context->Artifacts, TaskManager);
 			}
 
 			// Output to Paths if enabled
@@ -537,7 +537,7 @@ namespace PCGExFindContours
 
 			PCGEX_MAKE_SHARED(OBBFacade, PCGExData::FFacade, OBBPointIO.ToSharedRef())
 			PCGExClusters::ProcessCellsAsOBBPoints(Cluster, ValidCells, OBBFacade,
-				Context->Artifacts, TaskManager);
+			                                       Context->Artifacts, TaskManager);
 		}
 
 		// Output to Paths if enabled

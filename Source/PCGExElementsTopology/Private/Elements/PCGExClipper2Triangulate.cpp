@@ -221,8 +221,8 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 			{
 				// No blend info - fall back to unprojection
 				const FPCGExGeo2DProjectionDetails& Projection = AllOpData->Projections.Num() > 0
-					? AllOpData->Projections[0]
-					: FPCGExGeo2DProjectionDetails();
+					                                                 ? AllOpData->Projections[0]
+					                                                 : FPCGExGeo2DProjectionDetails();
 
 				Vertex.Position = Projection.Unproject(
 					FVector(
@@ -263,8 +263,8 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 			else
 			{
 				const FPCGExGeo2DProjectionDetails& Projection = AllOpData->Projections.Num() > 0
-					? AllOpData->Projections[0]
-					: FPCGExGeo2DProjectionDetails();
+					                                                 ? AllOpData->Projections[0]
+					                                                 : FPCGExGeo2DProjectionDetails();
 
 				Vertex.Position = Projection.Unproject(
 					FVector(

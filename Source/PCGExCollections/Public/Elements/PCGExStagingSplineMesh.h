@@ -75,7 +75,7 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bUseStagedPoints = true;
-	
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints", EditConditionHides))
 	EPCGExCollectionSource CollectionSource = EPCGExCollectionSource::Asset;
 
@@ -87,7 +87,7 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Attribute", EditCondition="!bUseStagedPoints && CollectionSource == EPCGExCollectionSource::Attribute", EditConditionHides))
 	FName CollectionPathAttributeName = "CollectionPath";
-	
+
 	/** Distribution details */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
@@ -130,7 +130,7 @@ public:
 	/** If enabled, applies staged fitting/justification to the spline mesh segment. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Additional Outputs", meta=(PCG_Overridable, EditCondition="bUseStagedPoints && bReadTranslation"))
 	FName TranslationAttributeName = FName("FittingOffset");
-	
+
 	/** Push details */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Expansion"))
 	FPCGExSplineMeshMutationDetails MutationDetails;
@@ -191,13 +191,13 @@ struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
 	friend class FPCGExPathSplineMeshElement;
 
 	virtual void RegisterAssetDependencies() override;
-	
+
 	TSharedPtr<PCGExCollections::FPickUnpacker> CollectionPickUnpacker;
-	
+
 	FPCGExTangentsDetails Tangents;
 
 	TSharedPtr<PCGEx::TAssetLoader<UPCGExAssetCollection>> CollectionsLoader;
-	
+
 	TObjectPtr<UPCGExMeshCollection> MainCollection;
 	TSharedPtr<TSet<FSoftObjectPath>> AssetPaths;
 
@@ -287,7 +287,7 @@ namespace PCGExPathSplineMesh
 		}
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-		
+
 		virtual void PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops) override;
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
 
@@ -295,9 +295,8 @@ namespace PCGExPathSplineMesh
 		void ProcessSegment(const int32 Index);
 
 		virtual void CompleteWork() override;
-		
+
 	protected:
 		void HandleInvalidPoint(const int32 Index) const;
-		
 	};
 }

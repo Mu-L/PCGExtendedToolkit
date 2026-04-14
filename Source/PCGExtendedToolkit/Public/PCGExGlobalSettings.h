@@ -249,7 +249,7 @@ public:
 	/** Color associated with Fill Control subnodes */
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
 	FLinearColor ColorFillControl = FLinearColor(0.312910, 0.744792, 0.186198, 1.000000);
-	
+
 	/** Color associated with Heuristics subnodes. */
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes|Heuristics")
 	FLinearColor ColorHeuristics = FLinearColor(0.203896, 0.508125, 0.371500, 1.000000);

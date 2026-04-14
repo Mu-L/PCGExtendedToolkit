@@ -55,7 +55,7 @@ bool FPCGExGeo2DProjectionDetails::Init(const TSharedPtr<PCGExData::FFacade>& Po
 bool FPCGExGeo2DProjectionDetails::Init(const TSharedPtr<PCGExData::FPointIO>& PointIO)
 {
 	PCGEX_SANITIZE_PROJECTION_METHOD
-	
+
 	if (Method != EPCGExProjectionMethod::Normal)
 	{
 		Init(PCGExMath::FBestFitPlane(PointIO->GetIn()->GetConstTransformValueRange()));
@@ -81,7 +81,7 @@ bool FPCGExGeo2DProjectionDetails::Init(const TSharedPtr<PCGExData::FPointIO>& P
 bool FPCGExGeo2DProjectionDetails::Init(const UPCGData* InData)
 {
 	PCGEX_SANITIZE_PROJECTION_METHOD
-	
+
 	if (ProjectionVector.Input == EPCGExInputValueType::Attribute && !PCGExMetaHelpers::IsDataDomainAttribute(ProjectionVector.Attribute))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Only @Data domain attributes are supported for local projection."));

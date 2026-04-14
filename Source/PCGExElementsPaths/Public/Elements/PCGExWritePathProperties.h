@@ -95,7 +95,7 @@ protected:
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
-	
+
 	/** Projection settings. Some path data must be computed on a 2D plane. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExGeo2DProjectionDetails ProjectionDetails = FPCGExGeo2DProjectionDetails();

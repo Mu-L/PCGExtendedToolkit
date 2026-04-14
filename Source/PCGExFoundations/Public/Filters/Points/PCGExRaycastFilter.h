@@ -31,10 +31,10 @@ enum class EPCGExRaycastTestMode : uint8
 UENUM()
 enum class EPCGExRaycastOriginMode : uint8
 {
-	PointPosition   = 0 UMETA(DisplayName = "Point Position", Tooltip="Use the point's position directly"),
-	OffsetWorld     = 1 UMETA(DisplayName = "Offset (World)", Tooltip="Point position + offset in world space"),
-	OffsetRelative  = 2 UMETA(DisplayName = "Offset (Relative)", Tooltip="Point position + offset transformed by point rotation/scale"),
-	WorldPosition   = 3 UMETA(DisplayName = "World Position", Tooltip="Use offset value as absolute world position"),
+	PointPosition  = 0 UMETA(DisplayName = "Point Position", Tooltip="Use the point's position directly"),
+	OffsetWorld    = 1 UMETA(DisplayName = "Offset (World)", Tooltip="Point position + offset in world space"),
+	OffsetRelative = 2 UMETA(DisplayName = "Offset (Relative)", Tooltip="Point position + offset transformed by point rotation/scale"),
+	WorldPosition  = 3 UMETA(DisplayName = "World Position", Tooltip="Use offset value as absolute world position"),
 };
 
 USTRUCT(BlueprintType)
@@ -54,7 +54,7 @@ struct FPCGExRaycastFilterConfig
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="SurfaceSource == EPCGExSurfaceSource::ActorReferences", EditConditionHides))
 	FName ActorReference = FName("ActorReference");
 
-	
+
 	/** Test mode */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
 	EPCGExRaycastTestMode TestMode = EPCGExRaycastTestMode::AnyHit;
@@ -74,7 +74,7 @@ struct FPCGExRaycastFilterConfig
 	/** What to return when there is no hit in CompareDistance mode */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="TestMode == EPCGExRaycastTestMode::CompareDistance", EditConditionHides))
 	EPCGExFilterFallback NoHitFallback = EPCGExFilterFallback::Fail;
-	
+
 	/** Collision settings */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExCollisionDetails CollisionSettings;

@@ -61,8 +61,8 @@ public:
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
 	PCGEX_CREATE_DECOMPOSITION_OPERATION(DecompSpectral, {
-		Operation->NumPartitions = NumPartitions;
-		Operation->MaxIterations = MaxIterations;
-		Operation->ConvergenceTolerance = ConvergenceTolerance;
-	})
+	                                     Operation->NumPartitions = NumPartitions;
+	                                     Operation->MaxIterations = MaxIterations;
+	                                     Operation->ConvergenceTolerance = ConvergenceTolerance;
+	                                     })
 };

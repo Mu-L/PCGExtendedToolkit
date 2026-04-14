@@ -52,7 +52,7 @@ void UPCGExInclusionFilterProviderSettings::ApplyDeprecation(UPCGNode* InOutNode
 	{
 		Config.ProjectionDetails.ApplyDeprecation();
 	}
-	
+
 	Super::ApplyDeprecation(InOutNode);
 }
 #endif
@@ -66,7 +66,7 @@ namespace PCGExPointFilter
 		const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
 			&& TypedFilterFactory->HasMatchRuleFactories();
 
-			// See FDistanceFilter::Init for the full per-point vs static matching explanation.
+		// See FDistanceFilter::Init for the full per-point vs static matching explanation.
 
 		if (bMatchingEnabled && !TypedFilterFactory->Config.bCheckAgainstDataBounds)
 		{
@@ -131,7 +131,9 @@ namespace PCGExPointFilter
 		if (InverseMatcher)
 		{
 			if (!InverseMatcher->BuildPerPointExclude(PointDataFacade->Source->GetInPoint(PointIndex), *TypedFilterFactory->Datas, PerPointExclude))
-			{ return bNoMatchResult; }
+			{
+				return bNoMatchResult;
+			}
 			AdditionalExclude = &PerPointExclude;
 		}
 

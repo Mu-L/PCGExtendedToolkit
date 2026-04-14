@@ -142,7 +142,7 @@ namespace PCGExStagingSpawnActors
 		TSharedPtr<PCGExData::TBuffer<int64>> EntryHashGetter;
 		TSharedPtr<PCGExData::TBuffer<FString>> InstanceTagsGetter;
 
-		/** Pre-sized to NumPoints — each parallel thread writes to its own index, no locks */
+		/** Pre-sized to NumPoints -- each parallel thread writes to its own index, no locks */
 		TArray<FResolvedEntry> ResolvedEntries;
 
 		/** Main thread loop for spawning */

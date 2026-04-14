@@ -786,7 +786,7 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 		}
 		// Also catch changes to schema array elements (add/remove/reorder/rename/type change)
 		else if (PropertyChangedEvent.MemberProperty->GetOwnerStruct() == FPCGExPropertySchema::StaticStruct() ||
-		         PropertyChangedEvent.MemberProperty->GetOwnerStruct() == FPCGExPropertySchemaCollection::StaticStruct())
+			PropertyChangedEvent.MemberProperty->GetOwnerStruct() == FPCGExPropertySchemaCollection::StaticStruct())
 		{
 			bNeedsSync = true;
 			bNeedsUIRefresh = true;
@@ -830,7 +830,7 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	#if WITH_EDITOR
+#if WITH_EDITOR
 	// Force all details panels showing this object to rebuild
 	// This ensures nested PropertyOverrides customizations detect the schema changes
 	if (bNeedsSync)
@@ -838,7 +838,7 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 		FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
 		PropertyEditorModule.NotifyCustomizationModuleChanged();
 	}
-	#endif
+#endif
 
 	ForEachEntry([this](FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{

@@ -54,8 +54,8 @@ public:
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
 	PCGEX_CREATE_DECOMPOSITION_OPERATION(DecompThreshold, {
-		Operation->AttributeName = AttributeSelector.GetName();
-		Operation->NumBins = NumBins;
-		Operation->BinningMode = BinningMode;
-	})
+	                                     Operation->AttributeName = AttributeSelector.GetName();
+	                                     Operation->NumBins = NumBins;
+	                                     Operation->BinningMode = BinningMode;
+	                                     })
 };

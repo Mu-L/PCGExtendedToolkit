@@ -39,7 +39,7 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOutputConfig
 	 * Returns NAME_None if the name is invalid.
 	 */
 	FName GetEffectiveOutputName() const;
-	
+
 	bool IsValid() const
 	{
 		return bEnabled && !PropertyName.IsNone() && !GetEffectiveOutputName().IsNone();

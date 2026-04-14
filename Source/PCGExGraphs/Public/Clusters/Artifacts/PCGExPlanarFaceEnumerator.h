@@ -27,14 +27,15 @@ namespace PCGExClusters
 	 */
 	struct PCGEXGRAPHS_API FHalfEdge
 	{
-		int32 OriginNode = -1;    // Node index where this half-edge starts
-		int32 TargetNode = -1;    // Node index where this half-edge ends
-		int32 TwinIndex = -1;     // Index of the opposite half-edge
-		int32 NextIndex = -1;     // Index of the next half-edge in the face (CCW)
-		int32 FaceIndex = -1;     // Index of the face this half-edge bounds (-1 if not yet assigned)
-		double Angle = 0;         // Angle of this half-edge from origin (for sorting)
+		int32 OriginNode = -1; // Node index where this half-edge starts
+		int32 TargetNode = -1; // Node index where this half-edge ends
+		int32 TwinIndex = -1;  // Index of the opposite half-edge
+		int32 NextIndex = -1;  // Index of the next half-edge in the face (CCW)
+		int32 FaceIndex = -1;  // Index of the face this half-edge bounds (-1 if not yet assigned)
+		double Angle = 0;      // Angle of this half-edge from origin (for sorting)
 
 		FHalfEdge() = default;
+
 		FHalfEdge(int32 InOrigin, int32 InTarget, double InAngle)
 			: OriginNode(InOrigin), TargetNode(InTarget), Angle(InAngle)
 		{
@@ -48,10 +49,14 @@ namespace PCGExClusters
 	{
 		TArray<int32> Nodes;
 		int32 FaceIndex = -1;
-		FBox Bounds3D = FBox(ForceInit);  // Lightweight bounds for early culling
+		FBox Bounds3D = FBox(ForceInit); // Lightweight bounds for early culling
 
 		FRawFace() = default;
-		explicit FRawFace(int32 InFaceIndex) : FaceIndex(InFaceIndex) {}
+
+		explicit FRawFace(int32 InFaceIndex)
+			: FaceIndex(InFaceIndex)
+		{
+		}
 	};
 
 	/**
@@ -62,7 +67,7 @@ namespace PCGExClusters
 	{
 	protected:
 		TArray<FHalfEdge> HalfEdges;
-		TMap<uint64, int32> HalfEdgeMap;  // Maps H64(origin, target) to half-edge index
+		TMap<uint64, int32> HalfEdgeMap; // Maps H64(origin, target) to half-edge index
 
 		const FCluster* Cluster = nullptr;
 
@@ -158,7 +163,7 @@ namespace PCGExClusters
 			bool bIncludeOutside = false,
 			TArray<TSharedPtr<FCell>>* OutFailedCells = nullptr,
 			bool bDetectWrapper = false);
-		
+
 		/**
 		 * Find the face containing a given 2D point.
 		 * @param Point The 2D point to test

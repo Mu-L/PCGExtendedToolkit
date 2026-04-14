@@ -22,7 +22,7 @@ namespace PCGExPointFilter
 {
 	struct FCachedPrimitive
 	{
-		FBox WorldBounds = FBox(EForceInit::ForceInit);
+		FBox WorldBounds = FBox(ForceInit);
 		TWeakObjectPtr<UPrimitiveComponent> PrimitiveComponent = nullptr;
 	};
 }

@@ -6,13 +6,30 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Elements/PCGExPathShift.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Paths/PCGExPathsHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExOffsetPathElement"
 #define PCGEX_NAMESPACE OffsetPath
 
-PCGEX_SETTING_VALUE_IMPL(UPCGExOffsetPathSettings, Offset, double, OffsetInput, OffsetAttribute, OffsetConstant)
+#if WITH_EDITOR
+void UPCGExOffsetPathSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_UPDATE_TO_DATA_VERSION(1, 75, 7)
+	{
+		// Rewire Offset
+		PCGEX_SHORTHAND_RENAME_PIN(OffsetAttribute, OffsetConstant, Offset)
+		Offset.Update(OffsetInput_DEPRECATED, OffsetAttribute_DEPRECATED, OffsetConstant_DEPRECATED);
+
+		// Rewire Direction
+		PCGEX_SHORTHAND_RENAME_PIN(DirectionAttribute, UNDEFINED, Direction)
+		Direction.Update(DirectionType_DEPRECATED, DirectionAttribute_DEPRECATED, FVector::UpVector);
+	}
+
+	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+#endif
 
 PCGEX_INITIALIZE_ELEMENT(OffsetPath)
 
@@ -81,7 +98,7 @@ namespace PCGExOffsetPath
 		InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
 
 		Up = Settings->UpVectorConstant.GetSafeNormal();
-		OffsetConstant = Settings->OffsetConstant;
+		OffsetConstant = Settings->OffsetConstant_DEPRECATED;
 
 		Path = MakeShared<PCGExPaths::FPath>(InTransforms, PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn()), 0);
 
@@ -93,17 +110,16 @@ namespace PCGExOffsetPath
 			}
 		}
 
-		OffsetGetter = Settings->GetValueSettingOffset();
+		OffsetGetter = Settings->Offset.GetValueSetting();
 		if (!OffsetGetter->Init(PointDataFacade)) { return false; }
 
-		if (Settings->DirectionType == EPCGExInputValueType::Attribute)
+		OffsetScaleGetter = Settings->OffsetScale.GetValueSetting();
+		if (!OffsetScaleGetter->Init(PointDataFacade)) { return false; }
+
+		if (Settings->DirectionConstant == EPCGExPathNormalDirection::Custom)
 		{
-			DirectionGetter = PointDataFacade->GetBroadcaster<FVector>(Settings->DirectionAttribute, true);
-			if (!DirectionGetter)
-			{
-				PCGEX_LOG_INVALID_SELECTOR_C(ExecutionContext, Direction, Settings->DirectionAttribute)
-				return false;
-			}
+			DirectionGetter = Settings->Direction.GetValueSetting();
+			if (!DirectionGetter->Init(PointDataFacade)) { return false; }
 		}
 		else
 		{
@@ -115,6 +131,7 @@ namespace PCGExOffsetPath
 			{
 				switch (Settings->DirectionConstant)
 				{
+				default:
 				case EPCGExPathNormalDirection::Normal: OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeNormal>(false, Up));
 					break;
 				case EPCGExPathNormalDirection::Binormal: OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Up));
@@ -144,7 +161,7 @@ namespace PCGExOffsetPath
 			Path->ComputeEdgeExtra(EdgeIndex);
 
 			FVector Dir = (OffsetDirection ? OffsetDirection->Get(EdgeIndex) : DirectionGetter->Read(Index)) * DirectionFactor;
-			double Offset = OffsetGetter->Read(Index);
+			double Offset = OffsetGetter->Read(Index) * OffsetScaleGetter->Read(Index);
 
 			if (Settings->bApplyPointScaleToOffset) { Dir *= InTransforms[Index].GetScale3D(); }
 

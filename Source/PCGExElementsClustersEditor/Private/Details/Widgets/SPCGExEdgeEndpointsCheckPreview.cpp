@@ -88,12 +88,12 @@ int32 SPCGExEdgeEndpointsCheckPreview::OnPaint(
 
 	// 4 panels: (Pass,Pass), (Pass,Fail), (Fail,Pass), (Fail,Fail)
 	constexpr int32 NumPanels = 4;
-	const bool PanelInputs[NumPanels][2] = {{true, true}, {true, false}, {false, true}, {false, false}};
+	constexpr bool PanelInputs[NumPanels][2] = {{true, true}, {true, false}, {false, true}, {false, false}};
 
 	const float ContentWidth = LocalSize.X - 2.0f * Padding;
 	const float PanelWidth = (ContentWidth - (NumPanels - 1) * PanelGap) / NumPanels;
 	const float EdgeY = LocalSize.Y * 0.5f;
-	const float EdgeMargin = 16.0f;
+	constexpr float EdgeMargin = 16.0f;
 	const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Regular", 7);
 
 	for (int32 Panel = 0; Panel < NumPanels; ++Panel)

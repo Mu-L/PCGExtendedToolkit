@@ -142,16 +142,16 @@ protected:
 	//~
 	//~ Completion: AdvanceWork -> Done() -> TryComplete() -> OnComplete() -> OutputData populated
 
-	std::atomic<uint32> CurrentState{0};              // State machine position (see PCGExCommon::States)
-	std::atomic<bool> bPendingAsyncWorkEnd{false};    // Async completed while DriveAdvanceWork was active
-	std::atomic<bool> bWorkCompleted{false};          // Set once in TryComplete; triggers OnComplete
-	std::atomic<bool> bWorkCancelled{false};          // Cancellation flag; checked throughout execution
-	std::atomic<bool> bAdvanceWorkInProgress{false};  // DriveAdvanceWork is active; prevents concurrent driving
+	std::atomic<uint32> CurrentState{0};             // State machine position (see PCGExCommon::States)
+	std::atomic<bool> bPendingAsyncWorkEnd{false};   // Async completed while DriveAdvanceWork was active
+	std::atomic<bool> bWorkCompleted{false};         // Set once in TryComplete; triggers OnComplete
+	std::atomic<bool> bWorkCancelled{false};         // Cancellation flag; checked throughout execution
+	std::atomic<bool> bAdvanceWorkInProgress{false}; // DriveAdvanceWork is active; prevents concurrent driving
 
 	TSharedPtr<PCGExMT::FTaskManager> TaskManager;
 
 	void OnAsyncWorkEnd(const bool bWasCancelled);
-	
+
 	virtual void OnComplete();
 
 #pragma endregion

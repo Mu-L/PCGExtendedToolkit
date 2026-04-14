@@ -45,9 +45,9 @@ struct PCGEXPROPERTIES_API FPCGExPropertyRegistryEntry
 
 	FPCGExPropertyRegistryEntry(FName InName, FName InTypeName, EPCGMetadataTypes InOutputType, bool bInSupportsOutput)
 		: PropertyName(InName)
-		, TypeName(InTypeName)
-		, OutputType(InOutputType)
-		, bSupportsOutput(bInSupportsOutput)
+		  , TypeName(InTypeName)
+		  , OutputType(InOutputType)
+		  , bSupportsOutput(bInSupportsOutput)
 	{
 	}
 };
@@ -134,7 +134,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Settings, meta=(DisplayPriority = -1))
 	FName PropertyName;
 
-	#if WITH_EDITORONLY_DATA
+#if WITH_EDITORONLY_DATA
 	/**
 	 * Stable identity for override matching across schema changes.
 	 * Auto-generated on construction, preserved by FPCGExPropertySchema through:
@@ -145,13 +145,13 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 */
 	UPROPERTY(meta=(IgnoreForMemberInitializationTest))
 	int32 HeaderId = 0;
-	#endif
+#endif
 
 	FPCGExProperty()
 	{
-		#if WITH_EDITOR
+#if WITH_EDITOR
 		HeaderId = GetTypeHash(FGuid::NewGuid());
-		#endif
+#endif
 	}
 
 	virtual ~FPCGExProperty() = default;
@@ -173,7 +173,9 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * WARNING: Not thread-safe if Value was modified. Use WriteOutputFrom() for parallel processing.
 	 * @param PointIndex The point index to write to
 	 */
-	virtual void WriteOutput(int32 PointIndex) const {}
+	virtual void WriteOutput(int32 PointIndex) const
+	{
+	}
 
 	/**
 	 * Thread-safe: Write value from source property directly to buffer.
@@ -181,7 +183,9 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * @param PointIndex The point index to write to
 	 * @param Source The source property to read value from (must be same concrete type)
 	 */
-	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const {}
+	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const
+	{
+	}
 
 	/**
 	 * Copy value from another property of the same type.
@@ -189,7 +193,9 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * For parallel processing, use WriteOutputFrom() instead.
 	 * @param Source The source property to copy from (must be same concrete type)
 	 */
-	virtual void CopyValueFrom(const FPCGExProperty* Source) {}
+	virtual void CopyValueFrom(const FPCGExProperty* Source)
+	{
+	}
 
 	/**
 	 * Check if this property type supports attribute output.
@@ -224,7 +230,9 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * @param Attribute The attribute to write to (must match type)
 	 * @param EntryKey The metadata entry key to write to
 	 */
-	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const {}
+	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const
+	{
+	}
 
 	/**
 	 * Copy default value from another property (for Tuple header initialization).
@@ -273,7 +281,7 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
 
 	explicit FPCGExPropertyOverrideEntry(const FInstancedStruct& InValue, bool bInEnabled = false)
 		: bEnabled(bInEnabled)
-		, Value(InValue)
+		  , Value(InValue)
 	{
 	}
 
@@ -402,7 +410,7 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrides
 	const T* GetProperty(FName PropertyName) const
 	{
 		static_assert(TIsDerivedFrom<T, FPCGExProperty>::Value,
-			"T must derive from FPCGExProperty");
+		              "T must derive from FPCGExProperty");
 
 		for (const FPCGExPropertyOverrideEntry& Entry : Overrides)
 		{
@@ -441,11 +449,11 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 {
 	GENERATED_BODY()
 
-	#if WITH_EDITORONLY_DATA
+#if WITH_EDITORONLY_DATA
 	/** Stable identity for override matching, preserved through type changes */
 	UPROPERTY(meta=(IgnoreForMemberInitializationTest))
 	int32 HeaderId = 0;
-	#endif
+#endif
 
 	/** Property name (shown in UI, used for attribute output) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings)
@@ -455,7 +463,7 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, ShowOnlyInnerProperties))
 	FInstancedStruct Property;
 
-	FPCGExPropertySchema();  // Implemented in .cpp (needs full type definitions)
+	FPCGExPropertySchema(); // Implemented in .cpp (needs full type definitions)
 
 	/** Sync Name to Property.PropertyName and HeaderId */
 	void SyncPropertyName()
@@ -463,9 +471,9 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 		if (FPCGExProperty* Prop = GetPropertyMutable())
 		{
 			Prop->PropertyName = Name;
-			#if WITH_EDITOR
+#if WITH_EDITOR
 			Prop->HeaderId = HeaderId;
-			#endif
+#endif
 		}
 	}
 
@@ -545,7 +553,7 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	const T* GetProperty(FName PropertyName) const
 	{
 		static_assert(TIsDerivedFrom<T, FPCGExProperty>::Value,
-			"T must derive from FPCGExProperty");
+		              "T must derive from FPCGExProperty");
 
 		const FPCGExPropertySchema* Schema = FindByName(PropertyName);
 		return Schema ? Schema->Property.GetPtr<T>() : nullptr;
@@ -610,7 +618,7 @@ namespace PCGExProperties
 	const T* GetProperty(TConstArrayView<FInstancedStruct> Properties, FName PropertyName = NAME_None)
 	{
 		static_assert(TIsDerivedFrom<T, FPCGExProperty>::Value,
-			"T must derive from FPCGExProperty");
+		              "T must derive from FPCGExProperty");
 
 		for (const FInstancedStruct& Prop : Properties)
 		{
@@ -634,7 +642,7 @@ namespace PCGExProperties
 	TArray<const T*> GetAllProperties(TConstArrayView<FInstancedStruct> Properties)
 	{
 		static_assert(TIsDerivedFrom<T, FPCGExProperty>::Value,
-			"T must derive from FPCGExProperty");
+		              "T must derive from FPCGExProperty");
 
 		TArray<const T*> Result;
 		for (const FInstancedStruct& Prop : Properties)

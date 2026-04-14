@@ -18,14 +18,14 @@ bool UPCGExActorContentFilter::IsInfrastructureActor(AActor* Actor)
 	if (!Actor) { return true; }
 	if (Actor->IsHidden()) { return true; }
 	if (Actor->bIsEditorOnlyActor) { return true; }
-	
+
 #if WITH_EDITOR
 	if (Actor->bIsMainWorldOnly) { return true; }
 	if (Actor->IsA<ALevelScriptActor>()) { return true; }
 	if (Actor->IsA<AInfo>()) { return true; }
 	if (Actor->IsA<ABrush>()) { return true; }
 
-	// Soft check for ANavigationData — avoids hard link dependency on NavigationSystem module
+	// Soft check for ANavigationData -- avoids hard link dependency on NavigationSystem module
 	static UClass* NavigationDataClass = FindObject<UClass>(nullptr, TEXT("/Script/NavigationSystem.NavigationData"));
 	if (NavigationDataClass && Actor->IsA(NavigationDataClass)) { return true; }
 #endif
@@ -66,7 +66,11 @@ bool UPCGExDefaultActorContentFilter::PassesFilter_Implementation(AActor* Actor,
 		bool bHasIncludeTag = false;
 		for (const FName& Tag : IncludeTags)
 		{
-			if (Actor->Tags.Contains(Tag)) { bHasIncludeTag = true; break; }
+			if (Actor->Tags.Contains(Tag))
+			{
+				bHasIncludeTag = true;
+				break;
+			}
 		}
 		if (!bHasIncludeTag) { return false; }
 	}
@@ -86,7 +90,14 @@ bool UPCGExDefaultActorContentFilter::PassesFilter_Implementation(AActor* Actor,
 		bool bMatchesClass = false;
 		for (const TSoftClassPtr<AActor>& ClassPtr : IncludeClasses)
 		{
-			if (UClass* C = ClassPtr.Get()) { if (Actor->IsA(C)) { bMatchesClass = true; break; } }
+			if (UClass* C = ClassPtr.Get())
+			{
+				if (Actor->IsA(C))
+				{
+					bMatchesClass = true;
+					break;
+				}
+			}
 		}
 		if (!bMatchesClass) { return false; }
 	}

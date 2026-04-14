@@ -35,7 +35,7 @@ void UPCGExSettings::PostEditChangeProperty(struct FPropertyChangedEvent& Proper
 
 	bCachedSupportsDataStealing = SupportsDataStealing();
 	bCachedSupportsInitPolicy = GetExecutionPolicy() != EPCGExExecutionPolicy::Ignored;
-	
+
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif

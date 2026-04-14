@@ -51,9 +51,9 @@ public:
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
 	PCGEX_CREATE_DECOMPOSITION_OPERATION(DecompConvexBSP, {
-		Operation->MaxConcavityRatio = MaxConcavityRatio;
-		Operation->MinNodesPerCell = MinNodesPerCell;
-		Operation->MaxCells = MaxCells;
-		Operation->MaxDepth = MaxDepth;
-	})
+	                                     Operation->MaxConcavityRatio = MaxConcavityRatio;
+	                                     Operation->MinNodesPerCell = MinNodesPerCell;
+	                                     Operation->MaxCells = MaxCells;
+	                                     Operation->MaxDepth = MaxDepth;
+	                                     })
 };

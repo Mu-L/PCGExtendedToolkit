@@ -45,6 +45,7 @@ public class PCGExCollectionsEditor : ModuleRules
 				"PCGExFoundations",
 				"PCGExProperties",
 				"PCGExPropertiesEditor", // For FPCGExPropertyOverrides customization
+				"AssetDefinition"
 			}
 		);
 

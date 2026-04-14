@@ -79,5 +79,4 @@ namespace PCGExMath
 		TMap<TTuple<EPCGExDistance, EPCGExDistance, EPCGExDistanceType, bool>, TSharedPtr<IDistances>> Cache;
 		FDistancesStatic();
 	};
-
 }

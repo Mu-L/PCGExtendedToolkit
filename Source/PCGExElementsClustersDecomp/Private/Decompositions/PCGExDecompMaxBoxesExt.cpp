@@ -107,7 +107,7 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 			{
 				const PCGExGraphs::FEdge& Edge = (*Cluster->Edges)[i];
 				if (!Edge.bValid) { continue; }
-				// Edge.Start/End are PointIndex — use GetEdgeStart/End to resolve to FNode*
+				// Edge.Start/End are PointIndex -- use GetEdgeStart/End to resolve to FNode*
 				const PCGExClusters::FNode* StartNode = Cluster->GetEdgeStart(Edge);
 				const PCGExClusters::FNode* EndNode = Cluster->GetEdgeEnd(Edge);
 				EdgeScores[i] = Heuristics->GetEdgeScore(
@@ -504,7 +504,7 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 						const PCGExGraphs::FEdge& Edge = (*Cluster->Edges)[EdgeIdx];
 						if (!Edge.bValid) { continue; }
 
-						// Edge.Start/End are PointIndex — convert to NodeIndex via lookup
+						// Edge.Start/End are PointIndex -- convert to NodeIndex via lookup
 						const int32 NodeA = Cluster->NodeIndexLookup->Get(Edge.Start);
 						const int32 NodeB = Cluster->NodeIndexLookup->Get(Edge.End);
 						if (NodeA < 0 || NodeB < 0) { continue; }
@@ -524,11 +524,11 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 
 					if (BoundaryEdgeCount > 0 && (ScoreSum / BoundaryEdgeCount) > MergeScoreThreshold)
 					{
-						continue; // Skip merge — boundary edges score too high
+						continue; // Skip merge -- boundary edges score too high
 					}
 				}
 
-				// Valid merge — absorb B into A
+				// Valid merge -- absorb B into A
 				for (int32 Flat = 0; Flat < Grid.TotalVoxels; Flat++)
 				{
 					if (VoxelCellIDs[Flat] == CellB) { VoxelCellIDs[Flat] = CellA; }

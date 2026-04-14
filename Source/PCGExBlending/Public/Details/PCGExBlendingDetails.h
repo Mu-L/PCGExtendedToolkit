@@ -96,8 +96,8 @@ struct PCGEXBLENDING_API FPCGExPointPropertyBlendingOverrides
 	bool HasAnyOverride() const
 	{
 		return bOverrideDensity || bOverrideBoundsMin || bOverrideBoundsMax ||
-		       bOverrideColor || bOverridePosition || bOverrideRotation ||
-		       bOverrideScale || bOverrideSteepness || bOverrideSeed;
+			bOverrideColor || bOverridePosition || bOverrideRotation ||
+			bOverrideScale || bOverrideSteepness || bOverrideSeed;
 	}
 };
 
@@ -175,8 +175,8 @@ struct PCGEXBLENDING_API FPCGExBlendingDetails
 	bool HasAnyBlending() const
 	{
 		return DefaultBlending != EPCGExBlendingType::None ||
-		       PropertiesOverrides.HasAnyOverride() ||
-		       !AttributesOverrides.IsEmpty();
+			PropertiesOverrides.HasAnyOverride() ||
+			!AttributesOverrides.IsEmpty();
 	}
 
 	bool CanBlend(const FName AttributeName) const;

@@ -71,7 +71,13 @@ namespace PCGExData
 
 		FORCEINLINE bool ContainsIO(const int32 IO) const
 		{
-			for (const FElement& E : Elements) { if (E.IO == IO) return true; }
+			for (const FElement& E : Elements)
+			{
+				if (E.IO == IO)
+				{
+					return true;
+				}
+			}
 			return false;
 		}
 

@@ -45,39 +45,39 @@ void FPCGExDotComparisonCustomization::CustomizeChildren(
 {
 	// 1. Insert the arc visualization as the first custom row
 	ChildBuilder.AddCustomRow(FText::FromString(TEXT("Preview")))
-		.WholeRowContent()
+	            .WholeRowContent()
+	[
+		SNew(SBox)
+		.HeightOverride(140.0f)
+		.HAlign(HAlign_Center)
 		[
-			SNew(SBox)
-			.HeightOverride(140.0f)
-			.HAlign(HAlign_Center)
-			[
-				SAssignNew(PreviewWidget, SPCGExDotComparisonPreview)
-				.Comparison_Lambda([this]() -> EPCGExComparison
-				{
-					uint8 Value = 0;
-					if (ComparisonHandle.IsValid()) { ComparisonHandle->GetValue(Value); }
-					return static_cast<EPCGExComparison>(Value);
-				})
-				.bUnsigned_Lambda([this]() -> bool
-				{
-					bool Value = false;
-					if (UnsignedHandle.IsValid()) { UnsignedHandle->GetValue(Value); }
-					return Value;
-				})
-				.ComparisonThreshold_Lambda([this]() -> double
-				{
-					return GetComparisonThreshold();
-				})
-				.ComparisonTolerance_Lambda([this]() -> double
-				{
-					return GetComparisonTolerance();
-				})
-				.bShowThreshold_Lambda([this]() -> bool
-				{
-					return !IsAttributeMode();
-				})
-			]
-		];
+			SAssignNew(PreviewWidget, SPCGExDotComparisonPreview)
+			.Comparison_Lambda([this]() -> EPCGExComparison
+			{
+				uint8 Value = 0;
+				if (ComparisonHandle.IsValid()) { ComparisonHandle->GetValue(Value); }
+				return static_cast<EPCGExComparison>(Value);
+			})
+			.bUnsigned_Lambda([this]() -> bool
+			{
+				bool Value = false;
+				if (UnsignedHandle.IsValid()) { UnsignedHandle->GetValue(Value); }
+				return Value;
+			})
+			.ComparisonThreshold_Lambda([this]() -> double
+			{
+				return GetComparisonThreshold();
+			})
+			.ComparisonTolerance_Lambda([this]() -> double
+			{
+				return GetComparisonTolerance();
+			})
+			.bShowThreshold_Lambda([this]() -> bool
+			{
+				return !IsAttributeMode();
+			})
+		]
+	];
 
 	// 2. Add all child properties normally (EditCondition metadata handles visibility)
 	uint32 NumChildren = 0;

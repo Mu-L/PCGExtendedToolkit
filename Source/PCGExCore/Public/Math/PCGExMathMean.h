@@ -90,13 +90,10 @@ namespace PCGExMath
 			// Odd count: single middle element
 			return QuickSelect(WorkingCopy, 0, N - 1, Mid);
 		}
-		else
-		{
-			// Even count: average of two middle elements
-			const T Lower = QuickSelect(WorkingCopy, 0, N - 1, Mid - 1);
-			const T Upper = QuickSelect(WorkingCopy, 0, N - 1, Mid);
-			return (Lower + Upper) / 2;
-		}
+		// Even count: average of two middle elements
+		const T Lower = QuickSelect(WorkingCopy, 0, N - 1, Mid - 1);
+		const T Upper = QuickSelect(WorkingCopy, 0, N - 1, Mid);
+		return (Lower + Upper) / 2;
 	}
 
 	PCGEXCORE_API double GetMode(const TArray<double>& Values, const bool bHighest, const uint32 Tolerance = 5);

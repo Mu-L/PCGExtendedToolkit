@@ -21,20 +21,20 @@ UPCGExLevelCollection::UPCGExLevelCollection(const FObjectInitializer& ObjectIni
 	const auto& Settings = PCGEX_COLLECTIONS_SETTINGS;
 
 	UClass* FilterClass = Settings.DefaultContentFilterClass
-		? Settings.DefaultContentFilterClass.Get()
-		: UPCGExDefaultActorContentFilter::StaticClass();
+		                      ? Settings.DefaultContentFilterClass.Get()
+		                      : UPCGExDefaultActorContentFilter::StaticClass();
 
 	UClass* EvalClass = Settings.DefaultBoundsEvaluatorClass
-		? Settings.DefaultBoundsEvaluatorClass.Get()
-		: UPCGExDefaultBoundsEvaluator::StaticClass();
+		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
+		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
 
 	ContentFilter = Cast<UPCGExActorContentFilter>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("ContentFilter"),
-			UPCGExActorContentFilter::StaticClass(), FilterClass, false, false));
+		                                         UPCGExActorContentFilter::StaticClass(), FilterClass, false, false));
 
 	BoundsEvaluator = Cast<UPCGExBoundsEvaluator>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("BoundsEvaluator"),
-			UPCGExBoundsEvaluator::StaticClass(), EvalClass, false, false));
+		                                         UPCGExBoundsEvaluator::StaticClass(), EvalClass, false, false));
 }
 
 #pragma region FPCGExLevelCollectionEntry
@@ -85,8 +85,8 @@ void FPCGExLevelCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 			for (AActor* Actor : World->PersistentLevel->Actors)
 			{
 				if (!UPCGExActorContentFilter::StaticPassesFilter(
-						LevelCollection->ContentFilter, Actor,
-						const_cast<UPCGExLevelCollection*>(LevelCollection), InInternalIndex))
+					LevelCollection->ContentFilter, Actor,
+					const_cast<UPCGExLevelCollection*>(LevelCollection), InInternalIndex))
 				{
 					continue;
 				}

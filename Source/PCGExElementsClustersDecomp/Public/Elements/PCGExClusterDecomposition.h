@@ -26,7 +26,7 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ClusterDecomposition, "Cluster : Decomposition", "Decompose clusters into cells and write a CellID attribute on nodes.",
-		(Decomposition ? FName(Decomposition.GetClass()->GetMetaData(TEXT("DisplayName"))) : FName("...")));
+	                                 (Decomposition ? FName(Decomposition.GetClass()->GetMetaData(TEXT("DisplayName"))) : FName("...")));
 	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(ClusterOp); }
 #endif
 

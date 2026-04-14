@@ -175,8 +175,8 @@ bool FPCGExCellGrowthDetails::Init(FPCGExContext* InContext, const TSharedPtr<PC
 	if (!GrowthValue->Init(InFacade, false, true)) // bSupportScoped=false, bCaptureMinMax=true
 	{
 		PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(
-			FTEXT("Growth attribute '{0}' not found, falling back to constant 0."),
-			FText::FromString(Growth.Attribute.GetName().ToString())));
+			           FTEXT("Growth attribute '{0}' not found, falling back to constant 0."),
+			           FText::FromString(Growth.Attribute.GetName().ToString())));
 		GrowthValue.Reset();
 		return false;
 	}
@@ -243,7 +243,7 @@ namespace PCGExClusters
 		TPCGValueRange<FVector> OutBoundsMax = OutPointData->GetBoundsMaxValueRange();
 
 		// Create attribute writers (conditional based on ArtifactSettings) - use Elements domain for OBB points
-		TSharedPtr<PCGExData::TBuffer<int64>> CellHashWriter = ArtifactSettings.bWriteCellHash ? OutFacade->GetWritable<int64>(PCGExMetaHelpers::MakeElementIdentifier(ArtifactSettings.CellHashAttributeName), static_cast<int64>(0), true, PCGExData::EBufferInit::New) : nullptr;
+		TSharedPtr<PCGExData::TBuffer<int64>> CellHashWriter = ArtifactSettings.bWriteCellHash ? OutFacade->GetWritable<int64>(PCGExMetaHelpers::MakeElementIdentifier(ArtifactSettings.CellHashAttributeName), 0, true, PCGExData::EBufferInit::New) : nullptr;
 
 		TSharedPtr<PCGExData::TBuffer<double>> AreaWriter = ArtifactSettings.bWriteArea ? OutFacade->GetWritable<double>(PCGExMetaHelpers::MakeElementIdentifier(ArtifactSettings.AreaAttributeName), 0.0, true, PCGExData::EBufferInit::New) : nullptr;
 

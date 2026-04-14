@@ -68,9 +68,9 @@ public:
 	TObjectPtr<UPCGExEdgeRefineInstancedFactory> Refinement;
 
 	/** Scoring mode for combining multiple heuristics */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)                                                                    
-	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage; 
-	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
+	EPCGExHeuristicScoreMode HeuristicScoreMode = EPCGExHeuristicScoreMode::WeightedAverage;
+
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	EPCGExRefineEdgesOutput Mode = EPCGExRefineEdgesOutput::Clusters;
 

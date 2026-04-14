@@ -40,7 +40,9 @@ bool FPCGExAssetCollectionEditor::IsPropertyUnderEntries(const FPropertyAndParen
 {
 	// Check if property IS "Entries"
 	if (PropertyAndParent.Property.GetFName() == PCGExAssetCollectionEditor::EntriesName)
+	{
 		return true;
+	}
 
 	// Check all parents for "Entries" OR "PropertyOverrides"
 	// PropertyOverrides and its children must always be visible (PCGExPropertiesEditor controls them)
@@ -50,7 +52,9 @@ bool FPCGExAssetCollectionEditor::IsPropertyUnderEntries(const FPropertyAndParen
 		{
 			const FName ParentName = Parent->GetFName();
 			if (ParentName == PCGExAssetCollectionEditor::EntriesName || ParentName == FName("PropertyOverrides") || ParentName == FName("Overrides"))
+			{
 				return true;
+			}
 		}
 	}
 
@@ -66,7 +70,9 @@ bool FPCGExAssetCollectionEditor::IsPropertyUnderEntries(const FPropertyAndParen
 		if (UScriptStruct* OwnerScriptStruct = Cast<UScriptStruct>(OwnerStruct))
 		{
 			if (OwnerScriptStruct->IsChildOf(PropertyCompiledStruct))
+			{
 				return true;
+			}
 		}
 	}
 
@@ -79,7 +85,9 @@ bool FPCGExAssetCollectionEditor::IsPropertyUnderEntries(const FPropertyAndParen
 			if (UScriptStruct* ParentOwnerScriptStruct = Cast<UScriptStruct>(ParentOwnerStruct))
 			{
 				if (ParentOwnerScriptStruct->IsChildOf(PropertyCompiledStruct))
+				{
 					return true;
+				}
 			}
 		}
 	}
@@ -277,10 +285,10 @@ void FPCGExAssetCollectionEditor::CreateGridTab(TArray<PCGExAssetCollectionEdito
 	}
 
 	SAssignNew(GridView, SPCGExCollectionGridView)
-		.Collection(EditedCollection.Get())
-		.ThumbnailPool(ThumbnailPool)
-		.OnGetPickerWidget(FOnGetTilePickerWidget::CreateSP(this, &FPCGExAssetCollectionEditor::BuildTilePickerWidget))
-		.TileSize(128.f);
+	.Collection(EditedCollection.Get())
+	.ThumbnailPool(ThumbnailPool)
+	.OnGetPickerWidget(FOnGetTilePickerWidget::CreateSP(this, &FPCGExAssetCollectionEditor::BuildTilePickerWidget))
+	.TileSize(128.f);
 
 	PCGExAssetCollectionEditor::TabInfos& Infos = OutTabs.Emplace_GetRef(FName("Grid"), GridView, FName("Grid View"));
 	Infos.Icon = TEXT("Entries");
@@ -307,7 +315,7 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 	TWeakObjectPtr<UPCGExAssetCollection> WeakColl = InCollection;
 	const int32 Idx = EntryIndex;
 
-	// Resolve property metadata once — the struct type doesn't change at runtime
+	// Resolve property metadata once -- the struct type doesn't change at runtime
 	const FName PickerPropName = GetTilePickerPropertyName();
 	const UClass* AllowedClass = GetTilePickerAllowedClass();
 
@@ -333,44 +341,44 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 
 	// SubCollection picker (visible when bIsSubCollection is true)
 	Box->AddSlot()
-		.AutoHeight()
+	   .AutoHeight()
+	[
+		SNew(SBox)
+		.Visibility_Lambda([WeakColl, Idx]()
+		{
+			const UPCGExAssetCollection* Coll = WeakColl.Get();
+			if (!Coll) { return EVisibility::Collapsed; }
+			const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+			return (Result.IsValid() && Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
+		})
 		[
-			SNew(SBox)
-			.Visibility_Lambda([WeakColl, Idx]()
+			SNew(SObjectPropertyEntryBox)
+			.AllowedClass(SubCollectionClass)
+			.ObjectPath_Lambda([WeakColl, Idx]() -> FString
 			{
 				const UPCGExAssetCollection* Coll = WeakColl.Get();
-				if (!Coll) { return EVisibility::Collapsed; }
+				if (!Coll) { return FString(); }
 				const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-				return (Result.IsValid() && Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
+				if (!Result.IsValid()) { return FString(); }
+				const UPCGExAssetCollection* SubColl = Result.Entry->GetSubCollectionPtr();
+				return SubColl ? SubColl->GetPathName() : FString();
 			})
-			[
-				SNew(SObjectPropertyEntryBox)
-				.AllowedClass(SubCollectionClass)
-				.ObjectPath_Lambda([WeakColl, Idx]() -> FString
-				{
-					const UPCGExAssetCollection* Coll = WeakColl.Get();
-					if (!Coll) { return FString(); }
-					const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-					if (!Result.IsValid()) { return FString(); }
-					const UPCGExAssetCollection* SubColl = Result.Entry->GetSubCollectionPtr();
-					return SubColl ? SubColl->GetPathName() : FString();
-				})
-				.OnObjectChanged_Lambda([WeakColl, Idx, OnAssetChanged](const FAssetData& AssetData)
-				{
-					UPCGExAssetCollection* Coll = WeakColl.Get();
-					if (!Coll) { return; }
-					FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-					if (!Entry) { return; }
-					FScopedTransaction Transaction(INVTEXT("Set SubCollection"));
-					Coll->Modify();
-					// Write the InternalSubCollection via the base class pointer
-					Entry->InternalSubCollection = Cast<UPCGExAssetCollection>(AssetData.GetAsset());
-					Coll->PostEditChange();
-					OnAssetChanged.ExecuteIfBound();
-				})
-				.DisplayThumbnail(false)
-			]
-		];
+			.OnObjectChanged_Lambda([WeakColl, Idx, OnAssetChanged](const FAssetData& AssetData)
+			{
+				UPCGExAssetCollection* Coll = WeakColl.Get();
+				if (!Coll) { return; }
+				FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
+				if (!Entry) { return; }
+				FScopedTransaction Transaction(INVTEXT("Set SubCollection"));
+				Coll->Modify();
+				// Write the InternalSubCollection via the base class pointer
+				Entry->InternalSubCollection = Cast<UPCGExAssetCollection>(AssetData.GetAsset());
+				Coll->PostEditChange();
+				OnAssetChanged.ExecuteIfBound();
+			})
+			.DisplayThumbnail(false)
+		]
+	];
 
 	// Asset picker (visible when bIsSubCollection is false)
 	// Detect property type once at construction to choose the right widget
@@ -392,145 +400,145 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 
 		if (bIsClassProperty)
 		{
-			// TSoftClassPtr<T> — use SClassPropertyEntryBox
+			// TSoftClassPtr<T> -- use SClassPropertyEntryBox
 			Box->AddSlot()
-				.AutoHeight()
+			   .AutoHeight()
+			[
+				SNew(SBox)
+				.Visibility_Lambda([WeakColl, Idx]()
+				{
+					const UPCGExAssetCollection* Coll = WeakColl.Get();
+					if (!Coll) { return EVisibility::Collapsed; }
+					const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+					return (Result.IsValid() && !Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
+				})
 				[
-					SNew(SBox)
-					.Visibility_Lambda([WeakColl, Idx]()
+					SNew(SClassPropertyEntryBox)
+					.MetaClass(AllowedClass)
+					.SelectedClass_Lambda([WeakColl, Idx, PickerPropName]() -> const UClass*
 					{
-						const UPCGExAssetCollection* Coll = WeakColl.Get();
-						if (!Coll) { return EVisibility::Collapsed; }
-						const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-						return (Result.IsValid() && !Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
+						UPCGExAssetCollection* Coll = WeakColl.Get();
+						if (!Coll) { return nullptr; }
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						if (!ArrayProp) { return nullptr; }
+						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
+						if (!InnerProp || !InnerProp->Struct) { return nullptr; }
+						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
+						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return nullptr; }
+						const uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
+						const FSoftClassProperty* ClassProp = CastField<FSoftClassProperty>(InnerProp->Struct->FindPropertyByName(PickerPropName));
+						if (!ClassProp) { return nullptr; }
+						const FSoftObjectPtr& SoftRef = *ClassProp->GetPropertyValuePtr_InContainer(EntryPtr);
+						return Cast<UClass>(SoftRef.Get());
 					})
-					[
-						SNew(SClassPropertyEntryBox)
-						.MetaClass(AllowedClass)
-						.SelectedClass_Lambda([WeakColl, Idx, PickerPropName]() -> const UClass*
-						{
-							UPCGExAssetCollection* Coll = WeakColl.Get();
-							if (!Coll) { return nullptr; }
-							FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-							if (!ArrayProp) { return nullptr; }
-							FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-							if (!InnerProp || !InnerProp->Struct) { return nullptr; }
-							void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
-							FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-							if (Idx < 0 || Idx >= ArrayHelper.Num()) { return nullptr; }
-							const uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
-							const FSoftClassProperty* ClassProp = CastField<FSoftClassProperty>(InnerProp->Struct->FindPropertyByName(PickerPropName));
-							if (!ClassProp) { return nullptr; }
-							const FSoftObjectPtr& SoftRef = *ClassProp->GetPropertyValuePtr_InContainer(EntryPtr);
-							return Cast<UClass>(SoftRef.Get());
-						})
-						.OnSetClass_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const UClass* NewClass)
-						{
-							UPCGExAssetCollection* Coll = WeakColl.Get();
-							if (!Coll) { return; }
-							FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-							if (!ArrayProp) { return; }
-							FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-							if (!InnerProp || !InnerProp->Struct) { return; }
-							void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
-							FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-							if (Idx < 0 || Idx >= ArrayHelper.Num()) { return; }
-							uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
-							const FSoftClassProperty* ClassProp = CastField<FSoftClassProperty>(InnerProp->Struct->FindPropertyByName(PickerPropName));
-							if (!ClassProp) { return; }
+					.OnSetClass_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const UClass* NewClass)
+					{
+						UPCGExAssetCollection* Coll = WeakColl.Get();
+						if (!Coll) { return; }
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						if (!ArrayProp) { return; }
+						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
+						if (!InnerProp || !InnerProp->Struct) { return; }
+						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
+						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return; }
+						uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
+						const FSoftClassProperty* ClassProp = CastField<FSoftClassProperty>(InnerProp->Struct->FindPropertyByName(PickerPropName));
+						if (!ClassProp) { return; }
 
-							FScopedTransaction Transaction(INVTEXT("Set Class"));
-							Coll->Modify();
-							FSoftObjectPtr& SoftRef = *const_cast<FSoftObjectPtr*>(ClassProp->GetPropertyValuePtr_InContainer(EntryPtr));
-							SoftRef = NewClass ? FSoftObjectPath(NewClass) : FSoftObjectPath();
-							Coll->PostEditChange();
-							OnAssetChanged.ExecuteIfBound();
-						})
-					]
-				];
+						FScopedTransaction Transaction(INVTEXT("Set Class"));
+						Coll->Modify();
+						FSoftObjectPtr& SoftRef = *ClassProp->GetPropertyValuePtr_InContainer(EntryPtr);
+						SoftRef = NewClass ? FSoftObjectPath(NewClass) : FSoftObjectPath();
+						Coll->PostEditChange();
+						OnAssetChanged.ExecuteIfBound();
+					})
+				]
+			];
 		}
 		else
 		{
-			// TSoftObjectPtr<T> or TObjectPtr<T> — use SObjectPropertyEntryBox
+			// TSoftObjectPtr<T> or TObjectPtr<T> -- use SObjectPropertyEntryBox
 			Box->AddSlot()
-				.AutoHeight()
+			   .AutoHeight()
+			[
+				SNew(SBox)
+				.Visibility_Lambda([WeakColl, Idx]()
+				{
+					const UPCGExAssetCollection* Coll = WeakColl.Get();
+					if (!Coll) { return EVisibility::Collapsed; }
+					const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+					return (Result.IsValid() && !Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
+				})
 				[
-					SNew(SBox)
-					.Visibility_Lambda([WeakColl, Idx]()
+					SNew(SObjectPropertyEntryBox)
+					.AllowedClass(AllowedClass)
+					.ObjectPath_Lambda([WeakColl, Idx, PickerPropName]() -> FString
 					{
-						const UPCGExAssetCollection* Coll = WeakColl.Get();
-						if (!Coll) { return EVisibility::Collapsed; }
-						const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-						return (Result.IsValid() && !Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
+						UPCGExAssetCollection* Coll = WeakColl.Get();
+						if (!Coll) { return FString(); }
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						if (!ArrayProp) { return FString(); }
+						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
+						if (!InnerProp || !InnerProp->Struct) { return FString(); }
+						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
+						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return FString(); }
+
+						const uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
+						const FProperty* Prop = InnerProp->Struct->FindPropertyByName(PickerPropName);
+						if (!Prop) { return FString(); }
+
+						// Handle TSoftObjectPtr<T>
+						if (const FSoftObjectProperty* SoftProp = CastField<FSoftObjectProperty>(Prop))
+						{
+							const FSoftObjectPtr& SoftRef = *SoftProp->GetPropertyValuePtr_InContainer(EntryPtr);
+							return SoftRef.ToSoftObjectPath().ToString();
+						}
+						// Handle TObjectPtr<T>
+						if (const FObjectPropertyBase* ObjProp = CastField<FObjectPropertyBase>(Prop))
+						{
+							const UObject* Obj = ObjProp->GetObjectPropertyValue_InContainer(EntryPtr);
+							return Obj ? Obj->GetPathName() : FString();
+						}
+						return FString();
 					})
-					[
-						SNew(SObjectPropertyEntryBox)
-						.AllowedClass(AllowedClass)
-						.ObjectPath_Lambda([WeakColl, Idx, PickerPropName]() -> FString
+					.OnObjectChanged_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const FAssetData& AssetData)
+					{
+						UPCGExAssetCollection* Coll = WeakColl.Get();
+						if (!Coll) { return; }
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						if (!ArrayProp) { return; }
+						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
+						if (!InnerProp || !InnerProp->Struct) { return; }
+						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
+						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return; }
+
+						uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
+						const FProperty* Prop = InnerProp->Struct->FindPropertyByName(PickerPropName);
+						if (!Prop) { return; }
+
+						FScopedTransaction Transaction(INVTEXT("Set Asset"));
+						Coll->Modify();
+
+						if (const FSoftObjectProperty* SoftProp = CastField<FSoftObjectProperty>(Prop))
 						{
-							UPCGExAssetCollection* Coll = WeakColl.Get();
-							if (!Coll) { return FString(); }
-							FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-							if (!ArrayProp) { return FString(); }
-							FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-							if (!InnerProp || !InnerProp->Struct) { return FString(); }
-							void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
-							FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-							if (Idx < 0 || Idx >= ArrayHelper.Num()) { return FString(); }
-
-							const uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
-							const FProperty* Prop = InnerProp->Struct->FindPropertyByName(PickerPropName);
-							if (!Prop) { return FString(); }
-
-							// Handle TSoftObjectPtr<T>
-							if (const FSoftObjectProperty* SoftProp = CastField<FSoftObjectProperty>(Prop))
-							{
-								const FSoftObjectPtr& SoftRef = *SoftProp->GetPropertyValuePtr_InContainer(EntryPtr);
-								return SoftRef.ToSoftObjectPath().ToString();
-							}
-							// Handle TObjectPtr<T>
-							if (const FObjectPropertyBase* ObjProp = CastField<FObjectPropertyBase>(Prop))
-							{
-								const UObject* Obj = ObjProp->GetObjectPropertyValue_InContainer(EntryPtr);
-								return Obj ? Obj->GetPathName() : FString();
-							}
-							return FString();
-						})
-						.OnObjectChanged_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const FAssetData& AssetData)
+							FSoftObjectPtr& SoftRef = *SoftProp->GetPropertyValuePtr_InContainer(EntryPtr);
+							SoftRef = AssetData.GetSoftObjectPath();
+						}
+						else if (const FObjectPropertyBase* ObjProp = CastField<FObjectPropertyBase>(Prop))
 						{
-							UPCGExAssetCollection* Coll = WeakColl.Get();
-							if (!Coll) { return; }
-							FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-							if (!ArrayProp) { return; }
-							FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-							if (!InnerProp || !InnerProp->Struct) { return; }
-							void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
-							FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-							if (Idx < 0 || Idx >= ArrayHelper.Num()) { return; }
+							ObjProp->SetObjectPropertyValue_InContainer(EntryPtr, AssetData.GetAsset());
+						}
 
-							uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
-							const FProperty* Prop = InnerProp->Struct->FindPropertyByName(PickerPropName);
-							if (!Prop) { return; }
-
-							FScopedTransaction Transaction(INVTEXT("Set Asset"));
-							Coll->Modify();
-
-							if (const FSoftObjectProperty* SoftProp = CastField<FSoftObjectProperty>(Prop))
-							{
-								FSoftObjectPtr& SoftRef = *const_cast<FSoftObjectPtr*>(SoftProp->GetPropertyValuePtr_InContainer(EntryPtr));
-								SoftRef = AssetData.GetSoftObjectPath();
-							}
-							else if (const FObjectPropertyBase* ObjProp = CastField<FObjectPropertyBase>(Prop))
-							{
-								ObjProp->SetObjectPropertyValue_InContainer(EntryPtr, AssetData.GetAsset());
-							}
-
-							Coll->PostEditChange();
-							OnAssetChanged.ExecuteIfBound();
-						})
-						.DisplayThumbnail(false)
-					]
-				];
+						Coll->PostEditChange();
+						OnAssetChanged.ExecuteIfBound();
+					})
+					.DisplayThumbnail(false)
+				]
+			];
 		}
 	}
 
@@ -638,100 +646,100 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 				[this]() -> TSharedRef<SWidget>
 				{
 					return
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot()
-						  .AutoHeight()
-						  .Padding(4)
-						[
-							SNew(SButton)
-							.Text(INVTEXT("Normalize to 100"))
-							.OnClicked_Lambda(
-								[this]()
-								{
-									PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::NormalizedWeightToSum(Collection); }
-									return FReply::Handled();
-								})
-							.ToolTipText(INVTEXT("Normalize weight sum to 100"))
-						]
-						+ SVerticalBox::Slot()
-						  .AutoHeight()
-						  .Padding(4, 0, 4, 4)
-						[
-							SNew(SUniformGridPanel)
-							.SlotPadding(FMargin(2, 2))
-							+ SUniformGridPanel::Slot(0, 0)
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(4)
 							[
 								SNew(SButton)
-								.Text(FText::FromString(TEXT("= i")))
+								.Text(INVTEXT("Normalize to 100"))
 								.OnClicked_Lambda(
 									[this]()
 									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::SetWeightIndex(Collection); }
+										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::NormalizedWeightToSum(Collection); }
 										return FReply::Handled();
 									})
-								.ToolTipText(FText::FromString("Set the weight index to the entry index."))
+								.ToolTipText(INVTEXT("Normalize weight sum to 100"))
 							]
-							+ SUniformGridPanel::Slot(1, 0)
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(4, 0, 4, 4)
 							[
-								SNew(SButton)
-								.Text(FText::FromString(TEXT("100")))
-								.OnClicked_Lambda(
-									[this]()
-									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::WeightOne(Collection); }
-										return FReply::Handled();
-									})
-								.ToolTipText(FText::FromString("Reset all weights to 100"))
-							]
-							+ SUniformGridPanel::Slot(2, 0)
-							[
-								SNew(SButton)
-								.Text(FText::FromString(TEXT("+=1")))
-								.OnClicked_Lambda(
-									[this]()
-									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::PadWeight(Collection); }
-										return FReply::Handled();
-									})
-								.ToolTipText(FText::FromString("Add 1 to all weights"))
-							]
-							+ SUniformGridPanel::Slot(0, 1)
-							[
-								SNew(SButton)
-								.Text(FText::FromString(TEXT("\xD7""2")))
-								.OnClicked_Lambda(
-									[this]()
-									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::MultWeight(Collection, 2); }
-										return FReply::Handled();
-									})
-								.ToolTipText(FText::FromString("Multiply weights by 2"))
-							]
-							+ SUniformGridPanel::Slot(1, 1)
-							[
-								SNew(SButton)
-								.Text(FText::FromString(TEXT("\xD7""10")))
-								.OnClicked_Lambda(
-									[this]()
-									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::MultWeight(Collection, 10); }
-										return FReply::Handled();
-									})
-								.ToolTipText(FText::FromString("Multiply weights by 10"))
-							]
-							+ SUniformGridPanel::Slot(2, 1)
-							[
-								SNew(SButton)
-								.Text(FText::FromString(TEXT("???")))
-								.OnClicked_Lambda(
-									[this]()
-									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::WeightRandom(Collection); }
-										return FReply::Handled();
-									})
-								.ToolTipText(FText::FromString("Assign random weights"))
-							]
-						];
+								SNew(SUniformGridPanel)
+								.SlotPadding(FMargin(2, 2))
+								+ SUniformGridPanel::Slot(0, 0)
+								[
+									SNew(SButton)
+									.Text(FText::FromString(TEXT("= i")))
+									.OnClicked_Lambda(
+										[this]()
+										{
+											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::SetWeightIndex(Collection); }
+											return FReply::Handled();
+										})
+									.ToolTipText(FText::FromString("Set the weight index to the entry index."))
+								]
+								+ SUniformGridPanel::Slot(1, 0)
+								[
+									SNew(SButton)
+									.Text(FText::FromString(TEXT("100")))
+									.OnClicked_Lambda(
+										[this]()
+										{
+											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::WeightOne(Collection); }
+											return FReply::Handled();
+										})
+									.ToolTipText(FText::FromString("Reset all weights to 100"))
+								]
+								+ SUniformGridPanel::Slot(2, 0)
+								[
+									SNew(SButton)
+									.Text(FText::FromString(TEXT("+=1")))
+									.OnClicked_Lambda(
+										[this]()
+										{
+											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::PadWeight(Collection); }
+											return FReply::Handled();
+										})
+									.ToolTipText(FText::FromString("Add 1 to all weights"))
+								]
+								+ SUniformGridPanel::Slot(0, 1)
+								[
+									SNew(SButton)
+									.Text(FText::FromString(TEXT("\xD7""2")))
+									.OnClicked_Lambda(
+										[this]()
+										{
+											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::MultWeight(Collection, 2); }
+											return FReply::Handled();
+										})
+									.ToolTipText(FText::FromString("Multiply weights by 2"))
+								]
+								+ SUniformGridPanel::Slot(1, 1)
+								[
+									SNew(SButton)
+									.Text(FText::FromString(TEXT("\xD7""10")))
+									.OnClicked_Lambda(
+										[this]()
+										{
+											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::MultWeight(Collection, 10); }
+											return FReply::Handled();
+										})
+									.ToolTipText(FText::FromString("Multiply weights by 10"))
+								]
+								+ SUniformGridPanel::Slot(2, 1)
+								[
+									SNew(SButton)
+									.Text(FText::FromString(TEXT("???")))
+									.OnClicked_Lambda(
+										[this]()
+										{
+											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::WeightRandom(Collection); }
+											return FReply::Handled();
+										})
+									.ToolTipText(FText::FromString("Assign random weights"))
+								]
+							];
 				})
 		);
 
@@ -747,8 +755,8 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 			]
 			.OnGetMenuContent_Lambda(
 				[this]() -> TSharedRef<SWidget>
-					{
-						return
+				{
+					return
 							SNew(SUniformGridPanel)
 							.SlotPadding(FMargin(2, 2))
 							+ SUniformGridPanel::Slot(0, 0)
@@ -774,9 +782,8 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 										return FReply::Handled();
 									})
 								.ToolTipText(FText::FromString("Sort collection by descending weight"))
-							]
-						;
-					})
+							];
+				})
 		);
 	}
 	ToolbarBuilder.EndSection();
@@ -787,19 +794,19 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 void FPCGExAssetCollectionEditor::BuildAddMenuContent(const TSharedRef<SVerticalBox>& MenuBox)
 {
 	MenuBox->AddSlot()
-		.AutoHeight()
-		.Padding(4)
-		[
-			SNew(SButton)
-			.Text(INVTEXT("Add Content Browser Selection"))
-			.OnClicked_Lambda(
-				[this]()
-				{
-					PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::AddBrowserSelection(Collection); }
-					return FReply::Handled();
-				})
-			.ToolTipText(INVTEXT("Append the current content browser selection to this collection."))
-		];
+	       .AutoHeight()
+	       .Padding(4)
+	[
+		SNew(SButton)
+		.Text(INVTEXT("Add Content Browser Selection"))
+		.OnClicked_Lambda(
+			[this]()
+			{
+				PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::AddBrowserSelection(Collection); }
+				return FReply::Handled();
+			})
+		.ToolTipText(INVTEXT("Append the current content browser selection to this collection."))
+	];
 }
 
 void FPCGExAssetCollectionEditor::BuildAssetFooterToolbar(FToolBarBuilder& ToolbarBuilder)

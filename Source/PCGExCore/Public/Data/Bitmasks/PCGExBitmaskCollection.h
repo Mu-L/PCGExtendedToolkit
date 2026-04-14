@@ -59,7 +59,7 @@ namespace PCGExBitmaskCollection
 	};
 }
 
-UCLASS(BlueprintType, DisplayName="[PCGEx] Bitmask Library")
+UCLASS(BlueprintType, DisplayName="[PCGEx] Bitmask Library", meta=(ToolTip = "A library of named bitmask values for tagging and adjacency testing."))
 class PCGEXCORE_API UPCGExBitmaskCollection : public UDataAsset
 {
 	mutable FRWLock CacheLock;

@@ -10,23 +10,23 @@
 namespace PCGExAdjacencyPreviewConstants
 {
 	// Branch colors
-	static const FLinearColor PassBranchColor(0.1f, 0.6f, 0.2f, 0.8f);
-	static const FLinearColor FailBranchColor(0.4f, 0.15f, 0.15f, 0.5f);
+	static constexpr FLinearColor PassBranchColor(0.1f, 0.6f, 0.2f, 0.8f);
+	static constexpr FLinearColor FailBranchColor(0.4f, 0.15f, 0.15f, 0.5f);
 
 	// Node colors
-	static const FLinearColor CentralNodeColor(0.9f, 0.9f, 0.9f, 1.0f);
+	static constexpr FLinearColor CentralNodeColor(0.9f, 0.9f, 0.9f, 1.0f);
 
 	// Panel background tints
-	static const FLinearColor PanelPassBg(0.1f, 0.3f, 0.1f, 0.15f);
-	static const FLinearColor PanelFailBg(0.3f, 0.1f, 0.1f, 0.15f);
+	static constexpr FLinearColor PanelPassBg(0.1f, 0.3f, 0.1f, 0.15f);
+	static constexpr FLinearColor PanelFailBg(0.3f, 0.1f, 0.1f, 0.15f);
 
 	// Aggregated mode colors
-	static const FLinearColor AggregatedBranchColor(0.5f, 0.6f, 0.7f, 0.7f);
-	static const FLinearColor AggregatedHighlightColor(0.9f, 0.85f, 0.3f, 0.9f);
+	static constexpr FLinearColor AggregatedBranchColor(0.5f, 0.6f, 0.7f, 0.7f);
+	static constexpr FLinearColor AggregatedHighlightColor(0.9f, 0.85f, 0.3f, 0.9f);
 
 	// Labels
-	static const FLinearColor LabelColor(0.6f, 0.6f, 0.6f, 0.8f);
-	static const FLinearColor AttributeModeColor(0.3f, 0.3f, 0.3f, 0.3f);
+	static constexpr FLinearColor LabelColor(0.6f, 0.6f, 0.6f, 0.8f);
+	static constexpr FLinearColor AttributeModeColor(0.3f, 0.3f, 0.3f, 0.3f);
 
 	static constexpr float BranchThickness = 1.5f;
 	static constexpr float NeighborDotRadius = 3.0f;
@@ -83,7 +83,7 @@ void SPCGExAdjacencyPreview::DrawFilledCircle(
 {
 	const FSlateRenderTransform& RenderTransform = AllottedGeometry.GetAccumulatedRenderTransform();
 	const FColor VertColor = Color.ToFColor(true);
-	const FColor NoColor(0, 0, 0, 0);
+	constexpr FColor NoColor(0, 0, 0, 0);
 
 	TArray<FSlateVertex> Vertices;
 	TArray<SlateIndex> Indices;
@@ -124,7 +124,7 @@ void SPCGExAdjacencyPreview::DrawFilledRect(
 {
 	const FSlateRenderTransform& RenderTransform = AllottedGeometry.GetAccumulatedRenderTransform();
 	const FColor VertColor = Color.ToFColor(true);
-	const FColor NoColor(0, 0, 0, 0);
+	constexpr FColor NoColor(0, 0, 0, 0);
 
 	const FVector2D TR = TopLeft + FVector2D(Size.X, 0);
 	const FVector2D BL = TopLeft + FVector2D(0, Size.Y);
@@ -158,7 +158,7 @@ void SPCGExAdjacencyPreview::DrawStarPanel(
 
 	const double AngleStep = UE_TWO_PI / TotalBranches;
 	// Start from top (-PI/2), green branches first
-	const double StartAngle = -UE_HALF_PI;
+	constexpr double StartAngle = -UE_HALF_PI;
 
 	for (int32 i = 0; i < TotalBranches; ++i)
 	{
@@ -205,7 +205,7 @@ void SPCGExAdjacencyPreview::DrawAggregatedPanel(
 	if (N <= 0) { return; }
 
 	const double AngleStep = UE_TWO_PI / N;
-	const double StartAngle = -UE_HALF_PI;
+	constexpr double StartAngle = -UE_HALF_PI;
 	const double MinRadius = MaxRadius * 0.15; // Minimum branch length for visibility
 
 	for (int32 i = 0; i < N; ++i)
@@ -285,7 +285,7 @@ int32 SPCGExAdjacencyPreview::PaintSomeMode(
 		const int32 GreenCount = FMath::Clamp(Counts[Panel], 0, TotalNeighbors);
 
 		// Evaluate pass/fail
-		const bool bPass = PCGExCompare::Compare(Comparison, GreenCount, Threshold, static_cast<double>(Tolerance));
+		const bool bPass = PCGExCompare::Compare(Comparison, GreenCount, Threshold, Tolerance);
 
 		// Draw panel background
 		const FLinearColor& BgColor = bPass
@@ -341,7 +341,7 @@ int32 SPCGExAdjacencyPreview::PaintAllIndividualMode(
 	const FVector2D& LocalSize) const
 {
 	constexpr int32 TotalBranches = 5;
-	const int32 GreenCounts[3] = {5, 4, 1};
+	constexpr int32 GreenCounts[3] = {5, 4, 1};
 
 	const float ContentWidth = LocalSize.X - 2.0f * Padding;
 	const float PanelWidth = (ContentWidth - 2.0f * PanelGap) / 3.0f;
@@ -508,11 +508,16 @@ int32 SPCGExAdjacencyPreview::PaintAllAggregatedMode(
 		FString ModeStr;
 		switch (GatherMode)
 		{
-		case EPCGExAdjacencyGatherMode::Average: ModeStr = TEXT("All : Average"); break;
-		case EPCGExAdjacencyGatherMode::Min: ModeStr = TEXT("All : Min"); break;
-		case EPCGExAdjacencyGatherMode::Max: ModeStr = TEXT("All : Max"); break;
-		case EPCGExAdjacencyGatherMode::Sum: ModeStr = TEXT("All : Sum"); break;
-		default: ModeStr = TEXT("All : Aggregated"); break;
+		case EPCGExAdjacencyGatherMode::Average: ModeStr = TEXT("All : Average");
+			break;
+		case EPCGExAdjacencyGatherMode::Min: ModeStr = TEXT("All : Min");
+			break;
+		case EPCGExAdjacencyGatherMode::Max: ModeStr = TEXT("All : Max");
+			break;
+		case EPCGExAdjacencyGatherMode::Sum: ModeStr = TEXT("All : Sum");
+			break;
+		default: ModeStr = TEXT("All : Aggregated");
+			break;
 		}
 
 		const FVector2D LabelPos(LocalSize.X * 0.5 - 30.0, 2.0);
@@ -544,8 +549,8 @@ int32 SPCGExAdjacencyPreview::PaintAttributeMode(
 		const float PanelX = Padding + Panel * (PanelWidth + PanelGap);
 		const FVector2D PanelCenter(PanelX + PanelWidth * 0.5f, StarCenterY);
 
-		const double AngleStep = UE_TWO_PI / TotalBranches;
-		const double StartAngle = -UE_HALF_PI;
+		constexpr double AngleStep = UE_TWO_PI / TotalBranches;
+		constexpr double StartAngle = -UE_HALF_PI;
 
 		for (int32 i = 0; i < TotalBranches; ++i)
 		{
@@ -605,7 +610,7 @@ int32 SPCGExAdjacencyPreview::OnPaint(
 
 	if (CurrentMode == EPCGExAdjacencyTestMode::Some)
 	{
-		// "Some" mode — threshold counting
+		// "Some" mode -- threshold counting
 		const EPCGExMeanMeasure CurrentThresholdType = ThresholdType.Get();
 		int32 TotalForCalc;
 		if (CurrentThresholdType == EPCGExMeanMeasure::Relative)

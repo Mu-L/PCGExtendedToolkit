@@ -331,8 +331,8 @@ namespace PCGExPaths
 			InsetPositions[i] = Pos;
 			ProjectedBounds += Pos;
 		}
-		
-		if (Offset > 0) { ProjectedBounds = ProjectedBounds.ExpandBy(Offset); }   
+
+		if (Offset > 0) { ProjectedBounds = ProjectedBounds.ExpandBy(Offset); }
 
 		ProjectedPoints = MoveTemp(InsetPositions);
 	}

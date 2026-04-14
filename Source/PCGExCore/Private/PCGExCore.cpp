@@ -32,8 +32,6 @@ void FPCGExCoreModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>& InStyl
 	PCGEX_REGISTER_PIN_ICON(OUT_RecursionTracker)
 	PCGEX_REGISTER_PIN_ICON(IN_RecursionTracker)
 
-	PCGEX_ASSET_TYPE_ACTION_BASIC(
-		Bitmasks, "PCGEx Bitmasks", UPCGExBitmaskCollection,
-		FColor(195, 0, 40), EAssetTypeCategories::Misc)
+	// Bitmask collection: UAssetDefinition + UFactory in PCGExCoreEditor handle menu registration
 }
 #endif

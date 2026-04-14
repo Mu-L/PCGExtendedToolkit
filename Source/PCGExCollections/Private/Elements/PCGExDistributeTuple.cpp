@@ -48,6 +48,7 @@ void UPCGExDistributeTupleSettings::PostEditChangeProperty(struct FPropertyChang
 
 	if (!bNeedsSync && !bNeedsUIRefresh)
 	{
+		DirtyCache();
 		Super::PostEditChangeProperty(PropertyChangedEvent);
 		return;
 	}
@@ -71,6 +72,8 @@ void UPCGExDistributeTupleSettings::PostEditChangeProperty(struct FPropertyChang
 		}
 	}
 
+	DirtyCache();
+	
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif

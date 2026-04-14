@@ -114,7 +114,7 @@ namespace PCGExCompare
 
 	PCGEXCORE_API
 	bool Compare(const EPCGExStringComparison Method, const FString& A, const FString& B);
-	
+
 	PCGEXCORE_API
 	bool Compare(const EPCGExStringMatchMode Method, const FString& A, const FString& B);
 

@@ -36,32 +36,32 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeChildren(
 {
 	// 1. Insert the preview widget as the first custom row
 	ChildBuilder.AddCustomRow(FText::FromString(TEXT("Preview")))
-		.WholeRowContent()
+	            .WholeRowContent()
+	[
+		SNew(SBox)
+		.HeightOverride(140.0f)
 		[
-			SNew(SBox)
-			.HeightOverride(140.0f)
-			[
-				SAssignNew(PreviewWidget, SPCGExEdgeEndpointsCheckPreview)
-				.Mode_Lambda([this]() -> EPCGExEdgeEndpointsCheckMode
-				{
-					uint8 Value = 0;
-					if (ModeHandle.IsValid()) { ModeHandle->GetValue(Value); }
-					return static_cast<EPCGExEdgeEndpointsCheckMode>(Value);
-				})
-				.Expects_Lambda([this]() -> EPCGExFilterResult
-				{
-					uint8 Value = 0;
-					if (ExpectsHandle.IsValid()) { ExpectsHandle->GetValue(Value); }
-					return static_cast<EPCGExFilterResult>(Value);
-				})
-				.bInvert_Lambda([this]() -> bool
-				{
-					bool Value = false;
-					if (InvertHandle.IsValid()) { InvertHandle->GetValue(Value); }
-					return Value;
-				})
-			]
-		];
+			SAssignNew(PreviewWidget, SPCGExEdgeEndpointsCheckPreview)
+			.Mode_Lambda([this]() -> EPCGExEdgeEndpointsCheckMode
+			{
+				uint8 Value = 0;
+				if (ModeHandle.IsValid()) { ModeHandle->GetValue(Value); }
+				return static_cast<EPCGExEdgeEndpointsCheckMode>(Value);
+			})
+			.Expects_Lambda([this]() -> EPCGExFilterResult
+			{
+				uint8 Value = 0;
+				if (ExpectsHandle.IsValid()) { ExpectsHandle->GetValue(Value); }
+				return static_cast<EPCGExFilterResult>(Value);
+			})
+			.bInvert_Lambda([this]() -> bool
+			{
+				bool Value = false;
+				if (InvertHandle.IsValid()) { InvertHandle->GetValue(Value); }
+				return Value;
+			})
+		]
+	];
 
 	// 2. Add all child properties normally
 	uint32 NumChildren = 0;

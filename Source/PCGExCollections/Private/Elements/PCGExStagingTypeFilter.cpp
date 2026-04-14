@@ -248,33 +248,30 @@ bool FPCGExStagedTypeFilterElement::AdvanceWork(FPCGExContext* InContext, const 
 
 		return Context->TryComplete();
 	}
-	else
+	// Include/Exclude mode (unchanged)
+	PCGEX_ON_INITIAL_EXECUTION
 	{
-		// Include/Exclude mode (unchanged)
-		PCGEX_ON_INITIAL_EXECUTION
-		{
-			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
-				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
-				{
-					NewBatch->bRequiresWriteStep = true;
-				}))
+		if (!Context->StartBatchProcessingPoints(
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				return Context->CancelExecution(TEXT("Could not find any points to process."));
-			}
-		}
-
-		PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
-
-		Context->MainPoints->StageOutputs();
-
-		if (Context->FilteredOutCollection)
+				NewBatch->bRequiresWriteStep = true;
+			}))
 		{
-			Context->FilteredOutCollection->StageOutputs();
+			return Context->CancelExecution(TEXT("Could not find any points to process."));
 		}
-
-		return Context->TryComplete();
 	}
+
+	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
+
+	Context->MainPoints->StageOutputs();
+
+	if (Context->FilteredOutCollection)
+	{
+		Context->FilteredOutCollection->StageOutputs();
+	}
+
+	return Context->TryComplete();
 }
 
 #pragma endregion
@@ -300,7 +297,7 @@ namespace PCGExStagedTypeFilter
 			PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 		}
 
-		// Get hash attribute — silently skip data without staging hashes
+		// Get hash attribute -- silently skip data without staging hashes
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
 		if (!EntryHashGetter) { return false; }
 

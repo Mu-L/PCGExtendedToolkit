@@ -15,6 +15,13 @@ MACRO(Depth, int32, -1)\
 MACRO(Distance, double, -1)\
 MACRO(SeedIndex, int32, -1)
 
+UENUM()
+enum class EPCGExBFSNormalizedDepthMode : uint8
+{
+	Global  = 0 UMETA(DisplayName = "Global", ToolTip="depth / MaxDepth. Uniform gradient from seed (0) to deepest node (1)."),
+	Cascade = 1 UMETA(DisplayName = "Cascade", ToolTip="Hierarchical falloff. 1.0 at seed, 0.0 at leaf endpoints. Branches inherit from the trunk and smoothly decay toward their own leaves."),
+};
+
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters", meta=(PCGExNodeLibraryDoc="pathfinding/cluster-bfs-depth"))
 class UPCGExBFSDepthSettings : public UPCGExClustersProcessorSettings
 {
@@ -64,6 +71,18 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(DisplayName="Seed Index", PCG_Overridable, EditCondition="bWriteSeedIndex"))
 	FName SeedIndexAttributeName = FName("SeedIndex");
 
+	/** Write a normalized depth value (0-1) to vertices. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
+	bool bWriteNormalizedDepth = false;
+
+	/** Name of the 'double' attribute to write normalized depth to. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(DisplayName="Normalized Depth", PCG_Overridable, EditCondition="bWriteNormalizedDepth"))
+	FName NormalizedDepthAttributeName = FName("NormalizedBFSDepth");
+
+	/** How to normalize the depth values. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_NotOverridable, EditCondition="bWriteNormalizedDepth", EditCondtionHides, HideEditConditionToggle))
+	EPCGExBFSNormalizedDepthMode NormalizedDepthMode = EPCGExBFSNormalizedDepthMode::Global;
+
 	/** Whether to use an octree for closest node search. Depending on your dataset, this may be faster or slower. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, AdvancedDisplay))
 	bool bUseOctreeSearch = false;
@@ -106,9 +125,14 @@ namespace PCGExBFSDepth
 		TArray<int32> Depths;
 		TArray<double> Distances;
 		TArray<int32> SeedOwners;
+		TArray<int32> Parents;    // BFS tree parent per node (-1 = seed/root)
+		TArray<int32> ChildCount; // Number of BFS children per node
+		int32 MaxBFSDepth = 0;
 
 		TSharedPtr<PCGExMT::TScopedArray<FIntPoint>> SeedNodeIndices;
 		TArray<FIntPoint> CollectedSeeds;
+
+		void ComputeNormalizedDepth();
 
 	public:
 		FProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
@@ -119,6 +143,7 @@ namespace PCGExBFSDepth
 		int32* DepthData = nullptr;
 		double* DistanceData = nullptr;
 		int32* SeedIndexData = nullptr;
+		double* NormalizedDepthData = nullptr;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 
@@ -128,6 +153,7 @@ namespace PCGExBFSDepth
 	class FBatch final : public PCGExClusterMT::TBatch<FProcessor>
 	{
 		PCGEX_FOREACH_FIELD_BFS_DEPTH(PCGEX_OUTPUT_DECL)
+		TSharedPtr<PCGExData::TBuffer<double>> NormalizedDepthWriter;
 
 	public:
 		FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges);

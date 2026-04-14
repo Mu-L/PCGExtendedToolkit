@@ -39,7 +39,8 @@ public class PCGExCoreEditor : ModuleRules
 				"Settings",
 				"Engine",
 				"PCG",
-				"PCGExCore"
+				"PCGExCore",
+				"AssetDefinition"
 			}
 		);
 

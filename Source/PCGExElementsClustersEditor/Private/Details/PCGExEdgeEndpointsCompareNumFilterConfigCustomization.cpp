@@ -36,26 +36,26 @@ void FPCGExEdgeEndpointsCompareNumFilterConfigCustomization::CustomizeChildren(
 {
 	// 1. Insert the preview widget as the first custom row
 	ChildBuilder.AddCustomRow(FText::FromString(TEXT("Preview")))
-		.WholeRowContent()
+	            .WholeRowContent()
+	[
+		SNew(SBox)
+		.HeightOverride(140.0f)
 		[
-			SNew(SBox)
-			.HeightOverride(140.0f)
-			[
-				SAssignNew(PreviewWidget, SPCGExEdgeEndpointsCompareNumPreview)
-				.Comparison_Lambda([this]() -> EPCGExComparison
-				{
-					uint8 Value = 0;
-					if (ComparisonHandle.IsValid()) { ComparisonHandle->GetValue(Value); }
-					return static_cast<EPCGExComparison>(Value);
-				})
-				.bInvert_Lambda([this]() -> bool
-				{
-					bool Value = false;
-					if (InvertHandle.IsValid()) { InvertHandle->GetValue(Value); }
-					return Value;
-				})
-			]
-		];
+			SAssignNew(PreviewWidget, SPCGExEdgeEndpointsCompareNumPreview)
+			.Comparison_Lambda([this]() -> EPCGExComparison
+			{
+				uint8 Value = 0;
+				if (ComparisonHandle.IsValid()) { ComparisonHandle->GetValue(Value); }
+				return static_cast<EPCGExComparison>(Value);
+			})
+			.bInvert_Lambda([this]() -> bool
+			{
+				bool Value = false;
+				if (InvertHandle.IsValid()) { InvertHandle->GetValue(Value); }
+				return Value;
+			})
+		]
+	];
 
 	// 2. Add all child properties normally
 	uint32 NumChildren = 0;

@@ -50,7 +50,7 @@ struct PCGEXFOUNDATIONS_API FPCGExRemapDetails
 
 	/** Fixed In Max value. If disabled, will use the highest input value.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="bUseInMax"))
-	double InMax = 0;
+	double InMax = 1;
 
 	/** How to remap before sampling the curve. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))

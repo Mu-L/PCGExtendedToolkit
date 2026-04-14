@@ -41,7 +41,6 @@ protected:
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
-
 };
 
 struct FPCGExBlendAttributesContext final : FPCGExPointsProcessorContext

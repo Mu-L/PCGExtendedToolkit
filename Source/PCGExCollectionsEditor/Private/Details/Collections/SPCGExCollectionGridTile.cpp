@@ -50,7 +50,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 		PickerWidget = InArgs._OnGetPickerWidget.Execute(Collection, EntryIndex, RefreshDelegate);
 	}
 
-	// Build category widget — combobox with "New..." option
+	// Build category widget -- combobox with "New..." option
 	TSharedRef<SWidget> CategoryWidget = SNullWidget::NullWidget;
 	if (CategoryOptions.IsValid())
 	{
@@ -112,7 +112,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 						.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8));
 				})
 				[
-					// Content (header button) — shows current category
+					// Content (header button) -- shows current category
 					SNew(STextBlock)
 					.Text_Lambda([WeakColl, Idx]() -> FText
 					{
@@ -545,7 +545,7 @@ FReply SPCGExCollectionGridTile::OnMouseButtonUp(const FGeometry& MyGeometry, co
 	if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bPendingClick)
 	{
 		bPendingClick = false;
-		// Deferred exclusive select — was already selected, user didn't drag
+		// Deferred exclusive select -- was already selected, user didn't drag
 		OnTileClicked.ExecuteIfBound(EntryIndex, MouseEvent);
 		return FReply::Handled();
 	}
@@ -636,7 +636,7 @@ TSharedRef<SWidget> SPCGExCollectionGridTile::BuildThumbnailWidget()
 	bCachedIsSubCollection = Result.Entry->bIsSubCollection;
 	CachedStagingPath = Result.Entry->Staging.Path;
 
-	// Subcollection — show collection icon
+	// Subcollection -- show collection icon
 	if (Result.Entry->bIsSubCollection)
 	{
 		return SNew(SBox)

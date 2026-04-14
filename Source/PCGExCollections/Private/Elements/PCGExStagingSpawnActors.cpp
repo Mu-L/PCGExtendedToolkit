@@ -135,7 +135,7 @@ namespace PCGExStagingSpawnActors
 			GenerationWatcher->Initialize();
 		}
 
-		// Pre-size resolved entries — one slot per point, no locks needed during parallel write
+		// Pre-size resolved entries -- one slot per point, no locks needed during parallel write
 		NumPoints = PointDataFacade->Source->GetNum(PCGExData::EIOSide::In);
 		ResolvedEntries.SetNumZeroed(NumPoints);
 
@@ -175,7 +175,7 @@ namespace PCGExStagingSpawnActors
 			const FPCGExActorCollectionEntry* ActorEntry = static_cast<const FPCGExActorCollectionEntry*>(Result.Entry);
 			if (!ActorEntry->Actor.ToSoftObjectPath().IsValid()) { continue; }
 
-			// Write directly to our index — no lock, each thread writes unique indices
+			// Write directly to our index -- no lock, each thread writes unique indices
 			ResolvedEntries[Index].Entry = ActorEntry;
 		}
 	}
@@ -286,8 +286,8 @@ namespace PCGExStagingSpawnActors
 			if (!Settings->bQuietInvalidEntryWarnings)
 			{
 				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
-					FText::Format(LOCTEXT("FailedToLoadActor", "Failed to load actor class for point {0}"),
-						FText::AsNumber(PointIndex)));
+				           FText::Format(LOCTEXT("FailedToLoadActor", "Failed to load actor class for point {0}"),
+					           FText::AsNumber(PointIndex)));
 			}
 			return;
 		}
@@ -315,8 +315,8 @@ namespace PCGExStagingSpawnActors
 			if (!Settings->bQuietInvalidEntryWarnings)
 			{
 				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
-					FText::Format(LOCTEXT("FailedToSpawnActor", "Failed to spawn actor '{0}' at point {1}"),
-						FText::FromString(ActorClass->GetName()), FText::AsNumber(PointIndex)));
+				           FText::Format(LOCTEXT("FailedToSpawnActor", "Failed to spawn actor '{0}' at point {1}"),
+					           FText::FromString(ActorClass->GetName()), FText::AsNumber(PointIndex)));
 			}
 			return;
 		}

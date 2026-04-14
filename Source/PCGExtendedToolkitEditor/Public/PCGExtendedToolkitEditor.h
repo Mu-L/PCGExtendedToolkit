@@ -7,9 +7,6 @@
 #include "Modules/ModuleInterface.h"
 #include "Styling/SlateStyle.h"
 
-class FPCGExActorCollectionActions;
-class FPCGExMeshCollectionActions;
-
 class FPCGExtendedToolkitEditorModule : public IModuleInterface
 {
 public:

@@ -205,7 +205,7 @@ namespace PCGExPathInsert
 		{
 			const int32 Start = ChunkIndex * ChunkSize;
 			const int32 End = FMath::Min(Start + ChunkSize, TotalTargets);
-			
+
 			TArray<FCompactCandidate>& LocalCandidates = ChunkResults[ChunkIndex];
 
 			for (int32 i = Start; i < End; i++)
