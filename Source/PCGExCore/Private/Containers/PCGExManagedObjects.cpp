@@ -174,7 +174,7 @@ namespace PCGEx
 			{
 				if (ManagedObjects.Contains(SubObject)) { return; }
 				SubObject->ClearInternalFlags(EInternalObjectFlags::Async);
-			}, true);
+			}, EGetObjectsFlags::IncludeNestedObjects);
 		}
 	}
 }
