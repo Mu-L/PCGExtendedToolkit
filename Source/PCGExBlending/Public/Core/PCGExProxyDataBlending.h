@@ -244,7 +244,7 @@ namespace PCGExBlending
 		//void Set(const int32 TargetIndex, const T& Value) const { if (C) { C->Set(TargetIndex, Value); } }
 
 	protected:
-		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(EPCGMetadataTypes, EPCGExABBlendingType, bool);
+		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(EPCGMetadataTypes, EPCGExABBlendingType, bool, const UObject*);
 		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(FPCGExContext*, EPCGExABBlendingType, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, bool);
 		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(FPCGExContext*, EPCGExABBlendingType, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, bool);
 
@@ -274,10 +274,13 @@ namespace PCGExBlending
 
 	// Create blender with just type and mode - caller sets A, B, C proxies manually
 	// This replaces the old CreateProxyBlender<T>(BlendMode, bReset) template
+	// ValueTypeObject: UStruct/UEnum/UClass for extended types (Struct, Enum, etc.); nullptr for basic types.
+	// Required for non-basic types so FBlendOperationFactory can compute correct ValueSize.
 	PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(
 		EPCGMetadataTypes WorkingType,
 		EPCGExABBlendingType BlendMode,
-		bool bResetValueForMultiBlend = true);
+		bool bResetValueForMultiBlend = true,
+		const UObject* InValueTypeObject = nullptr);
 
 	// Create blender with A, B, and C descriptors
 	PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(

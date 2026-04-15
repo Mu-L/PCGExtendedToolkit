@@ -30,10 +30,21 @@ namespace PCGExData
 		EPCGMetadataTypes UnderlyingType = EPCGMetadataTypes::Unknown;
 		bool bAllowsInterpolation = true;
 
+		// UStruct/UEnum/UClass for extended types (Struct, Enum, Object, SoftObject, Class, SoftClass).
+		// nullptr for basic types (Float, Double, int32, FVector, etc.) — they don't need it.
+		// Required by PCGExTypes::GetElementSizeFromType / GetElementAlignmentFromType to correctly size
+		// non-basic attributes. Non-owning pointer; lifetime follows the attribute's metadata.
+		const UObject* ValueTypeObject = nullptr;
+
 		FAttributeIdentity() = default;
 
 		FAttributeIdentity(const FPCGAttributeIdentifier& InIdentifier, const EPCGMetadataTypes InUnderlyingType, const bool InAllowsInterpolation)
 			: Identifier(InIdentifier), UnderlyingType(InUnderlyingType), bAllowsInterpolation(InAllowsInterpolation)
+		{
+		}
+
+		FAttributeIdentity(const FPCGAttributeIdentifier& InIdentifier, const EPCGMetadataTypes InUnderlyingType, const bool InAllowsInterpolation, const UObject* InValueTypeObject)
+			: Identifier(InIdentifier), UnderlyingType(InUnderlyingType), bAllowsInterpolation(InAllowsInterpolation), ValueTypeObject(InValueTypeObject)
 		{
 		}
 

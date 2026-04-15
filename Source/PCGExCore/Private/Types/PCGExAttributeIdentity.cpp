@@ -9,6 +9,7 @@
 #include "Data/PCGSpatialData.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttribute.h"
 
 namespace PCGExData
 {
@@ -42,7 +43,8 @@ namespace PCGExData
 		for (int i = 0; i < NumAttributes; i++)
 		{
 			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifiers[i].Name)) { continue; }
-			OutIdentities.AddUnique(FAttributeIdentity(Identifiers[i], Types[i], InMetadata->GetConstAttribute(Identifiers[i])->AllowsInterpolation()));
+			const FPCGMetadataAttributeBase* Attr = InMetadata->GetConstAttribute(Identifiers[i]);
+			OutIdentities.AddUnique(FAttributeIdentity(Identifiers[i], Types[i], Attr->AllowsInterpolation(), Attr->GetAttributeDesc().ValueTypeObject));
 		}
 	}
 
@@ -60,7 +62,8 @@ namespace PCGExData
 		{
 			const FPCGAttributeIdentifier& Identifier = OutIdentifiers[i];
 			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifier.Name)) { continue; }
-			OutIdentities.Add(Identifier, FAttributeIdentity(Identifier, Types[i], InMetadata->GetConstAttribute(Identifier)->AllowsInterpolation()));
+			const FPCGMetadataAttributeBase* Attr = InMetadata->GetConstAttribute(Identifier);
+			OutIdentities.Add(Identifier, FAttributeIdentity(Identifier, Types[i], Attr->AllowsInterpolation(), Attr->GetAttributeDesc().ValueTypeObject));
 		}
 	}
 
@@ -75,6 +78,7 @@ namespace PCGExData
 		OutIdentity.Identifier = Attribute->Name;
 		OutIdentity.UnderlyingType = static_cast<EPCGMetadataTypes>(Attribute->GetTypeId());
 		OutIdentity.bAllowsInterpolation = Attribute->AllowsInterpolation();
+		OutIdentity.ValueTypeObject = Attribute->GetAttributeDesc().ValueTypeObject;
 
 		return true;
 	}
@@ -93,7 +97,8 @@ namespace PCGExData
 
 		for (int i = 0; i < NumAttributes; i++)
 		{
-			const FAttributeIdentity Identity = FAttributeIdentity(Identifiers[i], Types[i], InMetadata->GetConstAttribute(Identifiers[i])->AllowsInterpolation());
+			const FPCGMetadataAttributeBase* Attr = InMetadata->GetConstAttribute(Identifiers[i]);
+			const FAttributeIdentity Identity = FAttributeIdentity(Identifiers[i], Types[i], Attr->AllowsInterpolation(), Attr->GetAttributeDesc().ValueTypeObject);
 			Func(Identity, i);
 		}
 

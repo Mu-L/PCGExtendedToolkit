@@ -90,13 +90,24 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	}
 
 	template <typename T>
-	void TBuffer<T>::ReadVoid(const int32 Index, void* OutValue) const { *static_cast<T*>(OutValue) = Read(Index); }
+	void TBuffer<T>::ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const
+	{
+		// OutValue's storage is a properly-constructed T (either via the basic-type ctor
+		// or via FProperty-backed init). operator= is safe here.
+		OutValue.As<T>() = Read(Index);
+	}
 
 	template <typename T>
-	void TBuffer<T>::SetVoid(const int32 Index, const void* Value) { SetValue(Index, *static_cast<const T*>(Value)); }
+	void TBuffer<T>::SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value)
+	{
+		SetValue(Index, Value.As<T>());
+	}
 
 	template <typename T>
-	void TBuffer<T>::GetVoid(const int32 Index, void* OutValue) { *static_cast<T*>(OutValue) = GetValue(Index); }
+	void TBuffer<T>::GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue)
+	{
+		OutValue.As<T>() = GetValue(Index);
+	}
 
 	template <typename T>
 	PCGExValueHash TBuffer<T>::ReadValueHash(const int32 Index) { return PCGExTypes::ComputeHash(Read(Index)); }
@@ -428,6 +439,13 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 			}
 		}
 #undef PCGEX_TYPED_WRITABLE
+	}
+
+	TSharedPtr<IBuffer> FFacade::GetWritableFromAttribute(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init)
+	{
+		if (!InAttribute) { return nullptr; }
+		const EPCGMetadataTypes Type = static_cast<EPCGMetadataTypes>(InAttribute->GetTypeId());
+		return GetWritable(Type, InAttribute, Init);
 	}
 
 	TSharedPtr<IBuffer> FFacade::GetReadable(const FAttributeIdentity& Identity, const EIOSide InSide, const bool bSupportScoped)

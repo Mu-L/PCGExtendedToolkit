@@ -15,6 +15,7 @@
 #include "Helpers/PCGExMetaHelpersMacros.h"
 #include "Metadata/PCGMetadataCommon.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
+#include "Types/PCGExTypes.h"
 
 #pragma region DATA MACROS
 
@@ -146,9 +147,14 @@ namespace PCGExData
 		virtual bool IsReadable() = 0;
 		virtual bool ReadsFromOutput() = 0;
 
-		virtual void ReadVoid(const int32 Index, void* OutValue) const = 0;
-		virtual void SetVoid(const int32 Index, const void* Value) = 0;
-		virtual void GetVoid(const int32 Index, void* OutValue) = 0;
+		virtual void ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const = 0;
+		virtual void SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value) = 0;
+		virtual void GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) = 0;
+
+		// Creates a FScopedTypedValue appropriately sized & constructed for this buffer's type.
+		// Callers don't need to know EPCGMetadataTypes — the buffer knows its own type.
+		// TBuffer<T> uses compile-time TTraits<T>::Type; FPropertyBuffer uses its cached FProperty.
+		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const = 0;
 
 		virtual void Flush()
 		{
@@ -174,9 +180,16 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 
 		TBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
 
-		virtual void ReadVoid(const int32 Index, void* OutValue) const override;
-		virtual void SetVoid(const int32 Index, const void* Value) override;
-		virtual void GetVoid(const int32 Index, void* OutValue) override;
+		virtual void ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const override;
+		virtual void SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value) override;
+		virtual void GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) override;
+
+		// Compile-time typed: PCGExTypes::TTraits<T>::Type is resolved at template instantiation,
+		// so no EPCGMetadataTypes enum value ever surfaces at the caller.
+		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const override
+		{
+			return PCGExTypes::FScopedTypedValue(PCGExTypes::TTraits<T>::Type);
+		}
 
 		// Unsafe read from input
 		virtual const T& Read(const int32 Index) const = 0;
@@ -295,6 +308,10 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 
 		TSharedPtr<IBuffer> GetWritable(EPCGMetadataTypes Type, const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init);
 		TSharedPtr<IBuffer> GetWritable(EPCGMetadataTypes Type, const FName InName, EBufferInit Init);
+
+		// Attribute-driven writable lookup — callers don't need to extract EPCGMetadataTypes.
+		// Internally delegates to GetWritable(EPCGMetadataTypes, FPCGMetadataAttributeBase*, EBufferInit).
+		TSharedPtr<IBuffer> GetWritableFromAttribute(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init);
 
 #pragma endregion
 

@@ -274,14 +274,16 @@ namespace PCGExBlending
 	TSharedPtr<FProxyDataBlender> CreateProxyBlender(
 		EPCGMetadataTypes WorkingType,
 		EPCGExABBlendingType BlendMode,
-		bool bResetValueForMultiBlend)
+		bool bResetValueForMultiBlend,
+		const UObject* InValueTypeObject)
 	{
 		TSharedPtr<FProxyDataBlender> Blender = MakeShared<FProxyDataBlender>();
 
 		Blender->UnderlyingType = WorkingType;
 
-		// For unknown/generic types, get size from the type utility so FCopyOnlyBlendOperation can be created
-		const int32 DerivedSize = PCGExTypes::GetElementSizeFromType(WorkingType);
+		// For extended types (Struct/Enum/etc.), InValueTypeObject must be non-null so size can be computed.
+		// For basic types, size comes from the enum alone and VTO is ignored.
+		const int32 DerivedSize = PCGExTypes::GetElementSizeFromType(WorkingType, InValueTypeObject);
 		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize);
 
 		if (!Blender->Operation) { return nullptr; }

@@ -14,6 +14,10 @@ namespace PCGExMT
 	/** Function signature for parallel/sequential loop body */
 	using FLoopBody = std::function<void(int32)>;
 
+	struct FScope;
+	/** Scope-based loop body: runs once per worker task, iterates its own indices internally. */
+	using FScopedLoopBody = std::function<void(const FScope&)>;
+
 	/**
 	 * Execute a loop body either in parallel or sequentially based on iteration count.
 	 * @param Num Number of iterations
@@ -21,6 +25,19 @@ namespace PCGExMT
 	 * @param Threshold Iteration count below which we use sequential execution (default 512)
 	 */
 	PCGEXCORE_API void ParallelOrSequential(int32 Num, const FLoopBody& Body, int32 Threshold = DefaultParallelThreshold);
+
+	/**
+	 * Scope-based variant: divides Num into chunks (roughly one per worker thread) and calls Body
+	 * once per chunk with an FScope covering that chunk's index range.
+	 *
+	 * Use this when per-iteration work has setup cost that should be amortized across a chunk
+	 * (e.g., allocating scratch storage like FScopedTypedValue for type-erased buffer access).
+	 *
+	 * @param Num Total number of iterations
+	 * @param Body Function taking (const FScope&) — Body is responsible for iterating Scope.Start..Scope.End
+	 * @param Threshold Iteration count below which we use sequential execution (single scope, no dispatch)
+	 */
+	PCGEXCORE_API void ParallelOrSequentialScoped(int32 Num, const FScopedLoopBody& Body, int32 Threshold = DefaultParallelThreshold);
 
 	/**
 	 * Force sequential execution regardless of iteration count.
@@ -111,6 +128,7 @@ namespace PCGExMT
 
 #define PCGEX_PARALLEL_FOR(_NUM, ...) PCGExMT::ParallelOrSequential(_NUM, [&](const int32 i){ __VA_ARGS__ });
 #define PCGEX_PARALLEL_FOR_THRESHOLD(_NUM, _THRESHOLD, ...) PCGExMT::ParallelOrSequential(_NUM, [&](const int32 i){ __VA_ARGS__ }, _THRESHOLD);
+#define PCGEX_PARALLEL_FOR_SCOPED(_NUM, _THRESHOLD, ...) PCGExMT::ParallelOrSequentialScoped(_NUM, [&](const PCGExMT::FScope& Scope){ __VA_ARGS__ }, _THRESHOLD);
 #define PCGEX_SEQUENTIAL_FOR(_NUM, ...) PCGExMT::Sequential(_NUM, [&](const int32 i){ __VA_ARGS__ });
 
 #endif

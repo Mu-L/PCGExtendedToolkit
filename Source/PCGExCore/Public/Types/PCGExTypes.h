@@ -19,6 +19,7 @@
 //#include "PCGExTypeErasedBuffer.h"
 
 class FPCGMetadataAttributeBase;
+class FProperty;
 
 namespace PCGExTypes
 {
@@ -48,6 +49,7 @@ namespace PCGExTypes
 		void* ActiveStorage = Storage; // Points to Storage (inline) or heap allocation
 		EPCGMetadataTypes Type;
 		int32 ValueSize = 0; // Actual size of stored value (0 = computed from Type)
+		const FProperty* Property = nullptr; // If set, lifecycle routes through FProperty
 		bool bConstructed;
 		bool bHeapAllocated = false;
 
@@ -57,6 +59,10 @@ namespace PCGExTypes
 
 		// Construct with explicit size - heap-allocates if size > BufferSize
 		FScopedTypedValue(EPCGMetadataTypes InType, int32 InSize, int32 InAlignment = 1);
+
+		// Construct from an FProperty - uses FProperty reflection for size, alignment, and lifecycle.
+		// Supports arbitrary UStruct/UEnum/UObject types. Heap-allocates if size > BufferSize.
+		explicit FScopedTypedValue(const FProperty* InProperty);
 
 		// Destructor - calls destructor for complex types, frees heap if allocated
 		~FScopedTypedValue();
@@ -86,10 +92,14 @@ namespace PCGExTypes
 		FORCEINLINE int32 GetValueSize() const { return ValueSize; }
 		FORCEINLINE bool IsHeapAllocated() const { return bHeapAllocated; }
 
+		// Get the underlying FProperty if the value was constructed from one
+		FORCEINLINE const FProperty* GetProperty() const { return Property; }
+
 		// Manual lifecycle control (for reuse scenarios)
 		void Destruct();
 		void Initialize(EPCGMetadataTypes NewType);
 		void Initialize(EPCGMetadataTypes NewType, int32 InSize, int32 InAlignment = 1);
+		void Initialize(const FProperty* InProperty);
 
 		// Type traits helpers
 		static bool NeedsLifecycleManagement(EPCGMetadataTypes InType);

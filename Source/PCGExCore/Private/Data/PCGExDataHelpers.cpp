@@ -26,28 +26,30 @@ namespace PCGExData::Helpers
 				continue;
 			}
 
-			EPCGMetadataTypes SrcType = SrcBuffer->GetTypeId();
-			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritable(SrcType, SrcBuffer->Identifier.Name, EBufferInit::Inherit);
+			// TODO: support Data domain. Currently only Elements.
+			if (SrcBuffer->GetUnderlyingDomain() != EDomainType::Elements) { continue; }
+
+			const FPCGMetadataAttributeBase* SrcAttr = SrcBuffer->OutAttribute;
+			if (!SrcAttr) { continue; }
+
+			// Attribute-driven: tier-agnostic, no EPCGMetadataTypes surfaces here.
+			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritableFromAttribute(SrcAttr, EBufferInit::Inherit);
 			if (!DstBuffer) { continue; }
 
-			PCGExMetaHelpers::ExecuteWithRightType(SrcType, [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				if (SrcBuffer->GetUnderlyingDomain() == EDomainType::Elements)
-				{
-					TArray<T>& SrcValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(SrcBuffer)->GetOutValues().Get();
-					TArray<T>& DstValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(DstBuffer)->GetOutValues().Get();
+			const int32 NumCopy = SourcePointIndices.Num();
 
-					for (int32 i = 0; i < SourcePointIndices.Num(); i++)
-					{
-						DstValues[i] = SrcValues[SourcePointIndices[i]];
-					}
-				}
-				else
+			// Scope-based parallel: one FScopedTypedValue per worker task (not per iteration).
+			// Amortizes the scoped-value construction cost across each thread's chunk.
+			PCGEX_PARALLEL_FOR_SCOPED(
+				NumCopy, 1024,
 				{
-					// TODO 
+				PCGExTypes::FScopedTypedValue Temp = SrcBuffer->MakeScopedValue();
+				PCGEX_SCOPE_LOOP(i)
+				{
+					SrcBuffer->GetVoid(SourcePointIndices[i], Temp);
+					DstBuffer->SetVoid(i, Temp);
 				}
-			});
+				})
 		}
 	}
 

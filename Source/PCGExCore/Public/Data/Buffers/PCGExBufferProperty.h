@@ -58,6 +58,14 @@ namespace PCGExData
 		const FPCGMetadataAttributeBase* GetGenericInAttribute() const { return GenericInAttribute; }
 		FPCGMetadataAttributeBase* GetGenericOutAttribute() const { return GenericOutAttribute; }
 
+		// Runtime type via reflection — FScopedTypedValue(FProperty*) handles arbitrary UStructs/UEnums/etc.
+		// Precondition: CachedInnerProperty is valid (i.e. InitForRead or InitForWrite succeeded).
+		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const override
+		{
+			check(CachedInnerProperty);
+			return PCGExTypes::FScopedTypedValue(CachedInnerProperty);
+		}
+
 	private:
 		static FProperty* CreateInnerPropertyFromDesc(const FPCGMetadataAttributeDesc& Desc);
 	};
@@ -80,9 +88,9 @@ namespace PCGExData
 		virtual bool ReadsFromOutput() override;
 		virtual bool EnsureReadable() override;
 
-		virtual void ReadVoid(const int32 Index, void* OutValue) const override;
-		virtual void SetVoid(const int32 Index, const void* Value) override;
-		virtual void GetVoid(const int32 Index, void* OutValue) override;
+		virtual void ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const override;
+		virtual void SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value) override;
+		virtual void GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) override;
 
 		virtual PCGExValueHash ReadValueHash(const int32 Index) override;
 		virtual PCGExValueHash GetValueHash(const int32 Index) override;
@@ -117,9 +125,9 @@ namespace PCGExData
 		virtual bool ReadsFromOutput() override;
 		virtual bool EnsureReadable() override;
 
-		virtual void ReadVoid(const int32 Index, void* OutValue) const override;
-		virtual void SetVoid(const int32 Index, const void* Value) override;
-		virtual void GetVoid(const int32 Index, void* OutValue) override;
+		virtual void ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const override;
+		virtual void SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value) override;
+		virtual void GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) override;
 
 		virtual PCGExValueHash ReadValueHash(const int32 Index) override;
 		virtual PCGExValueHash GetValueHash(const int32 Index) override;

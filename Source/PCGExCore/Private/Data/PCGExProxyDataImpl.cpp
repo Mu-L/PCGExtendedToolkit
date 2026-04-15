@@ -370,21 +370,30 @@ namespace PCGExData
 	void FPropertyBufferProxy::GetVoid(const int32 Index, void* OutValue) const
 	{
 		check(Buffer);
-		Buffer->ReadVoid(Index, OutValue);
+		// Adapter: IBuffer takes FScopedTypedValue&, but IBufferProxy's void* contract
+		// is preserved for proxy callers. Wrap the incoming void* in a matching FScopedTypedValue.
+		// NOTE: this requires the caller to have properly-constructed memory at OutValue
+		// (FScopedTypedValue or typed stack var) — same contract as before.
+		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
+		Buffer->ReadVoid(Index, Wrapped);
+		// Copy result into caller's buffer
+		FMemory::Memcpy(OutValue, Wrapped.GetRaw(), Wrapped.GetValueSize());
 	}
 
 	void FPropertyBufferProxy::SetVoid(const int32 Index, const void* Value) const
 	{
 		check(Buffer);
-		// const_cast needed: IBuffer::SetVoid is non-const, but IBufferProxy::SetVoid is const.
-		const_cast<IBuffer*>(Buffer.Get())->SetVoid(Index, Value);
+		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
+		FMemory::Memcpy(Wrapped.GetRaw(), Value, Wrapped.GetValueSize());
+		const_cast<IBuffer*>(Buffer.Get())->SetVoid(Index, Wrapped);
 	}
 
 	void FPropertyBufferProxy::GetCurrentVoid(const int32 Index, void* OutValue) const
 	{
 		check(Buffer);
-		// GetVoid reads from the output side (current working value)
-		const_cast<IBuffer*>(Buffer.Get())->GetVoid(Index, OutValue);
+		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
+		const_cast<IBuffer*>(Buffer.Get())->GetVoid(Index, Wrapped);
+		FMemory::Memcpy(OutValue, Wrapped.GetRaw(), Wrapped.GetValueSize());
 	}
 
 	TSharedPtr<IBuffer> FPropertyBufferProxy::GetBuffer() const

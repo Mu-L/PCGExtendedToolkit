@@ -68,14 +68,16 @@ namespace PCGExBlending
 
 			bool bError = false;
 
-			MainBlender = CreateProxyBlender(WorkingType, Param.Blending);
+			// Pass Identity.ValueTypeObject so CreateProxyBlender can size extended types (Struct/Enum/etc.) correctly.
+			// For basic types ValueTypeObject is nullptr and the size comes from the enum alone.
+			MainBlender = CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 
 			for (int i = 0; i < Sources.Num(); i++)
 			{
 				TSharedPtr<PCGExData::FFacade> Source = Sources[i];
 				if (!SupportedSources.Contains(i)) { continue; }
 
-				TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+				TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 				SubBlenders[i] = SubBlender;
 
 				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags)) { return false; }

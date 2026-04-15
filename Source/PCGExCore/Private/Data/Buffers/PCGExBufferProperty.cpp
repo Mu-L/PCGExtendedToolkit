@@ -207,29 +207,57 @@ namespace PCGExData
 		return InitForRead(EIOSide::In);
 	}
 
-	void FPropertyArrayBuffer::ReadVoid(const int32 Index, void* OutValue) const
+	void FPropertyArrayBuffer::ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const
 	{
 		check(InBytes && ElementSize > 0);
+		check(OutValue.GetValueSize() == ElementSize);
 		const int32 Offset = Index * ElementSize;
 		check(Offset + ElementSize <= InBytes->Num());
-		FMemory::Memcpy(OutValue, InBytes->GetData() + Offset, ElementSize);
+
+		if (const FProperty* Prop = OutValue.GetProperty())
+		{
+			// Property-backed: use reflection for deep copy (handles TArray, TSet, etc.)
+			Prop->CopyCompleteValue(OutValue.GetRaw(), InBytes->GetData() + Offset);
+		}
+		else
+		{
+			FMemory::Memcpy(OutValue.GetRaw(), InBytes->GetData() + Offset, ElementSize);
+		}
 	}
 
-	void FPropertyArrayBuffer::SetVoid(const int32 Index, const void* Value)
+	void FPropertyArrayBuffer::SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value)
 	{
 		check(OutBytes && ElementSize > 0);
+		check(Value.GetValueSize() == ElementSize);
 		const int32 Offset = Index * ElementSize;
 		check(Offset + ElementSize <= OutBytes->Num());
-		FMemory::Memcpy(OutBytes->GetData() + Offset, Value, ElementSize);
+
+		if (const FProperty* Prop = Value.GetProperty())
+		{
+			Prop->CopyCompleteValue(OutBytes->GetData() + Offset, Value.GetRaw());
+		}
+		else
+		{
+			FMemory::Memcpy(OutBytes->GetData() + Offset, Value.GetRaw(), ElementSize);
+		}
 	}
 
-	void FPropertyArrayBuffer::GetVoid(const int32 Index, void* OutValue)
+	void FPropertyArrayBuffer::GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue)
 	{
 		if (OutBytes)
 		{
+			check(OutValue.GetValueSize() == ElementSize);
 			const int32 Offset = Index * ElementSize;
 			check(Offset + ElementSize <= OutBytes->Num());
-			FMemory::Memcpy(OutValue, OutBytes->GetData() + Offset, ElementSize);
+
+			if (const FProperty* Prop = OutValue.GetProperty())
+			{
+				Prop->CopyCompleteValue(OutValue.GetRaw(), OutBytes->GetData() + Offset);
+			}
+			else
+			{
+				FMemory::Memcpy(OutValue.GetRaw(), OutBytes->GetData() + Offset, ElementSize);
+			}
 			return;
 		}
 		ReadVoid(Index, OutValue);
@@ -404,23 +432,50 @@ namespace PCGExData
 		return InitForRead(EIOSide::In);
 	}
 
-	void FPropertySingleValueBuffer::ReadVoid(const int32 Index, void* OutVal) const
+	void FPropertySingleValueBuffer::ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutVal) const
 	{
 		check(InValue.Num() >= ElementSize && ElementSize > 0);
-		FMemory::Memcpy(OutVal, InValue.GetData(), ElementSize);
+		check(OutVal.GetValueSize() == ElementSize);
+
+		if (const FProperty* Prop = OutVal.GetProperty())
+		{
+			Prop->CopyCompleteValue(OutVal.GetRaw(), InValue.GetData());
+		}
+		else
+		{
+			FMemory::Memcpy(OutVal.GetRaw(), InValue.GetData(), ElementSize);
+		}
 	}
 
-	void FPropertySingleValueBuffer::SetVoid(const int32 Index, const void* Value)
+	void FPropertySingleValueBuffer::SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value)
 	{
 		check(OutValue.Num() >= ElementSize && ElementSize > 0);
-		FMemory::Memcpy(OutValue.GetData(), Value, ElementSize);
+		check(Value.GetValueSize() == ElementSize);
+
+		if (const FProperty* Prop = Value.GetProperty())
+		{
+			Prop->CopyCompleteValue(OutValue.GetData(), Value.GetRaw());
+		}
+		else
+		{
+			FMemory::Memcpy(OutValue.GetData(), Value.GetRaw(), ElementSize);
+		}
 	}
 
-	void FPropertySingleValueBuffer::GetVoid(const int32 Index, void* OutVal)
+	void FPropertySingleValueBuffer::GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutVal)
 	{
 		if (OutValue.Num() >= ElementSize)
 		{
-			FMemory::Memcpy(OutVal, OutValue.GetData(), ElementSize);
+			check(OutVal.GetValueSize() == ElementSize);
+
+			if (const FProperty* Prop = OutVal.GetProperty())
+			{
+				Prop->CopyCompleteValue(OutVal.GetRaw(), OutValue.GetData());
+			}
+			else
+			{
+				FMemory::Memcpy(OutVal.GetRaw(), OutValue.GetData(), ElementSize);
+			}
 			return;
 		}
 		ReadVoid(Index, OutVal);

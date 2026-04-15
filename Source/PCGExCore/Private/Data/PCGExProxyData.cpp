@@ -7,6 +7,8 @@
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExPointElements.h"
 #include "Data/PCGPointArrayData.h"
+#include "Helpers/PCGExMetaHelpers.h"
+#include "Metadata/PCGMetadataAttribute.h"
 
 namespace PCGExData
 {
@@ -50,8 +52,23 @@ namespace PCGExData
 		// Derive size/alignment for generic types that GetTypeSize doesn't know about
 		if (bValid && PCGExTypes::FScopedTypedValue::GetTypeSize(WorkingType) == 0)
 		{
-			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType);
-			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType);
+			// Non-basic type (Struct/Enum/etc.) needs ValueTypeObject to compute size correctly.
+			// Basic types never hit this branch (GetTypeSize returns non-zero for them).
+			const UObject* VTO = nullptr;
+			if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
+			{
+				if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
+				{
+					if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
+						PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
+					{
+						VTO = Attr->GetAttributeDesc().ValueTypeObject;
+					}
+				}
+			}
+
+			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType, VTO);
+			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType, VTO);
 		}
 
 		return bValid;
@@ -80,8 +97,23 @@ namespace PCGExData
 		// Derive size/alignment for generic types that GetTypeSize doesn't know about
 		if (bValid && PCGExTypes::FScopedTypedValue::GetTypeSize(WorkingType) == 0)
 		{
-			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType);
-			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType);
+			// Non-basic type (Struct/Enum/etc.) needs ValueTypeObject to compute size correctly.
+			// Basic types never hit this branch (GetTypeSize returns non-zero for them).
+			const UObject* VTO = nullptr;
+			if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
+			{
+				if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
+				{
+					if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
+						PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
+					{
+						VTO = Attr->GetAttributeDesc().ValueTypeObject;
+					}
+				}
+			}
+
+			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType, VTO);
+			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType, VTO);
 		}
 
 		return bValid;
