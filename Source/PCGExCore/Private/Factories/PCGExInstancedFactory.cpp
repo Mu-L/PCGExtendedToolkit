@@ -40,7 +40,7 @@ void UPCGExInstancedFactory::FindSettingsOverrides(FPCGExContext* InContext, FNa
 
 		for (PCGExData::FAttributeIdentity& Identity : Infos->Identities)
 		{
-			PossibleOverrides.Add(Identity.Identifier.Name, ParamData->Metadata->GetMutableAttribute(Identity.Identifier));
+			PossibleOverrides.Add(Identity.Name, ParamData->Metadata->GetMutableAttribute(Identity.GetIdentifier()));
 		}
 	}
 

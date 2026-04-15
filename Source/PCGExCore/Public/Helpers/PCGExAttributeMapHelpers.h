@@ -88,13 +88,14 @@ namespace PCGExAttributeMapHelpers
 			if (!ParamData) { continue; }
 
 			TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(ParamData->Metadata);
-			if (!Infos || Infos->Attributes.IsEmpty()) { continue; }
+			if (!Infos || Infos->Identities.IsEmpty()) { continue; }
 
-			FPCGMetadataAttributeBase* KeyCandidate = nullptr;
-			FPCGMetadataAttributeBase* ValueCandidate = nullptr;
+			const FPCGMetadataAttributeBase* KeyCandidate = nullptr;
+			const FPCGMetadataAttributeBase* ValueCandidate = nullptr;
 
-			for (FPCGMetadataAttributeBase* Candidate : Infos->Attributes)
+			for (const PCGExData::FAttributeIdentity& Identity : Infos->Identities)
 			{
+				const FPCGMetadataAttributeBase* Candidate = Identity.Attribute;
 				if (!Candidate) { continue; }
 
 				if (!KeyCandidate && Candidate->GetTypeId() == KeyType)

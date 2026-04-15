@@ -111,12 +111,12 @@ namespace PCGExPackClusters
 
 			const PCGExData::FAttributeIdentity& Identity = This->VtxAttributes->Identities[Index];
 
-			PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
+			PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
 				TArray<T> RawValues;
 
-				TSharedPtr<PCGExData::TBuffer<T>> InValues = This->VtxDataFacade->GetReadable<T>(Identity.Identifier);
+				TSharedPtr<PCGExData::TBuffer<T>> InValues = This->VtxDataFacade->GetReadable<T>(Identity.GetIdentifier());
 				TSharedPtr<PCGExData::TBuffer<T>> OutValues = This->PackedIOFacade->GetWritable<T>(InValues->InAttribute, PCGExData::EBufferInit::New);
 
 				const TArray<int32>& VtxSelection = This->VtxPointSelection;

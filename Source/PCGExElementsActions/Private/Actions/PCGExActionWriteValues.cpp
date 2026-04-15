@@ -19,8 +19,10 @@ bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, 
 {
 	if (!FPCGExActionOperation::PrepareForData(InContext, InPointDataFacade)) { return false; }
 
-	for (FPCGMetadataAttributeBase* AttributeBase : TypedFactory->CheckSuccessInfos->Attributes)
+	for (const PCGExData::FAttributeIdentity& Identity : TypedFactory->CheckSuccessInfos->Identities)
 	{
+		const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
+		if (!AttributeBase) { continue; }
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
@@ -30,8 +32,10 @@ bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, 
 		});
 	}
 
-	for (FPCGMetadataAttributeBase* AttributeBase : TypedFactory->CheckFailInfos->Attributes)
+	for (const PCGExData::FAttributeIdentity& Identity : TypedFactory->CheckFailInfos->Identities)
 	{
+		const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
+		if (!AttributeBase) { continue; }
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
@@ -48,7 +52,7 @@ void FPCGExActionWriteValuesOperation::OnMatchSuccess(int32 Index)
 {
 	for (int i = 0; i < SuccessAttributes.Num(); i++)
 	{
-		FPCGMetadataAttributeBase* AttributeBase = SuccessAttributes[i];
+		const FPCGMetadataAttributeBase* AttributeBase = SuccessAttributes[i];
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
@@ -61,7 +65,7 @@ void FPCGExActionWriteValuesOperation::OnMatchFail(int32 Index)
 {
 	for (int i = 0; i < FailAttributes.Num(); i++)
 	{
-		FPCGMetadataAttributeBase* AttributeBase = FailAttributes[i];
+		const FPCGMetadataAttributeBase* AttributeBase = FailAttributes[i];
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);

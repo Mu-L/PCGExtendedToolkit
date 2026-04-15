@@ -451,20 +451,21 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 	TSharedPtr<IBuffer> FFacade::GetReadable(const FAttributeIdentity& Identity, const EIOSide InSide, const bool bSupportScoped)
 	{
 		TSharedPtr<IBuffer> Buffer = nullptr;
+		const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
 
-#define PCGEX_TYPED_EXEC(_TYPE, _NAME) Buffer = GetReadable<_TYPE>(Identity.Identifier, InSide, bSupportScoped);
-		PCGEX_EXECUTEWITHRIGHTTYPE(Identity.UnderlyingType, PCGEX_TYPED_EXEC)
+#define PCGEX_TYPED_EXEC(_TYPE, _NAME) Buffer = GetReadable<_TYPE>(Identifier, InSide, bSupportScoped);
+		PCGEX_EXECUTEWITHRIGHTTYPE(Identity.GetType(), PCGEX_TYPED_EXEC)
 #undef PCGEX_TYPED_EXEC
 
 		// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES
 		if (!Buffer)
 		{
-			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(Identity.Identifier, InSide);
+			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(Identifier, InSide);
 			if (RawAttribute)
 			{
-				if (Identity.Identifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
+				if (Identity.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
 				{
-					auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, Identity.Identifier);
+					auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, Identifier);
 					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);
@@ -475,7 +476,7 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 				}
 				else
 				{
-					auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, Identity.Identifier);
+					auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, Identifier);
 					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);

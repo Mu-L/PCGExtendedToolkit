@@ -126,7 +126,7 @@ void FPCGExCarryOverDetails::Prune(TArray<PCGExData::FAttributeIdentity>& Identi
 		Identities,
 		[&](const PCGExData::FAttributeIdentity& Identity)
 		{
-			return Attributes.Test(Identity.Identifier.Name.ToString());
+			return Attributes.Test(Identity.Name.ToString());
 		}));
 }
 

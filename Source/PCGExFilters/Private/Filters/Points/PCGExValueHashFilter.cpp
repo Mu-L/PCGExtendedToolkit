@@ -89,9 +89,9 @@ PCGExFactories::EPreparationResult UPCGExValueHashFilterFactory::Prepare(FPCGExC
 		if (Config.SetAttributeName.IsNone())
 		{
 			TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(SourceFacade->GetIn()->Metadata);
-			if (Infos->Attributes.IsEmpty()) { return; }
+			if (Infos->Identities.IsEmpty()) { return; }
 
-			Identifier = Infos->Identities[0].Identifier;
+			Identifier = Infos->Identities[0].GetIdentifier();
 		}
 		else
 		{

@@ -115,11 +115,11 @@ bool FPCGExAttributeStatsElement::Boot(FPCGExContext* InContext) const
 	{
 		UPCGParamData* NewParamData = Context->ManagedObjects->New<UPCGParamData>();
 		Context->OutputParams.Add(NewParamData);
-		Context->OutputParamsMap.Add(Identity.Identifier.Name, NewParamData);
+		Context->OutputParamsMap.Add(Identity.Name, NewParamData);
 
 		for (int i = 0; i < NumRows; i++) { Context->Rows.Add(NewParamData->Metadata->AddEntry()); }
 
-		PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
+		PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
 			PCGEX_FOREACH_STAT(PCGEX_STAT_DECL, T)
@@ -157,7 +157,7 @@ bool FPCGExAttributeStatsElement::AdvanceWork(FPCGExContext* InContext, const UP
 		UPCGParamData* ParamData = Context->OutputParams[i];
 		Context->StageOutput(
 			ParamData, PCGExAttributeStats::OutputAttributeStats, PCGExData::EStaging::None,
-			{Context->AttributesInfos->Attributes[i]->Name.ToString()});
+			{Context->AttributesInfos->Identities[i].Name.ToString()});
 	}
 
 	return Context->TryComplete();
@@ -192,9 +192,9 @@ namespace PCGExAttributeStats
 		{
 			const PCGExData::FAttributeIdentity& Identity = Context->AttributesInfos->Identities[i];
 
-			if (Settings->bOutputPerUniqueValuesStats) { PerAttributeStatMap.Add(Identity.Identifier.Name, i); }
+			if (Settings->bOutputPerUniqueValuesStats) { PerAttributeStatMap.Add(Identity.Name, i); }
 
-			PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
+			PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
 			{
 				using T_REAL = decltype(DummyValue);
 				PCGEX_MAKE_SHARED(S, TAttributeStats<T_REAL>, Identity, Key)

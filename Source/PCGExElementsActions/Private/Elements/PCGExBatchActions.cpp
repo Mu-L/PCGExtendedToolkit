@@ -121,8 +121,10 @@ namespace PCGExBatchActions
 		if (!IProcessor::Process(InTaskManager)) { return false; }
 
 		// Initialize writers with provided default value
-		for (FPCGMetadataAttributeBase* AttributeBase : Context->DefaultAttributes->Attributes)
+		for (const PCGExData::FAttributeIdentity& Identity : Context->DefaultAttributes->Identities)
 		{
+			const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
+			if (!AttributeBase) { continue; }
 			PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);

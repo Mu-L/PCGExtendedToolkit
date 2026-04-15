@@ -91,7 +91,7 @@ namespace PCGExReversePointOrder
 			PCGExData::FAttributeIdentity* FirstIdentity = AttributesInfos->Find(OriginalPair.FirstAttributeName);
 			PCGExData::FAttributeIdentity* SecondIdentity = AttributesInfos->Find(OriginalPair.SecondAttributeName);
 			if (!FirstIdentity || !SecondIdentity) { continue; }
-			if (FirstIdentity->UnderlyingType != SecondIdentity->UnderlyingType) { continue; }
+			if (!FirstIdentity->IsSameType(*SecondIdentity)) { continue; }
 
 			const int32 AddIndex = SwapPairs.Add(OriginalPair);
 
@@ -170,7 +170,7 @@ namespace PCGExReversePointOrder
 			PCGEX_ASYNC_THIS
 			FPCGExSwapAttributePairDetails& WorkingPair = This->SwapPairs[Scope.Start];
 
-			PCGExMetaHelpers::ExecuteWithRightType(WorkingPair.FirstIdentity->UnderlyingType, [&](auto DummyValue)
+			PCGExMetaHelpers::ExecuteWithRightType(WorkingPair.FirstIdentity->GetType(), [&](auto DummyValue)
 			{
 				using T_REAL = decltype(DummyValue);
 				WorkingPair.FirstWriter = This->PointDataFacade->GetWritable<T_REAL>(WorkingPair.FirstAttributeName, PCGExData::EBufferInit::Inherit);
@@ -189,7 +189,7 @@ namespace PCGExReversePointOrder
 
 		for (const FPCGExSwapAttributePairDetails& WorkingPair : SwapPairs)
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(WorkingPair.FirstIdentity->UnderlyingType, [&](auto DummyValue)
+			PCGExMetaHelpers::ExecuteWithRightType(WorkingPair.FirstIdentity->GetType(), [&](auto DummyValue)
 			{
 				using T_REAL = decltype(DummyValue);
 				TSharedPtr<PCGExData::TBuffer<T_REAL>> FirstWriter = StaticCastSharedPtr<PCGExData::TBuffer<T_REAL>>(WorkingPair.FirstWriter);

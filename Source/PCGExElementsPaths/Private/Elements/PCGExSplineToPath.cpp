@@ -182,10 +182,10 @@ namespace PCGExSplineToPath
 
 				for (PCGExData::FAttributeIdentity Identity : SourceAttributes)
 				{
-					PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
+					PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
 					{
 						using T = decltype(DummyValue);
-						const FPCGMetadataAttribute<T>* SourceAttr = SplineData->Metadata->GetConstTypedAttribute<T>(Identity.Identifier);
+						const FPCGMetadataAttribute<T>* SourceAttr = SplineData->Metadata->GetConstTypedAttribute<T>(Identity.GetIdentifier());
 
 						if (!SourceAttr) { return; }
 
@@ -210,7 +210,7 @@ namespace PCGExSplineToPath
 						}
 						else
 						{
-							//PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(FTEXT("Attribute {0} could not be copied."), FText::FromName(Identity.Identifier.Name)));
+							//PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(FTEXT("Attribute {0} could not be copied."), FText::FromName(Identity.Name)));
 						}
 					});
 				}

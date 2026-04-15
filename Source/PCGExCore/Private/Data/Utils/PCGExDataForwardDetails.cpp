@@ -14,7 +14,7 @@ void FPCGExForwardDetails::Filter(TArray<PCGExData::FAttributeIdentity>& Identit
 {
 	for (int i = 0; i < Identities.Num(); i++)
 	{
-		if (!Test(Identities[i].Identifier.Name.ToString()))
+		if (!Test(Identities[i].Name.ToString()))
 		{
 			Identities.RemoveAt(i);
 			i--;

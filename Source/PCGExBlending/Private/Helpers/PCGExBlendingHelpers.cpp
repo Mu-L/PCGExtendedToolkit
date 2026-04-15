@@ -29,15 +29,16 @@ namespace PCGExBlending::Helpers
 
 			for (const PCGExData::FAttributeIdentity& Identity : InAttributesInfos.Identities)
 			{
+				const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
 				PCGExMetaHelpers::ExecuteWithRightType(Identity.GetTypeId(), [&](auto DummyValue)
 				{
 					using T = decltype(DummyValue);
-					const FPCGMetadataAttribute<T>* InAttribute = InMetadata->GetConstTypedAttribute<T>(Identity.Identifier);
-					FPCGMetadataAttributeBase* OutAttribute = PCGExMetaHelpers::TryGetMutableAttribute<T>(OutMetadata, Identity.Identifier);
+					const FPCGMetadataAttribute<T>* InAttribute = InMetadata->GetConstTypedAttribute<T>(Identifier);
+					FPCGMetadataAttributeBase* OutAttribute = PCGExMetaHelpers::TryGetMutableAttribute<T>(OutMetadata, Identifier);
 
 					if (!OutAttribute)
 					{
-						OutAttribute = Target->FindOrCreateAttribute<T>(Identity.Identifier, InAttribute->GetValueFromItemKey(PCGDefaultValueKey), InAttribute->AllowsInterpolation());
+						OutAttribute = Target->FindOrCreateAttribute<T>(Identifier, InAttribute->GetValueFromItemKey(PCGDefaultValueKey), InAttribute->AllowsInterpolation());
 					}
 
 					if (!OutAttribute) { return; }
