@@ -13,6 +13,7 @@
 
 #include "Core/PCGExClusterStates.h"
 #include "Elements/Meta/NeighborSamplers/PCGExNeighborSampleFactoryProvider.h"
+#include "Elements/Meta/VtxProperties/PCGExVtxPropertyFactoryProvider.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExElementsClustersModule"
@@ -41,6 +42,7 @@ void FPCGExElementsClustersModule::RegisterToEditor(const TSharedPtr<FSlateStyle
 	PCGEX_START_PCG_REGISTRATION
 	PCGEX_REGISTER_DATA_TYPE(ClusterState, ClusterState)
 	PCGEX_REGISTER_DATA_TYPE(NeighborSampler, NeighborSampler)
+	PCGEX_REGISTER_DATA_TYPE(VtxProperty, VtxProperty)
 }
 #endif
 
