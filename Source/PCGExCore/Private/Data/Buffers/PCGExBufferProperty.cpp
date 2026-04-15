@@ -7,7 +7,6 @@
 #include "PCGExSettingsCacheBody.h"
 #include "Data/PCGExPointIO.h"
 #include "Types/PCGExTypes.h"
-#include "Metadata/PCGMetadataAttributeGeneric.h"
 #include "Metadata/PCGMetadataDomain.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
@@ -156,7 +155,7 @@ namespace PCGExData
 		return nullptr;
 	}
 
-	bool FPropertyBuffer::InitProperty(const FPCGMetadataAttributeGeneric* InGenericAttribute)
+	bool FPropertyBuffer::InitProperty(const FPCGMetadataAttributeBase* InGenericAttribute)
 	{
 		if (!InGenericAttribute) { return false; }
 
@@ -260,9 +259,9 @@ namespace PCGExData
 		if (!PointData) { return false; }
 
 		const FPCGMetadataAttributeBase* Attr = Source->FindConstAttribute(Identifier, InSide);
-		if (!Attr || !Attr->IsGeneric()) { return false; }
+		if (!Attr) { return false; }
 
-		GenericInAttribute = static_cast<const FPCGMetadataAttributeGeneric*>(Attr);
+		GenericInAttribute = Attr;
 		InAttribute = Attr;
 
 		if (!CachedInnerProperty) { InitProperty(GenericInAttribute); }
@@ -300,20 +299,19 @@ namespace PCGExData
 		if (!OutData) { return false; }
 
 		// Resolve the output generic attribute
-		if (SourceAttribute && SourceAttribute->IsGeneric())
+		if (SourceAttribute)
 		{
 			// Look for existing attribute on output, or it should already exist from duplication
 			FPCGMetadataAttributeBase* MutableAttr = Source->FindMutableAttribute(Identifier, EIOSide::Out);
-			if (MutableAttr && MutableAttr->IsGeneric())
+			if (MutableAttr)
 			{
-				GenericOutAttribute = static_cast<FPCGMetadataAttributeGeneric*>(MutableAttr);
+				GenericOutAttribute = MutableAttr;
 				OutAttribute = GenericOutAttribute;
 			}
 
 			if (!CachedInnerProperty)
 			{
-				const FPCGMetadataAttributeGeneric* GenericSrc = static_cast<const FPCGMetadataAttributeGeneric*>(SourceAttribute);
-				InitProperty(GenericSrc);
+				InitProperty(SourceAttribute);
 			}
 		}
 
@@ -325,14 +323,13 @@ namespace PCGExData
 		OutBytes->SetNumZeroed(NumPoints * ElementSize);
 
 		// If inheriting, copy input values to output
-		if (Init == EBufferInit::Inherit && SourceAttribute && SourceAttribute->IsGeneric())
+		if (Init == EBufferInit::Inherit && SourceAttribute)
 		{
-			const FPCGMetadataAttributeGeneric* GenericSrc = static_cast<const FPCGMetadataAttributeGeneric*>(SourceAttribute);
 			auto EntryKeys = OutData->GetConstMetadataEntryValueRange();
 
 			for (int32 i = 0; i < NumPoints; i++)
 			{
-				const void* ReadAddr = GenericSrc->GetReadAddressFromEntryKey_Unsafe(EntryKeys[i]);
+				const void* ReadAddr = SourceAttribute->GetReadAddressFromEntryKey_Unsafe(EntryKeys[i]);
 				if (ReadAddr)
 				{
 					FMemory::Memcpy(OutBytes->GetData() + i * ElementSize, ReadAddr, ElementSize);
@@ -450,9 +447,9 @@ namespace PCGExData
 		if (ElementSize <= 0) { return false; }
 
 		const FPCGMetadataAttributeBase* Attr = Source->FindConstAttribute(Identifier, InSide);
-		if (!Attr || !Attr->IsGeneric()) { return false; }
+		if (!Attr) { return false; }
 
-		GenericInAttribute = static_cast<const FPCGMetadataAttributeGeneric*>(Attr);
+		GenericInAttribute = Attr;
 		InAttribute = Attr;
 
 		if (!CachedInnerProperty) { InitProperty(GenericInAttribute); }
@@ -475,19 +472,18 @@ namespace PCGExData
 
 		if (ElementSize <= 0) { return false; }
 
-		if (SourceAttribute && SourceAttribute->IsGeneric())
+		if (SourceAttribute)
 		{
 			FPCGMetadataAttributeBase* MutableAttr = Source->FindMutableAttribute(Identifier, EIOSide::Out);
-			if (MutableAttr && MutableAttr->IsGeneric())
+			if (MutableAttr)
 			{
-				GenericOutAttribute = static_cast<FPCGMetadataAttributeGeneric*>(MutableAttr);
+				GenericOutAttribute = MutableAttr;
 				OutAttribute = GenericOutAttribute;
 			}
 
 			if (!CachedInnerProperty)
 			{
-				const FPCGMetadataAttributeGeneric* GenericSrc = static_cast<const FPCGMetadataAttributeGeneric*>(SourceAttribute);
-				InitProperty(GenericSrc);
+				InitProperty(SourceAttribute);
 			}
 		}
 
@@ -495,10 +491,9 @@ namespace PCGExData
 
 		OutValue.SetNumZeroed(ElementSize);
 
-		if (Init == EBufferInit::Inherit && SourceAttribute && SourceAttribute->IsGeneric())
+		if (Init == EBufferInit::Inherit && SourceAttribute)
 		{
-			const FPCGMetadataAttributeGeneric* GenericSrc = static_cast<const FPCGMetadataAttributeGeneric*>(SourceAttribute);
-			const void* ReadAddr = GenericSrc->GetReadAddressFromEntryKey_Unsafe(PCGDefaultValueKey);
+			const void* ReadAddr = SourceAttribute->GetReadAddressFromEntryKey_Unsafe(PCGDefaultValueKey);
 			if (ReadAddr) { FMemory::Memcpy(OutValue.GetData(), ReadAddr, ElementSize); }
 		}
 

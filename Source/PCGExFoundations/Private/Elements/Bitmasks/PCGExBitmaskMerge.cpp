@@ -54,7 +54,7 @@ bool FPCGExBitmaskMergeElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		{
 			if (Infos->Identities[i].UnderlyingType != EPCGMetadataTypes::Integer64) { continue; }
 
-			const int64 InputMask = PCGExData::Helpers::ReadDataValue(static_cast<FPCGMetadataAttribute<int64>*>(Infos->Attributes[i]));
+			const int64 InputMask = PCGExData::Helpers::ReadDataValue<int64>(Infos->Attributes[i]);
 
 			if (!bInitialized)
 			{

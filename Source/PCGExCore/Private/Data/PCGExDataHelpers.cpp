@@ -52,17 +52,17 @@ namespace PCGExData::Helpers
 	}
 
 	template <typename T>
-	T ReadDataValue(const FPCGMetadataAttribute<T>* Attribute)
+	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute)
 	{
 		// Read a single value from a @Data domain attribute (one value per dataset, not per-point).
 		// PCG metadata attributes form an inheritance chain (parent pointers).
 		// If the current attribute has no entries, walk up the parent chain to find
 		// the nearest ancestor with actual data. If none have entries, fall back to
 		// the attribute's default value.
-		const FPCGMetadataAttribute<T>* Attr = Attribute;
+		const FPCGMetadataAttributeBase* Attr = Attribute;
 		if (!Attr->GetNumberOfEntries())
 		{
-			const FPCGMetadataAttribute<T>* Parent = Attr->GetParent();
+			const FPCGMetadataAttributeBase* Parent = Attr->GetParent();
 			while (Parent)
 			{
 				if (!Parent->GetNumberOfEntries()) { Parent = Parent->GetParent(); }
@@ -73,7 +73,7 @@ namespace PCGExData::Helpers
 				}
 			}
 		}
-		return !Attr->GetNumberOfEntries() ? Attr->GetValue(PCGDefaultValueKey) : Attr->GetValueFromItemKey(PCGFirstEntryKey);
+		return Attr->GetValueFromItemKey<T>(!Attr->GetNumberOfEntries() ? Attr->GetValueKey(PCGDefaultValueKey) : PCGFirstEntryKey);
 	}
 
 	template <typename T>
@@ -89,7 +89,7 @@ namespace PCGExData::Helpers
 	}
 
 	template <typename T>
-	void SetDataValue(FPCGMetadataAttribute<T>* Attribute, const T Value)
+	void SetDataValue(FPCGMetadataAttributeBase* Attribute, const T Value)
 	{
 		Attribute->SetValue(PCGFirstEntryKey, Value);
 		Attribute->SetDefaultValue(Value);
@@ -118,9 +118,9 @@ namespace PCGExData::Helpers
 	}
 
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
-template PCGEXCORE_API _TYPE ReadDataValue<_TYPE>(const FPCGMetadataAttribute<_TYPE>* Attribute); \
+template PCGEXCORE_API _TYPE ReadDataValue<_TYPE>(const FPCGMetadataAttributeBase* Attribute); \
 template PCGEXCORE_API _TYPE ReadDataValue<_TYPE>(const FPCGMetadataAttributeBase* Attribute, _TYPE Fallback); \
-template PCGEXCORE_API void SetDataValue<_TYPE>(FPCGMetadataAttribute<_TYPE>* Attribute, const _TYPE Value); \
+template PCGEXCORE_API void SetDataValue<_TYPE>(FPCGMetadataAttributeBase* Attribute, const _TYPE Value); \
 template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FName Name, const _TYPE Value); \
 template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeIdentifier Identifier, const _TYPE Value);
 	PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
@@ -144,8 +144,7 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 			{
 				using T_VALUE = decltype(DummyValue);
 
-				const FPCGMetadataAttribute<T_VALUE>* TypedSource = static_cast<const FPCGMetadataAttribute<T_VALUE>*>(SourceAttribute);
-				const T_VALUE Value = ReadDataValue(TypedSource);
+				const T_VALUE Value = ReadDataValue<T_VALUE>(SourceAttribute);
 
 				if (SubSelection.bIsValid) { OutValue = SubSelection.Get<T_VALUE, T>(Value); }
 				else { OutValue = PCGExTypeOps::Convert<T_VALUE, T>(Value); }

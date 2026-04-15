@@ -23,7 +23,7 @@ namespace PCGExData
 
 	template <typename T>
 	TArrayBuffer<T>::TArrayBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier)
-		: TLegacyBuffer<T>(InSource, InIdentifier)
+		: TBuffer<T>(InSource, InIdentifier)
 	{
 		check(InIdentifier.MetadataDomain.Flag != EPCGMetadataDomainFlag::Data)
 		this->UnderlyingDomain = EDomainType::Elements;
@@ -109,7 +109,6 @@ namespace PCGExData
 		if (bCacheValueHashes) { InHashes.Init(0, NumReadValue); }
 
 		InAttribute = Attribute;
-		TypedInAttribute = Attribute ? static_cast<const FPCGMetadataAttribute<T>*>(Attribute) : nullptr;
 
 		bSparseBuffer = bScoped;
 	}
@@ -123,7 +122,6 @@ namespace PCGExData
 		OutValues->Init(InDefaultValue, Source->GetOut()->GetNumPoints());
 
 		OutAttribute = Attribute;
-		TypedOutAttribute = Attribute ? static_cast<FPCGMetadataAttribute<T>*>(Attribute) : nullptr;
 	}
 
 	template <typename T>
@@ -184,22 +182,20 @@ namespace PCGExData
 			return true;
 		}
 
-		TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(Source->GetIn(), Identifier);
-		if (!TypedInAttribute)
+		const FPCGMetadataAttributeBase* FoundAttribute = Source->FindConstAttribute(Identifier, EIOSide::In);
+		if (!FoundAttribute)
 		{
 			return false;
 		}
 
-		TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, TypedInAttribute->GetMetadataDomain());
+		TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(FoundAttribute, FoundAttribute->GetMetadataDomain());
 
 		if (!InAccessor.IsValid())
 		{
-			TypedInAttribute = nullptr;
-			InAccessor = nullptr;
 			return false;
 		}
 
-		InitForReadInternal(bScoped, TypedInAttribute);
+		InitForReadInternal(bScoped, FoundAttribute);
 
 		// Non-scoped buffers bulk-read all values upfront. Scoped buffers leave
 		// the array allocated but empty; values are fetched on-demand per scope.
@@ -247,7 +243,6 @@ namespace PCGExData
 		InternalBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
 		if (!InternalBroadcaster->Prepare(InSelector, Source))
 		{
-			TypedInAttribute = nullptr;
 			return false;
 		}
 
@@ -276,22 +271,35 @@ namespace PCGExData
 
 		this->bIsNewOutput = !PCGExMetaHelpers::HasAttribute(Source->GetOut(), Identifier);
 
-		if (this->bIsNewOutput) { TypedOutAttribute = Source->CreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
-		else { TypedOutAttribute = Source->FindOrCreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
+		// Create attribute through domain — canonical UE 5.8 path
+		UPCGBasePointData* OutData = Source->GetOut();
 
-		if (!TypedOutAttribute) { return false; }
+		FPCGMetadataDomain* Domain = OutData->Metadata->GetMetadataDomain(Identifier.MetadataDomain);
+		if (!Domain) { Domain = OutData->Metadata->GetDefaultMetadataDomain(); }
 
-		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(TypedOutAttribute, const_cast<FPCGMetadataDomain*>(TypedOutAttribute->GetMetadataDomain()));
+		FPCGMetadataAttributeBase* CreatedAttribute = nullptr;
 
-		if (!TypedOutAttribute || !OutAccessor.IsValid())
+		if (this->bIsNewOutput)
 		{
-			TypedOutAttribute = nullptr;
+			CreatedAttribute = Domain->template CreateGenericAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation);
+		}
+		else
+		{
+			CreatedAttribute = Domain->template FindOrCreateAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation, true, true);
+		}
+
+		if (!CreatedAttribute) { return false; }
+
+		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(CreatedAttribute, const_cast<FPCGMetadataDomain*>(CreatedAttribute->GetMetadataDomain()));
+
+		if (!OutAccessor.IsValid())
+		{
 			return false;
 		}
 
-		InitForWriteInternal(TypedOutAttribute, DefaultValue, Init);
+		InitForWriteInternal(CreatedAttribute, DefaultValue, Init);
 
-		const int32 ExistingEntryCount = TypedOutAttribute->GetNumberOfEntriesWithParents();
+		const int32 ExistingEntryCount = CreatedAttribute->GetNumberOfEntriesWithParents();
 		const bool bHasIn = Source->GetIn() ? true : false;
 
 		auto GrabExistingValues = [&]()
@@ -318,9 +326,9 @@ namespace PCGExData
 			if (OutValues) { return true; }
 		}
 
-		if (const FPCGMetadataAttribute<T>* ExistingAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(Source->GetIn(), Identifier))
+		if (const FPCGMetadataAttributeBase* ExistingAttribute = Source->FindConstAttribute(Identifier, EIOSide::In))
 		{
-			return InitForWrite(ExistingAttribute->GetValue(PCGDefaultValueKey), ExistingAttribute->AllowsInterpolation(), Init);
+			return InitForWrite(ExistingAttribute->GetValueFromItemKey<T>(PCGDefaultValueKey), ExistingAttribute->AllowsInterpolation(), Init);
 		}
 
 		return InitForWrite(T{}, true, Init);
@@ -341,23 +349,23 @@ namespace PCGExData
 			return;
 		}
 
-		if (!TypedOutAttribute) { return; }
+		if (!OutAttribute) { return; }
 
 		// bResetWithFirstValue: collapse the entire attribute to a single default value.
 		// Used for @Data-domain attributes that should carry one value for the whole dataset.
 		if (this->bResetWithFirstValue)
 		{
-			TypedOutAttribute->Reset();
-			TypedOutAttribute->SetDefaultValue(*OutValues->GetData());
+			OutAttribute->Reset();
+			OutAttribute->template SetDefaultValue<T>(*OutValues->GetData());
 			return;
 		}
 
-		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(TypedOutAttribute, const_cast<FPCGMetadataDomain*>(TypedOutAttribute->GetMetadataDomain()));
+		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(OutAttribute, const_cast<FPCGMetadataDomain*>(OutAttribute->GetMetadataDomain()));
 		if (!OutAccessor.IsValid()) { return; }
 
 		// Mark this attribute as protected so the consumable-attributes cleanup
 		// in StageOutput won't delete data we just wrote.
-		SharedContext.Get()->AddProtectedAttributeName(TypedOutAttribute->Name);
+		SharedContext.Get()->AddProtectedAttributeName(OutAttribute->Name);
 
 		TArrayView<const T> View = MakeArrayView(OutValues->GetData(), OutValues->Num());
 		OutAccessor->SetRange<T>(View, 0, *Source->GetOutKeys(bEnsureValidKeys).Get());
@@ -367,9 +375,14 @@ namespace PCGExData
 	void TArrayBuffer<T>::Fetch(const PCGExMT::FScope& Scope)
 	{
 		if (!IsSparse() || bReadComplete || !IsEnabled()) { return; }
-		if (InternalBroadcaster) { InternalBroadcaster->Fetch(*InValues, Scope); }
-
-		if (TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, TypedInAttribute->GetMetadataDomain()); InAccessor.IsValid())
+		if (InternalBroadcaster)
+		{
+			InternalBroadcaster->Fetch(*InValues, Scope);
+			if (bCacheValueHashes) { ComputeValueHashes(Scope); }
+			return;;
+		}
+		
+		if (TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(InAttribute, InAttribute->GetMetadataDomain()); InAccessor.IsValid())
 		{
 			TArrayView<T> ReadRange = MakeArrayView(InValues->GetData() + Scope.Start, Scope.Count);
 			InAccessor->GetRange<T>(ReadRange, Scope.Start, *Source->GetInKeys());
@@ -411,7 +424,7 @@ namespace PCGExData
 
 	template <typename T>
 	TSingleValueBuffer<T>::TSingleValueBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier)
-		: TLegacyBuffer<T>(InSource, InIdentifier)
+		: TBuffer<T>(InSource, InIdentifier)
 	{
 		check(InIdentifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
 		this->UnderlyingDomain = EDomainType::Data;
@@ -491,13 +504,13 @@ namespace PCGExData
 			return true;
 		}
 
-		TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(Source->GetIn(), Identifier);
-		if (TypedInAttribute)
+		const FPCGMetadataAttributeBase* FoundAttribute = Source->FindConstAttribute(Identifier, EIOSide::In);
+		if (FoundAttribute)
 		{
 			bReadInitialized = true;
 
-			InAttribute = TypedInAttribute;
-			InValue = Helpers::ReadDataValue(TypedInAttribute);
+			InAttribute = FoundAttribute;
+			InValue = FoundAttribute->GetValueFromItemKey<T>(PCGDefaultValueKey);
 		}
 
 		return bReadInitialized;
@@ -536,22 +549,36 @@ namespace PCGExData
 
 		this->bIsNewOutput = !PCGExMetaHelpers::HasAttribute(Source->GetOut(), Identifier);
 
-		if (this->bIsNewOutput) { TypedOutAttribute = Source->CreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
-		else { TypedOutAttribute = Source->FindOrCreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
+		// Create attribute through domain — canonical UE 5.8 path
+		UPCGBasePointData* OutData = Source->GetOut();
 
-		if (!TypedOutAttribute) { return false; }
+		FPCGMetadataDomain* Domain = OutData->Metadata->GetMetadataDomain(Identifier.MetadataDomain);
+		if (!Domain) { Domain = OutData->Metadata->GetDefaultMetadataDomain(); }
 
-		OutAttribute = TypedOutAttribute;
+		FPCGMetadataAttributeBase* CreatedAttribute = nullptr;
+
+		if (this->bIsNewOutput)
+		{
+			CreatedAttribute = Domain->template CreateGenericAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation);
+		}
+		else
+		{
+			CreatedAttribute = Domain->template FindOrCreateAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation, true, true);
+		}
+
+		if (!CreatedAttribute) { return false; }
+
+		OutAttribute = CreatedAttribute;
 		bWriteInitialized = true;
 
 		OutValue = DefaultValue;
 
-		const int32 ExistingEntryCount = TypedOutAttribute->GetNumberOfEntriesWithParents();
+		const int32 ExistingEntryCount = CreatedAttribute->GetNumberOfEntriesWithParents();
 		const bool bHasIn = Source->GetIn() ? true : false;
 
 		auto GrabExistingValues = [&]()
 		{
-			OutValue = Helpers::ReadDataValue(TypedOutAttribute);
+			OutValue = CreatedAttribute->GetValueFromItemKey<T>(PCGDefaultValueKey);
 		};
 
 		if (Init == EBufferInit::Inherit) { GrabExistingValues(); }
@@ -568,9 +595,9 @@ namespace PCGExData
 			if (bWriteInitialized) { return true; }
 		}
 
-		if (const FPCGMetadataAttribute<T>* ExistingAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(Source->GetIn(), Identifier))
+		if (const FPCGMetadataAttributeBase* ExistingAttribute = Source->FindConstAttribute(Identifier, EIOSide::In))
 		{
-			return InitForWrite(Helpers::ReadDataValue(ExistingAttribute), ExistingAttribute->AllowsInterpolation(), Init);
+			return InitForWrite(ExistingAttribute->GetValueFromItemKey<T>(PCGDefaultValueKey), ExistingAttribute->AllowsInterpolation(), Init);
 		}
 
 		return InitForWrite(T{}, true, Init);
@@ -591,9 +618,9 @@ namespace PCGExData
 			return;
 		}
 
-		if (!TypedOutAttribute) { return; }
+		if (!OutAttribute) { return; }
 
-		Helpers::SetDataValue(TypedOutAttribute, OutValue);
+		OutAttribute->template SetValue<T>(PCGDefaultValueKey, OutValue);
 	}
 
 #pragma endregion

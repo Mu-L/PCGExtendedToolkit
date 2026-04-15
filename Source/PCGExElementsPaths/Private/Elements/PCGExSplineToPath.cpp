@@ -193,7 +193,7 @@ namespace PCGExSplineToPath
 
 						if (Identity.InDataDomain())
 						{
-							OutBuffer->SetValue(0, PCGExData::Helpers::ReadDataValue(SourceAttr));
+							OutBuffer->SetValue(0, PCGExData::Helpers::ReadDataValue<T>(SourceAttr));
 							return;
 						}
 

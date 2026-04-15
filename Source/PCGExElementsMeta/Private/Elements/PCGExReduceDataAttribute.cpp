@@ -162,7 +162,7 @@ bool FPCGExReduceDataAttributeElement::AdvanceWork(FPCGExContext* InContext, con
 			{
 				using T = decltype(DummyValue);
 				const T OutValue = PCGExTypeOps::Convert<int64, T>(AggregatedHash);
-				FPCGMetadataAttribute<T>* OutAtt = OutMetadata->FindOrCreateAttribute(Context->WriteIdentifier, OutValue);
+				FPCGMetadataAttributeBase* OutAtt = OutMetadata->FindOrCreateAttribute(Context->WriteIdentifier, OutValue);
 				OutAtt->SetValue(OutMetadata->AddEntry(), OutValue);
 			});
 		}
@@ -197,7 +197,7 @@ bool FPCGExReduceDataAttributeElement::AdvanceWork(FPCGExContext* InContext, con
 					ReducedValue = PCGExTypeOps::FTypeOps<T>::Div(ReducedValue, Context->Attributes.Num());
 				}
 
-				FPCGMetadataAttribute<T>* OutAtt = OutMetadata->FindOrCreateAttribute(Context->WriteIdentifier, ReducedValue);
+				FPCGMetadataAttributeBase* OutAtt = OutMetadata->FindOrCreateAttribute(Context->WriteIdentifier, ReducedValue);
 				OutAtt->SetValue(OutMetadata->AddEntry(), ReducedValue);
 			});
 		}

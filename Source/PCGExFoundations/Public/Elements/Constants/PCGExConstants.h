@@ -150,7 +150,7 @@ protected:
 		UPCGParamData* OutputData = InContext->ManagedObjects->New<UPCGParamData>();
 		check(OutputData && OutputData->Metadata);
 
-		FPCGMetadataAttribute<T>* Attrib = OutputData->Metadata->CreateAttribute<T>(InName, InValue, true, false);
+		FPCGMetadataAttributeBase* Attrib = OutputData->Metadata->CreateAttribute<T>(InName, InValue, true, false);
 		Attrib->SetValue(OutputData->Metadata->AddEntry(), InValue);
 
 		InContext->StageOutput(OutputData, InName, PCGExData::EStaging::Managed);

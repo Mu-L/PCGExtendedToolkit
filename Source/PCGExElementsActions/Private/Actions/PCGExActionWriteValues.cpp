@@ -24,8 +24,7 @@ bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, 
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
-			const FPCGMetadataAttribute<T>* TypedAttribute = static_cast<FPCGMetadataAttribute<T>*>(AttributeBase);
-			TSharedPtr<PCGExData::TBuffer<T>> Writer = InPointDataFacade->GetWritable<T>(TypedAttribute, PCGExData::EBufferInit::Inherit);
+			TSharedPtr<PCGExData::TBuffer<T>> Writer = InPointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
 			SuccessAttributes.Add(AttributeBase);
 			SuccessWriters.Add(Writer);
 		});
@@ -36,8 +35,7 @@ bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, 
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
-			const FPCGMetadataAttribute<T>* TypedAttribute = static_cast<FPCGMetadataAttribute<T>*>(AttributeBase);
-			TSharedPtr<PCGExData::TBuffer<T>> Writer = InPointDataFacade->GetWritable<T>(TypedAttribute, PCGExData::EBufferInit::Inherit);
+			TSharedPtr<PCGExData::TBuffer<T>> Writer = InPointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
 			FailAttributes.Add(AttributeBase);
 			FailWriters.Add(Writer);
 		});
@@ -54,7 +52,7 @@ void FPCGExActionWriteValuesOperation::OnMatchSuccess(int32 Index)
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
-			static_cast<PCGExData::TBuffer<T>*>(SuccessWriters[i].Get())->SetValue(Index, static_cast<FPCGMetadataAttribute<T>*>(AttributeBase)->GetValue(PCGDefaultValueKey));
+			static_cast<PCGExData::TBuffer<T>*>(SuccessWriters[i].Get())->SetValue(Index,AttributeBase->GetValueFromItemKey<T>(PCGDefaultValueKey));
 		});
 	}
 }
@@ -67,7 +65,7 @@ void FPCGExActionWriteValuesOperation::OnMatchFail(int32 Index)
 		PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
-			static_cast<PCGExData::TBuffer<T>*>(FailWriters[i].Get())->SetValue(Index, static_cast<FPCGMetadataAttribute<T>*>(AttributeBase)->GetValue(PCGDefaultValueKey));
+			static_cast<PCGExData::TBuffer<T>*>(FailWriters[i].Get())->SetValue(Index, AttributeBase->GetValueFromItemKey<T>(PCGDefaultValueKey));
 		});
 	}
 }

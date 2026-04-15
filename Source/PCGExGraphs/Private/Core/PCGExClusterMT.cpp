@@ -485,8 +485,10 @@ namespace PCGExClusterMT
 			PCGExArrayHelpers::InitArray(ReverseLookup, NumVtx);
 			PCGExArrayHelpers::InitArray(ExpectedAdjacency, NumVtx);
 
-			RawLookupAttribute = PCGExMetaHelpers::TryGetConstAttribute<int64>(VtxDataFacade->GetIn(), PCGExClusters::Labels::Attr_PCGExVtxIdx);
-			if (!RawLookupAttribute) { return; } // FAIL
+			const FPCGMetadataAttributeBase* RawLookupAttributeBase = PCGExMetaHelpers::TryGetConstAttribute<int64>(VtxDataFacade->GetIn(), PCGExClusters::Labels::Attr_PCGExVtxIdx);
+			if (!RawLookupAttributeBase) { return; } // FAIL
+			
+			RawLookupAttribute = static_cast<const FPCGMetadataAttribute<int64>*>(RawLookupAttributeBase);
 
 			BuildEndpointLookupTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 			{

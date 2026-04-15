@@ -365,7 +365,7 @@ namespace PCGExAttributeStats
 				ValuesCount.Reserve(NumPoints);
 				SetValuesCount.Reserve(NumPoints);
 
-				DefaultValue = Buffer->GetTypedInAttribute()->GetValueFromItemKey(PCGDefaultValueKey);
+				DefaultValue = Buffer->InAttribute->template GetValueFromItemKey<T>(PCGDefaultValueKey);
 				int32 NumValues = 0;
 
 				for (int i = 0; i < NumPoints; i++)
@@ -420,7 +420,7 @@ namespace PCGExAttributeStats
 				if (UniqueValuesParamData)
 				{
 					UPCGMetadata* UVM = UniqueValuesParamData->Metadata;
-					FPCGMetadataAttribute<T>* UValues = UVM->FindOrCreateAttribute<T>(Settings->UniqueValueAttributeName, MinValue);
+					FPCGMetadataAttributeBase* UValues = UVM->FindOrCreateAttribute<T>(Settings->UniqueValueAttributeName, MinValue);
 					FPCGMetadataAttribute<int32>* UCount = UVM->FindOrCreateAttribute<int32>(Settings->ValueCountAttributeName, 0);
 
 					if (Settings->bOmitDefaultValue)

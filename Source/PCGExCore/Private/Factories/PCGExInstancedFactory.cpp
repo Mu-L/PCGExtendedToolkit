@@ -99,8 +99,7 @@ void UPCGExInstancedFactory::ApplyOverrides()
 		PCGExMetaHelpers::ExecuteWithRightType(PossibleOverride.Value->GetTypeId(), [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
-			const FPCGMetadataAttribute<T>* TypedAttribute = static_cast<FPCGMetadataAttribute<T>*>(PossibleOverride.Value);
-			PCGExPropertyHelpers::TrySetFPropertyValue<T>(this, Property, TypedAttribute->GetValue(0));
+			PCGExPropertyHelpers::TrySetFPropertyValue<T>(this, Property, PossibleOverride.Value->GetValueFromItemKey<T>(0));
 		});
 	}
 }

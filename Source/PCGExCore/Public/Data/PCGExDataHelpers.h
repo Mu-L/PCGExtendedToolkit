@@ -20,13 +20,13 @@ namespace PCGExData
 namespace PCGExData::Helpers
 {
 	template <typename T>
-	T ReadDataValue(const FPCGMetadataAttribute<T>* Attribute);
+	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute);
 
 	template <typename T>
 	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute, T Fallback);
 
 	template <typename T>
-	void SetDataValue(FPCGMetadataAttribute<T>* Attribute, const T Value);
+	void SetDataValue(FPCGMetadataAttributeBase* Attribute, const T Value);
 
 	template <typename T>
 	void SetDataValue(UPCGData* InData, FName Name, const T Value);
@@ -35,9 +35,9 @@ namespace PCGExData::Helpers
 	void SetDataValue(UPCGData* InData, FPCGAttributeIdentifier Identifier, const T Value);
 
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
-extern template _TYPE ReadDataValue<_TYPE>(const FPCGMetadataAttribute<_TYPE>* Attribute); \
+extern template _TYPE ReadDataValue<_TYPE>(const FPCGMetadataAttributeBase* Attribute); \
 extern template _TYPE ReadDataValue<_TYPE>(const FPCGMetadataAttributeBase* Attribute, _TYPE Fallback); \
-extern template void SetDataValue<_TYPE>(FPCGMetadataAttribute<_TYPE>* Attribute, const _TYPE Value); \
+extern template void SetDataValue<_TYPE>(FPCGMetadataAttributeBase* Attribute, const _TYPE Value); \
 extern template void SetDataValue<_TYPE>(UPCGData* InData, FName Name, const _TYPE Value); \
 extern template void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeIdentifier Identifier, const _TYPE Value);
 	PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)

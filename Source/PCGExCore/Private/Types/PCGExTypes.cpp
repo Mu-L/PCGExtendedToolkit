@@ -5,7 +5,6 @@
 
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadataAttribute.h"
-#include "Metadata/PCGMetadataAttributeGeneric.h"
 #include "Metadata/PCGMetadataCommon.h"
 
 namespace PCGExTypes
@@ -268,14 +267,8 @@ namespace PCGExTypes
 		const int32 KnownSize = FScopedTypedValue::GetTypeSize(Type);
 		if (KnownSize > 0) { return KnownSize; }
 
-		// Generic attributes: extract size from descriptor
-		if (InAttribute->IsGeneric())
-		{
-			const FPCGMetadataAttributeGeneric* GenericAttr = static_cast<const FPCGMetadataAttributeGeneric*>(InAttribute);
-			const FPCGMetadataAttributeDesc& Desc = GenericAttr->GetAttributeDesc();
-			return GetElementSizeFromType(Desc.ValueType, Desc.ValueTypeObject);
-		}
-
-		return 0;
+		// Non-basic types: extract size from descriptor
+		const FPCGMetadataAttributeDesc& Desc = InAttribute->GetAttributeDesc();
+		return GetElementSizeFromType(Desc.ValueType, Desc.ValueTypeObject);
 	}
 }

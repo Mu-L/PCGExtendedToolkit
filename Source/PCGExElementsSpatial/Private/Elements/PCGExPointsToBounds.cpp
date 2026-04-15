@@ -25,11 +25,10 @@ void FPCGExPointsToBoundsDataDetails::Output(const UPCGBasePointData* InBoundsDa
 			PCGExMetaHelpers::ExecuteWithRightType(Source->GetTypeId(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
-				const FPCGMetadataAttribute<T>* TypedSource = static_cast<const FPCGMetadataAttribute<T>*>(Source);
-
 				FPCGAttributeIdentifier DataIdentifier = FPCGAttributeIdentifier(AttributeIdentifier.Name, PCGMetadataDomainID::Data);
-				const T Value = TypedSource->GetValueFromItemKey(PCGFirstEntryKey);
-				FPCGMetadataAttribute<T>* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
+				
+				const T Value = Source->GetValueFromItemKey<T>(PCGFirstEntryKey);
+				FPCGMetadataAttributeBase* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
 				Target->SetDefaultValue(Value);
 			});
 		}
@@ -66,11 +65,10 @@ void FPCGExPointsToBoundsDataDetails::OutputInverse(const UPCGBasePointData* InP
 			PCGExMetaHelpers::ExecuteWithRightType(Source->GetTypeId(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
-				const FPCGMetadataAttribute<T>* TypedSource = static_cast<const FPCGMetadataAttribute<T>*>(Source);
-
 				FPCGAttributeIdentifier DataIdentifier = FPCGAttributeIdentifier(AttributeIdentifier.Name, PCGMetadataDomainID::Data);
-				const T Value = TypedSource->GetValueFromItemKey(PCGFirstEntryKey);
-				FPCGMetadataAttribute<T>* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
+				
+				const T Value = Source->GetValueFromItemKey<T>(PCGFirstEntryKey);
+				FPCGMetadataAttributeBase* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
 				Target->SetDefaultValue(Value);
 			});
 		}

@@ -33,7 +33,7 @@ namespace PCGExBlending::Helpers
 				{
 					using T = decltype(DummyValue);
 					const FPCGMetadataAttribute<T>* InAttribute = InMetadata->GetConstTypedAttribute<T>(Identity.Identifier);
-					FPCGMetadataAttribute<T>* OutAttribute = PCGExMetaHelpers::TryGetMutableAttribute<T>(OutMetadata, Identity.Identifier);
+					FPCGMetadataAttributeBase* OutAttribute = PCGExMetaHelpers::TryGetMutableAttribute<T>(OutMetadata, Identity.Identifier);
 
 					if (!OutAttribute)
 					{

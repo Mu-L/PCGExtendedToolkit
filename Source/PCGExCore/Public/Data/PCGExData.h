@@ -46,7 +46,7 @@ namespace PCGExMT
 template <typename T>
 class FPCGMetadataAttribute;
 
-class FPCGMetadataAttributeGeneric;
+class FPCGMetadataAttributeBase;
 struct FPCGMetadataAttributeDesc;
 
 namespace PCGExData
@@ -174,9 +174,6 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 
 		TBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
 
-		virtual const FPCGMetadataAttribute<T>* GetTypedInAttribute() const { return nullptr; }
-		virtual FPCGMetadataAttribute<T>* GetTypedOutAttribute() const { return nullptr; }
-
 		virtual void ReadVoid(const int32 Index, void* OutValue) const override;
 		virtual void SetVoid(const int32 Index, const void* Value) override;
 		virtual void GetVoid(const int32 Index, void* OutValue) override;
@@ -236,51 +233,9 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 	using TBuffer<T>::IsEnabled;\
 	using TBuffer<T>::bCacheValueHashes;
 
-	template <typename T>
-	class PCGEXCORE_API TLegacyBuffer : public TBuffer<T>
-	{
-		friend class FFacade;
-
-	protected:
-		const FPCGMetadataAttribute<T>* TypedInAttribute = nullptr;
-		FPCGMetadataAttribute<T>* TypedOutAttribute = nullptr;
-
-	public:
-		TLegacyBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
-
-		virtual const FPCGMetadataAttribute<T>* GetTypedInAttribute() const override { return TypedInAttribute; }
-		virtual FPCGMetadataAttribute<T>* GetTypedOutAttribute() const override { return TypedOutAttribute; }
-	};
-
-	//
-	// TGenericBuffer<T> - Base for Tier 2 buffers (known T through FPCGMetadataAttributeGeneric).
-	// Used when the attribute is generic but the C++ type T is known at compile time.
-	// Also works for container types (TArray<T>, TSet<T>, TMap<K,V>) — see PCGExBufferGeneric.h.
-	//
-	// API direction: this is the future-proof path. When UE 5.8 unifies typed→generic,
-	// TLegacyBuffer becomes a thin wrapper and TGenericBuffer becomes the canonical buffer.
-	//
-	template <typename T>
-	class PCGEXCORE_API TGenericBuffer : public TBuffer<T>
-	{
-		PCGEX_USING_TBUFFER
-
-	protected:
-		const FPCGMetadataAttributeGeneric* GenericInAttribute = nullptr;
-		FPCGMetadataAttributeGeneric* GenericOutAttribute = nullptr;
-
-	public:
-		TGenericBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
-
-		const FPCGMetadataAttributeGeneric* GetGenericInAttribute() const { return GenericInAttribute; }
-		FPCGMetadataAttributeGeneric* GetGenericOutAttribute() const { return GenericOutAttribute; }
-	};
-
 	// Forward declarations for buffer leaf classes (defined in Buffers/ headers)
 	template <typename T> class TArrayBuffer;
 	template <typename T> class TSingleValueBuffer;
-	template <typename T> class TGenericArrayBuffer;
-	template <typename T> class TGenericSingleValueBuffer;
 	class FPropertyBuffer;
 	class FPropertyArrayBuffer;
 	class FPropertySingleValueBuffer;
@@ -333,7 +288,7 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		TSharedPtr<TBuffer<T>> GetWritable(const FPCGAttributeIdentifier& InIdentifier, T DefaultValue, bool bAllowInterpolation, EBufferInit Init);
 
 		template <typename T>
-		TSharedPtr<TBuffer<T>> GetWritable(const FPCGMetadataAttribute<T>* InAttribute, EBufferInit Init);
+		TSharedPtr<TBuffer<T>> GetWritable(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init);
 
 		template <typename T>
 		TSharedPtr<TBuffer<T>> GetWritable(const FPCGAttributeIdentifier& InIdentifier, EBufferInit Init);
@@ -369,10 +324,10 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		const FPCGMetadataAttributeBase* FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const;
 
 		template <typename T>
-		FPCGMetadataAttribute<T>* FindMutableAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const;
+		FPCGMetadataAttributeBase* FindMutableAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const;
 
 		template <typename T>
-		const FPCGMetadataAttribute<T>* FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const;
+		const FPCGMetadataAttributeBase* FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const;
 
 		const UPCGBasePointData* GetData(const EIOSide InSide) const;
 		const UPCGBasePointData* GetIn() const;
@@ -425,13 +380,13 @@ extern template TSharedPtr<TBuffer<_TYPE>> FFacade::FindBuffer_Unsafe<_TYPE>(con
 extern template TSharedPtr<TBuffer<_TYPE>> FFacade::FindBuffer<_TYPE>(const FPCGAttributeIdentifier& InIdentifier); \
 extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetBuffer<_TYPE>(const FPCGAttributeIdentifier& InIdentifier); \
 extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, _TYPE DefaultValue, bool bAllowInterpolation, EBufferInit Init); \
-extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGMetadataAttribute<_TYPE>* InAttribute, EBufferInit Init); \
+extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init); \
 extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, EBufferInit Init); \
 extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetReadable<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide, const bool bSupportScoped); \
 extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetBroadcaster<_TYPE>(const FPCGAttributePropertyInputSelector& InSelector, const bool bSupportScoped, const bool bCaptureMinMax, const bool bQuiet); \
 extern template TSharedPtr<TBuffer<_TYPE>> FFacade::GetBroadcaster<_TYPE>(const FName InName, const bool bSupportScoped, const bool bCaptureMinMax, const bool bQuiet); \
-extern template FPCGMetadataAttribute<_TYPE>* FFacade::FindMutableAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const; \
-extern template const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const;
+extern template FPCGMetadataAttributeBase* FFacade::FindMutableAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const; \
+extern template const FPCGMetadataAttributeBase* FFacade::FindConstAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const;
 	PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
 #undef PCGEX_TPL
 
@@ -440,10 +395,10 @@ extern template const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAttribute<
 #pragma region Data Marking
 
 	template <typename T>
-	FPCGMetadataAttribute<T>* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, T MarkValue);
+	FPCGMetadataAttributeBase* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, T MarkValue);
 
 	template <typename T>
-	FPCGMetadataAttribute<T>* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, T MarkValue);
+	FPCGMetadataAttributeBase* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, T MarkValue);
 
 	template <typename T>
 	bool TryReadMark(UPCGMetadata* Metadata, const FPCGAttributeIdentifier& MarkID, T& OutMark);
@@ -452,8 +407,8 @@ extern template const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAttribute<
 	bool TryReadMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, T& OutMark);
 
 #define PCGEX_TPL(_TYPE, _NAME, ...)\
-extern template FPCGMetadataAttribute<_TYPE>* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, _TYPE MarkValue); \
-extern template FPCGMetadataAttribute<_TYPE>* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, _TYPE MarkValue); \
+extern template FPCGMetadataAttributeBase* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, _TYPE MarkValue); \
+extern template FPCGMetadataAttributeBase* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, _TYPE MarkValue); \
 extern template bool TryReadMark<_TYPE>(UPCGMetadata* Metadata, const FPCGAttributeIdentifier& MarkID, _TYPE& OutMark); \
 extern template bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& PointIO, const FName MarkID, _TYPE& OutMark);
 	PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
@@ -479,6 +434,5 @@ extern template bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& PointIO, con
 }
 
 // Buffer leaf class definitions — must come after FFacade and base buffer declarations
-#include "Data/Buffers/PCGExBufferLegacy.h"
-#include "Data/Buffers/PCGExBufferGeneric.h"
+#include "Data/Buffers/PCGExBuffer.h"
 #include "Data/Buffers/PCGExBufferProperty.h"

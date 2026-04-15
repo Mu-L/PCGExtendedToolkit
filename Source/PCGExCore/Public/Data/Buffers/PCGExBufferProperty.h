@@ -10,11 +10,11 @@
 // FPropertyBuffer hierarchy — Tier 3: truly opaque attribute types.
 //
 // Use this ONLY when T is unknowable at compile time (arbitrary UStructs, UEnums, UObjects).
-// If T is known, prefer TGenericBuffer<T> (Tier 2) — it's type-safe, faster, and supports
+// If T is known, prefer TBuffer<T> (Tier 2) — it's type-safe, faster, and supports
 // the accessor API for bulk reads/writes.
 //
 // Container types (TArray, TSet, TMap) with KNOWN element types should use
-// TGenericBuffer<ContainerT> (Tier 2), not FPropertyBuffer. FPropertyBuffer handles
+// TBuffer<ContainerT>, not FPropertyBuffer. FPropertyBuffer handles
 // containers only when the element type is also unknown.
 //
 // Read path:  GetReadAddressFromEntryKey_Unsafe() → void* memcpy per element
@@ -25,7 +25,7 @@
 //
 // ── UE 5.8 migration notes ──
 //
-// FPropertyBuffer is migration-safe: it uses FPCGMetadataAttributeGeneric's public
+// FPropertyBuffer is migration-safe: it uses FPCGMetadataAttributeBase's public
 // void* API which is independent of the typed→generic unification. No changes expected.
 //
 
@@ -44,8 +44,8 @@ namespace PCGExData
 		int32 ElementSize = 0;
 		FProperty* CachedInnerProperty = nullptr; // Owned by us, constructed from attribute desc
 
-		const FPCGMetadataAttributeGeneric* GenericInAttribute = nullptr;
-		FPCGMetadataAttributeGeneric* GenericOutAttribute = nullptr;
+		const FPCGMetadataAttributeBase* GenericInAttribute = nullptr;
+		FPCGMetadataAttributeBase* GenericOutAttribute = nullptr;
 
 	public:
 		FPropertyBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
@@ -53,10 +53,10 @@ namespace PCGExData
 
 		FORCEINLINE int32 GetElementSize() const { return ElementSize; }
 
-		bool InitProperty(const FPCGMetadataAttributeGeneric* InGenericAttribute);
+		bool InitProperty(const FPCGMetadataAttributeBase* InGenericAttribute);
 
-		const FPCGMetadataAttributeGeneric* GetGenericInAttribute() const { return GenericInAttribute; }
-		FPCGMetadataAttributeGeneric* GetGenericOutAttribute() const { return GenericOutAttribute; }
+		const FPCGMetadataAttributeBase* GetGenericInAttribute() const { return GenericInAttribute; }
+		FPCGMetadataAttributeBase* GetGenericOutAttribute() const { return GenericOutAttribute; }
 
 	private:
 		static FProperty* CreateInnerPropertyFromDesc(const FPCGMetadataAttributeDesc& Desc);

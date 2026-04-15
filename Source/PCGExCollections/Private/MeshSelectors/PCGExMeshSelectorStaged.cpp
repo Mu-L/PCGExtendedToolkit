@@ -58,7 +58,7 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 		return true;
 	}
 
-	const FPCGMetadataAttribute<int64>* HashAttribute = PCGExMetaHelpers::TryGetConstAttribute<int64>(InPointData->Metadata, PCGExCollections::Labels::Tag_EntryIdx);
+	const FPCGMetadataAttributeBase* HashAttribute = PCGExMetaHelpers::TryGetConstAttribute<int64>(InPointData->Metadata, PCGExCollections::Labels::Tag_EntryIdx);
 
 	if (!HashAttribute)
 	{
@@ -119,7 +119,7 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 			TConstPCGValueRange<int64> MetadataEntries = InPointData->GetConstMetadataEntryValueRange();
 			while (Context.CurrentPointIndex < NumPoints)
 			{
-				CollectionMap->InsertEntry(HashAttribute->GetValueFromItemKey(MetadataEntries[Context.CurrentPointIndex]), Context.CurrentPointIndex, OutMeshInstances);
+				CollectionMap->InsertEntry(HashAttribute->GetValueFromItemKey<int64>(MetadataEntries[Context.CurrentPointIndex]), Context.CurrentPointIndex, OutMeshInstances);
 				Context.CurrentPointIndex++;
 				if (Context.ShouldStop()) { return false; }
 			}

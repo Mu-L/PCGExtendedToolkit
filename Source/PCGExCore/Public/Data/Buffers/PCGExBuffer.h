@@ -4,36 +4,24 @@
 #pragma once
 
 // NOTE: This header is included at the bottom of PCGExData.h — do NOT include PCGExData.h here.
-// All base types (IBuffer, TBuffer, TLegacyBuffer, FFacade, etc.) are already visible.
+// All base types (IBuffer, TBuffer, FFacade, etc.) are already visible.
 
 //
 // TArrayBuffer<T> / TSingleValueBuffer<T>
 //
-// Tier 1 (Legacy) buffers for standard FPCGMetadataAttribute<T> typed attributes.
-// This is the existing, well-tested path used by the vast majority of PCGEx nodes.
+// Unified buffers using FPCGMetadataAttributeBase* (from IBuffer).
+// Attribute creation goes through Domain->CreateGenericAttribute<T>() — the UE 5.8 canonical path.
 //
-// ── UE 5.8 migration notes ──
-//
-// When Epic unifies typed→generic internally, these buffers continue to work:
-// FPCGMetadataAttribute<T> becomes a thin wrapper over FPCGMetadataAttributeGeneric,
-// and CreateAttribute<T>() routes through the generic backend.
-//
-// No changes needed here unless Epic removes FPCGMetadataAttribute<T> entirely,
-// which is unlikely given the public API surface. If that happens, migrate callers
-// to TGenericBuffer<T> (Tier 2) which already uses the generic API directly.
+// FPCGMetadataAttribute<T> still exists for basic types; use GetTypedInAttribute()/GetTypedOutAttribute()
+// on TBuffer<T> for a convenience static_cast when you need the typed pointer.
 //
 
 namespace PCGExData
 {
-#define PCGEX_USING_TLEGACYBUFFER \
-	PCGEX_USING_TBUFFER \
-	using TLegacyBuffer<T>::TypedInAttribute;\
-	using TLegacyBuffer<T>::TypedOutAttribute;
-
 	template <typename T>
-	class PCGEXCORE_API TArrayBuffer : public TLegacyBuffer<T>
+	class PCGEXCORE_API TArrayBuffer : public TBuffer<T>
 	{
-		PCGEX_USING_TLEGACYBUFFER
+		PCGEX_USING_TBUFFER
 
 	protected:
 		// Used to read from an attribute as another type
@@ -90,9 +78,9 @@ namespace PCGExData
 	};
 
 	template <typename T>
-	class PCGEXCORE_API TSingleValueBuffer : public TLegacyBuffer<T>
+	class PCGEXCORE_API TSingleValueBuffer : public TBuffer<T>
 	{
-		PCGEX_USING_TLEGACYBUFFER
+		PCGEX_USING_TBUFFER
 
 	protected:
 		bool bReadInitialized = false;

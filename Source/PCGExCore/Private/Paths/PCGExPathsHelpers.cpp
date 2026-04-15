@@ -31,8 +31,8 @@ namespace PCGExPaths
 		{
 			if (const UPCGSplineData* SplineData = Cast<UPCGSplineData>(InData)) { return SplineData->IsClosed(); }
 
-			const FPCGMetadataAttribute<bool>* Attr = PCGExMetaHelpers::TryGetConstAttribute<bool>(InData, Labels::ClosedLoopIdentifier);
-			return Attr ? PCGExData::Helpers::ReadDataValue(Attr) : false;
+			const FPCGMetadataAttributeBase* Attr = PCGExMetaHelpers::TryGetConstAttribute<bool>(InData, Labels::ClosedLoopIdentifier);
+			return Attr ? PCGExData::Helpers::ReadDataValue<bool>(Attr) : false;
 		}
 
 		bool GetClosedLoop(const TSharedPtr<PCGExData::FPointIO>& InData)
@@ -42,7 +42,7 @@ namespace PCGExPaths
 
 		void SetIsHole(UPCGData* InData, const bool bIsHole)
 		{
-			FPCGMetadataAttribute<bool>* Attr = PCGExMetaHelpers::TryGetMutableAttribute<bool>(InData, Labels::HoleIdentifier);
+			FPCGMetadataAttributeBase* Attr = PCGExMetaHelpers::TryGetMutableAttribute<bool>(InData, Labels::HoleIdentifier);
 
 			if (!bIsHole)
 			{
@@ -63,8 +63,8 @@ namespace PCGExPaths
 		{
 			if (const UPCGSplineData* SplineData = Cast<UPCGSplineData>(InData)) { return SplineData->IsClosed(); }
 
-			const FPCGMetadataAttribute<bool>* Attr = PCGExMetaHelpers::TryGetConstAttribute<bool>(InData, Labels::HoleIdentifier);
-			return Attr ? PCGExData::Helpers::ReadDataValue(Attr) : false;
+			const FPCGMetadataAttributeBase* Attr = PCGExMetaHelpers::TryGetConstAttribute<bool>(InData, Labels::HoleIdentifier);
+			return Attr ? PCGExData::Helpers::ReadDataValue<bool>(Attr) : false;
 		}
 
 		bool GetIsHole(const TSharedPtr<PCGExData::FPointIO>& InData)

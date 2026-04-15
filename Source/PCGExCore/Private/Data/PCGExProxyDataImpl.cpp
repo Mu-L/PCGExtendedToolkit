@@ -497,7 +497,7 @@ namespace PCGExData
 	{
 		check(InAttribute && Data);
 
-		const T_REAL& RealValue = InAttribute->GetValueFromItemKey(Data->GetMetadataEntry(Index));
+		const T_REAL& RealValue = InAttribute->GetValueFromItemKey<T_REAL>(Data->GetMetadataEntry(Index));
 
 		if (bWantsSubSelection)
 		{
@@ -518,7 +518,7 @@ namespace PCGExData
 	{
 		check(OutAttribute && Data);
 
-		const T_REAL& RealValue = OutAttribute->GetValueFromItemKey(Data->GetMetadataEntry(Index));
+		const T_REAL& RealValue = OutAttribute->GetValueFromItemKey<T_REAL>(Data->GetMetadataEntry(Index));
 
 		if (bWantsSubSelection)
 		{
@@ -543,7 +543,7 @@ namespace PCGExData
 
 		if (bWantsSubSelection)
 		{
-			T_REAL RealValue = OutAttribute->GetValueFromItemKey(MetadataEntry);
+			T_REAL RealValue = OutAttribute->GetValueFromItemKey<T_REAL>(MetadataEntry);
 			CachedSubSelection.ApplySet(&RealValue, Value);
 			OutAttribute->SetValue(MetadataEntry, RealValue);
 		}
@@ -563,7 +563,7 @@ namespace PCGExData
 	PCGExValueHash TDirectAttributeProxy<T_REAL>::ReadValueHash(const int32 Index) const
 	{
 		check(InAttribute && Data);
-		return PCGExTypes::ComputeHash(InAttribute->GetValueFromItemKey(Data->GetMetadataEntry(Index)));
+		return PCGExTypes::ComputeHash(InAttribute->GetValueFromItemKey<T_REAL>(Data->GetMetadataEntry(Index)));
 	}
 
 	// Explicit instantiations
@@ -587,7 +587,7 @@ namespace PCGExData
 		check(InAttribute);
 
 		// Data-domain: always use default entry key
-		const T_REAL& RealValue = InAttribute->GetValueFromItemKey(PCGDefaultValueKey);
+		const T_REAL& RealValue = InAttribute->GetValueFromItemKey<T_REAL>(PCGDefaultValueKey);
 
 		if (bWantsSubSelection)
 		{
@@ -608,7 +608,7 @@ namespace PCGExData
 	{
 		check(OutAttribute);
 
-		const T_REAL& RealValue = OutAttribute->GetValueFromItemKey(PCGDefaultValueKey);
+		const T_REAL& RealValue = OutAttribute->GetValueFromItemKey<T_REAL>(PCGDefaultValueKey);
 
 		if (bWantsSubSelection)
 		{
@@ -631,7 +631,7 @@ namespace PCGExData
 
 		if (bWantsSubSelection)
 		{
-			T_REAL RealValue = OutAttribute->GetValueFromItemKey(PCGDefaultValueKey);
+			T_REAL RealValue = OutAttribute->GetValueFromItemKey<T_REAL>(PCGDefaultValueKey);
 			CachedSubSelection.ApplySet(&RealValue, Value);
 			OutAttribute->SetDefaultValue(RealValue);
 		}
@@ -651,7 +651,7 @@ namespace PCGExData
 	PCGExValueHash TDirectDataAttributeProxy<T_REAL>::ReadValueHash(const int32 Index) const
 	{
 		check(InAttribute);
-		return PCGExTypes::ComputeHash(InAttribute->GetValueFromItemKey(PCGDefaultValueKey));
+		return PCGExTypes::ComputeHash(InAttribute->GetValueFromItemKey<T_REAL>(PCGDefaultValueKey));
 	}
 
 	// Explicit instantiations

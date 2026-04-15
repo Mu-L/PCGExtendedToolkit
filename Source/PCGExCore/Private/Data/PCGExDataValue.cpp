@@ -208,7 +208,7 @@ template class PCGEXCORE_API TDataValue<_TYPE>;
 			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute->GetTypeId(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
-				const T Value = Helpers::ReadDataValue<T>(static_cast<const FPCGMetadataAttribute<T>*>(SourceAttribute));
+				const T Value = Helpers::ReadDataValue<T>(SourceAttribute);
 
 				FSubSelection SubSelection(Selector);
 				TSharedPtr<IDataValue> TypedDataValue = nullptr;

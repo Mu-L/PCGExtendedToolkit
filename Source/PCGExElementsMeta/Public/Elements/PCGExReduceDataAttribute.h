@@ -101,9 +101,7 @@ protected:
 			PCGExMetaHelpers::ExecuteWithRightType(Att->GetTypeId(), [&](auto ValueType)
 			{
 				using T_ATTR = decltype(ValueType);
-				const FPCGMetadataAttribute<T_ATTR>* TypedAtt = static_cast<const FPCGMetadataAttribute<T_ATTR>*>(Att);
-				T_ATTR Value = PCGExData::Helpers::ReadDataValue(TypedAtt);
-				Func(PCGExTypeOps::Convert<T_ATTR, T>(Value), i);
+				Func(PCGExTypeOps::Convert<T_ATTR, T>(PCGExData::Helpers::ReadDataValue<T_ATTR>(Att)), i);
 			});
 		}
 	}

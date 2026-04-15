@@ -16,8 +16,8 @@ namespace PCGExData
 	void TryGetInOutAttr(
 		const FProxyDescriptor& InDescriptor,
 		const TSharedPtr<FFacade>& InDataFacade,
-		const FPCGMetadataAttribute<T_REAL>*& OutInAttribute,
-		FPCGMetadataAttribute<T_REAL>*& OutOutAttribute)
+		const FPCGMetadataAttributeBase*& OutInAttribute,
+		FPCGMetadataAttributeBase*& OutOutAttribute)
 	{
 		OutInAttribute = nullptr;
 		OutOutAttribute = nullptr;
@@ -39,7 +39,7 @@ namespace PCGExData
 
 			if (OutInAttribute)
 			{
-				OutOutAttribute = const_cast<FPCGMetadataAttribute<T_REAL>*>(OutInAttribute);
+				OutOutAttribute = const_cast<FPCGMetadataAttributeBase*>(OutInAttribute);
 			}
 
 			check(OutInAttribute);
@@ -201,8 +201,8 @@ namespace PCGExData
 			const TSharedPtr<FFacade>& InDataFacade,
 			bool bIsDataDomain)
 		{
-			const FPCGMetadataAttribute<T_REAL>* InAttribute = nullptr;
-			FPCGMetadataAttribute<T_REAL>* OutAttribute = nullptr;
+			const FPCGMetadataAttributeBase* InAttribute = nullptr;
+			FPCGMetadataAttributeBase* OutAttribute = nullptr;
 
 			TryGetInOutAttr<T_REAL>(InDescriptor, InDataFacade, InAttribute, OutAttribute);
 
@@ -366,9 +366,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 					if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 					{
-						if (const FPCGMetadataAttribute<T>* Attr = PCGExMetaHelpers::TryGetConstAttribute<T>(InDataFacade->GetIn(), PCGExMetaHelpers::GetAttributeIdentifier(InDescriptor.Selector, InDataFacade->GetIn())))
+						if (const FPCGMetadataAttributeBase* Attr = PCGExMetaHelpers::TryGetConstAttribute<T>(InDataFacade->GetIn(), PCGExMetaHelpers::GetAttributeIdentifier(InDescriptor.Selector, InDataFacade->GetIn())))
 						{
-							OutProxy = GetConstantProxyBuffer<T>(Attr->GetValueFromItemKey(Key), InDescriptor.WorkingType);
+							OutProxy = GetConstantProxyBuffer<T>(Attr->GetValueFromItemKey<T>(Key), InDescriptor.WorkingType);
 						}
 					}
 					else if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Property)

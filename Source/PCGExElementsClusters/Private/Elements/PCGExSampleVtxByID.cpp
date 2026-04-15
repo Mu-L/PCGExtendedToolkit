@@ -103,11 +103,11 @@ bool FPCGExSampleVtxByIDElement::AdvanceWork(FPCGExContext* InContext, const UPC
 			for (const TSharedRef<PCGExData::FFacade>& TargetFacade : Context->TargetFacades)
 			{
 				const TConstPCGValueRange<int64> MetadataEntries = TargetFacade->GetIn()->GetConstMetadataEntryValueRange();
-				const FPCGMetadataAttribute<int64>* Attr = TargetFacade->FindConstAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
+				const FPCGMetadataAttributeBase* Attr = TargetFacade->FindConstAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
 
 				for (int i = 0; i < MetadataEntries.Num(); i++)
 				{
-					uint32 VtxID = PCGEx::H64A(Attr->GetValueFromItemKey(MetadataEntries[i]));
+					uint32 VtxID = PCGEx::H64A(Attr->GetValueFromItemKey<int64>(MetadataEntries[i]));
 					Context->VtxLookup.Add(VtxID, PCGEx::H64(i, TargetFacade->Idx));
 				}
 			}

@@ -18,7 +18,6 @@
 #include "Metadata/Accessors/PCGCustomAccessor.h"
 #include "Types/PCGExAttributeIdentity.h"
 #include "Types/PCGExTypes.h"
-#include "Metadata/PCGMetadataAttributeGeneric.h"
 #include "Metadata/PCGMetadataDomain.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
@@ -111,28 +110,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	template <typename T>
 	void TBuffer<T>::DumpValues(const TSharedPtr<TArray<T>>& OutValues) const { DumpValues(*OutValues.Get()); }
 
-	template <typename T>
-	TLegacyBuffer<T>::TLegacyBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier)
-		: TBuffer<T>(InSource, InIdentifier)
-	{
-	}
-
-#pragma region TGenericBuffer
-
-	template <typename T>
-	TGenericBuffer<T>::TGenericBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier)
-		: TBuffer<T>(InSource, InIdentifier)
-	{
-	}
-
-#pragma endregion
-
 #pragma region Externalization
 
 #define PCGEX_TPL(_TYPE, _NAME, ...)\
-template class PCGEXCORE_API TBuffer<_TYPE>;\
-template class PCGEXCORE_API TLegacyBuffer<_TYPE>;\
-template class PCGEXCORE_API TGenericBuffer<_TYPE>;
+template class PCGEXCORE_API TBuffer<_TYPE>;
 
 	PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
 
@@ -275,9 +256,9 @@ template class PCGEXCORE_API TGenericBuffer<_TYPE>;
 	}
 
 	template <typename T>
-	TSharedPtr<TBuffer<T>> FFacade::GetWritable(const FPCGMetadataAttribute<T>* InAttribute, EBufferInit Init)
+	TSharedPtr<TBuffer<T>> FFacade::GetWritable(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init)
 	{
-		return GetWritable(FPCGAttributeIdentifier(InAttribute->Name, InAttribute->GetMetadataDomain()->GetDomainID()), InAttribute->GetValue(PCGDefaultValueKey), InAttribute->AllowsInterpolation(), Init);
+		return GetWritable<T>(FPCGAttributeIdentifier(InAttribute->Name, InAttribute->GetMetadataDomain()->GetDomainID()), InAttribute->GetValueFromItemKey<T>(PCGDefaultValueKey), InAttribute->AllowsInterpolation(), Init);
 	}
 
 	template <typename T>
@@ -360,13 +341,13 @@ template class PCGEXCORE_API TGenericBuffer<_TYPE>;
 	}
 
 	template <typename T>
-	FPCGMetadataAttribute<T>* FFacade::FindMutableAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const
+	FPCGMetadataAttributeBase* FFacade::FindMutableAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const
 	{
 		return Source->FindMutableAttribute<T>(InIdentifier, InSide);
 	}
 
 	template <typename T>
-	const FPCGMetadataAttribute<T>* FFacade::FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const
+	const FPCGMetadataAttributeBase* FFacade::FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const
 	{
 		return Source->FindConstAttribute<T>(InIdentifier, InSide);
 	}
@@ -376,38 +357,34 @@ template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::FindBuffer_Unsafe<_TY
 template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::FindBuffer<_TYPE>(const FPCGAttributeIdentifier& InIdentifier); \
 template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetBuffer<_TYPE>(const FPCGAttributeIdentifier& InIdentifier); \
 template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, _TYPE DefaultValue, bool bAllowInterpolation, EBufferInit Init); \
-template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGMetadataAttribute<_TYPE>* InAttribute, EBufferInit Init); \
+template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init); \
 template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetWritable<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, EBufferInit Init); \
 template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetReadable<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide, const bool bSupportScoped); \
 template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetBroadcaster<_TYPE>(const FPCGAttributePropertyInputSelector& InSelector, const bool bSupportScoped, const bool bCaptureMinMax, const bool bQuiet); \
 template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> FFacade::GetBroadcaster<_TYPE>(const FName InName, const bool bSupportScoped, const bool bCaptureMinMax, const bool bQuiet); \
-template PCGEXCORE_API FPCGMetadataAttribute<_TYPE>* FFacade::FindMutableAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const; \
-template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const;
+template PCGEXCORE_API FPCGMetadataAttributeBase* FFacade::FindMutableAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const; \
+template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttribute<_TYPE>(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide) const;
 	PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
 #undef PCGEX_TPL
 
 	TSharedPtr<IBuffer> FFacade::GetWritable(const EPCGMetadataTypes Type, const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init)
 	{
-#define PCGEX_TYPED_WRITABLE(_TYPE, _ID, ...) case EPCGMetadataTypes::_ID: return GetWritable<_TYPE>(static_cast<const FPCGMetadataAttribute<_TYPE>*>(InAttribute), Init);
+#define PCGEX_TYPED_WRITABLE(_TYPE, _ID, ...) case EPCGMetadataTypes::_ID: return GetWritable<_TYPE>(InAttribute, Init);
 		switch (Type)
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TYPED_WRITABLE)
 		default:
 			{
 				// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES.
-				// If callers know T at compile time, they should use GetWritable<T>() or a
-				// TGenericBuffer<T> instantiation instead — it's type-safe and uses bulk accessor writes.
-				if (!InAttribute || !InAttribute->IsGeneric()) { return nullptr; }
+				if (!InAttribute) { return nullptr; }
 
 				const FPCGMetadataDomainID DomainID = InAttribute->GetMetadataDomain()->GetDomainID();
 				FPCGAttributeIdentifier AttrIdentifier(InAttribute->Name, DomainID);
 
-				const auto* GenericAttr = static_cast<const FPCGMetadataAttributeGeneric*>(InAttribute);
-
 				if (DomainID.Flag == EPCGMetadataDomainFlag::Data)
 				{
 					auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, AttrIdentifier);
-					if (!PropBuf->InitProperty(GenericAttr) || !PropBuf->InitForWrite(InAttribute, Init)) { return nullptr; }
+					if (!PropBuf->InitProperty(InAttribute) || !PropBuf->InitForWrite(InAttribute, Init)) { return nullptr; }
 					FWriteScopeLock WriteScopeLock(BufferLock);
 					PropBuf->BufferIndex = Buffers.Add(PropBuf);
 					BufferMap.Add(PropBuf->GetUID(), PropBuf);
@@ -416,7 +393,7 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 				else
 				{
 					auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, AttrIdentifier);
-					if (!PropBuf->InitProperty(GenericAttr) || !PropBuf->InitForWrite(InAttribute, Init)) { return nullptr; }
+					if (!PropBuf->InitProperty(InAttribute) || !PropBuf->InitForWrite(InAttribute, Init)) { return nullptr; }
 					FWriteScopeLock WriteScopeLock(BufferLock);
 					PropBuf->BufferIndex = Buffers.Add(PropBuf);
 					BufferMap.Add(PropBuf->GetUID(), PropBuf);
@@ -465,14 +442,12 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		if (!Buffer)
 		{
 			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(Identity.Identifier, InSide);
-			if (RawAttribute && RawAttribute->IsGeneric())
+			if (RawAttribute)
 			{
-				const auto* GenericAttr = static_cast<const FPCGMetadataAttributeGeneric*>(RawAttribute);
-
 				if (Identity.Identifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
 				{
 					auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, Identity.Identifier);
-					if (PropBuf->InitProperty(GenericAttr) && PropBuf->InitForRead(InSide))
+					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);
 						PropBuf->BufferIndex = Buffers.Add(PropBuf);
@@ -483,7 +458,7 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 				else
 				{
 					auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, Identity.Identifier);
-					if (PropBuf->InitProperty(GenericAttr) && PropBuf->InitForRead(InSide))
+					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);
 						PropBuf->BufferIndex = Buffers.Add(PropBuf);
@@ -511,14 +486,12 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 #undef PCGEX_TYPED_EXEC
 
 		// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES
-		if (!Buffer && RawAttribute->IsGeneric())
+		if (!Buffer && RawAttribute)
 		{
-			const auto* GenericAttr = static_cast<const FPCGMetadataAttributeGeneric*>(RawAttribute);
-
 			if (InIdentifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
 			{
 				auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, InIdentifier);
-				if (PropBuf->InitProperty(GenericAttr) && PropBuf->InitForRead(InSide))
+				if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 				{
 					FWriteScopeLock WriteScopeLock(BufferLock);
 					PropBuf->BufferIndex = Buffers.Add(PropBuf);
@@ -529,7 +502,7 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 			else
 			{
 				auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, InIdentifier);
-				if (PropBuf->InitProperty(GenericAttr) && PropBuf->InitForRead(InSide))
+				if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 				{
 					FWriteScopeLock WriteScopeLock(BufferLock);
 					PropBuf->BufferIndex = Buffers.Add(PropBuf);
@@ -771,20 +744,20 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 	}
 
 	template <typename T>
-	FPCGMetadataAttribute<T>* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, T MarkValue)
+	FPCGMetadataAttributeBase* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, T MarkValue)
 	{
 		UPCGMetadata* Metadata = InData->MutableMetadata();
 
 		if (!Metadata) { return nullptr; }
 
 		Metadata->DeleteAttribute(MarkID);
-		FPCGMetadataAttribute<T>* Mark = Metadata->CreateAttribute<T>(MarkID, MarkValue, true, true);
+		FPCGMetadataAttributeBase* Mark = Metadata->CreateAttribute<T>(MarkID, MarkValue, true, true);
 		Helpers::SetDataValue(Mark, MarkValue);
 		return Mark;
 	}
 
 	template <typename T>
-	FPCGMetadataAttribute<T>* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, T MarkValue)
+	FPCGMetadataAttributeBase* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, T MarkValue)
 	{
 		const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(MarkID, PointIO->GetOut());
 		return WriteMark<T>(PointIO->GetMutableData(EIOSide::Out), Identifier, MarkValue);
@@ -795,9 +768,9 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 	{
 		// 'template' spec required for clang on mac, and rider keeps removing it without the comment below.
 		// ReSharper disable once CppRedundantTemplateKeyword
-		const FPCGMetadataAttribute<T>* Mark = PCGExMetaHelpers::TryGetConstAttribute<T>(Metadata, MarkID);
+		const FPCGMetadataAttributeBase* Mark = PCGExMetaHelpers::TryGetConstAttribute<T>(Metadata, MarkID);
 		if (!Mark) { return false; }
-		OutMark = Helpers::ReadDataValue(Mark);
+		OutMark = Helpers::ReadDataValue<T>(Mark);
 		return true;
 	}
 
@@ -809,8 +782,8 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 	}
 
 #define PCGEX_TPL(_TYPE, _NAME, ...)\
-template PCGEXCORE_API FPCGMetadataAttribute<_TYPE>* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, _TYPE MarkValue); \
-template PCGEXCORE_API FPCGMetadataAttribute<_TYPE>* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, _TYPE MarkValue); \
+template PCGEXCORE_API FPCGMetadataAttributeBase* WriteMark(UPCGData* InData, const FPCGAttributeIdentifier& MarkID, _TYPE MarkValue); \
+template PCGEXCORE_API FPCGMetadataAttributeBase* WriteMark(const TSharedRef<FPointIO>& PointIO, const FName MarkID, _TYPE MarkValue); \
 template PCGEXCORE_API bool TryReadMark<_TYPE>(UPCGMetadata* Metadata, const FPCGAttributeIdentifier& MarkID, _TYPE& OutMark); \
 template PCGEXCORE_API bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& PointIO, const FName MarkID, _TYPE& OutMark);
 

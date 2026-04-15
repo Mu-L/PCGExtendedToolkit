@@ -121,7 +121,7 @@ namespace PCGExMetaHelpers
 	}
 
 	template <typename T>
-	static const FPCGMetadataAttribute<T>* TryGetConstAttribute(const UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier)
+	static const FPCGMetadataAttributeBase* TryGetConstAttribute(const UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier)
 	{
 		if (!InMetadata) { return nullptr; }
 		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain)) { return nullptr; }
@@ -132,14 +132,14 @@ namespace PCGExMetaHelpers
 	}
 
 	template <typename T>
-	static const FPCGMetadataAttribute<T>* TryGetConstAttribute(const UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
+	static const FPCGMetadataAttributeBase* TryGetConstAttribute(const UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
 	{
 		if (!InData) { return nullptr; }
 		return TryGetConstAttribute<T>(InData->ConstMetadata(), Identifier);
 	}
 
 	template <typename T>
-	static FPCGMetadataAttribute<T>* TryGetMutableAttribute(UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier)
+	static FPCGMetadataAttributeBase* TryGetMutableAttribute(UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier)
 	{
 		if (!InMetadata) { return nullptr; }
 		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain)) { return nullptr; }
@@ -150,7 +150,7 @@ namespace PCGExMetaHelpers
 	}
 
 	template <typename T>
-	static FPCGMetadataAttribute<T>* TryGetMutableAttribute(UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
+	static FPCGMetadataAttributeBase* TryGetMutableAttribute(UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
 	{
 		if (!InData) { return nullptr; }
 		return TryGetMutableAttribute<T>(InData->MutableMetadata(), Identifier);

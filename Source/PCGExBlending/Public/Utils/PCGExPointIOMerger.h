@@ -94,7 +94,7 @@ namespace PCGExPointIOMerger
 
 		UPCGMetadata* InMetadata = SourceIO->GetIn()->Metadata;
 
-		const FPCGMetadataAttribute<T>* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(InMetadata, Identity.Identifier);
+		const FPCGMetadataAttributeBase* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(InMetadata, Identity.Identifier);
 		if (!TypedInAttribute) { return; }
 
 		TSharedPtr<PCGExData::TArrayBuffer<T>> OutElementsBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(OutBuffer);
@@ -107,7 +107,7 @@ namespace PCGExPointIOMerger
 			if (TypedInAttribute->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data)
 			{
 				// From a data domain
-				const T Value = PCGExData::Helpers::ReadDataValue(TypedInAttribute);
+				const T Value = PCGExData::Helpers::ReadDataValue<T>(TypedInAttribute);
 				for (int Index = Scope.Write.Start; Index < Scope.Write.End; Index++) { OutElementsBuffer->SetValue(Index, Value); }
 			}
 			else
@@ -142,7 +142,7 @@ namespace PCGExPointIOMerger
 			if (TypedInAttribute->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data)
 			{
 				// From data domain
-				OutDataBuffer->SetValue(0, PCGExData::Helpers::ReadDataValue(TypedInAttribute));
+				OutDataBuffer->SetValue(0, PCGExData::Helpers::ReadDataValue<T>(TypedInAttribute));
 			}
 			else
 			{

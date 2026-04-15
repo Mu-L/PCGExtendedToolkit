@@ -294,9 +294,9 @@ namespace PCGExConnectClusters
 		UPCGMetadata* EdgeMetadata = CompoundedEdgesDataFacade->GetOut()->MutableMetadata();
 		UPCGMetadata* VtxMetadata = VtxDataFacade->GetOut()->MutableMetadata();
 
-		EdgeEndpointsAtt = EdgeMetadata->GetMutableTypedAttribute_Unsafe<int64>(PCGExClusters::Labels::Attr_PCGExEdgeIdx);
-		OutVtxEndpointAtt = VtxMetadata->GetMutableTypedAttribute_Unsafe<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
-		InVtxEndpointAtt = VtxDataFacade->GetIn()->Metadata->GetMutableTypedAttribute_Unsafe<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
+		EdgeEndpointsAtt = EdgeMetadata->GetMutableTypedAttribute<int64>(PCGExClusters::Labels::Attr_PCGExEdgeIdx);
+		OutVtxEndpointAtt = VtxMetadata->GetMutableTypedAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
+		InVtxEndpointAtt = VtxDataFacade->GetIn()->Metadata->GetMutableTypedAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
 
 		if (Settings->bFlagVtxConnector)
 		{

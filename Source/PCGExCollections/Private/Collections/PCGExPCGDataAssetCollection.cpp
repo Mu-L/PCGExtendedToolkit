@@ -145,7 +145,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			{
 				if (UPCGExMeshCollection* MC = Cast<UPCGExMeshCollection>(Inner)) { EmbeddedMeshCollection = MC; }
 				if (UPCGExActorCollection* AC = Cast<UPCGExActorCollection>(Inner)) { EmbeddedActorCollection = AC; }
-			}, false);
+			}, EGetObjectsFlags::None);
 		}
 		else
 		{

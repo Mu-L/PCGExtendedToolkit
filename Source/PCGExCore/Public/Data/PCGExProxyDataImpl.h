@@ -166,8 +166,8 @@ namespace PCGExData
 	class TDirectAttributeProxy : public IBufferProxy
 	{
 	public:
-		const FPCGMetadataAttribute<T_REAL>* InAttribute = nullptr;
-		FPCGMetadataAttribute<T_REAL>* OutAttribute = nullptr;
+		const FPCGMetadataAttributeBase* InAttribute = nullptr;
+		FPCGMetadataAttributeBase* OutAttribute = nullptr;
 
 		explicit TDirectAttributeProxy(EPCGMetadataTypes InWorkingType);
 
@@ -225,8 +225,8 @@ namespace PCGExData
 	class TDirectDataAttributeProxy : public IBufferProxy
 	{
 	public:
-		const FPCGMetadataAttribute<T_REAL>* InAttribute = nullptr;
-		FPCGMetadataAttribute<T_REAL>* OutAttribute = nullptr;
+		const FPCGMetadataAttributeBase* InAttribute = nullptr;
+		FPCGMetadataAttributeBase* OutAttribute = nullptr;
 
 		explicit TDirectDataAttributeProxy(EPCGMetadataTypes InWorkingType);
 

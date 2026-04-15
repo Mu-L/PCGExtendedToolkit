@@ -58,8 +58,12 @@ namespace PCGExPointIOMerger
 				using T = decltype(DummyValue);
 
 				TSharedPtr<PCGExData::TBuffer<T>> Buffer = Merger->UnionDataFacade->GetWritable(
-					Merger->WantsDataToElements() ? Identity.ElementsIdentifier : Identity.Identifier,
-					Identity.bInitDefault ? static_cast<const FPCGMetadataAttribute<T>*>(Identity.Attribute)->GetValue(PCGDefaultValueKey) : T{},
+					Merger->WantsDataToElements()
+						? Identity.ElementsIdentifier
+						: Identity.Identifier,
+					Identity.bInitDefault
+						? Identity.Attribute->GetValueFromItemKey<T>(PCGDefaultValueKey)
+						: T{},
 					Identity.bAllowsInterpolation, PCGExData::EBufferInit::New);
 
 				for (int i = 0; i < Merger->IOSources.Num(); i++)
@@ -67,8 +71,8 @@ namespace PCGExPointIOMerger
 					TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
 					const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identity.Identifier);
 
-					if (!Attribute) { continue; }                            // Missing attribute
-					if (!Identity.IsA(Attribute->GetTypeId())) { continue; } // Type mismatch
+					if (!Attribute) { continue; }                // Missing attribute
+					if (!Attribute->IsOfType<T>()) { continue; } // Type mismatch
 
 					PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer)
 				}

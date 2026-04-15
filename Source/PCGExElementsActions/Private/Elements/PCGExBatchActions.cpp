@@ -126,8 +126,7 @@ namespace PCGExBatchActions
 			PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
-				const FPCGMetadataAttribute<T>* TypedAttribute = static_cast<FPCGMetadataAttribute<T>*>(AttributeBase);
-				PointDataFacade->GetWritable<T>(TypedAttribute, PCGExData::EBufferInit::Inherit);
+				PointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
 			});
 		}
 

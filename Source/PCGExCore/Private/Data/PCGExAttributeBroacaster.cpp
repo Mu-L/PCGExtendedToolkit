@@ -90,7 +90,7 @@ namespace PCGExData
 			PCGExMetaHelpers::ExecuteWithRightType(ProcessingInfos.Attribute->GetTypeId(), [&](auto DummyValue)
 			{
 				using T_REAL = decltype(DummyValue);
-				DataValue = MakeShared<TDataValue<T_REAL>>(Helpers::ReadDataValue(static_cast<const FPCGMetadataAttribute<T_REAL>*>(ProcessingInfos.Attribute)));
+				DataValue = MakeShared<TDataValue<T_REAL>>(Helpers::ReadDataValue<T_REAL>(ProcessingInfos.Attribute));
 
 				const FSubSelection& S = ProcessingInfos.SubSelection;
 				TypedDataValue = S.bIsValid ? S.Get<T_REAL, T>(DataValue->GetValue<T_REAL>()) : PCGExTypeOps::Convert<T_REAL, T>(DataValue->GetValue<T_REAL>());
