@@ -11,50 +11,6 @@
 namespace PCGExData
 {
 	//
-	// Helper function implementations
-	//
-
-	bool GetComponentSelection(const TArray<FString>& Names, FInputSelectorComponentData& OutSelection)
-	{
-		if (Names.IsEmpty()) { return false; }
-		for (const FString& Name : Names)
-		{
-			if (const FInputSelectorComponentData* Selection = STRMAP_TRANSFORM_FIELD.Find(Name.ToUpper()))
-			{
-				OutSelection = *Selection;
-				return true;
-			}
-		}
-		return false;
-	}
-
-	bool GetFieldSelection(const TArray<FString>& Names, FInputSelectorFieldData& OutSelection)
-	{
-		if (Names.IsEmpty()) { return false; }
-		const FString& STR = Names.Num() > 1 ? Names[1].ToUpper() : Names[0].ToUpper();
-		if (const FInputSelectorFieldData* Selection = STRMAP_SINGLE_FIELD.Find(STR))
-		{
-			OutSelection = *Selection;
-			return true;
-		}
-		return false;
-	}
-
-	bool GetAxisSelection(const TArray<FString>& Names, FInputSelectorAxisData& OutSelection)
-	{
-		if (Names.IsEmpty()) { return false; }
-		for (const FString& Name : Names)
-		{
-			if (const FInputSelectorAxisData* Selection = STRMAP_AXIS.Find(Name.ToUpper()))
-			{
-				OutSelection = *Selection;
-				return true;
-			}
-		}
-		return false;
-	}
-
-	//
 	// FSubSelection constructors
 	//
 
@@ -120,46 +76,80 @@ namespace PCGExData
 
 	void FSubSelection::Init(const TArray<FString>& ExtraNames)
 	{
-		// Parse extra selector names (e.g. "$Position.X" → component=Position, field=X)
-		// to determine what part of a compound attribute type to read/write.
-		// Priority: axis (Forward/Right/Up) > component (Position/Rotation/Scale) > field (X/Y/Z/W).
-		// Multiple can be combined (e.g. "$Rotation.Forward" = axis from rotation component).
+		// Chain-backed parser. Builds a step sequence via FSubAccessorRegistry,
+		// then projects it onto the legacy flag layout so external readers
+		// (BlendOpFactory, AttributeRemap, ProxyData, FCachedSubSelection)
+		// keep working unchanged.
+		//
+		// The flag-population sequence below intentionally mirrors the
+		// pre-refactor STRMAP parser exactly, including the SetFieldIndex(0)
+		// side-effect that always sets bIsValid+bIsFieldSet for non-empty
+		// inputs and the {Rotation, Quaternion} component default. See the
+		// migration doc (.claude/migration_5.8_phase6_subaccessor_stage1.md)
+		// for the rationale and a note on the latent bugs locked in by
+		// parity.
+
+		ParsedChain.Reset();
+
 		if (ExtraNames.IsEmpty())
 		{
 			bIsValid = false;
 			return;
 		}
 
-		FInputSelectorAxisData AxisIDMapping = FInputSelectorAxisData{EPCGExAxis::Forward, EPCGMetadataTypes::Unknown};
-		FInputSelectorComponentData ComponentIDMapping = {PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion};
-		FInputSelectorFieldData FieldIDMapping = {PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Unknown, 0};
+		FSubAccessorRegistry::ParseChain(ExtraNames, EPCGMetadataTypes::Unknown, ParsedChain);
 
-		bIsAxisSet = GetAxisSelection(ExtraNames, AxisIDMapping);
-		Axis = AxisIDMapping.Get<0>();
-
-		bIsComponentSet = GetComponentSelection(ExtraNames, ComponentIDMapping);
-
-		if (bIsAxisSet)
+		// Locate steps by accessor identity. ParseChain produces at most one
+		// of each kind under the Stage 1 positional rule.
+		const FSubSelectionStep* AxisStep = nullptr;
+		const FSubSelectionStep* CompStep = nullptr;
+		const FSubSelectionStep* FieldStep = nullptr;
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
 		{
-			bIsValid = true;
-			bIsComponentSet = GetComponentSelection(ExtraNames, ComponentIDMapping);
-		}
-		else
-		{
-			bIsValid = bIsComponentSet;
+			const FString Name = Step.Accessor->GetDisplayName();
+			if (Name == TEXT("Axis")) { AxisStep = &Step; }
+			else if (Name == TEXT("TransformPart")) { CompStep = &Step; }
+			else if (Name == TEXT("SingleField")) { FieldStep = &Step; }
 		}
 
-		Component = ComponentIDMapping.Get<0>();
-		PossibleSourceType = ComponentIDMapping.Get<1>();
+		// Axis.
+		bIsAxisSet = (AxisStep != nullptr);
+		Axis = AxisStep ? AxisStep->Parsed.Axis : EPCGExAxis::Forward;
 
-		bIsFieldSet = GetFieldSelection(ExtraNames, FieldIDMapping);
-		Field = FieldIDMapping.Get<0>();
-		SetFieldIndex(FieldIDMapping.Get<2>());
+		// Component, with legacy default {Rotation, Quaternion} when no match.
+		bIsComponentSet = (CompStep != nullptr);
+		const PCGExTypeOps::ETransformPart ComponentLocal =
+			CompStep ? CompStep->Parsed.Component : PCGExTypeOps::ETransformPart::Rotation;
+		const EPCGMetadataTypes ComponentHint =
+			CompStep ? CompStep->Parsed.SourceTypeHint : EPCGMetadataTypes::Quaternion;
 
+		// bIsValid pre-field.
+		if (bIsAxisSet) { bIsValid = true; }
+		else { bIsValid = bIsComponentSet; }
+
+		Component = ComponentLocal;
+		PossibleSourceType = ComponentHint;
+
+		// Field with legacy default {X, Unknown, 0} when no match.
+		bIsFieldSet = (FieldStep != nullptr);
+		const PCGExTypeOps::ESingleField FieldLocal =
+			FieldStep ? FieldStep->Parsed.Field : PCGExTypeOps::ESingleField::X;
+		const int32 FieldIndexLocal = FieldStep ? FieldStep->Parsed.FieldIndex : 0;
+		const EPCGMetadataTypes FieldHint =
+			FieldStep ? FieldStep->Parsed.SourceTypeHint : EPCGMetadataTypes::Unknown;
+
+		Field = FieldLocal;
+
+		// SetFieldIndex side-effect: always called with the parsed (or default 0)
+		// index. This is what forces bIsValid=true and bIsFieldSet=true on every
+		// non-empty Init -- a load-bearing legacy behavior.
+		SetFieldIndex(FieldIndexLocal);
+
+		// Post-SetFieldIndex: bIsFieldSet is now true.
 		if (bIsFieldSet)
 		{
 			bIsValid = true;
-			if (!bIsComponentSet) { PossibleSourceType = FieldIDMapping.Get<1>(); }
+			if (!bIsComponentSet) { PossibleSourceType = FieldHint; }
 		}
 	}
 

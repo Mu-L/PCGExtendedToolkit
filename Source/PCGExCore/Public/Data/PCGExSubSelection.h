@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "Data/PCGExSubAccessor.h"
 #include "Math/PCGExMathAxis.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Types/PCGExTypeOps.h"
@@ -23,65 +24,6 @@ namespace PCGExData
 	// Forward declarations
 	class ISubSelectorOps;
 
-
-#pragma region Field helpers
-
-	using FInputSelectorComponentData = TTuple<PCGExTypeOps::ETransformPart, EPCGMetadataTypes>;
-	static const TMap<FString, FInputSelectorComponentData> STRMAP_TRANSFORM_FIELD = {
-		{TEXT("POSITION"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Position, EPCGMetadataTypes::Vector}},
-		{TEXT("POS"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Position, EPCGMetadataTypes::Vector}},
-		{TEXT("ROTATION"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-		{TEXT("ROT"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-		{TEXT("ORIENT"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-		{TEXT("SCALE"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Scale, EPCGMetadataTypes::Vector}},
-	};
-
-	using FInputSelectorFieldData = TTuple<PCGExTypeOps::ESingleField, EPCGMetadataTypes, int32>;
-	static const TMap<FString, FInputSelectorFieldData> STRMAP_SINGLE_FIELD = {
-		{TEXT("X"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("R"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
-		{TEXT("ROLL"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
-		{TEXT("RX"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
-		{TEXT("Y"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Vector, 1}},
-		{TEXT("G"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Vector4, 1}},
-		{TEXT("YAW"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Quaternion, 1}},
-		{TEXT("RY"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Quaternion, 1}},
-		{TEXT("Z"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Vector, 2}},
-		{TEXT("B"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Vector4, 2}},
-		{TEXT("P"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
-		{TEXT("PITCH"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
-		{TEXT("RZ"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
-		{TEXT("W"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::W, EPCGMetadataTypes::Vector4, 3}},
-		{TEXT("A"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::W, EPCGMetadataTypes::Vector4, 3}},
-		{TEXT("L"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("LEN"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("LENGTH"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("SQUAREDLENGTH"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("LENSQR"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("VOL"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Volume, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("VOLUME"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Volume, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("SUM"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Sum, EPCGMetadataTypes::Vector, 0}},
-	};
-
-	using FInputSelectorAxisData = TTuple<EPCGExAxis, EPCGMetadataTypes>;
-	static const TMap<FString, FInputSelectorAxisData> STRMAP_AXIS = {
-		{TEXT("FORWARD"), FInputSelectorAxisData{EPCGExAxis::Forward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("FRONT"), FInputSelectorAxisData{EPCGExAxis::Forward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("BACKWARD"), FInputSelectorAxisData{EPCGExAxis::Backward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("BACK"), FInputSelectorAxisData{EPCGExAxis::Backward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("RIGHT"), FInputSelectorAxisData{EPCGExAxis::Right, EPCGMetadataTypes::Quaternion}},
-		{TEXT("LEFT"), FInputSelectorAxisData{EPCGExAxis::Left, EPCGMetadataTypes::Quaternion}},
-		{TEXT("UP"), FInputSelectorAxisData{EPCGExAxis::Up, EPCGMetadataTypes::Quaternion}},
-		{TEXT("TOP"), FInputSelectorAxisData{EPCGExAxis::Up, EPCGMetadataTypes::Quaternion}},
-		{TEXT("DOWN"), FInputSelectorAxisData{EPCGExAxis::Down, EPCGMetadataTypes::Quaternion}},
-		{TEXT("BOTTOM"), FInputSelectorAxisData{EPCGExAxis::Down, EPCGMetadataTypes::Quaternion}},
-	};
-
-	bool GetComponentSelection(const TArray<FString>& Names, FInputSelectorComponentData& OutSelection);
-	bool GetFieldSelection(const TArray<FString>& Names, FInputSelectorFieldData& OutSelection);
-	bool GetAxisSelection(const TArray<FString>& Names, FInputSelectorAxisData& OutSelection);
-
-#pragma endregion
 
 	/**
 	 * FSubSelection - Sub-selection configuration and type-erased operations
@@ -126,6 +68,17 @@ namespace PCGExData
 		explicit FSubSelection(const FString& Path, const UPCGData* InData = nullptr);
 
 		/**
+		 * Read-only access to the chain produced by Init. Empty when Init
+		 * was given empty ExtraNames or when the FSubSelection was
+		 * default-constructed and never re-Init'd.
+		 *
+		 * Stage 1: chain is informational only -- ApplyGet/ApplySet still
+		 * route through the legacy flag-driven dispatch. Stage 3 will use
+		 * the chain in the hot path.
+		 */
+		FORCEINLINE const FSubSelectionChain& GetChain() const { return ParsedChain; }
+
+		/**
 		 * Get the resulting type when this sub-selection is applied
 		 * 
 		 * - Field selection → Double
@@ -156,6 +109,12 @@ namespace PCGExData
 
 	protected:
 		void Init(const TArray<FString>& ExtraNames);
+
+		/**
+		 * Parsed chain. Populated by Init via FSubAccessorRegistry::ParseChain.
+		 * Empty for default-constructed instances or empty ExtraNames.
+		 */
+		FSubSelectionChain ParsedChain;
 
 	public:
 		//
