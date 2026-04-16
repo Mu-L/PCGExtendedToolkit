@@ -8,6 +8,11 @@
 
 namespace PCGExData
 {
+	//
+	// Legacy SubSelectionImpl fn-getter helpers retained for external users.
+	// FCachedSubSelection itself no longer calls these (Stage 3 moved
+	// everything into the compiled chain's per-step fn pointers).
+	//
 	namespace SubSelectionImpl
 	{
 		FExtractFieldFn GetExtractFieldFn(EPCGMetadataTypes Type)
@@ -37,287 +42,165 @@ namespace PCGExData
 			switch (Type)
 			{
 			case EPCGMetadataTypes::Quaternion: return &PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis;
-			case EPCGMetadataTypes::Rotator: return &PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis;
-			case EPCGMetadataTypes::Transform: return &PCGExTypeOps::FTypeOps<FTransform>::ExtractAxis;
+			case EPCGMetadataTypes::Rotator:    return &PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis;
+			case EPCGMetadataTypes::Transform:  return &PCGExTypeOps::FTypeOps<FTransform>::ExtractAxis;
 			default: return &ExtractAxisDefault;
 			}
 		}
-
-		// Helper to get number of fields for a type
-		int32 GetNumFields(EPCGMetadataTypes Type)
-		{
-			switch (Type)
-			{
-			case EPCGMetadataTypes::Vector2: return 2;
-			case EPCGMetadataTypes::Vector:
-			case EPCGMetadataTypes::Rotator: return 3;
-			case EPCGMetadataTypes::Vector4:
-			case EPCGMetadataTypes::Quaternion: return 4;
-			case EPCGMetadataTypes::Transform: return 9;
-			default: return 1;
-			}
-		}
-
-		bool SupportsAxisExtraction(EPCGMetadataTypes Type)
-		{
-			return Type == EPCGMetadataTypes::Quaternion ||
-				Type == EPCGMetadataTypes::Rotator ||
-				Type == EPCGMetadataTypes::Transform;
-		}
 	}
+
+	//
+	// FCachedSubSelection
+	//
 
 	void FCachedSubSelection::Initialize(
 		const FSubSelection& Selection,
 		EPCGMetadataTypes InRealType,
 		EPCGMetadataTypes InWorkingType)
 	{
-		// Copy configuration
 		bIsValid = Selection.bIsValid;
-		bIsFieldSet = Selection.bIsFieldSet;
-		bIsAxisSet = Selection.bIsAxisSet;
-		bIsComponentSet = Selection.bIsComponentSet;
-		Field = Selection.Field;
-		Axis = Selection.Axis;
-		Component = Selection.Component;
-
 		RealType = InRealType;
 		WorkingType = InWorkingType;
 
-		// Determine component type for transforms
-		if (bIsComponentSet && InRealType == EPCGMetadataTypes::Transform)
-		{
-			switch (Component)
-			{
-			case PCGExTypeOps::ETransformPart::Position:
-			case PCGExTypeOps::ETransformPart::Scale: ComponentType = EPCGMetadataTypes::Vector;
-				break;
-			case PCGExTypeOps::ETransformPart::Rotation: ComponentType = EPCGMetadataTypes::Quaternion;
-				break;
-			}
-		}
+		// Start from the parser-produced chain, then run the Stage 3 compiler
+		// to drop/promote steps based on RealType. The compiler also fills
+		// each remaining step's typed fn pointers, so the hot path has zero
+		// per-call lookups.
+		CompiledChain = Selection.GetChain();
+		CompileChainForSource(CompiledChain, RealType);
 
-		// Cache type ops
+		FinalChainType = CompiledChain.Steps.IsEmpty() ? RealType : CompiledChain.Steps.Last().OutType;
+
+		// Type ops for copy/default (callers that rely on these).
 		RealOps = PCGExTypeOps::FTypeOpsRegistry::Get(RealType);
 		WorkingOps = PCGExTypeOps::FTypeOpsRegistry::Get(WorkingType);
 
-		// Cache field operation function pointers
-		ExtractFieldFromReal = SubSelectionImpl::GetExtractFieldFn(RealType);
-		InjectFieldToReal = SubSelectionImpl::GetInjectFieldFn(RealType);
-		ExtractFieldFromWorking = SubSelectionImpl::GetExtractFieldFn(WorkingType);
-		InjectFieldToWorking = SubSelectionImpl::GetInjectFieldFn(WorkingType);
-
-		// Cache axis extraction
-		ExtractAxisFromReal = SubSelectionImpl::GetExtractAxisFn(RealType);
-
-		// Cache transform component operations (only for Transform type)
-		if (RealType == EPCGMetadataTypes::Transform)
-		{
-			ExtractComponent = &PCGExTypeOps::FTypeOps<FTransform>::ExtractComponent;
-			InjectComponent = &PCGExTypeOps::FTypeOps<FTransform>::InjectComponent;
-		}
-
-		// Cache conversion functions
-		ConvertRealToWorking = PCGExTypeOps::FConversionTable::GetConversionFn(RealType, WorkingType);
-		ConvertWorkingToReal = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, RealType);
-		ConvertWorkingToDouble = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, EPCGMetadataTypes::Double);
-		ConvertDoubleToWorking = PCGExTypeOps::FConversionTable::GetConversionFn(EPCGMetadataTypes::Double, WorkingType);
-		ConvertRealToDouble = PCGExTypeOps::FConversionTable::GetConversionFn(RealType, EPCGMetadataTypes::Double);
-		ConvertDoubleToReal = PCGExTypeOps::FConversionTable::GetConversionFn(EPCGMetadataTypes::Double, RealType);
-	}
-
-	bool FCachedSubSelection::AppliesToSourceRead() const
-	{
-		if (!bIsValid) { return false; }
-
-		// For field selection, only applies if source has multiple fields
-		if (bIsFieldSet) { return SubSelectionImpl::GetNumFields(RealType) > 1; }
-
-		// For axis selection, only applies if source is rotation type
-		if (bIsAxisSet) { return SubSelectionImpl::SupportsAxisExtraction(RealType); }
-
-		// For component selection, only applies to Transform
-		if (bIsComponentSet) { return RealType == EPCGMetadataTypes::Transform; }
-
-		return false;
-	}
-
-	bool FCachedSubSelection::AppliesToTargetWrite() const
-	{
-		if (!bIsValid) { return false; }
-
-		// For field selection, only applies if target has multiple fields
-		if (bIsFieldSet) { return SubSelectionImpl::GetNumFields(RealType) > 1; }
-
-		// For component selection, only applies to Transform
-		if (bIsComponentSet) { return RealType == EPCGMetadataTypes::Transform; }
-
-		return false;
+		// Conversions.
+		// ConvertReal*Working are used on the identity (no-chain) path and by
+		// ConvertGet/ConvertSet. ConvertFinal*Working are used on the
+		// chain-active path to bridge the chain's final OutType and the
+		// blender's WorkingType.
+		ConvertRealToWorking  = PCGExTypeOps::FConversionTable::GetConversionFn(RealType, WorkingType);
+		ConvertWorkingToReal  = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, RealType);
+		ConvertFinalToWorking = PCGExTypeOps::FConversionTable::GetConversionFn(FinalChainType, WorkingType);
+		ConvertWorkingToFinal = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, FinalChainType);
 	}
 
 	void FCachedSubSelection::ApplyGet(const void* Source, void* OutValue) const
 	{
-		if (!bIsValid || !AppliesToSourceRead())
+		if (CompiledChain.Steps.IsEmpty())
 		{
-			// No applicable sub-selection - just convert
+			// No sub-selection applies (either user asked for nothing or the
+			// compiler dropped every step as nonsensical). Plain convert.
 			if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
 			return;
 		}
 
-		// Handle component extraction for Transform
-		if (bIsComponentSet && RealType == EPCGMetadataTypes::Transform)
+		// Walk the chain with double-buffered intermediates. Step N's input
+		// is either Source (step 0) or the previous step's output buffer.
+		// For the last step, we write directly to OutValue only if no
+		// FinalChainType -> WorkingType conversion is needed. Otherwise we
+		// land the chain output in a buffer and run ConvertFinalToWorking.
+		alignas(16) uint8 BufA[96];
+		alignas(16) uint8 BufB[96];
+		void* Bufs[2] = { BufA, BufB };
+
+		const void* CurrentIn = Source;
+		int32 BufIdx = 0;
+		const int32 LastIdx = CompiledChain.Steps.Num() - 1;
+
+		for (int32 i = 0; i < LastIdx; ++i)
 		{
-			ApplyGetWithComponent(Source, OutValue);
+			const FSubSelectionStep& Step = CompiledChain.Steps[i];
+			check(Step.StepGetFn);
+
+			void* StepOut = Bufs[BufIdx];
+			Step.StepGetFn(CurrentIn, StepOut, Step.Parsed);
+			CurrentIn = StepOut;
+			BufIdx = 1 - BufIdx;
+		}
+
+		const FSubSelectionStep& Last = CompiledChain.Steps[LastIdx];
+		check(Last.StepGetFn);
+
+		if (FinalChainType == WorkingType)
+		{
+			// Direct write: chain's final output is already the working type.
+			Last.StepGetFn(CurrentIn, OutValue, Last.Parsed);
 			return;
 		}
 
-		// Handle axis extraction
-		if (bIsAxisSet && ExtractAxisFromReal)
-		{
-			const FVector AxisDir = ExtractAxisFromReal(Source, Axis);
-
-			// Convert FVector to WorkingType
-			if (WorkingType == EPCGMetadataTypes::Vector) { *static_cast<FVector*>(OutValue) = AxisDir; }
-			// Need to convert FVector → WorkingType
-			else { PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Vector, &AxisDir, WorkingType, OutValue); }
-			return;
-		}
-
-		// Handle field extraction
-		if (bIsFieldSet && ExtractFieldFromReal)
-		{
-			const double FieldValue = ExtractFieldFromReal(Source, Field);
-
-			// Convert double to WorkingType
-			if (WorkingType == EPCGMetadataTypes::Double) { *static_cast<double*>(OutValue) = FieldValue; }
-			else if (ConvertDoubleToWorking) { ConvertDoubleToWorking(&FieldValue, OutValue); }
-			return;
-		}
-
-		// Fallback - just convert
-		if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
+		// Indirect: write to intermediate buffer, then convert.
+		void* FinalBuf = Bufs[BufIdx];
+		Last.StepGetFn(CurrentIn, FinalBuf, Last.Parsed);
+		if (ConvertFinalToWorking) { ConvertFinalToWorking(FinalBuf, OutValue); }
 	}
 
 	void FCachedSubSelection::ApplySet(void* Target, const void* Source) const
 	{
-		if (!bIsValid || !AppliesToTargetWrite())
+		if (CompiledChain.Steps.IsEmpty())
 		{
-			// No applicable sub-selection - just convert
 			if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
 			return;
 		}
 
-		// Handle component injection for Transform
-		if (bIsComponentSet && RealType == EPCGMetadataTypes::Transform)
+		const int32 LastIdx = CompiledChain.Steps.Num() - 1;
+
+		// Any step without a SetFn (e.g., axis) disqualifies the whole chain
+		// for inject. Defensive check -- AppliesToTargetWrite also guards.
+		for (const FSubSelectionStep& Step : CompiledChain.Steps)
 		{
-			ApplySetWithComponent(Target, Source);
-			return;
+			if (!Step.StepSetFn) { return; }
 		}
 
-		// Handle field injection
-		if (bIsFieldSet && InjectFieldToReal)
+		// Stage 3 uses a fixed-size intermediate buffer array. A compiled
+		// chain should never exceed ~3 steps in practice (a user-written
+		// pair can auto-promote by 1 step on Transform source). 4 slots
+		// gives headroom; assertion makes any overflow loud.
+		constexpr int32 MaxSteps = 4;
+		checkf(CompiledChain.Steps.Num() <= MaxSteps,
+			TEXT("FCachedSubSelection chain exceeded MaxSteps (%d > %d)"),
+			CompiledChain.Steps.Num(), MaxSteps);
+
+		alignas(16) uint8 Buffers[MaxSteps][96];
+
+		// 1) Extract phase: walk forward to populate Buffers[0..LastIdx-1]
+		//    with the current state at each depth. Buffers[LastIdx-1] is the
+		//    parent of the last (injection) step.
 		{
-			// Convert source (WorkingType) to double
-			double ScalarValue = 0.0;
-
-			if (WorkingType == EPCGMetadataTypes::Double) { ScalarValue = *static_cast<const double*>(Source); }
-			else if (ConvertWorkingToDouble) { ConvertWorkingToDouble(Source, &ScalarValue); }
-
-			// Inject into target field
-			InjectFieldToReal(Target, ScalarValue, Field);
-			return;
-		}
-
-		// Fallback - just convert
-		if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
-	}
-
-	void FCachedSubSelection::ApplyGetWithComponent(const void* Source, void* OutValue) const
-	{
-		// Extract the component from transform
-		alignas(16) uint8 ComponentBuffer[96];
-
-		if (ExtractComponent)
-		{
-			EPCGMetadataTypes SubType;
-			ExtractComponent(Source, Component, ComponentBuffer, SubType);
-		}
-
-		// Now apply axis or field selection to the component
-		if (bIsAxisSet && Component == PCGExTypeOps::ETransformPart::Rotation)
-		{
-			// Extract axis from quaternion
-			const FVector AxisDir = PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis(ComponentBuffer, Axis);
-
-			if (WorkingType == EPCGMetadataTypes::Vector) { *static_cast<FVector*>(OutValue) = AxisDir; }
-			else { PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Vector, &AxisDir, WorkingType, OutValue); }
-		}
-		else if (bIsFieldSet)
-		{
-			// Extract field from component
-			FExtractFieldFn ExtractFn = SubSelectionImpl::GetExtractFieldFn(ComponentType);
-			if (ExtractFn)
+			const void* CurrentIn = Target;
+			for (int32 i = 0; i < LastIdx; ++i)
 			{
-				const double FieldValue = ExtractFn(ComponentBuffer, Field);
-
-				if (WorkingType == EPCGMetadataTypes::Double) { *static_cast<double*>(OutValue) = FieldValue; }
-				else if (ConvertDoubleToWorking) { ConvertDoubleToWorking(&FieldValue, OutValue); }
+				const FSubSelectionStep& Step = CompiledChain.Steps[i];
+				Step.StepGetFn(CurrentIn, Buffers[i], Step.Parsed);
+				CurrentIn = Buffers[i];
 			}
 		}
-		else
+
+		// 2) Convert Source (WorkingType) to FinalChainType so it matches
+		//    the last step's expected NewChild type. Skip the conversion
+		//    when the two types are identical.
+		alignas(16) uint8 NewChildBuf[96];
+		const void* NewChild = Source;
+		if (WorkingType != FinalChainType)
 		{
-			// Just output the component
-			PCGExTypeOps::FConversionTable::Convert(
-				ComponentType, ComponentBuffer,
-				WorkingType, OutValue);
+			if (ConvertWorkingToFinal) { ConvertWorkingToFinal(Source, NewChildBuf); }
+			else { return; } // Can't bridge -- bail out.
+			NewChild = NewChildBuf;
 		}
-	}
 
-	void FCachedSubSelection::ApplySetWithComponent(void* Target, const void* Source) const
-	{
-		FTransform& T = *static_cast<FTransform*>(Target);
+		// 3) Inject phase: mutate the last-step's parent with the converted
+		//    NewChild. Then walk backward, propagating each mutation up.
+		void* LastParent = (LastIdx == 0) ? Target : Buffers[LastIdx - 1];
+		const FSubSelectionStep& Last = CompiledChain.Steps[LastIdx];
+		Last.StepSetFn(LastParent, NewChild, Last.Parsed);
 
-		if (bIsFieldSet)
+		for (int32 i = LastIdx - 1; i >= 0; --i)
 		{
-			// Convert source to double
-			double ScalarValue = 0.0;
-
-			if (WorkingType == EPCGMetadataTypes::Double) { ScalarValue = *static_cast<const double*>(Source); }
-			else if (ConvertWorkingToDouble) { ConvertWorkingToDouble(Source, &ScalarValue); }
-
-			// Inject into the appropriate component
-			switch (Component)
-			{
-			case PCGExTypeOps::ETransformPart::Position:
-				{
-					FVector Pos = T.GetLocation();
-					PCGExTypeOps::FTypeOps<FVector>::InjectField(&Pos, ScalarValue, Field);
-					T.SetLocation(Pos);
-				}
-				break;
-			case PCGExTypeOps::ETransformPart::Rotation:
-				{
-					FQuat Rot = T.GetRotation();
-					PCGExTypeOps::FTypeOps<FQuat>::InjectField(&Rot, ScalarValue, Field);
-					T.SetRotation(Rot);
-				}
-				break;
-			case PCGExTypeOps::ETransformPart::Scale:
-				{
-					FVector Scale = T.GetScale3D();
-					PCGExTypeOps::FTypeOps<FVector>::InjectField(&Scale, ScalarValue, Field);
-					T.SetScale3D(Scale);
-				}
-				break;
-			}
-		}
-		else
-		{
-			// Set the whole component
-			alignas(16) uint8 ComponentBuffer[96];
-
-			// Convert source to component type
-			PCGExTypeOps::FConversionTable::Convert(WorkingType, Source, ComponentType, ComponentBuffer);
-			if (InjectComponent) { InjectComponent(Target, Component, ComponentBuffer, ComponentType); }
+			const FSubSelectionStep& Step = CompiledChain.Steps[i];
+			void* Parent = (i == 0) ? Target : Buffers[i - 1];
+			const void* Child = Buffers[i];
+			Step.StepSetFn(Parent, Child, Step.Parsed);
 		}
 	}
 }

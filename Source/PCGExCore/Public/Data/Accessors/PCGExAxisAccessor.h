@@ -32,5 +32,10 @@ namespace PCGExData
 		                      const FAccessorParseResult& Parsed) const override;
 
 		virtual FString GetDisplayName() const override;
+
+		virtual FStepGetFn GetStepGetFn(EPCGMetadataTypes InType) const override;
+		// GetStepSetFn inherits default nullptr -- axes are read-only.
+		virtual ECompileAction ClassifyForInType(EPCGMetadataTypes InType,
+		                                         const FAccessorParseResult& Parsed) const override;
 	};
 }

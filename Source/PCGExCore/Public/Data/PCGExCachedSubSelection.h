@@ -1,23 +1,30 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExSubAccessor.h"
 #include "PCGExSubSelection.h"
 #include "Types/PCGExTypeOps.h"
 
 /**
  * PCGEx Cached Sub-Selection Operations
- * 
- * This header provides FCachedSubSelection - a structure that caches all
- * function pointers and type operations needed for sub-selection at construction
- * time, eliminating repeated registry lookups during hot loops.
- * 
+ *
+ * FCachedSubSelection caches a compiled sub-accessor chain plus the
+ * conversion fn pointers needed to move values between the attribute's
+ * real type, the chain's final type, and the blender's working type.
+ *
+ * Stage 3 rewrote this struct around chain walking: Initialize runs
+ * CompileChainForSource against the parsed chain to drop/promote steps
+ * based on the real type, resolves per-step fn pointers once, and the
+ * hot path ApplyGet/ApplySet just walk the compiled steps without any
+ * flag-driven branching or vtable dispatch on accessors.
+ *
  * Usage:
  *   // At proxy construction:
  *   CachedSubSelection.Initialize(SubSelection, RealType, WorkingType);
- *   
+ *
  *   // At runtime (hot path):
  *   CachedSubSelection.ApplyGet(Source, OutValue);  // No lookups!
  *   CachedSubSelection.ApplySet(Target, Source);    // No lookups!
@@ -26,30 +33,14 @@
 namespace PCGExData
 {
 	/**
-	 * Function pointer types for sub-selection operations
+	 * Legacy fn-pointer typedefs retained for any external helper that
+	 * still references them. FCachedSubSelection no longer uses these
+	 * internally.
 	 */
-
-	// Extract field value: double = ExtractField(const void* Value, ESingleField Field)
 	using FExtractFieldFn = double (*)(const void* Value, PCGExTypeOps::ESingleField Field);
-
-	// Inject field value: void InjectField(void* Target, double Value, ESingleField Field)  
 	using FInjectFieldFn = void (*)(void* Target, double Value, PCGExTypeOps::ESingleField Field);
-
-	// Extract axis direction: FVector = ExtractAxis(const void* Rotation, EPCGExAxis Axis)
 	using FExtractAxisFn = FVector (*)(const void* Value, EPCGExAxis Axis);
 
-	// Extract transform component: void ExtractComponent(const void* Transform, void* Out)
-	using FExtractComponentFn = void (*)(const void* Transform, PCGExTypeOps::ETransformPart Part, void* OutValue, EPCGMetadataTypes& OutType);
-
-	// Inject transform component: void InjectComponent(void* Transform, const void* Value)
-	using FInjectComponentFn = void (*)(void* Transform, PCGExTypeOps::ETransformPart Part, const void* Value, EPCGMetadataTypes ValueType);
-
-	/**
-	 * Sub-selection function implementations per type
-	 * 
-	 * These are the actual implementations that get cached as function pointers.
-	 * Only one set exists per type (14 total), not 14x14 combinations.
-	 */
 	namespace SubSelectionImpl
 	{
 		static FORCEINLINE FVector ExtractAxisDefault(const void* Value, EPCGExAxis Axis) { return FVector::ForwardVector; }
@@ -60,142 +51,101 @@ namespace PCGExData
 	}
 
 	/**
-	 * FCachedSubSelection - Pre-resolved sub-selection operations
-	 * 
-	 * Caches all function pointers and type operations at construction time.
-	 * Designed to be embedded in IBufferProxy for zero-overhead sub-selection
-	 * during hot loops.
-	 * 
-	 * Memory: ~80 bytes (function pointers + configuration)
+	 * FCachedSubSelection -- pre-compiled chain + type conversions.
+	 *
+	 * Memory layout (approx): one FSubSelectionChain (48 bytes + inline
+	 * storage for up to 2 steps, each ~56 bytes) + ~8 fn pointers + a few
+	 * enums. Stays under ~300 bytes for typical 1-2-step chains.
+	 *
+	 * Max supported chain length is 4 steps (auto-promotion can add one
+	 * step ahead of a user-written pair, for a total of 3 in practice;
+	 * the extra slot is a safety margin). Asserted at hot-path time.
 	 */
 	struct PCGEXCORE_API FCachedSubSelection
 	{
-		//
-		// Configuration (copied from FSubSelection)
-		//
+		// Set to Selection.bIsValid at Initialize time. External callers
+		// still read this to decide whether sub-selection is active at
+		// all. True iff the pre-compile chain had any steps.
 		bool bIsValid = false;
-		bool bIsFieldSet = false;
-		bool bIsAxisSet = false;
-		bool bIsComponentSet = false;
 
-		PCGExTypeOps::ESingleField Field = PCGExTypeOps::ESingleField::X;
-		EPCGExAxis Axis = EPCGExAxis::Forward;
-		PCGExTypeOps::ETransformPart Component = PCGExTypeOps::ETransformPart::Position;
-
-		//
-		// Cached type information
-		//
+		// Type info
 		EPCGMetadataTypes RealType = EPCGMetadataTypes::Unknown;
 		EPCGMetadataTypes WorkingType = EPCGMetadataTypes::Unknown;
-		EPCGMetadataTypes ComponentType = EPCGMetadataTypes::Unknown; // Vector or Quaternion for transform components
+		EPCGMetadataTypes FinalChainType = EPCGMetadataTypes::Unknown;
 
-		//
-		// Cached function pointers - resolved once at initialization
-		//
+		// Compiled chain. Empty after compilation means no sub-selection
+		// applies (either user-empty, or every step got dropped as
+		// nonsensical for RealType). Hot path short-circuits to plain
+		// Real<->Working conversion.
+		FSubSelectionChain CompiledChain;
 
-		// Field operations on RealType
-		FExtractFieldFn ExtractFieldFromReal = nullptr;
-		FInjectFieldFn InjectFieldToReal = nullptr;
-
-		// Field operations on WorkingType (for when we need to work with working type directly)
-		FExtractFieldFn ExtractFieldFromWorking = nullptr;
-		FInjectFieldFn InjectFieldToWorking = nullptr;
-
-		// Axis extraction from RealType (rotation types only)
-		FExtractAxisFn ExtractAxisFromReal = nullptr;
-
-		// Transform component operations (transform type only)
-		FExtractComponentFn ExtractComponent = nullptr;
-		FInjectComponentFn InjectComponent = nullptr;
-
-		// Conversion functions
+		// Identity conversions (used when CompiledChain is empty, and by
+		// ConvertGet/ConvertSet).
 		PCGExTypeOps::FConvertFn ConvertRealToWorking = nullptr;
 		PCGExTypeOps::FConvertFn ConvertWorkingToReal = nullptr;
-		PCGExTypeOps::FConvertFn ConvertWorkingToDouble = nullptr;
-		PCGExTypeOps::FConvertFn ConvertDoubleToWorking = nullptr;
-		PCGExTypeOps::FConvertFn ConvertRealToDouble = nullptr;
-		PCGExTypeOps::FConvertFn ConvertDoubleToReal = nullptr;
 
-		// Type ops for copy/default operations
+		// Post-chain / pre-chain conversions (used when CompiledChain is
+		// non-empty). FinalChainType <-> WorkingType.
+		PCGExTypeOps::FConvertFn ConvertFinalToWorking = nullptr;
+		PCGExTypeOps::FConvertFn ConvertWorkingToFinal = nullptr;
+
+		// Type ops kept for callers that already used these for default/copy
+		// semantics via FCachedSubSelection (e.g., IBufferProxy).
 		const PCGExTypeOps::ITypeOpsBase* RealOps = nullptr;
 		const PCGExTypeOps::ITypeOpsBase* WorkingOps = nullptr;
-
-		//
-		// Constructors
-		//
 
 		FCachedSubSelection() = default;
 
 		/**
-		 * Initialize from FSubSelection and type information
-		 * 
-		 * This resolves all function pointers once. After this call,
-		 * ApplyGet/ApplySet use only cached pointers with no lookups.
+		 * Initialize from a parsed FSubSelection + Real/Working types.
+		 * Runs CompileChainForSource against RealType, caches all per-step
+		 * fn pointers, resolves conversions. After this call the hot path
+		 * uses only cached state.
 		 */
 		void Initialize(const FSubSelection& Selection,
 		                EPCGMetadataTypes InRealType,
 		                EPCGMetadataTypes InWorkingType);
 
 		/**
-		 * Check if sub-selection applies to source reads
-		 * 
-		 * Returns true if reading from RealType should apply sub-selection.
-		 * For scalar sources (like double), field selection doesn't apply to reads.
+		 * True iff the compiled chain has at least one step (i.e., the
+		 * sub-selection actually changes the output).
 		 */
-		bool AppliesToSourceRead() const;
+		FORCEINLINE bool AppliesToSourceRead() const { return !CompiledChain.Steps.IsEmpty(); }
+		FORCEINLINE bool AppliesToTargetWrite() const
+		{
+			// Inject needs every step to have a writable SetFn. Axis-only
+			// chains (read-only) can't drive inject.
+			if (CompiledChain.Steps.IsEmpty()) { return false; }
+			for (const FSubSelectionStep& Step : CompiledChain.Steps)
+			{
+				if (!Step.StepSetFn) { return false; }
+			}
+			return true;
+		}
 
 		/**
-		 * Check if sub-selection applies to target writes
-		 * 
-		 * Returns true if writing to RealType should apply sub-selection.
-		 */
-		bool AppliesToTargetWrite() const;
-
-		//
-		// Hot-path operations - use only cached function pointers
-		//
-
-		/**
-		 * Apply sub-selection when reading (Get direction)
-		 * 
-		 * Reads from Source (RealType), applies sub-selection, outputs to OutValue (WorkingType).
-		 * Uses only cached function pointers - no registry lookups.
-		 * 
-		 * @param Source Pointer to source value (RealType)
-		 * @param OutValue Pointer to output buffer (WorkingType)
+		 * Hot path extract. Reads Source (RealType), walks the compiled
+		 * chain, converts the chain's final output to WorkingType into
+		 * OutValue.
 		 */
 		void ApplyGet(const void* Source, void* OutValue) const;
 
 		/**
-		 * Apply sub-selection when writing (Set direction)
-		 * 
-		 * Takes Source (WorkingType), applies sub-selection, writes to Target (RealType).
-		 * Uses only cached function pointers - no registry lookups.
-		 * 
-		 * @param Target Pointer to target value (RealType), modified in place
-		 * @param Source Pointer to source value (WorkingType)
+		 * Hot path inject. Reads Source (WorkingType), walks the chain in
+		 * extract-modify-inject order to mutate Target (RealType).
 		 */
 		void ApplySet(void* Target, const void* Source) const;
 
-		/**
-		 * Get without sub-selection - just convert RealType → WorkingType
-		 */
+		/** No sub-selection: just convert RealType -> WorkingType. */
 		FORCEINLINE void ConvertGet(const void* Source, void* OutValue) const
 		{
 			if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
 		}
 
-		/**
-		 * Set without sub-selection - just convert WorkingType → RealType
-		 */
+		/** No sub-selection: just convert WorkingType -> RealType. */
 		FORCEINLINE void ConvertSet(void* Target, const void* Source) const
 		{
 			if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
 		}
-
-	private:
-		// Internal helpers for complex sub-selection paths
-		void ApplyGetWithComponent(const void* Source, void* OutValue) const;
-		void ApplySetWithComponent(void* Target, const void* Source) const;
 	};
 }

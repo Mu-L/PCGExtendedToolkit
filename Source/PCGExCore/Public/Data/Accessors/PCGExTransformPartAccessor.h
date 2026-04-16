@@ -41,5 +41,10 @@ namespace PCGExData
 		                      const FAccessorParseResult& Parsed) const override;
 
 		virtual FString GetDisplayName() const override;
+
+		virtual FStepGetFn GetStepGetFn(EPCGMetadataTypes InType) const override;
+		virtual FStepSetFn GetStepSetFn(EPCGMetadataTypes InType) const override;
+		virtual ECompileAction ClassifyForInType(EPCGMetadataTypes InType,
+		                                         const FAccessorParseResult& Parsed) const override;
 	};
 }

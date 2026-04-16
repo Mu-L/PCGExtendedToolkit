@@ -152,4 +152,91 @@ namespace PCGExData
 		}
 		return OutChain.bIsValid;
 	}
+
+	//
+	// Stage 3 chain compilation
+	//
+
+	namespace
+	{
+		// Build a synthesized TransformPart step for auto-promotion. The returned
+		// step is compiled (InType/OutType/StepGetFn/StepSetFn populated) and
+		// ready to splice into the chain ahead of a step that needed promotion.
+		FSubSelectionStep MakeTransformPartStep(PCGExTypeOps::ETransformPart Part)
+		{
+			const ISubAccessor* Accessor = FSubAccessorRegistry::GetTransformPartAccessor();
+
+			FSubSelectionStep Step;
+			Step.Accessor = Accessor;
+			Step.Parsed.Component = Part;
+			// Hint mirrors the legacy STRMAP_TRANSFORM_FIELD values.
+			Step.Parsed.SourceTypeHint = (Part == PCGExTypeOps::ETransformPart::Rotation)
+				? EPCGMetadataTypes::Quaternion
+				: EPCGMetadataTypes::Vector;
+			Step.InType = EPCGMetadataTypes::Transform;
+			Accessor->ResolveOutputType(Step.InType, Step.Parsed, Step.OutType);
+			Step.StepGetFn = Accessor->GetStepGetFn(Step.InType);
+			Step.StepSetFn = Accessor->GetStepSetFn(Step.InType);
+			return Step;
+		}
+
+		// Finalize a step: resolve OutType and fill in hot-path fn pointers.
+		void FinalizeCompiledStep(FSubSelectionStep& Step, EPCGMetadataTypes InType)
+		{
+			Step.InType = InType;
+			Step.Accessor->ResolveOutputType(InType, Step.Parsed, Step.OutType);
+			Step.StepGetFn = Step.Accessor->GetStepGetFn(InType);
+			Step.StepSetFn = Step.Accessor->GetStepSetFn(InType);
+		}
+	}
+
+	void CompileChainForSource(FSubSelectionChain& InOutChain, EPCGMetadataTypes SourceType)
+	{
+		// Take ownership of the parser-produced step list, rebuild in-place.
+		TArray<FSubSelectionStep, TInlineAllocator<2>> Original = MoveTemp(InOutChain.Steps);
+		InOutChain.Steps.Reset();
+
+		EPCGMetadataTypes CurrentType = SourceType;
+
+		for (FSubSelectionStep& Step : Original)
+		{
+			// Re-check classification at each step because auto-promoted
+			// TransformPart inserts change the current type.
+			for (;;)
+			{
+				const ISubAccessor::ECompileAction Action =
+					Step.Accessor->ClassifyForInType(CurrentType, Step.Parsed);
+
+				if (Action == ISubAccessor::ECompileAction::Keep)
+				{
+					FinalizeCompiledStep(Step, CurrentType);
+					CurrentType = Step.OutType;
+					InOutChain.Steps.Add(MoveTemp(Step));
+					break;
+				}
+
+				if (Action == ISubAccessor::ECompileAction::Drop)
+				{
+					// Step is nonsensical for the current value type; chain
+					// flows past it at the same type.
+					break;
+				}
+
+				// Promote: insert TransformPart(Position|Rotation) before retrying.
+				const PCGExTypeOps::ETransformPart Part =
+					(Action == ISubAccessor::ECompileAction::PromoteWithRotation)
+					? PCGExTypeOps::ETransformPart::Rotation
+					: PCGExTypeOps::ETransformPart::Position;
+
+				FSubSelectionStep Inserted = MakeTransformPartStep(Part);
+				CurrentType = Inserted.OutType;
+				InOutChain.Steps.Add(MoveTemp(Inserted));
+				// Loop back to re-classify the same Step under the new CurrentType.
+			}
+		}
+
+		InOutChain.SourceTypeHint = SourceType;
+		InOutChain.bIsValid = !InOutChain.Steps.IsEmpty();
+		InOutChain.FinalType = InOutChain.bIsValid ? InOutChain.Steps.Last().OutType : SourceType;
+	}
 }

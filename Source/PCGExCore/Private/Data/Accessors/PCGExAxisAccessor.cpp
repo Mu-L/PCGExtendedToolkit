@@ -91,4 +91,56 @@ namespace PCGExData
 	{
 		return TEXT("Axis");
 	}
+
+	//
+	// Stage 3 typed fn pointers
+	//
+
+	namespace
+	{
+		void AxisGetStep_Quat(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
+		{
+			*static_cast<FVector*>(ChildOut) = PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis(Parent, Parsed.Axis);
+		}
+
+		void AxisGetStep_Rotator(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
+		{
+			*static_cast<FVector*>(ChildOut) = PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis(Parent, Parsed.Axis);
+		}
+	}
+
+	FStepGetFn FAxisAccessor::GetStepGetFn(EPCGMetadataTypes InType) const
+	{
+		switch (InType)
+		{
+		case EPCGMetadataTypes::Quaternion: return &AxisGetStep_Quat;
+		case EPCGMetadataTypes::Rotator:    return &AxisGetStep_Rotator;
+		default: return nullptr;
+		}
+	}
+
+	ISubAccessor::ECompileAction FAxisAccessor::ClassifyForInType(
+		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed) const
+	{
+		(void)Parsed;
+		switch (InType)
+		{
+		case EPCGMetadataTypes::Quaternion:
+		case EPCGMetadataTypes::Rotator:
+			return ECompileAction::Keep;
+
+		// `.Forward` on a Transform attribute conventionally means the forward
+		// axis of its rotation. Auto-promote to [Rotation, Axis] so the chain
+		// is explicit. (FTypeOps<FTransform>::ExtractAxis internally pulled
+		// GetRotation() for the same effect; promotion makes the step graph
+		// a faithful representation of what's happening.)
+		case EPCGMetadataTypes::Transform:
+			return ECompileAction::PromoteWithRotation;
+
+		// Any non-rotation source: axis is nonsensical. Drop so the source
+		// passes through unchanged instead of defaulting to ForwardVector.
+		default:
+			return ECompileAction::Drop;
+		}
+	}
 }

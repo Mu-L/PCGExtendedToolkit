@@ -118,4 +118,94 @@ namespace PCGExData
 	{
 		return TEXT("SingleField");
 	}
+
+	//
+	// Stage 3 typed fn pointers
+	//
+
+	namespace
+	{
+		// Extract direction: ParentPtr at T, ChildOut at double.
+		template <typename T>
+		void FieldGetStep(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
+		{
+			*static_cast<double*>(ChildOut) = PCGExTypeOps::FTypeOps<T>::ExtractField(Parent, Parsed.Field);
+		}
+
+		// Inject direction: ParentInOut at T, NewChild is the double to inject.
+		template <typename T>
+		void FieldSetStep(void* ParentInOut, const void* NewChild, const FAccessorParseResult& Parsed)
+		{
+			const double Value = *static_cast<const double*>(NewChild);
+			PCGExTypeOps::FTypeOps<T>::InjectField(ParentInOut, Value, Parsed.Field);
+		}
+	}
+
+	FStepGetFn FSingleFieldAccessor::GetStepGetFn(EPCGMetadataTypes InType) const
+	{
+		switch (InType)
+		{
+#define PCGEX_CASE(_TYPE, _NAME, ...) case EPCGMetadataTypes::_NAME: return &FieldGetStep<_TYPE>;
+		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_CASE)
+#undef PCGEX_CASE
+		default: return nullptr;
+		}
+	}
+
+	FStepSetFn FSingleFieldAccessor::GetStepSetFn(EPCGMetadataTypes InType) const
+	{
+		switch (InType)
+		{
+#define PCGEX_CASE(_TYPE, _NAME, ...) case EPCGMetadataTypes::_NAME: return &FieldSetStep<_TYPE>;
+		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_CASE)
+#undef PCGEX_CASE
+		default: return nullptr;
+		}
+	}
+
+	ISubAccessor::ECompileAction FSingleFieldAccessor::ClassifyForInType(
+		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed) const
+	{
+		(void)Parsed;
+		switch (InType)
+		{
+		// Multi-component vector + rotation types: field extraction is natively
+		// meaningful (X/Y/Z/W on vectors; X->Roll/Y->Yaw/Z->Pitch on rotations).
+		case EPCGMetadataTypes::Vector2:
+		case EPCGMetadataTypes::Vector:
+		case EPCGMetadataTypes::Vector4:
+		case EPCGMetadataTypes::Quaternion:
+		case EPCGMetadataTypes::Rotator:
+			return ECompileAction::Keep;
+
+		// Scalars: keep. FTypeOps<T>::ExtractField on scalars ignores the field
+		// enum and returns the value cast to double, which matches legacy
+		// FCachedSubSelection behavior (skip-and-convert produces the same output).
+		case EPCGMetadataTypes::Float:
+		case EPCGMetadataTypes::Double:
+		case EPCGMetadataTypes::Integer32:
+		case EPCGMetadataTypes::Integer64:
+		case EPCGMetadataTypes::Boolean:
+			return ECompileAction::Keep;
+
+		// Transform: promote with Position. `.X` on a Transform attribute
+		// conventionally means Position.X; the legacy FTypeOps<FTransform>
+		// ::ExtractField honored that via a direct GetLocation() call but the
+		// symmetric InjectField was UB. Auto-promoting to [Position, Field]
+		// gives the same get output AND a correct set path.
+		case EPCGMetadataTypes::Transform:
+			return ECompileAction::PromoteWithPosition;
+
+		// String family: field of a string is meaningless; drop the step so
+		// the string passes through unchanged.
+		case EPCGMetadataTypes::String:
+		case EPCGMetadataTypes::Name:
+		case EPCGMetadataTypes::SoftObjectPath:
+		case EPCGMetadataTypes::SoftClassPath:
+			return ECompileAction::Drop;
+
+		default:
+			return ECompileAction::Drop;
+		}
+	}
 }

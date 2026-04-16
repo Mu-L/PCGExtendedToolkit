@@ -54,8 +54,10 @@ namespace PCGExData
 		EPCGMetadataTypes SourceTypeHint = EPCGMetadataTypes::Unknown;
 	};
 
-	// Forward decl for FSubSelectionStep.
+	// Forward decls.
 	class ISubAccessor;
+	using FStepGetFn = void (*)(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed);
+	using FStepSetFn = void (*)(void* ParentInOut, const void* NewChild, const FAccessorParseResult& Parsed);
 
 	/**
 	 * FSubSelectionStep
@@ -63,9 +65,9 @@ namespace PCGExData
 	 * One step in a parsed chain: the accessor that matched, its parsed
 	 * payload, and the input/output types for this step in the pipeline.
 	 *
-	 * In Stage 1, InType/OutType may stay Unknown -- the chain is built
-	 * positionally and these fields are populated later in Stage 2 when the
-	 * chain becomes the hot-path source of truth.
+	 * After CompileChainForSource, InType/OutType are resolved and
+	 * StepGetFn/StepSetFn carry direct fn pointers so the hot path can
+	 * invoke each step without vtable dispatch on the accessor.
 	 */
 	struct PCGEXCORE_API FSubSelectionStep
 	{
@@ -73,6 +75,10 @@ namespace PCGExData
 		FAccessorParseResult Parsed;
 		EPCGMetadataTypes InType = EPCGMetadataTypes::Unknown;
 		EPCGMetadataTypes OutType = EPCGMetadataTypes::Unknown;
+
+		// Populated by CompileChainForSource. Hot path calls these directly.
+		FStepGetFn StepGetFn = nullptr;
+		FStepSetFn StepSetFn = nullptr;
 	};
 
 	/**
@@ -95,6 +101,20 @@ namespace PCGExData
 	};
 
 	/**
+	 * Stage 3 hot-path fn-pointer signatures.
+	 *
+	 * FStepGetFn reads Parent (at this step's InType) and writes the
+	 * extracted Child (at this step's OutType) to ChildOut.
+	 *
+	 * FStepSetFn takes a ParentInOut (at this step's InType) and a NewChild
+	 * (at this step's OutType) and modifies Parent so that applying the
+	 * extract again would produce NewChild. Read-only accessors (Axis)
+	 * return nullptr from GetStepSetFn.
+	 */
+	using FStepGetFn = void (*)(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed);
+	using FStepSetFn = void (*)(void* ParentInOut, const void* NewChild, const FAccessorParseResult& Parsed);
+
+	/**
 	 * ISubAccessor
 	 *
 	 * A pluggable accessor that knows how to match tokens, resolve the
@@ -105,7 +125,10 @@ namespace PCGExData
 	 * Stage 1 implementations (FSingleFieldAccessor, FAxisAccessor,
 	 * FTransformPartAccessor) wrap the existing FTypeOps<T> primitives so
 	 * the new code path produces identical results to the legacy STRMAP
-	 * path. Stage 2 absorbs the per-type switches in-house.
+	 * path. Stage 2 consolidates flag-driven dispatch at the FSubSelection
+	 * level. Stage 3 adds typed fn-pointer getters (GetStepGetFn /
+	 * GetStepSetFn) so FCachedSubSelection can cache per-step direct
+	 * function calls without vtable dispatch.
 	 */
 	class PCGEXCORE_API ISubAccessor
 	{
@@ -167,6 +190,49 @@ namespace PCGExData
 		 * Should be a short stable identifier, not a localized string.
 		 */
 		virtual FString GetDisplayName() const = 0;
+
+		//
+		// Stage 3 compiled-chain hot path
+		//
+
+		/**
+		 * Return a direct fn pointer for the extract direction at this
+		 * step's InType. Called once per step during FCachedSubSelection
+		 * Initialize; the returned pointer is cached in the compiled step
+		 * and called without vtable dispatch at hot-path time.
+		 *
+		 * Returns nullptr if this accessor cannot operate on InType (the
+		 * chain compiler drops such steps before they reach the hot path).
+		 */
+		virtual FStepGetFn GetStepGetFn(EPCGMetadataTypes InType) const = 0;
+
+		/**
+		 * Inject counterpart to GetStepGetFn. Returns nullptr for read-only
+		 * accessors (Axis) and for types where inject is not meaningful.
+		 */
+		virtual FStepSetFn GetStepSetFn(EPCGMetadataTypes InType) const { (void)InType; return nullptr; }
+
+		/**
+		 * Chain compilation classifier for the parser-time chain vs the
+		 * compile-time chain. Three outcomes:
+		 *   - Keep: the step applies to SourceType as-is.
+		 *   - Drop: the step is nonsensical for SourceType; the compiler
+		 *     removes it (chain flows on to the next step at SourceType).
+		 *   - PromoteToTransformPart_{Position,Rotation}: user shortcut --
+		 *     auto-insert a TransformPart step before this one. Used when
+		 *     SourceType is Transform and the user asked for axis/field
+		 *     without explicitly picking a component first.
+		 */
+		enum class ECompileAction : uint8
+		{
+			Keep,
+			Drop,
+			PromoteWithPosition,
+			PromoteWithRotation,
+		};
+
+		virtual ECompileAction ClassifyForInType(EPCGMetadataTypes InType,
+		                                         const FAccessorParseResult& Parsed) const = 0;
 	};
 
 	/**
@@ -226,4 +292,24 @@ namespace PCGExData
 	 *   everything else    -> 1
 	 */
 	PCGEXCORE_API int32 GetNumFieldsForType(EPCGMetadataTypes Type);
+
+	/**
+	 * Compile a parsed chain for a concrete source type.
+	 *
+	 * Walks the chain left-to-right. For each step, classifies against the
+	 * current value type (starting from SourceType; each kept step updates
+	 * the current type to its OutType):
+	 *   - Keep:   step is compatible; appended to the compiled chain as-is.
+	 *   - Drop:   step is nonsensical for the current type; removed.
+	 *   - Promote: insert an implicit TransformPart step before this one,
+	 *              then retry (e.g., `.Forward` on a Transform source gets
+	 *              promoted to `.Rotation.Forward`; `.X` on a Transform
+	 *              source gets promoted to `.Position.X`).
+	 *
+	 * Also fills in each step's InType, OutType, StepGetFn, StepSetFn so
+	 * the compiled chain is ready for direct invocation without further
+	 * accessor lookups.
+	 */
+	PCGEXCORE_API void CompileChainForSource(FSubSelectionChain& InOutChain,
+	                                         EPCGMetadataTypes SourceType);
 }

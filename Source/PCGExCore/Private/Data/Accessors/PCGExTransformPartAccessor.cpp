@@ -135,4 +135,63 @@ namespace PCGExData
 	{
 		return TEXT("TransformPart");
 	}
+
+	//
+	// Stage 3 typed fn pointers
+	//
+
+	namespace
+	{
+		void TransformGetStep(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
+		{
+			const FTransform& T = *static_cast<const FTransform*>(Parent);
+			switch (Parsed.Component)
+			{
+			case PCGExTypeOps::ETransformPart::Position:
+				*static_cast<FVector*>(ChildOut) = T.GetLocation();
+				break;
+			case PCGExTypeOps::ETransformPart::Rotation:
+				*static_cast<FQuat*>(ChildOut) = T.GetRotation();
+				break;
+			case PCGExTypeOps::ETransformPart::Scale:
+				*static_cast<FVector*>(ChildOut) = T.GetScale3D();
+				break;
+			}
+		}
+
+		void TransformSetStep(void* ParentInOut, const void* NewChild, const FAccessorParseResult& Parsed)
+		{
+			FTransform& T = *static_cast<FTransform*>(ParentInOut);
+			switch (Parsed.Component)
+			{
+			case PCGExTypeOps::ETransformPart::Position:
+				T.SetLocation(*static_cast<const FVector*>(NewChild));
+				break;
+			case PCGExTypeOps::ETransformPart::Rotation:
+				T.SetRotation(*static_cast<const FQuat*>(NewChild));
+				break;
+			case PCGExTypeOps::ETransformPart::Scale:
+				T.SetScale3D(*static_cast<const FVector*>(NewChild));
+				break;
+			}
+		}
+	}
+
+	FStepGetFn FTransformPartAccessor::GetStepGetFn(EPCGMetadataTypes InType) const
+	{
+		return InType == EPCGMetadataTypes::Transform ? &TransformGetStep : nullptr;
+	}
+
+	FStepSetFn FTransformPartAccessor::GetStepSetFn(EPCGMetadataTypes InType) const
+	{
+		return InType == EPCGMetadataTypes::Transform ? &TransformSetStep : nullptr;
+	}
+
+	ISubAccessor::ECompileAction FTransformPartAccessor::ClassifyForInType(
+		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed) const
+	{
+		(void)Parsed;
+		// Position/Rotation/Scale only make sense on a Transform source.
+		return InType == EPCGMetadataTypes::Transform ? ECompileAction::Keep : ECompileAction::Drop;
+	}
 }
