@@ -384,9 +384,18 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			// Handle attribute proxy
 			if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 			{
-				if (InDescriptor.HasFlag(EProxyFlags::Direct))
+				// Stage 5c: container attributes (TArray/TSet/TMap) must route
+				// through FPropertyBuffer, not TBuffer<T>. The Desc-based
+				// RealType is the inner element type (e.g. Vector for
+				// TArray<FVector>), so the normal ExecuteWithRightType path
+				// would instantiate TBuffer<FVector> — wrong for container
+				// storage (which is FScriptArray layout). Skip straight to
+				// the Tier 3 FPropertyBuffer fallback for containers.
+				const bool bIsContainer = InDescriptor.bHasSourceDesc && !InDescriptor.SourceDesc.IsSingleValue();
+
+				if (!bIsContainer && InDescriptor.HasFlag(EProxyFlags::Direct))
 				{
-					// Direct attribute access
+					// Direct attribute access (scalar only)
 					const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(InDescriptor.Selector, InDataFacade->GetIn());
 					const FPCGMetadataAttributeBase* BaseAttr = InDataFacade->FindConstAttribute(Identifier, InDescriptor.Side);
 					const bool bIsDataDomain = BaseAttr && BaseAttr->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data;
@@ -397,9 +406,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 						OutProxy = Internal::CreateDirectProxy<T>(InDescriptor, InDataFacade, bIsDataDomain);
 					});
 				}
-				else
+				else if (!bIsContainer)
 				{
-					// Buffered attribute access
+					// Buffered attribute access (scalar only)
 					PCGExMetaHelpers::ExecuteWithRightType(InDescriptor.RealType, [&](auto DummyValue)
 					{
 						using T = decltype(DummyValue);

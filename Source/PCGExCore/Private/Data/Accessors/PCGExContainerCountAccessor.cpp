@@ -3,6 +3,7 @@
 
 #include "Data/Accessors/PCGExContainerCountAccessor.h"
 
+#include "Data/PCGExData.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Metadata/PCGMetadataCommon.h"

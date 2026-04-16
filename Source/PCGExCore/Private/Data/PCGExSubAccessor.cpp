@@ -3,6 +3,7 @@
 
 #include "Data/PCGExSubAccessor.h"
 
+#include "Metadata/PCGMetadataCommon.h"
 #include "Data/Accessors/PCGExAxisAccessor.h"
 #include "Data/Accessors/PCGExContainerCountAccessor.h"
 #include "Data/Accessors/PCGExContainerIndexAccessor.h"
@@ -239,11 +240,26 @@ namespace PCGExData
 		EPCGMetadataTypes CurrentType = SourceType;
 
 		// CurrentDesc tracks the attribute-descriptor view of the value at
-		// this chain position. Starts as SourceDesc; becomes nullptr after
-		// the first container-unwrapping step consumes the outer
-		// ContainerType. Subsequent steps see non-container values and
-		// don't need Desc visibility.
-		const FPCGMetadataAttributeDesc* CurrentDesc = SourceDesc;
+		// this chain position. Starts as SourceDesc. Each container step
+		// that Keeps strips one ContainerType layer from the stack-local
+		// copy; this enables nested container unwrap (.1.0 on
+		// TArray<TArray<T>>). Non-container steps (TransformPart, Axis,
+		// Field, Swizzle) clear the Desc since they don't consume
+		// containers.
+		//
+		// We keep the Desc as an optional stack-local copy so the pointer
+		// remains valid throughout the loop without external ownership.
+		TOptional<FPCGMetadataAttributeDesc> DescStorage;
+		if (SourceDesc) { DescStorage.Emplace(*SourceDesc); }
+
+		auto GetCurrentDesc = [&]() -> const FPCGMetadataAttributeDesc*
+		{
+			return DescStorage.IsSet() ? &DescStorage.GetValue() : nullptr;
+		};
+
+		// Detect container accessor types for desc propagation decisions.
+		const ISubAccessor* ContainerIndexAccessor = FSubAccessorRegistry::GetContainerIndexAccessor();
+		const ISubAccessor* ContainerCountAccessor = FSubAccessorRegistry::GetContainerCountAccessor();
 
 		for (FSubSelectionStep& Step : Original)
 		{
@@ -252,7 +268,7 @@ namespace PCGExData
 			for (;;)
 			{
 				const ISubAccessor::ECompileAction Action =
-					Step.Accessor->ClassifyForInType(CurrentType, Step.Parsed, CurrentDesc);
+					Step.Accessor->ClassifyForInType(CurrentType, Step.Parsed, GetCurrentDesc());
 
 				if (Action == ISubAccessor::ECompileAction::Keep)
 				{
@@ -260,16 +276,23 @@ namespace PCGExData
 					// Compile-time stash (container accessors use this to
 					// carry ElementSize into the hot path). No-op for
 					// scalar accessors.
-					Step.Accessor->PostClassifyFinalize(CurrentType, Step.Parsed, CurrentDesc);
+					Step.Accessor->PostClassifyFinalize(CurrentType, Step.Parsed, GetCurrentDesc());
 
-					// Single-unwrap policy: once a container accessor is kept
-					// against a container-typed Desc, the outer ContainerType
-					// is consumed. Drop the Desc so subsequent steps classify
-					// against scalar/element-level state. FContainerIndexAccessor
-					// + FContainerCountAccessor are the only accessors whose
-					// Keep behavior depends on Desc, so stripping it here is
-					// safe for all current accessors.
-					CurrentDesc = nullptr;
+					// Desc propagation: container steps strip one ContainerType
+					// layer so nested containers remain visible to subsequent
+					// steps. Non-container steps clear the Desc entirely.
+					const bool bIsContainerStep =
+						Step.Accessor == ContainerIndexAccessor ||
+						Step.Accessor == ContainerCountAccessor;
+
+					if (bIsContainerStep && DescStorage.IsSet() && !DescStorage->IsSingleValue())
+					{
+						DescStorage->ContainerTypes.RemoveAt(0);
+					}
+					else
+					{
+						DescStorage.Reset();
+					}
 
 					CurrentType = Step.OutType;
 					InOutChain.Steps.Add(MoveTemp(Step));
@@ -291,13 +314,10 @@ namespace PCGExData
 
 				FSubSelectionStep Inserted = MakeTransformPartStep(Part);
 				CurrentType = Inserted.OutType;
-				// A synthesized TransformPart does not consume Desc in the
-				// container sense (it unwraps a Transform, not a container).
-				// But callers who pass SourceDesc for a Transform attribute
-				// have no container to preserve here, so stripping is a no-op
-				// in practice. Keep it simple: TransformPart promotion also
-				// clears Desc.
-				CurrentDesc = nullptr;
+				// TransformPart promotion doesn't consume a container layer.
+				// Clear Desc — the promoted value is a scalar sub-component
+				// of a Transform, no container semantics.
+				DescStorage.Reset();
 				InOutChain.Steps.Add(MoveTemp(Inserted));
 				// Loop back to re-classify the same Step under the new CurrentType.
 			}

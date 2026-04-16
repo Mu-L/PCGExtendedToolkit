@@ -360,6 +360,15 @@ namespace PCGExData
 		return static_cast<const uint8*>(Arr->GetData()) + static_cast<SIZE_T>(Index) * static_cast<SIZE_T>(ElementSize);
 	}
 
+	void* FPropertyBuffer::GetMutableArrayElementAt(void* ArrayBytes, int32 Index, int32 ElementSize)
+	{
+		if (!ArrayBytes || ElementSize <= 0) { return nullptr; }
+		FScriptArray* Arr = static_cast<FScriptArray*>(ArrayBytes);
+		const int32 Num = Arr->Num();
+		if (Index < 0 || Index >= Num) { return nullptr; }
+		return static_cast<uint8*>(Arr->GetData()) + static_cast<SIZE_T>(Index) * static_cast<SIZE_T>(ElementSize);
+	}
+
 	bool FPropertyBuffer::InitProperty(const FPCGMetadataAttributeBase* InGenericAttribute)
 	{
 		if (!InGenericAttribute) { return false; }

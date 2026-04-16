@@ -3,7 +3,10 @@
 
 #include "Data/PCGExCachedSubSelection.h"
 
+#include "Data/PCGExData.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Metadata/PCGMetadataCommon.h"
 #include "Types/PCGExTypeOpsImpl.h"
 
 namespace PCGExData
@@ -53,6 +56,38 @@ namespace PCGExData
 	// FCachedSubSelection
 	//
 
+	FCachedSubSelection::~FCachedSubSelection()
+	{
+		for (FProperty* Prop : OwnedProperties) { delete Prop; }
+	}
+
+	FCachedSubSelection::FCachedSubSelection(FCachedSubSelection&& Other) noexcept
+	{
+		*this = MoveTemp(Other);
+	}
+
+	FCachedSubSelection& FCachedSubSelection::operator=(FCachedSubSelection&& Other) noexcept
+	{
+		if (this != &Other)
+		{
+			for (FProperty* Prop : OwnedProperties) { delete Prop; }
+
+			bIsValid = Other.bIsValid;
+			RealType = Other.RealType;
+			WorkingType = Other.WorkingType;
+			FinalChainType = Other.FinalChainType;
+			CompiledChain = MoveTemp(Other.CompiledChain);
+			ConvertRealToWorking = Other.ConvertRealToWorking;
+			ConvertWorkingToReal = Other.ConvertWorkingToReal;
+			ConvertFinalToWorking = Other.ConvertFinalToWorking;
+			ConvertWorkingToFinal = Other.ConvertWorkingToFinal;
+			RealOps = Other.RealOps;
+			WorkingOps = Other.WorkingOps;
+			OwnedProperties = MoveTemp(Other.OwnedProperties);
+		}
+		return *this;
+	}
+
 	void FCachedSubSelection::Initialize(
 		const FSubSelection& Selection,
 		EPCGMetadataTypes InRealType,
@@ -68,8 +103,52 @@ namespace PCGExData
 		// each remaining step's typed fn pointers, so the hot path has zero
 		// per-call lookups. SourceDesc threads through to container-aware
 		// classifiers (Stage 5b).
+		// Clean up any previously owned properties from a prior Initialize.
+		for (FProperty* Prop : OwnedProperties) { delete Prop; }
+		OwnedProperties.Reset();
+
 		CompiledChain = Selection.GetChain();
 		CompileChainForSource(CompiledChain, RealType, SourceDesc);
+
+		// Stage 5c: create owned FProperty instances for container-index
+		// steps that need property-aware writes (CopyCompleteValue for
+		// non-trivially-copyable element types like FString, nested
+		// containers, UStructs). Replay the Desc strip logic: start with
+		// SourceDesc, strip the outermost ContainerType entry each time a
+		// container step appears. The inner-element FProperty is created
+		// from the stripped Desc.
+		if (SourceDesc && !CompiledChain.Steps.IsEmpty())
+		{
+			const ISubAccessor* ContainerIndexAccessor = FSubAccessorRegistry::GetContainerIndexAccessor();
+			FPCGMetadataAttributeDesc CurrentDesc = *SourceDesc;
+
+			for (FSubSelectionStep& Step : CompiledChain.Steps)
+			{
+				if (Step.Accessor == ContainerIndexAccessor && !CurrentDesc.IsSingleValue())
+				{
+					// Build the inner-element property from the stripped Desc.
+					FPCGMetadataAttributeDesc InnerDesc = CurrentDesc;
+					InnerDesc.ContainerTypes.RemoveAt(0);
+					FProperty* ElementProp = FPropertyBuffer::CreateInnerPropertyFromDesc(InnerDesc);
+					if (ElementProp)
+					{
+						OwnedProperties.Add(ElementProp);
+						Step.Parsed.ContainerElementProperty = ElementProp;
+					}
+
+					// Consume the outer container layer for subsequent steps.
+					CurrentDesc = InnerDesc;
+				}
+				else
+				{
+					// Non-container step (or container-count, which doesn't
+					// need a property). Clear the Desc so subsequent container
+					// steps on already-unwrapped values don't get spurious
+					// properties.
+					CurrentDesc.ContainerTypes.Reset();
+				}
+			}
+		}
 
 		FinalChainType = CompiledChain.Steps.IsEmpty() ? RealType : CompiledChain.Steps.Last().OutType;
 

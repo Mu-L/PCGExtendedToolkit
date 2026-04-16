@@ -23,8 +23,11 @@ namespace PCGExData
 	 * the hot path can stride into FScriptArray storage without carrying
 	 * the Desc forward.
 	 *
-	 * Read-only in Stage 5b. Inject path (write element [N]) is deferred
-	 * to Stage 5c along with property-proxy chain integration.
+	 * Stage 5c: write path uses FProperty::CopyCompleteValue when
+	 * Parsed.ContainerElementProperty is available (handles non-trivially-
+	 * copyable elements like FString, nested containers, UStructs), falling
+	 * back to memcpy for trivially-copyable types or when no property was
+	 * created.
 	 *
 	 * Type-agnostic at hot-path time: a single StepGetFn memcpys
 	 * Parsed.ContainerElementSize bytes from the array's storage into the
@@ -45,10 +48,16 @@ namespace PCGExData
 		                      void* OutValue,
 		                      const FAccessorParseResult& Parsed) const override;
 
+		virtual void ApplySet(EPCGMetadataTypes InType,
+		                      void* TargetInOut,
+		                      EPCGMetadataTypes SourceType,
+		                      const void* Source,
+		                      const FAccessorParseResult& Parsed) const override;
+
 		virtual FString GetDisplayName() const override;
 
 		virtual FStepGetFn GetStepGetFn(EPCGMetadataTypes InType) const override;
-		// Read-only in Stage 5b; GetStepSetFn inherits default nullptr.
+		virtual FStepSetFn GetStepSetFn(EPCGMetadataTypes InType) const override;
 
 		virtual ECompileAction ClassifyForInType(EPCGMetadataTypes InType,
 		                                         const FAccessorParseResult& Parsed,

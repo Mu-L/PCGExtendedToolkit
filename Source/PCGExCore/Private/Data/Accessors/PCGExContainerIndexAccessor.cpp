@@ -3,6 +3,7 @@
 
 #include "Data/Accessors/PCGExContainerIndexAccessor.h"
 
+#include "Data/PCGExData.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Metadata/PCGMetadataCommon.h"
@@ -50,6 +51,32 @@ namespace PCGExData
 
 			OutIndex = static_cast<int32>(Acc);
 			return true;
+		}
+
+		// Hot-path step: element write into a TArray's FScriptArray storage.
+		// Uses FProperty::CopyCompleteValue when the property is available
+		// (non-trivially-copyable element types), memcpy otherwise.
+		void ContainerIndexSetStep(void* ParentInOut, const void* NewChild, const FAccessorParseResult& Parsed)
+		{
+			const int32 ElementSize = Parsed.ContainerElementSize;
+			check(ElementSize > 0);
+
+			void* Dest = FPropertyBuffer::GetMutableArrayElementAt(ParentInOut, Parsed.ContainerIndex, ElementSize);
+			if (!Dest)
+			{
+				// Out-of-range: nothing to write to. Silent no-op rather than
+				// crash — mirrors the read path's zero-fill convention.
+				return;
+			}
+
+			if (Parsed.ContainerElementProperty)
+			{
+				Parsed.ContainerElementProperty->CopyCompleteValue(Dest, NewChild);
+			}
+			else
+			{
+				FMemory::Memcpy(Dest, NewChild, ElementSize);
+			}
 		}
 
 		// Hot-path step: element read from FScriptArray-backed storage.
@@ -116,12 +143,31 @@ namespace PCGExData
 		ContainerIndexStep(Source, OutValue, Parsed);
 	}
 
+	void FContainerIndexAccessor::ApplySet(EPCGMetadataTypes InType,
+	                                       void* TargetInOut,
+	                                       EPCGMetadataTypes SourceType,
+	                                       const void* Source,
+	                                       const FAccessorParseResult& Parsed) const
+	{
+		(void)InType;
+		(void)SourceType;
+		check(TargetInOut != nullptr);
+		check(Source != nullptr);
+		ContainerIndexSetStep(TargetInOut, Source, Parsed);
+	}
+
 	FStepGetFn FContainerIndexAccessor::GetStepGetFn(EPCGMetadataTypes InType) const
 	{
 		(void)InType;
 		// One fn pointer for all element types -- sizeof(element) is carried
 		// in Parsed.ContainerElementSize, populated by PostClassifyFinalize.
 		return &ContainerIndexStep;
+	}
+
+	FStepSetFn FContainerIndexAccessor::GetStepSetFn(EPCGMetadataTypes InType) const
+	{
+		(void)InType;
+		return &ContainerIndexSetStep;
 	}
 
 	ISubAccessor::ECompileAction FContainerIndexAccessor::ClassifyForInType(

@@ -113,6 +113,11 @@ namespace PCGExData
 		// NOTE: Only valid for Array containers (TArray). Set and Map do not
 		// store elements contiguously by index.
 		static const void* GetArrayElementAt(const void* ArrayBytes, int32 Index, int32 ElementSize);
+
+		// Mutable variant of GetArrayElementAt for the write path. Same
+		// semantics and safety checks. Used by FContainerIndexAccessor's
+		// StepSetFn to obtain a writable destination for CopyCompleteValue.
+		static void* GetMutableArrayElementAt(void* ArrayBytes, int32 Index, int32 ElementSize);
 	};
 
 	class PCGEXCORE_API FPropertyArrayBuffer : public FPropertyBuffer

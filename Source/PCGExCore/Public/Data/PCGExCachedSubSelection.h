@@ -96,7 +96,22 @@ namespace PCGExData
 		const PCGExTypeOps::ITypeOpsBase* RealOps = nullptr;
 		const PCGExTypeOps::ITypeOpsBase* WorkingOps = nullptr;
 
+		// Stage 5c: compile-time-created FProperty instances for container
+		// steps that need property-aware reads/writes (e.g., CopyCompleteValue
+		// for non-trivially-copyable element types). Each compiled container
+		// step stores a non-owning pointer in Parsed.ContainerElementProperty;
+		// this array owns the actual FProperty lifetime. Cleaned up in the
+		// destructor.
+		TArray<FProperty*> OwnedProperties;
+
 		FCachedSubSelection() = default;
+		~FCachedSubSelection();
+
+		// Non-copyable (owns FProperty pointers). Movable.
+		FCachedSubSelection(const FCachedSubSelection&) = delete;
+		FCachedSubSelection& operator=(const FCachedSubSelection&) = delete;
+		FCachedSubSelection(FCachedSubSelection&& Other) noexcept;
+		FCachedSubSelection& operator=(FCachedSubSelection&& Other) noexcept;
 
 		/**
 		 * Initialize from a parsed FSubSelection + Real/Working types.

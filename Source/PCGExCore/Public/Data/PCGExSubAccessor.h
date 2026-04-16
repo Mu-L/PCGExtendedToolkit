@@ -73,6 +73,17 @@ namespace PCGExData
 		// accessors (they never touch it).
 		int32 ContainerElementSize = 0;
 
+		// Compile-time (NOT parse-time) field. Non-owning pointer to the
+		// FProperty describing the container's inner element type (e.g., an
+		// FStructProperty for FVector when the source is TArray<FVector>).
+		// Populated by PostClassifyFinalize; owned by
+		// FCachedSubSelection::OwnedProperties. Used by the container-index
+		// write path for FProperty::CopyCompleteValue -- handles
+		// non-trivially-copyable elements (FString, nested containers,
+		// UStructs with custom copy/destroy). Null for non-container steps
+		// and for read-only container steps (ContainerCount).
+		const FProperty* ContainerElementProperty = nullptr;
+
 		// Hint type the matched token implies for the source attribute, e.g. "X" -> Vector,
 		// "W" -> Vector4, "Roll" -> Quaternion. Used for legacy PossibleSourceType
 		// projection. Unknown when the accessor doesn't supply a hint.
