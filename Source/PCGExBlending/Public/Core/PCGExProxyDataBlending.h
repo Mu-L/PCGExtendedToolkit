@@ -245,6 +245,7 @@ namespace PCGExBlending
 
 	protected:
 		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(EPCGMetadataTypes, EPCGExABBlendingType, bool, const UObject*);
+		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(EPCGMetadataTypes, EPCGExABBlendingType, bool, const FProperty*);
 		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(FPCGExContext*, EPCGExABBlendingType, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, bool);
 		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(FPCGExContext*, EPCGExABBlendingType, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, bool);
 
@@ -281,6 +282,15 @@ namespace PCGExBlending
 		EPCGExABBlendingType BlendMode,
 		bool bResetValueForMultiBlend = true,
 		const UObject* InValueTypeObject = nullptr);
+
+	// Property-aware variant. Required for container types (TArray/TSet/TMap) and for any
+	// non-trivially-copyable scalar where memcpy semantics would corrupt allocators.
+	// InProperty must outlive the returned blender (typically owned by an FPropertyBuffer).
+	PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(
+		EPCGMetadataTypes WorkingType,
+		EPCGExABBlendingType BlendMode,
+		bool bResetValueForMultiBlend,
+		const FProperty* InProperty);
 
 	// Create blender with A, B, and C descriptors
 	PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(

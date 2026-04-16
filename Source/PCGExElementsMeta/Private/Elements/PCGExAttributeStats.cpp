@@ -119,11 +119,21 @@ bool FPCGExAttributeStatsElement::Boot(FPCGExContext* InContext) const
 
 		for (int i = 0; i < NumRows; i++) { Context->Rows.Add(NewParamData->Metadata->AddEntry()); }
 
-		PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
-		{
-			using T = decltype(DummyValue);
-			PCGEX_FOREACH_STAT(PCGEX_STAT_DECL, T)
-		});
+		PCGExMetaHelpers::ExecuteWithRightType(
+			Identity,
+			[&](auto DummyValue)
+			{
+				using T = decltype(DummyValue);
+				PCGEX_FOREACH_STAT(PCGEX_STAT_DECL, T)
+			},
+			[&]()
+			{
+				// Stats are inherently arithmetic (min/max/avg/etc.) — no meaningful semantics for
+				// container or extended (Struct/Object/...) attributes. Skip with a clear log.
+				PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(
+					FTEXT("Attribute '{0}' is a container or extended type and cannot be analyzed by Attribute Stats — skipped."),
+					FText::FromName(Identity.Name)));
+			});
 	}
 #undef PCGEX_STAT_DECL
 
@@ -194,12 +204,20 @@ namespace PCGExAttributeStats
 
 			if (Settings->bOutputPerUniqueValuesStats) { PerAttributeStatMap.Add(Identity.Name, i); }
 
-			PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
-			{
-				using T_REAL = decltype(DummyValue);
-				PCGEX_MAKE_SHARED(S, TAttributeStats<T_REAL>, Identity, Key)
-				Stats.Add(StaticCastSharedPtr<IAttributeStats>(S));
-			});
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
+				{
+					using T_REAL = decltype(DummyValue);
+					PCGEX_MAKE_SHARED(S, TAttributeStats<T_REAL>, Identity, Key)
+					Stats.Add(StaticCastSharedPtr<IAttributeStats>(S));
+				},
+				[&]()
+				{
+					// Container/extended-typed attributes were skipped at the OutputParams stage;
+					// keep the slot count consistent by inserting a null entry.
+					Stats.Add(nullptr);
+				});
 		}
 
 
@@ -223,7 +241,8 @@ namespace PCGExAttributeStats
 		AttributeStatProcessing->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
-			This->Stats[Scope.Start]->Process(This->PointDataFacade, This->Context, This->Settings, This->PointFilterCache);
+			// Skip nullptr slots — those are container/extended-typed attributes that stats can't analyze.
+			if (const TSharedPtr<IAttributeStats>& Slot = This->Stats[Scope.Start]) { Slot->Process(This->PointDataFacade, This->Context, This->Settings, This->PointFilterCache); }
 		};
 
 		AttributeStatProcessing->StartSubLoops(Stats.Num(), 1);

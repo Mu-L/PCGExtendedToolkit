@@ -119,8 +119,13 @@ namespace PCGExTypes
 	// Get element alignment for generic/unknown attribute types.
 	PCGEXCORE_API int32 GetElementAlignmentFromType(EPCGMetadataTypes InType, const UObject* ValueTypeObject = nullptr);
 
-	// Get element size from an attribute base pointer (handles both typed and generic).
+	// Get element size from an attribute base pointer. Handles typed scalars, extended scalars
+	// (Struct/Enum/Object/etc.) AND containers (TArray/TSet/TMap) — for the last category it
+	// routes through FPropertyBuffer::GetElementSizeFromDesc which constructs a transient property.
 	PCGEXCORE_API int32 GetElementSizeFromAttribute(const FPCGMetadataAttributeBase* InAttribute);
+
+	// Companion to GetElementSizeFromAttribute. Returns 1 if no useful alignment can be derived.
+	PCGEXCORE_API int32 GetElementAlignmentFromAttribute(const FPCGMetadataAttributeBase* InAttribute);
 
 	/**
 	 * Convenience functions for common operations

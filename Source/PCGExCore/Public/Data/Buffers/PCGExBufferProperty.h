@@ -58,6 +58,12 @@ namespace PCGExData
 		const FPCGMetadataAttributeBase* GetGenericInAttribute() const { return GenericInAttribute; }
 		FPCGMetadataAttributeBase* GetGenericOutAttribute() const { return GenericOutAttribute; }
 
+		// Non-owning accessor to the cached property that drives this buffer's reads/writes.
+		// Lifetime-tied to the buffer itself — do not retain past the buffer's lifetime.
+		// Used by FBlendOperationFactory / CreateProxyBlender to construct property-aware blend ops
+		// for container/extended types where (EnumType, VTO)-based sizing returns 0.
+		const FProperty* GetCachedProperty() const { return CachedInnerProperty; }
+
 		// Runtime type via reflection — FScopedTypedValue(FProperty*) handles arbitrary UStructs/UEnums/etc.
 		// Precondition: CachedInnerProperty is valid (i.e. InitForRead or InitForWrite succeeded).
 		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const override
@@ -66,8 +72,20 @@ namespace PCGExData
 			return PCGExTypes::FScopedTypedValue(CachedInnerProperty);
 		}
 
-	private:
-		static FProperty* CreateInnerPropertyFromDesc(const FPCGMetadataAttributeDesc& Desc);
+		// Static factory: build an FProperty matching the attribute's full descriptor.
+		// Handles container types (TArray/TSet/TMap), scalar legacy types, struct/enum, and
+		// the Object family (Object/SoftObject/Class/SoftClass — transient processing only;
+		// values are not GC-tracked, do not persist outputs to UObject-owned storage).
+		// Returns nullptr if the desc cannot be mapped to a property.
+		// PropertyScope: pass the parent FProperty when constructing nested container inner
+		// properties; default (nullptr scope) is correct for top-level use.
+		static FProperty* CreateInnerPropertyFromDesc(const FPCGMetadataAttributeDesc& Desc, FFieldVariant PropertyScope = FFieldVariant{nullptr});
+
+		// Desc-aware element size / alignment. Returns the storage footprint of one element of
+		// the attribute described by Desc, including container wrapping (sizeof(FScriptArray) etc.).
+		// Returns 0/1 if the desc cannot be mapped.
+		static int32 GetElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc);
+		static int32 GetElementAlignmentFromDesc(const FPCGMetadataAttributeDesc& Desc);
 	};
 
 	class PCGEXCORE_API FPropertyArrayBuffer : public FPropertyBuffer
@@ -80,6 +98,7 @@ namespace PCGExData
 
 	public:
 		FPropertyArrayBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
+		virtual ~FPropertyArrayBuffer() override;
 
 		virtual int32 GetNumValues(const EIOSide InSide) override;
 
@@ -100,7 +119,20 @@ namespace PCGExData
 		bool InitForRead(const EIOSide InSide = EIOSide::In);
 		bool InitForWrite(const FPCGMetadataAttributeBase* SourceAttribute, EBufferInit Init = EBufferInit::Inherit);
 
+		// Property-aware write at a specific index. SrcPtr must point to bytes matching
+		// CachedInnerProperty's layout (typically obtained from an attribute with the same desc).
+		// Performs deep-copy via FProperty::CopyCompleteValue — correct for containers, FString, etc.
+		// No-op if the buffer isn't initialized for write or SrcPtr is null.
+		void SetFromVoidProperty(int32 Index, const void* SrcPtr);
+
 		virtual void Flush() override;
+
+	protected:
+		// Walk the byte array and call CachedInnerProperty->DestroyValue on each element slot.
+		// Required for property-backed buffers because per-element CopyCompleteValue / InitializeValue
+		// allocate per-element state (FString chars, FScriptArray storage, etc.) that the byte
+		// array's destructor doesn't know how to release.
+		void DestroyAllElements(const TSharedPtr<TArray<uint8>>& Bytes) const;
 	};
 
 	class PCGEXCORE_API FPropertySingleValueBuffer : public FPropertyBuffer
@@ -117,6 +149,7 @@ namespace PCGExData
 
 	public:
 		FPropertySingleValueBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
+		virtual ~FPropertySingleValueBuffer() override;
 
 		virtual int32 GetNumValues(const EIOSide InSide) override;
 

@@ -125,11 +125,18 @@ namespace PCGExBatchActions
 		{
 			const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
 			if (!AttributeBase) { continue; }
-			PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				PointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
-			});
+			PCGExMetaHelpers::ExecuteWithRightType(
+				AttributeBase,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					PointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
+				},
+				[&]()
+				{
+					// Property-backed: route through the generic GetWritableFromAttribute fallback.
+					PointDataFacade->GetWritableFromAttribute(AttributeBase, PCGExData::EBufferInit::Inherit);
+				});
 		}
 
 		for (const UPCGExActionFactoryData* Factory : Context->ActionsFactories)

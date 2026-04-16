@@ -7,7 +7,9 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExSubSelection.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Types/PCGExAttributeIdentity.h"
 #include "Types/PCGExTypes.h"
 
 namespace PCGExData::Helpers
@@ -53,6 +55,56 @@ namespace PCGExData::Helpers
 		}
 	}
 
+	bool PropertyCopyAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
+		FPCGMetadataAttributeBase* TargetAttr, const PCGMetadataEntryKey TargetKey)
+	{
+		if (!SourceAttr || !TargetAttr) { return false; }
+
+		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
+		if (!SrcAddr) { return false; }
+
+		// Build a transient property matching the source desc so SetValueFromProperty knows the layout.
+		// One-time per call — for hot paths the caller should cache via FPropertyArrayBuffer instead.
+		FProperty* TempProp = FPropertyBuffer::CreateInnerPropertyFromDesc(SourceAttr->GetAttributeDesc());
+		if (!TempProp) { return false; }
+
+		TargetAttr->SetValueFromProperty(TargetKey, SrcAddr, TempProp);
+		delete TempProp;
+		return true;
+	}
+
+	bool PropertyCopyAttributeRange(
+		const TSharedPtr<FPointIO>& SourceIO, const FAttributeIdentity& SourceIdentity,
+		const TSharedRef<FPropertyArrayBuffer>& TargetBuffer,
+		const PCGExMT::FScope& ReadScope, const PCGExMT::FScope& WriteScope, const bool bReverse)
+	{
+		check(ReadScope.Count == WriteScope.Count);
+
+		if (!SourceIO || ReadScope.Count <= 0) { return false; }
+
+		const UPCGBasePointData* SourceData = SourceIO->GetIn();
+		if (!SourceData || !SourceData->Metadata) { return false; }
+
+		const FPCGMetadataAttributeBase* SourceAttr = SourceData->Metadata->GetConstAttribute(SourceIdentity.GetIdentifier());
+		if (!SourceAttr) { return false; }
+
+		auto EntryKeys = SourceData->GetConstMetadataEntryValueRange();
+		if (EntryKeys.Num() < ReadScope.End) { return false; }
+
+		bool bAnyCopied = false;
+		for (int32 i = 0; i < ReadScope.Count; i++)
+		{
+			const int32 ReadIdx = bReverse ? (ReadScope.End - 1 - i) : (ReadScope.Start + i);
+			const PCGMetadataEntryKey EntryKey = EntryKeys[ReadIdx];
+			const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(EntryKey);
+			if (!SrcAddr) { continue; }
+			TargetBuffer->SetFromVoidProperty(WriteScope.Start + i, SrcAddr);
+			bAnyCopied = true;
+		}
+		return bAnyCopied;
+	}
+
 	template <typename T>
 	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute)
 	{
@@ -82,7 +134,8 @@ namespace PCGExData::Helpers
 	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute, T Fallback)
 	{
 		T Value = Fallback;
-		PCGExMetaHelpers::ExecuteWithRightType(Attribute->GetTypeId(), [&](auto DummyValue)
+		// Container/extended types fall through (no meaningful conversion to templated T) — fallback wins.
+		PCGExMetaHelpers::ExecuteWithRightType(Attribute, [&](auto DummyValue)
 		{
 			using T_VALUE = decltype(DummyValue);
 			Value = PCGExTypeOps::Convert<T_VALUE, T>(ReadDataValue<T_VALUE>(static_cast<const FPCGMetadataAttribute<T_VALUE>*>(Attribute)));
@@ -142,7 +195,8 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 
 		if (const FPCGMetadataAttributeBase* SourceAttribute = InMetadata->GetConstAttribute(SanitizedIdentifier))
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute->GetTypeId(), [&](auto DummyValue)
+			// Container/extended source types: TryReadDataValue<T> can't represent them; falls through to bSuccess=false.
+			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute, [&](auto DummyValue)
 			{
 				using T_VALUE = decltype(DummyValue);
 

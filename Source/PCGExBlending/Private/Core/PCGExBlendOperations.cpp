@@ -74,6 +74,47 @@ namespace PCGExBlending
 		}
 	}
 
+	TSharedPtr<IBlendOperation> FBlendOperationFactory::Create(
+		EPCGMetadataTypes WorkingType,
+		EPCGExABBlendingType BlendMode,
+		bool bResetForMultiBlend,
+		const FProperty* InProperty)
+	{
+		switch (WorkingType)
+		{
+		case EPCGMetadataTypes::Boolean: return CreateTyped<bool>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer32: return CreateTyped<int32>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer64: return CreateTyped<int64>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Float: return CreateTyped<float>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Double: return CreateTyped<double>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector2: return CreateTyped<FVector2D>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector: return CreateTyped<FVector>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector4: return CreateTyped<FVector4>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Quaternion: return CreateTyped<FQuat>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Rotator: return CreateTyped<FRotator>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Transform: return CreateTyped<FTransform>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::String: return CreateTyped<FString>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Name: return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftObjectPath: return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftClassPath: return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Byte: return CreateTyped<uint8>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Text: return CreateTyped<FText>(BlendMode, bResetForMultiBlend);
+		default:
+			if (InProperty)
+			{
+				if (BlendMode != EPCGExABBlendingType::None &&
+					BlendMode != EPCGExABBlendingType::CopySource &&
+					BlendMode != EPCGExABBlendingType::CopyTarget)
+				{
+					UE_LOG(LogPCGEx, Warning, TEXT("Blend mode %d requested for property-backed type %d (%s) — arithmetic not supported, falling back to copy."),
+						static_cast<int32>(BlendMode), static_cast<int32>(WorkingType), *InProperty->GetClass()->GetName());
+				}
+				return MakeShared<FPropertyCopyBlendOperation>(InProperty, BlendMode, bResetForMultiBlend);
+			}
+			return nullptr;
+		}
+	}
+
 	// FBlenderPool implementation
 
 	TSharedPtr<IBlendOperation> FBlenderPool::Get(

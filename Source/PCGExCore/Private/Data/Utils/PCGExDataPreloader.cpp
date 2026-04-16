@@ -61,23 +61,37 @@ namespace PCGExData
 
 		if (!Reader)
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				FWriteScopeLock WriteScopeLock(ReaderLock);
-
-				switch (Mode)
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
 				{
-				case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier(), EIOSide::In, true);
-					break;
-				case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name, true);
-					break;
-				case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector, true);
-					break;
-				}
+					using T = decltype(DummyValue);
+					FWriteScopeLock WriteScopeLock(ReaderLock);
 
-				WeakReader = Reader;
-			});
+					switch (Mode)
+					{
+					case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier(), EIOSide::In, true);
+						break;
+					case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name, true);
+						break;
+					case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector, true);
+						break;
+					}
+
+					WeakReader = Reader;
+				},
+				[&]()
+				{
+					// Property-backed: only RawAttribute mode is meaningful (broadcast/typed-conversion
+					// on extended/container types isn't defined). Fall back to the generic FFacade::GetReadable
+					// which returns FPropertyArrayBuffer / FPropertySingleValueBuffer for unknown types.
+					FWriteScopeLock WriteScopeLock(ReaderLock);
+					if (Mode == EBufferPreloadType::RawAttribute)
+					{
+						Reader = InFacade->GetReadable(Identity, EIOSide::In, true);
+					}
+					WeakReader = Reader;
+				});
 
 			if (!Reader)
 			{
@@ -92,20 +106,30 @@ namespace PCGExData
 
 	void FReadableBufferConfig::Read(const TSharedRef<FFacade>& InFacade) const
 	{
-		PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
-		{
-			using T = decltype(DummyValue);
-			TSharedPtr<TBuffer<T>> Reader = nullptr;
-			switch (Mode)
+		PCGExMetaHelpers::ExecuteWithRightType(
+			Identity,
+			[&](auto DummyValue)
 			{
-			case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier());
-				break;
-			case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name);
-				break;
-			case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector);
-				break;
-			}
-		});
+				using T = decltype(DummyValue);
+				TSharedPtr<TBuffer<T>> Reader = nullptr;
+				switch (Mode)
+				{
+				case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier());
+					break;
+				case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name);
+					break;
+				case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector);
+					break;
+				}
+			},
+			[&]()
+			{
+				// Property-backed: same constraints as Fetch — only RawAttribute makes sense.
+				if (Mode == EBufferPreloadType::RawAttribute)
+				{
+					InFacade->GetReadable(Identity, EIOSide::In, false);
+				}
+			});
 	}
 
 	FFacadePreloader::FFacadePreloader(const TSharedPtr<FFacade>& InDataFacade)

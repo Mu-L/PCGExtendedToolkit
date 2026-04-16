@@ -283,6 +283,8 @@ namespace PCGExBlending
 
 		// For extended types (Struct/Enum/etc.), InValueTypeObject must be non-null so size can be computed.
 		// For basic types, size comes from the enum alone and VTO is ignored.
+		// NOTE: container types CANNOT be sized via this VTO-only overload — callers with container
+		// attributes must use the FProperty-based overload (next).
 		const int32 DerivedSize = PCGExTypes::GetElementSizeFromType(WorkingType, InValueTypeObject);
 		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize);
 
@@ -291,6 +293,24 @@ namespace PCGExBlending
 		Blender->ValueSize = Blender->Operation->GetValueSize();
 		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
 
+		return Blender;
+	}
+
+	TSharedPtr<FProxyDataBlender> CreateProxyBlender(
+		EPCGMetadataTypes WorkingType,
+		EPCGExABBlendingType BlendMode,
+		bool bResetValueForMultiBlend,
+		const FProperty* InProperty)
+	{
+		// Property-aware factory: required for containers (TArray/TSet/TMap) and
+		// non-trivially-copyable scalars where memcpy semantics would corrupt allocators.
+		// InProperty must outlive the returned blender (typically owned by an FPropertyBuffer).
+		TSharedPtr<FProxyDataBlender> Blender = MakeShared<FProxyDataBlender>();
+		Blender->UnderlyingType = WorkingType;
+		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend, InProperty);
+		if (!Blender->Operation) { return nullptr; }
+		Blender->ValueSize = Blender->Operation->GetValueSize();
+		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
 		return Blender;
 	}
 

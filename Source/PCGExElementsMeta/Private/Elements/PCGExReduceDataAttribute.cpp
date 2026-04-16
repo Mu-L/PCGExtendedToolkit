@@ -95,6 +95,16 @@ bool FPCGExReduceDataAttributeElement::Boot(FPCGExContext* InContext) const
 			continue;
 		}
 
+		// Reduce semantics (min/max/sum/avg/hash/join) require an arithmetic-capable scalar.
+		// Container/extended types are dropped here so the typed dispatch downstream stays safe.
+		if (!PCGExMetaHelpers::IsBasicSingleValue(Attribute->GetAttributeDesc()))
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(
+				FTEXT("Attribute '{0}' is a container/extended type and cannot be reduced — input skipped."),
+				FText::FromName(ReadIdentifier.Name)));
+			continue;
+		}
+
 		int32& Count = TypeCounter.FindOrAdd(Attribute->GetTypeId(), 0);
 		Count++;
 

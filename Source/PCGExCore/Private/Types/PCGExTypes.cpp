@@ -3,6 +3,7 @@
 
 #include "Types/PCGExTypes.h"
 
+#include "Data/PCGExData.h" // Must precede PCGExBufferProperty.h (which requires IBuffer/FFacade in scope).
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadataAttribute.h"
 #include "Metadata/PCGMetadataCommon.h"
@@ -323,13 +324,32 @@ namespace PCGExTypes
 		if (!InAttribute) { return 0; }
 
 		const EPCGMetadataTypes Type = static_cast<EPCGMetadataTypes>(InAttribute->GetTypeId());
+		const FPCGMetadataAttributeDesc& Desc = InAttribute->GetAttributeDesc();
 
-		// Known types: use compile-time size
+		// Containers (TArray/TSet/TMap) need property-based sizing. Route through the buffer's
+		// desc-aware sizer so this stays a single source of truth.
+		if (!Desc.ContainerTypes.IsEmpty())
+		{
+			return PCGExData::FPropertyBuffer::GetElementSizeFromDesc(Desc);
+		}
+
+		// Known scalar types: use compile-time size
 		const int32 KnownSize = FScopedTypedValue::GetTypeSize(Type);
 		if (KnownSize > 0) { return KnownSize; }
 
-		// Non-basic types: extract size from descriptor
-		const FPCGMetadataAttributeDesc& Desc = InAttribute->GetAttributeDesc();
+		// Non-basic scalar types: extract size from (type, VTO).
 		return GetElementSizeFromType(Desc.ValueType, Desc.ValueTypeObject);
+	}
+
+	int32 GetElementAlignmentFromAttribute(const FPCGMetadataAttributeBase* InAttribute)
+	{
+		if (!InAttribute) { return 1; }
+
+		const FPCGMetadataAttributeDesc& Desc = InAttribute->GetAttributeDesc();
+		if (!Desc.ContainerTypes.IsEmpty())
+		{
+			return PCGExData::FPropertyBuffer::GetElementAlignmentFromDesc(Desc);
+		}
+		return GetElementAlignmentFromType(Desc.ValueType, Desc.ValueTypeObject);
 	}
 }

@@ -5,6 +5,8 @@
 #include "Utils/PCGExPointIOMerger.h"
 
 #include "Data/PCGExDataTags.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
+#include "Data/PCGExDataHelpers.h"
 #include "Details/PCGExBlendingDetails.h"
 
 namespace PCGExPointIOMerger
@@ -37,6 +39,35 @@ namespace PCGExPointIOMerger
 
 #undef PCGEX_TPL
 
+	// Property-backed counterpart to FWriteAttributeScopeTask<T>. Used for extended/container-typed
+	// attributes that aren't covered by PCGEX_FOREACH_SUPPORTEDTYPES. Not templated — relies on
+	// PropertyCopyAttributeRange to do property-aware deep copy via the target buffer's CachedInnerProperty.
+	class FWriteAttributePropertyScopeTask final : public PCGExMT::FTask
+	{
+	public:
+		PCGEX_ASYNC_TASK_NAME(FWriteAttributePropertyScopeTask)
+
+		FWriteAttributePropertyScopeTask(
+			const TSharedPtr<PCGExData::FPointIO>& InPointIO,
+			const FMergeScope& InScope,
+			const PCGExData::FAttributeIdentity& InIdentity,
+			const TSharedRef<PCGExData::FPropertyArrayBuffer>& InOutBuffer)
+			: FTask(), PointIO(InPointIO), Scope(InScope), Identity(InIdentity), OutBuffer(InOutBuffer)
+		{
+		}
+
+		const TSharedPtr<PCGExData::FPointIO> PointIO;
+		const FMergeScope Scope;
+		const PCGExData::FAttributeIdentity Identity;
+		const TSharedRef<PCGExData::FPropertyArrayBuffer> OutBuffer;
+
+		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(FWriteAttributePropertyScopeTask::ExecuteTask);
+			PCGExData::Helpers::PropertyCopyAttributeRange(PointIO, Identity, OutBuffer, Scope.Read, Scope.Write, Scope.bReverse);
+		}
+	};
+
 	class FCopyAttributeTask final : public PCGExMT::FPCGExIndexedTask
 	{
 	public:
@@ -60,28 +91,67 @@ namespace PCGExPointIOMerger
 			const bool bInitDefault = Merger->WantsInitDefault();
 			const bool bAllowsInterp = Identity.GetAllowsInterpolation();
 
-			PCGExMetaHelpers::ExecuteWithRightType(Identity.GetType(), [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-
-				TSharedPtr<PCGExData::TBuffer<T>> Buffer = Merger->UnionDataFacade->GetWritable(
-					TargetIdentifier,
-					bInitDefault && Identity.Attribute
-						? Identity.Attribute->GetValueFromItemKey<T>(PCGDefaultValueKey)
-						: T{},
-					bAllowsInterp, PCGExData::EBufferInit::New);
-
-				for (int i = 0; i < Merger->IOSources.Num(); i++)
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
 				{
-					TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
-					const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identifier);
+					// Typed path — basic legacy types covered by PCGEX_FOREACH_SUPPORTEDTYPES.
+					using T = decltype(DummyValue);
 
-					if (!Attribute) { continue; }                // Missing attribute
-					if (!Attribute->IsOfType<T>()) { continue; } // Type mismatch
+					TSharedPtr<PCGExData::TBuffer<T>> Buffer = Merger->UnionDataFacade->GetWritable(
+						TargetIdentifier,
+						bInitDefault && Identity.Attribute
+							? Identity.Attribute->GetValueFromItemKey<T>(PCGDefaultValueKey)
+							: T{},
+						bAllowsInterp, PCGExData::EBufferInit::New);
 
-					PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer)
-				}
-			});
+					for (int i = 0; i < Merger->IOSources.Num(); i++)
+					{
+						TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
+						const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identifier);
+
+						if (!Attribute) { continue; }                // Missing attribute
+						if (!Attribute->IsOfType<T>()) { continue; } // Type mismatch
+
+						PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer)
+					}
+				},
+				[&]()
+				{
+					// Property-backed path — Struct/Enum/Object/SoftObject/Class/SoftClass/Byte/Text + containers.
+					// The facade's generic GetWritable routes unknown types to FPropertyArrayBuffer, which
+					// builds CachedInnerProperty from the source attribute's desc (handles container wrapping).
+					if (!Identity.Attribute)
+					{
+						PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(
+							FTEXT("Cannot merge attribute '{0}' — no source attribute resolved on identity (extended/container type with null Attribute pointer)."),
+							FText::FromName(Identity.Name)));
+						return;
+					}
+
+					const TSharedPtr<PCGExData::IBuffer> RawBuffer = Merger->UnionDataFacade->GetWritable(
+						Identity.GetType(), Identity.Attribute, PCGExData::EBufferInit::New);
+					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(RawBuffer);
+					if (!PropBuffer)
+					{
+						PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(
+							FTEXT("Cannot merge attribute '{0}' — failed to create property-backed writable buffer."),
+							FText::FromName(Identity.Name)));
+						return;
+					}
+
+					const TSharedRef<PCGExData::FPropertyArrayBuffer> PropBufferRef = PropBuffer.ToSharedRef();
+					for (int i = 0; i < Merger->IOSources.Num(); i++)
+					{
+						TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
+						const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identifier);
+						if (!Attribute) { continue; }
+						// Desc-aware mismatch — same gate the typed path applies via IsOfType<T>.
+						if (!Attribute->GetAttributeDesc().IsSameType(Identity.Attribute->GetAttributeDesc())) { continue; }
+
+						PCGEX_LAUNCH_INTERNAL(FWriteAttributePropertyScopeTask, SourceIO, Merger->Scopes[i], Identity, PropBufferRef)
+					}
+				});
 		}
 	};
 }

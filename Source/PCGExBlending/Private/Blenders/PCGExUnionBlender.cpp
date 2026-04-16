@@ -10,6 +10,7 @@
 #include "Containers/PCGExIndexLookup.h"
 #include "Core/PCGExOpStats.h"
 #include "Data/PCGExData.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -69,16 +70,34 @@ namespace PCGExBlending
 
 			bool bError = false;
 
-			// Pass Identity.ValueTypeObject so CreateProxyBlender can size extended types (Struct/Enum/etc.) correctly.
-			// For basic types ValueTypeObject is nullptr and the size comes from the enum alone.
-			MainBlender = CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
+			// Property-backed buffers (containers, extended types, Object family) cache an FProperty
+			// that handles container layout and deep-copy semantics. We can route those to
+			// CreateProxyBlender's FProperty overload — but ONLY if the buffer is genuinely an
+			// FPropertyBuffer instance. Basic-typed buffers (TSingleValueBuffer<T>, TArrayBuffer<T>)
+			// are siblings of FPropertyBuffer in the IBuffer hierarchy, so an unconditional
+			// StaticCastSharedPtr would be undefined behavior. Gate on the identity's desc to know
+			// which kind of buffer FFacade::GetWritable returned.
+			const FProperty* InitProperty = nullptr;
+			if (!PCGExMetaHelpers::IsBasicSingleValue(Identity))
+			{
+				if (TSharedPtr<PCGExData::FPropertyBuffer> AsPropBuf = StaticCastSharedPtr<PCGExData::FPropertyBuffer>(InitializationBuffer))
+				{
+					InitProperty = AsPropBuf->GetCachedProperty();
+				}
+			}
+
+			MainBlender = InitProperty
+				? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
+				: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 
 			for (int i = 0; i < Sources.Num(); i++)
 			{
 				TSharedPtr<PCGExData::FFacade> Source = Sources[i];
 				if (!SupportedSources.Contains(i)) { continue; }
 
-				TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
+				TSharedPtr<FProxyDataBlender> SubBlender = InitProperty
+					? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
+					: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 				SubBlenders[i] = SubBlender;
 
 				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags)) { return false; }

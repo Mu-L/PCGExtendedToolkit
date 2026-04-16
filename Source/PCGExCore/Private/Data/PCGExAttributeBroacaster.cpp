@@ -87,14 +87,22 @@ namespace PCGExData
 
 		if (ProcessingInfos.bIsDataDomain)
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(ProcessingInfos.Attribute->GetTypeId(), [&](auto DummyValue)
-			{
-				using T_REAL = decltype(DummyValue);
-				DataValue = MakeShared<TDataValue<T_REAL>>(Helpers::ReadDataValue<T_REAL>(ProcessingInfos.Attribute));
+			PCGExMetaHelpers::ExecuteWithRightType(
+				ProcessingInfos.Attribute,
+				[&](auto DummyValue)
+				{
+					using T_REAL = decltype(DummyValue);
+					DataValue = MakeShared<TDataValue<T_REAL>>(Helpers::ReadDataValue<T_REAL>(ProcessingInfos.Attribute));
 
-				const FSubSelection& S = ProcessingInfos.SubSelection;
-				TypedDataValue = S.bIsValid ? S.Get<T_REAL, T>(DataValue->GetValue<T_REAL>()) : PCGExTypeOps::Convert<T_REAL, T>(DataValue->GetValue<T_REAL>());
-			});
+					const FSubSelection& S = ProcessingInfos.SubSelection;
+					TypedDataValue = S.bIsValid ? S.Get<T_REAL, T>(DataValue->GetValue<T_REAL>()) : PCGExTypeOps::Convert<T_REAL, T>(DataValue->GetValue<T_REAL>());
+				},
+				[&]()
+				{
+					// Broadcasting performs typed conversion; container/extended source types have no
+					// meaningful conversion to a templated T. Mark the broadcaster as invalid so callers skip it.
+					ProcessingInfos.bIsValid = false;
+				});
 		}
 		else
 		{
@@ -333,7 +341,9 @@ namespace PCGExData
 		if (!Attribute) { return nullptr; }
 
 		TSharedPtr<IAttributeBroadcaster> Broadcaster = nullptr;
-		PCGExMetaHelpers::ExecuteWithRightType(Attribute->GetTypeId(), [&](auto DummyValue)
+		// Container/extended types fall through silently — broadcasting requires a templated T,
+		// which has no meaning for TArray/Struct/Object. Caller gets nullptr and handles it.
+		PCGExMetaHelpers::ExecuteWithRightType(Attribute, [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
 			TSharedPtr<TAttributeBroadcaster<T>> TypedBroadcaster = MakeShared<TAttributeBroadcaster<T>>();

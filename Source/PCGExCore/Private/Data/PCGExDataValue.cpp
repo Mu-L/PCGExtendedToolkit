@@ -205,7 +205,9 @@ template class PCGEXCORE_API TDataValue<_TYPE>;
 
 		if (const FPCGMetadataAttributeBase* SourceAttribute = InMetadata->GetConstAttribute(SanitizedIdentifier))
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute->GetTypeId(), [&](auto DummyValue)
+			// Container/extended source types fall through — TDataValue<T> is templated on basic types only,
+			// so we can't represent them. Caller gets nullptr DataValue and skips.
+			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute, [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
 				const T Value = Helpers::ReadDataValue<T>(SourceAttribute);
@@ -215,7 +217,7 @@ template class PCGEXCORE_API TDataValue<_TYPE>;
 
 				if (SubSelection.bIsValid)
 				{
-					PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute->GetTypeId(), [&](auto WorkingValue)
+					PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute, [&](auto WorkingValue)
 					{
 						using T_WORKING = decltype(DummyValue);
 						TypedDataValue = MakeShared<TDataValue<T_WORKING>>(SubSelection.Get<T, T_WORKING>(Value));

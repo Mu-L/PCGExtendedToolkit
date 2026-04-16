@@ -6,6 +6,7 @@
 #include "Blenders/PCGExMetadataBlender.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPointsToBoundsElement"
@@ -22,15 +23,26 @@ void FPCGExPointsToBoundsDataDetails::Output(const UPCGBasePointData* InBoundsDa
 
 			const FPCGMetadataAttributeBase* Source = InBoundsData->Metadata->GetConstAttribute(AttributeIdentifier);
 
-			PCGExMetaHelpers::ExecuteWithRightType(Source->GetTypeId(), [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				FPCGAttributeIdentifier DataIdentifier = FPCGAttributeIdentifier(AttributeIdentifier.Name, PCGMetadataDomainID::Data);
-				
-				const T Value = Source->GetValueFromItemKey<T>(PCGFirstEntryKey);
-				FPCGMetadataAttributeBase* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
-				Target->SetDefaultValue(Value);
-			});
+			const FPCGAttributeIdentifier DataIdentifier = FPCGAttributeIdentifier(AttributeIdentifier.Name, PCGMetadataDomainID::Data);
+
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Source,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					const T Value = Source->GetValueFromItemKey<T>(PCGFirstEntryKey);
+					FPCGMetadataAttributeBase* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
+					Target->SetDefaultValue(Value);
+				},
+				[&]()
+				{
+					// Property-backed: carry the first-element value into a data-domain target attribute.
+					if (!Source) { return; }
+					FPCGMetadataAttributeBase* Target = OutData->Metadata->CreateAttribute(
+						DataIdentifier, Source->GetAttributeDesc(), Source->AllowsInterpolation(), /*bOverrideParent=*/true);
+					if (!Target) { return; }
+					PCGExData::Helpers::PropertyCopyAttribute(Source, PCGFirstEntryKey, Target, PCGDefaultValueKey);
+				});
 		}
 	}
 
@@ -62,15 +74,25 @@ void FPCGExPointsToBoundsDataDetails::OutputInverse(const UPCGBasePointData* InP
 
 			const FPCGMetadataAttributeBase* Source = OutData->Metadata->GetConstAttribute(AttributeIdentifier);
 
-			PCGExMetaHelpers::ExecuteWithRightType(Source->GetTypeId(), [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				FPCGAttributeIdentifier DataIdentifier = FPCGAttributeIdentifier(AttributeIdentifier.Name, PCGMetadataDomainID::Data);
-				
-				const T Value = Source->GetValueFromItemKey<T>(PCGFirstEntryKey);
-				FPCGMetadataAttributeBase* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
-				Target->SetDefaultValue(Value);
-			});
+			const FPCGAttributeIdentifier DataIdentifier = FPCGAttributeIdentifier(AttributeIdentifier.Name, PCGMetadataDomainID::Data);
+
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Source,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					const T Value = Source->GetValueFromItemKey<T>(PCGFirstEntryKey);
+					FPCGMetadataAttributeBase* Target = OutData->Metadata->FindOrCreateAttribute(DataIdentifier, Value);
+					Target->SetDefaultValue(Value);
+				},
+				[&]()
+				{
+					if (!Source) { return; }
+					FPCGMetadataAttributeBase* Target = OutData->Metadata->CreateAttribute(
+						DataIdentifier, Source->GetAttributeDesc(), Source->AllowsInterpolation(), /*bOverrideParent=*/true);
+					if (!Target) { return; }
+					PCGExData::Helpers::PropertyCopyAttribute(Source, PCGFirstEntryKey, Target, PCGDefaultValueKey);
+				});
 		}
 	}
 
