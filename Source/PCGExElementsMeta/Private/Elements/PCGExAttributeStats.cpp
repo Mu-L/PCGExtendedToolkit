@@ -129,10 +129,8 @@ bool FPCGExAttributeStatsElement::Boot(FPCGExContext* InContext) const
 			[&]()
 			{
 				// Stats are inherently arithmetic (min/max/avg/etc.) — no meaningful semantics for
-				// container or extended (Struct/Object/...) attributes. Skip with a clear log.
-				PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(
-					FTEXT("Attribute '{0}' is a container or extended type and cannot be analyzed by Attribute Stats — skipped."),
-					FText::FromName(Identity.Name)));
+				// container or extended (Struct/Object/...) attributes.
+				PCGEX_LOG_UNSUPPORTED_TYPE(Context, Identity, FTEXT("Attribute Stats"));
 			});
 	}
 #undef PCGEX_STAT_DECL

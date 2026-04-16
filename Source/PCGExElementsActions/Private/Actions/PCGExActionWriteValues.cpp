@@ -79,8 +79,9 @@ void FPCGExActionWriteValuesOperation::OnMatchSuccess(int32 Index)
 			[&]()
 			{
 				// Property-backed: write source attribute's default value into target slot via FProperty.
-				if (TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuf = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(SuccessWriters[i]))
+				if (SuccessWriters[i] && SuccessWriters[i]->IsPropertyBacked())
 				{
+					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuf = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(SuccessWriters[i]);
 					if (const void* SrcAddr = AttributeBase->GetReadAddressFromEntryKey_Unsafe(PCGDefaultValueKey))
 					{
 						PropBuf->SetFromVoidProperty(Index, SrcAddr);
@@ -104,8 +105,9 @@ void FPCGExActionWriteValuesOperation::OnMatchFail(int32 Index)
 			},
 			[&]()
 			{
-				if (TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuf = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(FailWriters[i]))
+				if (FailWriters[i] && FailWriters[i]->IsPropertyBacked())
 				{
+					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuf = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(FailWriters[i]);
 					if (const void* SrcAddr = AttributeBase->GetReadAddressFromEntryKey_Unsafe(PCGDefaultValueKey))
 					{
 						PropBuf->SetFromVoidProperty(Index, SrcAddr);

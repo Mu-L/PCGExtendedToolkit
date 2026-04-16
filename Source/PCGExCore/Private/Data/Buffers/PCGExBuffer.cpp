@@ -620,10 +620,13 @@ namespace PCGExData
 
 		if (!OutAttribute) { return; }
 
-		// CRITICAL: SetValue with PCGDefaultValueKey as the entry key silently bails inside the engine
-		// (PCGDefaultValueKey == -1 == PCGInvalidEntryKey, and SetValueFromValueKey_Unsafe early-returns
-		// for PCGInvalidEntryKey). Use SetDefaultValue, which goes through the proper default-value slot
-		// (ExistingIndexForDefaultValue) and persists. This was masked until @Data BlendOp output was tested.
+		// CRITICAL — DO NOT REPLACE WITH SetValue<T>(PCGDefaultValueKey, OutValue).
+		// PCGDefaultValueKey == -1 == PCGInvalidEntryKey; the engine's SetValueFromValueKey_Unsafe
+		// early-returns for invalid entry keys and the write is silently dropped. Use SetDefaultValue<T>
+		// which goes through the proper default-value slot (ExistingIndexForDefaultValue) and persists.
+		// (FPropertySingleValueBuffer::Write CAN safely use SetValueFromProperty with PCGDefaultValueKey
+		// because that engine API specifically handles InvalidEntryKey via the default slot — different
+		// code path, different behavior. See the comment there for context.)
 		OutAttribute->template SetDefaultValue<T>(OutValue);
 	}
 

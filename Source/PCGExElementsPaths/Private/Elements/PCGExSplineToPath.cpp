@@ -228,22 +228,14 @@ namespace PCGExSplineToPath
 							TSharedPtr<PCGExData::IBuffer> OutBuffer = PointDataFacade->GetWritable(Identity.GetType(), SourceAttr, PCGExData::EBufferInit::New);
 							if (!OutBuffer) { return; }
 
-							PCGExTypes::FScopedTypedValue Scratch = OutBuffer->MakeScopedValue();
-							const FProperty* Prop = Scratch.GetProperty();
-							if (!Prop) { return; }
-
 							if (Identity.InDataDomain())
 							{
-								if (const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(PCGDefaultValueKey))
-								{
-									Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
-									OutBuffer->SetVoid(0, Scratch);
-								}
+								PCGExData::Helpers::PropertyBroadcastAttribute(SourceAttr, PCGDefaultValueKey, OutBuffer);
 								return;
 							}
 
+							if (!Keys || !OutBuffer->IsPropertyBacked()) { return; }
 							const TSharedPtr<PCGExData::FPropertyArrayBuffer> ArrayBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(OutBuffer);
-							if (!ArrayBuffer || !Keys) { return; }
 
 							// Pull per-entry keys via the IPCGAttributeAccessorKeys public templated interface
 							// (GetMetadataEntryKeys is protected on FPCGAttributeAccessorKeysEntries).

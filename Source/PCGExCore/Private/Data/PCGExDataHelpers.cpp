@@ -64,13 +64,53 @@ namespace PCGExData::Helpers
 		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
 		if (!SrcAddr) { return false; }
 
-		// Build a transient property matching the source desc so SetValueFromProperty knows the layout.
-		// One-time per call — for hot paths the caller should cache via FPropertyArrayBuffer instead.
+		// PERF — this allocates a transient FProperty per call (CreateInnerPropertyFromDesc walks the
+		// desc + heap-allocates) and deletes it. Fine for one-shot single-value carry (DataForward,
+		// PointsToBounds, BlendingHelpers per-attribute outer loop). NOT fine for per-element loops —
+		// if you need that, drive the loop through an FPropertyBuffer instance whose CachedInnerProperty
+		// is built once at InitForRead/InitForWrite, and call SetFromVoidProperty per element.
 		FProperty* TempProp = FPropertyBuffer::CreateInnerPropertyFromDesc(SourceAttr->GetAttributeDesc());
 		if (!TempProp) { return false; }
 
 		TargetAttr->SetValueFromProperty(TargetKey, SrcAddr, TempProp);
 		delete TempProp;
+		return true;
+	}
+
+	bool PropertyBroadcastAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
+		const TSharedPtr<IBuffer>& TargetWriter)
+	{
+		if (!SourceAttr || !TargetWriter) { return false; }
+
+		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
+		if (!SrcAddr) { return false; }
+
+		PCGExTypes::FScopedTypedValue Scratch = TargetWriter->MakeScopedValue();
+		const FProperty* Prop = Scratch.GetProperty();
+		if (!Prop) { return false; }
+
+		Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
+		const int32 NumSlots = TargetWriter->GetNumValues(EIOSide::Out);
+		for (int32 s = 0; s < NumSlots; s++) { TargetWriter->SetVoid(s, Scratch); }
+		return NumSlots > 0;
+	}
+
+	bool PropertyScatterAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
+		const TSharedPtr<IBuffer>& TargetWriter, TArrayView<const int32> Indices)
+	{
+		if (!SourceAttr || !TargetWriter || Indices.IsEmpty()) { return false; }
+
+		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
+		if (!SrcAddr) { return false; }
+
+		PCGExTypes::FScopedTypedValue Scratch = TargetWriter->MakeScopedValue();
+		const FProperty* Prop = Scratch.GetProperty();
+		if (!Prop) { return false; }
+
+		Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
+		for (int32 Index : Indices) { TargetWriter->SetVoid(Index, Scratch); }
 		return true;
 	}
 

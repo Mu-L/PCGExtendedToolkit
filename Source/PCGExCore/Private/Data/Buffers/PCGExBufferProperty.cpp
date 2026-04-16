@@ -821,6 +821,14 @@ namespace PCGExData
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 		SharedContext.Get()->AddProtectedAttributeName(GenericOutAttribute->Name);
 
+		// NOTE on API asymmetry vs TSingleValueBuffer<T>::Write:
+		//   - Typed Write uses SetDefaultValue<T>(OutValue) because SetValue<T>(PCGDefaultValueKey, ...)
+		//     silently bails inside the engine (PCGDefaultValueKey == -1 == PCGInvalidEntryKey;
+		//     SetValueFromValueKey_Unsafe early-returns for invalid entries).
+		//   - The property-based path here is fine: SetValueFromProperty checks ItemKey ==
+		//     PCGInvalidEntryKey and routes to ExistingIndexForDefaultValue internally, so passing
+		//     PCGDefaultValueKey actually does what we want. Different code path, different behavior.
+		// If you ever switch this away from SetValueFromProperty, audit the new API the same way.
 		GenericOutAttribute->SetValueFromProperty(
 			PCGDefaultValueKey,
 			OutValue.GetData(),

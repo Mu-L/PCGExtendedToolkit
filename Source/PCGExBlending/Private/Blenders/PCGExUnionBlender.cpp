@@ -71,14 +71,12 @@ namespace PCGExBlending
 			bool bError = false;
 
 			// Property-backed buffers (containers, extended types, Object family) cache an FProperty
-			// that handles container layout and deep-copy semantics. We can route those to
-			// CreateProxyBlender's FProperty overload — but ONLY if the buffer is genuinely an
-			// FPropertyBuffer instance. Basic-typed buffers (TSingleValueBuffer<T>, TArrayBuffer<T>)
-			// are siblings of FPropertyBuffer in the IBuffer hierarchy, so an unconditional
-			// StaticCastSharedPtr would be undefined behavior. Gate on the identity's desc to know
-			// which kind of buffer FFacade::GetWritable returned.
+			// that handles container layout and deep-copy semantics. Route those to CreateProxyBlender's
+			// FProperty overload. IBuffer::IsPropertyBacked() is the safe gate for the static cast —
+			// typed and property buffers are siblings under IBuffer, so an unconditional
+			// StaticCastSharedPtr would be UB.
 			const FProperty* InitProperty = nullptr;
-			if (!PCGExMetaHelpers::IsBasicSingleValue(Identity))
+			if (InitializationBuffer->IsPropertyBacked())
 			{
 				if (TSharedPtr<PCGExData::FPropertyBuffer> AsPropBuf = StaticCastSharedPtr<PCGExData::FPropertyBuffer>(InitializationBuffer))
 				{

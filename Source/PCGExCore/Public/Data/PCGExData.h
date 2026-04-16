@@ -156,6 +156,12 @@ namespace PCGExData
 		// TBuffer<T> uses compile-time TTraits<T>::Type; FPropertyBuffer uses its cached FProperty.
 		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const = 0;
 
+		// True iff this buffer is property-backed (FPropertyArrayBuffer / FPropertySingleValueBuffer
+		// fallback path for extended/container types). False for typed TBuffer<T> instances.
+		// Use this to safely gate StaticCastSharedPtr<FPropertyBuffer>(buf) — the typed and property
+		// buffer hierarchies are siblings under IBuffer, so an unconditional static cast would be UB.
+		virtual bool IsPropertyBacked() const { return false; }
+
 		virtual void Flush()
 		{
 		}

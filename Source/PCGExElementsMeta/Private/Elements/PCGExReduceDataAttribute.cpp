@@ -99,9 +99,7 @@ bool FPCGExReduceDataAttributeElement::Boot(FPCGExContext* InContext) const
 		// Container/extended types are dropped here so the typed dispatch downstream stays safe.
 		if (!PCGExMetaHelpers::IsBasicSingleValue(Attribute->GetAttributeDesc()))
 		{
-			PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(
-				FTEXT("Attribute '{0}' is a container/extended type and cannot be reduced — input skipped."),
-				FText::FromName(ReadIdentifier.Name)));
+			PCGEX_LOG_UNSUPPORTED_TYPE(Context, ReadIdentifier, FTEXT("Reduce Data Attribute"));
 			continue;
 		}
 

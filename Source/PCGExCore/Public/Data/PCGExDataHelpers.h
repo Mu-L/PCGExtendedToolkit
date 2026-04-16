@@ -14,6 +14,7 @@ struct FPCGExContext;
 
 namespace PCGExData
 {
+	class IBuffer;
 	class FPointIO;
 	class FFacade;
 	class FPropertyArrayBuffer;
@@ -135,6 +136,29 @@ extern template void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeIdentifi
 		const TSharedPtr<FPointIO>& SourceIO, const FAttributeIdentity& SourceIdentity,
 		const TSharedRef<FPropertyArrayBuffer>& TargetBuffer,
 		const PCGExMT::FScope& ReadScope, const PCGExMT::FScope& WriteScope, bool bReverse);
+
+	/**
+	 * Property-aware broadcast: read a single value from SourceAttr at SourceKey, then deep-copy it
+	 * into ALL slots of TargetWriter. Standard fallback shape for property-backed forward / carry
+	 * paths (DataForward, PointsToBounds, spline-to-path data domain, etc.) where one source value
+	 * fans out to N target slots.
+	 *
+	 * @param SourceAttr Source attribute to read from (must be non-null)
+	 * @param SourceKey Entry key on source (PCGDefaultValueKey for data-domain values)
+	 * @param TargetWriter Property-backed writable IBuffer; uses MakeScopedValue + SetVoid in a loop
+	 * @return true if the value was deep-copied into at least one slot
+	 */
+	PCGEXCORE_API bool PropertyBroadcastAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, PCGMetadataEntryKey SourceKey,
+		const TSharedPtr<IBuffer>& TargetWriter);
+
+	/**
+	 * Like PropertyBroadcastAttribute but writes to a specific set of target indices instead of
+	 * all slots. Used by FDataForwardHandler::Forward(SourceIdx, FFacade, Indices).
+	 */
+	PCGEXCORE_API bool PropertyScatterAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, PCGMetadataEntryKey SourceKey,
+		const TSharedPtr<IBuffer>& TargetWriter, TArrayView<const int32> Indices);
 
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
 extern template bool TryReadDataValue<_TYPE>(FPCGExContext* InContext, const UPCGData* InData, const FPCGAttributePropertyInputSelector& InSelector, _TYPE& OutValue, const bool bQuiet); \

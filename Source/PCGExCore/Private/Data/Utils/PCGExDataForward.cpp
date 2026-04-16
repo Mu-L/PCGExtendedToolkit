@@ -167,15 +167,7 @@ namespace PCGExData
 						}
 
 						TSharedPtr<IBuffer> Writer = InTargetDataFacade->GetWritable(Identity.GetType(), SourceAtt, EBufferInit::New);
-						if (!Writer) { return; }
-
-						PCGExTypes::FScopedTypedValue Scratch = Writer->MakeScopedValue();
-						if (const FProperty* Prop = Scratch.GetProperty())
-						{
-							Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
-							const int32 NumSlots = Writer->GetNumValues(EIOSide::Out);
-							for (int32 s = 0; s < NumSlots; s++) { Writer->SetVoid(s, Scratch); }
-						}
+						Helpers::PropertyBroadcastAttribute(SourceAtt, SourceKey, Writer);
 					});
 			}
 
@@ -229,15 +221,7 @@ namespace PCGExData
 					InTargetDataFacade->Source->DeleteAttribute(Identifier);
 
 					TSharedPtr<IBuffer> Writer = InTargetDataFacade->GetWritable(Identity.GetType(), SourceAtt, EBufferInit::New);
-					if (!Writer) { return; }
-
-					PCGExTypes::FScopedTypedValue Scratch = Writer->MakeScopedValue();
-					if (const FProperty* Prop = Scratch.GetProperty())
-					{
-						Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
-						const int32 NumSlots = Writer->GetNumValues(EIOSide::Out);
-						for (int32 s = 0; s < NumSlots; s++) { Writer->SetVoid(s, Scratch); }
-					}
+					Helpers::PropertyBroadcastAttribute(SourceAtt, SourceKey, Writer);
 				});
 		}
 	}
@@ -284,21 +268,8 @@ namespace PCGExData
 					if (!SrcAddr) { return; }
 
 					TSharedPtr<IBuffer> Writer = InTargetDataFacade->GetWritable(Identity.GetType(), SourceAtt, EBufferInit::Inherit);
-					if (!Writer) { return; }
-
-					PCGExTypes::FScopedTypedValue Scratch = Writer->MakeScopedValue();
-					if (const FProperty* Prop = Scratch.GetProperty())
-					{
-						Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
-						if (Writer->GetUnderlyingDomain() == EDomainType::Elements)
-						{
-							for (int32 Index : Indices) { Writer->SetVoid(Index, Scratch); }
-						}
-						else
-						{
-							Writer->SetVoid(0, Scratch);
-						}
-					}
+					if (Writer && Writer->GetUnderlyingDomain() == EDomainType::Elements) { Helpers::PropertyScatterAttribute(SourceAtt, SourceKey, Writer, Indices); }
+					else { Helpers::PropertyBroadcastAttribute(SourceAtt, SourceKey, Writer); }
 				});
 		}
 	}

@@ -131,14 +131,14 @@ namespace PCGExPointIOMerger
 
 					const TSharedPtr<PCGExData::IBuffer> RawBuffer = Merger->UnionDataFacade->GetWritable(
 						Identity.GetType(), Identity.Attribute, PCGExData::EBufferInit::New);
-					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(RawBuffer);
-					if (!PropBuffer)
+					if (!RawBuffer || !RawBuffer->IsPropertyBacked())
 					{
 						PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(
 							FTEXT("Cannot merge attribute '{0}' — failed to create property-backed writable buffer."),
 							FText::FromName(Identity.Name)));
 						return;
 					}
+					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(RawBuffer);
 
 					const TSharedRef<PCGExData::FPropertyArrayBuffer> PropBufferRef = PropBuffer.ToSharedRef();
 					for (int i = 0; i < Merger->IOSources.Num(); i++)

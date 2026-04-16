@@ -72,6 +72,9 @@ namespace PCGExData
 			return PCGExTypes::FScopedTypedValue(CachedInnerProperty);
 		}
 
+		// Property-backed buffer — see IBuffer::IsPropertyBacked() rationale.
+		virtual bool IsPropertyBacked() const override { return true; }
+
 		// Static factory: build an FProperty matching the attribute's full descriptor.
 		// Handles container types (TArray/TSet/TMap), scalar legacy types, struct/enum, and
 		// the Object family (Object/SoftObject/Class/SoftClass — transient processing only;

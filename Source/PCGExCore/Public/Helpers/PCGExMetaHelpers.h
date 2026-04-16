@@ -266,6 +266,15 @@ namespace PCGExMetaHelpers
 			&& static_cast<uint16>(Desc.ValueType) < static_cast<uint16>(EPCGMetadataTypes::EndLegacyTypes);
 	}
 
+	// Standard "skip with warning" log for Bucket-A sites where the operation is inherently
+	// arithmetic / typed-conversion-only and has no defined semantics for container or extended types.
+	// _IDENTITY can be any expression with a `.Name` member (FAttributeIdentity, FPCGMetadataAttributeDesc).
+	// _OPERATION is a FText literal naming the operation, e.g. FTEXT("Attribute Stats").
+	#define PCGEX_LOG_UNSUPPORTED_TYPE(_CONTEXT, _IDENTITY, _OPERATION) \
+		PCGE_LOG_C(Warning, GraphAndLog, _CONTEXT, FText::Format( \
+			FTEXT("Attribute '{0}' is a container or extended type and cannot be used by {1} — skipped."), \
+			FText::FromName((_IDENTITY).Name), _OPERATION))
+
 	// Identity-aware dispatch with explicit fallback for extended/container types.
 	// Returns true if the typed branch ran, false if the fallback ran.
 	// Use this everywhere consumers used to call ExecuteWithRightType(Identity.GetType(), ...) —

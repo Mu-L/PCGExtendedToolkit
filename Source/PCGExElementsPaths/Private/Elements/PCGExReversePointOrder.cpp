@@ -182,9 +182,7 @@ namespace PCGExReversePointOrder
 				{
 					// Swap pair on container/extended-typed attribute would need property-aware
 					// per-element swap with a scratch slot. Not wired yet — drop the pair with a log.
-					PCGE_LOG_C(Warning, GraphAndLog, This->Context, FText::Format(
-						FTEXT("Reverse swap on attribute '{0}' is a container/extended type — not supported, pair skipped."),
-						FText::FromName(WorkingPair.FirstIdentity->Name)));
+					PCGEX_LOG_UNSUPPORTED_TYPE(This->Context, *WorkingPair.FirstIdentity, FTEXT("Reverse Point Order swap"));
 					WorkingPair.FirstWriter.Reset();
 					WorkingPair.SecondWriter.Reset();
 				});
