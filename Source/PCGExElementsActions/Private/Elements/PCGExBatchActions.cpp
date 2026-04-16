@@ -121,13 +121,22 @@ namespace PCGExBatchActions
 		if (!IProcessor::Process(InTaskManager)) { return false; }
 
 		// Initialize writers with provided default value
-		for (FPCGMetadataAttributeBase* AttributeBase : Context->DefaultAttributes->Attributes)
+		for (const PCGExData::FAttributeIdentity& Identity : Context->DefaultAttributes->Identities)
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				PointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
-			});
+			const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
+			if (!AttributeBase) { continue; }
+			PCGExMetaHelpers::ExecuteWithRightType(
+				AttributeBase,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					PointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
+				},
+				[&]()
+				{
+					// Property-backed: route through the generic GetWritableFromAttribute fallback.
+					PointDataFacade->GetWritableFromAttribute(AttributeBase, PCGExData::EBufferInit::Inherit);
+				});
 		}
 
 		for (const UPCGExActionFactoryData* Factory : Context->ActionsFactories)

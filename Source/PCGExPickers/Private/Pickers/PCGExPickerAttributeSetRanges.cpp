@@ -46,13 +46,13 @@ bool UPCGExPickerAttributeSetRangesFactory::GetUniqueRanges(FPCGExContext* InCon
 		if (InConfig.Attributes.IsEmpty())
 		{
 			const TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(Facade->Source->GetIn()->Metadata);
-			if (Infos->Attributes.IsEmpty())
+			if (Infos->Identities.IsEmpty())
 			{
 				PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Some input have no attributes."));
 				continue;
 			}
 
-			const TSharedPtr<PCGExData::TAttributeBroadcaster<FVector2D>> Values = PCGExData::MakeTypedBroadcaster<FVector2D>(Infos->Attributes[0]->Name, Facade->Source);
+			const TSharedPtr<PCGExData::TAttributeBroadcaster<FVector2D>> Values = PCGExData::MakeTypedBroadcaster<FVector2D>(Infos->Identities[0].Name, Facade->Source);
 			if (!Values) { continue; }
 			Values->GrabUniqueValues(UniqueRanges);
 		}

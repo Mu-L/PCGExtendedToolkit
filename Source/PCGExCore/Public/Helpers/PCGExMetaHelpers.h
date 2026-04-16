@@ -17,6 +17,7 @@ FORCEINLINE bool operator==(const FText& A, const FText& B) { return A.EqualTo(B
 #endif
 
 #include "Metadata/PCGMetadataAttributeTraits.h"
+#include "Types/PCGExAttributeIdentity.h"
 
 // Engine registers FText via PCGMetadataGenerateDataTypes but provides no MetadataTraits<FText> specialization.
 // The default template inherits DefaultWeightedSumTraits which requires operator* — FText doesn't have it.
@@ -253,6 +254,78 @@ namespace PCGExMetaHelpers
 		}
 
 #undef PCGEX_EXECUTE_WITH_TYPE
+	}
+
+	// True iff the desc describes a single-valued attribute of a basic legacy type
+	// covered by PCGEX_FOREACH_SUPPORTEDTYPES (Float..SoftClassPath). Container types
+	// (TArray/TSet/TMap) and extended 5.8 types (Struct/Enum/Object/SoftObject/Class/SoftClass/Byte/Text)
+	// return false — these need to route through FPropertyBuffer / FPropertyCopyBlendOperation.
+	FORCEINLINE bool IsBasicSingleValue(const FPCGMetadataAttributeDesc& Desc)
+	{
+		return Desc.ContainerTypes.IsEmpty()
+			&& static_cast<uint16>(Desc.ValueType) < static_cast<uint16>(EPCGMetadataTypes::EndLegacyTypes);
+	}
+
+	// Standard "skip with warning" log for Bucket-A sites where the operation is inherently
+	// arithmetic / typed-conversion-only and has no defined semantics for container or extended types.
+	// _IDENTITY can be any expression with a `.Name` member (FAttributeIdentity, FPCGMetadataAttributeDesc).
+	// _OPERATION is a FText literal naming the operation, e.g. FTEXT("Attribute Stats").
+	#define PCGEX_LOG_UNSUPPORTED_TYPE(_CONTEXT, _IDENTITY, _OPERATION) \
+		PCGE_LOG_C(Warning, GraphAndLog, _CONTEXT, FText::Format( \
+			FTEXT("Attribute '{0}' is a container or extended type and cannot be used by {1} — skipped."), \
+			FText::FromName((_IDENTITY).Name), _OPERATION))
+
+	// Identity-aware dispatch with explicit fallback for extended/container types.
+	// Returns true if the typed branch ran, false if the fallback ran.
+	// Use this everywhere consumers used to call ExecuteWithRightType(Identity.GetType(), ...) —
+	// the fallback branch is where you wire up PropertyBuffer-based copy semantics (or a "drop+log"
+	// for arithmetic-only sites).
+	template <typename TypedFn, typename FallbackFn>
+	static bool ExecuteWithRightType(const PCGExData::FAttributeIdentity& Identity, TypedFn&& Typed, FallbackFn&& Fallback)
+	{
+		if (IsBasicSingleValue(Identity))
+		{
+			ExecuteWithRightType(Identity.GetType(), std::forward<TypedFn>(Typed));
+			return true;
+		}
+		Fallback();
+		return false;
+	}
+
+	// Identity-aware dispatch, single callback. Returns true if the typed branch ran. No fallback
+	// runs for extended/container types — useful at sites where the fallback decision was already
+	// taken upstream (e.g., Reverse swap nulls the writer at fetch time and skips matching pairs here).
+	template <typename TypedFn>
+	static bool ExecuteWithRightType(const PCGExData::FAttributeIdentity& Identity, TypedFn&& Typed)
+	{
+		if (!IsBasicSingleValue(Identity)) { return false; }
+		ExecuteWithRightType(Identity.GetType(), std::forward<TypedFn>(Typed));
+		return true;
+	}
+
+	// Attribute-aware dispatch with fallback. Same shape as the Identity overload, but driven by
+	// the live attribute's desc. Use at sites where the attribute pointer is what's in scope.
+	template <typename TypedFn, typename FallbackFn>
+	static bool ExecuteWithRightType(const FPCGMetadataAttributeBase* Attr, TypedFn&& Typed, FallbackFn&& Fallback)
+	{
+		if (!Attr) { Fallback(); return false; }
+		if (IsBasicSingleValue(Attr->GetAttributeDesc()))
+		{
+			ExecuteWithRightType(static_cast<EPCGMetadataTypes>(Attr->GetTypeId()), std::forward<TypedFn>(Typed));
+			return true;
+		}
+		Fallback();
+		return false;
+	}
+
+	// Attribute-aware dispatch, single callback. Returns true if the typed branch ran.
+	// Use when the fallback is "do nothing / caller handles it via the bool return".
+	template <typename TypedFn>
+	static bool ExecuteWithRightType(const FPCGMetadataAttributeBase* Attr, TypedFn&& Typed)
+	{
+		if (!Attr || !IsBasicSingleValue(Attr->GetAttributeDesc())) { return false; }
+		ExecuteWithRightType(static_cast<EPCGMetadataTypes>(Attr->GetTypeId()), std::forward<TypedFn>(Typed));
+		return true;
 	}
 
 	PCGEXCORE_API FString GetSelectorDisplayName(const FPCGAttributePropertyInputSelector& InSelector);

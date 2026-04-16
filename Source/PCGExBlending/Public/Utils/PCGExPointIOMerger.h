@@ -29,18 +29,6 @@ namespace PCGExData
 
 namespace PCGExPointIOMerger
 {
-	struct PCGEXBLENDING_API FIdentityRef : PCGExData::FAttributeIdentity
-	{
-		const FPCGMetadataAttributeBase* Attribute = nullptr;
-		FPCGAttributeIdentifier ElementsIdentifier;
-		bool bInitDefault = false;
-
-		FIdentityRef();
-		FIdentityRef(const FIdentityRef& Other);
-		FIdentityRef(const FAttributeIdentity& Other);
-		FIdentityRef(const FName InName, const EPCGMetadataTypes InUnderlyingType, const bool InAllowsInterpolation);
-	};
-
 	struct PCGEXBLENDING_API FMergeScope
 	{
 		PCGExMT::FScope Read;
@@ -57,7 +45,7 @@ class PCGEXBLENDING_API FPCGExPointIOMerger final : public TSharedFromThis<FPCGE
 	friend class FPCGExAttributeMergeTask;
 
 public:
-	TArray<PCGExPointIOMerger::FIdentityRef> UniqueIdentities;
+	TArray<PCGExData::FAttributeIdentity> UniqueIdentities;
 	TSharedRef<PCGExData::FFacade> UnionDataFacade;
 	TArray<TSharedPtr<PCGExData::FPointIO>> IOSources;
 	TArray<PCGExPointIOMerger::FMergeScope> Scopes;
@@ -72,11 +60,15 @@ public:
 	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr);
 
 	bool WantsDataToElements() const { return bDataDomainToElements; }
+	bool WantsInitDefault() const { return bInitDefault; }
 
 protected:
 	void CopyProperties(const int32 Index);
 	PCGExPointIOMerger::FMergeScope NullScope;
 	bool bDataDomainToElements = false;
+	// Merger-wide: whether output buffers should be initialized from each attribute's default value
+	// (vs. a zero-init T{}). Sourced from FPCGExCarryOverDetails::bPreserveAttributesDefaultValue.
+	bool bInitDefault = false;
 	int32 NumCompositePoints = 0;
 	EPCGPointNativeProperties AllocateProperties = EPCGPointNativeProperties::None;
 
@@ -88,13 +80,13 @@ protected:
 namespace PCGExPointIOMerger
 {
 	template <typename T>
-	static void ScopeMerge(const FMergeScope& Scope, const FIdentityRef& Identity, const TSharedPtr<PCGExData::FPointIO>& SourceIO, const TSharedPtr<PCGExData::TBuffer<T>>& OutBuffer)
+	static void ScopeMerge(const FMergeScope& Scope, const PCGExData::FAttributeIdentity& Identity, const TSharedPtr<PCGExData::FPointIO>& SourceIO, const TSharedPtr<PCGExData::TBuffer<T>>& OutBuffer)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPointIOMerger::ScopeMerge);
 
 		UPCGMetadata* InMetadata = SourceIO->GetIn()->Metadata;
 
-		const FPCGMetadataAttributeBase* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(InMetadata, Identity.Identifier);
+		const FPCGMetadataAttributeBase* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(InMetadata, Identity.GetIdentifier());
 		if (!TypedInAttribute) { return; }
 
 		TSharedPtr<PCGExData::TArrayBuffer<T>> OutElementsBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(OutBuffer);

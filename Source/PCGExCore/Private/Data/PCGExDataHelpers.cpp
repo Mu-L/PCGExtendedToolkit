@@ -7,7 +7,9 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExSubSelection.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Types/PCGExAttributeIdentity.h"
 #include "Types/PCGExTypes.h"
 
 namespace PCGExData::Helpers
@@ -26,29 +28,121 @@ namespace PCGExData::Helpers
 				continue;
 			}
 
-			EPCGMetadataTypes SrcType = SrcBuffer->GetTypeId();
-			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritable(SrcType, SrcBuffer->Identifier.Name, EBufferInit::Inherit);
+			// TODO: support Data domain. Currently only Elements.
+			if (SrcBuffer->GetUnderlyingDomain() != EDomainType::Elements) { continue; }
+
+			const FPCGMetadataAttributeBase* SrcAttr = SrcBuffer->OutAttribute;
+			if (!SrcAttr) { continue; }
+
+			// Attribute-driven: tier-agnostic, no EPCGMetadataTypes surfaces here.
+			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritableFromAttribute(SrcAttr, EBufferInit::Inherit);
 			if (!DstBuffer) { continue; }
 
-			PCGExMetaHelpers::ExecuteWithRightType(SrcType, [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				if (SrcBuffer->GetUnderlyingDomain() == EDomainType::Elements)
-				{
-					TArray<T>& SrcValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(SrcBuffer)->GetOutValues().Get();
-					TArray<T>& DstValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(DstBuffer)->GetOutValues().Get();
+			const int32 NumCopy = SourcePointIndices.Num();
 
-					for (int32 i = 0; i < SourcePointIndices.Num(); i++)
-					{
-						DstValues[i] = SrcValues[SourcePointIndices[i]];
-					}
-				}
-				else
+			// Scope-based parallel: one FScopedTypedValue per worker task (not per iteration).
+			// Amortizes the scoped-value construction cost across each thread's chunk.
+			PCGEX_PARALLEL_FOR_SCOPED(
+				NumCopy, 1024,
 				{
-					// TODO 
+				PCGExTypes::FScopedTypedValue Temp = SrcBuffer->MakeScopedValue();
+				PCGEX_SCOPE_LOOP(i)
+				{
+					SrcBuffer->GetVoid(SourcePointIndices[i], Temp);
+					DstBuffer->SetVoid(i, Temp);
 				}
-			});
+				})
 		}
+	}
+
+	bool PropertyCopyAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
+		FPCGMetadataAttributeBase* TargetAttr, const PCGMetadataEntryKey TargetKey)
+	{
+		if (!SourceAttr || !TargetAttr) { return false; }
+
+		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
+		if (!SrcAddr) { return false; }
+
+		// PERF — this allocates a transient FProperty per call (CreateInnerPropertyFromDesc walks the
+		// desc + heap-allocates) and deletes it. Fine for one-shot single-value carry (DataForward,
+		// PointsToBounds, BlendingHelpers per-attribute outer loop). NOT fine for per-element loops —
+		// if you need that, drive the loop through an FPropertyBuffer instance whose CachedInnerProperty
+		// is built once at InitForRead/InitForWrite, and call SetFromVoidProperty per element.
+		FProperty* TempProp = FPropertyBuffer::CreateInnerPropertyFromDesc(SourceAttr->GetAttributeDesc());
+		if (!TempProp) { return false; }
+
+		TargetAttr->SetValueFromProperty(TargetKey, SrcAddr, TempProp);
+		delete TempProp;
+		return true;
+	}
+
+	bool PropertyBroadcastAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
+		const TSharedPtr<IBuffer>& TargetWriter)
+	{
+		if (!SourceAttr || !TargetWriter) { return false; }
+
+		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
+		if (!SrcAddr) { return false; }
+
+		PCGExTypes::FScopedTypedValue Scratch = TargetWriter->MakeScopedValue();
+		const FProperty* Prop = Scratch.GetProperty();
+		if (!Prop) { return false; }
+
+		Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
+		const int32 NumSlots = TargetWriter->GetNumValues(EIOSide::Out);
+		for (int32 s = 0; s < NumSlots; s++) { TargetWriter->SetVoid(s, Scratch); }
+		return NumSlots > 0;
+	}
+
+	bool PropertyScatterAttribute(
+		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
+		const TSharedPtr<IBuffer>& TargetWriter, TArrayView<const int32> Indices)
+	{
+		if (!SourceAttr || !TargetWriter || Indices.IsEmpty()) { return false; }
+
+		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
+		if (!SrcAddr) { return false; }
+
+		PCGExTypes::FScopedTypedValue Scratch = TargetWriter->MakeScopedValue();
+		const FProperty* Prop = Scratch.GetProperty();
+		if (!Prop) { return false; }
+
+		Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
+		for (int32 Index : Indices) { TargetWriter->SetVoid(Index, Scratch); }
+		return true;
+	}
+
+	bool PropertyCopyAttributeRange(
+		const TSharedPtr<FPointIO>& SourceIO, const FAttributeIdentity& SourceIdentity,
+		const TSharedRef<FPropertyArrayBuffer>& TargetBuffer,
+		const PCGExMT::FScope& ReadScope, const PCGExMT::FScope& WriteScope, const bool bReverse)
+	{
+		check(ReadScope.Count == WriteScope.Count);
+
+		if (!SourceIO || ReadScope.Count <= 0) { return false; }
+
+		const UPCGBasePointData* SourceData = SourceIO->GetIn();
+		if (!SourceData || !SourceData->Metadata) { return false; }
+
+		const FPCGMetadataAttributeBase* SourceAttr = SourceData->Metadata->GetConstAttribute(SourceIdentity.GetIdentifier());
+		if (!SourceAttr) { return false; }
+
+		auto EntryKeys = SourceData->GetConstMetadataEntryValueRange();
+		if (EntryKeys.Num() < ReadScope.End) { return false; }
+
+		bool bAnyCopied = false;
+		for (int32 i = 0; i < ReadScope.Count; i++)
+		{
+			const int32 ReadIdx = bReverse ? (ReadScope.End - 1 - i) : (ReadScope.Start + i);
+			const PCGMetadataEntryKey EntryKey = EntryKeys[ReadIdx];
+			const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(EntryKey);
+			if (!SrcAddr) { continue; }
+			TargetBuffer->SetFromVoidProperty(WriteScope.Start + i, SrcAddr);
+			bAnyCopied = true;
+		}
+		return bAnyCopied;
 	}
 
 	template <typename T>
@@ -80,7 +174,8 @@ namespace PCGExData::Helpers
 	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute, T Fallback)
 	{
 		T Value = Fallback;
-		PCGExMetaHelpers::ExecuteWithRightType(Attribute->GetTypeId(), [&](auto DummyValue)
+		// Container/extended types fall through (no meaningful conversion to templated T) — fallback wins.
+		PCGExMetaHelpers::ExecuteWithRightType(Attribute, [&](auto DummyValue)
 		{
 			using T_VALUE = decltype(DummyValue);
 			Value = PCGExTypeOps::Convert<T_VALUE, T>(ReadDataValue<T_VALUE>(static_cast<const FPCGMetadataAttribute<T_VALUE>*>(Attribute)));
@@ -140,7 +235,8 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 
 		if (const FPCGMetadataAttributeBase* SourceAttribute = InMetadata->GetConstAttribute(SanitizedIdentifier))
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute->GetTypeId(), [&](auto DummyValue)
+			// Container/extended source types: TryReadDataValue<T> can't represent them; falls through to bSuccess=false.
+			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute, [&](auto DummyValue)
 			{
 				using T_VALUE = decltype(DummyValue);
 

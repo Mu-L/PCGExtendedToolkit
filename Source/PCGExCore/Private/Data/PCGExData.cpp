@@ -90,13 +90,24 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	}
 
 	template <typename T>
-	void TBuffer<T>::ReadVoid(const int32 Index, void* OutValue) const { *static_cast<T*>(OutValue) = Read(Index); }
+	void TBuffer<T>::ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const
+	{
+		// OutValue's storage is a properly-constructed T (either via the basic-type ctor
+		// or via FProperty-backed init). operator= is safe here.
+		OutValue.As<T>() = Read(Index);
+	}
 
 	template <typename T>
-	void TBuffer<T>::SetVoid(const int32 Index, const void* Value) { SetValue(Index, *static_cast<const T*>(Value)); }
+	void TBuffer<T>::SetVoid(const int32 Index, const PCGExTypes::FScopedTypedValue& Value)
+	{
+		SetValue(Index, Value.As<T>());
+	}
 
 	template <typename T>
-	void TBuffer<T>::GetVoid(const int32 Index, void* OutValue) { *static_cast<T*>(OutValue) = GetValue(Index); }
+	void TBuffer<T>::GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue)
+	{
+		OutValue.As<T>() = GetValue(Index);
+	}
 
 	template <typename T>
 	PCGExValueHash TBuffer<T>::ReadValueHash(const int32 Index) { return PCGExTypes::ComputeHash(Read(Index)); }
@@ -430,23 +441,31 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 #undef PCGEX_TYPED_WRITABLE
 	}
 
+	TSharedPtr<IBuffer> FFacade::GetWritableFromAttribute(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init)
+	{
+		if (!InAttribute) { return nullptr; }
+		const EPCGMetadataTypes Type = static_cast<EPCGMetadataTypes>(InAttribute->GetTypeId());
+		return GetWritable(Type, InAttribute, Init);
+	}
+
 	TSharedPtr<IBuffer> FFacade::GetReadable(const FAttributeIdentity& Identity, const EIOSide InSide, const bool bSupportScoped)
 	{
 		TSharedPtr<IBuffer> Buffer = nullptr;
+		const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
 
-#define PCGEX_TYPED_EXEC(_TYPE, _NAME) Buffer = GetReadable<_TYPE>(Identity.Identifier, InSide, bSupportScoped);
-		PCGEX_EXECUTEWITHRIGHTTYPE(Identity.UnderlyingType, PCGEX_TYPED_EXEC)
+#define PCGEX_TYPED_EXEC(_TYPE, _NAME) Buffer = GetReadable<_TYPE>(Identifier, InSide, bSupportScoped);
+		PCGEX_EXECUTEWITHRIGHTTYPE(Identity.GetType(), PCGEX_TYPED_EXEC)
 #undef PCGEX_TYPED_EXEC
 
 		// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES
 		if (!Buffer)
 		{
-			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(Identity.Identifier, InSide);
+			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(Identifier, InSide);
 			if (RawAttribute)
 			{
-				if (Identity.Identifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
+				if (Identity.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
 				{
-					auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, Identity.Identifier);
+					auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, Identifier);
 					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);
@@ -457,7 +476,7 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 				}
 				else
 				{
-					auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, Identity.Identifier);
+					auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, Identifier);
 					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);

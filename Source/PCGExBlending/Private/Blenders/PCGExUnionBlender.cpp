@@ -10,6 +10,7 @@
 #include "Containers/PCGExIndexLookup.h"
 #include "Core/PCGExOpStats.h"
 #include "Data/PCGExData.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -40,16 +41,17 @@ namespace PCGExBlending
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(Attribute)
 
-			const EPCGMetadataTypes WorkingType = Identity.UnderlyingType;
+			const EPCGMetadataTypes WorkingType = Identity.GetType();
 			if (WorkingType == EPCGMetadataTypes::Unknown)
 			{
 				// Unknown attribute type
 				return false;
 			}
 
+			const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
 			TSharedPtr<PCGExData::IBuffer> InitializationBuffer = nullptr;
 
-			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identity.Identifier); ExistingAttribute && ExistingAttribute->GetTypeId() == static_cast<int16>(Identity.UnderlyingType))
+			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identifier); ExistingAttribute && ExistingAttribute->GetTypeId() == Identity.GetTypeId())
 			{
 				// This attribute exists on target already
 				InitializationBuffer = InTargetData->GetWritable(WorkingType, ExistingAttribute, PCGExData::EBufferInit::Inherit);
@@ -62,20 +64,38 @@ namespace PCGExBlending
 
 			if (!InitializationBuffer)
 			{
-				PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("FMultiSourceBlender : Cannot create writable output for : \"{0}\""), FText::FromName(Identity.Identifier.Name)));
+				PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("FMultiSourceBlender : Cannot create writable output for : \"{0}\""), FText::FromName(Identity.Name)));
 				return false;
 			}
 
 			bool bError = false;
 
-			MainBlender = CreateProxyBlender(WorkingType, Param.Blending);
+			// Property-backed buffers (containers, extended types, Object family) cache an FProperty
+			// that handles container layout and deep-copy semantics. Route those to CreateProxyBlender's
+			// FProperty overload. IBuffer::IsPropertyBacked() is the safe gate for the static cast —
+			// typed and property buffers are siblings under IBuffer, so an unconditional
+			// StaticCastSharedPtr would be UB.
+			const FProperty* InitProperty = nullptr;
+			if (InitializationBuffer->IsPropertyBacked())
+			{
+				if (TSharedPtr<PCGExData::FPropertyBuffer> AsPropBuf = StaticCastSharedPtr<PCGExData::FPropertyBuffer>(InitializationBuffer))
+				{
+					InitProperty = AsPropBuf->GetCachedProperty();
+				}
+			}
+
+			MainBlender = InitProperty
+				? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
+				: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 
 			for (int i = 0; i < Sources.Num(); i++)
 			{
 				TSharedPtr<PCGExData::FFacade> Source = Sources[i];
 				if (!SupportedSources.Contains(i)) { continue; }
 
-				TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+				TSharedPtr<FProxyDataBlender> SubBlender = InitProperty
+					? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
+					: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 				SubBlenders[i] = SubBlender;
 
 				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags)) { return false; }
@@ -170,9 +190,10 @@ namespace PCGExBlending
 				// First, grab the Param for this attribute
 				// Getting a fail means it's filtered out.
 				FBlendingParam Param{};
-				if (!BlendingDetails->GetBlendingParam(Identity.Identifier, Param)) { continue; }
+				const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
+				if (!BlendingDetails->GetBlendingParam(Identifier, Param)) { continue; }
 
-				const FPCGMetadataAttributeBase* SourceAttribute = Facade->FindConstAttribute(Identity.Identifier);
+				const FPCGMetadataAttributeBase* SourceAttribute = Facade->FindConstAttribute(Identifier);
 				if (!SourceAttribute) { continue; }
 
 				TSharedPtr<FMultiSourceBlender> MultiAttribute = nullptr;
@@ -181,7 +202,7 @@ namespace PCGExBlending
 				// This could be done more efficiently with a map, but we need the array later on
 				for (const TSharedPtr<FMultiSourceBlender>& ExistingMultiSourceBlender : Blenders)
 				{
-					if (ExistingMultiSourceBlender->Identity.Identifier == Identity.Identifier)
+					if (ExistingMultiSourceBlender->Identity == Identity)
 					{
 						// We found one with the same name
 						MultiAttribute = ExistingMultiSourceBlender;
@@ -193,10 +214,10 @@ namespace PCGExBlending
 				{
 					// A multi-source blender was found for this attribute!
 
-					if (Identity.UnderlyingType != MultiAttribute->Identity.UnderlyingType)
+					if (!MultiAttribute->Identity.IsSameType(Identity))
 					{
 						// Type mismatch, ignore for this source
-						TypeMismatches.Add(Identity.Identifier.Name.ToString());
+						TypeMismatches.Add(Identity.Name.ToString());
 						continue;
 					}
 				}

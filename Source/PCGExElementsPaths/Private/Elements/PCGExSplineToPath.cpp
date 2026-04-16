@@ -10,6 +10,7 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
 #include "Data/PCGSplineData.h"
 #include "Math/PCGExBestFitPlane.h"
 #include "Math/PCGExProjectionDetails.h"
@@ -182,37 +183,82 @@ namespace PCGExSplineToPath
 
 				for (PCGExData::FAttributeIdentity Identity : SourceAttributes)
 				{
-					PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
-					{
-						using T = decltype(DummyValue);
-						const FPCGMetadataAttribute<T>* SourceAttr = SplineData->Metadata->GetConstTypedAttribute<T>(Identity.Identifier);
-
-						if (!SourceAttr) { return; }
-
-						TSharedPtr<PCGExData::TBuffer<T>> OutBuffer = PointDataFacade->GetWritable<T>(SourceAttr, PCGExData::EBufferInit::New);
-
-						if (Identity.InDataDomain())
+					PCGExMetaHelpers::ExecuteWithRightType(
+						Identity,
+						[&](auto DummyValue)
 						{
-							OutBuffer->SetValue(0, PCGExData::Helpers::ReadDataValue<T>(SourceAttr));
-							return;
-						}
+							using T = decltype(DummyValue);
+							const FPCGMetadataAttribute<T>* SourceAttr = SplineData->Metadata->GetConstTypedAttribute<T>(Identity.GetIdentifier());
 
-						TSharedPtr<PCGExData::TArrayBuffer<T>> OutArrayBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(OutBuffer);
-						TArrayView<T> InRange = MakeArrayView(OutArrayBuffer->GetOutValues()->GetData(), OutArrayBuffer->GetOutValues()->Num());
+							if (!SourceAttr) { return; }
 
-						if (Keys)
+							TSharedPtr<PCGExData::TBuffer<T>> OutBuffer = PointDataFacade->GetWritable<T>(SourceAttr, PCGExData::EBufferInit::New);
+
+							if (Identity.InDataDomain())
+							{
+								OutBuffer->SetValue(0, PCGExData::Helpers::ReadDataValue<T>(SourceAttr));
+								return;
+							}
+
+							TSharedPtr<PCGExData::TArrayBuffer<T>> OutArrayBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(OutBuffer);
+							TArrayView<T> InRange = MakeArrayView(OutArrayBuffer->GetOutValues()->GetData(), OutArrayBuffer->GetOutValues()->Num());
+
+							if (Keys)
+							{
+								TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(SourceAttr, SourceAttr->GetMetadataDomain());
+								InAccessor->GetRange(InRange, 0, *Keys.Get());
+
+								// Reverse carried-over attributes to match the reversed point order
+								if (bReverse && !Identity.InDataDomain()) { Algo::Reverse(InRange); }
+							}
+							else
+							{
+								//PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(FTEXT("Attribute {0} could not be copied."), FText::FromName(Identity.Name)));
+							}
+						},
+						[&]()
 						{
-							TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(SourceAttr, SourceAttr->GetMetadataDomain());
-							InAccessor->GetRange(InRange, 0, *Keys.Get());
+							// Property-backed spline-to-path carry. Data domain is straightforward (single value);
+							// the elements-domain path needs per-entry keys from the spline metadata, which
+							// FPCGAttributeAccessorKeysEntries doesn't expose directly. Iterate via the
+							// engine accessor's GetMetadataEntryKeys interface for the elements case.
+							const FPCGMetadataAttributeBase* SourceAttr = Identity.Attribute;
+							if (!SourceAttr) { return; }
 
-							// Reverse carried-over attributes to match the reversed point order
-							if (bReverse && !Identity.InDataDomain()) { Algo::Reverse(InRange); }
-						}
-						else
-						{
-							//PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(FTEXT("Attribute {0} could not be copied."), FText::FromName(Identity.Identifier.Name)));
-						}
-					});
+							TSharedPtr<PCGExData::IBuffer> OutBuffer = PointDataFacade->GetWritable(Identity.GetType(), SourceAttr, PCGExData::EBufferInit::New);
+							if (!OutBuffer) { return; }
+
+							if (Identity.InDataDomain())
+							{
+								PCGExData::Helpers::PropertyBroadcastAttribute(SourceAttr, PCGDefaultValueKey, OutBuffer);
+								return;
+							}
+
+							if (!Keys || !OutBuffer->IsPropertyBacked()) { return; }
+							const TSharedPtr<PCGExData::FPropertyArrayBuffer> ArrayBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(OutBuffer);
+
+							// Pull per-entry keys via the IPCGAttributeAccessorKeys public templated interface
+							// (GetMetadataEntryKeys is protected on FPCGAttributeAccessorKeysEntries).
+							const int32 Num = OutBuffer->GetNumValues(PCGExData::EIOSide::Out);
+							const int32 NumKeys = Keys->GetNum();
+							TArray<PCGMetadataEntryKey> EntryKeyBuf;
+							EntryKeyBuf.SetNumZeroed(NumKeys);
+							TArray<PCGMetadataEntryKey*> KeyPtrs;
+							KeyPtrs.Reserve(NumKeys);
+
+							for (int32 k = 0; k < NumKeys; k++) { KeyPtrs.Add(&EntryKeyBuf[k]); }
+							if (!Keys->GetKeys<PCGMetadataEntryKey>(0, MakeArrayView(KeyPtrs))) { return; }
+
+							for (int32 i = 0; i < Num; i++)
+							{
+								const int32 ReadIdx = bReverse ? (NumKeys - 1 - i) : i;
+								if (!EntryKeyBuf.IsValidIndex(ReadIdx)) { continue; }
+								if (const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(EntryKeyBuf[ReadIdx]))
+								{
+									ArrayBuffer->SetFromVoidProperty(i, SrcAddr);
+								}
+							}
+						});
 				}
 			}
 

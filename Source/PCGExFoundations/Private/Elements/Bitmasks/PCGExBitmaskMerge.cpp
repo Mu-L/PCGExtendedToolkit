@@ -50,11 +50,12 @@ bool FPCGExBitmaskMergeElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 
 		const TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(Metadata);
 
-		for (int i = 0; i < Infos->Attributes.Num(); i++)
+		for (int i = 0; i < Infos->Identities.Num(); i++)
 		{
-			if (Infos->Identities[i].UnderlyingType != EPCGMetadataTypes::Integer64) { continue; }
+			const PCGExData::FAttributeIdentity& Identity = Infos->Identities[i];
+			if (Identity.ValueType != EPCGMetadataTypes::Integer64 || !Identity.Attribute) { continue; }
 
-			const int64 InputMask = PCGExData::Helpers::ReadDataValue<int64>(Infos->Attributes[i]);
+			const int64 InputMask = PCGExData::Helpers::ReadDataValue<int64>(Identity.Attribute);
 
 			if (!bInitialized)
 			{

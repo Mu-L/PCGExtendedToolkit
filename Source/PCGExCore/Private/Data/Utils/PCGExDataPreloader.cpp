@@ -24,13 +24,19 @@ namespace PCGExData
 	}
 
 	FReadableBufferConfig::FReadableBufferConfig(const FName InName, const EPCGMetadataTypes InUnderlyingType, EBufferPreloadType InMode)
-		: Mode(InMode), Identity(InName, InUnderlyingType, false)
+		: Mode(InMode)
 	{
+		// Synthesized identity: no live attribute, so populate the inherited Desc fields directly.
+		Identity.Name = InName;
+		Identity.ValueType = InUnderlyingType;
 	}
 
 	FReadableBufferConfig::FReadableBufferConfig(const FPCGAttributePropertyInputSelector& InSelector, const EPCGMetadataTypes InUnderlyingType)
-		: Mode(EBufferPreloadType::BroadcastFromSelector), Selector(InSelector), Identity(InSelector.GetName(), InUnderlyingType, false)
+		: Mode(EBufferPreloadType::BroadcastFromSelector), Selector(InSelector)
 	{
+		// Synthesized identity: no live attribute available at this construction site.
+		Identity.Name = InSelector.GetName();
+		Identity.ValueType = InUnderlyingType;
 	}
 
 	bool FReadableBufferConfig::Validate(FPCGExContext* InContext, const TSharedPtr<FFacade>& InFacade) const
@@ -55,23 +61,37 @@ namespace PCGExData
 
 		if (!Reader)
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				FWriteScopeLock WriteScopeLock(ReaderLock);
-
-				switch (Mode)
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
 				{
-				case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.Identifier, EIOSide::In, true);
-					break;
-				case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Identifier.Name, true);
-					break;
-				case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector, true);
-					break;
-				}
+					using T = decltype(DummyValue);
+					FWriteScopeLock WriteScopeLock(ReaderLock);
 
-				WeakReader = Reader;
-			});
+					switch (Mode)
+					{
+					case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier(), EIOSide::In, true);
+						break;
+					case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name, true);
+						break;
+					case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector, true);
+						break;
+					}
+
+					WeakReader = Reader;
+				},
+				[&]()
+				{
+					// Property-backed: only RawAttribute mode is meaningful (broadcast/typed-conversion
+					// on extended/container types isn't defined). Fall back to the generic FFacade::GetReadable
+					// which returns FPropertyArrayBuffer / FPropertySingleValueBuffer for unknown types.
+					FWriteScopeLock WriteScopeLock(ReaderLock);
+					if (Mode == EBufferPreloadType::RawAttribute)
+					{
+						Reader = InFacade->GetReadable(Identity, EIOSide::In, true);
+					}
+					WeakReader = Reader;
+				});
 
 			if (!Reader)
 			{
@@ -86,20 +106,30 @@ namespace PCGExData
 
 	void FReadableBufferConfig::Read(const TSharedRef<FFacade>& InFacade) const
 	{
-		PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
-		{
-			using T = decltype(DummyValue);
-			TSharedPtr<TBuffer<T>> Reader = nullptr;
-			switch (Mode)
+		PCGExMetaHelpers::ExecuteWithRightType(
+			Identity,
+			[&](auto DummyValue)
 			{
-			case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.Identifier);
-				break;
-			case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Identifier.Name);
-				break;
-			case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector);
-				break;
-			}
-		});
+				using T = decltype(DummyValue);
+				TSharedPtr<TBuffer<T>> Reader = nullptr;
+				switch (Mode)
+				{
+				case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier());
+					break;
+				case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name);
+					break;
+				case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector);
+					break;
+				}
+			},
+			[&]()
+			{
+				// Property-backed: same constraints as Fetch — only RawAttribute makes sense.
+				if (Mode == EBufferPreloadType::RawAttribute)
+				{
+					InFacade->GetReadable(Identity, EIOSide::In, false);
+				}
+			});
 	}
 
 	FFacadePreloader::FFacadePreloader(const TSharedPtr<FFacade>& InDataFacade)
@@ -127,7 +157,7 @@ namespace PCGExData
 			if (ExistingConfig.Identity == InIdentity) { return; }
 		}
 
-		BufferConfigs.Emplace(InIdentity.Identifier.Name, InIdentity.UnderlyingType);
+		BufferConfigs.Emplace(InIdentity.Name, InIdentity.GetType());
 	}
 
 	void FFacadePreloader::TryRegister(FPCGExContext* InContext, const FPCGAttributePropertyInputSelector& InSelector)
@@ -148,7 +178,7 @@ namespace PCGExData
 		EPCGMetadataTypes Type = PCGExTypes::TTraits<T>::Type;
 		for (const FReadableBufferConfig& ExistingConfig : BufferConfigs)
 		{
-			if (ExistingConfig.Selector == InSelector && ExistingConfig.Identity.UnderlyingType == Type)
+			if (ExistingConfig.Selector == InSelector && ExistingConfig.Identity.ValueType == Type)
 			{
 				return;
 			}
@@ -163,7 +193,7 @@ namespace PCGExData
 		EPCGMetadataTypes Type = PCGExTypes::TTraits<T>::Type;
 		for (const FReadableBufferConfig& ExistingConfig : BufferConfigs)
 		{
-			if (ExistingConfig.Identity.Identifier.Name == InName && ExistingConfig.Identity.UnderlyingType == Type)
+			if (ExistingConfig.Identity.Name == InName && ExistingConfig.Identity.ValueType == Type)
 			{
 				return;
 			}

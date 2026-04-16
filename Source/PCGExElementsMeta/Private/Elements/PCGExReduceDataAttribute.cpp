@@ -95,6 +95,14 @@ bool FPCGExReduceDataAttributeElement::Boot(FPCGExContext* InContext) const
 			continue;
 		}
 
+		// Reduce semantics (min/max/sum/avg/hash/join) require an arithmetic-capable scalar.
+		// Container/extended types are dropped here so the typed dispatch downstream stays safe.
+		if (!PCGExMetaHelpers::IsBasicSingleValue(Attribute->GetAttributeDesc()))
+		{
+			PCGEX_LOG_UNSUPPORTED_TYPE(Context, ReadIdentifier, FTEXT("Reduce Data Attribute"));
+			continue;
+		}
+
 		int32& Count = TypeCounter.FindOrAdd(Attribute->GetTypeId(), 0);
 		Count++;
 
