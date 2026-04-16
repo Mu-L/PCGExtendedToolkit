@@ -188,9 +188,11 @@ namespace PCGExData
 	}
 
 	ISubAccessor::ECompileAction FTransformPartAccessor::ClassifyForInType(
-		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed) const
+		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed,
+		const FPCGMetadataAttributeDesc* SourceDesc) const
 	{
 		(void)Parsed;
+		(void)SourceDesc;
 		// Position/Rotation/Scale only make sense on a Transform source.
 		return InType == EPCGMetadataTypes::Transform ? ECompileAction::Keep : ECompileAction::Drop;
 	}

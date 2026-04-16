@@ -120,9 +120,11 @@ namespace PCGExData
 	}
 
 	ISubAccessor::ECompileAction FAxisAccessor::ClassifyForInType(
-		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed) const
+		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed,
+		const FPCGMetadataAttributeDesc* SourceDesc) const
 	{
 		(void)Parsed;
+		(void)SourceDesc;
 		switch (InType)
 		{
 		case EPCGMetadataTypes::Quaternion:

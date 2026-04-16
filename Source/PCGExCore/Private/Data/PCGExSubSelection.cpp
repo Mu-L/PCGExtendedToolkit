@@ -71,20 +71,54 @@ namespace PCGExData
 		return false;
 	}
 
+	bool FSubSelection::IsContainerIndexSelection() const
+	{
+		const ISubAccessor* Target = FSubAccessorRegistry::GetContainerIndexAccessor();
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
+		{
+			if (Step.Accessor == Target) { return true; }
+		}
+		return false;
+	}
+
+	bool FSubSelection::IsContainerCountSelection() const
+	{
+		const ISubAccessor* Target = FSubAccessorRegistry::GetContainerCountAccessor();
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
+		{
+			if (Step.Accessor == Target) { return true; }
+		}
+		return false;
+	}
+
 	EPCGMetadataTypes FSubSelection::GetSubType(const EPCGMetadataTypes Fallback) const
 	{
 		if (!HasSelection()) { return Fallback; }
 		if (IsFieldSelection()) { return EPCGMetadataTypes::Double; }
 		if (IsAxisSelection()) { return EPCGMetadataTypes::Vector; }
 
-		// Only component set (no field, no axis).
-		switch (Component)
+		// Stage 5b: ContainerCount always yields Double (the count). Checked
+		// after field/axis so a chain like `.1.X` (ContainerIndex + Field)
+		// still reports Double via the field path.
+		if (IsContainerCountSelection()) { return EPCGMetadataTypes::Double; }
+
+		// Component selection: Vector (Pos/Scale) or Quaternion (Rotation).
+		// Gated on IsComponentSelection() so chains without a component step
+		// (e.g. container-index-only) fall through to the Fallback instead
+		// of reading the default-initialized Component member.
+		if (IsComponentSelection())
 		{
-		case PCGExTypeOps::ETransformPart::Position:
-		case PCGExTypeOps::ETransformPart::Scale:    return EPCGMetadataTypes::Vector;
-		case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
+			switch (Component)
+			{
+			case PCGExTypeOps::ETransformPart::Position:
+			case PCGExTypeOps::ETransformPart::Scale:    return EPCGMetadataTypes::Vector;
+			case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
+			}
 		}
 
+		// ContainerIndex-only (and any other non-type-changing chain) falls
+		// through to Fallback: the element type of a container equals the
+		// attribute's reported RealType.
 		return Fallback;
 	}
 

@@ -9,17 +9,22 @@
 namespace PCGExData
 {
 	/**
-	 * FTransformPartAccessor -- matches Position/Rotation/Scale and aliases
-	 * (Pos/Rot/Orient). Only resolves when the source type is FTransform.
+	 * FContainerCountAccessor -- matches `.Num` / `.Count` tokens on
+	 * container-typed attribute sources (TArray/TSet). Output is Double
+	 * (the number of elements in the outermost container).
 	 *
-	 * Output type depends on the matched component:
-	 *   Position -> Vector
-	 *   Rotation -> Quaternion
-	 *   Scale    -> Vector
+	 * Requires Desc-awareness: ClassifyForInType consults SourceDesc's
+	 * ContainerTypes to decide Keep (any container present) vs Drop
+	 * (scalar source -- `.Num` on a Vector is nonsensical). Supports
+	 * Array, Set, and Map containers: FScriptArray, FScriptSet, and
+	 * FScriptMap all store Num() at a compatible binary offset.
 	 *
-	 * Stateless. Inject mirrors PCGExData::SubSelectionImpl::InjectTransformComponent.
+	 * Read-only. Binary-reads the container's Num via FScriptArray layout
+	 * (UE guarantees TArray<T> / TSet<T> / TMap<K,V> share the tri-word
+	 * Data/Num/Max prefix). The accessor is type-agnostic at hot-path
+	 * time: sizeof(T) isn't needed because we only read the Num field.
 	 */
-	class PCGEXCORE_API FTransformPartAccessor final : public ISubAccessor
+	class PCGEXCORE_API FContainerCountAccessor final : public ISubAccessor
 	{
 	public:
 		virtual bool MatchesToken(const FString& UpperToken, FAccessorParseResult& OutParsed) const override;
@@ -34,18 +39,15 @@ namespace PCGExData
 		                      void* OutValue,
 		                      const FAccessorParseResult& Parsed) const override;
 
-		virtual void ApplySet(EPCGMetadataTypes InType,
-		                      void* TargetInOut,
-		                      EPCGMetadataTypes SourceType,
-		                      const void* Source,
-		                      const FAccessorParseResult& Parsed) const override;
-
 		virtual FString GetDisplayName() const override;
 
 		virtual FStepGetFn GetStepGetFn(EPCGMetadataTypes InType) const override;
-		virtual FStepSetFn GetStepSetFn(EPCGMetadataTypes InType) const override;
+		// Read-only; GetStepSetFn inherits default nullptr.
+
 		virtual ECompileAction ClassifyForInType(EPCGMetadataTypes InType,
 		                                         const FAccessorParseResult& Parsed,
 		                                         const FPCGMetadataAttributeDesc* SourceDesc = nullptr) const override;
+
+		// No PostClassifyFinalize override: Count doesn't need ElementSize.
 	};
 }

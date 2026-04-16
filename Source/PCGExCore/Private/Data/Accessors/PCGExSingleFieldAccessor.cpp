@@ -164,9 +164,11 @@ namespace PCGExData
 	}
 
 	ISubAccessor::ECompileAction FSingleFieldAccessor::ClassifyForInType(
-		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed) const
+		EPCGMetadataTypes InType, const FAccessorParseResult& Parsed,
+		const FPCGMetadataAttributeDesc* SourceDesc) const
 	{
 		(void)Parsed;
+		(void)SourceDesc;
 		switch (InType)
 		{
 		// Multi-component vector + rotation types: field extraction is natively

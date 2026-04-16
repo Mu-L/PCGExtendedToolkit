@@ -4,6 +4,8 @@
 #include "Data/PCGExSubAccessor.h"
 
 #include "Data/Accessors/PCGExAxisAccessor.h"
+#include "Data/Accessors/PCGExContainerCountAccessor.h"
+#include "Data/Accessors/PCGExContainerIndexAccessor.h"
 #include "Data/Accessors/PCGExSingleFieldAccessor.h"
 #include "Data/Accessors/PCGExSwizzleAccessor.h"
 #include "Data/Accessors/PCGExTransformPartAccessor.h"
@@ -36,6 +38,8 @@ namespace PCGExData
 		const ISubAccessor* GAxisAccessor = nullptr;
 		const ISubAccessor* GTransformPartAccessor = nullptr;
 		const ISubAccessor* GSingleFieldAccessor = nullptr;
+		const ISubAccessor* GContainerIndexAccessor = nullptr;
+		const ISubAccessor* GContainerCountAccessor = nullptr;
 	}
 
 	void FSubAccessorRegistry::Initialize()
@@ -67,6 +71,19 @@ namespace PCGExData
 		OwnedAccessors.Add(MakeUnique<FSwizzleAccessor>());
 		OrderedView.Add(OwnedAccessors.Last().Get());
 
+		// Stage 5b: container accessors. Count ("Num"/"Count") is registered
+		// before Index so that bare "Num"/"Count" tokens route there --
+		// FContainerIndexAccessor's MatchesToken only accepts numeric or
+		// bracket-wrapped numeric tokens so there's no overlap in practice,
+		// but Count-first is cheaper (no numeric parse attempt).
+		OwnedAccessors.Add(MakeUnique<FContainerCountAccessor>());
+		GContainerCountAccessor = OwnedAccessors.Last().Get();
+		OrderedView.Add(GContainerCountAccessor);
+
+		OwnedAccessors.Add(MakeUnique<FContainerIndexAccessor>());
+		GContainerIndexAccessor = OwnedAccessors.Last().Get();
+		OrderedView.Add(GContainerIndexAccessor);
+
 		bInitialized = true;
 	}
 
@@ -92,6 +109,18 @@ namespace PCGExData
 	{
 		if (!bInitialized) { Initialize(); }
 		return GSingleFieldAccessor;
+	}
+
+	const ISubAccessor* FSubAccessorRegistry::GetContainerIndexAccessor()
+	{
+		if (!bInitialized) { Initialize(); }
+		return GContainerIndexAccessor;
+	}
+
+	const ISubAccessor* FSubAccessorRegistry::GetContainerCountAccessor()
+	{
+		if (!bInitialized) { Initialize(); }
+		return GContainerCountAccessor;
 	}
 
 	int32 GetNumFieldsForType(EPCGMetadataTypes Type)
@@ -199,13 +228,22 @@ namespace PCGExData
 		}
 	}
 
-	void CompileChainForSource(FSubSelectionChain& InOutChain, EPCGMetadataTypes SourceType)
+	void CompileChainForSource(FSubSelectionChain& InOutChain,
+	                           EPCGMetadataTypes SourceType,
+	                           const FPCGMetadataAttributeDesc* SourceDesc)
 	{
 		// Take ownership of the parser-produced step list, rebuild in-place.
 		TArray<FSubSelectionStep, TInlineAllocator<2>> Original = MoveTemp(InOutChain.Steps);
 		InOutChain.Steps.Reset();
 
 		EPCGMetadataTypes CurrentType = SourceType;
+
+		// CurrentDesc tracks the attribute-descriptor view of the value at
+		// this chain position. Starts as SourceDesc; becomes nullptr after
+		// the first container-unwrapping step consumes the outer
+		// ContainerType. Subsequent steps see non-container values and
+		// don't need Desc visibility.
+		const FPCGMetadataAttributeDesc* CurrentDesc = SourceDesc;
 
 		for (FSubSelectionStep& Step : Original)
 		{
@@ -214,11 +252,25 @@ namespace PCGExData
 			for (;;)
 			{
 				const ISubAccessor::ECompileAction Action =
-					Step.Accessor->ClassifyForInType(CurrentType, Step.Parsed);
+					Step.Accessor->ClassifyForInType(CurrentType, Step.Parsed, CurrentDesc);
 
 				if (Action == ISubAccessor::ECompileAction::Keep)
 				{
 					FinalizeCompiledStep(Step, CurrentType);
+					// Compile-time stash (container accessors use this to
+					// carry ElementSize into the hot path). No-op for
+					// scalar accessors.
+					Step.Accessor->PostClassifyFinalize(CurrentType, Step.Parsed, CurrentDesc);
+
+					// Single-unwrap policy: once a container accessor is kept
+					// against a container-typed Desc, the outer ContainerType
+					// is consumed. Drop the Desc so subsequent steps classify
+					// against scalar/element-level state. FContainerIndexAccessor
+					// + FContainerCountAccessor are the only accessors whose
+					// Keep behavior depends on Desc, so stripping it here is
+					// safe for all current accessors.
+					CurrentDesc = nullptr;
+
 					CurrentType = Step.OutType;
 					InOutChain.Steps.Add(MoveTemp(Step));
 					break;
@@ -239,6 +291,13 @@ namespace PCGExData
 
 				FSubSelectionStep Inserted = MakeTransformPartStep(Part);
 				CurrentType = Inserted.OutType;
+				// A synthesized TransformPart does not consume Desc in the
+				// container sense (it unwraps a Transform, not a container).
+				// But callers who pass SourceDesc for a Transform attribute
+				// have no container to preserve here, so stripping is a no-op
+				// in practice. Keep it simple: TransformPart promotion also
+				// clears Desc.
+				CurrentDesc = nullptr;
 				InOutChain.Steps.Add(MoveTemp(Inserted));
 				// Loop back to re-classify the same Step under the new CurrentType.
 			}

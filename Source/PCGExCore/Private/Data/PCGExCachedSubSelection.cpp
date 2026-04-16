@@ -56,7 +56,8 @@ namespace PCGExData
 	void FCachedSubSelection::Initialize(
 		const FSubSelection& Selection,
 		EPCGMetadataTypes InRealType,
-		EPCGMetadataTypes InWorkingType)
+		EPCGMetadataTypes InWorkingType,
+		const FPCGMetadataAttributeDesc* SourceDesc)
 	{
 		bIsValid = Selection.HasSelection();
 		RealType = InRealType;
@@ -65,9 +66,10 @@ namespace PCGExData
 		// Start from the parser-produced chain, then run the Stage 3 compiler
 		// to drop/promote steps based on RealType. The compiler also fills
 		// each remaining step's typed fn pointers, so the hot path has zero
-		// per-call lookups.
+		// per-call lookups. SourceDesc threads through to container-aware
+		// classifiers (Stage 5b).
 		CompiledChain = Selection.GetChain();
-		CompileChainForSource(CompiledChain, RealType);
+		CompileChainForSource(CompiledChain, RealType, SourceDesc);
 
 		FinalChainType = CompiledChain.Steps.IsEmpty() ? RealType : CompiledChain.Steps.Last().OutType;
 

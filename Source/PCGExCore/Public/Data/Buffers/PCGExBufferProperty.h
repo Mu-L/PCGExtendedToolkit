@@ -89,6 +89,30 @@ namespace PCGExData
 		// Returns 0/1 if the desc cannot be mapped.
 		static int32 GetElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc);
 		static int32 GetElementAlignmentFromDesc(const FPCGMetadataAttributeDesc& Desc);
+
+		// Stage 5b container-accessor helpers.
+		//
+		// Returns the size of ONE element inside the outermost container of Desc.
+		// For TArray<FVector>: strips the [Array] wrapper and asks for Vector's
+		// element size -> 24. Non-container descs return GetElementSizeFromDesc
+		// directly. Zero if the desc cannot be mapped.
+		static int32 GetInnerElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc);
+
+		// Read the element count from a container attribute's raw bytes.
+		// Works for TArray, TSet, and TMap — all three UE container types
+		// store a layout-compatible element count at the same binary offset
+		// (the Num field in the underlying FScriptArray / FScriptSet /
+		// FScriptMap). Returns 0 if ContainerBytes is null.
+		static int32 GetContainerNum(const void* ContainerBytes);
+
+		// Return a pointer to the Index-th element of a TArray-layout
+		// attribute value. ElementSize must match sizeof(T). Returns nullptr
+		// for out-of-range Index, negative Index, or null ArrayBytes. The
+		// returned pointer is valid only while the containing array value is
+		// alive -- callers typically memcpy the element out.
+		// NOTE: Only valid for Array containers (TArray). Set and Map do not
+		// store elements contiguously by index.
+		static const void* GetArrayElementAt(const void* ArrayBytes, int32 Index, int32 ElementSize);
 	};
 
 	class PCGEXCORE_API FPropertyArrayBuffer : public FPropertyBuffer

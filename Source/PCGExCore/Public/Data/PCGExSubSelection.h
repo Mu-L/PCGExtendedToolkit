@@ -96,6 +96,12 @@ namespace PCGExData
 		/** True if the chain contains a TransformPart step. */
 		bool IsComponentSelection() const;
 
+		/** True if the chain contains an FContainerIndexAccessor step (Stage 5b). */
+		bool IsContainerIndexSelection() const;
+
+		/** True if the chain contains an FContainerCountAccessor step (Stage 5b). */
+		bool IsContainerCountSelection() const;
+
 		/**
 		 * Best-guess hint for the source-side type this selection assumes.
 		 * E.g., ".R" hints Quaternion, ".X" hints Vector. Returns Unknown
@@ -104,11 +110,14 @@ namespace PCGExData
 		FORCEINLINE EPCGMetadataTypes GetHintedSourceType() const { return PossibleSourceType; }
 
 		/**
-		 * Get the resulting type when this sub-selection is applied
-		 * 
+		 * Get the resulting type when this sub-selection is applied.
+		 *
 		 * - Field selection → Double
-		 * - Axis selection → Vector  
+		 * - Axis selection → Vector
 		 * - Component selection → Vector (Position/Scale) or Quaternion (Rotation)
+		 * - ContainerCount selection → Double (the count)
+		 * - ContainerIndex selection → Fallback (a container element is the
+		 *   same type as the element type PCG reports via RealType)
 		 * - No selection → Fallback (original type)
 		 */
 		EPCGMetadataTypes GetSubType(EPCGMetadataTypes Fallback = EPCGMetadataTypes::Unknown) const;

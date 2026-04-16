@@ -8,6 +8,11 @@
 #include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Types/PCGExTypeOps.h"
 
+// Forward-declare the PCG metadata attribute descriptor so header consumers don't
+// drag the full FPCGMetadataAttribute machinery in. Full definition only required
+// by accessors that consult container metadata (FContainerIndex/Count).
+struct FPCGMetadataAttributeDesc;
+
 /**
  * Phase 6 Stage 1 -- Sub-accessor abstraction (scaffolding).
  *
@@ -54,6 +59,19 @@ namespace PCGExData
 		// Bytes beyond [SwizzleLength-1] are unused.
 		uint8 SwizzleMask[4] = {0, 0, 0, 0};
 		uint8 SwizzleLength = 0;
+
+		// FContainerIndexAccessor writes ContainerIndex at parse time (the
+		// integer inside `.N` / `.[N]`). Signed so we can sentinel-reject
+		// unsuccessful parses (-1).
+		int32 ContainerIndex = -1;
+
+		// Compile-time (NOT parse-time) field. Populated by
+		// PostClassifyFinalize for container accessors after the compiler has
+		// seen the source attribute Desc: this is sizeof(ONE ELEMENT) of the
+		// container, e.g. 24 for TArray<FVector>. The hot path reads it to
+		// stride into FScriptArray-backed storage. Zero for non-container
+		// accessors (they never touch it).
+		int32 ContainerElementSize = 0;
 
 		// Hint type the matched token implies for the source attribute, e.g. "X" -> Vector,
 		// "W" -> Vector4, "Roll" -> Quaternion. Used for legacy PossibleSourceType
@@ -239,7 +257,27 @@ namespace PCGExData
 		};
 
 		virtual ECompileAction ClassifyForInType(EPCGMetadataTypes InType,
-		                                         const FAccessorParseResult& Parsed) const = 0;
+		                                         const FAccessorParseResult& Parsed,
+		                                         const FPCGMetadataAttributeDesc* SourceDesc = nullptr) const = 0;
+
+		/**
+		 * Compile-time finalization hook. Called by the chain compiler AFTER
+		 * ClassifyForInType returns Keep and AFTER InType/OutType/StepGetFn
+		 * are populated. Accessors that need to stash compile-derived state
+		 * (e.g. container element size from the source Desc) override this
+		 * to mutate Parsed in-place.
+		 *
+		 * Defaults to no-op. Only FContainerIndexAccessor and
+		 * FContainerCountAccessor currently override.
+		 */
+		virtual void PostClassifyFinalize(EPCGMetadataTypes InType,
+		                                  FAccessorParseResult& InOutParsed,
+		                                  const FPCGMetadataAttributeDesc* SourceDesc) const
+		{
+			(void)InType;
+			(void)InOutParsed;
+			(void)SourceDesc;
+		}
 	};
 
 	/**
@@ -265,6 +303,8 @@ namespace PCGExData
 		static const ISubAccessor* GetAxisAccessor();
 		static const ISubAccessor* GetTransformPartAccessor();
 		static const ISubAccessor* GetSingleFieldAccessor();
+		static const ISubAccessor* GetContainerIndexAccessor();
+		static const ISubAccessor* GetContainerCountAccessor();
 
 		/**
 		 * Parse a list of extra-name tokens into a chain. Stage 2: true
@@ -316,7 +356,16 @@ namespace PCGExData
 	 * Also fills in each step's InType, OutType, StepGetFn, StepSetFn so
 	 * the compiled chain is ready for direct invocation without further
 	 * accessor lookups.
+	 *
+	 * SourceDesc (Stage 5b): when non-null, container-aware accessors
+	 * (FContainerIndexAccessor / FContainerCountAccessor) consult it to
+	 * decide whether the source is a compatible container. The Desc is
+	 * only meaningful for the chain's first (unwrapping) step; after a
+	 * container step consumes the outer ContainerTypes entry, subsequent
+	 * steps see a null SourceDesc because the value has been unwrapped to
+	 * its element type. Scalar sources pass SourceDesc=nullptr.
 	 */
 	PCGEXCORE_API void CompileChainForSource(FSubSelectionChain& InOutChain,
-	                                         EPCGMetadataTypes SourceType);
+	                                         EPCGMetadataTypes SourceType,
+	                                         const FPCGMetadataAttributeDesc* SourceDesc = nullptr);
 }

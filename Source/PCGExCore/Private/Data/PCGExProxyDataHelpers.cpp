@@ -348,7 +348,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 					OutProxy = Internal::CreateRawProxy<T>(InContext, InDescriptor, InDataFacade);
 				});
 
-				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection); }
+				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr); }
 				return OutProxy;
 			}
 
@@ -377,7 +377,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 					}
 				});
 
-				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection); }
+				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr); }
 				return OutProxy;
 			}
 
@@ -476,7 +476,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			if (OutProxy)
 			{
 				OutProxy->Data = PointData;
-				OutProxy->SetSubSelection(InDescriptor.SubSelection);
+				OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr);
 				OutProxy->InitForRole(InDescriptor.Role);
 
 				if (!OutProxy->Validate(InDescriptor))

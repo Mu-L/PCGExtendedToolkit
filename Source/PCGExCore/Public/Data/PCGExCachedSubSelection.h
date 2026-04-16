@@ -8,6 +8,8 @@
 #include "PCGExSubSelection.h"
 #include "Types/PCGExTypeOps.h"
 
+struct FPCGMetadataAttributeDesc;
+
 /**
  * PCGEx Cached Sub-Selection Operations
  *
@@ -101,10 +103,15 @@ namespace PCGExData
 		 * Runs CompileChainForSource against RealType, caches all per-step
 		 * fn pointers, resolves conversions. After this call the hot path
 		 * uses only cached state.
+		 *
+		 * SourceDesc (Stage 5b): optional Desc view of the source attribute.
+		 * Only consulted when the chain contains container-aware steps
+		 * (FContainerIndex / FContainerCount). Scalar sources pass nullptr.
 		 */
 		void Initialize(const FSubSelection& Selection,
 		                EPCGMetadataTypes InRealType,
-		                EPCGMetadataTypes InWorkingType);
+		                EPCGMetadataTypes InWorkingType,
+		                const FPCGMetadataAttributeDesc* SourceDesc = nullptr);
 
 		/**
 		 * True iff the compiled chain has at least one step (i.e., the

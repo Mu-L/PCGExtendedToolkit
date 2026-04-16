@@ -47,6 +47,7 @@ namespace PCGExData
 		virtual FStepGetFn GetStepGetFn(EPCGMetadataTypes InType) const override;
 		// Read-only; GetStepSetFn inherits default nullptr.
 		virtual ECompileAction ClassifyForInType(EPCGMetadataTypes InType,
-		                                         const FAccessorParseResult& Parsed) const override;
+		                                         const FAccessorParseResult& Parsed,
+		                                         const FPCGMetadataAttributeDesc* SourceDesc = nullptr) const override;
 	};
 }
