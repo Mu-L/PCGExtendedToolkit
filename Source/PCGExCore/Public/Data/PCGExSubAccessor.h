@@ -173,13 +173,11 @@ namespace PCGExData
 	 * FSubAccessorRegistry
 	 *
 	 * Process-lifetime owner of accessor instances + entry point for
-	 * parsing ExtraNames into a chain. Mirrors the lazy-init pattern of
-	 * FSubSelectorRegistry (PCGExSubSelectionOps.h).
+	 * parsing ExtraNames into a chain.
 	 *
 	 * Registration order is priority order: when multiple accessors could
 	 * match a token, the earlier-registered one wins. Stage 1 order is
-	 * Axis -> TransformPart -> SingleField, matching the legacy Init's
-	 * implicit precedence (axis check first, component second, field third).
+	 * Axis -> TransformPart -> SingleField.
 	 */
 	class PCGEXCORE_API FSubAccessorRegistry
 	{
@@ -190,17 +188,19 @@ namespace PCGExData
 		/** Registration-order view of all known accessors. */
 		static TConstArrayView<const ISubAccessor*> GetAll();
 
+		/** Typed accessor getters. Stable for the process lifetime after Initialize(). */
+		static const ISubAccessor* GetAxisAccessor();
+		static const ISubAccessor* GetTransformPartAccessor();
+		static const ISubAccessor* GetSingleFieldAccessor();
+
 		/**
-		 * Parse a list of extra-name tokens into a chain.
-		 *
-		 * Stage 1: STUB. Returns false and produces an empty chain. Step 3
-		 * of Stage 1 fills this in using the registered accessors and the
-		 * legacy positional rule (axis/component walk all names; field
-		 * looks at Names[1] when Names.Num()>1, else Names[0]).
+		 * Parse a list of extra-name tokens into a chain. Stage 2: true
+		 * left-to-right walk; each token tries every accessor in
+		 * registration order, first match wins. Chain order mirrors
+		 * token order.
 		 *
 		 * @param ExtraNames     Tokens from FPCGAttributePropertyInputSelector::GetExtraNames().
 		 * @param SourceTypeHint Optional hint about the source attribute's type.
-		 *                       Unknown when not yet known.
 		 * @param OutChain       Populated on a successful parse; reset on failure.
 		 * @return true if any step was produced.
 		 */
@@ -213,4 +213,17 @@ namespace PCGExData
 		static TArray<const ISubAccessor*> OrderedView;
 		static bool bInitialized;
 	};
+
+	/**
+	 * Number of distinct field positions a source type exposes.
+	 * Used by callers that split an attribute into per-field sub-pieces
+	 * (attribute remapper, noise generator, proxy-data helper).
+	 *
+	 *   Vector2            -> 2
+	 *   Vector / Rotator   -> 3
+	 *   Vector4 / Quat     -> 4
+	 *   Transform          -> 9  (3 pos + 3 rot + 3 scale)
+	 *   everything else    -> 1
+	 */
+	PCGEXCORE_API int32 GetNumFieldsForType(EPCGMetadataTypes Type);
 }

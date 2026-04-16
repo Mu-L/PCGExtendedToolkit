@@ -4,9 +4,9 @@
 #include "Data/PCGExSubSelection.h"
 
 #include "CoreMinimal.h"
-#include "Data/PCGExSubSelectionOpsImpl.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Types/PCGExTypeOpsImpl.h"
 
 namespace PCGExData
 {
@@ -160,39 +160,183 @@ namespace PCGExData
 	void FSubSelection::ApplyGet(EPCGMetadataTypes SourceType, const void* Source,
 	                             void* OutValue, EPCGMetadataTypes& OutType) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(SourceType);
-		if (!Ops)
+		// Identity: no sub-selection active, copy the whole source through.
+		if (!bIsValid)
 		{
-			OutType = EPCGMetadataTypes::Unknown;
+			const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(SourceType);
+			if (Ops)
+			{
+				Ops->Copy(Source, OutValue);
+				OutType = SourceType;
+			}
+			else
+			{
+				OutType = EPCGMetadataTypes::Unknown;
+			}
 			return;
 		}
 
-		Ops->ApplyGetSelection(Source, *this, OutValue, OutType);
+		// FTransform with bIsComponentSet: extract the component first, then
+		// apply axis/field on the component result.
+		//
+		// IMPORTANT: axis extraction is only valid for the Rotation component
+		// (a position or scale vector has no orientation). This matches the
+		// legacy TSubSelectorOpsImpl<FTransform>::ApplyGetSelectionImpl which
+		// only checked bIsAxisSet inside the Rotation sub-branch. For Position
+		// and Scale components, bIsAxisSet is silently ignored and dispatch
+		// falls through to the field path.
+		if (SourceType == EPCGMetadataTypes::Transform && bIsComponentSet)
+		{
+			const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
+			FAccessorParseResult ComponentParsed;
+			ComponentParsed.Component = Component;
+
+			EPCGMetadataTypes ComponentOutType = EPCGMetadataTypes::Unknown;
+			TransformAccessor->ResolveOutputType(SourceType, ComponentParsed, ComponentOutType);
+
+			alignas(16) uint8 ComponentBuffer[96];
+			TransformAccessor->ApplyGet(SourceType, Source, ComponentOutType, ComponentBuffer, ComponentParsed);
+
+			const bool bIsRotationComponent = (Component == PCGExTypeOps::ETransformPart::Rotation);
+
+			if (bIsRotationComponent && bIsAxisSet)
+			{
+				const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
+				FAccessorParseResult AxisParsed;
+				AxisParsed.Axis = Axis;
+				AxisAccessor->ApplyGet(ComponentOutType, ComponentBuffer,
+				                       EPCGMetadataTypes::Vector, OutValue, AxisParsed);
+				OutType = EPCGMetadataTypes::Vector;
+				return;
+			}
+
+			if (bIsFieldSet)
+			{
+				const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+				FAccessorParseResult FieldParsed;
+				FieldParsed.Field = Field;
+				FieldAccessor->ApplyGet(ComponentOutType, ComponentBuffer,
+				                        EPCGMetadataTypes::Double, OutValue, FieldParsed);
+				OutType = EPCGMetadataTypes::Double;
+				return;
+			}
+
+			// Unreachable under normal Init (SetFieldIndex forces bIsFieldSet=true),
+			// but support direct-mutation call sites by copying the component through.
+			const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(ComponentOutType);
+			if (Ops) { Ops->Copy(ComponentBuffer, OutValue); }
+			OutType = ComponentOutType;
+			return;
+		}
+
+		// Non-Transform (or Transform without component): axis wins over field.
+		if (bIsAxisSet)
+		{
+			const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
+			FAccessorParseResult AxisParsed;
+			AxisParsed.Axis = Axis;
+			AxisAccessor->ApplyGet(SourceType, Source, EPCGMetadataTypes::Vector, OutValue, AxisParsed);
+			OutType = EPCGMetadataTypes::Vector;
+			return;
+		}
+
+		if (bIsFieldSet)
+		{
+			const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+			FAccessorParseResult FieldParsed;
+			FieldParsed.Field = Field;
+			FieldAccessor->ApplyGet(SourceType, Source, EPCGMetadataTypes::Double, OutValue, FieldParsed);
+			OutType = EPCGMetadataTypes::Double;
+			return;
+		}
+
+		// No axis/field/component applicable; identity copy.
+		const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(SourceType);
+		if (Ops)
+		{
+			Ops->Copy(Source, OutValue);
+			OutType = SourceType;
+		}
+		else
+		{
+			OutType = EPCGMetadataTypes::Unknown;
+		}
 	}
 
 	void FSubSelection::ApplySet(EPCGMetadataTypes TargetType, void* Target,
 	                             EPCGMetadataTypes SourceType, const void* Source) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(TargetType);
-		if (!Ops) { return; }
+		if (!bIsValid)
+		{
+			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
+			return;
+		}
 
-		Ops->ApplySetSelection(Target, *this, Source, SourceType);
+		// FTransform with bIsComponentSet: read component, mutate via field
+		// accessor if applicable, write component back.
+		if (TargetType == EPCGMetadataTypes::Transform && bIsComponentSet)
+		{
+			const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
+			FAccessorParseResult ComponentParsed;
+			ComponentParsed.Component = Component;
+
+			if (bIsFieldSet)
+			{
+				// Extract current component into a buffer, inject field, write back.
+				EPCGMetadataTypes ComponentType = EPCGMetadataTypes::Unknown;
+				TransformAccessor->ResolveOutputType(TargetType, ComponentParsed, ComponentType);
+
+				alignas(16) uint8 ComponentBuffer[96];
+				TransformAccessor->ApplyGet(TargetType, Target, ComponentType, ComponentBuffer, ComponentParsed);
+
+				const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+				FAccessorParseResult FieldParsed;
+				FieldParsed.Field = Field;
+				FieldAccessor->ApplySet(ComponentType, ComponentBuffer,
+				                        SourceType, Source, FieldParsed);
+
+				TransformAccessor->ApplySet(TargetType, Target,
+				                            ComponentType, ComponentBuffer, ComponentParsed);
+			}
+			else
+			{
+				// Whole-component inject.
+				TransformAccessor->ApplySet(TargetType, Target, SourceType, Source, ComponentParsed);
+			}
+			return;
+		}
+
+		if (bIsFieldSet)
+		{
+			const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+			FAccessorParseResult FieldParsed;
+			FieldParsed.Field = Field;
+			FieldAccessor->ApplySet(TargetType, Target, SourceType, Source, FieldParsed);
+			return;
+		}
+
+		// Fallback: convert + copy.
+		PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
 	}
 
 	double FSubSelection::ExtractFieldToDouble(EPCGMetadataTypes SourceType, const void* Source) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(SourceType);
-		if (!Ops) { return 0.0; }
+		const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+		FAccessorParseResult Parsed;
+		Parsed.Field = Field;
 
-		return Ops->ExtractField(Source, Field);
+		double Out = 0.0;
+		FieldAccessor->ApplyGet(SourceType, Source, EPCGMetadataTypes::Double, &Out, Parsed);
+		return Out;
 	}
 
 	void FSubSelection::InjectFieldFromDouble(EPCGMetadataTypes TargetType, void* Target, double Value) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(TargetType);
-		if (!Ops) { return; }
+		const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+		FAccessorParseResult Parsed;
+		Parsed.Field = Field;
 
-		Ops->InjectField(Target, Value, Field);
+		FieldAccessor->ApplySet(TargetType, Target, EPCGMetadataTypes::Double, &Value, Parsed);
 	}
 
 	//

@@ -8,7 +8,7 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyDataImpl.h"
-#include "Data/PCGExSubSelectionOps.h"
+#include "Data/PCGExSubAccessor.h"
 
 namespace PCGExData
 {
@@ -499,7 +499,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 		TArray<TSharedPtr<IBufferProxy>>& OutProxies)
 	{
 		OutProxies.Reset(NumDesiredFields);
-		const int32 Dimensions = FMath::Min(4, FSubSelectorRegistry::Get(InBaseDescriptor.RealType)->GetNumFields());
+		const int32 Dimensions = FMath::Min(4, GetNumFieldsForType(InBaseDescriptor.RealType));
 
 		if (Dimensions == -1 &&
 			(!InBaseDescriptor.SubSelection.bIsValid || !InBaseDescriptor.SubSelection.bIsComponentSet))

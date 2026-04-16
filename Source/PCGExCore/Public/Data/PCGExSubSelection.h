@@ -21,20 +21,17 @@ namespace PCGExData
 
 namespace PCGExData
 {
-	// Forward declarations
-	class ISubSelectorOps;
-
-
 	/**
 	 * FSubSelection - Sub-selection configuration and type-erased operations
-	 * 
+	 *
 	 * This struct stores the configuration for selecting sub-components of values
 	 * (like extracting .X from a vector, or Position from a Transform) and provides
 	 * type-erased methods for applying the selection.
-	 * 
-	 * The actual operations are delegated to ISubSelectorOps instances via
-	 * FSubSelectorRegistry
-	 * 
+	 *
+	 * Stage 2+: dispatch routes through FSubAccessorRegistry accessors (axis,
+	 * transform-part, single-field) driven by the parsed chain's projection
+	 * onto the legacy flag layout.
+	 *
 	 * Usage:
 	 *   FSubSelection Sub(Selector);  // Parse selection from attribute path
 	 *   
@@ -120,7 +117,7 @@ namespace PCGExData
 		//
 		// Type-Erased Interface (Primary API)
 		//
-		// These methods delegate to ISubSelectorOps via FSubSelectorRegistry.
+		// These methods dispatch through the Stage 2 sub-accessor system.
 		// No template instantiation required at call sites.
 		//
 

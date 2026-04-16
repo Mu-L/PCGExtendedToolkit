@@ -31,27 +31,32 @@ namespace PCGExData
 
 	namespace
 	{
-		// Indices into OrderedView for the Stage 1 parity accessors. Set by
-		// Initialize(). Used by ParseChain to invoke the legacy positional rule.
-		int32 GAxisIndex = INDEX_NONE;
-		int32 GTransformIndex = INDEX_NONE;
-		int32 GFieldIndex = INDEX_NONE;
+		// Cached pointers for typed getters. Set by Initialize().
+		const ISubAccessor* GAxisAccessor = nullptr;
+		const ISubAccessor* GTransformPartAccessor = nullptr;
+		const ISubAccessor* GSingleFieldAccessor = nullptr;
 	}
 
 	void FSubAccessorRegistry::Initialize()
 	{
 		if (bInitialized) { return; }
 
-		// Registration order = priority order. Matches the legacy Init's
-		// implicit precedence (axis check first, component second, field third).
+		// Registration order = priority order: when a token could match
+		// multiple accessors, the earlier-registered one wins. Stage 1's
+		// order Axis -> TransformPart -> SingleField is preserved here
+		// because the legacy parser had the same implicit precedence and
+		// no token in the Stage 1 lookup tables overlaps anyway.
 		OwnedAccessors.Add(MakeUnique<FAxisAccessor>());
-		GAxisIndex = OrderedView.Add(OwnedAccessors.Last().Get());
+		GAxisAccessor = OwnedAccessors.Last().Get();
+		OrderedView.Add(GAxisAccessor);
 
 		OwnedAccessors.Add(MakeUnique<FTransformPartAccessor>());
-		GTransformIndex = OrderedView.Add(OwnedAccessors.Last().Get());
+		GTransformPartAccessor = OwnedAccessors.Last().Get();
+		OrderedView.Add(GTransformPartAccessor);
 
 		OwnedAccessors.Add(MakeUnique<FSingleFieldAccessor>());
-		GFieldIndex = OrderedView.Add(OwnedAccessors.Last().Get());
+		GSingleFieldAccessor = OwnedAccessors.Last().Get();
+		OrderedView.Add(GSingleFieldAccessor);
 
 		bInitialized = true;
 	}
@@ -60,6 +65,38 @@ namespace PCGExData
 	{
 		if (!bInitialized) { Initialize(); }
 		return OrderedView;
+	}
+
+	const ISubAccessor* FSubAccessorRegistry::GetAxisAccessor()
+	{
+		if (!bInitialized) { Initialize(); }
+		return GAxisAccessor;
+	}
+
+	const ISubAccessor* FSubAccessorRegistry::GetTransformPartAccessor()
+	{
+		if (!bInitialized) { Initialize(); }
+		return GTransformPartAccessor;
+	}
+
+	const ISubAccessor* FSubAccessorRegistry::GetSingleFieldAccessor()
+	{
+		if (!bInitialized) { Initialize(); }
+		return GSingleFieldAccessor;
+	}
+
+	int32 GetNumFieldsForType(EPCGMetadataTypes Type)
+	{
+		switch (Type)
+		{
+		case EPCGMetadataTypes::Vector2:    return 2;
+		case EPCGMetadataTypes::Vector:
+		case EPCGMetadataTypes::Rotator:    return 3;
+		case EPCGMetadataTypes::Vector4:
+		case EPCGMetadataTypes::Quaternion: return 4;
+		case EPCGMetadataTypes::Transform:  return 9;
+		default:                            return 1;
+		}
 	}
 
 	bool FSubAccessorRegistry::ParseChain(const TArray<FString>& ExtraNames,
@@ -73,68 +110,38 @@ namespace PCGExData
 
 		if (ExtraNames.IsEmpty()) { return false; }
 
-		// Stage 1: positional-emulation parser. Mirrors the legacy Init exactly:
-		//   1. Walk all tokens for an axis match.
-		//   2. Walk all tokens for a component match.
-		//   3. Take Names[1] (or Names[0] if Num()==1) as the field token.
+		// Stage 2: true left-to-right walk. For each token in input order,
+		// try each accessor in registration order; first match wins. Steps
+		// are appended to the chain as they're matched, so chain order
+		// mirrors token order. Each step's InType chains from the previous
+		// step's OutType (greedy resolution).
 		//
-		// Stage 2 will rewrite this as a true left-to-right walk; for parity
-		// the positional rule is what FSubSelection::Init projects to its
-		// legacy flags, so the chain must reflect the same matching outcome.
+		// This drops Stage 1's positional emulation (axis-walk-all,
+		// component-walk-all, field-at-Names[1]). The behavior change is
+		// silent for well-formed inputs (the existing parity tests still
+		// pass) and only affects malformed inputs like {Roll, Garbage}
+		// where the legacy parser refused to recognize a leading field
+		// token. PossibleSourceType has zero external readers so the
+		// projection divergence is also silent at the consumer surface.
+		EPCGMetadataTypes CurrentType = SourceTypeHint;
 
-		const ISubAccessor* AxisAccessor = OrderedView[GAxisIndex];
-		const ISubAccessor* TransformAccessor = OrderedView[GTransformIndex];
-		const ISubAccessor* FieldAccessor = OrderedView[GFieldIndex];
-
-		// Pre-uppercase tokens once.
-		TArray<FString, TInlineAllocator<4>> Upper;
-		Upper.Reserve(ExtraNames.Num());
-		for (const FString& T : ExtraNames) { Upper.Add(T.ToUpper()); }
-
-		// Step A: axis (walk all).
-		for (const FString& Tok : Upper)
+		for (const FString& Token : ExtraNames)
 		{
-			FAccessorParseResult Parsed;
-			if (AxisAccessor->MatchesToken(Tok, Parsed))
+			const FString Upper = Token.ToUpper();
+			for (const ISubAccessor* Accessor : OrderedView)
 			{
+				FAccessorParseResult Parsed;
+				if (!Accessor->MatchesToken(Upper, Parsed)) { continue; }
+
 				FSubSelectionStep Step;
-				Step.Accessor = AxisAccessor;
+				Step.Accessor = Accessor;
 				Step.Parsed = Parsed;
-				Step.InType = SourceTypeHint;
-				AxisAccessor->ResolveOutputType(SourceTypeHint, Parsed, Step.OutType);
+				Step.InType = CurrentType;
+				Accessor->ResolveOutputType(CurrentType, Parsed, Step.OutType);
 				OutChain.Steps.Add(Step);
+
+				CurrentType = Step.OutType;
 				break;
-			}
-		}
-
-		// Step B: component (walk all).
-		for (const FString& Tok : Upper)
-		{
-			FAccessorParseResult Parsed;
-			if (TransformAccessor->MatchesToken(Tok, Parsed))
-			{
-				FSubSelectionStep Step;
-				Step.Accessor = TransformAccessor;
-				Step.Parsed = Parsed;
-				Step.InType = SourceTypeHint;
-				TransformAccessor->ResolveOutputType(SourceTypeHint, Parsed, Step.OutType);
-				OutChain.Steps.Add(Step);
-				break;
-			}
-		}
-
-		// Step C: field at the legacy positional slot (Names[1] or Names[0]).
-		{
-			const FString& FieldToken = Upper.Num() > 1 ? Upper[1] : Upper[0];
-			FAccessorParseResult Parsed;
-			if (FieldAccessor->MatchesToken(FieldToken, Parsed))
-			{
-				FSubSelectionStep Step;
-				Step.Accessor = FieldAccessor;
-				Step.Parsed = Parsed;
-				Step.InType = SourceTypeHint;
-				FieldAccessor->ResolveOutputType(SourceTypeHint, Parsed, Step.OutType);
-				OutChain.Steps.Add(Step);
 			}
 		}
 
