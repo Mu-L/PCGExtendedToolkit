@@ -32,16 +32,56 @@ namespace PCGExData
 		Init(ProxySelector.GetExtraNames());
 	}
 
+	//
+	// Classifier methods (Stage 5 -- chain-backed)
+	//
+
+	bool FSubSelection::HasSelection() const
+	{
+		return !ParsedChain.Steps.IsEmpty();
+	}
+
+	bool FSubSelection::IsFieldSelection() const
+	{
+		const ISubAccessor* Target = FSubAccessorRegistry::GetSingleFieldAccessor();
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
+		{
+			if (Step.Accessor == Target) { return true; }
+		}
+		return false;
+	}
+
+	bool FSubSelection::IsAxisSelection() const
+	{
+		const ISubAccessor* Target = FSubAccessorRegistry::GetAxisAccessor();
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
+		{
+			if (Step.Accessor == Target) { return true; }
+		}
+		return false;
+	}
+
+	bool FSubSelection::IsComponentSelection() const
+	{
+		const ISubAccessor* Target = FSubAccessorRegistry::GetTransformPartAccessor();
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
+		{
+			if (Step.Accessor == Target) { return true; }
+		}
+		return false;
+	}
+
 	EPCGMetadataTypes FSubSelection::GetSubType(const EPCGMetadataTypes Fallback) const
 	{
-		if (!bIsValid) { return Fallback; }
-		if (bIsFieldSet) { return EPCGMetadataTypes::Double; }
-		if (bIsAxisSet) { return EPCGMetadataTypes::Vector; }
+		if (!HasSelection()) { return Fallback; }
+		if (IsFieldSelection()) { return EPCGMetadataTypes::Double; }
+		if (IsAxisSelection()) { return EPCGMetadataTypes::Vector; }
 
+		// Only component set (no field, no axis).
 		switch (Component)
 		{
 		case PCGExTypeOps::ETransformPart::Position:
-		case PCGExTypeOps::ETransformPart::Scale: return EPCGMetadataTypes::Vector;
+		case PCGExTypeOps::ETransformPart::Scale:    return EPCGMetadataTypes::Vector;
 		case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
 		}
 
@@ -50,107 +90,119 @@ namespace PCGExData
 
 	void FSubSelection::SetComponent(const PCGExTypeOps::ETransformPart InComponent)
 	{
-		bIsValid = true;
-		bIsComponentSet = true;
+		// Rebuild the chain with a single TransformPart step so classifier
+		// methods and dispatch both see a valid component-selection state.
+		// Stage 5: the chain is the source of truth; pure flag mutations are gone.
+		const ISubAccessor* Accessor = FSubAccessorRegistry::GetTransformPartAccessor();
+
+		FSubSelectionStep Step;
+		Step.Accessor = Accessor;
+		Step.Parsed.Component = InComponent;
+		Step.Parsed.SourceTypeHint = (InComponent == PCGExTypeOps::ETransformPart::Rotation)
+			? EPCGMetadataTypes::Quaternion
+			: EPCGMetadataTypes::Vector;
+		Step.InType = EPCGMetadataTypes::Transform;
+		Accessor->ResolveOutputType(Step.InType, Step.Parsed, Step.OutType);
+		Step.StepGetFn = Accessor->GetStepGetFn(Step.InType);
+		Step.StepSetFn = Accessor->GetStepSetFn(Step.InType);
+
+		ParsedChain.Reset();
+		ParsedChain.Steps.Add(MoveTemp(Step));
+		ParsedChain.bIsValid = true;
+		ParsedChain.FinalType = ParsedChain.Steps.Last().OutType;
+
 		Component = InComponent;
+		PossibleSourceType = ParsedChain.Steps.Last().Parsed.SourceTypeHint;
 	}
 
 	bool FSubSelection::SetFieldIndex(const int32 InFieldIndex)
 	{
 		if (InFieldIndex < 0 || InFieldIndex > 3)
 		{
-			bIsFieldSet = false;
+			// Invalid index: clear the chain so HasSelection()/IsFieldSelection()
+			// return false. Matches the legacy "bIsFieldSet = false" path for
+			// out-of-range indices.
+			ParsedChain.Reset();
 			return false;
 		}
 
-		bIsValid = true;
-		bIsFieldSet = true;
+		PCGExTypeOps::ESingleField NewField = PCGExTypeOps::ESingleField::X;
+		switch (InFieldIndex)
+		{
+		case 0: NewField = PCGExTypeOps::ESingleField::X; break;
+		case 1: NewField = PCGExTypeOps::ESingleField::Y; break;
+		case 2: NewField = PCGExTypeOps::ESingleField::Z; break;
+		case 3: NewField = PCGExTypeOps::ESingleField::W; break;
+		}
 
-		if (InFieldIndex == 0) { Field = PCGExTypeOps::ESingleField::X; }
-		else if (InFieldIndex == 1) { Field = PCGExTypeOps::ESingleField::Y; }
-		else if (InFieldIndex == 2) { Field = PCGExTypeOps::ESingleField::Z; }
-		else if (InFieldIndex == 3) { Field = PCGExTypeOps::ESingleField::W; }
+		const ISubAccessor* Accessor = FSubAccessorRegistry::GetSingleFieldAccessor();
 
+		FSubSelectionStep Step;
+		Step.Accessor = Accessor;
+		Step.Parsed.Field = NewField;
+		Step.Parsed.FieldIndex = InFieldIndex;
+		Step.Parsed.SourceTypeHint = EPCGMetadataTypes::Vector; // default -- real hint comes from parsing aliases
+		Step.InType = EPCGMetadataTypes::Unknown;
+		Accessor->ResolveOutputType(Step.InType, Step.Parsed, Step.OutType);
+		Step.StepGetFn = nullptr;
+		Step.StepSetFn = nullptr;
+
+		ParsedChain.Reset();
+		ParsedChain.Steps.Add(MoveTemp(Step));
+		ParsedChain.bIsValid = true;
+		ParsedChain.FinalType = EPCGMetadataTypes::Double;
+
+		Field = NewField;
 		return true;
 	}
 
 	void FSubSelection::Init(const TArray<FString>& ExtraNames)
 	{
 		// Chain-backed parser. Builds a step sequence via FSubAccessorRegistry,
-		// then projects it onto the legacy flag layout so external readers
-		// (BlendOpFactory, AttributeRemap, ProxyData, FCachedSubSelection)
-		// keep working unchanged.
+		// then populates Field/Axis/Component/PossibleSourceType for
+		// dispatch-time reads.
 		//
-		// The flag-population sequence below intentionally mirrors the
-		// pre-refactor STRMAP parser exactly, including the SetFieldIndex(0)
-		// side-effect that always sets bIsValid+bIsFieldSet for non-empty
-		// inputs and the {Rotation, Quaternion} component default. See the
-		// migration doc (.claude/migration_5.8_phase6_subaccessor_stage1.md)
-		// for the rationale and a note on the latent bugs locked in by
-		// parity.
-
+		// Stage 5: the SetFieldIndex(0) unconditional side-effect is GONE.
+		// HasSelection() is now true iff the parser actually matched at least
+		// one token. Malformed inputs like {Garbage} produce an empty chain.
+		// This fixes the long-standing latent bug where every non-empty Init
+		// was treated as a field selection regardless of whether a field
+		// token was actually present.
 		ParsedChain.Reset();
 
-		if (ExtraNames.IsEmpty())
-		{
-			bIsValid = false;
-			return;
-		}
+		if (ExtraNames.IsEmpty()) { return; }
 
 		FSubAccessorRegistry::ParseChain(ExtraNames, EPCGMetadataTypes::Unknown, ParsedChain);
 
-		// Locate steps by accessor identity. ParseChain produces at most one
-		// of each kind under the Stage 1 positional rule.
+		// Locate steps for populating the legacy dispatch fields.
+		const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
+		const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
+		const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+
 		const FSubSelectionStep* AxisStep = nullptr;
 		const FSubSelectionStep* CompStep = nullptr;
 		const FSubSelectionStep* FieldStep = nullptr;
 		for (const FSubSelectionStep& Step : ParsedChain.Steps)
 		{
-			const FString Name = Step.Accessor->GetDisplayName();
-			if (Name == TEXT("Axis")) { AxisStep = &Step; }
-			else if (Name == TEXT("TransformPart")) { CompStep = &Step; }
-			else if (Name == TEXT("SingleField")) { FieldStep = &Step; }
+			if (Step.Accessor == AxisAccessor) { AxisStep = &Step; }
+			else if (Step.Accessor == TransformAccessor) { CompStep = &Step; }
+			else if (Step.Accessor == FieldAccessor) { FieldStep = &Step; }
 		}
 
-		// Axis.
-		bIsAxisSet = (AxisStep != nullptr);
 		Axis = AxisStep ? AxisStep->Parsed.Axis : EPCGExAxis::Forward;
+		Field = FieldStep ? FieldStep->Parsed.Field : PCGExTypeOps::ESingleField::X;
+		// Component default stays Rotation for parity with legacy dispatch --
+		// some ApplyGet branches read Component when bIsComponentSet was true,
+		// but the chain-based classifier methods gate that read now.
+		Component = CompStep ? CompStep->Parsed.Component : PCGExTypeOps::ETransformPart::Rotation;
 
-		// Component, with legacy default {Rotation, Quaternion} when no match.
-		bIsComponentSet = (CompStep != nullptr);
-		const PCGExTypeOps::ETransformPart ComponentLocal =
-			CompStep ? CompStep->Parsed.Component : PCGExTypeOps::ETransformPart::Rotation;
-		const EPCGMetadataTypes ComponentHint =
-			CompStep ? CompStep->Parsed.SourceTypeHint : EPCGMetadataTypes::Quaternion;
-
-		// bIsValid pre-field.
-		if (bIsAxisSet) { bIsValid = true; }
-		else { bIsValid = bIsComponentSet; }
-
-		Component = ComponentLocal;
-		PossibleSourceType = ComponentHint;
-
-		// Field with legacy default {X, Unknown, 0} when no match.
-		bIsFieldSet = (FieldStep != nullptr);
-		const PCGExTypeOps::ESingleField FieldLocal =
-			FieldStep ? FieldStep->Parsed.Field : PCGExTypeOps::ESingleField::X;
-		const int32 FieldIndexLocal = FieldStep ? FieldStep->Parsed.FieldIndex : 0;
-		const EPCGMetadataTypes FieldHint =
-			FieldStep ? FieldStep->Parsed.SourceTypeHint : EPCGMetadataTypes::Unknown;
-
-		Field = FieldLocal;
-
-		// SetFieldIndex side-effect: always called with the parsed (or default 0)
-		// index. This is what forces bIsValid=true and bIsFieldSet=true on every
-		// non-empty Init -- a load-bearing legacy behavior.
-		SetFieldIndex(FieldIndexLocal);
-
-		// Post-SetFieldIndex: bIsFieldSet is now true.
-		if (bIsFieldSet)
-		{
-			bIsValid = true;
-			if (!bIsComponentSet) { PossibleSourceType = FieldHint; }
-		}
+		// PossibleSourceType: component hint wins, else field hint, else axis hint, else Unknown.
+		// Axis tokens are parsed with a Quaternion hint -- an axis alone strongly
+		// suggests the source is rotational (FQuat/FRotator/FTransform).
+		if (CompStep) { PossibleSourceType = CompStep->Parsed.SourceTypeHint; }
+		else if (FieldStep) { PossibleSourceType = FieldStep->Parsed.SourceTypeHint; }
+		else if (AxisStep) { PossibleSourceType = AxisStep->Parsed.SourceTypeHint; }
+		else { PossibleSourceType = EPCGMetadataTypes::Unknown; }
 	}
 
 	//
@@ -161,7 +213,7 @@ namespace PCGExData
 	                             void* OutValue, EPCGMetadataTypes& OutType) const
 	{
 		// Identity: no sub-selection active, copy the whole source through.
-		if (!bIsValid)
+		if (!HasSelection())
 		{
 			const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(SourceType);
 			if (Ops)
@@ -176,16 +228,17 @@ namespace PCGExData
 			return;
 		}
 
-		// FTransform with bIsComponentSet: extract the component first, then
-		// apply axis/field on the component result.
+		const bool bHasComponent = IsComponentSelection();
+		const bool bHasAxis = IsAxisSelection();
+		const bool bHasField = IsFieldSelection();
+
+		// FTransform with a component selection: extract the component first,
+		// then apply axis/field on the component result.
 		//
-		// IMPORTANT: axis extraction is only valid for the Rotation component
-		// (a position or scale vector has no orientation). This matches the
-		// legacy TSubSelectorOpsImpl<FTransform>::ApplyGetSelectionImpl which
-		// only checked bIsAxisSet inside the Rotation sub-branch. For Position
-		// and Scale components, bIsAxisSet is silently ignored and dispatch
-		// falls through to the field path.
-		if (SourceType == EPCGMetadataTypes::Transform && bIsComponentSet)
+		// Axis is only meaningful for the Rotation component (a position or
+		// scale vector has no orientation). For Position/Scale, axis is
+		// silently ignored; dispatch falls through to the field path.
+		if (SourceType == EPCGMetadataTypes::Transform && bHasComponent)
 		{
 			const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
 			FAccessorParseResult ComponentParsed;
@@ -199,7 +252,7 @@ namespace PCGExData
 
 			const bool bIsRotationComponent = (Component == PCGExTypeOps::ETransformPart::Rotation);
 
-			if (bIsRotationComponent && bIsAxisSet)
+			if (bIsRotationComponent && bHasAxis)
 			{
 				const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
 				FAccessorParseResult AxisParsed;
@@ -210,7 +263,7 @@ namespace PCGExData
 				return;
 			}
 
-			if (bIsFieldSet)
+			if (bHasField)
 			{
 				const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
 				FAccessorParseResult FieldParsed;
@@ -221,8 +274,7 @@ namespace PCGExData
 				return;
 			}
 
-			// Unreachable under normal Init (SetFieldIndex forces bIsFieldSet=true),
-			// but support direct-mutation call sites by copying the component through.
+			// Component-only: output the whole component value.
 			const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(ComponentOutType);
 			if (Ops) { Ops->Copy(ComponentBuffer, OutValue); }
 			OutType = ComponentOutType;
@@ -230,7 +282,7 @@ namespace PCGExData
 		}
 
 		// Non-Transform (or Transform without component): axis wins over field.
-		if (bIsAxisSet)
+		if (bHasAxis)
 		{
 			const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
 			FAccessorParseResult AxisParsed;
@@ -240,7 +292,7 @@ namespace PCGExData
 			return;
 		}
 
-		if (bIsFieldSet)
+		if (bHasField)
 		{
 			const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
 			FAccessorParseResult FieldParsed;
@@ -250,7 +302,7 @@ namespace PCGExData
 			return;
 		}
 
-		// No axis/field/component applicable; identity copy.
+		// Fallback identity copy.
 		const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(SourceType);
 		if (Ops)
 		{
@@ -266,21 +318,24 @@ namespace PCGExData
 	void FSubSelection::ApplySet(EPCGMetadataTypes TargetType, void* Target,
 	                             EPCGMetadataTypes SourceType, const void* Source) const
 	{
-		if (!bIsValid)
+		if (!HasSelection())
 		{
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
 			return;
 		}
 
-		// FTransform with bIsComponentSet: read component, mutate via field
-		// accessor if applicable, write component back.
-		if (TargetType == EPCGMetadataTypes::Transform && bIsComponentSet)
+		const bool bHasComponent = IsComponentSelection();
+		const bool bHasField = IsFieldSelection();
+
+		// FTransform with a component selection: read component, mutate via
+		// field accessor if applicable, write component back.
+		if (TargetType == EPCGMetadataTypes::Transform && bHasComponent)
 		{
 			const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
 			FAccessorParseResult ComponentParsed;
 			ComponentParsed.Component = Component;
 
-			if (bIsFieldSet)
+			if (bHasField)
 			{
 				// Extract current component into a buffer, inject field, write back.
 				EPCGMetadataTypes ComponentType = EPCGMetadataTypes::Unknown;
@@ -306,7 +361,7 @@ namespace PCGExData
 			return;
 		}
 
-		if (bIsFieldSet)
+		if (bHasField)
 		{
 			const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
 			FAccessorParseResult FieldParsed;
@@ -348,7 +403,7 @@ namespace PCGExData
 
 	void FSubSelection::GetVoid(EPCGMetadataTypes SourceType, const void* Source, EPCGMetadataTypes WorkingType, void* Target) const
 	{
-		if (!bIsValid)
+		if (!HasSelection())
 		{
 			// No sub-selection - just convert
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, WorkingType, Target);
@@ -386,7 +441,7 @@ namespace PCGExData
 	void FSubSelection::SetVoid(EPCGMetadataTypes TargetType, void* Target,
 	                            EPCGMetadataTypes SourceType, const void* Source) const
 	{
-		if (!bIsValid)
+		if (!HasSelection())
 		{
 			// No sub-selection - just convert
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);

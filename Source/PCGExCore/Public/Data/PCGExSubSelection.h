@@ -46,13 +46,8 @@ namespace PCGExData
 	 */
 	struct PCGEXCORE_API FSubSelection
 	{
-		// Configuration flags
-		bool bIsValid = false;
-		bool bIsAxisSet = false;
-		bool bIsFieldSet = false;
-		bool bIsComponentSet = false;
-
-		// Selection parameters
+		// Selection parameters. Populated by Init from the parsed chain. External
+		// callers read these via the classifier methods below, not directly.
 		PCGExTypeOps::ETransformPart Component = PCGExTypeOps::ETransformPart::Position;
 		EPCGExAxis Axis = EPCGExAxis::Forward;
 		PCGExTypeOps::ESingleField Field = PCGExTypeOps::ESingleField::X;
@@ -78,25 +73,28 @@ namespace PCGExData
 		FORCEINLINE const FSubSelectionChain& GetChain() const { return ParsedChain; }
 
 		//
-		// Public classifier methods (Stage 3.5 -- stable API over the flag state).
+		// Public classifier methods (Stage 5 -- chain-backed).
 		//
-		// These wrap the bIsValid/bIsFieldSet/bIsAxisSet/bIsComponentSet reads
-		// so external callers don't depend on the exact flag field layout.
-		// Stage 5 will rewrite them to read directly from ParsedChain and then
-		// delete the flag fields.
+		// These compute directly from ParsedChain. The legacy boolean flag
+		// fields (bIsValid/bIsFieldSet/bIsAxisSet/bIsComponentSet) are gone
+		// as of Stage 5. The SetFieldIndex side-effect that used to force
+		// bIsFieldSet=true for any non-empty Init is also gone: malformed
+		// inputs like {Garbage} now produce an empty chain and HasSelection()
+		// returns false, as opposed to the legacy "treat anything as
+		// Double-producing-field-extraction" behavior.
 		//
 
-		/** True if Init saw at least one matched (or force-set) selection token. */
-		FORCEINLINE bool HasSelection() const { return bIsValid; }
+		/** True if the parsed chain has at least one step. */
+		bool HasSelection() const;
 
-		/** True if the selection resolves to a scalar field extraction (Double output). */
-		FORCEINLINE bool IsFieldSelection() const { return bIsValid && bIsFieldSet; }
+		/** True if the chain contains a SingleField step (resolves to Double). */
+		bool IsFieldSelection() const;
 
-		/** True if the selection specifies an axis (Forward/Right/Up/...). */
-		FORCEINLINE bool IsAxisSelection() const { return bIsValid && bIsAxisSet; }
+		/** True if the chain contains an Axis step. */
+		bool IsAxisSelection() const;
 
-		/** True if the selection specifies a transform component (Position/Rotation/Scale). */
-		FORCEINLINE bool IsComponentSelection() const { return bIsValid && bIsComponentSet; }
+		/** True if the chain contains a TransformPart step. */
+		bool IsComponentSelection() const;
 
 		/**
 		 * Best-guess hint for the source-side type this selection assumes.
@@ -120,17 +118,21 @@ namespace PCGExData
 
 		friend FORCEINLINE uint32 GetTypeHash(const FSubSelection& S)
 		{
+			// Hash derives from the four selection-parameter fields plus the
+			// chain shape (step count + each step's accessor kind). The old
+			// booleans are gone so the hash recipe is slimmer; identical
+			// inputs still produce identical hashes.
 			uint32 Hash = 0;
-
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsValid));
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsAxisSet));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.Axis));
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsFieldSet));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.Field));
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsComponentSet));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.Component));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.PossibleSourceType));
-
+			Hash = HashCombineFast(Hash, static_cast<uint32>(S.ParsedChain.Steps.Num()));
+			for (const FSubSelectionStep& Step : S.ParsedChain.Steps)
+			{
+				// Accessor pointer is stable for the process lifetime.
+				Hash = HashCombineFast(Hash, PointerHash(Step.Accessor));
+			}
 			return Hash;
 		}
 

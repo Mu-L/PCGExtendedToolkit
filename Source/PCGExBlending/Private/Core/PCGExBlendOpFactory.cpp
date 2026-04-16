@@ -145,7 +145,7 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 					// TODO : Account for possible desired cast to a different type in the blend stack
 				}
 
-				if (OutputSubselection.bIsValid && RealTypeC == EPCGMetadataTypes::Unknown)
+				if (OutputSubselection.HasSelection() && RealTypeC == EPCGMetadataTypes::Unknown)
 				{
 					// Take a wild guess based on subselection, if any
 					RealTypeC = OutputSubselection.GetHintedSourceType();

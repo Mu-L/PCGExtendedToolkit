@@ -58,7 +58,7 @@ namespace PCGExData
 		EPCGMetadataTypes InRealType,
 		EPCGMetadataTypes InWorkingType)
 	{
-		bIsValid = Selection.bIsValid;
+		bIsValid = Selection.HasSelection();
 		RealType = InRealType;
 		WorkingType = InWorkingType;
 

@@ -95,7 +95,7 @@ namespace PCGExData
 					DataValue = MakeShared<TDataValue<T_REAL>>(Helpers::ReadDataValue<T_REAL>(ProcessingInfos.Attribute));
 
 					const FSubSelection& S = ProcessingInfos.SubSelection;
-					TypedDataValue = S.bIsValid ? S.Get<T_REAL, T>(DataValue->GetValue<T_REAL>()) : PCGExTypeOps::Convert<T_REAL, T>(DataValue->GetValue<T_REAL>());
+					TypedDataValue = S.HasSelection() ? S.Get<T_REAL, T>(DataValue->GetValue<T_REAL>()) : PCGExTypeOps::Convert<T_REAL, T>(DataValue->GetValue<T_REAL>());
 				},
 				[&]()
 				{
