@@ -70,10 +70,40 @@ namespace PCGExData
 		 * default-constructed and never re-Init'd.
 		 *
 		 * Stage 1: chain is informational only -- ApplyGet/ApplySet still
-		 * route through the legacy flag-driven dispatch. Stage 3 will use
-		 * the chain in the hot path.
+		 * route through the legacy flag-driven dispatch. Stage 3 moved
+		 * FCachedSubSelection's hot path onto the chain (via
+		 * CompileChainForSource); FSubSelection's type-erased path still
+		 * uses the flag layout below. Stage 5 will unify them.
 		 */
 		FORCEINLINE const FSubSelectionChain& GetChain() const { return ParsedChain; }
+
+		//
+		// Public classifier methods (Stage 3.5 -- stable API over the flag state).
+		//
+		// These wrap the bIsValid/bIsFieldSet/bIsAxisSet/bIsComponentSet reads
+		// so external callers don't depend on the exact flag field layout.
+		// Stage 5 will rewrite them to read directly from ParsedChain and then
+		// delete the flag fields.
+		//
+
+		/** True if Init saw at least one matched (or force-set) selection token. */
+		FORCEINLINE bool HasSelection() const { return bIsValid; }
+
+		/** True if the selection resolves to a scalar field extraction (Double output). */
+		FORCEINLINE bool IsFieldSelection() const { return bIsValid && bIsFieldSet; }
+
+		/** True if the selection specifies an axis (Forward/Right/Up/...). */
+		FORCEINLINE bool IsAxisSelection() const { return bIsValid && bIsAxisSet; }
+
+		/** True if the selection specifies a transform component (Position/Rotation/Scale). */
+		FORCEINLINE bool IsComponentSelection() const { return bIsValid && bIsComponentSet; }
+
+		/**
+		 * Best-guess hint for the source-side type this selection assumes.
+		 * E.g., ".R" hints Quaternion, ".X" hints Vector. Returns Unknown
+		 * when the parser couldn't infer a hint (empty or unmatched tokens).
+		 */
+		FORCEINLINE EPCGMetadataTypes GetHintedSourceType() const { return PossibleSourceType; }
 
 		/**
 		 * Get the resulting type when this sub-selection is applied

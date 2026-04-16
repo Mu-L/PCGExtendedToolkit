@@ -242,7 +242,7 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 
 				const T_VALUE Value = ReadDataValue<T_VALUE>(SourceAttribute);
 
-				if (SubSelection.bIsValid) { OutValue = SubSelection.Get<T_VALUE, T>(Value); }
+				if (SubSelection.HasSelection()) { OutValue = SubSelection.Get<T_VALUE, T>(Value); }
 				else { OutValue = PCGExTypeOps::Convert<T_VALUE, T>(Value); }
 
 				bSuccess = true;

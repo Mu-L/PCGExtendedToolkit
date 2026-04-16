@@ -215,7 +215,7 @@ template class PCGEXCORE_API TDataValue<_TYPE>;
 				FSubSelection SubSelection(Selector);
 				TSharedPtr<IDataValue> TypedDataValue = nullptr;
 
-				if (SubSelection.bIsValid)
+				if (SubSelection.HasSelection())
 				{
 					PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute, [&](auto WorkingValue)
 					{

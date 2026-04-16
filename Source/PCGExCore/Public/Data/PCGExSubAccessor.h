@@ -48,6 +48,13 @@ namespace PCGExData
 		// FTransformPartAccessor writes Component.
 		PCGExTypeOps::ETransformPart Component = PCGExTypeOps::ETransformPart::Position;
 
+		// FSwizzleAccessor writes SwizzleMask + SwizzleLength.
+		// Each byte in SwizzleMask is a source-component index (0=X, 1=Y, 2=Z, 3=W).
+		// Length is the number of output components (2, 3, or 4 -> Vector2/Vector/Vector4).
+		// Bytes beyond [SwizzleLength-1] are unused.
+		uint8 SwizzleMask[4] = {0, 0, 0, 0};
+		uint8 SwizzleLength = 0;
+
 		// Hint type the matched token implies for the source attribute, e.g. "X" -> Vector,
 		// "W" -> Vector4, "Roll" -> Quaternion. Used for legacy PossibleSourceType
 		// projection. Unknown when the accessor doesn't supply a hint.

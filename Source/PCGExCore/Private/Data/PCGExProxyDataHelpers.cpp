@@ -502,7 +502,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 		const int32 Dimensions = FMath::Min(4, GetNumFieldsForType(InBaseDescriptor.RealType));
 
 		if (Dimensions == -1 &&
-			(!InBaseDescriptor.SubSelection.bIsValid || !InBaseDescriptor.SubSelection.bIsComponentSet))
+			(!InBaseDescriptor.SubSelection.HasSelection() || !InBaseDescriptor.SubSelection.IsComponentSelection()))
 		{
 			PCGE_LOG_C(Error, GraphAndLog, InContext,
 			           FTEXT("Can't automatically break complex type into sub-components. "
@@ -512,9 +512,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 		const int32 MaxIndex = Dimensions == -1 ? 2 : Dimensions - 1;
 
-		if (InBaseDescriptor.SubSelection.bIsValid)
+		if (InBaseDescriptor.SubSelection.HasSelection())
 		{
-			if (InBaseDescriptor.SubSelection.bIsFieldSet)
+			if (InBaseDescriptor.SubSelection.IsFieldSelection())
 			{
 				// Single specific field - use same proxy for all
 				const TSharedPtr<IBufferProxy> Proxy = GetProxyBuffer(InContext, InBaseDescriptor);

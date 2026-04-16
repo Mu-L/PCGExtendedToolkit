@@ -5,6 +5,7 @@
 
 #include "Data/Accessors/PCGExAxisAccessor.h"
 #include "Data/Accessors/PCGExSingleFieldAccessor.h"
+#include "Data/Accessors/PCGExSwizzleAccessor.h"
 #include "Data/Accessors/PCGExTransformPartAccessor.h"
 
 namespace PCGExData
@@ -57,6 +58,14 @@ namespace PCGExData
 		OwnedAccessors.Add(MakeUnique<FSingleFieldAccessor>());
 		GSingleFieldAccessor = OwnedAccessors.Last().Get();
 		OrderedView.Add(GSingleFieldAccessor);
+
+		// Stage 4: swizzle accessor registered last. Its MatchesToken only
+		// accepts 2-4 char combos of {x,y,z,w}, so it never competes with
+		// SingleField's single-letter entries or the longer word-like axis
+		// and component aliases. Registration order ensures SingleField
+		// gets first shot at "X"/"Y"/etc.; Swizzle handles "xy", "xyz", ...
+		OwnedAccessors.Add(MakeUnique<FSwizzleAccessor>());
+		OrderedView.Add(OwnedAccessors.Last().Get());
 
 		bInitialized = true;
 	}

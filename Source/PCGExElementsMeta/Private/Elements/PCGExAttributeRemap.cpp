@@ -149,7 +149,7 @@ namespace PCGExAttributeRemap
 		{
 			// This might be expected if the destination does not exist
 
-			if (Dimensions == 1 && Settings->Attributes.WantsRemappedOutput() && !OutputDescriptor.SubSelection.bIsValid)
+			if (Dimensions == 1 && Settings->Attributes.WantsRemappedOutput() && !OutputDescriptor.SubSelection.HasSelection())
 			{
 				// We're remapping a component to a single value with no subselection
 				OutputDescriptor.RealType = InputDescriptor.WorkingType;

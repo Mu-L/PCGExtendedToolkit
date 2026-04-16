@@ -236,7 +236,7 @@ namespace PCGExData
 
 	void IBufferProxy::SetSubSelection(const FSubSelection& InSubSelection)
 	{
-		bWantsSubSelection = InSubSelection.bIsValid;
+		bWantsSubSelection = InSubSelection.HasSelection();
 		if (bWantsSubSelection) { CachedSubSelection.Initialize(InSubSelection, RealType, WorkingType); }
 	}
 

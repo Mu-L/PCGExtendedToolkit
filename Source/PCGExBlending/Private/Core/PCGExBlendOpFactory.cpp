@@ -148,7 +148,7 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 				if (OutputSubselection.bIsValid && RealTypeC == EPCGMetadataTypes::Unknown)
 				{
 					// Take a wild guess based on subselection, if any
-					RealTypeC = OutputSubselection.PossibleSourceType;
+					RealTypeC = OutputSubselection.GetHintedSourceType();
 				}
 
 				if (RealTypeC == EPCGMetadataTypes::Unknown)
@@ -156,8 +156,8 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 					// Ok we really have little to work with,
 					// take a guess based on other attribute types and pick the broader type
 
-					EPCGMetadataTypes TypeA = A.SubSelection.bIsValid && A.SubSelection.bIsFieldSet ? EPCGMetadataTypes::Double : A.RealType;
-					EPCGMetadataTypes TypeB = B.SubSelection.bIsValid && B.SubSelection.bIsFieldSet ? EPCGMetadataTypes::Double : B.RealType;
+					EPCGMetadataTypes TypeA = A.SubSelection.IsFieldSelection() ? EPCGMetadataTypes::Double : A.RealType;
+					EPCGMetadataTypes TypeB = B.SubSelection.IsFieldSelection() ? EPCGMetadataTypes::Double : B.RealType;
 
 					auto GetMetadataRating = [](const EPCGMetadataTypes InType)
 					{
