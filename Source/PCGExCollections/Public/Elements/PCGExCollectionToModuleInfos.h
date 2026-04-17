@@ -7,6 +7,7 @@
 #include "Core/PCGExPointsProcessor.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
+#include "PCGExPropertyWriter.h"
 #include "PCGExCollectionToModuleInfos.generated.h"
 
 class UPCGExAssetCollection;
@@ -18,6 +19,7 @@ namespace PCGExCollectionToGrammar
 		FModule() = default;
 		FPCGSubdivisionSubmodule Infos;
 		const FPCGExAssetCollectionEntry* Entry = nullptr;
+		const UPCGExAssetCollection* Host = nullptr;
 		int64 Idx;
 	};
 }
@@ -82,6 +84,10 @@ protected:
 	/** Name of the attribute the entry' Category value will be written to */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, DisplayName="Category"))
 	FName CategoryAttributeName = FName("Category");
+
+	/** Additional custom properties to extract from the collection's CollectionProperties (and per-entry overrides). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(ShowOnlyInnerProperties))
+	FPCGExPropertyOutputSettings PropertyOutputSettings;
 };
 
 class FPCGExCollectionToModuleInfosElement final : public IPCGExElement

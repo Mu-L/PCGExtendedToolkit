@@ -238,6 +238,20 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 	ULevel* PersistentLevel = World->PersistentLevel;
 	if (!PersistentLevel) { return false; }
 
+	// Move any previous inner subobjects to the transient package so they get GC'd
+	// instead of being saved as orphan exports in the collection's .uasset. Otherwise,
+	// each rebuild accumulates dead sub-collections/point-data that can confuse save-time
+	// pointer traversal (observed as INT_MAX-pointer crashes during level save).
+	{
+		TArray<UObject*> OldInners;
+		GetObjectsWithOuter(OutAsset, OldInners, false);
+		for (UObject* Inner : OldInners)
+		{
+			Inner->Rename(nullptr, GetTransientPackage(),
+				REN_DontCreateRedirectors | REN_NonTransactional);
+		}
+	}
+
 	using namespace PCGExDefaultLevelDataExporterInternal;
 
 	// Phase 1: Collect and classify qualifying actors

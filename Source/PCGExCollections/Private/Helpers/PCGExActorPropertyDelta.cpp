@@ -9,9 +9,27 @@
 #include "Serialization/MemoryReader.h"
 #include "GameFramework/Actor.h"
 #include "Components/ActorComponent.h"
+#include "PCGExLog.h"
 
 namespace PCGExActorDelta
 {
+	// Wire format magic and version.
+	// The delta bytes are persisted to disk in the collection's .uasset and must survive
+	// editor restarts. Older formats without this header (or with older versions) are
+	// silently skipped by ApplyPropertyDelta -- the user must rebuild the collection to
+	// regenerate deltas in the current format.
+	//
+	// Version history:
+	//   v1: initial version with magic header; inner delta via FObjectWriter + structured
+	//       adapter (BROKEN across sessions: FObjectWriter encoded FNames as session-local
+	//       global name table indices, causing bogus names after editor restart and a crash
+	//       at level save during name serialization).
+	//   v2: FNames serialized as strings in both the outer wire format (component names) and
+	//       inside the delta bytes (via FDeltaWriter::operator<<(FName&) override). Fully
+	//       session-portable.
+	static constexpr uint32 DeltaWireMagic = 0x50434745u; // 'PCGE'
+	static constexpr uint32 DeltaWireVersion = 2u;
+
 	namespace Internal
 	{
 		/**
@@ -28,6 +46,27 @@ namespace PCGExActorDelta
 		// FObjectWriter/FObjectReader are UObject-aware memory archives that handle
 		// TObjectPtr, FSoftObjectPtr, etc. We subclass to filter via ShouldSkipProperty
 		// so only user-editable properties are included in the delta.
+		//
+		// FName MUST be serialized as string, NOT as the default session-local index+number.
+		// The delta bytes are persisted to the collection's .uasset and read back in a later
+		// editor session. The global FName table is NOT persistent across sessions -- indices
+		// assigned to names in session A refer to different names (or out-of-range entries)
+		// in session B. Writing FNames as strings makes the stream session-portable.
+
+		/** Transform-related root component properties that we NEVER want to capture in the delta.
+		 *  The spawned actor's transform is determined by the PCG point, not by the source
+		 *  actor's original position. Including these in the delta overwrites the spawn
+		 *  transform with the source actor's (often near-origin) values on apply. */
+		static bool IsTransformProperty(const FProperty* InProperty)
+		{
+			const FName PropName = InProperty->GetFName();
+			static const FName NAME_RelativeLocation(TEXT("RelativeLocation"));
+			static const FName NAME_RelativeRotation(TEXT("RelativeRotation"));
+			static const FName NAME_RelativeScale3D(TEXT("RelativeScale3D"));
+			return PropName == NAME_RelativeLocation
+				|| PropName == NAME_RelativeRotation
+				|| PropName == NAME_RelativeScale3D;
+		}
 
 		class FDeltaWriter : public FObjectWriter
 		{
@@ -37,7 +76,15 @@ namespace PCGExActorDelta
 			virtual bool ShouldSkipProperty(const FProperty* InProperty) const override
 			{
 				if (!IsInstanceEditableProperty(InProperty)) { return true; }
+				if (IsTransformProperty(InProperty)) { return true; }
 				return FObjectWriter::ShouldSkipProperty(InProperty);
+			}
+
+			virtual FArchive& operator<<(FName& Name) override
+			{
+				FString AsString = Name.ToString();
+				*this << AsString;
+				return *this;
 			}
 		};
 
@@ -49,7 +96,16 @@ namespace PCGExActorDelta
 			virtual bool ShouldSkipProperty(const FProperty* InProperty) const override
 			{
 				if (!IsInstanceEditableProperty(InProperty)) { return true; }
+				if (IsTransformProperty(InProperty)) { return true; }
 				return FObjectReader::ShouldSkipProperty(InProperty);
+			}
+
+			virtual FArchive& operator<<(FName& Name) override
+			{
+				FString AsString;
+				*this << AsString;
+				Name = FName(*AsString);
+				return *this;
 			}
 		};
 
@@ -155,11 +211,17 @@ namespace PCGExActorDelta
 		}
 
 		// Pack into wire format:
+		//   [uint32 Magic][uint32 Version]
 		//   [uint32 ActorDeltaSize][ActorDelta...]
 		//   [uint32 ComponentCount]
 		//   For each: [FName][uint32 CompDeltaSize][CompDelta...]
 		TArray<uint8> Result;
 		FMemoryWriter Writer(Result);
+
+		uint32 Magic = DeltaWireMagic;
+		uint32 Version = DeltaWireVersion;
+		Writer << Magic;
+		Writer << Version;
 
 		uint32 ActorSize = ActorBytes.Num();
 		Writer << ActorSize;
@@ -173,7 +235,11 @@ namespace PCGExActorDelta
 
 		for (FComponentDelta& CD : ComponentDeltas)
 		{
-			Writer << CD.Name;
+			// Component names serialized as strings for session-portability.
+			// Default FArchive FName serialization uses the current session's global
+			// name table indices, which are not stable across editor restarts.
+			FString CompNameStr = CD.Name.ToString();
+			Writer << CompNameStr;
 			uint32 CompSize = CD.Bytes.Num();
 			Writer << CompSize;
 			Writer.Serialize(CD.Bytes.GetData(), CompSize);
@@ -190,6 +256,33 @@ namespace PCGExActorDelta
 		// Bounds-check every read to handle corrupted/truncated data gracefully.
 		FMemoryReader Reader(DeltaBytes);
 		const int64 TotalSize = DeltaBytes.Num();
+
+		// Validate magic+version. Older collections saved delta bytes in an incompatible
+		// format (FStructuredArchiveFromArchive framing) -- reading those with the current
+		// binary path would misalign properties and corrupt FName values, which crashes
+		// the editor on later save. Silently skip unknown-format deltas; the user must
+		// rebuild the collection to regenerate deltas in the current format.
+		if (TotalSize < static_cast<int64>(sizeof(uint32) * 2)) { return; }
+
+		uint32 Magic = 0;
+		uint32 Version = 0;
+		Reader << Magic;
+		Reader << Version;
+		if (Magic != DeltaWireMagic)
+		{
+			// No header / unknown format: silently ignore. This is a delta captured before
+			// versioning was introduced, and applying it would corrupt the actor.
+			return;
+		}
+		if (Version != DeltaWireVersion)
+		{
+			// Known format but incompatible version. Surface this so the user knows the
+			// collection needs to be rebuilt to produce deltas in the current format.
+			UE_LOG(LogPCGEx, Warning,
+				TEXT("[PCGExActorDelta] Skipping delta with incompatible wire version %u (expected %u). Rebuild the source collection to regenerate deltas."),
+				Version, DeltaWireVersion);
+			return;
+		}
 
 		// Actor-level delta
 		uint32 ActorSize = 0;
@@ -214,8 +307,10 @@ namespace PCGExActorDelta
 		{
 			if (Reader.Tell() >= TotalSize) { return; }
 
-			FName CompName;
-			Reader << CompName;
+			// Component name as string for session-portability (see writer).
+			FString CompNameStr;
+			Reader << CompNameStr;
+			const FName CompName(*CompNameStr);
 
 			if (Reader.Tell() + static_cast<int64>(sizeof(uint32)) > TotalSize) { return; }
 

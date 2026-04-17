@@ -10,8 +10,10 @@
 #include "Details/PCGExPropertyCompiledCustomization.h"
 #include "Details/PCGExPropertySchemaCollectionCustomization.h"
 #include "Details/PCGExPropertySchemaCustomization.h"
+#include "Details/PCGExPropertyOutputConfigCustomization.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyTypes.h"
+#include "PCGExPropertyWriter.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExPropertiesEditorModule"
 
@@ -45,6 +47,12 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExPropertyOverrideEntry::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOverrideEntryCustomization::MakeInstance)
+	);
+
+	// Register FPCGExPropertyOutputConfig customization - compact inline [x] Prop -> Attribute row
+	PropertyModule.RegisterCustomPropertyTypeLayout(
+		FPCGExPropertyOutputConfig::StaticStruct()->GetFName(),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOutputConfigCustomization::MakeInstance)
 	);
 
 	// Register FPCGExWeightedPropertyOverrides customization - weight in header + flattened overrides

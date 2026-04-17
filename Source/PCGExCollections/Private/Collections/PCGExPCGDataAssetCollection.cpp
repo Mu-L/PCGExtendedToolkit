@@ -16,9 +16,11 @@
 #include "Helpers/PCGExLevelDataExporter.h"
 #include "Helpers/PCGExDefaultLevelDataExporter.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExSocketProvider.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExActorCollection.h"
 #include "PCGExLog.h"
+#include "Engine/Level.h"
 
 
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
@@ -100,12 +102,15 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			return;
 		}
 
-		// Create or reuse embedded data asset, outered to the owning collection
-		if (!ExportedDataAsset || ExportedDataAsset->GetOuter() != OwningCollection)
+		// Always recreate ExportedDataAsset fresh. Reusing + resetting TaggedData leaves orphaned
+		// UPCGBasePointData subobjects in the outer chain that still serialize into the .uasset,
+		// which causes save-time pointer traversal crashes after repeated rebuilds.
+		if (ExportedDataAsset)
 		{
-			ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
+			ExportedDataAsset->Rename(nullptr, GetTransientPackage(),
+				REN_DontCreateRedirectors | REN_NonTransactional);
 		}
-		ExportedDataAsset->Data.TaggedData.Reset();
+		ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
 
 		// Use collection's instanced exporter if available, otherwise create a transient default
 		UPCGExLevelDataExporter* Exporter = nullptr;
@@ -137,6 +142,23 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		{
 			Staging.Path = FSoftObjectPath(ExportedDataAsset);
 			Staging.Bounds = PCGExPCGDataAssetCollectionInternal::ComputeBoundsFromAsset(ExportedDataAsset);
+
+			// Scan for socket actors after export so the world is in the same initialized
+			// state the exporter used — transforms are reliable at this point.
+			if (LoadedWorld->PersistentLevel)
+			{
+				for (AActor* Actor : LoadedWorld->PersistentLevel->Actors)
+				{
+					if (IPCGExSocketProvider* Provider = Cast<IPCGExSocketProvider>(Actor))
+					{
+						FPCGExSocket& NewSocket = Staging.Sockets.Emplace_GetRef(
+							Provider->GetSocketName_Implementation(),
+							Provider->GetSocketTransform_Implementation(),
+							Provider->GetSocketTag_Implementation());
+						NewSocket.bManaged = true;
+					}
+				}
+			}
 
 			// Extract embedded collections (created by exporter when bGenerateCollections is enabled)
 			EmbeddedMeshCollection = nullptr;

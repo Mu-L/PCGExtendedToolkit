@@ -60,7 +60,7 @@ public:
 	/** When true, the exporter builds embedded mesh/actor collections
 	 *  and writes collection entry hashes instead of raw metadata. */
 	UPROPERTY(EditAnywhere, Category = Settings)
-	bool bGenerateCollections = false;
+	bool bGenerateCollections = true;
 
 	/** When true, material overrides from source components will be captured
 	 *  and stored as material variants on the mesh collection entries. */
@@ -70,7 +70,7 @@ public:
 	/** When true and bGenerateCollections is enabled, capture per-instance property deltas
 	 *  (CDO diff) on actor collection entries. Only applies to "Actor"-classified actors. */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bGenerateCollections"))
-	bool bCapturePropertyDeltas = false;
+	bool bCapturePropertyDeltas = true;
 
 	virtual bool ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset) override;
 
