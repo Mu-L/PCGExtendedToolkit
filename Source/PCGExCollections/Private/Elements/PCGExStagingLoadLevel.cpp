@@ -8,6 +8,7 @@
 #include "PCGComponent.h"
 #include "PCGElement.h"
 #include "PCGParamData.h"
+#include "PCGExSocketProvider.h"
 #include "Helpers/PCGExManagedResourceHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
@@ -56,6 +57,19 @@ void UPCGExLevelStreamingDynamic::OnLevelLoadedChanged(ULevel* Level)
 		{
 			Actor->Destroy();
 			continue;
+		}
+
+		// Strip socket-provider actors that flag themselves as export-only design markers.
+		// When spawning as loose actors (not a level instance), we mirror the same filtering
+		// that PCGExActorContentFilter applies during bounds/export. Level-instance mode
+		// intentionally keeps these because the whole level is instanced as a unit.
+		if (IPCGExSocketProvider* Provider = Cast<IPCGExSocketProvider>(Actor))
+		{
+			if (Provider->ShouldStripFromExport_Implementation())
+			{
+				Actor->Destroy();
+				continue;
+			}
 		}
 
 		if (GeneratedFolderPath != NAME_None)

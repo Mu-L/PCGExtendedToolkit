@@ -35,19 +35,13 @@ void FPCGExPropertyOutputConfigCustomization::CustomizeHeader(
 	};
 
 	HeaderRow.NameContent()
+	         .MinDesiredWidth(220)
 	[
-		SNew(SBox)
-		.MinDesiredWidth(24)
-		.MaxDesiredWidth(24)
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0, 0, 2, 0)
 		[
 			EnabledHandle->CreatePropertyValueWidget()
 		]
-	];
-
-	HeaderRow.ValueContent()
-	         .MinDesiredWidth(320)
-	[
-		SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().Padding(1).FillWidth(1)
 		[
 			SNew(SBox)
@@ -56,7 +50,13 @@ void FPCGExPropertyOutputConfigCustomization::CustomizeHeader(
 				PropertyNameHandle->CreatePropertyValueWidget()
 			]
 		]
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4, 0)
+	];
+
+	HeaderRow.ValueContent()
+	         .MinDesiredWidth(220)
+	[
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2, 0, 4, 0)
 		[
 			SNew(STextBlock)
 			.Text(FText::FromString(TEXT("→")))
