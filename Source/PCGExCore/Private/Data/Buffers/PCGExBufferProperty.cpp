@@ -313,6 +313,62 @@ namespace PCGExData
 		return Alignment;
 	}
 
+	//
+	// Container-accessor helpers
+	//
+
+	int32 FPropertyBuffer::GetInnerElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc)
+	{
+		// Non-container: inner == outer. Just forward.
+		if (Desc.ContainerTypes.IsEmpty())
+		{
+			return GetElementSizeFromDesc(Desc);
+		}
+
+		// Strip the outermost ContainerType entry and ask recursively. For
+		// TArray<FVector>: ContainerTypes=[Array] -> inner desc has ContainerTypes=[]
+		// + ValueType=Vector -> returns 24. For TArray<TArray<FVector>>:
+		// ContainerTypes=[Array,Array] -> inner has [Array] -> returns sizeof(FScriptArray).
+		// (Nested container element-reads aren't meaningful via FContainerIndexAccessor
+		// yet because the accessor hot path only walks one container level --
+		// Stripping one layer is correct
+		// for the single-step container-index case.)
+		FPCGMetadataAttributeDesc InnerDesc = Desc;
+		InnerDesc.ContainerTypes.RemoveAt(0);
+		return GetElementSizeFromDesc(InnerDesc);
+	}
+
+	int32 FPropertyBuffer::GetContainerNum(const void* ContainerBytes)
+	{
+		if (!ContainerBytes) { return 0; }
+		// TArray, TSet, and TMap all store their element count at a
+		// layout-compatible binary offset. We cast to FScriptArray as the
+		// canonical representative — FScriptSet and FScriptMap place Num()
+		// at the same offset.
+		const FScriptArray* Arr = static_cast<const FScriptArray*>(ContainerBytes);
+		return Arr->Num();
+	}
+
+	const void* FPropertyBuffer::GetArrayElementAt(const void* ArrayBytes, int32 Index, int32 ElementSize)
+	{
+		if (!ArrayBytes || ElementSize <= 0) { return nullptr; }
+		const FScriptArray* Arr = static_cast<const FScriptArray*>(ArrayBytes);
+		const int32 Num = Arr->Num();
+		if (Index < 0 || Index >= Num) { return nullptr; }
+		// GetData() on FScriptArray returns a raw const void* into the contiguous
+		// element storage; stride by ElementSize to reach element [Index].
+		return static_cast<const uint8*>(Arr->GetData()) + static_cast<SIZE_T>(Index) * static_cast<SIZE_T>(ElementSize);
+	}
+
+	void* FPropertyBuffer::GetMutableArrayElementAt(void* ArrayBytes, int32 Index, int32 ElementSize)
+	{
+		if (!ArrayBytes || ElementSize <= 0) { return nullptr; }
+		FScriptArray* Arr = static_cast<FScriptArray*>(ArrayBytes);
+		const int32 Num = Arr->Num();
+		if (Index < 0 || Index >= Num) { return nullptr; }
+		return static_cast<uint8*>(Arr->GetData()) + static_cast<SIZE_T>(Index) * static_cast<SIZE_T>(ElementSize);
+	}
+
 	bool FPropertyBuffer::InitProperty(const FPCGMetadataAttributeBase* InGenericAttribute)
 	{
 		if (!InGenericAttribute) { return false; }

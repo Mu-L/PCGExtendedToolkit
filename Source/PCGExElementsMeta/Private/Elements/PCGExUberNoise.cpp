@@ -15,7 +15,7 @@
 #include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExProxyDataBlending.h"
 #include "Data/PCGExProxyDataImpl.h"
-#include "Data/PCGExSubSelectionOps.h"
+#include "Data/PCGExSubAccessor.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExNoiseGenerator.h"
@@ -157,7 +157,7 @@ namespace PCGExUberNoise
 		C.Side = PCGExData::EIOSide::Out;
 		C.Role = PCGExData::EProxyRole::Write;
 
-		NoiseType = PCGExNoise3D::GetNoise3DType(PCGExData::FSubSelectorRegistry::Get(C.WorkingType)->GetNumFields());
+		NoiseType = PCGExNoise3D::GetNoise3DType(PCGExData::GetNumFieldsForType(C.WorkingType));
 		if (NoiseType == EPCGMetadataTypes::Unknown)
 		{
 			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Could not infer noise type."));

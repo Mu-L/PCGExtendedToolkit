@@ -56,8 +56,7 @@ namespace PCGExBlending
 		case EPCGMetadataTypes::Name: return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
 		case EPCGMetadataTypes::SoftObjectPath: return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
 		case EPCGMetadataTypes::SoftClassPath: return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Byte: return CreateTyped<uint8>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Text: return CreateTyped<FText>(BlendMode, bResetForMultiBlend);
+		// Byte/Text: no typed blend ops. Falls through to default (Tier 3 copy-only).
 		default:
 			if (InValueSize > 0)
 			{
@@ -97,8 +96,7 @@ namespace PCGExBlending
 		case EPCGMetadataTypes::Name: return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
 		case EPCGMetadataTypes::SoftObjectPath: return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
 		case EPCGMetadataTypes::SoftClassPath: return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Byte: return CreateTyped<uint8>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Text: return CreateTyped<FText>(BlendMode, bResetForMultiBlend);
+		// Byte/Text: no typed blend ops. Falls through to default (Tier 3 copy-only).
 		default:
 			if (InProperty)
 			{
@@ -180,8 +178,6 @@ namespace PCGExBlending
 	template class TBlendOperationImpl<FName>;
 	template class TBlendOperationImpl<FSoftObjectPath>;
 	template class TBlendOperationImpl<FSoftClassPath>;
-	template class TBlendOperationImpl<uint8>;
-	template class TBlendOperationImpl<FText>;
 
 	// Explicit instantiation of blend function getters
 #define INST_BLEND_FUNC_GETTER(TYPE) \
@@ -203,8 +199,6 @@ namespace PCGExBlending
 	INST_BLEND_FUNC_GETTER(FName)
 	INST_BLEND_FUNC_GETTER(FSoftObjectPath)
 	INST_BLEND_FUNC_GETTER(FSoftClassPath)
-	INST_BLEND_FUNC_GETTER(uint8)
-	INST_BLEND_FUNC_GETTER(FText)
 
 #undef INST_BLEND_FUNC_GETTER
 }

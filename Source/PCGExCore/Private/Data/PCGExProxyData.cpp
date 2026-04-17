@@ -49,24 +49,29 @@ namespace PCGExData
 		UpdateSubSelection();
 		WorkingType = SubSelection.GetSubType(RealType);
 
+		// Cache the source attribute's Desc once, up front. Needed by both
+		// the VTO-based size/alignment branch below and by container-aware
+		// chain accessors. Stays default-constructed + bHasSourceDesc=false
+		// when the selector isn't an attribute (point property, extra property).
+		bHasSourceDesc = false;
+		const UObject* VTO = nullptr;
+		if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
+		{
+			if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
+			{
+				if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
+					PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
+				{
+					SourceDesc = Attr->GetAttributeDesc();
+					bHasSourceDesc = true;
+					VTO = SourceDesc.ValueTypeObject;
+				}
+			}
+		}
+
 		// Derive size/alignment for generic types that GetTypeSize doesn't know about
 		if (bValid && PCGExTypes::FScopedTypedValue::GetTypeSize(WorkingType) == 0)
 		{
-			// Non-basic type (Struct/Enum/etc.) needs ValueTypeObject to compute size correctly.
-			// Basic types never hit this branch (GetTypeSize returns non-zero for them).
-			const UObject* VTO = nullptr;
-			if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
-			{
-				if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
-				{
-					if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
-						PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
-					{
-						VTO = Attr->GetAttributeDesc().ValueTypeObject;
-					}
-				}
-			}
-
 			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType, VTO);
 			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType, VTO);
 		}
@@ -94,24 +99,28 @@ namespace PCGExData
 		UpdateSubSelection();
 		WorkingType = SubSelection.GetSubType(RealType);
 
+		// Mirror the Path-based Capture overload: cache attribute Desc once
+		// so both the VTO sizing branch below and container-aware chain
+		// classifiers can consult it.
+		bHasSourceDesc = false;
+		const UObject* VTO = nullptr;
+		if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
+		{
+			if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
+			{
+				if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
+					PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
+				{
+					SourceDesc = Attr->GetAttributeDesc();
+					bHasSourceDesc = true;
+					VTO = SourceDesc.ValueTypeObject;
+				}
+			}
+		}
+
 		// Derive size/alignment for generic types that GetTypeSize doesn't know about
 		if (bValid && PCGExTypes::FScopedTypedValue::GetTypeSize(WorkingType) == 0)
 		{
-			// Non-basic type (Struct/Enum/etc.) needs ValueTypeObject to compute size correctly.
-			// Basic types never hit this branch (GetTypeSize returns non-zero for them).
-			const UObject* VTO = nullptr;
-			if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
-			{
-				if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
-				{
-					if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
-						PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
-					{
-						VTO = Attr->GetAttributeDesc().ValueTypeObject;
-					}
-				}
-			}
-
 			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType, VTO);
 			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType, VTO);
 		}
@@ -234,10 +243,11 @@ namespace PCGExData
 		return RealType == InDescriptor.RealType && WorkingType == InDescriptor.WorkingType;
 	}
 
-	void IBufferProxy::SetSubSelection(const FSubSelection& InSubSelection)
+	void IBufferProxy::SetSubSelection(const FSubSelection& InSubSelection,
+	                                   const FPCGMetadataAttributeDesc* SourceDesc)
 	{
-		bWantsSubSelection = InSubSelection.bIsValid;
-		if (bWantsSubSelection) { CachedSubSelection.Initialize(InSubSelection, RealType, WorkingType); }
+		bWantsSubSelection = InSubSelection.HasSelection();
+		if (bWantsSubSelection) { CachedSubSelection.Initialize(InSubSelection, RealType, WorkingType, SourceDesc); }
 	}
 
 	void IBufferProxy::InitForRole(EProxyRole InRole)

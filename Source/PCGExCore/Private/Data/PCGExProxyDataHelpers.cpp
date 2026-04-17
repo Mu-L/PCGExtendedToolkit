@@ -8,7 +8,7 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyDataImpl.h"
-#include "Data/PCGExSubSelectionOps.h"
+#include "Data/PCGExSubAccessor.h"
 
 namespace PCGExData
 {
@@ -348,7 +348,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 					OutProxy = Internal::CreateRawProxy<T>(InContext, InDescriptor, InDataFacade);
 				});
 
-				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection); }
+				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr); }
 				return OutProxy;
 			}
 
@@ -377,16 +377,25 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 					}
 				});
 
-				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection); }
+				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr); }
 				return OutProxy;
 			}
 
 			// Handle attribute proxy
 			if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 			{
-				if (InDescriptor.HasFlag(EProxyFlags::Direct))
+				// Container attributes (TArray/TSet/TMap) must route
+				// through FPropertyBuffer, not TBuffer<T>. The Desc-based
+				// RealType is the inner element type (e.g. Vector for
+				// TArray<FVector>), so the normal ExecuteWithRightType path
+				// would instantiate TBuffer<FVector> — wrong for container
+				// storage (which is FScriptArray layout). Skip straight to
+				// the Tier 3 FPropertyBuffer fallback for containers.
+				const bool bIsContainer = InDescriptor.bHasSourceDesc && !InDescriptor.SourceDesc.IsSingleValue();
+
+				if (!bIsContainer && InDescriptor.HasFlag(EProxyFlags::Direct))
 				{
-					// Direct attribute access
+					// Direct attribute access (scalar only)
 					const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(InDescriptor.Selector, InDataFacade->GetIn());
 					const FPCGMetadataAttributeBase* BaseAttr = InDataFacade->FindConstAttribute(Identifier, InDescriptor.Side);
 					const bool bIsDataDomain = BaseAttr && BaseAttr->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data;
@@ -397,9 +406,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 						OutProxy = Internal::CreateDirectProxy<T>(InDescriptor, InDataFacade, bIsDataDomain);
 					});
 				}
-				else
+				else if (!bIsContainer)
 				{
-					// Buffered attribute access
+					// Buffered attribute access (scalar only)
 					PCGExMetaHelpers::ExecuteWithRightType(InDescriptor.RealType, [&](auto DummyValue)
 					{
 						using T = decltype(DummyValue);
@@ -476,7 +485,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			if (OutProxy)
 			{
 				OutProxy->Data = PointData;
-				OutProxy->SetSubSelection(InDescriptor.SubSelection);
+				OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr);
 				OutProxy->InitForRole(InDescriptor.Role);
 
 				if (!OutProxy->Validate(InDescriptor))
@@ -499,10 +508,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 		TArray<TSharedPtr<IBufferProxy>>& OutProxies)
 	{
 		OutProxies.Reset(NumDesiredFields);
-		const int32 Dimensions = FMath::Min(4, FSubSelectorRegistry::Get(InBaseDescriptor.RealType)->GetNumFields());
+		const int32 Dimensions = FMath::Min(4, GetNumFieldsForType(InBaseDescriptor.RealType));
 
 		if (Dimensions == -1 &&
-			(!InBaseDescriptor.SubSelection.bIsValid || !InBaseDescriptor.SubSelection.bIsComponentSet))
+			(!InBaseDescriptor.SubSelection.HasSelection() || !InBaseDescriptor.SubSelection.IsComponentSelection()))
 		{
 			PCGE_LOG_C(Error, GraphAndLog, InContext,
 			           FTEXT("Can't automatically break complex type into sub-components. "
@@ -512,9 +521,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 		const int32 MaxIndex = Dimensions == -1 ? 2 : Dimensions - 1;
 
-		if (InBaseDescriptor.SubSelection.bIsValid)
+		if (InBaseDescriptor.SubSelection.HasSelection())
 		{
-			if (InBaseDescriptor.SubSelection.bIsFieldSet)
+			if (InBaseDescriptor.SubSelection.IsFieldSelection())
 			{
 				// Single specific field - use same proxy for all
 				const TSharedPtr<IBufferProxy> Proxy = GetProxyBuffer(InContext, InBaseDescriptor);

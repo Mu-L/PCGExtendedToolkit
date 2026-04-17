@@ -8,6 +8,7 @@
 #include "Types/PCGExTypes.h"
 #include "Data/PCGExSubSelection.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Metadata/PCGMetadataCommon.h"
 #include "Types/PCGExTypeOps.h"
 #include "UObject/Object.h"
 #include "Data/PCGExCachedSubSelection.h"
@@ -85,6 +86,14 @@ namespace PCGExData
 		int32 ValueSize = 0;
 		int32 ValueAlignment = 1;
 
+		// Cached attribute descriptor, populated by Capture() when the selector
+		// resolves to an actual attribute (as opposed to a point property or
+		// extra property). Used by container-aware accessors in the compiled
+		// chain (FContainerIndex / FContainerCount). Only valid when
+		// bHasSourceDesc is true.
+		FPCGMetadataAttributeDesc SourceDesc;
+		bool bHasSourceDesc = false;
+
 		TWeakPtr<FFacade> DataFacade;
 		const UPCGBasePointData* PointData = nullptr;
 
@@ -158,8 +167,11 @@ namespace PCGExData
 		virtual TSharedPtr<IBuffer> GetBuffer() const { return nullptr; }
 		virtual bool EnsureReadable() const { return true; }
 
-		// SubSelection configuration
-		void SetSubSelection(const FSubSelection& InSubSelection);
+		// SubSelection configuration. SourceDesc is forwarded to the compiled
+		// chain so container-aware steps can classify against the attribute's
+		// container-ness. Pass nullptr for non-attribute sources.
+		void SetSubSelection(const FSubSelection& InSubSelection,
+		                     const FPCGMetadataAttributeDesc* SourceDesc = nullptr);
 
 		// Role-specific initialization
 		virtual void InitForRole(EProxyRole InRole);

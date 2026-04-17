@@ -54,6 +54,4 @@ struct PCGEXBLENDING_API FPCGExBlendingSettingsCache
 	EPCGExBlendingTypeDefault DefaultNameBlendMode = EPCGExBlendingTypeDefault::Copy;
 	EPCGExBlendingTypeDefault DefaultSoftObjectPathBlendMode = EPCGExBlendingTypeDefault::Copy;
 	EPCGExBlendingTypeDefault DefaultSoftClassPathBlendMode = EPCGExBlendingTypeDefault::Copy;
-	EPCGExBlendingTypeDefault DefaultByteBlendMode = EPCGExBlendingTypeDefault::Default;
-	EPCGExBlendingTypeDefault DefaultTextBlendMode = EPCGExBlendingTypeDefault::Copy;
 };

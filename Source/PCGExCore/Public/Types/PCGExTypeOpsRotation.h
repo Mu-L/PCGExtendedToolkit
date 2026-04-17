@@ -45,8 +45,6 @@ namespace PCGExTypeOps
 			else if constexpr (std::is_same_v<TTo, FName>) { return FName(*Value.ToString()); }
 			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>) { return FSoftObjectPath(); }
 			else if constexpr (std::is_same_v<TTo, FSoftClassPath>) { return FSoftClassPath(); }
-			else if constexpr (std::is_same_v<TTo, uint8>) { return static_cast<uint8>(FMath::Clamp(Value.Pitch, 0.0, 255.0)); }
-			else if constexpr (std::is_same_v<TTo, FText>) { return FText::FromString(Value.ToString()); }
 			else { return TTo{}; }
 		}
 
@@ -82,8 +80,6 @@ namespace PCGExTypeOps
 			}
 			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>) { return Type::ZeroRotator; }
 			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>) { return Type::ZeroRotator; }
-			else if constexpr (std::is_same_v<TFrom, uint8>) { return Type(Value, Value, Value); }
-			else if constexpr (std::is_same_v<TFrom, FText>) { Type Result; Result.InitFromString(Value.ToString()); return Result; }
 			else { return Type::ZeroRotator; }
 		}
 
@@ -219,41 +215,6 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Abs(const Type& A) { return Type(FMath::Abs(A.Pitch), FMath::Abs(A.Yaw), FMath::Abs(A.Roll)); }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			const Type& R = *static_cast<const Type*>(Value);
-			switch (Field)
-			{
-			case ESingleField::X: return R.Roll;
-			case ESingleField::Y: return R.Yaw;
-			case ESingleField::Z: return R.Pitch;
-			default: return R.Roll;
-			}
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			Type& R = *static_cast<Type*>(Target);
-			switch (Field)
-			{
-			case ESingleField::X: R.Roll = Value;
-				break;
-			case ESingleField::Y: R.Yaw = Value;
-				break;
-			case ESingleField::Z: R.Pitch = Value;
-				break;
-			case ESingleField::Length: R = R.GetNormalized() * Value;
-				break;
-			case ESingleField::SquaredLength: R = R.GetNormalized() * FMath::Sqrt(Value);
-				break;
-			default: break;
-			}
-		}
-
-		static FORCEINLINE FVector ExtractAxis(const void* Value, EPCGExAxis Axis)
-		{
-			return PCGExMath::GetDirection(static_cast<const Type*>(Value)->Quaternion(), Axis);
-		}
 	};
 
 	template <>
@@ -290,8 +251,6 @@ namespace PCGExTypeOps
 			else if constexpr (std::is_same_v<TTo, FName>) { return FName(*Value.ToString()); }
 			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>) { return FSoftObjectPath(); }
 			else if constexpr (std::is_same_v<TTo, FSoftClassPath>) { return FSoftClassPath(); }
-			else if constexpr (std::is_same_v<TTo, uint8>) { return static_cast<uint8>(FMath::Clamp(Value.W * 255.0, 0.0, 255.0)); }
-			else if constexpr (std::is_same_v<TTo, FText>) { return FText::FromString(Value.ToString()); }
 			else { return TTo{}; }
 		}
 
@@ -327,8 +286,6 @@ namespace PCGExTypeOps
 			}
 			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>) { return Type::Identity; }
 			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>) { return Type::Identity; }
-			else if constexpr (std::is_same_v<TFrom, uint8>) { return FRotator(Value, Value, Value).Quaternion(); }
-			else if constexpr (std::is_same_v<TFrom, FText>) { Type Result; Result.InitFromString(Value.ToString()); return Result; }
 			else { return Type::Identity; }
 		}
 
@@ -417,24 +374,6 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Abs(const Type& A) { return FTypeOps<FRotator>::Abs(A.Rotator()).Quaternion().GetNormalized(); }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return (A.Rotator() * Factor).Quaternion(); }
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			const FRotator R = static_cast<const FQuat*>(Value)->Rotator();
-			return FTypeOps<FRotator>::ExtractField(&R, Field);
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			Type& Q = *static_cast<Type*>(Target);
-			FRotator R = Q.Rotator();
-			FTypeOps<FRotator>::InjectField(&R, Value, Field);
-			Q = R.Quaternion();
-		}
-
-		static FORCEINLINE FVector ExtractAxis(const void* Value, EPCGExAxis Axis)
-		{
-			return PCGExMath::GetDirection(*static_cast<const Type*>(Value), Axis);
-		}
 	};
 
 	// Transform Type Operations - FTransform
@@ -473,8 +412,6 @@ namespace PCGExTypeOps
 			else if constexpr (std::is_same_v<TTo, FName>) { return FName(*Value.ToString()); }
 			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>) { return FSoftObjectPath(); }
 			else if constexpr (std::is_same_v<TTo, FSoftClassPath>) { return FSoftClassPath(); }
-			else if constexpr (std::is_same_v<TTo, uint8>) { return 0; }
-			else if constexpr (std::is_same_v<TTo, FText>) { return FText::FromString(Value.ToString()); }
 			else { return TTo{}; }
 		}
 
@@ -506,8 +443,6 @@ namespace PCGExTypeOps
 			}
 			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>) { return Type::Identity; }
 			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>) { return Type::Identity; }
-			else if constexpr (std::is_same_v<TFrom, uint8>) { return Type::Identity; }
-			else if constexpr (std::is_same_v<TFrom, FText>) { Type Result; Result.InitFromString(Value.ToString()); return Result; }
 			else { return Type::Identity; }
 		}
 
@@ -668,25 +603,6 @@ namespace PCGExTypeOps
 				A.GetRotation().GetNormalized(),
 				A.GetLocation() * InvWeight,
 				A.GetScale3D() * InvWeight);
-		}
-
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			const FVector Pos = static_cast<const FTransform*>(Value)->GetLocation();
-			return FTypeOps<FVector>::ExtractField(&Pos, Field);
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			Type& T = *static_cast<Type*>(Target);
-			FVector Pos = T.GetLocation();
-			FTypeOps<FVector>::InjectField(&T, Value, Field);
-			T.SetLocation(Pos);
-		}
-
-		static FORCEINLINE FVector ExtractAxis(const void* Value, EPCGExAxis Axis)
-		{
-			return PCGExMath::GetDirection(static_cast<const Type*>(Value)->GetRotation(), Axis);
 		}
 
 		static FORCEINLINE void ExtractComponent(const void* Transform, ETransformPart Part, void* OutValue, EPCGMetadataTypes& OutType)

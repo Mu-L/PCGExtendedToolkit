@@ -11,7 +11,7 @@
 #include "Details/PCGExSettingsDetails.h"
 #include "PCGExVersion.h"
 #include "Containers/PCGExScopedContainers.h"
-#include "Data/PCGExSubSelectionOps.h"
+#include "Data/PCGExSubAccessor.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExAttributeRemap"
@@ -140,7 +140,7 @@ namespace PCGExAttributeRemap
 
 		// Number of dimensions to be remapped
 		UnderlyingType = InputDescriptor.WorkingType;
-		Dimensions = FMath::Min(4, PCGExData::FSubSelectorRegistry::Get(UnderlyingType)->GetNumFields());
+		Dimensions = FMath::Min(4, PCGExData::GetNumFieldsForType(UnderlyingType));
 
 		// Get per-field proxies for input
 		if (!GetPerFieldProxyBuffers(Context, InputDescriptor, Dimensions, UntypedInputProxies)) { return false; }
@@ -149,7 +149,7 @@ namespace PCGExAttributeRemap
 		{
 			// This might be expected if the destination does not exist
 
-			if (Dimensions == 1 && Settings->Attributes.WantsRemappedOutput() && !OutputDescriptor.SubSelection.bIsValid)
+			if (Dimensions == 1 && Settings->Attributes.WantsRemappedOutput() && !OutputDescriptor.SubSelection.HasSelection())
 			{
 				// We're remapping a component to a single value with no subselection
 				OutputDescriptor.RealType = InputDescriptor.WorkingType;
