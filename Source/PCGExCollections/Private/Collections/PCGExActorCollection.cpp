@@ -11,6 +11,7 @@
 #include "PCGComponent.h"
 #include "PCGExLog.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExSocketProvider.h"
 #include "Engine/Blueprint.h"
 #include "Engine/Level.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
@@ -112,6 +113,18 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		CachedPCGGraph = (bHasPCGComponent && PCGComps[0]->GetGraph())
 			                 ? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
 			                 : nullptr;
+
+		// Temp actor is at FTransform::Identity, so component world transform == relative to actor
+		TArray<UPCGExSocketComponent*> SocketComps;
+		TempActor->GetComponents<UPCGExSocketComponent>(SocketComps);
+		for (UPCGExSocketComponent* SC : SocketComps)
+		{
+			FPCGExSocket& NewSocket = Staging.Sockets.Emplace_GetRef(
+				SC->GetSocketName_Implementation(),
+				SC->GetSocketTransform_Implementation(),
+				SC->GetSocketTag_Implementation());
+			NewSocket.bManaged = true;
+		}
 
 		// Hide the actor to ensure it doesn't affect gameplay or rendering
 		TempActor->SetActorHiddenInGame(true);

@@ -16,9 +16,11 @@
 #include "Helpers/PCGExLevelDataExporter.h"
 #include "Helpers/PCGExDefaultLevelDataExporter.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExSocketProvider.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExActorCollection.h"
 #include "PCGExLog.h"
+#include "Engine/Level.h"
 
 
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
@@ -137,6 +139,23 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		{
 			Staging.Path = FSoftObjectPath(ExportedDataAsset);
 			Staging.Bounds = PCGExPCGDataAssetCollectionInternal::ComputeBoundsFromAsset(ExportedDataAsset);
+
+			// Scan for socket actors after export so the world is in the same initialized
+			// state the exporter used — transforms are reliable at this point.
+			if (LoadedWorld->PersistentLevel)
+			{
+				for (AActor* Actor : LoadedWorld->PersistentLevel->Actors)
+				{
+					if (IPCGExSocketProvider* Provider = Cast<IPCGExSocketProvider>(Actor))
+					{
+						FPCGExSocket& NewSocket = Staging.Sockets.Emplace_GetRef(
+							Provider->GetSocketName_Implementation(),
+							Provider->GetSocketTransform_Implementation(),
+							Provider->GetSocketTag_Implementation());
+						NewSocket.bManaged = true;
+					}
+				}
+			}
 
 			// Extract embedded collections (created by exporter when bGenerateCollections is enabled)
 			EmbeddedMeshCollection = nullptr;
