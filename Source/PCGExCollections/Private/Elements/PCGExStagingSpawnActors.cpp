@@ -432,10 +432,14 @@ namespace PCGExStagingSpawnActors
 			UPCGComponent* MutableSourceComponent = ExecutionContext->GetMutableComponent();
 			ManagedActors = NewObject<UPCGManagedActors>(MutableSourceComponent);
 			ManagedActors->SetCrc(Context->DependenciesCrc);
+			
+#if WITH_EDITOR
 			// Explicitly reflect the component's editing mode on the resource. Without this,
 			// bIsPreview may not match the component state and tracked actors can be treated
 			// as transient. UE's PCG spawn element does this at PCGSpawnActor.cpp:972.
 			ManagedActors->SetIsPreview(bIsPreviewActor);
+#endif
+			
 			MutableSourceComponent->AddToManagedResources(ManagedActors);
 		}
 
