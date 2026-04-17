@@ -55,7 +55,7 @@ public:
 
 	/** If enabled, apply collection entry tags to spawned actors. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable))
-	bool bApplyEntryTags = false;
+	bool bApplyEntryTags = true;
 
 	/** Attribute forwarding from input points to output points. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable))
@@ -63,14 +63,14 @@ public:
 
 	/** If enabled, apply per-instance tags from the InstanceTags attribute to spawned actors. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable))
-	bool bApplyInstanceTags = false;
+	bool bApplyInstanceTags = true;
 
 	// --- Properties ---
 
 	/** If enabled, apply per-instance property deltas stored on actor collection entries.
 	 *  Actors with deltas are spawned deferred to set properties before construction completes. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Properties", meta=(PCG_Overridable))
-	bool bApplyPropertyDeltas = false;
+	bool bApplyPropertyDeltas = true;
 
 	// --- PCG Generation ---
 
