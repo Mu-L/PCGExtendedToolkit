@@ -35,24 +35,6 @@ struct FPCGMetadataAttributeDesc;
 namespace PCGExData
 {
 	/**
-	 * Legacy fn-pointer typedefs retained for any external helper that
-	 * still references them. FCachedSubSelection no longer uses these
-	 * internally.
-	 */
-	using FExtractFieldFn = double (*)(const void* Value, PCGExTypeOps::ESingleField Field);
-	using FInjectFieldFn = void (*)(void* Target, double Value, PCGExTypeOps::ESingleField Field);
-	using FExtractAxisFn = FVector (*)(const void* Value, EPCGExAxis Axis);
-
-	namespace SubSelectionImpl
-	{
-		static FORCEINLINE FVector ExtractAxisDefault(const void* Value, EPCGExAxis Axis) { return FVector::ForwardVector; }
-
-		PCGEXCORE_API FExtractFieldFn GetExtractFieldFn(EPCGMetadataTypes Type);
-		PCGEXCORE_API FInjectFieldFn GetInjectFieldFn(EPCGMetadataTypes Type);
-		PCGEXCORE_API FExtractAxisFn GetExtractAxisFn(EPCGMetadataTypes Type);
-	}
-
-	/**
 	 * FCachedSubSelection -- pre-compiled chain + type conversions.
 	 *
 	 * Memory layout (approx): one FSubSelectionChain (48 bytes + inline

@@ -6,7 +6,7 @@
 #include "CoreMinimal.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Types/PCGExTypeOpsImpl.h"
+#include "Types/PCGExTypeOps.h"
 
 namespace PCGExData
 {
@@ -103,17 +103,18 @@ namespace PCGExData
 		if (IsContainerCountSelection()) { return EPCGMetadataTypes::Double; }
 
 		// Component selection: Vector (Pos/Scale) or Quaternion (Rotation).
-		// Gated on IsComponentSelection() so chains without a component step
-		// (e.g. container-index-only) fall through to the Fallback instead
-		// of reading the default-initialized Component member.
-		if (IsComponentSelection())
+		// NOTE: intentionally ungated — even chains without an explicit
+		// component step may have Component populated from Init's default
+		// (Position). Gating on IsComponentSelection() changes WorkingType
+		// for chains that don't have a component step (Swizzle-only, etc.),
+		// which can cause downstream buffer sizing mismatches. The default
+		// Component=Position → Vector is a safe fallback for non-component
+		// chains (most produce Vector-compatible output).
+		switch (Component)
 		{
-			switch (Component)
-			{
-			case PCGExTypeOps::ETransformPart::Position:
-			case PCGExTypeOps::ETransformPart::Scale:    return EPCGMetadataTypes::Vector;
-			case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
-			}
+		case PCGExTypeOps::ETransformPart::Position:
+		case PCGExTypeOps::ETransformPart::Scale:    return EPCGMetadataTypes::Vector;
+		case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
 		}
 
 		// ContainerIndex-only (and any other non-type-changing chain) falls
@@ -242,11 +243,23 @@ namespace PCGExData
 	//
 	// Type-Erased Interface Implementation
 	//
+	// Stage 6: chain-walker rewrite. ApplyGet/ApplySet now walk
+	// ParsedChain.Steps directly via accessor virtual calls instead of
+	// flag-driven branching (IsFieldSelection/IsAxisSelection/etc.).
+	// This is a non-hot fallback path; FCachedSubSelection is the
+	// performance-critical surface.
+	//
+	// NOTE: Container steps require compile-time ContainerElementSize
+	// (populated by PostClassifyFinalize at FCachedSubSelection::Initialize
+	// time). FSubSelection doesn't have a SourceDesc, so container steps
+	// in the parsed chain won't have ElementSize populated — they produce
+	// zero-filled output (graceful degradation). For container-aware
+	// dispatch, callers should use FCachedSubSelection.
+	//
 
 	void FSubSelection::ApplyGet(EPCGMetadataTypes SourceType, const void* Source,
 	                             void* OutValue, EPCGMetadataTypes& OutType) const
 	{
-		// Identity: no sub-selection active, copy the whole source through.
 		if (!HasSelection())
 		{
 			const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(SourceType);
@@ -262,91 +275,50 @@ namespace PCGExData
 			return;
 		}
 
-		const bool bHasComponent = IsComponentSelection();
-		const bool bHasAxis = IsAxisSelection();
-		const bool bHasField = IsFieldSelection();
+		// Compile the chain on-the-fly against SourceType. This drops
+		// nonsensical steps (axis on non-rotation Vector, field on string)
+		// and inserts auto-promotions (field on Transform -> Position.field).
+		// Acceptable cost for this non-hot fallback path.
+		FSubSelectionChain Compiled = ParsedChain;
+		CompileChainForSource(Compiled, SourceType);
 
-		// FTransform with a component selection: extract the component first,
-		// then apply axis/field on the component result.
-		//
-		// Axis is only meaningful for the Rotation component (a position or
-		// scale vector has no orientation). For Position/Scale, axis is
-		// silently ignored; dispatch falls through to the field path.
-		if (SourceType == EPCGMetadataTypes::Transform && bHasComponent)
+		if (Compiled.Steps.IsEmpty())
 		{
-			const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
-			FAccessorParseResult ComponentParsed;
-			ComponentParsed.Component = Component;
-
-			EPCGMetadataTypes ComponentOutType = EPCGMetadataTypes::Unknown;
-			TransformAccessor->ResolveOutputType(SourceType, ComponentParsed, ComponentOutType);
-
-			alignas(16) uint8 ComponentBuffer[96];
-			TransformAccessor->ApplyGet(SourceType, Source, ComponentOutType, ComponentBuffer, ComponentParsed);
-
-			const bool bIsRotationComponent = (Component == PCGExTypeOps::ETransformPart::Rotation);
-
-			if (bIsRotationComponent && bHasAxis)
-			{
-				const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
-				FAccessorParseResult AxisParsed;
-				AxisParsed.Axis = Axis;
-				AxisAccessor->ApplyGet(ComponentOutType, ComponentBuffer,
-				                       EPCGMetadataTypes::Vector, OutValue, AxisParsed);
-				OutType = EPCGMetadataTypes::Vector;
-				return;
-			}
-
-			if (bHasField)
-			{
-				const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
-				FAccessorParseResult FieldParsed;
-				FieldParsed.Field = Field;
-				FieldAccessor->ApplyGet(ComponentOutType, ComponentBuffer,
-				                        EPCGMetadataTypes::Double, OutValue, FieldParsed);
-				OutType = EPCGMetadataTypes::Double;
-				return;
-			}
-
-			// Component-only: output the whole component value.
-			const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(ComponentOutType);
-			if (Ops) { Ops->Copy(ComponentBuffer, OutValue); }
-			OutType = ComponentOutType;
-			return;
-		}
-
-		// Non-Transform (or Transform without component): axis wins over field.
-		if (bHasAxis)
-		{
-			const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
-			FAccessorParseResult AxisParsed;
-			AxisParsed.Axis = Axis;
-			AxisAccessor->ApplyGet(SourceType, Source, EPCGMetadataTypes::Vector, OutValue, AxisParsed);
-			OutType = EPCGMetadataTypes::Vector;
-			return;
-		}
-
-		if (bHasField)
-		{
-			const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
-			FAccessorParseResult FieldParsed;
-			FieldParsed.Field = Field;
-			FieldAccessor->ApplyGet(SourceType, Source, EPCGMetadataTypes::Double, OutValue, FieldParsed);
-			OutType = EPCGMetadataTypes::Double;
-			return;
-		}
-
-		// Fallback identity copy.
-		const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(SourceType);
-		if (Ops)
-		{
-			Ops->Copy(Source, OutValue);
-			OutType = SourceType;
-		}
-		else
-		{
+			// Every step was dropped as nonsensical for SourceType (e.g.,
+			// axis on a non-rotation type). Don't identity-copy: the caller
+			// may have sized OutValue for the expected output type (Vector
+			// for axis), not for SourceType (which could be FString, float,
+			// etc.). Report Unknown so the caller knows no valid output was
+			// produced.
 			OutType = EPCGMetadataTypes::Unknown;
+			return;
 		}
+
+		// Walk the compiled chain with double-buffered intermediates.
+		alignas(16) uint8 BufA[96];
+		alignas(16) uint8 BufB[96];
+		void* Bufs[2] = {BufA, BufB};
+
+		const void* CurrentIn = Source;
+		int32 BufIdx = 0;
+		const int32 LastIdx = Compiled.Steps.Num() - 1;
+
+		for (int32 i = 0; i < LastIdx; ++i)
+		{
+			const FSubSelectionStep& Step = Compiled.Steps[i];
+			check(Step.StepGetFn);
+			void* StepOut = Bufs[BufIdx];
+			Step.StepGetFn(CurrentIn, StepOut, Step.Parsed);
+			CurrentIn = StepOut;
+			BufIdx = 1 - BufIdx;
+		}
+
+		// Last step writes directly to OutValue.
+		const FSubSelectionStep& Last = Compiled.Steps[LastIdx];
+		check(Last.StepGetFn);
+		Last.StepGetFn(CurrentIn, OutValue, Last.Parsed);
+
+		OutType = Compiled.FinalType;
 	}
 
 	void FSubSelection::ApplySet(EPCGMetadataTypes TargetType, void* Target,
@@ -358,54 +330,69 @@ namespace PCGExData
 			return;
 		}
 
-		const bool bHasComponent = IsComponentSelection();
-		const bool bHasField = IsFieldSelection();
+		// Compile on-the-fly (same rationale as ApplyGet).
+		FSubSelectionChain Compiled = ParsedChain;
+		CompileChainForSource(Compiled, TargetType);
 
-		// FTransform with a component selection: read component, mutate via
-		// field accessor if applicable, write component back.
-		if (TargetType == EPCGMetadataTypes::Transform && bHasComponent)
+		if (Compiled.Steps.IsEmpty())
 		{
-			const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
-			FAccessorParseResult ComponentParsed;
-			ComponentParsed.Component = Component;
-
-			if (bHasField)
-			{
-				// Extract current component into a buffer, inject field, write back.
-				EPCGMetadataTypes ComponentType = EPCGMetadataTypes::Unknown;
-				TransformAccessor->ResolveOutputType(TargetType, ComponentParsed, ComponentType);
-
-				alignas(16) uint8 ComponentBuffer[96];
-				TransformAccessor->ApplyGet(TargetType, Target, ComponentType, ComponentBuffer, ComponentParsed);
-
-				const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
-				FAccessorParseResult FieldParsed;
-				FieldParsed.Field = Field;
-				FieldAccessor->ApplySet(ComponentType, ComponentBuffer,
-				                        SourceType, Source, FieldParsed);
-
-				TransformAccessor->ApplySet(TargetType, Target,
-				                            ComponentType, ComponentBuffer, ComponentParsed);
-			}
-			else
-			{
-				// Whole-component inject.
-				TransformAccessor->ApplySet(TargetType, Target, SourceType, Source, ComponentParsed);
-			}
+			// All steps dropped (e.g., field on string). Fall back to
+			// direct conversion — the sub-selection is inapplicable, so
+			// the best we can do is convert Source to TargetType.
+			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
 			return;
 		}
 
-		if (bHasField)
+		const int32 LastIdx = Compiled.Steps.Num() - 1;
+
+		// All steps must have a SetFn for inject to work.
+		for (const FSubSelectionStep& Step : Compiled.Steps)
 		{
-			const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
-			FAccessorParseResult FieldParsed;
-			FieldParsed.Field = Field;
-			FieldAccessor->ApplySet(TargetType, Target, SourceType, Source, FieldParsed);
-			return;
+			if (!Step.StepSetFn)
+			{
+				PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
+				return;
+			}
 		}
 
-		// Fallback: convert + copy.
-		PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
+		// Extract phase: walk forward to populate intermediates.
+		constexpr int32 MaxSteps = 4;
+		checkf(Compiled.Steps.Num() <= MaxSteps,
+			TEXT("FSubSelection chain exceeded MaxSteps (%d > %d)"),
+			Compiled.Steps.Num(), MaxSteps);
+
+		alignas(16) uint8 Buffers[MaxSteps][96];
+
+		{
+			const void* CurrentIn = Target;
+			for (int32 i = 0; i < LastIdx; ++i)
+			{
+				const FSubSelectionStep& Step = Compiled.Steps[i];
+				check(Step.StepGetFn);
+				Step.StepGetFn(CurrentIn, Buffers[i], Step.Parsed);
+				CurrentIn = Buffers[i];
+			}
+		}
+
+		// Convert source to the chain's final type if needed, then inject.
+		alignas(16) uint8 NewChildBuf[96];
+		const void* NewChild = Source;
+		if (SourceType != Compiled.FinalType)
+		{
+			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, Compiled.FinalType, NewChildBuf);
+			NewChild = NewChildBuf;
+		}
+
+		// Inject at last step.
+		void* LastParent = (LastIdx == 0) ? Target : Buffers[LastIdx - 1];
+		Compiled.Steps[LastIdx].StepSetFn(LastParent, NewChild, Compiled.Steps[LastIdx].Parsed);
+
+		// Walk backward, propagating mutations up.
+		for (int32 i = LastIdx - 1; i >= 0; --i)
+		{
+			void* Parent = (i == 0) ? Target : Buffers[i - 1];
+			Compiled.Steps[i].StepSetFn(Parent, Buffers[i], Compiled.Steps[i].Parsed);
+		}
 	}
 
 	double FSubSelection::ExtractFieldToDouble(EPCGMetadataTypes SourceType, const void* Source) const
@@ -431,43 +418,34 @@ namespace PCGExData
 	//
 	// Legacy Type-Erased Interface (GetVoid/SetVoid)
 	//
-	// These implement the original signature but use the new type-erased system internally.
-	// NOTE: For performance, prefer using FCachedSubSelection in IBufferProxy instead.
+	// Delegates to ApplyGet/ApplySet (the chain walker) with intermediate
+	// type conversion. For performance, prefer FCachedSubSelection.
 	//
 
 	void FSubSelection::GetVoid(EPCGMetadataTypes SourceType, const void* Source, EPCGMetadataTypes WorkingType, void* Target) const
 	{
 		if (!HasSelection())
 		{
-			// No sub-selection - just convert
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, WorkingType, Target);
 			return;
 		}
 
-		// Apply the sub-selection to get an intermediate value
 		alignas(16) uint8 IntermediateBuffer[96];
 		EPCGMetadataTypes IntermediateType = EPCGMetadataTypes::Unknown;
 
 		ApplyGet(SourceType, Source, IntermediateBuffer, IntermediateType);
 
-		// Convert from intermediate to working type if needed
 		if (IntermediateType == WorkingType)
 		{
-			// Direct copy using type ops (handles strings, etc.)
 			const PCGExTypeOps::ITypeOpsBase* TypeOps = PCGExTypeOps::FTypeOpsRegistry::Get(IntermediateType);
-			if (TypeOps)
-			{
-				TypeOps->Copy(IntermediateBuffer, Target);
-			}
+			if (TypeOps) { TypeOps->Copy(IntermediateBuffer, Target); }
 		}
 		else if (IntermediateType != EPCGMetadataTypes::Unknown)
 		{
-			// Need conversion
 			PCGExTypeOps::FConversionTable::Convert(IntermediateType, IntermediateBuffer, WorkingType, Target);
 		}
 		else
 		{
-			// ApplyGet didn't produce valid output, fallback to direct conversion
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, WorkingType, Target);
 		}
 	}
@@ -477,12 +455,10 @@ namespace PCGExData
 	{
 		if (!HasSelection())
 		{
-			// No sub-selection - just convert
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
 			return;
 		}
 
-		// Use the sub-selector ops to apply the set
 		ApplySet(TargetType, Target, SourceType, Source);
 	}
 

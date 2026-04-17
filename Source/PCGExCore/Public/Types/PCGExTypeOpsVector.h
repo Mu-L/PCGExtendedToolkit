@@ -161,37 +161,6 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Abs(const Type& A) { return Type(FMath::Abs(A.X), FMath::Abs(A.Y)); }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			const Type& V = *static_cast<const Type*>(Value);
-			switch (Field)
-			{
-			case ESingleField::X: return V.X;
-			case ESingleField::Y: return V.Y;
-			case ESingleField::Length: return V.Length();
-			case ESingleField::SquaredLength: return V.SquaredLength();
-			case ESingleField::Volume: return V.X * V.Y;
-			case ESingleField::Sum: return V.X + V.Y;
-			default: return V.X;
-			}
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			Type& V = *static_cast<Type*>(Target);
-			switch (Field)
-			{
-			case ESingleField::X: V.X = Value;
-				break;
-			case ESingleField::Y: V.Y = Value;
-				break;
-			case ESingleField::Length: V = V.GetSafeNormal() * Value;
-				break;
-			case ESingleField::SquaredLength: V = V.GetSafeNormal() * FMath::Sqrt(Value);
-				break;
-			default: break;
-			}
-		}
 	};
 
 	// Vector Type Operations - FVector
@@ -346,40 +315,6 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Abs(const Type& A) { return Type(FMath::Abs(A.X), FMath::Abs(A.Y), FMath::Abs(A.Z)); }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			const Type& V = *static_cast<const Type*>(Value);
-			switch (Field)
-			{
-			case ESingleField::X: return V.X;
-			case ESingleField::Y: return V.Y;
-			case ESingleField::Z: return V.Z;
-			case ESingleField::Length: return V.Length();
-			case ESingleField::SquaredLength: return V.SquaredLength();
-			case ESingleField::Volume: return V.X * V.Y * V.Z;
-			case ESingleField::Sum: return V.X + V.Y + V.Z;
-			default: return V.X;
-			}
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			Type& V = *static_cast<Type*>(Target);
-			switch (Field)
-			{
-			case ESingleField::X: V.X = Value;
-				break;
-			case ESingleField::Y: V.Y = Value;
-				break;
-			case ESingleField::Z: V.Z = Value;
-				break;
-			case ESingleField::Length: V = V.GetSafeNormal() * Value;
-				break;
-			case ESingleField::SquaredLength: V = V.GetSafeNormal() * FMath::Sqrt(Value);
-				break;
-			default: break;
-			}
-		}
 	};
 
 	// Vector Type Operations - FVector4
@@ -558,52 +493,5 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Abs(const Type& A) { return Type(FMath::Abs(A.X), FMath::Abs(A.Y), FMath::Abs(A.Z), FMath::Abs(A.W)); }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return Type(A.X * Factor, A.Y * Factor, A.Z * Factor, A.W * Factor); }
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			const Type& V = *static_cast<const Type*>(Value);
-			switch (Field)
-			{
-			case ESingleField::X: return V.X;
-			case ESingleField::Y: return V.Y;
-			case ESingleField::Z: return V.Z;
-			case ESingleField::W: return V.W;
-			case ESingleField::Length: return FVector(V.X, V.Y, V.Z).Length();
-			case ESingleField::SquaredLength: return FVector(V.X, V.Y, V.Z).SquaredLength();
-			case ESingleField::Volume: return V.X * V.Y * V.Z * V.W;
-			case ESingleField::Sum: return V.X + V.Y + V.Z + V.W;
-			default: return V.X;
-			}
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			Type& V = *static_cast<Type*>(Target);
-			switch (Field)
-			{
-			case ESingleField::X: V.X = Value;
-				break;
-			case ESingleField::Y: V.Y = Value;
-				break;
-			case ESingleField::Z: V.Z = Value;
-				break;
-			case ESingleField::W: V.W = Value;
-				break;
-			case ESingleField::Length:
-				{
-					FVector Vec(V.X, V.Y, V.Z);
-					Vec = Vec.GetSafeNormal() * Value;
-					V = Type(Vec.X, Vec.Y, Vec.Z, V.W);
-				}
-				break;
-			case ESingleField::SquaredLength:
-				{
-					FVector Vec(V.X, V.Y, V.Z);
-					Vec = Vec.GetSafeNormal() * FMath::Sqrt(Value);
-					V = Type(Vec.X, Vec.Y, Vec.Z, V.W);
-				}
-				break;
-			default: break;
-			}
-		}
 	};
 }

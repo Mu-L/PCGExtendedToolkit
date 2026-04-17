@@ -7,51 +7,10 @@
 #include "Data/Buffers/PCGExBufferProperty.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadataCommon.h"
-#include "Types/PCGExTypeOpsImpl.h"
+#include "Types/PCGExTypeOps.h"
 
 namespace PCGExData
 {
-	//
-	// Legacy SubSelectionImpl fn-getter helpers retained for external users.
-	// FCachedSubSelection itself no longer calls these (Stage 3 moved
-	// everything into the compiled chain's per-step fn pointers).
-	//
-	namespace SubSelectionImpl
-	{
-		FExtractFieldFn GetExtractFieldFn(EPCGMetadataTypes Type)
-		{
-#define PCGEX_FN(_TYPE, _NAME, ...) case EPCGMetadataTypes::_NAME: return &PCGExTypeOps::FTypeOps<_TYPE>::ExtractField;
-			switch (Type)
-			{
-			PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_FN)
-			default: return nullptr;
-			}
-#undef PCGEX_FN
-		}
-
-		FInjectFieldFn GetInjectFieldFn(EPCGMetadataTypes Type)
-		{
-#define PCGEX_FN(_TYPE, _NAME, ...) case EPCGMetadataTypes::_NAME: return &PCGExTypeOps::FTypeOps<_TYPE>::InjectField;
-			switch (Type)
-			{
-			PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_FN)
-			default: return nullptr;
-			}
-#undef PCGEX_FN
-		}
-
-		FExtractAxisFn GetExtractAxisFn(EPCGMetadataTypes Type)
-		{
-			switch (Type)
-			{
-			case EPCGMetadataTypes::Quaternion: return &PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis;
-			case EPCGMetadataTypes::Rotator:    return &PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis;
-			case EPCGMetadataTypes::Transform:  return &PCGExTypeOps::FTypeOps<FTransform>::ExtractAxis;
-			default: return &ExtractAxisDefault;
-			}
-		}
-	}
-
 	//
 	// FCachedSubSelection
 	//

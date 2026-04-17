@@ -3,7 +3,7 @@
 
 #include "Data/Accessors/PCGExAxisAccessor.h"
 
-#include "Types/PCGExTypeOpsImpl.h"
+#include "Math/PCGExMathAxis.h"
 
 namespace PCGExData
 {
@@ -26,6 +26,36 @@ namespace PCGExData
 			};
 			return Table;
 		}
+
+		//
+		// Stage 6: ExtractAxis logic absorbed from the deleted
+		// FTypeOps<{FQuat,FRotator,FTransform}>::ExtractAxis surface.
+		// All three route through PCGExMath::GetDirection.
+		//
+
+		FORCEINLINE FVector ExtractAxisFromQuat(const FQuat& Q, EPCGExAxis Axis)
+		{
+			return PCGExMath::GetDirection(Q, Axis);
+		}
+
+		FORCEINLINE FVector ExtractAxisFromRotator(const FRotator& R, EPCGExAxis Axis)
+		{
+			return PCGExMath::GetDirection(R.Quaternion(), Axis);
+		}
+
+		//
+		// Stage 3 typed fn pointers (updated Stage 6: call absorbed logic)
+		//
+
+		void AxisGetStep_Quat(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
+		{
+			*static_cast<FVector*>(ChildOut) = ExtractAxisFromQuat(*static_cast<const FQuat*>(Parent), Parsed.Axis);
+		}
+
+		void AxisGetStep_Rotator(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
+		{
+			*static_cast<FVector*>(ChildOut) = ExtractAxisFromRotator(*static_cast<const FRotator*>(Parent), Parsed.Axis);
+		}
 	}
 
 	bool FAxisAccessor::MatchesToken(const FString& UpperToken, FAccessorParseResult& OutParsed) const
@@ -33,8 +63,6 @@ namespace PCGExData
 		if (const EPCGExAxis* Axis = GetAxisTable().Find(UpperToken))
 		{
 			OutParsed.Axis = *Axis;
-			// Legacy STRMAP_AXIS carried Quaternion as the hint; preserve it
-			// so future projection code can read it consistently.
 			OutParsed.SourceTypeHint = EPCGMetadataTypes::Quaternion;
 			return true;
 		}
@@ -47,9 +75,6 @@ namespace PCGExData
 	{
 		(void)InType;
 		(void)Parsed;
-		// Axis extraction always produces a Vector. For non-rotation sources
-		// the legacy fallback is FVector::ForwardVector, so the contract still
-		// holds.
 		OutType = EPCGMetadataTypes::Vector;
 		return true;
 	}
@@ -60,7 +85,7 @@ namespace PCGExData
 	                             void* OutValue,
 	                             const FAccessorParseResult& Parsed) const
 	{
-		(void)OutType; // always Vector
+		(void)OutType;
 		check(Source != nullptr);
 		check(OutValue != nullptr);
 
@@ -69,19 +94,17 @@ namespace PCGExData
 		switch (InType)
 		{
 		case EPCGMetadataTypes::Quaternion:
-			Out = PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis(Source, Parsed.Axis);
+			Out = ExtractAxisFromQuat(*static_cast<const FQuat*>(Source), Parsed.Axis);
 			break;
 		case EPCGMetadataTypes::Rotator:
-			Out = PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis(Source, Parsed.Axis);
+			Out = ExtractAxisFromRotator(*static_cast<const FRotator*>(Source), Parsed.Axis);
 			break;
 		case EPCGMetadataTypes::Transform:
-			Out = PCGExTypeOps::FTypeOps<FTransform>::ExtractAxis(Source, Parsed.Axis);
+			// Stage 6: inline the FTransform→FQuat extraction that was
+			// previously in FTypeOps<FTransform>::ExtractAxis.
+			Out = ExtractAxisFromQuat(static_cast<const FTransform*>(Source)->GetRotation(), Parsed.Axis);
 			break;
 		default:
-			// Legacy fallback for non-rotation source types: ForwardVector
-			// regardless of which axis was requested. Matches
-			// SubSelectionImpl::ExtractAxisDefault and the constexpr-if
-			// branch in TSubSelectorOpsImpl<T>::ExtractAxis.
 			Out = FVector::ForwardVector;
 			break;
 		}
@@ -90,23 +113,6 @@ namespace PCGExData
 	FString FAxisAccessor::GetDisplayName() const
 	{
 		return TEXT("Axis");
-	}
-
-	//
-	// Stage 3 typed fn pointers
-	//
-
-	namespace
-	{
-		void AxisGetStep_Quat(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
-		{
-			*static_cast<FVector*>(ChildOut) = PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis(Parent, Parsed.Axis);
-		}
-
-		void AxisGetStep_Rotator(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
-		{
-			*static_cast<FVector*>(ChildOut) = PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis(Parent, Parsed.Axis);
-		}
 	}
 
 	FStepGetFn FAxisAccessor::GetStepGetFn(EPCGMetadataTypes InType) const
@@ -131,16 +137,9 @@ namespace PCGExData
 		case EPCGMetadataTypes::Rotator:
 			return ECompileAction::Keep;
 
-		// `.Forward` on a Transform attribute conventionally means the forward
-		// axis of its rotation. Auto-promote to [Rotation, Axis] so the chain
-		// is explicit. (FTypeOps<FTransform>::ExtractAxis internally pulled
-		// GetRotation() for the same effect; promotion makes the step graph
-		// a faithful representation of what's happening.)
 		case EPCGMetadataTypes::Transform:
 			return ECompileAction::PromoteWithRotation;
 
-		// Any non-rotation source: axis is nonsensical. Drop so the source
-		// passes through unchanged instead of defaulting to ForwardVector.
 		default:
 			return ECompileAction::Drop;
 		}

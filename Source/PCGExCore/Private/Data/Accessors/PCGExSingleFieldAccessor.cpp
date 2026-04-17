@@ -4,7 +4,7 @@
 #include "Data/Accessors/PCGExSingleFieldAccessor.h"
 
 #include "Helpers/PCGExMetaHelpersMacros.h"
-#include "Types/PCGExTypeOpsImpl.h"
+#include "Types/PCGExTypeOps.h"
 
 namespace PCGExData
 {
@@ -50,6 +50,227 @@ namespace PCGExData
 			};
 			return Table;
 		}
+
+		//
+		// Stage 6: per-type ExtractField / InjectField logic absorbed from
+		// the deleted FTypeOps<T>::ExtractField/InjectField public surface.
+		// These private templates + specializations are the sole implementations
+		// of field extraction/injection now.
+		//
+
+		using PCGExTypeOps::ESingleField;
+
+		// --- ExtractField ---
+
+		// Scalars: Field enum ignored; cast to double.
+		template <typename T>
+		FORCEINLINE double ExtractFieldFromValue(const T& Value, ESingleField /*Field*/)
+		{
+			return static_cast<double>(Value);
+		}
+
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FVector2D>(const FVector2D& V, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: return V.X;
+			case ESingleField::Y: return V.Y;
+			case ESingleField::Length: return V.Length();
+			case ESingleField::SquaredLength: return V.SquaredLength();
+			case ESingleField::Volume: return V.X * V.Y;
+			case ESingleField::Sum: return V.X + V.Y;
+			default: return V.X;
+			}
+		}
+
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FVector>(const FVector& V, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: return V.X;
+			case ESingleField::Y: return V.Y;
+			case ESingleField::Z: return V.Z;
+			case ESingleField::Length: return V.Length();
+			case ESingleField::SquaredLength: return V.SquaredLength();
+			case ESingleField::Volume: return V.X * V.Y * V.Z;
+			case ESingleField::Sum: return V.X + V.Y + V.Z;
+			default: return V.X;
+			}
+		}
+
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FVector4>(const FVector4& V, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: return V.X;
+			case ESingleField::Y: return V.Y;
+			case ESingleField::Z: return V.Z;
+			case ESingleField::W: return V.W;
+			case ESingleField::Length: return FVector(V.X, V.Y, V.Z).Length();
+			case ESingleField::SquaredLength: return FVector(V.X, V.Y, V.Z).SquaredLength();
+			case ESingleField::Volume: return V.X * V.Y * V.Z * V.W;
+			case ESingleField::Sum: return V.X + V.Y + V.Z + V.W;
+			default: return V.X;
+			}
+		}
+
+		// FRotator quirk: X=Roll, Y=Yaw, Z=Pitch.
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FRotator>(const FRotator& R, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: return R.Roll;
+			case ESingleField::Y: return R.Yaw;
+			case ESingleField::Z: return R.Pitch;
+			default: return R.Roll;
+			}
+		}
+
+		// FQuat: convert to FRotator, then extract.
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FQuat>(const FQuat& Q, ESingleField Field)
+		{
+			return ExtractFieldFromValue<FRotator>(Q.Rotator(), Field);
+		}
+
+		// FTransform: extract location, then FVector field logic.
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FTransform>(const FTransform& T, ESingleField Field)
+		{
+			return ExtractFieldFromValue<FVector>(T.GetLocation(), Field);
+		}
+
+		// String types: return 0. Unreachable via ClassifyForInType (Drop on strings).
+		template <> FORCEINLINE double ExtractFieldFromValue<FString>(const FString& /*V*/, ESingleField /*F*/) { return 0.0; }
+		template <> FORCEINLINE double ExtractFieldFromValue<FName>(const FName& /*V*/, ESingleField /*F*/) { return 0.0; }
+		template <> FORCEINLINE double ExtractFieldFromValue<FSoftObjectPath>(const FSoftObjectPath& /*V*/, ESingleField /*F*/) { return 0.0; }
+		template <> FORCEINLINE double ExtractFieldFromValue<FSoftClassPath>(const FSoftClassPath& /*V*/, ESingleField /*F*/) { return 0.0; }
+
+		// --- InjectField ---
+
+		// Scalars: Field enum ignored; cast from double.
+		template <typename T>
+		FORCEINLINE void InjectFieldIntoValue(T& Value, double FieldValue, ESingleField /*Field*/)
+		{
+			Value = static_cast<T>(FieldValue);
+		}
+
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FVector2D>(FVector2D& V, double Value, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: V.X = Value; break;
+			case ESingleField::Y: V.Y = Value; break;
+			case ESingleField::Length: V = V.GetSafeNormal() * Value; break;
+			case ESingleField::SquaredLength: V = V.GetSafeNormal() * FMath::Sqrt(Value); break;
+			default: break;
+			}
+		}
+
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FVector>(FVector& V, double Value, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: V.X = Value; break;
+			case ESingleField::Y: V.Y = Value; break;
+			case ESingleField::Z: V.Z = Value; break;
+			case ESingleField::Length: V = V.GetSafeNormal() * Value; break;
+			case ESingleField::SquaredLength: V = V.GetSafeNormal() * FMath::Sqrt(Value); break;
+			default: break;
+			}
+		}
+
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FVector4>(FVector4& V, double Value, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: V.X = Value; break;
+			case ESingleField::Y: V.Y = Value; break;
+			case ESingleField::Z: V.Z = Value; break;
+			case ESingleField::W: V.W = Value; break;
+			case ESingleField::Length:
+				{
+					FVector Vec(V.X, V.Y, V.Z);
+					Vec = Vec.GetSafeNormal() * Value;
+					V = FVector4(Vec.X, Vec.Y, Vec.Z, V.W);
+				}
+				break;
+			case ESingleField::SquaredLength:
+				{
+					FVector Vec(V.X, V.Y, V.Z);
+					Vec = Vec.GetSafeNormal() * FMath::Sqrt(Value);
+					V = FVector4(Vec.X, Vec.Y, Vec.Z, V.W);
+				}
+				break;
+			default: break;
+			}
+		}
+
+		// FRotator quirk: X=Roll, Y=Yaw, Z=Pitch.
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FRotator>(FRotator& R, double Value, ESingleField Field)
+		{
+			switch (Field)
+			{
+			case ESingleField::X: R.Roll = Value; break;
+			case ESingleField::Y: R.Yaw = Value; break;
+			case ESingleField::Z: R.Pitch = Value; break;
+			case ESingleField::Length: R = R.GetNormalized() * Value; break;
+			case ESingleField::SquaredLength: R = R.GetNormalized() * FMath::Sqrt(Value); break;
+			default: break;
+			}
+		}
+
+		// FQuat: convert to FRotator, inject, convert back.
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FQuat>(FQuat& Q, double Value, ESingleField Field)
+		{
+			FRotator R = Q.Rotator();
+			InjectFieldIntoValue<FRotator>(R, Value, Field);
+			Q = R.Quaternion();
+		}
+
+		// FTransform: extract location, inject into FVector, write back.
+		// Stage 6 fix: the deleted FTypeOps<FTransform>::InjectField had UB
+		// at PCGExTypeOpsRotation.h:683 (passed &T as FVector* instead of
+		// extracting location first). Now correct.
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FTransform>(FTransform& T, double Value, ESingleField Field)
+		{
+			FVector Pos = T.GetLocation();
+			InjectFieldIntoValue<FVector>(Pos, Value, Field);
+			T.SetLocation(Pos);
+		}
+
+		// String types: no-op. Unreachable via ClassifyForInType (Drop on strings).
+		template <> FORCEINLINE void InjectFieldIntoValue<FString>(FString& /*V*/, double /*Val*/, ESingleField /*F*/) {}
+		template <> FORCEINLINE void InjectFieldIntoValue<FName>(FName& /*V*/, double /*Val*/, ESingleField /*F*/) {}
+		template <> FORCEINLINE void InjectFieldIntoValue<FSoftObjectPath>(FSoftObjectPath& /*V*/, double /*Val*/, ESingleField /*F*/) {}
+		template <> FORCEINLINE void InjectFieldIntoValue<FSoftClassPath>(FSoftClassPath& /*V*/, double /*Val*/, ESingleField /*F*/) {}
+
+		//
+		// Stage 3 typed fn pointers (updated Stage 6: call absorbed logic)
+		//
+
+		template <typename T>
+		void FieldGetStep(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
+		{
+			*static_cast<double*>(ChildOut) = ExtractFieldFromValue<T>(*static_cast<const T*>(Parent), Parsed.Field);
+		}
+
+		template <typename T>
+		void FieldSetStep(void* ParentInOut, const void* NewChild, const FAccessorParseResult& Parsed)
+		{
+			const double Value = *static_cast<const double*>(NewChild);
+			InjectFieldIntoValue<T>(*static_cast<T*>(ParentInOut), Value, Parsed.Field);
+		}
 	}
 
 	bool FSingleFieldAccessor::MatchesToken(const FString& UpperToken, FAccessorParseResult& OutParsed) const
@@ -84,7 +305,7 @@ namespace PCGExData
 		check(Source != nullptr);
 		check(OutValue != nullptr);
 
-#define PCGEX_FIELD_EXTRACT(_TYPE, _NAME) { *static_cast<double*>(OutValue) = PCGExTypeOps::FTypeOps<_TYPE>::ExtractField(Source, Parsed.Field); }
+#define PCGEX_FIELD_EXTRACT(_TYPE, _NAME) { *static_cast<double*>(OutValue) = ExtractFieldFromValue<_TYPE>(*static_cast<const _TYPE*>(Source), Parsed.Field); }
 		PCGEX_EXECUTEWITHRIGHTTYPE(InType, PCGEX_FIELD_EXTRACT)
 #undef PCGEX_FIELD_EXTRACT
 	}
@@ -109,7 +330,7 @@ namespace PCGExData
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, EPCGMetadataTypes::Double, &Scalar);
 		}
 
-#define PCGEX_FIELD_INJECT(_TYPE, _NAME) { PCGExTypeOps::FTypeOps<_TYPE>::InjectField(TargetInOut, Scalar, Parsed.Field); }
+#define PCGEX_FIELD_INJECT(_TYPE, _NAME) { InjectFieldIntoValue<_TYPE>(*static_cast<_TYPE*>(TargetInOut), Scalar, Parsed.Field); }
 		PCGEX_EXECUTEWITHRIGHTTYPE(InType, PCGEX_FIELD_INJECT)
 #undef PCGEX_FIELD_INJECT
 	}
@@ -117,28 +338,6 @@ namespace PCGExData
 	FString FSingleFieldAccessor::GetDisplayName() const
 	{
 		return TEXT("SingleField");
-	}
-
-	//
-	// Stage 3 typed fn pointers
-	//
-
-	namespace
-	{
-		// Extract direction: ParentPtr at T, ChildOut at double.
-		template <typename T>
-		void FieldGetStep(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
-		{
-			*static_cast<double*>(ChildOut) = PCGExTypeOps::FTypeOps<T>::ExtractField(Parent, Parsed.Field);
-		}
-
-		// Inject direction: ParentInOut at T, NewChild is the double to inject.
-		template <typename T>
-		void FieldSetStep(void* ParentInOut, const void* NewChild, const FAccessorParseResult& Parsed)
-		{
-			const double Value = *static_cast<const double*>(NewChild);
-			PCGExTypeOps::FTypeOps<T>::InjectField(ParentInOut, Value, Parsed.Field);
-		}
 	}
 
 	FStepGetFn FSingleFieldAccessor::GetStepGetFn(EPCGMetadataTypes InType) const
@@ -171,8 +370,6 @@ namespace PCGExData
 		(void)SourceDesc;
 		switch (InType)
 		{
-		// Multi-component vector + rotation types: field extraction is natively
-		// meaningful (X/Y/Z/W on vectors; X->Roll/Y->Yaw/Z->Pitch on rotations).
 		case EPCGMetadataTypes::Vector2:
 		case EPCGMetadataTypes::Vector:
 		case EPCGMetadataTypes::Vector4:
@@ -180,9 +377,6 @@ namespace PCGExData
 		case EPCGMetadataTypes::Rotator:
 			return ECompileAction::Keep;
 
-		// Scalars: keep. FTypeOps<T>::ExtractField on scalars ignores the field
-		// enum and returns the value cast to double, which matches legacy
-		// FCachedSubSelection behavior (skip-and-convert produces the same output).
 		case EPCGMetadataTypes::Float:
 		case EPCGMetadataTypes::Double:
 		case EPCGMetadataTypes::Integer32:
@@ -190,16 +384,9 @@ namespace PCGExData
 		case EPCGMetadataTypes::Boolean:
 			return ECompileAction::Keep;
 
-		// Transform: promote with Position. `.X` on a Transform attribute
-		// conventionally means Position.X; the legacy FTypeOps<FTransform>
-		// ::ExtractField honored that via a direct GetLocation() call but the
-		// symmetric InjectField was UB. Auto-promoting to [Position, Field]
-		// gives the same get output AND a correct set path.
 		case EPCGMetadataTypes::Transform:
 			return ECompileAction::PromoteWithPosition;
 
-		// String family: field of a string is meaningless; drop the step so
-		// the string passes through unchanged.
 		case EPCGMetadataTypes::String:
 		case EPCGMetadataTypes::Name:
 		case EPCGMetadataTypes::SoftObjectPath:

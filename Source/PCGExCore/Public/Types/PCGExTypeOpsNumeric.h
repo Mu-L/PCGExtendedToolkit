@@ -160,16 +160,6 @@ namespace PCGExTypeOps
 
 		static FORCEINLINE Type Abs(const Type& A) { return A; }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return FMath::IsNearlyZero(Factor) ? false : A; }
-
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			return *static_cast<const Type*>(Value);
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			*static_cast<Type*>(Target) = static_cast<Type>(Value);
-		}
 	};
 
 	// Numeric Type Operations - int32
@@ -272,16 +262,6 @@ namespace PCGExTypeOps
 
 		static FORCEINLINE Type Abs(const Type& A) { return FMath::Abs(A); }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
-
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			return *static_cast<const Type*>(Value);
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			*static_cast<Type*>(Target) = static_cast<Type>(Value);
-		}
 	};
 
 	// Numeric Type Operations - int64
@@ -496,16 +476,6 @@ namespace PCGExTypeOps
 
 		static FORCEINLINE Type Abs(const Type& A) { return FMath::Abs(A); }
 		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
-
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			return *static_cast<const Type*>(Value);
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-			*static_cast<Type*>(Target) = static_cast<Type>(Value);
-		}
 	};
 
 	// Numeric Type Operations - double
