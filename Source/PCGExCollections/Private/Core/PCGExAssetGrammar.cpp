@@ -11,6 +11,8 @@
 
 double FPCGExAssetGrammarDetails::GetSize(const FBox& InBounds, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
 {
+	if (Size == EPCGExGrammarSizeReference::Fixed) { return FixedSize; }
+
 	const FVector S = InBounds.GetSize();
 
 	switch (Size)
@@ -21,9 +23,8 @@ double FPCGExAssetGrammarDetails::GetSize(const FBox& InBounds, TMap<const FPCGE
 	case EPCGExGrammarSizeReference::Min: return FMath::Min3(S.X, S.Y, S.Z);
 	case EPCGExGrammarSizeReference::Max: return FMath::Max3(S.X, S.Y, S.Z);
 	case EPCGExGrammarSizeReference::Average: return (S.X + S.Y + S.Z) / 3;
+	default: return 0;
 	}
-
-	return 0;
 }
 
 void FPCGExAssetGrammarDetails::Fix(const FBox& InBounds, FPCGSubdivisionSubmodule& OutSubmodule, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const

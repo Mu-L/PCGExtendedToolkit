@@ -12,6 +12,12 @@
 
 namespace PCGExActorDelta
 {
+	// Wire format version tag. Present since the switch to direct FArchive serialization
+	// (without FStructuredArchiveFromArchive wrapper). Older saved deltas lack this magic
+	// and are silently skipped by ApplyPropertyDelta to avoid crashing on incompatible bytes.
+	static constexpr uint32 DeltaWireMagic = 0x50434745u; // 'PCGE'
+	static constexpr uint32 DeltaWireVersion = 1u;
+
 	namespace Internal
 	{
 		/**
@@ -66,7 +72,11 @@ namespace PCGExActorDelta
 
 		/** Serialize only the properties that differ from Defaults into OutBytes.
 		 *  Skips entirely if nothing differs -- avoids the ~13-byte terminator overhead
-		 *  that SerializeTaggedProperties writes even when no properties are emitted. */
+		 *  that SerializeTaggedProperties writes even when no properties are emitted.
+		 *  Uses the direct FArchive overload of SerializeTaggedProperties, not the
+		 *  FStructuredArchive wrapper: bridging a binary archive (FObjectWriter) via
+		 *  FStructuredArchiveFromArchive inserts structural framing that FObjectReader
+		 *  can't parse, which misaligns property reads and corrupts FName values. */
 		static void SerializeObjectDelta(
 			UObject* Object,
 			UObject* Defaults,
@@ -76,9 +86,8 @@ namespace PCGExActorDelta
 
 			UClass* Class = Object->GetClass();
 			FDeltaWriter Writer(OutBytes);
-			FStructuredArchiveFromArchive Adapter(Writer);
 			Class->SerializeTaggedProperties(
-				Adapter.GetSlot(),
+				Writer,
 				reinterpret_cast<uint8*>(Object),
 				Class,
 				reinterpret_cast<uint8*>(Defaults),
@@ -86,16 +95,16 @@ namespace PCGExActorDelta
 		}
 
 		/** Deserialize delta bytes onto Object; properties not present in the delta are untouched.
-		 *  Uses CDO as the diff baseline so tagged properties resolve correctly. */
+		 *  Uses CDO as the diff baseline so tagged properties resolve correctly.
+		 *  Uses direct FArchive overload -- see SerializeObjectDelta for rationale. */
 		static void DeserializeObjectDelta(
 			UObject* Object,
 			const TArray<uint8>& InBytes)
 		{
 			UClass* Class = Object->GetClass();
 			FDeltaReader Reader(InBytes);
-			FStructuredArchiveFromArchive Adapter(Reader);
 			Class->SerializeTaggedProperties(
-				Adapter.GetSlot(),
+				Reader,
 				reinterpret_cast<uint8*>(Object),
 				Class,
 				reinterpret_cast<uint8*>(Class->GetDefaultObject()),
@@ -155,11 +164,17 @@ namespace PCGExActorDelta
 		}
 
 		// Pack into wire format:
+		//   [uint32 Magic][uint32 Version]
 		//   [uint32 ActorDeltaSize][ActorDelta...]
 		//   [uint32 ComponentCount]
 		//   For each: [FName][uint32 CompDeltaSize][CompDelta...]
 		TArray<uint8> Result;
 		FMemoryWriter Writer(Result);
+
+		uint32 Magic = DeltaWireMagic;
+		uint32 Version = DeltaWireVersion;
+		Writer << Magic;
+		Writer << Version;
 
 		uint32 ActorSize = ActorBytes.Num();
 		Writer << ActorSize;
@@ -190,6 +205,19 @@ namespace PCGExActorDelta
 		// Bounds-check every read to handle corrupted/truncated data gracefully.
 		FMemoryReader Reader(DeltaBytes);
 		const int64 TotalSize = DeltaBytes.Num();
+
+		// Validate magic+version. Older collections saved delta bytes in an incompatible
+		// format (FStructuredArchiveFromArchive framing) -- reading those with the current
+		// binary path would misalign properties and corrupt FName values, which crashes
+		// the editor on later save. Silently skip unknown-format deltas; the user must
+		// rebuild the collection to regenerate deltas in the current format.
+		if (TotalSize < static_cast<int64>(sizeof(uint32) * 2)) { return; }
+
+		uint32 Magic = 0;
+		uint32 Version = 0;
+		Reader << Magic;
+		Reader << Version;
+		if (Magic != DeltaWireMagic || Version != DeltaWireVersion) { return; }
 
 		// Actor-level delta
 		uint32 ActorSize = 0;

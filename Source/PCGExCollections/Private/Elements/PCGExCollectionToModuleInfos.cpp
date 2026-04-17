@@ -10,6 +10,7 @@
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
+#include "PCGExProperty.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
 #define PCGEX_NAMESPACE CollectionToModuleInfos
@@ -85,12 +86,94 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 
 	FlattenCollection(Packer, MainCollection, Settings, Modules, UniqueSymbols, SizeCache);
 
+	// Prepare custom property outputs: clone a mutable writer FInstancedStruct per configured property
+	// and create its corresponding metadata attribute.
+	struct FCustomPropertyWriter
+	{
+		FName PropertyName;
+		FInstancedStruct WriterInstance;
+		FPCGMetadataAttributeBase* Attribute = nullptr;
+	};
+
+	TArray<FCustomPropertyWriter> CustomWriters;
+	if (Settings->PropertyOutputSettings.HasOutputs())
+	{
+		for (const FPCGExPropertyOutputConfig& Config : Settings->PropertyOutputSettings.Configs)
+		{
+			if (!Config.IsValid()) { continue; }
+
+			const FName OutputName = Config.GetEffectiveOutputName();
+			if (OutputName.IsNone()) { continue; }
+
+			// Find a prototype: check root collection's schema first, fall back to scanning entries
+			const FInstancedStruct* Prototype = MainCollection->CollectionProperties.GetPropertyByName(Config.PropertyName);
+			if (!Prototype || !Prototype->IsValid())
+			{
+				for (const PCGExCollectionToGrammar::FModule& Module : Modules)
+				{
+					if (!Module.Host) { continue; }
+					Prototype = Module.Host->CollectionProperties.GetPropertyByName(Config.PropertyName);
+					if (Prototype && Prototype->IsValid()) { break; }
+				}
+			}
+
+			if (!Prototype || !Prototype->IsValid())
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::FromString(FString::Printf(TEXT("Property '%s' not found in collection schema."), *Config.PropertyName.ToString())));
+				continue;
+			}
+
+			const FPCGExProperty* PrototypeProp = Prototype->GetPtr<FPCGExProperty>();
+			if (!PrototypeProp || !PrototypeProp->SupportsOutput()) { continue; }
+
+			FCustomPropertyWriter& Writer = CustomWriters.Emplace_GetRef();
+			Writer.PropertyName = Config.PropertyName;
+			Writer.WriterInstance = *Prototype;
+
+			if (FPCGExProperty* MutableWriter = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>())
+			{
+				Writer.Attribute = MutableWriter->CreateMetadataAttribute(Metadata, OutputName);
+			}
+
+			if (!Writer.Attribute)
+			{
+				CustomWriters.Pop(EAllowShrinking::No);
+			}
+		}
+	}
+
 	for (const PCGExCollectionToGrammar::FModule& Module : Modules)
 	{
 		const int64 Key = Metadata->AddEntry();
 #define PCGEX_MODULE_OUT(_NAME, _TYPE, _GETTER, _DEFAULT) _NAME##Attribute->SetValue(Key, Module._GETTER);
 		PCGEX_FOREACH_MODULE_FIELD(PCGEX_MODULE_OUT)
 #undef PCGEX_MODULE_OUT
+
+		for (FCustomPropertyWriter& Writer : CustomWriters)
+		{
+			// Resolve source: entry override first, then host collection default
+			const FInstancedStruct* Source = nullptr;
+			if (Module.Entry)
+			{
+				Source = Module.Entry->PropertyOverrides.GetOverride(Writer.PropertyName);
+			}
+			if ((!Source || !Source->IsValid()) && Module.Host)
+			{
+				Source = Module.Host->CollectionProperties.GetPropertyByName(Writer.PropertyName);
+			}
+
+			if (!Source || !Source->IsValid()) { continue; }
+
+			const FPCGExProperty* SourceProp = Source->GetPtr<FPCGExProperty>();
+			FPCGExProperty* WriterProp = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>();
+			if (!SourceProp || !WriterProp) { continue; }
+
+			// Only copy when source and writer have matching concrete types
+			if (Source->GetScriptStruct() != Writer.WriterInstance.GetScriptStruct()) { continue; }
+
+			WriterProp->CopyValueFrom(SourceProp);
+			WriterProp->WriteMetadataValue(Writer.Attribute, Key);
+		}
 	}
 
 	FPCGTaggedData& ModulesData = InContext->OutputData.TaggedData.Emplace_GetRef();
@@ -153,6 +236,7 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 		}
 
 		Module.Entry = Entry;
+		Module.Host = Result.Host;
 		Module.Idx = Packer->GetPickIdx(Result.Host, Entry->Staging.InternalIndex, 0);
 	}
 }

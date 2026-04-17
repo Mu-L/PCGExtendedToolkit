@@ -217,11 +217,12 @@ void FPCGExActorCollectionEntry::EDITOR_Sanitize()
 			CachedPCGGraph = nullptr;
 		}
 
-		// Clear stale delta if source level reference was removed
-		if (!DeltaSourceLevel.ToSoftObjectPath().IsValid() || DeltaSourceActorName == NAME_None)
-		{
-			SerializedPropertyDelta.Empty();
-		}
+		// Do NOT clear SerializedPropertyDelta here. Embedded entries populated by
+		// UPCGExDefaultLevelDataExporter never set DeltaSourceLevel/DeltaSourceActorName
+		// (the delta is captured programmatically from live actors at export time), so
+		// clearing on empty DeltaSource would wipe legitimate embedded deltas on every
+		// rebuild. User-authored entries that clear their DeltaSource can manually clear
+		// the delta via the details panel if needed.
 	}
 	else
 	{

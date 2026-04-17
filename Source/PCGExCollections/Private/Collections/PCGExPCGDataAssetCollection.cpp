@@ -26,6 +26,36 @@
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
 PCGEX_REGISTER_COLLECTION_TYPE(PCGDataAsset, UPCGExPCGDataAssetCollection, FPCGExPCGDataAssetCollectionEntry, "PCG Data Asset Collection", Base)
 
+void UPCGExPCGDataAssetCollection::PostLoad()
+{
+	Super::PostLoad();
+
+	// Diagnostic: report the loaded state of each Level-source entry's embedded collection.
+	// Helps verify whether embedded actor deltas survive serialization.
+	for (const FPCGExPCGDataAssetCollectionEntry& E : Entries)
+	{
+		if (E.bIsSubCollection || E.Source != EPCGExDataAssetEntrySource::Level) { continue; }
+
+		int32 EntryCount = -1;
+		int32 DeltaBearingCount = 0;
+		if (E.EmbeddedActorCollection)
+		{
+			EntryCount = E.EmbeddedActorCollection->Entries.Num();
+			for (const FPCGExActorCollectionEntry& AE : E.EmbeddedActorCollection->Entries)
+			{
+				if (AE.SerializedPropertyDelta.Num() > 0) { ++DeltaBearingCount; }
+			}
+		}
+
+		UE_LOG(LogPCGEx, Warning,
+			TEXT("[PCGEx PostLoad] Collection='%s' Entry Level='%s' ExportedDataAsset='%s' Embedded.Entries=%d WithDelta=%d"),
+			*GetName(),
+			*E.Level.ToSoftObjectPath().ToString(),
+			*GetNameSafe(E.ExportedDataAsset),
+			EntryCount, DeltaBearingCount);
+	}
+}
+
 // PCGDataAsset Collection Entry
 
 UPCGExAssetCollection* FPCGExPCGDataAssetCollectionEntry::GetSubCollectionPtr() const
@@ -102,12 +132,15 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			return;
 		}
 
-		// Create or reuse embedded data asset, outered to the owning collection
-		if (!ExportedDataAsset || ExportedDataAsset->GetOuter() != OwningCollection)
+		// Always recreate ExportedDataAsset fresh. Reusing + resetting TaggedData leaves orphaned
+		// UPCGBasePointData subobjects in the outer chain that still serialize into the .uasset,
+		// which causes save-time pointer traversal crashes after repeated rebuilds.
+		if (ExportedDataAsset)
 		{
-			ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
+			ExportedDataAsset->Rename(nullptr, GetTransientPackage(),
+				REN_DontCreateRedirectors | REN_NonTransactional);
 		}
-		ExportedDataAsset->Data.TaggedData.Reset();
+		ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
 
 		// Use collection's instanced exporter if available, otherwise create a transient default
 		UPCGExLevelDataExporter* Exporter = nullptr;

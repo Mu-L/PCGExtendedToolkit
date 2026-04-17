@@ -116,6 +116,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExPCGDataAssetCollectionEntry> Entries;
 
+	// Lifecycle
+
+	virtual void PostLoad() override;
+
 	// Editor Functions
 
 #if WITH_EDITOR
