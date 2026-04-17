@@ -53,6 +53,21 @@ namespace PCGExActorDelta
 		// assigned to names in session A refer to different names (or out-of-range entries)
 		// in session B. Writing FNames as strings makes the stream session-portable.
 
+		/** Transform-related root component properties that we NEVER want to capture in the delta.
+		 *  The spawned actor's transform is determined by the PCG point, not by the source
+		 *  actor's original position. Including these in the delta overwrites the spawn
+		 *  transform with the source actor's (often near-origin) values on apply. */
+		static bool IsTransformProperty(const FProperty* InProperty)
+		{
+			const FName PropName = InProperty->GetFName();
+			static const FName NAME_RelativeLocation(TEXT("RelativeLocation"));
+			static const FName NAME_RelativeRotation(TEXT("RelativeRotation"));
+			static const FName NAME_RelativeScale3D(TEXT("RelativeScale3D"));
+			return PropName == NAME_RelativeLocation
+				|| PropName == NAME_RelativeRotation
+				|| PropName == NAME_RelativeScale3D;
+		}
+
 		class FDeltaWriter : public FObjectWriter
 		{
 		public:
@@ -61,6 +76,7 @@ namespace PCGExActorDelta
 			virtual bool ShouldSkipProperty(const FProperty* InProperty) const override
 			{
 				if (!IsInstanceEditableProperty(InProperty)) { return true; }
+				if (IsTransformProperty(InProperty)) { return true; }
 				return FObjectWriter::ShouldSkipProperty(InProperty);
 			}
 
@@ -80,6 +96,7 @@ namespace PCGExActorDelta
 			virtual bool ShouldSkipProperty(const FProperty* InProperty) const override
 			{
 				if (!IsInstanceEditableProperty(InProperty)) { return true; }
+				if (IsTransformProperty(InProperty)) { return true; }
 				return FObjectReader::ShouldSkipProperty(InProperty);
 			}
 
