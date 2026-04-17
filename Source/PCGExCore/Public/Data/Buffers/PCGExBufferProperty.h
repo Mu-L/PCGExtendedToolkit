@@ -90,7 +90,7 @@ namespace PCGExData
 		static int32 GetElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc);
 		static int32 GetElementAlignmentFromDesc(const FPCGMetadataAttributeDesc& Desc);
 
-		// Stage 5b container-accessor helpers.
+		// Container-accessor helpers.
 		//
 		// Returns the size of ONE element inside the outermost container of Desc.
 		// For TArray<FVector>: strips the [Array] wrapper and asks for Vector's

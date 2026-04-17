@@ -23,7 +23,7 @@ namespace PCGExData
 	 * the hot path can stride into FScriptArray storage without carrying
 	 * the Desc forward.
 	 *
-	 * Stage 5c: write path uses FProperty::CopyCompleteValue when
+	 * Write path uses FProperty::CopyCompleteValue when
 	 * Parsed.ContainerElementProperty is available (handles non-trivially-
 	 * copyable elements like FString, nested containers, UStructs), falling
 	 * back to memcpy for trivially-copyable types or when no property was

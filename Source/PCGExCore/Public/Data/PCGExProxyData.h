@@ -86,11 +86,11 @@ namespace PCGExData
 		int32 ValueSize = 0;
 		int32 ValueAlignment = 1;
 
-		// Stage 5b: cached attribute descriptor, populated by Capture() when
-		// the selector resolves to an actual attribute (as opposed to a point
-		// property or extra property). Used by container-aware accessors in
-		// the compiled chain (FContainerIndex / FContainerCount). Only valid
-		// when bHasSourceDesc is true.
+		// Cached attribute descriptor, populated by Capture() when the selector
+		// resolves to an actual attribute (as opposed to a point property or
+		// extra property). Used by container-aware accessors in the compiled
+		// chain (FContainerIndex / FContainerCount). Only valid when
+		// bHasSourceDesc is true.
 		FPCGMetadataAttributeDesc SourceDesc;
 		bool bHasSourceDesc = false;
 

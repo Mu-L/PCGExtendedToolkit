@@ -100,8 +100,8 @@ namespace PCGExData
 		WorkingType = SubSelection.GetSubType(RealType);
 
 		// Mirror the Path-based Capture overload: cache attribute Desc once
-		// so both the VTO sizing branch below and Stage 5b container-aware
-		// chain classifiers can consult it.
+		// so both the VTO sizing branch below and container-aware chain
+		// classifiers can consult it.
 		bHasSourceDesc = false;
 		const UObject* VTO = nullptr;
 		if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)

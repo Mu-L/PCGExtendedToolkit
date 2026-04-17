@@ -57,8 +57,8 @@ namespace PCGExData
 	                                               EPCGMetadataTypes& OutType) const
 	{
 		// This accessor only meaningfully applies to FTransform sources.
-		// (Stage 1 still allows the chain to include a step on a non-Transform
-		// source -- the legacy projection path tolerates this.)
+		// The chain may include this step on a non-Transform source (the
+		// projection path tolerates it; the compiler will drop it).
 		OutType = ComponentToOutputType(Parsed.Component);
 		return InType == EPCGMetadataTypes::Transform;
 	}
@@ -137,7 +137,7 @@ namespace PCGExData
 	}
 
 	//
-	// Stage 3 typed fn pointers
+	// Typed fn pointers for compiled-chain hot path
 	//
 
 	namespace

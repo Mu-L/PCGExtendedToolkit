@@ -28,7 +28,7 @@ namespace PCGExData
 	 * (like extracting .X from a vector, or Position from a Transform) and provides
 	 * type-erased methods for applying the selection.
 	 *
-	 * Stage 2+: dispatch routes through FSubAccessorRegistry accessors (axis,
+	 * Dispatch routes through FSubAccessorRegistry accessors (axis,
 	 * transform-part, single-field) driven by the parsed chain's projection
 	 * onto the legacy flag layout.
 	 *
@@ -77,24 +77,18 @@ namespace PCGExData
 		 * was given empty ExtraNames or when the FSubSelection was
 		 * default-constructed and never re-Init'd.
 		 *
-		 * Stage 1: chain is informational only -- ApplyGet/ApplySet still
-		 * route through the legacy flag-driven dispatch. Stage 3 moved
-		 * FCachedSubSelection's hot path onto the chain (via
-		 * CompileChainForSource); FSubSelection's type-erased path still
-		 * uses the flag layout below. Stage 5 will unify them.
+		 * FCachedSubSelection's hot path uses the compiled chain (via
+		 * CompileChainForSource); FSubSelection's type-erased path also
+		 * walks the chain via accessor virtual calls.
 		 */
 		FORCEINLINE const FSubSelectionChain& GetChain() const { return ParsedChain; }
 
 		//
-		// Public classifier methods (Stage 5 -- chain-backed).
+		// Public classifier methods (chain-backed).
 		//
-		// These compute directly from ParsedChain. The legacy boolean flag
-		// fields (bIsValid/bIsFieldSet/bIsAxisSet/bIsComponentSet) are gone
-		// as of Stage 5. The SetFieldIndex side-effect that used to force
-		// bIsFieldSet=true for any non-empty Init is also gone: malformed
-		// inputs like {Garbage} now produce an empty chain and HasSelection()
-		// returns false, as opposed to the legacy "treat anything as
-		// Double-producing-field-extraction" behavior.
+		// These compute directly from ParsedChain via a classifier bitmask.
+		// Malformed inputs like {Garbage} produce an empty chain and
+		// HasSelection() returns false.
 		//
 
 		/** True if the parsed chain has at least one step. */
@@ -183,7 +177,7 @@ namespace PCGExData
 		//
 		// Type-Erased Interface (Primary API)
 		//
-		// These methods dispatch through the Stage 2 sub-accessor system.
+		// These methods dispatch through the sub-accessor system.
 		// No template instantiation required at call sites.
 		//
 

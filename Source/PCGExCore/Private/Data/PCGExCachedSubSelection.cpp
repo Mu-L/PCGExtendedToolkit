@@ -61,11 +61,10 @@ namespace PCGExData
 		RealType = InRealType;
 		WorkingType = InWorkingType;
 
-		// Start from the parser-produced chain, then run the Stage 3 compiler
-		// to drop/promote steps based on RealType. The compiler also fills
+		// Start from the parser-produced chain, then run the compiler to
+		// drop/promote steps based on RealType. The compiler also fills
 		// each remaining step's typed fn pointers, so the hot path has zero
-		// per-call lookups. SourceDesc threads through to container-aware
-		// classifiers (Stage 5b).
+		// per-call lookups.
 		// Clean up any previously owned properties from a prior Initialize.
 		for (FProperty* Prop : OwnedProperties) { delete Prop; }
 		OwnedProperties.Reset();
@@ -73,13 +72,12 @@ namespace PCGExData
 		CompiledChain = Selection.GetChain();
 		CompileChainForSource(CompiledChain, RealType, SourceDesc);
 
-		// Stage 5c: create owned FProperty instances for container-index
-		// steps that need property-aware writes (CopyCompleteValue for
-		// non-trivially-copyable element types like FString, nested
-		// containers, UStructs). Replay the Desc strip logic: start with
-		// SourceDesc, strip the outermost ContainerType entry each time a
-		// container step appears. The inner-element FProperty is created
-		// from the stripped Desc.
+		// Create owned FProperty instances for container-index steps that
+		// need property-aware writes (CopyCompleteValue for non-trivially-
+		// copyable element types like FString, nested containers, UStructs).
+		// Replay the Desc strip logic: start with SourceDesc, strip the
+		// outermost ContainerType entry each time a container step appears.
+		// The inner-element FProperty is created from the stripped Desc.
 		if (SourceDesc && !CompiledChain.Steps.IsEmpty())
 		{
 			const ISubAccessor* ContainerIndexAccessor = FSubAccessorRegistry::GetContainerIndexAccessor();

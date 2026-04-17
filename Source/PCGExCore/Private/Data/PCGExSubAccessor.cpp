@@ -48,10 +48,9 @@ namespace PCGExData
 		if (bInitialized) { return; }
 
 		// Registration order = priority order: when a token could match
-		// multiple accessors, the earlier-registered one wins. Stage 1's
-		// order Axis -> TransformPart -> SingleField is preserved here
-		// because the legacy parser had the same implicit precedence and
-		// no token in the Stage 1 lookup tables overlaps anyway.
+		// multiple accessors, the earlier-registered one wins. Order is
+		// Axis -> TransformPart -> SingleField -> Swizzle ->
+		// ContainerCount -> ContainerIndex.
 		OwnedAccessors.Add(MakeUnique<FAxisAccessor>());
 		GAxisAccessor = OwnedAccessors.Last().Get();
 		OrderedView.Add(GAxisAccessor);
@@ -64,16 +63,16 @@ namespace PCGExData
 		GSingleFieldAccessor = OwnedAccessors.Last().Get();
 		OrderedView.Add(GSingleFieldAccessor);
 
-		// Stage 4: swizzle accessor registered last. Its MatchesToken only
-		// accepts 2-4 char combos of {x,y,z,w}, so it never competes with
-		// SingleField's single-letter entries or the longer word-like axis
-		// and component aliases. Registration order ensures SingleField
-		// gets first shot at "X"/"Y"/etc.; Swizzle handles "xy", "xyz", ...
+		// Swizzle accessor. Its MatchesToken only accepts 2-4 char combos of
+		// {x,y,z,w}, so it never competes with SingleField's single-letter
+		// entries or the longer word-like axis and component aliases.
+		// Registration order ensures SingleField gets first shot at
+		// "X"/"Y"/etc.; Swizzle handles "xy", "xyz", ...
 		OwnedAccessors.Add(MakeUnique<FSwizzleAccessor>());
 		OrderedView.Add(OwnedAccessors.Last().Get());
 
-		// Stage 5b: container accessors. Count ("Num"/"Count") is registered
-		// before Index so that bare "Num"/"Count" tokens route there --
+		// Container accessors. Count ("Num"/"Count") is registered before
+		// Index so that bare "Num"/"Count" tokens route there --
 		// FContainerIndexAccessor's MatchesToken only accepts numeric or
 		// bracket-wrapped numeric tokens so there's no overlap in practice,
 		// but Count-first is cheaper (no numeric parse attempt).
@@ -149,19 +148,11 @@ namespace PCGExData
 
 		if (ExtraNames.IsEmpty()) { return false; }
 
-		// Stage 2: true left-to-right walk. For each token in input order,
-		// try each accessor in registration order; first match wins. Steps
-		// are appended to the chain as they're matched, so chain order
-		// mirrors token order. Each step's InType chains from the previous
-		// step's OutType (greedy resolution).
-		//
-		// This drops Stage 1's positional emulation (axis-walk-all,
-		// component-walk-all, field-at-Names[1]). The behavior change is
-		// silent for well-formed inputs (the existing parity tests still
-		// pass) and only affects malformed inputs like {Roll, Garbage}
-		// where the legacy parser refused to recognize a leading field
-		// token. PossibleSourceType has zero external readers so the
-		// projection divergence is also silent at the consumer surface.
+		// True left-to-right walk. For each token in input order, try each
+		// accessor in registration order; first match wins. Steps are
+		// appended to the chain as they're matched, so chain order mirrors
+		// token order. Each step's InType chains from the previous step's
+		// OutType (greedy resolution).
 		EPCGMetadataTypes CurrentType = SourceTypeHint;
 
 		for (const FString& Token : ExtraNames)
@@ -193,7 +184,7 @@ namespace PCGExData
 	}
 
 	//
-	// Stage 3 chain compilation
+	// Chain compilation
 	//
 
 	namespace

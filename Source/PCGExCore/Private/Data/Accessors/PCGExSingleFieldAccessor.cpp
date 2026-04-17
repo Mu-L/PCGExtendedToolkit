@@ -52,10 +52,9 @@ namespace PCGExData
 		}
 
 		//
-		// Stage 6: per-type ExtractField / InjectField logic absorbed from
-		// the deleted FTypeOps<T>::ExtractField/InjectField public surface.
-		// These private templates + specializations are the sole implementations
-		// of field extraction/injection now.
+		// Per-type ExtractField / InjectField logic. These private templates +
+		// specializations are the sole implementations of field
+		// extraction/injection.
 		//
 
 		using PCGExTypeOps::ESingleField;
@@ -238,9 +237,7 @@ namespace PCGExData
 		}
 
 		// FTransform: extract location, inject into FVector, write back.
-		// Stage 6 fix: the deleted FTypeOps<FTransform>::InjectField had UB
-		// at PCGExTypeOpsRotation.h:683 (passed &T as FVector* instead of
-		// extracting location first). Now correct.
+		// Correctly injects into Location rather than passing &T as FVector*.
 		template <>
 		FORCEINLINE void InjectFieldIntoValue<FTransform>(FTransform& T, double Value, ESingleField Field)
 		{
@@ -256,7 +253,7 @@ namespace PCGExData
 		template <> FORCEINLINE void InjectFieldIntoValue<FSoftClassPath>(FSoftClassPath& /*V*/, double /*Val*/, ESingleField /*F*/) {}
 
 		//
-		// Stage 3 typed fn pointers (updated Stage 6: call absorbed logic)
+		// Typed fn pointers for compiled-chain hot path
 		//
 
 		template <typename T>

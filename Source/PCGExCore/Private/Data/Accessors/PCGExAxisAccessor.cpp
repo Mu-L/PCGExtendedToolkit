@@ -28,9 +28,8 @@ namespace PCGExData
 		}
 
 		//
-		// Stage 6: ExtractAxis logic absorbed from the deleted
-		// FTypeOps<{FQuat,FRotator,FTransform}>::ExtractAxis surface.
-		// All three route through PCGExMath::GetDirection.
+		// ExtractAxis logic. All rotation types route through
+		// PCGExMath::GetDirection.
 		//
 
 		FORCEINLINE FVector ExtractAxisFromQuat(const FQuat& Q, EPCGExAxis Axis)
@@ -44,7 +43,7 @@ namespace PCGExData
 		}
 
 		//
-		// Stage 3 typed fn pointers (updated Stage 6: call absorbed logic)
+		// Typed fn pointers for compiled-chain hot path
 		//
 
 		void AxisGetStep_Quat(const void* Parent, void* ChildOut, const FAccessorParseResult& Parsed)
@@ -100,8 +99,7 @@ namespace PCGExData
 			Out = ExtractAxisFromRotator(*static_cast<const FRotator*>(Source), Parsed.Axis);
 			break;
 		case EPCGMetadataTypes::Transform:
-			// Stage 6: inline the FTransform→FQuat extraction that was
-			// previously in FTypeOps<FTransform>::ExtractAxis.
+			// FTransform: extract rotation quaternion, then apply axis.
 			Out = ExtractAxisFromQuat(static_cast<const FTransform*>(Source)->GetRotation(), Parsed.Axis);
 			break;
 		default:

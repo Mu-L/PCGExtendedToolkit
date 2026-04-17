@@ -17,11 +17,11 @@ struct FPCGMetadataAttributeDesc;
  * conversion fn pointers needed to move values between the attribute's
  * real type, the chain's final type, and the blender's working type.
  *
- * Stage 3 rewrote this struct around chain walking: Initialize runs
- * CompileChainForSource against the parsed chain to drop/promote steps
- * based on the real type, resolves per-step fn pointers once, and the
- * hot path ApplyGet/ApplySet just walk the compiled steps without any
- * flag-driven branching or vtable dispatch on accessors.
+ * Initialize runs CompileChainForSource against the parsed chain to
+ * drop/promote steps based on the real type, resolves per-step fn
+ * pointers once, and the hot path ApplyGet/ApplySet just walks the
+ * compiled steps without any flag-driven branching or vtable dispatch
+ * on accessors.
  *
  * Usage:
  *   // At proxy construction:
@@ -86,10 +86,10 @@ namespace PCGExData
 		FStepSetFn SingleStepSetFn = nullptr;
 		FAccessorParseResult SingleStepParsed;
 
-		// Stage 5c: compile-time-created FProperty instances for container
-		// steps that need property-aware reads/writes (e.g., CopyCompleteValue
-		// for non-trivially-copyable element types). Each compiled container
-		// step stores a non-owning pointer in Parsed.ContainerElementProperty;
+		// Compile-time-created FProperty instances for container steps that
+		// need property-aware reads/writes (e.g., CopyCompleteValue for
+		// non-trivially-copyable element types). Each compiled container step
+		// stores a non-owning pointer in Parsed.ContainerElementProperty;
 		// this array owns the actual FProperty lifetime. Cleaned up in the
 		// destructor.
 		TArray<FProperty*> OwnedProperties;
@@ -109,7 +109,7 @@ namespace PCGExData
 		 * fn pointers, resolves conversions. After this call the hot path
 		 * uses only cached state.
 		 *
-		 * SourceDesc (Stage 5b): optional Desc view of the source attribute.
+		 * SourceDesc: optional Desc view of the source attribute.
 		 * Only consulted when the chain contains container-aware steps
 		 * (FContainerIndex / FContainerCount). Scalar sources pass nullptr.
 		 */

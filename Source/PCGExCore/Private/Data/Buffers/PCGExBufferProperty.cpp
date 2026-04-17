@@ -314,7 +314,7 @@ namespace PCGExData
 	}
 
 	//
-	// Stage 5b container-accessor helpers
+	// Container-accessor helpers
 	//
 
 	int32 FPropertyBuffer::GetInnerElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc)
@@ -331,7 +331,7 @@ namespace PCGExData
 		// ContainerTypes=[Array,Array] -> inner has [Array] -> returns sizeof(FScriptArray).
 		// (Nested container element-reads aren't meaningful via FContainerIndexAccessor
 		// yet because the accessor hot path only walks one container level --
-		// Stage 5c may extend this. For now, stripping one layer is correct
+		// Stripping one layer is correct
 		// for the single-step container-index case.)
 		FPCGMetadataAttributeDesc InnerDesc = Desc;
 		InnerDesc.ContainerTypes.RemoveAt(0);

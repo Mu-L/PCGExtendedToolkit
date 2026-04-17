@@ -43,7 +43,7 @@ namespace PCGExData
 		if (IsFieldSelection()) { return EPCGMetadataTypes::Double; }
 		if (IsAxisSelection()) { return EPCGMetadataTypes::Vector; }
 
-		// Stage 5b: ContainerCount always yields Double (the count). Checked
+		// ContainerCount always yields Double (the count). Checked
 		// after field/axis so a chain like `.1.X` (ContainerIndex + Field)
 		// still reports Double via the field path.
 		if (IsContainerCountSelection()) { return EPCGMetadataTypes::Double; }
@@ -73,7 +73,7 @@ namespace PCGExData
 	{
 		// Rebuild the chain with a single TransformPart step so classifier
 		// methods and dispatch both see a valid component-selection state.
-		// Stage 5: the chain is the source of truth; pure flag mutations are gone.
+		// The chain is the source of truth; pure flag mutations are gone.
 		const ISubAccessor* Accessor = FSubAccessorRegistry::GetTransformPartAccessor();
 
 		FSubSelectionStep Step;
@@ -146,12 +146,8 @@ namespace PCGExData
 		// then populates Field/Axis/Component/PossibleSourceType for
 		// dispatch-time reads.
 		//
-		// Stage 5: the SetFieldIndex(0) unconditional side-effect is GONE.
-		// HasSelection() is now true iff the parser actually matched at least
-		// one token. Malformed inputs like {Garbage} produce an empty chain.
-		// This fixes the long-standing latent bug where every non-empty Init
-		// was treated as a field selection regardless of whether a field
-		// token was actually present.
+		// HasSelection() is true iff the parser actually matched at least one
+		// token. Malformed inputs like {Garbage} produce an empty chain.
 		ParsedChain.Reset();
 
 		if (ExtraNames.IsEmpty()) { return; }
@@ -207,11 +203,9 @@ namespace PCGExData
 	//
 	// Type-Erased Interface Implementation
 	//
-	// Stage 6: chain-walker rewrite. ApplyGet/ApplySet now walk
-	// ParsedChain.Steps directly via accessor virtual calls instead of
-	// flag-driven branching (IsFieldSelection/IsAxisSelection/etc.).
-	// This is a non-hot fallback path; FCachedSubSelection is the
-	// performance-critical surface.
+	// ApplyGet/ApplySet walk ParsedChain.Steps directly via accessor
+	// virtual calls. This is a non-hot fallback path;
+	// FCachedSubSelection is the performance-critical surface.
 	//
 	// NOTE: Container steps require compile-time ContainerElementSize
 	// (populated by PostClassifyFinalize at FCachedSubSelection::Initialize

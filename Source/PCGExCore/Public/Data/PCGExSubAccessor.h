@@ -14,21 +14,13 @@
 struct FPCGMetadataAttributeDesc;
 
 /**
- * Phase 6 Stage 1 -- Sub-accessor abstraction (scaffolding).
+ * Sub-accessor abstraction.
  *
- * Pluggable, chainable replacement for the closed STRMAP/per-type-dispatch
- * sub-selection system. In Stage 1 this layer co-exists with the legacy
- * FSubSelection::Init STRMAP path; in Stage 2 the per-type dispatch is
- * collapsed into accessor implementations; Stage 3 wires the chain into
- * FCachedSubSelection's hot path; Stage 4 adds new accessor classes
- * (swizzles, container index, etc.) without touching downstream layers.
- *
- * Contract for Stage 1:
- *   - The types defined here are NOT YET wired into FSubSelection. Adding
- *     this header to a TU does not change runtime behavior.
- *   - FSubAccessorRegistry::ParseChain is a stub in Stage 1 (returns false,
- *     produces an empty chain). Step 3 of Stage 1 fills in the three
- *     parity accessors and registers them.
+ * Pluggable, chainable sub-selection system. FSubAccessorRegistry owns
+ * accessor instances (axis, transform-part, single-field, swizzle,
+ * container-index, container-count) and parses ExtraNames into a chain.
+ * FCachedSubSelection compiles the chain against a concrete source type
+ * for direct fn-pointer invocation on the hot path.
  */
 
 namespace PCGExData
@@ -37,7 +29,7 @@ namespace PCGExData
 	 * FAccessorParseResult
 	 *
 	 * Per-step parsed payload. POD, additive layout: each accessor reads
-	 * only the fields it owns. Stage 4+ extends this struct with new fields
+	 * only the fields it owns. New accessors extend this struct with new fields
 	 * (container index, swizzle mask, struct-field name, ...) without
 	 * breaking ABI.
 	 */
@@ -137,7 +129,7 @@ namespace PCGExData
 	};
 
 	/**
-	 * Stage 3 hot-path fn-pointer signatures.
+	 * Compiled-chain hot-path fn-pointer signatures.
 	 *
 	 * FStepGetFn reads Parent (at this step's InType) and writes the
 	 * extracted Child (at this step's OutType) to ChildOut.
@@ -158,13 +150,11 @@ namespace PCGExData
 	 *
 	 * Stateless by convention. Owned for-process by FSubAccessorRegistry.
 	 *
-	 * Stage 1 implementations (FSingleFieldAccessor, FAxisAccessor,
-	 * FTransformPartAccessor) wrap the existing FTypeOps<T> primitives so
-	 * the new code path produces identical results to the legacy STRMAP
-	 * path. Stage 2 consolidates flag-driven dispatch at the FSubSelection
-	 * level. Stage 3 adds typed fn-pointer getters (GetStepGetFn /
-	 * GetStepSetFn) so FCachedSubSelection can cache per-step direct
-	 * function calls without vtable dispatch.
+	 * Implementations (FSingleFieldAccessor, FAxisAccessor,
+	 * FTransformPartAccessor, FSwizzleAccessor, FContainerIndex/Count)
+	 * provide typed fn-pointer getters (GetStepGetFn / GetStepSetFn)
+	 * so FCachedSubSelection can cache per-step direct function calls
+	 * without vtable dispatch.
 	 */
 	class PCGEXCORE_API ISubAccessor
 	{
@@ -228,7 +218,7 @@ namespace PCGExData
 		virtual FString GetDisplayName() const = 0;
 
 		//
-		// Stage 3 compiled-chain hot path
+		// Compiled-chain hot path
 		//
 
 		/**
@@ -298,8 +288,8 @@ namespace PCGExData
 	 * parsing ExtraNames into a chain.
 	 *
 	 * Registration order is priority order: when multiple accessors could
-	 * match a token, the earlier-registered one wins. Stage 1 order is
-	 * Axis -> TransformPart -> SingleField.
+	 * match a token, the earlier-registered one wins. Registration order is
+	 * Axis -> TransformPart -> SingleField -> Swizzle -> ContainerCount -> ContainerIndex.
 	 */
 	class PCGEXCORE_API FSubAccessorRegistry
 	{
@@ -318,10 +308,9 @@ namespace PCGExData
 		static const ISubAccessor* GetContainerCountAccessor();
 
 		/**
-		 * Parse a list of extra-name tokens into a chain. Stage 2: true
-		 * left-to-right walk; each token tries every accessor in
-		 * registration order, first match wins. Chain order mirrors
-		 * token order.
+		 * Parse a list of extra-name tokens into a chain. True left-to-right
+		 * walk; each token tries every accessor in registration order, first
+		 * match wins. Chain order mirrors token order.
 		 *
 		 * @param ExtraNames     Tokens from FPCGAttributePropertyInputSelector::GetExtraNames().
 		 * @param SourceTypeHint Optional hint about the source attribute's type.
@@ -368,7 +357,7 @@ namespace PCGExData
 	 * the compiled chain is ready for direct invocation without further
 	 * accessor lookups.
 	 *
-	 * SourceDesc (Stage 5b): when non-null, container-aware accessors
+	 * SourceDesc: when non-null, container-aware accessors
 	 * (FContainerIndexAccessor / FContainerCountAccessor) consult it to
 	 * decide whether the source is a compatible container. The Desc is
 	 * only meaningful for the chain's first (unwrapping) step; after a

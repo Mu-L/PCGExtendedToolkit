@@ -384,7 +384,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			// Handle attribute proxy
 			if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 			{
-				// Stage 5c: container attributes (TArray/TSet/TMap) must route
+				// Container attributes (TArray/TSet/TMap) must route
 				// through FPropertyBuffer, not TBuffer<T>. The Desc-based
 				// RealType is the inner element type (e.g. Vector for
 				// TArray<FVector>), so the normal ExecuteWithRightType path
