@@ -42,6 +42,10 @@ namespace PCGExData
 			ConvertWorkingToFinal = Other.ConvertWorkingToFinal;
 			RealOps = Other.RealOps;
 			WorkingOps = Other.WorkingOps;
+			bIsSingleStep = Other.bIsSingleStep;
+			SingleStepGetFn = Other.SingleStepGetFn;
+			SingleStepSetFn = Other.SingleStepSetFn;
+			SingleStepParsed = Other.SingleStepParsed;
 			OwnedProperties = MoveTemp(Other.OwnedProperties);
 		}
 		return *this;
@@ -124,36 +128,59 @@ namespace PCGExData
 		ConvertWorkingToReal  = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, RealType);
 		ConvertFinalToWorking = PCGExTypeOps::FConversionTable::GetConversionFn(FinalChainType, WorkingType);
 		ConvertWorkingToFinal = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, FinalChainType);
+
+		// 1-step fast-path cache: snapshot the step's fn pointers + parsed
+		// data so ApplyGet/ApplySet skip the array dereference entirely.
+		bIsSingleStep = (CompiledChain.Steps.Num() == 1);
+		if (bIsSingleStep)
+		{
+			const FSubSelectionStep& Only = CompiledChain.Steps[0];
+			SingleStepGetFn = Only.StepGetFn;
+			SingleStepSetFn = Only.StepSetFn;
+			SingleStepParsed = Only.Parsed;
+		}
 	}
 
 	void FCachedSubSelection::ApplyGet(const void* Source, void* OutValue) const
 	{
 		if (CompiledChain.Steps.IsEmpty())
 		{
-			// No sub-selection applies (either user asked for nothing or the
-			// compiler dropped every step as nonsensical). Plain convert.
 			if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
 			return;
 		}
 
-		// Walk the chain with double-buffered intermediates. Step N's input
-		// is either Source (step 0) or the previous step's output buffer.
-		// For the last step, we write directly to OutValue only if no
-		// FinalChainType -> WorkingType conversion is needed. Otherwise we
-		// land the chain output in a buffer and run ConvertFinalToWorking.
+		const int32 NumSteps = CompiledChain.Steps.Num();
+
+		// Fast path: single-step chain (the common case — .X, .Position,
+		// .Forward, etc.). Uses cached fn pointer + parsed data — zero
+		// array dereference, zero bounds check.
+		if (bIsSingleStep)
+		{
+			if (FinalChainType == WorkingType)
+			{
+				SingleStepGetFn(Source, OutValue, SingleStepParsed);
+			}
+			else
+			{
+				alignas(16) uint8 Tmp[96];
+				SingleStepGetFn(Source, Tmp, SingleStepParsed);
+				if (ConvertFinalToWorking) { ConvertFinalToWorking(Tmp, OutValue); }
+			}
+			return;
+		}
+
+		// Multi-step path: double-buffered intermediates.
 		alignas(16) uint8 BufA[96];
 		alignas(16) uint8 BufB[96];
 		void* Bufs[2] = { BufA, BufB };
 
 		const void* CurrentIn = Source;
 		int32 BufIdx = 0;
-		const int32 LastIdx = CompiledChain.Steps.Num() - 1;
+		const int32 LastIdx = NumSteps - 1;
 
 		for (int32 i = 0; i < LastIdx; ++i)
 		{
 			const FSubSelectionStep& Step = CompiledChain.Steps[i];
-			check(Step.StepGetFn);
-
 			void* StepOut = Bufs[BufIdx];
 			Step.StepGetFn(CurrentIn, StepOut, Step.Parsed);
 			CurrentIn = StepOut;
@@ -161,19 +188,17 @@ namespace PCGExData
 		}
 
 		const FSubSelectionStep& Last = CompiledChain.Steps[LastIdx];
-		check(Last.StepGetFn);
 
 		if (FinalChainType == WorkingType)
 		{
-			// Direct write: chain's final output is already the working type.
 			Last.StepGetFn(CurrentIn, OutValue, Last.Parsed);
-			return;
 		}
-
-		// Indirect: write to intermediate buffer, then convert.
-		void* FinalBuf = Bufs[BufIdx];
-		Last.StepGetFn(CurrentIn, FinalBuf, Last.Parsed);
-		if (ConvertFinalToWorking) { ConvertFinalToWorking(FinalBuf, OutValue); }
+		else
+		{
+			void* FinalBuf = Bufs[BufIdx];
+			Last.StepGetFn(CurrentIn, FinalBuf, Last.Parsed);
+			if (ConvertFinalToWorking) { ConvertFinalToWorking(FinalBuf, OutValue); }
+		}
 	}
 
 	void FCachedSubSelection::ApplySet(void* Target, const void* Source) const
@@ -184,7 +209,7 @@ namespace PCGExData
 			return;
 		}
 
-		const int32 LastIdx = CompiledChain.Steps.Num() - 1;
+		const int32 NumSteps = CompiledChain.Steps.Num();
 
 		// Any step without a SetFn (e.g., axis) disqualifies the whole chain
 		// for inject. Defensive check -- AppliesToTargetWrite also guards.
@@ -193,20 +218,35 @@ namespace PCGExData
 			if (!Step.StepSetFn) { return; }
 		}
 
-		// Stage 3 uses a fixed-size intermediate buffer array. A compiled
-		// chain should never exceed ~3 steps in practice (a user-written
-		// pair can auto-promote by 1 step on Transform source). 4 slots
-		// gives headroom; assertion makes any overflow loud.
-		constexpr int32 MaxSteps = 4;
-		checkf(CompiledChain.Steps.Num() <= MaxSteps,
-			TEXT("FCachedSubSelection chain exceeded MaxSteps (%d > %d)"),
-			CompiledChain.Steps.Num(), MaxSteps);
+		// Convert Source (WorkingType) to FinalChainType so it matches
+		// the last step's expected NewChild type.
+		alignas(16) uint8 NewChildBuf[96];
+		const void* NewChild = Source;
+		if (WorkingType != FinalChainType)
+		{
+			if (ConvertWorkingToFinal) { ConvertWorkingToFinal(Source, NewChildBuf); }
+			else { return; }
+			NewChild = NewChildBuf;
+		}
 
+		// Fast path: single-step chain. Uses cached fn pointer — inject
+		// directly into Target with zero array dereference.
+		if (bIsSingleStep)
+		{
+			SingleStepSetFn(Target, NewChild, SingleStepParsed);
+			return;
+		}
+
+		// Multi-step path: extract-modify-inject.
+		constexpr int32 MaxSteps = 4;
+		checkf(NumSteps <= MaxSteps,
+			TEXT("FCachedSubSelection chain exceeded MaxSteps (%d > %d)"),
+			NumSteps, MaxSteps);
+
+		const int32 LastIdx = NumSteps - 1;
 		alignas(16) uint8 Buffers[MaxSteps][96];
 
-		// 1) Extract phase: walk forward to populate Buffers[0..LastIdx-1]
-		//    with the current state at each depth. Buffers[LastIdx-1] is the
-		//    parent of the last (injection) step.
+		// Extract phase: walk forward to populate intermediates.
 		{
 			const void* CurrentIn = Target;
 			for (int32 i = 0; i < LastIdx; ++i)
@@ -217,30 +257,14 @@ namespace PCGExData
 			}
 		}
 
-		// 2) Convert Source (WorkingType) to FinalChainType so it matches
-		//    the last step's expected NewChild type. Skip the conversion
-		//    when the two types are identical.
-		alignas(16) uint8 NewChildBuf[96];
-		const void* NewChild = Source;
-		if (WorkingType != FinalChainType)
-		{
-			if (ConvertWorkingToFinal) { ConvertWorkingToFinal(Source, NewChildBuf); }
-			else { return; } // Can't bridge -- bail out.
-			NewChild = NewChildBuf;
-		}
-
-		// 3) Inject phase: mutate the last-step's parent with the converted
-		//    NewChild. Then walk backward, propagating each mutation up.
+		// Inject at last step, walk backward propagating mutations.
 		void* LastParent = (LastIdx == 0) ? Target : Buffers[LastIdx - 1];
-		const FSubSelectionStep& Last = CompiledChain.Steps[LastIdx];
-		Last.StepSetFn(LastParent, NewChild, Last.Parsed);
+		CompiledChain.Steps[LastIdx].StepSetFn(LastParent, NewChild, CompiledChain.Steps[LastIdx].Parsed);
 
 		for (int32 i = LastIdx - 1; i >= 0; --i)
 		{
-			const FSubSelectionStep& Step = CompiledChain.Steps[i];
 			void* Parent = (i == 0) ? Target : Buffers[i - 1];
-			const void* Child = Buffers[i];
-			Step.StepSetFn(Parent, Child, Step.Parsed);
+			CompiledChain.Steps[i].StepSetFn(Parent, Buffers[i], CompiledChain.Steps[i].Parsed);
 		}
 	}
 }

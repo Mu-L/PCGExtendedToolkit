@@ -53,6 +53,19 @@ namespace PCGExData
 		PCGExTypeOps::ESingleField Field = PCGExTypeOps::ESingleField::X;
 		EPCGMetadataTypes PossibleSourceType = EPCGMetadataTypes::Unknown;
 
+		// Classifier bitmask. Cached at Init time so HasSelection /
+		// IsFieldSelection / etc. are O(1) bit tests instead of chain walks.
+		enum EClassifierBits : uint8
+		{
+			Bit_HasSelection      = 1 << 0,
+			Bit_Field             = 1 << 1,
+			Bit_Axis              = 1 << 2,
+			Bit_Component         = 1 << 3,
+			Bit_ContainerIndex    = 1 << 4,
+			Bit_ContainerCount    = 1 << 5,
+		};
+		uint8 ClassifierMask = 0;
+
 		// Constructors
 		FSubSelection() = default;
 		explicit FSubSelection(const TArray<FString>& ExtraNames);
@@ -85,22 +98,22 @@ namespace PCGExData
 		//
 
 		/** True if the parsed chain has at least one step. */
-		bool HasSelection() const;
+		FORCEINLINE bool HasSelection() const { return (ClassifierMask & Bit_HasSelection) != 0; }
 
 		/** True if the chain contains a SingleField step (resolves to Double). */
-		bool IsFieldSelection() const;
+		FORCEINLINE bool IsFieldSelection() const { return (ClassifierMask & Bit_Field) != 0; }
 
 		/** True if the chain contains an Axis step. */
-		bool IsAxisSelection() const;
+		FORCEINLINE bool IsAxisSelection() const { return (ClassifierMask & Bit_Axis) != 0; }
 
 		/** True if the chain contains a TransformPart step. */
-		bool IsComponentSelection() const;
+		FORCEINLINE bool IsComponentSelection() const { return (ClassifierMask & Bit_Component) != 0; }
 
-		/** True if the chain contains an FContainerIndexAccessor step (Stage 5b). */
-		bool IsContainerIndexSelection() const;
+		/** True if the chain contains an FContainerIndexAccessor step. */
+		FORCEINLINE bool IsContainerIndexSelection() const { return (ClassifierMask & Bit_ContainerIndex) != 0; }
 
-		/** True if the chain contains an FContainerCountAccessor step (Stage 5b). */
-		bool IsContainerCountSelection() const;
+		/** True if the chain contains an FContainerCountAccessor step. */
+		FORCEINLINE bool IsContainerCountSelection() const { return (ClassifierMask & Bit_ContainerCount) != 0; }
 
 		/**
 		 * Best-guess hint for the source-side type this selection assumes.
@@ -153,6 +166,18 @@ namespace PCGExData
 		 * Empty for default-constructed instances or empty ExtraNames.
 		 */
 		FSubSelectionChain ParsedChain;
+
+		/**
+		 * 1-entry compile cache for ApplyGet/ApplySet. The type-erased
+		 * dispatch compiles the chain on-the-fly against SourceType; since
+		 * the same FSubSelection is typically applied to many elements of
+		 * the same type, caching the last compilation avoids re-running
+		 * CompileChainForSource per element. Thread-safe via mutable
+		 * (each FSubSelection is owned by a single proxy descriptor, not
+		 * shared across threads).
+		 */
+		mutable FSubSelectionChain CachedCompiled;
+		mutable EPCGMetadataTypes CachedCompiledSourceType = EPCGMetadataTypes::Unknown;
 
 	public:
 		//

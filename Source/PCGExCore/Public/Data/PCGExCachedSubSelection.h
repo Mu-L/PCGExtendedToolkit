@@ -78,6 +78,14 @@ namespace PCGExData
 		const PCGExTypeOps::ITypeOpsBase* RealOps = nullptr;
 		const PCGExTypeOps::ITypeOpsBase* WorkingOps = nullptr;
 
+		// 1-step fast-path cache. Populated by Initialize when the compiled
+		// chain has exactly 1 step (the common case: .X, .Position, etc.).
+		// Avoids array dereference + bounds check on every ApplyGet/ApplySet.
+		bool bIsSingleStep = false;
+		FStepGetFn SingleStepGetFn = nullptr;
+		FStepSetFn SingleStepSetFn = nullptr;
+		FAccessorParseResult SingleStepParsed;
+
 		// Stage 5c: compile-time-created FProperty instances for container
 		// steps that need property-aware reads/writes (e.g., CopyCompleteValue
 		// for non-trivially-copyable element types). Each compiled container

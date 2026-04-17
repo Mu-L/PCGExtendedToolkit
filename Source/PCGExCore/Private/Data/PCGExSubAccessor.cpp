@@ -239,22 +239,25 @@ namespace PCGExData
 
 		EPCGMetadataTypes CurrentType = SourceType;
 
-		// CurrentDesc tracks the attribute-descriptor view of the value at
-		// this chain position. Starts as SourceDesc. Each container step
-		// that Keeps strips one ContainerType layer from the stack-local
-		// copy; this enables nested container unwrap (.1.0 on
-		// TArray<TArray<T>>). Non-container steps (TransformPart, Axis,
-		// Field, Swizzle) clear the Desc since they don't consume
-		// containers.
-		//
-		// We keep the Desc as an optional stack-local copy so the pointer
-		// remains valid throughout the loop without external ownership.
-		TOptional<FPCGMetadataAttributeDesc> DescStorage;
-		if (SourceDesc) { DescStorage.Emplace(*SourceDesc); }
+		// CurrentDesc tracks the attribute-descriptor view at this chain
+		// position. Uses an index offset into the original SourceDesc's
+		// ContainerTypes rather than mutating a copy (avoids O(N) RemoveAt
+		// per container step). Non-container steps clear the Desc entirely.
+		const FPCGMetadataAttributeDesc* BaseDesc = SourceDesc;
+		int32 ContainerDepth = 0; // number of container layers consumed
+		TOptional<FPCGMetadataAttributeDesc> StrippedDescStorage; // lazy, only if needed
 
 		auto GetCurrentDesc = [&]() -> const FPCGMetadataAttributeDesc*
 		{
-			return DescStorage.IsSet() ? &DescStorage.GetValue() : nullptr;
+			if (!BaseDesc) { return nullptr; }
+			if (ContainerDepth == 0) { return BaseDesc; }
+			// Synthesize a stripped view on demand (rare — only for nested containers).
+			if (!StrippedDescStorage.IsSet())
+			{
+				StrippedDescStorage.Emplace(*BaseDesc);
+				StrippedDescStorage->ContainerTypes.RemoveAt(0, ContainerDepth);
+			}
+			return &StrippedDescStorage.GetValue();
 		};
 
 		// Detect container accessor types for desc propagation decisions.
@@ -285,13 +288,14 @@ namespace PCGExData
 						Step.Accessor == ContainerIndexAccessor ||
 						Step.Accessor == ContainerCountAccessor;
 
-					if (bIsContainerStep && DescStorage.IsSet() && !DescStorage->IsSingleValue())
+					if (bIsContainerStep && BaseDesc && ContainerDepth < BaseDesc->ContainerTypes.Num())
 					{
-						DescStorage->ContainerTypes.RemoveAt(0);
+						ContainerDepth++;
+						StrippedDescStorage.Reset(); // invalidate lazy cache
 					}
 					else
 					{
-						DescStorage.Reset();
+						BaseDesc = nullptr; // non-container step clears Desc
 					}
 
 					CurrentType = Step.OutType;
@@ -317,7 +321,7 @@ namespace PCGExData
 				// TransformPart promotion doesn't consume a container layer.
 				// Clear Desc — the promoted value is a scalar sub-component
 				// of a Transform, no container semantics.
-				DescStorage.Reset();
+				BaseDesc = nullptr;
 				InOutChain.Steps.Add(MoveTemp(Inserted));
 				// Loop back to re-classify the same Step under the new CurrentType.
 			}
