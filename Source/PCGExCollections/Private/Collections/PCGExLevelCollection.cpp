@@ -11,6 +11,7 @@
 
 #include "PCGExLog.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExSocketProvider.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
 
 // Static-init type registration: TypeId=Level, parent=Base
@@ -84,6 +85,20 @@ void FPCGExLevelCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		{
 			for (AActor* Actor : World->PersistentLevel->Actors)
 			{
+				if (!Actor) { continue; }
+
+				// Extract sockets from socket actors before content filter.
+				// StaticPassesFilter will then reject actors with ShouldStripFromExport=true,
+				// keeping them out of bounds computation automatically.
+				if (IPCGExSocketProvider* Provider = Cast<IPCGExSocketProvider>(Actor))
+				{
+					FPCGExSocket& NewSocket = Staging.Sockets.Emplace_GetRef(
+						Provider->GetSocketName_Implementation(),
+						Provider->GetSocketTransform_Implementation(),
+						Provider->GetSocketTag_Implementation());
+					NewSocket.bManaged = true;
+				}
+
 				if (!UPCGExActorContentFilter::StaticPassesFilter(
 					LevelCollection->ContentFilter, Actor,
 					const_cast<UPCGExLevelCollection*>(LevelCollection), InInternalIndex))

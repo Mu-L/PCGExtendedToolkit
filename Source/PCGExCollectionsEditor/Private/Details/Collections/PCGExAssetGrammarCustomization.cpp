@@ -12,6 +12,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SBoxPanel.h"
 
@@ -53,6 +54,7 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 	TSharedPtr<IPropertyHandle> SymbolHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, Symbol));
 	TSharedPtr<IPropertyHandle> ScaleModeHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, ScaleMode));
 	TSharedPtr<IPropertyHandle> SizeHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, Size));
+	TSharedPtr<IPropertyHandle> FixedSizeHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, FixedSize));
 	TSharedPtr<IPropertyHandle> DebugColorHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, DebugColor));
 
 	TSharedPtr<IPropertyHandle> GrammarSourceHandle = nullptr;
@@ -154,6 +156,39 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 				.IsEnabled_Lambda(IsLocalData)
 				[
 					SizeHandle->CreatePropertyValueWidget()
+				]
+			]
+			// Fixed size (conditional)
+			+ SHorizontalBox::Slot().Padding(1).FillWidth(1)
+			[
+				SNew(SBox)
+				.IsEnabled_Lambda(IsLocalData)
+				.Visibility_Lambda([SizeHandle]()
+				{
+					uint8 EnumValue = 0;
+					if (SizeHandle->GetValue(EnumValue) == FPropertyAccess::Success)
+					{
+						return EnumValue == static_cast<uint8>(EPCGExGrammarSizeReference::Fixed) ? EVisibility::Visible : EVisibility::Collapsed;
+					}
+					return EVisibility::Collapsed;
+				})
+				[
+					SNew(SNumericEntryBox<double>)
+					.Value_Lambda([FixedSizeHandle]() -> TOptional<double>
+					{
+						double V = 0;
+						FixedSizeHandle->GetValue(V);
+						return V;
+					})
+					.OnValueCommitted_Lambda([FixedSizeHandle](double NewVal, ETextCommit::Type)
+					{
+						FixedSizeHandle->SetValue(NewVal);
+					})
+					.ToolTipText(FixedSizeHandle->GetToolTipText())
+					.AllowSpin(true)
+					.MinValue(0.0)
+					.MinSliderValue(0.0)
+					.MaxSliderValue(1000.0)
 				]
 			]
 			// Debug color
