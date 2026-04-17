@@ -4,6 +4,7 @@
 #include "Helpers/PCGExActorContentFilter.h"
 
 #include "GameFramework/Actor.h"
+#include "PCGExSocketProvider.h"
 
 #if WITH_EDITOR
 #include "Engine/LevelScriptActor.h"
@@ -38,6 +39,12 @@ bool UPCGExActorContentFilter::StaticPassesFilter(
 	UPCGExAssetCollection* OwningCollection, int32 EntryIndex)
 {
 	if (!Actor) { return false; }
+
+	// Socket providers that strip themselves are excluded from all content scans
+	if (const IPCGExSocketProvider* Provider = Cast<IPCGExSocketProvider>(Actor))
+	{
+		if (Provider->ShouldStripFromExport_Implementation()) { return false; }
+	}
 
 	if (Filter)
 	{

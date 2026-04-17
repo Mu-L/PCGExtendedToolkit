@@ -8,9 +8,12 @@
 #include "PCGManagedResource.h"
 #include "PCGParamData.h"
 #include "Helpers/PCGExManagedResourceHelpers.h"
+#include "Helpers/PCGHelpers.h"
+#include "Helpers/PCGActorHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataForward.h"
+#include "Engine/Level.h"
 #include "Engine/World.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
@@ -300,12 +303,30 @@ namespace PCGExStagingSpawnActors
 		const bool bHasDelta = Settings->bApplyPropertyDeltas
 			&& ActorEntry->SerializedPropertyDelta.Num() > 0;
 
+		const UPCGComponent* SourceComponent = ExecutionContext->GetComponent();
+		const bool bIsPreviewActor = (SourceComponent && SourceComponent->IsInPreviewMode());
+
 		AActor* SpawnedActor = nullptr;
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::WorldSpawnActor);
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.Template = Cast<AActor>(ActorClass->GetDefaultObject());
 			SpawnParams.SpawnCollisionHandlingOverride = Settings->CollisionHandling;
+			// Explicitly target the persistent level so the actor is serialized with the
+			// main level's .umap (mirrors UPCGActorHelpers::SpawnDefaultActor).
+			SpawnParams.OverrideLevel = World->PersistentLevel;
+			// Mark transient at runtime / in PIE / when the PCG component is in preview
+			// mode, so preview/runtime-spawned actors don't accidentally persist to disk.
+			// Mirrors UPCGActorHelpers::SpawnDefaultActor's flag handling.
+			if (PCGHelpers::IsRuntimeOrPIE() || bIsPreviewActor)
+			{
+				SpawnParams.ObjectFlags |= RF_Transient | RF_NonPIEDuplicateTransient;
+			}
+			// Defer construction when a delta is present so properties can be applied
+			// before construction scripts run. This is the key reason we use direct
+			// SpawnActor instead of UPCGActorHelpers::SpawnDefaultActor: the helper does
+			// post-spawn setup that can interfere with the deferred + pre-construction
+			// delta apply sequence.
 			if (bHasDelta) { SpawnParams.bDeferConstruction = true; }
 			SpawnedActor = World->SpawnActor<AActor>(ActorClass, SpawnTransform, SpawnParams);
 		}
@@ -326,6 +347,39 @@ namespace PCGExStagingSpawnActors
 		{
 			PCGExActorDelta::ApplyPropertyDelta(SpawnedActor, ActorEntry->SerializedPropertyDelta);
 			SpawnedActor->FinishSpawning(SpawnTransform);
+
+			// Delta application writes the source actor's root component transform
+			// (RelativeLocation/Rotation/Scale3D are user-editable UPROPERTYs so they're
+			// captured in the delta). That overwrites the location we spawned at, so the
+			// actor ends up at the source actor's original position instead of the PCG
+			// point's position. Re-apply the spawn transform so the PCG point wins.
+			SpawnedActor->SetActorTransform(SpawnTransform);
+		}
+
+		// Persistence setup (skipped for preview/runtime-spawned actors which are
+		// intentionally transient). After FinishSpawning the actor is fully constructed
+		// and its outer/package chain is finalized, so it's safe to:
+		//  1. Tag with UE's standard PCG-generated marker
+		//  2. Modify() the actor (adds to transaction buffer AND dirties its package)
+		//  3. Explicitly dirty the owning level/package as belt-and-suspenders
+		// Without this, programmatic SpawnActor leaves the level package clean, so the
+		// editor's Save pipeline skips writing the .umap entirely -- spawned actors appear
+		// in-editor but vanish after restart. User-moved actors persist because the move
+		// triggers the editor's own Modify/MarkPackageDirty flow.
+		const bool bTransientSpawn = PCGHelpers::IsRuntimeOrPIE() || bIsPreviewActor;
+		if (!SpawnedActor->Tags.Contains(PCGHelpers::DefaultPCGActorTag))
+		{
+			SpawnedActor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
+		}
+		if (!bTransientSpawn)
+		{
+			SpawnedActor->Modify();
+			(void)SpawnedActor->MarkPackageDirty();
+			if (ULevel* ActorLevel = SpawnedActor->GetLevel())
+			{
+				ActorLevel->Modify();
+				(void)ActorLevel->MarkPackageDirty();
+			}
 		}
 
 		// UE-62747: SpawnActor doesn't properly apply scale from the spawn transform
@@ -375,9 +429,14 @@ namespace PCGExStagingSpawnActors
 		// tracked and will be cleaned up.
 		if (!ManagedActors)
 		{
-			ManagedActors = NewObject<UPCGManagedActors>(ExecutionContext->GetMutableComponent());
+			UPCGComponent* MutableSourceComponent = ExecutionContext->GetMutableComponent();
+			ManagedActors = NewObject<UPCGManagedActors>(MutableSourceComponent);
 			ManagedActors->SetCrc(Context->DependenciesCrc);
-			ExecutionContext->GetMutableComponent()->AddToManagedResources(ManagedActors);
+			// Explicitly reflect the component's editing mode on the resource. Without this,
+			// bIsPreview may not match the component state and tracked actors can be treated
+			// as transient. UE's PCG spawn element does this at PCGSpawnActor.cpp:972.
+			ManagedActors->SetIsPreview(bIsPreviewActor);
+			MutableSourceComponent->AddToManagedResources(ManagedActors);
 		}
 
 		ManagedActors->GetMutableGeneratedActors().Add(SpawnedActor);

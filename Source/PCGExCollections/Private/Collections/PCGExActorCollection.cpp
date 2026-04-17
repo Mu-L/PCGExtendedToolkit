@@ -11,6 +11,7 @@
 #include "PCGComponent.h"
 #include "PCGExLog.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExSocketProvider.h"
 #include "Engine/Blueprint.h"
 #include "Engine/Level.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
@@ -113,6 +114,18 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 			                 ? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
 			                 : nullptr;
 
+		// Temp actor is at FTransform::Identity, so component world transform == relative to actor
+		TArray<UPCGExSocketComponent*> SocketComps;
+		TempActor->GetComponents<UPCGExSocketComponent>(SocketComps);
+		for (UPCGExSocketComponent* SC : SocketComps)
+		{
+			FPCGExSocket& NewSocket = Staging.Sockets.Emplace_GetRef(
+				SC->GetSocketName_Implementation(),
+				SC->GetSocketTransform_Implementation(),
+				SC->GetSocketTag_Implementation());
+			NewSocket.bManaged = true;
+		}
+
 		// Hide the actor to ensure it doesn't affect gameplay or rendering
 		TempActor->SetActorHiddenInGame(true);
 		TempActor->SetActorEnableCollision(false);
@@ -204,11 +217,12 @@ void FPCGExActorCollectionEntry::EDITOR_Sanitize()
 			CachedPCGGraph = nullptr;
 		}
 
-		// Clear stale delta if source level reference was removed
-		if (!DeltaSourceLevel.ToSoftObjectPath().IsValid() || DeltaSourceActorName == NAME_None)
-		{
-			SerializedPropertyDelta.Empty();
-		}
+		// Do NOT clear SerializedPropertyDelta here. Embedded entries populated by
+		// UPCGExDefaultLevelDataExporter never set DeltaSourceLevel/DeltaSourceActorName
+		// (the delta is captured programmatically from live actors at export time), so
+		// clearing on empty DeltaSource would wipe legitimate embedded deltas on every
+		// rebuild. User-authored entries that clear their DeltaSource can manually clear
+		// the delta via the details panel if needed.
 	}
 	else
 	{

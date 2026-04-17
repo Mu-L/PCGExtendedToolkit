@@ -27,6 +27,7 @@ enum class EPCGExGrammarSizeReference : uint8
 	Min     = 3 UMETA(DisplayName = "Smallest", Tooltip="Use smallest axis size", ActionIcon="MinSize"),
 	Max     = 4 UMETA(DisplayName = "Largest", Tooltip="Use largest axis size", ActionIcon="MaxSize"),
 	Average = 5 UMETA(DisplayName = "Average", Tooltip="Average size of all axes.", ActionIcon="AverageSize"),
+	Fixed   = 6 UMETA(DisplayName = "Fixed", Tooltip="Use a manually specified size, independent of bounds.", ActionIcon="Constant"),
 };
 
 UENUM()
@@ -74,6 +75,10 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 	/** If the volume can be scaled to fit the remaining space or not. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	EPCGExGrammarSizeReference Size = EPCGExGrammarSizeReference::X;
+
+	/** Manually specified size, used when Size is set to Fixed. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="Size == EPCGExGrammarSizeReference::Fixed", EditConditionHides, ClampMin=0))
+	double FixedSize = 100;
 
 	/** For easier debugging, using Point color in conjunction with PCG Debug Color Material. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
