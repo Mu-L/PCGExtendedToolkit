@@ -26,16 +26,8 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorFactoryBaseConfig
 	FPCGExSelectorFactoryBaseConfig() = default;
 	virtual ~FPCGExSelectorFactoryBaseConfig() = default;
 
-	/** Which components contribute to per-point seed generation. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Seed", meta=(PCG_Overridable, Bitmask, BitmaskEnum="/Script/PCGExCore.EPCGExSeedComponents"))
-	uint8 SeedComponents = 0;
-
-	/** Per-factory seed offset applied on top of SeedComponents. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Seed", meta=(PCG_Overridable))
-	int32 LocalSeed = 0;
-
 	/** Entry-level (micro) distribution -- picks material variants etc. within a picked entry. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Distribution", meta=(PCG_Overridable, ShowOnlyInnerProperties))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Distribution", meta=(PCG_Overridable))
 	FPCGExMicroCacheDistributionDetails SubDistribution;
 
 	/** If enabled, limit picks to entries flagged with a specific category. */
@@ -49,4 +41,13 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorFactoryBaseConfig
 	/** What to do when a point's Category attribute does not match any named category in the collection. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, EditCondition="bUseCategories"))
 	EPCGExMissingCategoryBehavior MissingCategoryBehavior = EPCGExMissingCategoryBehavior::Skip;
+	
+	
+	/** Which components contribute to per-point seed generation. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Seed", meta=(PCG_Overridable, Bitmask, BitmaskEnum="/Script/PCGExCore.EPCGExSeedComponents"))
+	uint8 SeedComponents = 0;
+
+	/** Per-factory seed offset applied on top of SeedComponents. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Seed", meta=(PCG_Overridable))
+	int32 LocalSeed = 0;
 };
