@@ -23,8 +23,8 @@ namespace PCGExCollections
 {
 	class FCollectionSource;
 	class FPickUnpacker;
-	class FMicroDistributionHelper;
-	class FDistributionHelper;
+	class FMicroSelectorHelper;
+	class FSelectorHelper;
 }
 
 namespace PCGExMT
@@ -62,6 +62,8 @@ public:
 
 	virtual void PostInitProperties() override;
 #endif
+	
+	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 protected:
 	virtual FPCGElementPtr CreateElement() const override;
@@ -88,16 +90,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Attribute", EditCondition="!bUseStagedPoints && CollectionSource == EPCGExCollectionSource::Attribute", EditConditionHides))
 	FName CollectionPathAttributeName = "CollectionPath";
 
-	/** How distribution is configured for this node. Legacy uses the inline settings below; External uses a factory on the Distribution input pin. */
+	/** How distribution is configured for this node. Legacy uses the inline settings below; External uses a factory on the Selector input pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints", EditConditionHides))
-	EPCGExDistributionMode DistributionMode = EPCGExDistributionMode::Legacy;
+	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::Legacy;
 
 	/** Distribution details */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints && DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
 
 	/** How should materials be distributed and picked. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints && DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails MaterialDistributionSettings;
 
 #pragma region DEPRECATED
@@ -205,8 +207,8 @@ struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
 	TObjectPtr<UPCGExMeshCollection> MainCollection;
 	TSharedPtr<TSet<FSoftObjectPath>> AssetPaths;
 
-	/** External distribution factory read from the Distribution input pin (only set when DistributionMode==External). */
-	TObjectPtr<const UPCGExDistributionFactoryData> DistributionFactory;
+	/** External selector factory read from the Selector input pin (only set when DistributionMode==External). */
+	TObjectPtr<const UPCGExSelectorFactoryData> SelectorFactory;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL

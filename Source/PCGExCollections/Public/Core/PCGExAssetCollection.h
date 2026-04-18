@@ -356,6 +356,12 @@ namespace PCGExAssetCollection
 		TSharedPtr<FCategory> Main;
 		TMap<FName, TSharedPtr<FCategory>> Categories;
 
+		// Flattened set of all collections transitively reachable from this one (self + every
+		// subcollection returnable as a Host from GetEntry). Built during BuildCacheFromEntries
+		// via a cycle-safe tree walk. Consumed by FPickPacker bulk registration to precompute
+		// collection→GUID mappings without per-point lock contention.
+		TArray<TObjectPtr<UPCGExAssetCollection>> FlatHosts;
+
 		FCache();
 		~FCache() = default;
 
@@ -429,6 +435,9 @@ public:
 	PCGExAssetCollection::FCache* LoadCache();
 	virtual void InvalidateCache();
 	virtual void BuildCache();
+
+	/** Flattened set of all collections transitively reachable from this one (self + subcollection Hosts). */
+	const TArray<TObjectPtr<UPCGExAssetCollection>>& GetFlatHosts() { return LoadCache()->FlatHosts; }
 
 #pragma endregion
 
@@ -666,15 +675,62 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 	const int32 NumEntriesCount = InEntries.Num();
 	Cache->Main->Reserve(NumEntriesCount);
 
+	// Collect direct subcollection children while iterating entries. Recursion into their
+	// FlatHosts is deferred to after the loop because LoadCache() on a sub-collection takes
+	// its own CacheLock and we want to release the write path here before that happens.
+	TSet<UPCGExAssetCollection*> DirectSubs;
+
 	for (int32 i = 0; i < NumEntriesCount; i++)
 	{
 		T& Entry = InEntries[i];
 		if (!Entry.Validate(this)) { continue; }
 
 		Cache->RegisterEntry(i, static_cast<const FPCGExAssetCollectionEntry*>(&Entry));
+
+		if (Entry.HasValidSubCollection())
+		{
+			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(Entry.GetSubCollectionPtr()))
+			{
+				if (Sub != this) { DirectSubs.Add(Sub); }
+			}
+		}
 	}
 
 	Cache->Compile();
+
+	// Materialize FlatHosts: self + every transitively reachable subcollection, deduplicated.
+	// Walks sub-collections via ForEachEntry (direct Entries array read — no lock on the
+	// sub-collection's cache). This avoids calling LoadCache() on sub-collections, which
+	// could re-enter BuildCacheFromEntries on a cycle (A→B→A) and deadlock on our own
+	// CacheLock. Cycles are handled by the Visited set.
+	TSet<UPCGExAssetCollection*> Visited;
+	Visited.Add(this);
+	Cache->FlatHosts.Add(this);
+
+	TArray<UPCGExAssetCollection*> Stack;
+	for (UPCGExAssetCollection* Sub : DirectSubs)
+	{
+		bool bAlreadyVisited = false;
+		Visited.Add(Sub, &bAlreadyVisited);
+		if (!bAlreadyVisited) { Stack.Add(Sub); }
+	}
+
+	while (!Stack.IsEmpty())
+	{
+		UPCGExAssetCollection* Current = Stack.Pop(EAllowShrinking::No);
+		Cache->FlatHosts.Add(Current);
+
+		Current->ForEachEntry([&Visited, &Stack](const FPCGExAssetCollectionEntry* E, int32 /*Idx*/)
+		{
+			if (!E || !E->HasValidSubCollection()) { return; }
+			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(E->GetSubCollectionPtr()))
+			{
+				bool bAlreadyVisited = false;
+				Visited.Add(Sub, &bAlreadyVisited);
+				if (!bAlreadyVisited) { Stack.Add(Sub); }
+			}
+		});
+	}
 
 	return true;
 }

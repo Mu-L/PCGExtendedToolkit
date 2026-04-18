@@ -5,7 +5,7 @@
 
 #include "PCGComponent.h"
 #include "Components/SplineMeshComponent.h"
-#include "Distributions/PCGExDistributionFactoryProvider.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExData.h"
@@ -52,6 +52,12 @@ void UPCGExPathSplineMeshSettings::PostInitProperties()
 }
 #endif
 
+bool UPCGExPathSplineMeshSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
+{
+	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode != EPCGExSelectorMode::External) { return false; }
+	return Super::IsPinUsedByNodeExecution(InPin);
+}
+
 
 PCGEX_INITIALIZE_ELEMENT(PathSplineMesh)
 
@@ -63,9 +69,13 @@ void UPCGExPathSplineMeshSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPi
 	if (CollectionSource == EPCGExCollectionSource::AttributeSet) { PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Required) }
 	else { PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Advanced) }
 
-	if (!bUseStagedPoints && DistributionMode == EPCGExDistributionMode::External)
+	if (!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::External)
 	{
-		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceDistributionLabel, "External distribution factory driving entry picks.", Required, FPCGExDataTypeInfoDistribution::AsId())
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Required, FPCGExDataTypeInfoSelector::AsId())
+	}
+	else
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Advanced, FPCGExDataTypeInfoSelector::AsId())
 	}
 
 	Super::InputPinPropertiesBeforeFilters(PinProperties);
@@ -89,20 +99,20 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 
 	if (!Context->Tangents.Init(Context, Settings->Tangents)) { return false; }
 
-	if (!Settings->bUseStagedPoints && Settings->DistributionMode == EPCGExDistributionMode::External)
+	if (!Settings->bUseStagedPoints && Settings->SelectorMode == EPCGExSelectorMode::External)
 	{
-		TArray<TObjectPtr<const UPCGExDistributionFactoryData>> Factories;
-		if (!PCGExFactories::GetInputFactories<UPCGExDistributionFactoryData>(Context, PCGExCollections::Labels::SourceDistributionLabel, Factories, {PCGExFactories::EType::Distribution}))
+		TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
+		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))
 		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Distribution factory on the Distribution input pin."));
+			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
 			return false;
 		}
 		if (Factories.Num() != 1)
 		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Distribution factory is expected on the Distribution input pin."));
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Selector factory is expected on the Selector input pin."));
 			return false;
 		}
-		Context->DistributionFactory = Factories[0];
+		Context->SelectorFactory = Factories[0];
 	}
 
 	if (Settings->bUseStagedPoints)
@@ -368,7 +378,7 @@ namespace PCGExPathSplineMesh
 			Source->DistributionSettings = Settings->DistributionSettings;
 			Source->EntryDistributionSettings = Settings->MaterialDistributionSettings;
 
-			const UPCGExDistributionFactoryData* ExternalFactory = Context->DistributionFactory.Get();
+			const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
 
 			if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 			{
@@ -458,7 +468,7 @@ namespace PCGExPathSplineMesh
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			PCGExCollections::FMicroDistributionHelper* MicroHelper = nullptr;
+			PCGExCollections::FMicroSelectorHelper* MicroHelper = nullptr;
 
 			if (!PointFilterCache[Index] || (Index == LastIndex && !bClosedLoop))
 			{
@@ -476,7 +486,7 @@ namespace PCGExPathSplineMesh
 
 			if (bLocalFitting)
 			{
-				PCGExCollections::FDistributionHelper* Helper = nullptr;
+				PCGExCollections::FSelectorHelper* Helper = nullptr;
 				if (!Source->TryGetHelpers(Index, Helper, MicroHelper))
 				{
 					HandleInvalidPoint(Index);

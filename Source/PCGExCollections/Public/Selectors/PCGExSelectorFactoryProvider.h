@@ -5,24 +5,24 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCollectionsCommon.h"
-#include "PCGExDistributionFactoryBaseConfig.h"
+#include "PCGExSelectorFactoryBaseConfig.h"
 #include "Factories/PCGExFactoryData.h"
 #include "Factories/PCGExFactoryProvider.h"
 
-#include "PCGExDistributionFactoryProvider.generated.h"
+#include "PCGExSelectorFactoryProvider.generated.h"
 
 class FPCGExEntryPickerOperation;
 class FPCGExMicroEntryPickerOperation;
 
 USTRUCT(meta=(PCG_DataTypeDisplayName="PCGEx | Distribution"))
-struct FPCGExDataTypeInfoDistribution : public FPCGExFactoryDataTypeInfo
+struct FPCGExDataTypeInfoSelector : public FPCGExFactoryDataTypeInfo
 {
 	GENERATED_BODY()
 	PCG_DECLARE_TYPE_INFO(PCGEXCOLLECTIONS_API)
 };
 
 /**
- * Abstract factory data for collection distribution. Flows on the "Distribution" pin from
+ * Abstract factory data for collection distribution. Flows on the "Selector" pin from
  * palette factory nodes to consuming nodes (Staging Distribute, Spline Mesh, ...).
  *
  * Concrete subclasses override CreateEntryOperation to emit the hot-path picker matching
@@ -31,17 +31,17 @@ struct FPCGExDataTypeInfoDistribution : public FPCGExFactoryDataTypeInfo
  * overridden by concrete main-mode factories.
  */
 UCLASS(Abstract, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Data")
-class PCGEXCOLLECTIONS_API UPCGExDistributionFactoryData : public UPCGExFactoryData
+class PCGEXCOLLECTIONS_API UPCGExSelectorFactoryData : public UPCGExFactoryData
 {
 	GENERATED_BODY()
 
 public:
-	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoDistribution)
+	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoSelector)
 
 	UPROPERTY()
-	FPCGExDistributionFactoryBaseConfig BaseConfig;
+	FPCGExSelectorFactoryBaseConfig BaseConfig;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Distribution; }
+	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Selector; }
 
 	/** Create a hot-path entry picker operation. Concrete subclasses override. */
 	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const;
@@ -53,26 +53,26 @@ public:
 /**
  * Abstract palette node base for distribution factories. Concrete subclasses
  * (Index / Random / WeightedRandom, plus any user-authored mode) inherit this
- * and fill in CreateFactory to emit their matching UPCGExDistributionFactoryData.
+ * and fill in CreateFactory to emit their matching UPCGExSelectorFactoryData.
  *
  * Output pin label: "Distribution" (see PCGExCollections::Labels::OutputDistributionLabel).
  */
 UCLASS(Abstract, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Graph|Params")
-class PCGEXCOLLECTIONS_API UPCGExDistributionFactoryProviderSettings : public UPCGExFactoryProviderSettings
+class PCGEXCOLLECTIONS_API UPCGExSelectorFactoryProviderSettings : public UPCGExFactoryProviderSettings
 {
 	GENERATED_BODY()
 
 protected:
-	PCGEX_FACTORY_TYPE_ID(FPCGExDataTypeInfoDistribution)
+	PCGEX_FACTORY_TYPE_ID(FPCGExDataTypeInfoSelector)
 
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS(DistributionFactory, "Distribution Definition", "Creates a distribution factory definition.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Misc); }
+	PCGEX_NODE_INFOS(SelectorFactory, "Selector Definition", "Creates a selector factory definition.")
+	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Distribution); }
 #endif
 	//~End UPCGSettings
 
-	virtual FName GetMainOutputPin() const override { return PCGExCollections::Labels::OutputDistributionLabel; }
+	virtual FName GetMainOutputPin() const override { return PCGExCollections::Labels::OutputSelectorLabel; }
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 };

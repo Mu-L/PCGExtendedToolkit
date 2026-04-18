@@ -1,23 +1,25 @@
 // Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
-#include "Distributions/PCGExDistributionFactoryProvider.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 
-#include "Distributions/PCGExBuiltinPickerOperations.h"
-#include "Distributions/PCGExEntryPickerOperation.h"
-#include "Distributions/PCGExMicroEntryPickerOperation.h"
+#include "Selectors/PCGExBuiltinPickerOperations.h"
+#include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExMicroEntryPickerOperation.h"
 
-PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoDistribution, UPCGExDistributionFactoryData)
+PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoSelector, UPCGExSelectorFactoryData)
 
-TSharedPtr<FPCGExEntryPickerOperation> UPCGExDistributionFactoryData::CreateEntryOperation(FPCGExContext* InContext) const
+#pragma region UPCGExSelectorFactoryData
+
+TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorFactoryData::CreateEntryOperation(FPCGExContext* InContext) const
 {
 	// Abstract -- concrete subclasses (Index / Random / WeightedRandom / user) override.
 	return nullptr;
 }
 
-TSharedPtr<FPCGExMicroEntryPickerOperation> UPCGExDistributionFactoryData::CreateMicroOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExMicroEntryPickerOperation> UPCGExSelectorFactoryData::CreateMicroOperation(FPCGExContext* InContext) const
 {
-	// Default dispatch on BaseConfig.EntryDistribution.Distribution -- concrete main-mode
+	// Default dispatch on BaseConfig.EntrySelector.Distribution -- concrete main-mode
 	// factories rarely need to override this; it's shared across all built-in modes and
 	// user-authored factories that configure micro via the standard BaseConfig path.
 	switch (BaseConfig.EntryDistribution.Distribution)
@@ -36,7 +38,13 @@ TSharedPtr<FPCGExMicroEntryPickerOperation> UPCGExDistributionFactoryData::Creat
 	}
 }
 
-UPCGExFactoryData* UPCGExDistributionFactoryProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
+#pragma endregion
+
+#pragma region UPCGExSelectorFactoryProviderSettings
+
+UPCGExFactoryData* UPCGExSelectorFactoryProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
 {
 	return Super::CreateFactory(InContext, InFactory);
 }
+
+#pragma endregion

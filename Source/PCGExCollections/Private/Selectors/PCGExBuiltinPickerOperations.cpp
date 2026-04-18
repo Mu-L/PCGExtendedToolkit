@@ -1,23 +1,31 @@
 // Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
-#include "Distributions/PCGExBuiltinPickerOperations.h"
+#include "Selectors/PCGExBuiltinPickerOperations.h"
 
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Math/PCGExMath.h"
 
-// Entry pickers --------------------------------------------------------------
+#pragma region FPCGExEntryWeightedRandomPickerOp
 
 int32 FPCGExEntryWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed) const
 {
 	return Target ? Target->GetPickRandomWeighted(Seed) : -1;
 }
 
+#pragma endregion
+
+#pragma region FPCGExEntryRandomPickerOp
+
 int32 FPCGExEntryRandomPickerOp::Pick(int32 PointIndex, int32 Seed) const
 {
 	return Target ? Target->GetPickRandom(Seed) : -1;
 }
+
+#pragma endregion
+
+#pragma region FPCGExEntryIndexPickerOp
 
 bool FPCGExEntryIndexPickerOp::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget)
 {
@@ -48,7 +56,9 @@ int32 FPCGExEntryIndexPickerOp::Pick(int32 PointIndex, int32 Seed) const
 	return Target->GetPick(Sanitized, IndexConfig.PickMode);
 }
 
-// Micro pickers --------------------------------------------------------------
+#pragma endregion
+
+#pragma region FPCGExMicroWeightedRandomPickerOp
 
 int32 FPCGExMicroWeightedRandomPickerOp::Pick(const PCGExAssetCollection::FMicroCache* InMicroCache, int32 PointIndex, int32 Seed) const
 {
@@ -56,11 +66,19 @@ int32 FPCGExMicroWeightedRandomPickerOp::Pick(const PCGExAssetCollection::FMicro
 	return InMicroCache->GetPickRandomWeighted(Seed);
 }
 
+#pragma endregion
+
+#pragma region FPCGExMicroRandomPickerOp
+
 int32 FPCGExMicroRandomPickerOp::Pick(const PCGExAssetCollection::FMicroCache* InMicroCache, int32 PointIndex, int32 Seed) const
 {
 	if (!InMicroCache || InMicroCache->IsEmpty()) { return -1; }
 	return InMicroCache->GetPickRandom(Seed);
 }
+
+#pragma endregion
+
+#pragma region FPCGExMicroIndexPickerOp
 
 bool FPCGExMicroIndexPickerOp::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
 {
@@ -81,3 +99,5 @@ int32 FPCGExMicroIndexPickerOp::Pick(const PCGExAssetCollection::FMicroCache* In
 	const int32 Sanitized = PCGExMath::SanitizeIndex(Index, InMicroCache->Num() - 1, IndexConfig.IndexSafety);
 	return InMicroCache->GetPick(Sanitized, IndexConfig.PickMode);
 }
+
+#pragma endregion

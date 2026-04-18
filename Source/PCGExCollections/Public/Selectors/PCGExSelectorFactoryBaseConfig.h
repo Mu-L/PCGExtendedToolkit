@@ -8,10 +8,10 @@
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Details/PCGExStagingDetails.h"
 
-#include "PCGExDistributionFactoryBaseConfig.generated.h"
+#include "PCGExSelectorFactoryBaseConfig.generated.h"
 
 /**
- * Shared base configuration embedded on every concrete distribution factory data.
+ * Shared base configuration embedded on every concrete selector factory data.
  * Mirrors the FPCGExShapeConfigBase pattern from the Shapes module.
  *
  * Holds the picker-side concerns that are orthogonal to the main distribution strategy:
@@ -19,12 +19,12 @@
  * category scoping with its missing-key behavior.
  */
 USTRUCT(BlueprintType)
-struct PCGEXCOLLECTIONS_API FPCGExDistributionFactoryBaseConfig
+struct PCGEXCOLLECTIONS_API FPCGExSelectorFactoryBaseConfig
 {
 	GENERATED_BODY()
 
-	FPCGExDistributionFactoryBaseConfig() = default;
-	virtual ~FPCGExDistributionFactoryBaseConfig() = default;
+	FPCGExSelectorFactoryBaseConfig() = default;
+	virtual ~FPCGExSelectorFactoryBaseConfig() = default;
 
 	/** Which components contribute to per-point seed generation. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Seed", meta=(PCG_Overridable, Bitmask, BitmaskEnum="/Script/PCGExCore.EPCGExSeedComponents"))

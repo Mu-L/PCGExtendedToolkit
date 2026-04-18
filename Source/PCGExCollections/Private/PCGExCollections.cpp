@@ -12,7 +12,7 @@
 #include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
 #endif
 
-#include "Distributions/PCGExDistributionFactoryProvider.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExCollectionsModule"
@@ -35,11 +35,11 @@ void FPCGExCollectionsModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>&
 {
 	IPCGExLegacyModuleInterface::RegisterToEditor(InStyle);
 	
-	PCGEX_REGISTER_PIN_ICON(IN_Distribution)
-	PCGEX_REGISTER_PIN_ICON(OUT_Distribution)
+	PCGEX_REGISTER_PIN_ICON(IN_Selector)
+	PCGEX_REGISTER_PIN_ICON(OUT_Selector)
 	
 	PCGEX_START_PCG_REGISTRATION
-	PCGEX_REGISTER_DATA_TYPE(Distribution, Distribution)
+	PCGEX_REGISTER_DATA_TYPE(Selector, Selector)
 }
 #endif
 

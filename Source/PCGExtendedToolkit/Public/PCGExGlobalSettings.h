@@ -295,9 +295,9 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
 	FLinearColor ColorNoise3D = FLinearColor(1.000000, 0.191, 0.0, 1.000000);
 	
-	/** Color associated with distribution subnodes */
+	/** Color associated with selector subnodes */
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
-	FLinearColor ColorDistribution = FLinearColor(0.350314, 0.750000, 0.60501, 1.000000);
+	FLinearColor ColorSelector = FLinearColor(0.350314, 0.750000, 0.60501, 1.000000);
 
 #pragma endregion
 

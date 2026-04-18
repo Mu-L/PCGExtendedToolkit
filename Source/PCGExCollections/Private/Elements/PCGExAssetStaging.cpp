@@ -12,7 +12,7 @@
 #include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Distributions/PCGExDistributionFactoryProvider.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExAssetLoader.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
@@ -33,6 +33,12 @@ void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedE
 }
 #endif
 
+bool UPCGExAssetStagingSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
+{
+	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode != EPCGExSelectorMode::External) { return false; }
+	return Super::IsPinUsedByNodeExecution(InPin);
+}
+
 PCGExData::EIOInit UPCGExAssetStagingSettings::GetMainDataInitializationPolicy() const
 {
 	// Forward is more efficient but we need Duplicate when pruning since we'll remove points
@@ -41,23 +47,26 @@ PCGExData::EIOInit UPCGExAssetStagingSettings::GetMainDataInitializationPolicy()
 }
 
 PCGEX_INITIALIZE_ELEMENT(AssetStaging)
+
 PCGEX_ELEMENT_BATCH_POINT_IMPL(AssetStaging)
 
-TArray<FPCGPinProperties> UPCGExAssetStagingSettings::InputPinProperties() const
+void UPCGExAssetStagingSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const
 {
-	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-
 	if (CollectionSource == EPCGExCollectionSource::AttributeSet)
 	{
 		PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Required)
 	}
 
-	if (DistributionMode == EPCGExDistributionMode::External)
+	if (SelectorMode == EPCGExSelectorMode::External)
 	{
-		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceDistributionLabel, "External distribution factory driving entry picks.", Required, FPCGExDataTypeInfoDistribution::AsId())
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Required, FPCGExDataTypeInfoSelector::AsId())
+	}
+	else
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Advanced, FPCGExDataTypeInfoSelector::AsId())
 	}
 
-	return PinProperties;
+	Super::InputPinPropertiesBeforeFilters(PinProperties);
 }
 
 TArray<FPCGPinProperties> UPCGExAssetStagingSettings::OutputPinProperties() const
@@ -114,20 +123,20 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 		PCGEX_VALIDATE_NAME(Settings->EntryTypeAttributeName)
 	}
 
-	if (Settings->DistributionMode == EPCGExDistributionMode::External)
+	if (Settings->SelectorMode == EPCGExSelectorMode::External)
 	{
-		TArray<TObjectPtr<const UPCGExDistributionFactoryData>> Factories;
-		if (!PCGExFactories::GetInputFactories<UPCGExDistributionFactoryData>(Context, PCGExCollections::Labels::SourceDistributionLabel, Factories, {PCGExFactories::EType::Distribution}))
+		TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
+		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))
 		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Distribution factory on the Distribution input pin."));
+			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
 			return false;
 		}
 		if (Factories.Num() != 1)
 		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Distribution factory is expected on the Distribution input pin."));
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Selector factory is expected on the Selector input pin."));
 			return false;
 		}
-		Context->DistributionFactory = Factories[0];
+		Context->SelectorFactory = Factories[0];
 	}
 
 	if (Settings->CollectionSource == EPCGExCollectionSource::Asset)
@@ -364,7 +373,7 @@ namespace PCGExAssetStaging
 		Source->DistributionSettings = Settings->DistributionSettings;
 		Source->EntryDistributionSettings = Settings->EntryDistributionSettings;
 
-		const UPCGExDistributionFactoryData* ExternalFactory = Context->DistributionFactory.Get();
+		const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
 
 		if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 		{
@@ -431,6 +440,22 @@ namespace PCGExAssetStaging
 
 		if (Settings->bPruneEmptyPoints) { Mask.Init(1, PointDataFacade->GetNum()); }
 
+		// Pre-register every collection (and its flat host set) with the packer before going
+		// parallel. GetPickIdx is lock-free and assumes all reachable Hosts are mapped — without
+		// this call, PackToDataset would omit any Host that only surfaces via GetEntry recursion.
+		if (Context->CollectionPickDatasetPacker)
+		{
+			Source->RegisterCollectionsTo(*Context->CollectionPickDatasetPacker);
+		}
+
+		// Pre-register + seal the socket helper: Add() in the parallel loop becomes lock-free.
+		// Every leaf entry reachable via FlatHosts gets an FSocketInfos slot upfront (even ones
+		// that never get picked) — the trade-off is memory for contention-free parallel writes.
+		if (SocketHelper)
+		{
+			Source->RegisterSocketsTo(*SocketHelper);
+		}
+
 		StartParallelLoopForPoints();
 
 		return true;
@@ -495,8 +520,8 @@ namespace PCGExAssetStaging
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			PCGExCollections::FDistributionHelper* Helper = nullptr;
-			PCGExCollections::FMicroDistributionHelper* MicroHelper = nullptr;
+			PCGExCollections::FSelectorHelper* Helper = nullptr;
+			PCGExCollections::FMicroSelectorHelper* MicroHelper = nullptr;
 
 			if (!PointFilterCache[Index] || !Source->TryGetHelpers(Index, Helper, MicroHelper))
 			{
@@ -587,7 +612,8 @@ namespace PCGExAssetStaging
 
 			if (SocketHelper)
 			{
-				uint64 EntryHash = PCGEx::H64(EntryHost->GetUniqueID(), Staging.InternalIndex);
+				// Hash scheme must match FSocketHelper::RegisterCollection (and LoadSockets' GetSimplifiedEntryHash).
+				const uint64 EntryHash = PCGEx::H64(EntryHost->GetCollectionGUID(), Staging.InternalIndex);
 				SocketHelper->Add(Index, EntryHash, Entry);
 			}
 

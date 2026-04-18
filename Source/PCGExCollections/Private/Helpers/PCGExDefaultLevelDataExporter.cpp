@@ -601,6 +601,8 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 
 		// Encode hashes on points
 		PCGExCollections::FPickPacker Packer;
+		if (EmbeddedMeshCollection) { Packer.RegisterCollection(EmbeddedMeshCollection); }
+		if (EmbeddedActorCollection) { Packer.RegisterCollection(EmbeddedActorCollection); }
 
 		// Encode mesh hashes
 		if (MeshPointData && EmbeddedMeshCollection)

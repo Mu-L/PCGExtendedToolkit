@@ -10,19 +10,19 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Distributions/PCGExDistributionClassic.h"
-#include "Distributions/PCGExDistributionFactoryProvider.h"
-#include "Distributions/PCGExEntryPickerOperation.h"
-#include "Distributions/PCGExMicroEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorClassic.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExMicroEntryPickerOperation.h"
 #include "MeshSelectors/PCGMeshSelectorBase.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
 
 namespace PCGExCollections
 {
-	// Distribution Helper Implementation
+	// Selector Helper Implementation
 
-	FDistributionHelper::FDistributionHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails)
+	FSelectorHelper::FSelectorHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails)
 		: Collection(InCollection), Details(InDetails)
 	{
 	}
@@ -30,9 +30,9 @@ namespace PCGExCollections
 	// Synthesize a transient Classic factory that mirrors the Legacy Details struct. Used when
 	// the caller did not provide an ExternalFactory. Keeps the post-Init code path unified:
 	// everything downstream reads from ActiveFactory->BaseConfig regardless of mode.
-	static UPCGExDistributionClassicFactoryData* BuildLegacyFactory(FPCGExContext* InContext, const FPCGExAssetDistributionDetails& InDetails)
+	static UPCGExSelectorClassicFactoryData* BuildLegacyFactory(FPCGExContext* InContext, const FPCGExAssetDistributionDetails& InDetails)
 	{
-		UPCGExDistributionClassicFactoryData* Factory = InContext->ManagedObjects->New<UPCGExDistributionClassicFactoryData>();
+		UPCGExSelectorClassicFactoryData* Factory = InContext->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
 		Factory->Mode = InDetails.Distribution;
 		Factory->IndexConfig = InDetails.IndexSettings;
 		Factory->BaseConfig.SeedComponents = InDetails.SeedComponents;
@@ -41,20 +41,22 @@ namespace PCGExCollections
 		Factory->BaseConfig.Category = InDetails.Category;
 		Factory->BaseConfig.MissingCategoryBehavior = InDetails.MissingCategoryBehavior;
 		// BaseConfig.EntryDistribution stays default -- the Legacy EntryDistributionSettings
-		// lives on the consuming node and is plumbed through FMicroDistributionHelper separately.
+		// lives on the consuming node and is plumbed through FMicroSelectorHelper separately.
 		return Factory;
 	}
 
 	// Init resolves the active factory (External or transient-from-Legacy), then creates
 	// picker operations for Cache->Main and each named category. Hot-path dispatch after
 	// Init is: category map lookup -> op->Pick -> GetEntryRaw -> subcollection recursion.
-	bool FDistributionHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExDistributionFactoryData* ExternalFactory)
+	bool FSelectorHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FSelectorHelper::Init);
+
 		Cache = Collection->LoadCache();
 
 		if (Cache->IsEmpty())
 		{
-			PCGE_LOG_C(Error, GraphAndLog, InDataFacade->GetContext(), FTEXT("FDistributionHelper got an empty Collection."));
+			PCGE_LOG_C(Error, GraphAndLog, InDataFacade->GetContext(), FTEXT("FSelectorHelper got an empty Collection."));
 			return false;
 		}
 
@@ -64,7 +66,7 @@ namespace PCGExCollections
 		else { ActiveFactory = BuildLegacyFactory(Ctx, Details); }
 		if (!ActiveFactory) { return false; }
 
-		const FPCGExDistributionFactoryBaseConfig& BaseConfig = ActiveFactory->BaseConfig;
+		const FPCGExSelectorFactoryBaseConfig& BaseConfig = ActiveFactory->BaseConfig;
 
 		if (BaseConfig.bUseCategories)
 		{
@@ -103,7 +105,7 @@ namespace PCGExCollections
 	// Category attribute doesn't match any named category, MissingCategoryBehavior controls
 	// whether we skip (return nullptr) or fall back to MainPickerOp.
 	// Returns nullptr when the result should be an empty FPCGExEntryAccessResult.
-	const FPCGExEntryPickerOperation* FDistributionHelper::ResolvePickerForPoint(int32 PointIndex) const
+	const FPCGExEntryPickerOperation* FSelectorHelper::ResolvePickerForPoint(int32 PointIndex) const
 	{
 		if (!CategoryGetter) { return MainPickerOp.Get(); }
 
@@ -121,7 +123,7 @@ namespace PCGExCollections
 	// Entry picking: resolve the active picker (category-aware) -> pick a raw entries index
 	// -> resolve entry -> handle subcollection recursion via the "fallback to WeightedRandom"
 	// policy (matches current behavior when the picked entry is a subcollection).
-	FPCGExEntryAccessResult FDistributionHelper::GetEntry(int32 PointIndex, int32 Seed) const
+	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed) const
 	{
 		const FPCGExEntryPickerOperation* Op = ResolvePickerForPoint(PointIndex);
 		if (!Op) { return FPCGExEntryAccessResult{}; }
@@ -135,7 +137,7 @@ namespace PCGExCollections
 		return Result;
 	}
 
-	FPCGExEntryAccessResult FDistributionHelper::GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const
+	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const
 	{
 		if (TagInheritance == 0) { return GetEntry(PointIndex, Seed); }
 
@@ -153,7 +155,7 @@ namespace PCGExCollections
 
 	// MicroDistribution Helper Implementation
 
-	FMicroDistributionHelper::FMicroDistributionHelper(const FPCGExMicroCacheDistributionDetails& InDetails)
+	FMicroSelectorHelper::FMicroSelectorHelper(const FPCGExMicroCacheDistributionDetails& InDetails)
 		: Details(InDetails)
 	{
 	}
@@ -161,14 +163,16 @@ namespace PCGExCollections
 	// Legacy mode: synthesize a transient Classic factory with BaseConfig.EntryDistribution
 	// populated from the inline micro Details. External mode: use the caller-provided factory.
 	// Either way, the factory's CreateMicroOperation dispatches on EntryDistribution.Distribution.
-	bool FMicroDistributionHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExDistributionFactoryData* ExternalFactory)
+	bool FMicroSelectorHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FMicroSelectorHelper::Init);
+
 		FPCGExContext* Ctx = InDataFacade->GetContext();
 
-		const UPCGExDistributionFactoryData* Factory = ExternalFactory;
+		const UPCGExSelectorFactoryData* Factory = ExternalFactory;
 		if (!Factory)
 		{
-			UPCGExDistributionClassicFactoryData* Transient = Ctx->ManagedObjects->New<UPCGExDistributionClassicFactoryData>();
+			UPCGExSelectorClassicFactoryData* Transient = Ctx->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
 			Transient->BaseConfig.EntryDistribution = Details;
 			Factory = Transient;
 		}
@@ -178,7 +182,7 @@ namespace PCGExCollections
 		return PickerOp->PrepareForData(Ctx, InDataFacade);
 	}
 
-	int32 FMicroDistributionHelper::GetPick(const PCGExAssetCollection::FMicroCache* InMicroCache, int32 PointIndex, int32 Seed) const
+	int32 FMicroSelectorHelper::GetPick(const PCGExAssetCollection::FMicroCache* InMicroCache, int32 PointIndex, int32 Seed) const
 	{
 		return PickerOp ? PickerOp->Pick(InMicroCache, PointIndex, Seed) : -1;
 	}
@@ -196,26 +200,24 @@ namespace PCGExCollections
 		// Kept for API backward compatibility. GUID-based scheme no longer needs context.
 	}
 
-	uint64 FPickPacker::GetPickIdx(const UPCGExAssetCollection* InCollection, int16 InIndex, int16 InSecondaryIndex)
+	// Registers the given collection and every host reachable from it via FCache::FlatHosts.
+	// A single top-level call therefore covers the entire nested-collection tree. The write
+	// lock is held for the full batch to amortize the cost of one acquire across K inserts.
+	// Re-entrant / idempotent: collections already mapped are skipped.
+	void FPickPacker::RegisterCollection(UPCGExAssetCollection* InCollection)
 	{
-		const uint32 ItemHash = PCGEx::H32(InIndex, InSecondaryIndex + 1);
-		const uint32 GUID = InCollection->GetCollectionGUID();
+		if (!InCollection) { return; }
 
-		{
-			FReadScopeLock ReadScopeLock(AssetCollectionsLock);
-			if (CollectionMap.Contains(InCollection))
-			{
-				return PCGEx::H64(GUID, ItemHash);
-			}
-		}
+		const TArray<TObjectPtr<UPCGExAssetCollection>>& FlatHosts = InCollection->GetFlatHosts();
 
+		FWriteScopeLock WriteScopeLock(AssetCollectionsLock);
+		CollectionMap.Reserve(CollectionMap.Num() + FlatHosts.Num());
+		for (const TObjectPtr<UPCGExAssetCollection>& Host : FlatHosts)
 		{
-			FWriteScopeLock WriteScopeLock(AssetCollectionsLock);
-			if (!CollectionMap.Contains(InCollection))
+			if (UPCGExAssetCollection* H = Host.Get())
 			{
-				CollectionMap.Add(InCollection, GUID);
+				CollectionMap.FindOrAdd(H, H->GetCollectionGUID());
 			}
-			return PCGEx::H64(GUID, ItemHash);
 		}
 	}
 
@@ -435,24 +437,28 @@ namespace PCGExCollections
 	{
 	}
 
-	bool FCollectionSource::Init(UPCGExAssetCollection* InCollection, const UPCGExDistributionFactoryData* ExternalFactory)
+	bool FCollectionSource::Init(UPCGExAssetCollection* InCollection, const UPCGExSelectorFactoryData* ExternalFactory)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FCollectionSource::Init_Single);
+
 		SingleSource = InCollection;
-		Helper = MakeShared<FDistributionHelper>(InCollection, DistributionSettings);
+		Helper = MakeShared<FSelectorHelper>(InCollection, DistributionSettings);
 		if (!Helper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { return false; }
 
 		// Create micro helper for mesh collections
 		if (InCollection->IsType(PCGExAssetCollection::TypeIds::Mesh))
 		{
-			MicroHelper = MakeShared<FMicroDistributionHelper>(EntryDistributionSettings);
+			MicroHelper = MakeShared<FMicroSelectorHelper>(EntryDistributionSettings);
 			if (!MicroHelper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { return false; }
 		}
 
 		return true;
 	}
 
-	bool FCollectionSource::Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys, const UPCGExDistributionFactoryData* ExternalFactory)
+	bool FCollectionSource::Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys, const UPCGExSelectorFactoryData* ExternalFactory)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FCollectionSource::Init_Mapped);
+
 		Keys = InKeys;
 		if (!Keys) { return false; }
 
@@ -464,7 +470,7 @@ namespace PCGExCollections
 		{
 			UPCGExAssetCollection* Collection = Pair.Value.Get();
 
-			TSharedPtr<FDistributionHelper> NewHelper = MakeShared<FDistributionHelper>(Collection, DistributionSettings);
+			TSharedPtr<FSelectorHelper> NewHelper = MakeShared<FSelectorHelper>(Collection, DistributionSettings);
 			if (!NewHelper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { continue; }
 
 			Indices.Add(Pair.Key, Helpers.Add(NewHelper));
@@ -472,7 +478,7 @@ namespace PCGExCollections
 			// Create micro helper for mesh collections
 			if (Collection->IsType(PCGExAssetCollection::TypeIds::Mesh))
 			{
-				TSharedPtr<FMicroDistributionHelper> NewMicroHelper = MakeShared<FMicroDistributionHelper>(EntryDistributionSettings);
+				TSharedPtr<FMicroSelectorHelper> NewMicroHelper = MakeShared<FMicroSelectorHelper>(EntryDistributionSettings);
 				if (!NewMicroHelper->Init(DataFacade.ToSharedRef(), ExternalFactory))
 				{
 					MicroHelpers.Add(nullptr);
@@ -491,7 +497,37 @@ namespace PCGExCollections
 		return !Helpers.IsEmpty();
 	}
 
-	bool FCollectionSource::TryGetHelpers(int32 Index, FDistributionHelper*& OutHelper, FMicroDistributionHelper*& OutMicroHelper)
+	void FCollectionSource::RegisterCollectionsTo(FPickPacker& Packer) const
+	{
+		if (SingleSource)
+		{
+			Packer.RegisterCollection(SingleSource);
+			return;
+		}
+
+		for (const TSharedPtr<FSelectorHelper>& H : Helpers)
+		{
+			if (!H) { continue; }
+			Packer.RegisterCollection(H->GetCollection());
+		}
+	}
+
+	void FCollectionSource::RegisterSocketsTo(FSocketHelper& SocketHelper) const
+	{
+		if (SingleSource)
+		{
+			SocketHelper.RegisterCollection(SingleSource);
+			return;
+		}
+
+		for (const TSharedPtr<FSelectorHelper>& H : Helpers)
+		{
+			if (!H) { continue; }
+			SocketHelper.RegisterCollection(H->GetCollection());
+		}
+	}
+
+	bool FCollectionSource::TryGetHelpers(int32 Index, FSelectorHelper*& OutHelper, FMicroSelectorHelper*& OutMicroHelper)
 	{
 		if (SingleSource)
 		{
@@ -521,43 +557,58 @@ namespace PCGExCollections
 	}
 
 
+	// Lock-free hot path: InfosKeys is populated once at init via RegisterCollection and
+	// immutable during parallel Add(). A miss means a node forgot to register a collection
+	// that can surface as a Host — setup bug, not a runtime condition. checkSlow catches it
+	// in debug builds; shipping builds treat it as a no-op to stay crash-free.
 	void FSocketHelper::Add(const int32 Index, const uint64 EntryHash, const FPCGExAssetCollectionEntry* Entry)
 	{
-		const int32* IdxPtr = nullptr;
+		const int32* IdxPtr = InfosKeys.Find(EntryHash);
+		checkSlow(IdxPtr);
+		if (!IdxPtr) { return; }
 
+		FPlatformAtomics::InterlockedIncrement(&SocketInfosList[*IdxPtr].Count);
+		Mapping[Index] = *IdxPtr;
+	}
+
+	// Walk every leaf entry reachable from InCollection (self + FlatHosts) and populate the
+	// InfosKeys/SocketInfosList. Must run before any parallel Add(). Write lock is held so
+	// multiple sequential RegisterCollection() calls from different top-level collections
+	// compose correctly.
+	void FSocketHelper::RegisterCollection(UPCGExAssetCollection* InCollection)
+	{
+		if (!InCollection) { return; }
+
+		const TArray<TObjectPtr<UPCGExAssetCollection>>& FlatHosts = InCollection->GetFlatHosts();
+
+		FWriteScopeLock WriteLock(SocketLock);
+
+		for (const TObjectPtr<UPCGExAssetCollection>& HostPtr : FlatHosts)
 		{
-			FReadScopeLock ReadLock(SocketLock);
-			IdxPtr = InfosKeys.Find(EntryHash);
-		}
+			UPCGExAssetCollection* Host = HostPtr.Get();
+			if (!Host) { continue; }
 
-		int32 Idx = -1;
+			// GUID-keyed, matches both AssetStaging's Add() hash and LoadSockets' GetSimplifiedEntryHash.
+			const uint32 HostGUID = Host->GetCollectionGUID();
 
-		if (!IdxPtr)
-		{
-			FWriteScopeLock WriteLock(SocketLock);
-
-			IdxPtr = InfosKeys.Find(EntryHash);
-			if (IdxPtr)
+			Host->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 /*Idx*/)
 			{
-				Idx = *IdxPtr;
-			}
-			else
-			{
-				PCGExStaging::FSocketInfos& NewInfos = NewSocketInfos(EntryHash, Idx);
+				// Leaf-entry only: sub-collection entries don't carry Staging/Sockets themselves —
+				// their socket data lives on the sub-collection's own leaf entries, which we
+				// reach via the FlatHosts walk.
+				if (!Entry || Entry->bIsSubCollection) { return; }
 
+				const uint64 EntryHash = PCGEx::H64(HostGUID, Entry->Staging.InternalIndex);
+				if (InfosKeys.Contains(EntryHash)) { return; }
+
+				int32 NewIdx = -1;
+				PCGExStaging::FSocketInfos& NewInfos = NewSocketInfos(EntryHash, NewIdx);
 				NewInfos.Path = Entry->Staging.Path;
 				NewInfos.Category = Entry->Category;
 				NewInfos.Sockets = Entry->Staging.Sockets;
 
-				FilterSocketInfos(Idx);
-			}
+				FilterSocketInfos(NewIdx);
+			});
 		}
-		else
-		{
-			Idx = *IdxPtr;
-		}
-
-		FPlatformAtomics::InterlockedIncrement(&SocketInfosList[Idx].Count);
-		Mapping[Index] = Idx;
 	}
 }

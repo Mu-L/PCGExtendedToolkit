@@ -11,7 +11,7 @@
 #include "PCGExStagingDetails.generated.h"
 
 class UPCGExBitmaskCollection;
-class UPCGExDistributionFactoryData;
+class UPCGExSelectorFactoryData;
 class UPCGParamData;
 
 /**

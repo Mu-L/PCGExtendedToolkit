@@ -5,21 +5,21 @@
 
 #include "CoreMinimal.h"
 #include "Details/PCGExStagingDetails.h"
-#include "Distributions/PCGExDistributionFactoryProvider.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "PCGExCollectionsCommon.h"
 
-#include "PCGExDistributionClassic.generated.h"
+#include "PCGExSelectorClassic.generated.h"
 
 /**
- * Classic (built-in) distribution factory data. Supports Index, Random, and WeightedRandom
+ * Classic (built-in) selector factory data. Supports Index, Random, and WeightedRandom
  * picks via the Mode enum -- consistent with the Legacy inline struct UX on the consuming
  * node so users can swap between inline and factory configuration without re-learning the knobs.
  *
- * User-authored custom factories should subclass UPCGExDistributionFactoryData directly
+ * User-authored custom factories should subclass UPCGExSelectorFactoryData directly
  * and override CreateEntryOperation; this class is a reference example of that contract.
  */
 UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Data")
-class PCGEXCOLLECTIONS_API UPCGExDistributionClassicFactoryData : public UPCGExDistributionFactoryData
+class PCGEXCOLLECTIONS_API UPCGExSelectorClassicFactoryData : public UPCGExSelectorFactoryData
 {
 	GENERATED_BODY()
 
@@ -34,17 +34,20 @@ public:
 };
 
 /**
- * Palette node: "Distribution : Classic". Produces the built-in distribution factory for the selected Mode.
+ * Palette node: "Selector : Classic". Produces the built-in selector factory for the selected Mode.
  */
-UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="collections/distribution/classic"))
-class PCGEXCOLLECTIONS_API UPCGExDistributionClassicFactoryProviderSettings : public UPCGExDistributionFactoryProviderSettings
+UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="collections/selector/classic"))
+class PCGEXCOLLECTIONS_API UPCGExSelectorClassicFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
 {
 	GENERATED_BODY()
 
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS(DistributionClassic, "Distribution : Classic", "Built-in distribution factory. Supports Index, Random, and Weighted Random selection modes.")
+	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(
+		SelectorClassic, "Selector : Classic",
+		"Built-in selector factory. Supports Index, Random, and Weighted Random selection modes.",
+		FName(GetDisplayName()))
 #endif
 	//~End UPCGSettings
 
@@ -58,7 +61,11 @@ public:
 
 	/** Shared distribution configuration (seed, entry distribution, categories). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
-	FPCGExDistributionFactoryBaseConfig BaseConfig;
+	FPCGExSelectorFactoryBaseConfig BaseConfig;
 
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
+
+#if WITH_EDITOR
+	virtual FString GetDisplayName() const override;
+#endif
 };

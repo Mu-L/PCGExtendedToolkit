@@ -69,6 +69,8 @@ public:
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
+	
+	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
 
@@ -76,7 +78,7 @@ protected:
 	virtual bool SupportsDataStealing() const override { return true; }
 
 	virtual FPCGElementPtr CreateElement() const override;
-	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
+	virtual void InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters which points get staged.", PCGExFactories::PointFilters, false)
 	//~End UPCGSettings
@@ -101,16 +103,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode == EPCGExStagingOutputMode::Attributes"))
 	FName AssetPathAttributeName = "AssetPath";
 
-	/** How distribution is configured for this node. Legacy uses the inline settings below; External uses a factory on the Distribution input pin. */
+	/** How distribution is configured for this node. Legacy uses the inline settings below; External uses a factory on the Selector input pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	EPCGExDistributionMode DistributionMode = EPCGExDistributionMode::Legacy;
+	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::Legacy;
 
 	/** Distribution details */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution", EditCondition="DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
 
 	/** Distribution details that are specific to the picked entry -- what it picks depends on the type of collection being staged. For Mesh Collections, this let you control how materials are picked. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution (Entry)", EditCondition="DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution (Entry)", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails EntryDistributionSettings;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -201,8 +203,8 @@ struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext
 	TObjectPtr<UPCGExAssetCollection> MainCollection;
 	bool bPickMaterials = false;
 
-	/** External distribution factory read from the Distribution input pin (only set when DistributionMode==External). */
-	TObjectPtr<const UPCGExDistributionFactoryData> DistributionFactory;
+	/** External selector factory read from the Selector input pin (only set when SelectorMode==External). */
+	TObjectPtr<const UPCGExSelectorFactoryData> SelectorFactory;
 
 	TSharedPtr<PCGExCollections::FPickPacker> CollectionPickDatasetPacker;
 

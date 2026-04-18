@@ -95,6 +95,13 @@ namespace PCGExSocketStaging
 
 		SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, PointDataFacade->GetNum());
 
+		// Pre-register every collection the unpacker can resolve. Add() is lock-free and
+		// requires every (Host, EntryIndex) pair it sees to be in the map.
+		for (const TPair<uint32, UPCGExAssetCollection*>& Pair : Context->CollectionPickUnpacker->GetCollections())
+		{
+			SocketHelper->RegisterCollection(Pair.Value);
+		}
+
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
 		return true;

@@ -18,7 +18,7 @@ struct FPCGExContext;
  * Abstract hot-path operation for picking an entry from a collection's category.
  *
  * One operation is bound to exactly one FCategory* target -- either Cache->Main or a
- * named sub-category. FDistributionHelper creates one op for Main and one per named
+ * named sub-category. FSelectorHelper creates one op for Main and one per named
  * category at init, then routes per-point picks based on the point's Category attribute.
  *
  * Concrete subclasses implement Pick() with a tight, branch-minimal body.

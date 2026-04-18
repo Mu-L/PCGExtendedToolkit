@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Distributions/PCGExEntryPickerOperation.h"
-#include "Distributions/PCGExMicroEntryPickerOperation.h"
+#include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExMicroEntryPickerOperation.h"
 #include "Details/PCGExStagingDetails.h"
 
 namespace PCGExDetails
@@ -17,7 +17,7 @@ namespace PCGExDetails
 /**
  * Built-in entry and micro picker operations. Shared between:
  *   - The three concrete built-in factories (PCGExDistributionIndex/Random/WeightedRandom)
- *   - UPCGExDistributionFactoryData::CreateMicroOperation which dispatches on
+ *   - UPCGExSelectorFactoryData::CreateMicroOperation which dispatches on
  *     BaseConfig.EntryDistribution.Distribution
  *
  * These operations are internal implementation; they intentionally have no reflection
