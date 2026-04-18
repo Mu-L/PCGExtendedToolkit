@@ -56,9 +56,18 @@ public:
 	FName MaxPropertyName = NAME_None;
 	FName RangePropertyName = NAME_None;
 
-	// Resolved at PrepareForData — parallel to Target->Entries
+	// Resolved at PrepareForData — parallel to Target->Entries (invalid entries sentinel'd as Min=1, Max=-1)
 	TArray<double> EntryMins;
 	TArray<double> EntryMaxs;
+	// Cached (Weight + 1) as double, parallel to Target->Entries. 0 for invalid entries.
+	TArray<double> EntryWeights;
+
+	// Valid entries only, sorted by ascending EntryMins. Enables early-exit scanning and binary search.
+	TArray<int32> SortedIndices;
+	// EntryMins[SortedIndices[k]] — contiguous sorted array for O(log N) lookup.
+	TArray<double> SortedMins;
+	// True when all adjacent sorted ranges satisfy next_Min > prev_Max strictly. Enables single-lookup fast path.
+	bool bNonOverlapping = false;
 
 	TSharedPtr<PCGExDetails::TSettingValue<double>> ValueGetter;
 
@@ -66,6 +75,9 @@ public:
 	virtual int32 Pick(int32 PointIndex, int32 Seed) const override = 0;
 
 protected:
+	/** Single-lookup fast path when bNonOverlapping. Returns raw Target index or -1. */
+	int32 FastPathPick(double V) const;
+
 	/** Apply BoundaryMode to a single (Value, Min, Max) check. */
 	FORCEINLINE bool Contains(double V, double Min, double Max) const
 	{
