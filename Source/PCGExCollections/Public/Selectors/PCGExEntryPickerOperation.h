@@ -13,6 +13,7 @@ namespace PCGExData
 }
 
 struct FPCGExContext;
+class UPCGExAssetCollection;
 
 /**
  * Abstract hot-path operation for picking an entry from a collection's category.
@@ -30,10 +31,17 @@ public:
 	PCGExAssetCollection::FCategory* Target = nullptr;
 
 	/**
-	 * Bind the operation to a data facade and a category target.
+	 * The collection the bound category belongs to. Bound once at PrepareForData time.
+	 * Ops that need to resolve per-entry properties via FPCGExAssetCollectionEntry::GetResolvedProperty
+	 * consume this during PrepareForData to pre-compute per-entry state.
+	 */
+	const UPCGExAssetCollection* OwningCollection = nullptr;
+
+	/**
+	 * Bind the operation to a data facade, a category target, and the owning collection.
 	 * @return false if the target is null or otherwise unusable.
 	 */
-	virtual bool PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget);
+	virtual bool PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection);
 
 	/**
 	 * Pick a raw Entries-array index from the bound target. Returns -1 if no valid pick.

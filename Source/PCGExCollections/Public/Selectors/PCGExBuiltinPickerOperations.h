@@ -52,7 +52,7 @@ public:
 	TSharedPtr<PCGExDetails::TSettingValue<double>> IndexGetter;
 	double MaxInputIndex = 0.0;
 
-	virtual bool PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget) override;
+	virtual bool PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection) override;
 	virtual int32 Pick(int32 PointIndex, int32 Seed) const override;
 };
 

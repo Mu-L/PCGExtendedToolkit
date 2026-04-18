@@ -5,10 +5,11 @@
 
 #include "Data/PCGExData.h"
 
-bool FPCGExEntryPickerOperation::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget)
+bool FPCGExEntryPickerOperation::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection)
 {
 	BindContext(InContext);
 	PrimaryDataFacade = InDataFacade;
 	Target = InTarget;
+	OwningCollection = InOwningCollection;
 	return Target != nullptr;
 }

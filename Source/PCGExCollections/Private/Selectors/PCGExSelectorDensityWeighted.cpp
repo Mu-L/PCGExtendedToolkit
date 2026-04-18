@@ -8,9 +8,9 @@
 
 #pragma region FPCGExEntryDensityWeightedPickerOp
 
-bool FPCGExEntryDensityWeightedPickerOp::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget)
+bool FPCGExEntryDensityWeightedPickerOp::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection)
 {
-	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget)) { return false; }
+	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection)) { return false; }
 
 	DensityGetter = DensitySource.GetValueSetting();
 	if (!DensityGetter->Init(InDataFacade)) { return false; }

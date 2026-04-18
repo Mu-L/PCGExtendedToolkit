@@ -75,7 +75,7 @@ namespace PCGExCollections
 		}
 
 		MainPickerOp = ActiveFactory->CreateEntryOperation(Ctx);
-		if (!MainPickerOp || !MainPickerOp->PrepareForData(Ctx, InDataFacade, Cache->Main.Get()))
+		if (!MainPickerOp || !MainPickerOp->PrepareForData(Ctx, InDataFacade, Cache->Main.Get(), Collection))
 		{
 			return false;
 		}
@@ -86,7 +86,7 @@ namespace PCGExCollections
 			for (const TPair<FName, TSharedPtr<PCGExAssetCollection::FCategory>>& Pair : Cache->Categories)
 			{
 				TSharedPtr<FPCGExEntryPickerOperation> Op = ActiveFactory->CreateEntryOperation(Ctx);
-				if (Op && Op->PrepareForData(Ctx, InDataFacade, Pair.Value.Get()))
+				if (Op && Op->PrepareForData(Ctx, InDataFacade, Pair.Value.Get(), Collection))
 				{
 					CategoryPickerOps.Add(Pair.Key, Op);
 				}
