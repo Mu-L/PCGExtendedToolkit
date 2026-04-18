@@ -201,6 +201,9 @@ struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext
 	TObjectPtr<UPCGExAssetCollection> MainCollection;
 	bool bPickMaterials = false;
 
+	/** External distribution factory read from the Distribution input pin (only set when DistributionMode==External). */
+	TObjectPtr<const UPCGExDistributionFactoryData> DistributionFactory;
+
 	TSharedPtr<PCGExCollections::FPickPacker> CollectionPickDatasetPacker;
 
 	FPCGExSocketOutputDetails OutputSocketDetails;

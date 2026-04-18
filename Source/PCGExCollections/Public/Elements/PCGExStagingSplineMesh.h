@@ -205,6 +205,9 @@ struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
 	TObjectPtr<UPCGExMeshCollection> MainCollection;
 	TSharedPtr<TSet<FSoftObjectPath>> AssetPaths;
 
+	/** External distribution factory read from the Distribution input pin (only set when DistributionMode==External). */
+	TObjectPtr<const UPCGExDistributionFactoryData> DistributionFactory;
+
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
 };

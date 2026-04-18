@@ -23,7 +23,10 @@ namespace PCGExDetails
 struct FPCGContext;
 struct FPCGMeshInstanceList;
 class UPCGBasePointData;
+class UPCGExDistributionFactoryData;
 class UPCGParamData;
+class FPCGExEntryPickerOperation;
+class FPCGExMicroEntryPickerOperation;
 
 /**
  * Runtime helpers for consuming collections in PCG nodes.
@@ -75,9 +78,16 @@ namespace PCGExCollections
 		PCGExAssetCollection::FCache* Cache = nullptr;
 		UPCGExAssetCollection* Collection = nullptr;
 
-		TSharedPtr<PCGExDetails::TSettingValue<double>> IndexGetter;
+		// Effective state resolved at Init time. In Legacy mode, a transient built-in factory
+		// is synthesized from Details; in External mode, the caller-provided factory is used.
+		const UPCGExDistributionFactoryData* ActiveFactory = nullptr;
+
 		TSharedPtr<PCGExDetails::TSettingValue<FName>> CategoryGetter;
-		double MaxInputIndex = 0;
+		TSharedPtr<FPCGExEntryPickerOperation> MainPickerOp;
+		TMap<FName, TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOps;
+
+		/** Resolve which picker op applies to a given point (category-aware, with MissingCategoryBehavior fallback). */
+		const FPCGExEntryPickerOperation* ResolvePickerForPoint(int32 PointIndex) const;
 
 	public:
 		FPCGExAssetDistributionDetails Details;
@@ -85,10 +95,15 @@ namespace PCGExCollections
 		explicit FDistributionHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails);
 
 		/**
-		 * Initialize the helper with a data facade
-		 * @return true if initialization successful
+		 * Initialize the helper with a data facade and optional external distribution factory.
+		 * @param InDataFacade Data facade to read per-point attributes from.
+		 * @param ExternalFactory When provided (External mode), drives picking instead of the inline Details.
+		 * @return true if initialization successful.
 		 */
-		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade);
+		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExDistributionFactoryData* ExternalFactory = nullptr);
+
+		/** Active factory (either the External one passed to Init, or the transient built-in built from Details in Legacy mode). */
+		const UPCGExDistributionFactoryData* GetActiveFactory() const { return ActiveFactory; }
 
 		/**
 		 * Get an entry for a specific point
@@ -134,15 +149,18 @@ namespace PCGExCollections
 	class PCGEXCOLLECTIONS_API FMicroDistributionHelper : public TSharedFromThis<FMicroDistributionHelper>
 	{
 	protected:
-		TSharedPtr<PCGExDetails::TSettingValue<double>> IndexGetter;
-		double MaxInputIndex = 0;
+		TSharedPtr<FPCGExMicroEntryPickerOperation> PickerOp;
 
 	public:
 		FPCGExMicroCacheDistributionDetails Details;
 
 		explicit FMicroDistributionHelper(const FPCGExMicroCacheDistributionDetails& InDetails);
 
-		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade);
+		/**
+		 * @param InDataFacade Data facade to read per-point attributes from.
+		 * @param ExternalFactory When provided (External mode), drives micro picking. Legacy mode synthesizes a transient factory from Details.
+		 */
+		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExDistributionFactoryData* ExternalFactory = nullptr);
 
 		/**
 		 * Get a pick index from a MicroCache
@@ -316,11 +334,11 @@ namespace PCGExCollections
 
 		explicit FCollectionSource(const TSharedPtr<PCGExData::FFacade>& InDataFacade);
 
-		/** Initialize with a single collection */
-		bool Init(UPCGExAssetCollection* InCollection);
+		/** Initialize with a single collection. ExternalFactory drives picking in External mode; nullptr falls back to Legacy inline details. */
+		bool Init(UPCGExAssetCollection* InCollection, const UPCGExDistributionFactoryData* ExternalFactory = nullptr);
 
-		/** Initialize with a mapped collection source */
-		bool Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys);
+		/** Initialize with a mapped collection source. ExternalFactory drives picking for all collections in External mode. */
+		bool Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys, const UPCGExDistributionFactoryData* ExternalFactory = nullptr);
 
 		/**
 		 * Get helpers for a specific point index

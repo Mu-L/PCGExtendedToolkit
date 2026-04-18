@@ -5,6 +5,8 @@
 
 #include "PCGComponent.h"
 #include "Components/SplineMeshComponent.h"
+#include "Distributions/PCGExDistributionFactoryProvider.h"
+#include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
@@ -61,6 +63,11 @@ void UPCGExPathSplineMeshSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPi
 	if (CollectionSource == EPCGExCollectionSource::AttributeSet) { PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Required) }
 	else { PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Advanced) }
 
+	if (!bUseStagedPoints && DistributionMode == EPCGExDistributionMode::External)
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceDistributionLabel, "External distribution factory driving entry picks.", Required, FPCGExDataTypeInfoDistribution::AsId())
+	}
+
 	Super::InputPinPropertiesBeforeFilters(PinProperties);
 }
 
@@ -81,6 +88,22 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 	PCGEX_CONTEXT_AND_SETTINGS(PathSplineMesh)
 
 	if (!Context->Tangents.Init(Context, Settings->Tangents)) { return false; }
+
+	if (!Settings->bUseStagedPoints && Settings->DistributionMode == EPCGExDistributionMode::External)
+	{
+		TArray<TObjectPtr<const UPCGExDistributionFactoryData>> Factories;
+		if (!PCGExFactories::GetInputFactories<UPCGExDistributionFactoryData>(Context, PCGExCollections::Labels::SourceDistributionLabel, Factories, {PCGExFactories::EType::Distribution}))
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Distribution factory on the Distribution input pin."));
+			return false;
+		}
+		if (Factories.Num() != 1)
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Distribution factory is expected on the Distribution input pin."));
+			return false;
+		}
+		Context->DistributionFactory = Factories[0];
+	}
 
 	if (Settings->bUseStagedPoints)
 	{
@@ -345,16 +368,18 @@ namespace PCGExPathSplineMesh
 			Source->DistributionSettings = Settings->DistributionSettings;
 			Source->EntryDistributionSettings = Settings->MaterialDistributionSettings;
 
+			const UPCGExDistributionFactoryData* ExternalFactory = Context->DistributionFactory.Get();
+
 			if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 			{
-				if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex)))
+				if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), ExternalFactory))
 				{
 					return false;
 				}
 			}
 			else
 			{
-				if (!Source->Init(Context->MainCollection))
+				if (!Source->Init(Context->MainCollection, ExternalFactory))
 				{
 					return false;
 				}

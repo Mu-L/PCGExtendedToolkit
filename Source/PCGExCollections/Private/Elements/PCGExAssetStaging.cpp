@@ -12,6 +12,8 @@
 #include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Distributions/PCGExDistributionFactoryProvider.h"
+#include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExAssetLoader.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
@@ -48,6 +50,11 @@ TArray<FPCGPinProperties> UPCGExAssetStagingSettings::InputPinProperties() const
 	if (CollectionSource == EPCGExCollectionSource::AttributeSet)
 	{
 		PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Required)
+	}
+
+	if (DistributionMode == EPCGExDistributionMode::External)
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceDistributionLabel, "External distribution factory driving entry picks.", Required, FPCGExDataTypeInfoDistribution::AsId())
 	}
 
 	return PinProperties;
@@ -105,6 +112,22 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	if (Settings->bWriteEntryType)
 	{
 		PCGEX_VALIDATE_NAME(Settings->EntryTypeAttributeName)
+	}
+
+	if (Settings->DistributionMode == EPCGExDistributionMode::External)
+	{
+		TArray<TObjectPtr<const UPCGExDistributionFactoryData>> Factories;
+		if (!PCGExFactories::GetInputFactories<UPCGExDistributionFactoryData>(Context, PCGExCollections::Labels::SourceDistributionLabel, Factories, {PCGExFactories::EType::Distribution}))
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Distribution factory on the Distribution input pin."));
+			return false;
+		}
+		if (Factories.Num() != 1)
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Distribution factory is expected on the Distribution input pin."));
+			return false;
+		}
+		Context->DistributionFactory = Factories[0];
 	}
 
 	if (Settings->CollectionSource == EPCGExCollectionSource::Asset)
@@ -341,16 +364,18 @@ namespace PCGExAssetStaging
 		Source->DistributionSettings = Settings->DistributionSettings;
 		Source->EntryDistributionSettings = Settings->EntryDistributionSettings;
 
+		const UPCGExDistributionFactoryData* ExternalFactory = Context->DistributionFactory.Get();
+
 		if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 		{
-			if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex)))
+			if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), ExternalFactory))
 			{
 				return false;
 			}
 		}
 		else
 		{
-			if (!Source->Init(Context->MainCollection)) { return false; }
+			if (!Source->Init(Context->MainCollection, ExternalFactory)) { return false; }
 		}
 
 		if (Settings->bDoOutputSockets) { SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, NumPoints); }
