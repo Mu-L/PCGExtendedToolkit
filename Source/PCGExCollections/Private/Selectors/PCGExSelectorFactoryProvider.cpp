@@ -22,12 +22,12 @@ TSharedPtr<FPCGExMicroEntryPickerOperation> UPCGExSelectorFactoryData::CreateMic
 	// Default dispatch on BaseConfig.EntrySelector.Distribution -- concrete main-mode
 	// factories rarely need to override this; it's shared across all built-in modes and
 	// user-authored factories that configure micro via the standard BaseConfig path.
-	switch (BaseConfig.EntryDistribution.Distribution)
+	switch (BaseConfig.SubDistribution.Distribution)
 	{
 	case EPCGExDistribution::Index:
 		{
 			TSharedPtr<FPCGExMicroIndexPickerOp> Op = MakeShared<FPCGExMicroIndexPickerOp>();
-			Op->IndexConfig = BaseConfig.EntryDistribution.IndexSettings;
+			Op->IndexConfig = BaseConfig.SubDistribution.IndexSettings;
 			return Op;
 		}
 	case EPCGExDistribution::Random:

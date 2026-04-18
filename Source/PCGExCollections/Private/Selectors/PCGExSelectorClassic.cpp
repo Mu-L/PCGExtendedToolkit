@@ -38,11 +38,11 @@ FString UPCGExSelectorClassicFactoryProviderSettings::GetDisplayName() const
 	switch (Mode) {
 		default:
 	case EPCGExDistribution::Index:
-		return TEXT("Dist : Indexed on ") + PCGExMetaHelpers::GetSelectorDisplayName(IndexConfig.IndexSource);
+		return TEXT("Select : Indexed on ") + PCGExMetaHelpers::GetSelectorDisplayName(IndexConfig.IndexSource);
 	case EPCGExDistribution::Random:
-		return TEXT("Dist : Random");
+		return TEXT("Select : Random");
 	case EPCGExDistribution::WeightedRandom:
-		return TEXT("Dist : Weighted Random");
+		return TEXT("Select : Weighted Random");
 	}
 }
 #endif

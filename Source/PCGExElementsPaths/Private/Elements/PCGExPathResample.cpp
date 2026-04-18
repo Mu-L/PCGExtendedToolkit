@@ -22,7 +22,7 @@ void UPCGExResamplePathSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOu
 
 void UPCGExResamplePathSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 71, 3)
+	PCGEX_IF_VERSION_LOWER(1, 71, 3)
 	{
 		SampleLength.Constant = Resolution_DEPRECATED;
 	}

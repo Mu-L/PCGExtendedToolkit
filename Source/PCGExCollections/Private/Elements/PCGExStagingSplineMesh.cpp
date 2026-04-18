@@ -28,17 +28,22 @@
 #if WITH_EDITOR
 void UPCGExPathSplineMeshSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 70, 11)
+	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
 		DefaultDescriptor.SplineMeshAxis = static_cast<EPCGExSplineMeshAxis>(SplineMeshAxisConstant_DEPRECATED);
 		Tangents.ApplyDeprecation(bApplyCustomTangents_DEPRECATED, ArriveTangentAttribute_DEPRECATED, LeaveTangentAttribute_DEPRECATED);
 	}
 
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 74, 0)
+	PCGEX_IF_VERSION_LOWER(1, 74, 0)
 	{
 		if (CollectionSource != EPCGExCollectionSource::Asset || !AssetCollection.IsNull()) { bUseStagedPoints = false; }
 	}
 
+	PCGEX_IF_VERSION_LOWER(1, 75, 10)
+	{	
+		SelectorMode = EPCGExSelectorMode::Legacy;
+	}
+	
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 

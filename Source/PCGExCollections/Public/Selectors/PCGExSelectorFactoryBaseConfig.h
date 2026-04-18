@@ -36,7 +36,7 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorFactoryBaseConfig
 
 	/** Entry-level (micro) distribution -- picks material variants etc. within a picked entry. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Distribution", meta=(PCG_Overridable, ShowOnlyInnerProperties))
-	FPCGExMicroCacheDistributionDetails EntryDistribution;
+	FPCGExMicroCacheDistributionDetails SubDistribution;
 
 	/** If enabled, limit picks to entries flagged with a specific category. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, InlineEditConditionToggle))

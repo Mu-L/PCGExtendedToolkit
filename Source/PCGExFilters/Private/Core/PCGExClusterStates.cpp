@@ -28,7 +28,7 @@ void UPCGExClusterStateFactoryData::BeginDestroy()
 #if WITH_EDITOR
 void UPCGExClusterStateFactoryProviderSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 71, 2)
+	PCGEX_IF_VERSION_LOWER(1, 71, 2)
 	{
 		Config.ApplyDeprecation();
 	}

@@ -173,7 +173,7 @@ namespace PCGExCollections
 		if (!Factory)
 		{
 			UPCGExSelectorClassicFactoryData* Transient = Ctx->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
-			Transient->BaseConfig.EntryDistribution = Details;
+			Transient->BaseConfig.SubDistribution = Details;
 			Factory = Transient;
 		}
 

@@ -297,7 +297,7 @@ public:
 	
 	/** Color associated with selector subnodes */
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
-	FLinearColor ColorSelector = FLinearColor(0.350314, 0.750000, 0.60501, 1.000000);
+	FLinearColor ColorSelector = FLinearColor(0.0, 0.20000, 0.15, 1.000000);
 
 #pragma endregion
 

@@ -30,7 +30,7 @@ FString UPCGExAttributeRemapSettings::GetDisplayName() const
 
 void UPCGExAttributeRemapSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 70, 11)
+	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
 		if (SourceAttributeName_DEPRECATED != NAME_None) { Attributes.Source = SourceAttributeName_DEPRECATED; }
 		if (TargetAttributeName_DEPRECATED != NAME_None)

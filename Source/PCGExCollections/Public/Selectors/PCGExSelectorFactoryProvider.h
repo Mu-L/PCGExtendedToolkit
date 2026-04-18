@@ -69,7 +69,7 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SelectorFactory, "Selector Definition", "Creates a selector factory definition.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Distribution); }
+	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Selector); }
 #endif
 	//~End UPCGSettings
 

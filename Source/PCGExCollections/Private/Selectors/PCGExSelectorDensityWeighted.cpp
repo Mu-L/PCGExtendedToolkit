@@ -126,9 +126,9 @@ FString UPCGExSelectorDensityWeightedFactoryProviderSettings::GetDisplayName() c
 	{
 	default:
 	case EPCGExDensityWeightMode::WeightModulation:
-		return TEXT("Dist : Weight Mod");
+		return TEXT("Select : Weight Mod");
 	case EPCGExDensityWeightMode::RandomnessModulation:
-		return TEXT("Dist : Randomness Mod");
+		return TEXT("Select : Randomness Mod");
 	}
 }
 #endif

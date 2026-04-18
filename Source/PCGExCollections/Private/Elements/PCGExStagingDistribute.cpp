@@ -4,7 +4,7 @@
 // Asset Staging - Picks assets from collections and assigns them to points.
 // Handles weighted distribution, fitting/scaling, material picking, and socket extraction.
 
-#include "Elements/PCGExAssetStaging.h"
+#include "Elements/PCGExStagingDistribute.h"
 
 #include "PCGParamData.h"
 #include "Core/PCGExAssetCollection.h"
@@ -26,6 +26,16 @@
 #pragma region UPCGExAssetStagingSettings
 
 #if WITH_EDITOR
+void UPCGExAssetStagingSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 10)
+	{
+		SelectorMode = EPCGExSelectorMode::Legacy;
+	}
+	
+	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
 void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	EntryTypeFilter.PostEditChangeProperty(PropertyChangedEvent);
