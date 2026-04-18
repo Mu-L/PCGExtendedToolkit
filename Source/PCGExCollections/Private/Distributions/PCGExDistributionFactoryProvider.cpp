@@ -3,6 +3,7 @@
 
 #include "Distributions/PCGExDistributionFactoryProvider.h"
 
+#include "Distributions/PCGExBuiltinPickerOperations.h"
 #include "Distributions/PCGExEntryPickerOperation.h"
 #include "Distributions/PCGExMicroEntryPickerOperation.h"
 
@@ -16,9 +17,23 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExDistributionFactoryData::CreateEntr
 
 TSharedPtr<FPCGExMicroEntryPickerOperation> UPCGExDistributionFactoryData::CreateMicroOperation(FPCGExContext* InContext) const
 {
-	// Concrete micro picker ops are provided once the built-in micro factories land in the next commit.
-	// Until then, nullptr is safe -- the helper treats it as "no micro picking needed" for non-mesh collections.
-	return nullptr;
+	// Default dispatch on BaseConfig.EntryDistribution.Distribution -- concrete main-mode
+	// factories rarely need to override this; it's shared across all built-in modes and
+	// user-authored factories that configure micro via the standard BaseConfig path.
+	switch (BaseConfig.EntryDistribution.Distribution)
+	{
+	case EPCGExDistribution::Index:
+		{
+			TSharedPtr<FPCGExMicroIndexPickerOp> Op = MakeShared<FPCGExMicroIndexPickerOp>();
+			Op->IndexConfig = BaseConfig.EntryDistribution.IndexSettings;
+			return Op;
+		}
+	case EPCGExDistribution::Random:
+		return MakeShared<FPCGExMicroRandomPickerOp>();
+	case EPCGExDistribution::WeightedRandom:
+	default:
+		return MakeShared<FPCGExMicroWeightedRandomPickerOp>();
+	}
 }
 
 UPCGExFactoryData* UPCGExDistributionFactoryProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
