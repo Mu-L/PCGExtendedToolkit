@@ -102,6 +102,7 @@ namespace PCGExCollections::Labels
 	const FName OutputCollectionMapLabel = TEXT("Map");
 
 	const FName SourceDistributionLabel = TEXT("Distribution");
+	const FName OutputDistributionLabel = TEXT("Distribution");
 
 	const FName Tag_CollectionPath = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Path"));
 	const FName Tag_CollectionIdx = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Idx"));

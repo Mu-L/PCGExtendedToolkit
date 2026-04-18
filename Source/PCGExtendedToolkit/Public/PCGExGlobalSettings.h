@@ -281,6 +281,7 @@ public:
 	/** Color associated with tensors subnodes */
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
 	FLinearColor ColorTensor = FLinearColor(0.350314, 1.000000, 0.470501, 1.000000);
+	
 
 	/** Color associated with sort rules subnodes */
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
@@ -293,7 +294,10 @@ public:
 	/** Color associated with noise subnodes */
 	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
 	FLinearColor ColorNoise3D = FLinearColor(1.000000, 0.191, 0.0, 1.000000);
-
+	
+	/** Color associated with distribution subnodes */
+	UPROPERTY(EditAnywhere, config, Category = "Colors and Semantics|Subnodes")
+	FLinearColor ColorDistribution = FLinearColor(0.350314, 0.750000, 0.60501, 1.000000);
 
 #pragma endregion
 
