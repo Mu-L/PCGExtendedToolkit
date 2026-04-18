@@ -330,6 +330,69 @@ bool FPCGExAssetCollectionEntry::Validate(const UPCGExAssetCollection* ParentCol
 	return true;
 }
 
+namespace
+{
+	// Aggregate child entry extents per the collection's SubcollectionBoundsMode.
+	// Children must have their Staging.Bounds already filled (caller ensures this via the
+	// recursive pass before this runs). Invalid or zero-volume children are skipped.
+	// Returned box is centered at origin — center offsets are intentionally not aggregated.
+	FBox AggregateSubcollectionBounds(const UPCGExAssetCollection* Child, EPCGExSubcollectionBoundsMode Mode)
+	{
+		if (!Child) { return FBox(ForceInit); }
+
+		FVector UnionMin(FLT_MAX, FLT_MAX, FLT_MAX);
+		FVector UnionMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+		FVector MaxExt = FVector::ZeroVector;
+		FVector SumExt = FVector::ZeroVector;
+		int32 Count = 0;
+		FVector WeightedSumExt = FVector::ZeroVector;
+		int64 TotalWeight = 0;
+
+		Child->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 /*Idx*/)
+		{
+			if (!Entry) { return; }
+			const FBox& ChildBox = Entry->Staging.Bounds;
+			if (!ChildBox.IsValid) { return; }
+
+			const FVector ChildExt = ChildBox.GetExtent();
+			if (ChildExt.IsNearlyZero()) { return; }
+
+			UnionMin = UnionMin.ComponentMin(ChildBox.Min);
+			UnionMax = UnionMax.ComponentMax(ChildBox.Max);
+			MaxExt = MaxExt.ComponentMax(ChildExt);
+			SumExt += ChildExt;
+			Count++;
+
+			const int64 W = FMath::Max(1, Entry->Weight);
+			WeightedSumExt += ChildExt * static_cast<double>(W);
+			TotalWeight += W;
+		});
+
+		if (Count == 0) { return FBox(ForceInit); }
+
+		FVector Extents;
+		switch (Mode)
+		{
+		default:
+		case EPCGExSubcollectionBoundsMode::UnionAABB:
+			// Reconstruct extents from the union min/max, centered at origin.
+			Extents = (UnionMax - UnionMin) * 0.5;
+			break;
+		case EPCGExSubcollectionBoundsMode::MeanExtents:
+			Extents = SumExt / static_cast<double>(Count);
+			break;
+		case EPCGExSubcollectionBoundsMode::WeightedMean:
+			Extents = (TotalWeight > 0) ? WeightedSumExt / static_cast<double>(TotalWeight) : (SumExt / static_cast<double>(Count));
+			break;
+		case EPCGExSubcollectionBoundsMode::MaxExtents:
+			Extents = MaxExt;
+			break;
+		}
+
+		return FBox(-Extents, Extents);
+	}
+}
+
 void FPCGExAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollection* OwningCollection, int32 InInternalIndex, bool bRecursive)
 {
 	Staging.InternalIndex = InInternalIndex;
@@ -341,6 +404,13 @@ void FPCGExAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		{
 			Staging.Path = FSoftObjectPath(InternalSubCollection.GetPathName());
 			if (bRecursive) { InternalSubCollection->RebuildStagingData(true); }
+
+			// Aggregate child bounds per the owning collection's policy. Children are now staged
+			// (either because bRecursive ran them, or because they were already up-to-date).
+			const EPCGExSubcollectionBoundsMode Mode = OwningCollection
+				? OwningCollection->SubcollectionBoundsMode
+				: EPCGExSubcollectionBoundsMode::UnionAABB;
+			Staging.Bounds = AggregateSubcollectionBounds(InternalSubCollection, Mode);
 		}
 		else
 		{

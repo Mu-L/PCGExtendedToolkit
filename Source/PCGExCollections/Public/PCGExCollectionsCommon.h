@@ -94,6 +94,20 @@ enum class EPCGExGlobalVariationRule : uint8
 	Overrule = 1 UMETA(DisplayName = "Overrule", ToolTip="Disregard the entry settings and enforce collection settings", ActionIcon="CollectionRule")
 };
 
+/**
+ * How a subcollection entry's aggregate Staging.Bounds is computed from its children.
+ * Consumed by selectors that reason about entry extents (e.g. Best Fit).
+ * Extents-only: aggregate bounds are centered at origin; center offsets are not aggregated.
+ */
+UENUM()
+enum class EPCGExSubcollectionBoundsMode : uint8
+{
+	UnionAABB    = 0 UMETA(DisplayName = "Union AABB", ToolTip="Enclosing AABB over all child bounds. Preserves worst-case footprint."),
+	MeanExtents  = 1 UMETA(DisplayName = "Mean Extents", ToolTip="Axis-wise average of child extents. More representative of typical entry size."),
+	WeightedMean = 2 UMETA(DisplayName = "Weight-Weighted Mean", ToolTip="Extents weighted by Entry.Weight. Biases toward likely-picked children."),
+	MaxExtents   = 3 UMETA(DisplayName = "Max Extents", ToolTip="Axis-wise max of child extents. Upper bound of any possible child pick."),
+};
+
 namespace PCGExCollections::Labels
 {
 	const FName SourceAssetCollection = TEXT("AttributeSet");

@@ -625,6 +625,13 @@ public:
 	bool bDoNotIgnoreInvalidEntries = false;
 
 	/**
+	 * How an entry that is itself a subcollection computes its aggregate Staging.Bounds
+	 * (extents, centered at origin). Consumed by selectors that reason about entry size.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Settings|Subcollection")
+	EPCGExSubcollectionBoundsMode SubcollectionBoundsMode = EPCGExSubcollectionBoundsMode::UnionAABB;
+
+	/**
 	 * Collection-level properties with default values.
 	 * Entries inherit these unless they provide overrides.
 	 */
