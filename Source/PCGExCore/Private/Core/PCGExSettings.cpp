@@ -14,8 +14,18 @@
 #define LOCTEXT_NAMESPACE "PCGExSettings"
 
 #if WITH_EDITOR
+void UPCGExSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+}
+
 void UPCGExSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
+	if (PCGExDataVersion != INDEX_NONE)
+	{
+		// Only call deprecation path if we're not a fresh new node
+		ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	}
+
 	PCGEX_UPDATE_DATA_VERSION_TO_LATEST
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
