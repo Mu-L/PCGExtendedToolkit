@@ -11,6 +11,7 @@
 #include "PCGExStagingDetails.generated.h"
 
 class UPCGExBitmaskCollection;
+class UPCGExDistributionFactoryData;
 class UPCGParamData;
 
 /**
@@ -101,6 +102,10 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetDistributionDetails
 	/** Category name source (constant or per-point attribute). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, EditCondition="bUseCategories"))
 	FPCGExInputShorthandNameName Category = FPCGExInputShorthandNameName(FName("Category"), FName("MyCategory"), false);
+
+	/** What to do when a point's Category attribute does not match any named category in the collection. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, EditCondition="bUseCategories"))
+	EPCGExMissingCategoryBehavior MissingCategoryBehavior = EPCGExMissingCategoryBehavior::Skip;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, Bitmask, BitmaskEnum="/Script/PCGExCore.EPCGExSeedComponents"))
 	uint8 SeedComponents = 0;

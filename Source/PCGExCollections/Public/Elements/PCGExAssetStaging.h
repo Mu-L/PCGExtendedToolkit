@@ -101,12 +101,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode == EPCGExStagingOutputMode::Attributes"))
 	FName AssetPathAttributeName = "AssetPath";
 
+	/** How distribution is configured for this node. Legacy uses the inline settings below; External uses a factory on the Distribution input pin. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	EPCGExDistributionMode DistributionMode = EPCGExDistributionMode::Legacy;
+
 	/** Distribution details */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution", EditCondition="DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
 
 	/** Distribution details that are specific to the picked entry -- what it picks depends on the type of collection being staged. For Mesh Collections, this let you control how materials are picked. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution (Entry)"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution (Entry)", EditCondition="DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails EntryDistributionSettings;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))

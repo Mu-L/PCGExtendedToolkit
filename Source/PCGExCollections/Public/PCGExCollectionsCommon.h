@@ -37,6 +37,22 @@ enum class EPCGExDistribution : uint8
 	WeightedRandom = 2 UMETA(DisplayName = "Weighted random", ToolTip="Random selection weighted by entry Weight property"),
 };
 
+/** Selects between inline (Legacy) distribution settings or an external factory provided on the Distribution input pin. */
+UENUM()
+enum class EPCGExDistributionMode : uint8
+{
+	Legacy   = 0 UMETA(DisplayName = "Legacy", ToolTip="Use the inline distribution settings configured on this node."),
+	External = 1 UMETA(DisplayName = "External (Factory)", ToolTip="Use a distribution factory provided via the Distribution input pin."),
+};
+
+/** Behavior when a point's Category attribute does not match any named category in the collection. */
+UENUM()
+enum class EPCGExMissingCategoryBehavior : uint8
+{
+	Skip    = 0 UMETA(DisplayName = "Skip", ToolTip="Skip the point -- no entry is picked."),
+	UseMain = 1 UMETA(DisplayName = "Use Main", ToolTip="Fall back to picking from the collection's main pool."),
+};
+
 UENUM()
 enum class EPCGExWeightOutputMode : uint8
 {
@@ -84,6 +100,8 @@ namespace PCGExCollections::Labels
 
 	const FName SourceCollectionMapLabel = TEXT("Map");
 	const FName OutputCollectionMapLabel = TEXT("Map");
+
+	const FName SourceDistributionLabel = TEXT("Distribution");
 
 	const FName Tag_CollectionPath = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Path"));
 	const FName Tag_CollectionIdx = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Idx"));

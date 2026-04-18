@@ -88,12 +88,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Attribute", EditCondition="!bUseStagedPoints && CollectionSource == EPCGExCollectionSource::Attribute", EditConditionHides))
 	FName CollectionPathAttributeName = "CollectionPath";
 
-	/** Distribution details */
+	/** How distribution is configured for this node. Legacy uses the inline settings below; External uses a factory on the Distribution input pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints", EditConditionHides))
+	EPCGExDistributionMode DistributionMode = EPCGExDistributionMode::Legacy;
+
+	/** Distribution details */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints && DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
 
 	/** How should materials be distributed and picked. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints && DistributionMode == EPCGExDistributionMode::Legacy", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails MaterialDistributionSettings;
 
 #pragma region DEPRECATED
