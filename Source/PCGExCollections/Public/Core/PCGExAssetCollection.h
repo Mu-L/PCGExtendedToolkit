@@ -248,6 +248,38 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	const T* GetResolvedProperty(const UPCGExAssetCollection* OwningCollection, FName PropertyName = NAME_None) const;
 
 	/**
+	 * Type-erased resolve: returns the FPCGExProperty base pointer for PropertyName,
+	 * preferring enabled overrides on this entry, then falling back to collection defaults.
+	 * Returns nullptr if the property isn't defined.
+	 *
+	 * Use this when you don't know (or don't care about) the concrete property type —
+	 * typically in combination with TryGetPropertyValue<T> for type-erased value reads.
+	 */
+	const FPCGExProperty* GetResolvedPropertyBase(const UPCGExAssetCollection* OwningCollection, FName PropertyName) const;
+
+	/**
+	 * Read a property's effective value converted to T, regardless of the property's
+	 * concrete type. Checks entry overrides first, then collection defaults, then
+	 * dispatches through FPCGExProperty::TryGetValue (backed by FConversionTable).
+	 *
+	 * T must be a PCG-supported metadata type (see PCGExTypes::TTraits).
+	 * Returns false if the property isn't defined for this name.
+	 *
+	 * Example:
+	 *   double Out = 0.0;
+	 *   if (Entry->TryGetPropertyValue<double>(Collection, TEXT("Weight"), Out)) { ... }
+	 */
+	template <typename T>
+	bool TryGetPropertyValue(const UPCGExAssetCollection* OwningCollection, FName PropertyName, T& Out) const
+	{
+		if (const FPCGExProperty* Base = GetResolvedPropertyBase(OwningCollection, PropertyName))
+		{
+			return Base->TryGetValue(Out);
+		}
+		return false;
+	}
+
+	/**
 	 * Check if this entry has an override for a specific property name.
 	 */
 	bool HasPropertyOverride(FName PropertyName) const

@@ -4,6 +4,7 @@
 #include "PCGExPropertyTypes.h"
 
 #include "Metadata/PCGMetadata.h"
+#include "Types/PCGExTypeOps.h"
 
 // ============================================================================
 // PCGEX_PROPERTY_IMPL - Code generation macro for simple property types
@@ -29,6 +30,10 @@
 //
 // NOTE: OutputBuffer validity is guaranteed by InitializeOutput returning true.
 // Callers must exclude properties that failed initialization from processing.
+//
+// The generated TryWriteValue dispatches Value through FConversionTable, giving
+// free N×N conversion across all supported PCG metadata types. Converting types
+// must override manually to project to their output type first.
 #define PCGEX_PROPERTY_IMPL(_TYPE, _NAME) \
 bool FPCGExProperty_##_NAME::InitializeOutput(const TSharedRef<PCGExData::FFacade>& OutputFacade, FName OutputName) \
 { \
@@ -58,6 +63,11 @@ FPCGMetadataAttributeBase* FPCGExProperty_##_NAME::CreateMetadataAttribute(UPCGM
 void FPCGExProperty_##_NAME::WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const \
 { \
 	static_cast<FPCGMetadataAttribute<_TYPE>*>(Attribute)->SetValue(EntryKey, Value); \
+} \
+bool FPCGExProperty_##_NAME::TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const \
+{ \
+	PCGExTypeOps::FConversionTable::Convert(PCGExTypes::TTraits<_TYPE>::Type, &Value, TargetType, OutBuffer); \
+	return true; \
 }
 
 #pragma region Standard Types
@@ -123,6 +133,13 @@ void FPCGExProperty_Color::WriteMetadataValue(FPCGMetadataAttributeBase* Attribu
 	static_cast<FPCGMetadataAttribute<FVector4>*>(Attribute)->SetValue(EntryKey, FVector4(Value));
 }
 
+bool FPCGExProperty_Color::TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const
+{
+	const FVector4 Projected = FVector4(Value);
+	PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Vector4, &Projected, TargetType, OutBuffer);
+	return true;
+}
+
 #pragma endregion
 
 #pragma region Enum (FEnumSelector -> int64)
@@ -160,6 +177,13 @@ FPCGMetadataAttributeBase* FPCGExProperty_Enum::CreateMetadataAttribute(UPCGMeta
 void FPCGExProperty_Enum::WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const
 {
 	static_cast<FPCGMetadataAttribute<int64>*>(Attribute)->SetValue(EntryKey, Value.Value);
+}
+
+bool FPCGExProperty_Enum::TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const
+{
+	const int64 Projected = Value.Value;
+	PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Integer64, &Projected, TargetType, OutBuffer);
+	return true;
 }
 
 #pragma endregion
