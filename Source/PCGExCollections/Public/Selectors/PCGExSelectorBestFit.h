@@ -7,6 +7,7 @@
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 #include "Data/PCGBasePointData.h"
 
 #include "PCGExSelectorBestFit.generated.h"
@@ -48,7 +49,21 @@ enum class EPCGExAxisMask : uint8
 ENUM_CLASS_FLAGS(EPCGExAxisMask)
 
 /**
- * Shared base for Best Fit picker operations. Caches per-entry extents/volumes/weights at Init,
+ * Collection-derived state for Best Fit. Built once per (Factory, Category) via the factory's
+ * BuildSharedData override; reused across facades via FSelectorSharedDataCache.
+ */
+class FPCGExBestFitSharedData : public PCGExCollections::FSelectorSharedData
+{
+public:
+	TArray<FVector> EntryExtents;
+	TArray<FVector> EntryExtentsMaxNorm;   // max-component normalized, for AspectRatio
+	TArray<double> EntryVolumes;
+	TArray<double> EntryWeights;
+	TArray<int32> ValidEntryIndices;       // entries with Volume > UE_DOUBLE_SMALL_NUMBER
+};
+
+/**
+ * Shared base for Best Fit picker operations. Caches the per-point extent source at Init,
  * scores all valid entries per point, and produces a pool for the concrete subclass to weighted-pick from.
  *
  * Concrete subclasses differ only in pool selection (TopK vs Tolerance). Scoring is uniform across them.
@@ -56,22 +71,17 @@ ENUM_CLASS_FLAGS(EPCGExAxisMask)
 class FPCGExEntryBestFitPickerOpBase : public FPCGExEntryPickerOperation
 {
 public:
-	// Copied from factory before PrepareForData
+	// Copied from factory before PrepareForData. Used in the hot path (ComputeScore).
 	EPCGExBestFitMetric Metric = EPCGExBestFitMetric::ClosestVolume;
 	uint8 AxisMask = static_cast<uint8>(EPCGExAxisMask::X) | static_cast<uint8>(EPCGExAxisMask::Y) | static_cast<uint8>(EPCGExAxisMask::Z);
 	EPCGExBestFitAxisAggregation AxisAggregation = EPCGExBestFitAxisAggregation::Sum;
 	double VolumeInfluence = 0.0;
 	bool bApplyPointScale = false;
+	// Resolved by the factory — holds whichever of TopK/Tolerance applies to the chosen strategy.
 	FPCGExInputShorthandSelectorDouble PoolSize;
 
-	// Resolved at PrepareForData — parallel to Target->Entries (invalid entries have Volume<=0)
-	TArray<FVector> EntryExtents;
-	TArray<FVector> EntryExtentsMaxNorm; // max-component normalized, for AspectRatio
-	TArray<double> EntryVolumes;
-	TArray<double> EntryWeights;
-
-	// Valid entries only (Volume > 0). Provides the iteration set for scoring.
-	TArray<int32> ValidEntryIndices;
+	// Typed view of SharedData. Resolved once in PrepareForData; hot path reads through this.
+	TSharedPtr<FPCGExBestFitSharedData> Shared;
 
 	// Per-point extent sources — cached at PrepareForData, read directly in the hot path.
 	TConstPCGValueRange<FVector> BoundsMinRange;
@@ -135,9 +145,15 @@ public:
 	EPCGExBestFitPoolStrategy PoolStrategy = EPCGExBestFitPoolStrategy::TopK;
 
 	UPROPERTY()
-	FPCGExInputShorthandSelectorDouble PoolSize = FPCGExInputShorthandSelectorDouble(NAME_None, 3.0, false);
+	FPCGExInputShorthandSelectorDouble TopK = FPCGExInputShorthandSelectorDouble(NAME_None, 3.0, false);
+
+	UPROPERTY()
+	FPCGExInputShorthandSelectorDouble Tolerance = FPCGExInputShorthandSelectorDouble(NAME_None, 0.1, false);
 
 	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const override;
+	virtual TSharedPtr<PCGExCollections::FSelectorSharedData> BuildSharedData(
+		const UPCGExAssetCollection* Collection,
+		const PCGExAssetCollection::FCategory* Target) const override;
 };
 
 /**
@@ -182,9 +198,13 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExBestFitPoolStrategy PoolStrategy = EPCGExBestFitPoolStrategy::TopK;
 
-	/** Pool size driver. Interpreted as K (rounded, clamped to [1, N]) when TopK, tolerance ratio when Tolerance. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
-	FPCGExInputShorthandSelectorDouble PoolSize = FPCGExInputShorthandSelectorDouble(NAME_None, 3.0, false);
+	/** Size of the top-K pool (rounded, clamped to [1, N]). Attribute-driven for per-point pool sizing. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="PoolStrategy == EPCGExBestFitPoolStrategy::TopK", EditConditionHides))
+	FPCGExInputShorthandSelectorDouble TopK = FPCGExInputShorthandSelectorDouble(NAME_None, 3.0, false);
+
+	/** Tolerance ratio. Pool = entries with score ≤ best * (1 + Tolerance). 0 = exact-tie only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="PoolStrategy == EPCGExBestFitPoolStrategy::Tolerance", EditConditionHides))
+	FPCGExInputShorthandSelectorDouble Tolerance = FPCGExInputShorthandSelectorDouble(NAME_None, 0.1, false);
 
 	/** Shared distribution configuration (seed, entry distribution, categories). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))

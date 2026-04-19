@@ -16,6 +16,13 @@ bool FPCGExEntryBestFitPickerOpBase::PrepareForData(FPCGExContext* InContext, co
 {
 	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection)) { return false; }
 
+	Shared = StaticCastSharedPtr<FPCGExBestFitSharedData>(SharedData);
+	if (!Shared)
+	{
+		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Best Fit — no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."));
+		return false;
+	}
+
 	const UPCGBasePointData* PointData = InDataFacade->Source->GetIn();
 	if (!PointData) { return false; }
 
@@ -32,42 +39,6 @@ bool FPCGExEntryBestFitPickerOpBase::PrepareForData(FPCGExContext* InContext, co
 		AxisMask = 0b111;
 	}
 
-	const int32 N = Target->Entries.Num();
-	EntryExtents.SetNumUninitialized(N);
-	EntryExtentsMaxNorm.SetNumUninitialized(N);
-	EntryVolumes.SetNumUninitialized(N);
-	EntryWeights.SetNumUninitialized(N);
-	ValidEntryIndices.Reserve(N);
-
-	for (int32 i = 0; i < N; ++i)
-	{
-		const FPCGExAssetCollectionEntry* Entry = Target->Entries[i];
-		FVector Ext = FVector::ZeroVector;
-		double Vol = 0.0;
-
-		if (Entry && Entry->Staging.Bounds.IsValid)
-		{
-			Ext = Entry->Staging.Bounds.GetExtent();
-			Vol = Ext.X * Ext.Y * Ext.Z;
-		}
-
-		EntryExtents[i] = Ext;
-		EntryVolumes[i] = Vol;
-		EntryWeights[i] = Entry ? static_cast<double>(Entry->Weight + 1) : 0.0;
-
-		// Max-component normalized for AspectRatio metric. Zero when Ext is degenerate.
-		const double MaxExt = FMath::Max3(Ext.X, Ext.Y, Ext.Z);
-		EntryExtentsMaxNorm[i] = MaxExt > UE_DOUBLE_SMALL_NUMBER ? Ext / MaxExt : FVector::ZeroVector;
-
-		if (Vol > UE_DOUBLE_SMALL_NUMBER) { ValidEntryIndices.Add(i); }
-	}
-
-	if (ValidEntryIndices.IsEmpty())
-	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Best Fit — no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."));
-		return false;
-	}
-
 	return true;
 }
 
@@ -80,8 +51,8 @@ FVector FPCGExEntryBestFitPickerOpBase::GetPointExtents(int32 PointIndex) const
 
 double FPCGExEntryBestFitPickerOpBase::ComputeScore(const FVector& P, int32 EntryIndex) const
 {
-	const FVector& E = EntryExtents[EntryIndex];
-	const double Ve = EntryVolumes[EntryIndex];
+	const FVector& E = Shared->EntryExtents[EntryIndex];
+	const double Ve = Shared->EntryVolumes[EntryIndex];
 
 	switch (Metric)
 	{
@@ -111,7 +82,7 @@ double FPCGExEntryBestFitPickerOpBase::ComputeScore(const FVector& P, int32 Entr
 		}
 	case EPCGExBestFitMetric::ClosestAspectRatio:
 		{
-			const FVector& Enorm = EntryExtentsMaxNorm[EntryIndex];
+			const FVector& Enorm = Shared->EntryExtentsMaxNorm[EntryIndex];
 			const double PMax = FMath::Max3(P.X, P.Y, P.Z);
 			const FVector Pnorm = PMax > UE_DOUBLE_SMALL_NUMBER ? P / PMax : FVector::ZeroVector;
 
@@ -147,6 +118,9 @@ double FPCGExEntryBestFitPickerOpBase::ComputeScore(const FVector& P, int32 Entr
 
 int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed) const
 {
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+
 	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty()) { return -1; }
 
 	const FVector P = GetPointExtents(PointIndex);
@@ -189,6 +163,9 @@ int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed) const
 
 int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed) const
 {
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+
 	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty()) { return -1; }
 
 	const FVector P = GetPointExtents(PointIndex);
@@ -255,8 +232,53 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorBestFitFactoryData::CreateE
 	NewOp->AxisAggregation = AxisAggregation;
 	NewOp->VolumeInfluence = VolumeInfluence;
 	NewOp->bApplyPointScale = bApplyPointScale;
-	NewOp->PoolSize = PoolSize;
+	// Pick the shorthand that matches the chosen strategy — op reads a single PoolSize regardless.
+	NewOp->PoolSize = (PoolStrategy == EPCGExBestFitPoolStrategy::TopK) ? TopK : Tolerance;
 	return NewOp;
+}
+
+TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorBestFitFactoryData::BuildSharedData(
+	const UPCGExAssetCollection* Collection,
+	const PCGExAssetCollection::FCategory* Target) const
+{
+	if (!Collection || !Target) { return nullptr; }
+
+	const int32 N = Target->Entries.Num();
+
+	TSharedPtr<FPCGExBestFitSharedData> NewShared = MakeShared<FPCGExBestFitSharedData>();
+	NewShared->EntryExtents.SetNumUninitialized(N);
+	NewShared->EntryExtentsMaxNorm.SetNumUninitialized(N);
+	NewShared->EntryVolumes.SetNumUninitialized(N);
+	NewShared->EntryWeights.SetNumUninitialized(N);
+	NewShared->ValidEntryIndices.Reserve(N);
+
+	for (int32 i = 0; i < N; ++i)
+	{
+		const FPCGExAssetCollectionEntry* Entry = Target->Entries[i];
+		FVector Ext = FVector::ZeroVector;
+		double Vol = 0.0;
+
+		if (Entry && Entry->Staging.Bounds.IsValid)
+		{
+			Ext = Entry->Staging.Bounds.GetExtent();
+			Vol = Ext.X * Ext.Y * Ext.Z;
+		}
+
+		NewShared->EntryExtents[i] = Ext;
+		NewShared->EntryVolumes[i] = Vol;
+		NewShared->EntryWeights[i] = Entry ? static_cast<double>(Entry->Weight + 1) : 0.0;
+
+		// Max-component normalized for AspectRatio metric. Zero when Ext is degenerate.
+		const double MaxExt = FMath::Max3(Ext.X, Ext.Y, Ext.Z);
+		NewShared->EntryExtentsMaxNorm[i] = MaxExt > UE_DOUBLE_SMALL_NUMBER ? Ext / MaxExt : FVector::ZeroVector;
+
+		if (Vol > UE_DOUBLE_SMALL_NUMBER) { NewShared->ValidEntryIndices.Add(i); }
+	}
+
+	// Caller (op's PrepareForData) reports the error when Shared is null.
+	if (NewShared->ValidEntryIndices.IsEmpty()) { return nullptr; }
+
+	return NewShared;
 }
 
 #pragma endregion
@@ -273,7 +295,8 @@ UPCGExFactoryData* UPCGExSelectorBestFitFactoryProviderSettings::CreateFactory(F
 	NewFactory->VolumeInfluence = VolumeInfluence;
 	NewFactory->bApplyPointScale = bApplyPointScale;
 	NewFactory->PoolStrategy = PoolStrategy;
-	NewFactory->PoolSize = PoolSize;
+	NewFactory->TopK = TopK;
+	NewFactory->Tolerance = Tolerance;
 	return Super::CreateFactory(InContext, NewFactory);
 }
 
