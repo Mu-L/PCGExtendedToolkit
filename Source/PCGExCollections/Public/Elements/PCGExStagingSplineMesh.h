@@ -55,7 +55,7 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 	
 	PCGEX_NODE_INFOS(PathSplineMesh, "Staging : Spline Mesh", "Create spline mesh components from paths using asset collections.");
 	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spawner; }
@@ -219,8 +219,7 @@ struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
 	TObjectPtr<UPCGExMeshCollection> MainCollection;
 	TSharedPtr<TSet<FSoftObjectPath>> AssetPaths;
 
-	/** External selector factory read from the Selector input pin (only set when DistributionMode==External). */
-	TObjectPtr<const UPCGExSelectorFactoryData> SelectorFactory;
+	const UPCGExSelectorFactoryData* SelectorFactory = nullptr;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL

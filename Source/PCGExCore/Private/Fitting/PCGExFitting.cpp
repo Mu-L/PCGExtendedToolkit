@@ -67,32 +67,14 @@ void FPCGExScaleToFitDetails::ScaleToFitAxis(const EPCGExScaleToFit Fit, const i
 
 FPCGExSingleJustifyDetails::FPCGExSingleJustifyDetails()
 {
-	FromSourceAttribute.Update(TEXT("None"));
-	ToSourceAttribute.Update(TEXT("None"));
 }
 
 bool FPCGExSingleJustifyDetails::Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
 {
-	if (From == EPCGExJustifyFrom::Custom && FromInput == EPCGExInputValueType::Attribute)
+	if (!SharedFromGetter)
 	{
-		FromGetter = InDataFacade->GetBroadcaster<double>(FromSourceAttribute, true);
-		if (!FromGetter)
-		{
-			if (SharedFromGetter)
-			{
-				// No complaints, expected.
-			}
-			else
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Invalid custom 'From' attribute used"));
-				return false;
-			}
-		}
-		else
-		{
-			// Get rid of shared ref
-			SharedFromGetter = nullptr;
-		}
+		FromGetter = CustomFrom.GetValueSetting();
+		if (!FromGetter->Init(InDataFacade)) { return false; }
 	}
 
 	if (To == EPCGExJustifyTo::Same)
@@ -111,26 +93,10 @@ bool FPCGExSingleJustifyDetails::Init(FPCGExContext* InContext, const TSharedRef
 		}
 	}
 
-	if (To == EPCGExJustifyTo::Custom && FromInput == EPCGExInputValueType::Attribute)
+	if (!SharedToGetter)
 	{
-		ToGetter = InDataFacade->GetBroadcaster<double>(FromSourceAttribute, true);
-		if (!ToGetter)
-		{
-			if (SharedToGetter)
-			{
-				// No complaints, expected.
-			}
-			else
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Invalid custom 'To' attribute used"));
-				return false;
-			}
-		}
-		else
-		{
-			// Get rid of shared ref
-			SharedToGetter = nullptr;
-		}
+		ToGetter = CustomTo.GetValueSetting();
+		if (!ToGetter->Init(InDataFacade)) { return false; }
 	}
 
 	return true;
@@ -143,8 +109,8 @@ void FPCGExSingleJustifyDetails::JustifyAxis(const int32 Axis, const int32 Index
 
 	const double HalfOutSize = OutSize[Axis] * 0.5;
 	const double HalfInSize = InSize[Axis] * 0.5;
-	const double FromValue = SharedFromGetter ? SharedFromGetter->Read(Index)[Axis] : FromGetter ? FromGetter->Read(Index) : FromConstant;
-	const double ToValue = SharedToGetter ? SharedToGetter->Read(Index)[Axis] : ToGetter ? ToGetter->Read(Index) : ToConstant;
+	const double FromValue = SharedFromGetter ? SharedFromGetter->Read(Index)[Axis] : FromGetter->Read(Index);
+	const double ToValue = SharedToGetter ? SharedToGetter->Read(Index)[Axis] : ToGetter->Read(Index);
 
 	switch (From)
 	{
@@ -198,12 +164,14 @@ bool FPCGExJustificationDetails::Init(FPCGExContext* InContext, const TSharedRef
 {
 	if (bSharedCustomFromAttribute)
 	{
-		SharedFromGetter = InDataFacade->GetBroadcaster<FVector>(CustomFromVectorAttribute, true);
+		SharedFromGetter = CustomFrom.GetValueSetting();
+		if (!SharedFromGetter->Init(InDataFacade)) { return false; }
 	}
 
 	if (bSharedCustomToAttribute)
 	{
-		SharedToGetter = InDataFacade->GetBroadcaster<FVector>(CustomToVectorAttribute, true);
+		SharedToGetter = CustomFrom.GetValueSetting();
+		if (!SharedToGetter->Init(InDataFacade)) { return false; }
 	}
 
 	if (bDoJustifyX)

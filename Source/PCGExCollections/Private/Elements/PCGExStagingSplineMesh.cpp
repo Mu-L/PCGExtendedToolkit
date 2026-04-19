@@ -30,7 +30,7 @@
 #define PCGEX_NAMESPACE BuildCustomGraph
 
 #if WITH_EDITOR
-void UPCGExPathSplineMeshSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExPathSplineMeshSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
@@ -44,7 +44,7 @@ void UPCGExPathSplineMeshSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNod
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
-	{	
+	{
 		if (!bSelectorModePreUpdated)
 		{
 			SelectorMode = EPCGExSelectorMode::Legacy;
@@ -52,7 +52,7 @@ void UPCGExPathSplineMeshSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNod
 		}
 	}
 	
-	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	Super::ApplyDeprecation(InOutNode);
 }
 
 void UPCGExPathSplineMeshSettings::PostInitProperties()
@@ -112,20 +112,32 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 
 	if (!Context->Tangents.Init(Context, Settings->Tangents)) { return false; }
 
-	if (!Settings->bUseStagedPoints && Settings->SelectorMode == EPCGExSelectorMode::External)
+	if (!Settings->bUseStagedPoints)
 	{
-		TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
-		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))
+		if (Settings->SelectorMode == EPCGExSelectorMode::External)
 		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
-			return false;
+			TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
+			if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))
+			{
+				PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
+				return false;
+			}
+			if (Factories.Num() != 1)
+			{
+				PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Selector factory is expected on the Selector input pin."));
+				return false;
+			}
+			Context->SelectorFactory = Factories[0];
 		}
-		if (Factories.Num() != 1)
+		else
 		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Selector factory is expected on the Selector input pin."));
-			return false;
+			Context->SelectorFactory = PCGExCollections::BuildLegacyFactory(Context, Settings->DistributionSettings);
 		}
-		Context->SelectorFactory = Factories[0];
+
+		if (!Context->SelectorFactory)
+		{
+			return Context->CancelExecution("Invalid Asset Selector");
+		}
 	}
 
 	Context->SelectorSharedDataCache = MakeShared<PCGExCollections::FSelectorSharedDataCache>();
@@ -360,7 +372,10 @@ namespace PCGExPathSplineMesh
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
-		bIsPreviewMode = ExecutionContext->GetComponent()->IsInPreviewMode();
+		const UPCGComponent* Component = ExecutionContext->GetComponent();
+		if (!Component) { return false; }
+		
+		bIsPreviewMode = Component->IsInPreviewMode();
 
 		Justification = Settings->Justification;
 		Justification.Init(ExecutionContext, PointDataFacade);
@@ -394,18 +409,16 @@ namespace PCGExPathSplineMesh
 			Source->EntryDistributionSettings = Settings->MaterialDistributionSettings;
 			Source->SetSharedDataCache(Context->SelectorSharedDataCache);
 
-			const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
-
 			if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 			{
-				if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), ExternalFactory))
+				if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), Context->SelectorFactory))
 				{
 					return false;
 				}
 			}
 			else
 			{
-				if (!Source->Init(Context->MainCollection, ExternalFactory))
+				if (!Source->Init(Context->MainCollection, Context->SelectorFactory))
 				{
 					return false;
 				}

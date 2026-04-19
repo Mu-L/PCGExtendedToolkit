@@ -21,19 +21,14 @@
 
 namespace PCGExCollections
 {
-	// Selector Helper Implementation
-
-	FSelectorHelper::FSelectorHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails)
-		: Collection(InCollection), Details(InDetails)
-	{
-	}
-
+	
 	// Synthesize a transient Classic factory that mirrors the Legacy Details struct. Used when
 	// the caller did not provide an ExternalFactory. Keeps the post-Init code path unified:
 	// everything downstream reads from ActiveFactory->BaseConfig regardless of mode.
-	static UPCGExSelectorClassicFactoryData* BuildLegacyFactory(FPCGExContext* InContext, const FPCGExAssetDistributionDetails& InDetails)
+	UPCGExSelectorFactoryData* BuildLegacyFactory(FPCGExContext* InContext, const FPCGExAssetDistributionDetails& InDetails)
 	{
 		UPCGExSelectorClassicFactoryData* Factory = InContext->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
+
 		Factory->Mode = InDetails.Distribution;
 		Factory->IndexConfig = InDetails.IndexSettings;
 		Factory->BaseConfig.SeedComponents = InDetails.SeedComponents;
@@ -41,9 +36,17 @@ namespace PCGExCollections
 		Factory->BaseConfig.bUseCategories = InDetails.bUseCategories;
 		Factory->BaseConfig.Category = InDetails.Category;
 		Factory->BaseConfig.MissingCategoryBehavior = InDetails.MissingCategoryBehavior;
+
 		// BaseConfig.EntryDistribution stays default -- the Legacy EntryDistributionSettings
 		// lives on the consuming node and is plumbed through FMicroSelectorHelper separately.
 		return Factory;
+	}
+	
+	// Selector Helper Implementation
+
+	FSelectorHelper::FSelectorHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails)
+		: Collection(InCollection), Details(InDetails)
+	{
 	}
 
 	// Init resolves the active factory (External or transient-from-Legacy), then creates
@@ -63,8 +66,7 @@ namespace PCGExCollections
 
 		FPCGExContext* Ctx = InDataFacade->GetContext();
 
-		if (ExternalFactory) { ActiveFactory = ExternalFactory; }
-		else { ActiveFactory = BuildLegacyFactory(Ctx, Details); }
+		ActiveFactory = ExternalFactory;
 		if (!ActiveFactory) { return false; }
 
 		const FPCGExSelectorFactoryBaseConfig& BaseConfig = ActiveFactory->BaseConfig;
@@ -183,6 +185,7 @@ namespace PCGExCollections
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FMicroSelectorHelper::Init);
 
 		FPCGExContext* Ctx = InDataFacade->GetContext();
+		if (!Ctx->GetWorkHandle().IsValid()) { return false; }
 
 		const UPCGExSelectorFactoryData* Factory = ExternalFactory;
 		if (!Factory)

@@ -55,18 +55,27 @@ void UPCGExSampleNearestSplineSettings::PCGExApplyDeprecationBeforeUpdatePins(UP
 	{
 		// Rewire alpha
 		PCGEX_SHORTHAND_RENAME_PIN(SampleAlphaAttribute, SampleAlphaConstant, SampleAlpha)
-		SampleAlpha.Update(SampleAlphaInput_DEPRECATED, SampleAlphaAttribute_DEPRECATED, SampleAlphaConstant_DEPRECATED);
 
 		// Rewire Range Min
 		PCGEX_SHORTHAND_RENAME_PIN(RangeMinAttribute, RangeMin, MinRange)
-		MinRange.Update(RangeMinInput_DEPRECATED, RangeMinAttribute_DEPRECATED, RangeMin_DEPRECATED);
 
 		// Rewire Range Max
 		PCGEX_SHORTHAND_RENAME_PIN(RangeMaxAttribute, RangeMax, MaxRange)
-		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExSampleNearestSplineSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 74, 3)
+	{
+		SampleAlpha.Update(SampleAlphaInput_DEPRECATED, SampleAlphaAttribute_DEPRECATED, SampleAlphaConstant_DEPRECATED);
+		MinRange.Update(RangeMinInput_DEPRECATED, RangeMinAttribute_DEPRECATED, RangeMin_DEPRECATED);
+		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
+	}
+	
+	Super::ApplyDeprecation(InOutNode);
 }
 #endif
 

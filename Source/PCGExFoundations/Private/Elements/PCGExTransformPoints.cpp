@@ -3,8 +3,8 @@
 
 #include "Elements/PCGExTransformPoints.h"
 
-
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Fitting/PCGExFittingVariations.h"
@@ -75,7 +75,7 @@ namespace PCGExTransformPoints
 		AllocateFor |= EPCGPointNativeProperties::Transform;
 
 		bApplyScaleToBounds = Settings->bApplyScaleToBounds;
-		bResetPointCenter = Settings->bApplyScaleToBounds;
+		bResetPointCenter = Settings->bResetPointCenter;
 		if (bApplyScaleToBounds || bResetPointCenter)
 		{
 			bAllocatedBounds = true;
@@ -148,11 +148,34 @@ namespace PCGExTransformPoints
 		PointDataFacade->Fetch(Scope);
 		FilterScope(Scope);
 
+		PCGEX_SV_VIEW(OffsetMin)
+		PCGEX_SV_VIEW(OffsetMax)
+		PCGEX_SV_VIEW(OffsetScale)
+		PCGEX_SV_VIEW(OffsetSnap)
+		PCGEX_SV_VIEW(AbsoluteOffset)
+		PCGEX_SV_VIEW(RotMin)
+		PCGEX_SV_VIEW(RotMax)
+		PCGEX_SV_VIEW(RotScale)
+		PCGEX_SV_VIEW(RotSnap)
+		PCGEX_SV_VIEW(ScaleMin)
+		PCGEX_SV_VIEW(ScaleMax)
+		PCGEX_SV_VIEW(ScaleScale)
+		PCGEX_SV_VIEW(ScaleSnap)
+		PCGEX_SV_VIEW(UniformScale)
+
+		PCGEX_SV_VIEW_COND(PointCenter, bResetPointCenter)
+
 		TConstPCGValueRange<int32> Seeds = PointDataFacade->GetIn()->GetConstSeedValueRange();
 		TPCGValueRange<FTransform> OutTransforms = PointDataFacade->GetOut()->GetTransformValueRange(false);
 
 		TPCGValueRange<FVector> OutBoundsMin = bAllocatedBounds ? PointDataFacade->GetOut()->GetBoundsMinValueRange(false) : TPCGValueRange<FVector>();
 		TPCGValueRange<FVector> OutBoundsMax = bAllocatedBounds ? PointDataFacade->GetOut()->GetBoundsMaxValueRange(false) : TPCGValueRange<FVector>();
+
+		FPCGExFittingVariations Variations;
+		Variations.SnapPosition = Settings->SnapPosition;
+		Variations.SnapRotation = Settings->SnapRotation;
+		Variations.SnapScale = Settings->SnapScale;
+		Variations.AbsoluteRotation = Settings->AbsoluteRotation;
 
 		FRandomStream RandomSource;
 
@@ -163,31 +186,32 @@ namespace PCGExTransformPoints
 		{
 			if (!PointFilterCache[Index]) { continue; }
 
+			const int32 i = Index - Scope.Start;
+
 			RandomSource.Initialize(Seeds[Index]);
 
 			FTransform& OutTransform = OutTransforms[Index];
 			if (bResetScale) { OutTransform.SetScale3D(FVector::OneVector); }
 			if (bResetRotation) { OutTransform.SetRotation(FQuat::Identity); }
 
-			const FVector OffsetScaleV = OffsetScale->Read(Index);
-			const FVector OffsetMinV = OffsetMin->Read(Index) * OffsetScaleV;
-			const FVector OffsetMaxV = OffsetMax->Read(Index) * OffsetScaleV;
-			const FVector OffsetSnapV = OffsetSnap->Read(Index);
+			const FVector& OffsetScaleV = PCGEX_SV_READ(OffsetScale, i);
+			Variations.OffsetMin = PCGEX_SV_READ(OffsetMin, i) * OffsetScaleV;
+			Variations.OffsetMax = PCGEX_SV_READ(OffsetMax, i) * OffsetScaleV;
+			Variations.OffsetSnap = PCGEX_SV_READ(OffsetSnap, i);
+			Variations.bAbsoluteOffset = PCGEX_SV_READ(AbsoluteOffset, i);
 
-			const FVector RotScaleV = RotScale->Read(Index);
-			const FRotator RotMinV = FRotator::MakeFromEuler(RotMin->Read(Index).Euler() * RotScaleV);
-			const FRotator RotMaxV = FRotator::MakeFromEuler(RotMax->Read(Index).Euler() * RotScaleV);
-			const FRotator RotSnapV = RotSnap->Read(Index);
+			const FVector& RotScaleV = PCGEX_SV_READ(RotScale, i);
+			const FRotator& RMin = PCGEX_SV_READ(RotMin, i);
+			const FRotator& RMax = PCGEX_SV_READ(RotMax, i);
+			Variations.RotationMin = FRotator(RMin.Pitch * RotScaleV.Y, RMin.Yaw * RotScaleV.Z, RMin.Roll * RotScaleV.X);
+			Variations.RotationMax = FRotator(RMax.Pitch * RotScaleV.Y, RMax.Yaw * RotScaleV.Z, RMax.Roll * RotScaleV.X);
+			Variations.RotationSnap = PCGEX_SV_READ(RotSnap, i);
 
-			const FVector ScaleScaleV = ScaleScale->Read(Index);
-			const FVector ScaleMinV = ScaleMin->Read(Index) * ScaleScaleV;
-			const FVector ScaleMaxV = ScaleMax->Read(Index) * ScaleScaleV;
-			const FVector ScaleSnapV = ScaleSnap->Read(Index);
-
-			const bool bAbsoluteOffset = AbsoluteOffset->Read(Index);
-			const bool bUniformScale = UniformScale->Read(Index);
-
-			FPCGExFittingVariations Variations(OffsetMinV, OffsetMaxV, Settings->SnapPosition, OffsetSnapV, bAbsoluteOffset, RotMinV, RotMaxV, Settings->SnapRotation, RotSnapV, Settings->AbsoluteRotation, ScaleMinV, ScaleMaxV, Settings->SnapScale, ScaleSnapV, bUniformScale);
+			const FVector& ScaleScaleV = PCGEX_SV_READ(ScaleScale, i);
+			Variations.ScaleMin = PCGEX_SV_READ(ScaleMin, i) * ScaleScaleV;
+			Variations.ScaleMax = PCGEX_SV_READ(ScaleMax, i) * ScaleScaleV;
+			Variations.ScaleSnap = PCGEX_SV_READ(ScaleSnap, i);
+			Variations.bUniformScale = PCGEX_SV_READ(UniformScale, i);
 
 			Variations.ApplyOffset(RandomSource, OutTransform);
 			Variations.ApplyRotation(RandomSource, OutTransform);
@@ -200,7 +224,7 @@ namespace PCGExTransformPoints
 
 			if (bResetPointCenter)
 			{
-				PCGPointHelpers::ResetPointCenter(PointCenter->Read(Index), OutTransform, OutBoundsMin[Index], OutBoundsMax[Index]);
+				PCGPointHelpers::ResetPointCenter(PCGEX_SV_READ(PointCenter, i), OutTransform, OutBoundsMin[Index], OutBoundsMax[Index]);
 			}
 		}
 	}

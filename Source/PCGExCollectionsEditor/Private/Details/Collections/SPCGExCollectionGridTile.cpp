@@ -676,9 +676,21 @@ TSharedRef<SWidget> SPCGExCollectionGridTile::BuildThumbnailWidget()
 		}
 	}
 
-	// Resolve FAssetData from path and create thumbnail
+	// Resolve FAssetData from path and create thumbnail.
 	const IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
-	const FAssetData AssetData = AssetRegistry.GetAssetByObjectPath(AssetPath);
+	FAssetData AssetData = AssetRegistry.GetAssetByObjectPath(AssetPath);
+
+	// Fallback: actor entries store the generated class path (ends in "_C"); the
+	// Blueprint asset is registered without the suffix, so retry with it stripped.
+	if (!AssetData.IsValid())
+	{
+		FString PathString = AssetPath.ToString();
+		if (PathString.EndsWith(TEXT("_C")))
+		{
+			PathString.LeftChopInline(2);
+			AssetData = AssetRegistry.GetAssetByObjectPath(FSoftObjectPath(PathString));
+		}
+	}
 
 	const int32 ThumbnailResolution = FMath::RoundToInt32(TileSize);
 	Thumbnail = MakeShared<FAssetThumbnail>(AssetData, ThumbnailResolution, ThumbnailResolution, ThumbnailPool);

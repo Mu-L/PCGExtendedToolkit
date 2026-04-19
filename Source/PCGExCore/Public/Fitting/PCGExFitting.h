@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGExFittingCommon.h"
 #include "Data/PCGExDataCommon.h"
+#include "Details/PCGExInputShorthandsDetails.h"
 #include "Metadata/PCGAttributePropertySelector.h"
 
 #include "PCGExFitting.generated.h"
@@ -17,6 +18,12 @@ namespace PCGExData
 }
 
 struct FPCGExContext;
+
+namespace PCGExDetails
+{
+	template <typename T>
+	class TSettingValue;
+}
 
 namespace PCGExData
 {
@@ -96,26 +103,15 @@ struct PCGEXCORE_API FPCGExSingleJustifyDetails
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExJustifyFrom From = EPCGExJustifyFrom::Center;
 
-	/** Whether custom 'From' comes from constant or attribute. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName=" ├─ Input", EditCondition="From == EPCGExJustifyFrom::Custom", EditConditionHides))
-	EPCGExInputValueType FromInput = EPCGExInputValueType::Constant;
-
 	/**
 	 * Attribute for custom 'From' position.
 	 * 0 = bounds min, 0.5 = center, 1 = bounds max.
 	 */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName=" └─ From (Attr)", EditCondition="From == EPCGExJustifyFrom::Custom && FromInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector FromSourceAttribute;
-
-	/**
-	 * Custom 'From' position within bounds.
-	 * 0 = bounds min, 0.5 = center, 1 = bounds max.
-	 */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName=" └─ From", EditCondition="From == EPCGExJustifyFrom::Custom && FromInput == EPCGExInputValueType::Constant", EditConditionHides))
-	double FromConstant = 0.5;
-
-	TSharedPtr<PCGExData::TBuffer<double>> FromGetter;
-	TSharedPtr<PCGExData::TBuffer<FVector>> SharedFromGetter;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Source", EditCondition="From == EPCGExJustifyFrom::Custom", EditConditionHides))
+	FPCGExInputShorthandSelectorDouble CustomFrom = FPCGExInputShorthandSelectorDouble(FName("From"), 0.5, false);
+	
+	TSharedPtr<PCGExDetails::TSettingValue<double>> FromGetter;
+	TSharedPtr<PCGExDetails::TSettingValue<FVector>> SharedFromGetter;
 
 	/**
 	 * Target point in the container bounds to align to.
@@ -123,27 +119,16 @@ struct PCGEXCORE_API FPCGExSingleJustifyDetails
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExJustifyTo To = EPCGExJustifyTo::Same;
-
-	/** Whether custom 'To' comes from constant or attribute. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName=" ├─ Input", EditCondition="To == EPCGExJustifyTo::Custom", EditConditionHides))
-	EPCGExInputValueType ToInput = EPCGExInputValueType::Constant;
-
+	
 	/**
 	 * Attribute for custom 'To' position.
 	 * 0 = bounds min, 0.5 = center, 1 = bounds max.
 	 */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName=" └─ To (Attr)", EditCondition="To == EPCGExJustifyTo::Custom && ToInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector ToSourceAttribute;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Source", EditCondition="To == EPCGExJustifyTo::Custom", EditConditionHides))
+	FPCGExInputShorthandSelectorDouble CustomTo = FPCGExInputShorthandSelectorDouble(FName("To"), 0.5, false);
 
-	/**
-	 * Custom 'To' position within container bounds.
-	 * 0 = bounds min, 0.5 = center, 1 = bounds max.
-	 */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName=" └─ To", EditCondition="To == EPCGExJustifyTo::Custom && ToInput == EPCGExInputValueType::Constant", EditConditionHides))
-	double ToConstant = 0.5;
-
-	TSharedPtr<PCGExData::TBuffer<double>> ToGetter;
-	TSharedPtr<PCGExData::TBuffer<FVector>> SharedToGetter;
+	TSharedPtr<PCGExDetails::TSettingValue<double>> ToGetter;
+	TSharedPtr<PCGExDetails::TSettingValue<FVector>> SharedToGetter;
 
 	bool Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade);
 
@@ -194,10 +179,10 @@ struct PCGEXCORE_API FPCGExJustificationDetails
 	 * Vector attribute where X/Y/Z components provide 'From' positions
 	 * for corresponding axes. Overrides per-axis attribute settings.
 	 */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="bSharedCustomFromAttribute"))
-	FPCGAttributePropertyInputSelector CustomFromVectorAttribute;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bSharedCustomFromAttribute"))
+	FPCGExInputShorthandSelectorVector CustomFrom = FPCGExInputShorthandSelectorVector(FName("From"), FVector(0.5), true);
 
-	TSharedPtr<PCGExData::TBuffer<FVector>> SharedFromGetter;
+	TSharedPtr<PCGExDetails::TSettingValue<FVector>> SharedFromGetter;
 
 	/** Use a single FVector attribute for all 'To' positions instead of per-axis attributes. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, InlineEditConditionToggle))
@@ -208,12 +193,11 @@ struct PCGEXCORE_API FPCGExJustificationDetails
 	 * for corresponding axes. Overrides per-axis attribute settings.
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="bSharedCustomToAttribute"))
-	FPCGAttributePropertyInputSelector CustomToVectorAttribute;
+	FPCGExInputShorthandSelectorVector CustomTo = FPCGExInputShorthandSelectorVector(FName("To"), FVector(0.5), true);
 
-	TSharedPtr<PCGExData::TBuffer<FVector>> SharedToGetter;
+	TSharedPtr<PCGExDetails::TSettingValue<FVector>> SharedToGetter;
 
 	void Process(const int32 Index, const FBox& InBounds, const FBox& OutBounds, FVector& OutTranslation) const;
-
 
 	bool Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade);
 };

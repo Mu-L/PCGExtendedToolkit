@@ -20,15 +20,24 @@ void UPCGExOffsetPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* I
 	{
 		// Rewire Offset
 		PCGEX_SHORTHAND_RENAME_PIN(OffsetAttribute, OffsetConstant, Offset)
-		Offset.Update(OffsetInput_DEPRECATED, OffsetAttribute_DEPRECATED, OffsetConstant_DEPRECATED);
 
 		// Rewire Direction
 		PCGEX_SHORTHAND_RENAME_PIN(DirectionAttribute, UNDEFINED, Direction)
-		Direction.Update(DirectionType_DEPRECATED, DirectionAttribute_DEPRECATED, FVector::UpVector);
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
+
+void UPCGExOffsetPathSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 7)
+	{
+		Offset.Update(OffsetInput_DEPRECATED, OffsetAttribute_DEPRECATED, OffsetConstant_DEPRECATED);
+		Direction.Update(DirectionType_DEPRECATED, DirectionAttribute_DEPRECATED, FVector::UpVector);
+	}
+	Super::ApplyDeprecation(InOutNode);
+}
+
 #endif
 
 PCGEX_INITIALIZE_ELEMENT(OffsetPath)

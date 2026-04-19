@@ -64,6 +64,9 @@ namespace PCGExCollections
  */
 namespace PCGExCollections
 {
+	PCGEXCOLLECTIONS_API
+	UPCGExSelectorFactoryData* BuildLegacyFactory(FPCGExContext* InContext, const FPCGExAssetDistributionDetails& InDetails);
+	
 	class FSocketHelper;
 	/**
 	 * Per-point entry picker. Reads distribution settings (index/random/weighted) and

@@ -35,11 +35,20 @@ void UPCGExSampleSurfaceGuidedSettings::PCGExApplyDeprecationBeforeUpdatePins(UP
 	{
 		// Rewire Distance
 		PCGEX_SHORTHAND_RENAME_PIN(LocalMaxDistance, MaxDistance, Distance)
+	}
+
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExSampleSurfaceGuidedSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 74, 3)
+	{
 		Distance.Update(DistanceInput_DEPRECATED == EPCGExTraceSampleDistanceInput::Constant ? EPCGExInputValueType::Constant : EPCGExInputValueType::Attribute,
 		                LocalMaxDistance_DEPRECATED, MaxDistance_DEPRECATED);
 	}
 
-	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	Super::ApplyDeprecation(InOutNode);
 }
 #endif
 
