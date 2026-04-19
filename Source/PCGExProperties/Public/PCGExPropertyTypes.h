@@ -231,7 +231,7 @@ public:
 /**
  * Vector property - outputs as FVector attribute.
  */
-USTRUCT(BlueprintType, DisplayName="Vector")
+USTRUCT(BlueprintType, DisplayName="Vector", meta=(PCGExInlineValue))
 struct PCGEXPROPERTIES_API FPCGExProperty_Vector : public FPCGExProperty
 {
 	GENERATED_BODY()
@@ -257,7 +257,7 @@ public:
 /**
  * Vector2D property - outputs as FVector2D attribute.
  */
-USTRUCT(BlueprintType, DisplayName="Vector2")
+USTRUCT(BlueprintType, DisplayName="Vector2", meta=(PCGExInlineValue))
 struct PCGEXPROPERTIES_API FPCGExProperty_Vector2 : public FPCGExProperty
 {
 	GENERATED_BODY()
@@ -343,7 +343,7 @@ public:
 /**
  * Rotator property - outputs as FRotator attribute.
  */
-USTRUCT(BlueprintType, DisplayName="Rotator")
+USTRUCT(BlueprintType, DisplayName="Rotator", meta=(PCGExInlineValue))
 struct PCGEXPROPERTIES_API FPCGExProperty_Rotator : public FPCGExProperty
 {
 	GENERATED_BODY()
