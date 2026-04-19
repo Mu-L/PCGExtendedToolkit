@@ -107,6 +107,19 @@ void FPCGExShapeFiblatBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> 
 	)
 }
 
+#if WITH_EDITOR
+void UPCGExCreateShapeFiblatSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
+	{
+		Config.ApplyDeprecation();
+	}
+	
+	Super::ApplyDeprecation(InOutNode);
+}
+#endif
+
+
 PCGEX_SHAPE_BUILDER_BOILERPLATE(Fiblat)
 
 #undef LOCTEXT_NAMESPACE

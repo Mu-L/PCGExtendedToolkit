@@ -4,6 +4,7 @@
 #include "Details/InputSettings/PCGExInputShorthandsCustomization.h"
 
 #include "UObject/TextProperty.h"
+#include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "PropertyHandle.h"
 #include "Details/PCGExCustomizationMacros.h"
@@ -94,8 +95,13 @@ TSharedRef<SWidget> FPCGExInputShorthandCustomization::CreateAttributeWidget(TSh
 		return AttributeHandle->CreatePropertyValueWidget();
 	}
 
-	return SNew(SEditableTextBox)
-		.Text_Lambda(
+	return SNew(SBox)
+		.VAlign(VAlign_Center)
+		.MaxDesiredHeight(22.0f)
+		[
+			SNew(SEditableTextBox)
+			.Font(IDetailLayoutBuilder::GetDetailFont())
+			.Text_Lambda(
 			[AttributeHandle]()
 			{
 				TArray<void*> RawData;
@@ -133,7 +139,8 @@ TSharedRef<SWidget> FPCGExInputShorthandCustomization::CreateAttributeWidget(TSh
 
 					if (bUpdated) { AttributeHandle->NotifyPostChange(EPropertyChangeType::ValueSet); }
 				}
-			});
+			})
+		];
 }
 
 TSharedRef<IPropertyTypeCustomization> FPCGExInputShorthandVectorCustomization::MakeInstance()

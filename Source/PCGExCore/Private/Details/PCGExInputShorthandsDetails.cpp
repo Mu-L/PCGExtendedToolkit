@@ -27,12 +27,12 @@ MACRO(FString, String, __VA_ARGS__)    \
 MACRO(FName, Name, __VA_ARGS__)
 
 #define PCGEX_SHORTHAND_UPDATE__NAME_IMPL(_TYPE, _NAME)\
-void FPCGExInputShorthandName##_NAME::Update(EPCGExInputValueType InInputType, FPCGAttributePropertyInputSelector InSelector, _TYPE InConstant){Input = InInputType; Constant = InConstant;	Attribute = InSelector.GetName();}\
+void FPCGExInputShorthandName##_NAME::Update(EPCGExInputValueType InInputType, const FPCGAttributePropertyInputSelector& InSelector, _TYPE InConstant){Input = InInputType; Constant = InConstant;	Attribute = InSelector.GetName();}\
 void FPCGExInputShorthandName##_NAME::Update(EPCGExInputValueType InInputType, FName InSelector, _TYPE InConstant){Input = InInputType; Constant = InConstant;	Attribute = InSelector;}\
 bool FPCGExInputShorthandName##_NAME::CanSupportDataOnly() const { return Input == EPCGExInputValueType::Constant ? true : PCGExMetaHelpers::IsDataDomainAttribute(Attribute); }
 
 #define PCGEX_SHORTHAND_UPDATE__SELECTOR_IMPL(_TYPE, _NAME)\
-void FPCGExInputShorthandSelector##_NAME::Update(EPCGExInputValueType InInputType, FPCGAttributePropertyInputSelector InSelector, _TYPE InConstant){Input = InInputType; Constant = InConstant;	Attribute = InSelector;}\
+void FPCGExInputShorthandSelector##_NAME::Update(EPCGExInputValueType InInputType, const FPCGAttributePropertyInputSelector& InSelector, _TYPE InConstant){Input = InInputType; Constant = InConstant;	Attribute = InSelector;}\
 void FPCGExInputShorthandSelector##_NAME::Update(EPCGExInputValueType InInputType, FName InSelector, _TYPE InConstant){Input = InInputType; Constant = InConstant;	Attribute.Update(InSelector.ToString());}\
 bool FPCGExInputShorthandSelector##_NAME::CanSupportDataOnly() const { return Input == EPCGExInputValueType::Constant ? true : PCGExMetaHelpers::IsDataDomainAttribute(Attribute); }
 

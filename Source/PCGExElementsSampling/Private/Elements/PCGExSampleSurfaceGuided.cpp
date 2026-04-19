@@ -29,7 +29,7 @@ UPCGExSampleSurfaceGuidedSettings::UPCGExSampleSurfaceGuidedSettings(const FObje
 }
 
 #if WITH_EDITOR
-void UPCGExSampleSurfaceGuidedSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExSampleSurfaceGuidedSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -39,7 +39,7 @@ void UPCGExSampleSurfaceGuidedSettings::ApplyPCGExDeprecation(UPCGNode* InOutNod
 		                LocalMaxDistance_DEPRECATED, MaxDistance_DEPRECATED);
 	}
 
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 #endif
 

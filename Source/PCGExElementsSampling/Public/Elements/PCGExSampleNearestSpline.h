@@ -119,7 +119,7 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual void ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 
 	PCGEX_NODE_INFOS(SampleNearestSpline, "Sample : Nearest Spline", "Find the closest transform on nearest polylines.");
 	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }

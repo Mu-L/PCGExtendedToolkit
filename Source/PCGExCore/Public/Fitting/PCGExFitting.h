@@ -269,11 +269,11 @@ struct PCGEXCORE_API FPCGExFittingDetailsHandler
 	}
 
 	/** How to scale objects to fit within target bounds. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties, AlwaysExpand=true))
 	FPCGExScaleToFitDetails ScaleToFit;
 
 	/** How to align objects within target bounds after scaling. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties, AlwaysExpand=true))
 	FPCGExJustificationDetails Justification;
 
 	TSharedPtr<PCGExData::FFacade> TargetDataFacade;

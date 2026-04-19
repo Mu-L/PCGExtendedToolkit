@@ -91,7 +91,7 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 				]
 				.ValueContent()
 				.MinDesiredWidth(250.0f)
-				.MaxDesiredWidth(TNumericLimits<float>::Max())
+				.MaxDesiredWidth(3000.0f)
 				[
 					(*Factory)(ValueHandle.ToSharedRef())
 				];

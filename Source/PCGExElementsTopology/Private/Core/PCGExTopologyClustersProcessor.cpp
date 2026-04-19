@@ -21,6 +21,22 @@
 #define LOCTEXT_NAMESPACE "TopologyProcessor"
 #define PCGEX_NAMESPACE TopologyProcessor
 
+#if WITH_EDITOR
+void UPCGExTopologyClustersProcessorSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	for (TObjectPtr<UPCGPin>& OutPin : OutputPins)
+	{
+		// If vtx/edge pins are connected, set Legacy output mode and log warning
+		if ((OutPin->Properties.Label == PCGExClusters::Labels::OutputVerticesLabel || OutPin->Properties.Label == PCGExClusters::Labels::OutputEdgesLabel) && OutPin->EdgeCount() > 0)
+		{
+			OutputMode = EPCGExTopologyOutputMode::Legacy;
+			UE_LOG(LogPCGEx, Warning, TEXT("Legacy output mode is deprecated. Please reconnect to use PCG Dynamic Mesh output."));
+		}
+	}
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+#endif
+
 PCGExData::EIOInit UPCGExTopologyClustersProcessorSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
 PCGExData::EIOInit UPCGExTopologyClustersProcessorSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
 
@@ -41,22 +57,6 @@ TArray<FPCGPinProperties> UPCGExTopologyClustersProcessorSettings::OutputPinProp
 	PCGEX_PIN_MESH(PCGExTopology::Labels::OutputMeshLabel, "PCG Dynamic Mesh", Normal)
 	return PinProperties;
 }
-
-#if WITH_EDITOR
-void UPCGExTopologyClustersProcessorSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
-{
-	for (TObjectPtr<UPCGPin>& OutPin : OutputPins)
-	{
-		// If vtx/edge pins are connected, set Legacy output mode and log warning
-		if ((OutPin->Properties.Label == PCGExClusters::Labels::OutputVerticesLabel || OutPin->Properties.Label == PCGExClusters::Labels::OutputEdgesLabel) && OutPin->EdgeCount() > 0)
-		{
-			OutputMode = EPCGExTopologyOutputMode::Legacy;
-			UE_LOG(LogPCGEx, Warning, TEXT("Legacy output mode is deprecated. Please reconnect to use PCG Dynamic Mesh output."));
-		}
-	}
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
-}
-#endif
 
 void FPCGExTopologyClustersProcessorContext::RegisterAssetDependencies()
 {
@@ -302,4 +302,4 @@ namespace PCGExTopologyEdges
 }
 
 #undef LOCTEXT_NAMESPACE
-#undef PCGEX_NAMESPACE
+#undef PCGEX_NAMESPAC

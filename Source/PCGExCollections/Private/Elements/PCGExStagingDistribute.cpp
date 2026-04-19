@@ -34,9 +34,9 @@
 #pragma region UPCGExAssetStagingSettings
 
 #if WITH_EDITOR
-void UPCGExAssetStagingSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExAssetStagingSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	PCGEX_IF_VERSION_LOWER(1, 75, 9)
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		if (!bSelectorModePreUpdated)
 		{
@@ -45,7 +45,7 @@ void UPCGExAssetStagingSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArr
 		}
 	}
 
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
 void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)

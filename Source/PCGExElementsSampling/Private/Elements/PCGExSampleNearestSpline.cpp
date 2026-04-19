@@ -49,7 +49,7 @@ UPCGExSampleNearestSplineSettings::UPCGExSampleNearestSplineSettings(const FObje
 }
 
 #if WITH_EDITOR
-void UPCGExSampleNearestSplineSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExSampleNearestSplineSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -66,7 +66,7 @@ void UPCGExSampleNearestSplineSettings::ApplyPCGExDeprecation(UPCGNode* InOutNod
 		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
 	}
 
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 #endif
 

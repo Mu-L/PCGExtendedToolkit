@@ -36,7 +36,7 @@ UPCGExSampleNearestPointSettings::UPCGExSampleNearestPointSettings(const FObject
 }
 
 #if WITH_EDITOR
-void UPCGExSampleNearestPointSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExSampleNearestPointSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -49,7 +49,7 @@ void UPCGExSampleNearestPointSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode
 		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
 	}
 
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 #endif
 

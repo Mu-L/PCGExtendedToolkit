@@ -199,7 +199,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 				]
 				.ValueContent()
 				.MinDesiredWidth(bHasCustomFactory ? 250.0f : 125.0f)
-				.MaxDesiredWidth(bHasCustomFactory ? TNumericLimits<float>::Max() : 600.0f)
+				.MaxDesiredWidth(bHasCustomFactory ? 3000.0f : 600.0f)
 				[
 					SNew(SBox)
 					.IsEnabled(IsEnabledAttr)

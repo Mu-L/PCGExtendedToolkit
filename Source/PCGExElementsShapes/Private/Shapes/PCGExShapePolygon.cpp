@@ -11,8 +11,14 @@
 #define LOCTEXT_NAMESPACE "PCGExCreateBuilderPolygon"
 #define PCGEX_NAMESPACE CreateBuilderPolygon;
 
-PCGEX_SETTING_VALUE_IMPL(FPCGExShapePolygonConfig, NumVertices, int32, NumVerticesInput, NumVerticesAttribute, NumVerticesConstant)
-PCGEX_SETTING_VALUE_IMPL(FPCGExShapePolygonConfig, AddSkeleton, bool, AddSkeletonInput, AddSkeletonAttribute, bAddSkeleton)
+#if WITH_EDITOR
+void FPCGExShapePolygonConfig::ApplyDeprecation()
+{
+	NumVertices.Update(NumVerticesInput_DEPRECATED, NumVerticesAttribute_DEPRECATED, NumVerticesConstant_DEPRECATED);
+	AddSkeleton.Update(AddSkeletonInput_DEPRECATED, AddSkeletonAttribute_DEPRECATED, bAddSkeleton_DEPRECATED);
+	FPCGExShapeConfigBase::ApplyDeprecation();
+}
+#endif
 
 bool FPCGExShapePolygonBuilder::PrepareForSeeds(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InSeedDataFacade)
 {
@@ -20,17 +26,11 @@ bool FPCGExShapePolygonBuilder::PrepareForSeeds(FPCGExContext* InContext, const 
 	{
 		return false;
 	}
-	NumVertices = Config.GetValueSettingNumVertices();
-	if (!NumVertices->Init(InSeedDataFacade))
-	{
-		return false;
-	}
+	NumVertices = Config.NumVertices.GetValueSetting();
+	if (!NumVertices->Init(InSeedDataFacade)) { return false; }
 
-	HasSkeleton = Config.GetValueSettingAddSkeleton();
-	if (!HasSkeleton->Init(InSeedDataFacade))
-	{
-		return false;
-	}
+	HasSkeleton = Config.AddSkeleton.GetValueSetting();
+	if (!HasSkeleton->Init(InSeedDataFacade)) { return false; }
 
 	PCGEX_VALIDATE_NAME_C(InContext, Config.AngleAttribute)
 	PCGEX_VALIDATE_NAME_C(InContext, Config.EdgeIndexAttribute)
@@ -249,6 +249,32 @@ void FPCGExShapePolygonBuilder::BuildShape(TSharedPtr<PCGExShapes::FShape> InSha
 		if (!Polygon->bHasSkeleton && Polygon->Config->bIsClosedLoop && bIsolated) { PCGExPaths::Helpers::SetClosedLoop(InDataFacade->Source, true); }
 	}
 }
+
+#if WITH_EDITOR
+void UPCGExCreateShapePolygonSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
+	{
+		// Rewire NumVertices
+		PCGEX_SHORTHAND_RENAME_PIN(NumVerticesAttribute, NumVerticesConstant, NumVertices)
+
+		// Rewire Add Skeleton
+		PCGEX_SHORTHAND_RENAME_PIN(AddSkeletonAttribute, AddSkeleton, AddSkeleton)
+	}
+
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExCreateShapePolygonSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
+	{
+		Config.ApplyDeprecation();
+	}
+	Super::ApplyDeprecation(InOutNode);
+}
+#endif
+
 
 PCGEX_SHAPE_BUILDER_BOILERPLATE(Polygon)
 

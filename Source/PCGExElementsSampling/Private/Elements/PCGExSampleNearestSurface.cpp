@@ -21,7 +21,7 @@
 #define PCGEX_NAMESPACE SampleNearestSurface
 
 #if WITH_EDITOR
-void UPCGExSampleNearestSurfaceSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExSampleNearestSurfaceSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -30,7 +30,7 @@ void UPCGExSampleNearestSurfaceSettings::ApplyPCGExDeprecation(UPCGNode* InOutNo
 		Distance.Update(bUseLocalMaxDistance_DEPRECATED ? EPCGExInputValueType::Attribute : EPCGExInputValueType::Constant, LocalMaxDistance_DEPRECATED, MaxDistance_DEPRECATED);
 	}
 
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 #endif
 

@@ -30,7 +30,7 @@
 #define PCGEX_NAMESPACE BuildCustomGraph
 
 #if WITH_EDITOR
-void UPCGExPathSplineMeshSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExPathSplineMeshSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
@@ -43,7 +43,7 @@ void UPCGExPathSplineMeshSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TA
 		if (CollectionSource != EPCGExCollectionSource::Asset || !AssetCollection.IsNull()) { bUseStagedPoints = false; }
 	}
 
-	PCGEX_IF_VERSION_LOWER(1, 75, 9)
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{	
 		if (!bSelectorModePreUpdated)
 		{
@@ -52,7 +52,7 @@ void UPCGExPathSplineMeshSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TA
 		}
 	}
 	
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
 void UPCGExPathSplineMeshSettings::PostInitProperties()

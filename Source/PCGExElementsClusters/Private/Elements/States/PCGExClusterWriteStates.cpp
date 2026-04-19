@@ -15,10 +15,10 @@ PCGExData::EIOInit UPCGExFlagNodesSettings::GetMainOutputInitMode() const { retu
 PCGExData::EIOInit UPCGExFlagNodesSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
 
 #if WITH_EDITOR
-void UPCGExFlagNodesSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExFlagNodesSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	InOutNode->RenameInputPin(FName("Node Flags"), PCGExPointStates::Labels::SourceStatesLabel);
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 #endif
 
