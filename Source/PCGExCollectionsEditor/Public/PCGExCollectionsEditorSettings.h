@@ -31,6 +31,10 @@ public:
 	UPROPERTY(Config)
 	TSet<FName> HiddenPropertyNames;
 
+	/** When a collection tile references a Blueprint class that isn't loaded yet, kick an async load so the picker shows the class name instead of "None". Disable if this causes editor stalls on open. */
+	UPROPERTY(EditAnywhere, config, Category = Settings)
+	bool bAsyncLoadPickerClasses = true;
+
 	void ToggleHiddenAssetPropertyName(const FName PropertyName, const bool bHide);
 	void ToggleHiddenAssetPropertyName(const TArray<FName> Properties, const bool bHide);
 	EVisibility GetPropertyVisibility(const FName PropertyName) const;

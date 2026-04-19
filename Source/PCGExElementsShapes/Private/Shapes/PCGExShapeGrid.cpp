@@ -159,6 +159,19 @@ void FPCGExShapeGridBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> In
 	}
 }
 
+#if WITH_EDITOR
+void UPCGExCreateShapeGridSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
+	{
+		Config.ApplyDeprecation();
+	}
+	
+	Super::ApplyDeprecation(InOutNode);
+}
+#endif
+
+
 PCGEX_SHAPE_BUILDER_BOILERPLATE(Grid)
 
 #undef LOCTEXT_NAMESPACE

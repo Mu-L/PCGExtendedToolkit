@@ -102,6 +102,7 @@ class UPCGExCreateShapeGridSettings : public UPCGExShapeBuilderFactoryProviderSe
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ShapeBuilderGrid, "Shape : 3D Grid", "Create points in a 3D grid shape.", FName("Grid"))
 
 #endif

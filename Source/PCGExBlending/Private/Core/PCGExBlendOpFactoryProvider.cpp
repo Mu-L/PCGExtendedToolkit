@@ -10,11 +10,11 @@
 #define PCGEX_NAMESPACE CreateAttributeBlend
 
 #if WITH_EDITOR
-void UPCGExBlendOpFactoryProviderSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExBlendOpFactoryProviderSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	InOutNode->RenameInputPin(FName("Constant A"), PCGExBlending::Labels::SourceConstantA);
 	InOutNode->RenameInputPin(FName("Constant B"), PCGExBlending::Labels::SourceConstantB);
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
 void UPCGExBlendOpFactoryProviderSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)

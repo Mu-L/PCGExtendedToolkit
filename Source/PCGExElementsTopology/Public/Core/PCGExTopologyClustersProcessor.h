@@ -29,6 +29,7 @@ class PCGEXELEMENTSTOPOLOGY_API UPCGExTopologyClustersProcessorSettings : public
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	PCGEX_NODE_INFOS(TopologyProcessor, "Topology", "Base processor to output meshes from clusters");
 	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::DynamicMesh; }
 	virtual FLinearColor GetNodeTitleColor() const override { return FLinearColor::White; }
@@ -42,11 +43,7 @@ public:
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
-
-#if WITH_EDITOR
-	virtual void ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
-#endif
-
+	
 	//~End UPCGSettings
 
 public:

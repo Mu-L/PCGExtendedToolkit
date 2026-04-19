@@ -13,8 +13,6 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
-#include "Widgets/Input/SRotatorInputBox.h"
-#include "Widgets/Input/SVectorInputBox.h"
 #include "Widgets/Layout/SBox.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExCompareShorthandCustomization::MakeInstance()
@@ -127,8 +125,13 @@ TSharedRef<SWidget> FPCGExCompareShorthandCustomization::CreateAttributeWidget(T
 		return AttributeHandle->CreatePropertyValueWidget();
 	}
 
-	return SNew(SEditableTextBox)
-		.Text_Lambda(
+	return SNew(SBox)
+		.VAlign(VAlign_Center)
+		.MaxDesiredHeight(22.0f)
+		[
+			SNew(SEditableTextBox)
+			.Font(IDetailLayoutBuilder::GetDetailFont())
+			.Text_Lambda(
 			[AttributeHandle]()
 			{
 				TArray<void*> RawData;
@@ -166,7 +169,8 @@ TSharedRef<SWidget> FPCGExCompareShorthandCustomization::CreateAttributeWidget(T
 
 					if (bUpdated) { AttributeHandle->NotifyPostChange(EPropertyChangeType::ValueSet); }
 				}
-			});
+			})
+		];
 }
 
 TSharedRef<IPropertyTypeCustomization> FPCGExCompareShorthandVectorCustomization::MakeInstance()

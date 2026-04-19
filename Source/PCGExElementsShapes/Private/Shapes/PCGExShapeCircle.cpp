@@ -13,17 +13,23 @@
 #define LOCTEXT_NAMESPACE "PCGExCreateBuilderCircle"
 #define PCGEX_NAMESPACE CreateBuilderCircle
 
-PCGEX_SETTING_VALUE_IMPL(FPCGExShapeCircleConfig, EndAngle, double, EndAngleInput, EndAngleAttribute, EndAngleConstant)
-PCGEX_SETTING_VALUE_IMPL(FPCGExShapeCircleConfig, StartAngle, double, StartAngleInput, StartAngleAttribute, StartAngleConstant)
+#if WITH_EDITOR
+void FPCGExShapeCircleConfig::ApplyDeprecation()
+{
+	StartAngle.Update(StartAngleInput_DEPRECATED, StartAngleAttribute_DEPRECATED, StartAngleConstant_DEPRECATED);
+	EndAngle.Update(EndAngleInput_DEPRECATED, EndAngleAttribute_DEPRECATED, EndAngleConstant_DEPRECATED);
+	FPCGExShapeConfigBase::ApplyDeprecation();
+}
+#endif
 
 bool FPCGExShapeCircleBuilder::PrepareForSeeds(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InSeedDataFacade)
 {
 	if (!FPCGExShapeBuilderOperation::PrepareForSeeds(InContext, InSeedDataFacade)) { return false; }
 
-	StartAngle = Config.GetValueSettingStartAngle();
+	StartAngle = Config.StartAngle.GetValueSetting();
 	if (!StartAngle->Init(InSeedDataFacade)) { return false; }
 
-	EndAngle = Config.GetValueSettingEndAngle();
+	EndAngle = Config.EndAngle.GetValueSetting();
 	if (!EndAngle->Init(InSeedDataFacade)) { return false; }
 
 	return true;
@@ -96,6 +102,33 @@ void FPCGExShapeCircleBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> 
 	// Mark @Data.IsClosed if a single circle "owns" the data
 	if (bOwnsData && Circle->bClosedLoop) { PCGExPaths::Helpers::SetClosedLoop(InDataFacade->GetOut(), true); }
 }
+
+void UPCGExCreateShapeCircleSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
+	{
+		// Rewire Start Angle
+		PCGEX_SHORTHAND_RENAME_PIN(StartAngleAttribute, StartAngleConstant, StartAngle)
+
+		// Rewire End Angle
+		PCGEX_SHORTHAND_RENAME_PIN(EndAngleAttribute, EndAngleConstant, EndAngle)
+	}
+
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+#if WITH_EDITOR
+void UPCGExCreateShapeCircleSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
+	{
+		Config.ApplyDeprecation();
+	}
+	
+	Super::ApplyDeprecation(InOutNode);
+}
+#endif
+
 
 PCGEX_SHAPE_BUILDER_BOILERPLATE(Circle)
 

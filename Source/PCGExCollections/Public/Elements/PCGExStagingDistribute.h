@@ -63,7 +63,7 @@ class UPCGExAssetStagingSettings : public UPCGExPointsProcessorSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual void ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 	
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AssetStaging, "Staging : Distribute", "Distribute PCGEx Asset Collection entries to points.", FName(GetDisplayName()));
 	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Sampler; }
@@ -217,8 +217,7 @@ struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext
 	TObjectPtr<UPCGExAssetCollection> MainCollection;
 	bool bPickMaterials = false;
 
-	/** External selector factory read from the Selector input pin (only set when SelectorMode==External). */
-	TObjectPtr<const UPCGExSelectorFactoryData> SelectorFactory;
+	const UPCGExSelectorFactoryData* SelectorFactory = nullptr;
 
 	TSharedPtr<PCGExCollections::FPickPacker> CollectionPickDatasetPacker;
 	TSharedPtr<PCGExCollections::FSelectorSharedDataCache> SelectorSharedDataCache;

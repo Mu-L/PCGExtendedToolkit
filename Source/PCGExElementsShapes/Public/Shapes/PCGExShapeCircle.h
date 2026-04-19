@@ -20,37 +20,44 @@ struct FPCGExShapeCircleConfig : public FPCGExShapeConfigBase
 	{
 	}
 
-	/** Start angle source. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
-	EPCGExInputValueType StartAngleInput = EPCGExInputValueType::Constant;
+	/** Start Angle. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable))
+	FPCGExInputShorthandSelectorDouble StartAngle = FPCGExInputShorthandSelectorDouble(FName("StartAngle"), 0, false);
+	
+	/** End Angle. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable))
+	FPCGExInputShorthandSelectorDouble EndAngle = FPCGExInputShorthandSelectorDouble(FName("EndAngle"), 360, false);
+	
+#pragma region DEPRECATED
+	
+	UPROPERTY()
+	EPCGExInputValueType StartAngleInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	/** Start angle attribute, in degrees. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Start Angle (Attr)", EditCondition="StartAngleInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector StartAngleAttribute;
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector StartAngleAttribute_DEPRECATED;
 
-	/** Start angle constant, in degrees. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Start Angle", EditCondition="StartAngleInput == EPCGExInputValueType::Constant", EditConditionHides, Units="Degrees"))
-	double StartAngleConstant = 0;
+	UPROPERTY()
+	double StartAngleConstant_DEPRECATED = 0;
 
-	PCGEX_SETTING_VALUE_DECL(StartAngle, double)
+	UPROPERTY()
+	EPCGExInputValueType EndAngleInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	/** End angle source. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
-	EPCGExInputValueType EndAngleInput = EPCGExInputValueType::Constant;
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector EndAngleAttribute_DEPRECATED;
 
-	/** End angle attribute, in degrees. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="End Angle (Attr)", EditCondition="EndAngleInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector EndAngleAttribute;
-
-	/** End angle constant, in degrees. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="End Angle", EditCondition="EndAngleInput == EPCGExInputValueType::Constant", EditConditionHides, Units="Degrees"))
-	double EndAngleConstant = 360;
-
-	PCGEX_SETTING_VALUE_DECL(EndAngle, double)
+	UPROPERTY()
+	double EndAngleConstant_DEPRECATED = 360;
+	
+#pragma endregion
 
 	/** If enabled, will flag circle as being closed if possible. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bIsClosedLoop = true;
+	
+#if WITH_EDITOR
+	virtual void ApplyDeprecation() override;
+#endif
+	
 };
 
 namespace PCGExShapes
@@ -109,6 +116,8 @@ class UPCGExCreateShapeCircleSettings : public UPCGExShapeBuilderFactoryProvider
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ShapeBuilderCircle, "Shape : Circle", "Create points in a circular shape.", FName("Circle"))
 
 #endif

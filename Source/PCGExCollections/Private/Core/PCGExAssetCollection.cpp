@@ -259,6 +259,24 @@ namespace PCGExAssetCollection
 
 #pragma region FPCGExAssetCollectionEntry
 
+const FPCGExProperty* FPCGExAssetCollectionEntry::GetResolvedPropertyBase(const UPCGExAssetCollection* OwningCollection, FName PropertyName) const
+{
+	if (const FInstancedStruct* Override = PropertyOverrides.GetOverride(PropertyName))
+	{
+		if (const FPCGExProperty* Base = Override->GetPtr<FPCGExProperty>()) { return Base; }
+	}
+
+	if (OwningCollection)
+	{
+		if (const FInstancedStruct* Default = OwningCollection->CollectionProperties.GetPropertyByName(PropertyName))
+		{
+			return Default->GetPtr<FPCGExProperty>();
+		}
+	}
+
+	return nullptr;
+}
+
 const FPCGExFittingVariations& FPCGExAssetCollectionEntry::GetVariations(const UPCGExAssetCollection* ParentCollection) const
 {
 	if (VariationMode == EPCGExEntryVariationMode::Global || ParentCollection->GlobalVariationMode == EPCGExGlobalVariationRule::Overrule)

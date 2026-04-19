@@ -224,41 +224,39 @@ namespace PCGExAttributeRemap
 
 		PointDataFacade->Fetch(Scope);
 
-		// Find min/max & clamp values
+		// Per-dim locals hoisted out of the inner loop so we walk the input buffer
+		// once across all dimensions (cache-friendly for multi-component types).
+		PCGExData::IBufferProxy* InProxy[4] = {nullptr, nullptr, nullptr, nullptr};
+		PCGExData::IBufferProxy* OutProxy[4] = {nullptr, nullptr, nullptr, nullptr};
+		FPCGExClampDetails* Clamp[4] = {nullptr, nullptr, nullptr, nullptr};
+		bool bAbs[4] = {false, false, false, false};
+		double Min[4] = {MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl};
+		double Max[4] = {MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg};
 
 		for (int d = 0; d < Dimensions; d++)
 		{
-			FPCGExComponentRemapRule& Rule = Rules[d];
+			InProxy[d] = InputProxies[d].Get();
+			OutProxy[d] = OutputProxies[d].Get();
+			Clamp[d] = &Rules[d].InputClampDetails;
+			bAbs[d] = Rules[d].RemapDetails.bUseAbsoluteRange;
+		}
 
-			TSharedPtr<PCGExData::IBufferProxy> InProxy = InputProxies[d];
-			TSharedPtr<PCGExData::IBufferProxy> OutProxy = OutputProxies[d];
-
-			double Min = MAX_dbl;
-			double Max = MIN_dbl_neg;
-
-			if (Rule.RemapDetails.bUseAbsoluteRange)
+		PCGEX_SCOPE_LOOP(i)
+		{
+			for (int d = 0; d < Dimensions; d++)
 			{
-				PCGEX_SCOPE_LOOP(i)
-				{
-					double V = Rule.InputClampDetails.GetClampedValue(InProxy->Get<double>(i));
-					Min = FMath::Min(Min, FMath::Abs(V));
-					Max = FMath::Max(Max, FMath::Abs(V));
-					OutProxy->Set(i, V);
-				}
+				const double V = Clamp[d]->GetClampedValue(InProxy[d]->Get<double>(i));
+				OutProxy[d]->Set(i, V);
+				const double Cmp = bAbs[d] ? FMath::Abs(V) : V;
+				Min[d] = FMath::Min(Min[d], Cmp);
+				Max[d] = FMath::Max(Max[d], Cmp);
 			}
-			else
-			{
-				PCGEX_SCOPE_LOOP(i)
-				{
-					double V = Rule.InputClampDetails.GetClampedValue(InProxy->Get<double>(i));
-					Min = FMath::Min(Min, V);
-					Max = FMath::Max(Max, V);
-					OutProxy->Set(i, V);
-				}
-			}
+		}
 
-			Rule.MinCache->Set(Scope, Min);
-			Rule.MaxCache->Set(Scope, Max);
+		for (int d = 0; d < Dimensions; d++)
+		{
+			Rules[d].MinCache->Set(Scope, Min[d]);
+			Rules[d].MaxCache->Set(Scope, Max[d]);
 		}
 	}
 

@@ -34,9 +34,9 @@
 #pragma region UPCGExAssetStagingSettings
 
 #if WITH_EDITOR
-void UPCGExAssetStagingSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExAssetStagingSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_IF_VERSION_LOWER(1, 75, 9)
+	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		if (!bSelectorModePreUpdated)
 		{
@@ -44,8 +44,8 @@ void UPCGExAssetStagingSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArr
 			bSelectorModePreUpdated = true; // So we don't override the value for folks who'll update in their own time
 		}
 	}
-
-	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+	
+	Super::ApplyDeprecation(InOutNode);
 }
 
 void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
@@ -159,6 +159,15 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 			return false;
 		}
 		Context->SelectorFactory = Factories[0];
+	}
+	else
+	{
+		Context->SelectorFactory = PCGExCollections::BuildLegacyFactory(Context, Settings->DistributionSettings);
+	}
+
+	if (!Context->SelectorFactory)
+	{
+		return Context->CancelExecution("Invalid Asset Selector");
 	}
 
 	if (Settings->CollectionSource == EPCGExCollectionSource::Asset)
@@ -398,18 +407,16 @@ namespace PCGExAssetStaging
 		Source->EntryDistributionSettings = Settings->EntryDistributionSettings;
 		Source->SetSharedDataCache(Context->SelectorSharedDataCache);
 
-		const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
-
 		if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 		{
-			if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), ExternalFactory))
+			if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), Context->SelectorFactory))
 			{
 				return false;
 			}
 		}
 		else
 		{
-			if (!Source->Init(Context->MainCollection, ExternalFactory)) { return false; }
+			if (!Source->Init(Context->MainCollection, Context->SelectorFactory)) { return false; }
 		}
 
 		if (Settings->bDoOutputSockets) { SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, NumPoints); }

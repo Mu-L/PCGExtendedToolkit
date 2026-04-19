@@ -85,7 +85,7 @@ class UPCGExFilterCollectionProviderSettings : public UPCGExFilterProviderSettin
 
 protected:
 #if WITH_EDITOR
-	virtual void ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 #endif
 
 	PCGEX_FACTORY_TYPE_ID(FPCGExDataTypeInfoFilterCollection)

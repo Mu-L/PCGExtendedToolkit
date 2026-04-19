@@ -11,6 +11,8 @@
 #include "Details/PCGExPropertySchemaCollectionCustomization.h"
 #include "Details/PCGExPropertySchemaCustomization.h"
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
+#include "PCGExBuiltInInlineWidgets.h"
+#include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyTypes.h"
 #include "PCGExPropertyWriter.h"
@@ -89,6 +91,16 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(Enum)
 
 #undef REGISTER_PROPERTY_COMPILED_CUSTOMIZATION
+
+	// Register built-in compact inline widgets for Vector / Vector2D / Rotator property types
+	PCGExBuiltInInlineWidgets::RegisterAll();
+}
+
+void FPCGExPropertiesEditorModule::ShutdownModule()
+{
+	FPCGExInlineWidgetRegistry::Clear();
+
+	IPCGExEditorModuleInterface::ShutdownModule();
 }
 
 #undef LOCTEXT_NAMESPACE

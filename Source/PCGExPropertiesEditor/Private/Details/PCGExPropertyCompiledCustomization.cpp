@@ -6,7 +6,9 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
+#include "IDetailPropertyRow.h"
 #include "PropertyHandle.h"
+#include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
@@ -70,6 +72,32 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 	TSharedPtr<IPropertyHandle> ValueHandle = PropertyHandle->GetChildHandle(TEXT("Value"));
 	if (ValueHandle.IsValid())
 	{
+		// If a compact inline widget is registered for this outer property struct, use it
+		// instead of the default expandable struct widget. Keeps the Compiled (shorthand)
+		// view visually consistent with the override entry view for the same types.
+		FName OuterStructName = NAME_None;
+		if (const FStructProperty* OuterStructProp = CastField<FStructProperty>(PropertyHandle->GetProperty()))
+		{
+			if (OuterStructProp->Struct) { OuterStructName = OuterStructProp->Struct->GetFName(); }
+		}
+
+		if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(OuterStructName))
+		{
+			IDetailPropertyRow& Row = ChildBuilder.AddProperty(ValueHandle.ToSharedRef());
+			Row.CustomWidget(/*bShowChildren=*/false)
+			   .NameContent()
+				[
+					ValueHandle->CreatePropertyNameWidget()
+				]
+				.ValueContent()
+				.MinDesiredWidth(250.0f)
+				.MaxDesiredWidth(3000.0f)
+				[
+					(*Factory)(ValueHandle.ToSharedRef())
+				];
+			return;
+		}
+
 		ChildBuilder.AddProperty(ValueHandle.ToSharedRef());
 		return;
 	}

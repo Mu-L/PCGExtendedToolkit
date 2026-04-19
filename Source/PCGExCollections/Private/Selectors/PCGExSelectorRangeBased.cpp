@@ -14,24 +14,23 @@ namespace
 {
 	constexpr double RangeTieEpsilon = 1e-6;
 
-	// Resolve a numeric property on an entry as double, walking the accepted-type ladder
-	// (Double -> Float -> Int32 -> Int64). Returns true on first successful resolution.
+	// Resolve a numeric property on an entry as double. Accepts any PCG-numeric property
+	// (Double/Float/Int32/Int64/Bool) transparently via the type-erased TryGetPropertyValue.
 	bool ResolveNumericAsDouble(const FPCGExAssetCollectionEntry* Entry, const UPCGExAssetCollection* Collection, FName Name, double& OutValue)
 	{
-		if (const FPCGExProperty_Double* P = Entry->GetResolvedProperty<FPCGExProperty_Double>(Collection, Name)) { OutValue = P->Value; return true; }
-		if (const FPCGExProperty_Float* P = Entry->GetResolvedProperty<FPCGExProperty_Float>(Collection, Name)) { OutValue = static_cast<double>(P->Value); return true; }
-		if (const FPCGExProperty_Int32* P = Entry->GetResolvedProperty<FPCGExProperty_Int32>(Collection, Name)) { OutValue = static_cast<double>(P->Value); return true; }
-		if (const FPCGExProperty_Int64* P = Entry->GetResolvedProperty<FPCGExProperty_Int64>(Collection, Name)) { OutValue = static_cast<double>(P->Value); return true; }
-		return false;
+		return Entry->TryGetPropertyValue<double>(Collection, Name, OutValue);
 	}
 
-	// Resolve a Vector2D-style range property on an entry. Accepts Vector2 natively and Vector
-	// (Z component ignored). Returns true on first successful resolution.
+	// Resolve a Vector2D-style range property on an entry. Any vector-compatible property
+	// projects via TryGetPropertyValue<FVector2D> — FVector drops Z to give (X, Y),
+	// FVector4 drops Z/W. X -> Min, Y -> Max.
 	bool ResolveRangeFromVector(const FPCGExAssetCollectionEntry* Entry, const UPCGExAssetCollection* Collection, FName Name, double& OutMin, double& OutMax)
 	{
-		if (const FPCGExProperty_Vector2* P = Entry->GetResolvedProperty<FPCGExProperty_Vector2>(Collection, Name)) { OutMin = P->Value.X; OutMax = P->Value.Y; return true; }
-		if (const FPCGExProperty_Vector* P = Entry->GetResolvedProperty<FPCGExProperty_Vector>(Collection, Name)) { OutMin = P->Value.X; OutMax = P->Value.Y; return true; }
-		return false;
+		FVector2D XY = FVector2D::ZeroVector;
+		if (!Entry->TryGetPropertyValue<FVector2D>(Collection, Name, XY)) { return false; }
+		OutMin = XY.X;
+		OutMax = XY.Y;
+		return true;
 	}
 }
 
