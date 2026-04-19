@@ -12,8 +12,6 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
-#include "Widgets/Input/SRotatorInputBox.h"
-#include "Widgets/Input/SVectorInputBox.h"
 #include "Widgets/Layout/SBox.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExInputShorthandCustomization::MakeInstance()
