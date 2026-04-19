@@ -8,6 +8,7 @@
 #include "Editor.h"
 #include "PropertyHandle.h"
 #include "Styling/AppStyle.h"
+#include "Widgets/Input/NumericTypeInterface.h"
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SNullWidget.h"
@@ -21,13 +22,45 @@ namespace PCGExBuiltInInlineWidgets
 		static const FLinearColor AxisColorY = FLinearColor(0.0f, 0.266f, 0.006f);
 		static const FLinearColor AxisColorZ = FLinearColor(0.0f, 0.07f, 0.321f);
 
-		TSharedRef<SWidget> MakeAxisEntry(TSharedPtr<IPropertyHandle> AxisHandle, const FLinearColor& LabelColor)
+		// Numeric type interface that displays values with a trailing degree symbol
+		// (e.g. 90.0 -> "90.0°") and tolerates the symbol on input parsing.
+		// Used for FRotator component editors to mirror the FTransform rotator UX.
+		struct FDegreesNumericTypeInterface : public TDefaultNumericTypeInterface<double>
+		{
+			virtual FString ToString(const double& Value) const override
+			{
+				return TDefaultNumericTypeInterface<double>::ToString(Value) + TEXT("\u00B0");
+			}
+
+			virtual TOptional<double> FromString(const FString& InString, const double& ExistingValue) override
+			{
+				FString Sanitized = InString;
+				Sanitized.ReplaceInline(TEXT("\u00B0"), TEXT(""));
+				Sanitized.TrimStartAndEndInline();
+				return TDefaultNumericTypeInterface<double>::FromString(Sanitized, ExistingValue);
+			}
+		};
+
+		TSharedRef<SWidget> MakeAxisEntry(
+			TSharedPtr<IPropertyHandle> AxisHandle,
+			const FLinearColor& LabelColor,
+			TSharedPtr<INumericTypeInterface<double>> TypeInterface = nullptr)
 		{
 			if (!AxisHandle.IsValid()) { return SNullWidget::NullWidget; }
 
 			return SNew(SNumericEntryBox<double>)
 				.AllowSpin(true)
 				.Font(FAppStyle::GetFontStyle(TEXT("PropertyWindow.NormalFont")))
+				.TypeInterface(TypeInterface)
+				.MinValue(TOptional<double>())
+				.MaxValue(TOptional<double>())
+				.MinSliderValue(TOptional<double>())
+				.MaxSliderValue(TOptional<double>())
+				.SupportDynamicSliderMaxValue(true)
+				.SupportDynamicSliderMinValue(true)
+				.LinearDeltaSensitivity(1)
+				.Delta(0.1)
+				.MinDesiredValueWidth(60.0f)
 				.Value_Lambda([AxisHandle]() -> TOptional<double>
 				{
 					double Out = 0.0;
@@ -85,10 +118,12 @@ namespace PCGExBuiltInInlineWidgets
 			TSharedPtr<IPropertyHandle> Pitch = ValueHandle->GetChildHandle(TEXT("Pitch"));
 			TSharedPtr<IPropertyHandle> Yaw = ValueHandle->GetChildHandle(TEXT("Yaw"));
 
+			const TSharedRef<INumericTypeInterface<double>> DegreeInterface = MakeShared<FDegreesNumericTypeInterface>();
+
 			return SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)[MakeAxisEntry(Roll, AxisColorX)]
-				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 2, 0)[MakeAxisEntry(Pitch, AxisColorY)]
-				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)[MakeAxisEntry(Yaw, AxisColorZ)];
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)[MakeAxisEntry(Roll, AxisColorX, DegreeInterface)]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 2, 0)[MakeAxisEntry(Pitch, AxisColorY, DegreeInterface)]
+				+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)[MakeAxisEntry(Yaw, AxisColorZ, DegreeInterface)];
 		}
 	}
 

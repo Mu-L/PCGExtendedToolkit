@@ -172,7 +172,11 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 					              : ValuePropertyHandle->CreatePropertyValueWidget();
 			}
 
-			// Customize the row to show checkbox + label in NameContent and value widget in ValueContent
+			// Customize the row to show checkbox + label in NameContent and value widget in ValueContent.
+			// When a factory widget is used (multi-field compact editor), widen the value column
+			// so all sub-fields fit and fill the available horizontal space uniformly.
+			const bool bHasCustomFactory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName()) != nullptr;
+
 			Row.CustomWidget()
 			   .NameContent()
 				[
@@ -194,6 +198,8 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 					]
 				]
 				.ValueContent()
+				.MinDesiredWidth(bHasCustomFactory ? 250.0f : 125.0f)
+				.MaxDesiredWidth(bHasCustomFactory ? TNumericLimits<float>::Max() : 600.0f)
 				[
 					SNew(SBox)
 					.IsEnabled(IsEnabledAttr)

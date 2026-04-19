@@ -152,6 +152,8 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 								ValuePropertyHandle->CreatePropertyNameWidget()
 							]
 							.ValueContent()
+							.MinDesiredWidth(250.0f)
+							.MaxDesiredWidth(TNumericLimits<float>::Max())
 							[
 								(*Factory)(ValuePropertyHandle.ToSharedRef())
 							];
