@@ -63,6 +63,7 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 	}
 
 	TSharedPtr<PCGExCollections::FPickPacker> Packer = MakeShared<PCGExCollections::FPickPacker>(InContext);
+	Packer->RegisterCollection(MainCollection);
 
 	MainCollection->EDITOR_RegisterTrackingKeys(InContext);
 

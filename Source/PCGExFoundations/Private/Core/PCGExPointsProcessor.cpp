@@ -15,7 +15,7 @@
 #if WITH_EDITOR
 void UPCGExPointsProcessorSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 73, 4)
+	PCGEX_IF_VERSION_LOWER(1, 73, 4)
 	{
 		for (TFieldIterator<FProperty> PropIt(GetClass()); PropIt; ++PropIt)
 		{

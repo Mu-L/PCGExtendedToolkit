@@ -14,15 +14,15 @@
 #define PCGEX_NAMESPACE ResamplePath
 
 #if WITH_EDITOR
-void UPCGExResamplePathSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExResamplePathSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	InOutNode->RenameOutputPin(FName("Resolution"), FName("Constant"));
-	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
 }
 
 void UPCGExResamplePathSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 71, 3)
+	PCGEX_IF_VERSION_LOWER(1, 71, 3)
 	{
 		SampleLength.Constant = Resolution_DEPRECATED;
 	}

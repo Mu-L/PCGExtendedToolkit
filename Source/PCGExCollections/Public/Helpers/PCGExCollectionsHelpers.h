@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
+#include "PCGExH.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Helpers/PCGExSocketHelpers.h"
 
@@ -23,14 +24,22 @@ namespace PCGExDetails
 struct FPCGContext;
 struct FPCGMeshInstanceList;
 class UPCGBasePointData;
+class UPCGExSelectorFactoryData;
 class UPCGParamData;
+class FPCGExEntryPickerOperation;
+class FPCGExMicroEntryPickerOperation;
+
+namespace PCGExCollections
+{
+	class FSelectorSharedDataCache;
+}
 
 /**
  * Runtime helpers for consuming collections in PCG nodes.
  *
  * Two-phase pipeline:
  *   Phase 1 - Generation (AssetStaging, CollectionToModuleInfos):
- *     FCollectionSource → wraps FDistributionHelper + FMicroDistributionHelper
+ *     FCollectionSource → wraps FSelectorHelper + FMicroSelectorHelper
  *     FPickPacker       → serializes picks to attribute set ("Collection Map")
  *
  *   Phase 2 - Consumption (LoadPCGData, LoadProperties, LoadSockets, Fitting, TypeFilter):
@@ -55,12 +64,13 @@ class UPCGParamData;
  */
 namespace PCGExCollections
 {
+	class FSocketHelper;
 	/**
 	 * Per-point entry picker. Reads distribution settings (index/random/weighted) and
 	 * optional category filtering, then picks entries from a collection's cache.
 	 *
 	 * Usage:
-	 *   auto Helper = MakeShared<FDistributionHelper>(Collection, DistributionDetails);
+	 *   auto Helper = MakeShared<FSelectorHelper>(Collection, DistributionDetails);
 	 *   Helper->Init(DataFacade);
 	 *   // In parallel loop:
 	 *   FPCGExEntryAccessResult Result = Helper->GetEntry(PointIndex, Seed);
@@ -69,26 +79,48 @@ namespace PCGExCollections
 	 * sub-category within the cache. If the picked entry is a subcollection, recursion
 	 * continues into it via GetEntryWeightedRandom.
 	 */
-	class PCGEXCOLLECTIONS_API FDistributionHelper : public TSharedFromThis<FDistributionHelper>
+	class PCGEXCOLLECTIONS_API FSelectorHelper : public TSharedFromThis<FSelectorHelper>
 	{
 	protected:
 		PCGExAssetCollection::FCache* Cache = nullptr;
 		UPCGExAssetCollection* Collection = nullptr;
 
-		TSharedPtr<PCGExDetails::TSettingValue<double>> IndexGetter;
+		// Effective state resolved at Init time. In Legacy mode, a transient built-in factory
+		// is synthesized from Details; in External mode, the caller-provided factory is used.
+		const UPCGExSelectorFactoryData* ActiveFactory = nullptr;
+
 		TSharedPtr<PCGExDetails::TSettingValue<FName>> CategoryGetter;
-		double MaxInputIndex = 0;
+		TSharedPtr<FPCGExEntryPickerOperation> MainPickerOp;
+		TMap<FName, TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOps;
+
+		// Optional cache for collection-derived shared state. Typically supplied by the consumer
+		// context (mirrors FPickPacker lifetime pattern). When null, ops self-build as before.
+		TSharedPtr<FSelectorSharedDataCache> SharedDataCache;
+
+		/** Resolve which picker op applies to a given point (category-aware, with MissingCategoryBehavior fallback). */
+		const FPCGExEntryPickerOperation* ResolvePickerForPoint(int32 PointIndex) const;
 
 	public:
 		FPCGExAssetDistributionDetails Details;
 
-		explicit FDistributionHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails);
+		explicit FSelectorHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails);
 
 		/**
-		 * Initialize the helper with a data facade
-		 * @return true if initialization successful
+		 * Wire a context-scoped shared-data cache. Call before Init. Ops will receive cached
+		 * collection-derived state via FSelectorSharedDataCache::GetOrBuild instead of self-building.
 		 */
-		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade);
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
+
+		/**
+		 * Initialize the helper with a data facade and optional external selector factory.
+		 * @param InDataFacade Data facade to read per-point attributes from.
+		 * @param ExternalFactory When provided (External mode), drives picking instead of the inline Details.
+		 * @return true if initialization successful.
+		 */
+		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
+
+		/** Active factory (either the External one passed to Init, or the transient built-in built from Details in Legacy mode). */
+		const UPCGExSelectorFactoryData* GetActiveFactory() const { return ActiveFactory; }
 
 		/**
 		 * Get an entry for a specific point
@@ -125,24 +157,27 @@ namespace PCGExCollections
 	 * used as a "secondary index" in the packing scheme.
 	 *
 	 * Usage:
-	 *   auto MicroHelper = MakeShared<FMicroDistributionHelper>(MicroDistDetails);
+	 *   auto MicroHelper = MakeShared<FMicroSelectorHelper>(MicroDistDetails);
 	 *   MicroHelper->Init(DataFacade);
 	 *   // In parallel loop:
 	 *   int32 Pick = MicroHelper->GetPick(Entry->MicroCache.Get(), PointIndex, Seed);
 	 *   // Pick is then passed to ApplyMaterials() or packed as SecondaryIndex
 	 */
-	class PCGEXCOLLECTIONS_API FMicroDistributionHelper : public TSharedFromThis<FMicroDistributionHelper>
+	class PCGEXCOLLECTIONS_API FMicroSelectorHelper : public TSharedFromThis<FMicroSelectorHelper>
 	{
 	protected:
-		TSharedPtr<PCGExDetails::TSettingValue<double>> IndexGetter;
-		double MaxInputIndex = 0;
+		TSharedPtr<FPCGExMicroEntryPickerOperation> PickerOp;
 
 	public:
 		FPCGExMicroCacheDistributionDetails Details;
 
-		explicit FMicroDistributionHelper(const FPCGExMicroCacheDistributionDetails& InDetails);
+		explicit FMicroSelectorHelper(const FPCGExMicroCacheDistributionDetails& InDetails);
 
-		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade);
+		/**
+		 * @param InDataFacade Data facade to read per-point attributes from.
+		 * @param ExternalFactory When provided (External mode), drives micro picking. Legacy mode synthesizes a transient factory from Details.
+		 */
+		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
 
 		/**
 		 * Get a pick index from a MicroCache
@@ -162,21 +197,27 @@ namespace PCGExCollections
 	 * IMPORTANT: InIndex is a RAW Entries array index (Staging.InternalIndex), NOT a
 	 * cache-adjusted index. The unpacker resolves these via GetEntryRaw(), not GetEntryAt().
 	 *
-	 * Thread-safe: GetPickIdx() can be called from parallel ProcessPoints loops.
 	 * The attribute set contains two attributes per collection:
 	 *   - Tag_CollectionIdx (int32): packed collection identifier
 	 *   - Tag_CollectionPath (FSoftObjectPath): collection asset path for loading
 	 *
+	 * GetPickIdx() is a pure hash computation — it does not register the collection.
+	 * Callers MUST call RegisterCollection() at init (single-threaded) for every collection
+	 * that can appear as a Host at runtime. RegisterCollection pulls the full flat host set
+	 * from the collection's cache, so a single call covers the entire nested-collection tree.
+	 * Failing to register a host that appears in a pick hash will cause PackToDataset to omit
+	 * it, breaking downstream unpacking.
+	 *
 	 * Usage:
-	 *   // In Boot:
-	 *   Packer = MakeShared<FPickPacker>();  // or FPickPacker(Context) for backward compat
-	 *   // In ProcessPoints (parallel):
+	 *   // In Boot / Process (single-threaded):
+	 *   Packer = MakeShared<FPickPacker>();
+	 *   Packer->RegisterCollection(TopLevelCollection);  // covers subcollections via FlatHosts
+	 *   // In ProcessPoints (parallel, lock-free):
 	 *   uint64 Hash = Packer->GetPickIdx(EntryHost, Staging.InternalIndex, SecondaryIndex);
 	 *   HashWriter->SetValue(Index, Hash);
 	 *   // After processing:
 	 *   UPCGParamData* OutputSet = Context->ManagedObjects->New<UPCGParamData>();
 	 *   Packer->PackToDataset(OutputSet);
-	 *   // Output to "Map" pin
 	 */
 	class PCGEXCOLLECTIONS_API FPickPacker : public TSharedFromThis<FPickPacker>
 	{
@@ -188,15 +229,24 @@ namespace PCGExCollections
 		explicit FPickPacker(FPCGContext* InContext);
 
 		/**
-		 * Get a packed index for a collection entry pick.
+		 * Register a collection and every host reachable from it (via FlatHosts). Idempotent.
+		 * Must be called at init time for every top-level collection that can surface as a
+		 * Host during GetEntry. Thread-safe but intended for single-threaded init paths.
+		 */
+		void RegisterCollection(UPCGExAssetCollection* InCollection);
+
+		/**
+		 * Compute the packed identifier for a collection entry pick. Pure hash — no lock,
+		 * no map lookup. InCollection must have been passed to RegisterCollection (or reached
+		 * via another collection's FlatHosts) prior to PackToDataset, otherwise the downstream
+		 * mapping will be missing.
 		 * IMPORTANT: InIndex must be a RAW Entries array index (e.g. Staging.InternalIndex),
 		 * not a cache-adjusted index. The unpacker uses GetEntryRaw() to resolve it.
-		 * @param InCollection The collection
-		 * @param InIndex Raw Entries array index (Staging.InternalIndex)
-		 * @param InSecondaryIndex Secondary index (e.g., material variant)
-		 * @return Packed 64-bit identifier
 		 */
-		uint64 GetPickIdx(const UPCGExAssetCollection* InCollection, int16 InIndex, int16 InSecondaryIndex);
+		FORCEINLINE uint64 GetPickIdx(const UPCGExAssetCollection* InCollection, int16 InIndex, int16 InSecondaryIndex) const
+		{
+			return PCGEx::H64(InCollection->GetCollectionGUID(), PCGEx::H32(InIndex, InSecondaryIndex + 1));
+		}
 
 		/** Write collection mapping to an attribute set */
 		void PackToDataset(const UPCGParamData* InAttributeSet);
@@ -277,7 +327,7 @@ namespace PCGExCollections
 
 	/**
 	 * Unified facade for single or per-point collection sources. Wraps one or many
-	 * FDistributionHelper + FMicroDistributionHelper pairs and routes TryGetHelpers()
+	 * FSelectorHelper + FMicroSelectorHelper pairs and routes TryGetHelpers()
 	 * to the correct one based on point index.
 	 *
 	 * Two modes:
@@ -293,22 +343,26 @@ namespace PCGExCollections
 	 *   Source->EntryDistributionSettings = Settings->EntryDistributionSettings;
 	 *   Source->Init(Collection);
 	 *   // In ProcessPoints:
-	 *   FDistributionHelper* Helper; FMicroDistributionHelper* MicroHelper;
+	 *   FSelectorHelper* Helper; FMicroSelectorHelper* MicroHelper;
 	 *   if (Source->TryGetHelpers(Index, Helper, MicroHelper)) { ... }
 	 */
 	class PCGEXCOLLECTIONS_API FCollectionSource : public TSharedFromThis<FCollectionSource>
 	{
-		TSharedPtr<FDistributionHelper> Helper;
-		TSharedPtr<FMicroDistributionHelper> MicroHelper;
+		TSharedPtr<FSelectorHelper> Helper;
+		TSharedPtr<FMicroSelectorHelper> MicroHelper;
 
 		// For mapped sources
-		TArray<TSharedPtr<FDistributionHelper>> Helpers;
-		TArray<TSharedPtr<FMicroDistributionHelper>> MicroHelpers;
+		TArray<TSharedPtr<FSelectorHelper>> Helpers;
+		TArray<TSharedPtr<FMicroSelectorHelper>> MicroHelpers;
 		TMap<PCGExValueHash, int32> Indices;
 
 		TSharedPtr<TArray<PCGExValueHash>> Keys;
 		TSharedPtr<PCGExData::FFacade> DataFacade;
 		UPCGExAssetCollection* SingleSource = nullptr;
+
+		// Optional shared-data cache (typically from the consumer context). Plumbed into each
+		// FSelectorHelper at Init so collection-derived state is built once and reused.
+		TSharedPtr<FSelectorSharedDataCache> SharedDataCache;
 
 	public:
 		FPCGExAssetDistributionDetails DistributionSettings;
@@ -316,11 +370,14 @@ namespace PCGExCollections
 
 		explicit FCollectionSource(const TSharedPtr<PCGExData::FFacade>& InDataFacade);
 
-		/** Initialize with a single collection */
-		bool Init(UPCGExAssetCollection* InCollection);
+		/** Wire a context-scoped shared-data cache. Call before Init. */
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
 
-		/** Initialize with a mapped collection source */
-		bool Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys);
+		/** Initialize with a single collection. ExternalFactory drives picking in External mode; nullptr falls back to Legacy inline details. */
+		bool Init(UPCGExAssetCollection* InCollection, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
+
+		/** Initialize with a mapped collection source. ExternalFactory drives picking for all collections in External mode. */
+		bool Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
 
 		/**
 		 * Get helpers for a specific point index
@@ -329,20 +386,46 @@ namespace PCGExCollections
 		 * @param OutMicroHelper Output: micro distribution helper (may be null)
 		 * @return true if valid helpers found
 		 */
-		bool TryGetHelpers(int32 Index, FDistributionHelper*& OutHelper, FMicroDistributionHelper*& OutMicroHelper);
+		bool TryGetHelpers(int32 Index, FSelectorHelper*& OutHelper, FMicroSelectorHelper*& OutMicroHelper);
 
 		/** Check if this is a single source */
 		bool IsSingleSource() const { return SingleSource != nullptr; }
 
 		/** Get the single source collection (if applicable) */
 		UPCGExAssetCollection* GetSingleSource() const { return SingleSource; }
+
+		/**
+		 * Pre-register every collection this source can surface as a Host with the given
+		 * packer. Call once after Init(), before entering a parallel ProcessPoints loop.
+		 * The packer's RegisterCollection pulls each collection's FlatHosts set, so nested
+		 * sub-collections are handled automatically.
+		 */
+		void RegisterCollectionsTo(FPickPacker& Packer) const;
+
+		/**
+		 * Pre-register every leaf entry this source can surface as a Host with the given
+		 * socket helper, then seal it for lock-free Add() in the parallel loop. Call once
+		 * after Init(), before entering a parallel ProcessPoints loop. For multi-source
+		 * scenarios, call PreRegisterCollection manually for each and Seal() at the end.
+		 */
+		void RegisterSocketsTo(FSocketHelper& SocketHelper) const;
 	};
 
 	/**
 	 * Collection-aware socket helper. Extracts socket transforms from collection entries'
-	 * staging data and builds per-entry socket point sets. Thread-safe Add() deduplicates
-	 * by entry hash and accumulates socket info with atomic reference counting.
-	 * Call Compile() after processing to output socket points to a FPointIOCollection.
+	 * staging data and builds per-entry socket point sets. Call Compile() after processing
+	 * to output socket points to a FPointIOCollection.
+	 *
+	 * Usage contract:
+	 *   1. Construct.
+	 *   2. RegisterCollection(...) once for each top-level collection (covers subcollections
+	 *      via FlatHosts). Single-threaded init.
+	 *   3. Parallel Add() from ProcessPoints — lock-free.
+	 *   4. Compile() to produce socket outputs.
+	 *
+	 * Add() is always lock-free and assumes every (Host, EntryIndex) pair it sees has been
+	 * pre-registered. Unregistered entries are a programming error — Add() is a no-op in
+	 * that case, guarded by checkSlow in debug builds.
 	 */
 	class PCGEXCOLLECTIONS_API FSocketHelper : public PCGExStaging::FSocketHelper
 	{
@@ -350,5 +433,12 @@ namespace PCGExCollections
 		explicit FSocketHelper(const FPCGExSocketOutputDetails* InDetails, const int32 InNumPoints);
 
 		void Add(const int32 Index, const uint64 EntryHash, const FPCGExAssetCollectionEntry* Entry);
+
+		/**
+		 * Populate InfosKeys + SocketInfosList for every leaf entry reachable from this
+		 * collection (self + all FlatHosts). Idempotent; safe to call multiple times for
+		 * different top-level collections. Must complete before any parallel Add() call.
+		 */
+		void RegisterCollection(UPCGExAssetCollection* InCollection);
 	};
 }

@@ -23,8 +23,9 @@ namespace PCGExCollections
 {
 	class FCollectionSource;
 	class FPickUnpacker;
-	class FMicroDistributionHelper;
-	class FDistributionHelper;
+	class FMicroSelectorHelper;
+	class FSelectorHelper;
+	class FSelectorSharedDataCache;
 }
 
 namespace PCGExMT
@@ -54,14 +55,16 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual void ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
-
+	virtual void ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	
 	PCGEX_NODE_INFOS(PathSplineMesh, "Staging : Spline Mesh", "Create spline mesh components from paths using asset collections.");
 	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spawner; }
 	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN(UPCGExPathProcessorSettings::GetNodeTitleColor()); }
 
 	virtual void PostInitProperties() override;
 #endif
+	
+	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 protected:
 	virtual FPCGElementPtr CreateElement() const override;
@@ -88,12 +91,26 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Attribute", EditCondition="!bUseStagedPoints && CollectionSource == EPCGExCollectionSource::Attribute", EditConditionHides))
 	FName CollectionPathAttributeName = "CollectionPath";
 
-	/** Distribution details */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints", EditConditionHides))
+	/** How distribution is configured for this node. 
+	 * Legacy uses the inline settings below -- only set for legacy nodes.
+	 * External uses a factory on the Selector input pin. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
+	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::External;
+
+#if WITH_EDITORONLY_DATA
+	// TODO : remove in 0.76
+	UPROPERTY()
+	bool bSelectorModePreUpdated = false;
+#endif
+		
+	/** Distribution details
+	 * Note : LEGACY Nodes only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
 
-	/** How should materials be distributed and picked. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseStagedPoints", EditConditionHides))
+	/** How should materials be distributed and picked. 
+	 * * Note : LEGACY Nodes only.  */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails MaterialDistributionSettings;
 
 #pragma region DEPRECATED
@@ -193,6 +210,7 @@ struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
 	virtual void RegisterAssetDependencies() override;
 
 	TSharedPtr<PCGExCollections::FPickUnpacker> CollectionPickUnpacker;
+	TSharedPtr<PCGExCollections::FSelectorSharedDataCache> SelectorSharedDataCache;
 
 	FPCGExTangentsDetails Tangents;
 
@@ -200,6 +218,9 @@ struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
 
 	TObjectPtr<UPCGExMeshCollection> MainCollection;
 	TSharedPtr<TSet<FSoftObjectPath>> AssetPaths;
+
+	/** External selector factory read from the Selector input pin (only set when DistributionMode==External). */
+	TObjectPtr<const UPCGExSelectorFactoryData> SelectorFactory;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL

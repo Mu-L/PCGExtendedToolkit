@@ -43,7 +43,7 @@ TArray<FPCGPinProperties> UPCGExTopologyClustersProcessorSettings::OutputPinProp
 }
 
 #if WITH_EDITOR
-void UPCGExTopologyClustersProcessorSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExTopologyClustersProcessorSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	for (TObjectPtr<UPCGPin>& OutPin : OutputPins)
 	{
@@ -54,7 +54,7 @@ void UPCGExTopologyClustersProcessorSettings::ApplyDeprecationBeforeUpdatePins(U
 			UE_LOG(LogPCGEx, Warning, TEXT("Legacy output mode is deprecated. Please reconnect to use PCG Dynamic Mesh output."));
 		}
 	}
-	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
 }
 #endif
 

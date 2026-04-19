@@ -13,7 +13,7 @@
 #include "Details/PCGExStagingDetails.h"
 #include "Fitting/PCGExFitting.h"
 
-#include "PCGExAssetStaging.generated.h"
+#include "PCGExStagingDistribute.generated.h"
 
 namespace PCGExCollections
 {
@@ -21,6 +21,7 @@ namespace PCGExCollections
 	class FSocketHelper;
 	class FCollectionSource;
 	class FPickPacker;
+	class FSelectorSharedDataCache;
 }
 
 namespace PCGExStaging
@@ -62,6 +63,8 @@ class UPCGExAssetStagingSettings : public UPCGExPointsProcessorSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AssetStaging, "Staging : Distribute", "Distribute PCGEx Asset Collection entries to points.", FName(GetDisplayName()));
 	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Sampler; }
 	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
@@ -69,6 +72,8 @@ public:
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
+	
+	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
 
@@ -76,7 +81,7 @@ protected:
 	virtual bool SupportsDataStealing() const override { return true; }
 
 	virtual FPCGElementPtr CreateElement() const override;
-	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
+	virtual void InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters which points get staged.", PCGExFactories::PointFilters, false)
 	//~End UPCGSettings
@@ -101,12 +106,27 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode == EPCGExStagingOutputMode::Attributes"))
 	FName AssetPathAttributeName = "AssetPath";
 
-	/** Distribution details */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution"))
+	/** How distribution is configured for this node. 
+	 * Legacy uses the inline settings below -- only set for legacy nodes.
+	 * External uses a factory on the Selector input pin. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
+	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::External;
+			
+#if WITH_EDITORONLY_DATA
+	// TODO : remove in 0.76
+	UPROPERTY()
+	bool bSelectorModePreUpdated = false;
+#endif
+	
+	/** Distribution details
+	 * Note : LEGACY Nodes only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
 
-	/** Distribution details that are specific to the picked entry -- what it picks depends on the type of collection being staged. For Mesh Collections, this let you control how materials are picked. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Distribution (Entry)"))
+	/** Distribution details that are specific to the picked entry -- what it picks depends on the type of collection being staged. 
+	 * For Mesh Collections, this let you control how materials are picked. 
+	 * Note : LEGACY Nodes only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution (Entry)", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails EntryDistributionSettings;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -197,7 +217,11 @@ struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext
 	TObjectPtr<UPCGExAssetCollection> MainCollection;
 	bool bPickMaterials = false;
 
+	/** External selector factory read from the Selector input pin (only set when SelectorMode==External). */
+	TObjectPtr<const UPCGExSelectorFactoryData> SelectorFactory;
+
 	TSharedPtr<PCGExCollections::FPickPacker> CollectionPickDatasetPacker;
+	TSharedPtr<PCGExCollections::FSelectorSharedDataCache> SelectorSharedDataCache;
 
 	FPCGExSocketOutputDetails OutputSocketDetails;
 	TSharedPtr<PCGExData::FPointIOCollection> SocketsCollection;

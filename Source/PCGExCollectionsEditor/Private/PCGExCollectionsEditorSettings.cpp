@@ -15,7 +15,7 @@ void UPCGExCollectionsEditorSettings::PostLoad()
 	/*
 #if WITH_EDITOR
 	bool bWantsSaving = false;
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 71, 2)
+	PCGEX_IF_VERSION_LOWER(1, 71, 2)
 	{
 		HiddenPropertyNames.Add(FName("AssetEditor.Descriptors"));
 		bWantsSaving = true;

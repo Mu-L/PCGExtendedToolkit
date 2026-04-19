@@ -20,12 +20,12 @@
 #if WITH_EDITOR
 void UPCGExRefineEdgesSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 70, 11)
+	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
 		if (bOutputEdgesOnly_DEPRECATED) { Mode = EPCGExRefineEdgesOutput::Points; }
 	}
 
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 71, 2)
+	PCGEX_IF_VERSION_LOWER(1, 71, 2)
 	{
 		ResultOutputVtx.ApplyDeprecation();
 		ResultOutputEdges.ApplyDeprecation();

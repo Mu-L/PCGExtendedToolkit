@@ -4,12 +4,17 @@
 #include "Elements/PCGExStagingSplineMesh.h"
 
 #include "PCGComponent.h"
+#include "PCGExLog.h"
 #include "Components/SplineMeshComponent.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorSharedData.h"
+#include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "PCGExVersion.h"
+#include "PCGGraph.h"
 #include "PCGParamData.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Helpers/PCGExAssetLoader.h"
@@ -17,6 +22,7 @@
 #include "Metadata/PCGObjectPropertyOverride.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsHelpers.h"
+#include "Selectors/PCGExSelectorClassic.h"
 #include "Tangents/PCGExTangentsAuto.h"
 #include "Utils/PCGExUniqueNameGenerator.h"
 
@@ -24,20 +30,29 @@
 #define PCGEX_NAMESPACE BuildCustomGraph
 
 #if WITH_EDITOR
-void UPCGExPathSplineMeshSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExPathSplineMeshSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 70, 11)
+	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
 		DefaultDescriptor.SplineMeshAxis = static_cast<EPCGExSplineMeshAxis>(SplineMeshAxisConstant_DEPRECATED);
 		Tangents.ApplyDeprecation(bApplyCustomTangents_DEPRECATED, ArriveTangentAttribute_DEPRECATED, LeaveTangentAttribute_DEPRECATED);
 	}
 
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 74, 0)
+	PCGEX_IF_VERSION_LOWER(1, 74, 0)
 	{
 		if (CollectionSource != EPCGExCollectionSource::Asset || !AssetCollection.IsNull()) { bUseStagedPoints = false; }
 	}
 
-	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	PCGEX_IF_VERSION_LOWER(1, 75, 9)
+	{	
+		if (!bSelectorModePreUpdated)
+		{
+			SelectorMode = EPCGExSelectorMode::Legacy;
+			bSelectorModePreUpdated = true; // So we don't override the value for folks who'll update in their own time
+		}
+	}
+	
+	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
 }
 
 void UPCGExPathSplineMeshSettings::PostInitProperties()
@@ -50,6 +65,12 @@ void UPCGExPathSplineMeshSettings::PostInitProperties()
 }
 #endif
 
+bool UPCGExPathSplineMeshSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
+{
+	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode != EPCGExSelectorMode::External) { return false; }
+	return Super::IsPinUsedByNodeExecution(InPin);
+}
+
 
 PCGEX_INITIALIZE_ELEMENT(PathSplineMesh)
 
@@ -60,6 +81,15 @@ void UPCGExPathSplineMeshSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPi
 
 	if (CollectionSource == EPCGExCollectionSource::AttributeSet) { PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Required) }
 	else { PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Advanced) }
+
+	if (!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::External)
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Required, FPCGExDataTypeInfoSelector::AsId())
+	}
+	else
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Advanced, FPCGExDataTypeInfoSelector::AsId())
+	}
 
 	Super::InputPinPropertiesBeforeFilters(PinProperties);
 }
@@ -81,6 +111,24 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 	PCGEX_CONTEXT_AND_SETTINGS(PathSplineMesh)
 
 	if (!Context->Tangents.Init(Context, Settings->Tangents)) { return false; }
+
+	if (!Settings->bUseStagedPoints && Settings->SelectorMode == EPCGExSelectorMode::External)
+	{
+		TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
+		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
+			return false;
+		}
+		if (Factories.Num() != 1)
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Selector factory is expected on the Selector input pin."));
+			return false;
+		}
+		Context->SelectorFactory = Factories[0];
+	}
+
+	Context->SelectorSharedDataCache = MakeShared<PCGExCollections::FSelectorSharedDataCache>();
 
 	if (Settings->bUseStagedPoints)
 	{
@@ -344,17 +392,20 @@ namespace PCGExPathSplineMesh
 			Source = MakeShared<PCGExCollections::FCollectionSource>(PointDataFacade);
 			Source->DistributionSettings = Settings->DistributionSettings;
 			Source->EntryDistributionSettings = Settings->MaterialDistributionSettings;
+			Source->SetSharedDataCache(Context->SelectorSharedDataCache);
+
+			const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
 
 			if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 			{
-				if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex)))
+				if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), ExternalFactory))
 				{
 					return false;
 				}
 			}
 			else
 			{
-				if (!Source->Init(Context->MainCollection))
+				if (!Source->Init(Context->MainCollection, ExternalFactory))
 				{
 					return false;
 				}
@@ -433,7 +484,7 @@ namespace PCGExPathSplineMesh
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			PCGExCollections::FMicroDistributionHelper* MicroHelper = nullptr;
+			PCGExCollections::FMicroSelectorHelper* MicroHelper = nullptr;
 
 			if (!PointFilterCache[Index] || (Index == LastIndex && !bClosedLoop))
 			{
@@ -451,7 +502,7 @@ namespace PCGExPathSplineMesh
 
 			if (bLocalFitting)
 			{
-				PCGExCollections::FDistributionHelper* Helper = nullptr;
+				PCGExCollections::FSelectorHelper* Helper = nullptr;
 				if (!Source->TryGetHelpers(Index, Helper, MicroHelper))
 				{
 					HandleInvalidPoint(Index);

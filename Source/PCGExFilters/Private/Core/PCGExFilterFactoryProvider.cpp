@@ -51,10 +51,10 @@ bool UPCGExFilterProviderSettings::ShouldCancel(FPCGExFactoryProviderContext* In
 }
 
 #if WITH_EDITOR
-void UPCGExFilterCollectionProviderSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExFilterCollectionProviderSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	InOutNode->RenameOutputPin(FName("C-Filter"), PCGExFilters::Labels::OutputColFilterLabel);
-	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
 }
 #endif
 

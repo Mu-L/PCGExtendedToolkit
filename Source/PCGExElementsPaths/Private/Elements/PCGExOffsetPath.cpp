@@ -14,9 +14,9 @@
 #define PCGEX_NAMESPACE OffsetPath
 
 #if WITH_EDITOR
-void UPCGExOffsetPathSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExOffsetPathSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 75, 7)
+	PCGEX_IF_VERSION_LOWER(1, 75, 7)
 	{
 		// Rewire Offset
 		PCGEX_SHORTHAND_RENAME_PIN(OffsetAttribute, OffsetConstant, Offset)
@@ -27,7 +27,7 @@ void UPCGExOffsetPathSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutN
 		Direction.Update(DirectionType_DEPRECATED, DirectionAttribute_DEPRECATED, FVector::UpVector);
 	}
 
-	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
 }
 #endif
 

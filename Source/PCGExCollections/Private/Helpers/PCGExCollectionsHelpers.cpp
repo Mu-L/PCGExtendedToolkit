@@ -6,284 +6,200 @@
 
 #include "PCGParamData.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Selectors/PCGExSelectorClassic.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExMicroEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 #include "MeshSelectors/PCGMeshSelectorBase.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
 
 namespace PCGExCollections
 {
-	// Distribution Helper Implementation
+	// Selector Helper Implementation
 
-	FDistributionHelper::FDistributionHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails)
+	FSelectorHelper::FSelectorHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails)
 		: Collection(InCollection), Details(InDetails)
 	{
 	}
 
-	// Loads the collection cache, initializes category getter (if category filtering is enabled),
-	// and index getter (if distribution mode is Index). The index getter optionally tracks
-	// min/max for remapping to collection size.
-	bool FDistributionHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade)
+	// Synthesize a transient Classic factory that mirrors the Legacy Details struct. Used when
+	// the caller did not provide an ExternalFactory. Keeps the post-Init code path unified:
+	// everything downstream reads from ActiveFactory->BaseConfig regardless of mode.
+	static UPCGExSelectorClassicFactoryData* BuildLegacyFactory(FPCGExContext* InContext, const FPCGExAssetDistributionDetails& InDetails)
 	{
+		UPCGExSelectorClassicFactoryData* Factory = InContext->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
+		Factory->Mode = InDetails.Distribution;
+		Factory->IndexConfig = InDetails.IndexSettings;
+		Factory->BaseConfig.SeedComponents = InDetails.SeedComponents;
+		Factory->BaseConfig.LocalSeed = InDetails.LocalSeed;
+		Factory->BaseConfig.bUseCategories = InDetails.bUseCategories;
+		Factory->BaseConfig.Category = InDetails.Category;
+		Factory->BaseConfig.MissingCategoryBehavior = InDetails.MissingCategoryBehavior;
+		// BaseConfig.EntryDistribution stays default -- the Legacy EntryDistributionSettings
+		// lives on the consuming node and is plumbed through FMicroSelectorHelper separately.
+		return Factory;
+	}
+
+	// Init resolves the active factory (External or transient-from-Legacy), then creates
+	// picker operations for Cache->Main and each named category. Hot-path dispatch after
+	// Init is: category map lookup -> op->Pick -> GetEntryRaw -> subcollection recursion.
+	bool FSelectorHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FSelectorHelper::Init);
+
 		Cache = Collection->LoadCache();
 
 		if (Cache->IsEmpty())
 		{
-			PCGE_LOG_C(Error, GraphAndLog, InDataFacade->GetContext(), FTEXT("FDistributionHelper got an empty Collection."));
+			PCGE_LOG_C(Error, GraphAndLog, InDataFacade->GetContext(), FTEXT("FSelectorHelper got an empty Collection."));
 			return false;
 		}
 
-		if (Details.bUseCategories)
+		FPCGExContext* Ctx = InDataFacade->GetContext();
+
+		if (ExternalFactory) { ActiveFactory = ExternalFactory; }
+		else { ActiveFactory = BuildLegacyFactory(Ctx, Details); }
+		if (!ActiveFactory) { return false; }
+
+		const FPCGExSelectorFactoryBaseConfig& BaseConfig = ActiveFactory->BaseConfig;
+
+		if (BaseConfig.bUseCategories)
 		{
-			CategoryGetter = Details.Category.GetValueSetting();
+			CategoryGetter = BaseConfig.Category.GetValueSetting();
 			if (!CategoryGetter->Init(InDataFacade)) { return false; }
 		}
 
-		if (Details.Distribution == EPCGExDistribution::Index)
+		// Route every shared-data request through BuildSharedData. If a cache is wired, the cache
+		// deduplicates across facades; otherwise we call directly (one-shot, non-cached).
+		// Selectors that don't override BuildSharedData get nullptr either way.
+		auto ObtainSharedData = [&](const PCGExAssetCollection::FCategory* Target) -> TSharedPtr<FSelectorSharedData>
 		{
-			const bool bWantsMinMax = Details.IndexSettings.bRemapIndexToCollectionSize;
+			return SharedDataCache
+				       ? SharedDataCache->GetOrBuild(ActiveFactory, Collection, Target)
+				       : ActiveFactory->BuildSharedData(Collection, Target);
+		};
 
-			IndexGetter = Details.IndexSettings.GetValueSettingIndex();
-			if (!IndexGetter->Init(InDataFacade, !bWantsMinMax, bWantsMinMax)) { return false; }
-
-			MaxInputIndex = IndexGetter->Max();
+		MainPickerOp = ActiveFactory->CreateEntryOperation(Ctx);
+		if (!MainPickerOp) { return false; }
+		MainPickerOp->SharedData = ObtainSharedData(Cache->Main.Get());
+		if (!MainPickerOp->PrepareForData(Ctx, InDataFacade, Cache->Main.Get(), Collection))
+		{
+			return false;
 		}
+
+		if (BaseConfig.bUseCategories)
+		{
+			CategoryPickerOps.Reserve(Cache->Categories.Num());
+			for (const TPair<FName, TSharedPtr<PCGExAssetCollection::FCategory>>& Pair : Cache->Categories)
+			{
+				TSharedPtr<FPCGExEntryPickerOperation> Op = ActiveFactory->CreateEntryOperation(Ctx);
+				if (!Op) { continue; }
+				Op->SharedData = ObtainSharedData(Pair.Value.Get());
+				if (Op->PrepareForData(Ctx, InDataFacade, Pair.Value.Get(), Collection))
+				{
+					CategoryPickerOps.Add(Pair.Key, Op);
+				}
+			}
+		}
+
+		// Sync the inline Details struct with the effective factory config so callers can
+		// read Helper->Details.SeedComponents / LocalSeed without knowing which mode is active.
+		Details.SeedComponents = BaseConfig.SeedComponents;
+		Details.LocalSeed = BaseConfig.LocalSeed;
 
 		return true;
 	}
 
-	// Entry picking: category filter → distribution strategy → subcollection recursion.
-	// When a category is active, the distribution strategy is applied within the category.
-	// If the category yields a subcollection entry, WorkingCollection switches to it and
-	// the main distribution strategy is applied to the subcollection instead.
-	FPCGExEntryAccessResult FDistributionHelper::GetEntry(int32 PointIndex, int32 Seed) const
+	// Resolve which picker to use for this point. When categories are enabled and the point's
+	// Category attribute doesn't match any named category, MissingCategoryBehavior controls
+	// whether we skip (return nullptr) or fall back to MainPickerOp.
+	// Returns nullptr when the result should be an empty FPCGExEntryAccessResult.
+	const FPCGExEntryPickerOperation* FSelectorHelper::ResolvePickerForPoint(int32 PointIndex) const
 	{
-		const UPCGExAssetCollection* WorkingCollection = Collection;
+		if (!CategoryGetter) { return MainPickerOp.Get(); }
 
-		if (CategoryGetter)
+		const FName CategoryKey = CategoryGetter->Read(PointIndex);
+		if (const TSharedPtr<FPCGExEntryPickerOperation>* Found = CategoryPickerOps.Find(CategoryKey); Found && Found->IsValid())
 		{
-			const FName CategoryKey = CategoryGetter->Read(PointIndex);
-			TSharedPtr<PCGExAssetCollection::FCategory>* CategoryPtr = Cache->Categories.Find(CategoryKey);
-
-			if (!CategoryPtr || !CategoryPtr->IsValid() || (*CategoryPtr)->IsEmpty())
-			{
-				return FPCGExEntryAccessResult{};
-			}
-
-			const TSharedPtr<PCGExAssetCollection::FCategory>& Category = *CategoryPtr;
-
-			int32 PickIndex;
-
-			if (Category->Num() == 1)
-			{
-				PickIndex = Category->Indices[0];
-			}
-			else
-			{
-				switch (Details.Distribution)
-				{
-				default:
-				case EPCGExDistribution::WeightedRandom:
-					PickIndex = Category->GetPickRandomWeighted(Seed);
-					break;
-				case EPCGExDistribution::Random:
-					PickIndex = Category->GetPickRandom(Seed);
-					break;
-				case EPCGExDistribution::Index:
-					{
-						const auto& IndexSettings = Details.IndexSettings;
-						const int32 CategoryMaxIndex = Category->Num() - 1;
-						double UserIndex = IndexGetter->Read(PointIndex);
-
-						if (IndexSettings.bRemapIndexToCollectionSize && MaxInputIndex > 0)
-						{
-							UserIndex = PCGExMath::Remap(UserIndex, 0, MaxInputIndex, 0, CategoryMaxIndex);
-							UserIndex = PCGExMath::TruncateDbl(UserIndex, IndexSettings.TruncateRemap);
-						}
-
-						const int32 Sanitized = PCGExMath::SanitizeIndex(static_cast<int32>(UserIndex), CategoryMaxIndex, IndexSettings.IndexSafety);
-						PickIndex = Category->GetPick(Sanitized, IndexSettings.PickMode);
-					}
-					break;
-				}
-			}
-
-			auto Result = Collection->GetEntryRaw(PickIndex);
-			if (Result && Result.Entry->HasValidSubCollection())
-			{
-				WorkingCollection = Result.Entry->GetSubCollectionPtr();
-			}
-			else
-			{
-				return Result;
-			}
+			return Found->Get();
 		}
 
-		// Apply distribution strategy (no category, or category resolved to a subcollection)
-		switch (Details.Distribution)
-		{
-		case EPCGExDistribution::WeightedRandom: return WorkingCollection->GetEntryWeightedRandom(Seed);
-
-		case EPCGExDistribution::Random: return WorkingCollection->GetEntryRandom(Seed);
-
-		case EPCGExDistribution::Index:
-			{
-				const auto& IndexSettings = Details.IndexSettings;
-				const int32 MaxIndex = const_cast<UPCGExAssetCollection*>(WorkingCollection)->LoadCache()->Main->Num() - 1;
-				double PickedIndex = IndexGetter->Read(PointIndex);
-
-				if (IndexSettings.bRemapIndexToCollectionSize && MaxInputIndex > 0)
-				{
-					PickedIndex = PCGExMath::Remap(PickedIndex, 0, MaxInputIndex, 0, MaxIndex);
-					PickedIndex = PCGExMath::TruncateDbl(PickedIndex, IndexSettings.TruncateRemap);
-				}
-
-				const int32 Sanitized = PCGExMath::SanitizeIndex(static_cast<int32>(PickedIndex), MaxIndex, IndexSettings.IndexSafety);
-
-				return WorkingCollection->GetEntry(Sanitized, Seed, IndexSettings.PickMode);
-			}
-		}
-
-		return FPCGExEntryAccessResult{};
+		return ActiveFactory->BaseConfig.MissingCategoryBehavior == EPCGExMissingCategoryBehavior::UseMain
+			       ? MainPickerOp.Get()
+			       : nullptr;
 	}
 
-	FPCGExEntryAccessResult FDistributionHelper::GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const
+	// Entry picking: resolve the active picker (category-aware) -> pick a raw entries index
+	// -> resolve entry -> handle subcollection recursion via the "fallback to WeightedRandom"
+	// policy (matches current behavior when the picked entry is a subcollection).
+	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed) const
 	{
-		if (TagInheritance == 0)
+		const FPCGExEntryPickerOperation* Op = ResolvePickerForPoint(PointIndex);
+		if (!Op) { return FPCGExEntryAccessResult{}; }
+
+		const int32 Raw = Op->Pick(PointIndex, Seed);
+		FPCGExEntryAccessResult Result = Collection->GetEntryRaw(Raw);
+		if (Result && Result.Entry->HasValidSubCollection())
 		{
-			return GetEntry(PointIndex, Seed);
+			return Result.Entry->GetSubCollectionPtr()->GetEntryWeightedRandom(Seed);
 		}
+		return Result;
+	}
 
-		const UPCGExAssetCollection* WorkingCollection = Collection;
+	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const
+	{
+		if (TagInheritance == 0) { return GetEntry(PointIndex, Seed); }
 
-		// Handle category-based selection
-		if (CategoryGetter)
+		const FPCGExEntryPickerOperation* Op = ResolvePickerForPoint(PointIndex);
+		if (!Op) { return FPCGExEntryAccessResult{}; }
+
+		const int32 Raw = Op->Pick(PointIndex, Seed);
+		FPCGExEntryAccessResult Result = Collection->GetEntryRaw(Raw, TagInheritance, OutTags);
+		if (Result && Result.Entry->HasValidSubCollection())
 		{
-			const FName CategoryKey = CategoryGetter->Read(PointIndex);
-			TSharedPtr<PCGExAssetCollection::FCategory>* CategoryPtr = Cache->Categories.Find(CategoryKey);
-
-			if (!CategoryPtr || !CategoryPtr->IsValid() || (*CategoryPtr)->IsEmpty())
-			{
-				return FPCGExEntryAccessResult{};
-			}
-
-			const TSharedPtr<PCGExAssetCollection::FCategory>& Category = *CategoryPtr;
-
-			int32 PickIndex;
-
-			if (Category->Num() == 1)
-			{
-				PickIndex = Category->Indices[0];
-			}
-			else
-			{
-				switch (Details.Distribution)
-				{
-				default:
-				case EPCGExDistribution::WeightedRandom:
-					PickIndex = Category->GetPickRandomWeighted(Seed);
-					break;
-				case EPCGExDistribution::Random:
-					PickIndex = Category->GetPickRandom(Seed);
-					break;
-				case EPCGExDistribution::Index:
-					{
-						const auto& IndexSettings = Details.IndexSettings;
-						const int32 CategoryMaxIndex = Category->Num() - 1;
-						double UserIndex = IndexGetter->Read(PointIndex);
-
-						if (IndexSettings.bRemapIndexToCollectionSize && MaxInputIndex > 0)
-						{
-							UserIndex = PCGExMath::Remap(UserIndex, 0, MaxInputIndex, 0, CategoryMaxIndex);
-							UserIndex = PCGExMath::TruncateDbl(UserIndex, IndexSettings.TruncateRemap);
-						}
-
-						const int32 Sanitized = PCGExMath::SanitizeIndex(static_cast<int32>(UserIndex), CategoryMaxIndex, IndexSettings.IndexSafety);
-						PickIndex = Category->GetPick(Sanitized, IndexSettings.PickMode);
-					}
-					break;
-				}
-			}
-
-			auto Result = Collection->GetEntryRaw(PickIndex, TagInheritance, OutTags);
-			if (Result && Result.Entry->HasValidSubCollection())
-			{
-				WorkingCollection = Result.Entry->GetSubCollectionPtr();
-			}
-			else
-			{
-				return Result;
-			}
+			return Result.Entry->GetSubCollectionPtr()->GetEntryWeightedRandom(Seed, TagInheritance, OutTags);
 		}
-
-		// Apply distribution strategy with tags
-		switch (Details.Distribution)
-		{
-		case EPCGExDistribution::WeightedRandom: return WorkingCollection->GetEntryWeightedRandom(Seed, TagInheritance, OutTags);
-
-		case EPCGExDistribution::Random: return WorkingCollection->GetEntryRandom(Seed, TagInheritance, OutTags);
-
-		case EPCGExDistribution::Index:
-			{
-				const auto& IndexSettings = Details.IndexSettings;
-				const int32 MaxIndex = const_cast<UPCGExAssetCollection*>(WorkingCollection)->LoadCache()->Main->Num() - 1;
-				double PickedIndex = IndexGetter->Read(PointIndex);
-
-				if (IndexSettings.bRemapIndexToCollectionSize && MaxInputIndex > 0)
-				{
-					PickedIndex = PCGExMath::Remap(PickedIndex, 0, MaxInputIndex, 0, MaxIndex);
-					PickedIndex = PCGExMath::TruncateDbl(PickedIndex, IndexSettings.TruncateRemap);
-				}
-
-				const int32 Sanitized = PCGExMath::SanitizeIndex(static_cast<int32>(PickedIndex), MaxIndex, IndexSettings.IndexSafety);
-
-				return WorkingCollection->GetEntry(Sanitized, Seed, IndexSettings.PickMode, TagInheritance, OutTags);
-			}
-		}
-
-		return FPCGExEntryAccessResult{};
+		return Result;
 	}
 
 	// MicroDistribution Helper Implementation
 
-	FMicroDistributionHelper::FMicroDistributionHelper(const FPCGExMicroCacheDistributionDetails& InDetails)
+	FMicroSelectorHelper::FMicroSelectorHelper(const FPCGExMicroCacheDistributionDetails& InDetails)
 		: Details(InDetails)
 	{
 	}
 
-	bool FMicroDistributionHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade)
+	// Legacy mode: synthesize a transient Classic factory with BaseConfig.EntryDistribution
+	// populated from the inline micro Details. External mode: use the caller-provided factory.
+	// Either way, the factory's CreateMicroOperation dispatches on EntryDistribution.Distribution.
+	bool FMicroSelectorHelper::Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory)
 	{
-		if (Details.Distribution == EPCGExDistribution::Index)
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FMicroSelectorHelper::Init);
+
+		FPCGExContext* Ctx = InDataFacade->GetContext();
+
+		const UPCGExSelectorFactoryData* Factory = ExternalFactory;
+		if (!Factory)
 		{
-			IndexGetter = Details.IndexSettings.GetValueSettingIndex();
-			if (!IndexGetter->Init(InDataFacade, true, false)) { return false; }
-			MaxInputIndex = IndexGetter->Max();
+			UPCGExSelectorClassicFactoryData* Transient = Ctx->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
+			Transient->BaseConfig.SubDistribution = Details;
+			Factory = Transient;
 		}
 
-		return true;
+		PickerOp = Factory->CreateMicroOperation(Ctx);
+		if (!PickerOp) { return false; }
+		return PickerOp->PrepareForData(Ctx, InDataFacade);
 	}
 
-	int32 FMicroDistributionHelper::GetPick(const PCGExAssetCollection::FMicroCache* InMicroCache, int32 PointIndex, int32 Seed) const
+	int32 FMicroSelectorHelper::GetPick(const PCGExAssetCollection::FMicroCache* InMicroCache, int32 PointIndex, int32 Seed) const
 	{
-		if (!InMicroCache || InMicroCache->IsEmpty()) { return -1; }
-
-		switch (Details.Distribution)
-		{
-		case EPCGExDistribution::WeightedRandom: return InMicroCache->GetPickRandomWeighted(Seed);
-
-		case EPCGExDistribution::Random: return InMicroCache->GetPickRandom(Seed);
-
-		case EPCGExDistribution::Index:
-			{
-				const int32 Index = IndexGetter ? static_cast<int32>(IndexGetter->Read(PointIndex)) : 0;
-				const int32 Sanitized = PCGExMath::SanitizeIndex(Index, InMicroCache->Num() - 1, Details.IndexSettings.IndexSafety);
-				return InMicroCache->GetPick(Sanitized, Details.IndexSettings.PickMode);
-			}
-		}
-
-		return -1;
+		return PickerOp ? PickerOp->Pick(InMicroCache, PointIndex, Seed) : -1;
 	}
 
 	// --- Pick Packer ---
@@ -299,26 +215,24 @@ namespace PCGExCollections
 		// Kept for API backward compatibility. GUID-based scheme no longer needs context.
 	}
 
-	uint64 FPickPacker::GetPickIdx(const UPCGExAssetCollection* InCollection, int16 InIndex, int16 InSecondaryIndex)
+	// Registers the given collection and every host reachable from it via FCache::FlatHosts.
+	// A single top-level call therefore covers the entire nested-collection tree. The write
+	// lock is held for the full batch to amortize the cost of one acquire across K inserts.
+	// Re-entrant / idempotent: collections already mapped are skipped.
+	void FPickPacker::RegisterCollection(UPCGExAssetCollection* InCollection)
 	{
-		const uint32 ItemHash = PCGEx::H32(InIndex, InSecondaryIndex + 1);
-		const uint32 GUID = InCollection->GetCollectionGUID();
+		if (!InCollection) { return; }
 
-		{
-			FReadScopeLock ReadScopeLock(AssetCollectionsLock);
-			if (CollectionMap.Contains(InCollection))
-			{
-				return PCGEx::H64(GUID, ItemHash);
-			}
-		}
+		const TArray<TObjectPtr<UPCGExAssetCollection>>& FlatHosts = InCollection->GetFlatHosts();
 
+		FWriteScopeLock WriteScopeLock(AssetCollectionsLock);
+		CollectionMap.Reserve(CollectionMap.Num() + FlatHosts.Num());
+		for (const TObjectPtr<UPCGExAssetCollection>& Host : FlatHosts)
 		{
-			FWriteScopeLock WriteScopeLock(AssetCollectionsLock);
-			if (!CollectionMap.Contains(InCollection))
+			if (UPCGExAssetCollection* H = Host.Get())
 			{
-				CollectionMap.Add(InCollection, GUID);
+				CollectionMap.FindOrAdd(H, H->GetCollectionGUID());
 			}
-			return PCGEx::H64(GUID, ItemHash);
 		}
 	}
 
@@ -538,24 +452,29 @@ namespace PCGExCollections
 	{
 	}
 
-	bool FCollectionSource::Init(UPCGExAssetCollection* InCollection)
+	bool FCollectionSource::Init(UPCGExAssetCollection* InCollection, const UPCGExSelectorFactoryData* ExternalFactory)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FCollectionSource::Init_Single);
+
 		SingleSource = InCollection;
-		Helper = MakeShared<FDistributionHelper>(InCollection, DistributionSettings);
-		if (!Helper->Init(DataFacade.ToSharedRef())) { return false; }
+		Helper = MakeShared<FSelectorHelper>(InCollection, DistributionSettings);
+		if (SharedDataCache) { Helper->SetSharedDataCache(SharedDataCache); }
+		if (!Helper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { return false; }
 
 		// Create micro helper for mesh collections
 		if (InCollection->IsType(PCGExAssetCollection::TypeIds::Mesh))
 		{
-			MicroHelper = MakeShared<FMicroDistributionHelper>(EntryDistributionSettings);
-			if (!MicroHelper->Init(DataFacade.ToSharedRef())) { return false; }
+			MicroHelper = MakeShared<FMicroSelectorHelper>(EntryDistributionSettings);
+			if (!MicroHelper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { return false; }
 		}
 
 		return true;
 	}
 
-	bool FCollectionSource::Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys)
+	bool FCollectionSource::Init(const TMap<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& InMap, const TSharedPtr<TArray<PCGExValueHash>>& InKeys, const UPCGExSelectorFactoryData* ExternalFactory)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::FCollectionSource::Init_Mapped);
+
 		Keys = InKeys;
 		if (!Keys) { return false; }
 
@@ -567,16 +486,17 @@ namespace PCGExCollections
 		{
 			UPCGExAssetCollection* Collection = Pair.Value.Get();
 
-			TSharedPtr<FDistributionHelper> NewHelper = MakeShared<FDistributionHelper>(Collection, DistributionSettings);
-			if (!NewHelper->Init(DataFacade.ToSharedRef())) { continue; }
+			TSharedPtr<FSelectorHelper> NewHelper = MakeShared<FSelectorHelper>(Collection, DistributionSettings);
+			if (SharedDataCache) { NewHelper->SetSharedDataCache(SharedDataCache); }
+			if (!NewHelper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { continue; }
 
 			Indices.Add(Pair.Key, Helpers.Add(NewHelper));
 
 			// Create micro helper for mesh collections
 			if (Collection->IsType(PCGExAssetCollection::TypeIds::Mesh))
 			{
-				TSharedPtr<FMicroDistributionHelper> NewMicroHelper = MakeShared<FMicroDistributionHelper>(EntryDistributionSettings);
-				if (!NewMicroHelper->Init(DataFacade.ToSharedRef()))
+				TSharedPtr<FMicroSelectorHelper> NewMicroHelper = MakeShared<FMicroSelectorHelper>(EntryDistributionSettings);
+				if (!NewMicroHelper->Init(DataFacade.ToSharedRef(), ExternalFactory))
 				{
 					MicroHelpers.Add(nullptr);
 				}
@@ -594,7 +514,37 @@ namespace PCGExCollections
 		return !Helpers.IsEmpty();
 	}
 
-	bool FCollectionSource::TryGetHelpers(int32 Index, FDistributionHelper*& OutHelper, FMicroDistributionHelper*& OutMicroHelper)
+	void FCollectionSource::RegisterCollectionsTo(FPickPacker& Packer) const
+	{
+		if (SingleSource)
+		{
+			Packer.RegisterCollection(SingleSource);
+			return;
+		}
+
+		for (const TSharedPtr<FSelectorHelper>& H : Helpers)
+		{
+			if (!H) { continue; }
+			Packer.RegisterCollection(H->GetCollection());
+		}
+	}
+
+	void FCollectionSource::RegisterSocketsTo(FSocketHelper& SocketHelper) const
+	{
+		if (SingleSource)
+		{
+			SocketHelper.RegisterCollection(SingleSource);
+			return;
+		}
+
+		for (const TSharedPtr<FSelectorHelper>& H : Helpers)
+		{
+			if (!H) { continue; }
+			SocketHelper.RegisterCollection(H->GetCollection());
+		}
+	}
+
+	bool FCollectionSource::TryGetHelpers(int32 Index, FSelectorHelper*& OutHelper, FMicroSelectorHelper*& OutMicroHelper)
 	{
 		if (SingleSource)
 		{
@@ -624,43 +574,58 @@ namespace PCGExCollections
 	}
 
 
+	// Lock-free hot path: InfosKeys is populated once at init via RegisterCollection and
+	// immutable during parallel Add(). A miss means a node forgot to register a collection
+	// that can surface as a Host — setup bug, not a runtime condition. checkSlow catches it
+	// in debug builds; shipping builds treat it as a no-op to stay crash-free.
 	void FSocketHelper::Add(const int32 Index, const uint64 EntryHash, const FPCGExAssetCollectionEntry* Entry)
 	{
-		const int32* IdxPtr = nullptr;
+		const int32* IdxPtr = InfosKeys.Find(EntryHash);
+		checkSlow(IdxPtr);
+		if (!IdxPtr) { return; }
 
+		FPlatformAtomics::InterlockedIncrement(&SocketInfosList[*IdxPtr].Count);
+		Mapping[Index] = *IdxPtr;
+	}
+
+	// Walk every leaf entry reachable from InCollection (self + FlatHosts) and populate the
+	// InfosKeys/SocketInfosList. Must run before any parallel Add(). Write lock is held so
+	// multiple sequential RegisterCollection() calls from different top-level collections
+	// compose correctly.
+	void FSocketHelper::RegisterCollection(UPCGExAssetCollection* InCollection)
+	{
+		if (!InCollection) { return; }
+
+		const TArray<TObjectPtr<UPCGExAssetCollection>>& FlatHosts = InCollection->GetFlatHosts();
+
+		FWriteScopeLock WriteLock(SocketLock);
+
+		for (const TObjectPtr<UPCGExAssetCollection>& HostPtr : FlatHosts)
 		{
-			FReadScopeLock ReadLock(SocketLock);
-			IdxPtr = InfosKeys.Find(EntryHash);
-		}
+			UPCGExAssetCollection* Host = HostPtr.Get();
+			if (!Host) { continue; }
 
-		int32 Idx = -1;
+			// GUID-keyed, matches both AssetStaging's Add() hash and LoadSockets' GetSimplifiedEntryHash.
+			const uint32 HostGUID = Host->GetCollectionGUID();
 
-		if (!IdxPtr)
-		{
-			FWriteScopeLock WriteLock(SocketLock);
-
-			IdxPtr = InfosKeys.Find(EntryHash);
-			if (IdxPtr)
+			Host->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 /*Idx*/)
 			{
-				Idx = *IdxPtr;
-			}
-			else
-			{
-				PCGExStaging::FSocketInfos& NewInfos = NewSocketInfos(EntryHash, Idx);
+				// Leaf-entry only: sub-collection entries don't carry Staging/Sockets themselves —
+				// their socket data lives on the sub-collection's own leaf entries, which we
+				// reach via the FlatHosts walk.
+				if (!Entry || Entry->bIsSubCollection) { return; }
 
+				const uint64 EntryHash = PCGEx::H64(HostGUID, Entry->Staging.InternalIndex);
+				if (InfosKeys.Contains(EntryHash)) { return; }
+
+				int32 NewIdx = -1;
+				PCGExStaging::FSocketInfos& NewInfos = NewSocketInfos(EntryHash, NewIdx);
 				NewInfos.Path = Entry->Staging.Path;
 				NewInfos.Category = Entry->Category;
 				NewInfos.Sockets = Entry->Staging.Sockets;
 
-				FilterSocketInfos(Idx);
-			}
+				FilterSocketInfos(NewIdx);
+			});
 		}
-		else
-		{
-			Idx = *IdxPtr;
-		}
-
-		FPlatformAtomics::InterlockedIncrement(&SocketInfosList[Idx].Count);
-		Mapping[Index] = Idx;
 	}
 }

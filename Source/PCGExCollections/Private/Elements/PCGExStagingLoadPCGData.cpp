@@ -828,9 +828,7 @@ namespace PCGExPCGDataAssetLoader
 					// just feed each collection through the packer once.
 					for (const auto& MapPair : TempUnpacker.GetCollections())
 					{
-						// Register each collection so packer knows about it
-						// GetPickIdx with dummy indices just to register the collection
-						Context->MergedMapPacker->GetPickIdx(MapPair.Value, 0, -1);
+						Context->MergedMapPacker->RegisterCollection(MapPair.Value);
 					}
 
 					Context->MergedMapPacker->PackToDataset(MergedMapData);

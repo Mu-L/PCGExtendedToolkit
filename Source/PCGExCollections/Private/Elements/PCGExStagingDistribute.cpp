@@ -4,18 +4,28 @@
 // Asset Staging - Picks assets from collections and assigns them to points.
 // Handles weighted distribution, fitting/scaling, material picking, and socket extraction.
 
-#include "Elements/PCGExAssetStaging.h"
+#include "Elements/PCGExStagingDistribute.h"
 
+#if WITH_EDITOR
+#include "PCGExSubSystem.h"
+#endif
+
+#include "PCGExLog.h"
+#include "PCGGraph.h"
 #include "PCGParamData.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorSharedData.h"
+#include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExAssetLoader.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Helpers/PCGExSocketHelpers.h"
+#include "Selectors/PCGExSelectorClassic.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExAssetStagingElement"
@@ -24,12 +34,32 @@
 #pragma region UPCGExAssetStagingSettings
 
 #if WITH_EDITOR
+void UPCGExAssetStagingSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 75, 9)
+	{
+		if (!bSelectorModePreUpdated)
+		{
+			SelectorMode = EPCGExSelectorMode::Legacy;
+			bSelectorModePreUpdated = true; // So we don't override the value for folks who'll update in their own time
+		}
+	}
+
+	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
+}
+
 void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	EntryTypeFilter.PostEditChangeProperty(PropertyChangedEvent);
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
+
+bool UPCGExAssetStagingSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
+{
+	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode != EPCGExSelectorMode::External) { return false; }
+	return Super::IsPinUsedByNodeExecution(InPin);
+}
 
 PCGExData::EIOInit UPCGExAssetStagingSettings::GetMainDataInitializationPolicy() const
 {
@@ -39,18 +69,26 @@ PCGExData::EIOInit UPCGExAssetStagingSettings::GetMainDataInitializationPolicy()
 }
 
 PCGEX_INITIALIZE_ELEMENT(AssetStaging)
+
 PCGEX_ELEMENT_BATCH_POINT_IMPL(AssetStaging)
 
-TArray<FPCGPinProperties> UPCGExAssetStagingSettings::InputPinProperties() const
+void UPCGExAssetStagingSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const
 {
-	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-
 	if (CollectionSource == EPCGExCollectionSource::AttributeSet)
 	{
 		PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Required)
 	}
 
-	return PinProperties;
+	if (SelectorMode == EPCGExSelectorMode::External)
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Required, FPCGExDataTypeInfoSelector::AsId())
+	}
+	else
+	{
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Advanced, FPCGExDataTypeInfoSelector::AsId())
+	}
+
+	Super::InputPinPropertiesBeforeFilters(PinProperties);
 }
 
 TArray<FPCGPinProperties> UPCGExAssetStagingSettings::OutputPinProperties() const
@@ -105,6 +143,22 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	if (Settings->bWriteEntryType)
 	{
 		PCGEX_VALIDATE_NAME(Settings->EntryTypeAttributeName)
+	}
+
+	if (Settings->SelectorMode == EPCGExSelectorMode::External)
+	{
+		TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
+		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
+			return false;
+		}
+		if (Factories.Num() != 1)
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Selector factory is expected on the Selector input pin."));
+			return false;
+		}
+		Context->SelectorFactory = Factories[0];
 	}
 
 	if (Settings->CollectionSource == EPCGExCollectionSource::Asset)
@@ -162,6 +216,8 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	{
 		Context->CollectionPickDatasetPacker = MakeShared<PCGExCollections::FPickPacker>(Context);
 	}
+
+	Context->SelectorSharedDataCache = MakeShared<PCGExCollections::FSelectorSharedDataCache>();
 
 	if (Settings->bDoOutputSockets)
 	{
@@ -340,17 +396,20 @@ namespace PCGExAssetStaging
 		Source = MakeShared<PCGExCollections::FCollectionSource>(PointDataFacade);
 		Source->DistributionSettings = Settings->DistributionSettings;
 		Source->EntryDistributionSettings = Settings->EntryDistributionSettings;
+		Source->SetSharedDataCache(Context->SelectorSharedDataCache);
+
+		const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
 
 		if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 		{
-			if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex)))
+			if (!Source->Init(Context->CollectionsLoader->AssetsMap, Context->CollectionsLoader->GetKeys(PointDataFacade->Source->IOIndex), ExternalFactory))
 			{
 				return false;
 			}
 		}
 		else
 		{
-			if (!Source->Init(Context->MainCollection)) { return false; }
+			if (!Source->Init(Context->MainCollection, ExternalFactory)) { return false; }
 		}
 
 		if (Settings->bDoOutputSockets) { SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, NumPoints); }
@@ -405,6 +464,22 @@ namespace PCGExAssetStaging
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
 		if (Settings->bPruneEmptyPoints) { Mask.Init(1, PointDataFacade->GetNum()); }
+
+		// Pre-register every collection (and its flat host set) with the packer before going
+		// parallel. GetPickIdx is lock-free and assumes all reachable Hosts are mapped — without
+		// this call, PackToDataset would omit any Host that only surfaces via GetEntry recursion.
+		if (Context->CollectionPickDatasetPacker)
+		{
+			Source->RegisterCollectionsTo(*Context->CollectionPickDatasetPacker);
+		}
+
+		// Pre-register + seal the socket helper: Add() in the parallel loop becomes lock-free.
+		// Every leaf entry reachable via FlatHosts gets an FSocketInfos slot upfront (even ones
+		// that never get picked) — the trade-off is memory for contention-free parallel writes.
+		if (SocketHelper)
+		{
+			Source->RegisterSocketsTo(*SocketHelper);
+		}
 
 		StartParallelLoopForPoints();
 
@@ -470,8 +545,8 @@ namespace PCGExAssetStaging
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			PCGExCollections::FDistributionHelper* Helper = nullptr;
-			PCGExCollections::FMicroDistributionHelper* MicroHelper = nullptr;
+			PCGExCollections::FSelectorHelper* Helper = nullptr;
+			PCGExCollections::FMicroSelectorHelper* MicroHelper = nullptr;
 
 			if (!PointFilterCache[Index] || !Source->TryGetHelpers(Index, Helper, MicroHelper))
 			{
@@ -562,7 +637,8 @@ namespace PCGExAssetStaging
 
 			if (SocketHelper)
 			{
-				uint64 EntryHash = PCGEx::H64(EntryHost->GetUniqueID(), Staging.InternalIndex);
+				// Hash scheme must match FSocketHelper::RegisterCollection (and LoadSockets' GetSimplifiedEntryHash).
+				const uint64 EntryHash = PCGEx::H64(EntryHost->GetCollectionGUID(), Staging.InternalIndex);
 				SocketHelper->Add(Index, EntryHash, Entry);
 			}
 

@@ -37,6 +37,22 @@ enum class EPCGExDistribution : uint8
 	WeightedRandom = 2 UMETA(DisplayName = "Weighted random", ToolTip="Random selection weighted by entry Weight property"),
 };
 
+/** Selects between inline (Legacy) distribution settings or an external factory provided on the Selector input pin. */
+UENUM()
+enum class EPCGExSelectorMode : uint8
+{
+	Legacy   = 0 UMETA(DisplayName = "Legacy", ToolTip="Use the inline distribution settings configured on this node."),
+	External = 1 UMETA(DisplayName = "External (Factory)", ToolTip="Use a selector factory provided via the Selector input pin."),
+};
+
+/** Behavior when a point's Category attribute does not match any named category in the collection. */
+UENUM()
+enum class EPCGExMissingCategoryBehavior : uint8
+{
+	Skip    = 0 UMETA(DisplayName = "Skip", ToolTip="Skip the point -- no entry is picked."),
+	UseMain = 1 UMETA(DisplayName = "Use Main", ToolTip="Fall back to picking from the collection's main pool."),
+};
+
 UENUM()
 enum class EPCGExWeightOutputMode : uint8
 {
@@ -78,12 +94,29 @@ enum class EPCGExGlobalVariationRule : uint8
 	Overrule = 1 UMETA(DisplayName = "Overrule", ToolTip="Disregard the entry settings and enforce collection settings", ActionIcon="CollectionRule")
 };
 
+/**
+ * How a subcollection entry's aggregate Staging.Bounds is computed from its children.
+ * Consumed by selectors that reason about entry extents (e.g. Best Fit).
+ * Extents-only: aggregate bounds are centered at origin; center offsets are not aggregated.
+ */
+UENUM()
+enum class EPCGExSubcollectionBoundsMode : uint8
+{
+	UnionAABB    = 0 UMETA(DisplayName = "Union AABB", ToolTip="Enclosing AABB over all child bounds. Preserves worst-case footprint."),
+	MeanExtents  = 1 UMETA(DisplayName = "Mean Extents", ToolTip="Axis-wise average of child extents. More representative of typical entry size."),
+	WeightedMean = 2 UMETA(DisplayName = "Weight-Weighted Mean", ToolTip="Extents weighted by Entry.Weight. Biases toward likely-picked children."),
+	MaxExtents   = 3 UMETA(DisplayName = "Max Extents", ToolTip="Axis-wise max of child extents. Upper bound of any possible child pick."),
+};
+
 namespace PCGExCollections::Labels
 {
 	const FName SourceAssetCollection = TEXT("AttributeSet");
 
 	const FName SourceCollectionMapLabel = TEXT("Map");
 	const FName OutputCollectionMapLabel = TEXT("Map");
+
+	const FName SourceSelectorLabel = TEXT("Selector");
+	const FName OutputSelectorLabel = TEXT("Selector");
 
 	const FName Tag_CollectionPath = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Path"));
 	const FName Tag_CollectionIdx = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Idx"));
