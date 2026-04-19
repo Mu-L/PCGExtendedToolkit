@@ -3,6 +3,7 @@
 
 #include "Selectors/PCGExSelectorDensityWeighted.h"
 
+#include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
 

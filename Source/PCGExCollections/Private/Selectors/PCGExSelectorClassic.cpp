@@ -3,6 +3,7 @@
 
 #include "Selectors/PCGExSelectorClassic.h"
 
+#include "Containers/PCGExManagedObjects.h"
 #include "Selectors/PCGExBuiltinPickerOperations.h"
 
 TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorClassicFactoryData::CreateEntryOperation(FPCGExContext* InContext) const

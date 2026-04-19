@@ -3,6 +3,7 @@
 
 #include "Selectors/PCGExSelectorRangeBased.h"
 
+#include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"

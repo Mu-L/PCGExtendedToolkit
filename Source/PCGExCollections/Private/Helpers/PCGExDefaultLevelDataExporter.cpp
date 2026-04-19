@@ -12,6 +12,8 @@
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExActorCollection.h"
 
+#include "UObject/Package.h"
+
 #include "Engine/Level.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
