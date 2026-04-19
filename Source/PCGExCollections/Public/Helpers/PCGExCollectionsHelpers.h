@@ -29,6 +29,11 @@ class UPCGParamData;
 class FPCGExEntryPickerOperation;
 class FPCGExMicroEntryPickerOperation;
 
+namespace PCGExCollections
+{
+	class FSelectorSharedDataCache;
+}
+
 /**
  * Runtime helpers for consuming collections in PCG nodes.
  *
@@ -88,6 +93,10 @@ namespace PCGExCollections
 		TSharedPtr<FPCGExEntryPickerOperation> MainPickerOp;
 		TMap<FName, TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOps;
 
+		// Optional cache for collection-derived shared state. Typically supplied by the consumer
+		// context (mirrors FPickPacker lifetime pattern). When null, ops self-build as before.
+		TSharedPtr<FSelectorSharedDataCache> SharedDataCache;
+
 		/** Resolve which picker op applies to a given point (category-aware, with MissingCategoryBehavior fallback). */
 		const FPCGExEntryPickerOperation* ResolvePickerForPoint(int32 PointIndex) const;
 
@@ -95,6 +104,12 @@ namespace PCGExCollections
 		FPCGExAssetDistributionDetails Details;
 
 		explicit FSelectorHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails);
+
+		/**
+		 * Wire a context-scoped shared-data cache. Call before Init. Ops will receive cached
+		 * collection-derived state via FSelectorSharedDataCache::GetOrBuild instead of self-building.
+		 */
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
 
 		/**
 		 * Initialize the helper with a data facade and optional external selector factory.
@@ -345,11 +360,18 @@ namespace PCGExCollections
 		TSharedPtr<PCGExData::FFacade> DataFacade;
 		UPCGExAssetCollection* SingleSource = nullptr;
 
+		// Optional shared-data cache (typically from the consumer context). Plumbed into each
+		// FSelectorHelper at Init so collection-derived state is built once and reused.
+		TSharedPtr<FSelectorSharedDataCache> SharedDataCache;
+
 	public:
 		FPCGExAssetDistributionDetails DistributionSettings;
 		FPCGExMicroCacheDistributionDetails EntryDistributionSettings;
 
 		explicit FCollectionSource(const TSharedPtr<PCGExData::FFacade>& InDataFacade);
+
+		/** Wire a context-scoped shared-data cache. Call before Init. */
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
 
 		/** Initialize with a single collection. ExternalFactory drives picking in External mode; nullptr falls back to Legacy inline details. */
 		bool Init(UPCGExAssetCollection* InCollection, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);

@@ -21,6 +21,7 @@ namespace PCGExCollections
 	class FSocketHelper;
 	class FCollectionSource;
 	class FPickPacker;
+	class FSelectorSharedDataCache;
 }
 
 namespace PCGExStaging
@@ -108,9 +109,15 @@ public:
 	/** How distribution is configured for this node. 
 	 * Legacy uses the inline settings below -- only set for legacy nodes.
 	 * External uses a factory on the Selector input pin. */
-	UPROPERTY()
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
 	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::External;
-
+			
+#if WITH_EDITORONLY_DATA
+	// TODO : remove in 0.76
+	UPROPERTY()
+	bool bSelectorModePreUpdated = false;
+#endif
+	
 	/** Distribution details
 	 * Note : LEGACY Nodes only. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
@@ -214,6 +221,7 @@ struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext
 	TObjectPtr<const UPCGExSelectorFactoryData> SelectorFactory;
 
 	TSharedPtr<PCGExCollections::FPickPacker> CollectionPickDatasetPacker;
+	TSharedPtr<PCGExCollections::FSelectorSharedDataCache> SelectorSharedDataCache;
 
 	FPCGExSocketOutputDetails OutputSocketDetails;
 	TSharedPtr<PCGExData::FPointIOCollection> SocketsCollection;

@@ -14,6 +14,7 @@
 #include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
 #include "Selectors/PCGExMicroEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 #include "MeshSelectors/PCGMeshSelectorBase.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
@@ -74,8 +75,20 @@ namespace PCGExCollections
 			if (!CategoryGetter->Init(InDataFacade)) { return false; }
 		}
 
+		// Route every shared-data request through BuildSharedData. If a cache is wired, the cache
+		// deduplicates across facades; otherwise we call directly (one-shot, non-cached).
+		// Selectors that don't override BuildSharedData get nullptr either way.
+		auto ObtainSharedData = [&](const PCGExAssetCollection::FCategory* Target) -> TSharedPtr<FSelectorSharedData>
+		{
+			return SharedDataCache
+				       ? SharedDataCache->GetOrBuild(ActiveFactory, Collection, Target)
+				       : ActiveFactory->BuildSharedData(Collection, Target);
+		};
+
 		MainPickerOp = ActiveFactory->CreateEntryOperation(Ctx);
-		if (!MainPickerOp || !MainPickerOp->PrepareForData(Ctx, InDataFacade, Cache->Main.Get(), Collection))
+		if (!MainPickerOp) { return false; }
+		MainPickerOp->SharedData = ObtainSharedData(Cache->Main.Get());
+		if (!MainPickerOp->PrepareForData(Ctx, InDataFacade, Cache->Main.Get(), Collection))
 		{
 			return false;
 		}
@@ -86,7 +99,9 @@ namespace PCGExCollections
 			for (const TPair<FName, TSharedPtr<PCGExAssetCollection::FCategory>>& Pair : Cache->Categories)
 			{
 				TSharedPtr<FPCGExEntryPickerOperation> Op = ActiveFactory->CreateEntryOperation(Ctx);
-				if (Op && Op->PrepareForData(Ctx, InDataFacade, Pair.Value.Get(), Collection))
+				if (!Op) { continue; }
+				Op->SharedData = ObtainSharedData(Pair.Value.Get());
+				if (Op->PrepareForData(Ctx, InDataFacade, Pair.Value.Get(), Collection))
 				{
 					CategoryPickerOps.Add(Pair.Key, Op);
 				}
@@ -443,6 +458,7 @@ namespace PCGExCollections
 
 		SingleSource = InCollection;
 		Helper = MakeShared<FSelectorHelper>(InCollection, DistributionSettings);
+		if (SharedDataCache) { Helper->SetSharedDataCache(SharedDataCache); }
 		if (!Helper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { return false; }
 
 		// Create micro helper for mesh collections
@@ -471,6 +487,7 @@ namespace PCGExCollections
 			UPCGExAssetCollection* Collection = Pair.Value.Get();
 
 			TSharedPtr<FSelectorHelper> NewHelper = MakeShared<FSelectorHelper>(Collection, DistributionSettings);
+			if (SharedDataCache) { NewHelper->SetSharedDataCache(SharedDataCache); }
 			if (!NewHelper->Init(DataFacade.ToSharedRef(), ExternalFactory)) { continue; }
 
 			Indices.Add(Pair.Key, Helpers.Add(NewHelper));

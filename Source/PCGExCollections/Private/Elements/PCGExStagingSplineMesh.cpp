@@ -4,14 +4,17 @@
 #include "Elements/PCGExStagingSplineMesh.h"
 
 #include "PCGComponent.h"
+#include "PCGExLog.h"
 #include "Components/SplineMeshComponent.h"
 #include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 #include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "PCGExVersion.h"
+#include "PCGGraph.h"
 #include "PCGParamData.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Helpers/PCGExAssetLoader.h"
@@ -19,6 +22,7 @@
 #include "Metadata/PCGObjectPropertyOverride.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsHelpers.h"
+#include "Selectors/PCGExSelectorClassic.h"
 #include "Tangents/PCGExTangentsAuto.h"
 #include "Utils/PCGExUniqueNameGenerator.h"
 
@@ -39,9 +43,13 @@ void UPCGExPathSplineMeshSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TA
 		if (CollectionSource != EPCGExCollectionSource::Asset || !AssetCollection.IsNull()) { bUseStagedPoints = false; }
 	}
 
-	PCGEX_IF_VERSION_LOWER(1, 75, 10)
+	PCGEX_IF_VERSION_LOWER(1, 75, 9)
 	{	
-		SelectorMode = EPCGExSelectorMode::Legacy;
+		if (!bSelectorModePreUpdated)
+		{
+			SelectorMode = EPCGExSelectorMode::Legacy;
+			bSelectorModePreUpdated = true; // So we don't override the value for folks who'll update in their own time
+		}
 	}
 	
 	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
@@ -119,6 +127,8 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 		}
 		Context->SelectorFactory = Factories[0];
 	}
+
+	Context->SelectorSharedDataCache = MakeShared<PCGExCollections::FSelectorSharedDataCache>();
 
 	if (Settings->bUseStagedPoints)
 	{
@@ -382,6 +392,7 @@ namespace PCGExPathSplineMesh
 			Source = MakeShared<PCGExCollections::FCollectionSource>(PointDataFacade);
 			Source->DistributionSettings = Settings->DistributionSettings;
 			Source->EntryDistributionSettings = Settings->MaterialDistributionSettings;
+			Source->SetSharedDataCache(Context->SelectorSharedDataCache);
 
 			const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
 

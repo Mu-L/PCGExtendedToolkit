@@ -6,6 +6,12 @@
 
 #include "Elements/PCGExStagingDistribute.h"
 
+#if WITH_EDITOR
+#include "PCGExSubSystem.h"
+#endif
+
+#include "PCGExLog.h"
+#include "PCGGraph.h"
 #include "PCGParamData.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Collections/PCGExMeshCollection.h"
@@ -13,11 +19,13 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 #include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExAssetLoader.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Helpers/PCGExSocketHelpers.h"
+#include "Selectors/PCGExSelectorClassic.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExAssetStagingElement"
@@ -28,11 +36,15 @@
 #if WITH_EDITOR
 void UPCGExAssetStagingSettings::ApplyPCGExDeprecation(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	PCGEX_IF_VERSION_LOWER(1, 75, 10)
+	PCGEX_IF_VERSION_LOWER(1, 75, 9)
 	{
-		SelectorMode = EPCGExSelectorMode::Legacy;
+		if (!bSelectorModePreUpdated)
+		{
+			SelectorMode = EPCGExSelectorMode::Legacy;
+			bSelectorModePreUpdated = true; // So we don't override the value for folks who'll update in their own time
+		}
 	}
-	
+
 	Super::ApplyPCGExDeprecation(InOutNode, InputPins, OutputPins);
 }
 
@@ -204,6 +216,8 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	{
 		Context->CollectionPickDatasetPacker = MakeShared<PCGExCollections::FPickPacker>(Context);
 	}
+
+	Context->SelectorSharedDataCache = MakeShared<PCGExCollections::FSelectorSharedDataCache>();
 
 	if (Settings->bDoOutputSockets)
 	{
@@ -382,6 +396,7 @@ namespace PCGExAssetStaging
 		Source = MakeShared<PCGExCollections::FCollectionSource>(PointDataFacade);
 		Source->DistributionSettings = Settings->DistributionSettings;
 		Source->EntryDistributionSettings = Settings->EntryDistributionSettings;
+		Source->SetSharedDataCache(Context->SelectorSharedDataCache);
 
 		const UPCGExSelectorFactoryData* ExternalFactory = Context->SelectorFactory.Get();
 

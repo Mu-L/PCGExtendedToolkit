@@ -7,6 +7,7 @@
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 
 #include "PCGExSelectorRangeBased.generated.h"
 
@@ -38,25 +39,13 @@ enum class EPCGExRangeBoundaryMode : uint8
 };
 
 /**
- * Shared base for Range-Based picker operations. Holds the per-entry resolved Min/Max
- * arrays and the per-point value getter. Concrete subclasses implement Pick() according
- * to their overlap policy.
- *
- * Resolution happens once at PrepareForData and writes EntryMins / EntryMaxs parallel
- * to Target->Entries. The hot path never re-reads property metadata.
+ * Collection-derived state for Range-Based selection. Built once per (Factory, Category) via
+ * the factory's BuildSharedData override; shared across all facades via FSelectorSharedDataCache.
  */
-class FPCGExEntryRangeBasedPickerOpBase : public FPCGExEntryPickerOperation
+class FPCGExRangeBasedSharedData : public PCGExCollections::FSelectorSharedData
 {
 public:
-	// Copied from factory before PrepareForData
-	EPCGExRangeSourceMode SourceMode = EPCGExRangeSourceMode::TwoNumerics;
-	EPCGExRangeBoundaryMode BoundaryMode = EPCGExRangeBoundaryMode::ClosedOpen;
-	FPCGExInputShorthandSelectorDouble ValueSource;
-	FName MinPropertyName = NAME_None;
-	FName MaxPropertyName = NAME_None;
-	FName RangePropertyName = NAME_None;
-
-	// Resolved at PrepareForData — parallel to Target->Entries (invalid entries sentinel'd as Min=1, Max=-1)
+	// Parallel to Target->Entries. Invalid entries sentinel'd as Min=1, Max=-1 so Contains() never matches.
 	TArray<double> EntryMins;
 	TArray<double> EntryMaxs;
 	// Cached (Weight + 1) as double, parallel to Target->Entries. 0 for invalid entries.
@@ -68,6 +57,23 @@ public:
 	TArray<double> SortedMins;
 	// True when all adjacent sorted ranges satisfy next_Min > prev_Max strictly. Enables single-lookup fast path.
 	bool bNonOverlapping = false;
+};
+
+/**
+ * Shared base for Range-Based picker operations. Holds the per-point value getter and a typed
+ * pointer to shared collection-derived state. Concrete subclasses implement Pick() according
+ * to their overlap policy.
+ */
+class FPCGExEntryRangeBasedPickerOpBase : public FPCGExEntryPickerOperation
+{
+public:
+	// Copied from factory before PrepareForData. Consumed only by the factory's BuildSharedData
+	// path; kept on the op so Pick() has access to BoundaryMode for Contains().
+	EPCGExRangeBoundaryMode BoundaryMode = EPCGExRangeBoundaryMode::ClosedOpen;
+	FPCGExInputShorthandSelectorDouble ValueSource;
+
+	// Typed view of SharedData. Resolved once in PrepareForData; hot path reads through this.
+	TSharedPtr<FPCGExRangeBasedSharedData> Shared;
 
 	TSharedPtr<PCGExDetails::TSettingValue<double>> ValueGetter;
 
@@ -146,6 +152,9 @@ public:
 	EPCGExRangeOverlapMode OverlapMode = EPCGExRangeOverlapMode::WeightedRandom;
 
 	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const override;
+	virtual TSharedPtr<PCGExCollections::FSelectorSharedData> BuildSharedData(
+		const UPCGExAssetCollection* Collection,
+		const PCGExAssetCollection::FCategory* Target) const override;
 };
 
 /**

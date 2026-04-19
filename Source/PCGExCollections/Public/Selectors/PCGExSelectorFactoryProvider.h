@@ -11,8 +11,18 @@
 
 #include "PCGExSelectorFactoryProvider.generated.h"
 
+namespace PCGExAssetCollection
+{
+	class FCategory;
+}
+
 class FPCGExEntryPickerOperation;
 class FPCGExMicroEntryPickerOperation;
+
+namespace PCGExCollections
+{
+	class FSelectorSharedData;
+}
 
 USTRUCT(meta=(PCG_DataTypeDisplayName="PCGEx | Distribution"))
 struct FPCGExDataTypeInfoSelector : public FPCGExFactoryDataTypeInfo
@@ -48,6 +58,15 @@ public:
 
 	/** Create a hot-path micro picker operation based on BaseConfig.EntryDistribution. */
 	virtual TSharedPtr<FPCGExMicroEntryPickerOperation> CreateMicroOperation(FPCGExContext* InContext) const;
+
+	/**
+	 * Produce collection-derived shared data for a given (Collection, Category). Invoked by
+	 * FSelectorSharedDataCache on cache miss. Selectors that benefit from reusing collection-derived
+	 * state across facades override this. Default returns nullptr (no caching, ops self-build).
+	 */
+	virtual TSharedPtr<PCGExCollections::FSelectorSharedData> BuildSharedData(
+		const UPCGExAssetCollection* Collection,
+		const PCGExAssetCollection::FCategory* Target) const { return nullptr; }
 };
 
 /**

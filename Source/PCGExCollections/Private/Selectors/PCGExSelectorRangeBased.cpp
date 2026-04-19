@@ -39,82 +39,18 @@ namespace
 bool FPCGExEntryRangeBasedPickerOpBase::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection)
 {
 	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection)) { return false; }
-	if (!OwningCollection) { return false; }
 
-	ValueGetter = ValueSource.GetValueSetting();
-	if (!ValueGetter->Init(InDataFacade)) { return false; }
-
-	const int32 N = Target->Entries.Num();
-	EntryMins.SetNumUninitialized(N);
-	EntryMaxs.SetNumUninitialized(N);
-
-	// Sentinel range that never matches any value (Contains() returns false for all Boundary modes).
-	auto MarkInvalid = [&](int32 i) { EntryMins[i] = 1.0; EntryMaxs[i] = -1.0; };
-
-	int32 ResolvedCount = 0;
-	for (int32 i = 0; i < N; ++i)
-	{
-		const FPCGExAssetCollectionEntry* Entry = Target->Entries[i];
-		double Min = 0.0;
-		double Max = 0.0;
-		bool bResolved = false;
-
-		switch (SourceMode)
-		{
-		case EPCGExRangeSourceMode::TwoNumerics:
-			bResolved = ResolveNumericAsDouble(Entry, OwningCollection, MinPropertyName, Min)
-				&& ResolveNumericAsDouble(Entry, OwningCollection, MaxPropertyName, Max);
-			break;
-		case EPCGExRangeSourceMode::Vector2:
-			bResolved = ResolveRangeFromVector(Entry, OwningCollection, RangePropertyName, Min, Max);
-			break;
-		}
-
-		if (!bResolved) { MarkInvalid(i); continue; }
-
-		// Auto-swap out-of-order ranges — matches PCGEx convention for numeric range inputs.
-		if (Min > Max) { Swap(Min, Max); }
-		EntryMins[i] = Min;
-		EntryMaxs[i] = Max;
-		++ResolvedCount;
-	}
-
-	if (ResolvedCount == 0)
+	// Shared data is always produced by the factory's BuildSharedData (directly or via cache).
+	// A null Shared here means the factory decided the collection has nothing usable for Range-Based.
+	Shared = StaticCastSharedPtr<FPCGExRangeBasedSharedData>(SharedData);
+	if (!Shared)
 	{
 		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based — no entries resolved the referenced range property. Check property names and types in the collection."));
 		return false;
 	}
 
-	// Cache (Weight + 1) as double for the hot path.
-	EntryWeights.SetNumUninitialized(N);
-	for (int32 i = 0; i < N; ++i)
-	{
-		EntryWeights[i] = (EntryMins[i] <= EntryMaxs[i])
-			? static_cast<double>(Target->Entries[i]->Weight + 1)
-			: 0.0;
-	}
-
-	// Build sorted view over valid entries (invalid entries have Min > Max sentinel).
-	SortedIndices.Reserve(ResolvedCount);
-	for (int32 i = 0; i < N; ++i)
-	{
-		if (EntryMins[i] <= EntryMaxs[i]) { SortedIndices.Add(i); }
-	}
-	SortedIndices.Sort([this](int32 A, int32 B) { return EntryMins[A] < EntryMins[B]; });
-
-	const int32 NValid = SortedIndices.Num();
-	SortedMins.SetNumUninitialized(NValid);
-	for (int32 k = 0; k < NValid; ++k) { SortedMins[k] = EntryMins[SortedIndices[k]]; }
-
-	// Strict non-overlap detection — any adjacent pair with next_Min <= prev_Max disables the fast path.
-	// Strictness avoids the shared-endpoint ambiguity (same V may land in two ranges under Closed boundaries).
-	bNonOverlapping = true;
-	for (int32 k = 1; k < NValid; ++k)
-	{
-		const double PrevMax = EntryMaxs[SortedIndices[k - 1]];
-		const double CurMin = EntryMins[SortedIndices[k]];
-		if (CurMin <= PrevMax) { bNonOverlapping = false; break; }
-	}
+	ValueGetter = ValueSource.GetValueSetting();
+	if (!ValueGetter->Init(InDataFacade)) { return false; }
 
 	return true;
 }
@@ -123,6 +59,9 @@ bool FPCGExEntryRangeBasedPickerOpBase::PrepareForData(FPCGExContext* InContext,
 // so all three overlap modes collapse to the same lookup. Returns raw Target index or -1.
 int32 FPCGExEntryRangeBasedPickerOpBase::FastPathPick(double V) const
 {
+	const TArray<double>& SortedMins = Shared->SortedMins;
+	const TArray<int32>& SortedIndices = Shared->SortedIndices;
+
 	// Manual upper_bound — first k where SortedMins[k] > V.
 	int32 Lo = 0;
 	int32 Hi = SortedMins.Num();
@@ -135,7 +74,7 @@ int32 FPCGExEntryRangeBasedPickerOpBase::FastPathPick(double V) const
 
 	if (Lo <= 0) { return -1; }
 	const int32 i = SortedIndices[Lo - 1];
-	return Contains(V, EntryMins[i], EntryMaxs[i]) ? Target->Indices[i] : -1;
+	return Contains(V, Shared->EntryMins[i], Shared->EntryMaxs[i]) ? Target->Indices[i] : -1;
 }
 
 #pragma endregion
@@ -148,7 +87,12 @@ int32 FPCGExEntryRangeWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed)
 
 	const double V = ValueGetter->Read(PointIndex);
 
-	if (bNonOverlapping) { return FastPathPick(V); }
+	if (Shared->bNonOverlapping) { return FastPathPick(V); }
+
+	const TArray<double>& EntryMins = Shared->EntryMins;
+	const TArray<double>& EntryMaxs = Shared->EntryMaxs;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+	const TArray<int32>& SortedIndices = Shared->SortedIndices;
 
 	// Sorted early-exit scan over valid entries; accumulate cumulative weights for matches.
 	TArray<int32, TInlineAllocator<32>> Matches;
@@ -189,9 +133,11 @@ int32 FPCGExEntryRangeFirstMatchPickerOp::Pick(int32 PointIndex, int32 Seed) con
 	const double V = ValueGetter->Read(PointIndex);
 
 	// Non-overlapping => at most one match, same answer as unsorted scan.
-	if (bNonOverlapping) { return FastPathPick(V); }
+	if (Shared->bNonOverlapping) { return FastPathPick(V); }
 
 	// Overlapping case: preserve "first in category order" semantics by iterating unsorted.
+	const TArray<double>& EntryMins = Shared->EntryMins;
+	const TArray<double>& EntryMaxs = Shared->EntryMaxs;
 	const int32 N = Target->Entries.Num();
 	for (int32 i = 0; i < N; ++i)
 	{
@@ -211,7 +157,12 @@ int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed) cons
 
 	const double V = ValueGetter->Read(PointIndex);
 
-	if (bNonOverlapping) { return FastPathPick(V); }
+	if (Shared->bNonOverlapping) { return FastPathPick(V); }
+
+	const TArray<double>& EntryMins = Shared->EntryMins;
+	const TArray<double>& EntryMaxs = Shared->EntryMaxs;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+	const TArray<int32>& SortedIndices = Shared->SortedIndices;
 
 	// Sorted early-exit scan; track current minimum width and accumulate same-width ties.
 	double MinWidth = TNumericLimits<double>::Max();
@@ -278,13 +229,95 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorRangeBasedFactoryData::Crea
 		break;
 	}
 
-	NewOp->SourceMode = SourceMode;
+	// BoundaryMode is needed in the hot path for Contains(); ValueSource drives the per-facade getter.
+	// Everything else (MinPropertyName, SourceMode, etc.) is consumed by BuildSharedData on the factory side.
 	NewOp->BoundaryMode = BoundaryMode;
 	NewOp->ValueSource = ValueSource;
-	NewOp->MinPropertyName = MinPropertyName;
-	NewOp->MaxPropertyName = MaxPropertyName;
-	NewOp->RangePropertyName = RangePropertyName;
 	return NewOp;
+}
+
+TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorRangeBasedFactoryData::BuildSharedData(
+	const UPCGExAssetCollection* Collection,
+	const PCGExAssetCollection::FCategory* Target) const
+{
+	if (!Collection || !Target) { return nullptr; }
+
+	const int32 N = Target->Entries.Num();
+
+	TSharedPtr<FPCGExRangeBasedSharedData> NewShared = MakeShared<FPCGExRangeBasedSharedData>();
+	NewShared->EntryMins.SetNumUninitialized(N);
+	NewShared->EntryMaxs.SetNumUninitialized(N);
+
+	// Sentinel range that never matches any value (Contains() returns false for all Boundary modes).
+	auto MarkInvalid = [&](int32 i) { NewShared->EntryMins[i] = 1.0; NewShared->EntryMaxs[i] = -1.0; };
+
+	int32 ResolvedCount = 0;
+	for (int32 i = 0; i < N; ++i)
+	{
+		const FPCGExAssetCollectionEntry* Entry = Target->Entries[i];
+		double Min = 0.0;
+		double Max = 0.0;
+		bool bResolved = false;
+
+		switch (SourceMode)
+		{
+		case EPCGExRangeSourceMode::TwoNumerics:
+			bResolved = ResolveNumericAsDouble(Entry, Collection, MinPropertyName, Min)
+				&& ResolveNumericAsDouble(Entry, Collection, MaxPropertyName, Max);
+			break;
+		case EPCGExRangeSourceMode::Vector2:
+			bResolved = ResolveRangeFromVector(Entry, Collection, RangePropertyName, Min, Max);
+			break;
+		}
+
+		if (!bResolved) { MarkInvalid(i); continue; }
+
+		// Auto-swap out-of-order ranges — matches PCGEx convention for numeric range inputs.
+		if (Min > Max) { Swap(Min, Max); }
+		NewShared->EntryMins[i] = Min;
+		NewShared->EntryMaxs[i] = Max;
+		++ResolvedCount;
+	}
+
+	// Caller (FSelectorHelper::PrepareForData) reports the error when Shared is null.
+	if (ResolvedCount == 0) { return nullptr; }
+
+	// Cache (Weight + 1) as double for the hot path.
+	NewShared->EntryWeights.SetNumUninitialized(N);
+	for (int32 i = 0; i < N; ++i)
+	{
+		NewShared->EntryWeights[i] = (NewShared->EntryMins[i] <= NewShared->EntryMaxs[i])
+			? static_cast<double>(Target->Entries[i]->Weight + 1)
+			: 0.0;
+	}
+
+	// Build sorted view over valid entries (invalid entries have Min > Max sentinel).
+	NewShared->SortedIndices.Reserve(ResolvedCount);
+	for (int32 i = 0; i < N; ++i)
+	{
+		if (NewShared->EntryMins[i] <= NewShared->EntryMaxs[i]) { NewShared->SortedIndices.Add(i); }
+	}
+	const TArray<double>& MinsRef = NewShared->EntryMins;
+	NewShared->SortedIndices.Sort([&MinsRef](int32 A, int32 B) { return MinsRef[A] < MinsRef[B]; });
+
+	const int32 NValid = NewShared->SortedIndices.Num();
+	NewShared->SortedMins.SetNumUninitialized(NValid);
+	for (int32 k = 0; k < NValid; ++k)
+	{
+		NewShared->SortedMins[k] = NewShared->EntryMins[NewShared->SortedIndices[k]];
+	}
+
+	// Strict non-overlap detection — any adjacent pair with next_Min <= prev_Max disables the fast path.
+	// Strictness avoids the shared-endpoint ambiguity (same V may land in two ranges under Closed boundaries).
+	NewShared->bNonOverlapping = true;
+	for (int32 k = 1; k < NValid; ++k)
+	{
+		const double PrevMax = NewShared->EntryMaxs[NewShared->SortedIndices[k - 1]];
+		const double CurMin = NewShared->EntryMins[NewShared->SortedIndices[k]];
+		if (CurMin <= PrevMax) { NewShared->bNonOverlapping = false; break; }
+	}
+
+	return NewShared;
 }
 
 #pragma endregion

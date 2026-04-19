@@ -15,6 +15,11 @@ namespace PCGExData
 struct FPCGExContext;
 class UPCGExAssetCollection;
 
+namespace PCGExCollections
+{
+	class FSelectorSharedData;
+}
+
 /**
  * Abstract hot-path operation for picking an entry from a collection's category.
  *
@@ -36,6 +41,13 @@ public:
 	 * consume this during PrepareForData to pre-compute per-entry state.
 	 */
 	const UPCGExAssetCollection* OwningCollection = nullptr;
+
+	/**
+	 * Optional collection-derived shared data. When non-null, the op reads shared state from this
+	 * cached instance instead of rebuilding it inline. Set by FSelectorHelper prior to PrepareForData
+	 * when a FSelectorSharedDataCache is wired on the consumer context. Null means self-build.
+	 */
+	TSharedPtr<PCGExCollections::FSelectorSharedData> SharedData;
 
 	/**
 	 * Bind the operation to a data facade, a category target, and the owning collection.
