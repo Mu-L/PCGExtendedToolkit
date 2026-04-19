@@ -8,6 +8,7 @@
 #include "IDetailChildrenBuilder.h"
 #include "PropertyHandle.h"
 #include "PCGExProperty.h"
+#include "PCGExInlineWidgetRegistry.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -157,6 +158,20 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			// Get the property handle for the value widget
 			TSharedPtr<IPropertyHandle> ValuePropertyHandle = Row.GetPropertyHandle();
 
+			// Query the inline widget registry - if a factory is registered for this outer
+			// struct type, use it instead of the default property value widget. The default
+			// path (CreatePropertyValueWidget) works for simple scalar types but falls back
+			// to expandable widgets for complex types (FVector, FRotator, etc.), which
+			// break the inline contract - custom factories exist to provide compact renders.
+			TSharedRef<SWidget> ValueWidget = SNullWidget::NullWidget;
+			if (ValuePropertyHandle.IsValid())
+			{
+				const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName());
+				ValueWidget = Factory
+					              ? (*Factory)(ValuePropertyHandle.ToSharedRef())
+					              : ValuePropertyHandle->CreatePropertyValueWidget();
+			}
+
 			// Customize the row to show checkbox + label in NameContent and value widget in ValueContent
 			Row.CustomWidget()
 			   .NameContent()
@@ -183,7 +198,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 					SNew(SBox)
 					.IsEnabled(IsEnabledAttr)
 					[
-						ValuePropertyHandle.IsValid() ? ValuePropertyHandle->CreatePropertyValueWidget() : SNullWidget::NullWidget
+						ValueWidget
 					]
 				];
 		}

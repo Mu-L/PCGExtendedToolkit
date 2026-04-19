@@ -11,6 +11,7 @@
 #include "Details/PCGExPropertySchemaCollectionCustomization.h"
 #include "Details/PCGExPropertySchemaCustomization.h"
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
+#include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyTypes.h"
 #include "PCGExPropertyWriter.h"
@@ -89,6 +90,13 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(Enum)
 
 #undef REGISTER_PROPERTY_COMPILED_CUSTOMIZATION
+}
+
+void FPCGExPropertiesEditorModule::ShutdownModule()
+{
+	FPCGExInlineWidgetRegistry::Clear();
+
+	IPCGExEditorModuleInterface::ShutdownModule();
 }
 
 #undef LOCTEXT_NAMESPACE

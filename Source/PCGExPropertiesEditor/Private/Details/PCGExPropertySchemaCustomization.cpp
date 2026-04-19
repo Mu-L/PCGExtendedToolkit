@@ -6,8 +6,10 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
+#include "IDetailPropertyRow.h"
 #include "PropertyHandle.h"
 #include "PCGExProperty.h"
+#include "PCGExInlineWidgetRegistry.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCustomization::MakeInstance()
@@ -135,7 +137,26 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 			// For simple types, just add the Value property directly
 			if (const FProperty* ValueProperty = InnerStruct->FindPropertyByName(TEXT("Value")))
 			{
-				ChildBuilder.AddExternalStructureProperty(StructOnScope, ValueProperty->GetFName());
+				IDetailPropertyRow& Row = *ChildBuilder.AddExternalStructureProperty(StructOnScope, ValueProperty->GetFName());
+
+				// If a compact inline widget is registered for this outer struct type, use it
+				// instead of the default value widget (which would expand for complex types).
+				if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName()))
+				{
+					TSharedPtr<IPropertyHandle> ValuePropertyHandle = Row.GetPropertyHandle();
+					if (ValuePropertyHandle.IsValid())
+					{
+						Row.CustomWidget()
+						   .NameContent()
+							[
+								ValuePropertyHandle->CreatePropertyNameWidget()
+							]
+							.ValueContent()
+							[
+								(*Factory)(ValuePropertyHandle.ToSharedRef())
+							];
+					}
+				}
 			}
 		}
 		else
