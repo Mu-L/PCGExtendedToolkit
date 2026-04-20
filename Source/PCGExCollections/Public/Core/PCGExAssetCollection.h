@@ -596,6 +596,9 @@ public:
 	void EDITOR_SanitizeAndRebuildStagingData(bool bRecursive);
 	void EDITOR_AddBrowserSelectionTyped(const TArray<FAssetData>& InAssetData);
 
+	/** Re-stage a single entry. Mirrors the dirty/broadcast behaviour of editing the entry's properties so UI refreshes. Returns true if the entry was rebuilt. */
+	bool EDITOR_RebuildEntryStaging(int32 EntryIndex);
+
 	/** Sync PropertyOverrides in all entries to match CollectionProperties schema */
 	void SyncPropertyOverridesToEntries();
 

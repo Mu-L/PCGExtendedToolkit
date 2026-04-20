@@ -976,6 +976,34 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 	FCoreUObjectDelegates::BroadcastOnObjectModified(this);
 }
 
+bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
+{
+	if (!bAutoRebuildStaging) { return false; }
+
+	bool bRebuilt = false;
+	ForEachEntry([this, EntryIndex, &bRebuilt](FPCGExAssetCollectionEntry* InEntry, int32 i)
+	{
+		if (i != EntryIndex) { return; }
+		Modify(true);
+		InEntry->EDITOR_Sanitize();
+		InEntry->UpdateStaging(this, i, false);
+		bRebuilt = true;
+	});
+
+	if (bRebuilt)
+	{
+		InvalidateCache();
+		(void)MarkPackageDirty();
+		FCoreUObjectDelegates::BroadcastOnObjectModified(this);
+		// Also fire OnObjectPropertyChanged so downstream tracking (PCG asset trackers, etc.)
+		// re-evaluates -- this is the signal that weight edits implicitly fire via
+		// Super::PostEditChangeProperty.
+		FPropertyChangedEvent EmptyEvent(nullptr);
+		FCoreUObjectDelegates::OnObjectPropertyChanged.Broadcast(this, EmptyEvent);
+	}
+	return bRebuilt;
+}
+
 void UPCGExAssetCollection::EDITOR_RebuildStagingData_Project()
 {
 	const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");

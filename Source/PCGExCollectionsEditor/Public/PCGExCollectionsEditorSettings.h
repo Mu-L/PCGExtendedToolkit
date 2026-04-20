@@ -35,6 +35,10 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = Settings)
 	bool bAsyncLoadPickerClasses = true;
 
+	/** Auto-rebuild an entry's staging when its referenced asset is saved. Per-entry scope (only the affected entry rebuilds). Disable if you prefer manual rebuilds only. */
+	UPROPERTY(EditAnywhere, config, Category = Settings)
+	bool bAutoRebuildOnStale = true;
+
 	void ToggleHiddenAssetPropertyName(const FName PropertyName, const bool bHide);
 	void ToggleHiddenAssetPropertyName(const TArray<FName> Properties, const bool bHide);
 	EVisibility GetPropertyVisibility(const FName PropertyName) const;
