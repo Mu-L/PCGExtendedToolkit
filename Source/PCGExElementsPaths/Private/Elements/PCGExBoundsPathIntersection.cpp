@@ -22,7 +22,7 @@
 #define LOCTEXT_NAMESPACE "PCGExBoundsPathIntersectionElement"
 #define PCGEX_NAMESPACE BoundsPathIntersection
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UPCGExBoundsPathIntersectionSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())

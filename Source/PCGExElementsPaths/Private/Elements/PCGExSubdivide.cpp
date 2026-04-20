@@ -21,7 +21,7 @@
 
 PCGEX_SETTING_VALUE_IMPL(UPCGExSubdivideSettings, SubdivisionAmount, double, AmountInput, SubdivisionAmount, SubdivideMethod == EPCGExSubdivideMode::Count ? Count : Distance)
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UPCGExSubdivideSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
