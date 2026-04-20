@@ -95,7 +95,7 @@ public:
 	 * Legacy uses the inline settings below -- only set for legacy nodes.
 	 * External uses a factory on the Selector input pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
-	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::External;
+	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::Legacy;
 
 #if WITH_EDITORONLY_DATA
 	// TODO : remove in 0.76
