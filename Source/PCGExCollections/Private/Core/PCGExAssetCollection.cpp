@@ -19,6 +19,8 @@
 #include "ScopedTransaction.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "HAL/FileManager.h"
+#include "Misc/PackageName.h"
 #endif
 
 bool FPCGExEntryAccessResult::IsType(PCGExAssetCollection::FTypeId TypeId) const
@@ -964,6 +966,7 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData()
 	Modify(true);
 	InvalidateCache();
 	EDITOR_SanitizeAndRebuildStagingData(false);
+	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
 }
@@ -973,8 +976,38 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 	Modify(true);
 	InvalidateCache();
 	EDITOR_SanitizeAndRebuildStagingData(true);
+	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
+}
+
+int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
+{
+	if (!bAutoRebuildStaging) { return 0; }
+	// No baseline -- pre-existing collection that hasn't had a tracked rebuild yet. Skip
+	// rather than treating every entry as stale (which would mass-rebuild on first open
+	// after upgrade and risk silently changing serialised bounds).
+	if (LastRebuiltUtc == FDateTime::MinValue()) { return 0; }
+
+	TArray<int32> StaleIndices;
+	ForEachEntry([this, &StaleIndices](const FPCGExAssetCollectionEntry* InEntry, int32 i)
+	{
+		if (InEntry->bIsSubCollection) { return; }
+		const FSoftObjectPath& Path = InEntry->Staging.Path;
+		if (!Path.IsValid()) { return; }
+
+		FString Filename;
+		if (!FPackageName::TryConvertLongPackageNameToFilename(Path.GetLongPackageName(), Filename)) { return; }
+		const FString UAsset = Filename + FPackageName::GetAssetPackageExtension();
+		const FString UMap = Filename + FPackageName::GetMapPackageExtension();
+		FDateTime AssetTime = IFileManager::Get().GetTimeStamp(*UAsset);
+		if (AssetTime == FDateTime::MinValue()) { AssetTime = IFileManager::Get().GetTimeStamp(*UMap); }
+		if (AssetTime == FDateTime::MinValue()) { return; }
+		if (AssetTime > LastRebuiltUtc) { StaleIndices.Add(i); }
+	});
+
+	for (int32 Index : StaleIndices) { EDITOR_RebuildEntryStaging(Index); }
+	return StaleIndices.Num();
 }
 
 bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)

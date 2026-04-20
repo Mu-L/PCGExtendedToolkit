@@ -599,6 +599,9 @@ public:
 	/** Re-stage a single entry. Mirrors the dirty/broadcast behaviour of editing the entry's properties so UI refreshes. Returns true if the entry was rebuilt. */
 	bool EDITOR_RebuildEntryStaging(int32 EntryIndex);
 
+	/** Walks entries and re-stages any whose referenced asset's file mtime is newer than LastRebuiltUtc. Per-entry scope (not a full rebuild). No-op if LastRebuiltUtc is MinValue. Returns the number of entries re-staged. */
+	int32 EDITOR_RebuildStaleEntries();
+
 	/** Sync PropertyOverrides in all entries to match CollectionProperties schema */
 	void SyncPropertyOverridesToEntries();
 
@@ -639,6 +642,15 @@ public:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = Settings, AdvancedDisplay)
 	bool bAutoRebuildStaging = true;
+
+	/** Set at the end of every full rebuild (EDITOR_RebuildStagingData / _Recursive) to UtcNow.
+	 *  Used by EDITOR_RebuildStaleEntries to detect entries whose referenced asset's file mtime
+	 *  is newer than this -- i.e. modified since the last collection-wide rebuild.
+	 *  MinValue means "no baseline yet" -- the stale check is skipped entirely until the user
+	 *  triggers a manual rebuild once. Per-entry rebuilds do NOT update this field, otherwise
+	 *  they'd mask staleness in unrelated entries that haven't been re-staged. */
+	UPROPERTY()
+	FDateTime LastRebuiltUtc = FDateTime::MinValue();
 #endif
 
 	UPROPERTY(EditAnywhere, Category = Settings)

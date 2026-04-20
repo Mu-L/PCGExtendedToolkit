@@ -121,6 +121,13 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		}
 	}
 
+	// Catch entries whose referenced asset was modified between editor sessions.
+	// Per-entry scope, no-op until a baseline has been established by a manual rebuild.
+	if (GetDefault<UPCGExCollectionsEditorSettings>()->bRebuildStaleEntriesOnOpen)
+	{
+		InCollection->EDITOR_RebuildStaleEntries();
+	}
+
 	const TArray<UObject*> ObjectsToEdit = {InCollection};
 	constexpr bool bCreateDefaultStandaloneMenu = true;
 	constexpr bool bCreateDefaultToolbar = true;
