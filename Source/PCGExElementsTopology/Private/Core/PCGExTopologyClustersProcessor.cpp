@@ -302,4 +302,4 @@ namespace PCGExTopologyEdges
 }
 
 #undef LOCTEXT_NAMESPACE
-#undef PCGEX_NAMESPAC
+#undef PCGEX_NAMESPACE
