@@ -10,6 +10,7 @@
 #include "ContentBrowserMenuContexts.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Editor.h"
+#include "TimerManager.h"
 #include "PCGExAssetTypesMacros.h"
 #include "PCGExCollectionsEditorMenuUtils.h"
 #include "PCGExCollectionsEditorSettings.h"
@@ -67,6 +68,8 @@ void FPCGExCollectionsEditorModule::OnFilesLoaded()
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 	OnAssetUpdatedOnDiskHandle = AssetRegistry.OnAssetUpdatedOnDisk().AddRaw(this, &FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk);
+	// BP edits/compiles don't fire OnAssetUpdatedOnDisk -- catch them via reinstancing.
+	OnObjectsReinstancedHandle = FCoreUObjectDelegates::OnObjectsReinstanced.AddRaw(this, &FPCGExCollectionsEditorModule::OnObjectsReinstanced);
 }
 
 void FPCGExCollectionsEditorModule::ShutdownModule()
@@ -77,6 +80,7 @@ void FPCGExCollectionsEditorModule::ShutdownModule()
 		AssetRegistry.OnFilesLoaded().Remove(OnFilesLoadedHandle);
 		AssetRegistry.OnAssetUpdatedOnDisk().Remove(OnAssetUpdatedOnDiskHandle);
 	}
+	FCoreUObjectDelegates::OnObjectsReinstanced.Remove(OnObjectsReinstancedHandle);
 
 	IPCGExEditorModuleInterface::ShutdownModule();
 }
@@ -131,6 +135,46 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 			});
 		}
 	}
+}
+
+void FPCGExCollectionsEditorModule::OnObjectsReinstanced(const TMap<UObject*, UObject*>& OldToNewMap)
+{
+	if (!GEditor) { return; }
+	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale) { return; }
+
+	// Reinstancing fires DURING the BP recompile flow -- the new class exists but isn't
+	// fully settled (CDO, components, etc. may still be finalising). Spawning a temp actor
+	// at this point gives unstable bounds. Capture the affected packages and defer the
+	// actual rebuild to the next tick when reinstancing is complete.
+	TSet<FName> ChangedPackages;
+	for (const TPair<UObject*, UObject*>& Pair : OldToNewMap)
+	{
+		UObject* NewObj = Pair.Value;
+		if (!NewObj) { continue; }
+		UPackage* Package = NewObj->GetOutermost();
+		if (!Package || Package == GetTransientPackage()) { continue; }
+		ChangedPackages.Add(Package->GetFName());
+	}
+
+	if (ChangedPackages.IsEmpty()) { return; }
+
+	GEditor->GetTimerManager()->SetTimerForNextTick(
+		[this, ChangedPackages]()
+		{
+			if (!GEditor) { return; }
+			const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+			const IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+			for (const FName& PackageName : ChangedPackages)
+			{
+				TArray<FAssetData> Assets;
+				AssetRegistry.GetAssetsByPackageName(PackageName, Assets, /*bIncludeOnlyOnDiskAssets=*/ false);
+				for (const FAssetData& AssetData : Assets)
+				{
+					OnAssetUpdatedOnDisk(AssetData);
+				}
+			}
+		});
 }
 
 void FPCGExCollectionsEditorModule::RegisterMenuExtensions()

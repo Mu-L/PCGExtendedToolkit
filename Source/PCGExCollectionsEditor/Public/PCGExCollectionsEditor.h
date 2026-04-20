@@ -19,7 +19,9 @@ public:
 private:
 	FDelegateHandle OnFilesLoadedHandle;
 	FDelegateHandle OnAssetUpdatedOnDiskHandle;
+	FDelegateHandle OnObjectsReinstancedHandle;
 
 	void OnFilesLoaded();
 	void OnAssetUpdatedOnDisk(const FAssetData& AssetData);
+	void OnObjectsReinstanced(const TMap<UObject*, UObject*>& OldToNewMap);
 };
