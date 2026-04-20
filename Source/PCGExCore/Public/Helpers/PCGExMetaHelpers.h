@@ -34,6 +34,15 @@ namespace PCGExMetaHelpers
 	PCGEXCORE_API FName MakePCGExAttributeName(const FString& Str0, const FString& Str1);
 
 	PCGEXCORE_API bool IsWritableAttributeName(const FName Name);
+
+	/**
+	 * Sanitize an arbitrary name into a valid PCG attribute name.
+	 * Characters outside [A-Za-z0-9 _-/] are replaced with '_'.
+	 * Runs of '_' are collapsed, and leading/trailing '_' are trimmed.
+	 * Returns NAME_None if the result is empty.
+	 */
+	PCGEXCORE_API FName SanitizeAttributeName(const FName InName);
+
 	PCGEXCORE_API FString StringTagFromName(const FName Name);
 	PCGEXCORE_API bool IsValidStringTag(const FString& Tag);
 

@@ -7,12 +7,17 @@
 
 FName FPCGExPropertyOutputConfig::GetEffectiveOutputName() const
 {
-	FName Name = OutputAttributeName.IsNone() ? PropertyName : OutputAttributeName;
-	if (Name.IsNone() || !PCGExMetaHelpers::IsWritableAttributeName(Name))
+	// When OutputAttributeName is unset, the PropertyName is used directly - but PropertyName may
+	// contain characters that aren't valid in an attribute name (e.g. "My.Prop"), so we sanitize
+	// to produce a usable attribute name. When OutputAttributeName is explicitly set, keep the
+	// strict check - the user is responsible for providing a valid name.
+	if (OutputAttributeName.IsNone())
 	{
-		return NAME_None;
+		return PCGExMetaHelpers::SanitizeAttributeName(PropertyName);
 	}
-	return Name;
+
+	if (!PCGExMetaHelpers::IsWritableAttributeName(OutputAttributeName)) { return NAME_None; }
+	return OutputAttributeName;
 }
 
 // Initialize creates a writer instance for each configured property output.

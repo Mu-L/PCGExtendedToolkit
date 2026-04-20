@@ -7,6 +7,7 @@
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Helpers/PCGExCollectionPropertySetWriter.h"
 #include "Collections/PCGExActorCollection.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
@@ -99,7 +100,7 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 #undef PCGEX_DECLARE_ATT
 
 	const PCGExAssetCollection::FCache* MainCache = MainCollection->LoadCache();
-	TArray<const FPCGExAssetCollectionEntry*> Entries;
+	TArray<FPCGExAssetCollectionToSetElement::FEntryWithHost> Entries;
 
 	TSet<uint64> GUIDS;
 
@@ -107,13 +108,31 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 	{
 		GUIDS.Empty();
 		FPCGExEntryAccessResult Result = MainCollection->GetEntryAt(i);
-		ProcessEntry(InContext, Result.Entry, Entries, Settings->bOmitInvalidAndEmpty, !Settings->bAllowDuplicates, Settings->SubCollectionHandling, GUIDS);
+		ProcessEntry(InContext, Result.Entry, Result.Host, Entries, Settings->bOmitInvalidAndEmpty, !Settings->bAllowDuplicates, Settings->SubCollectionHandling, GUIDS);
 	}
 
 	if (Entries.IsEmpty()) { return OutputToPin(); }
 
-	for (const FPCGExAssetCollectionEntry* E : Entries)
+	// Custom property outputs. Fallback hosts = unique collected hosts (for heterogeneous nested
+	// collections where a property is only declared on a sub-host).
+	TArray<const UPCGExAssetCollection*> FallbackHosts;
 	{
+		TSet<const UPCGExAssetCollection*> Seen;
+		for (const FPCGExAssetCollectionToSetElement::FEntryWithHost& EH : Entries)
+		{
+			if (!EH.Host || EH.Host == MainCollection) { continue; }
+			bool bAlreadyIn = false;
+			Seen.Add(EH.Host, &bAlreadyIn);
+			if (!bAlreadyIn) { FallbackHosts.Add(EH.Host); }
+		}
+	}
+
+	PCGExCollections::FPCGExCollectionPropertySetWriter PropertyWriter;
+	PropertyWriter.Initialize(InContext, Settings->PropertyOutputSettings, MainCollection, FallbackHosts, OutputSet->Metadata);
+
+	for (const FPCGExAssetCollectionToSetElement::FEntryWithHost& EH : Entries)
+	{
+		const FPCGExAssetCollectionEntry* E = EH.Entry;
 		const int64 Key = OutputSet->Metadata->AddEntry();
 
 		if (!E || E->bIsSubCollection)
@@ -127,6 +146,8 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 #define PCGEX_SET_ATT(_NAME, _TYPE, _DEFAULT, _VALUE) if(_NAME##Attribute){ _NAME##Attribute->SetValue(Key, _VALUE); }
 		PCGEX_FOREACH_COL_FIELD(PCGEX_SET_ATT)
 #undef PCGEX_SET_ATT
+
+		PropertyWriter.WriteEntry(Key, E, EH.Host);
 	}
 
 	return OutputToPin();
@@ -135,18 +156,25 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 void FPCGExAssetCollectionToSetElement::ProcessEntry(
 	FPCGExContext* InContext,
 	const FPCGExAssetCollectionEntry* InEntry,
-	TArray<const FPCGExAssetCollectionEntry*>& OutEntries,
+	const UPCGExAssetCollection* InHost,
+	TArray<FEntryWithHost>& OutEntries,
 	const bool bOmitInvalidAndEmpty,
 	const bool bNoDuplicates,
 	const EPCGExSubCollectionToSet SubHandling,
 	TSet<uint64>& GUIDS)
 {
-	if (bNoDuplicates) { if (OutEntries.Contains(InEntry)) { return; } }
+	if (bNoDuplicates)
+	{
+		for (const FEntryWithHost& Existing : OutEntries)
+		{
+			if (Existing.Entry == InEntry) { return; }
+		}
+	}
 
 	auto AddNone = [&]()
 	{
 		if (bOmitInvalidAndEmpty) { return; }
-		OutEntries.Add(nullptr);
+		OutEntries.Add({nullptr, nullptr});
 	};
 
 	if (!InEntry)
@@ -158,7 +186,7 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 	auto AddEmpty = [&](const FPCGExAssetCollectionEntry* S)
 	{
 		if (bOmitInvalidAndEmpty) { return; }
-		OutEntries.Add(S);
+		OutEntries.Add({S, InHost});
 	};
 
 	if (InEntry->bIsSubCollection)
@@ -185,7 +213,7 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 		case EPCGExSubCollectionToSet::Expand: for (int i = 0; i < SubCache->Main->Order.Num(); i++)
 			{
 				SubResult = SubCollection->GetEntryAt(i);
-				ProcessEntry(InContext, SubResult.Entry, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, GUIDS);
+				ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, GUIDS);
 			}
 			return;
 		case EPCGExSubCollectionToSet::PickRandom: SubResult = SubCollection->GetEntryRandom(0);
@@ -198,11 +226,11 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 			break;
 		}
 
-		ProcessEntry(InContext, SubResult.Entry, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, GUIDS);
+		ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, GUIDS);
 	}
 	else
 	{
-		OutEntries.Add(InEntry);
+		OutEntries.Add({InEntry, InHost});
 	}
 }
 
