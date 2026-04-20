@@ -41,7 +41,7 @@ struct PCGEXCORE_API FPCGExInputShorthandBase
 #define PCGEX_ATTRIBUTE_TOGGLE Input = bDefaultToAttribute ? EPCGExInputValueType::Attribute : EPCGExInputValueType::Constant;
 
 #define PCGEX_SHORTHAND_UPDATE_DECL(_NAME, _TYPE)\
-void Update(EPCGExInputValueType InInputType, FPCGAttributePropertyInputSelector InSelector, _TYPE InConstant);\
+void Update(EPCGExInputValueType InInputType, const FPCGAttributePropertyInputSelector& InSelector, _TYPE InConstant);\
 void Update(EPCGExInputValueType InInputType, FName InSelector, _TYPE InConstant);\
 bool CanSupportDataOnly() const;
 

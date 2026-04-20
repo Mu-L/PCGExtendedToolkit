@@ -5,6 +5,7 @@
 #include "Details/Collections/PCGExCollectionEditorMacros.h"
 
 #include "AssetThumbnail.h"
+#include "Engine/AssetManager.h"
 #include "PCGExCollectionsEditorSettings.h"
 #include "ToolMenus.h"
 #include "Widgets/Input/SButton.h"
@@ -105,6 +106,27 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 	// Without this, the grid view detail panel may show empty overrides until the schema
 	// is manually edited (which triggers SyncPropertyOverridesToEntries via PostEditChangeProperty).
 	InCollection->SyncPropertyOverridesToEntries();
+
+	// Async-load all referenced assets so class/object pickers display their names on open
+	// without requiring Rebuild Staging. Opt-out via editor settings.
+	if (const UPCGExCollectionsEditorSettings* Settings = GetDefault<UPCGExCollectionsEditorSettings>();
+		Settings && Settings->bAsyncLoadPickerClasses)
+	{
+		TSet<FSoftObjectPath> PathsToLoad;
+		InCollection->GetAssetPaths(PathsToLoad, PCGExAssetCollection::ELoadingFlags::Recursive);
+		PathsToLoad.Remove(FSoftObjectPath());
+		if (!PathsToLoad.IsEmpty())
+		{
+			UAssetManager::GetStreamableManager().RequestAsyncLoad(PathsToLoad.Array());
+		}
+	}
+
+	// Catch entries whose referenced asset was modified between editor sessions.
+	// Per-entry scope, no-op until a baseline has been established by a manual rebuild.
+	if (GetDefault<UPCGExCollectionsEditorSettings>()->bRebuildStaleEntriesOnOpen)
+	{
+		InCollection->EDITOR_RebuildStaleEntries();
+	}
 
 	const TArray<UObject*> ObjectsToEdit = {InCollection};
 	constexpr bool bCreateDefaultStandaloneMenu = true;

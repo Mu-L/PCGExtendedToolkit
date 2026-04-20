@@ -12,6 +12,8 @@
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExActorCollection.h"
 
+#include "UObject/Package.h"
+
 #include "Engine/Level.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
@@ -601,6 +603,8 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 
 		// Encode hashes on points
 		PCGExCollections::FPickPacker Packer;
+		if (EmbeddedMeshCollection) { Packer.RegisterCollection(EmbeddedMeshCollection); }
+		if (EmbeddedActorCollection) { Packer.RegisterCollection(EmbeddedActorCollection); }
 
 		// Encode mesh hashes
 		if (MeshPointData && EmbeddedMeshCollection)

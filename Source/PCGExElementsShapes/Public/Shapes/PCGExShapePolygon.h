@@ -50,45 +50,39 @@ struct FPCGExShapePolygonConfig : public FPCGExShapeConfigBase
 	//UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_NotOverridable))
 	EPCGExPolygonShapeType PolygonType = EPCGExPolygonShapeType::Convex;
 
-	/*
-	 * Number of vertices
-	 */
+	/** Number of vertices */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable))
+	FPCGExInputShorthandSelectorInteger32Abs NumVertices = FPCGExInputShorthandSelectorInteger32Abs(FName("NumVertices"), 5, false);
 
-	// Source
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
-	EPCGExInputValueType NumVerticesInput = EPCGExInputValueType::Constant;
+	/** Whether to add Skeleton */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable))
+	FPCGExInputShorthandSelectorBoolean AddSkeleton = FPCGExInputShorthandSelectorBoolean(FName("AddSkeleton"), false, false);
 
-	// Attribute
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Number of Vertices (Attr)", EditCondition="NumVerticesInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector NumVerticesAttribute;
-
-	// Constant
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_Overridable, DisplayName="Number of Vertices"))
-	int32 NumVerticesConstant = 5;
-
-	PCGEX_SETTING_VALUE_DECL(NumVertices, int32)
-
-	/*
-	 * Skeleton
-	 */
-
-	// Source
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_NotOverridable))
-	EPCGExInputValueType AddSkeletonInput = EPCGExInputValueType::Constant;
-
-	// Attribute
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Add Skeleton (Attr)", EditCondition="AddSkeletonInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector AddSkeletonAttribute;
-
-	// Constant
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_Overridable))
-	bool bAddSkeleton = false;
-
-	PCGEX_SETTING_VALUE_DECL(AddSkeleton, bool)
-
-	// Where the skeleton goes
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(EditCondition="bAddSkeleton"))
+	// Where the skeleton goes if enabled
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(DisplayName=" └─ Connection Mode"))
 	EPCGExPolygonSkeletonConnectionType SkeletonConnectionMode = EPCGExPolygonSkeletonConnectionType::Vertex;
+
+#pragma region DEPRECATED
+
+	UPROPERTY()
+	EPCGExInputValueType NumVerticesInput_DEPRECATED = EPCGExInputValueType::Constant;
+
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector NumVerticesAttribute_DEPRECATED;
+
+	UPROPERTY()
+	int32 NumVerticesConstant_DEPRECATED = 5;
+
+	UPROPERTY()
+	EPCGExInputValueType AddSkeletonInput_DEPRECATED = EPCGExInputValueType::Constant;
+
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector AddSkeletonAttribute_DEPRECATED;
+
+	UPROPERTY()
+	bool bAddSkeleton_DEPRECATED = false;
+
+#pragma endregion
 
 	// Alignment for the polygon within the bounds of the seed
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_Overridable))
@@ -122,6 +116,10 @@ struct FPCGExShapePolygonConfig : public FPCGExShapeConfigBase
 	/** If enabled, will flag polygon as being closed if possible. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bIsClosedLoop = true;
+
+#if WITH_EDITOR
+	virtual void ApplyDeprecation() override;
+#endif
 };
 
 namespace PCGExShapes
@@ -188,8 +186,9 @@ class UPCGExCreateShapePolygonSettings : public UPCGExShapeBuilderFactoryProvide
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ShapeBuilderCircle, "Shape : Polygon", "Create points as a regular polygon or star.", FName ("Polygon")
-	)
+	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
+	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ShapeBuilderCircle, "Shape : Polygon", "Create points as a regular polygon or star.", FName ("Polygon"))
 
 #endif
 	//~End UPCGSettings

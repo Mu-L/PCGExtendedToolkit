@@ -34,7 +34,7 @@ bool UPCGExSmoothSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UPCGExSmoothSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())

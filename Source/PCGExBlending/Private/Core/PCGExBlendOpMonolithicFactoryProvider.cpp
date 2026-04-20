@@ -91,8 +91,12 @@ bool UPCGExBlendOpMonolithicFactory::RegisterConsumableAttributesWithData(FPCGEx
 #if WITH_EDITOR
 TArray<FPCGPreConfiguredSettingsInfo> UPCGExBlendOpMonolithicProviderSettings::GetPreconfiguredInfo() const
 {
+	return {};
+	// Removed preconfigured infos because it was adding too much noise to the search
+	/*
 	const TSet ValuesToSkip = {EPCGExBlendingType::None, EPCGExBlendingType::Unset};
 	return FPCGPreConfiguredSettingsInfo::PopulateFromEnum<EPCGExBlendingType>(ValuesToSkip, FTEXT("Blend All : {0}"));
+	*/
 }
 #endif
 

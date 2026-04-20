@@ -48,7 +48,7 @@ void UPCGExInclusionFilterFactory::InitConfig_Internal()
 #if WITH_EDITOR
 void UPCGExInclusionFilterProviderSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 73, 4)
+	PCGEX_IF_VERSION_LOWER(1, 73, 4)
 	{
 		Config.ProjectionDetails.ApplyDeprecation();
 	}

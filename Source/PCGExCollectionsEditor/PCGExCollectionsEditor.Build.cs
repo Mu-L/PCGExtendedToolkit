@@ -56,6 +56,7 @@ public class PCGExCollectionsEditor : ModuleRules
 				"ContentBrowser",
 				"InputCore",
 				"AssetTools",
+				"AssetRegistry",
 				"Slate",
 				"SlateCore",
 				"PropertyPath",
@@ -64,7 +65,7 @@ public class PCGExCollectionsEditor : ModuleRules
 				"SlateCore",
 				"PropertyEditor",
 				"EditorWidgets",
-				"ToolMenus" 
+				"ToolMenus"
 			}
 		);
 

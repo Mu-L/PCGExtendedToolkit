@@ -32,11 +32,18 @@ namespace PCGExMatching
 		TArray<FBox> Bounds;
 		Bounds.Reserve(Targets->Pairs.Num());
 
+		TSet<const UPCGData*> SeenData;
+		SeenData.Reserve(Targets->Pairs.Num());
+
 		int32 Idx = 0;
 		for (const TSharedPtr<PCGExData::FPointIO>& IO : Targets->Pairs)
 		{
 			const FBox DataBounds = InitFn(IO, Idx);
 			if (!DataBounds.IsValid) { continue; }
+
+			bool bAlreadySeen = false;
+			SeenData.Add(IO->GetIn(), &bAlreadySeen);
+			if (bAlreadySeen) { continue; }
 
 			TSharedPtr<PCGExData::FFacade> TargetFacade = MakeShared<PCGExData::FFacade>(IO.ToSharedRef());
 

@@ -14,10 +14,25 @@
 #define LOCTEXT_NAMESPACE "PCGExSettings"
 
 #if WITH_EDITOR
+void UPCGExSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+}
+
 void UPCGExSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	PCGEX_UPDATE_DATA_VERSION_TO_LATEST
+	if (PCGExDataVersion != INDEX_NONE)
+	{
+		// Only call deprecation path if we're not a fresh new node
+		PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	}
+
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExSettings::ApplyDeprecation(UPCGNode* InOutNode)
+{
+	Super::ApplyDeprecation(InOutNode);	
+	PCGEX_UPDATE_DATA_VERSION_TO_LATEST
 }
 
 bool UPCGExSettings::GetPinExtraIcon(const UPCGPin* InPin, FName& OutExtraIcon, FText& OutTooltip) const

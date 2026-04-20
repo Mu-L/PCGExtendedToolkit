@@ -22,7 +22,7 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ClusterCentrality)
 #if WITH_EDITOR
 void UPCGExClusterCentralitySettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 73, 0)
+	PCGEX_IF_VERSION_LOWER(1, 73, 0)
 	{
 		RandomDownsampling.ApplyDeprecation();
 	}

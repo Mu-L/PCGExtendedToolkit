@@ -248,6 +248,38 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	const T* GetResolvedProperty(const UPCGExAssetCollection* OwningCollection, FName PropertyName = NAME_None) const;
 
 	/**
+	 * Type-erased resolve: returns the FPCGExProperty base pointer for PropertyName,
+	 * preferring enabled overrides on this entry, then falling back to collection defaults.
+	 * Returns nullptr if the property isn't defined.
+	 *
+	 * Use this when you don't know (or don't care about) the concrete property type —
+	 * typically in combination with TryGetPropertyValue<T> for type-erased value reads.
+	 */
+	const FPCGExProperty* GetResolvedPropertyBase(const UPCGExAssetCollection* OwningCollection, FName PropertyName) const;
+
+	/**
+	 * Read a property's effective value converted to T, regardless of the property's
+	 * concrete type. Checks entry overrides first, then collection defaults, then
+	 * dispatches through FPCGExProperty::TryGetValue (backed by FConversionTable).
+	 *
+	 * T must be a PCG-supported metadata type (see PCGExTypes::TTraits).
+	 * Returns false if the property isn't defined for this name.
+	 *
+	 * Example:
+	 *   double Out = 0.0;
+	 *   if (Entry->TryGetPropertyValue<double>(Collection, TEXT("Weight"), Out)) { ... }
+	 */
+	template <typename T>
+	bool TryGetPropertyValue(const UPCGExAssetCollection* OwningCollection, FName PropertyName, T& Out) const
+	{
+		if (const FPCGExProperty* Base = GetResolvedPropertyBase(OwningCollection, PropertyName))
+		{
+			return Base->TryGetValue(Out);
+		}
+		return false;
+	}
+
+	/**
 	 * Check if this entry has an override for a specific property name.
 	 */
 	bool HasPropertyOverride(FName PropertyName) const
@@ -356,6 +388,12 @@ namespace PCGExAssetCollection
 		TSharedPtr<FCategory> Main;
 		TMap<FName, TSharedPtr<FCategory>> Categories;
 
+		// Flattened set of all collections transitively reachable from this one (self + every
+		// subcollection returnable as a Host from GetEntry). Built during BuildCacheFromEntries
+		// via a cycle-safe tree walk. Consumed by FPickPacker bulk registration to precompute
+		// collection→GUID mappings without per-point lock contention.
+		TArray<TObjectPtr<UPCGExAssetCollection>> FlatHosts;
+
 		FCache();
 		~FCache() = default;
 
@@ -429,6 +467,9 @@ public:
 	PCGExAssetCollection::FCache* LoadCache();
 	virtual void InvalidateCache();
 	virtual void BuildCache();
+
+	/** Flattened set of all collections transitively reachable from this one (self + subcollection Hosts). */
+	const TArray<TObjectPtr<UPCGExAssetCollection>>& GetFlatHosts() { return LoadCache()->FlatHosts; }
 
 #pragma endregion
 
@@ -555,6 +596,12 @@ public:
 	void EDITOR_SanitizeAndRebuildStagingData(bool bRecursive);
 	void EDITOR_AddBrowserSelectionTyped(const TArray<FAssetData>& InAssetData);
 
+	/** Re-stage a single entry. Mirrors the dirty/broadcast behaviour of editing the entry's properties so UI refreshes. Returns true if the entry was rebuilt. */
+	bool EDITOR_RebuildEntryStaging(int32 EntryIndex);
+
+	/** Walks entries and re-stages any whose referenced asset's file mtime is newer than LastRebuiltUtc. Per-entry scope (not a full rebuild). No-op if LastRebuiltUtc is MinValue. Returns the number of entries re-staged. */
+	int32 EDITOR_RebuildStaleEntries();
+
 	/** Sync PropertyOverrides in all entries to match CollectionProperties schema */
 	void SyncPropertyOverridesToEntries();
 
@@ -595,6 +642,15 @@ public:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = Settings, AdvancedDisplay)
 	bool bAutoRebuildStaging = true;
+
+	/** Set at the end of every full rebuild (EDITOR_RebuildStagingData / _Recursive) to UtcNow.
+	 *  Used by EDITOR_RebuildStaleEntries to detect entries whose referenced asset's file mtime
+	 *  is newer than this -- i.e. modified since the last collection-wide rebuild.
+	 *  MinValue means "no baseline yet" -- the stale check is skipped entirely until the user
+	 *  triggers a manual rebuild once. Per-entry rebuilds do NOT update this field, otherwise
+	 *  they'd mask staleness in unrelated entries that haven't been re-staged. */
+	UPROPERTY()
+	FDateTime LastRebuiltUtc = FDateTime::MinValue();
 #endif
 
 	UPROPERTY(EditAnywhere, Category = Settings)
@@ -614,6 +670,13 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = Settings)
 	bool bDoNotIgnoreInvalidEntries = false;
+
+	/**
+	 * How an entry that is itself a subcollection computes its aggregate Staging.Bounds
+	 * (extents, centered at origin). Consumed by selectors that reason about entry size.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Settings|Subcollection")
+	EPCGExSubcollectionBoundsMode SubcollectionBoundsMode = EPCGExSubcollectionBoundsMode::UnionAABB;
 
 	/**
 	 * Collection-level properties with default values.
@@ -666,15 +729,62 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 	const int32 NumEntriesCount = InEntries.Num();
 	Cache->Main->Reserve(NumEntriesCount);
 
+	// Collect direct subcollection children while iterating entries. Recursion into their
+	// FlatHosts is deferred to after the loop because LoadCache() on a sub-collection takes
+	// its own CacheLock and we want to release the write path here before that happens.
+	TSet<UPCGExAssetCollection*> DirectSubs;
+
 	for (int32 i = 0; i < NumEntriesCount; i++)
 	{
 		T& Entry = InEntries[i];
 		if (!Entry.Validate(this)) { continue; }
 
 		Cache->RegisterEntry(i, static_cast<const FPCGExAssetCollectionEntry*>(&Entry));
+
+		if (Entry.HasValidSubCollection())
+		{
+			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(Entry.GetSubCollectionPtr()))
+			{
+				if (Sub != this) { DirectSubs.Add(Sub); }
+			}
+		}
 	}
 
 	Cache->Compile();
+
+	// Materialize FlatHosts: self + every transitively reachable subcollection, deduplicated.
+	// Walks sub-collections via ForEachEntry (direct Entries array read — no lock on the
+	// sub-collection's cache). This avoids calling LoadCache() on sub-collections, which
+	// could re-enter BuildCacheFromEntries on a cycle (A→B→A) and deadlock on our own
+	// CacheLock. Cycles are handled by the Visited set.
+	TSet<UPCGExAssetCollection*> Visited;
+	Visited.Add(this);
+	Cache->FlatHosts.Add(this);
+
+	TArray<UPCGExAssetCollection*> Stack;
+	for (UPCGExAssetCollection* Sub : DirectSubs)
+	{
+		bool bAlreadyVisited = false;
+		Visited.Add(Sub, &bAlreadyVisited);
+		if (!bAlreadyVisited) { Stack.Add(Sub); }
+	}
+
+	while (!Stack.IsEmpty())
+	{
+		UPCGExAssetCollection* Current = Stack.Pop(EAllowShrinking::No);
+		Cache->FlatHosts.Add(Current);
+
+		Current->ForEachEntry([&Visited, &Stack](const FPCGExAssetCollectionEntry* E, int32 /*Idx*/)
+		{
+			if (!E || !E->HasValidSubCollection()) { return; }
+			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(E->GetSubCollectionPtr()))
+			{
+				bool bAlreadyVisited = false;
+				Visited.Add(Sub, &bAlreadyVisited);
+				if (!bAlreadyVisited) { Stack.Add(Sub); }
+			}
+		});
+	}
 
 	return true;
 }
