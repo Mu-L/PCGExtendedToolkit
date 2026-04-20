@@ -113,7 +113,7 @@ void UPCGExWaitForPCGDataSettings::PostEditChangeProperty(FPropertyChangedEvent&
 void UPCGExWaitForPCGDataSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 76, 0)
+	PCGEX_IF_VERSION_LOWER(1, 76, 0)
 	{
 		// TODO : Reconstruct cached pins from old outputs
 		// CachedPinEx -> Read from OutputPins
