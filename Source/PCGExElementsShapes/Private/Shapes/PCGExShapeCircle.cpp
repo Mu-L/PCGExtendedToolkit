@@ -103,6 +103,7 @@ void FPCGExShapeCircleBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> 
 	if (bOwnsData && Circle->bClosedLoop) { PCGExPaths::Helpers::SetClosedLoop(InDataFacade->GetOut(), true); }
 }
 
+#if WITH_EDITOR
 void UPCGExCreateShapeCircleSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
@@ -117,7 +118,6 @@ void UPCGExCreateShapeCircleSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCG
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-#if WITH_EDITOR
 void UPCGExCreateShapeCircleSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
