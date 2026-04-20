@@ -24,7 +24,7 @@
 #define LOCTEXT_NAMESPACE "PCGExPathInsertElement"
 #define PCGEX_NAMESPACE PathInsert
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UPCGExPathInsertSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())

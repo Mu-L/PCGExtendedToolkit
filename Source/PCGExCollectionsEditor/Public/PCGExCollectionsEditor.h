@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "PCGExEditorModuleInterface.h"
+#include "UObject/SoftObjectPath.h"
 
 class FPCGExCollectionsEditorModule final : public IPCGExEditorModuleInterface
 {
@@ -12,5 +13,15 @@ class FPCGExCollectionsEditorModule final : public IPCGExEditorModuleInterface
 
 public:
 	virtual void StartupModule() override;
+	virtual void ShutdownModule() override;
 	virtual void RegisterMenuExtensions() override;
+
+private:
+	FDelegateHandle OnFilesLoadedHandle;
+	FDelegateHandle OnAssetUpdatedOnDiskHandle;
+	FDelegateHandle OnObjectsReinstancedHandle;
+
+	void OnFilesLoaded();
+	void OnAssetUpdatedOnDisk(const FAssetData& AssetData);
+	void OnObjectsReinstanced(const TMap<UObject*, UObject*>& OldToNewMap);
 };

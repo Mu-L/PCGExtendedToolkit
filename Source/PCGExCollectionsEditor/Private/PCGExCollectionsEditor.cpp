@@ -4,11 +4,18 @@
 #include "PCGExCollectionsEditor.h"
 
 #include "AssetToolsModule.h"
+#include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
 #include "ContentBrowserMenuContexts.h"
+#include "Core/PCGExAssetCollection.h"
 #include "Editor.h"
+#include "TimerManager.h"
 #include "PCGExAssetTypesMacros.h"
 #include "PCGExCollectionsEditorMenuUtils.h"
+#include "PCGExCollectionsEditorSettings.h"
 #include "PropertyEditorModule.h"
+#include "UObject/UObjectGlobals.h"
 #include "Details/Collections/PCGExActorCollectionActions.h"
 #include "Details/Collections/PCGExAssetEntryCustomization.h"
 #include "Details/Collections/PCGExAssetGrammarCustomization.h"
@@ -40,6 +47,134 @@ void FPCGExCollectionsEditorModule::StartupModule()
 	PCGEX_FOREACH_ENTRY_TYPE_ALL(PCGEX_REGISTER_ENTRY_CUSTOMIZATION)
 
 #undef PCGEX_REGISTER_ENTRY_CUSTOMIZATION
+
+	// Defer subscription until the AssetRegistry's initial scan completes -- it fires
+	// OnAssetUpdatedOnDisk for every asset it discovers at startup, when referenced data
+	// isn't yet ready. Acting then would clobber saved staging.
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+	if (AssetRegistry.IsLoadingAssets())
+	{
+		OnFilesLoadedHandle = AssetRegistry.OnFilesLoaded().AddRaw(this, &FPCGExCollectionsEditorModule::OnFilesLoaded);
+	}
+	else
+	{
+		OnFilesLoaded();
+	}
+}
+
+void FPCGExCollectionsEditorModule::OnFilesLoaded()
+{
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+	OnAssetUpdatedOnDiskHandle = AssetRegistry.OnAssetUpdatedOnDisk().AddRaw(this, &FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk);
+	// BP edits/compiles don't fire OnAssetUpdatedOnDisk -- catch them via reinstancing.
+	OnObjectsReinstancedHandle = FCoreUObjectDelegates::OnObjectsReinstanced.AddRaw(this, &FPCGExCollectionsEditorModule::OnObjectsReinstanced);
+}
+
+void FPCGExCollectionsEditorModule::ShutdownModule()
+{
+	if (FAssetRegistryModule* AssetRegistryModule = FModuleManager::GetModulePtr<FAssetRegistryModule>("AssetRegistry"))
+	{
+		IAssetRegistry& AssetRegistry = AssetRegistryModule->Get();
+		AssetRegistry.OnFilesLoaded().Remove(OnFilesLoadedHandle);
+		AssetRegistry.OnAssetUpdatedOnDisk().Remove(OnAssetUpdatedOnDiskHandle);
+	}
+	FCoreUObjectDelegates::OnObjectsReinstanced.Remove(OnObjectsReinstancedHandle);
+
+	IPCGExEditorModuleInterface::ShutdownModule();
+}
+
+void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& AssetData)
+{
+	if (!GEditor) { return; }
+	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale) { return; }
+
+	const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	const IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+	// Defense in depth -- shouldn't happen given the deferred subscription, but harmless.
+	if (AssetRegistry.IsLoadingAssets()) { return; }
+
+	// Find packages that reference this asset (no load).
+	TArray<FName> Referencers;
+	AssetRegistry.GetReferencers(AssetData.PackageName, Referencers, UE::AssetRegistry::EDependencyCategory::Package);
+	if (Referencers.IsEmpty()) { return; }
+
+	const UClass* CollectionClass = UPCGExAssetCollection::StaticClass();
+	const FSoftObjectPath ChangedAssetPath(AssetData.PackageName.ToString() + TEXT(".") + AssetData.AssetName.ToString());
+
+	for (const FName& ReferencerPackage : Referencers)
+	{
+		// Class metadata only -- no load.
+		TArray<FAssetData> ReferencerAssets;
+		AssetRegistry.GetAssetsByPackageName(ReferencerPackage, ReferencerAssets, /*bIncludeOnlyOnDiskAssets=*/ true);
+
+		for (const FAssetData& ReferencerAsset : ReferencerAssets)
+		{
+			const UClass* AssetClass = ReferencerAsset.GetClass();
+			if (!AssetClass || !AssetClass->IsChildOf(CollectionClass)) { continue; }
+
+			// Only act on collections that are already loaded. Unloaded ones are not touched
+			// here -- they'll be considered when the user next opens them via manual rebuild.
+			UPCGExAssetCollection* Collection = Cast<UPCGExAssetCollection>(ReferencerAsset.GetSoftObjectPath().ResolveObject());
+			if (!Collection) { continue; }
+
+			// Per-entry rebuild: only entries whose Staging.Path matches the changed asset.
+			// This keeps the blast radius minimal and avoids rebuilding entries whose
+			// referenced assets might be in transient/partial-load states.
+			Collection->ForEachEntry([Collection, &ChangedAssetPath, &AssetData](const FPCGExAssetCollectionEntry* InEntry, int32 i)
+			{
+				if (InEntry->bIsSubCollection) { return; }
+
+				// Match on package name -- handles both regular assets and BP class paths
+				// (where Staging.Path ends in "_C" but the package name is the same).
+				if (InEntry->Staging.Path.GetLongPackageFName() != AssetData.PackageName) { return; }
+
+				Collection->EDITOR_RebuildEntryStaging(i);
+			});
+		}
+	}
+}
+
+void FPCGExCollectionsEditorModule::OnObjectsReinstanced(const TMap<UObject*, UObject*>& OldToNewMap)
+{
+	if (!GEditor) { return; }
+	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale) { return; }
+
+	// Reinstancing fires DURING the BP recompile flow -- the new class exists but isn't
+	// fully settled (CDO, components, etc. may still be finalising). Spawning a temp actor
+	// at this point gives unstable bounds. Capture the affected packages and defer the
+	// actual rebuild to the next tick when reinstancing is complete.
+	TSet<FName> ChangedPackages;
+	for (const TPair<UObject*, UObject*>& Pair : OldToNewMap)
+	{
+		UObject* NewObj = Pair.Value;
+		if (!NewObj) { continue; }
+		UPackage* Package = NewObj->GetOutermost();
+		if (!Package || Package == GetTransientPackage()) { continue; }
+		ChangedPackages.Add(Package->GetFName());
+	}
+
+	if (ChangedPackages.IsEmpty()) { return; }
+
+	GEditor->GetTimerManager()->SetTimerForNextTick(
+		[this, ChangedPackages]()
+		{
+			if (!GEditor) { return; }
+			const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+			const IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+			for (const FName& PackageName : ChangedPackages)
+			{
+				TArray<FAssetData> Assets;
+				AssetRegistry.GetAssetsByPackageName(PackageName, Assets, /*bIncludeOnlyOnDiskAssets=*/ false);
+				for (const FAssetData& AssetData : Assets)
+				{
+					OnAssetUpdatedOnDisk(AssetData);
+				}
+			}
+		});
 }
 
 void FPCGExCollectionsEditorModule::RegisterMenuExtensions()

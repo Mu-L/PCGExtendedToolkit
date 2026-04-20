@@ -47,6 +47,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bounds")
 	bool bIgnoreLightComponents = true;
 
+	/** When true, editor-only components (billboard sprites, arrow visualizers, etc.) are excluded. Disabling this re-introduces the inflated bounds those visualizers add. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bounds")
+	bool bIgnoreEditorOnlyComponents = true;
+
 	/** When true, child actor components are included in bounds computation. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Bounds")
 	bool bIncludeFromChildActors = false;
