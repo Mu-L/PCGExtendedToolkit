@@ -23,6 +23,7 @@ UPCGExFactoryData* UPCGExCreateShape##_SHAPE##Settings::CreateFactory(FPCGExCont
 	NewFactory->Config = Config; \
 	return Super::CreateFactory(InContext, NewFactory);}
 
+struct FPCGExShapeConfigBase;
 class FPCGExShapeBuilderOperation;
 
 USTRUCT(meta=(PCG_DataTypeDisplayName="PCGEx | Shape"))
@@ -55,6 +56,8 @@ protected:
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
+	
 	PCGEX_NODE_INFOS(ShapeBuilder, "ShapeBuilder Definition", "Creates a single shape builder node, to be used with a Shape processor node.")
 	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Shape); }
 #endif

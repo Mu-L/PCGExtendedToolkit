@@ -14,7 +14,7 @@
 #if WITH_EDITOR
 void UPCGExDiscardSameSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_UPDATE_TO_DATA_VERSION(1, 72, 0)
+	PCGEX_IF_VERSION_LOWER(1, 72, 0)
 	{
 		if (bTestAttributeHash_DEPRECATED) { TestAttributesHash = EPCGExDiscardAttributeHashMode::Single; }
 	}

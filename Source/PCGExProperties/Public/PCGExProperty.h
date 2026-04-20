@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "StructUtils/InstancedStruct.h"
 #include "Data/PCGExData.h"
+#include "Types/PCGExTypeTraits.h"
 
 #include "PCGExProperty.generated.h"
 
@@ -240,6 +241,39 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * @param Source The source property to copy from
 	 */
 	virtual void InitializeFrom(const FPCGExProperty* Source) { CopyValueFrom(Source); }
+
+	// --- Value Read Interface (type-erased) ---
+
+	/**
+	 * Type-erased value read: converts this property's effective value to TargetType,
+	 * writing into OutBuffer. OutBuffer must point to a storage location of TargetType.
+	 *
+	 * For simple properties (Value type matches a supported PCG type), the default
+	 * macro implementation dispatches through FConversionTable, giving free N×N
+	 * conversion across all supported types.
+	 *
+	 * Converting properties (e.g., Color: FLinearColor -> FVector4, Enum: FEnumSelector
+	 * -> int64) override this manually to first project to their output type, then
+	 * dispatch the conversion.
+	 *
+	 * Returns false if this property does not expose a convertible value.
+	 *
+	 * Prefer the templated TryGetValue<T> wrapper at call sites.
+	 */
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const { return false; }
+
+	/**
+	 * Templated value read: resolves T to its EPCGMetadataTypes at compile time and
+	 * forwards to TryWriteValue. Returns false if T is not a supported PCG type or
+	 * the property has no convertible value.
+	 */
+	template <typename T>
+	bool TryGetValue(T& Out) const
+	{
+		static_assert(PCGExTypes::TTraits<T>::Type != EPCGMetadataTypes::Unknown,
+			"TryGetValue<T>: T must be a PCG-supported metadata type.");
+		return TryWriteValue(PCGExTypes::TTraits<T>::Type, &Out);
+	}
 
 	// --- Registry ---
 

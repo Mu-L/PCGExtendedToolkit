@@ -694,6 +694,7 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 
 	void FFacade::Fetch(const PCGExMT::FScope& Scope)
 	{
+		if (!bSupportsScopedGet) { return; }
 		TRACE_CPUPROFILER_EVENT_SCOPE(FFacade::Fetch);
 		for (const TSharedPtr<IBuffer>& Buffer : Buffers) { Buffer->Fetch(Scope); }
 	}

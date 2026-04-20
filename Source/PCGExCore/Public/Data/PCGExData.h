@@ -10,6 +10,7 @@
 #include "PCGExPointElements.h"
 #include "PCGExCommon.h"
 #include "PCGExDataCommon.h"
+#include "PCGExDataMacros.h"
 #include "PCGCommon.h"
 #include "Core/PCGExMTCommon.h"
 #include "Helpers/PCGExMetaHelpersMacros.h"
@@ -17,19 +18,6 @@
 #include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Types/PCGExTypes.h"
 
-#pragma region DATA MACROS
-
-#ifndef PCGEX_DATA_MACROS
-#define PCGEX_DATA_MACROS
-
-#define PCGEX_INIT_IO_VOID(_IO, _INIT) if (!_IO->InitializeOutput(_INIT)) { return; }
-#define PCGEX_INIT_IO(_IO, _INIT) if (!_IO->InitializeOutput(_INIT)) { return false; }
-
-#define PCGEX_CLEAR_IO_VOID(_IO) if (!_IO->InitializeOutput(PCGExData::EIOInit::NoInit)) { return; } _IO->Disable();
-#define PCGEX_CLEAR_IO(_IO) if (!_IO->InitializeOutput(PCGExData::EIOInit::NoInit)) { return false; } _IO->Disable();
-
-#endif
-#pragma endregion
 
 struct FPCGContext;
 class UPCGMetadata;

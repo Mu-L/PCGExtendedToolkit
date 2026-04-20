@@ -13,7 +13,7 @@
 #define LOCTEXT_NAMESPACE "PCGExOrientElement"
 #define PCGEX_NAMESPACE Orient
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UPCGExOrientSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())

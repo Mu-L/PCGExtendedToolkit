@@ -15,12 +15,12 @@ bool FPCGExShapeBuilderOperation::PrepareForSeeds(FPCGExContext* InContext, cons
 
 	if (BaseConfig.bThreeDimensions)
 	{
-		ResolutionVector = BaseConfig.GetValueSettingResolutionVector();
+		ResolutionVector = BaseConfig.ResolutionVector.GetValueSetting();
 		if (!ResolutionVector->Init(InSeedDataFacade)) { return false; }
 	}
 	else
 	{
-		Resolution = BaseConfig.GetValueSettingResolution();
+		Resolution = BaseConfig.Resolution.GetValueSetting();
 		if (!Resolution->Init(InSeedDataFacade)) { return false; }
 	}
 

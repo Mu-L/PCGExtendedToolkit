@@ -70,6 +70,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("String"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -96,6 +97,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Name"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -122,6 +124,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Int32"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -148,6 +151,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Int64"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -174,6 +178,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Float"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -200,6 +205,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Double"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -226,12 +232,13 @@ public:
 	virtual FName GetTypeName() const override { return FName("Bool"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
  * Vector property - outputs as FVector attribute.
  */
-USTRUCT(BlueprintType, DisplayName="Vector")
+USTRUCT(BlueprintType, DisplayName="Vector", meta=(PCGExInlineValue))
 struct PCGEXPROPERTIES_API FPCGExProperty_Vector : public FPCGExProperty
 {
 	GENERATED_BODY()
@@ -252,12 +259,13 @@ public:
 	virtual FName GetTypeName() const override { return FName("Vector"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
  * Vector2D property - outputs as FVector2D attribute.
  */
-USTRUCT(BlueprintType, DisplayName="Vector2")
+USTRUCT(BlueprintType, DisplayName="Vector2", meta=(PCGExInlineValue))
 struct PCGEXPROPERTIES_API FPCGExProperty_Vector2 : public FPCGExProperty
 {
 	GENERATED_BODY()
@@ -278,6 +286,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Vector2D"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -304,6 +313,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Vector4"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -338,12 +348,13 @@ public:
 	virtual FName GetTypeName() const override { return FName("Color"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
  * Rotator property - outputs as FRotator attribute.
  */
-USTRUCT(BlueprintType, DisplayName="Rotator")
+USTRUCT(BlueprintType, DisplayName="Rotator", meta=(PCGExInlineValue))
 struct PCGEXPROPERTIES_API FPCGExProperty_Rotator : public FPCGExProperty
 {
 	GENERATED_BODY()
@@ -364,6 +375,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Rotator"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -390,6 +402,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Quat"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -416,6 +429,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Transform"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -442,6 +456,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("SoftObjectPath"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -468,6 +483,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("SoftClassPath"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 /**
@@ -499,6 +515,7 @@ public:
 	virtual FName GetTypeName() const override { return FName("Enum"); }
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 };
 
 #pragma endregion

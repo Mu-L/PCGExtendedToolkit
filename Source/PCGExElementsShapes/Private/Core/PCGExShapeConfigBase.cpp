@@ -4,9 +4,6 @@
 #include "Core/PCGExShapeConfigBase.h"
 #include "Details/PCGExSettingsDetails.h"
 
-PCGEX_SETTING_VALUE_IMPL(FPCGExShapeConfigBase, Resolution, double, ResolutionInput, ResolutionAttribute, ResolutionConstant);
-PCGEX_SETTING_VALUE_IMPL(FPCGExShapeConfigBase, ResolutionVector, FVector, ResolutionInput, ResolutionAttribute, ResolutionConstantVector)
-
 void FPCGExShapeConfigBase::Init()
 {
 	FQuat A = FQuat::Identity;
@@ -45,3 +42,11 @@ void FPCGExShapeConfigBase::Init()
 
 	LocalTransform = FTransform(A * B, FVector::ZeroVector, FVector::OneVector);
 }
+
+#if WITH_EDITOR
+void FPCGExShapeConfigBase::ApplyDeprecation()
+{
+	Resolution.Update(ResolutionInput_DEPRECATED, ResolutionAttribute_DEPRECATED, ResolutionConstant_DEPRECATED);
+	ResolutionVector.Update(ResolutionInput_DEPRECATED, ResolutionAttribute_DEPRECATED, ResolutionConstantVector_DEPRECATED);
+}
+#endif

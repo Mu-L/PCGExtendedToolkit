@@ -20,7 +20,7 @@
 #define LOCTEXT_NAMESPACE "PCGExPathCrossingsElement"
 #define PCGEX_NAMESPACE PathCrossings
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UPCGExPathCrossingsSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())

@@ -43,6 +43,7 @@ FBox UPCGExDefaultBoundsEvaluator::EvaluateActorBounds_Implementation(AActor* Ac
 	for (const UPrimitiveComponent* PrimComp : PrimitiveComponents)
 	{
 		if (!PrimComp->IsRegistered()) { continue; }
+		if (bIgnoreEditorOnlyComponents && PrimComp->IsEditorOnly()) { continue; }
 		if (bOnlyCollidingComponents && !PrimComp->IsCollisionEnabled()) { continue; }
 		if (bIgnoreLightComponents && PrimComp->IsA<ULightComponent>()) { continue; }
 

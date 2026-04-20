@@ -18,7 +18,7 @@
 PCGEX_SETTING_VALUE_IMPL(UPCGExWriteTangentsSettings, ArriveScale, FVector, ArriveScaleInput, ArriveScaleAttribute, FVector(ArriveScaleConstant))
 PCGEX_SETTING_VALUE_IMPL(UPCGExWriteTangentsSettings, LeaveScale, FVector, LeaveScaleInput, LeaveScaleAttribute, FVector(LeaveScaleConstant))
 
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITOR
 void UPCGExWriteTangentsSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())

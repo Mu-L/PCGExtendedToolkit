@@ -10,6 +10,7 @@
 
 #include "PCGExShapesCommon.h"
 #include "Data/PCGExDataCommon.h"
+#include "Details/PCGExInputShorthandsDetails.h"
 #include "Fitting/PCGExFitting.h"
 
 #include "PCGExShapeConfigBase.generated.h"
@@ -39,24 +40,29 @@ struct PCGEXELEMENTSSHAPES_API FPCGExShapeConfigBase
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Resolution", meta = (PCG_Overridable))
 	EPCGExResolutionMode ResolutionMode = EPCGExResolutionMode::Fixed;
 
-	/** Resolution input type */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Resolution", meta = (PCG_NotOverridable))
-	EPCGExInputValueType ResolutionInput = EPCGExInputValueType::Constant;
+	/** Resolution. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable, EditCondition="!bThreeDimensions", EditConditionHides, HideEditConditionToggle))
+	FPCGExInputShorthandSelectorDoubleAbs Resolution = FPCGExInputShorthandSelectorDoubleAbs(FName("Resolution"), 10, false);
+	
+	/** Resolution. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable, EditCondition="bThreeDimensions", EditConditionHides, HideEditConditionToggle))
+	FPCGExInputShorthandSelectorVector ResolutionVector = FPCGExInputShorthandSelectorVector(FName("Resolution"), FVector(10), false);
+	
+#pragma region DEPRECATED
+	
+	UPROPERTY()
+	EPCGExInputValueType ResolutionInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	/** Resolution Attribute. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Resolution", meta=(PCG_Overridable, DisplayName="Resolution (Attr)", EditCondition="ResolutionInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector ResolutionAttribute;
+	UPROPERTY()
+	FPCGAttributePropertyInputSelector ResolutionAttribute_DEPRECATED;
 
-	/** Resolution Constant. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Resolution", meta=(PCG_Overridable, DisplayName="Resolution", EditCondition="ResolutionInput == EPCGExInputValueType::Constant && !bThreeDimensions", EditConditionHides, ClampMin=0))
-	double ResolutionConstant = 10;
+	UPROPERTY()
+	double ResolutionConstant_DEPRECATED = 10;
 
-	/** Resolution Constant. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Resolution", meta=(PCG_Overridable, DisplayName="Resolution (Vector)", EditCondition="ResolutionInput == EPCGExInputValueType::Constant && bThreeDimensions", EditConditionHides, ClampMin=0))
-	FVector ResolutionConstantVector = FVector(10);
-
-	PCGEX_SETTING_VALUE_DECL(Resolution, double);
-	PCGEX_SETTING_VALUE_DECL(ResolutionVector, FVector);
+	UPROPERTY()
+	FVector ResolutionConstantVector_DEPRECATED = FVector(10);
+	
+#pragma endregion
 
 	/** Fitting details */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
@@ -112,4 +118,10 @@ struct PCGEXELEMENTSSHAPES_API FPCGExShapeConfigBase
 	FTransform LocalTransform = FTransform::Identity;
 
 	virtual void Init();
+	
+#if WITH_EDITOR
+	virtual void ApplyDeprecation();
+#endif
+	
+	
 };
