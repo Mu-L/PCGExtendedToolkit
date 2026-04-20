@@ -144,7 +144,7 @@ void FPCGExtendedToolkitModule::StartupModule()
 	PCGEX_EMPLACE_PIN_OUT(OUT_MatchRule, "PCGEx Data Matching Rule");
 	PCGEX_MAP_PIN_OUT("Match Rule")
 	
-	PCGEX_EMPLACE_PIN_OUT(OUT_Distribution, "PCGEx Selector");
+	PCGEX_EMPLACE_PIN_OUT(OUT_Selector, "PCGEx Selector");
 	PCGEX_MAP_PIN_OUT("Selector")
 
 	PCGEX_EMPLACE_PIN_OUT(OUT_Vtx, "Point collection formatted for use as cluster vtx.");
@@ -208,7 +208,7 @@ void FPCGExtendedToolkitModule::StartupModule()
 	PCGEX_MAP_PIN_IN("Edge Filters")
 	PCGEX_MAP_PIN_IN("EdgeFilters")
 
-	PCGEX_EMPLACE_PIN_IN(IN_Distribution, "Expects PCGEx Selector, supports single input.");
+	PCGEX_EMPLACE_PIN_IN(IN_Selector, "Expects PCGEx Selector, supports single input.");
 	PCGEX_MAP_PIN_IN("Selector")
 
 	PCGEX_EMPLACE_PIN_IN(IN_FilterVtx, "Expects PCGEx Filters or Vtx Filter, supports multiple inputs.");
