@@ -6,6 +6,7 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Helpers/PCGExCollectionPropertySetWriter.h"
 #include "PCGExPropertyTypes.h"
 #include "PCGParamData.h"
 
@@ -130,6 +131,14 @@ namespace PCGExStagingLoadProperties
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExStagingLoadProperties::BuildPropertyCaches);
 
+		// Flatten collections from the unpacker into a search order, once.
+		TArray<const UPCGExAssetCollection*> SearchOrder;
+		SearchOrder.Reserve(Context->CollectionPickUnpacker->GetCollections().Num());
+		for (const auto& CollectionPair : Context->CollectionPickUnpacker->GetCollections())
+		{
+			if (CollectionPair.Value) { SearchOrder.Add(CollectionPair.Value); }
+		}
+
 		// For each configured property output
 		for (const FPCGExPropertyOutputConfig& Config : Context->PropertyOutputSettings.Configs)
 		{
@@ -138,20 +147,7 @@ namespace PCGExStagingLoadProperties
 			const FName OutputName = Config.GetEffectiveOutputName();
 			const FName PropName = Config.PropertyName;
 
-			// Find a prototype property from any collection
-			const FInstancedStruct* Prototype = nullptr;
-			for (const auto& CollectionPair : Context->CollectionPickUnpacker->GetCollections())
-			{
-				if (const UPCGExAssetCollection* Collection = CollectionPair.Value)
-				{
-					if (const FInstancedStruct* Found = Collection->CollectionProperties.GetPropertyByName(PropName))
-					{
-						Prototype = Found;
-						break;
-					}
-				}
-			}
-
+			const FInstancedStruct* Prototype = PCGExCollections::FindPrototypeProperty(PropName, SearchOrder);
 			if (!Prototype)
 			{
 				PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(
@@ -188,28 +184,14 @@ namespace PCGExStagingLoadProperties
 			int16 MaterialPick = 0;
 			for (const uint64 Hash : UniqueEntryHashes)
 			{
-				if (FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
-					Result.IsValid())
+				FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
+				if (!Result.IsValid()) { continue; }
+
+				if (const FInstancedStruct* Source = PCGExCollections::ResolveEntrySourceProperty(Result.Entry, Result.Host, PropName))
 				{
-					const FPCGExProperty* Source = nullptr;
-
-					// Check entry overrides first
-					if (const FInstancedStruct* SourceProp = Result.Entry->PropertyOverrides.GetOverride(PropName))
+					if (const FPCGExProperty* SourceProp = Source->GetPtr<FPCGExProperty>())
 					{
-						Source = SourceProp->GetPtr<FPCGExProperty>();
-					}
-					else if (Result.Host)
-					{
-						// Fallback to collection defaults
-						if (const FInstancedStruct* CollectionProp = Result.Host->CollectionProperties.GetPropertyByName(PropName))
-						{
-							Source = CollectionProp->GetPtr<FPCGExProperty>();
-						}
-					}
-
-					if (Source)
-					{
-						Cache.SourceByHash.Add(Hash, Source);
+						Cache.SourceByHash.Add(Hash, SourceProp);
 					}
 				}
 			}
