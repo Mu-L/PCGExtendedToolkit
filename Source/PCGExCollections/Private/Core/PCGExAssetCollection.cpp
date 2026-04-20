@@ -11,6 +11,7 @@
 #include "Algo/RemoveIf.h"
 #include "Engine/World.h"
 #include "Helpers/PCGExArrayHelpers.h"
+#include "Helpers/PCGExObjectNotifyHelpers.h"
 
 #if WITH_EDITOR
 #include "Editor.h"
@@ -964,7 +965,7 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData()
 	InvalidateCache();
 	EDITOR_SanitizeAndRebuildStagingData(false);
 	(void)MarkPackageDirty();
-	FCoreUObjectDelegates::BroadcastOnObjectModified(this);
+	PCGExEditor::NotifyObjectChanged(this);
 }
 
 void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
@@ -973,7 +974,7 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 	InvalidateCache();
 	EDITOR_SanitizeAndRebuildStagingData(true);
 	(void)MarkPackageDirty();
-	FCoreUObjectDelegates::BroadcastOnObjectModified(this);
+	PCGExEditor::NotifyObjectChanged(this);
 }
 
 bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
@@ -994,12 +995,7 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 	{
 		InvalidateCache();
 		(void)MarkPackageDirty();
-		FCoreUObjectDelegates::BroadcastOnObjectModified(this);
-		// Also fire OnObjectPropertyChanged so downstream tracking (PCG asset trackers, etc.)
-		// re-evaluates -- this is the signal that weight edits implicitly fire via
-		// Super::PostEditChangeProperty.
-		FPropertyChangedEvent EmptyEvent(nullptr);
-		FCoreUObjectDelegates::OnObjectPropertyChanged.Broadcast(this, EmptyEvent);
+		PCGExEditor::NotifyObjectChanged(this);
 	}
 	return bRebuilt;
 }
