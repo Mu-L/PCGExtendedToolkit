@@ -42,15 +42,6 @@ void UPCGExPathSplineMeshSettings::ApplyDeprecation(UPCGNode* InOutNode)
 	{
 		if (CollectionSource != EPCGExCollectionSource::Asset || !AssetCollection.IsNull()) { bUseStagedPoints = false; }
 	}
-
-	PCGEX_IF_VERSION_LOWER(1, 75, 11)
-	{
-		if (!bSelectorModePreUpdated)
-		{
-			SelectorMode = EPCGExSelectorMode::Legacy;
-			bSelectorModePreUpdated = true; // So we don't override the value for folks who'll update in their own time
-		}
-	}
 	
 	Super::ApplyDeprecation(InOutNode);
 }

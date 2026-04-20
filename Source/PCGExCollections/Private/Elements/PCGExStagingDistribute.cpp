@@ -34,20 +34,6 @@
 #pragma region UPCGExAssetStagingSettings
 
 #if WITH_EDITOR
-void UPCGExAssetStagingSettings::ApplyDeprecation(UPCGNode* InOutNode)
-{
-	PCGEX_IF_VERSION_LOWER(1, 75, 11)
-	{
-		if (!bSelectorModePreUpdated)
-		{
-			SelectorMode = EPCGExSelectorMode::Legacy;
-			bSelectorModePreUpdated = true; // So we don't override the value for folks who'll update in their own time
-		}
-	}
-	
-	Super::ApplyDeprecation(InOutNode);
-}
-
 void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	EntryTypeFilter.PostEditChangeProperty(PropertyChangedEvent);
