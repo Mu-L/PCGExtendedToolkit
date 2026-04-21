@@ -459,6 +459,146 @@ namespace PCGExClusters
 		BuildWrapperCell(SharedThis(this));
 	}
 
+	TArray<TSharedPtr<FCell>> MergeAdjacentCells(
+		const TArray<TSharedPtr<FCell>>& InCells,
+		const TSharedRef<FCellConstraints>& InConstraints,
+		const FCluster* InCluster,
+		const TSharedPtr<TArray<FVector2D>>& InProjectedPositions,
+		const int32 InCustomIndex)
+	{
+		TArray<TSharedPtr<FCell>> Result;
+
+		if (InCells.IsEmpty()) { return Result; }
+
+		// Build boundary edge set via undirected hash deduplication.
+		// First occurrence of H64U(A,B) → boundary candidate (store directed form).
+		// Second occurrence → shared interior edge → remove from both set and directed map.
+		TSet<uint64> BoundaryHashes;
+		TMap<uint64, TPair<int32, int32>> DirectedEdges;
+
+		for (const TSharedPtr<FCell>& Cell : InCells)
+		{
+			if (!Cell) { continue; }
+			const TArray<int32>& Nodes = Cell->Nodes;
+			const int32 N = Nodes.Num();
+			for (int32 i = 0; i < N; ++i)
+			{
+				const int32 A = Nodes[i];
+				const int32 B = Nodes[(i + 1) % N];
+				const uint64 Hash = PCGEx::H64U(static_cast<uint32>(A), static_cast<uint32>(B));
+
+				bool bAlreadyIn;
+				BoundaryHashes.Add(Hash, &bAlreadyIn);
+				if (bAlreadyIn)
+				{
+					BoundaryHashes.Remove(Hash);
+					DirectedEdges.Remove(Hash);
+				}
+				else
+				{
+					DirectedEdges.Add(Hash, TPair<int32, int32>(A, B));
+				}
+			}
+		}
+
+		if (DirectedEdges.IsEmpty()) { return Result; }
+
+		// Build NextNode map: FromNode → ToNode
+		TMap<int32, int32> NextNode;
+		NextNode.Reserve(DirectedEdges.Num());
+		for (const auto& Pair : DirectedEdges)
+		{
+			NextNode.Add(Pair.Value.Key, Pair.Value.Value);
+		}
+
+		// Walk boundary loops. Each unvisited start node begins a new loop.
+		TSet<int32> GlobalVisited;
+
+		for (const auto& StartPair : DirectedEdges)
+		{
+			const int32 StartNode = StartPair.Value.Key;
+			if (GlobalVisited.Contains(StartNode)) { continue; }
+
+			TArray<int32> LoopNodes;
+			TSet<int32> LoopVisited;
+			int32 Current = StartNode;
+			bool bValid = true;
+
+			while (true)
+			{
+				if (LoopVisited.Contains(Current))
+				{
+					bValid = (Current == StartNode); // premature cycle unless it closed cleanly
+					break;
+				}
+				LoopVisited.Add(Current);
+				LoopNodes.Add(Current);
+
+				const int32* Next = NextNode.Find(Current);
+				if (!Next) { bValid = false; break; } // dead end — non-manifold boundary
+				Current = *Next;
+				if (Current == StartNode) { break; }   // loop closed
+			}
+
+			GlobalVisited.Append(LoopVisited);
+
+			if (!bValid || LoopNodes.Num() < 3) { continue; }
+
+			TSharedPtr<FCell> MergedCell = MakeShared<FCell>(InConstraints);
+			MergedCell->Nodes = LoopNodes;
+			MergedCell->CustomIndex = InCustomIndex;
+			MergedCell->bBuiltSuccessfully = true;
+			MergedCell->Data.bIsClosedLoop = true;
+			MergedCell->Data.bIsValid = true;
+
+			// Compute 3D bounds and centroid
+			FBox Bounds(ForceInit);
+			FVector Centroid = FVector::ZeroVector;
+			for (const int32 NodeIdx : LoopNodes)
+			{
+				const FVector Pos = InCluster->GetPos(NodeIdx);
+				Bounds += Pos;
+				Centroid += Pos;
+			}
+			MergedCell->Data.Bounds = Bounds;
+			MergedCell->Data.Centroid = Centroid / LoopNodes.Num();
+
+			// Compute 2D polygon metrics if projected positions are available.
+			// Polygon is intentionally not populated — synthetic cells only need it for containment testing,
+			// which never runs on merged cells (seeding/hole detection precedes the merge step).
+			if (InProjectedPositions && !InProjectedPositions->IsEmpty())
+			{
+				MergedCell->Bounds2D = FBox2D(ForceInit);
+				double SignedArea = 0;
+				double Perimeter = 0;
+				const int32 NumPts = LoopNodes.Num();
+				for (int32 i = 0; i < NumPts; ++i)
+				{
+					const FVector2D& PA = (*InProjectedPositions)[LoopNodes[i]];
+					const FVector2D& PB = (*InProjectedPositions)[LoopNodes[(i + 1) % NumPts]];
+					MergedCell->Bounds2D += PA;
+					SignedArea += (PA.X * PB.Y - PB.X * PA.Y);
+					Perimeter += FVector2D::Distance(PA, PB);
+				}
+				SignedArea *= 0.5;
+				MergedCell->Data.Area = FMath::Abs(SignedArea);
+				MergedCell->Data.Perimeter = Perimeter;
+				MergedCell->Data.bIsClockwise = SignedArea < 0;
+				if (Perimeter > 0)
+				{
+					MergedCell->Data.Compactness = FMath::Clamp((4.0 * UE_PI * MergedCell->Data.Area) / (Perimeter * Perimeter), 0.0, 1.0);
+				}
+			}
+
+			// Merged cells spanning multiple original faces are never purely convex
+			MergedCell->Data.bIsConvex = false;
+
+			Result.Add(MergedCell);
+		}
+
+		return Result;
+	}
+
 	void FCellConstraints::Cleanup()
 	{
 		WrapperCell = nullptr;
