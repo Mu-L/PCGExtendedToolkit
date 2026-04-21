@@ -248,6 +248,89 @@ namespace PCGExEnumCustomization
 		return CreateCheckboxGroup(PropertyHandle, FindFirstObjectSafe<UEnum>(*Enum), SkipIndices);
 	}
 
+	static int32 FindNextVisibleEnumIndex(const UEnum* Enum, int32 FromIndex)
+	{
+		const int32 NumValues = Enum->NumEnums() - 1;
+		if (NumValues <= 0) { return INDEX_NONE; }
+		if (FromIndex < 0) { FromIndex = -1; }
+
+		for (int32 Step = 1; Step <= NumValues; ++Step)
+		{
+			const int32 Next = (FromIndex + Step) % NumValues;
+			if (!Enum->HasMetaData(TEXT("Hidden"), Next)) { return Next; }
+		}
+		return INDEX_NONE;
+	}
+
+	TSharedRef<SWidget> CreateCycleButton(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum)
+	{
+		return SNew(SButton)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			.ContentPadding(FMargin(2, 0))
+			.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+			.Text_Lambda([PropertyHandle, Enum]()
+			{
+				FString CurrentValue;
+				PropertyHandle->GetValueAsFormattedString(CurrentValue);
+				const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
+				return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
+			})
+			.ToolTipText_Lambda([PropertyHandle, Enum]()
+			{
+				FString CurrentValue;
+				PropertyHandle->GetValueAsFormattedString(CurrentValue);
+				const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
+				return Idx != INDEX_NONE ? Enum->GetToolTipTextByIndex(Idx) : FText::GetEmpty();
+			})
+			.OnClicked_Lambda([PropertyHandle, Enum]()
+			{
+				FString CurrentValue;
+				PropertyHandle->GetValueAsFormattedString(CurrentValue);
+				const int32 CurrentIdx = Enum->GetIndexByNameString(CurrentValue);
+				const int32 NextIdx = FindNextVisibleEnumIndex(Enum, CurrentIdx);
+				if (NextIdx != INDEX_NONE)
+				{
+					PropertyHandle->SetValueFromFormattedString(Enum->GetNameStringByIndex(NextIdx));
+				}
+				return FReply::Handled();
+			});
+	}
+
+	TSharedRef<SWidget> CreateCycleButton(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum)
+	{
+		return CreateCycleButton(PropertyHandle, FindFirstObjectSafe<UEnum>(*Enum));
+	}
+
+	TSharedRef<SWidget> CreateCycleButton(UEnum* Enum, TFunction<int32()> GetValue, TFunction<void(int32)> SetValue)
+	{
+		return SNew(SButton)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			.ContentPadding(FMargin(2, 0))
+			.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+			.Text_Lambda([GetValue, Enum]()
+			{
+				const int32 Idx = Enum->GetIndexByValue(GetValue());
+				return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
+			})
+			.ToolTipText_Lambda([GetValue, Enum]()
+			{
+				const int32 Idx = Enum->GetIndexByValue(GetValue());
+				return Idx != INDEX_NONE ? Enum->GetToolTipTextByIndex(Idx) : FText::GetEmpty();
+			})
+			.OnClicked_Lambda([GetValue, SetValue, Enum]()
+			{
+				const int32 CurrentIdx = Enum->GetIndexByValue(GetValue());
+				const int32 NextIdx = FindNextVisibleEnumIndex(Enum, CurrentIdx);
+				if (NextIdx != INDEX_NONE)
+				{
+					SetValue(static_cast<int32>(Enum->GetValueByIndex(NextIdx)));
+				}
+				return FReply::Handled();
+			});
+	}
+
 	TSharedRef<SWidget> CreateCheckboxGroup(UEnum* Enum, TFunction<uint8()> GetValue, TFunction<void(uint8)> SetValue, const TSet<int32>& SkipIndices)
 	{
 		TSharedRef<SHorizontalBox> Box = SNew(SHorizontalBox);

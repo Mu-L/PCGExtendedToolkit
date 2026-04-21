@@ -31,6 +31,14 @@ enum class EPCGExGrammarSizeReference : uint8
 };
 
 UENUM()
+enum class EPCGExGrammarSizeOp : uint8
+{
+	None     = 0 UMETA(DisplayName = "=", Tooltip="Use the axis size as-is."),
+	Offset   = 1 UMETA(DisplayName = "+", Tooltip="Add the specified value to the axis size."),
+	Multiply = 2 UMETA(DisplayName = "×", Tooltip="Multiply the axis size by the specified value."),
+};
+
+UENUM()
 enum class EPCGExGrammarSubCollectionMode : uint8
 {
 	Inherit  = 0 UMETA(DisplayName = "Inherit", Tooltip="Inherit the settings from the selected collection."),
@@ -76,8 +84,12 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	EPCGExGrammarSizeReference Size = EPCGExGrammarSizeReference::X;
 
-	/** Manually specified size, used when Size is set to Fixed. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="Size == EPCGExGrammarSizeReference::Fixed", EditConditionHides, ClampMin=0))
+	/** Optional operation applied on top of the axis-derived size using FixedSize. Ignored when Size is Fixed. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="Size != EPCGExGrammarSizeReference::Fixed", EditConditionHides))
+	EPCGExGrammarSizeOp SizeOp = EPCGExGrammarSizeOp::None;
+
+	/** Manually specified size. Used as the absolute size when Size is Fixed, as an offset when SizeOp is Offset, or as a multiplier when SizeOp is Multiply. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="Size == EPCGExGrammarSizeReference::Fixed || SizeOp != EPCGExGrammarSizeOp::None", EditConditionHides))
 	double FixedSize = 100;
 
 	/** For easier debugging, using Point color in conjunction with PCG Debug Color Material. */

@@ -54,6 +54,7 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 	TSharedPtr<IPropertyHandle> SymbolHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, Symbol));
 	TSharedPtr<IPropertyHandle> ScaleModeHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, ScaleMode));
 	TSharedPtr<IPropertyHandle> SizeHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, Size));
+	TSharedPtr<IPropertyHandle> SizeOpHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, SizeOp));
 	TSharedPtr<IPropertyHandle> FixedSizeHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, FixedSize));
 	TSharedPtr<IPropertyHandle> DebugColorHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, DebugColor));
 
@@ -158,17 +159,43 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 					SizeHandle->CreatePropertyValueWidget()
 				]
 			]
-			// Fixed size (conditional)
-			+ SHorizontalBox::Slot().Padding(1).FillWidth(1)
+			// Size op cycle button (hidden when Size is Fixed)
+			+ SHorizontalBox::Slot().Padding(1).AutoWidth()
 			[
 				SNew(SBox)
+				.MinDesiredWidth(22)
 				.IsEnabled_Lambda(IsLocalData)
 				.Visibility_Lambda([SizeHandle]()
 				{
 					uint8 EnumValue = 0;
 					if (SizeHandle->GetValue(EnumValue) == FPropertyAccess::Success)
 					{
-						return EnumValue == static_cast<uint8>(EPCGExGrammarSizeReference::Fixed) ? EVisibility::Visible : EVisibility::Collapsed;
+						return EnumValue == static_cast<uint8>(EPCGExGrammarSizeReference::Fixed) ? EVisibility::Collapsed : EVisibility::Visible;
+					}
+					return EVisibility::Collapsed;
+				})
+				[
+					PCGExEnumCustomization::CreateCycleButton(SizeOpHandle, TEXT("EPCGExGrammarSizeOp"))
+				]
+			]
+			// Fixed size (visible when Size==Fixed or SizeOp!=None)
+			+ SHorizontalBox::Slot().Padding(1).FillWidth(1)
+			[
+				SNew(SBox)
+				.IsEnabled_Lambda(IsLocalData)
+				.Visibility_Lambda([SizeHandle, SizeOpHandle]()
+				{
+					uint8 SizeEnum = 0;
+					if (SizeHandle->GetValue(SizeEnum) == FPropertyAccess::Success &&
+						SizeEnum == static_cast<uint8>(EPCGExGrammarSizeReference::Fixed))
+					{
+						return EVisibility::Visible;
+					}
+					uint8 OpEnum = 0;
+					if (SizeOpHandle->GetValue(OpEnum) == FPropertyAccess::Success &&
+						OpEnum != static_cast<uint8>(EPCGExGrammarSizeOp::None))
+					{
+						return EVisibility::Visible;
 					}
 					return EVisibility::Collapsed;
 				})
@@ -186,8 +213,26 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 					})
 					.ToolTipText(FixedSizeHandle->GetToolTipText())
 					.AllowSpin(true)
-					.MinValue(0.0)
-					.MinSliderValue(0.0)
+					.MinValue_Lambda([SizeOpHandle]() -> TOptional<double>
+					{
+						uint8 OpEnum = 0;
+						if (SizeOpHandle->GetValue(OpEnum) == FPropertyAccess::Success &&
+							OpEnum == static_cast<uint8>(EPCGExGrammarSizeOp::Offset))
+						{
+							return TOptional<double>();
+						}
+						return 0.0;
+					})
+					.MinSliderValue_Lambda([SizeOpHandle]() -> TOptional<double>
+					{
+						uint8 OpEnum = 0;
+						if (SizeOpHandle->GetValue(OpEnum) == FPropertyAccess::Success &&
+							OpEnum == static_cast<uint8>(EPCGExGrammarSizeOp::Offset))
+						{
+							return -1000.0;
+						}
+						return 0.0;
+					})
 					.MaxSliderValue(1000.0)
 				]
 			]
