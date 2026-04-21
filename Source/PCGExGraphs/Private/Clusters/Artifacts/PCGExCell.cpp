@@ -471,9 +471,8 @@ namespace PCGExClusters
 		if (InCells.IsEmpty()) { return Result; }
 
 		// Build boundary edge set via undirected hash deduplication.
-		// First occurrence of H64U(A,B) → boundary candidate (store directed form).
-		// Second occurrence → shared interior edge → remove from both set and directed map.
-		TSet<uint64> BoundaryHashes;
+		// TMap::Remove returns the count of removed elements: 0 = first occurrence (boundary candidate),
+		// 1 = second occurrence (shared interior edge — already removed, nothing to re-add).
 		TMap<uint64, TPair<int32, int32>> DirectedEdges;
 
 		for (const TSharedPtr<FCell>& Cell : InCells)
@@ -486,18 +485,7 @@ namespace PCGExClusters
 				const int32 A = Nodes[i];
 				const int32 B = Nodes[(i + 1) % N];
 				const uint64 Hash = PCGEx::H64U(static_cast<uint32>(A), static_cast<uint32>(B));
-
-				bool bAlreadyIn;
-				BoundaryHashes.Add(Hash, &bAlreadyIn);
-				if (bAlreadyIn)
-				{
-					BoundaryHashes.Remove(Hash);
-					DirectedEdges.Remove(Hash);
-				}
-				else
-				{
-					DirectedEdges.Add(Hash, TPair<int32, int32>(A, B));
-				}
+				if (DirectedEdges.Remove(Hash) == 0) { DirectedEdges.Add(Hash, TPair<int32, int32>(A, B)); }
 			}
 		}
 
@@ -506,13 +494,13 @@ namespace PCGExClusters
 		// Build NextNode map: FromNode → ToNode
 		TMap<int32, int32> NextNode;
 		NextNode.Reserve(DirectedEdges.Num());
-		for (const auto& Pair : DirectedEdges)
-		{
-			NextNode.Add(Pair.Value.Key, Pair.Value.Value);
-		}
+		for (const auto& Pair : DirectedEdges) { NextNode.Add(Pair.Value.Key, Pair.Value.Value); }
 
-		// Walk boundary loops. Each unvisited start node begins a new loop.
+		// Walk boundary loops. GlobalVisited serves double duty: skips already-claimed start nodes
+		// and catches premature cycles mid-walk, eliminating a per-loop LoopVisited set.
 		TSet<int32> GlobalVisited;
+		GlobalVisited.Reserve(NextNode.Num());
+		Result.Reserve(InCells.Num());
 
 		for (const auto& StartPair : DirectedEdges)
 		{
@@ -520,27 +508,20 @@ namespace PCGExClusters
 			if (GlobalVisited.Contains(StartNode)) { continue; }
 
 			TArray<int32> LoopNodes;
-			TSet<int32> LoopVisited;
 			int32 Current = StartNode;
 			bool bValid = true;
 
 			while (true)
 			{
-				if (LoopVisited.Contains(Current))
-				{
-					bValid = (Current == StartNode); // premature cycle unless it closed cleanly
-					break;
-				}
-				LoopVisited.Add(Current);
+				GlobalVisited.Add(Current);
 				LoopNodes.Add(Current);
 
 				const int32* Next = NextNode.Find(Current);
-				if (!Next) { bValid = false; break; } // dead end — non-manifold boundary
+				if (!Next) { bValid = false; break; }  // dead end — non-manifold boundary
 				Current = *Next;
-				if (Current == StartNode) { break; }   // loop closed
+				if (Current == StartNode) { break; }   // loop closed cleanly
+				if (GlobalVisited.Contains(Current)) { bValid = false; break; } // premature cycle
 			}
-
-			GlobalVisited.Append(LoopVisited);
 
 			if (!bValid || LoopNodes.Num() < 3) { continue; }
 

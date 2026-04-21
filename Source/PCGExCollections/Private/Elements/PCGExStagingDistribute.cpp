@@ -164,6 +164,7 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	}
 	else
 	{
+		PCGE_LOG(Warning, GraphAndLog, FTEXT("Legacy Distribution settings will be removed in the next update; make sure to update to 'External' (Detail Panel > Advanced > SelectorMode), and use a Selector : Classic."));
 		Context->SelectorFactory = PCGExCollections::BuildLegacyFactory(Context, Settings->DistributionSettings);
 	}
 
