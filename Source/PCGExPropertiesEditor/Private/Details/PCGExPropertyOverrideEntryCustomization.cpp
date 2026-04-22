@@ -9,6 +9,7 @@
 #include "PropertyHandle.h"
 #include "PCGExProperty.h"
 #include "PCGExInlineWidgetRegistry.h"
+#include "UObject/StructOnScope.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -49,19 +50,19 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 	FDetailWidgetRow& HeaderRow,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// Store property handle for dynamic text
+	// Capture the entry + its well-known child handles as members. Every lambda / widget
+	// created below (and in CustomizeChildren) reads through these members, so their
+	// backing nodes stay reachable for the full lifetime of this customization.
 	PropertyHandlePtr = PropertyHandle;
+	ValueHandlePtr = PropertyHandle->GetChildHandle(TEXT("Value"));
+	EnabledHandlePtr = PropertyHandle->GetChildHandle(TEXT("bEnabled"));
 
-	// Get bEnabled handle for checkbox widget
-	TSharedPtr<IPropertyHandle> EnabledHandle = PropertyHandle->GetChildHandle(TEXT("bEnabled"));
-
-	// Check if this is an inline type
-	TSharedPtr<IPropertyHandle> ValueHandle = PropertyHandle->GetChildHandle(TEXT("Value"));
+	// Check if this is an inline type (schema-driven, stable for the detail session)
 	bool bShouldInline = false;
-	if (ValueHandle.IsValid())
+	if (ValueHandlePtr.IsValid())
 	{
 		TArray<void*> RawData;
-		ValueHandle->AccessRawData(RawData);
+		ValueHandlePtr->AccessRawData(RawData);
 		if (!RawData.IsEmpty() && RawData[0])
 		{
 			FInstancedStruct* Instance = static_cast<FInstancedStruct*>(RawData[0]);
@@ -89,7 +90,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 				.VAlign(VAlign_Center)
 				.Padding(0, 0, 4, 0)
 				[
-					EnabledHandle.IsValid() ? EnabledHandle->CreatePropertyValueWidget() : SNullWidget::NullWidget
+					EnabledHandlePtr.IsValid() ? EnabledHandlePtr->CreatePropertyValueWidget() : SNullWidget::NullWidget
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
@@ -108,16 +109,22 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// Get bEnabled handle for checkbox widget
-	TSharedPtr<IPropertyHandle> EnabledHandle = PropertyHandle->GetChildHandle(TEXT("bEnabled"));
+	// CustomizeHeader is always called first and populates the member handles,
+	// but recover gracefully if we are somehow entered cold.
+	if (!ValueHandlePtr.IsValid())
+	{
+		ValueHandlePtr = PropertyHandle->GetChildHandle(TEXT("Value"));
+	}
+	if (!EnabledHandlePtr.IsValid())
+	{
+		EnabledHandlePtr = PropertyHandle->GetChildHandle(TEXT("bEnabled"));
+	}
 
-	// Get the Value handle (FInstancedStruct)
-	TSharedPtr<IPropertyHandle> ValueHandle = PropertyHandle->GetChildHandle(TEXT("Value"));
-	if (!ValueHandle.IsValid()) { return; }
+	if (!ValueHandlePtr.IsValid()) { return; }
 
 	// Access raw data to get the FInstancedStruct
 	TArray<void*> RawData;
-	ValueHandle->AccessRawData(RawData);
+	ValueHandlePtr->AccessRawData(RawData);
 	if (RawData.IsEmpty() || !RawData[0]) { return; }
 
 	FInstancedStruct* Instance = static_cast<FInstancedStruct*>(RawData[0]);
@@ -132,16 +139,26 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 	// Check if this type should be inlined
 	const bool bShouldInline = InnerStruct->HasMetaData(TEXT("PCGExInlineValue"));
 
-	// Create FStructOnScope for the inner struct (FPCGExPropertyCompiled_*)
-	TSharedRef<FStructOnScope> StructOnScope = MakeShared<FStructOnScope>(InnerStruct, StructMemory);
+	// Hold the inner scope on the customization so it is guaranteed to outlive every
+	// widget / lambda that will reference it below. The detail panel tears down the
+	// Slate subtree before releasing its customization instances, so this member
+	// chain (customization -> InnerScope -> StructMemory) gives a structural, not
+	// probabilistic, lifetime guarantee.
+	// Non-owning ctor is correct: StructMemory is owned by the outer FStructOnScope
+	// the grid view passes into SetStructureData, which the detail panel keeps alive
+	// for the session, and the inner type is pinned by the collection schema.
+	InnerScope = MakeShared<FStructOnScope>(InnerStruct, StructMemory);
 
-	// Create an attribute that checks if the override is enabled
-	TAttribute<bool> IsEnabledAttr = TAttribute<bool>::Create([EnabledHandle]()
+	// Enabled attribute: capture the member handle by TWeakPtr so the lambda can never
+	// keep a stale shared-ref alive after the customization is torn down. While this
+	// customization is alive, EnabledHandlePtr is alive, and the weak pin succeeds.
+	TWeakPtr<IPropertyHandle> WeakEnabledHandle = EnabledHandlePtr;
+	TAttribute<bool> IsEnabledAttr = TAttribute<bool>::Create([WeakEnabledHandle]()
 	{
-		if (EnabledHandle.IsValid())
+		if (TSharedPtr<IPropertyHandle> Handle = WeakEnabledHandle.Pin())
 		{
 			bool bEnabled = false;
-			EnabledHandle->GetValue(bEnabled);
+			Handle->GetValue(bEnabled);
 			return bEnabled;
 		}
 		return true;
@@ -153,7 +170,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 		// For inline types, only show the "Value" property
 		if (const FProperty* ValueProperty = InnerStruct->FindPropertyByName(TEXT("Value")))
 		{
-			IDetailPropertyRow& Row = *ChildBuilder.AddExternalStructureProperty(StructOnScope, ValueProperty->GetFName());
+			IDetailPropertyRow& Row = *ChildBuilder.AddExternalStructureProperty(InnerScope.ToSharedRef(), ValueProperty->GetFName());
 
 			// Get the property handle for the value widget
 			TSharedPtr<IPropertyHandle> ValuePropertyHandle = Row.GetPropertyHandle();
@@ -163,10 +180,10 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			// path (CreatePropertyValueWidget) works for simple scalar types but falls back
 			// to expandable widgets for complex types (FVector, FRotator, etc.), which
 			// break the inline contract - custom factories exist to provide compact renders.
+			const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName());
 			TSharedRef<SWidget> ValueWidget = SNullWidget::NullWidget;
 			if (ValuePropertyHandle.IsValid())
 			{
-				const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName());
 				ValueWidget = Factory
 					              ? (*Factory)(ValuePropertyHandle.ToSharedRef())
 					              : ValuePropertyHandle->CreatePropertyValueWidget();
@@ -175,7 +192,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			// Customize the row to show checkbox + label in NameContent and value widget in ValueContent.
 			// When a factory widget is used (multi-field compact editor), widen the value column
 			// so all sub-fields fit and fill the available horizontal space uniformly.
-			const bool bHasCustomFactory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName()) != nullptr;
+			const bool bHasCustomFactory = Factory != nullptr;
 
 			Row.CustomWidget()
 			   .NameContent()
@@ -186,7 +203,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 					.VAlign(VAlign_Center)
 					.Padding(0, 0, 4, 0)
 					[
-						EnabledHandle.IsValid() ? EnabledHandle->CreatePropertyValueWidget() : SNullWidget::NullWidget
+						EnabledHandlePtr.IsValid() ? EnabledHandlePtr->CreatePropertyValueWidget() : SNullWidget::NullWidget
 					]
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
@@ -226,7 +243,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			}
 
 			// Add each property as a child row with enabled state
-			IDetailPropertyRow& PropRow = *ChildBuilder.AddExternalStructureProperty(StructOnScope, PropName);
+			IDetailPropertyRow& PropRow = *ChildBuilder.AddExternalStructureProperty(InnerScope.ToSharedRef(), PropName);
 			PropRow.IsEnabled(IsEnabledAttr);
 		}
 	}

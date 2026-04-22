@@ -71,13 +71,18 @@ void FPCGExPropertyOverridesCustomization::CustomizeChildren(
 	TSharedPtr<IPropertyHandle> OverridesArrayHandle = PropertyHandle->GetChildHandle(TEXT("Overrides"));
 	if (!OverridesArrayHandle.IsValid()) { return; }
 
-	// Structural changes (add/remove/reorder) need immediate refresh
-	// to recreate FStructOnScope instances with fresh pointers.
+	// Structural changes (add/remove/reorder) need a refresh to recreate
+	// FStructOnScope instances with fresh pointers, but it MUST be deferred:
+	// the notification can fire synchronously from inside a Slate event handler
+	// (e.g. schema sync triggered during an undo/redo or toolbar action), and
+	// ForceRefresh() would tear down the widget tree while slot destructors are
+	// still unwinding on the stack. RequestRefresh() enqueues the rebuild for
+	// the next tick, matching the deferred pattern the grid view uses elsewhere.
 	auto RefreshDelegate = FSimpleDelegate::CreateLambda([this]()
 	{
 		if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 		{
-			PropertyUtilities->ForceRefresh();
+			PropertyUtilities->RequestRefresh();
 		}
 	});
 
