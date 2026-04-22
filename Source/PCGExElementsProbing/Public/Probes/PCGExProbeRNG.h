@@ -46,6 +46,7 @@ public:
 
 protected:
 	double HalfBeta = 1.0;
+	double HalfBetaSq = 1.0;
 };
 
 ////
