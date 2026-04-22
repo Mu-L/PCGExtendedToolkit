@@ -12,6 +12,7 @@
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCell.h"
 #include "Clusters/Artifacts/PCGExCellPathBuilder.h"
+#include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Paths/PCGExPath.h"
@@ -53,6 +54,7 @@ TArray<FPCGPinProperties> UPCGExFindContoursBoundedSettings::OutputPinProperties
 			if (OutputOutside()) { PCGEX_PIN_POINTS(PCGExFindContoursBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Normal) }
 			else { PCGEX_PIN_POINTS(PCGExFindContoursBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Advanced) }
 		}
+		
 		if (Artifacts.bOutputCellBounds)
 		{
 			if (OutputInside()) { PCGEX_PIN_POINTS(PCGExFindContoursBounded::OutputBoundsInsideLabel, "Cell OBB bounds fully inside", Normal) }
@@ -616,6 +618,37 @@ namespace PCGExFindContoursBounded
 						}
 					}
 				}
+			}
+		}
+
+		// Merge adjacent cells per seed when enabled (only seeds with Growth > 0 can have multiple cells)
+		if (Context->SeedGrowth.bMergeAdjacentCells && Context->SeedGrowth.HasPotentialGrowth())
+		{
+			const TSharedPtr<TArray<FVector2D>> ProjectedPositions = CellsConstraints->Enumerator ? CellsConstraints->Enumerator->GetProjectedPositions() : nullptr;
+
+			TMap<int32, TArray<TSharedPtr<PCGExClusters::FCell>>> CellsBySeed;
+			for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
+			{
+				if (Cell) { CellsBySeed.FindOrAdd(Cell->CustomIndex).Add(Cell); }
+			}
+
+			ValidCells.Reset();
+
+			for (auto& Pair : CellsBySeed)
+			{
+				const int32 SeedIndex = Pair.Key;
+				TArray<TSharedPtr<PCGExClusters::FCell>>& SeedCells = Pair.Value;
+
+				if (SeedCells.Num() <= 1 || Context->SeedGrowth.GetGrowth(SeedIndex) == 0)
+				{
+					ValidCells.Append(SeedCells);
+					continue;
+				}
+
+				TArray<TSharedPtr<PCGExClusters::FCell>> Merged = PCGExClusters::MergeAdjacentCells(
+					SeedCells, CellsConstraints.ToSharedRef(), Cluster.Get(), ProjectedPositions, SeedIndex);
+
+				ValidCells.Append(Merged.IsEmpty() ? SeedCells : Merged);
 			}
 		}
 
