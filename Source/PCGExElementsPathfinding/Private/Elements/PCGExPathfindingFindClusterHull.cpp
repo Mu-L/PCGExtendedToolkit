@@ -26,6 +26,7 @@ TArray<FPCGPinProperties> UPCGExFindClusterHullSettings::InputPinProperties() co
 TArray<FPCGPinProperties> UPCGExFindClusterHullSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
+	
 	PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cluster hulls as closed paths", Required)
 	PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cluster hull OBB bounds as points", Required)
 	return PinProperties;

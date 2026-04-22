@@ -43,6 +43,28 @@ namespace PCGExClusters
 	PCGEXGRAPHS_API
 	void SetPointProperty(PCGExData::FMutablePoint& InPoint, const double InValue, const EPCGExPointPropertyOutput InProperty);
 
+#pragma region MergeAdjacentCells
+
+	class FCluster;
+	class FCell;
+	class FCellConstraints;
+
+	/**
+	 * Merges a set of cells by cancelling shared interior edges via undirected hash deduplication, then walking
+	 * the remaining directed boundary edges to extract one closed path per connected loop.
+	 * Running on a per-seed group (FindCells) dissolves the seed's grown region.
+	 * Running on all valid cells (FindAllCells) produces one merged cell per connected component.
+	 * @note Synthetic output cells do not populate Polygon — only required if used for containment testing.
+	 */
+	PCGEXGRAPHS_API TArray<TSharedPtr<FCell>> MergeAdjacentCells(
+		const TArray<TSharedPtr<FCell>>& InCells,
+		const TSharedRef<FCellConstraints>& InConstraints,
+		const FCluster* InCluster,
+		const TSharedPtr<TArray<FVector2D>>& InProjectedPositions,
+		int32 InCustomIndex = -1);
+
+#pragma endregion
+
 #pragma region Cell
 
 	enum class ECellResult : uint8

@@ -37,8 +37,13 @@ bool UPCGExFindContoursSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) 
 TArray<FPCGPinProperties> UPCGExFindContoursSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
-	PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths", Required)
-	PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points", Required)
+	
+	if (Artifacts.bOutputPaths) { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths", Required) }
+	else { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths", Advanced) }
+
+	if (Artifacts.bOutputCellBounds) { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points", Required) }
+	else { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points", Advanced) }
+
 	if (bOutputFilteredSeeds)
 	{
 		PCGEX_PIN_POINT(PCGExFindContours::OutputGoodSeedsLabel, "GoodSeeds", Required)
@@ -445,6 +450,37 @@ namespace PCGExFindContours
 						}
 					}
 				}
+			}
+		}
+
+		// Merge adjacent cells per seed when enabled (only seeds with Growth > 0 can have multiple cells)
+		if (Context->SeedGrowth.bMergeAdjacentCells && Context->SeedGrowth.HasPotentialGrowth())
+		{
+			const TSharedPtr<TArray<FVector2D>> ProjectedPositions = CellsConstraints->Enumerator ? CellsConstraints->Enumerator->GetProjectedPositions() : nullptr;
+
+			TMap<int32, TArray<TSharedPtr<PCGExClusters::FCell>>> CellsBySeed;
+			for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
+			{
+				if (Cell) { CellsBySeed.FindOrAdd(Cell->CustomIndex).Add(Cell); }
+			}
+
+			ValidCells.Reset();
+
+			for (auto& Pair : CellsBySeed)
+			{
+				const int32 SeedIndex = Pair.Key;
+				TArray<TSharedPtr<PCGExClusters::FCell>>& SeedCells = Pair.Value;
+
+				if (SeedCells.Num() <= 1 || Context->SeedGrowth.GetGrowth(SeedIndex) == 0)
+				{
+					ValidCells.Append(SeedCells);
+					continue;
+				}
+
+				TArray<TSharedPtr<PCGExClusters::FCell>> Merged = PCGExClusters::MergeAdjacentCells(
+					SeedCells, CellsConstraints.ToSharedRef(), Cluster.Get(), ProjectedPositions, SeedIndex);
+
+				ValidCells.Append(Merged.IsEmpty() ? SeedCells : Merged);
 			}
 		}
 
