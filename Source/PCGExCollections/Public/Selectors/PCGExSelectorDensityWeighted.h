@@ -75,7 +75,7 @@ public:
 /**
  * Palette node: "Selector : Density-Weighted".
  */
-UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="collections/selector/density-weighted"))
+UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-density-weighted"))
 class PCGEXCOLLECTIONS_API UPCGExSelectorDensityWeightedFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
 {
 	GENERATED_BODY()

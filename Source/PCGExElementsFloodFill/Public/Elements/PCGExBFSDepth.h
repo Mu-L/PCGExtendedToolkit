@@ -22,7 +22,7 @@ enum class EPCGExBFSNormalizedDepthMode : uint8
 	Cascade = 1 UMETA(DisplayName = "Cascade", ToolTip="Hierarchical falloff. 1.0 at seed, 0.0 at leaf endpoints. Branches inherit from the trunk and smoothly decay toward their own leaves."),
 };
 
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters", meta=(PCGExNodeLibraryDoc="pathfinding/cluster-bfs-depth"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters", meta=(PCGExNodeLibraryDoc="clusters/analyze/cluster-bfs-depth"))
 class UPCGExBFSDepthSettings : public UPCGExClustersProcessorSettings
 {
 	GENERATED_BODY()
