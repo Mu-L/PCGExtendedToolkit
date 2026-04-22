@@ -160,7 +160,7 @@ public:
 /**
  * Palette node: "Selector : Range-Based".
  */
-UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="collections/selector/range-based"))
+UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-range-based"))
 class PCGEXCOLLECTIONS_API UPCGExSelectorRangeBasedFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
 {
 	GENERATED_BODY()

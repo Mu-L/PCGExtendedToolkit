@@ -11,20 +11,35 @@
 
 double FPCGExAssetGrammarDetails::GetSize(const FBox& InBounds, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
 {
-	if (Size == EPCGExGrammarSizeReference::Fixed) { return FixedSize; }
+	double Resolved = 0;
 
-	const FVector S = InBounds.GetSize();
-
-	switch (Size)
+	if (Size == EPCGExGrammarSizeReference::Fixed)
 	{
-	case EPCGExGrammarSizeReference::X: return S.X;
-	case EPCGExGrammarSizeReference::Y: return S.Y;
-	case EPCGExGrammarSizeReference::Z: return S.Z;
-	case EPCGExGrammarSizeReference::Min: return FMath::Min3(S.X, S.Y, S.Z);
-	case EPCGExGrammarSizeReference::Max: return FMath::Max3(S.X, S.Y, S.Z);
-	case EPCGExGrammarSizeReference::Average: return (S.X + S.Y + S.Z) / 3;
-	default: return 0;
+		Resolved = FixedSize;
 	}
+	else
+	{
+		const FVector S = InBounds.GetSize();
+		switch (Size)
+		{
+		case EPCGExGrammarSizeReference::X: Resolved = S.X; break;
+		case EPCGExGrammarSizeReference::Y: Resolved = S.Y; break;
+		case EPCGExGrammarSizeReference::Z: Resolved = S.Z; break;
+		case EPCGExGrammarSizeReference::Min: Resolved = FMath::Min3(S.X, S.Y, S.Z); break;
+		case EPCGExGrammarSizeReference::Max: Resolved = FMath::Max3(S.X, S.Y, S.Z); break;
+		case EPCGExGrammarSizeReference::Average: Resolved = (S.X + S.Y + S.Z) / 3; break;
+		default: break;
+		}
+
+		switch (SizeOp)
+		{
+		case EPCGExGrammarSizeOp::Offset: Resolved += FixedSize; break;
+		case EPCGExGrammarSizeOp::Multiply: Resolved *= FixedSize; break;
+		default: break;
+		}
+	}
+
+	return FMath::Max(1.0, Resolved);
 }
 
 void FPCGExAssetGrammarDetails::Fix(const FBox& InBounds, FPCGSubdivisionSubmodule& OutSubmodule, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const

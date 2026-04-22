@@ -27,6 +27,16 @@ namespace PCGExEnumCustomization
 
 	PCGEXCOREEDITOR_API
 	TSharedRef<SWidget> CreateCheckboxGroup(UEnum* Enum, TFunction<uint8()> GetValue, TFunction<void(uint8)> SetValue, const TSet<int32>& SkipIndices = {});
+
+	/** Single compact button that cycles forward through non-hidden enum entries on click. Label shows the current entry's DisplayName. */
+	PCGEXCOREEDITOR_API
+	TSharedRef<SWidget> CreateCycleButton(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum);
+
+	PCGEXCOREEDITOR_API
+	TSharedRef<SWidget> CreateCycleButton(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum);
+
+	PCGEXCOREEDITOR_API
+	TSharedRef<SWidget> CreateCycleButton(UEnum* Enum, TFunction<int32()> GetValue, TFunction<void(int32)> SetValue);
 }
 
 class PCGEXCOREEDITOR_API FPCGExInlineEnumCustomization : public IPropertyTypeCustomization

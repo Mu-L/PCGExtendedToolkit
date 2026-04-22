@@ -159,7 +159,7 @@ public:
 /**
  * Palette node: "Selector : Best Fit".
  */
-UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="collections/selector/best-fit"))
+UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-best-fit"))
 class PCGEXCOLLECTIONS_API UPCGExSelectorBestFitFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
 {
 	GENERATED_BODY()

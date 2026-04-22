@@ -215,6 +215,17 @@ namespace PCGExFindAllCells
 			}
 		}
 
+		// Merge adjacent valid cells into connected components when enabled
+		if (Context->HoleGrowth.bMergeAdjacentCells && !ValidCells.IsEmpty())
+		{
+			const TSharedPtr<TArray<FVector2D>> ProjectedPositions = CellsConstraints->Enumerator ? CellsConstraints->Enumerator->GetProjectedPositions() : nullptr;
+
+			TArray<TSharedPtr<PCGExClusters::FCell>> Merged = PCGExClusters::MergeAdjacentCells(
+				ValidCells, CellsConstraints.ToSharedRef(), Cluster.Get(), ProjectedPositions);
+
+			if (!Merged.IsEmpty()) { ValidCells = MoveTemp(Merged); }
+		}
+
 		// Initialize cell processor
 		CellProcessor = MakeShared<PCGExClusters::FCellPathBuilder>();
 		CellProcessor->Cluster = Cluster;

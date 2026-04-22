@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExPointsProcessor.h"
+#include "PCGExPropertyWriter.h"
 #include "PCGExAssetCollectionToSet.generated.h"
 
 class UPCGExAssetCollection;
@@ -127,12 +128,23 @@ protected:
 	/** Name of the attribute on the AttributeSet that contains the asset depth, if any. Otherwise -1 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, DisplayName="Nesting Depth", EditCondition="bWriteNestingDepth"))
 	FName NestingDepthAttributeName = FName("NestingDepth");
+
+	/** Additional custom properties to extract from the collection's CollectionProperties (and per-entry overrides). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(ShowOnlyInnerProperties))
+	FPCGExPropertyOutputSettings PropertyOutputSettings;
 };
 
 class FPCGExAssetCollectionToSetElement final : public IPCGExElement
 {
 public:
 	virtual bool IsCacheable(const UPCGSettings* InSettings) const override;
+
+	/** Collected entry along with the collection that directly owns it. */
+	struct FEntryWithHost
+	{
+		const FPCGExAssetCollectionEntry* Entry = nullptr;
+		const UPCGExAssetCollection* Host = nullptr;
+	};
 
 protected:
 	PCGEX_ELEMENT_CREATE_DEFAULT_CONTEXT
@@ -141,7 +153,8 @@ protected:
 	static void ProcessEntry(
 		FPCGExContext* InContext,
 		const FPCGExAssetCollectionEntry* InEntry,
-		TArray<const FPCGExAssetCollectionEntry*>& OutEntries,
+		const UPCGExAssetCollection* InHost,
+		TArray<FEntryWithHost>& OutEntries,
 		const bool bOmitInvalidAndEmpty,
 		const bool bNoDuplicates,
 		const EPCGExSubCollectionToSet SubHandling,

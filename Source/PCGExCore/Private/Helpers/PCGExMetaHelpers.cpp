@@ -25,12 +25,62 @@ namespace PCGExMetaHelpers
 
 	bool IsWritableAttributeName(const FName Name)
 	{
-		// This is a very expensive check, however it's also futureproofing 
+		// This is a very expensive check, however it's also futureproofing
 		if (Name.IsNone()) { return false; }
 
 		FPCGAttributePropertyInputSelector DummySelector;
 		if (!DummySelector.Update(Name.ToString())) { return false; }
 		return DummySelector.GetSelection() == EPCGAttributePropertySelection::Attribute && DummySelector.IsValid();
+	}
+
+	FName SanitizeAttributeName(const FName InName)
+	{
+		if (InName.IsNone()) { return NAME_None; }
+
+		// Allowed character set mirrors FPCGMetadataAttributeBase::IsValidName:
+		// alphanumerics plus space, underscore, hyphen, forward slash.
+		const FString Src = InName.ToString();
+		FString Out;
+		Out.Reserve(Src.Len());
+
+		bool bLastUnderscore = false;
+		for (int32 i = 0; i < Src.Len(); ++i)
+		{
+			const TCHAR C = Src[i];
+			const bool bValid =
+				FChar::IsAlpha(C) || FChar::IsDigit(C) ||
+				C == TEXT(' ') || C == TEXT('_') || C == TEXT('-') || C == TEXT('/');
+
+			if (bValid)
+			{
+				if (C == TEXT('_'))
+				{
+					if (bLastUnderscore) { continue; }
+					bLastUnderscore = true;
+				}
+				else
+				{
+					bLastUnderscore = false;
+				}
+				Out.AppendChar(C);
+			}
+			else
+			{
+				if (bLastUnderscore) { continue; }
+				Out.AppendChar(TEXT('_'));
+				bLastUnderscore = true;
+			}
+		}
+
+		// Trim leading/trailing underscores
+		int32 Start = 0;
+		while (Start < Out.Len() && Out[Start] == TEXT('_')) { ++Start; }
+		int32 End = Out.Len();
+		while (End > Start && Out[End - 1] == TEXT('_')) { --End; }
+		if (Start > 0 || End < Out.Len()) { Out = Out.Mid(Start, End - Start); }
+
+		if (Out.IsEmpty()) { return NAME_None; }
+		return FName(*Out);
 	}
 
 	FString StringTagFromName(const FName Name)

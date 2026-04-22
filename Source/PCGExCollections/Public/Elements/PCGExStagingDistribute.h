@@ -97,7 +97,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Attribute", EditCondition="CollectionSource == EPCGExCollectionSource::Attribute", EditConditionHides))
 	FName CollectionPathAttributeName = "CollectionPath";
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="CollectionSource != EPCGExCollectionSource::AttributeSet", EditConditionHides))
 	EPCGExStagingOutputMode OutputMode = EPCGExStagingOutputMode::CollectionMap;
 
 	/** The name of the attribute to write asset path to.*/
@@ -203,6 +203,8 @@ struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext
 	friend class FPCGExAssetStagingElement;
 
 	virtual void RegisterAssetDependencies() override;
+	
+	EPCGExStagingOutputMode OutputMode = EPCGExStagingOutputMode::CollectionMap;
 
 	TSharedPtr<PCGEx::TAssetLoader<UPCGExAssetCollection>> CollectionsLoader;
 

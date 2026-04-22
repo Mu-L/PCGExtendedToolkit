@@ -8,8 +8,10 @@
 #include "IDetailChildrenBuilder.h"
 #include "PropertyHandle.h"
 #include "PCGExPropertyWriter.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "Styling/SlateColor.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SBoxPanel.h"
 
@@ -52,6 +54,37 @@ void FPCGExPropertyOutputConfigCustomization::CustomizeHeader(
 		]
 	];
 
+	// Value widget: a text box that shows OutputAttributeName, with a greyed hint
+	// "= {SanitizedPropertyName}" when OutputAttributeName is None (runtime falls back to
+	// PropertyName - see FPCGExPropertyOutputConfig::GetEffectiveOutputName).
+	auto GetOutputText = [OutputAttributeNameHandle]()
+	{
+		FName Value = NAME_None;
+		if (OutputAttributeNameHandle) { OutputAttributeNameHandle->GetValue(Value); }
+		return Value.IsNone() ? FText::GetEmpty() : FText::FromName(Value);
+	};
+
+	auto GetHintText = [OutputAttributeNameHandle, PropertyNameHandle]()
+	{
+		FName OutputValue = NAME_None;
+		if (OutputAttributeNameHandle) { OutputAttributeNameHandle->GetValue(OutputValue); }
+		if (!OutputValue.IsNone()) { return FText::GetEmpty(); }
+
+		FName PropName = NAME_None;
+		if (PropertyNameHandle) { PropertyNameHandle->GetValue(PropName); }
+		const FName Sanitized = PCGExMetaHelpers::SanitizeAttributeName(PropName);
+		if (Sanitized.IsNone()) { return FText::GetEmpty(); }
+		return FText::FromString(TEXT("= ") + Sanitized.ToString());
+	};
+
+	auto OnOutputCommitted = [OutputAttributeNameHandle](const FText& InText, ETextCommit::Type)
+	{
+		if (!OutputAttributeNameHandle) { return; }
+		const FString Trimmed = InText.ToString().TrimStartAndEnd();
+		const FName NewValue = Trimmed.IsEmpty() ? NAME_None : FName(*Trimmed);
+		OutputAttributeNameHandle->SetValue(NewValue);
+	};
+
 	HeaderRow.ValueContent()
 	         .MinDesiredWidth(220)
 	[
@@ -68,7 +101,13 @@ void FPCGExPropertyOutputConfigCustomization::CustomizeHeader(
 			SNew(SBox)
 			.IsEnabled_Lambda(IsEnabled)
 			[
-				OutputAttributeNameHandle->CreatePropertyValueWidget()
+				SNew(SEditableTextBox)
+				.Text_Lambda(GetOutputText)
+				.HintText_Lambda(GetHintText)
+				.OnTextCommitted_Lambda(OnOutputCommitted)
+				.SelectAllTextWhenFocused(true)
+				.ClearKeyboardFocusOnCommit(true)
+				.Font(IDetailLayoutBuilder::GetDetailFont())
 			]
 		]
 	];

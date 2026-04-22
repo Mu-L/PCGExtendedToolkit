@@ -93,7 +93,7 @@ namespace PCGExPointFilter
 
 ///
 
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Filter", meta=(PCGExNodeLibraryDoc="filters/point-filters/data/filter-data-match"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Filter", meta=(PCGExNodeLibraryDoc="filters/point-filters/filter-data-match"))
 class UPCGExDataMatchFilterProviderSettings : public UPCGExFilterProviderSettings
 {
 	GENERATED_BODY()

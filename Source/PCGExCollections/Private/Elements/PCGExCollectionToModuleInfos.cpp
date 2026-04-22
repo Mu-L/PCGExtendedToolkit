@@ -8,6 +8,7 @@
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Helpers/PCGExCollectionPropertySetWriter.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
 #include "PCGExProperty.h"
@@ -87,61 +88,22 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 
 	FlattenCollection(Packer, MainCollection, Settings, Modules, UniqueSymbols, SizeCache);
 
-	// Prepare custom property outputs: clone a mutable writer FInstancedStruct per configured property
-	// and create its corresponding metadata attribute.
-	struct FCustomPropertyWriter
+	// Prepare custom property outputs. Fallback hosts = unique per-module hosts (for heterogeneous
+	// nested collections where a property is only declared on a sub-host).
+	TArray<const UPCGExAssetCollection*> FallbackHosts;
 	{
-		FName PropertyName;
-		FInstancedStruct WriterInstance;
-		FPCGMetadataAttributeBase* Attribute = nullptr;
-	};
-
-	TArray<FCustomPropertyWriter> CustomWriters;
-	if (Settings->PropertyOutputSettings.HasOutputs())
-	{
-		for (const FPCGExPropertyOutputConfig& Config : Settings->PropertyOutputSettings.Configs)
+		TSet<const UPCGExAssetCollection*> Seen;
+		for (const PCGExCollectionToGrammar::FModule& Module : Modules)
 		{
-			if (!Config.IsValid()) { continue; }
-
-			const FName OutputName = Config.GetEffectiveOutputName();
-			if (OutputName.IsNone()) { continue; }
-
-			// Find a prototype: check root collection's schema first, fall back to scanning entries
-			const FInstancedStruct* Prototype = MainCollection->CollectionProperties.GetPropertyByName(Config.PropertyName);
-			if (!Prototype || !Prototype->IsValid())
-			{
-				for (const PCGExCollectionToGrammar::FModule& Module : Modules)
-				{
-					if (!Module.Host) { continue; }
-					Prototype = Module.Host->CollectionProperties.GetPropertyByName(Config.PropertyName);
-					if (Prototype && Prototype->IsValid()) { break; }
-				}
-			}
-
-			if (!Prototype || !Prototype->IsValid())
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::FromString(FString::Printf(TEXT("Property '%s' not found in collection schema."), *Config.PropertyName.ToString())));
-				continue;
-			}
-
-			const FPCGExProperty* PrototypeProp = Prototype->GetPtr<FPCGExProperty>();
-			if (!PrototypeProp || !PrototypeProp->SupportsOutput()) { continue; }
-
-			FCustomPropertyWriter& Writer = CustomWriters.Emplace_GetRef();
-			Writer.PropertyName = Config.PropertyName;
-			Writer.WriterInstance = *Prototype;
-
-			if (FPCGExProperty* MutableWriter = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>())
-			{
-				Writer.Attribute = MutableWriter->CreateMetadataAttribute(Metadata, OutputName);
-			}
-
-			if (!Writer.Attribute)
-			{
-				CustomWriters.Pop(EAllowShrinking::No);
-			}
+			if (!Module.Host || Module.Host == MainCollection) { continue; }
+			bool bAlreadyIn = false;
+			Seen.Add(Module.Host, &bAlreadyIn);
+			if (!bAlreadyIn) { FallbackHosts.Add(Module.Host); }
 		}
 	}
+
+	PCGExCollections::FPCGExCollectionPropertySetWriter PropertyWriter;
+	PropertyWriter.Initialize(InContext, Settings->PropertyOutputSettings, MainCollection, FallbackHosts, Metadata);
 
 	for (const PCGExCollectionToGrammar::FModule& Module : Modules)
 	{
@@ -150,31 +112,7 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 		PCGEX_FOREACH_MODULE_FIELD(PCGEX_MODULE_OUT)
 #undef PCGEX_MODULE_OUT
 
-		for (FCustomPropertyWriter& Writer : CustomWriters)
-		{
-			// Resolve source: entry override first, then host collection default
-			const FInstancedStruct* Source = nullptr;
-			if (Module.Entry)
-			{
-				Source = Module.Entry->PropertyOverrides.GetOverride(Writer.PropertyName);
-			}
-			if ((!Source || !Source->IsValid()) && Module.Host)
-			{
-				Source = Module.Host->CollectionProperties.GetPropertyByName(Writer.PropertyName);
-			}
-
-			if (!Source || !Source->IsValid()) { continue; }
-
-			const FPCGExProperty* SourceProp = Source->GetPtr<FPCGExProperty>();
-			FPCGExProperty* WriterProp = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>();
-			if (!SourceProp || !WriterProp) { continue; }
-
-			// Only copy when source and writer have matching concrete types
-			if (Source->GetScriptStruct() != Writer.WriterInstance.GetScriptStruct()) { continue; }
-
-			WriterProp->CopyValueFrom(SourceProp);
-			WriterProp->WriteMetadataValue(Writer.Attribute, Key);
-		}
+		PropertyWriter.WriteEntry(Key, Module.Entry, Module.Host);
 	}
 
 	FPCGTaggedData& ModulesData = InContext->OutputData.TaggedData.Emplace_GetRef();

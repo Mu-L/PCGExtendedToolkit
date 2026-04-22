@@ -46,6 +46,7 @@ TArray<FPCGPinProperties> UPCGExFindAllCellsBoundedSettings::OutputPinProperties
 			if (OutputOutside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Normal) }
 			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Advanced) }
 		}
+		
 		if (Artifacts.bOutputCellBounds)
 		{
 			if (OutputInside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsInsideLabel, "Cell OBB bounds fully inside", Normal) }
@@ -337,6 +338,17 @@ namespace PCGExFindAllCellsBounded
 		CellProcessor->TaskManager = TaskManager;
 		CellProcessor->Artifacts = &Context->Artifacts;
 		CellProcessor->EdgeDataFacade = EdgeDataFacade;
+
+		// Merge adjacent valid cells into connected components when enabled
+		if (Context->HoleGrowth.bMergeAdjacentCells && !AllCells.IsEmpty())
+		{
+			const TSharedPtr<TArray<FVector2D>> ProjectedPositions = CellsConstraints->Enumerator ? CellsConstraints->Enumerator->GetProjectedPositions() : nullptr;
+
+			TArray<TSharedPtr<PCGExClusters::FCell>> Merged = PCGExClusters::MergeAdjacentCells(
+				AllCells, CellsConstraints.ToSharedRef(), Cluster.Get(), ProjectedPositions);
+
+			if (!Merged.IsEmpty()) { AllCells = MoveTemp(Merged); }
+		}
 
 		// Classify cells by bounds relationship, respecting enable flags
 		for (const TSharedPtr<PCGExClusters::FCell>& Cell : AllCells)
