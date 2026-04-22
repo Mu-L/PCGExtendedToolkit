@@ -3,6 +3,8 @@
 
 #include "Probes/PCGExProbeRNG.h"
 
+#include "PCGExH.h"
+#include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExProbingCandidates.h"
 
 PCGEX_CREATE_PROBE_FACTORY(RNG, {}, {})
