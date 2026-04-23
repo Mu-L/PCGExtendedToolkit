@@ -322,12 +322,6 @@ namespace PCGExStagingSpawnActors
 			{
 				SpawnParams.ObjectFlags |= RF_Transient | RF_NonPIEDuplicateTransient;
 			}
-			// Defer construction when a delta is present so properties can be applied
-			// before construction scripts run. This is the key reason we use direct
-			// SpawnActor instead of UPCGActorHelpers::SpawnDefaultActor: the helper does
-			// post-spawn setup that can interfere with the deferred + pre-construction
-			// delta apply sequence.
-			if (bHasDelta) { SpawnParams.bDeferConstruction = true; }
 			SpawnedActor = World->SpawnActor<AActor>(ActorClass, SpawnTransform, SpawnParams);
 		}
 
@@ -342,11 +336,20 @@ namespace PCGExStagingSpawnActors
 			return;
 		}
 
-		// Apply property delta BEFORE finishing construction
+		// Apply delta AFTER SpawnActor has fully constructed the actor. Pre-construction apply
+		// doesn't work: SCS components (anything added in the BP Components panel) don't exist
+		// until ExecuteConstruction runs inside SpawnActor, and even if they did, SCS execution
+		// re-duplicates templates over any prior edits. The only time all components are present
+		// and stable is after SpawnActor returns.
+		//
+		// Known trade-off: the User Construction Script ran with template values, so logic that
+		// consumes component state (e.g. "for each spline point, spawn a mesh") used defaults
+		// rather than the delta-edited values. Preserving UCS visibility would require the
+		// RerunConstructionScripts machinery -- out of scope here. The delta-edited state is
+		// correct in the final actor; only the UCS pass is uninformed by it.
 		if (bHasDelta)
 		{
 			PCGExActorDelta::ApplyPropertyDelta(SpawnedActor, ActorEntry->SerializedPropertyDelta);
-			SpawnedActor->FinishSpawning(SpawnTransform);
 
 			// Delta application writes the source actor's root component transform
 			// (RelativeLocation/Rotation/Scale3D are user-editable UPROPERTYs so they're

@@ -12,30 +12,30 @@ namespace PCGExComponentFixups
 	namespace
 	{
 		/**
-		 * USplineComponent invariants that the tagged-property delta can break.
+		 * USplineComponent invariants that the per-property delta cannot express on its own.
 		 *
-		 * UE 5.7+ added a second EditAnywhere spline property (`FSpline Spline`) that
-		 * aliases the legacy `FSplineCurves SplineCurves`. Authoring code keeps the two
-		 * in sync, but the delta system treats them independently: if only one side was
-		 * actually modified on the source, only that side is captured, and the other
-		 * reads back as archetype defaults on the spawned actor. The runtime then
-		 * follows whichever side `ShouldUseSplineCurves()` selects -- and if that's the
-		 * unchanged side, the spline looks "reset" to BP defaults.
+		 * UE 5.7+ has two EditAnywhere spline properties that alias each other:
+		 *   - `FSplineCurves SplineCurves` (legacy)
+		 *   - `FSpline Spline` (new, experimental)
+		 * `UE::SplineComponent::ShouldUseSplineCurves()` selects which one the runtime reads
+		 * from for point queries. Authoring code keeps the two in sync, but the delta system
+		 * serializes them independently: if the source only modified one side, only that side
+		 * reaches the target, and the unchanged side reads back as archetype defaults. If the
+		 * runtime then resolves against the unchanged side, the rendered spline looks reset
+		 * to BP defaults.
 		 *
-		 * In UE 5.6 the new `Spline` field is Transient + private and never appears in
-		 * the delta; only SplineCurves is ever captured, so no sync is needed -- just
-		 * the reparam-table rebuild below.
+		 * Strategy (5.7+): after the per-property delta is applied, diff each spline property
+		 * against its archetype. If only one side diverged, call SetSpline() to rebuild the
+		 * other from it (both overloads update both sides). If both agree or neither changed,
+		 * leave them alone. If both changed but disagree, we can't pick a winner without
+		 * losing data; leave as-is.
 		 *
-		 * Strategy (5.7+):
-		 *   - Compare each property against the archetype. Whichever side diverged is
-		 *     authoritative; the other gets rebuilt from it via SetSpline() (both
-		 *     overloads write both sides, so one call restores consistency).
-		 *   - Both diverged and match -> already consistent, nothing to do.
-		 *   - Both diverged and disagree -> caller-authored inconsistency we can't
-		 *     resolve without losing data; leave as-is.
+		 * In UE 5.6 the new `Spline` field is Transient + private and never appears in the
+		 * delta; only SplineCurves is ever written, so no sync branch is needed -- only the
+		 * reparam-table rebuild at the end.
 		 *
-		 * The reparam table is always rebuilt -- it's CPF_Transient, so the delta
-		 * never includes it, and rendering/sampling depend on it being current.
+		 * Always call UpdateSpline() to rebuild the transient reparam table -- it's
+		 * CPF_Transient so the delta never includes it, and rendering/sampling depend on it.
 		 */
 		static void FixupSplineComponent(UActorComponent* Component, UObject* Archetype)
 		{
@@ -45,17 +45,30 @@ namespace PCGExComponentFixups
 #if PCGEX_ENGINE_VERSION > 506
 			if (const USplineComponent* ArchSpline = Cast<USplineComponent>(Archetype))
 			{
-				const bool bSplineDiverged = Spline->GetSpline() != ArchSpline->GetSpline();
+				// FSpline::operator== returns false for two "disabled" FSplines (no LegacyData
+				// and no NewData) even when they are functionally equivalent -- the inner
+				// if-branches both skip and the function falls through to `return false`.
+				// Without this guard, two empty/disabled splines would be reported as
+				// diverged and the fixup would try to rebuild SplineCurves from the empty
+				// Spline via SetSpline(GetSpline()), wiping the archetype's SplineCurves data.
+				const int32 CurSplinePts = Spline->GetSpline().GetNumControlPoints();
+				const int32 ArchSplinePts = ArchSpline->GetSpline().GetNumControlPoints();
+				const bool bBothSplinesEmpty = (CurSplinePts == 0 && ArchSplinePts == 0);
+
+				const bool bSplineDiverged = !bBothSplinesEmpty
+					&& Spline->GetSpline() != ArchSpline->GetSpline();
 				const bool bCurvesDiverged = Spline->GetSplineCurves() != ArchSpline->GetSplineCurves();
 
 				if (bCurvesDiverged && !bSplineDiverged)
 				{
-					// Legacy path: SplineCurves edited, Spline at default. Rebuild Spline.
+					// SplineCurves edited, Spline at default. SynchronizeSplines() calls
+					// SetSpline(FSplineCurves) which updates both sides from the curves.
 					Spline->SynchronizeSplines();
 				}
 				else if (bSplineDiverged && !bCurvesDiverged)
 				{
-					// New path: Spline edited, SplineCurves at default. Rebuild SplineCurves.
+					// Spline edited, SplineCurves at default. SetSpline(FSpline) updates both
+					// sides from the new spline.
 					Spline->SetSpline(Spline->GetSpline());
 				}
 			}

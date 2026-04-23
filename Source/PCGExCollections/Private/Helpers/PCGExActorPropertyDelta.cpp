@@ -9,6 +9,7 @@
 #include "Serialization/MemoryReader.h"
 #include "GameFramework/Actor.h"
 #include "Components/ActorComponent.h"
+#include "ComponentReregisterContext.h"
 #include "PCGExLog.h"
 
 namespace PCGExActorDelta
@@ -28,7 +29,14 @@ namespace PCGExActorDelta
 	//       inside the delta bytes (via FDeltaWriter::operator<<(FName&) override). Fully
 	//       session-portable.
 	static constexpr uint32 DeltaWireMagic = 0x50434745u; // 'PCGE'
-	static constexpr uint32 DeltaWireVersion = 2u;
+	//   v3: replaced the per-object inner format. v1/v2 routed through UE's
+	//       SerializeTaggedProperties via FStructuredArchiveFromArchive; writes produced
+	//       large streams but reads on USplineComponent never actually applied the values
+	//       to the target (bSplineHasBeenEdited never flipped). The replacement walks the
+	//       object's top-level Edit properties ourselves, writes each value via
+	//       FProperty::SerializeItem into a length-prefixed segment, and reads the same way.
+	//       No TPS, no archetype-vs-CDO default asymmetry, no tagged-iteration quirks.
+	static constexpr uint32 DeltaWireVersion = 3u;
 
 	namespace Internal
 	{
@@ -68,6 +76,22 @@ namespace PCGExActorDelta
 				|| PropName == NAME_RelativeScale3D;
 		}
 
+		/** Edit/transform filtering should only apply at the TOP LEVEL (properties declared
+		 *  on UObject-derived classes). It must NOT apply to inner struct properties --
+		 *  ShouldSkipProperty is invoked recursively by tagged-property serialization when
+		 *  entering structs, and most struct inner fields are plain UPROPERTY() without
+		 *  CPF_Edit (e.g. FSplineCurves::Position/Rotation/Scale). Filtering them out strips
+		 *  struct contents during both serialize and deserialize, so the struct tag reaches
+		 *  the stream but its data is empty and the target keeps its archetype values.
+		 *
+		 *  Property owner distinguishes the two cases: class properties have a UClass owner,
+		 *  struct inner properties have a UScriptStruct owner. Only apply the class-level
+		 *  filter when the property is owned by a class. */
+		static bool ShouldApplyClassLevelFilter(const FProperty* InProperty)
+		{
+			return InProperty && InProperty->GetOwner<UClass>() != nullptr;
+		}
+
 		class FDeltaWriter : public FObjectWriter
 		{
 		public:
@@ -75,8 +99,11 @@ namespace PCGExActorDelta
 
 			virtual bool ShouldSkipProperty(const FProperty* InProperty) const override
 			{
-				if (!IsInstanceEditableProperty(InProperty)) { return true; }
-				if (IsTransformProperty(InProperty)) { return true; }
+				if (ShouldApplyClassLevelFilter(InProperty))
+				{
+					if (!IsInstanceEditableProperty(InProperty)) { return true; }
+					if (IsTransformProperty(InProperty)) { return true; }
+				}
 				return FObjectWriter::ShouldSkipProperty(InProperty);
 			}
 
@@ -95,8 +122,11 @@ namespace PCGExActorDelta
 
 			virtual bool ShouldSkipProperty(const FProperty* InProperty) const override
 			{
-				if (!IsInstanceEditableProperty(InProperty)) { return true; }
-				if (IsTransformProperty(InProperty)) { return true; }
+				if (ShouldApplyClassLevelFilter(InProperty))
+				{
+					if (!IsInstanceEditableProperty(InProperty)) { return true; }
+					if (IsTransformProperty(InProperty)) { return true; }
+				}
 				return FObjectReader::ShouldSkipProperty(InProperty);
 			}
 
@@ -120,9 +150,19 @@ namespace PCGExActorDelta
 			return false;
 		}
 
-		/** Serialize only the properties that differ from Defaults into OutBytes.
-		 *  Skips entirely if nothing differs -- avoids the ~13-byte terminator overhead
-		 *  that SerializeTaggedProperties writes even when no properties are emitted. */
+		/** Per-property serialization format (inner stream, wrapped by SerializeActorDelta's
+		 *  outer container):
+		 *
+		 *    [uint32 Count]
+		 *    repeated Count times:
+		 *      [FString PropName]      // FName serialized as string for session portability
+		 *      [uint32 ValueSize]
+		 *      [ValueSize bytes]       // result of FProperty::SerializeItem on the property
+		 *
+		 *  Each value segment is length-prefixed so a missing/renamed property on apply can
+		 *  be skipped without corrupting subsequent reads. FProperty::SerializeItem handles
+		 *  all struct/object/name internals itself (including custom-serialized structs like
+		 *  FSpline), so there is no recursive tag iteration for us to filter incorrectly. */
 		static void SerializeObjectDelta(
 			UObject* Object,
 			UObject* Defaults,
@@ -131,31 +171,106 @@ namespace PCGExActorDelta
 			if (!HasInstanceEditableDelta(Object, Defaults)) { return; }
 
 			UClass* Class = Object->GetClass();
+
+			TArray<FProperty*> PropsToWrite;
+			for (FProperty* Property = Class->PropertyLink; Property; Property = Property->PropertyLinkNext)
+			{
+				if (!IsInstanceEditableProperty(Property)) { continue; }
+				if (IsTransformProperty(Property)) { continue; }
+				if (Property->Identical_InContainer(Object, Defaults)) { continue; }
+				PropsToWrite.Add(Property);
+			}
+
+			if (PropsToWrite.IsEmpty()) { return; }
+
 			FDeltaWriter Writer(OutBytes);
-			FStructuredArchiveFromArchive Adapter(Writer);
-			Class->SerializeTaggedProperties(
-				Adapter.GetSlot(),
-				reinterpret_cast<uint8*>(Object),
-				Class,
-				reinterpret_cast<uint8*>(Defaults),
-				Object);
+
+			uint32 Count = PropsToWrite.Num();
+			Writer << Count;
+
+			for (FProperty* Property : PropsToWrite)
+			{
+				FString PropName = Property->GetName();
+				Writer << PropName;
+
+				// Write the value into its own buffer first so we can length-prefix it.
+				TArray<uint8> ValueBytes;
+				{
+					FDeltaWriter ValueWriter(ValueBytes);
+					// Inherit the outer writer's archive state so custom-versioned structs
+					// (FSpline uses FFortniteMainBranchObjectVersion etc.) see consistent
+					// versioning between write and subsequent read.
+					ValueWriter.SetCustomVersions(Writer.GetCustomVersions());
+					Property->SerializeItem(
+						FStructuredArchiveFromArchive(ValueWriter).GetSlot(),
+						Property->ContainerPtrToValuePtr<void>(Object),
+						Property->ContainerPtrToValuePtr<void>(Defaults));
+				}
+
+				uint32 ValueSize = ValueBytes.Num();
+				Writer << ValueSize;
+				if (ValueSize > 0)
+				{
+					Writer.Serialize(ValueBytes.GetData(), ValueSize);
+				}
+			}
 		}
 
-		/** Deserialize delta bytes onto Object; properties not present in the delta are untouched.
-		 *  Uses CDO as the diff baseline so tagged properties resolve correctly. */
+		/** Read per-property segments written by SerializeObjectDelta. Properties not present
+		 *  on the target class (renamed/removed) are skipped by seeking past their bytes. */
 		static void DeserializeObjectDelta(
 			UObject* Object,
 			const TArray<uint8>& InBytes)
 		{
 			UClass* Class = Object->GetClass();
 			FDeltaReader Reader(InBytes);
-			FStructuredArchiveFromArchive Adapter(Reader);
-			Class->SerializeTaggedProperties(
-				Adapter.GetSlot(),
-				reinterpret_cast<uint8*>(Object),
-				Class,
-				reinterpret_cast<uint8*>(Class->GetDefaultObject()),
-				Object);
+			const int64 TotalSize = InBytes.Num();
+
+			uint32 Count = 0;
+			Reader << Count;
+
+			for (uint32 i = 0; i < Count; ++i)
+			{
+				if (Reader.IsError() || Reader.Tell() >= TotalSize) { break; }
+
+				FString PropName;
+				Reader << PropName;
+
+				uint32 ValueSize = 0;
+				Reader << ValueSize;
+
+				if (Reader.Tell() + static_cast<int64>(ValueSize) > TotalSize)
+				{
+					Reader.SetError();
+					break;
+				}
+
+				const int64 ValueStart = Reader.Tell();
+
+				FProperty* Property = Class->FindPropertyByName(FName(*PropName));
+				if (!Property || !IsInstanceEditableProperty(Property) || IsTransformProperty(Property))
+				{
+					// Property doesn't exist on target, isn't editable, or is an excluded
+					// transform property. Skip past its payload to stay aligned.
+					Reader.Seek(ValueStart + ValueSize);
+					continue;
+				}
+
+				// Extract this property's value segment into its own buffer so the inner
+				// FProperty::SerializeItem sees a clean stream starting at byte 0. Avoids
+				// leaving the outer reader mid-segment if the property's own read under/over
+				// reads.
+				TArray<uint8> ValueBytes;
+				ValueBytes.SetNumUninitialized(ValueSize);
+				Reader.Serialize(ValueBytes.GetData(), ValueSize);
+
+				FDeltaReader ValueReader(ValueBytes);
+				ValueReader.SetCustomVersions(Reader.GetCustomVersions());
+				Property->SerializeItem(
+					FStructuredArchiveFromArchive(ValueReader).GetSlot(),
+					Property->ContainerPtrToValuePtr<void>(Object),
+					Property->ContainerPtrToValuePtr<void>(Class->GetDefaultObject()));
+			}
 		}
 	}
 
@@ -316,11 +431,10 @@ namespace PCGExActorDelta
 		FMemoryReader Reader(DeltaBytes);
 		const int64 TotalSize = DeltaBytes.Num();
 
-		// Validate magic+version. Older collections saved delta bytes in an incompatible
-		// format (FStructuredArchiveFromArchive framing) -- reading those with the current
-		// binary path would misalign properties and corrupt FName values, which crashes
-		// the editor on later save. Silently skip unknown-format deltas; the user must
-		// rebuild the collection to regenerate deltas in the current format.
+		// Validate magic+version. Old-format deltas would misalign under the current reader
+		// and corrupt the target (FName reads returning bogus indices, crashing the editor
+		// on later save). Silently skip unknown-format deltas; the user must rebuild the
+		// collection to regenerate deltas in the current format.
 		if (TotalSize < static_cast<int64>(sizeof(uint32) * 2)) { return; }
 
 		uint32 Magic = 0;
@@ -383,15 +497,22 @@ namespace PCGExActorDelta
 			CompBytes.SetNumUninitialized(CompSize);
 			Reader.Serialize(CompBytes.GetData(), CompSize);
 
-			// Skip if target actor doesn't have a component with this name
+			// Skip if target actor doesn't have a component with this name.
+			// Writing directly to a registered component leaves the render proxy pointing at
+			// stale data (observed: splines rendering with no points after apply). Wrap each
+			// write in FComponentReregisterContext so the component is unregistered before
+			// its properties are touched and re-registered on scope exit -- this rebuilds
+			// the render proxy from the updated state.
 			if (UActorComponent* Component = FindObjectFast<UActorComponent>(Actor, CompName))
 			{
+				FComponentReregisterContext ReregContext(Component);
 				Internal::DeserializeObjectDelta(Component, CompBytes);
 			}
 		}
 
-		// Repair engine-managed invariants that the tagged-property delta cannot express.
-		// Runs on every component so archetype-cloning inconsistencies are fixed too.
+		// Repair engine-managed invariants that the per-property delta cannot express
+		// (e.g. USplineComponent's Spline/SplineCurves aliasing in UE 5.7+). Runs on every
+		// component so archetype-cloning inconsistencies are fixed too.
 		FixupRegistry::RunAll(Actor);
 	}
 
