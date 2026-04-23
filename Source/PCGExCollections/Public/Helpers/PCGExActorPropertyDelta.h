@@ -108,7 +108,7 @@ namespace PCGExActorDelta
 	 * Returns a handle; hold it for the duration the fixup should remain active.
 	 * Dropping the handle unregisters the fixup.
 	 */
-	PCGEXCOLLECTIONS_API FPostApplyFixupHandle RegisterPostApplyFixup(
+	[[nodiscard]] PCGEXCOLLECTIONS_API FPostApplyFixupHandle RegisterPostApplyFixup(
 		UClass* ComponentClass, FPostApplyFixup Fixup);
 
 	/**
@@ -118,6 +118,6 @@ namespace PCGExActorDelta
 	 * hard-link against the target module -- the fixup simply never fires in projects
 	 * where the target class never loads.
 	 */
-	PCGEXCOLLECTIONS_API FPostApplyFixupHandle RegisterPostApplyFixup(
+	[[nodiscard]] PCGEXCOLLECTIONS_API FPostApplyFixupHandle RegisterPostApplyFixup(
 		const FSoftClassPath& ClassPath, FPostApplyFixup Fixup);
 }
