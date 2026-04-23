@@ -35,11 +35,24 @@ namespace PCGExActorDelta
 	//       to the target (bSplineHasBeenEdited never flipped). The replacement walks the
 	//       object's top-level Edit properties ourselves, writes each value via
 	//       FProperty::SerializeItem into a length-prefixed segment, and reads the same way.
-	//       No TPS, no archetype-vs-CDO default asymmetry, no tagged-iteration quirks.
-	static constexpr uint32 DeltaWireVersion = 3u;
+	//   v4: added a per-segment kind byte and subobject recursion. v3 wrote Instanced UObject
+	//       references (UPROPERTY(Instanced) TObjectPtr<UFoo>) as raw in-memory pointers via
+	//       FObjectWriter's base << UObject*&, which doesn't persist meaningfully across
+	//       invocations -- the subobject's contents were never captured. v4 detects
+	//       CPF_InstancedReference properties on write and emits a recursive object-delta
+	//       segment (kind=Subobject) instead of a raw pointer dump. On read, we walk into
+	//       the target's existing subobject and apply the nested delta. Cycle safety via
+	//       a visited set of source objects (UE subobject graphs are almost always trees,
+	//       but the guard short-circuits anything pathological).
+	static constexpr uint32 DeltaWireVersion = 4u;
 
 	namespace Internal
 	{
+		/** Segment kind byte distinguishing a property value from a recursive subobject delta.
+		 *  Forward-compatible: unknown kinds on read are skipped via the length prefix. */
+		static constexpr uint8 kSegValue = 1;
+		static constexpr uint8 kSegSubobject = 2;
+
 		/**
 		 * Only serialize properties that are user-editable on instances (EditAnywhere / EditInstanceOnly).
 		 * This excludes engine bookkeeping (ActorGuid, tick state, net role, etc.) that always differs
@@ -150,56 +163,116 @@ namespace PCGExActorDelta
 			return false;
 		}
 
-		/** Per-property serialization format (inner stream, wrapped by SerializeActorDelta's
+		/** Per-object serialization format (inner stream, wrapped by SerializeActorDelta's
 		 *  outer container):
 		 *
 		 *    [uint32 Count]
 		 *    repeated Count times:
-		 *      [FString PropName]      // FName serialized as string for session portability
-		 *      [uint32 ValueSize]
-		 *      [ValueSize bytes]       // result of FProperty::SerializeItem on the property
+		 *      [FString PropName]    // FName as string (session-portable)
+		 *      [uint8  SegmentKind]  // kSegValue | kSegSubobject (unknown = skipped forward-compat)
+		 *      [uint32 SegmentSize]
+		 *      [SegmentSize bytes]
 		 *
-		 *  Each value segment is length-prefixed so a missing/renamed property on apply can
-		 *  be skipped without corrupting subsequent reads. FProperty::SerializeItem handles
-		 *  all struct/object/name internals itself (including custom-serialized structs like
-		 *  FSpline), so there is no recursive tag iteration for us to filter incorrectly. */
+		 *  kSegValue bytes: FProperty::SerializeItem output for a normal property value.
+		 *  kSegSubobject bytes: a recursive object delta (same format, applied to the target's
+		 *    existing instanced subobject).
+		 *
+		 *  Length-prefixed segments let a missing/renamed/unknown-kind property on apply seek
+		 *  past its payload without corrupting subsequent reads. */
+		static void SerializeObjectDeltaImpl(
+			UObject* Object,
+			UObject* Defaults,
+			TArray<uint8>& OutBytes,
+			TSet<const UObject*>& VisitedSources);
+
+		/** Detect UPROPERTY(Instanced) object refs -- these are per-instance-owned subobjects
+		 *  whose contents must be captured via recursion, not by writing the raw pointer. */
+		static bool IsInstancedSubobjectProperty(const FProperty* Property)
+		{
+			const FObjectPropertyBase* ObjProp = CastField<FObjectPropertyBase>(Property);
+			return ObjProp && ObjProp->HasAnyPropertyFlags(CPF_InstancedReference);
+		}
+
 		static void SerializeObjectDelta(
 			UObject* Object,
 			UObject* Defaults,
 			TArray<uint8>& OutBytes)
 		{
+			TSet<const UObject*> Visited;
+			SerializeObjectDeltaImpl(Object, Defaults, OutBytes, Visited);
+		}
+
+		static void SerializeObjectDeltaImpl(
+			UObject* Object,
+			UObject* Defaults,
+			TArray<uint8>& OutBytes,
+			TSet<const UObject*>& VisitedSources)
+		{
+			if (!Object || !Defaults) { return; }
+
+			// Cycle guard. UE subobject graphs are trees in practice, but a pathological
+			// UPROPERTY(Instanced) referring back up the chain would loop forever otherwise.
+			// A source object visited once in this capture tree emits nothing on re-entry.
+			bool bAlreadyVisited = false;
+			VisitedSources.Add(Object, &bAlreadyVisited);
+			if (bAlreadyVisited) { return; }
+
 			if (!HasInstanceEditableDelta(Object, Defaults)) { return; }
 
 			UClass* Class = Object->GetClass();
 
-			TArray<FProperty*> PropsToWrite;
+			struct FPendingSegment
+			{
+				FString PropName;
+				uint8 Kind = kSegValue;
+				TArray<uint8> Bytes;
+			};
+			TArray<FPendingSegment> Segments;
+
+			// Use one writer only to inherit/propagate custom versions to inner writers.
+			FDeltaWriter Writer(OutBytes);
+
 			for (FProperty* Property = Class->PropertyLink; Property; Property = Property->PropertyLinkNext)
 			{
 				if (!IsInstanceEditableProperty(Property)) { continue; }
 				if (IsTransformProperty(Property)) { continue; }
-				if (Property->Identical_InContainer(Object, Defaults)) { continue; }
-				PropsToWrite.Add(Property);
-			}
 
-			if (PropsToWrite.IsEmpty()) { return; }
+				const bool bInstanced = IsInstancedSubobjectProperty(Property);
 
-			FDeltaWriter Writer(OutBytes);
+				// Non-instanced: skip identical properties (standard delta). Instanced: always
+				// recurse and let the inner call decide -- object-ref Identical compares
+				// pointers, which always differ between per-instance subobjects even when
+				// their contents match.
+				if (!bInstanced && Property->Identical_InContainer(Object, Defaults)) { continue; }
 
-			uint32 Count = PropsToWrite.Num();
-			Writer << Count;
+				FPendingSegment Segment;
+				Segment.PropName = Property->GetName();
 
-			for (FProperty* Property : PropsToWrite)
-			{
-				FString PropName = Property->GetName();
-				Writer << PropName;
-
-				// Write the value into its own buffer first so we can length-prefix it.
-				TArray<uint8> ValueBytes;
+				if (bInstanced)
 				{
-					FDeltaWriter ValueWriter(ValueBytes);
-					// Inherit the outer writer's archive state so custom-versioned structs
-					// (FSpline uses FFortniteMainBranchObjectVersion etc.) see consistent
-					// versioning between write and subsequent read.
+					// Instanced subobject: recurse on the owned object rather than dumping
+					// the raw pointer (pointers don't persist across apply invocations).
+					Segment.Kind = kSegSubobject;
+					const FObjectPropertyBase* ObjProp = CastFieldChecked<FObjectPropertyBase>(Property);
+					UObject* SrcSub = ObjProp->GetObjectPropertyValue_InContainer(Object);
+					UObject* ArchSub = ObjProp->GetObjectPropertyValue_InContainer(Defaults);
+
+					if (SrcSub && ArchSub && SrcSub->GetClass() == ArchSub->GetClass())
+					{
+						SerializeObjectDeltaImpl(SrcSub, ArchSub, Segment.Bytes, VisitedSources);
+					}
+
+					// Nothing to restore? Don't emit an empty segment -- keeps payloads tight
+					// when the instanced subobject is identical to archetype in all its
+					// editable fields.
+					if (Segment.Bytes.IsEmpty()) { continue; }
+				}
+				else
+				{
+					Segment.Kind = kSegValue;
+					FDeltaWriter ValueWriter(Segment.Bytes);
+					// Propagate archive state so custom-versioned structs (FSpline uses
+					// FFortniteMainBranchObjectVersion etc.) round-trip with consistent versions.
 					ValueWriter.SetCustomVersions(Writer.GetCustomVersions());
 					Property->SerializeItem(
 						FStructuredArchiveFromArchive(ValueWriter).GetSlot(),
@@ -207,21 +280,42 @@ namespace PCGExActorDelta
 						Property->ContainerPtrToValuePtr<void>(Defaults));
 				}
 
-				uint32 ValueSize = ValueBytes.Num();
-				Writer << ValueSize;
-				if (ValueSize > 0)
+				Segments.Add(MoveTemp(Segment));
+			}
+
+			if (Segments.IsEmpty())
+			{
+				// No effective differences. Reset so the caller sees an empty stream.
+				OutBytes.Reset();
+				return;
+			}
+
+			// Emit the segments now that we know the final count.
+			uint32 Count = Segments.Num();
+			Writer << Count;
+
+			for (FPendingSegment& Segment : Segments)
+			{
+				Writer << Segment.PropName;
+				Writer << Segment.Kind;
+				uint32 SegmentSize = Segment.Bytes.Num();
+				Writer << SegmentSize;
+				if (SegmentSize > 0)
 				{
-					Writer.Serialize(ValueBytes.GetData(), ValueSize);
+					Writer.Serialize(Segment.Bytes.GetData(), SegmentSize);
 				}
 			}
 		}
 
-		/** Read per-property segments written by SerializeObjectDelta. Properties not present
-		 *  on the target class (renamed/removed) are skipped by seeking past their bytes. */
+		/** Read per-property segments written by SerializeObjectDelta. Unknown properties,
+		 *  type mismatches, and unrecognised segment kinds all seek past their payload so
+		 *  subsequent reads stay aligned. */
 		static void DeserializeObjectDelta(
 			UObject* Object,
 			const TArray<uint8>& InBytes)
 		{
+			if (!Object || InBytes.IsEmpty()) { return; }
+
 			UClass* Class = Object->GetClass();
 			FDeltaReader Reader(InBytes);
 			const int64 TotalSize = InBytes.Num();
@@ -236,40 +330,61 @@ namespace PCGExActorDelta
 				FString PropName;
 				Reader << PropName;
 
-				uint32 ValueSize = 0;
-				Reader << ValueSize;
+				uint8 SegmentKind = 0;
+				Reader << SegmentKind;
 
-				if (Reader.Tell() + static_cast<int64>(ValueSize) > TotalSize)
+				uint32 SegmentSize = 0;
+				Reader << SegmentSize;
+
+				if (Reader.Tell() + static_cast<int64>(SegmentSize) > TotalSize)
 				{
 					Reader.SetError();
 					break;
 				}
 
-				const int64 ValueStart = Reader.Tell();
+				const int64 SegmentStart = Reader.Tell();
 
 				FProperty* Property = Class->FindPropertyByName(FName(*PropName));
-				if (!Property || !IsInstanceEditableProperty(Property) || IsTransformProperty(Property))
+				const bool bValidProperty = Property && IsInstanceEditableProperty(Property) && !IsTransformProperty(Property);
+
+				if (!bValidProperty)
 				{
-					// Property doesn't exist on target, isn't editable, or is an excluded
-					// transform property. Skip past its payload to stay aligned.
-					Reader.Seek(ValueStart + ValueSize);
+					// Property doesn't exist on target or isn't serializable; skip its payload.
+					Reader.Seek(SegmentStart + SegmentSize);
 					continue;
 				}
 
-				// Extract this property's value segment into its own buffer so the inner
-				// FProperty::SerializeItem sees a clean stream starting at byte 0. Avoids
-				// leaving the outer reader mid-segment if the property's own read under/over
-				// reads.
-				TArray<uint8> ValueBytes;
-				ValueBytes.SetNumUninitialized(ValueSize);
-				Reader.Serialize(ValueBytes.GetData(), ValueSize);
+				// Extract segment into a fresh buffer. Any under/over-read inside the property
+				// handler is contained within this buffer and can't desync the outer stream.
+				TArray<uint8> SegmentBytes;
+				SegmentBytes.SetNumUninitialized(SegmentSize);
+				Reader.Serialize(SegmentBytes.GetData(), SegmentSize);
 
-				FDeltaReader ValueReader(ValueBytes);
-				ValueReader.SetCustomVersions(Reader.GetCustomVersions());
-				Property->SerializeItem(
-					FStructuredArchiveFromArchive(ValueReader).GetSlot(),
-					Property->ContainerPtrToValuePtr<void>(Object),
-					Property->ContainerPtrToValuePtr<void>(Class->GetDefaultObject()));
+				if (SegmentKind == kSegSubobject)
+				{
+					if (SegmentSize == 0) { continue; } // writer emitted empty (null/class mismatch)
+
+					if (const FObjectPropertyBase* ObjProp = CastField<FObjectPropertyBase>(Property))
+					{
+						if (UObject* TargetSub = ObjProp->GetObjectPropertyValue_InContainer(Object))
+						{
+							DeserializeObjectDelta(TargetSub, SegmentBytes);
+						}
+						// Target has no subobject to apply to: silently skip.
+					}
+					// Property isn't an object reference on the target class (schema changed):
+					// skip. SegmentBytes already consumed above.
+				}
+				else if (SegmentKind == kSegValue)
+				{
+					FDeltaReader ValueReader(SegmentBytes);
+					ValueReader.SetCustomVersions(Reader.GetCustomVersions());
+					Property->SerializeItem(
+						FStructuredArchiveFromArchive(ValueReader).GetSlot(),
+						Property->ContainerPtrToValuePtr<void>(Object),
+						Property->ContainerPtrToValuePtr<void>(Class->GetDefaultObject()));
+				}
+				// Unknown kind: payload was consumed above; forward-compat no-op.
 			}
 		}
 	}
