@@ -18,6 +18,8 @@
 FPCGExPCGDataAssetCollectionEditor::FPCGExPCGDataAssetCollectionEditor()
 	: FPCGExAssetCollectionEditor()
 {
+	SourceOptions.Add(MakeShared<FString>(TEXT("Data Asset")));
+	SourceOptions.Add(MakeShared<FString>(TEXT("Level")));
 }
 
 TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
@@ -97,11 +99,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 	];
 
 	// Source enum combobox (visible when not subcollection)
-	// Build a simple two-option combobox for EPCGExDataAssetEntrySource
-	TSharedPtr<TArray<TSharedPtr<FString>>> SourceOptions = MakeShared<TArray<TSharedPtr<FString>>>();
-	SourceOptions->Add(MakeShared<FString>(TEXT("Data Asset")));
-	SourceOptions->Add(MakeShared<FString>(TEXT("Level")));
-
+	// SourceOptions lives on this editor instance — SComboBox stores a raw pointer into it.
 	Box->AddSlot()
 	   .AutoHeight()
 	   .Padding(0, 0, 0, 2)
@@ -116,11 +114,11 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 		})
 		[
 			SNew(SComboBox<TSharedPtr<FString>>)
-			.OptionsSource(&(*SourceOptions))
+			.OptionsSource(&SourceOptions)
 			.OnGenerateWidget_Lambda([](TSharedPtr<FString> Item) -> TSharedRef<SWidget>
 			{
 				return SNew(STextBlock)
-					.Text(FText::FromString(*Item))
+					.Text(Item.IsValid() ? FText::FromString(*Item) : FText::GetEmpty())
 					.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8));
 			})
 			.OnSelectionChanged_Lambda([GetTypedEntry, WeakColl, OnAssetChanged](TSharedPtr<FString> Selected, ESelectInfo::Type SelectType)

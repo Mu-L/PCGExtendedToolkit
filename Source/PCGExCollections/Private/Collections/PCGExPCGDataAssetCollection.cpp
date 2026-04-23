@@ -236,6 +236,24 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_Sanitize()
 		EmbeddedActorCollection = nullptr;
 	}
 }
+
+void FPCGExPCGDataAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
+{
+	if (bIsSubCollection) { return; }
+
+	// Source refs trigger rebuild — not Staging.Path, which for Source==Level points at
+	// an embedded ExportedDataAsset inside the collection's own package.
+	if (Source == EPCGExDataAssetEntrySource::Level)
+	{
+		const FSoftObjectPath LevelPath = Level.ToSoftObjectPath();
+		if (LevelPath.IsValid()) { OutPaths.Emplace(LevelPath); }
+	}
+	else
+	{
+		const FSoftObjectPath AssetPath = DataAsset.ToSoftObjectPath();
+		if (AssetPath.IsValid()) { OutPaths.Emplace(AssetPath); }
+	}
+}
 #endif
 
 #if WITH_EDITOR

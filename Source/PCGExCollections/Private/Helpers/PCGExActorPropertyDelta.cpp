@@ -159,6 +159,65 @@ namespace PCGExActorDelta
 		}
 	}
 
+	namespace FixupRegistry
+	{
+		struct FEntry
+		{
+			TWeakObjectPtr<UClass> ComponentClass;
+			FPostApplyFixup Fixup;
+		};
+
+		// Registrations happen once at module startup, before any gameplay/PCG execution.
+		// ApplyPropertyDelta is the only reader and is called single-threaded per actor.
+		// No lock needed.
+		static TArray<FEntry>& Get()
+		{
+			static TArray<FEntry> Instance;
+			return Instance;
+		}
+
+		/** Run all registered fixups against each component on Actor. */
+		static void RunAll(AActor* Actor)
+		{
+			TArray<FEntry>& Registry = Get();
+			if (Registry.IsEmpty() || !Actor) { return; }
+
+			TInlineComponentArray<UActorComponent*> Components;
+			Actor->GetComponents(Components);
+
+			for (UActorComponent* Component : Components)
+			{
+				if (!Component) { continue; }
+
+				UClass* CompClass = Component->GetClass();
+				UObject* Archetype = Component->GetArchetype();
+
+				for (const FEntry& Entry : Registry)
+				{
+					UClass* TargetClass = Entry.ComponentClass.Get();
+					if (!TargetClass || !CompClass->IsChildOf(TargetClass)) { continue; }
+					Entry.Fixup(Component, Archetype);
+				}
+			}
+		}
+	}
+
+	void RegisterPostApplyFixup(UClass* ComponentClass, FPostApplyFixup Fixup)
+	{
+		if (!ComponentClass || !Fixup) { return; }
+		FixupRegistry::Get().Add({ComponentClass, MoveTemp(Fixup)});
+	}
+
+	void UnregisterPostApplyFixupsForClass(UClass* ComponentClass)
+	{
+		if (!ComponentClass) { return; }
+		TArray<FixupRegistry::FEntry>& Registry = FixupRegistry::Get();
+		Registry.RemoveAllSwap([ComponentClass](const FixupRegistry::FEntry& Entry)
+		{
+			return Entry.ComponentClass.Get() == ComponentClass;
+		});
+	}
+
 	TArray<uint8> SerializeActorDelta(AActor* Actor)
 	{
 		if (!Actor) { return {}; }
@@ -330,6 +389,10 @@ namespace PCGExActorDelta
 				Internal::DeserializeObjectDelta(Component, CompBytes);
 			}
 		}
+
+		// Repair engine-managed invariants that the tagged-property delta cannot express.
+		// Runs on every component so archetype-cloning inconsistencies are fixed too.
+		FixupRegistry::RunAll(Actor);
 	}
 
 	uint32 HashDelta(const TArray<uint8>& DeltaBytes)

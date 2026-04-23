@@ -102,7 +102,6 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 	if (Referencers.IsEmpty()) { return; }
 
 	const UClass* CollectionClass = UPCGExAssetCollection::StaticClass();
-	const FSoftObjectPath ChangedAssetPath(AssetData.PackageName.ToString() + TEXT(".") + AssetData.AssetName.ToString());
 
 	for (const FName& ReferencerPackage : Referencers)
 	{
@@ -120,18 +119,26 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 			UPCGExAssetCollection* Collection = Cast<UPCGExAssetCollection>(ReferencerAsset.GetSoftObjectPath().ResolveObject());
 			if (!Collection) { continue; }
 
-			// Per-entry rebuild: only entries whose Staging.Path matches the changed asset.
-			// This keeps the blast radius minimal and avoids rebuilding entries whose
-			// referenced assets might be in transient/partial-load states.
-			Collection->ForEachEntry([Collection, &ChangedAssetPath, &AssetData](const FPCGExAssetCollectionEntry* InEntry, int32 i)
+			// Per-entry rebuild: match against the entry's advertised source paths.
+			// EDITOR_GetSourceAssetPaths() returns the *external* refs that should trigger
+			// a rebuild when updated on disk — which for some entry types (e.g. PCGDataAsset
+			// entries in Level mode) is NOT Staging.Path. Matching by package name also
+			// handles BP class paths where the path ends in "_C".
+			Collection->ForEachEntry([Collection, &AssetData](const FPCGExAssetCollectionEntry* InEntry, int32 i)
 			{
 				if (InEntry->bIsSubCollection) { return; }
 
-				// Match on package name -- handles both regular assets and BP class paths
-				// (where Staging.Path ends in "_C" but the package name is the same).
-				if (InEntry->Staging.Path.GetLongPackageFName() != AssetData.PackageName) { return; }
+				TSet<FSoftObjectPath> SourcePaths;
+				InEntry->EDITOR_GetSourceAssetPaths(SourcePaths);
 
-				Collection->EDITOR_RebuildEntryStaging(i);
+				for (const FSoftObjectPath& SourcePath : SourcePaths)
+				{
+					if (SourcePath.GetLongPackageFName() == AssetData.PackageName)
+					{
+						Collection->EDITOR_RebuildEntryStaging(i);
+						return;
+					}
+				}
 			});
 		}
 	}
