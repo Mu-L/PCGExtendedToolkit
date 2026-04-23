@@ -20,30 +20,25 @@ namespace PCGExActorDelta
 	// silently skipped by ApplyPropertyDelta -- the user must rebuild the collection to
 	// regenerate deltas in the current format.
 	//
-	// Version history:
+	// Version history (shipped):
 	//   v1: initial version with magic header; inner delta via FObjectWriter + structured
 	//       adapter (BROKEN across sessions: FObjectWriter encoded FNames as session-local
 	//       global name table indices, causing bogus names after editor restart and a crash
 	//       at level save during name serialization).
 	//   v2: FNames serialized as strings in both the outer wire format (component names) and
 	//       inside the delta bytes (via FDeltaWriter::operator<<(FName&) override). Fully
-	//       session-portable.
+	//       session-portable, but tagged-property roundtrip through FStructuredArchiveFromArchive
+	//       silently dropped values on USplineComponent (bSplineHasBeenEdited never flipped
+	//       from 0 to 1 post-apply).
+	//   v4: per-property format with per-segment kind byte + Instanced-subobject recursion.
+	//       Walks top-level Edit properties, writes each value via FProperty::SerializeItem
+	//       into a length-prefixed segment (kind=Value), or for UPROPERTY(Instanced) fields
+	//       emits a recursive object-delta segment (kind=Subobject). Cycle-safe via a visited
+	//       set of source objects. No TPS, no archetype-vs-CDO default asymmetry.
+	//
+	//       (v3 was an intermediate per-property design without subobject recursion; never
+	//       shipped, so readers don't need to handle it.)
 	static constexpr uint32 DeltaWireMagic = 0x50434745u; // 'PCGE'
-	//   v3: replaced the per-object inner format. v1/v2 routed through UE's
-	//       SerializeTaggedProperties via FStructuredArchiveFromArchive; writes produced
-	//       large streams but reads on USplineComponent never actually applied the values
-	//       to the target (bSplineHasBeenEdited never flipped). The replacement walks the
-	//       object's top-level Edit properties ourselves, writes each value via
-	//       FProperty::SerializeItem into a length-prefixed segment, and reads the same way.
-	//   v4: added a per-segment kind byte and subobject recursion. v3 wrote Instanced UObject
-	//       references (UPROPERTY(Instanced) TObjectPtr<UFoo>) as raw in-memory pointers via
-	//       FObjectWriter's base << UObject*&, which doesn't persist meaningfully across
-	//       invocations -- the subobject's contents were never captured. v4 detects
-	//       CPF_InstancedReference properties on write and emits a recursive object-delta
-	//       segment (kind=Subobject) instead of a raw pointer dump. On read, we walk into
-	//       the target's existing subobject and apply the nested delta. Cycle safety via
-	//       a visited set of source objects (UE subobject graphs are almost always trees,
-	//       but the guard short-circuits anything pathological).
 	static constexpr uint32 DeltaWireVersion = 4u;
 
 	namespace Internal
