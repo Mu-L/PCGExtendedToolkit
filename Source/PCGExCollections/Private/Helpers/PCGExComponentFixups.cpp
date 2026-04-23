@@ -11,6 +11,12 @@ namespace PCGExComponentFixups
 {
 	namespace
 	{
+		static TArray<PCGExActorDelta::FPostApplyFixupHandle>& GetBuiltinHandles()
+		{
+			static TArray<PCGExActorDelta::FPostApplyFixupHandle> Instance;
+			return Instance;
+		}
+
 		/**
 		 * USplineComponent invariants that the per-property delta cannot express on its own.
 		 *
@@ -45,6 +51,8 @@ namespace PCGExComponentFixups
 #if PCGEX_ENGINE_VERSION > 506
 			if (const USplineComponent* ArchSpline = Cast<USplineComponent>(Archetype))
 			{
+				PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS
+				
 				// FSpline::operator== returns false for two "disabled" FSplines (no LegacyData
 				// and no NewData) even when they are functionally equivalent -- the inner
 				// if-branches both skip and the function falls through to `return false`.
@@ -54,6 +62,7 @@ namespace PCGExComponentFixups
 				const int32 CurSplinePts = Spline->GetSpline().GetNumControlPoints();
 				const int32 ArchSplinePts = ArchSpline->GetSpline().GetNumControlPoints();
 				const bool bBothSplinesEmpty = (CurSplinePts == 0 && ArchSplinePts == 0);
+
 
 				const bool bSplineDiverged = !bBothSplinesEmpty
 					&& Spline->GetSpline() != ArchSpline->GetSpline();
@@ -71,6 +80,8 @@ namespace PCGExComponentFixups
 					// sides from the new spline.
 					Spline->SetSpline(Spline->GetSpline());
 				}
+				
+				PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS
 			}
 #endif
 
@@ -80,6 +91,12 @@ namespace PCGExComponentFixups
 
 	void RegisterBuiltins()
 	{
-		PCGExActorDelta::RegisterPostApplyFixup(USplineComponent::StaticClass(), &FixupSplineComponent);
+		GetBuiltinHandles().Add(PCGExActorDelta::RegisterPostApplyFixup(
+			USplineComponent::StaticClass(), &FixupSplineComponent));
+	}
+
+	void UnregisterBuiltins()
+	{
+		GetBuiltinHandles().Empty();
 	}
 }

@@ -29,6 +29,8 @@ void FPCGExCollectionsModule::StartupModule()
 
 void FPCGExCollectionsModule::ShutdownModule()
 {
+	// Release built-in fixup handles before the delta registry goes out of scope.
+	PCGExComponentFixups::UnregisterBuiltins();
 	IPCGExLegacyModuleInterface::ShutdownModule();
 }
 

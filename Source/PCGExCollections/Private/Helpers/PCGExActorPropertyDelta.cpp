@@ -601,24 +601,150 @@ namespace PCGExActorDelta
 
 	namespace FixupRegistry
 	{
+		/** Single registration record. Either Class (direct UClass* registration) or
+		 *  PendingPath (soft-path registration resolving lazily) identifies the target. */
 		struct FEntry
 		{
-			TWeakObjectPtr<UClass> ComponentClass;
+			FSoftClassPath PendingPath;      // populated for unresolved path registrations
+			TWeakObjectPtr<UClass> Class;    // resolved target (may be invalid for pending)
 			FPostApplyFixup Fixup;
 		};
 
-		// Registrations happen once at module startup, before any gameplay/PCG execution.
-		// ApplyPropertyDelta is the only reader and runs single-threaded per actor.
-		static TArray<FEntry>& Get()
+		// Registry state. Access is main-thread only in practice (registration from module
+		// startup, RunAll from spawn paths). No locking.
+		//
+		// Entries are keyed by a monotonic uint64 ID so removals don't invalidate bucket
+		// indices. Buckets are TMap<UClass*, TArray<ID>> keyed by the *resolved* target
+		// class -- RunAll walks the component class hierarchy and does O(1) bucket lookups
+		// per super, instead of the earlier O(registrations x components) scan.
+		static TMap<uint64, FEntry>& GetEntries()
 		{
-			static TArray<FEntry> Instance;
+			static TMap<uint64, FEntry> Instance;
 			return Instance;
+		}
+
+		static TMap<UClass*, TArray<uint64>>& GetBuckets()
+		{
+			static TMap<UClass*, TArray<uint64>> Instance;
+			return Instance;
+		}
+
+		// IDs whose PendingPath hasn't resolved yet. Retried on each RunAll so registrations
+		// made before their target module loaded pick up activation at the next apply.
+		static TArray<uint64>& GetPendingIds()
+		{
+			static TArray<uint64> Instance;
+			return Instance;
+		}
+
+		static uint64 AllocId()
+		{
+			static uint64 Counter = 0;
+			return ++Counter;
+		}
+
+		/** Resolve the target class (if necessary) and attach the entry to its bucket. If
+		 *  the path can't resolve yet, the entry is parked on GetPendingIds() and retried
+		 *  at the next RunAll. */
+		static void Bucket(uint64 Id)
+		{
+			FEntry* E = GetEntries().Find(Id);
+			if (!E) { return; }
+
+			UClass* Target = E->Class.Get();
+			if (!Target && !E->PendingPath.IsNull())
+			{
+				Target = E->PendingPath.ResolveClass();
+				if (Target) { E->Class = Target; }
+			}
+
+			if (Target)
+			{
+				GetBuckets().FindOrAdd(Target).AddUnique(Id);
+			}
+			else
+			{
+				GetPendingIds().AddUnique(Id);
+			}
+		}
+
+		static void Unregister(uint64 Id)
+		{
+			if (Id == 0) { return; }
+			FEntry Removed;
+			if (GetEntries().RemoveAndCopyValue(Id, Removed))
+			{
+				if (UClass* C = Removed.Class.Get())
+				{
+					if (TArray<uint64>* Bucket = GetBuckets().Find(C))
+					{
+						Bucket->Remove(Id);
+						if (Bucket->IsEmpty()) { GetBuckets().Remove(C); }
+					}
+				}
+				GetPendingIds().Remove(Id);
+			}
+		}
+
+		static uint64 Register(UClass* Class, const FSoftClassPath& Path, FPostApplyFixup Fixup)
+		{
+			if (!Fixup) { return 0; }
+			if (!Class && Path.IsNull()) { return 0; }
+
+			const uint64 Id = AllocId();
+			FEntry Entry;
+			Entry.PendingPath = Path;
+			Entry.Class = Class;
+			Entry.Fixup = MoveTemp(Fixup);
+			GetEntries().Add(Id, MoveTemp(Entry));
+			Bucket(Id);
+			return Id;
+		}
+
+		/** Best-effort retry of pending path resolutions. Cheap (FSoftClassPath::ResolveClass
+		 *  is a hash lookup when the class is loaded) so we just run it every RunAll instead
+		 *  of subscribing to module-load events. */
+		static void TryResolvePending()
+		{
+			TArray<uint64>& Pending = GetPendingIds();
+			if (Pending.IsEmpty()) { return; }
+
+			TMap<uint64, FEntry>& Entries = GetEntries();
+			for (int32 i = Pending.Num() - 1; i >= 0; --i)
+			{
+				const uint64 Id = Pending[i];
+				FEntry* E = Entries.Find(Id);
+				if (!E)
+				{
+					// Entry was unregistered while pending.
+					Pending.RemoveAtSwap(i, EAllowShrinking::No);
+					continue;
+				}
+
+				UClass* Target = E->Class.Get();
+				if (!Target && !E->PendingPath.IsNull())
+				{
+					Target = E->PendingPath.ResolveClass();
+					if (Target) { E->Class = Target; }
+				}
+
+				if (Target)
+				{
+					GetBuckets().FindOrAdd(Target).AddUnique(Id);
+					Pending.RemoveAtSwap(i, EAllowShrinking::No);
+				}
+			}
 		}
 
 		static void RunAll(AActor* Actor)
 		{
-			TArray<FEntry>& Registry = Get();
-			if (Registry.IsEmpty() || !Actor) { return; }
+			if (!Actor) { return; }
+			TryResolvePending();
+
+			TMap<UClass*, TArray<uint64>>& Buckets = GetBuckets();
+			if (Buckets.IsEmpty()) { return; }
+
+			TMap<uint64, FEntry>& Entries = GetEntries();
 
 			TInlineComponentArray<UActorComponent*> Components;
 			Actor->GetComponents(Components);
@@ -626,34 +752,84 @@ namespace PCGExActorDelta
 			for (UActorComponent* Component : Components)
 			{
 				if (!Component) { continue; }
-
-				UClass* CompClass = Component->GetClass();
 				UObject* Archetype = Component->GetArchetype();
 
-				for (const FEntry& Entry : Registry)
+				// Walk the class hierarchy: a fixup registered against UFoo fires for
+				// UFoo and anything that derives from it. Bucket lookup per super class
+				// is O(1), so total cost per component is O(class-hierarchy depth) --
+				// independent of registration count.
+				for (UClass* Cls = Component->GetClass(); Cls; Cls = Cls->GetSuperClass())
 				{
-					UClass* TargetClass = Entry.ComponentClass.Get();
-					if (!TargetClass || !CompClass->IsChildOf(TargetClass)) { continue; }
-					Entry.Fixup(Component, Archetype);
+					if (TArray<uint64>* Bucket = Buckets.Find(Cls))
+					{
+						for (uint64 Id : *Bucket)
+						{
+							if (FEntry* E = Entries.Find(Id))
+							{
+								E->Fixup(Component, Archetype);
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 
-	void RegisterPostApplyFixup(UClass* ComponentClass, FPostApplyFixup Fixup)
+	// ---- FPostApplyFixupHandle ----
+
+	FPostApplyFixupHandle::~FPostApplyFixupHandle()
 	{
-		if (!ComponentClass || !Fixup) { return; }
-		FixupRegistry::Get().Add({ComponentClass, MoveTemp(Fixup)});
+		if (Id != 0) { FixupRegistry::Unregister(Id); }
 	}
 
-	void UnregisterPostApplyFixupsForClass(UClass* ComponentClass)
+	FPostApplyFixupHandle::FPostApplyFixupHandle(FPostApplyFixupHandle&& Other) noexcept
+		: Id(Other.Id)
 	{
-		if (!ComponentClass) { return; }
-		TArray<FixupRegistry::FEntry>& Registry = FixupRegistry::Get();
-		Registry.RemoveAllSwap([ComponentClass](const FixupRegistry::FEntry& Entry)
+		Other.Id = 0;
+	}
+
+	FPostApplyFixupHandle& FPostApplyFixupHandle::operator=(FPostApplyFixupHandle&& Other) noexcept
+	{
+		if (this != &Other)
 		{
-			return Entry.ComponentClass.Get() == ComponentClass;
-		});
+			if (Id != 0) { FixupRegistry::Unregister(Id); }
+			Id = Other.Id;
+			Other.Id = 0;
+		}
+		return *this;
+	}
+
+	void FPostApplyFixupHandle::Reset()
+	{
+		if (Id != 0)
+		{
+			FixupRegistry::Unregister(Id);
+			Id = 0;
+		}
+	}
+
+	/** Handle factory. Defined in the cpp (not exported) and befriended by the handle. */
+	class FPostApplyFixupHandleFactory
+	{
+	public:
+		static FPostApplyFixupHandle Make(uint64 Id)
+		{
+			FPostApplyFixupHandle Handle;
+			Handle.Id = Id;
+			return Handle;
+		}
+	};
+
+	FPostApplyFixupHandle RegisterPostApplyFixup(UClass* ComponentClass, FPostApplyFixup Fixup)
+	{
+		const uint64 Id = FixupRegistry::Register(ComponentClass, FSoftClassPath(), MoveTemp(Fixup));
+		return FPostApplyFixupHandleFactory::Make(Id);
+	}
+
+	FPostApplyFixupHandle RegisterPostApplyFixup(const FSoftClassPath& ClassPath, FPostApplyFixup Fixup)
+	{
+		const uint64 Id = FixupRegistry::Register(nullptr, ClassPath, MoveTemp(Fixup));
+		return FPostApplyFixupHandleFactory::Make(Id);
 	}
 
 	TArray<uint8> SerializeActorDelta(AActor* Actor)
