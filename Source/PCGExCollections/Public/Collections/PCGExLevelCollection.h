@@ -51,6 +51,7 @@ struct PCGEXCOLLECTIONS_API FPCGExLevelCollectionEntry : public FPCGExAssetColle
 
 #if WITH_EDITOR
 	virtual void EDITOR_Sanitize() override;
+	virtual void EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
 #endif
 };
 

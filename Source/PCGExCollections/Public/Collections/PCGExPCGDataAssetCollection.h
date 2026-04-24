@@ -14,6 +14,7 @@ class UPCGExPCGDataAssetCollection;
 class UPCGExLevelDataExporter;
 class UPCGExMeshCollection;
 class UPCGExActorCollection;
+class UPCGExLevelCollection;
 class UWorld;
 
 UENUM()
@@ -66,6 +67,11 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	UPROPERTY()
 	TObjectPtr<UPCGExActorCollection> EmbeddedActorCollection;
 
+	/** Embedded level collection built by level exporter when bGenerateCollections is enabled,
+	 *  populated when nested level instances are encountered in the source level. */
+	UPROPERTY()
+	TObjectPtr<UPCGExLevelCollection> EmbeddedLevelCollection;
+
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bIsSubCollection", EditConditionHides, DisplayAfter="bIsSubCollection"))
 	TObjectPtr<UPCGExPCGDataAssetCollection> SubCollection;
 
@@ -83,6 +89,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 
 #if WITH_EDITOR
 	virtual void EDITOR_Sanitize() override;
+	virtual void EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
 #endif
 
 };

@@ -25,4 +25,7 @@ protected:
 		TWeakObjectPtr<UPCGExAssetCollection> Collection,
 		int32 EntryIndex,
 		FSimpleDelegate OnAssetChanged) override;
+
+	// Kept alive for SComboBox::OptionsSource (raw pointer into this array).
+	TArray<TSharedPtr<FString>> SourceOptions;
 };

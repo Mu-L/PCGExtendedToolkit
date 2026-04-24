@@ -450,6 +450,16 @@ void FPCGExAssetCollectionEntry::GetAssetPaths(TSet<FSoftObjectPath>& OutPaths) 
 	OutPaths.Emplace(Staging.Path);
 }
 
+#if WITH_EDITOR
+void FPCGExAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
+{
+	// Default: the staged path is the source path for most entry types.
+	// Types that bake into an embedded asset (e.g. level → exported data asset)
+	// must override to advertise their external source reference instead.
+	if (Staging.Path.IsValid()) { OutPaths.Emplace(Staging.Path); }
+}
+#endif
+
 void FPCGExAssetCollectionEntry::BuildMicroCache()
 {
 	MicroCache = nullptr;
