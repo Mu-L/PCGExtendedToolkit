@@ -19,6 +19,7 @@
 #include "PCGExSocketProvider.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExActorCollection.h"
+#include "Collections/PCGExLevelCollection.h"
 #include "PCGExLog.h"
 #include "Engine/Level.h"
 
@@ -163,10 +164,12 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			// Extract embedded collections (created by exporter when bGenerateCollections is enabled)
 			EmbeddedMeshCollection = nullptr;
 			EmbeddedActorCollection = nullptr;
+			EmbeddedLevelCollection = nullptr;
 			ForEachObjectWithOuter(ExportedDataAsset, [this](UObject* Inner)
 			{
 				if (UPCGExMeshCollection* MC = Cast<UPCGExMeshCollection>(Inner)) { EmbeddedMeshCollection = MC; }
 				if (UPCGExActorCollection* AC = Cast<UPCGExActorCollection>(Inner)) { EmbeddedActorCollection = AC; }
+				if (UPCGExLevelCollection* LC = Cast<UPCGExLevelCollection>(Inner)) { EmbeddedLevelCollection = LC; }
 			}, false);
 		}
 		else
@@ -175,6 +178,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			Staging.Bounds = FBox(ForceInit);
 			EmbeddedMeshCollection = nullptr;
 			EmbeddedActorCollection = nullptr;
+			EmbeddedLevelCollection = nullptr;
 		}
 
 		PCGExHelpers::SafeReleaseHandle(Handle);
@@ -234,6 +238,7 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_Sanitize()
 		ExportedDataAsset = nullptr;
 		EmbeddedMeshCollection = nullptr;
 		EmbeddedActorCollection = nullptr;
+		EmbeddedLevelCollection = nullptr;
 	}
 }
 

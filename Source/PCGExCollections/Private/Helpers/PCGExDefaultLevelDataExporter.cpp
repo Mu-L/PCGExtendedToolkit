@@ -11,6 +11,8 @@
 
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExActorCollection.h"
+#include "Collections/PCGExLevelCollection.h"
+#include "Collections/PCGExPCGDataAssetCollection.h"
 
 #include "UObject/Package.h"
 
@@ -22,6 +24,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInterface.h"
+
+#include "LevelInstance/LevelInstanceActor.h"
 
 #include "Helpers/PCGExActorPropertyDelta.h"
 
@@ -50,6 +54,19 @@ UPCGExDefaultLevelDataExporter::UPCGExDefaultLevelDataExporter(const FObjectInit
 
 EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Actor, UStaticMeshComponent*& OutMeshComponent) const
 {
+	// Level instances precede the mesh check: an ALevelInstance can incidentally have
+	// a UStaticMeshComponent (gizmo/visualizer) but the meaningful payload is the
+	// referenced UWorld asset.
+	if (const ALevelInstance* LI = Cast<ALevelInstance>(Actor))
+	{
+		if (!LI->GetWorldAsset().IsNull())
+		{
+			return EPCGExActorExportType::Level;
+		}
+		// Empty world ref -- nothing to embed; fall through to actor-style export so
+		// transform/tags survive the round-trip.
+	}
+
 	OutMeshComponent = Actor->FindComponentByClass<UStaticMeshComponent>();
 	if (OutMeshComponent && OutMeshComponent->GetStaticMesh())
 	{
@@ -188,6 +205,12 @@ namespace PCGExDefaultLevelDataExporterInternal
 		}
 	};
 
+	struct FLevelInfo
+	{
+		int32 EntryIndex = -1;
+		int32 Count = 0;
+	};
+
 	static uint32 HashMaterials(const UStaticMeshComponent* Comp)
 	{
 		uint32 H = 0;
@@ -277,11 +300,24 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 	// Separate by type
 	TArray<FClassifiedActor> MeshActors;
 	TArray<FClassifiedActor> ActorActors;
+	TArray<FClassifiedActor> LevelActors;
 
 	for (const FClassifiedActor& CA : ClassifiedActors)
 	{
 		if (CA.Type == EPCGExActorExportType::Mesh) { MeshActors.Add(CA); }
 		else if (CA.Type == EPCGExActorExportType::Actor) { ActorActors.Add(CA); }
+		else if (CA.Type == EPCGExActorExportType::Level) { LevelActors.Add(CA); }
+	}
+
+	// Group level instances by their referenced UWorld asset path.
+	TMap<FSoftObjectPath, FLevelInfo> LevelInfoMap;
+	for (const FClassifiedActor& CA : LevelActors)
+	{
+		const ALevelInstance* LI = Cast<ALevelInstance>(CA.Actor);
+		if (!LI) { continue; }
+		const FSoftObjectPath LevelPath = LI->GetWorldAsset().ToSoftObjectPath();
+		if (LevelPath.IsNull()) { continue; }
+		LevelInfoMap.FindOrAdd(LevelPath).Count++;
 	}
 
 	// Compute actor tag intersections and property deltas for collection building
@@ -517,6 +553,56 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 		TaggedData.Pin = FName(TEXT("Actors"));
 	}
 
+	// --- Levels (nested level instances) ---
+	UPCGBasePointData* LevelPointData = nullptr;
+	if (!LevelActors.IsEmpty())
+	{
+		TPCGValueRange<FTransform> Transforms;
+		TPCGValueRange<FVector> BMin, BMax;
+		LevelPointData = CreatePointData(OutAsset, LevelActors.Num(), Transforms, BMin, BMax);
+
+		for (int32 i = 0; i < LevelActors.Num(); i++)
+		{
+			WriteActorTransformAndBounds(LevelActors[i].Actor, i, BoundsEvaluator, Transforms, BMin, BMax);
+		}
+
+		InitMetadata(LevelPointData, LevelActors.Num());
+
+		UPCGMetadata* Meta = LevelPointData->MutableMetadata();
+		TPCGValueRange<int64> MetaEntries = LevelPointData->GetMetadataEntryValueRange();
+
+		FPCGMetadataAttribute<FString>* ActorNameAttr = Meta->CreateAttribute<FString>(TEXT("ActorName"), FString(), false, true);
+
+		if (!bGenerateCollections)
+		{
+			FPCGMetadataAttribute<FSoftObjectPath>* LevelAssetAttr = Meta->CreateAttribute<FSoftObjectPath>(TEXT("LevelAsset"), FSoftObjectPath(), false, true);
+
+			for (int32 i = 0; i < LevelActors.Num(); i++)
+			{
+				const int64 Entry = MetaEntries[i];
+				if (ActorNameAttr) { ActorNameAttr->SetValue(Entry, LevelActors[i].Actor->GetActorNameOrLabel()); }
+				if (LevelAssetAttr)
+				{
+					if (const ALevelInstance* LI = Cast<ALevelInstance>(LevelActors[i].Actor))
+					{
+						LevelAssetAttr->SetValue(Entry, LI->GetWorldAsset().ToSoftObjectPath());
+					}
+				}
+			}
+		}
+		else
+		{
+			for (int32 i = 0; i < LevelActors.Num(); i++)
+			{
+				if (ActorNameAttr) { ActorNameAttr->SetValue(MetaEntries[i], LevelActors[i].Actor->GetActorNameOrLabel()); }
+			}
+		}
+
+		FPCGTaggedData& TaggedData = OutAsset->Data.TaggedData.Emplace_GetRef();
+		TaggedData.Data = LevelPointData;
+		TaggedData.Pin = FName(TEXT("Levels"));
+	}
+
 	// Phase 2.5: Notify subclasses
 	OnExportComplete(OutAsset);
 
@@ -601,10 +687,36 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 			EmbeddedActorCollection->RebuildStagingData(true);
 		}
 
+		// Build embedded level collection (one entry per unique referenced UWorld asset).
+		// Level instances have no per-instance overrides beyond transform, so the entry is
+		// just the level reference + instance count -- no delta capture, no tag intersection.
+		UPCGExLevelCollection* EmbeddedLevelCollection = nullptr;
+
+		if (!LevelInfoMap.IsEmpty())
+		{
+			EmbeddedLevelCollection = NewObject<UPCGExLevelCollection>(OutAsset);
+			EmbeddedLevelCollection->InitNumEntries(LevelInfoMap.Num());
+
+			int32 LevelIdx = 0;
+			for (auto& Elem : LevelInfoMap)
+			{
+				Elem.Value.EntryIndex = LevelIdx;
+
+				FPCGExLevelCollectionEntry& LevelEntry = EmbeddedLevelCollection->Entries[LevelIdx];
+				LevelEntry.Level = TSoftObjectPtr<UWorld>(Elem.Key);
+				LevelEntry.Weight = Elem.Value.Count;
+
+				LevelIdx++;
+			}
+
+			EmbeddedLevelCollection->RebuildStagingData(true);
+		}
+
 		// Encode hashes on points
 		PCGExCollections::FPickPacker Packer;
 		if (EmbeddedMeshCollection) { Packer.RegisterCollection(EmbeddedMeshCollection); }
 		if (EmbeddedActorCollection) { Packer.RegisterCollection(EmbeddedActorCollection); }
+		if (EmbeddedLevelCollection) { Packer.RegisterCollection(EmbeddedLevelCollection); }
 
 		// Encode mesh hashes
 		if (MeshPointData && EmbeddedMeshCollection)
@@ -653,6 +765,31 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 					if (!Info) { continue; }
 
 					const uint64 Hash = Packer.GetPickIdx(EmbeddedActorCollection, static_cast<int16>(Info->EntryIndex), -1);
+					EntryHashAttr->SetValue(MetaEntries[i], static_cast<int64>(Hash));
+				}
+			}
+		}
+
+		// Encode level hashes
+		if (LevelPointData && EmbeddedLevelCollection)
+		{
+			UPCGMetadata* Meta = LevelPointData->MutableMetadata();
+			TPCGValueRange<int64> MetaEntries = LevelPointData->GetMetadataEntryValueRange();
+
+			FPCGMetadataAttribute<int64>* EntryHashAttr = Meta->CreateAttribute<int64>(
+				PCGExCollections::Labels::Tag_EntryIdx, static_cast<int64>(0), false, true);
+
+			if (EntryHashAttr)
+			{
+				for (int32 i = 0; i < LevelActors.Num(); i++)
+				{
+					const ALevelInstance* LI = Cast<ALevelInstance>(LevelActors[i].Actor);
+					if (!LI) { continue; }
+					const FSoftObjectPath LevelPath = LI->GetWorldAsset().ToSoftObjectPath();
+					const FLevelInfo* Info = LevelInfoMap.Find(LevelPath);
+					if (!Info) { continue; }
+
+					const uint64 Hash = Packer.GetPickIdx(EmbeddedLevelCollection, static_cast<int16>(Info->EntryIndex), -1);
 					EntryHashAttr->SetValue(MetaEntries[i], static_cast<int64>(Hash));
 				}
 			}

@@ -21,7 +21,9 @@ enum class EPCGExActorExportType : uint8
 	// Has UStaticMeshComponent with valid mesh
 	Actor = 1,
 	// No static mesh → export as actor class reference
-	Skip = 2,
+	Level = 2,
+	// ALevelInstance → export the referenced UWorld asset to an embedded level collection
+	Skip = 3,
 	// Exclude entirely
 };
 
