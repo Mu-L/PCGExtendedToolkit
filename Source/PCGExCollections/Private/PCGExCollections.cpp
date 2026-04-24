@@ -4,6 +4,7 @@
 #include "PCGExCollections.h"
 
 #include "Core/PCGExAssetCollectionTypes.h"
+#include "Helpers/PCGExComponentFixups.h"
 
 #if WITH_EDITOR
 #include "Styling/AppStyle.h"
@@ -23,10 +24,13 @@ void FPCGExCollectionsModule::StartupModule()
 	// and it cannot be access during initialization so we defer it here.
 	PCGExAssetCollection::FTypeRegistry::ProcessPendingRegistrations();
 	IPCGExLegacyModuleInterface::StartupModule();
+	PCGExComponentFixups::RegisterBuiltins();
 }
 
 void FPCGExCollectionsModule::ShutdownModule()
 {
+	// Release built-in fixup handles before the delta registry goes out of scope.
+	PCGExComponentFixups::UnregisterBuiltins();
 	IPCGExLegacyModuleInterface::ShutdownModule();
 }
 
