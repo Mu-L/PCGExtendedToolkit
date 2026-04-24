@@ -149,6 +149,16 @@ void FPCGExLevelCollectionEntry::EDITOR_Sanitize()
 		InternalSubCollection = SubCollection;
 	}
 }
+
+void FPCGExLevelCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
+{
+	if (bIsSubCollection) { return; }
+
+	// Advertise Level independent of Staging.Path so rebuild fires even on fresh entries
+	// that haven't been staged yet.
+	const FSoftObjectPath LevelPath = Level.ToSoftObjectPath();
+	if (LevelPath.IsValid()) { OutPaths.Emplace(LevelPath); }
+}
 #endif
 
 #pragma endregion

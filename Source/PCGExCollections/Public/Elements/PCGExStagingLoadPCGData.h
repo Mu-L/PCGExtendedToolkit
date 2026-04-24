@@ -118,7 +118,7 @@ public:
 	/** When enabled, scans loaded data assets for embedded CollectionMap entries,
 	 *  merges them into a single output, and strips them from duplicated data. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
-	bool bMergeEmbeddedCollectionMaps = false;
+	bool bMergeEmbeddedCollectionMaps = true;
 
 	/** Quiet warnings about unsupported spatial data types that cannot be transformed */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors", meta = (PCG_Overridable))

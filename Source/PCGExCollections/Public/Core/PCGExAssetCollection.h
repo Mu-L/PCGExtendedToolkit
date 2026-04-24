@@ -227,6 +227,14 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 #if WITH_EDITOR
 	virtual void EDITOR_Sanitize();
+
+	/**
+	 * Editor-only: paths whose on-disk updates should trigger a rebuild of this entry.
+	 * Base returns Staging.Path. Override when the entry is driven by a *source* asset
+	 * that differs from Staging.Path — e.g. a level that gets exported into an embedded
+	 * UPCGDataAsset living inside the collection package.
+	 */
+	virtual void EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const;
 #endif
 
 

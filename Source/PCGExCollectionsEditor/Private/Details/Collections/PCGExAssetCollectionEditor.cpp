@@ -138,16 +138,30 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		FTabManager::NewPrimaryArea()
 		->SetOrientation(Orient_Horizontal);
 
+	// Bumped to _v7: Assets tab now defaults to left sidebar (vertical tab button)
+	// instead of being fully closed. Users who had a saved v6 layout will get the
+	// new default on first open; subsequent drag-to-reconfigure is preserved.
 	const TSharedRef<FTabManager::FLayout> Layout =
-		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v6")
+		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v7")
 		->AddArea(Area);
 
 	TSharedRef<FTabManager::FStack> MainStack = FTabManager::NewStack();
-	// Add tabs in reverse order so grid comes first; list view closed by default
+	// Add tabs in reverse order so grid comes first; Assets tab is docked to the
+	// left sidebar as a collapsed vertical tab (clickable to expand as an overlay).
 	for (int i = Tabs.Num() - 1; i >= 0; i--)
 	{
-		const ETabState::Type State = Tabs[i].Id == FName("Assets") ? ETabState::ClosedTab : ETabState::OpenedTab;
-		MainStack->AddTab(Tabs[i].Id, State);
+		if (Tabs[i].Id == FName("Assets"))
+		{
+			// SidebarSizeCoefficient 0.25 = expanded-overlay width as a fraction of the area.
+			// bPinnedInSidebar=false keeps it collapsed on open; user clicks the vertical tab
+			// to expand, and it collapses again when focus leaves — matches the native UE
+			// "outliner in sidebar" pattern.
+			MainStack->AddTab(Tabs[i].Id, ETabState::SidebarTab, ESidebarLocation::Left, 0.25f, /*bPinnedInSidebar=*/ false);
+		}
+		else
+		{
+			MainStack->AddTab(Tabs[i].Id, ETabState::OpenedTab);
+		}
 	}
 	Area->Split(MainStack);
 
