@@ -39,7 +39,15 @@ namespace PCGExActorDelta
 	//       references in EditAnywhere properties were the common trigger.
 	//   v6 (current): same per-property shape as v5, with operator<<(UObject*&)
 	//       writing FSoftObjectPath strings for the fall-through case instead of raw
-	//       pointers. Other v5 design points unchanged:
+	//       pointers, AND operator<<(FObjectPtr&) routing through the same path.
+	//       The FObjectPtr override is critical: in UE 5.6/5.7 FObjectProperty::
+	//       SerializeItem for TObjectPtr<T>-backed storage routes through that
+	//       virtual, NOT through operator<<(UObject*&). Without the override the
+	//       base FObjectWriter writes the raw 8-byte FObjectPtr handle (e.g.
+	//       BillboardComponent::Sprite as TObjectPtr<UTexture2D>) which is a stale
+	//       runtime address after editor restart -- CoreUObject access-violates on
+	//       the first dereference inside component re-registration. Other design
+	//       points unchanged:
 	//       - Outer-ownership detection (Inst->GetOuter() == Object) for subobjects
 	//         instead of CPF_InstancedReference. UHT only sets that flag for the
 	//         Instanced keyword / DefaultToInstanced; plugins using CreateDefaultSubobject
@@ -179,6 +187,15 @@ namespace PCGExActorDelta
 			}
 
 			virtual FArchive& operator<<(UObject*& Res) override;
+
+			/** TObjectPtr<T>-backed properties serialize through this virtual in UE 5.6/5.7,
+			 *  bypassing operator<<(UObject*&). Route both through the same soft-path code. */
+			virtual FArchive& operator<<(FObjectPtr& Value) override
+			{
+				UObject* Raw = Value.Get();
+				*this << Raw;
+				return *this;
+			}
 		};
 
 		class FDeltaReader : public FObjectReader
@@ -195,6 +212,22 @@ namespace PCGExActorDelta
 			}
 
 			virtual FArchive& operator<<(UObject*& Res) override;
+
+			/** TObjectPtr<T>-backed properties serialize through this virtual in UE 5.6/5.7,
+			 *  bypassing operator<<(UObject*&). Start Raw as nullptr (do NOT call
+			 *  Value.Get()): on a freshly archetype-cloned target, calling Get() on every
+			 *  TObjectPtr triggers lazy resolution / sync-loads and turns each spawn into
+			 *  a multi-second pause. We accept the trade-off that source-was-null intent
+			 *  isn't preserved (target stays at archetype baseline instead of being
+			 *  nulled out) -- archetype baseline is almost always safer than nulling a
+			 *  slot the component may require non-null. */
+			virtual FArchive& operator<<(FObjectPtr& Value) override
+			{
+				UObject* Raw = nullptr;
+				*this << Raw;
+				if (Raw) { Value = Raw; }
+				return *this;
+			}
 		};
 
 		/** A direct FObjectProperty field on Object whose value is outer-owned by Object --
@@ -540,7 +573,9 @@ namespace PCGExActorDelta
 
 		FArchive& FDeltaReader::operator<<(UObject*& Res)
 		{
-			if (IsInstancedNestedRef(GetSerializedProperty()))
+			const FProperty* CurProp = GetSerializedProperty();
+
+			if (IsInstancedNestedRef(CurProp))
 			{
 				uint8 Present = 0;
 				*this << Present;
@@ -571,11 +606,43 @@ namespace PCGExActorDelta
 			}
 
 			// Default fall-through: read soft-object path written by FDeltaWriter.
-			// TryLoad pulls the asset in if it isn't already loaded -- apply runs on
-			// the game thread (per the delta-system contract), so sync load is fine.
 			FString PathStr;
 			*this << PathStr;
-			Res = PathStr.IsEmpty() ? nullptr : FSoftObjectPath(PathStr).TryLoad();
+
+			if (PathStr.IsEmpty())
+			{
+				// Source had nullptr -- match source intent.
+				Res = nullptr;
+				return *this;
+			}
+
+			// ResolveObject only finds already-loaded objects -- no sync load. Apply
+			// runs inside SerializeItem callbacks; a TryLoad here could re-enter PCG
+			// or other systems via PostLoad on the loaded asset. The expected case is
+			// that the source actor was loaded, which already pulled its references
+			// into memory.
+			UObject* Loaded = FSoftObjectPath(PathStr).ResolveObject();
+			if (!Loaded)
+			{
+				// Path didn't resolve (transient runtime object on the source side, or
+				// asset not loaded in this context). Leave Res at the archetype-cloned
+				// baseline rather than nulling out a slot the component may require
+				// non-null (re-registration would then crash on a stale invariant).
+				return *this;
+			}
+
+			// Type-guard: the property class is the assignment-compatible base. A
+			// resolved object of an incompatible type would corrupt subsequent reads
+			// of the slot.
+			if (const FObjectPropertyBase* ObjProp = CastField<FObjectPropertyBase>(CurProp))
+			{
+				if (ObjProp->PropertyClass && !Loaded->IsA(ObjProp->PropertyClass))
+				{
+					return *this;
+				}
+			}
+
+			Res = Loaded;
 			return *this;
 		}
 	}
