@@ -147,6 +147,8 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 void FPCGExCollectionsEditorModule::OnObjectsReinstanced(const TMap<UObject*, UObject*>& OldToNewMap)
 {
 	if (!GEditor) { return; }
+	// Failsafe for early startup
+	if (!GEditor->IsTimerManagerValid()) { return; }
 	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale) { return; }
 
 	// Reinstancing fires DURING the BP recompile flow -- the new class exists but isn't
