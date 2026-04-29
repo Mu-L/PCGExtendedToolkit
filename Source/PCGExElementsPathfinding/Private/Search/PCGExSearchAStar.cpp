@@ -84,15 +84,16 @@ bool FPCGExSearchOperationAStar::ResolveQuery(
 
 	bool bSuccess = false;
 
-	int32 PathNodeIndex = PCGEx::NH64A(TravelStack->Get(GoalNode.Index));
-	int32 PathEdgeIndex = -1;
+	int32 PathNodeIndex;
+	int32 PathEdgeIndex;
+	PCGEx::NH64(TravelStack->Get(GoalNode.Index), PathNodeIndex, PathEdgeIndex);
 
 	if (PathNodeIndex != -1)
 	{
 		bSuccess = true;
 		//InQuery->Reserve(VisitedNum);
 
-		InQuery->AddPathNode(GoalNode.Index);
+		InQuery->AddPathNode(GoalNode.Index, PathEdgeIndex);
 
 		while (PathNodeIndex != -1)
 		{
