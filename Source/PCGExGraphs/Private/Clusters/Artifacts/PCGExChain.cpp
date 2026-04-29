@@ -20,6 +20,19 @@ namespace PCGExClusters
 			return;
 		}
 
+		if (bIsClosedLoop)
+		{
+			// A closed loop seeded at Seed.Node uses two of that node's edges: the initial edge
+			// (preserved as Links[0].Edge) and the closing edge (Seed.Edge after BuildChain wraps).
+			// Reverse-direction traversal swaps which is initial vs closing, but the unordered
+			// pair is identical; so key on it to dedupe both representations.
+			const FLink& First = Links[0];
+			UniqueHash = PCGEx::H64U(
+				HashCombineFast(Seed.Node, FMath::Min(Seed.Edge, First.Edge)),
+				HashCombineFast(Seed.Node, FMath::Max(Seed.Edge, First.Edge)));
+			return;
+		}
+
 		const FLink LastLink = Links.Last();
 		UniqueHash = PCGEx::H64U(HashCombineFast(Seed.Node, Seed.Edge), HashCombineFast(LastLink.Node, LastLink.Edge));
 	}
