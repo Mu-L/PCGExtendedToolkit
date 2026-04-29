@@ -26,7 +26,11 @@ namespace PCGExClusters
 		bool bIsLeaf = false;
 
 		uint64 UniqueHash = 0;
-		TArray<FLink> Links; // {Seed} [Edge <- Node][Edge <- Node] // Seed hold edge index that wrap if closed loop.
+		TArray<FLink> Links; // {Seed} [Edge <- Node][Edge <- Node]
+		// Seed.Edge holds the initial edge from Seed.Node; for closed loops it is overwritten to
+		// the closing edge during BuildChain. Links[0].Edge always preserves the original initial
+		// edge (added before the wrap), so (Seed.Edge, Links[0].Edge) is the pair of edges-at-seed
+		// participating in the loop.
 
 		explicit FNodeChain(const FLink InSeed)
 			: Seed(InSeed)
