@@ -219,11 +219,32 @@ void FPCGExSearchOperationBidirectional::ReconstructPath(
 	int32 SeedIndex,
 	int32 GoalIndex) const
 {
-	// Build path from meeting point back to seed (will be reversed later)
+	// Build paths in goal-to-seed order so FPathQuery::SetResolution's reverse
+	// produces the conventional seed-to-goal output (matching A*/Dijkstra/BellmanFord).
+
+	// Goal-side: walk BackwardStack from Meeting toward Goal, then reverse to get goal-to-meeting.
+	TArray<int32> BackwardPath;
+	TArray<int32> BackwardEdges;
+
+	int32 CurrentNode = MeetingNode;
+	while (CurrentNode != GoalIndex)
+	{
+		int32 NextNode, EdgeIndex;
+		PCGEx::NH64(BackwardStack->Get(CurrentNode), NextNode, EdgeIndex);
+		if (NextNode == -1) { break; }
+		BackwardEdges.Add(EdgeIndex);
+		BackwardPath.Add(NextNode);
+		CurrentNode = NextNode;
+	}
+	Algo::Reverse(BackwardPath);
+	Algo::Reverse(BackwardEdges);
+
+	// Seed-side: walk ForwardStack from Meeting back toward Seed via predecessors.
+	// Already in meeting-to-seed order, which is what we want.
 	TArray<int32> ForwardPath;
 	TArray<int32> ForwardEdges;
 
-	int32 CurrentNode = MeetingNode;
+	CurrentNode = MeetingNode;
 	while (CurrentNode != SeedIndex)
 	{
 		ForwardPath.Add(CurrentNode);
@@ -235,36 +256,15 @@ void FPCGExSearchOperationBidirectional::ReconstructPath(
 	}
 	ForwardPath.Add(SeedIndex);
 
-	// Reverse to get seed-to-meeting order
-	Algo::Reverse(ForwardPath);
-	Algo::Reverse(ForwardEdges);
-
-	// Build path from meeting point to goal
-	TArray<int32> BackwardPath;
-	TArray<int32> BackwardEdges;
-
-	CurrentNode = MeetingNode;
-	while (CurrentNode != GoalIndex)
-	{
-		int32 NextNode, EdgeIndex;
-		PCGEx::NH64(BackwardStack->Get(CurrentNode), NextNode, EdgeIndex);
-		if (NextNode == -1) { break; }
-		BackwardEdges.Add(EdgeIndex);
-		BackwardPath.Add(NextNode);
-		CurrentNode = NextNode;
-	}
-
-	// Combine paths (skip duplicate meeting node)
-	// Add from seed to meeting point
-	for (int i = 0; i < ForwardPath.Num(); i++)
-	{
-		InQuery->AddPathNode(ForwardPath[i], i < ForwardEdges.Num() ? ForwardEdges[i] : -1);
-	}
-
-	// Add from after meeting point to goal
+	// Merge: goal-side first (Goal..B), then seed-side (Meeting..Seed).
 	for (int i = 0; i < BackwardPath.Num(); i++)
 	{
 		InQuery->AddPathNode(BackwardPath[i], i < BackwardEdges.Num() ? BackwardEdges[i] : -1);
+	}
+
+	for (int i = 0; i < ForwardPath.Num(); i++)
+	{
+		InQuery->AddPathNode(ForwardPath[i], i < ForwardEdges.Num() ? ForwardEdges[i] : -1);
 	}
 }
 
