@@ -54,7 +54,7 @@ namespace PCGExData
 
 	void FDataForwardHandler::ValidateIdentities(FValidateFn&& Fn)
 	{
-		Identities.SetNum(Algo::RemoveIf(Identities, [&Fn](const FAttributeIdentity& Identity) { return Fn(Identity); }));
+		Identities.SetNum(Algo::RemoveIf(Identities, [&Fn](const FAttributeIdentity& Identity) { return !Fn(Identity); }));
 	}
 
 	void FDataForwardHandler::Forward(const int32 SourceIndex, const int32 TargetIndex)
