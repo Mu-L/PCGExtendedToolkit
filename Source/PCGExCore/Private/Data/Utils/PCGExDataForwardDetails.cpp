@@ -76,25 +76,29 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, T
 	{
 		for (const TSharedPtr<PCGExData::IAttributeBroadcaster>& Getter : Getters)
 		{
-			FString Value = TEXT("");
-			FString Prefix = TEXT("");
-
 			PCGExMetaHelpers::ExecuteWithRightType(Getter->GetMetadataType(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
 				TSharedPtr<PCGExData::TAttributeBroadcaster<T>> TypedGetter = StaticCastSharedPtr<PCGExData::TAttributeBroadcaster<T>>(Getter);
 				if (!TypedGetter) { return; }
 
-				Prefix = TypedGetter->GetName().ToString();
+				const FString Prefix = TypedGetter->GetName().ToString();
 
 				T TypedValue = T{};
-				if (TypedGetter->TryFetchSingle(TagSource, TypedValue)) { Value = PCGExTypeOps::Convert<T, FString>(TypedValue); }
+				if (!TypedGetter->TryFetchSingle(TagSource, TypedValue)) { return; }
+
+				if constexpr (std::is_same_v<T, bool>)
+				{
+					// Booleans tag by presence: add the attribute name when true, omit when false.
+					if (TypedValue) { InTags.Add(Prefix); }
+					return;
+				}
+
+				FString StringValue = PCGExTypeOps::Convert<T, FString>(TypedValue);
+				if (StringValue.IsEmpty()) { return; }
+
+				InTags.Add(bPrefixWithAttributeName ? (Prefix + TEXT(":") + StringValue) : StringValue);
 			});
-
-			if (Value.IsEmpty()) { continue; }
-
-			if (bPrefixWithAttributeName) { Value = Prefix + ":" + Value; }
-			InTags.Add(Value);
 		}
 	}
 }
