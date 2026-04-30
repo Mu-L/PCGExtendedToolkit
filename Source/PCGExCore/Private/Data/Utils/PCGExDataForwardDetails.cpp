@@ -91,13 +91,14 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, T
 				{
 					// Booleans tag by presence: add the attribute name when true, omit when false.
 					if (TypedValue) { InTags.Add(Prefix); }
-					return;
 				}
+				else
+				{
+					FString StringValue = PCGExTypeOps::Convert<T, FString>(TypedValue);
+					if (StringValue.IsEmpty()) { return; }
 
-				FString StringValue = PCGExTypeOps::Convert<T, FString>(TypedValue);
-				if (StringValue.IsEmpty()) { return; }
-
-				InTags.Add(bPrefixWithAttributeName ? (Prefix + TEXT(":") + StringValue) : StringValue);
+					InTags.Add(bPrefixWithAttributeName ? (Prefix + TEXT(":") + StringValue) : StringValue);
+				}
 			});
 		}
 	}
