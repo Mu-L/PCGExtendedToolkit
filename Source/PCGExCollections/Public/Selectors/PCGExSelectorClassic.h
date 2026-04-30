@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "Details/PCGExStagingDetails.h"
 #include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "PCGExCollectionsCommon.h"
 
 #include "PCGExSelectorClassic.generated.h"
