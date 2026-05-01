@@ -159,6 +159,15 @@ bool FPCGExStagingLoadLevelElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
+#if WITH_EDITOR
+	if (Settings->bSpawnAsLevelInstance
+		&& !(Settings->bSpawnAsLevelInstance && InContext->GetComponent()->GenerationTrigger != EPCGComponentGenerationTrigger::GenerateAtRuntime)
+		&& !Settings->bQuietRuntimeFallbackWarning)
+	{
+		PCGE_LOG(Warning, GraphAndLog, LOCTEXT("RuntimeFallback", "Spawn As Level Instance is enabled but the component uses Generate At Runtime. Falling back to streaming levels."));
+	}
+#endif
+
 	return true;
 }
 
@@ -399,12 +408,6 @@ namespace PCGExStagingLoadLevel
 			// whose output is transient and would otherwise leave stale actors in the level.
 			bUseLevelInstance = Settings->bSpawnAsLevelInstance
 				&& SourceComponent->GenerationTrigger != EPCGComponentGenerationTrigger::GenerateAtRuntime;
-
-			if (Settings->bSpawnAsLevelInstance && !bUseLevelInstance && !Settings->bQuietRuntimeFallbackWarning)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
-				           LOCTEXT("RuntimeFallback", "Spawn As Level Instance is enabled but the component uses Generate At Runtime. Falling back to streaming levels."));
-			}
 
 			if (bUseLevelInstance)
 			{
