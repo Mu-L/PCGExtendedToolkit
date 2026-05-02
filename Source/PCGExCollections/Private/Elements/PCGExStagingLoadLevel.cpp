@@ -159,6 +159,15 @@ bool FPCGExStagingLoadLevelElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
+	if (const UClass* StreamClass = Settings->StreamingLevelClass.Get())
+	{
+		if (StreamClass->IsChildOf(ULevelStreamingLevelInstance::StaticClass()))
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("StreamingLevelClass is a subclass of ULevelStreamingLevelInstance, which is reserved for the ALevelInstance actor path and requires engine-side subsystem registration. Using it on the streaming level path will crash at runtime. Use a subclass of ULevelStreamingDynamic instead (e.g. UPCGExLevelStreamingDynamic)."));
+			return false;
+		}
+	}
+
 #if WITH_EDITOR
 	if (Settings->bSpawnAsLevelInstance
 		&& !(Settings->bSpawnAsLevelInstance && InContext->GetComponent()->GenerationTrigger != EPCGComponentGenerationTrigger::GenerateAtRuntime)
