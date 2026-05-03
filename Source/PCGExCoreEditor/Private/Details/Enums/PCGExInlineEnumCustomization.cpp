@@ -262,39 +262,77 @@ namespace PCGExEnumCustomization
 		return INDEX_NONE;
 	}
 
+	static bool EnumHasAnyActionIcon(const UEnum* Enum)
+	{
+		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
+		{
+			if (Enum->HasMetaData(TEXT("Hidden"), i)) { continue; }
+			if (!Enum->GetMetaData(TEXT("ActionIcon"), i).IsEmpty()) { return true; }
+		}
+		return false;
+	}
+
 	TSharedRef<SWidget> CreateCycleButton(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum)
 	{
+		auto ToolTip = [PropertyHandle, Enum]()
+		{
+			FString CurrentValue;
+			PropertyHandle->GetValueAsFormattedString(CurrentValue);
+			const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
+			return Idx != INDEX_NONE ? Enum->GetToolTipTextByIndex(Idx) : FText::GetEmpty();
+		};
+
+		auto Cycle = [PropertyHandle, Enum]()
+		{
+			FString CurrentValue;
+			PropertyHandle->GetValueAsFormattedString(CurrentValue);
+			const int32 CurrentIdx = Enum->GetIndexByNameString(CurrentValue);
+			const int32 NextIdx = FindNextVisibleEnumIndex(Enum, CurrentIdx);
+			if (NextIdx != INDEX_NONE)
+			{
+				PropertyHandle->SetValueFromFormattedString(Enum->GetNameStringByIndex(NextIdx));
+			}
+			return FReply::Handled();
+		};
+
+		if (!EnumHasAnyActionIcon(Enum))
+		{
+			return SNew(SButton)
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				.ContentPadding(FMargin(2, 0))
+				.Text_Lambda([PropertyHandle, Enum]()
+				{
+					FString CurrentValue;
+					PropertyHandle->GetValueAsFormattedString(CurrentValue);
+					const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
+					return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
+				})
+				.ToolTipText_Lambda(ToolTip)
+				.OnClicked_Lambda(Cycle);
+		}
+
 		return SNew(SButton)
 			.HAlign(HAlign_Center)
 			.VAlign(VAlign_Center)
 			.ContentPadding(FMargin(2, 0))
-			.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-			.Text_Lambda([PropertyHandle, Enum]()
-			{
-				FString CurrentValue;
-				PropertyHandle->GetValueAsFormattedString(CurrentValue);
-				const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
-				return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
-			})
-			.ToolTipText_Lambda([PropertyHandle, Enum]()
-			{
-				FString CurrentValue;
-				PropertyHandle->GetValueAsFormattedString(CurrentValue);
-				const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
-				return Idx != INDEX_NONE ? Enum->GetToolTipTextByIndex(Idx) : FText::GetEmpty();
-			})
-			.OnClicked_Lambda([PropertyHandle, Enum]()
-			{
-				FString CurrentValue;
-				PropertyHandle->GetValueAsFormattedString(CurrentValue);
-				const int32 CurrentIdx = Enum->GetIndexByNameString(CurrentValue);
-				const int32 NextIdx = FindNextVisibleEnumIndex(Enum, CurrentIdx);
-				if (NextIdx != INDEX_NONE)
+			.ButtonStyle(FAppStyle::Get(), "PCGEx.ActionIcon")
+			.ToolTipText_Lambda(ToolTip)
+			.OnClicked_Lambda(Cycle)
+			[
+				SNew(SImage)
+				.Image_Lambda([PropertyHandle, Enum]() -> const FSlateBrush*
 				{
-					PropertyHandle->SetValueFromFormattedString(Enum->GetNameStringByIndex(NextIdx));
-				}
-				return FReply::Handled();
-			});
+					FString CurrentValue;
+					PropertyHandle->GetValueAsFormattedString(CurrentValue);
+					const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
+					if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
+					FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
+					if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
+					IconName = TEXT("PCGEx.ActionIcon.") + IconName;
+					return FAppStyle::Get().GetBrush(*IconName);
+				})
+			];
 	}
 
 	TSharedRef<SWidget> CreateCycleButton(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum)
@@ -304,31 +342,57 @@ namespace PCGExEnumCustomization
 
 	TSharedRef<SWidget> CreateCycleButton(UEnum* Enum, TFunction<int32()> GetValue, TFunction<void(int32)> SetValue)
 	{
+		auto ToolTip = [GetValue, Enum]()
+		{
+			const int32 Idx = Enum->GetIndexByValue(GetValue());
+			return Idx != INDEX_NONE ? Enum->GetToolTipTextByIndex(Idx) : FText::GetEmpty();
+		};
+
+		auto Cycle = [GetValue, SetValue, Enum]()
+		{
+			const int32 CurrentIdx = Enum->GetIndexByValue(GetValue());
+			const int32 NextIdx = FindNextVisibleEnumIndex(Enum, CurrentIdx);
+			if (NextIdx != INDEX_NONE)
+			{
+				SetValue(static_cast<int32>(Enum->GetValueByIndex(NextIdx)));
+			}
+			return FReply::Handled();
+		};
+
+		if (!EnumHasAnyActionIcon(Enum))
+		{
+			return SNew(SButton)
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				.ContentPadding(FMargin(2, 0))
+				.Text_Lambda([GetValue, Enum]()
+				{
+					const int32 Idx = Enum->GetIndexByValue(GetValue());
+					return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
+				})
+				.ToolTipText_Lambda(ToolTip)
+				.OnClicked_Lambda(Cycle);
+		}
+
 		return SNew(SButton)
 			.HAlign(HAlign_Center)
 			.VAlign(VAlign_Center)
 			.ContentPadding(FMargin(2, 0))
-			.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-			.Text_Lambda([GetValue, Enum]()
-			{
-				const int32 Idx = Enum->GetIndexByValue(GetValue());
-				return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
-			})
-			.ToolTipText_Lambda([GetValue, Enum]()
-			{
-				const int32 Idx = Enum->GetIndexByValue(GetValue());
-				return Idx != INDEX_NONE ? Enum->GetToolTipTextByIndex(Idx) : FText::GetEmpty();
-			})
-			.OnClicked_Lambda([GetValue, SetValue, Enum]()
-			{
-				const int32 CurrentIdx = Enum->GetIndexByValue(GetValue());
-				const int32 NextIdx = FindNextVisibleEnumIndex(Enum, CurrentIdx);
-				if (NextIdx != INDEX_NONE)
+			.ButtonStyle(FAppStyle::Get(), "PCGEx.ActionIcon")
+			.ToolTipText_Lambda(ToolTip)
+			.OnClicked_Lambda(Cycle)
+			[
+				SNew(SImage)
+				.Image_Lambda([GetValue, Enum]() -> const FSlateBrush*
 				{
-					SetValue(static_cast<int32>(Enum->GetValueByIndex(NextIdx)));
-				}
-				return FReply::Handled();
-			});
+					const int32 Idx = Enum->GetIndexByValue(GetValue());
+					if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
+					FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
+					if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
+					IconName = TEXT("PCGEx.ActionIcon.") + IconName;
+					return FAppStyle::Get().GetBrush(*IconName);
+				})
+			];
 	}
 
 	TSharedRef<SWidget> CreateCheckboxGroup(UEnum* Enum, TFunction<uint8()> GetValue, TFunction<void(uint8)> SetValue, const TSet<int32>& SkipIndices)
