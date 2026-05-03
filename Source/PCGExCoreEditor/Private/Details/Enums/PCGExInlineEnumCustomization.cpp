@@ -6,6 +6,8 @@
 #include "PropertyHandle.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -272,6 +274,17 @@ namespace PCGExEnumCustomization
 		return false;
 	}
 
+	// Small "advance" glyph rendered inside cycle buttons so users can tell the button cycles.
+	// Plain ASCII '>' is used so the default Slate font (Roboto) can render it without
+	// falling back to DroidSansFallback (which spams "Could not find Glyph Index" warnings).
+	static TSharedRef<SWidget> MakeCycleIndicator(int32 FontSize)
+	{
+		return SNew(STextBlock)
+			.Text(FText::FromString(TEXT(">")))
+			.Font(FCoreStyle::GetDefaultFontStyle("Bold", FontSize))
+			.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, 0.4f)));
+	}
+
 	TSharedRef<SWidget> CreateCycleButton(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum)
 	{
 		auto ToolTip = [PropertyHandle, Enum]()
@@ -301,15 +314,31 @@ namespace PCGExEnumCustomization
 				.HAlign(HAlign_Center)
 				.VAlign(VAlign_Center)
 				.ContentPadding(FMargin(2, 0))
-				.Text_Lambda([PropertyHandle, Enum]()
-				{
-					FString CurrentValue;
-					PropertyHandle->GetValueAsFormattedString(CurrentValue);
-					const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
-					return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
-				})
 				.ToolTipText_Lambda(ToolTip)
-				.OnClicked_Lambda(Cycle);
+				.OnClicked_Lambda(Cycle)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					[
+						SNew(STextBlock)
+						.Text_Lambda([PropertyHandle, Enum]()
+						{
+							FString CurrentValue;
+							PropertyHandle->GetValueAsFormattedString(CurrentValue);
+							const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
+							return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
+						})
+					]
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					.Padding(FMargin(4, 0, 0, 0))
+					[
+						MakeCycleIndicator(7)
+					]
+				];
 		}
 
 		return SNew(SButton)
@@ -320,18 +349,30 @@ namespace PCGExEnumCustomization
 			.ToolTipText_Lambda(ToolTip)
 			.OnClicked_Lambda(Cycle)
 			[
-				SNew(SImage)
-				.Image_Lambda([PropertyHandle, Enum]() -> const FSlateBrush*
-				{
-					FString CurrentValue;
-					PropertyHandle->GetValueAsFormattedString(CurrentValue);
-					const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
-					if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
-					FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
-					if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
-					IconName = TEXT("PCGEx.ActionIcon.") + IconName;
-					return FAppStyle::Get().GetBrush(*IconName);
-				})
+				SNew(SOverlay)
+				+ SOverlay::Slot()
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				[
+					SNew(SImage)
+					.Image_Lambda([PropertyHandle, Enum]() -> const FSlateBrush*
+					{
+						FString CurrentValue;
+						PropertyHandle->GetValueAsFormattedString(CurrentValue);
+						const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
+						if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
+						FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
+						if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
+						IconName = TEXT("PCGEx.ActionIcon.") + IconName;
+						return FAppStyle::Get().GetBrush(*IconName);
+					})
+				]
+				+ SOverlay::Slot()
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Bottom)
+				[
+					MakeCycleIndicator(5)
+				]
 			];
 	}
 
@@ -365,13 +406,29 @@ namespace PCGExEnumCustomization
 				.HAlign(HAlign_Center)
 				.VAlign(VAlign_Center)
 				.ContentPadding(FMargin(2, 0))
-				.Text_Lambda([GetValue, Enum]()
-				{
-					const int32 Idx = Enum->GetIndexByValue(GetValue());
-					return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
-				})
 				.ToolTipText_Lambda(ToolTip)
-				.OnClicked_Lambda(Cycle);
+				.OnClicked_Lambda(Cycle)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					[
+						SNew(STextBlock)
+						.Text_Lambda([GetValue, Enum]()
+						{
+							const int32 Idx = Enum->GetIndexByValue(GetValue());
+							return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::FromString(TEXT("?"));
+						})
+					]
+					+ SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					.Padding(FMargin(4, 0, 0, 0))
+					[
+						MakeCycleIndicator(7)
+					]
+				];
 		}
 
 		return SNew(SButton)
@@ -382,16 +439,28 @@ namespace PCGExEnumCustomization
 			.ToolTipText_Lambda(ToolTip)
 			.OnClicked_Lambda(Cycle)
 			[
-				SNew(SImage)
-				.Image_Lambda([GetValue, Enum]() -> const FSlateBrush*
-				{
-					const int32 Idx = Enum->GetIndexByValue(GetValue());
-					if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
-					FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
-					if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
-					IconName = TEXT("PCGEx.ActionIcon.") + IconName;
-					return FAppStyle::Get().GetBrush(*IconName);
-				})
+				SNew(SOverlay)
+				+ SOverlay::Slot()
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				[
+					SNew(SImage)
+					.Image_Lambda([GetValue, Enum]() -> const FSlateBrush*
+					{
+						const int32 Idx = Enum->GetIndexByValue(GetValue());
+						if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
+						FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
+						if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
+						IconName = TEXT("PCGEx.ActionIcon.") + IconName;
+						return FAppStyle::Get().GetBrush(*IconName);
+					})
+				]
+				+ SOverlay::Slot()
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Bottom)
+				[
+					MakeCycleIndicator(5)
+				]
 			];
 	}
 
