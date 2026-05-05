@@ -19,6 +19,7 @@
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Graphs/PCGExGraphCommon.h"
+#include "Helpers/PCGExRandomHelpers.h"
 #include "Math/Geo/PCGExGeo.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
@@ -134,7 +135,7 @@ namespace PCGExMeshToCluster
 			TArray<int32> UVChannels;
 			TArray<FPCGAttributeIdentifier> UVIdentifiers;
 
-			EPCGPointNativeProperties Allocations = EPCGPointNativeProperties::Transform;
+			EPCGPointNativeProperties Allocations = EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed;
 			const FStaticMeshVertexBuffers* VertexBuffers = nullptr;
 
 			const FPCGExGeoMeshImportDetails& ImportDetails = Context->ImportDetails;
@@ -417,6 +418,16 @@ namespace PCGExMeshToCluster
 						}
 					}
 				}
+			}
+
+			if (VtxPoints->GetNumPoints())
+			{
+				TPCGValueRange<int32> OutVtxSeeds = VtxPoints->GetSeedValueRange();
+				TPCGValueRange<FTransform> OutTransforms = VtxPoints->GetTransformValueRange(false);
+				PCGEX_PARALLEL_FOR_THRESHOLD(
+					VtxPoints->GetNumPoints(), 1024, {
+					OutVtxSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation());
+					})
 			}
 
 			TSharedPtr<PCGExGraphs::FGraphBuilder> GraphBuilder = MakeShared<PCGExGraphs::FGraphBuilder>(RootVtxFacade.ToSharedRef(), &Context->GraphBuilderDetails);
