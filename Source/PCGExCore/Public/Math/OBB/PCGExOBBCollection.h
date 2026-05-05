@@ -253,6 +253,10 @@ namespace PCGExMath::OBB
 		/** Check if any entry overlaps with penetration depth exceeding threshold. */
 		bool OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex = INDEX_NONE) const;
 
+		/** Check threshold-overlap with SkipIndex and per-entry callback filter. Callback receives the stored item index (OBB.Bounds.Index), returns true to SKIP that entry. */
+		bool OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex,
+			TFunctionRef<bool(int32)> ShouldSkip) const;
+
 		/** Count valid (non-invalidated) entries. */
 		int32 NumValid() const;
 
@@ -271,5 +275,9 @@ namespace PCGExMath::OBB
 		/** Templated overlap implementation for code reuse. */
 		template <typename FilterFn>
 		bool OverlapsImpl(const FOBB& Candidate, int32 SkipIndex, FilterFn&& Filter) const;
+
+		/** Templated penetration-threshold overlap implementation for code reuse. */
+		template <typename FilterFn>
+		bool OverlapsBeyondThresholdImpl(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex, FilterFn&& Filter) const;
 	};
 }

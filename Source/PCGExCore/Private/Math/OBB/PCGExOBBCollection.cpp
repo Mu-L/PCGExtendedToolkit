@@ -420,7 +420,8 @@ namespace PCGExMath::OBB
 		return OverlapsImpl(Candidate, SkipIndex, [this, &ShouldSkip](int32 i) { return !ShouldSkip(GetBounds(i).Index); });
 	}
 
-	bool FDynamicCollection::OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex) const
+	template <typename FilterFn>
+	bool FDynamicCollection::OverlapsBeyondThresholdImpl(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex, FilterFn&& Filter) const
 	{
 		// Octree query for entries in the octree
 		if (Octree && OctreeCount > 0)
@@ -434,6 +435,7 @@ namespace PCGExMath::OBB
 				const int32 i = Item.Index;
 				if (i == SkipIndex) { return true; }
 				if (ValidMask.IsValidIndex(i) && !ValidMask[i]) { return true; }
+				if (!Filter(i)) { return true; }
 
 				if (SpherePenetrationDepth(GetBounds(i), Candidate.Bounds) <= 0.0f) { return true; }
 
@@ -455,6 +457,7 @@ namespace PCGExMath::OBB
 		{
 			if (i == SkipIndex) { continue; }
 			if (ValidMask.IsValidIndex(i) && !ValidMask[i]) { continue; }
+			if (!Filter(i)) { continue; }
 
 			if (SpherePenetrationDepth(GetBounds(i), Candidate.Bounds) <= 0.0f) { continue; }
 
@@ -466,6 +469,20 @@ namespace PCGExMath::OBB
 		}
 
 		return false;
+	}
+
+	bool FDynamicCollection::OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex) const
+	{
+		return OverlapsBeyondThresholdImpl(Candidate, MaxPenetration, SkipIndex, [](int32) { return true; });
+	}
+
+	bool FDynamicCollection::OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex,
+		TFunctionRef<bool(int32)> ShouldSkip) const
+	{
+		// ShouldSkip receives the stored module index (Bounds.Index), not the entry index.
+		// Filter returns true to KEEP, false to SKIP -- inverted from ShouldSkip.
+		return OverlapsBeyondThresholdImpl(Candidate, MaxPenetration, SkipIndex,
+			[this, &ShouldSkip](int32 i) { return !ShouldSkip(GetBounds(i).Index); });
 	}
 
 #pragma endregion
