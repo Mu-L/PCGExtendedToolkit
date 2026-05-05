@@ -237,6 +237,7 @@ namespace PCGExPaths
 		void OffsetProjection(const double Offset);
 
 		const TArray<FVector2D>& GetProjectedPoints() const { return ProjectedPoints; }
+		const FPCGExGeo2DProjectionDetails& GetProjection() const { return Projection; }
 
 		virtual bool IsInsideProjection(const FVector& WorldPosition) const;
 		virtual bool Contains(const TConstPCGValueRange<FTransform>& InPositions, const double Tolerance = 0) const;
