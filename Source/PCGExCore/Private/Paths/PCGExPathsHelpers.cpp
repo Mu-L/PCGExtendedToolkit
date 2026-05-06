@@ -13,6 +13,8 @@
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
 
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
+
 namespace PCGExPaths
 {
 	namespace Helpers
@@ -362,3 +364,5 @@ namespace PCGExPaths
 		return true;
 	}
 }
+
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS

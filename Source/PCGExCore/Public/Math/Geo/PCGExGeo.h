@@ -148,6 +148,34 @@ namespace PCGExMath::Geo
 
 	PCGEXCORE_API bool IsAnyPointInPolygon(const TArray<FVector2D>& Points, const TArray<FVector2D>& Polygon);
 
+	/**
+	 * Squared distance from a 2D point to the segment AB. Tighter than promoting
+	 * to FVector and calling FMath::PointDistToSegmentSquared (which is 3D-only).
+	 */
+	FORCEINLINE static float DistancePointToSegmentSquared2D(const FVector2D& P, const FVector2D& A, const FVector2D& B)
+	{
+		const FVector2D AB = B - A;
+		const float L2 = static_cast<float>(AB.SquaredLength());
+		if (L2 <= UE_SMALL_NUMBER) { return static_cast<float>((P - A).SquaredLength()); }
+		const float T = FMath::Clamp(static_cast<float>(FVector2D::DotProduct(P - A, AB) / L2), 0.0f, 1.0f);
+		const FVector2D Closest = A + AB * T;
+		return static_cast<float>((P - Closest).SquaredLength());
+	}
+
+	/**
+	 * World-space AABB of an extruded prism: a 2D outline (in projection-frame XY)
+	 * extruded along the projection-frame Z by [ZMin, ZMax], placed in world via
+	 * (WorldOrigin + ProjectionQuat). Computes the prism's local-space AABB-of-AABB
+	 * (8 corners of the outline's 2D bounds × ZMin/ZMax), rotates them through the
+	 * quat, and unions. Returns an invalid box for degenerate inputs (Outline < 3
+	 * verts or ZMax <= ZMin).
+	 */
+	PCGEXCORE_API FBox ProjectPrismToWorldAABB(
+		TConstArrayView<FVector2D> Outline,
+		float ZMin, float ZMax,
+		const FVector& WorldOrigin,
+		const FQuat& ProjectionQuat);
+
 	// L1/L∞ Voronoi edge path computation
 
 	/** Transform 2D coordinates for L1/L∞ Voronoi computation: (x,y) -> (x+y, x-y) */
