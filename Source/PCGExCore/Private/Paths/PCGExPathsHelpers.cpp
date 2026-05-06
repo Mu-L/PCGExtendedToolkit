@@ -1,6 +1,8 @@
 ﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
+
 #include "Paths/PCGExPathsHelpers.h"
 
 #include "Data/PCGSplineData.h"
@@ -13,7 +15,6 @@
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
 
-PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 
 namespace PCGExPaths
 {
