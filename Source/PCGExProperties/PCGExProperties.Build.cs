@@ -40,8 +40,8 @@ public class PCGExProperties : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"PCG",
-				"PCGExCore",
-				"StructUtils",
+				"PCGExCore"
+				//"StructUtils",
 			}
 		);
 
