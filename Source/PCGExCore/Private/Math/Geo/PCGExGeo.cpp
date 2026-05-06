@@ -286,6 +286,33 @@ namespace PCGExMath::Geo
 		return false;
 	}
 
+	FBox ProjectPrismToWorldAABB(
+		TConstArrayView<FVector2D> Outline,
+		const float ZMin, const float ZMax,
+		const FVector& WorldOrigin,
+		const FQuat& ProjectionQuat)
+	{
+		if (Outline.Num() < 3 || ZMax <= ZMin) { return FBox(ForceInit); }
+
+		FBox2D Bounds2D(ForceInit);
+		for (const FVector2D& V : Outline) { Bounds2D += V; }
+
+		const FVector LocalCorners[8] = {
+			FVector(Bounds2D.Min.X, Bounds2D.Min.Y, ZMin),
+			FVector(Bounds2D.Max.X, Bounds2D.Min.Y, ZMin),
+			FVector(Bounds2D.Min.X, Bounds2D.Max.Y, ZMin),
+			FVector(Bounds2D.Max.X, Bounds2D.Max.Y, ZMin),
+			FVector(Bounds2D.Min.X, Bounds2D.Min.Y, ZMax),
+			FVector(Bounds2D.Max.X, Bounds2D.Min.Y, ZMax),
+			FVector(Bounds2D.Min.X, Bounds2D.Max.Y, ZMax),
+			FVector(Bounds2D.Max.X, Bounds2D.Max.Y, ZMax),
+		};
+
+		FBox AABB(ForceInit);
+		for (const FVector& Local : LocalCorners) { AABB += WorldOrigin + ProjectionQuat.RotateVector(Local); }
+		return AABB;
+	}
+
 	void ComputeLInfEdgePath(const FVector2D& Start, const FVector2D& End, TArray<FVector2D>& OutPath)
 	{
 		// Compute an L∞ (Chebyshev) metric edge path between two Voronoi cell centers.
