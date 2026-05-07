@@ -271,6 +271,118 @@ namespace PCGExMath::OBB
 		}
 	}
 
+	bool FCollection::OverlapsFiltered(const FOBB& Candidate, int32 SkipIndex) const
+	{
+		if (!Octree) { return false; }
+		const float R = Candidate.Bounds.Radius;
+		const FBoxCenterAndExtent QueryBounds(Candidate.Bounds.Origin, FVector4(R, R, R, R));
+		bool bFound = false;
+		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		{
+			const int32 i = Item.Index;
+			if (i == SkipIndex) { return true; }
+			if (SphereOverlap(GetBounds(i), Candidate.Bounds) && SATOverlap(GetOBB(i), Candidate))
+			{
+				bFound = true;
+				return false;
+			}
+			return true;
+		});
+		return bFound;
+	}
+
+	bool FCollection::OverlapsFiltered(const FOBB& Candidate, int32 SkipIndex, TFunctionRef<bool(int32)> ShouldSkip) const
+	{
+		if (!Octree) { return false; }
+		const float R = Candidate.Bounds.Radius;
+		const FBoxCenterAndExtent QueryBounds(Candidate.Bounds.Origin, FVector4(R, R, R, R));
+		bool bFound = false;
+		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		{
+			const int32 i = Item.Index;
+			if (i == SkipIndex) { return true; }
+			if (ShouldSkip(GetBounds(i).Index)) { return true; }
+			if (SphereOverlap(GetBounds(i), Candidate.Bounds) && SATOverlap(GetOBB(i), Candidate))
+			{
+				bFound = true;
+				return false;
+			}
+			return true;
+		});
+		return bFound;
+	}
+
+	bool FCollection::OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex) const
+	{
+		if (!Octree) { return false; }
+		const float R = Candidate.Bounds.Radius;
+		const FBoxCenterAndExtent QueryBounds(Candidate.Bounds.Origin, FVector4(R, R, R, R));
+		bool bFound = false;
+		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		{
+			const int32 i = Item.Index;
+			if (i == SkipIndex) { return true; }
+			if (SpherePenetrationDepth(GetBounds(i), Candidate.Bounds) <= 0.0f) { return true; }
+			if (SATPenetrationDepth(GetOBB(i), Candidate) > MaxPenetration)
+			{
+				bFound = true;
+				return false;
+			}
+			return true;
+		});
+		return bFound;
+	}
+
+	bool FCollection::OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex, TFunctionRef<bool(int32)> ShouldSkip) const
+	{
+		if (!Octree) { return false; }
+		const float R = Candidate.Bounds.Radius;
+		const FBoxCenterAndExtent QueryBounds(Candidate.Bounds.Origin, FVector4(R, R, R, R));
+		bool bFound = false;
+		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		{
+			const int32 i = Item.Index;
+			if (i == SkipIndex) { return true; }
+			if (ShouldSkip(GetBounds(i).Index)) { return true; }
+			if (SpherePenetrationDepth(GetBounds(i), Candidate.Bounds) <= 0.0f) { return true; }
+			if (SATPenetrationDepth(GetOBB(i), Candidate) > MaxPenetration)
+			{
+				bFound = true;
+				return false;
+			}
+			return true;
+		});
+		return bFound;
+	}
+
+	bool FCollection::ForEachOverlapping(
+		const FOBB& Candidate,
+		int32 SkipIndex,
+		TFunctionRef<bool(int32)> ShouldSkipOwner,
+		TFunctionRef<bool(const FOBB&, int32 OwnerIndex)> ConfirmOverlap) const
+	{
+		if (!Octree) { return false; }
+		const float R = Candidate.Bounds.Radius;
+		const FBoxCenterAndExtent QueryBounds(Candidate.Bounds.Origin, FVector4(R, R, R, R));
+		bool bFound = false;
+		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		{
+			const int32 i = Item.Index;
+			if (i == SkipIndex) { return true; }
+			if (ShouldSkipOwner(GetBounds(i).Index)) { return true; }
+			if (!SphereOverlap(GetBounds(i), Candidate.Bounds)) { return true; }
+			const FOBB StoredOBB = GetOBB(i);
+			if (!SATOverlap(StoredOBB, Candidate)) { return true; }
+			if (ConfirmOverlap(StoredOBB, GetBounds(i).Index))
+			{
+				bFound = true;
+				return false;
+			}
+			return true;
+		});
+		return bFound;
+	}
+
 	// ========== FDynamicCollection ==========
 
 #pragma region FDynamicCollection
@@ -408,6 +520,54 @@ namespace PCGExMath::OBB
 		return false;
 	}
 
+	template <typename FilterFn, typename MatchFn>
+	bool FDynamicCollection::ForEachImpl(const FOBB& Candidate, int32 SkipIndex, FilterFn&& Filter, MatchFn&& OnMatch) const
+	{
+		// 1. Octree query (entries 0..OctreeCount-1)
+		if (Octree && OctreeCount > 0)
+		{
+			const float R = Candidate.Bounds.Radius;
+			const FBoxCenterAndExtent QueryBounds(Candidate.Bounds.Origin, FVector4(R, R, R, R));
+
+			bool bFound = false;
+			Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+			{
+				const int32 i = Item.Index;
+				if (i == SkipIndex) { return true; }                             // Continue
+				if (ValidMask.IsValidIndex(i) && !ValidMask[i]) { return true; } // Skip invalid
+				if (!Filter(i)) { return true; }                                 // Custom filter says skip
+				if (!SphereOverlap(GetBounds(i), Candidate.Bounds)) { return true; }
+				const FOBB StoredOBB = GetOBB(i);
+				if (!SATOverlap(StoredOBB, Candidate)) { return true; }
+
+				if (OnMatch(StoredOBB, i))
+				{
+					bFound = true;
+					return false; // Stop
+				}
+				return true; // Continue
+			});
+
+			if (bFound) { return true; }
+		}
+
+		// 2. Linear scan pending entries (OctreeCount..Num()-1)
+		const int32 Total = Num();
+		for (int32 i = OctreeCount; i < Total; ++i)
+		{
+			if (i == SkipIndex) { continue; }
+			if (ValidMask.IsValidIndex(i) && !ValidMask[i]) { continue; }
+			if (!Filter(i)) { continue; }
+			if (!SphereOverlap(GetBounds(i), Candidate.Bounds)) { continue; }
+			const FOBB StoredOBB = GetOBB(i);
+			if (!SATOverlap(StoredOBB, Candidate)) { continue; }
+
+			if (OnMatch(StoredOBB, i)) { return true; }
+		}
+
+		return false;
+	}
+
 	bool FDynamicCollection::OverlapsFiltered(const FOBB& Candidate, int32 SkipIndex) const
 	{
 		return OverlapsImpl(Candidate, SkipIndex, [](int32) { return true; });
@@ -418,6 +578,17 @@ namespace PCGExMath::OBB
 		// ShouldSkip receives the stored module index (Bounds.Index), not the entry index.
 		// Filter returns true to KEEP, false to SKIP -- inverted from ShouldSkip.
 		return OverlapsImpl(Candidate, SkipIndex, [this, &ShouldSkip](int32 i) { return !ShouldSkip(GetBounds(i).Index); });
+	}
+
+	bool FDynamicCollection::ForEachOverlapping(
+		const FOBB& Candidate,
+		int32 SkipIndex,
+		TFunctionRef<bool(int32)> ShouldSkipOwner,
+		TFunctionRef<bool(const FOBB&, int32 OwnerIndex)> ConfirmOverlap) const
+	{
+		return ForEachImpl(Candidate, SkipIndex,
+			[this, &ShouldSkipOwner](int32 i) { return !ShouldSkipOwner(GetBounds(i).Index); },
+			[this, &ConfirmOverlap](const FOBB& OBB, int32 i) { return ConfirmOverlap(OBB, GetBounds(i).Index); });
 	}
 
 	template <typename FilterFn>
