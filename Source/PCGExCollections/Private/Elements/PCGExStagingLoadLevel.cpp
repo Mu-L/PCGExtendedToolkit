@@ -272,6 +272,9 @@ namespace PCGExStagingLoadLevel
 			FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
 			if (!Result.IsValid()) { continue; }
 
+			// Check if this is a Level entry
+			if (!Result.Entry->IsType(PCGExAssetCollection::TypeIds::Level)) { continue; }
+			
 			const FSoftObjectPath& LevelPath = Result.Entry->Staging.Path;
 			if (!LevelPath.IsValid()) { continue; }
 
