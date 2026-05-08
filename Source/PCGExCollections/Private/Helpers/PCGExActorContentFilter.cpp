@@ -10,6 +10,7 @@
 #include "Engine/LevelScriptActor.h"
 #include "Engine/Brush.h"
 #include "GameFramework/Info.h"
+#include "GameFramework/Volume.h"
 #endif
 
 #pragma region UPCGExActorContentFilter
@@ -24,7 +25,7 @@ bool UPCGExActorContentFilter::IsInfrastructureActor(AActor* Actor)
 	if (Actor->bIsMainWorldOnly) { return true; }
 	if (Actor->IsA<ALevelScriptActor>()) { return true; }
 	if (Actor->IsA<AInfo>()) { return true; }
-	if (Actor->IsA<ABrush>()) { return true; }
+	if (Actor->IsA<ABrush>() && !Actor->IsA<AVolume>()) { return true; }
 
 	// Soft check for ANavigationData -- avoids hard link dependency on NavigationSystem module
 	static UClass* NavigationDataClass = FindObject<UClass>(nullptr, TEXT("/Script/NavigationSystem.NavigationData"));

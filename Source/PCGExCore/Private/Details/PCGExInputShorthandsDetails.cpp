@@ -24,7 +24,8 @@ MACRO(FVector4, Vector4, __VA_ARGS__)   \
 MACRO(FRotator, Rotator, __VA_ARGS__)   \
 MACRO(FTransform, Transform, __VA_ARGS__) \
 MACRO(FString, String, __VA_ARGS__)    \
-MACRO(FName, Name, __VA_ARGS__)
+MACRO(FName, Name, __VA_ARGS__) \
+MACRO(FSoftObjectPath, SoftObjectPath, __VA_ARGS__)
 
 #define PCGEX_SHORTHAND_UPDATE__NAME_IMPL(_TYPE, _NAME)\
 void FPCGExInputShorthandName##_NAME::Update(EPCGExInputValueType InInputType, const FPCGAttributePropertyInputSelector& InSelector, _TYPE InConstant){Input = InInputType; Constant = InConstant;	Attribute = InSelector.GetName();}\

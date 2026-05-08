@@ -7,6 +7,7 @@
 
 #include "Helpers/PCGExLevelDataExporter.h"
 #include "Helpers/PCGExActorContentFilter.h"
+#include "Helpers/PCGExActorMeshClassificator.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
 
 #include "PCGExDefaultLevelDataExporter.generated.h"
@@ -55,6 +56,11 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
 	TObjectPtr<UPCGExActorContentFilter> ContentFilter;
 
+	/** Determines which actors are treated as mesh containers (parsed for static/instanced
+	 *  mesh components). Defaults to UPCGExDefaultActorMeshClassificator. */
+	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
+	TObjectPtr<UPCGExActorMeshClassificator> MeshClassificator;
+
 	/** Bounds evaluator. Defaults to UPCGExDefaultBoundsEvaluator. */
 	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
 	TObjectPtr<UPCGExBoundsEvaluator> BoundsEvaluator;
@@ -77,7 +83,8 @@ public:
 	virtual bool ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset) override;
 
 	/** Classify an actor. Override for custom logic.
-	 *  Default: Mesh if has UStaticMeshComponent with valid mesh, Actor otherwise. */
+	 *  Default: delegates to MeshClassificator; if it approves, checks for a valid
+	 *  UStaticMeshComponent. Falls back to Actor if not approved or no mesh found. */
 	virtual EPCGExActorExportType ClassifyActor(AActor* Actor, UStaticMeshComponent*& OutMeshComponent) const;
 
 	/** Called after all points are created, before collection generation. */
