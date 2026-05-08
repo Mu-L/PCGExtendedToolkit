@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -10,15 +10,19 @@
 #include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Details/PCGExBlendingDetails.h"
+#include "Details/PCGExFuseDetails.h"
 #include "Details/PCGExIntersectionDetails.h"
 #include "Math/PCGExMathAxis.h"
+#include "PCGExUnionCommon.h"
 
 
 #include "PCGExFusePoints.generated.h"
 
-namespace PCGExGraphs
+namespace PCGExData
 {
-	class FUnionGraph;
+	class FUnionTable;
+	class FUnionTableBuilder;
+	class FUnionRegistry;
 }
 
 UENUM()
@@ -35,24 +39,6 @@ enum class EPCGExFusedBoundsMode : uint8
 	AABB = 1 UMETA(DisplayName = "AABB", ToolTip="Axis-aligned bounding box of all fused points."),
 	OBB  = 2 UMETA(DisplayName = "OBB", ToolTip="Oriented bounding box of all fused points. Overrides point rotation."),
 };
-
-namespace PCGExFuse
-{
-	struct FFusedPoint
-	{
-		mutable FRWLock IndicesLock;
-		int32 Index = -1;
-		FVector Position = FVector::ZeroVector;
-		TArray<int32> Fused;
-		TArray<double> Distances;
-		double MaxDistance = 0;
-
-		FFusedPoint(const int32 InIndex, const FVector& InPosition);
-		~FFusedPoint() = default;
-
-		void Add(const int32 InIndex, const double Distance);
-	};
-}
 
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="transform/modify/fuse-points"))
 class UPCGExFusePointsSettings : public UPCGExPointsProcessorSettings
@@ -98,7 +84,7 @@ public:
 	/** Minimum extent for fused bounds on each axis. Prevents degenerate (flat) bounds. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Min Bounds Extent", EditCondition="FusedBoundsMode != EPCGExFusedBoundsMode::None", EditConditionHides, ClampMin=0))
 	double MinBoundsExtent = 1;
-	
+
 	/** Defines how fused point properties and attributes are merged together. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="Mode == EPCGExFusedPointOutput::Blend", EditConditionHides))
 	FPCGExBlendingDetails BlendingDetails = FPCGExBlendingDetails(EPCGExBlendingType::Average, EPCGExBlendingType::None);
@@ -134,26 +120,40 @@ namespace PCGExFusePoints
 {
 	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExFusePointsContext, UPCGExFusePointsSettings>
 	{
-		TSharedPtr<PCGExGraphs::FUnionGraph> UnionGraph;
+		// Processor-owned mutable copy of the settings' FuseDetails.
+		// FuseDetails carries a TSharedPtr<TSettingValue<FVector>> ToleranceGetter that gets bound
+		// to this facade in Init(); we need a per-processor instance because Settings is const.
+		FPCGExFuseDetails FuseDetailsCopy;
+
+		EPCGExFuseMethod EffectiveMethod = EPCGExFuseMethod::Voxel;
+		int32 IOIndex = -1;
+
+		// Build-time scratch (allocated in Process / PrepareLoopScopesForPoints, freed in CompleteWork).
+		TSharedPtr<PCGExData::FUnionTableBuilder> UnionTableBuilder;
+		TSharedPtr<PCGExData::FUnionRegistry>     Registry; // Octree mode only
+
+		// Compiled, immutable result of the build phase. Read by ProcessRange / bounds passes.
+		TSharedPtr<PCGExData::FUnionTable> UnionTable;
+
 		TSharedPtr<PCGExBlending::IUnionBlender> UnionBlender;
 
-		TSharedPtr<PCGExData::TBuffer<bool>> IsUnionWriter;
+		TSharedPtr<PCGExData::TBuffer<bool>>  IsUnionWriter;
 		TSharedPtr<PCGExData::TBuffer<int32>> UnionSizeWriter;
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
 			: TProcessor(InPointDataFacade)
 		{
-			bForceSingleThreadedProcessPoints = true;
 		}
 
 		virtual ~FProcessor() override;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
+		virtual void PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops) override;
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
 
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
-		
+
 		virtual void CompleteWork() override;
 		virtual void Write() override;
 	};
