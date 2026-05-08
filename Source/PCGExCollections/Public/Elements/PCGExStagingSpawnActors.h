@@ -6,10 +6,12 @@
 #include "CoreMinimal.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Core/PCGExPointFilter.h"
+#include "Details/PCGExInputShorthandsDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Helpers/PCGExPCGGenerationWatcher.h"
+#include "PCGCommon.h"
 #include "PCGManagedResource.h"
 #include "PCGCrc.h"
 
@@ -45,11 +47,29 @@ protected:
 	virtual bool IsCacheable() const override { return false; }
 
 public:
+	// --- Targeting ---
+
+	/** Optional root actor that owns the spawned actors. Resolves per-point (constant, data-domain attribute, or
+	 *  per-point attribute). When the resolved soft path is null, falls back to the PCG component's target actor.
+	 *  Resolution is by ResolveObject only — paths must point to live actors. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning", meta=(PCG_Overridable))
+	FPCGExInputShorthandNameSoftObjectPath RootActor;
+
+	/** Controls where spawned actors appear in the Outliner and how they are parented to the root actor.
+	 *  Mirrors UE PCG SpawnActor's AttachOptions semantics. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning")
+	EPCGAttachOptions AttachOptions = EPCGAttachOptions::InFolder;
+
 	// --- Spawning ---
 
 	/** How to handle collisions when spawning actors. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning", meta=(PCG_Overridable))
 	ESpawnActorCollisionHandlingMethod CollisionHandling = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	/** If enabled, apply per-instance property deltas stored on actor collection entries.
+	 *  Actors with deltas are spawned deferred to set properties before construction completes. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning", meta=(PCG_Overridable))
+	bool bApplyPropertyDeltas = true;
 
 	// --- Tagging ---
 
@@ -64,13 +84,6 @@ public:
 	/** If enabled, apply per-instance tags from the InstanceTags attribute to spawned actors. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable))
 	bool bApplyInstanceTags = true;
-
-	// --- Properties ---
-
-	/** If enabled, apply per-instance property deltas stored on actor collection entries.
-	 *  Actors with deltas are spawned deferred to set properties before construction completes. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Properties", meta=(PCG_Overridable))
-	bool bApplyPropertyDeltas = true;
 
 	// --- PCG Generation ---
 
@@ -142,6 +155,15 @@ namespace PCGExStagingSpawnActors
 		TSharedPtr<PCGExData::TBuffer<int64>> EntryHashGetter;
 		TSharedPtr<PCGExData::TBuffer<FString>> InstanceTagsGetter;
 
+		/** Per-point root actor source -- supports constant, data-domain, or per-point attribute */
+		TSharedPtr<PCGExDetails::TSettingValue<FSoftObjectPath>> RootActorSV;
+
+		/** Per-point soft paths, only allocated when not in Constant mode */
+		TArray<FSoftObjectPath> RootActorPaths;
+
+		/** Main-thread-only cache that dedups soft-path -> AActor resolution across the spawn loop */
+		TMap<FSoftObjectPath, TWeakObjectPtr<AActor>> RootActorResolveCache;
+
 		/** Pre-sized to NumPoints -- each parallel thread writes to its own index, no locks */
 		TArray<FResolvedEntry> ResolvedEntries;
 
@@ -167,11 +189,6 @@ namespace PCGExStagingSpawnActors
 		TConstPCGValueRange<FTransform> Transforms;
 		int32 NumPoints = 0;
 
-#if WITH_EDITOR
-		/** Cached folder path for organizing spawned actors */
-		FName CachedFolderPath;
-#endif
-
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
 			: TProcessor(InPointDataFacade)
@@ -187,8 +204,7 @@ namespace PCGExStagingSpawnActors
 	private:
 		void SpawnAtPoint(int32 PointIndex);
 
-#if WITH_EDITOR
-		void ComputeFolderPath();
-#endif
+		/** Resolve the per-point target actor: soft path -> ResolveObject -> fall back to component target */
+		AActor* ResolveTargetActor(int32 PointIndex);
 	};
 }

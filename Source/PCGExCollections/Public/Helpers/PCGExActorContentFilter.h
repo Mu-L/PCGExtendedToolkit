@@ -23,7 +23,7 @@ class PCGEXCOLLECTIONS_API UPCGExActorContentFilter : public UObject
 
 public:
 	/** Infrastructure checks shared by all callers: hidden, editor-only,
-	 *  main-world-only, ALevelScriptActor, AInfo, ABrush, ANavigationData. */
+	 *  main-world-only, ALevelScriptActor, AInfo, ABrush (excluding AVolume), ANavigationData. */
 	static bool IsInfrastructureActor(AActor* Actor);
 
 	/** Convenience: delegates to filter if non-null, else falls back to IsInfrastructureActor. */

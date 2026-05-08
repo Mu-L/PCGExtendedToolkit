@@ -50,3 +50,10 @@ public:
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();
 	virtual TSharedRef<SWidget> CreateValueWidget(TSharedPtr<IPropertyHandle> ValueHandle) override;
 };
+
+class FPCGExInputShorthandSoftObjectPathCustomization : public FPCGExInputShorthandCustomization
+{
+public:
+	static TSharedRef<IPropertyTypeCustomization> MakeInstance();
+	virtual TSharedRef<SWidget> CreateValueWidget(TSharedPtr<IPropertyHandle> ValueHandle) override;
+};

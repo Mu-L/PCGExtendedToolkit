@@ -14,6 +14,8 @@
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExPCGDataAssetCollection.h"
 
+#include "Helpers/PCGExActorMeshClassificator.h"
+
 #include "UObject/Package.h"
 
 #include "Engine/Level.h"
@@ -43,9 +45,17 @@ UPCGExDefaultLevelDataExporter::UPCGExDefaultLevelDataExporter(const FObjectInit
 		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
 		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
 
+	UClass* ClassificatorClass = Settings.DefaultMeshClassificatorClass
+		                             ? Settings.DefaultMeshClassificatorClass.Get()
+		                             : UPCGExDefaultActorMeshClassificator::StaticClass();
+
 	ContentFilter = Cast<UPCGExActorContentFilter>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("ContentFilter"),
 		                                         UPCGExActorContentFilter::StaticClass(), FilterClass, false, false));
+
+	MeshClassificator = Cast<UPCGExActorMeshClassificator>(
+		ObjectInitializer.CreateDefaultSubobject(this, TEXT("MeshClassificator"),
+		                                         UPCGExActorMeshClassificator::StaticClass(), ClassificatorClass, false, false));
 
 	BoundsEvaluator = Cast<UPCGExBoundsEvaluator>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("BoundsEvaluator"),
@@ -67,10 +77,13 @@ EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Acto
 		// transform/tags survive the round-trip.
 	}
 
-	OutMeshComponent = Actor->FindComponentByClass<UStaticMeshComponent>();
-	if (OutMeshComponent && OutMeshComponent->GetStaticMesh())
+	if (MeshClassificator && MeshClassificator->ShouldClassifyAsMesh(Actor))
 	{
-		return EPCGExActorExportType::Mesh;
+		OutMeshComponent = Actor->FindComponentByClass<UStaticMeshComponent>();
+		if (OutMeshComponent && OutMeshComponent->GetStaticMesh())
+		{
+			return EPCGExActorExportType::Mesh;
+		}
 	}
 
 	return EPCGExActorExportType::Actor;
@@ -273,7 +286,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 		for (UObject* Inner : OldInners)
 		{
 			Inner->Rename(nullptr, GetTransientPackage(),
-				REN_DontCreateRedirectors | REN_NonTransactional);
+			              REN_DontCreateRedirectors | REN_NonTransactional);
 		}
 	}
 

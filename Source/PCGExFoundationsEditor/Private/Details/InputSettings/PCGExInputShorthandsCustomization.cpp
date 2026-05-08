@@ -228,3 +228,59 @@ TSharedRef<SWidget> FPCGExInputShorthandRotatorCustomization::CreateValueWidget(
 {
 	return PCGEX_ROTATORINPUTBOX(ValueHandle);
 }
+
+TSharedRef<IPropertyTypeCustomization> FPCGExInputShorthandSoftObjectPathCustomization::MakeInstance()
+{
+	return MakeShareable(new FPCGExInputShorthandSoftObjectPathCustomization());
+}
+
+TSharedRef<SWidget> FPCGExInputShorthandSoftObjectPathCustomization::CreateValueWidget(TSharedPtr<IPropertyHandle> ValueHandle)
+{
+	// FSoftObjectPath's default property widget renders as a multi-row asset picker that doesn't
+	// fit our header layout, and an asset picker isn't meaningful here -- the path is resolved at
+	// graph execution against live actors. A plain editable text box matches the attribute fallback.
+	return SNew(SBox)
+		.VAlign(VAlign_Center)
+		.MaxDesiredHeight(22.0f)
+		[
+			SNew(SEditableTextBox)
+			.Font(IDetailLayoutBuilder::GetDetailFont())
+			.Text_Lambda(
+				[ValueHandle]()
+				{
+					TArray<void*> RawData;
+					ValueHandle->AccessRawData(RawData);
+					if (RawData.Num() > 0)
+					{
+						if (const FSoftObjectPath* Path = static_cast<const FSoftObjectPath*>(RawData[0]))
+						{
+							return FText::FromString(Path->ToString());
+						}
+					}
+					return FText::GetEmpty();
+				})
+			.OnTextCommitted_Lambda(
+				[ValueHandle](const FText& NewText, ETextCommit::Type CommitType)
+				{
+					if (CommitType != ETextCommit::OnEnter && CommitType != ETextCommit::OnUserMovedFocus) { return; }
+
+					ValueHandle->NotifyPreChange();
+
+					TArray<void*> RawData;
+					ValueHandle->AccessRawData(RawData);
+
+					const FString NewPath = NewText.ToString();
+					bool bUpdated = false;
+					for (void* Ptr : RawData)
+					{
+						if (FSoftObjectPath* Path = static_cast<FSoftObjectPath*>(Ptr))
+						{
+							Path->SetPath(NewPath);
+							bUpdated = true;
+						}
+					}
+
+					if (bUpdated) { ValueHandle->NotifyPostChange(EPropertyChangeType::ValueSet); }
+				})
+		];
+}

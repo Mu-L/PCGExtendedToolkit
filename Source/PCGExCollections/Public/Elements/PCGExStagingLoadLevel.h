@@ -6,10 +6,12 @@
 #include "CoreMinimal.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Core/PCGExPointFilter.h"
+#include "Details/PCGExInputShorthandsDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "LevelInstance/LevelInstanceLevelStreaming.h"
 #include "LevelInstance/LevelInstanceActor.h"
+#include "PCGCommon.h"
 #include "PCGManagedResource.h"
 #include "PCGCrc.h"
 
@@ -117,6 +119,19 @@ protected:
 	virtual bool IsCacheable() const override { return false; }
 
 public:
+	// --- Targeting ---
+
+	/** Optional root actor that owns the spawned levels. Resolves per-point (constant, data-domain attribute,
+	 *  or per-point attribute). When the resolved soft path is null, falls back to the PCG component's target
+	 *  actor. Resolution is by ResolveObject only -- paths must point to live actors. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning", meta=(PCG_Overridable))
+	FPCGExInputShorthandNameSoftObjectPath RootActor;
+
+	/** Controls where spawned ALevelInstance actors appear in the Outliner and how they are parented to the
+	 *  root actor. On the streaming-level path (no actor to attach), Attached silently behaves like InFolder. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning")
+	EPCGAttachOptions AttachOptions = EPCGAttachOptions::InFolder;
+
 	/** Suffix appended to each spawned streaming level's package name to ensure uniqueness. If empty, uses point index. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FString LevelNameSuffix = TEXT("PCGEx");
@@ -181,11 +196,13 @@ namespace PCGExStagingLoadLevel
 	{
 		int32 PointIndex = -1;
 		FSoftObjectPath LevelPath;
+		FSoftObjectPath RootActorPath;
 		ULevelStreamingDynamic::FLoadLevelInstanceParams Params;
 
-		FLevelSpawnRequest(UWorld* InWorld, const FString& InPackageName, const FSoftObjectPath& InLevelPath, const FTransform& InTransform, const int32 InPointIndex)
+		FLevelSpawnRequest(UWorld* InWorld, const FString& InPackageName, const FSoftObjectPath& InLevelPath, const FSoftObjectPath& InRootActorPath, const FTransform& InTransform, const int32 InPointIndex)
 			: PointIndex(InPointIndex)
 			  , LevelPath(InLevelPath)
+			  , RootActorPath(InRootActorPath)
 			  , Params(InWorld, InPackageName, InTransform)
 		{
 		}
@@ -194,6 +211,12 @@ namespace PCGExStagingLoadLevel
 	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExStagingLoadLevelContext, UPCGExStagingLoadLevelSettings>
 	{
 		TSharedPtr<PCGExData::TBuffer<int64>> EntryHashGetter;
+
+		/** Per-point root actor source -- supports constant, data-domain, or per-point attribute */
+		TSharedPtr<PCGExDetails::TSettingValue<FSoftObjectPath>> RootActorSV;
+
+		/** Main-thread-only cache that dedups soft-path -> AActor resolution across the spawn loop */
+		TMap<FSoftObjectPath, TWeakObjectPtr<AActor>> RootActorResolveCache;
 
 		/** Collected spawn requests from parallel phase */
 		TArray<FLevelSpawnRequest> SpawnRequests;
@@ -209,9 +232,6 @@ namespace PCGExStagingLoadLevel
 		UPCGExManagedStreamingLevels* ManagedStreamingLevels = nullptr;
 
 #if WITH_EDITOR
-		/** Cached folder path for organizing spawned actors, computed on first spawn */
-		FName CachedFolderPath;
-
 		/** Resolved at first spawn: true if using ALevelInstance path, false for streaming.
 		 *  Forced to false for runtime components since their output is transient. */
 		bool bUseLevelInstance = false;
@@ -235,8 +255,15 @@ namespace PCGExStagingLoadLevel
 	private:
 		void SpawnLevelInstance(int32 RequestIndex);
 
+		/** Resolve the per-request target actor: soft path -> ResolveObject -> fall back to component target */
+		AActor* ResolveTargetActor(const FLevelSpawnRequest& Request);
+
+		/** Compute the inner-actor folder for a streamed level. AttachOptions::Attached has no
+		 *  meaningful semantics for inner actors (the host attach is handled separately), so it's
+		 *  silently flattened to InFolder here. */
+		FName ComputeInnerFolderPath(AActor* TargetActor) const;
+
 #if WITH_EDITOR
-		void ComputeFolderPath();
 		void SpawnAsLevelInstance(FLevelSpawnRequest& Request);
 #endif
 	};
