@@ -256,7 +256,7 @@ namespace PCGExBlending
 		return true;
 	}
 
-	bool FUnionBlender::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, const PCGExData::EProxyFlags InProxyFlags)
+	bool FUnionBlender::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TSharedPtr<PCGExData::IUnionMetadata>& InUnionMetadata, const PCGExData::EProxyFlags InProxyFlags)
 	{
 		CurrentUnionMetadata = InUnionMetadata;
 		return Init(InContext, TargetData, InProxyFlags);
@@ -273,6 +273,13 @@ namespace PCGExBlending
 	{
 		const PCGExData::FConstPoint Target = CurrentTargetData->Source->GetOutPoint(WriteIndex);
 		return PCGExData::FUnionTable::ComputeWeightsForSpan(InElements, SourcesData, IOLookup, Target, DistanceDetails, OutWeightedPoints);
+	}
+
+	int32 FUnionBlender::ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionMetadata>& InMetadata, const int32 EntryIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const
+	{
+		if (!InMetadata.IsValid()) { return 0; }
+		const PCGExData::FConstPoint Target = CurrentTargetData->Source->GetOutPoint(WriteIndex);
+		return InMetadata->ComputeWeights(EntryIndex, SourcesData, IOLookup, Target, DistanceDetails, OutWeightedPoints);
 	}
 
 	void FUnionBlender::Blend(const int32 WriteIndex, const TArray<PCGExData::FWeightedPoint>& InWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
@@ -306,7 +313,9 @@ namespace PCGExBlending
 
 	void FUnionBlender::MergeSingle(const int32 UnionIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		if (!ComputeWeights(UnionIndex, CurrentUnionMetadata->Get(UnionIndex), OutWeightedPoints)) { return; }
+		// Resolves through the IUnionMetadata interface so the same code path serves both the legacy
+		// FUnionMetadata (sparse, IUnionData-backed) and the new FUnionTable (dense, span-backed).
+		if (!ComputeWeights(UnionIndex, CurrentUnionMetadata, UnionIndex, OutWeightedPoints)) { return; }
 		Blend(UnionIndex, OutWeightedPoints, Trackers);
 	}
 

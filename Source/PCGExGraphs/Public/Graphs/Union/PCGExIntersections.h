@@ -12,7 +12,6 @@
 #include "Data/PCGExPointElements.h"
 #include "Clusters/PCGExEdge.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
-#include "Details/PCGExFuseDetails.h"
 #include "Utils/PCGValueRange.h"
 
 struct FPCGExEdgeEdgeIntersectionDetails;
@@ -25,7 +24,6 @@ namespace PCGExBlending
 
 namespace PCGExData
 {
-	class FPointIOCollection;
 	class FUnionMetadata;
 	class IUnionData;
 }
@@ -49,102 +47,6 @@ namespace PCGExGraphs
 	class FEdgeEdgeIntersections;
 	class FGraph;
 	struct FEdge;
-
-#pragma region Compound Graph
-
-	class PCGEXGRAPHS_API FUnionNode : public TSharedFromThis<FUnionNode>
-	{
-	public:
-		const PCGExData::FConstPoint Point;
-		FVector Center;
-		FBoxSphereBounds Bounds;
-		int32 Index;
-
-		FVector CenterAccum;
-		int32 FuseCount = 1;
-
-		FUnionNode(const PCGExData::FConstPoint& InPoint, const FVector& InCenter, const int32 InIndex);
-		~FUnionNode() = default;
-
-		FORCEINLINE FVector GetCenter() const { return CenterAccum / static_cast<double>(FuseCount); }
-		FORCEINLINE void Accumulate(const FVector& Position)
-		{
-			CenterAccum += Position;
-			FuseCount++;
-		}
-	};
-
-	PCGEX_OCTREE_SEMANTICS(FUnionNode, { return Element->Bounds;}, { return A->Index == B->Index; })
-
-	class PCGEXGRAPHS_API FUnionGraph : public TSharedFromThis<FUnionGraph>
-	{
-		int32 NumCollapsedEdges = 0;
-
-	public:
-		PCGExMT::TH64MapShards<int32> NodeBinsShards;
-
-		TWeakPtr<PCGExData::FPointIOCollection> SourceCollection = nullptr;
-		TSharedPtr<PCGExData::FUnionMetadata> NodesUnion;
-		TSharedPtr<PCGExData::FUnionMetadata> EdgesUnion;
-		TArray<TSharedPtr<FUnionNode>> Nodes;
-
-		PCGExMT::TH64MapShards<int32> EdgesMapShards;
-		TArray<FEdge> Edges;
-
-		FPCGExFuseDetails FuseDetails;
-
-		FBox Bounds;
-
-		bool bNodesSorted = false;
-
-		TUniquePtr<FUnionNodeOctree> Octree;
-
-		mutable FRWLock UnionLock;
-		mutable FRWLock EdgesLock;
-
-		explicit FUnionGraph(const FPCGExFuseDetails& InFuseDetails, const FBox& InBounds, const TSharedPtr<PCGExData::FPointIOCollection>& InSourceCollection = nullptr);
-
-		~FUnionGraph() = default;
-
-		bool Init(FPCGExContext* InContext);
-		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InUniqueSourceFacade, const bool SupportScopedGet);
-
-		void Reserve(const int32 NodeReserve, const int32 EdgeReserve);
-
-		FORCEINLINE int32 GetNumCollapsedEdges() const { return NumCollapsedEdges; }
-		FORCEINLINE bool RequiresSequentialInsertion() const { return Octree != nullptr; }
-
-		int32 InsertPoint(const PCGExData::FConstPoint& Point);
-
-		void InsertEdge(const PCGExData::FConstPoint& From, const PCGExData::FConstPoint& To, const PCGExData::FConstPoint& Edge = PCGExData::NONE_ConstPoint);
-
-		void WriteNodeMetadata(const TSharedPtr<FGraph>& InGraph) const;
-		void WriteEdgeMetadata(const TSharedPtr<FGraph>& InGraph) const;
-
-		void Collapse();
-
-		/** RAII batch inserter for sequential use. Holds both locks for the lifetime,
-		 *  avoiding per-element lock overhead when inserting from a single thread. */
-		class PCGEXGRAPHS_API FBatchInserter
-		{
-			FUnionGraph& Graph;
-			FWriteScopeLock UnionLk;
-			FWriteScopeLock EdgesLk;
-
-		public:
-			explicit FBatchInserter(FUnionGraph& InGraph)
-				: Graph(InGraph), UnionLk(InGraph.UnionLock), EdgesLk(InGraph.EdgesLock)
-			{
-			}
-
-			int32 InsertPoint(const PCGExData::FConstPoint& Point);
-			void InsertEdge(const PCGExData::FConstPoint& From,
-			                const PCGExData::FConstPoint& To,
-			                const PCGExData::FConstPoint& Edge = PCGExData::NONE_ConstPoint);
-		};
-	};
-
-#pragma endregion
 
 	class PCGEXGRAPHS_API FIntersectionCache : public TSharedFromThis<FIntersectionCache>
 	{
@@ -281,7 +183,7 @@ namespace PCGExGraphs
 		TArray<FEECrossing> UniqueCrossings;
 		TArray<TSharedPtr<FEdgeEdgeProxy>> Edges;
 
-		FEdgeEdgeIntersections(const TSharedPtr<FGraph>& InGraph, const TSharedPtr<FUnionGraph>& InUnionGraph, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const FPCGExEdgeEdgeIntersectionDetails* InDetails);
+		FEdgeEdgeIntersections(const TSharedPtr<FGraph>& InGraph, const FBox& InBounds, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const FPCGExEdgeEdgeIntersectionDetails* InDetails);
 
 		void Init(const TArray<PCGExMT::FScope>& Loops);
 		void Collapse(const int32 InReserve);

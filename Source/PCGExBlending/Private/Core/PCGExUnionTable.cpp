@@ -56,44 +56,7 @@ namespace PCGExData
 		const PCGExMath::IDistances* InDistances,
 		TArray<FWeightedPoint>& OutWeightedPoints)
 	{
-		const int32 NumElements = InElements.Num();
-		OutWeightedPoints.Reset(NumElements);
-
-		double MaxWeight = 0;
-		double TotalWeight = 0;
-		int32 Index = 0;
-
-		for (const FElement& Element : InElements)
-		{
-			const int32 IOIdx = IdxLookup->Get(Element.IO);
-			if (IOIdx == -1) { continue; }
-
-			FWeightedPoint& P = OutWeightedPoints.Emplace_GetRef(Element.Index, 0, IOIdx);
-			const double Dist = InDistances->GetDistSquared(FConstPoint(Sources[P.IO], P), Target);
-			P.Weight = Dist;
-
-			MaxWeight = FMath::Max(MaxWeight, Dist);
-			Index++;
-		}
-
-		if (Index == 0) { return 0; }
-
-		for (FWeightedPoint& P : OutWeightedPoints) { TotalWeight += (P.Weight = 1 - (P.Weight / MaxWeight)); }
-
-		if (Index == 1)
-		{
-			OutWeightedPoints[0].Weight = 1;
-			return 1;
-		}
-
-		if (TotalWeight == 0)
-		{
-			const double StaticWeight = 1 / static_cast<double>(Index);
-			for (FWeightedPoint& P : OutWeightedPoints) { P.Weight = StaticWeight; }
-			return Index;
-		}
-
-		return Index;
+		return ComputeUnionWeights(InElements, Sources, IdxLookup, Target, InDistances, OutWeightedPoints);
 	}
 
 	void FUnionTable::Reset()

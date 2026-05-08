@@ -7,6 +7,8 @@
 
 #include "Core/PCGExPathProcessor.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Core/PCGExUnionTable.h"
+#include "Core/PCGExUnionRegistry.h"
 #include "Graphs/Union/PCGExUnionProcessor.h"
 #include "Graphs/Union/PCGExIntersections.h"
 #include "PCGExPathToClusters.generated.h"
@@ -14,6 +16,17 @@
 namespace PCGExPathToClusters
 {
 	class FFusingProcessor;
+
+	// Same shape as PCGExFuseClusters::FStagedEdge but locally namespaced -- paths use IO=-1 / Index=-1
+	// in the abstract field (no edge point data). Resolved into the central edge table after node compile.
+	struct FStagedEdge
+	{
+		uint64 KeyA = 0;
+		uint64 KeyB = 0;
+
+		FStagedEdge() = default;
+		FStagedEdge(const uint64 InKeyA, const uint64 InKeyB) : KeyA(InKeyA), KeyB(InKeyB) {}
+	};
 }
 
 /**
@@ -107,8 +120,16 @@ struct FPCGExPathToClustersContext final : FPCGExPathProcessorContext
 
 	FPCGExCarryOverDetails CarryOverDetails;
 
-	TSharedPtr<PCGExGraphs::FUnionGraph> UnionGraph;
 	TSharedPtr<PCGExData::FFacade> UnionDataFacade;
+
+	// Phase 1+2 streaming build state -- mirrors FuseClusters context. Edges are abstract (no
+	// per-edge point data), so the EdgeBuilder receives placeholder records with IO=-1, Index=0.
+	TSharedPtr<PCGExData::FUnionTableBuilder> NodeBuilder;
+	TSharedPtr<PCGExData::FUnionTableBuilder> EdgeBuilder;
+	TSharedPtr<PCGExData::FUnionRegistry> NodeRegistry;
+	FPCGExFuseDetails FuseDetails;
+	FBox FuseBounds = FBox(ForceInit);
+	bool bUseOctreeMode = false;
 
 	TSharedPtr<PCGExGraphs::FUnionProcessor> UnionProcessor;
 
@@ -162,7 +183,9 @@ namespace PCGExPathToClusters
 		int32 LastIndex = 0;
 
 	public:
-		TSharedPtr<PCGExGraphs::FUnionGraph> UnionGraph;
+		// Per-processor buffers populated during Process(), drained serially in the post-batch step.
+		TArray<PCGExData::FUnionStreamRecord> NodeRecords;
+		TArray<FStagedEdge> StagedEdges;
 
 		explicit FFusingProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
 			: TProcessor(InPointDataFacade)
@@ -172,7 +195,7 @@ namespace PCGExPathToClusters
 		virtual ~FFusingProcessor() override;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-		void InsertEdges(const PCGExMT::FScope& Scope);
+		void EmitEdges(const PCGExMT::FScope& Scope);
 	};
 
 #pragma endregion

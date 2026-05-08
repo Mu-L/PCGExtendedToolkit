@@ -12,6 +12,11 @@
 
 struct FPCGExCarryOverDetails;
 
+namespace PCGExData
+{
+	class FUnionTable;
+}
+
 namespace PCGExBlending
 {
 	class FMetadataBlender;
@@ -28,8 +33,8 @@ namespace PCGExGraphs
 {
 	class FEdgeEdgeIntersections;
 	class FPointEdgeIntersections;
-	class FUnionGraph;
 	class FGraphBuilder;
+	struct FEdge;
 
 	class PCGEXGRAPHS_API FUnionProcessor : public TSharedFromThis<FUnionProcessor>
 	{
@@ -39,7 +44,16 @@ namespace PCGExGraphs
 		FPCGExContext* Context = nullptr;
 
 		TSharedRef<PCGExData::FFacade> UnionDataFacade;
-		TSharedPtr<FUnionGraph> UnionGraph;
+
+		// Pre-built by the cluster element's Phase 1+2 streaming build, handed off via SetUnionData
+		// before StartExecution. NodesTable provides per-node source-element groups (drives P/P blend);
+		// EdgesTable provides per-edge source groups (drives CompileRange edge blending). Edges is the
+		// flat edge array decoded from EdgesTable's packed (Start, End) keys; AdoptEdges takes ownership.
+		TSharedPtr<PCGExData::FUnionTable> NodesTable;
+		TSharedPtr<PCGExData::FUnionTable> EdgesTable;
+		TArray<FEdge> Edges;
+		FBox Bounds = FBox(ForceInit);
+
 		const TArray<TSharedRef<PCGExData::FFacade>>* SourceEdgesIO = nullptr;
 
 		FPCGExPointPointIntersectionDetails PointPointIntersectionDetails;
@@ -64,7 +78,6 @@ namespace PCGExGraphs
 		explicit FUnionProcessor(
 			FPCGExContext* InContext,
 			TSharedRef<PCGExData::FFacade> InUnionDataFacade,
-			TSharedRef<FUnionGraph> InUnionGraph,
 			FPCGExPointPointIntersectionDetails PointPointIntersectionDetails,
 			FPCGExBlendingDetails InDefaultPointsBlending,
 			FPCGExBlendingDetails InDefaultEdgesBlending);
@@ -74,6 +87,13 @@ namespace PCGExGraphs
 		void InitPointEdge(const FPCGExPointEdgeIntersectionDetails& InDetails, const bool bUseCustom = false, const FPCGExBlendingDetails* InOverride = nullptr);
 
 		void InitEdgeEdge(const FPCGExEdgeEdgeIntersectionDetails& InDetails, const bool bUseCustom = false, const FPCGExBlendingDetails* InOverride = nullptr);
+
+		// Hand off the streaming-built tables and decoded edges before StartExecution. Edges is moved.
+		void SetUnionData(
+			const TSharedPtr<PCGExData::FUnionTable>& InNodesTable,
+			const TSharedPtr<PCGExData::FUnionTable>& InEdgesTable,
+			TArray<FEdge>&& InEdges,
+			const FBox& InBounds);
 
 		bool StartExecution(const TArray<TSharedRef<PCGExData::FFacade>>& InFacades, const FPCGExGraphBuilderDetails& InBuilderDetails);
 

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExUnionData.h"
 #include "Data/PCGExPointElements.h"
 
 namespace PCGExMath
@@ -43,7 +44,7 @@ namespace PCGExData
 
 	// Immutable, packed CSR result of a streaming union build.
 	// One entry per unique Key; Get(i) returns a contiguous view of the source elements that mapped to it.
-	class PCGEXBLENDING_API FUnionTable
+	class PCGEXBLENDING_API FUnionTable final : public IUnionMetadata
 	{
 	public:
 		// Offsets[NumEntries+1] -- entry i covers Elements[Offsets[i] .. Offsets[i+1])
@@ -52,32 +53,31 @@ namespace PCGExData
 		TArray<uint64> Keys;
 
 		FUnionTable() = default;
-		~FUnionTable() = default;
+		virtual ~FUnionTable() override = default;
 
-		FORCEINLINE int32 Num() const { return Offsets.Num() > 0 ? Offsets.Num() - 1 : 0; }
-		FORCEINLINE int32 Size(const int32 EntryIndex) const { return Offsets[EntryIndex + 1] - Offsets[EntryIndex]; }
-		FORCEINLINE bool IsUnion(const int32 EntryIndex) const { return Size(EntryIndex) > 1; }
+		// IUnionMetadata
+		virtual int32 Num() const override { return Offsets.Num() > 0 ? Offsets.Num() - 1 : 0; }
+		virtual int32 Size(const int32 EntryIndex) const override { return Offsets[EntryIndex + 1] - Offsets[EntryIndex]; }
+
+		virtual int32 ComputeWeights(
+			int32 EntryIndex,
+			const TArray<const UPCGBasePointData*>& Sources,
+			const TSharedPtr<PCGEx::FIndexLookup>& IdxLookup,
+			const FPoint& Target,
+			const PCGExMath::IDistances* InDistances,
+			TArray<FWeightedPoint>& OutWeightedPoints) const override;
+
+		virtual bool ContainsIO(int32 EntryIndex, int32 IO) const override;
+		virtual TSet<int32> GetIOSet(int32 EntryIndex) const override;
+		virtual bool IOIndexOverlap(int32 EntryIndex, const TSet<int32>& InIndices) const override;
+
+		// FUnionTable-specific (not on interface)
 		FORCEINLINE uint64 GetKey(const int32 EntryIndex) const { return Keys[EntryIndex]; }
 
 		FORCEINLINE TConstArrayView<FElement> Get(const int32 EntryIndex) const
 		{
 			return MakeArrayView(Elements.GetData() + Offsets[EntryIndex], Size(EntryIndex));
 		}
-
-		bool ContainsIO(const int32 EntryIndex, const int32 IO) const;
-		TSet<int32> GetIOSet(const int32 EntryIndex) const;
-		bool IOIndexOverlap(const int32 EntryIndex, const TSet<int32>& InIndices) const;
-
-		// Populates OutWeightedPoints with one entry per source element (filtered by IdxLookup),
-		// using inverse-distance-from-Target weights normalized to sum to 1.
-		// Bit-identical to IUnionData::ComputeWeights to preserve existing blending output.
-		int32 ComputeWeights(
-			const int32 EntryIndex,
-			const TArray<const UPCGBasePointData*>& Sources,
-			const TSharedPtr<PCGEx::FIndexLookup>& IdxLookup,
-			const FPoint& Target,
-			const PCGExMath::IDistances* InDistances,
-			TArray<FWeightedPoint>& OutWeightedPoints) const;
 
 		static int32 ComputeWeightsForSpan(
 			TConstArrayView<FElement> InElements,

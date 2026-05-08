@@ -16,6 +16,7 @@ namespace PCGEx
 
 namespace PCGExData
 {
+	class IUnionMetadata;
 	class FUnionMetadata;
 }
 
@@ -34,11 +35,14 @@ namespace PCGExGraphs
 		TArray<FNode> Nodes;
 		TArray<FEdge> Edges;
 
-		TSharedPtr<PCGExData::FUnionMetadata> NodesUnion;
+		// Read interface — concrete type is FUnionMetadata (sparse, mutable) or FUnionTable (dense, immutable)
+		// depending on which builder populated it. Consumers needing the rich legacy write API
+		// (NewEntryAt_Unsafe, etc.) should keep their own TSharedPtr<FUnionMetadata> reference.
+		TSharedPtr<PCGExData::IUnionMetadata> NodesUnion;
 		TArray<FGraphNodeMetadata> NodeMetadata;
 		bool bHasAnyNodeMetadata = false;
 
-		TSharedPtr<PCGExData::FUnionMetadata> EdgesUnion;
+		TSharedPtr<PCGExData::IUnionMetadata> EdgesUnion;
 		TArray<FGraphEdgeMetadata> EdgeMetadata;
 		bool bHasAnyEdgeMetadata = false;
 
@@ -67,7 +71,7 @@ namespace PCGExGraphs
 		void InsertEdges(const TArray<uint64>& InEdges, int32 InIOIndex);
 		int32 InsertEdges(const TArray<FEdge>& InEdges);
 
-		/** Bulk-adopt pre-deduplicated edges without hash checking. Edges are guaranteed unique from FUnionGraph. */
+		/** Bulk-adopt pre-deduplicated edges without hash checking. Caller guarantees uniqueness. */
 		void AdoptEdges(TArray<FEdge>& InEdges);
 
 		FEdge* FindEdge_Unsafe(const uint64 Hash);

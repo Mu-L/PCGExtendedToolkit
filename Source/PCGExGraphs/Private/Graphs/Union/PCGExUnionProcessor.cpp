@@ -9,8 +9,10 @@
 #include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Clusters/PCGExEdge.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExProxyDataBlending.h"
+#include "Core/PCGExUnionTable.h"
 #include "Data/PCGExData.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
@@ -18,9 +20,21 @@
 
 namespace PCGExGraphs
 {
-	FUnionProcessor::FUnionProcessor(FPCGExContext* InContext, TSharedRef<PCGExData::FFacade> InUnionDataFacade, TSharedRef<FUnionGraph> InUnionGraph, FPCGExPointPointIntersectionDetails InPointPointIntersectionSettings, FPCGExBlendingDetails InDefaultPointsBlending, FPCGExBlendingDetails InDefaultEdgesBlending)
-		: Context(InContext), UnionDataFacade(InUnionDataFacade), UnionGraph(InUnionGraph), PointPointIntersectionDetails(InPointPointIntersectionSettings), DefaultPointsBlendingDetails(InDefaultPointsBlending), DefaultEdgesBlendingDetails(InDefaultEdgesBlending)
+	FUnionProcessor::FUnionProcessor(FPCGExContext* InContext, TSharedRef<PCGExData::FFacade> InUnionDataFacade, FPCGExPointPointIntersectionDetails InPointPointIntersectionSettings, FPCGExBlendingDetails InDefaultPointsBlending, FPCGExBlendingDetails InDefaultEdgesBlending)
+		: Context(InContext), UnionDataFacade(InUnionDataFacade), PointPointIntersectionDetails(InPointPointIntersectionSettings), DefaultPointsBlendingDetails(InDefaultPointsBlending), DefaultEdgesBlendingDetails(InDefaultEdgesBlending)
 	{
+	}
+
+	void FUnionProcessor::SetUnionData(
+		const TSharedPtr<PCGExData::FUnionTable>& InNodesTable,
+		const TSharedPtr<PCGExData::FUnionTable>& InEdgesTable,
+		TArray<FEdge>&& InEdges,
+		const FBox& InBounds)
+	{
+		NodesTable = InNodesTable;
+		EdgesTable = InEdgesTable;
+		Edges = MoveTemp(InEdges);
+		Bounds = InBounds;
 	}
 
 	FUnionProcessor::~FUnionProcessor()
@@ -48,14 +62,15 @@ namespace PCGExGraphs
 	{
 		BuilderDetails = InBuilderDetails;
 
-		const int32 NumUnionNodes = UnionGraph->Nodes.Num();
+		check(NodesTable && EdgesTable);
+
+		const int32 NumUnionNodes = NodesTable->Num();
 		if (NumUnionNodes == 0)
 		{
 			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Union graph is empty. Something is likely corrupted."));
 			return false;
 		}
 
-		UnionGraph->Collapse();
 		Context->SetState(States::State_ProcessingUnion);
 
 		const TSharedPtr<PCGExBlending::FUnionBlender> TypedBlender = MakeShared<PCGExBlending::FUnionBlender>(
@@ -68,7 +83,41 @@ namespace PCGExGraphs
 		UPCGBasePointData* MutablePoints = UnionDataFacade->GetOut();
 		PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumUnionNodes, UnionBlender->GetAllocatedProperties()); // TODO : Proper Allocation
 
-		if (!TypedBlender->Init(Context, UnionDataFacade, UnionGraph->NodesUnion)) { return false; }
+		if (!TypedBlender->Init(Context, UnionDataFacade, NodesTable)) { return false; }
+
+		// New natural ordering: adopt the graph state up front so downstream phases (P/E, E/E, finalize)
+		// see a fully wired FGraph. Only dependency is that MutablePoints is already sized -- which it is.
+		GraphMetadataDetails.Update(Context, PointPointIntersectionDetails);
+		GraphMetadataDetails.Update(Context, PointEdgeIntersectionDetails);
+		GraphMetadataDetails.Update(Context, EdgeEdgeIntersectionDetails);
+		GraphMetadataDetails.EdgesBlendingDetailsPtr = bUseCustomEdgeEdgeBlending ? &CustomEdgeEdgeBlendingDetails : &DefaultEdgesBlendingDetails;
+		GraphMetadataDetails.EdgesCarryOverDetails = EdgesCarryOverDetails;
+
+		GraphBuilder = MakeShared<FGraphBuilder>(UnionDataFacade, &BuilderDetails);
+		GraphBuilder->bInheritNodeData = false;
+		GraphBuilder->bRequiresEdgeResort = false; // All insertion is sequential → deterministic node ordering
+		// TODO(perf): expose an opt-in Morton remap step on FUnionTableBuilder so we can reinstate the
+		// fast-path. Lexicographic key sort is deterministic but not Morton-spatial.
+		GraphBuilder->bNodesPreSorted = false;
+		GraphBuilder->SourceEdgeFacades = SourceEdgesIO;
+		GraphBuilder->Graph->NodesUnion = NodesTable;
+		GraphBuilder->Graph->EdgesUnion = EdgesTable;
+
+		// Initialize per-node UnionSize from table sizes (was previously done by WriteNodeMetadata).
+		// Per-edge metadata UnionSize is similarly seeded inside AdoptEdges-time logic via the FGraph.
+		// We do it here in one explicit pass so the source of truth is unambiguous.
+		for (int32 i = 0; i < NumUnionNodes; i++)
+		{
+			GraphBuilder->Graph->GetOrCreateNodeMetadata_Unsafe(i).UnionSize = NodesTable->Size(i);
+		}
+
+		GraphBuilder->Graph->AdoptEdges(Edges);
+
+		const int32 NumEdges = EdgesTable->Num();
+		for (int32 i = 0; i < NumEdges; i++)
+		{
+			GraphBuilder->Graph->GetOrCreateEdgeMetadata_Unsafe(i).UnionSize = EdgesTable->Size(i);
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD(Context->GetTaskManager(), ProcessNodesGroup)
 
@@ -79,11 +128,12 @@ namespace PCGExGraphs
 			This->OnNodesProcessingComplete();
 		};
 
-		ProcessNodesGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
+		ProcessNodesGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, InFacades](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
 
 			const TSharedPtr<PCGExBlending::IUnionBlender> Blender = This->UnionBlender;
+			const TSharedPtr<PCGExData::FUnionTable> Table = This->NodesTable;
 
 			TArray<PCGExData::FWeightedPoint> WeightedPoints;
 			TArray<PCGEx::FOpStats> Trackers;
@@ -94,16 +144,22 @@ namespace PCGExGraphs
 
 			PCGEX_SCOPE_LOOP(Index)
 			{
-				TSharedPtr<FUnionNode> UnionNode = This->UnionGraph->Nodes[Index];
+				const TConstArrayView<PCGExData::FElement> Span = Table->Get(Index);
 
-				//const PCGMetadataEntryKey Key = OutPoints[i].MetadataEntry;
-				//OutPoints[Index] = UnionNode->Point; // Copy "original" point properties, in case  there's only one
+				// Compute centroid from source point locations -- replaces FUnionNode::GetCenter() which
+				// previously held a running mean accumulated during sequential cluster build.
+				FVector Center = FVector::ZeroVector;
+				int32 ContributingPoints = 0;
+				for (const PCGExData::FElement& E : Span)
+				{
+					if (E.IO < 0 || !InFacades.IsValidIndex(E.IO)) { continue; }
+					Center += InFacades[E.IO]->GetIn()->GetTransform(E.Index).GetLocation();
+					ContributingPoints++;
+				}
+				if (ContributingPoints > 0) { Center /= static_cast<double>(ContributingPoints); }
 
-				//FPCGPoint& Point = OutPoints[Index];
-				//Point.MetadataEntry = Key; // Restore key
-
-				OutTransforms[Index].SetLocation(UnionNode->GetCenter());
-				Blender->MergeSingle(Index, WeightedPoints, Trackers);
+				OutTransforms[Index].SetLocation(Center);
+				Blender->MergeSingle(Index, Span, WeightedPoints, Trackers);
 			}
 		};
 
@@ -121,22 +177,17 @@ namespace PCGExGraphs
 
 		bRunning = true;
 
-
-		GraphMetadataDetails.Update(Context, PointPointIntersectionDetails);
-		GraphMetadataDetails.Update(Context, PointEdgeIntersectionDetails);
-		GraphMetadataDetails.Update(Context, EdgeEdgeIntersectionDetails);
-		GraphMetadataDetails.EdgesBlendingDetailsPtr = bUseCustomEdgeEdgeBlending ? &CustomEdgeEdgeBlendingDetails : &DefaultEdgesBlendingDetails;
-		GraphMetadataDetails.EdgesCarryOverDetails = EdgesCarryOverDetails;
-
-		GraphBuilder = MakeShared<FGraphBuilder>(UnionDataFacade, &BuilderDetails);
-		GraphBuilder->bInheritNodeData = false;
-		GraphBuilder->bRequiresEdgeResort = false; // All insertion is sequential → deterministic node ordering
-		GraphBuilder->bNodesPreSorted = UnionGraph->bNodesSorted;
-		GraphBuilder->SourceEdgeFacades = SourceEdgesIO;
-		GraphBuilder->Graph->NodesUnion = UnionGraph->NodesUnion;
-		GraphBuilder->Graph->EdgesUnion = UnionGraph->EdgesUnion;
-
-		GraphBuilder->Graph->AdoptEdges(UnionGraph->Edges);
+		// Adoption happened in StartExecution. Only thing left here is flushing blended attribute
+		// buffers before P/E reads them. Critical: we collect the per-buffer write callbacks first
+		// and *only* spin up an async group if there's actual work -- creating one without queued
+		// tasks registers an orphan token that hangs the graph forever.
+		TArray<PCGExMT::FSimpleCallback> WriteCallbacks = UnionDataFacade->GetWriteBufferCallbacks();
+		if (WriteCallbacks.IsEmpty())
+		{
+			UnionDataFacade->Flush();
+			InternalStartExecution();
+			return;
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), WriteMetadataTask);
 		WriteMetadataTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
@@ -146,20 +197,7 @@ namespace PCGExGraphs
 			This->InternalStartExecution();
 		};
 
-		UnionDataFacade->WriteBuffersAsCallbacks(WriteMetadataTask);
-
-		WriteMetadataTask->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE]()
-		{
-			PCGEX_ASYNC_THIS
-			This->UnionGraph->WriteNodeMetadata(This->GraphBuilder->Graph);
-		});
-
-		WriteMetadataTask->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE]()
-		{
-			PCGEX_ASYNC_THIS
-			This->UnionGraph->WriteEdgeMetadata(This->GraphBuilder->Graph);
-		});
-
+		WriteMetadataTask->AddSimpleCallbacks(MoveTemp(WriteCallbacks));
 		WriteMetadataTask->StartSimpleCallbacks();
 	}
 
@@ -332,7 +370,7 @@ namespace PCGExGraphs
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), FindEdgeEdgeGroup)
 
-		EdgeEdgeIntersections = MakeShared<FEdgeEdgeIntersections>(GraphBuilder->Graph, UnionGraph, UnionDataFacade->Source, &EdgeEdgeIntersectionDetails);
+		EdgeEdgeIntersections = MakeShared<FEdgeEdgeIntersections>(GraphBuilder->Graph, Bounds, UnionDataFacade->Source, &EdgeEdgeIntersectionDetails);
 
 		Context->SetState(States::State_ProcessingEdgeEdgeIntersections);
 
