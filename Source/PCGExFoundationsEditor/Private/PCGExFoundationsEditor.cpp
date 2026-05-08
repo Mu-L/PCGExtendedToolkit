@@ -47,6 +47,7 @@ void FPCGExFoundationsEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandNameVector", FPCGExInputShorthandVectorCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandNameDirection", FPCGExInputShorthandDirectionCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandNameRotator", FPCGExInputShorthandRotatorCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExInputShorthandNameSoftObjectPath", FPCGExInputShorthandSoftObjectPathCustomization)
 
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandSelectorBoolean", FPCGExInputShorthandCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandSelectorFloat", FPCGExInputShorthandCustomization)
@@ -61,6 +62,7 @@ void FPCGExFoundationsEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandSelectorVector", FPCGExInputShorthandVectorCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandSelectorDirection", FPCGExInputShorthandDirectionCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExInputShorthandSelectorRotator", FPCGExInputShorthandRotatorCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExInputShorthandSelectorSoftObjectPath", FPCGExInputShorthandSoftObjectPathCustomization)
 }
 
 PCGEX_IMPLEMENT_MODULE(FPCGExFoundationsEditorModule, PCGExFoundationsEditor)
