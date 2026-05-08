@@ -159,6 +159,24 @@ bool FPCGExStagingLoadLevelElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
+	if (const UClass* StreamClass = Settings->StreamingLevelClass.Get())
+	{
+		if (StreamClass->IsChildOf(ULevelStreamingLevelInstance::StaticClass()))
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("StreamingLevelClass is a subclass of ULevelStreamingLevelInstance, which is reserved for the ALevelInstance actor path and requires engine-side subsystem registration. Using it on the streaming level path will crash at runtime. Use a subclass of ULevelStreamingDynamic instead (e.g. UPCGExLevelStreamingDynamic)."));
+			return false;
+		}
+	}
+
+#if WITH_EDITOR
+	if (Settings->bSpawnAsLevelInstance
+		&& !(Settings->bSpawnAsLevelInstance && InContext->GetComponent()->GenerationTrigger != EPCGComponentGenerationTrigger::GenerateAtRuntime)
+		&& !Settings->bQuietRuntimeFallbackWarning)
+	{
+		PCGE_LOG(Warning, GraphAndLog, LOCTEXT("RuntimeFallback", "Spawn As Level Instance is enabled but the component uses Generate At Runtime. Falling back to streaming levels."));
+	}
+#endif
+
 	return true;
 }
 
@@ -254,6 +272,9 @@ namespace PCGExStagingLoadLevel
 			FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
 			if (!Result.IsValid()) { continue; }
 
+			// Check if this is a Level entry
+			if (!Result.Entry->IsType(PCGExAssetCollection::TypeIds::Level)) { continue; }
+			
 			const FSoftObjectPath& LevelPath = Result.Entry->Staging.Path;
 			if (!LevelPath.IsValid()) { continue; }
 
@@ -399,12 +420,6 @@ namespace PCGExStagingLoadLevel
 			// whose output is transient and would otherwise leave stale actors in the level.
 			bUseLevelInstance = Settings->bSpawnAsLevelInstance
 				&& SourceComponent->GenerationTrigger != EPCGComponentGenerationTrigger::GenerateAtRuntime;
-
-			if (Settings->bSpawnAsLevelInstance && !bUseLevelInstance && !Settings->bQuietRuntimeFallbackWarning)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
-				           LOCTEXT("RuntimeFallback", "Spawn As Level Instance is enabled but the component uses Generate At Runtime. Falling back to streaming levels."));
-			}
 
 			if (bUseLevelInstance)
 			{

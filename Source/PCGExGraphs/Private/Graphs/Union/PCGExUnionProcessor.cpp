@@ -6,11 +6,14 @@
 
 #include "PCGExCoreSettingsCache.h"
 #include "Blenders/PCGExMetadataBlender.h"
+#include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Clusters/PCGExEdge.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExProxyDataBlending.h"
+#include "Core/PCGExUnionTable.h"
 #include "Data/PCGExData.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
@@ -18,9 +21,21 @@
 
 namespace PCGExGraphs
 {
-	FUnionProcessor::FUnionProcessor(FPCGExContext* InContext, TSharedRef<PCGExData::FFacade> InUnionDataFacade, TSharedRef<FUnionGraph> InUnionGraph, FPCGExPointPointIntersectionDetails InPointPointIntersectionSettings, FPCGExBlendingDetails InDefaultPointsBlending, FPCGExBlendingDetails InDefaultEdgesBlending)
-		: Context(InContext), UnionDataFacade(InUnionDataFacade), UnionGraph(InUnionGraph), PointPointIntersectionDetails(InPointPointIntersectionSettings), DefaultPointsBlendingDetails(InDefaultPointsBlending), DefaultEdgesBlendingDetails(InDefaultEdgesBlending)
+	FUnionProcessor::FUnionProcessor(FPCGExContext* InContext, TSharedRef<PCGExData::FFacade> InUnionDataFacade, FPCGExPointPointIntersectionDetails InPointPointIntersectionSettings, FPCGExBlendingDetails InDefaultPointsBlending, FPCGExBlendingDetails InDefaultEdgesBlending)
+		: Context(InContext), UnionDataFacade(InUnionDataFacade), PointPointIntersectionDetails(InPointPointIntersectionSettings), DefaultPointsBlendingDetails(InDefaultPointsBlending), DefaultEdgesBlendingDetails(InDefaultEdgesBlending)
 	{
+	}
+
+	void FUnionProcessor::SetUnionData(
+		const TSharedPtr<PCGExData::FUnionTable>& InNodesTable,
+		const TSharedPtr<PCGExData::FUnionTable>& InEdgesTable,
+		TArray<FEdge>&& InEdges,
+		const FBox& InBounds)
+	{
+		NodesTable = InNodesTable;
+		EdgesTable = InEdgesTable;
+		Edges = MoveTemp(InEdges);
+		Bounds = InBounds;
 	}
 
 	FUnionProcessor::~FUnionProcessor()
@@ -48,14 +63,15 @@ namespace PCGExGraphs
 	{
 		BuilderDetails = InBuilderDetails;
 
-		const int32 NumUnionNodes = UnionGraph->Nodes.Num();
+		check(NodesTable && EdgesTable);
+
+		const int32 NumUnionNodes = NodesTable->Num();
 		if (NumUnionNodes == 0)
 		{
 			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Union graph is empty. Something is likely corrupted."));
 			return false;
 		}
 
-		UnionGraph->Collapse();
 		Context->SetState(States::State_ProcessingUnion);
 
 		const TSharedPtr<PCGExBlending::FUnionBlender> TypedBlender = MakeShared<PCGExBlending::FUnionBlender>(
@@ -68,7 +84,41 @@ namespace PCGExGraphs
 		UPCGBasePointData* MutablePoints = UnionDataFacade->GetOut();
 		PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumUnionNodes, UnionBlender->GetAllocatedProperties()); // TODO : Proper Allocation
 
-		if (!TypedBlender->Init(Context, UnionDataFacade, UnionGraph->NodesUnion)) { return false; }
+		if (!TypedBlender->Init(Context, UnionDataFacade, NodesTable)) { return false; }
+
+		// New natural ordering: adopt the graph state up front so downstream phases (P/E, E/E, finalize)
+		// see a fully wired FGraph. Only dependency is that MutablePoints is already sized -- which it is.
+		GraphMetadataDetails.Update(Context, PointPointIntersectionDetails);
+		GraphMetadataDetails.Update(Context, PointEdgeIntersectionDetails);
+		GraphMetadataDetails.Update(Context, EdgeEdgeIntersectionDetails);
+		GraphMetadataDetails.EdgesBlendingDetailsPtr = bUseCustomEdgeEdgeBlending ? &CustomEdgeEdgeBlendingDetails : &DefaultEdgesBlendingDetails;
+		GraphMetadataDetails.EdgesCarryOverDetails = EdgesCarryOverDetails;
+
+		GraphBuilder = MakeShared<FGraphBuilder>(UnionDataFacade, &BuilderDetails);
+		GraphBuilder->bInheritNodeData = false;
+		GraphBuilder->bRequiresEdgeResort = false; // All insertion is sequential → deterministic node ordering
+		// TODO(perf): expose an opt-in Morton remap step on FUnionTableBuilder so we can reinstate the
+		// fast-path. Lexicographic key sort is deterministic but not Morton-spatial.
+		GraphBuilder->bNodesPreSorted = false;
+		GraphBuilder->SourceEdgeFacades = SourceEdgesIO;
+		GraphBuilder->Graph->NodesUnion = NodesTable;
+		GraphBuilder->Graph->EdgesUnion = EdgesTable;
+
+		// Initialize per-node UnionSize from table sizes (was previously done by WriteNodeMetadata).
+		// Per-edge metadata UnionSize is similarly seeded inside AdoptEdges-time logic via the FGraph.
+		// We do it here in one explicit pass so the source of truth is unambiguous.
+		for (int32 i = 0; i < NumUnionNodes; i++)
+		{
+			GraphBuilder->Graph->GetOrCreateNodeMetadata_Unsafe(i).UnionSize = NodesTable->Size(i);
+		}
+
+		GraphBuilder->Graph->AdoptEdges(Edges);
+
+		const int32 NumEdges = EdgesTable->Num();
+		for (int32 i = 0; i < NumEdges; i++)
+		{
+			GraphBuilder->Graph->GetOrCreateEdgeMetadata_Unsafe(i).UnionSize = EdgesTable->Size(i);
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD(Context->GetTaskManager(), ProcessNodesGroup)
 
@@ -79,11 +129,12 @@ namespace PCGExGraphs
 			This->OnNodesProcessingComplete();
 		};
 
-		ProcessNodesGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
+		ProcessNodesGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, InFacades](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
 
 			const TSharedPtr<PCGExBlending::IUnionBlender> Blender = This->UnionBlender;
+			const TSharedPtr<PCGExData::FUnionTable> Table = This->NodesTable;
 
 			TArray<PCGExData::FWeightedPoint> WeightedPoints;
 			TArray<PCGEx::FOpStats> Trackers;
@@ -94,16 +145,22 @@ namespace PCGExGraphs
 
 			PCGEX_SCOPE_LOOP(Index)
 			{
-				TSharedPtr<FUnionNode> UnionNode = This->UnionGraph->Nodes[Index];
+				const TConstArrayView<PCGExData::FElement> Span = Table->Get(Index);
 
-				//const PCGMetadataEntryKey Key = OutPoints[i].MetadataEntry;
-				//OutPoints[Index] = UnionNode->Point; // Copy "original" point properties, in case  there's only one
+				// Compute centroid from source point locations -- replaces FUnionNode::GetCenter() which
+				// previously held a running mean accumulated during sequential cluster build.
+				FVector Center = FVector::ZeroVector;
+				int32 ContributingPoints = 0;
+				for (const PCGExData::FElement& E : Span)
+				{
+					if (E.IO < 0 || !InFacades.IsValidIndex(E.IO)) { continue; }
+					Center += InFacades[E.IO]->GetIn()->GetTransform(E.Index).GetLocation();
+					ContributingPoints++;
+				}
+				if (ContributingPoints > 0) { Center /= static_cast<double>(ContributingPoints); }
 
-				//FPCGPoint& Point = OutPoints[Index];
-				//Point.MetadataEntry = Key; // Restore key
-
-				OutTransforms[Index].SetLocation(UnionNode->GetCenter());
-				Blender->MergeSingle(Index, WeightedPoints, Trackers);
+				OutTransforms[Index].SetLocation(Center);
+				Blender->MergeSingle(Index, Span, WeightedPoints, Trackers);
 			}
 		};
 
@@ -121,22 +178,17 @@ namespace PCGExGraphs
 
 		bRunning = true;
 
-
-		GraphMetadataDetails.Update(Context, PointPointIntersectionDetails);
-		GraphMetadataDetails.Update(Context, PointEdgeIntersectionDetails);
-		GraphMetadataDetails.Update(Context, EdgeEdgeIntersectionDetails);
-		GraphMetadataDetails.EdgesBlendingDetailsPtr = bUseCustomEdgeEdgeBlending ? &CustomEdgeEdgeBlendingDetails : &DefaultEdgesBlendingDetails;
-		GraphMetadataDetails.EdgesCarryOverDetails = EdgesCarryOverDetails;
-
-		GraphBuilder = MakeShared<FGraphBuilder>(UnionDataFacade, &BuilderDetails);
-		GraphBuilder->bInheritNodeData = false;
-		GraphBuilder->bRequiresEdgeResort = false; // All insertion is sequential → deterministic node ordering
-		GraphBuilder->bNodesPreSorted = UnionGraph->bNodesSorted;
-		GraphBuilder->SourceEdgeFacades = SourceEdgesIO;
-		GraphBuilder->Graph->NodesUnion = UnionGraph->NodesUnion;
-		GraphBuilder->Graph->EdgesUnion = UnionGraph->EdgesUnion;
-
-		GraphBuilder->Graph->AdoptEdges(UnionGraph->Edges);
+		// Adoption happened in StartExecution. Only thing left here is flushing blended attribute
+		// buffers before P/E reads them. Critical: we collect the per-buffer write callbacks first
+		// and *only* spin up an async group if there's actual work -- creating one without queued
+		// tasks registers an orphan token that hangs the graph forever.
+		TArray<PCGExMT::FSimpleCallback> WriteCallbacks = UnionDataFacade->GetWriteBufferCallbacks();
+		if (WriteCallbacks.IsEmpty())
+		{
+			UnionDataFacade->Flush();
+			InternalStartExecution();
+			return;
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), WriteMetadataTask);
 		WriteMetadataTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
@@ -146,20 +198,7 @@ namespace PCGExGraphs
 			This->InternalStartExecution();
 		};
 
-		UnionDataFacade->WriteBuffersAsCallbacks(WriteMetadataTask);
-
-		WriteMetadataTask->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE]()
-		{
-			PCGEX_ASYNC_THIS
-			This->UnionGraph->WriteNodeMetadata(This->GraphBuilder->Graph);
-		});
-
-		WriteMetadataTask->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE]()
-		{
-			PCGEX_ASYNC_THIS
-			This->UnionGraph->WriteEdgeMetadata(This->GraphBuilder->Graph);
-		});
-
+		WriteMetadataTask->AddSimpleCallbacks(MoveTemp(WriteCallbacks));
 		WriteMetadataTask->StartSimpleCallbacks();
 	}
 
@@ -198,19 +237,23 @@ namespace PCGExGraphs
 
 #pragma region PointEdge
 
-
 	void FUnionProcessor::FindPointEdgeIntersections()
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FUnionProcessor::FindPointEdgeIntersections);
 
-		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), FindPointEdgeGroup)
-
-		PointEdgeIntersections = MakeShared<FPointEdgeIntersections>(GraphBuilder->Graph, UnionDataFacade->Source, &PointEdgeIntersectionDetails);
-
 		Context->SetState(States::State_ProcessingPointEdgeIntersections);
 
-		// Init point octree
-		(void)PointEdgeIntersections->PointIO->GetOutIn()->GetPointOctree();
+		// Fresh allocations -- the graph has been adopted but not yet mutated by P/E. We rebuild
+		// rather than try to share with E/E since E/E runs against a post-P/E graph (different
+		// edge count) and uses its own tolerance.
+		IntersectionAllocations = MakeShared<FIntersectionAllocations>(GraphBuilder->Graph, UnionDataFacade->Source);
+		IntersectionAllocations->Build(PointEdgeIntersectionDetails.FuseDetails.Tolerance);
+		if (!PointEdgeIntersectionDetails.bEnableSelfIntersection) { IntersectionAllocations->BuildRootIOSets(); }
+
+		// Init point octree (P/E queries the *output* point octree, so it has to exist)
+		(void)IntersectionAllocations->PointIO->GetOutIn()->GetPointOctree();
+
+		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), FindPointEdgeGroup)
 
 		FindPointEdgeGroup->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 		{
@@ -221,64 +264,53 @@ namespace PCGExGraphs
 		FindPointEdgeGroup->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops)
 		{
 			PCGEX_ASYNC_THIS
-			This->PointEdgeIntersections->Init(Loops);
+			This->ScopedPERecords = MakeShared<PCGExMT::TScopedArray<FPECollinear>>(Loops);
+			// Pre-reserve scope arrays at ~1 record per edge in the scope. Avoids the realloc
+			// cascade as records accumulate; over-allocation is cheap (records are small PODs).
+			for (const PCGExMT::FScope& S : Loops)
+			{
+				This->ScopedPERecords->Get_Ref(S).Reserve(S.Count);
+			}
 		};
 
 		FindPointEdgeGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(FindPointEdgeIntersections::ScopeLoop)
-
 			PCGEX_ASYNC_THIS
-			TSharedPtr<FPointEdgeProxy> EdgeProxy = MakeShared<FPointEdgeProxy>();
-			TSharedPtr<FPointEdgeIntersections> PEI = This->PointEdgeIntersections;
-
-			TArray<TSharedPtr<FPointEdgeProxy>>& ScopedEdges = PEI->ScopedEdges->Get_Ref(Scope);
-
-			int32& PENum_Ref = This->PENum;
-			TArray<FEdge>& GraphEdges = This->GraphBuilder->Graph->Edges;
-
-#define PCGEX_FOUND_PE \
-				ScopedEdges.Add(EdgeProxy); \
-				FPlatformAtomics::InterlockedAdd(&PENum_Ref, EdgeProxy->CollinearPoints.Num() + 1); \
-				GraphEdges[Index].bValid = 0; \
-				EdgeProxy->CollinearPoints.Sort([](const FPESplit& A, const FPESplit& B) { return A.Time < B.Time; }); \
-				EdgeProxy = MakeShared<FPointEdgeProxy>();
-
-			// Self-intersection bool is hoisted out of the loop -- FindCollinearNodes handles
-			// the branching internally (computing RootIOIndices only when needed).
-			const bool bSelfIntersect = PEI->Details->bEnableSelfIntersection;
-			PCGEX_SCOPE_LOOP(Index)
-			{
-				if (!PEI->InitProxy(EdgeProxy, Index)) { continue; }
-				FindCollinearNodes(PEI, EdgeProxy, bSelfIntersect);
-				if (!EdgeProxy->IsEmpty()) { PCGEX_FOUND_PE }
-			}
-#undef PCGEX_FOUND_PE
+			TArray<FPECollinear>& Records = This->ScopedPERecords->Get_Ref(Scope);
+			PointEdgePass::Emit(*This->IntersectionAllocations, This->PointEdgeIntersectionDetails, This->PointEdgeIntersectionDetails.bEnableSelfIntersection, Scope, Records);
 		};
 
 		FindPointEdgeGroup->StartSubLoops(GraphBuilder->Graph->Edges.Num(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize * 2);
 	}
 
-
 	void FUnionProcessor::OnPointEdgeIntersectionsFound()
 	{
-		if (!PointEdgeIntersections)
+		TRACE_CPUPROFILER_EVENT_SCOPE(FUnionProcessor::OnPointEdgeIntersectionsFound);
+
+		if (!ScopedPERecords)
 		{
 			OnPointEdgeIntersectionsComplete();
 			return;
 		}
 
-		// InsertEdges collapses ScopedEdges into Edges, then creates sub-edges in the graph.
-		// Must only be called once -- a second call would find duplicates via InsertEdge_Unsafe
-		// and incorrectly increment UnionSize on existing metadata.
-		PointEdgeIntersections->InsertEdges();
+		// Drain scope-local records into a single flat array. Order across scopes is stable since
+		// TScopedArray::Collapse concatenates in scope-index order; the apply pass sorts anyway.
+		TArray<FPECollinear> Records;
+		ScopedPERecords->Collapse(Records);
+		ScopedPERecords.Reset();
 
-		if (PointEdgeIntersections->Edges.IsEmpty())
+		PENum = Records.Num();
+
+		if (Records.IsEmpty())
 		{
 			OnPointEdgeIntersectionsComplete();
 			return;
 		}
 
+		PointEdgePass::Apply(*IntersectionAllocations, PointEdgeIntersectionDetails, Records);
+
+		// Blend pass -- still a no-op body (proper P/E lerp still TODO). We retain
+		// the async group + blender plumbing so it's a one-line edit when the time comes.
 		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), BlendPointEdgeGroup)
 
 		UnionDataFacade->Source->ClearCachedKeys();
@@ -289,7 +321,6 @@ namespace PCGExGraphs
 
 		if (!MetadataBlender->Init(Context, bUseCustomPointEdgeBlending ? CustomPointEdgeBlendingDetails : DefaultPointsBlendingDetails, &PCGExClusters::Labels::ProtectedClusterAttributes))
 		{
-			// Fail
 			Context->CancelExecution(FString("Error initializing Point/Edge blending"));
 			return;
 		}
@@ -303,22 +334,22 @@ namespace PCGExGraphs
 		BlendPointEdgeGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
-
 			if (!This->MetadataBlender) { return; }
 			const TSharedRef<PCGExBlending::FMetadataBlender> Blender = This->MetadataBlender.ToSharedRef();
 
 			PCGEX_SCOPE_LOOP(Index)
 			{
-				// TODO
+				// TODO : per-record blend via PointEdgePass::BlendIntersection
 			}
 		};
 
-		BlendPointEdgeGroup->StartSubLoops(PointEdgeIntersections->Edges.Num(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize * 2);
+		BlendPointEdgeGroup->StartSubLoops(Records.Num(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize * 2);
 	}
 
 	void FUnionProcessor::OnPointEdgeIntersectionsComplete()
 	{
-		PointEdgeIntersections.Reset();
+		// Allocations and scoped records are scratch -- release before E/E rebuilds them.
+		IntersectionAllocations.Reset();
 		if (MetadataBlender) { UnionDataFacade->WriteFastest(Context->GetTaskManager()); }
 	}
 
@@ -330,11 +361,14 @@ namespace PCGExGraphs
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FUnionProcessor::FindEdgeEdgeIntersections);
 
-		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), FindEdgeEdgeGroup)
-
-		EdgeEdgeIntersections = MakeShared<FEdgeEdgeIntersections>(GraphBuilder->Graph, UnionGraph, UnionDataFacade->Source, &EdgeEdgeIntersectionDetails);
-
 		Context->SetState(States::State_ProcessingEdgeEdgeIntersections);
+
+		IntersectionAllocations = MakeShared<FIntersectionAllocations>(GraphBuilder->Graph, UnionDataFacade->Source);
+		IntersectionAllocations->Build(EdgeEdgeIntersectionDetails.Tolerance);
+		if (!EdgeEdgeIntersectionDetails.bEnableSelfIntersection) { IntersectionAllocations->BuildRootIOSets(); }
+		IntersectionAllocations->BuildEdgeOctree(Bounds);
+
+		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), FindEdgeEdgeGroup)
 
 		FindEdgeEdgeGroup->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 		{
@@ -345,40 +379,19 @@ namespace PCGExGraphs
 		FindEdgeEdgeGroup->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops)
 		{
 			PCGEX_ASYNC_THIS
-			This->EdgeEdgeIntersections->Init(Loops);
+			This->ScopedEERecords = MakeShared<PCGExMT::TScopedArray<FEECrossing>>(Loops);
+			for (const PCGExMT::FScope& S : Loops)
+			{
+				This->ScopedEERecords->Get_Ref(S).Reserve(S.Count);
+			}
 		};
 
 		FindEdgeEdgeGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
-
-			int32& EENum_Ref = This->EENum;
-			TArray<FEdge>& GraphEdges = This->GraphBuilder->Graph->Edges;
-
-#define PCGEX_FOUND_EE \
-				ScopedEdges.Add(EdgeProxy); \
-				GraphEdges[Index].bValid = 0; \
-				FPlatformAtomics::InterlockedAdd(&EENum_Ref, EdgeProxy->Crossings.Num()); \
-				EdgeProxy = MakeShared<FEdgeEdgeProxy>();
-
-
-			const TSharedRef<FEdgeEdgeIntersections> EEI = This->EdgeEdgeIntersections.ToSharedRef();
-			TArray<TSharedPtr<FEdgeEdgeProxy>>& ScopedEdges = EEI->ScopedEdges->Get_Ref(Scope);
-
-			TSharedPtr<FEdgeEdgeProxy> EdgeProxy = MakeShared<FEdgeEdgeProxy>();
-
-			// Same pattern as PE: self-intersection bool hoisted, FindOverlappingEdges handles internally.
-			const bool bSelfIntersect = EEI->Details->bEnableSelfIntersection;
-			PCGEX_SCOPE_LOOP(Index)
-			{
-				if (!EEI->InitProxy(EdgeProxy, Index)) { continue; }
-				FindOverlappingEdges(EEI, EdgeProxy, bSelfIntersect);
-				if (!EdgeProxy->IsEmpty()) { PCGEX_FOUND_EE }
-			}
-
-#undef PCGEX_FOUND_EE
+			TArray<FEECrossing>& Records = This->ScopedEERecords->Get_Ref(Scope);
+			EdgeEdgePass::Emit(*This->IntersectionAllocations, This->EdgeEdgeIntersectionDetails, This->EdgeEdgeIntersectionDetails.bEnableSelfIntersection, Scope, Records);
 		};
-
 
 		FindEdgeEdgeGroup->StartSubLoops(GraphBuilder->Graph->Edges.Num(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize * 2);
 	}
@@ -387,16 +400,38 @@ namespace PCGExGraphs
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FUnionProcessor::OnEdgeEdgeIntersectionsFound);
 
-		if (!EdgeEdgeIntersections || !EdgeEdgeIntersections->InsertNodes(EENum / 2))
+		if (!ScopedEERecords)
 		{
 			OnEdgeEdgeIntersectionsComplete();
 			return;
 		}
 
-		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), BlendEdgeEdgeGroup)
+		ScopedEERecords->Collapse(EECrossings);
+		ScopedEERecords.Reset();
 
-		EdgeEdgeIntersections->InsertEdges();
+		EENum = EECrossings.Num();
+
+		if (EECrossings.IsEmpty())
+		{
+			OnEdgeEdgeIntersectionsComplete();
+			return;
+		}
+
+		// Phase 2 (sequential): dedupe + endpoint-reuse + node allocation.
+		const int32 NewlyAllocated = EdgeEdgePass::ResolveCrossings(*IntersectionAllocations, EECrossings);
+
+		// Phase 3 (sequential): subdivide edges.
+		EdgeEdgePass::Apply(*IntersectionAllocations, EECrossings);
+
 		UnionDataFacade->Source->ClearCachedKeys();
+
+		// Phase 4 (parallel): blend at each newly-allocated crossing node. Skip if no new nodes
+		// (i.e. every crossing resolved onto an existing endpoint -- no new node needs blending).
+		if (NewlyAllocated <= 0)
+		{
+			OnEdgeEdgeIntersectionsComplete();
+			return;
+		}
 
 		MetadataBlender = MakeShared<PCGExBlending::FMetadataBlender>();
 		MetadataBlender->SetTargetData(UnionDataFacade);
@@ -404,10 +439,11 @@ namespace PCGExGraphs
 
 		if (!MetadataBlender->Init(Context, bUseCustomEdgeEdgeBlending ? CustomEdgeEdgeBlendingDetails : DefaultPointsBlendingDetails, &PCGExClusters::Labels::ProtectedClusterAttributes))
 		{
-			// Fail
 			Context->CancelExecution(FString("Error initializing Edge/Edge blending"));
 			return;
 		}
+
+		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), BlendEdgeEdgeGroup)
 
 		BlendEdgeEdgeGroup->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 		{
@@ -415,30 +451,32 @@ namespace PCGExGraphs
 			This->OnEdgeEdgeIntersectionsComplete();
 		};
 
-		BlendEdgeEdgeGroup->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops)
-		{
-			PCGEX_ASYNC_THIS
-		};
-
 		BlendEdgeEdgeGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
-
 			if (!This->MetadataBlender) { return; }
 			const TSharedRef<PCGExBlending::FMetadataBlender> Blender = This->MetadataBlender.ToSharedRef();
 
 			TArray<PCGEx::FOpStats> Trackers;
 			Blender->InitTrackers(Trackers);
 
-			PCGEX_SCOPE_LOOP(Index) { This->EdgeEdgeIntersections->BlendIntersection(Index, Blender, Trackers); }
+			PCGEX_SCOPE_LOOP(Index)
+			{
+				const FEECrossing& Crossing = This->EECrossings[Index];
+				// Only primaries that allocated a new node need blending. Duplicates and reused-
+				// endpoint records share the existing node's already-blended state.
+				if (!Crossing.bIsPrimary || !Crossing.bAllocatedNewNode) { continue; }
+				EdgeEdgePass::BlendIntersection(*This->IntersectionAllocations, Blender, Crossing, Trackers);
+			}
 		};
 
-		BlendEdgeEdgeGroup->StartSubLoops(EdgeEdgeIntersections->UniqueCrossings.Num(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize * 2);
+		BlendEdgeEdgeGroup->StartSubLoops(EECrossings.Num(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize * 2);
 	}
 
 	void FUnionProcessor::OnEdgeEdgeIntersectionsComplete()
 	{
-		if (EdgeEdgeIntersections) { EdgeEdgeIntersections.Reset(); }
+		EECrossings.Empty();
+		IntersectionAllocations.Reset();
 		UnionDataFacade->WriteFastest(Context->GetTaskManager());
 	}
 

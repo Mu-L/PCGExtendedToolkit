@@ -57,11 +57,11 @@ public:
 	EPCGExResolutionMode ResolutionMode = EPCGExResolutionMode::Distance;
 
 	/** Adjust sample spacing so all samples are evenly distributed across the path length. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Mode == EPCGExResampleMode::Sweep && ResolutionMode == EPCGExResolutionMode::Distance"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Mode == EPCGExResampleMode::Sweep && ResolutionMode == EPCGExResolutionMode::Distance", EditConditionHides))
 	bool bRedistributeEvenly = true;
 
 	/** (ignored for closed loops) */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bRedistributeEvenly && Mode == EPCGExResampleMode::Sweep && ResolutionMode == EPCGExResolutionMode::Distance"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bRedistributeEvenly && Mode == EPCGExResampleMode::Sweep && ResolutionMode == EPCGExResolutionMode::Distance", EditConditionHides))
 	bool bPreserveLastPoint = false;
 
 	UPROPERTY()

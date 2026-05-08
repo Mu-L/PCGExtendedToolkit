@@ -350,7 +350,13 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		void Flush();
 
 		void Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const bool bEnsureValidKeys = true);
-		FPlatformTypes::int32 WriteBuffersAsCallbacks(const TSharedPtr<PCGExMT::FTaskGroup>& TaskGroup);
+
+		// Returns one write callback per writable buffer. Empty if validation fails or there are
+		// no writable buffers. Caller owns the dispatch decision -- in particular, this exists so
+		// callers can decide whether to spin up a TaskGroup at all (creating one without queuing
+		// work registers an orphan token that the task manager waits on indefinitely).
+		TArray<PCGExMT::FSimpleCallback> GetWriteBufferCallbacks();
+
 		void WriteBuffers(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, PCGExMT::FCompletionCallback&& Callback);
 		int32 WriteSynchronous(const bool bEnsureValidKeys = true);
 		void WriteFastest(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const bool bEnsureValidKeys = true);

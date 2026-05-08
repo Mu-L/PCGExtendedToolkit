@@ -6,6 +6,8 @@
 
 #include "Data/PCGExPointIO.h"
 #include "Core/PCGExUnionData.h"
+#include "Core/PCGExUnionTable.h"
+#include "Core/PCGExUnionRegistry.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
 #include "Graphs/PCGExGraph.h"
@@ -52,15 +54,18 @@ bool FPCGExPathToClustersElement::Boot(FPCGExContext* InContext) const
 
 		Context->UnionDataFacade = MakeShared<PCGExData::FFacade>(UnionVtxPoints.ToSharedRef());
 
-		Context->UnionGraph = MakeShared<PCGExGraphs::FUnionGraph>(Settings->PointPointIntersectionDetails.FuseDetails, Context->MainPoints->GetInBounds().ExpandBy(10), Context->MainPoints);
-
+		Context->FuseDetails = Settings->PointPointIntersectionDetails.FuseDetails;
 		// TODO : Support local fuse distance, requires access to all input facades
-		if (!Context->UnionGraph->Init(Context)) { return false; }
-		Context->UnionGraph->Reserve(Context->MainPoints->GetInNumPoints(), -1);
+		if (!Context->FuseDetails.Init(Context, nullptr)) { return false; }
 
-		Context->UnionGraph->EdgesUnion->bIsAbstract = true; // Because we don't have edge data
+		Context->FuseBounds = Context->MainPoints->GetInBounds().ExpandBy(10);
+		Context->bUseOctreeMode = (Context->FuseDetails.GetEffectiveMethod() == EPCGExFuseMethod::Octree);
 
-		Context->UnionProcessor = MakeShared<PCGExGraphs::FUnionProcessor>(Context, Context->UnionDataFacade.ToSharedRef(), Context->UnionGraph.ToSharedRef(), Settings->PointPointIntersectionDetails, Settings->DefaultPointsBlendingDetails, Settings->DefaultEdgesBlendingDetails);
+		Context->NodeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
+		Context->EdgeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
+		if (Context->bUseOctreeMode) { Context->NodeRegistry = MakeShared<PCGExData::FUnionRegistry>(Context->FuseBounds); }
+
+		Context->UnionProcessor = MakeShared<PCGExGraphs::FUnionProcessor>(Context, Context->UnionDataFacade.ToSharedRef(), Settings->PointPointIntersectionDetails, Settings->DefaultPointsBlendingDetails, Settings->DefaultEdgesBlendingDetails);
 
 		Context->UnionProcessor->VtxCarryOverDetails = &Context->CarryOverDetails;
 
@@ -90,6 +95,7 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 	{
 		if (Settings->bFusePaths)
 		{
+			const bool bUseOctree = Context->bUseOctreeMode;
 			PCGEX_ON_INVALILD_INPUTS(FTEXT("Some input have less than 2 points and will be ignored."))
 			if (!Context->StartBatchProcessingPoints(
 				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
@@ -100,10 +106,11 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 						return false;
 					}
 					return true;
-				}, [&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
+				}, [bUseOctree](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 					NewBatch->bSkipCompletion = true;
-					NewBatch->bForceSingleThreadedProcessing = true; // Sequential insertion for deterministic node ordering
+					// Octree-fuse mode is sequential by registry contract; grid mode runs fully parallel.
+					NewBatch->bForceSingleThreadedProcessing = bUseOctree;
 				}))
 			{
 				return Context->CancelExecution(TEXT("Could not build any clusters."));
@@ -138,24 +145,94 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 	{
 		PCGEX_ON_STATE(PCGExGraphs::States::State_PreparingUnion)
 		{
-			const int32 NumFacades = Context->MainBatch->ProcessorFacades.Num();
+			using namespace PCGExPathToClusters;
+
+			PCGExPointsMT::TBatch<FFusingProcessor>* MainBatch = static_cast<PCGExPointsMT::TBatch<FFusingProcessor>*>(Context->MainBatch.Get());
+
+			const int32 NumFacades = MainBatch->ProcessorFacades.Num();
 			Context->PathsFacades.Reserve(NumFacades);
 
-			PCGExPointsMT::TBatch<PCGExPathToClusters::FFusingProcessor>* MainBatch = static_cast<PCGExPointsMT::TBatch<PCGExPathToClusters::FFusingProcessor>*>(Context->MainBatch.Get());
+			// Phase 1+2 collection. Same pattern as FuseClusters but the records are streamed in
+			// processor (path) order. Edges are abstract (no per-edge source point) so the table
+			// will only carry placeholder (IO=-1) entries -- skipped during blend, but counted in
+			// UnionSize so the value matches legacy.
+			TArray<PCGExData::FUnionStreamRecord>& NodeScope = Context->NodeBuilder->GetScope(0);
+			TArray<FStagedEdge> AllStagedEdges;
 
-			for (int Pi = 0; Pi < MainBatch->GetNumProcessors(); Pi++)
+			int32 EstNodeRecords = 0;
+			int32 EstStagedEdges = 0;
+			const int32 NumProcs = MainBatch->GetNumProcessors();
+			for (int32 Pi = 0; Pi < NumProcs; Pi++)
 			{
-				const TSharedPtr<PCGExPointsMT::IProcessor> P = MainBatch->GetProcessor<PCGExPointsMT::IProcessor>(Pi);
-				if (!P->bIsProcessorValid) { continue; }
+				const TSharedPtr<FFusingProcessor> P = MainBatch->GetProcessor<FFusingProcessor>(Pi);
+				if (!P.IsValid() || !P->bIsProcessorValid) { continue; }
+				EstNodeRecords += P->NodeRecords.Num();
+				EstStagedEdges += P->StagedEdges.Num();
+			}
+			NodeScope.Reserve(EstNodeRecords);
+			AllStagedEdges.Reserve(EstStagedEdges);
+
+			for (int32 Pi = 0; Pi < NumProcs; Pi++)
+			{
+				const TSharedPtr<FFusingProcessor> P = MainBatch->GetProcessor<FFusingProcessor>(Pi);
+				if (!P.IsValid() || !P->bIsProcessorValid) { continue; }
 				Context->PathsFacades.Add(P->PointDataFacade);
+				NodeScope.Append(MoveTemp(P->NodeRecords));
+				AllStagedEdges.Append(MoveTemp(P->StagedEdges));
 			}
 
 			Context->MainBatch.Reset();
+
+			// Phase 1 -- compile node table
+			const TSharedPtr<PCGExData::FUnionTable> NodesTable = MakeShared<PCGExData::FUnionTable>();
+			Context->NodeBuilder->Compile(*NodesTable);
+			Context->NodeBuilder.Reset();
+
+			const int32 NumUnionNodes = NodesTable->Num();
+			if (NumUnionNodes == 0) { return Context->CancelExecution(TEXT("Union table is empty after fuse build.")); }
+
+			TMap<uint64, int32> KeyToNode;
+			KeyToNode.Reserve(NumUnionNodes);
+			for (int32 i = 0; i < NumUnionNodes; i++) { KeyToNode.Add(NodesTable->Keys[i], i); }
+
+			// Phase 2 -- emit abstract edges. Placeholder (IO=-1, Index=0) so each unique edge has an
+			// entry whose Size is the count of incoming paths that produced it; ComputeWeights skips
+			// IO=-1 so the entry contributes nothing to blending, matching legacy abstract behavior.
+			TArray<PCGExData::FUnionStreamRecord>& EdgeScope = Context->EdgeBuilder->GetScope(0);
+			EdgeScope.Reserve(AllStagedEdges.Num());
+			for (const FStagedEdge& Staged : AllStagedEdges)
+			{
+				const int32* NodeA = KeyToNode.Find(Staged.KeyA);
+				const int32* NodeB = KeyToNode.Find(Staged.KeyB);
+				if (!NodeA || !NodeB || *NodeA == *NodeB) { continue; }
+				const uint64 EdgeKey = PCGEx::H64U(static_cast<uint32>(*NodeA), static_cast<uint32>(*NodeB));
+				EdgeScope.Emplace(EdgeKey, -1, 0);
+			}
+			AllStagedEdges.Empty();
+
+			const TSharedPtr<PCGExData::FUnionTable> EdgesTable = MakeShared<PCGExData::FUnionTable>();
+			Context->EdgeBuilder->Compile(*EdgesTable);
+			Context->EdgeBuilder.Reset();
+
+			const int32 NumEdges = EdgesTable->Num();
+			TArray<PCGExGraphs::FEdge> Edges;
+			Edges.SetNumUninitialized(NumEdges);
+			for (int32 i = 0; i < NumEdges; i++)
+			{
+				const uint64 K = EdgesTable->Keys[i];
+				const int32 Start = static_cast<int32>(PCGEx::H64A(K));
+				const int32 End = static_cast<int32>(PCGEx::H64B(K));
+				Edges[i] = PCGExGraphs::FEdge(i, Start, End, -1, -1);
+			}
+
+			Context->UnionProcessor->SetUnionData(NodesTable, EdgesTable, MoveTemp(Edges), Context->FuseBounds);
 
 			if (!Context->UnionProcessor->StartExecution(Context->PathsFacades, Settings->GraphBuilderDetails))
 			{
 				return Context->CancelExecution(TEXT("Could not start union."));
 			}
+
+			Context->NodeRegistry.Reset();
 		}
 
 		if (!Context->UnionProcessor->Execute()) { return false; }
@@ -247,28 +324,52 @@ namespace PCGExPathToClusters
 
 		if (NumPoints < 2) { return false; }
 
-		UnionGraph = Context->UnionGraph;
 		bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn());
 
-		InsertEdges(PCGExMT::FScope(0, NumPoints));
+		// Each point contributes 1 node record (and 2 records for the closing edge in a closed loop).
+		// Each edge between successive points contributes 1 staged edge + endpoint duplicates handled
+		// during sort-and-group. Reserve generously to avoid TArray growth in the hot loop.
+		const int32 NumEdges = bClosedLoop ? NumPoints : NumPoints - 1;
+		NodeRecords.Reserve(NumEdges * 2);
+		StagedEdges.Reserve(NumEdges);
+
+		EmitEdges(PCGExMT::FScope(0, NumPoints));
 
 		return true;
 	}
 
-	void FFusingProcessor::InsertEdges(const PCGExMT::FScope& Scope)
+	void FFusingProcessor::EmitEdges(const PCGExMT::FScope& Scope)
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPathToClusters::FFusingProcessor::InsertEdges);
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPathToClusters::FFusingProcessor::EmitEdges);
 
-		PCGExGraphs::FUnionGraph::FBatchInserter Batch(*UnionGraph);
+		const FPCGExFuseDetails& FuseDetails = Context->FuseDetails;
+		const bool bUseOctree = Context->bUseOctreeMode;
+		const TSharedPtr<PCGExData::FUnionRegistry> Registry = Context->NodeRegistry;
+
+		auto KeyOf = [&](const PCGExData::FConstPoint& Pt) -> uint64
+		{
+			if (bUseOctree) { return static_cast<uint64>(Registry->FindOrInsert(Pt, FuseDetails)); }
+			return FuseDetails.GetGridKey(Pt.GetLocation(), Pt.Index);
+		};
+
+		auto EmitPathEdge = [&](const PCGExData::FConstPoint& From, const PCGExData::FConstPoint& To)
+		{
+			const uint64 KeyA = KeyOf(From);
+			const uint64 KeyB = KeyOf(To);
+			NodeRecords.Emplace(KeyA, From.IO, From.Index);
+			NodeRecords.Emplace(KeyB, To.IO, To.Index);
+			StagedEdges.Emplace(KeyA, KeyB);
+		};
+
 		PCGEX_SCOPE_LOOP(i)
 		{
 			const int32 NextIndex = i + 1;
 			if (NextIndex > LastIndex)
 			{
-				if (bClosedLoop) { Batch.InsertEdge(PointDataFacade->GetInPoint(LastIndex), PointDataFacade->GetInPoint(0)); }
+				if (bClosedLoop) { EmitPathEdge(PointDataFacade->GetInPoint(LastIndex), PointDataFacade->GetInPoint(0)); }
 				return;
 			}
-			Batch.InsertEdge(PointDataFacade->GetInPoint(i), PointDataFacade->GetInPoint(NextIndex));
+			EmitPathEdge(PointDataFacade->GetInPoint(i), PointDataFacade->GetInPoint(NextIndex));
 		}
 	}
 

@@ -123,7 +123,9 @@ public:
 
 	/** Streaming level class used for the runtime (non-LevelInstance) path.
 	 *  Override with a custom subclass for advanced streaming behavior.
-	 *  If None, defaults to UPCGExLevelStreamingDynamic. */
+	 *  If None, defaults to UPCGExLevelStreamingDynamic.
+	 *  WARNING: Do NOT use ULevelStreamingLevelInstance subclasses here — they require the
+	 *  ALevelInstance actor path and will not work with raw streaming level spawning. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	TSubclassOf<ULevelStreamingDynamic> StreamingLevelClass;
 

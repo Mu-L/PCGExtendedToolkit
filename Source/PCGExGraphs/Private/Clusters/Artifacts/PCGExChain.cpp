@@ -20,6 +20,19 @@ namespace PCGExClusters
 			return;
 		}
 
+		if (bIsClosedLoop)
+		{
+			// A closed loop seeded at Seed.Node uses two of that node's edges: the initial edge
+			// (preserved as Links[0].Edge) and the closing edge (Seed.Edge after BuildChain wraps).
+			// Reverse-direction traversal swaps which is initial vs closing, but the unordered
+			// pair is identical; so key on it to dedupe both representations.
+			const FLink& First = Links[0];
+			UniqueHash = PCGEx::H64U(
+				HashCombineFast(Seed.Node, FMath::Min(Seed.Edge, First.Edge)),
+				HashCombineFast(Seed.Node, FMath::Max(Seed.Edge, First.Edge)));
+			return;
+		}
+
 		const FLink LastLink = Links.Last();
 		UniqueHash = PCGEx::H64U(HashCombineFast(Seed.Node, Seed.Edge), HashCombineFast(LastLink.Node, LastLink.Edge));
 	}
@@ -81,6 +94,23 @@ namespace PCGExClusters
 	{
 		if (bFirst) { return GetFirstEdgeDir(Cluster); }
 		return GetLastEdgeDir(Cluster);
+	}
+
+	FVector FNodeChain::GetOutwardDirAt(const TSharedPtr<FCluster>& Cluster, const int32 NodeIndex, const bool bExitSide) const
+	{
+		const bool bAtSeed = (NodeIndex == Seed.Node);
+		const bool bAtEnd = (NodeIndex == Links.Last().Node);
+
+		// Closed-loop seed: Seed.Edge is the closing edge (overwritten during BuildChain), so we
+		// can't go through GetFirstEdgeDir. Resolve directly via Links[0]/Last() neighbor positions.
+		if (bIsClosedLoop && bAtSeed && !Links.IsEmpty())
+		{
+			return bExitSide
+				? Cluster->GetDir(Seed.Node, Links[0].Node)
+				: Cluster->GetDir(Seed.Node, Links.Last().Node);
+		}
+
+		return GetEdgeDir(Cluster, (bAtSeed && bAtEnd) ? bExitSide : bAtSeed);
 	}
 
 	int32 FNodeChain::GetNodes(const TSharedPtr<FCluster>& Cluster, TArray<int32>& OutNodes, const bool bReverse)

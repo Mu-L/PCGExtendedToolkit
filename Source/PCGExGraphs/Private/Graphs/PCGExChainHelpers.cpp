@@ -66,9 +66,12 @@ namespace PCGExClusters::ChainHelpers
 			PCGExGraphs::FGraphEdgeMetadata& EdgeMetadata = Graph->GetOrCreateEdgeMetadata(OutEdge.Index);
 			EdgeMetadata.UnionSize = 1;
 
-			if (Graph->EdgesUnion)
+			// Chain-compaction is only ever driven by SimplifyClusters, which seeds Graph->EdgesUnion
+			// with a concrete FUnionMetadata. The interface-typed FGraph field needs a downcast here
+			// so we can hit the sparse-write API (NewEntryAt_Unsafe).
+			if (TSharedPtr<PCGExData::FUnionMetadata> SparseUnion = StaticCastSharedPtr<PCGExData::FUnionMetadata>(Graph->EdgesUnion))
 			{
-				Graph->EdgesUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add_Unsafe(PCGExData::FPoint(OriginalEdge.Index, IOIndex));
+				SparseUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add_Unsafe(PCGExData::FPoint(OriginalEdge.Index, IOIndex));
 			}
 		}
 		else
@@ -85,7 +88,7 @@ namespace PCGExClusters::ChainHelpers
 			PCGExGraphs::FGraphEdgeMetadata& EdgeMetadata = Graph->GetOrCreateEdgeMetadata(OutEdge.Index);
 			EdgeMetadata.UnionSize = Chain->Links.Num();
 
-			if (Graph->EdgesUnion)
+			if (TSharedPtr<PCGExData::FUnionMetadata> SparseUnion = StaticCastSharedPtr<PCGExData::FUnionMetadata>(Graph->EdgesUnion))
 			{
 				TArray<int32> MergedEdges;
 				MergedEdges.Reserve(Chain->Links.Num());
@@ -93,7 +96,7 @@ namespace PCGExClusters::ChainHelpers
 				// TODO : Possible missing edge in some edge cases
 				for (const FLink& Link : Chain->Links) { MergedEdges.Add(Link.Edge); }
 
-				Graph->EdgesUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add_Unsafe(IOIndex, MergedEdges);
+				SparseUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add_Unsafe(IOIndex, MergedEdges);
 			}
 		}
 	}

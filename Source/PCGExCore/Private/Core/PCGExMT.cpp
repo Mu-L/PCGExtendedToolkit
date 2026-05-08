@@ -739,6 +739,12 @@ namespace PCGExMT
 		SimpleCallbacks.Add(InCallback);
 	}
 
+	void FTaskGroup::AddSimpleCallbacks(TArray<FSimpleCallback>&& InCallbacks)
+	{
+		if (InCallbacks.IsEmpty()) { return; }
+		SimpleCallbacks.Append(MoveTemp(InCallbacks));
+	}
+
 	void FTaskGroup::StartSimpleCallbacks()
 	{
 		const int32 Count = SimpleCallbacks.Num();

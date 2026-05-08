@@ -1,8 +1,11 @@
 ﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
+
 #include "Elements/PCGExCopyToPaths.h"
 
+#include "Misc/CoreMiscDefines.h"
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
@@ -442,5 +445,6 @@ namespace PCGExCopyToPaths
 	}
 }
 
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

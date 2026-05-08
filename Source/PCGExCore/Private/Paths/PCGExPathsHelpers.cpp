@@ -3,6 +3,9 @@
 
 #include "Paths/PCGExPathsHelpers.h"
 
+#include "Misc/CoreMiscDefines.h"
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
+
 #include "Data/PCGSplineData.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExData.h"
@@ -12,6 +15,7 @@
 #include "Paths/PCGExPathIntersectionDetails.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
+
 
 namespace PCGExPaths
 {
@@ -362,3 +366,5 @@ namespace PCGExPaths
 		return true;
 	}
 }
+
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS

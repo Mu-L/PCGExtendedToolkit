@@ -26,7 +26,11 @@ namespace PCGExClusters
 		bool bIsLeaf = false;
 
 		uint64 UniqueHash = 0;
-		TArray<FLink> Links; // {Seed} [Edge <- Node][Edge <- Node] // Seed hold edge index that wrap if closed loop.
+		TArray<FLink> Links; // {Seed} [Edge <- Node][Edge <- Node]
+		// Seed.Edge holds the initial edge from Seed.Node; for closed loops it is overwritten to
+		// the closing edge during BuildChain. Links[0].Edge always preserves the original initial
+		// edge (added before the wrap), so (Seed.Edge, Links[0].Edge) is the pair of edges-at-seed
+		// participating in the loop.
 
 		explicit FNodeChain(const FLink InSeed)
 			: Seed(InSeed)
@@ -41,6 +45,11 @@ namespace PCGExClusters
 		FVector GetFirstEdgeDir(const TSharedPtr<FCluster>& Cluster) const;
 		FVector GetLastEdgeDir(const TSharedPtr<FCluster>& Cluster) const;
 		FVector GetEdgeDir(const TSharedPtr<FCluster>& Cluster, const bool bFirst) const;
+
+		/** Direction at chain endpoint NodeIndex pointing outward (away from polygon, into the chain).
+		 *  For closed loops at seed (Seed.Node == Links.Last().Node), bExitSide picks the opening edge (true) vs the closing edge (false).
+		 *  For open chains where Seed.Node == Links.Last().Node (single-edge chains), bExitSide picks first vs last. */
+		FVector GetOutwardDirAt(const TSharedPtr<FCluster>& Cluster, int32 NodeIndex, bool bExitSide) const;
 
 		int32 GetNodes(const TSharedPtr<FCluster>& Cluster, TArray<int32>& OutNodes, bool bReverse);
 	};

@@ -97,6 +97,33 @@ namespace PCGExMath::OBB
 			return FBox(-Bounds.Extents, Bounds.Extents);
 		}
 
+		// World-space corners. i bit 0 = X sign, bit 1 = Y, bit 2 = Z (-extent / +extent).
+		FORCEINLINE void GetCorners(FVector(&OutCorners)[8]) const
+		{
+			const FVector& E = Bounds.Extents;
+			for (int32 i = 0; i < 8; ++i)
+			{
+				OutCorners[i] = ToWorld(FVector(
+					(i & 1) ? E.X : -E.X,
+					(i & 2) ? E.Y : -E.Y,
+					(i & 4) ? E.Z : -E.Z));
+			}
+		}
+
+		// Calls Fn(WorldCorner) for each of the 8 OBB corners.
+		template <typename FnT>
+		FORCEINLINE void ForEachCorner(FnT&& Fn) const
+		{
+			const FVector& E = Bounds.Extents;
+			for (int32 i = 0; i < 8; ++i)
+			{
+				Fn(ToWorld(FVector(
+					(i & 1) ? E.X : -E.X,
+					(i & 2) ? E.Y : -E.Y,
+					(i & 4) ? E.Z : -E.Z)));
+			}
+		}
+
 		// Matrix - computed on demand for FMath::LineExtentBoxIntersection
 		FMatrix GetMatrix() const
 		{

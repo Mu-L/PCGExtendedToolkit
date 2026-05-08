@@ -9,17 +9,36 @@
 #include "Details/PCGExBlendingDetails.h"
 #include "Details/PCGExIntersectionDetails.h"
 
+#include "Core/PCGExUnionTable.h"
+#include "Core/PCGExUnionRegistry.h"
+
 #include "PCGExFuseClusters.generated.h"
 
 namespace PCGExGraphs
 {
 	class FUnionProcessor;
-	class FUnionGraph;
 }
 
 namespace PCGExFuseClusters
 {
 	class FProcessor;
+
+	// Intermediate per-processor record produced during the parallel cluster scan; resolved into
+	// final edge-table entries during the sequential post-batch step (after node table compile).
+	struct FStagedEdge
+	{
+		uint64 KeyA = 0;
+		uint64 KeyB = 0;
+		int32 IO = -1;
+		int32 EdgePointIndex = -1;
+
+		FStagedEdge() = default;
+
+		FStagedEdge(const uint64 InKeyA, const uint64 InKeyB, const int32 InIO, const int32 InEdgePointIndex)
+			: KeyA(InKeyA), KeyB(InKeyB), IO(InIO), EdgePointIndex(InEdgePointIndex)
+		{
+		}
+	};
 }
 
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters", meta=(PCGExNodeLibraryDoc="clusters/refine/cluster-fuse"))
@@ -109,8 +128,18 @@ struct FPCGExFuseClustersContext final : FPCGExClustersProcessorContext
 	friend class PCGExFuseClusters::FProcessor;
 
 	TArray<TSharedRef<PCGExData::FFacade>> VtxFacades;
-	TSharedPtr<PCGExGraphs::FUnionGraph> UnionGraph;
 	TSharedPtr<PCGExData::FFacade> UnionDataFacade;
+
+	// Phase 1+2 streaming build state. NodeBuilder collects (GridKey, IO, PtIndex) records as
+	// each cluster's edges are scanned; NodeRegistry handles the octree-fuse path which is
+	// sequential by contract (FindOrInsert is single-threaded). EdgeBuilder is fed in the
+	// post-batch sequential step once the node-key → node-index mapping is known.
+	TSharedPtr<PCGExData::FUnionTableBuilder> NodeBuilder;
+	TSharedPtr<PCGExData::FUnionTableBuilder> EdgeBuilder;
+	TSharedPtr<PCGExData::FUnionRegistry> NodeRegistry;
+	FPCGExFuseDetails FuseDetails;
+	FBox FuseBounds = FBox(ForceInit);
+	bool bUseOctreeMode = false;
 
 	FPCGExCarryOverDetails VtxCarryOverDetails;
 	FPCGExCarryOverDetails EdgesCarryOverDetails;
@@ -143,7 +172,11 @@ namespace PCGExFuseClusters
 
 	public:
 		bool bInvalidEdges = true;
-		TSharedPtr<PCGExGraphs::FUnionGraph> UnionGraph;
+
+		// Per-processor buffers populated during Process(); collected serially in the
+		// post-batch sequential phase so the central builders see input in deterministic order.
+		TArray<PCGExData::FUnionStreamRecord> NodeRecords;
+		TArray<FStagedEdge> StagedEdges;
 
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 			: TProcessor(InVtxDataFacade, InEdgeDataFacade)
@@ -154,7 +187,6 @@ namespace PCGExFuseClusters
 		virtual ~FProcessor() override;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-		void InsertEdges(const PCGExMT::FScope& Scope);
-		void OnInsertionComplete();
+		void EmitEdges(const PCGExMT::FScope& Scope);
 	};
 }
