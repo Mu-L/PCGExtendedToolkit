@@ -17,6 +17,7 @@ class FPCGMetadataAttribute;
 
 namespace PCGExData
 {
+	class IUnionMetadata;
 	class FUnionMetadata;
 }
 
@@ -74,15 +75,23 @@ namespace PCGExBlending
 		// bWantsDirectAccess replaces the previous "soft blending" concept
 		// Blenders will be initialized with an attribute instead of a buffer if it is enabled
 		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, PCGExData::EProxyFlags InProxyFlags = PCGExData::EProxyFlags::None);
-		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, PCGExData::EProxyFlags InProxyFlags = PCGExData::EProxyFlags::None);
+		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TSharedPtr<PCGExData::IUnionMetadata>& InUnionMetadata, PCGExData::EProxyFlags InProxyFlags = PCGExData::EProxyFlags::None);
 
 		virtual void InitTrackers(TArray<PCGEx::FOpStats>& Trackers) const override
 		{
 		};
 		virtual int32 ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const override;
+		virtual int32 ComputeWeights(const int32 WriteIndex, TConstArrayView<PCGExData::FElement> InElements, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const override;
+		virtual int32 ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionMetadata>& InMetadata, const int32 EntryIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const override;
 		virtual void Blend(const int32 WriteIndex, const TArray<PCGExData::FWeightedPoint>& InWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const override;
 		virtual void MergeSingle(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const override;
 		virtual void MergeSingle(const int32 UnionIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const override;
+
+		// Unhide the base-class overloads we inherit verbatim (span-based MergeSingle and the
+		// IUnionMetadata-based MergeSingle default impl). C++ name lookup hides all base overloads
+		// when any same-named member is declared in the derived class, so we re-expose explicitly.
+		using IUnionBlender::MergeSingle;
+		using IUnionBlender::ComputeWeights;
 
 	protected:
 		TSet<FString> TypeMismatches;
@@ -104,7 +113,7 @@ namespace PCGExBlending
 		TArray<const UPCGBasePointData*> SourcesData;
 		TSet<int32> RelevantSourcePositions; // Optimization: if set, only these source positions get property blenders
 
-		TSharedPtr<PCGExData::FUnionMetadata> CurrentUnionMetadata;
+		TSharedPtr<PCGExData::IUnionMetadata> CurrentUnionMetadata;
 		TSharedPtr<PCGExData::FFacade> CurrentTargetData;
 	};
 }

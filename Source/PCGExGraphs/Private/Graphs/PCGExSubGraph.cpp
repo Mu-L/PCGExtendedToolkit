@@ -298,9 +298,9 @@ MACRO(EdgeUnionSize, int32, 0, UnionSize)
 						const FGraphEdgeMetadata* EdgeMeta = ParentGraph->FindEdgeMetadata_Unsafe(E.IOIndex);
 						if (const FGraphEdgeMetadata* RootEdgeMeta = EdgeMeta ? ParentGraph->FindEdgeMetadata_Unsafe(EdgeMeta->RootIndex) : nullptr)
 						{
-							if (TSharedPtr<PCGExData::IUnionData> UnionData = ParentGraph->EdgesUnion->Get(RootEdgeMeta->RootIndex); UnionBlender && UnionData)
+							if (ParentGraph->EdgesUnion->Size(RootEdgeMeta->RootIndex) > 0)
 							{
-								for (const PCGExData::FElement& Elem : UnionData->Elements) { UniqueSourceIOIndices.Add(Elem.IO); }
+								UniqueSourceIOIndices.Append(ParentGraph->EdgesUnion->GetIOSet(RootEdgeMeta->RootIndex));
 							}
 						}
 					}
@@ -417,9 +417,9 @@ MACRO(EdgeUnionSize, int32, 0, UnionSize)
 				const FGraphEdgeMetadata* EdgeMeta = ParentGraph->FindEdgeMetadata_Unsafe(E.IOIndex);
 				if (const FGraphEdgeMetadata* RootEdgeMeta = EdgeMeta ? ParentGraph->FindEdgeMetadata_Unsafe(EdgeMeta->RootIndex) : nullptr)
 				{
-					if (TSharedPtr<PCGExData::IUnionData> UnionData = ParentGraph->EdgesUnion->Get(RootEdgeMeta->RootIndex); UnionBlender && UnionData)
+					if (UnionBlender && ParentGraph->EdgesUnion && ParentGraph->EdgesUnion->Size(RootEdgeMeta->RootIndex) > 0)
 					{
-						UnionBlender->MergeSingle(EdgeIndex, UnionData, WeightedPoints, Trackers);
+						UnionBlender->MergeSingle(EdgeIndex, ParentGraph->EdgesUnion, RootEdgeMeta->RootIndex, WeightedPoints, Trackers);
 					}
 
 					// TODO : Add Sub-edge edge (is the result of a subdivision + merge)

@@ -136,7 +136,9 @@ namespace PCGExSimplifyClusters
 
 	void FProcessor::CompileChains()
 	{
-		EdgesUnion = GraphBuilder->Graph->EdgesUnion;
+		// SimplifyClusters' FBatch creates the EdgesUnion as a concrete FUnionMetadata (sparse, mutable),
+		// so this downcast from the interface-typed FGraph field is sound.
+		EdgesUnion = StaticCastSharedPtr<PCGExData::FUnionMetadata>(GraphBuilder->Graph->EdgesUnion);
 
 		bIsProcessorValid = PCGExClusters::ChainHelpers::GetOrBuildChains(
 			Cluster.ToSharedRef(),
@@ -292,9 +294,9 @@ namespace PCGExSimplifyClusters
 	{
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(SimplifyClusters)
 
-		GraphBuilder->Graph->EdgesUnion = MakeShared<PCGExData::FUnionMetadata>();
-		GraphBuilder->Graph->EdgesUnion->SetNum(PCGExData::PCGExPointIO::GetTotalPointsNum(Edges));
-		GraphBuilder->Graph->EdgesUnion->bIsAbstract = false; // Because we have valid edge data
+		const TSharedPtr<PCGExData::FUnionMetadata> SparseEdgesUnion = MakeShared<PCGExData::FUnionMetadata>();
+		SparseEdgesUnion->SetNum(PCGExData::PCGExPointIO::GetTotalPointsNum(Edges));
+		GraphBuilder->Graph->EdgesUnion = SparseEdgesUnion;
 
 		// Pre-size edge metadata so the locked GetOrCreateEdgeMetadata never needs to auto-grow
 		GraphBuilder->Graph->ReserveForEdges(PCGExData::PCGExPointIO::GetTotalPointsNum(Edges));

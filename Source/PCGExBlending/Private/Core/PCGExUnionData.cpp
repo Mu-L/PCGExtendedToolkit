@@ -40,45 +40,7 @@ namespace PCGExData
 		const PCGExMath::IDistances* InDistances,
 		TArray<FWeightedPoint>& OutWeightedPoints) const
 	{
-		const int32 NumElements = Elements.Num();
-		OutWeightedPoints.Reset(NumElements);
-
-		double MaxWeight = 0;
-		double TotalWeight = 0;
-		int32 Index = 0;
-
-		for (const FElement& Element : Elements)
-		{
-			const int32 IOIdx = IdxLookup->Get(Element.IO);
-			if (IOIdx == -1) { continue; }
-
-			FWeightedPoint& P = OutWeightedPoints.Emplace_GetRef(Element.Index, 0, IOIdx);
-			const double Dist = InDistances->GetDistSquared(FConstPoint(Sources[P.IO], P), Target);
-			P.Weight = Dist;
-
-			MaxWeight = FMath::Max(MaxWeight, Dist);
-			Index++;
-		}
-
-		if (Index == 0) { return 0; }
-
-		// Normalize & one minus distances to make them weights
-		for (FWeightedPoint& P : OutWeightedPoints) { TotalWeight += (P.Weight = 1 - (P.Weight / MaxWeight)); }
-
-		if (Index == 1)
-		{
-			OutWeightedPoints[0].Weight = 1;
-			return 1;
-		}
-
-		if (TotalWeight == 0)
-		{
-			const double StaticWeight = 1 / static_cast<double>(Index);
-			for (FWeightedPoint& P : OutWeightedPoints) { P.Weight = StaticWeight; }
-			return Index;
-		}
-
-		return Index;
+		return ComputeUnionWeights(Elements, Sources, IdxLookup, Target, InDistances, OutWeightedPoints);
 	}
 
 	void IUnionData::Reserve(const int32 InSetReserve, const int32 InElementReserve = 8)
@@ -89,6 +51,46 @@ namespace PCGExData
 	void IUnionData::Reset()
 	{
 		Elements.Reset();
+	}
+
+	int32 FUnionMetadata::Size(const int32 EntryIndex) const
+	{
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return 0; }
+		return Entries[EntryIndex]->Num();
+	}
+
+	int32 FUnionMetadata::ComputeWeights(
+		const int32 EntryIndex,
+		const TArray<const UPCGBasePointData*>& Sources,
+		const TSharedPtr<PCGEx::FIndexLookup>& IdxLookup,
+		const FPoint& Target,
+		const PCGExMath::IDistances* InDistances,
+		TArray<FWeightedPoint>& OutWeightedPoints) const
+	{
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return 0; }
+		return Entries[EntryIndex]->ComputeWeights(Sources, IdxLookup, Target, InDistances, OutWeightedPoints);
+	}
+
+	bool FUnionMetadata::ContainsIO(const int32 EntryIndex, const int32 IO) const
+	{
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return false; }
+		return Entries[EntryIndex]->ContainsIO(IO);
+	}
+
+	TSet<int32> FUnionMetadata::GetIOSet(const int32 EntryIndex) const
+	{
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return TSet<int32>(); }
+		return Entries[EntryIndex]->GetIOSet();
+	}
+
+	bool FUnionMetadata::IOIndexOverlap(const int32 EntryIndex, const TSet<int32>& InIndices) const
+	{
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return false; }
+		for (const FElement& E : Entries[EntryIndex]->Elements)
+		{
+			if (InIndices.Contains(E.IO)) { return true; }
+		}
+		return false;
 	}
 
 	void FUnionMetadata::SetNum(const int32 InNum)
@@ -108,14 +110,5 @@ namespace PCGExData
 	{
 		Entries[ItemIndex] = MakeShared<IUnionData>();
 		return Entries[ItemIndex];
-	}
-
-	bool FUnionMetadata::IOIndexOverlap(const int32 InIdx, const TSet<int32>& InIndices)
-	{
-		for (const FElement& E : Entries[InIdx]->Elements)
-		{
-			if (InIndices.Contains(E.IO)) { return true; }
-		}
-		return false;
 	}
 }
