@@ -43,6 +43,7 @@ namespace PCGExData
 	class IBuffer;
 	class FFacade;
 	struct FWeightedPoint;
+	struct FElement;
 	class IBufferProxy;
 	class IUnionData;
 
@@ -138,6 +139,15 @@ namespace PCGExBlending
 		virtual void Blend(const int32 WriteIndex, const TArray<PCGExData::FWeightedPoint>& InWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const = 0;
 		virtual void MergeSingle(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const = 0;
 		virtual void MergeSingle(const int32 UnionIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const = 0;
+
+		// Span-based overloads for FUnionTable consumers. Default no-op so existing implementations
+		// that don't speak this dialect (FDummyUnionBlender, FUnionOpsManager) don't have to override.
+		virtual int32 ComputeWeights(const int32 WriteIndex, TConstArrayView<PCGExData::FElement> InElements, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const { return 0; }
+		virtual void MergeSingle(const int32 WriteIndex, TConstArrayView<PCGExData::FElement> InElements, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
+		{
+			if (!ComputeWeights(WriteIndex, InElements, OutWeightedPoints)) { return; }
+			Blend(WriteIndex, OutWeightedPoints, Trackers);
+		}
 
 		FORCEINLINE EPCGPointNativeProperties GetAllocatedProperties() const { return AllocatedProperties; }
 

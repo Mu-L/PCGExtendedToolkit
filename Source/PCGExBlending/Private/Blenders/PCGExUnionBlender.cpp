@@ -14,6 +14,7 @@
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Core/PCGExUnionData.h"
+#include "Core/PCGExUnionTable.h"
 #include "Details/PCGExBlendingDetails.h"
 
 namespace PCGExBlending
@@ -266,6 +267,12 @@ namespace PCGExBlending
 		if (!InUnionData.IsValid()) { return 0; }
 		const PCGExData::FConstPoint Target = CurrentTargetData->Source->GetOutPoint(WriteIndex);
 		return InUnionData->ComputeWeights(SourcesData, IOLookup, Target, DistanceDetails, OutWeightedPoints);
+	}
+
+	int32 FUnionBlender::ComputeWeights(const int32 WriteIndex, TConstArrayView<PCGExData::FElement> InElements, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const
+	{
+		const PCGExData::FConstPoint Target = CurrentTargetData->Source->GetOutPoint(WriteIndex);
+		return PCGExData::FUnionTable::ComputeWeightsForSpan(InElements, SourcesData, IOLookup, Target, DistanceDetails, OutWeightedPoints);
 	}
 
 	void FUnionBlender::Blend(const int32 WriteIndex, const TArray<PCGExData::FWeightedPoint>& InWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
