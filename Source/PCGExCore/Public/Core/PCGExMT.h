@@ -283,6 +283,7 @@ namespace PCGExMT
 		void StartSubLoops(const int32 NumIterations, const int32 ChunkSize, const bool bForceSingleThreaded = false);
 
 		void AddSimpleCallback(FSimpleCallback&& InCallback);
+		void AddSimpleCallbacks(TArray<FSimpleCallback>&& InCallbacks);
 		void StartSimpleCallbacks();
 
 		template <typename T>

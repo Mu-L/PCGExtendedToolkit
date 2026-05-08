@@ -1054,33 +1054,33 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		Flush();
 	}
 
-	int32 FFacade::WriteBuffersAsCallbacks(const TSharedPtr<PCGExMT::FTaskGroup>& TaskGroup)
+	TArray<PCGExMT::FSimpleCallback> FFacade::GetWriteBufferCallbacks()
 	{
-		// !!! Requires manual flush !!!
+		// !!! Requires manual flush by the caller after callbacks have run !!!
 
-		if (!TaskGroup || !ValidateOutputsBeforeWriting())
+		TArray<PCGExMT::FSimpleCallback> Callbacks;
+
+		if (!ValidateOutputsBeforeWriting())
 		{
 			Flush();
-			return -1;
+			return Callbacks;
 		}
 
-		int32 WritableCount = 0;
 		Source->GetOutKeys(true);
 
 		{
 			FWriteScopeLock WriteScopeLock(BufferLock);
 
+			Callbacks.Reserve(Buffers.Num());
 			for (int i = 0; i < Buffers.Num(); i++)
 			{
 				const TSharedPtr<IBuffer> Buffer = Buffers[i];
 				if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled()) { continue; }
-
-				TaskGroup->AddSimpleCallback([BufferRef = Buffer]() { BufferRef->Write(); });
-				WritableCount++;
+				Callbacks.Add([BufferRef = Buffer]() { BufferRef->Write(); });
 			}
 		}
 
-		return WritableCount;
+		return Callbacks;
 	}
 
 	void FFacade::WriteBuffers(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, PCGExMT::FCompletionCallback&& Callback)
@@ -1088,13 +1088,24 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		if (!ValidateOutputsBeforeWriting())
 		{
 			Flush();
+			if (Callback) { Callback(); }
 			return;
 		}
 
 		if (Source->GetNum(EIOSide::Out) < PCGEX_CORE_SETTINGS.SmallPointsSize)
 		{
 			WriteSynchronous(true);
-			Callback();
+			if (Callback) { Callback(); }
+			return;
+		}
+
+		// Collect first; only spin up an async group if there's actual work, otherwise we'd
+		// register an orphan task token that the manager waits on indefinitely.
+		TArray<PCGExMT::FSimpleCallback> WriteCallbacks = GetWriteBufferCallbacks();
+		if (WriteCallbacks.IsEmpty())
+		{
+			Flush();
+			if (Callback) { Callback(); }
 			return;
 		}
 
@@ -1103,16 +1114,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		{
 			PCGEX_ASYNC_THIS
 			This->Flush();
-			Callback();
+			if (Callback) { Callback(); }
 		};
 
-		if (const int32 WritableCount = WriteBuffersAsCallbacks(WriteBuffersWithCallback); WritableCount <= 0)
-		{
-			// -1 is fail so no callback
-			if (WritableCount == 0) { Callback(); }
-			return;
-		}
-
+		WriteBuffersWithCallback->AddSimpleCallbacks(MoveTemp(WriteCallbacks));
 		WriteBuffersWithCallback->StartSimpleCallbacks();
 	}
 
