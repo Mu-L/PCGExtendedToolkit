@@ -9,6 +9,7 @@
 #include "Details/PCGExIntersectionDetails.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Graphs/PCGExGraphMetadata.h"
+#include "Graphs/Union/PCGExIntersections.h"
 
 struct FPCGExCarryOverDetails;
 
@@ -26,13 +27,11 @@ namespace PCGExBlending
 namespace PCGExMT
 {
 	template <typename T>
-	class TScopedPtr;
+	class TScopedArray;
 }
 
 namespace PCGExGraphs
 {
-	class FEdgeEdgeIntersections;
-	class FPointEdgeIntersections;
 	class FGraphBuilder;
 	struct FEdge;
 
@@ -116,10 +115,17 @@ namespace PCGExGraphs
 
 		FGraphMetadataDetails GraphMetadataDetails;
 
-		TSharedPtr<FPointEdgeIntersections> PointEdgeIntersections;
+		// Per-graph scratch shared by P/E and E/E. Built once on first use, retained across the
+		// two phases so Positions/EdgeBoxes/etc. don't get rebuilt twice.
+		TSharedPtr<FIntersectionAllocations> IntersectionAllocations;
 
-		TSharedPtr<PCGExMT::TScopedPtr<FEdgeEdgeIntersections>> ScopedEdgeEdgeIntersections;
-		TSharedPtr<FEdgeEdgeIntersections> EdgeEdgeIntersections;
+		// P/E find-pass accumulators -- thread-local during emit, drained sequentially in apply.
+		TSharedPtr<PCGExMT::TScopedArray<FPECollinear>> ScopedPERecords;
+
+		// E/E find-pass accumulators + the merged record array that survives across find -> resolve
+		// -> apply -> blend. Records flagged bIsPrimary && bAllocatedNewNode drive the blend phase.
+		TSharedPtr<PCGExMT::TScopedArray<FEECrossing>> ScopedEERecords;
+		TArray<FEECrossing> EECrossings;
 
 		TSharedPtr<PCGExBlending::FMetadataBlender> MetadataBlender;
 
