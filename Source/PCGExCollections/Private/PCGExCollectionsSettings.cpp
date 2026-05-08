@@ -9,6 +9,7 @@
 #include "Helpers/PCGExLevelDataExporter.h"
 #include "Helpers/PCGExActorContentFilter.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
+#include "Helpers/PCGExActorMeshClassificator.h"
 
 void UPCGExCollectionsSettings::PostLoad()
 {
@@ -37,4 +38,5 @@ void UPCGExCollectionsSettings::UpdateSettingsCaches() const
 	Cache.DefaultLevelExporterClass = DefaultLevelExporterClass.TryLoadClass<UPCGExLevelDataExporter>();
 	Cache.DefaultContentFilterClass = DefaultContentFilterClass.TryLoadClass<UPCGExActorContentFilter>();
 	Cache.DefaultBoundsEvaluatorClass = DefaultBoundsEvaluatorClass.TryLoadClass<UPCGExBoundsEvaluator>();
+	Cache.DefaultMeshClassificatorClass = DefaultMeshClassificatorClass.TryLoadClass<UPCGExActorMeshClassificator>();
 }

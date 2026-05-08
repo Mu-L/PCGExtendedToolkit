@@ -41,5 +41,10 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "Defaults", meta=(MetaClass="/Script/PCGExCollections.PCGExBoundsEvaluator"))
 	FSoftClassPath DefaultBoundsEvaluatorClass;
 
+	/** Default actor mesh classificator class used on new exporters.
+	 *  If None, falls back to UPCGExDefaultActorMeshClassificator. */
+	UPROPERTY(EditAnywhere, config, Category = "Defaults", meta=(MetaClass="/Script/PCGExCollections.PCGExActorMeshClassificator"))
+	FSoftClassPath DefaultMeshClassificatorClass;
+
 	void UpdateSettingsCaches() const;
 };
