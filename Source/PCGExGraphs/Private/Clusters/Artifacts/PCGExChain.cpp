@@ -96,6 +96,23 @@ namespace PCGExClusters
 		return GetLastEdgeDir(Cluster);
 	}
 
+	FVector FNodeChain::GetOutwardDirAt(const TSharedPtr<FCluster>& Cluster, const int32 NodeIndex, const bool bExitSide) const
+	{
+		const bool bAtSeed = (NodeIndex == Seed.Node);
+		const bool bAtEnd = (NodeIndex == Links.Last().Node);
+
+		// Closed-loop seed: Seed.Edge is the closing edge (overwritten during BuildChain), so we
+		// can't go through GetFirstEdgeDir. Resolve directly via Links[0]/Last() neighbor positions.
+		if (bIsClosedLoop && bAtSeed && !Links.IsEmpty())
+		{
+			return bExitSide
+				? Cluster->GetDir(Seed.Node, Links[0].Node)
+				: Cluster->GetDir(Seed.Node, Links.Last().Node);
+		}
+
+		return GetEdgeDir(Cluster, (bAtSeed && bAtEnd) ? bExitSide : bAtSeed);
+	}
+
 	int32 FNodeChain::GetNodes(const TSharedPtr<FCluster>& Cluster, TArray<int32>& OutNodes, const bool bReverse)
 	{
 		if (SingleEdge != -1)

@@ -587,9 +587,6 @@ namespace PCGExGraphs
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FEdgeEdgeIntersections::Collapse);
 
-		// Collapse and dedupe crossings nodes
-		// TODO : Need to keep only one of the two existing crossings, and update the duplicate one with its final insertion index
-
 		ScopedEdges->Collapse(Edges);
 
 		if (Edges.IsEmpty()) { return; }
@@ -597,9 +594,6 @@ namespace PCGExGraphs
 		const int32 StartIndex = Graph->Nodes.Num();
 		TMap<uint64, int32> IdxMap; // Edge Index x Edge Index unsigned hash mapped to final crossing index
 		IdxMap.Reserve(InReserve);
-
-		// TODO : Crossings need to exist only once to be inserted
-		// Flush existing crossing as we process them and only keep the (unordered) final node Index
 
 		int32 Offset = 0;
 		for (const TSharedPtr<FEdgeEdgeProxy>& EdgeProxy : Edges)
@@ -613,9 +607,49 @@ namespace PCGExGraphs
 				}
 				else
 				{
-					Crossing.Index = IdxMap.Add(Key, StartIndex + Offset);
-					UniqueCrossings.Add(Crossing);
-					Offset++;
+					// Guard against two silent duplication paths: (a) FP near-miss on FindSplit's
+					// exact endpoint check leaves Center ≈ an existing node; (b) a P-P fused node
+					// whose source IOs overlap both crossing edges is blocked by the P-E
+					// self-intersection filter, so E-E would otherwise re-create it.
+					int32 ExistingNodeIndex = -1;
+					const FVector& Center = Crossing.Split.Center;
+
+					const FEdge& EdgeA = Graph->Edges[Crossing.Split.A];
+					const FEdge& EdgeB = Graph->Edges[Crossing.Split.B];
+					for (const int32 Endpoint : {(int32)EdgeA.Start, (int32)EdgeA.End, (int32)EdgeB.Start, (int32)EdgeB.End})
+					{
+						if (FVector::DistSquared(Positions[Endpoint], Center) < ToleranceSquared)
+						{
+							ExistingNodeIndex = Endpoint;
+							break;
+						}
+					}
+
+					// Broader check via octree for third-party P-P nodes not on either crossing edge.
+					if (ExistingNodeIndex < 0 && Octree)
+					{
+						Octree->FindElementsWithBoundsTest(PCGEX_BOX_TOLERANCE_INLINE(Center, Center, Tolerance),
+							[&](const PCGExOctree::FItem& Item)
+							{
+								if (ExistingNodeIndex >= 0 || !ValidEdges[Item.Index]) { return; }
+								const FEdge& NearEdge = Graph->Edges[Item.Index];
+								if (FVector::DistSquared(Positions[NearEdge.Start], Center) < ToleranceSquared)
+									ExistingNodeIndex = static_cast<int32>(NearEdge.Start);
+								else if (FVector::DistSquared(Positions[NearEdge.End], Center) < ToleranceSquared)
+									ExistingNodeIndex = static_cast<int32>(NearEdge.End);
+							});
+					}
+
+					if (ExistingNodeIndex >= 0)
+					{
+						Crossing.Index = IdxMap.Add(Key, ExistingNodeIndex);
+					}
+					else
+					{
+						Crossing.Index = IdxMap.Add(Key, StartIndex + Offset);
+						UniqueCrossings.Add(Crossing);
+						Offset++;
+					}
 				}
 			}
 		}
@@ -687,6 +721,10 @@ namespace PCGExGraphs
 			{
 				B = Crossing.Index;
 
+				// When Collapse() reuses an existing endpoint node for a crossing, B may
+				// equal A (crossing resolved to the current chain position). Skip silently.
+				if (A == B) { continue; }
+
 				//BUG: this is the wrong edge IOIndex
 
 				if (Graph->InsertEdge_Unsafe(A, B, NewEdge, IOIndex))
@@ -705,17 +743,21 @@ namespace PCGExGraphs
 				A = B;
 			}
 
-			// Insert last edge
-			if (Graph->InsertEdge_Unsafe(A, EdgeProxy->End, NewEdge, IOIndex))
+			// Insert last edge. Guard against the case where the final crossing resolved to
+			// EdgeProxy->End (reused endpoint), which would produce a degenerate self-loop.
+			if (A != EdgeProxy->End)
 			{
-				FGraphEdgeMetadata& NewEdgeMeta = Graph->GetOrCreateEdgeMetadata_Unsafe(NewEdge.Index, EdgeRootIndex);
-				NewEdgeMeta.Type = EPCGExIntersectionType::EdgeEdge;
-				NewEdgeMeta.bIsSubEdge = true;
-			}
-			else if (FGraphEdgeMetadata* ExistingEdgeMeta = Graph->FindEdgeMetadata_Unsafe(NewEdge.Index))
-			{
-				ExistingEdgeMeta->UnionSize++;
-				ExistingEdgeMeta->bIsSubEdge = true;
+				if (Graph->InsertEdge_Unsafe(A, EdgeProxy->End, NewEdge, IOIndex))
+				{
+					FGraphEdgeMetadata& NewEdgeMeta = Graph->GetOrCreateEdgeMetadata_Unsafe(NewEdge.Index, EdgeRootIndex);
+					NewEdgeMeta.Type = EPCGExIntersectionType::EdgeEdge;
+					NewEdgeMeta.bIsSubEdge = true;
+				}
+				else if (FGraphEdgeMetadata* ExistingEdgeMeta = Graph->FindEdgeMetadata_Unsafe(NewEdge.Index))
+				{
+					ExistingEdgeMeta->UnionSize++;
+					ExistingEdgeMeta->bIsSubEdge = true;
+				}
 			}
 		}
 	}
