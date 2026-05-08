@@ -4,11 +4,13 @@
 #include "Math/Geo/PCGExGeo.h"
 
 #include "CoreMinimal.h"
+#include "Math/ConvexHull2d.h"
 #include "GeomTools.h"
 #include "Data/PCGExPointIO.h"
 #include "Async/ParallelFor.h"
 #include "Math/PCGExMath.h"
 #include "Math/PCGExMathAxis.h"
+#include "Math/OBB/PCGExOBB.h"
 
 namespace PCGExMath::Geo
 {
@@ -311,6 +313,118 @@ namespace PCGExMath::Geo
 		FBox AABB(ForceInit);
 		for (const FVector& Local : LocalCorners) { AABB += WorldOrigin + ProjectionQuat.RotateVector(Local); }
 		return AABB;
+	}
+
+	bool PolygonsOverlap2D(TConstArrayView<FVector2D> A, TConstArrayView<FVector2D> B)
+	{
+		const int32 N = A.Num();
+		const int32 M = B.Num();
+		if (N < 3 || M < 3) { return false; }
+
+		// Crossing-number test against an arbitrary polygon (concave or convex).
+		// Inlined here so the polygon argument can be a TConstArrayView -- the
+		// FGeomTools2D variant requires a TArray<>.
+		auto PointInPolygon = [](const FVector2D& P, TConstArrayView<FVector2D> Poly) -> bool
+		{
+			const int32 K = Poly.Num();
+			int32 Crossings = 0;
+			for (int32 i = 0, j = K - 1; i < K; j = i++)
+			{
+				const FVector2D& Vi = Poly[i];
+				const FVector2D& Vj = Poly[j];
+				if (((Vi.Y > P.Y) != (Vj.Y > P.Y)) &&
+					(P.X < (Vj.X - Vi.X) * (P.Y - Vi.Y) / (Vj.Y - Vi.Y) + Vi.X))
+				{
+					++Crossings;
+				}
+			}
+			return (Crossings & 1) != 0;
+		};
+
+		// Vertex-in-other tier rejects the common nested case before any edge work.
+		for (const FVector2D& V : B)
+		{
+			if (PointInPolygon(V, A)) { return true; }
+		}
+		for (const FVector2D& V : A)
+		{
+			if (PointInPolygon(V, B)) { return true; }
+		}
+
+		FVector IntersectionPt;
+		for (int32 i = 0; i < N; ++i)
+		{
+			const FVector A1(A[i].X, A[i].Y, 0.0);
+			const FVector A2(A[(i + 1) % N].X, A[(i + 1) % N].Y, 0.0);
+			for (int32 j = 0; j < M; ++j)
+			{
+				const FVector B1(B[j].X, B[j].Y, 0.0);
+				const FVector B2(B[(j + 1) % M].X, B[(j + 1) % M].Y, 0.0);
+				if (FMath::SegmentIntersection2D(A1, A2, B1, B2, IntersectionPt)) { return true; }
+			}
+		}
+		return false;
+	}
+
+	void ProjectOBBToFrame(
+		const PCGExMath::OBB::FOBB& OBB,
+		const FVector& TargetWorldOrigin,
+		const FQuat& TargetProjectionQuat,
+		TArray<FVector2D, TInlineAllocator<8>>& OutHull,
+		float& OutLocalZMin,
+		float& OutLocalZMax)
+	{
+		TArray<FVector2D, TInlineAllocator<8>> Corners2D;
+		OutLocalZMin = TNumericLimits<float>::Max();
+		OutLocalZMax = -TNumericLimits<float>::Max();
+
+		OBB.ForEachCorner([&](const FVector& WorldCorner)
+		{
+			const FVector LocalCorner = TargetProjectionQuat.UnrotateVector(WorldCorner - TargetWorldOrigin);
+			Corners2D.Add(FVector2D(LocalCorner.X, LocalCorner.Y));
+			OutLocalZMin = FMath::Min(OutLocalZMin, static_cast<float>(LocalCorner.Z));
+			OutLocalZMax = FMath::Max(OutLocalZMax, static_cast<float>(LocalCorner.Z));
+		});
+
+		TArray<int32, TInlineAllocator<8>> HullIndices;
+		ConvexHull2D::ComputeConvexHull(Corners2D, HullIndices);
+
+		OutHull.Reset();
+		for (int32 Idx : HullIndices) { OutHull.Add(Corners2D[Idx]); }
+	}
+
+	void ProjectPrismToFrame(
+		TConstArrayView<FVector2D> SourceOutline,
+		float SourceZMin, float SourceZMax,
+		const FVector& SourceWorldOrigin,
+		const FQuat& SourceProjectionQuat,
+		const FVector& TargetWorldOrigin,
+		const FQuat& TargetProjectionQuat,
+		TArray<FVector2D>& OutOutline,
+		float& OutLocalZMin,
+		float& OutLocalZMax)
+	{
+		OutLocalZMin = TNumericLimits<float>::Max();
+		OutLocalZMax = -TNumericLimits<float>::Max();
+		OutOutline.Reset();
+		OutOutline.Reserve(SourceOutline.Num());
+
+		for (const FVector2D& V : SourceOutline)
+		{
+			const FVector SourceLocalLo(V.X, V.Y, SourceZMin);
+			const FVector SourceLocalHi(V.X, V.Y, SourceZMax);
+			const FVector WorldLo = SourceWorldOrigin + SourceProjectionQuat.RotateVector(SourceLocalLo);
+			const FVector WorldHi = SourceWorldOrigin + SourceProjectionQuat.RotateVector(SourceLocalHi);
+
+			const FVector TargetLocalLo = TargetProjectionQuat.UnrotateVector(WorldLo - TargetWorldOrigin);
+			const FVector TargetLocalHi = TargetProjectionQuat.UnrotateVector(WorldHi - TargetWorldOrigin);
+
+			OutOutline.Emplace(TargetLocalLo.X, TargetLocalLo.Y);
+			// Track Z extremes from BOTH lo and hi rings (target frame may be rotated
+			// relative to source, so "Lo" can have higher target-frame Z than "Hi").
+			OutLocalZMin = FMath::Min(OutLocalZMin, static_cast<float>(FMath::Min(TargetLocalLo.Z, TargetLocalHi.Z)));
+			OutLocalZMax = FMath::Max(OutLocalZMax, static_cast<float>(FMath::Max(TargetLocalLo.Z, TargetLocalHi.Z)));
+		}
 	}
 
 	void ComputeLInfEdgePath(const FVector2D& Start, const FVector2D& End, TArray<FVector2D>& OutPath)

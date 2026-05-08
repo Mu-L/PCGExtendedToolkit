@@ -8,6 +8,8 @@
 
 #include "PCGExGeo.generated.h"
 
+namespace PCGExMath::OBB { struct FOBB; }
+
 UENUM()
 enum class EPCGExCellCenter : uint8
 {
@@ -175,6 +177,51 @@ namespace PCGExMath::Geo
 		float ZMin, float ZMax,
 		const FVector& WorldOrigin,
 		const FQuat& ProjectionQuat);
+
+	/**
+	 * 2D polygon-vs-polygon overlap. Concave allowed on either side; convex
+	 * inputs work transparently. Reports true if any vertex of one polygon
+	 * lies inside the other or any edge of one crosses any edge of the other.
+	 * O(N*M).
+	 */
+	PCGEXCORE_API bool PolygonsOverlap2D(
+		TConstArrayView<FVector2D> A,
+		TConstArrayView<FVector2D> B);
+
+	/**
+	 * Project an OBB's 8 corners into a target frame. Outputs the convex hull
+	 * (CCW, up to 8 verts) of the projected XY shadow plus the local Z range
+	 * spanned by the corners.
+	 */
+	PCGEXCORE_API void ProjectOBBToFrame(
+		const PCGExMath::OBB::FOBB& OBB,
+		const FVector& TargetWorldOrigin,
+		const FQuat& TargetProjectionQuat,
+		TArray<FVector2D, TInlineAllocator<8>>& OutHull,
+		float& OutLocalZMin,
+		float& OutLocalZMax);
+
+	/**
+	 * Project an extruded prism (Outline x [SourceZMin, SourceZMax] in source
+	 * frame) into a target frame. Outputs the source outline expressed in the
+	 * target frame's XY plane plus the target-frame Z extremes spanned by both
+	 * Z extrusion rings.
+	 *
+	 * For coplanar source/target the lo-ring outline alone is exact; for
+	 * tilted prisms the outline is a conservative slice of the true tilted
+	 * volume (full fidelity would require the convex hull of both rings).
+	 * The Z band always reflects both rings.
+	 */
+	PCGEXCORE_API void ProjectPrismToFrame(
+		TConstArrayView<FVector2D> SourceOutline,
+		float SourceZMin, float SourceZMax,
+		const FVector& SourceWorldOrigin,
+		const FQuat& SourceProjectionQuat,
+		const FVector& TargetWorldOrigin,
+		const FQuat& TargetProjectionQuat,
+		TArray<FVector2D>& OutOutline,
+		float& OutLocalZMin,
+		float& OutLocalZMax);
 
 	// L1/L∞ Voronoi edge path computation
 

@@ -46,6 +46,11 @@ namespace PCGExClusters
 		FVector GetLastEdgeDir(const TSharedPtr<FCluster>& Cluster) const;
 		FVector GetEdgeDir(const TSharedPtr<FCluster>& Cluster, const bool bFirst) const;
 
+		/** Direction at chain endpoint NodeIndex pointing outward (away from polygon, into the chain).
+		 *  For closed loops at seed (Seed.Node == Links.Last().Node), bExitSide picks the opening edge (true) vs the closing edge (false).
+		 *  For open chains where Seed.Node == Links.Last().Node (single-edge chains), bExitSide picks first vs last. */
+		FVector GetOutwardDirAt(const TSharedPtr<FCluster>& Cluster, int32 NodeIndex, bool bExitSide) const;
+
 		int32 GetNodes(const TSharedPtr<FCluster>& Cluster, TArray<int32>& OutNodes, bool bReverse);
 	};
 
