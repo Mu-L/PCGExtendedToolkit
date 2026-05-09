@@ -14,6 +14,7 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
 

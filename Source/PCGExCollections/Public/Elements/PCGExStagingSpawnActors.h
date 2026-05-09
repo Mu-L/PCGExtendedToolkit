@@ -81,10 +81,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable))
 	FPCGExForwardDetails TargetsForwarding;
 
-	/** If enabled, apply per-instance tags from the InstanceTags attribute to spawned actors. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable))
+	/** If enabled, apply per-instance tags from the named attribute to spawned actors. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bApplyInstanceTags = true;
 
+	/** Attribute name that contains the per-instance tags string (comma-separated). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable, EditCondition="bApplyInstanceTags"))
+	FName InstanceTagsAttributeName = FName("InstanceTags");
+	
 	// --- PCG Generation ---
 
 	/** If enabled, trigger PCG generation on spawned actors that have PCG components. */

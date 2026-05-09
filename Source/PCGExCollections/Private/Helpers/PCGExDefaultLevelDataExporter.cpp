@@ -531,32 +531,26 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 			}
 		}
 
-		// Write per-point instance tags delta
-		FPCGMetadataAttribute<FString>* InstanceTagsAttr = Meta->CreateAttribute<FString>(TEXT("InstanceTags"), FString(), false, true);
-		if (InstanceTagsAttr)
+		// Write the full actor tag set per point. Redundant with the property-delta tag restore
+		// and entry.Tags intersection, but populated unconditionally so downstream consumers can
+		// read tags directly from the point without unserializing the delta.
+		if (bWriteInstanceTags && InstanceTagsAttributeName != NAME_None)
 		{
-			for (int32 i = 0; i < ActorActors.Num(); i++)
+			if (FPCGMetadataAttribute<FString>* InstanceTagsAttr = Meta->CreateAttribute<FString>(InstanceTagsAttributeName, FString(), false, true))
 			{
-				FActorInstanceKey Key;
-				Key.ClassPath = FSoftClassPath(ActorActors[i].Actor->GetClass());
-				Key.DeltaHash = ActorActors[i].DeltaHash;
-				const FActorClassInfo* Info = ActorClassInfoMap.Find(Key);
-				if (!Info) { continue; }
-
-				// Compute delta: actor tags minus intersection
-				FString DeltaStr;
-				for (const FName& Tag : ActorActors[i].Actor->Tags)
+				for (int32 i = 0; i < ActorActors.Num(); i++)
 				{
-					if (!Info->IntersectedTags.Contains(Tag))
+					FString TagsStr;
+					for (const FName& Tag : ActorActors[i].Actor->Tags)
 					{
-						if (!DeltaStr.IsEmpty()) { DeltaStr += TEXT(","); }
-						DeltaStr += Tag.ToString();
+						if (!TagsStr.IsEmpty()) { TagsStr += TEXT(","); }
+						TagsStr += Tag.ToString();
 					}
-				}
 
-				if (!DeltaStr.IsEmpty())
-				{
-					InstanceTagsAttr->SetValue(MetaEntries[i], DeltaStr);
+					if (!TagsStr.IsEmpty())
+					{
+						InstanceTagsAttr->SetValue(MetaEntries[i], TagsStr);
+					}
 				}
 			}
 		}
