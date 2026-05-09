@@ -242,6 +242,25 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 */
 	virtual void InitializeFrom(const FPCGExProperty* Source) { CopyValueFrom(Source); }
 
+	/**
+	 * Copy "structural" sub-fields from a sibling schema entry.
+	 *
+	 * For property types whose Value contains both schema-owned (structural) and
+	 * user-overridable parts, this hook is invoked from FPCGExPropertyOverrides::SyncToSchema
+	 * on every preserved override, so the structural parts continue to mirror the schema
+	 * while the user-overridable parts stay intact.
+	 *
+	 * Default implementation is a no-op — types whose Value is entirely user-overridable
+	 * (the common case) need not override this.
+	 *
+	 * Example: FPCGExProperty_Enum's Value.Class is structural (the schema decides the
+	 * enum type), but Value.Value (the int64 selection) is user-overridable.
+	 *
+	 * @param Schema The matching schema-side property to copy structural fields from.
+	 *               Same script struct as `this` is guaranteed by the caller.
+	 */
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) {}
+
 	// --- Value Read Interface (type-erased) ---
 
 	/**
@@ -252,7 +271,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * macro implementation dispatches through FConversionTable, giving free N×N
 	 * conversion across all supported types.
 	 *
-	 * Converting properties (e.g., Color: FLinearColor -> FVector4, Enum: FEnumSelector
+	 * Converting properties (e.g., Color: FLinearColor -> FVector4, Enum: FPCGExEnumSelector
 	 * -> int64) override this manually to first project to their output type, then
 	 * dispatch the conversion.
 	 *

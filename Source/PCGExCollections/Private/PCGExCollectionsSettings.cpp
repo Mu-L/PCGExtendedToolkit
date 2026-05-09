@@ -39,4 +39,7 @@ void UPCGExCollectionsSettings::UpdateSettingsCaches() const
 	Cache.DefaultContentFilterClass = DefaultContentFilterClass.TryLoadClass<UPCGExActorContentFilter>();
 	Cache.DefaultBoundsEvaluatorClass = DefaultBoundsEvaluatorClass.TryLoadClass<UPCGExBoundsEvaluator>();
 	Cache.DefaultMeshClassificatorClass = DefaultMeshClassificatorClass.TryLoadClass<UPCGExActorMeshClassificator>();
+
+	Cache.SystemActorClasses = UPCGExActorContentFilter::KnownSystemActorClasses;
+	Cache.SystemActorClasses.Append(AdditionalSystemActorClasses);
 }

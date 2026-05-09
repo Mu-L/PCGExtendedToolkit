@@ -5,14 +5,29 @@
 
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExPropertyTypes.h"
+#include "Details/PCGExEnumSelectorWidget.h"
 #include "Details/PCGExInlineNumericWidgets.h"
 
 namespace PCGExBuiltInInlineWidgets
 {
 	void RegisterAll()
 	{
-		FPCGExInlineWidgetRegistry::Register(FPCGExProperty_Vector::StaticStruct()->GetFName(), &PCGExInlineNumericWidgets::MakeVectorWidget);
-		FPCGExInlineWidgetRegistry::Register(FPCGExProperty_Vector2::StaticStruct()->GetFName(), &PCGExInlineNumericWidgets::MakeVector2Widget);
-		FPCGExInlineWidgetRegistry::Register(FPCGExProperty_Rotator::StaticStruct()->GetFName(), &PCGExInlineNumericWidgets::MakeRotatorWidget);
+		// Numeric inline widgets render identically in Edit and Compact contexts — no
+		// "definition" controls (the value IS the definition), so register under both.
+		FPCGExInlineWidgetRegistry::RegisterAllModes(FPCGExProperty_Vector::StaticStruct()->GetFName(), &PCGExInlineNumericWidgets::MakeVectorWidget);
+		FPCGExInlineWidgetRegistry::RegisterAllModes(FPCGExProperty_Vector2::StaticStruct()->GetFName(), &PCGExInlineNumericWidgets::MakeVector2Widget);
+		FPCGExInlineWidgetRegistry::RegisterAllModes(FPCGExProperty_Rotator::StaticStruct()->GetFName(), &PCGExInlineNumericWidgets::MakeRotatorWidget);
+
+		// Enum: compact-mode only. The schema-edit (Edit) path falls through to the default
+		// AddProperty(ValueHandle), which routes to FPCGExEnumSelectorCustomization — that
+		// renders the full editor (class picker + value picker). The compact mode used in
+		// override / readonly-schema contexts hides the class picker.
+		FPCGExInlineWidgetRegistry::Register(
+			FPCGExProperty_Enum::StaticStruct()->GetFName(),
+			EPCGExInlineWidgetMode::Compact,
+			[](const TSharedRef<IPropertyHandle>& ValueHandle) -> TSharedRef<SWidget>
+			{
+				return PCGExEnumSelectorWidget::Make(ValueHandle, /*bAllowClassPicker=*/false);
+			});
 	}
 }

@@ -142,7 +142,7 @@ bool FPCGExProperty_Color::TryWriteValue(EPCGMetadataTypes TargetType, void* Out
 
 #pragma endregion
 
-#pragma region Enum (FEnumSelector -> int64)
+#pragma region Enum (FPCGExEnumSelector -> int64)
 
 bool FPCGExProperty_Enum::InitializeOutput(const TSharedRef<PCGExData::FFacade>& OutputFacade, FName OutputName)
 {
@@ -167,6 +167,16 @@ void FPCGExProperty_Enum::CopyValueFrom(const FPCGExProperty* Source)
 {
 	const FPCGExProperty_Enum* Typed = static_cast<const FPCGExProperty_Enum*>(Source);
 	Value = Typed->Value;
+}
+
+void FPCGExProperty_Enum::SyncStructuralFromSchema(const FPCGExProperty& Schema)
+{
+	// The enum class is structural — the schema decides which UEnum the property targets,
+	// and overrides must follow it. The selected int64 value is intentionally preserved
+	// here; if it no longer corresponds to a member of the new class, the picker UI will
+	// surface the raw integer and the user can re-pick.
+	const FPCGExProperty_Enum& Typed = static_cast<const FPCGExProperty_Enum&>(Schema);
+	Value.Class = Typed.Value.Class;
 }
 
 FPCGMetadataAttributeBase* FPCGExProperty_Enum::CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const
