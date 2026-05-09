@@ -16,6 +16,7 @@
 #include "Engine/Level.h"
 #include "Engine/World.h"
 #include "Data/PCGExDataMacros.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
 
@@ -51,6 +52,7 @@ bool FPCGExStagingSpawnActorsElement::Boot(FPCGExContext* InContext) const
 	PCGEX_CONTEXT_AND_SETTINGS(StagingSpawnActors)
 
 	PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReferenceAttribute)
+	if (Settings->bApplyInstanceTags) { PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->InstanceTagsAttributeName) }
 
 	Context->CollectionUnpacker = MakeShared<PCGExCollections::FPickUnpacker>();
 	Context->CollectionUnpacker->UnpackPin(InContext, PCGExCollections::Labels::SourceCollectionMapLabel);
@@ -118,7 +120,7 @@ namespace PCGExStagingSpawnActors
 
 		if (Settings->bApplyInstanceTags)
 		{
-			InstanceTagsGetter = PointDataFacade->GetReadable<FString>(TEXT("InstanceTags"), PCGExData::EIOSide::In, true);
+			InstanceTagsGetter = PointDataFacade->GetReadable<FString>(Settings->InstanceTagsAttributeName, PCGExData::EIOSide::In, true);
 		}
 
 		// Create ActorReference writer
@@ -437,14 +439,14 @@ namespace PCGExStagingSpawnActors
 			UPCGComponent* MutableSourceComponent = ExecutionContext->GetMutableComponent();
 			ManagedActors = NewObject<UPCGManagedActors>(MutableSourceComponent);
 			ManagedActors->SetCrc(Context->DependenciesCrc);
-			
+
 #if WITH_EDITOR
 			// Explicitly reflect the component's editing mode on the resource. Without this,
 			// bIsPreview may not match the component state and tracked actors can be treated
 			// as transient. UE's PCG spawn element does this at PCGSpawnActor.cpp:972.
 			ManagedActors->SetIsPreview(bIsPreviewActor);
 #endif
-			
+
 			MutableSourceComponent->AddToManagedResources(ManagedActors);
 		}
 

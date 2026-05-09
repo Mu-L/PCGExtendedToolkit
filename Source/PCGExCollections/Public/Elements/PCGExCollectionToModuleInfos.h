@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExPointsProcessor.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
 #include "PCGExPropertyWriter.h"
@@ -60,6 +61,11 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bOmitInvalidAndEmpty = true;
 
+	/** Optionally include/exclude entries by category name. Tested against both leaf entries and
+	 *  sub-collection containers; excluding a sub-collection skips its descendants entirely. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	FPCGExNameFiltersDetails CategoryFilters;
+
 	/** Name of the attribute the "Symbol" value will be written to */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, DisplayName="Symbol"))
 	FName SymbolAttributeName = FName("Symbol");
@@ -104,6 +110,7 @@ protected:
 		const TSharedPtr<PCGExCollections::FPickPacker>& Packer,
 		const UPCGExAssetCollection* Collection,
 		const UPCGExCollectionToModuleInfosSettings* Settings,
+		const FPCGExNameFiltersDetails& CategoryFilters,
 		TArray<PCGExCollectionToGrammar::FModule>& OutModules,
 		TSet<FName>& OutSymbols,
 		TMap<const FPCGExAssetCollectionEntry*, double>& SizeCache) const;

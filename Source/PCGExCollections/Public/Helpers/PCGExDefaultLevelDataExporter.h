@@ -80,6 +80,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bGenerateCollections"))
 	bool bCapturePropertyDeltas = true;
 
+	/** When true, write each actor's full tag set as a joined string attribute on its actor point.
+	 *  Lets downstream consumers read the tags directly without unserializing the property delta. */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(InlineEditConditionToggle))
+	bool bWriteInstanceTags = true;
+
+	/** Output attribute name for the joined per-actor tag string. */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bWriteInstanceTags"))
+	FName InstanceTagsAttributeName = FName("InstanceTags");
+
 	virtual bool ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset) override;
 
 	/** Classify an actor. Override for custom logic.
