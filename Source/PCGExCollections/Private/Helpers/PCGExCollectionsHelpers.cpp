@@ -41,7 +41,24 @@ namespace PCGExCollections
 		// lives on the consuming node and is plumbed through FMicroSelectorHelper separately.
 		return Factory;
 	}
-	
+
+	AActor* ResolveTargetActor(FPCGExContext* InContext, const FSoftObjectPath& InPath, TMap<FSoftObjectPath, TWeakObjectPtr<AActor>>& InOutCache)
+	{
+		if (!InPath.IsNull())
+		{
+			if (const TWeakObjectPtr<AActor>* Cached = InOutCache.Find(InPath))
+			{
+				if (AActor* Live = Cached->Get()) { return Live; }
+			}
+			if (AActor* Resolved = Cast<AActor>(InPath.ResolveObject()))
+			{
+				InOutCache.Add(InPath, Resolved);
+				return Resolved;
+			}
+		}
+		return InContext->GetTargetActor(nullptr);
+	}
+
 	// Selector Helper Implementation
 
 	FSelectorHelper::FSelectorHelper(UPCGExAssetCollection* InCollection, const FPCGExAssetDistributionDetails& InDetails)

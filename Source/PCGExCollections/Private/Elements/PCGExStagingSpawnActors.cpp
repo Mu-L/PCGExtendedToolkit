@@ -15,6 +15,8 @@
 #include "Data/Utils/PCGExDataForward.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
+#include "Data/PCGExDataMacros.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
 
@@ -50,6 +52,7 @@ bool FPCGExStagingSpawnActorsElement::Boot(FPCGExContext* InContext) const
 	PCGEX_CONTEXT_AND_SETTINGS(StagingSpawnActors)
 
 	PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReferenceAttribute)
+	if (Settings->bApplyInstanceTags) { PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->InstanceTagsAttributeName) }
 
 	Context->CollectionUnpacker = MakeShared<PCGExCollections::FPickUnpacker>();
 	Context->CollectionUnpacker->UnpackPin(InContext, PCGExCollections::Labels::SourceCollectionMapLabel);
@@ -117,7 +120,7 @@ namespace PCGExStagingSpawnActors
 
 		if (Settings->bApplyInstanceTags)
 		{
-			InstanceTagsGetter = PointDataFacade->GetReadable<FString>(TEXT("InstanceTags"), PCGExData::EIOSide::In, true);
+			InstanceTagsGetter = PointDataFacade->GetReadable<FString>(Settings->InstanceTagsAttributeName, PCGExData::EIOSide::In, true);
 		}
 
 		// Create ActorReference writer
@@ -125,6 +128,10 @@ namespace PCGExStagingSpawnActors
 
 		// Init forwarding
 		ForwardHandler = Settings->TargetsForwarding.TryGetHandler(PointDataFacade);
+
+		// Init root-actor source. Constant-mode short-circuits per-point materialization.
+		RootActorSV = Settings->RootActor.GetValueSetting();
+		if (!RootActorSV->Init(PointDataFacade)) { return false; }
 
 		// Init PCG generation watcher if requested
 		if (Settings->bTriggerPCGGeneration)
@@ -142,6 +149,8 @@ namespace PCGExStagingSpawnActors
 		NumPoints = PointDataFacade->Source->GetNum(PCGExData::EIOSide::In);
 		ResolvedEntries.SetNumZeroed(NumPoints);
 
+		if (!RootActorSV->IsConstant()) { RootActorPaths.SetNum(NumPoints); }
+
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
 		return true;
@@ -153,6 +162,11 @@ namespace PCGExStagingSpawnActors
 
 		PointDataFacade->Fetch(Scope);
 		FilterScope(Scope);
+
+		// Materialize per-point root paths only when not constant. The constant path is read directly
+		// from settings on the main thread.
+		const bool bRootIsConstant = RootActorSV->IsConstant();
+		PCGEX_SV_VIEW_COND(RootActorSV, !bRootIsConstant)
 
 		int16 MaterialPick = 0;
 
@@ -180,6 +194,8 @@ namespace PCGExStagingSpawnActors
 
 			// Write directly to our index -- no lock, each thread writes unique indices
 			ResolvedEntries[Index].Entry = ActorEntry;
+
+			if (!bRootIsConstant) { RootActorPaths[Index] = PCGEX_SV_READ(RootActorSV, Index - Scope.Start); }
 		}
 	}
 
@@ -225,10 +241,6 @@ namespace PCGExStagingSpawnActors
 		// Cache transforms for the spawn loop
 		Transforms = PointDataFacade->Source->GetIn()->GetConstTransformValueRange();
 
-#if WITH_EDITOR
-		ComputeFolderPath();
-#endif
-
 		// Batch-load all unique actor classes asynchronously, then start spawning
 		TArray<FSoftObjectPath> PathsToLoad = UniqueClasses.Array();
 
@@ -254,27 +266,11 @@ namespace PCGExStagingSpawnActors
 			});
 	}
 
-#if WITH_EDITOR
-	void FProcessor::ComputeFolderPath()
+	AActor* FProcessor::ResolveTargetActor(const int32 PointIndex)
 	{
-		const UPCGComponent* Component = ExecutionContext->GetComponent();
-		if (!Component) { return; }
-
-		const AActor* Owner = Component->GetOwner();
-		if (!Owner) { return; }
-
-		TStringBuilderWithBuffer<TCHAR, 1024> FolderBuilder;
-
-		const FName OwnerFolder = Owner->GetFolderPath();
-		if (OwnerFolder != NAME_None)
-		{
-			FolderBuilder << OwnerFolder.ToString() << TEXT("/");
-		}
-
-		FolderBuilder << Owner->GetActorNameOrLabel() << TEXT("_Generated");
-		CachedFolderPath = FName(FolderBuilder.ToString());
+		const FSoftObjectPath& Path = RootActorSV->IsConstant() ? Settings->RootActor.Constant : RootActorPaths[PointIndex];
+		return PCGExCollections::ResolveTargetActor(ExecutionContext, Path, RootActorResolveCache);
 	}
-#endif
 
 	void FProcessor::SpawnAtPoint(const int32 PointIndex)
 	{
@@ -298,6 +294,18 @@ namespace PCGExStagingSpawnActors
 		UWorld* World = ExecutionContext->GetWorld();
 		if (!World) { return; }
 
+		AActor* TargetActor = ResolveTargetActor(PointIndex);
+		if (!TargetActor)
+		{
+			if (!Settings->bQuietInvalidEntryWarnings)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
+				           FText::Format(LOCTEXT("InvalidTargetActor", "No target actor available for point {0}; ensure either RootActor or the component's target actor is set."),
+					           FText::AsNumber(PointIndex)));
+			}
+			return;
+		}
+
 		const FTransform& SpawnTransform = Transforms[PointIndex];
 
 		const bool bHasDelta = Settings->bApplyPropertyDeltas
@@ -312,9 +320,10 @@ namespace PCGExStagingSpawnActors
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.Template = Cast<AActor>(ActorClass->GetDefaultObject());
 			SpawnParams.SpawnCollisionHandlingOverride = Settings->CollisionHandling;
-			// Explicitly target the persistent level so the actor is serialized with the
-			// main level's .umap (mirrors UPCGActorHelpers::SpawnDefaultActor).
-			SpawnParams.OverrideLevel = World->PersistentLevel;
+			// Spawn into the target actor's level so the spawned actor is serialized with the
+			// same .umap as its parent (mirrors UPCGActorHelpers::SpawnDefaultActor and lets
+			// per-point root actors in sublevels keep their spawned children in those sublevels).
+			SpawnParams.OverrideLevel = TargetActor->GetLevel();
 			// Mark transient at runtime / in PIE / when the PCG component is in preview
 			// mode, so preview/runtime-spawned actors don't accidentally persist to disk.
 			// Mirrors UPCGActorHelpers::SpawnDefaultActor's flag handling.
@@ -388,15 +397,10 @@ namespace PCGExStagingSpawnActors
 		// UE-62747: SpawnActor doesn't properly apply scale from the spawn transform
 		SpawnedActor->SetActorRelativeScale3D(SpawnTransform.GetScale3D());
 
-#if WITH_EDITOR
 		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::SetFolderPath);
-			if (CachedFolderPath != NAME_None)
-			{
-				SpawnedActor->SetFolderPath(CachedFolderPath);
-			}
+			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::AttachToParent);
+			PCGHelpers::AttachToParent(SpawnedActor, TargetActor, Settings->AttachOptions, ExecutionContext);
 		}
-#endif
 
 		// Apply entry tags to the actor
 		if (Settings->bApplyEntryTags)
@@ -435,14 +439,14 @@ namespace PCGExStagingSpawnActors
 			UPCGComponent* MutableSourceComponent = ExecutionContext->GetMutableComponent();
 			ManagedActors = NewObject<UPCGManagedActors>(MutableSourceComponent);
 			ManagedActors->SetCrc(Context->DependenciesCrc);
-			
+
 #if WITH_EDITOR
 			// Explicitly reflect the component's editing mode on the resource. Without this,
 			// bIsPreview may not match the component state and tracked actors can be treated
 			// as transient. UE's PCG spawn element does this at PCGSpawnActor.cpp:972.
 			ManagedActors->SetIsPreview(bIsPreviewActor);
 #endif
-			
+
 			MutableSourceComponent->AddToManagedResources(ManagedActors);
 		}
 

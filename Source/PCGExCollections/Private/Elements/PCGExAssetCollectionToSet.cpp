@@ -104,11 +104,14 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 
 	TSet<uint64> GUIDS;
 
+	FPCGExNameFiltersDetails CategoryFilters = Settings->CategoryFilters;
+	CategoryFilters.Init();
+
 	for (int i = 0; i < MainCache->Main->Order.Num(); i++)
 	{
 		GUIDS.Empty();
 		FPCGExEntryAccessResult Result = MainCollection->GetEntryAt(i);
-		ProcessEntry(InContext, Result.Entry, Result.Host, Entries, Settings->bOmitInvalidAndEmpty, !Settings->bAllowDuplicates, Settings->SubCollectionHandling, GUIDS);
+		ProcessEntry(InContext, Result.Entry, Result.Host, Entries, Settings->bOmitInvalidAndEmpty, !Settings->bAllowDuplicates, Settings->SubCollectionHandling, CategoryFilters, GUIDS);
 	}
 
 	if (Entries.IsEmpty()) { return OutputToPin(); }
@@ -161,6 +164,7 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 	const bool bOmitInvalidAndEmpty,
 	const bool bNoDuplicates,
 	const EPCGExSubCollectionToSet SubHandling,
+	const FPCGExNameFiltersDetails& CategoryFilters,
 	TSet<uint64>& GUIDS)
 {
 	if (bNoDuplicates)
@@ -182,6 +186,8 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 		AddNone();
 		return;
 	}
+
+	if (!CategoryFilters.Test(InEntry->Category.ToString())) { return; }
 
 	auto AddEmpty = [&](const FPCGExAssetCollectionEntry* S)
 	{
@@ -213,7 +219,7 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 		case EPCGExSubCollectionToSet::Expand: for (int i = 0; i < SubCache->Main->Order.Num(); i++)
 			{
 				SubResult = SubCollection->GetEntryAt(i);
-				ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, GUIDS);
+				ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, CategoryFilters, GUIDS);
 			}
 			return;
 		case EPCGExSubCollectionToSet::PickRandom: SubResult = SubCollection->GetEntryRandom(0);
@@ -226,7 +232,7 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 			break;
 		}
 
-		ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, GUIDS);
+		ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, CategoryFilters, GUIDS);
 	}
 	else
 	{

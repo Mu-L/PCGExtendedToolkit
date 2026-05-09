@@ -10,8 +10,11 @@
 #include "PCGParamData.h"
 #include "PCGExSocketProvider.h"
 #include "Helpers/PCGExManagedResourceHelpers.h"
+#include "Helpers/PCGHelpers.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
 
@@ -243,6 +246,10 @@ namespace PCGExStagingLoadLevel
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
 		if (!EntryHashGetter) { return false; }
 
+		// Init root-actor source. Constant-mode short-circuits per-point materialization.
+		RootActorSV = Settings->RootActor.GetValueSetting();
+		if (!RootActorSV->Init(PointDataFacade)) { return false; }
+
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
 		return true;
@@ -260,6 +267,11 @@ namespace PCGExStagingLoadLevel
 
 		TConstPCGValueRange<FTransform> Transforms = PointDataFacade->Source->GetIn()->GetConstTransformValueRange();
 
+		// Materialize per-point root paths only when not constant. The constant path is read directly
+		// from settings on the main thread.
+		const bool bRootIsConstant = RootActorSV->IsConstant();
+		PCGEX_SV_VIEW_COND(RootActorSV, !bRootIsConstant)
+
 		int16 MaterialPick = 0;
 
 		PCGEX_SCOPE_LOOP(Index)
@@ -274,14 +286,18 @@ namespace PCGExStagingLoadLevel
 
 			// Check if this is a Level entry
 			if (!Result.Entry->IsType(PCGExAssetCollection::TypeIds::Level)) { continue; }
-			
+
 			const FSoftObjectPath& LevelPath = Result.Entry->Staging.Path;
 			if (!LevelPath.IsValid()) { continue; }
+
+			const FSoftObjectPath PerPointRoot = bRootIsConstant
+				? FSoftObjectPath()
+				: PCGEX_SV_READ(RootActorSV, Index - Scope.Start);
 
 			{
 				// TODO : Move to TScopedArray instead
 				FWriteScopeLock WriteLock(RequestLock);
-				SpawnRequests.Emplace(World, LevelPath.GetLongPackageName(), LevelPath, Transforms[Index], Index);
+				SpawnRequests.Emplace(World, LevelPath.GetLongPackageName(), LevelPath, PerPointRoot, Transforms[Index], Index);
 			}
 		}
 	}
@@ -313,32 +329,42 @@ namespace PCGExStagingLoadLevel
 		PCGEX_ASYNC_HANDLE_CHKD_VOID(TaskManager, MainThreadLoop)
 	}
 
-#if WITH_EDITOR
-	void FProcessor::ComputeFolderPath()
+	AActor* FProcessor::ResolveTargetActor(const FLevelSpawnRequest& Request)
 	{
-		// Match native PCG convention: {OwnerFolder}/{OwnerLabel}_Generated
-		const UPCGComponent* Component = ExecutionContext->GetComponent();
-		if (!Component) { return; }
-
-		const AActor* Owner = Component->GetOwner();
-		if (!Owner) { return; }
-
-		TStringBuilderWithBuffer<TCHAR, 1024> FolderBuilder;
-
-		const FName OwnerFolder = Owner->GetFolderPath();
-		if (OwnerFolder != NAME_None)
-		{
-			FolderBuilder << OwnerFolder.ToString() << TEXT("/");
-		}
-
-		FolderBuilder << Owner->GetActorNameOrLabel() << TEXT("_Generated");
-		CachedFolderPath = FName(FolderBuilder.ToString());
+		const FSoftObjectPath& Path = RootActorSV->IsConstant() ? Settings->RootActor.Constant : Request.RootActorPath;
+		return PCGExCollections::ResolveTargetActor(ExecutionContext, Path, RootActorResolveCache);
 	}
 
+	FName FProcessor::ComputeInnerFolderPath(AActor* TargetActor) const
+	{
+#if WITH_EDITOR
+		// Attached has no meaningful semantics for inner actors loaded by the streaming level
+		// (the host actor's own attach happens separately). Flatten so they still organize.
+		const EPCGAttachOptions Effective = (Settings->AttachOptions == EPCGAttachOptions::Attached)
+			? EPCGAttachOptions::InFolder
+			: Settings->AttachOptions;
+		FString FolderPath;
+		PCGHelpers::GetGeneratedActorsFolderPath(TargetActor, ExecutionContext, Effective, FolderPath);
+		return FolderPath.IsEmpty() ? NAME_None : FName(*FolderPath);
+#else
+		return NAME_None;
+#endif
+	}
+
+#if WITH_EDITOR
 	void FProcessor::SpawnAsLevelInstance(FLevelSpawnRequest& Request)
 	{
 		UWorld* World = Request.Params.World;
 		if (!World) { return; }
+
+		AActor* TargetActor = ResolveTargetActor(Request);
+		if (!TargetActor)
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
+			           FText::Format(LOCTEXT("InvalidTargetActorLI", "No target actor available for level instance at point {0}; ensure either RootActor or the component's target actor is set."),
+				           FText::AsNumber(Request.PointIndex)));
+			return;
+		}
 
 		// Resolve actor class -- user override or our default
 		UClass* ActorClass = Settings->LevelInstanceClass.Get();
@@ -350,6 +376,9 @@ namespace PCGExStagingLoadLevel
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.bDeferConstruction = true;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		// Spawn into the target actor's level so the ALevelInstance is serialized with the
+		// same .umap as its parent (mirrors UPCGActorHelpers::SpawnDefaultActor).
+		SpawnParams.OverrideLevel = TargetActor->GetLevel();
 
 		ALevelInstance* LevelInstanceActor = World->SpawnActor<ALevelInstance>(
 			ActorClass,
@@ -364,10 +393,11 @@ namespace PCGExStagingLoadLevel
 			return;
 		}
 
-		// Pass folder path to our subclass so its streaming level can apply it
+		// Pass an inner-actor folder to our subclass so the streamed-in actors organize alongside the
+		// LevelInstance host. The host itself is attached separately below.
 		if (APCGExLevelInstance* PCGExInstance = Cast<APCGExLevelInstance>(LevelInstanceActor))
 		{
-			PCGExInstance->GeneratedFolderPath = CachedFolderPath;
+			PCGExInstance->GeneratedFolderPath = ComputeInnerFolderPath(TargetActor);
 		}
 
 		// Set world asset BEFORE finishing construction
@@ -376,18 +406,15 @@ namespace PCGExStagingLoadLevel
 		const TSoftObjectPtr<UWorld> WorldAsset(Request.LevelPath);
 		LevelInstanceActor->SetWorldAsset(WorldAsset);
 
-		// Organize in folder
-		if (CachedFolderPath != NAME_None)
-		{
-			LevelInstanceActor->SetFolderPath(CachedFolderPath);
-		}
-
 		// Finish spawning -- registers components
 		LevelInstanceActor->FinishSpawning(Request.Params.LevelTransform);
 
 		// Trigger level loading via the same path the editor uses when WorldAsset changes
 		// (PostRegisterAllComponents has a GUID check that doesn't fire for editor-spawned actors)
 		LevelInstanceActor->UpdateLevelInstanceFromWorldAsset();
+
+		// AttachOptions semantics for the LevelInstance host actor itself.
+		PCGHelpers::AttachToParent(LevelInstanceActor, TargetActor, Settings->AttachOptions, ExecutionContext);
 
 		// Track via PCG managed resources -- engine handles cleanup on re-execution
 		if (ManagedLevelInstances)
@@ -413,9 +440,6 @@ namespace PCGExStagingLoadLevel
 		if (RequestIndex == 0)
 		{
 #if WITH_EDITOR
-			// Compute folder path once (game thread, safe to access actor labels)
-			ComputeFolderPath();
-
 			// ALevelInstance actors persist across save/load -- skip for runtime components
 			// whose output is transient and would otherwise leave stale actors in the level.
 			bUseLevelInstance = Settings->bSpawnAsLevelInstance
@@ -467,7 +491,9 @@ namespace PCGExStagingLoadLevel
 		{
 			PCGExStreaming->OwnerSuffix = BaseSuffix;
 #if WITH_EDITOR
-			PCGExStreaming->GeneratedFolderPath = CachedFolderPath;
+			// No actor to attach on the streaming-level path; the inner-folder helper still handles
+			// the Attached->InFolder flatten so loaded actors organize sensibly.
+			PCGExStreaming->GeneratedFolderPath = ComputeInnerFolderPath(ResolveTargetActor(Request));
 #endif
 		}
 

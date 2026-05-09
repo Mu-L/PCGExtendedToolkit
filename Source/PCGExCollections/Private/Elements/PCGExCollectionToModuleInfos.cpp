@@ -86,7 +86,10 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 	TArray<PCGExCollectionToGrammar::FModule> Modules;
 	Modules.Reserve(100);
 
-	FlattenCollection(Packer, MainCollection, Settings, Modules, UniqueSymbols, SizeCache);
+	FPCGExNameFiltersDetails CategoryFilters = Settings->CategoryFilters;
+	CategoryFilters.Init();
+
+	FlattenCollection(Packer, MainCollection, Settings, CategoryFilters, Modules, UniqueSymbols, SizeCache);
 
 	// Prepare custom property outputs. Fallback hosts = unique per-module hosts (for heterogeneous
 	// nested collections where a property is only declared on a sub-host).
@@ -134,6 +137,7 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 	const TSharedPtr<PCGExCollections::FPickPacker>& Packer,
 	const UPCGExAssetCollection* Collection,
 	const UPCGExCollectionToModuleInfosSettings* Settings,
+	const FPCGExNameFiltersDetails& CategoryFilters,
 	TArray<PCGExCollectionToGrammar::FModule>& OutModules,
 	TSet<FName>& UniqueSymbols,
 	TMap<const FPCGExAssetCollectionEntry*, double>& SizeCache) const
@@ -152,9 +156,11 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 
 		if (!Entry) { continue; }
 
+		if (!CategoryFilters.Test(Entry->Category.ToString())) { continue; }
+
 		if (Entry->bIsSubCollection && Entry->SubGrammarMode == EPCGExGrammarSubCollectionMode::Flatten)
 		{
-			FlattenCollection(Packer, Entry->GetSubCollection<UPCGExAssetCollection>(), Settings, OutModules, UniqueSymbols, SizeCache);
+			FlattenCollection(Packer, Entry->GetSubCollection<UPCGExAssetCollection>(), Settings, CategoryFilters, OutModules, UniqueSymbols, SizeCache);
 			continue;
 		}
 

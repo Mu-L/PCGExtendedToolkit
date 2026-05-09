@@ -19,4 +19,5 @@ struct PCGEXCOLLECTIONS_API FPCGExCollectionsSettingsCache
 	TSubclassOf<UObject> DefaultLevelExporterClass;
 	TSubclassOf<UObject> DefaultContentFilterClass;
 	TSubclassOf<UObject> DefaultBoundsEvaluatorClass;
+	TSubclassOf<UObject> DefaultMeshClassificatorClass;
 };

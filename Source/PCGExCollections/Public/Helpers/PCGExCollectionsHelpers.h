@@ -66,7 +66,17 @@ namespace PCGExCollections
 {
 	PCGEXCOLLECTIONS_API
 	UPCGExSelectorFactoryData* BuildLegacyFactory(FPCGExContext* InContext, const FPCGExAssetDistributionDetails& InDetails);
-	
+
+	/**
+	 * Resolves a soft-path-referenced root actor with a per-batch cache, falling back to the
+	 * component's target actor when the path is null or fails to resolve. Soft paths point to
+	 * live actors; only ResolveObject is used (no LoadSynchronous). The cache deduplicates
+	 * StaticFindObject lookups across points that share the same root, and uses weak pointers
+	 * to stay correct across GC if the time-sliced spawn loop yields between iterations.
+	 */
+	PCGEXCOLLECTIONS_API
+	AActor* ResolveTargetActor(FPCGExContext* InContext, const FSoftObjectPath& InPath, TMap<FSoftObjectPath, TWeakObjectPtr<AActor>>& InOutCache);
+
 	class FSocketHelper;
 	/**
 	 * Per-point entry picker. Reads distribution settings (index/random/weighted) and

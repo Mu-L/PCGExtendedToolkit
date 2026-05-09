@@ -14,6 +14,8 @@
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExPCGDataAssetCollection.h"
 
+#include "Helpers/PCGExActorMeshClassificator.h"
+
 #include "UObject/Package.h"
 
 #include "Engine/Level.h"
@@ -43,9 +45,17 @@ UPCGExDefaultLevelDataExporter::UPCGExDefaultLevelDataExporter(const FObjectInit
 		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
 		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
 
+	UClass* ClassificatorClass = Settings.DefaultMeshClassificatorClass
+		                             ? Settings.DefaultMeshClassificatorClass.Get()
+		                             : UPCGExDefaultActorMeshClassificator::StaticClass();
+
 	ContentFilter = Cast<UPCGExActorContentFilter>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("ContentFilter"),
 		                                         UPCGExActorContentFilter::StaticClass(), FilterClass, false, false));
+
+	MeshClassificator = Cast<UPCGExActorMeshClassificator>(
+		ObjectInitializer.CreateDefaultSubobject(this, TEXT("MeshClassificator"),
+		                                         UPCGExActorMeshClassificator::StaticClass(), ClassificatorClass, false, false));
 
 	BoundsEvaluator = Cast<UPCGExBoundsEvaluator>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("BoundsEvaluator"),
@@ -67,10 +77,13 @@ EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Acto
 		// transform/tags survive the round-trip.
 	}
 
-	OutMeshComponent = Actor->FindComponentByClass<UStaticMeshComponent>();
-	if (OutMeshComponent && OutMeshComponent->GetStaticMesh())
+	if (MeshClassificator && MeshClassificator->ShouldClassifyAsMesh(Actor))
 	{
-		return EPCGExActorExportType::Mesh;
+		OutMeshComponent = Actor->FindComponentByClass<UStaticMeshComponent>();
+		if (OutMeshComponent && OutMeshComponent->GetStaticMesh())
+		{
+			return EPCGExActorExportType::Mesh;
+		}
 	}
 
 	return EPCGExActorExportType::Actor;
@@ -273,7 +286,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 		for (UObject* Inner : OldInners)
 		{
 			Inner->Rename(nullptr, GetTransientPackage(),
-				REN_DontCreateRedirectors | REN_NonTransactional);
+			              REN_DontCreateRedirectors | REN_NonTransactional);
 		}
 	}
 
@@ -518,32 +531,26 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 			}
 		}
 
-		// Write per-point instance tags delta
-		FPCGMetadataAttribute<FString>* InstanceTagsAttr = Meta->CreateAttribute<FString>(TEXT("InstanceTags"), FString(), false, true);
-		if (InstanceTagsAttr)
+		// Write the full actor tag set per point. Redundant with the property-delta tag restore
+		// and entry.Tags intersection, but populated unconditionally so downstream consumers can
+		// read tags directly from the point without unserializing the delta.
+		if (bWriteInstanceTags && InstanceTagsAttributeName != NAME_None)
 		{
-			for (int32 i = 0; i < ActorActors.Num(); i++)
+			if (FPCGMetadataAttribute<FString>* InstanceTagsAttr = Meta->CreateAttribute<FString>(InstanceTagsAttributeName, FString(), false, true))
 			{
-				FActorInstanceKey Key;
-				Key.ClassPath = FSoftClassPath(ActorActors[i].Actor->GetClass());
-				Key.DeltaHash = ActorActors[i].DeltaHash;
-				const FActorClassInfo* Info = ActorClassInfoMap.Find(Key);
-				if (!Info) { continue; }
-
-				// Compute delta: actor tags minus intersection
-				FString DeltaStr;
-				for (const FName& Tag : ActorActors[i].Actor->Tags)
+				for (int32 i = 0; i < ActorActors.Num(); i++)
 				{
-					if (!Info->IntersectedTags.Contains(Tag))
+					FString TagsStr;
+					for (const FName& Tag : ActorActors[i].Actor->Tags)
 					{
-						if (!DeltaStr.IsEmpty()) { DeltaStr += TEXT(","); }
-						DeltaStr += Tag.ToString();
+						if (!TagsStr.IsEmpty()) { TagsStr += TEXT(","); }
+						TagsStr += Tag.ToString();
 					}
-				}
 
-				if (!DeltaStr.IsEmpty())
-				{
-					InstanceTagsAttr->SetValue(MetaEntries[i], DeltaStr);
+					if (!TagsStr.IsEmpty())
+					{
+						InstanceTagsAttr->SetValue(MetaEntries[i], TagsStr);
+					}
 				}
 			}
 		}

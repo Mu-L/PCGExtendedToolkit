@@ -258,6 +258,17 @@ struct PCGEXCORE_API FPCGExInputShorthandNameName : public FPCGExInputShorthandN
 	FName Constant = NAME_None;
 };
 
+USTRUCT(BlueprintType)
+struct PCGEXCORE_API FPCGExInputShorthandNameSoftObjectPath : public FPCGExInputShorthandNameBase
+{
+	GENERATED_BODY()
+
+	PCGEX_SHORTHAND_NAME_CTR(SoftObjectPath, FSoftObjectPath)
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	FSoftObjectPath Constant;
+};
+
 #pragma endregion
 
 #pragma region Selector
@@ -470,6 +481,21 @@ struct PCGEXCORE_API FPCGExInputShorthandSelectorName : public FPCGExInputShorth
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FName Constant = NAME_None;
 };
+
+#pragma region DUMMIES
+
+USTRUCT(BlueprintType)
+struct PCGEXCORE_API FPCGExInputShorthandSelectorSoftObjectPath : public FPCGExInputShorthandSelectorBase
+{
+	GENERATED_BODY()
+
+	PCGEX_SHORTHAND_SELECTOR_CTR(SoftObjectPath, FSoftObjectPath)
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	FSoftObjectPath Constant;
+};
+
+#pragma endregion
 
 #pragma endregion
 

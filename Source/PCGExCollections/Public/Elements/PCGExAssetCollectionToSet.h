@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExPointsProcessor.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "PCGExPropertyWriter.h"
 #include "PCGExAssetCollectionToSet.generated.h"
 
@@ -65,6 +66,11 @@ protected:
 	/** If enabled, invalid or empty entries are removed from the output */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bOmitInvalidAndEmpty = true;
+
+	/** Optionally include/exclude entries by category name. Tested against both leaf entries and
+	 *  sub-collection containers; excluding a sub-collection skips its descendants entirely. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	FPCGExNameFiltersDetails CategoryFilters;
 
 
 	/** Write the asset path to an attribute. */
@@ -158,5 +164,6 @@ protected:
 		const bool bOmitInvalidAndEmpty,
 		const bool bNoDuplicates,
 		const EPCGExSubCollectionToSet SubHandling,
+		const FPCGExNameFiltersDetails& CategoryFilters,
 		TSet<uint64>& GUIDS);
 };
