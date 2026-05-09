@@ -7,7 +7,7 @@
 #include "Utils/PCGExCompare.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExEnumCommon.h"
-#include "Elements/ControlFlow/PCGControlFlow.h"
+#include "PCGExEnumSelector.h"
 
 #include "PCGExBranchOnDataAttribute.generated.h"
 
@@ -122,7 +122,7 @@ public:
 
 	/** Determines which Enum be used. Enum selection is ignored here, it's only using the class value internally. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_NotOverridable, EditCondition="SelectionMode != EPCGExControlFlowSelectionMode::UserDefined && EnumSource == EPCGExEnumConstantSourceType::Selector", EditConditionHides, ShowOnlyInnerProperties))
-	FEnumSelector EnumPicker;
+	FPCGExEnumSelector EnumPicker;
 
 	/** Name of the default/fallback output pin. This is exposed because to allow easy disambiguation when 'default' is a valid switch. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, AdvancedDisplay)

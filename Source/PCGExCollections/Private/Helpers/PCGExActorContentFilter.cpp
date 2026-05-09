@@ -4,6 +4,7 @@
 #include "Helpers/PCGExActorContentFilter.h"
 
 #include "GameFramework/Actor.h"
+#include "PCGExCollectionsSettingsCache.h"
 #include "PCGExSocketProvider.h"
 
 #if WITH_EDITOR
@@ -14,6 +15,14 @@
 #endif
 
 #pragma region UPCGExActorContentFilter
+
+TSet<FName> UPCGExActorContentFilter::KnownSystemActorClasses =
+{
+	// Add new entries here as they are discovered; external plugins call RegisterSystemActorClass().
+	TEXT("ChaosDebugDrawActor"),
+	TEXT("Valency Editor Cache"),
+	TEXT("ValencyEditorCache"),
+};
 
 bool UPCGExActorContentFilter::IsInfrastructureActor(AActor* Actor)
 {
@@ -30,9 +39,19 @@ bool UPCGExActorContentFilter::IsInfrastructureActor(AActor* Actor)
 	// Soft check for ANavigationData -- avoids hard link dependency on NavigationSystem module
 	static UClass* NavigationDataClass = FindObject<UClass>(nullptr, TEXT("/Script/NavigationSystem.NavigationData"));
 	if (NavigationDataClass && Actor->IsA(NavigationDataClass)) { return true; }
+
+	if (PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetClass()->GetFName())) { return true; }
 #endif
 
 	return false;
+}
+
+void UPCGExActorContentFilter::RegisterSystemActorClass(FName ClassName)
+{
+	KnownSystemActorClasses.Add(ClassName);
+	// Push into the cache so the addition takes effect immediately, even if external plugins
+	// register before/outside the developer-settings PostEdit flow.
+	PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Add(ClassName);
 }
 
 bool UPCGExActorContentFilter::StaticPassesFilter(

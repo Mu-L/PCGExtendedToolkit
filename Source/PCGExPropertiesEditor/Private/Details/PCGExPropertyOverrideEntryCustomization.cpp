@@ -180,7 +180,10 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			// path (CreatePropertyValueWidget) works for simple scalar types but falls back
 			// to expandable widgets for complex types (FVector, FRotator, etc.), which
 			// break the inline contract - custom factories exist to provide compact renders.
-			const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName());
+			// Compact-mode lookup: override entry is value-editing only; the schema
+			// already pinned the property type and any "definition" controls would
+			// be misleading here.
+			const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName(), EPCGExInlineWidgetMode::Compact);
 			TSharedRef<SWidget> ValueWidget = SNullWidget::NullWidget;
 			if (ValuePropertyHandle.IsValid())
 			{

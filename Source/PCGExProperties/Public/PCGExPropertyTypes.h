@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGSettings.h"
+#include "PCGExEnumSelector.h"
 #include "PCGExProperty.h"
-#include "Elements/ControlFlow/PCGControlFlow.h"
 
 #include "PCGExPropertyTypes.generated.h"
 
@@ -487,20 +487,20 @@ public:
 };
 
 /**
- * Enum property - uses FEnumSelector for type-safe enum selection, outputs as int64 attribute.
+ * Enum property - uses FPCGExEnumSelector for type-safe enum selection, outputs as int64 attribute.
  *
  * Another example of a CONVERTING property type:
- * - Value is FEnumSelector (gives the user a type-safe enum picker)
+ * - Value is FPCGExEnumSelector (gives the user a type-safe enum picker)
  * - OutputBuffer is TBuffer<int64> (enum values stored as integer)
  * - Output methods extract Value.Value (the int64) before writing
  */
-USTRUCT(BlueprintType, DisplayName="Enum")
+USTRUCT(BlueprintType, meta=(PCGExInlineValue), DisplayName="Enum")
 struct PCGEXPROPERTIES_API FPCGExProperty_Enum : public FPCGExProperty
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
-	FEnumSelector Value;
+	FPCGExEnumSelector Value;
 
 protected:
 	TSharedPtr<PCGExData::TBuffer<int64>> OutputBuffer;
@@ -510,6 +510,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 	virtual bool SupportsOutput() const override { return true; }
 	virtual EPCGMetadataTypes GetOutputType() const override { return EPCGMetadataTypes::Integer64; }
 	virtual FName GetTypeName() const override { return FName("Enum"); }

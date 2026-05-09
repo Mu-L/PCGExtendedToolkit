@@ -6,10 +6,16 @@
 #include "IPropertyTypeCustomization.h"
 
 /**
- * Customizes FPCGExProperty-derived structs when shown inside FInstancedStructDetails.
- * Collapses the redundant inner group header and exposes only the Value field for editing.
+ * Default IPropertyTypeCustomization for FPCGExEnumSelector.
+ *
+ * Renders a single-row inline editor (class picker + value picker) via
+ * PCGExEnumSelectorWidget::Make. This is the customization that gets invoked anywhere
+ * an FPCGExEnumSelector appears as a UPROPERTY in user-defined structs / classes.
+ *
+ * Registered against FPCGExEnumSelector::StaticStruct() in PCGExPropertiesEditor module
+ * startup. Replaces the engine's FEnumSelectorDetails (which we no longer use).
  */
-class PCGEXPROPERTIESEDITOR_API FPCGExPropertyCompiledCustomization : public IPropertyTypeCustomization
+class PCGEXPROPERTIESEDITOR_API FPCGExEnumSelectorCustomization : public IPropertyTypeCustomization
 {
 public:
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();

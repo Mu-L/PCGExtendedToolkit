@@ -16,6 +16,18 @@ class AActor;
 class UStaticMeshComponent;
 
 UENUM()
+enum class EPCGExValueTagMode : uint8
+{
+	NoParsing    UMETA(DisplayName = "No Parsing"),
+	// Tags are written as-is to the instance tag string; no attribute parsing.
+	Parse        UMETA(DisplayName = "Parse"),
+	// Plain tags become bool=true attributes; Name:Value tags become typed attributes.
+	// The instance tag string is never written in this mode.
+	ParseAndKeep UMETA(DisplayName = "Parse and Keep"),
+	// Same as Parse, but the name-part of each value tag is also written to the instance tag string.
+};
+
+UENUM()
 enum class EPCGExActorExportType : uint8
 {
 	Mesh = 0,
@@ -80,13 +92,20 @@ public:
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bGenerateCollections"))
 	bool bCapturePropertyDeltas = true;
 
-	/** When true, write each actor's full tag set as a joined string attribute on its actor point.
-	 *  Lets downstream consumers read the tags directly without unserializing the property delta. */
+	/** Controls how actor tags in the form Name:Value are handled.
+	 *  Parse: plain tags → bool=true attributes; Name:Value tags → typed attributes; tag string not written.
+	 *  ParseAndKeep: same as Parse, but the name-part of each value tag is also included in the tag string.
+	 *  NoParsing: all tags are treated as plain strings (original behavior). */
+	UPROPERTY(EditAnywhere, Category = Settings)
+	EPCGExValueTagMode ValueTagMode = EPCGExValueTagMode::Parse;
+
+	/** When true, write each actor's tag names as a joined string attribute on its actor point.
+	 *  Only meaningful when ValueTagMode is NoParsing or ParseAndKeep. */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(InlineEditConditionToggle))
 	bool bWriteInstanceTags = true;
 
 	/** Output attribute name for the joined per-actor tag string. */
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bWriteInstanceTags"))
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bWriteInstanceTags && ValueTagMode != EPCGExValueTagMode::Parse", EditConditionHides))
 	FName InstanceTagsAttributeName = FName("InstanceTags");
 
 	virtual bool ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset) override;

@@ -3,14 +3,12 @@
 
 #include "Details/PCGExPropertyCompiledCustomization.h"
 
-#include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "IDetailPropertyRow.h"
 #include "PropertyHandle.h"
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
-#include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertyCompiledCustomization::MakeInstance()
@@ -23,44 +21,10 @@ void FPCGExPropertyCompiledCustomization::CustomizeHeader(
 	FDetailWidgetRow& HeaderRow,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// Get the property name to display as header
-	const FName PropName = GetPropertyName(PropertyHandle);
-	const FString DisplayText = PropName.IsNone() ? TEXT("(Unnamed)") : PropName.ToString();
-
-	// Get type name for context
-	FString TypeName = TEXT("Property");
-	TArray<void*> RawData;
-	PropertyHandle->AccessRawData(RawData);
-	if (!RawData.IsEmpty() && RawData[0])
-	{
-		if (const FPCGExProperty* Prop = static_cast<const FPCGExProperty*>(RawData[0]))
-		{
-			TypeName = Prop->GetTypeName().ToString();
-		}
-	}
-
-	HeaderRow.NameContent()
-	[
-		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
-		.VAlign(VAlign_Center)
-		[
-			SNew(STextBlock)
-			.Text(FText::FromString(DisplayText))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-		]
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
-		.VAlign(VAlign_Center)
-		.Padding(8, 0, 0, 0)
-		[
-			SNew(STextBlock)
-			.Text(FText::FromString(FString::Printf(TEXT("(%s)"), *TypeName)))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-			.ColorAndOpacity(FSlateColor(FLinearColor::Gray * 0.6f))
-		]
-	];
+	// Collapse the inner group header that FInstancedStructDetails would otherwise inject
+	// between the type-picker row and the Value field. The schema header already shows
+	// the property name and type, so this wrapper is pure noise.
+	HeaderRow.Visibility(EVisibility::Collapsed);
 }
 
 void FPCGExPropertyCompiledCustomization::CustomizeChildren(
@@ -81,7 +45,10 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 			if (OuterStructProp->Struct) { OuterStructName = OuterStructProp->Struct->GetFName(); }
 		}
 
-		if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(OuterStructName))
+		// Edit-mode lookup: this customization is only invoked from the schema-edit path
+		// (FInstancedStruct expansion inside FPCGExPropertySchemaCustomization's non-readonly
+		// branch). Property *definition* controls (e.g. enum class picker) belong here.
+		if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(OuterStructName, EPCGExInlineWidgetMode::Edit))
 		{
 			IDetailPropertyRow& Row = ChildBuilder.AddProperty(ValueHandle.ToSharedRef());
 			Row.CustomWidget(/*bShowChildren=*/false)
@@ -113,21 +80,10 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 
 		const FName ChildName = ChildHandle->GetProperty() ? ChildHandle->GetProperty()->GetFName() : NAME_None;
 
-		// Skip PropertyName - it's shown in the header
+		// Skip PropertyName - it's shown in the outer schema header
 		if (ChildName == TEXT("PropertyName")) { continue; }
 
 		ChildBuilder.AddProperty(ChildHandle.ToSharedRef());
 	}
 }
 
-FName FPCGExPropertyCompiledCustomization::GetPropertyName(TSharedRef<IPropertyHandle> PropertyHandle) const
-{
-	TSharedPtr<IPropertyHandle> NameHandle = PropertyHandle->GetChildHandle(TEXT("PropertyName"));
-	if (NameHandle.IsValid())
-	{
-		FName Value;
-		NameHandle->GetValue(Value);
-		return Value;
-	}
-	return NAME_None;
-}

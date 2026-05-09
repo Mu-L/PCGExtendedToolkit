@@ -30,6 +30,9 @@
 #include "LevelInstance/LevelInstanceActor.h"
 
 #include "Helpers/PCGExActorPropertyDelta.h"
+#include "Helpers/PCGExMetaHelpersMacros.h"
+#include "Data/PCGExDataValue.h"
+#include "PCGExLog.h"
 
 #include "PCGExCollectionsSettingsCache.h"
 
@@ -267,6 +270,137 @@ namespace PCGExDefaultLevelDataExporterInternal
 
 		return VariantIdx;
 	}
+
+	// Registry that tracks which attribute name maps to which PCG metadata type.
+	// First registration wins; subsequent conflicts are warned and discarded.
+	struct FValueTagRegistry
+	{
+		TMap<FName, EPCGMetadataTypes> TypeMap;
+
+		bool Register(const FName& Name, EPCGMetadataTypes NewType, const FString& SourceActorName)
+		{
+			if (const EPCGMetadataTypes* Existing = TypeMap.Find(Name))
+			{
+				if (*Existing != NewType)
+				{
+					UE_LOG(LogPCGEx, Warning,
+					       TEXT("Value tag type conflict: '%s' on actor '%s'. Attribute was already registered with a different type; this actor's value will be discarded."),
+					       *Name.ToString(), *SourceActorName);
+					return false;
+				}
+				return true;
+			}
+			TypeMap.Add(Name, NewType);
+			return true;
+		}
+	};
+
+	// Per-actor parsed tag result.
+	// PlainTags: tags with no colon (or unrecognized format) → become bool=true attributes.
+	// ValueTags: Name:Value tags → become typed attributes.
+	// Under ParseAndKeep, the name-part of each ValueTag is also written to the instance tag string
+	// (handled at the call site by iterating both arrays).
+	struct FParsedActorTags
+	{
+		TArray<FName> PlainTags;
+		TArray<TPair<FName, TSharedPtr<PCGExData::IDataValue>>> ValueTags;
+	};
+
+	static FParsedActorTags ParseActorTags(const AActor* Actor, FValueTagRegistry& Registry)
+	{
+		FParsedActorTags Result;
+		const FString ActorName = Actor->GetActorNameOrLabel();
+
+		for (const FName& Tag : Actor->Tags)
+		{
+			FString Key;
+			const TSharedPtr<PCGExData::IDataValue> DataValue = PCGExData::TryGetValueFromTag(Tag.ToString(), Key);
+
+			if (DataValue.IsValid())
+			{
+				const FName AttrName(Key);
+				if (Registry.Register(AttrName, DataValue->GetTypeId(), ActorName))
+				{
+					Result.ValueTags.Add(TPair<FName, TSharedPtr<PCGExData::IDataValue>>(AttrName, DataValue));
+				}
+				// Note: name-parts of value tags are intentionally NOT added to PlainTags.
+				// They appear in the instance tag string only via the ValueTags array (ParseAndKeep).
+			}
+			else
+			{
+				// Plain tag → will become a bool=true attribute
+				if (Registry.Register(Tag, EPCGMetadataTypes::Boolean, ActorName))
+				{
+					Result.PlainTags.Add(Tag);
+				}
+			}
+		}
+		return Result;
+	}
+
+	// Creates one typed PCG metadata attribute per registry entry; returns a map of base ptrs for fast per-point writes.
+	static TMap<FName, FPCGMetadataAttributeBase*> CreateValueTagAttributes(UPCGMetadata* Meta, const FValueTagRegistry& Registry)
+	{
+		TMap<FName, FPCGMetadataAttributeBase*> AttrMap;
+		AttrMap.Reserve(Registry.TypeMap.Num());
+
+		for (const TPair<FName, EPCGMetadataTypes>& Elem : Registry.TypeMap)
+		{
+			const FName& Name = Elem.Key;
+			FPCGMetadataAttributeBase* Attr = nullptr;
+#define PCGEX_CREATE_VALUE_TAG_ATTR(_TYPE, _NAME) Attr = Meta->CreateAttribute<_TYPE>(Name, _TYPE{}, false, true);
+			PCGEX_EXECUTEWITHRIGHTTYPE(Elem.Value, PCGEX_CREATE_VALUE_TAG_ATTR)
+#undef PCGEX_CREATE_VALUE_TAG_ATTR
+			if (Attr) { AttrMap.Add(Name, Attr); }
+		}
+		return AttrMap;
+	}
+
+	// Writes value-tag attributes for a single point.
+	// PlainTags → bool=true; ValueTags → typed value via base-ptr cast.
+	static void SetValueTagAttributes(
+		const TMap<FName, FPCGMetadataAttributeBase*>& AttrMap,
+		int64 Entry,
+		const FParsedActorTags& Parsed)
+	{
+		for (const FName& Tag : Parsed.PlainTags)
+		{
+			if (FPCGMetadataAttributeBase* const* BasePtr = AttrMap.Find(Tag))
+			{
+				static_cast<FPCGMetadataAttribute<bool>*>(*BasePtr)->SetValue(Entry, true);
+			}
+		}
+
+		for (const TPair<FName, TSharedPtr<PCGExData::IDataValue>>& VT : Parsed.ValueTags)
+		{
+			FPCGMetadataAttributeBase* const* BasePtr = AttrMap.Find(VT.Key);
+			if (!BasePtr) { continue; }
+
+			FPCGMetadataAttributeBase* Base = *BasePtr;
+			const TSharedPtr<PCGExData::IDataValue>& Val = VT.Value;
+
+#define PCGEX_SET_VALUE_TAG_ATTR(_TYPE, _NAME) static_cast<FPCGMetadataAttribute<_TYPE>*>(Base)->SetValue(Entry, Val->GetValue<_TYPE>());
+			PCGEX_EXECUTEWITHRIGHTTYPE(Val->GetTypeId(), PCGEX_SET_VALUE_TAG_ATTR)
+#undef PCGEX_SET_VALUE_TAG_ATTR
+		}
+	}
+
+	// Creates value-tag attributes from Registry, then writes one row per parsed actor.
+	// Parsed and Entries are parallel arrays; Entries[i] receives the attributes from Parsed[i].
+	static void EmitValueTagAttributes(
+		UPCGMetadata* Meta,
+		const FValueTagRegistry& Registry,
+		TConstArrayView<FParsedActorTags> Parsed,
+		const TPCGValueRange<int64>& MetaEntries)
+	{
+		if (Parsed.IsEmpty() || Registry.TypeMap.IsEmpty()) { return; }
+		const TMap<FName, FPCGMetadataAttributeBase*> AttrMap = CreateValueTagAttributes(Meta, Registry);
+		if (AttrMap.IsEmpty()) { return; }
+		for (int32 i = 0; i < Parsed.Num(); ++i)
+		{
+			SetValueTagAttributes(AttrMap, MetaEntries[i], Parsed[i]);
+		}
+	}
 }
 
 bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset)
@@ -333,10 +467,26 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 		LevelInfoMap.FindOrAdd(LevelPath).Count++;
 	}
 
+	// Parse actor value tags before the intersection loop so PlainTags/ValueTags are available.
+	// ActorParsedTags is parallel to ActorActors (same index); empty when NoParsing.
+	FValueTagRegistry ActorValueRegistry;
+	TArray<FParsedActorTags> ActorParsedTags;
+
+	if (ValueTagMode != EPCGExValueTagMode::NoParsing && !ActorActors.IsEmpty())
+	{
+		ActorParsedTags.Reserve(ActorActors.Num());
+		for (const FClassifiedActor& CA : ActorActors)
+		{
+			ActorParsedTags.Add(ParseActorTags(CA.Actor, ActorValueRegistry));
+		}
+	}
+
 	// Compute actor tag intersections and property deltas for collection building
 	TMap<FActorInstanceKey, FActorClassInfo> ActorClassInfoMap;
-	for (FClassifiedActor& CA : ActorActors)
+	for (int32 i = 0; i < ActorActors.Num(); i++)
 	{
+		FClassifiedActor& CA = ActorActors[i];
+
 		TArray<uint8> DeltaBytes;
 		uint32 DeltaHash = 0;
 		if (bCapturePropertyDeltas && bGenerateCollections)
@@ -353,17 +503,36 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 		FActorClassInfo& Info = ActorClassInfoMap.FindOrAdd(Key);
 		Info.Count++;
 
+		// Build the effective tag set for intersection based on the parsing mode.
+		// Raw Actor->Tags are still used for property deltas (kept as-is).
+		auto BuildEffectiveTags = [&]() -> TSet<FName>
+		{
+			TSet<FName> Tags;
+			if (ActorParsedTags.IsValidIndex(i))
+			{
+				const FParsedActorTags& Parsed = ActorParsedTags[i];
+				for (const FName& Tag : Parsed.PlainTags) { Tags.Add(Tag); }
+				if (ValueTagMode == EPCGExValueTagMode::ParseAndKeep)
+				{
+					for (const TPair<FName, TSharedPtr<PCGExData::IDataValue>>& VT : Parsed.ValueTags) { Tags.Add(VT.Key); }
+				}
+			}
+			else
+			{
+				for (const FName& Tag : CA.Actor->Tags) { Tags.Add(Tag); }
+			}
+			return Tags;
+		};
+
 		if (Info.bFirstActor)
 		{
 			Info.bFirstActor = false;
 			if (!DeltaBytes.IsEmpty()) { Info.SerializedDelta = MoveTemp(DeltaBytes); }
-			for (const FName& Tag : CA.Actor->Tags) { Info.IntersectedTags.Add(Tag); }
+			Info.IntersectedTags = BuildEffectiveTags();
 		}
 		else
 		{
-			TSet<FName> ActorTags;
-			for (const FName& Tag : CA.Actor->Tags) { ActorTags.Add(Tag); }
-			Info.IntersectedTags = Info.IntersectedTags.Intersect(ActorTags);
+			Info.IntersectedTags = Info.IntersectedTags.Intersect(BuildEffectiveTags());
 		}
 	}
 
@@ -449,6 +618,24 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 	UPCGBasePointData* MeshPointData = nullptr;
 	if (!AllMeshPoints.IsEmpty())
 	{
+		// Parse value tags for each unique source actor (ISM actors may share the same actor).
+		FValueTagRegistry MeshValueRegistry;
+		TMap<AActor*, int32> MeshActorParsedTagIdx;
+		TArray<FParsedActorTags> MeshActorParsedTagsList;
+
+		if (ValueTagMode != EPCGExValueTagMode::NoParsing)
+		{
+			for (const FMeshPoint& Point : AllMeshPoints)
+			{
+				if (Point.SourceActor && !MeshActorParsedTagIdx.Contains(Point.SourceActor))
+				{
+					const int32 Idx = MeshActorParsedTagsList.Num();
+					MeshActorParsedTagIdx.Add(Point.SourceActor, Idx);
+					MeshActorParsedTagsList.Add(ParseActorTags(Point.SourceActor, MeshValueRegistry));
+				}
+			}
+		}
+
 		TPCGValueRange<FTransform> Transforms;
 		TPCGValueRange<FVector> BMin, BMax;
 		MeshPointData = CreatePointData(OutAsset, AllMeshPoints.Num(), Transforms, BMin, BMax);
@@ -465,6 +652,12 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 
 		UPCGMetadata* Meta = MeshPointData->MutableMetadata();
 		TPCGValueRange<int64> MetaEntries = MeshPointData->GetMetadataEntryValueRange();
+
+		TMap<FName, FPCGMetadataAttributeBase*> MeshValueTagAttrMap;
+		if (!MeshActorParsedTagsList.IsEmpty())
+		{
+			MeshValueTagAttrMap = CreateValueTagAttributes(Meta, MeshValueRegistry);
+		}
 
 		FPCGMetadataAttribute<FString>* ActorNameAttr = Meta->CreateAttribute<FString>(TEXT("ActorName"), FString(), false, true);
 
@@ -484,6 +677,17 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 			for (int32 i = 0; i < AllMeshPoints.Num(); i++)
 			{
 				if (ActorNameAttr) { ActorNameAttr->SetValue(MetaEntries[i], AllMeshPoints[i].SourceActor->GetActorNameOrLabel()); }
+			}
+		}
+
+		if (!MeshValueTagAttrMap.IsEmpty())
+		{
+			for (int32 i = 0; i < AllMeshPoints.Num(); i++)
+			{
+				if (const int32* PIdx = MeshActorParsedTagIdx.Find(AllMeshPoints[i].SourceActor))
+				{
+					SetValueTagAttributes(MeshValueTagAttrMap, MetaEntries[i], MeshActorParsedTagsList[*PIdx]);
+				}
 			}
 		}
 
@@ -531,20 +735,39 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 			}
 		}
 
-		// Write the full actor tag set per point. Redundant with the property-delta tag restore
-		// and entry.Tags intersection, but populated unconditionally so downstream consumers can
-		// read tags directly from the point without unserializing the delta.
-		if (bWriteInstanceTags && InstanceTagsAttributeName != NAME_None)
+		EmitValueTagAttributes(Meta, ActorValueRegistry, ActorParsedTags, MetaEntries);
+
+		// Write per-actor tag names as a joined string. Only meaningful in NoParsing and ParseAndKeep
+		// modes; in Parse mode all tags are already written as typed attributes above.
+		if (bWriteInstanceTags && InstanceTagsAttributeName != NAME_None && ValueTagMode != EPCGExValueTagMode::Parse)
 		{
 			if (FPCGMetadataAttribute<FString>* InstanceTagsAttr = Meta->CreateAttribute<FString>(InstanceTagsAttributeName, FString(), false, true))
 			{
 				for (int32 i = 0; i < ActorActors.Num(); i++)
 				{
 					FString TagsStr;
-					for (const FName& Tag : ActorActors[i].Actor->Tags)
+
+					if (ValueTagMode == EPCGExValueTagMode::NoParsing)
 					{
-						if (!TagsStr.IsEmpty()) { TagsStr += TEXT(","); }
-						TagsStr += Tag.ToString();
+						for (const FName& Tag : ActorActors[i].Actor->Tags)
+						{
+							if (!TagsStr.IsEmpty()) { TagsStr += TEXT(","); }
+							TagsStr += Tag.ToString();
+						}
+					}
+					else if (ActorParsedTags.IsValidIndex(i)) // ParseAndKeep: plain tag names + value-tag name-parts
+					{
+						const FParsedActorTags& Parsed = ActorParsedTags[i];
+						for (const FName& Tag : Parsed.PlainTags)
+						{
+							if (!TagsStr.IsEmpty()) { TagsStr += TEXT(","); }
+							TagsStr += Tag.ToString();
+						}
+						for (const TPair<FName, TSharedPtr<PCGExData::IDataValue>>& VT : Parsed.ValueTags)
+						{
+							if (!TagsStr.IsEmpty()) { TagsStr += TEXT(","); }
+							TagsStr += VT.Key.ToString();
+						}
 					}
 
 					if (!TagsStr.IsEmpty())
@@ -564,6 +787,18 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 	UPCGBasePointData* LevelPointData = nullptr;
 	if (!LevelActors.IsEmpty())
 	{
+		FValueTagRegistry LevelValueRegistry;
+		TArray<FParsedActorTags> LevelParsedTags;
+
+		if (ValueTagMode != EPCGExValueTagMode::NoParsing)
+		{
+			LevelParsedTags.Reserve(LevelActors.Num());
+			for (const FClassifiedActor& CA : LevelActors)
+			{
+				LevelParsedTags.Add(ParseActorTags(CA.Actor, LevelValueRegistry));
+			}
+		}
+
 		TPCGValueRange<FTransform> Transforms;
 		TPCGValueRange<FVector> BMin, BMax;
 		LevelPointData = CreatePointData(OutAsset, LevelActors.Num(), Transforms, BMin, BMax);
@@ -604,6 +839,8 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData_Implementation(UWorld* Worl
 				if (ActorNameAttr) { ActorNameAttr->SetValue(MetaEntries[i], LevelActors[i].Actor->GetActorNameOrLabel()); }
 			}
 		}
+
+		EmitValueTagAttributes(Meta, LevelValueRegistry, LevelParsedTags, MetaEntries);
 
 		FPCGTaggedData& TaggedData = OutAsset->Data.TaggedData.Emplace_GetRef();
 		TaggedData.Data = LevelPointData;

@@ -23,13 +23,25 @@ class PCGEXCOLLECTIONS_API UPCGExActorContentFilter : public UObject
 
 public:
 	/** Infrastructure checks shared by all callers: hidden, editor-only,
-	 *  main-world-only, ALevelScriptActor, AInfo, ABrush (excluding AVolume), ANavigationData. */
+	 *  main-world-only, ALevelScriptActor, AInfo, ABrush (excluding AVolume), ANavigationData,
+	 *  and any class registered via RegisterSystemActorClass. */
 	static bool IsInfrastructureActor(AActor* Actor);
 
 	/** Convenience: delegates to filter if non-null, else falls back to IsInfrastructureActor. */
 	static bool StaticPassesFilter(
 		const UPCGExActorContentFilter* Filter, AActor* Actor,
 		UPCGExAssetCollection* OwningCollection = nullptr, int32 EntryIndex = -1);
+
+	/** Known engine/plugin system actor class names that are always excluded from level exports.
+	 *  Pre-populated with well-known engine offenders; external plugins may extend this set
+	 *  (e.g. in their StartupModule) to suppress actors they know should never be exported.
+	 *  Mirrored into the collections settings cache (along with user-config additions) on
+	 *  RegisterSystemActorClass and on settings updates so IsInfrastructureActor only does one lookup. */
+	static TSet<FName> KnownSystemActorClasses;
+
+	/** Adds a class name to the system-actor exclusion set. Safe to call from external plugins
+	 *  during StartupModule; the addition is also propagated to the cache used by IsInfrastructureActor. */
+	static void RegisterSystemActorClass(FName ClassName);
 
 	/** Override for custom filtering logic.
 	 *  OwningCollection + EntryIndex provide optional context about which collection/entry

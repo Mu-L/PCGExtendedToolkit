@@ -141,7 +141,9 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 
 				// If a compact inline widget is registered for this outer struct type, use it
 				// instead of the default value widget (which would expand for complex types).
-				if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName()))
+				// Compact-mode lookup: schema is read-only so the type definition is fixed;
+				// only value-editing affordances make sense here.
+				if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName(), EPCGExInlineWidgetMode::Compact))
 				{
 					TSharedPtr<IPropertyHandle> ValuePropertyHandle = Row.GetPropertyHandle();
 					if (ValuePropertyHandle.IsValid())
@@ -196,7 +198,7 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 		{
 			PropertyInnerHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCustomization::OnSchemaChanged));
 			PropertyInnerHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCustomization::OnSchemaChanged));
-			ChildBuilder.AddProperty(PropertyInnerHandle.ToSharedRef());
+			ChildBuilder.AddProperty(PropertyInnerHandle.ToSharedRef()).ShouldAutoExpand(true);
 		}
 	}
 }

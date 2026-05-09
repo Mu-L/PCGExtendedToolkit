@@ -52,6 +52,7 @@ public class PCGExFoundations : ModuleRules
 				"PCGExFilters",
 				"PCGExPickers",
 				"PCGExMatching",
+				"PCGExProperties",
 			}
 		);
 
