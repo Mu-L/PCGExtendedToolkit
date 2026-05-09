@@ -10,7 +10,7 @@
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
 #include "Details/PCGExEnumCommon.h"
-#include "Elements/ControlFlow/PCGControlFlow.h"
+#include "PCGExEnumSelector.h"
 #include "PCGExConstantEnum.generated.h"
 
 struct FPCGExBitmask;
@@ -86,7 +86,7 @@ public:
 	TObjectPtr<UEnum> PickerEnum;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(EditCondition="Source == EPCGExEnumConstantSourceType::Selector", EditConditionHides, ShowOnlyInnerProperties), Category="Settings")
-	FEnumSelector SelectedEnum;
+	FPCGExEnumSelector SelectedEnum;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings", EditFixedSize, meta=( ReadOnlyKeys, EditCondition="OutputMode == EPCGExEnumOutputMode::EEOM_Selection || OutputMode == EPCGExEnumOutputMode::EEOM_SelectionToMultiplePins", EditConditionHides ))
 	TMap<FName, bool> EnabledExportValues;

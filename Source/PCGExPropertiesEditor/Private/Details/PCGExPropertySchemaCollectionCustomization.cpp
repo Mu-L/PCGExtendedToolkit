@@ -73,7 +73,6 @@ void FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged()
 		Schema.SyncPropertyName();
 	}
 
-	// Force complete UI rebuild to refresh all dependent customizations
 	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 	{
 		PropertyUtilities->ForceRefresh();
@@ -85,7 +84,6 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// Get the Schemas array handle
 	TSharedPtr<IPropertyHandle> SchemasArrayHandle = PropertyHandle->GetChildHandle(TEXT("Schemas"));
 	if (!SchemasArrayHandle.IsValid()) { return; }
 

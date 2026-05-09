@@ -23,6 +23,23 @@ enum class EPCGExSubCollectionToSet : uint8
 	PickLastItem       = 5 UMETA(DisplayName = "Last item", Tooltip="Pick the last item"),
 };
 
+UENUM()
+enum class EPCGExWeightNormalization : uint8
+{
+	None          = 0 UMETA(DisplayName = "None", Tooltip="No normalization. Weight is written as the raw integer."),
+	PerCategory   = 1 UMETA(DisplayName = "Per Category", Tooltip="Weight is written as a float, normalized against the sum of weights within each category. Entries with no category share a single bucket."),
+	PerCollection = 2 UMETA(DisplayName = "Per Collection", Tooltip="Weight is written as a float, normalized against the sum of weights within each owning collection."),
+	Global        = 3 UMETA(DisplayName = "Global", Tooltip="Weight is written as a float, normalized against the sum of all entry weights."),
+};
+
+UENUM()
+enum class EPCGExCategoryInheritance : uint8
+{
+	None      = 0 UMETA(DisplayName = "None", Tooltip="No inheritance. Each entry keeps its own category as authored."),
+	FillEmpty = 1 UMETA(DisplayName = "Fill Empty", Tooltip="When an entry's category is None, inherit the closest non-None category from the ancestor chain of sub-collection entries."),
+	Replace   = 2 UMETA(DisplayName = "Replace", Tooltip="The closest non-None category from the ancestor chain of sub-collection entries always wins. The entry's own category survives only when no ancestor provides one."),
+};
+
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), meta=(PCGExNodeLibraryDoc="staging/utilities/asset-collection-to-set"))
 class UPCGExAssetCollectionToSetSettings : public UPCGExSettings
 {
@@ -95,6 +112,11 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, DisplayName="Weight", EditCondition="bWriteWeight"))
 	FName WeightAttributeName = FName("Weight");
 
+	/** How (and whether) to normalize the weight value. When set to anything other than None, the
+	 *  Weight attribute is written as a float in [0..1] instead of the raw int32. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, DisplayName = " └─ Normalize", EditCondition="bWriteWeight", HideEditConditionToggle))
+	EPCGExWeightNormalization WeightNormalization = EPCGExWeightNormalization::None;
+
 	/** Write the asset category to an attribute. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteCategory = false;
@@ -102,6 +124,12 @@ protected:
 	/** Name of the attribute on the AttributeSet that contains the asset category, if any. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, DisplayName="Category", EditCondition="bWriteCategory"))
 	FName CategoryAttributeName = FName("Category");
+
+	/** How (and whether) to fold parent sub-collection categories down into descendant entries during
+	 *  expansion. Also applies to Per Category weight normalization, so the buckets reflect the
+	 *  resolved categories the entries are actually written with. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, DisplayName = " └─ Inheritance", EditCondition="bWriteCategory", HideEditConditionToggle))
+	EPCGExCategoryInheritance CategoryInheritance = EPCGExCategoryInheritance::None;
 
 	/** Write the asset bounds extents to an attribute. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
@@ -145,11 +173,25 @@ class FPCGExAssetCollectionToSetElement final : public IPCGExElement
 public:
 	virtual bool IsCacheable(const UPCGSettings* InSettings) const override;
 
-	/** Collected entry along with the collection that directly owns it. */
+	/** Collected entry along with the collection that directly owns it and the resolved
+	 *  category to write (after inheritance has been applied during recursion). */
 	struct FEntryWithHost
 	{
 		const FPCGExAssetCollectionEntry* Entry = nullptr;
 		const UPCGExAssetCollection* Host = nullptr;
+		FName Category = NAME_None;
+	};
+
+	/** Invariant inputs to ProcessEntry that don't change across recursion levels.
+	 *  Bundled to keep the recursive call site readable and stable as new options are added. */
+	struct FProcessEntryContext
+	{
+		FPCGExContext* Context = nullptr;
+		const FPCGExNameFiltersDetails* CategoryFilters = nullptr;
+		EPCGExSubCollectionToSet SubHandling = EPCGExSubCollectionToSet::Ignore;
+		EPCGExCategoryInheritance CategoryInheritance = EPCGExCategoryInheritance::None;
+		bool bOmitInvalidAndEmpty = true;
+		bool bNoDuplicates = true;
 	};
 
 protected:
@@ -157,13 +199,10 @@ protected:
 
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 	static void ProcessEntry(
-		FPCGExContext* InContext,
+		const FProcessEntryContext& Ctx,
 		const FPCGExAssetCollectionEntry* InEntry,
 		const UPCGExAssetCollection* InHost,
 		TArray<FEntryWithHost>& OutEntries,
-		const bool bOmitInvalidAndEmpty,
-		const bool bNoDuplicates,
-		const EPCGExSubCollectionToSet SubHandling,
-		const FPCGExNameFiltersDetails& CategoryFilters,
+		const FName EffectiveParentCategory,
 		TSet<uint64>& GUIDS);
 };

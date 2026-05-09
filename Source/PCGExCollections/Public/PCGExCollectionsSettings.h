@@ -46,5 +46,11 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "Defaults", meta=(MetaClass="/Script/PCGExCollections.PCGExActorMeshClassificator"))
 	FSoftClassPath DefaultMeshClassificatorClass;
 
+	/** Additional actor class names to unconditionally exclude from all level exports,
+	 *  on top of the hardcoded list in UPCGExActorContentFilter::KnownSystemActorClasses.
+	 *  Use the C++ class name without the A prefix (e.g. "ChaosDebugDrawActor"). */
+	UPROPERTY(EditAnywhere, config, Category = "Defaults")
+	TArray<FName> AdditionalSystemActorClasses;
+
 	void UpdateSettingsCaches() const;
 };

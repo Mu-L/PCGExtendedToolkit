@@ -42,11 +42,13 @@ FPCGElementPtr UPCGExAssetCollectionToSetSettings::CreateElement() const { retur
 
 #pragma endregion
 
+// Note: Weight and Category are intentionally NOT in this list — they're handled explicitly.
+// Weight: attribute type (int32 vs float) and value (raw vs normalized) depend on WeightNormalization.
+// Category: value is read from FEntryWithHost::Category (resolved during recursion via CategoryInheritance),
+// not from E->Category.
 #define PCGEX_FOREACH_COL_FIELD(MACRO)\
 MACRO(AssetPath, FSoftObjectPath, FSoftObjectPath(), E->Staging.Path)\
 MACRO(AssetClass, FSoftClassPath, FSoftClassPath(), E->Staging.Path.ToString())\
-MACRO(Weight, int32, 0, E->Weight)\
-MACRO(Category, FName, NAME_None, E->Category)\
 MACRO(Extents, FVector, FVector::OneVector, E->Staging.Bounds.GetExtent())\
 MACRO(BoundsMin, FVector, FVector::OneVector, E->Staging.Bounds.Min)\
 MACRO(BoundsMax, FVector, FVector::OneVector, E->Staging.Bounds.Max)\
@@ -89,6 +91,13 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_FOREACH_COL_FIELD(PCGEX_DECLARE_ATT);
 #undef PCGEX_DECLARE_ATT
 
+	const bool bOutputWeight = Settings->bWriteWeight;
+	const EPCGExWeightNormalization WeightNorm = bOutputWeight ? Settings->WeightNormalization : EPCGExWeightNormalization::None;
+	const bool bWeightAsFloat = bOutputWeight && WeightNorm != EPCGExWeightNormalization::None;
+
+	const bool bOutputCategory = Settings->bWriteCategory;
+	const EPCGExCategoryInheritance CategoryInheritance = bOutputCategory ? Settings->CategoryInheritance : EPCGExCategoryInheritance::None;
+
 	// Output actor as FSoftClassPath
 	if (Cast<UPCGExActorCollection>(MainCollection)) { bOutputAssetPath = false; }
 	else { bOutputAssetClass = false; }
@@ -99,6 +108,23 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_FOREACH_COL_FIELD(PCGEX_DECLARE_ATT);
 #undef PCGEX_DECLARE_ATT
 
+	FPCGMetadataAttribute<int32>* WeightAttributeInt = nullptr;
+	FPCGMetadataAttribute<float>* WeightAttributeFloat = nullptr;
+	if (bOutputWeight)
+	{
+		PCGEX_VALIDATE_NAME(Settings->WeightAttributeName)
+		const FPCGAttributeIdentifier WeightId = PCGExMetaHelpers::GetAttributeIdentifier(Settings->WeightAttributeName, OutputSet);
+		if (bWeightAsFloat) { WeightAttributeFloat = OutputSet->Metadata->FindOrCreateAttribute<float>(WeightId, 0.0f, false, true); }
+		else { WeightAttributeInt = OutputSet->Metadata->FindOrCreateAttribute<int32>(WeightId, 0, false, true); }
+	}
+
+	FPCGMetadataAttribute<FName>* CategoryAttribute = nullptr;
+	if (bOutputCategory)
+	{
+		PCGEX_VALIDATE_NAME(Settings->CategoryAttributeName)
+		CategoryAttribute = OutputSet->Metadata->FindOrCreateAttribute<FName>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->CategoryAttributeName, OutputSet), NAME_None, false, true);
+	}
+
 	const PCGExAssetCollection::FCache* MainCache = MainCollection->LoadCache();
 	TArray<FPCGExAssetCollectionToSetElement::FEntryWithHost> Entries;
 
@@ -107,11 +133,19 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 	FPCGExNameFiltersDetails CategoryFilters = Settings->CategoryFilters;
 	CategoryFilters.Init();
 
+	FProcessEntryContext Ctx;
+	Ctx.Context = InContext;
+	Ctx.CategoryFilters = &CategoryFilters;
+	Ctx.SubHandling = Settings->SubCollectionHandling;
+	Ctx.CategoryInheritance = CategoryInheritance;
+	Ctx.bOmitInvalidAndEmpty = Settings->bOmitInvalidAndEmpty;
+	Ctx.bNoDuplicates = !Settings->bAllowDuplicates;
+
 	for (int i = 0; i < MainCache->Main->Order.Num(); i++)
 	{
 		GUIDS.Empty();
 		FPCGExEntryAccessResult Result = MainCollection->GetEntryAt(i);
-		ProcessEntry(InContext, Result.Entry, Result.Host, Entries, Settings->bOmitInvalidAndEmpty, !Settings->bAllowDuplicates, Settings->SubCollectionHandling, CategoryFilters, GUIDS);
+		ProcessEntry(Ctx, Result.Entry, Result.Host, Entries, NAME_None, GUIDS);
 	}
 
 	if (Entries.IsEmpty()) { return OutputToPin(); }
@@ -133,6 +167,27 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGExCollections::FPCGExCollectionPropertySetWriter PropertyWriter;
 	PropertyWriter.Initialize(InContext, Settings->PropertyOutputSettings, MainCollection, FallbackHosts, OutputSet->Metadata);
 
+	// Weight normalization pre-pass. Only real (non-placeholder) entries contribute to the sums.
+	double GlobalWeightSum = 0.0;
+	TMap<FName, double> CategoryWeightSums;
+	TMap<const UPCGExAssetCollection*, double> CollectionWeightSums;
+	if (bWeightAsFloat)
+	{
+		for (const FPCGExAssetCollectionToSetElement::FEntryWithHost& EH : Entries)
+		{
+			const FPCGExAssetCollectionEntry* E = EH.Entry;
+			if (!E || E->bIsSubCollection) { continue; }
+			const double W = static_cast<double>(E->Weight);
+			switch (WeightNorm)
+			{
+			case EPCGExWeightNormalization::Global: GlobalWeightSum += W; break;
+			case EPCGExWeightNormalization::PerCategory: CategoryWeightSums.FindOrAdd(EH.Category) += W; break;
+			case EPCGExWeightNormalization::PerCollection: CollectionWeightSums.FindOrAdd(EH.Host) += W; break;
+			default: ;
+			}
+		}
+	}
+
 	for (const FPCGExAssetCollectionToSetElement::FEntryWithHost& EH : Entries)
 	{
 		const FPCGExAssetCollectionEntry* E = EH.Entry;
@@ -143,12 +198,31 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 #define PCGEX_SET_ATT(_NAME, _TYPE, _DEFAULT, _VALUE) if(_NAME##Attribute){ _NAME##Attribute->SetValue(Key, _DEFAULT); }
 			PCGEX_FOREACH_COL_FIELD(PCGEX_SET_ATT)
 #undef PCGEX_SET_ATT
+			if (CategoryAttribute) { CategoryAttribute->SetValue(Key, NAME_None); }
+			if (WeightAttributeInt) { WeightAttributeInt->SetValue(Key, 0); }
+			else if (WeightAttributeFloat) { WeightAttributeFloat->SetValue(Key, 0.0f); }
 			continue;
 		}
 
 #define PCGEX_SET_ATT(_NAME, _TYPE, _DEFAULT, _VALUE) if(_NAME##Attribute){ _NAME##Attribute->SetValue(Key, _VALUE); }
 		PCGEX_FOREACH_COL_FIELD(PCGEX_SET_ATT)
 #undef PCGEX_SET_ATT
+
+		if (CategoryAttribute) { CategoryAttribute->SetValue(Key, EH.Category); }
+
+		if (WeightAttributeInt) { WeightAttributeInt->SetValue(Key, E->Weight); }
+		else if (WeightAttributeFloat)
+		{
+			double Denom = 0.0;
+			switch (WeightNorm)
+			{
+			case EPCGExWeightNormalization::Global: Denom = GlobalWeightSum; break;
+			case EPCGExWeightNormalization::PerCategory: Denom = CategoryWeightSums.FindRef(EH.Category); break;
+			case EPCGExWeightNormalization::PerCollection: Denom = CollectionWeightSums.FindRef(EH.Host); break;
+			default: ;
+			}
+			WeightAttributeFloat->SetValue(Key, Denom > 0.0 ? static_cast<float>(static_cast<double>(E->Weight) / Denom) : 0.0f);
+		}
 
 		PropertyWriter.WriteEntry(Key, E, EH.Host);
 	}
@@ -157,17 +231,14 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 }
 
 void FPCGExAssetCollectionToSetElement::ProcessEntry(
-	FPCGExContext* InContext,
+	const FProcessEntryContext& Ctx,
 	const FPCGExAssetCollectionEntry* InEntry,
 	const UPCGExAssetCollection* InHost,
 	TArray<FEntryWithHost>& OutEntries,
-	const bool bOmitInvalidAndEmpty,
-	const bool bNoDuplicates,
-	const EPCGExSubCollectionToSet SubHandling,
-	const FPCGExNameFiltersDetails& CategoryFilters,
+	const FName EffectiveParentCategory,
 	TSet<uint64>& GUIDS)
 {
-	if (bNoDuplicates)
+	if (Ctx.bNoDuplicates)
 	{
 		for (const FEntryWithHost& Existing : OutEntries)
 		{
@@ -177,8 +248,8 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 
 	auto AddNone = [&]()
 	{
-		if (bOmitInvalidAndEmpty) { return; }
-		OutEntries.Add({nullptr, nullptr});
+		if (Ctx.bOmitInvalidAndEmpty) { return; }
+		OutEntries.Add({nullptr, nullptr, NAME_None});
 	};
 
 	if (!InEntry)
@@ -187,19 +258,32 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 		return;
 	}
 
-	if (!CategoryFilters.Test(InEntry->Category.ToString())) { return; }
+	// Filters always run on the authored category, never on the resolved one — inheritance is an
+	// output concern.
+	if (!Ctx.CategoryFilters->Test(InEntry->Category.ToString())) { return; }
+
+	// Resolve the category for THIS entry against the inherited chain.
+	auto ResolveCategory = [&](const FName Authored) -> FName
+	{
+		switch (Ctx.CategoryInheritance)
+		{
+		case EPCGExCategoryInheritance::FillEmpty: return Authored.IsNone() ? EffectiveParentCategory : Authored;
+		case EPCGExCategoryInheritance::Replace:   return EffectiveParentCategory.IsNone() ? Authored : EffectiveParentCategory;
+		default:                                   return Authored;
+		}
+	};
 
 	auto AddEmpty = [&](const FPCGExAssetCollectionEntry* S)
 	{
-		if (bOmitInvalidAndEmpty) { return; }
-		OutEntries.Add({S, InHost});
+		if (Ctx.bOmitInvalidAndEmpty) { return; }
+		OutEntries.Add({S, InHost, NAME_None});
 	};
 
 	if (InEntry->bIsSubCollection)
 	{
-		if (SubHandling == EPCGExSubCollectionToSet::Ignore) { return; }
+		if (Ctx.SubHandling == EPCGExSubCollectionToSet::Ignore) { return; }
 
-		UPCGExAssetCollection* SubCollection = InEntry->Staging.LoadSync<UPCGExAssetCollection>(InContext);
+		UPCGExAssetCollection* SubCollection = InEntry->Staging.LoadSync<UPCGExAssetCollection>(Ctx.Context);
 		const PCGExAssetCollection::FCache* SubCache = SubCollection ? SubCollection->LoadCache() : nullptr;
 
 		if (!SubCache)
@@ -212,14 +296,17 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 		GUIDS.Add(SubCollection->GetUniqueID(), &bVisited);
 		if (bVisited) { return; } // !! Circular dependency !!
 
+		// Cascade: a None-stub doesn't reset the chain — the closest non-None ancestor wins.
+		const FName NextParent = InEntry->Category.IsNone() ? EffectiveParentCategory : InEntry->Category;
+
 		FPCGExEntryAccessResult SubResult;
-		switch (SubHandling)
+		switch (Ctx.SubHandling)
 		{
 		default: ;
 		case EPCGExSubCollectionToSet::Expand: for (int i = 0; i < SubCache->Main->Order.Num(); i++)
 			{
 				SubResult = SubCollection->GetEntryAt(i);
-				ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, CategoryFilters, GUIDS);
+				ProcessEntry(Ctx, SubResult.Entry, SubResult.Host, OutEntries, NextParent, GUIDS);
 			}
 			return;
 		case EPCGExSubCollectionToSet::PickRandom: SubResult = SubCollection->GetEntryRandom(0);
@@ -232,11 +319,11 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 			break;
 		}
 
-		ProcessEntry(InContext, SubResult.Entry, SubResult.Host, OutEntries, bOmitInvalidAndEmpty, bNoDuplicates, SubHandling, CategoryFilters, GUIDS);
+		ProcessEntry(Ctx, SubResult.Entry, SubResult.Host, OutEntries, NextParent, GUIDS);
 	}
 	else
 	{
-		OutEntries.Add({InEntry, InHost});
+		OutEntries.Add({InEntry, InHost, ResolveCategory(InEntry->Category)});
 	}
 }
 

@@ -180,6 +180,10 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 				if (FPCGExProperty* Prop = NewEntry.GetPropertyMutable())
 				{
 					Prop->PropertyName = SchemaData->PropertyName;
+					// Sync structural sub-fields from the schema (e.g. FPCGExProperty_Enum's
+					// Value.Class). Keeps schema-owned parts in lockstep while leaving
+					// user-overridable parts of Value untouched.
+					Prop->SyncStructuralFromSchema(*SchemaData);
 				}
 			}
 			else

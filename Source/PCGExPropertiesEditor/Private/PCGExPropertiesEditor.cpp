@@ -4,6 +4,7 @@
 #include "PCGExPropertiesEditor.h"
 
 #include "PropertyEditorModule.h"
+#include "Details/PCGExEnumSelectorCustomization.h"
 #include "Details/PCGExPropertyOverridesCustomization.h"
 #include "Details/PCGExPropertyOverrideEntryCustomization.h"
 #include "Details/PCGExWeightedPropertyOverridesCustomization.h"
@@ -12,6 +13,7 @@
 #include "Details/PCGExPropertySchemaCustomization.h"
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
 #include "PCGExBuiltInInlineWidgets.h"
+#include "PCGExEnumSelector.h"
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyTypes.h"
@@ -24,6 +26,13 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	IPCGExEditorModuleInterface::StartupModule();
 
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+
+	// Register FPCGExEnumSelector customization - replaces engine FEnumSelectorDetails
+	// (which crashes when its detail panel is rebuilt mid-callstack via ForceRefresh).
+	PropertyModule.RegisterCustomPropertyTypeLayout(
+		FPCGExEnumSelector::StaticStruct()->GetFName(),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExEnumSelectorCustomization::MakeInstance)
+	);
 
 	// Register FPCGExPropertySchemaCollection customization - handles schema array changes
 	// Used by Tuple (Composition), Collections (CollectionProperties), Valency (DefaultProperties)
