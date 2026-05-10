@@ -9,20 +9,6 @@
 #include "PCGExFootprintShape.generated.h"
 
 /**
- * Shape discriminator (transitional). Replaced by UScriptStruct identity in
- * the dispatch refactor; kept during the migration so the existing
- * FPCGExSpatialFootprintElement::GetEmittedShapeKind() consumers compile
- * unchanged. Deleted in Phase D.
- */
-UENUM()
-enum class EPCGExFootprintShapeKind : uint8
-{
-	None      = 0,
-	OBB       = 1,
-	Polygon2D = 2,
-};
-
-/**
  * Extruded-prism polygon entry. Outline lives in projection-frame XY; the
  * Z band is along the frame's normal. World placement = WorldOrigin
  * (translation) + ProjectionQuat (world->frame). To test a world point P:
@@ -93,13 +79,6 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape
 	 * indexes entries by AABB and never inspects shape-specific fields.
 	 */
 	virtual FBox GetWorldAABB() const { return FBox(ForceInit); }
-
-	/**
-	 * Transitional discriminator. Mirrors GetScriptStruct() during migration.
-	 * Removed in Phase D once GetEmittedShapeKind consumers migrate to
-	 * UScriptStruct-based identity.
-	 */
-	virtual EPCGExFootprintShapeKind GetKind() const { return EPCGExFootprintShapeKind::None; }
 };
 
 /** Oriented-box shape — the default contribution kind for cage modules. */
@@ -117,7 +96,6 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape_OBB : public FPCGExFootprint
 
 	virtual UScriptStruct* GetScriptStruct() const override { return StaticStruct(); }
 	virtual FBox GetWorldAABB() const override;
-	virtual EPCGExFootprintShapeKind GetKind() const override { return EPCGExFootprintShapeKind::OBB; }
 };
 
 /** Extruded-prism polygon shape — concave allowed, projection-frame aware. */
@@ -134,5 +112,4 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape_Polygon : public FPCGExFootp
 
 	virtual UScriptStruct* GetScriptStruct() const override { return StaticStruct(); }
 	virtual FBox GetWorldAABB() const override { return Entry.WorldAABB; }
-	virtual EPCGExFootprintShapeKind GetKind() const override { return EPCGExFootprintShapeKind::Polygon2D; }
 };
