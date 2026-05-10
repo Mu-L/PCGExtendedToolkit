@@ -65,14 +65,41 @@ namespace PCGExSpatial::NarrowPhase
 
 	void RegisterPolygonPairTests()
 	{
-		// OBB-vs-Polygon. Stored under the canonical (lower-pointer-first)
-		// key by the registry; lookup handles the swap automatically.
+		// OBB-vs-Polygon. Stored under one direction; the registry's
+		// symmetric Resolve() handles arg-swap automatically when the
+		// query comes in the other direction.
+		//
+		// Penetration is intentionally NULL on polygon pairs (current
+		// limitation):
+		//
+		//   The registry's QueryPenetration falls back to +INFINITY when
+		//   there's no Penetration fn -- meaning "any overlap exceeds any
+		//   threshold". That's the correct-direction conservative default:
+		//   FootprintPenetration placement conditions reject the candidate
+		//   on any polygon overlap, identical to today's behavior. It is
+		//   NOT looser than expected; it is NOT incorrect; it is just
+		//   missing the "tolerate shallow polygon overlaps" capability.
+		//
+		//   Naive conservative paths (polygon's bounding OBB vs OBB SAT-MTV)
+		//   are wrong-direction for concave polygons: an L-shape with a
+		//   candidate in the inner corner gets reported as deeply penetrated
+		//   when the actual polygon-vs-OBB penetration is zero. Authors
+		//   reach for polygons specifically to allow placement in concave
+		//   negative space; over-rejecting kills that benefit.
+		//
+		//   Real polygon-prism vs OBB MTV (2D SAT on the outline + Z-band
+		//   depth, concave-aware) is ~half a day of math. We'll implement
+		//   it when a real user need surfaces, or via the natural extension
+		//   path: a separate shape type (FPCGExFootprintShape_PrecisePolygon2D)
+		//   that opts into the precise math while the existing _Polygon
+		//   keeps its cheap default. Adding it is a pure addition -- new
+		//   USTRUCT + Register calls, no edits here.
 		Register(
 			FPCGExFootprintShape_OBB::StaticStruct(),
 			FPCGExFootprintShape_Polygon::StaticStruct(),
 			{ &OBBvsPolygon_Overlap, /*Penetration*/ nullptr });
 
-		// Polygon-vs-Polygon.
+		// Polygon-vs-Polygon. Same Penetration story as above.
 		Register(
 			FPCGExFootprintShape_Polygon::StaticStruct(),
 			FPCGExFootprintShape_Polygon::StaticStruct(),

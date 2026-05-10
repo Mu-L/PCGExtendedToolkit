@@ -21,7 +21,7 @@ bool FPCGExSpatialDomain_SDF::IsValid() const
 	return false;
 }
 
-int32 FPCGExSpatialDomain_SDF::Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex)
+int32 FPCGExSpatialDomain_SDF::Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex, uint32 ChannelMask)
 {
 	checkf(false, TEXT("FPCGExSpatialDomain_SDF is immutable; Append() is not supported."));
 	return INDEX_NONE;

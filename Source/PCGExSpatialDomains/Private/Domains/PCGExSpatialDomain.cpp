@@ -26,7 +26,8 @@ float FPCGExSpatialDomain::QueryOBB(const PCGExMath::OBB::FOBB& Bounds) const
 bool FPCGExSpatialDomain::Overlaps(
 	const FPCGExFootprintShape& Candidate,
 	[[maybe_unused]] int32 SkipOwnerIndex,
-	[[maybe_unused]] TFunctionRef<bool(int32)> ShouldSkip) const
+	[[maybe_unused]] TFunctionRef<bool(int32)> ShouldSkip,
+	[[maybe_unused]] uint32 CandidateChannelMask) const
 {
 	// Generic fallback: signed-distance overlap against the candidate's
 	// bounding OBB derived from its WorldAABB. Useful for static domains
@@ -51,10 +52,11 @@ bool FPCGExSpatialDomain::Overlaps(
 bool FPCGExSpatialDomain::OverlapsBeyondThreshold(
 	const FPCGExFootprintShape& Candidate,
 	[[maybe_unused]] float MaxAllowedPenetration,
-	int32 SkipOwnerIndex) const
+	int32 SkipOwnerIndex,
+	uint32 CandidateChannelMask) const
 {
 	// Conservative shim: any overlap exceeds any threshold. The Broadphase
 	// overrides with the registry's QueryPenetration path which returns
 	// real MTV magnitudes for OBB-OBB pairs.
-	return Overlaps(Candidate, SkipOwnerIndex, NoSkip);
+	return Overlaps(Candidate, SkipOwnerIndex, NoSkip, CandidateChannelMask);
 }

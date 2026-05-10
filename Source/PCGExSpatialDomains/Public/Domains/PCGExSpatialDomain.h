@@ -73,12 +73,16 @@ public:
 	virtual bool Overlaps(
 		const FPCGExFootprintShape& Candidate,
 		int32 SkipOwnerIndex,
-		TFunctionRef<bool(int32)> ShouldSkip) const;
+		TFunctionRef<bool(int32)> ShouldSkip,
+		uint32 CandidateChannelMask = 0) const;
 
 	/** No-skip-predicate convenience overload. Forwards to the virtual. */
-	bool Overlaps(const FPCGExFootprintShape& Candidate, int32 SkipOwnerIndex = INDEX_NONE) const
+	bool Overlaps(
+		const FPCGExFootprintShape& Candidate,
+		int32 SkipOwnerIndex = INDEX_NONE,
+		uint32 CandidateChannelMask = 0) const
 	{
-		return Overlaps(Candidate, SkipOwnerIndex, NoSkip);
+		return Overlaps(Candidate, SkipOwnerIndex, NoSkip, CandidateChannelMask);
 	}
 
 	/**
@@ -86,11 +90,16 @@ public:
 	 * any stored entry beyond MaxAllowedPenetration. Default impl shims to
 	 * boolean Overlaps (any overlap counts as exceeding any threshold).
 	 * Broadphase overrides via the registry's QueryPenetration path.
+	 *
+	 * CandidateChannelMask gates the test through the channel-interaction
+	 * matrix (Ignored pairs are skipped without invoking narrow phase).
+	 * Default 0 = no channel info -> matrix-gate falls back to "always run".
 	 */
 	virtual bool OverlapsBeyondThreshold(
 		const FPCGExFootprintShape& Candidate,
 		float MaxAllowedPenetration,
-		int32 SkipOwnerIndex = INDEX_NONE) const;
+		int32 SkipOwnerIndex = INDEX_NONE,
+		uint32 CandidateChannelMask = 0) const;
 
 	// ========== Common ==========
 
@@ -110,13 +119,24 @@ public:
 	virtual bool IsMutable() const { return false; }
 
 	/**
-	 * Append a shape with its owner identity. Default no-op so generic
-	 * callers degrade gracefully against unsupported domains; static
-	 * subclasses override with check(false) to fail loud.
+	 * Append a shape with its owner identity + channel mask. Default no-op
+	 * so generic callers degrade gracefully against unsupported domains;
+	 * static subclasses override with check(false) to fail loud.
 	 *
 	 * OwnerIndex must be >= 0 -- INDEX_NONE is the skip-nothing sentinel.
+	 *
+	 * ChannelMask is a bitmask over the project's channel registry (see
+	 * UPCGExSpatialDomainsSettings::SpatialChannels). Bit N set = the entry
+	 * participates in the channel at index N. 0 = no channel info (gracefully
+	 * degrades: queries run narrow phase regardless of matrix configuration).
+	 * Defaulted so call sites that don't care about channels keep compiling
+	 * unchanged; the broadphase ignores the mask at query time until the
+	 * matrix-consult slice (D.5) lands.
 	 */
-	virtual int32 Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex)
+	virtual int32 Append(
+		const FPCGExFootprintShape& Shape,
+		int32 OwnerIndex,
+		uint32 ChannelMask = 0)
 	{
 		return INDEX_NONE;
 	}

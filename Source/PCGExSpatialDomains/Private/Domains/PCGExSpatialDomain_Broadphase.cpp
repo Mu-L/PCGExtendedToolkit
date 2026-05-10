@@ -6,6 +6,12 @@
 #include "Math/OBB/PCGExOBB.h"
 #include "NarrowPhase/PCGExNarrowPhase.h"
 #include "Shapes/PCGExFootprintShape.h"
+#include "Settings/PCGExSpatialDomainsSettings.h"
+
+FPCGExSpatialDomain_Broadphase::FPCGExSpatialDomain_Broadphase()
+	: MatrixRef(&UPCGExSpatialDomainsSettings::GetCompiledMatrix())
+{
+}
 
 namespace
 {
@@ -37,7 +43,8 @@ float FPCGExSpatialDomain_Broadphase::QueryPoint(const FVector& Point) const
 bool FPCGExSpatialDomain_Broadphase::Overlaps(
 	const FPCGExFootprintShape& Candidate,
 	int32 SkipOwnerIndex,
-	TFunctionRef<bool(int32)> ShouldSkip) const
+	TFunctionRef<bool(int32)> ShouldSkip,
+	uint32 CandidateChannelMask) const
 {
 	if (NumValidEntries == 0) { return false; }
 
@@ -61,14 +68,22 @@ bool FPCGExSpatialDomain_Broadphase::Overlaps(
 			|| ShouldSkip(OwnerIdx);
 	};
 
-	// ConfirmOverlap runs per SAT-confirmed (AABB-confirmed) entry. The
-	// narrow phase resolves the (Candidate.UScriptStruct, Stored.UScriptStruct)
-	// pair test from the registry; first to overlap stops the walk.
-	auto ConfirmOverlap = [this, &Candidate](
+	// ConfirmOverlap runs per SAT-confirmed (AABB-confirmed) entry. Two
+	// gates before the narrow phase:
+	//   1. Channel matrix -- skip pairs whose (candidate, stored) response
+	//      is Ignore. Cheap table read; saves us a registry dispatch on
+	//      author-declared "don't care" pairs.
+	//   2. Narrow phase via the registry on survivors.
+	auto ConfirmOverlap = [this, &Candidate, CandidateChannelMask](
 		const PCGExMath::OBB::FOBB&, int32 StorageIdx) -> bool
 	{
-		const FInstancedStruct& Wrapper = Entries[StorageIdx].Shape;
-		const FPCGExFootprintShape* StoredShape = Wrapper.GetPtr<FPCGExFootprintShape>();
+		const FEntry& Entry = Entries[StorageIdx];
+		if (MatrixRef && !MatrixRef->ShouldRunNarrowPhase(CandidateChannelMask, Entry.ChannelMask))
+		{
+			return false;  // channel matrix says Ignore -- skip without invoking narrow phase
+		}
+
+		const FPCGExFootprintShape* StoredShape = Entry.Shape.GetPtr<FPCGExFootprintShape>();
 		if (!StoredShape) { return false; }
 		return PCGExSpatial::NarrowPhase::TestOverlap(Candidate, *StoredShape);
 	};
@@ -80,7 +95,8 @@ bool FPCGExSpatialDomain_Broadphase::Overlaps(
 bool FPCGExSpatialDomain_Broadphase::OverlapsBeyondThreshold(
 	const FPCGExFootprintShape& Candidate,
 	float MaxAllowedPenetration,
-	int32 SkipOwnerIndex) const
+	int32 SkipOwnerIndex,
+	uint32 CandidateChannelMask) const
 {
 	if (NumValidEntries == 0) { return false; }
 
@@ -96,13 +112,20 @@ bool FPCGExSpatialDomain_Broadphase::OverlapsBeyondThreshold(
 		return SkipOwnerIndex != INDEX_NONE && OwnerIdx == SkipOwnerIndex;
 	};
 
-	// Per-entry penetration test via the registry. First entry whose
-	// magnitude exceeds the threshold rejects the candidate.
-	auto ConfirmExceedsThreshold = [this, &Candidate, MaxAllowedPenetration](
+	// Per-entry penetration test via the registry. Channel matrix gate
+	// runs first -- Ignored pairs skip without invoking the registry's
+	// QueryPenetration dispatch. First survivor whose magnitude exceeds
+	// the threshold rejects the candidate.
+	auto ConfirmExceedsThreshold = [this, &Candidate, MaxAllowedPenetration, CandidateChannelMask](
 		const PCGExMath::OBB::FOBB&, int32 StorageIdx) -> bool
 	{
-		const FInstancedStruct& Wrapper = Entries[StorageIdx].Shape;
-		const FPCGExFootprintShape* StoredShape = Wrapper.GetPtr<FPCGExFootprintShape>();
+		const FEntry& Entry = Entries[StorageIdx];
+		if (MatrixRef && !MatrixRef->ShouldRunNarrowPhase(CandidateChannelMask, Entry.ChannelMask))
+		{
+			return false;
+		}
+
+		const FPCGExFootprintShape* StoredShape = Entry.Shape.GetPtr<FPCGExFootprintShape>();
 		if (!StoredShape) { return false; }
 		const float Pen = PCGExSpatial::NarrowPhase::QueryPenetration(Candidate, *StoredShape);
 		return Pen > MaxAllowedPenetration;
@@ -112,7 +135,10 @@ bool FPCGExSpatialDomain_Broadphase::OverlapsBeyondThreshold(
 		SkipPredicate, ConfirmExceedsThreshold);
 }
 
-int32 FPCGExSpatialDomain_Broadphase::Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex)
+int32 FPCGExSpatialDomain_Broadphase::Append(
+	const FPCGExFootprintShape& Shape,
+	int32 OwnerIndex,
+	uint32 ChannelMask)
 {
 	// Owner-index >= 0 contract: INDEX_NONE is the skip-nothing sentinel
 	// and would silently make this entry untargetable by skip-by-owner.
@@ -132,6 +158,7 @@ int32 FPCGExSpatialDomain_Broadphase::Append(const FPCGExFootprintShape& Shape, 
 	Entry.Shape.InitializeAs(StructType, reinterpret_cast<const uint8*>(&Shape));
 	Entry.OwnerIndex = OwnerIndex;
 	Entry.WorldAABB = WorldAABB;
+	Entry.ChannelMask = ChannelMask;
 
 	ValidMask.Add(true);
 	++NumValidEntries;

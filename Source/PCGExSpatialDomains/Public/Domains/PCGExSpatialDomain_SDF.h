@@ -50,5 +50,5 @@ public:
 
 	// ========== FPCGExSpatialDomain (mutation) ==========
 
-	virtual int32 Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex) override;
+	virtual int32 Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex, uint32 ChannelMask = 0) override;
 };

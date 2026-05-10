@@ -8,6 +8,7 @@
 #include "Math/OBB/PCGExOBB.h"
 #include "Math/OBB/PCGExOBBCollection.h"
 #include "Shapes/PCGExFootprintShape.h"
+#include "Channels/PCGExChannelInteractionMatrix.h"
 #include "StructUtils/InstancedStruct.h"
 
 /**
@@ -41,8 +42,19 @@
 class PCGEXSPATIALDOMAINS_API FPCGExSpatialDomain_Broadphase : public FPCGExSpatialDomain
 {
 public:
-	FPCGExSpatialDomain_Broadphase() = default;
+	FPCGExSpatialDomain_Broadphase();
 	virtual ~FPCGExSpatialDomain_Broadphase() override = default;
+
+	/**
+	 * Override the channel-interaction matrix used for query-time gating.
+	 * Default is `UPCGExSpatialDomainsSettings::GetCompiledMatrix()` at
+	 * construction; tests and isolated growth runs that want a different
+	 * matrix call this before placing anything.
+	 */
+	void SetChannelMatrix(const FPCGExChannelInteractionMatrix& InMatrix)
+	{
+		MatrixRef = &InMatrix;
+	}
 
 	// ========== Query ==========
 
@@ -52,13 +64,15 @@ public:
 	virtual bool Overlaps(
 		const FPCGExFootprintShape& Candidate,
 		int32 SkipOwnerIndex,
-		TFunctionRef<bool(int32)> ShouldSkip) const override;
+		TFunctionRef<bool(int32)> ShouldSkip,
+		uint32 CandidateChannelMask = 0) const override;
 	using FPCGExSpatialDomain::Overlaps; // pull in 2-arg no-skip overload
 
 	virtual bool OverlapsBeyondThreshold(
 		const FPCGExFootprintShape& Candidate,
 		float MaxAllowedPenetration,
-		int32 SkipOwnerIndex = INDEX_NONE) const override;
+		int32 SkipOwnerIndex = INDEX_NONE,
+		uint32 CandidateChannelMask = 0) const override;
 
 	virtual FBox GetBounds() const override { return WorldBounds; }
 	virtual bool IsValid() const override { return NumValidEntries > 0; }
@@ -66,7 +80,10 @@ public:
 	// ========== Mutation + snapshot ==========
 
 	virtual bool IsMutable() const override { return true; }
-	virtual int32 Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex) override;
+	virtual int32 Append(
+		const FPCGExFootprintShape& Shape,
+		int32 OwnerIndex,
+		uint32 ChannelMask = 0) override;
 	virtual FSnapshotHandle BeginSnapshotScope() override;
 	virtual void RollbackToScope(FSnapshotHandle Handle) override;
 
@@ -81,6 +98,14 @@ private:
 		FInstancedStruct Shape;
 		int32 OwnerIndex = INDEX_NONE;
 		FBox WorldAABB = FBox(ForceInit);
+
+		/**
+		 * Bitmask over the project's channel registry. 0 = no channel info
+		 * (the broadphase's matrix-gate query falls back to "run narrow
+		 * phase" -- preserves pre-channel-matrix behavior for un-channeled
+		 * entries). Set by Append; immutable for the entry's lifetime.
+		 */
+		uint32 ChannelMask = 0;
 	};
 
 	TArray<FEntry> Entries;
@@ -95,6 +120,15 @@ private:
 	 * AABB-vs-AABB. Bounds.Index = storage index (into Entries[]).
 	 */
 	PCGExMath::OBB::FDynamicCollection BroadphaseAABBs;
+
+	/**
+	 * Borrowed-pointer to the channel-interaction matrix consulted before
+	 * each narrow-phase invocation. Initialized to the project-settings'
+	 * compiled matrix in the constructor; tests/specialized growth runs
+	 * may override via SetChannelMatrix. Pointer (not reference) so we
+	 * can keep the default ctor noexcept-friendly.
+	 */
+	const FPCGExChannelInteractionMatrix* MatrixRef = nullptr;
 
 	void RecomputeWorldBounds();
 };

@@ -45,6 +45,7 @@ public class PCGExSpatialDomains : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"DeveloperSettings",
 			}
 		);
 

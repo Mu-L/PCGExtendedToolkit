@@ -74,7 +74,7 @@ float FPCGExSpatialDomain_Polygon2D::QueryPoint(const FVector& Point) const
 	return FMath::Max(D2D, DZ);
 }
 
-int32 FPCGExSpatialDomain_Polygon2D::Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex)
+int32 FPCGExSpatialDomain_Polygon2D::Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex, uint32 ChannelMask)
 {
 	checkf(false, TEXT("FPCGExSpatialDomain_Polygon2D is immutable; Append() is not supported."));
 	return INDEX_NONE;

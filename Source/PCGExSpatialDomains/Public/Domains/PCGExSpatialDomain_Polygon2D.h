@@ -81,7 +81,7 @@ public:
 	virtual float QueryPoint(const FVector& Point) const override;
 	virtual FBox GetBounds() const override { return WorldBounds; }
 	virtual bool IsValid() const override { return Outline.Num() >= 3 && ZMax > ZMin; }
-	virtual int32 Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex) override;
+	virtual int32 Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex, uint32 ChannelMask = 0) override;
 
 	// ========== Inspection ==========
 
