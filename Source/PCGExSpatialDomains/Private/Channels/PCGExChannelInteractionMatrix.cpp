@@ -5,41 +5,46 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogPCGExChannelMatrix, Log, All);
 
+static_assert(static_cast<uint8>(EPCGExChannelResponse::Block) == 0,
+	"FMemory::Memset relies on Block having underlying byte value 0 -- "
+	"see ResetResponsesToBlock().");
+
+namespace
+{
+	FORCEINLINE void ResetResponsesToBlock(EPCGExChannelResponse* Cells, size_t NumBytes)
+	{
+		// Single memset to fill the entire 32x32 table with Block -- relies
+		// on the static_assert above pinning Block's representation to 0.
+		FMemory::Memset(Cells, 0, NumBytes);
+	}
+}
+
 FPCGExChannelInteractionMatrix::FPCGExChannelInteractionMatrix()
 {
-	// Default: every cell is Block. Compile() overlays the authored profile
-	// entries on top; cells the user didn't touch stay Block, matching the
-	// Q3-locked "Block by default" policy.
-	for (int32 i = 0; i < MaxChannels; ++i)
-	{
-		for (int32 j = 0; j < MaxChannels; ++j)
-		{
-			Responses[i][j] = EPCGExChannelResponse::Block;
-		}
-	}
+	ResetResponsesToBlock(&Responses[0][0], sizeof(Responses));
 }
 
 void FPCGExChannelInteractionMatrix::Compile(
 	TConstArrayView<FName> InChannelKeys,
 	TConstArrayView<FPCGExChannelProfile> InProfiles)
 {
-	// Reset to all-Block (the per-pair default). Authoring overrides only
-	// flip cells the user explicitly listed.
-	for (int32 i = 0; i < MaxChannels; ++i)
-	{
-		for (int32 j = 0; j < MaxChannels; ++j)
-		{
-			Responses[i][j] = EPCGExChannelResponse::Block;
-		}
-	}
+	ResetResponsesToBlock(&Responses[0][0], sizeof(Responses));
 
 	// Snapshot channel keys (capped at MaxChannels -- excess registered
 	// channels can't be addressed by the uint32 mask anyway; if we ever
 	// need more, widen the mask).
 	ChannelKeys.Reset();
+	KeyToBit.Reset();
+
 	const int32 Count = FMath::Min(InChannelKeys.Num(), MaxChannels);
 	ChannelKeys.Reserve(Count);
-	for (int32 i = 0; i < Count; ++i) { ChannelKeys.Add(InChannelKeys[i]); }
+	KeyToBit.Reserve(Count);
+	for (int32 i = 0; i < Count; ++i)
+	{
+		const FName& Key = InChannelKeys[i];
+		ChannelKeys.Add(Key);
+		KeyToBit.Add(Key, i);
+	}
 
 	if (InChannelKeys.Num() > MaxChannels)
 	{
@@ -80,12 +85,8 @@ void FPCGExChannelInteractionMatrix::Compile(
 int32 FPCGExChannelInteractionMatrix::GetChannelBit(FName ChannelKey) const
 {
 	if (ChannelKey.IsNone()) { return INDEX_NONE; }
-
-	for (int32 i = 0; i < ChannelKeys.Num(); ++i)
-	{
-		if (ChannelKeys[i].IsEqual(ChannelKey, ENameCase::IgnoreCase)) { return i; }
-	}
-	return INDEX_NONE;
+	const int32* Found = KeyToBit.Find(ChannelKey);
+	return Found ? *Found : INDEX_NONE;
 }
 
 FName FPCGExChannelInteractionMatrix::GetChannelKey(int32 BitIndex) const

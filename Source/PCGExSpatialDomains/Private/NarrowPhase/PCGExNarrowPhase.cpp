@@ -9,115 +9,173 @@ namespace PCGExSpatial::NarrowPhase
 {
 	namespace
 	{
-		using FPairKey = TPair<UScriptStruct*, UScriptStruct*>;
-
 		/**
-		 * The singleton registry. Module-scoped (function-local static) so it
-		 * lives in the .obj of this TU regardless of unity-build mergers.
-		 * Module init populates; module shutdown clears (UnregisterAll). The
-		 * map is read-only during query phase, so no synchronization is needed
-		 * past registration -- callers are responsible for not registering
-		 * during placement runs.
+		 * Single dispatch slot. For an entry at Matrix[StoredTag][CandidateTag]:
+		 *   - bSwapArgs = false means call Overlap(Candidate, Stored)
+		 *   - bSwapArgs = true  means call Overlap(Stored, Candidate)
 		 *
-		 * Storage convention: we store under the EXACT (StructA, StructB)
-		 * order the registration specified -- pair-test impls distinguish
-		 * args by static_cast and depend on a consistent argument layout, so
-		 * canonicalizing keys would either crash on asymmetric pairs or force
-		 * impls to dynamic-cast on every call. Symmetry is provided by the
-		 * lookup side: missing (A, B) falls back to (B, A) with arg swap.
+		 * The mirrored slot at [CandidateTag][StoredTag] holds the same fn ptrs
+		 * with the swap flag inverted, so any direction of lookup resolves in
+		 * a single 2D index.
 		 */
-		TMap<FPairKey, FPairFns>& GetRegistry()
+		struct FPairSlot
 		{
-			static TMap<FPairKey, FPairFns> Registry;
-			return Registry;
-		}
+			FPairOverlapFn     Overlap     = nullptr;
+			FPairPenetrationFn Penetration = nullptr;
+			bool               bSwapArgs   = false;
+		};
 
 		/**
-		 * Resolve a pair lookup. Tries (A, B) first; on miss, tries (B, A)
-		 * and signals the caller to swap args. Missing both directions
-		 * returns nullptr.
+		 * Module-scoped singleton registry. Function-local static so it lives
+		 * in the .obj of this TU regardless of unity-build mergers. Populated
+		 * during module init; read-only during query phase, so no synchronization
+		 * is needed past registration.
+		 *
+		 * Storage:
+		 *   - StructToTag / TagToStruct: dense bidirectional tag table.
+		 *   - Matrix[a][b]: dispatch slot for "stored kind a vs candidate kind b".
+		 *     Sized to NumKinds x NumKinds; grown as new kinds are registered.
 		 */
-		const FPairFns* Resolve(UScriptStruct* A, UScriptStruct* B, bool& bOutSwapArgs)
+		struct FRegistryState
 		{
-			bOutSwapArgs = false;
-			if (!A || !B) { return nullptr; }
+			TArray<TArray<FPairSlot>>             Matrix;
+			TMap<const UScriptStruct*, FShapeKindTag> StructToTag;
+			TArray<const UScriptStruct*>          TagToStruct;
+		};
 
-			const TMap<FPairKey, FPairFns>& Reg = GetRegistry();
-
-			if (const FPairFns* Found = Reg.Find(FPairKey(A, B)))
-			{
-				return Found;
-			}
-			if (const FPairFns* Found = Reg.Find(FPairKey(B, A)))
-			{
-				bOutSwapArgs = true;
-				return Found;
-			}
-			return nullptr;
+		FRegistryState& State()
+		{
+			static FRegistryState S;
+			return S;
 		}
+
+		void EnsureMatrixSize(int32 NumKinds)
+		{
+			FRegistryState& S = State();
+			if (S.Matrix.Num() >= NumKinds) { return; }
+			S.Matrix.SetNum(NumKinds);
+			for (TArray<FPairSlot>& Row : S.Matrix) { Row.SetNum(NumKinds); }
+		}
+	}
+
+	FShapeKindTag RegisterShapeKind(UScriptStruct* Struct)
+	{
+		if (!Struct) { return InvalidKindTag; }
+
+		FRegistryState& S = State();
+		if (const FShapeKindTag* Existing = S.StructToTag.Find(Struct)) { return *Existing; }
+
+		const FShapeKindTag Tag = S.TagToStruct.Add(Struct);
+		S.StructToTag.Add(Struct, Tag);
+		EnsureMatrixSize(S.TagToStruct.Num());
+		return Tag;
+	}
+
+	FShapeKindTag FindShapeKindTag(const UScriptStruct* Struct)
+	{
+		if (!Struct) { return InvalidKindTag; }
+		const FShapeKindTag* Found = State().StructToTag.Find(Struct);
+		return Found ? *Found : InvalidKindTag;
 	}
 
 	void Register(UScriptStruct* StructA, UScriptStruct* StructB, FPairFns Fns)
 	{
 		if (!ensureMsgf(StructA && StructB, TEXT("PCGExSpatial::NarrowPhase::Register: null UScriptStruct*"))) { return; }
 
-		const FPairKey Key(StructA, StructB);
+		const FShapeKindTag TagA = RegisterShapeKind(StructA);
+		const FShapeKindTag TagB = RegisterShapeKind(StructB);
 
-		TMap<FPairKey, FPairFns>& Reg = GetRegistry();
-		if (FPairFns* Existing = Reg.Find(Key))
+		FRegistryState& S = State();
+		FPairSlot& Slot = S.Matrix[TagA][TagB];
+
+		if (Slot.Overlap != nullptr || Slot.Penetration != nullptr)
 		{
 			ensureMsgf(false,
 				TEXT("PCGExSpatial::NarrowPhase: duplicate registration for (%s, %s) -- last write wins."),
 				*StructA->GetName(), *StructB->GetName());
-			*Existing = Fns;
-			return;
 		}
 
-		// Catch the "registered both orientations" pattern -- impls expect a
-		// specific arg order, so registering (B, A) after (A, B) means one of
-		// them will be called with mismatched args and crash on static_cast.
-		// One direction only; lookup handles the swap.
-		ensureMsgf(!Reg.Contains(FPairKey(StructB, StructA)),
-			TEXT("PCGExSpatial::NarrowPhase: pair (%s, %s) is already registered in the reverse direction. "
-			     "Register only one orientation; lookups in the other direction resolve via arg swap."),
-			*StructA->GetName(), *StructB->GetName());
+		Slot.Overlap     = Fns.Overlap;
+		Slot.Penetration = Fns.Penetration;
+		Slot.bSwapArgs   = false;
 
-		Reg.Add(Key, Fns);
+		if (TagA != TagB)
+		{
+			// Mirror: a query coming in as (B, A) resolves to the same fns
+			// with the swap flag set, so the impl is always called with the
+			// arg order the registration specified.
+			FPairSlot& Mirror = S.Matrix[TagB][TagA];
+			ensureMsgf(Mirror.Overlap == nullptr,
+				TEXT("PCGExSpatial::NarrowPhase: pair (%s, %s) is already registered in the reverse direction. "
+				     "Register only one orientation; lookups in the other direction resolve via arg swap."),
+				*StructA->GetName(), *StructB->GetName());
+			Mirror.Overlap     = Fns.Overlap;
+			Mirror.Penetration = Fns.Penetration;
+			Mirror.bSwapArgs   = true;
+		}
 	}
 
 	void UnregisterAll()
 	{
-		GetRegistry().Reset();
+		FRegistryState& S = State();
+		S.Matrix.Reset();
+		S.StructToTag.Reset();
+		S.TagToStruct.Reset();
 	}
 
-	bool TestOverlap(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
+	bool TestOverlap(
+		FShapeKindTag AKind, const FPCGExFootprintShape& A,
+		FShapeKindTag BKind, const FPCGExFootprintShape& B)
 	{
-		bool bSwap = false;
-		const FPairFns* Fns = Resolve(A.GetScriptStruct(), B.GetScriptStruct(), bSwap);
-		if (!Fns || !Fns->Overlap) { return false; }
-		return bSwap ? Fns->Overlap(B, A) : Fns->Overlap(A, B);
+		const FRegistryState& S = State();
+		check(AKind >= 0 && AKind < S.Matrix.Num());
+		check(BKind >= 0 && BKind < S.Matrix.Num());
+
+		const FPairSlot& Slot = S.Matrix[AKind][BKind];
+		if (!Slot.Overlap) { return false; }
+		return Slot.bSwapArgs ? Slot.Overlap(B, A) : Slot.Overlap(A, B);
 	}
 
-	float QueryPenetration(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
+	float QueryPenetration(
+		FShapeKindTag AKind, const FPCGExFootprintShape& A,
+		FShapeKindTag BKind, const FPCGExFootprintShape& B)
 	{
-		bool bSwap = false;
-		const FPairFns* Fns = Resolve(A.GetScriptStruct(), B.GetScriptStruct(), bSwap);
-		if (!Fns) { return TNumericLimits<float>::Max(); }
+		const FRegistryState& S = State();
+		check(AKind >= 0 && AKind < S.Matrix.Num());
+		check(BKind >= 0 && BKind < S.Matrix.Num());
 
-		if (Fns->Penetration)
+		const FPairSlot& Slot = S.Matrix[AKind][BKind];
+
+		if (Slot.Penetration)
 		{
-			return bSwap ? Fns->Penetration(B, A) : Fns->Penetration(A, B);
+			return Slot.bSwapArgs ? Slot.Penetration(B, A) : Slot.Penetration(A, B);
 		}
 
 		// No penetration fn: degenerate to "any overlap is infinite penetration".
 		// Callers comparing against MaxAllowedPenetration get the conservative
 		// reject, matching the FSpatialDomain default-base semantic.
-		if (Fns->Overlap)
+		if (Slot.Overlap)
 		{
-			const bool bOverlaps = bSwap ? Fns->Overlap(B, A) : Fns->Overlap(A, B);
+			const bool bOverlaps = Slot.bSwapArgs ? Slot.Overlap(B, A) : Slot.Overlap(A, B);
 			return bOverlaps ? TNumericLimits<float>::Max() : 0.0f;
 		}
 
 		return TNumericLimits<float>::Max();
+	}
+
+	bool TestOverlap(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
+	{
+		const FShapeKindTag AKind = FindShapeKindTag(A.GetScriptStruct());
+		const FShapeKindTag BKind = FindShapeKindTag(B.GetScriptStruct());
+		if (AKind == InvalidKindTag || BKind == InvalidKindTag) { return false; }
+		return TestOverlap(AKind, A, BKind, B);
+	}
+
+	float QueryPenetration(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
+	{
+		const FShapeKindTag AKind = FindShapeKindTag(A.GetScriptStruct());
+		const FShapeKindTag BKind = FindShapeKindTag(B.GetScriptStruct());
+		if (AKind == InvalidKindTag || BKind == InvalidKindTag) { return TNumericLimits<float>::Max(); }
+		return QueryPenetration(AKind, A, BKind, B);
 	}
 }

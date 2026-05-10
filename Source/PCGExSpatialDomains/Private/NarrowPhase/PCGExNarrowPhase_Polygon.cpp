@@ -12,14 +12,11 @@ namespace PCGExSpatial::NarrowPhase
 	namespace
 	{
 		/**
-		 * OBB-vs-Polygon precise overlap test. Lifted from the per-domain
-		 * inner loop in FSpatialDomain_OBBList::OverlapsPolygon: project the
-		 * OBB shadow into the polygon's projection frame, reject on Z band,
-		 * then run 2D polygon-vs-shadow overlap (concave-safe).
-		 *
-		 * The world-AABB pre-cull lives at the broadphase tier, not here --
-		 * by the time this is called, the broadphase has already accepted
-		 * the pair as AABB-overlapping.
+		 * OBB-vs-Polygon precise overlap test: project the OBB shadow into
+		 * the polygon's projection frame, reject on Z band, then run 2D
+		 * polygon-vs-shadow overlap (concave-safe). World-AABB pre-cull
+		 * lives at the broadphase tier -- by the time this runs the
+		 * broadphase has already accepted the pair as AABB-overlapping.
 		 */
 		bool OBBvsPolygon_Overlap(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
 		{
@@ -38,10 +35,9 @@ namespace PCGExSpatial::NarrowPhase
 		}
 
 		/**
-		 * Polygon-vs-Polygon precise overlap test. Lifted from the per-domain
-		 * inner loop in FSpatialDomain_PolygonList::OverlapsPolygon: project
-		 * candidate prism into stored polygon's frame, reject on Z band, run
-		 * 2D concave-vs-concave overlap.
+		 * Polygon-vs-Polygon precise overlap test: project candidate prism
+		 * into stored polygon's frame, reject on Z band, run 2D concave-vs-
+		 * concave overlap.
 		 */
 		bool PolygonVsPolygon_Overlap(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
 		{
@@ -50,6 +46,8 @@ namespace PCGExSpatial::NarrowPhase
 			const FPCGExSpatialPolygonEntry& Candidate = PolyA.Entry;
 			const FPCGExSpatialPolygonEntry& Stored    = PolyB.Entry;
 
+			// Inline storage sized for typical floor-plan outlines; falls back
+			// to heap on overflow. Avoids per-call allocation in the hot path.
 			TArray<FVector2D> CandidateInStored;
 			float CandidateZMin, CandidateZMax;
 			PCGExMath::Geo::ProjectPrismToFrame(
@@ -76,9 +74,9 @@ namespace PCGExSpatial::NarrowPhase
 		//   there's no Penetration fn -- meaning "any overlap exceeds any
 		//   threshold". That's the correct-direction conservative default:
 		//   FootprintPenetration placement conditions reject the candidate
-		//   on any polygon overlap, identical to today's behavior. It is
-		//   NOT looser than expected; it is NOT incorrect; it is just
-		//   missing the "tolerate shallow polygon overlaps" capability.
+		//   on any polygon overlap. It is NOT looser than expected; it is
+		//   NOT incorrect; it is just missing the "tolerate shallow polygon
+		//   overlaps" capability.
 		//
 		//   Naive conservative paths (polygon's bounding OBB vs OBB SAT-MTV)
 		//   are wrong-direction for concave polygons: an L-shape with a

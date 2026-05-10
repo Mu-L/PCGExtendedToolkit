@@ -9,10 +9,21 @@
 namespace PCGExSpatial::NarrowPhase
 {
 	/**
+	 * Stable per-module-lifetime tag for a registered shape kind. The hot
+	 * dispatch path indexes a 2D function-pointer table by (StoredTag, CandidateTag);
+	 * callers (e.g. the broadphase) cache the tag on each stored entry at
+	 * Append time so per-pair-test lookup is a single 2D array index.
+	 *
+	 * Tags are dense and stable for the module's lifetime. Never re-assigned.
+	 */
+	using FShapeKindTag = int32;
+	constexpr FShapeKindTag InvalidKindTag = INDEX_NONE;
+
+	/**
 	 * Pair-test function signatures. Free functions, registered by shape pair
 	 * at module-init time. Receive both operands as base-class refs; impls
-	 * static_cast to their concrete shape types after the registry has matched
-	 * the (StructA, StructB) keys -- the cast is type-safe by construction.
+	 * static_cast to their concrete shape types -- the cast is type-safe by
+	 * construction (the registry only invokes the fn when both tags match).
 	 */
 	using FPairOverlapFn     = bool (*)(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B);
 	using FPairPenetrationFn = float (*)(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B);
@@ -29,42 +40,81 @@ namespace PCGExSpatial::NarrowPhase
 	};
 
 	/**
-	 * Register the pair test for (StructA, StructB). Symmetric -- callers
-	 * may pass A,B and B,A interchangeably; registration stores under the
-	 * canonical (lower-pointer-first) key, lookup tries both orientations.
+	 * Ensure a stable tag exists for the given shape kind. Idempotent: callers
+	 * may invoke from arbitrary registration sites without worrying about
+	 * double-tagging. Returns InvalidKindTag iff Struct is null.
+	 *
+	 * Register() auto-tags both operands, so most consumers never call this
+	 * directly. Use it when a shape kind needs a tag without (yet) having any
+	 * pair tests registered -- e.g. a storage backend that wants to cache tags
+	 * before pair-test modules have loaded.
+	 *
+	 * Thread model: call from module-init (StartupModule); never call from
+	 * worker threads.
+	 */
+	PCGEXSPATIALDOMAINS_API FShapeKindTag RegisterShapeKind(UScriptStruct* Struct);
+
+	/**
+	 * Resolve the tag previously assigned to a shape kind. Returns InvalidKindTag
+	 * for kinds that have never been registered (directly or through Register()).
+	 *
+	 * Read-only; safe to call from any thread post-registration.
+	 */
+	PCGEXSPATIALDOMAINS_API FShapeKindTag FindShapeKindTag(const UScriptStruct* Struct);
+
+	/**
+	 * Register the pair test for (StructA, StructB). Auto-registers tags for
+	 * both kinds (no need to call RegisterShapeKind first). The dispatch table
+	 * stores a mirrored entry at [TagB][TagA] with an arg-swap flag, so
+	 * lookups in either direction take a single 2D array index.
 	 *
 	 * Registering the same pair twice is a programmer error: ensures in
-	 * debug, last-write-wins in shipping. Module load order: register
-	 * during StartupModule; queries from any phase after that are safe.
+	 * debug, last-write-wins in shipping. Registering both orientations of
+	 * the same pair (i.e. (A, B) and then (B, A)) is also flagged -- impls
+	 * depend on a consistent argument layout, so only one direction may be
+	 * registered.
 	 *
 	 * Either of the Fns members may be null. A null Overlap effectively
 	 * disables the pair (TestOverlap will return false / not-overlapping);
 	 * a null Penetration falls back to Overlap.
+	 *
+	 * Thread model: call from StartupModule; queries from any phase after
+	 * that are safe.
 	 */
 	PCGEXSPATIALDOMAINS_API void Register(
 		UScriptStruct* StructA,
 		UScriptStruct* StructB,
 		FPairFns Fns);
 
-	/** Drop all registrations. Test/utility hook -- production code never calls this. */
+	/** Drop all registrations (kinds AND pair tests). Test/utility hook -- production code never calls this. */
 	PCGEXSPATIALDOMAINS_API void UnregisterAll();
 
 	/**
-	 * Symmetric overlap query. Resolves (A.GetScriptStruct(), B.GetScriptStruct())
-	 * in the registry -- exact pair preferred, fallback to swapped-order with
-	 * args automatically swapped. Missing pair returns false (the safe direction
-	 * for "no opinion"). Stack-safe and lock-free post-registration.
+	 * Tag-dispatched overlap query. The fast path -- single 2D array index +
+	 * one branch (for the swap flag) per pair test. Callers cache tags on
+	 * their stored entries (see broadphase FEntry::KindTag); the candidate's
+	 * tag is resolved once per overlap query outside the inner loop.
+	 *
+	 * Tags must be valid (>= 0 and bounded). Out-of-range tags trip a check.
+	 */
+	PCGEXSPATIALDOMAINS_API bool TestOverlap(
+		FShapeKindTag AKind, const FPCGExFootprintShape& A,
+		FShapeKindTag BKind, const FPCGExFootprintShape& B);
+
+	PCGEXSPATIALDOMAINS_API float QueryPenetration(
+		FShapeKindTag AKind, const FPCGExFootprintShape& A,
+		FShapeKindTag BKind, const FPCGExFootprintShape& B);
+
+	/**
+	 * Convenience overloads: tags are resolved via GetScriptStruct() on each
+	 * side. Use in cold paths (one-off tests, generic helpers, debug hooks).
+	 * Return false / +INFINITY when either side's kind has never been
+	 * registered.
 	 */
 	PCGEXSPATIALDOMAINS_API bool TestOverlap(
 		const FPCGExFootprintShape& A,
 		const FPCGExFootprintShape& B);
 
-	/**
-	 * Symmetric penetration query. When the resolved pair has no Penetration
-	 * fn, falls back to the Overlap fn -- any overlap counts as infinite
-	 * penetration (the conservative direction for "did this exceed the
-	 * tolerance?"). Returns +INFINITY for the missing-pair case.
-	 */
 	PCGEXSPATIALDOMAINS_API float QueryPenetration(
 		const FPCGExFootprintShape& A,
 		const FPCGExFootprintShape& B);

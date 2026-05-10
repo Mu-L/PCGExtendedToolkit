@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/StreamableManager.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Core/PCGExPointFilter.h"
 #include "Details/PCGExInputShorthandsDetails.h"
@@ -232,12 +233,20 @@ namespace PCGExStagingLoadLevel
 		UPCGExManagedStreamingLevels* ManagedStreamingLevels = nullptr;
 
 #if WITH_EDITOR
-		/** Resolved at first spawn: true if using ALevelInstance path, false for streaming.
-		 *  Forced to false for runtime components since their output is transient. */
+		/** True when using ALevelInstance path (bSpawnAsLevelInstance=true, editor, non-runtime). */
 		bool bUseLevelInstance = false;
+
+		/** True when spawning level content as individual persistent actors (bSpawnAsLevelInstance=false, editor, non-runtime). */
+		bool bUseLooseActors = false;
 
 		/** Managed resource for ALevelInstance cleanup via PCG's native resource tracking */
 		UPCGManagedActors* ManagedLevelInstances = nullptr;
+
+		/** Managed resource for loose-actor cleanup via PCG's native resource tracking */
+		UPCGManagedActors* ManagedLooseActors = nullptr;
+
+		/** Keeps source UWorld assets alive for the duration of the loose-actor spawn loop */
+		TSharedPtr<FStreamableHandle> LevelLoadHandle;
 #endif
 
 	public:
@@ -265,6 +274,7 @@ namespace PCGExStagingLoadLevel
 
 #if WITH_EDITOR
 		void SpawnAsLevelInstance(FLevelSpawnRequest& Request);
+		void SpawnAsLooseActors(FLevelSpawnRequest& Request);
 #endif
 	};
 }

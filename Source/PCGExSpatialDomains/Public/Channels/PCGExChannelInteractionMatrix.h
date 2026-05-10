@@ -13,9 +13,9 @@
  * "interested" in each other); Ignore = skip the narrow phase entirely, the
  * pair has no spatial relationship.
  *
- * Q2 locked: Block and Ignore only. The middle "Overlap" state from UE
- * collision (record but don't reject) doesn't fit placement's binary
- * accept/reject; we'd add it if a trigger-style use case appears.
+ * Block and Ignore only -- the middle "Overlap" state from UE collision
+ * (record but don't reject) doesn't fit placement's binary accept/reject;
+ * we'd add it if a trigger-style use case appears.
  */
 UENUM(BlueprintType)
 enum class EPCGExChannelResponse : uint8
@@ -29,8 +29,8 @@ enum class EPCGExChannelResponse : uint8
 /**
  * One channel-response override in a profile. "When THIS profile's channel
  * is the candidate, and the stored entry's channel is StoredChannel, the
- * response is Response." Asymmetric by design (Q4): the directional read
- * matters; `(A → B)` may differ from `(B → A)`.
+ * response is Response." Asymmetric by design: the directional read matters;
+ * `(A → B)` may differ from `(B → A)`.
  */
 USTRUCT(BlueprintType)
 struct PCGEXSPATIALDOMAINS_API FPCGExChannelResponseEntry
@@ -77,13 +77,14 @@ struct PCGEXSPATIALDOMAINS_API FPCGExChannelProfile
  *
  * Storage:
  *   - ChannelKeys[i] = the channel name at bit index i (max 32).
+ *   - KeyToBit[key]  = O(1) reverse lookup from name to bit index.
  *   - Responses[from][to] = the response when a candidate at bit `from`
  *     hits a stored entry at bit `to`.
  *
  * Hot-path lookup: ShouldRunNarrowPhase(CandidateMask, StoredMask) ORs across
  * the cross-product of set bits; first Block returns true. For the dominant
  * single-channel-per-side case this is two CountTrailingZeros + one table
- * read -- ~5ns.
+ * read.
  *
  * Lives outside USTRUCT reflection (plain C++ class) -- it's runtime-only
  * derived state, never serialised. The authoring (ChannelKeys + Profiles)
@@ -111,7 +112,7 @@ public:
 		TConstArrayView<FName> InChannelKeys,
 		TConstArrayView<FPCGExChannelProfile> InProfiles);
 
-	/** Resolve a channel name to its bit index. INDEX_NONE if not registered. */
+	/** Resolve a channel name to its bit index. INDEX_NONE if not registered. O(1). */
 	int32 GetChannelBit(FName ChannelKey) const;
 
 	/**
@@ -145,6 +146,9 @@ public:
 private:
 	/** Channel name at each bit index. Index = bit position. Bounded by MaxChannels. */
 	TArray<FName> ChannelKeys;
+
+	/** Reverse lookup name -> bit. Rebuilt in Compile() alongside ChannelKeys; case-insensitive. */
+	TMap<FName, int32> KeyToBit;
 
 	/**
 	 * Response table. Responses[CandidateBit][StoredBit] is the response when

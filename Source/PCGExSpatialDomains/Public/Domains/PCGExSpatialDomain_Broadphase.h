@@ -9,23 +9,26 @@
 #include "Math/OBB/PCGExOBBCollection.h"
 #include "Shapes/PCGExFootprintShape.h"
 #include "Channels/PCGExChannelInteractionMatrix.h"
+#include "NarrowPhase/PCGExNarrowPhase.h"
 #include "StructUtils/InstancedStruct.h"
 
 /**
- * Heterogeneous mutable spatial domain. Single concrete impl that replaces
- * the previous per-shape-typed combo (OBB list + polygon list + facade) --
- * shape-agnostic by construction:
+ * Heterogeneous mutable spatial domain. Single concrete impl that backs the
+ * placed-modules tracker for generative growth runs -- shape-agnostic by
+ * construction:
  *
- *   - Storage: parallel arrays of (FInstancedStruct shape payload, owner idx, validity bit)
+ *   - Storage: parallel arrays of (FInstancedStruct shape payload, owner idx,
+ *     cached narrow-phase tag, validity bit)
  *   - Broadphase: FDynamicCollection lensed as an AABB octree -- each entry's
  *     WorldAABB is added as an identity-orientation OBB, so the collection's
  *     SAT path collapses to AABB-vs-AABB (cheap, tight, no shape-specific math)
- *   - Narrow phase: PCGExSpatial::NarrowPhase registry, dispatched per
- *     stored entry by (Candidate.UScriptStruct, Stored.UScriptStruct)
+ *   - Narrow phase: PCGExSpatial::NarrowPhase 2D dispatch table, indexed by
+ *     (CandidateKindTag, StoredKindTag) -- one array index + one branch per
+ *     surviving pair.
  *
  * Adding a new shape kind requires zero edits here. Register pair tests via
  * NarrowPhase::Register from the shape's owning module's StartupModule;
- * the broadphase routes automatically.
+ * the broadphase routes automatically once the kind has a tag.
  *
  * Owner identity:
  *   The OBB's Bounds.Index slot holds the entry's STORAGE index (into Entries[])
@@ -37,7 +40,12 @@
  * Snapshot model:
  *   BeginSnapshotScope() returns Entries.Num() (high-water mark).
  *   RollbackToScope(handle) flips ValidMask bits past handle to invalid.
- *   O(1) amortized, no realloc.
+ *   O(1) amortized, no realloc, no per-entry walk on partial rollback.
+ *
+ *   GetBounds() may return an over-approximation after partial rollback:
+ *   invalid entries' AABBs aren't subtracted out (that'd be O(N)). Consumers
+ *   must treat GetBounds() as a cull hint, never a tight extent. Full rollback
+ *   (Handle == 0) resets to empty.
  */
 class PCGEXSPATIALDOMAINS_API FPCGExSpatialDomain_Broadphase : public FPCGExSpatialDomain
 {
@@ -84,6 +92,7 @@ public:
 		const FPCGExFootprintShape& Shape,
 		int32 OwnerIndex,
 		uint32 ChannelMask = 0) override;
+	virtual void Reserve(int32 ExpectedCount) override;
 	virtual FSnapshotHandle BeginSnapshotScope() override;
 	virtual void RollbackToScope(FSnapshotHandle Handle) override;
 
@@ -100,6 +109,13 @@ private:
 		FBox WorldAABB = FBox(ForceInit);
 
 		/**
+		 * Cached narrow-phase tag for this entry's shape kind. Resolved once
+		 * at Append time so per-pair dispatch is a single 2D array index --
+		 * no GetScriptStruct() walk or hash per overlap test.
+		 */
+		PCGExSpatial::NarrowPhase::FShapeKindTag KindTag = PCGExSpatial::NarrowPhase::InvalidKindTag;
+
+		/**
 		 * Bitmask over the project's channel registry. 0 = no channel info
 		 * (the broadphase's matrix-gate query falls back to "run narrow
 		 * phase" -- preserves pre-channel-matrix behavior for un-channeled
@@ -111,6 +127,12 @@ private:
 	TArray<FEntry> Entries;
 	TBitArray<> ValidMask;
 	int32 NumValidEntries = 0;
+
+	/**
+	 * Union AABB of all entries that have ever been appended (never shrunk on
+	 * partial rollback -- see class doc). Reset to empty on full rollback
+	 * (Handle == 0). Used as a cheap cull by GetBounds() consumers.
+	 */
 	FBox WorldBounds = FBox(ForceInit);
 
 	/**
@@ -126,9 +148,8 @@ private:
 	 * each narrow-phase invocation. Initialized to the project-settings'
 	 * compiled matrix in the constructor; tests/specialized growth runs
 	 * may override via SetChannelMatrix. Pointer (not reference) so we
-	 * can keep the default ctor noexcept-friendly.
+	 * can keep the default ctor noexcept-friendly; guaranteed non-null
+	 * post-construction.
 	 */
 	const FPCGExChannelInteractionMatrix* MatrixRef = nullptr;
-
-	void RecomputeWorldBounds();
 };

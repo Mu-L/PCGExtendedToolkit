@@ -8,8 +8,8 @@
 // =============================================================================
 
 // Out-of-line destructor: forces a single export of the vtable + dtor symbol
-// from this module. Without this, consuming modules (PCGExValencyGrowth) that
-// construct/destroy subclasses inline get LNK2019 unresolved __imp_ symbols.
+// from this module. Without this, consuming modules that construct/destroy
+// subclasses inline get LNK2019 unresolved __imp_ symbols.
 FPCGExFootprintShape::~FPCGExFootprintShape() = default;
 
 // =============================================================================

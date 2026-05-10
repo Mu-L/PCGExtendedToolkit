@@ -54,14 +54,16 @@ float FPCGExSpatialDomain_Polygon2D::QueryPoint(const FVector& Point) const
 	float MinDistSq = TNumericLimits<float>::Max();
 	int32 Winding = 0;
 
-	for (int32 i = 0; i < N; ++i)
+	// Trailing-index idiom: j wraps via the prior iteration's i, so we
+	// avoid a per-edge modulo without changing the (A,B) traversal order.
+	for (int32 i = 0, j = N - 1; i < N; j = i, ++i)
 	{
-		const FVector2D& A = Outline[i];
-		const FVector2D& B = Outline[(i + 1) % N];
+		const FVector2D& A = Outline[j];
+		const FVector2D& B = Outline[i];
 		MinDistSq = FMath::Min(MinDistSq, PCGExMath::Geo::DistancePointToSegmentSquared2D(P2D, A, B));
 		const float Cross = (B.X - A.X) * (P2D.Y - A.Y) - (B.Y - A.Y) * (P2D.X - A.X);
-		if (A.Y <= P2D.Y) { if (B.Y > P2D.Y  && Cross > 0.0f) ++Winding; }
-		else              { if (B.Y <= P2D.Y  && Cross < 0.0f) --Winding; }
+		if (A.Y <= P2D.Y && B.Y >  P2D.Y && Cross > 0.0f) { ++Winding; }
+		else if (A.Y >  P2D.Y && B.Y <= P2D.Y && Cross < 0.0f) { --Winding; }
 	}
 
 	const float EdgeDist = FMath::Sqrt(MinDistSq);

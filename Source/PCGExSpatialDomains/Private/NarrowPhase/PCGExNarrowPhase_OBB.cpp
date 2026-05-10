@@ -13,9 +13,7 @@ namespace PCGExSpatial::NarrowPhase
 	{
 		/**
 		 * OBB-vs-OBB precise overlap test. Sphere pre-cull + SAT (the
-		 * EPCGExBoxCheckMode::Box path inside PCGExMath::OBB::TestOverlap),
-		 * matching the math the per-domain inner loops ran before the dispatch
-		 * refactor.
+		 * EPCGExBoxCheckMode::Box path inside PCGExMath::OBB::TestOverlap).
 		 */
 		bool OBBvsOBB_Overlap(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
 		{
@@ -27,8 +25,7 @@ namespace PCGExSpatial::NarrowPhase
 		/**
 		 * OBB-vs-OBB SAT-MTV penetration depth. Returns the magnitude of the
 		 * minimum translation vector required to separate the two boxes (zero
-		 * when not overlapping). Forwards to the existing free function in
-		 * PCGExOBBTests.h.
+		 * when not overlapping).
 		 */
 		float OBBvsOBB_Penetration(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
 		{

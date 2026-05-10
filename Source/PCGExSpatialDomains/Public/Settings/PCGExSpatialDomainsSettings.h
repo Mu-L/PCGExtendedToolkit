@@ -38,12 +38,9 @@ struct PCGEXSPATIALDOMAINS_API FPCGExSpatialChannelDefinition
  *
  * The single source of truth for the channel registry (which channels exist,
  * in what order -- order determines the bit index in the runtime
- * ChannelMask). Lives in the toolkit-level module so consumers other than
- * Valency can author and react to channels.
- *
- * The matrix-authoring side (channel-vs-channel response profiles, compile
- * to bitmask matrix) lands in D.2; this slice just owns the registry +
- * picker plumbing + footprint-key validation.
+ * ChannelMask) and the channel-vs-channel interaction matrix. Lives in the
+ * toolkit-level module so consumers other than Valency can author and react
+ * to channels.
  */
 UCLASS(Config = Editor, DefaultConfig, meta = (DisplayName = "PCGEx | Spatial Domains"))
 class PCGEXSPATIALDOMAINS_API UPCGExSpatialDomainsSettings : public UDeveloperSettings
@@ -126,9 +123,9 @@ private:
 
 	/**
 	 * Runtime-derived matrix. Plain C++ class (not USTRUCT) held by value;
-	 * the reflection system skips it entirely. Rebuilt on every settings
-	 * change; mutable so the const GetCompiledMatrix() accessor can return
-	 * a reference into the CDO.
+	 * the reflection system skips it entirely. Rebuilt from the non-const
+	 * settings lifecycle hooks (PostInitProperties / PostLoad /
+	 * PostEditChangeProperty); read-only at runtime via GetCompiledMatrix().
 	 */
-	mutable FPCGExChannelInteractionMatrix CompiledMatrix;
+	FPCGExChannelInteractionMatrix CompiledMatrix;
 };

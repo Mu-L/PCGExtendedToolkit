@@ -40,13 +40,7 @@ bool FPCGExSpatialDomain::Overlaps(
 	const FBox AABB = Candidate.GetWorldAABB();
 	if (!AABB.IsValid) { return false; }
 
-	const FVector Center = AABB.GetCenter();
-	const FVector Extents = AABB.GetExtent();
-	const PCGExMath::OBB::FOBB AABBasOBB(
-		PCGExMath::OBB::FBounds(Center, Extents, INDEX_NONE),
-		PCGExMath::OBB::FOrientation(FQuat::Identity));
-
-	return QueryOBB(AABBasOBB) <= 0.0f;
+	return QueryOBB(PCGExMath::OBB::Factory::FromAABB(AABB, INDEX_NONE)) <= 0.0f;
 }
 
 bool FPCGExSpatialDomain::OverlapsBeyondThreshold(

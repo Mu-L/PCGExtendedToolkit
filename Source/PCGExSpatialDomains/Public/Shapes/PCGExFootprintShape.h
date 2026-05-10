@@ -62,9 +62,8 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape
 	GENERATED_BODY()
 
 	// Out-of-line virtual destructor anchors the vtable in the cpp. UE pattern
-	// for _API-marked polymorphic USTRUCTs -- inline `= default` would risk
-	// no-emit when consuming modules need to reference the destructor symbol
-	// (the LNK2019 we hit during Phase A).
+	// for _API-marked polymorphic USTRUCTs -- inline `= default` risks no-emit
+	// when consuming modules need to reference the destructor symbol (LNK2019).
 	virtual ~FPCGExFootprintShape();
 
 	/**

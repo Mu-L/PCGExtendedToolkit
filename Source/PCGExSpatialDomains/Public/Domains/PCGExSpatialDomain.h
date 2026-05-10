@@ -119,27 +119,33 @@ public:
 	virtual bool IsMutable() const { return false; }
 
 	/**
-	 * Append a shape with its owner identity + channel mask. Default no-op
-	 * so generic callers degrade gracefully against unsupported domains;
-	 * static subclasses override with check(false) to fail loud.
+	 * Append a shape with its owner identity + channel mask. Pure virtual --
+	 * every concrete subclass implements (the mutable Broadphase actually
+	 * stores; static subclasses like Polygon2D / SDF check(false) loudly so
+	 * generic callers get a clear failure rather than a silent no-op).
 	 *
 	 * OwnerIndex must be >= 0 -- INDEX_NONE is the skip-nothing sentinel.
 	 *
 	 * ChannelMask is a bitmask over the project's channel registry (see
 	 * UPCGExSpatialDomainsSettings::SpatialChannels). Bit N set = the entry
-	 * participates in the channel at index N. 0 = no channel info (gracefully
-	 * degrades: queries run narrow phase regardless of matrix configuration).
-	 * Defaulted so call sites that don't care about channels keep compiling
-	 * unchanged; the broadphase ignores the mask at query time until the
-	 * matrix-consult slice (D.5) lands.
+	 * participates in the channel at index N. 0 = no channel info (the
+	 * broadphase's matrix-gate falls back to "always run narrow phase" --
+	 * preserves pre-channel behaviour for un-channeled entries).
 	 */
 	virtual int32 Append(
 		const FPCGExFootprintShape& Shape,
 		int32 OwnerIndex,
-		uint32 ChannelMask = 0)
-	{
-		return INDEX_NONE;
-	}
+		uint32 ChannelMask = 0) = 0;
+
+	/**
+	 * Hint the expected entry count so mutable subclasses can pre-size their
+	 * storage. Optional -- default no-op so static subclasses (Polygon2D, SDF)
+	 * inherit the empty implementation without having to opt out.
+	 *
+	 * Call once before a batched Append sequence when the count is known
+	 * (placement-op setup); calling mid-sequence is allowed but pointless.
+	 */
+	virtual void Reserve(int32 ExpectedCount) {}
 
 	// ========== Snapshot API ==========
 
