@@ -288,6 +288,40 @@ namespace PCGExMath::Geo
 		return false;
 	}
 
+	float SignedDistanceToPolygonPrism(
+		const FVector& LocalPoint,
+		TConstArrayView<FVector2D> Outline,
+		const float ZMin, const float ZMax)
+	{
+		const int32 N = Outline.Num();
+		if (N < 3) { return TNumericLimits<float>::Max(); }
+
+		const FVector2D P2D(LocalPoint.X, LocalPoint.Y);
+
+		// Single pass: closest-edge distance + winding-number inside test.
+		// Trailing-index idiom: j wraps via the prior iteration's i, no modulo.
+		float MinDistSq = TNumericLimits<float>::Max();
+		int32 Winding = 0;
+		for (int32 i = 0, j = N - 1; i < N; j = i, ++i)
+		{
+			const FVector2D& A = Outline[j];
+			const FVector2D& B = Outline[i];
+			MinDistSq = FMath::Min(MinDistSq, DistancePointToSegmentSquared2D(P2D, A, B));
+			const float Cross = (B.X - A.X) * (P2D.Y - A.Y) - (B.Y - A.Y) * (P2D.X - A.X);
+			if (A.Y <= P2D.Y && B.Y >  P2D.Y && Cross > 0.0f) { ++Winding; }
+			else if (A.Y >  P2D.Y && B.Y <= P2D.Y && Cross < 0.0f) { --Winding; }
+		}
+
+		const float DZ = FMath::Max(ZMin - LocalPoint.Z, LocalPoint.Z - ZMax);
+		if (Winding == 0 && DZ > 0.0f) { return FMath::Sqrt(MinDistSq + DZ * DZ); }
+
+		const float EdgeDist = FMath::Sqrt(MinDistSq);
+		const float D2D = (Winding != 0) ? -EdgeDist : EdgeDist;
+		if (D2D > 0.0f) { return D2D; }
+		if (DZ > 0.0f) { return DZ; }
+		return FMath::Max(D2D, DZ);
+	}
+
 	FBox ProjectPrismToWorldAABB(
 		TConstArrayView<FVector2D> Outline,
 		const float ZMin, const float ZMax,

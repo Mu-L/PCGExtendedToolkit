@@ -25,6 +25,7 @@ struct FPCGContext;
 struct FPCGMeshInstanceList;
 class UPCGBasePointData;
 class UPCGExSelectorFactoryData;
+class UPCGManagedActors;
 class UPCGParamData;
 class FPCGExEntryPickerOperation;
 class FPCGExMicroEntryPickerOperation;
@@ -76,6 +77,16 @@ namespace PCGExCollections
 	 */
 	PCGEXCOLLECTIONS_API
 	AActor* ResolveTargetActor(FPCGExContext* InContext, const FSoftObjectPath& InPath, TMap<FSoftObjectPath, TWeakObjectPtr<AActor>>& InOutCache);
+
+	/**
+	 * Applies PCG persistence semantics to a freshly-spawned actor:
+	 * tags with DefaultPCGActorTag, Modify()/MarkPackageDirty() the actor and its
+	 * level (skipped for preview/transient spawns), and registers with ManagedActors.
+	 * Shared by all spawn elements (SpawnActors, loose level actors) to ensure a
+	 * single consistent persistence path.
+	 */
+	PCGEXCOLLECTIONS_API
+	void FinalizeSpawnedActor(AActor* InActor, UPCGManagedActors* InManagedActors, bool bIsPreview);
 
 	class FSocketHelper;
 	/**
