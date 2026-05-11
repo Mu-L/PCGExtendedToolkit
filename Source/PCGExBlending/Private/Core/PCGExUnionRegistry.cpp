@@ -2,7 +2,7 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Core/PCGExUnionRegistry.h"
-
+#include "Data/PCGBasePointData.h"
 #include "Details/PCGExFuseDetails.h"
 #include "Math/PCGExMath.h"
 
