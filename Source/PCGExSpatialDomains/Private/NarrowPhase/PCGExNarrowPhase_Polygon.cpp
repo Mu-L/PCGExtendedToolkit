@@ -59,6 +59,15 @@ namespace PCGExSpatial::NarrowPhase
 			if (CandidateZMax < Stored.ZMin || CandidateZMin > Stored.ZMax) { return false; }
 			return PCGExMath::Geo::PolygonsOverlap2D(Stored.Outline, CandidateInStored);
 		}
+
+		float Polygon_QueryPoint(const FVector& Point, const FPCGExFootprintShape& Stored)
+		{
+			const FPCGExSpatialPolygonEntry& Entry = static_cast<const FPCGExFootprintShape_Polygon&>(Stored).Entry;
+			return PCGExMath::Geo::SignedDistanceToPolygonPrism(
+				Entry.ProjectionQuat.UnrotateVector(Point - Entry.WorldOrigin),
+				TConstArrayView<FVector2D>(Entry.Outline),
+				Entry.ZMin, Entry.ZMax);
+		}
 	}
 
 	void RegisterPolygonPairTests()
@@ -102,5 +111,9 @@ namespace PCGExSpatial::NarrowPhase
 			FPCGExFootprintShape_Polygon::StaticStruct(),
 			FPCGExFootprintShape_Polygon::StaticStruct(),
 			{ &PolygonVsPolygon_Overlap, /*Penetration*/ nullptr });
+
+		RegisterQueryPoint(
+			FPCGExFootprintShape_Polygon::StaticStruct(),
+			&Polygon_QueryPoint);
 	}
 }

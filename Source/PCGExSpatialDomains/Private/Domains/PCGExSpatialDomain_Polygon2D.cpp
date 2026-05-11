@@ -41,39 +41,12 @@ FPCGExSpatialDomain_Polygon2D FPCGExSpatialDomain_Polygon2D::MakeFromFPolyPath(
 
 float FPCGExSpatialDomain_Polygon2D::QueryPoint(const FVector& Point) const
 {
-	// Rotate world point into projection-frame local space. Outline is
-	// authored in projection-frame XY; the height band is along projection-
-	// frame Z. With Identity quat (default) UnrotateVector is a no-op and
-	// behavior collapses to the world-XY case.
-	const FVector LocalP = ProjectionQuat.UnrotateVector(Point);
-	const FVector2D P2D(LocalP.X, LocalP.Y);
-	const int32 N = Outline.Num();
-
-	// Single pass: closest-edge distance + winding-number inside test.
-	// See https://iquilezles.org/articles/distfunctions/ "extrusion"
-	float MinDistSq = TNumericLimits<float>::Max();
-	int32 Winding = 0;
-
-	// Trailing-index idiom: j wraps via the prior iteration's i, so we
-	// avoid a per-edge modulo without changing the (A,B) traversal order.
-	for (int32 i = 0, j = N - 1; i < N; j = i, ++i)
-	{
-		const FVector2D& A = Outline[j];
-		const FVector2D& B = Outline[i];
-		MinDistSq = FMath::Min(MinDistSq, PCGExMath::Geo::DistancePointToSegmentSquared2D(P2D, A, B));
-		const float Cross = (B.X - A.X) * (P2D.Y - A.Y) - (B.Y - A.Y) * (P2D.X - A.X);
-		if (A.Y <= P2D.Y && B.Y >  P2D.Y && Cross > 0.0f) { ++Winding; }
-		else if (A.Y >  P2D.Y && B.Y <= P2D.Y && Cross < 0.0f) { --Winding; }
-	}
-
-	const float EdgeDist = FMath::Sqrt(MinDistSq);
-	const float D2D = (Winding != 0) ? -EdgeDist : EdgeDist;
-	const float DZ = FMath::Max(ZMin - LocalP.Z, LocalP.Z - ZMax);
-
-	if (D2D > 0.0f && DZ > 0.0f) return FMath::Sqrt(MinDistSq + DZ * DZ);
-	if (D2D > 0.0f) return D2D;
-	if (DZ > 0.0f) return DZ;
-	return FMath::Max(D2D, DZ);
+	// No WorldOrigin: outline is already in projection-frame XY, so only the
+	// quaternion unrotation is needed to bring the world point into local space.
+	return PCGExMath::Geo::SignedDistanceToPolygonPrism(
+		ProjectionQuat.UnrotateVector(Point),
+		TConstArrayView<FVector2D>(Outline),
+		ZMin, ZMax);
 }
 
 int32 FPCGExSpatialDomain_Polygon2D::Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex, uint32 ChannelMask)

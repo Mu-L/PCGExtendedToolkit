@@ -41,6 +41,15 @@ namespace PCGExSpatial::NarrowPhase
 			TArray<TArray<FPairSlot>>             Matrix;
 			TMap<const UScriptStruct*, FShapeKindTag> StructToTag;
 			TArray<const UScriptStruct*>          TagToStruct;
+
+			/**
+			 * Single-axis table for signed-distance dispatch, indexed by
+			 * FShapeKindTag. Parallel to the pair-test Matrix but one-
+			 * dimensional -- QueryPoint takes a single stored shape, not a
+			 * pair. Grown alongside the matrix in EnsureMatrixSize so the
+			 * two stay in lockstep.
+			 */
+			TArray<FQueryPointFn> QueryPointFns;
 		};
 
 		FRegistryState& State()
@@ -52,9 +61,14 @@ namespace PCGExSpatial::NarrowPhase
 		void EnsureMatrixSize(int32 NumKinds)
 		{
 			FRegistryState& S = State();
-			if (S.Matrix.Num() >= NumKinds) { return; }
+			if (S.Matrix.Num() >= NumKinds)
+			{
+				if (S.QueryPointFns.Num() < NumKinds) { S.QueryPointFns.SetNumZeroed(NumKinds); }
+				return;
+			}
 			S.Matrix.SetNum(NumKinds);
 			for (TArray<FPairSlot>& Row : S.Matrix) { Row.SetNum(NumKinds); }
+			S.QueryPointFns.SetNumZeroed(NumKinds);
 		}
 	}
 
@@ -121,6 +135,42 @@ namespace PCGExSpatial::NarrowPhase
 		S.Matrix.Reset();
 		S.StructToTag.Reset();
 		S.TagToStruct.Reset();
+		S.QueryPointFns.Reset();
+	}
+
+	void RegisterQueryPoint(UScriptStruct* Struct, FQueryPointFn Fn)
+	{
+		if (!ensureMsgf(Struct, TEXT("PCGExSpatial::NarrowPhase::RegisterQueryPoint: null UScriptStruct*"))) { return; }
+		if (!ensureMsgf(Fn, TEXT("PCGExSpatial::NarrowPhase::RegisterQueryPoint: null FQueryPointFn for %s"), *Struct->GetName())) { return; }
+
+		const FShapeKindTag Tag = RegisterShapeKind(Struct);
+		FRegistryState& S = State();
+
+		if (S.QueryPointFns[Tag] != nullptr)
+		{
+			ensureMsgf(false,
+				TEXT("PCGExSpatial::NarrowPhase: duplicate QueryPoint registration for %s -- last write wins."),
+				*Struct->GetName());
+		}
+
+		S.QueryPointFns[Tag] = Fn;
+	}
+
+	float QueryPoint(FShapeKindTag StoredKind, const FVector& Point, const FPCGExFootprintShape& Stored)
+	{
+		const FRegistryState& S = State();
+		check(StoredKind >= 0 && StoredKind < S.QueryPointFns.Num());
+
+		const FQueryPointFn Fn = S.QueryPointFns[StoredKind];
+		if (!Fn) { return TNumericLimits<float>::Max(); }
+		return Fn(Point, Stored);
+	}
+
+	float QueryPoint(const FVector& Point, const FPCGExFootprintShape& Stored)
+	{
+		const FShapeKindTag Kind = FindShapeKindTag(Stored.GetScriptStruct());
+		if (Kind == InvalidKindTag) { return TNumericLimits<float>::Max(); }
+		return QueryPoint(Kind, Point, Stored);
 	}
 
 	bool TestOverlap(

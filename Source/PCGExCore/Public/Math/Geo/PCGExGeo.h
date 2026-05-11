@@ -165,6 +165,19 @@ namespace PCGExMath::Geo
 	}
 
 	/**
+	 * Signed distance from a pre-projected local-space point to an extruded polygon
+	 * prism (outline in local XY, extruded along local Z by [ZMin, ZMax]).
+	 * Negative inside, positive outside, zero on surface.
+	 * LocalPoint must already be in the prism's projection frame — the caller handles
+	 * the WorldOrigin offset and quaternion unrotation before calling.
+	 * Returns +MAX_float for degenerate outlines (< 3 vertices).
+	 */
+	PCGEXCORE_API float SignedDistanceToPolygonPrism(
+		const FVector& LocalPoint,
+		TConstArrayView<FVector2D> Outline,
+		float ZMin, float ZMax);
+
+	/**
 	 * World-space AABB of an extruded prism: a 2D outline (in projection-frame XY)
 	 * extruded along the projection-frame Z by [ZMin, ZMax], placed in world via
 	 * (WorldOrigin + ProjectionQuat). Computes the prism's local-space AABB-of-AABB

@@ -29,6 +29,18 @@ namespace PCGExSpatial::NarrowPhase
 	using FPairPenetrationFn = float (*)(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B);
 
 	/**
+	 * Single-shape signed-distance signature. Returns negative inside, positive
+	 * outside, zero on surface. Used by FPCGExSpatialDomain_Broadphase::QueryPoint
+	 * to walk stored entries and combine via min (CSG-union semantics), and by
+	 * placement conditions that need precise polygon / OBB distance against an
+	 * external constraint domain.
+	 *
+	 * Registered per stored kind (not per pair) -- the query takes a single
+	 * shape and a world-space point.
+	 */
+	using FQueryPointFn = float (*)(const FVector& Point, const FPCGExFootprintShape& Stored);
+
+	/**
 	 * Per-pair function bundle. Penetration is optional -- when null, the
 	 * registry's QueryPenetration() falls back to a binary "any overlap is
 	 * infinite penetration" semantic via Overlap.
@@ -118,4 +130,39 @@ namespace PCGExSpatial::NarrowPhase
 	PCGEXSPATIALDOMAINS_API float QueryPenetration(
 		const FPCGExFootprintShape& A,
 		const FPCGExFootprintShape& B);
+
+	/**
+	 * Register the signed-distance function for a stored shape kind. Auto-
+	 * registers the tag (no need to call RegisterShapeKind first). Calling
+	 * twice for the same kind is a programmer error: ensures in debug,
+	 * last-write-wins in shipping.
+	 *
+	 * Thread model: call from StartupModule; queries from any phase after
+	 * that are safe.
+	 */
+	PCGEXSPATIALDOMAINS_API void RegisterQueryPoint(
+		UScriptStruct* Struct,
+		FQueryPointFn Fn);
+
+	/**
+	 * Tag-dispatched signed-distance query. The hot path used by
+	 * FPCGExSpatialDomain_Broadphase::QueryPoint -- single table read +
+	 * one indirect call per stored entry. Returns +INFINITY for unregistered
+	 * kinds (the safe direction: "no info => maximally outside", which leaves
+	 * union/min combinations unaffected).
+	 *
+	 * Tag must be valid (>= 0 and bounded). Out-of-range tags trip a check.
+	 */
+	PCGEXSPATIALDOMAINS_API float QueryPoint(
+		FShapeKindTag StoredKind,
+		const FVector& Point,
+		const FPCGExFootprintShape& Stored);
+
+	/**
+	 * Convenience overload: tag resolved via GetScriptStruct(). Cold-path
+	 * use; returns +INFINITY when the stored kind has never been registered.
+	 */
+	PCGEXSPATIALDOMAINS_API float QueryPoint(
+		const FVector& Point,
+		const FPCGExFootprintShape& Stored);
 }

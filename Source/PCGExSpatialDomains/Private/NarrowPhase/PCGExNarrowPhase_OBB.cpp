@@ -33,6 +33,11 @@ namespace PCGExSpatial::NarrowPhase
 			const auto& OBB_B = static_cast<const FPCGExFootprintShape_OBB&>(B);
 			return PCGExMath::OBB::SATPenetrationDepth(OBB_A.Bounds, OBB_B.Bounds);
 		}
+
+		float OBB_QueryPoint(const FVector& Point, const FPCGExFootprintShape& Stored)
+		{
+			return PCGExMath::OBB::SignedDistance(static_cast<const FPCGExFootprintShape_OBB&>(Stored).Bounds, Point);
+		}
 	}
 
 	void RegisterOBBPairTests()
@@ -41,5 +46,9 @@ namespace PCGExSpatial::NarrowPhase
 			FPCGExFootprintShape_OBB::StaticStruct(),
 			FPCGExFootprintShape_OBB::StaticStruct(),
 			{ &OBBvsOBB_Overlap, &OBBvsOBB_Penetration });
+
+		RegisterQueryPoint(
+			FPCGExFootprintShape_OBB::StaticStruct(),
+			&OBB_QueryPoint);
 	}
 }

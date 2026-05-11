@@ -15,11 +15,35 @@ FPCGExSpatialDomain_Broadphase::FPCGExSpatialDomain_Broadphase()
 
 float FPCGExSpatialDomain_Broadphase::QueryPoint(const FVector& Point) const
 {
-	// Best-effort signed distance reduced to inside/outside indication.
-	// The broadphase's AABB lensing answers "is this point inside any
-	// stored AABB?" without per-shape signed-distance math. Per-shape
-	// distance lands when a placement condition needs the magnitude.
-	return BroadphaseAABBs.IsPointInside(Point) ? -1.0f : 1.0f;
+	// Union SDF: walk valid entries, dispatch per-shape signed distance via
+	// the narrow-phase QueryPoint registry, combine via min (CSG-union for
+	// "inside any entry"). Entries whose kind has no registered QueryPoint
+	// fn contribute +INFINITY -- safely ignored by the min.
+	//
+	// No broadphase pruning: the SDF magnitude across an entry's AABB is
+	// only loosely bounded by AABB distance, so an entry far from Point's
+	// AABB could still win the min if other entries are farther. A future
+	// optimization could maintain a "best so far" and skip entries whose
+	// AABB-to-point distance exceeds it -- but for the external-constraint
+	// use case (single-digit entries per channel typically) the walk is
+	// already cheap. Add the pruner if profiling demands.
+	if (NumValidEntries == 0) { return TNumericLimits<float>::Max(); }
+
+	float Best = TNumericLimits<float>::Max();
+	for (int32 i = 0; i < Entries.Num(); ++i)
+	{
+		if (!ValidMask[i]) { continue; }
+		const FEntry& E = Entries[i];
+		if (E.KindTag == PCGExSpatial::NarrowPhase::InvalidKindTag) { continue; }
+
+		const FPCGExFootprintShape* ShapePtr =
+			reinterpret_cast<const FPCGExFootprintShape*>(E.Shape.GetMemory());
+		if (!ShapePtr) { continue; }
+
+		const float D = PCGExSpatial::NarrowPhase::QueryPoint(E.KindTag, Point, *ShapePtr);
+		Best = FMath::Min(Best, D);
+	}
+	return Best;
 }
 
 bool FPCGExSpatialDomain_Broadphase::Overlaps(
