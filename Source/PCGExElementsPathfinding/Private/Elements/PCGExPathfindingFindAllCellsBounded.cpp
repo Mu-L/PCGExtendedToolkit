@@ -46,7 +46,7 @@ TArray<FPCGPinProperties> UPCGExFindAllCellsBoundedSettings::OutputPinProperties
 			if (OutputOutside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Normal) }
 			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Advanced) }
 		}
-		
+
 		if (Artifacts.bOutputCellBounds)
 		{
 			if (OutputInside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsInsideLabel, "Cell OBB bounds fully inside", Normal) }
@@ -376,8 +376,9 @@ namespace PCGExFindAllCellsBounded
 		{
 			if (!OutputCollection || Cells.IsEmpty()) { return; }
 
-			TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-				OutputCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			TSharedPtr<PCGExData::FPointIO> OBBPointIO = OutputCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			if (!OBBPointIO) { return; }
+			
 			OBBPointIO->Tags->Reset();
 			if (!TriageTag.IsEmpty()) { OBBPointIO->Tags->AddRaw(TriageTag); }
 			OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
