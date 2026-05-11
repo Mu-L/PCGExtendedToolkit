@@ -3,13 +3,15 @@
 
 #include "Helpers/PCGExCollectionsHelpers.h"
 
-
+#include "PCGManagedResource.h"
 #include "PCGParamData.h"
+#include "Helpers/PCGHelpers.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Engine/Level.h"
 #include "Selectors/PCGExSelectorClassic.h"
 #include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
@@ -40,6 +42,26 @@ namespace PCGExCollections
 		// BaseConfig.EntryDistribution stays default -- the Legacy EntryDistributionSettings
 		// lives on the consuming node and is plumbed through FMicroSelectorHelper separately.
 		return Factory;
+	}
+
+	void FinalizeSpawnedActor(AActor* InActor, UPCGManagedActors* InManagedActors, bool bIsPreview)
+	{
+		if (!InActor) { return; }
+
+		InActor->Tags.AddUnique(PCGHelpers::DefaultPCGActorTag);
+
+		if (!bIsPreview)
+		{
+			InActor->Modify();
+			(void)InActor->MarkPackageDirty();
+			if (ULevel* Level = InActor->GetLevel())
+			{
+				Level->Modify();
+				(void)Level->MarkPackageDirty();
+			}
+		}
+
+		if (InManagedActors) { InManagedActors->GetMutableGeneratedActors().Add(InActor); }
 	}
 
 	AActor* ResolveTargetActor(FPCGExContext* InContext, const FSoftObjectPath& InPath, TMap<FSoftObjectPath, TWeakObjectPtr<AActor>>& InOutCache)

@@ -529,8 +529,9 @@ namespace PCGExFindContoursBounded
 
 		if (Settings->Artifacts.bOutputCellBounds && BoundsCollection)
 		{
-			TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-				BoundsCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			TSharedPtr<PCGExData::FPointIO> OBBPointIO = BoundsCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			if (!OBBPointIO) { return; }
+			
 			OBBPointIO->Tags->Reset();
 			if (!TriageTag.IsEmpty()) { OBBPointIO->Tags->AddRaw(TriageTag); }
 			OBBPointIO->IOIndex = BatchIndex;
@@ -765,8 +766,9 @@ namespace PCGExFindContoursBounded
 		{
 			if (!OutputCollection || Cells.IsEmpty()) { return; }
 
-			TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-				OutputCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			TSharedPtr<PCGExData::FPointIO> OBBPointIO = OutputCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			if (!OBBPointIO) { return; }
+			
 			OBBPointIO->Tags->Reset();
 			if (!TriageTag.IsEmpty()) { OBBPointIO->Tags->AddRaw(TriageTag); }
 			OBBPointIO->IOIndex = BatchIndex;

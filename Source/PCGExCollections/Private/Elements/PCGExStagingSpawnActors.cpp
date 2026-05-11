@@ -368,31 +368,7 @@ namespace PCGExStagingSpawnActors
 			SpawnedActor->SetActorTransform(SpawnTransform);
 		}
 
-		// Persistence setup (skipped for preview/runtime-spawned actors which are
-		// intentionally transient). After FinishSpawning the actor is fully constructed
-		// and its outer/package chain is finalized, so it's safe to:
-		//  1. Tag with UE's standard PCG-generated marker
-		//  2. Modify() the actor (adds to transaction buffer AND dirties its package)
-		//  3. Explicitly dirty the owning level/package as belt-and-suspenders
-		// Without this, programmatic SpawnActor leaves the level package clean, so the
-		// editor's Save pipeline skips writing the .umap entirely -- spawned actors appear
-		// in-editor but vanish after restart. User-moved actors persist because the move
-		// triggers the editor's own Modify/MarkPackageDirty flow.
 		const bool bTransientSpawn = PCGHelpers::IsRuntimeOrPIE() || bIsPreviewActor;
-		if (!SpawnedActor->Tags.Contains(PCGHelpers::DefaultPCGActorTag))
-		{
-			SpawnedActor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
-		}
-		if (!bTransientSpawn)
-		{
-			SpawnedActor->Modify();
-			(void)SpawnedActor->MarkPackageDirty();
-			if (ULevel* ActorLevel = SpawnedActor->GetLevel())
-			{
-				ActorLevel->Modify();
-				(void)ActorLevel->MarkPackageDirty();
-			}
-		}
 
 		// UE-62747: SpawnActor doesn't properly apply scale from the spawn transform
 		SpawnedActor->SetActorRelativeScale3D(SpawnTransform.GetScale3D());
@@ -450,7 +426,7 @@ namespace PCGExStagingSpawnActors
 			MutableSourceComponent->AddToManagedResources(ManagedActors);
 		}
 
-		ManagedActors->GetMutableGeneratedActors().Add(SpawnedActor);
+		PCGExCollections::FinalizeSpawnedActor(SpawnedActor, ManagedActors, bTransientSpawn);
 
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::WriteActorRef);

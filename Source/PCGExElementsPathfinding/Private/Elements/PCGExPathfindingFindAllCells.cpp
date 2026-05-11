@@ -245,8 +245,9 @@ namespace PCGExFindAllCells
 
 				if (Settings->Artifacts.bOutputCellBounds)
 				{
-					TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-						Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+					TSharedPtr<PCGExData::FPointIO> OBBPointIO = Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+					if (!OBBPointIO) { return false; }
+
 					OBBPointIO->Tags->Reset();
 					OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 					PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
@@ -265,8 +266,9 @@ namespace PCGExFindAllCells
 
 		if (Settings->Artifacts.bOutputCellBounds)
 		{
-			TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-				Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			TSharedPtr<PCGExData::FPointIO> OBBPointIO = Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			if (!OBBPointIO) { return false; }
+			
 			OBBPointIO->Tags->Reset();
 			OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 			PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
