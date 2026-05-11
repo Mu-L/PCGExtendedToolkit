@@ -4,7 +4,9 @@
 #include "Paths/PCGExPolyPath.h"
 
 #include "Data/PCGSplineData.h"
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Data/PCGSplineStruct.h"
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Curve/CurveUtil.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"

@@ -5,7 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExTensorFactoryProvider.h"
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Data/PCGSplineStruct.h"
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Filters/Points/PCGExPolyPathFilterFactory.h"
 
 #include "PCGExTensorSplineFactoryProvider.generated.h"

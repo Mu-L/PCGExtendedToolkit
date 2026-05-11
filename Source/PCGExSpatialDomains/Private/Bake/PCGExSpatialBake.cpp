@@ -8,7 +8,9 @@
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGSplineData.h"
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Data/PCGSplineStruct.h"
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Math/PCGExBestFitPlane.h"
 #include "Math/PCGExProjectionDetails.h"
 #include "Math/Geo/PCGExGeo.h"
