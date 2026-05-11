@@ -1,11 +1,15 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "PCGExTensorFactoryProvider.h"
+
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Data/PCGSplineStruct.h"
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
+
 #include "Filters/Points/PCGExPolyPathFilterFactory.h"
 
 #include "PCGExTensorSplineFactoryProvider.generated.h"
