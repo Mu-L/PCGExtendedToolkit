@@ -3,9 +3,9 @@
 
 #pragma once
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
+#include "UObject/Object.h"
 
 #include "PCGExOctree.h"
 #include "Curves/CurveVector.h"
@@ -257,10 +257,25 @@ namespace PCGExTensor
 		virtual void PrepareSinglePoint(const int32 Index, const FTransform& InTransform, FPackedEffector& OutPackedEffector);
 
 	public:
-		FORCEINLINE const PCGExOctree::FItemOctree* GetOctree() const { return Octree.Get(); }
-		FORCEINLINE const FPackedEffector& GetPackedEffector(const int32 Index) const { return PackedEffectors[Index]; }
-		FORCEINLINE const FPackedEffector* GetPackedEffectorPtr(const int32 Index) const { return (PackedEffectors.GetData() + Index); }
-		FORCEINLINE const FQuat& GetRotation(const int32 Index) const { return Rotations[Index]; }
+		FORCEINLINE const PCGExOctree::FItemOctree* GetOctree() const
+		{
+			return Octree.Get();
+		}
+
+		FORCEINLINE const FPackedEffector& GetPackedEffector(const int32 Index) const
+		{
+			return PackedEffectors[Index];
+		}
+
+		FORCEINLINE const FPackedEffector* GetPackedEffectorPtr(const int32 Index) const
+		{
+			return (PackedEffectors.GetData() + Index);
+		}
+
+		FORCEINLINE const FQuat& GetRotation(const int32 Index) const
+		{
+			return Rotations[Index];
+		}
 	};
 
 	struct FTensorSample

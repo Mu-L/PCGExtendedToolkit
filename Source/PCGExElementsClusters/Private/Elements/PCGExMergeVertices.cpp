@@ -13,8 +13,15 @@
 
 #pragma region UPCGSettings interface
 
-PCGExData::EIOInit UPCGExMergeVerticesSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExMergeVerticesSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExMergeVerticesSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExMergeVerticesSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 #pragma endregion
 
@@ -29,7 +36,10 @@ void FPCGExMergeVerticesContext::ClusterProcessing_InitialProcessingDone()
 		PCGExClusterMT::TBatch<PCGExMergeVertices::FProcessor>* Batch = static_cast<PCGExClusterMT::TBatch<PCGExMergeVertices::FProcessor>*>(Batches[i].Get());
 		Merger->Append(Batch->VtxDataFacade->Source);
 
-		for (int Pi = 0; Pi < Batch->GetNumProcessors(); Pi++) { Batch->GetProcessor<PCGExMergeVertices::FProcessor>(Pi)->StartIndexOffset = StartOffset; }
+		for (int Pi = 0; Pi < Batch->GetNumProcessors(); Pi++)
+		{
+			Batch->GetProcessor<PCGExMergeVertices::FProcessor>(Pi)->StartIndexOffset = StartOffset;
+		}
 		StartOffset += Batch->VtxDataFacade->GetNum();
 	}
 
@@ -47,7 +57,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL(MergeVertices)
 
 bool FPCGExMergeVerticesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(MergeVertices)
 
@@ -69,10 +82,13 @@ bool FPCGExMergeVerticesElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bRequiresWriteStep = true;
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bRequiresWriteStep = true;
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -102,7 +118,10 @@ namespace PCGExMergeVertices
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExMergeVertices::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		Cluster->WillModifyVtxIO();
 

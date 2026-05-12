@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "Metadata/PCGMetadataCommon.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Metadata/PCGMetadataCommon.h"
 
 UENUM(BlueprintType)
 enum class EPCGExBlendingType : uint8

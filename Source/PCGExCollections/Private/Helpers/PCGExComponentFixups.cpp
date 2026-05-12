@@ -4,14 +4,14 @@
 #include "Helpers/PCGExComponentFixups.h"
 
 #include "PCGExVersion.h"
-#include "Helpers/PCGExActorPropertyDelta.h"
 #include "Components/SplineComponent.h"
+#include "Helpers/PCGExActorPropertyDelta.h"
 
 namespace PCGExComponentFixups
 {
 	namespace
 	{
-		static TArray<PCGExActorDelta::FPostApplyFixupHandle>& GetBuiltinHandles()
+		TArray<PCGExActorDelta::FPostApplyFixupHandle>& GetBuiltinHandles()
 		{
 			static TArray<PCGExActorDelta::FPostApplyFixupHandle> Instance;
 			return Instance;
@@ -43,16 +43,19 @@ namespace PCGExComponentFixups
 		 * Always call UpdateSpline() to rebuild the transient reparam table -- it's
 		 * CPF_Transient so the delta never includes it, and rendering/sampling depend on it.
 		 */
-		static void FixupSplineComponent(UActorComponent* Component, UObject* Archetype)
+		void FixupSplineComponent(UActorComponent* Component, UObject* Archetype)
 		{
 			USplineComponent* Spline = Cast<USplineComponent>(Component);
-			if (!Spline) { return; }
+			if (!Spline)
+			{
+				return;
+			}
 
 #if PCGEX_ENGINE_VERSION > 506
 			if (const USplineComponent* ArchSpline = Cast<USplineComponent>(Archetype))
 			{
 				PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS
-				
+
 				// FSpline::operator== returns false for two "disabled" FSplines (no LegacyData
 				// and no NewData) even when they are functionally equivalent -- the inner
 				// if-branches both skip and the function falls through to `return false`.
@@ -80,7 +83,7 @@ namespace PCGExComponentFixups
 					// sides from the new spline.
 					Spline->SetSpline(Spline->GetSpline());
 				}
-				
+
 				PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS
 			}
 #endif

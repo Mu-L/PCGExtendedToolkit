@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "Core/PCGExPointFilter.h"
 #include "Math/PCGExMath.h"
+#include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExNumericSelfCompareFilter.generated.h"
 
@@ -88,7 +88,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FNumericSelfCompareFilter(const TObjectPtr<const UPCGExNumericSelfCompareFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

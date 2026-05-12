@@ -34,22 +34,37 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(CopyToPoints)
 
 bool FPCGExCopyToPointsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(CopyToPoints)
 
 	Context->TargetsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExCommon::Labels::SourceTargetsLabel, false, true);
-	if (!Context->TargetsDataFacade) { return false; }
+	if (!Context->TargetsDataFacade)
+	{
+		return false;
+	}
 
 	PCGEX_FWD(TransformDetails)
-	if (!Context->TransformDetails.Init(Context, Context->TargetsDataFacade.ToSharedRef())) { return false; }
+	if (!Context->TransformDetails.Init(Context, Context->TargetsDataFacade.ToSharedRef()))
+	{
+		return false;
+	}
 
 	PCGEX_FWD(TargetsAttributesToCopyTags)
-	if (!Context->TargetsAttributesToCopyTags.Init(Context, Context->TargetsDataFacade)) { return false; }
+	if (!Context->TargetsAttributesToCopyTags.Init(Context, Context->TargetsDataFacade))
+	{
+		return false;
+	}
 
 	Context->DataMatcher = MakeShared<PCGExMatching::FDataMatcher>();
 	Context->DataMatcher->SetDetails(&Settings->DataMatching);
-	if (!Context->DataMatcher->Init(Context, {Context->TargetsDataFacade}, true)) { return false; }
+	if (!Context->DataMatcher->Init(Context, {Context->TargetsDataFacade}, true))
+	{
+		return false;
+	}
 
 
 	Context->TargetsForwardHandler = Settings->TargetsForwarding.GetHandler(Context->TargetsDataFacade);
@@ -67,7 +82,10 @@ bool FPCGExCopyToPointsElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -89,7 +107,10 @@ namespace PCGExCopyToPoints
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExCopyToPoints::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		MatchScope = PCGExMatching::FScope(Context->InitialMainPointsNum);
 
@@ -112,10 +133,16 @@ namespace PCGExCopyToPoints
 		{
 			Dupes[i] = nullptr;
 
-			if (!Context->DataMatcher->Test(Context->TargetsDataFacade->GetInPoint(i), AsCandidate, MatchScope)) { continue; }
+			if (!Context->DataMatcher->Test(Context->TargetsDataFacade->GetInPoint(i), AsCandidate, MatchScope))
+			{
+				continue;
+			}
 
 			TSharedPtr<PCGExData::FPointIO> Dupe = Context->MainPoints->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Duplicate);
-			if (!Dupe) { continue; }
+			if (!Dupe)
+			{
+				continue;
+			}
 
 			Copies++;
 			Context->TargetsForwardHandler->Forward(i, Dupe->GetOut()->Metadata);
@@ -125,7 +152,10 @@ namespace PCGExCopyToPoints
 			PCGEX_LAUNCH(PCGExFitting::Tasks::FTransformPointIO, i, Context->TargetsDataFacade->Source, Dupe, &Context->TransformDetails)
 		}
 
-		if (Copies > 0) { FPlatformAtomics::InterlockedAdd(&NumCopies, Copies); }
+		if (Copies > 0)
+		{
+			FPlatformAtomics::InterlockedAdd(&NumCopies, Copies);
+		}
 	}
 
 	void FProcessor::CompleteWork()

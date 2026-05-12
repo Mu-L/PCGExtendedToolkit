@@ -37,10 +37,16 @@ bool UPCGExBlendOpMonolithicFactory::CreateOperations(
 
 	for (const PCGExBlending::FBlendingParam& Param : Params)
 	{
-		if (Param.Blending == EPCGExABBlendingType::None) { continue; }
+		if (Param.Blending == EPCGExABBlendingType::None)
+		{
+			continue;
+		}
 
 		// Check supersede set
-		if (InSupersedeNames && InSupersedeNames->Contains(Param.Identifier.Name)) { continue; }
+		if (InSupersedeNames && InSupersedeNames->Contains(Param.Identifier.Name))
+		{
+			continue;
+		}
 
 		FPCGExAttributeBlendConfig OpConfig;
 		OpConfig.BlendMode = Param.Blending;
@@ -77,7 +83,10 @@ void UPCGExBlendOpMonolithicFactory::RegisterBuffersDependenciesForSourceB(FPCGE
 
 bool UPCGExBlendOpMonolithicFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	// Monolithic blending can consume any attribute that it blends
 	// We don't know the full list until runtime, so we don't register specific consumables

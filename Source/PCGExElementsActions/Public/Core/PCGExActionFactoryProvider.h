@@ -82,7 +82,11 @@ public:
 	UPROPERTY(meta=(PCG_NotOverridable))
 	TArray<TObjectPtr<const UPCGExPointFilterFactoryData>> FilterFactories;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Action; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Action;
+	}
+
 	virtual TSharedPtr<FPCGExActionOperation> CreateOperation(FPCGExContext* InContext) const;
 
 	virtual bool Boot(FPCGContext* InContext);
@@ -100,18 +104,30 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(ActionAbstract, "Action : Abstract", "Abstract Action Provider.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Action); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Action);
+	}
 #endif
 
 protected:
-	virtual bool GetRequiresFilters() const { return true; }
+	virtual bool GetRequiresFilters() const
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	//~End UPCGSettings
 
 	PCGEX_FACTORY_TYPE_ID(FPCGExDataTypeInfoAction)
 
 public:
-	virtual FName GetMainOutputPin() const override { return PCGExActions::Labels::OutputActionLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExActions::Labels::OutputActionLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 #if WITH_EDITOR

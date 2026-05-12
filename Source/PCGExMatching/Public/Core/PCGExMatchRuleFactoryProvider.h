@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExMatchingCommon.h"
-#include "Factories/PCGExFactoryProvider.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
 #include "Factories/PCGExOperation.h"
 
 #include "PCGExMatchRuleFactoryProvider.generated.h"
@@ -69,13 +69,22 @@ public:
 	virtual bool Test(const PCGExData::FConstPoint& InMatchableSourceElement, const FPCGExTaggedData& InCandidate, const PCGExMatching::FScope& InMatchingScope) const PCGEX_NOT_IMPLEMENTED_RET(Test, false);
 
 	/** Whether this rule type supports recursive/transitive matching */
-	virtual bool SupportsRecursion() const { return false; }
+	virtual bool SupportsRecursion() const
+	{
+		return false;
+	}
 
 	/** Whether recursion is both supported AND enabled in config */
-	virtual bool WantsRecursion() const { return false; }
+	virtual bool WantsRecursion() const
+	{
+		return false;
+	}
 
 	/** Maximum recursion depth (-1 = unlimited). Only meaningful if WantsRecursion() returns true. */
-	virtual int32 GetMaxRecursionDepth() const { return -1; }
+	virtual int32 GetMaxRecursionDepth() const
+	{
+		return -1;
+	}
 
 protected:
 	TSharedPtr<TArray<FPCGExTaggedData>> MatchableSources;
@@ -98,9 +107,16 @@ public:
 
 	FPCGExMatchRuleConfigBase BaseConfig;
 
-	virtual bool WantsPoints() { return false; }
+	virtual bool WantsPoints()
+	{
+		return false;
+	}
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::MatchRule; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::MatchRule;
+	}
+
 	virtual TSharedPtr<FPCGExMatchRuleOperation> CreateOperation(FPCGExContext* InContext) const;
 };
 
@@ -116,11 +132,23 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(MatchRule, "Match Rule Definition", "Creates a single match rule node, to be used with nodes that support data matching.")
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::ControlFlow; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MatchRule); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::ControlFlow;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MatchRule);
+	}
 #endif
 	//~End UPCGSettings
 
-	virtual FName GetMainOutputPin() const override { return PCGExMatching::Labels::OutputMatchRuleLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExMatching::Labels::OutputMatchRuleLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 };

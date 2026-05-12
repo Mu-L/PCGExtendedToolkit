@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExPropertyWriter.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
-#include "PCGExPropertyWriter.h"
 #include "PCGExAssetCollectionToSet.generated.h"
 
 class UPCGExAssetCollection;
@@ -58,8 +58,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(AssetCollectionToSet, "Asset Collection to Set", "Converts an asset collection to an attribute set.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; }
-	virtual bool CanDynamicallyTrackKeys() const override { return true; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	}
+
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 #endif
 
 protected:

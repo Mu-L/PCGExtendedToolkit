@@ -13,7 +13,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigHeuristicsThreshold, Threshold, 
 
 bool FPCGExFillControlHeuristicsThreshold::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryHxThreshold* TypedFactory = Cast<UPCGExFillControlsFactoryHxThreshold>(Factory);
 
@@ -23,7 +26,10 @@ bool FPCGExFillControlHeuristicsThreshold::PrepareForDiffusions(FPCGExContext* I
 
 	// Initialize threshold setting value
 	Threshold = TypedFactory->Config.GetValueSettingThreshold();
-	if (!Threshold->Init(GetSourceFacade())) { return false; }
+	if (!Threshold->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	if (TypedFactory->HeuristicsFactories.IsEmpty())
 	{
@@ -47,7 +53,10 @@ bool FPCGExFillControlHeuristicsThreshold::PrepareForDiffusions(FPCGExContext* I
 
 void FPCGExFillControlHeuristicsThreshold::ScoreCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, PCGExFloodFill::FCandidate& OutCandidate)
 {
-	if (!HeuristicsHandler) { return; }
+	if (!HeuristicsHandler)
+	{
+		return;
+	}
 
 	const PCGExClusters::FNode& FromNode = *From.Node;
 	const PCGExClusters::FNode& ToNode = *OutCandidate.Node;

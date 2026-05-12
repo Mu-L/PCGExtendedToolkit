@@ -3,10 +3,10 @@
 
 #include "Elements/Filtering/PCGExUberFilterCascade.h"
 
-#include "Data/PCGExData.h"
-#include "Core/PCGExPointFilter.h"
-#include "Data/PCGExPointIO.h"
 #include "Containers/PCGExScopedContainers.h"
+#include "Core/PCGExPointFilter.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExPointArrayDataHelpers.h"
 
@@ -37,12 +37,18 @@ bool UPCGExUberFilterCascadeSettings::IsPinUsedByNodeExecution(const UPCGPin* In
 {
 	for (const FName& Label : InputLabels)
 	{
-		if (InPin->Properties.Label == Label) { return InPin->EdgeCount() > 0; }
+		if (InPin->Properties.Label == Label)
+		{
+			return InPin->EdgeCount() > 0;
+		}
 	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
-bool UPCGExUberFilterCascadeSettings::HasDynamicPins() const { return true; }
+bool UPCGExUberFilterCascadeSettings::HasDynamicPins() const
+{
+	return true;
+}
 
 TArray<FPCGPinProperties> UPCGExUberFilterCascadeSettings::InputPinProperties() const
 {
@@ -84,7 +90,10 @@ FName UPCGExUberFilterCascadeSettings::GetMainOutputPin() const
 
 bool FPCGExUberFilterCascadeElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(UberFilterCascade)
 
@@ -125,7 +134,10 @@ bool FPCGExUberFilterCascadeElement::AdvanceWork(FPCGExContext* InContext, const
 		Context->DefaultOutput->Pairs.Init(nullptr, Context->NumPairs);
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -148,7 +160,10 @@ bool FPCGExUberFilterCascadeElement::AdvanceWork(FPCGExContext* InContext, const
 
 	if (Settings->bOutputDiscardedElements)
 	{
-		if (!Context->DefaultOutput->StageOutputs()) { Mask |= 1ULL << 0; }
+		if (!Context->DefaultOutput->StageOutputs())
+		{
+			Mask |= 1ULL << 0;
+		}
 	}
 	else
 	{
@@ -157,7 +172,10 @@ bool FPCGExUberFilterCascadeElement::AdvanceWork(FPCGExContext* InContext, const
 
 	for (int i = 0; i < Settings->NumBranches; i++)
 	{
-		if (!Context->BranchOutputs[i]->StageOutputs()) { Mask |= 1ULL << (i + 1); }
+		if (!Context->BranchOutputs[i]->StageOutputs())
+		{
+			Mask |= 1ULL << (i + 1);
+		}
 	}
 
 	return Context->TryComplete();
@@ -179,7 +197,10 @@ namespace PCGExUberFilterCascade
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::NoInit)
 
@@ -257,7 +278,10 @@ namespace PCGExUberFilterCascade
 	{
 		TSharedPtr<PCGExData::FPointIO> NewPointIO = PCGExData::NewPointIO(PointDataFacade->Source, InCollection->OutputPin);
 
-		if (!NewPointIO->InitializeOutput(InitMode)) { return nullptr; }
+		if (!NewPointIO->InitializeOutput(InitMode))
+		{
+			return nullptr;
+		}
 
 		InCollection->Pairs[BatchIndex] = NewPointIO;
 		return NewPointIO;
@@ -287,7 +311,10 @@ namespace PCGExUberFilterCascade
 			// All points in one bucket -- Forward (zero-copy)
 			if (SingleBucket == DefaultIdx)
 			{
-				if (!Settings->bOutputDiscardedElements) { return; }
+				if (!Settings->bOutputDiscardedElements)
+				{
+					return;
+				}
 				(void)CreateIO(Context->DefaultOutput.ToSharedRef(), PCGExData::EIOInit::Forward);
 			}
 			else
@@ -300,13 +327,19 @@ namespace PCGExUberFilterCascade
 		// Mixed distribution -- create new outputs per bucket
 		for (int32 i = 0; i < NumBranches; i++)
 		{
-			if (BranchCounts[i] <= 0) { continue; }
+			if (BranchCounts[i] <= 0)
+			{
+				continue;
+			}
 
 			TArray<int32> ReadIndices;
 			BranchIndices[i]->Collapse(ReadIndices);
 
 			TSharedPtr<PCGExData::FPointIO> BranchIO = CreateIO(Context->BranchOutputs[i].ToSharedRef(), PCGExData::EIOInit::New);
-			if (!BranchIO) { continue; }
+			if (!BranchIO)
+			{
+				continue;
+			}
 
 			PCGExPointArrayDataHelpers::SetNumPointsAllocated(BranchIO->GetOut(), ReadIndices.Num(), BranchIO->GetAllocations());
 			BranchIO->InheritProperties(ReadIndices, BranchIO->GetAllocations());
@@ -319,7 +352,10 @@ namespace PCGExUberFilterCascade
 			BranchIndices[DefaultIdx]->Collapse(ReadIndices);
 
 			TSharedPtr<PCGExData::FPointIO> DefaultIO = CreateIO(Context->DefaultOutput.ToSharedRef(), PCGExData::EIOInit::New);
-			if (!DefaultIO) { return; }
+			if (!DefaultIO)
+			{
+				return;
+			}
 
 			PCGExPointArrayDataHelpers::SetNumPointsAllocated(DefaultIO->GetOut(), ReadIndices.Num(), DefaultIO->GetAllocations());
 			DefaultIO->InheritProperties(ReadIndices, DefaultIO->GetAllocations());

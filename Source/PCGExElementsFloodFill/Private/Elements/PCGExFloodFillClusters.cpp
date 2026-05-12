@@ -4,17 +4,17 @@
 #include "Elements/PCGExFloodFillClusters.h"
 
 
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
-#include "Details/PCGExBlendingDetails.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
 #include "Core/PCGExBlendOpsManager.h"
-#include "Core/PCGExHeuristicsFactoryProvider.h"
-#include "Data/Utils/PCGExDataForward.h"
-#include "Core/PCGExFloodFill.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
+#include "Core/PCGExFloodFill.h"
+#include "Core/PCGExHeuristicsFactoryProvider.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataForward.h"
+#include "Details/PCGExBlendingDetails.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
 
@@ -27,8 +27,15 @@ UPCGExClusterDiffusionSettings::UPCGExClusterDiffusionSettings(const FObjectInit
 	SeedForwarding.bPreservePCGExData = true;
 }
 
-PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetMainOutputInitMode() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
-PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetMainOutputInitMode() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
+
+PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 TArray<FPCGPinProperties> UPCGExClusterDiffusionSettings::InputPinProperties() const
 {
@@ -59,7 +66,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ClusterDiffusion)
 
 bool FPCGExClusterDiffusionElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ClusterDiffusion)
 	PCGEX_FOREACH_FIELD_CLUSTER_DIFF(PCGEX_OUTPUT_VALIDATE_NAME)
@@ -79,12 +89,18 @@ bool FPCGExClusterDiffusionElement::Boot(FPCGExContext* InContext) const
 	}
 
 	Context->SeedsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExCommon::Labels::SourceSeedsLabel, false, true);
-	if (!Context->SeedsDataFacade) { return false; }
+	if (!Context->SeedsDataFacade)
+	{
+		return false;
+	}
 
 	if (Settings->PathOutput != EPCGExFloodFillPathOutput::None)
 	{
 		PCGEX_FWD(SeedAttributesToPathTags)
-		if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade)) { return false; }
+		if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade))
+		{
+			return false;
+		}
 
 		Context->Paths = MakeShared<PCGExData::FPointIOCollection>(Context);
 		Context->Paths->OutputPin = PCGExPaths::Labels::OutputPathsLabel;
@@ -105,10 +121,13 @@ bool FPCGExClusterDiffusionElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bRequiresWriteStep = true;
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bRequiresWriteStep = true;
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -117,7 +136,10 @@ bool FPCGExClusterDiffusionElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_CLUSTER_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
 	Context->OutputPointsAndEdges();
-	if (Context->Paths) { Context->Paths->StageOutputs(); }
+	if (Context->Paths)
+	{
+		Context->Paths->StageOutputs();
+	}
 
 	return Context->TryComplete();
 }
@@ -132,7 +154,10 @@ namespace PCGExClusterDiffusion
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExClusterDiffusion::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		FillControlsHandler = MakeShared<PCGExFloodFill::FFillControlsHandler>(Context, Cluster, VtxDataFacade, EdgeDataFacade, Context->SeedsDataFacade, Context->FillControlFactories);
 
@@ -154,7 +179,10 @@ namespace PCGExClusterDiffusion
 			This->InitialDiffusions = MakeShared<PCGExMT::TScopedArray<TSharedPtr<PCGExFloodFill::FDiffusion>>>(Loops);
 		};
 
-		if (Settings->bUseOctreeSearch) { Cluster->RebuildOctree(Settings->Seeds.SeedPicking.PickingMethod); }
+		if (Settings->bUseOctreeSearch)
+		{
+			Cluster->RebuildOctree(Settings->Seeds.SeedPicking.PickingMethod);
+		}
 
 		DiffusionInitialization->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
@@ -168,10 +196,16 @@ namespace PCGExClusterDiffusion
 				FVector SeedLocation = SeedTransforms[Index].GetLocation();
 				const int32 ClosestIndex = This->Cluster->FindClosestNode(SeedLocation, This->Settings->Seeds.SeedPicking.PickingMethod);
 
-				if (ClosestIndex < 0) { continue; }
+				if (ClosestIndex < 0)
+				{
+					continue;
+				}
 
 				const PCGExClusters::FNode* SeedNode = &Nodes[ClosestIndex];
-				if (!This->Settings->Seeds.SeedPicking.WithinDistance(This->Cluster->GetPos(SeedNode), SeedLocation) || FPlatformAtomics::InterlockedCompareExchange(&This->Seeded[ClosestIndex], 1, 0) == 1) { continue; }
+				if (!This->Settings->Seeds.SeedPicking.WithinDistance(This->Cluster->GetPos(SeedNode), SeedLocation) || FPlatformAtomics::InterlockedCompareExchange(&This->Seeded[ClosestIndex], 1, 0) == 1)
+				{
+					continue;
+				}
 
 				TSharedPtr<PCGExFloodFill::FDiffusion> NewDiffusion = MakeShared<PCGExFloodFill::FDiffusion>(This->FillControlsHandler, This->Cluster, SeedNode);
 				NewDiffusion->Index = Index;
@@ -179,7 +213,10 @@ namespace PCGExClusterDiffusion
 			}
 		};
 
-		if (Context->SeedsDataFacade->GetNum() <= 0) { return false; }
+		if (Context->SeedsDataFacade->GetNum() <= 0)
+		{
+			return false;
+		}
 
 		DiffusionInitialization->StartSubLoops(Context->SeedsDataFacade->GetNum(), PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize);
 
@@ -226,7 +263,10 @@ namespace PCGExClusterDiffusion
 
 	void FProcessor::Grow()
 	{
-		if (OngoingDiffusions.IsEmpty()) { return; }
+		if (OngoingDiffusions.IsEmpty())
+		{
+			return;
+		}
 
 		if (Settings->Processing == EPCGExFloodFillProcessing::Parallel)
 		{
@@ -237,7 +277,10 @@ namespace PCGExClusterDiffusion
 
 		// Grow one entirely
 		TSharedPtr<PCGExFloodFill::FDiffusion> Diffusion = OngoingDiffusions.Pop();
-		while (!Diffusion->bStopped) { Diffusion->Grow(); }
+		while (!Diffusion->bStopped)
+		{
+			Diffusion->Grow();
+		}
 
 		Diffusions.Add(Diffusion);
 
@@ -250,7 +293,10 @@ namespace PCGExClusterDiffusion
 		{
 			const TSharedPtr<PCGExFloodFill::FDiffusion> Diffusion = OngoingDiffusions[Index];
 			const int32 CurrentFillRate = FillRate->Read(Diffusion->GetSettingsIndex(Settings->Diffusion.FillRateSource));
-			for (int i = 0; i < CurrentFillRate; i++) { Diffusion->Grow(); }
+			for (int i = 0; i < CurrentFillRate; i++)
+			{
+				Diffusion->Grow();
+			}
 		}
 	}
 
@@ -264,13 +310,22 @@ namespace PCGExClusterDiffusion
 		for (int32 i = 0; i < OngoingNum; i++)
 		{
 			const TSharedPtr<PCGExFloodFill::FDiffusion> Diff = OngoingDiffusions[i];
-			if (Diff->bStopped) { Diffusions.Add(Diff); }
-			else { OngoingDiffusions[WriteIndex++] = Diff; }
+			if (Diff->bStopped)
+			{
+				Diffusions.Add(Diff);
+			}
+			else
+			{
+				OngoingDiffusions[WriteIndex++] = Diff;
+			}
 		}
 
 		OngoingDiffusions.SetNum(WriteIndex);
 
-		if (OngoingDiffusions.IsEmpty()) { return; }
+		if (OngoingDiffusions.IsEmpty())
+		{
+			return;
+		}
 
 		Grow();
 	}
@@ -323,14 +378,20 @@ namespace PCGExClusterDiffusion
 
 				PCGEX_OUTPUT_VALUE(DiffusionDepth, TargetIndex, Candidate.Depth);
 				PCGEX_OUTPUT_VALUE(NormalizedDiffusionDepth, TargetIndex, Diffusion->GetMaxDepth() > 0 ? static_cast<double>(Candidate.Depth) / static_cast<double>(Diffusion->GetMaxDepth()) : 0.0);
-				if (DiffusionDepths) { (*DiffusionDepths)[TargetIndex] = Candidate.Depth; }
+				if (DiffusionDepths)
+				{
+					(*DiffusionDepths)[TargetIndex] = Candidate.Depth;
+				}
 				PCGEX_OUTPUT_VALUE(DiffusionDistance, TargetIndex, Candidate.PathDistance);
 				PCGEX_OUTPUT_VALUE(DiffusionOrder, TargetIndex, i);
 				PCGEX_OUTPUT_VALUE(DiffusionEnding, TargetIndex, Diffusion->Endpoints.Contains(Candidate.CaptureIndex));
 			}
 
 			// Forward seed values to diffusion
-			if (Diffusion->SeedIndex != -1) { Context->SeedForwardHandler->Forward(Diffusion->SeedIndex, VtxDataFacade, Indices); }
+			if (Diffusion->SeedIndex != -1)
+			{
+				Context->SeedForwardHandler->Forward(Diffusion->SeedIndex, VtxDataFacade, Indices);
+			}
 		}
 
 		// Diffusion->Captured.Empty(); // We need it for paths, TODO : turn diff data into shared vtx arrays on the batch instead.
@@ -350,8 +411,8 @@ namespace PCGExClusterDiffusion
 		PathWriter = MakeShared<PCGExFloodFill::FDiffusionPathWriter>(Cluster.ToSharedRef(), VtxDataFacade, Context->Paths.ToSharedRef(), TaskManager, DiffusionDepths);
 
 		const FName NormPathDepthName = Settings->bWriteNormalizedPathDepth && Settings->PathOutput != EPCGExFloodFillPathOutput::None
-			                                ? Settings->NormalizedPathDepthAttributeName
-			                                : NAME_None;
+			? Settings->NormalizedPathDepthAttributeName
+			: NAME_None;
 		const EPCGExFloodFillNormalizedPathDepthMode NormPathDepthMode = Settings->NormalizedPathDepthMode;
 
 		if (Settings->PathOutput == EPCGExFloodFillPathOutput::Full)
@@ -397,14 +458,53 @@ namespace PCGExClusterDiffusion
 
 			switch (SortOver)
 			{
-			case EPCGExFloodFillPathPartitions::Length: if (SortOrder == EPCGExSortDirection::Ascending) { Endpoints.Sort([&](const int32 A, const int32 B) { return Captured[A].PathDistance < Captured[B].PathDistance; }); }
-				else { Endpoints.Sort([&](const int32 A, const int32 B) { return Captured[A].PathDistance > Captured[B].PathDistance; }); }
+			case EPCGExFloodFillPathPartitions::Length:
+				if (SortOrder == EPCGExSortDirection::Ascending)
+				{
+					Endpoints.Sort([&](const int32 A, const int32 B)
+					{
+						return Captured[A].PathDistance < Captured[B].PathDistance;
+					});
+				}
+				else
+				{
+					Endpoints.Sort([&](const int32 A, const int32 B)
+					{
+						return Captured[A].PathDistance > Captured[B].PathDistance;
+					});
+				}
 				break;
-			case EPCGExFloodFillPathPartitions::Score: if (SortOrder == EPCGExSortDirection::Ascending) { Endpoints.Sort([&](const int32 A, const int32 B) { return Captured[A].PathScore < Captured[B].PathScore; }); }
-				else { Endpoints.Sort([&](const int32 A, const int32 B) { return Captured[A].PathScore > Captured[B].PathScore; }); }
+			case EPCGExFloodFillPathPartitions::Score:
+				if (SortOrder == EPCGExSortDirection::Ascending)
+				{
+					Endpoints.Sort([&](const int32 A, const int32 B)
+					{
+						return Captured[A].PathScore < Captured[B].PathScore;
+					});
+				}
+				else
+				{
+					Endpoints.Sort([&](const int32 A, const int32 B)
+					{
+						return Captured[A].PathScore > Captured[B].PathScore;
+					});
+				}
 				break;
-			case EPCGExFloodFillPathPartitions::Depth: if (SortOrder == EPCGExSortDirection::Ascending) { Endpoints.Sort([&](const int32 A, const int32 B) { return Captured[A].Depth < Captured[B].Depth; }); }
-				else { Endpoints.Sort([&](const int32 A, const int32 B) { return Captured[A].Depth > Captured[B].Depth; }); }
+			case EPCGExFloodFillPathPartitions::Depth:
+				if (SortOrder == EPCGExSortDirection::Ascending)
+				{
+					Endpoints.Sort([&](const int32 A, const int32 B)
+					{
+						return Captured[A].Depth < Captured[B].Depth;
+					});
+				}
+				else
+				{
+					Endpoints.Sort([&](const int32 A, const int32 B)
+					{
+						return Captured[A].Depth > Captured[B].Depth;
+					});
+				}
 				break;
 			}
 
@@ -444,7 +544,10 @@ namespace PCGExClusterDiffusion
 						bool bIsAlreadyVisited = false;
 						Visited.Add(PathPointIndex, &bIsAlreadyVisited);
 
-						if (bIsAlreadyVisited) { PathNodeIndex = -1; }
+						if (bIsAlreadyVisited)
+						{
+							PathNodeIndex = -1;
+						}
 					}
 				}
 
@@ -574,14 +677,20 @@ namespace PCGExClusterDiffusion
 		FillRate = PCGExDetails::MakeSettingValue<int32>(Settings->Diffusion.FillRateInput, Settings->Diffusion.FillRateAttribute, Settings->Diffusion.FillRateConstant);
 		bIsBatchValid = FillRate->Init(Settings->Diffusion.FillRateSource == EPCGExFloodFillSettingSource::Seed ? Context->SeedsDataFacade : VtxDataFacade);
 
-		if (!bIsBatchValid) { return; } // Fail
+		if (!bIsBatchValid)
+		{
+			return;
+		} // Fail
 
 		TBatch<FProcessor>::Process();
 	}
 
 	bool FBatch::PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor)
 	{
-		if (!TBatch<FProcessor>::PrepareSingle(InProcessor)) { return false; }
+		if (!TBatch<FProcessor>::PrepareSingle(InProcessor))
+		{
+			return false;
+		}
 
 		PCGEX_TYPED_PROCESSOR
 

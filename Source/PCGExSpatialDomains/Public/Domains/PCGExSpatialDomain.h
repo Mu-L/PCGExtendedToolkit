@@ -36,7 +36,10 @@ public:
 	virtual ~FPCGExSpatialDomain();
 
 	/** Shared no-op skip predicate -- the default for Overlaps* family calls. */
-	static bool NoSkip(int32) { return false; }
+	static bool NoSkip(int32)
+	{
+		return false;
+	}
 
 	// ========== Query API ==========
 
@@ -116,7 +119,10 @@ public:
 	 * subclasses (Polygon2D, SDF, ...) return false; the placed-modules
 	 * tracker (Broadphase) returns true.
 	 */
-	virtual bool IsMutable() const { return false; }
+	virtual bool IsMutable() const
+	{
+		return false;
+	}
 
 	/**
 	 * Append a shape with its owner identity + channel mask. Pure virtual --
@@ -145,7 +151,9 @@ public:
 	 * Call once before a batched Append sequence when the count is known
 	 * (placement-op setup); calling mid-sequence is allowed but pointless.
 	 */
-	virtual void Reserve(int32 ExpectedCount) {}
+	virtual void Reserve(int32 ExpectedCount)
+	{
+	}
 
 	// ========== Snapshot API ==========
 
@@ -156,6 +164,12 @@ public:
 	 */
 	using FSnapshotHandle = int32;
 
-	virtual FSnapshotHandle BeginSnapshotScope() { return 0; }
-	virtual void RollbackToScope(FSnapshotHandle Handle) {}
+	virtual FSnapshotHandle BeginSnapshotScope()
+	{
+		return 0;
+	}
+
+	virtual void RollbackToScope(FSnapshotHandle Handle)
+	{
+	}
 };

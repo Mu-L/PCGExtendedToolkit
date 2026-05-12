@@ -8,14 +8,14 @@
 *******************************************************************************/
 
 #include "Clipper2Lib/clipper.engine.h"
-#include "Clipper2Lib/clipper.h"
 #include <stdexcept>
+#include "Clipper2Lib/clipper.h"
 
 // https://github.com/AngusJohnson/Clipper2/discussions/334
 // #discussioncomment-4248602
 #if defined(_MSC_VER) && ( defined(_M_AMD64) || defined(_M_X64) )
-#include <xmmintrin.h>
 #include <emmintrin.h>
+#include <xmmintrin.h>
 #define fmin(a,b) _mm_cvtsd_f64(_mm_min_sd(_mm_set_sd(a),_mm_set_sd(b)))
 #define fmax(a,b) _mm_cvtsd_f64(_mm_max_sd(_mm_set_sd(a),_mm_set_sd(b)))
 #define nearbyint(a) _mm_cvtsd_si64(_mm_set_sd(a)) /* Note: expression type is (int64_t) */
@@ -728,7 +728,8 @@ namespace PCGExClipper2Lib
 				}
 				pip = PointInPolygonResult::IsInside;
 				break;
-			default: break;
+			default:
+				break;
 			}
 			op = op->next;
 		}
@@ -1221,7 +1222,8 @@ namespace PCGExClipper2Lib
 			return !result;
 			break;
 
-		case ClipType::Xor: return true;
+		case ClipType::Xor:
+			return true;
 			break;
 		// Should never happen, but adding this to stop a compiler warning
 		default:
@@ -1251,9 +1253,12 @@ namespace PCGExClipper2Lib
 
 		switch (cliptype_)
 		{
-		case ClipType::Intersection: return is_in_clip;
-		case ClipType::Union: return (!is_in_subj && !is_in_clip);
-		default: return !is_in_clip;
+		case ClipType::Intersection:
+			return is_in_clip;
+		case ClipType::Union:
+			return (!is_in_subj && !is_in_clip);
+		default:
+			return !is_in_clip;
 		}
 	}
 
@@ -2710,7 +2715,10 @@ namespace PCGExClipper2Lib
 	{
 		auto j = std::count_if(horz_seg_list_.begin(),
 		                       horz_seg_list_.end(),
-		                       [](HorzSegment& hs) { return UpdateHorzSegment(hs); });
+		                       [](HorzSegment& hs)
+		                       {
+			                       return UpdateHorzSegment(hs);
+		                       });
 		if (j < 2)
 		{
 			return;

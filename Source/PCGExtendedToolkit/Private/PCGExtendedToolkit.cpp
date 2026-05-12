@@ -2,14 +2,14 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "PCGExtendedToolkit.h"
-#include "PCGExVersion.h"
 #include "PCGExSubModules.generated.h"
+#include "PCGExVersion.h"
 
 #if WITH_EDITOR
 #include "PCGExCoreSettingsCache.h"
-#include "UObject/ICookInfo.h"
-#include "Engine/AssetManagerTypes.h"
 #include "Engine/AssetManager.h"
+#include "Engine/AssetManagerTypes.h"
+#include "UObject/ICookInfo.h"
 #endif
 
 #include "PCGExGlobalSettings.h"
@@ -40,7 +40,7 @@ void FPCGExtendedToolkitModule::StartupModule()
 				InOutPackageCookRules.Emplace(Asset.PackageName, Instigator, UE::Cook::EPackageCookRule::AddToCook);
 			}
 		}
-	);
+		);
 
 #endif
 
@@ -50,12 +50,18 @@ void FPCGExtendedToolkitModule::StartupModule()
 	// Recursive loader
 	TFunction<void(const FString&)> LoadWithDeps = [&](const FString& ModuleName)
 	{
-		if (Loaded.Contains(ModuleName)) { return; }
+		if (Loaded.Contains(ModuleName))
+		{
+			return;
+		}
 
 		// Load dependencies first
 		if (const TArray<FString>* Deps = Dependencies.Find(ModuleName))
 		{
-			for (const FString& Dep : *Deps) { LoadWithDeps(Dep); }
+			for (const FString& Dep : *Deps)
+			{
+				LoadWithDeps(Dep);
+			}
 		}
 
 		// Now load this module
@@ -143,7 +149,7 @@ void FPCGExtendedToolkitModule::StartupModule()
 
 	PCGEX_EMPLACE_PIN_OUT(OUT_MatchRule, "PCGEx Data Matching Rule");
 	PCGEX_MAP_PIN_OUT("Match Rule")
-	
+
 	PCGEX_EMPLACE_PIN_OUT(OUT_Selector, "PCGEx Selector");
 	PCGEX_MAP_PIN_OUT("Selector")
 

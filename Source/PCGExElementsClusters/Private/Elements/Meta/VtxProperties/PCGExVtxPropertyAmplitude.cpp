@@ -4,11 +4,11 @@
 #include "Elements/Meta/VtxProperties/PCGExVtxPropertyAmplitude.h"
 
 #include "PCGPin.h"
-#include "Data/PCGExData.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Data/PCGExData.h"
 #include "Data/Utils/PCGExDataPreloader.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Types/PCGExTypes.h"
 
 
@@ -35,7 +35,10 @@ bool FPCGExAmplitudeConfig::Validate(FPCGExContext* InContext) const
 
 bool FPCGExVtxPropertyAmplitude::PrepareForCluster(FPCGExContext* InContext, TSharedPtr<PCGExClusters::FCluster> InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataFacade, const TSharedPtr<PCGExData::FFacade>& InEdgeDataFacade)
 {
-	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade)) { return false; }
+	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade))
+	{
+		return false;
+	}
 
 	if (!Config.Validate(InContext))
 	{
@@ -132,14 +135,26 @@ void FPCGExVtxPropertyAmplitude::ProcessNode(PCGExClusters::FNode& Node, const T
 
 		if (Config.UpMode == EPCGExVtxAmplitudeUpMode::UpVector)
 		{
-			for (int i = 0; i < NumAdjacency; i++) { Sign += FVector::DotProduct(DirCache->Read(Node.PointIndex), Adjacency[i].Direction) * (Sizes[i] / MaxSize); }
+			for (int i = 0; i < NumAdjacency; i++)
+			{
+				Sign += FVector::DotProduct(DirCache->Read(Node.PointIndex), Adjacency[i].Direction) * (Sizes[i] / MaxSize);
+			}
 
-			if (Config.SignOutputMode == EPCGExVtxAmplitudeSignOutput::NormalizedSize) { Sign /= NumAdjacency; }
-			else { Sign /= NumAdjacency; }
+			if (Config.SignOutputMode == EPCGExVtxAmplitudeSignOutput::NormalizedSize)
+			{
+				Sign /= NumAdjacency;
+			}
+			else
+			{
+				Sign /= NumAdjacency;
+			}
 		}
 		else
 		{
-			for (int i = 0; i < NumAdjacency; i++) { Sign += FVector::DotProduct(AverageDirection, Adjacency[i].Direction); }
+			for (int i = 0; i < NumAdjacency; i++)
+			{
+				Sign += FVector::DotProduct(AverageDirection, Adjacency[i].Direction);
+			}
 			Sign /= NumAdjacency;
 		}
 
@@ -157,13 +172,28 @@ void FPCGExVtxPropertyAmplitude::ProcessNode(PCGExClusters::FNode& Node, const T
 	{
 		AmpRangeBuffer->SetValue(Node.PointIndex, Config.bAbsoluteRange ? PCGExTypes::Abs(AmplitudeRange) : AmplitudeRange);
 	}
-	if (AmpRangeLengthBuffer) { AmpRangeLengthBuffer->SetValue(Node.PointIndex, AmplitudeRange.Length()); }
+	if (AmpRangeLengthBuffer)
+	{
+		AmpRangeLengthBuffer->SetValue(Node.PointIndex, AmplitudeRange.Length());
+	}
 
-	if (MinAmpLengthBuffer) { MinAmpLengthBuffer->SetValue(Node.PointIndex, MinAmplitude.Length()); }
-	if (MinAmpBuffer) { MinAmpBuffer->SetValue(Node.PointIndex, MinAmplitude); }
+	if (MinAmpLengthBuffer)
+	{
+		MinAmpLengthBuffer->SetValue(Node.PointIndex, MinAmplitude.Length());
+	}
+	if (MinAmpBuffer)
+	{
+		MinAmpBuffer->SetValue(Node.PointIndex, MinAmplitude);
+	}
 
-	if (MaxAmpLengthBuffer) { MaxAmpLengthBuffer->SetValue(Node.PointIndex, MaxAmplitude.Length()); }
-	if (MaxAmpBuffer) { MaxAmpBuffer->SetValue(Node.PointIndex, MaxAmplitude); }
+	if (MaxAmpLengthBuffer)
+	{
+		MaxAmpLengthBuffer->SetValue(Node.PointIndex, MaxAmplitude.Length());
+	}
+	if (MaxAmpBuffer)
+	{
+		MaxAmpBuffer->SetValue(Node.PointIndex, MaxAmplitude);
+	}
 }
 
 #if WITH_EDITOR

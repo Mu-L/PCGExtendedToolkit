@@ -4,11 +4,11 @@
 #include "Filters/Edges/PCGExEdgeLengthFilter.h"
 
 
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Graphs/PCGExGraph.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
@@ -19,7 +19,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExEdgeLengthFilterConfig, Threshold, double, Thresh
 
 bool UPCGExEdgeLengthFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.ThresholdInput == EPCGExInputValueType::Attribute, Config.ThresholdAttribute, Consumable)
@@ -36,12 +39,18 @@ namespace PCGExEdgeLength
 {
 	bool FLengthFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 	{
-		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
+		{
+			return false;
+		}
 
 		TConstPCGValueRange<FTransform> VtxTransforms = InPointDataFacade->Source->GetIn()->GetConstTransformValueRange();
 
 		Threshold = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
-		if (!Threshold->Init(PointDataFacade)) { return false; }
+		if (!Threshold->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		return true;
 	}
@@ -64,8 +73,14 @@ FString UPCGExEdgeLengthFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = "Edge Length ";
 	DisplayName += PCGExCompare::ToString(Config.Comparison);
-	if (Config.ThresholdInput == EPCGExInputValueType::Constant) { DisplayName += FString::Printf(TEXT("%f"), Config.ThresholdConstant); }
-	else { DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.ThresholdAttribute); }
+	if (Config.ThresholdInput == EPCGExInputValueType::Constant)
+	{
+		DisplayName += FString::Printf(TEXT("%f"), Config.ThresholdConstant);
+	}
+	else
+	{
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.ThresholdAttribute);
+	}
 
 	return DisplayName;
 }

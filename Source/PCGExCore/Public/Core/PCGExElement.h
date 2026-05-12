@@ -34,7 +34,10 @@ public:
 	virtual FPCGContext* Initialize(const FPCGInitializeElementParams& InParams) override;
 
 #if WITH_EDITOR
-	virtual bool ShouldLog() const override { return false; }
+	virtual bool ShouldLog() const override
+	{
+		return false;
+	}
 #endif
 
 	virtual bool IsCacheable(const UPCGSettings* InSettings) const override;

@@ -101,9 +101,24 @@ namespace PCGExPaths
 		double Add(const FVector& Location);
 		double Add(const FVector& Location, double& OutDistToLast);
 
-		bool IsValid() const { return Length > 0; }
-		double GetTime(const double Distance) const { return (!Distance || !Length) ? 0 : Distance / Length; }
-		double DistToLast(const FVector& Location) const { return FVector::Dist(Last, Location); }
-		bool IsLastWithinRange(const FVector& Location, const double Range) const { return DistToLast(Location) < Range; }
+		bool IsValid() const
+		{
+			return Length > 0;
+		}
+
+		double GetTime(const double Distance) const
+		{
+			return (!Distance || !Length) ? 0 : Distance / Length;
+		}
+
+		double DistToLast(const FVector& Location) const
+		{
+			return FVector::Dist(Last, Location);
+		}
+
+		bool IsLastWithinRange(const FVector& Location, const double Range) const
+		{
+			return DistToLast(Location) < Range;
+		}
 	};
 }

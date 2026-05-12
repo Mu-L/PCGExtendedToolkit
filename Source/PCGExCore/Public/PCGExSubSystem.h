@@ -41,14 +41,23 @@ namespace PCGEx
 		FPolledEvent() = default;
 
 		FPolledEvent(UPCGComponent* InSource, const EPCGExSubsystemEventType InType, const uint32 InEventId)
-			: Source(InSource), Type(InType), EventId(InEventId)
+			: Source(InSource)
+			  , Type(InType)
+			  , EventId(InEventId)
 		{
 		}
 
 		~FPolledEvent() = default;
 
-		bool operator==(const FPolledEvent& Other) const { return Source == Other.Source && Type == Other.Type && EventId == Other.EventId; }
-		FORCEINLINE friend uint32 GetTypeHash(const FPolledEvent& Key) { return HashCombineFast(static_cast<uint32>(Key.Type), HashCombineFast(GetTypeHash(Key.Source), Key.EventId)); }
+		bool operator==(const FPolledEvent& Other) const
+		{
+			return Source == Other.Source && Type == Other.Type && EventId == Other.EventId;
+		}
+
+		FORCEINLINE friend uint32 GetTypeHash(const FPolledEvent& Key)
+		{
+			return HashCombineFast(static_cast<uint32>(Key.Type), HashCombineFast(GetTypeHash(Key.Source), Key.EventId));
+		}
 	};
 }
 
@@ -75,7 +84,12 @@ public:
 
 	//~ Begin FTickableGameObject
 	virtual void Tick(float DeltaSeconds) override;
-	virtual bool IsTickableInEditor() const override { return true; }
+
+	virtual bool IsTickableInEditor() const override
+	{
+		return true;
+	}
+
 	virtual ETickableTickType GetTickableTickType() const override;
 	virtual bool IsTickable() const override;
 	virtual TStatId GetStatId() const override;
@@ -101,7 +115,10 @@ public:
 
 #pragma endregion
 
-	FORCEINLINE double GetEndTime() const { return EndTime; }
+	FORCEINLINE double GetEndTime() const
+	{
+		return EndTime;
+	}
 
 protected:
 	double EndTime = 0.0;

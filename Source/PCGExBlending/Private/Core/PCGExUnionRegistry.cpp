@@ -22,8 +22,8 @@ namespace PCGExData
 		{
 			const FRep& Rep = Reps[Item.Index];
 			const bool bIsWithin = FuseDetails.bComponentWiseTolerance
-				                       ? FuseDetails.IsWithinToleranceComponentWise(Point, Rep.Point)
-				                       : FuseDetails.IsWithinTolerance(Point, Rep.Point);
+				? FuseDetails.IsWithinToleranceComponentWise(Point, Rep.Point)
+				: FuseDetails.IsWithinTolerance(Point, Rep.Point);
 
 			if (bIsWithin)
 			{

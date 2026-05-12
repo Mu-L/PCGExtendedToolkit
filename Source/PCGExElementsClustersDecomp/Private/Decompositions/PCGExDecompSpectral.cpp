@@ -7,7 +7,10 @@
 
 bool FPCGExDecompSpectral::Decompose(FPCGExDecompositionResult& OutResult)
 {
-	if (!Cluster || Cluster->Nodes->Num() == 0) { return false; }
+	if (!Cluster || Cluster->Nodes->Num() == 0)
+	{
+		return false;
+	}
 
 	const int32 NumNodes = Cluster->Nodes->Num();
 
@@ -16,10 +19,16 @@ bool FPCGExDecompSpectral::Decompose(FPCGExDecompositionResult& OutResult)
 	ValidNodes.Reserve(NumNodes);
 	for (int32 i = 0; i < NumNodes; i++)
 	{
-		if (Cluster->GetNode(i)->bValid) { ValidNodes.Add(i); }
+		if (Cluster->GetNode(i)->bValid)
+		{
+			ValidNodes.Add(i);
+		}
 	}
 
-	if (ValidNodes.Num() < 2) { return false; }
+	if (ValidNodes.Num() < 2)
+	{
+		return false;
+	}
 
 	const int32 SafePartitions = FMath::Max(NumPartitions, 2);
 
@@ -27,7 +36,10 @@ bool FPCGExDecompSpectral::Decompose(FPCGExDecompositionResult& OutResult)
 	TArray<TArray<int32>> Partitions;
 	BisectRecursive(ValidNodes, SafePartitions, Partitions);
 
-	if (Partitions.Num() == 0) { return false; }
+	if (Partitions.Num() == 0)
+	{
+		return false;
+	}
 
 	OutResult.NumCells = Partitions.Num();
 	for (int32 CellIdx = 0; CellIdx < Partitions.Num(); CellIdx++)
@@ -46,12 +58,18 @@ bool FPCGExDecompSpectral::ComputeFiedlerVector(
 	TArray<double>& OutFiedler) const
 {
 	const int32 N = SubsetNodeIndices.Num();
-	if (N < 2) { return false; }
+	if (N < 2)
+	{
+		return false;
+	}
 
 	// Build local index mapping: NodeIndex -> local index within subset
 	TMap<int32, int32> NodeToLocal;
 	NodeToLocal.Reserve(N);
-	for (int32 i = 0; i < N; i++) { NodeToLocal.Add(SubsetNodeIndices[i], i); }
+	for (int32 i = 0; i < N; i++)
+	{
+		NodeToLocal.Add(SubsetNodeIndices[i], i);
+	}
 
 	// Build graph Laplacian L = D - A in sparse form
 	// For shifted power iteration, we need (sigma*I - L) where sigma > lambda_max(L)
@@ -73,7 +91,10 @@ bool FPCGExDecompSpectral::ComputeFiedlerVector(
 		for (const PCGExGraphs::FLink Lk : Node->Links)
 		{
 			const int32* LocalNeighbor = NodeToLocal.Find(Lk.Node);
-			if (!LocalNeighbor) { continue; } // Neighbor not in subset
+			if (!LocalNeighbor)
+			{
+				continue;
+			} // Neighbor not in subset
 
 			// Edge weight from heuristics if available, else use inverse distance
 			double Weight = 1.0;
@@ -94,7 +115,10 @@ bool FPCGExDecompSpectral::ComputeFiedlerVector(
 
 	// Find sigma = max(Degree) * 2 + 1 (upper bound on lambda_max)
 	double MaxDegree = 0;
-	for (const double D : Degree) { MaxDegree = FMath::Max(MaxDegree, D); }
+	for (const double D : Degree)
+	{
+		MaxDegree = FMath::Max(MaxDegree, D);
+	}
 	const double Sigma = MaxDegree * 2.0 + 1.0;
 
 	// Shifted power iteration to find largest eigenvector of M = sigma*I - L
@@ -111,20 +135,38 @@ bool FPCGExDecompSpectral::ComputeFiedlerVector(
 
 	// Initialize with alternating values to break symmetry
 	FRandomStream RNG(42);
-	for (int32 i = 0; i < N; i++) { V[i] = RNG.FRandRange(-1.0, 1.0); }
+	for (int32 i = 0; i < N; i++)
+	{
+		V[i] = RNG.FRandRange(-1.0, 1.0);
+	}
 
 	// Remove constant component (project out the constant eigenvector)
 	double Sum = 0;
-	for (const double Val : V) { Sum += Val; }
+	for (const double Val : V)
+	{
+		Sum += Val;
+	}
 	const double Mean = Sum / N;
-	for (double& Val : V) { Val -= Mean; }
+	for (double& Val : V)
+	{
+		Val -= Mean;
+	}
 
 	// Normalize
 	double Norm = 0;
-	for (const double Val : V) { Norm += Val * Val; }
+	for (const double Val : V)
+	{
+		Norm += Val * Val;
+	}
 	Norm = FMath::Sqrt(Norm);
-	if (Norm < KINDA_SMALL_NUMBER) { return false; }
-	for (double& Val : V) { Val /= Norm; }
+	if (Norm < KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+	for (double& Val : V)
+	{
+		Val /= Norm;
+	}
 
 	TArray<double> NewV;
 	NewV.SetNum(N);
@@ -145,16 +187,31 @@ bool FPCGExDecompSpectral::ComputeFiedlerVector(
 
 		// Project out constant component
 		Sum = 0;
-		for (const double Val : NewV) { Sum += Val; }
+		for (const double Val : NewV)
+		{
+			Sum += Val;
+		}
 		const double NewMean = Sum / N;
-		for (double& Val : NewV) { Val -= NewMean; }
+		for (double& Val : NewV)
+		{
+			Val -= NewMean;
+		}
 
 		// Normalize
 		Norm = 0;
-		for (const double Val : NewV) { Norm += Val * Val; }
+		for (const double Val : NewV)
+		{
+			Norm += Val * Val;
+		}
 		Norm = FMath::Sqrt(Norm);
-		if (Norm < KINDA_SMALL_NUMBER) { return false; }
-		for (double& Val : NewV) { Val /= Norm; }
+		if (Norm < KINDA_SMALL_NUMBER)
+		{
+			return false;
+		}
+		for (double& Val : NewV)
+		{
+			Val /= Norm;
+		}
 
 		// Check convergence
 		double Diff = 0;
@@ -166,7 +223,10 @@ bool FPCGExDecompSpectral::ComputeFiedlerVector(
 
 		V = NewV;
 
-		if (Diff < ConvergenceTolerance * ConvergenceTolerance) { break; }
+		if (Diff < ConvergenceTolerance * ConvergenceTolerance)
+		{
+			break;
+		}
 	}
 
 	OutFiedler = MoveTemp(V);
@@ -196,8 +256,14 @@ void FPCGExDecompSpectral::BisectRecursive(
 	TArray<int32> Positive, Negative;
 	for (int32 i = 0; i < NodeIndices.Num(); i++)
 	{
-		if (Fiedler[i] >= 0) { Positive.Add(NodeIndices[i]); }
-		else { Negative.Add(NodeIndices[i]); }
+		if (Fiedler[i] >= 0)
+		{
+			Positive.Add(NodeIndices[i]);
+		}
+		else
+		{
+			Negative.Add(NodeIndices[i]);
+		}
 	}
 
 	// Handle degenerate case where all values have same sign

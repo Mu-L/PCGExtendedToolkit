@@ -11,24 +11,36 @@
 
 bool FPCGExEntryDensityWeightedPickerOp::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection)
 {
-	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection)) { return false; }
+	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection))
+	{
+		return false;
+	}
 
 	DensityGetter = DensitySource.GetValueSetting();
-	if (!DensityGetter->Init(InDataFacade)) { return false; }
+	if (!DensityGetter->Init(InDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
 
 int32 FPCGExEntryDensityWeightedPickerOp::Pick(int32 PointIndex, int32 Seed) const
 {
-	if (!Target || Target->IsEmpty()) { return -1; }
+	if (!Target || Target->IsEmpty())
+	{
+		return -1;
+	}
 
 	double Density = DensityGetter ? DensityGetter->Read(PointIndex) : 1.0;
 
 	// Out-of-range policy: either clamp, or skip the point entirely.
 	if (Density < 0.0 || Density > 1.0)
 	{
-		if (OutOfRangePolicy == EPCGExDensityOutOfRangePolicy::SkipPoint) { return -1; }
+		if (OutOfRangePolicy == EPCGExDensityOutOfRangePolicy::SkipPoint)
+		{
+			return -1;
+		}
 		Density = FMath::Clamp(Density, 0.0, 1.0);
 	}
 
@@ -43,39 +55,42 @@ int32 FPCGExEntryDensityWeightedPickerOp::Pick(int32 PointIndex, int32 Seed) con
 	switch (Mode)
 	{
 	case EPCGExDensityWeightMode::WeightModulation:
+	{
+		// exponent = lerp(1, density*2, DensityInfluence)
+		// DI=0               -> exp=1               -> plain weighted (parity with WeightedRandom)
+		// DI=1 & density=0   -> exp=0               -> uniform (all weights become 1)
+		// DI=1 & density=0.5 -> exp=1               -> plain weighted
+		// DI=1 & density=1   -> exp=2               -> amplified bias toward higher weights
+		const double Exponent = FMath::Lerp(1.0, Density * 2.0, DensityInfluence);
+		for (int32 i = 0; i < N; ++i)
 		{
-			// exponent = lerp(1, density*2, DensityInfluence)
-			// DI=0               -> exp=1               -> plain weighted (parity with WeightedRandom)
-			// DI=1 & density=0   -> exp=0               -> uniform (all weights become 1)
-			// DI=1 & density=0.5 -> exp=1               -> plain weighted
-			// DI=1 & density=1   -> exp=2               -> amplified bias toward higher weights
-			const double Exponent = FMath::Lerp(1.0, Density * 2.0, DensityInfluence);
-			for (int32 i = 0; i < N; ++i)
-			{
-				const double W = static_cast<double>(Target->Entries[i]->Weight + 1);
-				EffectiveWeights[i] = FMath::Pow(W, Exponent);
-				TotalWeight += EffectiveWeights[i];
-			}
-			break;
+			const double W = Target->Entries[i]->Weight + 1;
+			EffectiveWeights[i] = FMath::Pow(W, Exponent);
+			TotalWeight += EffectiveWeights[i];
 		}
+		break;
+	}
 	case EPCGExDensityWeightMode::RandomnessModulation:
+	{
+		// effective_density = (1 - DI) + DI * density, then effective_weight = lerp(1, W, effective_density)
+		// DI=0               -> eff=1               -> plain weighted (parity with WeightedRandom)
+		// DI=1 & density=1   -> eff=1               -> plain weighted
+		// DI=1 & density=0   -> eff=0               -> uniform
+		const double EffectiveDensity = (1.0 - DensityInfluence) + DensityInfluence * Density;
+		for (int32 i = 0; i < N; ++i)
 		{
-			// effective_density = (1 - DI) + DI * density, then effective_weight = lerp(1, W, effective_density)
-			// DI=0               -> eff=1               -> plain weighted (parity with WeightedRandom)
-			// DI=1 & density=1   -> eff=1               -> plain weighted
-			// DI=1 & density=0   -> eff=0               -> uniform
-			const double EffectiveDensity = (1.0 - DensityInfluence) + DensityInfluence * Density;
-			for (int32 i = 0; i < N; ++i)
-			{
-				const double W = static_cast<double>(Target->Entries[i]->Weight + 1);
-				EffectiveWeights[i] = FMath::Lerp(1.0, W, EffectiveDensity);
-				TotalWeight += EffectiveWeights[i];
-			}
-			break;
+			const double W = Target->Entries[i]->Weight + 1;
+			EffectiveWeights[i] = FMath::Lerp(1.0, W, EffectiveDensity);
+			TotalWeight += EffectiveWeights[i];
 		}
+		break;
+	}
 	}
 
-	if (TotalWeight <= 0.0) { return -1; }
+	if (TotalWeight <= 0.0)
+	{
+		return -1;
+	}
 
 	// Roll and linear cumulative search. Mirrors FCategory::GetPickRandomWeighted's approach
 	// but over the per-point effective weight table.
@@ -84,7 +99,10 @@ int32 FPCGExEntryDensityWeightedPickerOp::Pick(int32 PointIndex, int32 Seed) con
 	for (int32 i = 0; i < N; ++i)
 	{
 		Cumulative += EffectiveWeights[i];
-		if (Roll <= Cumulative) { return Target->Indices[i]; }
+		if (Roll <= Cumulative)
+		{
+			return Target->Indices[i];
+		}
 	}
 
 	// Numerical fallback -- return the last entry (matches FCategory's fallback pattern).

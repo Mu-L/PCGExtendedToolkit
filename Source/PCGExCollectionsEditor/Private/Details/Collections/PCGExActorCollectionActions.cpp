@@ -3,24 +3,27 @@
 
 #include "Details/Collections/PCGExActorCollectionActions.h"
 
-#include "UObject/UObjectGlobals.h"
-#include "UObject/Package.h"
 #include "FileHelpers.h"
+#include "ToolMenuSection.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Collections/PCGExActorCollection.h"
-#include "UObject/UObjectGlobals.h"
-#include "UObject/Package.h"
-#include "ToolMenuSection.h"
 #include "Details/Collections/PCGExActorCollectionEditor.h"
 #include "Details/Collections/PCGExAssetCollectionEditor.h"
 #include "Misc/MessageDialog.h"
+#include "UObject/Package.h"
+#include "UObject/Package.h"
+#include "UObject/UObjectGlobals.h"
+#include "UObject/UObjectGlobals.h"
 #include "Widgets/Views/SListView.h"
 
 namespace PCGExActorCollectionActions
 {
 	void CreateCollectionFrom(const TArray<FAssetData>& SelectedAssets)
 	{
-		if (SelectedAssets.IsEmpty()) { return; }
+		if (SelectedAssets.IsEmpty())
+		{
+			return;
+		}
 
 		//FPCGAssetExporterParameters Parameters = InParameters;
 
@@ -134,7 +137,10 @@ namespace PCGExActorCollectionActions
 		const TArray<FAssetData>& SelectedAssets,
 		bool bIsNewCollection)
 	{
-		if (SelectedCollections.IsEmpty() || SelectedAssets.IsEmpty()) { return; }
+		if (SelectedCollections.IsEmpty() || SelectedAssets.IsEmpty())
+		{
+			return;
+		}
 
 		for (const TObjectPtr<UPCGExActorCollection>& Collection : SelectedCollections)
 		{

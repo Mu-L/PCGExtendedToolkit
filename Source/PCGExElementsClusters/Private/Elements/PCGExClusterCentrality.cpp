@@ -5,12 +5,12 @@
 
 #include "PCGExHeuristicsHandler.h"
 #include "PCGParamData.h"
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Utils/PCGExScoredQueue.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClusterCentralityElement"
@@ -33,8 +33,14 @@ void UPCGExClusterCentralitySettings::ApplyDeprecation(UPCGNode* InOutNode)
 
 bool UPCGExClusterCentralitySettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExClusters::Labels::SourceVtxFiltersLabel) { return IsPathBased() && DownsamplingMode == EPCGExCentralityDownsampling::Filters; }
-	if (InPin->Properties.Label == PCGExHeuristics::Labels::SourceHeuristicsLabel) { return IsPathBased(); }
+	if (InPin->Properties.Label == PCGExClusters::Labels::SourceVtxFiltersLabel)
+	{
+		return IsPathBased() && DownsamplingMode == EPCGExCentralityDownsampling::Filters;
+	}
+	if (InPin->Properties.Label == PCGExHeuristics::Labels::SourceHeuristicsLabel)
+	{
+		return IsPathBased();
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
@@ -51,18 +57,34 @@ TArray<FPCGPinProperties> UPCGExClusterCentralitySettings::InputPinProperties() 
 		PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics.", Advanced, FPCGExDataTypeInfoHeuristics::AsId())
 	}
 
-	if (IsPathBased() && DownsamplingMode == EPCGExCentralityDownsampling::Filters) { PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceVtxFiltersLabel, "Vtx filters.", Required) }
-	else { PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceVtxFiltersLabel, "Vtx filters.", Advanced) }
+	if (IsPathBased() && DownsamplingMode == EPCGExCentralityDownsampling::Filters)
+	{
+		PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceVtxFiltersLabel, "Vtx filters.", Required)
+	}
+	else
+	{
+		PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceVtxFiltersLabel, "Vtx filters.", Advanced)
+	}
 
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExClusterCentralitySettings::GetMainOutputInitMode() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
-PCGExData::EIOInit UPCGExClusterCentralitySettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExClusterCentralitySettings::GetMainOutputInitMode() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
+
+PCGExData::EIOInit UPCGExClusterCentralitySettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 bool FPCGExClusterCentralityElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ClusterCentrality)
 
@@ -87,19 +109,22 @@ bool FPCGExClusterCentralityElement::AdvanceWork(FPCGExContext* InContext, const
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			if (Settings->IsPathBased())
-			{
-				NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
-			}
-			NewBatch->bSkipCompletion = true;
-			NewBatch->bRequiresWriteStep = true;
-			if (Settings->IsPathBased() && Settings->DownsamplingMode == EPCGExCentralityDownsampling::Filters)
-			{
-				NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
-			}
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      if (Settings->IsPathBased())
+			                                      {
+				                                      NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+			                                      }
+			                                      NewBatch->bSkipCompletion = true;
+			                                      NewBatch->bRequiresWriteStep = true;
+			                                      if (Settings->IsPathBased() && Settings->DownsamplingMode == EPCGExCentralityDownsampling::Filters)
+			                                      {
+				                                      NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
+			                                      }
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -122,7 +147,10 @@ namespace PCGExClusterCentrality
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExClusterCentrality::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		CentralityScores.Init(0.0, NumNodes);
 
@@ -219,7 +247,10 @@ namespace PCGExClusterCentrality
 	{
 		{
 			FReadScopeLock ReadScopeLock(CompletionLock);
-			if (!bVtxComplete || !bEdgeComplete) { return; }
+			if (!bVtxComplete || !bEdgeComplete)
+			{
+				return;
+			}
 		}
 
 		if (Settings->DownsamplingMode == EPCGExCentralityDownsampling::Filters)
@@ -236,7 +267,10 @@ namespace PCGExClusterCentrality
 			RandomSamples.SetNum(WriteIndex);
 		}
 
-		if (bDownsample && RandomSamples.IsEmpty()) { RandomSamples.Add(0); }
+		if (bDownsample && RandomSamples.IsEmpty())
+		{
+			RandomSamples.Add(0);
+		}
 
 		StartParallelLoopForRange(bDownsample ? RandomSamples.Num() : NumNodes, 128);
 	}
@@ -280,7 +314,10 @@ namespace PCGExClusterCentrality
 				}
 
 				const double Ratio = static_cast<double>(NumNodes) / static_cast<double>(RandomSamples.Num());
-				for (double& B : LocalScores) { B *= Ratio; }
+				for (double& B : LocalScores)
+				{
+					B *= Ratio;
+				}
 			}
 			else
 			{
@@ -300,7 +337,10 @@ namespace PCGExClusterCentrality
 				}
 
 				const double Ratio = static_cast<double>(NumNodes) / static_cast<double>(RandomSamples.Num());
-				for (double& B : LocalScores) { B *= Ratio; }
+				for (double& B : LocalScores)
+				{
+					B *= Ratio;
+				}
 			}
 			else
 			{
@@ -320,7 +360,10 @@ namespace PCGExClusterCentrality
 				}
 
 				const double Ratio = static_cast<double>(NumNodes) / static_cast<double>(RandomSamples.Num());
-				for (double& B : LocalScores) { B *= Ratio; }
+				for (double& B : LocalScores)
+				{
+					B *= Ratio;
+				}
 			}
 			else
 			{
@@ -381,8 +424,14 @@ namespace PCGExClusterCentrality
 		for (int32 i = Stack.Num() - 1; i >= 0; --i)
 		{
 			const int32 W = Stack[i];
-			for (const int32 V : Pred[W]) { Delta[V] += (Sigma[V] / Sigma[W]) * (1.0 + Delta[W]); }
-			if (W != Index) { LocalScores[W] += Delta[W]; }
+			for (const int32 V : Pred[W])
+			{
+				Delta[V] += (Sigma[V] / Sigma[W]) * (1.0 + Delta[W]);
+			}
+			if (W != Index)
+			{
+				LocalScores[W] += Delta[W];
+			}
 		}
 
 		// Reset only visited nodes (optimization: O(visited) instead of O(N))
@@ -445,7 +494,10 @@ namespace PCGExClusterCentrality
 			}
 		}
 
-		if (SumDist > 0) { LocalScores[Index] += static_cast<double>(Reachable) / SumDist; }
+		if (SumDist > 0)
+		{
+			LocalScores[Index] += static_cast<double>(Reachable) / SumDist;
+		}
 
 		// Reset only visited nodes
 		for (const int32 N : Stack)
@@ -496,7 +548,10 @@ namespace PCGExClusterCentrality
 		double HarmonicSum = 0;
 		for (const int32 N : Stack)
 		{
-			if (N != Index && Score[N] > 0) { HarmonicSum += 1.0 / Score[N]; }
+			if (N != Index && Score[N] > 0)
+			{
+				HarmonicSum += 1.0 / Score[N];
+			}
 		}
 
 		LocalScores[Index] += HarmonicSum;
@@ -538,12 +593,18 @@ namespace PCGExClusterCentrality
 
 			// Normalize: norm = ||x_new||_2
 			double Norm = 0;
-			for (int32 i = 0; i < NumNodes; i++) { Norm += XNew[i] * XNew[i]; }
+			for (int32 i = 0; i < NumNodes; i++)
+			{
+				Norm += XNew[i] * XNew[i];
+			}
 			Norm = FMath::Sqrt(Norm);
 
 			if (Norm > 0)
 			{
-				for (int32 i = 0; i < NumNodes; i++) { XNew[i] /= Norm; }
+				for (int32 i = 0; i < NumNodes; i++)
+				{
+					XNew[i] /= Norm;
+				}
 			}
 
 			// Check convergence: ||x_new - x||_2
@@ -556,10 +617,16 @@ namespace PCGExClusterCentrality
 
 			Swap(X, XNew);
 
-			if (FMath::Sqrt(Diff) < Settings->Tolerance) { break; }
+			if (FMath::Sqrt(Diff) < Settings->Tolerance)
+			{
+				break;
+			}
 		}
 
-		for (int32 i = 0; i < NumNodes; i++) { CentralityScores[i] = X[i]; }
+		for (int32 i = 0; i < NumNodes; i++)
+		{
+			CentralityScores[i] = X[i];
+		}
 	}
 
 #pragma endregion
@@ -599,10 +666,16 @@ namespace PCGExClusterCentrality
 
 			Swap(X, XNew);
 
-			if (MaxDiff < Settings->Tolerance) { break; }
+			if (MaxDiff < Settings->Tolerance)
+			{
+				break;
+			}
 		}
 
-		for (int32 i = 0; i < NumNodes; i++) { CentralityScores[i] = X[i]; }
+		for (int32 i = 0; i < NumNodes; i++)
+		{
+			CentralityScores[i] = X[i];
+		}
 	}
 
 #pragma endregion
@@ -613,7 +686,10 @@ namespace PCGExClusterCentrality
 	{
 		ScopedCentralityScores->ForEach([&](TArray<double>& ScopedArray)
 		{
-			for (int i = 0; i < NumNodes; i++) { CentralityScores[i] += ScopedArray[i]; }
+			for (int i = 0; i < NumNodes; i++)
+			{
+				CentralityScores[i] += ScopedArray[i];
+			}
 			ScopedArray.Empty();
 		});
 
@@ -622,7 +698,10 @@ namespace PCGExClusterCentrality
 		// Normalize for undirected graphs (betweenness only)
 		if (Settings->CentralityType == EPCGExCentralityType::Betweenness)
 		{
-			for (double& C : CentralityScores) { C *= 0.5; }
+			for (double& C : CentralityScores)
+			{
+				C *= 0.5;
+			}
 		}
 
 		WriteResults();
@@ -635,24 +714,36 @@ namespace PCGExClusterCentrality
 
 		// Compute output values into CentralityScores (reuse the array)
 		double Max = 0;
-		for (const double& C : CentralityScores) { Max = FMath::Max(Max, C); }
+		for (const double& C : CentralityScores)
+		{
+			Max = FMath::Max(Max, C);
+		}
 
 		if (Settings->bNormalize && Max > 0)
 		{
 			const double InvMax = 1.0 / Max;
 			if (Settings->bOutputOneMinus)
 			{
-				for (int i = 0; i < NumNodes; i++) { CentralityScores[i] = 1.0 - (CentralityScores[i] * InvMax); }
+				for (int i = 0; i < NumNodes; i++)
+				{
+					CentralityScores[i] = 1.0 - (CentralityScores[i] * InvMax);
+				}
 			}
 			else
 			{
-				for (int i = 0; i < NumNodes; i++) { CentralityScores[i] *= InvMax; }
+				for (int i = 0; i < NumNodes; i++)
+				{
+					CentralityScores[i] *= InvMax;
+				}
 			}
 		}
 		else if (Settings->bNormalize)
 		{
 			const double V = Settings->bOutputOneMinus ? 1.0 : 0.0;
-			for (int i = 0; i < NumNodes; i++) { CentralityScores[i] = V; }
+			for (int i = 0; i < NumNodes; i++)
+			{
+				CentralityScores[i] = V;
+			}
 		}
 
 		// Apply contrast per-cluster on computed values
@@ -677,7 +768,10 @@ namespace PCGExClusterCentrality
 		}
 
 		// Write final values to buffer
-		for (int i = 0; i < NumNodes; i++) { Buffer->SetValue(Nodes[i].PointIndex, CentralityScores[i]); }
+		for (int i = 0; i < NumNodes; i++)
+		{
+			Buffer->SetValue(Nodes[i].PointIndex, CentralityScores[i]);
+		}
 	}
 
 #pragma endregion

@@ -45,19 +45,28 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeChildren(
 			.Mode_Lambda([this]() -> EPCGExEdgeEndpointsCheckMode
 			{
 				uint8 Value = 0;
-				if (ModeHandle.IsValid()) { ModeHandle->GetValue(Value); }
+				if (ModeHandle.IsValid())
+				{
+					ModeHandle->GetValue(Value);
+				}
 				return static_cast<EPCGExEdgeEndpointsCheckMode>(Value);
 			})
 			.Expects_Lambda([this]() -> EPCGExFilterResult
 			{
 				uint8 Value = 0;
-				if (ExpectsHandle.IsValid()) { ExpectsHandle->GetValue(Value); }
+				if (ExpectsHandle.IsValid())
+				{
+					ExpectsHandle->GetValue(Value);
+				}
 				return static_cast<EPCGExFilterResult>(Value);
 			})
 			.bInvert_Lambda([this]() -> bool
 			{
 				bool Value = false;
-				if (InvertHandle.IsValid()) { InvertHandle->GetValue(Value); }
+				if (InvertHandle.IsValid())
+				{
+					InvertHandle->GetValue(Value);
+				}
 				return Value;
 			})
 		]

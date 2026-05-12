@@ -7,8 +7,8 @@
 #include "PCGExLayout.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExInputShorthandsDetails.h"
-#include "Sorting/PCGExSortingCommon.h"
 #include "Math/PCGExUVW.h"
+#include "Sorting/PCGExSortingCommon.h"
 
 #include "PCGExBinPacking.generated.h"
 
@@ -49,8 +49,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BinPacking, "Bin Packing", "[EXPERIMENTAL] An simple bin packing node.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Transform); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Transform);
+	}
 #endif
 
 protected:
@@ -195,7 +203,11 @@ namespace PCGExBinPacking
 		FBin(const PCGExData::FConstPoint& InBinPoint, const FVector& InSeed, const TSharedPtr<FBinSplit>& InSplitter);
 		~FBin() = default;
 
-		bool IsFull() const { return Items.Num() <= MaxItems; }
+		bool IsFull() const
+		{
+			return Items.Num() <= MaxItems;
+		}
+
 		int32 GetBestSpaceScore(const FItem& InItem, double& OutScore, FRotator& OutRotator) const;
 		void AddItem(int32 SpaceIndex, FItem& InItem);
 		bool Insert(FItem& InItem);

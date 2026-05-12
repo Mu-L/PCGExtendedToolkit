@@ -21,7 +21,7 @@ UENUM()
 enum class EPCGExDataAssetEntrySource : uint8
 {
 	DataAsset = 0 UMETA(DisplayName = "Data Asset", ToolTip="Reference an existing PCGDataAsset", ActionIcon="PCGDA_DataAsset"),
-	Level     = 1 UMETA(DisplayName = "Level",      ToolTip="Export a level to an embedded PCGDataAsset", ActionIcon="PCGDA_Level"),
+	Level     = 1 UMETA(DisplayName = "Level", ToolTip="Export a level to an embedded PCGDataAsset", ActionIcon="PCGDA_Level"),
 };
 
 /**
@@ -48,11 +48,11 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
 	EPCGExDataAssetEntrySource Source = EPCGExDataAssetEntrySource::DataAsset;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="Source==EPCGExDataAssetEntrySource::DataAsset && !bIsSubCollection", EditConditionHides))
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="Source == EPCGExDataAssetEntrySource::DataAsset && !bIsSubCollection", EditConditionHides))
 	TSoftObjectPtr<UPCGDataAsset> DataAsset = nullptr;
 
 	/** Level reference (used when Source == Level) */
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="Source==EPCGExDataAssetEntrySource::Level && !bIsSubCollection", EditConditionHides))
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="Source == EPCGExDataAssetEntrySource::Level && !bIsSubCollection", EditConditionHides))
 	TSoftObjectPtr<UWorld> Level;
 
 	/** Embedded exported data asset (hidden, serialized, outered to collection) */
@@ -91,7 +91,6 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	virtual void EDITOR_Sanitize() override;
 	virtual void EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
 #endif
-
 };
 
 /** Concrete collection for UPCGDataAsset references with optional level-sourced entries. */
@@ -100,10 +99,9 @@ class PCGEXCOLLECTIONS_API UPCGExPCGDataAssetCollection : public UPCGExAssetColl
 {
 	GENERATED_BODY()
 	PCGEX_ASSET_COLLECTION_BODY(FPCGExPCGDataAssetCollectionEntry)
-
-public:
 	friend struct FPCGExPCGDataAssetCollectionEntry;
 
+public:
 	// Type System
 
 	virtual PCGExAssetCollection::FTypeId GetTypeId() const override

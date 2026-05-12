@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "Details/PCGExInputShorthandsDetails.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 
 #include "PCGExSelectorDensityWeighted.generated.h"
 

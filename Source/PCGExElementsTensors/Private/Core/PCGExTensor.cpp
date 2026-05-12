@@ -13,9 +13,15 @@
 
 PCGExTensor::FTensorSample FPCGExTensorSamplingMutationsDetails::Mutate(const FTransform& InProbe, PCGExTensor::FTensorSample InSample) const
 {
-	if (bInvert) { InSample.DirectionAndSize *= -1; }
+	if (bInvert)
+	{
+		InSample.DirectionAndSize *= -1;
+	}
 
-	if (bScaleDirectionAndSize) { InSample.DirectionAndSize *= Scale; }
+	if (bScaleDirectionAndSize)
+	{
+		InSample.DirectionAndSize *= Scale;
+	}
 
 	if (bBidirectional)
 	{
@@ -30,7 +36,8 @@ PCGExTensor::FTensorSample FPCGExTensorSamplingMutationsDetails::Mutate(const FT
 }
 
 FPCGExTensorConfigBase::FPCGExTensorConfigBase(const bool SupportAttributes, const bool SupportMutations)
-	: bSupportAttributes(SupportAttributes), bSupportMutations(SupportMutations)
+	: bSupportAttributes(SupportAttributes)
+	  , bSupportMutations(SupportMutations)
 {
 	if (!bSupportAttributes)
 	{
@@ -63,11 +70,23 @@ void FPCGExTensorConfigBase::Init(FPCGExContext* InContext)
 {
 	PCGEX_MAKE_SHARED(CurvePaths, TSet<FSoftObjectPath>)
 
-	if (!bUseLocalWeightFalloffCurve) { CurvePaths->Add(WeightFalloffCurve.ToSoftObjectPath()); }
-	if (!bUseLocalPotencyFalloffCurve) { CurvePaths->Add(PotencyFalloffCurve.ToSoftObjectPath()); }
-	if (!bUseLocalGuideCurve) { CurvePaths->Add(GuideCurve.ToSoftObjectPath()); }
+	if (!bUseLocalWeightFalloffCurve)
+	{
+		CurvePaths->Add(WeightFalloffCurve.ToSoftObjectPath());
+	}
+	if (!bUseLocalPotencyFalloffCurve)
+	{
+		CurvePaths->Add(PotencyFalloffCurve.ToSoftObjectPath());
+	}
+	if (!bUseLocalGuideCurve)
+	{
+		CurvePaths->Add(GuideCurve.ToSoftObjectPath());
+	}
 
-	if (!CurvePaths->IsEmpty()) { PCGExHelpers::LoadBlocking_AnyThread(CurvePaths, InContext); }
+	if (!CurvePaths->IsEmpty())
+	{
+		PCGExHelpers::LoadBlocking_AnyThread(CurvePaths, InContext);
+	}
 
 	WeightFalloffLUT = WeightFalloffCurveLookup.MakeLookup(bUseLocalWeightFalloffCurve, LocalWeightFalloffCurve, WeightFalloffCurve);
 	PotencyFalloffLUT = PotencyFalloffCurveLookup.MakeLookup(bUseLocalPotencyFalloffCurve, LocalPotencyFalloffCurve, PotencyFalloffCurve);
@@ -79,10 +98,16 @@ namespace PCGExTensor
 	bool FEffectorsArray::Init(FPCGExContext* InContext, const UPCGExTensorPointFactoryData* InFactory)
 	{
 		TSharedPtr<PCGExDetails::TSettingValue<double>> PotencyValue = InFactory->BaseConfig.GetValueSettingPotency();
-		if (!PotencyValue->Init(InFactory->InputDataFacade, false)) { return false; }
+		if (!PotencyValue->Init(InFactory->InputDataFacade, false))
+		{
+			return false;
+		}
 
 		TSharedPtr<PCGExDetails::TSettingValue<double>> WeightValue = InFactory->BaseConfig.GetValueSettingWeight();
-		if (!WeightValue->Init(InFactory->InputDataFacade, false)) { return false; }
+		if (!WeightValue->Init(InFactory->InputDataFacade, false))
+		{
+			return false;
+		}
 
 		const UPCGBasePointData* InPoints = InFactory->InputDataFacade->GetIn();
 		const int32 NumEffectors = InPoints->GetNumPoints();
@@ -117,7 +142,7 @@ namespace PCGExTensor
 			PackedEffector.RadiusSquared = Extents.SquaredLength();
 
 			PrepareSinglePoint(i, Transform, PackedEffector);
-		)
+			)
 
 		// Build octree outside of parallel for :x
 		TConstPCGValueRange<float> InSteepness = InPoints->GetConstSteepnessValueRange();
@@ -139,7 +164,10 @@ namespace PCGExTensor
 	}
 
 	FTensorSample::FTensorSample(const FVector& InDirectionAndSize, const FQuat& InRotation, const int32 InEffectors, const double InWeight)
-		: DirectionAndSize(InDirectionAndSize), Rotation(InRotation), Effectors(InEffectors), Weight(InWeight)
+		: DirectionAndSize(InDirectionAndSize)
+		  , Rotation(InRotation)
+		  , Effectors(InEffectors)
+		  , Weight(InWeight)
 	{
 	}
 
@@ -201,7 +229,9 @@ namespace PCGExTensor
 namespace PCGExTensor
 {
 	FEffectorSample::FEffectorSample(const FVector& InDirection, const double InPotency, const double InWeight)
-		: Direction(InDirection), Potency(InPotency), Weight(InWeight)
+		: Direction(InDirection)
+		  , Potency(InPotency)
+		  , Weight(InWeight)
 	{
 	}
 

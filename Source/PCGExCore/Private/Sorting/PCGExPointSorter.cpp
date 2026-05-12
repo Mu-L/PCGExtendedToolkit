@@ -3,13 +3,13 @@
 
 #include "Sorting/PCGExPointSorter.h"
 
-#include "Utils/PCGExCompare.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyData.h"
 #include "Data/PCGExProxyDataHelpers.h"
 #include "Sorting/PCGExSortingDetails.h"
+#include "Utils/PCGExCompare.h"
 
 namespace PCGExSorting
 {
@@ -20,7 +20,8 @@ namespace PCGExSorting
 	}
 
 	FSorter::FSorter(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, TArray<FPCGExSortRuleConfig> InRuleConfigs)
-		: ExecutionContext(InContext), DataFacade(InDataFacade)
+		: ExecutionContext(InContext)
+		  , DataFacade(InDataFacade)
 	{
 		const UPCGData* InData = InDataFacade->Source->GetIn();
 		FName Consumable = NAME_None;
@@ -30,13 +31,18 @@ namespace PCGExSorting
 			PCGEX_MAKE_SHARED(NewRule, FRuleHandler, RuleConfig)
 			RuleHandlers.Add(NewRule);
 
-			if (InContext->bCleanupConsumableAttributes && InData) { PCGEX_CONSUMABLE_SELECTOR(RuleConfig.Selector, Consumable) }
+			if (InContext->bCleanupConsumableAttributes && InData)
+			{
+				PCGEX_CONSUMABLE_SELECTOR(RuleConfig.Selector, Consumable)
+			}
 		}
 	}
 
 	FRuleHandler::FRuleHandler(const FPCGExSortRuleConfig& Config)
-		: Selector(Config.Selector), Tolerance(Config.Tolerance), bInvertRule(Config.bInvertRule),
-		  bUseDataTag(Config.bReadDataTag)
+		: Selector(Config.Selector)
+		  , Tolerance(Config.Tolerance)
+		  , bInvertRule(Config.bInvertRule)
+		  , bUseDataTag(Config.bReadDataTag)
 	{
 	}
 
@@ -85,7 +91,10 @@ namespace PCGExSorting
 			PCGExData::FProxyDescriptor Descriptor(DataFacade);
 			Descriptor.AddFlags(PCGExData::EProxyFlags::Direct);
 
-			if (Descriptor.CaptureStrict(InContext, RuleHandler->Selector, PCGExData::EIOSide::In)) { Buffer = PCGExData::GetProxyBuffer(InContext, Descriptor); }
+			if (Descriptor.CaptureStrict(InContext, RuleHandler->Selector, PCGExData::EIOSide::In))
+			{
+				Buffer = PCGExData::GetProxyBuffer(InContext, Descriptor);
+			}
 
 			if (!Buffer)
 			{
@@ -106,7 +115,10 @@ namespace PCGExSorting
 	bool FSorter::InitFacadesInternal(FPCGExContext* InContext, const FacadeArrayType& InDataFacades)
 	{
 		int32 MaxIndex = 0;
-		for (const auto& Facade : InDataFacades) { MaxIndex = FMath::Max(Facade->Idx, MaxIndex); }
+		for (const auto& Facade : InDataFacades)
+		{
+			MaxIndex = FMath::Max(Facade->Idx, MaxIndex);
+		}
 		MaxIndex++;
 
 		for (int32 i = 0; i < RuleHandlers.Num(); i++)
@@ -200,7 +212,10 @@ namespace PCGExSorting
 	{
 		const int32 NumDatas = InTaggedDatas.Num();
 		IdxMap.Reserve(NumDatas);
-		for (int32 i = 0; i < NumDatas; i++) { IdxMap.Add(InTaggedDatas[i].Data->GetUniqueID(), i); }
+		for (int32 i = 0; i < NumDatas; i++)
+		{
+			IdxMap.Add(InTaggedDatas[i].Data->GetUniqueID(), i);
+		}
 
 		for (int32 i = 0; i < RuleHandlers.Num(); i++)
 		{
@@ -248,14 +263,23 @@ namespace PCGExSorting
 			ValueA = Rule->Buffer->ReadAsDouble(A);
 			ValueB = Rule->Buffer->ReadAsDouble(B);
 
-			if (FMath::IsNearlyEqual(ValueA, ValueB, Rule->Tolerance)) { continue; }
+			if (FMath::IsNearlyEqual(ValueA, ValueB, Rule->Tolerance))
+			{
+				continue;
+			}
 
 			Result = ValueA < ValueB ? -1 : 1;
-			if (Rule->bInvertRule) { Result = -Result; }
+			if (Rule->bInvertRule)
+			{
+				Result = -Result;
+			}
 			break;
 		}
 
-		if (bDescending) { Result = -Result; }
+		if (bDescending)
+		{
+			Result = -Result;
+		}
 		return Result < 0;
 	}
 
@@ -280,14 +304,23 @@ namespace PCGExSorting
 				ValueB = Rule->Buffers[B.IO]->ReadAsDouble(B.Index);
 			}
 
-			if (FMath::IsNearlyEqual(ValueA, ValueB, Rule->Tolerance)) { continue; }
+			if (FMath::IsNearlyEqual(ValueA, ValueB, Rule->Tolerance))
+			{
+				continue;
+			}
 
 			Result = ValueA < ValueB ? -1 : 1;
-			if (Rule->bInvertRule) { Result = -Result; }
+			if (Rule->bInvertRule)
+			{
+				Result = -Result;
+			}
 			break;
 		}
 
-		if (bDescending) { Result = -Result; }
+		if (bDescending)
+		{
+			Result = -Result;
+		}
 		return Result < 0;
 	}
 
@@ -302,14 +335,20 @@ namespace PCGExSorting
 			PCGExData::IDataValue* DataValueA = Rule->DataValues[A].Get();
 			PCGExData::IDataValue* DataValueB = Rule->DataValues[B].Get();
 
-			if (!DataValueA || !DataValueB) { continue; }
+			if (!DataValueA || !DataValueB)
+			{
+				continue;
+			}
 
 			if (DataValueA->IsNumeric() || DataValueB->IsNumeric())
 			{
 				const double ValueA = DataValueA->AsDouble();
 				const double ValueB = DataValueB->AsDouble();
 
-				if (FMath::IsNearlyEqual(ValueA, ValueB, Rule->Tolerance)) { continue; }
+				if (FMath::IsNearlyEqual(ValueA, ValueB, Rule->Tolerance))
+				{
+					continue;
+				}
 				Result = ValueA < ValueB ? -1 : 1;
 			}
 			else
@@ -317,15 +356,24 @@ namespace PCGExSorting
 				const FString ValueA = DataValueA->AsString();
 				const FString ValueB = DataValueB->AsString();
 
-				if (PCGExCompare::StrictlyEqual(ValueA, ValueB)) { continue; }
+				if (PCGExCompare::StrictlyEqual(ValueA, ValueB))
+				{
+					continue;
+				}
 				Result = ValueA < ValueB ? -1 : 1;
 			}
 
-			if (Rule->bInvertRule) { Result = -Result; }
+			if (Rule->bInvertRule)
+			{
+				Result = -Result;
+			}
 			break;
 		}
 
-		if (bDescending) { Result = -Result; }
+		if (bDescending)
+		{
+			Result = -Result;
+		}
 		return Result < 0;
 	}
 
@@ -420,7 +468,7 @@ namespace PCGExSorting
 			ValueArrays[RuleIdx][i] = 0.0;
 			}
 			}
-		)
+			)
 
 		return Cache;
 	}

@@ -7,18 +7,24 @@
 #include "PCGExH.h"
 #include "Containers/PCGExManagedObjects.h"
 
-#include "Details/PCGExSettingsDetails.h"
 #include "Core/PCGExProbingCandidates.h"
+#include "Details/PCGExSettingsDetails.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExProbeConfigClosest, MaxConnections, int32, MaxConnectionsInput, MaxConnectionsAttribute, MaxConnectionsConstant)
 PCGEX_CREATE_PROBE_FACTORY(Closest, {}, {})
 
 bool FPCGExProbeClosest::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	MaxConnections = Config.GetValueSettingMaxConnections();
-	if (!MaxConnections->Init(PrimaryDataFacade)) { return false; }
+	if (!MaxConnections->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	CWCoincidenceTolerance = FVector(PCGEx::SafeScalarTolerance(Config.CoincidencePreventionTolerance));
 
@@ -31,31 +37,46 @@ void FPCGExProbeClosest::ProcessCandidates(const int32 Index, TArray<PCGExProbin
 	const int32 MaxIterations = FMath::Min(MaxConnections->Read(Index), Candidates.Num());
 	const double R = GetSearchRadius(Index);
 
-	if (MaxIterations <= 0) { return; }
+	if (MaxIterations <= 0)
+	{
+		return;
+	}
 
 	TSet<uint64> LocalCoincidence;
 	int32 Additions = 0;
 
 	for (PCGExProbing::FCandidate& C : Candidates)
 	{
-		if (C.Distance > R) { return; } // Candidates are sorted, stop there.
+		if (C.Distance > R)
+		{
+			return;
+		} // Candidates are sorted, stop there.
 
 		if (Coincidence)
 		{
 			Coincidence->Add(C.GH, &bIsAlreadyConnected);
-			if (bIsAlreadyConnected) { continue; }
+			if (bIsAlreadyConnected)
+			{
+				continue;
+			}
 		}
 
 		if (Config.bPreventCoincidence)
 		{
 			LocalCoincidence.Add(PCGEx::SH3(C.Direction, CWCoincidenceTolerance), &bIsAlreadyConnected);
-			if (bIsAlreadyConnected) { continue; }
+			if (bIsAlreadyConnected)
+			{
+				continue;
+			}
 		}
 
 		OutEdges->Add(PCGEx::H64U(Index, C.PointIndex));
 
 		Additions++;
-		if (Additions >= MaxIterations) { return; }
+		if (Additions >= MaxIterations)
+		{
+			return;
+		}
 	}
 }
 

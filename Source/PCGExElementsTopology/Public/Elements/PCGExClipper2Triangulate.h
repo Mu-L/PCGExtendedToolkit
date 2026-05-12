@@ -26,8 +26,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(Clipper2Triangulate, "Clipper2 : Triangulate", "Performs Constrained Delaunay Triangulation on closed paths and outputs a Dynamic Mesh.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::DynamicMesh; }
-	virtual FLinearColor GetNodeTitleColor() const override { return FLinearColor::White; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::DynamicMesh;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return FLinearColor::White;
+	}
 #endif
 
 protected:
@@ -64,7 +72,11 @@ public:
 	bool bQuietBadVerticesWarning = false;
 
 	virtual FPCGExGeo2DProjectionDetails GetProjectionDetails() const override;
-	virtual bool SupportOpenMainPaths() const override { return false; } // Triangulation requires closed paths
+
+	virtual bool SupportOpenMainPaths() const override
+	{
+		return false;
+	} // Triangulation requires closed paths
 };
 
 /**
@@ -100,7 +112,9 @@ struct FPCGExStagedMeshOutput
 	FPCGExStagedMeshOutput() = default;
 
 	FPCGExStagedMeshOutput(UPCGDynamicMeshData* InMeshData, const TSet<FString>& InTags, int32 InOrderIndex)
-		: MeshData(InMeshData), Tags(InTags), OrderIndex(InOrderIndex)
+		: MeshData(InMeshData)
+		  , Tags(InTags)
+		  , OrderIndex(InOrderIndex)
 	{
 	}
 };

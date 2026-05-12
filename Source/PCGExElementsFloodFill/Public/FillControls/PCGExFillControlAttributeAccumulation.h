@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "Core/PCGExFillControlOperation.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
-#include "Clusters/PCGExClusterCommon.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "UObject/Object.h"
 
 #include "PCGExFillControlAttributeAccumulation.generated.h"
 
@@ -68,8 +68,15 @@ class FPCGExFillControlAttributeAccumulation : public FPCGExFillControlOperation
 	friend class UPCGExFillControlsFactoryAttributeAccumulation;
 
 public:
-	virtual bool DoesScoring() const override { return true; }
-	virtual bool ChecksCandidate() const override { return true; }
+	virtual bool DoesScoring() const override
+	{
+		return true;
+	}
+
+	virtual bool ChecksCandidate() const override
+	{
+		return true;
+	}
 
 	virtual bool PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler) override;
 	virtual void ScoreCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, PCGExFloodFill::FCandidate& OutCandidate) override;

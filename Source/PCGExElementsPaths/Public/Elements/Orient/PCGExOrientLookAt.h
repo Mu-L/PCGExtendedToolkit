@@ -27,7 +27,10 @@ public:
 
 	virtual bool PrepareForData(const TSharedRef<PCGExData::FFacade>& InDataFacade, const TSharedRef<PCGExPaths::FPath>& InPath) override
 	{
-		if (!FPCGExOrientOperation::PrepareForData(InDataFacade, InPath)) { return false; }
+		if (!FPCGExOrientOperation::PrepareForData(InDataFacade, InPath))
+		{
+			return false;
+		}
 
 		if (LookAt == EPCGExOrientLookAtMode::Direction || LookAt == EPCGExOrientLookAtMode::Position)
 		{
@@ -46,10 +49,14 @@ public:
 	{
 		switch (LookAt)
 		{
-		default: case EPCGExOrientLookAtMode::NextPoint: return LookAtAxis(Point.GetTransform(), Path->DirToNextPoint(Point.Index), DirectionMultiplier);
-		case EPCGExOrientLookAtMode::PreviousPoint: return LookAtAxis(Point.GetTransform(), Path->DirToPrevPoint(Point.Index), DirectionMultiplier);
-		case EPCGExOrientLookAtMode::Direction: return LookAtDirection(Point.GetTransform(), Point.Index, DirectionMultiplier);
-		case EPCGExOrientLookAtMode::Position: return LookAtPosition(Point.GetTransform(), Point.Index, DirectionMultiplier);
+		default: case EPCGExOrientLookAtMode::NextPoint:
+			return LookAtAxis(Point.GetTransform(), Path->DirToNextPoint(Point.Index), DirectionMultiplier);
+		case EPCGExOrientLookAtMode::PreviousPoint:
+			return LookAtAxis(Point.GetTransform(), Path->DirToPrevPoint(Point.Index), DirectionMultiplier);
+		case EPCGExOrientLookAtMode::Direction:
+			return LookAtDirection(Point.GetTransform(), Point.Index, DirectionMultiplier);
+		case EPCGExOrientLookAtMode::Position:
+			return LookAtPosition(Point.GetTransform(), Point.Index, DirectionMultiplier);
 		}
 	}
 

@@ -32,13 +32,16 @@ namespace PCGExData
 		{
 			switch (Part)
 			{
-			case PCGExTypeOps::ETransformPart::Position: *static_cast<FVector*>(OutValue) = Transform.GetLocation();
+			case PCGExTypeOps::ETransformPart::Position:
+				*static_cast<FVector*>(OutValue) = Transform.GetLocation();
 				OutType = EPCGMetadataTypes::Vector;
 				break;
-			case PCGExTypeOps::ETransformPart::Rotation: *static_cast<FQuat*>(OutValue) = Transform.GetRotation();
+			case PCGExTypeOps::ETransformPart::Rotation:
+				*static_cast<FQuat*>(OutValue) = Transform.GetRotation();
 				OutType = EPCGMetadataTypes::Quaternion;
 				break;
-			case PCGExTypeOps::ETransformPart::Scale: *static_cast<FVector*>(OutValue) = Transform.GetScale3D();
+			case PCGExTypeOps::ETransformPart::Scale:
+				*static_cast<FVector*>(OutValue) = Transform.GetScale3D();
 				OutType = EPCGMetadataTypes::Vector;
 				break;
 			}
@@ -48,12 +51,27 @@ namespace PCGExData
 		{
 			switch (Part)
 			{
-			case PCGExTypeOps::ETransformPart::Position: if (ValueType == EPCGMetadataTypes::Vector) { Transform.SetLocation(*static_cast<const FVector*>(Value)); }
+			case PCGExTypeOps::ETransformPart::Position:
+				if (ValueType == EPCGMetadataTypes::Vector)
+				{
+					Transform.SetLocation(*static_cast<const FVector*>(Value));
+				}
 				break;
-			case PCGExTypeOps::ETransformPart::Rotation: if (ValueType == EPCGMetadataTypes::Quaternion) { Transform.SetRotation(*static_cast<const FQuat*>(Value)); }
-				else if (ValueType == EPCGMetadataTypes::Rotator) { Transform.SetRotation(static_cast<const FRotator*>(Value)->Quaternion()); }
+			case PCGExTypeOps::ETransformPart::Rotation:
+				if (ValueType == EPCGMetadataTypes::Quaternion)
+				{
+					Transform.SetRotation(*static_cast<const FQuat*>(Value));
+				}
+				else if (ValueType == EPCGMetadataTypes::Rotator)
+				{
+					Transform.SetRotation(static_cast<const FRotator*>(Value)->Quaternion());
+				}
 				break;
-			case PCGExTypeOps::ETransformPart::Scale: if (ValueType == EPCGMetadataTypes::Vector) { Transform.SetScale3D(*static_cast<const FVector*>(Value)); }
+			case PCGExTypeOps::ETransformPart::Scale:
+				if (ValueType == EPCGMetadataTypes::Vector)
+				{
+					Transform.SetScale3D(*static_cast<const FVector*>(Value));
+				}
 				break;
 			}
 		}
@@ -75,11 +93,30 @@ namespace PCGExData
 
 		//~ Begin ISubSelectorOps interface
 
-		virtual EPCGMetadataTypes GetTypeId() const override { return Traits::Type; }
-		virtual int32 GetNumFields() const override { return SubSelectionTraits::NumFields; }
-		virtual bool SupportsFieldExtraction() const override { return SubSelectionTraits::bSupportsFieldExtraction; }
-		virtual bool SupportsAxisExtraction() const override { return SubSelectionTraits::bSupportsAxisExtraction; }
-		virtual bool SupportsComponentExtraction() const override { return SubSelectionTraits::bSupportsComponentExtraction; }
+		virtual EPCGMetadataTypes GetTypeId() const override
+		{
+			return Traits::Type;
+		}
+
+		virtual int32 GetNumFields() const override
+		{
+			return SubSelectionTraits::NumFields;
+		}
+
+		virtual bool SupportsFieldExtraction() const override
+		{
+			return SubSelectionTraits::bSupportsFieldExtraction;
+		}
+
+		virtual bool SupportsAxisExtraction() const override
+		{
+			return SubSelectionTraits::bSupportsAxisExtraction;
+		}
+
+		virtual bool SupportsComponentExtraction() const override
+		{
+			return SubSelectionTraits::bSupportsComponentExtraction;
+		}
 
 		virtual double ExtractField(const void* Value, PCGExTypeOps::ESingleField Field) const override
 		{
@@ -93,8 +130,14 @@ namespace PCGExData
 
 		virtual FVector ExtractAxis(const void* Value, EPCGExAxis Axis) const override
 		{
-			if constexpr (PCGExTypes::TTraits<T>::bIsRotation) { return PCGExTypeOps::FTypeOps<T>::ExtractAxis(Value, Axis); }
-			else { return FVector::ForwardVector; }
+			if constexpr (PCGExTypes::TTraits<T>::bIsRotation)
+			{
+				return PCGExTypeOps::FTypeOps<T>::ExtractAxis(Value, Axis);
+			}
+			else
+			{
+				return FVector::ForwardVector;
+			}
 		}
 
 		virtual void ExtractComponent(const void* Transform, PCGExTypeOps::ETransformPart Part, void* OutValue, EPCGMetadataTypes& OutType) const override
@@ -107,7 +150,10 @@ namespace PCGExData
 
 		virtual void InjectComponent(void* Transform, PCGExTypeOps::ETransformPart Part, const void* Value, EPCGMetadataTypes ValueType) const override
 		{
-			if constexpr (std::is_same_v<T, FTransform>) { PCGExTypeOps::FTypeOps<T>::InjectComponent(Transform, Part, Value, ValueType); }
+			if constexpr (std::is_same_v<T, FTransform>)
+			{
+				PCGExTypeOps::FTypeOps<T>::InjectComponent(Transform, Part, Value, ValueType);
+			}
 		}
 
 		virtual void ApplyGetSelection(const void* Value, const FSubSelection& Selection, void* OutValue, EPCGMetadataTypes& OutType) const override
@@ -256,8 +302,14 @@ namespace PCGExData
 							PCGExTypeOps::FConversionTable::Convert(SourceType, Source, EPCGMetadataTypes::Double, &ScalarValue);
 							PCGExTypeOps::FTypeOps<FVector>::InjectField(&Vec, ScalarValue, Selection.Field);
 
-							if (Selection.Component == PCGExTypeOps::ETransformPart::Position) { Target.SetLocation(Vec); }
-							else { Target.SetScale3D(Vec); }
+							if (Selection.Component == PCGExTypeOps::ETransformPart::Position)
+							{
+								Target.SetLocation(Vec);
+							}
+							else
+							{
+								Target.SetScale3D(Vec);
+							}
 						}
 						else
 						{

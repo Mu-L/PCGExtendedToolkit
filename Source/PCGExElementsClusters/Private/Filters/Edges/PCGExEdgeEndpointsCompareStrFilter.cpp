@@ -20,7 +20,10 @@ void UPCGExEdgeEndpointsCompareStrFilterFactory::RegisterBuffersDependencies(FPC
 
 bool UPCGExEdgeEndpointsCompareStrFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_SELECTOR(Config.Attribute, Consumable)
@@ -37,7 +40,10 @@ namespace PCGExEdgeEndpointsCompareStr
 {
 	bool FFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 	{
-		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
+		{
+			return false;
+		}
 
 		StringBuffer = InPointDataFacade->GetBroadcaster<FString>(TypedFilterFactory->Config.Attribute, false, PCGEX_QUIET_HANDLING);
 		if (!StringBuffer)

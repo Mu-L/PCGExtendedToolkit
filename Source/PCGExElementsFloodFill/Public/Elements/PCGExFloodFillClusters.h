@@ -7,8 +7,8 @@
 #include "Containers/PCGExScopedContainers.h"
 
 #include "Core/PCGExClustersProcessor.h"
-#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Core/PCGExFloodFill.h"
+#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Sampling/PCGExSamplingCommon.h"
 #include "PCGExFloodFillClusters.generated.h"
 
@@ -93,7 +93,11 @@ public:
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
 
 protected:
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;

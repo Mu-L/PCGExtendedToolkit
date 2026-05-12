@@ -38,7 +38,10 @@ bool FPCGExSpatialDomain::Overlaps(
 	// identity to filter on. The Broadphase override honors them via the
 	// per-entry callback in its broadphase walk.
 	const FBox AABB = Candidate.GetWorldAABB();
-	if (!AABB.IsValid) { return false; }
+	if (!AABB.IsValid)
+	{
+		return false;
+	}
 
 	return QueryOBB(PCGExMath::OBB::Factory::FromAABB(AABB, INDEX_NONE)) <= 0.0f;
 }

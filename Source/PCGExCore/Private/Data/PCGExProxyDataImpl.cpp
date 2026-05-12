@@ -4,8 +4,8 @@
 #include "Data/PCGExProxyDataImpl.h"
 
 #include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
 #include "Data/PCGExPointElements.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/PCGPointArrayData.h"
 
 namespace PCGExData
@@ -26,9 +26,15 @@ namespace PCGExData
 		T_REAL* RealValue = (Buffer->GetData() + Index);
 
 		// Use direct conversion function
-		if (RealType != WorkingType) { RealToWorking(RealValue, OutValue); }
+		if (RealType != WorkingType)
+		{
+			RealToWorking(RealValue, OutValue);
+		}
 		// Same type - direct get
-		else { *static_cast<T_REAL*>(OutValue) = *RealValue; }
+		else
+		{
+			*static_cast<T_REAL*>(OutValue) = *RealValue;
+		}
 	}
 
 	template <typename T_REAL>
@@ -37,9 +43,15 @@ namespace PCGExData
 		check(Buffer);
 
 		// Use direct conversion function
-		if (RealType != WorkingType) { WorkingToReal(Value, (Buffer->GetData() + Index)); }
+		if (RealType != WorkingType)
+		{
+			WorkingToReal(Value, (Buffer->GetData() + Index));
+		}
 		// Same type - direct set
-		else { *(Buffer->GetData() + Index) = *static_cast<const T_REAL*>(Value); }
+		else
+		{
+			*(Buffer->GetData() + Index) = *static_cast<const T_REAL*>(Value);
+		}
 	}
 
 	template <typename T_REAL>
@@ -174,35 +186,50 @@ namespace PCGExData
 
 		switch (Property)
 		{
-		case EPCGPointProperties::Density: *static_cast<float*>(OutValue) = Point.GetDensity();
+		case EPCGPointProperties::Density:
+			*static_cast<float*>(OutValue) = Point.GetDensity();
 			break;
-		case EPCGPointProperties::BoundsMin: *static_cast<FVector*>(OutValue) = Point.GetBoundsMin();
+		case EPCGPointProperties::BoundsMin:
+			*static_cast<FVector*>(OutValue) = Point.GetBoundsMin();
 			break;
-		case EPCGPointProperties::BoundsMax: *static_cast<FVector*>(OutValue) = Point.GetBoundsMax();
+		case EPCGPointProperties::BoundsMax:
+			*static_cast<FVector*>(OutValue) = Point.GetBoundsMax();
 			break;
-		case EPCGPointProperties::Extents: *static_cast<FVector*>(OutValue) = Point.GetExtents();
+		case EPCGPointProperties::Extents:
+			*static_cast<FVector*>(OutValue) = Point.GetExtents();
 			break;
-		case EPCGPointProperties::Color: *static_cast<FVector4*>(OutValue) = Point.GetColor();
+		case EPCGPointProperties::Color:
+			*static_cast<FVector4*>(OutValue) = Point.GetColor();
 			break;
-		case EPCGPointProperties::Position: *static_cast<FVector*>(OutValue) = Point.GetLocation();
+		case EPCGPointProperties::Position:
+			*static_cast<FVector*>(OutValue) = Point.GetLocation();
 			break;
-		case EPCGPointProperties::Rotation: *static_cast<FQuat*>(OutValue) = Point.GetRotation();
+		case EPCGPointProperties::Rotation:
+			*static_cast<FQuat*>(OutValue) = Point.GetRotation();
 			break;
-		case EPCGPointProperties::Scale: *static_cast<FVector*>(OutValue) = Point.GetScale3D();
+		case EPCGPointProperties::Scale:
+			*static_cast<FVector*>(OutValue) = Point.GetScale3D();
 			break;
-		case EPCGPointProperties::Transform: *static_cast<FTransform*>(OutValue) = Point.GetTransform();
+		case EPCGPointProperties::Transform:
+			*static_cast<FTransform*>(OutValue) = Point.GetTransform();
 			break;
-		case EPCGPointProperties::Steepness: *static_cast<float*>(OutValue) = Point.GetSteepness();
+		case EPCGPointProperties::Steepness:
+			*static_cast<float*>(OutValue) = Point.GetSteepness();
 			break;
-		case EPCGPointProperties::LocalCenter: *static_cast<FVector*>(OutValue) = Point.GetLocalCenter();
+		case EPCGPointProperties::LocalCenter:
+			*static_cast<FVector*>(OutValue) = Point.GetLocalCenter();
 			break;
-		case EPCGPointProperties::LocalSize: *static_cast<FVector*>(OutValue) = Point.GetLocalSize();
+		case EPCGPointProperties::LocalSize:
+			*static_cast<FVector*>(OutValue) = Point.GetLocalSize();
 			break;
-		case EPCGPointProperties::ScaledLocalSize: *static_cast<FVector*>(OutValue) = Point.GetScaledLocalSize();
+		case EPCGPointProperties::ScaledLocalSize:
+			*static_cast<FVector*>(OutValue) = Point.GetScaledLocalSize();
 			break;
-		case EPCGPointProperties::Seed: *static_cast<int32*>(OutValue) = Point.GetSeed();
+		case EPCGPointProperties::Seed:
+			*static_cast<int32*>(OutValue) = Point.GetSeed();
 			break;
-		default: break;
+		default:
+			break;
 		}
 	}
 
@@ -213,29 +240,41 @@ namespace PCGExData
 
 		switch (Property)
 		{
-		case EPCGPointProperties::Density: Point.SetDensity(*static_cast<const float*>(Value));
+		case EPCGPointProperties::Density:
+			Point.SetDensity(*static_cast<const float*>(Value));
 			break;
-		case EPCGPointProperties::BoundsMin: Point.SetBoundsMin(*static_cast<const FVector*>(Value));
+		case EPCGPointProperties::BoundsMin:
+			Point.SetBoundsMin(*static_cast<const FVector*>(Value));
 			break;
-		case EPCGPointProperties::BoundsMax: Point.SetBoundsMax(*static_cast<const FVector*>(Value));
+		case EPCGPointProperties::BoundsMax:
+			Point.SetBoundsMax(*static_cast<const FVector*>(Value));
 			break;
-		case EPCGPointProperties::Extents: Point.SetExtents(*static_cast<const FVector*>(Value));
+		case EPCGPointProperties::Extents:
+			Point.SetExtents(*static_cast<const FVector*>(Value));
 			break;
-		case EPCGPointProperties::Color: Point.SetColor(*static_cast<const FVector4*>(Value));
+		case EPCGPointProperties::Color:
+			Point.SetColor(*static_cast<const FVector4*>(Value));
 			break;
-		case EPCGPointProperties::Position: Point.SetLocation(*static_cast<const FVector*>(Value));
+		case EPCGPointProperties::Position:
+			Point.SetLocation(*static_cast<const FVector*>(Value));
 			break;
-		case EPCGPointProperties::Rotation: Point.SetRotation(*static_cast<const FQuat*>(Value));
+		case EPCGPointProperties::Rotation:
+			Point.SetRotation(*static_cast<const FQuat*>(Value));
 			break;
-		case EPCGPointProperties::Scale: Point.SetScale3D(*static_cast<const FVector*>(Value));
+		case EPCGPointProperties::Scale:
+			Point.SetScale3D(*static_cast<const FVector*>(Value));
 			break;
-		case EPCGPointProperties::Transform: Point.SetTransform(*static_cast<const FTransform*>(Value));
+		case EPCGPointProperties::Transform:
+			Point.SetTransform(*static_cast<const FTransform*>(Value));
 			break;
-		case EPCGPointProperties::Steepness: Point.SetSteepness(*static_cast<const float*>(Value));
+		case EPCGPointProperties::Steepness:
+			Point.SetSteepness(*static_cast<const float*>(Value));
 			break;
-		case EPCGPointProperties::Seed: Point.SetSeed(*static_cast<const int32*>(Value));
+		case EPCGPointProperties::Seed:
+			Point.SetSeed(*static_cast<const int32*>(Value));
 			break;
-		default: break;
+		default:
+			break;
 		}
 	}
 
@@ -314,8 +353,10 @@ namespace PCGExData
 	{
 		switch (InProperty)
 		{
-		case EPCGExtraProperties::Index: return EPCGMetadataTypes::Integer32;
-		default: return EPCGMetadataTypes::Unknown;
+		case EPCGExtraProperties::Index:
+			return EPCGMetadataTypes::Integer32;
+		default:
+			return EPCGMetadataTypes::Unknown;
 		}
 	}
 
@@ -324,9 +365,11 @@ namespace PCGExData
 		int32 Value = 0;
 		switch (Property)
 		{
-		case EPCGExtraProperties::Index: Value = Index;
+		case EPCGExtraProperties::Index:
+			Value = Index;
 			break;
-		default: break;
+		default:
+			break;
 		}
 
 		if (WorkingType == EPCGMetadataTypes::Integer32)
@@ -349,9 +392,11 @@ namespace PCGExData
 		int32 Value = 0;
 		switch (Property)
 		{
-		case EPCGExtraProperties::Index: Value = Index;
+		case EPCGExtraProperties::Index:
+			Value = Index;
 			break;
-		default: break;
+		default:
+			break;
 		}
 		return PCGExTypes::ComputeHash(Value);
 	}

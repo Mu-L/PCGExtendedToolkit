@@ -5,8 +5,8 @@
 
 #include <functional>
 #include "CoreMinimal.h"
-#include "PCGExOctree.h"
 #include "PCGExCoreMacros.h"
+#include "PCGExOctree.h"
 #include "Math/PCGExMath.h"
 #include "Math/PCGExProjectionDetails.h"
 #include "Utils/PCGValueRange.h"
@@ -52,7 +52,10 @@ namespace PCGExPaths
 		bool ShareIndices(const FPathEdge& Other) const;
 		bool Connects(const FPathEdge& Other) const;
 		bool ShareIndices(const FPathEdge* Other) const;
-		FORCEINLINE double GetLength() const { return Length; }
+		FORCEINLINE double GetLength() const
+		{
+			return Length;
+		}
 	};
 
 	class FPath;
@@ -70,10 +73,21 @@ namespace PCGExPaths
 
 		virtual ~IPathEdgeExtra() = default;
 
-		virtual void ProcessSingleEdge(const FPath* Path, const FPathEdge& Edge) { ProcessFirstEdge(Path, Edge); }
-		virtual void ProcessFirstEdge(const FPath* Path, const FPathEdge& Edge) { ProcessEdge(Path, Edge); };
+		virtual void ProcessSingleEdge(const FPath* Path, const FPathEdge& Edge)
+		{
+			ProcessFirstEdge(Path, Edge);
+		}
+
+		virtual void ProcessFirstEdge(const FPath* Path, const FPathEdge& Edge)
+		{
+			ProcessEdge(Path, Edge);
+		};
 		virtual void ProcessEdge(const FPath* Path, const FPathEdge& Edge) = 0;
-		virtual void ProcessLastEdge(const FPath* Path, const FPathEdge& Edge) { ProcessEdge(Path, Edge); }
+
+		virtual void ProcessLastEdge(const FPath* Path, const FPathEdge& Edge)
+		{
+			ProcessEdge(Path, Edge);
+		}
 
 		virtual void ProcessingDone(const FPath* Path);
 	};
@@ -90,16 +104,45 @@ namespace PCGExPaths
 		explicit TPathEdgeExtra(const int32 InNumSegments, bool InClosedLoop)
 			: IPathEdgeExtra(InNumSegments, InClosedLoop)
 		{
-			if constexpr (std::is_trivially_copyable_v<T>) { Data.SetNumUninitialized(InNumSegments); }
-			else { Data.SetNum(InNumSegments); }
+			if constexpr (std::is_trivially_copyable_v<T>)
+			{
+				Data.SetNumUninitialized(InNumSegments);
+			}
+			else
+			{
+				Data.SetNum(InNumSegments);
+			}
 		}
 
-		FORCEINLINE T& operator[](const int32 At) { return Data[At]; }
-		FORCEINLINE T operator[](const int32 At) const { return Data[At]; }
-		FORCEINLINE void Set(const int32 At, const T Value) { Data[At] = Value; }
-		FORCEINLINE T Get(const int32 At) { return Data[At]; }
-		FORCEINLINE T& GetMutable(const int32 At) { return Data[At]; }
-		FORCEINLINE T Get(const FPathEdge& At) { return Data[At.Start]; }
+		FORCEINLINE T& operator[](const int32 At)
+		{
+			return Data[At];
+		}
+
+		FORCEINLINE T operator[](const int32 At) const
+		{
+			return Data[At];
+		}
+
+		FORCEINLINE void Set(const int32 At, const T Value)
+		{
+			Data[At] = Value;
+		}
+
+		FORCEINLINE T Get(const int32 At)
+		{
+			return Data[At];
+		}
+
+		FORCEINLINE T& GetMutable(const int32 At)
+		{
+			return Data[At];
+		}
+
+		FORCEINLINE T Get(const FPathEdge& At)
+		{
+			return Data[At.Start];
+		}
 	};
 
 	PCGEX_OCTREE_SEMANTICS(FPathEdge, { return Element->Bounds;}, { return A == B; })
@@ -137,23 +180,53 @@ namespace PCGExPaths
 		double TotalLength = 0;
 
 		PCGExMT::FScope GetEdgeScope(const int32 InLoopIndex = -1) const;
-		const TConstPCGValueRange<FTransform>& GetPositions() const { return Positions; }
+
+		const TConstPCGValueRange<FTransform>& GetPositions() const
+		{
+			return Positions;
+		}
 
 		int32 LoopPointIndex(const int32 Index) const;
 		int32 SafePointIndex(const int32 Index) const;
 
-		FORCEINLINE virtual FVector GetPos(const int32 Index) const { return Positions[SafePointIndex(Index)].GetLocation(); }
-		FORCEINLINE virtual FVector GetPos_Unsafe(const int32 Index) const { return Positions[Index].GetLocation(); }
-		FORCEINLINE bool IsValidEdgeIndex(const int32 Index) const { return Index >= 0 && Index < NumEdges; }
+		FORCEINLINE virtual FVector GetPos(const int32 Index) const
+		{
+			return Positions[SafePointIndex(Index)].GetLocation();
+		}
+
+		FORCEINLINE virtual FVector GetPos_Unsafe(const int32 Index) const
+		{
+			return Positions[Index].GetLocation();
+		}
+
+		FORCEINLINE bool IsValidEdgeIndex(const int32 Index) const
+		{
+			return Index >= 0 && Index < NumEdges;
+		}
 
 		virtual FVector DirToNextPoint(const int32 Index) const;
-		FVector DirToPrevPoint(const int32 Index) const { return DirToNextPoint(SafePointIndex(Index - 1)) * -1; }
+
+		FVector DirToPrevPoint(const int32 Index) const
+		{
+			return DirToNextPoint(SafePointIndex(Index - 1)) * -1;
+		}
+
 		FVector DirToNeighbor(const int32 Index, const int32 Offset) const;
 
-		virtual int32 NextPointIndex(const int32 Index) const { return SafePointIndex(Index + 1); }
-		virtual int32 PrevPointIndex(const int32 Index) const { return SafePointIndex(Index - 1); }
+		virtual int32 NextPointIndex(const int32 Index) const
+		{
+			return SafePointIndex(Index + 1);
+		}
 
-		FVector GetEdgePositionAtAlpha(const FPathEdge& Edge, const double Alpha) const { return FMath::Lerp(Positions[Edge.End].GetLocation(), Positions[Edge.Start].GetLocation(), Alpha); }
+		virtual int32 PrevPointIndex(const int32 Index) const
+		{
+			return SafePointIndex(Index - 1);
+		}
+
+		FVector GetEdgePositionAtAlpha(const FPathEdge& Edge, const double Alpha) const
+		{
+			return FMath::Lerp(Positions[Edge.End].GetLocation(), Positions[Edge.Start].GetLocation(), Alpha);
+		}
 
 		FVector GetEdgePositionAtAlpha(const int32 Index, const double Alpha) const
 		{
@@ -161,8 +234,15 @@ namespace PCGExPaths
 			return FMath::Lerp(Positions[Edge.Start].GetLocation(), Positions[Edge.End].GetLocation(), Alpha);
 		}
 
-		virtual bool IsEdgeValid(const FPathEdge& Edge) const { return FVector::DistSquared(GetPos_Unsafe(Edge.Start), GetPos_Unsafe(Edge.End)) > 0; }
-		virtual bool IsEdgeValid(const int32 Index) const { return IsEdgeValid(Edges[Index]); }
+		virtual bool IsEdgeValid(const FPathEdge& Edge) const
+		{
+			return FVector::DistSquared(GetPos_Unsafe(Edge.Start), GetPos_Unsafe(Edge.End)) > 0;
+		}
+
+		virtual bool IsEdgeValid(const int32 Index) const
+		{
+			return IsEdgeValid(Edges[Index]);
+		}
 
 		PCGExMath::FClosestPosition FindClosestIntersection(const FPCGExPathIntersectionDetails& InDetails, const PCGExMath::FSegment& Segment) const;
 
@@ -172,8 +252,15 @@ namespace PCGExPaths
 		void BuildPartialEdgeOctree(const TArray<int8>& Filter);
 		void BuildPartialEdgeOctree(const TBitArray<>& Filter);
 
-		const FPathEdgeOctree* GetEdgeOctree() const { return EdgeOctree.Get(); }
-		FORCEINLINE bool IsClosedLoop() const { return bClosedLoop; }
+		const FPathEdgeOctree* GetEdgeOctree() const
+		{
+			return EdgeOctree.Get();
+		}
+
+		FORCEINLINE bool IsClosedLoop() const
+		{
+			return bClosedLoop;
+		}
 
 		void UpdateConvexity(const int32 Index);
 
@@ -192,12 +279,18 @@ namespace PCGExPaths
 				{
 					if (bClosedLoop)
 					{
-						for (int i = 0; i < NumEdges; ++i) { Extra->ProcessEdge(this, Edges[i]); }
+						for (int i = 0; i < NumEdges; ++i)
+						{
+							Extra->ProcessEdge(this, Edges[i]);
+						}
 					}
 					else
 					{
 						Extra->ProcessFirstEdge(this, Edges[0]);
-						for (int i = 1; i < LastEdge; ++i) { Extra->ProcessEdge(this, Edges[i]); }
+						for (int i = 1; i < LastEdge; ++i)
+						{
+							Extra->ProcessEdge(this, Edges[i]);
+						}
 						Extra->ProcessLastEdge(this, Edges[LastEdge]);
 					}
 				}
@@ -236,8 +329,15 @@ namespace PCGExPaths
 		void BuildProjection(const FPCGExGeo2DProjectionDetails& InProjectionDetails);
 		void OffsetProjection(const double Offset);
 
-		const TArray<FVector2D>& GetProjectedPoints() const { return ProjectedPoints; }
-		const FPCGExGeo2DProjectionDetails& GetProjection() const { return Projection; }
+		const TArray<FVector2D>& GetProjectedPoints() const
+		{
+			return ProjectedPoints;
+		}
+
+		const FPCGExGeo2DProjectionDetails& GetProjection() const
+		{
+			return Projection;
+		}
 
 		virtual bool IsInsideProjection(const FVector& WorldPosition) const;
 		virtual bool Contains(const TConstPCGValueRange<FTransform>& InPositions, const double Tolerance = 0) const;
@@ -256,7 +356,8 @@ namespace PCGExPaths
 		ProcessEdgeFunc ProcessEdgeCallback;
 
 		explicit FPathEdgeCustomData(const int32 InNumSegments, const bool InClosedLoop, ProcessEdgeFunc&& Func)
-			: TPathEdgeExtra<T>(InNumSegments, InClosedLoop), ProcessEdgeCallback(Func)
+			: TPathEdgeExtra<T>(InNumSegments, InClosedLoop)
+			  , ProcessEdgeCallback(Func)
 		{
 		}
 
@@ -298,7 +399,8 @@ namespace PCGExPaths
 
 	public:
 		explicit FPathEdgeNormal(const int32 InNumSegments, const bool InClosedLoop, const FVector& InUp)
-			: TPathEdgeExtra(InNumSegments, InClosedLoop), Up(InUp)
+			: TPathEdgeExtra(InNumSegments, InClosedLoop)
+			  , Up(InUp)
 		{
 		}
 
@@ -313,7 +415,8 @@ namespace PCGExPaths
 		TArray<FVector> Normals;
 
 		explicit FPathEdgeBinormal(const int32 InNumSegments, const bool InClosedLoop, const FVector& InUp = FVector::UpVector)
-			: TPathEdgeExtra(InNumSegments, InClosedLoop), Up(InUp)
+			: TPathEdgeExtra(InNumSegments, InClosedLoop)
+			  , Up(InUp)
 		{
 			Normals.SetNumUninitialized(InNumSegments);
 		}
@@ -328,7 +431,8 @@ namespace PCGExPaths
 
 	public:
 		explicit FPathEdgeAvgNormal(const int32 InNumSegments, const bool InClosedLoop, const FVector& InUp = FVector::UpVector)
-			: TPathEdgeExtra(InNumSegments, InClosedLoop), Up(InUp)
+			: TPathEdgeExtra(InNumSegments, InClosedLoop)
+			  , Up(InUp)
 		{
 		}
 
@@ -342,7 +446,8 @@ namespace PCGExPaths
 
 	public:
 		explicit FPathEdgeHalfAngle(const int32 InNumSegments, const bool InClosedLoop, const FVector& InUp = FVector::UpVector)
-			: TPathEdgeExtra(InNumSegments, InClosedLoop), Up(InUp)
+			: TPathEdgeExtra(InNumSegments, InClosedLoop)
+			  , Up(InUp)
 		{
 		}
 
@@ -356,7 +461,8 @@ namespace PCGExPaths
 
 	public:
 		explicit FPathEdgeFullAngle(const int32 InNumSegments, const bool InClosedLoop, const FVector& InUp = FVector::UpVector)
-			: TPathEdgeExtra(InNumSegments, InClosedLoop), Up(InUp)
+			: TPathEdgeExtra(InNumSegments, InClosedLoop)
+			  , Up(InUp)
 		{
 		}
 

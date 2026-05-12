@@ -29,7 +29,10 @@ bool PCGExPCGInterop::FGenerationConfig::TriggerGeneration(UPCGComponent* Compon
 {
 	bOutShouldWatch = false;
 
-	if (Component->IsCleaningUp()) { return false; }
+	if (Component->IsCleaningUp())
+	{
+		return false;
+	}
 
 	// Already generating - just watch
 	if (Component->IsGenerating())
@@ -144,7 +147,10 @@ PCGExPCGInterop::FGenerationWatcher::~FGenerationWatcher()
 
 void PCGExPCGInterop::FGenerationWatcher::Watch(UPCGComponent* InComponent)
 {
-	if (GenerationConfig.ShouldIgnore(InComponent->GenerationTrigger)) { return; }
+	if (GenerationConfig.ShouldIgnore(InComponent->GenerationTrigger))
+	{
+		return;
+	}
 
 	WatcherTracker->IncrementPending();
 	ProcessComponent(InComponent);
@@ -191,7 +197,10 @@ void PCGExPCGInterop::FGenerationWatcher::WatchComponentGeneration(UPCGComponent
 
 		if (!Watcher || !Component)
 		{
-			if (Watcher) { Watcher->WatcherTracker->IncrementCompleted(); }
+			if (Watcher)
+			{
+				Watcher->WatcherTracker->IncrementCompleted();
+			}
 			return;
 		}
 

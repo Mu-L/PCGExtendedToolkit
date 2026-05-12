@@ -16,7 +16,10 @@ void FPCGExNoise3DConfigBase::Init()
 
 bool UPCGExNoise3DFactoryData::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 	return true;
 }
 

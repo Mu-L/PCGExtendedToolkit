@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCoreMacros.h"
-#include "Core/PCGExPointsProcessor.h"
 #include "Core/PCGExPointStates.h"
+#include "Core/PCGExPointsProcessor.h"
 
 #include "PCGExWriteStates.generated.h"
 
@@ -27,8 +27,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(WriteStates, "Write States", "Writes point states as a int64 flag mask");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterState); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterState);
+	}
 #endif
 
 protected:
@@ -105,7 +113,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ClusterNodeFlag, "State : Point", "A single, filter-driven point state.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterState); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterState);
+	}
 #endif
 	//~End UPCGSettings
 

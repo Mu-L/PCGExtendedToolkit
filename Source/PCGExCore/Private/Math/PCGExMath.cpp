@@ -10,10 +10,14 @@ namespace PCGExMath
 	{
 		switch (Mode)
 		{
-		case EPCGExTruncateMode::Round: return FMath::RoundToInt(Value);
-		case EPCGExTruncateMode::Ceil: return FMath::CeilToDouble(Value);
-		case EPCGExTruncateMode::Floor: return FMath::FloorToDouble(Value);
-		default: case EPCGExTruncateMode::None: return Value;
+		case EPCGExTruncateMode::Round:
+			return FMath::RoundToInt(Value);
+		case EPCGExTruncateMode::Ceil:
+			return FMath::CeilToDouble(Value);
+		case EPCGExTruncateMode::Floor:
+			return FMath::FloorToDouble(Value);
+		default: case EPCGExTruncateMode::None:
+			return Value;
 		}
 	}
 
@@ -23,18 +27,26 @@ namespace PCGExMath
 	}
 
 	FClosestPosition::FClosestPosition(const FVector& InOrigin, const FVector& InLocation)
-		: bValid(true), Origin(InOrigin), Location(InLocation), DistSquared(FVector::DistSquared(InOrigin, InLocation))
+		: bValid(true)
+		  , Origin(InOrigin)
+		  , Location(InLocation)
+		  , DistSquared(FVector::DistSquared(InOrigin, InLocation))
 	{
 	}
 
 	FClosestPosition::FClosestPosition(const FVector& InOrigin, const FVector& InLocation, const int32 InIndex)
-		: bValid(true), Index(InIndex), Origin(InOrigin), Location(InLocation), DistSquared(FVector::DistSquared(InOrigin, InLocation))
+		: bValid(true)
+		  , Index(InIndex)
+		  , Origin(InOrigin)
+		  , Location(InLocation)
+		  , DistSquared(FVector::DistSquared(InOrigin, InLocation))
 	{
 	}
 
 	bool FClosestPosition::Update(const FVector& InLocation)
 	{
-		if (const double Dist = FVector::DistSquared(Origin, InLocation); Dist < DistSquared)
+		if (const double Dist = FVector::DistSquared(Origin, InLocation);
+			Dist < DistSquared)
 		{
 			bValid = true;
 			DistSquared = Dist;
@@ -57,7 +69,10 @@ namespace PCGExMath
 	}
 
 	FSegment::FSegment(const FVector& InA, const FVector& InB, const double Expansion)
-		: A(InA), B(InB), Direction((B - A).GetSafeNormal()), Bounds(PCGEX_BOX_TOLERANCE_INLINE(A, B, Expansion))
+		: A(InA)
+		  , B(InB)
+		  , Direction((B - A).GetSafeNormal())
+		  , Bounds(PCGEX_BOX_TOLERANCE_INLINE(A, B, Expansion))
 	{
 	}
 
@@ -68,12 +83,27 @@ namespace PCGExMath
 		// e.g. to prevent detecting shared vertices as intersections in a mesh.
 		FMath::SegmentDistToSegment(A, B, A2, B2, OutSelf, OutOther);
 
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainA)) && A == OutSelf) { return false; }
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainB)) && B == OutSelf) { return false; }
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherA)) && A2 == OutOther) { return false; }
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherB)) && B2 == OutOther) { return false; }
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainA)) && A == OutSelf)
+		{
+			return false;
+		}
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainB)) && B == OutSelf)
+		{
+			return false;
+		}
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherA)) && A2 == OutOther)
+		{
+			return false;
+		}
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherB)) && B2 == OutOther)
+		{
+			return false;
+		}
 
-		if (FVector::DistSquared(OutSelf, OutOther) >= SquaredTolerance) { return false; }
+		if (FVector::DistSquared(OutSelf, OutOther) >= SquaredTolerance)
+		{
+			return false;
+		}
 		return true;
 	}
 
@@ -81,12 +111,27 @@ namespace PCGExMath
 	{
 		FMath::SegmentDistToSegment(A, B, S.A, S.B, OutSelf, OutOther);
 
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainA)) && A == OutSelf) { return false; }
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainB)) && B == OutSelf) { return false; }
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherA)) && S.A == OutOther) { return false; }
-		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherB)) && S.B == OutOther) { return false; }
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainA)) && A == OutSelf)
+		{
+			return false;
+		}
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::MainB)) && B == OutSelf)
+		{
+			return false;
+		}
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherA)) && S.A == OutOther)
+		{
+			return false;
+		}
+		if ((Strictness & static_cast<uint8>(EPCGExIntersectionStrictness::OtherB)) && S.B == OutOther)
+		{
+			return false;
+		}
 
-		if (FVector::DistSquared(OutSelf, OutOther) >= SquaredTolerance) { return false; }
+		if (FVector::DistSquared(OutSelf, OutOther) >= SquaredTolerance)
+		{
+			return false;
+		}
 		return true;
 	}
 
@@ -126,7 +171,10 @@ namespace PCGExMath
 		// Computes the cross product of edges AB and AC, projected onto UpVector.
 		// If the sign ever flips from a previously observed sign, the polygon is concave.
 		// OutSign tracks the first non-zero sign seen; subsequent sign changes set bIsConvex=false.
-		if (!bIsConvex) { return; }
+		if (!bIsConvex)
+		{
+			return;
+		}
 
 		if (A == C)
 		{
@@ -139,8 +187,14 @@ namespace PCGExMath
 
 		if (CurrentSign != 0)
 		{
-			if (OutSign == 0) { OutSign = CurrentSign; }
-			else if (OutSign != CurrentSign) { bIsConvex = false; }
+			if (OutSign == 0)
+			{
+				OutSign = CurrentSign;
+			}
+			else if (OutSign != CurrentSign)
+			{
+				bIsConvex = false;
+			}
 		}
 	}
 

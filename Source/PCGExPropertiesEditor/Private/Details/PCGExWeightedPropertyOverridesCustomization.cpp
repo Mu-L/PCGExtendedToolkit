@@ -7,8 +7,8 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "IPropertyUtilities.h"
-#include "PropertyHandle.h"
 #include "PCGExProperty.h"
+#include "PropertyHandle.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExWeightedPropertyOverridesCustomization::MakeInstance()
@@ -57,7 +57,10 @@ void FPCGExWeightedPropertyOverridesCustomization::CustomizeHeader(
 
 FText FPCGExWeightedPropertyOverridesCustomization::GetHeaderText() const
 {
-	if (!PropertyHandlePtr.IsValid()) { return FText::FromString(TEXT("0 / 0 active")); }
+	if (!PropertyHandlePtr.IsValid())
+	{
+		return FText::FromString(TEXT("0 / 0 active"));
+	}
 
 	TArray<void*> RawData;
 	PropertyHandlePtr.Pin()->AccessRawData(RawData);
@@ -80,7 +83,10 @@ void FPCGExWeightedPropertyOverridesCustomization::CustomizeChildren(
 {
 	// Get the inherited Overrides array handle
 	TSharedPtr<IPropertyHandle> OverridesArrayHandle = PropertyHandle->GetChildHandle(TEXT("Overrides"));
-	if (!OverridesArrayHandle.IsValid()) { return; }
+	if (!OverridesArrayHandle.IsValid())
+	{
+		return;
+	}
 
 	// Structural changes (add/remove/reorder) need immediate refresh.
 	auto RefreshDelegate = FSimpleDelegate::CreateLambda([this]()

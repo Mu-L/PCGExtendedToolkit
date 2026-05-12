@@ -66,7 +66,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FEntryCountFilter(const TObjectPtr<const UPCGExEntryCountFilterFactory>& InDefinition)
-			: ICollectionFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ICollectionFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

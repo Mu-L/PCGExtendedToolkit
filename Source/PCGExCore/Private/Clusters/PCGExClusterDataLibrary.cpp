@@ -3,11 +3,11 @@
 
 #include "Clusters/PCGExClusterDataLibrary.h"
 
+#include "Clusters/PCGExCluster.h"
+#include "Clusters/PCGExClusterCommon.h"
+#include "Clusters/PCGExClustersHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
-#include "Clusters/PCGExClustersHelpers.h"
-#include "Clusters/PCGExClusterCommon.h"
 
 namespace PCGExClusters
 {
@@ -22,7 +22,10 @@ namespace PCGExClusters
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FDataLibrary::Build_Mixed);
 
-		if (InMixedCollection->Pairs.IsEmpty()) { return false; }
+		if (InMixedCollection->Pairs.IsEmpty())
+		{
+			return false;
+		}
 
 		// First, cache all "valid" vtx & edge data from the collection
 
@@ -78,7 +81,10 @@ namespace PCGExClusters
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FDataLibrary::Build);
 
-		if (InVtxCollection->IsEmpty() || InEdgeCollection->IsEmpty()) { return false; }
+		if (InVtxCollection->IsEmpty() || InEdgeCollection->IsEmpty())
+		{
+			return false;
+		}
 
 		// Gather Vtx inputs
 		for (const TSharedPtr<PCGExData::FPointIO>& VtxIO : InVtxCollection->Pairs)
@@ -164,7 +170,11 @@ namespace PCGExClusters
 	{
 		if (const PCGExDataId CurrentPairId = PCGEX_GET_DATAIDTAG(InVtxIO->Tags, PCGExClusters::Labels::TagStr_PCGExCluster))
 		{
-			if (TSharedPtr<PCGExData::FPointIOTaggedEntries> EdgesEntries = InputDictionary->GetEntries(CurrentPairId->Value); EdgesEntries && !EdgesEntries->Entries.IsEmpty()) { return EdgesEntries; }
+			if (TSharedPtr<PCGExData::FPointIOTaggedEntries> EdgesEntries = InputDictionary->GetEntries(CurrentPairId->Value);
+				EdgesEntries && !EdgesEntries->Entries.IsEmpty())
+			{
+				return EdgesEntries;
+			}
 		}
 
 		return nullptr;
@@ -174,10 +184,16 @@ namespace PCGExClusters
 	{
 		for (int i = 0; i < ProblemsTracker.Num(); i++)
 		{
-			if (ProblemsTracker[i] <= 0) { continue; }
+			if (ProblemsTracker[i] <= 0)
+			{
+				continue;
+			}
 
 			const FProblem& Problem = EProblemLogs[static_cast<EProblem>(i)];
-			if ((bSkipTrivial && !Problem.Get<0>()) || (bSkipImportant && Problem.Get<0>())) { continue; }
+			if ((bSkipTrivial && !Problem.Get<0>()) || (bSkipImportant && Problem.Get<0>()))
+			{
+				continue;
+			}
 
 			PCGE_LOG_C(Warning, GraphAndLog, InContext, Problem.Get<1>());
 		}
@@ -193,21 +209,28 @@ namespace PCGExClusters
 		// Insert Vtx as keys		
 		for (const TSharedPtr<PCGExData::FPointIO>& Vtx : TaggedVtx)
 		{
-			if (!InputDictionary->CreateKey(Vtx.ToSharedRef())) { Invalidate(Vtx, EProblem::VtxDupes); }
+			if (!InputDictionary->CreateKey(Vtx.ToSharedRef()))
+			{
+				Invalidate(Vtx, EProblem::VtxDupes);
+			}
 			Keys.Add(Vtx);
 		}
 
 		// Assign edges to their Vtx group
 		for (const TSharedPtr<PCGExData::FPointIO>& Edges : TaggedEdges)
 		{
-			if (!InputDictionary->TryAddEntry(Edges.ToSharedRef())) { Invalidate(Edges, EProblem::RoamingEdges); }
+			if (!InputDictionary->TryAddEntry(Edges.ToSharedRef()))
+			{
+				Invalidate(Edges, EProblem::RoamingEdges);
+			}
 		}
 
 		// Cleanup Vtx keys that have no edges
 		for (const TSharedPtr<PCGExData::FPointIO>& Key : Keys)
 		{
 			// Try and find paired Vtx/Edges
-			if (const TSharedPtr<PCGExData::FPointIOTaggedEntries> EdgesEntries = GetAssociatedEdges(Key); !EdgesEntries)
+			if (const TSharedPtr<PCGExData::FPointIOTaggedEntries> EdgesEntries = GetAssociatedEdges(Key);
+				!EdgesEntries)
 			{
 				Invalidate(Key, EProblem::RoamingVtx);
 				InputDictionary->RemoveKey(Key.ToSharedRef());
@@ -222,11 +245,20 @@ namespace PCGExClusters
 		bool bAlreadyInvalid = false;
 		Invalidated.Add(InPointData, &bAlreadyInvalid);
 
-		if (bDisableInvalidData) { InPointData->Disable(); }
+		if (bDisableInvalidData)
+		{
+			InPointData->Disable();
+		}
 
-		if (bAlreadyInvalid) { return; }
+		if (bAlreadyInvalid)
+		{
+			return;
+		}
 
-		if (Problem != EProblem::None) { Log(Problem); }
+		if (Problem != EProblem::None)
+		{
+			Log(Problem);
+		}
 	}
 
 	void FDataLibrary::Log(const EProblem Problem)
@@ -235,7 +267,9 @@ namespace PCGExClusters
 	}
 
 	FClusterDataForwardHandler::FClusterDataForwardHandler(const TSharedPtr<FCluster>& InCluster, const TSharedPtr<PCGExData::FDataForwardHandler>& InVtxDataForwardHandler, const TSharedPtr<PCGExData::FDataForwardHandler>& InEdgeDataForwardHandler)
-		: Cluster(InCluster), VtxDataForwardHandler(InVtxDataForwardHandler), EdgeDataForwardHandler(InEdgeDataForwardHandler)
+		: Cluster(InCluster)
+		  , VtxDataForwardHandler(InVtxDataForwardHandler)
+		  , EdgeDataForwardHandler(InEdgeDataForwardHandler)
 	{
 	}
 }

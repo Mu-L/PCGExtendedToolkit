@@ -3,9 +3,10 @@
 
 #include "Elements/PCGExPathInsert.h"
 
-#include "Algo/RemoveIf.h"
-#include "Async/TaskGraphInterfaces.h"
 #include "PCGParamData.h"
+#include "Algo/RemoveIf.h"
+#include "Async/ParallelFor.h"
+#include "Async/TaskGraphInterfaces.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -19,7 +20,6 @@
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
 #include "SubPoints/DataBlending/PCGExSubPointsBlendInterpolate.h"
-#include "Async/ParallelFor.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPathInsertElement"
 #define PCGEX_NAMESPACE PathInsert
@@ -29,7 +29,10 @@ void UPCGExPathInsertSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!Blending) { Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending")); }
+		if (!Blending)
+		{
+			Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending"));
+		}
 	}
 	Super::PostInitProperties();
 }
@@ -56,7 +59,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(PathInsert)
 
 bool FPCGExPathInsertElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathInsert)
 
@@ -114,7 +120,10 @@ bool FPCGExPathInsertElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 					if (Entry->GetNum() < 2)
 					{
 						Entry->InitializeOutput(PCGExData::EIOInit::Forward);
-						if (Settings->bTagIfNoInserts) { Entry->Tags->AddRaw(Settings->NoInsertsTag); }
+						if (Settings->bTagIfNoInserts)
+						{
+							Entry->Tags->AddRaw(Settings->NoInsertsTag);
+						}
 						bHasInvalidInputs = true;
 						return false;
 					}
@@ -187,7 +196,10 @@ namespace PCGExPathInsert
 
 		const TArray<int32>& TargetPrefixSums = *TargetPrefixSumsPtr;
 
-		if (TotalTargets == 0) { return; }
+		if (TotalTargets == 0)
+		{
+			return;
+		}
 
 		// Read range value once if constant (optimization for most common case)
 		const double MaxRange = RangeGetter ? RangeGetter->Read(0) : MAX_dbl;
@@ -240,12 +252,18 @@ namespace PCGExPathInsert
 					}
 				}
 
-				if (BestEdgeIndex < 0) { continue; }
+				if (BestEdgeIndex < 0)
+				{
+					continue;
+				}
 
 				const float BestDist = static_cast<float>(FMath::Sqrt(BestDistSq));
 
 				// Check range filter if enabled
-				if (RangeGetter && BestDist > MaxRangeF) { continue; }
+				if (RangeGetter && BestDist > MaxRangeF)
+				{
+					continue;
+				}
 
 				// Check for path extension (open paths only)
 				if (bCanExtend)
@@ -288,7 +306,10 @@ namespace PCGExPathInsert
 				{
 					const bool bAtStart = BestAlpha < KINDA_SMALL_NUMBER;
 					const bool bAtEnd = BestAlpha > (1.0 - KINDA_SMALL_NUMBER);
-					if (bAtStart || bAtEnd) { continue; }
+					if (bAtStart || bAtEnd)
+					{
+						continue;
+					}
 				}
 
 				// Add as regular edge candidate
@@ -350,7 +371,10 @@ namespace PCGExPathInsert
 		// Can't support scoped here
 		//PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
 
@@ -371,14 +395,20 @@ namespace PCGExPathInsert
 		if (Settings->bWithinRange)
 		{
 			RangeGetter = Settings->Range.GetValueSetting();
-			if (!RangeGetter->Init(PointDataFacade)) { return false; }
+			if (!RangeGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		// Initialize limit getter if limiting inserts per edge
 		if (Settings->bLimitInsertsPerEdge)
 		{
 			LimitGetter = Settings->InsertLimit.GetValueSetting();
-			if (!LimitGetter->Init(PointDataFacade)) { return false; }
+			if (!LimitGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		// Create sub-blending operation
@@ -387,7 +417,8 @@ namespace PCGExPathInsert
 
 		// Populate ignore list based on matching rules
 		IgnoreList.Add(PointDataFacade->GetIn());
-		if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true); !Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
+		if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true);
+			!Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
 		{
 			(void)Context->TargetsHandler->HandleUnmatchedOutput(PointDataFacade, true);
 			return false;
@@ -404,7 +435,10 @@ namespace PCGExPathInsert
 			for (int32 EdgeIdx = 0; EdgeIdx < Path->NumEdges; EdgeIdx++)
 			{
 				FEdgeInserts& EI = EdgeInserts[EdgeIdx];
-				if (EI.IsEmpty()) { continue; }
+				if (EI.IsEmpty())
+				{
+					continue;
+				}
 
 				int32 MaxInserts;
 				if (Settings->LimitMode == EPCGExInsertLimitMode::Discrete)
@@ -428,7 +462,10 @@ namespace PCGExPathInsert
 				if (EI.Num() > MaxInserts)
 				{
 					// Sort by distance (closest to path wins)
-					EI.Inserts.Sort([](const FInsertCandidate& A, const FInsertCandidate& B) { return A.Distance < B.Distance; });
+					EI.Inserts.Sort([](const FInsertCandidate& A, const FInsertCandidate& B)
+					{
+						return A.Distance < B.Distance;
+					});
 					// Truncate
 					EI.Inserts.SetNum(MaxInserts);
 					// Re-sort by alpha for output order
@@ -441,7 +478,10 @@ namespace PCGExPathInsert
 			// Just sort by alpha (no limits)
 			for (FEdgeInserts& EI : EdgeInserts)
 			{
-				if (!EI.IsEmpty()) { EI.SortByAlpha(); }
+				if (!EI.IsEmpty())
+				{
+					EI.SortByAlpha();
+				}
 			}
 		}
 
@@ -454,7 +494,10 @@ namespace PCGExPathInsert
 			for (int32 EdgeIdx = 0; EdgeIdx < Path->NumEdges; EdgeIdx++)
 			{
 				FEdgeInserts& EI = EdgeInserts[EdgeIdx];
-				if (EI.IsEmpty()) { continue; }
+				if (EI.IsEmpty())
+				{
+					continue;
+				}
 
 				const PCGExPaths::FPathEdge& Edge = Path->Edges[EdgeIdx];
 				const FVector EdgeStart = PathTransforms[Edge.Start].GetLocation();
@@ -469,10 +512,16 @@ namespace PCGExPathInsert
 					const FVector InsertPos = Settings->bSnapToPath ? Insert.PathLocation : Insert.OriginalLocation;
 
 					// Check distance to edge start
-					if (FVector::DistSquared(InsertPos, EdgeStart) < ToleranceSq) { continue; }
+					if (FVector::DistSquared(InsertPos, EdgeStart) < ToleranceSq)
+					{
+						continue;
+					}
 
 					// Check distance to edge end
-					if (FVector::DistSquared(InsertPos, EdgeEnd) < ToleranceSq) { continue; }
+					if (FVector::DistSquared(InsertPos, EdgeEnd) < ToleranceSq)
+					{
+						continue;
+					}
 
 					// Check distance to already accepted inserts
 					bool bTooClose = false;
@@ -500,12 +549,18 @@ namespace PCGExPathInsert
 		if (!PrePathInserts.IsEmpty())
 		{
 			// Sort ascending (most negative first = furthest from start comes first in path order)
-			PrePathInserts.Sort([](const FInsertCandidate& A, const FInsertCandidate& B) { return A.Alpha < B.Alpha; });
+			PrePathInserts.Sort([](const FInsertCandidate& A, const FInsertCandidate& B)
+			{
+				return A.Alpha < B.Alpha;
+			});
 		}
 		if (!PostPathInserts.IsEmpty())
 		{
 			// Sort ascending (smallest positive first = closest to end comes first)
-			PostPathInserts.Sort([](const FInsertCandidate& A, const FInsertCandidate& B) { return A.Alpha < B.Alpha; });
+			PostPathInserts.Sort([](const FInsertCandidate& A, const FInsertCandidate& B)
+			{
+				return A.Alpha < B.Alpha;
+			});
 		}
 
 		// Register candidates to claim map for exclusive targets mode
@@ -584,7 +639,10 @@ namespace PCGExPathInsert
 		if (TotalInserts == 0)
 		{
 			PCGEX_INIT_IO_VOID(PointIO, PCGExData::EIOInit::Forward)
-			if (Settings->bTagIfNoInserts) { PointIO->Tags->AddRaw(Settings->NoInsertsTag); }
+			if (Settings->bTagIfNoInserts)
+			{
+				PointIO->Tags->AddRaw(Settings->NoInsertsTag);
+			}
 			return;
 		}
 
@@ -710,7 +768,10 @@ namespace PCGExPathInsert
 		});
 
 		// Tag output
-		if (Settings->bTagIfHasInserts) { PointIO->Tags->AddRaw(Settings->HasInsertsTag); }
+		if (Settings->bTagIfHasInserts)
+		{
+			PointIO->Tags->AddRaw(Settings->HasInsertsTag);
+		}
 
 		// Process extension inserts (single-threaded, before parallel edge processing)
 		TPCGValueRange<FTransform> OutTransforms = PointIO->GetOut()->GetTransformValueRange(false);
@@ -735,14 +796,29 @@ namespace PCGExPathInsert
 				OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(Position);
 
 				// Write output attributes for pre-path extension
-				if (FlagWriter) { FlagWriter->SetValue(i, true); }
-				if (AlphaWriter) { AlphaWriter->SetValue(i, Insert.Alpha); } // Negative = before start
-				if (DistanceWriter) { DistanceWriter->SetValue(i, Insert.Distance); }
-				if (TargetIndexWriter) { TargetIndexWriter->SetValue(i, Insert.TargetIOIndex); }
+				if (FlagWriter)
+				{
+					FlagWriter->SetValue(i, true);
+				}
+				if (AlphaWriter)
+				{
+					AlphaWriter->SetValue(i, Insert.Alpha);
+				} // Negative = before start
+				if (DistanceWriter)
+				{
+					DistanceWriter->SetValue(i, Insert.Distance);
+				}
+				if (TargetIndexWriter)
+				{
+					TargetIndexWriter->SetValue(i, Insert.TargetIOIndex);
+				}
 				if (DirectionWriter)
 				{
 					FVector Direction = (Insert.PathLocation - Insert.OriginalLocation).GetSafeNormal();
-					if (Settings->bInvertDirection) { Direction = -Direction; }
+					if (Settings->bInvertDirection)
+					{
+						Direction = -Direction;
+					}
 					DirectionWriter->SetValue(i, Direction);
 				}
 
@@ -752,7 +828,10 @@ namespace PCGExPathInsert
 					Handler->Forward(Insert.TargetPointIndex, i);
 				}
 
-				if (i > 0) { PreMetrics.Add(Position); }
+				if (i > 0)
+				{
+					PreMetrics.Add(Position);
+				}
 			}
 
 			PreMetrics.Add(FirstPointPos);
@@ -786,14 +865,29 @@ namespace PCGExPathInsert
 				OutSeeds[InsertIndex] = PCGExRandomHelpers::ComputeSpatialSeed(Position);
 
 				// Write output attributes for post-path extension
-				if (FlagWriter) { FlagWriter->SetValue(InsertIndex, true); }
-				if (AlphaWriter) { AlphaWriter->SetValue(InsertIndex, 1.0 + Insert.Alpha); } // > 1 = after end
-				if (DistanceWriter) { DistanceWriter->SetValue(InsertIndex, Insert.Distance); }
-				if (TargetIndexWriter) { TargetIndexWriter->SetValue(InsertIndex, Insert.TargetIOIndex); }
+				if (FlagWriter)
+				{
+					FlagWriter->SetValue(InsertIndex, true);
+				}
+				if (AlphaWriter)
+				{
+					AlphaWriter->SetValue(InsertIndex, 1.0 + Insert.Alpha);
+				} // > 1 = after end
+				if (DistanceWriter)
+				{
+					DistanceWriter->SetValue(InsertIndex, Insert.Distance);
+				}
+				if (TargetIndexWriter)
+				{
+					TargetIndexWriter->SetValue(InsertIndex, Insert.TargetIOIndex);
+				}
 				if (DirectionWriter)
 				{
 					FVector Direction = (Insert.PathLocation - Insert.OriginalLocation).GetSafeNormal();
-					if (Settings->bInvertDirection) { Direction = -Direction; }
+					if (Settings->bInvertDirection)
+					{
+						Direction = -Direction;
+					}
 					DirectionWriter->SetValue(InsertIndex, Direction);
 				}
 
@@ -834,7 +928,10 @@ namespace PCGExPathInsert
 		PCGEX_SCOPE_LOOP(EdgeIndex)
 		{
 			const FEdgeInserts& EI = EdgeInserts[EdgeIndex];
-			if (EI.IsEmpty()) { continue; }
+			if (EI.IsEmpty())
+			{
+				continue;
+			}
 
 			const PCGExPaths::FPathEdge& Edge = Path->Edges[EdgeIndex];
 			const int32 OutStartIdx = StartIndices[EdgeIndex];
@@ -869,14 +966,29 @@ namespace PCGExPathInsert
 				OutSeeds[InsertIndex] = PCGExRandomHelpers::ComputeSpatialSeed(Position);
 
 				// Write output attributes
-				if (FlagWriter) { FlagWriter->SetValue(InsertIndex, true); }
-				if (AlphaWriter) { AlphaWriter->SetValue(InsertIndex, Insert.Alpha); }
-				if (DistanceWriter) { DistanceWriter->SetValue(InsertIndex, Insert.Distance); }
-				if (TargetIndexWriter) { TargetIndexWriter->SetValue(InsertIndex, Insert.TargetIOIndex); }
+				if (FlagWriter)
+				{
+					FlagWriter->SetValue(InsertIndex, true);
+				}
+				if (AlphaWriter)
+				{
+					AlphaWriter->SetValue(InsertIndex, Insert.Alpha);
+				}
+				if (DistanceWriter)
+				{
+					DistanceWriter->SetValue(InsertIndex, Insert.Distance);
+				}
+				if (TargetIndexWriter)
+				{
+					TargetIndexWriter->SetValue(InsertIndex, Insert.TargetIOIndex);
+				}
 				if (DirectionWriter)
 				{
 					FVector Direction = (Insert.PathLocation - Insert.OriginalLocation).GetSafeNormal();
-					if (Settings->bInvertDirection) { Direction = -Direction; }
+					if (Settings->bInvertDirection)
+					{
+						Direction = -Direction;
+					}
 					DirectionWriter->SetValue(InsertIndex, Direction);
 				}
 

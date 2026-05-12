@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Core/PCGExPathProcessor.h"
 #include "Collections/PCGExMeshCollection.h"
+#include "Core/PCGExPathProcessor.h"
 #include "Details/PCGExRoamingAssetCollectionDetails.h"
 #include "Details/PCGExSplineMeshDetails.h"
 #include "Details/PCGExStagingDetails.h"
@@ -56,14 +56,22 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
-	
+
 	PCGEX_NODE_INFOS(PathSplineMesh, "Staging : Spline Mesh", "Create spline mesh components from paths using asset collections.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spawner; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN(UPCGExPathProcessorSettings::GetNodeTitleColor()); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spawner;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN(UPCGExPathProcessorSettings::GetNodeTitleColor());
+	}
 
 	virtual void PostInitProperties() override;
 #endif
-	
+
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 protected:
@@ -102,7 +110,7 @@ public:
 	UPROPERTY()
 	bool bSelectorModePreUpdated = false;
 #endif
-		
+
 	/** Distribution details
 	 * Note : LEGACY Nodes only. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
@@ -200,7 +208,10 @@ public:
 	TArray<FName> PostProcessFunctionNames;
 
 protected:
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 };
 
 struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
@@ -229,7 +240,10 @@ class FPCGExPathSplineMeshElement final : public FPCGExPathProcessorElement
 {
 public:
 	// Generates artifacts
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 protected:
 	PCGEX_CAN_ONLY_EXECUTE_ON_MAIN_THREAD(true)

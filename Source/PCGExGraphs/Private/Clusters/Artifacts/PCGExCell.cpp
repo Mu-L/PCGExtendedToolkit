@@ -4,14 +4,14 @@
 #include "Clusters/Artifacts/PCGExCell.h"
 #include "Misc/ScopeExit.h"
 
-#include "Clusters/Artifacts/PCGExCellDetails.h"
 #include "Clusters/Artifacts/PCGExCachedFaceEnumerator.h"
+#include "Clusters/Artifacts/PCGExCellDetails.h"
 
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
-#include "Data/PCGExPointElements.h"
 #include "Clusters/PCGExCluster.h"
 #include "Data/PCGBasePointData.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointElements.h"
+#include "Data/PCGExPointIO.h"
 #include "Math/Geo/PCGExGeo.h"
 
 namespace PCGExClusters
@@ -54,12 +54,18 @@ namespace PCGExClusters
 	{
 		{
 			FReadScopeLock ReadScopeLock(ProjectionLock);
-			if (!ProjectedPoints.IsEmpty()) { return; }
+			if (!ProjectedPoints.IsEmpty())
+			{
+				return;
+			}
 		}
 
 		{
 			FWriteScopeLock WriteScopeLock(ProjectionLock);
-			if (!ProjectedPoints.IsEmpty()) { return; }
+			if (!ProjectedPoints.IsEmpty())
+			{
+				return;
+			}
 
 			// Project all points
 			ProjectionDetails.ProjectFlat(PointDataFacade, ProjectedPoints);
@@ -116,14 +122,23 @@ namespace PCGExClusters
 			const FVector Projected = FaceProjection.Project(Transforms[i].GetLocation());
 			const FVector2D Point2D(Projected.X, Projected.Y);
 
-			if (!PolygonBounds.IsInside(Point2D)) { continue; }
-			if (PCGExMath::Geo::IsPointInPolygon(Point2D, Polygon)) { return true; }
+			if (!PolygonBounds.IsInside(Point2D))
+			{
+				continue;
+			}
+			if (PCGExMath::Geo::IsPointInPolygon(Point2D, Polygon))
+			{
+				return true;
+			}
 		}
 
 		return false;
 	}
 
-	int32 FProjectedPointSet::Num() const { return PointDataFacade->GetNum(); }
+	int32 FProjectedPointSet::Num() const
+	{
+		return PointDataFacade->GetNum();
+	}
 
 	FCellConstraints::FCellConstraints(const FPCGExCellConstraintsDetails& InDetails)
 	{
@@ -135,23 +150,59 @@ namespace PCGExClusters
 
 		bBuildWrapper = InDetails.bOmitWrappingBounds;
 
-		if (InDetails.bOmitBelowPointCount) { MinPointCount = InDetails.MinPointCount; }
-		if (InDetails.bOmitAbovePointCount) { MaxPointCount = InDetails.MaxPointCount; }
+		if (InDetails.bOmitBelowPointCount)
+		{
+			MinPointCount = InDetails.MinPointCount;
+		}
+		if (InDetails.bOmitAbovePointCount)
+		{
+			MaxPointCount = InDetails.MaxPointCount;
+		}
 
-		if (InDetails.bOmitBelowBoundsSize) { MinBoundsSize = InDetails.MinBoundsSize; }
-		if (InDetails.bOmitAboveBoundsSize) { MaxBoundsSize = InDetails.MaxBoundsSize; }
+		if (InDetails.bOmitBelowBoundsSize)
+		{
+			MinBoundsSize = InDetails.MinBoundsSize;
+		}
+		if (InDetails.bOmitAboveBoundsSize)
+		{
+			MaxBoundsSize = InDetails.MaxBoundsSize;
+		}
 
-		if (InDetails.bOmitBelowArea) { MinArea = InDetails.MinArea; }
-		if (InDetails.bOmitAboveArea) { MaxArea = InDetails.MaxArea; }
+		if (InDetails.bOmitBelowArea)
+		{
+			MinArea = InDetails.MinArea;
+		}
+		if (InDetails.bOmitAboveArea)
+		{
+			MaxArea = InDetails.MaxArea;
+		}
 
-		if (InDetails.bOmitBelowPerimeter) { MinPerimeter = InDetails.MinPerimeter; }
-		if (InDetails.bOmitAbovePerimeter) { MaxPerimeter = InDetails.MaxPerimeter; }
+		if (InDetails.bOmitBelowPerimeter)
+		{
+			MinPerimeter = InDetails.MinPerimeter;
+		}
+		if (InDetails.bOmitAbovePerimeter)
+		{
+			MaxPerimeter = InDetails.MaxPerimeter;
+		}
 
-		if (InDetails.bOmitBelowSegmentLength) { MinSegmentLength = InDetails.MinSegmentLength; }
-		if (InDetails.bOmitAboveSegmentLength) { MaxSegmentLength = InDetails.MaxSegmentLength; }
+		if (InDetails.bOmitBelowSegmentLength)
+		{
+			MinSegmentLength = InDetails.MinSegmentLength;
+		}
+		if (InDetails.bOmitAboveSegmentLength)
+		{
+			MaxSegmentLength = InDetails.MaxSegmentLength;
+		}
 
-		if (InDetails.bOmitBelowCompactness) { MinCompactness = InDetails.MinCompactness; }
-		if (InDetails.bOmitAboveCompactness) { MaxCompactness = InDetails.MaxCompactness; }
+		if (InDetails.bOmitBelowCompactness)
+		{
+			MinCompactness = InDetails.MinCompactness;
+		}
+		if (InDetails.bOmitAboveCompactness)
+		{
+			MaxCompactness = InDetails.MaxCompactness;
+		}
 	}
 
 	void FCellConstraints::Reserve(const int32 InCellHashReserve)
@@ -183,7 +234,10 @@ namespace PCGExClusters
 		const TSharedRef<FCluster>& InCluster,
 		const FPCGExGeo2DProjectionDetails& ProjectionDetails)
 	{
-		if (Enumerator) { return Enumerator; }
+		if (Enumerator)
+		{
+			return Enumerator;
+		}
 
 		// Compute projection hash for cache lookup
 		const uint32 ProjHash = FFaceEnumeratorCacheFactory::ComputeProjectionHash(ProjectionDetails);
@@ -249,7 +303,10 @@ namespace PCGExClusters
 		{
 			const TArray<FRawFace>& RawFaces = Enumerator->EnumerateRawFaces();
 			const FCluster* Cluster = Enumerator->GetCluster();
-			if (!Cluster || RawFaces.IsEmpty()) { return; }
+			if (!Cluster || RawFaces.IsEmpty())
+			{
+				return;
+			}
 
 			TSharedPtr<FCellConstraints> TempConstraints = MakeShared<FCellConstraints>();
 			TempConstraints->bKeepCellsWithLeaves = true;
@@ -262,7 +319,10 @@ namespace PCGExClusters
 				TSharedPtr<FCell> Cell = MakeShared<FCell>(TempConstraints.ToSharedRef());
 				const ECellResult Result = Enumerator->BuildCellFromRawFace(RawFace, Cell, TempConstraints.ToSharedRef());
 
-				if (Result != ECellResult::Success && Result != ECellResult::Duplicate) { continue; }
+				if (Result != ECellResult::Success && Result != ECellResult::Duplicate)
+				{
+					continue;
+				}
 
 				if (Cell->Data.Area > LargestArea)
 				{
@@ -271,7 +331,10 @@ namespace PCGExClusters
 				}
 			}
 
-			if (WrapperCell) { IsUniqueCellHash(WrapperCell); }
+			if (WrapperCell)
+			{
+				IsUniqueCellHash(WrapperCell);
+			}
 			return;
 		}
 
@@ -285,7 +348,10 @@ namespace PCGExClusters
 		const FCluster* Cluster = Enumerator->GetCluster();
 		const TSharedPtr<TArray<FVector2D>>& ProjectedPositions = Enumerator->GetProjectedPositions();
 
-		if (!Cluster || !ProjectedPositions) { return; }
+		if (!Cluster || !ProjectedPositions)
+		{
+			return;
+		}
 
 		// Find the wrapper face by computing signed area directly from projected positions
 		// CCW face (positive signed area) is the exterior/wrapper due to coordinate system inversion.
@@ -296,7 +362,10 @@ namespace PCGExClusters
 		for (int32 FaceIdx = 0; FaceIdx < RawFaces.Num(); ++FaceIdx)
 		{
 			const TArray<int32>& FaceNodes = RawFaces[FaceIdx].Nodes;
-			if (FaceNodes.Num() < 3) { continue; }
+			if (FaceNodes.Num() < 3)
+			{
+				continue;
+			}
 
 			// Compute signed area using shoelace formula on projected positions
 			double SignedArea = 0;
@@ -358,7 +427,10 @@ namespace PCGExClusters
 			Stack.Reserve(NumNodes);
 			Stack.Emplace(StartNode, 0);
 			WalkNodes.Add(StartNode);
-			if (bDuplicateLeaves && Nodes[StartNode].IsLeaf()) { WalkNodes.Add(StartNode); }
+			if (bDuplicateLeaves && Nodes[StartNode].IsLeaf())
+			{
+				WalkNodes.Add(StartNode);
+			}
 			VisitedNodes.Add(StartNode);
 
 			while (!Stack.IsEmpty())
@@ -376,7 +448,10 @@ namespace PCGExClusters
 					{
 						VisitedNodes.Add(NeighborNode);
 						WalkNodes.Add(NeighborNode);
-						if (bDuplicateLeaves && Nodes[NeighborNode].IsLeaf()) { WalkNodes.Add(NeighborNode); }
+						if (bDuplicateLeaves && Nodes[NeighborNode].IsLeaf())
+						{
+							WalkNodes.Add(NeighborNode);
+						}
 						Stack.Emplace(NeighborNode, 0);
 						bFoundNext = true;
 						break;
@@ -468,7 +543,10 @@ namespace PCGExClusters
 	{
 		TArray<TSharedPtr<FCell>> Result;
 
-		if (InCells.IsEmpty()) { return Result; }
+		if (InCells.IsEmpty())
+		{
+			return Result;
+		}
 
 		// Build boundary edge set via undirected hash deduplication.
 		// TMap::Remove returns the count of removed elements: 0 = first occurrence (boundary candidate),
@@ -477,7 +555,10 @@ namespace PCGExClusters
 
 		for (const TSharedPtr<FCell>& Cell : InCells)
 		{
-			if (!Cell) { continue; }
+			if (!Cell)
+			{
+				continue;
+			}
 			const TArray<int32>& Nodes = Cell->Nodes;
 			const int32 N = Nodes.Num();
 			for (int32 i = 0; i < N; ++i)
@@ -485,16 +566,25 @@ namespace PCGExClusters
 				const int32 A = Nodes[i];
 				const int32 B = Nodes[(i + 1) % N];
 				const uint64 Hash = PCGEx::H64U(static_cast<uint32>(A), static_cast<uint32>(B));
-				if (DirectedEdges.Remove(Hash) == 0) { DirectedEdges.Add(Hash, TPair<int32, int32>(A, B)); }
+				if (DirectedEdges.Remove(Hash) == 0)
+				{
+					DirectedEdges.Add(Hash, TPair<int32, int32>(A, B));
+				}
 			}
 		}
 
-		if (DirectedEdges.IsEmpty()) { return Result; }
+		if (DirectedEdges.IsEmpty())
+		{
+			return Result;
+		}
 
 		// Build NextNode map: FromNode → ToNode
 		TMap<int32, int32> NextNode;
 		NextNode.Reserve(DirectedEdges.Num());
-		for (const auto& Pair : DirectedEdges) { NextNode.Add(Pair.Value.Key, Pair.Value.Value); }
+		for (const auto& Pair : DirectedEdges)
+		{
+			NextNode.Add(Pair.Value.Key, Pair.Value.Value);
+		}
 
 		// Walk boundary loops. GlobalVisited serves double duty: skips already-claimed start nodes
 		// and catches premature cycles mid-walk, eliminating a per-loop LoopVisited set.
@@ -505,7 +595,10 @@ namespace PCGExClusters
 		for (const auto& StartPair : DirectedEdges)
 		{
 			const int32 StartNode = StartPair.Value.Key;
-			if (GlobalVisited.Contains(StartNode)) { continue; }
+			if (GlobalVisited.Contains(StartNode))
+			{
+				continue;
+			}
 
 			TArray<int32> LoopNodes;
 			int32 Current = StartNode;
@@ -517,13 +610,27 @@ namespace PCGExClusters
 				LoopNodes.Add(Current);
 
 				const int32* Next = NextNode.Find(Current);
-				if (!Next) { bValid = false; break; }  // dead end — non-manifold boundary
+				if (!Next)
+				{
+					bValid = false;
+					break;
+				} // dead end — non-manifold boundary
 				Current = *Next;
-				if (Current == StartNode) { break; }   // loop closed cleanly
-				if (GlobalVisited.Contains(Current)) { bValid = false; break; } // premature cycle
+				if (Current == StartNode)
+				{
+					break;
+				} // loop closed cleanly
+				if (GlobalVisited.Contains(Current))
+				{
+					bValid = false;
+					break;
+				} // premature cycle
 			}
 
-			if (!bValid || LoopNodes.Num() < 3) { continue; }
+			if (!bValid || LoopNodes.Num() < 3)
+			{
+				continue;
+			}
 
 			TSharedPtr<FCell> MergedCell = MakeShared<FCell>(InConstraints);
 			MergedCell->Nodes = LoopNodes;
@@ -588,7 +695,10 @@ namespace PCGExClusters
 
 	uint64 FCell::GetCellHash()
 	{
-		if (CellHash != 0) { return CellHash; }
+		if (CellHash != 0)
+		{
+			return CellHash;
+		}
 		CellHash = CityHash64(reinterpret_cast<const char*>(Nodes.GetData()), Nodes.Num() * sizeof(int32));
 		return CellHash;
 	}

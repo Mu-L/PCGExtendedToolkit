@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExHeuristicOperation.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
 #include "UObject/Object.h"
-#include "Core/PCGExHeuristicOperation.h"
 #include "PCGExHeuristicInertia.generated.h"
 
 USTRUCT(BlueprintType)
@@ -47,7 +47,10 @@ public:
 	int32 MaxSamples = 1;
 	bool bIgnoreIfNotEnoughSamples = true;
 
-	virtual EPCGExHeuristicCategory GetCategory() const override { return EPCGExHeuristicCategory::TravelDependent; }
+	virtual EPCGExHeuristicCategory GetCategory() const override
+	{
+		return EPCGExHeuristicCategory::TravelDependent;
+	}
 
 	virtual double GetGlobalScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal) const override;
 

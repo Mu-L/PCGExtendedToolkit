@@ -6,12 +6,22 @@
 
 PCGEX_CREATE_PROBE_FACTORY(Theta, {}, {})
 
-bool FPCGExProbeTheta::IsGlobalProbe() const { return true; }
-bool FPCGExProbeTheta::WantsOctree() const { return true; }
+bool FPCGExProbeTheta::IsGlobalProbe() const
+{
+	return true;
+}
+
+bool FPCGExProbeTheta::WantsOctree() const
+{
+	return true;
+}
 
 bool FPCGExProbeTheta::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	// Precompute cone bisector directions
 	const FVector Axis = Config.ConeAxis.GetSafeNormal();
@@ -34,7 +44,10 @@ void FPCGExProbeTheta::ProcessAll(TSet<uint64>& OutEdges) const
 {
 	const TArray<FVector>& Positions = *WorkingPositions;
 	const int32 NumPoints = Positions.Num();
-	if (NumPoints < 2) { return; }
+	if (NumPoints < 2)
+	{
+		return;
+	}
 
 	const TArray<int8>& CanGenerateRef = *CanGenerate;
 	const TArray<int8>& AcceptConnectionsRef = *AcceptConnections;
@@ -43,7 +56,10 @@ void FPCGExProbeTheta::ProcessAll(TSet<uint64>& OutEdges) const
 
 	for (int32 i = 0; i < NumPoints; ++i)
 	{
-		if (!CanGenerateRef[i]) { continue; }
+		if (!CanGenerateRef[i])
+		{
+			continue;
+		}
 
 		const FVector& Pos = Positions[i];
 		const double MaxDistSq = GetSearchRadius(i);
@@ -60,11 +76,17 @@ void FPCGExProbeTheta::ProcessAll(TSet<uint64>& OutEdges) const
 			[&](const PCGExOctree::FItem& Other)
 			{
 				const int32 j = Other.Index;
-				if (i == j || !AcceptConnectionsRef[j]) { return; }
+				if (i == j || !AcceptConnectionsRef[j])
+				{
+					return;
+				}
 
 				const FVector Delta = Positions[j] - Pos;
 				const double DistSq = Delta.SizeSquared();
-				if (DistSq > MaxDistSq || DistSq < SMALL_NUMBER) { return; }
+				if (DistSq > MaxDistSq || DistSq < SMALL_NUMBER)
+				{
+					return;
+				}
 
 				const FVector Dir = Delta.GetUnsafeNormal();
 

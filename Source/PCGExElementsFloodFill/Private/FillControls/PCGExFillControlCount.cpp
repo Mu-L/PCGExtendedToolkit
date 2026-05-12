@@ -6,20 +6,26 @@
 
 
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExFillControlsFactoryProvider.h"
 #include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Core/PCGExFillControlsFactoryProvider.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigCount, MaxCount, int32, MaxCountInput, MaxCountAttribute, MaxCount)
 
 bool FPCGExFillControlCount::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryCount* TypedFactory = Cast<UPCGExFillControlsFactoryCount>(Factory);
 
 	CountLimit = TypedFactory->Config.GetValueSettingMaxCount();
-	if (!CountLimit->Init(GetSourceFacade())) { return false; }
+	if (!CountLimit->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -59,8 +65,14 @@ FString UPCGExFillControlsCountProviderSettings::GetDisplayName() const
 {
 	FString DName = GetDefaultNodeTitle().ToString().Replace(TEXT("PCGEx | Fill Control"), TEXT("FC")) + TEXT(" @ ");
 
-	if (Config.MaxCountInput == EPCGExInputValueType::Attribute) { DName += Config.MaxCountAttribute.ToString(); }
-	else { DName += FString::Printf(TEXT("%d"), Config.MaxCount); }
+	if (Config.MaxCountInput == EPCGExInputValueType::Attribute)
+	{
+		DName += Config.MaxCountAttribute.ToString();
+	}
+	else
+	{
+		DName += FString::Printf(TEXT("%d"), Config.MaxCount);
+	}
 
 	return DName;
 }

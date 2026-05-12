@@ -4,16 +4,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExPointsProcessor.h"
+#include "PCGCommon.h"
+#include "PCGCrc.h"
+#include "PCGManagedResource.h"
+#include "Collections/PCGExActorCollection.h"
 #include "Core/PCGExPointFilter.h"
+#include "Core/PCGExPointsProcessor.h"
+#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
-#include "Collections/PCGExActorCollection.h"
-#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Helpers/PCGExPCGGenerationWatcher.h"
-#include "PCGCommon.h"
-#include "PCGManagedResource.h"
-#include "PCGCrc.h"
 
 #include "PCGExStagingSpawnActors.generated.h"
 
@@ -33,8 +33,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(StagingSpawnActors, "Staging : Spawn Actors", "Spawns actors from staged collection entries.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spawner; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spawner;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
 #endif
 
 protected:
@@ -44,7 +52,10 @@ protected:
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters which points spawn an actor.", PCGExFactories::PointFilters, false)
 	//~End UPCGSettings
 
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 
 public:
 	// --- Targeting ---
@@ -88,7 +99,7 @@ public:
 	/** Attribute name that contains the per-instance tags string (comma-separated). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable, EditCondition="bApplyInstanceTags"))
 	FName InstanceTagsAttributeName = FName("InstanceTags");
-	
+
 	// --- PCG Generation ---
 
 	/** If enabled, trigger PCG generation on spawned actors that have PCG components. */
@@ -136,7 +147,10 @@ protected:
 class FPCGExStagingSpawnActorsElement final : public FPCGExPointsProcessorElement
 {
 public:
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 protected:
 	PCGEX_CAN_ONLY_EXECUTE_ON_MAIN_THREAD(true)

@@ -3,20 +3,20 @@
 
 #include "Elements/PCGExGetTextureData.h"
 
+#include "PCGComponent.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
-#include "PCGComponent.h"
 
+#include "PCGExSubSystem.h"
+#include "TextureResource.h"
+#include "Core/PCGExTexCommon.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/PCGRenderTargetData.h"
 #include "Data/PCGTextureData.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Helpers/PCGBlueprintHelpers.h"
 #include "Helpers/PCGHelpers.h"
-#include "TextureResource.h"
-#include "PCGExSubSystem.h"
-#include "Core/PCGExTexCommon.h"
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
 
 
 #include "Engine/Texture.h"
@@ -34,14 +34,20 @@ UPCGExGetTextureDataSettings::UPCGExGetTextureDataSettings(const FObjectInitiali
 TArray<FPCGPinProperties> UPCGExGetTextureDataSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	if (SourceType == EPCGExGetTexturePathType::MaterialPath) { PCGEX_PIN_FACTORIES(PCGExTexture::SourceTexLabel, "Texture params to extract from reference materials.", Required, FPCGExDataTypeInfoTexParam::AsId()) }
+	if (SourceType == EPCGExGetTexturePathType::MaterialPath)
+	{
+		PCGEX_PIN_FACTORIES(PCGExTexture::SourceTexLabel, "Texture params to extract from reference materials.", Required, FPCGExDataTypeInfoTexParam::AsId())
+	}
 	return PinProperties;
 }
 
 TArray<FPCGPinProperties> UPCGExGetTextureDataSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
-	if (SourceType == EPCGExGetTexturePathType::TexturePath || bBuildTextureData) { PCGEX_PIN_TEXTURES(PCGExTexture::OutputTextureDataLabel, "Texture data.", Required) }
+	if (SourceType == EPCGExGetTexturePathType::TexturePath || bBuildTextureData)
+	{
+		PCGEX_PIN_TEXTURES(PCGExTexture::OutputTextureDataLabel, "Texture data.", Required)
+	}
 	return PinProperties;
 }
 
@@ -50,7 +56,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(GetTextureData)
 
 bool FPCGExGetTextureDataElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(GetTextureData)
 
@@ -76,7 +85,10 @@ bool FPCGExGetTextureDataElement::Boot(FPCGExContext* InContext) const
 
 		if (Settings->bOutputTextureIds)
 		{
-			for (const TObjectPtr<const UPCGExTexParamFactoryData>& Factory : Context->TexParamsFactories) { PCGEX_VALIDATE_NAME_C(InContext, Factory->Config.TextureIDAttributeName) }
+			for (const TObjectPtr<const UPCGExTexParamFactoryData>& Factory : Context->TexParamsFactories)
+			{
+				PCGEX_VALIDATE_NAME_C(InContext, Factory->Config.TextureIDAttributeName)
+			}
 		}
 	}
 
@@ -94,7 +106,10 @@ bool FPCGExGetTextureDataElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -112,7 +127,10 @@ bool FPCGExGetTextureDataElement::AdvanceWork(FPCGExContext* InContext, const UP
 		{
 			// Start loading textures...
 			TSharedPtr<TSet<FSoftObjectPath>> Paths = MakeShared<TSet<FSoftObjectPath>>();
-			for (const PCGExTexture::FReference& Ref : Context->TextureReferences) { Paths->Add(Ref.TexturePath); }
+			for (const PCGExTexture::FReference& Ref : Context->TextureReferences)
+			{
+				Paths->Add(Ref.TexturePath);
+			}
 			PCGExHelpers::LoadBlocking_AnyThread(Paths, Context);
 
 			Context->TextureReferencesList = Context->TextureReferences.Array();
@@ -122,7 +140,10 @@ bool FPCGExGetTextureDataElement::AdvanceWork(FPCGExContext* InContext, const UP
 			Context->TextureDataList.Init(nullptr, Context->TextureReferencesList.Num());
 
 			Context->TextureProcessingToken = Context->GetTaskManager()->TryCreateToken(FName("TextureProcessing"));
-			if (!Context->TextureProcessingToken.IsValid()) { return true; }
+			if (!Context->TextureProcessingToken.IsValid())
+			{
+				return true;
+			}
 
 			PCGExMT::ExecuteOnMainThread(Context->GetTaskManager(), [CtxHandle = Context->GetOrCreateHandle()]()
 			{
@@ -145,7 +166,10 @@ void FPCGExGetTextureDataContext::AdvanceProcessing(const int32 Index)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FCreateTextureTask::ExecuteTask);
 
-	if (!TextureProcessingToken.IsValid()) { return; }
+	if (!TextureProcessingToken.IsValid())
+	{
+		return;
+	}
 	if (!TextureReferencesList.IsValidIndex(Index))
 	{
 		PCGEX_ASYNC_RELEASE_TOKEN(TextureProcessingToken)
@@ -184,7 +208,10 @@ void FPCGExGetTextureDataContext::AdvanceProcessing(const int32 Index)
 	PCGExTexture::FReference Ref = TextureReferencesList[Index];
 	TSoftObjectPtr<UTexture> Texture = TSoftObjectPtr<UTexture>(Ref.TexturePath);
 
-	if (!Texture.Get()) { return; }
+	if (!Texture.Get())
+	{
+		return;
+	}
 
 	TObjectPtr<UPCGTextureData> TexData = TextureDataList[Index];
 
@@ -271,7 +298,10 @@ namespace PCGExGetTextureData
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->bCleanupConsumableAttributes ? PCGExData::EIOInit::Duplicate : PCGExData::EIOInit::Forward)
 
@@ -315,7 +345,10 @@ namespace PCGExGetTextureData
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			FSoftObjectPath AssetPath = PathGetter->Read(Index);
 
@@ -323,13 +356,19 @@ namespace PCGExGetTextureData
 			{
 				{
 					FReadScopeLock ReadScopeLock(ReferenceLock);
-					if (MaterialReferences->Contains(AssetPath)) { continue; }
+					if (MaterialReferences->Contains(AssetPath))
+					{
+						continue;
+					}
 				}
 				{
 					FWriteScopeLock WriteScopeLock(ReferenceLock);
 					bool bAlreadySet = false;
 					MaterialReferences->Add(AssetPath, &bAlreadySet);
-					if (!bAlreadySet) { Context->EDITOR_TrackPath(AssetPath); }
+					if (!bAlreadySet)
+					{
+						Context->EDITOR_TrackPath(AssetPath);
+					}
 				}
 				continue;
 			}
@@ -338,7 +377,8 @@ namespace PCGExGetTextureData
 
 			// See if the path breaks down as a path:index textureArray2D path
 			int32 LastColonIndex;
-			if (const FString Str = AssetPath.ToString(); Str.FindLastChar(TEXT(':'), LastColonIndex))
+			if (const FString Str = AssetPath.ToString();
+				Str.FindLastChar(TEXT(':'), LastColonIndex))
 			{
 				const FString PotentialIndex = Str.Mid(LastColonIndex + 1);
 				const FString Prefix = Str.Left(LastColonIndex);
@@ -359,7 +399,10 @@ namespace PCGExGetTextureData
 
 			{
 				FReadScopeLock ReadScopeLock(ReferenceLock);
-				if (TextureReferences.Contains(Ref)) { continue; }
+				if (TextureReferences.Contains(Ref))
+				{
+					continue;
+				}
 			}
 			{
 				FWriteScopeLock WriteScopeLock(ReferenceLock);
@@ -413,7 +456,10 @@ namespace PCGExGetTextureData
 			for (const FSoftObjectPath& Path : *MaterialReferences.Get())
 			{
 				UMaterialInterface* Material = TSoftObjectPtr<UMaterialInterface>(Path).Get();
-				if (!Material) { continue; }
+				if (!Material)
+				{
+					continue;
+				}
 				TexParamLookup->ExtractReferences(Material, TextureReferences);
 			}
 		}

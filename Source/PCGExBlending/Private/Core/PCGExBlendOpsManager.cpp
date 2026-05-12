@@ -97,16 +97,25 @@ namespace PCGExBlending
 		check(SourceBFacade)
 		check(TargetFacade)
 
-		if (!WeightFacade) { WeightFacade = SourceAFacade; }
+		if (!WeightFacade)
+		{
+			WeightFacade = SourceAFacade;
+		}
 		check(WeightFacade)
 
 		// Phase 1: Build supersede set from non-monolithic (individual) factory output names
 		TSet<FName> SupersedeNames;
 		for (const TObjectPtr<const UPCGExBlendOpFactory>& Factory : InFactories)
 		{
-			if (Factory->IsMonolithic()) { continue; }
+			if (Factory->IsMonolithic())
+			{
+				continue;
+			}
 			const FName OutputName = UPCGExBlendOpFactory::GetOutputTargetName(Factory->Config);
-			if (!OutputName.IsNone()) { SupersedeNames.Add(OutputName); }
+			if (!OutputName.IsNone())
+			{
+				SupersedeNames.Add(OutputName);
+			}
 		}
 
 		Operations->Reserve(InFactories.Num());
@@ -143,7 +152,10 @@ namespace PCGExBlending
 
 				if (!Op->PrepareForData(InContext))
 				{
-					if (!Factory->IsMonolithic()) { return false; }
+					if (!Factory->IsMonolithic())
+					{
+						return false;
+					}
 					continue; // Monolithic ops may fail when a source lacks the attribute
 				}
 
@@ -156,33 +168,51 @@ namespace PCGExBlending
 
 	void FBlendOpsManager::BlendAutoWeight(const int32 SourceIndex, const int32 TargetIndex) const
 	{
-		for (const auto Op : CachedOperations) { Op->BlendAutoWeight(SourceIndex, TargetIndex); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->BlendAutoWeight(SourceIndex, TargetIndex);
+		}
 	}
 
 	void FBlendOpsManager::Blend(const int32 SourceIndex, const int32 TargetIndex, const double InWeight) const
 	{
-		for (const auto Op : CachedOperations) { Op->Blend(SourceIndex, TargetIndex, InWeight); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->Blend(SourceIndex, TargetIndex, InWeight);
+		}
 	}
 
 	void FBlendOpsManager::Blend(const int32 SourceAIndex, const int32 SourceBIndex, const int32 TargetIndex, const double InWeight) const
 	{
-		for (const auto Op : CachedOperations) { Op->Blend(SourceAIndex, SourceBIndex, TargetIndex, InWeight); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->Blend(SourceAIndex, SourceBIndex, TargetIndex, InWeight);
+		}
 	}
 
 	void FBlendOpsManager::BlendAutoWeight(const PCGExMT::FScope& Scope) const
 	{
-		for (const auto Op : CachedOperations) { Op->BlendScope(Scope); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->BlendScope(Scope);
+		}
 	}
 
 	void FBlendOpsManager::BlendAutoWeight(const PCGExMT::FScope& Scope, TArrayView<const int8> Mask) const
 	{
-		for (const auto Op : CachedOperations) { Op->BlendScope(Scope, Mask); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->BlendScope(Scope, Mask);
+		}
 	}
 
 	void FBlendOpsManager::InitScopedTrackers(const TArray<PCGExMT::FScope>& Loops)
 	{
 		ScopedTrackers = MakeShared<PCGExMT::TScopedArray<PCGEx::FOpStats>>(Loops);
-		ScopedTrackers->ForEach([&](TArray<PCGEx::FOpStats>& Array) { InitTrackers(Array); });
+		ScopedTrackers->ForEach([&](TArray<PCGEx::FOpStats>& Array)
+		{
+			InitTrackers(Array);
+		});
 	}
 
 	TArray<PCGEx::FOpStats>& FBlendOpsManager::GetScopedTrackers(const PCGExMT::FScope& Scope) const
@@ -194,7 +224,10 @@ namespace PCGExBlending
 	{
 		for (const TSharedPtr<FPCGExBlendOperation>& Op : *Operations)
 		{
-			if (!Op) { continue; }
+			if (!Op)
+			{
+				continue;
+			}
 			const FName Name = UPCGExBlendOpFactory::GetOutputTargetName(Op->Config);
 			if (const int32* Idx = SharedIndexMap.Find(Name))
 			{
@@ -211,28 +244,43 @@ namespace PCGExBlending
 
 	void FBlendOpsManager::BeginMultiBlend(const int32 TargetIndex, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		for (const auto Op : CachedOperations) { Trackers[Op->OpIdx] = Op->BeginMultiBlend(TargetIndex); }
+		for (const auto Op : CachedOperations)
+		{
+			Trackers[Op->OpIdx] = Op->BeginMultiBlend(TargetIndex);
+		}
 	}
 
 	void FBlendOpsManager::MultiBlend(const int32 SourceIndex, const int32 TargetIndex, const double InWeight, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		for (const auto Op : CachedOperations) { Op->MultiBlend(SourceIndex, TargetIndex, InWeight, Trackers[Op->OpIdx]); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->MultiBlend(SourceIndex, TargetIndex, InWeight, Trackers[Op->OpIdx]);
+		}
 	}
 
 	void FBlendOpsManager::EndMultiBlend(const int32 TargetIndex, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		for (const auto Op : CachedOperations) { Op->EndMultiBlend(TargetIndex, Trackers[Op->OpIdx]); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->EndMultiBlend(TargetIndex, Trackers[Op->OpIdx]);
+		}
 	}
 
 	void FBlendOpsManager::Cleanup(FPCGExContext* InContext)
 	{
 		TSet<TSharedPtr<PCGExData::IBuffer>> DisabledBuffers;
-		for (const auto Op : CachedOperations) { Op->CompleteWork(DisabledBuffers); }
+		for (const auto Op : CachedOperations)
+		{
+			Op->CompleteWork(DisabledBuffers);
+		}
 
 		for (const TSharedPtr<PCGExData::IBuffer>& Buffer : DisabledBuffers)
 		{
 			// If disabled buffer does not exist on input, delete it entirely
-			if (!Buffer->OutAttribute) { continue; }
+			if (!Buffer->OutAttribute)
+			{
+				continue;
+			}
 			if (!TargetFacade->GetIn()->Metadata->HasAttribute(Buffer->OutAttribute->Name))
 			{
 				TargetFacade->GetOut()->Metadata->DeleteAttribute(Buffer->OutAttribute->Name);

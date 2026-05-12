@@ -46,7 +46,10 @@ namespace PCGExBlending
 		virtual void MultiBlend(const int32 SourceIndex, const int32 TargetIndex, const double Weight, TArray<PCGEx::FOpStats>& Trackers) const override;
 		virtual void EndMultiBlend(const int32 TargetIndex, TArray<PCGEx::FOpStats>& Trackers) const override;
 
-		const TArray<FPCGAttributeIdentifier>& GetAttributeIdentifiers() const { return AttributeIdentifiers; }
+		const TArray<FPCGAttributeIdentifier>& GetAttributeIdentifiers() const
+		{
+			return AttributeIdentifiers;
+		}
 
 	protected:
 		bool bUseTargetAsSecondarySource = true;

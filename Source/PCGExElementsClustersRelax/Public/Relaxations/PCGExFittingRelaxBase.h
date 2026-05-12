@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGElement.h"
-#include "Core/PCGExRelaxClusterOperation.h"
 #include "Core/PCGExContext.h"
+#include "Core/PCGExRelaxClusterOperation.h"
 #include "Data/PCGExData.h"
 
 
@@ -65,7 +65,12 @@ public:
 	double TimeStep = 0.01;
 
 	virtual bool PrepareForCluster(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster) override;
-	virtual int32 GetNumSteps() override { return 3; }
+
+	virtual int32 GetNumSteps() override
+	{
+		return 3;
+	}
+
 	virtual EPCGExClusterElement PrepareNextStep(const int32 InStep) override;
 	virtual void Step1(const PCGExGraphs::FEdge& Edge) override;
 	virtual void Step3(const PCGExClusters::FNode& Node) override;

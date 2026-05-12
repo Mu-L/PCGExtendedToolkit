@@ -4,20 +4,26 @@
 #include "Shapes/PCGExShapeFiblat.h"
 
 
+#include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Paths/PCGExPath.h"
-#include "Containers/PCGExManagedObjects.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCreateBuilderFiblat"
 #define PCGEX_NAMESPACE CreateBuilderFiblat
 
 bool FPCGExShapeFiblatBuilder::PrepareForSeeds(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InSeedDataFacade)
 {
-	if (!FPCGExShapeBuilderOperation::PrepareForSeeds(InContext, InSeedDataFacade)) { return false; }
+	if (!FPCGExShapeBuilderOperation::PrepareForSeeds(InContext, InSeedDataFacade))
+	{
+		return false;
+	}
 
 	Phi = Config.Phi.GetValueSetting();
-	if (!Phi->Init(InSeedDataFacade)) { return false; }
+	if (!Phi->Init(InSeedDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -46,21 +52,30 @@ void FPCGExShapeFiblatBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 			Fiblat->NumPoints = 100; // fallback
 		}
 	}
-	else { Fiblat->NumPoints = GetResolution(Seed); }
+	else
+	{
+		Fiblat->NumPoints = GetResolution(Seed);
+	}
 
 	switch (Config.PhiConstant)
 	{
-	case EPCGExFibPhiConstant::GoldenRatio: Fiblat->Phi = (FMath::Sqrt(5.0) - 1.0) * 0.5;
+	case EPCGExFibPhiConstant::GoldenRatio:
+		Fiblat->Phi = (FMath::Sqrt(5.0) - 1.0) * 0.5;
 		break;
-	case EPCGExFibPhiConstant::SqRootOfTwo: Fiblat->Phi = FMath::Sqrt(2.0);
+	case EPCGExFibPhiConstant::SqRootOfTwo:
+		Fiblat->Phi = FMath::Sqrt(2.0);
 		break;
-	case EPCGExFibPhiConstant::Irrational: Fiblat->Phi = (9 + FMath::Sqrt(221.0)) * 0.1;
+	case EPCGExFibPhiConstant::Irrational:
+		Fiblat->Phi = (9 + FMath::Sqrt(221.0)) * 0.1;
 		break;
-	case EPCGExFibPhiConstant::SqRootOfTthree: Fiblat->Phi = FMath::Sqrt(2.0);
+	case EPCGExFibPhiConstant::SqRootOfTthree:
+		Fiblat->Phi = FMath::Sqrt(2.0);
 		break;
-	case EPCGExFibPhiConstant::Ln2: Fiblat->Phi = 0.69314718056;
+	case EPCGExFibPhiConstant::Ln2:
+		Fiblat->Phi = 0.69314718056;
 		break;
-	case EPCGExFibPhiConstant::Custom: Fiblat->Phi = Phi->Read(Seed.Index);
+	case EPCGExFibPhiConstant::Custom:
+		Fiblat->Phi = Phi->Read(Seed.Index);
 		break;
 	}
 
@@ -104,7 +119,7 @@ void FPCGExShapeFiblatBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> 
 
 		const FVector P = Center + (Fiblat->ComputeFibLatPoint(i, Count) * Extents);
 		OutTransforms[Scope.Start + i] = FTransform(PCGExMath::MakeLookAtTransform(P - Target, FVector::UpVector, Config.LookAtAxis).GetRotation(), P, FVector::OneVector);
-	)
+		)
 }
 
 #if WITH_EDITOR
@@ -114,7 +129,7 @@ void UPCGExCreateShapeFiblatSettings::ApplyDeprecation(UPCGNode* InOutNode)
 	{
 		Config.ApplyDeprecation();
 	}
-	
+
 	Super::ApplyDeprecation(InOutNode);
 }
 #endif

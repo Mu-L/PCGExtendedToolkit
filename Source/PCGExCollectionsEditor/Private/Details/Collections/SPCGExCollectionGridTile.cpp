@@ -3,11 +3,12 @@
 
 #include "Details/Collections/SPCGExCollectionGridTile.h"
 
-#include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetThumbnail.h"
 #include "Editor.h"
 #include "ScopedTransaction.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboBox.h"
@@ -15,7 +16,6 @@
 #include "Widgets/Input/SSpinBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
-#include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 
 namespace PCGExCollectionGrid
@@ -65,7 +65,10 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 				.OptionsSource(&(*CategoryOptions))
 				.OnSelectionChanged_Lambda([this, WeakColl, Idx](TSharedPtr<FName> Selected, ESelectInfo::Type SelectType)
 				{
-					if (!Selected.IsValid() || SelectType == ESelectInfo::Direct) { return; }
+					if (!Selected.IsValid() || SelectType == ESelectInfo::Direct)
+					{
+						return;
+					}
 
 					if (*Selected == PCGExCollectionGrid::NewCategorySentinel)
 					{
@@ -79,17 +82,29 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 
 					// Set the category value
 					UPCGExAssetCollection* Coll = WeakColl.Get();
-					if (!Coll) { return; }
+					if (!Coll)
+					{
+						return;
+					}
 
 					FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-					if (!Entry) { return; }
+					if (!Entry)
+					{
+						return;
+					}
 
-					if (BatchFlagPtr) { *BatchFlagPtr = true; }
+					if (BatchFlagPtr)
+					{
+						*BatchFlagPtr = true;
+					}
 					FScopedTransaction Transaction(INVTEXT("Change Category"));
 					Coll->Modify();
 					Entry->Category = *Selected;
 					Coll->PostEditChange();
-					if (BatchFlagPtr) { *BatchFlagPtr = false; }
+					if (BatchFlagPtr)
+					{
+						*BatchFlagPtr = false;
+					}
 					OnTileCategoryChanged.ExecuteIfBound();
 				})
 				.OnGenerateWidget_Lambda([](TSharedPtr<FName> Item) -> TSharedRef<SWidget>
@@ -117,9 +132,15 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 					.Text_Lambda([WeakColl, Idx]() -> FText
 					{
 						const UPCGExAssetCollection* Coll = WeakColl.Get();
-						if (!Coll) { return INVTEXT("?"); }
+						if (!Coll)
+						{
+							return INVTEXT("?");
+						}
 						const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-						if (!Result.IsValid()) { return INVTEXT("?"); }
+						if (!Result.IsValid())
+						{
+							return INVTEXT("?");
+						}
 						return Result.Entry->Category.IsNone() ? INVTEXT("Uncategorized") : FText::FromName(Result.Entry->Category);
 					})
 					.Font(FCoreStyle::GetDefaultFontStyle("Regular", 7))
@@ -143,12 +164,18 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 							if (Entry)
 							{
 								const FName NewCat = FName(*Text.ToString());
-								if (BatchFlagPtr) { *BatchFlagPtr = true; }
+								if (BatchFlagPtr)
+								{
+									*BatchFlagPtr = true;
+								}
 								FScopedTransaction Transaction(INVTEXT("New Category"));
 								Coll->Modify();
 								Entry->Category = NewCat;
 								Coll->PostEditChange();
-								if (BatchFlagPtr) { *BatchFlagPtr = false; }
+								if (BatchFlagPtr)
+								{
+									*BatchFlagPtr = false;
+								}
 								OnTileCategoryChanged.ExecuteIfBound();
 							}
 						}
@@ -168,7 +195,10 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 			if (const UPCGExAssetCollection* Coll = WeakColl.Get())
 			{
 				const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-				if (Result.IsValid()) { CurrentCategory = Result.Entry->Category; }
+				if (Result.IsValid())
+				{
+					CurrentCategory = Result.Entry->Category;
+				}
 			}
 			for (const TSharedPtr<FName>& Option : *CategoryOptions)
 			{
@@ -195,8 +225,8 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 		.BorderBackgroundColor_Lambda([this]() -> FSlateColor
 		{
 			return bIsSelected
-				       ? FSlateColor(FLinearColor(0.1f, 0.4f, 0.9f, 1.0f))
-				       : FSlateColor(FLinearColor(0, 0, 0, 0));
+				? FSlateColor(FLinearColor(0.1f, 0.4f, 0.9f, 1.0f))
+				: FSlateColor(FLinearColor(0, 0, 0, 0));
 		})
 		.Padding(2.f)
 		[
@@ -229,23 +259,41 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 								.IsChecked_Lambda([WeakColl, Idx]() -> ECheckBoxState
 								{
 									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return ECheckBoxState::Unchecked; }
+									if (!Coll)
+									{
+										return ECheckBoxState::Unchecked;
+									}
 									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-									if (!Result.IsValid()) { return ECheckBoxState::Unchecked; }
+									if (!Result.IsValid())
+									{
+										return ECheckBoxState::Unchecked;
+									}
 									return Result.Entry->bIsSubCollection ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 								})
 								.OnCheckStateChanged_Lambda([this, WeakColl, Idx](ECheckBoxState NewState)
 								{
 									UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return; }
+									if (!Coll)
+									{
+										return;
+									}
 									FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-									if (!Entry) { return; }
-									if (BatchFlagPtr) { *BatchFlagPtr = true; }
+									if (!Entry)
+									{
+										return;
+									}
+									if (BatchFlagPtr)
+									{
+										*BatchFlagPtr = true;
+									}
 									FScopedTransaction Transaction(INVTEXT("Toggle SubCollection"));
 									Coll->Modify();
 									Entry->bIsSubCollection = (NewState == ECheckBoxState::Checked);
 									Coll->PostEditChange();
-									if (BatchFlagPtr) { *BatchFlagPtr = false; }
+									if (BatchFlagPtr)
+									{
+										*BatchFlagPtr = false;
+									}
 									RefreshThumbnail();
 								})
 							]
@@ -276,41 +324,80 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 								.Value_Lambda([WeakColl, Idx]() -> int32
 								{
 									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return 0; }
+									if (!Coll)
+									{
+										return 0;
+									}
 									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
 									return Result.IsValid() ? Result.Entry->Weight : 0;
 								})
 								.OnBeginSliderMovement_Lambda([this, WeakColl]()
 								{
-									if (BatchFlagPtr) { *BatchFlagPtr = true; }
-									if (GEditor) { GEditor->BeginTransaction(INVTEXT("Adjust Weight")); }
-									if (UPCGExAssetCollection* Coll = WeakColl.Get()) { Coll->Modify(); }
+									if (BatchFlagPtr)
+									{
+										*BatchFlagPtr = true;
+									}
+									if (GEditor)
+									{
+										GEditor->BeginTransaction(INVTEXT("Adjust Weight"));
+									}
+									if (UPCGExAssetCollection* Coll = WeakColl.Get())
+									{
+										Coll->Modify();
+									}
 								})
 								.OnValueChanged_Lambda([WeakColl, Idx](int32 NewVal)
 								{
 									UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return; }
+									if (!Coll)
+									{
+										return;
+									}
 									FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-									if (Entry) { Entry->Weight = NewVal; }
+									if (Entry)
+									{
+										Entry->Weight = NewVal;
+									}
 								})
 								.OnEndSliderMovement_Lambda([this, WeakColl](int32)
 								{
-									if (UPCGExAssetCollection* Coll = WeakColl.Get()) { Coll->PostEditChange(); }
-									if (GEditor) { GEditor->EndTransaction(); }
-									if (BatchFlagPtr) { *BatchFlagPtr = false; }
+									if (UPCGExAssetCollection* Coll = WeakColl.Get())
+									{
+										Coll->PostEditChange();
+									}
+									if (GEditor)
+									{
+										GEditor->EndTransaction();
+									}
+									if (BatchFlagPtr)
+									{
+										*BatchFlagPtr = false;
+									}
 								})
 								.OnValueCommitted_Lambda([this, WeakColl, Idx](int32 NewVal, ETextCommit::Type CommitType)
 								{
 									UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return; }
+									if (!Coll)
+									{
+										return;
+									}
 									FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-									if (!Entry) { return; }
-									if (BatchFlagPtr) { *BatchFlagPtr = true; }
+									if (!Entry)
+									{
+										return;
+									}
+									if (BatchFlagPtr)
+									{
+										*BatchFlagPtr = true;
+									}
 									FScopedTransaction Transaction(INVTEXT("Set Weight"));
 									Coll->Modify();
 									Entry->Weight = NewVal;
 									Coll->PostEditChange();
-									if (BatchFlagPtr) { *BatchFlagPtr = false; }
+									if (BatchFlagPtr)
+									{
+										*BatchFlagPtr = false;
+									}
 								})
 								.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8))
 							]
@@ -387,9 +474,15 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 								.Visibility_Lambda([WeakColl, Idx]() -> EVisibility
 								{
 									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return EVisibility::Collapsed; }
+									if (!Coll)
+									{
+										return EVisibility::Collapsed;
+									}
 									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-									if (!Result.IsValid() || Result.Entry->bIsSubCollection) { return EVisibility::Collapsed; }
+									if (!Result.IsValid() || Result.Entry->bIsSubCollection)
+									{
+										return EVisibility::Collapsed;
+									}
 									const FPCGExFittingVariations& V = Result.Entry->Variations;
 									const bool bHasVariations =
 										V.OffsetMin != FVector::ZeroVector || V.OffsetMax != FVector::ZeroVector ||
@@ -417,9 +510,15 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 								.Visibility_Lambda([WeakColl, Idx]() -> EVisibility
 								{
 									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return EVisibility::Collapsed; }
+									if (!Coll)
+									{
+										return EVisibility::Collapsed;
+									}
 									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-									if (!Result.IsValid() || Result.Entry->bIsSubCollection) { return EVisibility::Collapsed; }
+									if (!Result.IsValid() || Result.Entry->bIsSubCollection)
+									{
+										return EVisibility::Collapsed;
+									}
 									return !Result.Entry->Staging.Sockets.IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
 								.BorderImage(FAppStyle::GetBrush("Brushes.White"))
@@ -430,9 +529,15 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									.Text_Lambda([WeakColl, Idx]() -> FText
 									{
 										const UPCGExAssetCollection* Coll = WeakColl.Get();
-										if (!Coll) { return FText::GetEmpty(); }
+										if (!Coll)
+										{
+											return FText::GetEmpty();
+										}
 										const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-										if (!Result.IsValid()) { return FText::GetEmpty(); }
+										if (!Result.IsValid())
+										{
+											return FText::GetEmpty();
+										}
 										return FText::Format(INVTEXT("S:{0}"), FText::AsNumber(Result.Entry->Staging.Sockets.Num()));
 									})
 									.Font(FCoreStyle::GetDefaultFontStyle("Bold", 6))
@@ -449,9 +554,15 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 								.Visibility_Lambda([WeakColl, Idx]() -> EVisibility
 								{
 									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return EVisibility::Collapsed; }
+									if (!Coll)
+									{
+										return EVisibility::Collapsed;
+									}
 									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-									if (!Result.IsValid()) { return EVisibility::Collapsed; }
+									if (!Result.IsValid())
+									{
+										return EVisibility::Collapsed;
+									}
 									return !Result.Entry->Tags.IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
 								.BorderImage(FAppStyle::GetBrush("Brushes.White"))
@@ -474,9 +585,15 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 								.Visibility_Lambda([WeakColl, Idx]() -> EVisibility
 								{
 									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll) { return EVisibility::Collapsed; }
+									if (!Coll)
+									{
+										return EVisibility::Collapsed;
+									}
 									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-									if (!Result.IsValid() || Result.Entry->bIsSubCollection) { return EVisibility::Collapsed; }
+									if (!Result.IsValid() || Result.Entry->bIsSubCollection)
+									{
+										return EVisibility::Collapsed;
+									}
 									return Result.Entry->PropertyOverrides.GetEnabledCount() > 0 ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
 								.BorderImage(FAppStyle::GetBrush("Brushes.White"))
@@ -564,7 +681,10 @@ FReply SPCGExCollectionGridTile::OnDragDetected(const FGeometry& MyGeometry, con
 
 void SPCGExCollectionGridTile::RefreshThumbnail()
 {
-	if (!ThumbnailBox.IsValid()) { return; }
+	if (!ThumbnailBox.IsValid())
+	{
+		return;
+	}
 
 	// Check if the visual state has actually changed
 	const UPCGExAssetCollection* Coll = Collection.Get();

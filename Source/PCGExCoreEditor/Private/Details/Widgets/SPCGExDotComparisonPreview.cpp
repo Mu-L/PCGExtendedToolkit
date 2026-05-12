@@ -61,7 +61,10 @@ void SPCGExDotComparisonPreview::DrawArcFan(
 	const FLinearColor& Color,
 	const int32 NumSegments) const
 {
-	if (NumSegments < 1 || FMath::IsNearlyEqual(StartAngle, EndAngle)) { return; }
+	if (NumSegments < 1 || FMath::IsNearlyEqual(StartAngle, EndAngle))
+	{
+		return;
+	}
 
 	const FSlateRenderTransform& RenderTransform = AllottedGeometry.GetAccumulatedRenderTransform();
 	const FColor VertColor = Color.ToFColor(true);

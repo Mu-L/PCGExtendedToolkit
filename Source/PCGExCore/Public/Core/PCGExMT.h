@@ -3,17 +3,17 @@
 
 #pragma once
 
-#include <functional>
 #include <atomic>
+#include <functional>
 
 #include "CoreMinimal.h"
 #include "PCGExMTCommon.h"
-#include "UObject/ObjectPtr.h"
-#include "Templates/SharedPointer.h"
-#include "Templates/SharedPointerFwd.h"
 #include "Async/AsyncWork.h"
 #include "Misc/QueuedThreadPool.h"
 #include "Tasks/Task.h"
+#include "Templates/SharedPointer.h"
+#include "Templates/SharedPointerFwd.h"
+#include "UObject/ObjectPtr.h"
 
 #include "PCGExCoreMacros.h"
 
@@ -66,13 +66,24 @@ namespace PCGExMT
 
 	public:
 		int32 HandleIdx = -1;
-		virtual FString DEBUG_HandleId() const { return TEXT("NOT IMPLEMENTED"); }
+
+		virtual FString DEBUG_HandleId() const
+		{
+			return TEXT("NOT IMPLEMENTED");
+		}
 
 		IAsyncHandle() = default;
 		virtual ~IAsyncHandle();
 
-		bool IsCancelled() const { return bCancelled.load(std::memory_order_acquire); }
-		EAsyncHandleState GetState() const { return State.load(std::memory_order_acquire); }
+		bool IsCancelled() const
+		{
+			return bCancelled.load(std::memory_order_acquire);
+		}
+
+		EAsyncHandleState GetState() const
+		{
+			return State.load(std::memory_order_acquire);
+		}
 
 		virtual FTaskManager* GetManager() const;
 		bool SetGroup(const TSharedPtr<IAsyncHandleGroup>& InGroup);
@@ -134,11 +145,18 @@ namespace PCGExMT
 			~FRegistrationGuard()
 			{
 				const int32 Remaining = Parent->PendingRegistrations.fetch_sub(1, std::memory_order_release) - 1;
-				if (Remaining == 0) { Parent->CheckCompletion(); }
+				if (Remaining == 0)
+				{
+					Parent->CheckCompletion();
+				}
 			}
 		};
 
-		virtual FString DEBUG_HandleId() const override { return GroupName.ToString(); }
+		virtual FString DEBUG_HandleId() const override
+		{
+			return GroupName.ToString();
+		}
+
 		FCompletionCallback OnCompleteCallback;
 
 		explicit IAsyncHandleGroup(const FName InName);
@@ -212,9 +230,15 @@ namespace PCGExMT
 		bool IsWaitingForTasks() const;
 
 		template <typename T>
-		T* GetContext() const { return static_cast<T*>(Context); }
+		T* GetContext() const
+		{
+			return static_cast<T*>(Context);
+		}
 
-		FPCGExContext* GetContext() const { return Context; }
+		FPCGExContext* GetContext() const
+		{
+			return Context;
+		}
 
 		virtual bool Start() override;
 		virtual void Cancel() override;
@@ -257,7 +281,10 @@ namespace PCGExMT
 		template <typename T, typename... Args>
 		void StartRanges(const int32 NumIterations, const int32 ChunkSize, const bool bPrepareOnly, Args&&... InArgs)
 		{
-			if (!IsAvailable()) { return; }
+			if (!IsAvailable())
+			{
+				return;
+			}
 
 			if (!NumIterations)
 			{
@@ -268,7 +295,10 @@ namespace PCGExMT
 			TArray<FScope> Loops;
 			const int32 NumLoops = SubLoopScopes(Loops, NumIterations, FMath::Max(1, GetSanitizedBatchSize(NumIterations, ChunkSize)));
 
-			if (OnPrepareSubLoopsCallback) { OnPrepareSubLoopsCallback(Loops); }
+			if (OnPrepareSubLoopsCallback)
+			{
+				OnPrepareSubLoopsCallback(Loops);
+			}
 
 			Launch(NumLoops, [&](int32 i)
 			{
@@ -334,7 +364,8 @@ namespace PCGExMT
 		PCGEX_ASYNC_TASK_NAME(FPCGExIndexedTask)
 
 		explicit FPCGExIndexedTask(const int32 InTaskIndex)
-			: FTask(), TaskIndex(InTaskIndex)
+			: FTask()
+			  , TaskIndex(InTaskIndex)
 		{
 		}
 	};

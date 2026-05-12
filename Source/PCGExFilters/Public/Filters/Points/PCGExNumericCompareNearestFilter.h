@@ -6,13 +6,13 @@
 #include "CoreMinimal.h"
 #include "Utils/PCGExCompare.h"
 
-#include "Core/PCGExFilterFactoryProvider.h"
-#include "UObject/Object.h"
-#include "Core/PCGExPointFilter.h"
-#include "Details/PCGExDistancesDetails.h"
 #include "PCGExFilterCommon.h"
+#include "Core/PCGExFilterFactoryProvider.h"
+#include "Core/PCGExPointFilter.h"
 #include "Data/PCGExTaggedData.h"
+#include "Details/PCGExDistancesDetails.h"
 #include "PCGExMatching/Public/Core/PCGExMatchRuleFactoryProvider.h"
+#include "UObject/Object.h"
 
 #include "PCGExNumericCompareNearestFilter.generated.h"
 
@@ -90,10 +90,17 @@ public:
 
 	virtual bool Init(FPCGExContext* InContext) override;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
 
-	virtual bool SupportsCollectionEvaluation() const override { return false; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
@@ -107,7 +114,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FNumericCompareNearestFilter(const TObjectPtr<const UPCGExNumericCompareNearestFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 			TargetsHandler = TypedFilterFactory->TargetsHandler;
 			OperandA = TypedFilterFactory->OperandA;
@@ -163,6 +171,10 @@ protected:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

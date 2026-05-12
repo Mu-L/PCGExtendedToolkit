@@ -6,7 +6,10 @@
 
 PCGEX_CREATE_PROBE_FACTORY(Spanner, {}, {})
 
-bool FPCGExProbeSpanner::IsGlobalProbe() const { return true; }
+bool FPCGExProbeSpanner::IsGlobalProbe() const
+{
+	return true;
+}
 
 bool FPCGExProbeSpanner::Prepare(FPCGExContext* InContext)
 {
@@ -16,7 +19,10 @@ bool FPCGExProbeSpanner::Prepare(FPCGExContext* InContext)
 double FPCGExProbeSpanner::GetGraphDistance(int32 From, int32 To,
                                             const TArray<TSet<int32>>& Adjacency, const TArray<FVector>& Positions) const
 {
-	if (From == To) { return 0.0; }
+	if (From == To)
+	{
+		return 0.0;
+	}
 
 	const int32 NumPoints = Positions.Num();
 	TArray<double> Dist;
@@ -25,15 +31,27 @@ double FPCGExProbeSpanner::GetGraphDistance(int32 From, int32 To,
 
 	// Simple Dijkstra with priority queue
 	TArray<TPair<double, int32>> PQ;
-	PQ.HeapPush({0.0, From}, [](const auto& A, const auto& B) { return A.Key < B.Key; });
+	PQ.HeapPush({0.0, From}, [](const auto& A, const auto& B)
+	{
+		return A.Key < B.Key;
+	});
 
 	while (PQ.Num() > 0)
 	{
 		TPair<double, int32> Current;
-		PQ.HeapPop(Current, [](const auto& A, const auto& B) { return A.Key < B.Key; });
+		PQ.HeapPop(Current, [](const auto& A, const auto& B)
+		{
+			return A.Key < B.Key;
+		});
 
-		if (Current.Value == To) { return Current.Key; }
-		if (Current.Key > Dist[Current.Value]) { continue; }
+		if (Current.Value == To)
+		{
+			return Current.Key;
+		}
+		if (Current.Key > Dist[Current.Value])
+		{
+			continue;
+		}
 
 		for (const int32 Neighbor : Adjacency[Current.Value])
 		{
@@ -43,7 +61,10 @@ double FPCGExProbeSpanner::GetGraphDistance(int32 From, int32 To,
 			if (NewDist < Dist[Neighbor])
 			{
 				Dist[Neighbor] = NewDist;
-				PQ.HeapPush({NewDist, Neighbor}, [](const auto& A, const auto& B) { return A.Key < B.Key; });
+				PQ.HeapPush({NewDist, Neighbor}, [](const auto& A, const auto& B)
+				{
+					return A.Key < B.Key;
+				});
 			}
 		}
 	}
@@ -55,7 +76,10 @@ void FPCGExProbeSpanner::ProcessAll(TSet<uint64>& OutEdges) const
 {
 	const TArray<FVector>& Positions = *WorkingPositions;
 	const int32 NumPoints = Positions.Num();
-	if (NumPoints < 2) { return; }
+	if (NumPoints < 2)
+	{
+		return;
+	}
 
 	const TArray<int8>& CanGenerateRef = *CanGenerate;
 	const TArray<int8>& AcceptConnectionsRef = *AcceptConnections;
@@ -72,19 +96,31 @@ void FPCGExProbeSpanner::ProcessAll(TSet<uint64>& OutEdges) const
 
 	for (int32 i = 0; i < NumPoints && Candidates.Num() < Config.MaxEdgeCandidates; ++i)
 	{
-		if (!CanGenerateRef[i] && !AcceptConnectionsRef[i]) { continue; }
+		if (!CanGenerateRef[i] && !AcceptConnectionsRef[i])
+		{
+			continue;
+		}
 
 		for (int32 j = i + 1; j < NumPoints && Candidates.Num() < Config.MaxEdgeCandidates; ++j)
 		{
-			if (!CanGenerateRef[j] && !AcceptConnectionsRef[j]) { continue; }
-			if (!CanGenerateRef[i] && !CanGenerateRef[j]) { continue; }
+			if (!CanGenerateRef[j] && !AcceptConnectionsRef[j])
+			{
+				continue;
+			}
+			if (!CanGenerateRef[i] && !CanGenerateRef[j])
+			{
+				continue;
+			}
 
 			Candidates.Add({i, j, FVector::Dist(Positions[i], Positions[j])});
 		}
 	}
 
 	// Sort by distance (greedy processes shortest first)
-	Algo::Sort(Candidates, [](const FEdgeCandidate& A, const FEdgeCandidate& B) { return A.Dist < B.Dist; });
+	Algo::Sort(Candidates, [](const FEdgeCandidate& A, const FEdgeCandidate& B)
+	{
+		return A.Dist < B.Dist;
+	});
 
 	// Build adjacency list for path queries
 	TArray<TSet<int32>> Adjacency;

@@ -3,20 +3,26 @@
 
 #include "Core/PCGExPathfinding.h"
 
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
 #include "GoalPickers/PCGExGoalPicker.h"
 
 namespace PCGExPathfinding
 {
 	bool FNodePick::ResolveNode(const TSharedRef<PCGExClusters::FCluster>& InCluster, const FPCGExNodeSelectionDetails& SelectionDetails)
 	{
-		if (Node != nullptr) { return true; }
+		if (Node != nullptr)
+		{
+			return true;
+		}
 
 		const FVector SourcePosition = Point.GetLocation();
 		const int32 NodeIndex = InCluster->FindClosestNode(SourcePosition, SelectionDetails.PickingMethod);
-		if (NodeIndex == -1) { return false; }
+		if (NodeIndex == -1)
+		{
+			return false;
+		}
 		Node = InCluster->GetNode(NodeIndex);
 		if (!SelectionDetails.WithinDistance(SourcePosition, InCluster->GetPos(Node)))
 		{
@@ -38,14 +44,20 @@ namespace PCGExPathfinding
 				GoalPicker->GetGoalIndices(Seed, GoalIndices);
 				for (const int32 GoalIndex : GoalIndices)
 				{
-					if (GoalIndex < 0) { continue; }
+					if (GoalIndex < 0)
+					{
+						continue;
+					}
 					GoalFunc(PointIndex, GoalIndex);
 				}
 			}
 			else
 			{
 				const int32 GoalIndex = GoalPicker->GetGoalIndex(Seed);
-				if (GoalIndex < 0) { continue; }
+				if (GoalIndex < 0)
+				{
+					continue;
+				}
 				GoalFunc(PointIndex, GoalIndex);
 			}
 		}

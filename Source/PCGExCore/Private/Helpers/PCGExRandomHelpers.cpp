@@ -47,9 +47,18 @@ namespace PCGExRandomHelpers
 
 		int Seed = BaseSeed + Local;
 
-		if (Settings && Component) { Seed = PCGHelpers::ComputeSeed(Seed, Settings->Seed, Component->Seed); }
-		else if (Settings) { Seed = PCGHelpers::ComputeSeed(Seed, Settings->Seed); }
-		else if (Component) { Seed = PCGHelpers::ComputeSeed(Seed, Component->Seed); }
+		if (Settings && Component)
+		{
+			Seed = PCGHelpers::ComputeSeed(Seed, Settings->Seed, Component->Seed);
+		}
+		else if (Settings)
+		{
+			Seed = PCGHelpers::ComputeSeed(Seed, Settings->Seed);
+		}
+		else if (Component)
+		{
+			Seed = PCGHelpers::ComputeSeed(Seed, Component->Seed);
+		}
 
 		return Seed;
 	}

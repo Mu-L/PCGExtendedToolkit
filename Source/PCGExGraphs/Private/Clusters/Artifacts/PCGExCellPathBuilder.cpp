@@ -3,10 +3,10 @@
 
 #include "Clusters/Artifacts/PCGExCellPathBuilder.h"
 
-#include "Clusters/Artifacts/PCGExCell.h"
-#include "Clusters/Artifacts/PCGExCellDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
+#include "Clusters/Artifacts/PCGExCell.h"
+#include "Clusters/Artifacts/PCGExCellDetails.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -21,12 +21,15 @@ namespace PCGExClusters
 		const TSharedPtr<PCGExData::FPointIO>& InPathIO,
 		const FString& InTriageTag) const
 	{
-		if (!InCell || !InPathIO || !Cluster) { return; }
+		if (!InCell || !InPathIO || !Cluster)
+		{
+			return;
+		}
 
 		// Edge-based IOIndex for non-seeded variants
 		const int32 IOIndex = EdgeDataFacade
-			                      ? EdgeDataFacade->Source->IOIndex * 1000000 + Cluster->GetNodePointIndex(InCell->Nodes[0])
-			                      : Cluster->GetNodePointIndex(InCell->Nodes[0]);
+			? EdgeDataFacade->Source->IOIndex * 1000000 + Cluster->GetNodePointIndex(InCell->Nodes[0])
+			: Cluster->GetNodePointIndex(InCell->Nodes[0]);
 
 		ProcessCellInternal(InCell, InPathIO, InTriageTag, IOIndex, INDEX_NONE);
 	}
@@ -36,7 +39,10 @@ namespace PCGExClusters
 		const TSharedPtr<PCGExData::FPointIO>& InPathIO,
 		const FString& InTriageTag) const
 	{
-		if (!InCell || !InPathIO || !Cluster) { return; }
+		if (!InCell || !InPathIO || !Cluster)
+		{
+			return;
+		}
 
 		const int32 SeedIndex = InCell->CustomIndex;
 		const int32 IOIndex = BatchIndex * 1000000 + SeedIndex;

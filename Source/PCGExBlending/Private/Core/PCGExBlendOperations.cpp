@@ -8,9 +8,9 @@
 namespace PCGExBlending
 {
 	IBlendOperation::IBlendOperation(const EPCGExABBlendingType InMode, const bool bInResetForMulti)
-		: Mode(InMode),
-		  bResetForMulti(bInResetForMulti),
-		  bInitWithSource(
+		: Mode(InMode)
+		  , bResetForMulti(bInResetForMulti)
+		  , bInitWithSource(
 			  InMode == EPCGExABBlendingType::Min ||
 			  InMode == EPCGExABBlendingType::Max ||
 			  InMode == EPCGExABBlendingType::UnsignedMin ||
@@ -18,8 +18,8 @@ namespace PCGExBlending
 			  InMode == EPCGExABBlendingType::AbsoluteMin ||
 			  InMode == EPCGExABBlendingType::AbsoluteMax ||
 			  InMode == EPCGExABBlendingType::Hash ||
-			  InMode == EPCGExABBlendingType::UnsignedHash),
-		  bConsiderOriginalValue(
+			  InMode == EPCGExABBlendingType::UnsignedHash)
+		  , bConsiderOriginalValue(
 			  InMode == EPCGExABBlendingType::Average ||
 			  InMode == EPCGExABBlendingType::Add ||
 			  InMode == EPCGExABBlendingType::Subtract ||
@@ -38,22 +38,38 @@ namespace PCGExBlending
 	{
 		switch (WorkingType)
 		{
-		case EPCGMetadataTypes::Boolean: return CreateTyped<bool>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Integer32: return CreateTyped<int32>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Integer64: return CreateTyped<int64>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Float: return CreateTyped<float>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Double: return CreateTyped<double>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector2: return CreateTyped<FVector2D>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector: return CreateTyped<FVector>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector4: return CreateTyped<FVector4>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Quaternion: return CreateTyped<FQuat>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Rotator: return CreateTyped<FRotator>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Transform: return CreateTyped<FTransform>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::String: return CreateTyped<FString>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Name: return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::SoftObjectPath: return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::SoftClassPath: return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
-		default: return nullptr;
+		case EPCGMetadataTypes::Boolean:
+			return CreateTyped<bool>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer32:
+			return CreateTyped<int32>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer64:
+			return CreateTyped<int64>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Float:
+			return CreateTyped<float>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Double:
+			return CreateTyped<double>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector2:
+			return CreateTyped<FVector2D>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector:
+			return CreateTyped<FVector>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector4:
+			return CreateTyped<FVector4>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Quaternion:
+			return CreateTyped<FQuat>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Rotator:
+			return CreateTyped<FRotator>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Transform:
+			return CreateTyped<FTransform>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::String:
+			return CreateTyped<FString>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Name:
+			return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftObjectPath:
+			return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftClassPath:
+			return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
+		default:
+			return nullptr;
 		}
 	}
 
@@ -68,7 +84,10 @@ namespace PCGExBlending
 
 		{
 			FScopeLock Lock(&CacheLock);
-			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key)) { return *Found; }
+			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key))
+			{
+				return *Found;
+			}
 		}
 
 		// Create new operation outside lock
@@ -78,7 +97,10 @@ namespace PCGExBlending
 		{
 			FScopeLock Lock(&CacheLock);
 			// Check again in case another thread added it
-			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key)) { return *Found; }
+			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key))
+			{
+				return *Found;
+			}
 			Cache.Add(Key, NewOp);
 		}
 

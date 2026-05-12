@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widgets/SCompoundWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
+#include "Widgets/SCompoundWidget.h"
 
 struct FAssetData;
 class SBox;
@@ -54,10 +54,16 @@ public:
 	void ClearTiles();
 
 	/** Get the category name */
-	FName GetCategoryName() const { return CategoryName; }
+	FName GetCategoryName() const
+	{
+		return CategoryName;
+	}
 
 	/** Get collapse state */
-	bool IsCollapsed() const { return bIsCollapsed; }
+	bool IsCollapsed() const
+	{
+		return bIsCollapsed;
+	}
 
 	// Drop target overrides
 	virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& InDragDropEvent) override;

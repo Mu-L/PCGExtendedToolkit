@@ -9,7 +9,10 @@
 
 bool UPCGExBoxFittingRelax::PrepareForCluster(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster)
 {
-	if (!Super::PrepareForCluster(InContext, InCluster)) { return false; }
+	if (!Super::PrepareForCluster(InContext, InCluster))
+	{
+		return false;
+	}
 	PCGExArrayHelpers::InitArray(BoxBuffer, Cluster->Nodes->Num());
 	return true;
 }
@@ -48,14 +51,20 @@ void UPCGExBoxFittingRelax::Step2(const PCGExClusters::FNode& Node)
 		const FBox OtherBox = BoxBuffer[OtherNodeIndex];
 
 		// Check for overlap
-		if (!CurrentBox.Intersect(OtherBox)) { continue; }
+		if (!CurrentBox.Intersect(OtherBox))
+		{
+			continue;
+		}
 
 		// Calculate overlap resolution force
 		// TODO : Test with repulsion based on overlap size
 		FVector Delta = OtherPos - CurrentPos;
 		const double Distance = Delta.Size();
 
-		if (Distance <= KINDA_SMALL_NUMBER) { continue; }
+		if (Distance <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
 
 		// Overlap resolution
 		FVector OverlapSize = CurrentBox.GetExtent() + OtherBox.GetExtent() - PCGExTypes::Abs(Delta);

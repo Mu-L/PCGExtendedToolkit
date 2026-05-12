@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Data/PCGExData.h"
 #include "PCGExProperty.h"
+#include "Data/PCGExData.h"
 
 #include "PCGExPropertyWriter.generated.h"
 
@@ -67,7 +67,10 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOutputSettings
 	{
 		for (const FPCGExPropertyOutputConfig& Config : Configs)
 		{
-			if (Config.IsValid()) { return true; }
+			if (Config.IsValid())
+			{
+				return true;
+			}
 		}
 		return false;
 	}
@@ -207,7 +210,7 @@ public:
 		const IPCGExPropertyProvider* InProvider,
 		const TSharedRef<PCGExData::FFacade>& OutputFacade,
 		const FPCGExPropertyOutputSettings& OutputSettings
-	);
+		);
 
 	/**
 	 * Write property values for a resolved index to a point.

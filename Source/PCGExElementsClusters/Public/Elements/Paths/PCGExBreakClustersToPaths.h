@@ -40,7 +40,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BreakClustersToPaths, "Cluster : Break to Paths", "Create individual paths from continuous edge chains.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterOp); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterOp);
+	}
 #endif
 
 protected:
@@ -50,7 +54,11 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual bool SupportsEdgeSorting() const override { return DirectionSettings.RequiresSortingRules(); }
+	virtual bool SupportsEdgeSorting() const override
+	{
+		return DirectionSettings.RequiresSortingRules();
+	}
+
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
 	PCGEX_NODE_POINT_FILTER(FName("Break Conditions"), "Filters used to know which points are 'break' points.", PCGExFactories::ClusterNodeFilters, false)

@@ -75,8 +75,15 @@ namespace PCGExData
 
 		TSharedPtr<FFacade> GetDataFacade() const;
 
-		bool IsEmpty() const { return BufferConfigs.IsEmpty(); }
-		int32 Num() const { return BufferConfigs.Num(); }
+		bool IsEmpty() const
+		{
+			return BufferConfigs.IsEmpty();
+		}
+
+		int32 Num() const
+		{
+			return BufferConfigs.Num();
+		}
 
 		bool Validate(FPCGExContext* InContext) const;
 
@@ -100,7 +107,10 @@ namespace PCGExData
 
 		bool StartLoading(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<PCGExMT::IAsyncHandleGroup>& InParentHandle = nullptr);
 
-		bool IsLoaded() const { return bLoaded; }
+		bool IsLoaded() const
+		{
+			return bLoaded;
+		}
 
 	protected:
 		void OnLoadingEnd();
@@ -122,8 +132,15 @@ extern template void FFacadePreloader::Register<_TYPE>(FPCGExContext* InContext,
 		FMultiFacadePreloader(const TArray<TSharedPtr<FFacade>>& InDataFacades);
 		FMultiFacadePreloader(const TArray<TSharedRef<FFacade>>& InDataFacades);
 
-		bool IsEmpty() const { return Preloaders.IsEmpty(); }
-		int32 Num() const { return Preloaders.Num(); }
+		bool IsEmpty() const
+		{
+			return Preloaders.IsEmpty();
+		}
+
+		int32 Num() const
+		{
+			return Preloaders.Num();
+		}
 
 		using FPreloaderItCallback = std::function<void(FFacadePreloader&)>;
 		void ForEach(FPreloaderItCallback&& It);

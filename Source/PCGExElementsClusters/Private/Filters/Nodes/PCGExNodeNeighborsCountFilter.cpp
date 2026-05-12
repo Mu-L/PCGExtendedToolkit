@@ -4,10 +4,10 @@
 #include "Filters/Nodes/PCGExNodeNeighborsCountFilter.h"
 
 
-#include "Data/Utils/PCGExDataPreloader.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Data/Utils/PCGExDataPreloader.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Graphs/PCGExGraph.h"
 
 #define LOCTEXT_NAMESPACE "PCGExNodeNeighborsCountFilter"
@@ -18,12 +18,18 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExNodeNeighborsCountFilterConfig, LocalCount, doubl
 void UPCGExNodeNeighborsCountFilterFactory::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute) { FacadePreloader.Register<double>(InContext, Config.LocalCount); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<double>(InContext, Config.LocalCount);
+	}
 }
 
 bool UPCGExNodeNeighborsCountFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.CompareAgainst == EPCGExInputValueType::Attribute, Config.LocalCount, Consumable)
@@ -40,10 +46,16 @@ namespace PCGExNodeNeighborsCount
 {
 	bool FFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 	{
-		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
+		{
+			return false;
+		}
 
 		LocalCount = TypedFilterFactory->Config.GetValueSettingLocalCount(PCGEX_QUIET_HANDLING);
-		if (!LocalCount->Init(PointDataFacade, false)) { return false; }
+		if (!LocalCount->Init(PointDataFacade, false))
+		{
+			return false;
+		}
 
 		return true;
 	}
@@ -68,8 +80,14 @@ FString UPCGExNodeNeighborsCountFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = "Num Edges" + PCGExCompare::ToString(Config.Comparison);
 
-	if (Config.CompareAgainst == EPCGExInputValueType::Constant) { DisplayName += FString::Printf(TEXT("%d"), Config.Count); }
-	else { DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.LocalCount); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Constant)
+	{
+		DisplayName += FString::Printf(TEXT("%d"), Config.Count);
+	}
+	else
+	{
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.LocalCount);
+	}
 
 	return DisplayName;
 }

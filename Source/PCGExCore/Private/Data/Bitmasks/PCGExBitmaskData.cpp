@@ -51,7 +51,10 @@ namespace PCGExBitmask
 		Directions.Reserve(Reserve);
 		Dots.Reserve(Reserve);
 
-		for (const FPCGExBitmaskRef& Ref : InBitmaskRef) { Append(Ref, InAngle); }
+		for (const FPCGExBitmaskRef& Ref : InBitmaskRef)
+		{
+			Append(Ref, InAngle);
+		}
 	}
 
 	void FBitmaskData::MutateMatch(const FVector& InDirection, int64& Flags) const
@@ -59,7 +62,10 @@ namespace PCGExBitmask
 		const int32 NumEntries = Directions.Num();
 		for (int i = 0; i < NumEntries; i++)
 		{
-			if (FVector::DotProduct(InDirection, Directions[i]) >= Dots[i]) { Bitmasks[i].Mutate(Flags); }
+			if (FVector::DotProduct(InDirection, Directions[i]) >= Dots[i])
+			{
+				Bitmasks[i].Mutate(Flags);
+			}
 		}
 	}
 
@@ -68,7 +74,10 @@ namespace PCGExBitmask
 		const int32 NumEntries = Directions.Num();
 		for (int i = 0; i < NumEntries; i++)
 		{
-			if (FVector::DotProduct(InDirection, Directions[i]) <= Dots[i]) { Bitmasks[i].Mutate(Flags); }
+			if (FVector::DotProduct(InDirection, Directions[i]) <= Dots[i])
+			{
+				Bitmasks[i].Mutate(Flags);
+			}
 		}
 	}
 
@@ -79,7 +88,10 @@ namespace PCGExBitmask
 		Data->Append(InReferences, Angle);
 		for (const TPair<TObjectPtr<UPCGExBitmaskCollection>, EPCGExBitOp_OR>& Pair : InCollections)
 		{
-			if (Pair.Key) { Data->Append(Pair.Key, Angle, GetBitOp(Pair.Value)); }
+			if (Pair.Key)
+			{
+				Data->Append(Pair.Key, Angle, GetBitOp(Pair.Value));
+			}
 		}
 		return Data;
 	}

@@ -3,8 +3,8 @@
 
 #include "Sampling/PCGExSamplingUnionData.h"
 
-#include "Misc/ScopeRWLock.h"
 #include "Containers/PCGExIndexLookup.h"
+#include "Misc/ScopeRWLock.h"
 
 
 namespace PCGExSampling
@@ -28,7 +28,10 @@ namespace PCGExSampling
 			for (const PCGExData::FElement& Element : Elements)
 			{
 				const int32 IOIdx = IdxLookup->Get(Element.IO);
-				if (IOIdx == -1) { continue; }
+				if (IOIdx == -1)
+				{
+					continue;
+				}
 
 				const double Weight = Weights[Element];
 				OutWeightedPoints.Emplace(Element.Index, Weight, IOIdx);
@@ -39,13 +42,19 @@ namespace PCGExSampling
 		else if (WeightRange == -1)
 		{
 			double InternalRange = 0;
-			for (const TPair<PCGExData::FElement, double>& W : Weights) { InternalRange = FMath::Max(InternalRange, W.Value); }
+			for (const TPair<PCGExData::FElement, double>& W : Weights)
+			{
+				InternalRange = FMath::Max(InternalRange, W.Value);
+			}
 
 			// Remap weight to available max
 			for (const PCGExData::FElement& Element : Elements)
 			{
 				const int32 IOIdx = IdxLookup->Get(Element.IO);
-				if (IOIdx == -1) { continue; }
+				if (IOIdx == -1)
+				{
+					continue;
+				}
 
 				const double Weight = 1 - (Weights[Element] / InternalRange);
 				OutWeightedPoints.Emplace(Element.Index, Weight, IOIdx);
@@ -59,7 +68,10 @@ namespace PCGExSampling
 			for (const PCGExData::FElement& Element : Elements)
 			{
 				const int32 IOIdx = IdxLookup->Get(Element.IO);
-				if (IOIdx == -1) { continue; }
+				if (IOIdx == -1)
+				{
+					continue;
+				}
 
 				const double Weight = 1 - (Weights[Element] / WeightRange);
 				OutWeightedPoints.Emplace(Element.Index, Weight, IOIdx);
@@ -68,11 +80,17 @@ namespace PCGExSampling
 			}
 		}
 
-		if (Index == 0) { return 0; }
+		if (Index == 0)
+		{
+			return 0;
+		}
 		if (TotalWeight == 0)
 		{
 			const double FixedWeight = 1 / static_cast<double>(Index);
-			for (PCGExData::FWeightedPoint& P : OutWeightedPoints) { P.Weight = FixedWeight; }
+			for (PCGExData::FWeightedPoint& P : OutWeightedPoints)
+			{
+				P.Weight = FixedWeight;
+			}
 			return Index;
 		}
 
@@ -88,26 +106,41 @@ namespace PCGExSampling
 
 	double FSampingUnionData::GetWeightAverage() const
 	{
-		if (Weights.Num() == 0) { return 0; }
+		if (Weights.Num() == 0)
+		{
+			return 0;
+		}
 
 		double Average = 0;
-		for (const TPair<PCGExData::FElement, double>& Pair : Weights) { Average += Pair.Value; }
+		for (const TPair<PCGExData::FElement, double>& Pair : Weights)
+		{
+			Average += Pair.Value;
+		}
 		return Average / Weights.Num();
 	}
 
 	double FSampingUnionData::GetSqrtWeightAverage() const
 	{
-		if (Weights.Num() == 0) { return 0; }
+		if (Weights.Num() == 0)
+		{
+			return 0;
+		}
 
 		double Average = 0;
-		for (const TPair<PCGExData::FElement, double>& Pair : Weights) { Average += FMath::Sqrt(Pair.Value); }
+		for (const TPair<PCGExData::FElement, double>& Pair : Weights)
+		{
+			Average += FMath::Sqrt(Pair.Value);
+		}
 		return Average / Weights.Num();
 	}
 
 	void FSampingUnionData::Reserve(const int32 InSetReserve, const int32 InElementReserve)
 	{
 		IUnionData::Reserve(InSetReserve, InElementReserve);
-		if (InElementReserve > 8) { Weights.Reserve(InElementReserve); }
+		if (InElementReserve > 8)
+		{
+			Weights.Reserve(InElementReserve);
+		}
 	}
 
 	void FSampingUnionData::Reset()

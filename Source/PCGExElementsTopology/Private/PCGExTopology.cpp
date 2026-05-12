@@ -10,16 +10,25 @@
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
 #include "Paths/PCGExPath.h"
 
 void FPCGExTopologyDetails::PostProcessMesh(const TObjectPtr<UDynamicMesh>& InDynamicMesh) const
 {
-	if (bWeldEdges) { UGeometryScriptLibrary_MeshRepairFunctions::WeldMeshEdges(InDynamicMesh, WeldEdgesOptions); }
-	if (bComputeNormals) { UGeometryScriptLibrary_MeshNormalsFunctions::RecomputeNormals(InDynamicMesh, NormalsOptions); }
-	if (bFlipNormals) { UGeometryScriptLibrary_MeshNormalsFunctions::FlipNormals(InDynamicMesh); }
+	if (bWeldEdges)
+	{
+		UGeometryScriptLibrary_MeshRepairFunctions::WeldMeshEdges(InDynamicMesh, WeldEdgesOptions);
+	}
+	if (bComputeNormals)
+	{
+		UGeometryScriptLibrary_MeshNormalsFunctions::RecomputeNormals(InDynamicMesh, NormalsOptions);
+	}
+	if (bFlipNormals)
+	{
+		UGeometryScriptLibrary_MeshNormalsFunctions::FlipNormals(InDynamicMesh);
+	}
 }
 
 void FPCGExTopologyUVDetails::Prepare(const TSharedPtr<PCGExData::FFacade>& InDataFacade)
@@ -31,11 +40,17 @@ void FPCGExTopologyUVDetails::Prepare(const TSharedPtr<PCGExData::FFacade>& InDa
 
 	for (const FPCGExUVInputDetails& Channel : UVs)
 	{
-		if (!Channel.bEnabled || Channel.AttributeName.IsNone()) { continue; }
+		if (!Channel.bEnabled || Channel.AttributeName.IsNone())
+		{
+			continue;
+		}
 
 		bool bIsAlreadySet = false;
 		ExistingChannels.Add(Channel.Channel, &bIsAlreadySet);
-		if (bIsAlreadySet) { continue; }
+		if (bIsAlreadySet)
+		{
+			continue;
+		}
 
 		TSharedPtr<PCGExData::TBuffer<FVector2D>> Buffer = InDataFacade->GetBroadcaster<FVector2D>(Channel.AttributeName, true);
 		if (!Buffer)
@@ -57,11 +72,17 @@ void FPCGExTopologyUVDetails::RegisterBuffersDependencies(FPCGExContext* InConte
 
 	for (const FPCGExUVInputDetails& Channel : UVs)
 	{
-		if (!Channel.bEnabled || Channel.AttributeName.IsNone()) { continue; }
+		if (!Channel.bEnabled || Channel.AttributeName.IsNone())
+		{
+			continue;
+		}
 
 		bool bIsAlreadySet = false;
 		ExistingChannels.Add(Channel.Channel, &bIsAlreadySet);
-		if (bIsAlreadySet) { continue; }
+		if (bIsAlreadySet)
+		{
+			continue;
+		}
 
 		FacadePreloader.Register<FVector2D>(InContext, Channel.AttributeName, PCGExData::EBufferPreloadType::BroadcastFromName);
 	}
@@ -69,7 +90,10 @@ void FPCGExTopologyUVDetails::RegisterBuffersDependencies(FPCGExContext* InConte
 
 void FPCGExTopologyUVDetails::Write(const TArray<int32>& TriangleIDs, UE::Geometry::FDynamicMesh3& InMesh) const
 {
-	if (!NumChannels) { return; }
+	if (!NumChannels)
+	{
+		return;
+	}
 
 	const int32 VtxCount = InMesh.MaxVertexID();
 	InMesh.Attributes()->SetNumUVLayers(NumChannels);
@@ -84,7 +108,10 @@ void FPCGExTopologyUVDetails::Write(const TArray<int32>& TriangleIDs, UE::Geomet
 
 		UE::Geometry::FDynamicMeshUVOverlay* UV = InMesh.Attributes()->GetUVLayer(ChannelIndex);
 
-		for (int i = 0; i < VtxCount; i++) { ElemIDs[i] = UV->AppendElement(FVector2f(UVBuffer->Read(i))); }
+		for (int i = 0; i < VtxCount; i++)
+		{
+			ElemIDs[i] = UV->AppendElement(FVector2f(UVBuffer->Read(i)));
+		}
 
 		for (const int32 TriangleID : TriangleIDs)
 		{
@@ -96,7 +123,10 @@ void FPCGExTopologyUVDetails::Write(const TArray<int32>& TriangleIDs, UE::Geomet
 
 void FPCGExTopologyUVDetails::Write(const TArray<int32>& TriangleIDs, const TArray<int32>& VtxIDs, UE::Geometry::FDynamicMesh3& InMesh) const
 {
-	if (!NumChannels) { return; }
+	if (!NumChannels)
+	{
+		return;
+	}
 
 	const int32 VtxCount = InMesh.MaxVertexID();
 	InMesh.Attributes()->SetNumUVLayers(NumChannels);
@@ -133,7 +163,10 @@ void FPCGExTopologyUVDetails::Write(
 	const TArray<TSharedPtr<PCGExData::FFacade>>& Facades,
 	UE::Geometry::FDynamicMesh3& InMesh) const
 {
-	if (UVs.IsEmpty()) { return; }
+	if (UVs.IsEmpty())
+	{
+		return;
+	}
 
 	const int32 VtxCount = InMesh.MaxVertexID();
 	const int32 NumFacades = Facades.Num();
@@ -145,11 +178,17 @@ void FPCGExTopologyUVDetails::Write(
 
 	for (const FPCGExUVInputDetails& Channel : UVs)
 	{
-		if (!Channel.bEnabled || Channel.AttributeName.IsNone()) { continue; }
+		if (!Channel.bEnabled || Channel.AttributeName.IsNone())
+		{
+			continue;
+		}
 
 		bool bIsAlreadySet = false;
 		ExistingChannels.Add(Channel.Channel, &bIsAlreadySet);
-		if (bIsAlreadySet) { continue; }
+		if (bIsAlreadySet)
+		{
+			continue;
+		}
 
 		TArray<TSharedPtr<PCGExData::TBuffer<FVector2D>>>& FacadeBuffers = PerFacadeBuffers.FindOrAdd(Channel.Channel);
 		FacadeBuffers.SetNum(NumFacades);
@@ -160,18 +199,30 @@ void FPCGExTopologyUVDetails::Write(
 			if (const TSharedPtr<PCGExData::FFacade>& Facade = Facades[FacadeIdx])
 			{
 				FacadeBuffers[FacadeIdx] = Facade->GetBroadcaster<FVector2D>(Channel.AttributeName, true);
-				if (FacadeBuffers[FacadeIdx]) { bHasAnyBuffer = true; }
+				if (FacadeBuffers[FacadeIdx])
+				{
+					bHasAnyBuffer = true;
+				}
 			}
 		}
 
-		if (bHasAnyBuffer) { ActiveChannelIndices.Add(Channel.Channel); }
+		if (bHasAnyBuffer)
+		{
+			ActiveChannelIndices.Add(Channel.Channel);
+		}
 	}
 
-	if (ActiveChannelIndices.IsEmpty()) { return; }
+	if (ActiveChannelIndices.IsEmpty())
+	{
+		return;
+	}
 
 	// Find max channel index for layer count
 	int32 MaxChannel = 0;
-	for (const int32 Ch : ActiveChannelIndices) { MaxChannel = FMath::Max(MaxChannel, Ch + 1); }
+	for (const int32 Ch : ActiveChannelIndices)
+	{
+		MaxChannel = FMath::Max(MaxChannel, Ch + 1);
+	}
 	InMesh.Attributes()->SetNumUVLayers(MaxChannel);
 
 	TArray<int32> ElemIDs;
@@ -210,7 +261,10 @@ void FPCGExTopologyUVDetails::Write(
 
 FTransform PCGExTopology::GetCoordinateSpaceTransform(EPCGCoordinateSpace CoordinateSpace, FPCGExContext* Context)
 {
-	if (CoordinateSpace == EPCGCoordinateSpace::World) { return FTransform::Identity; }
+	if (CoordinateSpace == EPCGCoordinateSpace::World)
+	{
+		return FTransform::Identity;
+	}
 
 	FTransform LocalTransform = Context->ExecutionSource->GetExecutionState().GetTransform();
 

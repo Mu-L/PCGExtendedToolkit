@@ -23,5 +23,8 @@ struct PCGEXCOLLECTIONS_API FPCGExProperty_AssetCollection : public FPCGExProper
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
 	TSoftObjectPtr<UPCGExAssetCollection> AssetCollection;
 
-	virtual FName GetTypeName() const override { return FName("AssetCollection"); }
+	virtual FName GetTypeName() const override
+	{
+		return FName("AssetCollection");
+	}
 };

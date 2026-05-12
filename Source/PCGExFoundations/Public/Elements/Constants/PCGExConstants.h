@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExConstantsDefinitions.h"
 #include "PCGPin.h"
 #include "PCGSettings.h"
-#include "PCGExConstantsDefinitions.h"
 #include "Core/PCGExContext.h"
 
 #include "PCGExCoreMacros.h"
@@ -27,13 +27,29 @@ public:
 
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(Constant, "Constant", "Constants.", GetEnumName());
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Constant); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Constant);
+	}
 
 	FName GetEnumName() const;
 
-	virtual bool OnlyExposePreconfiguredSettings() const override { return true; };
-	virtual bool CanUserEditTitle() const override { return false; }
+	virtual bool OnlyExposePreconfiguredSettings() const override
+	{
+		return true;
+	};
+
+	virtual bool CanUserEditTitle() const override
+	{
+		return false;
+	}
+
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 
@@ -70,7 +86,11 @@ public:
 #endif
 
 protected:
-	virtual TArray<FPCGPinProperties> InputPinProperties() const override { return {}; }
+	virtual TArray<FPCGPinProperties> InputPinProperties() const override
+	{
+		return {};
+	}
+
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 
@@ -116,14 +136,23 @@ public:
 	T ApplyNumericValueSettings(const T& InValue) const
 	{
 		T Value = InValue;
-		if (NegateOutput) { Value *= -1; }
+		if (NegateOutput)
+		{
+			Value *= -1;
+		}
 
 		if constexpr (std::is_floating_point_v<T>)
 		{
 			if (OutputReciprocal)
 			{
-				if (!FMath::IsNearlyZero(Value)) { Value = 1 / Value; }
-				else { Value = 0; }
+				if (!FMath::IsNearlyZero(Value))
+				{
+					Value = 1 / Value;
+				}
+				else
+				{
+					Value = 0;
+				}
 			}
 		}
 

@@ -5,9 +5,9 @@
 #include "GoalPickers/PCGExGoalPickerRandom.h"
 
 #include "Data/PCGBasePointData.h"
-#include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExPointElements.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Helpers/PCGExRandomHelpers.h"
 
 PCGEX_SETTING_VALUE_IMPL(UPCGExGoalPickerRandom, NumGoals, int32, NumGoalsType, NumGoalAttribute, NumGoals)
 
@@ -26,10 +26,16 @@ void UPCGExGoalPickerRandom::CopySettingsFrom(const UPCGExInstancedFactory* Othe
 
 bool UPCGExGoalPickerRandom::PrepareForData(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSeedsDataFacade, const TSharedPtr<PCGExData::FFacade>& InGoalsDataFacade)
 {
-	if (!Super::PrepareForData(InContext, InSeedsDataFacade, InGoalsDataFacade)) { return false; }
+	if (!Super::PrepareForData(InContext, InSeedsDataFacade, InGoalsDataFacade))
+	{
+		return false;
+	}
 
 	NumGoalsBuffer = GetValueSettingNumGoals();
-	if (!NumGoalsBuffer->Init(InSeedsDataFacade, false)) { return false; }
+	if (!NumGoalsBuffer->Init(InSeedsDataFacade, false))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -46,12 +52,21 @@ void UPCGExGoalPickerRandom::GetGoalIndices(const PCGExData::FConstPoint& Seed, 
 
 	FRandomStream Random = PCGExRandomHelpers::GetRandomStreamFromPoint(Seed.Data->GetSeed(Seed.Index), Seed.Index);
 
-	if (GoalCount == EPCGExGoalPickRandomAmount::Random) { Picks = Random.RandRange(0, Picks); }
+	if (GoalCount == EPCGExGoalPickRandomAmount::Random)
+	{
+		Picks = Random.RandRange(0, Picks);
+	}
 
-	for (int i = 0; i < Picks; i++) { OutIndices.Emplace(Random.RandRange(0, MaxGoalIndex)); }
+	for (int i = 0; i < Picks; i++)
+	{
+		OutIndices.Emplace(Random.RandRange(0, MaxGoalIndex));
+	}
 }
 
-bool UPCGExGoalPickerRandom::OutputMultipleGoals() const { return GoalCount != EPCGExGoalPickRandomAmount::Single; }
+bool UPCGExGoalPickerRandom::OutputMultipleGoals() const
+{
+	return GoalCount != EPCGExGoalPickRandomAmount::Single;
+}
 
 void UPCGExGoalPickerRandom::Cleanup()
 {

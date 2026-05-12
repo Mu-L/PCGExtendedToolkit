@@ -11,8 +11,15 @@
 
 #pragma region UPCGSettings interface
 
-PCGExData::EIOInit UPCGExMakeClustersUniqueSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Forward; }
-PCGExData::EIOInit UPCGExMakeClustersUniqueSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExMakeClustersUniqueSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
+
+PCGExData::EIOInit UPCGExMakeClustersUniqueSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 #pragma endregion
 
@@ -20,7 +27,10 @@ PCGEX_INITIALIZE_ELEMENT(MakeClustersUnique)
 
 bool FPCGExMakeClustersUniqueElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(MakeClustersUnique)
 
@@ -43,7 +53,10 @@ bool FPCGExMakeClustersUniqueElement::AdvanceWork(FPCGExContext* InContext, cons
 		PCGExDataId OutId;
 		PCGExClusters::Helpers::SetClusterVtx(Context->CurrentIO, OutId);
 
-		if (!Context->TaggedEdges) { continue; }
+		if (!Context->TaggedEdges)
+		{
+			continue;
+		}
 
 		PCGExClusters::Helpers::MarkClusterEdges(Context->TaggedEdges->Entries, OutId);
 	}

@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "PCGExVersion.h"
 #include "Factories/PCGExFactoryData.h"
+#include "UObject/Object.h"
 #if PCGEX_ENGINE_VERSION < 507
 #include "MaterialTypes.h"
 #else
@@ -135,7 +135,10 @@ class UPCGExTexParamFactoryData : public UPCGExFactoryData
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoTexParam)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::TexParam; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::TexParam;
+	}
 
 	FPCGExTextureParamConfig Config;
 	FHashedMaterialParameterInfo Infos;
@@ -153,12 +156,20 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(TexParamAttribute, "Texture Param", "A simple texture parameter definition.", FName(Config.TextureIDAttributeName.ToString() +" / "+Config.SampleAttributeName.ToString()))
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(TexParam); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(TexParam);
+	}
 #endif
 	//~End UPCGSettings
 
 	//~Begin UPCGExFactoryProviderSettings
-	virtual FName GetMainOutputPin() const override { return PCGExTexture::OutputTexLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExTexture::OutputTexLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 	//~End UPCGExFactoryProviderSettings
 

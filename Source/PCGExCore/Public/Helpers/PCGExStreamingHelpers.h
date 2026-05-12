@@ -7,12 +7,12 @@
 #include <functional>
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "UObject/Interface.h"
-#include "UObject/UObjectGlobals.h"
+#include "UObject/Object.h"
 #include "UObject/ObjectPtr.h"
-#include "UObject/SoftObjectPtr.h"
 #include "UObject/SoftObjectPath.h"
+#include "UObject/SoftObjectPtr.h"
+#include "UObject/UObjectGlobals.h"
 
 #include "Async/Async.h"
 

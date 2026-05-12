@@ -8,8 +8,8 @@
 #include "Factories/PCGExFactories.h"
 
 #include "Core/PCGExPathProcessor.h"
-#include "Details/PCGExSubdivisionDetails.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "Details/PCGExSubdivisionDetails.h"
 
 #include "PCGExSubdivide.generated.h"
 
@@ -153,7 +153,10 @@ namespace PCGExSubdivide
 		{
 		}
 
-		virtual bool IsTrivial() const override { return false; } // Force non-trivial
+		virtual bool IsTrivial() const override
+		{
+			return false;
+		} // Force non-trivial
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;

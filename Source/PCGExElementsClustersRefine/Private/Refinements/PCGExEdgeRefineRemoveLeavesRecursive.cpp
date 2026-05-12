@@ -51,14 +51,23 @@ void FPCGExEdgeRemoveLeavesRecursive::Process()
 			const int32 NodeIndex = LeafQueue[Idx];
 			PCGExClusters::FNode& Node = (*Cluster->Nodes)[NodeIndex];
 
-			if (!Node.bValid) { return; }
-			if (ValidLinkCounts[NodeIndex].load(std::memory_order_acquire) != 1) { return; }
+			if (!Node.bValid)
+			{
+				return;
+			}
+			if (ValidLinkCounts[NodeIndex].load(std::memory_order_acquire) != 1)
+			{
+				return;
+			}
 
 			// Find the single valid link
 			for (const PCGExGraphs::FLink& Lk : Node.Links)
 			{
 				PCGExGraphs::FEdge* Edge = Cluster->GetEdge(Lk.Edge);
-				if (!Edge->bValid) { continue; }
+				if (!Edge->bValid)
+				{
+					continue;
+				}
 
 				// Invalidate the leaf and its edge
 				Node.bValid = false;

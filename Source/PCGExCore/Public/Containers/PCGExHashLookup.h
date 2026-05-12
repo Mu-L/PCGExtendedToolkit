@@ -22,7 +22,11 @@ namespace PCGEx
 
 		FORCEINLINE virtual void Set(const int32 At, const uint64 Value) = 0;
 		FORCEINLINE virtual uint64 Get(const int32 At) = 0;
-		FORCEINLINE virtual bool IsInitValue(const uint64 InValue) { return InValue == InternalInitValue; }
+		FORCEINLINE virtual bool IsInitValue(const uint64 InValue)
+		{
+			return InValue == InternalInitValue;
+		}
+
 		virtual void Reset() = 0;
 	};
 
@@ -38,12 +42,33 @@ namespace PCGEx
 			Data.Init(InitValue, Size);
 		}
 
-		FORCEINLINE virtual void Set(const int32 At, const uint64 Value) override { Data[At] = Value; }
-		FORCEINLINE virtual uint64 Get(const int32 At) override { return Data[At]; }
-		virtual void Reset() override { for (uint64& V : Data) { V = InternalInitValue; } }
+		FORCEINLINE virtual void Set(const int32 At, const uint64 Value) override
+		{
+			Data[At] = Value;
+		}
 
-		operator TArrayView<const uint64>() const { return Data; }
-		operator TArrayView<uint64>() { return Data; }
+		FORCEINLINE virtual uint64 Get(const int32 At) override
+		{
+			return Data[At];
+		}
+
+		virtual void Reset() override
+		{
+			for (uint64& V : Data)
+			{
+				V = InternalInitValue;
+			}
+		}
+
+		operator TArrayView<const uint64>() const
+		{
+			return Data;
+		}
+
+		operator TArrayView<uint64>()
+		{
+			return Data;
+		}
 	};
 
 	class FHashLookupMap : public FHashLookup
@@ -55,19 +80,35 @@ namespace PCGEx
 		explicit FHashLookupMap(const uint64 InitValue, const int32 Size)
 			: FHashLookup(InitValue, Size)
 		{
-			if (Size > 0) { Data.Reserve(Size); }
+			if (Size > 0)
+			{
+				Data.Reserve(Size);
+			}
 		}
 
-		FORCEINLINE virtual void Set(const int32 At, const uint64 Value) override { Data.Add(At, Value); }
+		FORCEINLINE virtual void Set(const int32 At, const uint64 Value) override
+		{
+			Data.Add(At, Value);
+		}
+
 		FORCEINLINE virtual uint64 Get(const int32 At) override
 		{
-			if (const uint64* Value = Data.Find(At)) { return *Value; }
+			if (const uint64* Value = Data.Find(At))
+			{
+				return *Value;
+			}
 			return InternalInitValue;
 		}
 
-		virtual void Reset() override { Data.Reset(); }
+		virtual void Reset() override
+		{
+			Data.Reset();
+		}
 
-		FORCEINLINE bool Contains(const int32 Index) const { return Data.Contains(Index); }
+		FORCEINLINE bool Contains(const int32 Index) const
+		{
+			return Data.Contains(Index);
+		}
 	};
 
 	template <typename T>

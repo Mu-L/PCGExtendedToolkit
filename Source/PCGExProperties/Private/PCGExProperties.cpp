@@ -34,11 +34,17 @@ FPCGExPropertySchema::FPCGExPropertySchema()
 
 const FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByName(FName PropertyName) const
 {
-	if (PropertyName.IsNone()) { return nullptr; }
+	if (PropertyName.IsNone())
+	{
+		return nullptr;
+	}
 
 	for (const FPCGExPropertySchema& Schema : Schemas)
 	{
-		if (Schema.Name == PropertyName) { return &Schema; }
+		if (Schema.Name == PropertyName)
+		{
+			return &Schema;
+		}
 	}
 	return nullptr;
 }
@@ -65,7 +71,10 @@ bool FPCGExPropertySchemaCollection::ValidateUniqueNames(TArray<FName>& OutDupli
 
 	for (const FPCGExPropertySchema& Schema : Schemas)
 	{
-		if (Schema.Name.IsNone()) { continue; }
+		if (Schema.Name.IsNone())
+		{
+			continue;
+		}
 
 		bool bAlreadyInSet = false;
 		Seen.Add(Schema.Name, &bAlreadyInSet);
@@ -154,7 +163,10 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 	for (const FInstancedStruct& SchemaProp : Schema)
 	{
 		const FPCGExProperty* SchemaData = SchemaProp.GetPtr<FPCGExProperty>();
-		if (!SchemaData) { continue; }
+		if (!SchemaData)
+		{
+			continue;
+		}
 
 		FPCGExPropertyOverrideEntry& NewEntry = Overrides.AddDefaulted_GetRef();
 		FPCGExPropertyOverrideEntry* Existing = nullptr;

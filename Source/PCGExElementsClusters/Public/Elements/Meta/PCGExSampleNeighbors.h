@@ -27,7 +27,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SampleNeighbors, "Cluster : Sample Neighbors", "Sample cluster vtx' neighbors values.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Sampling);
+	}
 #endif
 	PCGEX_NODE_POINT_FILTER(PCGExClusters::Labels::SourceVtxFiltersLabel, "Optional per-node filters. Only nodes that pass the filter will be sampled; filtered-out nodes can still be read by other nodes.", PCGExFactories::ClusterNodeFilters, false)
 

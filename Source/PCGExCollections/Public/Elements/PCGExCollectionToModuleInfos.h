@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExPropertyWriter.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
-#include "Helpers/PCGExCollectionsHelpers.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
-#include "PCGExPropertyWriter.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
 #include "PCGExCollectionToModuleInfos.generated.h"
 
 class UPCGExAssetCollection;
@@ -36,7 +36,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(CollectionToModuleInfos, "Collection to Module Infos", "Converts an asset collection to a grammar-friendly attribute set that can be used as module infos.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	}
 #endif
 
 protected:

@@ -14,7 +14,10 @@ namespace PCGEx
 	// Uses ExecuteWithRightType to dispatch the correct attribute type at runtime.
 	void TagsToData(UPCGData* Data, const TSharedPtr<PCGExData::FTags>& Tags, const EPCGExTagsToDataAction Action)
 	{
-		if (Action == EPCGExTagsToDataAction::Ignore) { return; }
+		if (Action == EPCGExTagsToDataAction::Ignore)
+		{
+			return;
+		}
 
 		if (Action == EPCGExTagsToDataAction::ToData)
 		{
@@ -44,19 +47,26 @@ namespace PCGEx
 
 	void TagsToData(const TSharedPtr<PCGExData::FPointIO>& Data, const EPCGExTagsToDataAction Action)
 	{
-		if (Action == EPCGExTagsToDataAction::Ignore) { return; }
+		if (Action == EPCGExTagsToDataAction::Ignore)
+		{
+			return;
+		}
 		TagsToData(Data->GetOut(), Data->Tags, Action);
 	}
 }
 
 FPCGExFilterResultDetails::FPCGExFilterResultDetails(bool bTogglable, bool InEnabled)
-	: bOptional(bTogglable), bEnabled(InEnabled)
+	: bOptional(bTogglable)
+	  , bEnabled(InEnabled)
 {
 }
 
 bool FPCGExFilterResultDetails::Validate(FPCGExContext* InContext) const
 {
-	if (!bEnabled) { return true; }
+	if (!bEnabled)
+	{
+		return true;
+	}
 	PCGEX_VALIDATE_NAME_C(InContext, ResultAttributeName);
 	return true;
 }
@@ -65,11 +75,14 @@ void FPCGExFilterResultDetails::Init(const TSharedPtr<PCGExData::FFacade>& InDat
 {
 	switch (Action)
 	{
-	case EPCGExResultWriteAction::Bool: BoolBuffer = InDataFacade->GetWritable<bool>(ResultAttributeName, false, true, PCGExData::EBufferInit::New);
+	case EPCGExResultWriteAction::Bool:
+		BoolBuffer = InDataFacade->GetWritable<bool>(ResultAttributeName, false, true, PCGExData::EBufferInit::New);
 		break;
-	case EPCGExResultWriteAction::Counter: IncrementBuffer = InDataFacade->GetWritable<double>(ResultAttributeName, 0, true, PCGExData::EBufferInit::Inherit);
+	case EPCGExResultWriteAction::Counter:
+		IncrementBuffer = InDataFacade->GetWritable<double>(ResultAttributeName, 0, true, PCGExData::EBufferInit::Inherit);
 		break;
-	case EPCGExResultWriteAction::Bitmask: BitmaskBuffer = InDataFacade->GetWritable<int64>(ResultAttributeName, 0, true, PCGExData::EBufferInit::Inherit);
+	case EPCGExResultWriteAction::Bitmask:
+		BitmaskBuffer = InDataFacade->GetWritable<int64>(ResultAttributeName, 0, true, PCGExData::EBufferInit::Inherit);
 		break;
 	}
 }
@@ -78,15 +91,24 @@ void FPCGExFilterResultDetails::Write(const int32 Index, bool bPass) const
 {
 	switch (Action)
 	{
-	case EPCGExResultWriteAction::Bool: BoolBuffer->SetValue(Index, bPass);
+	case EPCGExResultWriteAction::Bool:
+		BoolBuffer->SetValue(Index, bPass);
 		break;
-	case EPCGExResultWriteAction::Counter: IncrementBuffer->SetValue(Index, IncrementBuffer->GetValue(Index) + (bPass ? PassIncrement : FailIncrement));
+	case EPCGExResultWriteAction::Counter:
+		IncrementBuffer->SetValue(Index, IncrementBuffer->GetValue(Index) + (bPass ? PassIncrement : FailIncrement));
 		break;
-	case EPCGExResultWriteAction::Bitmask: if (bDoBitmaskOpOnFail && bDoBitmaskOpOnPass)
+	case EPCGExResultWriteAction::Bitmask:
+		if (bDoBitmaskOpOnFail && bDoBitmaskOpOnPass)
 		{
 			int64 Flags = BitmaskBuffer->GetValue(Index);
-			if (bPass) { PassBitmask.Mutate(Flags); }
-			else { FailBitmask.Mutate(Flags); }
+			if (bPass)
+			{
+				PassBitmask.Mutate(Flags);
+			}
+			else
+			{
+				FailBitmask.Mutate(Flags);
+			}
 			BitmaskBuffer->SetValue(Index, Flags);
 		}
 		else if (bDoBitmaskOpOnPass)
@@ -135,8 +157,14 @@ void FPCGExFilterResultDetails::Write(const PCGExMT::FScope& Scope, const TArray
 			{
 				int64 Flags = BitmaskBuffer->GetValue(Index);
 
-				if (Results[Index]) { PassBitmask.Mutate(Flags); }
-				else { FailBitmask.Mutate(Flags); }
+				if (Results[Index])
+				{
+					PassBitmask.Mutate(Flags);
+				}
+				else
+				{
+					FailBitmask.Mutate(Flags);
+				}
 
 				BitmaskBuffer->SetValue(Index, Flags);
 			}
@@ -192,8 +220,14 @@ void FPCGExFilterResultDetails::Write(const PCGExMT::FScope& Scope, const TBitAr
 			{
 				int64 Flags = BitmaskBuffer->GetValue(Index);
 
-				if (Results[Index]) { PassBitmask.Mutate(Flags); }
-				else { FailBitmask.Mutate(Flags); }
+				if (Results[Index])
+				{
+					PassBitmask.Mutate(Flags);
+				}
+				else
+				{
+					FailBitmask.Mutate(Flags);
+				}
 
 				BitmaskBuffer->SetValue(Index, Flags);
 			}

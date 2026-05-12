@@ -5,12 +5,12 @@
 
 #include "CoreMinimal.h"
 
-#include "Data/Bitmasks/PCGExBitmaskDetails.h"
+#include "PCGExCoreMacros.h"
+#include "PCGExCoreSettingsCache.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
-#include "PCGExCoreMacros.h"
-#include "PCGExCoreSettingsCache.h"
+#include "Data/Bitmasks/PCGExBitmaskDetails.h"
 
 #include "PCGExBitmask.generated.h"
 
@@ -27,8 +27,17 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(Bitmask, "Bitmask", "A Simple bitmask attribute.", GetDisplayName());
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Constant); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Constant);
+	}
+
 	FName GetDisplayName() const;
 #endif
 

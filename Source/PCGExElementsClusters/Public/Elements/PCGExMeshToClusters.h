@@ -7,8 +7,8 @@
 
 #include "Clusters/PCGExClusterCommon.h"
 #include "Core/PCGExPointsProcessor.h"
-#include "Data/External/PCGExMeshCommon.h"
 #include "Data/External/PCGExMesh.h"
+#include "Data/External/PCGExMeshCommon.h"
 #include "Data/External/PCGExMeshImportDetails.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Fitting/PCGExFitting.h"
@@ -44,8 +44,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(MeshToClusters, "Mesh to Clusters", "Creates clusters from mesh topology.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
-	virtual bool CanDynamicallyTrackKeys() const override { return true; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
+
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 #endif
 
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
@@ -57,9 +65,21 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual FName GetMainInputPin() const override { return PCGExCommon::Labels::SourceTargetsLabel; }
-	virtual FName GetMainOutputPin() const override { return PCGExClusters::Labels::OutputVerticesLabel; }
-	virtual bool GetMainAcceptMultipleData() const override { return false; }
+	virtual FName GetMainInputPin() const override
+	{
+		return PCGExCommon::Labels::SourceTargetsLabel;
+	}
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExClusters::Labels::OutputVerticesLabel;
+	}
+
+	virtual bool GetMainAcceptMultipleData() const override
+	{
+		return false;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 	/** Triangulation type */
@@ -152,5 +172,8 @@ protected:
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
 };

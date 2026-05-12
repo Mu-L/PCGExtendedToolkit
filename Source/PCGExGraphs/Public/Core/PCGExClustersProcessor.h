@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExClusterMT.h"
-#include "Core/PCGExPointsProcessor.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Core/PCGExPointsProcessor.h"
 #include "Sorting/PCGExSortingDetails.h"
 
 #include "PCGExClustersProcessor.generated.h"
@@ -38,7 +38,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(ClustersProcessorSettings, "Edges Processor Settings", "TOOLTIP_TEXT");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterOp); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterOp);
+	}
 #endif
 
 protected:
@@ -54,8 +58,15 @@ public:
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const;
 
-	virtual FName GetMainInputPin() const override { return PCGExClusters::Labels::SourceVerticesLabel; }
-	virtual FName GetMainOutputPin() const override { return PCGExClusters::Labels::OutputVerticesLabel; }
+	virtual FName GetMainInputPin() const override
+	{
+		return PCGExClusters::Labels::SourceVerticesLabel;
+	}
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExClusters::Labels::OutputVerticesLabel;
+	}
 
 	virtual bool GetMainAcceptMultipleData() const override;
 	//~End UPCGExPointsProcessorSettings
@@ -107,7 +118,10 @@ struct PCGEXGRAPHS_API FPCGExClustersProcessorContext : FPCGExPointsProcessorCon
 		{
 			const int32 NumProcessors = Batch->GetNumProcessors();
 			OutProcessors.Reserve(OutProcessors.Num() + NumProcessors);
-			for (int i = 0; i < NumProcessors; i++) { OutProcessors.Add(Batch->GetProcessor<T>(i)); }
+			for (int i = 0; i < NumProcessors; i++)
+			{
+				OutProcessors.Add(Batch->GetProcessor<T>(i));
+			}
 		}
 	}
 
@@ -119,7 +133,11 @@ protected:
 
 public:
 	bool ProcessClusters(const PCGExCommon::ContextState NextStateId);
-	bool GetHasValidHeuristics() const { return bHasValidHeuristics; }
+
+	bool GetHasValidHeuristics() const
+	{
+		return bHasValidHeuristics;
+	}
 
 protected:
 	bool CompileGraphBuilders(const bool bOutputToContext, const PCGExCommon::ContextState NextStateId);

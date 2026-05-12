@@ -9,12 +9,12 @@
 
 #include "Containers/PCGExIndexLookup.h"
 #include "Core/PCGExOpStats.h"
-#include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
 #include "Core/PCGExUnionData.h"
 #include "Core/PCGExUnionTable.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Details/PCGExBlendingDetails.h"
 
 namespace PCGExBlending
@@ -22,7 +22,8 @@ namespace PCGExBlending
 #pragma region FMultiSourceBlender
 
 	FUnionBlender::FMultiSourceBlender::FMultiSourceBlender(const PCGExData::FAttributeIdentity& InIdentity, const TArray<TSharedPtr<PCGExData::FFacade>>& InSources)
-		: Identity(InIdentity), Sources(InSources)
+		: Identity(InIdentity)
+		  , Sources(InSources)
 	{
 	}
 
@@ -50,7 +51,8 @@ namespace PCGExBlending
 
 			TSharedPtr<PCGExData::IBuffer> InitializationBuffer = nullptr;
 
-			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identity.Identifier); ExistingAttribute && ExistingAttribute->GetTypeId() == static_cast<int16>(Identity.UnderlyingType))
+			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identity.Identifier);
+				ExistingAttribute && ExistingAttribute->GetTypeId() == static_cast<int16>(Identity.UnderlyingType))
 			{
 				// This attribute exists on target already
 				InitializationBuffer = InTargetData->GetWritable(WorkingType, ExistingAttribute, PCGExData::EBufferInit::Inherit);
@@ -74,15 +76,24 @@ namespace PCGExBlending
 			for (int i = 0; i < Sources.Num(); i++)
 			{
 				TSharedPtr<PCGExData::FFacade> Source = Sources[i];
-				if (!SupportedSources.Contains(i)) { continue; }
+				if (!SupportedSources.Contains(i))
+				{
+					continue;
+				}
 
 				TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
 				SubBlenders[i] = SubBlender;
 
-				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags)) { return false; }
+				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags))
+				{
+					return false;
+				}
 			}
 
-			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags)) { return false; }
+			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags))
+			{
+				return false;
+			}
 		}
 		else if (Param.Selector.GetSelection() == EPCGAttributePropertySelection::Property)
 		{
@@ -95,16 +106,25 @@ namespace PCGExBlending
 			for (int i = 0; i < Sources.Num(); i++)
 			{
 				// Optimization: skip sources that aren't relevant (if filtering is enabled)
-				if (!SupportedSources.IsEmpty() && !SupportedSources.Contains(i)) { continue; }
+				if (!SupportedSources.IsEmpty() && !SupportedSources.Contains(i))
+				{
+					continue;
+				}
 
 				TSharedPtr<PCGExData::FFacade> Source = Sources[i];
 				TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
 				SubBlenders[i] = SubBlender;
 
-				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags)) { return false; }
+				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags))
+				{
+					return false;
+				}
 			}
 
-			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags)) { return false; }
+			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags))
+			{
+				return false;
+			}
 		}
 		else
 		{
@@ -118,7 +138,9 @@ namespace PCGExBlending
 #pragma endregion
 
 	FUnionBlender::FUnionBlender(const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const PCGExMath::IDistances* InDistanceDetails)
-		: CarryOverDetails(InCarryOverDetails), BlendingDetails(InBlendingDetails), DistanceDetails(InDistanceDetails)
+		: CarryOverDetails(InCarryOverDetails)
+		  , BlendingDetails(InBlendingDetails)
+		  , DistanceDetails(InDistanceDetails)
 	{
 		BlendingDetails->GetPointPropertyBlendingParams(PropertyParams);
 	}
@@ -129,12 +151,21 @@ namespace PCGExBlending
 
 	void FUnionBlender::AddSources(const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSet<FName>* IgnoreAttributeSet, FGetSourceIdx GetSourceIdxFn, const TSet<int32>* RelevantIOIndices)
 	{
-		if (!GetSourceIdxFn) { GetSourceIdxFn = [](const TSharedRef<PCGExData::FFacade>& InFacade) { return InFacade->Source->IOIndex; }; }
+		if (!GetSourceIdxFn)
+		{
+			GetSourceIdxFn = [](const TSharedRef<PCGExData::FFacade>& InFacade)
+			{
+				return InFacade->Source->IOIndex;
+			};
+		}
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(FUnionBlender::AddSources)
 
 		int32 MaxIndex = 0;
-		for (const TSharedRef<PCGExData::FFacade>& Src : InSources) { MaxIndex = FMath::Max(GetSourceIdxFn(Src), MaxIndex); }
+		for (const TSharedRef<PCGExData::FFacade>& Src : InSources)
+		{
+			MaxIndex = FMath::Max(GetSourceIdxFn(Src), MaxIndex);
+		}
 		IOLookup = MakeShared<PCGEx::FIndexLookup>(MaxIndex + 1);
 
 		const int32 NumSources = InSources.Num();
@@ -171,10 +202,16 @@ namespace PCGExBlending
 				// First, grab the Param for this attribute
 				// Getting a fail means it's filtered out.
 				FBlendingParam Param{};
-				if (!BlendingDetails->GetBlendingParam(Identity.Identifier, Param)) { continue; }
+				if (!BlendingDetails->GetBlendingParam(Identity.Identifier, Param))
+				{
+					continue;
+				}
 
 				const FPCGMetadataAttributeBase* SourceAttribute = Facade->FindConstAttribute(Identity.Identifier);
-				if (!SourceAttribute) { continue; }
+				if (!SourceAttribute)
+				{
+					continue;
+				}
 
 				TSharedPtr<FMultiSourceBlender> MultiAttribute = nullptr;
 
@@ -225,7 +262,10 @@ namespace PCGExBlending
 
 		CurrentTargetData = TargetData;
 
-		if (!Validate(InContext, false)) { return false; }
+		if (!Validate(InContext, false))
+		{
+			return false;
+		}
 
 		// Create property blender at the last moment
 		Blenders.Reserve(Blenders.Num() + PropertyParams.Num());
@@ -249,7 +289,10 @@ namespace PCGExBlending
 			// Initialize all blending operations
 			for (const TSharedPtr<FMultiSourceBlender>& MultiAttribute : Blenders)
 			{
-				if (!MultiAttribute->Init(InContext, CurrentTargetData, InProxyFlags)) { return false; }
+				if (!MultiAttribute->Init(InContext, CurrentTargetData, InProxyFlags))
+				{
+					return false;
+				}
 			}
 		}
 
@@ -264,7 +307,10 @@ namespace PCGExBlending
 
 	int32 FUnionBlender::ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const
 	{
-		if (!InUnionData.IsValid()) { return 0; }
+		if (!InUnionData.IsValid())
+		{
+			return 0;
+		}
 		const PCGExData::FConstPoint Target = CurrentTargetData->Source->GetOutPoint(WriteIndex);
 		return InUnionData->ComputeWeights(SourcesData, IOLookup, Target, DistanceDetails, OutWeightedPoints);
 	}
@@ -277,14 +323,20 @@ namespace PCGExBlending
 
 	int32 FUnionBlender::ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionMetadata>& InMetadata, const int32 EntryIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const
 	{
-		if (!InMetadata.IsValid()) { return 0; }
+		if (!InMetadata.IsValid())
+		{
+			return 0;
+		}
 		const PCGExData::FConstPoint Target = CurrentTargetData->Source->GetOutPoint(WriteIndex);
 		return InMetadata->ComputeWeights(EntryIndex, SourcesData, IOLookup, Target, DistanceDetails, OutWeightedPoints);
 	}
 
 	void FUnionBlender::Blend(const int32 WriteIndex, const TArray<PCGExData::FWeightedPoint>& InWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		if (InWeightedPoints.IsEmpty()) { return; }
+		if (InWeightedPoints.IsEmpty())
+		{
+			return;
+		}
 
 		// For each attribute/property we want to blend
 		for (const TSharedPtr<FMultiSourceBlender>& MultiAttribute : Blenders)
@@ -307,7 +359,10 @@ namespace PCGExBlending
 	void FUnionBlender::MergeSingle(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
 	{
 		check(InUnionData)
-		if (!ComputeWeights(WriteIndex, InUnionData, OutWeightedPoints)) { return; }
+		if (!ComputeWeights(WriteIndex, InUnionData, OutWeightedPoints))
+		{
+			return;
+		}
 		Blend(WriteIndex, OutWeightedPoints, Trackers);
 	}
 
@@ -315,13 +370,19 @@ namespace PCGExBlending
 	{
 		// Resolves through the IUnionMetadata interface so the same code path serves both the legacy
 		// FUnionMetadata (sparse, IUnionData-backed) and the new FUnionTable (dense, span-backed).
-		if (!ComputeWeights(UnionIndex, CurrentUnionMetadata, UnionIndex, OutWeightedPoints)) { return; }
+		if (!ComputeWeights(UnionIndex, CurrentUnionMetadata, UnionIndex, OutWeightedPoints))
+		{
+			return;
+		}
 		Blend(UnionIndex, OutWeightedPoints, Trackers);
 	}
 
 	bool FUnionBlender::Validate(FPCGExContext* InContext, const bool bQuiet) const
 	{
-		if (TypeMismatches.IsEmpty()) { return true; }
+		if (TypeMismatches.IsEmpty())
+		{
+			return true;
+		}
 
 		if (!bQuiet)
 		{

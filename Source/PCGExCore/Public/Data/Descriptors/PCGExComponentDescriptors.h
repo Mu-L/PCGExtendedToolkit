@@ -4,16 +4,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/PrimitiveComponent.h"
 #include "SceneTypes.h"
+#include "Components/PrimitiveComponent.h"
+#include "Engine/EngineTypes.h"
+#include "Materials/MaterialInterface.h"
+#include "Paths/PCGExPathsCommon.h"
 #include "PhysicsEngine/BodyInstance.h"
+#include "UObject/SoftObjectPath.h"
+#include "UObject/SoftObjectPtr.h"
 #include "VT/RuntimeVirtualTexture.h"
 #include "VT/RuntimeVirtualTextureEnum.h"
-#include "Engine/EngineTypes.h"
-#include "Paths/PCGExPathsCommon.h"
-#include "Materials/MaterialInterface.h"
-#include "UObject/SoftObjectPtr.h"
-#include "UObject/SoftObjectPath.h"
 
 
 #include "PCGExComponentDescriptors.generated.h"

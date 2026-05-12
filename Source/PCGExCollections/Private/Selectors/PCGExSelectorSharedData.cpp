@@ -12,7 +12,10 @@ namespace PCGExCollections
 		const UPCGExAssetCollection* Collection,
 		const PCGExAssetCollection::FCategory* Target)
 	{
-		if (!Factory || !Target) { return nullptr; }
+		if (!Factory || !Target)
+		{
+			return nullptr;
+		}
 
 		const FKey Key{Factory, Target};
 
@@ -26,7 +29,10 @@ namespace PCGExCollections
 		// Cache the result even when null so factories that don't participate aren't re-queried.
 		Entries.Add(Key, NewData);
 #if WITH_EDITOR
-		if (NewData) { ++BuildCount; }
+		if (NewData)
+		{
+			++BuildCount;
+		}
 #endif
 		return NewData;
 	}

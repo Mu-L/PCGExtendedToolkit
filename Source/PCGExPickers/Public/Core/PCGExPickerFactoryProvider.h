@@ -81,7 +81,10 @@ public:
 	UPROPERTY()
 	TArray<double> RelativePicks;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::IndexPicker; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::IndexPicker;
+	}
 
 	virtual void AddPicks(int32 InNum, TSet<int32>& OutPicks) const;
 
@@ -90,7 +93,12 @@ public:
 
 protected:
 	virtual bool RequiresInputs() const;
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return false; }
+
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return false;
+	}
+
 	virtual PCGExFactories::EPreparationResult InitInternalData(FPCGExContext* InContext);
 };
 
@@ -106,7 +114,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(Picker, "Picker Definition", "Creates a single Picker definition.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Misc); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Misc);
+	}
 #endif
 
 protected:
@@ -114,7 +126,11 @@ protected:
 	//~End UPCGSettings
 
 public:
-	virtual FName GetMainOutputPin() const override { return PCGExPickers::Labels::OutputPickerLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExPickers::Labels::OutputPickerLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 };
 

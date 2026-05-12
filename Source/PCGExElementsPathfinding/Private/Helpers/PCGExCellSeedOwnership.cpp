@@ -62,61 +62,61 @@ namespace PCGExCells
 			return Candidates[0];
 
 		case EPCGExCellSeedOwnership::Closest:
-			{
-				// Use full 3D world distance
-				int32 BestIdx = Candidates[0];
-				double BestDistSq = FVector::DistSquared(SeedTransforms[BestIdx].GetLocation(), CellCentroid);
+		{
+			// Use full 3D world distance
+			int32 BestIdx = Candidates[0];
+			double BestDistSq = FVector::DistSquared(SeedTransforms[BestIdx].GetLocation(), CellCentroid);
 
-				for (int32 i = 1; i < Candidates.Num(); ++i)
+			for (int32 i = 1; i < Candidates.Num(); ++i)
+			{
+				const int32 CandidateIdx = Candidates[i];
+				const double DistSq = FVector::DistSquared(SeedTransforms[CandidateIdx].GetLocation(), CellCentroid);
+				if (DistSq < BestDistSq)
 				{
-					const int32 CandidateIdx = Candidates[i];
-					const double DistSq = FVector::DistSquared(SeedTransforms[CandidateIdx].GetLocation(), CellCentroid);
-					if (DistSq < BestDistSq)
-					{
-						BestDistSq = DistSq;
-						BestIdx = CandidateIdx;
-					}
+					BestDistSq = DistSq;
+					BestIdx = CandidateIdx;
 				}
-				return BestIdx;
 			}
+			return BestIdx;
+		}
 
 		case EPCGExCellSeedOwnership::ClosestProjected:
-			{
-				// Use 2D distance (XY plane) to match the projected cell containment check
-				int32 BestIdx = Candidates[0];
-				double BestDistSq = FVector::DistSquaredXY(SeedTransforms[BestIdx].GetLocation(), CellCentroid);
+		{
+			// Use 2D distance (XY plane) to match the projected cell containment check
+			int32 BestIdx = Candidates[0];
+			double BestDistSq = FVector::DistSquaredXY(SeedTransforms[BestIdx].GetLocation(), CellCentroid);
 
-				for (int32 i = 1; i < Candidates.Num(); ++i)
+			for (int32 i = 1; i < Candidates.Num(); ++i)
+			{
+				const int32 CandidateIdx = Candidates[i];
+				const double DistSq = FVector::DistSquaredXY(SeedTransforms[CandidateIdx].GetLocation(), CellCentroid);
+				if (DistSq < BestDistSq)
 				{
-					const int32 CandidateIdx = Candidates[i];
-					const double DistSq = FVector::DistSquaredXY(SeedTransforms[CandidateIdx].GetLocation(), CellCentroid);
-					if (DistSq < BestDistSq)
-					{
-						BestDistSq = DistSq;
-						BestIdx = CandidateIdx;
-					}
+					BestDistSq = DistSq;
+					BestIdx = CandidateIdx;
 				}
-				return BestIdx;
 			}
+			return BestIdx;
+		}
 
 		case EPCGExCellSeedOwnership::BestCandidate:
+		{
+			if (!SortCache)
 			{
-				if (!SortCache)
-				{
-					return Candidates[0];
-				}
-
-				int32 BestIdx = Candidates[0];
-				for (int32 i = 1; i < Candidates.Num(); ++i)
-				{
-					const int32 CandidateIdx = Candidates[i];
-					if (SortCache->Compare(CandidateIdx, BestIdx))
-					{
-						BestIdx = CandidateIdx;
-					}
-				}
-				return BestIdx;
+				return Candidates[0];
 			}
+
+			int32 BestIdx = Candidates[0];
+			for (int32 i = 1; i < Candidates.Num(); ++i)
+			{
+				const int32 CandidateIdx = Candidates[i];
+				if (SortCache->Compare(CandidateIdx, BestIdx))
+				{
+					BestIdx = CandidateIdx;
+				}
+			}
+			return BestIdx;
+		}
 
 		default:
 			return Candidates[0];

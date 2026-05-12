@@ -4,30 +4,39 @@
 #include "Elements/PCGExBuildVoronoiGraph2D.h"
 
 
-#include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Helpers/PCGExRandomHelpers.h"
 
 
-#include "Elements/Metadata/PCGMetadataElementCommon.h"
-#include "Math/Geo/PCGExDelaunay.h"
-#include "Math/Geo/PCGExVoronoi.h"
 #include "Clusters/PCGExCluster.h"
 #include "Core/PCGExMT.h"
 #include "Data/PCGExClusterData.h"
+#include "Elements/Metadata/PCGMetadataElementCommon.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Math/PCGExBestFitPlane.h"
+#include "Math/Geo/PCGExDelaunay.h"
+#include "Math/Geo/PCGExVoronoi.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
 #define PCGEX_NAMESPACE BuildVoronoiGraph2D
 
 bool FPCGExVoronoiSitesOutputDetails::Validate(FPCGExContext* InContext) const
 {
-	if (bWriteInfluencesCount) { PCGEX_VALIDATE_NAME_C(InContext, InfluencesCountAttributeName) }
-	if (bWriteMinRadius) { PCGEX_VALIDATE_NAME_C(InContext, MinRadiusAttributeName) }
-	if (bWriteMaxRadius) { PCGEX_VALIDATE_NAME_C(InContext, MaxRadiusAttributeName) }
+	if (bWriteInfluencesCount)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, InfluencesCountAttributeName)
+	}
+	if (bWriteMinRadius)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, MinRadiusAttributeName)
+	}
+	if (bWriteMaxRadius)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, MaxRadiusAttributeName)
+	}
 	return true;
 }
 
@@ -84,14 +93,20 @@ void FPCGExVoronoiSitesOutputDetails::AddInfluence(const int32 SiteIndex, const 
 
 void FPCGExVoronoiSitesOutputDetails::Output(const int32 SiteIndex)
 {
-	if (InfluenceCountWriter) { InfluenceCountWriter->SetValue(SiteIndex, Influences[SiteIndex]); }
+	if (InfluenceCountWriter)
+	{
+		InfluenceCountWriter->SetValue(SiteIndex, Influences[SiteIndex]);
+	}
 }
 
 TArray<FPCGPinProperties> UPCGExBuildVoronoiGraph2DSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
 	PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputEdgesLabel, "Point data representing edges.", Required)
-	if (bOutputSites) { PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputSitesLabel, "Updated Delaunay sites.", Required) }
+	if (bOutputSites)
+	{
+		PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputSitesLabel, "Updated Delaunay sites.", Required)
+	}
 	return PinProperties;
 }
 
@@ -100,16 +115,25 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BuildVoronoiGraph2D)
 
 bool FPCGExBuildVoronoiGraph2DElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildVoronoiGraph2D)
 
 	PCGEX_VALIDATE_NAME(Settings->HullAttributeName)
-	if (!Settings->SitesOutputDetails.Validate(Context)) { return false; }
+	if (!Settings->SitesOutputDetails.Validate(Context))
+	{
+		return false;
+	}
 
 	if (Settings->bOutputSites)
 	{
-		if (!Settings->bPruneOpenSites) { PCGEX_VALIDATE_NAME(Settings->OpenSiteFlag) }
+		if (!Settings->bPruneOpenSites)
+		{
+			PCGEX_VALIDATE_NAME(Settings->OpenSiteFlag)
+		}
 
 		Context->SitesOutput = MakeShared<PCGExData::FPointIOCollection>(Context);
 		Context->SitesOutput->OutputPin = PCGExClusters::Labels::OutputSitesLabel;
@@ -154,7 +178,10 @@ bool FPCGExBuildVoronoiGraph2DElement::AdvanceWork(FPCGExContext* InContext, con
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
 	Context->MainPoints->StageOutputs();
-	if (Context->SitesOutput) { Context->SitesOutput->StageOutputs(); }
+	if (Context->SitesOutput)
+	{
+		Context->SitesOutput->StageOutputs();
+	}
 	Context->MainBatch->Output();
 
 	return Context->TryComplete();
@@ -170,14 +197,20 @@ namespace PCGExBuildVoronoiGraph2D
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBuildVoronoiGraph2D::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::New)
 
 		SitesOutputDetails = Settings->SitesOutputDetails;
 
 		ProjectionDetails = Settings->ProjectionDetails;
-		if (!ProjectionDetails.Init(PointDataFacade)) { return false; }
+		if (!ProjectionDetails.Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		// Build voronoi
 
@@ -226,13 +259,22 @@ namespace PCGExBuildVoronoiGraph2D
 				TArray<int8> Mask;
 				Mask.Init(0, Iterations);
 
-				for (int32 i = 0; i < Iterations; i++) { if (IsVtxValid[i]) { Mask[i] = 1; } }
+				for (int32 i = 0; i < Iterations; i++)
+				{
+					if (IsVtxValid[i])
+					{
+						Mask[i] = 1;
+					}
+				}
 
 				(void)SiteDataFacade->Source->Gather(Mask);
 			}
 		}
 
-		if (SiteDataFacade) { SiteDataFacade->Source->Tags->Append(PointDataFacade->Source->Tags.ToSharedRef()); }
+		if (SiteDataFacade)
+		{
+			SiteDataFacade->Source->Tags->Append(PointDataFacade->Source->Tags.ToSharedRef());
+		}
 	}
 
 	void FProcessor::Write()
@@ -264,7 +306,10 @@ namespace PCGExBuildVoronoiGraph2D
 		if (Settings->bOutputSites)
 		{
 			IsVtxValid.Init(true, DelaunaySitesNum);
-			for (int i = 0; i < IsVtxValid.Num(); i++) { IsVtxValid[i] = !Voronoi->Delaunay->DelaunayHull.Contains(i); }
+			for (int i = 0; i < IsVtxValid.Num(); i++)
+			{
+				IsVtxValid[i] = !Voronoi->Delaunay->DelaunayHull.Contains(i);
+			}
 
 			SiteDataFacade = MakeShared<PCGExData::FFacade>(Context->SitesOutput->Pairs[PointDataFacade->Source->IOIndex].ToSharedRef());
 			PCGEX_INIT_IO(SiteDataFacade->Source, PCGExData::EIOInit::Duplicate)
@@ -299,11 +344,17 @@ namespace PCGExBuildVoronoiGraph2D
 
 				if (!WithinBounds[HA])
 				{
-					for (int i = 0; i < 3; i++) { IsVtxValid[SiteA.Vtx[i]] = false; }
+					for (int i = 0; i < 3; i++)
+					{
+						IsVtxValid[SiteA.Vtx[i]] = false;
+					}
 				}
 				if (!WithinBounds[HB])
 				{
-					for (int i = 0; i < 3; i++) { IsVtxValid[SiteB.Vtx[i]] = false; }
+					for (int i = 0; i < 3; i++)
+					{
+						IsVtxValid[SiteB.Vtx[i]] = false;
+					}
 				}
 			}
 
@@ -314,7 +365,10 @@ namespace PCGExBuildVoronoiGraph2D
 		}
 
 		// Initialize cluster output
-		if (!PointDataFacade->Source->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::New)) { return false; }
+		if (!PointDataFacade->Source->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::New))
+		{
+			return false;
+		}
 
 		// Create output points from OutputVertices
 		UPCGBasePointData* OutputPoints = PointDataFacade->GetOut();
@@ -368,9 +422,15 @@ namespace PCGExBuildVoronoiGraph2D
 				PCGEX_SCOPE_LOOP(Index)
 				{
 					const bool bIsWithinBounds = This->IsVtxValid[Index];
-					if (This->OpenSiteWriter) { This->OpenSiteWriter->SetValue(Index, bIsWithinBounds); }
+					if (This->OpenSiteWriter)
+					{
+						This->OpenSiteWriter->SetValue(Index, bIsWithinBounds);
+					}
 					This->SitesOutputDetails.Output(Index);
-					if (SitesInfluenceCountDetails[Index] == 0) { continue; }
+					if (SitesInfluenceCountDetails[Index] == 0)
+					{
+						continue;
+					}
 					SiteOutTransforms[Index].SetLocation(SitesPositionsDetails[Index] / SitesInfluenceCountDetails[Index]);
 				}
 			};

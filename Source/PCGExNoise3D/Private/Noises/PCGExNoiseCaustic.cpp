@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseCaustic.h"
-#include "Helpers/PCGExNoise3DMath.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Helpers/PCGExNoise3DMath.h"
 
 using namespace PCGExNoise3D::Math;
 

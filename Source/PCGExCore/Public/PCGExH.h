@@ -15,7 +15,8 @@ namespace PCGEx
 		FIndexKey() = default;
 
 		FIndexKey(const int32 InIndex, const uint64 InKey)
-			: Index(InIndex), Key(InKey)
+			: Index(InIndex)
+			  , Key(InKey)
 		{
 		}
 	};
@@ -54,11 +55,21 @@ namespace PCGEx
 	}
 
 	// Signed uint32 hash
-	constexpr FORCEINLINE static uint32 H32(const uint16 A, const uint16 B) { return static_cast<uint32>(A) << 16 | B; }
+	constexpr FORCEINLINE static uint32 H32(const uint16 A, const uint16 B)
+	{
+		return static_cast<uint32>(A) << 16 | B;
+	}
 
 	// Expand uint32 hash
-	constexpr FORCEINLINE static uint32 H32A(const uint32 Hash) { return static_cast<uint16>(Hash >> 16); }
-	constexpr FORCEINLINE static uint32 H32B(const uint32 Hash) { return static_cast<uint16>(Hash); }
+	constexpr FORCEINLINE static uint32 H32A(const uint32 Hash)
+	{
+		return static_cast<uint16>(Hash >> 16);
+	}
+
+	constexpr FORCEINLINE static uint32 H32B(const uint32 Hash)
+	{
+		return static_cast<uint16>(Hash);
+	}
 
 	constexpr FORCEINLINE static void H32(const uint32 Hash, uint16& A, uint16& B)
 	{
@@ -67,16 +78,41 @@ namespace PCGEx
 	}
 
 	// Signed uint64 hash
-	constexpr FORCEINLINE static uint64 H64(const uint32 A, const uint32 B) { return static_cast<uint64>(A) << 32 | B; }
-	constexpr FORCEINLINE static uint64 NH64(const int32 A, const int32 B) { return H64(A + 1, B + 1); }
-	constexpr FORCEINLINE static uint64 NH64U(const int32 A, const int32 B) { return H64U(A + 1, B + 1); }
+	constexpr FORCEINLINE static uint64 H64(const uint32 A, const uint32 B)
+	{
+		return static_cast<uint64>(A) << 32 | B;
+	}
+
+	constexpr FORCEINLINE static uint64 NH64(const int32 A, const int32 B)
+	{
+		return H64(A + 1, B + 1);
+	}
+
+	constexpr FORCEINLINE static uint64 NH64U(const int32 A, const int32 B)
+	{
+		return H64U(A + 1, B + 1);
+	}
 
 	// Expand uint64 hash
-	constexpr FORCEINLINE static uint32 H64A(const uint64 Hash) { return static_cast<uint32>(Hash >> 32); }
-	constexpr FORCEINLINE static uint32 H64B(const uint64 Hash) { return static_cast<uint32>(Hash); }
+	constexpr FORCEINLINE static uint32 H64A(const uint64 Hash)
+	{
+		return static_cast<uint32>(Hash >> 32);
+	}
 
-	constexpr FORCEINLINE static int32 NH64A(const uint64 Hash) { return static_cast<int32>(H64A(Hash)) - 1; }
-	constexpr FORCEINLINE static int32 NH64B(const uint64 Hash) { return static_cast<int32>(H64B(Hash)) - 1; }
+	constexpr FORCEINLINE static uint32 H64B(const uint64 Hash)
+	{
+		return static_cast<uint32>(Hash);
+	}
+
+	constexpr FORCEINLINE static int32 NH64A(const uint64 Hash)
+	{
+		return static_cast<int32>(H64A(Hash)) - 1;
+	}
+
+	constexpr FORCEINLINE static int32 NH64B(const uint64 Hash)
+	{
+		return static_cast<int32>(H64B(Hash)) - 1;
+	}
 
 	constexpr FORCEINLINE static void H64(const uint64 Hash, uint32& A, uint32& B)
 	{
@@ -114,7 +150,7 @@ namespace PCGEx
 			FMath::Max(InVector.X, SMALL_NUMBER),
 			FMath::Max(InVector.Y, SMALL_NUMBER),
 			FMath::Max(InVector.Z, SMALL_NUMBER)
-		);
+			);
 	}
 
 	FORCEINLINE static uint64 SH3(const FVector& Seed, const FVector& Tolerance)
@@ -157,9 +193,18 @@ namespace PCGEx
 	FORCEINLINE static uint64 UH3(const int32 A, const int32 B, const int32 C)
 	{
 		int64 X = A, Y = B, Z = C;
-		if (X > Y) { Swap(X, Y); }
-		if (X > Z) { Swap(X, Z); }
-		if (Y > Z) { Swap(Y, Z); }
+		if (X > Y)
+		{
+			Swap(X, Y);
+		}
+		if (X > Z)
+		{
+			Swap(X, Z);
+		}
+		if (Y > Z)
+		{
+			Swap(Y, Z);
+		}
 
 		PCGEX_FNV1A
 	}

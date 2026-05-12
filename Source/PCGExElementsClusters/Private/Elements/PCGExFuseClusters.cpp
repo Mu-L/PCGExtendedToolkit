@@ -4,14 +4,14 @@
 #include "Elements/PCGExFuseClusters.h"
 
 
-#include "Data/PCGExPointIO.h"
-#include "Core/PCGExUnionData.h"
-#include "Core/PCGExUnionTable.h"
-#include "Core/PCGExUnionRegistry.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
+#include "Core/PCGExUnionData.h"
+#include "Core/PCGExUnionRegistry.h"
+#include "Core/PCGExUnionTable.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphHelpers.h"
 #include "Graphs/Union/PCGExIntersections.h"
@@ -21,8 +21,15 @@
 
 #pragma region UPCGSettings interface
 
-PCGExData::EIOInit UPCGExFuseClustersSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExFuseClustersSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExFuseClustersSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExFuseClustersSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 #pragma endregion
 
@@ -55,14 +62,20 @@ bool FPCGExFuseClustersElement::Boot(FPCGExContext* InContext) const
 	// look up grid keys / octree tolerance without going through the settings each call.
 	Context->FuseDetails = Settings->PointPointIntersectionDetails.FuseDetails;
 	// TODO : Support local fuse distance, requires access to all input facades
-	if (!Context->FuseDetails.Init(Context, nullptr)) { return false; }
+	if (!Context->FuseDetails.Init(Context, nullptr))
+	{
+		return false;
+	}
 
 	Context->FuseBounds = Context->MainPoints->GetInBounds().ExpandBy(10);
 	Context->bUseOctreeMode = (Context->FuseDetails.GetEffectiveMethod() == EPCGExFuseMethod::Octree);
 
 	Context->NodeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
 	Context->EdgeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
-	if (Context->bUseOctreeMode) { Context->NodeRegistry = MakeShared<PCGExData::FUnionRegistry>(Context->FuseBounds); }
+	if (Context->bUseOctreeMode)
+	{
+		Context->NodeRegistry = MakeShared<PCGExData::FUnionRegistry>(Context->FuseBounds);
+	}
 
 	Context->UnionProcessor = MakeShared<PCGExGraphs::FUnionProcessor>(Context, Context->UnionDataFacade.ToSharedRef(), Settings->PointPointIntersectionDetails, Settings->DefaultPointsBlendingDetails, Settings->DefaultEdgesBlendingDetails);
 
@@ -91,14 +104,17 @@ bool FPCGExFuseClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		const bool bUseOctree = Context->bUseOctreeMode;
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [bUseOctree](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bSkipCompletion = true;
-			// Octree-fuse mode routes through FUnionRegistry, which is sequential by contract.
-			// Grid mode is fully parallel: each processor builds local records, then the post-batch
-			// step collects and sort-groups them deterministically.
-			NewBatch->bForceSingleThreadedProcessing = bUseOctree;
-		}, true))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [bUseOctree](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bSkipCompletion = true;
+			                                      // Octree-fuse mode routes through FUnionRegistry, which is sequential by contract.
+			                                      // Grid mode is fully parallel: each processor builds local records, then the post-batch
+			                                      // step collects and sort-groups them deterministically.
+			                                      NewBatch->bForceSingleThreadedProcessing = bUseOctree;
+		                                      }, true))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -130,7 +146,10 @@ bool FPCGExFuseClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 			for (int32 i = 0; i < NumProcs; i++)
 			{
 				const TSharedPtr<FProcessor> Proc = Batch->GetProcessor<FProcessor>(i);
-				if (!Proc.IsValid()) { continue; }
+				if (!Proc.IsValid())
+				{
+					continue;
+				}
 				EstNodeRecords += Proc->NodeRecords.Num();
 				EstStagedEdges += Proc->StagedEdges.Num();
 			}
@@ -144,7 +163,10 @@ bool FPCGExFuseClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 			for (int32 i = 0; i < NumProcs; i++)
 			{
 				const TSharedPtr<FProcessor> Proc = Batch->GetProcessor<FProcessor>(i);
-				if (!Proc.IsValid() || Proc->bInvalidEdges) { continue; }
+				if (!Proc.IsValid() || Proc->bInvalidEdges)
+				{
+					continue;
+				}
 				NodeScope.Append(MoveTemp(Proc->NodeRecords));
 				AllStagedEdges.Append(MoveTemp(Proc->StagedEdges));
 			}
@@ -156,13 +178,19 @@ bool FPCGExFuseClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		Context->NodeBuilder.Reset();
 
 		const int32 NumUnionNodes = NodesTable->Num();
-		if (NumUnionNodes == 0) { return Context->CancelExecution(TEXT("Union table is empty after fuse build.")); }
+		if (NumUnionNodes == 0)
+		{
+			return Context->CancelExecution(TEXT("Union table is empty after fuse build."));
+		}
 
 		// Build (Key -> NodeIndex) lookup so staged edges can resolve their endpoints. Keys come
 		// straight from NodesTable; size is exactly NumUnionNodes since the table is one-entry-per-key.
 		TMap<uint64, int32> KeyToNode;
 		KeyToNode.Reserve(NumUnionNodes);
-		for (int32 i = 0; i < NumUnionNodes; i++) { KeyToNode.Add(NodesTable->Keys[i], i); }
+		for (int32 i = 0; i < NumUnionNodes; i++)
+		{
+			KeyToNode.Add(NodesTable->Keys[i], i);
+		}
 
 		// Phase 2 -- emit edge records keyed by packed (min(Start,End), max(Start,End)). The packed
 		// form is reversible (high 32 bits = min, low 32 bits = max) so we can decode endpoints
@@ -173,7 +201,10 @@ bool FPCGExFuseClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		{
 			const int32* NodeA = KeyToNode.Find(Staged.KeyA);
 			const int32* NodeB = KeyToNode.Find(Staged.KeyB);
-			if (!NodeA || !NodeB || *NodeA == *NodeB) { continue; } // self-collapsed edge
+			if (!NodeA || !NodeB || *NodeA == *NodeB)
+			{
+				continue;
+			} // self-collapsed edge
 			const uint64 EdgeKey = PCGEx::H64U(static_cast<uint32>(*NodeA), static_cast<uint32>(*NodeB));
 			EdgeScope.Emplace(EdgeKey, Staged.IO, Staged.EdgePointIndex);
 		}
@@ -207,7 +238,10 @@ bool FPCGExFuseClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		Context->NodeRegistry.Reset();
 	}
 
-	if (!Context->UnionProcessor->Execute()) { return false; }
+	if (!Context->UnionProcessor->Execute())
+	{
+		return false;
+	}
 
 	(void)Context->UnionDataFacade->Source->StageOutput(Context);
 	Context->Done();
@@ -225,7 +259,10 @@ namespace PCGExFuseClusters
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExFuseClusters::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		VtxIOIndex = VtxDataFacade->Source->IOIndex;
 		EdgesIOIndex = EdgeDataFacade->Source->IOIndex;
@@ -234,8 +271,14 @@ namespace PCGExFuseClusters
 
 		if (!Cluster)
 		{
-			if (!PCGExGraphs::Helpers::BuildIndexedEdges(EdgeDataFacade->Source, *EndpointsLookup, IndexedEdges, true)) { return false; }
-			if (IndexedEdges.IsEmpty()) { return false; }
+			if (!PCGExGraphs::Helpers::BuildIndexedEdges(EdgeDataFacade->Source, *EndpointsLookup, IndexedEdges, true))
+			{
+				return false;
+			}
+			if (IndexedEdges.IsEmpty())
+			{
+				return false;
+			}
 		}
 		else
 		{

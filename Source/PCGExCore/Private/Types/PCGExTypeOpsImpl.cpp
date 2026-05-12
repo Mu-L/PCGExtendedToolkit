@@ -18,7 +18,8 @@ namespace PCGExTypeOps
 		switch (Type)
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
-		default: return nullptr;
+		default:
+			return nullptr;
 		}
 #undef PCGEX_TPL
 	}
@@ -54,7 +55,10 @@ namespace PCGExTypeOps
 	// Called once at module load via the static FTypeOpsModuleInit below.
 	void FConversionTable::Initialize()
 	{
-		if (bInitialized) { return; }
+		if (bInitialized)
+		{
+			return;
+		}
 
 		int32 Idx = 0;
 #define PCGEX_TPL(_TYPE, _NAME, ...) PopulateConversionRow<_TYPE>(Table[Idx++]);

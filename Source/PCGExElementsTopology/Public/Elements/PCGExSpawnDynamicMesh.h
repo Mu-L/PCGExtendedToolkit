@@ -22,7 +22,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SpawnDynamicMesh, "Spawn Dynamic Mesh", "A more flexible alternative to the native Spawn Dynamic Mesh");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::DynamicMesh; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::DynamicMesh;
+	}
 #endif
 
 protected:
@@ -58,13 +62,23 @@ struct FPCGExSpawnDynamicMeshContext final : FPCGExContext
 class FPCGExSpawnDynamicMeshElement final : public IPCGExElement
 {
 public:
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(SpawnDynamicMesh)
 
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
-	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override { return true; }
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
+
+	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override
+	{
+		return true;
+	}
 };

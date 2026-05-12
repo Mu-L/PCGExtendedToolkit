@@ -5,11 +5,11 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Utils/PCGExCompare.h"
 #include "Factories/PCGExFactories.h"
+#include "Utils/PCGExCompare.h"
 
-#include "Math/PCGExMathMean.h"
 #include "Core/PCGExPointsProcessor.h"
+#include "Math/PCGExMathMean.h"
 
 #include "PCGExUberFilterCollections.generated.h"
 
@@ -38,12 +38,25 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(UberFilterCollections, "Uber Filter (Data)", "Filter entire collections based on multiple rules & conditions.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
 	virtual bool HasDynamicPins() const override;
 
 protected:

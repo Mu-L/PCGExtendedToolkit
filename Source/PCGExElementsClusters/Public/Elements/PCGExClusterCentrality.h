@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExClustersProcessor.h"
 #include "Details/PCGExDetailsNoise.h"
 #include "Math/PCGExMathContrast.h"
-#include "Core/PCGExClustersProcessor.h"
 
 #include "PCGExClusterCentrality.generated.h"
 
@@ -57,7 +57,11 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS(ClusterCentrality, "Cluster : Centrality", "Compute centrality (betweenness, closeness, degree, eigenvector, katz).");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(NeighborSampler); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(NeighborSampler);
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
@@ -67,7 +71,10 @@ protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 public:
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;

@@ -2,15 +2,15 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
-#include "PCGSettings.h"
 #include "PCGExCoreMacros.h"
 #include "PCGExCoreSettingsCache.h"
+#include "PCGSettings.h"
 
+#include "PCGExEnumSelector.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
 #include "Details/PCGExEnumCommon.h"
-#include "PCGExEnumSelector.h"
 #include "PCGExConstantEnum.generated.h"
 
 struct FPCGExBitmask;
@@ -58,8 +58,16 @@ public:
 	// Begin unrolling of Tim's lovely macro
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(EnumConstant, "Enum Constant", "Break an enum into handy constant values.", FName(GetDisplayName())); // Tim says nope! :D
 	FString GetDisplayName() const;
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; };
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Constant); };
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	};
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Constant);
+	};
 	// End unrolling of Tim's lovely macro
 #endif
 
@@ -72,7 +80,10 @@ public:
 	virtual void FillEnabledExportValues();
 	virtual void OnOverrideSettingsDuplicatedInternal(bool bSkippedPostLoad) override;
 
-	virtual bool HasDynamicPins() const override { return true; };
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	};
 
 	TObjectPtr<UEnum> GetEnumClass() const;
 
@@ -151,7 +162,10 @@ protected:
 	virtual EPCGChangeType GetChangeTypeForProperty(const FName& PropName) const override;
 #endif
 
-	virtual TArray<FPCGPinProperties> InputPinProperties() const override { return {}; };
+	virtual TArray<FPCGPinProperties> InputPinProperties() const override
+	{
+		return {};
+	};
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 };
@@ -170,5 +184,8 @@ protected:
 	// Stage bitflags
 	static void StageBitFlags(FPCGExContext* InContext, const UPCGExConstantEnumSettings* Settings, FPCGExBitmask& OutBitflags);
 
-	virtual FPCGContext* CreateContext() override { return new FPCGExContext(); }
+	virtual FPCGContext* CreateContext() override
+	{
+		return new FPCGExContext();
+	}
 };

@@ -6,10 +6,10 @@
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
 #include "Containers/PCGExIndexLookup.h"
-#include "Misc/ScopeRWLock.h"
-#include "UObject/Object.h"
 #include "Data/PCGExPointElements.h"
 #include "Math/PCGExMathDistances.h"
+#include "Misc/ScopeRWLock.h"
+#include "UObject/Object.h"
 
 namespace PCGExMath
 {
@@ -58,7 +58,10 @@ namespace PCGExData
 		for (const FElement& Element : InElements)
 		{
 			const int32 IOIdx = IdxLookup->Get(Element.IO);
-			if (IOIdx == -1) { continue; }
+			if (IOIdx == -1)
+			{
+				continue;
+			}
 
 			FWeightedPoint& P = OutWeightedPoints.Emplace_GetRef(Element.Index, 0, IOIdx);
 			const double Dist = InDistances->GetDistSquared(FConstPoint(Sources[P.IO], P), Target);
@@ -68,10 +71,16 @@ namespace PCGExData
 			Index++;
 		}
 
-		if (Index == 0) { return 0; }
+		if (Index == 0)
+		{
+			return 0;
+		}
 
 		double TotalWeight = 0;
-		for (FWeightedPoint& P : OutWeightedPoints) { TotalWeight += (P.Weight = 1 - (P.Weight / MaxWeight)); }
+		for (FWeightedPoint& P : OutWeightedPoints)
+		{
+			TotalWeight += (P.Weight = 1 - (P.Weight / MaxWeight));
+		}
 
 		if (Index == 1)
 		{
@@ -82,7 +91,10 @@ namespace PCGExData
 		if (TotalWeight == 0)
 		{
 			const double StaticWeight = 1 / static_cast<double>(Index);
-			for (FWeightedPoint& P : OutWeightedPoints) { P.Weight = StaticWeight; }
+			for (FWeightedPoint& P : OutWeightedPoints)
+			{
+				P.Weight = StaticWeight;
+			}
 			return Index;
 		}
 
@@ -101,7 +113,10 @@ namespace PCGExData
 		virtual int32 Num() const = 0;
 		virtual int32 Size(int32 EntryIndex) const = 0;
 
-		FORCEINLINE bool IsUnion(const int32 EntryIndex) const { return Size(EntryIndex) > 1; }
+		FORCEINLINE bool IsUnion(const int32 EntryIndex) const
+		{
+			return Size(EntryIndex) > 1;
+		}
 
 		// Output is bit-identical across impls (both route through ComputeUnionWeights).
 		virtual int32 ComputeWeights(
@@ -128,7 +143,10 @@ namespace PCGExData
 		IUnionData() = default;
 		virtual ~IUnionData() = default;
 
-		FORCEINLINE int32 Num() const { return Elements.Num(); }
+		FORCEINLINE int32 Num() const
+		{
+			return Elements.Num();
+		}
 
 		FORCEINLINE void Add_Unsafe(const FElement& Point)
 		{
@@ -147,7 +165,10 @@ namespace PCGExData
 		FORCEINLINE TSet<int32> GetIOSet() const
 		{
 			TSet<int32> Result;
-			for (const FElement& E : Elements) { Result.Add(E.IO); }
+			for (const FElement& E : Elements)
+			{
+				Result.Add(E.IO);
+			}
 			return Result;
 		}
 
@@ -166,7 +187,10 @@ namespace PCGExData
 		void Add_Unsafe(const int32 IOIndex, const TArray<int32>& PointIndices);
 		void Add(const int32 IOIndex, const TArray<int32>& PointIndices);
 
-		bool IsEmpty() const { return Elements.IsEmpty(); }
+		bool IsEmpty() const
+		{
+			return Elements.IsEmpty();
+		}
 
 		virtual int32 ComputeWeights(
 			const TArray<const UPCGBasePointData*>& Sources,
@@ -188,7 +212,11 @@ namespace PCGExData
 		virtual ~FUnionMetadata() override = default;
 
 		// IUnionMetadata
-		virtual int32 Num() const override { return Entries.Num(); }
+		virtual int32 Num() const override
+		{
+			return Entries.Num();
+		}
+
 		virtual int32 Size(int32 EntryIndex) const override;
 		virtual int32 ComputeWeights(
 			int32 EntryIndex,
@@ -206,8 +234,15 @@ namespace PCGExData
 		TSharedPtr<IUnionData> NewEntry_Unsafe(const FConstPoint& Point);
 		TSharedPtr<IUnionData> NewEntryAt_Unsafe(const int32 ItemIndex);
 
-		FORCEINLINE void Append_Unsafe(const int32 Index, const FPoint& Point) { Entries[Index]->Add_Unsafe(Point); }
-		FORCEINLINE void Append(const int32 Index, const FPoint& Point) { Entries[Index]->Add(Point); }
+		FORCEINLINE void Append_Unsafe(const int32 Index, const FPoint& Point)
+		{
+			Entries[Index]->Add_Unsafe(Point);
+		}
+
+		FORCEINLINE void Append(const int32 Index, const FPoint& Point)
+		{
+			Entries[Index]->Add(Point);
+		}
 
 		FORCEINLINE TSharedPtr<IUnionData> Get(const int32 Index) const
 		{

@@ -30,7 +30,10 @@ TArray<FPCGPinProperties> UPCGExSocketStagingSettings::OutputPinProperties() con
 
 bool FPCGExSocketStagingElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SocketStaging)
 
@@ -44,7 +47,10 @@ bool FPCGExSocketStagingElement::Boot(FPCGExContext* InContext) const
 	}
 
 	PCGEX_FWD(OutputSocketDetails)
-	if (!Context->OutputSocketDetails.Init(Context)) { return false; }
+	if (!Context->OutputSocketDetails.Init(Context))
+	{
+		return false;
+	}
 
 	Context->SocketsCollection = MakeShared<PCGExData::FPointIOCollection>(Context);
 	Context->SocketsCollection->OutputPin = PCGExStaging::Labels::OutputSocketLabel;
@@ -61,7 +67,10 @@ bool FPCGExSocketStagingElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -86,12 +95,18 @@ namespace PCGExSocketStaging
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Forward)
 
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
-		if (!EntryHashGetter) { return false; }
+		if (!EntryHashGetter)
+		{
+			return false;
+		}
 
 		SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, PointDataFacade->GetNum());
 
@@ -118,7 +133,10 @@ namespace PCGExSocketStaging
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const uint64 Hash = EntryHashGetter->Read(Index);
 			if (FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);

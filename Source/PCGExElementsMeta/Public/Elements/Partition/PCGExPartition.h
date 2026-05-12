@@ -54,7 +54,10 @@ struct FPCGExPartitonRuleConfig : public FPCGExInputConfig
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override
 	{
-		if (bEnabled) { return FPCGExInputConfig::GetDisplayName(); }
+		if (bEnabled)
+		{
+			return FPCGExInputConfig::GetDisplayName();
+		}
 		return "(Disabled) " + FPCGExInputConfig::GetDisplayName();
 	}
 #endif
@@ -180,10 +183,10 @@ namespace PCGExPartition
 			{
 			default:
 			case EPCGExPartitionFilterMode::Floor:
-				{
-					const double Filtered = (Value - FMath::Fmod(Value, FilterSize)) / FilterSize + PCGExMath::SignPlus(Value);
-					Key = static_cast<int64>(Filtered);
-				}
+			{
+				const double Filtered = (Value - FMath::Fmod(Value, FilterSize)) / FilterSize + PCGExMath::SignPlus(Value);
+				Key = static_cast<int64>(Filtered);
+			}
 				break;
 			case EPCGExPartitionFilterMode::Ceil:
 				Key = static_cast<int64>(FMath::CeilToDouble(Value / FilterSize));
@@ -196,9 +199,18 @@ namespace PCGExPartition
 				break;
 			}
 
-			if (bAbsoluteKey) { Key = FMath::Abs(Key); }
-			if (bInvertKey) { Key = -Key; }
-			if (bClampKey) { Key = FMath::Clamp(Key, KeyClampMin, KeyClampMax); }
+			if (bAbsoluteKey)
+			{
+				Key = FMath::Abs(Key);
+			}
+			if (bInvertKey)
+			{
+				Key = -Key;
+			}
+			if (bClampKey)
+			{
+				Key = FMath::Clamp(Key, KeyClampMin, KeyClampMax);
+			}
 
 			return Key;
 		}

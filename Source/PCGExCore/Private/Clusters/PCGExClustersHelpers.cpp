@@ -3,13 +3,13 @@
 
 #include "Clusters/PCGExClustersHelpers.h"
 
-#include "PCGExSettingsCacheBody.h"
 #include "PCGExCoreSettingsCache.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
+#include "PCGExSettingsCacheBody.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClusterCommon.h"
 #include "Data/PCGExClusterData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
 #include "Paths/PCGExPathsCommon.h"
 
 namespace PCGExClusters::Helpers
@@ -39,7 +39,10 @@ namespace PCGExClusters::Helpers
 
 	void MarkClusterEdges(const TArrayView<TSharedRef<PCGExData::FPointIO>> Edges, const PCGExDataId& Id)
 	{
-		for (const TSharedRef<PCGExData::FPointIO>& IO : Edges) { MarkClusterEdges(IO, Id); }
+		for (const TSharedRef<PCGExData::FPointIO>& IO : Edges)
+		{
+			MarkClusterEdges(IO, Id);
+		}
 	}
 
 	bool IsPointDataVtxReady(const UPCGMetadata* Metadata)
@@ -54,7 +57,10 @@ namespace PCGExClusters::Helpers
 
 	void CleanupVtxData(const TSharedPtr<PCGExData::FPointIO>& PointIO)
 	{
-		if (!PointIO->GetOut()) { return; }
+		if (!PointIO->GetOut())
+		{
+			return;
+		}
 		UPCGMetadata* Metadata = PointIO->GetOut()->MutableMetadata();
 		PointIO->Tags->Remove(Labels::TagStr_PCGExCluster);
 		PointIO->Tags->Remove(Labels::TagStr_PCGExVtx);
@@ -64,7 +70,10 @@ namespace PCGExClusters::Helpers
 
 	void CleanupEdgeData(const TSharedPtr<PCGExData::FPointIO>& PointIO)
 	{
-		if (!PointIO->GetOut()) { return; }
+		if (!PointIO->GetOut())
+		{
+			return;
+		}
 		UPCGMetadata* Metadata = PointIO->GetOut()->MutableMetadata();
 		PointIO->Tags->Remove(Labels::TagStr_PCGExCluster);
 		PointIO->Tags->Remove(Labels::TagStr_PCGExEdges);
@@ -83,7 +92,10 @@ namespace PCGExClusters::Helpers
 	{
 		IO->Tags->Remove(Labels::TagStr_PCGExVtx);
 		IO->Tags->Remove(Labels::TagStr_PCGExEdges);
-		if (!bKeepPairTag) { IO->Tags->Remove(Labels::TagStr_PCGExCluster); }
+		if (!bKeepPairTag)
+		{
+			IO->Tags->Remove(Labels::TagStr_PCGExCluster);
+		}
 	}
 
 	void GetAdjacencyData(const FCluster* InCluster, FNode& InNode, TArray<FAdjacencyData>& OutData)

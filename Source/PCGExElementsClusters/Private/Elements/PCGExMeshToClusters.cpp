@@ -3,23 +3,23 @@
 
 #include "Elements/PCGExMeshToClusters.h"
 
-#include "Data/PCGExAttributeBroadcaster.h"
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
-#include "GameFramework/Actor.h"
-#include "Elements/Metadata/PCGMetadataElementCommon.h"
-#include "Math/Geo/PCGExDelaunay.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
+#include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExClusterData.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/External/PCGExMesh.h"
 #include "Data/External/PCGExMeshCommon.h"
+#include "Elements/Metadata/PCGMetadataElementCommon.h"
 #include "Fitting/PCGExFitting.h"
 #include "Fitting/PCGExFittingTasks.h"
+#include "GameFramework/Actor.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Graphs/PCGExGraphCommon.h"
 #include "Helpers/PCGExRandomHelpers.h"
+#include "Math/Geo/PCGExDelaunay.h"
 #include "Math/Geo/PCGExGeo.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
@@ -41,7 +41,12 @@ namespace PCGExGraphTask
 	{
 	public:
 		FCopyGraphToPoint(const int32 InTaskIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<PCGExGraphs::FGraphBuilder>& InGraphBuilder, const TSharedPtr<PCGExData::FPointIOCollection>& InVtxCollection, const TSharedPtr<PCGExData::FPointIOCollection>& InEdgeCollection, FPCGExTransformDetails* InTransformDetails)
-			: FPCGExIndexedTask(InTaskIndex), PointIO(InPointIO), GraphBuilder(InGraphBuilder), VtxCollection(InVtxCollection), EdgeCollection(InEdgeCollection), TransformDetails(InTransformDetails)
+			: FPCGExIndexedTask(InTaskIndex)
+			  , PointIO(InPointIO)
+			  , GraphBuilder(InGraphBuilder)
+			  , VtxCollection(InVtxCollection)
+			  , EdgeCollection(InEdgeCollection)
+			  , TransformDetails(InTransformDetails)
 		{
 		}
 
@@ -55,10 +60,16 @@ namespace PCGExGraphTask
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
-			if (!GraphBuilder || !GraphBuilder->bCompiledSuccessfully) { return; }
+			if (!GraphBuilder || !GraphBuilder->bCompiledSuccessfully)
+			{
+				return;
+			}
 
 			const TSharedPtr<PCGExData::FPointIO> VtxDupe = VtxCollection->Emplace_GetRef(GraphBuilder->NodeDataFacade->GetOut(), PCGExData::EIOInit::Duplicate);
-			if (!VtxDupe) { return; }
+			if (!VtxDupe)
+			{
+				return;
+			}
 
 			VtxDupe->IOIndex = TaskIndex;
 
@@ -71,7 +82,10 @@ namespace PCGExGraphTask
 			for (const TSharedPtr<PCGExData::FPointIO>& Edges : GraphBuilder->EdgesIO->Pairs)
 			{
 				TSharedPtr<PCGExData::FPointIO> EdgeDupe = EdgeCollection->Emplace_GetRef(Edges->GetOut(), PCGExData::EIOInit::Duplicate);
-				if (!EdgeDupe) { return; }
+				if (!EdgeDupe)
+				{
+					return;
+				}
 
 				EdgeDupe->IOIndex = TaskIndex;
 				PCGExClusters::Helpers::MarkClusterEdges(EdgeDupe, OutId);
@@ -92,7 +106,8 @@ namespace PCGExMeshToCluster
 	{
 	public:
 		FExtractMeshAndBuildGraph(const int32 InTaskIndex, const TSharedPtr<PCGExMesh::FGeoStaticMesh>& InMesh)
-			: FPCGExIndexedTask(InTaskIndex), Mesh(InMesh)
+			: FPCGExIndexedTask(InTaskIndex)
+			  , Mesh(InMesh)
 		{
 		}
 
@@ -106,24 +121,37 @@ namespace PCGExMeshToCluster
 			switch (Mesh->DesiredTriangulationType)
 			{
 			default: ;
-			case EPCGExTriangulationType::Raw: Mesh->ExtractMeshSynchronous();
+			case EPCGExTriangulationType::Raw:
+				Mesh->ExtractMeshSynchronous();
 				break;
-			case EPCGExTriangulationType::Dual: Mesh->TriangulateMeshSynchronous();
+			case EPCGExTriangulationType::Dual:
+				Mesh->TriangulateMeshSynchronous();
 				Mesh->MakeDual();
 				break;
-			case EPCGExTriangulationType::Hollow: Mesh->TriangulateMeshSynchronous();
+			case EPCGExTriangulationType::Hollow:
+				Mesh->TriangulateMeshSynchronous();
 				Mesh->MakeHollowDual();
 				break;
-			case EPCGExTriangulationType::Boundaries: Mesh->TriangulateMeshSynchronous();
-				if (Mesh->HullIndices.IsEmpty() || Mesh->HullEdges.IsEmpty()) { return; }
+			case EPCGExTriangulationType::Boundaries:
+				Mesh->TriangulateMeshSynchronous();
+				if (Mesh->HullIndices.IsEmpty() || Mesh->HullEdges.IsEmpty())
+				{
+					return;
+				}
 				break;
 			}
 
-			if (!Mesh->bIsValid || Mesh->Vertices.IsEmpty()) { return; }
+			if (!Mesh->bIsValid || Mesh->Vertices.IsEmpty())
+			{
+				return;
+			}
 
 			const TSharedPtr<PCGExData::FPointIO> RootVtx = Context->RootVtx->Emplace_GetRef<UPCGExClusterNodesData>();
 
-			if (!RootVtx) { return; }
+			if (!RootVtx)
+			{
+				return;
+			}
 
 			RootVtx->IOIndex = TaskIndex;
 
@@ -150,7 +178,8 @@ namespace PCGExMeshToCluster
 					bWantsColor = true;
 				}
 
-				if (const int32 NumTexCoords = Mesh->RawData.NumTexCoords; !ImportDetails.UVChannelIndex.IsEmpty() && NumTexCoords >= 0)
+				if (const int32 NumTexCoords = Mesh->RawData.NumTexCoords;
+					!ImportDetails.UVChannelIndex.IsEmpty() && NumTexCoords >= 0)
 				{
 					UVChannels.Reserve(ImportDetails.UVChannelIndex.Num());
 					UVChannelsWriters.Reserve(ImportDetails.UVChannelIndex.Num());
@@ -163,7 +192,10 @@ namespace PCGExMeshToCluster
 
 						if (Channel >= NumTexCoords)
 						{
-							if (ImportDetails.bCreatePlaceholders) { PCGExData::WriteMark(VtxPoints, Id, ImportDetails.Placeholder); }
+							if (ImportDetails.bCreatePlaceholders)
+							{
+								PCGExData::WriteMark(VtxPoints, Id, ImportDetails.Placeholder);
+							}
 							continue;
 						}
 
@@ -247,7 +279,10 @@ namespace PCGExMeshToCluster
 				else
 				{
 					// No imports
-					for (int32 i : Mesh->HullIndices) { PCGEX_BOUNDARY_PUSH }
+					for (int32 i : Mesh->HullIndices)
+					{
+						PCGEX_BOUNDARY_PUSH
+					}
 				}
 
 #undef PCGEX_BOUNDARY_PUSH
@@ -267,7 +302,10 @@ namespace PCGExMeshToCluster
 				InitUVWriters();
 
 				TPCGValueRange<FTransform> OutTransforms = VtxPoints->GetTransformValueRange(false);
-				for (int i = 0; i < OutTransforms.Num(); i++) { OutTransforms[i].SetLocation(Mesh->Vertices[i]); }
+				for (int i = 0; i < OutTransforms.Num(); i++)
+				{
+					OutTransforms[i].SetLocation(Mesh->Vertices[i]);
+				}
 
 				if (bWantsColor || NumUVChannels)
 				{
@@ -303,7 +341,10 @@ namespace PCGExMeshToCluster
 									for (int u = 0; u < NumUVChannels; u++)
 									{
 										FVector2D AverageUVs = FVector2D::ZeroVector;
-										for (int t = 0; t < 3; t++) { AverageUVs += FVector2D(VertexBuffers->StaticMeshVertexBuffer.GetVertexUV(Triangle[t], UVChannels[u])); }
+										for (int t = 0; t < 3; t++)
+										{
+											AverageUVs += FVector2D(VertexBuffers->StaticMeshVertexBuffer.GetVertexUV(Triangle[t], UVChannels[u]));
+										}
 										AverageUVs /= 3;
 										UVChannelsWriters[u]->SetValue(i, AverageUVs);
 									}
@@ -320,7 +361,10 @@ namespace PCGExMeshToCluster
 								for (int u = 0; u < NumUVChannels; u++)
 								{
 									FVector2D AverageUVs = FVector2D::ZeroVector;
-									for (int t = 0; t < 3; t++) { AverageUVs += FVector2D(VertexBuffers->StaticMeshVertexBuffer.GetVertexUV(Triangle[t], UVChannels[u])); }
+									for (int t = 0; t < 3; t++)
+									{
+										AverageUVs += FVector2D(VertexBuffers->StaticMeshVertexBuffer.GetVertexUV(Triangle[t], UVChannels[u]));
+									}
 									AverageUVs /= 3;
 									UVChannelsWriters[u]->SetValue(i, AverageUVs);
 								}
@@ -438,13 +482,19 @@ namespace PCGExMeshToCluster
 			// We need to write down UVs attributes before compiling the graph
 			// as compilation will re-order points and metadata...
 			// This is far from ideal but also much less of a headache.
-			if (NumUVChannels > 0) { RootVtxFacade->WriteSynchronous(); }
+			if (NumUVChannels > 0)
+			{
+				RootVtxFacade->WriteSynchronous();
+			}
 
 
 			TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetOrCreateHandle();
 			GraphBuilder->OnCompilationEndCallback = [WeakHandle](const TSharedRef<PCGExGraphs::FGraphBuilder>& InBuilder, const bool bSuccess)
 			{
-				if (!bSuccess) { return; }
+				if (!bSuccess)
+				{
+					return;
+				}
 				PCGEX_SHARED_TCONTEXT_VOID(MeshToClusters, WeakHandle)
 
 				SharedContext.Get()->BaseMeshDataCollection->Add(InBuilder->NodeDataFacade->Source);
@@ -475,7 +525,10 @@ PCGEX_INITIALIZE_ELEMENT(MeshToClusters)
 
 bool FPCGExMeshToClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(MeshToClusters)
 	PCGEX_EXECUTION_CHECK
@@ -491,10 +544,16 @@ bool FPCGExMeshToClustersElement::Boot(FPCGExContext* InContext) const
 	PCGEX_FWD(GraphBuilderDetails)
 
 	PCGEX_FWD(TransformDetails)
-	if (!Context->TransformDetails.Init(Context, Context->TargetsDataFacade.ToSharedRef())) { return false; }
+	if (!Context->TransformDetails.Init(Context, Context->TargetsDataFacade.ToSharedRef()))
+	{
+		return false;
+	}
 
 	PCGEX_FWD(ImportDetails)
-	if (!Context->ImportDetails.Validate(Context)) { return false; }
+	if (!Context->ImportDetails.Validate(Context))
+	{
+		return false;
+	}
 	Context->bWantsImport = Context->ImportDetails.WantsImport();
 
 	if (Settings->StaticMeshInput == EPCGExInputValueType::Attribute)
@@ -553,7 +612,10 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 			}
 
 			Context->EDITOR_TrackPath(Settings->StaticMeshConstant.ToSoftObjectPath());
-			for (int32& Index : Context->MeshIdx) { Index = Idx; }
+			for (int32& Index : Context->MeshIdx)
+			{
+				Index = Idx;
+			}
 		}
 		else
 		{
@@ -575,7 +637,10 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 
 				if (!Path.IsValid())
 				{
-					if (!Settings->bIgnoreMeshWarnings) { PCGE_LOG(Warning, GraphAndLog, FTEXT("Some targets could not have their mesh loaded.")); }
+					if (!Settings->bIgnoreMeshWarnings)
+					{
+						PCGE_LOG(Warning, GraphAndLog, FTEXT("Some targets could not have their mesh loaded."));
+					}
 					Context->MeshIdx[i] = -1;
 					continue;
 				}
@@ -586,7 +651,10 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 
 					if (Idx == -1)
 					{
-						if (!Settings->bIgnoreMeshWarnings) { PCGE_LOG(Warning, GraphAndLog, FTEXT("Some targets could not have their mesh loaded.")); }
+						if (!Settings->bIgnoreMeshWarnings)
+						{
+							PCGE_LOG(Warning, GraphAndLog, FTEXT("Some targets could not have their mesh loaded."));
+						}
 						Context->MeshIdx[i] = -1;
 					}
 					else
@@ -620,7 +688,10 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 						const int32 Idx = Context->StaticMeshMap->FindOrAdd(TSoftObjectPtr<UStaticMesh>(SMComponents[0]->GetStaticMesh()).ToSoftObjectPath());
 						if (Idx == -1)
 						{
-							if (!Settings->bIgnoreMeshWarnings) { PCGE_LOG(Warning, GraphAndLog, FTEXT("Some actors have invalid SMCs.")); }
+							if (!Settings->bIgnoreMeshWarnings)
+							{
+								PCGE_LOG(Warning, GraphAndLog, FTEXT("Some actors have invalid SMCs."));
+							}
 							Context->MeshIdx[i] = -1;
 						}
 						else
@@ -634,7 +705,10 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 
 		const int32 GSMNums = Context->StaticMeshMap->GSMs.Num();
 		Context->GraphBuilders.SetNum(GSMNums);
-		for (int i = 0; i < GSMNums; i++) { Context->GraphBuilders[i] = nullptr; }
+		for (int i = 0; i < GSMNums; i++)
+		{
+			Context->GraphBuilders[i] = nullptr;
+		}
 
 		const TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
 		for (int i = 0; i < Context->StaticMeshMap->GSMs.Num(); i++)
@@ -656,7 +730,10 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 		for (int i = 0; i < NumTargets; i++)
 		{
 			const int32 MeshIdx = Context->MeshIdx[i];
-			if (MeshIdx == -1) { continue; }
+			if (MeshIdx == -1)
+			{
+				continue;
+			}
 			PCGEX_LAUNCH(PCGExGraphTask::FCopyGraphToPoint, i, Context->CurrentIO, Context->GraphBuilders[MeshIdx], Context->VtxChildCollection, Context->EdgeChildCollection, &Context->TransformDetails)
 		}
 	}

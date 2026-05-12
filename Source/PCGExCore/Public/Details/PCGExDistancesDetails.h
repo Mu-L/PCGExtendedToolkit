@@ -27,7 +27,8 @@ struct PCGEXCORE_API FPCGExDistanceDetails
 	}
 
 	explicit FPCGExDistanceDetails(const EPCGExDistance SourceMethod, const EPCGExDistance TargetMethod)
-		: Source(SourceMethod), Target(TargetMethod)
+		: Source(SourceMethod)
+		  , Target(TargetMethod)
 	{
 	}
 

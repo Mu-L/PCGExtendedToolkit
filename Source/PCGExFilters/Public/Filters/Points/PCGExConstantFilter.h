@@ -42,8 +42,16 @@ public:
 	FPCGExConstantFilterConfig Config;
 
 	virtual bool Init(FPCGExContext* InContext) override;
-	virtual bool SupportsCollectionEvaluation() const override { return true; }
-	virtual bool SupportsProxyEvaluation() const override { return true; }
+
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return true;
+	}
+
+	virtual bool SupportsProxyEvaluation() const override
+	{
+		return true;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 };
@@ -54,7 +62,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FConstantFilter(const TObjectPtr<const UPCGExConstantFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

@@ -7,10 +7,10 @@
 #include "Clusters/Artifacts/PCGExCellDetails.h"
 #include "Containers/PCGExScopedContainers.h"
 
-#include "Core/PCGExClustersProcessor.h"
-#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "PCGExPathfindingFindAllCellsBounded.h"
 #include "Clusters/Artifacts/PCGExCell.h"
+#include "Core/PCGExClustersProcessor.h"
+#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Helpers/PCGExCellSeedOwnership.h"
 #include "Sorting/PCGExSortingCommon.h"
 
@@ -57,12 +57,24 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(FindContoursBounded, "Pathfinding : Find Cells (Bounded)", "Finds closed cells around seed points and triages them by spatial bounds relationship (Inside/Touching/Outside).");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Pathfinding);
+	}
 #endif
 
 protected:
-	virtual bool HasDynamicPins() const override { return true; }
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	}
+
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
@@ -84,9 +96,20 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, Bitmask, BitmaskEnum = "/Script/PCGExGraphs.EPCGExCellTriageFlags"))
 	uint8 TriageFlags = static_cast<uint8>(PCGExCellTriage::DefaultFlags);
 
-	FORCEINLINE bool OutputInside() const { return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Inside)); }
-	FORCEINLINE bool OutputTouching() const { return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Touching)); }
-	FORCEINLINE bool OutputOutside() const { return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Outside)); }
+	FORCEINLINE bool OutputInside() const
+	{
+		return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Inside));
+	}
+
+	FORCEINLINE bool OutputTouching() const
+	{
+		return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Touching));
+	}
+
+	FORCEINLINE bool OutputOutside() const
+	{
+		return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Outside));
+	}
 
 	/** Drive how a seed selects a node. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))

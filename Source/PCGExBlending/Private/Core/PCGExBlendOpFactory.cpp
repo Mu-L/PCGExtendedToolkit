@@ -7,9 +7,9 @@
 #include "Core/PCGExBlendOpFactoryProvider.h"
 #include "Core/PCGExOpStats.h"
 #include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyData.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "GeometryCollection/Facades/CollectionPositionTargetFacade.h"
 
@@ -45,21 +45,42 @@ void FPCGExAttributeBlendConfig::Init()
 bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 {
 	Weight = Config.Weighting.GetValueSettingWeight();
-	if (!Weight->Init(WeightFacade)) { return false; }
+	if (!Weight->Init(WeightFacade))
+	{
+		return false;
+	}
 
 	// Fix @Selectors based on siblings 
-	if (!CopyAndFixSiblingSelector(InContext, Config.OperandA)) { return false; }
-	if (Config.bUseOperandB) { if (!CopyAndFixSiblingSelector(InContext, Config.OperandB)) { return false; } }
-	else { Config.OperandB = Config.OperandA; }
+	if (!CopyAndFixSiblingSelector(InContext, Config.OperandA))
+	{
+		return false;
+	}
+	if (Config.bUseOperandB)
+	{
+		if (!CopyAndFixSiblingSelector(InContext, Config.OperandB))
+		{
+			return false;
+		}
+	}
+	else
+	{
+		Config.OperandB = Config.OperandA;
+	}
 
 	switch (Config.OutputMode)
 	{
-	case EPCGExBlendOpOutputMode::SameAsA: Config.OutputTo = Config.OperandA;
+	case EPCGExBlendOpOutputMode::SameAsA:
+		Config.OutputTo = Config.OperandA;
 		break;
-	case EPCGExBlendOpOutputMode::SameAsB: Config.OutputTo = Config.OperandB;
+	case EPCGExBlendOpOutputMode::SameAsB:
+		Config.OutputTo = Config.OperandB;
 		break;
 	case EPCGExBlendOpOutputMode::New:
-	case EPCGExBlendOpOutputMode::Transient: if (!CopyAndFixSiblingSelector(InContext, Config.OutputTo)) { return false; }
+	case EPCGExBlendOpOutputMode::Transient:
+		if (!CopyAndFixSiblingSelector(InContext, Config.OutputTo))
+		{
+			return false;
+		}
 		break;
 	}
 
@@ -76,11 +97,17 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 	if (A.DataFacade.Pin() != Source_A_Facade)
 	{
 		A.AddFlags(PCGExData::EProxyFlags::Constant);
-		if (!A.Capture(InContext, Config.OperandA, PCGExData::EIOSide::In)) { return false; }
+		if (!A.Capture(InContext, Config.OperandA, PCGExData::EIOSide::In))
+		{
+			return false;
+		}
 	}
 	else
 	{
-		if (!A.Capture(InContext, Config.OperandA, SideA)) { return false; }
+		if (!A.Capture(InContext, Config.OperandA, SideA))
+		{
+			return false;
+		}
 	}
 
 	// Build secondary source descriptor
@@ -98,11 +125,17 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 		if (B.DataFacade.Pin() != Source_B_Facade)
 		{
 			B.AddFlags(PCGExData::EProxyFlags::Constant);
-			if (!B.Capture(InContext, Config.OperandB, PCGExData::EIOSide::In)) { return false; }
+			if (!B.Capture(InContext, Config.OperandB, PCGExData::EIOSide::In))
+			{
+				return false;
+			}
 		}
 		else
 		{
-			if (!B.Capture(InContext, Config.OperandB, SideB)) { return false; }
+			if (!B.Capture(InContext, Config.OperandB, SideB))
+			{
+				return false;
+			}
 		}
 	}
 
@@ -133,9 +166,18 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 		}
 		else
 		{
-			if (Config.OutputType == EPCGExOperandAuthority::A) { RealTypeC = A.RealType; }
-			else if (Config.OutputType == EPCGExOperandAuthority::B) { RealTypeC = B.RealType; }
-			else if (Config.OutputType == EPCGExOperandAuthority::Custom) { RealTypeC = Config.CustomType; }
+			if (Config.OutputType == EPCGExOperandAuthority::A)
+			{
+				RealTypeC = A.RealType;
+			}
+			else if (Config.OutputType == EPCGExOperandAuthority::B)
+			{
+				RealTypeC = B.RealType;
+			}
+			else if (Config.OutputType == EPCGExOperandAuthority::Custom)
+			{
+				RealTypeC = Config.CustomType;
+			}
 			else if (Config.OutputType == EPCGExOperandAuthority::Auto)
 			{
 				if (OutAttribute)
@@ -163,21 +205,29 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 					{
 						switch (InType)
 						{
-						default: return 0;
+						default:
+							return 0;
 						case EPCGMetadataTypes::Boolean:
 						case EPCGMetadataTypes::Float:
 						case EPCGMetadataTypes::Double:
 						case EPCGMetadataTypes::Integer32:
-						case EPCGMetadataTypes::Integer64: return 1;
-						case EPCGMetadataTypes::Vector2: return 2;
+						case EPCGMetadataTypes::Integer64:
+							return 1;
+						case EPCGMetadataTypes::Vector2:
+							return 2;
 						case EPCGMetadataTypes::Vector:
-						case EPCGMetadataTypes::Rotator: return 3;
+						case EPCGMetadataTypes::Rotator:
+							return 3;
 						case EPCGMetadataTypes::Vector4:
-						case EPCGMetadataTypes::Quaternion: return 4;
-						case EPCGMetadataTypes::Transform: return 5;
+						case EPCGMetadataTypes::Quaternion:
+							return 4;
+						case EPCGMetadataTypes::Transform:
+							return 5;
 						case EPCGMetadataTypes::String:
-						case EPCGMetadataTypes::Name: return 6;
-						case EPCGMetadataTypes::Unknown: return -1;
+						case EPCGMetadataTypes::Name:
+							return 6;
+						case EPCGMetadataTypes::Unknown:
+							return -1;
 						}
 					};
 
@@ -208,11 +258,20 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 	C.RealType = RealTypeC;
 	C.WorkingType = WorkingTypeC;
 
-	if (bSkipSourceB) { Blender = PCGExBlending::CreateProxyBlender(InContext, Config.BlendMode, A, C, Config.bResetValueBeforeMultiSourceBlend); }
-	else { Blender = PCGExBlending::CreateProxyBlender(InContext, Config.BlendMode, A, B, C, Config.bResetValueBeforeMultiSourceBlend); }
+	if (bSkipSourceB)
+	{
+		Blender = PCGExBlending::CreateProxyBlender(InContext, Config.BlendMode, A, C, Config.bResetValueBeforeMultiSourceBlend);
+	}
+	else
+	{
+		Blender = PCGExBlending::CreateProxyBlender(InContext, Config.BlendMode, A, B, C, Config.bResetValueBeforeMultiSourceBlend);
+	}
 
 
-	if (!Blender) { return false; }
+	if (!Blender)
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -359,7 +418,10 @@ bool UPCGExBlendOpFactory::CreateOperations(
 	const TSet<FName>* InSupersedeNames) const
 {
 	TSharedPtr<FPCGExBlendOperation> Op = CreateOperation(InContext);
-	if (!Op) { return false; }
+	if (!Op)
+	{
+		return false;
+	}
 	OutOperations.Add(Op);
 	return true;
 }
@@ -382,7 +444,10 @@ FName UPCGExBlendOpFactory::GetOutputTargetName(const FPCGExAttributeBlendConfig
 		break;
 	}
 
-	if (!RelevantSelector) { return NAME_None; }
+	if (!RelevantSelector)
+	{
+		return NAME_None;
+	}
 
 	const EPCGAttributePropertySelection Selection = RelevantSelector->GetSelection();
 
@@ -394,7 +459,8 @@ FName UPCGExBlendOpFactory::GetOutputTargetName(const FPCGExAttributeBlendConfig
 #define PCGEX_MAP_PP(_NAME, ...) case EPCGPointProperties::_NAME: return FName(TEXT("$" #_NAME));
 		PCGEX_FOREACH_BLEND_POINTPROPERTY(PCGEX_MAP_PP)
 #undef PCGEX_MAP_PP
-		default: return NAME_None;
+		default:
+			return NAME_None;
 		}
 	}
 
@@ -410,10 +476,16 @@ bool UPCGExBlendOpFactory::WantsPreparation(FPCGExContext* InContext)
 PCGExFactories::EPreparationResult UPCGExBlendOpFactory::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	ConstantA = PCGExData::TryGetSingleFacade(InContext, PCGExBlending::Labels::SourceConstantA, true, false);
-	if (Config.bUseOperandB) { ConstantB = PCGExData::TryGetSingleFacade(InContext, PCGExBlending::Labels::SourceConstantB, true, false); }
+	if (Config.bUseOperandB)
+	{
+		ConstantB = PCGExData::TryGetSingleFacade(InContext, PCGExBlending::Labels::SourceConstantB, true, false);
+	}
 
 	if (ConstantA)
 	{
@@ -433,12 +505,18 @@ PCGExFactories::EPreparationResult UPCGExBlendOpFactory::Prepare(FPCGExContext* 
 void UPCGExBlendOpFactory::RegisterAssetDependencies(FPCGExContext* InContext) const
 {
 	Super::RegisterAssetDependencies(InContext);
-	if (!Config.Weighting.bUseLocalCurve) { InContext->AddAssetDependency(Config.Weighting.WeightCurve.ToSoftObjectPath()); }
+	if (!Config.Weighting.bUseLocalCurve)
+	{
+		InContext->AddAssetDependency(Config.Weighting.WeightCurve.ToSoftObjectPath());
+	}
 }
 
 bool UPCGExBlendOpFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_SELECTOR(Config.OperandA, Consumable)

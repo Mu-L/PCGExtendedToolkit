@@ -14,22 +14,22 @@
 #include "UObject/UObjectGlobals.h"
 
 // PCG core - precompiled here so modules don't re-process them
-#include "Metadata/PCGMetadataCommon.h"
-#include "Metadata/PCGMetadataAttributeTraits.h"
 #include "PCGCommon.h"
+#include "Metadata/PCGMetadataAttributeTraits.h"
+#include "Metadata/PCGMetadataCommon.h"
 
 // Foundational
 #include "PCGExCommon.h"
-#include "Core/PCGExContext.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExContext.h"
 #include "Data/PCGExDataTags.h"
 
 // Heavy hitter (289 includes across codebase)
-#include "Math/PCGExMath.h"
-#include "Utils/PCGExCompare.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataPreloader.h"
-#include "Helpers/PCGExMetaHelpers.h"
-#include "Helpers/PCGExArrayHelpers.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Helpers/PCGExArrayHelpers.h"
+#include "Helpers/PCGExMetaHelpers.h"
+#include "Math/PCGExMath.h"
+#include "Utils/PCGExCompare.h"

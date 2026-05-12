@@ -48,12 +48,24 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(FindAllCellsBounded, "Pathfinding : Find All Cells (Bounded)", "Finds all cluster cells and triages them by spatial bounds relationship (Inside/Touching/Outside).");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Pathfinding);
+	}
 #endif
 
 protected:
-	virtual bool HasDynamicPins() const override { return true; }
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	}
+
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
@@ -74,9 +86,20 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, Bitmask, BitmaskEnum = "/Script/PCGExGraphs.EPCGExCellTriageFlags"))
 	uint8 TriageFlags = static_cast<uint8>(PCGExCellTriage::DefaultFlags);
 
-	FORCEINLINE bool OutputInside() const { return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Inside)); }
-	FORCEINLINE bool OutputTouching() const { return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Touching)); }
-	FORCEINLINE bool OutputOutside() const { return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Outside)); }
+	FORCEINLINE bool OutputInside() const
+	{
+		return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Inside));
+	}
+
+	FORCEINLINE bool OutputTouching() const
+	{
+		return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Touching));
+	}
+
+	FORCEINLINE bool OutputOutside() const
+	{
+		return !!(TriageFlags & static_cast<uint8>(EPCGExCellTriageFlags::Outside));
+	}
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExCellConstraintsDetails Constraints = FPCGExCellConstraintsDetails(true);

@@ -37,7 +37,10 @@ int32 FPCGExRandomRatioDetails::GetNumPicks(FPCGExContext* InContext, const UPCG
 		MaxPicks = FMath::Clamp(MaxPicks, 0, NumMaxItems);
 	}
 
-	if (MaxPicks < MinPicks) { Swap(MinPicks, MaxPicks); }
+	if (MaxPicks < MinPicks)
+	{
+		Swap(MinPicks, MaxPicks);
+	}
 	NumPicks = FMath::Clamp(NumPicks, MinPicks, MaxPicks);
 
 	return NumPicks;
@@ -60,7 +63,10 @@ void FPCGExRandomRatioDetails::GetPicks(FPCGExContext* InContext, const UPCGData
 	BaseSeed.TryReadDataValue(InContext, InData, S);
 	FRandomStream Random = PCGHelpers::GetRandomStreamFromSeed(PCGHelpers::ComputeSeed(S), InContext->GetInputSettings<UPCGSettings>(), InContext->ExecutionSource.Get());
 
-	for (int32 i = NumMaxItems - 1; i > 0; --i) { OutPicks.Swap(i, Random.RandRange(0, i)); }
+	for (int32 i = NumMaxItems - 1; i > 0; --i)
+	{
+		OutPicks.Swap(i, Random.RandRange(0, i));
+	}
 	OutPicks.SetNum(NumPicks);
 }
 

@@ -9,12 +9,12 @@
 #include "PCGSettings.h"
 #include "UObject/Object.h"
 
+#include "PCGExCoreSettingsCache.h" // Boilerplate
+#include "PCGExVersion.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
 #include "Factories/PCGExFactories.h"
-#include "PCGExCoreSettingsCache.h" // Boilerplate
-#include "PCGExVersion.h"
 
 #include "PCGExFactoryProvider.generated.h"
 
@@ -56,12 +56,26 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	//PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(FactoryProvider, "Factory : Provider", "Creates an abstract factory provider.", FName(GetDisplayName()))
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Debug); }
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Debug);
+	}
 #endif
 
-	virtual int32 GetDefaultPriority() const { return 0; }
-	virtual EPCGExExecutionPolicy GetExecutionPolicy() const override { return EPCGExExecutionPolicy::Ignored; }
+	virtual int32 GetDefaultPriority() const
+	{
+		return 0;
+	}
+
+	virtual EPCGExExecutionPolicy GetExecutionPolicy() const override
+	{
+		return EPCGExExecutionPolicy::Ignored;
+	}
 
 protected:
 	UPROPERTY()
@@ -74,9 +88,17 @@ protected:
 
 	//~Begin UPCGExFactoryProviderSettings
 public:
-	virtual FName GetMainOutputPin() const { return TEXT(""); }
+	virtual FName GetMainOutputPin() const
+	{
+		return TEXT("");
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory = nullptr) const;
-	virtual bool ShouldCancel(FPCGExFactoryProviderContext* InContext, PCGExFactories::EPreparationResult InResult) const { return true; }
+
+	virtual bool ShouldCancel(FPCGExFactoryProviderContext* InContext, PCGExFactories::EPreparationResult InResult) const
+	{
+		return true;
+	}
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const;
@@ -94,7 +116,10 @@ class PCGEXCORE_API FPCGExFactoryProviderElement final : public IPCGExElement
 {
 public:
 #if WITH_EDITOR
-	virtual bool ShouldLog() const override { return false; }
+	virtual bool ShouldLog() const override
+	{
+		return false;
+	}
 #endif
 
 protected:
@@ -102,6 +127,11 @@ protected:
 
 public:
 	PCGEX_ELEMENT_CREATE_CONTEXT(FactoryProvider)
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
+
 	virtual void DisabledPassThroughData(FPCGContext* Context) const override;
 };

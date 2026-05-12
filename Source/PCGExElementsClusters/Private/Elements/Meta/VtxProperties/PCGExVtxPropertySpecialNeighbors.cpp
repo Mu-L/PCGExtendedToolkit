@@ -12,7 +12,10 @@
 
 bool FPCGExVtxPropertySpecialNeighbors::PrepareForCluster(FPCGExContext* InContext, TSharedPtr<PCGExClusters::FCluster> InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataFacade, const TSharedPtr<PCGExData::FFacade>& InEdgeDataFacade)
 {
-	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade)) { return false; }
+	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade))
+	{
+		return false;
+	}
 
 	if (!Config.LargestNeighbor.Validate(InContext) || !Config.SmallestNeighbor.Validate(InContext))
 	{
@@ -52,11 +55,23 @@ void FPCGExVtxPropertySpecialNeighbors::ProcessNode(PCGExClusters::FNode& Node, 
 		}
 	}
 
-	if (ILargest != -1) { Config.LargestNeighbor.Set(Node.PointIndex, Adjacency[ILargest], Cluster->GetNode(Adjacency[ILargest].NodeIndex)->Num()); }
-	else { Config.LargestNeighbor.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0); }
+	if (ILargest != -1)
+	{
+		Config.LargestNeighbor.Set(Node.PointIndex, Adjacency[ILargest], Cluster->GetNode(Adjacency[ILargest].NodeIndex)->Num());
+	}
+	else
+	{
+		Config.LargestNeighbor.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0);
+	}
 
-	if (ISmallest != -1) { Config.SmallestNeighbor.Set(Node.PointIndex, Adjacency[ISmallest], Cluster->GetNode(Adjacency[ISmallest].NodeIndex)->Num()); }
-	else { Config.SmallestNeighbor.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0); }
+	if (ISmallest != -1)
+	{
+		Config.SmallestNeighbor.Set(Node.PointIndex, Adjacency[ISmallest], Cluster->GetNode(Adjacency[ISmallest].NodeIndex)->Num());
+	}
+	else
+	{
+		Config.SmallestNeighbor.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0);
+	}
 }
 
 #if WITH_EDITOR

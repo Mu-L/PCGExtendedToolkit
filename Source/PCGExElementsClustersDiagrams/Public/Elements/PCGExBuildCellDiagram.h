@@ -42,7 +42,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BuildCellDiagram, "Cluster : Cell Diagram", "Creates a graph from cell adjacency relationships. Points are cell centroids, edges connect adjacent cells.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_BLEND(ClusterGenerator, Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_BLEND(ClusterGenerator, Pathfinding);
+	}
 #endif
 
 protected:

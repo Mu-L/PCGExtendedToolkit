@@ -4,13 +4,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "Details/PCGExCollisionDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Sampling/PCGExSamplingCommon.h"
 #include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "Core/PCGExPointFilter.h"
 
@@ -134,7 +134,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FRaycastFilter(const TObjectPtr<const UPCGExRaycastFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 

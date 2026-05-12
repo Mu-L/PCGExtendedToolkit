@@ -7,16 +7,25 @@
 
 PCGEX_CREATE_PROBE_FACTORY(Chain, {}, {})
 
-bool FPCGExProbeChain::IsGlobalProbe() const { return true; }
+bool FPCGExProbeChain::IsGlobalProbe() const
+{
+	return true;
+}
 
 bool FPCGExProbeChain::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	if (Config.SortMode == EPCGExProbeChainSortMode::ByAttribute)
 	{
 		SortBuffer = PrimaryDataFacade->GetBroadcaster<double>(Config.SortAttribute, true, false);
-		if (!SortBuffer) { return false; }
+		if (!SortBuffer)
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -29,7 +38,10 @@ void FPCGExProbeChain::ComputeHilbertOrder(TArray<int32>& OutOrder) const
 
 	// Find bounds
 	FBox Bounds(ForceInit);
-	for (const FVector& P : Positions) { Bounds += P; }
+	for (const FVector& P : Positions)
+	{
+		Bounds += P;
+	}
 
 	const FVector Size = Bounds.GetSize();
 	const double MaxSize = FMath::Max3(Size.X, Size.Y, Size.Z);
@@ -60,7 +72,10 @@ void FPCGExProbeChain::ComputeHilbertOrder(TArray<int32>& OutOrder) const
 		HilbertIndices[i] = {Morton, i};
 	}
 
-	Algo::Sort(HilbertIndices, [](const auto& A, const auto& B) { return A.Key < B.Key; });
+	Algo::Sort(HilbertIndices, [](const auto& A, const auto& B)
+	{
+		return A.Key < B.Key;
+	});
 
 	OutOrder.SetNum(NumPoints);
 	for (int32 i = 0; i < NumPoints; ++i)
@@ -75,7 +90,10 @@ void FPCGExProbeChain::ComputeGreedyTSPOrder(TArray<int32>& OutOrder) const
 	const int32 NumPoints = Positions.Num();
 
 	TSet<int32> Remaining;
-	for (int32 i = 0; i < NumPoints; ++i) { Remaining.Add(i); }
+	for (int32 i = 0; i < NumPoints; ++i)
+	{
+		Remaining.Add(i);
+	}
 
 	OutOrder.Reserve(NumPoints);
 
@@ -110,7 +128,10 @@ void FPCGExProbeChain::ProcessAll(TSet<uint64>& OutEdges) const
 {
 	const TArray<FVector>& Positions = *WorkingPositions;
 	const int32 NumPoints = Positions.Num();
-	if (NumPoints < 2) { return; }
+	if (NumPoints < 2)
+	{
+		return;
+	}
 
 	const TArray<int8>& CanGenerateRef = *CanGenerate;
 	const TArray<int8>& AcceptConnectionsRef = *AcceptConnections;
@@ -121,33 +142,45 @@ void FPCGExProbeChain::ProcessAll(TSet<uint64>& OutEdges) const
 	switch (Config.SortMode)
 	{
 	case EPCGExProbeChainSortMode::ByAttribute:
+	{
+		TArray<TPair<double, int32>> SortPairs;
+		SortPairs.SetNum(NumPoints);
+		for (int32 i = 0; i < NumPoints; ++i)
 		{
-			TArray<TPair<double, int32>> SortPairs;
-			SortPairs.SetNum(NumPoints);
-			for (int32 i = 0; i < NumPoints; ++i)
-			{
-				SortPairs[i] = {SortBuffer->Read(i), i};
-			}
-			Algo::Sort(SortPairs, [](const auto& A, const auto& B) { return A.Key < B.Key; });
-			Order.SetNum(NumPoints);
-			for (int32 i = 0; i < NumPoints; ++i) { Order[i] = SortPairs[i].Value; }
+			SortPairs[i] = {SortBuffer->Read(i), i};
 		}
-		break;
+		Algo::Sort(SortPairs, [](const auto& A, const auto& B)
+		{
+			return A.Key < B.Key;
+		});
+		Order.SetNum(NumPoints);
+		for (int32 i = 0; i < NumPoints; ++i)
+		{
+			Order[i] = SortPairs[i].Value;
+		}
+	}
+	break;
 
 	case EPCGExProbeChainSortMode::ByAxisProjection:
+	{
+		const FVector Axis = Config.ProjectionAxis.GetSafeNormal();
+		TArray<TPair<double, int32>> SortPairs;
+		SortPairs.SetNum(NumPoints);
+		for (int32 i = 0; i < NumPoints; ++i)
 		{
-			const FVector Axis = Config.ProjectionAxis.GetSafeNormal();
-			TArray<TPair<double, int32>> SortPairs;
-			SortPairs.SetNum(NumPoints);
-			for (int32 i = 0; i < NumPoints; ++i)
-			{
-				SortPairs[i] = {FVector::DotProduct(Positions[i], Axis), i};
-			}
-			Algo::Sort(SortPairs, [](const auto& A, const auto& B) { return A.Key < B.Key; });
-			Order.SetNum(NumPoints);
-			for (int32 i = 0; i < NumPoints; ++i) { Order[i] = SortPairs[i].Value; }
+			SortPairs[i] = {FVector::DotProduct(Positions[i], Axis), i};
 		}
-		break;
+		Algo::Sort(SortPairs, [](const auto& A, const auto& B)
+		{
+			return A.Key < B.Key;
+		});
+		Order.SetNum(NumPoints);
+		for (int32 i = 0; i < NumPoints; ++i)
+		{
+			Order[i] = SortPairs[i].Value;
+		}
+	}
+	break;
 
 	case EPCGExProbeChainSortMode::BySpatialCurve:
 		ComputeGreedyTSPOrder(Order);
@@ -174,7 +207,10 @@ void FPCGExProbeChain::ProcessAll(TSet<uint64>& OutEdges) const
 		const int32 A = ValidOrder[i];
 		const int32 B = ValidOrder[i + 1];
 
-		if (!CanGenerateRef[A] && !CanGenerateRef[B]) { continue; }
+		if (!CanGenerateRef[A] && !CanGenerateRef[B])
+		{
+			continue;
+		}
 
 		if (FVector::DistSquared(Positions[A], Positions[B]) <= FMath::Max(GetSearchRadius(A), GetSearchRadius(B)))
 		{

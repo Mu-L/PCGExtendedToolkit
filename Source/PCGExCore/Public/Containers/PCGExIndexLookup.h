@@ -23,13 +23,39 @@ namespace PCGEx
 			Data.Init(-1, Size);
 		}
 
-		FORCEINLINE int32& operator[](const int32 At) { return Data[At]; }
-		FORCEINLINE int32 operator[](const int32 At) const { return Data[At]; }
-		FORCEINLINE void Set(const int32 At, const int32 Value) { Data[At] = Value; }
-		FORCEINLINE int32 Get(const int32 At) { return Data[At]; }
-		FORCEINLINE int32& GetMutable(const int32 At) { return Data[At]; }
+		FORCEINLINE int32& operator[](const int32 At)
+		{
+			return Data[At];
+		}
 
-		operator TArrayView<const int32>() const { return Data; }
-		operator TArrayView<int32>() { return Data; }
+		FORCEINLINE int32 operator[](const int32 At) const
+		{
+			return Data[At];
+		}
+
+		FORCEINLINE void Set(const int32 At, const int32 Value)
+		{
+			Data[At] = Value;
+		}
+
+		FORCEINLINE int32 Get(const int32 At)
+		{
+			return Data[At];
+		}
+
+		FORCEINLINE int32& GetMutable(const int32 At)
+		{
+			return Data[At];
+		}
+
+		operator TArrayView<const int32>() const
+		{
+			return Data;
+		}
+
+		operator TArrayView<int32>()
+		{
+			return Data;
+		}
 	};
 }

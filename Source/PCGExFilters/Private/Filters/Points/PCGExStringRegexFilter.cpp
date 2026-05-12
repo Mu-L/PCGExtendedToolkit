@@ -24,7 +24,10 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExStringRegexFilterFactory::CreateFilt
 
 bool UPCGExStringRegexFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	InContext->AddConsumableAttributeName(Config.OperandA);
 
@@ -33,7 +36,10 @@ bool UPCGExStringRegexFilterFactory::RegisterConsumableAttributesWithData(FPCGEx
 
 bool PCGExPointFilter::FStringRegexFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	OperandA = MakeShared<PCGExData::TAttributeBroadcaster<FString>>();
 	if (!OperandA->Prepare(TypedFilterFactory->Config.OperandA, PointDataFacade->Source))
@@ -63,7 +69,10 @@ bool PCGExPointFilter::FStringRegexFilter::Test(const TSharedPtr<PCGExData::FPoi
 {
 	FString A = TEXT("");
 
-	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, A, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, A, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
 
 	const bool bResult = RegexMatcher.Test(A);
 	return TypedFilterFactory->Config.bInvert ? !bResult : bResult;

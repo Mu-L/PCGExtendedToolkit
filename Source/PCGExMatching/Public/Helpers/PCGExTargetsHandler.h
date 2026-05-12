@@ -63,17 +63,35 @@ namespace PCGExMatching
 		FTargetsHandler() = default;
 		virtual ~FTargetsHandler() = default;
 
-		const TArray<TSharedRef<PCGExData::FFacade>>& GetFacades() const { return TargetFacades; }
-		int32 Num() const { return TargetFacades.Num(); }
-		bool IsEmpty() const { return TargetFacades.IsEmpty(); }
-		int32 GetMaxNumTargets() const { return MaxNumTargets; }
+		const TArray<TSharedRef<PCGExData::FFacade>>& GetFacades() const
+		{
+			return TargetFacades;
+		}
+
+		int32 Num() const
+		{
+			return TargetFacades.Num();
+		}
+
+		bool IsEmpty() const
+		{
+			return TargetFacades.IsEmpty();
+		}
+
+		int32 GetMaxNumTargets() const
+		{
+			return MaxNumTargets;
+		}
 
 		int32 Init(FPCGExContext* InContext, const FName InPinLabel, FInitData&& InitFn);
 		int32 Init(FPCGExContext* InContext, const FName InPinLabel);
 
 		void SetDistances(const FPCGExDistanceDetails& InDetails);
 		void SetDistances(const EPCGExDistance Source, const EPCGExDistance Target, const bool bOverlapIsZero);
-		FORCEINLINE const PCGExMath::IDistances* GetDistances() const { return Distances; }
+		FORCEINLINE const PCGExMath::IDistances* GetDistances() const
+		{
+			return Distances;
+		}
 
 		void SetMatchingDetails(FPCGExContext* InContext, const FPCGExMatchingDetails* InDetails);
 		bool PopulateIgnoreList(const TSharedPtr<PCGExData::FPointIO>& InDataCandidate, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const;

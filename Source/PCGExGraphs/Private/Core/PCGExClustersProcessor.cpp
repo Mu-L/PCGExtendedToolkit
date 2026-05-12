@@ -6,24 +6,34 @@
 #include "PCGExHeuristicsCommon.h"
 #include "Clusters/PCGExClusterDataLibrary.h"
 #include "Clusters/PCGExClustersHelpers.h"
+#include "Core/PCGExHeuristicsFactoryProvider.h"
+#include "Core/PCGExPointFilter.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Core/PCGExPointFilter.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphCommon.h"
 #include "Sorting/PCGExSortingRuleProvider.h"
-#include "Core/PCGExHeuristicsFactoryProvider.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
 
 #pragma region UPCGSettings interface
 
 
-PCGExData::EIOInit UPCGExClustersProcessorSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Forward; }
-PCGExData::EIOInit UPCGExClustersProcessorSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExClustersProcessorSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
-bool UPCGExClustersProcessorSettings::GetMainAcceptMultipleData() const { return true; }
+PCGExData::EIOInit UPCGExClustersProcessorSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
+
+bool UPCGExClustersProcessorSettings::GetMainAcceptMultipleData() const
+{
+	return true;
+}
 
 bool UPCGExClustersProcessorSettings::WantsScopedIndexLookupBuild() const
 {
@@ -49,22 +59,40 @@ TArray<FPCGPinProperties> UPCGExClustersProcessorSettings::InputPinProperties() 
 
 	if (!IsInputless())
 	{
-		if (GetMainAcceptMultipleData()) { PCGEX_PIN_POINTS(GetMainInputPin(), "The point data to be processed.", Required) }
-		else { PCGEX_PIN_POINT(GetMainInputPin(), "The point data to be processed.", Required) }
+		if (GetMainAcceptMultipleData())
+		{
+			PCGEX_PIN_POINTS(GetMainInputPin(), "The point data to be processed.", Required)
+		}
+		else
+		{
+			PCGEX_PIN_POINT(GetMainInputPin(), "The point data to be processed.", Required)
+		}
 	}
 
 	PCGEX_PIN_POINTS(PCGExClusters::Labels::SourceEdgesLabel, "Edges associated with the main input points", Required)
 
 	if (SupportsPointFilters())
 	{
-		if (RequiresPointFilters()) { PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Required) }
-		else { PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Normal) }
+		if (RequiresPointFilters())
+		{
+			PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Required)
+		}
+		else
+		{
+			PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Normal)
+		}
 	}
 
 	if (SupportsEdgeSorting())
 	{
-		if (RequiresEdgeSorting()) { PCGEX_PIN_FACTORIES(PCGExClusters::Labels::SourceEdgeSortingRules, "Plug sorting rules here. Order is defined by each rule' priority value, in ascending order.", Required, FPCGExDataTypeInfoSortRule::AsId()) }
-		else { PCGEX_PIN_FACTORIES(PCGExClusters::Labels::SourceEdgeSortingRules, "Plug sorting rules here. Order is defined by each rule' priority value, in ascending order.", Normal, FPCGExDataTypeInfoSortRule::AsId()) }
+		if (RequiresEdgeSorting())
+		{
+			PCGEX_PIN_FACTORIES(PCGExClusters::Labels::SourceEdgeSortingRules, "Plug sorting rules here. Order is defined by each rule' priority value, in ascending order.", Required, FPCGExDataTypeInfoSortRule::AsId())
+		}
+		else
+		{
+			PCGEX_PIN_FACTORIES(PCGExClusters::Labels::SourceEdgeSortingRules, "Plug sorting rules here. Order is defined by each rule' priority value, in ascending order.", Normal, FPCGExDataTypeInfoSortRule::AsId())
+		}
 	}
 	return PinProperties;
 }
@@ -76,15 +104,24 @@ TArray<FPCGPinProperties> UPCGExClustersProcessorSettings::OutputPinProperties()
 	return PinProperties;
 }
 
-bool UPCGExClustersProcessorSettings::SupportsEdgeSorting() const { return false; }
+bool UPCGExClustersProcessorSettings::SupportsEdgeSorting() const
+{
+	return false;
+}
 
-bool UPCGExClustersProcessorSettings::RequiresEdgeSorting() const { return true; }
+bool UPCGExClustersProcessorSettings::RequiresEdgeSorting() const
+{
+	return true;
+}
 
 #pragma endregion
 
 const TArray<FPCGExSortRuleConfig>* FPCGExClustersProcessorContext::GetEdgeSortingRules() const
 {
-	if (EdgeSortingRules.IsEmpty()) { return nullptr; }
+	if (EdgeSortingRules.IsEmpty())
+	{
+		return nullptr;
+	}
 	return &EdgeSortingRules;
 }
 
@@ -94,7 +131,10 @@ bool FPCGExClustersProcessorContext::AdvancePointsIO(const bool bCleanupKeys)
 
 	CurrentEdgesIndex = -1;
 
-	if (!FPCGExPointsProcessorContext::AdvancePointsIO(bCleanupKeys)) { return false; }
+	if (!FPCGExPointsProcessorContext::AdvancePointsIO(bCleanupKeys))
+	{
+		return false;
+	}
 
 	TaggedEdges = ClusterDataLibrary->GetAssociatedEdges(CurrentIO);
 
@@ -104,7 +144,10 @@ bool FPCGExClustersProcessorContext::AdvancePointsIO(const bool bCleanupKeys)
 		PCGExClusters::Helpers::SetClusterVtx(CurrentIO, OutId); // Update key
 		PCGExClusters::Helpers::MarkClusterEdges(TaggedEdges->Entries, OutId);
 	}
-	else { TaggedEdges = nullptr; }
+	else
+	{
+		TaggedEdges = nullptr;
+	}
 
 	if (!TaggedEdges && !bQuietMissingClusterPairElement)
 	{
@@ -116,7 +159,10 @@ bool FPCGExClustersProcessorContext::AdvancePointsIO(const bool bCleanupKeys)
 
 void FPCGExClustersProcessorContext::OutputBatches() const
 {
-	for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches) { Batch->Output(); }
+	for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+	{
+		Batch->Output();
+	}
 }
 
 TSharedPtr<PCGExClusterMT::IBatch> FPCGExClustersProcessorContext::CreateEdgeBatchInstance(const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges) const
@@ -126,7 +172,10 @@ TSharedPtr<PCGExClusterMT::IBatch> FPCGExClustersProcessorContext::CreateEdgeBat
 
 bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextState NextStateId)
 {
-	if (!bBatchProcessingEnabled) { return true; }
+	if (!bBatchProcessingEnabled)
+	{
+		return true;
+	}
 
 	if (bDaisyChainClusterBatches)
 	{
@@ -171,24 +220,36 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			if (!bSkipClusterBatchCompletionStep)
 			{
 				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
-				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches) { Batch->CompleteWork(); }
+				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+				{
+					Batch->CompleteWork();
+				}
 				return false;
 			}
 		}
 
 		PCGEX_ON_ASYNC_STATE_READY_INTERNAL(PCGExClusterMT::MTState_ClusterCompletingWork)
 		{
-			if (!bSkipClusterBatchCompletionStep) { ClusterProcessing_WorkComplete(); }
+			if (!bSkipClusterBatchCompletionStep)
+			{
+				ClusterProcessing_WorkComplete();
+			}
 
 			if (bDoClusterBatchWritingStep)
 			{
 				SetState(PCGExClusterMT::MTState_ClusterWriting);
 				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
-				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches) { Batch->Write(); }
+				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+				{
+					Batch->Write();
+				}
 				return false;
 			}
 			bBatchProcessingEnabled = false;
-			if (NextStateId == PCGExCommon::States::State_Done) { Done(); }
+			if (NextStateId == PCGExCommon::States::State_Done)
+			{
+				Done();
+			}
 			SetState(NextStateId);
 		}
 
@@ -197,7 +258,10 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			ClusterProcessing_WritingDone();
 
 			bBatchProcessingEnabled = false;
-			if (NextStateId == PCGExCommon::States::State_Done) { Done(); }
+			if (NextStateId == PCGExCommon::States::State_Done)
+			{
+				Done();
+			}
 			SetState(NextStateId);
 		}
 	}
@@ -210,7 +274,10 @@ bool FPCGExClustersProcessorContext::CompileGraphBuilders(const bool bOutputToCo
 	PCGEX_ON_STATE_INTERNAL(PCGExGraphs::States::State_ReadyToCompile)
 	{
 		SetState(PCGExGraphs::States::State_Compiling);
-		for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches) { Batch->CompileGraphBuilder(bOutputToContext); }
+		for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+		{
+			Batch->CompileGraphBuilder(bOutputToContext);
+		}
 	}
 
 	PCGEX_ON_ASYNC_STATE_READY_INTERNAL(PCGExGraphs::States::State_Compiling)
@@ -250,14 +317,26 @@ bool FPCGExClustersProcessorContext::StartProcessingClusters(FBatchProcessingVal
 			continue;
 		}
 
-		if (!ValidateEntries(TaggedEdges)) { continue; }
+		if (!ValidateEntries(TaggedEdges))
+		{
+			continue;
+		}
 
 		const TSharedPtr<PCGExClusterMT::IBatch> NewBatch = CreateEdgeBatchInstance(CurrentIO.ToSharedRef(), TaggedEdges->Entries);
 		InitBatch(NewBatch);
 
-		if (NewBatch->bRequiresWriteStep) { bDoClusterBatchWritingStep = true; }
-		if (NewBatch->bSkipCompletion) { bSkipClusterBatchCompletionStep = true; }
-		if (NewBatch->RequiresGraphBuilder()) { NewBatch->GraphBuilderDetails = GraphBuilderDetails; }
+		if (NewBatch->bRequiresWriteStep)
+		{
+			bDoClusterBatchWritingStep = true;
+		}
+		if (NewBatch->bSkipCompletion)
+		{
+			bSkipClusterBatchCompletionStep = true;
+		}
+		if (NewBatch->RequiresGraphBuilder())
+		{
+			NewBatch->GraphBuilderDetails = GraphBuilderDetails;
+		}
 		if (NewBatch->WantsHeuristics())
 		{
 			if (!bHasValidHeuristics)
@@ -272,7 +351,10 @@ bool FPCGExClustersProcessorContext::StartProcessingClusters(FBatchProcessingVal
 		Batches.Add(NewBatch);
 	}
 
-	if (Batches.IsEmpty()) { return false; }
+	if (Batches.IsEmpty())
+	{
+		return false;
+	}
 
 	bBatchProcessingEnabled = true;
 
@@ -312,7 +394,10 @@ void FPCGExClustersProcessorContext::AdvanceBatch(const PCGExCommon::ContextStat
 	{
 		CurrentBatch = nullptr;
 		bBatchProcessingEnabled = false;
-		if (NextStateId == PCGExCommon::States::State_Done) { Done(); }
+		if (NextStateId == PCGExCommon::States::State_Done)
+		{
+			Done();
+		}
 		SetState(NextStateId);
 	}
 	else
@@ -333,7 +418,10 @@ void FPCGExClustersProcessorContext::OutputPointsAndEdges() const
 int32 FPCGExClustersProcessorContext::GetClusterProcessorsNum() const
 {
 	int32 Num = 0;
-	for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches) { Num += Batch->GetNumProcessors(); }
+	for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+	{
+		Num += Batch->GetNumProcessors();
+	}
 	return Num;
 }
 
@@ -354,7 +442,10 @@ void FPCGExClustersProcessorElement::DisabledPassThroughData(FPCGContext* Contex
 
 bool FPCGExClustersProcessorElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ClustersProcessor)
 
@@ -400,7 +491,10 @@ void FPCGExClustersProcessorElement::InitializeData(FPCGExContext* InContext, co
 	PCGExData::EIOInit InitMode = Settings->GetEdgeOutputInitMode();
 	if (InitMode != PCGExData::EIOInit::NoInit)
 	{
-		for (const TSharedPtr<PCGExData::FPointIO>& IO : Context->MainEdges->Pairs) { IO->InitializeOutput(InitMode); }
+		for (const TSharedPtr<PCGExData::FPointIO>& IO : Context->MainEdges->Pairs)
+		{
+			IO->InitializeOutput(InitMode);
+		}
 	}
 }
 

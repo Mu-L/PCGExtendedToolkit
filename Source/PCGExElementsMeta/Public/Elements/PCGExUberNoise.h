@@ -6,11 +6,11 @@
 #include "CoreMinimal.h"
 #include "PCGExBlendingCommon.h"
 #include "PCGExFilterCommon.h"
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPointsProcessor.h"
-#include "UObject/Object.h"
 #include "Details/PCGExAttributesDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
+#include "Factories/PCGExFactories.h"
+#include "UObject/Object.h"
 #include "Utils/PCGExCurveLookup.h"
 
 #include "PCGExUberNoise.generated.h"
@@ -52,8 +52,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(UberNoise, "Uber Noise", "Generate noise or mutate existing attribute using noises.", FName(GetDisplayName()));
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Noise3D); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Noise3D);
+	}
 #endif
 
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourceFiltersLabel, "Filters", PCGExFactories::PointFilters, false)
@@ -63,7 +71,10 @@ protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;

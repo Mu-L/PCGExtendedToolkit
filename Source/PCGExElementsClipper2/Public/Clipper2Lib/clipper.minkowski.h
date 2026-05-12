@@ -35,7 +35,10 @@ namespace PCGExClipper2Lib
 				{
 					Path64 path2(pattern.size());
 					std::transform(pattern.cbegin(), pattern.cend(),
-					               path2.begin(), [p](const Point64& pt2) { return p + pt2; });
+					               path2.begin(), [p](const Point64& pt2)
+					               {
+						               return p + pt2;
+					               });
 					tmp.emplace_back(std::move(path2));
 				}
 			}
@@ -45,7 +48,10 @@ namespace PCGExClipper2Lib
 				{
 					Path64 path2(pattern.size());
 					std::transform(pattern.cbegin(), pattern.cend(),
-					               path2.begin(), [p](const Point64& pt2) { return p - pt2; });
+					               path2.begin(), [p](const Point64& pt2)
+					               {
+						               return p - pt2;
+					               });
 					tmp.emplace_back(std::move(path2));
 				}
 			}

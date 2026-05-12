@@ -3,13 +3,13 @@
 
 #include "Elements/PCGExStagingLoadProperties.h"
 
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
-#include "Core/PCGExAssetCollection.h"
-#include "Elements/Grammar/PCGSubdivisionBase.h"
-#include "Helpers/PCGExCollectionPropertySetWriter.h"
 #include "PCGExPropertyTypes.h"
 #include "PCGParamData.h"
+#include "Core/PCGExAssetCollection.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
+#include "Elements/Grammar/PCGSubdivisionBase.h"
+#include "Helpers/PCGExCollectionPropertySetWriter.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagingLoadPropertiesElement"
 #define PCGEX_NAMESPACE StagingLoadProperties
@@ -31,7 +31,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(StagingLoadProperties)
 
 bool FPCGExStagingLoadPropertiesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagingLoadProperties)
 
@@ -75,7 +78,10 @@ bool FPCGExStagingLoadPropertiesElement::Boot(FPCGExContext* InContext) const
 		PCGE_LOG(Warning, GraphAndLog, FTEXT("No property outputs configured."));
 	}
 
-	if (Settings->bWriteEntryTags) { PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->EntryTagsAttributeName) }
+	if (Settings->bWriteEntryTags)
+	{
+		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->EntryTagsAttributeName)
+	}
 
 	return true;
 }
@@ -89,7 +95,10 @@ bool FPCGExStagingLoadPropertiesElement::AdvanceWork(FPCGExContext* InContext, c
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -113,12 +122,18 @@ namespace PCGExStagingLoadProperties
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
-		if (!EntryHashGetter) { return false; }
+		if (!EntryHashGetter)
+		{
+			return false;
+		}
 
 		// Step 1: Collect unique entry hashes (O(N) scan, but enables O(1) lookups later)
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
@@ -144,7 +159,10 @@ namespace PCGExStagingLoadProperties
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const uint64 Hash = EntryHashGetter->Read(Index);
 			if (Hash != 0)
@@ -163,13 +181,19 @@ namespace PCGExStagingLoadProperties
 		SearchOrder.Reserve(Context->CollectionPickUnpacker->GetCollections().Num());
 		for (const auto& CollectionPair : Context->CollectionPickUnpacker->GetCollections())
 		{
-			if (CollectionPair.Value) { SearchOrder.Add(CollectionPair.Value); }
+			if (CollectionPair.Value)
+			{
+				SearchOrder.Add(CollectionPair.Value);
+			}
 		}
 
 		// For each configured property output
 		for (const FPCGExPropertyOutputConfig& Config : Context->PropertyOutputSettings.Configs)
 		{
-			if (!Config.IsValid()) { continue; }
+			if (!Config.IsValid())
+			{
+				continue;
+			}
 
 			const FName OutputName = Config.GetEffectiveOutputName();
 			const FName PropName = Config.PropertyName;
@@ -212,7 +236,10 @@ namespace PCGExStagingLoadProperties
 			for (const uint64 Hash : UniqueEntryHashes)
 			{
 				FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
-				if (!Result.IsValid()) { continue; }
+				if (!Result.IsValid())
+				{
+					continue;
+				}
 
 				if (const FInstancedStruct* Source = PCGExCollections::ResolveEntrySourceProperty(Result.Entry, Result.Host, PropName))
 				{
@@ -231,7 +258,10 @@ namespace PCGExStagingLoadProperties
 
 		EntryTagsWriter = PointDataFacade->GetWritable<FString>(
 			Settings->EntryTagsAttributeName, FString(), false, PCGExData::EBufferInit::New);
-		if (!EntryTagsWriter) { return; }
+		if (!EntryTagsWriter)
+		{
+			return;
+		}
 
 		const FString& Separator = Settings->EntryTagsSeparator;
 		EntryTagsByHash.Reserve(UniqueEntryHashes.Num());
@@ -240,12 +270,18 @@ namespace PCGExStagingLoadProperties
 		for (const uint64 Hash : UniqueEntryHashes)
 		{
 			FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
-			if (!Result.IsValid() || !Result.Entry || Result.Entry->Tags.IsEmpty()) { continue; }
+			if (!Result.IsValid() || !Result.Entry || Result.Entry->Tags.IsEmpty())
+			{
+				continue;
+			}
 
 			FString Joined;
 			for (const FName& Tag : Result.Entry->Tags)
 			{
-				if (!Joined.IsEmpty()) { Joined += Separator; }
+				if (!Joined.IsEmpty())
+				{
+					Joined += Separator;
+				}
 				Joined += Tag.ToString();
 			}
 			EntryTagsByHash.Add(Hash, MoveTemp(Joined));
@@ -269,7 +305,10 @@ namespace PCGExStagingLoadProperties
 
 #undef PCGEX_LOAD_PROP_FIELD_INIT
 
-		if (!HasAnyEntryFieldWriter()) { return; }
+		if (!HasAnyEntryFieldWriter())
+		{
+			return;
+		}
 
 		// Determine whether any grammar field is enabled to decide whether FixModuleInfos must run.
 		bool bAnyGrammarEnabled = false;
@@ -281,7 +320,10 @@ namespace PCGExStagingLoadProperties
 		for (const uint64 Hash : UniqueEntryHashes)
 		{
 			FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
-			if (!Result.IsValid() || !Result.Entry) { continue; }
+			if (!Result.IsValid() || !Result.Entry)
+			{
+				continue;
+			}
 
 			const FPCGExAssetCollectionEntry* Entry = Result.Entry;
 			const UPCGExAssetCollection* Host = Result.Host;
@@ -331,7 +373,10 @@ namespace PCGExStagingLoadProperties
 		// Step 2: Initialize writers and pre-resolve properties for all unique hashes
 		BuildPropertyCaches();
 
-		if (Settings->bWriteEntryTags) { BuildEntryTagsCache(); }
+		if (Settings->bWriteEntryTags)
+		{
+			BuildEntryTagsCache();
+		}
 
 		BuildEntryFieldsCache();
 
@@ -343,7 +388,7 @@ namespace PCGExStagingLoadProperties
 		}
 
 #define PCGEX_LOAD_PROP_FIELD_WRITE(_NAME, _TYPE, _DEFAULT, _GETTER) if (_NAME##Writer) { if (const _TYPE* Cached = _NAME##ByHash.Find(Hash)) { _NAME##Writer->SetValue(i, *Cached); } }
-				
+
 		PCGEX_PARALLEL_FOR(
 			PointDataFacade->GetNum(),
 			if (!PointFilterCache[i]) { return; }
@@ -368,13 +413,13 @@ namespace PCGExStagingLoadProperties
 			EntryTagsWriter->SetValue(i, *Joined);
 			}
 			}
-			
+
 			PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
 			PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
-		)
+			)
 
 #undef PCGEX_LOAD_PROP_FIELD_WRITE
-		
+
 		PointDataFacade->WriteFastest(TaskManager);
 	}
 }

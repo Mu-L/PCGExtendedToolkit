@@ -4,10 +4,10 @@
 #include "Elements/PCGExExtrudeTensors.h"
 
 #include "Containers/PCGExScopedContainers.h"
-#include "Data/PCGExData.h"
-#include "Data/PCGExDataTags.h"
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExTensorFactoryProvider.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Sorting/PCGExPointSorter.h"
@@ -80,8 +80,14 @@ TArray<FPCGPinProperties> UPCGExExtrudeTensorsSettings::InputPinProperties() con
 	PCGEX_PIN_FACTORIES(PCGExTensor::SourceTensorsLabel, "Tensors", Required, FPCGExDataTypeInfoTensor::AsId())
 	PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceStopConditionLabel, "Extruded points will be tested against those filters. If a filter returns true, the extrusion point is considered 'out-of-bounds'.", Normal)
 
-	if (bDoExternalPathIntersections) { PCGEX_PIN_POINTS(PCGExPaths::Labels::SourcePathsLabel, "Paths that will be checked for intersections while extruding.", Normal) }
-	else { PCGEX_PIN_POINTS(PCGExPaths::Labels::SourcePathsLabel, "(This is only there to preserve connections, enable it in the settings.)", Advanced) }
+	if (bDoExternalPathIntersections)
+	{
+		PCGEX_PIN_POINTS(PCGExPaths::Labels::SourcePathsLabel, "Paths that will be checked for intersections while extruding.", Normal)
+	}
+	else
+	{
+		PCGEX_PIN_POINTS(PCGExPaths::Labels::SourcePathsLabel, "(This is only there to preserve connections, enable it in the settings.)", Advanced)
+	}
 
 	PCGExSorting::DeclareSortingRulesInputs(PinProperties, bDoSelfPathIntersections ? EPCGPinStatus::Normal : EPCGPinStatus::Advanced);
 
@@ -97,8 +103,15 @@ bool UPCGExExtrudeTensorsSettings::GetSortingRules(FPCGExContext* InContext, TAr
 PCGEX_INITIALIZE_ELEMENT(ExtrudeTensors)
 PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(ExtrudeTensors)
 
-FName UPCGExExtrudeTensorsSettings::GetMainInputPin() const { return PCGExCommon::Labels::SourceSeedsLabel; }
-FName UPCGExExtrudeTensorsSettings::GetMainOutputPin() const { return PCGExPaths::Labels::OutputPathsLabel; }
+FName UPCGExExtrudeTensorsSettings::GetMainInputPin() const
+{
+	return PCGExCommon::Labels::SourceSeedsLabel;
+}
+
+FName UPCGExExtrudeTensorsSettings::GetMainOutputPin() const
+{
+	return PCGExPaths::Labels::OutputPathsLabel;
+}
 
 //
 // Element Implementation
@@ -106,7 +119,10 @@ FName UPCGExExtrudeTensorsSettings::GetMainOutputPin() const { return PCGExPaths
 
 bool FPCGExExtrudeTensorsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ExtrudeTensors)
 
@@ -138,7 +154,10 @@ bool FPCGExExtrudeTensorsElement::AdvanceWork(FPCGExContext* InContext, const UP
 		Context->AddConsumableAttributeName(Settings->IterationsAttribute);
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bPrefetchData = true;
@@ -183,9 +202,15 @@ namespace PCGExExtrudeTensors
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
-		if (Sorter && !Sorter->Init(Context)) { Sorter.Reset(); }
+		if (Sorter && !Sorter->Init(Context))
+		{
+			Sorter.Reset();
+		}
 
 		StaticPaths = MakeShared<TArray<TSharedPtr<PCGExPaths::FPath>>>();
 
@@ -193,7 +218,10 @@ namespace PCGExExtrudeTensors
 		if (!Context->StopFilterFactories.IsEmpty())
 		{
 			StopFilters = MakeShared<PCGExPointFilter::FManager>(PointDataFacade);
-			if (!StopFilters->Init(Context, Context->StopFilterFactories)) { StopFilters.Reset(); }
+			if (!StopFilters->Init(Context, Context->StopFilterFactories))
+			{
+				StopFilters.Reset();
+			}
 		}
 
 		// Initialize config using node-specific settings
@@ -201,30 +229,51 @@ namespace PCGExExtrudeTensors
 
 		// Initialize tensor handler
 		TensorsHandler = MakeShared<PCGExTensor::FTensorsHandler>(Settings->TensorHandlerDetails);
-		if (!TensorsHandler->Init(Context, Context->TensorFactories, PointDataFacade)) { return false; }
+		if (!TensorsHandler->Init(Context, Context->TensorFactories, PointDataFacade))
+		{
+			return false;
+		}
 
 		AttributesToPathTags = Settings->AttributesToPathTags;
-		if (!AttributesToPathTags.Init(Context, PointDataFacade)) { return false; }
+		if (!AttributesToPathTags.Init(Context, PointDataFacade))
+		{
+			return false;
+		}
 
 		// Initialize per-point settings
 		PerPointIterations = Settings->GetValueSettingIterations();
-		if (!PerPointIterations->Init(PointDataFacade, false, true)) { return false; }
+		if (!PerPointIterations->Init(PointDataFacade, false, true))
+		{
+			return false;
+		}
 		if (!PerPointIterations->IsConstant())
 		{
-			if (Settings->bUseMaxFromPoints) { RemainingIterations = FMath::Max(RemainingIterations, PerPointIterations->Max()); }
+			if (Settings->bUseMaxFromPoints)
+			{
+				RemainingIterations = FMath::Max(RemainingIterations, PerPointIterations->Max());
+			}
 		}
-		else { RemainingIterations = Settings->Iterations; }
+		else
+		{
+			RemainingIterations = Settings->Iterations;
+		}
 
 		if (Settings->bUseMaxLength)
 		{
 			MaxLength = Settings->GetValueSettingMaxLength();
-			if (!MaxLength->Init(PointDataFacade, false)) { return false; }
+			if (!MaxLength->Init(PointDataFacade, false))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->bUseMaxPointsCount)
 		{
 			MaxPointsCount = Settings->GetValueSettingMaxPointsCount();
-			if (!MaxPointsCount->Init(PointDataFacade, false)) { return false; }
+			if (!MaxPointsCount->Init(PointDataFacade, false))
+			{
+				return false;
+			}
 		}
 
 		const int32 NumPoints = PointDataFacade->GetNum();
@@ -290,18 +339,27 @@ namespace PCGExExtrudeTensors
 	void FProcessor::InitExtrusionFromSeed(const int32 InSeedIndex)
 	{
 		const int32 Iterations = PerPointIterations->Read(InSeedIndex);
-		if (Iterations < 1) { return; }
+		if (Iterations < 1)
+		{
+			return;
+		}
 
 		bool bIsStopped = false;
 		if (StopFilters)
 		{
 			const PCGExData::FProxyPoint ProxyPoint(PointDataFacade->Source->GetInPoint(InSeedIndex));
 			bIsStopped = StopFilters->Test(ProxyPoint);
-			if (Settings->bIgnoreStoppedSeeds && bIsStopped) { return; }
+			if (Settings->bIgnoreStoppedSeeds && bIsStopped)
+			{
+				return;
+			}
 		}
 
 		TSharedPtr<FExtrusion> NewExtrusion = CreateExtrusion(InSeedIndex, Iterations);
-		if (!NewExtrusion) { return; }
+		if (!NewExtrusion)
+		{
+			return;
+		}
 
 		// If starting stopped, stay in probing state
 		if (bIsStopped)
@@ -309,18 +367,30 @@ namespace PCGExExtrudeTensors
 			NewExtrusion->State = EExtrusionState::Probing;
 		}
 
-		if (Settings->bUseMaxLength) { NewExtrusion->MaxLength = MaxLength->Read(InSeedIndex); }
-		if (Settings->bUseMaxPointsCount) { NewExtrusion->MaxPointCount = MaxPointsCount->Read(InSeedIndex); }
+		if (Settings->bUseMaxLength)
+		{
+			NewExtrusion->MaxLength = MaxLength->Read(InSeedIndex);
+		}
+		if (Settings->bUseMaxPointsCount)
+		{
+			NewExtrusion->MaxPointCount = MaxPointsCount->Read(InSeedIndex);
+		}
 
 		ExtrusionQueue[InSeedIndex] = NewExtrusion;
 	}
 
 	TSharedPtr<FExtrusion> FProcessor::InitExtrusionFromExtrusion(const TSharedRef<FExtrusion>& InExtrusion)
 	{
-		if (!Settings->bAllowChildExtrusions) { return nullptr; }
+		if (!Settings->bAllowChildExtrusions)
+		{
+			return nullptr;
+		}
 
 		TSharedPtr<FExtrusion> NewExtrusion = CreateExtrusion(InExtrusion->SeedIndex, InExtrusion->RemainingIterations);
-		if (!NewExtrusion) { return nullptr; }
+		if (!NewExtrusion)
+		{
+			return nullptr;
+		}
 
 		NewExtrusion->SetHead(InExtrusion->Head);
 		NewExtrusion->ParentExtrusion = InExtrusion;
@@ -336,15 +406,27 @@ namespace PCGExExtrudeTensors
 	TSharedPtr<FExtrusion> FProcessor::CreateExtrusion(const int32 InSeedIndex, const int32 InMaxIterations)
 	{
 		TSharedPtr<PCGExData::FPointIO> NewIO = Context->MainPoints->Emplace_GetRef(PointDataFacade->Source->GetIn(), PCGExData::EIOInit::NoInit);
-		if (!NewIO) { return nullptr; }
+		if (!NewIO)
+		{
+			return nullptr;
+		}
 
 		PCGEX_MAKE_SHARED(Facade, PCGExData::FFacade, NewIO.ToSharedRef());
-		if (!Facade->Source->InitializeOutput(PCGExData::EIOInit::New)) { return nullptr; }
+		if (!Facade->Source->InitializeOutput(PCGExData::EIOInit::New))
+		{
+			return nullptr;
+		}
 
 		TSharedPtr<FExtrusion> NewExtrusion = MakeShared<FExtrusion>(InSeedIndex, Facade.ToSharedRef(), InMaxIterations, Context->ExtrusionConfig);
 
-		if (Settings->bUseMaxLength) { NewExtrusion->MaxLength = MaxLength->Read(InSeedIndex); }
-		if (Settings->bUseMaxPointsCount) { NewExtrusion->MaxPointCount = MaxPointsCount->Read(InSeedIndex); }
+		if (Settings->bUseMaxLength)
+		{
+			NewExtrusion->MaxLength = MaxLength->Read(InSeedIndex);
+		}
+		if (Settings->bUseMaxPointsCount)
+		{
+			NewExtrusion->MaxPointCount = MaxPointsCount->Read(InSeedIndex);
+		}
 
 		NewExtrusion->PointDataFacade->Source->IOIndex = BatchIndex * 1000000 + InSeedIndex;
 		AttributesToPathTags.Tag(PointDataFacade->GetInPoint(InSeedIndex), Facade->Source);
@@ -372,7 +454,10 @@ namespace PCGExExtrudeTensors
 				{
 					ExtrusionQueue.Sort([S = Sorter](const TSharedPtr<FExtrusion>& EA, const TSharedPtr<FExtrusion>& EB)
 					{
-						if (EA->Metrics.Length == EB->Metrics.Length) { return S->Sort(EA->SeedIndex, EB->SeedIndex); }
+						if (EA->Metrics.Length == EB->Metrics.Length)
+						{
+							return S->Sort(EA->SeedIndex, EB->SeedIndex);
+						}
 						return EA->Metrics.Length > EB->Metrics.Length;
 					});
 				}
@@ -380,7 +465,10 @@ namespace PCGExExtrudeTensors
 				{
 					ExtrusionQueue.Sort([S = Sorter](const TSharedPtr<FExtrusion>& EA, const TSharedPtr<FExtrusion>& EB)
 					{
-						if (EA->Metrics.Length == EB->Metrics.Length) { return S->Sort(EA->SeedIndex, EB->SeedIndex); }
+						if (EA->Metrics.Length == EB->Metrics.Length)
+						{
+							return S->Sort(EA->SeedIndex, EB->SeedIndex);
+						}
 						return EA->Metrics.Length < EB->Metrics.Length;
 					});
 				}
@@ -416,19 +504,26 @@ namespace PCGExExtrudeTensors
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::ExtrudeTensors::ProcessPoints);
 
 		PointDataFacade->Fetch(Scope);
-		PCGEX_SCOPE_LOOP(Index) { InitExtrusionFromSeed(Index); }
+		PCGEX_SCOPE_LOOP(Index)
+		{
+			InitExtrusionFromSeed(Index);
+		}
 	}
 
 	void FProcessor::OnPointsProcessingComplete()
 	{
-		if (UpdateExtrusionQueue()) { StartParallelLoopForRange(ExtrusionQueue.Num(), 32); }
+		if (UpdateExtrusionQueue())
+		{
+			StartParallelLoopForRange(ExtrusionQueue.Num(), 32);
+		}
 	}
 
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
 	{
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (TSharedPtr<FExtrusion> Extrusion = ExtrusionQueue[Index]; Extrusion && !Extrusion->Advance())
+			if (TSharedPtr<FExtrusion> Extrusion = ExtrusionQueue[Index];
+				Extrusion && !Extrusion->Advance())
 			{
 				Extrusion->Complete();
 				CompletedExtrusions->Get(Scope)->Add(Extrusion);
@@ -451,7 +546,10 @@ namespace PCGExExtrudeTensors
 			{
 				TSharedPtr<FExtrusion> E = ExtrusionQueue[i];
 
-				if (E->AdvancedOnly() || !E->bIsExtruding) { continue; }
+				if (E->AdvancedOnly() || !E->bIsExtruding)
+				{
+					continue;
+				}
 
 				const PCGExMath::FSegment HeadSegment = E->GetHeadSegment();
 				PCGExMath::FClosestPosition Crossing(HeadSegment.A);
@@ -461,8 +559,14 @@ namespace PCGExExtrudeTensors
 				for (int32 j = 0; j < ExtrusionQueue.Num(); j++)
 				{
 					const TSharedPtr<FExtrusion> OE = ExtrusionQueue[j];
-					if (!OE->bIsExtruding) { continue; }
-					if (!OE->Bounds.Intersect(HeadSegment.Bounds)) { continue; }
+					if (!OE->bIsExtruding)
+					{
+						continue;
+					}
+					if (!OE->Bounds.Intersect(HeadSegment.Bounds))
+					{
+						continue;
+					}
 
 					const int32 TruncateSearch = i == j ? 2 : 0;
 					bool bIsLastSegment = false;
@@ -486,7 +590,10 @@ namespace PCGExExtrudeTensors
 						if (PCGExMath::FClosestPosition LocalCrossing = OE->FindCrossing(HeadSegment, bIsLastSegment, PreMerge, TruncateSearch))
 						{
 							// Crossing found
-							if (bMergeFirst) { Merge.Update(PreMerge); }
+							if (bMergeFirst)
+							{
+								Merge.Update(PreMerge);
+							}
 							Crossing.Update(LocalCrossing, j);
 						}
 						else
@@ -526,17 +633,24 @@ namespace PCGExExtrudeTensors
 			}
 		}
 
-		if (UpdateExtrusionQueue()) { StartParallelLoopForRange(ExtrusionQueue.Num(), 32); }
+		if (UpdateExtrusionQueue())
+		{
+			StartParallelLoopForRange(ExtrusionQueue.Num(), 32);
+		}
 	}
 
 	bool FProcessor::UpdateExtrusionQueue()
 	{
-		if (RemainingIterations <= 0) { return false; }
+		if (RemainingIterations <= 0)
+		{
+			return false;
+		}
 
 		int32 WriteIndex = 0;
 		for (int32 i = 0; i < ExtrusionQueue.Num(); i++)
 		{
-			if (TSharedPtr<FExtrusion> E = ExtrusionQueue[i]; E && E->IsActive())
+			if (TSharedPtr<FExtrusion> E = ExtrusionQueue[i];
+				E && E->IsActive())
 			{
 				ExtrusionQueue[WriteIndex++] = E;
 			}
@@ -551,7 +665,10 @@ namespace PCGExExtrudeTensors
 			NewExtrusions.Reset();
 		}
 
-		if (ExtrusionQueue.IsEmpty()) { return false; }
+		if (ExtrusionQueue.IsEmpty())
+		{
+			return false;
+		}
 
 		// Convert completed paths to static collision constraints
 		if (Settings->bDoSelfPathIntersections && CompletedExtrusions)
@@ -563,7 +680,10 @@ namespace PCGExExtrudeTensors
 				{
 					E->Cleanup();
 
-					if (!E->IsValidPath()) { continue; }
+					if (!E->IsValidPath())
+					{
+						continue;
+					}
 
 					TSharedPtr<PCGExPaths::FPath> StaticPath = MakeShared<PCGExPaths::FPath>(E->PointDataFacade->GetOut(), Settings->ExternalPathIntersections.Tolerance);
 					StaticPath->BuildEdgeOctree();
@@ -581,7 +701,10 @@ namespace PCGExExtrudeTensors
 	{
 		for (const TSharedPtr<FExtrusion>& E : ExtrusionQueue)
 		{
-			if (E) { E->Complete(); }
+			if (E)
+			{
+				E->Complete();
+			}
 		}
 		CompletedExtrusions.Reset();
 		ExtrusionQueue.Empty();

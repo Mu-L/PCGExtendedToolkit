@@ -114,12 +114,12 @@ the four vertices that define the two segments that are intersecting.
 #ifndef PCGEX_CLIPPER_H_EXPORT
 #define PCGEX_CLIPPER_H_EXPORT
 
+#include <cstdlib>
 #include "Clipper2Lib/clipper.core.h"
 #include "Clipper2Lib/clipper.engine.h"
 #include "Clipper2Lib/clipper.offset.h"
 #include "Clipper2Lib/clipper.rectclip.h"
 #include "Clipper2Lib/clipper.triangulation.h"
-#include <cstdlib>
 
 #include "clipper.minkowski.h"
 

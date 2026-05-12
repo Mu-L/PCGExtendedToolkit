@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExPointFilter.h"
+#include "Factories/PCGExFactoryProvider.h"
+#include "UObject/Object.h"
 
 #include "PCGExFilterFactoryProvider.generated.h"
 
@@ -42,8 +42,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AbstractFilterFactory, "Filter : Abstract", "Creates an abstract filter definition.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Filter); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Filter);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
 #endif
 	//~End UPCGSettings
 
@@ -70,10 +78,16 @@ public:
 
 protected:
 #if WITH_EDITOR
-	virtual bool ShowMissingDataPolicy_Internal() const { return false; }
+	virtual bool ShowMissingDataPolicy_Internal() const
+	{
+		return false;
+	}
 
 	UFUNCTION()
-	bool ShowMissingDataPolicy() const { return ShowMissingDataPolicy_Internal(); }
+	bool ShowMissingDataPolicy() const
+	{
+		return ShowMissingDataPolicy_Internal();
+	}
 #endif
 };
 

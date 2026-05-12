@@ -30,13 +30,19 @@ TArray<FPCGPinProperties> UPCGExBlendPathSettings::InputPinProperties() const
 
 PCGEX_INITIALIZE_ELEMENT(BlendPath)
 
-PCGExData::EIOInit UPCGExBlendPathSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBlendPathSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BlendPath)
 
 bool FPCGExBlendPathElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BlendPath)
 
@@ -92,14 +98,20 @@ namespace PCGExBlendPath
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		if (Settings->BlendOver == EPCGExBlendOver::Fixed)
 		{
 			LerpGetter = Settings->GetValueSettingLerp();
-			if (!LerpGetter->Init(PointDataFacade)) { return false; }
+			if (!LerpGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		MaxIndex = PointDataFacade->GetNum() - 1;
@@ -110,7 +122,10 @@ namespace PCGExBlendPath
 		BlendOpsManager = MakeShared<PCGExBlending::FBlendOpsManager>(PointDataFacade);
 		BlendOpsManager->SetSources(PointDataFacade); // We want operands A & B to be the vtx here
 
-		if (!BlendOpsManager->Init(Context, Context->BlendingFactories)) { return false; }
+		if (!BlendOpsManager->Init(Context, Context->BlendingFactories))
+		{
+			return false;
+		}
 
 		if (Settings->BlendOver == EPCGExBlendOver::Distance)
 		{
@@ -118,7 +133,10 @@ namespace PCGExBlendPath
 			PCGExArrayHelpers::InitArray(Length, PointDataFacade->GetNum());
 
 			const TConstPCGValueRange<FTransform> Transforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
-			for (int i = 0; i < PointDataFacade->GetNum(); i++) { Length[i] = Metrics.Add(Transforms[i].GetLocation()); }
+			for (int i = 0; i < PointDataFacade->GetNum(); i++)
+			{
+				Length[i] = Metrics.Add(Transforms[i].GetLocation());
+			}
 		}
 
 		StartParallelLoopForPoints();
@@ -161,7 +179,10 @@ namespace PCGExBlendPath
 
 	void FProcessor::CompleteWork()
 	{
-		if (BlendOpsManager) { BlendOpsManager->Cleanup(Context); }
+		if (BlendOpsManager)
+		{
+			BlendOpsManager->Cleanup(Context);
+		}
 		PointDataFacade->WriteFastest(TaskManager);
 	}
 }

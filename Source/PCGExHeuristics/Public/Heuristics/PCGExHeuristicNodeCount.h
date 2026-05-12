@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "PCGExHeuristicDistance.h"
+#include "UObject/Object.h"
 #include "PCGExHeuristicNodeCount.generated.h"
 
 USTRUCT(BlueprintType)
@@ -25,7 +25,10 @@ struct FPCGExHeuristicConfigLeastNodes : public FPCGExHeuristicConfigBase
 class FPCGExHeuristicNodeCount : public FPCGExHeuristicDistance
 {
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override { return EPCGExHeuristicCategory::FullyStatic; }
+	virtual EPCGExHeuristicCategory GetCategory() const override
+	{
+		return EPCGExHeuristicCategory::FullyStatic;
+	}
 
 	virtual double GetGlobalScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal) const override;
 

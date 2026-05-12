@@ -3,11 +3,11 @@
 
 #include "Elements/Utils/PCGExMergePoints.h"
 
+#include "PCGExMatchingCommon.h"
 #include "Data/PCGExDataTags.h"
 #include "Details/PCGExMatchingDetails.h"
 #include "Helpers/PCGExDataMatcher.h"
 #include "Helpers/PCGExMatchingHelpers.h"
-#include "PCGExMatchingCommon.h"
 #include "Sorting/PCGExPointSorter.h"
 #include "Utils/PCGExPointIOMerger.h"
 
@@ -21,12 +21,18 @@ namespace PCGExMergePoints
 
 void FPCGExMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails)
 {
-	if (IOs.IsEmpty()) { return; }
+	if (IOs.IsEmpty())
+	{
+		return;
+	}
 
 	FPCGExMergePointsContext* Ctx = TaskManager->GetContext<FPCGExMergePointsContext>();
 	const TSharedPtr<PCGExData::FPointIO> CompositeIO = Ctx->MainPoints->Emplace_GetRef(IOs[0], PCGExData::EIOInit::New);
 
-	if (!CompositeIO) { return; }
+	if (!CompositeIO)
+	{
+		return;
+	}
 
 	CompositeDataFacade = MakeShared<PCGExData::FFacade>(CompositeIO.ToSharedRef());
 
@@ -40,7 +46,10 @@ void FPCGExMergeList::Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager
 	CompositeDataFacade->WriteFastest(TaskManager);
 }
 
-FPCGElementPtr UPCGExMergePointsSettings::CreateElement() const { return MakeShared<FPCGExMergePointsElement>(); }
+FPCGElementPtr UPCGExMergePointsSettings::CreateElement() const
+{
+	return MakeShared<FPCGExMergePointsElement>();
+}
 
 TArray<FPCGPinProperties> UPCGExMergePointsSettings::InputPinProperties() const
 {
@@ -60,7 +69,10 @@ TArray<FPCGPinProperties> UPCGExMergePointsSettings::OutputPinProperties() const
 
 bool FPCGExMergePointsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(MergePoints)
 
@@ -85,7 +97,10 @@ bool FPCGExMergePointsElement::Boot(FPCGExContext* InContext) const
 			return false;
 		}
 
-		for (int i = 0; i < Facades.Num(); i++) { Facades[i]->Idx = i; }
+		for (int i = 0; i < Facades.Num(); i++)
+		{
+			Facades[i]->Idx = i;
+		}
 		Facades.Sort([&](const TSharedPtr<PCGExData::FFacade>& A, const TSharedPtr<PCGExData::FFacade>& B)
 		{
 			return Sorter->SortData(A->Idx, B->Idx);
@@ -109,7 +124,10 @@ bool FPCGExMergePointsElement::Boot(FPCGExContext* InContext) const
 	{
 		// No matching rules or disabled - treat all as one group
 		Context->Partitions.SetNum(1);
-		for (int32 i = 0; i < Facades.Num(); i++) { Context->Partitions[0].Add(i); }
+		for (int32 i = 0; i < Facades.Num(); i++)
+		{
+			Context->Partitions[0].Add(i);
+		}
 	}
 	else
 	{
@@ -135,7 +153,10 @@ bool FPCGExMergePointsElement::Boot(FPCGExContext* InContext) const
 	}
 
 	// Remove empty partitions
-	Context->Partitions.RemoveAll([](const TArray<int32>& Partition) { return Partition.IsEmpty(); });
+	Context->Partitions.RemoveAll([](const TArray<int32>& Partition)
+	{
+		return Partition.IsEmpty();
+	});
 
 	// Allow execution if we have partitions to merge OR unmatched items to forward
 	if (Context->Partitions.IsEmpty() && Context->UnmatchedIndices.IsEmpty())
@@ -166,7 +187,10 @@ bool FPCGExMergePointsElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 
 		for (const TArray<int32>& Partition : Context->Partitions)
 		{
-			if (Partition.IsEmpty()) { continue; }
+			if (Partition.IsEmpty())
+			{
+				continue;
+			}
 
 			// Single item partitions just forward (these are not unmatched, they were already processed above)
 			if (Partition.Num() == 1)
@@ -216,7 +240,10 @@ bool FPCGExMergePointsElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 		{
 			TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
 			PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
-			for (const TSharedPtr<FPCGExMergeList>& List : Context->MergeLists) { List->Write(TaskManager); }
+			for (const TSharedPtr<FPCGExMergeList>& List : Context->MergeLists)
+			{
+				List->Write(TaskManager);
+			}
 		}
 	}
 

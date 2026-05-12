@@ -8,16 +8,28 @@
 
 PCGEX_CREATE_PROBE_FACTORY(GradientFlow, {}, {})
 
-bool FPCGExProbeGradientFlow::IsGlobalProbe() const { return true; }
+bool FPCGExProbeGradientFlow::IsGlobalProbe() const
+{
+	return true;
+}
 
-bool FPCGExProbeGradientFlow::WantsOctree() const { return true; }
+bool FPCGExProbeGradientFlow::WantsOctree() const
+{
+	return true;
+}
 
 bool FPCGExProbeGradientFlow::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	FlowBuffer = PrimaryDataFacade->GetBroadcaster<double>(Config.FlowAttribute, true, false);
-	if (!FlowBuffer) { return false; }
+	if (!FlowBuffer)
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -26,7 +38,10 @@ void FPCGExProbeGradientFlow::ProcessAll(TSet<uint64>& OutEdges) const
 {
 	const TArray<FVector>& Positions = *WorkingPositions;
 	const int32 NumPoints = Positions.Num();
-	if (NumPoints < 2) { return; }
+	if (NumPoints < 2)
+	{
+		return;
+	}
 
 	const TArray<int8> CanGenerateRef = *CanGenerate;
 	const TArray<int8> AcceptConnectionsRef = *AcceptConnections;
@@ -39,7 +54,10 @@ void FPCGExProbeGradientFlow::ProcessAll(TSet<uint64>& OutEdges) const
 
 	for (int32 i = 0; i < NumPoints; ++i)
 	{
-		if (!CanGenerateRef[i]) { continue; }
+		if (!CanGenerateRef[i])
+		{
+			continue;
+		}
 
 		int32 BestUphill = INDEX_NONE;
 		int32 BestDownhill = INDEX_NONE;
@@ -56,11 +74,17 @@ void FPCGExProbeGradientFlow::ProcessAll(TSet<uint64>& OutEdges) const
 			[&](const PCGExOctree::FItem& Other)
 			{
 				const int32 OtherIndex = Other.Index;
-				if (i == OtherIndex || !AcceptConnectionsRef[OtherIndex]) { return; }
+				if (i == OtherIndex || !AcceptConnectionsRef[OtherIndex])
+				{
+					return;
+				}
 
 				const double DistSq = FVector::DistSquared(Pos, Positions[OtherIndex]);
 
-				if (DistSq > MaxDistSq) { return; }
+				if (DistSq > MaxDistSq)
+				{
+					return;
+				}
 
 				const double Dist = FMath::Sqrt(DistSq);
 				const double ValueDiff = FlowBuffer->Read(OtherIndex) - CurrentFlow;
@@ -91,8 +115,14 @@ void FPCGExProbeGradientFlow::ProcessAll(TSet<uint64>& OutEdges) const
 
 		if (Config.bSteepestOnly)
 		{
-			if (BestUphill != INDEX_NONE) { OutEdges.Add(PCGEx::H64U(i, BestUphill)); }
-			if (!Config.bUphillOnly && BestDownhill != INDEX_NONE) { OutEdges.Add(PCGEx::H64U(i, BestDownhill)); }
+			if (BestUphill != INDEX_NONE)
+			{
+				OutEdges.Add(PCGEx::H64U(i, BestUphill));
+			}
+			if (!Config.bUphillOnly && BestDownhill != INDEX_NONE)
+			{
+				OutEdges.Add(PCGEx::H64U(i, BestDownhill));
+			}
 		}
 	}
 }

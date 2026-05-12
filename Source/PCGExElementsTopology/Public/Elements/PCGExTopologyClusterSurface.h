@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Clusters/Artifacts/PCGExCell.h"
 #include "Core/PCGExClusterMT.h"
 #include "Core/PCGExClustersProcessor.h"
 #include "Core/PCGExTopologyClustersProcessor.h"
-#include "Clusters/Artifacts/PCGExCell.h"
 
 #include "PCGExTopologyClusterSurface.generated.h"
 
@@ -42,7 +42,10 @@ class FPCGExTopologyClusterSurfaceElement final : public FPCGExTopologyClustersP
 {
 public:
 	// Generates artifacts
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(TopologyClusterSurface)

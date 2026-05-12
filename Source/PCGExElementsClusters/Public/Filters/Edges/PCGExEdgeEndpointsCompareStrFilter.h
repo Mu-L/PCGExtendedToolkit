@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExEdgeEndpointsCompareStrFilter.generated.h"
 
@@ -56,7 +56,8 @@ namespace PCGExEdgeEndpointsCompareStr
 	{
 	public:
 		explicit FFilter(const UPCGExEdgeEndpointsCompareStrFilterFactory* InFactory)
-			: IEdgeFilter(InFactory), TypedFilterFactory(InFactory)
+			: IEdgeFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 
@@ -82,7 +83,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(EdgeEndpointsCompareStrFilterFactory, "Edge Filter : Endpoints Compare (String)", "Compare the value of an attribute on each of the edge endpoint.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster);
+	}
 #endif
 	//~End UPCGSettings
 

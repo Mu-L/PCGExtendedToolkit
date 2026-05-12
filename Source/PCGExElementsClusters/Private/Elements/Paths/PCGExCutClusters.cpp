@@ -3,11 +3,11 @@
 
 #include "Elements/Paths/PCGExCutClusters.h"
 
+#include "Clusters/PCGExCluster.h"
+#include "Core/PCGExClusterFilter.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
 #include "Graphs/PCGExGraph.h"
-#include "Core/PCGExClusterFilter.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Graphs/PCGExGraphCommon.h"
 #include "Math/PCGExMathBounds.h"
@@ -22,21 +22,37 @@ TArray<FPCGPinProperties> UPCGExCutEdgesSettings::InputPinProperties() const
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
 
 	PCGEX_PIN_POINTS(PCGExPaths::Labels::SourcePathsLabel, "Cutting paths.", Required)
-	if (Mode != EPCGExCutEdgesMode::Edges) { PCGEX_PIN_FILTERS(PCGExCutEdges::SourceNodeFilters, "Node preservation filters.", Normal) }
-	if (Mode != EPCGExCutEdgesMode::Nodes) { PCGEX_PIN_FILTERS(PCGExCutEdges::SourceEdgeFilters, "Edge preservation filters.", Normal) }
+	if (Mode != EPCGExCutEdgesMode::Edges)
+	{
+		PCGEX_PIN_FILTERS(PCGExCutEdges::SourceNodeFilters, "Node preservation filters.", Normal)
+	}
+	if (Mode != EPCGExCutEdgesMode::Nodes)
+	{
+		PCGEX_PIN_FILTERS(PCGExCutEdges::SourceEdgeFilters, "Edge preservation filters.", Normal)
+	}
 
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExCutEdgesSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::New; }
-PCGExData::EIOInit UPCGExCutEdgesSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExCutEdgesSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::New;
+}
+
+PCGExData::EIOInit UPCGExCutEdgesSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(CutEdges)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(CutEdges)
 
 bool FPCGExCutEdgesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(CutEdges)
 
@@ -124,12 +140,21 @@ bool FPCGExCutEdgesElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSe
 
 	PCGEX_ON_ASYNC_STATE_READY(PCGExPaths::Labels::State_BuildingPaths)
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			if (Context->bWantsVtxProcessing) { NewBatch->VtxFilterFactories = &Context->VtxFilterFactories; }
-			if (Context->bWantsEdgesProcessing) { NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories; }
-			NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      if (Context->bWantsVtxProcessing)
+			                                      {
+				                                      NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
+			                                      }
+			                                      if (Context->bWantsEdgesProcessing)
+			                                      {
+				                                      NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories;
+			                                      }
+			                                      NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
+		                                      }))
 		{
 			PCGE_LOG(Warning, GraphAndLog, FTEXT("Could not build any clusters."));
 			return true;
@@ -137,7 +162,10 @@ bool FPCGExCutEdgesElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSe
 	}
 
 	PCGEX_CLUSTER_BATCH_PROCESSING(PCGExGraphs::States::State_ReadyToCompile)
-	if (!Context->CompileGraphBuilders(true, PCGExCommon::States::State_Done)) { return false; }
+	if (!Context->CompileGraphBuilders(true, PCGExCommon::States::State_Done))
+	{
+		return false;
+	}
 
 	Context->MainPoints->StageOutputs();
 
@@ -160,26 +188,41 @@ namespace PCGExCutEdges
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExCutEdges::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Settings->bInvert)
 		{
 			if (Context->bWantsEdgesProcessing)
 			{
-				for (PCGExGraphs::FEdge& E : *Cluster->Edges) { E.bValid = false; }
+				for (PCGExGraphs::FEdge& E : *Cluster->Edges)
+				{
+					E.bValid = false;
+				}
 				StartParallelLoopForEdges();
 			}
 
 			if (Context->bWantsVtxProcessing)
 			{
-				for (PCGExClusters::FNode& N : *Cluster->Nodes) { N.bValid = false; }
+				for (PCGExClusters::FNode& N : *Cluster->Nodes)
+				{
+					N.bValid = false;
+				}
 				StartParallelLoopForNodes();
 			}
 		}
 		else
 		{
-			if (Context->bWantsEdgesProcessing) { StartParallelLoopForEdges(); }
-			if (Context->bWantsVtxProcessing) { StartParallelLoopForNodes(); }
+			if (Context->bWantsEdgesProcessing)
+			{
+				StartParallelLoopForEdges();
+			}
+			if (Context->bWantsVtxProcessing)
+			{
+				StartParallelLoopForNodes();
+			}
 		}
 
 		return true;
@@ -199,7 +242,10 @@ namespace PCGExCutEdges
 
 			if (EdgeFilterCache[Index])
 			{
-				if (Settings->bInvert) { Edge.bValid = true; }
+				if (Settings->bInvert)
+				{
+					Edge.bValid = true;
+				}
 				continue;
 			}
 
@@ -213,7 +259,10 @@ namespace PCGExCutEdges
 
 			for (const TSharedRef<PCGExPaths::FPath>& Path : Context->Paths)
 			{
-				if (!Path->Bounds.Intersect(EdgeBox)) { continue; }
+				if (!Path->Bounds.Intersect(EdgeBox))
+				{
+					continue;
+				}
 
 				// Check paths
 				Path->GetEdgeOctree()->FindFirstElementWithBoundsTest(EdgeBox, [&](const PCGExPaths::FPathEdge* PathEdge)
@@ -237,7 +286,10 @@ namespace PCGExCutEdges
 					FMath::SegmentDistToSegment(A1, B1, A2, B2, A, B);
 					//if (A == A1 || A == B1 || B == A2 || B == B2) { return true; }
 
-					if (FVector::DistSquared(A, B) >= Context->IntersectionDetails.ToleranceSquared) { return true; }
+					if (FVector::DistSquared(A, B) >= Context->IntersectionDetails.ToleranceSquared)
+					{
+						return true;
+					}
 
 					PCGExClusters::FNode* StartNode = Cluster->GetEdgeStart(Edge);
 					PCGExClusters::FNode* EndNode = Cluster->GetEdgeEnd(Edge);
@@ -283,7 +335,10 @@ namespace PCGExCutEdges
 
 			if (IsNodePassingFilters(Node))
 			{
-				if (Settings->bInvert) { Node.bValid = true; }
+				if (Settings->bInvert)
+				{
+					Node.bValid = true;
+				}
 				continue;
 			}
 
@@ -294,7 +349,10 @@ namespace PCGExCutEdges
 
 			for (const TSharedRef<PCGExPaths::FPath>& Path : Context->Paths)
 			{
-				if (!Path->Bounds.Intersect(PointBox)) { continue; }
+				if (!Path->Bounds.Intersect(PointBox))
+				{
+					continue;
+				}
 
 				// Check paths
 				Path->GetEdgeOctree()->FindFirstElementWithBoundsTest(PointBox, [&](const PCGExPaths::FPathEdge* PathEdge)
@@ -308,7 +366,10 @@ namespace PCGExCutEdges
 					const FVector B1 = FMath::ClosestPointOnSegment(A1, A2, B2);
 					const FVector C1 = Distances->GetSourceCenter(NodePoint, A1, B1);
 
-					if (FVector::DistSquared(B1, C1) >= Context->IntersectionDetails.ToleranceSquared) { return true; }
+					if (FVector::DistSquared(B1, C1) >= Context->IntersectionDetails.ToleranceSquared)
+					{
+						return true;
+					}
 
 					if (Settings->bInvert)
 					{
@@ -359,11 +420,23 @@ namespace PCGExCutEdges
 	{
 		switch (Settings->Mode)
 		{
-		case EPCGExCutEdgesMode::Nodes: if (!NodesProcessed) { return; }
+		case EPCGExCutEdgesMode::Nodes:
+			if (!NodesProcessed)
+			{
+				return;
+			}
 			break;
-		case EPCGExCutEdgesMode::Edges: if (!EdgesProcessed) { return; }
+		case EPCGExCutEdgesMode::Edges:
+			if (!EdgesProcessed)
+			{
+				return;
+			}
 			break;
-		case EPCGExCutEdgesMode::NodesAndEdges: if (!EdgesProcessed || !NodesProcessed) { return; }
+		case EPCGExCutEdgesMode::NodesAndEdges:
+			if (!EdgesProcessed || !NodesProcessed)
+			{
+				return;
+			}
 			break;
 		}
 
@@ -384,7 +457,10 @@ namespace PCGExCutEdges
 			const PCGExClusters::FNode* StartNode = Cluster->GetEdgeStart(Edge);
 			const PCGExClusters::FNode* EndNode = Cluster->GetEdgeEnd(Edge);
 
-			if (StartNode->bValid && EndNode->bValid) { Edge.bValid = true; }
+			if (StartNode->bValid && EndNode->bValid)
+			{
+				Edge.bValid = true;
+			}
 		}
 	}
 
@@ -393,7 +469,10 @@ namespace PCGExCutEdges
 		TArray<PCGExGraphs::FEdge> ValidEdges;
 		Cluster->GetValidEdges(ValidEdges);
 
-		if (ValidEdges.IsEmpty()) { return; }
+		if (ValidEdges.IsEmpty())
+		{
+			return;
+		}
 
 		GraphBuilder->Graph->InsertEdges(ValidEdges);
 	}

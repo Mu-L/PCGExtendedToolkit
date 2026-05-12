@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widgets/SLeafWidget.h"
 #include "Filters/Edges/PCGExEdgeEndpointsCheckFilter.h"
+#include "Widgets/SLeafWidget.h"
 
 /**
  * Read-only 4-panel truth table visualization for FPCGExEdgeEndpointsCheckFilterConfig.

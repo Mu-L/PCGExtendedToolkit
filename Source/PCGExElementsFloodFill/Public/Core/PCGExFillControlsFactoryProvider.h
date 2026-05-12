@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExFloodFill.h"
 #include "Factories/PCGExFactoryData.h"
 #include "Factories/PCGExFactoryProvider.h"
-#include "Core/PCGExFloodFill.h"
 
 #include "PCGExFillControlsFactoryProvider.generated.h"
 
@@ -67,7 +67,10 @@ public:
 
 	FPCGExFillControlConfigBase ConfigBase;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FillControls; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FillControls;
+	}
 
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
 
@@ -86,10 +89,18 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(AbstractFillControls, "Fill Controls Definition", "Creates a single Fill Control node, to be used with flood fill nodes.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(FillControl); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(FillControl);
+	}
 #endif
 	//~End UPCGSettings
 
-	virtual FName GetMainOutputPin() const override { return PCGExFloodFill::OutputFillControlsLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExFloodFill::OutputFillControlsLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 };

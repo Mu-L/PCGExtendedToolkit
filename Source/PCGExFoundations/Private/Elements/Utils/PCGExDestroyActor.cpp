@@ -20,7 +20,10 @@ UPCGExDestroyActorSettings::UPCGExDestroyActorSettings(const FObjectInitializer&
 {
 }
 
-PCGExData::EIOInit UPCGExDestroyActorSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExDestroyActorSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 PCGEX_INITIALIZE_ELEMENT(DestroyActor)
 PCGEX_ELEMENT_BATCH_POINT_IMPL(DestroyActor)
@@ -32,7 +35,10 @@ FName UPCGExDestroyActorSettings::GetMainInputPin() const
 
 bool FPCGExDestroyActorElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(DestroyActor)
 
@@ -48,7 +54,10 @@ bool FPCGExDestroyActorElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -74,7 +83,10 @@ namespace PCGExDestroyActor
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExDestroyActor::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		TSharedPtr<PCGExData::TAttributeBroadcaster<FSoftObjectPath>> ActorReferences = MakeShared<PCGExData::TAttributeBroadcaster<FSoftObjectPath>>();
 		if (!ActorReferences->Prepare(Settings->ActorReferenceAttribute, PointDataFacade->Source))
@@ -87,17 +99,26 @@ namespace PCGExDestroyActor
 		ActorReferences->GrabUniqueValues(UniqueActorReferences);
 
 		MainThreadToken = TaskManager->TryCreateToken(FName("DestroyActors"));
-		if (!MainThreadToken.IsValid()) { return false; }
+		if (!MainThreadToken.IsValid())
+		{
+			return false;
+		}
 
 		Context->GetMutableComponent()->ForEachManagedResource([&](UPCGManagedResource* InResource)
 		{
 			UPCGManagedActors* ManagedActors = Cast<UPCGManagedActors>(InResource);
 
-			if (!ManagedActors) { return; }
+			if (!ManagedActors)
+			{
+				return;
+			}
 
 			TArray<TSoftObjectPtr<AActor>> GeneratedActors = ManagedActors->GetConstGeneratedActors();
 
-			if (!ManagedActors || GeneratedActors.IsEmpty()) { return; }
+			if (!ManagedActors || GeneratedActors.IsEmpty())
+			{
+				return;
+			}
 
 			for (const TSoftObjectPtr<AActor>& Actor : GeneratedActors)
 			{
@@ -115,7 +136,10 @@ namespace PCGExDestroyActor
 			PCGEX_ASYNC_THIS
 			for (const TSoftObjectPtr<AActor>& ActorRef : This->ActorsToDelete)
 			{
-				if (ActorRef.IsValid()) { ActorRef->Destroy(); }
+				if (ActorRef.IsValid())
+				{
+					ActorRef->Destroy();
+				}
 			}
 
 			PCGEX_ASYNC_RELEASE_TOKEN(This->MainThreadToken)

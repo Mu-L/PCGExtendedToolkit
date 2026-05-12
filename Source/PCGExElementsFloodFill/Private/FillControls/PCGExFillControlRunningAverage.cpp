@@ -5,28 +5,37 @@
 #include "FillControls/PCGExFillControlRunningAverage.h"
 
 
-#include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
+#include "Data/PCGExData.h"
+#include "Data/Utils/PCGExDataPreloader.h"
+#include "Details/PCGExSettingsDetails.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigRunningAverage, WindowSize, int32, WindowSizeInput, WindowSizeAttribute, WindowSize)
 PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigRunningAverage, Tolerance, double, ToleranceInput, ToleranceAttribute, Tolerance)
 
 bool FPCGExFillControlRunningAverage::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryRunningAverage* TypedFactory = Cast<UPCGExFillControlsFactoryRunningAverage>(Factory);
 
 	WindowSize = TypedFactory->Config.GetValueSettingWindowSize();
-	if (!WindowSize->Init(GetSourceFacade())) { return false; }
+	if (!WindowSize->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	Tolerance = TypedFactory->Config.GetValueSettingTolerance();
-	if (!Tolerance->Init(GetSourceFacade())) { return false; }
+	if (!Tolerance->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	Operand = InHandler->VtxDataFacade->GetBroadcaster<double>(TypedFactory->Config.Operand);
 	if (!Operand)

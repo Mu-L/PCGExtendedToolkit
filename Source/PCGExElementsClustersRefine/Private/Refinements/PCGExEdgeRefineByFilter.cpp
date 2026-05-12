@@ -13,7 +13,10 @@ void FPCGExEdgeRefineByFilter::PrepareForCluster(const TSharedPtr<PCGExClusters:
 
 void FPCGExEdgeRefineByFilter::ProcessEdge(PCGExGraphs::FEdge& Edge)
 {
-	if (*(EdgeFilterCache->GetData() + Edge.Index)) { FPlatformAtomics::InterlockedExchange(&Edge.bValid, ExchangeValue); }
+	if (*(EdgeFilterCache->GetData() + Edge.Index))
+	{
+		FPlatformAtomics::InterlockedExchange(&Edge.bValid, ExchangeValue);
+	}
 }
 
 #pragma endregion

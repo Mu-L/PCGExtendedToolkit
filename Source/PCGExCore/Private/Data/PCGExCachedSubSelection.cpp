@@ -16,7 +16,8 @@ namespace PCGExData
 			switch (Type)
 			{
 			PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_FN)
-			default: return nullptr;
+			default:
+				return nullptr;
 			}
 #undef PCGEX_FN
 		}
@@ -27,7 +28,8 @@ namespace PCGExData
 			switch (Type)
 			{
 			PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_FN)
-			default: return nullptr;
+			default:
+				return nullptr;
 			}
 #undef PCGEX_FN
 		}
@@ -36,10 +38,14 @@ namespace PCGExData
 		{
 			switch (Type)
 			{
-			case EPCGMetadataTypes::Quaternion: return &PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis;
-			case EPCGMetadataTypes::Rotator: return &PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis;
-			case EPCGMetadataTypes::Transform: return &PCGExTypeOps::FTypeOps<FTransform>::ExtractAxis;
-			default: return &ExtractAxisDefault;
+			case EPCGMetadataTypes::Quaternion:
+				return &PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis;
+			case EPCGMetadataTypes::Rotator:
+				return &PCGExTypeOps::FTypeOps<FRotator>::ExtractAxis;
+			case EPCGMetadataTypes::Transform:
+				return &PCGExTypeOps::FTypeOps<FTransform>::ExtractAxis;
+			default:
+				return &ExtractAxisDefault;
 			}
 		}
 
@@ -48,13 +54,18 @@ namespace PCGExData
 		{
 			switch (Type)
 			{
-			case EPCGMetadataTypes::Vector2: return 2;
+			case EPCGMetadataTypes::Vector2:
+				return 2;
 			case EPCGMetadataTypes::Vector:
-			case EPCGMetadataTypes::Rotator: return 3;
+			case EPCGMetadataTypes::Rotator:
+				return 3;
 			case EPCGMetadataTypes::Vector4:
-			case EPCGMetadataTypes::Quaternion: return 4;
-			case EPCGMetadataTypes::Transform: return 9;
-			default: return 1;
+			case EPCGMetadataTypes::Quaternion:
+				return 4;
+			case EPCGMetadataTypes::Transform:
+				return 9;
+			default:
+				return 1;
 			}
 		}
 
@@ -89,9 +100,11 @@ namespace PCGExData
 			switch (Component)
 			{
 			case PCGExTypeOps::ETransformPart::Position:
-			case PCGExTypeOps::ETransformPart::Scale: ComponentType = EPCGMetadataTypes::Vector;
+			case PCGExTypeOps::ETransformPart::Scale:
+				ComponentType = EPCGMetadataTypes::Vector;
 				break;
-			case PCGExTypeOps::ETransformPart::Rotation: ComponentType = EPCGMetadataTypes::Quaternion;
+			case PCGExTypeOps::ETransformPart::Rotation:
+				ComponentType = EPCGMetadataTypes::Quaternion;
 				break;
 			}
 		}
@@ -127,29 +140,50 @@ namespace PCGExData
 
 	bool FCachedSubSelection::AppliesToSourceRead() const
 	{
-		if (!bIsValid) { return false; }
+		if (!bIsValid)
+		{
+			return false;
+		}
 
 		// For field selection, only applies if source has multiple fields
-		if (bIsFieldSet) { return SubSelectionImpl::GetNumFields(RealType) > 1; }
+		if (bIsFieldSet)
+		{
+			return SubSelectionImpl::GetNumFields(RealType) > 1;
+		}
 
 		// For axis selection, only applies if source is rotation type
-		if (bIsAxisSet) { return SubSelectionImpl::SupportsAxisExtraction(RealType); }
+		if (bIsAxisSet)
+		{
+			return SubSelectionImpl::SupportsAxisExtraction(RealType);
+		}
 
 		// For component selection, only applies to Transform
-		if (bIsComponentSet) { return RealType == EPCGMetadataTypes::Transform; }
+		if (bIsComponentSet)
+		{
+			return RealType == EPCGMetadataTypes::Transform;
+		}
 
 		return false;
 	}
 
 	bool FCachedSubSelection::AppliesToTargetWrite() const
 	{
-		if (!bIsValid) { return false; }
+		if (!bIsValid)
+		{
+			return false;
+		}
 
 		// For field selection, only applies if target has multiple fields
-		if (bIsFieldSet) { return SubSelectionImpl::GetNumFields(RealType) > 1; }
+		if (bIsFieldSet)
+		{
+			return SubSelectionImpl::GetNumFields(RealType) > 1;
+		}
 
 		// For component selection, only applies to Transform
-		if (bIsComponentSet) { return RealType == EPCGMetadataTypes::Transform; }
+		if (bIsComponentSet)
+		{
+			return RealType == EPCGMetadataTypes::Transform;
+		}
 
 		return false;
 	}
@@ -159,7 +193,10 @@ namespace PCGExData
 		if (!bIsValid || !AppliesToSourceRead())
 		{
 			// No applicable sub-selection - just convert
-			if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
+			if (ConvertRealToWorking)
+			{
+				ConvertRealToWorking(Source, OutValue);
+			}
 			return;
 		}
 
@@ -176,9 +213,15 @@ namespace PCGExData
 			const FVector AxisDir = ExtractAxisFromReal(Source, Axis);
 
 			// Convert FVector to WorkingType
-			if (WorkingType == EPCGMetadataTypes::Vector) { *static_cast<FVector*>(OutValue) = AxisDir; }
+			if (WorkingType == EPCGMetadataTypes::Vector)
+			{
+				*static_cast<FVector*>(OutValue) = AxisDir;
+			}
 			// Need to convert FVector → WorkingType
-			else { PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Vector, &AxisDir, WorkingType, OutValue); }
+			else
+			{
+				PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Vector, &AxisDir, WorkingType, OutValue);
+			}
 			return;
 		}
 
@@ -188,13 +231,22 @@ namespace PCGExData
 			const double FieldValue = ExtractFieldFromReal(Source, Field);
 
 			// Convert double to WorkingType
-			if (WorkingType == EPCGMetadataTypes::Double) { *static_cast<double*>(OutValue) = FieldValue; }
-			else if (ConvertDoubleToWorking) { ConvertDoubleToWorking(&FieldValue, OutValue); }
+			if (WorkingType == EPCGMetadataTypes::Double)
+			{
+				*static_cast<double*>(OutValue) = FieldValue;
+			}
+			else if (ConvertDoubleToWorking)
+			{
+				ConvertDoubleToWorking(&FieldValue, OutValue);
+			}
 			return;
 		}
 
 		// Fallback - just convert
-		if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
+		if (ConvertRealToWorking)
+		{
+			ConvertRealToWorking(Source, OutValue);
+		}
 	}
 
 	void FCachedSubSelection::ApplySet(void* Target, const void* Source) const
@@ -202,7 +254,10 @@ namespace PCGExData
 		if (!bIsValid || !AppliesToTargetWrite())
 		{
 			// No applicable sub-selection - just convert
-			if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
+			if (ConvertWorkingToReal)
+			{
+				ConvertWorkingToReal(Source, Target);
+			}
 			return;
 		}
 
@@ -219,8 +274,14 @@ namespace PCGExData
 			// Convert source (WorkingType) to double
 			double ScalarValue = 0.0;
 
-			if (WorkingType == EPCGMetadataTypes::Double) { ScalarValue = *static_cast<const double*>(Source); }
-			else if (ConvertWorkingToDouble) { ConvertWorkingToDouble(Source, &ScalarValue); }
+			if (WorkingType == EPCGMetadataTypes::Double)
+			{
+				ScalarValue = *static_cast<const double*>(Source);
+			}
+			else if (ConvertWorkingToDouble)
+			{
+				ConvertWorkingToDouble(Source, &ScalarValue);
+			}
 
 			// Inject into target field
 			InjectFieldToReal(Target, ScalarValue, Field);
@@ -228,7 +289,10 @@ namespace PCGExData
 		}
 
 		// Fallback - just convert
-		if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
+		if (ConvertWorkingToReal)
+		{
+			ConvertWorkingToReal(Source, Target);
+		}
 	}
 
 	void FCachedSubSelection::ApplyGetWithComponent(const void* Source, void* OutValue) const
@@ -248,8 +312,14 @@ namespace PCGExData
 			// Extract axis from quaternion
 			const FVector AxisDir = PCGExTypeOps::FTypeOps<FQuat>::ExtractAxis(ComponentBuffer, Axis);
 
-			if (WorkingType == EPCGMetadataTypes::Vector) { *static_cast<FVector*>(OutValue) = AxisDir; }
-			else { PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Vector, &AxisDir, WorkingType, OutValue); }
+			if (WorkingType == EPCGMetadataTypes::Vector)
+			{
+				*static_cast<FVector*>(OutValue) = AxisDir;
+			}
+			else
+			{
+				PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Vector, &AxisDir, WorkingType, OutValue);
+			}
 		}
 		else if (bIsFieldSet)
 		{
@@ -259,8 +329,14 @@ namespace PCGExData
 			{
 				const double FieldValue = ExtractFn(ComponentBuffer, Field);
 
-				if (WorkingType == EPCGMetadataTypes::Double) { *static_cast<double*>(OutValue) = FieldValue; }
-				else if (ConvertDoubleToWorking) { ConvertDoubleToWorking(&FieldValue, OutValue); }
+				if (WorkingType == EPCGMetadataTypes::Double)
+				{
+					*static_cast<double*>(OutValue) = FieldValue;
+				}
+				else if (ConvertDoubleToWorking)
+				{
+					ConvertDoubleToWorking(&FieldValue, OutValue);
+				}
 			}
 		}
 		else
@@ -281,33 +357,39 @@ namespace PCGExData
 			// Convert source to double
 			double ScalarValue = 0.0;
 
-			if (WorkingType == EPCGMetadataTypes::Double) { ScalarValue = *static_cast<const double*>(Source); }
-			else if (ConvertWorkingToDouble) { ConvertWorkingToDouble(Source, &ScalarValue); }
+			if (WorkingType == EPCGMetadataTypes::Double)
+			{
+				ScalarValue = *static_cast<const double*>(Source);
+			}
+			else if (ConvertWorkingToDouble)
+			{
+				ConvertWorkingToDouble(Source, &ScalarValue);
+			}
 
 			// Inject into the appropriate component
 			switch (Component)
 			{
 			case PCGExTypeOps::ETransformPart::Position:
-				{
-					FVector Pos = T.GetLocation();
-					PCGExTypeOps::FTypeOps<FVector>::InjectField(&Pos, ScalarValue, Field);
-					T.SetLocation(Pos);
-				}
-				break;
+			{
+				FVector Pos = T.GetLocation();
+				PCGExTypeOps::FTypeOps<FVector>::InjectField(&Pos, ScalarValue, Field);
+				T.SetLocation(Pos);
+			}
+			break;
 			case PCGExTypeOps::ETransformPart::Rotation:
-				{
-					FQuat Rot = T.GetRotation();
-					PCGExTypeOps::FTypeOps<FQuat>::InjectField(&Rot, ScalarValue, Field);
-					T.SetRotation(Rot);
-				}
-				break;
+			{
+				FQuat Rot = T.GetRotation();
+				PCGExTypeOps::FTypeOps<FQuat>::InjectField(&Rot, ScalarValue, Field);
+				T.SetRotation(Rot);
+			}
+			break;
 			case PCGExTypeOps::ETransformPart::Scale:
-				{
-					FVector Scale = T.GetScale3D();
-					PCGExTypeOps::FTypeOps<FVector>::InjectField(&Scale, ScalarValue, Field);
-					T.SetScale3D(Scale);
-				}
-				break;
+			{
+				FVector Scale = T.GetScale3D();
+				PCGExTypeOps::FTypeOps<FVector>::InjectField(&Scale, ScalarValue, Field);
+				T.SetScale3D(Scale);
+			}
+			break;
 			}
 		}
 		else
@@ -317,7 +399,10 @@ namespace PCGExData
 
 			// Convert source to component type
 			PCGExTypeOps::FConversionTable::Convert(WorkingType, Source, ComponentType, ComponentBuffer);
-			if (InjectComponent) { InjectComponent(Target, Component, ComponentBuffer, ComponentType); }
+			if (InjectComponent)
+			{
+				InjectComponent(Target, Component, ComponentBuffer, ComponentType);
+			}
 		}
 	}
 }

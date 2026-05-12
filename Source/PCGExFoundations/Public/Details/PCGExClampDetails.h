@@ -15,7 +15,10 @@ struct PCGEXFOUNDATIONS_API FPCGExClampDetails
 	}
 
 	FPCGExClampDetails(const FPCGExClampDetails& Other)
-		: bApplyClampMin(Other.bApplyClampMin), ClampMinValue(Other.ClampMinValue), bApplyClampMax(Other.bApplyClampMax), ClampMaxValue(Other.ClampMaxValue)
+		: bApplyClampMin(Other.bApplyClampMin)
+		  , ClampMinValue(Other.ClampMinValue)
+		  , bApplyClampMax(Other.bApplyClampMax)
+		  , ClampMaxValue(Other.ClampMaxValue)
 	{
 	}
 
@@ -52,8 +55,14 @@ struct PCGEXFOUNDATIONS_API FPCGExClampDetails
 
 	FORCEINLINE double GetClampedValue(const double InValue) const
 	{
-		if (bApplyClampMin && InValue < ClampMinValue) { return ClampMinValue; }
-		if (bApplyClampMax && InValue > ClampMaxValue) { return ClampMaxValue; }
+		if (bApplyClampMin && InValue < ClampMinValue)
+		{
+			return ClampMinValue;
+		}
+		if (bApplyClampMax && InValue > ClampMaxValue)
+		{
+			return ClampMaxValue;
+		}
 		return InValue;
 	}
 };

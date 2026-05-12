@@ -4,14 +4,14 @@
 #include "Details/Collections/SPCGExCollectionCategoryGroup.h"
 
 #include "Details/Collections/FPCGExCollectionTileDragDropOp.h"
-#include "Widgets/SOverlay.h"
 #include "DragAndDrop/AssetDragDropOp.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWrapBox.h"
-#include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 
 #pragma region SPCGExCollectionCategoryGroup
@@ -32,26 +32,26 @@ void SPCGExCollectionCategoryGroup::Construct(const FArguments& InArgs)
 	const FText CountText = FText::Format(INVTEXT("({0})"), FText::AsNumber(InArgs._EntryCount));
 
 	TSharedRef<SWidget> HeaderNameWidget = bIsUncategorized
-		                                       ? StaticCastSharedRef<SWidget>(
-			                                       SNew(STextBlock)
-			                                       .Text(DisplayName)
-			                                       .Font(FCoreStyle::GetDefaultFontStyle("Bold", 10))
-			                                       .ColorAndOpacity(FSlateColor(FLinearColor(1, 1, 1, 0.5f))))
-		                                       : StaticCastSharedRef<SWidget>(
-			                                       SNew(SEditableTextBox)
-			                                       .Text(DisplayName)
-			                                       .Font(FCoreStyle::GetDefaultFontStyle("Bold", 10))
-			                                       .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type CommitType)
-			                                       {
-				                                       if (CommitType == ETextCommit::OnEnter || CommitType == ETextCommit::OnUserMovedFocus)
-				                                       {
-					                                       const FName NewName = FName(*NewText.ToString());
-					                                       if (NewName != CategoryName && !NewName.IsNone())
-					                                       {
-						                                       OnCategoryRenamed.ExecuteIfBound(CategoryName, NewName);
-					                                       }
-				                                       }
-			                                       }));
+		? StaticCastSharedRef<SWidget>(
+			SNew(STextBlock)
+			.Text(DisplayName)
+			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10))
+			.ColorAndOpacity(FSlateColor(FLinearColor(1, 1, 1, 0.5f))))
+		: StaticCastSharedRef<SWidget>(
+			SNew(SEditableTextBox)
+			.Text(DisplayName)
+			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10))
+			.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type CommitType)
+			{
+				if (CommitType == ETextCommit::OnEnter || CommitType == ETextCommit::OnUserMovedFocus)
+				{
+					const FName NewName = FName(*NewText.ToString());
+					if (NewName != CategoryName && !NewName.IsNone())
+					{
+						OnCategoryRenamed.ExecuteIfBound(CategoryName, NewName);
+					}
+				}
+			}));
 
 	ChildSlot
 	[
@@ -60,8 +60,8 @@ void SPCGExCollectionCategoryGroup::Construct(const FArguments& InArgs)
 		.BorderBackgroundColor_Lambda([this]() -> FSlateColor
 		{
 			return bIsDragOver
-				       ? FSlateColor(FLinearColor(0.2f, 0.5f, 1.f, 0.3f))
-				       : FSlateColor(FLinearColor::Transparent);
+				? FSlateColor(FLinearColor(0.2f, 0.5f, 1.f, 0.3f))
+				: FSlateColor(FLinearColor::Transparent);
 		})
 		.Padding(0)
 		[
@@ -339,7 +339,10 @@ FReply SPCGExCollectionCategoryGroup::OnDrop(const FGeometry& MyGeometry, const 
 	bIsDragOver = false;
 	const int32 CapturedInsertIndex = DropInsertIndex;
 	DropInsertIndex = INDEX_NONE;
-	if (InsertIndicator.IsValid()) { InsertIndicator->SetVisibility(EVisibility::Collapsed); }
+	if (InsertIndicator.IsValid())
+	{
+		InsertIndicator->SetVisibility(EVisibility::Collapsed);
+	}
 
 	if (const TSharedPtr<FPCGExCollectionTileDragDropOp> TileOp = InDragDropEvent.GetOperationAs<FPCGExCollectionTileDragDropOp>())
 	{
@@ -373,7 +376,10 @@ void SPCGExCollectionCategoryGroup::OnDragLeave(const FDragDropEvent& InDragDrop
 {
 	bIsDragOver = false;
 	DropInsertIndex = INDEX_NONE;
-	if (InsertIndicator.IsValid()) { InsertIndicator->SetVisibility(EVisibility::Collapsed); }
+	if (InsertIndicator.IsValid())
+	{
+		InsertIndicator->SetVisibility(EVisibility::Collapsed);
+	}
 	SCompoundWidget::OnDragLeave(InDragDropEvent);
 }
 

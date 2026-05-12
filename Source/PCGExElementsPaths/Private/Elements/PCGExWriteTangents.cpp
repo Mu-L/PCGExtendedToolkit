@@ -5,8 +5,8 @@
 
 
 #include "PCGParamData.h"
-#include "Data/PCGExData.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Paths/PCGExPathsHelpers.h"
@@ -23,7 +23,10 @@ void UPCGExWriteTangentsSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!Tangents) { Tangents = NewObject<UPCGExAutoTangents>(this, TEXT("Tangents")); }
+		if (!Tangents)
+		{
+			Tangents = NewObject<UPCGExAutoTangents>(this, TEXT("Tangents"));
+		}
 	}
 	Super::PostInitProperties();
 }
@@ -40,7 +43,10 @@ TArray<FPCGPinProperties> UPCGExWriteTangentsSettings::InputPinProperties() cons
 
 PCGEX_INITIALIZE_ELEMENT(WriteTangents)
 
-PCGExData::EIOInit UPCGExWriteTangentsSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExWriteTangentsSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(WriteTangents)
 
@@ -53,14 +59,23 @@ UPCGExWriteTangentsSettings::UPCGExWriteTangentsSettings(const FObjectInitialize
 	: Super(ObjectInitializer)
 {
 #if WITH_EDITOR
-	if (ArriveScaleAttribute.GetName() == FName("@Last")) { ArriveScaleAttribute.Update(TEXT("$Scale")); }
-	if (LeaveScaleAttribute.GetName() == FName("@Last")) { LeaveScaleAttribute.Update(TEXT("$Scale")); }
+	if (ArriveScaleAttribute.GetName() == FName("@Last"))
+	{
+		ArriveScaleAttribute.Update(TEXT("$Scale"));
+	}
+	if (LeaveScaleAttribute.GetName() == FName("@Last"))
+	{
+		LeaveScaleAttribute.Update(TEXT("$Scale"));
+	}
 #endif
 }
 
 bool FPCGExWriteTangentsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(WriteTangents)
 
@@ -68,8 +83,14 @@ bool FPCGExWriteTangentsElement::Boot(FPCGExContext* InContext) const
 	PCGEX_VALIDATE_NAME(Settings->LeaveName)
 
 	PCGEX_BIND_INSTANCED_FACTORY(Tangents, UPCGExTangentsInstancedFactory, PCGExTangents::SourceOverridesTangents)
-	if (Settings->StartTangents) { PCGEX_BIND_INSTANCED_FACTORY(StartTangents, UPCGExTangentsInstancedFactory, PCGExTangents::SourceOverridesTangentsStart) }
-	if (Settings->EndTangents) { PCGEX_BIND_INSTANCED_FACTORY(EndTangents, UPCGExTangentsInstancedFactory, PCGExTangents::SourceOverridesTangentsEnd) }
+	if (Settings->StartTangents)
+	{
+		PCGEX_BIND_INSTANCED_FACTORY(StartTangents, UPCGExTangentsInstancedFactory, PCGExTangents::SourceOverridesTangentsStart)
+	}
+	if (Settings->EndTangents)
+	{
+		PCGEX_BIND_INSTANCED_FACTORY(EndTangents, UPCGExTangentsInstancedFactory, PCGExTangents::SourceOverridesTangentsEnd)
+	}
 
 	return true;
 }
@@ -120,7 +141,10 @@ namespace PCGExWriteTangents
 	{
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -129,13 +153,22 @@ namespace PCGExWriteTangents
 		Tangents = Context->Tangents->CreateOperation();
 		Tangents->bClosedLoop = bClosedLoop;
 
-		if (!Tangents->PrepareForData(Context)) { return false; }
+		if (!Tangents->PrepareForData(Context))
+		{
+			return false;
+		}
 
 		ArriveScaleReader = Settings->GetValueSettingArriveScale();
-		if (!ArriveScaleReader->Init(PointDataFacade)) { return false; }
+		if (!ArriveScaleReader->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		LeaveScaleReader = Settings->GetValueSettingLeaveScale();
-		if (!LeaveScaleReader->Init(PointDataFacade)) { return false; }
+		if (!LeaveScaleReader->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		if (Context->StartTangents)
 		{
@@ -143,9 +176,15 @@ namespace PCGExWriteTangents
 			StartTangents->bClosedLoop = bClosedLoop;
 			StartTangents->PrimaryDataFacade = PointDataFacade;
 
-			if (!StartTangents->PrepareForData(Context)) { return false; }
+			if (!StartTangents->PrepareForData(Context))
+			{
+				return false;
+			}
 		}
-		else { StartTangents = Tangents; }
+		else
+		{
+			StartTangents = Tangents;
+		}
 
 		if (Context->EndTangents)
 		{
@@ -153,9 +192,15 @@ namespace PCGExWriteTangents
 			EndTangents->bClosedLoop = bClosedLoop;
 			EndTangents->PrimaryDataFacade = PointDataFacade;
 
-			if (!EndTangents->PrepareForData(Context)) { return false; }
+			if (!EndTangents->PrepareForData(Context))
+			{
+				return false;
+			}
 		}
-		else { EndTangents = Tangents; }
+		else
+		{
+			EndTangents = Tangents;
+		}
 
 		ArriveWriter = PointDataFacade->GetWritable(Settings->ArriveName, FVector::ZeroVector, true, PCGExData::EBufferInit::Inherit);
 		LeaveWriter = PointDataFacade->GetWritable(Settings->LeaveName, FVector::ZeroVector, true, PCGExData::EBufferInit::Inherit);
@@ -178,7 +223,10 @@ namespace PCGExWriteTangents
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			int32 PrevIndex = Index - 1;
 			int32 NextIndex = Index + 1;
@@ -191,8 +239,14 @@ namespace PCGExWriteTangents
 
 			if (bClosedLoop)
 			{
-				if (PrevIndex < 0) { PrevIndex = LastIndex; }
-				if (NextIndex > LastIndex) { NextIndex = 0; }
+				if (PrevIndex < 0)
+				{
+					PrevIndex = LastIndex;
+				}
+				if (NextIndex > LastIndex)
+				{
+					NextIndex = 0;
+				}
 
 				Tangents->ProcessPoint(InPoints, Index, NextIndex, PrevIndex, ArriveScale, OutArrive, LeaveScale, OutLeave);
 			}

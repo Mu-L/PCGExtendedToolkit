@@ -4,9 +4,9 @@
 
 #include "Core/PCGExHeuristicOperation.h"
 
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
 
 
 void FPCGExHeuristicOperation::PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster)
@@ -32,12 +32,18 @@ void FPCGExHeuristicOperation::PrepareForCluster(const TSharedPtr<const PCGExClu
 		if (LocalWeightMultiplierSource == EPCGExClusterElement::Vtx)
 		{
 			LocalWeightMultiplier.SetNumZeroed(InCluster->Nodes->Num());
-			for (const PCGExClusters::FNode& Node : (*InCluster->Nodes)) { LocalWeightMultiplier[Node.Index] = LocalWeightCache->Read(Node.PointIndex); }
+			for (const PCGExClusters::FNode& Node : (*InCluster->Nodes))
+			{
+				LocalWeightMultiplier[Node.Index] = LocalWeightCache->Read(Node.PointIndex);
+			}
 		}
 		else
 		{
 			LocalWeightMultiplier.SetNumZeroed(NumPoints);
-			for (int i = 0; i < NumPoints; i++) { LocalWeightMultiplier[i] = LocalWeightCache->Read(i); }
+			for (int i = 0; i < NumPoints; i++)
+			{
+				LocalWeightMultiplier[i] = LocalWeightCache->Read(i);
+			}
 		}
 
 		bHasCustomLocalWeightMultiplier = true;
@@ -57,13 +63,22 @@ double FPCGExHeuristicOperation::GetEdgeScore(const PCGExClusters::FNode& From, 
 double FPCGExHeuristicOperation::GetCustomWeightMultiplier(const int32 PointIndex, const int32 EdgeIndex) const
 {
 	//TODO Rewrite this
-	if (!bUseLocalWeightMultiplier || LocalWeightMultiplier.IsEmpty()) { return 1; }
+	if (!bUseLocalWeightMultiplier || LocalWeightMultiplier.IsEmpty())
+	{
+		return 1;
+	}
 	return FMath::Abs(LocalWeightMultiplier[LocalWeightMultiplierSource == EPCGExClusterElement::Vtx ? PointIndex : EdgeIndex]);
 }
 
-const PCGExClusters::FNode* FPCGExHeuristicOperation::GetRoamingSeed() const { return Cluster->GetRoamingNode(UVWSeed); }
+const PCGExClusters::FNode* FPCGExHeuristicOperation::GetRoamingSeed() const
+{
+	return Cluster->GetRoamingNode(UVWSeed);
+}
 
-const PCGExClusters::FNode* FPCGExHeuristicOperation::GetRoamingGoal() const { return Cluster->GetRoamingNode(UVWGoal); }
+const PCGExClusters::FNode* FPCGExHeuristicOperation::GetRoamingGoal() const
+{
+	return Cluster->GetRoamingNode(UVWGoal);
+}
 
 double FPCGExHeuristicOperation::GetScoreInternal(const double InTime) const
 {

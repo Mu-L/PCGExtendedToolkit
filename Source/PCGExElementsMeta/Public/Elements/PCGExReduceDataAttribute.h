@@ -7,10 +7,10 @@
 
 
 #include "Core/PCGExPointsProcessor.h"
-#include "Types/PCGExTypes.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Details/PCGExAttributesDetails.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Types/PCGExTypes.h"
 
 #include "PCGExReduceDataAttribute.generated.h"
 
@@ -37,18 +37,38 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ReduceDataAttribute, "Reduce Data", "Reduce @Data domain attribute.", FName(GetDisplayName()));
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite);
+	}
+
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 
-	virtual FName GetMainInputPin() const override { return PCGPinConstants::DefaultInputLabel; }
-	virtual FName GetMainOutputPin() const override { return PCGPinConstants::DefaultOutputLabel; }
+	virtual FName GetMainInputPin() const override
+	{
+		return PCGPinConstants::DefaultInputLabel;
+	}
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGPinConstants::DefaultOutputLabel;
+	}
 
 protected:
-	virtual bool IsInputless() const override { return true; }
+	virtual bool IsInputless() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
@@ -112,6 +132,9 @@ protected:
 	void AggregateValues(TArray<T>& OutList, const TArray<const FPCGMetadataAttributeBase*>& InAttributes) const
 	{
 		OutList.Reserve(InAttributes.Num());
-		ForEachValue<T>(InAttributes, [&](T Value, int32) { OutList.Add(Value); });
+		ForEachValue<T>(InAttributes, [&](T Value, int32)
+		{
+			OutList.Add(Value);
+		});
 	}
 };

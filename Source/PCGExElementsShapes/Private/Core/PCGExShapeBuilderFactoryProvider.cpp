@@ -25,7 +25,7 @@ void UPCGExShapeBuilderFactoryProviderSettings::PCGExApplyDeprecationBeforeUpdat
 		// Rewire Resolution Vector
 		PCGEX_SHORTHAND_RENAME_PIN(ResolutionAttribute, ResolutionConstantVector, ResolutionVector)
 	}
-	
+
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 #endif

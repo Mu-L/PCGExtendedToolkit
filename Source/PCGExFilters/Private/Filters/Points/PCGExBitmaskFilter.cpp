@@ -6,9 +6,9 @@
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Bitmasks/PCGExBitmaskDetails.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCompareFilterDefinition"
@@ -30,12 +30,18 @@ void UPCGExBitmaskFilterFactory::RegisterBuffersDependencies(FPCGExContext* InCo
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
 	FacadePreloader.Register<int64>(InContext, Config.FlagsAttribute);
-	if (Config.MaskInput == EPCGExInputValueType::Attribute) { FacadePreloader.Register<int64>(InContext, Config.BitmaskAttribute); }
+	if (Config.MaskInput == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<int64>(InContext, Config.BitmaskAttribute);
+	}
 }
 
 bool UPCGExBitmaskFilterFactory::RegisterConsumableAttributes(FPCGExContext* InContext) const
 {
-	if (!Super::RegisterConsumableAttributes(InContext)) { return false; }
+	if (!Super::RegisterConsumableAttributes(InContext))
+	{
+		return false;
+	}
 
 	InContext->AddConsumableAttributeName(Config.FlagsAttribute);
 	InContext->AddConsumableAttributeName(Config.BitmaskAttribute);
@@ -45,7 +51,10 @@ bool UPCGExBitmaskFilterFactory::RegisterConsumableAttributes(FPCGExContext* InC
 
 bool PCGExPointFilter::FBitmaskFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	FlagsReader = PointDataFacade->GetReadable<int64>(TypedFilterFactory->Config.FlagsAttribute, PCGExData::EIOSide::In, true);
 
@@ -56,10 +65,16 @@ bool PCGExPointFilter::FBitmaskFilter::Init(FPCGExContext* InContext, const TSha
 	}
 
 	MaskReader = TypedFilterFactory->Config.GetValueSettingBitmask(PCGEX_QUIET_HANDLING);
-	if (!MaskReader->Init(PointDataFacade)) { return false; }
+	if (!MaskReader->Init(PointDataFacade))
+	{
+		return false;
+	}
 
 	Compositions.Reserve(TypedFilterFactory->Config.Compositions.Num());
-	for (const FPCGExBitmaskRef& Ref : TypedFilterFactory->Config.Compositions) { Compositions.Add(Ref.GetSimpleBitmask()); }
+	for (const FPCGExBitmaskRef& Ref : TypedFilterFactory->Config.Compositions)
+	{
+		Compositions.Add(Ref.GetSimpleBitmask());
+	}
 
 	return true;
 }
@@ -68,7 +83,10 @@ bool PCGExPointFilter::FBitmaskFilter::Test(const int32 PointIndex) const
 {
 	// Start with the base mask value, then apply each composition's bitwise mutation (AND/OR/XOR/NOT) in sequence.
 	int64 OutMask = MaskReader->Read(PointIndex);
-	for (const FPCGExSimpleBitmask& Comp : Compositions) { Comp.Mutate(OutMask); }
+	for (const FPCGExSimpleBitmask& Comp : Compositions)
+	{
+		Comp.Mutate(OutMask);
+	}
 	const bool Result = PCGExBitmask::Compare(TypedFilterFactory->Config.Comparison, FlagsReader->Read(PointIndex), OutMask);
 	return TypedFilterFactory->Config.bInvertResult ? !Result : Result;
 }
@@ -78,11 +96,20 @@ bool PCGExPointFilter::FBitmaskFilter::Test(const TSharedPtr<PCGExData::FPointIO
 	int64 OutFlags = 0;
 	int64 OutMask = 0;
 
-	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.FlagsAttribute, OutFlags, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.FlagsAttribute, OutFlags, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
 
-	if (!PCGExData::Helpers::TryGetSettingDataValue(IO, TypedFilterFactory->Config.MaskInput, TypedFilterFactory->Config.BitmaskAttribute, TypedFilterFactory->Config.Bitmask, OutMask, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+	if (!PCGExData::Helpers::TryGetSettingDataValue(IO, TypedFilterFactory->Config.MaskInput, TypedFilterFactory->Config.BitmaskAttribute, TypedFilterFactory->Config.Bitmask, OutMask, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
 
-	for (const FPCGExSimpleBitmask& Comp : Compositions) { Comp.Mutate(OutMask); }
+	for (const FPCGExSimpleBitmask& Comp : Compositions)
+	{
+		Comp.Mutate(OutMask);
+	}
 
 	const bool Result = PCGExBitmask::Compare(TypedFilterFactory->Config.Comparison, OutFlags, OutMask);
 	return TypedFilterFactory->Config.bInvertResult ? !Result : Result;
@@ -99,27 +126,33 @@ FString UPCGExBitmaskFilterProviderSettings::GetDisplayName() const
 
 	switch (Config.Comparison)
 	{
-	case EPCGExBitflagComparison::MatchPartial: DisplayName = TEXT("Contains Any");
+	case EPCGExBitflagComparison::MatchPartial:
+		DisplayName = TEXT("Contains Any");
 		//DisplayName = TEXT("A & B != 0");
 		//DisplayName = A + " & " + B + TEXT(" != 0");
 		break;
-	case EPCGExBitflagComparison::MatchFull: DisplayName = TEXT("Contains All");
+	case EPCGExBitflagComparison::MatchFull:
+		DisplayName = TEXT("Contains All");
 		//DisplayName = TEXT("A & B == B");
 		//DisplayName = A + " Any " + B + TEXT(" == B");
 		break;
-	case EPCGExBitflagComparison::MatchStrict: DisplayName = TEXT("Is Exactly");
+	case EPCGExBitflagComparison::MatchStrict:
+		DisplayName = TEXT("Is Exactly");
 		//DisplayName = TEXT("A == B");
 		//DisplayName = A + " == " + B;
 		break;
-	case EPCGExBitflagComparison::NoMatchPartial: DisplayName = TEXT("Not Contains Any");
+	case EPCGExBitflagComparison::NoMatchPartial:
+		DisplayName = TEXT("Not Contains Any");
 		//DisplayName = TEXT("A & B == 0");
 		//DisplayName = A + " & " + B + TEXT(" == 0");
 		break;
-	case EPCGExBitflagComparison::NoMatchFull: DisplayName = TEXT("Not Contains All");
+	case EPCGExBitflagComparison::NoMatchFull:
+		DisplayName = TEXT("Not Contains All");
 		//DisplayName = TEXT("A & B != B");
 		//DisplayName = A + " & " + B + TEXT(" != B");
 		break;
-	default: DisplayName = " ?? ";
+	default:
+		DisplayName = " ?? ";
 		break;
 	}
 

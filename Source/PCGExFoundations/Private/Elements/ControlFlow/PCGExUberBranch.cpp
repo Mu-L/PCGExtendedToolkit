@@ -3,8 +3,8 @@
 
 #include "Elements/ControlFlow/PCGExUberBranch.h"
 
-#include "Data/PCGExData.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 
 
@@ -28,7 +28,10 @@ void UPCGExUberBranchSettings::PostEditChangeProperty(FPropertyChangedEvent& Pro
 }
 #endif
 
-bool UPCGExUberBranchSettings::HasDynamicPins() const { return true; }
+bool UPCGExUberBranchSettings::HasDynamicPins() const
+{
+	return true;
+}
 
 TArray<FPCGPinProperties> UPCGExUberBranchSettings::InputPinProperties() const
 {
@@ -66,7 +69,10 @@ FName UPCGExUberBranchSettings::GetMainOutputPin() const
 
 bool FPCGExUberBranchElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(UberBranch)
 
@@ -81,7 +87,8 @@ bool FPCGExUberBranchElement::Boot(FPCGExContext* InContext) const
 	{
 		bool bInitialized = false;
 
-		if (TArray<TObjectPtr<const UPCGExPointFilterFactoryData>> Factories; GetInputFactories(Context, Settings->InputLabels[i], Factories, PCGExFactories::PointFilters))
+		if (TArray<TObjectPtr<const UPCGExPointFilterFactoryData>> Factories;
+			GetInputFactories(Context, Settings->InputLabels[i], Factories, PCGExFactories::PointFilters))
 		{
 			for (const TSharedPtr<PCGExData::FFacade>& Facade : Context->Facades)
 			{
@@ -97,7 +104,10 @@ bool FPCGExUberBranchElement::Boot(FPCGExContext* InContext) const
 			}
 		}
 
-		if (!bInitialized) { Context->Managers.Add(nullptr); }
+		if (!bInitialized)
+		{
+			Context->Managers.Add(nullptr);
+		}
 	}
 
 	Context->Dispatch.Init(0, Settings->NumBranches);
@@ -131,7 +141,10 @@ bool FPCGExUberBranchElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 					for (int i = 0; i < Settings->NumBranches; i++)
 					{
 						const TSharedPtr<PCGExPointFilter::FManager> Manager = SharedContext.Get()->Managers[i];
-						if (!Manager) { continue; }
+						if (!Manager)
+						{
+							continue;
+						}
 						Manager->bWillBeUsedWithCollections = true;
 						if (Manager->Test(Facade->Source, SharedContext.Get()->MainPoints))
 						{
@@ -142,7 +155,10 @@ bool FPCGExUberBranchElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 						}
 					}
 
-					if (!bDistributed) { Facade->Source->OutputPin = Settings->GetMainOutputPin(); }
+					if (!bDistributed)
+					{
+						Facade->Source->OutputPin = Settings->GetMainOutputPin();
+					}
 				}
 			};
 
@@ -152,7 +168,13 @@ bool FPCGExUberBranchElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 
 		PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
 		{
-			for (int i = 0; i < Settings->NumBranches; i++) { if (!Context->Dispatch[i]) { Context->OutputData.InactiveOutputPinBitmask |= 1ULL << (i + 1); } }
+			for (int i = 0; i < Settings->NumBranches; i++)
+			{
+				if (!Context->Dispatch[i])
+				{
+					Context->OutputData.InactiveOutputPinBitmask |= 1ULL << (i + 1);
+				}
+			}
 			Context->MainPoints->StageOutputs();
 			Context->Done();
 		}
@@ -165,7 +187,10 @@ bool FPCGExUberBranchElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 			for (int i = 0; i < Settings->NumBranches; i++)
 			{
 				const TSharedPtr<PCGExPointFilter::FManager> Manager = Context->Managers[i];
-				if (!Manager) { continue; }
+				if (!Manager)
+				{
+					continue;
+				}
 				if (Manager->Test(Facade->Source, Context->MainPoints))
 				{
 					Facade->Source->OutputPin = Settings->OutputLabels[i];
@@ -175,10 +200,19 @@ bool FPCGExUberBranchElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 				}
 			}
 
-			if (!bDistributed) { Facade->Source->OutputPin = Settings->GetMainOutputPin(); }
+			if (!bDistributed)
+			{
+				Facade->Source->OutputPin = Settings->GetMainOutputPin();
+			}
 		}
 
-		for (int i = 0; i < Settings->NumBranches; i++) { if (!Context->Dispatch[i]) { Context->OutputData.InactiveOutputPinBitmask |= 1ULL << (i + 1); } }
+		for (int i = 0; i < Settings->NumBranches; i++)
+		{
+			if (!Context->Dispatch[i])
+			{
+				Context->OutputData.InactiveOutputPinBitmask |= 1ULL << (i + 1);
+			}
+		}
 		Context->MainPoints->StageOutputs();
 		Context->Done();
 	}

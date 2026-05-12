@@ -120,7 +120,10 @@ namespace PCGExStaging
 			for (int i = 0; i < NumPoints; i++)
 			{
 				int32 Idx = Mapping[i];
-				if (Idx == -1) { continue; }
+				if (Idx == -1)
+				{
+					continue;
+				}
 
 				StartIndices[i] = WriteIndex;
 
@@ -179,7 +182,8 @@ namespace PCGExStaging
 
 		for (int i = 0; i < SocketInfos.Sockets.Num(); i++)
 		{
-			if (const FPCGExSocket& Socket = SocketInfos.Sockets[i]; Details->SocketNameFilters.Test(Socket.SocketName.ToString()) && Details->SocketTagFilters.Test(Socket.Tag))
+			if (const FPCGExSocket& Socket = SocketInfos.Sockets[i];
+				Details->SocketNameFilters.Test(Socket.SocketName.ToString()) && Details->SocketTagFilters.Test(Socket.Tag))
 			{
 				ValidSockets.Add(Socket);
 			}
@@ -201,7 +205,10 @@ namespace PCGExStaging
 		PCGEX_SCOPE_LOOP(i)
 		{
 			int32 Index = StartIndices[i];
-			if (Index == -1) { continue; }
+			if (Index == -1)
+			{
+				continue;
+			}
 
 			const FTransform& InTransform = ReadTransform[i];
 			const FSocketInfos& SocketInfos = SocketInfosList[Mapping[i]];
@@ -216,7 +223,10 @@ namespace PCGExStaging
 				const FVector WorldSc = WorldTransform.GetScale3D();
 				FVector OutScale = Socket.RelativeTransform.GetScale3D();
 
-				for (const int32 C : Details->TrScaComponents) { OutScale[C] = WorldSc[C]; }
+				for (const int32 C : Details->TrScaComponents)
+				{
+					OutScale[C] = WorldSc[C];
+				}
 				WorldTransform.SetScale3D(OutScale);
 
 				OutTransform[Index] = WorldTransform;

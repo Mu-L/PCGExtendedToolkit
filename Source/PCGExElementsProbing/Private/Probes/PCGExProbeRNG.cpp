@@ -11,7 +11,10 @@ PCGEX_CREATE_PROBE_FACTORY(RNG, {}, {})
 
 bool FPCGExProbeRNG::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 	HalfBeta = Config.Beta * 0.5;
 	HalfBetaSq = HalfBeta * HalfBeta;
 	return true;
@@ -31,7 +34,10 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 		for (int32 c = 0; c < Candidates.Num(); ++c)
 		{
 			const PCGExProbing::FCandidate& Cj = Candidates[c];
-			if (Cj.Distance > R) { break; }
+			if (Cj.Distance > R)
+			{
+				break;
+			}
 
 			const double DijSq = Cj.Distance * Cj.Distance;
 			const FVector& Pj = Positions[Cj.PointIndex];
@@ -40,7 +46,10 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 			for (int32 k = 0; k < c; ++k)
 			{
 				const PCGExProbing::FCandidate& Ck = Candidates[k];
-				if (Ck.Distance >= Cj.Distance) { break; }
+				if (Ck.Distance >= Cj.Distance)
+				{
+					break;
+				}
 
 				if (FVector::DistSquared(Pj, Positions[Ck.PointIndex]) < DijSq)
 				{
@@ -49,7 +58,10 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 				}
 			}
 
-			if (!bBlocked) { OutEdges->Add(PCGEx::H64U(Index, Cj.PointIndex)); }
+			if (!bBlocked)
+			{
+				OutEdges->Add(PCGEx::H64U(Index, Cj.PointIndex));
+			}
 		}
 	}
 	else
@@ -62,7 +74,10 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 		for (int32 c = 0; c < Candidates.Num(); ++c)
 		{
 			const PCGExProbing::FCandidate& Cj = Candidates[c];
-			if (Cj.Distance > R) { break; }
+			if (Cj.Distance > R)
+			{
+				break;
+			}
 
 			const double Dij = Cj.Distance;
 			const double RadiusSq = HalfBetaSq * Dij * Dij;
@@ -74,7 +89,10 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 			for (int32 k = 0; k < c; ++k)
 			{
 				const PCGExProbing::FCandidate& Ck = Candidates[k];
-				if (Ck.Distance >= Dij) { break; }
+				if (Ck.Distance >= Dij)
+				{
+					break;
+				}
 
 				const FVector& Pk = Positions[Ck.PointIndex];
 				if (FVector::DistSquared(C1, Pk) < RadiusSq && FVector::DistSquared(C2, Pk) < RadiusSq)
@@ -84,7 +102,10 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 				}
 			}
 
-			if (!bBlocked) { OutEdges->Add(PCGEx::H64U(Index, Cj.PointIndex)); }
+			if (!bBlocked)
+			{
+				OutEdges->Add(PCGEx::H64U(Index, Cj.PointIndex));
+			}
 		}
 	}
 }
@@ -93,8 +114,14 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 FString UPCGExProbeRNGProviderSettings::GetDisplayName() const
 {
 	const double B = Config.Beta;
-	if (FMath::IsNearlyEqual(B, 2.0)) { return TEXT("RNG"); }
-	if (FMath::IsNearlyEqual(B, 1.0)) { return TEXT("Gabriel"); }
+	if (FMath::IsNearlyEqual(B, 2.0))
+	{
+		return TEXT("RNG");
+	}
+	if (FMath::IsNearlyEqual(B, 1.0))
+	{
+		return TEXT("Gabriel");
+	}
 	return FString::Printf(TEXT("β = %.2f"), B);
 }
 #endif

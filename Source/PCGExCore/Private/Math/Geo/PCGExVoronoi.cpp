@@ -6,9 +6,9 @@
 #include "CoreMinimal.h"
 #include "Helpers/PCGExArrayHelpers.h"
 
+#include "Math/PCGExProjectionDetails.h"
 #include "Math/Geo/PCGExDelaunay.h"
 #include "Math/Geo/PCGExGeo.h"
-#include "Math/PCGExProjectionDetails.h"
 
 namespace PCGExMath::Geo
 {
@@ -54,7 +54,10 @@ namespace PCGExMath::Geo
 			{
 				const int32 AdjacentIdx = Site.Neighbors[i];
 
-				if (AdjacentIdx == -1) { continue; }
+				if (AdjacentIdx == -1)
+				{
+					continue;
+				}
 
 				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
 			}
@@ -95,7 +98,10 @@ namespace PCGExMath::Geo
 			{
 				const int32 AdjacentIdx = Site.Neighbors[i];
 
-				if (AdjacentIdx == -1) { continue; }
+				if (AdjacentIdx == -1)
+				{
+					continue;
+				}
 
 				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
 			}
@@ -130,7 +136,10 @@ namespace PCGExMath::Geo
 			for (int i = 0; i < 3; i++)
 			{
 				const int32 AdjacentIdx = Site.Neighbors[i];
-				if (AdjacentIdx == -1) { continue; }
+				if (AdjacentIdx == -1)
+				{
+					continue;
+				}
 				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
 			}
 		}
@@ -166,7 +175,10 @@ namespace PCGExMath::Geo
 			for (int i = 0; i < 3; i++)
 			{
 				const int32 AdjacentIdx = Site.Neighbors[i];
-				if (AdjacentIdx == -1) { continue; }
+				if (AdjacentIdx == -1)
+				{
+					continue;
+				}
 				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
 			}
 		}
@@ -275,10 +287,22 @@ namespace PCGExMath::Geo
 			{
 				const bool bInBoundsA = WithinBounds ? (*WithinBounds)[SiteA] : true;
 				const bool bInBoundsB = WithinBounds ? (*WithinBounds)[SiteB] : true;
-				if (bInBoundsA) { GetCircumcenter2D(ProjectedView, SiteDataA.Vtx, ProjectedCenterA); }
-				else { GetCentroid(ProjectedView, SiteDataA.Vtx, ProjectedCenterA); }
-				if (bInBoundsB) { GetCircumcenter2D(ProjectedView, SiteDataB.Vtx, ProjectedCenterB); }
-				else { GetCentroid(ProjectedView, SiteDataB.Vtx, ProjectedCenterB); }
+				if (bInBoundsA)
+				{
+					GetCircumcenter2D(ProjectedView, SiteDataA.Vtx, ProjectedCenterA);
+				}
+				else
+				{
+					GetCentroid(ProjectedView, SiteDataA.Vtx, ProjectedCenterA);
+				}
+				if (bInBoundsB)
+				{
+					GetCircumcenter2D(ProjectedView, SiteDataB.Vtx, ProjectedCenterB);
+				}
+				else
+				{
+					GetCentroid(ProjectedView, SiteDataB.Vtx, ProjectedCenterB);
+				}
 			}
 
 			// Use projected X,Y for 2D path computation
@@ -378,7 +402,10 @@ namespace PCGExMath::Geo
 				int32 B = -1;
 				PCGEx::NH64(AdjacencyPair.Value, A, B);
 
-				if (A == -1 || B == -1) { continue; }
+				if (A == -1 || B == -1)
+				{
+					continue;
+				}
 
 				VoronoiEdges.Add(PCGEx::H64U(A, B));
 			}

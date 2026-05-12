@@ -170,7 +170,10 @@ namespace PCGExMath::OBB
 			const float ra = EA[i];
 			const float rb = EB.X * AbsR[i][0] + EB.Y * AbsR[i][1] + EB.Z * AbsR[i][2];
 			const float Overlap = (ra + rb) - FMath::Abs(D | AxesA[i]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 
@@ -180,7 +183,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.X * AbsR[0][i] + EA.Y * AbsR[1][i] + EA.Z * AbsR[2][i];
 			const float rb = EB[i];
 			const float Overlap = (ra + rb) - FMath::Abs(D | AxesB[i]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 
@@ -190,7 +196,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.Y * AbsR[2][0] + EA.Z * AbsR[1][0];
 			const float rb = EB.Y * AbsR[0][2] + EB.Z * AbsR[0][1];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[2]) * R[1][0] - (D | AxesA[1]) * R[2][0]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A0 x B1
@@ -198,7 +207,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.Y * AbsR[2][1] + EA.Z * AbsR[1][1];
 			const float rb = EB.X * AbsR[0][2] + EB.Z * AbsR[0][0];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[2]) * R[1][1] - (D | AxesA[1]) * R[2][1]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A0 x B2
@@ -206,7 +218,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.Y * AbsR[2][2] + EA.Z * AbsR[1][2];
 			const float rb = EB.X * AbsR[0][1] + EB.Y * AbsR[0][0];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[2]) * R[1][2] - (D | AxesA[1]) * R[2][2]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A1 x B0
@@ -214,7 +229,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.X * AbsR[2][0] + EA.Z * AbsR[0][0];
 			const float rb = EB.Y * AbsR[1][2] + EB.Z * AbsR[1][1];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[0]) * R[2][0] - (D | AxesA[2]) * R[0][0]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A1 x B1
@@ -222,7 +240,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.X * AbsR[2][1] + EA.Z * AbsR[0][1];
 			const float rb = EB.X * AbsR[1][2] + EB.Z * AbsR[1][0];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[0]) * R[2][1] - (D | AxesA[2]) * R[0][1]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A1 x B2
@@ -230,7 +251,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.X * AbsR[2][2] + EA.Z * AbsR[0][2];
 			const float rb = EB.X * AbsR[1][1] + EB.Y * AbsR[1][0];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[0]) * R[2][2] - (D | AxesA[2]) * R[0][2]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A2 x B0
@@ -238,7 +262,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.X * AbsR[1][0] + EA.Y * AbsR[0][0];
 			const float rb = EB.Y * AbsR[2][2] + EB.Z * AbsR[2][1];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[1]) * R[0][0] - (D | AxesA[0]) * R[1][0]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A2 x B1
@@ -246,7 +273,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.X * AbsR[1][1] + EA.Y * AbsR[0][1];
 			const float rb = EB.X * AbsR[2][2] + EB.Z * AbsR[2][0];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[1]) * R[0][1] - (D | AxesA[0]) * R[1][1]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 		// A2 x B2
@@ -254,7 +284,10 @@ namespace PCGExMath::OBB
 			const float ra = EA.X * AbsR[1][2] + EA.Y * AbsR[0][2];
 			const float rb = EB.X * AbsR[2][1] + EB.Y * AbsR[2][0];
 			const float Overlap = (ra + rb) - FMath::Abs((D | AxesA[1]) * R[0][2] - (D | AxesA[0]) * R[1][2]);
-			if (Overlap < 0) { return Overlap; }
+			if (Overlap < 0)
+			{
+				return Overlap;
+			}
 			MinOverlap = FMath::Min(MinOverlap, Overlap);
 		}
 

@@ -3,11 +3,11 @@
 
 #include "Elements/PCGExStagingFitting.h"
 
-#include "Engine/StaticMesh.h"
 #include "PCGParamData.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Engine/StaticMesh.h"
 #include "Helpers/PCGExAssetLoader.h"
 #include "Helpers/PCGExRandomHelpers.h"
 
@@ -19,7 +19,10 @@
 
 PCGExData::EIOInit UPCGExStagingFittingSettings::GetMainDataInitializationPolicy() const
 {
-	if (StealData == EPCGExOptionState::Enabled && !bPruneEmptyPoints) { return PCGExData::EIOInit::Forward; }
+	if (StealData == EPCGExOptionState::Enabled && !bPruneEmptyPoints)
+	{
+		return PCGExData::EIOInit::Forward;
+	}
 	return PCGExData::EIOInit::Duplicate;
 }
 
@@ -49,7 +52,10 @@ TArray<FPCGPinProperties> UPCGExStagingFittingSettings::OutputPinProperties() co
 
 bool FPCGExStagingFittingElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagingFitting)
 
@@ -96,7 +102,10 @@ bool FPCGExStagingFittingElement::AdvanceWork(FPCGExContext* InContext, const UP
 		}
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
@@ -114,7 +123,10 @@ bool FPCGExStagingFittingElement::AdvanceWork(FPCGExContext* InContext, const UP
 		}
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
@@ -142,14 +154,20 @@ namespace PCGExStagingFitting
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
 		if (Settings->Source == EPCGExFittingSource::CollectionMap)
 		{
 			EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
-			if (!EntryHashGetter) { return false; }
+			if (!EntryHashGetter)
+			{
+				return false;
+			}
 
 			Variations = Settings->Variations;
 			Variations.Init(Settings->Seed);
@@ -171,7 +189,10 @@ namespace PCGExStagingFitting
 		FittingHandler.ScaleToFit = Settings->ScaleToFit;
 		FittingHandler.Justification = Settings->Justification;
 
-		if (!FittingHandler.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!FittingHandler.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		if (Settings->bWriteTranslation)
 		{
@@ -185,7 +206,10 @@ namespace PCGExStagingFitting
 
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
-		if (Settings->bPruneEmptyPoints) { Mask.Init(1, PointDataFacade->GetNum()); }
+		if (Settings->bPruneEmptyPoints)
+		{
+			Mask.Init(1, PointDataFacade->GetNum());
+		}
 
 		StartParallelLoopForPoints();
 
@@ -247,7 +271,10 @@ namespace PCGExStagingFitting
 
 				FittingHandler.ComputeTransform(Index, OutTransform, OutBounds, OutTranslation);
 
-				if (TranslationWriter) { TranslationWriter->SetValue(Index, OutTranslation); }
+				if (TranslationWriter)
+				{
+					TranslationWriter->SetValue(Index, OutTranslation);
+				}
 
 				OutBoundsMin[Index] = OutBounds.Min;
 				OutBoundsMax[Index] = OutBounds.Max;
@@ -283,7 +310,10 @@ namespace PCGExStagingFitting
 					FittingHandler.ComputeTransform(Index, OutTransform, OutBounds, OutTranslation);
 				}
 
-				if (TranslationWriter) { TranslationWriter->SetValue(Index, OutTranslation); }
+				if (TranslationWriter)
+				{
+					TranslationWriter->SetValue(Index, OutTranslation);
+				}
 
 				OutBoundsMin[Index] = OutBounds.Min;
 				OutBoundsMax[Index] = OutBounds.Max;

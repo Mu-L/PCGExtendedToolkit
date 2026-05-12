@@ -8,8 +8,8 @@
 #include "Core/PCGExAssetCollection.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
-#include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExActorContentFilter.h"
+#include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
 
 #include "PCGExLevelCollection.generated.h"
@@ -30,7 +30,10 @@ struct PCGEXCOLLECTIONS_API FPCGExLevelCollectionEntry : public FPCGExAssetColle
 
 	// Type System
 
-	virtual PCGExAssetCollection::FTypeId GetTypeId() const override { return PCGExAssetCollection::TypeIds::Level; }
+	virtual PCGExAssetCollection::FTypeId GetTypeId() const override
+	{
+		return PCGExAssetCollection::TypeIds::Level;
+	}
 
 	// Level-Specific Properties
 

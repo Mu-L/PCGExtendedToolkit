@@ -177,11 +177,17 @@ namespace PCGExFloodFill
 			// HeapPop will return the element with lowest score (highest priority for spreading)
 			if (Mode == EPCGExFloodFillPrioritization::Heuristics)
 			{
-				if (A.Score == B.Score) { return A.Depth < B.Depth; }
+				if (A.Score == B.Score)
+				{
+					return A.Depth < B.Depth;
+				}
 				return A.Score < B.Score;
 			}
 			// Depth
-			if (A.Depth == B.Depth) { return A.Score < B.Score; }
+			if (A.Depth == B.Depth)
+			{
+				return A.Score < B.Score;
+			}
 			return A.Depth < B.Depth;
 		}
 	};
@@ -218,9 +224,20 @@ namespace PCGExFloodFill
 		FDiffusion(const TSharedPtr<FFillControlsHandler>& InFillControlsHandler, const TSharedPtr<PCGExClusters::FCluster>& InCluster, const PCGExClusters::FNode* InSeedNode);
 		~FDiffusion() = default;
 
-		FORCEINLINE const FDiffusionConfig& GetConfig() const { return Config; }
-		FORCEINLINE int32 GetMaxDepth() const { return MaxDepth; }
-		FORCEINLINE double GetMaxDistance() const { return MaxDistance; }
+		FORCEINLINE const FDiffusionConfig& GetConfig() const
+		{
+			return Config;
+		}
+
+		FORCEINLINE int32 GetMaxDepth() const
+		{
+			return MaxDepth;
+		}
+
+		FORCEINLINE double GetMaxDistance() const
+		{
+			return MaxDistance;
+		}
 
 		int32 GetSettingsIndex(EPCGExFloodFillSettingSource Source) const;
 
@@ -261,9 +278,20 @@ namespace PCGExFloodFill
 
 		FDiffusionConfig DiffusionConfig; // Shared config for all diffusions in this handler
 
-		FORCEINLINE bool IsValidHandler() const { return bIsValidHandler; }
-		FORCEINLINE int32 GetNumDiffusions() const { return NumDiffusions; }
-		FORCEINLINE const FDiffusionConfig& GetDiffusionConfig() const { return DiffusionConfig; }
+		FORCEINLINE bool IsValidHandler() const
+		{
+			return bIsValidHandler;
+		}
+
+		FORCEINLINE int32 GetNumDiffusions() const
+		{
+			return NumDiffusions;
+		}
+
+		FORCEINLINE const FDiffusionConfig& GetDiffusionConfig() const
+		{
+			return DiffusionConfig;
+		}
 
 		FFillControlsHandler(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataCache, const TSharedPtr<PCGExData::FFacade>& InEdgeDataCache, const TSharedPtr<PCGExData::FFacade>& InSeedsDataCache, const TArray<TObjectPtr<const UPCGExFillControlsFactoryData>>& InFactories);
 

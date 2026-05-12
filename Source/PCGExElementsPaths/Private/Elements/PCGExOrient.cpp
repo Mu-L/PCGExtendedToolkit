@@ -18,7 +18,10 @@ void UPCGExOrientSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!Orientation) { Orientation = NewObject<UPCGExOrientLookAt>(this, TEXT("Orientation")); }
+		if (!Orientation)
+		{
+			Orientation = NewObject<UPCGExOrientLookAt>(this, TEXT("Orientation"));
+		}
 	}
 	Super::PostInitProperties();
 }
@@ -33,13 +36,19 @@ TArray<FPCGPinProperties> UPCGExOrientSettings::InputPinProperties() const
 
 PCGEX_INITIALIZE_ELEMENT(Orient)
 
-PCGExData::EIOInit UPCGExOrientSettings::GetMainDataInitializationPolicy() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExOrientSettings::GetMainDataInitializationPolicy() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(Orient)
 
 bool FPCGExOrientElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(Orient)
 
@@ -49,8 +58,14 @@ bool FPCGExOrientElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
-	if (Settings->Output == EPCGExOrientUsage::OutputToAttribute) { PCGEX_VALIDATE_NAME(Settings->OutputAttribute); }
-	if (Settings->bOutputDot) { PCGEX_VALIDATE_NAME(Settings->DotAttribute); }
+	if (Settings->Output == EPCGExOrientUsage::OutputToAttribute)
+	{
+		PCGEX_VALIDATE_NAME(Settings->OutputAttribute);
+	}
+	if (Settings->bOutputDot)
+	{
+		PCGEX_VALIDATE_NAME(Settings->DotAttribute);
+	}
 
 	PCGEX_BIND_INSTANCED_FACTORY(Orientation, UPCGExOrientInstancedFactory, PCGExOrient::SourceOverridesOrient)
 	Context->Orientation->OrientAxis = Settings->OrientAxis;
@@ -109,7 +124,10 @@ namespace PCGExOrient
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
@@ -120,7 +138,10 @@ namespace PCGExOrient
 		LastIndex = PointDataFacade->GetNum() - 1;
 
 		Orient = Context->Orientation->CreateOperation();
-		if (!Orient->PrepareForData(PointDataFacade, Path.ToSharedRef())) { return false; }
+		if (!Orient->PrepareForData(PointDataFacade, Path.ToSharedRef()))
+		{
+			return false;
+		}
 
 		if (Settings->Output == EPCGExOrientUsage::OutputToAttribute)
 		{
@@ -148,13 +169,25 @@ namespace PCGExOrient
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (Path->IsValidEdgeIndex(Index)) { Path->ComputeEdgeExtra(Index); }
+			if (Path->IsValidEdgeIndex(Index))
+			{
+				Path->ComputeEdgeExtra(Index);
+			}
 
 			const FTransform OutT = Orient->ComputeOrientation(PointDataFacade->GetOutPoint(Index), PointFilterCache[Index] ? -1 : 1);
-			if (Settings->bOutputDot) { DotWriter->SetValue(Index, FVector::DotProduct(Path->DirToPrevPoint(Index) * -1, Path->DirToNextPoint(Index))); }
+			if (Settings->bOutputDot)
+			{
+				DotWriter->SetValue(Index, FVector::DotProduct(Path->DirToPrevPoint(Index) * -1, Path->DirToNextPoint(Index)));
+			}
 
-			if (TransformWriter) { TransformWriter->SetValue(Index, OutT); }
-			else { OutTransform[Index] = OutT; }
+			if (TransformWriter)
+			{
+				TransformWriter->SetValue(Index, OutT);
+			}
+			else
+			{
+				OutTransform[Index] = OutT;
+			}
 		}
 	}
 

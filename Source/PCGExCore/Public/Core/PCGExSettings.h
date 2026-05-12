@@ -35,7 +35,12 @@ public:
 
 protected:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const;
-	virtual bool OnlyPassThroughOneEdgeWhenDisabled() const override { return false; }
+
+	virtual bool OnlyPassThroughOneEdgeWhenDisabled() const override
+	{
+		return false;
+	}
+
 	//~End UPCGSettings
 
 	UPROPERTY()
@@ -64,7 +69,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsDataStealing", EditConditionHides, HideEditConditionToggle))
 	EPCGExOptionState StealData = EPCGExOptionState::Disabled;
 
-	virtual EPCGExExecutionPolicy GetExecutionPolicy() const { return ExecutionPolicy; }
+	virtual EPCGExExecutionPolicy GetExecutionPolicy() const
+	{
+		return ExecutionPolicy;
+	}
 
 	/** Forces the execution over a single frame.
 	 * Not safe on all nodes, some nodes will override this internally.

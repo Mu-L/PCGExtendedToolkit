@@ -3,9 +3,9 @@
 
 #include "Filters/PCGExAdjacency.h"
 
+#include "Clusters/PCGExCluster.h"
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
-#include "Clusters/PCGExCluster.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
 bool FPCGExAdjacencySettings::Init(const FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InPrimaryDataFacade, const bool bQuiet)
@@ -19,7 +19,10 @@ bool FPCGExAdjacencySettings::Init(const FPCGExContext* InContext, const TShared
 		LocalThreshold = InPrimaryDataFacade->GetBroadcaster<double>(ThresholdAttribute);
 		if (!LocalThreshold)
 		{
-			if (!bQuiet) { PCGEX_LOG_INVALID_SELECTOR_C(InContext, Local Threshold, ThresholdAttribute) }
+			if (!bQuiet)
+			{
+				PCGEX_LOG_INVALID_SELECTOR_C(InContext, Local Threshold, ThresholdAttribute)
+			}
 			return false;
 		}
 	}
@@ -33,15 +36,24 @@ int32 FPCGExAdjacencySettings::GetThreshold(const PCGExClusters::FNode& Node) co
 	{
 		switch (ThresholdComparison)
 		{
-		case EPCGExComparison::StrictlyEqual: return Node.Num() < Value ? -1 : Value;
-		case EPCGExComparison::StrictlyNotEqual: return Value;
-		case EPCGExComparison::EqualOrGreater: return Node.Num() < Value ? -1 : Value;
-		case EPCGExComparison::EqualOrSmaller: return Value;
-		case EPCGExComparison::StrictlyGreater: return Node.Num() <= Value ? -1 : Value;
-		case EPCGExComparison::StrictlySmaller: return Value;
-		case EPCGExComparison::NearlyEqual: return Value;
-		case EPCGExComparison::NearlyNotEqual: return Value;
-		default: return Value;
+		case EPCGExComparison::StrictlyEqual:
+			return Node.Num() < Value ? -1 : Value;
+		case EPCGExComparison::StrictlyNotEqual:
+			return Value;
+		case EPCGExComparison::EqualOrGreater:
+			return Node.Num() < Value ? -1 : Value;
+		case EPCGExComparison::EqualOrSmaller:
+			return Value;
+		case EPCGExComparison::StrictlyGreater:
+			return Node.Num() <= Value ? -1 : Value;
+		case EPCGExComparison::StrictlySmaller:
+			return Value;
+		case EPCGExComparison::NearlyEqual:
+			return Value;
+		case EPCGExComparison::NearlyNotEqual:
+			return Value;
+		default:
+			return Value;
 		}
 	};
 
@@ -57,9 +69,12 @@ int32 FPCGExAdjacencySettings::GetThreshold(const PCGExClusters::FNode& Node) co
 		switch (Rounding)
 		{
 		default: ;
-		case EPCGExRelativeThresholdRoundingMode::Round: return FMath::RoundToInt32(LocalThreshold->Read(Node.PointIndex) * Node.Num());
-		case EPCGExRelativeThresholdRoundingMode::Floor: return FMath::FloorToInt32(LocalThreshold->Read(Node.PointIndex) * Node.Num());
-		case EPCGExRelativeThresholdRoundingMode::Ceil: return FMath::CeilToInt32(LocalThreshold->Read(Node.PointIndex) * Node.Num());
+		case EPCGExRelativeThresholdRoundingMode::Round:
+			return FMath::RoundToInt32(LocalThreshold->Read(Node.PointIndex) * Node.Num());
+		case EPCGExRelativeThresholdRoundingMode::Floor:
+			return FMath::FloorToInt32(LocalThreshold->Read(Node.PointIndex) * Node.Num());
+		case EPCGExRelativeThresholdRoundingMode::Ceil:
+			return FMath::CeilToInt32(LocalThreshold->Read(Node.PointIndex) * Node.Num());
 		}
 	}
 
@@ -72,8 +87,11 @@ int32 FPCGExAdjacencySettings::GetThreshold(const PCGExClusters::FNode& Node) co
 	switch (Rounding)
 	{
 	default: ;
-	case EPCGExRelativeThresholdRoundingMode::Round: return FMath::RoundToInt32(RelativeThreshold * Node.Num());
-	case EPCGExRelativeThresholdRoundingMode::Floor: return FMath::FloorToInt32(RelativeThreshold * Node.Num());
-	case EPCGExRelativeThresholdRoundingMode::Ceil: return FMath::CeilToInt32(RelativeThreshold * Node.Num());
+	case EPCGExRelativeThresholdRoundingMode::Round:
+		return FMath::RoundToInt32(RelativeThreshold * Node.Num());
+	case EPCGExRelativeThresholdRoundingMode::Floor:
+		return FMath::FloorToInt32(RelativeThreshold * Node.Num());
+	case EPCGExRelativeThresholdRoundingMode::Ceil:
+		return FMath::CeilToInt32(RelativeThreshold * Node.Num());
 	}
 }

@@ -4,10 +4,10 @@
 #include "Factories/PCGExFactories.h"
 
 #include "Core/PCGExContext.h"
-#include "Factories/PCGExFactoryProvider.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
 #include "Tasks/Task.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFactoryProvider"
@@ -32,7 +32,10 @@ namespace PCGExFactories
 		{
 			bool bIsAlreadyInSet;
 			UniqueData.Add(TaggedData.Data->GetUniqueID(), &bIsAlreadyInSet);
-			if (bIsAlreadyInSet) { continue; }
+			if (bIsAlreadyInSet)
+			{
+				continue;
+			}
 
 			const UPCGExFactoryData* Factory = Cast<UPCGExFactoryData>(TaggedData.Data);
 			if (Factory)
@@ -55,11 +58,17 @@ namespace PCGExFactories
 
 		if (OutFactories.IsEmpty())
 		{
-			if (bRequired) { PCGEX_LOG_MISSING_INPUT(InContext, FText::Format(FTEXT("Missing required inputs on pin '{0}'."), FText::FromName(InLabel))) }
+			if (bRequired)
+			{
+				PCGEX_LOG_MISSING_INPUT(InContext, FText::Format(FTEXT("Missing required inputs on pin '{0}'."), FText::FromName(InLabel)))
+			}
 			return false;
 		}
 
-		OutFactories.Sort([](const UPCGExFactoryData& A, const UPCGExFactoryData& B) { return A.Priority < B.Priority; });
+		OutFactories.Sort([](const UPCGExFactoryData& A, const UPCGExFactoryData& B)
+		{
+			return A.Priority < B.Priority;
+		});
 
 		return true;
 	}
@@ -68,11 +77,17 @@ namespace PCGExFactories
 	{
 		check(InContext)
 
-		if (!InData || InFactories.IsEmpty()) { return; }
+		if (!InData || InFactories.IsEmpty())
+		{
+			return;
+		}
 
 		for (const TObjectPtr<const UPCGExFactoryData>& Factory : InFactories)
 		{
-			if (!Factory.Get()) { continue; }
+			if (!Factory.Get())
+			{
+				continue;
+			}
 			Factory->RegisterConsumableAttributesWithData(InContext, InData);
 		}
 	}
@@ -82,11 +97,17 @@ namespace PCGExFactories
 		FPCGContext::FSharedContext<FPCGExContext> SharedContext(InFacade->Source->GetContextHandle());
 		check(SharedContext.Get())
 
-		if (!InFacade->GetIn()) { return; }
+		if (!InFacade->GetIn())
+		{
+			return;
+		}
 
 		const UPCGData* Data = InFacade->GetIn();
 
-		if (!Data) { return; }
+		if (!Data)
+		{
+			return;
+		}
 
 		for (const TObjectPtr<const UPCGExFactoryData>& Factory : InFactories)
 		{

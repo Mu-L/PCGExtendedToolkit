@@ -8,10 +8,10 @@
 #include "Core/PCGExAssetCollection.h"
 
 #include "Data/Descriptors/PCGExComponentDescriptors.h"
-#include "ISMPartition/ISMComponentDescriptor.h"
-#include "MeshSelectors/PCGMeshSelectorBase.h"
 #include "Engine/StaticMesh.h"
 #include "Helpers/PCGExArrayHelpers.h"
+#include "ISMPartition/ISMComponentDescriptor.h"
+#include "MeshSelectors/PCGMeshSelectorBase.h"
 #include "UObject/SoftObjectPath.h"
 
 #include "PCGExMeshCollection.generated.h"
@@ -91,7 +91,10 @@ namespace PCGExMeshCollection
 			return PCGExAssetCollection::TypeIds::Mesh;
 		}
 
-		int32 GetHighestIndex() const { return HighestMaterialIndex; }
+		int32 GetHighestIndex() const
+		{
+			return HighestMaterialIndex;
+		}
 
 		void ProcessMaterialOverrides(const TArray<FPCGExMaterialOverrideSingleEntry>& Overrides, int32 InSlotIndex = -1);
 		void ProcessMaterialOverrides(const TArray<FPCGExMaterialOverrideCollection>& Overrides);
@@ -185,7 +188,6 @@ struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionEntry : public FPCGExAssetCollec
 	{
 		return static_cast<PCGExMeshCollection::FMicroCache*>(MicroCache.Get());
 	}
-
 };
 
 /**
@@ -200,10 +202,9 @@ class PCGEXCOLLECTIONS_API UPCGExMeshCollection : public UPCGExAssetCollection
 {
 	GENERATED_BODY()
 	PCGEX_ASSET_COLLECTION_BODY(FPCGExMeshCollectionEntry)
-
-public:
 	friend struct FPCGExMeshCollectionEntry;
 
+public:
 	// Type System
 	virtual PCGExAssetCollection::FTypeId GetTypeId() const override
 	{

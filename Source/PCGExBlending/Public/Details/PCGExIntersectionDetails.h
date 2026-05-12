@@ -42,7 +42,11 @@ struct PCGEXBLENDING_API FPCGExUnionMetadataDetails
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Union Size", EditCondition="bWriteUnionSize"))
 	FName UnionSizeAttributeName = "UnionSize";
 
-	bool WriteAny() const { return bWriteIsUnion || bWriteUnionSize; }
+	bool WriteAny() const
+	{
+		return bWriteIsUnion || bWriteUnionSize;
+	}
+
 	bool SanityCheck(FPCGExContext* InContext) const;
 };
 
@@ -182,5 +186,8 @@ struct PCGEXBLENDING_API FPCGExEdgeEdgeIntersectionDetails
 
 	void Init();
 
-	FORCEINLINE bool CheckDot(const double InDot) const { return InDot <= MaxDot && InDot >= MinDot; }
+	FORCEINLINE bool CheckDot(const double InDot) const
+	{
+		return InDot <= MaxDot && InDot >= MinDot;
+	}
 };

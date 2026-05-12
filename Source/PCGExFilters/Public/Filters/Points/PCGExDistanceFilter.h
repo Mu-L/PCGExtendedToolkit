@@ -6,13 +6,13 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 
-#include "Utils/PCGExCompare.h"
+#include "PCGExFilterCommon.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "Core/PCGExPointFilter.h"
-#include "Details/PCGExDistancesDetails.h"
-#include "PCGExFilterCommon.h"
 #include "Data/PCGExTaggedData.h"
+#include "Details/PCGExDistancesDetails.h"
 #include "PCGExMatching/Public/Core/PCGExMatchRuleFactoryProvider.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExDistanceFilter.generated.h"
 
@@ -91,14 +91,22 @@ public:
 
 	virtual bool Init(FPCGExContext* InContext) override;
 
-	virtual bool SupportsCollectionEvaluation() const override { return Config.bCheckAgainstDataBounds; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return Config.bCheckAgainstDataBounds;
+	}
+
 	virtual bool SupportsProxyEvaluation() const override;
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
 
 	virtual void BeginDestroy() override;
@@ -110,7 +118,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FDistanceFilter(const TObjectPtr<const UPCGExDistanceFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 			TargetsHandler = TypedFilterFactory->TargetsHandler;
 		}
@@ -173,9 +182,16 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 
 protected:
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 };

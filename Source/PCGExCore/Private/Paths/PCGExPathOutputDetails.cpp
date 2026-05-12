@@ -5,10 +5,19 @@
 
 bool FPCGExPathOutputDetails::Validate(const int32 NumPathPoints) const
 {
-	if (NumPathPoints < 2) { return false; }
+	if (NumPathPoints < 2)
+	{
+		return false;
+	}
 
-	if (bRemoveSmallPaths && NumPathPoints < MinPointCount) { return false; }
-	if (bRemoveLargePaths && NumPathPoints > MaxPointCount) { return false; }
+	if (bRemoveSmallPaths && NumPathPoints < MinPointCount)
+	{
+		return false;
+	}
+	if (bRemoveLargePaths && NumPathPoints > MaxPointCount)
+	{
+		return false;
+	}
 
 	return true;
 }

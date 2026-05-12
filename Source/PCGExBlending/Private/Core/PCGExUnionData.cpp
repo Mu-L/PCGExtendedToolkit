@@ -24,7 +24,10 @@ namespace PCGExData
 	void IUnionData::Add_Unsafe(const int32 IOIndex, const TArray<int32>& PointIndices)
 	{
 		Elements.Reserve(Elements.Num() + PointIndices.Num());
-		for (const int32 A : PointIndices) { Elements.Add(FElement(A, IOIndex)); }
+		for (const int32 A : PointIndices)
+		{
+			Elements.Add(FElement(A, IOIndex));
+		}
 	}
 
 	void IUnionData::Add(const int32 IOIndex, const TArray<int32>& PointIndices)
@@ -45,7 +48,10 @@ namespace PCGExData
 
 	void IUnionData::Reserve(const int32 InSetReserve, const int32 InElementReserve = 8)
 	{
-		if (InElementReserve > 8) { Elements.Reserve(InElementReserve); }
+		if (InElementReserve > 8)
+		{
+			Elements.Reserve(InElementReserve);
+		}
 	}
 
 	void IUnionData::Reset()
@@ -55,7 +61,10 @@ namespace PCGExData
 
 	int32 FUnionMetadata::Size(const int32 EntryIndex) const
 	{
-		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return 0; }
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex])
+		{
+			return 0;
+		}
 		return Entries[EntryIndex]->Num();
 	}
 
@@ -67,28 +76,43 @@ namespace PCGExData
 		const PCGExMath::IDistances* InDistances,
 		TArray<FWeightedPoint>& OutWeightedPoints) const
 	{
-		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return 0; }
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex])
+		{
+			return 0;
+		}
 		return Entries[EntryIndex]->ComputeWeights(Sources, IdxLookup, Target, InDistances, OutWeightedPoints);
 	}
 
 	bool FUnionMetadata::ContainsIO(const int32 EntryIndex, const int32 IO) const
 	{
-		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return false; }
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex])
+		{
+			return false;
+		}
 		return Entries[EntryIndex]->ContainsIO(IO);
 	}
 
 	TSet<int32> FUnionMetadata::GetIOSet(const int32 EntryIndex) const
 	{
-		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return TSet<int32>(); }
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex])
+		{
+			return TSet<int32>();
+		}
 		return Entries[EntryIndex]->GetIOSet();
 	}
 
 	bool FUnionMetadata::IOIndexOverlap(const int32 EntryIndex, const TSet<int32>& InIndices) const
 	{
-		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex]) { return false; }
+		if (!Entries.IsValidIndex(EntryIndex) || !Entries[EntryIndex])
+		{
+			return false;
+		}
 		for (const FElement& E : Entries[EntryIndex]->Elements)
 		{
-			if (InIndices.Contains(E.IO)) { return true; }
+			if (InIndices.Contains(E.IO))
+			{
+				return true;
+			}
 		}
 		return false;
 	}

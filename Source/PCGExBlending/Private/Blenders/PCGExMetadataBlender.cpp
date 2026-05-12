@@ -43,7 +43,10 @@ namespace PCGExBlending
 			PCGExData::FProxyDescriptor A = PCGExData::FProxyDescriptor(SourceFacade, PCGExData::EProxyRole::Read);
 			PCGExData::FProxyDescriptor B = PCGExData::FProxyDescriptor(bUseTargetAsSecondarySource ? TargetFacade : SourceFacade, PCGExData::EProxyRole::Read);
 
-			if (!A.Capture(InContext, Param.Selector, SourceSide)) { return false; }
+			if (!A.Capture(InContext, Param.Selector, SourceSide))
+			{
+				return false;
+			}
 
 			if (Param.bIsNewAttribute)
 			{
@@ -61,7 +64,10 @@ namespace PCGExBlending
 			else
 			{
 				// Strict capture may fail here, TBD
-				if (!B.CaptureStrict(InContext, Param.Selector, BSide)) { return false; }
+				if (!B.CaptureStrict(InContext, Param.Selector, BSide))
+				{
+					return false;
+				}
 			}
 
 			PCGExData::FProxyDescriptor C = B;
@@ -75,7 +81,10 @@ namespace PCGExBlending
 
 			TSharedPtr<FProxyDataBlender> Blender = CreateProxyBlender(InContext, Param.Blending, A, B, C);
 
-			if (!Blender) { return false; }
+			if (!Blender)
+			{
+				return false;
+			}
 
 			Blenders.Add(Blender);
 		}
@@ -85,12 +94,18 @@ namespace PCGExBlending
 
 	void FMetadataBlender::Blend(const int32 SourceIndex, const int32 TargetIndex, const double Weight) const
 	{
-		for (int i = 0; i < Blenders.Num(); i++) { Blenders[i]->Blend(SourceIndex, TargetIndex, Weight); }
+		for (int i = 0; i < Blenders.Num(); i++)
+		{
+			Blenders[i]->Blend(SourceIndex, TargetIndex, Weight);
+		}
 	}
 
 	void FMetadataBlender::Blend(const int32 SourceAIndex, const int32 SourceBIndex, const int32 TargetIndex, const double Weight) const
 	{
-		for (int i = 0; i < Blenders.Num(); i++) { Blenders[i]->Blend(SourceAIndex, SourceBIndex, TargetIndex, Weight); }
+		for (int i = 0; i < Blenders.Num(); i++)
+		{
+			Blenders[i]->Blend(SourceAIndex, SourceBIndex, TargetIndex, Weight);
+		}
 	}
 
 	void FMetadataBlender::InitTrackers(TArray<PCGEx::FOpStats>& Trackers) const
@@ -100,16 +115,25 @@ namespace PCGExBlending
 
 	void FMetadataBlender::BeginMultiBlend(const int32 TargetIndex, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		for (int i = 0; i < Blenders.Num(); i++) { Trackers[i] = Blenders[i]->BeginMultiBlend(TargetIndex); }
+		for (int i = 0; i < Blenders.Num(); i++)
+		{
+			Trackers[i] = Blenders[i]->BeginMultiBlend(TargetIndex);
+		}
 	}
 
 	void FMetadataBlender::MultiBlend(const int32 SourceIndex, const int32 TargetIndex, const double Weight, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		for (int i = 0; i < Blenders.Num(); i++) { Blenders[i]->MultiBlend(SourceIndex, TargetIndex, Weight, Trackers[i]); }
+		for (int i = 0; i < Blenders.Num(); i++)
+		{
+			Blenders[i]->MultiBlend(SourceIndex, TargetIndex, Weight, Trackers[i]);
+		}
 	}
 
 	void FMetadataBlender::EndMultiBlend(const int32 TargetIndex, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		for (int i = 0; i < Blenders.Num(); i++) { Blenders[i]->EndMultiBlend(TargetIndex, Trackers[i]); }
+		for (int i = 0; i < Blenders.Num(); i++)
+		{
+			Blenders[i]->EndMultiBlend(TargetIndex, Trackers[i]);
+		}
 	}
 }

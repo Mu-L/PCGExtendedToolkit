@@ -48,7 +48,10 @@ namespace PCGExCollections
 
 #if WITH_EDITOR
 		/** Test-only: number of BuildSharedData calls performed by this cache. */
-		int32 GetBuildCount() const { return BuildCount; }
+		int32 GetBuildCount() const
+		{
+			return BuildCount;
+		}
 #endif
 
 	private:

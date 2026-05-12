@@ -26,8 +26,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(WriteIndex, "Write Index", "Write the current point index to an attribute.", FName(GetDisplayName()));
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite);
+	}
 #endif
 
 protected:
@@ -37,7 +45,10 @@ protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
@@ -105,7 +116,11 @@ public:
 
 	bool CollectionLevelOutputOnly() const;
 
-	virtual bool IsInputless() const override { return CollectionLevelOutputOnly(); }
+	virtual bool IsInputless() const override
+	{
+		return CollectionLevelOutputOnly();
+	}
+
 	virtual EPCGExExecutionPolicy GetExecutionPolicy() const override;
 
 #if WITH_EDITOR

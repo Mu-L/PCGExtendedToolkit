@@ -10,7 +10,10 @@
 namespace PCGExFitting::Tasks
 {
 	FTransformPointIO::FTransformPointIO(const int32 InTaskIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<PCGExData::FPointIO>& InToBeTransformedIO, FPCGExTransformDetails* InTransformDetails, bool bAllocate)
-		: FPCGExIndexedTask(InTaskIndex), PointIO(InPointIO), ToBeTransformedIO(InToBeTransformedIO), TransformDetails(InTransformDetails)
+		: FPCGExIndexedTask(InTaskIndex)
+		  , PointIO(InPointIO)
+		  , ToBeTransformedIO(InToBeTransformedIO)
+		  , TransformDetails(InTransformDetails)
 	{
 	}
 
@@ -25,11 +28,17 @@ namespace PCGExFitting::Tasks
 
 		if (!TransformDetails->bIgnoreBounds)
 		{
-			for (int i = 0; i < OutTransforms.Num(); i++) { PointBounds += OutPointData->GetLocalBounds(i).TransformBy(OutTransforms[i]); }
+			for (int i = 0; i < OutTransforms.Num(); i++)
+			{
+				PointBounds += OutPointData->GetLocalBounds(i).TransformBy(OutTransforms[i]);
+			}
 		}
 		else
 		{
-			for (const FTransform& Pt : OutTransforms) { PointBounds += Pt.GetLocation(); }
+			for (const FTransform& Pt : OutTransforms)
+			{
+				PointBounds += Pt.GetLocation();
+			}
 		}
 
 		PointBounds = PointBounds.ExpandBy(0.1); // Avoid NaN
@@ -44,7 +53,7 @@ namespace PCGExFitting::Tasks
 			PCGEX_PARALLEL_FOR(
 				OutTransforms.Num(),
 				OutTransforms[i] *= TargetTransform;
-			)
+				)
 			break;
 		case 2: // Inherit rotation only
 			PCGEX_PARALLEL_FOR(
@@ -53,7 +62,7 @@ namespace PCGExFitting::Tasks
 				FQuat OriginalRot = Transform.GetRotation();
 				Transform *= TargetTransform;
 				Transform.SetRotation(OriginalRot);
-			)
+				)
 			break;
 		case 1: // Inherit scale only
 			PCGEX_PARALLEL_FOR(
@@ -62,14 +71,14 @@ namespace PCGExFitting::Tasks
 				FVector OriginalScale = Transform.GetScale3D();
 				Transform *= TargetTransform;
 				Transform.SetScale3D(OriginalScale);
-			)
+				)
 			break;
 		default:
 			PCGEX_PARALLEL_FOR(
 				OutTransforms.Num(),
 				FTransform& Transform = OutTransforms[i];
 				Transform.SetLocation(TargetTransform.TransformPosition(Transform.GetLocation()));
-			)
+				)
 			break;
 		}
 	}

@@ -67,7 +67,10 @@ namespace PCGExAssetCollection
 		}
 		IsProcessed() = true;
 
-		for (auto& Func : GetPendingRegistrations()) { Func(); }
+		for (auto& Func : GetPendingRegistrations())
+		{
+			Func();
+		}
 		GetPendingRegistrations().Empty();
 		GetPendingRegistrations().Shrink();
 	}

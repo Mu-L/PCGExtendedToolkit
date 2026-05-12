@@ -15,16 +15,16 @@ struct PCGEXFOUNDATIONS_API FPCGExSocket
 	FPCGExSocket() = default;
 
 	FPCGExSocket(const FName& InSocketName, const FVector& InRelativeLocation, const FRotator& InRelativeRotation, const FVector& InRelativeScale, FString InTag)
-		: SocketName(InSocketName),
-		  RelativeTransform(FTransform(InRelativeRotation.Quaternion(), InRelativeLocation, InRelativeScale)),
-		  Tag(InTag)
+		: SocketName(InSocketName)
+		  , RelativeTransform(FTransform(InRelativeRotation.Quaternion(), InRelativeLocation, InRelativeScale))
+		  , Tag(InTag)
 	{
 	}
 
 	FPCGExSocket(const FName& InSocketName, const FTransform& InRelativeTransform, const FString& InTag)
-		: SocketName(InSocketName),
-		  RelativeTransform(InRelativeTransform),
-		  Tag(InTag)
+		: SocketName(InSocketName)
+		  , RelativeTransform(InRelativeTransform)
+		  , Tag(InTag)
 	{
 	}
 

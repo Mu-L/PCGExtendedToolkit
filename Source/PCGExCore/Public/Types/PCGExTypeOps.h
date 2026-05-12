@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/SoftObjectPath.h"
-#include "Metadata/PCGMetadataAttributeTraits.h"
 #include "PCGExCommon.h"
 #include "PCGExTypeTraits.h"
+#include "Metadata/PCGMetadataAttributeTraits.h"
+#include "UObject/SoftObjectPath.h"
 
 /**
  * PCGEx Type Operations System
@@ -74,7 +74,11 @@ namespace PCGExTypeOps
 		virtual bool SupportsLerp() const = 0;
 		virtual bool SupportsMinMax() const = 0;
 		virtual bool SupportsArithmetic() const = 0;
-		virtual bool SameType(const ITypeOpsBase* Other) const { return GetTypeId() == Other->GetTypeId(); }
+
+		virtual bool SameType(const ITypeOpsBase* Other) const
+		{
+			return GetTypeId() == Other->GetTypeId();
+		}
 
 		// Default value operations
 		virtual void SetDefault(void* OutValue) const = 0;
@@ -167,14 +171,20 @@ namespace PCGExTypeOps
 			EPCGMetadataTypes FromType, const void* FromValue,
 			EPCGMetadataTypes ToType, void* ToValue)
 		{
-			if (!bInitialized) { Initialize(); }
+			if (!bInitialized)
+			{
+				Initialize();
+			}
 			Table[static_cast<int32>(FromType)][static_cast<int32>(ToType)](FromValue, ToValue);
 		}
 
 		// Get the conversion function pointer for a specific pair
 		FORCEINLINE static FConvertFn GetConversionFn(EPCGMetadataTypes FromType, EPCGMetadataTypes ToType)
 		{
-			if (!bInitialized) { Initialize(); }
+			if (!bInitialized)
+			{
+				Initialize();
+			}
 			return Table[static_cast<int32>(FromType)][static_cast<int32>(ToType)];
 		}
 

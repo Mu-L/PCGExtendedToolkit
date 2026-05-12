@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Math/GenericOctree.h"
 #include "Templates/SharedPointer.h"
 #include "Templates/SharedPointerFwd.h"
-#include "Math/GenericOctree.h"
 
 #ifndef PCGEX_OCTREE_MACROS
 #define PCGEX_OCTREE_MACROS
@@ -45,7 +45,8 @@ namespace PCGExOctree
 		FBoxSphereBounds Bounds;
 
 		FItem(const int32 InIndex, const FBoxSphereBounds& InBounds)
-			: Index(InIndex), Bounds(InBounds)
+			: Index(InIndex)
+			  , Bounds(InBounds)
 		{
 		}
 	};

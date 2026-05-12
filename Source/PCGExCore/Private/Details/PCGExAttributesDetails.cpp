@@ -4,9 +4,9 @@
 
 #include "Details/PCGExAttributesDetails.h"
 
-#include "Core/PCGExContext.h"
-#include "PCGModule.h"
 #include "PCGExCoreMacros.h"
+#include "PCGModule.h"
+#include "Core/PCGExContext.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadata.h"
 
@@ -30,9 +30,15 @@ FPCGExInputConfig::FPCGExInputConfig(const FName InName)
 }
 
 #if WITH_EDITOR
-FString FPCGExInputConfig::GetDisplayName() const { return GetName().ToString(); }
+FString FPCGExInputConfig::GetDisplayName() const
+{
+	return GetName().ToString();
+}
 
-void FPCGExInputConfig::UpdateUserFacingInfos() { TitlePropertyName = GetDisplayName(); }
+void FPCGExInputConfig::UpdateUserFacingInfos()
+{
+	TitlePropertyName = GetDisplayName();
+}
 #endif
 
 bool FPCGExInputConfig::Validate(const UPCGData* InData)
@@ -59,7 +65,10 @@ bool FPCGExInputConfig::Validate(const UPCGData* InData)
 bool FPCGExAttributeSourceToTargetDetails::ValidateNames(FPCGExContext* InContext) const
 {
 	PCGEX_VALIDATE_NAME_CONSUMABLE_C(InContext, Source)
-	if (WantsRemappedOutput()) { PCGEX_VALIDATE_NAME_C(InContext, Target) }
+	if (WantsRemappedOutput())
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, Target)
+	}
 	return true;
 }
 
@@ -104,12 +113,21 @@ FPCGAttributePropertyInputSelector FPCGExAttributeSourceToTargetDetails::GetTarg
 
 bool FPCGExAttributeSourceToTargetList::ValidateNames(FPCGExContext* InContext) const
 {
-	for (const FPCGExAttributeSourceToTargetDetails& Entry : Attributes) { if (!Entry.ValidateNames(InContext)) { return false; } }
+	for (const FPCGExAttributeSourceToTargetDetails& Entry : Attributes)
+	{
+		if (!Entry.ValidateNames(InContext))
+		{
+			return false;
+		}
+	}
 	return true;
 }
 
 void FPCGExAttributeSourceToTargetList::GetSources(TArray<FName>& OutNames) const
 {
 	OutNames.Reserve(OutNames.Num() + Attributes.Num());
-	for (const FPCGExAttributeSourceToTargetDetails& Entry : Attributes) { OutNames.Add(Entry.Source); }
+	for (const FPCGExAttributeSourceToTargetDetails& Entry : Attributes)
+	{
+		OutNames.Add(Entry.Source);
+	}
 }

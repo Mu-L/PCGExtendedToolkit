@@ -62,18 +62,36 @@ namespace PCGExMath::Geo
 		{
 			const double L[3] = {FVector::DistSquared(Positions[Vtx[0]], Positions[Vtx[1]]), FVector::DistSquared(Positions[Vtx[0]], Positions[Vtx[2]]), FVector::DistSquared(Positions[Vtx[1]], Positions[Vtx[2]])};
 
-			if (L[0] > L[1] && L[0] > L[2]) { Edge = PCGEx::H64U(L[0], L[1]); }
-			else if (L[1] > L[0] && L[1] > L[2]) { Edge = PCGEx::H64U(L[0], L[2]); }
-			else { Edge = PCGEx::H64U(L[1], L[2]); }
+			if (L[0] > L[1] && L[0] > L[2])
+			{
+				Edge = PCGEx::H64U(L[0], L[1]);
+			}
+			else if (L[1] > L[0] && L[1] > L[2])
+			{
+				Edge = PCGEx::H64U(L[0], L[2]);
+			}
+			else
+			{
+				Edge = PCGEx::H64U(L[1], L[2]);
+			}
 		}
 
 		FORCEINLINE void GetLongestEdge(const TArrayView<const FVector2D>& Positions, uint64& Edge) const
 		{
 			const double L[3] = {FVector2D::DistSquared(Positions[Vtx[0]], Positions[Vtx[1]]), FVector2D::DistSquared(Positions[Vtx[0]], Positions[Vtx[2]]), FVector2D::DistSquared(Positions[Vtx[1]], Positions[Vtx[2]])};
 
-			if (L[0] > L[1] && L[0] > L[2]) { Edge = PCGEx::H64U(L[0], L[1]); }
-			else if (L[1] > L[0] && L[1] > L[2]) { Edge = PCGEx::H64U(L[0], L[2]); }
-			else { Edge = PCGEx::H64U(L[1], L[2]); }
+			if (L[0] > L[1] && L[0] > L[2])
+			{
+				Edge = PCGEx::H64U(L[0], L[1]);
+			}
+			else if (L[1] > L[0] && L[1] > L[2])
+			{
+				Edge = PCGEx::H64U(L[0], L[2]);
+			}
+			else
+			{
+				Edge = PCGEx::H64U(L[1], L[2]);
+			}
 		}
 
 		FORCEINLINE void GetBounds(const TArrayView<const FVector>& Positions, FBox& Bounds) const
@@ -107,7 +125,10 @@ namespace PCGExMath::Geo
 			const FVector2D& A = Positions[Vtx[0]];
 			const FVector2D& B = Positions[Vtx[1]];
 			const FVector2D& C = Positions[Vtx[2]];
-			if ((B.X - A.X) * (C.Y - A.Y) - (C.X - A.X) * (B.Y - A.Y) > 0) { Swap(Vtx[1], Vtx[2]); }
+			if ((B.X - A.X) * (C.Y - A.Y) - (C.X - A.X) * (B.Y - A.Y) > 0)
+			{
+				Swap(Vtx[1], Vtx[2]);
+			}
 		}
 
 		template <typename T>
@@ -125,7 +146,10 @@ namespace PCGExMath::Geo
 
 		FORCEINLINE void FixWinding(const FVector& A, const FVector& B, const FVector& C, const FVector& Up = FVector::UpVector)
 		{
-			if (FVector::DotProduct(FVector::CrossProduct(B - A, C - A), Up) > 0) { Swap(Vtx[1], Vtx[2]); }
+			if (FVector::DotProduct(FVector::CrossProduct(B - A, C - A), Up) > 0)
+			{
+				Swap(Vtx[1], Vtx[2]);
+			}
 		}
 	};
 
@@ -143,7 +167,14 @@ namespace PCGExMath::Geo
 		{
 		}
 
-		FORCEINLINE void ComputeBounds(const TArrayView<FVector>& Positions) { GetBounds(Positions, Bounds); }
-		FORCEINLINE void ComputeBounds(const TArrayView<FVector2D>& Positions) { GetBounds(Positions, Bounds); }
+		FORCEINLINE void ComputeBounds(const TArrayView<FVector>& Positions)
+		{
+			GetBounds(Positions, Bounds);
+		}
+
+		FORCEINLINE void ComputeBounds(const TArrayView<FVector2D>& Positions)
+		{
+			GetBounds(Positions, Bounds);
+		}
 	};
 }

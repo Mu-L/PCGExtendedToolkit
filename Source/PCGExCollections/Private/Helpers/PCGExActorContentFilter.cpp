@@ -3,13 +3,13 @@
 
 #include "Helpers/PCGExActorContentFilter.h"
 
-#include "GameFramework/Actor.h"
 #include "PCGExCollectionsSettingsCache.h"
 #include "PCGExSocketProvider.h"
+#include "GameFramework/Actor.h"
 
 #if WITH_EDITOR
-#include "Engine/LevelScriptActor.h"
 #include "Engine/Brush.h"
+#include "Engine/LevelScriptActor.h"
 #include "GameFramework/Info.h"
 #include "GameFramework/Volume.h"
 #endif
@@ -26,21 +26,48 @@ TSet<FName> UPCGExActorContentFilter::KnownSystemActorClasses =
 
 bool UPCGExActorContentFilter::IsInfrastructureActor(AActor* Actor)
 {
-	if (!Actor) { return true; }
-	if (Actor->IsHidden()) { return true; }
-	if (Actor->bIsEditorOnlyActor) { return true; }
+	if (!Actor)
+	{
+		return true;
+	}
+	if (Actor->IsHidden())
+	{
+		return true;
+	}
+	if (Actor->bIsEditorOnlyActor)
+	{
+		return true;
+	}
 
 #if WITH_EDITOR
-	if (Actor->bIsMainWorldOnly) { return true; }
-	if (Actor->IsA<ALevelScriptActor>()) { return true; }
-	if (Actor->IsA<AInfo>()) { return true; }
-	if (Actor->IsA<ABrush>() && !Actor->IsA<AVolume>()) { return true; }
+	if (Actor->bIsMainWorldOnly)
+	{
+		return true;
+	}
+	if (Actor->IsA<ALevelScriptActor>())
+	{
+		return true;
+	}
+	if (Actor->IsA<AInfo>())
+	{
+		return true;
+	}
+	if (Actor->IsA<ABrush>() && !Actor->IsA<AVolume>())
+	{
+		return true;
+	}
 
 	// Soft check for ANavigationData -- avoids hard link dependency on NavigationSystem module
 	static UClass* NavigationDataClass = FindObject<UClass>(nullptr, TEXT("/Script/NavigationSystem.NavigationData"));
-	if (NavigationDataClass && Actor->IsA(NavigationDataClass)) { return true; }
+	if (NavigationDataClass && Actor->IsA(NavigationDataClass))
+	{
+		return true;
+	}
 
-	if (PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetClass()->GetFName())) { return true; }
+	if (PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetClass()->GetFName()))
+	{
+		return true;
+	}
 #endif
 
 	return false;
@@ -58,12 +85,18 @@ bool UPCGExActorContentFilter::StaticPassesFilter(
 	const UPCGExActorContentFilter* Filter, AActor* Actor,
 	UPCGExAssetCollection* OwningCollection, int32 EntryIndex)
 {
-	if (!Actor) { return false; }
+	if (!Actor)
+	{
+		return false;
+	}
 
 	// Socket providers that strip themselves are excluded from all content scans
 	if (const IPCGExSocketProvider* Provider = Cast<IPCGExSocketProvider>(Actor))
 	{
-		if (Provider->ShouldStripFromExport_Implementation()) { return false; }
+		if (Provider->ShouldStripFromExport_Implementation())
+		{
+			return false;
+		}
 	}
 
 	if (Filter)
@@ -85,7 +118,10 @@ bool UPCGExActorContentFilter::PassesFilter_Implementation(AActor* Actor, UPCGEx
 
 bool UPCGExDefaultActorContentFilter::PassesFilter_Implementation(AActor* Actor, UPCGExAssetCollection* OwningCollection, int32 EntryIndex) const
 {
-	if (IsInfrastructureActor(Actor)) { return false; }
+	if (IsInfrastructureActor(Actor))
+	{
+		return false;
+	}
 
 	// Tag include filter
 	if (IncludeTags.Num() > 0)
@@ -99,7 +135,10 @@ bool UPCGExDefaultActorContentFilter::PassesFilter_Implementation(AActor* Actor,
 				break;
 			}
 		}
-		if (!bHasIncludeTag) { return false; }
+		if (!bHasIncludeTag)
+		{
+			return false;
+		}
 	}
 
 	// Tag exclude filter
@@ -107,7 +146,10 @@ bool UPCGExDefaultActorContentFilter::PassesFilter_Implementation(AActor* Actor,
 	{
 		for (const FName& Tag : ExcludeTags)
 		{
-			if (Actor->Tags.Contains(Tag)) { return false; }
+			if (Actor->Tags.Contains(Tag))
+			{
+				return false;
+			}
 		}
 	}
 
@@ -126,7 +168,10 @@ bool UPCGExDefaultActorContentFilter::PassesFilter_Implementation(AActor* Actor,
 				}
 			}
 		}
-		if (!bMatchesClass) { return false; }
+		if (!bMatchesClass)
+		{
+			return false;
+		}
 	}
 
 	// Class exclude filter
@@ -134,7 +179,13 @@ bool UPCGExDefaultActorContentFilter::PassesFilter_Implementation(AActor* Actor,
 	{
 		for (const TSoftClassPtr<AActor>& ClassPtr : ExcludeClasses)
 		{
-			if (UClass* C = ClassPtr.Get()) { if (Actor->IsA(C)) { return false; } }
+			if (UClass* C = ClassPtr.Get())
+			{
+				if (Actor->IsA(C))
+				{
+					return false;
+				}
+			}
 		}
 	}
 

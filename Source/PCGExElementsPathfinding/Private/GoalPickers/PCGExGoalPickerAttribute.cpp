@@ -24,7 +24,10 @@ void UPCGExGoalPickerAttribute::CopySettingsFrom(const UPCGExInstancedFactory* O
 
 bool UPCGExGoalPickerAttribute::PrepareForData(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSeedsDataFacade, const TSharedPtr<PCGExData::FFacade>& InGoalsDataFacade)
 {
-	if (!Super::PrepareForData(InContext, InSeedsDataFacade, InGoalsDataFacade)) { return false; }
+	if (!Super::PrepareForData(InContext, InSeedsDataFacade, InGoalsDataFacade))
+	{
+		return false;
+	}
 
 	if (GoalCount == EPCGExGoalPickAttributeAmount::Single)
 	{
@@ -66,9 +69,15 @@ void UPCGExGoalPickerAttribute::GetGoalIndices(const PCGExData::FConstPoint& See
 {
 	for (const TSharedPtr<PCGExData::TBuffer<int32>>& Getter : AttributeGetters)
 	{
-		if (!Getter) { continue; }
+		if (!Getter)
+		{
+			continue;
+		}
 		OutIndices.Emplace(PCGExMath::SanitizeIndex(Getter->Read(Seed.Index), MaxGoalIndex, IndexSafety));
 	}
 }
 
-bool UPCGExGoalPickerAttribute::OutputMultipleGoals() const { return GoalCount != EPCGExGoalPickAttributeAmount::Single; }
+bool UPCGExGoalPickerAttribute::OutputMultipleGoals() const
+{
+	return GoalCount != EPCGExGoalPickAttributeAmount::Single;
+}

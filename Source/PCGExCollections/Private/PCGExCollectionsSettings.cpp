@@ -6,10 +6,10 @@
 #include "CoreMinimal.h"
 #include "PCGExCollectionsSettingsCache.h"
 #include "PCGExCoreSettingsCache.h"
-#include "Helpers/PCGExLevelDataExporter.h"
 #include "Helpers/PCGExActorContentFilter.h"
-#include "Helpers/PCGExBoundsEvaluator.h"
 #include "Helpers/PCGExActorMeshClassificator.h"
+#include "Helpers/PCGExBoundsEvaluator.h"
+#include "Helpers/PCGExLevelDataExporter.h"
 
 void UPCGExCollectionsSettings::PostLoad()
 {

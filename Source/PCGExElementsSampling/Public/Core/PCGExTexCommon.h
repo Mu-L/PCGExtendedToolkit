@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "PCGExVersion.h"
+#include "UObject/Object.h"
 
 #if PCGEX_ENGINE_VERSION < 507
 #include "MaterialTypes.h"
@@ -36,14 +36,22 @@ namespace PCGExTexture
 		}
 
 		explicit FReference(const FSoftObjectPath& InTexturePath, const int32 InTextureIndex = -1)
-			: TexturePath(InTexturePath), TextureIndex(InTextureIndex)
+			: TexturePath(InTexturePath)
+			  , TextureIndex(InTextureIndex)
 		{
 		}
 
 		FString GetTag() const;
 
-		bool operator==(const FReference& Other) const { return TexturePath == Other.TexturePath && TextureIndex == Other.TextureIndex; }
-		FORCEINLINE friend uint32 GetTypeHash(const FReference& Key) { return HashCombineFast(GetTypeHash(Key.TexturePath), Key.TextureIndex); }
+		bool operator==(const FReference& Other) const
+		{
+			return TexturePath == Other.TexturePath && TextureIndex == Other.TextureIndex;
+		}
+
+		FORCEINLINE friend uint32 GetTypeHash(const FReference& Key)
+		{
+			return HashCombineFast(GetTypeHash(Key.TexturePath), Key.TextureIndex);
+		}
 	};
 
 	class FLookup : public TSharedFromThis<FLookup>

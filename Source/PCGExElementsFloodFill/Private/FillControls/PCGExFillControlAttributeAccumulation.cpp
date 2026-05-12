@@ -13,7 +13,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigAttributeAccumulation, MaxAccumu
 
 bool FPCGExFillControlAttributeAccumulation::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryAttributeAccumulation* TypedFactory = Cast<UPCGExFillControlsFactoryAttributeAccumulation>(Factory);
 
@@ -23,12 +26,15 @@ bool FPCGExFillControlAttributeAccumulation::PrepareForDiffusions(FPCGExContext*
 
 	// Initialize max accumulation setting value
 	MaxAccumulation = TypedFactory->Config.GetValueSettingMaxAccumulation();
-	if (!MaxAccumulation->Init(GetSourceFacade())) { return false; }
+	if (!MaxAccumulation->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	// Get the attribute buffer
 	TSharedPtr<PCGExData::FFacade> SourceFacade = (AttributeSource == EPCGExClusterElement::Vtx)
-		                                              ? InHandler->VtxDataFacade
-		                                              : InHandler->EdgeDataFacade;
+		? InHandler->VtxDataFacade
+		: InHandler->EdgeDataFacade;
 
 	AttributeBuffer = SourceFacade->GetReadable<double>(TypedFactory->Config.Attribute.GetName());
 	if (!AttributeBuffer)
@@ -43,10 +49,13 @@ bool FPCGExFillControlAttributeAccumulation::PrepareForDiffusions(FPCGExContext*
 void FPCGExFillControlAttributeAccumulation::ScoreCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, PCGExFloodFill::FCandidate& OutCandidate)
 {
 	const int32 Index = (AttributeSource == EPCGExClusterElement::Vtx)
-		                    ? OutCandidate.Node->PointIndex
-		                    : OutCandidate.Link.Edge;
+		? OutCandidate.Node->PointIndex
+		: OutCandidate.Link.Edge;
 
-	if (Index < 0) { return; } // Invalid index
+	if (Index < 0)
+	{
+		return;
+	} // Invalid index
 
 	const double NewValue = AttributeBuffer->Read(Index);
 	const double PreviousAccumulated = From.AccumulatedValue;
@@ -75,12 +84,18 @@ double FPCGExFillControlAttributeAccumulation::ComputeAccumulation(double Previo
 
 	case EPCGExAccumulationMode::Min:
 		// For min, we need to handle the initial case (depth 1 means first non-seed node)
-		if (Depth <= 1) { return NewValue; }
+		if (Depth <= 1)
+		{
+			return NewValue;
+		}
 		return FMath::Min(PreviousAccumulated, NewValue);
 
 	case EPCGExAccumulationMode::Average:
 		// Running average: ((prev * (n-1)) + new) / n where n is the depth
-		if (Depth <= 1) { return NewValue; }
+		if (Depth <= 1)
+		{
+			return NewValue;
+		}
 		return ((PreviousAccumulated * (Depth - 1)) + NewValue) / Depth;
 	}
 

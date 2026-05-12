@@ -39,13 +39,22 @@ namespace PCGExCells
 		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSeedsFacade);
 
 		/** Whether we need to collect all candidates (vs break on first match). */
-		FORCEINLINE bool NeedsAllCandidates() const { return Method != EPCGExCellSeedOwnership::SeedOrder; }
+		FORCEINLINE bool NeedsAllCandidates() const
+		{
+			return Method != EPCGExCellSeedOwnership::SeedOrder;
+		}
 
 		/** Whether sorting rules pin is required. */
-		FORCEINLINE bool RequiresSortingRules() const { return Method == EPCGExCellSeedOwnership::BestCandidate; }
+		FORCEINLINE bool RequiresSortingRules() const
+		{
+			return Method == EPCGExCellSeedOwnership::BestCandidate;
+		}
 
 		/** Whether initialized and ready to pick winners. */
-		FORCEINLINE bool IsReady() const { return bInitialized; }
+		FORCEINLINE bool IsReady() const
+		{
+			return bInitialized;
+		}
 
 		/**
 		 * Pick the winning seed index from a set of candidates.

@@ -5,16 +5,19 @@
 
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExContext.h"
+#include "Data/PCGBasePointData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Data/PCGBasePointData.h"
 
 #pragma region FPCGExEntryBestFitPickerOpBase
 
 bool FPCGExEntryBestFitPickerOpBase::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection)
 {
-	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection)) { return false; }
+	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection))
+	{
+		return false;
+	}
 
 	Shared = StaticCastSharedPtr<FPCGExBestFitSharedData>(SharedData);
 	if (!Shared)
@@ -24,14 +27,23 @@ bool FPCGExEntryBestFitPickerOpBase::PrepareForData(FPCGExContext* InContext, co
 	}
 
 	const UPCGBasePointData* PointData = InDataFacade->Source->GetIn();
-	if (!PointData) { return false; }
+	if (!PointData)
+	{
+		return false;
+	}
 
 	BoundsMinRange = PointData->GetConstBoundsMinValueRange();
 	BoundsMaxRange = PointData->GetConstBoundsMaxValueRange();
-	if (bApplyPointScale) { TransformRange = PointData->GetConstTransformValueRange(); }
+	if (bApplyPointScale)
+	{
+		TransformRange = PointData->GetConstTransformValueRange();
+	}
 
 	PoolSizeGetter = PoolSize.GetValueSetting();
-	if (!PoolSizeGetter->Init(InDataFacade)) { return false; }
+	if (!PoolSizeGetter->Init(InDataFacade))
+	{
+		return false;
+	}
 
 	// Clamp AxisMask to a valid non-zero bitmask. Zero mask would make all scores identical.
 	if (Metric != EPCGExBestFitMetric::ClosestVolume && (AxisMask & 0b111) == 0)
@@ -45,7 +57,10 @@ bool FPCGExEntryBestFitPickerOpBase::PrepareForData(FPCGExContext* InContext, co
 FVector FPCGExEntryBestFitPickerOpBase::GetPointExtents(int32 PointIndex) const
 {
 	FVector Ext = (BoundsMaxRange[PointIndex] - BoundsMinRange[PointIndex]) * 0.5;
-	if (bApplyPointScale) { Ext *= TransformRange[PointIndex].GetScale3D().GetAbs(); }
+	if (bApplyPointScale)
+	{
+		Ext *= TransformRange[PointIndex].GetScale3D().GetAbs();
+	}
 	return Ext;
 }
 
@@ -58,57 +73,63 @@ double FPCGExEntryBestFitPickerOpBase::ComputeScore(const FVector& P, int32 Entr
 	{
 	default:
 	case EPCGExBestFitMetric::ClosestVolume:
+	{
+		const double Vp = P.X * P.Y * P.Z;
+		const double MaxV = FMath::Max3(Ve, Vp, UE_DOUBLE_SMALL_NUMBER);
+		return FMath::Abs(Ve - Vp) / MaxV;
+	}
+	case EPCGExBestFitMetric::ClosestPerAxis:
+	{
+		const double PerAxis[3] = {
+			FMath::Abs(E.X - P.X),
+			FMath::Abs(E.Y - P.Y),
+			FMath::Abs(E.Z - P.Z)
+		};
+		double Accum = 0.0;
+		for (int32 a = 0; a < 3; ++a)
+		{
+			if (!(AxisMask & (1 << a)))
+			{
+				continue;
+			}
+			Accum = (AxisAggregation == EPCGExBestFitAxisAggregation::Sum)
+				? Accum + PerAxis[a]
+				: FMath::Max(Accum, PerAxis[a]);
+		}
+		return Accum;
+	}
+	case EPCGExBestFitMetric::ClosestAspectRatio:
+	{
+		const FVector& Enorm = Shared->EntryExtentsMaxNorm[EntryIndex];
+		const double PMax = FMath::Max3(P.X, P.Y, P.Z);
+		const FVector Pnorm = PMax > UE_DOUBLE_SMALL_NUMBER ? P / PMax : FVector::ZeroVector;
+
+		const double PerAxis[3] = {
+			FMath::Abs(Enorm.X - Pnorm.X),
+			FMath::Abs(Enorm.Y - Pnorm.Y),
+			FMath::Abs(Enorm.Z - Pnorm.Z)
+		};
+		double Accum = 0.0;
+		for (int32 a = 0; a < 3; ++a)
+		{
+			if (!(AxisMask & (1 << a)))
+			{
+				continue;
+			}
+			Accum = (AxisAggregation == EPCGExBestFitAxisAggregation::Sum)
+				? Accum + PerAxis[a]
+				: FMath::Max(Accum, PerAxis[a]);
+		}
+
+		if (VolumeInfluence > 0.0)
 		{
 			const double Vp = P.X * P.Y * P.Z;
 			const double MaxV = FMath::Max3(Ve, Vp, UE_DOUBLE_SMALL_NUMBER);
-			return FMath::Abs(Ve - Vp) / MaxV;
+			const double VolumeScore = FMath::Abs(Ve - Vp) / MaxV;
+			Accum += VolumeInfluence * VolumeScore;
 		}
-	case EPCGExBestFitMetric::ClosestPerAxis:
-		{
-			const double PerAxis[3] = {
-				FMath::Abs(E.X - P.X),
-				FMath::Abs(E.Y - P.Y),
-				FMath::Abs(E.Z - P.Z)
-			};
-			double Accum = 0.0;
-			for (int32 a = 0; a < 3; ++a)
-			{
-				if (!(AxisMask & (1 << a))) { continue; }
-				Accum = (AxisAggregation == EPCGExBestFitAxisAggregation::Sum)
-					        ? Accum + PerAxis[a]
-					        : FMath::Max(Accum, PerAxis[a]);
-			}
-			return Accum;
-		}
-	case EPCGExBestFitMetric::ClosestAspectRatio:
-		{
-			const FVector& Enorm = Shared->EntryExtentsMaxNorm[EntryIndex];
-			const double PMax = FMath::Max3(P.X, P.Y, P.Z);
-			const FVector Pnorm = PMax > UE_DOUBLE_SMALL_NUMBER ? P / PMax : FVector::ZeroVector;
-
-			const double PerAxis[3] = {
-				FMath::Abs(Enorm.X - Pnorm.X),
-				FMath::Abs(Enorm.Y - Pnorm.Y),
-				FMath::Abs(Enorm.Z - Pnorm.Z)
-			};
-			double Accum = 0.0;
-			for (int32 a = 0; a < 3; ++a)
-			{
-				if (!(AxisMask & (1 << a))) { continue; }
-				Accum = (AxisAggregation == EPCGExBestFitAxisAggregation::Sum)
-					        ? Accum + PerAxis[a]
-					        : FMath::Max(Accum, PerAxis[a]);
-			}
-
-			if (VolumeInfluence > 0.0)
-			{
-				const double Vp = P.X * P.Y * P.Z;
-				const double MaxV = FMath::Max3(Ve, Vp, UE_DOUBLE_SMALL_NUMBER);
-				const double VolumeScore = FMath::Abs(Ve - Vp) / MaxV;
-				Accum += VolumeInfluence * VolumeScore;
-			}
-			return Accum;
-		}
+		return Accum;
+	}
 	}
 }
 
@@ -121,7 +142,10 @@ int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed) const
 	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
 	const TArray<double>& EntryWeights = Shared->EntryWeights;
 
-	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty()) { return -1; }
+	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty())
+	{
+		return -1;
+	}
 
 	const FVector P = GetPointExtents(PointIndex);
 	const int32 N = ValidEntryIndices.Num();
@@ -130,8 +154,14 @@ int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed) const
 	// Score + sort. Inline allocator covers typical category sizes.
 	TArray<TPair<double, int32>, TInlineAllocator<32>> Scored;
 	Scored.Reserve(N);
-	for (const int32 i : ValidEntryIndices) { Scored.Emplace(ComputeScore(P, i), i); }
-	Scored.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
+	for (const int32 i : ValidEntryIndices)
+	{
+		Scored.Emplace(ComputeScore(P, i), i);
+	}
+	Scored.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B)
+	{
+		return A.Key < B.Key;
+	});
 
 	// Pool = first K, plus any ties at the K-th score to avoid arbitrary tie-breaking.
 	const double Cutoff = Scored[K - 1].Key;
@@ -141,18 +171,27 @@ int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed) const
 
 	for (const TPair<double, int32>& S : Scored)
 	{
-		if (S.Key > Cutoff + UE_DOUBLE_KINDA_SMALL_NUMBER) { break; }
+		if (S.Key > Cutoff + UE_DOUBLE_KINDA_SMALL_NUMBER)
+		{
+			break;
+		}
 		Pool.Add(S.Value);
 		TotalWeight += EntryWeights[S.Value];
 		Cumulative.Add(TotalWeight);
 	}
 
-	if (Pool.IsEmpty() || TotalWeight <= 0.0) { return -1; }
+	if (Pool.IsEmpty() || TotalWeight <= 0.0)
+	{
+		return -1;
+	}
 
 	const double Roll = FRandomStream(Seed).FRandRange(0.0, TotalWeight);
 	for (int32 k = 0; k < Pool.Num(); ++k)
 	{
-		if (Roll <= Cumulative[k]) { return Target->Indices[Pool[k]]; }
+		if (Roll <= Cumulative[k])
+		{
+			return Target->Indices[Pool[k]];
+		}
 	}
 	return Target->Indices[Pool.Last()];
 }
@@ -166,7 +205,10 @@ int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed) co
 	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
 	const TArray<double>& EntryWeights = Shared->EntryWeights;
 
-	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty()) { return -1; }
+	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty())
+	{
+		return -1;
+	}
 
 	const FVector P = GetPointExtents(PointIndex);
 	const double Tolerance = FMath::Max(0.0, PoolSizeGetter->Read(PointIndex));
@@ -179,7 +221,10 @@ int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed) co
 	{
 		const double S = ComputeScore(P, i);
 		Scored.Emplace(S, i);
-		if (S < BestScore) { BestScore = S; }
+		if (S < BestScore)
+		{
+			BestScore = S;
+		}
 	}
 
 	// Pool = entries within Tolerance * BestScore of the best score.
@@ -192,18 +237,27 @@ int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed) co
 
 	for (const TPair<double, int32>& S : Scored)
 	{
-		if (S.Key > Cutoff) { continue; }
+		if (S.Key > Cutoff)
+		{
+			continue;
+		}
 		Pool.Add(S.Value);
 		TotalWeight += EntryWeights[S.Value];
 		Cumulative.Add(TotalWeight);
 	}
 
-	if (Pool.IsEmpty() || TotalWeight <= 0.0) { return -1; }
+	if (Pool.IsEmpty() || TotalWeight <= 0.0)
+	{
+		return -1;
+	}
 
 	const double Roll = FRandomStream(Seed).FRandRange(0.0, TotalWeight);
 	for (int32 k = 0; k < Pool.Num(); ++k)
 	{
-		if (Roll <= Cumulative[k]) { return Target->Indices[Pool[k]]; }
+		if (Roll <= Cumulative[k])
+		{
+			return Target->Indices[Pool[k]];
+		}
 	}
 	return Target->Indices[Pool.Last()];
 }
@@ -241,7 +295,10 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorBestFitFactoryDa
 	const UPCGExAssetCollection* Collection,
 	const PCGExAssetCollection::FCategory* Target) const
 {
-	if (!Collection || !Target) { return nullptr; }
+	if (!Collection || !Target)
+	{
+		return nullptr;
+	}
 
 	const int32 N = Target->Entries.Num();
 
@@ -272,11 +329,17 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorBestFitFactoryDa
 		const double MaxExt = FMath::Max3(Ext.X, Ext.Y, Ext.Z);
 		NewShared->EntryExtentsMaxNorm[i] = MaxExt > UE_DOUBLE_SMALL_NUMBER ? Ext / MaxExt : FVector::ZeroVector;
 
-		if (Vol > UE_DOUBLE_SMALL_NUMBER) { NewShared->ValidEntryIndices.Add(i); }
+		if (Vol > UE_DOUBLE_SMALL_NUMBER)
+		{
+			NewShared->ValidEntryIndices.Add(i);
+		}
 	}
 
 	// Caller (op's PrepareForData) reports the error when Shared is null.
-	if (NewShared->ValidEntryIndices.IsEmpty()) { return nullptr; }
+	if (NewShared->ValidEntryIndices.IsEmpty())
+	{
+		return nullptr;
+	}
 
 	return NewShared;
 }
@@ -306,9 +369,12 @@ FString UPCGExSelectorBestFitFactoryProviderSettings::GetDisplayName() const
 	switch (Metric)
 	{
 	default:
-	case EPCGExBestFitMetric::ClosestVolume:      return TEXT("Select : Fit Volume");
-	case EPCGExBestFitMetric::ClosestPerAxis:     return TEXT("Select : Fit Per-Axis");
-	case EPCGExBestFitMetric::ClosestAspectRatio: return TEXT("Select : Fit Aspect");
+	case EPCGExBestFitMetric::ClosestVolume:
+		return TEXT("Select : Fit Volume");
+	case EPCGExBestFitMetric::ClosestPerAxis:
+		return TEXT("Select : Fit Per-Axis");
+	case EPCGExBestFitMetric::ClosestAspectRatio:
+		return TEXT("Select : Fit Aspect");
 	}
 }
 #endif

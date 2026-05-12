@@ -7,9 +7,9 @@
 #include "PCGExCoreSettingsCache.h"
 
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Data/PCGExDataHelpers.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Math/PCGExBestFitPlane.h"
 
@@ -36,7 +36,10 @@ bool FPCGExGeo2DProjectionDetails::Init(const TSharedPtr<PCGExData::FFacade>& Po
 	}
 
 	FPCGExContext* Context = PointDataFacade->GetContext();
-	if (!Context) { return false; }
+	if (!Context)
+	{
+		return false;
+	}
 
 	if (ProjectionVector.Input == EPCGExInputValueType::Attribute && !PCGExMetaHelpers::IsDataDomainAttribute(ProjectionVector.Attribute))
 	{
@@ -45,7 +48,10 @@ bool FPCGExGeo2DProjectionDetails::Init(const TSharedPtr<PCGExData::FFacade>& Po
 	}
 
 	TSharedPtr<PCGExDetails::TSettingValue<FVector>> NormalGetter = ProjectionVector.GetValueSetting(false);
-	if (!NormalGetter->Init(PointDataFacade)) { return false; }
+	if (!NormalGetter->Init(PointDataFacade))
+	{
+		return false;
+	}
 
 	InitInternal(NormalGetter->Read(0));
 
@@ -63,7 +69,10 @@ bool FPCGExGeo2DProjectionDetails::Init(const TSharedPtr<PCGExData::FPointIO>& P
 	}
 
 	FPCGExContext* Context = PointIO->GetContext();
-	if (!Context) { return false; }
+	if (!Context)
+	{
+		return false;
+	}
 
 	if (ProjectionVector.Input == EPCGExInputValueType::Attribute && !PCGExMetaHelpers::IsDataDomainAttribute(ProjectionVector.Attribute))
 	{
@@ -71,7 +80,10 @@ bool FPCGExGeo2DProjectionDetails::Init(const TSharedPtr<PCGExData::FPointIO>& P
 		ProjectionVector.Input = EPCGExInputValueType::Constant;
 	}
 
-	if (!PCGExData::Helpers::TryGetSettingDataValue(Context, PointIO->GetIn(), ProjectionVector.Input, ProjectionVector.Attribute, ProjectionVector.Constant, Normal)) { return false; }
+	if (!PCGExData::Helpers::TryGetSettingDataValue(Context, PointIO->GetIn(), ProjectionVector.Input, ProjectionVector.Attribute, ProjectionVector.Constant, Normal))
+	{
+		return false;
+	}
 
 	InitInternal(Normal);
 
@@ -89,7 +101,10 @@ bool FPCGExGeo2DProjectionDetails::Init(const UPCGData* InData)
 	}
 
 	TSharedPtr<PCGExDetails::TSettingValue<FVector>> NormalGetter = PCGExDetails::MakeSettingValue<FVector>(nullptr, InData, ProjectionVector.Input, ProjectionVector.Attribute, ProjectionVector.Constant);
-	if (!NormalGetter) { return false; }
+	if (!NormalGetter)
+	{
+		return false;
+	}
 
 	InitInternal(NormalGetter->Read(0));
 
@@ -112,8 +127,8 @@ void FPCGExGeo2DProjectionDetails::InitInternal(const FVector& InNormal)
 	// Adaptive X hint: when Normal ≈ WorldFwd, MakeFromZX degenerates.
 	// Fall back to WorldUp which is guaranteed perpendicular in that case.
 	const FVector XHint = FMath::Abs(FVector::DotProduct(Normal, WorldFwd)) < 0.95
-		                      ? WorldFwd
-		                      : WorldUp;
+		? WorldFwd
+		: WorldUp;
 	ProjectionQuat = FRotationMatrix::MakeFromZX(Normal, XHint).ToQuat();
 	ProjectionQuatInv = ProjectionQuat.Inverse();
 }
@@ -129,7 +144,7 @@ void FPCGExGeo2DProjectionDetails::ProjectFlat(const TSharedPtr<PCGExData::FFaca
 	PCGEX_PARALLEL_FOR(
 		NumVectors,
 		OutPositions[i] = T(ProjectFlat(Transforms[i].GetLocation()));
-	)
+		)
 }
 
 template PCGEXCORE_API void FPCGExGeo2DProjectionDetails::ProjectFlat<FVector2D>(const TSharedPtr<PCGExData::FFacade>& InFacade, TArray<FVector2D>& OutPositions) const;
@@ -144,7 +159,7 @@ void FPCGExGeo2DProjectionDetails::Project(const TArray<FVector>& InPositions, T
 	PCGEX_PARALLEL_FOR(
 		NumVectors,
 		OutPositions[i] = ProjectionQuat.UnrotateVector(InPositions[i]);
-	)
+		)
 }
 
 void FPCGExGeo2DProjectionDetails::Project(const TArrayView<FVector>& InPositions, TArray<FVector2D>& OutPositions) const
@@ -154,7 +169,7 @@ void FPCGExGeo2DProjectionDetails::Project(const TArrayView<FVector>& InPosition
 	PCGEX_PARALLEL_FOR(
 		NumVectors,
 		OutPositions[i] = FVector2D(ProjectionQuat.UnrotateVector(InPositions[i]));
-	)
+		)
 }
 
 void FPCGExGeo2DProjectionDetails::Project(const TConstPCGValueRange<FTransform>& InTransforms, TArray<FVector2D>& OutPositions) const
@@ -164,7 +179,7 @@ void FPCGExGeo2DProjectionDetails::Project(const TConstPCGValueRange<FTransform>
 	PCGEX_PARALLEL_FOR(
 		NumVectors,
 		OutPositions[i] = FVector2D(ProjectionQuat.UnrotateVector(InTransforms[i].GetLocation()));
-	)
+		)
 }
 
 void FPCGExGeo2DProjectionDetails::Project(const TArrayView<FVector>& InPositions, std::vector<double>& OutPositions) const
@@ -175,7 +190,7 @@ void FPCGExGeo2DProjectionDetails::Project(const TArrayView<FVector>& InPosition
 		const int32 ii = i * 2;
 		OutPositions[ii] = PP.X;
 		OutPositions[ii+1] = PP.Y;
-	)
+		)
 }
 
 void FPCGExGeo2DProjectionDetails::Project(const TConstPCGValueRange<FTransform>& InTransforms, std::vector<double>& OutPositions) const
@@ -186,7 +201,7 @@ void FPCGExGeo2DProjectionDetails::Project(const TConstPCGValueRange<FTransform>
 		const int32 ii = i * 2;
 		OutPositions[ii] = PP.X;
 		OutPositions[ii+1] = PP.Y;
-	)
+		)
 }
 
 #if WITH_EDITOR

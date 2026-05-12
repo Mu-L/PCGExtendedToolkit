@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Containers/PCGExScopedContainers.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Clusters/PCGExEdge.h"
 #include "Clusters/Artifacts/PCGExCellDetails.h"
 #include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
+#include "Containers/PCGExScopedContainers.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Math/PCGExProjectionDetails.h"
 #include "Math/PCGExWinding.h"
 
@@ -109,9 +109,15 @@ namespace PCGExClusters
 
 	public:
 		explicit FProjectedPointSet(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const FPCGExGeo2DProjectionDetails& InProjectionDetails)
-			: PointDataFacade(InPointDataFacade), ProjectionDetails(InProjectionDetails), TightBounds(ForceInit), TightBounds3D(ForceInit)
+			: PointDataFacade(InPointDataFacade)
+			  , ProjectionDetails(InProjectionDetails)
+			  , TightBounds(ForceInit)
+			  , TightBounds3D(ForceInit)
 		{
-			if (ProjectionDetails.Method == EPCGExProjectionMethod::Normal) { ProjectionDetails.Init(PointDataFacade); }
+			if (ProjectionDetails.Method == EPCGExProjectionMethod::Normal)
+			{
+				ProjectionDetails.Init(PointDataFacade);
+			}
 		}
 
 		/** Lazy project all points + compute tight AABB (thread-safe) */
@@ -134,7 +140,10 @@ namespace PCGExClusters
 		}
 
 		int32 Num() const;
-		FORCEINLINE const FBox2D& GetBounds() const { return TightBounds; }
+		FORCEINLINE const FBox2D& GetBounds() const
+		{
+			return TightBounds;
+		}
 	};
 
 	class PCGEXGRAPHS_API FCellConstraints : public TSharedFromThis<FCellConstraints>

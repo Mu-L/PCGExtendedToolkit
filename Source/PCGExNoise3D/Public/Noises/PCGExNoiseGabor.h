@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExNoise3DOperation.h"
+#include "UObject/Object.h"
 
 #include "PCGExNoiseGabor.generated.h"
 
@@ -58,7 +58,10 @@ private:
 	FORCEINLINE double GaborKernel(const FVector& Offset, double K, double A) const
 	{
 		const double R2 = Offset.SizeSquared();
-		if (R2 > KernelRadius * KernelRadius) { return 0.0; }
+		if (R2 > KernelRadius * KernelRadius)
+		{
+			return 0.0;
+		}
 
 		// Gaussian envelope
 		const double Gaussian = FMath::Exp(-PI * A * A * R2);
@@ -79,7 +82,7 @@ private:
 			PCGExNoise3D::Math::Hash32ToDouble01(H1),
 			PCGExNoise3D::Math::Hash32ToDouble01(H2),
 			PCGExNoise3D::Math::Hash32ToDouble01(H3)
-		);
+			);
 	}
 };
 

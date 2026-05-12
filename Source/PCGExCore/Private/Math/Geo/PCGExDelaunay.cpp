@@ -7,11 +7,11 @@
 #include "PCGExCoreSettingsCache.h"
 
 #include "PCGExSettingsCacheBody.h"
+#include "Async/ParallelFor.h"
+#include "Math/PCGExProjectionDetails.h"
+#include "Math/Geo/PCGExGeo.h"
 #include "Math/Geo/PCGExPrimtives.h"
 #include "ThirdParty/Delaunator/include/delaunator.hpp"
-#include "Async/ParallelFor.h"
-#include "Math/Geo/PCGExGeo.h"
-#include "Math/PCGExProjectionDetails.h"
 
 namespace PCGExMath::Geo
 {
@@ -31,7 +31,10 @@ namespace PCGExMath::Geo
 		Vtx[0] = A;
 		Vtx[1] = B;
 		Vtx[2] = C;
-		for (int i = 0; i < 3; i++) { Neighbors[i] = -1; }
+		for (int i = 0; i < 3; i++)
+		{
+			Neighbors[i] = -1;
+		}
 	}
 
 	bool FDelaunaySite2::ContainsEdge(const uint64 Edge) const
@@ -75,7 +78,11 @@ namespace PCGExMath::Geo
 	{
 		Clear();
 
-		if (const int32 NumPositions = Positions.Num(); Positions.IsEmpty() || NumPositions <= 2) { return false; }
+		if (const int32 NumPositions = Positions.Num();
+			Positions.IsEmpty() || NumPositions <= 2)
+		{
+			return false;
+		}
 
 		TMap<uint64, int32> EdgeMap;
 
@@ -93,7 +100,8 @@ namespace PCGExMath::Geo
 				DelaunayEdges.Add(Edge, &bIsAlreadySet);
 				if (bIsAlreadySet)
 				{
-					if (int32 Idx = -1; EdgeMap.RemoveAndCopyValue(Edge, Idx))
+					if (int32 Idx = -1;
+						EdgeMap.RemoveAndCopyValue(Edge, Idx))
 					{
 						FDelaunaySite2& OtherSite = Sites[Idx];
 						OtherSite.PushAdjacency(Site.Id);
@@ -113,11 +121,17 @@ namespace PCGExMath::Geo
 
 				delaunator::Delaunator d(OutVector);
 
-				if (d.runtime_error) { return false; }
+				if (d.runtime_error)
+				{
+					return false;
+				}
 
 				const int32 NumTriangles = d.triangles.size();
 
-				if (!NumTriangles) { return false; }
+				if (!NumTriangles)
+				{
+					return false;
+				}
 
 				const int32 NumSites = NumTriangles / 3;
 				DelaunayEdges.Reserve(NumSites);
@@ -139,12 +153,18 @@ namespace PCGExMath::Geo
 				ProjectionDetails.Project(Positions, OutVector);
 
 				UE::Geometry::FDelaunay2 Delaunay2;
-				if (!Delaunay2.Triangulate(OutVector)) { return false; }
+				if (!Delaunay2.Triangulate(OutVector))
+				{
+					return false;
+				}
 
 				TArray<UE::Geometry::FIndex3i> Triangles = Delaunay2.GetTriangles();
 				const int32 NumTriangles = Triangles.Num();
 
-				if (!NumTriangles) { return false; }
+				if (!NumTriangles)
+				{
+					return false;
+				}
 
 				const int32 NumSites = NumTriangles / 3;
 				DelaunayEdges.Reserve(NumSites);
@@ -233,7 +253,10 @@ namespace PCGExMath::Geo
 		{
 			const int32 NextIndex = Stack.Pop(EAllowShrinking::No);
 
-			if (VisitedSites[NextIndex]) { continue; }
+			if (VisitedSites[NextIndex])
+			{
+				continue;
+			}
 
 			OutMerged.Add(NextIndex);
 			VisitedSites[NextIndex] = true;
@@ -243,9 +266,13 @@ namespace PCGExMath::Geo
 			for (int i = 0; i < 3; i++)
 			{
 				const int32 OtherIndex = Site->Neighbors[i];
-				if (OtherIndex == -1 || VisitedSites[OtherIndex]) { continue; }
+				if (OtherIndex == -1 || VisitedSites[OtherIndex])
+				{
+					continue;
+				}
 				const FDelaunaySite2* NeighborSite = Sites.GetData() + OtherIndex;
-				if (const uint64 SharedEdge = Site->GetSharedEdge(NeighborSite); EdgeConnectors.Contains(SharedEdge))
+				if (const uint64 SharedEdge = Site->GetSharedEdge(NeighborSite);
+					EdgeConnectors.Contains(SharedEdge))
 				{
 					OutUEdges.Add(SharedEdge);
 					Stack.Add(OtherIndex);
@@ -270,7 +297,10 @@ namespace PCGExMath::Geo
 
 	void FDelaunaySite3::ComputeFaces()
 	{
-		for (int i = 0; i < 4; i++) { Faces[i] = PCGEx::UH3(Vtx[MTX[i][0]], Vtx[MTX[i][1]], Vtx[MTX[i][2]]); }
+		for (int i = 0; i < 4; i++)
+		{
+			Faces[i] = PCGEx::UH3(Vtx[MTX[i][0]], Vtx[MTX[i][1]], Vtx[MTX[i][2]]);
+		}
 	}
 
 	TDelaunay3::~TDelaunay3()

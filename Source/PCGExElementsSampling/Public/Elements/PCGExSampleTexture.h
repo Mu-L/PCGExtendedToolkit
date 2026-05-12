@@ -39,7 +39,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SampleTexture, "Sample : Texture", "Sample texture data using UV coordinates.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Sampling);
+	}
 #endif
 
 protected:
@@ -121,7 +125,11 @@ namespace PCGExSampleTexture
 
 		explicit FSampler(const FPCGExTextureParamConfig& InConfig, const TSharedPtr<PCGExTexture::FLookup>& InTextureMap, const TSharedRef<PCGExData::FFacade>& InDataFacade);
 
-		bool IsValid() const { return bValid; }
+		bool IsValid() const
+		{
+			return bValid;
+		}
+
 		virtual bool Sample(const PCGExData::FConstPoint& Point, const FVector2D& UV) const = 0;
 	};
 
@@ -134,7 +142,10 @@ namespace PCGExSampleTexture
 		explicit TSampler(const FPCGExTextureParamConfig& InConfig, const TSharedPtr<PCGExTexture::FLookup>& InTextureMap, const TSharedRef<PCGExData::FFacade>& InDataFacade)
 			: FSampler(InConfig, InTextureMap, InDataFacade)
 		{
-			if (!IsValid()) { return; }
+			if (!IsValid())
+			{
+				return;
+			}
 			Buffer = InDataFacade->GetWritable<T>(InConfig.SampleAttributeName, T{}, true, PCGExData::EBufferInit::Inherit);
 		}
 
@@ -143,7 +154,8 @@ namespace PCGExSampleTexture
 			FVector4 SampledValue = FVector4::Zero();
 			float SampledDensity = 1;
 
-			if (const UPCGBaseTextureData* Tex = TextureMap->TryGetTextureData(IDGetter->FetchSingle(Point, TEXT(""))); !Tex || !Tex->SamplePointLocal(UV, SampledValue, SampledDensity))
+			if (const UPCGBaseTextureData* Tex = TextureMap->TryGetTextureData(IDGetter->FetchSingle(Point, TEXT("")));
+				!Tex || !Tex->SamplePointLocal(UV, SampledValue, SampledDensity))
 			{
 				return false;
 			}
@@ -154,13 +166,19 @@ namespace PCGExSampleTexture
 
 			if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
 			{
-				for (const int32 C : Config.OutChannels) { V = SampledValue[C]; }
+				for (const int32 C : Config.OutChannels)
+				{
+					V = SampledValue[C];
+				}
 				Buffer->SetValue(Point.Index, V);
 				return true;
 			}
 			else if constexpr (std::is_same_v<T, FVector2D> || std::is_same_v<T, FVector> || std::is_same_v<T, FVector4>)
 			{
-				for (int i = 0; i < Config.OutChannels.Num(); i++) { V[i] = SampledValue[Config.OutChannels[i]]; }
+				for (int i = 0; i < Config.OutChannels.Num(); i++)
+				{
+					V[i] = SampledValue[Config.OutChannels[i]];
+				}
 				Buffer->SetValue(Point.Index, V);
 				return true;
 			}

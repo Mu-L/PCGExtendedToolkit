@@ -3,7 +3,11 @@
 
 #include "Core/PCGExClipper2Processor.h"
 
+#include "Async/ParallelFor.h"
+#include "Blenders/PCGExUnionBlender.h"
+#include "Clipper2Lib/clipper.h"
 #include "Core/PCGExClipper2Common.h"
+#include "Core/PCGExUnionData.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
@@ -12,13 +16,9 @@
 #include "Helpers/PCGExDataMatcher.h"
 #include "Helpers/PCGExMatchingHelpers.h"
 #include "Math/PCGExBestFitPlane.h"
+#include "Math/PCGExMathDistances.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsHelpers.h"
-#include "Blenders/PCGExUnionBlender.h"
-#include "Clipper2Lib/clipper.h"
-#include "Core/PCGExUnionData.h"
-#include "Math/PCGExMathDistances.h"
-#include "Async/ParallelFor.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2ProcessorElement"
 
@@ -54,8 +54,14 @@ namespace PCGExClipper2
 		OpenSubjectPaths.reserve(SubjectIndices.Num());
 		for (const int32 Idx : SubjectIndices)
 		{
-			if (AllOpData->IsClosedLoop[Idx]) { SubjectPaths.push_back(AllOpData->Paths[Idx]); }
-			else { OpenSubjectPaths.push_back(AllOpData->Paths[Idx]); }
+			if (AllOpData->IsClosedLoop[Idx])
+			{
+				SubjectPaths.push_back(AllOpData->Paths[Idx]);
+			}
+			else
+			{
+				OpenSubjectPaths.push_back(AllOpData->Paths[Idx]);
+			}
 
 			GroupTags->Append(AllOpData->Facades[Idx]->Source->Tags.ToSharedRef());
 		}
@@ -67,8 +73,14 @@ namespace PCGExClipper2
 		{
 			if (Idx < AllOpData->Paths.Num())
 			{
-				if (AllOpData->IsClosedLoop[Idx]) { OperandPaths.push_back(AllOpData->Paths[Idx]); }
-				else { OpenOperandPaths.push_back(AllOpData->Paths[Idx]); }
+				if (AllOpData->IsClosedLoop[Idx])
+				{
+					OperandPaths.push_back(AllOpData->Paths[Idx]);
+				}
+				else
+				{
+					OpenOperandPaths.push_back(AllOpData->Paths[Idx]);
+				}
 			}
 
 			GroupTags->Append(AllOpData->Facades[Idx]->Source->Tags.ToSharedRef());
@@ -128,7 +140,10 @@ namespace PCGExClipper2
 			PCGExClipper2Lib::Point64& pt)
 		{
 			TSharedPtr<FProcessingGroup> Group = WeakSelf.Pin();
-			if (!Group) { return; }
+			if (!Group)
+			{
+				return;
+			}
 
 			// Decode the source info from each vertex
 			uint32 E1BotPtIdx, E1BotSrcIdx;
@@ -147,7 +162,10 @@ namespace PCGExClipper2
 				const double DX = static_cast<double>(Top.x - Bot.x);
 				const double DY = static_cast<double>(Top.y - Bot.y);
 				const double Len = FMath::Sqrt(DX * DX + DY * DY);
-				if (Len < SMALL_NUMBER) { return 0.5; }
+				if (Len < SMALL_NUMBER)
+				{
+					return 0.5;
+				}
 
 				const double PtDX = static_cast<double>(Pt.x - Bot.x);
 				const double PtDY = static_cast<double>(Pt.y - Bot.y);
@@ -194,7 +212,10 @@ UPCGExClipper2ProcessorSettings::UPCGExClipper2ProcessorSettings(const FObjectIn
 
 bool UPCGExClipper2ProcessorSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExClipper2::Labels::SourceOperandsLabel) { return WantsOperands(); }
+	if (InPin->Properties.Label == PCGExClipper2::Labels::SourceOperandsLabel)
+	{
+		return WantsOperands();
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
@@ -223,7 +244,10 @@ TArray<FPCGPinProperties> UPCGExClipper2ProcessorSettings::InputPinProperties() 
 TArray<FPCGPinProperties> UPCGExClipper2ProcessorSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
-	if (OpenPathsOutput == EPCGExClipper2OpenPathOutput::OutputPin) { PCGEX_PIN_POINTS(FName("Open Paths"), "Open paths", Normal) }
+	if (OpenPathsOutput == EPCGExClipper2OpenPathOutput::OutputPin)
+	{
+		PCGEX_PIN_POINTS(FName("Open Paths"), "Open paths", Normal)
+	}
 	return PinProperties;
 }
 
@@ -286,7 +310,10 @@ TSharedPtr<PCGExData::FTags> FPCGExClipper2ProcessorContext::GatherTags(const TA
 
 	for (int i = 0; i < VisitedSources.Num(); i++)
 	{
-		if (!VisitedSources[i]) { continue; }
+		if (!VisitedSources[i])
+		{
+			continue;
+		}
 		const TSharedPtr<PCGExData::FFacade> Facade = AllOpData->Facades[i];
 		OutTags->Append(Facade->Source->Tags.ToSharedRef());
 	}
@@ -306,7 +333,10 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 
 	const UPCGExClipper2ProcessorSettings* Settings = GetInputSettings<UPCGExClipper2ProcessorSettings>();
 
-	if (InPaths.empty()) { return; }
+	if (InPaths.empty())
+	{
+		return;
+	}
 
 	const double InvScale = 1.0 / static_cast<double>(Settings->Precision);
 
@@ -319,13 +349,19 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 	int32 LocalPathIndex = 0;
 	for (PCGExClipper2Lib::Path64& Path : InPaths)
 	{
-		if (Path.size() < 2) { continue; }
+		if (Path.size() < 2)
+		{
+			continue;
+		}
 
 		// Simplify if requested
 		if (Settings->bSimplifyPaths)
 		{
 			Path = PCGExClipper2Lib::SimplifyPath(Path, Settings->Precision * 0.5, true);
-			if (Path.size() < 2) { continue; }
+			if (Path.size() < 2)
+			{
+				continue;
+			}
 		}
 
 		// Determine if this is a hole (counter-clockwise winding)
@@ -405,7 +441,10 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 			NewPointIO = MainPoints->Emplace_GetRef(PCGExData::EIOInit::New);
 		}
 
-		if (!NewPointIO) { return; }
+		if (!NewPointIO)
+		{
+			return;
+		}
 
 		// Deterministic IOIndex for stable output ordering:
 		NewPointIO->IOIndex = Group->GroupIndex * 10000000 + CallSiteIndex * 100000 + LocalPathIndex;
@@ -426,7 +465,10 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		OutputFacade = MakeShared<PCGExData::FFacade>(NewPointIO.ToSharedRef());
 
 		Blender = MakeShared<PCGExBlending::FUnionBlender>(&BlendingDetails, &CarryOverDetails, PCGExMath::GetDistances());
-		Blender->AddSources(BlendSources, nullptr, [](const TSharedRef<PCGExData::FFacade>& InFacade) { return InFacade->Idx; });
+		Blender->AddSources(BlendSources, nullptr, [](const TSharedRef<PCGExData::FFacade>& InFacade)
+		{
+			return InFacade->Idx;
+		});
 		UnionMetadata = MakeShared<PCGExData::FUnionMetadata>();
 		UnionMetadata->SetNum(NumPoints);
 
@@ -441,10 +483,16 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		auto GetProjectedZ = [this](uint32 SrcIdx, uint32 PtIdx) -> double
 		{
 			const int32 ArrayIdx = static_cast<int32>(SrcIdx);
-			if (ArrayIdx < 0 || ArrayIdx >= AllOpData->ProjectedZValues.Num()) { return 0.0; }
+			if (ArrayIdx < 0 || ArrayIdx >= AllOpData->ProjectedZValues.Num())
+			{
+				return 0.0;
+			}
 
 			const TArray<double>& ZValues = AllOpData->ProjectedZValues[ArrayIdx];
-			if (static_cast<int32>(PtIdx) >= ZValues.Num()) { return 0.0; }
+			if (static_cast<int32>(PtIdx) >= ZValues.Num())
+			{
+				return 0.0;
+			}
 
 			return ZValues[PtIdx];
 		};
@@ -453,7 +501,10 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		auto GetProjection = [this](uint32 SrcIdx) -> const FPCGExGeo2DProjectionDetails*
 		{
 			const int32 ArrayIdx = static_cast<int32>(SrcIdx);
-			if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Projections.Num()) { return nullptr; }
+			if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Projections.Num())
+			{
+				return nullptr;
+			}
 			return &AllOpData->Projections[ArrayIdx];
 		};
 
@@ -493,26 +544,38 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 
 							// Get projection from first valid source
 							const FPCGExGeo2DProjectionDetails* Projection = GetProjection(BlendInfo->E1BotSourceIdx);
-							if (!Projection) { Projection = GetProjection(BlendInfo->E2BotSourceIdx); }
+							if (!Projection)
+							{
+								Projection = GetProjection(BlendInfo->E2BotSourceIdx);
+							}
 
 							// Build projected position and unproject
 							FVector UnprojectedPos(
 								static_cast<double>(Pt.x) * InvScale,
 								static_cast<double>(Pt.y) * InvScale,
 								ProjectedZ
-							);
+								);
 
-							if (Projection) { Projection->UnprojectInPlace(UnprojectedPos); }
+							if (Projection)
+							{
+								Projection->UnprojectInPlace(UnprojectedPos);
+							}
 
 							// Interpolate rotation/scale from source transforms
 							auto GetSourceTransform = [this](uint32 PtIdx, uint32 SrcIdx, FTransform& OutT) -> bool
 							{
 								const int32 ArrayIdx = static_cast<int32>(SrcIdx);
-								if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num()) { return false; }
+								if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num())
+								{
+									return false;
+								}
 
 								const TSharedPtr<PCGExData::FFacade>& SrcFacade = AllOpData->Facades[ArrayIdx];
 								const int32 NumPts = SrcFacade->Source->GetNum(PCGExData::EIOSide::In);
-								if (static_cast<int32>(PtIdx) >= NumPts) { return false; }
+								if (static_cast<int32>(PtIdx) >= NumPts)
+								{
+									return false;
+								}
 
 								TConstPCGValueRange<FTransform> SrcTransforms = SrcFacade->Source->GetIn()->GetConstTransformValueRange();
 								OutT = SrcTransforms[PtIdx];
@@ -527,10 +590,16 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 
 							// Interpolate for rotation/scale
 							FTransform E1Interp = E1Bot;
-							if (bHasE1Bot && bHasE1Top) { E1Interp.Blend(E1Bot, E1Top, BlendInfo->E1Alpha); }
+							if (bHasE1Bot && bHasE1Top)
+							{
+								E1Interp.Blend(E1Bot, E1Top, BlendInfo->E1Alpha);
+							}
 
 							FTransform E2Interp = E2Bot;
-							if (bHasE2Bot && bHasE2Top) { E2Interp.Blend(E2Bot, E2Top, BlendInfo->E2Alpha); }
+							if (bHasE2Bot && bHasE2Top)
+							{
+								E2Interp.Blend(E2Bot, E2Top, BlendInfo->E2Alpha);
+							}
 
 							OutTransform.Blend(E1Interp, E2Interp, 0.5);
 							OutTransform.SetLocation(UnprojectedPos);
@@ -541,11 +610,17 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 							auto GetSourceTransform = [this](uint32 PtIdx, uint32 SrcIdx, FTransform& OutT) -> bool
 							{
 								const int32 ArrayIdx = static_cast<int32>(SrcIdx);
-								if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num()) { return false; }
+								if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num())
+								{
+									return false;
+								}
 
 								const TSharedPtr<PCGExData::FFacade>& SrcFacade = AllOpData->Facades[ArrayIdx];
 								const int32 NumPts = SrcFacade->Source->GetNum(PCGExData::EIOSide::In);
-								if (static_cast<int32>(PtIdx) >= NumPts) { return false; }
+								if (static_cast<int32>(PtIdx) >= NumPts)
+								{
+									return false;
+								}
 
 								TConstPCGValueRange<FTransform> SrcTransforms = SrcFacade->Source->GetIn()->GetConstTransformValueRange();
 								OutT = SrcTransforms[PtIdx];
@@ -559,10 +634,16 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 							bool bHasE2Top = GetSourceTransform(BlendInfo->E2TopPointIdx, BlendInfo->E2TopSourceIdx, E2Top);
 
 							FTransform E1Interp = E1Bot;
-							if (bHasE1Bot && bHasE1Top) { E1Interp.Blend(E1Bot, E1Top, BlendInfo->E1Alpha); }
+							if (bHasE1Bot && bHasE1Top)
+							{
+								E1Interp.Blend(E1Bot, E1Top, BlendInfo->E1Alpha);
+							}
 
 							FTransform E2Interp = E2Bot;
-							if (bHasE2Bot && bHasE2Top) { E2Interp.Blend(E2Bot, E2Top, BlendInfo->E2Alpha); }
+							if (bHasE2Bot && bHasE2Top)
+							{
+								E2Interp.Blend(E2Bot, E2Top, BlendInfo->E2Alpha);
+							}
 
 							OutTransform.Blend(E1Interp, E2Interp, 0.5);
 						}
@@ -573,12 +654,18 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 						auto AddToUnion = [&](uint32 PtIdx, uint32 SrcIdx)
 						{
 							const int32 ArrayIdx = static_cast<int32>(SrcIdx);
-							if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num()) { return; }
+							if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num())
+							{
+								return;
+							}
 
 							const TSharedPtr<PCGExData::FFacade>& SourceFacade = AllOpData->Facades[ArrayIdx];
 							const int32 NumPts = SourceFacade->Source->GetNum(PCGExData::EIOSide::In);
 
-							if (static_cast<int32>(PtIdx) >= NumPts) { return; }
+							if (static_cast<int32>(PtIdx) >= NumPts)
+							{
+								return;
+							}
 
 							Union->Add_Unsafe(static_cast<int32>(PtIdx), SourceFacade->Idx);
 						};
@@ -646,7 +733,10 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 								static_cast<double>(Pt.y) * InvScale,
 								0.0);
 
-							if (Projection) { Projection->UnprojectInPlace(UnprojectedPos); }
+							if (Projection)
+							{
+								Projection->UnprojectInPlace(UnprojectedPos);
+							}
 							OutTransform.SetLocation(UnprojectedPos);
 						}
 
@@ -699,9 +789,12 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 							static_cast<double>(Pt.x) * InvScale,
 							static_cast<double>(Pt.y) * InvScale,
 							ProjectedZ
-						);
+							);
 
-						if (Projection) { Projection->UnprojectInPlace(UnprojectedPos); }
+						if (Projection)
+						{
+							Projection->UnprojectInPlace(UnprojectedPos);
+						}
 
 						// Get rotation/scale from source
 						if (SourceArrayIdx >= 0 && SourceArrayIdx < AllOpData->Facades.Num())
@@ -779,7 +872,10 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 			// Per-point source endpoint classification for joint arc boundary detection
 			// 0 = not from a source endpoint, 1 = from source start (idx 0), 2 = from source end (idx N-1)
 			TArray<int8> SourceEndpointClass;
-			if (JointWriter) { SourceEndpointClass.SetNumZeroed(NumPoints); }
+			if (JointWriter)
+			{
+				SourceEndpointClass.SetNumZeroed(NumPoints);
+			}
 
 			if (IntersectionWriter || JointWriter)
 			{
@@ -802,8 +898,14 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 						if (SrcArrayIdx >= 0 && SrcArrayIdx < AllOpData->Facades.Num() && !AllOpData->IsClosedLoop[SrcArrayIdx])
 						{
 							const int32 SrcNumPts = AllOpData->Facades[SrcArrayIdx]->Source->GetNum(PCGExData::EIOSide::In);
-							if (static_cast<int32>(FlagPtIdx) == 0) { SourceEndpointClass[i] = 1; }
-							else if (static_cast<int32>(FlagPtIdx) == SrcNumPts - 1) { SourceEndpointClass[i] = 2; }
+							if (static_cast<int32>(FlagPtIdx) == 0)
+							{
+								SourceEndpointClass[i] = 1;
+							}
+							else if (static_cast<int32>(FlagPtIdx) == SrcNumPts - 1)
+							{
+								SourceEndpointClass[i] = 2;
+							}
 						}
 					}
 				}
@@ -814,7 +916,10 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 					for (int32 i = 0; i < NumPoints; i++)
 					{
 						const int8 Current = SourceEndpointClass[i];
-						if (Current == 0) { continue; }
+						if (Current == 0)
+						{
+							continue;
+						}
 
 						const int8 Prev = (i > 0) ? SourceEndpointClass[i - 1] : (bClosedPaths ? SourceEndpointClass[NumPoints - 1] : static_cast<int8>(0));
 						const int8 Next = (i < NumPoints - 1) ? SourceEndpointClass[i + 1] : (bClosedPaths ? SourceEndpointClass[0] : static_cast<int8>(0));
@@ -838,11 +943,17 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		}
 
 		// Tag as hole if applicable
-		if (bIsHole && Settings->bTagHoles) { NewPointIO->Tags->AddRaw(Settings->HoleTag); }
+		if (bIsHole && Settings->bTagHoles)
+		{
+			NewPointIO->Tags->AddRaw(Settings->HoleTag);
+		}
 
 		PCGExPaths::Helpers::SetClosedLoop(NewPointIO, bClosedPaths);
 
-		if (!bClosedPaths && Settings->OpenPathsOutput == EPCGExClipper2OpenPathOutput::OutputPin) { NewPointIO->OutputPin = FName("Open Paths"); }
+		if (!bClosedPaths && Settings->OpenPathsOutput == EPCGExClipper2OpenPathOutput::OutputPin)
+		{
+			NewPointIO->OutputPin = FName("Open Paths");
+		}
 
 		TSharedPtr<PCGExData::FTags> GatheredTags = GatherTags(VisitedSources);
 		NewPointIO->Tags->Append(GatheredTags.ToSharedRef());
@@ -862,7 +973,10 @@ void FPCGExClipper2ProcessorContext::Process(const TSharedPtr<PCGExClipper2::FPr
 
 bool FPCGExClipper2ProcessorElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(Clipper2Processor)
 
@@ -941,7 +1055,10 @@ bool FPCGExClipper2ProcessorElement::AdvanceWork(FPCGExContext* InContext, const
 			WorkTasks->AddSimpleCallback([Settings, WeakHandle, Index = i]
 			{
 				FPCGContext::FSharedContext<FPCGExClipper2ProcessorContext> SharedContext(WeakHandle);
-				if (!SharedContext.Get()) { return; }
+				if (!SharedContext.Get())
+				{
+					return;
+				}
 
 				const TSharedPtr<PCGExClipper2::FProcessingGroup> Group = SharedContext.Get()->ProcessingGroups[Index];
 				Group->PreProcess(Settings);
@@ -973,10 +1090,16 @@ int32 FPCGExClipper2ProcessorElement::BuildDataFromCollection(
 	const TSharedPtr<PCGExData::FPointIOCollection>& Collection,
 	const bool bSupportOpenPaths, TArray<int32>& OutIndices) const
 {
-	if (!Collection) { return 0; }
+	if (!Collection)
+	{
+		return 0;
+	}
 
 	const int32 NumInputs = Collection->Num();
-	if (NumInputs == 0) { return 0; }
+	if (NumInputs == 0)
+	{
+		return 0;
+	}
 
 	struct FBuildResult
 	{
@@ -1006,7 +1129,10 @@ int32 FPCGExClipper2ProcessorElement::BuildDataFromCollection(
 
 				// Check if closed (required for boolean ops)
 				const bool bIsClosed = PCGExPaths::Helpers::GetClosedLoop(IO->GetIn());
-				if (!bIsClosed && !bSupportOpenPaths) { return; }
+				if (!bIsClosed && !bSupportOpenPaths)
+				{
+					return;
+				}
 
 				// Skip paths with insufficient points
 				if (IO->GetNum() < 2 && !Settings->OperandsAsBounds())
@@ -1022,7 +1148,10 @@ int32 FPCGExClipper2ProcessorElement::BuildDataFromCollection(
 
 				// Initialize projection for this path
 				FPCGExGeo2DProjectionDetails LocalProjection = Context->ProjectionDetails;
-				if (!LocalProjection.Init(Facade)) { return; }
+				if (!LocalProjection.Init(Facade))
+				{
+					return;
+				}
 
 				const int32 Scale = Settings->Precision;
 
@@ -1045,7 +1174,7 @@ int32 FPCGExClipper2ProcessorElement::BuildDataFromCollection(
 						static_cast<int64_t>(ProjectedLocation.X * Scale),
 						static_cast<int64_t>(ProjectedLocation.Y * Scale),
 						static_cast<int64_t>(j) // Temporary: just store point index, will encode with source idx later
-					);
+						);
 				}
 
 				Result.bValid = true;
@@ -1062,7 +1191,10 @@ int32 FPCGExClipper2ProcessorElement::BuildDataFromCollection(
 	// Phase 2: Collect results sequentially and assign final indices
 	for (FBuildResult& Result : Results)
 	{
-		if (!Result.bValid) { continue; }
+		if (!Result.bValid)
+		{
+			continue;
+		}
 
 		// ArrayIndex is the position in AllOpData arrays
 		const int32 ArrayIndex = Context->AllOpData->Facades.Num();
@@ -1104,7 +1236,10 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 	MainFacades.Reserve(MainIndices.Num());
 	for (const int32 Idx : MainIndices)
 	{
-		if (Idx < AllFacades.Num()) { MainFacades.Add(AllFacades[Idx]); }
+		if (Idx < AllFacades.Num())
+		{
+			MainFacades.Add(AllFacades[Idx]);
+		}
 	}
 
 	// Determine main data partitions
@@ -1131,14 +1266,17 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 		{
 		case EPCGExGroupingPolicy::Split:
 			MainPartitions.Reserve(MainIndices.Num());
-			for (const int32 Index : MainIndices) { MainPartitions.Add({Index}); }
-			break;
-		case EPCGExGroupingPolicy::Consolidate:
+			for (const int32 Index : MainIndices)
 			{
-				TArray<int32>& Consolidated = MainPartitions.Emplace_GetRef();
-				Consolidated.Append(MainIndices);
+				MainPartitions.Add({Index});
 			}
 			break;
+		case EPCGExGroupingPolicy::Consolidate:
+		{
+			TArray<int32>& Consolidated = MainPartitions.Emplace_GetRef();
+			Consolidated.Append(MainIndices);
+		}
+		break;
 		}
 	}
 	else
@@ -1167,7 +1305,10 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 		OperandFacades.Reserve(OperandIndices.Num());
 		for (const int32 Idx : OperandIndices)
 		{
-			if (Idx < AllFacades.Num()) { OperandFacades.Add(AllFacades[Idx]); }
+			if (Idx < AllFacades.Num())
+			{
+				OperandFacades.Add(AllFacades[Idx]);
+			}
 		}
 
 		bool bDoOperandMatching = false;
@@ -1235,7 +1376,10 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 		TSharedPtr<PCGExClipper2::FProcessingGroup> Group = MakeShared<PCGExClipper2::FProcessingGroup>();
 		Group->SubjectIndices = MoveTemp(MainPartitions[i]);
 
-		if (i < OperandPartitions.Num()) { Group->OperandIndices = MoveTemp(OperandPartitions[i]); }
+		if (i < OperandPartitions.Num())
+		{
+			Group->OperandIndices = MoveTemp(OperandPartitions[i]);
+		}
 
 		Group->Prepare(Context->AllOpData);
 		Context->CarryOverDetails.Prune(Group->GroupTags.Get());

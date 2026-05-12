@@ -154,7 +154,10 @@ namespace PCGExCompare
 	}
 
 	template <typename T>
-	FORCEINLINE static bool StrictlyNotEqual(const T& A, const T& B) { return !StrictlyEqual(A, B); }
+	FORCEINLINE static bool StrictlyNotEqual(const T& A, const T& B)
+	{
+		return !StrictlyEqual(A, B);
+	}
 
 	template <typename T>
 	FORCEINLINE static bool EqualOrGreater(const T& A, const T& B)
@@ -346,7 +349,10 @@ namespace PCGExCompare
 	}
 
 	template <typename T>
-	FORCEINLINE static bool NearlyNotEqual(const T& A, const T& B, const double Tolerance = DBL_COMPARE_TOLERANCE) { return !NearlyEqual(A, B, Tolerance); }
+	FORCEINLINE static bool NearlyNotEqual(const T& A, const T& B, const double Tolerance = DBL_COMPARE_TOLERANCE)
+	{
+		return !NearlyEqual(A, B, Tolerance);
+	}
 
 #pragma endregion
 
@@ -355,15 +361,24 @@ namespace PCGExCompare
 	{
 		switch (Method)
 		{
-		case EPCGExComparison::StrictlyEqual: return StrictlyEqual(A, B);
-		case EPCGExComparison::StrictlyNotEqual: return StrictlyNotEqual(A, B);
-		case EPCGExComparison::EqualOrGreater: return EqualOrGreater(A, B);
-		case EPCGExComparison::EqualOrSmaller: return EqualOrSmaller(A, B);
-		case EPCGExComparison::StrictlyGreater: return StrictlyGreater(A, B);
-		case EPCGExComparison::StrictlySmaller: return StrictlySmaller(A, B);
-		case EPCGExComparison::NearlyEqual: return NearlyEqual(A, B, Tolerance);
-		case EPCGExComparison::NearlyNotEqual: return NearlyNotEqual(A, B, Tolerance);
-		default: return false;
+		case EPCGExComparison::StrictlyEqual:
+			return StrictlyEqual(A, B);
+		case EPCGExComparison::StrictlyNotEqual:
+			return StrictlyNotEqual(A, B);
+		case EPCGExComparison::EqualOrGreater:
+			return EqualOrGreater(A, B);
+		case EPCGExComparison::EqualOrSmaller:
+			return EqualOrSmaller(A, B);
+		case EPCGExComparison::StrictlyGreater:
+			return StrictlyGreater(A, B);
+		case EPCGExComparison::StrictlySmaller:
+			return StrictlySmaller(A, B);
+		case EPCGExComparison::NearlyEqual:
+			return NearlyEqual(A, B, Tolerance);
+		case EPCGExComparison::NearlyNotEqual:
+			return NearlyNotEqual(A, B, Tolerance);
+		default:
+			return false;
 		}
 	}
 

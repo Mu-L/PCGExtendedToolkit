@@ -22,7 +22,10 @@ PCGExFactories::EPreparationResult UPCGExDataMatchFilterFactory::Prepare(FPCGExC
 {
 	// Load targets from pin
 	const TSharedPtr<PCGExData::FPointIOCollection> Targets = MakeShared<PCGExData::FPointIOCollection>(InContext, PCGExCommon::Labels::SourceTargetsLabel, PCGExData::EIOInit::NoInit, true);
-	if (Targets->IsEmpty()) { return PCGExFactories::EPreparationResult::MissingData; }
+	if (Targets->IsEmpty())
+	{
+		return PCGExFactories::EPreparationResult::MissingData;
+	}
 
 	// Build facades and keep them alive for tag data lifetime
 	TargetFacades.Reserve(Targets->Pairs.Num());
@@ -58,7 +61,10 @@ void UPCGExDataMatchFilterFactory::BeginDestroy()
 
 bool PCGExPointFilter::FDataMatchFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	if (!TypedFilterFactory->DataMatcher)
 	{
@@ -85,7 +91,10 @@ bool PCGExPointFilter::FDataMatchFilter::Test(const int32 PointIndex) const
 
 bool PCGExPointFilter::FDataMatchFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
 {
-	if (!TypedFilterFactory->DataMatcher) { return !TypedFilterFactory->Config.bInvert; }
+	if (!TypedFilterFactory->DataMatcher)
+	{
+		return !TypedFilterFactory->Config.bInvert;
+	}
 
 	const FPCGExTaggedData Candidate = IO->GetTaggedData();
 	PCGExMatching::FScope Scope(TypedFilterFactory->DataMatcher->GetNumSources(), true);
@@ -120,7 +129,10 @@ FString UPCGExDataMatchFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = TEXT("Data Match : ");
 	DisplayName += Config.Mode == EPCGExMapMatchMode::All ? TEXT("All") : TEXT("Any");
-	if (Config.bInvert) { DisplayName += TEXT(" (Inverted)"); }
+	if (Config.bInvert)
+	{
+		DisplayName += TEXT(" (Inverted)");
+	}
 	return DisplayName;
 }
 #endif

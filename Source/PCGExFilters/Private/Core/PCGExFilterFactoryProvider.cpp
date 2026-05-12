@@ -3,15 +3,18 @@
 
 #include "Core/PCGExFilterFactoryProvider.h"
 
-#include "Containers/PCGExManagedObjects.h"
 #include "PCGExFilterCommon.h"
+#include "Containers/PCGExManagedObjects.h"
 #include "Filters/Points/PCGExConstantFilter.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCreateFilter"
 #define PCGEX_NAMESPACE PCGExCreateFilter
 
 #if WITH_EDITOR
-FString UPCGExFilterProviderSettings::GetDisplayName() const { return TEXT(""); }
+FString UPCGExFilterProviderSettings::GetDisplayName() const
+{
+	return TEXT("");
+}
 #endif
 
 UPCGExFilterProviderSettings::UPCGExFilterProviderSettings()
@@ -19,7 +22,10 @@ UPCGExFilterProviderSettings::UPCGExFilterProviderSettings()
 	Priority = GetDefaultPriority();
 }
 
-FName UPCGExFilterProviderSettings::GetMainOutputPin() const { return PCGExFilters::Labels::OutputFilterLabel; }
+FName UPCGExFilterProviderSettings::GetMainOutputPin() const
+{
+	return PCGExFilters::Labels::OutputFilterLabel;
+}
 
 UPCGExFactoryData* UPCGExFilterProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
 {
@@ -36,7 +42,10 @@ UPCGExFactoryData* UPCGExFilterProviderSettings::CreateFactory(FPCGExContext* In
 // a predictable fallback behavior rather than producing no output.
 bool UPCGExFilterProviderSettings::ShouldCancel(FPCGExFactoryProviderContext* InContext, PCGExFactories::EPreparationResult InResult) const
 {
-	if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error) { return Super::ShouldCancel(InContext, InResult); }
+	if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error)
+	{
+		return Super::ShouldCancel(InContext, InResult);
+	}
 
 	UPCGExConstantFilterFactory* NewFactory = InContext->ManagedObjects->New<UPCGExConstantFilterFactory>();
 
@@ -44,7 +53,10 @@ bool UPCGExFilterProviderSettings::ShouldCancel(FPCGExFactoryProviderContext* In
 	NewFactory->Config.bInvert = false;
 	NewFactory->Config.Value = MissingDataPolicy == EPCGExFilterNoDataFallback::Pass;
 
-	if (InContext->OutFactory) { InContext->ManagedObjects->Destroy(InContext->OutFactory); }
+	if (InContext->OutFactory)
+	{
+		InContext->ManagedObjects->Destroy(InContext->OutFactory);
+	}
 	InContext->OutFactory = NewFactory;
 
 	return false;
@@ -58,7 +70,10 @@ void UPCGExFilterCollectionProviderSettings::PCGExApplyDeprecationBeforeUpdatePi
 }
 #endif
 
-FName UPCGExFilterCollectionProviderSettings::GetMainOutputPin() const { return PCGExFilters::Labels::OutputColFilterLabel; }
+FName UPCGExFilterCollectionProviderSettings::GetMainOutputPin() const
+{
+	return PCGExFilters::Labels::OutputColFilterLabel;
+}
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

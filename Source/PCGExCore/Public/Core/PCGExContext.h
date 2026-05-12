@@ -61,11 +61,22 @@ protected:
 	int32 TopLoopIndex = INDEX_NONE;
 
 public:
-	TWeakPtr<PCGEx::FWorkHandle> GetWorkHandle() { return WorkHandle; }
+	TWeakPtr<PCGEx::FWorkHandle> GetWorkHandle()
+	{
+		return WorkHandle;
+	}
+
 	TSharedPtr<PCGEx::FManagedObjects> ManagedObjects;
 
-	int32 GetLoopIndex() const { return LoopIndex; }
-	bool IsExecutingInsideLoop() const { return TopLoopIndex != INDEX_NONE; }
+	int32 GetLoopIndex() const
+	{
+		return LoopIndex;
+	}
+
+	bool IsExecutingInsideLoop() const
+	{
+		return TopLoopIndex != INDEX_NONE;
+	}
 
 	// TODO : bool toggle for hoarder execution 
 
@@ -103,10 +114,25 @@ public:
 	virtual bool IsWaitingForTasks();
 	void ReadyForExecution();
 
-	bool IsState(const PCGExCommon::ContextState StateId) const { return CurrentState.load(std::memory_order_acquire) == StateId.GetComparisonIndex().ToUnstableInt(); }
-	bool IsInitialExecution() const { return IsState(PCGExCommon::States::State_InitialExecution); }
-	bool IsDone() const { return IsState(PCGExCommon::States::State_Done); }
-	bool IsWorkCompleted() const { return bWorkCompleted.load(std::memory_order_acquire); }
+	bool IsState(const PCGExCommon::ContextState StateId) const
+	{
+		return CurrentState.load(std::memory_order_acquire) == StateId.GetComparisonIndex().ToUnstableInt();
+	}
+
+	bool IsInitialExecution() const
+	{
+		return IsState(PCGExCommon::States::State_InitialExecution);
+	}
+
+	bool IsDone() const
+	{
+		return IsState(PCGExCommon::States::State_Done);
+	}
+
+	bool IsWorkCompleted() const
+	{
+		return bWorkCompleted.load(std::memory_order_acquire);
+	}
 
 	// Executes AdvanceWork with re-entry protection and deferred completion handling
 	bool DriveAdvanceWork(const UPCGExSettings* InSettings);
@@ -160,7 +186,11 @@ protected:
 
 public:
 	TSet<FSoftObjectPath>& GetRequiredAssets();
-	bool HasAssetRequirements() const { return RequiredAssets && !RequiredAssets->IsEmpty(); }
+
+	bool HasAssetRequirements() const
+	{
+		return RequiredAssets && !RequiredAssets->IsEmpty();
+	}
 
 	virtual void RegisterAssetDependencies();
 	void AddAssetDependency(const FSoftObjectPath& Dependency);

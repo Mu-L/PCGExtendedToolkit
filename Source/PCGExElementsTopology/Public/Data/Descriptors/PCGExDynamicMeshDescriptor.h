@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/PrimitiveComponent.h"
-#include "Components/DynamicMeshComponent.h"
 #include "SceneTypes.h"
+#include "Components/DynamicMeshComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Data/Descriptors/PCGExComponentDescriptors.h"
 #include "Engine/EngineTypes.h"
 

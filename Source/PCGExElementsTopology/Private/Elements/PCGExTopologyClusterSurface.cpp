@@ -3,12 +3,12 @@
 
 #include "Elements/PCGExTopologyClusterSurface.h"
 
-#include "Data/PCGExData.h"
-#include "GeometryScript/PolygonFunctions.h"
-#include "GeometryScript/MeshPrimitiveFunctions.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/Artifacts/PCGExCellDetails.h"
 #include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
+#include "Data/PCGExData.h"
+#include "GeometryScript/MeshPrimitiveFunctions.h"
+#include "GeometryScript/PolygonFunctions.h"
 
 #define LOCTEXT_NAMESPACE "TopologyClustersProcessor"
 #define PCGEX_NAMESPACE TopologyClustersProcessor
@@ -18,7 +18,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(TopologyClusterSurface)
 
 bool FPCGExTopologyClusterSurfaceElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExTopologyClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExTopologyClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 	PCGEX_CONTEXT_AND_SETTINGS(TopologyClusterSurface)
 
 	return true;
@@ -33,7 +36,10 @@ bool FPCGExTopologyClusterSurfaceElement::AdvanceWork(FPCGExContext* InContext, 
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartProcessingClusters(
-			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; },
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
 			{
 				NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
@@ -57,7 +63,10 @@ namespace PCGExTopologyClusterSurface
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExTopologyClusterSurface::Process);
 
-		if (!TProcessor<FPCGExTopologyClusterSurfaceContext, UPCGExTopologyClusterSurfaceSettings>::Process(InTaskManager)) { return false; }
+		if (!TProcessor<FPCGExTopologyClusterSurfaceContext, UPCGExTopologyClusterSurfaceSettings>::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		// Build or get the shared enumerator from constraints (enables reuse)
 		TSharedPtr<PCGExClusters::FPlanarFaceEnumerator> Enumerator = CellsConstraints->GetOrBuildEnumerator(Cluster.ToSharedRef(), ProjectionDetails);
@@ -81,7 +90,10 @@ namespace PCGExTopologyClusterSurface
 
 		for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
 		{
-			if (!Cell || Cell->Polygon.IsEmpty()) { continue; }
+			if (!Cell || Cell->Polygon.IsEmpty())
+			{
+				continue;
+			}
 
 			FGeometryScriptSimplePolygon& Polygon = Polygons.Emplace_GetRef();
 			Polygon.Reset(Cell->Polygon.Num());

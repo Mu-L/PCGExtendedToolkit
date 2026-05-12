@@ -25,8 +25,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(TopologyPointSurface, "Topology : Point Surface", "Create a delaunay triangulated surface for each input dataset.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::DynamicMesh; }
-	virtual FLinearColor GetNodeTitleColor() const override { return FLinearColor::White; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::DynamicMesh;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return FLinearColor::White;
+	}
 #endif
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 

@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PCGExProxyDataBlending.h"
 #include "PCGExBlendOpFactoryProvider.h"
+#include "PCGExProxyDataBlending.h"
 
 class UPCGExBlendOpFactory;
 class FPCGExBlendOperation;
@@ -55,8 +55,17 @@ namespace PCGExBlending
 		void SetTargetFacade(const TSharedPtr<PCGExData::FFacade>& InDataFacade);
 
 		bool Init(FPCGExContext* InContext, const TArray<TObjectPtr<const UPCGExBlendOpFactory>>& InFactories);
-		int32 GetNumOperations() const { return SharedOperationCount >= 0 ? SharedOperationCount : (Operations ? Operations->Num() : 0); }
-		TArrayView<FPCGExBlendOperation* const> GetCachedOperations() const { return CachedOperations; }
+
+		int32 GetNumOperations() const
+		{
+			return SharedOperationCount >= 0 ? SharedOperationCount : (Operations ? Operations->Num() : 0);
+		}
+
+		TArrayView<FPCGExBlendOperation* const> GetCachedOperations() const
+		{
+			return CachedOperations;
+		}
+
 		void RemapOperationIndices(const TMap<FName, int32>& SharedIndexMap, int32 TotalCount);
 
 		void BlendAutoWeight(const int32 SourceIndex, const int32 TargetIndex) const;

@@ -4,17 +4,20 @@
 #include "Elements/PCGExEdgeOrder.h"
 
 
-#include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExScopedContainers.h"
+#include "Data/PCGExData.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 
 #define LOCTEXT_NAMESPACE "EdgeOrder"
 #define PCGEX_NAMESPACE EdgeOrder
 
 #pragma region UPCGExEdgeOrderSettings
 
-PCGExData::EIOInit UPCGExEdgeOrderSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExEdgeOrderSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 PCGExData::EIOInit UPCGExEdgeOrderSettings::GetEdgeOutputInitMode() const
 {
@@ -40,14 +43,20 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(EdgeOrder)
 
 bool FPCGExEdgeOrderElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(EdgeOrder)
 
 	if (Settings->Mode != EPCGExEdgeOrderMode::DirectionSettings)
 	{
 		Context->SeedsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExCommon::Labels::SourceSeedsLabel, false, true);
-		if (!Context->SeedsDataFacade) { return false; }
+		if (!Context->SeedsDataFacade)
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -61,9 +70,12 @@ bool FPCGExEdgeOrderElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -98,7 +110,10 @@ namespace PCGExEdgeOrder
 
 		EdgeDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		VtxEndpointBuffer = VtxDataFacade->GetReadable<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
 		EndpointsBuffer = EdgeDataFacade->GetWritable<int64>(PCGExClusters::Labels::Attr_PCGExEdgeIdx, PCGExData::EBufferInit::New);
@@ -115,12 +130,18 @@ namespace PCGExEdgeOrder
 		}
 
 		// DFS traversal path
-		if (Context->SeedsDataFacade->GetNum() <= 0) { return false; }
+		if (Context->SeedsDataFacade->GetNum() <= 0)
+		{
+			return false;
+		}
 
 		Depths.Init(-1, NumNodes);
 		Seeded.Init(0, NumNodes);
 
-		if (Settings->bUseOctreeSearch) { Cluster->RebuildOctree(Settings->SeedPicking.PickingMethod); }
+		if (Settings->bUseOctreeSearch)
+		{
+			Cluster->RebuildOctree(Settings->SeedPicking.PickingMethod);
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD(TaskManager, SeedPickingGroup)
 
@@ -147,7 +168,10 @@ namespace PCGExEdgeOrder
 				const FVector SeedLocation = SeedTransforms[Index].GetLocation();
 				const int32 ClosestIndex = This->Cluster->FindClosestNode(SeedLocation, This->Settings->SeedPicking.PickingMethod);
 
-				if (ClosestIndex < 0) { continue; }
+				if (ClosestIndex < 0)
+				{
+					continue;
+				}
 
 				if (!This->Settings->SeedPicking.WithinDistance(This->Cluster->GetPos(ClosestIndex), SeedLocation) ||
 					FPlatformAtomics::InterlockedCompareExchange(&This->Seeded[ClosestIndex], 1, 0) == 1)
@@ -197,7 +221,10 @@ namespace PCGExEdgeOrder
 
 			for (const PCGExGraphs::FLink& Lk : Nodes[CurrentIdx].Links)
 			{
-				if (Depths[Lk.Node] != -1) { continue; }
+				if (Depths[Lk.Node] != -1)
+				{
+					continue;
+				}
 				Depths[Lk.Node] = NextDepth;
 				Stack.Add(Lk.Node);
 			}
@@ -252,7 +279,10 @@ namespace PCGExEdgeOrder
 			if (StartDepth >= 0 && EndDepth >= 0 && StartDepth != EndDepth)
 			{
 				bSwap = (StartDepth > EndDepth);
-				if (bInvert) { bSwap = !bSwap; }
+				if (bInvert)
+				{
+					bSwap = !bSwap;
+				}
 			}
 
 			if (bSwap)

@@ -215,10 +215,25 @@ namespace PCGExPaths
 			bool bIsClosed,
 			TArray<FVector>& OutPoints);
 
-		FORCEINLINE static double H00(double t) { return 2.0 * t * t * t - 3.0 * t * t + 1.0; }
-		FORCEINLINE static double H10(double t) { return t * t * t - 2.0 * t * t + t; }
-		FORCEINLINE static double H01(double t) { return -2.0 * t * t * t + 3.0 * t * t; }
-		FORCEINLINE static double H11(double t) { return t * t * t - t * t; }
+		FORCEINLINE static double H00(double t)
+		{
+			return 2.0 * t * t * t - 3.0 * t * t + 1.0;
+		}
+
+		FORCEINLINE static double H10(double t)
+		{
+			return t * t * t - 2.0 * t * t + t;
+		}
+
+		FORCEINLINE static double H01(double t)
+		{
+			return -2.0 * t * t * t + 3.0 * t * t;
+		}
+
+		FORCEINLINE static double H11(double t)
+		{
+			return t * t * t - t * t;
+		}
 
 		static FVector EvaluateHermite(const FVector& P0, const FVector& T0,
 		                               const FVector& P1, const FVector& T1, double t);

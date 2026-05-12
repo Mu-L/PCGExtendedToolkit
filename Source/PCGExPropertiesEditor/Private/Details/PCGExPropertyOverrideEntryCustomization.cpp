@@ -6,9 +6,9 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
-#include "PropertyHandle.h"
-#include "PCGExProperty.h"
 #include "PCGExInlineWidgetRegistry.h"
+#include "PCGExProperty.h"
+#include "PropertyHandle.h"
 #include "UObject/StructOnScope.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
@@ -20,7 +20,10 @@ TSharedRef<IPropertyTypeCustomization> FPCGExPropertyOverrideEntryCustomization:
 
 FText FPCGExPropertyOverrideEntryCustomization::GetEntryLabelText() const
 {
-	if (!PropertyHandlePtr.IsValid()) { return FText::FromString(TEXT("None (Unknown)")); }
+	if (!PropertyHandlePtr.IsValid())
+	{
+		return FText::FromString(TEXT("None (Unknown)"));
+	}
 
 	// Access entry data directly - THIS RUNS EACH FRAME, reads fresh data after sync
 	TArray<void*> RawData;
@@ -120,21 +123,36 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 		EnabledHandlePtr = PropertyHandle->GetChildHandle(TEXT("bEnabled"));
 	}
 
-	if (!ValueHandlePtr.IsValid()) { return; }
+	if (!ValueHandlePtr.IsValid())
+	{
+		return;
+	}
 
 	// Access raw data to get the FInstancedStruct
 	TArray<void*> RawData;
 	ValueHandlePtr->AccessRawData(RawData);
-	if (RawData.IsEmpty() || !RawData[0]) { return; }
+	if (RawData.IsEmpty() || !RawData[0])
+	{
+		return;
+	}
 
 	FInstancedStruct* Instance = static_cast<FInstancedStruct*>(RawData[0]);
-	if (!Instance || !Instance->IsValid()) { return; }
+	if (!Instance || !Instance->IsValid())
+	{
+		return;
+	}
 
 	UScriptStruct* InnerStruct = const_cast<UScriptStruct*>(Instance->GetScriptStruct());
-	if (!InnerStruct) { return; }
+	if (!InnerStruct)
+	{
+		return;
+	}
 
 	uint8* StructMemory = Instance->GetMutableMemory();
-	if (!StructMemory) { return; }
+	if (!StructMemory)
+	{
+		return;
+	}
 
 	// Check if this type should be inlined
 	const bool bShouldInline = InnerStruct->HasMetaData(TEXT("PCGExInlineValue"));
@@ -188,8 +206,8 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			if (ValuePropertyHandle.IsValid())
 			{
 				ValueWidget = Factory
-					              ? (*Factory)(ValuePropertyHandle.ToSharedRef())
-					              : ValuePropertyHandle->CreatePropertyValueWidget();
+					? (*Factory)(ValuePropertyHandle.ToSharedRef())
+					: ValuePropertyHandle->CreatePropertyValueWidget();
 			}
 
 			// Customize the row to show checkbox + label in NameContent and value widget in ValueContent.
@@ -235,7 +253,10 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 		for (TFieldIterator<FProperty> It(InnerStruct); It; ++It)
 		{
 			const FProperty* Property = *It;
-			if (!Property) { continue; }
+			if (!Property)
+			{
+				continue;
+			}
 
 			FName PropName = Property->GetFName();
 

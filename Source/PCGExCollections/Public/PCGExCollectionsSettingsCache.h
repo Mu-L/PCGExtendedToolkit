@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExSettingsCacheBody.h"
 #include "Templates/SubclassOf.h"
 #include "UObject/Object.h"
-#include "PCGExSettingsCacheBody.h"
 
 #define PCGEX_COLLECTIONS_SETTINGS PCGEX_SETTINGS_INST(Collections)
 

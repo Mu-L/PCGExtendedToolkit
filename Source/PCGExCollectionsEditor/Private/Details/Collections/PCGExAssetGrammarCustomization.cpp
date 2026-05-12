@@ -9,12 +9,12 @@
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExAssetGrammar.h"
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
-#include "Widgets/Text/STextBlock.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/SBoxPanel.h"
+#include "Widgets/Text/STextBlock.h"
 
 #define PCGEX_SMALL_LABEL(_TEXT) \
 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(1, 0)\
@@ -59,7 +59,10 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 	TSharedPtr<IPropertyHandle> DebugColorHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExAssetGrammarDetails, DebugColor));
 
 	TSharedPtr<IPropertyHandle> GrammarSourceHandle = nullptr;
-	if (TSharedPtr<IPropertyHandle> ParentHandle = PropertyHandle->GetParentHandle()) { GrammarSourceHandle = ParentHandle->GetChildHandle(FName("GrammarSource")); }
+	if (TSharedPtr<IPropertyHandle> ParentHandle = PropertyHandle->GetParentHandle())
+	{
+		GrammarSourceHandle = ParentHandle->GetChildHandle(FName("GrammarSource"));
+	}
 
 	// Grab parent collection
 	TArray<UObject*> OuterObjects;
@@ -84,15 +87,15 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 					[Collection]()
 					{
 						return Collection->GlobalGrammarMode == EPCGExGlobalVariationRule::Overrule
-							       ? FText::FromString(TEXT("··· Overruled"))
-							       : FText::GetEmpty();
+							? FText::FromString(TEXT("··· Overruled"))
+							: FText::GetEmpty();
 					})
 				.ColorAndOpacity_Lambda(
 					[Collection]()
 					{
 						return Collection->GlobalGrammarMode == EPCGExGlobalVariationRule::Overrule
-							       ? FLinearColor(1.0f, 0.5f, 0.1f, 0.5)
-							       : FLinearColor::Transparent;
+							? FLinearColor(1.0f, 0.5f, 0.1f, 0.5)
+							: FLinearColor::Transparent;
 					})
 			]
 
@@ -108,7 +111,10 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 
 	auto IsLocalData = [GrammarSourceHandle]()
 	{
-		if (!GrammarSourceHandle) { return true; }
+		if (!GrammarSourceHandle)
+		{
+			return true;
+		}
 		uint8 EnumValue = 0;
 		GrammarSourceHandle->GetValue(EnumValue);
 		return !EnumValue;
@@ -128,7 +134,10 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 			+ SHorizontalBox::Slot().Padding(1).FillWidth(1)
 			[
 				SNew(SBox)
-				.IsEnabled_Lambda([bIsGlobal]() { return !bIsGlobal; })
+				.IsEnabled_Lambda([bIsGlobal]()
+				{
+					return !bIsGlobal;
+				})
 				[
 					SymbolHandle->CreatePropertyValueWidget()
 				]

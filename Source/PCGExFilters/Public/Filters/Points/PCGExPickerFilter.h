@@ -46,7 +46,11 @@ public:
 	UPROPERTY()
 	TArray<TObjectPtr<const UPCGExPickerFactoryData>> PickerFactories;
 
-	virtual bool SupportsCollectionEvaluation() const override { return true; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return true;
+	}
+
 	virtual bool Init(FPCGExContext* InContext) override;
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 };
@@ -57,7 +61,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FPickerFilter(const TObjectPtr<const UPCGExPickerFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 

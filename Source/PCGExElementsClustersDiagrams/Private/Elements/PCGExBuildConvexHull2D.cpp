@@ -4,14 +4,14 @@
 #include "Elements/PCGExBuildConvexHull2D.h"
 
 
+#include "Clusters/PCGExCluster.h"
 #include "Curve/CurveUtil.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Elements/Metadata/PCGMetadataElementCommon.h"
-#include "Math/ConvexHull2d.h"
-#include "Clusters/PCGExCluster.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
+#include "Math/ConvexHull2d.h"
 #include "Math/PCGExBestFitPlane.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
@@ -39,7 +39,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BuildConvexHull2D)
 
 bool FPCGExBuildConvexHull2DElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildConvexHull2D)
 
@@ -95,10 +98,16 @@ namespace PCGExBuildConvexHull2D
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBuildConvexHull2D::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		ProjectionDetails = Settings->ProjectionDetails;
-		if (!ProjectionDetails.Init(PointDataFacade)) { return false; }
+		if (!ProjectionDetails.Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		// Build convex hull
 
@@ -117,7 +126,10 @@ namespace PCGExBuildConvexHull2D
 		}
 
 		const TSharedPtr<PCGExData::FPointIO> PathIO = Context->PathsIO->Emplace_GetRef(PointDataFacade->GetIn(), PCGExData::EIOInit::New);
-		if (!PathIO) { return false; }
+		if (!PathIO)
+		{
+			return false;
+		}
 
 		PathIO->IOIndex = PointDataFacade->Source->IOIndex;
 		UPCGBasePointData* MutablePoints = PathIO->GetOut();
@@ -128,8 +140,14 @@ namespace PCGExBuildConvexHull2D
 
 		PCGExPaths::Helpers::SetClosedLoop(PathIO->GetOut(), true);
 
-		for (int i = 0; i <= LastIndex; i++) { ProjectedPoints.Emplace(ActivePositions[ConvexHullIndices[i]]); }
-		if (!PCGExMath::IsWinded(Settings->Winding, UE::Geometry::CurveUtil::SignedArea2<double, FVector2D>(ProjectedPoints) < 0)) { Algo::Reverse(ConvexHullIndices); }
+		for (int i = 0; i <= LastIndex; i++)
+		{
+			ProjectedPoints.Emplace(ActivePositions[ConvexHullIndices[i]]);
+		}
+		if (!PCGExMath::IsWinded(Settings->Winding, UE::Geometry::CurveUtil::SignedArea2<double, FVector2D>(ProjectedPoints) < 0))
+		{
+			Algo::Reverse(ConvexHullIndices);
+		}
 
 		if (Settings->bOutputClusters)
 		{
@@ -180,7 +198,10 @@ namespace PCGExBuildConvexHull2D
 
 	void FProcessor::Output()
 	{
-		if (!Settings->bOutputClusters) { return; }
+		if (!Settings->bOutputClusters)
+		{
+			return;
+		}
 		GraphBuilder->StageEdgesOutputs();
 	}
 }

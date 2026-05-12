@@ -6,14 +6,14 @@
 #include "CoreMinimal.h"
 
 
+#include "PCGExUnionCommon.h"
+#include "Blenders/PCGExUnionBlender.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
-#include "Blenders/PCGExUnionBlender.h"
 #include "Details/PCGExBlendingDetails.h"
 #include "Details/PCGExFuseDetails.h"
 #include "Details/PCGExIntersectionDetails.h"
 #include "Math/PCGExMathAxis.h"
-#include "PCGExUnionCommon.h"
 
 
 #include "PCGExFusePoints.generated.h"
@@ -49,7 +49,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(FusePoints, "Fuse Points", "Fuse points based on distance.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(MiscRemove); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(MiscRemove);
+	}
 #endif
 
 protected:
@@ -130,14 +134,14 @@ namespace PCGExFusePoints
 
 		// Build-time scratch (allocated in Process / PrepareLoopScopesForPoints, freed in CompleteWork).
 		TSharedPtr<PCGExData::FUnionTableBuilder> UnionTableBuilder;
-		TSharedPtr<PCGExData::FUnionRegistry>     Registry; // Octree mode only
+		TSharedPtr<PCGExData::FUnionRegistry> Registry; // Octree mode only
 
 		// Compiled, immutable result of the build phase. Read by ProcessRange / bounds passes.
 		TSharedPtr<PCGExData::FUnionTable> UnionTable;
 
 		TSharedPtr<PCGExBlending::IUnionBlender> UnionBlender;
 
-		TSharedPtr<PCGExData::TBuffer<bool>>  IsUnionWriter;
+		TSharedPtr<PCGExData::TBuffer<bool>> IsUnionWriter;
 		TSharedPtr<PCGExData::TBuffer<int32>> UnionSizeWriter;
 
 	public:

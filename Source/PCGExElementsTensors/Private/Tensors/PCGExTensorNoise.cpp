@@ -14,7 +14,10 @@
 
 bool FPCGExTensorNoise::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -25,7 +28,10 @@ PCGExTensor::FTensorSample FPCGExTensorNoise::Sample(const int32 InSeedIndex, co
 	const FVector InPosition = InProbe.GetLocation();
 
 	FVector Noise = NoiseGenerator->GetVector(InPosition);
-	if (Config.bNormalizeNoiseSampling) { Noise.Normalize(); }
+	if (Config.bNormalizeNoiseSampling)
+	{
+		Noise.Normalize();
+	}
 
 	if (NoiseMaskGenerator)
 	{

@@ -7,8 +7,8 @@
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 
-#include "Core/PCGExSettings.h"
 #include "PCGExCoreMacros.h"
+#include "Core/PCGExSettings.h"
 
 #include "PCGExFlushDebug.generated.h"
 
@@ -23,11 +23,22 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(FlushDebug, "Flush Debug", "Flush persistent debug lines.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Debug; }
-	virtual FLinearColor GetNodeTitleColor() const override { return CustomColor; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Debug;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return CustomColor;
+	}
 #endif
 
-	virtual bool HasDynamicPins() const override { return true; }
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	}
 
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
@@ -47,10 +58,17 @@ protected:
 class FPCGExDebugElement final : public IPCGExElement
 {
 protected:
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
 
 	PCGEX_ELEMENT_CREATE_DEFAULT_CONTEXT
 
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
-	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override { return true; }
+
+	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override
+	{
+		return true;
+	}
 };

@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
-#include "Details/PCGExSettingsMacros.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Details/PCGExSettingsMacros.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExNodeNeighborsCountFilter.generated.h"
 
@@ -66,7 +66,8 @@ namespace PCGExNodeNeighborsCount
 	{
 	public:
 		explicit FFilter(const UPCGExNodeNeighborsCountFilterFactory* InFactory)
-			: IVtxFilter(InFactory), TypedFilterFactory(InFactory)
+			: IVtxFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 
@@ -92,7 +93,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(NodeNeighborsCountFilterFactory, "Vtx Filter : Num Edges", "Check against the node' edges count.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster);
+	}
 #endif
 	//~End UPCGSettings
 

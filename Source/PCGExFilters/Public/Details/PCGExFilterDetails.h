@@ -117,7 +117,10 @@ struct PCGEXFILTERS_API FPCGExFilterResultDetails
 #if WITH_EDITOR
 	void ApplyDeprecation()
 	{
-		if (bResultAsIncrement_DEPRECATED) { Action = EPCGExResultWriteAction::Counter; }
+		if (bResultAsIncrement_DEPRECATED)
+		{
+			Action = EPCGExResultWriteAction::Counter;
+		}
 	}
 #endif
 

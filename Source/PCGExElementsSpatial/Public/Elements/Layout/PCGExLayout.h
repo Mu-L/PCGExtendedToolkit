@@ -53,7 +53,10 @@ namespace PCGExLayout
 			Volume = Box.GetVolume();
 			Size = Box.GetSize();
 
-			for (int C = 0; C < 3; C++) { CoG[C] = FMath::Clamp(InSeed[C], Box.Min[C], Box.Max[C]); }
+			for (int C = 0; C < 3; C++)
+			{
+				CoG[C] = FMath::Clamp(InSeed[C], Box.Min[C], Box.Max[C]);
+			}
 			DistanceScore = FVector::DistSquared(InSeed, CoG);
 		}
 

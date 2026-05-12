@@ -4,10 +4,10 @@
 #include "Elements/PCGExPathResample.h"
 
 
-#include "Helpers/PCGExRandomHelpers.h"
-#include "Data/PCGExPointIO.h"
 #include "PCGExVersion.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
+#include "Helpers/PCGExRandomHelpers.h"
 #include "Paths/PCGExPath.h"
 
 #define LOCTEXT_NAMESPACE "PCGExResamplePathElement"
@@ -35,7 +35,10 @@ PCGEX_INITIALIZE_ELEMENT(ResamplePath)
 
 PCGExData::EIOInit UPCGExResamplePathSettings::GetMainDataInitializationPolicy() const
 {
-	if (Mode == EPCGExResampleMode::Sweep) { return PCGExData::EIOInit::New; }
+	if (Mode == EPCGExResampleMode::Sweep)
+	{
+		return PCGExData::EIOInit::New;
+	}
 	return PCGExData::EIOInit::Duplicate;
 }
 
@@ -43,7 +46,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(ResamplePath)
 
 bool FPCGExResamplePathElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ResamplePath)
 
@@ -92,14 +98,20 @@ namespace PCGExResamplePath
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = false; //Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const UPCGBasePointData* InPoints = PointDataFacade->GetIn();
 
 		bPreserveLastPoint = Settings->bPreserveLastPoint;
 		bAutoSampleSize = true;
 
-		if (!Settings->SampleLength.TryReadDataValue(PointDataFacade->Source, SampleLength)) { return false; }
+		if (!Settings->SampleLength.TryReadDataValue(PointDataFacade->Source, SampleLength))
+		{
+			return false;
+		}
 
 		Path = MakeShared<PCGExPaths::FPath>(InPoints, 0);
 		Path->IOIndex = PointDataFacade->Source->IOIndex;
@@ -119,7 +131,10 @@ namespace PCGExResamplePath
 			}
 
 
-			if (NumSamples < 2) { return false; }
+			if (NumSamples < 2)
+			{
+				return false;
+			}
 
 			PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::New)
 			PCGExPointArrayDataHelpers::SetNumPointsAllocated(PointDataFacade->GetOut(), NumSamples, PointDataFacade->GetAllocations() | EPCGPointNativeProperties::Seed);
@@ -131,7 +146,10 @@ namespace PCGExResamplePath
 			NumSamples = PointDataFacade->GetNum();
 		}
 
-		if (Path->IsClosedLoop()) { NumSamples++; }
+		if (Path->IsClosedLoop())
+		{
+			NumSamples++;
+		}
 
 		if (bAutoSampleSize)
 		{
@@ -192,8 +210,14 @@ namespace PCGExResamplePath
 					NextPosition = InTransforms[EndIndex].GetLocation();
 					DistToNext = FVector::Dist(PrevPosition, NextPosition);
 
-					if (Remainder <= DistToNext) { PrevPosition = PrevPosition + (Path->DirToPrevPoint(EndIndex) * -Remainder); }
-					else { PrevPosition = NextPosition; }
+					if (Remainder <= DistToNext)
+					{
+						PrevPosition = PrevPosition + (Path->DirToPrevPoint(EndIndex) * -Remainder);
+					}
+					else
+					{
+						PrevPosition = NextPosition;
+					}
 					Remainder -= DistToNext;
 				}
 			}
@@ -244,7 +268,10 @@ namespace PCGExResamplePath
 			{
 				const FPointSample& Sample = Samples[Index];
 				OutTransforms[Index].SetLocation(Sample.Location);
-				if (Settings->bEnsureUniqueSeeds) { OutSeed[Index] = PCGExRandomHelpers::ComputeSpatialSeed(Sample.Location); }
+				if (Settings->bEnsureUniqueSeeds)
+				{
+					OutSeed[Index] = PCGExRandomHelpers::ComputeSpatialSeed(Sample.Location);
+				}
 			}
 		}
 		else
@@ -258,7 +285,10 @@ namespace PCGExResamplePath
 
 				OutTransforms[Index].SetLocation(Sample.Location);
 
-				if (Settings->bEnsureUniqueSeeds) { OutSeed[Index] = PCGExRandomHelpers::ComputeSpatialSeed(Sample.Location); }
+				if (Settings->bEnsureUniqueSeeds)
+				{
+					OutSeed[Index] = PCGExRandomHelpers::ComputeSpatialSeed(Sample.Location);
+				}
 
 				const FVector Start = Path->GetPos(Sample.Start);
 				const double SampleBreadth = FVector::Dist(Start, Path->GetPos(Sample.End));

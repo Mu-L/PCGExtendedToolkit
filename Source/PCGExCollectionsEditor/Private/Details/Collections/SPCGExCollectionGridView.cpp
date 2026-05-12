@@ -11,6 +11,7 @@
 #include "InputCoreTypes.h"
 #include "ScopedTransaction.h"
 
+#include "InstancedStruct.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Details/Collections/FPCGExCollectionTileDragDropOp.h"
 #include "Details/Collections/PCGExAssetCollectionEditor.h"
@@ -19,15 +20,14 @@
 #include "DragAndDrop/AssetDragDropOp.h"
 #include "Misc/TransactionObjectEvent.h"
 #include "Modules/ModuleManager.h"
-#include "InstancedStruct.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
-#include "Widgets/SOverlay.h"
 #include "Widgets/Layout/SSplitter.h"
-#include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 
 #pragma region SPCGExCollectionGridView
@@ -157,7 +157,10 @@ void SPCGExCollectionGridView::Construct(const FArguments& InArgs)
 					.Text(INVTEXT("Duplicate"))
 					.ToolTipText(INVTEXT("Duplicate the selected entries"))
 					.OnClicked(this, &SPCGExCollectionGridView::OnDuplicateSelected)
-					.IsEnabled_Lambda([this]() { return !SelectedIndices.IsEmpty(); })
+					.IsEnabled_Lambda([this]()
+					{
+						return !SelectedIndices.IsEmpty();
+					})
 				]
 
 				+ SHorizontalBox::Slot()
@@ -167,7 +170,10 @@ void SPCGExCollectionGridView::Construct(const FArguments& InArgs)
 					.Text(INVTEXT("Delete"))
 					.ToolTipText(INVTEXT("Delete the selected entries"))
 					.OnClicked(this, &SPCGExCollectionGridView::OnDeleteSelected)
-					.IsEnabled_Lambda([this]() { return !SelectedIndices.IsEmpty(); })
+					.IsEnabled_Lambda([this]()
+					{
+						return !SelectedIndices.IsEmpty();
+					})
 				]
 			]
 
@@ -192,7 +198,10 @@ void SPCGExCollectionGridView::RebuildCategoryCache()
 	VisualOrder.Reset();
 
 	const UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return; }
+	if (!Coll)
+	{
+		return;
+	}
 
 	const int32 Num = Coll->NumEntries();
 
@@ -217,7 +226,10 @@ void SPCGExCollectionGridView::RebuildCategoryCache()
 			SortedCategoryNames.Add(Pair.Key);
 		}
 	}
-	SortedCategoryNames.Sort([](const FName& A, const FName& B) { return A.LexicalLess(B); });
+	SortedCategoryNames.Sort([](const FName& A, const FName& B)
+	{
+		return A.LexicalLess(B);
+	});
 
 	// Always add uncategorized as last category (persistent drop target)
 	SortedCategoryNames.Add(NAME_None);
@@ -256,7 +268,10 @@ void SPCGExCollectionGridView::RebuildCategoryCache()
 
 void SPCGExCollectionGridView::RebuildGroupedLayout()
 {
-	if (!GroupScrollBox.IsValid()) { return; }
+	if (!GroupScrollBox.IsValid())
+	{
+		return;
+	}
 
 	// Capture current collapse states before destroying old widgets
 	for (const auto& Pair : CategoryGroupWidgets)
@@ -305,7 +320,10 @@ void SPCGExCollectionGridView::RebuildGroupedLayout()
 		CategoryGroupWidgets.Add(CatName, Group);
 
 		// Skip tile creation for collapsed categories (lazy -- created on expand)
-		if (bIsCollapsed || !Indices) { continue; }
+		if (bIsCollapsed || !Indices)
+		{
+			continue;
+		}
 
 		// Create tiles for this category
 		for (int32 CatIdx = 0; CatIdx < Indices->Num(); ++CatIdx)
@@ -366,7 +384,10 @@ void SPCGExCollectionGridView::RebuildGroupedLayout()
 
 void SPCGExCollectionGridView::IncrementalCategoryRefresh()
 {
-	if (!GroupScrollBox.IsValid()) { return; }
+	if (!GroupScrollBox.IsValid())
+	{
+		return;
+	}
 
 	// Capture collapse states
 	for (const auto& Pair : CategoryGroupWidgets)
@@ -423,7 +444,10 @@ void SPCGExCollectionGridView::IncrementalCategoryRefresh()
 		CategoryGroupWidgets.Add(CatName, Group);
 
 		// Skip tile creation for collapsed categories (lazy -- created on expand)
-		if (bIsCollapsed || !Indices) { continue; }
+		if (bIsCollapsed || !Indices)
+		{
+			continue;
+		}
 
 		for (int32 CatIdx = 0; CatIdx < Indices->Num(); ++CatIdx)
 		{
@@ -495,7 +519,10 @@ void SPCGExCollectionGridView::RefreshGrid()
 	const int32 Num = Collection.IsValid() ? Collection->NumEntries() : 0;
 	for (auto It = SelectedIndices.CreateIterator(); It; ++It)
 	{
-		if (*It < 0 || *It >= Num) { It.RemoveCurrent(); }
+		if (*It < 0 || *It >= Num)
+		{
+			It.RemoveCurrent();
+		}
 	}
 	if (LastClickedIndex < 0 || LastClickedIndex >= Num)
 	{
@@ -528,7 +555,10 @@ void SPCGExCollectionGridView::SelectIndex(int32 Index, bool bCtrl, bool bShift)
 
 		if (StartPos != INDEX_NONE && EndPos != INDEX_NONE)
 		{
-			if (!bCtrl) { SelectedIndices.Reset(); }
+			if (!bCtrl)
+			{
+				SelectedIndices.Reset();
+			}
 
 			const int32 Lo = FMath::Min(StartPos, EndPos);
 			const int32 Hi = FMath::Max(StartPos, EndPos);
@@ -606,7 +636,10 @@ void SPCGExCollectionGridView::OnTileClicked(int32 Index, const FPointerEvent& M
 
 FReply SPCGExCollectionGridView::OnTileDragDetected(int32 Index, const FPointerEvent& MouseEvent)
 {
-	if (SelectedIndices.IsEmpty()) { return FReply::Unhandled(); }
+	if (SelectedIndices.IsEmpty())
+	{
+		return FReply::Unhandled();
+	}
 
 	// If dragged tile isn't selected, select it exclusively first
 	if (!SelectedIndices.Contains(Index))
@@ -654,7 +687,10 @@ void SPCGExCollectionGridView::OnTileCategoryChanged()
 void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const TArray<int32>& Indices, int32 InsertBeforeLocalIndex)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll || Indices.IsEmpty()) { return; }
+	if (!Coll || Indices.IsEmpty())
+	{
+		return;
+	}
 
 	FEntriesArrayAccess Access = GetEntriesAccess();
 	UScriptStruct* EntryStruct = (Access.IsValid() && Access.InnerProp) ? Access.InnerProp->Struct : nullptr;
@@ -668,7 +704,10 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 		for (int32 Index : Indices)
 		{
 			FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Index);
-			if (Entry) { Entry->Category = TargetCategory; }
+			if (Entry)
+			{
+				Entry->Category = TargetCategory;
+			}
 		}
 
 		// Step 2: If a drop position was given, reorder within target category
@@ -687,8 +726,14 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 
 				for (int32 Idx : *CatIndices)
 				{
-					if (DraggedSet.Contains(Idx)) { Dragged.Add(Idx); }
-					else { NonDragged.Add(Idx); }
+					if (DraggedSet.Contains(Idx))
+					{
+						Dragged.Add(Idx);
+					}
+					else
+					{
+						NonDragged.Add(Idx);
+					}
 				}
 
 				if (!Dragged.IsEmpty())
@@ -697,9 +742,15 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 
 					TArray<int32> DesiredOrder;
 					DesiredOrder.Reserve(CatIndices->Num());
-					for (int32 i = 0; i < ClampedInsert; i++) { DesiredOrder.Add(NonDragged[i]); }
+					for (int32 i = 0; i < ClampedInsert; i++)
+					{
+						DesiredOrder.Add(NonDragged[i]);
+					}
 					DesiredOrder.Append(Dragged);
-					for (int32 i = ClampedInsert; i < NonDragged.Num(); i++) { DesiredOrder.Add(NonDragged[i]); }
+					for (int32 i = ClampedInsert; i < NonDragged.Num(); i++)
+					{
+						DesiredOrder.Add(NonDragged[i]);
+					}
 
 					if (DesiredOrder != *CatIndices)
 					{
@@ -713,7 +764,10 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 						TArray<int32> CurrentOrder = *CatIndices;
 						for (int32 i = 0; i < DesiredOrder.Num(); i++)
 						{
-							if (CurrentOrder[i] == DesiredOrder[i]) { continue; }
+							if (CurrentOrder[i] == DesiredOrder[i])
+							{
+								continue;
+							}
 
 							const int32 j = CurrentOrder.Find(DesiredOrder[i]);
 							check(j != INDEX_NONE);
@@ -762,7 +816,10 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 void SPCGExCollectionGridView::OnAssetDropOnCategory(FName TargetCategory, const TArray<FAssetData>& Assets)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll || Assets.IsEmpty()) { return; }
+	if (!Coll || Assets.IsEmpty())
+	{
+		return;
+	}
 
 	const int32 OldCount = Coll->NumEntries();
 
@@ -780,7 +837,10 @@ void SPCGExCollectionGridView::OnAssetDropOnCategory(FName TargetCategory, const
 			for (int32 i = OldCount; i < NewCount; ++i)
 			{
 				FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(i);
-				if (Entry) { Entry->Category = TargetCategory; }
+				if (Entry)
+				{
+					Entry->Category = TargetCategory;
+				}
 			}
 		}
 	}
@@ -795,7 +855,10 @@ void SPCGExCollectionGridView::OnAssetDropOnCategory(FName TargetCategory, const
 void SPCGExCollectionGridView::OnCategoryRenamed(FName OldName, FName NewName)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll || OldName == NewName) { return; }
+	if (!Coll || OldName == NewName)
+	{
+		return;
+	}
 
 	const int32 Num = Coll->NumEntries();
 
@@ -823,10 +886,16 @@ void SPCGExCollectionGridView::OnCategoryRenamed(FName OldName, FName NewName)
 void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return; }
+	if (!Coll)
+	{
+		return;
+	}
 
 	FEntriesArrayAccess Access = GetEntriesAccess();
-	if (!Access.IsValid()) { return; }
+	if (!Access.IsValid())
+	{
+		return;
+	}
 
 	bIsBatchOperation = true;
 	{
@@ -845,7 +914,10 @@ void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 
 		// Set category on newly added entry
 		FPCGExAssetCollectionEntry* NewEntry = Coll->EDITOR_GetMutableEntry(NewIndex);
-		if (NewEntry) { NewEntry->Category = Category; }
+		if (NewEntry)
+		{
+			NewEntry->Category = Category;
+		}
 
 		Coll->PostEditChange();
 
@@ -876,13 +948,22 @@ void SPCGExCollectionGridView::OnCategoryExpansionChanged(FName Category, bool b
 void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TArray<int32>& DraggedIndices, int32 InsertBeforeLocalIndex)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return; }
+	if (!Coll)
+	{
+		return;
+	}
 
 	FEntriesArrayAccess Access = GetEntriesAccess();
-	if (!Access.IsValid()) { return; }
+	if (!Access.IsValid())
+	{
+		return;
+	}
 
 	const TArray<int32>* CatIndices = CategoryToEntryIndices.Find(Category);
-	if (!CatIndices || CatIndices->Num() < 2) { return; }
+	if (!CatIndices || CatIndices->Num() < 2)
+	{
+		return;
+	}
 
 	// Build the desired category order via remove-then-insert
 	TSet<int32> DraggedSet(DraggedIndices);
@@ -901,7 +982,10 @@ void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TAr
 		}
 	}
 
-	if (Dragged.IsEmpty()) { return; }
+	if (Dragged.IsEmpty())
+	{
+		return;
+	}
 
 	// Adjust insertion index for removed dragged items before the insert point
 	int32 AdjustedInsert = InsertBeforeLocalIndex;
@@ -917,15 +1001,27 @@ void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TAr
 	// Build desired order: NonDragged[0..Adj) + Dragged + NonDragged[Adj..end)
 	TArray<int32> DesiredOrder;
 	DesiredOrder.Reserve(CatIndices->Num());
-	for (int32 i = 0; i < AdjustedInsert; i++) { DesiredOrder.Add(NonDragged[i]); }
+	for (int32 i = 0; i < AdjustedInsert; i++)
+	{
+		DesiredOrder.Add(NonDragged[i]);
+	}
 	DesiredOrder.Append(Dragged);
-	for (int32 i = AdjustedInsert; i < NonDragged.Num(); i++) { DesiredOrder.Add(NonDragged[i]); }
+	for (int32 i = AdjustedInsert; i < NonDragged.Num(); i++)
+	{
+		DesiredOrder.Add(NonDragged[i]);
+	}
 
 	// Check if order actually changed
-	if (DesiredOrder == *CatIndices) { return; }
+	if (DesiredOrder == *CatIndices)
+	{
+		return;
+	}
 
 	UScriptStruct* EntryStruct = Access.InnerProp ? Access.InnerProp->Struct : nullptr;
-	if (!EntryStruct) { return; }
+	if (!EntryStruct)
+	{
+		return;
+	}
 
 	FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
 
@@ -943,7 +1039,10 @@ void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TAr
 		TArray<int32> CurrentOrder = *CatIndices;
 		for (int32 i = 0; i < DesiredOrder.Num(); i++)
 		{
-			if (CurrentOrder[i] == DesiredOrder[i]) { continue; }
+			if (CurrentOrder[i] == DesiredOrder[i])
+			{
+				continue;
+			}
 
 			// Find where the desired entry currently is
 			const int32 j = CurrentOrder.Find(DesiredOrder[i]);
@@ -999,10 +1098,16 @@ void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TAr
 void SPCGExCollectionGridView::PopulateCategoryTiles(FName Category)
 {
 	TSharedPtr<SPCGExCollectionCategoryGroup>* GroupPtr = CategoryGroupWidgets.Find(Category);
-	if (!GroupPtr || !GroupPtr->IsValid()) { return; }
+	if (!GroupPtr || !GroupPtr->IsValid())
+	{
+		return;
+	}
 
 	const TArray<int32>* Indices = CategoryToEntryIndices.Find(Category);
-	if (!Indices || Indices->IsEmpty()) { return; }
+	if (!Indices || Indices->IsEmpty())
+	{
+		return;
+	}
 
 	// Check if tiles already exist for this category
 	bool bAlreadyPopulated = false;
@@ -1014,7 +1119,10 @@ void SPCGExCollectionGridView::PopulateCategoryTiles(FName Category)
 			break;
 		}
 	}
-	if (bAlreadyPopulated) { return; }
+	if (bAlreadyPopulated)
+	{
+		return;
+	}
 
 	TSharedPtr<SPCGExCollectionCategoryGroup>& Group = *GroupPtr;
 
@@ -1081,7 +1189,10 @@ void SPCGExCollectionGridView::UpdateDetailForSelection()
 	UScriptStruct* EntryStruct = GetEntryScriptStruct();
 	uint8* EntryPtr = GetEntryRawPtr(Index);
 
-	if (!EntryStruct || !EntryPtr) { return; }
+	if (!EntryStruct || !EntryPtr)
+	{
+		return;
+	}
 
 	// Create FStructOnScope with a copy of the entry data
 	CurrentStructScope = MakeShared<FStructOnScope>(EntryStruct);
@@ -1096,16 +1207,28 @@ void SPCGExCollectionGridView::UpdateDetailForSelection()
 
 void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMemberProperty, const FProperty* ChangedLeafProperty)
 {
-	if (!CurrentStructScope.IsValid() || CurrentDetailIndex == INDEX_NONE) { return; }
+	if (!CurrentStructScope.IsValid() || CurrentDetailIndex == INDEX_NONE)
+	{
+		return;
+	}
 
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return; }
+	if (!Coll)
+	{
+		return;
+	}
 
 	UScriptStruct* EntryStruct = GetEntryScriptStruct();
-	if (!EntryStruct) { return; }
+	if (!EntryStruct)
+	{
+		return;
+	}
 
 	uint8* PrimaryPtr = GetEntryRawPtr(CurrentDetailIndex);
-	if (!PrimaryPtr) { return; }
+	if (!PrimaryPtr)
+	{
+		return;
+	}
 
 	const uint8* SrcData = CurrentStructScope->GetStructMemory();
 
@@ -1151,8 +1274,8 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 	// propagate only changed sub-properties / array elements.
 	TArray<uint8> MemberSnapshot;
 	const FStructProperty* StructMember = PropToPropagate
-		                                      ? CastField<FStructProperty>(PropToPropagate)
-		                                      : nullptr;
+		? CastField<FStructProperty>(PropToPropagate)
+		: nullptr;
 
 	if (StructMember && SelectedIndices.Num() > 1)
 	{
@@ -1177,7 +1300,10 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 			TArray<int32> Selected = GetSelectedIndices();
 			for (int32 OtherIndex : Selected)
 			{
-				if (OtherIndex == CurrentDetailIndex) { continue; }
+				if (OtherIndex == CurrentDetailIndex)
+				{
+					continue;
+				}
 				uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
 				if (OtherPtr)
 				{
@@ -1197,7 +1323,10 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 			TArray<int32> Selected = GetSelectedIndices();
 			for (int32 OtherIndex : Selected)
 			{
-				if (OtherIndex == CurrentDetailIndex) { continue; }
+				if (OtherIndex == CurrentDetailIndex)
+				{
+					continue;
+				}
 				uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
 				if (OtherPtr)
 				{
@@ -1234,10 +1363,16 @@ void SPCGExCollectionGridView::PropagateChangedProperties(
 		const int32 Offset = Prop->GetOffset_ForInternal();
 
 		// Skip unchanged properties
-		if (Prop->Identical(OldData + Offset, NewData + Offset)) { continue; }
+		if (Prop->Identical(OldData + Offset, NewData + Offset))
+		{
+			continue;
+		}
 
 		// If gate is active, only allow the gate field (bEnabled) to propagate
-		if (bGateBlocksNonGateFields && Prop->GetFName() != EnabledFieldName) { continue; }
+		if (bGateBlocksNonGateFields && Prop->GetFName() != EnabledFieldName)
+		{
+			continue;
+		}
 
 		if (const FStructProperty* NestedStruct = CastField<FStructProperty>(Prop))
 		{
@@ -1345,11 +1480,17 @@ void SPCGExCollectionGridView::OnDetailPropertyChanged(const FPropertyChangedEve
 UScriptStruct* SPCGExCollectionGridView::GetEntryScriptStruct() const
 {
 	const UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return nullptr; }
+	if (!Coll)
+	{
+		return nullptr;
+	}
 
 	FArrayProperty* ArrayProp = CastField<FArrayProperty>(
 		Coll->GetClass()->FindPropertyByName(FName("Entries")));
-	if (!ArrayProp) { return nullptr; }
+	if (!ArrayProp)
+	{
+		return nullptr;
+	}
 
 	FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
 	return InnerProp ? InnerProp->Struct : nullptr;
@@ -1358,16 +1499,25 @@ UScriptStruct* SPCGExCollectionGridView::GetEntryScriptStruct() const
 uint8* SPCGExCollectionGridView::GetEntryRawPtr(int32 Index) const
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll || Index < 0) { return nullptr; }
+	if (!Coll || Index < 0)
+	{
+		return nullptr;
+	}
 
 	FArrayProperty* ArrayProp = CastField<FArrayProperty>(
 		Coll->GetClass()->FindPropertyByName(FName("Entries")));
-	if (!ArrayProp) { return nullptr; }
+	if (!ArrayProp)
+	{
+		return nullptr;
+	}
 
 	void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
 	FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
 
-	if (Index >= ArrayHelper.Num()) { return nullptr; }
+	if (Index >= ArrayHelper.Num())
+	{
+		return nullptr;
+	}
 	return ArrayHelper.GetRawPtr(Index);
 }
 
@@ -1376,11 +1526,17 @@ SPCGExCollectionGridView::FEntriesArrayAccess SPCGExCollectionGridView::GetEntri
 	FEntriesArrayAccess Result;
 
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return Result; }
+	if (!Coll)
+	{
+		return Result;
+	}
 
 	Result.ArrayProp = CastField<FArrayProperty>(
 		Coll->GetClass()->FindPropertyByName(FName("Entries")));
-	if (!Result.ArrayProp) { return Result; }
+	if (!Result.ArrayProp)
+	{
+		return Result;
+	}
 
 	Result.InnerProp = CastField<FStructProperty>(Result.ArrayProp->Inner);
 	Result.ArrayData = Result.ArrayProp->ContainerPtrToValuePtr<void>(Coll);
@@ -1393,10 +1549,16 @@ SPCGExCollectionGridView::FEntriesArrayAccess SPCGExCollectionGridView::GetEntri
 FReply SPCGExCollectionGridView::OnAddEntry()
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return FReply::Handled(); }
+	if (!Coll)
+	{
+		return FReply::Handled();
+	}
 
 	FEntriesArrayAccess Access = GetEntriesAccess();
-	if (!Access.IsValid()) { return FReply::Handled(); }
+	if (!Access.IsValid())
+	{
+		return FReply::Handled();
+	}
 
 	bIsBatchOperation = true;
 	{
@@ -1426,7 +1588,10 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 
 	IncrementalCategoryRefresh();
 	UpdateDetailForSelection();
-	if (GroupScrollBox.IsValid()) { GroupScrollBox->ScrollToEnd(); }
+	if (GroupScrollBox.IsValid())
+	{
+		GroupScrollBox->ScrollToEnd();
+	}
 
 	return FReply::Handled();
 }
@@ -1434,17 +1599,29 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 FReply SPCGExCollectionGridView::OnDuplicateSelected()
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return FReply::Handled(); }
+	if (!Coll)
+	{
+		return FReply::Handled();
+	}
 
 	FEntriesArrayAccess Access = GetEntriesAccess();
-	if (!Access.IsValid()) { return FReply::Handled(); }
+	if (!Access.IsValid())
+	{
+		return FReply::Handled();
+	}
 
 	UScriptStruct* EntryStruct = Access.InnerProp ? Access.InnerProp->Struct : nullptr;
-	if (!EntryStruct) { return FReply::Handled(); }
+	if (!EntryStruct)
+	{
+		return FReply::Handled();
+	}
 
 	TArray<int32> Selected = SelectedIndices.Array();
 	Selected.Sort();
-	if (Selected.IsEmpty()) { return FReply::Handled(); }
+	if (Selected.IsEmpty())
+	{
+		return FReply::Handled();
+	}
 
 	bIsBatchOperation = true;
 	{
@@ -1478,7 +1655,10 @@ FReply SPCGExCollectionGridView::OnDuplicateSelected()
 		{
 			const int32 FinalPos = Selected[k] + k + 1;
 			SelectedIndices.Add(FinalPos);
-			if (LastClickedIndex == INDEX_NONE) { LastClickedIndex = FinalPos; }
+			if (LastClickedIndex == INDEX_NONE)
+			{
+				LastClickedIndex = FinalPos;
+			}
 		}
 	}
 	bIsBatchOperation = false;
@@ -1492,14 +1672,23 @@ FReply SPCGExCollectionGridView::OnDuplicateSelected()
 FReply SPCGExCollectionGridView::OnDeleteSelected()
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll) { return FReply::Handled(); }
+	if (!Coll)
+	{
+		return FReply::Handled();
+	}
 
 	FEntriesArrayAccess Access = GetEntriesAccess();
-	if (!Access.IsValid()) { return FReply::Handled(); }
+	if (!Access.IsValid())
+	{
+		return FReply::Handled();
+	}
 
 	TArray<int32> Selected = SelectedIndices.Array();
 	Selected.Sort();
-	if (Selected.IsEmpty()) { return FReply::Handled(); }
+	if (Selected.IsEmpty())
+	{
+		return FReply::Handled();
+	}
 
 	bIsBatchOperation = true;
 	{
@@ -1577,9 +1766,18 @@ void SPCGExCollectionGridView::OnObjectTransacted(UObject* Object, const FTransa
 
 void SPCGExCollectionGridView::OnObjectModified(UObject* Object)
 {
-	if (Object != Collection.Get()) { return; }
-	if (bIsSyncing || bIsBatchOperation) { return; }
-	if (bPendingExternalRefresh) { return; } // Already scheduled
+	if (Object != Collection.Get())
+	{
+		return;
+	}
+	if (bIsSyncing || bIsBatchOperation)
+	{
+		return;
+	}
+	if (bPendingExternalRefresh)
+	{
+		return;
+	} // Already scheduled
 
 	// Defer to next tick -- Modify() fires BEFORE changes are applied,
 	// so the entry count / data hasn't been updated yet.
@@ -1589,7 +1787,10 @@ void SPCGExCollectionGridView::OnObjectModified(UObject* Object)
 		                    {
 			                    bPendingExternalRefresh = false;
 
-			                    if (bIsSyncing || bIsBatchOperation) { return EActiveTimerReturnType::Stop; }
+			                    if (bIsSyncing || bIsBatchOperation)
+			                    {
+				                    return EActiveTimerReturnType::Stop;
+			                    }
 
 			                    const int32 CurrentCount = Collection.IsValid() ? Collection->NumEntries() : 0;
 			                    if (CurrentCount != VisualOrder.Num())

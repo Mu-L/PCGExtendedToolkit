@@ -102,7 +102,12 @@ public:
 	double DampingScale = 0.99;
 
 	virtual bool PrepareForCluster(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster) override;
-	virtual int32 GetNumSteps() override { return 3; }
+
+	virtual int32 GetNumSteps() override
+	{
+		return 3;
+	}
+
 	virtual EPCGExClusterElement PrepareNextStep(const int32 InStep) override;
 	virtual void Step1(const PCGExClusters::FNode& Node) override;
 	virtual void Step2(const PCGExGraphs::FEdge& Edge) override;

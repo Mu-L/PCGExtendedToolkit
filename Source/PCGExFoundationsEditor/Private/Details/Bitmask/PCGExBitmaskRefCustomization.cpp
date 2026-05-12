@@ -7,9 +7,9 @@
 #include "PropertyHandle.h"
 #include "Data/Bitmasks/PCGExBitmaskCollection.h"
 #include "Data/Bitmasks/PCGExBitmaskDetails.h"
-#include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExBitmaskRefCustomization::MakeInstance()
 {
@@ -107,7 +107,10 @@ void FPCGExBitmaskRefCustomization::RefreshOptions()
 		if (UPCGExBitmaskCollection* Collection = Cast<UPCGExBitmaskCollection>(SourceObject))
 		{
 			TArray<FName> Identifiers = Collection->EDITOR_GetIdentifierOptions();
-			for (const FName& Name : Identifiers) { ComboOptions.Add(MakeShared<FName>(Name)); }
+			for (const FName& Name : Identifiers)
+			{
+				ComboOptions.Add(MakeShared<FName>(Name));
+			}
 			bNoOptions = Identifiers.IsEmpty();
 		}
 	}

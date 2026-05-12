@@ -6,8 +6,8 @@
 #include "PCGExHeuristicsHandler.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
-#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExPathQuery.h"
+#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExSearchAllocations.h"
 
 bool FPCGExSearchOperationBellmanFord::ResolveQuery(
@@ -19,8 +19,14 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 	check(InQuery->PickResolution == PCGExPathfinding::EQueryPickResolution::Success)
 
 	TSharedPtr<PCGExPathfinding::FSearchAllocations> LocalAllocations = Allocations;
-	if (!LocalAllocations) { LocalAllocations = NewAllocations(); }
-	else { LocalAllocations->Reset(); }
+	if (!LocalAllocations)
+	{
+		LocalAllocations = NewAllocations();
+	}
+	else
+	{
+		LocalAllocations->Reset();
+	}
 
 	const TArray<PCGExClusters::FNode>& NodesRef = *Cluster->Nodes;
 	const TArray<PCGExGraphs::FEdge>& EdgesRef = *Cluster->Edges;
@@ -49,7 +55,10 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 		for (int32 NodeIndex = 0; NodeIndex < NumNodes; NodeIndex++)
 		{
 			const double CurrentDist = Distance[NodeIndex];
-			if (CurrentDist == MAX_dbl) { continue; } // Not yet reachable
+			if (CurrentDist == MAX_dbl)
+			{
+				continue;
+			} // Not yet reachable
 
 			const PCGExClusters::FNode& CurrentNode = NodesRef[NodeIndex];
 
@@ -74,10 +83,16 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 		}
 
 		// Early termination if no relaxation occurred
-		if (!bAnyRelaxation) { break; }
+		if (!bAnyRelaxation)
+		{
+			break;
+		}
 
 		// Early exit if goal is reachable and we want to exit early
-		if (bEarlyExit && Distance[GoalNode.Index] != MAX_dbl && !bAnyRelaxation) { break; }
+		if (bEarlyExit && Distance[GoalNode.Index] != MAX_dbl && !bAnyRelaxation)
+		{
+			break;
+		}
 	}
 
 	// Check for negative weight cycles if requested
@@ -86,7 +101,10 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 		for (int32 NodeIndex = 0; NodeIndex < NumNodes; NodeIndex++)
 		{
 			const double CurrentDist = Distance[NodeIndex];
-			if (CurrentDist == MAX_dbl) { continue; }
+			if (CurrentDist == MAX_dbl)
+			{
+				continue;
+			}
 
 			const PCGExClusters::FNode& CurrentNode = NodesRef[NodeIndex];
 
@@ -111,7 +129,10 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 	}
 
 	// Check if goal is reachable
-	if (Distance[GoalNode.Index] == MAX_dbl) { return false; }
+	if (Distance[GoalNode.Index] == MAX_dbl)
+	{
+		return false;
+	}
 
 	// Reconstruct path
 	int32 PathNodeIndex;

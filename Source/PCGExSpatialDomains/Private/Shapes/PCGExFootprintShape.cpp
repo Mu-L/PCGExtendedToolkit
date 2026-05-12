@@ -31,7 +31,10 @@ FBox FPCGExFootprintShape_OBB::GetWorldAABB() const
 	// component cleanly without a separate fast path. Single-element OBBs
 	// hit this once per Append, not in the hot query loop.
 	FBox AABB(ForceInit);
-	Bounds.ForEachCorner([&AABB](const FVector& World) { AABB += World; });
+	Bounds.ForEachCorner([&AABB](const FVector& World)
+	{
+		AABB += World;
+	});
 	return AABB;
 }
 

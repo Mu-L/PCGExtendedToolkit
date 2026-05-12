@@ -6,10 +6,10 @@
 
 #include "PCGComponent.h"
 
+#include "PCGExVersion.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "PCGExVersion.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Paths/PCGExPathsHelpers.h"
 
@@ -32,7 +32,10 @@ PCGEX_INITIALIZE_ELEMENT(CreateSpline)
 
 bool UPCGExCreateSplineSettings::ShouldCache() const
 {
-	if (Mode == EPCGCreateSplineMode::CreateComponent) { return false; }
+	if (Mode == EPCGCreateSplineMode::CreateComponent)
+	{
+		return false;
+	}
 	return Super::ShouldCache();
 }
 
@@ -52,13 +55,19 @@ void FPCGExCreateSplineElement::DisabledPassThroughData(FPCGContext* Context) co
 
 bool FPCGExCreateSplineElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(CreateSpline)
 
 	if (Settings->bApplyCustomPointType || Settings->DefaultPointType == EPCGExSplinePointType::CurveCustomTangent)
 	{
-		if (!Context->Tangents.Init(Context, Settings->Tangents)) { return false; }
+		if (!Context->Tangents.Init(Context, Settings->Tangents))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -114,7 +123,10 @@ bool FPCGExCreateSplineElement::CanExecuteOnlyOnMainThread(FPCGContext* Context)
 	if (Context)
 	{
 		const UPCGExCreateSplineSettings* Settings = Context->GetInputSettings<UPCGExCreateSplineSettings>();
-		if (Settings && Settings->Mode != EPCGCreateSplineMode::CreateDataOnly) { return true; }
+		if (Settings && Settings->Mode != EPCGCreateSplineMode::CreateDataOnly)
+		{
+			return true;
+		}
 	}
 	return FPCGExPathProcessorElement::CanExecuteOnlyOnMainThread(Context);
 }
@@ -127,7 +139,10 @@ namespace PCGExCreateSpline
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn());
 		bApplyTangents = Settings->GetApplyTangents();
@@ -135,7 +150,10 @@ namespace PCGExCreateSpline
 		if (bApplyTangents)
 		{
 			TangentsHandler = MakeShared<PCGExTangents::FTangentsHandler>(bClosedLoop);
-			if (!TangentsHandler->Init(Context, Context->Tangents, PointDataFacade)) { return false; }
+			if (!TangentsHandler->Init(Context, Context->Tangents, PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->bApplyCustomPointType)
@@ -177,7 +195,10 @@ namespace PCGExCreateSpline
 			FVector OutArrive = FVector::ZeroVector;
 			FVector OutLeave = FVector::ZeroVector;
 
-			if (bApplyTangents) { TangentsHandler->GetPointTangents(Index, OutArrive, OutLeave); }
+			if (bApplyTangents)
+			{
+				TangentsHandler->GetPointTangents(Index, OutArrive, OutLeave);
+			}
 
 			const FTransform& TR = InTransforms[Index];
 
@@ -187,20 +208,28 @@ namespace PCGExCreateSpline
 			if (CustomPointType)
 			{
 				const int32 Value = CustomPointType->Read(Index);
-				if (FMath::IsWithinInclusive(Value, 0, 4)) { PointTypeProxy = static_cast<EPCGExSplinePointType>(static_cast<uint8>(Value)); }
+				if (FMath::IsWithinInclusive(Value, 0, 4))
+				{
+					PointTypeProxy = static_cast<EPCGExSplinePointType>(static_cast<uint8>(Value));
+				}
 			}
 
 			switch (PointTypeProxy)
 			{
-			case EPCGExSplinePointType::Linear: PointType = ESplinePointType::Linear;
+			case EPCGExSplinePointType::Linear:
+				PointType = ESplinePointType::Linear;
 				break;
-			case EPCGExSplinePointType::Curve: PointType = ESplinePointType::Curve;
+			case EPCGExSplinePointType::Curve:
+				PointType = ESplinePointType::Curve;
 				break;
-			case EPCGExSplinePointType::Constant: PointType = ESplinePointType::Constant;
+			case EPCGExSplinePointType::Constant:
+				PointType = ESplinePointType::Constant;
 				break;
-			case EPCGExSplinePointType::CurveClamped: PointType = ESplinePointType::CurveClamped;
+			case EPCGExSplinePointType::CurveClamped:
+				PointType = ESplinePointType::CurveClamped;
 				break;
-			case EPCGExSplinePointType::CurveCustomTangent: PointType = ESplinePointType::CurveCustomTangent;
+			case EPCGExSplinePointType::CurveCustomTangent:
+				PointType = ESplinePointType::CurveCustomTangent;
 				break;
 			}
 
@@ -211,7 +240,10 @@ namespace PCGExCreateSpline
 			bHasAValidEntry |= (PointMetadataEntry != PCGInvalidEntryKey);
 		}
 
-		if (bHasAValidEntry) { FPlatformAtomics::InterlockedExchange(&HasAValidEntry, true); }
+		if (bHasAValidEntry)
+		{
+			FPlatformAtomics::InterlockedExchange(&HasAValidEntry, true);
+		}
 	}
 
 	void FProcessor::OnPointsProcessingComplete()
@@ -253,8 +285,14 @@ namespace PCGExCreateSpline
 
 	bool FBatch::PrepareSingle(const TSharedRef<PCGExPointsMT::IProcessor>& InProcessor)
 	{
-		if (!TargetActor) { return false; }
-		if (!TBatch<FProcessor>::PrepareSingle(InProcessor)) { return false; }
+		if (!TargetActor)
+		{
+			return false;
+		}
+		if (!TBatch<FProcessor>::PrepareSingle(InProcessor))
+		{
+			return false;
+		}
 		PCGEX_TYPED_PROCESSOR_REF
 		TypedProcessor->SplineActor = TargetActor;
 		return true;

@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/PCGExEdgeRefineOperation.h"
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExEdgeRefineOperation.h"
 #include "Math/PCGExMath.h"
 #include "PCGExEdgeRefineRemoveOverlap.generated.h"
 
@@ -49,8 +49,15 @@ class UPCGExEdgeRemoveOverlap : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool WantsIndividualEdgeProcessing() const override { return true; }
-	virtual bool WantsEdgeOctree() const override { return true; }
+	virtual bool WantsIndividualEdgeProcessing() const override
+	{
+		return true;
+	}
+
+	virtual bool WantsEdgeOctree() const override
+	{
+		return true;
+	}
 
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 

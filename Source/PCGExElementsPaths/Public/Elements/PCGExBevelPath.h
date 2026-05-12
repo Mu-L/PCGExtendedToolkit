@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExPathProcessor.h"
+#include "Details/PCGExSettingsMacros.h"
+#include "Details/PCGExSubdivisionDetails.h"
 #include "Factories/PCGExFactories.h"
 #include "Math/PCGExMathMean.h"
-#include "Core/PCGExPathProcessor.h"
-#include "Details/PCGExSubdivisionDetails.h"
-#include "Details/PCGExSettingsMacros.h"
 
 #include "PCGExBevelPath.generated.h"
 
@@ -346,8 +346,14 @@ namespace PCGExBevelPath
 
 		FORCEINLINE int32 WrapIndex(const int32 Index) const
 		{
-			if (Index < 0) { return bIsClosedLoop ? NumPoints + Index : -1; }
-			if (Index >= NumPoints) { return bIsClosedLoop ? Index - NumPoints : -1; }
+			if (Index < 0)
+			{
+				return bIsClosedLoop ? NumPoints + Index : -1;
+			}
+			if (Index >= NumPoints)
+			{
+				return bIsClosedLoop ? Index - NumPoints : -1;
+			}
 			return Index;
 		}
 

@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "PCGExCoreSettingsCache.h"
 #include "Core/PCGExContext.h"
-#include "Core/PCGExSettings.h"
 #include "Core/PCGExElement.h"
+#include "Core/PCGExSettings.h"
 #include "Data/External/PCGExMesh.h"
 #include "Data/External/PCGExMeshCommon.h"
 #include "Data/External/PCGExMeshImportDetails.h"
@@ -39,7 +39,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(DynamicMeshToClusters, "Dynamic Mesh to Clusters", "Creates clusters from dynamic mesh topology.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
 #endif
 
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
@@ -104,7 +108,10 @@ struct FPCGExDynamicMeshToClustersContext final : FPCGExContext
 class FPCGExDynamicMeshToClustersElement final : public IPCGExElement
 {
 public:
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return true; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return true;
+	}
 
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(DynamicMeshToClusters)
@@ -112,5 +119,8 @@ protected:
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
 };

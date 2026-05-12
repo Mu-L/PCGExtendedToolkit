@@ -8,8 +8,8 @@
 #include "PCGSettings.h"
 #include "UObject/Object.h"
 
-#include "Factories/PCGExFactories.h"
 #include "Data/PCGExPointData.h"
+#include "Factories/PCGExFactories.h"
 
 #include "PCGExFactoryData.generated.h"
 
@@ -46,7 +46,10 @@ class PCGEXCORE_API UPCGExParamDataBase : public UPCGExPointData
 	GENERATED_BODY()
 
 public:
-	virtual EPCGDataType GetDataType() const override { return EPCGDataType::Param; } //PointOrParam would be best but it's gray and I don't like it
+	virtual EPCGDataType GetDataType() const override
+	{
+		return EPCGDataType::Param;
+	} //PointOrParam would be best but it's gray and I don't like it
 
 	virtual void OutputConfigToMetadata();
 };
@@ -70,15 +73,25 @@ public:
 
 	PCGExFactories::EPreparationResult PrepResult = PCGExFactories::EPreparationResult::None;
 
-	virtual PCGExFactories::EType GetFactoryType() const { return PCGExFactories::EType::None; }
+	virtual PCGExFactories::EType GetFactoryType() const
+	{
+		return PCGExFactories::EType::None;
+	}
 
 	virtual bool RegisterConsumableAttributes(FPCGExContext* InContext) const;
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const;
 	virtual void RegisterAssetDependencies(FPCGExContext* InContext) const;
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) { return false; }
-	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) { return PCGExFactories::EPreparationResult::Success; }
+	virtual bool WantsPreparation(FPCGExContext* InContext)
+	{
+		return false;
+	}
+
+	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
+	{
+		return PCGExFactories::EPreparationResult::Success;
+	}
 
 	virtual void AddDataDependency(const UPCGData* InData);
 	virtual void BeginDestroy() override;

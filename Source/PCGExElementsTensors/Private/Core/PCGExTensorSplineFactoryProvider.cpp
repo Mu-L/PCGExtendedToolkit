@@ -20,11 +20,17 @@ bool UPCGExTensorSplineFactoryData::InitInternalFacade(FPCGExContext* InContext)
 PCGExFactories::EPreparationResult UPCGExTensorSplineFactoryData::InitInternalData(FPCGExContext* InContext)
 {
 	PCGExFactories::EPreparationResult Result = Super::InitInternalData(InContext);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	if (bBuildFromPaths)
 	{
-		if (!InitInternalFacade(InContext)) { return PCGExFactories::EPreparationResult::Fail; }
+		if (!InitInternalFacade(InContext))
+		{
+			return PCGExFactories::EPreparationResult::Fail;
+		}
 
 		TArray<FPCGTaggedData> Targets = InContext->InputData.GetInputsByPin(PCGExPaths::Labels::SourcePathsLabel);
 
@@ -33,11 +39,20 @@ PCGExFactories::EPreparationResult UPCGExTensorSplineFactoryData::InitInternalDa
 			for (const FPCGTaggedData& TaggedData : Targets)
 			{
 				const UPCGBasePointData* PathData = Cast<UPCGBasePointData>(TaggedData.Data);
-				if (!PathData) { continue; }
+				if (!PathData)
+				{
+					continue;
+				}
 
 				const bool bIsClosedLoop = PCGExPaths::Helpers::GetClosedLoop(PathData);
-				if (SampleInputs == EPCGExSplineSamplingIncludeMode::ClosedLoopOnly && !bIsClosedLoop) { continue; }
-				if (SampleInputs == EPCGExSplineSamplingIncludeMode::OpenSplineOnly && bIsClosedLoop) { continue; }
+				if (SampleInputs == EPCGExSplineSamplingIncludeMode::ClosedLoopOnly && !bIsClosedLoop)
+				{
+					continue;
+				}
+				if (SampleInputs == EPCGExSplineSamplingIncludeMode::OpenSplineOnly && bIsClosedLoop)
+				{
+					continue;
+				}
 
 				if (TSharedPtr<FPCGSplineStruct> SplineStruct = PCGExPaths::Helpers::MakeSplineFromPoints(PathData->GetConstTransformValueRange(), PointType, bIsClosedLoop, bSmoothLinear))
 				{
@@ -60,11 +75,20 @@ PCGExFactories::EPreparationResult UPCGExTensorSplineFactoryData::InitInternalDa
 			for (const FPCGTaggedData& TaggedData : Targets)
 			{
 				const UPCGSplineData* SplineData = Cast<UPCGSplineData>(TaggedData.Data);
-				if (!SplineData || SplineData->SplineStruct.GetNumberOfSplineSegments() <= 0) { continue; }
+				if (!SplineData || SplineData->SplineStruct.GetNumberOfSplineSegments() <= 0)
+				{
+					continue;
+				}
 
 				const bool bIsClosedLoop = SplineData->SplineStruct.bClosedLoop;
-				if (SampleInputs == EPCGExSplineSamplingIncludeMode::ClosedLoopOnly && !bIsClosedLoop) { continue; }
-				if (SampleInputs == EPCGExSplineSamplingIncludeMode::OpenSplineOnly && bIsClosedLoop) { continue; }
+				if (SampleInputs == EPCGExSplineSamplingIncludeMode::ClosedLoopOnly && !bIsClosedLoop)
+				{
+					continue;
+				}
+				if (SampleInputs == EPCGExSplineSamplingIncludeMode::OpenSplineOnly && bIsClosedLoop)
+				{
+					continue;
+				}
 
 				Splines.Add(SplineData->SplineStruct);
 			}

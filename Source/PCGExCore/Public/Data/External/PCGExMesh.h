@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExMeshCommon.h"
-#include "Engine/StaticMesh.h"
 #include "StaticMeshResources.h"
+#include "Engine/StaticMesh.h"
 #include "UObject/SoftObjectPath.h"
 
 struct FPCGExGeoMeshImportDetails;
@@ -41,10 +41,20 @@ namespace PCGExMesh
 		const FColorVertexBuffer* Colors = nullptr;
 
 
-		FORCEINLINE int32 NumTriangles() const { return Indices.Num() / 3; }
-		FORCEINLINE int32 NumVertices() const { return Indices.Num(); }
+		FORCEINLINE int32 NumTriangles() const
+		{
+			return Indices.Num() / 3;
+		}
 
-		FORCEINLINE bool HasColor() const { return Colors != nullptr; }
+		FORCEINLINE int32 NumVertices() const
+		{
+			return Indices.Num();
+		}
+
+		FORCEINLINE bool HasColor() const
+		{
+			return Colors != nullptr;
+		}
 	};
 
 	class FExtractStaticMeshTask;
@@ -122,6 +132,9 @@ namespace PCGExMesh
 
 		int32 FindOrAdd(const FSoftObjectPath& InPath);
 
-		TSharedPtr<FGeoStaticMesh> GetMesh(const int32 Index) { return GSMs[Index]; }
+		TSharedPtr<FGeoStaticMesh> GetMesh(const int32 Index)
+		{
+			return GSMs[Index];
+		}
 	};
 }

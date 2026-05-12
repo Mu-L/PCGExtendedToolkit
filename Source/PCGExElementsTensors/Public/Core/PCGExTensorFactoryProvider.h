@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExTensor.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
 
 #include "PCGExTensorFactoryProvider.generated.h"
 
@@ -52,7 +52,11 @@ class PCGEXELEMENTSTENSORS_API UPCGExTensorFactoryData : public UPCGExFactoryDat
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoTensor)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Tensor; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Tensor;
+	}
+
 	virtual TSharedPtr<PCGExTensorOperation> CreateOperation(FPCGExContext* InContext) const;
 
 	FPCGExTensorConfigBase BaseConfig;
@@ -75,7 +79,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(Tensor, "Tensor Definition", "Creates a single tensor field definition.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Tensor); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Tensor);
+	}
 #endif
 
 protected:
@@ -87,7 +95,11 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayPriority=-1), AdvancedDisplay)
 	int32 Priority = 0;
 
-	virtual FName GetMainOutputPin() const override { return PCGExTensor::OutputTensorLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExTensor::OutputTensorLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 };
 
@@ -102,7 +114,11 @@ public:
 	TSharedPtr<PCGExTensor::FEffectorsArray> EffectorsArray;
 
 protected:
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult InitInternalData(FPCGExContext* InContext) override;
 
 	virtual TSharedPtr<PCGExTensor::FEffectorsArray> GetEffectorsArray() const;

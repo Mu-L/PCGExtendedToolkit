@@ -7,9 +7,9 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "IDetailPropertyRow.h"
-#include "PropertyHandle.h"
-#include "PCGExProperty.h"
 #include "PCGExInlineWidgetRegistry.h"
+#include "PCGExProperty.h"
+#include "PropertyHandle.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCustomization::MakeInstance()
@@ -19,7 +19,10 @@ TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCustomization::MakeIn
 
 FText FPCGExPropertySchemaCustomization::GetHeaderText() const
 {
-	if (!PropertyHandlePtr.IsValid()) { return FText::FromString(TEXT("None (Unknown)")); }
+	if (!PropertyHandlePtr.IsValid())
+	{
+		return FText::FromString(TEXT("None (Unknown)"));
+	}
 
 	// Access schema data directly
 	TArray<void*> RawData;
@@ -46,12 +49,18 @@ FText FPCGExPropertySchemaCustomization::GetHeaderText() const
 
 void FPCGExPropertySchemaCustomization::OnSchemaChanged()
 {
-	if (!PropertyHandlePtr.IsValid()) { return; }
+	if (!PropertyHandlePtr.IsValid())
+	{
+		return;
+	}
 
 	// Access schema to sync
 	TArray<void*> RawData;
 	PropertyHandlePtr.Pin()->AccessRawData(RawData);
-	if (RawData.IsEmpty() || !RawData[0]) { return; }
+	if (RawData.IsEmpty() || !RawData[0])
+	{
+		return;
+	}
 
 	FPCGExPropertySchema* Schema = static_cast<FPCGExPropertySchema*>(RawData[0]);
 	if (Schema)
@@ -110,21 +119,36 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 		// Read-only mode: Only show the inner Value field from the FInstancedStruct
 		// Schema name and type are shown in header, struct type cannot be changed
 
-		if (!PropertyInnerHandle.IsValid()) { return; }
+		if (!PropertyInnerHandle.IsValid())
+		{
+			return;
+		}
 
 		// Access raw data to get the FInstancedStruct
 		TArray<void*> RawData;
 		PropertyInnerHandle->AccessRawData(RawData);
-		if (RawData.IsEmpty() || !RawData[0]) { return; }
+		if (RawData.IsEmpty() || !RawData[0])
+		{
+			return;
+		}
 
 		FInstancedStruct* Instance = static_cast<FInstancedStruct*>(RawData[0]);
-		if (!Instance || !Instance->IsValid()) { return; }
+		if (!Instance || !Instance->IsValid())
+		{
+			return;
+		}
 
 		UScriptStruct* InnerStruct = const_cast<UScriptStruct*>(Instance->GetScriptStruct());
-		if (!InnerStruct) { return; }
+		if (!InnerStruct)
+		{
+			return;
+		}
 
 		uint8* StructMemory = Instance->GetMutableMemory();
-		if (!StructMemory) { return; }
+		if (!StructMemory)
+		{
+			return;
+		}
 
 		// Check if this type should be inlined (simple type)
 		const bool bShouldInline = InnerStruct->HasMetaData(TEXT("PCGExInlineValue"));
@@ -169,7 +193,10 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 			for (TFieldIterator<FProperty> It(InnerStruct); It; ++It)
 			{
 				const FProperty* Property = *It;
-				if (!Property) { continue; }
+				if (!Property)
+				{
+					continue;
+				}
 
 				FName PropName = Property->GetFName();
 

@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "PCGExBlendingCommon.h"
 #include "Core/PCGExProxyDataBlending.h"
-#include "UObject/Object.h"
 #include "Types/PCGExAttributeIdentity.h"
+#include "UObject/Object.h"
 
 struct FPCGExBlendingDetails;
 struct FPCGExCarryOverDetails;
@@ -67,7 +67,10 @@ namespace PCGExBlending
 			const TArray<TSharedPtr<PCGExData::FFacade>>& Sources; // Sources (null if attribute is not valid on that source)
 			TArray<TSharedPtr<FProxyDataBlender>> SubBlenders;     // One blender per source
 
-			void SetNum(const int32 InNum) { SubBlenders.SetNum(InNum); }
+			void SetNum(const int32 InNum)
+			{
+				SubBlenders.SetNum(InNum);
+			}
 		};
 
 		void AddSources(const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSet<FName>* IgnoreAttributeSet = nullptr, FGetSourceIdx GetSourceIdxFn = nullptr, const TSet<int32>* RelevantIOIndices = nullptr);

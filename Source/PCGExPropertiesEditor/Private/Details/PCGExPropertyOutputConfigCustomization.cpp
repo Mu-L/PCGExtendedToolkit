@@ -6,14 +6,14 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
-#include "PropertyHandle.h"
 #include "PCGExPropertyWriter.h"
+#include "PropertyHandle.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Styling/SlateColor.h"
-#include "Widgets/Text/STextBlock.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/SBoxPanel.h"
+#include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertyOutputConfigCustomization::MakeInstance()
 {
@@ -32,7 +32,10 @@ void FPCGExPropertyOutputConfigCustomization::CustomizeHeader(
 	auto IsEnabled = [EnabledHandle]()
 	{
 		bool bEnabled = false;
-		if (EnabledHandle) { EnabledHandle->GetValue(bEnabled); }
+		if (EnabledHandle)
+		{
+			EnabledHandle->GetValue(bEnabled);
+		}
 		return bEnabled;
 	};
 
@@ -60,26 +63,44 @@ void FPCGExPropertyOutputConfigCustomization::CustomizeHeader(
 	auto GetOutputText = [OutputAttributeNameHandle]()
 	{
 		FName Value = NAME_None;
-		if (OutputAttributeNameHandle) { OutputAttributeNameHandle->GetValue(Value); }
+		if (OutputAttributeNameHandle)
+		{
+			OutputAttributeNameHandle->GetValue(Value);
+		}
 		return Value.IsNone() ? FText::GetEmpty() : FText::FromName(Value);
 	};
 
 	auto GetHintText = [OutputAttributeNameHandle, PropertyNameHandle]()
 	{
 		FName OutputValue = NAME_None;
-		if (OutputAttributeNameHandle) { OutputAttributeNameHandle->GetValue(OutputValue); }
-		if (!OutputValue.IsNone()) { return FText::GetEmpty(); }
+		if (OutputAttributeNameHandle)
+		{
+			OutputAttributeNameHandle->GetValue(OutputValue);
+		}
+		if (!OutputValue.IsNone())
+		{
+			return FText::GetEmpty();
+		}
 
 		FName PropName = NAME_None;
-		if (PropertyNameHandle) { PropertyNameHandle->GetValue(PropName); }
+		if (PropertyNameHandle)
+		{
+			PropertyNameHandle->GetValue(PropName);
+		}
 		const FName Sanitized = PCGExMetaHelpers::SanitizeAttributeName(PropName);
-		if (Sanitized.IsNone()) { return FText::GetEmpty(); }
+		if (Sanitized.IsNone())
+		{
+			return FText::GetEmpty();
+		}
 		return FText::FromString(TEXT("= ") + Sanitized.ToString());
 	};
 
 	auto OnOutputCommitted = [OutputAttributeNameHandle](const FText& InText, ETextCommit::Type)
 	{
-		if (!OutputAttributeNameHandle) { return; }
+		if (!OutputAttributeNameHandle)
+		{
+			return;
+		}
 		const FString Trimmed = InText.ToString().TrimStartAndEnd();
 		const FName NewValue = Trimmed.IsEmpty() ? NAME_None : FName(*Trimmed);
 		OutputAttributeNameHandle->SetValue(NewValue);

@@ -49,11 +49,21 @@ struct PCGEXCOLLECTIONS_API FPCGExEntryAccessResult
 	const FPCGExAssetCollectionEntry* Entry = nullptr;
 	const UPCGExAssetCollection* Host = nullptr;
 
-	FORCEINLINE operator bool() const { return Entry != nullptr; }
-	FORCEINLINE bool IsValid() const { return Entry != nullptr; }
+	FORCEINLINE operator bool() const
+	{
+		return Entry != nullptr;
+	}
+
+	FORCEINLINE bool IsValid() const
+	{
+		return Entry != nullptr;
+	}
 
 	template <typename T>
-	FORCEINLINE const T* As() const { return static_cast<const T*>(Entry); }
+	FORCEINLINE const T* As() const
+	{
+		return static_cast<const T*>(Entry);
+	}
 
 	// Check if entry is of a specific type
 	bool IsType(PCGExAssetCollection::FTypeId TypeId) const;
@@ -93,7 +103,10 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetStagingData
 	}
 
 	template <typename T>
-	T* TryGet() const { return TSoftObjectPtr<T>(Path).Get(); }
+	T* TryGet() const
+	{
+		return TSoftObjectPtr<T>(Path).Get();
+	}
 
 	bool FindSocket(FName InName, const FPCGExSocket*& OutSocket) const;
 	bool FindSocket(FName InName, const FString& Tag, const FPCGExSocket*& OutSocket) const;
@@ -192,22 +205,37 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	// Subcollection Access (Virtual - Override in derived types)
 
 	/** Get subcollection as base type. Override in derived classes. */
-	virtual const UPCGExAssetCollection* GetSubCollectionPtr() const { return InternalSubCollection; }
+	virtual const UPCGExAssetCollection* GetSubCollectionPtr() const
+	{
+		return InternalSubCollection;
+	}
 
 	/** Clear subcollection references. Override to also clear typed pointer. */
-	virtual void ClearSubCollection() { InternalSubCollection = nullptr; }
+	virtual void ClearSubCollection()
+	{
+		InternalSubCollection = nullptr;
+	}
 
 	/** Check if this is a valid subcollection entry */
-	bool HasValidSubCollection() const { return bIsSubCollection && GetSubCollectionPtr() != nullptr; }
+	bool HasValidSubCollection() const
+	{
+		return bIsSubCollection && GetSubCollectionPtr() != nullptr;
+	}
 
 
 	// Typed Subcollection Access (Templates for convenience)
 
 	template <typename T>
-	T* GetSubCollection() { return Cast<T>(InternalSubCollection); }
+	T* GetSubCollection()
+	{
+		return Cast<T>(InternalSubCollection);
+	}
 
 	template <typename T>
-	const T* GetSubCollection() const { return Cast<T>(InternalSubCollection); }
+	const T* GetSubCollection() const
+	{
+		return Cast<T>(InternalSubCollection);
+	}
 
 
 	// Variations & Grammar
@@ -324,10 +352,20 @@ namespace PCGExAssetCollection
 		FMicroCache() = default;
 		virtual ~FMicroCache() = default;
 
-		virtual FTypeId GetTypeId() const { return TypeIds::None; }
+		virtual FTypeId GetTypeId() const
+		{
+			return TypeIds::None;
+		}
 
-		bool IsEmpty() const { return Order.IsEmpty(); }
-		int32 Num() const { return Order.Num(); }
+		bool IsEmpty() const
+		{
+			return Order.IsEmpty();
+		}
+
+		int32 Num() const
+		{
+			return Order.Num();
+		}
 
 		int32 GetPick(int32 Index, EPCGExIndexPickMode PickMode) const;
 		int32 GetPickAscending(int32 Index) const;
@@ -367,8 +405,15 @@ namespace PCGExAssetCollection
 
 		~FCategory() = default;
 
-		FORCEINLINE bool IsEmpty() const { return Order.IsEmpty(); }
-		FORCEINLINE int32 Num() const { return Order.Num(); }
+		FORCEINLINE bool IsEmpty() const
+		{
+			return Order.IsEmpty();
+		}
+
+		FORCEINLINE int32 Num() const
+		{
+			return Order.Num();
+		}
 
 		int32 GetPick(int32 Index, EPCGExIndexPickMode PickMode) const;
 		int32 GetPickAscending(int32 Index) const;
@@ -405,7 +450,10 @@ namespace PCGExAssetCollection
 		FCache();
 		~FCache() = default;
 
-		FORCEINLINE bool IsEmpty() const { return Main ? Main->IsEmpty() : true; }
+		FORCEINLINE bool IsEmpty() const
+		{
+			return Main ? Main->IsEmpty() : true;
+		}
 
 		void Compile();
 		void RegisterEntry(int32 Index, const FPCGExAssetCollectionEntry* InEntry);
@@ -460,7 +508,10 @@ public:
 #pragma region Type
 
 	/** Get the type ID of this collection */
-	virtual PCGExAssetCollection::FTypeId GetTypeId() const { return PCGExAssetCollection::TypeIds::Base; }
+	virtual PCGExAssetCollection::FTypeId GetTypeId() const
+	{
+		return PCGExAssetCollection::TypeIds::Base;
+	}
 
 	/** Check if this collection is of a specific type */
 	bool IsType(PCGExAssetCollection::FTypeId TypeId) const
@@ -477,7 +528,10 @@ public:
 	virtual void BuildCache();
 
 	/** Flattened set of all collections transitively reachable from this one (self + subcollection Hosts). */
-	const TArray<TObjectPtr<UPCGExAssetCollection>>& GetFlatHosts() { return LoadCache()->FlatHosts; }
+	const TArray<TObjectPtr<UPCGExAssetCollection>>& GetFlatHosts()
+	{
+		return LoadCache()->FlatHosts;
+	}
 
 #pragma endregion
 
@@ -491,7 +545,10 @@ public:
 
 #if WITH_EDITOR
 	/** Editor-only mutable access to entry at raw array index. For editor UI direct writes. */
-	FPCGExAssetCollectionEntry* EDITOR_GetMutableEntry(int32 Index) { return GetMutableEntryAtRawIndex(Index); }
+	FPCGExAssetCollectionEntry* EDITOR_GetMutableEntry(int32 Index)
+	{
+		return GetMutableEntryAtRawIndex(Index);
+	}
 #endif
 
 	/** Get entry by index with pick mode */
@@ -515,13 +572,22 @@ public:
 #pragma region Enumeration
 
 	/** Check if index is valid in the entries array */
-	virtual bool IsValidIndex(int32 InIndex) const { return false; }
+	virtual bool IsValidIndex(int32 InIndex) const
+	{
+		return false;
+	}
 
 	/** Get total number of entries */
-	virtual int32 NumEntries() const { return 0; }
+	virtual int32 NumEntries() const
+	{
+		return 0;
+	}
 
 	/** Get number of valid (non-zero weight) entries */
-	virtual int32 GetValidEntryNum() { return LoadCache()->Main->Indices.Num(); }
+	virtual int32 GetValidEntryNum()
+	{
+		return LoadCache()->Main->Indices.Num();
+	}
 
 	/** Initialize entries array to given size */
 	virtual void InitNumEntries(int32 Num) PCGEX_NOT_IMPLEMENTED(InitNumEntries)
@@ -624,7 +690,10 @@ protected:
 	}
 #endif
 
-	static uint32 GenerateNewGUID() { return GetTypeHash(FGuid::NewGuid()); }
+	static uint32 GenerateNewGUID()
+	{
+		return GetTypeHash(FGuid::NewGuid());
+	}
 
 #pragma endregion
 
@@ -645,7 +714,10 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = Settings, AdvancedDisplay, meta=(IgnoreForMemberInitializationTest))
 	uint32 CollectionGUID = 0;
 
-	uint32 GetCollectionGUID() const { return CollectionGUID; }
+	uint32 GetCollectionGUID() const
+	{
+		return CollectionGUID;
+	}
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = Settings, AdvancedDisplay)
@@ -704,10 +776,16 @@ protected:
 	// Internal - Override in derived classes
 
 	/** Get entry at raw array index (not cache-adjusted). Must override. */
-	virtual const FPCGExAssetCollectionEntry* GetEntryAtRawIndex(int32 Index) const { return nullptr; }
+	virtual const FPCGExAssetCollectionEntry* GetEntryAtRawIndex(int32 Index) const
+	{
+		return nullptr;
+	}
 
 	/** Get mutable entry at raw array index. Must override. */
-	virtual FPCGExAssetCollectionEntry* GetMutableEntryAtRawIndex(int32 Index) { return nullptr; }
+	virtual FPCGExAssetCollectionEntry* GetMutableEntryAtRawIndex(int32 Index)
+	{
+		return nullptr;
+	}
 
 	/** Build cache from entries. Call with your Entries array. */
 	template <typename T>
@@ -726,7 +804,10 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 {
 	FWriteScopeLock WriteScopeLock(CacheLock);
 
-	if (Cache) { return true; }
+	if (Cache)
+	{
+		return true;
+	}
 
 	// Rebuild property registry from collection properties
 	RebuildPropertyRegistry();
@@ -745,7 +826,10 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 	for (int32 i = 0; i < NumEntriesCount; i++)
 	{
 		T& Entry = InEntries[i];
-		if (!Entry.Validate(this)) { continue; }
+		if (!Entry.Validate(this))
+		{
+			continue;
+		}
 
 		Cache->RegisterEntry(i, static_cast<const FPCGExAssetCollectionEntry*>(&Entry));
 
@@ -753,7 +837,10 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 		{
 			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(Entry.GetSubCollectionPtr()))
 			{
-				if (Sub != this) { DirectSubs.Add(Sub); }
+				if (Sub != this)
+				{
+					DirectSubs.Add(Sub);
+				}
 			}
 		}
 	}
@@ -774,7 +861,10 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 	{
 		bool bAlreadyVisited = false;
 		Visited.Add(Sub, &bAlreadyVisited);
-		if (!bAlreadyVisited) { Stack.Add(Sub); }
+		if (!bAlreadyVisited)
+		{
+			Stack.Add(Sub);
+		}
 	}
 
 	while (!Stack.IsEmpty())
@@ -784,12 +874,18 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 
 		Current->ForEachEntry([&Visited, &Stack](const FPCGExAssetCollectionEntry* E, int32 /*Idx*/)
 		{
-			if (!E || !E->HasValidSubCollection()) { return; }
+			if (!E || !E->HasValidSubCollection())
+			{
+				return;
+			}
 			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(E->GetSubCollectionPtr()))
 			{
 				bool bAlreadyVisited = false;
 				Visited.Add(Sub, &bAlreadyVisited);
-				if (!bAlreadyVisited) { Stack.Add(Sub); }
+				if (!bAlreadyVisited)
+				{
+					Stack.Add(Sub);
+				}
 			}
 		});
 	}
@@ -831,8 +927,7 @@ protected: \
 	virtual const FPCGExAssetCollectionEntry* GetEntryAtRawIndex(int32 Index) const override \
 	{ return Entries.IsValidIndex(Index) ? &Entries[Index] : nullptr; } \
 	virtual FPCGExAssetCollectionEntry* GetMutableEntryAtRawIndex(int32 Index) override \
-	{ return Entries.IsValidIndex(Index) ? &Entries[Index] : nullptr; } \
-public:
+	{ return Entries.IsValidIndex(Index) ? &Entries[Index] : nullptr; }
 
 // Entry Property Resolution Implementation
 template <typename T>

@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
+#include "UObject/Object.h"
 
 #include "Factories/PCGExFactoryProvider.h"
 
@@ -168,7 +168,10 @@ public:
 	UPROPERTY()
 	TArray<TObjectPtr<const UPCGExPointFilterFactoryData>> ValueFilterFactories;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Sampler; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Sampler;
+	}
 
 	virtual TSharedPtr<FPCGExNeighborSampleOperation> CreateOperation(FPCGExContext* InContext) const;
 
@@ -189,7 +192,10 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	//PCGEX_NODE_INFOS_CUSTOM_SUBTITLE( NeighborSamplerAttribute, "Sampler : Abstract", "Abstract sampler settings.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(NeighborSampler); }
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(NeighborSampler);
+	}
 #endif
 
 protected:
@@ -201,7 +207,11 @@ protected:
 
 	//~Begin UPCGExFactoryProviderSettings
 public:
-	virtual FName GetMainOutputPin() const override { return PCGExNeighborSample::OutputSamplerLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExNeighborSample::OutputSamplerLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 #if WITH_EDITOR

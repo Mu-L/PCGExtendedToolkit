@@ -3,19 +3,19 @@
 
 #include "Elements/PCGExBuildCellDiagram.h"
 
-#include "Data/PCGExData.h"
-#include "Data/PCGPointArrayData.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCell.h"
 #include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
-#include "Math/PCGExMathDistances.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGPointArrayData.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Math/PCGExMathDistances.h"
 #include "Sampling/PCGExSamplingUnionData.h"
 
 #define LOCTEXT_NAMESPACE "PCGExBuildCellDiagram"
@@ -28,22 +28,41 @@ TArray<FPCGPinProperties> UPCGExBuildCellDiagramSettings::InputPinProperties() c
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExBuildCellDiagramSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExBuildCellDiagramSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExBuildCellDiagramSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExBuildCellDiagramSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(BuildCellDiagram)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL(BuildCellDiagram)
 
 bool FPCGExBuildCellDiagramElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildCellDiagram)
 
 	// Validate attribute names
-	if (Settings->bWriteArea) { PCGEX_VALIDATE_NAME_C(Context, Settings->AreaAttributeName); }
-	if (Settings->bWriteCompactness) { PCGEX_VALIDATE_NAME_C(Context, Settings->CompactnessAttributeName); }
-	if (Settings->bWriteNumNodes) { PCGEX_VALIDATE_NAME_C(Context, Settings->NumNodesAttributeName); }
+	if (Settings->bWriteArea)
+	{
+		PCGEX_VALIDATE_NAME_C(Context, Settings->AreaAttributeName);
+	}
+	if (Settings->bWriteCompactness)
+	{
+		PCGEX_VALIDATE_NAME_C(Context, Settings->CompactnessAttributeName);
+	}
+	if (Settings->bWriteNumNodes)
+	{
+		PCGEX_VALIDATE_NAME_C(Context, Settings->NumNodesAttributeName);
+	}
 
 	Context->HolesFacade = PCGExData::TryGetSingleFacade(Context, PCGExClusters::Labels::SourceHolesLabel, false, false);
 	if (Context->HolesFacade && Settings->ProjectionDetails.Method == EPCGExProjectionMethod::Normal)
@@ -66,11 +85,14 @@ bool FPCGExBuildCellDiagramElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bSkipCompletion = true;
-			NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bSkipCompletion = true;
+			                                      NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -94,12 +116,18 @@ namespace PCGExBuildCellDiagram
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBuildCellDiagram::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Context->HolesFacade)
 		{
 			Holes = Context->Holes ? Context->Holes : MakeShared<PCGExClusters::FProjectedPointSet>(Context, Context->HolesFacade.ToSharedRef(), ProjectionDetails);
-			if (Holes) { Holes->EnsureProjected(); }
+			if (Holes)
+			{
+				Holes->EnsureProjected();
+			}
 		}
 
 		// Set up cell constraints
@@ -200,7 +228,10 @@ namespace PCGExBuildCellDiagram
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			const TSharedPtr<PCGExClusters::FCell>& Cell = ValidCells[Index];
-			if (!Cell) { continue; }
+			if (!Cell)
+			{
+				continue;
+			}
 
 			// Set transform at centroid
 			FTransform Transform = FTransform::Identity;
@@ -226,9 +257,18 @@ namespace PCGExBuildCellDiagram
 			UnionBlender->Blend(Index, WeightedPoints, Trackers);
 
 			// Write cell-specific attributes
-			if (AreaWriter) { AreaWriter->SetValue(Index, Cell->Data.Area); }
-			if (CompactnessWriter) { CompactnessWriter->SetValue(Index, Cell->Data.Compactness); }
-			if (NumNodesWriter) { NumNodesWriter->SetValue(Index, Cell->Nodes.Num()); }
+			if (AreaWriter)
+			{
+				AreaWriter->SetValue(Index, Cell->Data.Area);
+			}
+			if (CompactnessWriter)
+			{
+				CompactnessWriter->SetValue(Index, Cell->Data.Compactness);
+			}
+			if (NumNodesWriter)
+			{
+				NumNodesWriter->SetValue(Index, Cell->Nodes.Num());
+			}
 		}
 	}
 
@@ -238,10 +278,16 @@ namespace PCGExBuildCellDiagram
 		TSet<uint64> UniqueEdges;
 		for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
 		{
-			if (!Cell || Cell->FaceIndex < 0) { continue; }
+			if (!Cell || Cell->FaceIndex < 0)
+			{
+				continue;
+			}
 
 			const int32* PointAPtr = FaceIndexToOutputIndex.Find(Cell->FaceIndex);
-			if (!PointAPtr) { continue; }
+			if (!PointAPtr)
+			{
+				continue;
+			}
 			const int32 PointA = *PointAPtr;
 
 			if (const TSet<int32>* Adjacent = CellAdjacencyMap.Find(Cell->FaceIndex))
@@ -249,7 +295,10 @@ namespace PCGExBuildCellDiagram
 				for (int32 AdjFace : *Adjacent)
 				{
 					const int32* PointBPtr = FaceIndexToOutputIndex.Find(AdjFace);
-					if (!PointBPtr) { continue; }
+					if (!PointBPtr)
+					{
+						continue;
+					}
 					const int32 PointB = *PointBPtr;
 
 					// Use H64U to ensure unique edges (A,B) == (B,A)
@@ -283,7 +332,10 @@ namespace PCGExBuildCellDiagram
 	void FProcessor::Cleanup()
 	{
 		TProcessor<FPCGExBuildCellDiagramContext, UPCGExBuildCellDiagramSettings>::Cleanup();
-		if (CellsConstraints) { CellsConstraints->Cleanup(); }
+		if (CellsConstraints)
+		{
+			CellsConstraints->Cleanup();
+		}
 	}
 }
 

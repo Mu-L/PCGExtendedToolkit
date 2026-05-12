@@ -7,13 +7,13 @@
 #include "Data/PCGExPointIO.h"
 
 
-#include "Elements/Metadata/PCGMetadataElementCommon.h"
-#include "Math/Geo/PCGExVoronoi.h"
 #include "Clusters/PCGExCluster.h"
 #include "Data/PCGExClusterData.h"
+#include "Elements/Metadata/PCGMetadataElementCommon.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Helpers/PCGExRandomHelpers.h"
+#include "Math/Geo/PCGExVoronoi.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
 #define PCGEX_NAMESPACE BuildVoronoiGraph
@@ -36,7 +36,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BuildVoronoiGraph)
 
 bool FPCGExBuildVoronoiGraphElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildVoronoiGraph)
 
@@ -97,7 +100,10 @@ namespace PCGExBuildVoronoiGraph
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBuildVoronoiGraph::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		// Build voronoi
 
@@ -117,7 +123,10 @@ namespace PCGExBuildVoronoiGraph
 
 		ActivePositions.Empty();
 
-		if (!PointDataFacade->Source->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::New)) { return false; }
+		if (!PointDataFacade->Source->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::New))
+		{
+			return false;
+		}
 		const FBox Bounds = PointDataFacade->Source->GetIn()->GetBounds().ExpandBy(Settings->ExpandBounds);
 
 		if (Settings->Method == EPCGExCellCenter::Circumcenter && Settings->bPruneOutOfBounds)
@@ -147,7 +156,10 @@ namespace PCGExBuildVoronoiGraph
 			{
 				const int32 A = RemappedIndices[PCGEx::H64A(Hash)];
 				const int32 B = RemappedIndices[PCGEx::H64B(Hash)];
-				if (A == -1 || B == -1) { continue; }
+				if (A == -1 || B == -1)
+				{
+					continue;
+				}
 				ValidEdges.Add(PCGEx::H64(A, B));
 			}
 
@@ -158,7 +170,11 @@ namespace PCGExBuildVoronoiGraph
 
 			for (int i = 0; i < RemappedIndices.Num(); i++)
 			{
-				if (const int32 Idx = RemappedIndices[i]; Idx != -1) { OutTransforms[Idx].SetLocation(Voronoi->Circumspheres[i].Center); }
+				if (const int32 Idx = RemappedIndices[i];
+					Idx != -1)
+				{
+					OutTransforms[Idx].SetLocation(Voronoi->Circumspheres[i].Center);
+				}
 			}
 
 			RemappedIndices.Empty();
@@ -197,8 +213,14 @@ namespace PCGExBuildVoronoiGraph
 				for (int i = 0; i < NumSites; i++)
 				{
 					FVector Target = Voronoi->Circumspheres[i].Center;
-					if (Bounds.IsInside(Target)) { OutTransforms[i].SetLocation(Target); }
-					else { OutTransforms[i].SetLocation(Voronoi->Centroids[i]); }
+					if (Bounds.IsInside(Target))
+					{
+						OutTransforms[i].SetLocation(Target);
+					}
+					else
+					{
+						OutTransforms[i].SetLocation(Voronoi->Centroids[i]);
+					}
 				}
 			}
 

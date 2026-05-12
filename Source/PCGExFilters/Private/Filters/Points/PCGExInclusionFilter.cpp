@@ -4,12 +4,12 @@
 #include "Filters/Points/PCGExInclusionFilter.h"
 
 
+#include "PCGExVersion.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Paths/PCGExPath.h"
-#include "PCGExVersion.h"
 #include "PCGExMatching/Public/Helpers/PCGExDataMatcher.h"
 #include "PCGExMatching/Public/Helpers/PCGExMatchingHelpers.h"
+#include "Paths/PCGExPath.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExInclusionFilterDefinition"
@@ -61,7 +61,10 @@ namespace PCGExPointFilter
 {
 	bool FInclusionFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 	{
-		if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InPointDataFacade))
+		{
+			return false;
+		}
 
 		const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
 			&& TypedFilterFactory->HasMatchRuleFactories();
@@ -80,7 +83,10 @@ namespace PCGExPointFilter
 			{
 				bNoMatchResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
 			}
-			else { InverseMatcher.Reset(); }
+			else
+			{
+				InverseMatcher.Reset();
+			}
 		}
 		else
 		{
@@ -123,7 +129,10 @@ namespace PCGExPointFilter
 
 	bool FInclusionFilter::Test(const int32 PointIndex) const
 	{
-		if (bCheckAgainstDataBounds) { return bCollectionTestResult; }
+		if (bCheckAgainstDataBounds)
+		{
+			return bCollectionTestResult;
+		}
 
 		const TSet<const UPCGData*>* AdditionalExclude = nullptr;
 		TSet<const UPCGData*> PerPointExclude;

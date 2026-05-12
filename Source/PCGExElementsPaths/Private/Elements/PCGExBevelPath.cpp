@@ -3,8 +3,8 @@
 
 #include "Elements/PCGExBevelPath.h"
 
-#include "Data/PCGExData.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExBlendingDetails.h"
 #include "Details/PCGExSettingsDetails.h"
@@ -23,7 +23,10 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExBevelPathSettings, Subdivisions, double, Subdivis
 TArray<FPCGPinProperties> UPCGExBevelPathSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	if (Type == EPCGExBevelProfileType::Custom) { PCGEX_PIN_POINT(PCGExBevelPath::SourceCustomProfile, "Single path used as bevel profile", Required) }
+	if (Type == EPCGExBevelProfileType::Custom)
+	{
+		PCGEX_PIN_POINT(PCGExBevelPath::SourceCustomProfile, "Single path used as bevel profile", Required)
+	}
 	return PinProperties;
 }
 
@@ -32,27 +35,57 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BevelPath)
 
 void UPCGExBevelPathSettings::InitOutputFlags(const TSharedPtr<PCGExData::FPointIO>& InPointIO) const
 {
-	if (bFlagPoles) { InPointIO->FindOrCreateAttribute(PoleFlagName, false); }
-	if (bFlagStartPoint) { InPointIO->FindOrCreateAttribute(StartPointFlagName, false); }
-	if (bFlagEndPoint) { InPointIO->FindOrCreateAttribute(EndPointFlagName, false); }
-	if (bFlagSubdivision) { InPointIO->FindOrCreateAttribute(SubdivisionFlagName, false); }
+	if (bFlagPoles)
+	{
+		InPointIO->FindOrCreateAttribute(PoleFlagName, false);
+	}
+	if (bFlagStartPoint)
+	{
+		InPointIO->FindOrCreateAttribute(StartPointFlagName, false);
+	}
+	if (bFlagEndPoint)
+	{
+		InPointIO->FindOrCreateAttribute(EndPointFlagName, false);
+	}
+	if (bFlagSubdivision)
+	{
+		InPointIO->FindOrCreateAttribute(SubdivisionFlagName, false);
+	}
 }
 
 bool FPCGExBevelPathElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BevelPath)
 
-	if (Settings->bFlagPoles) { PCGEX_VALIDATE_NAME(Settings->PoleFlagName) }
-	if (Settings->bFlagStartPoint) { PCGEX_VALIDATE_NAME(Settings->StartPointFlagName) }
-	if (Settings->bFlagEndPoint) { PCGEX_VALIDATE_NAME(Settings->EndPointFlagName) }
-	if (Settings->bFlagSubdivision) { PCGEX_VALIDATE_NAME(Settings->SubdivisionFlagName) }
+	if (Settings->bFlagPoles)
+	{
+		PCGEX_VALIDATE_NAME(Settings->PoleFlagName)
+	}
+	if (Settings->bFlagStartPoint)
+	{
+		PCGEX_VALIDATE_NAME(Settings->StartPointFlagName)
+	}
+	if (Settings->bFlagEndPoint)
+	{
+		PCGEX_VALIDATE_NAME(Settings->EndPointFlagName)
+	}
+	if (Settings->bFlagSubdivision)
+	{
+		PCGEX_VALIDATE_NAME(Settings->SubdivisionFlagName)
+	}
 
 	if (Settings->Type == EPCGExBevelProfileType::Custom)
 	{
 		const TSharedPtr<PCGExData::FPointIO> CustomProfileIO = PCGExData::TryGetSingleInput(Context, PCGExBevelPath::SourceCustomProfile, false, true);
-		if (!CustomProfileIO) { return false; }
+		if (!CustomProfileIO)
+		{
+			return false;
+		}
 
 		if (CustomProfileIO->GetNum() < 2)
 		{
@@ -134,8 +167,14 @@ namespace PCGExBevelPath
 		LeaveIdx = InProcessor->WrapIndex(Index + 1);
 
 		// Handle open paths - should not happen as endpoints are filtered, but safety check
-		if (ArriveIdx < 0) { ArriveIdx = 0; }
-		if (LeaveIdx < 0) { LeaveIdx = PointCount - 1; }
+		if (ArriveIdx < 0)
+		{
+			ArriveIdx = 0;
+		}
+		if (LeaveIdx < 0)
+		{
+			LeaveIdx = PointCount - 1;
+		}
 
 		Corner = InTransforms[InIndex].GetLocation();
 		PrevLocation = InTransforms[ArriveIdx].GetLocation();
@@ -200,13 +239,19 @@ namespace PCGExBevelPath
 		{
 			// Get the edge length
 			const int32 EdgeIdx = (Direction > 0) ? CurrentIdx : InProcessor->WrapIndex(CurrentIdx - 1);
-			if (EdgeIdx < 0) { break; } // Hit path end
+			if (EdgeIdx < 0)
+			{
+				break;
+			} // Hit path end
 
 			TotalDistance += InProcessor->PathLength->Get(EdgeIdx);
 
 			// Move to next point
 			const int32 NextIdx = InProcessor->WrapIndex(CurrentIdx + Direction);
-			if (NextIdx < 0) { break; } // Hit path end
+			if (NextIdx < 0)
+			{
+				break;
+			} // Hit path end
 
 			// Check if next point has a bevel
 			if (InProcessor->Bevels[NextIdx])
@@ -218,7 +263,10 @@ namespace PCGExBevelPath
 			CurrentIdx = NextIdx;
 
 			// For closed loops, stop if we've come back around
-			if (CurrentIdx == Index) { break; }
+			if (CurrentIdx == Index)
+			{
+				break;
+			}
 		}
 
 		return TotalDistance;
@@ -358,7 +406,10 @@ namespace PCGExBevelPath
 
 	void FBevel::Balance(const FProcessor* InProcessor)
 	{
-		if (InProcessor->Settings->Limit != EPCGExBevelLimit::Balanced) { return; }
+		if (InProcessor->Settings->Limit != EPCGExBevelLimit::Balanced)
+		{
+			return;
+		}
 
 		double EffectiveArriveLimit = ArriveSlidingLimit;
 		double EffectiveLeaveLimit = LeaveSlidingLimit;
@@ -418,13 +469,25 @@ namespace PCGExBevelPath
 			double ArriveAlphaSum = ArriveAlpha;
 			double LeaveAlphaSum = LeaveAlpha;
 
-			if (PrevBevel) { ArriveAlphaSum += PrevBevel->LeaveAlpha; }
-			else { ArriveAlphaSum = 1.0; }
+			if (PrevBevel)
+			{
+				ArriveAlphaSum += PrevBevel->LeaveAlpha;
+			}
+			else
+			{
+				ArriveAlphaSum = 1.0;
+			}
 
 			EffectiveArriveLimit = ArriveLen * (ArriveAlpha * (1.0 / ArriveAlphaSum));
 
-			if (NextBevel) { LeaveAlphaSum += NextBevel->ArriveAlpha; }
-			else { LeaveAlphaSum = 1.0; }
+			if (NextBevel)
+			{
+				LeaveAlphaSum += NextBevel->ArriveAlpha;
+			}
+			else
+			{
+				LeaveAlphaSum = 1.0;
+			}
 
 			EffectiveLeaveLimit = LeaveLen * (LeaveAlpha * (1.0 / LeaveAlphaSum));
 		}
@@ -463,7 +526,10 @@ namespace PCGExBevelPath
 			return;
 		}
 
-		if (!InProcessor->bSubdivide) { return; }
+		if (!InProcessor->bSubdivide)
+		{
+			return;
+		}
 
 		if (InProcessor->ManhattanDetails.IsValid())
 		{
@@ -473,8 +539,14 @@ namespace PCGExBevelPath
 
 		const double Amount = InProcessor->SubdivAmountGetter->Read(Index);
 
-		if (!InProcessor->bArc) { SubdivideLine(Amount, InProcessor->bSubdivideCount, InProcessor->bKeepCorner); }
-		else { SubdivideArc(Amount, InProcessor->bSubdivideCount); }
+		if (!InProcessor->bArc)
+		{
+			SubdivideLine(Amount, InProcessor->bSubdivideCount, InProcessor->bKeepCorner);
+		}
+		else
+		{
+			SubdivideArc(Amount, InProcessor->bSubdivideCount);
+		}
 	}
 
 	void FBevel::SubdivideLine(const double Factor, const bool bIsCount, const bool bKeepCorner)
@@ -508,19 +580,28 @@ namespace PCGExBevelPath
 			{
 				int32 WriteIndex = 0;
 				FVector Dir = (Corner - Arrive).GetSafeNormal();
-				for (int i = 0; i < SubdivCount; i++) { Subdivisions[WriteIndex++] = Arrive + Dir * (StepSize + i * StepSize); }
+				for (int i = 0; i < SubdivCount; i++)
+				{
+					Subdivisions[WriteIndex++] = Arrive + Dir * (StepSize + i * StepSize);
+				}
 
 				Subdivisions[WriteIndex++] = Corner;
 
 				Dir = (Leave - Corner).GetSafeNormal();
-				for (int i = 0; i < SubdivCount; i++) { Subdivisions[WriteIndex++] = Corner + Dir * (StepSize + i * StepSize); }
+				for (int i = 0; i < SubdivCount; i++)
+				{
+					Subdivisions[WriteIndex++] = Corner + Dir * (StepSize + i * StepSize);
+				}
 			}
 		}
 		else
 		{
 			PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount);
 			const FVector Dir = (Leave - Arrive).GetSafeNormal();
-			for (int i = 0; i < SubdivCount; i++) { Subdivisions[i] = Arrive + Dir * (StepSize + i * StepSize); }
+			for (int i = 0; i < SubdivCount; i++)
+			{
+				Subdivisions[i] = Arrive + Dir * (StepSize + i * StepSize);
+			}
 		}
 	}
 
@@ -540,7 +621,10 @@ namespace PCGExBevelPath
 		const double StepSize = 1.0 / static_cast<double>(SubdivCount + 1);
 		PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount);
 
-		for (int i = 0; i < SubdivCount; i++) { Subdivisions[i] = Arc.GetLocationOnArc(StepSize + i * StepSize); }
+		for (int i = 0; i < SubdivCount; i++)
+		{
+			Subdivisions[i] = Arc.GetLocationOnArc(StepSize + i * StepSize);
+		}
 	}
 
 	void FBevel::SubdivideCustom(const FProcessor* InProcessor)
@@ -550,7 +634,10 @@ namespace PCGExBevelPath
 
 		PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount);
 
-		if (SubdivCount == 0) { return; }
+		if (SubdivCount == 0)
+		{
+			return;
+		}
 
 		const double ProfileSize = FVector::Dist(Leave, Arrive);
 		const FVector ProjectionNormal = (Leave - Arrive).GetSafeNormal(1E-08, FVector::ForwardVector);
@@ -649,7 +736,10 @@ namespace PCGExBevelPath
 		for (int32 i = 0; i < NumPoints; ++i)
 		{
 			const TSharedPtr<FBevel>& Bevel = Bevels[i];
-			if (!Bevel) { continue; }
+			if (!Bevel)
+			{
+				continue;
+			}
 
 			const double BevelWidth = Bevel->Width;
 
@@ -689,7 +779,10 @@ namespace PCGExBevelPath
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const UPCGBasePointData* InPoints = PointDataFacade->GetIn();
 		NumPoints = PointDataFacade->GetNum();
@@ -706,7 +799,10 @@ namespace PCGExBevelPath
 		Bevels.Init(nullptr, NumPoints);
 
 		WidthGetter = Settings->GetValueSettingWidth();
-		if (!WidthGetter->Init(PointDataFacade)) { return false; }
+		if (!WidthGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		bKeepCorner = Settings->bKeepCornerPoint;
 		bSlideAlongPath = Settings->bSlideAlongPath && (Settings->Limit != EPCGExBevelLimit::None);
@@ -720,7 +816,10 @@ namespace PCGExBevelPath
 				if (Settings->SubdivideMethod != EPCGExSubdivideMode::Manhattan)
 				{
 					SubdivAmountGetter = Settings->GetValueSettingSubdivisions();
-					if (!SubdivAmountGetter->Init(PointDataFacade)) { return false; }
+					if (!SubdivAmountGetter->Init(PointDataFacade))
+					{
+						return false;
+					}
 				}
 			}
 		}
@@ -735,7 +834,10 @@ namespace PCGExBevelPath
 		if (Settings->SubdivideMethod == EPCGExSubdivideMode::Manhattan)
 		{
 			ManhattanDetails = Settings->ManhattanDetails;
-			if (!ManhattanDetails.Init(Context, PointDataFacade)) { return false; }
+			if (!ManhattanDetails.Init(Context, PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		bArc = Settings->Type == EPCGExBevelProfileType::Arc;
@@ -788,7 +890,10 @@ namespace PCGExBevelPath
 				This->PointFilterCache[This->PointFilterCache.Num() - 1] = false;
 			}
 
-			PCGEX_SCOPE_LOOP(i) { This->PrepareSinglePoint(i); }
+			PCGEX_SCOPE_LOOP(i)
+			{
+				This->PrepareSinglePoint(i);
+			}
 		};
 
 		Preparation->StartSubLoops(NumPoints, PCGEX_CORE_SETTINGS.PointsDefaultBatchChunkSize);
@@ -798,7 +903,10 @@ namespace PCGExBevelPath
 
 	void FProcessor::PrepareSinglePoint(const int32 Index)
 	{
-		if (!PointFilterCache[Index]) { return; }
+		if (!PointFilterCache[Index])
+		{
+			return;
+		}
 
 		Bevels[Index] = MakeShared<FBevel>(Index, this);
 		Bevels[Index]->CustomMainAxisScale = Settings->MainAxisScale;
@@ -812,7 +920,10 @@ namespace PCGExBevelPath
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			const TSharedPtr<FBevel>& Bevel = Bevels[Index];
-			if (!Bevel) { continue; }
+			if (!Bevel)
+			{
+				continue;
+			}
 
 			Bevel->Compute(this);
 		}
@@ -836,7 +947,10 @@ namespace PCGExBevelPath
 			const int32 StartIndex = StartIndices[Index];
 
 			// Skip consumed points
-			if (StartIndex < 0) { continue; }
+			if (StartIndex < 0)
+			{
+				continue;
+			}
 
 			const TSharedPtr<FBevel>& Bevel = Bevels[Index];
 
@@ -862,7 +976,10 @@ namespace PCGExBevelPath
 			OutSeeds[A] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransform[A].GetLocation());
 			OutSeeds[B] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransform[B].GetLocation());
 
-			if (Bevel->Subdivisions.IsEmpty()) { continue; }
+			if (Bevel->Subdivisions.IsEmpty())
+			{
+				continue;
+			}
 
 			for (int i = 0; i < Bevel->Subdivisions.Num(); i++)
 			{
@@ -883,7 +1000,10 @@ namespace PCGExBevelPath
 	void FProcessor::WriteFlags(const int32 Index)
 	{
 		const TSharedPtr<FBevel>& Bevel = Bevels[Index];
-		if (!Bevel) { return; }
+		if (!Bevel)
+		{
+			return;
+		}
 
 		if (EndpointsWriter)
 		{
@@ -891,11 +1011,23 @@ namespace PCGExBevelPath
 			EndpointsWriter->SetValue(Bevel->EndOutputIndex, true);
 		}
 
-		if (StartPointWriter) { StartPointWriter->SetValue(Bevel->StartOutputIndex, true); }
+		if (StartPointWriter)
+		{
+			StartPointWriter->SetValue(Bevel->StartOutputIndex, true);
+		}
 
-		if (EndPointWriter) { EndPointWriter->SetValue(Bevel->EndOutputIndex, true); }
+		if (EndPointWriter)
+		{
+			EndPointWriter->SetValue(Bevel->EndOutputIndex, true);
+		}
 
-		if (SubdivisionWriter) { for (int i = 1; i <= Bevel->Subdivisions.Num(); i++) { SubdivisionWriter->SetValue(Bevel->StartOutputIndex + i, true); } }
+		if (SubdivisionWriter)
+		{
+			for (int i = 1; i <= Bevel->Subdivisions.Num(); i++)
+			{
+				SubdivisionWriter->SetValue(Bevel->StartOutputIndex + i, true);
+			}
+		}
 	}
 
 	void FProcessor::CompleteWork()
@@ -965,7 +1097,10 @@ namespace PCGExBevelPath
 			const int32 StartIndex = StartIndices[Index];
 
 			// Skip consumed points
-			if (StartIndex < 0) { continue; }
+			if (StartIndex < 0)
+			{
+				continue;
+			}
 
 			const TSharedPtr<FBevel>& Bevel = Bevels[Index];
 
@@ -1023,7 +1158,10 @@ namespace PCGExBevelPath
 			PCGEX_ASYNC_THIS
 			PCGEX_SCOPE_LOOP(i)
 			{
-				if (!This->PointFilterCache[i]) { continue; }
+				if (!This->PointFilterCache[i])
+				{
+					continue;
+				}
 				This->WriteFlags(i);
 			}
 		};

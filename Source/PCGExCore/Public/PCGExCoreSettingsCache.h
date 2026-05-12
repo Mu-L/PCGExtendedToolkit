@@ -43,15 +43,27 @@ struct PCGEXCORE_API FPCGExCoreSettingsCache
 	EPCGExExecutionPolicy ExecutionPolicy = EPCGExExecutionPolicy::Default;
 
 	int32 SmallPointsSize = 1024;
-	bool IsSmallPointSize(const int32 InNum) const { return InNum <= SmallPointsSize; }
+
+	bool IsSmallPointSize(const int32 InNum) const
+	{
+		return InNum <= SmallPointsSize;
+	}
 
 	int32 SmallClusterSize = 512;
 
 	int32 PointsDefaultBatchChunkSize = 1024;
-	int32 GetPointsBatchChunkSize(const int32 In = -1) const { return FMath::Max(In <= -1 ? PointsDefaultBatchChunkSize : In, 1); }
+
+	int32 GetPointsBatchChunkSize(const int32 In = -1) const
+	{
+		return FMath::Max(In <= -1 ? PointsDefaultBatchChunkSize : In, 1);
+	}
 
 	int32 ClusterDefaultBatchChunkSize = 512;
-	int32 GetClusterBatchChunkSize(const int32 In = -1) const { return FMath::Max(In <= -1 ? ClusterDefaultBatchChunkSize : In, 1); }
+
+	int32 GetClusterBatchChunkSize(const int32 In = -1) const
+	{
+		return FMath::Max(In <= -1 ? ClusterDefaultBatchChunkSize : In, 1);
+	}
 
 #if WITH_EDITOR
 
@@ -70,7 +82,8 @@ struct PCGEXCORE_API FPCGExCoreSettingsCache
 		FPinInfos() = default;
 
 		FPinInfos(const FName InIcon, const FString& InTooltip)
-			: Icon(InIcon), Tooltip(FText::FromString(InTooltip))
+			: Icon(InIcon)
+			  , Tooltip(FText::FromString(InTooltip))
 		{
 		}
 

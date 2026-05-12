@@ -6,10 +6,10 @@
 #include <type_traits>
 
 #include "CoreMinimal.h"
-#include "Helpers/PCGExMetaHelpersMacros.h"
 #include "PCGExSubSelection.h"
-#include "Metadata/PCGMetadataCommon.h"
+#include "Helpers/PCGExMetaHelpersMacros.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Metadata/PCGMetadataCommon.h"
 #include "Types/PCGExAttributeIdentity.h"
 #include "Types/PCGExTypeTraits.h"
 
@@ -57,13 +57,27 @@ namespace PCGExData
 			FAttributeProcessingInfos(const UPCGData* InData, const FPCGAttributePropertyInputSelector& InSelector);
 			FAttributeProcessingInfos(const UPCGData* InData, const FName InAttributeName);
 
-			operator const FPCGMetadataAttributeBase*() const { return Attribute; }
+			operator const FPCGMetadataAttributeBase*() const
+			{
+				return Attribute;
+			}
 
 			operator EPCGMetadataTypes() const;
 
-			operator EPCGAttributePropertySelection() const { return Selector.GetSelection(); }
-			operator EPCGPointProperties() const { return Selector.GetPointProperty(); }
-			operator EPCGExtraProperties() const { return Selector.GetExtraProperty(); }
+			operator EPCGAttributePropertySelection() const
+			{
+				return Selector.GetSelection();
+			}
+
+			operator EPCGPointProperties() const
+			{
+				return Selector.GetPointProperty();
+			}
+
+			operator EPCGExtraProperties() const
+			{
+				return Selector.GetExtraProperty();
+			}
 
 		protected:
 			void Init(const UPCGData* InData, const FPCGAttributePropertyInputSelector& InSelector);

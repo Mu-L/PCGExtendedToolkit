@@ -26,17 +26,26 @@ void UPCGExShiftPathSettings::PostEditChangeProperty(FPropertyChangedEvent& Prop
 
 PCGEX_INITIALIZE_ELEMENT(ShiftPath)
 
-PCGExData::EIOInit UPCGExShiftPathSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExShiftPathSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(ShiftPath)
 
 bool FPCGExShiftPathElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ShiftPath)
 
-	if (Settings->ShiftType != EPCGExShiftType::CherryPick) { return true; }
+	if (Settings->ShiftType != EPCGExShiftType::CherryPick)
+	{
+		return true;
+	}
 
 	Context->ShiftedProperties = PCGExPointArrayDataHelpers::GetPointNativeProperties(Settings->CherryPickedProperties);
 
@@ -50,12 +59,18 @@ bool FPCGExShiftPathElement::Boot(FPCGExContext* InContext) const
 		bool bAlreadyInSet = false;
 		UniqueNames.Add(Property, &bAlreadyInSet);
 
-		if (bAlreadyInSet) { continue; }
+		if (bAlreadyInSet)
+		{
+			continue;
+		}
 
 		FPCGAttributePropertyInputSelector Selector;
 		Selector.Update(Property.ToString());
 
-		if (Selector.GetSelection() != EPCGAttributePropertySelection::Attribute) { continue; }
+		if (Selector.GetSelection() != EPCGAttributePropertySelection::Attribute)
+		{
+			continue;
+		}
 
 		FPCGAttributeIdentifier& Identifier = Context->ShiftedAttributes.Add_GetRef(Selector.GetAttributeName());
 		Identifier.MetadataDomain = PCGMetadataDomainID::Elements;
@@ -86,7 +101,10 @@ bool FPCGExShiftPathElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 		// TODO : Skip completion
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bPrefetchData = true;
@@ -114,7 +132,10 @@ namespace PCGExShiftPath
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExShiftPath::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -131,7 +152,10 @@ namespace PCGExShiftPath
 		}
 		else if (Settings->InputMode == EPCGExShiftPathMode::Filter)
 		{
-			if (Context->FilterFactories.IsEmpty()) { return false; }
+			if (Context->FilterFactories.IsEmpty())
+			{
+				return false;
+			}
 
 			PCGEX_ASYNC_GROUP_CHKD(TaskManager, FilterTask)
 
@@ -173,7 +197,10 @@ namespace PCGExShiftPath
 			return true;
 		}
 
-		if (Settings->bReverseShift) { PivotIndex = MaxIndex - PivotIndex; }
+		if (Settings->bReverseShift)
+		{
+			PivotIndex = MaxIndex - PivotIndex;
+		}
 		PivotIndex = PCGExMath::SanitizeIndex(PivotIndex, MaxIndex, Settings->IndexSafety);
 
 		if (!FMath::IsWithinInclusive(PivotIndex, 0, MaxIndex))
@@ -192,7 +219,10 @@ namespace PCGExShiftPath
 				PCGEX_ASYNC_THIS
 				const FPCGMetadataAttributeBase* Attr = This->PointDataFacade->FindConstAttribute(This->GetContext()->ShiftedAttributes[Index]);
 
-				if (!Attr) { return; }
+				if (!Attr)
+				{
+					return;
+				}
 
 				TSharedPtr<PCGExData::IBuffer> Buffer = This->PointDataFacade->GetWritable(static_cast<EPCGMetadataTypes>(Attr->GetTypeId()), Attr, PCGExData::EBufferInit::Inherit);
 				This->Buffers[Index] = Buffer;
@@ -214,7 +244,10 @@ namespace PCGExShiftPath
 
 	void FProcessor::CompleteWork()
 	{
-		if (PivotIndex == 0 || PivotIndex == MaxIndex) { return; }
+		if (PivotIndex == 0 || PivotIndex == MaxIndex)
+		{
+			return;
+		}
 
 		if (!FMath::IsWithinInclusive(PivotIndex, 0, MaxIndex))
 		{
@@ -237,7 +270,10 @@ namespace PCGExShiftPath
 
 		Algo::Reverse(Indices);
 
-		if (Settings->ShiftType == EPCGExShiftType::Index) { return; }
+		if (Settings->ShiftType == EPCGExShiftType::Index)
+		{
+			return;
+		}
 
 		if (Settings->ShiftType == EPCGExShiftType::Metadata)
 		{
@@ -253,7 +289,10 @@ namespace PCGExShiftPath
 		}
 		else if (Settings->ShiftType == EPCGExShiftType::CherryPick)
 		{
-			if (Context->ShiftedProperties != EPCGPointNativeProperties::None) { PointDataFacade->Source->InheritProperties(Indices, Context->ShiftedProperties); }
+			if (Context->ShiftedProperties != EPCGPointNativeProperties::None)
+			{
+				PointDataFacade->Source->InheritProperties(Indices, Context->ShiftedProperties);
+			}
 
 			if (!Buffers.IsEmpty())
 			{
@@ -270,14 +309,20 @@ namespace PCGExShiftPath
 					PCGEX_ASYNC_THIS
 					TSharedPtr<PCGExData::IBuffer> Buffer = This->Buffers[Index];
 
-					if (!Buffer || Buffer->GetUnderlyingDomain() != PCGExData::EDomainType::Elements) { return; }
+					if (!Buffer || Buffer->GetUnderlyingDomain() != PCGExData::EDomainType::Elements)
+					{
+						return;
+					}
 
 					PCGExMetaHelpers::ExecuteWithRightType(Buffer->GetTypeId(), [&](auto DummyValue)
 					{
 						using T = decltype(DummyValue);
 						TSharedPtr<PCGExData::TArrayBuffer<T>> TypedBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(This->Buffers[Index]);
 
-						if (!TypedBuffer) { return; }
+						if (!TypedBuffer)
+						{
+							return;
+						}
 
 						TArray<T>& Values = *TypedBuffer->GetOutValues().Get();
 						PCGExArrayHelpers::ReorderArray(Values, This->Indices);

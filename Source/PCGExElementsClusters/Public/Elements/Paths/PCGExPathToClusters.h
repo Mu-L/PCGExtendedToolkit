@@ -5,12 +5,12 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/PCGExPathProcessor.h"
 #include "Clusters/PCGExClusterCommon.h"
-#include "Core/PCGExUnionTable.h"
+#include "Core/PCGExPathProcessor.h"
 #include "Core/PCGExUnionRegistry.h"
-#include "Graphs/Union/PCGExUnionProcessor.h"
+#include "Core/PCGExUnionTable.h"
 #include "Graphs/Union/PCGExIntersections.h"
+#include "Graphs/Union/PCGExUnionProcessor.h"
 #include "PCGExPathToClusters.generated.h"
 
 namespace PCGExPathToClusters
@@ -25,7 +25,12 @@ namespace PCGExPathToClusters
 		uint64 KeyB = 0;
 
 		FStagedEdge() = default;
-		FStagedEdge(const uint64 InKeyA, const uint64 InKeyB) : KeyA(InKeyA), KeyB(InKeyB) {}
+
+		FStagedEdge(const uint64 InKeyA, const uint64 InKeyB)
+			: KeyA(InKeyA)
+			  , KeyB(InKeyB)
+		{
+		}
 	};
 }
 
@@ -41,7 +46,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PathsToClusters, "Path : To Clusters", "Merge paths to edge clusters for glorious pathfinding inception");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
 #endif
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
@@ -51,7 +60,11 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual FName GetMainOutputPin() const override { return PCGExClusters::Labels::OutputVerticesLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExClusters::Labels::OutputVerticesLabel;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 	/** Whether to fuse paths into a single graph or not. */

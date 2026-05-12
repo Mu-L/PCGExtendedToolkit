@@ -35,14 +35,21 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Path); }
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Path);
+	}
 #endif
 	//~End UPCGSettings
 
 	//~Begin UPCGExPointsProcessorSettings
 	virtual FName GetMainInputPin() const override;
 	virtual FName GetMainOutputPin() const override;
-	virtual FString GetPointFilterTooltip() const override { return TEXT("Path points processing filters"); }
+
+	virtual FString GetPointFilterTooltip() const override
+	{
+		return TEXT("Path points processing filters");
+	}
 
 	//~End UPCGExPointsProcessorSettings
 

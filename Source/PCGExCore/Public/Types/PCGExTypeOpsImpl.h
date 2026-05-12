@@ -6,9 +6,9 @@
 #include "CoreMinimal.h"
 #include "PCGExTypeOps.h"
 #include "PCGExTypeOpsNumeric.h"
-#include "PCGExTypeOpsVector.h"
 #include "PCGExTypeOpsRotation.h"
 #include "PCGExTypeOpsString.h"
+#include "PCGExTypeOpsVector.h"
 #include "PCGExTypeTraits.h"
 #include "Helpers/PCGExMetaHelpersMacros.h"
 
@@ -35,7 +35,10 @@ namespace PCGExTypeOps
 
 		// Type Information
 
-		virtual EPCGMetadataTypes GetTypeId() const override { return Traits::Type; }
+		virtual EPCGMetadataTypes GetTypeId() const override
+		{
+			return Traits::Type;
+		}
 
 		virtual FString GetTypeName() const override
 		{
@@ -43,20 +46,49 @@ namespace PCGExTypeOps
 			return FString();
 		}
 
-		virtual int32 GetTypeSize() const override { return sizeof(T); }
-		virtual int32 GetTypeAlignment() const override { return alignof(T); }
-		virtual bool SupportsLerp() const override { return Traits::bSupportsLerp; }
-		virtual bool SupportsMinMax() const override { return Traits::bSupportsMinMax; }
-		virtual bool SupportsArithmetic() const override { return Traits::bSupportsArithmetic; }
+		virtual int32 GetTypeSize() const override
+		{
+			return sizeof(T);
+		}
+
+		virtual int32 GetTypeAlignment() const override
+		{
+			return alignof(T);
+		}
+
+		virtual bool SupportsLerp() const override
+		{
+			return Traits::bSupportsLerp;
+		}
+
+		virtual bool SupportsMinMax() const override
+		{
+			return Traits::bSupportsMinMax;
+		}
+
+		virtual bool SupportsArithmetic() const override
+		{
+			return Traits::bSupportsArithmetic;
+		}
 
 		// Default Value Operations
 
-		virtual void SetDefault(void* OutValue) const override { new(OutValue) T(); }
-		virtual void Copy(const void* Src, void* Dst) const override { *static_cast<T*>(Dst) = *static_cast<const T*>(Src); }
+		virtual void SetDefault(void* OutValue) const override
+		{
+			new(OutValue) T();
+		}
+
+		virtual void Copy(const void* Src, void* Dst) const override
+		{
+			*static_cast<T*>(Dst) = *static_cast<const T*>(Src);
+		}
 
 		// Hash Operations
 
-		virtual PCGExValueHash ComputeHash(const void* Value) const override { return TypeOps::Hash(*static_cast<const T*>(Value)); }
+		virtual PCGExValueHash ComputeHash(const void* Value) const override
+		{
+			return TypeOps::Hash(*static_cast<const T*>(Value));
+		}
 
 		// Conversion Operations
 
@@ -90,8 +122,14 @@ namespace PCGExTypeOps
 		virtual void BlendDiv(const void* A, double Divisor, void* Out) const override
 		{
 			// Div by scalar - use Weight with 1/Divisor for types that support it
-			if (Divisor != 0.0) { *static_cast<T*>(Out) = TypeOps::Div(*static_cast<const T*>(A), Divisor); }
-			else { *static_cast<T*>(Out) = *static_cast<const T*>(A); }
+			if (Divisor != 0.0)
+			{
+				*static_cast<T*>(Out) = TypeOps::Div(*static_cast<const T*>(A), Divisor);
+			}
+			else
+			{
+				*static_cast<T*>(Out) = *static_cast<const T*>(A);
+			}
 		}
 
 		virtual void BlendLerp(const void* A, const void* B, double Weight, void* Out) const override
@@ -215,13 +253,19 @@ namespace PCGExTypeOps
 		 * Generate a conversion function from TFrom to TTo
 		 */
 		template <typename TFrom, typename TTo>
-		void ConvertImpl(const void* From, void* To) { *static_cast<TTo*>(To) = FTypeOps<TFrom>::template ConvertTo<TTo>(*static_cast<const TFrom*>(From)); }
+		void ConvertImpl(const void* From, void* To)
+		{
+			*static_cast<TTo*>(To) = FTypeOps<TFrom>::template ConvertTo<TTo>(*static_cast<const TFrom*>(From));
+		}
 
 		/**
 		 * Identity conversion (same type)
 		 */
 		template <typename T>
-		void ConvertIdentity(const void* From, void* To) { *static_cast<T*>(To) = *static_cast<const T*>(From); }
+		void ConvertIdentity(const void* From, void* To)
+		{
+			*static_cast<T*>(To) = *static_cast<const T*>(From);
+		}
 
 		/**
 		 * Get conversion function for a type pair
@@ -229,8 +273,14 @@ namespace PCGExTypeOps
 		template <typename TFrom, typename TTo>
 		constexpr FConvertFn GetConvertFunction()
 		{
-			if constexpr (std::is_same_v<TFrom, TTo>) { return &ConvertIdentity<TFrom>; }
-			else { return &ConvertImpl<TFrom, TTo>; }
+			if constexpr (std::is_same_v<TFrom, TTo>)
+			{
+				return &ConvertIdentity<TFrom>;
+			}
+			else
+			{
+				return &ConvertImpl<TFrom, TTo>;
+			}
 		}
 
 		/**
@@ -254,10 +304,16 @@ namespace PCGExTypeOps
 	// FTypeOpsRegistry Template Implementations
 
 	template <typename T>
-	const ITypeOpsBase* FTypeOpsRegistry::Get() { return &TTypeOpsImpl<T>::GetInstance(); }
+	const ITypeOpsBase* FTypeOpsRegistry::Get()
+	{
+		return &TTypeOpsImpl<T>::GetInstance();
+	}
 
 	template <typename T>
-	EPCGMetadataTypes FTypeOpsRegistry::GetTypeId() { return &TTypeOpsImpl<T>::GetTypeId(); }
+	EPCGMetadataTypes FTypeOpsRegistry::GetTypeId()
+	{
+		return &TTypeOpsImpl<T>::GetTypeId();
+	}
 
 	// Extern template declarations - prevents implicit instantiation in every translation unit
 	// Actual instantiations are in PCGExTypeOpsImpl.cpp

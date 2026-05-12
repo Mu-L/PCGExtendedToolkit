@@ -2,10 +2,10 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "PCGExEditorModuleInterface.h"
-#include "Styling/SlateStyle.h"
 #include "Editor.h"
 #include "PCGExLog.h"
 #include "ToolMenus.h"
+#include "Styling/SlateStyle.h"
 
 TArray<IPCGExEditorModuleInterface*> IPCGExEditorModuleInterface::RegisteredModules;
 

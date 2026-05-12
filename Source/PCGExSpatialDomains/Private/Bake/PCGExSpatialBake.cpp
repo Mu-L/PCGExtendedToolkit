@@ -20,9 +20,9 @@ PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 
 FPCGExExternalDomainBakeSettings::FPCGExExternalDomainBakeSettings()
 	: TagPrefix(TEXT("SpatialChannel"))
-	, FallbackChannel(TEXT("Default"))
-	, ZMin(NAME_None, /*DefaultValue=*/0.0)
-	, ZMax(NAME_None, /*DefaultValue=*/100.0)
+	  , FallbackChannel(TEXT("Default"))
+	  , ZMin(NAME_None, /*DefaultValue=*/0.0)
+	  , ZMax(NAME_None, /*DefaultValue=*/100.0)
 {
 }
 
@@ -45,17 +45,29 @@ namespace PCGExSpatial::Bake
 			double InZMin, double InZMax,
 			FPCGExSpatialPolygonEntry& OutEntry)
 		{
-			if (!SplineData) { return false; }
-			if (!SplineData->IsClosed()) { return false; }
+			if (!SplineData)
+			{
+				return false;
+			}
+			if (!SplineData->IsClosed())
+			{
+				return false;
+			}
 
 			TArray<FVector> WorldPositions;
 			SplineData->SplineStruct.ConvertSplineToPolyLine(
 				ESplineCoordinateSpace::World, FMath::Square(Fidelity), WorldPositions);
-			if (WorldPositions.Num() < 3) { return false; }
+			if (WorldPositions.Num() < 3)
+			{
+				return false;
+			}
 
 			const float ZLow = static_cast<float>(FMath::Min(InZMin, InZMax));
 			const float ZHigh = static_cast<float>(FMath::Max(InZMin, InZMax));
-			if (ZHigh <= ZLow) { return false; }
+			if (ZHigh <= ZLow)
+			{
+				return false;
+			}
 
 			// Projection setup mirrors FPolyPath ctor for splines:
 			//   - Non-Normal method: compute FBestFitPlane from sampled positions.
@@ -72,7 +84,10 @@ namespace PCGExSpatial::Bake
 
 			TArray<FVector2D> Outline;
 			Projection.Project(MakeArrayView(WorldPositions), Outline);
-			if (Outline.Num() < 3) { return false; }
+			if (Outline.Num() < 3)
+			{
+				return false;
+			}
 
 			// WorldOrigin stays at zero: the projection is rotation-only and
 			// the outline coords are already in world-XY-rotated-into-frame
@@ -99,10 +114,19 @@ namespace PCGExSpatial::Bake
 			TArray<FBakedEntry>& OutEntries,
 			FName ChannelKey)
 		{
-			if (!PointData) { return 0; }
+			if (!PointData)
+			{
+				return 0;
+			}
 			const int32 NumPoints = PointData->GetNumPoints();
-			if (NumPoints <= 0) { return 0; }
-			if (ChannelKey.IsNone()) { return 0; }
+			if (NumPoints <= 0)
+			{
+				return 0;
+			}
+			if (ChannelKey.IsNone())
+			{
+				return 0;
+			}
 
 			const TConstPCGValueRange<FTransform> Transforms = PointData->GetConstTransformValueRange();
 			const TConstPCGValueRange<FVector> BoundsMin = PointData->GetConstBoundsMinValueRange();
@@ -115,14 +139,20 @@ namespace PCGExSpatial::Bake
 				const FVector& BMax = BoundsMax[i];
 				const FVector LocalCenter = (BMin + BMax) * 0.5;
 				const FVector LocalExtents = (BMax - BMin) * 0.5;
-				if (LocalExtents.GetMin() <= 0.0) { continue; }
+				if (LocalExtents.GetMin() <= 0.0)
+				{
+					continue;
+				}
 
 				const FTransform& Xform = Transforms[i];
 				const FVector Scale = Xform.GetScale3D();
 				const FVector AbsScale = Scale.GetAbs();
 				const FVector ScaledCenter = LocalCenter * Scale;
 				const FVector ScaledExtents = LocalExtents * AbsScale;
-				if (ScaledExtents.GetMin() <= 0.0) { continue; }
+				if (ScaledExtents.GetMin() <= 0.0)
+				{
+					continue;
+				}
 
 				const FQuat Rotation = Xform.GetRotation();
 				const FVector WorldOrigin = Xform.GetLocation() + Rotation.RotateVector(ScaledCenter);
@@ -150,7 +180,10 @@ namespace PCGExSpatial::Bake
 		// inputs flowing through to the default channel rather than dropping.
 		const PCGExData::FTags ParsedTags(InData.Tags);
 		const FString Channel = ParsedTags.GetValue<FString>(InSettings.TagPrefix.ToString(), FString());
-		if (Channel.IsEmpty()) { return InSettings.FallbackChannel; }
+		if (Channel.IsEmpty())
+		{
+			return InSettings.FallbackChannel;
+		}
 		return FName(*Channel);
 	}
 
@@ -161,10 +194,16 @@ namespace PCGExSpatial::Bake
 		TArray<FBakedEntry>& OutEntries)
 	{
 		const UPCGData* RawData = InData.Data.Get();
-		if (!RawData) { return false; }
+		if (!RawData)
+		{
+			return false;
+		}
 
 		const FName ChannelKey = ResolveChannelKey(InData, InSettings);
-		if (ChannelKey.IsNone()) { return false; }
+		if (ChannelKey.IsNone())
+		{
+			return false;
+		}
 
 		// Per-input-type dispatch. Adding a new input kind = one branch here.
 		// Promote to TMap<UClass*, FBakeFn> once we have >= 3 kinds.
@@ -176,7 +215,10 @@ namespace PCGExSpatial::Bake
 			double ZMaxVal = 0.0;
 			const bool bZMinOk = InSettings.ZMin.TryReadDataValue(InContext, RawData, ZMinVal, /*bQuiet=*/true);
 			const bool bZMaxOk = InSettings.ZMax.TryReadDataValue(InContext, RawData, ZMaxVal, /*bQuiet=*/true);
-			if (!bZMinOk || !bZMaxOk) { return false; }
+			if (!bZMinOk || !bZMaxOk)
+			{
+				return false;
+			}
 
 			FPCGExSpatialPolygonEntry Entry;
 			if (!Detail::BakeSplineToPolygonEntry(

@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widgets/SCompoundWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
+#include "Widgets/SCompoundWidget.h"
 
 class FAssetThumbnail;
 class FAssetThumbnailPool;
@@ -65,10 +65,16 @@ public:
 	void RefreshThumbnail();
 
 	/** Set selection state (visual highlight) */
-	void SetSelected(bool bInSelected) { bIsSelected = bInSelected; }
+	void SetSelected(bool bInSelected)
+	{
+		bIsSelected = bInSelected;
+	}
 
 	/** Query selection state */
-	bool IsSelected() const { return bIsSelected; }
+	bool IsSelected() const
+	{
+		return bIsSelected;
+	}
 
 	// Mouse handling for selection and drag
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;

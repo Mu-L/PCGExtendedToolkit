@@ -6,20 +6,26 @@
 
 
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExFillControlsFactoryProvider.h"
 #include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Core/PCGExFillControlsFactoryProvider.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigDepth, MaxDepth, int32, MaxDepthInput, MaxDepthAttribute, MaxDepth)
 
 bool FPCGExFillControlDepth::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryDepth* TypedFactory = Cast<UPCGExFillControlsFactoryDepth>(Factory);
 
 	DepthLimit = TypedFactory->Config.GetValueSettingMaxDepth();
-	if (!DepthLimit->Init(GetSourceFacade())) { return false; }
+	if (!DepthLimit->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -68,8 +74,14 @@ FString UPCGExFillControlsDepthProviderSettings::GetDisplayName() const
 {
 	FString DName = GetDefaultNodeTitle().ToString().Replace(TEXT("PCGEx | Fill Control"), TEXT("FC")) + TEXT(" @ ");
 
-	if (Config.MaxDepthInput == EPCGExInputValueType::Attribute) { DName += Config.MaxDepthAttribute.ToString(); }
-	else { DName += FString::Printf(TEXT("%d"), Config.MaxDepth); }
+	if (Config.MaxDepthInput == EPCGExInputValueType::Attribute)
+	{
+		DName += Config.MaxDepthAttribute.ToString();
+	}
+	else
+	{
+		DName += FString::Printf(TEXT("%d"), Config.MaxDepth);
+	}
 
 	return DName;
 }

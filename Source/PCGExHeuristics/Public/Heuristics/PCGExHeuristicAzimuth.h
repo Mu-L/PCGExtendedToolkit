@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExHeuristicOperation.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
 #include "UObject/Object.h"
-#include "Core/PCGExHeuristicOperation.h"
 #include "PCGExHeuristicAzimuth.generated.h"
 
 USTRUCT(BlueprintType)
@@ -29,7 +29,10 @@ class FPCGExHeuristicAzimuth : public FPCGExHeuristicOperation
 	TArray<FVector> CachedEdgeDirections;
 
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override { return EPCGExHeuristicCategory::GoalDependent; }
+	virtual EPCGExHeuristicCategory GetCategory() const override
+	{
+		return EPCGExHeuristicCategory::GoalDependent;
+	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 

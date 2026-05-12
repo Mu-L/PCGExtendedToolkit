@@ -61,8 +61,15 @@ namespace PCGExPCGInterop
 
 		~FGenerationWatcher();
 
-		void SetOnGenerationComplete(FOnGenerationComplete&& InCallback) { OnGenerationComplete = MoveTemp(InCallback); }
-		void SetOnAllComplete(TFunction<void()>&& InCallback) { OnAllComplete = MoveTemp(InCallback); }
+		void SetOnGenerationComplete(FOnGenerationComplete&& InCallback)
+		{
+			OnGenerationComplete = MoveTemp(InCallback);
+		}
+
+		void SetOnAllComplete(TFunction<void()>&& InCallback)
+		{
+			OnAllComplete = MoveTemp(InCallback);
+		}
 
 		/** Must be called after construction to initialize the tracker (cannot use SharedThis in constructor) */
 		void Initialize();

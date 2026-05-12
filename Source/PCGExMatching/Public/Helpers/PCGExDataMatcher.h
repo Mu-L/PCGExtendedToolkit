@@ -36,9 +36,20 @@ namespace PCGExMatching
 		explicit FScope(const int32 InNumCandidates, const bool bUnlimited = false);
 
 		void RegisterMatch();
-		FORCEINLINE int32 GetNumCandidates() const { return NumCandidates; }
-		FORCEINLINE int32 GetCounter() const { return FPlatformAtomics::AtomicRead(&Counter); }
-		FORCEINLINE bool IsValid() const { return static_cast<bool>(FPlatformAtomics::AtomicRead(&Valid)); }
+		FORCEINLINE int32 GetNumCandidates() const
+		{
+			return NumCandidates;
+		}
+
+		FORCEINLINE int32 GetCounter() const
+		{
+			return FPlatformAtomics::AtomicRead(&Counter);
+		}
+
+		FORCEINLINE bool IsValid() const
+		{
+			return static_cast<bool>(FPlatformAtomics::AtomicRead(&Valid));
+		}
 
 		void Invalidate();
 	};
@@ -65,7 +76,11 @@ namespace PCGExMatching
 
 		FDataMatcher();
 
-		FORCEINLINE int32 GetNumSources() const { return NumSources; }
+		FORCEINLINE int32 GetNumSources() const
+		{
+			return NumSources;
+		}
+
 		bool FindIndex(const UPCGData* InData, int32& OutIndex) const;
 
 		void SetDetails(const FPCGExMatchingDetails* InDetails);
@@ -103,7 +118,10 @@ namespace PCGExMatching
 		bool HandleUnmatchedOutput(const TSharedPtr<PCGExData::FFacade>& InFacade, const bool bForward = true) const;
 
 		/** Returns true if any operation wants recursive/transitive matching */
-		FORCEINLINE bool WantsRecursion() const { return bWantsRecursion; }
+		FORCEINLINE bool WantsRecursion() const
+		{
+			return bWantsRecursion;
+		}
 
 	protected:
 		int32 GetMatchLimitFor(const FPCGExTaggedData& InDataCandidate) const;

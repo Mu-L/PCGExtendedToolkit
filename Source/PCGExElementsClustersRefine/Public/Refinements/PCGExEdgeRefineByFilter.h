@@ -34,9 +34,20 @@ class UPCGExEdgeRefineByFilter : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool SupportFilters() const override { return true; }
-	virtual bool WantsIndividualEdgeProcessing() const override { return true; }
-	virtual bool GetDefaultEdgeValidity() const override { return bInvert; }
+	virtual bool SupportFilters() const override
+	{
+		return true;
+	}
+
+	virtual bool WantsIndividualEdgeProcessing() const override
+	{
+		return true;
+	}
+
+	virtual bool GetDefaultEdgeValidity() const override
+	{
+		return bInvert;
+	}
 
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 

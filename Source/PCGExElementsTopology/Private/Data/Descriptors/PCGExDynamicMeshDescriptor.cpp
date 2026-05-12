@@ -17,7 +17,10 @@ void FPCGExDynamicMeshDescriptor::InitFrom(const UPrimitiveComponent* Component,
 	FPCGExMeshComponentDescriptor::InitFrom(Component, bInitBodyInstance);
 
 	const UDynamicMeshComponent* DynamicMeshComponent = Cast<UDynamicMeshComponent>(Component);
-	if (!DynamicMeshComponent) { return; }
+	if (!DynamicMeshComponent)
+	{
+		return;
+	}
 
 	bExplicitShowWireframe = DynamicMeshComponent->bExplicitShowWireframe;
 	WireframeColor = DynamicMeshComponent->WireframeColor;
@@ -34,7 +37,10 @@ void FPCGExDynamicMeshDescriptor::InitComponent(UPrimitiveComponent* InComponent
 	FPCGExMeshComponentDescriptor::InitComponent(InComponent);
 
 	UDynamicMeshComponent* DynamicMeshComponent = Cast<UDynamicMeshComponent>(InComponent);
-	if (!DynamicMeshComponent) { return; }
+	if (!DynamicMeshComponent)
+	{
+		return;
+	}
 
 	DynamicMeshComponent->bUseAsyncCooking = bUseAsyncCooking;
 	DynamicMeshComponent->bDeferCollisionUpdates = bDeferCollisionUpdates;

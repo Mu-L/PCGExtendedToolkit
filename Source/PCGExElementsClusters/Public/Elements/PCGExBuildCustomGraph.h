@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "Clusters/PCGExClusterCommon.h"
-#include "Factories/PCGExInstancedFactory.h"
 #include "Core/PCGExPointsProcessor.h"
+#include "Factories/PCGExInstancedFactory.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Helpers/PCGExBufferHelper.h"
 #include "PCGExBuildCustomGraph.generated.h"
@@ -404,7 +404,10 @@ class PCGEXELEMENTSCLUSTERS_API UPCGExCustomGraphBuilder : public UPCGExInstance
 	GENERATED_BODY()
 
 public:
-	virtual bool WantsPerDataInstance() override { return true; }
+	virtual bool WantsPerDataInstance() override
+	{
+		return true;
+	}
 
 	/**
 	 * Main initialization function. Called once, and is responsible for populating graph builder settings.
@@ -434,7 +437,10 @@ public:
 	{
 		InputActors.Empty();
 
-		for (UPCGExCustomGraphSettings* GSettings : GraphSettings) { GSettings->GraphBuilder.Reset(); }
+		for (UPCGExCustomGraphSettings* GSettings : GraphSettings)
+		{
+			GSettings->GraphBuilder.Reset();
+		}
 
 		GraphSettings.Empty();
 		Super::Cleanup();
@@ -462,8 +468,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(BuildCustomGraph, "Cluster : Build Custom Graph", "Create clusters using custom blueprint objects", (Builder ? FName(Builder.GetClass()->GetMetaData(TEXT("DisplayName"))) : FName("...")));
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
-	virtual bool CanDynamicallyTrackKeys() const override { return true; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
+
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 #endif
 
 protected:
@@ -474,8 +488,16 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual FName GetMainOutputPin() const override { return PCGExClusters::Labels::OutputVerticesLabel; }
-	virtual bool IsInputless() const override { return Mode == EPCGExCustomGraphActorSourceMode::Owner; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExClusters::Labels::OutputVerticesLabel;
+	}
+
+	virtual bool IsInputless() const override
+	{
+		return Mode == EPCGExCustomGraphActorSourceMode::Owner;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 	/** Actor fetching mode. These actors will be forwarded to the builder so it can fetch components and data from there during its initialization. */

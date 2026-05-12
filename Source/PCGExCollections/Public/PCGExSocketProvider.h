@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Interface.h"
-#include "GameFramework/Actor.h"
 #include "Components/SceneComponent.h"
+#include "GameFramework/Actor.h"
+#include "UObject/Interface.h"
 
 class UStaticMeshComponent;
 
@@ -71,10 +71,25 @@ public:
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 
-	virtual FName GetSocketName_Implementation() const override { return SocketName; }
-	virtual FString GetSocketTag_Implementation() const override { return SocketTag; }
-	virtual FTransform GetSocketTransform_Implementation() const override { return CachedTransform; }
-	virtual bool ShouldStripFromExport_Implementation() const override { return bStripFromExport; }
+	virtual FName GetSocketName_Implementation() const override
+	{
+		return SocketName;
+	}
+
+	virtual FString GetSocketTag_Implementation() const override
+	{
+		return SocketTag;
+	}
+
+	virtual FTransform GetSocketTransform_Implementation() const override
+	{
+		return CachedTransform;
+	}
+
+	virtual bool ShouldStripFromExport_Implementation() const override
+	{
+		return bStripFromExport;
+	}
 
 private:
 	/** World transform cached by OnConstruction. Read during staging from loaded levels where
@@ -105,8 +120,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
 	bool bStripFromExport = true;
 
-	virtual FName GetSocketName_Implementation() const override { return SocketName; }
-	virtual FString GetSocketTag_Implementation() const override { return SocketTag; }
-	virtual FTransform GetSocketTransform_Implementation() const override { return GetComponentTransform(); }
-	virtual bool ShouldStripFromExport_Implementation() const override { return bStripFromExport; }
+	virtual FName GetSocketName_Implementation() const override
+	{
+		return SocketName;
+	}
+
+	virtual FString GetSocketTag_Implementation() const override
+	{
+		return SocketTag;
+	}
+
+	virtual FTransform GetSocketTransform_Implementation() const override
+	{
+		return GetComponentTransform();
+	}
+
+	virtual bool ShouldStripFromExport_Implementation() const override
+	{
+		return bStripFromExport;
+	}
 };

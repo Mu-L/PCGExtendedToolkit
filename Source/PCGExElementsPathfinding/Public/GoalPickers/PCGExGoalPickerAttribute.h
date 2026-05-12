@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "PCGExGoalPicker.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "UObject/Object.h"
 #include "PCGExGoalPickerAttribute.generated.h"
 
 namespace PCGExData

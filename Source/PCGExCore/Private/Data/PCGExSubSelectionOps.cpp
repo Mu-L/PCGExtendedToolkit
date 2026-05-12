@@ -15,7 +15,10 @@ namespace PCGExData
 
 	void FSubSelectorRegistry::Initialize()
 	{
-		if (bInitialized) { return; }
+		if (bInitialized)
+		{
+			return;
+		}
 
 		Ops.SetNum(15); // Index 0-14 for EPCGMetadataTypes enum values
 
@@ -33,7 +36,10 @@ namespace PCGExData
 		//if (!bInitialized) { Initialize(); }
 
 		const int32 Index = static_cast<int32>(Type);
-		if (Index >= 0 && Index < Ops.Num() && Ops[Index].IsValid()) { return Ops[Index].Get(); }
+		if (Index >= 0 && Index < Ops.Num() && Ops[Index].IsValid())
+		{
+			return Ops[Index].Get();
+		}
 
 		return nullptr;
 	}

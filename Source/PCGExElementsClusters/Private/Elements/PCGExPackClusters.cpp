@@ -4,16 +4,23 @@
 #include "Elements/PCGExPackClusters.h"
 
 
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExDataTags.h"
 #include "Utils/PCGExPointIOMerger.h"
-#include "Clusters/PCGExCluster.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPackClusters"
 #define PCGEX_NAMESPACE PackClusters
 
-PCGExData::EIOInit UPCGExPackClustersSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExPackClustersSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExPackClustersSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExPackClustersSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 TArray<FPCGPinProperties> UPCGExPackClustersSettings::OutputPinProperties() const
 {
@@ -27,7 +34,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL(PackClusters)
 
 bool FPCGExPackClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PackClusters)
 
@@ -48,9 +58,12 @@ bool FPCGExPackClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([&](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-		}))
+		if (!Context->StartProcessingClusters([&](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+		                                      }))
 		{
 			Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -65,20 +78,32 @@ namespace PCGExPackClusters
 {
 	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
-		if (!TProcessor::Process(InTaskManager)) { return false; }
+		if (!TProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		// TODO : Refactor because we're actually partitioning indices, which is bad as we don't preserve the original data layout
 
 		EPCGPointNativeProperties AllocateProperties = VtxDataFacade->GetAllocations() | EdgeDataFacade->GetAllocations();
 
 		VtxPointSelection.SetNumUninitialized(NumNodes);
-		for (int i = 0; i < NumNodes; i++) { VtxPointSelection[i] = Cluster->GetNodePointIndex(i); }
+		for (int i = 0; i < NumNodes; i++)
+		{
+			VtxPointSelection[i] = Cluster->GetNodePointIndex(i);
+		}
 
 		VtxStartIndex = EdgeDataFacade->GetNum();
 		NumVtx = VtxPointSelection.Num();
 
-		if (VtxStartIndex <= 0) { return false; }
-		if (NumVtx <= 0) { return false; }
+		if (VtxStartIndex <= 0)
+		{
+			return false;
+		}
+		if (NumVtx <= 0)
+		{
+			return false;
+		}
 
 		PackedIO = Context->PackedClusters->Emplace_GetRef(EdgeDataFacade->Source, PCGExData::EIOInit::Duplicate);
 		PackedIOFacade = MakeShared<PCGExData::FFacade>(PackedIO.ToSharedRef());
@@ -97,11 +122,17 @@ namespace PCGExPackClusters
 
 		// The following may be redundant
 		TPCGValueRange<int64> MetadataEntries = PackedPoints->GetMetadataEntryValueRange(false);
-		for (int32 Index : WriteIndices) { MetadataEntries[Index] = PCGInvalidEntryKey; }
+		for (int32 Index : WriteIndices)
+		{
+			MetadataEntries[Index] = PCGInvalidEntryKey;
+		}
 
 		//
 		VtxAttributes = PCGExData::FAttributesInfos::Get(VtxDataFacade->GetIn()->Metadata);
-		if (VtxAttributes->Identities.IsEmpty()) { return true; }
+		if (VtxAttributes->Identities.IsEmpty())
+		{
+			return true;
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD(TaskManager, CopyVtxAttributes)
 
@@ -120,7 +151,10 @@ namespace PCGExPackClusters
 				TSharedPtr<PCGExData::TBuffer<T>> OutValues = This->PackedIOFacade->GetWritable<T>(InValues->GetTypedInAttribute(), PCGExData::EBufferInit::New);
 
 				const TArray<int32>& VtxSelection = This->VtxPointSelection;
-				for (int i = 0; i < VtxSelection.Num(); i++) { OutValues->SetValue(This->VtxStartIndex + i, InValues->Read(VtxSelection[i])); }
+				for (int i = 0; i < VtxSelection.Num(); i++)
+				{
+					OutValues->SetValue(This->VtxStartIndex + i, InValues->Read(VtxSelection[i]));
+				}
 			});
 		};
 

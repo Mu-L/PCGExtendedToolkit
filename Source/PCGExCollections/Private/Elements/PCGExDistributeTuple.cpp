@@ -8,8 +8,8 @@
 #include "Helpers/PCGExRandomHelpers.h"
 
 #if WITH_EDITOR
-#include "UObject/UObjectGlobals.h"
 #include "Editor.h"
+#include "UObject/UObjectGlobals.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "PCGExDistributeTupleElement"
@@ -57,7 +57,10 @@ void UPCGExDistributeTupleSettings::PostEditChangeProperty(struct FPropertyChang
 	{
 		Composition.SyncAllSchemas();
 		TArray<FInstancedStruct> Schema = Composition.BuildSchema();
-		for (FPCGExWeightedPropertyOverrides& Row : Values) { Row.SyncToSchema(Schema); }
+		for (FPCGExWeightedPropertyOverrides& Row : Values)
+		{
+			Row.SyncToSchema(Schema);
+		}
 	}
 
 	(void)MarkPackageDirty();
@@ -73,7 +76,7 @@ void UPCGExDistributeTupleSettings::PostEditChangeProperty(struct FPropertyChang
 	}
 
 	DirtyCache();
-	
+
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
@@ -92,7 +95,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(DistributeTuple)
 
 bool FPCGExDistributeTupleElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(DistributeTuple)
 
@@ -136,7 +142,10 @@ bool FPCGExDistributeTupleElement::AdvanceWork(FPCGExContext* InContext, const U
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -164,12 +173,18 @@ namespace PCGExDistributeTuple
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExDistributeTuple::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
 		NumRows = Settings->Values.Num();
-		if (NumRows == 0) { return false; }
+		if (NumRows == 0)
+		{
+			return false;
+		}
 
 		// Build cumulative weight table
 		CumulativeWeights.SetNum(NumRows);
@@ -184,7 +199,10 @@ namespace PCGExDistributeTuple
 		{
 			// All weights are zero - fall back to uniform random
 			TotalWeight = NumRows;
-			for (int32 i = 0; i < NumRows; ++i) { CumulativeWeights[i] = i + 1; }
+			for (int32 i = 0; i < NumRows; ++i)
+			{
+				CumulativeWeights[i] = i + 1;
+			}
 		}
 
 		// Initialize per-column output buffers
@@ -265,52 +283,76 @@ namespace PCGExDistributeTuple
 			switch (Settings->Distribution)
 			{
 			case EPCGExDistribution::Index:
+			{
+				PickedRow = PCGExMath::SanitizeIndex(Index, MaxRowIndex, Settings->IndexSafety);
+				if (PickedRow < 0)
 				{
-					PickedRow = PCGExMath::SanitizeIndex(Index, MaxRowIndex, Settings->IndexSafety);
-					if (PickedRow < 0) { continue; }
+					continue;
 				}
-				break;
+			}
+			break;
 
 			case EPCGExDistribution::Random:
-				{
-					const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], Settings->SeedComponents, Settings->LocalSeed, Settings, Component);
-					FRandomStream RandomStream(Seed);
-					PickedRow = RandomStream.RandRange(0, MaxRowIndex);
-				}
-				break;
+			{
+				const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], Settings->SeedComponents, Settings->LocalSeed, Settings, Component);
+				FRandomStream RandomStream(Seed);
+				PickedRow = RandomStream.RandRange(0, MaxRowIndex);
+			}
+			break;
 
 			case EPCGExDistribution::WeightedRandom:
-				{
-					const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], Settings->SeedComponents, Settings->LocalSeed, Settings, Component);
-					FRandomStream RandomStream(Seed);
-					const int32 Roll = RandomStream.RandRange(1, TotalWeight);
+			{
+				const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], Settings->SeedComponents, Settings->LocalSeed, Settings, Component);
+				FRandomStream RandomStream(Seed);
+				const int32 Roll = RandomStream.RandRange(1, TotalWeight);
 
-					// Binary search through cumulative weights
-					int32 Lo = 0, Hi = MaxRowIndex;
-					while (Lo < Hi)
+				// Binary search through cumulative weights
+				int32 Lo = 0, Hi = MaxRowIndex;
+				while (Lo < Hi)
+				{
+					const int32 Mid = (Lo + Hi) >> 1;
+					if (CumulativeWeights[Mid] < Roll)
 					{
-						const int32 Mid = (Lo + Hi) >> 1;
-						if (CumulativeWeights[Mid] < Roll) { Lo = Mid + 1; }
-						else { Hi = Mid; }
+						Lo = Mid + 1;
 					}
-					PickedRow = Lo;
+					else
+					{
+						Hi = Mid;
+					}
 				}
-				break;
+				PickedRow = Lo;
+			}
+			break;
 			}
 
-			if (PickedRow < 0 || PickedRow > MaxRowIndex) { continue; }
+			if (PickedRow < 0 || PickedRow > MaxRowIndex)
+			{
+				continue;
+			}
 
 			// Write optional outputs
-			if (RowIndexWriter) { RowIndexWriter->SetValue(Index, PickedRow); }
-			if (WeightWriter) { WeightWriter->SetValue(Index, Settings->Values[PickedRow].Weight); }
+			if (RowIndexWriter)
+			{
+				RowIndexWriter->SetValue(Index, PickedRow);
+			}
+			if (WeightWriter)
+			{
+				WeightWriter->SetValue(Index, Settings->Values[PickedRow].Weight);
+			}
 
 			// Write column values from the picked row
 			for (const FColumnOutput& Col : Columns)
 			{
-				if (!Col.WriterPtr) { continue; }
+				if (!Col.WriterPtr)
+				{
+					continue;
+				}
 
 				const FPCGExProperty* RowSource = Col.RowSources[PickedRow];
-				if (!RowSource) { continue; }
+				if (!RowSource)
+				{
+					continue;
+				}
 
 				Col.WriterPtr->WriteOutputFrom(Index, RowSource);
 			}

@@ -4,13 +4,13 @@
 #include "Elements/PCGExBuildConvexHull.h"
 
 
+#include "Clusters/PCGExClusterCommon.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExClusterCommon.h"
 #include "Elements/Metadata/PCGMetadataElementCommon.h"
-#include "Math/Geo/PCGExDelaunay.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
+#include "Math/Geo/PCGExDelaunay.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
 #define PCGEX_NAMESPACE BuildConvexHull
@@ -24,15 +24,24 @@ TArray<FPCGPinProperties> UPCGExBuildConvexHullSettings::OutputPinProperties() c
 
 PCGEX_INITIALIZE_ELEMENT(BuildConvexHull)
 
-PCGExData::EIOInit UPCGExBuildConvexHullSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBuildConvexHullSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BuildConvexHull)
 
-FName UPCGExBuildConvexHullSettings::GetMainOutputPin() const { return PCGExClusters::Labels::OutputVerticesLabel; }
+FName UPCGExBuildConvexHullSettings::GetMainOutputPin() const
+{
+	return PCGExClusters::Labels::OutputVerticesLabel;
+}
 
 bool FPCGExBuildConvexHullElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildConvexHull)
 
@@ -81,7 +90,10 @@ namespace PCGExBuildConvexHull
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBuildConvexHull::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		// Build delaunay
 
@@ -125,8 +137,14 @@ namespace PCGExBuildConvexHull
 
 			if (!bAIsOnHull || !bBIsOnHull)
 			{
-				if (!bAIsOnHull) { GraphBuilder->Graph->Nodes[A].bValid = false; }
-				if (!bBIsOnHull) { GraphBuilder->Graph->Nodes[B].bValid = false; }
+				if (!bAIsOnHull)
+				{
+					GraphBuilder->Graph->Nodes[A].bValid = false;
+				}
+				if (!bBIsOnHull)
+				{
+					GraphBuilder->Graph->Nodes[B].bValid = false;
+				}
 				continue;
 			}
 

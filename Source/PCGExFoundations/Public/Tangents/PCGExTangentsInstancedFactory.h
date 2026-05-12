@@ -4,12 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExCoreMacros.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExDataHelpers.h"
+#include "Details/PCGExSettingsMacros.h"
 #include "Factories/PCGExInstancedFactory.h"
 #include "Factories/PCGExOperation.h"
-#include "Details/PCGExSettingsMacros.h"
-#include "PCGExCoreMacros.h"
 
 #include "PCGExTangentsInstancedFactory.generated.h"
 
@@ -203,7 +203,10 @@ namespace PCGExTangents
 
 		virtual ~FTangentsHandler() = default;
 
-		FORCEINLINE bool IsEnabled() const { return Mode != EPCGExTangentSource::None; }
+		FORCEINLINE bool IsEnabled() const
+		{
+			return Mode != EPCGExTangentSource::None;
+		}
 
 		bool Init(FPCGExContext* InContext, const FPCGExTangentsDetails& InDetails, const TSharedPtr<PCGExData::FFacade>& InDataFacade);
 

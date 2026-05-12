@@ -4,8 +4,8 @@
 #include "PCGExBlending.h"
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
 #include "Core/PCGExBlendOpFactory.h"
+#include "Styling/AppStyle.h"
 
 #if PCGEX_ENGINE_VERSION > 506
 #include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY

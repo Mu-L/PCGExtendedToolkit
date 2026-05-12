@@ -14,7 +14,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigAttributeThreshold, Threshold, d
 
 bool FPCGExFillControlAttributeThreshold::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryAttributeThreshold* TypedFactory = Cast<UPCGExFillControlsFactoryAttributeThreshold>(Factory);
 
@@ -23,12 +26,15 @@ bool FPCGExFillControlAttributeThreshold::PrepareForDiffusions(FPCGExContext* In
 
 	// Initialize threshold setting value
 	Threshold = TypedFactory->Config.GetValueSettingThreshold();
-	if (!Threshold->Init(GetSourceFacade())) { return false; }
+	if (!Threshold->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	// Get the attribute buffer
 	TSharedPtr<PCGExData::FFacade> SourceFacade = (AttributeSource == EPCGExClusterElement::Vtx)
-		                                              ? InHandler->VtxDataFacade
-		                                              : InHandler->EdgeDataFacade;
+		? InHandler->VtxDataFacade
+		: InHandler->EdgeDataFacade;
 
 	AttributeBuffer = SourceFacade->GetReadable<double>(TypedFactory->Config.Attribute.GetName());
 	if (!AttributeBuffer)
@@ -47,7 +53,10 @@ bool FPCGExFillControlAttributeThreshold::IsValidCapture(const PCGExFloodFill::F
 
 bool FPCGExFillControlAttributeThreshold::IsValidProbe(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate)
 {
-	if (Candidate.Link.Edge == -1) { return true; } // Seed node
+	if (Candidate.Link.Edge == -1)
+	{
+		return true;
+	} // Seed node
 	return TestCandidate(Diffusion, Candidate);
 }
 
@@ -59,10 +68,13 @@ bool FPCGExFillControlAttributeThreshold::IsValidCandidate(const PCGExFloodFill:
 bool FPCGExFillControlAttributeThreshold::TestCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate) const
 {
 	const int32 Index = (AttributeSource == EPCGExClusterElement::Vtx)
-		                    ? Candidate.Node->PointIndex
-		                    : Candidate.Link.Edge;
+		? Candidate.Node->PointIndex
+		: Candidate.Link.Edge;
 
-	if (Index < 0) { return true; } // Invalid index, pass through
+	if (Index < 0)
+	{
+		return true;
+	} // Invalid index, pass through
 
 	const double Value = AttributeBuffer->Read(Index);
 	const double ThresholdValue = Threshold->Read(GetSettingsIndex(Diffusion));

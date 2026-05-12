@@ -117,10 +117,16 @@ namespace PCGExPathfinding
 		PCGExData::FConstPoint Point;
 		const PCGExClusters::FNode* Node = nullptr;
 
-		bool IsValid() const { return Node != nullptr; };
+		bool IsValid() const
+		{
+			return Node != nullptr;
+		};
 		bool ResolveNode(const TSharedRef<PCGExClusters::FCluster>& InCluster, const FPCGExNodeSelectionDetails& SelectionDetails);
 
-		operator PCGExData::FConstPoint() const { return Point; }
+		operator PCGExData::FConstPoint() const
+		{
+			return Point;
+		}
 	};
 
 	struct PCGEXELEMENTSPATHFINDING_API FSeedGoalPair
@@ -133,16 +139,25 @@ namespace PCGExPathfinding
 		FSeedGoalPair() = default;
 
 		FSeedGoalPair(const int32 InSeed, const FVector& InSeedPosition, const int32 InGoal, const FVector& InGoalPosition)
-			: Seed(InSeed), SeedPosition(InSeedPosition), Goal(InGoal), GoalPosition(InGoalPosition)
+			: Seed(InSeed)
+			  , SeedPosition(InSeedPosition)
+			  , Goal(InGoal)
+			  , GoalPosition(InGoalPosition)
 		{
 		}
 
 		FSeedGoalPair(const PCGExData::FConstPoint& InSeed, const PCGExData::FConstPoint& InGoal)
-			: Seed(InSeed.Index), SeedPosition(InSeed.GetLocation()), Goal(InGoal.Index), GoalPosition(InGoal.GetLocation())
+			: Seed(InSeed.Index)
+			  , SeedPosition(InSeed.GetLocation())
+			  , Goal(InGoal.Index)
+			  , GoalPosition(InGoal.GetLocation())
 		{
 		}
 
-		bool IsValid() const { return Seed != -1 && Goal != -1; }
+		bool IsValid() const
+		{
+			return Seed != -1 && Goal != -1;
+		}
 	};
 
 	PCGEXELEMENTSPATHFINDING_API

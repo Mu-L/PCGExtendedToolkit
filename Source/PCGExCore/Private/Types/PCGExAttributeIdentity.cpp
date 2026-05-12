@@ -4,9 +4,9 @@
 #include "Types/PCGExAttributeIdentity.h"
 
 #include "PCGParamData.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGSpatialData.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadata.h"
 
@@ -29,7 +29,10 @@ namespace PCGExData
 
 	void FAttributeIdentity::Get(const UPCGMetadata* InMetadata, TArray<FAttributeIdentity>& OutIdentities, const TSet<FName>* OptionalIgnoreList)
 	{
-		if (!InMetadata) { return; }
+		if (!InMetadata)
+		{
+			return;
+		}
 
 		TArray<FPCGAttributeIdentifier> Identifiers;
 		TArray<EPCGMetadataTypes> Types;
@@ -41,14 +44,20 @@ namespace PCGExData
 
 		for (int i = 0; i < NumAttributes; i++)
 		{
-			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifiers[i].Name)) { continue; }
+			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifiers[i].Name))
+			{
+				continue;
+			}
 			OutIdentities.AddUnique(FAttributeIdentity(Identifiers[i], Types[i], InMetadata->GetConstAttribute(Identifiers[i])->AllowsInterpolation()));
 		}
 	}
 
 	void FAttributeIdentity::Get(const UPCGMetadata* InMetadata, TArray<FPCGAttributeIdentifier>& OutIdentifiers, TMap<FPCGAttributeIdentifier, FAttributeIdentity>& OutIdentities, const TSet<FName>* OptionalIgnoreList)
 	{
-		if (!InMetadata) { return; }
+		if (!InMetadata)
+		{
+			return;
+		}
 
 		TArray<EPCGMetadataTypes> Types;
 		InMetadata->GetAllAttributes(OutIdentifiers, Types);
@@ -59,7 +68,10 @@ namespace PCGExData
 		for (int i = 0; i < NumAttributes; i++)
 		{
 			const FPCGAttributeIdentifier& Identifier = OutIdentifiers[i];
-			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifier.Name)) { continue; }
+			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifier.Name))
+			{
+				continue;
+			}
 			OutIdentities.Add(Identifier, FAttributeIdentity(Identifier, Types[i], InMetadata->GetConstAttribute(Identifier)->AllowsInterpolation()));
 		}
 	}
@@ -67,10 +79,16 @@ namespace PCGExData
 	bool FAttributeIdentity::Get(const UPCGData* InData, const FPCGAttributePropertyInputSelector& InSelector, FAttributeIdentity& OutIdentity)
 	{
 		FPCGAttributePropertyInputSelector FixedSelector = InSelector.CopyAndFixLast(InData);
-		if (!FixedSelector.IsValid() || FixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute) { return false; }
+		if (!FixedSelector.IsValid() || FixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute)
+		{
+			return false;
+		}
 
 		const FPCGMetadataAttributeBase* Attribute = InData->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(FixedSelector, InData));
-		if (!Attribute) { return false; }
+		if (!Attribute)
+		{
+			return false;
+		}
 
 		OutIdentity.Identifier = Attribute->Name;
 		OutIdentity.UnderlyingType = static_cast<EPCGMetadataTypes>(Attribute->GetTypeId());
@@ -83,7 +101,10 @@ namespace PCGExData
 	{
 		// BUG : This does not account for metadata domains
 
-		if (!InMetadata) { return 0; }
+		if (!InMetadata)
+		{
+			return 0;
+		}
 
 		TArray<FPCGAttributeIdentifier> Identifiers;
 		TArray<EPCGMetadataTypes> Types;
@@ -102,19 +123,37 @@ namespace PCGExData
 
 	bool FAttributesInfos::Contains(const FName AttributeName, const EPCGMetadataTypes Type)
 	{
-		for (FAttributeIdentity& Identity : Identities) { if (Identity.Identifier.Name == AttributeName && Identity.UnderlyingType == Type) { return true; } }
+		for (FAttributeIdentity& Identity : Identities)
+		{
+			if (Identity.Identifier.Name == AttributeName && Identity.UnderlyingType == Type)
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 
 	bool FAttributesInfos::Contains(const FName AttributeName)
 	{
-		for (FAttributeIdentity& Identity : Identities) { if (Identity.Identifier.Name == AttributeName) { return true; } }
+		for (FAttributeIdentity& Identity : Identities)
+		{
+			if (Identity.Identifier.Name == AttributeName)
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 
 	FAttributeIdentity* FAttributesInfos::Find(const FName AttributeName)
 	{
-		for (FAttributeIdentity& Identity : Identities) { if (Identity.Identifier.Name == AttributeName) { return &Identity; } }
+		for (FAttributeIdentity& Identity : Identities)
+		{
+			if (Identity.Identifier.Name == AttributeName)
+			{
+				return &Identity;
+			}
+		}
 		return nullptr;
 	}
 
@@ -152,7 +191,10 @@ namespace PCGExData
 		{
 			const FAttributeIdentity& OtherId = Other->Identities[i];
 
-			if (!InGatherDetails.Test(OtherId.Identifier.Name.ToString())) { continue; }
+			if (!InGatherDetails.Test(OtherId.Identifier.Name.ToString()))
+			{
+				continue;
+			}
 
 			if (const int32* Index = Map.Find(OtherId.Identifier))
 			{
@@ -179,7 +221,10 @@ namespace PCGExData
 		{
 			const FAttributeIdentity& OtherId = Other->Identities[i];
 
-			if (InIgnoredAttributes && InIgnoredAttributes->Contains(OtherId.Identifier.Name)) { continue; }
+			if (InIgnoredAttributes && InIgnoredAttributes->Contains(OtherId.Identifier.Name))
+			{
+				continue;
+			}
 
 			if (const int32* Index = Map.Find(OtherId.Identifier))
 			{
@@ -212,7 +257,10 @@ namespace PCGExData
 
 		for (const TPair<FPCGAttributeIdentifier, int32>& Pair : Map)
 		{
-			if (FilterFn(Pair.Key.Name)) { continue; }
+			if (FilterFn(Pair.Key.Name))
+			{
+				continue;
+			}
 			FilteredOutNames.Add(Pair.Key.Name);
 		}
 
@@ -232,7 +280,10 @@ namespace PCGExData
 		}
 
 		// Refresh indices
-		for (int i = 0; i < Identities.Num(); i++) { Map.Add(Identities[i].Identifier, i); }
+		for (int i = 0; i < Identities.Num(); i++)
+		{
+			Map.Add(Identities[i].Identifier, i);
+		}
 	}
 
 	TSharedPtr<FAttributesInfos> FAttributesInfos::Get(const UPCGMetadata* InMetadata, const TSet<FName>* IgnoredAttributes)
@@ -297,10 +348,19 @@ namespace PCGExData
 		{
 			const UPCGMetadata* Metadata = nullptr;
 
-			if (const UPCGParamData* ParamData = Cast<UPCGParamData>(TaggedData.Data)) { Metadata = ParamData->Metadata; }
-			else if (const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(TaggedData.Data)) { Metadata = SpatialData->Metadata; }
+			if (const UPCGParamData* ParamData = Cast<UPCGParamData>(TaggedData.Data))
+			{
+				Metadata = ParamData->Metadata;
+			}
+			else if (const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(TaggedData.Data))
+			{
+				Metadata = SpatialData->Metadata;
+			}
 
-			if (!Metadata) { continue; }
+			if (!Metadata)
+			{
+				continue;
+			}
 
 			TSet<FName> Mismatch;
 			TSharedPtr<FAttributesInfos> Infos = FAttributesInfos::Get(Metadata);
@@ -315,7 +375,10 @@ namespace PCGExData
 			}
 		}
 
-		if (bHasErrors) { OutInfos.Reset(); }
+		if (bHasErrors)
+		{
+			OutInfos.Reset();
+		}
 		return OutInfos;
 	}
 }

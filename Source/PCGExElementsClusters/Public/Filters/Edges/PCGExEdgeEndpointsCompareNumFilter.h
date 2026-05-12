@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExEdgeEndpointsCompareNumFilter.generated.h"
 
@@ -69,7 +69,8 @@ namespace PCGExEdgeEndpointsCompareNum
 	{
 	public:
 		explicit FFilter(const UPCGExEdgeEndpointsCompareNumFilterFactory* InFactory)
-			: IEdgeFilter(InFactory), TypedFilterFactory(InFactory)
+			: IEdgeFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 
@@ -95,7 +96,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(EdgeEndpointsCompareNumFilterFactory, "Edge Filter : Endpoints Compare (Numeric)", "Compare the value of an attribute on each of the edge endpoint.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster);
+	}
 #endif
 	//~End UPCGSettings
 
@@ -107,6 +112,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

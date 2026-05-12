@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExDecompositionOperation.h"
 #include "Core/PCGExDecompOccupancyGrid.h"
+#include "Core/PCGExDecompositionOperation.h"
 
 #include "PCGExDecompMaxBoxes.generated.h"
 

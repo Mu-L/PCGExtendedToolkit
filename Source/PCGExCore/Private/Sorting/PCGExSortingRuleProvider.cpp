@@ -15,7 +15,10 @@ PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoSortRule, UPCGExSortingRule)
 
 bool UPCGExSortingRule::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable;
 	PCGEX_CONSUMABLE_SELECTOR(Config.Selector, Consumable)
@@ -32,5 +35,8 @@ UPCGExFactoryData* UPCGExSortingRuleProviderSettings::CreateFactory(FPCGExContex
 }
 
 #if WITH_EDITOR
-FString UPCGExSortingRuleProviderSettings::GetDisplayName() const { return Config.GetDisplayName(); }
+FString UPCGExSortingRuleProviderSettings::GetDisplayName() const
+{
+	return Config.GetDisplayName();
+}
 #endif

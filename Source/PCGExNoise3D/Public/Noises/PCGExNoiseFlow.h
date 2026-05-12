@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExNoise3DOperation.h"
+#include "UObject/Object.h"
 
 #include "PCGExNoiseFlow.generated.h"
 
@@ -73,7 +73,7 @@ private:
 			BaseGrad.X * CosA - BaseGrad.Y * SinA,
 			BaseGrad.X * SinA + BaseGrad.Y * CosA,
 			BaseGrad.Z
-		);
+			);
 	}
 };
 

@@ -20,13 +20,22 @@ bool FPCGExCompareSelectorDouble::TryReadDataValue(const TSharedPtr<PCGExData::F
 FString FPCGExCompareSelectorDouble::GetDisplayNamePostfix() const
 {
 	FString DisplayName = PCGExCompare::ToString(Comparison);
-	if (Input == EPCGExInputValueType::Attribute) { DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Attribute); }
-	else { DisplayName += FString::Printf(TEXT("%.1f"), Constant); }
+	if (Input == EPCGExInputValueType::Attribute)
+	{
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Attribute);
+	}
+	else
+	{
+		DisplayName += FString::Printf(TEXT("%.1f"), Constant);
+	}
 	return DisplayName;
 }
 #endif
 
 void FPCGExCompareSelectorDouble::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
-	if (Input == EPCGExInputValueType::Attribute) { FacadePreloader.Register<double>(InContext, Attribute); }
+	if (Input == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<double>(InContext, Attribute);
+	}
 }

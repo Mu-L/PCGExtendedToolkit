@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Details/PCGExStagingDetails.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
-#include "Helpers/PCGExMetaHelpers.h"
 #include "PCGExCollectionsCommon.h"
+#include "Details/PCGExStagingDetails.h"
+#include "Helpers/PCGExMetaHelpers.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 
 #include "PCGExSelectorClassic.generated.h"
 

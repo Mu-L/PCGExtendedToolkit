@@ -143,23 +143,40 @@ namespace PCGExBlending
 
 		// Span-based overloads for FUnionTable consumers. Default no-op so existing implementations
 		// that don't speak this dialect (FDummyUnionBlender, FUnionOpsManager) don't have to override.
-		virtual int32 ComputeWeights(const int32 WriteIndex, TConstArrayView<PCGExData::FElement> InElements, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const { return 0; }
+		virtual int32 ComputeWeights(const int32 WriteIndex, TConstArrayView<PCGExData::FElement> InElements, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const
+		{
+			return 0;
+		}
+
 		virtual void MergeSingle(const int32 WriteIndex, TConstArrayView<PCGExData::FElement> InElements, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
 		{
-			if (!ComputeWeights(WriteIndex, InElements, OutWeightedPoints)) { return; }
+			if (!ComputeWeights(WriteIndex, InElements, OutWeightedPoints))
+			{
+				return;
+			}
 			Blend(WriteIndex, OutWeightedPoints, Trackers);
 		}
 
 		// Not supported by most subclasses; returns 0 (no-op) unless overridden.
 		// FUnionBlender overrides to delegate to IUnionMetadata::ComputeWeights.
-		virtual int32 ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionMetadata>& InMetadata, const int32 EntryIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const { return 0; }
+		virtual int32 ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionMetadata>& InMetadata, const int32 EntryIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const
+		{
+			return 0;
+		}
+
 		virtual void MergeSingle(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionMetadata>& InMetadata, const int32 EntryIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
 		{
-			if (!ComputeWeights(WriteIndex, InMetadata, EntryIndex, OutWeightedPoints)) { return; }
+			if (!ComputeWeights(WriteIndex, InMetadata, EntryIndex, OutWeightedPoints))
+			{
+				return;
+			}
 			Blend(WriteIndex, OutWeightedPoints, Trackers);
 		}
 
-		FORCEINLINE EPCGPointNativeProperties GetAllocatedProperties() const { return AllocatedProperties; }
+		FORCEINLINE EPCGPointNativeProperties GetAllocatedProperties() const
+		{
+			return AllocatedProperties;
+		}
 
 	protected:
 		EPCGPointNativeProperties AllocatedProperties = EPCGPointNativeProperties::None;

@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Details/PCGExStagingDetails.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
 #include "Selectors/PCGExMicroEntryPickerOperation.h"
-#include "Details/PCGExStagingDetails.h"
 
 namespace PCGExDetails
 {

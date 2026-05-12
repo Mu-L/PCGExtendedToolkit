@@ -3,11 +3,11 @@
 
 #include "Clusters/PCGExEdgeDirectionDetails.h"
 
-#include "Core/PCGExContext.h"
-#include "Data/Utils/PCGExDataPreloader.h"
-#include "Data/PCGExData.h"
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExContext.h"
 #include "Data/PCGBasePointData.h"
+#include "Data/PCGExData.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Sorting/PCGExPointSorter.h"
 #include "Sorting/PCGExSortingDetails.h"
 
@@ -24,11 +24,17 @@ bool FPCGExEdgeDirectionSettings::Init(FPCGExContext* InContext, const TSharedRe
 	bAscendingDesired = DirectionChoice == EPCGExEdgeDirectionChoice::SmallestToGreatest;
 	if (DirectionMethod == EPCGExEdgeDirectionMethod::EndpointsSort)
 	{
-		if (!InSortingRules) { return false; }
+		if (!InSortingRules)
+		{
+			return false;
+		}
 
 		Sorter = MakeShared<PCGExSorting::FSorter>(InContext, InVtxDataFacade, *InSortingRules);
 		Sorter->SortDirection = DirectionChoice == EPCGExEdgeDirectionChoice::GreatestToSmallest ? EPCGExSortDirection::Descending : EPCGExSortDirection::Ascending;
-		if (!Sorter->Init(InContext)) { return false; }
+		if (!Sorter->Init(InContext))
+		{
+			return false;
+		}
 	}
 	return true;
 }
@@ -46,7 +52,10 @@ bool FPCGExEdgeDirectionSettings::InitFromParent(FPCGExContext* InContext, const
 		EdgeDirReader = InEdgeDataFacade->GetBroadcaster<FVector>(DirSourceAttribute, true);
 		if (!EdgeDirReader)
 		{
-			if (!bQuiet) { PCGEX_LOG_INVALID_SELECTOR_C(InContext, Dir Source (Edges), DirSourceAttribute) }
+			if (!bQuiet)
+			{
+				PCGEX_LOG_INVALID_SELECTOR_C(InContext, Dir Source (Edges), DirSourceAttribute)
+			}
 			return false;
 		}
 	}

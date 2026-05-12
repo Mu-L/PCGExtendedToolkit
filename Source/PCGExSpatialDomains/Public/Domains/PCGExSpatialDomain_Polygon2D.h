@@ -79,16 +79,40 @@ public:
 	// ========== FPCGExSpatialDomain ==========
 
 	virtual float QueryPoint(const FVector& Point) const override;
-	virtual FBox GetBounds() const override { return WorldBounds; }
-	virtual bool IsValid() const override { return Outline.Num() >= 3 && ZMax > ZMin; }
+
+	virtual FBox GetBounds() const override
+	{
+		return WorldBounds;
+	}
+
+	virtual bool IsValid() const override
+	{
+		return Outline.Num() >= 3 && ZMax > ZMin;
+	}
+
 	virtual int32 Append(const FPCGExFootprintShape& Shape, int32 OwnerIndex, uint32 ChannelMask = 0) override;
 
 	// ========== Inspection ==========
 
-	const TArray<FVector2D>& GetOutline() const { return Outline; }
-	const FQuat& GetProjectionQuat() const { return ProjectionQuat; }
-	float GetZMin() const { return ZMin; }
-	float GetZMax() const { return ZMax; }
+	const TArray<FVector2D>& GetOutline() const
+	{
+		return Outline;
+	}
+
+	const FQuat& GetProjectionQuat() const
+	{
+		return ProjectionQuat;
+	}
+
+	float GetZMin() const
+	{
+		return ZMin;
+	}
+
+	float GetZMax() const
+	{
+		return ZMax;
+	}
 
 private:
 	/** Authored 2D outline in projection-frame XY. Winding-agnostic for inside test. */

@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExEdgeRefineOperation.h"
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExEdgeRefineOperation.h"
 #include "PCGExEdgeRefineRemoveShortest.generated.h"
 
 /**
@@ -26,7 +26,10 @@ class UPCGExEdgeRemoveShortest : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool WantsIndividualNodeProcessing() const override { return true; }
+	virtual bool WantsIndividualNodeProcessing() const override
+	{
+		return true;
+	}
 
 	PCGEX_CREATE_REFINE_OPERATION(EdgeRemoveShortest, {})
 };

@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "PCGExOctree.h"
 #include "Data/PCGExDataHelpers.h"
-#include "Factories/PCGExOperation.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "Factories/PCGExOperation.h"
 #include "Metadata/PCGAttributePropertySelector.h"
 
 #include "UObject/Object.h"

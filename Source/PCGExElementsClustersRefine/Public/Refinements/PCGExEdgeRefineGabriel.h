@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExEdgeRefineOperation.h"
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExEdgeRefineOperation.h"
 #include "PCGExEdgeRefineGabriel.generated.h"
 
 /**
@@ -30,12 +30,22 @@ class UPCGExEdgeRefineGabriel : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool GetDefaultEdgeValidity() const override { return !bInvert; }
-	virtual bool WantsNodeOctree() const override { return true; }
+	virtual bool GetDefaultEdgeValidity() const override
+	{
+		return !bInvert;
+	}
+
+	virtual bool WantsNodeOctree() const override
+	{
+		return true;
+	}
 
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 
-	virtual bool WantsIndividualEdgeProcessing() const override { return !bInvert; }
+	virtual bool WantsIndividualEdgeProcessing() const override
+	{
+		return !bInvert;
+	}
 
 	/** Invert the refinement result (keep edges that would be removed and vice versa). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))

@@ -59,7 +59,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FTagCheckFilter(const TObjectPtr<const UPCGExTagCheckFilterFactory>& InDefinition)
-			: ICollectionFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ICollectionFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

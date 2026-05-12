@@ -4,10 +4,10 @@
 #include "Filters/Edges/PCGExIsoEdgeDirectionFilter.h"
 
 #include "PCGPin.h"
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Clusters/PCGExCluster.h"
 #include "Sorting/PCGExSortingDetails.h"
 #include "Sorting/PCGExSortingRuleProvider.h"
 
@@ -24,13 +24,22 @@ void UPCGExIsoEdgeDirectionFilterFactory::RegisterBuffersDependencies(FPCGExCont
 
 bool UPCGExIsoEdgeDirectionFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.CompareAgainst == EPCGExInputValueType::Attribute, Config.Direction, Consumable)
 
-	if (Config.ComparisonQuality == EPCGExDirectionCheckMode::Dot) { Config.DotComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData); }
-	else { Config.HashComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData); }
+	if (Config.ComparisonQuality == EPCGExDirectionCheckMode::Dot)
+	{
+		Config.DotComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData);
+	}
+	else
+	{
+		Config.HashComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData);
+	}
 
 	return true;
 }
@@ -41,7 +50,8 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExIsoEdgeDirectionFilterFactory::Creat
 }
 
 FIsoEdgeDirectionFilter::FIsoEdgeDirectionFilter(const UPCGExIsoEdgeDirectionFilterFactory* InFactory)
-	: IEdgeFilter(InFactory), TypedFilterFactory(InFactory)
+	: IEdgeFilter(InFactory)
+	  , TypedFilterFactory(InFactory)
 {
 	DotComparison = InFactory->Config.DotComparisonDetails;
 	HashComparison = InFactory->Config.HashComparisonDetails;
@@ -50,26 +60,47 @@ FIsoEdgeDirectionFilter::FIsoEdgeDirectionFilter(const UPCGExIsoEdgeDirectionFil
 
 bool FIsoEdgeDirectionFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 {
-	if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
+	{
+		return false;
+	}
 
 	// Init for vtx
-	if (!DirectionSettings.Init(InContext, InPointDataFacade, &TypedFilterFactory->EdgeSortingRules, PCGEX_QUIET_HANDLING)) { return false; }
+	if (!DirectionSettings.Init(InContext, InPointDataFacade, &TypedFilterFactory->EdgeSortingRules, PCGEX_QUIET_HANDLING))
+	{
+		return false;
+	}
 
 	// Init for edges
-	if (!DirectionSettings.InitFromParent(InContext, DirectionSettings, InEdgeDataFacade, PCGEX_QUIET_HANDLING)) { return false; }
+	if (!DirectionSettings.InitFromParent(InContext, DirectionSettings, InEdgeDataFacade, PCGEX_QUIET_HANDLING))
+	{
+		return false;
+	}
 
 	OperandDirection = TypedFilterFactory->Config.GetValueSettingDirection(PCGEX_QUIET_HANDLING);
-	if (!OperandDirection->Init(InEdgeDataFacade)) { return false; }
-	if (!OperandDirection->IsConstant()) { DirectionMultiplier = TypedFilterFactory->Config.bInvertDirection ? -1 : 1; }
+	if (!OperandDirection->Init(InEdgeDataFacade))
+	{
+		return false;
+	}
+	if (!OperandDirection->IsConstant())
+	{
+		DirectionMultiplier = TypedFilterFactory->Config.bInvertDirection ? -1 : 1;
+	}
 
 	if (TypedFilterFactory->Config.ComparisonQuality == EPCGExDirectionCheckMode::Dot)
 	{
-		if (!DotComparison.Init(InContext, InEdgeDataFacade)) { return false; }
+		if (!DotComparison.Init(InContext, InEdgeDataFacade))
+		{
+			return false;
+		}
 	}
 	else
 	{
 		bUseDot = false;
-		if (!HashComparison.Init(InContext, InEdgeDataFacade)) { return false; }
+		if (!HashComparison.Init(InContext, InEdgeDataFacade))
+		{
+			return false;
+		}
 	}
 
 	InTransforms = InEdgeDataFacade->Source->GetIn()->GetConstTransformValueRange();
@@ -96,7 +127,10 @@ bool FIsoEdgeDirectionFilter::TestDot(const int32 PtIndex, const FVector& EdgeDi
 bool FIsoEdgeDirectionFilter::TestHash(const int32 PtIndex, const FVector& EdgeDir) const
 {
 	FVector RefDir = OperandDirection->Read(PtIndex) * DirectionMultiplier;
-	if (TypedFilterFactory->Config.bTransformDirection) { RefDir = InTransforms[PtIndex].TransformVectorNoScale(RefDir); }
+	if (TypedFilterFactory->Config.bTransformDirection)
+	{
+		RefDir = InTransforms[PtIndex].TransformVectorNoScale(RefDir);
+	}
 
 	RefDir.Normalize();
 	return HashComparison.Test(RefDir, EdgeDir, PtIndex);
@@ -129,7 +163,10 @@ UPCGExFactoryData* UPCGExIsoEdgeDirectionFilterProviderSettings::CreateFactory(F
 
 	Super::CreateFactory(InContext, NewFactory);
 
-	if (!NewFactory->Init(InContext)) { InContext->ManagedObjects->Destroy(NewFactory); }
+	if (!NewFactory->Init(InContext))
+	{
+		InContext->ManagedObjects->Destroy(NewFactory);
+	}
 	return NewFactory;
 }
 

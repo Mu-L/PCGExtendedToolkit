@@ -32,8 +32,15 @@ public:
 	virtual bool SupportsProxyEvaluation() const override;
 	virtual bool SupportsCollectionEvaluation() const override;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FilterGroup; }
-	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override { return nullptr; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FilterGroup;
+	}
+
+	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override
+	{
+		return nullptr;
+	}
 
 	virtual bool RegisterConsumableAttributes(FPCGExContext* InContext) const override;
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
@@ -48,7 +55,11 @@ class UPCGExFilterGroupFactoryDataAND : public UPCGExFilterGroupFactoryData
 	GENERATED_BODY()
 
 public:
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FilterGroup; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FilterGroup;
+	}
+
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 };
 
@@ -59,7 +70,11 @@ class UPCGExFilterGroupFactoryDataOR : public UPCGExFilterGroupFactoryData
 	GENERATED_BODY()
 
 public:
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FilterGroup; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FilterGroup;
+	}
+
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 };
 
@@ -78,7 +93,9 @@ namespace PCGExFilterGroup
 	{
 	public:
 		explicit FFilterGroup(const UPCGExFilterGroupFactoryData* InFactory, const TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* InFilterFactories)
-			: IFilter(InFactory), GroupFactory(InFactory), ManagedFactories(InFilterFactories)
+			: IFilter(InFactory)
+			  , GroupFactory(InFactory)
+			  , ManagedFactories(InFilterFactories)
 		{
 		}
 
@@ -87,7 +104,10 @@ namespace PCGExFilterGroup
 		const UPCGExFilterGroupFactoryData* GroupFactory;
 		const TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* ManagedFactories;
 
-		virtual PCGExFilters::EType GetFilterType() const override { return PCGExFilters::EType::Group; }
+		virtual PCGExFilters::EType GetFilterType() const override
+		{
+			return PCGExFilters::EType::Group;
+		}
 
 		virtual bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade) override;
 		virtual bool Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade) override;
@@ -158,8 +178,17 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(FilterGroup, "Filter Group", "Creates an Filter Group.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 	//~End UPCGSettings

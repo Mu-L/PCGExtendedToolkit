@@ -34,9 +34,15 @@ namespace PCGExMath::Contrast
 		 */
 	FORCEINLINE double ContrastPower(const double Value, const double Contrast)
 	{
-		if (Contrast <= SMALL_NUMBER) { return Value; }
+		if (Contrast <= SMALL_NUMBER)
+		{
+			return Value;
+		}
 		const double T = Value * 2.0 - 1.0;
-		if (FMath::Abs(T) < SMALL_NUMBER) { return Value; }
+		if (FMath::Abs(T) < SMALL_NUMBER)
+		{
+			return Value;
+		}
 		const double Exp = 1.0 / Contrast;
 		return (FMath::Sign(T) * FMath::Pow(FMath::Abs(T), Exp)) * 0.5 + 0.5;
 	}
@@ -49,9 +55,15 @@ namespace PCGExMath::Contrast
 		 */
 	FORCEINLINE double ContrastSCurve(const double Value, const double Contrast)
 	{
-		if (Contrast <= SMALL_NUMBER) { return Value; }
+		if (Contrast <= SMALL_NUMBER)
+		{
+			return Value;
+		}
 		const double TanhC = FMath::Tanh(Contrast);
-		if (FMath::Abs(TanhC) < SMALL_NUMBER) { return Value; }
+		if (FMath::Abs(TanhC) < SMALL_NUMBER)
+		{
+			return Value;
+		}
 		const double T = Value * 2.0 - 1.0;
 		return (FMath::Tanh(T * Contrast) / TanhC) * 0.5 + 0.5;
 	}
@@ -64,7 +76,10 @@ namespace PCGExMath::Contrast
 		 */
 	FORCEINLINE double ContrastGain(const double Value, const double Contrast)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return Value; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return Value;
+		}
 
 		if (Value < 0.5)
 		{
@@ -81,14 +96,21 @@ namespace PCGExMath::Contrast
 		 */
 	FORCEINLINE double ApplyContrast(const double Value, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return Value; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return Value;
+		}
 
 		switch (CurveType)
 		{
-		case 0: return ContrastPower(Value, Contrast);
-		case 1: return ContrastSCurve(Value, Contrast);
-		case 2: return ContrastGain(Value, Contrast);
-		default: return ContrastPower(Value, Contrast);
+		case 0:
+			return ContrastPower(Value, Contrast);
+		case 1:
+			return ContrastSCurve(Value, Contrast);
+		case 2:
+			return ContrastGain(Value, Contrast);
+		default:
+			return ContrastPower(Value, Contrast);
 		}
 	}
 
@@ -98,32 +120,41 @@ namespace PCGExMath::Contrast
 
 	FORCEINLINE FVector2D ApplyContrast(const FVector2D& Value, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return Value; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return Value;
+		}
 		return FVector2D(
 			ApplyContrast(Value.X, Contrast, CurveType),
 			ApplyContrast(Value.Y, Contrast, CurveType)
-		);
+			);
 	}
 
 	FORCEINLINE FVector ApplyContrast(const FVector& Value, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return Value; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return Value;
+		}
 		return FVector(
 			ApplyContrast(Value.X, Contrast, CurveType),
 			ApplyContrast(Value.Y, Contrast, CurveType),
 			ApplyContrast(Value.Z, Contrast, CurveType)
-		);
+			);
 	}
 
 	FORCEINLINE FVector4 ApplyContrast(const FVector4& Value, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return Value; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return Value;
+		}
 		return FVector4(
 			ApplyContrast(Value.X, Contrast, CurveType),
 			ApplyContrast(Value.Y, Contrast, CurveType),
 			ApplyContrast(Value.Z, Contrast, CurveType),
 			ApplyContrast(Value.W, Contrast, CurveType)
-		);
+			);
 	}
 
 	//
@@ -132,9 +163,15 @@ namespace PCGExMath::Contrast
 
 	FORCEINLINE double ApplyContrastInRange(const double Value, const double Contrast, const int32 CurveType, const double Min, const double Max)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return Value; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return Value;
+		}
 		const double Range = Max - Min;
-		if (Range <= SMALL_NUMBER) { return Value; }
+		if (Range <= SMALL_NUMBER)
+		{
+			return Value;
+		}
 		const double Normalized = (Value - Min) / Range;
 		return ApplyContrast(Normalized, Contrast, CurveType) * Range + Min;
 	}
@@ -145,35 +182,38 @@ namespace PCGExMath::Contrast
 
 	inline void ApplyContrastBatch(double* RESTRICT Values, const int32 Count, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return;
+		}
 
 		switch (CurveType)
 		{
 		case 0: // Power
+		{
+			const double Exp = 1.0 / Contrast;
+			for (int32 i = 0; i < Count; ++i)
 			{
-				const double Exp = 1.0 / Contrast;
-				for (int32 i = 0; i < Count; ++i)
+				const double T = Values[i] * 2.0 - 1.0;
+				if (FMath::Abs(T) > SMALL_NUMBER)
 				{
-					const double T = Values[i] * 2.0 - 1.0;
-					if (FMath::Abs(T) > SMALL_NUMBER)
-					{
-						Values[i] = (FMath::Sign(T) * FMath::Pow(FMath::Abs(T), Exp)) * 0.5 + 0.5;
-					}
+					Values[i] = (FMath::Sign(T) * FMath::Pow(FMath::Abs(T), Exp)) * 0.5 + 0.5;
 				}
 			}
-			break;
+		}
+		break;
 
 		case 1: // SCurve
+		{
+			const double TanhC = FMath::Tanh(Contrast);
+			const double InvTanhC = 1.0 / TanhC;
+			for (int32 i = 0; i < Count; ++i)
 			{
-				const double TanhC = FMath::Tanh(Contrast);
-				const double InvTanhC = 1.0 / TanhC;
-				for (int32 i = 0; i < Count; ++i)
-				{
-					const double T = Values[i] * 2.0 - 1.0;
-					Values[i] = (FMath::Tanh(T * Contrast) * InvTanhC) * 0.5 + 0.5;
-				}
+				const double T = Values[i] * 2.0 - 1.0;
+				Values[i] = (FMath::Tanh(T * Contrast) * InvTanhC) * 0.5 + 0.5;
 			}
-			break;
+		}
+		break;
 
 		case 2: // Gain
 			for (int32 i = 0; i < Count; ++i)
@@ -190,7 +230,10 @@ namespace PCGExMath::Contrast
 
 	inline void ApplyContrastBatch(FVector2D* RESTRICT Values, const int32 Count, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return;
+		}
 
 		for (int32 i = 0; i < Count; ++i)
 		{
@@ -200,7 +243,10 @@ namespace PCGExMath::Contrast
 
 	inline void ApplyContrastBatch(FVector* RESTRICT Values, const int32 Count, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return;
+		}
 
 		for (int32 i = 0; i < Count; ++i)
 		{
@@ -210,7 +256,10 @@ namespace PCGExMath::Contrast
 
 	inline void ApplyContrastBatch(FVector4* RESTRICT Values, const int32 Count, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return;
+		}
 
 		for (int32 i = 0; i < Count; ++i)
 		{
@@ -225,42 +274,48 @@ namespace PCGExMath::Contrast
 
 	inline void ApplyContrastBatchInRange(double* RESTRICT Values, const int32 Count, const double Contrast, const int32 CurveType, const double Min, const double Max)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER)) { return; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		{
+			return;
+		}
 
 		const double Range = Max - Min;
-		if (Range <= SMALL_NUMBER) { return; }
+		if (Range <= SMALL_NUMBER)
+		{
+			return;
+		}
 
 		const double InvRange = 1.0 / Range;
 
 		switch (CurveType)
 		{
 		case 0: // Power
+		{
+			const double Exp = 1.0 / Contrast;
+			for (int32 i = 0; i < Count; ++i)
 			{
-				const double Exp = 1.0 / Contrast;
-				for (int32 i = 0; i < Count; ++i)
-				{
-					const double Norm = (Values[i] - Min) * InvRange;
-					const double T = Norm * 2.0 - 1.0;
-					const double C = FMath::Abs(T) > SMALL_NUMBER
-						                 ? FMath::Sign(T) * FMath::Pow(FMath::Abs(T), Exp)
-						                 : T;
-					Values[i] = (C * 0.5 + 0.5) * Range + Min;
-				}
+				const double Norm = (Values[i] - Min) * InvRange;
+				const double T = Norm * 2.0 - 1.0;
+				const double C = FMath::Abs(T) > SMALL_NUMBER
+					? FMath::Sign(T) * FMath::Pow(FMath::Abs(T), Exp)
+					: T;
+				Values[i] = (C * 0.5 + 0.5) * Range + Min;
 			}
-			break;
+		}
+		break;
 
 		case 1: // SCurve
+		{
+			const double TanhC = FMath::Tanh(Contrast);
+			const double InvTanhC = 1.0 / TanhC;
+			for (int32 i = 0; i < Count; ++i)
 			{
-				const double TanhC = FMath::Tanh(Contrast);
-				const double InvTanhC = 1.0 / TanhC;
-				for (int32 i = 0; i < Count; ++i)
-				{
-					const double Norm = (Values[i] - Min) * InvRange;
-					const double T = Norm * 2.0 - 1.0;
-					Values[i] = (FMath::Tanh(T * Contrast) * InvTanhC * 0.5 + 0.5) * Range + Min;
-				}
+				const double Norm = (Values[i] - Min) * InvRange;
+				const double T = Norm * 2.0 - 1.0;
+				Values[i] = (FMath::Tanh(T * Contrast) * InvTanhC * 0.5 + 0.5) * Range + Min;
 			}
-			break;
+		}
+		break;
 
 		case 2: // Gain
 			for (int32 i = 0; i < Count; ++i)
@@ -281,7 +336,10 @@ namespace PCGExMath::Contrast
 		 */
 	inline void ApplyContrastBatchAutoRange(double* RESTRICT Values, const int32 Count, const double Contrast, const int32 CurveType = 0)
 	{
-		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER) || Count <= 0) { return; }
+		if (FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER) || Count <= 0)
+		{
+			return;
+		}
 
 		double Min = Values[0];
 		double Max = Values[0];

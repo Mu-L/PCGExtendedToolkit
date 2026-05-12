@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseSpots.h"
-#include "Helpers/PCGExNoise3DMath.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Helpers/PCGExNoise3DMath.h"
 
 using namespace PCGExNoise3D::Math;
 
@@ -17,12 +17,15 @@ FVector FPCGExNoiseSpots::GetSpotCenter(const int32 CellX, const int32 CellY, co
 		CellX + 0.5 + (Hash32ToDouble01(H1) - 0.5) * Jitter * 2.0,
 		CellY + 0.5 + (Hash32ToDouble01(H2) - 0.5) * Jitter * 2.0,
 		CellZ + 0.5 + (Hash32ToDouble01(H3) - 0.5) * Jitter * 2.0
-	);
+		);
 }
 
 double FPCGExNoiseSpots::GetSpotRadius(const int32 CellX, const int32 CellY, const int32 CellZ) const
 {
-	if (RadiusVariation <= 0.0) { return SpotRadius; }
+	if (RadiusVariation <= 0.0)
+	{
+		return SpotRadius;
+	}
 
 	const uint32 H = Hash32(CellX + Seed * 3, CellY + Seed * 5, CellZ + Seed * 7);
 	const double Variation = (Hash32ToDouble01(H) - 0.5) * 2.0 * RadiusVariation;
@@ -31,7 +34,10 @@ double FPCGExNoiseSpots::GetSpotRadius(const int32 CellX, const int32 CellY, con
 
 double FPCGExNoiseSpots::GetSpotValue(const int32 CellX, const int32 CellY, const int32 CellZ) const
 {
-	if (ValueVariation <= 0.0) { return 1.0; }
+	if (ValueVariation <= 0.0)
+	{
+		return 1.0;
+	}
 
 	const uint32 H = Hash32(CellX + Seed * 11, CellY + Seed * 13, CellZ + Seed * 17);
 	return 1.0 - Hash32ToDouble01(H) * ValueVariation;
@@ -42,38 +48,38 @@ double FPCGExNoiseSpots::ComputeShapeDistance(const FVector& Offset, const doubl
 	switch (Shape)
 	{
 	case EPCGExSpotsShape::Circle:
-		{
-			const double Dist = Offset.Size() / Radius;
-			return Dist <= 1.0 ? 0.0 : 1.0;
-		}
+	{
+		const double Dist = Offset.Size() / Radius;
+		return Dist <= 1.0 ? 0.0 : 1.0;
+	}
 
 	case EPCGExSpotsShape::SoftCircle:
-		{
-			const double Dist = Offset.Size() / Radius;
-			return FMath::Clamp(Dist, 0.0, 1.0);
-		}
+	{
+		const double Dist = Offset.Size() / Radius;
+		return FMath::Clamp(Dist, 0.0, 1.0);
+	}
 
 	case EPCGExSpotsShape::Square:
-		{
-			const double MaxCoord = FMath::Max3(FMath::Abs(Offset.X), FMath::Abs(Offset.Y), FMath::Abs(Offset.Z)) / Radius;
-			return MaxCoord <= 1.0 ? 0.0 : 1.0;
-		}
+	{
+		const double MaxCoord = FMath::Max3(FMath::Abs(Offset.X), FMath::Abs(Offset.Y), FMath::Abs(Offset.Z)) / Radius;
+		return MaxCoord <= 1.0 ? 0.0 : 1.0;
+	}
 
 	case EPCGExSpotsShape::Diamond:
-		{
-			const double ManhattanDist = (FMath::Abs(Offset.X) + FMath::Abs(Offset.Y) + FMath::Abs(Offset.Z)) / Radius;
-			return FMath::Clamp(ManhattanDist / 1.5, 0.0, 1.0);
-		}
+	{
+		const double ManhattanDist = (FMath::Abs(Offset.X) + FMath::Abs(Offset.Y) + FMath::Abs(Offset.Z)) / Radius;
+		return FMath::Clamp(ManhattanDist / 1.5, 0.0, 1.0);
+	}
 
 	case EPCGExSpotsShape::Star:
-		{
-			// Star shape using modulated distance
-			const double Angle = FMath::Atan2(Offset.Y, Offset.X);
-			const double StarFactor = 0.5 + 0.5 * FMath::Cos(Angle * 5.0);
-			const double EffectiveRadius = Radius * (0.5 + 0.5 * StarFactor);
-			const double Dist = FVector2D(Offset.X, Offset.Y).Size() / EffectiveRadius;
-			return FMath::Clamp(Dist, 0.0, 1.0);
-		}
+	{
+		// Star shape using modulated distance
+		const double Angle = FMath::Atan2(Offset.Y, Offset.X);
+		const double StarFactor = 0.5 + 0.5 * FMath::Cos(Angle * 5.0);
+		const double EffectiveRadius = Radius * (0.5 + 0.5 * StarFactor);
+		const double Dist = FVector2D(Offset.X, Offset.Y).Size() / EffectiveRadius;
+		return FMath::Clamp(Dist, 0.0, 1.0);
+	}
 
 	default:
 		return Offset.Size() / Radius;

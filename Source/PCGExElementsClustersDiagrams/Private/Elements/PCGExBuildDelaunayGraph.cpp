@@ -4,14 +4,14 @@
 #include "Elements/PCGExBuildDelaunayGraph.h"
 
 
+#include "Clusters/PCGExCluster.h"
+#include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Elements/Metadata/PCGMetadataElementCommon.h"
-#include "Math/Geo/PCGExDelaunay.h"
-#include "Clusters/PCGExCluster.h"
-#include "Data/PCGExClusterData.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
+#include "Math/Geo/PCGExDelaunay.h"
 #include "Paths/PCGExPath.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
@@ -21,7 +21,10 @@ TArray<FPCGPinProperties> UPCGExBuildDelaunayGraphSettings::OutputPinProperties(
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
 	PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputEdgesLabel, "Point data representing edges.", Required)
-	if (bOutputSites) { PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputSitesLabel, "Complete delaunay sites.", Required) }
+	if (bOutputSites)
+	{
+		PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputSitesLabel, "Complete delaunay sites.", Required)
+	}
 	return PinProperties;
 }
 
@@ -30,14 +33,20 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BuildDelaunayGraph)
 
 bool FPCGExBuildDelaunayGraphElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildDelaunayGraph)
 	PCGEX_VALIDATE_NAME(Settings->HullAttributeName)
 
 	if (Settings->bOutputSites)
 	{
-		if (Settings->bMarkSiteHull) { PCGEX_VALIDATE_NAME(Settings->SiteHullAttributeName) }
+		if (Settings->bMarkSiteHull)
+		{
+			PCGEX_VALIDATE_NAME(Settings->SiteHullAttributeName)
+		}
 		Context->MainSites = MakeShared<PCGExData::FPointIOCollection>(Context);
 		Context->MainSites->OutputPin = PCGExClusters::Labels::OutputSitesLabel;
 		Context->MainSites->Pairs.Init(nullptr, Context->MainPoints->Num());
@@ -95,7 +104,9 @@ namespace PCGExBuildDelaunayGraph
 		PCGEX_ASYNC_TASK_NAME(FOutputDelaunaySites)
 
 		FOutputDelaunaySites(const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<FProcessor>& InProcessor)
-			: FTask(), PointIO(InPointIO), Processor(InProcessor)
+			: FTask()
+			  , PointIO(InPointIO)
+			  , Processor(InProcessor)
 		{
 		}
 
@@ -148,7 +159,10 @@ namespace PCGExBuildDelaunayGraph
 				HullBuffer->InitForWrite(false, true, PCGExData::EBufferInit::New);
 				{
 					TArray<bool>& OutValues = *HullBuffer->GetOutValues();
-					for (int i = 0; i < NumSites; i++) { OutValues[i] = static_cast<bool>(Delaunay->Sites[i].bOnHull); }
+					for (int i = 0; i < NumSites; i++)
+					{
+						OutValues[i] = static_cast<bool>(Delaunay->Sites[i].bOnHull);
+					}
 				}
 				WriteBuffer(TaskManager, HullBuffer);
 			}
@@ -161,7 +175,9 @@ namespace PCGExBuildDelaunayGraph
 		PCGEX_ASYNC_TASK_NAME(FOutputDelaunayUrquhartSites)
 
 		FOutputDelaunayUrquhartSites(const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<FProcessor>& InProcessor)
-			: FTask(), PointIO(InPointIO), Processor(InProcessor)
+			: FTask()
+			  , PointIO(InPointIO)
+			  , Processor(InProcessor)
 		{
 		}
 
@@ -214,7 +230,10 @@ namespace PCGExBuildDelaunayGraph
 				HullBuffer->InitForWrite(false, true, PCGExData::EBufferInit::New);
 				{
 					TArray<bool>& OutValues = *HullBuffer->GetOutValues();
-					for (int i = 0; i < NumSites; i++) { OutValues[i] = static_cast<bool>(Delaunay->Sites[i].bOnHull); }
+					for (int i = 0; i < NumSites; i++)
+					{
+						OutValues[i] = static_cast<bool>(Delaunay->Sites[i].bOnHull);
+					}
 				}
 				WriteBuffer(TaskManager, HullBuffer);
 			}
@@ -225,7 +244,10 @@ namespace PCGExBuildDelaunayGraph
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBuildDelaunayGraph::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		// Build delaunay
 
@@ -235,8 +257,14 @@ namespace PCGExBuildDelaunayGraph
 		Delaunay = MakeShared<PCGExMath::Geo::TDelaunay3>();
 
 		bool bProcessed = false;
-		if (Settings->bMarkHull) { bProcessed = Delaunay->Process<false, true>(ActivePositions); }
-		else { bProcessed = Delaunay->Process<false, false>(ActivePositions); }
+		if (Settings->bMarkHull)
+		{
+			bProcessed = Delaunay->Process<false, true>(ActivePositions);
+		}
+		else
+		{
+			bProcessed = Delaunay->Process<false, false>(ActivePositions);
+		}
 
 		if (!bProcessed)
 		{
@@ -247,12 +275,21 @@ namespace PCGExBuildDelaunayGraph
 			return false;
 		}
 
-		if (!PointDataFacade->Source->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::Duplicate)) { return false; }
+		if (!PointDataFacade->Source->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::Duplicate))
+		{
+			return false;
+		}
 
 		if (Settings->bUrquhart)
 		{
-			if (Settings->bOutputSites && Settings->bMergeUrquhartSites) { Delaunay->RemoveLongestEdges(ActivePositions, UrquhartEdges); }
-			else { Delaunay->RemoveLongestEdges(ActivePositions); }
+			if (Settings->bOutputSites && Settings->bMergeUrquhartSites)
+			{
+				Delaunay->RemoveLongestEdges(ActivePositions, UrquhartEdges);
+			}
+			else
+			{
+				Delaunay->RemoveLongestEdges(ActivePositions);
+			}
 		}
 
 		ActivePositions.Empty();
@@ -260,15 +297,24 @@ namespace PCGExBuildDelaunayGraph
 		PCGEX_SHARED_THIS_DECL
 		if (Settings->bOutputSites)
 		{
-			if (Settings->bMergeUrquhartSites) { PCGEX_LAUNCH(FOutputDelaunayUrquhartSites, PointDataFacade->Source, ThisPtr) }
-			else { PCGEX_LAUNCH(FOutputDelaunaySites, PointDataFacade->Source, ThisPtr) }
+			if (Settings->bMergeUrquhartSites)
+			{
+				PCGEX_LAUNCH(FOutputDelaunayUrquhartSites, PointDataFacade->Source, ThisPtr)
+			}
+			else
+			{
+				PCGEX_LAUNCH(FOutputDelaunaySites, PointDataFacade->Source, ThisPtr)
+			}
 		}
 
 		GraphBuilder = MakeShared<PCGExGraphs::FGraphBuilder>(PointDataFacade, &Settings->GraphBuilderDetails);
 		GraphBuilder->Graph->InsertEdges(Delaunay->DelaunayEdges, -1);
 		GraphBuilder->CompileAsync(TaskManager, false);
 
-		if (!Settings->bMarkHull && !Settings->bOutputSites) { Delaunay.Reset(); }
+		if (!Settings->bMarkHull && !Settings->bOutputSites)
+		{
+			Delaunay.Reset();
+		}
 
 		return true;
 	}
@@ -277,7 +323,10 @@ namespace PCGExBuildDelaunayGraph
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::BuildDelaunayGraph::ProcessPoints);
 
-		PCGEX_SCOPE_LOOP(Index) { HullMarkPointWriter->SetValue(Index, Delaunay->DelaunayHull.Contains(Index)); }
+		PCGEX_SCOPE_LOOP(Index)
+		{
+			HullMarkPointWriter->SetValue(Index, Delaunay->DelaunayHull.Contains(Index));
+		}
 	}
 
 	void FProcessor::CompleteWork()

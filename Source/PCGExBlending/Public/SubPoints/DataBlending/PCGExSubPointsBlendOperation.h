@@ -64,5 +64,8 @@ public:
 	virtual TSharedPtr<FPCGExSubPointsBlendOperation> CreateOperation() const PCGEX_NOT_IMPLEMENTED_RET(CreateOperation(), nullptr);
 
 protected:
-	virtual EPCGExBlendingType GetDefaultBlending() const { return EPCGExBlendingType::Lerp; }
+	virtual EPCGExBlendingType GetDefaultBlending() const
+	{
+		return EPCGExBlendingType::Lerp;
+	}
 };

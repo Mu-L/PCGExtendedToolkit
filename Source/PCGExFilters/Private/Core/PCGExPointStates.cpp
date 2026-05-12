@@ -43,7 +43,10 @@ namespace PCGExPointStates
 
 	bool FState::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 	{
-		if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InPointDataFacade))
+		{
+			return false;
+		}
 
 		Manager = MakeShared<PCGExPointFilter::FManager>(InPointDataFacade.ToSharedRef());
 		return true;
@@ -84,7 +87,10 @@ namespace PCGExPointStates
 	bool FStateManager::Test(const int32 Index)
 	{
 		int64& Flags = (*FlagsCache)[Index];
-		for (const TSharedPtr<FState>& State : States) { State->ProcessFlags(State->Test(Index), Flags); }
+		for (const TSharedPtr<FState>& State : States)
+		{
+			State->ProcessFlags(State->Test(Index), Flags);
+		}
 		return true;
 	}
 }
@@ -117,22 +123,32 @@ TArray<FPCGPinProperties> UPCGExStateFactoryProviderSettings::OutputPinPropertie
 	return PinProperties;
 }
 
-FName UPCGExStateFactoryProviderSettings::GetMainOutputPin() const { return PCGExPointStates::Labels::OutputStateLabel; }
+FName UPCGExStateFactoryProviderSettings::GetMainOutputPin() const
+{
+	return PCGExPointStates::Labels::OutputStateLabel;
+}
 
 UPCGExFactoryData* UPCGExStateFactoryProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
 {
 	UPCGExPointStateFactoryData* NewFactory = Cast<UPCGExPointStateFactoryData>(InFactory);
-	if (!NewFactory) { return NewFactory; }
+	if (!NewFactory)
+	{
+		return NewFactory;
+	}
 
 	NewFactory->Priority = Priority;
 
-	if (const bool bRequiresFilters = NewFactory->GetRequiresFilters(); !GetInputFactories(InContext, PCGExFilters::Labels::SourceFiltersLabel, NewFactory->FilterFactories, PCGExFactories::ClusterNodeFilters, bRequiresFilters) && bRequiresFilters)
+	if (const bool bRequiresFilters = NewFactory->GetRequiresFilters();
+		!GetInputFactories(InContext, PCGExFilters::Labels::SourceFiltersLabel, NewFactory->FilterFactories, PCGExFactories::ClusterNodeFilters, bRequiresFilters) && bRequiresFilters)
 	{
 		InContext->ManagedObjects->Destroy(NewFactory);
 		return nullptr;
 	}
 
-	if (CanOutputBitmasks() && bOutputBitmasks) { OutputBitmasks(InContext, NewFactory->BaseConfig); }
+	if (CanOutputBitmasks() && bOutputBitmasks)
+	{
+		OutputBitmasks(InContext, NewFactory->BaseConfig);
+	}
 
 	Super::CreateFactory(InContext, InFactory);
 	return InFactory;

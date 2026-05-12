@@ -4,11 +4,11 @@
 #include "Details/Collections/PCGExActorCollectionEditor.h"
 
 #include "Editor.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
-#include "Widgets/Images/SImage.h"
-#include "Widgets/SBoxPanel.h"
-#include "Framework/MultiBox/MultiBoxBuilder.h"
 
 #include "Selection.h"
 #include "Collections/PCGExActorCollection.h"
@@ -64,7 +64,10 @@ void FPCGExActorCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 						PCGEX_CURRENT_COLLECTION
 						{
 							UWorld* World = GEditor->GetEditorWorldContext().World();
-							if (!World || !World->PersistentLevel) { return; }
+							if (!World || !World->PersistentLevel)
+							{
+								return;
+							}
 
 							const FSoftObjectPath CurrentWorldPath(World);
 							Collection->Modify();
@@ -72,12 +75,21 @@ void FPCGExActorCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 							const int32 Removed = Collection->Entries.RemoveAll(
 								[&](const FPCGExActorCollectionEntry& E)
 								{
-									if (E.DeltaSourceLevel.ToSoftObjectPath() != CurrentWorldPath) { return false; }
-									if (E.DeltaSourceActorName == NAME_None) { return false; }
+									if (E.DeltaSourceLevel.ToSoftObjectPath() != CurrentWorldPath)
+									{
+										return false;
+									}
+									if (E.DeltaSourceActorName == NAME_None)
+									{
+										return false;
+									}
 
 									for (const AActor* Actor : World->PersistentLevel->Actors)
 									{
-										if (Actor && Actor->GetFName() == E.DeltaSourceActorName) { return false; }
+										if (Actor && Actor->GetFName() == E.DeltaSourceActorName)
+										{
+											return false;
+										}
 									}
 									return true;
 								});
@@ -89,12 +101,12 @@ void FPCGExActorCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 							}
 						}
 					})
-			),
+				),
 			NAME_None,
 			FText::GetEmpty(),
 			INVTEXT("Remove Missing\nRemove entries whose delta source actor no longer exists in the current level.\nEntries referencing other levels are left untouched."),
 			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.X")
-		);
+			);
 
 		ToolbarBuilder.AddToolBarButton(
 			FUIAction(
@@ -137,12 +149,12 @@ void FPCGExActorCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 							}
 						}
 					})
-			),
+				),
 			NAME_None,
 			FText::GetEmpty(),
 			INVTEXT("Cleanup\nRemove broken entries:\n- Delta source level that no longer exists\n- Incomplete delta references (level set but no actor name)\n- Empty entries (no actor class and no subcollection)"),
 			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Adjust")
-		);
+			);
 	}
 	ToolbarBuilder.EndSection();
 
@@ -169,7 +181,10 @@ void FPCGExActorCollectionEditor::BuildAddMenuContent(const TSharedRef<SVertical
 				PCGEX_CURRENT_COLLECTION
 				{
 					USelection* Selection = GEditor->GetSelectedActors();
-					if (!Selection || Selection->Num() == 0) { return FReply::Handled(); }
+					if (!Selection || Selection->Num() == 0)
+					{
+						return FReply::Handled();
+					}
 
 					Collection->Modify();
 
@@ -213,20 +228,29 @@ void FPCGExActorCollectionEditor::BuildAddMenuContent(const TSharedRef<SVertical
 			.OnClicked_Lambda(
 				[this, NameSearchBox]()
 				{
-					if (!NameSearchBox.IsValid() || NameSearchBox->GetText().IsEmpty()) { return FReply::Handled(); }
+					if (!NameSearchBox.IsValid() || NameSearchBox->GetText().IsEmpty())
+					{
+						return FReply::Handled();
+					}
 
 					PCGEX_CURRENT_COLLECTION
 					{
 						const FString SearchTerm = NameSearchBox->GetText().ToString();
 						UWorld* World = GEditor->GetEditorWorldContext().World();
-						if (!World || !World->PersistentLevel) { return FReply::Handled(); }
+						if (!World || !World->PersistentLevel)
+						{
+							return FReply::Handled();
+						}
 
 						Collection->Modify();
 						int32 Added = 0;
 
 						for (AActor* Actor : World->PersistentLevel->Actors)
 						{
-							if (!Actor) { continue; }
+							if (!Actor)
+							{
+								continue;
+							}
 							if (Actor->GetFName().ToString().Contains(SearchTerm, ESearchCase::IgnoreCase))
 							{
 								AddOrUpdateActorEntry(Collection, Actor);

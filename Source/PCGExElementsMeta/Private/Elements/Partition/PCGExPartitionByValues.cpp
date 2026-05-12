@@ -20,12 +20,18 @@ namespace PCGExPartitionByValuesBase
 #if WITH_EDITOR
 void UPCGExPartitionByValuesSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	for (FPCGExPartitonRuleConfig& Config : PartitionRules) { Config.UpdateUserFacingInfos(); }
+	for (FPCGExPartitonRuleConfig& Config : PartitionRules)
+	{
+		Config.UpdateUserFacingInfos();
+	}
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
 
-bool UPCGExPartitionByValuesBaseSettings::GetMainAcceptMultipleData() const { return false; }
+bool UPCGExPartitionByValuesBaseSettings::GetMainAcceptMultipleData() const
+{
+	return false;
+}
 
 bool UPCGExPartitionByValuesBaseSettings::GetPartitionRules(FPCGExContext* InContext, TArray<FPCGExPartitonRuleConfig>& OutRules) const
 {
@@ -34,8 +40,14 @@ bool UPCGExPartitionByValuesBaseSettings::GetPartitionRules(FPCGExContext* InCon
 
 bool UPCGExPartitionByValuesSettings::GetPartitionRules(FPCGExContext* InContext, TArray<FPCGExPartitonRuleConfig>& OutRules) const
 {
-	if (PartitionRules.IsEmpty()) { return false; }
-	for (const FPCGExPartitonRuleConfig& Config : PartitionRules) { OutRules.Add(Config); }
+	if (PartitionRules.IsEmpty())
+	{
+		return false;
+	}
+	for (const FPCGExPartitonRuleConfig& Config : PartitionRules)
+	{
+		OutRules.Add(Config);
+	}
 	return true;
 }
 
@@ -44,7 +56,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(PartitionByValuesBase)
 
 bool FPCGExPartitionByValuesBaseElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PartitionByValuesBase)
 
@@ -55,13 +70,19 @@ bool FPCGExPartitionByValuesBaseElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
-	if (Settings->bWriteKeySum) { PCGEX_VALIDATE_NAME(Settings->KeySumAttributeName) }
+	if (Settings->bWriteKeySum)
+	{
+		PCGEX_VALIDATE_NAME(Settings->KeySumAttributeName)
+	}
 
 	Context->RulesConfigs.Reserve(Configs.Num());
 
 	for (const FPCGExPartitonRuleConfig& Config : Configs)
 	{
-		if (!Config.bEnabled) { continue; }
+		if (!Config.bEnabled)
+		{
+			continue;
+		}
 
 		PCGEX_VALIDATE_NAME_CONDITIONAL(Config.bWriteKey, Config.KeyAttributeName)
 		PCGEX_VALIDATE_NAME_CONDITIONAL(Config.bWriteTag, Config.TagPrefixName)
@@ -86,7 +107,10 @@ bool FPCGExPartitionByValuesBaseElement::AdvanceWork(FPCGExContext* InContext, c
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -108,14 +132,20 @@ namespace PCGExPartitionByValuesBase
 
 	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->bSplitOutput ? PCGExData::EIOInit::NoInit : PCGExData::EIOInit::Duplicate)
 
 		Rules.Empty();
 		const int32 NumPoints = PointDataFacade->GetNum();
 
-		if (Settings->bWriteKeySum && !Settings->bSplitOutput) { PCGExArrayHelpers::InitArray(KeySums, NumPoints); }
+		if (Settings->bWriteKeySum && !Settings->bSplitOutput)
+		{
+			PCGExArrayHelpers::InitArray(KeySums, NumPoints);
+		}
 
 		// Initialize sorted indices array
 		PCGExArrayHelpers::ArrayOfIndices(SortedIndices, NumPoints);
@@ -125,16 +155,25 @@ namespace PCGExPartitionByValuesBase
 		for (FPCGExPartitonRuleConfig& Config : Context->RulesConfigs)
 		{
 			const TSharedPtr<PCGExData::TBuffer<double>> DataCache = PointDataFacade->GetBroadcaster<double>(Config.Selector, true);
-			if (!DataCache) { continue; }
+			if (!DataCache)
+			{
+				continue;
+			}
 
-			if (PCGExMetaHelpers::TryGetAttributeName(Config.Selector, PointDataFacade->Source->GetIn(), Consumable)) { Context->AddConsumableAttributeName(Consumable); }
+			if (PCGExMetaHelpers::TryGetAttributeName(Config.Selector, PointDataFacade->Source->GetIn(), Consumable))
+			{
+				Context->AddConsumableAttributeName(Consumable);
+			}
 
 			PCGExPartition::FRule& NewRule = Rules.Emplace_GetRef(Config);
 			NewRule.DataCache = DataCache;
 		}
 
 		// Prepare each rule so it can cache the filter key by index
-		for (PCGExPartition::FRule& Rule : Rules) { Rule.FilteredValues.SetNumZeroed(NumPoints); }
+		for (PCGExPartition::FRule& Rule : Rules)
+		{
+			Rule.FilteredValues.SetNumZeroed(NumPoints);
+		}
 
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
@@ -162,7 +201,10 @@ namespace PCGExPartitionByValuesBase
 	{
 		for (const PCGExPartition::FRule& Rule : Rules)
 		{
-			if (Rule.FilteredValues[IndexA] != Rule.FilteredValues[IndexB]) { return true; }
+			if (Rule.FilteredValues[IndexA] != Rule.FilteredValues[IndexB])
+			{
+				return true;
+			}
 		}
 		return false;
 	}
@@ -172,8 +214,14 @@ namespace PCGExPartitionByValuesBase
 		// Build per-rule key-to-partition-index maps for rules that need them
 		for (PCGExPartition::FRule& Rule : Rules)
 		{
-			if (!Rule.RuleConfig->bWriteKey && !Rule.RuleConfig->bWriteTag) { continue; }
-			if (!Rule.RuleConfig->bUsePartitionIndexAsKey && !Rule.RuleConfig->bTagUsePartitionIndexAsKey) { continue; }
+			if (!Rule.RuleConfig->bWriteKey && !Rule.RuleConfig->bWriteTag)
+			{
+				continue;
+			}
+			if (!Rule.RuleConfig->bUsePartitionIndexAsKey && !Rule.RuleConfig->bTagUsePartitionIndexAsKey)
+			{
+				continue;
+			}
 
 			// Build key-to-index map for this rule based on sorted order
 			TMap<int64, int32> KeyToIndex;
@@ -242,7 +290,10 @@ namespace PCGExPartitionByValuesBase
 				}
 			}
 
-			if (Settings->bWriteKeySum) { PCGExData::WriteMark<int64>(PartitionIO, Settings->KeySumAttributeName, Sum); }
+			if (Settings->bWriteKeySum)
+			{
+				PCGExData::WriteMark<int64>(PartitionIO, Settings->KeySumAttributeName, Sum);
+			}
 		}
 	}
 
@@ -262,7 +313,10 @@ namespace PCGExPartitionByValuesBase
 					{
 						const int64 KeyA = Rule.FilteredValues[A];
 						const int64 KeyB = Rule.FilteredValues[B];
-						if (KeyA != KeyB) { return KeyA < KeyB; }
+						if (KeyA != KeyB)
+						{
+							return KeyA < KeyB;
+						}
 					}
 					return A < B; // Stable tiebreaker by original index
 				});
@@ -303,7 +357,10 @@ namespace PCGExPartitionByValuesBase
 		TMap<int64, int64> IndiceMap;
 		for (PCGExPartition::FRule& Rule : Rules)
 		{
-			if (!Rule.RuleConfig->bWriteKey) { continue; }
+			if (!Rule.RuleConfig->bWriteKey)
+			{
+				continue;
+			}
 
 			if (Rule.RuleConfig->bUsePartitionIndexAsKey)
 			{
@@ -329,14 +386,20 @@ namespace PCGExPartitionByValuesBase
 			for (int i = 0; i < Rule.FilteredValues.Num(); i++)
 			{
 				KeyWriter->SetValue(i, Rule.FilteredValues[i]);
-				if (Settings->bWriteKeySum) { KeySums[i] += Rule.FilteredValues[i]; }
+				if (Settings->bWriteKeySum)
+				{
+					KeySums[i] += Rule.FilteredValues[i];
+				}
 			}
 		}
 
 		if (Settings->bWriteKeySum)
 		{
 			const TSharedPtr<PCGExData::TBuffer<int32>> KeySumWriter = PointDataFacade->GetWritable(Settings->KeySumAttributeName, 0, true, PCGExData::EBufferInit::New);
-			for (int i = 0; i < KeySums.Num(); i++) { KeySumWriter->SetValue(i, KeySums[i]); }
+			for (int i = 0; i < KeySums.Num(); i++)
+			{
+				KeySumWriter->SetValue(i, KeySums[i]);
+			}
 		}
 
 		PointDataFacade->WriteFastest(TaskManager);

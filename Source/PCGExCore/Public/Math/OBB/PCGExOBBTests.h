@@ -82,7 +82,7 @@ namespace PCGExMath::OBB
 			FMath::Clamp(Local.X, -Box.Bounds.Extents.X, Box.Bounds.Extents.X),
 			FMath::Clamp(Local.Y, -Box.Bounds.Extents.Y, Box.Bounds.Extents.Y),
 			FMath::Clamp(Local.Z, -Box.Bounds.Extents.Z, Box.Bounds.Extents.Z)
-		);
+			);
 		return Box.ToWorld(Clamped);
 	}
 
@@ -117,21 +117,21 @@ namespace PCGExMath::OBB
 			return SphereOverlap(A.Bounds, B.Bounds);
 
 		case EPCGExBoxCheckMode::ExpandedSphere:
-			{
-				const float Combined = A.Bounds.Radius + B.Bounds.Radius + Expansion;
-				return FVector::DistSquared(A.Bounds.Origin, B.Bounds.Origin) <= Combined * Combined;
-			}
+		{
+			const float Combined = A.Bounds.Radius + B.Bounds.Radius + Expansion;
+			return FVector::DistSquared(A.Bounds.Origin, B.Bounds.Origin) <= Combined * Combined;
+		}
 
 		case EPCGExBoxCheckMode::ExpandedBox:
+		{
+			// Expand A for test
+			FOBB ExpandedA = Factory::Expanded(A, Expansion);
+			if (!SphereOverlap(ExpandedA.Bounds, B.Bounds))
 			{
-				// Expand A for test
-				FOBB ExpandedA = Factory::Expanded(A, Expansion);
-				if (!SphereOverlap(ExpandedA.Bounds, B.Bounds))
-				{
-					return false;
-				}
-				return SATOverlap(ExpandedA, B);
+				return false;
 			}
+			return SATOverlap(ExpandedA, B);
+		}
 
 		case EPCGExBoxCheckMode::Box:
 		default:
@@ -183,7 +183,8 @@ namespace PCGExMath::OBB
 		FPolicy() = default;
 
 		explicit FPolicy(EPCGExBoxCheckMode InMode, float InExpansion = 0.0f)
-			: Mode(InMode), Expansion(InExpansion)
+			: Mode(InMode)
+			  , Expansion(InExpansion)
 		{
 		}
 

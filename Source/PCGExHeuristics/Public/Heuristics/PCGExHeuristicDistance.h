@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExHeuristicOperation.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
+#include "UObject/Object.h"
 
 
 #include "PCGExHeuristicDistance.generated.h"
@@ -28,7 +28,10 @@ struct FPCGExHeuristicConfigShortestDistance : public FPCGExHeuristicConfigBase
 class FPCGExHeuristicDistance : public FPCGExHeuristicOperation
 {
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override { return EPCGExHeuristicCategory::GoalDependent; }
+	virtual EPCGExHeuristicCategory GetCategory() const override
+	{
+		return EPCGExHeuristicCategory::GoalDependent;
+	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 

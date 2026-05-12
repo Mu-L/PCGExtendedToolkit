@@ -12,14 +12,14 @@
 #ifndef PCGEX_CLIPPER_H
 #define PCGEX_CLIPPER_H
 
-#include "Math/UnrealMathUtility.h"
+#include <type_traits>
 #include "Clipper2Lib/clipper.core.h"
 #include "Clipper2Lib/clipper.engine.h"
+#include "Clipper2Lib/clipper.minkowski.h"
 #include "Clipper2Lib/clipper.offset.h"
 #include "Clipper2Lib/clipper.rectclip.h"
-#include "Clipper2Lib/clipper.minkowski.h"
 #include "Clipper2Lib/clipper.triangulation.h"
-#include <type_traits>
+#include "Math/UnrealMathUtility.h"
 
 namespace PCGExClipper2Lib
 {
@@ -189,7 +189,10 @@ namespace PCGExClipper2Lib
 		Path<T> result;
 		result.reserve(path.size());
 		std::transform(path.begin(), path.end(), back_inserter(result),
-		               [dx, dy](const auto& pt) { return Point<T>(pt.x + dx, pt.y + dy); });
+		               [dx, dy](const auto& pt)
+		               {
+			               return Point<T>(pt.x + dx, pt.y + dy);
+		               });
 		return result;
 	}
 
@@ -209,7 +212,10 @@ namespace PCGExClipper2Lib
 		Paths<T> result;
 		result.reserve(paths.size());
 		std::transform(paths.begin(), paths.end(), back_inserter(result),
-		               [dx, dy](const auto& path) { return TranslatePath(path, dx, dy); });
+		               [dx, dy](const auto& path)
+		               {
+			               return TranslatePath(path, dx, dy);
+		               });
 		return result;
 	}
 

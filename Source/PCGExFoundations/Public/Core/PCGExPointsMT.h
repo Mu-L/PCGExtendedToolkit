@@ -99,7 +99,11 @@ namespace PCGExPointsMT
 
 	public:
 		TWeakPtr<IBatch> ParentBatch;
-		TSharedPtr<PCGExMT::FTaskManager> GetTaskManager() { return TaskManager; }
+
+		TSharedPtr<PCGExMT::FTaskManager> GetTaskManager()
+		{
+			return TaskManager;
+		}
 
 		bool bIsProcessorValid = false;
 		int32 BatchIndex = -1;
@@ -114,7 +118,10 @@ namespace PCGExPointsMT
 		UPCGExInstancedFactory* PrimaryInstancedFactory = nullptr;
 
 		template <typename T>
-		T* GetPrimaryInstancedFactory() { return Cast<T>(PrimaryInstancedFactory); }
+		T* GetPrimaryInstancedFactory()
+		{
+			return Cast<T>(PrimaryInstancedFactory);
+		}
 
 		explicit IProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade);
 
@@ -122,9 +129,16 @@ namespace PCGExPointsMT
 
 		virtual ~IProcessor() = default;
 
-		virtual bool IsTrivial() const { return bIsTrivial; }
+		virtual bool IsTrivial() const
+		{
+			return bIsTrivial;
+		}
 
-		bool HasFilters() const { return FilterFactories != nullptr; }
+		bool HasFilters() const
+		{
+			return FilterFactories != nullptr;
+		}
+
 		void SetPointsFilterData(TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* InFactories);
 
 		virtual void RegisterConsumableAttributesWithFacade() const;
@@ -185,8 +199,15 @@ namespace PCGExPointsMT
 			check(Settings)
 		}
 
-		TContext* GetContext() { return Context; }
-		const TSettings* GetSettings() { return Settings; }
+		TContext* GetContext()
+		{
+			return Context;
+		}
+
+		const TSettings* GetSettings()
+		{
+			return Settings;
+		}
 	};
 
 	class PCGEXFOUNDATIONS_API IBatch : public TSharedFromThis<IBatch>
@@ -220,7 +241,11 @@ namespace PCGExPointsMT
 		UPCGExInstancedFactory* PrimaryInstancedFactory = nullptr;
 
 		TArray<TSharedRef<IProcessor>> Processors;
-		int32 GetNumProcessors() const { return Processors.Num(); }
+
+		int32 GetNumProcessors() const
+		{
+			return Processors.Num();
+		}
 
 		IBatch(FPCGExContext* InContext, const TArray<TWeakPtr<PCGExData::FPointIO>>& InPointsCollection);
 		virtual ~IBatch() = default;
@@ -228,15 +253,27 @@ namespace PCGExPointsMT
 		virtual void SetExecutionContext(FPCGExContext* InContext);
 
 		template <typename T>
-		T* GetContext() { return static_cast<T*>(ExecutionContext); }
+		T* GetContext()
+		{
+			return static_cast<T*>(ExecutionContext);
+		}
 
 		template <typename T>
-		TSharedPtr<T> GetProcessor(const int32 Index) { return StaticCastSharedPtr<T>(Processors[Index].ToSharedPtr()); }
+		TSharedPtr<T> GetProcessor(const int32 Index)
+		{
+			return StaticCastSharedPtr<T>(Processors[Index].ToSharedPtr());
+		}
 
 		template <typename T>
-		TSharedRef<T> GetProcessorRef(const int32 Index) { return StaticCastSharedRef<T>(Processors[Index]); }
+		TSharedRef<T> GetProcessorRef(const int32 Index)
+		{
+			return StaticCastSharedRef<T>(Processors[Index]);
+		}
 
-		void SetPointsFilterData(TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* InFilterFactories) { FilterFactories = InFilterFactories; }
+		void SetPointsFilterData(TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* InFilterFactories)
+		{
+			FilterFactories = InFilterFactories;
+		}
 
 		virtual bool PrepareProcessing();
 		virtual void Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager);

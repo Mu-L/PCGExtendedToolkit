@@ -30,12 +30,18 @@ void UPCGExBooleanCompareFilterFactory::RegisterBuffersDependencies(FPCGExContex
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
 	FacadePreloader.Register<bool>(InContext, Config.OperandA);
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute) { FacadePreloader.Register<bool>(InContext, Config.OperandB); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<bool>(InContext, Config.OperandB);
+	}
 }
 
 bool UPCGExBooleanCompareFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_SELECTOR(Config.OperandA, Consumable)
@@ -46,7 +52,10 @@ bool UPCGExBooleanCompareFilterFactory::RegisterConsumableAttributesWithData(FPC
 
 bool PCGExPointFilter::FBooleanCompareFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	OperandA = PointDataFacade->GetBroadcaster<bool>(TypedFilterFactory->Config.OperandA, true, false, PCGEX_QUIET_HANDLING);
 
@@ -57,7 +66,10 @@ bool PCGExPointFilter::FBooleanCompareFilter::Init(FPCGExContext* InContext, con
 	}
 
 	OperandB = TypedFilterFactory->Config.GetValueSettingOperandB(PCGEX_QUIET_HANDLING);
-	if (!OperandB->Init(PointDataFacade)) { return false; }
+	if (!OperandB->Init(PointDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -74,8 +86,14 @@ bool PCGExPointFilter::FBooleanCompareFilter::Test(const TSharedPtr<PCGExData::F
 	bool A = false;
 	bool B = false;
 
-	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, A, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
-	if (!PCGExData::Helpers::TryGetSettingDataValue(IO, TypedFilterFactory->Config.CompareAgainst, TypedFilterFactory->Config.OperandB, TypedFilterFactory->Config.OperandBConstant, B, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, A, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
+	if (!PCGExData::Helpers::TryGetSettingDataValue(IO, TypedFilterFactory->Config.CompareAgainst, TypedFilterFactory->Config.OperandB, TypedFilterFactory->Config.OperandBConstant, B, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
 
 	return TypedFilterFactory->Config.Comparison == EPCGExEquality::Equal ? A == B : A != B;
 }
@@ -87,7 +105,10 @@ FString UPCGExBooleanCompareFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandA) + (Config.Comparison == EPCGExEquality::Equal ? TEXT(" == ") : TEXT(" != "));
 
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute) { DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	{
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB);
+	}
 	else
 	{
 		DisplayName += FString::Printf(TEXT("%s"), Config.OperandBConstant ? TEXT("true") : TEXT("false"));

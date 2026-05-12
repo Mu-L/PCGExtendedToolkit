@@ -3,10 +3,10 @@
 
 #pragma once
 
-#include "UObject/Object.h"
 #include "CoreMinimal.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExClusterStates.h"
+#include "UObject/Object.h"
 #include "PCGExAdjacencyStates.generated.h"
 
 namespace PCGExBitmask
@@ -79,7 +79,11 @@ public:
 	TSharedPtr<PCGExBitmask::FBitmaskData> SuccessBitmaskData;
 	TSharedPtr<PCGExBitmask::FBitmaskData> FailBitmaskData;
 
-	virtual bool GetRequiresFilters() const override { return false; }
+	virtual bool GetRequiresFilters() const override
+	{
+		return false;
+	}
+
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 };
 
@@ -99,7 +103,8 @@ namespace PCGExAdjacencyStates
 		const UPCGExAdjacencyStateFactoryData* StateFactory = nullptr;
 
 		explicit FState(const UPCGExAdjacencyStateFactoryData* InFactory)
-			: PCGExClusterStates::FState(InFactory), StateFactory(InFactory)
+			: PCGExClusterStates::FState(InFactory)
+			  , StateFactory(InFactory)
 		{
 		}
 
@@ -133,7 +138,11 @@ public:
 
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 
-	virtual bool CanOutputBitmasks() const override { return false; }
+	virtual bool CanOutputBitmasks() const override
+	{
+		return false;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties, DisplayAfter="Name"))

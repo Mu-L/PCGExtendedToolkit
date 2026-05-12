@@ -12,8 +12,8 @@
 #ifndef PCGEX_CLIPPER_H_RECTCLIP
 #define PCGEX_CLIPPER_H_RECTCLIP
 
-#include "Clipper2Lib/clipper.core.h"
 #include <queue>
+#include "Clipper2Lib/clipper.core.h"
 
 namespace PCGExClipper2Lib
 {
@@ -68,9 +68,9 @@ namespace PCGExClipper2Lib
 
 	public:
 		explicit RectClip64(const Rect64& rect)
-			: rect_(rect),
-			  rect_as_path_(rect.AsPath()),
-			  rect_mp_(rect.MidPoint())
+			: rect_(rect)
+			  , rect_as_path_(rect.AsPath())
+			  , rect_mp_(rect.MidPoint())
 		{
 		}
 

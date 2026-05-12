@@ -46,7 +46,11 @@ protected:
 class PCGEXCOLLECTIONSEDITOR_API FPCGExEntryHeaderCustomizationBase : public FPCGExAssetEntryCustomization
 {
 protected:
-	virtual FName GetAssetName() { return FName("Asset"); }
+	virtual FName GetAssetName()
+	{
+		return FName("Asset");
+	}
+
 	virtual void FillCustomizedTopLevelPropertiesNames() override;
 	virtual TSharedRef<SWidget> GetAssetPicker(TSharedRef<IPropertyHandle> PropertyHandle, TSharedPtr<IPropertyHandle> IsSubCollectionHandle) override;
 };
@@ -79,7 +83,11 @@ class FPCGExActorEntryCustomization : public FPCGExEntryHeaderCustomizationBase
 {
 public:
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();
-	virtual FName GetAssetName() override { return FName("Actor"); }
+
+	virtual FName GetAssetName() override
+	{
+		return FName("Actor");
+	}
 
 protected:
 	virtual void FillCustomizedTopLevelPropertiesNames() override;

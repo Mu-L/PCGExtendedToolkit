@@ -3,10 +3,10 @@
 
 #include "Elements/PCGExTensorsTransform.h"
 
-#include "Data/PCGExData.h"
 #include "Core/PCGExPointFilter.h"
-#include "Data/PCGExPointIO.h"
 #include "Core/PCGExTensorFactoryProvider.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 
 #define LOCTEXT_NAMESPACE "PCGExTensorsTransformElement"
 #define PCGEX_NAMESPACE TensorsTransform
@@ -21,13 +21,19 @@ TArray<FPCGPinProperties> UPCGExTensorsTransformSettings::InputPinProperties() c
 
 PCGEX_INITIALIZE_ELEMENT(TensorsTransform)
 
-PCGExData::EIOInit UPCGExTensorsTransformSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExTensorsTransformSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(TensorsTransform)
 
 bool FPCGExTensorsTransformElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(TensorsTransform)
 
@@ -60,7 +66,10 @@ bool FPCGExTensorsTransformElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -87,7 +96,10 @@ namespace PCGExTensorsTransform
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExTensorsTransform::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
@@ -95,11 +107,17 @@ namespace PCGExTensorsTransform
 		if (!Context->StopFilterFactories.IsEmpty())
 		{
 			StopFilters = MakeShared<PCGExPointFilter::FManager>(PointDataFacade);
-			if (!StopFilters->Init(Context, Context->StopFilterFactories)) { StopFilters.Reset(); }
+			if (!StopFilters->Init(Context, Context->StopFilterFactories))
+			{
+				StopFilters.Reset();
+			}
 		}
 
 		TensorsHandler = MakeShared<PCGExTensor::FTensorsHandler>(Settings->TensorHandlerDetails);
-		if (!TensorsHandler->Init(Context, Context->TensorFactories, PointDataFacade)) { return false; }
+		if (!TensorsHandler->Init(Context, Context->TensorFactories, PointDataFacade))
+		{
+			return false;
+		}
 
 		{
 			const TSharedRef<PCGExData::FFacade>& OutputFacade = PointDataFacade;
@@ -130,7 +148,10 @@ namespace PCGExTensorsTransform
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			bool bSuccess = false;
 			const PCGExTensor::FTensorSample Sample = TensorsHandler->Sample(Index, OutTransforms[Index], bSuccess);
@@ -205,7 +226,7 @@ namespace PCGExTensorsTransform
 			PCGEX_OUTPUT_VALUE(TraveledDistance, i, Metric.Length)
 			PCGEX_OUTPUT_VALUE(GracefullyStopped, i, UpdateCount < Settings->Iterations)
 			PCGEX_OUTPUT_VALUE(MaxIterationsReached, i, UpdateCount == Settings->Iterations)
-		)
+			)
 
 		PointDataFacade->WriteFastest(TaskManager);
 	}

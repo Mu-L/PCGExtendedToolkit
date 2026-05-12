@@ -10,10 +10,10 @@
 #include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
 #endif
 
-#include "Sorting/PCGExSortingRuleProvider.h"
 #include "AssetTypeActions_Base.h"
 #include "Data/Bitmasks/PCGExBitmaskCollection.h"
 #include "PCGExCoreEditor/Public/PCGExAssetTypesMacros.h"
+#include "Sorting/PCGExSortingRuleProvider.h"
 #endif
 
 PCGEX_IMPLEMENT_MODULE(FPCGExCoreModule, PCGExCore)

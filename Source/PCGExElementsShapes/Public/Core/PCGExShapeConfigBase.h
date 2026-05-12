@@ -43,13 +43,13 @@ struct PCGEXELEMENTSSHAPES_API FPCGExShapeConfigBase
 	/** Resolution. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable, EditCondition="!bThreeDimensions", EditConditionHides, HideEditConditionToggle))
 	FPCGExInputShorthandSelectorDoubleAbs Resolution = FPCGExInputShorthandSelectorDoubleAbs(FName("Resolution"), 10, false);
-	
+
 	/** Resolution. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable, EditCondition="bThreeDimensions", EditConditionHides, HideEditConditionToggle))
 	FPCGExInputShorthandSelectorVector ResolutionVector = FPCGExInputShorthandSelectorVector(FName("Resolution"), FVector(10), false);
-	
+
 #pragma region DEPRECATED
-	
+
 	UPROPERTY()
 	EPCGExInputValueType ResolutionInput_DEPRECATED = EPCGExInputValueType::Constant;
 
@@ -61,7 +61,7 @@ struct PCGEXELEMENTSSHAPES_API FPCGExShapeConfigBase
 
 	UPROPERTY()
 	FVector ResolutionConstantVector_DEPRECATED = FVector(10);
-	
+
 #pragma endregion
 
 	/** Fitting details */
@@ -118,10 +118,8 @@ struct PCGEXELEMENTSSHAPES_API FPCGExShapeConfigBase
 	FTransform LocalTransform = FTransform::Identity;
 
 	virtual void Init();
-	
+
 #if WITH_EDITOR
 	virtual void ApplyDeprecation();
 #endif
-	
-	
 };

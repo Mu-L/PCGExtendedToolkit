@@ -19,8 +19,14 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExDistanceFilterConfig, DistanceThreshold, double, 
 
 bool UPCGExDistanceFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
-	if (Config.DataMatching.IsEnabled()) { PCGExFactories::GetInputFactories(InContext, PCGExMatching::Labels::SourceMatchRulesLabel, MatchRuleFactories, {PCGExFactories::EType::MatchRule}); }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
+	if (Config.DataMatching.IsEnabled())
+	{
+		PCGExFactories::GetInputFactories(InContext, PCGExMatching::Labels::SourceMatchRulesLabel, MatchRuleFactories, {PCGExFactories::EType::MatchRule});
+	}
 	return true;
 }
 
@@ -37,12 +43,18 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExDistanceFilterFactory::CreateFilter(
 void UPCGExDistanceFilterFactory::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute) { FacadePreloader.Register<double>(InContext, Config.DistanceThreshold); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<double>(InContext, Config.DistanceThreshold);
+	}
 }
 
 bool UPCGExDistanceFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.CompareAgainst == EPCGExInputValueType::Attribute, Config.DistanceThreshold, Consumable)
@@ -53,7 +65,10 @@ bool UPCGExDistanceFilterFactory::RegisterConsumableAttributesWithData(FPCGExCon
 PCGExFactories::EPreparationResult UPCGExDistanceFilterFactory::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	TargetsHandler = MakeShared<PCGExMatching::FTargetsHandler>();
-	if (!TargetsHandler->Init(InContext, PCGExCommon::Labels::SourceTargetsLabel)) { return PCGExFactories::EPreparationResult::MissingData; }
+	if (!TargetsHandler->Init(InContext, PCGExCommon::Labels::SourceTargetsLabel))
+	{
+		return PCGExFactories::EPreparationResult::MissingData;
+	}
 
 	TargetsHandler->SetDistances(Config.DistanceDetails);
 	TargetsHandler->SetMatchingDetails(InContext, &Config.DataMatching);
@@ -68,9 +83,15 @@ void UPCGExDistanceFilterFactory::BeginDestroy()
 
 bool PCGExPointFilter::FDistanceFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
-	if (TypedFilterFactory->Config.bIgnoreSelf) { IgnoreList.Add(InPointDataFacade->GetIn()); }
+	if (TypedFilterFactory->Config.bIgnoreSelf)
+	{
+		IgnoreList.Add(InPointDataFacade->GetIn());
+	}
 
 	const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
 		&& !TypedFilterFactory->MatchRuleFactories.IsEmpty();
@@ -99,12 +120,16 @@ bool PCGExPointFilter::FDistanceFilter::Init(FPCGExContext* InContext, const TSh
 			});
 			bNoMatchResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
 		}
-		else { InverseMatcher.Reset(); }
+		else
+		{
+			InverseMatcher.Reset();
+		}
 	}
 	else if (bMatchingEnabled)
 	{
 		// Static matching (collection-level with bCheckAgainstDataBounds)
-		if (PCGExMatching::FScope MatchingScope(TargetsHandler->Num(), true); !TargetsHandler->PopulateIgnoreListInverse(TypedFilterFactory->MatchRuleFactories, InPointDataFacade, &TypedFilterFactory->Config.DataMatching, MatchingScope, IgnoreList))
+		if (PCGExMatching::FScope MatchingScope(TargetsHandler->Num(), true);
+			!TargetsHandler->PopulateIgnoreListInverse(TypedFilterFactory->MatchRuleFactories, InPointDataFacade, &TypedFilterFactory->Config.DataMatching, MatchingScope, IgnoreList))
 		{
 			bCheckAgainstDataBounds = true;
 			bCollectionTestResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
@@ -123,7 +148,10 @@ bool PCGExPointFilter::FDistanceFilter::Init(FPCGExContext* InContext, const TSh
 	}
 
 	DistanceThresholdGetter = TypedFilterFactory->Config.GetValueSettingDistanceThreshold(PCGEX_QUIET_HANDLING);
-	if (!DistanceThresholdGetter->Init(InPointDataFacade)) { return false; }
+	if (!DistanceThresholdGetter->Init(InPointDataFacade))
+	{
+		return false;
+	}
 
 	InTransforms = InPointDataFacade->GetIn()->GetConstTransformValueRange();
 
@@ -142,7 +170,8 @@ bool PCGExPointFilter::FDistanceFilter::Test(const PCGExData::FProxyPoint& Point
 
 	TargetsHandler->FindElementsWithBoundsTest(QueryBounds, [&](const PCGExData::FConstPoint& CandidatePoint)
 	{
-		if (const double D = FVector::DistSquared(Dist->GetTargetCenter(CandidatePoint, CandidatePoint.GetLocation(), ProbeLocation), ProbeLocation); BestDist > D)
+		if (const double D = FVector::DistSquared(Dist->GetTargetCenter(CandidatePoint, CandidatePoint.GetLocation(), ProbeLocation), ProbeLocation);
+			BestDist > D)
 		{
 			BestDist = D;
 		}
@@ -153,7 +182,10 @@ bool PCGExPointFilter::FDistanceFilter::Test(const PCGExData::FProxyPoint& Point
 
 bool PCGExPointFilter::FDistanceFilter::Test(const int32 PointIndex) const
 {
-	if (bCheckAgainstDataBounds) { return bCollectionTestResult; }
+	if (bCheckAgainstDataBounds)
+	{
+		return bCollectionTestResult;
+	}
 
 	const TSet<const UPCGData*>* ExcludePtr = &IgnoreList;
 	TSet<const UPCGData*> PerPointExclude;
@@ -208,8 +240,14 @@ FString UPCGExDistanceFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = TEXT("Distance ") + PCGExCompare::ToString(Config.Comparison);
 
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute) { DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.DistanceThreshold); }
-	else { DisplayName += FString::Printf(TEXT("%.3f"), (static_cast<int32>(1000 * Config.DistanceThresholdConstant) / 1000.0)); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	{
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.DistanceThreshold);
+	}
+	else
+	{
+		DisplayName += FString::Printf(TEXT("%.3f"), (static_cast<int32>(1000 * Config.DistanceThresholdConstant) / 1000.0));
+	}
 
 	return DisplayName;
 }

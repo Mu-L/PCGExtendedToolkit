@@ -32,7 +32,7 @@ void FPCGExEnumSelectorCustomization::CustomizeChildren(
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
 	ChildBuilder.AddCustomRow(LOCTEXT("EnumSelector", "Enum Selector"))
-		.NameContent()
+	            .NameContent()
 		[
 			PropertyHandle->CreatePropertyNameWidget()
 		]

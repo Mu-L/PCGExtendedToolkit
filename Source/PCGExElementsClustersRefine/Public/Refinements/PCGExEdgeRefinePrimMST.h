@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExEdgeRefineOperation.h"
 #include "Containers/PCGExHashLookup.h"
+#include "Core/PCGExEdgeRefineOperation.h"
 #include "Utils/PCGExScoredQueue.h"
 #include "PCGExEdgeRefinePrimMST.generated.h"
 
@@ -29,8 +29,15 @@ class UPCGExEdgeRefinePrimMST : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool GetDefaultEdgeValidity() const override { return bInvert; }
-	virtual bool WantsHeuristics() const override { return true; }
+	virtual bool GetDefaultEdgeValidity() const override
+	{
+		return bInvert;
+	}
+
+	virtual bool WantsHeuristics() const override
+	{
+		return true;
+	}
 
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 

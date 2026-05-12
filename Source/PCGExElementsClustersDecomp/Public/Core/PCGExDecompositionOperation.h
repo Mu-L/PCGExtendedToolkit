@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExHeuristicsHandler.h"
-#include "Factories/PCGExInstancedFactory.h"
 #include "Clusters/PCGExCluster.h"
+#include "Factories/PCGExInstancedFactory.h"
 #include "Factories/PCGExOperation.h"
 
 #include "PCGExDecompositionOperation.generated.h"
@@ -28,7 +28,10 @@ struct FPCGExDecompositionResult
 	void Init(const int32 NumNodes)
 	{
 		NodeCellIDs.SetNumUninitialized(NumNodes);
-		for (int32& ID : NodeCellIDs) { ID = -1; }
+		for (int32& ID : NodeCellIDs)
+		{
+			ID = -1;
+		}
 		NumCells = 0;
 	}
 };
@@ -53,8 +56,14 @@ public:
 		Cluster = InCluster;
 		Heuristics = InHeuristics;
 
-		if (bWantsNodeOctree) { Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Vtx); }
-		if (bWantsEdgeOctree) { Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Edge); }
+		if (bWantsNodeOctree)
+		{
+			Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Vtx);
+		}
+		if (bWantsEdgeOctree)
+		{
+			Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Edge);
+		}
 
 		if (bWantsHeuristics && Heuristics)
 		{
@@ -91,9 +100,20 @@ public:
 	{
 	}
 
-	virtual bool WantsNodeOctree() const { return false; }
-	virtual bool WantsEdgeOctree() const { return false; }
-	virtual bool WantsHeuristics() const { return false; }
+	virtual bool WantsNodeOctree() const
+	{
+		return false;
+	}
+
+	virtual bool WantsEdgeOctree() const
+	{
+		return false;
+	}
+
+	virtual bool WantsHeuristics() const
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<FPCGExDecompositionOperation> CreateOperation() const PCGEX_NOT_IMPLEMENTED_RET(CreateOperation(), nullptr);
 

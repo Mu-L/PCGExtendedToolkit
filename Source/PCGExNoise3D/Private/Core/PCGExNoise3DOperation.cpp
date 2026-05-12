@@ -6,7 +6,10 @@
 
 void FPCGExNoise3DOperation::ComputeFractalBounding() const
 {
-	if (bFractalBoundingComputed) { return; }
+	if (bFractalBoundingComputed)
+	{
+		return;
+	}
 	FractalBounding = PCGExNoise3D::Math::CalcFractalBounding(Octaves, Persistence);
 	bFractalBoundingComputed = true;
 }

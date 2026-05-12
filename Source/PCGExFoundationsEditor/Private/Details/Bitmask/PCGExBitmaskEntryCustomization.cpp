@@ -9,10 +9,10 @@
 #include "PropertyHandle.h"
 #include "Data/Bitmasks/PCGExBitmaskCollection.h"
 #include "Details/PCGExCustomizationMacros.h"
-#include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SVectorInputBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExBitmaskEntryCustomization::MakeInstance()
 {
@@ -66,7 +66,10 @@ void FPCGExBitmaskEntryCustomization::CustomizeChildren(
 	{
 		TSharedPtr<IPropertyHandle> Handle = PropertyHandle->GetChildHandle(i);
 		if (Handle->GetProperty()->GetFName() == FName("Identifier") ||
-			Handle->GetProperty()->GetFName() == FName("Direction")) { continue; }
+			Handle->GetProperty()->GetFName() == FName("Direction"))
+		{
+			continue;
+		}
 
 		ChildBuilder.AddProperty(Handle.ToSharedRef()).ShouldAutoExpand(true);
 	}

@@ -20,7 +20,10 @@ namespace PCGExMath::OBB
 		{
 			const double DistToA = FVector::DistSquared(S, A.Position);
 			const double DistToB = FVector::DistSquared(S, B.Position);
-			if (DistToA == DistToB) { return A.Idx < B.Idx; }
+			if (DistToA == DistToB)
+			{
+				return A.Idx < B.Idx;
+			}
 			return DistToA < DistToB;
 		});
 	}
@@ -28,7 +31,10 @@ namespace PCGExMath::OBB
 	void FIntersections::SortAndDedupe(float Tolerance)
 	{
 		Sort();
-		Cuts.SetNum(Algo::Unique(Cuts, [](const FCut& A, const FCut& B) { return A.Position == B.Position; }));
+		Cuts.SetNum(Algo::Unique(Cuts, [](const FCut& A, const FCut& B)
+		{
+			return A.Position == B.Position;
+		}));
 	}
 
 	bool SegmentBoxRaw(
@@ -168,7 +174,10 @@ namespace PCGExMath::OBB
 		const FVector LocalStart = Matrix.InverseTransformPosition(Start);
 		const FVector LocalEnd = Matrix.InverseTransformPosition(End);
 
-		if (LocalBox.IsInside(LocalStart) || LocalBox.IsInside(LocalEnd)) { return true; }
+		if (LocalBox.IsInside(LocalStart) || LocalBox.IsInside(LocalEnd))
+		{
+			return true;
+		}
 
 		FVector HitLoc, HitNorm;
 		float HitTime;

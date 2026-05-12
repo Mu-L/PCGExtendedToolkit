@@ -8,9 +8,9 @@
 #include "Core/PCGExTensor.h"
 #include "Core/PCGExTensorOperation.h"
 #include "Core/PCGExTensorSplineFactoryProvider.h"
+#include "Filters/Points/PCGExPolyPathFilterFactory.h"
 #include "Math/PCGExMathAxis.h"
 #include "Paths/PCGExPathsCommon.h"
-#include "Filters/Points/PCGExPolyPathFilterFactory.h"
 #include "PCGExTensorPathFlow.generated.h"
 
 
@@ -82,7 +82,10 @@ public:
 #endif
 	//~End UPCGSettings
 
-	virtual bool GetBuildFromPoints() const override { return true; }
+	virtual bool GetBuildFromPoints() const override
+	{
+		return true;
+	}
 
 	/** Tensor properties */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))

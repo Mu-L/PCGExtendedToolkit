@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExDecompOccupancyGrid.h"
+#include "Core/PCGExDecompositionOperation.h"
 #include "Data/PCGExDataCommon.h"
 #include "Details/PCGExInputShorthandsDetails.h"
-#include "Core/PCGExDecompositionOperation.h"
-#include "Core/PCGExDecompOccupancyGrid.h"
 
 #include "PCGExDecompMaxBoxesExt.generated.h"
 
@@ -211,7 +211,11 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Heuristics", meta=(PCG_Overridable, ClampMin="0", ClampMax="1", EditCondition="bUseHeuristicMergeGating", EditConditionHides))
 	double MergeScoreThreshold = 0.5;
 
-	virtual bool WantsHeuristics() const override { return bUseHeuristicMergeGating; }
+	virtual bool WantsHeuristics() const override
+	{
+		return bUseHeuristicMergeGating;
+	}
+
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) override;
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
 

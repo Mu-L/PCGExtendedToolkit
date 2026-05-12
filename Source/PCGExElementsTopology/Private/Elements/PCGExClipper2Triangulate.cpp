@@ -5,12 +5,12 @@
 
 #include "PCGComponent.h"
 #include "UDynamicMesh.h"
-#include "Data/PCGDynamicMeshData.h"
-#include "Data/PCGExPointIO.h"
 #include "Clipper2Lib/clipper.h"
 #include "Clipper2Lib/clipper.triangulation.h"
+#include "Data/PCGDynamicMeshData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
 #include "GeometryScript/MeshRepairFunctions.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2TriangulateElement"
@@ -47,8 +47,14 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 {
 	const UPCGExClipper2TriangulateSettings* Settings = GetInputSettings<UPCGExClipper2TriangulateSettings>();
 
-	if (!Group->IsValid()) { return; }
-	if (Group->SubjectPaths.empty()) { return; }
+	if (!Group->IsValid())
+	{
+		return;
+	}
+	if (Group->SubjectPaths.empty())
+	{
+		return;
+	}
 
 	// Local data for this group - no shared state
 	TArray<FPCGExTriangulationVertex> VertexPool;
@@ -73,7 +79,10 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 	// Build vertex pool from this group's paths
 	for (const int32 SubjectIdx : Group->SubjectIndices)
 	{
-		if (SubjectIdx >= AllOpData->Paths.Num()) { continue; }
+		if (SubjectIdx >= AllOpData->Paths.Num())
+		{
+			continue;
+		}
 
 		const auto& Path = AllOpData->Paths[SubjectIdx];
 		const auto& Facade = AllOpData->Facades[SubjectIdx];
@@ -88,7 +97,10 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 			const uint64 Hash = HashPoint(Pt.x, Pt.y);
 
 			// Skip if already in pool
-			if (VertexMap.Contains(Hash)) { continue; }
+			if (VertexMap.Contains(Hash))
+			{
+				continue;
+			}
 
 			// Decode source info from Z
 			uint32 PointIdx, SourceIdx;
@@ -140,7 +152,7 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 			PCGExClipper2::ConvertFillRule(Settings->FillRule),
 			Settings->bUseDelaunay,
 			Group->CreateZCallback()
-		);
+			);
 
 	if (Result != PCGExClipper2Lib::TriangulateResult::success)
 	{
@@ -165,7 +177,10 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 	auto FindOrCreateVertexIndex = [&](const PCGExClipper2Lib::Point64& Pt) -> int32
 	{
 		const uint64 Hash = HashPoint(Pt.x, Pt.y);
-		if (const int32* Found = VertexMap.Find(Hash)) { return *Found; }
+		if (const int32* Found = VertexMap.Find(Hash))
+		{
+			return *Found;
+		}
 
 		// Not found - check if this is an intersection point with blend info
 		uint32 PointIdx, SourceIdx;
@@ -184,13 +199,19 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 				auto GetSourcePos = [&](uint32 SrcIdx, uint32 PtIdx, FVector& OutPos, FVector4& OutColor) -> bool
 				{
 					const int32 ArrayIdx = static_cast<int32>(SrcIdx);
-					if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num()) { return false; }
+					if (ArrayIdx < 0 || ArrayIdx >= AllOpData->Facades.Num())
+					{
+						return false;
+					}
 
 					const TSharedPtr<PCGExData::FFacade>& SrcFacade = AllOpData->Facades[ArrayIdx];
 					TConstPCGValueRange<FTransform> SrcTransforms = SrcFacade->Source->GetIn()->GetConstTransformValueRange();
 					TConstPCGValueRange<FVector4> SrcColors = SrcFacade->Source->GetIn()->GetConstColorValueRange();
 
-					if (static_cast<int32>(PtIdx) >= SrcTransforms.Num()) { return false; }
+					if (static_cast<int32>(PtIdx) >= SrcTransforms.Num())
+					{
+						return false;
+					}
 					OutPos = SrcTransforms[PtIdx].GetLocation();
 					OutColor = SrcColors[PtIdx];
 					return true;
@@ -221,8 +242,8 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 			{
 				// No blend info - fall back to unprojection
 				const FPCGExGeo2DProjectionDetails& Projection = AllOpData->Projections.Num() > 0
-					                                                 ? AllOpData->Projections[0]
-					                                                 : FPCGExGeo2DProjectionDetails();
+					? AllOpData->Projections[0]
+					: FPCGExGeo2DProjectionDetails();
 
 				Vertex.Position = Projection.Unproject(
 					FVector(
@@ -263,8 +284,8 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 			else
 			{
 				const FPCGExGeo2DProjectionDetails& Projection = AllOpData->Projections.Num() > 0
-					                                                 ? AllOpData->Projections[0]
-					                                                 : FPCGExGeo2DProjectionDetails();
+					? AllOpData->Projections[0]
+					: FPCGExGeo2DProjectionDetails();
 
 				Vertex.Position = Projection.Unproject(
 					FVector(
@@ -284,23 +305,35 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 	// Convert triangle paths to indexed triangles
 	for (const auto& TriPath : TrianglePaths)
 	{
-		if (TriPath.size() != 3) { continue; }
+		if (TriPath.size() != 3)
+		{
+			continue;
+		}
 
 		const int32 V0 = FindOrCreateVertexIndex(TriPath[0]);
 		const int32 V1 = FindOrCreateVertexIndex(TriPath[1]);
 		const int32 V2 = FindOrCreateVertexIndex(TriPath[2]);
 
 		// Skip degenerate triangles
-		if (V0 == V1 || V1 == V2 || V2 == V0) { continue; }
+		if (V0 == V1 || V1 == V2 || V2 == V0)
+		{
+			continue;
+		}
 
 		Triangles.Add(FIntVector(V0, V1, V2));
 	}
 
-	if (VertexPool.IsEmpty() || Triangles.IsEmpty()) { return; }
+	if (VertexPool.IsEmpty() || Triangles.IsEmpty())
+	{
+		return;
+	}
 
 	// Create mesh objects
 	TObjectPtr<UPCGDynamicMeshData> MeshData = ManagedObjects->New<UPCGDynamicMeshData>();
-	if (!MeshData) { return; }
+	if (!MeshData)
+	{
+		return;
+	}
 
 	TObjectPtr<UDynamicMesh> Mesh = ManagedObjects->New<UDynamicMesh>();
 	Mesh->InitializeMesh();
@@ -406,7 +439,10 @@ void FPCGExClipper2TriangulateContext::Process(const TSharedPtr<PCGExClipper2::F
 
 	// Add to staged outputs for deterministic ordering
 	TSet<FString> Tags;
-	if (Group->GroupTags) { Tags = Group->GroupTags->Flatten(); }
+	if (Group->GroupTags)
+	{
+		Tags = Group->GroupTags->Flatten();
+	}
 
 	AddStagedOutput(MeshData, Tags, Group->GroupIndex);
 }

@@ -3,16 +3,16 @@
 
 #include "Elements/PCGExPathfindingFindAllCellsBounded.h"
 
-#include "Data/PCGExData.h"
-#include "Data/PCGPointArrayData.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
-#include "Data/PCGSpatialData.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCell.h"
 #include "Clusters/Artifacts/PCGExCellPathBuilder.h"
 #include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGPointArrayData.h"
+#include "Data/PCGSpatialData.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
@@ -37,54 +37,109 @@ TArray<FPCGPinProperties> UPCGExFindAllCellsBoundedSettings::OutputPinProperties
 		// Separate pins for each triage category - all pins present, unwanted ones marked Advanced
 		if (Artifacts.bOutputPaths)
 		{
-			if (OutputInside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsInsideLabel, "Cell paths fully inside bounds", Normal) }
-			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsInsideLabel, "Cell paths fully inside bounds", Advanced) }
+			if (OutputInside())
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsInsideLabel, "Cell paths fully inside bounds", Normal)
+			}
+			else
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsInsideLabel, "Cell paths fully inside bounds", Advanced)
+			}
 
-			if (OutputTouching()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsTouchingLabel, "Cell paths touching bounds", Normal) }
-			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsTouchingLabel, "Cell paths touching bounds", Advanced) }
+			if (OutputTouching())
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsTouchingLabel, "Cell paths touching bounds", Normal)
+			}
+			else
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsTouchingLabel, "Cell paths touching bounds", Advanced)
+			}
 
-			if (OutputOutside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Normal) }
-			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Advanced) }
+			if (OutputOutside())
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Normal)
+			}
+			else
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputPathsOutsideLabel, "Cell paths outside bounds", Advanced)
+			}
 		}
 
 		if (Artifacts.bOutputCellBounds)
 		{
-			if (OutputInside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsInsideLabel, "Cell OBB bounds fully inside", Normal) }
-			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsInsideLabel, "Cell OBB bounds fully inside", Advanced) }
+			if (OutputInside())
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsInsideLabel, "Cell OBB bounds fully inside", Normal)
+			}
+			else
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsInsideLabel, "Cell OBB bounds fully inside", Advanced)
+			}
 
-			if (OutputTouching()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsTouchingLabel, "Cell OBB bounds touching", Normal) }
-			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsTouchingLabel, "Cell OBB bounds touching", Advanced) }
+			if (OutputTouching())
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsTouchingLabel, "Cell OBB bounds touching", Normal)
+			}
+			else
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsTouchingLabel, "Cell OBB bounds touching", Advanced)
+			}
 
-			if (OutputOutside()) { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsOutsideLabel, "Cell OBB bounds outside", Normal) }
-			else { PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsOutsideLabel, "Cell OBB bounds outside", Advanced) }
+			if (OutputOutside())
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsOutsideLabel, "Cell OBB bounds outside", Normal)
+			}
+			else
+			{
+				PCGEX_PIN_POINTS(PCGExFindAllCellsBounded::OutputBoundsOutsideLabel, "Cell OBB bounds outside", Advanced)
+			}
 		}
 	}
 	else
 	{
 		// Combined output with triage tags
-		if (Artifacts.bOutputPaths) { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths (tagged with triage result)", Required) }
-		if (Artifacts.bOutputCellBounds) { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points (tagged with triage result)", Required) }
+		if (Artifacts.bOutputPaths)
+		{
+			PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths (tagged with triage result)", Required)
+		}
+		if (Artifacts.bOutputCellBounds)
+		{
+			PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points (tagged with triage result)", Required)
+		}
 	}
 
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExFindAllCellsBoundedSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExFindAllCellsBoundedSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExFindAllCellsBoundedSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExFindAllCellsBoundedSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(FindAllCellsBounded)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL(FindAllCellsBounded)
 
 bool FPCGExFindAllCellsBoundedElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FindAllCellsBounded)
 
 	PCGEX_FWD(Artifacts)
 
 	// Initialize Artifacts (output settings + OBB settings)
-	if (!Context->Artifacts.Init(Context)) { return false; }
+	if (!Context->Artifacts.Init(Context))
+	{
+		return false;
+	}
 
 	// Get required bounds from spatial input
 	TArray<FPCGTaggedData> BoundsData = Context->InputData.GetSpatialInputsByPin(PCGExFindAllCellsBounded::SourceBoundsLabel);
@@ -173,11 +228,14 @@ bool FPCGExFindAllCellsBoundedElement::AdvanceWork(FPCGExContext* InContext, con
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bSkipCompletion = true;
-			NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bSkipCompletion = true;
+			                                      NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -194,20 +252,38 @@ bool FPCGExFindAllCellsBoundedElement::AdvanceWork(FPCGExContext* InContext, con
 		// Mark as inactive if collection is empty or disabled
 		if (Settings->Artifacts.bOutputPaths)
 		{
-			if (!Context->OutputPathsInside || !Context->OutputPathsInside->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputPathsInside || !Context->OutputPathsInside->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
-			if (!Context->OutputPathsTouching || !Context->OutputPathsTouching->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputPathsTouching || !Context->OutputPathsTouching->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
-			if (!Context->OutputPathsOutside || !Context->OutputPathsOutside->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputPathsOutside || !Context->OutputPathsOutside->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
 		}
 		if (Settings->Artifacts.bOutputCellBounds)
 		{
-			if (!Context->OutputCellBoundsInside || !Context->OutputCellBoundsInside->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputCellBoundsInside || !Context->OutputCellBoundsInside->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
-			if (!Context->OutputCellBoundsTouching || !Context->OutputCellBoundsTouching->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputCellBoundsTouching || !Context->OutputCellBoundsTouching->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
-			if (!Context->OutputCellBoundsOutside || !Context->OutputCellBoundsOutside->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputCellBoundsOutside || !Context->OutputCellBoundsOutside->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
 		}
 	}
@@ -216,12 +292,18 @@ bool FPCGExFindAllCellsBoundedElement::AdvanceWork(FPCGExContext* InContext, con
 		// Combined mode
 		if (Settings->Artifacts.bOutputPaths)
 		{
-			if (!Context->OutputPathsInside || !Context->OutputPathsInside->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputPathsInside || !Context->OutputPathsInside->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
 		}
 		if (Settings->Artifacts.bOutputCellBounds)
 		{
-			if (!Context->OutputCellBoundsInside || !Context->OutputCellBoundsInside->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->OutputCellBoundsInside || !Context->OutputCellBoundsInside->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
 		}
 	}
@@ -245,12 +327,18 @@ namespace PCGExFindAllCellsBounded
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExFindAllCellsBounded::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Context->HolesFacade)
 		{
 			Holes = Context->Holes ? Context->Holes : MakeShared<PCGExClusters::FProjectedPointSet>(Context, Context->HolesFacade.ToSharedRef(), ProjectionDetails);
-			if (Holes) { Holes->EnsureProjected(); }
+			if (Holes)
+			{
+				Holes->EnsureProjected();
+			}
 		}
 
 		// Set up cell constraints
@@ -284,7 +372,10 @@ namespace PCGExFindAllCellsBounded
 			const int32 NumHoles = Context->HolesFacade->GetNum();
 			for (const TSharedPtr<PCGExClusters::FCell>& FailedCell : FailedCells)
 			{
-				if (!FailedCell || FailedCell->Polygon.IsEmpty() || FailedCell->FaceIndex < 0) { continue; }
+				if (!FailedCell || FailedCell->Polygon.IsEmpty() || FailedCell->FaceIndex < 0)
+				{
+					continue;
+				}
 
 				// Check if this cell contains a hole
 				bool bContainsHole = false;
@@ -330,7 +421,10 @@ namespace PCGExFindAllCellsBounded
 			AllCells.Add(CellsConstraints->WrapperCell);
 		}
 
-		if (AllCells.IsEmpty()) { return true; }
+		if (AllCells.IsEmpty())
+		{
+			return true;
+		}
 
 		// Initialize cell processor
 		CellProcessor = MakeShared<PCGExClusters::FCellPathBuilder>();
@@ -347,26 +441,41 @@ namespace PCGExFindAllCellsBounded
 			TArray<TSharedPtr<PCGExClusters::FCell>> Merged = PCGExClusters::MergeAdjacentCells(
 				AllCells, CellsConstraints.ToSharedRef(), Cluster.Get(), ProjectedPositions);
 
-			if (!Merged.IsEmpty()) { AllCells = MoveTemp(Merged); }
+			if (!Merged.IsEmpty())
+			{
+				AllCells = MoveTemp(Merged);
+			}
 		}
 
 		// Classify cells by bounds relationship, respecting enable flags
 		for (const TSharedPtr<PCGExClusters::FCell>& Cell : AllCells)
 		{
-			if (!Cell) { continue; }
+			if (!Cell)
+			{
+				continue;
+			}
 
 			const ECellTriageResult Result = ClassifyCell(Cell);
 
 			switch (Result)
 			{
 			case ECellTriageResult::Inside:
-				if (Settings->OutputInside()) { CellsInside.Add(Cell); }
+				if (Settings->OutputInside())
+				{
+					CellsInside.Add(Cell);
+				}
 				break;
 			case ECellTriageResult::Touching:
-				if (Settings->OutputTouching()) { CellsTouching.Add(Cell); }
+				if (Settings->OutputTouching())
+				{
+					CellsTouching.Add(Cell);
+				}
 				break;
 			case ECellTriageResult::Outside:
-				if (Settings->OutputOutside()) { CellsOutside.Add(Cell); }
+				if (Settings->OutputOutside())
+				{
+					CellsOutside.Add(Cell);
+				}
 				break;
 			}
 		}
@@ -374,13 +483,22 @@ namespace PCGExFindAllCellsBounded
 		// Output CellBounds for each category
 		auto OutputCellBounds = [&](const TArray<TSharedPtr<PCGExClusters::FCell>>& Cells, const TSharedPtr<PCGExData::FPointIOCollection>& OutputCollection, const FString& TriageTag = TEXT(""))
 		{
-			if (!OutputCollection || Cells.IsEmpty()) { return; }
+			if (!OutputCollection || Cells.IsEmpty())
+			{
+				return;
+			}
 
 			TSharedPtr<PCGExData::FPointIO> OBBPointIO = OutputCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
-			if (!OBBPointIO) { return; }
-			
+			if (!OBBPointIO)
+			{
+				return;
+			}
+
 			OBBPointIO->Tags->Reset();
-			if (!TriageTag.IsEmpty()) { OBBPointIO->Tags->AddRaw(TriageTag); }
+			if (!TriageTag.IsEmpty())
+			{
+				OBBPointIO->Tags->AddRaw(TriageTag);
+			}
 			OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 			PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
 
@@ -407,7 +525,10 @@ namespace PCGExFindAllCellsBounded
 		// Prepare path outputs
 		auto PreparePathOutputs = [&](TArray<TSharedPtr<PCGExClusters::FCell>>& Cells, TArray<TSharedPtr<PCGExData::FPointIO>>& CellsIO, TArray<FString>& CellTags, const TSharedPtr<PCGExData::FPointIOCollection>& OutputCollection, const FString& TriageTag)
 		{
-			if (!OutputCollection || Cells.IsEmpty()) { return; }
+			if (!OutputCollection || Cells.IsEmpty())
+			{
+				return;
+			}
 
 			CellsIO.Reserve(Cells.Num());
 			CellTags.Reserve(Cells.Num());
@@ -482,8 +603,14 @@ namespace PCGExFindAllCellsBounded
 
 	void FProcessor::ExpandHoleExclusion(int32 HoleIndex, int32 InitialFaceIndex, int32 MaxGrowth)
 	{
-		if (MaxGrowth <= 0) { return; }
-		if (CellAdjacencyMap.IsEmpty()) { return; }
+		if (MaxGrowth <= 0)
+		{
+			return;
+		}
+		if (CellAdjacencyMap.IsEmpty())
+		{
+			return;
+		}
 
 		TSet<int32> Visited;
 		Visited.Add(InitialFaceIndex); // Don't re-visit the initial cell
@@ -534,7 +661,10 @@ namespace PCGExFindAllCellsBounded
 	void FProcessor::Cleanup()
 	{
 		TProcessor<FPCGExFindAllCellsBoundedContext, UPCGExFindAllCellsBoundedSettings>::Cleanup();
-		if (CellsConstraints) { CellsConstraints->Cleanup(); }
+		if (CellsConstraints)
+		{
+			CellsConstraints->Cleanup();
+		}
 	}
 }
 

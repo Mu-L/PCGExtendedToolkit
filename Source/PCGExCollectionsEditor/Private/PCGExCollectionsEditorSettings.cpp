@@ -4,8 +4,8 @@
 #include "PCGExCollectionsEditorSettings.h"
 
 #include "CoreMinimal.h"
-#include "Components/SlateWrapperTypes.h"
 #include "PCGExVersion.h"
+#include "Components/SlateWrapperTypes.h"
 
 FSimpleMulticastDelegate UPCGExCollectionsEditorSettings::OnHiddenAssetPropertyNamesChanged;
 
@@ -32,7 +32,10 @@ void UPCGExCollectionsEditorSettings::ToggleHiddenAssetPropertyName(const FName 
 	{
 		bool bIsAlreadyInSet = false;
 		HiddenPropertyNames.Add(PropertyName, &bIsAlreadyInSet);
-		if (bIsAlreadyInSet) { return; }
+		if (bIsAlreadyInSet)
+		{
+			return;
+		}
 	}
 	else if (!HiddenPropertyNames.Remove(PropertyName))
 	{
@@ -45,7 +48,10 @@ void UPCGExCollectionsEditorSettings::ToggleHiddenAssetPropertyName(const FName 
 
 void UPCGExCollectionsEditorSettings::ToggleHiddenAssetPropertyName(const TArray<FName> Properties, const bool bHide)
 {
-	if (Properties.IsEmpty()) { return; }
+	if (Properties.IsEmpty())
+	{
+		return;
+	}
 	bool bAnyChanges = false;
 	if (bHide)
 	{
@@ -53,18 +59,27 @@ void UPCGExCollectionsEditorSettings::ToggleHiddenAssetPropertyName(const TArray
 		{
 			bool bIsAlreadyInSet = false;
 			HiddenPropertyNames.Add(PropertyName, &bIsAlreadyInSet);
-			if (!bIsAlreadyInSet) { bAnyChanges = true; }
+			if (!bIsAlreadyInSet)
+			{
+				bAnyChanges = true;
+			}
 		}
 	}
 	else
 	{
 		for (FName PropertyName : Properties)
 		{
-			if (HiddenPropertyNames.Remove(PropertyName)) { bAnyChanges = true; }
+			if (HiddenPropertyNames.Remove(PropertyName))
+			{
+				bAnyChanges = true;
+			}
 		}
 	}
 
-	if (!bAnyChanges) { return; }
+	if (!bAnyChanges)
+	{
+		return;
+	}
 
 	SaveConfig();
 	OnHiddenAssetPropertyNamesChanged.Broadcast();

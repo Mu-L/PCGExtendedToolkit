@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "PCGExVersion.h"
 #include "PCGExPath.h"
+#include "PCGExVersion.h"
 #include "Math/PCGExWinding.h"
 
 namespace PCGExMT
@@ -63,7 +63,10 @@ namespace PCGExPaths
 			const EPCGExWindingMutation WindingMutation = EPCGExWindingMutation::Unchanged);
 #endif
 
-		FORCEINLINE const FPCGSplineStruct* GetSpline() const { return Spline; }
+		FORCEINLINE const FPCGSplineStruct* GetSpline() const
+		{
+			return Spline;
+		}
 
 	protected:
 		void InitFromTransforms(const EPCGExWindingMutation WindingMutation = EPCGExWindingMutation::Unchanged);

@@ -97,7 +97,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(ExtrudeTensors, "Path : Extrude Tensors", "Extrude input points into paths along tensors.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Transform); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Transform);
+	}
 #endif
 
 protected:
@@ -371,7 +375,10 @@ namespace PCGExExtrudeTensors
 
 		virtual ~FProcessor() override;
 
-		virtual bool IsTrivial() const override { return false; }
+		virtual bool IsTrivial() const override
+		{
+			return false;
+		}
 
 		virtual void RegisterBuffersDependencies(PCGExData::FFacadePreloader& FacadePreloader) override;
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;

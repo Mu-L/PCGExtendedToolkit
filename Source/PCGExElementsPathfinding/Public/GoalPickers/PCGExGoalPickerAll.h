@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "PCGExGoalPicker.h"
+#include "UObject/Object.h"
 
 #include "PCGExGoalPickerAll.generated.h"
 

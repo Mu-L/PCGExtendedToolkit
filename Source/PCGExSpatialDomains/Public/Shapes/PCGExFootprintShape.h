@@ -39,7 +39,10 @@ struct PCGEXSPATIALDOMAINS_API FPCGExSpatialPolygonEntry
 	/** Cached at append time for the cheap-reject pre-filter tier. */
 	FBox WorldAABB = FBox(ForceInit);
 
-	FORCEINLINE bool IsValid() const { return Outline.Num() >= 3 && ZMax > ZMin; }
+	FORCEINLINE bool IsValid() const
+	{
+		return Outline.Num() >= 3 && ZMax > ZMin;
+	}
 };
 
 /**
@@ -71,13 +74,19 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape
 	 * `return StaticStruct();`. Used by the narrow-phase registry to resolve
 	 * pair tests.
 	 */
-	virtual UScriptStruct* GetScriptStruct() const { return nullptr; }
+	virtual UScriptStruct* GetScriptStruct() const
+	{
+		return nullptr;
+	}
 
 	/**
 	 * World-space AABB. Must be implementable for any shape — the broadphase
 	 * indexes entries by AABB and never inspects shape-specific fields.
 	 */
-	virtual FBox GetWorldAABB() const { return FBox(ForceInit); }
+	virtual FBox GetWorldAABB() const
+	{
+		return FBox(ForceInit);
+	}
 };
 
 /** Oriented-box shape — the default contribution kind for cage modules. */
@@ -93,7 +102,11 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape_OBB : public FPCGExFootprint
 	explicit FPCGExFootprintShape_OBB(const PCGExMath::OBB::FOBB& InBounds);
 	virtual ~FPCGExFootprintShape_OBB() override;
 
-	virtual UScriptStruct* GetScriptStruct() const override { return StaticStruct(); }
+	virtual UScriptStruct* GetScriptStruct() const override
+	{
+		return StaticStruct();
+	}
+
 	virtual FBox GetWorldAABB() const override;
 };
 
@@ -109,6 +122,13 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape_Polygon : public FPCGExFootp
 	explicit FPCGExFootprintShape_Polygon(FPCGExSpatialPolygonEntry InEntry);
 	virtual ~FPCGExFootprintShape_Polygon() override;
 
-	virtual UScriptStruct* GetScriptStruct() const override { return StaticStruct(); }
-	virtual FBox GetWorldAABB() const override { return Entry.WorldAABB; }
+	virtual UScriptStruct* GetScriptStruct() const override
+	{
+		return StaticStruct();
+	}
+
+	virtual FBox GetWorldAABB() const override
+	{
+		return Entry.WorldAABB;
+	}
 };

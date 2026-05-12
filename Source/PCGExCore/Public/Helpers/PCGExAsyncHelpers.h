@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Tasks/Task.h"
 #include "Async/Async.h"
+#include "Tasks/Task.h"
 
 namespace PCGExAsyncHelpers
 {
@@ -21,7 +21,10 @@ namespace PCGExAsyncHelpers
 		FAsyncExecutionScope(FAsyncExecutionScope&&) = delete;
 		FAsyncExecutionScope& operator=(FAsyncExecutionScope&&) = delete;
 
-		explicit FAsyncExecutionScope(int32 Reserve = 0) { Tasks.Reserve(Reserve); }
+		explicit FAsyncExecutionScope(int32 Reserve = 0)
+		{
+			Tasks.Reserve(Reserve);
+		}
 
 		~FAsyncExecutionScope()
 		{
@@ -34,11 +37,14 @@ namespace PCGExAsyncHelpers
 		void Execute(TUniqueFunction<void()>&& Fn)
 		{
 			Tasks.Add(FFunctionGraphTask::CreateAndDispatchWhenReady(
-				[Func = MoveTemp(Fn)]() mutable { Func(); },
+				[Func = MoveTemp(Fn)]() mutable
+				{
+					Func();
+				},
 				TStatId(),
 				nullptr,
 				ENamedThreads::AnyThread
-			));
+				));
 		}
 	};
 }

@@ -93,7 +93,7 @@ public:
 			ProjectionQuatInv * InTransform.GetRotation(),
 			ProjectionQuatInv.RotateVector(InTransform.GetLocation()),
 			InTransform.GetScale3D()
-		);
+			);
 	}
 
 	FORCEINLINE void ProjectInPlace(FTransform& InTransform) const
@@ -135,7 +135,7 @@ public:
 			ProjectionQuat * InTransform.GetRotation(),
 			ProjectionQuat.RotateVector(InTransform.GetLocation()),
 			InTransform.GetScale3D()
-		);
+			);
 	}
 
 	FORCEINLINE FVector Unproject(const FVector& InPosition) const

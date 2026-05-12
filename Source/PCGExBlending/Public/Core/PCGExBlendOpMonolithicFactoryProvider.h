@@ -20,7 +20,10 @@ class PCGEXBLENDING_API UPCGExBlendOpMonolithicFactory : public UPCGExBlendOpFac
 public:
 	FPCGExBlendingDetails BlendingDetails;
 
-	virtual bool IsMonolithic() const override { return true; }
+	virtual bool IsMonolithic() const override
+	{
+		return true;
+	}
 
 	virtual bool CreateOperations(
 		FPCGExContext* InContext,
@@ -44,9 +47,17 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(BlendOpMonolithic, "BlendOp : Blend All", "Creates bulk blend operations from monolithic blending settings.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(BlendOp); }
 
-	virtual bool CanUserEditTitle() const override { return false; }
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(BlendOp);
+	}
+
+	virtual bool CanUserEditTitle() const override
+	{
+		return false;
+	}
+
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 
@@ -55,7 +66,11 @@ public:
 
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 
-	virtual FName GetMainOutputPin() const override { return PCGExBlending::Labels::OutputBlendingLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExBlending::Labels::OutputBlendingLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 	/** Filter Priority.*/

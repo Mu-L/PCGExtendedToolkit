@@ -6,12 +6,12 @@
 #include "PCGExH.h"
 
 #include "Async/ParallelFor.h"
-#include "Details/PCGExIntersectionDetails.h"
-#include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExMetadataBlender.h"
 #include "Clusters/PCGExEdge.h"
-#include "Data/PCGExData.h"
 #include "Core/PCGExUnionData.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
+#include "Details/PCGExIntersectionDetails.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphMetadata.h"
 #include "Math/PCGExMath.h"
@@ -21,7 +21,8 @@ namespace PCGExGraphs
 #pragma region FIntersectionAllocations
 
 	FIntersectionAllocations::FIntersectionAllocations(const TSharedPtr<FGraph>& InGraph, const TSharedPtr<PCGExData::FPointIO>& InPointIO)
-		: Graph(InGraph), PointIO(InPointIO)
+		: Graph(InGraph)
+		  , PointIO(InPointIO)
 	{
 		NodeTransforms = InPointIO->GetOutIn()->GetConstTransformValueRange();
 	}
@@ -37,7 +38,10 @@ namespace PCGExGraphs
 		const int32 NumEdges = Graph->Edges.Num();
 
 		Positions.SetNumUninitialized(NumNodes);
-		for (int32 i = 0; i < NumNodes; i++) { Positions[i] = NodeTransforms[i].GetLocation(); }
+		for (int32 i = 0; i < NumNodes; i++)
+		{
+			Positions[i] = NodeTransforms[i].GetLocation();
+		}
 
 		ValidEdges.Init(false, NumEdges);
 		LengthSquared.SetNumUninitialized(NumEdges);
@@ -60,7 +64,10 @@ namespace PCGExGraphs
 			const FVector A = Positions[Edge.Start];
 			const FVector B = Positions[Edge.End];
 			const double Len = FVector::DistSquared(A, B);
-			if (FMath::IsNearlyZero(Len)) { continue; }
+			if (FMath::IsNearlyZero(Len))
+			{
+				continue;
+			}
 
 			ValidEdges[i] = true;
 			LengthSquared[i] = Len;
@@ -79,7 +86,10 @@ namespace PCGExGraphs
 		EdgeRootIOSetIdx.Init(-1, NumEdges);
 
 		const TSharedPtr<PCGExData::IUnionMetadata> EdgesUnion = Graph->EdgesUnion;
-		if (!EdgesUnion) { return; }
+		if (!EdgesUnion)
+		{
+			return;
+		}
 
 		// Single pass: for each valid edge, look up or insert into UniqueRootIOSets. This stores one
 		// TSet per unique RootIndex (typically O(num IO sources) ≪ NumEdges) rather than one per
@@ -87,7 +97,10 @@ namespace PCGExGraphs
 		TMap<int32, int32> RootIdxToUniqueIdx;
 		for (int32 i = 0; i < NumEdges; i++)
 		{
-			if (!ValidEdges[i]) { continue; }
+			if (!ValidEdges[i])
+			{
+				continue;
+			}
 			const int32 RootIdx = EdgeRootIndex[i];
 			if (const int32* ExistingUniqueIdx = RootIdxToUniqueIdx.Find(RootIdx))
 			{
@@ -112,7 +125,10 @@ namespace PCGExGraphs
 		const int32 NumEdges = Graph->Edges.Num();
 		for (int32 i = 0; i < NumEdges; i++)
 		{
-			if (!ValidEdges[i]) { continue; }
+			if (!ValidEdges[i])
+			{
+				continue;
+			}
 			EdgeOctree->AddElement(PCGExOctree::FItem(i, EdgeBoxes[i]));
 		}
 	}
@@ -138,8 +154,14 @@ namespace PCGExGraphs
 			const FVector& C = Allocations.Positions[CandidateNodeIdx];
 
 			OutClosestPoint = FMath::ClosestPointOnSegment(C, A, B);
-			if ((OutClosestPoint - A).IsNearlyZero() || (OutClosestPoint - B).IsNearlyZero()) { return false; }
-			if (FVector::DistSquared(OutClosestPoint, C) >= Allocations.ToleranceSquared) { return false; }
+			if ((OutClosestPoint - A).IsNearlyZero() || (OutClosestPoint - B).IsNearlyZero())
+			{
+				return false;
+			}
+			if (FVector::DistSquared(OutClosestPoint, C) >= Allocations.ToleranceSquared)
+			{
+				return false;
+			}
 
 			OutTime = FVector::DistSquared(A, OutClosestPoint) / Allocations.LengthSquared[EdgeIdx];
 			return true;
@@ -160,7 +182,10 @@ namespace PCGExGraphs
 
 			PCGEX_SCOPE_LOOP(EdgeIdx)
 			{
-				if (!Allocations.ValidEdges[EdgeIdx]) { continue; }
+				if (!Allocations.ValidEdges[EdgeIdx])
+				{
+					continue;
+				}
 
 				const FEdge& Edge = Graph->Edges[EdgeIdx];
 				const FBox& Box = Allocations.EdgeBoxes[EdgeIdx];
@@ -172,28 +197,49 @@ namespace PCGExGraphs
 				if (!bEnableSelfIntersection && Allocations.EdgeRootIOSetIdx.IsValidIndex(EdgeIdx))
 				{
 					const int32 SetIdx = Allocations.EdgeRootIOSetIdx[EdgeIdx];
-					if (SetIdx >= 0) { RootIOIndices = &Allocations.UniqueRootIOSets[SetIdx]; }
+					if (SetIdx >= 0)
+					{
+						RootIOIndices = &Allocations.UniqueRootIOSets[SetIdx];
+					}
 				}
 
 				PointOctree.FindElementsWithBoundsTest(Box, [&](const PCGPointOctree::FPointRef& PointRef)
 				{
 					const int32 PointIndex = PointRef.Index;
-					if (!Transforms.IsValidIndex(PointIndex)) { return; }
+					if (!Transforms.IsValidIndex(PointIndex))
+					{
+						return;
+					}
 
 					const FNode& Node = Graph->Nodes[PointIndex];
-					if (!Node.bValid) { return; }
-					if (Edge.Contains(Node.PointIndex)) { return; }
+					if (!Node.bValid)
+					{
+						return;
+					}
+					if (Edge.Contains(Node.PointIndex))
+					{
+						return;
+					}
 
 					const FVector Position = Transforms[Node.PointIndex].GetLocation();
-					if (!Box.IsInside(Position)) { return; }
+					if (!Box.IsInside(Position))
+					{
+						return;
+					}
 
 					FVector ClosestPoint;
 					double Time;
-					if (!TryFindSplit(Allocations, EdgeIdx, Node.PointIndex, ClosestPoint, Time)) { return; }
+					if (!TryFindSplit(Allocations, EdgeIdx, Node.PointIndex, ClosestPoint, Time))
+					{
+						return;
+					}
 
 					if (RootIOIndices && !RootIOIndices->IsEmpty())
 					{
-						if (Graph->NodesUnion->IOIndexOverlap(Node.Index, *RootIOIndices)) { return; }
+						if (Graph->NodesUnion->IOIndexOverlap(Node.Index, *RootIOIndices))
+						{
+							return;
+						}
 					}
 
 					OutScopeRecords.Emplace(EdgeIdx, Node.Index, Time, ClosestPoint);
@@ -208,7 +254,10 @@ namespace PCGExGraphs
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(PointEdgePass::Apply);
 
-			if (Records.IsEmpty()) { return; }
+			if (Records.IsEmpty())
+			{
+				return;
+			}
 
 			// CSR-bucket records by edge so per-edge sort can run in parallel. Cheaper than a
 			// global O(N log N) sort when typical per-edge collinear count is small (1-8).
@@ -218,8 +267,14 @@ namespace PCGExGraphs
 
 			TArray<int32> EdgeOffsets;
 			EdgeOffsets.SetNumZeroed(NumEdges + 1);
-			for (const FPECollinear& R : Records) { EdgeOffsets[R.EdgeIdx + 1]++; }
-			for (int32 i = 1; i <= NumEdges; i++) { EdgeOffsets[i] += EdgeOffsets[i - 1]; }
+			for (const FPECollinear& R : Records)
+			{
+				EdgeOffsets[R.EdgeIdx + 1]++;
+			}
+			for (int32 i = 1; i <= NumEdges; i++)
+			{
+				EdgeOffsets[i] += EdgeOffsets[i - 1];
+			}
 
 			// Collect only edges that actually have records. When crossings are sparse (typical),
 			// this is far fewer than NumEdges, avoiding millions of no-op ParallelFor tasks.
@@ -227,13 +282,19 @@ namespace PCGExGraphs
 			NonEmptyBuckets.Reserve(NumRecords); // at most one unique edge per record
 			for (int32 i = 0; i < NumEdges; i++)
 			{
-				if (EdgeOffsets[i + 1] > EdgeOffsets[i]) { NonEmptyBuckets.Add(i); }
+				if (EdgeOffsets[i + 1] > EdgeOffsets[i])
+				{
+					NonEmptyBuckets.Add(i);
+				}
 			}
 
 			TArray<FPECollinear> Bucketed;
 			Bucketed.SetNumUninitialized(NumRecords);
 			TArray<int32> Cursor = EdgeOffsets;
-			for (const FPECollinear& R : Records) { Bucketed[Cursor[R.EdgeIdx]++] = R; }
+			for (const FPECollinear& R : Records)
+			{
+				Bucketed[Cursor[R.EdgeIdx]++] = R;
+			}
 
 			// Parallel per-edge sort by Time. Time is a ratio of DistSquared so ties are
 			// effectively impossible -- unstable sort is sufficient and faster than StableSort.
@@ -242,9 +303,15 @@ namespace PCGExGraphs
 				const int32 EdgeIdx = NonEmptyBuckets[i];
 				const int32 Begin = EdgeOffsets[EdgeIdx];
 				const int32 End = EdgeOffsets[EdgeIdx + 1];
-				if (End - Begin <= 1) { return; }
+				if (End - Begin <= 1)
+				{
+					return;
+				}
 				TArrayView<FPECollinear> Slice = MakeArrayView(Bucketed.GetData() + Begin, End - Begin);
-				Slice.Sort([](const FPECollinear& A, const FPECollinear& B) { return A.Time < B.Time; });
+				Slice.Sort([](const FPECollinear& A, const FPECollinear& B)
+				{
+					return A.Time < B.Time;
+				});
 			});
 
 			// Sequential subdivision.
@@ -256,7 +323,10 @@ namespace PCGExGraphs
 			{
 				const int32 Begin = EdgeOffsets[EdgeIdx];
 				const int32 End = EdgeOffsets[EdgeIdx + 1];
-				if (Begin == End) { continue; }
+				if (Begin == End)
+				{
+					continue;
+				}
 
 				const FEdge& SrcEdge = Graph->Edges[EdgeIdx];
 				const int32 RootIndex = Allocations.EdgeRootIndex[EdgeIdx];
@@ -353,8 +423,14 @@ namespace PCGExGraphs
 			FVector PointOnB;
 			FMath::SegmentDistToSegment(A0, B0, A1, B1, PointOnA, PointOnB);
 
-			if (FVector::DistSquared(PointOnA, PointOnB) >= Allocations.ToleranceSquared) { return false; }
-			if (PointOnA == A0 || PointOnA == B0 || PointOnB == A1 || PointOnB == B1) { return false; }
+			if (FVector::DistSquared(PointOnA, PointOnB) >= Allocations.ToleranceSquared)
+			{
+				return false;
+			}
+			if (PointOnA == A0 || PointOnA == B0 || PointOnB == A1 || PointOnB == B1)
+			{
+				return false;
+			}
 
 			OutCenter = FMath::Lerp(PointOnA, PointOnB, 0.5);
 			OutTimeA = FVector::DistSquared(A0, PointOnA) / Allocations.LengthSquared[EdgeAIdx];
@@ -377,7 +453,10 @@ namespace PCGExGraphs
 
 			PCGEX_SCOPE_LOOP(EdgeIdx)
 			{
-				if (!Allocations.ValidEdges[EdgeIdx]) { continue; }
+				if (!Allocations.ValidEdges[EdgeIdx])
+				{
+					continue;
+				}
 
 				const FEdge& Edge = Graph->Edges[EdgeIdx];
 				const FBox& Box = Allocations.EdgeBoxes[EdgeIdx];
@@ -388,23 +467,38 @@ namespace PCGExGraphs
 				if (!bEnableSelfIntersection && Allocations.EdgeRootIOSetIdx.IsValidIndex(EdgeIdx))
 				{
 					const int32 SetIdx = Allocations.EdgeRootIOSetIdx[EdgeIdx];
-					if (SetIdx >= 0) { RootIOIndices = &Allocations.UniqueRootIOSets[SetIdx]; }
+					if (SetIdx >= 0)
+					{
+						RootIOIndices = &Allocations.UniqueRootIOSets[SetIdx];
+					}
 				}
 
 				Octree->FindElementsWithBoundsTest(Box, [&](const PCGExOctree::FItem& Item)
 				{
 					const int32 OtherIdx = Item.Index;
 					// Canonical ordering: emit each unordered pair exactly once.
-					if (OtherIdx <= EdgeIdx) { return; }
-					if (!Allocations.ValidEdges[OtherIdx]) { return; }
+					if (OtherIdx <= EdgeIdx)
+					{
+						return;
+					}
+					if (!Allocations.ValidEdges[OtherIdx])
+					{
+						return;
+					}
 
 					const FEdge& OtherEdge = Graph->Edges[OtherIdx];
 					if (Edge.Start == OtherEdge.Start || Edge.Start == OtherEdge.End ||
-						Edge.End == OtherEdge.Start || Edge.End == OtherEdge.End) { return; }
+						Edge.End == OtherEdge.Start || Edge.End == OtherEdge.End)
+					{
+						return;
+					}
 
 					if (Details.bUseMinAngle || Details.bUseMaxAngle)
 					{
-						if (!Details.CheckDot(FMath::Abs(FVector::DotProduct(Directions[EdgeIdx], Directions[OtherIdx])))) { return; }
+						if (!Details.CheckDot(FMath::Abs(FVector::DotProduct(Directions[EdgeIdx], Directions[OtherIdx]))))
+						{
+							return;
+						}
 					}
 
 					if (RootIOIndices && !RootIOIndices->IsEmpty())
@@ -415,7 +509,10 @@ namespace PCGExGraphs
 							const TSet<int32>& OtherIOs = Allocations.UniqueRootIOSets[OtherSetIdx];
 							for (const int32 IO : OtherIOs)
 							{
-								if (RootIOIndices->Contains(IO)) { return; }
+								if (RootIOIndices->Contains(IO))
+								{
+									return;
+								}
 							}
 						}
 					}
@@ -423,7 +520,10 @@ namespace PCGExGraphs
 					FVector Center;
 					double TimeA;
 					double TimeB;
-					if (!TryFindSplit(Allocations, EdgeIdx, OtherIdx, Center, TimeA, TimeB)) { return; }
+					if (!TryFindSplit(Allocations, EdgeIdx, OtherIdx, Center, TimeA, TimeB))
+					{
+						return;
+					}
 
 					FEECrossing& Rec = OutScopeRecords.Emplace_GetRef();
 					Rec.EdgeA = EdgeIdx;
@@ -441,12 +541,18 @@ namespace PCGExGraphs
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(EdgeEdgePass::ResolveCrossings);
 
-			if (Records.IsEmpty()) { return 0; }
+			if (Records.IsEmpty())
+			{
+				return 0;
+			}
 
 			// Canonical-pair filter at emit time guarantees one record per unordered pair, so we
 			// don't need a dedup pass. Sort by packed pair key for deterministic node-allocation
 			// order; single-uint64 compare keeps the comparator branch-free.
-			Records.Sort([](const FEECrossing& A, const FEECrossing& B) { return A.Key() < B.Key(); });
+			Records.Sort([](const FEECrossing& A, const FEECrossing& B)
+			{
+				return A.Key() < B.Key();
+			});
 
 			const TSharedPtr<FGraph> Graph = Allocations.Graph;
 			const double ToleranceSq = Allocations.ToleranceSquared;
@@ -470,7 +576,7 @@ namespace PCGExGraphs
 				int32 Reused = INDEX_NONE;
 				const FVector& Center = Rec.Center;
 
-				for (const int32 Endpoint : {(int32)EdgeA.Start, (int32)EdgeA.End, (int32)EdgeB.Start, (int32)EdgeB.End})
+				for (const int32 Endpoint : {static_cast<int32>(EdgeA.Start), static_cast<int32>(EdgeA.End), static_cast<int32>(EdgeB.Start), static_cast<int32>(EdgeB.End)})
 				{
 					if (FVector::DistSquared(Positions[Endpoint], Center) < ToleranceSq)
 					{
@@ -484,10 +590,19 @@ namespace PCGExGraphs
 					Octree->FindElementsWithBoundsTest(PCGEX_BOX_TOLERANCE_INLINE(Center, Center, ToleranceVal),
 					                                   [&](const PCGExOctree::FItem& Item)
 					                                   {
-						                                   if (Reused != INDEX_NONE || !Allocations.ValidEdges[Item.Index]) { return; }
+						                                   if (Reused != INDEX_NONE || !Allocations.ValidEdges[Item.Index])
+						                                   {
+							                                   return;
+						                                   }
 						                                   const FEdge& Near = Graph->Edges[Item.Index];
-						                                   if (FVector::DistSquared(Positions[Near.Start], Center) < ToleranceSq) { Reused = Near.Start; }
-						                                   else if (FVector::DistSquared(Positions[Near.End], Center) < ToleranceSq) { Reused = Near.End; }
+						                                   if (FVector::DistSquared(Positions[Near.Start], Center) < ToleranceSq)
+						                                   {
+							                                   Reused = Near.Start;
+						                                   }
+						                                   else if (FVector::DistSquared(Positions[Near.End], Center) < ToleranceSq)
+						                                   {
+							                                   Reused = Near.End;
+						                                   }
 					                                   });
 				}
 
@@ -538,7 +653,10 @@ namespace PCGExGraphs
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(EdgeEdgePass::Apply);
 
-			if (Records.IsEmpty()) { return; }
+			if (Records.IsEmpty())
+			{
+				return;
+			}
 
 			// Each crossing splits both EdgeA and EdgeB, so we need 2 (Time, NodeIdx) entries per
 			// record bucketed by edge. Build a CSR layout (Offsets[NumEdges+1], flat Splits) so
@@ -565,7 +683,10 @@ namespace PCGExGraphs
 			}
 
 			// Prefix sum.
-			for (int32 i = 1; i <= NumEdges; i++) { EdgeOffsets[i] += EdgeOffsets[i - 1]; }
+			for (int32 i = 1; i <= NumEdges; i++)
+			{
+				EdgeOffsets[i] += EdgeOffsets[i - 1];
+			}
 			const int32 TotalSplits = EdgeOffsets[NumEdges];
 
 			// Collect only edges that actually have crossings before spawning parallel tasks.
@@ -574,7 +695,10 @@ namespace PCGExGraphs
 			NonEmptyBuckets.Reserve(FMath::Min(NumEdges, 2 * NumPrimaries));
 			for (int32 i = 0; i < NumEdges; i++)
 			{
-				if (EdgeOffsets[i + 1] > EdgeOffsets[i]) { NonEmptyBuckets.Add(i); }
+				if (EdgeOffsets[i + 1] > EdgeOffsets[i])
+				{
+					NonEmptyBuckets.Add(i);
+				}
 			}
 
 			TArray<FEdgeSplit> Splits;
@@ -595,9 +719,15 @@ namespace PCGExGraphs
 				const int32 EdgeIdx = NonEmptyBuckets[i];
 				const int32 Begin = EdgeOffsets[EdgeIdx];
 				const int32 End = EdgeOffsets[EdgeIdx + 1];
-				if (End - Begin <= 1) { return; }
+				if (End - Begin <= 1)
+				{
+					return;
+				}
 				TArrayView<FEdgeSplit> Slice = MakeArrayView(Splits.GetData() + Begin, End - Begin);
-				Slice.Sort([](const FEdgeSplit& A, const FEdgeSplit& B) { return A.Time < B.Time; });
+				Slice.Sort([](const FEdgeSplit& A, const FEdgeSplit& B)
+				{
+					return A.Time < B.Time;
+				});
 			});
 
 			// Pass 4: sequential subdivision (graph mutations).
@@ -608,7 +738,10 @@ namespace PCGExGraphs
 			{
 				const int32 Begin = EdgeOffsets[EdgeIdx];
 				const int32 End = EdgeOffsets[EdgeIdx + 1];
-				if (Begin == End) { continue; }
+				if (Begin == End)
+				{
+					continue;
+				}
 
 				const FEdge& SrcEdge = Graph->Edges[EdgeIdx];
 				const int32 RootIndex = Allocations.EdgeRootIndex[EdgeIdx];
@@ -620,7 +753,10 @@ namespace PCGExGraphs
 				for (int32 k = Begin; k < End; k++)
 				{
 					const int32 Next = Splits[k].NodeIdx;
-					if (Next == Prev) { continue; }
+					if (Next == Prev)
+					{
+						continue;
+					}
 
 					if (Graph->InsertEdge_Unsafe(Prev, Next, NewEdge, IOIndex))
 					{

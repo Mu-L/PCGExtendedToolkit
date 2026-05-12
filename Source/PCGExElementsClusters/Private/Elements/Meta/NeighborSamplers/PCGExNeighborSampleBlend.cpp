@@ -23,7 +23,10 @@ void FPCGExNeighborSampleBlend::PrepareForCluster(FPCGExContext* InContext, cons
 	BlendOpsManager->SetTargetFacade(VtxDataFacade);
 	BlendOpsManager->SetSources(Factory->SamplingConfig.NeighborSource == EPCGExClusterElement::Vtx ? VtxDataFacade : EdgeDataFacade);
 
-	if (!BlendOpsManager->Init(Context, Factory->BlendingFactories)) { return; }
+	if (!BlendOpsManager->Init(Context, Factory->BlendingFactories))
+	{
+		return;
+	}
 
 	bIsValidOperation = true;
 }
@@ -61,7 +64,10 @@ void FPCGExNeighborSampleBlend::CompleteOperation()
 }
 
 #if WITH_EDITOR
-FString UPCGExNeighborSampleBlendSettings::GetDisplayName() const { return TEXT("TBD"); }
+FString UPCGExNeighborSampleBlendSettings::GetDisplayName() const
+{
+	return TEXT("TBD");
+}
 #endif
 
 TSharedPtr<FPCGExNeighborSampleOperation> UPCGExNeighborSamplerFactoryBlend::CreateOperation(FPCGExContext* InContext) const
@@ -76,7 +82,10 @@ TSharedPtr<FPCGExNeighborSampleOperation> UPCGExNeighborSamplerFactoryBlend::Cre
 
 bool UPCGExNeighborSamplerFactoryBlend::RegisterConsumableAttributes(FPCGExContext* InContext) const
 {
-	if (!Super::RegisterConsumableAttributes(InContext)) { return false; }
+	if (!Super::RegisterConsumableAttributes(InContext))
+	{
+		return false;
+	}
 	// TODO !
 	return true;
 }

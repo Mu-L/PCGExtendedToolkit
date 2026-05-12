@@ -5,12 +5,12 @@
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetData.h"
-#include "Engine/World.h"
 #include "Engine/Level.h"
+#include "Engine/World.h"
 #endif
 
-#include "PCGExLog.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExLog.h"
 #include "PCGExSocketProvider.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
 
@@ -22,12 +22,12 @@ UPCGExLevelCollection::UPCGExLevelCollection(const FObjectInitializer& ObjectIni
 	const auto& Settings = PCGEX_COLLECTIONS_SETTINGS;
 
 	UClass* FilterClass = Settings.DefaultContentFilterClass
-		                      ? Settings.DefaultContentFilterClass.Get()
-		                      : UPCGExDefaultActorContentFilter::StaticClass();
+		? Settings.DefaultContentFilterClass.Get()
+		: UPCGExDefaultActorContentFilter::StaticClass();
 
 	UClass* EvalClass = Settings.DefaultBoundsEvaluatorClass
-		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
-		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
+		? Settings.DefaultBoundsEvaluatorClass.Get()
+		: UPCGExDefaultBoundsEvaluator::StaticClass();
 
 	ContentFilter = Cast<UPCGExActorContentFilter>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("ContentFilter"),
@@ -55,7 +55,10 @@ bool FPCGExLevelCollectionEntry::Validate(const UPCGExAssetCollection* ParentCol
 {
 	if (!bIsSubCollection)
 	{
-		if (!Level.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries) { return false; }
+		if (!Level.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries)
+		{
+			return false;
+		}
 	}
 
 	return FPCGExAssetCollectionEntry::Validate(ParentCollection);
@@ -85,7 +88,10 @@ void FPCGExLevelCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		{
 			for (AActor* Actor : World->PersistentLevel->Actors)
 			{
-				if (!Actor) { continue; }
+				if (!Actor)
+				{
+					continue;
+				}
 
 				// Extract sockets from socket actors before content filter.
 				// StaticPassesFilter will then reject actors with ShouldStripFromExport=true,
@@ -152,12 +158,18 @@ void FPCGExLevelCollectionEntry::EDITOR_Sanitize()
 
 void FPCGExLevelCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
 {
-	if (bIsSubCollection) { return; }
+	if (bIsSubCollection)
+	{
+		return;
+	}
 
 	// Advertise Level independent of Staging.Path so rebuild fires even on fresh entries
 	// that haven't been staged yet.
 	const FSoftObjectPath LevelPath = Level.ToSoftObjectPath();
-	if (LevelPath.IsValid()) { OutPaths.Emplace(LevelPath); }
+	if (LevelPath.IsValid())
+	{
+		OutPaths.Emplace(LevelPath);
+	}
 }
 #endif
 
@@ -189,7 +201,10 @@ void UPCGExLevelCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAss
 			}
 		}
 
-		if (bAlreadyExists) { continue; }
+		if (bAlreadyExists)
+		{
+			continue;
+		}
 
 		FPCGExLevelCollectionEntry Entry = FPCGExLevelCollectionEntry();
 		Entry.Level = LevelPtr;

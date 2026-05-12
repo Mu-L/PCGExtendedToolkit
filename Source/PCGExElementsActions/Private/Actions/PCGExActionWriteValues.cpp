@@ -17,7 +17,10 @@
 
 bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!FPCGExActionOperation::PrepareForData(InContext, InPointDataFacade)) { return false; }
+	if (!FPCGExActionOperation::PrepareForData(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	for (FPCGMetadataAttributeBase* AttributeBase : TypedFactory->CheckSuccessInfos->Attributes)
 	{
@@ -73,7 +76,10 @@ void FPCGExActionWriteValuesOperation::OnMatchFail(int32 Index)
 }
 
 #if WITH_EDITOR
-FString UPCGExActionWriteValuesProviderSettings::GetDisplayName() const { return TEXT(""); }
+FString UPCGExActionWriteValuesProviderSettings::GetDisplayName() const
+{
+	return TEXT("");
+}
 #endif
 
 PCGEX_BITMASK_TRANSMUTE_CREATE_OPERATION(ActionWriteValues, {})
@@ -91,7 +97,10 @@ bool UPCGExActionWriteValuesFactory::Boot(FPCGContext* InContext)
 	CheckSuccessInfos = PCGExData::GatherAttributeInfos(InContext, PCGExActionWriteValues::SourceForwardSuccess, SuccessAttributesFilter, true);
 	CheckFailInfos = PCGExData::GatherAttributeInfos(InContext, PCGExActionWriteValues::SourceForwardFail, FailAttributesFilter, true);
 
-	if (!CheckSuccessInfos || !CheckFailInfos) { return false; }
+	if (!CheckSuccessInfos || !CheckFailInfos)
+	{
+		return false;
+	}
 
 	return true;
 }

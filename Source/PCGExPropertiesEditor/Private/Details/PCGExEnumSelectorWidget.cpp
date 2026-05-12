@@ -4,19 +4,19 @@
 #include "Details/PCGExEnumSelectorWidget.h"
 
 #include "DetailLayoutBuilder.h"
-#include "PropertyHandle.h"
 #include "PCGExEnumSelector.h"
+#include "PropertyHandle.h"
 #include "ScopedTransaction.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectIterator.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/SNullWidget.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
-#include "Widgets/SBoxPanel.h"
-#include "Widgets/SNullWidget.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/SListView.h"
 
@@ -29,7 +29,10 @@ namespace PCGExEnumSelectorWidget
 	 * for a long-scrolling list; this is the same Regular face at a slightly larger size,
 	 * which matches the readability of native UE class/asset pickers.
 	 */
-	static FSlateFontInfo MenuItemFont() { return FCoreStyle::GetDefaultFontStyle("Regular", 10); }
+	static FSlateFontInfo MenuItemFont()
+	{
+		return FCoreStyle::GetDefaultFontStyle("Regular", 10);
+	}
 
 	// ---------- Raw data access on the FPCGExEnumSelector property handle -------------------
 
@@ -37,14 +40,20 @@ namespace PCGExEnumSelectorWidget
 	static TArray<FPCGExEnumSelector*> AccessSelectors(const TSharedRef<IPropertyHandle>& ValueHandle)
 	{
 		TArray<FPCGExEnumSelector*> Out;
-		if (!ValueHandle->IsValidHandle()) { return Out; }
+		if (!ValueHandle->IsValidHandle())
+		{
+			return Out;
+		}
 
 		TArray<void*> RawData;
 		ValueHandle->AccessRawData(RawData);
 		Out.Reserve(RawData.Num());
 		for (void* Raw : RawData)
 		{
-			if (Raw) { Out.Add(static_cast<FPCGExEnumSelector*>(Raw)); }
+			if (Raw)
+			{
+				Out.Add(static_cast<FPCGExEnumSelector*>(Raw));
+			}
 		}
 		return Out;
 	}
@@ -54,7 +63,10 @@ namespace PCGExEnumSelectorWidget
 	{
 		bOutMultipleValues = false;
 		const TArray<FPCGExEnumSelector*> Selectors = AccessSelectors(ValueHandle);
-		if (Selectors.IsEmpty()) { return nullptr; }
+		if (Selectors.IsEmpty())
+		{
+			return nullptr;
+		}
 
 		UEnum* First = Selectors[0]->Class;
 		for (int32 i = 1; i < Selectors.Num(); ++i)
@@ -73,7 +85,10 @@ namespace PCGExEnumSelectorWidget
 	{
 		bOutMultipleValues = false;
 		const TArray<FPCGExEnumSelector*> Selectors = AccessSelectors(ValueHandle);
-		if (Selectors.IsEmpty()) { return 0; }
+		if (Selectors.IsEmpty())
+		{
+			return 0;
+		}
 
 		const int64 First = Selectors[0]->Value;
 		for (int32 i = 1; i < Selectors.Num(); ++i)
@@ -96,15 +111,24 @@ namespace PCGExEnumSelectorWidget
 		const FText& TransactionDescription,
 		TFunctionRef<void(FPCGExEnumSelector&)> Mutator)
 	{
-		if (!ValueHandle->IsValidHandle()) { return; }
+		if (!ValueHandle->IsValidHandle())
+		{
+			return;
+		}
 
 		const TArray<FPCGExEnumSelector*> Selectors = AccessSelectors(ValueHandle);
-		if (Selectors.IsEmpty()) { return; }
+		if (Selectors.IsEmpty())
+		{
+			return;
+		}
 
 		FScopedTransaction Transaction(TransactionDescription);
 		ValueHandle->NotifyPreChange();
 
-		for (FPCGExEnumSelector* Selector : Selectors) { Mutator(*Selector); }
+		for (FPCGExEnumSelector* Selector : Selectors)
+		{
+			Mutator(*Selector);
+		}
 
 		ValueHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
 		ValueHandle->NotifyFinishedChangingProperties();
@@ -112,7 +136,10 @@ namespace PCGExEnumSelectorWidget
 
 	// ---------- Enum metadata helpers ----------------------------------------------------------
 
-	static bool IsBitflagsEnum(const UEnum* Enum) { return Enum && Enum->HasMetaData(TEXT("Bitflags")); }
+	static bool IsBitflagsEnum(const UEnum* Enum)
+	{
+		return Enum && Enum->HasMetaData(TEXT("Bitflags"));
+	}
 
 	/**
 	 * Mirrors the engine's own SEnumComboBox visibility filter so behavior matches what users
@@ -136,7 +163,10 @@ namespace PCGExEnumSelectorWidget
 		}
 
 		const FString EntryName = Enum->GetNameStringByIndex(Index);
-		if (EntryName.EndsWith(TEXT("_MAX"), ESearchCase::CaseSensitive)) { return true; }
+		if (EntryName.EndsWith(TEXT("_MAX"), ESearchCase::CaseSensitive))
+		{
+			return true;
+		}
 
 		return false;
 	}
@@ -148,9 +178,18 @@ namespace PCGExEnumSelectorWidget
 	 */
 	static bool ShouldHideEnumClass(const UEnum* Enum)
 	{
-		if (!Enum) { return true; }
-		if (Enum->HasMetaData(TEXT("Hidden"))) { return true; }
-		if (Enum->HasMetaData(TEXT("BlueprintInternalUseOnly"))) { return true; }
+		if (!Enum)
+		{
+			return true;
+		}
+		if (Enum->HasMetaData(TEXT("Hidden")))
+		{
+			return true;
+		}
+		if (Enum->HasMetaData(TEXT("BlueprintInternalUseOnly")))
+		{
+			return true;
+		}
 		return false;
 	}
 
@@ -160,8 +199,14 @@ namespace PCGExEnumSelectorWidget
 	{
 		bool bMulti = false;
 		UEnum* Enum = ReadUnanimousClass(ValueHandle, bMulti);
-		if (bMulti) { return LOCTEXT("MultipleClasses", "Multiple Values"); }
-		if (!Enum) { return LOCTEXT("NoClass", "Select Enum..."); }
+		if (bMulti)
+		{
+			return LOCTEXT("MultipleClasses", "Multiple Values");
+		}
+		if (!Enum)
+		{
+			return LOCTEXT("NoClass", "Select Enum...");
+		}
 		return FText::FromString(Enum->GetName());
 	}
 
@@ -169,28 +214,46 @@ namespace PCGExEnumSelectorWidget
 	{
 		bool bMultiClass = false;
 		UEnum* Enum = ReadUnanimousClass(ValueHandle, bMultiClass);
-		if (bMultiClass || !Enum) { return LOCTEXT("NoValue", "—"); }
+		if (bMultiClass || !Enum)
+		{
+			return LOCTEXT("NoValue", "—");
+		}
 
 		bool bMultiValue = false;
 		const int64 Value = ReadUnanimousValue(ValueHandle, bMultiValue);
-		if (bMultiValue) { return LOCTEXT("MultipleValues", "Multiple Values"); }
+		if (bMultiValue)
+		{
+			return LOCTEXT("MultipleValues", "Multiple Values");
+		}
 
 		if (IsBitflagsEnum(Enum))
 		{
-			if (Value == 0) { return LOCTEXT("BitflagsNone", "(None)"); }
+			if (Value == 0)
+			{
+				return LOCTEXT("BitflagsNone", "(None)");
+			}
 
 			TArray<FString> Parts;
 			for (int32 i = 0, Num = Enum->NumEnums(); i < Num; ++i)
 			{
-				if (ShouldHideEnumValue(Enum, i)) { continue; }
+				if (ShouldHideEnumValue(Enum, i))
+				{
+					continue;
+				}
 				const int64 Bit = Enum->GetValueByIndex(i);
-				if (Bit != 0 && (Value & Bit) == Bit) { Parts.Add(Enum->GetDisplayNameTextByIndex(i).ToString()); }
+				if (Bit != 0 && (Value & Bit) == Bit)
+				{
+					Parts.Add(Enum->GetDisplayNameTextByIndex(i).ToString());
+				}
 			}
 			return FText::FromString(FString::Join(Parts, TEXT(" | ")));
 		}
 
 		const int32 Index = Enum->GetIndexByValue(Value);
-		if (Index == INDEX_NONE) { return FText::AsNumber(Value); }
+		if (Index == INDEX_NONE)
+		{
+			return FText::AsNumber(Value);
+		}
 		return Enum->GetDisplayNameTextByIndex(Index);
 	}
 
@@ -205,7 +268,10 @@ namespace PCGExEnumSelectorWidget
 	class SEnumClassMenu : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SEnumClassMenu) {}
+		SLATE_BEGIN_ARGS(SEnumClassMenu)
+			{
+			}
+
 			SLATE_ARGUMENT(TSharedPtr<IPropertyHandle>, ValueHandle)
 			SLATE_ARGUMENT(TWeakPtr<SComboButton>, OwningCombo)
 		SLATE_END_ARGS()
@@ -249,14 +315,20 @@ namespace PCGExEnumSelectorWidget
 			for (TObjectIterator<UEnum> It; It; ++It)
 			{
 				UEnum* Enum = *It;
-				if (ShouldHideEnumClass(Enum)) { continue; }
+				if (ShouldHideEnumClass(Enum))
+				{
+					continue;
+				}
 				AllEntries.Add(Enum);
 			}
 			AllEntries.Sort([](const TWeakObjectPtr<UEnum>& A, const TWeakObjectPtr<UEnum>& B)
 			{
 				const UEnum* EA = A.Get();
 				const UEnum* EB = B.Get();
-				if (!EA || !EB) { return EA != nullptr; }
+				if (!EA || !EB)
+				{
+					return EA != nullptr;
+				}
 				return EA->GetName() < EB->GetName();
 			});
 		}
@@ -274,7 +346,10 @@ namespace PCGExEnumSelectorWidget
 				for (const TWeakObjectPtr<UEnum>& Weak : AllEntries)
 				{
 					const UEnum* Enum = Weak.Get();
-					if (!Enum) { continue; }
+					if (!Enum)
+					{
+						continue;
+					}
 					if (Enum->GetName().Contains(Query, ESearchCase::IgnoreCase) ||
 						Enum->GetDisplayNameText().ToString().Contains(Query, ESearchCase::IgnoreCase))
 					{
@@ -282,7 +357,10 @@ namespace PCGExEnumSelectorWidget
 					}
 				}
 			}
-			if (ListView.IsValid()) { ListView->RequestListRefresh(); }
+			if (ListView.IsValid())
+			{
+				ListView->RequestListRefresh();
+			}
 		}
 
 		TSharedRef<ITableRow> OnGenerateRow(TWeakObjectPtr<UEnum> Item, const TSharedRef<STableViewBase>& OwnerTable)
@@ -303,21 +381,33 @@ namespace PCGExEnumSelectorWidget
 		void OnSelectionChanged(TWeakObjectPtr<UEnum> Selected, ESelectInfo::Type SelectInfo)
 		{
 			// Ignore programmatic selection changes from list refresh; only act on user clicks.
-			if (SelectInfo == ESelectInfo::Direct) { return; }
+			if (SelectInfo == ESelectInfo::Direct)
+			{
+				return;
+			}
 
 			UEnum* NewClass = Selected.Get();
-			if (!NewClass) { return; }
-			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle()) { return; }
+			if (!NewClass)
+			{
+				return;
+			}
+			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle())
+			{
+				return;
+			}
 
 			ApplyWrite(ValueHandle.ToSharedRef(), LOCTEXT("SetEnumClass", "Set Enum Class"),
-				[NewClass](FPCGExEnumSelector& Selector)
-				{
-					Selector.Class = NewClass;
-					// Previous Value is unlikely to map cleanly to a different enum — reset.
-					Selector.Value = 0;
-				});
+			           [NewClass](FPCGExEnumSelector& Selector)
+			           {
+				           Selector.Class = NewClass;
+				           // Previous Value is unlikely to map cleanly to a different enum — reset.
+				           Selector.Value = 0;
+			           });
 
-			if (TSharedPtr<SComboButton> Combo = OwningCombo.Pin()) { Combo->SetIsOpen(false); }
+			if (TSharedPtr<SComboButton> Combo = OwningCombo.Pin())
+			{
+				Combo->SetIsOpen(false);
+			}
 		}
 
 		TSharedPtr<IPropertyHandle> ValueHandle;
@@ -334,7 +424,10 @@ namespace PCGExEnumSelectorWidget
 	class SEnumValueMenu : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SEnumValueMenu) {}
+		SLATE_BEGIN_ARGS(SEnumValueMenu)
+			{
+			}
+
 			SLATE_ARGUMENT(TSharedPtr<IPropertyHandle>, ValueHandle)
 			SLATE_ARGUMENT(TWeakObjectPtr<UEnum>, EnumClass)
 			SLATE_ARGUMENT(TWeakPtr<SComboButton>, OwningCombo)
@@ -369,10 +462,16 @@ namespace PCGExEnumSelectorWidget
 		{
 			Entries.Reset();
 			const UEnum* Enum = EnumClass.Get();
-			if (!Enum) { return; }
+			if (!Enum)
+			{
+				return;
+			}
 			for (int32 i = 0, Num = Enum->NumEnums(); i < Num; ++i)
 			{
-				if (ShouldHideEnumValue(Enum, i)) { continue; }
+				if (ShouldHideEnumValue(Enum, i))
+				{
+					continue;
+				}
 				Entries.Add(MakeShared<int32>(i));
 			}
 		}
@@ -395,19 +494,37 @@ namespace PCGExEnumSelectorWidget
 
 		void OnSelectionChanged(TSharedPtr<int32> Selected, ESelectInfo::Type SelectInfo)
 		{
-			if (SelectInfo == ESelectInfo::Direct) { return; }
-			if (!Selected.IsValid()) { return; }
+			if (SelectInfo == ESelectInfo::Direct)
+			{
+				return;
+			}
+			if (!Selected.IsValid())
+			{
+				return;
+			}
 
 			const UEnum* Enum = EnumClass.Get();
-			if (!Enum) { return; }
-			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle()) { return; }
+			if (!Enum)
+			{
+				return;
+			}
+			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle())
+			{
+				return;
+			}
 
 			const int64 NewValue = Enum->GetValueByIndex(*Selected);
 
 			ApplyWrite(ValueHandle.ToSharedRef(), LOCTEXT("SetEnumValue", "Set Enum Value"),
-				[NewValue](FPCGExEnumSelector& Selector) { Selector.Value = NewValue; });
+			           [NewValue](FPCGExEnumSelector& Selector)
+			           {
+				           Selector.Value = NewValue;
+			           });
 
-			if (TSharedPtr<SComboButton> Combo = OwningCombo.Pin()) { Combo->SetIsOpen(false); }
+			if (TSharedPtr<SComboButton> Combo = OwningCombo.Pin())
+			{
+				Combo->SetIsOpen(false);
+			}
 		}
 
 		TSharedPtr<IPropertyHandle> ValueHandle;
@@ -422,7 +539,10 @@ namespace PCGExEnumSelectorWidget
 	class SEnumBitflagsMenu : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SEnumBitflagsMenu) {}
+		SLATE_BEGIN_ARGS(SEnumBitflagsMenu)
+			{
+			}
+
 			SLATE_ARGUMENT(TSharedPtr<IPropertyHandle>, ValueHandle)
 			SLATE_ARGUMENT(TWeakObjectPtr<UEnum>, EnumClass)
 		SLATE_END_ARGS()
@@ -439,9 +559,15 @@ namespace PCGExEnumSelectorWidget
 			{
 				for (int32 i = 0, Num = Enum->NumEnums(); i < Num; ++i)
 				{
-					if (ShouldHideEnumValue(Enum, i)) { continue; }
+					if (ShouldHideEnumValue(Enum, i))
+					{
+						continue;
+					}
 					const int64 Bit = Enum->GetValueByIndex(i);
-					if (Bit == 0) { continue; }
+					if (Bit == 0)
+					{
+						continue;
+					}
 
 					const FText Display = Enum->GetDisplayNameTextByIndex(i);
 					const FText Tooltip = Enum->GetToolTipTextByIndex(i);
@@ -479,31 +605,52 @@ namespace PCGExEnumSelectorWidget
 	private:
 		void EnsureCache() const
 		{
-			if (bCacheValid) { return; }
-			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle()) { return; }
+			if (bCacheValid)
+			{
+				return;
+			}
+			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle())
+			{
+				return;
+			}
 			CachedValue = ReadUnanimousValue(ValueHandle.ToSharedRef(), bCachedMulti);
 			bCacheValid = true;
 		}
 
 		ECheckBoxState IsBitChecked(int64 Bit) const
 		{
-			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle()) { return ECheckBoxState::Unchecked; }
+			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle())
+			{
+				return ECheckBoxState::Unchecked;
+			}
 			EnsureCache();
-			if (bCachedMulti) { return ECheckBoxState::Undetermined; }
+			if (bCachedMulti)
+			{
+				return ECheckBoxState::Undetermined;
+			}
 			return (CachedValue & Bit) == Bit ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 		}
 
 		void OnBitToggled(ECheckBoxState NewState, int64 Bit)
 		{
-			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle()) { return; }
+			if (!ValueHandle.IsValid() || !ValueHandle->IsValidHandle())
+			{
+				return;
+			}
 			const bool bSet = (NewState == ECheckBoxState::Checked);
 
 			ApplyWrite(ValueHandle.ToSharedRef(), LOCTEXT("ToggleEnumBit", "Toggle Enum Flag"),
-				[Bit, bSet](FPCGExEnumSelector& Selector)
-				{
-					if (bSet) { Selector.Value |= Bit; }
-					else { Selector.Value &= ~Bit; }
-				});
+			           [Bit, bSet](FPCGExEnumSelector& Selector)
+			           {
+				           if (bSet)
+				           {
+					           Selector.Value |= Bit;
+				           }
+				           else
+				           {
+					           Selector.Value &= ~Bit;
+				           }
+			           });
 
 			bCacheValid = false;
 		}
@@ -522,7 +669,10 @@ namespace PCGExEnumSelectorWidget
 
 	TSharedRef<SWidget> Make(const TSharedRef<IPropertyHandle>& ValueHandle, bool bAllowClassPicker)
 	{
-		if (!ValueHandle->IsValidHandle()) { return SNullWidget::NullWidget; }
+		if (!ValueHandle->IsValidHandle())
+		{
+			return SNullWidget::NullWidget;
+		}
 
 		TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
 
@@ -537,7 +687,10 @@ namespace PCGExEnumSelectorWidget
 				.ButtonContent()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([ValueHandle]() { return FormatClassButtonLabel(ValueHandle); })
+					.Text_Lambda([ValueHandle]()
+					{
+						return FormatClassButtonLabel(ValueHandle);
+					})
 					.Font(IDetailLayoutBuilder::GetDetailFont())
 				]
 			];
@@ -607,7 +760,10 @@ namespace PCGExEnumSelectorWidget
 		{
 			bool bMulti = false;
 			UEnum* Enum = ReadUnanimousClass(ValueHandle, bMulti);
-			if (!Enum) { return SNullWidget::NullWidget; }
+			if (!Enum)
+			{
+				return SNullWidget::NullWidget;
+			}
 
 			if (IsBitflagsEnum(Enum))
 			{

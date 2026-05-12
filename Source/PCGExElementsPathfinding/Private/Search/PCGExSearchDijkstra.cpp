@@ -8,8 +8,8 @@
 #include "PCGExHeuristicsHandler.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
-#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExPathQuery.h"
+#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExSearchAllocations.h"
 #include "Utils/PCGExScoredQueue.h"
 
@@ -20,8 +20,14 @@ bool FPCGExSearchOperationDijkstra::ResolveQuery(
 	const TSharedPtr<PCGExHeuristics::FLocalFeedbackHandler>& LocalFeedback) const
 {
 	TSharedPtr<PCGExPathfinding::FSearchAllocations> LocalAllocations = Allocations;
-	if (!LocalAllocations) { LocalAllocations = NewAllocations(); }
-	else { LocalAllocations->Reset(); }
+	if (!LocalAllocations)
+	{
+		LocalAllocations = NewAllocations();
+	}
+	else
+	{
+		LocalAllocations->Reset();
+	}
 
 	const TArray<PCGExClusters::FNode>& NodesRef = *Cluster->Nodes;
 	const TArray<PCGExGraphs::FEdge>& EdgesRef = *Cluster->Edges;
@@ -51,11 +57,17 @@ bool FPCGExSearchOperationDijkstra::ResolveQuery(
 	double CurrentScore;
 	while (ScoredQueue->Dequeue(CurrentNodeIndex, CurrentScore))
 	{
-		if (bEarlyExit && CurrentNodeIndex == GoalNode.Index) { break; } // Exit early
+		if (bEarlyExit && CurrentNodeIndex == GoalNode.Index)
+		{
+			break;
+		} // Exit early
 
 		const PCGExClusters::FNode& Current = NodesRef[CurrentNodeIndex];
 
-		if (Visited[CurrentNodeIndex]) { continue; }
+		if (Visited[CurrentNodeIndex])
+		{
+			continue;
+		}
 		Visited[CurrentNodeIndex] = true;
 		VisitedNum++;
 
@@ -64,7 +76,10 @@ bool FPCGExSearchOperationDijkstra::ResolveQuery(
 			const uint32 NeighborIndex = Lk.Node;
 			const uint32 EdgeIndex = Lk.Edge;
 
-			if (Visited[NeighborIndex]) { continue; }
+			if (Visited[NeighborIndex])
+			{
+				continue;
+			}
 
 			const PCGExClusters::FNode& AdjacentNode = NodesRef[NeighborIndex];
 			const PCGExGraphs::FEdge& Edge = EdgesRef[EdgeIndex];

@@ -3,10 +3,10 @@
 
 #include "MeshSelectors/PCGExMeshSelectorStaged.h"
 
-#include "Helpers/PCGExCollectionsHelpers.h"
 #include "Data/PCGPointData.h"
 #include "Elements/PCGStaticMeshSpawnerContext.h"
 #include "Elements/Metadata/PCGMetadataElementCommon.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
 #include "MeshSelectors/PCGMeshSelectorBase.h"
 
 #include "Collections/PCGExMeshCollection.h"
@@ -67,7 +67,10 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 			PCGE_LOG_C(Error, GraphAndLog, &Context, FTEXT("Unable to get hash attribute from input. Enable 'Quiet Missing Staging Data Warning' to silence this."));
 		}
 
-		if (OutPointData) { OutPointData->SetNumPoints(0); }
+		if (OutPointData)
+		{
+			OutPointData->SetNumPoints(0);
+		}
 		return true;
 	}
 
@@ -121,7 +124,10 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 			{
 				CollectionMap->InsertEntry(HashAttribute->GetValueFromItemKey(MetadataEntries[Context.CurrentPointIndex]), Context.CurrentPointIndex, OutMeshInstances);
 				Context.CurrentPointIndex++;
-				if (Context.ShouldStop()) { return false; }
+				if (Context.ShouldStop())
+				{
+					return false;
+				}
 			}
 		}
 	}
@@ -137,7 +143,10 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 			int16 MaterialPick = -1;
 
 			FPCGExEntryAccessResult Result = CollectionMap->ResolveEntry(Partition.Key, MaterialPick);
-			if (!Result.IsValid() || !Result.Host->IsType(PCGExAssetCollection::TypeIds::Mesh)) { continue; }
+			if (!Result.IsValid() || !Result.Host->IsType(PCGExAssetCollection::TypeIds::Mesh))
+			{
+				continue;
+			}
 
 			Entry = static_cast<const FPCGExMeshCollectionEntry*>(Result.Entry);
 
@@ -161,11 +170,17 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 				OutDescriptor.BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			}
 
-			if (bApplyMaterialOverrides) { Entry->ApplyMaterials(MaterialPick, OutDescriptor); }
+			if (bApplyMaterialOverrides)
+			{
+				Entry->ApplyMaterials(MaterialPick, OutDescriptor);
+			}
 
 			const TArray<int32>& InstanceIndices = InstanceList.InstancesIndices;
 			InstanceList.Instances.Reserve(InstanceIndices.Num());
-			for (const int32 i : InstanceIndices) { InstanceList.Instances.Emplace(InTransforms[i]); }
+			for (const int32 i : InstanceIndices)
+			{
+				InstanceList.Instances.Emplace(InTransforms[i]);
+			}
 		}
 	}
 

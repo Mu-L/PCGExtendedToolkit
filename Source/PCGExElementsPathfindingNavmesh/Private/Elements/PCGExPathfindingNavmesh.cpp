@@ -4,9 +4,9 @@
 #include "Elements/PCGExPathfindingNavmesh.h"
 
 #include "PCGParamData.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExClusterCommon.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "GoalPickers/PCGExGoalPickerRandom.h"
 #include "Graphs/PCGExGraphCommon.h"
@@ -38,28 +38,46 @@ void UPCGExPathfindingNavmeshSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!GoalPicker) { GoalPicker = NewObject<UPCGExGoalPicker>(this, TEXT("GoalPicker")); }
-		if (!Blending) { Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending")); }
+		if (!GoalPicker)
+		{
+			GoalPicker = NewObject<UPCGExGoalPicker>(this, TEXT("GoalPicker"));
+		}
+		if (!Blending)
+		{
+			Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending"));
+		}
 	}
 	Super::PostInitProperties();
 }
 
 void UPCGExPathfindingNavmeshSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	if (GoalPicker) { GoalPicker->UpdateUserFacingInfos(); }
-	if (Blending) { Blending->UpdateUserFacingInfos(); }
+	if (GoalPicker)
+	{
+		GoalPicker->UpdateUserFacingInfos();
+	}
+	if (Blending)
+	{
+		Blending->UpdateUserFacingInfos();
+	}
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
 
-FName UPCGExPathfindingNavmeshSettings::GetMainInputPin() const { return PCGExCommon::Labels::SourceSeedsLabel; }
+FName UPCGExPathfindingNavmeshSettings::GetMainInputPin() const
+{
+	return PCGExCommon::Labels::SourceSeedsLabel;
+}
 
 PCGEX_INITIALIZE_ELEMENT(PathfindingNavmesh)
 
 
 bool FPCGExPathfindingNavmeshElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathfindingNavmesh)
 
@@ -69,7 +87,10 @@ bool FPCGExPathfindingNavmeshElement::Boot(FPCGExContext* InContext) const
 	Context->SeedsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExCommon::Labels::SourceSeedsLabel, false, true);
 	Context->GoalsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExClusters::Labels::SourceGoalsLabel, false, true);
 
-	if (!Context->SeedsDataFacade || !Context->GoalsDataFacade) { return false; }
+	if (!Context->SeedsDataFacade || !Context->GoalsDataFacade)
+	{
+		return false;
+	}
 
 	Context->SeedsDataFacade = MakeShared<PCGExData::FFacade>(Context->SeedsDataFacade->Source);
 	Context->GoalsDataFacade = MakeShared<PCGExData::FFacade>(Context->GoalsDataFacade->Source);
@@ -77,8 +98,14 @@ bool FPCGExPathfindingNavmeshElement::Boot(FPCGExContext* InContext) const
 	PCGEX_FWD(SeedAttributesToPathTags)
 	PCGEX_FWD(GoalAttributesToPathTags)
 
-	if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade)) { return false; }
-	if (!Context->GoalAttributesToPathTags.Init(Context, Context->GoalsDataFacade)) { return false; }
+	if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade))
+	{
+		return false;
+	}
+	if (!Context->GoalAttributesToPathTags.Init(Context, Context->GoalsDataFacade))
+	{
+		return false;
+	}
 
 	Context->SeedForwardHandler = Settings->SeedForwarding.GetHandler(Context->SeedsDataFacade);
 	Context->GoalForwardHandler = Settings->GoalForwarding.GetHandler(Context->GoalsDataFacade);
@@ -90,7 +117,10 @@ bool FPCGExPathfindingNavmeshElement::Boot(FPCGExContext* InContext) const
 
 	// Prepare path queries
 
-	if (!Context->GoalPicker->PrepareForData(Context, Context->SeedsDataFacade, Context->GoalsDataFacade)) { return false; }
+	if (!Context->GoalPicker->PrepareForData(Context, Context->SeedsDataFacade, Context->GoalsDataFacade))
+	{
+		return false;
+	}
 
 	PCGExPathfinding::ProcessGoals(Context->SeedsDataFacade, Context->GoalPicker, [&](const int32 SeedIndex, const int32 GoalIndex)
 	{
@@ -148,7 +178,10 @@ void FSampleNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 	PCGExNavmesh::FNavmeshQuery Query((*Queries)[TaskIndex]);
 	Query.FindPath(Context);
 
-	if (!Query.IsValid()) { return; }
+	if (!Query.IsValid())
+	{
+		return;
+	}
 
 	const UPCGBasePointData* SeedsData = Context->SeedsDataFacade->GetIn();
 	const UPCGBasePointData* GoalsData = Context->GoalsDataFacade->GetIn();
@@ -158,7 +191,10 @@ void FSampleNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 
 	const int32 NumPositions = Query.Positions.Num() + Settings->bAddSeedToPath + Settings->bAddGoalToPath;
 
-	if (NumPositions <= 2) { return; }
+	if (NumPositions <= 2)
+	{
+		return;
+	}
 
 	TSharedPtr<PCGExData::FPointIO> PathIO = Context->OutputPaths->Emplace_GetRef(PointIO, PCGExData::EIOInit::New);
 	PCGEX_MAKE_SHARED(PathDataFacade, PCGExData::FFacade, PathIO.ToSharedRef())
@@ -171,7 +207,10 @@ void FSampleNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 	Query.CopyPositions(OutTransforms, WriteIndex, Settings->bAddGoalToPath, Settings->bAddGoalToPath);
 
 	TSharedPtr<FPCGExSubPointsBlendOperation> SubBlending = Context->Blending->CreateOperation();
-	if (!SubBlending->PrepareForData(Context, PathDataFacade, Context->GoalsDataFacade, PCGExData::EIOSide::In)) { return; }
+	if (!SubBlending->PrepareForData(Context, PathDataFacade, Context->GoalsDataFacade, PCGExData::EIOSide::In))
+	{
+		return;
+	}
 
 	// TODO : Need to ensure the metadata blender can pick source A as target IN, if relevant
 	// cause we might try to blend from a point that's technically in the same data but also not

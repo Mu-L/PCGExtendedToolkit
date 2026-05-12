@@ -45,13 +45,19 @@ void FPCGExEdgeEndpointsCompareNumFilterConfigCustomization::CustomizeChildren(
 			.Comparison_Lambda([this]() -> EPCGExComparison
 			{
 				uint8 Value = 0;
-				if (ComparisonHandle.IsValid()) { ComparisonHandle->GetValue(Value); }
+				if (ComparisonHandle.IsValid())
+				{
+					ComparisonHandle->GetValue(Value);
+				}
 				return static_cast<EPCGExComparison>(Value);
 			})
 			.bInvert_Lambda([this]() -> bool
 			{
 				bool Value = false;
-				if (InvertHandle.IsValid()) { InvertHandle->GetValue(Value); }
+				if (InvertHandle.IsValid())
+				{
+					InvertHandle->GetValue(Value);
+				}
 				return Value;
 			})
 		]

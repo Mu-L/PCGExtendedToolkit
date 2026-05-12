@@ -6,8 +6,8 @@
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Math/Geo/PCGExDelaunay.h"
 #include "Math/PCGExBestFitPlane.h"
+#include "Math/Geo/PCGExDelaunay.h"
 #include "Math/Geo/PCGExGeo.h"
 
 #define LOCTEXT_NAMESPACE "PCGExLloydRelax2DElement"
@@ -15,13 +15,19 @@
 
 PCGEX_INITIALIZE_ELEMENT(LloydRelax2D)
 
-PCGExData::EIOInit UPCGExLloydRelax2DSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExLloydRelax2DSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(LloydRelax2D)
 
 bool FPCGExLloydRelax2DElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(LloydRelax2D)
 
@@ -70,7 +76,10 @@ namespace PCGExLloydRelax2D
 	{
 	public:
 		FLloydRelaxTask(const int32 InTaskIndex, const TSharedPtr<FProcessor>& InProcessor, const FPCGExInfluenceDetails* InInfluenceSettings, const int32 InNumIterations)
-			: FPCGExIndexedTask(InTaskIndex), Processor(InProcessor), InfluenceSettings(InInfluenceSettings), NumIterations(InNumIterations)
+			: FPCGExIndexedTask(InTaskIndex)
+			  , Processor(InProcessor)
+			  , InfluenceSettings(InInfluenceSettings)
+			  , NumIterations(InNumIterations)
 		{
 		}
 
@@ -86,7 +95,10 @@ namespace PCGExLloydRelax2D
 			TArray<FVector>& Positions = Processor->ActivePositions;
 
 			const TArrayView<FVector> View = MakeArrayView(Positions);
-			if (!Delaunay->Process(View, Processor->ProjectionDetails)) { return; }
+			if (!Delaunay->Process(View, Processor->ProjectionDetails))
+			{
+				return;
+			}
 
 			const int32 NumPoints = Positions.Num();
 
@@ -94,7 +106,10 @@ namespace PCGExLloydRelax2D
 			TArray<double> Counts;
 			Sum.Append(Processor->ActivePositions);
 			Counts.SetNum(NumPoints);
-			for (int i = 0; i < NumPoints; i++) { Counts[i] = 1; }
+			for (int i = 0; i < NumPoints; i++)
+			{
+				Counts[i] = 1;
+			}
 
 			FVector Centroid;
 			for (const PCGExMath::Geo::FDelaunaySite2& Site : Delaunay->Sites)
@@ -112,7 +127,7 @@ namespace PCGExLloydRelax2D
 				PCGEX_PARALLEL_FOR(
 					NumPoints,
 					Positions[i] = FMath::Lerp(Positions[i], Sum[i] / Counts[i], InfluenceSettings->GetInfluence(i));
-				)
+					)
 			}
 
 			Delaunay.Reset();
@@ -128,7 +143,10 @@ namespace PCGExLloydRelax2D
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExLloydRelax2D::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
@@ -137,7 +155,10 @@ namespace PCGExLloydRelax2D
 		ProjectionDetails.Init(PointDataFacade);
 
 		InfluenceDetails = Settings->InfluenceDetails;
-		if (!InfluenceDetails.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!InfluenceDetails.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		PCGExPointArrayDataHelpers::PointsToPositions(PointDataFacade->GetIn(), ActivePositions);
 
@@ -165,7 +186,7 @@ namespace PCGExLloydRelax2D
 				TargetPosition.Y = ActivePositions[i].Y;
 
 				Transform.SetLocation(TargetPosition);
-			)
+				)
 		}
 		else
 		{
@@ -179,7 +200,7 @@ namespace PCGExLloydRelax2D
 				TargetPosition.Y = ActivePositions[i].Y;
 
 				Transform.SetLocation(FMath::Lerp(Transform.GetLocation(), TargetPosition, InfluenceDetails.GetInfluence(i)));
-			);
+				);
 		}
 	}
 }

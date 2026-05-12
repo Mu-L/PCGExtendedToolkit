@@ -3,24 +3,27 @@
 
 #include "Details/Collections/PCGExLevelCollectionActions.h"
 
-#include "UObject/UObjectGlobals.h"
-#include "UObject/Package.h"
 #include "FileHelpers.h"
+#include "ToolMenuSection.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Collections/PCGExLevelCollection.h"
-#include "UObject/UObjectGlobals.h"
-#include "UObject/Package.h"
-#include "ToolMenuSection.h"
-#include "Details/Collections/PCGExLevelCollectionEditor.h"
 #include "Details/Collections/PCGExAssetCollectionEditor.h"
+#include "Details/Collections/PCGExLevelCollectionEditor.h"
 #include "Misc/MessageDialog.h"
+#include "UObject/Package.h"
+#include "UObject/Package.h"
+#include "UObject/UObjectGlobals.h"
+#include "UObject/UObjectGlobals.h"
 #include "Widgets/Views/SListView.h"
 
 namespace PCGExLevelCollectionActions
 {
 	void CreateCollectionFrom(const TArray<FAssetData>& SelectedAssets)
 	{
-		if (SelectedAssets.IsEmpty()) { return; }
+		if (SelectedAssets.IsEmpty())
+		{
+			return;
+		}
 
 		if (SelectedAssets.Num() > 1)
 		{
@@ -103,7 +106,10 @@ namespace PCGExLevelCollectionActions
 		const TArray<FAssetData>& SelectedAssets,
 		bool bIsNewCollection)
 	{
-		if (SelectedCollections.IsEmpty() || SelectedAssets.IsEmpty()) { return; }
+		if (SelectedCollections.IsEmpty() || SelectedAssets.IsEmpty())
+		{
+			return;
+		}
 
 		for (const TObjectPtr<UPCGExLevelCollection>& Collection : SelectedCollections)
 		{

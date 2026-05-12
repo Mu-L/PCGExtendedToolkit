@@ -14,7 +14,10 @@
 
 bool FPCGExTensorNoiseBounded::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorPointOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorPointOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -26,7 +29,10 @@ PCGExTensor::FTensorSample FPCGExTensorNoiseBounded::Sample(const int32 InSeedIn
 	const bool bNrmNoise = Config.bNormalizeNoiseSampling;
 
 	FVector Noise = NoiseGenerator->GetVector(InPosition);
-	if (Config.bNormalizeNoiseSampling) { Noise.Normalize(); }
+	if (Config.bNormalizeNoiseSampling)
+	{
+		Noise.Normalize();
+	}
 
 	PCGExTensor::FEffectorMetrics Metrics;
 	PCGExTensor::FEffectorSamples Samples = PCGExTensor::FEffectorSamples();
@@ -69,7 +75,10 @@ namespace PCGExTensor
 	{
 		const UPCGExTensorNoiseBoundedFactory* NoiseBoundedFactory = Cast<UPCGExTensorNoiseBoundedFactory>(InFactory);
 		Config = NoiseBoundedFactory->Config;
-		if (!FEffectorsArray::Init(InContext, InFactory)) { return false; }
+		if (!FEffectorsArray::Init(InContext, InFactory))
+		{
+			return false;
+		}
 		return true;
 	}
 }

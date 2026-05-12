@@ -9,8 +9,8 @@
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
 
-#include "Core/PCGExPointsProcessor.h"
 #include "PCGExSampleNearestPath.h"
+#include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExSettingsMacros.h"
 
 #include "PCGExSampleInsidePath.generated.h"
@@ -49,7 +49,11 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS(SampleInsidePath, "Sample : Inside Path", "Sample the points inside the paths.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Sampling);
+	}
 #endif
 
 protected:

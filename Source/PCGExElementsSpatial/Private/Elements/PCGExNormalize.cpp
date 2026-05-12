@@ -4,12 +4,12 @@
 #include "Elements/PCGExNormalize.h"
 
 
+#include "Async/ParallelFor.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyData.h"
 #include "Data/PCGExProxyDataHelpers.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Async/ParallelFor.h"
 #include "Math/PCGExMathBounds.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
@@ -22,8 +22,14 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExNormalizeSettings, Transform, FTransform, Transfo
 UPCGExNormalizeSettings::UPCGExNormalizeSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	if (Output.GetName() == TEXT("@Last")) { Output.Update("$Position"); }
-	if (TransformAttribute.GetName() == TEXT("@Last")) { TransformAttribute.Update("@Data.Transform"); }
+	if (Output.GetName() == TEXT("@Last"))
+	{
+		Output.Update("$Position");
+	}
+	if (TransformAttribute.GetName() == TEXT("@Last"))
+	{
+		TransformAttribute.Update("@Data.Transform");
+	}
 }
 
 PCGEX_INITIALIZE_ELEMENT(Normalize)
@@ -38,15 +44,24 @@ TArray<FPCGPinProperties> UPCGExNormalizeSettings::InputPinProperties() const
 
 bool UPCGExNormalizeSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExCommon::Labels::SourceBoundsLabel) { return InPin->EdgeCount() > 0; }
+	if (InPin->Properties.Label == PCGExCommon::Labels::SourceBoundsLabel)
+	{
+		return InPin->EdgeCount() > 0;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
-PCGExData::EIOInit UPCGExNormalizeSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExNormalizeSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 bool FPCGExNormalizeElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(Normalize)
 
@@ -72,7 +87,10 @@ bool FPCGExNormalizeElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -99,12 +117,18 @@ namespace PCGExNormalize
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExNormalize::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		TransformBuffer = Settings->GetValueSettingTransform();
-		if (!TransformBuffer->Init(PointDataFacade, true)) { return false; }
+		if (!TransformBuffer->Init(PointDataFacade, true))
+		{
+			return false;
+		}
 
 		Box = Context->bUseUnifiedBounds ? Context->UnifiedBounds : PCGExMath::GetBounds(PointDataFacade->GetIn(), Settings->BoundsSource);
 		Size = Box.GetSize();
@@ -120,11 +144,17 @@ namespace PCGExNormalize
 		Descriptor.Capture(Context, Settings->Output, PCGExData::EIOSide::Out, false);
 
 		Descriptor.WorkingType = EPCGMetadataTypes::Vector;
-		if (Descriptor.RealType == EPCGMetadataTypes::Unknown) { Descriptor.RealType = EPCGMetadataTypes::Vector; }
+		if (Descriptor.RealType == EPCGMetadataTypes::Unknown)
+		{
+			Descriptor.RealType = EPCGMetadataTypes::Vector;
+		}
 
 		OutputBuffer = PCGExData::GetProxyBuffer(Context, Descriptor);
 
-		if (!OutputBuffer.IsValid()) { return false; }
+		if (!OutputBuffer.IsValid())
+		{
+			return false;
+		}
 
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::Normalize::ProcessPoints);
@@ -133,22 +163,32 @@ namespace PCGExNormalize
 
 			using FWrapFn = std::function<double(const double)>;
 
-			FWrapFn Wrap = [](const double Value)-> double { return Value; };
+			FWrapFn Wrap = [](const double Value)-> double
+			{
+				return Value;
+			};
 
 
 			switch (Settings->Wrapping)
 			{
-			case EPCGExIndexSafety::Ignore: break;
-			case EPCGExIndexSafety::Tile: Wrap = [](const double Value)-> double
+			case EPCGExIndexSafety::Ignore:
+				break;
+			case EPCGExIndexSafety::Tile:
+				Wrap = [](const double Value)-> double
 				{
 					constexpr double OnePlus = 1 + UE_SMALL_NUMBER;
 					const double W = FMath::Fmod(Value, OnePlus);
 					return W < 0 ? W + OnePlus : W;
 				};
 				break;
-			case EPCGExIndexSafety::Clamp: Wrap = [](const double Value)-> double { return FMath::Clamp(Value, 0, 1); };
+			case EPCGExIndexSafety::Clamp:
+				Wrap = [](const double Value)-> double
+				{
+					return FMath::Clamp(Value, 0, 1);
+				};
 				break;
-			case EPCGExIndexSafety::Yoyo: Wrap = [](const double Value)-> double
+			case EPCGExIndexSafety::Yoyo:
+				Wrap = [](const double Value)-> double
 				{
 					double C = FMath::Fmod(Value, 2);
 					C = C < 0 ? C + 2 : C;
@@ -166,7 +206,7 @@ namespace PCGExNormalize
 				if (OneMinus[j]) { UVW[j] = 1 - UVW[j]; }
 				}
 				OutputBuffer->Set(i, UVW);
-			)
+				)
 
 			PointDataFacade->WriteFastest(TaskManager);
 

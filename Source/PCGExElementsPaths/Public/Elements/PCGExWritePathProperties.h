@@ -86,12 +86,19 @@ public:
 #endif
 
 protected:
-	virtual bool OutputPinsCanBeDeactivated() const override { return bUseInclusionPins; }
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return bUseInclusionPins;
+	}
+
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;

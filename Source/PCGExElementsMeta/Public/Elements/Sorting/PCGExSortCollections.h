@@ -24,17 +24,36 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SortCollections, "Sort Data", "Sort data using @Data domain attributes.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Generic; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Generic;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite);
+	}
 #endif
 
 	virtual bool HasDynamicPins() const override;
 
-	virtual FName GetMainInputPin() const override { return PCGPinConstants::DefaultInputLabel; }
-	virtual FName GetMainOutputPin() const override { return PCGPinConstants::DefaultOutputLabel; }
+	virtual FName GetMainInputPin() const override
+	{
+		return PCGPinConstants::DefaultInputLabel;
+	}
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGPinConstants::DefaultOutputLabel;
+	}
 
 protected:
-	virtual bool IsInputless() const override { return true; }
+	virtual bool IsInputless() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;

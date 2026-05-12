@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExHeuristicsFactoryProvider.h"
 #include "PCGExHeuristicsCommon.h"
 #include "Clusters/PCGExNode.h"
+#include "Core/PCGExHeuristicsFactoryProvider.h"
 
 class FPCGExHeuristicFeedback;
 class FPCGExHeuristicOperation;
@@ -107,11 +107,30 @@ namespace PCGExHeuristics
 		/** Categorized operations for fast-path optimizations */
 		FCategorizedOperations CategorizedOps;
 
-		bool IsValidHandler() const { return bIsValidHandler; }
-		bool HasTravelDependentOperations() const { return CategorizedOps.bHasTravelDependent; }
-		bool HasGlobalFeedback() const { return !Feedbacks.IsEmpty(); };
-		bool HasLocalFeedback() const { return !LocalFeedbackFactories.IsEmpty(); };
-		bool HasAnyFeedback() const { return HasGlobalFeedback() || HasLocalFeedback(); };
+		bool IsValidHandler() const
+		{
+			return bIsValidHandler;
+		}
+
+		bool HasTravelDependentOperations() const
+		{
+			return CategorizedOps.bHasTravelDependent;
+		}
+
+		bool HasGlobalFeedback() const
+		{
+			return !Feedbacks.IsEmpty();
+		};
+
+		bool HasLocalFeedback() const
+		{
+			return !LocalFeedbackFactories.IsEmpty();
+		};
+
+		bool HasAnyFeedback() const
+		{
+			return HasGlobalFeedback() || HasLocalFeedback();
+		};
 
 		FHandler(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InVtxDataCache, const TSharedPtr<PCGExData::FFacade>& InEdgeDataCache, const TArray<TObjectPtr<const UPCGExHeuristicsFactoryData>>& InFactories);
 		virtual ~FHandler();

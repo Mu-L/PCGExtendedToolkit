@@ -6,19 +6,19 @@
 #include "PCGComponent.h"
 #include "Components/SplineMeshComponent.h"
 
+#include "PCGExVersion.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "PCGExVersion.h"
-#include "Metadata/PCGObjectPropertyOverride.h"
 #include "Engine/StaticMesh.h"
 #include "Helpers/PCGExAssetLoader.h"
 #include "Helpers/PCGExStreamingHelpers.h"
-#include "Paths/PCGExPathsHelpers.h"
-#include "Utils/PCGExUniqueNameGenerator.h"
 #include "Materials/MaterialInterface.h"
+#include "Metadata/PCGObjectPropertyOverride.h"
+#include "Paths/PCGExPathsHelpers.h"
 #include "Tangents/PCGExTangentsAuto.h"
+#include "Utils/PCGExUniqueNameGenerator.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPathSplineMeshSimpleElement"
 #define PCGEX_NAMESPACE BuildCustomGraph
@@ -42,7 +42,10 @@ void UPCGExPathSplineMeshSimpleSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!Tangents.Tangents) { Tangents.Tangents = NewObject<UPCGExAutoTangents>(this, TEXT("Tangents")); }
+		if (!Tangents.Tangents)
+		{
+			Tangents.Tangents = NewObject<UPCGExAutoTangents>(this, TEXT("Tangents"));
+		}
 	}
 	Super::PostInitProperties();
 }
@@ -50,23 +53,35 @@ void UPCGExPathSplineMeshSimpleSettings::PostInitProperties()
 
 PCGEX_INITIALIZE_ELEMENT(PathSplineMeshSimple)
 
-PCGExData::EIOInit UPCGExPathSplineMeshSimpleSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExPathSplineMeshSimpleSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(PathSplineMeshSimple)
 
 UPCGExPathSplineMeshSimpleSettings::UPCGExPathSplineMeshSimpleSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	if (SplineMeshUpVectorAttribute.GetName() == FName("@Last")) { SplineMeshUpVectorAttribute.Update(TEXT("$Rotation.Up")); }
+	if (SplineMeshUpVectorAttribute.GetName() == FName("@Last"))
+	{
+		SplineMeshUpVectorAttribute.Update(TEXT("$Rotation.Up"));
+	}
 }
 
 bool FPCGExPathSplineMeshSimpleElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathSplineMeshSimple)
 
-	if (!Context->Tangents.Init(Context, Settings->Tangents)) { return false; }
+	if (!Context->Tangents.Init(Context, Settings->Tangents))
+	{
+		return false;
+	}
 
 	if (Settings->AssetType == EPCGExInputValueType::Attribute)
 	{
@@ -131,7 +146,10 @@ bool FPCGExPathSplineMeshSimpleElement::AdvanceWork(FPCGExContext* InContext, co
 			}
 		}
 
-		if (Context->IsWaitingForTasks()) { return false; }
+		if (Context->IsWaitingForTasks())
+		{
+			return false;
+		}
 	}
 
 	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
@@ -177,20 +195,32 @@ namespace PCGExPathSplineMeshSimple
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		bIsPreviewMode = ExecutionContext->GetComponent()->IsInPreviewMode();
 
 		MutationDetails = Settings->MutationDetails;
-		if (!MutationDetails.Init(PointDataFacade)) { return false; }
+		if (!MutationDetails.Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		StartOffset = Settings->GetValueSettingStartOffset();
-		if (!StartOffset->Init(PointDataFacade)) { return false; }
+		if (!StartOffset->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		EndOffset = Settings->GetValueSettingEndOffset();
-		if (!EndOffset->Init(PointDataFacade)) { return false; }
+		if (!EndOffset->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		if (Settings->SplineMeshUpMode == EPCGExSplineMeshUpMode::Attribute)
 		{
@@ -227,13 +257,19 @@ namespace PCGExPathSplineMeshSimple
 		bUseTags = true;
 
 		TangentsHandler = MakeShared<PCGExTangents::FTangentsHandler>(bClosedLoop);
-		if (!TangentsHandler->Init(Context, Context->Tangents, PointDataFacade)) { return false; }
+		if (!TangentsHandler->Init(Context, Context->Tangents, PointDataFacade))
+		{
+			return false;
+		}
 
 		LastIndex = PointDataFacade->GetNum() - 1;
 
 		Segments.Init(PCGExPaths::FSplineMeshSegment(), bClosedLoop ? LastIndex + 1 : LastIndex);
 		Meshes.Init(nullptr, Segments.Num());
-		if (MaterialKeys) { Materials.Init(nullptr, Segments.Num()); }
+		if (MaterialKeys)
+		{
+			Materials.Init(nullptr, Segments.Num());
+		}
 
 		StartParallelLoopForPoints();
 
@@ -331,15 +367,27 @@ namespace PCGExPathSplineMeshSimple
 				Segment.Params.EndTangent = Transforms[NextIndex].GetRotation().GetForwardVector();
 			}
 
-			if (UpGetter) { Segment.UpVector = UpGetter->Read(Index); }
-			else if (Settings->SplineMeshUpMode == EPCGExSplineMeshUpMode::Constant) { Segment.UpVector = Settings->SplineMeshUpVector; }
-			else { Segment.ComputeUpVectorFromTangents(); }
+			if (UpGetter)
+			{
+				Segment.UpVector = UpGetter->Read(Index);
+			}
+			else if (Settings->SplineMeshUpMode == EPCGExSplineMeshUpMode::Constant)
+			{
+				Segment.UpVector = Settings->SplineMeshUpVector;
+			}
+			else
+			{
+				Segment.ComputeUpVectorFromTangents();
+			}
 
 			MutationDetails.Mutate(Index, Segment);
 			bAnyValidSegment = true;
 		}
 
-		if (bAnyValidSegment) { FPlatformAtomics::InterlockedExchange(&bHasValidSegments, 1); }
+		if (bAnyValidSegment)
+		{
+			FPlatformAtomics::InterlockedExchange(&bHasValidSegments, 1);
+		}
 	}
 
 	void FProcessor::OnPointsProcessingComplete()
@@ -372,7 +420,10 @@ namespace PCGExPathSplineMeshSimple
 		}
 
 		MainThreadLoop = MakeShared<PCGExMT::FTimeSlicedMainThreadLoop>(FinalNumSegments);
-		MainThreadLoop->OnIterationCallback = [&](const int32 Index, const PCGExMT::FScope& Scope) { ProcessSegment(Index); };
+		MainThreadLoop->OnIterationCallback = [&](const int32 Index, const PCGExMT::FScope& Scope)
+		{
+			ProcessSegment(Index);
+		};
 
 		PCGEX_ASYNC_HANDLE_CHKD_VOID(TaskManager, MainThreadLoop)
 	}
@@ -380,7 +431,10 @@ namespace PCGExPathSplineMeshSimple
 	void FProcessor::ProcessSegment(const int32 Index)
 	{
 		const PCGExPaths::FSplineMeshSegment& Segment = Segments[Index];
-		if (!Meshes[Index]) { return; }
+		if (!Meshes[Index])
+		{
+			return;
+		}
 
 		USplineMeshComponent* SplineMeshComponent = Context->ManagedObjects->New<USplineMeshComponent>(TargetActor, MakeUniqueObjectName(TargetActor, USplineMeshComponent::StaticClass(), Context->UniqueNameGenerator->Get(TEXT("PCGSplineMeshComponent_") + Meshes[Index].GetName())), ObjectFlags);
 
@@ -390,12 +444,24 @@ namespace PCGExPathSplineMeshSimple
 		{
 			int32 SlotIndex = Settings->MaterialSlotConstant;
 
-			if (SlotIndex < 0) { SlotIndex = 0; }
-			if (Materials[Index]) { SplineMeshComponent->SetMaterial(SlotIndex, Materials[Index]); }
+			if (SlotIndex < 0)
+			{
+				SlotIndex = 0;
+			}
+			if (Materials[Index])
+			{
+				SplineMeshComponent->SetMaterial(SlotIndex, Materials[Index]);
+			}
 		}
 
-		if (bUseTags) { SplineMeshComponent->ComponentTags.Append(DataTags); }
-		if (!Segment.Tags.IsEmpty()) { SplineMeshComponent->ComponentTags.Append(Segment.Tags.Array()); }
+		if (bUseTags)
+		{
+			SplineMeshComponent->ComponentTags.Append(DataTags);
+		}
+		if (!Segment.Tags.IsEmpty())
+		{
+			SplineMeshComponent->ComponentTags.Append(Segment.Tags.Array());
+		}
 
 		Settings->StaticMeshDescriptor.InitComponent(SplineMeshComponent);
 

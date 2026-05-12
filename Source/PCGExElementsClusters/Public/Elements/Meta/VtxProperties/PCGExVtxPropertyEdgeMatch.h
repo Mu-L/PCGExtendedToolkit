@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
-#include "UObject/Object.h"
-#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExVtxPropertyFactoryProvider.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Factories/PCGExFactoryProvider.h"
+#include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExVtxPropertyEdgeMatch.generated.h"
 

@@ -11,7 +11,10 @@
 
 void FPCGExScaleToFitDetails::Process(const PCGExData::FPoint& InPoint, const FBox& InBounds, FVector& OutScale, FBox& OutBounds) const
 {
-	if (ScaleToFitMode == EPCGExFitMode::None) { return; }
+	if (ScaleToFitMode == EPCGExFitMode::None)
+	{
+		return;
+	}
 
 	const FVector TargetSize = InPoint.GetLocalBounds().GetSize();
 	const FVector TargetScale = InPoint.GetTransform().GetScale3D();
@@ -52,14 +55,19 @@ void FPCGExScaleToFitDetails::ScaleToFitAxis(const EPCGExScaleToFit Fit, const i
 
 	switch (Fit)
 	{
-	default: case EPCGExScaleToFit::None: break;
-	case EPCGExScaleToFit::Fill: FinalScale = ((TargetSize[Axis] * Scale) / CandidateSize[Axis]);
+	default: case EPCGExScaleToFit::None:
 		break;
-	case EPCGExScaleToFit::Min: FinalScale = MinMaxFit[0];
+	case EPCGExScaleToFit::Fill:
+		FinalScale = ((TargetSize[Axis] * Scale) / CandidateSize[Axis]);
 		break;
-	case EPCGExScaleToFit::Max: FinalScale = MinMaxFit[1];
+	case EPCGExScaleToFit::Min:
+		FinalScale = MinMaxFit[0];
 		break;
-	case EPCGExScaleToFit::Avg: FinalScale = MinMaxFit[2];
+	case EPCGExScaleToFit::Max:
+		FinalScale = MinMaxFit[1];
+		break;
+	case EPCGExScaleToFit::Avg:
+		FinalScale = MinMaxFit[2];
 		break;
 	}
 
@@ -75,21 +83,29 @@ bool FPCGExSingleJustifyDetails::Init(FPCGExContext* InContext, const TSharedRef
 	if (!SharedFromGetter)
 	{
 		FromGetter = CustomFrom.GetValueSetting();
-		if (!FromGetter->Init(InDataFacade)) { return false; }
+		if (!FromGetter->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 
 	if (To == EPCGExJustifyTo::Same)
 	{
 		switch (From)
 		{
-		default: case EPCGExJustifyFrom::Min: To = EPCGExJustifyTo::Min;
+		default: case EPCGExJustifyFrom::Min:
+			To = EPCGExJustifyTo::Min;
 			break;
-		case EPCGExJustifyFrom::Center: To = EPCGExJustifyTo::Center;
+		case EPCGExJustifyFrom::Center:
+			To = EPCGExJustifyTo::Center;
 			break;
-		case EPCGExJustifyFrom::Max: To = EPCGExJustifyTo::Max;
+		case EPCGExJustifyFrom::Max:
+			To = EPCGExJustifyTo::Max;
 			break;
-		case EPCGExJustifyFrom::Custom: break;
-		case EPCGExJustifyFrom::Pivot: To = EPCGExJustifyTo::Pivot;
+		case EPCGExJustifyFrom::Custom:
+			break;
+		case EPCGExJustifyFrom::Pivot:
+			To = EPCGExJustifyTo::Pivot;
 			break;
 		}
 	}
@@ -97,7 +113,10 @@ bool FPCGExSingleJustifyDetails::Init(FPCGExContext* InContext, const TSharedRef
 	if (!SharedToGetter)
 	{
 		ToGetter = CustomTo.GetValueSetting();
-		if (!ToGetter->Init(InDataFacade)) { return false; }
+		if (!ToGetter->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -115,33 +134,43 @@ void FPCGExSingleJustifyDetails::JustifyAxis(const int32 Axis, const int32 Index
 
 	switch (From)
 	{
-	default: case EPCGExJustifyFrom::Min: Start = OutCenter[Axis] - HalfOutSize;
+	default: case EPCGExJustifyFrom::Min:
+		Start = OutCenter[Axis] - HalfOutSize;
 		break;
-	case EPCGExJustifyFrom::Center: Start = OutCenter[Axis];
+	case EPCGExJustifyFrom::Center:
+		Start = OutCenter[Axis];
 		break;
-	case EPCGExJustifyFrom::Max: Start = OutCenter[Axis] + HalfOutSize;
+	case EPCGExJustifyFrom::Max:
+		Start = OutCenter[Axis] + HalfOutSize;
 		break;
-	case EPCGExJustifyFrom::Custom: Start = OutCenter[Axis] - HalfOutSize + (OutSize[Axis] * FromValue);
+	case EPCGExJustifyFrom::Custom:
+		Start = OutCenter[Axis] - HalfOutSize + (OutSize[Axis] * FromValue);
 		break;
-	case EPCGExJustifyFrom::Pivot: Start = 0;
+	case EPCGExJustifyFrom::Pivot:
+		Start = 0;
 		break;
 	}
 
 	switch (To)
 	{
-	default: case EPCGExJustifyTo::Min: End = InCenter[Axis] - HalfInSize;
+	default: case EPCGExJustifyTo::Min:
+		End = InCenter[Axis] - HalfInSize;
 		break;
-	case EPCGExJustifyTo::Center: End = InCenter[Axis];
+	case EPCGExJustifyTo::Center:
+		End = InCenter[Axis];
 		break;
-	case EPCGExJustifyTo::Max: End = InCenter[Axis] + HalfInSize;
+	case EPCGExJustifyTo::Max:
+		End = InCenter[Axis] + HalfInSize;
 		break;
-	case EPCGExJustifyTo::Custom: End = InCenter[Axis] - HalfInSize + (InSize[Axis] * ToValue);
+	case EPCGExJustifyTo::Custom:
+		End = InCenter[Axis] - HalfInSize + (InSize[Axis] * ToValue);
 		break;
 	case EPCGExJustifyTo::Same:
 		// == Custom but using From values
 		End = InCenter[Axis] - HalfInSize * (InSize[Axis] * FromValue);
 		break;
-	case EPCGExJustifyTo::Pivot: End = 0;
+	case EPCGExJustifyTo::Pivot:
+		End = 0;
 		break;
 	}
 
@@ -156,9 +185,18 @@ void FPCGExJustificationDetails::Process(const int32 Index, const FBox& InBounds
 	const FVector OutCenter = OutBounds.GetCenter();
 	const FVector OutSize = OutBounds.GetSize();
 
-	if (bDoJustifyX) { JustifyX.JustifyAxis(0, Index, InCenter, InSize, OutCenter, OutSize, OutTranslation); }
-	if (bDoJustifyY) { JustifyY.JustifyAxis(1, Index, InCenter, InSize, OutCenter, OutSize, OutTranslation); }
-	if (bDoJustifyZ) { JustifyZ.JustifyAxis(2, Index, InCenter, InSize, OutCenter, OutSize, OutTranslation); }
+	if (bDoJustifyX)
+	{
+		JustifyX.JustifyAxis(0, Index, InCenter, InSize, OutCenter, OutSize, OutTranslation);
+	}
+	if (bDoJustifyY)
+	{
+		JustifyY.JustifyAxis(1, Index, InCenter, InSize, OutCenter, OutSize, OutTranslation);
+	}
+	if (bDoJustifyZ)
+	{
+		JustifyZ.JustifyAxis(2, Index, InCenter, InSize, OutCenter, OutSize, OutTranslation);
+	}
 }
 
 bool FPCGExJustificationDetails::Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
@@ -166,13 +204,19 @@ bool FPCGExJustificationDetails::Init(FPCGExContext* InContext, const TSharedRef
 	if (bSharedCustomFromAttribute)
 	{
 		SharedFromGetter = CustomFrom.GetValueSetting();
-		if (!SharedFromGetter->Init(InDataFacade)) { return false; }
+		if (!SharedFromGetter->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 
 	if (bSharedCustomToAttribute)
 	{
 		SharedToGetter = CustomFrom.GetValueSetting();
-		if (!SharedToGetter->Init(InDataFacade)) { return false; }
+		if (!SharedToGetter->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 
 	if (bDoJustifyX)
@@ -185,7 +229,10 @@ bool FPCGExJustificationDetails::Init(FPCGExContext* InContext, const TSharedRef
 		{
 			JustifyX.SharedFromGetter = SharedFromGetter;
 			JustifyX.SharedToGetter = SharedToGetter;
-			if (!JustifyX.Init(InContext, InDataFacade)) { return false; }
+			if (!JustifyX.Init(InContext, InDataFacade))
+			{
+				return false;
+			}
 		}
 	}
 
@@ -199,7 +246,10 @@ bool FPCGExJustificationDetails::Init(FPCGExContext* InContext, const TSharedRef
 		{
 			JustifyY.SharedFromGetter = SharedFromGetter;
 			JustifyY.SharedToGetter = SharedToGetter;
-			if (!JustifyY.Init(InContext, InDataFacade)) { return false; }
+			if (!JustifyY.Init(InContext, InDataFacade))
+			{
+				return false;
+			}
 		}
 	}
 
@@ -213,7 +263,10 @@ bool FPCGExJustificationDetails::Init(FPCGExContext* InContext, const TSharedRef
 		{
 			JustifyZ.SharedFromGetter = SharedFromGetter;
 			JustifyZ.SharedToGetter = SharedToGetter;
-			if (!JustifyZ.Init(InContext, InDataFacade)) { return false; }
+			if (!JustifyZ.Init(InContext, InDataFacade))
+			{
+				return false;
+			}
 		}
 	}
 	return true;
@@ -228,9 +281,18 @@ void FPCGExFittingVariationsDetails::Init(const int InSeed)
 
 void FPCGExFittingVariationsDetails::Apply(const FRandomStream& RandomStream, FTransform& OutTransform, const FPCGExFittingVariations& Variations, const EPCGExVariationMode& Step) const
 {
-	if (Offset == Step) { Variations.ApplyOffset(RandomStream, OutTransform); }
-	if (Rotation == Step) { Variations.ApplyRotation(RandomStream, OutTransform); }
-	if (Scale == Step) { Variations.ApplyScale(RandomStream, OutTransform); }
+	if (Offset == Step)
+	{
+		Variations.ApplyOffset(RandomStream, OutTransform);
+	}
+	if (Rotation == Step)
+	{
+		Variations.ApplyRotation(RandomStream, OutTransform);
+	}
+	if (Scale == Step)
+	{
+		Variations.ApplyScale(RandomStream, OutTransform);
+	}
 }
 
 bool FPCGExFittingDetailsHandler::Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InTargetFacade)
@@ -245,7 +307,10 @@ void FPCGExFittingDetailsHandler::ComputeTransform(const int32 TargetIndex, FTra
 	check(TargetDataFacade);
 	const PCGExData::FConstPoint& TargetPoint = TargetDataFacade->Source->GetInPoint(TargetIndex);
 
-	if (bWorldSpace) { OutTransform = TargetPoint.GetTransform(); }
+	if (bWorldSpace)
+	{
+		OutTransform = TargetPoint.GetTransform();
+	}
 
 	FVector OutScale = OutTransform.GetScale3D();
 	OutTranslation = FVector::ZeroVector;

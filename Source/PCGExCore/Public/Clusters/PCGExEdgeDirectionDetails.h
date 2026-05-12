@@ -59,9 +59,20 @@ struct PCGEXCORE_API FPCGExEdgeDirectionSettings
 
 	bool InitFromParent(FPCGExContext* InContext, const FPCGExEdgeDirectionSettings& ParentSettings, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade, const bool bQuiet = false);
 
-	bool RequiresSortingRules() const { return DirectionMethod == EPCGExEdgeDirectionMethod::EndpointsSort; }
-	bool RequiresEndpointsMetadata() const { return DirectionMethod == EPCGExEdgeDirectionMethod::EndpointsSort; }
-	bool RequiresEdgeMetadata() const { return DirectionMethod == EPCGExEdgeDirectionMethod::EdgeDotAttribute; }
+	bool RequiresSortingRules() const
+	{
+		return DirectionMethod == EPCGExEdgeDirectionMethod::EndpointsSort;
+	}
+
+	bool RequiresEndpointsMetadata() const
+	{
+		return DirectionMethod == EPCGExEdgeDirectionMethod::EndpointsSort;
+	}
+
+	bool RequiresEdgeMetadata() const
+	{
+		return DirectionMethod == EPCGExEdgeDirectionMethod::EdgeDotAttribute;
+	}
 
 	bool SortEndpoints(const PCGExClusters::FCluster* InCluster, PCGExGraphs::FEdge& InEdge) const;
 	bool SortExtrapolation(const PCGExClusters::FCluster* InCluster, const int32 InEdgeIndex, const int32 StartNodeIndex, const int32 EndNodeIndex) const;

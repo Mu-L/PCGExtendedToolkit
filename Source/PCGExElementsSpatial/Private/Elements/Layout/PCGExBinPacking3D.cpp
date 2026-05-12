@@ -11,8 +11,8 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Helpers/PCGExArrayHelpers.h"
 #include "Elements/Layout/PCGExLayout.h"
+#include "Helpers/PCGExArrayHelpers.h"
 #include "Math/PCGExMathBounds.h"
 #include "Sorting/PCGExPointSorter.h"
 #include "Sorting/PCGExSortingDetails.h"
@@ -46,7 +46,10 @@ TArray<FPCGPinProperties> UPCGExBinPacking3DSettings::OutputPinProperties() cons
 
 PCGEX_INITIALIZE_ELEMENT(BinPacking3D)
 
-PCGExData::EIOInit UPCGExBinPacking3DSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBinPacking3DSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 #pragma endregion
 
@@ -56,7 +59,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BinPacking3D)
 
 bool FPCGExBinPacking3DElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BinPacking3D)
 
@@ -105,7 +111,10 @@ bool FPCGExBinPacking3DElement::Boot(FPCGExContext* InContext) const
 		}
 	}
 
-	for (int i = 0; i < NumBins; i++) { Context->Bins->Pairs[i]->OutputPin = Context->Bins->OutputPin; }
+	for (int i = 0; i < NumBins; i++)
+	{
+		Context->Bins->Pairs[i]->OutputPin = Context->Bins->OutputPin;
+	}
 
 	Context->Discarded = MakeShared<PCGExData::FPointIOCollection>(InContext);
 	Context->Discarded->OutputPin = PCGExCommon::Labels::OutputDiscardedLabel;
@@ -269,7 +278,10 @@ namespace PCGExBinPacking3D
 
 	FVector FBP3DRotationHelper::RotateSize(const FVector& Size, const FRotator& Rotation)
 	{
-		if (Rotation.IsNearlyZero()) { return Size; }
+		if (Rotation.IsNearlyZero())
+		{
+			return Size;
+		}
 
 		const FQuat Quat = Rotation.Quaternion();
 		const FVector HalfSize = Size * 0.5;
@@ -282,7 +294,7 @@ namespace PCGExBinPacking3D
 				(i & 1) ? HalfSize.X : -HalfSize.X,
 				(i & 2) ? HalfSize.Y : -HalfSize.Y,
 				(i & 4) ? HalfSize.Z : -HalfSize.Z
-			);
+				);
 
 			Corner = Quat.RotateVector(Corner);
 			Min = Min.ComponentMin(Corner);
@@ -492,8 +504,14 @@ namespace PCGExBinPacking3D
 		// Check bin walls
 		for (int C = 0; C < 3; C++)
 		{
-			if (FMath::IsNearlyEqual(TestBox.Min[C], Bounds.Min[C], KINDA_SMALL_NUMBER)) { Contacts++; }
-			if (FMath::IsNearlyEqual(TestBox.Max[C], Bounds.Max[C], KINDA_SMALL_NUMBER)) { Contacts++; }
+			if (FMath::IsNearlyEqual(TestBox.Min[C], Bounds.Min[C], KINDA_SMALL_NUMBER))
+			{
+				Contacts++;
+			}
+			if (FMath::IsNearlyEqual(TestBox.Max[C], Bounds.Max[C], KINDA_SMALL_NUMBER))
+			{
+				Contacts++;
+			}
 		}
 
 		// Check contact with placed items (face-to-face adjacency with padded boxes)
@@ -512,8 +530,14 @@ namespace PCGExBinPacking3D
 
 				if (bRangeA && bRangeB)
 				{
-					if (FMath::IsNearlyEqual(TestBox.Min[C], Item.PaddedBox.Max[C], KINDA_SMALL_NUMBER)) { Contacts++; }
-					if (FMath::IsNearlyEqual(TestBox.Max[C], Item.PaddedBox.Min[C], KINDA_SMALL_NUMBER)) { Contacts++; }
+					if (FMath::IsNearlyEqual(TestBox.Min[C], Item.PaddedBox.Max[C], KINDA_SMALL_NUMBER))
+					{
+						Contacts++;
+					}
+					if (FMath::IsNearlyEqual(TestBox.Max[C], Item.PaddedBox.Min[C], KINDA_SMALL_NUMBER))
+					{
+						Contacts++;
+					}
 				}
 			}
 		}
@@ -529,7 +553,10 @@ namespace PCGExBinPacking3D
 		const FRotator& Rotation,
 		FBP3DPlacementCandidate& OutCandidate) const
 	{
-		if (EPIndex < 0 || EPIndex >= ExtremePoints.Num()) { return false; }
+		if (EPIndex < 0 || EPIndex >= ExtremePoints.Num())
+		{
+			return false;
+		}
 
 		const FVector& EP = ExtremePoints[EPIndex];
 		const FVector RotatedSize = FBP3DRotationHelper::RotateSize(ItemSize, Rotation);
@@ -572,7 +599,10 @@ namespace PCGExBinPacking3D
 		}
 
 		// Overlap check against all placed items (padded vs padded)
-		if (HasOverlap(PaddedBox)) { return false; }
+		if (HasOverlap(PaddedBox))
+		{
+			return false;
+		}
 
 		// Actual item position (inset from padded box)
 		const FVector ActualMin = PaddedMin + EffectivePadding;
@@ -587,8 +617,8 @@ namespace PCGExBinPacking3D
 
 		// o2: Height -- prefer lower actual placement Z (Paper Eq. 2)
 		const double NormalizedZ = BinSize.Z > KINDA_SMALL_NUMBER
-			                           ? (ActualMin.Z + RotatedSize.Z - Bounds.Min.Z) / BinSize.Z
-			                           : 0.0;
+			? (ActualMin.Z + RotatedSize.Z - Bounds.Min.Z) / BinSize.Z
+			: 0.0;
 
 		// o3: Load balance -- Manhattan distance of actual center to bin center (Paper Eq. 3)
 		const FVector ActualCenter = ActualMin + RotatedSize * 0.5;
@@ -618,7 +648,10 @@ namespace PCGExBinPacking3D
 
 	bool FBP3DBin::CheckLoadBearing(const FBP3DPlacementCandidate& Candidate, double ItemWeight, double Threshold) const
 	{
-		if (Items.IsEmpty()) { return true; }
+		if (Items.IsEmpty())
+		{
+			return true;
+		}
 
 		// Use padded geometry since the algorithm places items in padded-box space
 		const FBox CandidateActual(Candidate.PlacementMin, Candidate.PlacementMin + Candidate.RotatedSize);
@@ -629,7 +662,10 @@ namespace PCGExBinPacking3D
 			// Check if candidate is above existing using padded geometry
 			const bool bAbove = CandidatePadded.Min.Z >= Existing.PaddedBox.Max.Z - KINDA_SMALL_NUMBER;
 
-			if (!bAbove) { continue; }
+			if (!bAbove)
+			{
+				continue;
+			}
 
 			// Check XY overlap using padded geometry
 			const bool bXOverlap = CandidatePadded.Min.X < Existing.PaddedBox.Max.X && CandidatePadded.Max.X > Existing.PaddedBox.Min.X;
@@ -650,7 +686,10 @@ namespace PCGExBinPacking3D
 	double FBP3DBin::ComputeSupportRatio(const FBox& ItemBox) const
 	{
 		const double BaseArea = (ItemBox.Max.X - ItemBox.Min.X) * (ItemBox.Max.Y - ItemBox.Min.Y);
-		if (BaseArea <= KINDA_SMALL_NUMBER) { return 1.0; }
+		if (BaseArea <= KINDA_SMALL_NUMBER)
+		{
+			return 1.0;
+		}
 
 		// On the bin floor = fully supported
 		if (FMath::IsNearlyEqual(ItemBox.Min.Z, Bounds.Min.Z, KINDA_SMALL_NUMBER))
@@ -684,7 +723,10 @@ namespace PCGExBinPacking3D
 
 	void FBP3DBin::CommitPlacement(const FBP3DPlacementCandidate& Candidate, FBP3DItem& InItem)
 	{
-		if (!Candidate.IsValid()) { return; }
+		if (!Candidate.IsValid())
+		{
+			return;
+		}
 
 		const FVector ItemSize = Candidate.RotatedSize;
 		const FVector ItemMin = Candidate.PlacementMin;
@@ -724,7 +766,7 @@ namespace PCGExBinPacking3D
 			RotQuat,
 			InItem.Box.GetCenter() - RotQuat.RotateVector(ScaledBoundsCenter),
 			InPoint.GetScale3D()
-		);
+			);
 		InPoint.SetTransform(ItemTransform * Transform);
 	}
 
@@ -737,7 +779,10 @@ namespace PCGExBinPacking3D
 		NegativeAffinityPairs.Empty();
 		PositiveAffinityGroup.Empty();
 
-		if (!Settings->bEnableAffinities || Settings->AffinityRules.IsEmpty()) { return; }
+		if (!Settings->bEnableAffinities || Settings->AffinityRules.IsEmpty())
+		{
+			return;
+		}
 
 		TMap<int32, int32> Parent;
 
@@ -769,8 +814,14 @@ namespace PCGExBinPacking3D
 			}
 			else
 			{
-				if (!Parent.Contains(Rule.CategoryA)) { Parent.Add(Rule.CategoryA, Rule.CategoryA); }
-				if (!Parent.Contains(Rule.CategoryB)) { Parent.Add(Rule.CategoryB, Rule.CategoryB); }
+				if (!Parent.Contains(Rule.CategoryA))
+				{
+					Parent.Add(Rule.CategoryA, Rule.CategoryA);
+				}
+				if (!Parent.Contains(Rule.CategoryB))
+				{
+					Parent.Add(Rule.CategoryB, Rule.CategoryB);
+				}
 				Union(Rule.CategoryA, Rule.CategoryB);
 			}
 		}
@@ -783,7 +834,10 @@ namespace PCGExBinPacking3D
 
 	uint64 FProcessor::MakeAffinityKey(int32 A, int32 B)
 	{
-		if (A > B) { Swap(A, B); }
+		if (A > B)
+		{
+			Swap(A, B);
+		}
 		return (static_cast<uint64>(static_cast<uint32>(A)) << 32) | static_cast<uint64>(static_cast<uint32>(B));
 	}
 
@@ -800,7 +854,10 @@ namespace PCGExBinPacking3D
 
 	bool FProcessor::IsCategoryCompatibleWithBin(int32 ItemCategory, const FBP3DBin& Bin) const
 	{
-		if (ItemCategory < 0) { return true; }
+		if (ItemCategory < 0)
+		{
+			return true;
+		}
 
 		for (const int32 PresentCat : Bin.PresentCategories)
 		{
@@ -815,10 +872,16 @@ namespace PCGExBinPacking3D
 
 	int32 FProcessor::FindRequiredBinForPositiveAffinity(int32 ItemCategory) const
 	{
-		if (ItemCategory < 0) { return -1; }
+		if (ItemCategory < 0)
+		{
+			return -1;
+		}
 
 		const int32 ItemGroup = FindPositiveGroup(ItemCategory);
-		if (ItemGroup < 0) { return -1; }
+		if (ItemGroup < 0)
+		{
+			return -1;
+		}
 
 		for (int32 BinIdx = 0; BinIdx < Bins.Num(); BinIdx++)
 		{
@@ -991,7 +1054,10 @@ namespace PCGExBinPacking3D
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 		PointDataFacade->Source->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
@@ -1001,18 +1067,27 @@ namespace PCGExBinPacking3D
 
 		// Init shorthand buffers
 		PaddingBuffer = Settings->OccupationPadding.GetValueSetting();
-		if (!PaddingBuffer->Init(PointDataFacade)) { return false; }
+		if (!PaddingBuffer->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		if (Settings->bEnableWeightConstraint)
 		{
 			ItemWeightBuffer = Settings->ItemWeight.GetValueSetting();
-			if (!ItemWeightBuffer->Init(PointDataFacade)) { return false; }
+			if (!ItemWeightBuffer->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->bEnableAffinities)
 		{
 			CategoryBuffer = Settings->ItemCategory.GetValueSetting();
-			if (!CategoryBuffer->Init(PointDataFacade)) { return false; }
+			if (!CategoryBuffer->Init(PointDataFacade))
+			{
+				return false;
+			}
 
 			BuildAffinityLookups();
 		}
@@ -1020,13 +1095,19 @@ namespace PCGExBinPacking3D
 		if (Settings->bEnableLoadBearing)
 		{
 			LoadBearingThresholdBuffer = Settings->LoadBearingThreshold.GetValueSetting();
-			if (!LoadBearingThresholdBuffer->Init(PointDataFacade)) { return false; }
+			if (!LoadBearingThresholdBuffer->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->bRequireSupport)
 		{
 			MinSupportRatioBuffer = Settings->MinSupportRatio.GetValueSetting();
-			if (!MinSupportRatioBuffer->Init(PointDataFacade)) { return false; }
+			if (!MinSupportRatioBuffer->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		const int32 NumPoints = PointDataFacade->GetNum();
@@ -1066,7 +1147,10 @@ namespace PCGExBinPacking3D
 		{
 			PCGEX_MAKE_SHARED(BinFacade, PCGExData::FFacade, TargetBins.ToSharedRef())
 			BinMaxWeightBuffer = Settings->BinMaxWeight.GetValueSetting();
-			if (!BinMaxWeightBuffer->Init(BinFacade)) { return false; }
+			if (!BinMaxWeightBuffer->Init(BinFacade))
+			{
+				return false;
+			}
 		}
 
 		PCGExArrayHelpers::ArrayOfIndices(ProcessingOrder, NumPoints);
@@ -1087,22 +1171,34 @@ namespace PCGExBinPacking3D
 
 			if (Settings->SortDirection == EPCGExSortDirection::Descending)
 			{
-				ProcessingOrder.Sort([&Volumes](const int32 A, const int32 B) { return Volumes[A] > Volumes[B]; });
+				ProcessingOrder.Sort([&Volumes](const int32 A, const int32 B)
+				{
+					return Volumes[A] > Volumes[B];
+				});
 			}
 			else
 			{
-				ProcessingOrder.Sort([&Volumes](const int32 A, const int32 B) { return Volumes[A] < Volumes[B]; });
+				ProcessingOrder.Sort([&Volumes](const int32 A, const int32 B)
+				{
+					return Volumes[A] < Volumes[B];
+				});
 			}
 		}
 		else if (Sorter && Sorter->Init(Context))
 		{
 			if (TSharedPtr<PCGExSorting::FSortCache> Cache = Sorter->BuildCache(NumPoints))
 			{
-				ProcessingOrder.Sort([&](const int32 A, const int32 B) { return Cache->Compare(A, B); });
+				ProcessingOrder.Sort([&](const int32 A, const int32 B)
+				{
+					return Cache->Compare(A, B);
+				});
 			}
 			else
 			{
-				ProcessingOrder.Sort([&](const int32 A, const int32 B) { return Sorter->Sort(A, B); });
+				ProcessingOrder.Sort([&](const int32 A, const int32 B)
+				{
+					return Sorter->Sort(A, B);
+				});
 			}
 		}
 
@@ -1183,7 +1279,10 @@ namespace PCGExBinPacking3D
 			}
 
 			Fitted[PointIndex] = bPlaced;
-			if (!bPlaced) { bHasUnfitted = true; }
+			if (!bPlaced)
+			{
+				bHasUnfitted = true;
+			}
 		}
 	}
 

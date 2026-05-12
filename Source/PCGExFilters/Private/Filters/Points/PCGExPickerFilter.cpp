@@ -13,7 +13,10 @@
 
 bool UPCGExPickerFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
 
 	return PCGExFactories::GetInputFactories(InContext, PCGExPickers::Labels::SourcePickersLabel, PickerFactories, {PCGExFactories::EType::IndexPicker});
 }
@@ -25,7 +28,10 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExPickerFilterFactory::CreateFilter() 
 
 bool PCGExPointFilter::FPickerFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	for (const TObjectPtr<const UPCGExPickerFactoryData>& FactoryData : TypedFilterFactory->PickerFactories)
 	{
@@ -42,14 +48,20 @@ bool PCGExPointFilter::FPickerFilter::Test(const int32 PointIndex) const
 
 bool PCGExPointFilter::FPickerFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
 {
-	if (!ParentCollection) { return false; }
+	if (!ParentCollection)
+	{
+		return false;
+	}
 
 	const int32 NumEntries = ParentCollection->Num();
 	for (const TObjectPtr<const UPCGExPickerFactoryData>& FactoryData : TypedFilterFactory->PickerFactories)
 	{
 		TSet<int32> TempPicks;
 		FactoryData->AddPicks(NumEntries, TempPicks);
-		if (TempPicks.Contains(IO->IOIndex)) { return !TypedFilterFactory->Config.bInvert; }
+		if (TempPicks.Contains(IO->IOIndex))
+		{
+			return !TypedFilterFactory->Config.bInvert;
+		}
 	}
 
 	return TypedFilterFactory->Config.bInvert;

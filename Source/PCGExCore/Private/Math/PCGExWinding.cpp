@@ -10,14 +10,23 @@ namespace PCGExMath
 {
 	bool IsWinded(const EPCGExWinding Winding, const bool bIsInputClockwise)
 	{
-		if (Winding == EPCGExWinding::Clockwise) { return bIsInputClockwise; }
+		if (Winding == EPCGExWinding::Clockwise)
+		{
+			return bIsInputClockwise;
+		}
 		return !bIsInputClockwise;
 	}
 
 	bool IsWinded(const EPCGExWindingMutation Winding, const bool bIsInputClockwise)
 	{
-		if (Winding == EPCGExWindingMutation::Unchanged) { return true; }
-		if (Winding == EPCGExWindingMutation::Clockwise) { return bIsInputClockwise; }
+		if (Winding == EPCGExWindingMutation::Unchanged)
+		{
+			return true;
+		}
+		if (Winding == EPCGExWindingMutation::Clockwise)
+		{
+			return bIsInputClockwise;
+		}
 		return !bIsInputClockwise; // CounterClockwise
 	}
 
@@ -36,8 +45,14 @@ namespace PCGExMath
 			bIsClockwise = false;
 		}
 
-		if (Perimeter == 0.0f) { Compactness = 0; }
-		else { Compactness = (4.0f * PI * Area) / (Perimeter * Perimeter); }
+		if (Perimeter == 0.0f)
+		{
+			Compactness = 0;
+		}
+		else
+		{
+			Compactness = (4.0f * PI * Area) / (Perimeter * Perimeter);
+		}
 	}
 
 	bool FPolygonInfos::IsWinded(const EPCGExWinding Winding) const

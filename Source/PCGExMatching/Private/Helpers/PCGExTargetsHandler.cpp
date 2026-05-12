@@ -39,11 +39,17 @@ namespace PCGExMatching
 		for (const TSharedPtr<PCGExData::FPointIO>& IO : Targets->Pairs)
 		{
 			const FBox DataBounds = InitFn(IO, Idx);
-			if (!DataBounds.IsValid) { continue; }
+			if (!DataBounds.IsValid)
+			{
+				continue;
+			}
 
 			bool bAlreadySeen = false;
 			SeenData.Add(IO->GetIn(), &bAlreadySeen);
-			if (bAlreadySeen) { continue; }
+			if (bAlreadySeen)
+			{
+				continue;
+			}
 
 			TSharedPtr<PCGExData::FFacade> TargetFacade = MakeShared<PCGExData::FFacade>(IO.ToSharedRef());
 
@@ -59,10 +65,16 @@ namespace PCGExMatching
 			Idx++;
 		}
 
-		if (TargetFacades.IsEmpty()) { return 0; }
+		if (TargetFacades.IsEmpty())
+		{
+			return 0;
+		}
 
 		TargetsOctree = MakeShared<PCGExOctree::FItemOctree>(OctreeBounds.GetCenter(), OctreeBounds.GetExtent().Length());
-		for (int i = 0; i < TargetFacades.Num(); ++i) { TargetsOctree->AddElement(PCGExOctree::FItem(i, Bounds[i])); }
+		for (int i = 0; i < TargetFacades.Num(); ++i)
+		{
+			TargetsOctree->AddElement(PCGExOctree::FItem(i, Bounds[i]));
+		}
 
 		TargetsPreloader = MakeShared<PCGExData::FMultiFacadePreloader>(TargetFacades);
 
@@ -71,7 +83,10 @@ namespace PCGExMatching
 
 	int32 FTargetsHandler::Init(FPCGExContext* InContext, const FName InPinLabel)
 	{
-		return Init(InContext, InPinLabel, [](const TSharedPtr<PCGExData::FPointIO>& IO, const int32 Idx) { return IO->GetIn()->GetBounds(); });
+		return Init(InContext, InPinLabel, [](const TSharedPtr<PCGExData::FPointIO>& IO, const int32 Idx)
+		{
+			return IO->GetIn()->GetBounds();
+		});
 	}
 
 	void FTargetsHandler::SetDistances(const FPCGExDistanceDetails& InDetails)
@@ -88,19 +103,31 @@ namespace PCGExMatching
 	{
 		DataMatcher = MakeShared<FDataMatcher>();
 		DataMatcher->SetDetails(InDetails);
-		if (!DataMatcher->Init(InContext, TargetFacades, false)) { DataMatcher.Reset(); }
+		if (!DataMatcher->Init(InContext, TargetFacades, false))
+		{
+			DataMatcher.Reset();
+		}
 	}
 
 	bool FTargetsHandler::PopulateIgnoreList(const TSharedPtr<PCGExData::FPointIO>& InDataCandidate, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const
 	{
-		if (DataMatcher) { return DataMatcher->PopulateIgnoreList(InDataCandidate->GetTaggedData(), InMatchingScope, OutIgnoreList); }
+		if (DataMatcher)
+		{
+			return DataMatcher->PopulateIgnoreList(InDataCandidate->GetTaggedData(), InMatchingScope, OutIgnoreList);
+		}
 		return true;
 	}
 
 	bool FTargetsHandler::PopulateIgnoreListInverse(const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& InMatchRuleFactories, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const FPCGExMatchingDetails* InDetails, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const
 	{
-		if (!InDetails || !InDetails->IsEnabled()) { return true; }
-		if (InMatchRuleFactories.IsEmpty()) { return true; }
+		if (!InDetails || !InDetails->IsEnabled())
+		{
+			return true;
+		}
+		if (InMatchRuleFactories.IsEmpty())
+		{
+			return true;
+		}
 
 		// Create inverse matcher: input is the single MatchableSource, targets are candidates
 		auto InverseMatcher = MakeShared<FDataMatcher>();
@@ -108,7 +135,10 @@ namespace PCGExMatching
 
 		TArray<TSharedPtr<PCGExData::FFacade>> SingleSource;
 		SingleSource.Add(InSourceFacade);
-		if (!InverseMatcher->Init(InMatchRuleFactories, SingleSource, false)) { return true; }
+		if (!InverseMatcher->Init(InMatchRuleFactories, SingleSource, false))
+		{
+			return true;
+		}
 
 		// Build FPCGExTaggedData array from targets (candidates in inverse context)
 		TArray<FPCGExTaggedData> TargetCandidates;
@@ -123,8 +153,14 @@ namespace PCGExMatching
 
 	bool FTargetsHandler::HandleUnmatchedOutput(const TSharedPtr<PCGExData::FFacade>& InFacade, const bool bForward) const
 	{
-		if (DataMatcher) { return DataMatcher->HandleUnmatchedOutput(InFacade, bForward); }
-		if (bForward) { return InFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward); }
+		if (DataMatcher)
+		{
+			return DataMatcher->HandleUnmatchedOutput(InFacade, bForward);
+		}
+		if (bForward)
+		{
+			return InFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
+		}
 		return false;
 	}
 
@@ -139,7 +175,10 @@ namespace PCGExMatching
 		for (int i = 0; i < TargetFacades.Num(); i++)
 		{
 			const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[i];
-			if (Exclude && Exclude->Contains(Target->GetIn())) { continue; }
+			if (Exclude && Exclude->Contains(Target->GetIn()))
+			{
+				continue;
+			}
 			It(Target, i);
 		}
 	}
@@ -150,9 +189,15 @@ namespace PCGExMatching
 		for (int i = 0; i < TargetFacades.Num(); i++)
 		{
 			const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[i];
-			if (Exclude && Exclude->Contains(Target->GetIn())) { continue; }
+			if (Exclude && Exclude->Contains(Target->GetIn()))
+			{
+				continue;
+			}
 			It(Target, i, bBreak);
-			if (bBreak) { return true; }
+			if (bBreak)
+			{
+				return true;
+			}
 		}
 
 		return bBreak;
@@ -162,9 +207,15 @@ namespace PCGExMatching
 	{
 		for (int i = 0; i < TargetFacades.Num(); i++)
 		{
-			if (Exclude && Exclude->Contains(TargetFacades[i]->GetIn())) { continue; }
+			if (Exclude && Exclude->Contains(TargetFacades[i]->GetIn()))
+			{
+				continue;
+			}
 			const int32 NumPoints = TargetFacades[i]->GetNum();
-			for (int j = 0; j < NumPoints; j++) { It(PCGExData::FPoint(j, i)); }
+			for (int j = 0; j < NumPoints; j++)
+			{
+				It(PCGExData::FPoint(j, i));
+			}
 		}
 	}
 
@@ -173,7 +224,10 @@ namespace PCGExMatching
 		for (int i = 0; i < TargetFacades.Num(); i++)
 		{
 			const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[i];
-			if (Exclude && Exclude->Contains(Target->GetIn())) { continue; }
+			if (Exclude && Exclude->Contains(Target->GetIn()))
+			{
+				continue;
+			}
 			const int32 NumPoints = TargetFacades[i]->GetNum();
 			for (int j = 0; j < NumPoints; j++)
 			{
@@ -188,7 +242,10 @@ namespace PCGExMatching
 	{
 		TargetsOctree->FindElementsWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item)
 		{
-			if (Exclude && Exclude->Contains(TargetFacades[Item.Index]->GetIn())) { return; }
+			if (Exclude && Exclude->Contains(TargetFacades[Item.Index]->GetIn()))
+			{
+				return;
+			}
 			Func(Item);
 		});
 	}
@@ -198,7 +255,10 @@ namespace PCGExMatching
 		TargetsOctree->FindElementsWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item)
 		{
 			const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[Item.Index];
-			if (Exclude && Exclude->Contains(Target->GetIn())) { return; }
+			if (Exclude && Exclude->Contains(Target->GetIn()))
+			{
+				return;
+			}
 
 			TargetOctrees[Item.Index]->FindElementsWithBoundsTest(QueryBounds, [&](const PCGPointOctree::FPointRef& PointRef)
 			{
@@ -220,16 +280,25 @@ namespace PCGExMatching
 				const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[Item.Index];
 				const bool bSelf = Target->GetIn() == Probe.Data;
 
-				if (Exclude && Exclude->Contains(Target->GetIn())) { return; }
+				if (Exclude && Exclude->Contains(Target->GetIn()))
+				{
+					return;
+				}
 
 				TargetOctrees[Item.Index]->FindElementsWithBoundsTest(QueryBounds, [&](const PCGPointOctree::FPointRef& PointRef)
 				{
-					if (bSelf && PointRef.Index == Probe.Index) { return; }
+					if (bSelf && PointRef.Index == Probe.Index)
+					{
+						return;
+					}
 
 					PCGExData::FConstPoint Point = Target->GetInPoint(PointRef.Index);
 					bool bOverlap = false;
 					double Dist = Distances->GetDistSquared(Probe, Point, bOverlap);
-					if (bOverlap) { Dist = 0; }
+					if (bOverlap)
+					{
+						Dist = 0;
+					}
 
 					if (OutDistSquared > Dist)
 					{
@@ -249,14 +318,21 @@ namespace PCGExMatching
 				const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[Item.Index];
 				const bool bSelf = Target->GetIn() == Probe.Data;
 
-				if (Exclude && Exclude->Contains(Target->GetIn())) { return; }
+				if (Exclude && Exclude->Contains(Target->GetIn()))
+				{
+					return;
+				}
 
 				TargetOctrees[Item.Index]->FindElementsWithBoundsTest(QueryBounds, [&](const PCGPointOctree::FPointRef& PointRef)
 				{
-					if (bSelf && PointRef.Index == Probe.Index) { return; }
+					if (bSelf && PointRef.Index == Probe.Index)
+					{
+						return;
+					}
 
 					const PCGExData::FConstPoint Point = Target->GetInPoint(PointRef.Index);
-					if (const double Dist = Distances->GetDistSquared(Probe, Point); OutDistSquared > Dist)
+					if (const double Dist = Distances->GetDistSquared(Probe, Point);
+						OutDistSquared > Dist)
 					{
 						OutResult = Point;
 						OutResult.IO = Item.Index;
@@ -282,16 +358,25 @@ namespace PCGExMatching
 				const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[Item.Index];
 				const bool bSelf = Target->GetIn() == Probe.Data;
 
-				if (Exclude && Exclude->Contains(Target->GetIn())) { return; }
+				if (Exclude && Exclude->Contains(Target->GetIn()))
+				{
+					return;
+				}
 
 				TargetOctrees[Item.Index]->FindNearbyElements(ProbeLocation, [&](const PCGPointOctree::FPointRef& PointRef)
 				{
-					if (bSelf && PointRef.Index == Probe.Index) { return; }
+					if (bSelf && PointRef.Index == Probe.Index)
+					{
+						return;
+					}
 
 					const PCGExData::FConstPoint Point = Target->GetInPoint(PointRef.Index);
 					bool bOverlap = false;
 					double Dist = Distances->GetDistSquared(Probe, Point, bOverlap);
-					if (bOverlap) { Dist = 0; }
+					if (bOverlap)
+					{
+						Dist = 0;
+					}
 
 					if (OutDistSquared > Dist)
 					{
@@ -310,14 +395,21 @@ namespace PCGExMatching
 				const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[Item.Index];
 				const bool bSelf = Target->GetIn() == Probe.Data;
 
-				if (Exclude && Exclude->Contains(Target->GetIn())) { return; }
+				if (Exclude && Exclude->Contains(Target->GetIn()))
+				{
+					return;
+				}
 
 				TargetOctrees[Item.Index]->FindNearbyElements(ProbeLocation, [&](const PCGPointOctree::FPointRef& PointRef)
 				{
-					if (bSelf && PointRef.Index == Probe.Index) { return; }
+					if (bSelf && PointRef.Index == Probe.Index)
+					{
+						return;
+					}
 
 					const PCGExData::FConstPoint Point = Target->GetInPoint(PointRef.Index);
-					if (const double Dist = Distances->GetDistSquared(Probe, Point); OutDistSquared > Dist)
+					if (const double Dist = Distances->GetDistSquared(Probe, Point);
+						OutDistSquared > Dist)
 					{
 						OutResult = Point;
 						OutResult.IO = Item.Index;
@@ -334,13 +426,17 @@ namespace PCGExMatching
 		TargetsOctree->FindNearbyElements(Probe, [&](const PCGExOctree::FItem& Item)
 		{
 			const TSharedRef<PCGExData::FFacade>& Target = TargetFacades[Item.Index];
-			if (Exclude && Exclude->Contains(Target->GetIn())) { return; }
+			if (Exclude && Exclude->Contains(Target->GetIn()))
+			{
+				return;
+			}
 
 			TargetOctrees[Item.Index]->FindNearbyElements(Probe, [&](const PCGPointOctree::FPointRef& PointRef)
 			{
 				PCGExData::FConstPoint Point = Target->GetInPoint(PointRef.Index);
 
-				if (const double Dist = FVector::DistSquared(Distances->GetTargetCenter(Point, Point.GetLocation(), Probe), Probe); OutDistSquared > Dist)
+				if (const double Dist = FVector::DistSquared(Distances->GetTargetCenter(Point, Point.GetLocation(), Probe), Probe);
+					OutDistSquared > Dist)
 				{
 					OutResult = Point;
 					OutResult.IO = Item.Index;
@@ -366,7 +462,10 @@ namespace PCGExMatching
 		int32 Total = 0;
 		for (int i = 0; i < TargetFacades.Num(); i++)
 		{
-			if (Exclude && Exclude->Contains(TargetFacades[i]->GetIn())) { continue; }
+			if (Exclude && Exclude->Contains(TargetFacades[i]->GetIn()))
+			{
+				continue;
+			}
 			Total += TargetFacades[i]->GetNum();
 		}
 		return Total;
@@ -416,7 +515,10 @@ namespace PCGExMatching
 		{
 			bool bOverlap = false;
 			double DistSquared = Distances->GetDistSquared(SourcePoint, TargetPoint, bOverlap);
-			if (bOverlap) { DistSquared = 0; }
+			if (bOverlap)
+			{
+				DistSquared = 0;
+			}
 			return DistSquared;
 		}
 		return Distances->GetDistSquared(SourcePoint, TargetPoint);

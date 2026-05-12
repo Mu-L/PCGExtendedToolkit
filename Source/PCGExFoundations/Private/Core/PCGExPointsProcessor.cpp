@@ -4,8 +4,8 @@
 #include "Core/PCGExPointsProcessor.h"
 
 #include "PCGPin.h"
-#include "Data/PCGExPointIO.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGExPointIO.h"
 #include "Math/PCGExProjectionDetails.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
@@ -50,13 +50,25 @@ TArray<FPCGPinProperties> UPCGExPointsProcessorSettings::InputPinProperties() co
 	{
 		if (!GetIsMainTransactional())
 		{
-			if (GetMainAcceptMultipleData()) { PCGEX_PIN_POINTS(GetMainInputPin(), "The point data to be processed.", Required) }
-			else { PCGEX_PIN_POINT(GetMainInputPin(), "The point data to be processed.", Required) }
+			if (GetMainAcceptMultipleData())
+			{
+				PCGEX_PIN_POINTS(GetMainInputPin(), "The point data to be processed.", Required)
+			}
+			else
+			{
+				PCGEX_PIN_POINT(GetMainInputPin(), "The point data to be processed.", Required)
+			}
 		}
 		else
 		{
-			if (GetMainAcceptMultipleData()) { PCGEX_PIN_ANY(GetMainInputPin(), "The data to be processed.", Required) }
-			else { PCGEX_PIN_ANY(GetMainInputPin(), "The data to be processed.", Required) }
+			if (GetMainAcceptMultipleData())
+			{
+				PCGEX_PIN_ANY(GetMainInputPin(), "The data to be processed.", Required)
+			}
+			else
+			{
+				PCGEX_PIN_ANY(GetMainInputPin(), "The data to be processed.", Required)
+			}
 		}
 	}
 
@@ -64,8 +76,14 @@ TArray<FPCGPinProperties> UPCGExPointsProcessorSettings::InputPinProperties() co
 
 	if (SupportsPointFilters())
 	{
-		if (RequiresPointFilters()) { PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Required) }
-		else { PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Normal) }
+		if (RequiresPointFilters())
+		{
+			PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Required)
+		}
+		else
+		{
+			PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Normal)
+		}
 	}
 
 	return PinProperties;
@@ -83,19 +101,31 @@ TArray<FPCGPinProperties> UPCGExPointsProcessorSettings::OutputPinProperties() c
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExPointsProcessorSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExPointsProcessorSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
-TSet<PCGExFactories::EType> UPCGExPointsProcessorSettings::GetPointFilterTypes() const { return PCGExFactories::PointFilters; }
+TSet<PCGExFactories::EType> UPCGExPointsProcessorSettings::GetPointFilterTypes() const
+{
+	return PCGExFactories::PointFilters;
+}
 
 FPCGExPointsProcessorContext::~FPCGExPointsProcessorContext()
 {
-	if (MainBatch) { MainBatch->Cleanup(); }
+	if (MainBatch)
+	{
+		MainBatch->Cleanup();
+	}
 	MainBatch.Reset();
 }
 
 bool FPCGExPointsProcessorContext::AdvancePointsIO(const bool bCleanupKeys)
 {
-	if (bCleanupKeys && CurrentIO) { CurrentIO->ClearCachedKeys(); }
+	if (bCleanupKeys && CurrentIO)
+	{
+		CurrentIO->ClearCachedKeys();
+	}
 
 	if (MainPoints->Pairs.IsValidIndex(++CurrentPointIOIndex))
 	{
@@ -111,7 +141,10 @@ bool FPCGExPointsProcessorContext::AdvancePointsIO(const bool bCleanupKeys)
 
 bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::ContextState NextStateId)
 {
-	if (!bBatchProcessingEnabled) { return true; }
+	if (!bBatchProcessingEnabled)
+	{
+		return true;
+	}
 
 	PCGEX_ON_ASYNC_STATE_READY_INTERNAL(PCGExPointsMT::MTState_PointsProcessing)
 	{
@@ -130,7 +163,10 @@ bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::Context
 	PCGEX_ON_ASYNC_STATE_READY_INTERNAL(PCGExPointsMT::MTState_PointsCompletingWork)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExPointsProcessorContext::ProcessPointsBatch::WorkComplete);
-		if (!MainBatch->bSkipCompletion) { BatchProcessing_WorkComplete(); }
+		if (!MainBatch->bSkipCompletion)
+		{
+			BatchProcessing_WorkComplete();
+		}
 
 		if (MainBatch->bRequiresWriteStep)
 		{
@@ -140,7 +176,10 @@ bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::Context
 			return false;
 		}
 		bBatchProcessingEnabled = false;
-		if (NextStateId == PCGExCommon::States::State_Done) { Done(); }
+		if (NextStateId == PCGExCommon::States::State_Done)
+		{
+			Done();
+		}
 		SetState(NextStateId);
 		return true;
 	}
@@ -151,7 +190,10 @@ bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::Context
 		BatchProcessing_WritingDone();
 
 		bBatchProcessingEnabled = false;
-		if (NextStateId == PCGExCommon::States::State_Done) { Done(); }
+		if (NextStateId == PCGExCommon::States::State_Done)
+		{
+			Done();
+		}
 		SetState(NextStateId);
 	}
 
@@ -174,11 +216,17 @@ bool FPCGExPointsProcessorContext::StartBatchProcessingPoints(FBatchProcessingVa
 
 	while (AdvancePointsIO(false))
 	{
-		if (!ValidateEntry(CurrentIO)) { continue; }
+		if (!ValidateEntry(CurrentIO))
+		{
+			continue;
+		}
 		BatchAblePoints.Add(CurrentIO.ToSharedRef());
 	}
 
-	if (BatchAblePoints.IsEmpty()) { return bBatchProcessingEnabled; }
+	if (BatchAblePoints.IsEmpty())
+	{
+		return bBatchProcessingEnabled;
+	}
 	bBatchProcessingEnabled = true;
 
 	const TSharedPtr<PCGExPointsMT::IBatch> NewBatch = CreatePointBatchInstance(BatchAblePoints);
@@ -188,7 +236,10 @@ bool FPCGExPointsProcessorContext::StartBatchProcessingPoints(FBatchProcessingVa
 
 	InitBatch(NewBatch);
 
-	if (Settings->SupportsPointFilters()) { NewBatch->SetPointsFilterData(&FilterFactories); }
+	if (Settings->SupportsPointFilters())
+	{
+		NewBatch->SetPointsFilterData(&FilterFactories);
+	}
 
 	if (MainBatch->PrepareProcessing())
 	{
@@ -234,18 +285,27 @@ void FPCGExPointsProcessorElement::DisabledPassThroughData(FPCGContext* Context)
 
 bool FPCGExPointsProcessorElement::Boot(FPCGExContext* InContext) const
 {
-	if (!IPCGExElement::Boot(InContext)) { return false; }
+	if (!IPCGExElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	FPCGExPointsProcessorContext* Context = static_cast<FPCGExPointsProcessorContext*>(InContext);
 	PCGEX_SETTINGS(PointsProcessor)
 
-	if (Context->InputData.GetAllInputs().IsEmpty() && !Settings->IsInputless()) { return false; } //Get rid of errors and warning when there is no input
+	if (Context->InputData.GetAllInputs().IsEmpty() && !Settings->IsInputless())
+	{
+		return false;
+	} //Get rid of errors and warning when there is no input
 
 	Context->MainPoints = MakeShared<PCGExData::FPointIOCollection>(Context, Settings->GetIsMainTransactional());
 	Context->MainPoints->OutputPin = Settings->GetMainOutputPin();
 
 	TArray<FPCGTaggedData> Sources = Context->InputData.GetInputsByPin(Settings->GetMainInputPin());
-	if (Sources.IsEmpty() && !Settings->IsInputless()) { return false; } // Silent cancel, there's simply no data
+	if (Sources.IsEmpty() && !Settings->IsInputless())
+	{
+		return false;
+	} // Silent cancel, there's simply no data
 
 	if (Settings->GetMainAcceptMultipleData())
 	{
@@ -269,7 +329,8 @@ bool FPCGExPointsProcessorElement::Boot(FPCGExContext* InContext) const
 
 	if (Settings->SupportsPointFilters())
 	{
-		if (const bool bRequiredFilters = Settings->RequiresPointFilters(); !GetInputFactories(Context, Settings->GetPointFilterPin(), Context->FilterFactories, Settings->GetPointFilterTypes(), bRequiredFilters) && bRequiredFilters)
+		if (const bool bRequiredFilters = Settings->RequiresPointFilters();
+			!GetInputFactories(Context, Settings->GetPointFilterPin(), Context->FilterFactories, Settings->GetPointFilterTypes(), bRequiredFilters) && bRequiredFilters)
 		{
 			return false;
 		}
@@ -288,7 +349,10 @@ void FPCGExPointsProcessorElement::InitializeData(FPCGExContext* InContext, cons
 	PCGExData::EIOInit InitMode = Settings->GetMainOutputInitMode();
 	if (InitMode != PCGExData::EIOInit::NoInit)
 	{
-		for (const TSharedPtr<PCGExData::FPointIO>& IO : Context->MainPoints->Pairs) { IO->InitializeOutput(InitMode); }
+		for (const TSharedPtr<PCGExData::FPointIO>& IO : Context->MainPoints->Pairs)
+		{
+			IO->InitializeOutput(InitMode);
+		}
 	}
 }
 

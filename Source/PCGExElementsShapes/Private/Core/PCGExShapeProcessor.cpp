@@ -18,26 +18,44 @@ TArray<FPCGPinProperties> UPCGExShapeProcessorSettings::InputPinProperties() con
 
 	if (!IsInputless())
 	{
-		if (GetMainAcceptMultipleData()) { PCGEX_PIN_POINTS(GetMainInputPin(), "The point data to be processed.", Required) }
-		else { PCGEX_PIN_POINT(GetMainInputPin(), "The point data to be processed.", Required) }
+		if (GetMainAcceptMultipleData())
+		{
+			PCGEX_PIN_POINTS(GetMainInputPin(), "The point data to be processed.", Required)
+		}
+		else
+		{
+			PCGEX_PIN_POINT(GetMainInputPin(), "The point data to be processed.", Required)
+		}
 	}
 
 	PCGEX_PIN_FACTORIES(PCGExShapes::Labels::SourceShapeBuildersLabel, "Shape builders that will be used by this element.", Required, FPCGExDataTypeInfoShape::AsId())
 
 	if (SupportsPointFilters())
 	{
-		if (RequiresPointFilters()) { PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Required) }
-		else { PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Normal) }
+		if (RequiresPointFilters())
+		{
+			PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Required)
+		}
+		else
+		{
+			PCGEX_PIN_FILTERS(GetPointFilterPin(), GetPointFilterTooltip(), Normal)
+		}
 	}
 
 	return PinProperties;
 }
 
-FName UPCGExShapeProcessorSettings::GetMainInputPin() const { return PCGExCommon::Labels::SourceSeedsLabel; }
+FName UPCGExShapeProcessorSettings::GetMainInputPin() const
+{
+	return PCGExCommon::Labels::SourceSeedsLabel;
+}
 
 bool FPCGExShapeProcessorElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ShapeProcessor)
 

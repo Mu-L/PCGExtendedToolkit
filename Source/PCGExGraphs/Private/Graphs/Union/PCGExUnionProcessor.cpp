@@ -6,15 +6,15 @@
 
 #include "PCGExCoreSettingsCache.h"
 #include "Blenders/PCGExMetadataBlender.h"
-#include "Containers/PCGExScopedContainers.h"
-#include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Clusters/PCGExClusterCommon.h"
 #include "Clusters/PCGExEdge.h"
+#include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExProxyDataBlending.h"
 #include "Core/PCGExUnionTable.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Graphs/Union/PCGExIntersections.h"
@@ -22,7 +22,11 @@
 namespace PCGExGraphs
 {
 	FUnionProcessor::FUnionProcessor(FPCGExContext* InContext, TSharedRef<PCGExData::FFacade> InUnionDataFacade, FPCGExPointPointIntersectionDetails InPointPointIntersectionSettings, FPCGExBlendingDetails InDefaultPointsBlending, FPCGExBlendingDetails InDefaultEdgesBlending)
-		: Context(InContext), UnionDataFacade(InUnionDataFacade), PointPointIntersectionDetails(InPointPointIntersectionSettings), DefaultPointsBlendingDetails(InDefaultPointsBlending), DefaultEdgesBlendingDetails(InDefaultEdgesBlending)
+		: Context(InContext)
+		  , UnionDataFacade(InUnionDataFacade)
+		  , PointPointIntersectionDetails(InPointPointIntersectionSettings)
+		  , DefaultPointsBlendingDetails(InDefaultPointsBlending)
+		  , DefaultEdgesBlendingDetails(InDefaultEdgesBlending)
 	{
 	}
 
@@ -47,7 +51,10 @@ namespace PCGExGraphs
 		bDoPointEdge = true;
 		PointEdgeIntersectionDetails = InDetails;
 		bUseCustomPointEdgeBlending = bUseCustom;
-		if (InOverride) { CustomPointEdgeBlendingDetails = *InOverride; }
+		if (InOverride)
+		{
+			CustomPointEdgeBlendingDetails = *InOverride;
+		}
 	}
 
 	void FUnionProcessor::InitEdgeEdge(const FPCGExEdgeEdgeIntersectionDetails& InDetails, const bool bUseCustom, const FPCGExBlendingDetails* InOverride)
@@ -56,7 +63,10 @@ namespace PCGExGraphs
 		EdgeEdgeIntersectionDetails = InDetails;
 		EdgeEdgeIntersectionDetails.Init();
 		bUseCustomEdgeEdgeBlending = bUseCustom;
-		if (InOverride) { CustomEdgeEdgeBlendingDetails = *InOverride; }
+		if (InOverride)
+		{
+			CustomEdgeEdgeBlendingDetails = *InOverride;
+		}
 	}
 
 	bool FUnionProcessor::StartExecution(const TArray<TSharedRef<PCGExData::FFacade>>& InFacades, const FPCGExGraphBuilderDetails& InBuilderDetails)
@@ -84,7 +94,10 @@ namespace PCGExGraphs
 		UPCGBasePointData* MutablePoints = UnionDataFacade->GetOut();
 		PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumUnionNodes, UnionBlender->GetAllocatedProperties()); // TODO : Proper Allocation
 
-		if (!TypedBlender->Init(Context, UnionDataFacade, NodesTable)) { return false; }
+		if (!TypedBlender->Init(Context, UnionDataFacade, NodesTable))
+		{
+			return false;
+		}
 
 		// New natural ordering: adopt the graph state up front so downstream phases (P/E, E/E, finalize)
 		// see a fully wired FGraph. Only dependency is that MutablePoints is already sized -- which it is.
@@ -153,11 +166,17 @@ namespace PCGExGraphs
 				int32 ContributingPoints = 0;
 				for (const PCGExData::FElement& E : Span)
 				{
-					if (E.IO < 0 || !InFacades.IsValidIndex(E.IO)) { continue; }
+					if (E.IO < 0 || !InFacades.IsValidIndex(E.IO))
+					{
+						continue;
+					}
 					Center += InFacades[E.IO]->GetIn()->GetTransform(E.Index).GetLocation();
 					ContributingPoints++;
 				}
-				if (ContributingPoints > 0) { Center /= static_cast<double>(ContributingPoints); }
+				if (ContributingPoints > 0)
+				{
+					Center /= static_cast<double>(ContributingPoints);
+				}
 
 				OutTransforms[Index].SetLocation(Center);
 				Blender->MergeSingle(Index, Span, WeightedPoints, Trackers);
@@ -204,20 +223,41 @@ namespace PCGExGraphs
 
 	void FUnionProcessor::InternalStartExecution()
 	{
-		if (GraphBuilder->Graph->Edges.Num() <= 1) { CompileFinalGraph(); } // Nothing to be found
-		else if (bDoPointEdge) { FindPointEdgeIntersections(); }
-		else if (bDoEdgeEdge) { FindEdgeEdgeIntersections(); }
-		else { CompileFinalGraph(); }
+		if (GraphBuilder->Graph->Edges.Num() <= 1)
+		{
+			CompileFinalGraph();
+		} // Nothing to be found
+		else if (bDoPointEdge)
+		{
+			FindPointEdgeIntersections();
+		}
+		else if (bDoEdgeEdge)
+		{
+			FindEdgeEdgeIntersections();
+		}
+		else
+		{
+			CompileFinalGraph();
+		}
 	}
 
 	bool FUnionProcessor::Execute()
 	{
-		if (!bRunning || Context->IsState(States::State_ProcessingUnion)) { return false; }
+		if (!bRunning || Context->IsState(States::State_ProcessingUnion))
+		{
+			return false;
+		}
 
 		PCGEX_ON_ASYNC_STATE_READY(States::State_ProcessingPointEdgeIntersections)
 		{
-			if (bDoEdgeEdge) { FindEdgeEdgeIntersections(); }
-			else { CompileFinalGraph(); }
+			if (bDoEdgeEdge)
+			{
+				FindEdgeEdgeIntersections();
+			}
+			else
+			{
+				CompileFinalGraph();
+			}
 			return false;
 		}
 
@@ -248,7 +288,10 @@ namespace PCGExGraphs
 		// edge count) and uses its own tolerance.
 		IntersectionAllocations = MakeShared<FIntersectionAllocations>(GraphBuilder->Graph, UnionDataFacade->Source);
 		IntersectionAllocations->Build(PointEdgeIntersectionDetails.FuseDetails.Tolerance);
-		if (!PointEdgeIntersectionDetails.bEnableSelfIntersection) { IntersectionAllocations->BuildRootIOSets(); }
+		if (!PointEdgeIntersectionDetails.bEnableSelfIntersection)
+		{
+			IntersectionAllocations->BuildRootIOSets();
+		}
 
 		// Init point octree (P/E queries the *output* point octree, so it has to exist)
 		(void)IntersectionAllocations->PointIO->GetOutIn()->GetPointOctree();
@@ -334,7 +377,10 @@ namespace PCGExGraphs
 		BlendPointEdgeGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
-			if (!This->MetadataBlender) { return; }
+			if (!This->MetadataBlender)
+			{
+				return;
+			}
 			const TSharedRef<PCGExBlending::FMetadataBlender> Blender = This->MetadataBlender.ToSharedRef();
 
 			PCGEX_SCOPE_LOOP(Index)
@@ -350,7 +396,10 @@ namespace PCGExGraphs
 	{
 		// Allocations and scoped records are scratch -- release before E/E rebuilds them.
 		IntersectionAllocations.Reset();
-		if (MetadataBlender) { UnionDataFacade->WriteFastest(Context->GetTaskManager()); }
+		if (MetadataBlender)
+		{
+			UnionDataFacade->WriteFastest(Context->GetTaskManager());
+		}
 	}
 
 #pragma endregion
@@ -365,7 +414,10 @@ namespace PCGExGraphs
 
 		IntersectionAllocations = MakeShared<FIntersectionAllocations>(GraphBuilder->Graph, UnionDataFacade->Source);
 		IntersectionAllocations->Build(EdgeEdgeIntersectionDetails.Tolerance);
-		if (!EdgeEdgeIntersectionDetails.bEnableSelfIntersection) { IntersectionAllocations->BuildRootIOSets(); }
+		if (!EdgeEdgeIntersectionDetails.bEnableSelfIntersection)
+		{
+			IntersectionAllocations->BuildRootIOSets();
+		}
 		IntersectionAllocations->BuildEdgeOctree(Bounds);
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(Context->GetTaskManager(), FindEdgeEdgeGroup)
@@ -454,7 +506,10 @@ namespace PCGExGraphs
 		BlendEdgeEdgeGroup->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
-			if (!This->MetadataBlender) { return; }
+			if (!This->MetadataBlender)
+			{
+				return;
+			}
 			const TSharedRef<PCGExBlending::FMetadataBlender> Blender = This->MetadataBlender.ToSharedRef();
 
 			TArray<PCGEx::FOpStats> Trackers;
@@ -465,7 +520,10 @@ namespace PCGExGraphs
 				const FEECrossing& Crossing = This->EECrossings[Index];
 				// Only primaries that allocated a new node need blending. Duplicates and reused-
 				// endpoint records share the existing node's already-blended state.
-				if (!Crossing.bIsPrimary || !Crossing.bAllocatedNewNode) { continue; }
+				if (!Crossing.bIsPrimary || !Crossing.bAllocatedNewNode)
+				{
+					continue;
+				}
 				EdgeEdgePass::BlendIntersection(*This->IntersectionAllocations, Blender, Crossing, Trackers);
 			}
 		};
@@ -492,8 +550,14 @@ namespace PCGExGraphs
 		GraphBuilder->OnCompilationEndCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TSharedRef<FGraphBuilder>& InBuilder, const bool bSuccess)
 		{
 			PCGEX_ASYNC_THIS
-			if (!bSuccess) { This->UnionDataFacade->Source->InitializeOutput(PCGExData::EIOInit::NoInit); }
-			else { This->GraphBuilder->StageEdgesOutputs(); }
+			if (!bSuccess)
+			{
+				This->UnionDataFacade->Source->InitializeOutput(PCGExData::EIOInit::NoInit);
+			}
+			else
+			{
+				This->GraphBuilder->StageEdgesOutputs();
+			}
 		};
 
 		// Make sure we provide up-to-date transform range to sort over

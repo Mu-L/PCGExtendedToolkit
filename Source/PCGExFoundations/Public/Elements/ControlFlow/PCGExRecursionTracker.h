@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/PCGExPointsProcessor.h"
 #include "PCGExVersion.h"
+#include "Core/PCGExPointsProcessor.h"
 
 #include "PCGExRecursionTracker.generated.h"
 
@@ -50,13 +50,26 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(Break, "Break", "A Simple Recursion tracker to make working with recursive subgraphs easier. Acts as a \"break\" by tracking a counter, and/or checking if data meet certain requirements.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::ControlFlow; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Constant); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::ControlFlow;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Constant);
+	}
+
 	virtual bool GetPinExtraIcon(const UPCGPin* InPin, FName& OutExtraIcon, FText& OutTooltip) const override;
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
 	virtual bool HasDynamicPins() const override;
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 
@@ -144,5 +157,9 @@ public:
 
 protected:
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
-	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override { return true; }
+
+	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override
+	{
+		return true;
+	}
 };

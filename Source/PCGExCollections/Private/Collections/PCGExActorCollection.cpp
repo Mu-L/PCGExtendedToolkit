@@ -9,8 +9,8 @@
 #endif
 
 #include "PCGComponent.h"
-#include "PCGExLog.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExLog.h"
 #include "PCGExSocketProvider.h"
 #include "Engine/Blueprint.h"
 #include "Engine/Level.h"
@@ -24,8 +24,8 @@ UPCGExActorCollection::UPCGExActorCollection(const FObjectInitializer& ObjectIni
 	const auto& Settings = PCGEX_COLLECTIONS_SETTINGS;
 
 	UClass* EvalClass = Settings.DefaultBoundsEvaluatorClass
-		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
-		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
+		? Settings.DefaultBoundsEvaluatorClass.Get()
+		: UPCGExDefaultBoundsEvaluator::StaticClass();
 
 	BoundsEvaluator = Cast<UPCGExBoundsEvaluator>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("BoundsEvaluator"),
@@ -49,7 +49,10 @@ bool FPCGExActorCollectionEntry::Validate(const UPCGExAssetCollection* ParentCol
 {
 	if (!bIsSubCollection)
 	{
-		if (!Actor.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries) { return false; }
+		if (!Actor.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries)
+		{
+			return false;
+		}
 	}
 
 	return FPCGExAssetCollectionEntry::Validate(ParentCollection);
@@ -111,8 +114,8 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		TempActor->GetComponents(PCGComps);
 		bHasPCGComponent = !PCGComps.IsEmpty();
 		CachedPCGGraph = (bHasPCGComponent && PCGComps[0]->GetGraph())
-			                 ? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
-			                 : nullptr;
+			? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
+			: nullptr;
 
 		// Temp actor is at FTransform::Identity, so component world transform == relative to actor
 		TArray<UPCGExSocketComponent*> SocketComps;
@@ -264,7 +267,10 @@ void UPCGExActorCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAss
 				}
 			}
 
-			if (bAlreadyExists) { continue; }
+			if (bAlreadyExists)
+			{
+				continue;
+			}
 
 			FPCGExActorCollectionEntry Entry = FPCGExActorCollectionEntry();
 			Entry.Actor = ActorClass;

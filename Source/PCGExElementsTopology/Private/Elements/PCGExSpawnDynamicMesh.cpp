@@ -28,7 +28,10 @@ TArray<FPCGPinProperties> UPCGExSpawnDynamicMeshSettings::OutputPinProperties() 
 	return PinProperties;
 }
 
-FPCGElementPtr UPCGExSpawnDynamicMeshSettings::CreateElement() const { return MakeShared<FPCGExSpawnDynamicMeshElement>(); }
+FPCGElementPtr UPCGExSpawnDynamicMeshSettings::CreateElement() const
+{
+	return MakeShared<FPCGExSpawnDynamicMeshElement>();
+}
 
 #pragma endregion
 
@@ -62,7 +65,10 @@ bool FPCGExSpawnDynamicMeshElement::AdvanceWork(FPCGExContext* InContext, const 
 		const EObjectFlags ObjectFlags = (bIsPreviewMode ? RF_Transient : RF_NoFlags);
 		UPCGExDynamicMeshComponent* DynamicMeshComponent = NewObject<UPCGExDynamicMeshComponent>(TargetActor, MakeUniqueObjectName(TargetActor, UPCGExDynamicMeshComponent::StaticClass(), FName(ComponentName)), ObjectFlags);
 
-		if (!DynamicMeshComponent) { continue; }
+		if (!DynamicMeshComponent)
+		{
+			continue;
+		}
 
 		SourcePCGComponent->IgnoreChangeOriginDuringGenerationWithScope(DynamicMeshComponent, [&]()
 		{
@@ -71,7 +77,10 @@ bool FPCGExSpawnDynamicMeshElement::AdvanceWork(FPCGExContext* InContext, const 
 
 			//DynMeshData->InitializeDynamicMeshComponentFromData(Component);
 
-			for (int32 i = 0; i < Materials.Num(); ++i) { DynamicMeshComponent->SetMaterial(i, Materials[i]); }
+			for (int32 i = 0; i < Materials.Num(); ++i)
+			{
+				DynamicMeshComponent->SetMaterial(i, Materials[i]);
+			}
 			Settings->TemplateDescriptor.InitComponent(DynamicMeshComponent);
 			DynamicMeshComponent->SetMesh(FDynamicMesh3(DynamicMesh->GetMeshRef()));
 		});
@@ -86,7 +95,10 @@ bool FPCGExSpawnDynamicMeshElement::AdvanceWork(FPCGExContext* InContext, const 
 			}
 		}
 
-		for (const FString& Tag : Input.Tags) { DynamicMeshComponent->ComponentTags.AddUnique(*Tag); }
+		for (const FString& Tag : Input.Tags)
+		{
+			DynamicMeshComponent->ComponentTags.AddUnique(*Tag);
+		}
 
 		Context->AttachManagedComponent(TargetActor, DynamicMeshComponent, Settings->AttachmentRules.GetRules());
 		InContext->OutputData.TaggedData.Emplace(Input);

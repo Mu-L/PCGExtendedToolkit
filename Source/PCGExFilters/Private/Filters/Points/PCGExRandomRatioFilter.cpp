@@ -4,8 +4,8 @@
 #include "Filters/Points/PCGExRandomRatioFilter.h"
 
 #include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCompareFilterDefinition"
 #define PCGEX_NAMESPACE CompareFilterDefinition
@@ -37,7 +37,10 @@ const TSet<int32>& PCGExPointFilter::FRandomRatioFilter::GetCollectionPicks(cons
 {
 	{
 		FReadScopeLock ReadScopeLock(CollectionLock);
-		if (bColPicksBuilt) { return CollectionPicks; }
+		if (bColPicksBuilt)
+		{
+			return CollectionPicks;
+		}
 	}
 
 	{
@@ -51,8 +54,14 @@ const TSet<int32>& PCGExPointFilter::FRandomRatioFilter::GetCollectionPicks(cons
 
 bool PCGExPointFilter::FRandomRatioFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
-	if (!bWillBeUsedWithCollections) { TypedFilterFactory->Config.Random.GetPicks(InContext, InPointDataFacade->GetIn(), InPointDataFacade->GetNum(), PointPicks); }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
+	if (!bWillBeUsedWithCollections)
+	{
+		TypedFilterFactory->Config.Random.GetPicks(InContext, InPointDataFacade->GetIn(), InPointDataFacade->GetNum(), PointPicks);
+	}
 	return true;
 }
 

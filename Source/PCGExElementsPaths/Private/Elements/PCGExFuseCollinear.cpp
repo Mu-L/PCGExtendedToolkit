@@ -3,11 +3,11 @@
 
 #include "Elements/PCGExFuseCollinear.h"
 
+#include "Blenders/PCGExUnionBlender.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Blenders/PCGExUnionBlender.h"
-#include "Math/PCGExMathDistances.h"
 #include "Elements/PCGExPathShift.h"
+#include "Math/PCGExMathDistances.h"
 #include "Paths/PCGExPath.h"
 #include "Sampling/PCGExSamplingUnionData.h"
 
@@ -20,14 +20,20 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(FuseCollinear)
 
 bool FPCGExFuseCollinearElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FuseCollinear)
 
 	Context->DotThreshold = PCGExMath::DegreesToDot(Settings->Threshold);
 	Context->FuseDistSquared = FMath::Square(Settings->FuseDistance);
 
-	if (!Settings->UnionDetails.SanityCheck(Context)) { return false; }
+	if (!Settings->UnionDetails.SanityCheck(Context))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -49,7 +55,10 @@ bool FPCGExFuseCollinearElement::AdvanceWork(FPCGExContext* InContext, const UPC
 				if (Entry->GetNum() < 2)
 				{
 					bHasInvalidInputs = true;
-					if (!Settings->bOmitInvalidPathsFromOutput) { Entry->InitializeOutput(PCGExData::EIOInit::Forward); }
+					if (!Settings->bOmitInvalidPathsFromOutput)
+					{
+						Entry->InitializeOutput(PCGExData::EIOInit::Forward);
+					}
 					return false;
 				}
 				return true;
@@ -80,7 +89,10 @@ namespace PCGExFuseCollinear
 
 		//PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		Path = MakeShared<PCGExPaths::FPath>(PointDataFacade->GetIn(), 0);
 
@@ -99,7 +111,10 @@ namespace PCGExFuseCollinear
 		PointFilterCache[0] = true;
 
 		// Only force-preserve last point if not closed loop
-		if (!Path->IsClosedLoop()) { PointFilterCache[Path->LastIndex] = true; }
+		if (!Path->IsClosedLoop())
+		{
+			PointFilterCache[Path->LastIndex] = true;
+		}
 
 		// Process path...
 
@@ -132,7 +147,10 @@ namespace PCGExFuseCollinear
 			LastPosition = Path->GetPos(i);
 		}
 
-		if (ReadIndices.Num() < 2) { return false; }
+		if (ReadIndices.Num() < 2)
+		{
+			return false;
+		}
 
 		if (Path->IsClosedLoop())
 		{
@@ -153,7 +171,10 @@ namespace PCGExFuseCollinear
 			}
 		}
 
-		if (ReadIndices.Num() < 2) { return false; }
+		if (ReadIndices.Num() < 2)
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::New)
 
@@ -183,7 +204,10 @@ namespace PCGExFuseCollinear
 				1, true, PCGExData::EBufferInit::New);
 		}
 
-		if (!Settings->bDoBlend && !Settings->UnionDetails.WriteAny()) { return; }
+		if (!Settings->bDoBlend && !Settings->UnionDetails.WriteAny())
+		{
+			return;
+		}
 
 		const int32 NumInPoints = PointDataFacade->GetNum();
 		const int32 LastRead = ReadIndices.Num() - 1;
@@ -196,18 +220,33 @@ namespace PCGExFuseCollinear
 				const int32 To = ReadIndices[i + 1];
 				const int32 Count = To - From;
 
-				if (Count <= 1) { continue; }
+				if (Count <= 1)
+				{
+					continue;
+				}
 
-				if (IsUnionWriter) { IsUnionWriter->SetValue(i, true); }
-				if (UnionSizeWriter) { UnionSizeWriter->SetValue(i, Count); }
+				if (IsUnionWriter)
+				{
+					IsUnionWriter->SetValue(i, true);
+				}
+				if (UnionSizeWriter)
+				{
+					UnionSizeWriter->SetValue(i, Count);
+				}
 			}
 
 			// Last point
 			const int32 Count = (NumInPoints - ReadIndices.Last()) + ReadIndices[0];
 			if (Count > 1)
 			{
-				if (IsUnionWriter) { IsUnionWriter->SetValue(LastRead, true); }
-				if (UnionSizeWriter) { UnionSizeWriter->SetValue(LastRead, Count); }
+				if (IsUnionWriter)
+				{
+					IsUnionWriter->SetValue(LastRead, true);
+				}
+				if (UnionSizeWriter)
+				{
+					UnionSizeWriter->SetValue(LastRead, Count);
+				}
 			}
 
 			PointDataFacade->WriteFastest(TaskManager);
@@ -224,12 +263,21 @@ namespace PCGExFuseCollinear
 		UnionSources.Add(PointDataFacade);
 
 		TSet<FName> ProtectedAttributes;
-		if (Settings->UnionDetails.bWriteIsUnion) { ProtectedAttributes.Add(Settings->UnionDetails.IsUnionAttributeName); }
-		if (Settings->UnionDetails.bWriteUnionSize) { ProtectedAttributes.Add(Settings->UnionDetails.UnionSizeAttributeName); }
+		if (Settings->UnionDetails.bWriteIsUnion)
+		{
+			ProtectedAttributes.Add(Settings->UnionDetails.IsUnionAttributeName);
+		}
+		if (Settings->UnionDetails.bWriteUnionSize)
+		{
+			ProtectedAttributes.Add(Settings->UnionDetails.UnionSizeAttributeName);
+		}
 
 		DataBlender->AddSources(UnionSources, &ProtectedAttributes);
 
-		if (!DataBlender->Init(Context, PointDataFacade)) { return; }
+		if (!DataBlender->Init(Context, PointDataFacade))
+		{
+			return;
+		}
 
 		TArray<PCGExData::FWeightedPoint> OutWeightedPoints;
 		TArray<PCGEx::FOpStats> Trackers;
@@ -245,10 +293,19 @@ namespace PCGExFuseCollinear
 			const int32 To = ReadIndices[i + 1];
 			const int32 Count = To - From;
 
-			if (Count <= 1) { continue; }
+			if (Count <= 1)
+			{
+				continue;
+			}
 
-			if (IsUnionWriter) { IsUnionWriter->SetValue(i, true); }
-			if (UnionSizeWriter) { UnionSizeWriter->SetValue(i, Count); }
+			if (IsUnionWriter)
+			{
+				IsUnionWriter->SetValue(i, true);
+			}
+			if (UnionSizeWriter)
+			{
+				UnionSizeWriter->SetValue(i, Count);
+			}
 
 			Union->Reset();
 			Union->Reserve(1, Count);
@@ -268,8 +325,14 @@ namespace PCGExFuseCollinear
 
 			if (Count > 1)
 			{
-				if (IsUnionWriter) { IsUnionWriter->SetValue(LastRead, true); }
-				if (UnionSizeWriter) { UnionSizeWriter->SetValue(LastRead, Count); }
+				if (IsUnionWriter)
+				{
+					IsUnionWriter->SetValue(LastRead, true);
+				}
+				if (UnionSizeWriter)
+				{
+					UnionSizeWriter->SetValue(LastRead, Count);
+				}
 
 				Union->Reset();
 				Union->Reserve(1, Count);

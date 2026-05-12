@@ -5,16 +5,19 @@
 #include "SubPoints/DataBlending/PCGExSubPointsBlendInterpolate.h"
 
 
-#include "Data/PCGExPointElements.h"
 #include "Blenders/PCGExMetadataBlender.h"
 #include "Data/PCGBasePointData.h"
+#include "Data/PCGExPointElements.h"
 #include "Paths/PCGExPathsCommon.h"
 
 
 void FPCGExSubPointsBlendInterpolate::BlendSubPoints(const PCGExData::FConstPoint& From, const PCGExData::FConstPoint& To, PCGExData::FScope& Scope, const PCGExPaths::FPathMetrics& Metrics) const
 {
 	EPCGExBlendOver SafeBlendOver = TypedFactory->BlendOver;
-	if (TypedFactory->BlendOver == EPCGExBlendOver::Distance && !Metrics.IsValid()) { SafeBlendOver = EPCGExBlendOver::Index; }
+	if (TypedFactory->BlendOver == EPCGExBlendOver::Distance && !Metrics.IsValid())
+	{
+		SafeBlendOver = EPCGExBlendOver::Index;
+	}
 
 	if (SafeBlendOver == EPCGExBlendOver::Distance)
 	{

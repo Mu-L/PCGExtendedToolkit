@@ -4,9 +4,9 @@
 #include "Details/PCGExBoxIntersectionDetails.h"
 
 #include "Async/ParallelFor.h"
-#include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExMetadataBlender.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "Helpers/PCGExTargetsHandler.h"
 #include "Math/OBB/PCGExOBBIntersections.h"
@@ -17,7 +17,10 @@ FPCGExBoxIntersectionDetails::FPCGExBoxIntersectionDetails()
 	if (const UEnum* EnumClass = StaticEnum<EPCGExCutType>())
 	{
 		const int32 NumEnums = EnumClass->NumEnums() - 1; // Skip _MAX 
-		for (int32 i = 0; i < NumEnums; ++i) { CutTypeValueMapping.Add(static_cast<EPCGExCutType>(EnumClass->GetValueByIndex(i)), i); }
+		for (int32 i = 0; i < NumEnums; ++i)
+		{
+			CutTypeValueMapping.Add(static_cast<EPCGExCutType>(EnumClass->GetValueByIndex(i)), i);
+		}
 	}
 }
 
@@ -69,8 +72,20 @@ void FPCGExBoxIntersectionDetails::SetIntersection(const int32 PointIndex, const
 		IntersectionForwardHandler->Forward(InCut.BoxIndex, PointIndex);
 	}
 
-	if (IsIntersectionWriter) { IsIntersectionWriter->SetValue(PointIndex, true); }
-	if (CutTypeWriter) { CutTypeWriter->SetValue(PointIndex, CutTypeValueMapping[InCut.Type]); }
-	if (NormalWriter) { NormalWriter->SetValue(PointIndex, InCut.Normal); }
-	if (BoundIndexWriter) { BoundIndexWriter->SetValue(PointIndex, InCut.BoxIndex); }
+	if (IsIntersectionWriter)
+	{
+		IsIntersectionWriter->SetValue(PointIndex, true);
+	}
+	if (CutTypeWriter)
+	{
+		CutTypeWriter->SetValue(PointIndex, CutTypeValueMapping[InCut.Type]);
+	}
+	if (NormalWriter)
+	{
+		NormalWriter->SetValue(PointIndex, InCut.Normal);
+	}
+	if (BoundIndexWriter)
+	{
+		BoundIndexWriter->SetValue(PointIndex, InCut.BoxIndex);
+	}
 }

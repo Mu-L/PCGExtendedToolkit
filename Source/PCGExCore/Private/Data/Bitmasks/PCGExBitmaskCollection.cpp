@@ -59,8 +59,14 @@ PCGExBitmaskCollection::FCache* UPCGExBitmaskCollection::LoadCache()
 {
 	{
 		FReadScopeLock ReadScopeLock(CacheLock);
-		if (bCacheNeedsRebuild) { InvalidateCache(); }
-		if (Cache) { return Cache.Get(); }
+		if (bCacheNeedsRebuild)
+		{
+			InvalidateCache();
+		}
+		if (Cache)
+		{
+			return Cache.Get();
+		}
 	}
 
 	BuildCache();
@@ -100,14 +106,20 @@ void UPCGExBitmaskCollection::PostEditImport()
 void UPCGExBitmaskCollection::EDITOR_RegisterTrackingKeys(FPCGExContext* Context) const
 {
 	Context->EDITOR_TrackPath(this);
-	for (const FPCGExBitmaskCollectionEntry& Entry : Entries) { Entry.EDITOR_RegisterTrackingKeys(Context); }
+	for (const FPCGExBitmaskCollectionEntry& Entry : Entries)
+	{
+		Entry.EDITOR_RegisterTrackingKeys(Context);
+	}
 }
 
 void UPCGExBitmaskCollection::BuildCache()
 {
 	FWriteScopeLock WriteScopeLock(CacheLock);
 
-	if (Cache) { return; } // Cache needs to be invalidated
+	if (Cache)
+	{
+		return;
+	} // Cache needs to be invalidated
 
 	Cache = MakeShared<PCGExBitmaskCollection::FCache>();
 	bCacheNeedsRebuild = false;
@@ -125,7 +137,10 @@ void UPCGExBitmaskCollection::BuildCache()
 		bool bAlreadyInSet = false;
 		UniqueIdentifiers.Add(Entry.Identifier, &bAlreadyInSet);
 		Cache->BitmaskMap.Add(Entry.Identifier, Cache->Bitmasks.Add(EntryCache));
-		if (!bAlreadyInSet) { Cache->Identifiers.Add(Entry.Identifier.ToString()); }
+		if (!bAlreadyInSet)
+		{
+			Cache->Identifiers.Add(Entry.Identifier.ToString());
+		}
 	}
 }
 
@@ -133,7 +148,10 @@ void UPCGExBitmaskCollection::BuildCache()
 
 bool UPCGExBitmaskCollection::HasCircularDependency(const UPCGExBitmaskCollection* OtherCollection) const
 {
-	if (OtherCollection == this) { return true; }
+	if (OtherCollection == this)
+	{
+		return true;
+	}
 	TSet<const UPCGExBitmaskCollection*> References;
 	References.Add(this);
 	return OtherCollection->HasCircularDependency(References);
@@ -144,14 +162,23 @@ bool UPCGExBitmaskCollection::HasCircularDependency(TSet<const UPCGExBitmaskColl
 	bool bIsAlreadyInSet = false;
 	InReferences.Add(this, &bIsAlreadyInSet);
 
-	if (bIsAlreadyInSet) { return true; }
+	if (bIsAlreadyInSet)
+	{
+		return true;
+	}
 
 	for (const FPCGExBitmaskCollectionEntry& Entry : Entries)
 	{
 		for (const FPCGExBitmaskRef& Ref : Entry.Bitmask.Compositions)
 		{
-			if (Ref.Source == this) { return true; }
-			if (Ref.Source && Ref.Source->HasCircularDependency(InReferences)) { return true; }
+			if (Ref.Source == this)
+			{
+				return true;
+			}
+			if (Ref.Source && Ref.Source->HasCircularDependency(InReferences))
+			{
+				return true;
+			}
 		}
 	}
 
@@ -172,7 +199,10 @@ void UPCGExBitmaskCollection::PostEditChangeProperty(FPropertyChangedEvent& Prop
 		}
 	}
 
-	if (PropertyChangedEvent.Property) { Super::PostEditChangeProperty(PropertyChangedEvent); }
+	if (PropertyChangedEvent.Property)
+	{
+		Super::PostEditChangeProperty(PropertyChangedEvent);
+	}
 
 	EDITOR_SetDirty();
 }
@@ -181,7 +211,10 @@ TArray<FName> UPCGExBitmaskCollection::EDITOR_GetIdentifierOptions() const
 {
 	TArray<FName> Options;
 	Options.Reserve(const_cast<UPCGExBitmaskCollection*>(this)->LoadCache()->Bitmasks.Num());
-	for (const PCGExBitmask::FCachedRef& StagedBitmask : Cache->Bitmasks) { Options.Add(StagedBitmask.Identifier); }
+	for (const PCGExBitmask::FCachedRef& StagedBitmask : Cache->Bitmasks)
+	{
+		Options.Add(StagedBitmask.Identifier);
+	}
 	return Options;
 }
 #endif

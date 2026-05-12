@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
+#include "UObject/Object.h"
 
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "Core/PCGExPointFilter.h"
@@ -115,7 +115,9 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FRandomFilter(const TObjectPtr<const UPCGExRandomFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition), RandomSeed(InDefinition->Config.RandomSeed)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
+			  , RandomSeed(InDefinition->Config.RandomSeed)
 		{
 		}
 

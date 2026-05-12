@@ -12,7 +12,10 @@
 
 bool FPCGExVtxPropertySpecialEdges::PrepareForCluster(FPCGExContext* InContext, TSharedPtr<PCGExClusters::FCluster> InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataFacade, const TSharedPtr<PCGExData::FFacade>& InEdgeDataFacade)
 {
-	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade)) { return false; }
+	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade))
+	{
+		return false;
+	}
 
 	if (!Config.ShortestEdge.Validate(InContext) || !Config.LongestEdge.Validate(InContext) || !Config.AverageEdge.Validate(InContext))
 	{
@@ -63,11 +66,23 @@ void FPCGExVtxPropertySpecialEdges::ProcessNode(PCGExClusters::FNode& Node, cons
 
 	Config.AverageEdge.Set(Node.PointIndex, LAverage, VAverage);
 
-	if (ILongest != -1) { Config.LongestEdge.Set(Node.PointIndex, Adjacency[ILongest], Cluster->GetNode(Adjacency[ILongest].NodeIndex)->Num()); }
-	else { Config.LongestEdge.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0); }
+	if (ILongest != -1)
+	{
+		Config.LongestEdge.Set(Node.PointIndex, Adjacency[ILongest], Cluster->GetNode(Adjacency[ILongest].NodeIndex)->Num());
+	}
+	else
+	{
+		Config.LongestEdge.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0);
+	}
 
-	if (IShortest != -1) { Config.ShortestEdge.Set(Node.PointIndex, Adjacency[IShortest], Cluster->GetNode(Adjacency[IShortest].NodeIndex)->Num()); }
-	else { Config.ShortestEdge.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0); }
+	if (IShortest != -1)
+	{
+		Config.ShortestEdge.Set(Node.PointIndex, Adjacency[IShortest], Cluster->GetNode(Adjacency[IShortest].NodeIndex)->Num());
+	}
+	else
+	{
+		Config.ShortestEdge.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0);
+	}
 }
 
 #if WITH_EDITOR

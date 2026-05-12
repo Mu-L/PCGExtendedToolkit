@@ -21,13 +21,19 @@ TArray<FPCGPinProperties> UPCGExBlendAttributesSettings::InputPinProperties() co
 
 PCGEX_INITIALIZE_ELEMENT(BlendAttributes)
 
-PCGExData::EIOInit UPCGExBlendAttributesSettings::GetMainDataInitializationPolicy() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBlendAttributesSettings::GetMainDataInitializationPolicy() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BlendAttributes)
 
 bool FPCGExBlendAttributesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BlendAttributes)
 
@@ -43,7 +49,10 @@ bool FPCGExBlendAttributesElement::AdvanceWork(FPCGExContext* InContext, const U
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -67,7 +76,10 @@ namespace PCGExBlendAttributes
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -75,7 +87,10 @@ namespace PCGExBlendAttributes
 		BlendOpsManager->SetSources(PointDataFacade, PCGExData::EIOSide::Out);
 		BlendOpsManager->SetTargetFacade(PointDataFacade);
 
-		if (!BlendOpsManager->Init(Context, Context->BlendingFactories)) { return false; }
+		if (!BlendOpsManager->Init(Context, Context->BlendingFactories))
+		{
+			return false;
+		}
 
 		NumPoints = PointDataFacade->GetNum();
 

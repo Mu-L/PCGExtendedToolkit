@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/EngineTypes.h"
 #include "Engine/DeveloperSettings.h"
+#include "Engine/EngineTypes.h"
 #include "Layout/Visibility.h"
 
 
@@ -19,9 +19,20 @@ class PCGEXCOLLECTIONSEDITOR_API UPCGExCollectionsEditorSettings : public UDevel
 public:
 	virtual void PostLoad() override;
 
-	virtual FName GetContainerName() const override { return "Editor"; }
-	virtual FName GetCategoryName() const override { return "Plugins"; }
-	virtual FName GetSectionName() const override { return "PCGEx | Collections"; }
+	virtual FName GetContainerName() const override
+	{
+		return "Editor";
+	}
+
+	virtual FName GetCategoryName() const override
+	{
+		return "Plugins";
+	}
+
+	virtual FName GetSectionName() const override
+	{
+		return "PCGEx | Collections";
+	}
 
 	static FSimpleMulticastDelegate OnHiddenAssetPropertyNamesChanged;
 

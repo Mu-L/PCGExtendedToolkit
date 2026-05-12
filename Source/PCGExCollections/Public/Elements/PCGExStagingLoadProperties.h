@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExPointsProcessor.h"
-#include "Core/PCGExPointFilter.h"
-#include "Helpers/PCGExCollectionsHelpers.h"
 #include "PCGExPropertyWriter.h"
 #include "Containers/PCGExScopedContainers.h"
+#include "Core/PCGExPointFilter.h"
+#include "Core/PCGExPointsProcessor.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
 
 #include "PCGExStagingLoadProperties.generated.h"
 
@@ -25,8 +25,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(StagingLoadProperties, "Staging : Load Properties", "Output property values from staged entries as point attributes.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Sampler; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Sampler;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
 #endif
 
 protected:
@@ -35,7 +43,10 @@ protected:
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters which points get properties.", PCGExFactories::PointFilters, false)
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
@@ -101,7 +112,7 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Data", meta=(PCG_Overridable, EditCondition="bWriteCollectionType"))
 	FName CollectionTypeAttributeName = FName("CollectionType");
-	
+
 	/** Output attribute name for the joined entry tags. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Data", meta=(PCG_Overridable, EditCondition="bWriteEntryTags"))
 	FName EntryTagsAttributeName = FName("EntryTags");

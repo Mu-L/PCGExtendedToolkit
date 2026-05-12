@@ -14,14 +14,14 @@
 
 #define PCGEX_CLIPPER2_HI_PRECISION 0
 
-#include "Clipper2Lib/clipper.version.h"
-#include <cstdint>
-#include <vector>
-#include <string>
-#include <iostream>
 #include <algorithm>
-#include <numeric>
 #include <cmath>
+#include <cstdint>
+#include <iostream>
+#include <numeric>
+#include <string>
+#include <vector>
+#include "Clipper2Lib/clipper.version.h"
 
 namespace PCGExClipper2Lib
 {
@@ -35,7 +35,10 @@ namespace PCGExClipper2Lib
 		{
 		}
 
-		virtual const char* what() const noexcept override { return m_descr.c_str(); }
+		virtual const char* what() const noexcept override
+		{
+			return m_descr.c_str();
+		}
 
 	private:
 		std::string m_descr;
@@ -151,7 +154,9 @@ namespace PCGExClipper2Lib
 		}
 
 		explicit Point()
-			: x(0), y(0), z(0)
+			: x(0)
+			  , y(0)
+			  , z(0)
 		{
 		};
 
@@ -179,7 +184,10 @@ namespace PCGExClipper2Lib
 			return Point(x * scale, y * scale, z);
 		}
 
-		void SetZ(const z_type z_value) { z = z_value; }
+		void SetZ(const z_type z_value)
+		{
+			z = z_value;
+		}
 
 		friend std::ostream& operator<<(std::ostream& os, const Point& point)
 		{
@@ -280,10 +288,10 @@ namespace PCGExClipper2Lib
 		T bottom;
 
 		Rect(T l, T t, T r, T b)
-			: left(l),
-			  top(t),
-			  right(r),
-			  bottom(b)
+			: left(l)
+			  , top(t)
+			  , right(r)
+			  , bottom(b)
 		{
 		}
 
@@ -310,12 +318,30 @@ namespace PCGExClipper2Lib
 			};
 		}
 
-		bool IsValid() const { return left != (std::numeric_limits<T>::max)(); }
+		bool IsValid() const
+		{
+			return left != (std::numeric_limits<T>::max)();
+		}
 
-		T Width() const { return right - left; }
-		T Height() const { return bottom - top; }
-		void Width(T width) { right = left + width; }
-		void Height(T height) { bottom = top + height; }
+		T Width() const
+		{
+			return right - left;
+		}
+
+		T Height() const
+		{
+			return bottom - top;
+		}
+
+		void Width(T width)
+		{
+			right = left + width;
+		}
+
+		void Height(T height)
+		{
+			bottom = top + height;
+		}
 
 		Point<T> MidPoint() const
 		{
@@ -352,7 +378,10 @@ namespace PCGExClipper2Lib
 			bottom *= scale;
 		}
 
-		bool IsEmpty() const { return bottom <= top || right <= left; };
+		bool IsEmpty() const
+		{
+			return bottom <= top || right <= left;
+		};
 
 		bool Intersects(const Rect<T>& rec) const
 		{
@@ -641,7 +670,10 @@ namespace PCGExClipper2Lib
 		Path<T1> result;
 		result.reserve(path.size());
 		std::transform(path.cbegin(), path.cend(), std::back_inserter(result),
-		               [](const Point<T2>& pt) { return Point<T1>(pt); });
+		               [](const Point<T2>& pt)
+		               {
+			               return Point<T1>(pt);
+		               });
 		return result;
 	}
 
@@ -650,7 +682,10 @@ namespace PCGExClipper2Lib
 	{
 		Paths<T1> result;
 		std::transform(paths.cbegin(), paths.cend(), std::back_inserter(result),
-		               [](const Path<T2>& path) { return TransformPath<T1, T2>(path); });
+		               [](const Path<T2>& path)
+		               {
+			               return TransformPath<T1, T2>(path);
+		               });
 		return result;
 	}
 
@@ -777,8 +812,14 @@ namespace PCGExClipper2Lib
 	inline UInt128Struct MultiplyUInt64(uint64_t a, uint64_t b) // #834, #835
 	{
 		// note to self - lamba expressions follow
-		const auto lo = [](uint64_t x) { return x & 0xFFFFFFFF; };
-		const auto hi = [](uint64_t x) { return x >> 32; };
+		const auto lo = [](uint64_t x)
+		{
+			return x & 0xFFFFFFFF;
+		};
+		const auto hi = [](uint64_t x)
+		{
+			return x >> 32;
+		};
 
 		const uint64_t x1 = lo(a) * lo(b);
 		const uint64_t x2 = hi(a) * lo(b) + hi(x1);
@@ -822,9 +863,12 @@ namespace PCGExClipper2Lib
 #if (defined(__clang__) || defined(__GNUC__)) && UINTPTR_MAX >= UINT64_MAX
 		const auto ab = static_cast<__int128_t>(a) * static_cast<__int128_t>(b);
 		const auto cd = static_cast<__int128_t>(c) * static_cast<__int128_t>(d);
-		if (ab > cd) return 1;
-		else if (ab < cd) return -1;
-		else return 0;
+		if (ab > cd)
+			return 1;
+		else if (ab < cd)
+			return -1;
+		else
+			return 0;
 #else
 		const auto ab = MultiplyUInt64(std::abs(a), std::abs(b));
 		const auto cd = MultiplyUInt64(std::abs(c), std::abs(d));
@@ -985,7 +1029,8 @@ namespace PCGExClipper2Lib
 		double ln2dy = static_cast<double>(ln2b.y - ln2a.y);
 		double ln2dx = static_cast<double>(ln2a.x - ln2b.x);
 		double det = (ln2dy * ln1dx) - (ln1dy * ln2dx);
-		if (det == 0.0) return false;
+		if (det == 0.0)
+			return false;
 		T bb0minx = CC_MIN(ln1a.x, ln1b.x);
 		T bb0miny = CC_MIN(ln1a.y, ln1b.y);
 		T bb0maxx = CC_MAX(ln1a.x, ln1b.x);

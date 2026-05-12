@@ -5,12 +5,12 @@
 
 #include "CoreMinimal.h"
 #include "PCGExNoise3DCommon.h"
-#include "Factories/PCGExFactoryProvider.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
 #include "Math/PCGExMathContrast.h"
+#include "UObject/Object.h"
 #include "Utils/PCGExCurveLookup.h"
 
 #include "PCGExNoise3DFactoryProvider.generated.h"
@@ -124,7 +124,10 @@ public:
 
 	FPCGExNoise3DConfigBase ConfigBase;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Noise3D; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Noise3D;
+	}
 
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
 
@@ -142,10 +145,18 @@ protected:
 public:
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(AbstractNoise3D, "Noise3D Definition", "Creates a single Noise3D computational node, to be used with nodes that support it.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Noise3D); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Noise3D);
+	}
 #endif
 
-	virtual FName GetMainOutputPin() const override { return PCGExNoise3D::Labels::OutputNoise3DLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExNoise3D::Labels::OutputNoise3DLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 	/** Noise priority, matters for blending and weighting.*/

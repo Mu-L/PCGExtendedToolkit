@@ -28,7 +28,8 @@ namespace PCGEx
 	}
 
 	FManagedObjects::FManagedObjects(FPCGContext* InContext, const TWeakPtr<FWorkHandle>& InWorkHandle)
-		: WorkHandle(InWorkHandle), WeakHandle(InContext->GetOrCreateHandle())
+		: WorkHandle(InWorkHandle)
+		  , WeakHandle(InContext->GetOrCreateHandle())
 	{
 	}
 
@@ -62,7 +63,10 @@ namespace PCGEx
 				ObjectPtr->RemoveFromRoot();
 				RecursivelyClearAsyncFlag_Unsafe(ObjectPtr);
 
-				if (IPCGExManagedObjectInterface* ManagedObject = Cast<IPCGExManagedObjectInterface>(ObjectPtr)) { ManagedObject->Cleanup(); }
+				if (IPCGExManagedObjectInterface* ManagedObject = Cast<IPCGExManagedObjectInterface>(ObjectPtr))
+				{
+					ManagedObject->Cleanup();
+				}
 			}
 
 			ManagedObjects.Empty();
@@ -74,7 +78,10 @@ namespace PCGEx
 	{
 		check(!IsFlushing())
 
-		if (!IsValid(InObject)) { return false; }
+		if (!IsValid(InObject))
+		{
+			return false;
+		}
 
 		bool bIsAlreadyInSet = false;
 		{
@@ -89,28 +96,43 @@ namespace PCGEx
 
 	bool FManagedObjects::Remove(UObject* InObject)
 	{
-		if (IsFlushing()) { return false; } // Will be removed anyway
+		if (IsFlushing())
+		{
+			return false;
+		} // Will be removed anyway
 
 		{
 			FWriteScopeLock WriteScopeLock(ManagedObjectLock);
 
-			if (!IsValid(InObject)) { return false; }
+			if (!IsValid(InObject))
+			{
+				return false;
+			}
 			int32 Removed = ManagedObjects.Remove(InObject);
-			if (Removed == 0) { return false; }
+			if (Removed == 0)
+			{
+				return false;
+			}
 
 			/*FCOLLECTOR_IMPL*/
 			InObject->RemoveFromRoot();
 			RecursivelyClearAsyncFlag_Unsafe(InObject);
 		}
 
-		if (IPCGExManagedObjectInterface* ManagedObject = Cast<IPCGExManagedObjectInterface>(InObject)) { ManagedObject->Cleanup(); }
+		if (IPCGExManagedObjectInterface* ManagedObject = Cast<IPCGExManagedObjectInterface>(InObject))
+		{
+			ManagedObject->Cleanup();
+		}
 
 		return true;
 	}
 
 	void FManagedObjects::Remove(const TArray<FPCGTaggedData>& InTaggedData)
 	{
-		if (IsFlushing()) { return; } // Will be removed anyway
+		if (IsFlushing())
+		{
+			return;
+		} // Will be removed anyway
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(FManagedObjects::Remove);
 
@@ -119,14 +141,21 @@ namespace PCGEx
 
 			for (const FPCGTaggedData& FData : InTaggedData)
 			{
-				if (UObject* InObject = const_cast<UPCGData*>(FData.Data.Get()); IsValid(InObject))
+				if (UObject* InObject = const_cast<UPCGData*>(FData.Data.Get());
+					IsValid(InObject))
 				{
-					if (ManagedObjects.Remove(InObject) == 0) { continue; }
+					if (ManagedObjects.Remove(InObject) == 0)
+					{
+						continue;
+					}
 
 					/*FCOLLECTOR_IMPL*/
 					InObject->RemoveFromRoot();
 					RecursivelyClearAsyncFlag_Unsafe(InObject);
-					if (IPCGExManagedObjectInterface* ManagedObject = Cast<IPCGExManagedObjectInterface>(InObject)) { ManagedObject->Cleanup(); }
+					if (IPCGExManagedObjectInterface* ManagedObject = Cast<IPCGExManagedObjectInterface>(InObject))
+					{
+						ManagedObject->Cleanup();
+					}
 				}
 			}
 		}
@@ -163,7 +192,10 @@ namespace PCGEx
 
 		{
 			FReadScopeLock ReadScopeLock(DuplicatedObjectLock);
-			if (DuplicateObjects.Contains(InObject)) { return; }
+			if (DuplicateObjects.Contains(InObject))
+			{
+				return;
+			}
 		}
 
 		if (InObject->HasAnyInternalFlags(EInternalObjectFlags::Async))
@@ -172,7 +204,10 @@ namespace PCGEx
 
 			ForEachObjectWithOuter(InObject, [&](UObject* SubObject)
 			{
-				if (ManagedObjects.Contains(SubObject)) { return; }
+				if (ManagedObjects.Contains(SubObject))
+				{
+					return;
+				}
 				SubObject->ClearInternalFlags(EInternalObjectFlags::Async);
 			}, true);
 		}

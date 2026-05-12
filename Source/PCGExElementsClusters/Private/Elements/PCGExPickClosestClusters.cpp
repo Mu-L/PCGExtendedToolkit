@@ -5,16 +5,23 @@
 
 
 #include "PCGExPickersCommon.h"
-#include "Data/PCGExDataTags.h"
-#include "Utils/PCGExPointIOMerger.h"
 #include "Clusters/PCGExCluster.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/Utils/PCGExDataForward.h"
+#include "Utils/PCGExPointIOMerger.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPickClosestClusters"
 #define PCGEX_NAMESPACE PickClosestClusters
 
-PCGExData::EIOInit UPCGExPickClosestClustersSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExPickClosestClustersSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExPickClosestClustersSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExPickClosestClustersSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 TArray<FPCGPinProperties> UPCGExPickClosestClustersSettings::InputPinProperties() const
 {
@@ -51,7 +58,10 @@ void FPCGExPickClosestClustersContext::ClusterProcessing_InitialProcessingDone()
 				}
 			}
 
-			if (Pick == -1) { continue; }
+			if (Pick == -1)
+			{
+				continue;
+			}
 			Processors[Pick]->Picker = i;
 		}
 	}
@@ -72,7 +82,10 @@ void FPCGExPickClosestClustersContext::ClusterProcessing_InitialProcessingDone()
 				}
 			}
 
-			if (Pick == -1) { continue; }
+			if (Pick == -1)
+			{
+				continue;
+			}
 			Processors[Pick]->Picker = i;
 		}
 	}
@@ -83,16 +96,25 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(PickClosestClusters)
 
 bool FPCGExPickClosestClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PickClosestClusters)
 
 	Context->TargetDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExPickers::Labels::SourcePickersLabel, false, true);
-	if (!Context->TargetDataFacade) { return false; }
+	if (!Context->TargetDataFacade)
+	{
+		return false;
+	}
 
 	PCGEX_FWD(TargetAttributesToTags)
 
-	if (!Context->TargetAttributesToTags.Init(Context, Context->TargetDataFacade)) { return false; }
+	if (!Context->TargetAttributesToTags.Init(Context, Context->TargetDataFacade))
+	{
+		return false;
+	}
 
 	Context->TargetForwardHandler = Settings->TargetForwarding.GetHandler(Context->TargetDataFacade);
 
@@ -110,9 +132,12 @@ bool FPCGExPickClosestClustersElement::AdvanceWork(FPCGExContext* InContext, con
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -135,7 +160,10 @@ namespace PCGExPickClosestClusters
 
 	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 
 		Cluster->RebuildOctree(Settings->SearchMode);
@@ -213,8 +241,20 @@ namespace PCGExPickClosestClusters
 
 	void FProcessor::CompleteWork()
 	{
-		if (Settings->Action == EPCGExFilterDataAction::Omit) { if (Picker != -1) { return; } }
-		else if (Settings->Action == EPCGExFilterDataAction::Keep) { if (Picker == -1) { return; } }
+		if (Settings->Action == EPCGExFilterDataAction::Omit)
+		{
+			if (Picker != -1)
+			{
+				return;
+			}
+		}
+		else if (Settings->Action == EPCGExFilterDataAction::Keep)
+		{
+			if (Picker == -1)
+			{
+				return;
+			}
+		}
 		else
 		{
 			if (Picker == -1)
@@ -229,12 +269,18 @@ namespace PCGExPickClosestClusters
 		if (!Settings->TargetForwarding.bEnabled)
 		{
 			PCGEX_INIT_IO_VOID(EdgeDataFacade->Source, PCGExData::EIOInit::Forward)
-			if (!VtxDataFacade->Source->GetOut()) { PCGEX_INIT_IO_VOID(VtxDataFacade->Source, PCGExData::EIOInit::Forward) }
+			if (!VtxDataFacade->Source->GetOut())
+			{
+				PCGEX_INIT_IO_VOID(VtxDataFacade->Source, PCGExData::EIOInit::Forward)
+			}
 		}
 		else
 		{
 			PCGEX_INIT_IO_VOID(EdgeDataFacade->Source, PCGExData::EIOInit::Duplicate)
-			if (!VtxDataFacade->Source->GetOut()) { PCGEX_INIT_IO_VOID(VtxDataFacade->Source, PCGExData::EIOInit::Duplicate) }
+			if (!VtxDataFacade->Source->GetOut())
+			{
+				PCGEX_INIT_IO_VOID(VtxDataFacade->Source, PCGExData::EIOInit::Duplicate)
+			}
 
 			Context->TargetForwardHandler->Forward(Picker, EdgeDataFacade);
 			Context->TargetForwardHandler->Forward(Picker, VtxDataFacade);
@@ -250,17 +296,41 @@ namespace PCGExPickClosestClusters
 		int32 Picks = 0;
 		const int32 MaxPicks = Processors.Num();
 
-		for (int Pi = 0; Pi < Processors.Num(); Pi++) { if (GetProcessor<FProcessor>(Pi)->Picker != -1) { Picks++; } }
+		for (int Pi = 0; Pi < Processors.Num(); Pi++)
+		{
+			if (GetProcessor<FProcessor>(Pi)->Picker != -1)
+			{
+				Picks++;
+			}
+		}
 
 		const FPCGExPickClosestClustersContext* Ctx = GetContext<FPCGExPickClosestClustersContext>();
 		const UPCGExPickClosestClustersSettings* Stg = Ctx->GetInputSettings<UPCGExPickClosestClustersSettings>();
 
-		if (Stg->Action == EPCGExFilterDataAction::Omit) { if (Picks == MaxPicks) { return; } }
-		else if (Stg->Action == EPCGExFilterDataAction::Keep) { if (Picks == 0) { return; } }
+		if (Stg->Action == EPCGExFilterDataAction::Omit)
+		{
+			if (Picks == MaxPicks)
+			{
+				return;
+			}
+		}
+		else if (Stg->Action == EPCGExFilterDataAction::Keep)
+		{
+			if (Picks == 0)
+			{
+				return;
+			}
+		}
 		else
 		{
-			if (Picks > 0) { VtxDataFacade->Source->Tags->AddRaw(Ctx->KeepTag); }
-			else { VtxDataFacade->Source->Tags->AddRaw(Ctx->OmitTag); }
+			if (Picks > 0)
+			{
+				VtxDataFacade->Source->Tags->AddRaw(Ctx->KeepTag);
+			}
+			else
+			{
+				VtxDataFacade->Source->Tags->AddRaw(Ctx->OmitTag);
+			}
 		}
 
 

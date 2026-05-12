@@ -19,7 +19,10 @@ FVector FPCGExDecompOccupancyGrid::ResolveVoxelSize(
 	}
 
 	// EdgeInferred: compute average edge length
-	if (!InCluster || InCluster->Nodes->Num() < 2) { return FVector(100.0); }
+	if (!InCluster || InCluster->Nodes->Num() < 2)
+	{
+		return FVector(100.0);
+	}
 
 	const int32 NumNodes = InCluster->Nodes->Num();
 	double TotalDist = 0;
@@ -28,7 +31,10 @@ FVector FPCGExDecompOccupancyGrid::ResolveVoxelSize(
 	for (int32 i = 0; i < NumNodes; i++)
 	{
 		const PCGExClusters::FNode* Node = InCluster->GetNode(i);
-		if (!Node->bValid) { continue; }
+		if (!Node->bValid)
+		{
+			continue;
+		}
 
 		const FVector NodePos = InCluster->GetPos(i);
 		for (const PCGExGraphs::FLink& Lk : Node->Links)
@@ -38,7 +44,10 @@ FVector FPCGExDecompOccupancyGrid::ResolveVoxelSize(
 		}
 	}
 
-	if (EdgeCount == 0) { return FVector(100.0); }
+	if (EdgeCount == 0)
+	{
+		return FVector(100.0);
+	}
 
 	const double AvgEdgeLength = FMath::Max(TotalDist / EdgeCount, KINDA_SMALL_NUMBER);
 	return FVector(AvgEdgeLength);
@@ -50,7 +59,10 @@ bool FPCGExDecompOccupancyGrid::Build(
 	const FVector& CellSize,
 	const FTransform& CustomTransform)
 {
-	if (!InCluster || InCluster->Nodes->Num() == 0) { return false; }
+	if (!InCluster || InCluster->Nodes->Num() == 0)
+	{
+		return false;
+	}
 
 	const int32 NumNodes = InCluster->Nodes->Num();
 
@@ -69,12 +81,15 @@ bool FPCGExDecompOccupancyGrid::Build(
 		break;
 
 	case EPCGExDecompTransformSpace::BestFit:
+	{
+		const PCGExMath::FBestFitPlane BFP(NumNodes, [&](const int32 i)
 		{
-			const PCGExMath::FBestFitPlane BFP(NumNodes, [&](const int32 i) { return InCluster->GetPos(i); });
-			GridToWorld = BFP.GetTransform();
-			WorldToGrid = GridToWorld.Inverse();
-		}
-		break;
+			return InCluster->GetPos(i);
+		});
+		GridToWorld = BFP.GetTransform();
+		WorldToGrid = GridToWorld.Inverse();
+	}
+	break;
 
 	case EPCGExDecompTransformSpace::Custom:
 		GridToWorld = CustomTransform;
@@ -89,12 +104,18 @@ bool FPCGExDecompOccupancyGrid::Build(
 	FBox LocalBounds(ForceInit);
 	for (int32 i = 0; i < NumNodes; i++)
 	{
-		if (!InCluster->GetNode(i)->bValid) { continue; }
+		if (!InCluster->GetNode(i)->bValid)
+		{
+			continue;
+		}
 		LocalPositions[i] = WorldToGrid.TransformPosition(InCluster->GetPos(i));
 		LocalBounds += LocalPositions[i];
 	}
 
-	if (!LocalBounds.IsValid) { return false; }
+	if (!LocalBounds.IsValid)
+	{
+		return false;
+	}
 
 	LocalMin = LocalBounds.Min;
 
@@ -108,21 +129,33 @@ bool FPCGExDecompOccupancyGrid::Build(
 		FMath::Max(FMath::FloorToInt(BoundsSize.Z / SafeCellSize.Z) + 1, 1));
 
 	TotalVoxels = GridDimensions.X * GridDimensions.Y * GridDimensions.Z;
-	if (TotalVoxels <= 0) { return false; }
+	if (TotalVoxels <= 0)
+	{
+		return false;
+	}
 
 	// Initialize occupancy and mapping arrays
 	Occupied.Init(false, TotalVoxels);
 	VoxelToNodeIndex.SetNumUninitialized(TotalVoxels);
-	for (int32& Idx : VoxelToNodeIndex) { Idx = -1; }
+	for (int32& Idx : VoxelToNodeIndex)
+	{
+		Idx = -1;
+	}
 
 	NodeToVoxelIndex.SetNumUninitialized(NumNodes);
-	for (int32& Idx : NodeToVoxelIndex) { Idx = -1; }
+	for (int32& Idx : NodeToVoxelIndex)
+	{
+		Idx = -1;
+	}
 
 	// Quantize each valid node and populate occupancy
 	int32 OccupiedCount = 0;
 	for (int32 i = 0; i < NumNodes; i++)
 	{
-		if (!InCluster->GetNode(i)->bValid) { continue; }
+		if (!InCluster->GetNode(i)->bValid)
+		{
+			continue;
+		}
 
 		const FVector Rel = LocalPositions[i] - LocalMin;
 		const FIntVector Coord = FIntVector(

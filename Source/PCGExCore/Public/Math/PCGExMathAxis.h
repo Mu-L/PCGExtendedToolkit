@@ -124,12 +124,30 @@ namespace PCGExMath
 	template <const EPCGExAxis Dir = EPCGExAxis::Forward>
 	FORCEINLINE static FVector GetDirection(const FQuat& Quat)
 	{
-		if constexpr (Dir == EPCGExAxis::Backward) { return Quat.GetForwardVector() * -1; }
-		else if constexpr (Dir == EPCGExAxis::Right) { return Quat.GetRightVector(); }
-		else if constexpr (Dir == EPCGExAxis::Left) { return Quat.GetRightVector() * -1; }
-		else if constexpr (Dir == EPCGExAxis::Up) { return Quat.GetUpVector(); }
-		else if constexpr (Dir == EPCGExAxis::Down) { return Quat.GetUpVector() * -1; }
-		else { return Quat.GetForwardVector(); }
+		if constexpr (Dir == EPCGExAxis::Backward)
+		{
+			return Quat.GetForwardVector() * -1;
+		}
+		else if constexpr (Dir == EPCGExAxis::Right)
+		{
+			return Quat.GetRightVector();
+		}
+		else if constexpr (Dir == EPCGExAxis::Left)
+		{
+			return Quat.GetRightVector() * -1;
+		}
+		else if constexpr (Dir == EPCGExAxis::Up)
+		{
+			return Quat.GetUpVector();
+		}
+		else if constexpr (Dir == EPCGExAxis::Down)
+		{
+			return Quat.GetUpVector() * -1;
+		}
+		else
+		{
+			return Quat.GetForwardVector();
+		}
 	}
 
 	PCGEXCORE_API FVector GetDirection(const FQuat& Quat, const EPCGExAxis Dir);

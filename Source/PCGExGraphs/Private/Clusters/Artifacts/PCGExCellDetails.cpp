@@ -3,6 +3,8 @@
 
 #include "Clusters/Artifacts/PCGExCellDetails.h"
 
+#include "Clusters/PCGExCluster.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "Clusters/Artifacts/PCGExCell.h"
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
@@ -10,31 +12,40 @@
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointElements.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
-#include "Clusters/PCGExClusterCommon.h"
-#include "Paths/PCGExPathsHelpers.h"
-#include "Math/PCGExBestFitPlane.h"
 #include "Data/PCGPointArrayData.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Math/PCGExBestFitPlane.h"
+#include "Paths/PCGExPathsHelpers.h"
 
 void FPCGExCellSeedMutationDetails::ApplyToPoint(const PCGExClusters::FCell* InCell, PCGExData::FMutablePoint& OutSeedPoint, const UPCGBasePointData* CellPoints) const
 {
 	switch (Location)
 	{
-	default: case EPCGExCellSeedLocation::Original: break;
-	case EPCGExCellSeedLocation::Centroid: OutSeedPoint.SetLocation(InCell->Data.Centroid);
+	default: case EPCGExCellSeedLocation::Original:
 		break;
-	case EPCGExCellSeedLocation::PathBoundsCenter: OutSeedPoint.SetLocation(InCell->Data.Bounds.GetCenter());
+	case EPCGExCellSeedLocation::Centroid:
+		OutSeedPoint.SetLocation(InCell->Data.Centroid);
 		break;
-	case EPCGExCellSeedLocation::FirstNode: OutSeedPoint.SetLocation(CellPoints->GetTransform(0).GetLocation());
+	case EPCGExCellSeedLocation::PathBoundsCenter:
+		OutSeedPoint.SetLocation(InCell->Data.Bounds.GetCenter());
 		break;
-	case EPCGExCellSeedLocation::LastNode: OutSeedPoint.SetLocation(CellPoints->GetTransform(CellPoints->GetNumPoints() - 1).GetLocation());
+	case EPCGExCellSeedLocation::FirstNode:
+		OutSeedPoint.SetLocation(CellPoints->GetTransform(0).GetLocation());
+		break;
+	case EPCGExCellSeedLocation::LastNode:
+		OutSeedPoint.SetLocation(CellPoints->GetTransform(CellPoints->GetNumPoints() - 1).GetLocation());
 		break;
 	}
 
-	if (bResetScale) { OutSeedPoint.SetScale3D(FVector::OneVector); }
+	if (bResetScale)
+	{
+		OutSeedPoint.SetScale3D(FVector::OneVector);
+	}
 
-	if (bResetRotation) { OutSeedPoint.SetRotation(FQuat::Identity); }
+	if (bResetRotation)
+	{
+		OutSeedPoint.SetRotation(FQuat::Identity);
+	}
 
 	if (bMatchCellBounds)
 	{
@@ -51,13 +62,22 @@ void FPCGExCellSeedMutationDetails::ApplyToPoint(const PCGExClusters::FCell* InC
 bool FPCGExCellArtifactsDetails::WriteAny() const
 {
 	// Common attributes
-	if (bWriteCellHash || bWriteArea || bWriteCompactness) { return true; }
+	if (bWriteCellHash || bWriteArea || bWriteCompactness)
+	{
+		return true;
+	}
 
 	// Paths-specific
-	if (bOutputPaths && (bWriteVtxId || bFlagTerminalPoint || bWriteNumRepeat)) { return true; }
+	if (bOutputPaths && (bWriteVtxId || bFlagTerminalPoint || bWriteNumRepeat))
+	{
+		return true;
+	}
 
 	// CellBounds-specific
-	if (bOutputCellBounds && bWriteNumNodes) { return true; }
+	if (bOutputCellBounds && bWriteNumNodes)
+	{
+		return true;
+	}
 
 	return false;
 }
@@ -65,16 +85,34 @@ bool FPCGExCellArtifactsDetails::WriteAny() const
 bool FPCGExCellArtifactsDetails::Init(FPCGExContext* InContext)
 {
 	// Validate common attributes (used in all modes)
-	if (bWriteCellHash) { PCGEX_VALIDATE_NAME_C(InContext, CellHashAttributeName); }
-	if (bWriteArea) { PCGEX_VALIDATE_NAME_C(InContext, AreaAttributeName); }
-	if (bWriteCompactness) { PCGEX_VALIDATE_NAME_C(InContext, CompactnessAttributeName); }
+	if (bWriteCellHash)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, CellHashAttributeName);
+	}
+	if (bWriteArea)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, AreaAttributeName);
+	}
+	if (bWriteCompactness)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, CompactnessAttributeName);
+	}
 
 	// Validate paths-specific attributes
 	if (bOutputPaths)
 	{
-		if (bWriteVtxId) { PCGEX_VALIDATE_NAME_C(InContext, VtxIdAttributeName); }
-		if (bFlagTerminalPoint) { PCGEX_VALIDATE_NAME_C(InContext, TerminalFlagAttributeName); }
-		if (bWriteNumRepeat) { PCGEX_VALIDATE_NAME_C(InContext, NumRepeatAttributeName); }
+		if (bWriteVtxId)
+		{
+			PCGEX_VALIDATE_NAME_C(InContext, VtxIdAttributeName);
+		}
+		if (bFlagTerminalPoint)
+		{
+			PCGEX_VALIDATE_NAME_C(InContext, TerminalFlagAttributeName);
+		}
+		if (bWriteNumRepeat)
+		{
+			PCGEX_VALIDATE_NAME_C(InContext, NumRepeatAttributeName);
+		}
 
 		// Tagging only relevant for Paths mode
 		TagForwarding.bFilterToRemove = true;
@@ -85,7 +123,10 @@ bool FPCGExCellArtifactsDetails::Init(FPCGExContext* InContext)
 	// Validate CellBounds-specific attributes
 	if (bOutputCellBounds)
 	{
-		if (bWriteNumNodes) { PCGEX_VALIDATE_NAME_C(InContext, NumNodesAttributeName); }
+		if (bWriteNumNodes)
+		{
+			PCGEX_VALIDATE_NAME_C(InContext, NumNodesAttributeName);
+		}
 	}
 
 	return true;
@@ -115,10 +156,25 @@ void FPCGExCellArtifactsDetails::Process(const TSharedPtr<PCGExClusters::FCluste
 
 	PCGExPaths::Helpers::SetClosedLoop(InDataFacade->GetOut(), true);
 
-	if (InCell->Data.bIsConvex) { if (bTagConvex) { InDataFacade->Source->Tags->AddRaw(ConvexTag); } }
-	else { if (bTagConcave) { InDataFacade->Source->Tags->AddRaw(ConcaveTag); } }
+	if (InCell->Data.bIsConvex)
+	{
+		if (bTagConvex)
+		{
+			InDataFacade->Source->Tags->AddRaw(ConvexTag);
+		}
+	}
+	else
+	{
+		if (bTagConcave)
+		{
+			InDataFacade->Source->Tags->AddRaw(ConcaveTag);
+		}
+	}
 
-	if (!WriteAny()) { return; }
+	if (!WriteAny())
+	{
+		return;
+	}
 
 	const int32 NumNodes = InCell->Nodes.Num();
 	const TSharedPtr<PCGExData::TBuffer<bool>> TerminalBuffer = bFlagTerminalPoint ? InDataFacade->GetWritable(TerminalFlagAttributeName, false, true, PCGExData::EBufferInit::New) : nullptr;
@@ -137,11 +193,32 @@ void FPCGExCellArtifactsDetails::Process(const TSharedPtr<PCGExClusters::FCluste
 		}
 	}
 
-	if (bWriteCellHash) { InDataFacade->GetWritable<int64>(PCGExMetaHelpers::MakeDataIdentifier(CellHashAttributeName), static_cast<int64>(InCell->GetCellHash()), true, PCGExData::EBufferInit::New); }
-	if (bWriteArea) { InDataFacade->GetWritable<double>(PCGExMetaHelpers::MakeDataIdentifier(AreaAttributeName), InCell->Data.Area, true, PCGExData::EBufferInit::New); }
-	if (bWriteCompactness) { InDataFacade->GetWritable<double>(PCGExMetaHelpers::MakeDataIdentifier(CompactnessAttributeName), InCell->Data.Compactness, true, PCGExData::EBufferInit::New); }
-	if (TerminalBuffer) { for (int i = 0; i < NumNodes; i++) { TerminalBuffer->SetValue(i, InCluster->GetNode(InCell->Nodes[i])->IsLeaf()); } }
-	if (RepeatBuffer) { for (int i = 0; i < NumNodes; i++) { RepeatBuffer->SetValue(i, NumRepeats[InCell->Nodes[i]] - 1); } }
+	if (bWriteCellHash)
+	{
+		InDataFacade->GetWritable<int64>(PCGExMetaHelpers::MakeDataIdentifier(CellHashAttributeName), static_cast<int64>(InCell->GetCellHash()), true, PCGExData::EBufferInit::New);
+	}
+	if (bWriteArea)
+	{
+		InDataFacade->GetWritable<double>(PCGExMetaHelpers::MakeDataIdentifier(AreaAttributeName), InCell->Data.Area, true, PCGExData::EBufferInit::New);
+	}
+	if (bWriteCompactness)
+	{
+		InDataFacade->GetWritable<double>(PCGExMetaHelpers::MakeDataIdentifier(CompactnessAttributeName), InCell->Data.Compactness, true, PCGExData::EBufferInit::New);
+	}
+	if (TerminalBuffer)
+	{
+		for (int i = 0; i < NumNodes; i++)
+		{
+			TerminalBuffer->SetValue(i, InCluster->GetNode(InCell->Nodes[i])->IsLeaf());
+		}
+	}
+	if (RepeatBuffer)
+	{
+		for (int i = 0; i < NumNodes; i++)
+		{
+			RepeatBuffer->SetValue(i, NumRepeats[InCell->Nodes[i]] - 1);
+		}
+	}
 
 	const TSharedPtr<PCGExData::TBuffer<int32>> VtxIDBuffer = bWriteVtxId ? InDataFacade->GetWritable(VtxIdAttributeName, 0, true, PCGExData::EBufferInit::New) : nullptr;
 	if (VtxIDBuffer)
@@ -168,7 +245,10 @@ bool FPCGExCellGrowthDetails::Init(FPCGExContext* InContext, const TSharedPtr<PC
 {
 	GrowthValue.Reset();
 
-	if (!InFacade) { return false; }
+	if (!InFacade)
+	{
+		return false;
+	}
 
 	// Use the value setting from the shorthand, capturing min/max
 	GrowthValue = Growth.GetValueSetting();
@@ -224,7 +304,10 @@ namespace PCGExClusters
 	{
 		if (!InCluster || InCells.IsEmpty() || !OutFacade)
 		{
-			if (OutFacade) { OutFacade->Source->Disable(); }
+			if (OutFacade)
+			{
+				OutFacade->Source->Disable();
+			}
 			return;
 		}
 
@@ -279,7 +362,7 @@ namespace PCGExClusters
 			if (CompactnessWriter) { CompactnessWriter->SetValue(i, Cell->Data.Compactness); }
 			if (NumNodesWriter) { NumNodesWriter->SetValue(i, Cell->Nodes.Num()); }
 
-		);
+			);
 
 		// Commit facade
 		OutFacade->WriteFastest(TaskManager);

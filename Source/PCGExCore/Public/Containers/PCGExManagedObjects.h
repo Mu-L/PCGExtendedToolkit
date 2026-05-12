@@ -42,7 +42,10 @@ namespace PCGEx
 		TWeakPtr<FPCGContextHandle> WeakHandle;
 		TSet<TObjectPtr<UObject>> ManagedObjects;
 
-		bool IsFlushing() const { return bIsFlushing.load(std::memory_order_acquire); }
+		bool IsFlushing() const
+		{
+			return bIsFlushing.load(std::memory_order_acquire);
+		}
 
 		explicit FManagedObjects(FPCGContext* InContext, const TWeakPtr<FWorkHandle>& InWorkHandle);
 
@@ -61,10 +64,16 @@ namespace PCGEx
 		template <class T, typename... Args>
 		T* New(Args&&... InArgs)
 		{
-			if (!WorkHandle.IsValid()) { return nullptr; }
+			if (!WorkHandle.IsValid())
+			{
+				return nullptr;
+			}
 
 			FPCGContext::FSharedContext<FPCGContext> SharedContext(WeakHandle);
-			if (!SharedContext.Get()) { return nullptr; }
+			if (!SharedContext.Get())
+			{
+				return nullptr;
+			}
 
 			T* Object = nullptr;
 			if (!IsInGameThread())
@@ -87,10 +96,16 @@ namespace PCGEx
 		template <class T>
 		T* DuplicateData(const UPCGData* InData)
 		{
-			if (!WorkHandle.IsValid()) { return nullptr; }
+			if (!WorkHandle.IsValid())
+			{
+				return nullptr;
+			}
 
 			FPCGContext::FSharedContext<FPCGContext> SharedContext(WeakHandle);
-			if (!SharedContext.Get()) { return nullptr; }
+			if (!SharedContext.Get())
+			{
+				return nullptr;
+			}
 
 			T* Object = nullptr;
 

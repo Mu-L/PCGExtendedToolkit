@@ -16,7 +16,10 @@ namespace PCGExDetails
 	bool TSettingValueBuffer<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
-		if (!Context) { return false; }
+		if (!Context)
+		{
+			return false;
+		}
 
 		PCGEX_VALIDATE_NAME_C(Context, Name)
 
@@ -25,7 +28,10 @@ namespace PCGExDetails
 
 		if (!Buffer)
 		{
-			if (!this->bQuiet) { PCGEX_LOG_INVALID_ATTR_C(Context, Attribute, Name) }
+			if (!this->bQuiet)
+			{
+				PCGEX_LOG_INVALID_ATTR_C(Context, Attribute, Name)
+			}
 			return false;
 		}
 
@@ -36,28 +42,49 @@ namespace PCGExDetails
 	}
 
 	template <typename T>
-	T TSettingValueBuffer<T>::Read(const int32 Index) { return Buffer->Read(Index); }
+	T TSettingValueBuffer<T>::Read(const int32 Index)
+	{
+		return Buffer->Read(Index);
+	}
 
 	template <typename T>
-	void TSettingValueBuffer<T>::ReadScope(const int32 Start, TArrayView<T> OutResults) { Buffer->Read(Start, OutResults); }
+	void TSettingValueBuffer<T>::ReadScope(const int32 Start, TArrayView<T> OutResults)
+	{
+		Buffer->Read(Start, OutResults);
+	}
 
 	template <typename T>
-	T TSettingValueBuffer<T>::Min() { return Buffer->Min; }
+	T TSettingValueBuffer<T>::Min()
+	{
+		return Buffer->Min;
+	}
 
 	template <typename T>
-	T TSettingValueBuffer<T>::Max() { return Buffer->Max; }
+	T TSettingValueBuffer<T>::Max()
+	{
+		return Buffer->Max;
+	}
 
 	template <typename T>
-	uint32 TSettingValueBuffer<T>::ReadValueHash(const int32 Index) { return Buffer->ReadValueHash(Index); }
+	uint32 TSettingValueBuffer<T>::ReadValueHash(const int32 Index)
+	{
+		return Buffer->ReadValueHash(Index);
+	}
 
 	template <typename T>
 	bool TSettingValueSelector<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
-		if (!Context) { return false; }
+		if (!Context)
+		{
+			return false;
+		}
 
 		Buffer = InDataFacade->GetBroadcaster<T>(Selector, bSupportScoped && !bCaptureMinMax, bCaptureMinMax, this->bQuiet);
-		if (!Buffer) { return false; }
+		if (!Buffer)
+		{
+			return false;
+		}
 
 		// Register as consumable if it's an attribute
 		FName AttributeName = NAME_None;
@@ -70,25 +97,40 @@ namespace PCGExDetails
 	}
 
 	template <typename T>
-	bool TSettingValueConstant<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax) { return true; }
+	bool TSettingValueConstant<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
+	{
+		return true;
+	}
 
 	template <typename T>
 	void TSettingValueConstant<T>::ReadScope(const int32 Start, TArrayView<T> OutResults)
 	{
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = Constant; }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = Constant;
+		}
 	}
 
 	template <typename T>
-	uint32 TSettingValueConstant<T>::ReadValueHash(const int32 Index) { return PCGExTypes::ComputeHash(Constant); }
+	uint32 TSettingValueConstant<T>::ReadValueHash(const int32 Index)
+	{
+		return PCGExTypes::ComputeHash(Constant);
+	}
 
 	template <typename T>
 	bool TSettingValueSelectorConstant<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
-		if (!Context) { return false; }
+		if (!Context)
+		{
+			return false;
+		}
 
-		if (!PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Selector, this->Constant, this->bQuiet)) { return false; }
+		if (!PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Selector, this->Constant, this->bQuiet))
+		{
+			return false;
+		}
 
 		// Register as consumable if it's an attribute
 		FName AttributeName = NAME_None;
@@ -104,11 +146,17 @@ namespace PCGExDetails
 	bool TSettingValueBufferConstant<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
-		if (!Context) { return false; }
+		if (!Context)
+		{
+			return false;
+		}
 
 		PCGEX_VALIDATE_NAME_C(Context, Name)
 
-		if (!PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Name, this->Constant, this->bQuiet)) { return false; }
+		if (!PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Name, this->Constant, this->bQuiet))
+		{
+			return false;
+		}
 
 		// Register as consumable
 		Context->AddConsumableAttributeName(Name);

@@ -3,15 +3,15 @@
 
 #include "Elements/PCGExBuildDualGraph.h"
 
-#include "Data/PCGExData.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
-#include "Data/PCGExClusterData.h"
-#include "Data/PCGPointArrayData.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
+#include "Data/PCGExClusterData.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGPointArrayData.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Graphs/PCGExSubGraph.h"
@@ -22,21 +22,37 @@
 #define LOCTEXT_NAMESPACE "PCGExBuildDualGraph"
 #define PCGEX_NAMESPACE BuildDualGraph
 
-PCGExData::EIOInit UPCGExBuildDualGraphSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExBuildDualGraphSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExBuildDualGraphSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExBuildDualGraphSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(BuildDualGraph)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL(BuildDualGraph)
 
 bool FPCGExBuildDualGraphElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildDualGraph)
 
 	// Validate attribute names
-	if (Settings->bWriteEdgeLength) { PCGEX_VALIDATE_NAME_C(Context, Settings->EdgeLengthAttributeName); }
-	if (Settings->bWriteOriginalEdgeIndex) { PCGEX_VALIDATE_NAME_C(Context, Settings->OriginalEdgeIndexAttributeName); }
+	if (Settings->bWriteEdgeLength)
+	{
+		PCGEX_VALIDATE_NAME_C(Context, Settings->EdgeLengthAttributeName);
+	}
+	if (Settings->bWriteOriginalEdgeIndex)
+	{
+		PCGEX_VALIDATE_NAME_C(Context, Settings->OriginalEdgeIndexAttributeName);
+	}
 
 	PCGEX_FWD(VtxCarryOverDetails)
 	PCGEX_FWD(EdgeCarryOverDetails)
@@ -54,10 +70,13 @@ bool FPCGExBuildDualGraphElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bSkipCompletion = true;
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bSkipCompletion = true;
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -81,7 +100,10 @@ namespace PCGExBuildDualGraph
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBuildDualGraph::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const TArray<PCGExGraphs::FEdge>& ClusterEdges = *Cluster->Edges;
 
@@ -92,7 +114,10 @@ namespace PCGExBuildDualGraph
 		NumValidEdges = 0;
 		for (const PCGExGraphs::FEdge& E : ClusterEdges)
 		{
-			if (!E.bValid) { continue; }
+			if (!E.bValid)
+			{
+				continue;
+			}
 			const int32 NodeA = Cluster->NodeIndexLookup->Get(E.Start);
 			const int32 NodeB = Cluster->NodeIndexLookup->Get(E.End);
 			EdgeToDualVtx.Add(PCGEx::H64U(NodeA, NodeB), NumValidEdges++);
@@ -118,17 +143,26 @@ namespace PCGExBuildDualGraph
 		// Track shared node's point index for each dual edge (for vertex→edge blending)
 		for (const PCGExClusters::FHalfEdge& HE : FaceEnumerator->GetHalfEdges())
 		{
-			if (HE.NextIndex < 0) { continue; }
+			if (HE.NextIndex < 0)
+			{
+				continue;
+			}
 
 			const PCGExClusters::FHalfEdge& NextHE = FaceEnumerator->GetHalfEdge(HE.NextIndex);
 
 			const int32* VtxA = EdgeToDualVtx.Find(PCGEx::H64U(HE.OriginNode, HE.TargetNode));
 			const int32* VtxB = EdgeToDualVtx.Find(PCGEx::H64U(NextHE.OriginNode, NextHE.TargetNode));
 
-			if (!VtxA || !VtxB || *VtxA == *VtxB) { continue; }
+			if (!VtxA || !VtxB || *VtxA == *VtxB)
+			{
+				continue;
+			}
 
 			const uint64 DualHash = PCGEx::H64U(*VtxA, *VtxB);
-			if (DualEdgeHashes.Contains(DualHash)) { continue; }
+			if (DualEdgeHashes.Contains(DualHash))
+			{
+				continue;
+			}
 
 			DualEdgeHashes.Add(DualHash);
 
@@ -186,7 +220,10 @@ namespace PCGExBuildDualGraph
 
 		TArray<PCGExData::FWeightedPoint> WeightedPoints;
 		TArray<PCGEx::FOpStats> Trackers;
-		if (VtxBlender) { VtxBlender->InitTrackers(Trackers); }
+		if (VtxBlender)
+		{
+			VtxBlender->InitTrackers(Trackers);
+		}
 
 		const TSharedPtr<PCGExSampling::FSampingUnionData> Union = MakeShared<PCGExSampling::FSampingUnionData>();
 		const int32 EdgeSourceIOIndex = EdgeDataFacade->Source->IOIndex;
@@ -270,7 +307,10 @@ namespace PCGExBuildDualGraph
 				PCGEX_ASYNC_THIS
 
 				FEdgeBlendContext& Ctx = static_cast<FEdgeBlendContext&>(UserContext);
-				if (!Ctx.EdgeBlender) { return; }
+				if (!Ctx.EdgeBlender)
+				{
+					return;
+				}
 
 				const TArray<int32>& EdgeToSharedPoint = Ctx.EdgeToSharedPoint;
 				const int32 NumEdges = SubGraph->FlattenedEdges.Num();
@@ -285,7 +325,10 @@ namespace PCGExBuildDualGraph
 				for (int32 i = 0; i < NumEdges; ++i)
 				{
 					const int32 SharedPoint = EdgeToSharedPoint[i];
-					if (SharedPoint < 0) { continue; }
+					if (SharedPoint < 0)
+					{
+						continue;
+					}
 
 					U->Reset();
 					U->Reserve(1, 1);

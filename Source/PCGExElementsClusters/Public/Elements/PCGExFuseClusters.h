@@ -4,13 +4,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExClustersProcessor.h"
 #include "Blenders/PCGExUnionBlender.h"
+#include "Core/PCGExClustersProcessor.h"
 #include "Details/PCGExBlendingDetails.h"
 #include "Details/PCGExIntersectionDetails.h"
 
-#include "Core/PCGExUnionTable.h"
 #include "Core/PCGExUnionRegistry.h"
+#include "Core/PCGExUnionTable.h"
 
 #include "PCGExFuseClusters.generated.h"
 
@@ -35,7 +35,10 @@ namespace PCGExFuseClusters
 		FStagedEdge() = default;
 
 		FStagedEdge(const uint64 InKeyA, const uint64 InKeyB, const int32 InIO, const int32 InEdgePointIndex)
-			: KeyA(InKeyA), KeyB(InKeyB), IO(InIO), EdgePointIndex(InEdgePointIndex)
+			: KeyA(InKeyA)
+			  , KeyB(InKeyB)
+			  , IO(InIO)
+			  , EdgePointIndex(InEdgePointIndex)
 		{
 		}
 	};
@@ -50,7 +53,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(FuseClusters, "Cluster : Fuse", "Finds Point/Edge and Edge/Edge intersections between all input clusters.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterOp); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterOp);
+	}
 #endif
 
 protected:

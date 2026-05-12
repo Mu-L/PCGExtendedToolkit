@@ -12,7 +12,10 @@ class FPCGDataTypeRegistry;
 class PCGEXCOREEDITOR_API IPCGExEditorModuleInterface : public IModuleInterface
 {
 public:
-	virtual FString GetModuleName() const { return TEXT(""); }
+	virtual FString GetModuleName() const
+	{
+		return TEXT("");
+	}
 
 	// Static registry
 	static TArray<IPCGExEditorModuleInterface*> RegisteredModules;

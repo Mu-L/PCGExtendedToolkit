@@ -17,7 +17,10 @@ bool FPCGExMatchCopyTags::PrepareForMatchableSources(FPCGExContext* InContext, c
 
 bool FPCGExMatchCopyTags::Test(const PCGExData::FConstPoint& InTargetElement, const FPCGExTaggedData& InCandidate, const PCGExMatching::FScope& InMatchingScope) const
 {
-	if (InTargetElement.Data) { return true; }
+	if (InTargetElement.Data)
+	{
+		return true;
+	}
 
 	const FPCGExTaggedData* TaggedData = MatchableSources->GetData() + InTargetElement.IO;
 

@@ -14,7 +14,10 @@
 
 bool FPCGExMatchOverlap::PrepareForMatchableSources(FPCGExContext* InContext, const TSharedPtr<TArray<FPCGExTaggedData>>& InMatchableSources)
 {
-	if (!FPCGExMatchRuleOperation::PrepareForMatchableSources(InContext, InMatchableSources)) { return false; }
+	if (!FPCGExMatchRuleOperation::PrepareForMatchableSources(InContext, InMatchableSources))
+	{
+		return false;
+	}
 
 	TArray<FPCGExTaggedData>& MatchableSourcesRef = *InMatchableSources.Get();
 	const int32 NumSources = MatchableSourcesRef.Num();

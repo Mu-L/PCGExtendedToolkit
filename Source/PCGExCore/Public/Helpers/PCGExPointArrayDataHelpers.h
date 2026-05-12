@@ -48,11 +48,25 @@ namespace PCGExPointArrayDataHelpers
 		void CopyPoints(const UPCGBasePointData* Read, UPCGBasePointData* Write, const bool bClean = true, const bool bInitializeMetadata = false);
 		void CopyProperties(const UPCGBasePointData* Read, UPCGBasePointData* Write, EPCGPointNativeProperties Properties, const bool bClean = true);
 
-		bool IsEmpty() const { return ReadIndices.IsEmpty(); }
-		int32 Num() const { return ReadIndices.Num(); }
+		bool IsEmpty() const
+		{
+			return ReadIndices.IsEmpty();
+		}
 
-		const TArray<int32>& GetReadIndices() const { return ReadIndices; }
-		const TArray<int32>& GetWriteIndices() const { return WriteIndices; }
+		int32 Num() const
+		{
+			return ReadIndices.Num();
+		}
+
+		const TArray<int32>& GetReadIndices() const
+		{
+			return ReadIndices;
+		}
+
+		const TArray<int32>& GetWriteIndices() const
+		{
+			return WriteIndices;
+		}
 	};
 
 	PCGEXCORE_API int32 SetNumPointsAllocated(UPCGBasePointData* InData, const int32 InNumPoints, EPCGPointNativeProperties Properties = EPCGPointNativeProperties::All);
@@ -67,7 +81,10 @@ namespace PCGExPointArrayDataHelpers
 	static void Reverse(TPCGValueRange<T> Range)
 	{
 		const int32 Count = Range.Num();
-		for (int32 i = 0; i < Count / 2; ++i) { Swap(Range[i], Range[Count - 1 - i]); }
+		for (int32 i = 0; i < Count / 2; ++i)
+		{
+			Swap(Range[i], Range[Count - 1 - i]);
+		}
 	}
 
 	template <typename T>

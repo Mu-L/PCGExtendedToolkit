@@ -24,8 +24,14 @@ void FPCGExPrimitiveComponentDescriptor::InitFrom(const UPrimitiveComponent* Com
 	bEnableAutoLODGeneration = PrimitiveComponent->bEnableAutoLODGeneration;
 	bNeverDistanceCull = PrimitiveComponent->bNeverDistanceCull;
 
-	if (bInitBodyInstance) { BodyInstance.CopyBodyInstancePropertiesFrom(PrimitiveComponent->GetBodyInstance()); }
-	else { BodyInstance.SetCollisionEnabled(ECollisionEnabled::Type::NoCollision); }
+	if (bInitBodyInstance)
+	{
+		BodyInstance.CopyBodyInstancePropertiesFrom(PrimitiveComponent->GetBodyInstance());
+	}
+	else
+	{
+		BodyInstance.SetCollisionEnabled(ECollisionEnabled::Type::NoCollision);
+	}
 
 	bAlwaysCreatePhysicsState = PrimitiveComponent->bAlwaysCreatePhysicsState;
 	bMultiBodyOverlap = PrimitiveComponent->bMultiBodyOverlap;
@@ -93,7 +99,10 @@ void FPCGExPrimitiveComponentDescriptor::InitComponent(UPrimitiveComponent* InCo
 	UPrimitiveComponent* PrimitiveComponent = InComponent;
 
 	// Only update visibility if it's set to false to avoid massive overhead.
-	if (!bVisible) { PrimitiveComponent->SetVisibility(false, false); }
+	if (!bVisible)
+	{
+		PrimitiveComponent->SetVisibility(false, false);
+	}
 
 	PrimitiveComponent->MinDrawDistance = MinDrawDistance;
 	PrimitiveComponent->LDMaxDrawDistance = LDMaxDrawDistance;
@@ -176,7 +185,10 @@ void FPCGExMeshComponentDescriptor::InitFrom(const UPrimitiveComponent* Componen
 	FPCGExPrimitiveComponentDescriptor::InitFrom(Component, bInitBodyInstance);
 
 	const UMeshComponent* MeshComponent = Cast<UMeshComponent>(Component);
-	if (!MeshComponent) { return; }
+	if (!MeshComponent)
+	{
+		return;
+	}
 
 	// OverrideMaterials = SourceComponent->OverrideMaterials; // TODO!!
 	OverlayMaterial = MeshComponent->OverlayMaterial;
@@ -188,15 +200,24 @@ void FPCGExMeshComponentDescriptor::InitComponent(UPrimitiveComponent* InCompone
 	FPCGExPrimitiveComponentDescriptor::InitComponent(InComponent);
 
 	UMeshComponent* TargetComponent = Cast<UMeshComponent>(InComponent);
-	if (!TargetComponent) { return; }
+	if (!TargetComponent)
+	{
+		return;
+	}
 
 	for (int i = 0; i < OverrideMaterials.Num(); i++)
 	{
 		const TSoftObjectPtr<UMaterialInterface>& Mat = OverrideMaterials[i];
-		if (Mat.IsValid() && Mat.Get()) { TargetComponent->SetMaterial(i, Mat.Get()); }
+		if (Mat.IsValid() && Mat.Get())
+		{
+			TargetComponent->SetMaterial(i, Mat.Get());
+		}
 	}
 
-	if (OverlayMaterial.IsValid() && OverlayMaterial.Get()) { TargetComponent->OverlayMaterial = OverlayMaterial.Get(); }
+	if (OverlayMaterial.IsValid() && OverlayMaterial.Get())
+	{
+		TargetComponent->OverlayMaterial = OverlayMaterial.Get();
+	}
 
 	TargetComponent->OverlayMaterialMaxDrawDistance = OverlayMaterialMaxDrawDistance;
 }
@@ -213,7 +234,10 @@ void FPCGExStaticMeshComponentDescriptor::InitFrom(const UPrimitiveComponent* Co
 	FPCGExMeshComponentDescriptor::InitFrom(Component, bInitBodyInstance);
 
 	const UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(Component);
-	if (!StaticMeshComponent) { return; }
+	if (!StaticMeshComponent)
+	{
+		return;
+	}
 
 	ForcedLodModel = StaticMeshComponent->ForcedLodModel;
 	MinLOD = StaticMeshComponent->MinLOD;
@@ -247,7 +271,10 @@ void FPCGExStaticMeshComponentDescriptor::InitComponent(UPrimitiveComponent* InC
 	FPCGExMeshComponentDescriptor::InitComponent(InComponent);
 
 	UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(InComponent);
-	if (!StaticMeshComponent) { return; }
+	if (!StaticMeshComponent)
+	{
+		return;
+	}
 
 	StaticMeshComponent->ForcedLodModel = ForcedLodModel;
 	StaticMeshComponent->MinLOD = MinLOD;

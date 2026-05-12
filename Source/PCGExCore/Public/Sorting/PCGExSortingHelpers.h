@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "PCGExH.h"
 #include "CoreMinimal.h"
+#include "PCGExH.h"
 
 namespace PCGExSortingHelpers
 {
@@ -15,7 +15,10 @@ namespace PCGExSortingHelpers
 		FVectorKey() = default;
 
 		FVectorKey(const int32 InIndex, const FVector& InVector)
-			: X(InVector.X), Y(InVector.Y), Z(InVector.Z), Index(InIndex)
+			: X(InVector.X)
+			  , Y(InVector.Y)
+			  , Z(InVector.Z)
+			  , Index(InIndex)
 		{
 		}
 
@@ -26,8 +29,14 @@ namespace PCGExSortingHelpers
 
 		bool operator<(const FVectorKey& Other) const
 		{
-			if (X != Other.X) { return X < Other.X; }
-			if (Y != Other.Y) { return Y < Other.Y; }
+			if (X != Other.X)
+			{
+				return X < Other.X;
+			}
+			if (Y != Other.Y)
+			{
+				return Y < Other.Y;
+			}
 			return Z < Other.Z;
 		}
 	};
@@ -35,7 +44,10 @@ namespace PCGExSortingHelpers
 	static void RadixSort(TArray<FIndexKey>& Keys)
 	{
 		const int32 N = Keys.Num();
-		if (N <= 1) { return; }
+		if (N <= 1)
+		{
+			return;
+		}
 
 		// Radix sort by Key
 		constexpr int32 NUM_BUCKETS = 256;

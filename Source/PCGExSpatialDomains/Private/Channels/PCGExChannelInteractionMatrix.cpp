@@ -6,8 +6,8 @@
 DEFINE_LOG_CATEGORY_STATIC(LogPCGExChannelMatrix, Log, All);
 
 static_assert(static_cast<uint8>(EPCGExChannelResponse::Block) == 0,
-	"FMemory::Memset relies on Block having underlying byte value 0 -- "
-	"see ResetResponsesToBlock().");
+              "FMemory::Memset relies on Block having underlying byte value 0 -- "
+              "see ResetResponsesToBlock().");
 
 namespace
 {
@@ -49,8 +49,8 @@ void FPCGExChannelInteractionMatrix::Compile(
 	if (InChannelKeys.Num() > MaxChannels)
 	{
 		UE_LOG(LogPCGExChannelMatrix, Warning,
-			TEXT("Channel registry exceeds MaxChannels (%d > %d); excess channels are unaddressable in the runtime mask. Widen the mask type or trim the registry."),
-			InChannelKeys.Num(), MaxChannels);
+		       TEXT("Channel registry exceeds MaxChannels (%d > %d); excess channels are unaddressable in the runtime mask. Widen the mask type or trim the registry."),
+		       InChannelKeys.Num(), MaxChannels);
 	}
 
 	// Apply each profile's response overrides. Drop profiles or entries
@@ -62,8 +62,8 @@ void FPCGExChannelInteractionMatrix::Compile(
 		if (CandidateBit == INDEX_NONE)
 		{
 			UE_LOG(LogPCGExChannelMatrix, Warning,
-				TEXT("Channel profile references unknown channel '%s'; dropping."),
-				*Profile.ChannelKey.ToString());
+			       TEXT("Channel profile references unknown channel '%s'; dropping."),
+			       *Profile.ChannelKey.ToString());
 			continue;
 		}
 
@@ -73,8 +73,8 @@ void FPCGExChannelInteractionMatrix::Compile(
 			if (StoredBit == INDEX_NONE)
 			{
 				UE_LOG(LogPCGExChannelMatrix, Warning,
-					TEXT("Channel profile '%s' references unknown stored channel '%s'; dropping that response entry."),
-					*Profile.ChannelKey.ToString(), *Entry.StoredChannel.ToString());
+				       TEXT("Channel profile '%s' references unknown stored channel '%s'; dropping that response entry."),
+				       *Profile.ChannelKey.ToString(), *Entry.StoredChannel.ToString());
 				continue;
 			}
 			Responses[CandidateBit][StoredBit] = Entry.Response;
@@ -84,7 +84,10 @@ void FPCGExChannelInteractionMatrix::Compile(
 
 int32 FPCGExChannelInteractionMatrix::GetChannelBit(FName ChannelKey) const
 {
-	if (ChannelKey.IsNone()) { return INDEX_NONE; }
+	if (ChannelKey.IsNone())
+	{
+		return INDEX_NONE;
+	}
 	const int32* Found = KeyToBit.Find(ChannelKey);
 	return Found ? *Found : INDEX_NONE;
 }
@@ -98,7 +101,10 @@ bool FPCGExChannelInteractionMatrix::ShouldRunNarrowPhase(uint32 CandidateMask, 
 {
 	// Safe default: no channel info on either side means we run narrow phase
 	// (preserves pre-channel-matrix behavior for un-channeled entries / tests).
-	if (CandidateMask == 0 || StoredMask == 0) { return true; }
+	if (CandidateMask == 0 || StoredMask == 0)
+	{
+		return true;
+	}
 
 	// Walk the cross-product of set bits. First Block wins -- as soon as any
 	// (candidate, stored) channel pair is Block, the narrow phase has to run.
@@ -107,7 +113,7 @@ bool FPCGExChannelInteractionMatrix::ShouldRunNarrowPhase(uint32 CandidateMask, 
 	while (CMask != 0)
 	{
 		const uint32 CBit = FMath::CountTrailingZeros(CMask);
-		CMask &= CMask - 1;  // clear lowest set bit
+		CMask &= CMask - 1; // clear lowest set bit
 
 		uint32 SMask = StoredMask;
 		while (SMask != 0)
@@ -115,7 +121,10 @@ bool FPCGExChannelInteractionMatrix::ShouldRunNarrowPhase(uint32 CandidateMask, 
 			const uint32 SBit = FMath::CountTrailingZeros(SMask);
 			SMask &= SMask - 1;
 
-			if (Responses[CBit][SBit] == EPCGExChannelResponse::Block) { return true; }
+			if (Responses[CBit][SBit] == EPCGExChannelResponse::Block)
+			{
+				return true;
+			}
 		}
 	}
 

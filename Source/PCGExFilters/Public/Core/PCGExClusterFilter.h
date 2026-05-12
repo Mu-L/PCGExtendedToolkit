@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "PCGExPointFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "UObject/Object.h"
 
 #include "PCGExClusterFilter.generated.h"
 
@@ -51,7 +51,10 @@ class PCGEXFILTERS_API UPCGExClusterFilterFactoryData : public UPCGExPointFilter
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoFilterCluster)
 
-	virtual bool SupportsCollectionEvaluation() const override { return false; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return false;
+	}
 };
 
 UCLASS(Abstract)
@@ -86,7 +89,10 @@ class PCGEXFILTERS_API UPCGExNodeFilterFactoryData : public UPCGExClusterFilterF
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoFilterVtx)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FilterNode; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FilterNode;
+	}
 };
 
 UCLASS(Abstract)
@@ -123,7 +129,10 @@ class PCGEXFILTERS_API UPCGExEdgeFilterFactoryData : public UPCGExClusterFilterF
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoFilterEdge)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FilterEdge; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FilterEdge;
+	}
 };
 
 UCLASS(Abstract)
@@ -183,7 +192,11 @@ namespace PCGExClusterFilter
 		{
 		}
 
-		virtual PCGExFilters::EType GetFilterType() const override { return PCGExFilters::EType::Node; }
+		virtual PCGExFilters::EType GetFilterType() const override
+		{
+			return PCGExFilters::EType::Node;
+		}
+
 		virtual bool Test(const int32 Index) const override final;
 		virtual bool Test(const PCGExClusters::FNode& Node) const override;
 		virtual bool Test(const PCGExGraphs::FEdge& Edge) const override final;
@@ -202,7 +215,11 @@ namespace PCGExClusterFilter
 		{
 		}
 
-		virtual PCGExFilters::EType GetFilterType() const override { return PCGExFilters::EType::Edge; }
+		virtual PCGExFilters::EType GetFilterType() const override
+		{
+			return PCGExFilters::EType::Edge;
+		}
+
 		virtual bool Test(const int32 Index) const override final;
 		virtual bool Test(const PCGExClusters::FNode& Node) const override final;
 		virtual bool Test(const PCGExGraphs::FEdge& Edge) const override;

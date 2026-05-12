@@ -12,7 +12,10 @@
 
 bool FPCGExFillControlEdgeFilters::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryEdgeFilters* TypedFactory = Cast<UPCGExFillControlsFactoryEdgeFilters>(Factory);
 
@@ -33,7 +36,10 @@ bool FPCGExFillControlEdgeFilters::IsValidCapture(const PCGExFloodFill::FDiffusi
 
 bool FPCGExFillControlEdgeFilters::IsValidProbe(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate)
 {
-	if (Candidate.Link.Edge == -1) { return true; }
+	if (Candidate.Link.Edge == -1)
+	{
+		return true;
+	}
 	const PCGExGraphs::FEdge* E = Cluster->GetEdge(Candidate.Link);
 	// Orient edge in diffusion direction
 	const PCGExGraphs::FEdge Edge(E->Index, Candidate.Link.Node, Candidate.Node->PointIndex, E->PointIndex, E->IOIndex);

@@ -25,11 +25,11 @@ TSharedPtr<FPCGExMicroEntryPickerOperation> UPCGExSelectorFactoryData::CreateMic
 	switch (BaseConfig.SubDistribution.Distribution)
 	{
 	case EPCGExDistribution::Index:
-		{
-			TSharedPtr<FPCGExMicroIndexPickerOp> Op = MakeShared<FPCGExMicroIndexPickerOp>();
-			Op->IndexConfig = BaseConfig.SubDistribution.IndexSettings;
-			return Op;
-		}
+	{
+		TSharedPtr<FPCGExMicroIndexPickerOp> Op = MakeShared<FPCGExMicroIndexPickerOp>();
+		Op->IndexConfig = BaseConfig.SubDistribution.IndexSettings;
+		return Op;
+	}
 	case EPCGExDistribution::Random:
 		return MakeShared<FPCGExMicroRandomPickerOp>();
 	case EPCGExDistribution::WeightedRandom:

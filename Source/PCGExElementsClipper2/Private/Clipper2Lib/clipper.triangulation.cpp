@@ -47,7 +47,12 @@ namespace PCGExClipper2Lib
 		Point64 pt;
 		EdgeList edges;
 		bool innerLM = false;
-		Vertex2(const Point64& p64) : pt(p64) { edges.reserve(2); };
+
+		Vertex2(const Point64& p64)
+			: pt(p64)
+		{
+			edges.reserve(2);
+		};
 	};
 
 	class Edge
@@ -115,7 +120,11 @@ namespace PCGExClipper2Lib
 			: useDelaunay(delaunay)
 		{
 		};
-		~Delaunay() { CleanUp(); };
+
+		~Delaunay()
+		{
+			CleanUp();
+		};
 		Paths64 Execute(const Paths64& paths, TriangulateResult& triResult);
 	};
 
@@ -1694,7 +1703,10 @@ namespace PCGExClipper2Lib
 		// This resolves which paths are holes inside which outer polygons
 		PolyTree64 polytree;
 		Clipper64 clipper;
-		if (zCallback) { clipper.SetZCallback(zCallback); }
+		if (zCallback)
+		{
+			clipper.SetZCallback(zCallback);
+		}
 		clipper.AddSubject(pp);
 
 		Paths64 openPaths; // We don't use open paths for triangulation

@@ -6,8 +6,15 @@
 
 PCGEX_CREATE_PROBE_FACTORY(GlobalAnisotropic, {}, {})
 
-bool FPCGExProbeGlobalAnisotropic::IsGlobalProbe() const { return true; }
-bool FPCGExProbeGlobalAnisotropic::WantsOctree() const { return true; }
+bool FPCGExProbeGlobalAnisotropic::IsGlobalProbe() const
+{
+	return true;
+}
+
+bool FPCGExProbeGlobalAnisotropic::WantsOctree() const
+{
+	return true;
+}
 
 bool FPCGExProbeGlobalAnisotropic::Prepare(FPCGExContext* InContext)
 {
@@ -43,7 +50,10 @@ void FPCGExProbeGlobalAnisotropic::ProcessAll(TSet<uint64>& OutEdges) const
 {
 	const TArray<FVector>& Positions = *WorkingPositions;
 	const int32 NumPoints = Positions.Num();
-	if (NumPoints < 2) { return; }
+	if (NumPoints < 2)
+	{
+		return;
+	}
 
 	const TArray<int8>& CanGenerateRef = *CanGenerate;
 	const TArray<int8>& AcceptConnectionsRef = *AcceptConnections;
@@ -56,7 +66,10 @@ void FPCGExProbeGlobalAnisotropic::ProcessAll(TSet<uint64>& OutEdges) const
 
 	for (int32 i = 0; i < NumPoints; ++i)
 	{
-		if (!CanGenerateRef[i]) { continue; }
+		if (!CanGenerateRef[i])
+		{
+			continue;
+		}
 
 		const FVector& Pos = Positions[i];
 		double BaseRadius = FMath::Sqrt(GetSearchRadius(i));
@@ -80,12 +93,18 @@ void FPCGExProbeGlobalAnisotropic::ProcessAll(TSet<uint64>& OutEdges) const
 			[&](const PCGExOctree::FItem& Other)
 			{
 				const int32 j = Other.Index;
-				if (i == j || !AcceptConnectionsRef[j]) { return; }
+				if (i == j || !AcceptConnectionsRef[j])
+				{
+					return;
+				}
 
 				const FVector Delta = Positions[j] - Pos;
 
 				// Quick isotropic pre-filter
-				if (Delta.SizeSquared() > LocalSearchRadiusSq) { return; }
+				if (Delta.SizeSquared() > LocalSearchRadiusSq)
+				{
+					return;
+				}
 
 				const double AnisoDist = ComputeGlobalAnisotropicDistSq(Delta, Transform);
 				if (AnisoDist <= BaseRadius)
@@ -95,7 +114,10 @@ void FPCGExProbeGlobalAnisotropic::ProcessAll(TSet<uint64>& OutEdges) const
 			});
 
 		// Sort and take K nearest
-		Algo::Sort(Candidates, [](const auto& A, const auto& B) { return A.Key < B.Key; });
+		Algo::Sort(Candidates, [](const auto& A, const auto& B)
+		{
+			return A.Key < B.Key;
+		});
 
 		const int32 K = FMath::Min(Config.K, Candidates.Num());
 		for (int32 k = 0; k < K; ++k)

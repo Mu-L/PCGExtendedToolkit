@@ -127,7 +127,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FInclusionFilter(const TObjectPtr<const UPCGExInclusionFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 			Handler = TypedFilterFactory->CreateHandler();
 			Handler->Init(TypedFilterFactory->Config.CheckType);
@@ -188,6 +189,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

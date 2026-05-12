@@ -44,7 +44,10 @@ class UPCGExDecompSpectral : public UPCGExDecompositionInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool WantsHeuristics() const override { return true; }
+	virtual bool WantsHeuristics() const override
+	{
+		return true;
+	}
 
 	/** Number of partitions to produce. Must be a power of 2 for balanced bisection. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin="2"))
