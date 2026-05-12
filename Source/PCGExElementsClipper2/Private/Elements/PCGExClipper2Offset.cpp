@@ -3,11 +3,11 @@
 
 #include "Elements/PCGExClipper2Offset.h"
 
+#include "Clipper2Lib/clipper.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Clipper2Lib/clipper.h"
-#include "Data/PCGExDataTags.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2OffsetElement"
 #define PCGEX_NAMESPACE Clipper2Offset
@@ -29,14 +29,20 @@ void FPCGExClipper2OffsetContext::Process(const TSharedPtr<PCGExClipper2::FProce
 {
 	const UPCGExClipper2OffsetSettings* Settings = GetInputSettings<UPCGExClipper2OffsetSettings>();
 
-	if (!Group->IsValid()) { return; }
+	if (!Group->IsValid())
+	{
+		return;
+	}
 
 	const double Scale = Settings->Precision;
 	const PCGExClipper2Lib::JoinType JoinType = PCGExClipper2::ConvertJoinType(Settings->JoinType);
 	const PCGExClipper2Lib::EndType EndTypeClosed = PCGExClipper2::ConvertEndType(Settings->EndTypeClosed);
 	const PCGExClipper2Lib::EndType EndTypeOpen = PCGExClipper2::ConvertEndType(Settings->EndTypeOpen);
 
-	if (Group->SubjectPaths.empty() && Group->OpenSubjectPaths.empty()) { return; }
+	if (Group->SubjectPaths.empty() && Group->OpenSubjectPaths.empty())
+	{
+		return;
+	}
 
 	int32 NumIterations = 1;
 	constexpr double DefaultOffset = 10;
@@ -51,23 +57,35 @@ void FPCGExClipper2OffsetContext::Process(const TSharedPtr<PCGExClipper2::FProce
 		NumIterations = FMath::Max(1, IterationValues[Group->SubjectIndices.Last()]->Read(0));
 		break;
 	case EPCGExClipper2OffsetIterationCount::Average:
+	{
+		for (const int32 SubjectIdx : Group->SubjectIndices)
 		{
-			for (const int32 SubjectIdx : Group->SubjectIndices) { NumIterations += FMath::Max(1, IterationValues[SubjectIdx]->Read(0)); }
-			NumIterations /= Group->SubjectIndices.Num();
+			NumIterations += FMath::Max(1, IterationValues[SubjectIdx]->Read(0));
 		}
-		break;
+		NumIterations /= Group->SubjectIndices.Num();
+	}
+	break;
 	case EPCGExClipper2OffsetIterationCount::Min:
-		for (const int32 SubjectIdx : Group->SubjectIndices) { NumIterations = FMath::Min(NumIterations, IterationValues[SubjectIdx]->Read(0)); }
+		for (const int32 SubjectIdx : Group->SubjectIndices)
+		{
+			NumIterations = FMath::Min(NumIterations, IterationValues[SubjectIdx]->Read(0));
+		}
 		break;
 	default:
 	case EPCGExClipper2OffsetIterationCount::Max:
-		for (const int32 SubjectIdx : Group->SubjectIndices) { NumIterations = FMath::Max(NumIterations, IterationValues[SubjectIdx]->Read(0)); }
+		for (const int32 SubjectIdx : Group->SubjectIndices)
+		{
+			NumIterations = FMath::Max(NumIterations, IterationValues[SubjectIdx]->Read(0));
+		}
 		break;
 	}
 
 	NumIterations = FMath::Max(Settings->MinIterations, NumIterations);
 
-	if (!NumIterations) { return; }
+	if (!NumIterations)
+	{
+		return;
+	}
 
 	// Capture values by copy for lambda safety
 	// Since Facade->Idx == ArrayIndex, we can use SourceIdx from Z directly as array index
@@ -115,8 +133,14 @@ void FPCGExClipper2OffsetContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			PCGExClipper2Lib::ClipperOffset ClipperOffset(Settings->MiterLimit, Settings->GetArcTolerance(), Settings->bPreserveCollinear, false);
 			ClipperOffset.SetZCallback(Group->CreateZCallback());
 
-			if (!Group->SubjectPaths.empty()) { ClipperOffset.AddPaths(Group->SubjectPaths, JoinType, EndTypeClosed); }
-			if (!Group->OpenSubjectPaths.empty()) { ClipperOffset.AddPaths(Group->OpenSubjectPaths, JoinType, EndTypeOpen); }
+			if (!Group->SubjectPaths.empty())
+			{
+				ClipperOffset.AddPaths(Group->SubjectPaths, JoinType, EndTypeClosed);
+			}
+			if (!Group->OpenSubjectPaths.empty())
+			{
+				ClipperOffset.AddPaths(Group->OpenSubjectPaths, JoinType, EndTypeOpen);
+			}
 
 			PCGExClipper2Lib::Paths64 ResultPaths;
 			ClipperOffset.Execute(CreateDeltaCallback(1.0 * Settings->OffsetScale, IterationMultiplier), ResultPaths);
@@ -152,11 +176,17 @@ bool FPCGExClipper2OffsetElement::PostBoot(FPCGExContext* InContext) const
 		const TSharedPtr<PCGExData::FFacade>& Facade = Context->AllOpData->Facades[i];
 
 		auto OffsetSetting = Settings->Offset.GetValueSetting();
-		if (!OffsetSetting->Init(Facade)) { return false; }
+		if (!OffsetSetting->Init(Facade))
+		{
+			return false;
+		}
 		Context->OffsetValues[i] = OffsetSetting;
 
 		auto IterationSetting = Settings->Iterations.GetValueSetting();
-		if (!IterationSetting->Init(Facade)) { return false; }
+		if (!IterationSetting->Init(Facade))
+		{
+			return false;
+		}
 		Context->IterationValues[i] = IterationSetting;
 	}
 

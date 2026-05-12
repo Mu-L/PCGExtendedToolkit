@@ -6,9 +6,9 @@
 #include "Editor.h"
 #include "PropertyHandle.h"
 #include "Styling/AppStyle.h"
-#include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SNullWidget.h"
+#include "Widgets/Input/SNumericEntryBox.h"
 
 namespace PCGExInlineNumericWidgets
 {
@@ -34,7 +34,10 @@ namespace PCGExInlineNumericWidgets
 		const FLinearColor& LabelColor,
 		TSharedPtr<INumericTypeInterface<double>> TypeInterface)
 	{
-		if (!AxisHandle.IsValid()) { return SNullWidget::NullWidget; }
+		if (!AxisHandle.IsValid())
+		{
+			return SNullWidget::NullWidget;
+		}
 
 		return SNew(SNumericEntryBox<double>)
 			.AllowSpin(true)
@@ -52,7 +55,10 @@ namespace PCGExInlineNumericWidgets
 			.Value_Lambda([AxisHandle]() -> TOptional<double>
 			{
 				double Out = 0.0;
-				if (AxisHandle->GetValue(Out) == FPropertyAccess::Success) { return Out; }
+				if (AxisHandle->GetValue(Out) == FPropertyAccess::Success)
+				{
+					return Out;
+				}
 				return TOptional<double>();
 			})
 			.OnValueChanged_Lambda([AxisHandle](double NewValue)
@@ -84,9 +90,18 @@ namespace PCGExInlineNumericWidgets
 		TSharedPtr<IPropertyHandle> Z = ValueHandle->GetChildHandle(TEXT("Z"));
 
 		return SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)[MakeAxisEntry(X, AxisColorX)]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 2, 0)[MakeAxisEntry(Y, AxisColorY)]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)[MakeAxisEntry(Z, AxisColorZ)];
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)
+			[
+				MakeAxisEntry(X, AxisColorX)
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 2, 0)
+			[
+				MakeAxisEntry(Y, AxisColorY)
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)
+			[
+				MakeAxisEntry(Z, AxisColorZ)
+			];
 	}
 
 	TSharedRef<SWidget> MakeVector2Widget(const TSharedRef<IPropertyHandle>& ValueHandle)
@@ -95,8 +110,14 @@ namespace PCGExInlineNumericWidgets
 		TSharedPtr<IPropertyHandle> Y = ValueHandle->GetChildHandle(TEXT("Y"));
 
 		return SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)[MakeAxisEntry(X, AxisColorX)]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)[MakeAxisEntry(Y, AxisColorY)];
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)
+			[
+				MakeAxisEntry(X, AxisColorX)
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)
+			[
+				MakeAxisEntry(Y, AxisColorY)
+			];
 	}
 
 	TSharedRef<SWidget> MakeRotatorWidget(const TSharedRef<IPropertyHandle>& ValueHandle)
@@ -109,8 +130,17 @@ namespace PCGExInlineNumericWidgets
 		const TSharedRef<INumericTypeInterface<double>> DegreeInterface = MakeShared<FDegreesNumericTypeInterface>();
 
 		return SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)[MakeAxisEntry(Roll, AxisColorX, DegreeInterface)]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 2, 0)[MakeAxisEntry(Pitch, AxisColorY, DegreeInterface)]
-			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)[MakeAxisEntry(Yaw, AxisColorZ, DegreeInterface)];
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(0, 0, 2, 0)
+			[
+				MakeAxisEntry(Roll, AxisColorX, DegreeInterface)
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 2, 0)
+			[
+				MakeAxisEntry(Pitch, AxisColorY, DegreeInterface)
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2, 0, 0, 0)
+			[
+				MakeAxisEntry(Yaw, AxisColorZ, DegreeInterface)
+			];
 	}
 }

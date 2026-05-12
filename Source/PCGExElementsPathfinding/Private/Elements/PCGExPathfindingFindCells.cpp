@@ -3,15 +3,15 @@
 
 #include "Elements/PCGExPathfindingFindCells.h"
 
-#include "Data/PCGExData.h"
-#include "Data/PCGPointArrayData.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCell.h"
 #include "Clusters/Artifacts/PCGExCellPathBuilder.h"
 #include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGPointArrayData.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Paths/PCGExPath.h"
@@ -30,19 +30,34 @@ TArray<FPCGPinProperties> UPCGExFindContoursSettings::InputPinProperties() const
 
 bool UPCGExFindContoursSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules) { return SeedOwnership == EPCGExCellSeedOwnership::BestCandidate; }
+	if (InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules)
+	{
+		return SeedOwnership == EPCGExCellSeedOwnership::BestCandidate;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
 TArray<FPCGPinProperties> UPCGExFindContoursSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
-	
-	if (Artifacts.bOutputPaths) { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths", Required) }
-	else { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths", Advanced) }
 
-	if (Artifacts.bOutputCellBounds) { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points", Required) }
-	else { PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points", Advanced) }
+	if (Artifacts.bOutputPaths)
+	{
+		PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths", Required)
+	}
+	else
+	{
+		PCGEX_PIN_POINTS(PCGExCells::OutputLabels::Paths, "Cell contours as closed paths", Advanced)
+	}
+
+	if (Artifacts.bOutputCellBounds)
+	{
+		PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points", Required)
+	}
+	else
+	{
+		PCGEX_PIN_POINTS(PCGExCells::OutputLabels::CellBounds, "Cell OBB bounds as points", Advanced)
+	}
 
 	if (bOutputFilteredSeeds)
 	{
@@ -52,15 +67,25 @@ TArray<FPCGPinProperties> UPCGExFindContoursSettings::OutputPinProperties() cons
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExFindContoursSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExFindContoursSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExFindContoursSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExFindContoursSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(FindContours)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL(FindContours)
 
 bool FPCGExFindContoursElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FindContours)
 
@@ -68,10 +93,16 @@ bool FPCGExFindContoursElement::Boot(FPCGExContext* InContext) const
 	PCGEX_FWD(SeedGrowth)
 
 	// Initialize Artifacts (output settings + OBB settings)
-	if (!Context->Artifacts.Init(Context)) { return false; }
+	if (!Context->Artifacts.Init(Context))
+	{
+		return false;
+	}
 
 	Context->SeedsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExCommon::Labels::SourceSeedsLabel, false, true);
-	if (!Context->SeedsDataFacade) { return false; }
+	if (!Context->SeedsDataFacade)
+	{
+		return false;
+	}
 
 	// Initialize seed growth (will read per-point growth attribute if needed)
 	Context->SeedGrowth.Init(Context, Context->SeedsDataFacade);
@@ -86,7 +117,10 @@ bool FPCGExFindContoursElement::Boot(FPCGExContext* InContext) const
 	}
 
 	PCGEX_FWD(SeedAttributesToPathTags)
-	if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade)) { return false; }
+	if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade))
+	{
+		return false;
+	}
 	Context->SeedForwardHandler = Settings->SeedForwarding.GetHandler(Context->SeedsDataFacade);
 
 	Context->OutputPaths = MakeShared<PCGExData::FPointIOCollection>(Context);
@@ -121,12 +155,15 @@ bool FPCGExFindContoursElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			//NewBatch->bRequiresWriteStep = Settings->Artifacts.WriteAny();
-			NewBatch->bSkipCompletion = true;
-			NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      //NewBatch->bRequiresWriteStep = Settings->Artifacts.WriteAny();
+			                                      NewBatch->bSkipCompletion = true;
+			                                      NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -171,7 +208,10 @@ namespace PCGExFindContours
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExFindContours::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const int32 NumSeeds = Context->SeedsDataFacade->Source->GetNum();
 
@@ -268,7 +308,10 @@ namespace PCGExFindContours
 		PCGEX_SCOPE_LOOP(CellIndex)
 		{
 			const TSharedPtr<PCGExClusters::FCell>& Cell = EnumeratedCells[CellIndex];
-			if (!Cell || Cell->Polygon.IsEmpty()) { continue; }
+			if (!Cell || Cell->Polygon.IsEmpty())
+			{
+				continue;
+			}
 
 			CandidateSeeds.Reset();
 
@@ -278,7 +321,10 @@ namespace PCGExFindContours
 				const FVector2D& SeedPoint = Seeds->GetProjected(SeedIdx);
 
 				// AABB early-out
-				if (!Cell->Bounds2D.IsInside(SeedPoint)) { continue; }
+				if (!Cell->Bounds2D.IsInside(SeedPoint))
+				{
+					continue;
+				}
 
 				// Fine polygon check
 				if (PCGExMath::Geo::IsPointInPolygon(SeedPoint, Cell->Polygon))
@@ -286,7 +332,10 @@ namespace PCGExFindContours
 					CandidateSeeds.Add(SeedIdx);
 
 					// For SeedOrder mode, first match wins - break early
-					if (!bNeedsAllCandidates) { break; }
+					if (!bNeedsAllCandidates)
+					{
+						break;
+					}
 				}
 			}
 
@@ -303,7 +352,10 @@ namespace PCGExFindContours
 	void FProcessor::HandleWrapperOnlyCase(const int32 NumSeeds)
 	{
 		// No valid internal cells exist - check if exterior seeds can claim wrapper
-		if (!WrapperCell) { return; }
+		if (!WrapperCell)
+		{
+			return;
+		}
 
 		const TSharedPtr<PCGExCells::FSeedOwnershipHandler>& SeedOwnership = Context->SeedOwnership;
 
@@ -329,7 +381,10 @@ namespace PCGExFindContours
 				}
 			}
 
-			if (bConsumed) { continue; }
+			if (bConsumed)
+			{
+				continue;
+			}
 
 			// Seed is exterior - find closest edge distance
 			const FVector& SeedPos = SeedTransforms[SeedIdx].GetLocation();
@@ -338,7 +393,10 @@ namespace PCGExFindContours
 			Cluster->GetEdgeOctree()->FindNearbyElements(SeedPos, [&](const PCGExOctree::FItem& Item)
 			{
 				const double DistSq = Cluster->GetPointDistToEdgeSquared(Item.Index, SeedPos);
-				if (DistSq < ClosestEdgeDistSq) { ClosestEdgeDistSq = DistSq; }
+				if (DistSq < ClosestEdgeDistSq)
+				{
+					ClosestEdgeDistSq = DistSq;
+				}
 			});
 
 			if (Settings->SeedPicking.WithinDistanceSquared(ClosestEdgeDistSq))
@@ -360,8 +418,12 @@ namespace PCGExFindContours
 			// Output to CellBounds if enabled
 			if (Settings->Artifacts.bOutputCellBounds)
 			{
-				TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-					Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+				TSharedPtr<PCGExData::FPointIO> OBBPointIO = Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+				if (!OBBPointIO)
+				{
+					return;
+				}
+
 				OBBPointIO->Tags->Reset();
 				OBBPointIO->IOIndex = BatchIndex;
 				PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
@@ -389,7 +451,10 @@ namespace PCGExFindContours
 			// Record initial seed matches (depth 0) and perform expansion
 			for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
 			{
-				if (!Cell || Cell->FaceIndex < 0) { continue; }
+				if (!Cell || Cell->FaceIndex < 0)
+				{
+					continue;
+				}
 
 				const int32 SeedIndex = Cell->CustomIndex;
 				const int32 FaceIndex = Cell->FaceIndex;
@@ -410,7 +475,10 @@ namespace PCGExFindContours
 			TSet<int32> InitialFaceIndices;
 			for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
 			{
-				if (Cell && Cell->FaceIndex >= 0) { InitialFaceIndices.Add(Cell->FaceIndex); }
+				if (Cell && Cell->FaceIndex >= 0)
+				{
+					InitialFaceIndices.Add(Cell->FaceIndex);
+				}
 			}
 
 			const TSharedPtr<PCGExCells::FSeedOwnershipHandler>& SeedOwnership = Context->SeedOwnership;
@@ -461,7 +529,10 @@ namespace PCGExFindContours
 			TMap<int32, TArray<TSharedPtr<PCGExClusters::FCell>>> CellsBySeed;
 			for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
 			{
-				if (Cell) { CellsBySeed.FindOrAdd(Cell->CustomIndex).Add(Cell); }
+				if (Cell)
+				{
+					CellsBySeed.FindOrAdd(Cell->CustomIndex).Add(Cell);
+				}
 			}
 
 			ValidCells.Reset();
@@ -494,14 +565,20 @@ namespace PCGExFindContours
 			TSet<int32> ConsumedSeeds;
 			for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
 			{
-				if (Cell) { ConsumedSeeds.Add(Cell->CustomIndex); }
+				if (Cell)
+				{
+					ConsumedSeeds.Add(Cell->CustomIndex);
+				}
 			}
 
 			// Also mark seeds inside failed cells as consumed
 			const int32 NumSeeds = Seeds->Num();
 			for (int32 SeedIdx = 0; SeedIdx < NumSeeds; ++SeedIdx)
 			{
-				if (ConsumedSeeds.Contains(SeedIdx)) { continue; }
+				if (ConsumedSeeds.Contains(SeedIdx))
+				{
+					continue;
+				}
 
 				const FVector2D& SeedPoint = Seeds->GetProjected(SeedIdx);
 
@@ -528,7 +605,10 @@ namespace PCGExFindContours
 
 			for (int32 SeedIdx = 0; SeedIdx < NumSeeds; ++SeedIdx)
 			{
-				if (ConsumedSeeds.Contains(SeedIdx)) { continue; }
+				if (ConsumedSeeds.Contains(SeedIdx))
+				{
+					continue;
+				}
 
 				const FVector& SeedPos = SeedTransforms[SeedIdx].GetLocation();
 				double ClosestEdgeDistSq = MAX_dbl;
@@ -536,7 +616,10 @@ namespace PCGExFindContours
 				Cluster->GetEdgeOctree()->FindNearbyElements(SeedPos, [&](const PCGExOctree::FItem& Item)
 				{
 					const double DistSq = Cluster->GetPointDistToEdgeSquared(Item.Index, SeedPos);
-					if (DistSq < ClosestEdgeDistSq) { ClosestEdgeDistSq = DistSq; }
+					if (DistSq < ClosestEdgeDistSq)
+					{
+						ClosestEdgeDistSq = DistSq;
+					}
 				});
 
 				if (Settings->SeedPicking.WithinDistanceSquared(ClosestEdgeDistSq))
@@ -565,8 +648,12 @@ namespace PCGExFindContours
 		// Output to CellBounds if enabled
 		if (Settings->Artifacts.bOutputCellBounds)
 		{
-			TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-				Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			TSharedPtr<PCGExData::FPointIO> OBBPointIO = Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			if (!OBBPointIO)
+			{
+				return;
+			}
+
 			OBBPointIO->Tags->Reset();
 			OBBPointIO->IOIndex = BatchIndex;
 			PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
@@ -598,7 +685,10 @@ namespace PCGExFindContours
 
 				PCGEX_SCOPE_LOOP(Index)
 				{
-					if (const TSharedPtr<PCGExData::FPointIO> IO = CellsIOIndices_Ref[Index]) { Processor->ProcessSeededCell(ValidCells_Ref[Index], IO); }
+					if (const TSharedPtr<PCGExData::FPointIO> IO = CellsIOIndices_Ref[Index])
+					{
+						Processor->ProcessSeededCell(ValidCells_Ref[Index], IO);
+					}
 					ValidCells_Ref[Index] = nullptr;
 				}
 			};
@@ -609,8 +699,14 @@ namespace PCGExFindContours
 
 	void FProcessor::ExpandSeedToAdjacentCells(int32 SeedIndex, int32 InitialFaceIndex, int32 MaxGrowth)
 	{
-		if (MaxGrowth <= 0) { return; }
-		if (CellAdjacencyMap.IsEmpty()) { return; }
+		if (MaxGrowth <= 0)
+		{
+			return;
+		}
+		if (CellAdjacencyMap.IsEmpty())
+		{
+			return;
+		}
 
 		TSet<int32> Visited;
 		Visited.Add(InitialFaceIndex); // Don't re-visit the initial cell
@@ -662,7 +758,10 @@ namespace PCGExFindContours
 	void FProcessor::Cleanup()
 	{
 		TProcessor<FPCGExFindContoursContext, UPCGExFindContoursSettings>::Cleanup();
-		if (CellsConstraints) { CellsConstraints->Cleanup(); }
+		if (CellsConstraints)
+		{
+			CellsConstraints->Cleanup();
+		}
 	}
 }
 

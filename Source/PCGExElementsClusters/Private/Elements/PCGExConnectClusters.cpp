@@ -3,20 +3,27 @@
 
 #include "Elements/PCGExConnectClusters.h"
 
-#include "Data/PCGExDataTags.h"
-#include "Core/PCGExPointFilter.h"
-#include "Utils/PCGExPointIOMerger.h"
-#include "Math/Geo/PCGExDelaunay.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
+#include "Core/PCGExPointFilter.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Math/Geo/PCGExDelaunay.h"
+#include "Utils/PCGExPointIOMerger.h"
 
 #define LOCTEXT_NAMESPACE "PCGExConnectClusters"
 #define PCGEX_NAMESPACE ConnectClusters
 
-PCGExData::EIOInit UPCGExConnectClustersSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExConnectClustersSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExConnectClustersSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExConnectClustersSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(ConnectClusters)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ConnectClusters)
@@ -36,7 +43,10 @@ TArray<FPCGPinProperties> UPCGExConnectClustersSettings::InputPinProperties() co
 
 bool FPCGExConnectClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ConnectClusters)
 
@@ -62,8 +72,14 @@ bool FPCGExConnectClustersElement::Boot(FPCGExContext* InContext) const
 		*/
 	}
 
-	if (Settings->bFlagVtxConnector) { PCGEX_VALIDATE_NAME(Settings->VtxConnectorFlagName) }
-	if (Settings->bFlagEdgeConnector) { PCGEX_VALIDATE_NAME(Settings->EdgeConnectorFlagName) }
+	if (Settings->bFlagVtxConnector)
+	{
+		PCGEX_VALIDATE_NAME(Settings->VtxConnectorFlagName)
+	}
+	if (Settings->bFlagEdgeConnector)
+	{
+		PCGEX_VALIDATE_NAME(Settings->EdgeConnectorFlagName)
+	}
 
 	return true;
 }
@@ -93,10 +109,19 @@ bool FPCGExConnectClustersElement::AdvanceWork(FPCGExContext* InContext, const U
 				NewBatch->bRequiresWriteStep = true;
 			}))
 		{
-			if (!Settings->bQuietNoBridgeWarning) { PCGE_LOG(Warning, GraphAndLog, FTEXT("No bridge was created.")); }
+			if (!Settings->bQuietNoBridgeWarning)
+			{
+				PCGE_LOG(Warning, GraphAndLog, FTEXT("No bridge was created."));
+			}
 
-			for (const TSharedPtr<PCGExData::FPointIO>& Vtx : Context->MainPoints->Pairs) { Vtx->InitializeOutput(PCGExData::EIOInit::Forward); }
-			for (const TSharedPtr<PCGExData::FPointIO>& Edges : Context->MainEdges->Pairs) { Edges->InitializeOutput(PCGExData::EIOInit::Forward); }
+			for (const TSharedPtr<PCGExData::FPointIO>& Vtx : Context->MainPoints->Pairs)
+			{
+				Vtx->InitializeOutput(PCGExData::EIOInit::Forward);
+			}
+			for (const TSharedPtr<PCGExData::FPointIO>& Edges : Context->MainEdges->Pairs)
+			{
+				Edges->InitializeOutput(PCGExData::EIOInit::Forward);
+			}
 
 			Context->OutputPointsAndEdges();
 			return Context->TryComplete(true);
@@ -125,7 +150,10 @@ namespace PCGExConnectClusters
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExConnectClusters::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		Cluster->GetNodeOctree();
 
@@ -163,7 +191,10 @@ namespace PCGExConnectClusters
 
 	bool FBatch::PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor)
 	{
-		if (!TBatch<FProcessor>::PrepareSingle(InProcessor)) { return false; }
+		if (!TBatch<FProcessor>::PrepareSingle(InProcessor))
+		{
+			return false;
+		}
 		PCGEX_TYPED_PROCESSOR
 		CompoundedEdgesDataFacade->Source->Tags->Append(TypedProcessor->EdgeDataFacade->Source->Tags.ToSharedRef());
 		return true;
@@ -180,7 +211,10 @@ namespace PCGExConnectClusters
 			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Some vtx/edges groups have invalid clusters. Make sure to sanitize the input first."));
 		}
 
-		if (ValidClusters.IsEmpty()) { return; } // Skip work completion entirely
+		if (ValidClusters.IsEmpty())
+		{
+			return;
+		} // Skip work completion entirely
 
 		CompoundedEdgesDataFacade->WriteFastest(TaskManager); // Write base attributes value while finding bridges
 
@@ -189,18 +223,27 @@ namespace PCGExConnectClusters
 
 		if (NumBounds <= 4)
 		{
-			if (SafeMethod == EPCGExBridgeClusterMethod::Delaunay3D) { SafeMethod = EPCGExBridgeClusterMethod::MostEdges; }
+			if (SafeMethod == EPCGExBridgeClusterMethod::Delaunay3D)
+			{
+				SafeMethod = EPCGExBridgeClusterMethod::MostEdges;
+			}
 		}
 		else if (NumBounds <= 3)
 		{
-			if (SafeMethod == EPCGExBridgeClusterMethod::Delaunay2D) { SafeMethod = EPCGExBridgeClusterMethod::MostEdges; }
+			if (SafeMethod == EPCGExBridgeClusterMethod::Delaunay2D)
+			{
+				SafeMethod = EPCGExBridgeClusterMethod::MostEdges;
+			}
 		}
 
 		// First find which cluster are connected
 
 		TArray<FBox> Bounds;
 		PCGExArrayHelpers::InitArray(Bounds, NumBounds);
-		for (int i = 0; i < NumBounds; i++) { Bounds[i] = ValidClusters[i]->Bounds; }
+		for (int i = 0; i < NumBounds; i++)
+		{
+			Bounds[i] = ValidClusters[i]->Bounds;
+		}
 
 		if (SafeMethod == EPCGExBridgeClusterMethod::Delaunay3D)
 		{
@@ -209,10 +252,19 @@ namespace PCGExConnectClusters
 			TArray<FVector> Positions;
 			Positions.SetNum(NumBounds);
 
-			for (int i = 0; i < NumBounds; i++) { Positions[i] = Bounds[i].GetCenter(); }
+			for (int i = 0; i < NumBounds; i++)
+			{
+				Positions[i] = Bounds[i].GetCenter();
+			}
 
-			if (Delaunay->Process<false, false>(Positions)) { Bridges.Append(Delaunay->DelaunayEdges); }
-			else { PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Delaunay 3D failed. Are points coplanar? If so, use Delaunay 2D instead.")); }
+			if (Delaunay->Process<false, false>(Positions))
+			{
+				Bridges.Append(Delaunay->DelaunayEdges);
+			}
+			else
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Delaunay 3D failed. Are points coplanar? If so, use Delaunay 2D instead."));
+			}
 
 			Positions.Empty();
 		}
@@ -223,10 +275,19 @@ namespace PCGExConnectClusters
 			TArray<FVector> Positions;
 			Positions.SetNum(NumBounds);
 
-			for (int i = 0; i < NumBounds; i++) { Positions[i] = Bounds[i].GetCenter(); }
+			for (int i = 0; i < NumBounds; i++)
+			{
+				Positions[i] = Bounds[i].GetCenter();
+			}
 
-			if (Delaunay->Process(Positions, Context->ProjectionDetails)) { Bridges.Append(Delaunay->DelaunayEdges); }
-			else { PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Delaunay 2D failed.")); }
+			if (Delaunay->Process(Positions, Context->ProjectionDetails))
+			{
+				Bridges.Append(Delaunay->DelaunayEdges);
+			}
+			else
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Delaunay 2D failed."));
+			}
 
 			Positions.Empty();
 		}
@@ -241,16 +302,23 @@ namespace PCGExConnectClusters
 
 				for (int j = 0; j < NumBounds; j++)
 				{
-					if (i == j || VisitedEdges.Contains(j)) { continue; }
+					if (i == j || VisitedEdges.Contains(j))
+					{
+						continue;
+					}
 
-					if (const double Dist = FVector::DistSquared(Bounds[i].GetCenter(), Bounds[j].GetCenter()); Dist < Distance)
+					if (const double Dist = FVector::DistSquared(Bounds[i].GetCenter(), Bounds[j].GetCenter());
+						Dist < Distance)
 					{
 						ClosestIndex = j;
 						Distance = Dist;
 					}
 				}
 
-				if (ClosestIndex == -1) { continue; }
+				if (ClosestIndex == -1)
+				{
+					continue;
+				}
 
 				Bridges.Add(PCGEx::H64(i, ClosestIndex));
 			}
@@ -261,7 +329,10 @@ namespace PCGExConnectClusters
 			{
 				for (int j = 0; j < NumBounds; j++)
 				{
-					if (i == j) { continue; }
+					if (i == j)
+					{
+						continue;
+					}
 					Bridges.Add(PCGEx::H64U(i, j));
 				}
 			}
@@ -335,7 +406,8 @@ namespace PCGExConnectClusters
 			FVector NodePos = ClusterA->GetPos(Node);
 			const PCGExClusters::FNode& OtherNode = NodesRefB[ClusterB->FindClosestNode(NodePos)];
 
-			if (const double Dist = FVector::DistSquared(NodePos, ClusterB->GetPos(OtherNode)); Dist < Distance)
+			if (const double Dist = FVector::DistSquared(NodePos, ClusterB->GetPos(OtherNode));
+				Dist < Distance)
 			{
 				IndexA = Node.PointIndex;
 				IndexB = OtherNode.PointIndex;

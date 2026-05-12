@@ -3,10 +3,10 @@
 
 #include "Heuristics/PCGExHeuristicGradient.h"
 
-#include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Data/PCGExData.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Math/PCGExMath.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCreateHeuristicGradient"
@@ -38,14 +38,20 @@ void FPCGExHeuristicGradient::PrepareForCluster(const TSharedPtr<const PCGExClus
 	if (Mode == EPCGExGradientMode::AvoidChange || Mode == EPCGExGradientMode::SeekChange)
 	{
 		GradientRange = MaxGradient - MinGradient;
-		if (GradientRange <= 0) { GradientRange = 1; }
+		if (GradientRange <= 0)
+		{
+			GradientRange = 1;
+		}
 	}
 }
 
 double FPCGExHeuristicGradient::GetGlobalScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal) const
 {
 	// Global score based on gradient toward goal
-	if (CachedValues.IsEmpty()) { return GetScoreInternal(0); }
+	if (CachedValues.IsEmpty())
+	{
+		return GetScoreInternal(0);
+	}
 
 	const double FromValue = CachedValues[From.Index];
 	const double GoalValue = CachedValues[Goal.Index];
@@ -72,7 +78,10 @@ double FPCGExHeuristicGradient::GetGlobalScore(const PCGExClusters::FNode& From,
 
 double FPCGExHeuristicGradient::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
 {
-	if (CachedValues.IsEmpty()) { return GetScoreInternal(0); }
+	if (CachedValues.IsEmpty())
+	{
+		return GetScoreInternal(0);
+	}
 
 	const double FromValue = CachedValues[From.Index];
 	const double ToValue = CachedValues[To.Index];
@@ -109,20 +118,20 @@ double FPCGExHeuristicGradient::GetEdgeScore(const PCGExClusters::FNode& From, c
 	case EPCGExGradientMode::AvoidChange:
 		// Large absolute gradient = bad = high score
 		// Small absolute gradient = good = low score
-		{
-			const double AbsGradient = FMath::Abs(Gradient);
-			Score = FMath::Clamp((AbsGradient - MinGradient) / GradientRange, 0.0, 1.0);
-		}
-		break;
+	{
+		const double AbsGradient = FMath::Abs(Gradient);
+		Score = FMath::Clamp((AbsGradient - MinGradient) / GradientRange, 0.0, 1.0);
+	}
+	break;
 
 	case EPCGExGradientMode::SeekChange:
 		// Large absolute gradient = good = low score
 		// Small absolute gradient = bad = high score
-		{
-			const double AbsGradient = FMath::Abs(Gradient);
-			Score = 1.0 - FMath::Clamp((AbsGradient - MinGradient) / GradientRange, 0.0, 1.0);
-		}
-		break;
+	{
+		const double AbsGradient = FMath::Abs(Gradient);
+		Score = 1.0 - FMath::Clamp((AbsGradient - MinGradient) / GradientRange, 0.0, 1.0);
+	}
+	break;
 	}
 
 	return GetScoreInternal(Score);

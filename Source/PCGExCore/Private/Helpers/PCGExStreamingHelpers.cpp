@@ -4,12 +4,12 @@
 #include "Helpers/PCGExStreamingHelpers.h"
 
 #include "CoreMinimal.h"
-#include "Core/PCGExContext.h"
-#include "Engine/AssetManager.h"
 #include "Async/Async.h"
 #include "Async/ParallelFor.h"
-#include "UObject/SoftObjectPath.h"
+#include "Core/PCGExContext.h"
+#include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "UObject/SoftObjectPath.h"
 
 namespace PCGExHelpers
 {
@@ -22,11 +22,17 @@ namespace PCGExHelpers
 		if (IsInGameThread())
 		{
 			Handle = UAssetManager::GetStreamableManager().RequestSyncLoad(Path);
-			if (InContext) { InContext->TrackAssetsHandle(Handle); }
+			if (InContext)
+			{
+				InContext->TrackAssetsHandle(Handle);
+			}
 		}
 		else
 		{
-			PCGExMT::ExecuteOnMainThreadAndWait([&]() { Handle = LoadBlocking_AnyThread(Path, InContext); });
+			PCGExMT::ExecuteOnMainThreadAndWait([&]()
+			{
+				Handle = LoadBlocking_AnyThread(Path, InContext);
+			});
 		}
 
 		return Handle;
@@ -38,11 +44,17 @@ namespace PCGExHelpers
 		if (IsInGameThread())
 		{
 			Handle = UAssetManager::GetStreamableManager().RequestSyncLoad(Paths->Array());
-			if (InContext) { InContext->TrackAssetsHandle(Handle); }
+			if (InContext)
+			{
+				InContext->TrackAssetsHandle(Handle);
+			}
 		}
 		else
 		{
-			PCGExMT::ExecuteOnMainThreadAndWait([&]() { Handle = LoadBlocking_AnyThread(Paths, InContext); });
+			PCGExMT::ExecuteOnMainThreadAndWait([&]()
+			{
+				Handle = LoadBlocking_AnyThread(Paths, InContext);
+			});
 		}
 		return Handle;
 	}
@@ -79,8 +91,14 @@ namespace PCGExHelpers
 			// Handle already-completed or failed loads (assets were cached or paths invalid).
 			if (!LoadHandle || !LoadHandle->IsActive())
 			{
-				if (!LoadHandle || !LoadHandle->HasLoadCompleted()) { OnLoadEnd(false, LoadHandle); }
-				else { OnLoadEnd(true, LoadHandle); }
+				if (!LoadHandle || !LoadHandle->HasLoadCompleted())
+				{
+					OnLoadEnd(false, LoadHandle);
+				}
+				else
+				{
+					OnLoadEnd(true, LoadHandle);
+				}
 				PCGEX_ASYNC_RELEASE_TOKEN(LoadToken)
 			}
 		});
@@ -88,7 +106,10 @@ namespace PCGExHelpers
 
 	void SafeReleaseHandle(TSharedPtr<FStreamableHandle>& InHandle)
 	{
-		if (!InHandle.IsValid()) { return; }
+		if (!InHandle.IsValid())
+		{
+			return;
+		}
 
 		if (IsInGameThread())
 		{
@@ -99,20 +120,29 @@ namespace PCGExHelpers
 		{
 			AsyncTask(ENamedThreads::GameThread, [Handle = MoveTemp(InHandle)]()
 			{
-				if (Handle.IsValid()) { Handle->ReleaseHandle(); }
+				if (Handle.IsValid())
+				{
+					Handle->ReleaseHandle();
+				}
 			});
 		}
 	}
 
 	void SafeReleaseHandles(TArray<TSharedPtr<FStreamableHandle>>& InHandles)
 	{
-		if (InHandles.IsEmpty()) { return; }
+		if (InHandles.IsEmpty())
+		{
+			return;
+		}
 
 		if (IsInGameThread())
 		{
 			for (TSharedPtr<FStreamableHandle>& Handle : InHandles)
 			{
-				if (Handle.IsValid()) { Handle->ReleaseHandle(); }
+				if (Handle.IsValid())
+				{
+					Handle->ReleaseHandle();
+				}
 			}
 			InHandles.Empty();
 		}
@@ -122,7 +152,10 @@ namespace PCGExHelpers
 			{
 				for (const TSharedPtr<FStreamableHandle>& Handle : Handles)
 				{
-					if (Handle.IsValid()) { Handle->ReleaseHandle(); }
+					if (Handle.IsValid())
+					{
+						Handle->ReleaseHandle();
+					}
 				}
 			});
 		}

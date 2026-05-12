@@ -10,14 +10,20 @@ namespace PCGExMT
 #pragma region FScope
 
 	FScope::FScope(const int32 InStart, const int32 InCount, const int32 InLoopIndex)
-		: Start(InStart), Count(InCount), End(InStart + InCount), LoopIndex(InLoopIndex)
+		: Start(InStart)
+		  , Count(InCount)
+		  , End(InStart + InCount)
+		  , LoopIndex(InLoopIndex)
 	{
 	}
 
 	void FScope::GetIndices(TArray<int32>& OutIndices) const
 	{
 		OutIndices.SetNumUninitialized(Count);
-		for (int i = 0; i < Count; i++) { OutIndices[i] = Start + i; }
+		for (int i = 0; i < Count; i++)
+		{
+			OutIndices[i] = Start + i;
+		}
 	}
 
 #pragma endregion

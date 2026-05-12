@@ -7,19 +7,22 @@
 
 #include "PCGExSettingsCacheBody.h"
 #include "Core/PCGExContext.h"
-#include "Data/PCGExData.h"
 #include "Data/PCGBasePointData.h"
+#include "Data/PCGExData.h"
 #include "Types/PCGExTypeTraits.h"
 
 namespace PCGExData
 {
 	FReadableBufferConfig::FReadableBufferConfig(const FReadableBufferConfig& Other)
-		: Mode(Other.Mode), Selector(Other.Selector), Identity(Other.Identity)
+		: Mode(Other.Mode)
+		  , Selector(Other.Selector)
+		  , Identity(Other.Identity)
 	{
 	}
 
 	FReadableBufferConfig::FReadableBufferConfig(const FAttributeIdentity& InIdentity, EBufferPreloadType InMode)
-		: Mode(InMode), Identity(InIdentity)
+		: Mode(InMode)
+		  , Identity(InIdentity)
 	{
 	}
 
@@ -50,7 +53,10 @@ namespace PCGExData
 		// -1 = failed (permanently skip), 0 = uninitialized, 1 = ready.
 		// The weak pointer allows the facade to own the buffer lifetime while
 		// we cache a reference for repeated scoped fetches across parallel chunks.
-		if (Status == -1) { return; }
+		if (Status == -1)
+		{
+			return;
+		}
 
 		TSharedPtr<IBuffer> Reader = nullptr;
 
@@ -144,9 +150,18 @@ namespace PCGExData
 
 	bool FFacadePreloader::Validate(FPCGExContext* InContext) const
 	{
-		if (BufferConfigs.IsEmpty()) { return true; }
+		if (BufferConfigs.IsEmpty())
+		{
+			return true;
+		}
 		const TSharedPtr<FFacade> InDataFacade = InternalDataFacadePtr.Pin();
-		for (const FReadableBufferConfig& Config : BufferConfigs) { if (!Config.Validate(InContext, InDataFacade)) { return false; } }
+		for (const FReadableBufferConfig& Config : BufferConfigs)
+		{
+			if (!Config.Validate(InContext, InDataFacade))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -154,7 +169,10 @@ namespace PCGExData
 	{
 		for (const FReadableBufferConfig& ExistingConfig : BufferConfigs)
 		{
-			if (ExistingConfig.Identity == InIdentity) { return; }
+			if (ExistingConfig.Identity == InIdentity)
+			{
+				return;
+			}
 		}
 
 		BufferConfigs.Emplace(InIdentity.Name, InIdentity.GetType());
@@ -163,7 +181,10 @@ namespace PCGExData
 	void FFacadePreloader::TryRegister(FPCGExContext* InContext, const FPCGAttributePropertyInputSelector& InSelector)
 	{
 		TSharedPtr<FFacade> SourceFacade = GetDataFacade();
-		if (!SourceFacade) { return; }
+		if (!SourceFacade)
+		{
+			return;
+		}
 
 		FAttributeIdentity Identity;
 		if (FAttributeIdentity::Get(SourceFacade->GetIn(), InSelector, Identity))
@@ -210,7 +231,10 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 
 	void FFacadePreloader::Fetch(const TSharedRef<FFacade>& InFacade, const PCGExMT::FScope& Scope)
 	{
-		for (FReadableBufferConfig& ExistingConfig : BufferConfigs) { ExistingConfig.Fetch(InFacade, Scope); }
+		for (FReadableBufferConfig& ExistingConfig : BufferConfigs)
+		{
+			ExistingConfig.Fetch(InFacade, Scope);
+		}
 	}
 
 	void FFacadePreloader::Read(const TSharedRef<FFacade>& InFacade, const int32 ConfigIndex) const
@@ -223,7 +247,10 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 		ContextHandle = TaskManager->GetContext()->GetOrCreateHandle();
 
 		TSharedPtr<FFacade> SourceFacade = GetDataFacade();
-		if (!SourceFacade) { return false; }
+		if (!SourceFacade)
+		{
+			return false;
+		}
 
 		if (IsEmpty())
 		{
@@ -280,13 +307,22 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 
 	void FFacadePreloader::OnLoadingEnd()
 	{
-		if (bLoaded) { return; }
+		if (bLoaded)
+		{
+			return;
+		}
 
 		PCGEX_SHARED_CONTEXT_VOID(ContextHandle)
 		bLoaded = true;
 
-		if (TSharedPtr<FFacade> InternalFacade = GetDataFacade()) { InternalFacade->MarkCurrentBuffersReadAsComplete(); }
-		if (OnCompleteCallback) { OnCompleteCallback(); }
+		if (TSharedPtr<FFacade> InternalFacade = GetDataFacade())
+		{
+			InternalFacade->MarkCurrentBuffersReadAsComplete();
+		}
+		if (OnCompleteCallback)
+		{
+			OnCompleteCallback();
+		}
 	}
 
 	FMultiFacadePreloader::FMultiFacadePreloader(const TArray<TSharedPtr<FFacade>>& InDataFacades)
@@ -311,12 +347,21 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 
 	void FMultiFacadePreloader::ForEach(FPreloaderItCallback&& It)
 	{
-		for (const TSharedPtr<FFacadePreloader>& Preloader : Preloaders) { It(*Preloader.Get()); }
+		for (const TSharedPtr<FFacadePreloader>& Preloader : Preloaders)
+		{
+			It(*Preloader.Get());
+		}
 	}
 
 	bool FMultiFacadePreloader::Validate(FPCGExContext* InContext)
 	{
-		for (const TSharedPtr<FFacadePreloader>& Preloader : Preloaders) { if (!Preloader->Validate(InContext)) { return false; } }
+		for (const TSharedPtr<FFacadePreloader>& Preloader : Preloaders)
+		{
+			if (!Preloader->Validate(InContext))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -333,19 +378,28 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 		}
 		{
 			PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager)
-			for (const TSharedPtr<FFacadePreloader>& Preloader : Preloaders) { Preloader->StartLoading(TaskManager, InParentHandle); }
+			for (const TSharedPtr<FFacadePreloader>& Preloader : Preloaders)
+			{
+				Preloader->StartLoading(TaskManager, InParentHandle);
+			}
 		}
 	}
 
 	void FMultiFacadePreloader::OnSubloadComplete()
 	{
-		if (bLoaded || NumCompleted != Preloaders.Num()) { return; }
+		if (bLoaded || NumCompleted != Preloaders.Num())
+		{
+			return;
+		}
 		OnLoadingEnd();
 	}
 
 	void FMultiFacadePreloader::OnLoadingEnd()
 	{
-		if (bLoaded) { return; }
+		if (bLoaded)
+		{
+			return;
+		}
 		bLoaded = true;
 		if (OnCompleteCallback)
 		{

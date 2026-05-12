@@ -66,9 +66,12 @@ int32 SPCGExAdjacencyPreview::ComputeThreshold(const int32 TotalNeighbors) const
 
 	switch (RoundMode)
 	{
-	case EPCGExRelativeThresholdRoundingMode::Floor: return FMath::FloorToInt32(Raw);
-	case EPCGExRelativeThresholdRoundingMode::Ceil: return FMath::CeilToInt32(Raw);
-	default: return FMath::RoundToInt32(Raw);
+	case EPCGExRelativeThresholdRoundingMode::Floor:
+		return FMath::FloorToInt32(Raw);
+	case EPCGExRelativeThresholdRoundingMode::Ceil:
+		return FMath::CeilToInt32(Raw);
+	default:
+		return FMath::RoundToInt32(Raw);
 	}
 }
 
@@ -154,7 +157,10 @@ void SPCGExAdjacencyPreview::DrawStarPanel(
 	const int32 GreenCount,
 	const bool bOverallPass) const
 {
-	if (TotalBranches <= 0) { return; }
+	if (TotalBranches <= 0)
+	{
+		return;
+	}
 
 	const double AngleStep = UE_TWO_PI / TotalBranches;
 	// Start from top (-PI/2), green branches first
@@ -165,8 +171,8 @@ void SPCGExAdjacencyPreview::DrawStarPanel(
 		const double Angle = StartAngle + AngleStep * i;
 		const bool bIsGreen = i < GreenCount;
 		const FLinearColor& BranchColor = bIsGreen
-			                                  ? PCGExAdjacencyPreviewConstants::PassBranchColor
-			                                  : PCGExAdjacencyPreviewConstants::FailBranchColor;
+			? PCGExAdjacencyPreviewConstants::PassBranchColor
+			: PCGExAdjacencyPreviewConstants::FailBranchColor;
 
 		const FVector2D EndPoint = Center + FVector2D(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius);
 
@@ -202,7 +208,10 @@ void SPCGExAdjacencyPreview::DrawAggregatedPanel(
 	const EPCGExAdjacencyGatherMode GatherMode) const
 {
 	const int32 N = Values.Num();
-	if (N <= 0) { return; }
+	if (N <= 0)
+	{
+		return;
+	}
 
 	const double AngleStep = UE_TWO_PI / N;
 	constexpr double StartAngle = -UE_HALF_PI;
@@ -214,8 +223,8 @@ void SPCGExAdjacencyPreview::DrawAggregatedPanel(
 		const double BranchRadius = MinRadius + Values[i] * (MaxRadius - MinRadius);
 		const bool bHighlight = (HighlightIndex < 0) || (i == HighlightIndex);
 		const FLinearColor& BranchColor = bHighlight
-			                                  ? PCGExAdjacencyPreviewConstants::AggregatedHighlightColor
-			                                  : PCGExAdjacencyPreviewConstants::AggregatedBranchColor;
+			? PCGExAdjacencyPreviewConstants::AggregatedHighlightColor
+			: PCGExAdjacencyPreviewConstants::AggregatedBranchColor;
 
 		const FVector2D EndPoint = Center + FVector2D(FMath::Cos(Angle) * BranchRadius, FMath::Sin(Angle) * BranchRadius);
 
@@ -289,8 +298,8 @@ int32 SPCGExAdjacencyPreview::PaintSomeMode(
 
 		// Draw panel background
 		const FLinearColor& BgColor = bPass
-			                              ? PCGExAdjacencyPreviewConstants::PanelPassBg
-			                              : PCGExAdjacencyPreviewConstants::PanelFailBg;
+			? PCGExAdjacencyPreviewConstants::PanelPassBg
+			: PCGExAdjacencyPreviewConstants::PanelFailBg;
 		DrawFilledRect(OutDrawElements, LayerId, AllottedGeometry,
 		               FVector2D(PanelX, 0), FVector2D(PanelWidth, LocalSize.Y), BgColor);
 
@@ -310,8 +319,8 @@ int32 SPCGExAdjacencyPreview::PaintSomeMode(
 		// Pass/fail label
 		const FString ResultStr = bPass ? TEXT("PASS") : TEXT("FAIL");
 		const FLinearColor ResultColor = bPass
-			                                 ? PCGExAdjacencyPreviewConstants::PassBranchColor
-			                                 : PCGExAdjacencyPreviewConstants::FailBranchColor;
+			? PCGExAdjacencyPreviewConstants::PassBranchColor
+			: PCGExAdjacencyPreviewConstants::FailBranchColor;
 		const FVector2D ResultPos(PanelCenter.X - 12.0, StarCenterY + StarRadius + 18.0);
 		FSlateDrawElement::MakeText(
 			OutDrawElements, LayerId + 4,
@@ -358,8 +367,8 @@ int32 SPCGExAdjacencyPreview::PaintAllIndividualMode(
 
 		// Panel background
 		const FLinearColor& BgColor = bPass
-			                              ? PCGExAdjacencyPreviewConstants::PanelPassBg
-			                              : PCGExAdjacencyPreviewConstants::PanelFailBg;
+			? PCGExAdjacencyPreviewConstants::PanelPassBg
+			: PCGExAdjacencyPreviewConstants::PanelFailBg;
 		DrawFilledRect(OutDrawElements, LayerId, AllottedGeometry,
 		               FVector2D(PanelX, 0), FVector2D(PanelWidth, LocalSize.Y), BgColor);
 
@@ -379,8 +388,8 @@ int32 SPCGExAdjacencyPreview::PaintAllIndividualMode(
 		// Pass/fail
 		const FString ResultStr = bPass ? TEXT("PASS") : TEXT("FAIL");
 		const FLinearColor ResultColor = bPass
-			                                 ? PCGExAdjacencyPreviewConstants::PassBranchColor
-			                                 : PCGExAdjacencyPreviewConstants::FailBranchColor;
+			? PCGExAdjacencyPreviewConstants::PassBranchColor
+			: PCGExAdjacencyPreviewConstants::FailBranchColor;
 		const FVector2D ResultPos(PanelCenter.X - 12.0, StarCenterY + StarRadius + 18.0);
 		FSlateDrawElement::MakeText(
 			OutDrawElements, LayerId + 4,
@@ -438,56 +447,63 @@ int32 SPCGExAdjacencyPreview::PaintAllAggregatedMode(
 		switch (GatherMode)
 		{
 		case EPCGExAdjacencyGatherMode::Average:
+		{
+			double Sum = 0.0;
+			for (const double V : Values)
 			{
-				double Sum = 0.0;
-				for (const double V : Values) { Sum += V; }
-				Aggregate = Sum / N;
-				AggLabel = FString::Printf(TEXT("avg:%.2f"), Aggregate);
-				HighlightIndex = -1; // All highlighted
-				break;
+				Sum += V;
 			}
+			Aggregate = Sum / N;
+			AggLabel = FString::Printf(TEXT("avg:%.2f"), Aggregate);
+			HighlightIndex = -1; // All highlighted
+			break;
+		}
 		case EPCGExAdjacencyGatherMode::Min:
+		{
+			double MinVal = Values[0];
+			HighlightIndex = 0;
+			for (int32 i = 1; i < N; ++i)
 			{
-				double MinVal = Values[0];
-				HighlightIndex = 0;
-				for (int32 i = 1; i < N; ++i)
+				if (Values[i] < MinVal)
 				{
-					if (Values[i] < MinVal)
-					{
-						MinVal = Values[i];
-						HighlightIndex = i;
-					}
+					MinVal = Values[i];
+					HighlightIndex = i;
 				}
-				Aggregate = MinVal;
-				AggLabel = FString::Printf(TEXT("min:%.2f"), Aggregate);
-				break;
 			}
+			Aggregate = MinVal;
+			AggLabel = FString::Printf(TEXT("min:%.2f"), Aggregate);
+			break;
+		}
 		case EPCGExAdjacencyGatherMode::Max:
+		{
+			double MaxVal = Values[0];
+			HighlightIndex = 0;
+			for (int32 i = 1; i < N; ++i)
 			{
-				double MaxVal = Values[0];
-				HighlightIndex = 0;
-				for (int32 i = 1; i < N; ++i)
+				if (Values[i] > MaxVal)
 				{
-					if (Values[i] > MaxVal)
-					{
-						MaxVal = Values[i];
-						HighlightIndex = i;
-					}
+					MaxVal = Values[i];
+					HighlightIndex = i;
 				}
-				Aggregate = MaxVal;
-				AggLabel = FString::Printf(TEXT("max:%.2f"), Aggregate);
-				break;
 			}
+			Aggregate = MaxVal;
+			AggLabel = FString::Printf(TEXT("max:%.2f"), Aggregate);
+			break;
+		}
 		case EPCGExAdjacencyGatherMode::Sum:
+		{
+			double Sum = 0.0;
+			for (const double V : Values)
 			{
-				double Sum = 0.0;
-				for (const double V : Values) { Sum += V; }
-				Aggregate = Sum;
-				AggLabel = FString::Printf(TEXT("sum:%.1f"), Aggregate);
-				HighlightIndex = -1; // All highlighted
-				break;
+				Sum += V;
 			}
-		default: break;
+			Aggregate = Sum;
+			AggLabel = FString::Printf(TEXT("sum:%.1f"), Aggregate);
+			HighlightIndex = -1; // All highlighted
+			break;
+		}
+		default:
+			break;
 		}
 
 		// Draw star
@@ -508,15 +524,20 @@ int32 SPCGExAdjacencyPreview::PaintAllAggregatedMode(
 		FString ModeStr;
 		switch (GatherMode)
 		{
-		case EPCGExAdjacencyGatherMode::Average: ModeStr = TEXT("All : Average");
+		case EPCGExAdjacencyGatherMode::Average:
+			ModeStr = TEXT("All : Average");
 			break;
-		case EPCGExAdjacencyGatherMode::Min: ModeStr = TEXT("All : Min");
+		case EPCGExAdjacencyGatherMode::Min:
+			ModeStr = TEXT("All : Min");
 			break;
-		case EPCGExAdjacencyGatherMode::Max: ModeStr = TEXT("All : Max");
+		case EPCGExAdjacencyGatherMode::Max:
+			ModeStr = TEXT("All : Max");
 			break;
-		case EPCGExAdjacencyGatherMode::Sum: ModeStr = TEXT("All : Sum");
+		case EPCGExAdjacencyGatherMode::Sum:
+			ModeStr = TEXT("All : Sum");
 			break;
-		default: ModeStr = TEXT("All : Aggregated");
+		default:
+			ModeStr = TEXT("All : Aggregated");
 			break;
 		}
 

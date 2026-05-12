@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExRegex.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "UObject/Object.h"
+#include "Utils/PCGExRegex.h"
 
 #include "Core/PCGExPointFilter.h"
 
@@ -66,7 +66,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FStringRegexFilter(const TObjectPtr<const UPCGExStringRegexFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 

@@ -17,13 +17,19 @@
 
 PCGEX_INITIALIZE_ELEMENT(PathReduce)
 
-PCGExData::EIOInit UPCGExPathReduceSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExPathReduceSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(PathReduce)
 
 bool FPCGExPathReduceElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathReduce)
 
@@ -69,7 +75,10 @@ namespace PCGExPathReduce
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPathReduce::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -80,7 +89,10 @@ namespace PCGExPathReduce
 		Mask.Init(true, PointDataFacade->GetNum());
 
 		SmoothingGetter = Settings->Smoothing.GetValueSetting();
-		if (!SmoothingGetter->Init(PointDataFacade, false)) { return false; }
+		if (!SmoothingGetter->Init(PointDataFacade, false))
+		{
+			return false;
+		}
 
 		const bool bPreserve = Settings->Mode == EPCGExPathReduceFilterMode::Preserve;
 
@@ -91,7 +103,10 @@ namespace PCGExPathReduce
 
 		if (bPreserve)
 		{
-			for (int8& Pass : PointFilterCache) { Pass = !Pass; }
+			for (int8& Pass : PointFilterCache)
+			{
+				Pass = !Pass;
+			}
 
 			if (SmoothingGetter->IsConstant())
 			{
@@ -102,7 +117,7 @@ namespace PCGExPathReduce
 					bClosedLoop,
 					SmoothingGetter->Read(0),
 					Settings->SmoothingMode
-				);
+					);
 			}
 			else
 			{
@@ -117,7 +132,7 @@ namespace PCGExPathReduce
 					Settings->ErrorTolerance,
 					bClosedLoop,
 					Settings->SmoothingMode
-				);
+					);
 			}
 		}
 		else
@@ -130,7 +145,7 @@ namespace PCGExPathReduce
 					bClosedLoop,
 					SmoothingGetter->Read(0),
 					Settings->SmoothingMode
-				);
+					);
 			}
 			else
 			{
@@ -144,7 +159,7 @@ namespace PCGExPathReduce
 					SmoothingValues,
 					bClosedLoop,
 					Settings->SmoothingMode
-				);
+					);
 			}
 		}
 
@@ -163,7 +178,10 @@ namespace PCGExPathReduce
 		{
 			if (!PointFilterCache[i])
 			{
-				if (!bPreserve) { Mask[i] = false; }
+				if (!bPreserve)
+				{
+					Mask[i] = false;
+				}
 				continue;
 			}
 

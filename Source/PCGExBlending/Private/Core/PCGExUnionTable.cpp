@@ -16,7 +16,10 @@ namespace PCGExData
 	{
 		for (const FElement& E : Get(EntryIndex))
 		{
-			if (E.IO == IO) { return true; }
+			if (E.IO == IO)
+			{
+				return true;
+			}
 		}
 		return false;
 	}
@@ -24,7 +27,10 @@ namespace PCGExData
 	TSet<int32> FUnionTable::GetIOSet(const int32 EntryIndex) const
 	{
 		TSet<int32> Result;
-		for (const FElement& E : Get(EntryIndex)) { Result.Add(E.IO); }
+		for (const FElement& E : Get(EntryIndex))
+		{
+			Result.Add(E.IO);
+		}
 		return Result;
 	}
 
@@ -32,7 +38,10 @@ namespace PCGExData
 	{
 		for (const FElement& E : Get(EntryIndex))
 		{
-			if (InIndices.Contains(E.IO)) { return true; }
+			if (InIndices.Contains(E.IO))
+			{
+				return true;
+			}
 		}
 		return false;
 	}

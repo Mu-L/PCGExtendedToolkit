@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "Math/PCGExMath.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExStringSelfCompareFilter.generated.h"
 
@@ -86,7 +86,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FStringSelfCompareFilter(const TObjectPtr<const UPCGExStringSelfCompareFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

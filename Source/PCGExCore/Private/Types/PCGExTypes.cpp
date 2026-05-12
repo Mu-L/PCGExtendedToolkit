@@ -229,7 +229,6 @@ namespace PCGExTypes
 				break;
 			case EPCGMetadataTypes::Text: new(ActiveStorage) FText();
 				break;
-			default: break;
 			}
 			bConstructed = true;
 		}
@@ -261,7 +260,8 @@ namespace PCGExTypes
 		switch (InType)
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
-		default: return 0;
+		default:
+			return 0;
 		}
 #undef PCGEX_TPL
 	}

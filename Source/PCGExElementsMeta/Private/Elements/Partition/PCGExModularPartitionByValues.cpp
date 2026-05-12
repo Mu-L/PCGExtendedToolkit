@@ -22,7 +22,10 @@ UPCGExFactoryData* UPCGExPartitionRuleProviderSettings::CreateFactory(FPCGExCont
 }
 
 #if WITH_EDITOR
-FString UPCGExPartitionRuleProviderSettings::GetDisplayName() const { return Config.GetDisplayName(); }
+FString UPCGExPartitionRuleProviderSettings::GetDisplayName() const
+{
+	return Config.GetDisplayName();
+}
 #endif
 
 TArray<FPCGPinProperties> UPCGExModularPartitionByValuesSettings::InputPinProperties() const
@@ -40,7 +43,10 @@ bool UPCGExModularPartitionByValuesSettings::GetPartitionRules(FPCGExContext* In
 		return false;
 	}
 
-	for (const UPCGExPartitionRule* Factory : Factories) { OutRules.Add(Factory->Config); }
+	for (const UPCGExPartitionRule* Factory : Factories)
+	{
+		OutRules.Add(Factory->Config);
+	}
 
 	return true;
 }

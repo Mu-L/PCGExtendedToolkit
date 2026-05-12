@@ -4,10 +4,10 @@
 #include "Core/PCGExPointFilter.h"
 
 #include "PCGExFiltersSubSystem.h"
+#include "Async/ParallelFor.h"
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
-#include "Async/ParallelFor.h"
 
 PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoFilter, UPCGExFilterFactoryData)
 PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoFilterPoint, UPCGExPointFilterFactoryData)
@@ -49,7 +49,10 @@ namespace PCGExPointFilter
 
 	void IFilter::PostInit()
 	{
-		if (!bCacheResults) { return; }
+		if (!bCacheResults)
+		{
+			return;
+		}
 		const int32 NumResults = PointDataFacade->Source->GetNum();
 		Results.Init(false, NumResults);
 	}
@@ -58,34 +61,71 @@ namespace PCGExPointFilter
 
 	bool IFilter::Test(const PCGExData::FProxyPoint& Point) const PCGEX_NOT_IMPLEMENTED_RET(FFilter::Test(const PCGExData::FProxyPoint& Point), false)
 
-	bool IFilter::Test(const PCGExClusters::FNode& Node) const { return Test(Node.PointIndex); }
-	bool IFilter::Test(const PCGExGraphs::FEdge& Edge) const { return Test(Edge.PointIndex); }
+	bool IFilter::Test(const PCGExClusters::FNode& Node) const
+	{
+		return Test(Node.PointIndex);
+	}
 
-	bool IFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const { return bCollectionTestResult; }
+	bool IFilter::Test(const PCGExGraphs::FEdge& Edge) const
+	{
+		return Test(Edge.PointIndex);
+	}
+
+	bool IFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
+	{
+		return bCollectionTestResult;
+	}
 
 	bool ISimpleFilter::Test(const int32 Index) const PCGEX_NOT_IMPLEMENTED_RET(FSimpleFilter::Test(const PCGExClusters::FNode& Node), false)
 
 	bool ISimpleFilter::Test(const PCGExData::FProxyPoint& Point) const PCGEX_NOT_IMPLEMENTED_RET(FSimpleFilter::TestRoamingPoint(const PCGExClusters::PCGExData::FProxyPoint& Point), false)
 
-	bool ISimpleFilter::Test(const PCGExClusters::FNode& Node) const { return Test(Node.PointIndex); }
-	bool ISimpleFilter::Test(const PCGExGraphs::FEdge& Edge) const { return Test(Edge.PointIndex); }
+	bool ISimpleFilter::Test(const PCGExClusters::FNode& Node) const
+	{
+		return Test(Node.PointIndex);
+	}
 
-	bool ISimpleFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const { return bCollectionTestResult; }
+	bool ISimpleFilter::Test(const PCGExGraphs::FEdge& Edge) const
+	{
+		return Test(Edge.PointIndex);
+	}
+
+	bool ISimpleFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
+	{
+		return bCollectionTestResult;
+	}
 
 	// Eagerly evaluates the collection-level test during Init and caches the result.
 	// All subsequent per-point Test() calls return this cached boolean.
 	bool ICollectionFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 	{
-		if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InPointDataFacade))
+		{
+			return false;
+		}
 		bCollectionTestResult = Test(InPointDataFacade->Source, nullptr);
 		return true;
 	}
 
-	bool ICollectionFilter::Test(const int32 Index) const { return bCollectionTestResult; }
-	bool ICollectionFilter::Test(const PCGExData::FProxyPoint& Point) const { return bCollectionTestResult; }
+	bool ICollectionFilter::Test(const int32 Index) const
+	{
+		return bCollectionTestResult;
+	}
 
-	bool ICollectionFilter::Test(const PCGExClusters::FNode& Node) const { return bCollectionTestResult; }
-	bool ICollectionFilter::Test(const PCGExGraphs::FEdge& Edge) const { return bCollectionTestResult; }
+	bool ICollectionFilter::Test(const PCGExData::FProxyPoint& Point) const
+	{
+		return bCollectionTestResult;
+	}
+
+	bool ICollectionFilter::Test(const PCGExClusters::FNode& Node) const
+	{
+		return bCollectionTestResult;
+	}
+
+	bool ICollectionFilter::Test(const PCGExGraphs::FEdge& Edge) const
+	{
+		return bCollectionTestResult;
+	}
 
 	bool ICollectionFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const PCGEX_NOT_IMPLEMENTED_RET(FCollectionFilter::Test(FPCGExContext* InContext, const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection), false)
 
@@ -172,8 +212,14 @@ namespace PCGExPointFilter
 
 			InitFilter(InContext, NewFilter);
 
-			if (ManagedFilters.IsEmpty()) { ManagedFilters.Add(NewFilter); }
-			else { ManagedFilters.Insert(NewFilter, 0); }
+			if (ManagedFilters.IsEmpty())
+			{
+				ManagedFilters.Add(NewFilter);
+			}
+			else
+			{
+				ManagedFilters.Insert(NewFilter, 0);
+			}
 		}
 
 		return PostInit(InContext);
@@ -181,31 +227,61 @@ namespace PCGExPointFilter
 
 	bool FManager::Test(const int32 Index)
 	{
-		for (const IFilter* Filter : Stack) { if (!Filter->Test(Index)) { return false; } }
+		for (const IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Index))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
 	bool FManager::Test(const PCGExData::FProxyPoint& Point)
 	{
-		for (const IFilter* Filter : Stack) { if (!Filter->Test(Point)) { return false; } }
+		for (const IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Point))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
 	bool FManager::Test(const PCGExClusters::FNode& Node)
 	{
-		for (const IFilter* Filter : Stack) { if (!Filter->Test(Node)) { return false; } }
+		for (const IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Node))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
 	bool FManager::Test(const PCGExGraphs::FEdge& Edge)
 	{
-		for (const IFilter* Filter : Stack) { if (!Filter->Test(Edge)) { return false; } }
+		for (const IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Edge))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
 	bool FManager::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection)
 	{
-		for (const IFilter* Filter : Stack) { if (!Filter->Test(IO, ParentCollection)) { return false; } }
+		for (const IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(IO, ParentCollection))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -221,7 +297,10 @@ namespace PCGExPointFilter
 			{
 				const int32 Index = Scope.Start + i;
 				PCGEX_TEST_STACK(Index, Index)
-				if (bResult) { FPlatformAtomics::InterlockedIncrement(&NumPass); }
+				if (bResult)
+				{
+					FPlatformAtomics::InterlockedIncrement(&NumPass);
+				}
 			});
 		}
 		else
@@ -246,7 +325,10 @@ namespace PCGExPointFilter
 			{
 				const int32 Index = Scope.Start + i;
 				PCGEX_TEST_STACK(Index, Index)
-				if (bResult) { FPlatformAtomics::InterlockedIncrement(&NumPass); }
+				if (bResult)
+				{
+					FPlatformAtomics::InterlockedIncrement(&NumPass);
+				}
 			});
 		}
 		else
@@ -274,7 +356,10 @@ namespace PCGExPointFilter
 			{
 				const PCGExClusters::FNode& Node = Items[i];
 				PCGEX_TEST_STACK(Node, Node.PointIndex)
-				if (bResult) { FPlatformAtomics::InterlockedIncrement(&NumPass); }
+				if (bResult)
+				{
+					FPlatformAtomics::InterlockedIncrement(&NumPass);
+				}
 			});
 		}
 		else
@@ -301,7 +386,10 @@ namespace PCGExPointFilter
 			{
 				const PCGExClusters::FNode& Node = Items[i];
 				PCGEX_TEST_STACK(Node, Node.PointIndex)
-				if (bResult) { FPlatformAtomics::InterlockedIncrement(&NumPass); }
+				if (bResult)
+				{
+					FPlatformAtomics::InterlockedIncrement(&NumPass);
+				}
 			});
 		}
 		else
@@ -327,7 +415,10 @@ namespace PCGExPointFilter
 			{
 				const PCGExGraphs::FEdge& Edge = Items[i];
 				PCGEX_TEST_STACK(Edge, i)
-				if (bResult) { FPlatformAtomics::InterlockedIncrement(&NumPass); }
+				if (bResult)
+				{
+					FPlatformAtomics::InterlockedIncrement(&NumPass);
+				}
 			});
 		}
 		else
@@ -365,10 +456,16 @@ namespace PCGExPointFilter
 	{
 		bValid = !ManagedFilters.IsEmpty();
 
-		if (!bValid) { return false; }
+		if (!bValid)
+		{
+			return false;
+		}
 
 		// Sort mappings so higher priorities come last, as they have to potential to override values.
-		ManagedFilters.Sort([](const TSharedPtr<IFilter>& A, const TSharedPtr<IFilter>& B) { return A->Factory->Priority < B->Factory->Priority; });
+		ManagedFilters.Sort([](const TSharedPtr<IFilter>& A, const TSharedPtr<IFilter>& B)
+		{
+			return A->Factory->Priority < B->Factory->Priority;
+		});
 
 		// Update index & post-init
 		Stack.Reserve(ManagedFilters.Num());
@@ -380,7 +477,10 @@ namespace PCGExPointFilter
 			Stack.Add(Filter.Get());
 		}
 
-		if (bCacheResults) { InitCache(); }
+		if (bCacheResults)
+		{
+			InitCache();
+		}
 
 		return true;
 	}
@@ -409,7 +509,10 @@ namespace PCGExPointFilter
 	// Uses an in-place compaction pattern (WriteIndex) to avoid allocations.
 	void PruneForDirectEvaluation(FPCGExContext* InContext, TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>& InFactories)
 	{
-		if (InFactories.IsEmpty()) { return; }
+		if (InFactories.IsEmpty())
+		{
+			return;
+		}
 
 		TArray<FString> UnsupportedFilters;
 		UnsupportedFilters.Reserve(InFactories.Num());
@@ -417,8 +520,14 @@ namespace PCGExPointFilter
 		int32 WriteIndex = 0;
 		for (int32 i = 0; i < InFactories.Num(); i++)
 		{
-			if (InFactories[i]->SupportsProxyEvaluation()) { InFactories[WriteIndex++] = InFactories[i]; }
-			else { UnsupportedFilters.AddUnique(InFactories[i]->GetName()); }
+			if (InFactories[i]->SupportsProxyEvaluation())
+			{
+				InFactories[WriteIndex++] = InFactories[i];
+			}
+			else
+			{
+				UnsupportedFilters.AddUnique(InFactories[i]->GetName());
+			}
 		}
 
 		InFactories.SetNum(WriteIndex);

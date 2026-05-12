@@ -15,13 +15,19 @@
 
 PCGEX_INITIALIZE_ELEMENT(FlatProjection)
 
-PCGExData::EIOInit UPCGExFlatProjectionSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExFlatProjectionSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(FlatProjection)
 
 bool FPCGExFlatProjectionElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FlatProjection)
 
@@ -96,7 +102,10 @@ namespace PCGExFlatProjection
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
@@ -142,13 +151,22 @@ namespace PCGExFlatProjection
 				FVector OutScale = CurrentTr.GetScale3D();
 
 				const FVector InTrRot = RestoreTr.GetRotation().Euler();
-				for (const int32 C : Context->TrRotComponents) { OutRotation[C] = InTrRot[C]; }
+				for (const int32 C : Context->TrRotComponents)
+				{
+					OutRotation[C] = InTrRot[C];
+				}
 
 				FVector InTrPos = RestoreTr.GetLocation();
-				for (const int32 C : Context->TrPosComponents) { OutPosition[C] = InTrPos[C]; }
+				for (const int32 C : Context->TrPosComponents)
+				{
+					OutPosition[C] = InTrPos[C];
+				}
 
 				FVector InTrSca = RestoreTr.GetScale3D();
-				for (const int32 C : Context->TrScaComponents) { OutScale[C] = InTrSca[C]; }
+				for (const int32 C : Context->TrScaComponents)
+				{
+					OutScale[C] = InTrSca[C];
+				}
 
 				OutTransforms[Index] = FTransform(FQuat::MakeFromEuler(OutRotation), OutPosition, OutScale);
 			}
@@ -157,16 +175,25 @@ namespace PCGExFlatProjection
 		{
 			if (bWriteAttribute)
 			{
-				PCGEX_SCOPE_LOOP(Index) { TransformWriter->SetValue(Index, OutTransforms[Index]); }
+				PCGEX_SCOPE_LOOP(Index)
+				{
+					TransformWriter->SetValue(Index, OutTransforms[Index]);
+				}
 			}
 
 			if (bProjectLocalTransform)
 			{
-				PCGEX_SCOPE_LOOP(Index) { OutTransforms[Index] = ProjectionDetails.ProjectFlat(OutTransforms[Index]); }
+				PCGEX_SCOPE_LOOP(Index)
+				{
+					OutTransforms[Index] = ProjectionDetails.ProjectFlat(OutTransforms[Index]);
+				}
 			}
 			else
 			{
-				PCGEX_SCOPE_LOOP(Index) { OutTransforms[Index].SetLocation(ProjectionDetails.ProjectFlat(OutTransforms[Index].GetLocation())); }
+				PCGEX_SCOPE_LOOP(Index)
+				{
+					OutTransforms[Index].SetLocation(ProjectionDetails.ProjectFlat(OutTransforms[Index].GetLocation()));
+				}
 			}
 		}
 	}

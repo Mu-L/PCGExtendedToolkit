@@ -4,7 +4,6 @@
 #include "Elements/PCGExSplineToPath.h"
 
 
-#include "Helpers/PCGExRandomHelpers.h"
 #include "Curve/CurveUtil.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
@@ -12,6 +11,7 @@
 #include "Data/PCGExPointIO.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
 #include "Data/PCGSplineData.h"
+#include "Helpers/PCGExRandomHelpers.h"
 #include "Math/PCGExBestFitPlane.h"
 #include "Math/PCGExProjectionDetails.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
@@ -29,7 +29,8 @@ namespace PCGExSplineToPath
 	{
 	public:
 		FWriteTask(const int32 InTaskIndex, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
-			: FPCGExIndexedTask(InTaskIndex), PointDataFacade(InPointDataFacade)
+			: FPCGExIndexedTask(InTaskIndex)
+			  , PointDataFacade(InPointDataFacade)
 
 		{
 		}
@@ -119,13 +120,19 @@ namespace PCGExSplineToPath
 			{
 				switch (Mode)
 				{
-				case CIM_Linear: return 0;
-				case CIM_CurveAuto: return 1;
-				case CIM_Constant: return 2;
-				case CIM_CurveUser: return 4;
-				case CIM_CurveAutoClamped: return 3;
+				case CIM_Linear:
+					return 0;
+				case CIM_CurveAuto:
+					return 1;
+				case CIM_Constant:
+					return 2;
+				case CIM_CurveUser:
+					return 4;
+				case CIM_CurveAutoClamped:
+					return 3;
 				default: case CIM_Unknown:
-				case CIM_CurveBreak: return -1;
+				case CIM_CurveBreak:
+					return -1;
 				}
 			};
 
@@ -177,7 +184,10 @@ namespace PCGExSplineToPath
 			{
 				TPCGValueRange<int64> OutMeta = MutablePoints->GetMetadataEntryValueRange();
 
-				for (int64& Key : OutMeta) { MutablePoints->Metadata->InitializeOnSet(Key); }
+				for (int64& Key : OutMeta)
+				{
+					MutablePoints->Metadata->InitializeOnSet(Key);
+				}
 
 				const TSharedPtr<FPCGAttributeAccessorKeysEntries> Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(SplineData->Metadata);
 
@@ -282,7 +292,10 @@ bool FPCGExSplineToPathElement::Boot(FPCGExContext* InContext) const
 
 	PCGEX_CONTEXT_AND_SETTINGS(SplineToPath)
 
-	if (Context->InputData.GetAllInputs().IsEmpty()) { return false; } //Get rid of errors and warning when there is no input
+	if (Context->InputData.GetAllInputs().IsEmpty())
+	{
+		return false;
+	} //Get rid of errors and warning when there is no input
 
 	TArray<FPCGTaggedData> Targets = Context->InputData.GetInputsByPin(PCGExSplineToPath::SourceSplineLabel);
 	PCGEX_FWD(TagForwarding)
@@ -308,20 +321,26 @@ bool FPCGExSplineToPathElement::Boot(FPCGExContext* InContext) const
 		for (const FPCGTaggedData& TaggedData : Targets)
 		{
 			const UPCGSplineData* SplineData = Cast<UPCGSplineData>(TaggedData.Data);
-			if (!SplineData || SplineData->SplineStruct.GetNumberOfSplineSegments() <= 0) { continue; }
+			if (!SplineData || SplineData->SplineStruct.GetNumberOfSplineSegments() <= 0)
+			{
+				continue;
+			}
 
 			switch (Settings->SampleInputs)
 			{
-			default: case EPCGExSplineSamplingIncludeMode::All: Context->Targets.Add(SplineData);
+			default: case EPCGExSplineSamplingIncludeMode::All:
+				Context->Targets.Add(SplineData);
 				AddTags(TaggedData.Tags);
 				break;
-			case EPCGExSplineSamplingIncludeMode::ClosedLoopOnly: if (SplineData->SplineStruct.bClosedLoop)
+			case EPCGExSplineSamplingIncludeMode::ClosedLoopOnly:
+				if (SplineData->SplineStruct.bClosedLoop)
 				{
 					Context->Targets.Add(SplineData);
 					AddTags(TaggedData.Tags);
 				}
 				break;
-			case EPCGExSplineSamplingIncludeMode::OpenSplineOnly: if (!SplineData->SplineStruct.bClosedLoop)
+			case EPCGExSplineSamplingIncludeMode::OpenSplineOnly:
+				if (!SplineData->SplineStruct.bClosedLoop)
 				{
 					Context->Targets.Add(SplineData);
 					AddTags(TaggedData.Tags);
@@ -340,7 +359,10 @@ bool FPCGExSplineToPathElement::Boot(FPCGExContext* InContext) const
 	}
 
 	Context->Splines.Reserve(Context->NumTargets);
-	for (const UPCGSplineData* SplineData : Context->Targets) { Context->Splines.Add(SplineData->SplineStruct); }
+	for (const UPCGSplineData* SplineData : Context->Targets)
+	{
+		Context->Splines.Add(SplineData->SplineStruct);
+	}
 
 	PCGEX_FOREACH_FIELD_SPLINETOPATH(PCGEX_OUTPUT_VALIDATE_NAME)
 
@@ -361,7 +383,10 @@ bool FPCGExSplineToPathElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		{
 			TSharedPtr<PCGExData::FPointIO> NewOutput = Context->MainPoints->Emplace_GetRef(PCGExData::EIOInit::New);
 
-			if (!NewOutput) { return true; }
+			if (!NewOutput)
+			{
+				return true;
+			}
 
 			PCGEX_MAKE_SHARED(PointDataFacade, PCGExData::FFacade, NewOutput.ToSharedRef())
 			PCGEX_LAUNCH(PCGExSplineToPath::FWriteTask, i, PointDataFacade)

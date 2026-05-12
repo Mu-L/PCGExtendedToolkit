@@ -23,13 +23,13 @@ struct FPCGExShapeCircleConfig : public FPCGExShapeConfigBase
 	/** Start Angle. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable))
 	FPCGExInputShorthandSelectorDouble StartAngle = FPCGExInputShorthandSelectorDouble(FName("StartAngle"), 0, false);
-	
+
 	/** End Angle. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PCG_Overridable))
 	FPCGExInputShorthandSelectorDouble EndAngle = FPCGExInputShorthandSelectorDouble(FName("EndAngle"), 360, false);
-	
+
 #pragma region DEPRECATED
-	
+
 	UPROPERTY()
 	EPCGExInputValueType StartAngleInput_DEPRECATED = EPCGExInputValueType::Constant;
 
@@ -47,17 +47,16 @@ struct FPCGExShapeCircleConfig : public FPCGExShapeConfigBase
 
 	UPROPERTY()
 	double EndAngleConstant_DEPRECATED = 360;
-	
+
 #pragma endregion
 
 	/** If enabled, will flag circle as being closed if possible. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bIsClosedLoop = true;
-	
+
 #if WITH_EDITOR
 	virtual void ApplyDeprecation() override;
 #endif
-	
 };
 
 namespace PCGExShapes
@@ -130,5 +129,8 @@ public:
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 protected:
-	virtual bool IsCacheable() const override { return true; }
+	virtual bool IsCacheable() const override
+	{
+		return true;
+	}
 };

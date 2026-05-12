@@ -4,9 +4,9 @@
 #include "Core/PCGExCollectionHelpers.h"
 
 #include "PCGParamData.h"
-#include "Details/PCGExStagingDetails.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Data/PCGExAttributeBroadcaster.h"
+#include "Details/PCGExStagingDetails.h"
 
 namespace PCGExCollectionHelpers
 {
@@ -17,10 +17,16 @@ namespace PCGExCollectionHelpers
 		const FPCGExAssetAttributeSetDetails& Details,
 		bool bBuildStaging)
 	{
-		if (!InCollection || !InAttributeSet) { return false; }
+		if (!InCollection || !InAttributeSet)
+		{
+			return false;
+		}
 
 		const UPCGMetadata* Metadata = InAttributeSet->Metadata;
-		if (!Metadata) { return false; }
+		if (!Metadata)
+		{
+			return false;
+		}
 
 		// Get path attribute
 		const FPCGMetadataAttributeBase* PathAttribute = Metadata->GetConstAttribute(Details.AssetPathSourceAttribute);
@@ -46,7 +52,10 @@ namespace PCGExCollectionHelpers
 
 		// Get entry count
 		const int32 NumEntries = Metadata->GetLocalItemCount();
-		if (NumEntries == 0) { return false; }
+		if (NumEntries == 0)
+		{
+			return false;
+		}
 
 		// Initialize collection entries
 		InCollection->InitNumEntries(NumEntries);
@@ -73,17 +82,26 @@ namespace PCGExCollectionHelpers
 				continue; // Skip unsupported attribute types
 			}
 
-			if (!Path.IsValid()) { continue; }
+			if (!Path.IsValid())
+			{
+				continue;
+			}
 
 			// Get mutable entry via ForEach (a bit awkward but maintains abstraction)
 			FPCGExAssetCollectionEntry* Entry = nullptr;
 			int32 CurrentIndex = ValidEntries;
 			InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* E, int32 Idx)
 			{
-				if (Idx == CurrentIndex) { Entry = E; }
+				if (Idx == CurrentIndex)
+				{
+					Entry = E;
+				}
 			});
 
-			if (!Entry) { continue; }
+			if (!Entry)
+			{
+				continue;
+			}
 
 			Entry->SetAssetPath(Path);
 
@@ -139,7 +157,10 @@ namespace PCGExCollectionHelpers
 		uint8 TagInheritance,
 		TSet<FName>& OutTags)
 	{
-		if (!Entry) { return; }
+		if (!Entry)
+		{
+			return;
+		}
 
 		if (TagInheritance & static_cast<uint8>(EPCGExAssetTagInheritance::Asset))
 		{
@@ -160,7 +181,10 @@ namespace PCGExCollectionHelpers
 		TSet<FSoftObjectPath>& OutPaths,
 		bool bRecursive)
 	{
-		if (!Collection) { return; }
+		if (!Collection)
+		{
+			return;
+		}
 
 		Collection->GetAssetPaths(OutPaths,
 		                          bRecursive ? PCGExAssetCollection::ELoadingFlags::Recursive : PCGExAssetCollection::ELoadingFlags::Default);
@@ -170,13 +194,19 @@ namespace PCGExCollectionHelpers
 		const UPCGExAssetCollection* Collection,
 		const FSoftObjectPath& AssetPath)
 	{
-		if (!Collection || !AssetPath.IsValid()) { return false; }
+		if (!Collection || !AssetPath.IsValid())
+		{
+			return false;
+		}
 
 		bool bFound = false;
 
 		Collection->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 Index)
 		{
-			if (bFound) { return; }
+			if (bFound)
+			{
+				return;
+			}
 
 			if (Entry->bIsSubCollection)
 			{
@@ -196,7 +226,10 @@ namespace PCGExCollectionHelpers
 
 	int32 CountTotalEntries(const UPCGExAssetCollection* Collection)
 	{
-		if (!Collection) { return 0; }
+		if (!Collection)
+		{
+			return 0;
+		}
 
 		int32 Count = 0;
 
@@ -222,14 +255,23 @@ namespace PCGExCollectionHelpers
 		const UPCGExAssetCollection* Source,
 		UPCGExAssetCollection* Target)
 	{
-		if (!Source || !Target) { return false; }
+		if (!Source || !Target)
+		{
+			return false;
+		}
 
 		// Must be same type
-		if (Source->GetTypeId() != Target->GetTypeId()) { return false; }
+		if (Source->GetTypeId() != Target->GetTypeId())
+		{
+			return false;
+		}
 
 		// Count total entries first
 		const int32 TotalEntries = CountTotalEntries(Source);
-		if (TotalEntries == 0) { return false; }
+		if (TotalEntries == 0)
+		{
+			return false;
+		}
 
 		Target->InitNumEntries(TotalEntries);
 
@@ -257,7 +299,10 @@ namespace PCGExCollectionHelpers
 					FPCGExAssetCollectionEntry* TargetEntry = nullptr;
 					Target->ForEachEntry([&](FPCGExAssetCollectionEntry* E, int32 Idx)
 					{
-						if (Idx == WriteIndex) { TargetEntry = E; }
+						if (Idx == WriteIndex)
+						{
+							TargetEntry = E;
+						}
 					});
 
 					if (TargetEntry)

@@ -7,8 +7,8 @@
 #include "PCGParamData.h"
 #include "Core/PCGExPickerFactoryProvider.h"
 #include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataForward.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataForward.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExAttributesToTagsElement"
@@ -57,7 +57,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(AttributesToTags)
 
 bool FPCGExAttributesToTagsElement::Boot(FPCGExContext* InContext) const
 {
-	if (InContext == nullptr || !FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (InContext == nullptr || !FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(AttributesToTags)
 
@@ -112,7 +115,10 @@ bool FPCGExAttributesToTagsElement::Boot(FPCGExContext* InContext) const
 		PCGEX_MAKE_SHARED(SourceFacade, PCGExData::FFacade, SourceCollection->Pairs[i].ToSharedRef())
 		Context->SourceDataFacades.Add(SourceFacade);
 
-		if (!Details.Init(Context, SourceFacade)) { return false; }
+		if (!Details.Init(Context, SourceFacade))
+		{
+			return false;
+		}
 	}
 
 	if (Settings->Selection == EPCGExCollectionEntrySelection::Picker || Settings->Selection == EPCGExCollectionEntrySelection::PickerFirst || Settings->Selection == EPCGExCollectionEntrySelection::PickerLast)
@@ -135,7 +141,10 @@ bool FPCGExAttributesToTagsElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -163,11 +172,20 @@ namespace PCGExAttributesToTags
 	void FProcessor::Hoist(const FPCGExAttributeToTagDetails& InDetails, const int32 Index) const
 	{
 		const PCGExData::FConstPoint Point = PointDataFacade->GetInPoint(Index);
-		if (OutputSet) { InDetails.Tag(Point, OutputSet->Metadata); }
+		if (OutputSet)
+		{
+			InDetails.Tag(Point, OutputSet->Metadata);
+		}
 		else
 		{
-			if (Settings->Action == EPCGExAttributeToTagsAction::AddTags) { InDetails.Tag(Point, PointDataFacade->Source); }
-			else { InDetails.Tag(Point, const_cast<UPCGData*>(PointDataFacade->Source->InitializationData.Get())->MutableMetadata()); }
+			if (Settings->Action == EPCGExAttributeToTagsAction::AddTags)
+			{
+				InDetails.Tag(Point, PointDataFacade->Source);
+			}
+			else
+			{
+				InDetails.Tag(Point, const_cast<UPCGData*>(PointDataFacade->Source->InitializationData.Get())->MutableMetadata());
+			}
 		}
 	}
 
@@ -175,7 +193,10 @@ namespace PCGExAttributesToTags
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExAttributesToTags::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Settings->Action == EPCGExAttributeToTagsAction::Attribute)
 		{
@@ -185,7 +206,10 @@ namespace PCGExAttributesToTags
 		{
 			// Since we're doing transactional work, InitializationData needs to be swapped with a duplicate
 			PointDataFacade->Source->InitializationData = Context->ManagedObjects->DuplicateData<UPCGData>(PointDataFacade->Source->InitializationData);
-			if (!PointDataFacade->Source->InitializationData) { return false; }
+			if (!PointDataFacade->Source->InitializationData)
+			{
+				return false;
+			}
 		}
 
 		FRandomStream RandomSource(BatchIndex);
@@ -209,19 +233,26 @@ namespace PCGExAttributesToTags
 			Details.bPrefixWithAttributeName = Settings->bPrefixWithAttributeName;
 			Details.Attributes = Context->Attributes;
 
-			if (!Details.Init(Context, PointDataFacade)) { return false; }
+			if (!Details.Init(Context, PointDataFacade))
+			{
+				return false;
+			}
 
 			switch (Settings->Selection)
 			{
-			case EPCGExCollectionEntrySelection::FirstIndex: Hoist(Details, 0);
+			case EPCGExCollectionEntrySelection::FirstIndex:
+				Hoist(Details, 0);
 				break;
-			case EPCGExCollectionEntrySelection::LastIndex: Hoist(Details, PointDataFacade->GetNum() - 1);
+			case EPCGExCollectionEntrySelection::LastIndex:
+				Hoist(Details, PointDataFacade->GetNum() - 1);
 				break;
-			case EPCGExCollectionEntrySelection::RandomIndex: Hoist(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
+			case EPCGExCollectionEntrySelection::RandomIndex:
+				Hoist(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
 				break;
 			case EPCGExCollectionEntrySelection::Picker:
 			case EPCGExCollectionEntrySelection::PickerFirst:
-			case EPCGExCollectionEntrySelection::PickerLast: TagWithPickers(Details);
+			case EPCGExCollectionEntrySelection::PickerLast:
+				TagWithPickers(Details);
 				break;
 			}
 		}
@@ -231,15 +262,19 @@ namespace PCGExAttributesToTags
 
 			switch (Settings->Selection)
 			{
-			case EPCGExCollectionEntrySelection::FirstIndex: Hoist(Details, 0);
+			case EPCGExCollectionEntrySelection::FirstIndex:
+				Hoist(Details, 0);
 				break;
-			case EPCGExCollectionEntrySelection::LastIndex: Hoist(Details, PointDataFacade->GetNum() - 1);
+			case EPCGExCollectionEntrySelection::LastIndex:
+				Hoist(Details, PointDataFacade->GetNum() - 1);
 				break;
-			case EPCGExCollectionEntrySelection::RandomIndex: Hoist(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
+			case EPCGExCollectionEntrySelection::RandomIndex:
+				Hoist(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
 				break;
 			case EPCGExCollectionEntrySelection::Picker:
 			case EPCGExCollectionEntrySelection::PickerFirst:
-			case EPCGExCollectionEntrySelection::PickerLast: TagWithPickers(Details);
+			case EPCGExCollectionEntrySelection::PickerLast:
+				TagWithPickers(Details);
 				break;
 			}
 		}
@@ -256,16 +291,25 @@ namespace PCGExAttributesToTags
 			Op->AddPicks(InDetails.SourceDataFacade->GetNum(), UniqueIndices);
 		}
 
-		if (UniqueIndices.IsEmpty()) { return; }
+		if (UniqueIndices.IsEmpty())
+		{
+			return;
+		}
 
 		TArray<int32> UniqueIndicesTemp = UniqueIndices.Array();
-		UniqueIndices.Sort([](const int32 A, const int32 B) { return A < B; });
+		UniqueIndices.Sort([](const int32 A, const int32 B)
+		{
+			return A < B;
+		});
 
 		if (Settings->Selection == EPCGExCollectionEntrySelection::Picker)
 		{
 			for (const int32 i : UniqueIndicesTemp)
 			{
-				if (i != -1) { Hoist(InDetails, i); }
+				if (i != -1)
+				{
+					Hoist(InDetails, i);
+				}
 			}
 		}
 		if (Settings->Selection == EPCGExCollectionEntrySelection::PickerFirst)
@@ -295,7 +339,10 @@ namespace PCGExAttributesToTags
 	void FProcessor::Output()
 	{
 		TProcessor<FPCGExAttributesToTagsContext, UPCGExAttributesToTagsSettings>::Output();
-		if (OutputSet) { Context->StageOutput(OutputSet, FName("Tags")); }
+		if (OutputSet)
+		{
+			Context->StageOutput(OutputSet, FName("Tags"));
+		}
 	}
 }
 

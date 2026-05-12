@@ -32,7 +32,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PathfindingNavmesh, "Pathfinding : Navmesh", "Extract paths from navmesh.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Pathfinding);
+	}
 #endif
 
 protected:
@@ -51,7 +55,12 @@ public:
 
 	//~Begin UPCGExPointsProcessorSettings
 	virtual FName GetMainInputPin() const override;
-	virtual FName GetMainOutputPin() const override { return PCGExPaths::Labels::OutputPathsLabel; }
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExPaths::Labels::OutputPathsLabel;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 

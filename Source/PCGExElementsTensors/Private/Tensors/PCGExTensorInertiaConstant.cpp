@@ -13,7 +13,10 @@
 
 bool FPCGExTensorInertiaConstant::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	Offset = Config.Offset.Quaternion();
 	return true;
 }

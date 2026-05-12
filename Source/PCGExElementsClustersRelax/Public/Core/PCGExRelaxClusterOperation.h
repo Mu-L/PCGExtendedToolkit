@@ -34,13 +34,23 @@ public:
 		return true;
 	}
 
-	virtual int32 GetNumSteps() { return 1; }
-	virtual EPCGExClusterElement GetStepSource(const int32 InStep) { return EPCGExClusterElement::Vtx; }
+	virtual int32 GetNumSteps()
+	{
+		return 1;
+	}
+
+	virtual EPCGExClusterElement GetStepSource(const int32 InStep)
+	{
+		return EPCGExClusterElement::Vtx;
+	}
 
 
 	virtual EPCGExClusterElement PrepareNextStep(const int32 InStep)
 	{
-		if (InStep == 0) { std::swap(ReadBuffer, WriteBuffer); }
+		if (InStep == 0)
+		{
+			std::swap(ReadBuffer, WriteBuffer);
+		}
 		return EPCGExClusterElement::Vtx;
 	}
 

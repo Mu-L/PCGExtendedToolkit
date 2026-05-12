@@ -7,16 +7,16 @@
 #include "PCGComponent.h"
 #include "PCGExLog.h"
 #include "UDynamicMesh.h"
-#include "Core/PCGExContext.h"
-#include "Data/PCGDynamicMeshData.h"
+#include "Async/ParallelFor.h"
+#include "Clusters/PCGExCluster.h"
 #include "Core/PCGExClusterMT.h"
 #include "Core/PCGExClustersProcessor.h"
+#include "Core/PCGExContext.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGDynamicMeshData.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Async/ParallelFor.h"
-#include "Data/PCGExData.h"
-#include "Clusters/PCGExCluster.h"
 
 #define LOCTEXT_NAMESPACE "TopologyProcessor"
 #define PCGEX_NAMESPACE TopologyProcessor
@@ -37,8 +37,15 @@ void UPCGExTopologyClustersProcessorSettings::PCGExApplyDeprecationBeforeUpdateP
 }
 #endif
 
-PCGExData::EIOInit UPCGExTopologyClustersProcessorSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExTopologyClustersProcessorSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExTopologyClustersProcessorSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExTopologyClustersProcessorSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 TArray<FPCGPinProperties> UPCGExTopologyClustersProcessorSettings::InputPinProperties() const
 {
@@ -72,7 +79,10 @@ void FPCGExTopologyClustersProcessorContext::RegisterAssetDependencies()
 
 bool FPCGExTopologyClustersProcessorElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(TopologyClustersProcessor)
 
@@ -123,12 +133,18 @@ namespace PCGExTopologyEdges
 
 		ProjectedHashMap = Context->HashMaps[VtxDataFacade->Source->IOIndex];
 
-		if (!PCGExClusterMT::IProcessor::Process(InTaskManager)) { return false; }
+		if (!PCGExClusterMT::IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Context->HolesFacade)
 		{
 			Holes = Context->Holes ? Context->Holes : MakeShared<PCGExClusters::FProjectedPointSet>(Context, Context->HolesFacade.ToSharedRef(), this->ProjectionDetails);
-			if (Holes) { Holes->EnsureProjected(); } // Project once upfront if not already done
+			if (Holes)
+			{
+				Holes->EnsureProjected();
+			} // Project once upfront if not already done
 		}
 
 		UVDetails = Settings->Topology.UVChannels;
@@ -139,32 +155,47 @@ namespace PCGExTopologyEdges
 		CellsConstraints = MakeShared<PCGExClusters::FCellConstraints>(Settings->Constraints);
 		CellsConstraints->Reserve(Cluster->Edges->Num());
 
-		if (Settings->Constraints.bOmitWrappingBounds) { CellsConstraints->BuildWrapperCell(Cluster.ToSharedRef(), this->ProjectionDetails); }
+		if (Settings->Constraints.bOmitWrappingBounds)
+		{
+			CellsConstraints->BuildWrapperCell(Cluster.ToSharedRef(), this->ProjectionDetails);
+		}
 		CellsConstraints->Holes = Holes;
 
 		InitConstraints();
 
-		for (PCGExClusters::FNode& Node : *Cluster->Nodes) { Node.bValid = false; } // Invalidate all edges, triangulation will mark valid nodes to rebuild an index
+		for (PCGExClusters::FNode& Node : *Cluster->Nodes)
+		{
+			Node.bValid = false;
+		} // Invalidate all edges, triangulation will mark valid nodes to rebuild an index
 
 		// IMPORTANT : Need to wait for projection to be completed.
 		// Children should start work only in CompleteWork!!
 
 		InternalMeshData = Context->ManagedObjects->New<UPCGDynamicMeshData>();
-		if (!InternalMeshData) { return false; }
+		if (!InternalMeshData)
+		{
+			return false;
+		}
 
 		InternalMesh = Context->ManagedObjects->New<UDynamicMesh>();
 		InternalMesh->InitializeMesh();
 
 		InternalMeshData->Initialize(InternalMesh, true);
 		InternalMesh = InternalMeshData->GetMutableDynamicMesh();
-		if (UMaterialInterface* Material = Settings->Topology.Material.Get()) { InternalMeshData->SetMaterials({Material}); }
+		if (UMaterialInterface* Material = Settings->Topology.Material.Get())
+		{
+			InternalMeshData->SetMaterials({Material});
+		}
 
 		return true;
 	}
 
 	void IProcessor::Output()
 	{
-		if (!this->bIsProcessorValid) { return; }
+		if (!this->bIsProcessorValid)
+		{
+			return;
+		}
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(UPCGExPathSplineMesh::FProcessor::Output);
 
@@ -190,7 +221,13 @@ namespace PCGExTopologyEdges
 	void IProcessor::FilterConstrainedEdgeScope(const PCGExMT::FScope& Scope)
 	{
 		int32 LocalConstrainedEdgesNum = 0;
-		PCGEX_SCOPE_LOOP(i) { if (EdgeFilterCache[i]) { LocalConstrainedEdgesNum++; } }
+		PCGEX_SCOPE_LOOP(i)
+		{
+			if (EdgeFilterCache[i])
+			{
+				LocalConstrainedEdgesNum++;
+			}
+		}
 		FPlatformAtomics::InterlockedAdd(&ConstrainedEdgesNum, LocalConstrainedEdgesNum);
 	}
 
@@ -225,7 +262,10 @@ namespace PCGExTopologyEdges
 			TArray<int32> ElemIDs;
 			ElemIDs.SetNum(VtxCount);
 
-			for (int32 i = 0; i < VtxCount; i++) { ElemIDs[i] = Colors->AppendElement(DefaultVertexColor); }
+			for (int32 i = 0; i < VtxCount; i++)
+			{
+				ElemIDs[i] = Colors->AppendElement(DefaultVertexColor);
+			}
 
 			ParallelFor(VtxCount, [&](int32 i)
 			{
@@ -282,7 +322,10 @@ namespace PCGExTopologyEdges
 
 	void IBatch::Output()
 	{
-		if (!this->bIsBatchValid) { return; }
+		if (!this->bIsBatchValid)
+		{
+			return;
+		}
 
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(TopologyClustersProcessor)
 		PCGExClusterMT::IBatch::Output();
@@ -295,7 +338,10 @@ namespace PCGExTopologyEdges
 		TMap<uint64, int32>& MP = *ProjectedHashMap;
 		const TArray<FVector2D>& PP = *this->ProjectedVtxPositions.Get();
 
-		for (int i = 0; i < NumVtx; i++) { MP.Add(PCGEx::GH2(PP[i], CWTolerance), i); }
+		for (int i = 0; i < NumVtx; i++)
+		{
+			MP.Add(PCGEx::GH2(PP[i], CWTolerance), i);
+		}
 
 		PCGExClusterMT::IBatch::OnInitialPostProcess();
 	}

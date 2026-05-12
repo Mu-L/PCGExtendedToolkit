@@ -6,17 +6,17 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 
-#include "Helpers/PCGExStreamingHelpers.h"
+#include "PCGExSubSystem.h"
 #include "PCGGraph.h"
 #include "PCGSubsystem.h"
-#include "PCGExSubSystem.h"
-#include "Tasks/Task.h"
 #include "Async/Async.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Helpers/PCGExStreamingHelpers.h"
+#include "Tasks/Task.h"
 #include "Utils/PCGExIntTracker.h"
 
 #define LOCTEXT_NAMESPACE "PCGExWaitForPCGDataElement"
@@ -38,20 +38,35 @@ bool PCGExWaitForPCGData::FFilterConfig::PassesFilter(const UPCGComponent* Candi
 	const UPCGGraph* CandidateGraph = Candidate->GetGraph();
 
 	// Basic validity checks
-	if (!CandidateGraph || !Candidate->bActivated) { return false; }
-	if (Self && Candidate == Self) { return false; }
+	if (!CandidateGraph || !Candidate->bActivated)
+	{
+		return false;
+	}
+	if (Self && Candidate == Self)
+	{
+		return false;
+	}
 
 	// Template matching
-	if (bMustMatchTemplate && CandidateGraph != TemplateGraph) { return false; }
+	if (bMustMatchTemplate && CandidateGraph != TemplateGraph)
+	{
+		return false;
+	}
 
 	// Tag matching
-	if (!MustHaveTag.IsNone() && !Candidate->ComponentHasTag(MustHaveTag)) { return false; }
+	if (!MustHaveTag.IsNone() && !Candidate->ComponentHasTag(MustHaveTag))
+	{
+		return false;
+	}
 
 	// Generation trigger matching
 	if (bDoMatchGenerationTrigger)
 	{
 		const bool bMatches = Candidate->GenerationTrigger == MatchGenerationTrigger;
-		if (bInvertGenerationTrigger ? bMatches : !bMatches) { return false; }
+		if (bInvertGenerationTrigger ? bMatches : !bMatches)
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -135,7 +150,10 @@ TArray<FPCGPinProperties> UPCGExWaitForPCGDataSettings::OutputPinProperties() co
 	FPCGPinProperties& DependencyPin = PinProperties.Emplace_GetRef(PCGPinConstants::DefaultExecutionDependencyLabel, EPCGDataType::Any, /*bInAllowMultipleConnections=*/true, /*bAllowMultipleData=*/true);
 	DependencyPin.Usage = EPCGPinUsage::DependencyOnly;
 
-	if (bOutputRoaming) { PCGEX_PIN_ANY(RoamingPin, "Roaming data that isn't part of the template output but still exists.", Normal) }
+	if (bOutputRoaming)
+	{
+		PCGEX_PIN_ANY(RoamingPin, "Roaming data that isn't part of the template output but still exists.", Normal)
+	}
 
 	PinProperties.Append(CachedPinsEx);
 
@@ -166,7 +184,10 @@ void FPCGExWaitForPCGDataContext::RegisterAssetDependencies()
 		for (const TSharedPtr<PCGExData::FPointIO>& IO : MainPoints->Pairs)
 		{
 			FSoftObjectPath Path = FSoftObjectPath();
-			if (PCGExData::Helpers::TryReadDataValue(this, IO->GetIn(), Settings->TemplateGraphAttributeName, Path)) { AddAssetDependency(Path); }
+			if (PCGExData::Helpers::TryReadDataValue(this, IO->GetIn(), Settings->TemplateGraphAttributeName, Path))
+			{
+				AddAssetDependency(Path);
+			}
 			GraphInstancePaths.Add(Path);
 		}
 	}
@@ -174,7 +195,10 @@ void FPCGExWaitForPCGDataContext::RegisterAssetDependencies()
 	{
 		FSoftObjectPath Path = Settings->TemplateGraph.ToSoftObjectPath();
 		AddAssetDependency(Path);
-		for (const TSharedPtr<PCGExData::FPointIO>& IO : MainPoints->Pairs) { GraphInstancePaths.Add(Path); }
+		for (const TSharedPtr<PCGExData::FPointIO>& IO : MainPoints->Pairs)
+		{
+			GraphInstancePaths.Add(Path);
+		}
 	}
 
 	FPCGExPointsProcessorContext::RegisterAssetDependencies();
@@ -210,12 +234,18 @@ FName UPCGExWaitForPCGDataSettings::GetMainInputPin() const
 
 bool FPCGExWaitForPCGDataElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(WaitForPCGData)
 
 	PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReferenceAttribute)
-	if (Settings->TemplateInput == EPCGExDataInputValueType::Attribute) { PCGEX_VALIDATE_NAME(Settings->TemplateGraphAttributeName) }
+	if (Settings->TemplateInput == EPCGExDataInputValueType::Attribute)
+	{
+		PCGEX_VALIDATE_NAME(Settings->TemplateGraphAttributeName)
+	}
 
 	for (FPCGPinProperties Pin : Settings->CachedPinsEx)
 	{
@@ -240,7 +270,10 @@ bool FPCGExWaitForPCGDataElement::Boot(FPCGExContext* InContext) const
 
 bool FPCGExWaitForPCGDataElement::PostBoot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::PostBoot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::PostBoot(InContext))
+	{
+		return false;
+	}
 
 	FPCGExWaitForPCGDataContext* Context = static_cast<FPCGExWaitForPCGDataContext*>(InContext);
 	for (const FSoftObjectPath& Path : Context->GraphInstancePaths)
@@ -266,7 +299,10 @@ bool FPCGExWaitForPCGDataElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -310,7 +346,10 @@ namespace PCGExWaitForPCGData
 	bool FComponentDiscovery::Start(const TSet<FSoftObjectPath>& InActorReferences)
 	{
 		TSharedPtr<PCGExMT::FTaskManager> TaskManager = TaskManagerWeak.Pin();
-		if (!TaskManager) { return false; }
+		if (!TaskManager)
+		{
+			return false;
+		}
 
 		UniqueActorReferences = InActorReferences;
 		QueuedActors.Reserve(UniqueActorReferences.Num());
@@ -327,7 +366,10 @@ namespace PCGExWaitForPCGData
 		{
 			StartTime = Context->GetWorld()->GetTimeSeconds();
 			SearchActorsToken = TaskManager->TryCreateToken(FName("SearchActors"));
-			if (!SearchActorsToken.IsValid()) { return false; }
+			if (!SearchActorsToken.IsValid())
+			{
+				return false;
+			}
 			GatherActors();
 		}
 		else
@@ -336,8 +378,14 @@ namespace PCGExWaitForPCGData
 
 			for (const FSoftObjectPath& ActorRef : UniqueActorReferences)
 			{
-				if (AActor* Actor = Cast<AActor>(ActorRef.ResolveObject())) { QueuedActors.Add(Actor); }
-				else { bHasUnresolvedReferences = true; }
+				if (AActor* Actor = Cast<AActor>(ActorRef.ResolveObject()))
+				{
+					QueuedActors.Add(Actor);
+				}
+				else
+				{
+					bHasUnresolvedReferences = true;
+				}
 			}
 
 			if (QueuedActors.IsEmpty() && !WarningConfig.bQuietActorNotFoundWarning)
@@ -353,7 +401,10 @@ namespace PCGExWaitForPCGData
 
 			// Start component search
 			SearchComponentsToken = TaskManager->TryCreateToken(FName("SearchComponents"));
-			if (!SearchComponentsToken.IsValid()) { return false; }
+			if (!SearchComponentsToken.IsValid())
+			{
+				return false;
+			}
 
 			StartTime = Context->GetWorld()->GetTimeSeconds();
 
@@ -378,7 +429,10 @@ namespace PCGExWaitForPCGData
 
 	void FComponentDiscovery::GatherActors()
 	{
-		if (!SearchActorsToken.IsValid()) { return; }
+		if (!SearchActorsToken.IsValid())
+		{
+			return;
+		}
 
 		TSharedPtr<PCGExMT::FTaskManager> TaskManager = TaskManagerWeak.Pin();
 		if (!TaskManager || !TaskManager->IsAvailable())
@@ -392,8 +446,14 @@ namespace PCGExWaitForPCGData
 		QueuedActors.Reset(UniqueActorReferences.Num());
 		for (const FSoftObjectPath& ActorRef : UniqueActorReferences)
 		{
-			if (AActor* Actor = Cast<AActor>(ActorRef.ResolveObject())) { QueuedActors.Add(Actor); }
-			else { bHasUnresolvedReferences = true; }
+			if (AActor* Actor = Cast<AActor>(ActorRef.ResolveObject()))
+			{
+				QueuedActors.Add(Actor);
+			}
+			else
+			{
+				bHasUnresolvedReferences = true;
+			}
 		}
 
 		if (bHasUnresolvedReferences)
@@ -416,14 +476,20 @@ namespace PCGExWaitForPCGData
 			{
 				for (const FSoftObjectPath& ActorRef : UniqueActorReferences)
 				{
-					if (Cast<AActor>(ActorRef.ResolveObject())) { continue; }
+					if (Cast<AActor>(ActorRef.ResolveObject()))
+					{
+						continue;
+					}
 					FString Rel = TEXT("TIMEOUT : ") + ActorRef.ToString() + TEXT(" not found.");
 					PCGE_LOG_C(Error, GraphAndLog, Context, FText::FromString(Rel));
 				}
 			}
 
 			PCGEX_ASYNC_RELEASE_TOKEN(SearchActorsToken)
-			if (OnDiscoveryComplete) { OnDiscoveryComplete(); }
+			if (OnDiscoveryComplete)
+			{
+				OnDiscoveryComplete();
+			}
 			return;
 		}
 
@@ -433,7 +499,10 @@ namespace PCGExWaitForPCGData
 		SearchComponentsToken = TaskManager->TryCreateToken(FName("SearchComponents"));
 		if (!SearchComponentsToken.IsValid())
 		{
-			if (OnDiscoveryComplete) { OnDiscoveryComplete(); }
+			if (OnDiscoveryComplete)
+			{
+				OnDiscoveryComplete();
+			}
 			return;
 		}
 
@@ -451,13 +520,19 @@ namespace PCGExWaitForPCGData
 
 	void FComponentDiscovery::GatherComponents()
 	{
-		if (!SearchComponentsToken.IsValid()) { return; }
+		if (!SearchComponentsToken.IsValid())
+		{
+			return;
+		}
 
 		TSharedPtr<PCGExMT::FTaskManager> TaskManager = TaskManagerWeak.Pin();
 		if (!TaskManager || !TaskManager->IsAvailable())
 		{
 			Stop();
-			if (OnDiscoveryComplete) { OnDiscoveryComplete(); }
+			if (OnDiscoveryComplete)
+			{
+				OnDiscoveryComplete();
+			}
 			return;
 		}
 
@@ -474,13 +549,19 @@ namespace PCGExWaitForPCGData
 
 	void FComponentDiscovery::InspectGatheredComponents()
 	{
-		if (!SearchComponentsToken.IsValid()) { return; }
+		if (!SearchComponentsToken.IsValid())
+		{
+			return;
+		}
 
 		TSharedPtr<PCGExMT::FTaskManager> TaskManager = TaskManagerWeak.Pin();
 		if (!TaskManager || !TaskManager->IsAvailable())
 		{
 			Stop();
-			if (OnDiscoveryComplete) { OnDiscoveryComplete(); }
+			if (OnDiscoveryComplete)
+			{
+				OnDiscoveryComplete();
+			}
 			return;
 		}
 
@@ -505,7 +586,10 @@ namespace PCGExWaitForPCGData
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExWaitForPCGData::Inspect);
 
-		ON_SCOPE_EXIT { InspectionTracker->IncrementCompleted(); };
+		ON_SCOPE_EXIT
+		{
+			InspectionTracker->IncrementCompleted();
+		};
 
 		UPCGComponent* Self = Context->GetMutableComponent();
 
@@ -515,15 +599,24 @@ namespace PCGExWaitForPCGData
 		FoundComponents.RemoveAll([this, Self](const UPCGComponent* Candidate) -> bool
 		{
 			// Remove if doesn't pass filter
-			if (!IsValidCandidate(Candidate)) { return true; }
+			if (!IsValidCandidate(Candidate))
+			{
+				return true;
+			}
 
 			// Remove if candidate is self
-			if (Self && Candidate == Self) { return true; }
+			if (Self && Candidate == Self)
+			{
+				return true;
+			}
 
 			// Check required pins if not matching template
 			if (!FilterConfig.bMustMatchTemplate)
 			{
-				if (!HasRequiredPins(Candidate->GetGraph())) { return true; }
+				if (!HasRequiredPins(Candidate->GetGraph()))
+				{
+					return true;
+				}
 			}
 
 			return false;
@@ -554,7 +647,10 @@ namespace PCGExWaitForPCGData
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExWaitForPCGData::OnInspectionComplete);
 
 		// Compact the queued actors array - remove processed (nullptr) entries
-		QueuedActors.RemoveAll([](const AActor* Actor) { return Actor == nullptr; });
+		QueuedActors.RemoveAll([](const AActor* Actor)
+		{
+			return Actor == nullptr;
+		});
 
 		// If some actors still have no valid components, retry or timeout
 		if (!QueuedActors.IsEmpty())
@@ -598,7 +694,10 @@ namespace PCGExWaitForPCGData
 
 	bool FComponentDiscovery::HasRequiredPins(const UPCGGraph* CandidateGraph) const
 	{
-		if (!CandidateGraph) { return false; }
+		if (!CandidateGraph)
+		{
+			return false;
+		}
 
 		TArray<FPCGPinProperties> OutPins = CandidateGraph->GetOutputNode()->OutputPinProperties();
 
@@ -614,7 +713,10 @@ namespace PCGExWaitForPCGData
 				}
 			}
 
-			if (!bFound) { return false; }
+			if (!bFound)
+			{
+				return false;
+			}
 		}
 
 		return true;
@@ -643,7 +745,10 @@ namespace PCGExWaitForPCGData
 	{
 		const FPCGDataCollection& GraphOutput = InComponent->GetGeneratedGraphOutput();
 
-		if (GraphOutput.TaggedData.IsEmpty()) { return; }
+		if (GraphOutput.TaggedData.IsEmpty())
+		{
+			return;
+		}
 
 		// Ensure we have all required pins first
 		if (!OutputConfig.bIgnoreRequiredPin)
@@ -659,15 +764,18 @@ namespace PCGExWaitForPCGData
 
 		Context->IncreaseStagedOutputReserve(
 			OutputConfig.bDedupeData
-				? GraphOutput.TaggedData.Num()
-				: GraphOutput.TaggedData.Num() * MatchingPointIndices.Num());
+			? GraphOutput.TaggedData.Num()
+			: GraphOutput.TaggedData.Num() * MatchingPointIndices.Num());
 
 		if (OutputConfig.bDedupeData)
 		{
 			// Dedupe mode: use first point's tags only
 			TSet<FString> PointsTags;
 			TagDetails.Tag(PointDataFacade->GetInPoint(MatchingPointIndices[0]), PointsTags);
-			if (OutputConfig.bCarryOverTargetTags) { PointDataFacade->Source->Tags->DumpTo(PointsTags); }
+			if (OutputConfig.bCarryOverTargetTags)
+			{
+				PointDataFacade->Source->Tags->DumpTo(PointsTags);
+			}
 
 			for (const FPCGTaggedData& TaggedData : GraphOutput.TaggedData)
 			{
@@ -681,7 +789,10 @@ namespace PCGExWaitForPCGData
 			{
 				TSet<FString> PointsTags;
 				TagDetails.Tag(PointDataFacade->GetInPoint(PtIndex), PointsTags);
-				if (OutputConfig.bCarryOverTargetTags) { PointDataFacade->Source->Tags->DumpTo(PointsTags); }
+				if (OutputConfig.bCarryOverTargetTags)
+				{
+					PointDataFacade->Source->Tags->DumpTo(PointsTags);
+				}
 
 				for (const FPCGTaggedData& TaggedData : GraphOutput.TaggedData)
 				{
@@ -744,14 +855,23 @@ namespace PCGExWaitForPCGData
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExWaitForPCGData::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		TemplateGraph = Context->GraphInstances[PointDataFacade->Source->IOIndex];
 
 		// Setup attribute to tags
 		TargetAttributesToDataTags = Settings->TargetAttributesToDataTags;
-		if (Settings->bDedupeData) { TargetAttributesToDataTags.bAddIndexTag = false; }
-		if (!TargetAttributesToDataTags.Init(Context, PointDataFacade)) { return false; }
+		if (Settings->bDedupeData)
+		{
+			TargetAttributesToDataTags.bAddIndexTag = false;
+		}
+		if (!TargetAttributesToDataTags.Init(Context, PointDataFacade))
+		{
+			return false;
+		}
 
 		// Gather actor references from points
 		PCGEX_MAKE_SHARED(ActorReferences, PCGExData::TAttributeBroadcaster<FSoftObjectPath>)
@@ -766,7 +886,10 @@ namespace PCGExWaitForPCGData
 		for (int i = 0; i < ActorReferences->Values.Num(); i++)
 		{
 			const FSoftObjectPath& ActorRef = ActorReferences->Values[i];
-			if (!ActorRef.IsValid()) { continue; }
+			if (!ActorRef.IsValid())
+			{
+				continue;
+			}
 
 			bool bAlreadySet = false;
 			UniqueActorReferences.Add(ActorRef, &bAlreadySet);
@@ -842,7 +965,10 @@ namespace PCGExWaitForPCGData
 		// Track component for later staging
 		{
 			FWriteScopeLock WriteLock(ComponentLock);
-			if (ComponentToIndex.Find(InComponent)) { return; } // Already tracked
+			if (ComponentToIndex.Find(InComponent))
+			{
+				return;
+			} // Already tracked
 
 			int32 Index = IndexedComponents.Add(InComponent);
 			ComponentToIndex.Emplace(InComponent, Index);
@@ -882,7 +1008,10 @@ namespace PCGExWaitForPCGData
 	void FProcessor::DoStageComponentData(UPCGComponent* InComponent)
 	{
 		const TSharedPtr<TArray<int32>>* MatchingPointsPtr = PerActorPoints.Find(InComponent->GetOwner()->GetPathName());
-		if (!MatchingPointsPtr) { return; }
+		if (!MatchingPointsPtr)
+		{
+			return;
+		}
 
 		Stager->StageComponentData(InComponent, *MatchingPointsPtr->Get());
 	}

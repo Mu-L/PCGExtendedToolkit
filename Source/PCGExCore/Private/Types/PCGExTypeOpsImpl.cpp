@@ -53,7 +53,10 @@ namespace PCGExTypeOps
 	// All other slots are initialized to NoOpConvert for safe fallback.
 	void FConversionTable::Initialize()
 	{
-		if (bInitialized) { return; }
+		if (bInitialized)
+		{
+			return;
+		}
 
 		// Fill entire table with no-op fallback
 		for (int32 i = 0; i < PCGExTypes::TypesAllocations; ++i)

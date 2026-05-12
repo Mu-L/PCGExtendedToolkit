@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExProxyDataBlending.h"
-#include "UObject/Object.h"
-#include "Data/PCGExData.h"
 #include "Core/PCGExUnionData.h"
+#include "Data/PCGExData.h"
+#include "UObject/Object.h"
 
 class UPCGExBlendOpFactory;
 class FPCGExBlendOperation;

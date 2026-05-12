@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExEdgeRefineOperation.h"
-#include "Clusters/PCGExCluster.h"
 #include "Async/ParallelFor.h"
+#include "Clusters/PCGExCluster.h"
+#include "Core/PCGExEdgeRefineOperation.h"
 
 #include "PCGExEdgeRefineRemoveLeavesRecursive.generated.h"
 

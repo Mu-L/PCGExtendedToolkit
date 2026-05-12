@@ -6,8 +6,8 @@
 #include "PCGExHeuristicsHandler.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
-#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExPathQuery.h"
+#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExSearchAllocations.h"
 #include "Utils/PCGExScoredQueue.h"
 
@@ -28,7 +28,10 @@ namespace PCGExPathfinding
 	{
 		FSearchAllocations::Reset();
 
-		for (int i = 0; i < NumNodes; i++) { GScore[i] = -1; }
+		for (int i = 0; i < NumNodes; i++)
+		{
+			GScore[i] = -1;
+		}
 
 		const int32 NumVisitedNodes = Visited.Num();
 		for (int i = 0; i < NumVisitedNodes; i++)
@@ -105,7 +108,10 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 			QueueForward->Dequeue(CurrentNodeIndex, CurrentScore);
 
 			// Check if we've found a better path
-			if (CurrentScore >= BestPathCost) { continue; }
+			if (CurrentScore >= BestPathCost)
+			{
+				continue;
+			}
 
 			// Check if backward search has reached this node
 			if (VisitedBackward[CurrentNodeIndex])
@@ -129,7 +135,10 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 					const uint32 NeighborIndex = Lk.Node;
 					const uint32 EdgeIndex = Lk.Edge;
 
-					if (VisitedForward[NeighborIndex]) { continue; }
+					if (VisitedForward[NeighborIndex])
+					{
+						continue;
+					}
 
 					const PCGExClusters::FNode& AdjacentNode = NodesRef[NeighborIndex];
 					const PCGExGraphs::FEdge& Edge = EdgesRef[EdgeIndex];
@@ -138,7 +147,10 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 					const double TentativeGScore = CurrentGScore + EScore;
 
 					const double PreviousGScore = GScoreForward[NeighborIndex];
-					if (PreviousGScore != -1 && TentativeGScore >= PreviousGScore) { continue; }
+					if (PreviousGScore != -1 && TentativeGScore >= PreviousGScore)
+					{
+						continue;
+					}
 
 					TravelStackForward->Set(NeighborIndex, PCGEx::NH64(CurrentNodeIndex, EdgeIndex));
 					GScoreForward[NeighborIndex] = TentativeGScore;
@@ -155,7 +167,10 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 			double CurrentScore;
 			QueueBackward->Dequeue(CurrentNodeIndex, CurrentScore);
 
-			if (CurrentScore >= BestPathCost) { continue; }
+			if (CurrentScore >= BestPathCost)
+			{
+				continue;
+			}
 
 			// Check if forward search has reached this node
 			if (VisitedForward[CurrentNodeIndex])
@@ -179,7 +194,10 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 					const uint32 NeighborIndex = Lk.Node;
 					const uint32 EdgeIndex = Lk.Edge;
 
-					if (VisitedBackward[NeighborIndex]) { continue; }
+					if (VisitedBackward[NeighborIndex])
+					{
+						continue;
+					}
 
 					const PCGExClusters::FNode& AdjacentNode = NodesRef[NeighborIndex];
 					const PCGExGraphs::FEdge& Edge = EdgesRef[EdgeIndex];
@@ -189,7 +207,10 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 					const double TentativeGScore = CurrentGScore + EScore;
 
 					const double PreviousGScore = GScoreBackward[NeighborIndex];
-					if (PreviousGScore != -1 && TentativeGScore >= PreviousGScore) { continue; }
+					if (PreviousGScore != -1 && TentativeGScore >= PreviousGScore)
+					{
+						continue;
+					}
 
 					TravelStackBackward->Set(NeighborIndex, PCGEx::NH64(CurrentNodeIndex, EdgeIndex));
 					GScoreBackward[NeighborIndex] = TentativeGScore;
@@ -200,10 +221,16 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 		}
 
 		// Early termination check
-		if (MeetingNode != -1 && QueueForward->IsEmpty() && QueueBackward->IsEmpty()) { break; }
+		if (MeetingNode != -1 && QueueForward->IsEmpty() && QueueBackward->IsEmpty())
+		{
+			break;
+		}
 	}
 
-	if (MeetingNode == -1) { return false; }
+	if (MeetingNode == -1)
+	{
+		return false;
+	}
 
 	// Reconstruct path
 	ReconstructPath(InQuery, MeetingNode, TravelStackForward, TravelStackBackward, SeedNode.Index, GoalNode.Index);
@@ -231,7 +258,10 @@ void FPCGExSearchOperationBidirectional::ReconstructPath(
 	{
 		int32 NextNode, EdgeIndex;
 		PCGEx::NH64(BackwardStack->Get(CurrentNode), NextNode, EdgeIndex);
-		if (NextNode == -1) { break; }
+		if (NextNode == -1)
+		{
+			break;
+		}
 		BackwardEdges.Add(EdgeIndex);
 		BackwardPath.Add(NextNode);
 		CurrentNode = NextNode;
@@ -250,7 +280,10 @@ void FPCGExSearchOperationBidirectional::ReconstructPath(
 		ForwardPath.Add(CurrentNode);
 		int32 PrevNode, EdgeIndex;
 		PCGEx::NH64(ForwardStack->Get(CurrentNode), PrevNode, EdgeIndex);
-		if (PrevNode == -1) { break; }
+		if (PrevNode == -1)
+		{
+			break;
+		}
 		ForwardEdges.Add(EdgeIndex);
 		CurrentNode = PrevNode;
 	}

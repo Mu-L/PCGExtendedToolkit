@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExPointsProcessor.h"
 #include "Core/PCGExPointFilter.h"
-#include "Helpers/PCGExCollectionsHelpers.h"
+#include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExSocketOutputDetails.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
 
 #include "PCGExStagingLoadSockets.generated.h"
 
@@ -26,8 +26,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SocketStaging, "Staging : Load Sockets", "Create points from staged data sockets.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Sampler; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Sampler;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
 #endif
 
 protected:

@@ -33,7 +33,10 @@ struct PCGEXCORE_API FPCGExDefaultValueContainer
 	FString GetPropertyValueAsString(FName PropertyName) const;
 
 	/** Serialize the properties into a Crc32 to be used for caching purposes. */
-	void SerializeCrc(FArchiveCrc32& Crc32) { PropertyBag.Serialize(Crc32); }
+	void SerializeCrc(FArchiveCrc32& Crc32)
+	{
+		PropertyBag.Serialize(Crc32);
+	}
 
 	/** Helper that creates a Param Data with the typed property as an attribute attached to the metadata. */
 	const UPCGParamData* CreateParamData(FPCGContext* Context, FName PropertyName) const;

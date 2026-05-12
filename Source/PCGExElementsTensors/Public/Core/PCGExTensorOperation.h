@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "Factories/PCGExOperation.h"
 #include "PCGExTensor.h"
 #include "Elements/PCGExExtrudeTensors.h"
+#include "Factories/PCGExOperation.h"
+#include "UObject/Object.h"
 
 namespace PCGExMath
 {
@@ -51,13 +51,22 @@ public:
 		const double RadiusSquared = E->RadiusSquared;
 		const double DistSquared = FVector::DistSquared(InPosition, E->Location);
 
-		if (DistSquared > RadiusSquared) { return nullptr; }
+		if (DistSquared > RadiusSquared)
+		{
+			return nullptr;
+		}
 
 		const double OutFactor = DistSquared / RadiusSquared;
 		OutMetrics.Factor = OutFactor;
 
-		if constexpr (bFast) { OutMetrics.Guide = FVector::ForwardVector; }
-		else { OutMetrics.Guide = BaseConfig.LocalGuideCurve.GetValue(OutFactor); }
+		if constexpr (bFast)
+		{
+			OutMetrics.Guide = FVector::ForwardVector;
+		}
+		else
+		{
+			OutMetrics.Guide = BaseConfig.LocalGuideCurve.GetValue(OutFactor);
+		}
 
 		OutMetrics.Potency = E->Potency * PotencyFalloffLUT->Eval(OutFactor);
 		OutMetrics.Weight = E->Weight * WeightFalloffLUT->Eval(OutFactor);
@@ -79,13 +88,22 @@ public:
 		const double RadiusSquared = FMath::Square(FVector2D(Scale.Y, Scale.Z).Length() * Radius);
 		const double DistSquared = FVector::DistSquared(InPosition, OutTransform.GetLocation());
 
-		if (DistSquared > RadiusSquared) { return false; }
+		if (DistSquared > RadiusSquared)
+		{
+			return false;
+		}
 
 		const double OutFactor = DistSquared / RadiusSquared;
 		OutMetrics.Factor = OutFactor;
 
-		if constexpr (bFast) { OutMetrics.Guide = FVector::ForwardVector; }
-		else { OutMetrics.Guide = BaseConfig.LocalGuideCurve.GetValue(OutFactor); }
+		if constexpr (bFast)
+		{
+			OutMetrics.Guide = FVector::ForwardVector;
+		}
+		else
+		{
+			OutMetrics.Guide = BaseConfig.LocalGuideCurve.GetValue(OutFactor);
+		}
 
 		OutMetrics.Potency = BaseConfig.Potency * PotencyFalloffLUT->Eval(OutFactor);
 		OutMetrics.Weight = BaseConfig.Weight * WeightFalloffLUT->Eval(OutFactor);

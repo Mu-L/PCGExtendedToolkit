@@ -3,20 +3,20 @@
 
 #include "Elements/PCGExPathStitch.h"
 
+#include "PCGExMatchingCommon.h"
 #include "PCGExOctree.h"
 #include "Clusters/PCGExClusterCommon.h"
-#include "Data/PCGExDataTags.h"
 #include "Core/PCGExPointFilter.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExDataMatcher.h"
 #include "Helpers/PCGExMatchingHelpers.h"
-#include "PCGExMatchingCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
 
-#include "SubPoints/DataBlending/PCGExSubPointsBlendInterpolate.h"
 #include "Sorting/PCGExPointSorter.h"
 #include "Sorting/PCGExSortingDetails.h"
+#include "SubPoints/DataBlending/PCGExSubPointsBlendInterpolate.h"
 #include "Utils/PCGExPointIOMerger.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPathStitchElement"
@@ -35,7 +35,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(PathStitch)
 
 bool FPCGExPathStitchElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathStitch)
 
@@ -108,14 +111,20 @@ namespace PCGExPathStitch
 
 	bool FProcessor::SetStartStitch(const TSharedPtr<FProcessor>& InStitch)
 	{
-		if (StartStitch) { return false; }
+		if (StartStitch)
+		{
+			return false;
+		}
 		StartStitch = InStitch;
 		return true;
 	}
 
 	bool FProcessor::SetEndStitch(const TSharedPtr<FProcessor>& InStitch)
 	{
-		if (EndStitch) { return false; }
+		if (EndStitch)
+		{
+			return false;
+		}
 		EndStitch = InStitch;
 		return true;
 	}
@@ -126,7 +135,10 @@ namespace PCGExPathStitch
 
 		const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 		const TConstPCGValueRange<FTransform> InTransform = PointDataFacade->GetIn()->GetConstTransformValueRange();
 
 		const FVector Extents = FVector::OneVector * 0.5;
@@ -180,7 +192,10 @@ namespace PCGExPathStitch
 		// Mid-path, will be merged
 		if (EndStitch && StartStitch)
 		{
-			if (!bClosedLoop || WorkIndex != SmallestWorkIndex) { return; }
+			if (!bClosedLoop || WorkIndex != SmallestWorkIndex)
+			{
+				return;
+			}
 		}
 
 		if (bClosedLoop)
@@ -188,12 +203,21 @@ namespace PCGExPathStitch
 			// Nullify start so we go in order
 			StartStitch = nullptr;
 
-			if (Chain.Last()->StartStitch == Start) { Chain.Last()->StartStitch = nullptr; }
-			else if (Chain.Last()->EndStitch == Start) { Chain.Last()->EndStitch = nullptr; }
+			if (Chain.Last()->StartStitch == Start)
+			{
+				Chain.Last()->StartStitch = nullptr;
+			}
+			else if (Chain.Last()->EndStitch == Start)
+			{
+				Chain.Last()->EndStitch = nullptr;
+			}
 		}
 		else
 		{
-			if (Chain.Last()->WorkIndex < WorkIndex) { return; }
+			if (Chain.Last()->WorkIndex < WorkIndex)
+			{
+				return;
+			}
 		}
 
 		// Other work index is smaller, will do the resolve.
@@ -213,11 +237,17 @@ namespace PCGExPathStitch
 			{
 				const bool bIsLast = i == Chain.Num() - 1;
 
-				if (!bIsLast || bClosedLoop) { ReadCount--; }
+				if (!bIsLast || bClosedLoop)
+				{
+					ReadCount--;
+				}
 
 				if (Settings->FuseMethod == EPCGExStitchFuseMethod::KeepEnd)
 				{
-					if (!bIsLast || bClosedLoop) { ReadStart++; }
+					if (!bIsLast || bClosedLoop)
+					{
+						ReadStart++;
+					}
 				}
 				else
 				{
@@ -307,7 +337,10 @@ namespace PCGExPathStitch
 		{
 			TArray<TSharedPtr<PCGExData::FFacade>> Facades;
 			Facades.Reserve(SortedProcessors.Num());
-			for (const TSharedPtr<FProcessor>& P : SortedProcessors) { Facades.Add(P->PointDataFacade); }
+			for (const TSharedPtr<FProcessor>& P : SortedProcessors)
+			{
+				Facades.Add(P->PointDataFacade);
+			}
 
 			TSharedPtr<PCGExMatching::FDataMatcher> Matcher = MakeShared<PCGExMatching::FDataMatcher>();
 			Matcher->SetDetails(&Context->MatchingDetails);
@@ -319,11 +352,17 @@ namespace PCGExPathStitch
 
 				// Each sorted index gets a partition ID; unmatched get unique negative IDs
 				PartitionOf.SetNum(SortedProcessors.Num());
-				for (int32 Idx = 0; Idx < PartitionOf.Num(); ++Idx) { PartitionOf[Idx] = -(Idx + 1); }
+				for (int32 Idx = 0; Idx < PartitionOf.Num(); ++Idx)
+				{
+					PartitionOf[Idx] = -(Idx + 1);
+				}
 
 				for (int32 PIdx = 0; PIdx < Partitions.Num(); ++PIdx)
 				{
-					for (const int32 Idx : Partitions[PIdx]) { PartitionOf[Idx] = PIdx; }
+					for (const int32 Idx : Partitions[PIdx])
+					{
+						PartitionOf[Idx] = PIdx;
+					}
 				}
 			}
 		}
@@ -357,16 +396,28 @@ namespace PCGExPathStitch
 					const int32 OtherBatchIndex = FMath::Abs(Item.Index) - 1;
 					const TSharedPtr<FProcessor> Other = GetProcessor<FProcessor>(OtherBatchIndex);
 
-					if (Other->WorkIndex <= Current->WorkIndex) { return; } // Dedup + skip self
+					if (Other->WorkIndex <= Current->WorkIndex)
+					{
+						return;
+					} // Dedup + skip self
 
-					if (!PartitionOf.IsEmpty() && PartitionOf[Current->WorkIndex] != PartitionOf[Other->WorkIndex]) { return; }
+					if (!PartitionOf.IsEmpty() && PartitionOf[Current->WorkIndex] != PartitionOf[Other->WorkIndex])
+					{
+						return;
+					}
 
-					if (Settings->bOnlyMatchStartAndEnds && bCurrentEnd == bOtherEnd) { return; }
+					if (Settings->bOnlyMatchStartAndEnds && bCurrentEnd == bOtherEnd)
+					{
+						return;
+					}
 
 					const PCGExMath::FSegment& OtherSeg = bOtherEnd ? Other->EndSegment : Other->StartSegment;
 
 					const double Dist = FVector::Dist(CurrentSeg.B, OtherSeg.B);
-					if (Dist > Settings->Tolerance) { return; }
+					if (Dist > Settings->Tolerance)
+					{
+						return;
+					}
 
 					// Compute alignment based on mode
 					double Alignment;
@@ -391,16 +442,19 @@ namespace PCGExPathStitch
 							const double BridgeDotB = FVector::DotProduct(OtherSeg.Direction * -1, BridgeDir);
 
 							const double BridgeScore = Settings->BridgeScoring == EPCGExStitchBridgeScoring::Minimum
-								                           ? FMath::Min(BridgeDotA, BridgeDotB)
-								                           : (BridgeDotA + BridgeDotB) * 0.5;
+								? FMath::Min(BridgeDotA, BridgeDotB)
+								: (BridgeDotA + BridgeDotB) * 0.5;
 
 							Alignment = Settings->AlignmentMode == EPCGExStitchAlignmentMode::Bridge
-								            ? BridgeScore
-								            : FMath::Min(SegmentDot, BridgeScore);
+								? BridgeScore
+								: FMath::Min(SegmentDot, BridgeScore);
 						}
 					}
 
-					if (Settings->bDoRequireAlignment && Settings->bStrictAlignment && !Context->DotComparisonDetails.Test(Alignment)) { return; }
+					if (Settings->bDoRequireAlignment && Settings->bStrictAlignment && !Context->DotComparisonDetails.Test(Alignment))
+					{
+						return;
+					}
 
 					Candidates.Add({Current, Other, bCurrentEnd, bOtherEnd, Alignment, Dist});
 				});
@@ -423,7 +477,10 @@ namespace PCGExPathStitch
 			{
 				return X.Dist < Y.Dist;
 			}
-			if (X.A->WorkIndex != Y.A->WorkIndex) { return X.A->WorkIndex < Y.A->WorkIndex; }
+			if (X.A->WorkIndex != Y.A->WorkIndex)
+			{
+				return X.A->WorkIndex < Y.A->WorkIndex;
+			}
 			return X.B->WorkIndex < Y.B->WorkIndex;
 		});
 

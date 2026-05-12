@@ -9,11 +9,11 @@
 #include "PropertyHandle.h"
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
 #include "Filters/Points/PCGExBitmaskFilter.h"
-#include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SScaleBox.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
+#include "Widgets/Text/STextBlock.h"
 
 namespace PCGExBitmaskCustomization
 {
@@ -44,8 +44,14 @@ namespace PCGExBitmaskCustomization
 						BitmaskHandle->GetValue(Mask);
 
 						const int64 Bit = (1LL << BitIndex);
-						if (NewState == ECheckBoxState::Checked) { Mask |= Bit; }
-						else { Mask &= ~Bit; }
+						if (NewState == ECheckBoxState::Checked)
+						{
+							Mask |= Bit;
+						}
+						else
+						{
+							Mask &= ~Bit;
+						}
 
 						BitmaskHandle->SetValue(Mask);
 					})
@@ -88,9 +94,18 @@ void FPCGExBitmaskCustomization::CustomizeChildren(
 	for (uint32 i = 0; i < NumChildren; ++i)
 	{
 		TSharedPtr<IPropertyHandle> Handle = PropertyHandle->GetChildHandle(i);
-		if (Handle->GetProperty()->GetFName() == FName("Mode")) { continue; }
-		if (Handle->GetProperty()->GetFName() == FName("Bitmask")) { BuildGrid(PropertyHandle, ChildBuilder); }
-		else { ChildBuilder.AddProperty(Handle.ToSharedRef()); }
+		if (Handle->GetProperty()->GetFName() == FName("Mode"))
+		{
+			continue;
+		}
+		if (Handle->GetProperty()->GetFName() == FName("Bitmask"))
+		{
+			BuildGrid(PropertyHandle, ChildBuilder);
+		}
+		else
+		{
+			ChildBuilder.AddProperty(Handle.ToSharedRef());
+		}
 	}
 }
 

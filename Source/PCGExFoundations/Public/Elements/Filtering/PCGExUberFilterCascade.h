@@ -6,9 +6,9 @@
 #include "CoreMinimal.h"
 #include "Factories/PCGExFactories.h"
 
-#include "Core/PCGExPointsProcessor.h"
-#include "Core/PCGExPointFilter.h"
 #include "PCGExFilterCommon.h"
+#include "Core/PCGExPointFilter.h"
+#include "Core/PCGExPointsProcessor.h"
 
 #include "PCGExUberFilterCascade.generated.h"
 
@@ -33,12 +33,25 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(UberFilterCascade, "Uber Filter (Cascade)", "Filter points into multiple buckets based on ordered filter groups. First matching group claims the point.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
 	virtual bool HasDynamicPins() const override;
 
 protected:
@@ -49,7 +62,11 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override { return PCGExData::EIOInit::NoInit; }
+	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override
+	{
+		return PCGExData::EIOInit::NoInit;
+	}
+
 	virtual FName GetMainOutputPin() const override;
 	//~End UPCGExPointsProcessorSettings
 

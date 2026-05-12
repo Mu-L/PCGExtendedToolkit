@@ -4,13 +4,15 @@
 #include "Paths/PCGExPolyPath.h"
 
 #include "Data/PCGSplineData.h"
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Data/PCGSplineStruct.h"
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Curve/CurveUtil.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Math/PCGExBestFitPlane.h"
-#include "Paths/PCGExPathsHelpers.h"
 #include "Paths/PCGExPathsCommon.h"
+#include "Paths/PCGExPathsHelpers.h"
 
 #if PCGEX_ENGINE_VERSION > 506
 #include "Data/PCGPolygon2DData.h"
@@ -25,8 +27,17 @@ namespace PCGExPaths
 		: FPath(InPointIO->GetIn()->GetConstTransformValueRange(), Helpers::GetClosedLoop(InPointIO), Expansion)
 	{
 		Projection = InProjection;
-		if (Projection.Method != EPCGExProjectionMethod::Normal) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); }
-		else { if (!Projection.Init(InPointIO)) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); } }
+		if (Projection.Method != EPCGExProjectionMethod::Normal)
+		{
+			Projection.Init(PCGExMath::FBestFitPlane(Positions));
+		}
+		else
+		{
+			if (!Projection.Init(InPointIO))
+			{
+				Projection.Init(PCGExMath::FBestFitPlane(Positions));
+			}
+		}
 
 		InitFromTransforms(WindingMutation);
 	}
@@ -35,8 +46,17 @@ namespace PCGExPaths
 		: FPath(InPathFacade->GetIn()->GetConstTransformValueRange(), Helpers::GetClosedLoop(InPathFacade->Source), Expansion)
 	{
 		Projection = InProjection;
-		if (Projection.Method != EPCGExProjectionMethod::Normal) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); }
-		else { if (!Projection.Init(InPathFacade)) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); } }
+		if (Projection.Method != EPCGExProjectionMethod::Normal)
+		{
+			Projection.Init(PCGExMath::FBestFitPlane(Positions));
+		}
+		else
+		{
+			if (!Projection.Init(InPathFacade))
+			{
+				Projection.Init(PCGExMath::FBestFitPlane(Positions));
+			}
+		}
 
 		InitFromTransforms(WindingMutation);
 	}
@@ -50,13 +70,25 @@ namespace PCGExPaths
 		Spline->ConvertSplineToPolyLine(ESplineCoordinateSpace::World, FMath::Square(Fidelity), TempPolyline);
 
 		LocalTransforms.Reserve(TempPolyline.Num());
-		for (int i = 0; i < TempPolyline.Num(); i++) { LocalTransforms.Emplace(TempPolyline[i]); }
+		for (int i = 0; i < TempPolyline.Num(); i++)
+		{
+			LocalTransforms.Emplace(TempPolyline[i]);
+		}
 
 		Positions = TConstPCGValueRange<FTransform>(MakeConstStridedView(LocalTransforms));
 
 		Projection = InProjection;
-		if (Projection.Method != EPCGExProjectionMethod::Normal) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); }
-		else { if (!Projection.Init(SplineData)) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); } }
+		if (Projection.Method != EPCGExProjectionMethod::Normal)
+		{
+			Projection.Init(PCGExMath::FBestFitPlane(Positions));
+		}
+		else
+		{
+			if (!Projection.Init(SplineData))
+			{
+				Projection.Init(PCGExMath::FBestFitPlane(Positions));
+			}
+		}
 
 
 		InitFromTransforms(WindingMutation);
@@ -82,8 +114,17 @@ namespace PCGExPaths
 		Positions = TConstPCGValueRange<FTransform>(MakeConstStridedView(LocalTransforms));
 
 		Projection = InProjection;
-		if (Projection.Method != EPCGExProjectionMethod::Normal) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); }
-		else { if (!Projection.Init(PolygonData)) { Projection.Init(PCGExMath::FBestFitPlane(Positions)); } }
+		if (Projection.Method != EPCGExProjectionMethod::Normal)
+		{
+			Projection.Init(PCGExMath::FBestFitPlane(Positions));
+		}
+		else
+		{
+			if (!Projection.Init(PolygonData))
+			{
+				Projection.Init(PCGExMath::FBestFitPlane(Positions));
+			}
+		}
 
 		InitFromTransforms(WindingMutation);
 
@@ -108,7 +149,10 @@ namespace PCGExPaths
 			if (!PCGExMath::IsWinded(Wants, UE::Geometry::CurveUtil::SignedArea2<double, FVector2D>(ProjectedPoints) < 0))
 			{
 				Algo::Reverse(ProjectedPoints);
-				if (!LocalTransforms.IsEmpty()) { Algo::Reverse(LocalTransforms); }
+				if (!LocalTransforms.IsEmpty())
+				{
+					Algo::Reverse(LocalTransforms);
+				}
 			}
 		}
 

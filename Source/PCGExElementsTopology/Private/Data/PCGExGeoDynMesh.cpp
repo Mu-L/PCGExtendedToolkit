@@ -31,33 +31,45 @@ namespace PCGExMesh
 				TArray<int32>* InRawIndices,
 				const FVector& InTolerance,
 				const bool bInPrecise)
-				: Vertices(InVertices),
-				  RawIndices(InRawIndices),
-				  HashTolerance(InTolerance),
-				  bPrecise(bInPrecise)
+				: Vertices(InVertices)
+				  , RawIndices(InRawIndices)
+				  , HashTolerance(InTolerance)
+				  , bPrecise(bInPrecise)
 			{
 				Data.Reserve(EstimatedSize);
 				Vertices->Reserve(EstimatedSize);
-				if (RawIndices) { RawIndices->Reserve(EstimatedSize); }
+				if (RawIndices)
+				{
+					RawIndices->Reserve(EstimatedSize);
+				}
 			}
 
 			uint32 Add_GetIdx(const FVector& Position, const int32 RawIndex)
 			{
 				const uint64 Key = PCGEx::SH3(Position, HashTolerance);
 
-				if (const int32* IdxPtr = Data.Find(Key)) { return *IdxPtr; }
+				if (const int32* IdxPtr = Data.Find(Key))
+				{
+					return *IdxPtr;
+				}
 
 				if (bPrecise)
 				{
 					const uint64 OffsetKey = PCGEx::SH3(Position + (0.5 * HashTolerance), HashTolerance);
 					if (OffsetKey != Key)
 					{
-						if (const int32* IdxPtr = Data.Find(OffsetKey)) { return *IdxPtr; }
+						if (const int32* IdxPtr = Data.Find(OffsetKey))
+						{
+							return *IdxPtr;
+						}
 					}
 
 					const int32 Idx = AddVertex(Position, RawIndex);
 					Data.Add(Key, Idx);
-					if (OffsetKey != Key) { Data.Add(OffsetKey, Idx); }
+					if (OffsetKey != Key)
+					{
+						Data.Add(OffsetKey, Idx);
+					}
 					return Idx;
 				}
 
@@ -70,7 +82,10 @@ namespace PCGExMesh
 			FORCEINLINE int32 AddVertex(const FVector& Position, const int32 RawIndex) const
 			{
 				const int32 Idx = Vertices->Emplace(Position);
-				if (RawIndices) { RawIndices->Emplace(RawIndex); }
+				if (RawIndices)
+				{
+					RawIndices->Emplace(RawIndex);
+				}
 				return Idx;
 			}
 		};
@@ -82,8 +97,8 @@ namespace PCGExMesh
 		const UE::Geometry::FDynamicMesh3* InMesh,
 		const FVector& InCWTolerance,
 		const bool bInPreciseVertexMerge)
-		: CWTolerance(InCWTolerance),
-		  bPreciseVertexMerge(bInPreciseVertexMerge)
+		: CWTolerance(InCWTolerance)
+		  , bPreciseVertexMerge(bInPreciseVertexMerge)
 	{
 		SourceMesh = InMesh;
 		bIsValid = SourceMesh != nullptr && SourceMesh->TriangleCount() > 0;
@@ -93,8 +108,14 @@ namespace PCGExMesh
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FGeoDynMesh::ExtractMeshSynchronous);
 
-		if (bIsLoaded) { return; }
-		if (!bIsValid) { return; }
+		if (bIsLoaded)
+		{
+			return;
+		}
+		if (!bIsValid)
+		{
+			return;
+		}
 
 		const UE::Geometry::FDynamicMesh3& Mesh = *SourceMesh;
 		const int32 EstimatedVertices = Mesh.MaxVertexID();
@@ -116,9 +137,18 @@ namespace PCGExMesh
 			VertexIDToDenseIndex.Add(Tri.B, B);
 			VertexIDToDenseIndex.Add(Tri.C, C);
 
-			if (A != B) { Edges.Add(PCGEx::H64U(A, B)); }
-			if (B != C) { Edges.Add(PCGEx::H64U(B, C)); }
-			if (C != A) { Edges.Add(PCGEx::H64U(C, A)); }
+			if (A != B)
+			{
+				Edges.Add(PCGEx::H64U(A, B));
+			}
+			if (B != C)
+			{
+				Edges.Add(PCGEx::H64U(B, C));
+			}
+			if (C != A)
+			{
+				Edges.Add(PCGEx::H64U(C, A));
+			}
 		}
 
 		bIsLoaded = true;
@@ -128,8 +158,14 @@ namespace PCGExMesh
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FGeoDynMesh::TriangulateMeshSynchronous);
 
-		if (bIsLoaded) { return; }
-		if (!bIsValid) { return; }
+		if (bIsLoaded)
+		{
+			return;
+		}
+		if (!bIsValid)
+		{
+			return;
+		}
 
 		const UE::Geometry::FDynamicMesh3& Mesh = *SourceMesh;
 		const int32 EstimatedVertices = Mesh.MaxVertexID();
@@ -158,7 +194,10 @@ namespace PCGExMesh
 				if (Adjacency[i] == -1)
 				{
 					Adjacency[i] = OtherTri;
-					if (i == 2) { Tri_IsOnHull[Tri] = false; }
+					if (i == 2)
+					{
+						Tri_IsOnHull[Tri] = false;
+					}
 					break;
 				}
 			}
@@ -170,7 +209,8 @@ namespace PCGExMesh
 			Edges.Add(Edge, &bIsAlreadySet);
 			if (bIsAlreadySet)
 			{
-				if (int32 OtherTri = -1; EdgeMap.RemoveAndCopyValue(Edge, OtherTri))
+				if (int32 OtherTri = -1;
+					EdgeMap.RemoveAndCopyValue(Edge, OtherTri))
 				{
 					PushAdjacency(OtherTri, Tri);
 					PushAdjacency(Tri, OtherTri);
@@ -195,7 +235,10 @@ namespace PCGExMesh
 			VertexIDToDenseIndex.Add(SrcTri.B, B);
 			VertexIDToDenseIndex.Add(SrcTri.C, C);
 
-			if (A == B || B == C || C == A) { continue; }
+			if (A == B || B == C || C == A)
+			{
+				continue;
+			}
 
 			Triangles[Ti] = FIntVector3(A, B, C);
 
@@ -254,10 +297,16 @@ namespace PCGExMesh
 
 	bool FGeoDynMesh::GetAveragedVertexColors(TArray<FVector4f>& OutColors) const
 	{
-		if (!SourceMesh || !SourceMesh->HasAttributes()) { return false; }
+		if (!SourceMesh || !SourceMesh->HasAttributes())
+		{
+			return false;
+		}
 
 		const UE::Geometry::FDynamicMeshColorOverlay* ColorOverlay = SourceMesh->Attributes()->PrimaryColors();
-		if (!ColorOverlay || ColorOverlay->ElementCount() == 0) { return false; }
+		if (!ColorOverlay || ColorOverlay->ElementCount() == 0)
+		{
+			return false;
+		}
 
 		const int32 NumVerts = Vertices.Num();
 		OutColors.SetNumZeroed(NumVerts);
@@ -266,7 +315,10 @@ namespace PCGExMesh
 
 		for (const int32 TriID : SourceMesh->TriangleIndicesItr())
 		{
-			if (!ColorOverlay->IsSetTriangle(TriID)) { continue; }
+			if (!ColorOverlay->IsSetTriangle(TriID))
+			{
+				continue;
+			}
 
 			const UE::Geometry::FIndex3i SrcTri = SourceMesh->GetTriangle(TriID);
 			const UE::Geometry::FIndex3i ColorTri = ColorOverlay->GetTriangle(TriID);
@@ -274,7 +326,10 @@ namespace PCGExMesh
 			for (int i = 0; i < 3; i++)
 			{
 				const int32* DenseIdx = VertexIDToDenseIndex.Find(SrcTri[i]);
-				if (!DenseIdx) { continue; }
+				if (!DenseIdx)
+				{
+					continue;
+				}
 
 				const FVector4f Color = ColorOverlay->GetElement(ColorTri[i]);
 				OutColors[*DenseIdx] += Color;
@@ -284,7 +339,10 @@ namespace PCGExMesh
 
 		for (int i = 0; i < NumVerts; i++)
 		{
-			if (Counts[i] > 0) { OutColors[i] /= static_cast<float>(Counts[i]); }
+			if (Counts[i] > 0)
+			{
+				OutColors[i] /= static_cast<float>(Counts[i]);
+			}
 		}
 
 		return true;
@@ -292,17 +350,29 @@ namespace PCGExMesh
 
 	int32 FGeoDynMesh::GetNumUVChannels() const
 	{
-		if (!SourceMesh || !SourceMesh->HasAttributes()) { return 0; }
+		if (!SourceMesh || !SourceMesh->HasAttributes())
+		{
+			return 0;
+		}
 		return SourceMesh->Attributes()->NumUVLayers();
 	}
 
 	bool FGeoDynMesh::GetAveragedVertexUVs(const int32 Channel, TArray<FVector2f>& OutUVs) const
 	{
-		if (!SourceMesh || !SourceMesh->HasAttributes()) { return false; }
-		if (Channel < 0 || Channel >= SourceMesh->Attributes()->NumUVLayers()) { return false; }
+		if (!SourceMesh || !SourceMesh->HasAttributes())
+		{
+			return false;
+		}
+		if (Channel < 0 || Channel >= SourceMesh->Attributes()->NumUVLayers())
+		{
+			return false;
+		}
 
 		const UE::Geometry::FDynamicMeshUVOverlay* UVOverlay = SourceMesh->Attributes()->GetUVLayer(Channel);
-		if (!UVOverlay || UVOverlay->ElementCount() == 0) { return false; }
+		if (!UVOverlay || UVOverlay->ElementCount() == 0)
+		{
+			return false;
+		}
 
 		const int32 NumVerts = Vertices.Num();
 		OutUVs.SetNumZeroed(NumVerts);
@@ -311,7 +381,10 @@ namespace PCGExMesh
 
 		for (const int32 TriID : SourceMesh->TriangleIndicesItr())
 		{
-			if (!UVOverlay->IsSetTriangle(TriID)) { continue; }
+			if (!UVOverlay->IsSetTriangle(TriID))
+			{
+				continue;
+			}
 
 			const UE::Geometry::FIndex3i SrcTri = SourceMesh->GetTriangle(TriID);
 			const UE::Geometry::FIndex3i UVTri = UVOverlay->GetTriangle(TriID);
@@ -319,7 +392,10 @@ namespace PCGExMesh
 			for (int i = 0; i < 3; i++)
 			{
 				const int32* DenseIdx = VertexIDToDenseIndex.Find(SrcTri[i]);
-				if (!DenseIdx) { continue; }
+				if (!DenseIdx)
+				{
+					continue;
+				}
 
 				const FVector2f UV = UVOverlay->GetElement(UVTri[i]);
 				OutUVs[*DenseIdx] += UV;
@@ -329,7 +405,10 @@ namespace PCGExMesh
 
 		for (int i = 0; i < NumVerts; i++)
 		{
-			if (Counts[i] > 0) { OutUVs[i] /= static_cast<float>(Counts[i]); }
+			if (Counts[i] > 0)
+			{
+				OutUVs[i] /= static_cast<float>(Counts[i]);
+			}
 		}
 
 		return true;

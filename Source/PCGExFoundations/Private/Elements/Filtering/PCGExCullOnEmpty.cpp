@@ -7,8 +7,8 @@
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Data/PCGBasePointData.h"
-#include "Factories/PCGExFactories.h"
 #include "Data/PCGPolyLineData.h"
+#include "Factories/PCGExFactories.h"
 #include "Metadata/PCGMetadata.h"
 
 #define LOCTEXT_NAMESPACE "CullOnEmptyElement"
@@ -37,7 +37,10 @@ namespace PCGExCullOnEmpty
 {
 	static bool IsDataNonEmpty(const UPCGData* Data)
 	{
-		if (!Data) { return false; }
+		if (!Data)
+		{
+			return false;
+		}
 
 		// Point data: check point count
 		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(Data))

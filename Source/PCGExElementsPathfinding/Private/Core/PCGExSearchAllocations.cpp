@@ -22,7 +22,10 @@ namespace PCGExPathfinding
 		}
 		else
 		{
-			for (int i = 0; i < NumNodes; i++) { Visited[i] = false; }
+			for (int i = 0; i < NumNodes; i++)
+			{
+				Visited[i] = false;
+			}
 		}
 
 		TravelStack->Reset();

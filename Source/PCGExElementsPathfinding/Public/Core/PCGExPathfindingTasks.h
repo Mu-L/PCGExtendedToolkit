@@ -17,7 +17,9 @@ class FPCGExPathfindingTask : public PCGExMT::FPCGExIndexedTask
 {
 public:
 	FPCGExPathfindingTask(const int32 InTaskIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TArray<PCGExPathfinding::FSeedGoalPair>* InQueries)
-		: FPCGExIndexedTask(InTaskIndex), PointIO(InPointIO), Queries(InQueries)
+		: FPCGExIndexedTask(InTaskIndex)
+		  , PointIO(InPointIO)
+		  , Queries(InQueries)
 	{
 	}
 

@@ -76,11 +76,16 @@ namespace PCGExClipper2
 	{
 		switch (InType)
 		{
-		case EPCGExClipper2JoinType::Square: return PCGExClipper2Lib::JoinType::Square;
-		case EPCGExClipper2JoinType::Round: return PCGExClipper2Lib::JoinType::Round;
-		case EPCGExClipper2JoinType::Bevel: return PCGExClipper2Lib::JoinType::Bevel;
-		case EPCGExClipper2JoinType::Miter: return PCGExClipper2Lib::JoinType::Miter;
-		default: return PCGExClipper2Lib::JoinType::Round;
+		case EPCGExClipper2JoinType::Square:
+			return PCGExClipper2Lib::JoinType::Square;
+		case EPCGExClipper2JoinType::Round:
+			return PCGExClipper2Lib::JoinType::Round;
+		case EPCGExClipper2JoinType::Bevel:
+			return PCGExClipper2Lib::JoinType::Bevel;
+		case EPCGExClipper2JoinType::Miter:
+			return PCGExClipper2Lib::JoinType::Miter;
+		default:
+			return PCGExClipper2Lib::JoinType::Round;
 		}
 	}
 
@@ -88,12 +93,18 @@ namespace PCGExClipper2
 	{
 		switch (InType)
 		{
-		case EPCGExClipper2EndType::Polygon: return PCGExClipper2Lib::EndType::Polygon;
-		case EPCGExClipper2EndType::Joined: return PCGExClipper2Lib::EndType::Joined;
-		case EPCGExClipper2EndType::Butt: return PCGExClipper2Lib::EndType::Butt;
-		case EPCGExClipper2EndType::Square: return PCGExClipper2Lib::EndType::Square;
-		case EPCGExClipper2EndType::Round: return PCGExClipper2Lib::EndType::Round;
-		default: return PCGExClipper2Lib::EndType::Round;
+		case EPCGExClipper2EndType::Polygon:
+			return PCGExClipper2Lib::EndType::Polygon;
+		case EPCGExClipper2EndType::Joined:
+			return PCGExClipper2Lib::EndType::Joined;
+		case EPCGExClipper2EndType::Butt:
+			return PCGExClipper2Lib::EndType::Butt;
+		case EPCGExClipper2EndType::Square:
+			return PCGExClipper2Lib::EndType::Square;
+		case EPCGExClipper2EndType::Round:
+			return PCGExClipper2Lib::EndType::Round;
+		default:
+			return PCGExClipper2Lib::EndType::Round;
 		}
 	}
 
@@ -101,11 +112,15 @@ namespace PCGExClipper2
 	{
 		switch (InRule)
 		{
-		case EPCGExClipper2FillRule::EvenOdd: return PCGExClipper2Lib::FillRule::EvenOdd;
+		case EPCGExClipper2FillRule::EvenOdd:
+			return PCGExClipper2Lib::FillRule::EvenOdd;
 		default:
-		case EPCGExClipper2FillRule::NonZero: return PCGExClipper2Lib::FillRule::NonZero;
-		case EPCGExClipper2FillRule::Positive: return PCGExClipper2Lib::FillRule::Positive;
-		case EPCGExClipper2FillRule::Negative: return PCGExClipper2Lib::FillRule::Negative;
+		case EPCGExClipper2FillRule::NonZero:
+			return PCGExClipper2Lib::FillRule::NonZero;
+		case EPCGExClipper2FillRule::Positive:
+			return PCGExClipper2Lib::FillRule::Positive;
+		case EPCGExClipper2FillRule::Negative:
+			return PCGExClipper2Lib::FillRule::Negative;
 		}
 	}
 
@@ -155,7 +170,10 @@ namespace PCGExClipper2
 		explicit FOpData(const int32 InReserve);
 		void AddReserve(const int32 InReserve);
 
-		int32 Num() const { return Facades.Num(); }
+		int32 Num() const
+		{
+			return Facades.Num();
+		}
 	};
 
 	/**
@@ -193,7 +211,10 @@ namespace PCGExClipper2
 		void PreProcess(const UPCGExClipper2ProcessorSettings* InSettings);
 
 		// Check if this group is valid for processing
-		bool IsValid() const { return !SubjectPaths.empty() || !OpenSubjectPaths.empty(); }
+		bool IsValid() const
+		{
+			return !SubjectPaths.empty() || !OpenSubjectPaths.empty();
+		}
 
 		// Add intersection blend info (thread-safe)
 		void AddIntersectionBlendInfo(int64_t X, int64_t Y, const FIntersectionBlendInfo& Info);
@@ -219,7 +240,10 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Path); }
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Path);
+	}
 #endif
 	//~End UPCGSettings
 
@@ -264,7 +288,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable))
 	double ArcTolerance = 5.0;
 
-	FORCEINLINE double GetArcTolerance() const { return ArcTolerance * static_cast<double>(Precision); }
+	FORCEINLINE double GetArcTolerance() const
+	{
+		return ArcTolerance * static_cast<double>(Precision);
+	}
 
 	/** Filter in/out which attributes get carried over from inputs to outputs. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))

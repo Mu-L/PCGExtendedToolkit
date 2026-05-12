@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Details/PCGExInputShorthandsDetails.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
-#include "Selectors/PCGExEntryPickerOperation.h"
-#include "Selectors/PCGExSelectorSharedData.h"
 #include "Data/PCGBasePointData.h"
+#include "Details/PCGExInputShorthandsDetails.h"
+#include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 
 #include "PCGExSelectorBestFit.generated.h"
 
@@ -46,6 +46,7 @@ enum class EPCGExAxisMask : uint8
 	Y    = 1 << 1,
 	Z    = 1 << 2,
 };
+
 ENUM_CLASS_FLAGS(EPCGExAxisMask)
 
 /**
@@ -56,10 +57,10 @@ class FPCGExBestFitSharedData : public PCGExCollections::FSelectorSharedData
 {
 public:
 	TArray<FVector> EntryExtents;
-	TArray<FVector> EntryExtentsMaxNorm;   // max-component normalized, for AspectRatio
+	TArray<FVector> EntryExtentsMaxNorm; // max-component normalized, for AspectRatio
 	TArray<double> EntryVolumes;
 	TArray<double> EntryWeights;
-	TArray<int32> ValidEntryIndices;       // entries with Volume > UE_DOUBLE_SMALL_NUMBER
+	TArray<int32> ValidEntryIndices; // entries with Volume > UE_DOUBLE_SMALL_NUMBER
 };
 
 /**

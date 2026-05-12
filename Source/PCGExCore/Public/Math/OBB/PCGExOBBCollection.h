@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
 #include "PCGExOBB.h"
-#include "PCGExOBBTests.h"
 #include "PCGExOBBIntersections.h"
+#include "PCGExOBBTests.h"
 #include "PCGExOctree.h"
 #include "Math/PCGExMathBounds.h"
 
@@ -55,20 +55,51 @@ namespace PCGExMath::OBB
 
 		void BuildFrom(const TSharedPtr<PCGExData::FPointIO>& InIO, const EPCGExPointBoundsSource BoundsSource);
 
-		FORCEINLINE int32 Num() const { return Bounds.Num(); }
-		FORCEINLINE bool IsEmpty() const { return Bounds.IsEmpty(); }
+		FORCEINLINE int32 Num() const
+		{
+			return Bounds.Num();
+		}
 
-		FORCEINLINE const FBounds& GetBounds(const int32 Index) const { return Bounds[Index]; }
-		FORCEINLINE const FOrientation& GetOrientation(const int32 Index) const { return Orientations[Index]; }
+		FORCEINLINE bool IsEmpty() const
+		{
+			return Bounds.IsEmpty();
+		}
 
-		FORCEINLINE FOBB GetOBB(const int32 Index) const { return FOBB(Bounds[Index], Orientations[Index]); }
+		FORCEINLINE const FBounds& GetBounds(const int32 Index) const
+		{
+			return Bounds[Index];
+		}
 
-		FORCEINLINE const FBox& GetWorldBounds() const { return WorldBounds; }
-		FORCEINLINE PCGExOctree::FItemOctree* GetOctree() const { return Octree.Get(); }
+		FORCEINLINE const FOrientation& GetOrientation(const int32 Index) const
+		{
+			return Orientations[Index];
+		}
+
+		FORCEINLINE FOBB GetOBB(const int32 Index) const
+		{
+			return FOBB(Bounds[Index], Orientations[Index]);
+		}
+
+		FORCEINLINE const FBox& GetWorldBounds() const
+		{
+			return WorldBounds;
+		}
+
+		FORCEINLINE PCGExOctree::FItemOctree* GetOctree() const
+		{
+			return Octree.Get();
+		}
 
 		// Raw array access for advanced use
-		FORCEINLINE const TArray<FBounds>& GetBoundsArray() const { return Bounds; }
-		FORCEINLINE const TArray<FOrientation>& GetOrientationsArray() const { return Orientations; }
+		FORCEINLINE const TArray<FBounds>& GetBoundsArray() const
+		{
+			return Bounds;
+		}
+
+		FORCEINLINE const TArray<FOrientation>& GetOrientationsArray() const
+		{
+			return Orientations;
+		}
 
 		// Point queries
 
@@ -229,7 +260,13 @@ namespace PCGExMath::OBB
 				{Box.Min.X, Box.Max.Y, Box.Max.Z}, {Box.Max.X, Box.Max.Y, Box.Max.Z},
 			};
 
-			for (int32 i = 0; i < 8; i++) { if (!IsPointInside(Corners[i])) { return false; } }
+			for (int32 i = 0; i < 8; i++)
+			{
+				if (!IsPointInside(Corners[i]))
+				{
+					return false;
+				}
+			}
 			return true;
 		}
 	};
@@ -256,7 +293,10 @@ namespace PCGExMath::OBB
 		virtual void Reset() override;
 
 		/** Returns the index of the last added entry. */
-		FORCEINLINE int32 LastIndex() const { return Num() - 1; }
+		FORCEINLINE int32 LastIndex() const
+		{
+			return Num() - 1;
+		}
 
 		/** Mark entries from FromIndex onward as invalid (for grammar backtracking). */
 		void Invalidate(int32 FromIndex);
@@ -272,7 +312,7 @@ namespace PCGExMath::OBB
 
 		/** Two-tier threshold-overlap check with ValidMask + per-entry callback filter. Callback receives stored item index (OBB.Bounds.Index), returns true to SKIP. */
 		virtual bool OverlapsBeyondThreshold(const FOBB& Candidate, float MaxPenetration, int32 SkipIndex,
-			TFunctionRef<bool(int32)> ShouldSkip) const override;
+		                                     TFunctionRef<bool(int32)> ShouldSkip) const override;
 
 		/** Two-tier SAT enumerator (octree + pending) with ValidMask filtering; calls ConfirmOverlap for each survivor. */
 		virtual bool ForEachOverlapping(

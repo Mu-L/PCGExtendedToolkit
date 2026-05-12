@@ -7,19 +7,19 @@
 #include "PCGExHeuristicsCommon.h"
 #include "PCGExHeuristicsHandler.h"
 #include "PCGParamData.h"
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
 #include "Core/PCGExPathQuery.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "GoalPickers/PCGExGoalPickerRandom.h"
-#include "Search/PCGExSearchAStar.h"
-#include "Search/PCGExSearchOperation.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
+#include "Search/PCGExSearchAStar.h"
+#include "Search/PCGExSearchOperation.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPathfindingEdgesElement"
 #define PCGEX_NAMESPACE PathfindingEdges
@@ -29,22 +29,37 @@ void UPCGExPathfindingEdgesSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!GoalPicker) { GoalPicker = NewObject<UPCGExGoalPicker>(this, TEXT("GoalPicker")); }
-		if (!SearchAlgorithm) { SearchAlgorithm = NewObject<UPCGExSearchAStar>(this, TEXT("SearchAlgorithm")); }
+		if (!GoalPicker)
+		{
+			GoalPicker = NewObject<UPCGExGoalPicker>(this, TEXT("GoalPicker"));
+		}
+		if (!SearchAlgorithm)
+		{
+			SearchAlgorithm = NewObject<UPCGExSearchAStar>(this, TEXT("SearchAlgorithm"));
+		}
 	}
 	Super::PostInitProperties();
 }
 
 void UPCGExPathfindingEdgesSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	if (GoalPicker) { GoalPicker->UpdateUserFacingInfos(); }
-	if (SearchAlgorithm) { SearchAlgorithm->UpdateUserFacingInfos(); }
+	if (GoalPicker)
+	{
+		GoalPicker->UpdateUserFacingInfos();
+	}
+	if (SearchAlgorithm)
+	{
+		SearchAlgorithm->UpdateUserFacingInfos();
+	}
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
 void FPCGExPathfindingEdgesContext::BuildPath(const TSharedPtr<PCGExPathfinding::FPathQuery>& Query, const TSharedPtr<PCGExData::FPointIO>& PathIO)
 {
-	if (!PathIO) { return; }
+	if (!PathIO)
+	{
+		return;
+	}
 
 	PCGEX_SETTINGS_LOCAL(PathfindingEdges)
 
@@ -55,22 +70,37 @@ void FPCGExPathfindingEdgesContext::BuildPath(const TSharedPtr<PCGExPathfinding:
 	if (Settings->PathComposition == EPCGExPathComposition::Vtx)
 	{
 		Query->AppendNodePoints(PathIndices);
-		if (PathIndices.Num() < 2) { return; }
+		if (PathIndices.Num() < 2)
+		{
+			return;
+		}
 	}
 	else if (Settings->PathComposition == EPCGExPathComposition::Edges)
 	{
 		Query->AppendEdgePoints(PathIndices);
-		if (PathIndices.Num() < 1) { return; }
+		if (PathIndices.Num() < 1)
+		{
+			return;
+		}
 	}
 	else if (Settings->PathComposition == EPCGExPathComposition::VtxAndEdges)
 	{
 		// TODO : Implement
 	}
 
-	if (Settings->bAddSeedToPath) { ExtraIndices++; }
-	if (Settings->bAddGoalToPath) { ExtraIndices++; }
+	if (Settings->bAddSeedToPath)
+	{
+		ExtraIndices++;
+	}
+	if (Settings->bAddGoalToPath)
+	{
+		ExtraIndices++;
+	}
 
-	if (!Settings->PathOutputDetails.Validate(PathIndices.Num() + ExtraIndices)) { return; }
+	if (!Settings->PathOutputDetails.Validate(PathIndices.Num() + ExtraIndices))
+	{
+		return;
+	}
 
 	PathIO->Enable();
 
@@ -130,12 +160,22 @@ TArray<FPCGPinProperties> UPCGExPathfindingEdgesSettings::OutputPinProperties() 
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExPathfindingEdgesSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExPathfindingEdgesSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExPathfindingEdgesSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExPathfindingEdgesSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 bool FPCGExPathfindingEdgesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathfindingEdges)
 
@@ -143,16 +183,28 @@ bool FPCGExPathfindingEdgesElement::Boot(FPCGExContext* InContext) const
 	PCGEX_BIND_INSTANCED_FACTORY(SearchAlgorithm, UPCGExSearchInstancedFactory, PCGExPathfinding::Labels::SourceOverridesSearch)
 
 	Context->SeedsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExCommon::Labels::SourceSeedsLabel, false, true);
-	if (!Context->SeedsDataFacade) { return false; }
+	if (!Context->SeedsDataFacade)
+	{
+		return false;
+	}
 
 	Context->GoalsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExClusters::Labels::SourceGoalsLabel, false, true);
-	if (!Context->GoalsDataFacade) { return false; }
+	if (!Context->GoalsDataFacade)
+	{
+		return false;
+	}
 
 	PCGEX_FWD(SeedAttributesToPathTags)
 	PCGEX_FWD(GoalAttributesToPathTags)
 
-	if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade)) { return false; }
-	if (!Context->GoalAttributesToPathTags.Init(Context, Context->GoalsDataFacade)) { return false; }
+	if (!Context->SeedAttributesToPathTags.Init(Context, Context->SeedsDataFacade))
+	{
+		return false;
+	}
+	if (!Context->GoalAttributesToPathTags.Init(Context, Context->GoalsDataFacade))
+	{
+		return false;
+	}
 
 
 	auto ValidIdentity = [](const PCGExData::FAttributeIdentity& Identity) { return Identity.GetIdentifier() != PCGExPaths::Labels::ClosedLoopIdentifier; };
@@ -168,7 +220,10 @@ bool FPCGExPathfindingEdgesElement::Boot(FPCGExContext* InContext) const
 
 	// Prepare path seed/goal pairs
 
-	if (!Context->GoalPicker->PrepareForData(Context, Context->SeedsDataFacade, Context->GoalsDataFacade)) { return false; }
+	if (!Context->GoalPicker->PrepareForData(Context, Context->SeedsDataFacade, Context->GoalsDataFacade))
+	{
+		return false;
+	}
 
 	PCGExPathfinding::ProcessGoals(Context->SeedsDataFacade, Context->GoalPicker, [&](const int32 SeedIndex, const int32 GoalIndex)
 	{
@@ -192,10 +247,13 @@ bool FPCGExPathfindingEdgesElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -219,7 +277,10 @@ namespace PCGExPathfindingEdges
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPathfindingEdges::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Settings->bUseOctreeSearch)
 		{
@@ -236,8 +297,14 @@ namespace PCGExPathfindingEdges
 
 		TSharedPtr<PCGExData::FPointIO> ReferenceIO = nullptr;
 
-		if (Settings->PathComposition == EPCGExPathComposition::Vtx) { ReferenceIO = VtxDataFacade->Source; }
-		else if (Settings->PathComposition == EPCGExPathComposition::Edges) { ReferenceIO = EdgeDataFacade->Source; }
+		if (Settings->PathComposition == EPCGExPathComposition::Vtx)
+		{
+			ReferenceIO = VtxDataFacade->Source;
+		}
+		else if (Settings->PathComposition == EPCGExPathComposition::Edges)
+		{
+			ReferenceIO = EdgeDataFacade->Source;
+		}
 		else if (Settings->PathComposition == EPCGExPathComposition::VtxAndEdges)
 		{
 			// TODO : Implement
@@ -247,7 +314,10 @@ namespace PCGExPathfindingEdges
 		SearchOperation->PrepareForCluster(Cluster.Get());
 
 		bForceSingleThreadedProcessRange = HeuristicsHandler->HasGlobalFeedback() || !Settings->bGreedyQueries;
-		if (bForceSingleThreadedProcessRange) { SearchAllocations = SearchOperation->NewAllocations(); }
+		if (bForceSingleThreadedProcessRange)
+		{
+			SearchAllocations = SearchOperation->NewAllocations();
+		}
 
 		const int32 NumQueries = Context->SeedGoalPairs.Num();
 		PCGExArrayHelpers::InitArray(Queries, NumQueries);
@@ -273,15 +343,24 @@ namespace PCGExPathfindingEdges
 		{
 			TSharedPtr<PCGExPathfinding::FPathQuery> Query = Queries[Index];
 
-			ON_SCOPE_EXIT { Query->Cleanup(); };
+			ON_SCOPE_EXIT
+			{
+				Query->Cleanup();
+			};
 
 			Query->ResolvePicks(Settings->SeedPicking, Settings->GoalPicking);
 
-			if (!Query->HasValidEndpoints()) { continue; }
+			if (!Query->HasValidEndpoints())
+			{
+				continue;
+			}
 
 			Query->FindPath(SearchOperation, SearchAllocations, HeuristicsHandler, nullptr);
 
-			if (!Query->IsQuerySuccessful()) { continue; }
+			if (!Query->IsQuerySuccessful())
+			{
+				continue;
+			}
 
 			Context->BuildPath(Query, QueriesIO[Query->QueryIndex]);
 			QueriesIO[Query->QueryIndex]->IOIndex = EdgeDataFacade->Source->IOIndex * 100000 + Query->QueryIndex;

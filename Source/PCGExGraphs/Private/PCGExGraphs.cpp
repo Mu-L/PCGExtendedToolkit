@@ -4,8 +4,8 @@
 #include "PCGExGraphs.h"
 
 #include "Clusters/PCGExClusterCache.h"
-#include "Clusters/Artifacts/PCGExCachedFaceEnumerator.h"
 #include "Clusters/Artifacts/PCGExCachedChain.h"
+#include "Clusters/Artifacts/PCGExCachedFaceEnumerator.h"
 
 #if WITH_EDITOR
 

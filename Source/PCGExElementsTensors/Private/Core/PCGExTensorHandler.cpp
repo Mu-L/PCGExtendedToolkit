@@ -6,8 +6,8 @@
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExTensorFactoryProvider.h"
 #include "Core/PCGExTensorOperation.h"
-#include "UObject/UObjectGlobals.h"
 #include "UObject/Package.h"
+#include "UObject/UObjectGlobals.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExTensorHandlerDetails, Size, double, SizeInput, SizeAttribute, SizeConstant)
 
@@ -31,19 +31,34 @@ namespace PCGExTensor
 		if (Config.bNormalize)
 		{
 			Size = Config.GetValueSettingSize();
-			if (!Size->Init(InDataFacade)) { return false; }
+			if (!Size->Init(InDataFacade))
+			{
+				return false;
+			}
 		}
 
 		for (const UPCGExTensorFactoryData* Factory : InFactories)
 		{
 			TSharedPtr<PCGExTensorOperation> Op = Factory->CreateOperation(InContext);
-			if (!Op->PrepareForData(InDataFacade)) { continue; }
+			if (!Op->PrepareForData(InDataFacade))
+			{
+				continue;
+			}
 			Tensors.Add(Op);
 		}
 
-		if (Config.SamplerSettings.Sampler) { SamplerInstance = InContext->ManagedObjects->New<UPCGExTensorSampler>(GetTransientPackage(), Config.SamplerSettings.Sampler); }
-		if (!SamplerInstance) { SamplerInstance = InContext->ManagedObjects->New<UPCGExTensorSampler>(); }
-		if (!SamplerInstance) { return false; }
+		if (Config.SamplerSettings.Sampler)
+		{
+			SamplerInstance = InContext->ManagedObjects->New<UPCGExTensorSampler>(GetTransientPackage(), Config.SamplerSettings.Sampler);
+		}
+		if (!SamplerInstance)
+		{
+			SamplerInstance = InContext->ManagedObjects->New<UPCGExTensorSampler>();
+		}
+		if (!SamplerInstance)
+		{
+			return false;
+		}
 
 		SamplerInstance->BindContext(InContext);
 		SamplerInstance->PrimaryDataFacade = InDataFacade;

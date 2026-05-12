@@ -38,10 +38,10 @@ void FPCGExCollectionsModule::ShutdownModule()
 void FPCGExCollectionsModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>& InStyle)
 {
 	IPCGExLegacyModuleInterface::RegisterToEditor(InStyle);
-	
+
 	PCGEX_REGISTER_PIN_ICON(IN_Selector)
 	PCGEX_REGISTER_PIN_ICON(OUT_Selector)
-	
+
 	PCGEX_START_PCG_REGISTRATION
 	PCGEX_REGISTER_DATA_TYPE(Selector, Selector)
 }

@@ -11,8 +11,8 @@
 #endif
 
 #include "PCGEditorSettings.h"
-#include "Core/PCGExPointFilter.h"
 #include "Core/PCGExClusterFilter.h"
+#include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointStates.h"
 #endif
 

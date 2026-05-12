@@ -3,15 +3,18 @@
 
 #include "Helpers/PCGExBoundsEvaluator.h"
 
-#include "GameFramework/Actor.h"
-#include "Components/PrimitiveComponent.h"
 #include "Components/LightComponent.h"
+#include "Components/PrimitiveComponent.h"
+#include "GameFramework/Actor.h"
 
 #pragma region UPCGExBoundsEvaluator
 
 FBox UPCGExBoundsEvaluator::EvaluateActorBounds_Implementation(AActor* Actor, UPCGExAssetCollection* OwningCollection, int32 EntryIndex) const
 {
-	if (!Actor) { return FBox(ForceInit); }
+	if (!Actor)
+	{
+		return FBox(ForceInit);
+	}
 
 	FBox AccumulatedBounds(ForceInit);
 
@@ -20,7 +23,10 @@ FBox UPCGExBoundsEvaluator::EvaluateActorBounds_Implementation(AActor* Actor, UP
 
 	for (const UPrimitiveComponent* PrimComp : PrimitiveComponents)
 	{
-		if (!PrimComp->IsRegistered()) { continue; }
+		if (!PrimComp->IsRegistered())
+		{
+			continue;
+		}
 		AccumulatedBounds += PrimComp->Bounds.GetBox();
 	}
 
@@ -33,7 +39,10 @@ FBox UPCGExBoundsEvaluator::EvaluateActorBounds_Implementation(AActor* Actor, UP
 
 FBox UPCGExDefaultBoundsEvaluator::EvaluateActorBounds_Implementation(AActor* Actor, UPCGExAssetCollection* OwningCollection, int32 EntryIndex) const
 {
-	if (!Actor) { return FBox(ForceInit); }
+	if (!Actor)
+	{
+		return FBox(ForceInit);
+	}
 
 	FBox AccumulatedBounds(ForceInit);
 
@@ -42,10 +51,22 @@ FBox UPCGExDefaultBoundsEvaluator::EvaluateActorBounds_Implementation(AActor* Ac
 
 	for (const UPrimitiveComponent* PrimComp : PrimitiveComponents)
 	{
-		if (!PrimComp->IsRegistered()) { continue; }
-		if (bIgnoreEditorOnlyComponents && PrimComp->IsEditorOnly()) { continue; }
-		if (bOnlyCollidingComponents && !PrimComp->IsCollisionEnabled()) { continue; }
-		if (bIgnoreLightComponents && PrimComp->IsA<ULightComponent>()) { continue; }
+		if (!PrimComp->IsRegistered())
+		{
+			continue;
+		}
+		if (bIgnoreEditorOnlyComponents && PrimComp->IsEditorOnly())
+		{
+			continue;
+		}
+		if (bOnlyCollidingComponents && !PrimComp->IsCollisionEnabled())
+		{
+			continue;
+		}
+		if (bIgnoreLightComponents && PrimComp->IsA<ULightComponent>())
+		{
+			continue;
+		}
 
 		AccumulatedBounds += PrimComp->Bounds.GetBox();
 	}

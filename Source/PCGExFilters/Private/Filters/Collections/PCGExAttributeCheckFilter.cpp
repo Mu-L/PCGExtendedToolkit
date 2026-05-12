@@ -38,7 +38,10 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain) { continue; }
 			}
 
-			if (PCGExCompare::Compare(TypedFilterFactory->Config.Match, Str, IdentifierStr)) { bMatches = true; }
+			if (PCGExCompare::Compare(TypedFilterFactory->Config.Match, Str, IdentifierStr))
+			{
+				bMatches = true;
+			}
 
 			if (bMatches && Identity.ValueType == TypedFilterFactory->Config.Type)
 			{
@@ -64,7 +67,10 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain) { continue; }
 			}
 
-			if (PCGExCompare::Compare(TypedFilterFactory->Config.Match, Str, IdentifierStr)) { bMatches = true; }
+			if (PCGExCompare::Compare(TypedFilterFactory->Config.Match, Str, IdentifierStr))
+			{
+				bMatches = true;
+			}
 
 			if (bMatches)
 			{

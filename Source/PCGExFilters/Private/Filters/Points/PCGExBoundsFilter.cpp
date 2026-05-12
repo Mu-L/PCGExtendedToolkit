@@ -21,27 +21,39 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExBoundsFilterFactory::CreateFilter() 
 
 bool UPCGExBoundsFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
-	if (Config.DataMatching.IsEnabled()) { PCGExFactories::GetInputFactories(InContext, PCGExMatching::Labels::SourceMatchRulesLabel, MatchRuleFactories, {PCGExFactories::EType::MatchRule}); }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
+	if (Config.DataMatching.IsEnabled())
+	{
+		PCGExFactories::GetInputFactories(InContext, PCGExMatching::Labels::SourceMatchRulesLabel, MatchRuleFactories, {PCGExFactories::EType::MatchRule});
+	}
 	return true;
 }
 
 PCGExFactories::EPreparationResult UPCGExBoundsFilterFactory::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	if (!PCGExData::TryGetFacades(InContext, FName("Bounds"), BoundsDataFacades, false))
 	{
-		if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error) { PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Missing bounds data.")) }
+		if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error)
+		{
+			PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Missing bounds data."))
+		}
 		return PCGExFactories::EPreparationResult::MissingData;
 	}
 
 	// Expansion is doubled for expanded modes (legacy behavior)
 	const float Expansion =
 		(Config.TestMode == EPCGExBoxCheckMode::ExpandedBox || Config.TestMode == EPCGExBoxCheckMode::ExpandedSphere)
-			? Config.Expansion * 2.0f
-			: Config.Expansion;
+		? Config.Expansion * 2.0f
+		: Config.Expansion;
 
 	// Build OBB collections from bounds data
 	Collections.Reserve(BoundsDataFacades.Num());
@@ -59,7 +71,10 @@ PCGExFactories::EPreparationResult UPCGExBoundsFilterFactory::Prepare(FPCGExCont
 			FBox LocalBox = PCGExMath::GetLocalBounds(Point, Config.BoundsTarget);
 
 			// Apply expansion if needed
-			if (Expansion > 0) { LocalBox = LocalBox.ExpandBy(Expansion); }
+			if (Expansion > 0)
+			{
+				LocalBox = LocalBox.ExpandBy(Expansion);
+			}
 
 			Collection->Add(Transform, LocalBox, i);
 		}
@@ -80,10 +95,16 @@ void UPCGExBoundsFilterFactory::BeginDestroy()
 
 bool PCGExPointFilter::FBoundsFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	Collections = &TypedFilterFactory->Collections;
-	if (!Collections || Collections->IsEmpty()) { return false; }
+	if (!Collections || Collections->IsEmpty())
+	{
+		return false;
+	}
 
 	const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
 		&& !TypedFilterFactory->MatchRuleFactories.IsEmpty();
@@ -107,7 +128,10 @@ bool PCGExPointFilter::FBoundsFilter::Init(FPCGExContext* InContext, const TShar
 			}
 			bNoMatchResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
 		}
-		else { InverseMatcher.Reset(); }
+		else
+		{
+			InverseMatcher.Reset();
+		}
 	}
 	else if (bMatchingEnabled)
 	{
@@ -202,12 +226,12 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 			switch (CheckType)
 			{
 			case EPCGExBoundsCheckType::Intersects:
-				{
-					// Query OBB intersects collection's world bounds
-					const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-					bPass = ExpandedBounds.Intersect(QueryWorldBox);
-				}
-				break;
+			{
+				// Query OBB intersects collection's world bounds
+				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
+				bPass = ExpandedBounds.Intersect(QueryWorldBox);
+			}
+			break;
 
 			case EPCGExBoundsCheckType::IsInside:
 				bPass = ExpandedBounds.IsInside(Position);
@@ -218,11 +242,11 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 				break;
 
 			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-				{
-					const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-					bPass = ExpandedBounds.IsInside(Position) || ExpandedBounds.Intersect(QueryWorldBox);
-				}
-				break;
+			{
+				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
+				bPass = ExpandedBounds.IsInside(Position) || ExpandedBounds.Intersect(QueryWorldBox);
+			}
+			break;
 			}
 		}
 		else
@@ -253,7 +277,10 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 			}
 		}
 
-		if (bPass) { return !bInvert; }
+		if (bPass)
+		{
+			return !bInvert;
+		}
 	}
 
 	return bInvert; // No collection matched
@@ -281,11 +308,11 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 			switch (CheckType)
 			{
 			case EPCGExBoundsCheckType::Intersects:
-				{
-					const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-					bPass = ExpandedBounds.Intersect(QueryWorldBox);
-				}
-				break;
+			{
+				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
+				bPass = ExpandedBounds.Intersect(QueryWorldBox);
+			}
+			break;
 			case EPCGExBoundsCheckType::IsInside:
 				bPass = ExpandedBounds.IsInside(Position);
 				break;
@@ -293,11 +320,11 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 				bPass = ExpandedBounds.IsInsideOrOn(Position);
 				break;
 			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-				{
-					const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-					bPass = ExpandedBounds.IsInside(Position) || ExpandedBounds.Intersect(QueryWorldBox);
-				}
-				break;
+			{
+				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
+				bPass = ExpandedBounds.IsInside(Position) || ExpandedBounds.Intersect(QueryWorldBox);
+			}
+			break;
 			}
 		}
 		else
@@ -320,7 +347,10 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 			}
 		}
 
-		if (bPass) { return !bInvert; }
+		if (bPass)
+		{
+			return !bInvert;
+		}
 	}
 
 	return bInvert;
@@ -335,7 +365,10 @@ bool PCGExPointFilter::FBoundsFilter::Test(const PCGExData::FProxyPoint& Point) 
 
 bool PCGExPointFilter::FBoundsFilter::Test(const int32 PointIndex) const
 {
-	if (bCheckAgainstDataBounds) { return bCollectionTestResult; }
+	if (bCheckAgainstDataBounds)
+	{
+		return bCollectionTestResult;
+	}
 
 	if (InverseMatcher)
 	{
@@ -355,7 +388,10 @@ bool PCGExPointFilter::FBoundsFilter::Test(const int32 PointIndex) const
 				bAnyMatch = true;
 			}
 		}
-		if (!bAnyMatch) { return bNoMatchResult; }
+		if (!bAnyMatch)
+		{
+			return bNoMatchResult;
+		}
 
 		const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
 		const FTransform Transform = Point.GetTransform();
@@ -412,10 +448,14 @@ FString UPCGExBoundsFilterProviderSettings::GetDisplayName() const
 	switch (Config.CheckType)
 	{
 	default:
-	case EPCGExBoundsCheckType::Intersects: return TEXT("Intersects");
-	case EPCGExBoundsCheckType::IsInside: return TEXT("Is Inside");
-	case EPCGExBoundsCheckType::IsInsideOrOn: return TEXT("Is Inside or On");
-	case EPCGExBoundsCheckType::IsInsideOrIntersects: return TEXT("Is Inside or Intersects");
+	case EPCGExBoundsCheckType::Intersects:
+		return TEXT("Intersects");
+	case EPCGExBoundsCheckType::IsInside:
+		return TEXT("Is Inside");
+	case EPCGExBoundsCheckType::IsInsideOrOn:
+		return TEXT("Is Inside or On");
+	case EPCGExBoundsCheckType::IsInsideOrIntersects:
+		return TEXT("Is Inside or Intersects");
 	}
 }
 #endif

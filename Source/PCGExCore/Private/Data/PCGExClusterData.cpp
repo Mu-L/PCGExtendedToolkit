@@ -30,7 +30,8 @@ UPCGSpatialData* UPCGExClusterNodesData::CopyInternal(FPCGContext* Context) cons
 void UPCGExClusterEdgesData::InitializeSpatialDataInternal(const FPCGInitializeFromDataParams& InParams)
 {
 	Super::InitializeSpatialDataInternal(InParams);
-	if (const UPCGExClusterEdgesData* InEdgeData = Cast<UPCGExClusterEdgesData>(InParams.Source); InEdgeData && PCGEX_CORE_SETTINGS.bCacheClusters)
+	if (const UPCGExClusterEdgesData* InEdgeData = Cast<UPCGExClusterEdgesData>(InParams.Source);
+		InEdgeData && PCGEX_CORE_SETTINGS.bCacheClusters)
 	{
 		SetBoundCluster(InEdgeData->Cluster);
 	}

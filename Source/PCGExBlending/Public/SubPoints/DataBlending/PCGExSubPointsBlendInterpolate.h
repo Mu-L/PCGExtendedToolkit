@@ -39,5 +39,8 @@ public:
 	virtual TSharedPtr<FPCGExSubPointsBlendOperation> CreateOperation() const override;
 
 protected:
-	virtual EPCGExBlendingType GetDefaultBlending() const override { return EPCGExBlendingType::Lerp; }
+	virtual EPCGExBlendingType GetDefaultBlending() const override
+	{
+		return EPCGExBlendingType::Lerp;
+	}
 };

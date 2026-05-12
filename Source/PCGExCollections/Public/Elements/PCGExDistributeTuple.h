@@ -5,10 +5,10 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCollectionsCommon.h"
+#include "PCGExProperty.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Math/PCGExMath.h"
-#include "PCGExProperty.h"
 
 #include "PCGExDistributeTuple.generated.h"
 
@@ -21,8 +21,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(DistributeTuple, "Tuple : Distribute", "Distribute weighted tuple row values across input points.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Constant); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Constant);
+	}
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -31,7 +39,10 @@ protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;

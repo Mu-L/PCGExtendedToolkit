@@ -4,12 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExClustersProcessor.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Details/PCGExMatchingDetails.h"
 #include "Fitting/PCGExFitting.h"
 #include "Helpers/PCGExDataMatcher.h"
+#include "Utils/PCGExCompare.h"
 
 
 #include "PCGExCopyClustersToPoints.generated.h"
@@ -28,7 +28,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(CopyClustersToPoints, "Cluster : Copy to Points", "Create a copies of the input clusters onto the target points.  NOTE: Does not sanitize input.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterOp); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterOp);
+	}
 #endif
 
 protected:

@@ -18,18 +18,28 @@ FPCGExFuseDetailsBase::FPCGExFuseDetailsBase()
 FPCGExFuseDetailsBase::FPCGExFuseDetailsBase(const bool InSupportLocalTolerance)
 	: bSupportLocalTolerance(InSupportLocalTolerance)
 {
-	if (!bSupportLocalTolerance) { ToleranceInput = EPCGExInputValueType::Constant; }
+	if (!bSupportLocalTolerance)
+	{
+		ToleranceInput = EPCGExInputValueType::Constant;
+	}
 }
 
 FPCGExFuseDetailsBase::FPCGExFuseDetailsBase(const bool InSupportLocalTolerance, const double InTolerance)
-	: bSupportLocalTolerance(InSupportLocalTolerance), Tolerance(InTolerance)
+	: bSupportLocalTolerance(InSupportLocalTolerance)
+	  , Tolerance(InTolerance)
 {
-	if (!bSupportLocalTolerance) { ToleranceInput = EPCGExInputValueType::Constant; }
+	if (!bSupportLocalTolerance)
+	{
+		ToleranceInput = EPCGExInputValueType::Constant;
+	}
 }
 
 bool FPCGExFuseDetailsBase::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InDataFacade)
 {
-	if (!bComponentWiseTolerance) { Tolerances = FVector(Tolerance); }
+	if (!bComponentWiseTolerance)
+	{
+		Tolerances = FVector(Tolerance);
+	}
 
 	if (!InDataFacade)
 	{
@@ -40,7 +50,10 @@ bool FPCGExFuseDetailsBase::Init(FPCGExContext* InContext, const TSharedPtr<PCGE
 		ToleranceGetter = PCGExDetails::MakeSettingValue<FVector>(ToleranceInput, ToleranceAttribute, Tolerances);
 	}
 
-	if (!ToleranceGetter->Init(InDataFacade)) { return false; }
+	if (!ToleranceGetter->Init(InDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -77,38 +90,48 @@ FPCGExSourceFuseDetails::FPCGExSourceFuseDetails(const bool InSupportLocalTolera
 }
 
 FPCGExSourceFuseDetails::FPCGExSourceFuseDetails(const bool InSupportLocalTolerance, const double InTolerance, const EPCGExDistance SourceMethod)
-	: FPCGExFuseDetailsBase(InSupportLocalTolerance, InTolerance), SourceDistance(SourceMethod)
+	: FPCGExFuseDetailsBase(InSupportLocalTolerance, InTolerance)
+	  , SourceDistance(SourceMethod)
 {
 }
 
 FPCGExFuseDetails::FPCGExFuseDetails()
-	: FPCGExSourceFuseDetails(false), Distances(GetDistances())
+	: FPCGExSourceFuseDetails(false)
+	  , Distances(GetDistances())
 {
 }
 
 FPCGExFuseDetails::FPCGExFuseDetails(const bool InSupportLocalTolerance)
-	: FPCGExSourceFuseDetails(InSupportLocalTolerance), Distances(GetDistances())
+	: FPCGExSourceFuseDetails(InSupportLocalTolerance)
+	  , Distances(GetDistances())
 {
 }
 
 FPCGExFuseDetails::FPCGExFuseDetails(const bool InSupportLocalTolerance, const double InTolerance)
-	: FPCGExSourceFuseDetails(InSupportLocalTolerance, InTolerance), Distances(GetDistances())
+	: FPCGExSourceFuseDetails(InSupportLocalTolerance, InTolerance)
+	  , Distances(GetDistances())
 {
 }
 
 FPCGExFuseDetails::FPCGExFuseDetails(const bool InSupportLocalTolerance, const double InTolerance, const EPCGExDistance InSourceMethod)
-	: FPCGExSourceFuseDetails(InSupportLocalTolerance, InTolerance, InSourceMethod), Distances(GetDistances())
+	: FPCGExSourceFuseDetails(InSupportLocalTolerance, InTolerance, InSourceMethod)
+	  , Distances(GetDistances())
 {
 }
 
 FPCGExFuseDetails::FPCGExFuseDetails(const bool InSupportLocalTolerance, const double InTolerance, const EPCGExDistance InSourceMethod, const EPCGExDistance InTargetMethod)
-	: FPCGExSourceFuseDetails(InSupportLocalTolerance, InTolerance, InSourceMethod), TargetDistance(InTargetMethod), Distances(GetDistances())
+	: FPCGExSourceFuseDetails(InSupportLocalTolerance, InTolerance, InSourceMethod)
+	  , TargetDistance(InTargetMethod)
+	  , Distances(GetDistances())
 {
 }
 
 bool FPCGExFuseDetails::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InDataFacade)
 {
-	if (!FPCGExFuseDetailsBase::Init(InContext, InDataFacade)) { return false; }
+	if (!FPCGExFuseDetailsBase::Init(InContext, InDataFacade))
+	{
+		return false;
+	}
 	Distances = GetDistances();
 	return true;
 }

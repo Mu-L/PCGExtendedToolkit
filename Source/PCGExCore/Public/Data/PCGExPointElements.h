@@ -30,13 +30,30 @@ namespace PCGExData
 		explicit FElement(const int32 InIndex, const int32 InIO = -1);
 		FElement(const TSharedPtr<FPointIO>& InIO, const uint32 InIndex);
 
-		FORCEINLINE bool IsValid() const { return Index >= 0; }
-		FORCEINLINE uint64 H64() const { return PCGEx::H64U(Index, IO); }
+		FORCEINLINE bool IsValid() const
+		{
+			return Index >= 0;
+		}
 
-		explicit operator int32() const { return Index; }
+		FORCEINLINE uint64 H64() const
+		{
+			return PCGEx::H64U(Index, IO);
+		}
 
-		bool operator==(const FElement& Other) const { return Index == Other.Index && IO == Other.IO; }
-		FORCEINLINE friend uint32 GetTypeHash(const FElement& Key) { return HashCombineFast(Key.Index, Key.IO); }
+		explicit operator int32() const
+		{
+			return Index;
+		}
+
+		bool operator==(const FElement& Other) const
+		{
+			return Index == Other.Index && IO == Other.IO;
+		}
+
+		FORCEINLINE friend uint32 GetTypeHash(const FElement& Key)
+		{
+			return HashCombineFast(Key.Index, Key.IO);
+		}
 	};
 
 	// FPoint is used when we only care about point index
@@ -140,7 +157,10 @@ virtual int32 GetSeed() const override;
 		virtual void SetColor(const FVector4& InValue);
 		virtual void SetSeed(const int32 InValue);
 
-		bool operator==(const FMutablePoint& Other) const { return Index == Other.Index && Data == Other.Data; }
+		bool operator==(const FMutablePoint& Other) const
+		{
+			return Index == Other.Index && Data == Other.Data;
+		}
 	};
 
 	// A beefed-up version of FPoint that implement FPoint getters
@@ -160,7 +180,10 @@ virtual int32 GetSeed() const override;
 
 		PCGEX_POINT_PROXY_OVERRIDES
 
-		bool operator==(const FConstPoint& Other) const { return Index == Other.Index && IO == Other.IO && Data == Other.Data; }
+		bool operator==(const FConstPoint& Other) const
+		{
+			return Index == Other.Index && IO == Other.IO && Data == Other.Data;
+		}
 	};
 
 	// An oddball struct that store some basic information but exposes the same as API FPoint
@@ -211,7 +234,10 @@ virtual int32 GetSeed() const override;
 		virtual void SetExtents(const FVector& InValue, const bool bKeepLocalCenter = false);
 		virtual void SetLocalBounds(const FBox& InValue);
 
-		bool operator==(const FProxyPoint& Other) const { return Index == Other.Index && IO == Other.IO; }
+		bool operator==(const FProxyPoint& Other) const
+		{
+			return Index == Other.Index && IO == Other.IO;
+		}
 
 		void CopyTo(UPCGBasePointData* InData) const;
 		void CopyTo(FMutablePoint& InPoint) const;

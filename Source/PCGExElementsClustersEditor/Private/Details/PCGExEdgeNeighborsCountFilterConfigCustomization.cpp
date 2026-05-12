@@ -48,36 +48,54 @@ void FPCGExEdgeNeighborsCountFilterConfigCustomization::CustomizeChildren(
 			.Mode_Lambda([this]() -> EPCGExRefineEdgeThresholdMode
 			{
 				uint8 Value = 0;
-				if (ModeHandle.IsValid()) { ModeHandle->GetValue(Value); }
+				if (ModeHandle.IsValid())
+				{
+					ModeHandle->GetValue(Value);
+				}
 				return static_cast<EPCGExRefineEdgeThresholdMode>(Value);
 			})
 			.Comparison_Lambda([this]() -> EPCGExComparison
 			{
 				uint8 Value = 0;
-				if (ComparisonHandle.IsValid()) { ComparisonHandle->GetValue(Value); }
+				if (ComparisonHandle.IsValid())
+				{
+					ComparisonHandle->GetValue(Value);
+				}
 				return static_cast<EPCGExComparison>(Value);
 			})
 			.ThresholdConstant_Lambda([this]() -> int32
 			{
 				int32 Value = 2;
-				if (ThresholdConstantHandle.IsValid()) { ThresholdConstantHandle->GetValue(Value); }
+				if (ThresholdConstantHandle.IsValid())
+				{
+					ThresholdConstantHandle->GetValue(Value);
+				}
 				return Value;
 			})
 			.Tolerance_Lambda([this]() -> int32
 			{
 				int32 Value = 0;
-				if (ToleranceHandle.IsValid()) { ToleranceHandle->GetValue(Value); }
+				if (ToleranceHandle.IsValid())
+				{
+					ToleranceHandle->GetValue(Value);
+				}
 				return Value;
 			})
 			.bInvert_Lambda([this]() -> bool
 			{
 				bool Value = false;
-				if (InvertHandle.IsValid()) { InvertHandle->GetValue(Value); }
+				if (InvertHandle.IsValid())
+				{
+					InvertHandle->GetValue(Value);
+				}
 				return Value;
 			})
 			.bShowThreshold_Lambda([this]() -> bool
 			{
-				if (!ThresholdInputHandle.IsValid()) { return true; }
+				if (!ThresholdInputHandle.IsValid())
+				{
+					return true;
+				}
 				uint8 InputType = 0;
 				ThresholdInputHandle->GetValue(InputType);
 				return InputType == 0; // 0 = Constant

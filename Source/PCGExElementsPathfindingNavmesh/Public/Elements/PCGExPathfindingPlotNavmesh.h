@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExPathfindingNavmesh.h"
-#include "Core/PCGExPointsProcessor.h"
 #include "AI/Navigation/NavigationTypes.h"
+#include "Core/PCGExPointsProcessor.h"
 
 
 #include "SubPoints/DataBlending/PCGExSubPointsBlendInterpolate.h"
@@ -32,7 +32,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PCGExPathfindingPlotNavmesh, "Pathfinding : Plot Navmesh", "Extract a single paths from navmesh, going through each seed points in order.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Pathfinding);
+	}
 #endif
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
@@ -51,7 +55,12 @@ public:
 
 	//~Begin UPCGExPointsProcessorSettings
 	virtual FName GetMainInputPin() const override;
-	virtual FName GetMainOutputPin() const override { return PCGExPaths::Labels::OutputPathsLabel; }
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExPaths::Labels::OutputPathsLabel;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 
@@ -121,7 +130,8 @@ public:
 	PCGEX_ASYNC_TASK_NAME(FPCGExPlotNavmeshTask)
 
 	explicit FPCGExPlotNavmeshTask(const TSharedPtr<PCGExData::FPointIO>& InPointIO)
-		: FTask(), PointIO(InPointIO)
+		: FTask()
+		  , PointIO(InPointIO)
 	{
 	}
 

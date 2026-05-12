@@ -11,7 +11,10 @@
 
 bool FPCGExTensorNull::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorPointOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorPointOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -25,7 +28,10 @@ PCGExTensor::FTensorSample FPCGExTensorNull::Sample(const int32 InSeedIndex, con
 	auto ProcessNeighbor = [&](const PCGExOctree::FItem& InEffector)
 	{
 		PCGExTensor::FEffectorMetrics Metrics;
-		if (!ComputeFactor(InPosition, InEffector.Index, Metrics)) { return; }
+		if (!ComputeFactor(InPosition, InEffector.Index, Metrics))
+		{
+			return;
+		}
 		Samples.Emplace_GetRef(FVector::ZeroVector, 1, 1);
 	};
 

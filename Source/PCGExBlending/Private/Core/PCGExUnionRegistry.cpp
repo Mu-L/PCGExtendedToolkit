@@ -2,7 +2,7 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Core/PCGExUnionRegistry.h"
-
+#include "Data/PCGBasePointData.h"
 #include "Details/PCGExFuseDetails.h"
 #include "Math/PCGExMath.h"
 
@@ -22,8 +22,8 @@ namespace PCGExData
 		{
 			const FRep& Rep = Reps[Item.Index];
 			const bool bIsWithin = FuseDetails.bComponentWiseTolerance
-				                       ? FuseDetails.IsWithinToleranceComponentWise(Point, Rep.Point)
-				                       : FuseDetails.IsWithinTolerance(Point, Rep.Point);
+				? FuseDetails.IsWithinToleranceComponentWise(Point, Rep.Point)
+				: FuseDetails.IsWithinTolerance(Point, Rep.Point);
 
 			if (bIsWithin)
 			{

@@ -3,17 +3,17 @@
 
 #include "Data/PCGExAttributeBroadcaster.h"
 
+#include "PCGParamData.h"
+#include "Data/PCGExDataHelpers.h"
+#include "Data/PCGExDataValue.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGExTaggedData.h"
+#include "Helpers/PCGExArrayHelpers.h"
 #include "Metadata/PCGAttributePropertySelector.h"
 #include "Metadata/Accessors/IPCGAttributeAccessor.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGCustomAccessor.h"
-#include "Data/PCGExDataHelpers.h"
-#include "PCGParamData.h"
-#include "Data/PCGExDataValue.h"
-#include "Data/PCGExPointIO.h"
-#include "Helpers/PCGExArrayHelpers.h"
 #include "Types/PCGExTypeOpsImpl.h"
-#include "Data/PCGExTaggedData.h"
 
 namespace PCGExData
 {
@@ -33,7 +33,10 @@ namespace PCGExData
 
 	IAttributeBroadcaster::FAttributeProcessingInfos::operator EPCGMetadataTypes() const
 	{
-		if (Attribute) { return static_cast<EPCGMetadataTypes>(Attribute->GetTypeId()); }
+		if (Attribute)
+		{
+			return static_cast<EPCGMetadataTypes>(Attribute->GetTypeId());
+		}
 		return EPCGMetadataTypes::Unknown;
 	}
 
@@ -42,7 +45,10 @@ namespace PCGExData
 		Selector = InSelector.CopyAndFixLast(InData);
 		bIsValid = Selector.IsValid();
 
-		if (!bIsValid) { return; }
+		if (!bIsValid)
+		{
+			return;
+		}
 
 		SubSelection = FSubSelection(Selector.GetExtraNames());
 
@@ -64,14 +70,20 @@ namespace PCGExData
 
 #pragma region Attribute Broadcaster
 
-	const FPCGMetadataAttributeBase* IAttributeBroadcaster::GetAttribute() const { return ProcessingInfos; }
+	const FPCGMetadataAttributeBase* IAttributeBroadcaster::GetAttribute() const
+	{
+		return ProcessingInfos;
+	}
 
 	EPCGMetadataTypes IAttributeBroadcaster::GetMetadataType() const
 	{
 		return EPCGMetadataTypes::Unknown;
 	}
 
-	FName IAttributeBroadcaster::GetName() const { return NAME_None; }
+	FName IAttributeBroadcaster::GetName() const
+	{
+		return NAME_None;
+	}
 
 	template <typename T>
 	bool TAttributeBroadcaster<T>::ApplySelector(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData)
@@ -83,7 +95,10 @@ namespace PCGExData
 		static_assert(Traits::Type != EPCGMetadataTypes::Unknown, "T must be of PCG-friendly type. Custom types are unsupported -- you'll have to static_cast the values.");
 
 		ProcessingInfos = FAttributeProcessingInfos(InData, InSelector);
-		if (!ProcessingInfos.bIsValid) { return false; }
+		if (!ProcessingInfos.bIsValid)
+		{
+			return false;
+		}
 
 		if (ProcessingInfos.bIsDataDomain)
 		{
@@ -114,10 +129,16 @@ namespace PCGExData
 	}
 
 	template <typename T>
-	FName TAttributeBroadcaster<T>::GetName() const { return ProcessingInfos.Selector.GetName(); }
+	FName TAttributeBroadcaster<T>::GetName() const
+	{
+		return ProcessingInfos.Selector.GetName();
+	}
 
 	template <typename T>
-	bool TAttributeBroadcaster<T>::IsUsable(int32 NumEntries) { return ProcessingInfos.bIsValid && Values.Num() >= NumEntries; }
+	bool TAttributeBroadcaster<T>::IsUsable(int32 NumEntries)
+	{
+		return ProcessingInfos.bIsValid && Values.Num() >= NumEntries;
+	}
 
 	template <typename T>
 	bool TAttributeBroadcaster<T>::Prepare(const FPCGAttributePropertyInputSelector& InSelector, const TSharedRef<FPointIO>& InPointIO)
@@ -145,11 +166,23 @@ namespace PCGExData
 	template <typename T>
 	bool TAttributeBroadcaster<T>::PrepareForSingleFetch(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData, const TSharedPtr<IPCGAttributeAccessorKeys> InKeys)
 	{
-		if (InKeys) { Keys = InKeys; }
-		else if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData)) { Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData); }
-		else if (InData->Metadata) { Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(InData->Metadata); }
+		if (InKeys)
+		{
+			Keys = InKeys;
+		}
+		else if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
+		{
+			Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
+		}
+		else if (InData->Metadata)
+		{
+			Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(InData->Metadata);
+		}
 
-		if (!Keys) { return false; }
+		if (!Keys)
+		{
+			return false;
+		}
 
 		Min = Traits::Min();
 		Max = Traits::Max();
@@ -196,13 +229,19 @@ namespace PCGExData
 
 		if (!ProcessingInfos.bIsValid)
 		{
-			PCGEX_SCOPE_LOOP(i) { Dump[i] = T{}; }
+			PCGEX_SCOPE_LOOP(i)
+			{
+				Dump[i] = T{};
+			}
 			return;
 		}
 
 		if (DataValue)
 		{
-			PCGEX_SCOPE_LOOP(i) { Dump[i] = TypedDataValue; }
+			PCGEX_SCOPE_LOOP(i)
+			{
+				Dump[i] = TypedDataValue;
+			}
 		}
 		else
 		{
@@ -227,13 +266,19 @@ namespace PCGExData
 
 		if (!ProcessingInfos.bIsValid)
 		{
-			for (int i = 0; i < NumPoints; i++) { Dump[i] = T{}; }
+			for (int i = 0; i < NumPoints; i++)
+			{
+				Dump[i] = T{};
+			}
 			return;
 		}
 
 		if (DataValue)
 		{
-			for (int i = 0; i < NumPoints; i++) { Dump[i] = TypedDataValue; }
+			for (int i = 0; i < NumPoints; i++)
+			{
+				Dump[i] = TypedDataValue;
+			}
 
 			if (bCaptureMinMax)
 			{
@@ -263,7 +308,10 @@ namespace PCGExData
 	template <typename T>
 	void TAttributeBroadcaster<T>::GrabUniqueValues(TSet<T>& OutUniqueValues)
 	{
-		if (!ProcessingInfos.bIsValid) { return; }
+		if (!ProcessingInfos.bIsValid)
+		{
+			return;
+		}
 
 		// TODO : Revise this work with a custom has function and output an array of unique values instead
 
@@ -303,18 +351,30 @@ namespace PCGExData
 	template <typename T>
 	T TAttributeBroadcaster<T>::FetchSingle(const FElement& Element, const T& Fallback) const
 	{
-		if (!ProcessingInfos.bIsValid) { return Fallback; }
-		if (DataValue) { return TypedDataValue; }
+		if (!ProcessingInfos.bIsValid)
+		{
+			return Fallback;
+		}
+		if (DataValue)
+		{
+			return TypedDataValue;
+		}
 
 		T OutValue = Fallback;
-		if (!InternalAccessor->Get<T>(OutValue, Element.Index, *Keys.Get(), EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible)) { OutValue = Fallback; }
+		if (!InternalAccessor->Get<T>(OutValue, Element.Index, *Keys.Get(), EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible))
+		{
+			OutValue = Fallback;
+		}
 		return OutValue;
 	}
 
 	template <typename T>
 	bool TAttributeBroadcaster<T>::TryFetchSingle(const FElement& Element, T& OutValue) const
 	{
-		if (!ProcessingInfos.bIsValid) { return false; }
+		if (!ProcessingInfos.bIsValid)
+		{
+			return false;
+		}
 		if (DataValue)
 		{
 			OutValue = TypedDataValue;
@@ -338,7 +398,10 @@ namespace PCGExData
 	TSharedPtr<IAttributeBroadcaster> MakeBroadcaster(const FPCGAttributeIdentifier& InIdentifier, const TSharedRef<FPointIO>& InPointIO, bool bSingleFetch)
 	{
 		const FPCGMetadataAttributeBase* Attribute = InPointIO->FindConstAttribute(InIdentifier);
-		if (!Attribute) { return nullptr; }
+		if (!Attribute)
+		{
+			return nullptr;
+		}
 
 		TSharedPtr<IAttributeBroadcaster> Broadcaster = nullptr;
 		// Container/extended types fall through silently — broadcasting requires a templated T,
@@ -347,7 +410,10 @@ namespace PCGExData
 		{
 			using T = decltype(DummyValue);
 			TSharedPtr<TAttributeBroadcaster<T>> TypedBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
-			if (!(bSingleFetch ? TypedBroadcaster->PrepareForSingleFetch(InIdentifier, InPointIO->GetIn()) : TypedBroadcaster->Prepare(InIdentifier, InPointIO))) { return; }
+			if (!(bSingleFetch ? TypedBroadcaster->PrepareForSingleFetch(InIdentifier, InPointIO->GetIn()) : TypedBroadcaster->Prepare(InIdentifier, InPointIO)))
+			{
+				return;
+			}
 			Broadcaster = TypedBroadcaster;
 		});
 
@@ -358,14 +424,20 @@ namespace PCGExData
 	{
 		const UPCGData* InData = InPointIO->GetIn();
 		EPCGMetadataTypes Type = EPCGMetadataTypes::Unknown;
-		if (!TryGetType(InSelector, InData, Type)) { return nullptr; }
+		if (!TryGetType(InSelector, InData, Type))
+		{
+			return nullptr;
+		}
 
 		TSharedPtr<IAttributeBroadcaster> Broadcaster = nullptr;
 		PCGExMetaHelpers::ExecuteWithRightType(Type, [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
 			TSharedPtr<TAttributeBroadcaster<T>> TypedBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
-			if (!(bSingleFetch ? TypedBroadcaster->PrepareForSingleFetch(InSelector, InData) : TypedBroadcaster->Prepare(InSelector, InPointIO))) { return; }
+			if (!(bSingleFetch ? TypedBroadcaster->PrepareForSingleFetch(InSelector, InData) : TypedBroadcaster->Prepare(InSelector, InPointIO)))
+			{
+				return;
+			}
 			Broadcaster = TypedBroadcaster;
 		});
 
@@ -376,7 +448,10 @@ namespace PCGExData
 	TSharedPtr<TAttributeBroadcaster<T>> MakeTypedBroadcaster(const FName& InName, const TSharedRef<FPointIO>& InPointIO, bool bSingleFetch)
 	{
 		PCGEX_MAKE_SHARED(Broadcaster, TAttributeBroadcaster<T>)
-		if (!(bSingleFetch ? Broadcaster->PrepareForSingleFetch(InName, InPointIO->GetIn()) : Broadcaster->Prepare(InName, InPointIO))) { return nullptr; }
+		if (!(bSingleFetch ? Broadcaster->PrepareForSingleFetch(InName, InPointIO->GetIn()) : Broadcaster->Prepare(InName, InPointIO)))
+		{
+			return nullptr;
+		}
 		return Broadcaster;
 	}
 
@@ -392,7 +467,10 @@ namespace PCGExData
 	TSharedPtr<TAttributeBroadcaster<T>> MakeTypedBroadcaster(const FPCGAttributePropertyInputSelector& InSelector, const TSharedRef<FPointIO>& InPointIO, bool bSingleFetch)
 	{
 		PCGEX_MAKE_SHARED(Broadcaster, TAttributeBroadcaster<T>)
-		if (!(bSingleFetch ? Broadcaster->PrepareForSingleFetch(InSelector, InPointIO->GetIn()) : Broadcaster->Prepare(InSelector, InPointIO))) { return nullptr; }
+		if (!(bSingleFetch ? Broadcaster->PrepareForSingleFetch(InSelector, InPointIO->GetIn()) : Broadcaster->Prepare(InSelector, InPointIO)))
+		{
+			return nullptr;
+		}
 		return Broadcaster;
 	}
 

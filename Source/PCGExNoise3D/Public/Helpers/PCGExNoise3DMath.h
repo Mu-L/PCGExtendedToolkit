@@ -203,7 +203,7 @@ namespace PCGExNoise3D
 				CellX + 0.5 + Jx * Jitter,
 				CellY + 0.5 + Jy * Jitter,
 				CellZ + 0.5 + Jz * Jitter
-			);
+				);
 		}
 
 		//

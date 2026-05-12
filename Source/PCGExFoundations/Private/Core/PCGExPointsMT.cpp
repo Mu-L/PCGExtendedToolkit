@@ -4,11 +4,11 @@
 #include "Core/PCGExPointsMT.h"
 
 
-#include "Factories/PCGExInstancedFactory.h"
-#include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
-#include "Data/PCGExPointIO.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataPreloader.h"
+#include "Factories/PCGExInstancedFactory.h"
 
 namespace PCGExPointsMT
 {
@@ -21,7 +21,8 @@ namespace PCGExPointsMT
 		PCGEX_ASYNC_TASK_NAME(FStartBatchProcessing)
 
 		FStartBatchProcessing(TSharedPtr<T> InTarget)
-			: FTask(), Target(InTarget)
+			: FTask()
+			  , Target(InTarget)
 		{
 		}
 
@@ -57,13 +58,22 @@ namespace PCGExPointsMT
 		// Gives an opportunity for the processor to register attributes with a valid facade
 		// So selectors shortcut can be properly resolved (@Last, etc.)
 
-		if (FilterFactories) { PCGExFactories::RegisterConsumableAttributesWithFacade(*FilterFactories, PointDataFacade); }
-		if (PrimaryInstancedFactory) { PrimaryInstancedFactory->RegisterConsumableAttributesWithFacade(ExecutionContext, PointDataFacade); }
+		if (FilterFactories)
+		{
+			PCGExFactories::RegisterConsumableAttributesWithFacade(*FilterFactories, PointDataFacade);
+		}
+		if (PrimaryInstancedFactory)
+		{
+			PrimaryInstancedFactory->RegisterConsumableAttributesWithFacade(ExecutionContext, PointDataFacade);
+		}
 	}
 
 	void IProcessor::RegisterBuffersDependencies(PCGExData::FFacadePreloader& FacadePreloader)
 	{
-		if (HasFilters()) { PCGExPointFilter::RegisterBuffersDependencies(ExecutionContext, *FilterFactories, FacadePreloader); }
+		if (HasFilters())
+		{
+			PCGExPointFilter::RegisterBuffersDependencies(ExecutionContext, *FilterFactories, FacadePreloader);
+		}
 	}
 
 	void IProcessor::PrefetchData(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, const TSharedPtr<PCGExMT::FTaskGroup>& InPrefetchDataTaskGroup)
@@ -95,7 +105,10 @@ namespace PCGExPointsMT
 			if (PrimaryInstancedFactory->WantsPerDataInstance())
 			{
 				PrimaryInstancedFactory = PrimaryInstancedFactory->CreateNewInstance(ExecutionContext->ManagedObjects.Get());
-				if (!PrimaryInstancedFactory) { return false; }
+				if (!PrimaryInstancedFactory)
+				{
+					return false;
+				}
 				PrimaryInstancedFactory->PrimaryDataFacade = PointDataFacade;
 			}
 		}
@@ -106,7 +119,10 @@ namespace PCGExPointsMT
 	void IProcessor::StartParallelLoopForPoints(const PCGExData::EIOSide Side, const int32 PerLoopIterations)
 	{
 		const UPCGBasePointData* CurrentProcessingSource = const_cast<UPCGBasePointData*>(PointDataFacade->GetData(Side));
-		if (!CurrentProcessingSource) { return; }
+		if (!CurrentProcessingSource)
+		{
+			return;
+		}
 
 		const int32 NumPoints = CurrentProcessingSource->GetNumPoints();
 
@@ -163,7 +179,10 @@ namespace PCGExPointsMT
 	{
 		PointFilterCache.Init(DefaultPointFilterValue, PointDataFacade->GetNum());
 
-		if (InFilterFactories->IsEmpty()) { return true; }
+		if (InFilterFactories->IsEmpty())
+		{
+			return true;
+		}
 
 		PrimaryFilters = MakeShared<PCGExPointFilter::FManager>(PointDataFacade);
 		return PrimaryFilters->Init(ExecutionContext, *InFilterFactories);
@@ -171,7 +190,10 @@ namespace PCGExPointsMT
 
 	int32 IProcessor::FilterScope(const PCGExMT::FScope& Scope, const bool bParallel)
 	{
-		if (PrimaryFilters) { return PrimaryFilters->Test(Scope, PointFilterCache, bParallel); }
+		if (PrimaryFilters)
+		{
+			return PrimaryFilters->Test(Scope, PointFilterCache, bParallel);
+		}
 		return DefaultPointFilterValue ? Scope.Count : 0;
 	}
 
@@ -186,7 +208,8 @@ namespace PCGExPointsMT
 	}
 
 	IBatch::IBatch(FPCGExContext* InContext, const TArray<TWeakPtr<PCGExData::FPointIO>>& InPointsCollection)
-		: ExecutionContext(InContext), PointsCollection(InPointsCollection)
+		: ExecutionContext(InContext),
+		  PointsCollection(InPointsCollection)
 	{
 		SetExecutionContext(InContext);
 	}
@@ -204,7 +227,10 @@ namespace PCGExPointsMT
 
 	void IBatch::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
-		if (PointsCollection.IsEmpty()) { return; }
+		if (PointsCollection.IsEmpty())
+		{
+			return;
+		}
 
 		TaskManager = InTaskManager;
 		PCGEX_ASYNC_CHKD_VOID(TaskManager)
@@ -225,12 +251,21 @@ namespace PCGExPointsMT
 			NewProcessor->ParentBatch = SharedThis(this);
 			NewProcessor->BatchIndex = Processors.Num();
 
-			if (FilterFactories) { NewProcessor->SetPointsFilterData(FilterFactories); }
-			if (PrimaryInstancedFactory) { NewProcessor->PrimaryInstancedFactory = PrimaryInstancedFactory; }
+			if (FilterFactories)
+			{
+				NewProcessor->SetPointsFilterData(FilterFactories);
+			}
+			if (PrimaryInstancedFactory)
+			{
+				NewProcessor->PrimaryInstancedFactory = PrimaryInstancedFactory;
+			}
 
 			NewProcessor->RegisterConsumableAttributesWithFacade();
 
-			if (!PrepareSingle(NewProcessor)) { continue; }
+			if (!PrepareSingle(NewProcessor))
+			{
+				continue;
+			}
 
 			Processors.Add(NewProcessor);
 
@@ -239,7 +274,10 @@ namespace PCGExPointsMT
 
 			NewProcessor->bIsTrivial = IO->GetNum() < PCGEX_CORE_SETTINGS.SmallPointsSize;
 
-			if (bDoInitData) { NewProcessor->PointDataFacade->Source->InitializeOutput(DataInitializationPolicy); }
+			if (bDoInitData)
+			{
+				NewProcessor->PointDataFacade->Source->InitializeOutput(DataInitializationPolicy);
+			}
 		}
 
 		if (Processors.IsEmpty())
@@ -282,7 +320,10 @@ namespace PCGExPointsMT
 
 	void IBatch::CompleteWork()
 	{
-		if (bSkipCompletion) { return; }
+		if (bSkipCompletion)
+		{
+			return;
+		}
 		PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(CompleteWork, bForceSingleThreadedCompletion, { Processor->CompleteWork(); }, {})
 	}
 
@@ -295,7 +336,10 @@ namespace PCGExPointsMT
 	{
 		for (const TSharedRef<IProcessor>& P : Processors)
 		{
-			if (!P->bIsProcessorValid) { continue; }
+			if (!P->bIsProcessorValid)
+			{
+				continue;
+			}
 			P->Output();
 		}
 	}
@@ -304,7 +348,10 @@ namespace PCGExPointsMT
 	{
 		ProcessorFacades.Empty();
 
-		for (const TSharedRef<IProcessor>& P : Processors) { P->Cleanup(); }
+		for (const TSharedRef<IProcessor>& P : Processors)
+		{
+			P->Cleanup();
+		}
 		Processors.Empty();
 	}
 

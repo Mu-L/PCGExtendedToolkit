@@ -31,13 +31,19 @@ void FPCGExEdgeRefinePrimMST::Process()
 			const uint32 NeighborIndex = Lk.Node;
 			const uint32 EdgeIndex = Lk.Edge;
 
-			if (Visited[NeighborIndex]) { continue; } // Exit early
+			if (Visited[NeighborIndex])
+			{
+				continue;
+			} // Exit early
 
 			const PCGExClusters::FNode& AdjacentNode = *Cluster->GetNode(NeighborIndex);
 			PCGExGraphs::FEdge& Edge = *Cluster->GetEdge(EdgeIndex);
 
 			const double Score = Heuristics->GetEdgeScore(Current, AdjacentNode, Edge, RoamingSeedNode, RoamingGoalNode, nullptr, TravelStack);
-			if (!ScoredQueue->Enqueue(NeighborIndex, Score)) { continue; }
+			if (!ScoredQueue->Enqueue(NeighborIndex, Score))
+			{
+				continue;
+			}
 
 			TravelStack->Set(NeighborIndex, PCGEx::NH64(CurrentNodeIndex, EdgeIndex));
 		}
@@ -49,7 +55,10 @@ void FPCGExEdgeRefinePrimMST::Process()
 		int32 EdgeIndex;
 
 		PCGEx::NH64(TravelStack->Get(i), Node, EdgeIndex);
-		if (Node == -1 || EdgeIndex == -1) { continue; }
+		if (Node == -1 || EdgeIndex == -1)
+		{
+			continue;
+		}
 
 		Cluster->GetEdge(EdgeIndex)->bValid = !bInvert;
 	}

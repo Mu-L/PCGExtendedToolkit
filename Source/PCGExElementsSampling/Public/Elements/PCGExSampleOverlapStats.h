@@ -40,7 +40,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SampleOverlapStats, "Sample : Overlap Stats", "Sample & write per-point overlap stats between entire point data.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Misc); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Misc);
+	}
 #endif
 
 protected:
@@ -214,7 +218,10 @@ namespace PCGExSampleOverlapStats
 		FOverlapStats Stats;
 
 		FOverlap(FProcessor* InPrimary, FProcessor* InSecondary, const FBox& InIntersection);
-		FORCEINLINE FProcessor* GetOther(const FProcessor* InCandidate) const { return Primary == InCandidate ? Secondary : Primary; }
+		FORCEINLINE FProcessor* GetOther(const FProcessor* InCandidate) const
+		{
+			return Primary == InCandidate ? Secondary : Primary;
+		}
 	};
 
 	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExSampleOverlapStatsContext, UPCGExSampleOverlapStatsSettings>
@@ -252,9 +259,20 @@ namespace PCGExSampleOverlapStats
 		{
 		}
 
-		FORCEINLINE const FBox& GetBounds() const { return Bounds; }
-		FORCEINLINE const TArray<TSharedPtr<PCGExDiscardByOverlap::FPointBounds>>& GetPointBounds() const { return LocalPointBounds; }
-		FORCEINLINE const PCGExDiscardByOverlap::FPointBoundsOctree* GetOctree() const { return Octree.Get(); }
+		FORCEINLINE const FBox& GetBounds() const
+		{
+			return Bounds;
+		}
+
+		FORCEINLINE const TArray<TSharedPtr<PCGExDiscardByOverlap::FPointBounds>>& GetPointBounds() const
+		{
+			return LocalPointBounds;
+		}
+
+		FORCEINLINE const PCGExDiscardByOverlap::FPointBoundsOctree* GetOctree() const
+		{
+			return Octree.Get();
+		}
 
 		//virtual bool IsTrivial() const override { return false; } // Force non-trivial because this shit is expensive
 

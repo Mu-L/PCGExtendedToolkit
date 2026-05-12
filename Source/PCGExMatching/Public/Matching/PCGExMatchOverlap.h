@@ -75,9 +75,20 @@ public:
 
 	virtual bool Test(const PCGExData::FConstPoint& InTargetElement, const FPCGExTaggedData& InCandidate, const PCGExMatching::FScope& InMatchingScope) const override;
 
-	virtual bool SupportsRecursion() const override { return true; }
-	virtual bool WantsRecursion() const override { return Config.bRecursive; }
-	virtual int32 GetMaxRecursionDepth() const override { return Config.MaxRecursionDepth; }
+	virtual bool SupportsRecursion() const override
+	{
+		return true;
+	}
+
+	virtual bool WantsRecursion() const override
+	{
+		return Config.bRecursive;
+	}
+
+	virtual int32 GetMaxRecursionDepth() const override
+	{
+		return Config.MaxRecursionDepth;
+	}
 
 protected:
 	// Pre-computed source bounds (already expanded during preparation)
@@ -131,7 +142,10 @@ public:
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 protected:
-	virtual bool IsCacheable() const override { return true; }
+	virtual bool IsCacheable() const override
+	{
+		return true;
+	}
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;

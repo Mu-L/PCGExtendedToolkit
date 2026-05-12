@@ -26,7 +26,10 @@ namespace PCGExCollectionEditorUtils
 		TArray<FAssetData> SelectedAssets;
 		ContentBrowserModule.Get().GetSelectedAssets(SelectedAssets);
 
-		if (SelectedAssets.IsEmpty()) { return; }
+		if (SelectedAssets.IsEmpty())
+		{
+			return;
+		}
 
 		InCollection->EDITOR_AddBrowserSelectionTyped(SelectedAssets);
 	}
@@ -35,7 +38,10 @@ namespace PCGExCollectionEditorUtils
 	{
 		FScopedTransaction Transaction(INVTEXT("Sort Collection by Weight (Ascending)"));
 		InCollection->Modify();
-		InCollection->Sort([&](const FPCGExAssetCollectionEntry* A, const FPCGExAssetCollectionEntry* B) { return A->Weight < B->Weight; });
+		InCollection->Sort([&](const FPCGExAssetCollectionEntry* A, const FPCGExAssetCollectionEntry* B)
+		{
+			return A->Weight < B->Weight;
+		});
 		NotifyModified(InCollection);
 	}
 
@@ -43,7 +49,10 @@ namespace PCGExCollectionEditorUtils
 	{
 		FScopedTransaction Transaction(INVTEXT("Sort Collection by Weight (Descending)"));
 		InCollection->Modify();
-		InCollection->Sort([&](const FPCGExAssetCollectionEntry* A, const FPCGExAssetCollectionEntry* B) { return A->Weight > B->Weight; });
+		InCollection->Sort([&](const FPCGExAssetCollectionEntry* A, const FPCGExAssetCollectionEntry* B)
+		{
+			return A->Weight > B->Weight;
+		});
 		NotifyModified(InCollection);
 	}
 
@@ -51,7 +60,10 @@ namespace PCGExCollectionEditorUtils
 	{
 		FScopedTransaction Transaction(INVTEXT("Set Weights to Index"));
 		InCollection->Modify();
-		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i) { Entry->Weight = i + 1; });
+		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i)
+		{
+			Entry->Weight = i + 1;
+		});
 		NotifyModified(InCollection);
 	}
 
@@ -59,7 +71,10 @@ namespace PCGExCollectionEditorUtils
 	{
 		FScopedTransaction Transaction(INVTEXT("Pad Weights (+1)"));
 		InCollection->Modify();
-		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i) { Entry->Weight += 1; });
+		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i)
+		{
+			Entry->Weight += 1;
+		});
 		NotifyModified(InCollection);
 	}
 
@@ -67,7 +82,10 @@ namespace PCGExCollectionEditorUtils
 	{
 		FScopedTransaction Transaction(FText::Format(INVTEXT("Multiply Weights (x{0})"), FText::AsNumber(Mult)));
 		InCollection->Modify();
-		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i) { Entry->Weight *= Mult; });
+		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i)
+		{
+			Entry->Weight *= Mult;
+		});
 		NotifyModified(InCollection);
 	}
 
@@ -75,7 +93,10 @@ namespace PCGExCollectionEditorUtils
 	{
 		FScopedTransaction Transaction(INVTEXT("Reset Weights to 100"));
 		InCollection->Modify();
-		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i) { Entry->Weight = 100; });
+		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i)
+		{
+			Entry->Weight = 100;
+		});
 		NotifyModified(InCollection);
 	}
 
@@ -99,7 +120,10 @@ namespace PCGExCollectionEditorUtils
 		InCollection->Modify();
 		double Sum = 0;
 
-		InCollection->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 i) { Sum += Entry->Weight; });
+		InCollection->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 i)
+		{
+			Sum += Entry->Weight;
+		});
 		InCollection->ForEachEntry([&](FPCGExAssetCollectionEntry* Entry, int32 i)
 		{
 			int32& W = Entry->Weight;

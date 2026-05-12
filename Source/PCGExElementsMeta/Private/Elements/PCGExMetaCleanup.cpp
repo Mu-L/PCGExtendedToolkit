@@ -10,11 +10,17 @@
 
 PCGEX_INITIALIZE_ELEMENT(MetaCleanup)
 
-PCGExData::EIOInit UPCGExMetaCleanupSettings::GetMainDataInitializationPolicy() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExMetaCleanupSettings::GetMainDataInitializationPolicy() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 bool FPCGExMetaCleanupElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(MetaCleanup)
 
@@ -30,7 +36,10 @@ bool FPCGExMetaCleanupElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 
 	PCGEX_CONTEXT_AND_SETTINGS(MetaCleanup)
 
-	if (!Boot(Context)) { return true; }
+	if (!Boot(Context))
+	{
+		return true;
+	}
 
 	if (Context->Filters.Attributes.FilterMode == EPCGExAttributeFilter::All)
 	{

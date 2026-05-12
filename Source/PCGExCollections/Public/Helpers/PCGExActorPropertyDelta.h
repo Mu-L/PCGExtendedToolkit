@@ -92,7 +92,10 @@ namespace PCGExActorDelta
 		FPostApplyFixupHandle(const FPostApplyFixupHandle&) = delete;
 		FPostApplyFixupHandle& operator=(const FPostApplyFixupHandle&) = delete;
 
-		bool IsValid() const { return Id != 0; }
+		bool IsValid() const
+		{
+			return Id != 0;
+		}
 
 		/** Unregister early (before destruction). Safe to call multiple times. */
 		void Reset();

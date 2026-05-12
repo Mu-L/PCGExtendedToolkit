@@ -5,15 +5,15 @@
 
 #include "CoreMinimal.h"
 #include "PCGExBlendingCommon.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
+#include "UObject/Object.h"
 
-#include "Factories/PCGExFactoryProvider.h"
-#include "Factories/PCGExOperation.h"
 #include "PCGExProxyDataBlending.h"
 #include "Details/PCGExSettingsMacros.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
+#include "Factories/PCGExOperation.h"
 #include "Utils/PCGExCurveLookup.h"
 
 #include "PCGExBlendOpFactory.generated.h"
@@ -216,8 +216,15 @@ public:
 	TSharedPtr<PCGExData::FFacade> ConstantA;
 	TSharedPtr<PCGExData::FFacade> ConstantB;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Blending; }
-	virtual bool IsMonolithic() const { return false; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Blending;
+	}
+
+	virtual bool IsMonolithic() const
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<FPCGExBlendOperation> CreateOperation(FPCGExContext* InContext) const;
 

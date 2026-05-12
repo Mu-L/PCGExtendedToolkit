@@ -14,9 +14,15 @@
 namespace PCGExData
 {
 	FDataForwardHandler::FDataForwardHandler(const FPCGExForwardDetails& InDetails, const TSharedPtr<FFacade>& InSourceDataFacade, const bool ElementDomainToDataDomain)
-		: Details(InDetails), SourceDataFacade(InSourceDataFacade), TargetDataFacade(nullptr), bElementDomainToDataDomain(ElementDomainToDataDomain)
+		: Details(InDetails)
+		  , SourceDataFacade(InSourceDataFacade)
+		  , TargetDataFacade(nullptr)
+		  , bElementDomainToDataDomain(ElementDomainToDataDomain)
 	{
-		if (!Details.bEnabled) { return; }
+		if (!Details.bEnabled)
+		{
+			return;
+		}
 
 		Details.Init();
 		FAttributeIdentity::Get(InSourceDataFacade->GetIn()->Metadata, Identities);
@@ -24,7 +30,10 @@ namespace PCGExData
 	}
 
 	FDataForwardHandler::FDataForwardHandler(const FPCGExForwardDetails& InDetails, const TSharedPtr<FFacade>& InSourceDataFacade, const TSharedPtr<FFacade>& InTargetDataFacade, const bool ElementDomainToDataDomain)
-		: Details(InDetails), SourceDataFacade(InSourceDataFacade), TargetDataFacade(InTargetDataFacade), bElementDomainToDataDomain(ElementDomainToDataDomain)
+		: Details(InDetails)
+		  , SourceDataFacade(InSourceDataFacade)
+		  , TargetDataFacade(InTargetDataFacade)
+		  , bElementDomainToDataDomain(ElementDomainToDataDomain)
 	{
 		Details.Init();
 		FAttributeIdentity::Get(InSourceDataFacade->GetIn()->Metadata, Identities);
@@ -69,7 +78,10 @@ namespace PCGExData
 
 	void FDataForwardHandler::ValidateIdentities(FValidateFn&& Fn)
 	{
-		Identities.SetNum(Algo::RemoveIf(Identities, [&Fn](const FAttributeIdentity& Identity) { return !Fn(Identity); }));
+		Identities.SetNum(Algo::RemoveIf(Identities, [&Fn](const FAttributeIdentity& Identity)
+		{
+			return !Fn(Identity);
+		}));
 	}
 
 	void FDataForwardHandler::Forward(const int32 SourceIndex, const int32 TargetIndex)
@@ -103,7 +115,10 @@ namespace PCGExData
 
 	void FDataForwardHandler::Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade)
 	{
-		if (Identities.IsEmpty()) { return; }
+		if (Identities.IsEmpty())
+		{
+			return;
+		}
 
 		const UPCGBasePointData* InSourceData = SourceDataFacade->GetIn();
 
@@ -228,7 +243,10 @@ namespace PCGExData
 
 	void FDataForwardHandler::Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade, const TArray<int32>& Indices)
 	{
-		if (Identities.IsEmpty()) { return; }
+		if (Identities.IsEmpty())
+		{
+			return;
+		}
 
 		const UPCGBasePointData* InSourceData = SourceDataFacade->GetIn();
 
@@ -276,7 +294,10 @@ namespace PCGExData
 
 	void FDataForwardHandler::Forward(const int32 SourceIndex, UPCGMetadata* InTargetMetadata)
 	{
-		if (Identities.IsEmpty()) { return; }
+		if (Identities.IsEmpty())
+		{
+			return;
+		}
 
 		const UPCGBasePointData* InSourceData = SourceDataFacade->GetIn();
 

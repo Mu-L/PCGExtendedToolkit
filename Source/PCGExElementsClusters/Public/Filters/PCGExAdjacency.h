@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Math/PCGExMathMean.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExAdjacency.generated.h"
 

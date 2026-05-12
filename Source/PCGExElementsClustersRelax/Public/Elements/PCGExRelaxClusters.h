@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Details/PCGExInfluenceDetails.h"
 #include "Core/PCGExClustersProcessor.h"
+#include "Details/PCGExInfluenceDetails.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
 #include "PCGExRelaxClusters.generated.h"
@@ -37,7 +37,10 @@ public:
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(RelaxClusters, "Cluster : Relax", "Relax point positions using edges connecting them.", (Relaxing ? FName(Relaxing.GetClass()->GetMetaData(TEXT("DisplayName"))) : FName("...")));
 #endif
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;

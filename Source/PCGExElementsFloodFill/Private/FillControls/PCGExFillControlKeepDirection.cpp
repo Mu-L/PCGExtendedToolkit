@@ -5,26 +5,35 @@
 #include "FillControls/PCGExFillControlKeepDirection.h"
 
 
-#include "Data/Utils/PCGExDataPreloader.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
+#include "Data/Utils/PCGExDataPreloader.h"
+#include "Details/PCGExSettingsDetails.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigKeepDirection, WindowSize, int32, WindowSizeInput, WindowSizeAttribute, WindowSize)
 
 bool FPCGExFillControlKeepDirection::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryKeepDirection* TypedFactory = Cast<UPCGExFillControlsFactoryKeepDirection>(Factory);
 
 	WindowSize = TypedFactory->Config.GetValueSettingWindowSize();
-	if (!WindowSize->Init(GetSourceFacade())) { return false; }
+	if (!WindowSize->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	HashComparisonDetails = TypedFactory->Config.HashComparisonDetails;
-	if (!HashComparisonDetails.Init(InContext, GetSourceFacade().ToSharedRef())) { return false; }
+	if (!HashComparisonDetails.Init(InContext, GetSourceFacade().ToSharedRef()))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -48,13 +57,19 @@ bool FPCGExFillControlKeepDirection::IsValidCandidate(const PCGExFloodFill::FDif
 			const int32 CurrentIndex = PathNodeIndex;
 			PCGEx::NH64(Diffusion->TravelStack->Get(CurrentIndex), PathNodeIndex, PathEdgeIndex);
 
-			if (PathEdgeIndex < 0) { continue; }
+			if (PathEdgeIndex < 0)
+			{
+				continue;
+			}
 
 			Avg += Cluster->GetDir(PathNodeIndex, CurrentIndex);
 			Sampled++;
 		}
 
-		if (Sampled < 1) { return true; }
+		if (Sampled < 1)
+		{
+			return true;
+		}
 
 		return HashComparisonDetails.Test(CurrentDir, (Avg / Sampled).GetSafeNormal(), GetSettingsIndex(Diffusion));
 	}
@@ -90,8 +105,14 @@ FString UPCGExFillControlsKeepDirectionProviderSettings::GetDisplayName() const
 {
 	FString DName = GetDefaultNodeTitle().ToString().Replace(TEXT("PCGEx | Fill Control"), TEXT("FC")) + TEXT(" @ ");
 
-	if (Config.WindowSizeInput == EPCGExInputValueType::Attribute) { DName += PCGExMetaHelpers::GetSelectorDisplayName(Config.WindowSizeAttribute); }
-	else { DName += FString::Printf(TEXT("%d"), Config.WindowSize); }
+	if (Config.WindowSizeInput == EPCGExInputValueType::Attribute)
+	{
+		DName += PCGExMetaHelpers::GetSelectorDisplayName(Config.WindowSizeAttribute);
+	}
+	else
+	{
+		DName += FString::Printf(TEXT("%d"), Config.WindowSize);
+	}
 
 	return DName;
 }

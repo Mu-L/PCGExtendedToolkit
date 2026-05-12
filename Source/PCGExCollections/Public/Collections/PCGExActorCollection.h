@@ -5,11 +5,11 @@
 
 #include "CoreMinimal.h"
 
+#include "PCGGraph.h"
 #include "Core/PCGExAssetCollection.h"
 #include "GameFramework/Actor.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
-#include "PCGGraph.h"
 
 #include "PCGExActorCollection.generated.h"
 
@@ -30,10 +30,13 @@ struct PCGEXCOLLECTIONS_API FPCGExActorCollectionEntry : public FPCGExAssetColle
 
 	// Type System
 
-	virtual PCGExAssetCollection::FTypeId GetTypeId() const override { return PCGExAssetCollection::TypeIds::Actor; }
+	virtual PCGExAssetCollection::FTypeId GetTypeId() const override
+	{
+		return PCGExAssetCollection::TypeIds::Actor;
+	}
 
 	// Actor-Specific Properties
-	
+
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
 	TSoftClassPtr<AActor> Actor = nullptr;
 

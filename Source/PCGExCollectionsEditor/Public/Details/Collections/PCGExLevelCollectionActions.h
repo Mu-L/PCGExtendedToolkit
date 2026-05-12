@@ -5,10 +5,10 @@
 
 #include "CoreMinimal.h"
 #include "AssetDefinitionDefault.h"
+#include "PCGExDataAssetFactory.h"
+#include "AssetRegistry/AssetData.h"
 #include "Collections/PCGExLevelCollection.h"
 #include "Engine/World.h"
-#include "AssetRegistry/AssetData.h"
-#include "PCGExDataAssetFactory.h"
 
 #include "PCGExLevelCollectionActions.generated.h"
 
@@ -29,7 +29,10 @@ class UPCGExLevelCollectionFactory : public UPCGExDataAssetFactoryBase
 	GENERATED_BODY()
 
 public:
-	UPCGExLevelCollectionFactory() { SupportedClass = UPCGExLevelCollection::StaticClass(); }
+	UPCGExLevelCollectionFactory()
+	{
+		SupportedClass = UPCGExLevelCollection::StaticClass();
+	}
 };
 
 UCLASS()
@@ -38,10 +41,25 @@ class UAssetDefinition_PCGExLevelCollection : public UAssetDefinitionDefault
 	GENERATED_BODY()
 
 public:
-	virtual FText GetAssetDisplayName() const override { return INVTEXT("Level Collection"); }
-	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(255, 156, 0)); }
-	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("A weighted collection of level assets."); }
-	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExLevelCollection::StaticClass(); }
+	virtual FText GetAssetDisplayName() const override
+	{
+		return INVTEXT("Level Collection");
+	}
+
+	virtual FLinearColor GetAssetColor() const override
+	{
+		return FLinearColor(FColor(255, 156, 0));
+	}
+
+	virtual FText GetAssetDescription(const FAssetData& AssetData) const override
+	{
+		return INVTEXT("A weighted collection of level assets.");
+	}
+
+	virtual TSoftClassPtr<UObject> GetAssetClass() const override
+	{
+		return UPCGExLevelCollection::StaticClass();
+	}
 
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{

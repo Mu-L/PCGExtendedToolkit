@@ -19,7 +19,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExSegmentLengthFilterConfig, Index, int32, CompareA
 
 bool UPCGExSegmentLengthFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
 	Config.Sanitize();
 	return true;
 }
@@ -38,13 +41,22 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExSegmentLengthFilterFactory::CreateFi
 void UPCGExSegmentLengthFilterFactory::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
-	if (Config.ThresholdInput == EPCGExInputValueType::Attribute) { FacadePreloader.Register<double>(InContext, Config.ThresholdAttribute); }
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute) { FacadePreloader.Register<double>(InContext, Config.IndexAttribute); }
+	if (Config.ThresholdInput == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<double>(InContext, Config.ThresholdAttribute);
+	}
+	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<double>(InContext, Config.IndexAttribute);
+	}
 }
 
 bool UPCGExSegmentLengthFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.ThresholdInput == EPCGExInputValueType::Attribute, Config.ThresholdAttribute, Consumable)
@@ -55,21 +67,36 @@ bool UPCGExSegmentLengthFilterFactory::RegisterConsumableAttributesWithData(FPCG
 
 bool PCGExPointFilter::FSegmentLengthFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(InPointDataFacade->GetIn());
 	LastIndex = InPointDataFacade->GetNum() - 1;
 	InTransforms = InPointDataFacade->GetIn()->GetConstTransformValueRange();
 	bOffset = TypedFilterFactory->Config.IndexMode == EPCGExIndexMode::Offset;
 
-	if (TypedFilterFactory->Config.bForceTileIfClosedLoop && bClosedLoop) { IndexSafety = EPCGExIndexSafety::Tile; }
-	else { IndexSafety = TypedFilterFactory->Config.IndexSafety; }
+	if (TypedFilterFactory->Config.bForceTileIfClosedLoop && bClosedLoop)
+	{
+		IndexSafety = EPCGExIndexSafety::Tile;
+	}
+	else
+	{
+		IndexSafety = TypedFilterFactory->Config.IndexSafety;
+	}
 
 	Threshold = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
-	if (!Threshold->Init(PointDataFacade)) { return false; }
+	if (!Threshold->Init(PointDataFacade))
+	{
+		return false;
+	}
 
 	Index = TypedFilterFactory->Config.GetValueSettingIndex(PCGEX_QUIET_HANDLING);
-	if (!Index->Init(PointDataFacade)) { return false; }
+	if (!Index->Init(PointDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }

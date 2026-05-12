@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExPointsProcessor.h"
-#include "Paths/PCGExPath.h"
 #include "AI/Navigation/NavigationTypes.h"
 #include "Core/PCGExPathfinding.h"
+#include "Core/PCGExPointsProcessor.h"
+#include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
 
 UENUM()
@@ -37,7 +37,11 @@ namespace PCGExNavmesh
 		FNavmeshQuery() = default;
 		explicit FNavmeshQuery(const PCGExPathfinding::FSeedGoalPair& InSeedGoalPair);
 
-		bool IsValid() const { return !Positions.IsEmpty(); }
+		bool IsValid() const
+		{
+			return !Positions.IsEmpty();
+		}
+
 		void FindPath(FPCGExNavmeshContext* InContext);
 		void CopyPositions(const TPCGValueRange<FTransform>& InRange, int32& OutStartIndex, const bool bAddSeed, const bool bAddGoal);
 	};

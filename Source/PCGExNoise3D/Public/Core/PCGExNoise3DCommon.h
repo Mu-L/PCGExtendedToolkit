@@ -52,11 +52,16 @@ namespace PCGExNoise3D
 	{
 		switch (NumFields)
 		{
-		case 1: return EPCGMetadataTypes::Double;
-		case 2: return EPCGMetadataTypes::Vector2;
-		case 3: return EPCGMetadataTypes::Vector;
-		case 4: return EPCGMetadataTypes::Vector4;
-		default: return EPCGMetadataTypes::Unknown;
+		case 1:
+			return EPCGMetadataTypes::Double;
+		case 2:
+			return EPCGMetadataTypes::Vector2;
+		case 3:
+			return EPCGMetadataTypes::Vector;
+		case 4:
+			return EPCGMetadataTypes::Vector4;
+		default:
+			return EPCGMetadataTypes::Unknown;
 		}
 	}
 }

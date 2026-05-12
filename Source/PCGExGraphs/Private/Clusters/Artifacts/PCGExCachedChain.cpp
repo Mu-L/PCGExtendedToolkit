@@ -4,8 +4,8 @@
 #include "Clusters/Artifacts/PCGExCachedChain.h"
 
 #include "Algo/RemoveIf.h"
-#include "Clusters/Artifacts/PCGExChain.h"
 #include "Clusters/PCGExCluster.h"
+#include "Clusters/Artifacts/PCGExChain.h"
 #include "Core/PCGExMTCommon.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCachedChain"
@@ -88,7 +88,10 @@ namespace PCGExClusters
 			for (int32 i = 0; i < NumNodes; i++)
 			{
 				FNode* Node = Cluster->GetNode(i);
-				if (!Node || Node->IsEmpty()) { continue; }
+				if (!Node || Node->IsEmpty())
+				{
+					continue;
+				}
 
 				if (Node->IsLeaf())
 				{
@@ -105,7 +108,10 @@ namespace PCGExClusters
 				for (const FLink& Lk : Node->Links)
 				{
 					// Skip immediately known leaves to avoid double-sampling
-					if (Cluster->GetNode(Lk.Node)->IsLeaf()) { continue; }
+					if (Cluster->GetNode(Lk.Node)->IsLeaf())
+					{
+						continue;
+					}
 					Chains.Add(MakeShared<FNodeChain>(FLink(Node->Index, Lk.Edge)));
 				}
 			}
@@ -173,7 +179,10 @@ namespace PCGExClusters
 
 			for (const TSharedPtr<FNodeChain>& SourceChain : SourceChains)
 			{
-				if (!SourceChain) { continue; }
+				if (!SourceChain)
+				{
+					continue;
+				}
 
 				// Single edge chains can't be split - pass through as-is
 				// (Breakpoints only meaningfully apply to binary nodes in multi-link chains)
@@ -207,8 +216,8 @@ namespace PCGExClusters
 				// For closed loops, Seed.Edge was overwritten with the closing edge during BuildChain.
 				// The first segment needs the original edge from seed to first link (Links[0].Edge).
 				int32 SegmentSeedEdge = (SourceChain->bIsClosedLoop && !SourceChain->Links.IsEmpty())
-					                        ? SourceChain->Links[0].Edge
-					                        : SourceChain->Seed.Edge;
+					? SourceChain->Links[0].Edge
+					: SourceChain->Seed.Edge;
 
 				const int32 OriginalSeedPI = Cluster->GetNodePointIndex(SourceChain->Seed.Node);
 				const bool bOriginalSeedIsBreakpoint = BreakpointsRef.IsValidIndex(OriginalSeedPI) && BreakpointsRef[OriginalSeedPI];
@@ -243,7 +252,10 @@ namespace PCGExClusters
 
 						NewChain->FixUniqueHash();
 
-						if (FirstEmittedIndex == -1) { FirstEmittedIndex = OutChains.Num(); }
+						if (FirstEmittedIndex == -1)
+						{
+							FirstEmittedIndex = OutChains.Num();
+						}
 						OutChains.Add(NewChain);
 
 						CurrentSegmentLinks.Reset();
@@ -303,7 +315,10 @@ namespace PCGExClusters
 						const FNode* EndNode = Cluster->GetNode(NewChain->Links.Last().Node);
 						NewChain->bIsLeaf = (StartNode && StartNode->IsLeaf()) || (EndNode && EndNode->IsLeaf());
 
-						if (NewChain->bIsClosedLoop) { NewChain->bIsLeaf = false; }
+						if (NewChain->bIsClosedLoop)
+						{
+							NewChain->bIsLeaf = false;
+						}
 
 						NewChain->FixUniqueHash();
 						OutChains.Add(NewChain);
@@ -319,7 +334,10 @@ namespace PCGExClusters
 				OutChains,
 				[&UniqueHashSet](const TSharedPtr<FNodeChain>& Chain)
 				{
-					if (!Chain || Chain->Links.IsEmpty()) { return true; }
+					if (!Chain || Chain->Links.IsEmpty())
+					{
+						return true;
+					}
 					bool bAlreadySet = false;
 					UniqueHashSet.Add(Chain->UniqueHash, &bAlreadySet);
 					return bAlreadySet;
@@ -335,7 +353,10 @@ namespace PCGExClusters
 				// In-place filter
 				OutChains.SetNum(Algo::StableRemoveIf(
 					OutChains,
-					[](const TSharedPtr<FNodeChain>& Chain) { return !Chain || !Chain->bIsLeaf; }));
+					[](const TSharedPtr<FNodeChain>& Chain)
+					{
+						return !Chain || !Chain->bIsLeaf;
+					}));
 			}
 			else
 			{

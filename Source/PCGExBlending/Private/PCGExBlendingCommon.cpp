@@ -11,46 +11,66 @@ namespace PCGExBlending
 	{
 		switch (From)
 		{
-		case EPCGExBlendingType::None: OutTo = EPCGExABBlendingType::None;
+		case EPCGExBlendingType::None:
+			OutTo = EPCGExABBlendingType::None;
 			break;
-		case EPCGExBlendingType::Average: OutTo = EPCGExABBlendingType::Average;
+		case EPCGExBlendingType::Average:
+			OutTo = EPCGExABBlendingType::Average;
 			break;
-		case EPCGExBlendingType::Weight: OutTo = EPCGExABBlendingType::Weight;
+		case EPCGExBlendingType::Weight:
+			OutTo = EPCGExABBlendingType::Weight;
 			break;
-		case EPCGExBlendingType::Min: OutTo = EPCGExABBlendingType::Min;
+		case EPCGExBlendingType::Min:
+			OutTo = EPCGExABBlendingType::Min;
 			break;
-		case EPCGExBlendingType::Max: OutTo = EPCGExABBlendingType::Max;
+		case EPCGExBlendingType::Max:
+			OutTo = EPCGExABBlendingType::Max;
 			break;
-		case EPCGExBlendingType::Copy: OutTo = EPCGExABBlendingType::CopySource;
+		case EPCGExBlendingType::Copy:
+			OutTo = EPCGExABBlendingType::CopySource;
 			break;
-		case EPCGExBlendingType::Sum: OutTo = EPCGExABBlendingType::Add;
+		case EPCGExBlendingType::Sum:
+			OutTo = EPCGExABBlendingType::Add;
 			break;
-		case EPCGExBlendingType::WeightedSum: OutTo = EPCGExABBlendingType::WeightedAdd;
+		case EPCGExBlendingType::WeightedSum:
+			OutTo = EPCGExABBlendingType::WeightedAdd;
 			break;
-		case EPCGExBlendingType::Lerp: OutTo = EPCGExABBlendingType::Lerp;
+		case EPCGExBlendingType::Lerp:
+			OutTo = EPCGExABBlendingType::Lerp;
 			break;
-		case EPCGExBlendingType::Subtract: OutTo = EPCGExABBlendingType::Subtract;
+		case EPCGExBlendingType::Subtract:
+			OutTo = EPCGExABBlendingType::Subtract;
 			break;
-		case EPCGExBlendingType::UnsignedMin: OutTo = EPCGExABBlendingType::UnsignedMin;
+		case EPCGExBlendingType::UnsignedMin:
+			OutTo = EPCGExABBlendingType::UnsignedMin;
 			break;
-		case EPCGExBlendingType::UnsignedMax: OutTo = EPCGExABBlendingType::UnsignedMax;
+		case EPCGExBlendingType::UnsignedMax:
+			OutTo = EPCGExABBlendingType::UnsignedMax;
 			break;
-		case EPCGExBlendingType::AbsoluteMin: OutTo = EPCGExABBlendingType::AbsoluteMin;
+		case EPCGExBlendingType::AbsoluteMin:
+			OutTo = EPCGExABBlendingType::AbsoluteMin;
 			break;
-		case EPCGExBlendingType::AbsoluteMax: OutTo = EPCGExABBlendingType::AbsoluteMax;
+		case EPCGExBlendingType::AbsoluteMax:
+			OutTo = EPCGExABBlendingType::AbsoluteMax;
 			break;
-		case EPCGExBlendingType::WeightedSubtract: OutTo = EPCGExABBlendingType::WeightedSubtract;
+		case EPCGExBlendingType::WeightedSubtract:
+			OutTo = EPCGExABBlendingType::WeightedSubtract;
 			break;
-		case EPCGExBlendingType::CopyOther: OutTo = EPCGExABBlendingType::CopyTarget;
+		case EPCGExBlendingType::CopyOther:
+			OutTo = EPCGExABBlendingType::CopyTarget;
 			break;
-		case EPCGExBlendingType::Hash: OutTo = EPCGExABBlendingType::Hash;
+		case EPCGExBlendingType::Hash:
+			OutTo = EPCGExABBlendingType::Hash;
 			break;
-		case EPCGExBlendingType::UnsignedHash: OutTo = EPCGExABBlendingType::UnsignedHash;
+		case EPCGExBlendingType::UnsignedHash:
+			OutTo = EPCGExABBlendingType::UnsignedHash;
 			break;
-		case EPCGExBlendingType::WeightNormalize: OutTo = EPCGExABBlendingType::WeightNormalize;
+		case EPCGExBlendingType::WeightNormalize:
+			OutTo = EPCGExABBlendingType::WeightNormalize;
 			break;
 		default:
-		case EPCGExBlendingType::Unset: OutTo = EPCGExABBlendingType::None;
+		case EPCGExBlendingType::Unset:
+			OutTo = EPCGExABBlendingType::None;
 			break;
 		}
 	}
@@ -66,8 +86,14 @@ namespace PCGExBlending
 		Identifier = InIdentifier;
 		Selector.Update(InIdentifier.Name.ToString());
 
-		if (InIdentifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data) { Selector.SetDomainName(PCGDataConstants::DataDomainName); }
-		else { Selector.SetDomainName(PCGDataConstants::DefaultDomainName); }
+		if (InIdentifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
+		{
+			Selector.SetDomainName(PCGDataConstants::DataDomainName);
+		}
+		else
+		{
+			Selector.SetDomainName(PCGDataConstants::DefaultDomainName);
+		}
 	}
 
 	void FBlendingParam::SetBlending(const EPCGExBlendingType InBlending)

@@ -19,7 +19,10 @@ void FPCGExPointsToBoundsDataDetails::Output(const UPCGBasePointData* InBoundsDa
 		for (const FPCGAttributeIdentifier& AttributeIdentifier : AttributeIdentifiers)
 		{
 			// Only carry over non-data attributes
-			if (AttributeIdentifier.MetadataDomain.Flag != EPCGMetadataDomainFlag::Elements) { continue; }
+			if (AttributeIdentifier.MetadataDomain.Flag != EPCGMetadataDomainFlag::Elements)
+			{
+				continue;
+			}
 
 			const FPCGMetadataAttributeBase* Source = InBoundsData->Metadata->GetConstAttribute(AttributeIdentifier);
 
@@ -70,7 +73,10 @@ void FPCGExPointsToBoundsDataDetails::OutputInverse(const UPCGBasePointData* InP
 		for (const FPCGAttributeIdentifier& AttributeIdentifier : AttributeIdentifiers)
 		{
 			// Only carry over non-data attributes
-			if (AttributeIdentifier.MetadataDomain.Flag != EPCGMetadataDomainFlag::Elements) { continue; }
+			if (AttributeIdentifier.MetadataDomain.Flag != EPCGMetadataDomainFlag::Elements)
+			{
+				continue;
+			}
 
 			const FPCGMetadataAttributeBase* Source = OutData->Metadata->GetConstAttribute(AttributeIdentifier);
 
@@ -117,7 +123,10 @@ PCGEX_INITIALIZE_ELEMENT(PointsToBounds)
 
 PCGExData::EIOInit UPCGExPointsToBoundsSettings::GetMainDataInitializationPolicy() const
 {
-	if (OutputMode == EPCGExPointsToBoundsOutputMode::Collapse) { return PCGExData::EIOInit::New; }
+	if (OutputMode == EPCGExPointsToBoundsOutputMode::Collapse)
+	{
+		return PCGExData::EIOInit::New;
+	}
 	return PCGExData::EIOInit::Duplicate;
 }
 
@@ -125,11 +134,17 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(PointsToBounds)
 
 bool FPCGExPointsToBoundsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PointsToBounds)
 
-	if (Settings->bWritePointsCount) { PCGEX_VALIDATE_NAME(Settings->PointsCountAttributeName) }
+	if (Settings->bWritePointsCount)
+	{
+		PCGEX_VALIDATE_NAME(Settings->PointsCountAttributeName)
+	}
 
 	return true;
 }
@@ -143,7 +158,10 @@ bool FPCGExPointsToBoundsElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				//NewBatch->bRequiresWriteStep = true;
@@ -170,7 +188,10 @@ namespace PCGExPointsToBounds
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPointsToBounds::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Settings->OutputMode == EPCGExPointsToBoundsOutputMode::Collapse)
 		{
@@ -198,17 +219,69 @@ namespace PCGExPointsToBounds
 		switch (Settings->BoundsSource)
 		{
 		default: ;
-		case EPCGExPointBoundsSource::DensityBounds: if (Settings->bOutputOrientedBoundingBox) { for (int i = 0; i < NumPoints; i++) { Bounds += InPointData->GetDensityBounds(i).GetBox().TransformBy(InvTransform); } }
-			else { for (int i = 0; i < NumPoints; i++) { Bounds += InPointData->GetDensityBounds(i).GetBox(); } }
+		case EPCGExPointBoundsSource::DensityBounds:
+			if (Settings->bOutputOrientedBoundingBox)
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += InPointData->GetDensityBounds(i).GetBox().TransformBy(InvTransform);
+				}
+			}
+			else
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += InPointData->GetDensityBounds(i).GetBox();
+				}
+			}
 			break;
-		case EPCGExPointBoundsSource::ScaledBounds: if (Settings->bOutputOrientedBoundingBox) { for (int i = 0; i < NumPoints; i++) { Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(InTransforms[i].GetLocation()), InPointData->GetScaledExtents(i)).GetBox(); } }
-			else { for (int i = 0; i < NumPoints; i++) { Bounds += FBoxCenterAndExtent(InTransforms[i].GetLocation(), InPointData->GetScaledExtents(i)).GetBox(); } }
+		case EPCGExPointBoundsSource::ScaledBounds:
+			if (Settings->bOutputOrientedBoundingBox)
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(InTransforms[i].GetLocation()), InPointData->GetScaledExtents(i)).GetBox();
+				}
+			}
+			else
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += FBoxCenterAndExtent(InTransforms[i].GetLocation(), InPointData->GetScaledExtents(i)).GetBox();
+				}
+			}
 			break;
-		case EPCGExPointBoundsSource::Bounds: if (Settings->bOutputOrientedBoundingBox) { for (int i = 0; i < NumPoints; i++) { Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(InTransforms[i].GetLocation()), InPointData->GetExtents(i)).GetBox(); } }
-			else { for (int i = 0; i < NumPoints; i++) { Bounds += FBoxCenterAndExtent(InTransforms[i].GetLocation(), InPointData->GetExtents(i)).GetBox(); } }
+		case EPCGExPointBoundsSource::Bounds:
+			if (Settings->bOutputOrientedBoundingBox)
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += FBoxCenterAndExtent(InvTransform.TransformPosition(InTransforms[i].GetLocation()), InPointData->GetExtents(i)).GetBox();
+				}
+			}
+			else
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += FBoxCenterAndExtent(InTransforms[i].GetLocation(), InPointData->GetExtents(i)).GetBox();
+				}
+			}
 			break;
-		case EPCGExPointBoundsSource::Center: if (Settings->bOutputOrientedBoundingBox) { for (int i = 0; i < NumPoints; i++) { Bounds += InvTransform.TransformPosition(InTransforms[i].GetLocation()); } }
-			else { for (int i = 0; i < NumPoints; i++) { Bounds += InTransforms[i].GetLocation(); } }
+		case EPCGExPointBoundsSource::Center:
+			if (Settings->bOutputOrientedBoundingBox)
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += InvTransform.TransformPosition(InTransforms[i].GetLocation());
+				}
+			}
+			else
+			{
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Bounds += InTransforms[i].GetLocation();
+				}
+			}
 			break;
 		}
 
@@ -276,7 +349,10 @@ namespace PCGExPointsToBounds
 		}
 
 
-		if (Settings->bWritePointsCount) { WriteMark(OutputFacade->Source, Settings->PointsCountAttributeName, NumPoints); }
+		if (Settings->bWritePointsCount)
+		{
+			WriteMark(OutputFacade->Source, Settings->PointsCountAttributeName, NumPoints);
+		}
 
 		OutputFacade->WriteSynchronous();
 

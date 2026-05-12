@@ -25,6 +25,7 @@ struct FPCGContext;
 struct FPCGMeshInstanceList;
 class UPCGBasePointData;
 class UPCGExSelectorFactoryData;
+class UPCGManagedActors;
 class UPCGParamData;
 class FPCGExEntryPickerOperation;
 class FPCGExMicroEntryPickerOperation;
@@ -77,6 +78,16 @@ namespace PCGExCollections
 	PCGEXCOLLECTIONS_API
 	AActor* ResolveTargetActor(FPCGExContext* InContext, const FSoftObjectPath& InPath, TMap<FSoftObjectPath, TWeakObjectPtr<AActor>>& InOutCache);
 
+	/**
+	 * Applies PCG persistence semantics to a freshly-spawned actor:
+	 * tags with DefaultPCGActorTag, Modify()/MarkPackageDirty() the actor and its
+	 * level (skipped for preview/transient spawns), and registers with ManagedActors.
+	 * Shared by all spawn elements (SpawnActors, loose level actors) to ensure a
+	 * single consistent persistence path.
+	 */
+	PCGEXCOLLECTIONS_API
+	void FinalizeSpawnedActor(AActor* InActor, UPCGManagedActors* InManagedActors, bool bIsPreview);
+
 	class FSocketHelper;
 	/**
 	 * Per-point entry picker. Reads distribution settings (index/random/weighted) and
@@ -122,7 +133,10 @@ namespace PCGExCollections
 		 * Wire a context-scoped shared-data cache. Call before Init. Ops will receive cached
 		 * collection-derived state via FSelectorSharedDataCache::GetOrBuild instead of self-building.
 		 */
-		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache)
+		{
+			SharedDataCache = InCache;
+		}
 
 		/**
 		 * Initialize the helper with a data facade and optional external selector factory.
@@ -133,7 +147,10 @@ namespace PCGExCollections
 		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
 
 		/** Active factory (either the External one passed to Init, or the transient built-in built from Details in Legacy mode). */
-		const UPCGExSelectorFactoryData* GetActiveFactory() const { return ActiveFactory; }
+		const UPCGExSelectorFactoryData* GetActiveFactory() const
+		{
+			return ActiveFactory;
+		}
 
 		/**
 		 * Get an entry for a specific point
@@ -154,7 +171,10 @@ namespace PCGExCollections
 		FPCGExEntryAccessResult GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const;
 
 		/** Get the underlying collection */
-		UPCGExAssetCollection* GetCollection() const { return Collection; }
+		UPCGExAssetCollection* GetCollection() const
+		{
+			return Collection;
+		}
 
 		/** Get the collection's type ID */
 		PCGExAssetCollection::FTypeId GetCollectionTypeId() const
@@ -304,10 +324,16 @@ namespace PCGExCollections
 		FPickUnpacker() = default;
 		~FPickUnpacker();
 
-		bool HasValidMapping() const { return !CollectionMap.IsEmpty(); }
+		bool HasValidMapping() const
+		{
+			return !CollectionMap.IsEmpty();
+		}
 
 		/** Get read-only access to the collection map */
-		const TMap<uint32, UPCGExAssetCollection*>& GetCollections() const { return CollectionMap; }
+		const TMap<uint32, UPCGExAssetCollection*>& GetCollections() const
+		{
+			return CollectionMap;
+		}
 
 		/** Unpack collection mappings from an attribute set */
 		bool UnpackDataset(FPCGContext* InContext, const UPCGParamData* InAttributeSet);
@@ -384,7 +410,10 @@ namespace PCGExCollections
 		explicit FCollectionSource(const TSharedPtr<PCGExData::FFacade>& InDataFacade);
 
 		/** Wire a context-scoped shared-data cache. Call before Init. */
-		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache)
+		{
+			SharedDataCache = InCache;
+		}
 
 		/** Initialize with a single collection. ExternalFactory drives picking in External mode; nullptr falls back to Legacy inline details. */
 		bool Init(UPCGExAssetCollection* InCollection, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
@@ -402,10 +431,16 @@ namespace PCGExCollections
 		bool TryGetHelpers(int32 Index, FSelectorHelper*& OutHelper, FMicroSelectorHelper*& OutMicroHelper);
 
 		/** Check if this is a single source */
-		bool IsSingleSource() const { return SingleSource != nullptr; }
+		bool IsSingleSource() const
+		{
+			return SingleSource != nullptr;
+		}
 
 		/** Get the single source collection (if applicable) */
-		UPCGExAssetCollection* GetSingleSource() const { return SingleSource; }
+		UPCGExAssetCollection* GetSingleSource() const
+		{
+			return SingleSource;
+		}
 
 		/**
 		 * Pre-register every collection this source can surface as a Host with the given

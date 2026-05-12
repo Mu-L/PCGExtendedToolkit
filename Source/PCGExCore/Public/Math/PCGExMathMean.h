@@ -31,7 +31,10 @@ namespace PCGExMath
 	FORCEINLINE static T GetAverage(const TArray<T>& Values)
 	{
 		T Sum = 0;
-		for (const T Value : Values) { Sum += Value; }
+		for (const T Value : Values)
+		{
+			Sum += Value;
+		}
 		return Sum / Values.Num();
 	}
 
@@ -64,9 +67,18 @@ namespace PCGExMath
 			const int32 PivotIndex = Left + (Right - Left) / 2;
 			const int32 NewPivotIndex = QuickSelectPartition(Arr, Left, Right, PivotIndex);
 
-			if (NewPivotIndex == K) { return Arr[K]; }
-			if (K < NewPivotIndex) { Right = NewPivotIndex - 1; }
-			else { Left = NewPivotIndex + 1; }
+			if (NewPivotIndex == K)
+			{
+				return Arr[K];
+			}
+			if (K < NewPivotIndex)
+			{
+				Right = NewPivotIndex - 1;
+			}
+			else
+			{
+				Left = NewPivotIndex + 1;
+			}
 		}
 		return Arr[Left];
 	}
@@ -74,8 +86,14 @@ namespace PCGExMath
 	template <typename T>
 	FORCEINLINE static T GetMedian(const TArray<T>& Values)
 	{
-		if (Values.IsEmpty()) { return T{}; }
-		if (Values.Num() == 1) { return Values[0]; }
+		if (Values.IsEmpty())
+		{
+			return T{};
+		}
+		if (Values.Num() == 1)
+		{
+			return Values[0];
+		}
 
 		// Copy for in-place quickselect (avoids full sort - O(n) avg vs O(n log n))
 		TArray<T> WorkingCopy;

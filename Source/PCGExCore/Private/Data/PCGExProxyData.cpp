@@ -4,8 +4,8 @@
 #include "Data/PCGExProxyData.h"
 
 #include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
 #include "Data/PCGExPointElements.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/PCGPointArrayData.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadataAttribute.h"
@@ -21,7 +21,10 @@ namespace PCGExData
 
 	bool FProxyDescriptor::SetFieldIndex(const int32 InFieldIndex)
 	{
-		if (!SubSelection.SetFieldIndex(InFieldIndex)) { return false; }
+		if (!SubSelection.SetFieldIndex(InFieldIndex))
+		{
+			return false;
+		}
 		UpdateSubSelection();
 		return true;
 	}
@@ -40,7 +43,10 @@ namespace PCGExData
 
 		if (!TryGetTypeAndSource(Selector, InFacade, RealType, Side))
 		{
-			if (bRequired) { PCGEX_LOG_INVALID_SELECTOR_C(InContext, , Selector) }
+			if (bRequired)
+			{
+				PCGEX_LOG_INVALID_SELECTOR_C(InContext, , Selector)
+			}
 			bValid = false;
 		}
 
@@ -89,7 +95,10 @@ namespace PCGExData
 
 		if (!TryGetTypeAndSource(InSelector, InFacade, RealType, Side))
 		{
-			if (bRequired) { PCGEX_LOG_INVALID_SELECTOR_C(InContext, , InSelector) }
+			if (bRequired)
+			{
+				PCGEX_LOG_INVALID_SELECTOR_C(InContext, , InSelector)
+			}
 			bValid = false;
 		}
 
@@ -130,7 +139,10 @@ namespace PCGExData
 
 	bool FProxyDescriptor::CaptureStrict(FPCGExContext* InContext, const FString& Path, const EIOSide InSide, const bool bRequired)
 	{
-		if (!Capture(InContext, Path, InSide, bRequired)) { return false; }
+		if (!Capture(InContext, Path, InSide, bRequired))
+		{
+			return false;
+		}
 
 		if (Side != InSide)
 		{
@@ -154,7 +166,10 @@ namespace PCGExData
 
 	bool FProxyDescriptor::CaptureStrict(FPCGExContext* InContext, const FPCGAttributePropertyInputSelector& InSelector, const EIOSide InSide, const bool bRequired)
 	{
-		if (!Capture(InContext, InSelector, InSide, bRequired)) { return false; }
+		if (!Capture(InContext, InSelector, InSide, bRequired))
+		{
+			return false;
+		}
 
 		if (Side != InSide)
 		{
@@ -293,7 +308,10 @@ namespace PCGExData
 	{
 		FReadScopeLock ReadScopeLock(MapLock);
 		TWeakPtr<IBufferProxy>* ProxyPtr = ProxyMap.Find(GetTypeHash(Descriptor));
-		if (!ProxyPtr) { return nullptr; }
+		if (!ProxyPtr)
+		{
+			return nullptr;
+		}
 		return ProxyPtr->Pin();
 	}
 

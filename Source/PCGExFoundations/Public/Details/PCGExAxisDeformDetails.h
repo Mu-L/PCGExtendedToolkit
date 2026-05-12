@@ -4,9 +4,9 @@
 #pragma once
 #include "Engine/EngineTypes.h"
 
+#include "Core/PCGExContext.h"
 #include "Details/PCGExSettingsMacros.h"
 #include "Metadata/PCGAttributePropertySelector.h"
-#include "Core/PCGExContext.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
 #include "PCGExAxisDeformDetails.generated.h"

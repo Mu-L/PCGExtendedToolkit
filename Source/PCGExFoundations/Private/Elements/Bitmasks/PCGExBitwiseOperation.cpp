@@ -14,13 +14,19 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExBitwiseOperationSettings, Mask, int64, MaskInput,
 
 PCGEX_INITIALIZE_ELEMENT(BitwiseOperation)
 
-PCGExData::EIOInit UPCGExBitwiseOperationSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBitwiseOperationSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BitwiseOperation)
 
 bool FPCGExBitwiseOperationElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BitwiseOperation)
 
@@ -75,12 +81,18 @@ namespace PCGExBitwiseOperation
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBitwiseOperation::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		Mask = Settings->GetValueSettingMask();
-		if (!Mask->Init(PointDataFacade)) { return false; }
+		if (!Mask->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		Writer = PointDataFacade->GetWritable<int64>(Settings->FlagAttribute, 0, false, PCGExData::EBufferInit::Inherit);
 

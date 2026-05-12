@@ -51,7 +51,10 @@ public:
 	UPROPERTY()
 	FPCGExSelectorFactoryBaseConfig BaseConfig;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Selector; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Selector;
+	}
 
 	/** Create a hot-path entry picker operation. Concrete subclasses override. */
 	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const;
@@ -66,7 +69,10 @@ public:
 	 */
 	virtual TSharedPtr<PCGExCollections::FSelectorSharedData> BuildSharedData(
 		const UPCGExAssetCollection* Collection,
-		const PCGExAssetCollection::FCategory* Target) const { return nullptr; }
+		const PCGExAssetCollection::FCategory* Target) const
+	{
+		return nullptr;
+	}
 };
 
 /**
@@ -88,10 +94,18 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SelectorFactory, "Selector Definition", "Creates a selector factory definition.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Selector); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Selector);
+	}
 #endif
 	//~End UPCGSettings
 
-	virtual FName GetMainOutputPin() const override { return PCGExCollections::Labels::OutputSelectorLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExCollections::Labels::OutputSelectorLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 };

@@ -2,19 +2,19 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "PCGExtendedToolkitEditor.h"
-#include "Styling/SlateStyle.h"
-#include "Styling/SlateStyleRegistry.h"
-#include "Interfaces/IPluginManager.h"
-#include "AssetRegistry/AssetData.h"
 #include "Editor.h"
 #include "PCGExGlobalSettings.h"
 #include "PCGExModuleInterface.h"
 #include "PCGGraph.h"
 #include "PCGModule.h"
+#include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Data/PCGSpatialData.h"
 #include "DataViz/PCGExSpatialDataVisualization.h"
 #include "Details/PCGExDetailsCustomization.h"
+#include "Interfaces/IPluginManager.h"
+#include "Styling/SlateStyle.h"
+#include "Styling/SlateStyleRegistry.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExtendedToolkitEditorModule"
 

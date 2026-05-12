@@ -5,8 +5,8 @@
 
 #include <functional>
 #include "CoreMinimal.h"
-#include "Misc/ScopeRWLock.h"
 #include "Core/PCGExMTCommon.h"
+#include "Misc/ScopeRWLock.h"
 
 namespace PCGExMT
 {
@@ -66,7 +66,10 @@ namespace PCGExMT
 		void Collapse(TSet<uint64>& OutMerged)
 		{
 			int32 Num = 0;
-			for (int32 i = 0; i < NumShards; i++) { Num += Shards[i].Num(); }
+			for (int32 i = 0; i < NumShards; i++)
+			{
+				Num += Shards[i].Num();
+			}
 			for (int32 i = 0; i < NumShards; i++)
 			{
 				OutMerged.Append(Shards[i]);
@@ -76,7 +79,10 @@ namespace PCGExMT
 
 		void Empty()
 		{
-			for (int32 i = 0; i < NumShards; i++) { Shards[i].Empty(); }
+			for (int32 i = 0; i < NumShards; i++)
+			{
+				Shards[i].Empty();
+			}
 		}
 
 	private:
@@ -178,7 +184,10 @@ namespace PCGExMT
 		void Collapse(TMap<uint64, T>& OutMerged)
 		{
 			int32 Num = 0;
-			for (int32 i = 0; i < NumShards; i++) { Num += Shards[i].Num(); }
+			for (int32 i = 0; i < NumShards; i++)
+			{
+				Num += Shards[i].Num();
+			}
 			for (int32 i = 0; i < NumShards; i++)
 			{
 				OutMerged.Append(Shards[i]);
@@ -188,7 +197,10 @@ namespace PCGExMT
 
 		void Empty()
 		{
-			for (int32 i = 0; i < NumShards; i++) { Shards[i].Empty(); }
+			for (int32 i = 0; i < NumShards; i++)
+			{
+				Shards[i].Empty();
+			}
 		}
 
 	private:
@@ -203,7 +215,10 @@ namespace PCGExMT
 		FScope Scope;
 
 	public:
-		const FScope& GetScope() const { return Scope; }
+		const FScope& GetScope() const
+		{
+			return Scope;
+		}
 
 		virtual ~FScopedContainer() = default;
 
@@ -226,39 +241,67 @@ namespace PCGExMT
 		explicit TScopedArray(const TArray<FScope>& InScopes, const T InDefaultValue)
 		{
 			Arrays.Reserve(InScopes.Num());
-			for (const FScope& Scope : InScopes) { Arrays[Arrays.Add(MakeShared<TArray<T>>())]->Init(InDefaultValue, Scope.Count); }
+			for (const FScope& Scope : InScopes)
+			{
+				Arrays[Arrays.Add(MakeShared<TArray<T>>())]->Init(InDefaultValue, Scope.Count);
+			}
 		};
 
 		explicit TScopedArray(const TArray<FScope>& InScopes)
 		{
 			Arrays.Reserve(InScopes.Num());
-			for (int i = 0; i < InScopes.Num(); i++) { Arrays.Add(MakeShared<TArray<T>>()); }
+			for (int i = 0; i < InScopes.Num(); i++)
+			{
+				Arrays.Add(MakeShared<TArray<T>>());
+			}
 		};
 
 		~TScopedArray() = default;
 
 		void Reserve(const int32 NumReserve)
 		{
-			for (int i = 0; i < Arrays.Num(); i++) { Arrays[i]->Reserve(NumReserve); }
+			for (int i = 0; i < Arrays.Num(); i++)
+			{
+				Arrays[i]->Reserve(NumReserve);
+			}
 		}
 
-		FORCEINLINE TSharedPtr<TArray<T>> Get(const FScope& InScope) { return Arrays[InScope.LoopIndex]; }
-		FORCEINLINE TArray<T>& Get_Ref(const FScope& InScope) { return *Arrays[InScope.LoopIndex].Get(); }
+		FORCEINLINE TSharedPtr<TArray<T>> Get(const FScope& InScope)
+		{
+			return Arrays[InScope.LoopIndex];
+		}
+
+		FORCEINLINE TArray<T>& Get_Ref(const FScope& InScope)
+		{
+			return *Arrays[InScope.LoopIndex].Get();
+		}
 
 		int32 GetTotalNum()
 		{
 			int32 TotalNum = 0;
-			for (int i = 0; i < Arrays.Num(); i++) { TotalNum += Arrays[i]->Num(); }
+			for (int i = 0; i < Arrays.Num(); i++)
+			{
+				TotalNum += Arrays[i]->Num();
+			}
 			return TotalNum;
 		}
 
 		using FForEachFunc = std::function<void (TArray<T>&)>;
-		FORCEINLINE void ForEach(FForEachFunc&& Func) { for (int i = 0; i < Arrays.Num(); i++) { Func(*Arrays[i].Get()); } }
+		FORCEINLINE void ForEach(FForEachFunc&& Func)
+		{
+			for (int i = 0; i < Arrays.Num(); i++)
+			{
+				Func(*Arrays[i].Get());
+			}
+		}
 
 		void Collapse(TArray<T>& InTarget)
 		{
 			int32 Reserve = 0;
-			for (int i = 0; i < Arrays.Num(); i++) { Reserve += Arrays[i]->Num(); }
+			for (int i = 0; i < Arrays.Num(); i++)
+			{
+				Reserve += Arrays[i]->Num();
+			}
 			InTarget.Reserve(Reserve);
 
 			for (int i = 0; i < Arrays.Num(); i++)
@@ -282,31 +325,56 @@ namespace PCGExMT
 			Sets.Reserve(InScopes.Num());
 			if (InReserve > 0)
 			{
-				for (int i = 0; i < InScopes.Num(); i++) { Sets.Add_GetRef(MakeShared<TSet<T>>())->Reserve(InReserve); }
+				for (int i = 0; i < InScopes.Num(); i++)
+				{
+					Sets.Add_GetRef(MakeShared<TSet<T>>())->Reserve(InReserve);
+				}
 			}
 			else if (InReserve == 0)
 			{
-				for (int i = 0; i < InScopes.Num(); i++) { Sets.Add(MakeShared<TSet<T>>()); }
+				for (int i = 0; i < InScopes.Num(); i++)
+				{
+					Sets.Add(MakeShared<TSet<T>>());
+				}
 			}
 			else
 			{
 				const int32 ReserveFactor = FMath::Abs(InReserve);
-				for (int i = 0; i < InScopes.Num(); i++) { Sets.Add_GetRef(MakeShared<TSet<T>>())->Reserve(InScopes[i].Count * ReserveFactor); }
+				for (int i = 0; i < InScopes.Num(); i++)
+				{
+					Sets.Add_GetRef(MakeShared<TSet<T>>())->Reserve(InScopes[i].Count * ReserveFactor);
+				}
 			}
 		};
 
 		~TScopedSet() = default;
 
-		FORCEINLINE TSharedPtr<TSet<T>> Get(const FScope& InScope) { return Sets[InScope.LoopIndex]; }
-		FORCEINLINE TSet<T>& Get_Ref(const FScope& InScope) { return *Sets[InScope.LoopIndex].Get(); }
+		FORCEINLINE TSharedPtr<TSet<T>> Get(const FScope& InScope)
+		{
+			return Sets[InScope.LoopIndex];
+		}
+
+		FORCEINLINE TSet<T>& Get_Ref(const FScope& InScope)
+		{
+			return *Sets[InScope.LoopIndex].Get();
+		}
 
 		using FForEachFunc = std::function<void (TSet<T>&)>;
-		FORCEINLINE void ForEach(FForEachFunc&& Func) { for (int i = 0; i < Sets.Num(); i++) { Func(*Sets[i].Get()); } }
+		FORCEINLINE void ForEach(FForEachFunc&& Func)
+		{
+			for (int i = 0; i < Sets.Num(); i++)
+			{
+				Func(*Sets[i].Get());
+			}
+		}
 
 		void Collapse(TSet<T>& InTarget)
 		{
 			int32 Reserve = 0;
-			for (int i = 0; i < Sets.Num(); i++) { Reserve += Sets[i]->Num(); }
+			for (int i = 0; i < Sets.Num(); i++)
+			{
+				Reserve += Sets[i]->Num();
+			}
 			InTarget.Reserve(InTarget.Num() + Reserve);
 
 			for (int i = 0; i < Sets.Num(); i++)
@@ -334,14 +402,31 @@ namespace PCGExMT
 
 		~TScopedValue() = default;
 
-		FORCEINLINE T Get(const FScope& InScope) { return Values[InScope.LoopIndex]; }
-		FORCEINLINE T& GetMutable(const FScope& InScope) { return Values[InScope.LoopIndex]; }
-		FORCEINLINE T Set(const FScope& InScope, const T& InValue) { return Values[InScope.LoopIndex] = InValue; }
+		FORCEINLINE T Get(const FScope& InScope)
+		{
+			return Values[InScope.LoopIndex];
+		}
+
+		FORCEINLINE T& GetMutable(const FScope& InScope)
+		{
+			return Values[InScope.LoopIndex];
+		}
+
+		FORCEINLINE T Set(const FScope& InScope, const T& InValue)
+		{
+			return Values[InScope.LoopIndex] = InValue;
+		}
 
 		FORCEINLINE T Flatten(FFlattenFunc&& Func)
 		{
 			T Result = Values[0];
-			if (Values.Num() > 1) { for (int i = 1; i < Values.Num(); i++) { Result = Func(Values[i], Result); } }
+			if (Values.Num() > 1)
+			{
+				for (int i = 1; i < Values.Num(); i++)
+				{
+					Result = Func(Values[i], Result);
+				}
+			}
 			return Result;
 		}
 	};
@@ -357,23 +442,42 @@ namespace PCGExMT
 		TScopedPtr(const TArray<FScope>& InScopes)
 		{
 			Data.Reserve(InScopes.Num());
-			for (int i = 0; i < InScopes.Num(); i++) { Data.Add(MakeShared<T>()); }
+			for (int i = 0; i < InScopes.Num(); i++)
+			{
+				Data.Add(MakeShared<T>());
+			}
 		};
 
 		template <typename... Args>
 		TScopedPtr(const TArray<FScope>& InScopes, Args&&... InArgs)
 		{
 			Data.Reserve(InScopes.Num());
-			for (int i = 0; i < InScopes.Num(); i++) { Data.Add(MakeShared<T>(std::forward<Args>(InArgs)...)); }
+			for (int i = 0; i < InScopes.Num(); i++)
+			{
+				Data.Add(MakeShared<T>(std::forward<Args>(InArgs)...));
+			}
 		};
 
 		~TScopedPtr() = default;
 
-		FORCEINLINE TSharedPtr<T> Get(const FScope& InScope) { return Data[InScope.LoopIndex]; }
-		FORCEINLINE T& Get_Ref(const FScope& InScope) { return *Data[InScope.LoopIndex].Get(); }
+		FORCEINLINE TSharedPtr<T> Get(const FScope& InScope)
+		{
+			return Data[InScope.LoopIndex];
+		}
+
+		FORCEINLINE T& Get_Ref(const FScope& InScope)
+		{
+			return *Data[InScope.LoopIndex].Get();
+		}
 
 		using FForEachFunc = std::function<void (T&)>;
-		FORCEINLINE void ForEach(FForEachFunc&& Func) { for (int i = 0; i < Data.Num(); i++) { Func(*Data[i].Get()); } }
+		FORCEINLINE void ForEach(FForEachFunc&& Func)
+		{
+			for (int i = 0; i < Data.Num(); i++)
+			{
+				Func(*Data[i].Get());
+			}
+		}
 	};
 
 	template <typename T>
@@ -390,21 +494,39 @@ namespace PCGExMT
 		FORCEINLINE T Min()
 		{
 			T Result = Values[0];
-			if (Values.Num() > 1) { for (int i = 1; i < Values.Num(); i++) { Result = FMath::Min(Values[i], Result); } }
+			if (Values.Num() > 1)
+			{
+				for (int i = 1; i < Values.Num(); i++)
+				{
+					Result = FMath::Min(Values[i], Result);
+				}
+			}
 			return Result;
 		}
 
 		FORCEINLINE T Max()
 		{
 			T Result = Values[0];
-			if (Values.Num() > 1) { for (int i = 1; i < Values.Num(); i++) { Result = FMath::Max(Values[i], Result); } }
+			if (Values.Num() > 1)
+			{
+				for (int i = 1; i < Values.Num(); i++)
+				{
+					Result = FMath::Max(Values[i], Result);
+				}
+			}
 			return Result;
 		}
 
 		FORCEINLINE T Sum()
 		{
 			T Result = Values[0];
-			if (Values.Num() > 1) { for (int i = 1; i < Values.Num(); i++) { Result += Values[i]; } }
+			if (Values.Num() > 1)
+			{
+				for (int i = 1; i < Values.Num(); i++)
+				{
+					Result += Values[i];
+				}
+			}
 			return Result;
 		}
 	};

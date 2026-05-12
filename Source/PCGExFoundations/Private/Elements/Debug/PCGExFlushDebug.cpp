@@ -3,9 +3,9 @@
 
 #include "Elements/Debug/PCGExFlushDebug.h"
 
+#include "DrawDebugHelpers.h"
 #include "PCGGraph.h"
 #include "PCGPin.h"
-#include "DrawDebugHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
 #define PCGEX_NAMESPACE Debug
@@ -26,7 +26,10 @@ TArray<FPCGPinProperties> UPCGExDebugSettings::OutputPinProperties() const
 	return PinProperties;
 }
 
-FPCGElementPtr UPCGExDebugSettings::CreateElement() const { return MakeShared<FPCGExDebugElement>(); }
+FPCGElementPtr UPCGExDebugSettings::CreateElement() const
+{
+	return MakeShared<FPCGExDebugElement>();
+}
 
 #pragma endregion
 

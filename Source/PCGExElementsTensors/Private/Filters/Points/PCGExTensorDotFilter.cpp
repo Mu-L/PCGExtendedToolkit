@@ -15,7 +15,10 @@
 
 bool UPCGExTensorDotFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
 
 	return PCGExFactories::GetInputFactories(InContext, PCGExTensor::SourceTensorsLabel, TensorFactories, {PCGExFactories::EType::Tensor});
 }
@@ -34,7 +37,10 @@ void UPCGExTensorDotFilterFactory::RegisterBuffersDependencies(FPCGExContext* In
 
 bool UPCGExTensorDotFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_SELECTOR(Config.OperandA, Consumable)
@@ -45,10 +51,16 @@ bool UPCGExTensorDotFilterFactory::RegisterConsumableAttributesWithData(FPCGExCo
 
 bool PCGExPointFilter::FTensorDotFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	TensorsHandler = MakeShared<PCGExTensor::FTensorsHandler>(TypedFilterFactory->Config.TensorHandlerDetails);
-	if (!TensorsHandler->Init(InContext, TypedFilterFactory->TensorFactories, InPointDataFacade)) { return false; }
+	if (!TensorsHandler->Init(InContext, TypedFilterFactory->TensorFactories, InPointDataFacade))
+	{
+		return false;
+	}
 
 	OperandA = PointDataFacade->GetBroadcaster<FVector>(TypedFilterFactory->Config.OperandA, true, false, PCGEX_QUIET_HANDLING);
 	if (!OperandA)
@@ -69,7 +81,10 @@ bool PCGExPointFilter::FTensorDotFilter::Test(const int32 PointIndex) const
 	bool bSuccess = false;
 	const PCGExTensor::FTensorSample Sample = TensorsHandler->Sample(PointIndex, InTransforms[PointIndex], bSuccess);
 
-	if (!bSuccess) { return false; }
+	if (!bSuccess)
+	{
+		return false;
+	}
 
 	return DotComparison.Test(FVector::DotProduct(TypedFilterFactory->Config.bTransformOperandA ? OperandA->Read(PointIndex) : InTransforms[PointIndex].TransformVectorNoScale(OperandA->Read(PointIndex)), Sample.DirectionAndSize.GetSafeNormal()), DotComparison.GetComparisonThreshold(PointIndex));
 }

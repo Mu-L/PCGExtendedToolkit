@@ -7,18 +7,18 @@
 #include "PCGElement.h"
 #include "PCGManagedResource.h"
 #include "PCGParamData.h"
-#include "Helpers/PCGExManagedResourceHelpers.h"
-#include "Helpers/PCGHelpers.h"
-#include "Helpers/PCGActorHelpers.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataForward.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
-#include "Data/PCGExDataMacros.h"
-#include "Details/PCGExSettingsDetails.h"
-#include "Helpers/PCGExStreamingHelpers.h"
+#include "Helpers/PCGActorHelpers.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
+#include "Helpers/PCGExManagedResourceHelpers.h"
+#include "Helpers/PCGExStreamingHelpers.h"
+#include "Helpers/PCGHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagingSpawnActorsElement"
 #define PCGEX_NAMESPACE StagingSpawnActors
@@ -47,12 +47,18 @@ TArray<FPCGPinProperties> UPCGExStagingSpawnActorsSettings::OutputPinProperties(
 
 bool FPCGExStagingSpawnActorsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagingSpawnActors)
 
 	PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReferenceAttribute)
-	if (Settings->bApplyInstanceTags) { PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->InstanceTagsAttributeName) }
+	if (Settings->bApplyInstanceTags)
+	{
+		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->InstanceTagsAttributeName)
+	}
 
 	Context->CollectionUnpacker = MakeShared<PCGExCollections::FPickUnpacker>();
 	Context->CollectionUnpacker->UnpackPin(InContext, PCGExCollections::Labels::SourceCollectionMapLabel);
@@ -84,7 +90,10 @@ bool FPCGExStagingSpawnActorsElement::AdvanceWork(FPCGExContext* InContext, cons
 		}
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -111,12 +120,18 @@ namespace PCGExStagingSpawnActors
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
-		if (!EntryHashGetter) { return false; }
+		if (!EntryHashGetter)
+		{
+			return false;
+		}
 
 		if (Settings->bApplyInstanceTags)
 		{
@@ -131,7 +146,10 @@ namespace PCGExStagingSpawnActors
 
 		// Init root-actor source. Constant-mode short-circuits per-point materialization.
 		RootActorSV = Settings->RootActor.GetValueSetting();
-		if (!RootActorSV->Init(PointDataFacade)) { return false; }
+		if (!RootActorSV->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		// Init PCG generation watcher if requested
 		if (Settings->bTriggerPCGGeneration)
@@ -149,7 +167,10 @@ namespace PCGExStagingSpawnActors
 		NumPoints = PointDataFacade->Source->GetNum(PCGExData::EIOSide::In);
 		ResolvedEntries.SetNumZeroed(NumPoints);
 
-		if (!RootActorSV->IsConstant()) { RootActorPaths.SetNum(NumPoints); }
+		if (!RootActorSV->IsConstant())
+		{
+			RootActorPaths.SetNum(NumPoints);
+		}
 
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
@@ -172,13 +193,22 @@ namespace PCGExStagingSpawnActors
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const uint64 Hash = EntryHashGetter->Read(Index);
-			if (Hash == 0 || Hash == static_cast<uint64>(-1)) { continue; }
+			if (Hash == 0 || Hash == static_cast<uint64>(-1))
+			{
+				continue;
+			}
 
 			FPCGExEntryAccessResult Result = Context->CollectionUnpacker->ResolveEntry(Hash, MaterialPick);
-			if (!Result.IsValid()) { continue; }
+			if (!Result.IsValid())
+			{
+				continue;
+			}
 
 			if (Result.Host->GetTypeId() != PCGExAssetCollection::TypeIds::Actor)
 			{
@@ -190,12 +220,18 @@ namespace PCGExStagingSpawnActors
 			}
 
 			const FPCGExActorCollectionEntry* ActorEntry = static_cast<const FPCGExActorCollectionEntry*>(Result.Entry);
-			if (!ActorEntry->Actor.ToSoftObjectPath().IsValid()) { continue; }
+			if (!ActorEntry->Actor.ToSoftObjectPath().IsValid())
+			{
+				continue;
+			}
 
 			// Write directly to our index -- no lock, each thread writes unique indices
 			ResolvedEntries[Index].Entry = ActorEntry;
 
-			if (!bRootIsConstant) { RootActorPaths[Index] = PCGEX_SV_READ(RootActorSV, Index - Scope.Start); }
+			if (!bRootIsConstant)
+			{
+				RootActorPaths[Index] = PCGEX_SV_READ(RootActorSV, Index - Scope.Start);
+			}
 		}
 	}
 
@@ -260,7 +296,10 @@ namespace PCGExStagingSpawnActors
 				This->LoadHandle = StreamableHandle;
 
 				This->MainThreadLoop = MakeShared<PCGExMT::FTimeSlicedMainThreadLoop>(This->NumPoints);
-				This->MainThreadLoop->OnIterationCallback = [This](const int32 Index, const PCGExMT::FScope& Scope) { This->SpawnAtPoint(Index); };
+				This->MainThreadLoop->OnIterationCallback = [This](const int32 Index, const PCGExMT::FScope& Scope)
+				{
+					This->SpawnAtPoint(Index);
+				};
 
 				PCGEX_ASYNC_HANDLE_CHKD_VOID(This->TaskManager, This->MainThreadLoop)
 			});
@@ -275,7 +314,10 @@ namespace PCGExStagingSpawnActors
 	void FProcessor::SpawnAtPoint(const int32 PointIndex)
 	{
 		const FPCGExActorCollectionEntry* ActorEntry = ResolvedEntries[PointIndex].Entry;
-		if (!ActorEntry) { return; }
+		if (!ActorEntry)
+		{
+			return;
+		}
 
 		// Class is already pre-loaded in OnPointsProcessingComplete
 		UClass* ActorClass = ActorEntry->Actor.Get();
@@ -292,7 +334,10 @@ namespace PCGExStagingSpawnActors
 		}
 
 		UWorld* World = ExecutionContext->GetWorld();
-		if (!World) { return; }
+		if (!World)
+		{
+			return;
+		}
 
 		AActor* TargetActor = ResolveTargetActor(PointIndex);
 		if (!TargetActor)
@@ -368,31 +413,7 @@ namespace PCGExStagingSpawnActors
 			SpawnedActor->SetActorTransform(SpawnTransform);
 		}
 
-		// Persistence setup (skipped for preview/runtime-spawned actors which are
-		// intentionally transient). After FinishSpawning the actor is fully constructed
-		// and its outer/package chain is finalized, so it's safe to:
-		//  1. Tag with UE's standard PCG-generated marker
-		//  2. Modify() the actor (adds to transaction buffer AND dirties its package)
-		//  3. Explicitly dirty the owning level/package as belt-and-suspenders
-		// Without this, programmatic SpawnActor leaves the level package clean, so the
-		// editor's Save pipeline skips writing the .umap entirely -- spawned actors appear
-		// in-editor but vanish after restart. User-moved actors persist because the move
-		// triggers the editor's own Modify/MarkPackageDirty flow.
 		const bool bTransientSpawn = PCGHelpers::IsRuntimeOrPIE() || bIsPreviewActor;
-		if (!SpawnedActor->Tags.Contains(PCGHelpers::DefaultPCGActorTag))
-		{
-			SpawnedActor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
-		}
-		if (!bTransientSpawn)
-		{
-			SpawnedActor->Modify();
-			(void)SpawnedActor->MarkPackageDirty();
-			if (ULevel* ActorLevel = SpawnedActor->GetLevel())
-			{
-				ActorLevel->Modify();
-				(void)ActorLevel->MarkPackageDirty();
-			}
-		}
 
 		// UE-62747: SpawnActor doesn't properly apply scale from the spawn transform
 		SpawnedActor->SetActorRelativeScale3D(SpawnTransform.GetScale3D());
@@ -450,7 +471,7 @@ namespace PCGExStagingSpawnActors
 			MutableSourceComponent->AddToManagedResources(ManagedActors);
 		}
 
-		ManagedActors->GetMutableGeneratedActors().Add(SpawnedActor);
+		PCGExCollections::FinalizeSpawnedActor(SpawnedActor, ManagedActors, bTransientSpawn);
 
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::WriteActorRef);

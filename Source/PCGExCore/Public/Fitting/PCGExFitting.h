@@ -78,8 +78,14 @@ struct PCGEXCORE_API FPCGExScaleToFitDetails
 
 	bool IsEnabled() const
 	{
-		if (ScaleToFitMode == EPCGExFitMode::None) { return false; }
-		if (ScaleToFitMode == EPCGExFitMode::Uniform) { return ScaleToFit != EPCGExScaleToFit::None; }
+		if (ScaleToFitMode == EPCGExFitMode::None)
+		{
+			return false;
+		}
+		if (ScaleToFitMode == EPCGExFitMode::Uniform)
+		{
+			return ScaleToFit != EPCGExScaleToFit::None;
+		}
 		return !(ScaleToFitX == EPCGExScaleToFit::None
 			&& ScaleToFitY == EPCGExScaleToFit::None
 			&& ScaleToFitZ == EPCGExScaleToFit::None);
@@ -109,7 +115,7 @@ struct PCGEXCORE_API FPCGExSingleJustifyDetails
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Source", EditCondition="From == EPCGExJustifyFrom::Custom", EditConditionHides))
 	FPCGExInputShorthandSelectorDouble CustomFrom = FPCGExInputShorthandSelectorDouble(FName("From"), 0.5, false);
-	
+
 	TSharedPtr<PCGExDetails::TSettingValue<double>> FromGetter;
 	TSharedPtr<PCGExDetails::TSettingValue<FVector>> SharedFromGetter;
 
@@ -119,7 +125,7 @@ struct PCGEXCORE_API FPCGExSingleJustifyDetails
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExJustifyTo To = EPCGExJustifyTo::Same;
-	
+
 	/**
 	 * Attribute for custom 'To' position.
 	 * 0 = bounds min, 0.5 = center, 1 = bounds max.
@@ -143,7 +149,9 @@ struct PCGEXCORE_API FPCGExJustificationDetails
 	FPCGExJustificationDetails() = default;
 
 	explicit FPCGExJustificationDetails(const bool bInEnabled)
-		: bDoJustifyX(bInEnabled), bDoJustifyY(bInEnabled), bDoJustifyZ(bInEnabled)
+		: bDoJustifyX(bInEnabled)
+		  , bDoJustifyY(bInEnabled)
+		  , bDoJustifyZ(bInEnabled)
 	{
 	}
 
@@ -281,7 +289,8 @@ struct PCGEXCORE_API FPCGExTransformDetails : public FPCGExFittingDetailsHandler
 	}
 
 	explicit FPCGExTransformDetails(const bool InInheritScale, const bool InInheritRotation)
-		: bInheritScale(InInheritScale), bInheritRotation(InInheritRotation)
+		: bInheritScale(InInheritScale)
+		  , bInheritRotation(InInheritRotation)
 	{
 	}
 

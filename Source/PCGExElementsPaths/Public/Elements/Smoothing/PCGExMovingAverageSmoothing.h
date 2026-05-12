@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExSmoothingInstancedFactory.h"
+#include "Core/PCGExProxyDataBlending.h"
 #include "Data/PCGExPointIO.h"
 #include "Math/PCGExMath.h"
-#include "Core/PCGExProxyDataBlending.h"
 
 #include "PCGExMovingAverageSmoothing.generated.h"
 
@@ -22,7 +22,10 @@ public:
 		const int32 MaxIndex = NumPoints - 1;
 		const int32 SmoothingInt = Smoothing;
 
-		if (SmoothingInt == 0 || Influence == 0) { return; }
+		if (SmoothingInt == 0 || Influence == 0)
+		{
+			return;
+		}
 
 		const double SafeWindowSize = FMath::Max(1, SmoothingInt);
 
@@ -43,7 +46,10 @@ public:
 			{
 				const int32 Index = PCGExMath::SanitizeIndex(TargetIndex + i, MaxIndex, IndexSafety);
 
-				if (!FMath::IsWithin(Index, 0, NumPoints)) { continue; }
+				if (!FMath::IsWithin(Index, 0, NumPoints))
+				{
+					continue;
+				}
 
 				const double Weight = (1 - (static_cast<double>(FMath::Abs(i)) / SafeWindowSize)) * Influence;
 				Blender->MultiBlend(Index, TargetIndex, Weight, Trackers);

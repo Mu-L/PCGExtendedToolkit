@@ -3,7 +3,9 @@
 
 #include "Tensors/PCGExTensorSplineFlow.h"
 
+PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Data/PCGSplineStruct.h"
+PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Containers/PCGExManagedObjects.h"
 
 
@@ -12,7 +14,10 @@
 
 bool FPCGExTensorSplineFlow::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -26,7 +31,10 @@ PCGExTensor::FTensorSample FPCGExTensorSplineFlow::Sample(const int32 InSeedInde
 		FTransform T = FTransform::Identity;
 		PCGExTensor::FEffectorMetrics Metrics;
 
-		if (!ComputeFactor(InPosition, Spline, Config.Radius, T, Metrics)) { continue; }
+		if (!ComputeFactor(InPosition, Spline, Config.Radius, T, Metrics))
+		{
+			continue;
+		}
 
 		Samples.Emplace_GetRef(FRotationMatrix::MakeFromX(PCGExMath::GetDirection(T.GetRotation(), Config.SplineDirection)).ToQuat().RotateVector(Metrics.Guide), Metrics.Potency, Metrics.Weight);
 	}

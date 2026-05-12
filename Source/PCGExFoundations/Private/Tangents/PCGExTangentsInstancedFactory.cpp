@@ -14,7 +14,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExTangentsScalingDetails, LeaveScale, FVector, Leav
 #if WITH_EDITOR
 void FPCGExTangentsDetails::ApplyDeprecation(const bool bUseAttribute, const FName InArriveAttributeName, const FName InLeaveAttributeName)
 {
-	if (bDeprecationApplied) { return; }
+	if (bDeprecationApplied)
+	{
+		return;
+	}
 
 	ArriveTangentAttribute = InArriveAttributeName;
 	LeaveTangentAttribute = InLeaveAttributeName;
@@ -89,17 +92,26 @@ namespace PCGExTangents
 		LastIndex = InDataFacade->GetNum() - 1;
 
 		StartScaleReader = InDetails.Scaling.GetValueSettingArriveScale();
-		if (!StartScaleReader->Init(InDataFacade)) { return false; }
+		if (!StartScaleReader->Init(InDataFacade))
+		{
+			return false;
+		}
 
 		EndScaleReader = InDetails.Scaling.GetValueSettingLeaveScale();
-		if (!EndScaleReader->Init(InDataFacade)) { return false; }
+		if (!EndScaleReader->Init(InDataFacade))
+		{
+			return false;
+		}
 
 		if (Mode == EPCGExTangentSource::InPlace)
 		{
 			Tangents = InDetails.Tangents->CreateOperation();
 			Tangents->bClosedLoop = bClosedLoop;
 
-			if (!Tangents->PrepareForData(InContext)) { return false; }
+			if (!Tangents->PrepareForData(InContext))
+			{
+				return false;
+			}
 
 			if (InDetails.StartTangents)
 			{
@@ -107,9 +119,15 @@ namespace PCGExTangents
 				StartTangents->bClosedLoop = bClosedLoop;
 				StartTangents->PrimaryDataFacade = InDataFacade;
 
-				if (!StartTangents->PrepareForData(InContext)) { return false; }
+				if (!StartTangents->PrepareForData(InContext))
+				{
+					return false;
+				}
 			}
-			else { StartTangents = Tangents; }
+			else
+			{
+				StartTangents = Tangents;
+			}
 
 			if (InDetails.EndTangents)
 			{
@@ -117,9 +135,15 @@ namespace PCGExTangents
 				EndTangents->bClosedLoop = bClosedLoop;
 				EndTangents->PrimaryDataFacade = InDataFacade;
 
-				if (!EndTangents->PrepareForData(InContext)) { return false; }
+				if (!EndTangents->PrepareForData(InContext))
+				{
+					return false;
+				}
 			}
-			else { EndTangents = Tangents; }
+			else
+			{
+				EndTangents = Tangents;
+			}
 		}
 		else if (Mode == EPCGExTangentSource::Attribute)
 		{
@@ -146,7 +170,10 @@ namespace PCGExTangents
 		OutArrive = FVector::ZeroVector;
 		OutLeave = FVector::ZeroVector;
 
-		if (Mode == EPCGExTangentSource::None) { return; }
+		if (Mode == EPCGExTangentSource::None)
+		{
+			return;
+		}
 
 		int32 PrevIndex = Index - 1;
 		int32 NextIndex = Index + 1;
@@ -158,16 +185,31 @@ namespace PCGExTangents
 		{
 			if (bClosedLoop)
 			{
-				if (PrevIndex < 0) { PrevIndex = LastIndex; }
-				if (NextIndex > LastIndex) { NextIndex = 0; }
+				if (PrevIndex < 0)
+				{
+					PrevIndex = LastIndex;
+				}
+				if (NextIndex > LastIndex)
+				{
+					NextIndex = 0;
+				}
 
 				Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, ArriveScale, OutArrive, LeaveScale, OutLeave);
 			}
 			else
 			{
-				if (Index == 0) { StartTangents->ProcessFirstPoint(PointData, ArriveScale, OutArrive, LeaveScale, OutLeave); }
-				else if (Index == LastIndex) { EndTangents->ProcessLastPoint(PointData, ArriveScale, OutArrive, LeaveScale, OutLeave); }
-				else { Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, ArriveScale, OutArrive, LeaveScale, OutLeave); }
+				if (Index == 0)
+				{
+					StartTangents->ProcessFirstPoint(PointData, ArriveScale, OutArrive, LeaveScale, OutLeave);
+				}
+				else if (Index == LastIndex)
+				{
+					EndTangents->ProcessLastPoint(PointData, ArriveScale, OutArrive, LeaveScale, OutLeave);
+				}
+				else
+				{
+					Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, ArriveScale, OutArrive, LeaveScale, OutLeave);
+				}
 			}
 		}
 		else
@@ -182,11 +224,23 @@ namespace PCGExTangents
 		OutStartTangent = FVector::ZeroVector;
 		OutEndTangent = FVector::ZeroVector;
 
-		if (Mode == EPCGExTangentSource::None) { return; }
+		if (Mode == EPCGExTangentSource::None)
+		{
+			return;
+		}
 
 		int32 NextIndex = Index + 1;
-		if (bClosedLoop) { if (NextIndex > LastIndex) { NextIndex = 0; } }
-		else if (NextIndex >= LastIndex) { NextIndex = LastIndex; }
+		if (bClosedLoop)
+		{
+			if (NextIndex > LastIndex)
+			{
+				NextIndex = 0;
+			}
+		}
+		else if (NextIndex >= LastIndex)
+		{
+			NextIndex = LastIndex;
+		}
 
 		const FVector StartScale = StartScaleReader->Read(Index);
 		const FVector EndScale = EndScaleReader->Read(NextIndex);
@@ -215,16 +269,31 @@ namespace PCGExTangents
 
 		if (bClosedLoop)
 		{
-			if (PrevIndex < 0) { PrevIndex = LastIndex; }
-			if (NextIndex > LastIndex) { NextIndex = 0; }
+			if (PrevIndex < 0)
+			{
+				PrevIndex = LastIndex;
+			}
+			if (NextIndex > LastIndex)
+			{
+				NextIndex = 0;
+			}
 
 			Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, InScale, OutDir, InScale, Dummy);
 		}
 		else
 		{
-			if (Index <= 0) { StartTangents->ProcessFirstPoint(PointData, InScale, OutDir, InScale, Dummy); }
-			else if (Index >= LastIndex) { EndTangents->ProcessLastPoint(PointData, InScale, OutDir, InScale, Dummy); }
-			else { Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, InScale, OutDir, InScale, Dummy); }
+			if (Index <= 0)
+			{
+				StartTangents->ProcessFirstPoint(PointData, InScale, OutDir, InScale, Dummy);
+			}
+			else if (Index >= LastIndex)
+			{
+				EndTangents->ProcessLastPoint(PointData, InScale, OutDir, InScale, Dummy);
+			}
+			else
+			{
+				Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, InScale, OutDir, InScale, Dummy);
+			}
 		}
 	}
 
@@ -240,16 +309,31 @@ namespace PCGExTangents
 
 		if (bClosedLoop)
 		{
-			if (PrevIndex < 0) { PrevIndex = LastIndex; }
-			if (NextIndex > LastIndex) { NextIndex = 0; }
+			if (PrevIndex < 0)
+			{
+				PrevIndex = LastIndex;
+			}
+			if (NextIndex > LastIndex)
+			{
+				NextIndex = 0;
+			}
 
 			Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, InScale, Dummy, InScale, OutDir);
 		}
 		else
 		{
-			if (Index == 0) { StartTangents->ProcessFirstPoint(PointData, InScale, Dummy, InScale, OutDir); }
-			else if (Index == LastIndex) { EndTangents->ProcessLastPoint(PointData, InScale, Dummy, InScale, OutDir); }
-			else { Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, InScale, Dummy, InScale, OutDir); }
+			if (Index == 0)
+			{
+				StartTangents->ProcessFirstPoint(PointData, InScale, Dummy, InScale, OutDir);
+			}
+			else if (Index == LastIndex)
+			{
+				EndTangents->ProcessLastPoint(PointData, InScale, Dummy, InScale, OutDir);
+			}
+			else
+			{
+				Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, InScale, Dummy, InScale, OutDir);
+			}
 		}
 	}
 }

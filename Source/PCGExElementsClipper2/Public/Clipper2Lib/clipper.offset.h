@@ -12,9 +12,9 @@
 #ifndef PCGEX_CLIPPER_H_OFFSET
 #define PCGEX_CLIPPER_H_OFFSET
 
+#include <optional>
 #include "clipper.core.h"
 #include "clipper.engine.h"
-#include <optional>
 
 namespace PCGExClipper2Lib
 {
@@ -102,15 +102,22 @@ namespace PCGExClipper2Lib
 		                       double arc_tolerance = 0.0,
 		                       bool preserve_collinear = false,
 		                       bool reverse_solution = false)
-			: miter_limit_(miter_limit), arc_tolerance_(arc_tolerance),
-			  preserve_collinear_(preserve_collinear),
-			  reverse_solution_(reverse_solution)
+			: miter_limit_(miter_limit)
+			  , arc_tolerance_(arc_tolerance)
+			  , preserve_collinear_(preserve_collinear)
+			  , reverse_solution_(reverse_solution)
 		{
 		};
 
-		~ClipperOffset() { Clear(); };
+		~ClipperOffset()
+		{
+			Clear();
+		};
 
-		int ErrorCode() const { return error_code_; };
+		int ErrorCode() const
+		{
+			return error_code_;
+		};
 		void AddPath(const Path64& path, JoinType jt_, EndType et_);
 		void AddPaths(const Paths64& paths, JoinType jt_, EndType et_);
 
@@ -124,21 +131,56 @@ namespace PCGExClipper2Lib
 		void Execute(double delta, PolyTree64& polytree);
 		void Execute(DeltaCallback64 delta_cb, Paths64& paths);
 
-		double MiterLimit() const { return miter_limit_; }
-		void MiterLimit(double miter_limit) { miter_limit_ = miter_limit; }
+		double MiterLimit() const
+		{
+			return miter_limit_;
+		}
+
+		void MiterLimit(double miter_limit)
+		{
+			miter_limit_ = miter_limit;
+		}
 
 		//ArcTolerance: needed for rounded offsets (See offset_triginometry2.svg)
-		double ArcTolerance() const { return arc_tolerance_; }
-		void ArcTolerance(double arc_tolerance) { arc_tolerance_ = arc_tolerance; }
+		double ArcTolerance() const
+		{
+			return arc_tolerance_;
+		}
 
-		bool PreserveCollinear() const { return preserve_collinear_; }
-		void PreserveCollinear(bool preserve_collinear) { preserve_collinear_ = preserve_collinear; }
+		void ArcTolerance(double arc_tolerance)
+		{
+			arc_tolerance_ = arc_tolerance;
+		}
 
-		bool ReverseSolution() const { return reverse_solution_; }
-		void ReverseSolution(bool reverse_solution) { reverse_solution_ = reverse_solution; }
+		bool PreserveCollinear() const
+		{
+			return preserve_collinear_;
+		}
 
-		void SetZCallback(ZCallback64 cb) { zCallback64_ = cb; }
-		void SetDeltaCallback(DeltaCallback64 cb) { deltaCallback64_ = cb; }
+		void PreserveCollinear(bool preserve_collinear)
+		{
+			preserve_collinear_ = preserve_collinear;
+		}
+
+		bool ReverseSolution() const
+		{
+			return reverse_solution_;
+		}
+
+		void ReverseSolution(bool reverse_solution)
+		{
+			reverse_solution_ = reverse_solution;
+		}
+
+		void SetZCallback(ZCallback64 cb)
+		{
+			zCallback64_ = cb;
+		}
+
+		void SetDeltaCallback(DeltaCallback64 cb)
+		{
+			deltaCallback64_ = cb;
+		}
 	};
 }
 

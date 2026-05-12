@@ -20,11 +20,22 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(DiscardByPointCount, "Discard By Point Count", "Filter outputs by point count.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
 #endif
 
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
 
 protected:
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;

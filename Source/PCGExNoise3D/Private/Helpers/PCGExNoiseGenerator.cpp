@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Helpers/PCGExNoiseGenerator.h"
-#include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Async/ParallelFor.h"
+#include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExNoise3DOperation.h"
 
 #define LOCTEXT_NAMESPACE "PCGExNoise3D"
@@ -30,7 +30,10 @@ namespace PCGExNoise3D
 		for (const TObjectPtr<const UPCGExNoise3DFactoryData>& Factory : Factories)
 		{
 			TSharedPtr<FPCGExNoise3DOperation> Operation = Factory->CreateOperation(InContext);
-			if (!Operation) { continue; }
+			if (!Operation)
+			{
+				continue;
+			}
 
 			const double Weight = FMath::Max(SMALL_NUMBER, Factory->ConfigBase.WeightFactor);
 			TotalWeight += Weight;
@@ -100,7 +103,7 @@ namespace PCGExNoise3D
 		return FVector2D(
 			BlendSingle(BlendMode, A.X, B.X, BlendFactor),
 			BlendSingle(BlendMode, A.Y, B.Y, BlendFactor)
-		);
+			);
 	}
 
 	FVector FNoiseGenerator::BlendSingle(const EPCGExNoiseBlendMode BlendMode, const FVector& A, const FVector& B, const double BlendFactor) const
@@ -109,7 +112,7 @@ namespace PCGExNoise3D
 			BlendSingle(BlendMode, A.X, B.X, BlendFactor),
 			BlendSingle(BlendMode, A.Y, B.Y, BlendFactor),
 			BlendSingle(BlendMode, A.Z, B.Z, BlendFactor)
-		);
+			);
 	}
 
 	FVector4 FNoiseGenerator::BlendSingle(const EPCGExNoiseBlendMode BlendMode, const FVector4& A, const FVector4& B, const double BlendFactor) const
@@ -119,7 +122,7 @@ namespace PCGExNoise3D
 			BlendSingle(BlendMode, A.Y, B.Y, BlendFactor),
 			BlendSingle(BlendMode, A.Z, B.Z, BlendFactor),
 			BlendSingle(BlendMode, A.W, B.W, BlendFactor)
-		);
+			);
 	}
 
 	//
@@ -196,7 +199,10 @@ namespace PCGExNoise3D
 		case EPCGExNoiseBlendMode::First:
 			for (int32 i = 0; i < Count; ++i)
 			{
-				if (Out[i] <= SMALL_NUMBER) { Out[i] = In[i]; }
+				if (Out[i] <= SMALL_NUMBER)
+				{
+					Out[i] = In[i];
+				}
 			}
 			break;
 		}
@@ -322,7 +328,10 @@ namespace PCGExNoise3D
 
 	double FNoiseGenerator::GetDouble(const FVector& Position) const
 	{
-		if (Operations.IsEmpty()) { return 0.0; }
+		if (Operations.IsEmpty())
+		{
+			return 0.0;
+		}
 
 		double Result = OperationsPtr[0]->GetDouble(Position);
 
@@ -337,7 +346,10 @@ namespace PCGExNoise3D
 
 	FVector2D FNoiseGenerator::GetVector2D(const FVector& Position) const
 	{
-		if (Operations.IsEmpty()) { return FVector2D::ZeroVector; }
+		if (Operations.IsEmpty())
+		{
+			return FVector2D::ZeroVector;
+		}
 
 		FVector2D Result = OperationsPtr[0]->GetVector2D(Position);
 
@@ -352,7 +364,10 @@ namespace PCGExNoise3D
 
 	FVector FNoiseGenerator::GetVector(const FVector& Position) const
 	{
-		if (Operations.IsEmpty()) { return FVector::ZeroVector; }
+		if (Operations.IsEmpty())
+		{
+			return FVector::ZeroVector;
+		}
 
 		FVector Result = OperationsPtr[0]->GetVector(Position);
 
@@ -367,7 +382,10 @@ namespace PCGExNoise3D
 
 	FVector4 FNoiseGenerator::GetVector4(const FVector& Position) const
 	{
-		if (Operations.IsEmpty()) { return FVector4::Zero(); }
+		if (Operations.IsEmpty())
+		{
+			return FVector4::Zero();
+		}
 
 		FVector4 Result = OperationsPtr[0]->GetVector4(Position);
 

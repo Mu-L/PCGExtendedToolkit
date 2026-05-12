@@ -15,10 +15,25 @@ class UAssetDefinition_PCGExCustomActorDataPacker : public UAssetDefinitionDefau
 	GENERATED_BODY()
 
 public:
-	virtual FText GetAssetDisplayName() const override { return INVTEXT("PCGEx Actor Data Packer"); }
-	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(195, 124, 40)); }
-	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("Custom logic for packing actor component data onto PCG points."); }
-	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExCustomActorDataPacker::StaticClass(); }
+	virtual FText GetAssetDisplayName() const override
+	{
+		return INVTEXT("PCGEx Actor Data Packer");
+	}
+
+	virtual FLinearColor GetAssetColor() const override
+	{
+		return FLinearColor(FColor(195, 124, 40));
+	}
+
+	virtual FText GetAssetDescription(const FAssetData& AssetData) const override
+	{
+		return INVTEXT("Custom logic for packing actor component data onto PCG points.");
+	}
+
+	virtual TSoftClassPtr<UObject> GetAssetClass() const override
+	{
+		return UPCGExCustomActorDataPacker::StaticClass();
+	}
 
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{

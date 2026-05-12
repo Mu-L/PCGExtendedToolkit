@@ -3,10 +3,10 @@
 
 #include "Graphs/PCGExChainHelpers.h"
 
-#include "Data/PCGExPointIO.h"
-#include "Core/PCGExUnionData.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/Artifacts/PCGExChain.h"
+#include "Core/PCGExUnionData.h"
+#include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
 
 namespace PCGExClusters::ChainHelpers
@@ -23,7 +23,10 @@ namespace PCGExClusters::ChainHelpers
 		if (Chain->SingleEdge != -1)
 		{
 			Graph->InsertEdge(*Cluster->GetEdge(Chain->Seed.Edge), OutEdge, IOIndex);
-			if (bAddMetadata) { Graph->GetOrCreateEdgeMetadata(OutEdge.Index).UnionSize = 1; }
+			if (bAddMetadata)
+			{
+				Graph->GetOrCreateEdgeMetadata(OutEdge.Index).UnionSize = 1;
+			}
 		}
 		else
 		{
@@ -43,8 +46,14 @@ namespace PCGExClusters::ChainHelpers
 			}
 			else
 			{
-				if (Chain->bIsClosedLoop) { Graph->InsertEdge(*Cluster->GetEdge(Chain->Seed.Edge), OutEdge, IOIndex); }
-				for (const FLink& Link : Chain->Links) { Graph->InsertEdge(*Cluster->GetEdge(Link.Edge), OutEdge, IOIndex); }
+				if (Chain->bIsClosedLoop)
+				{
+					Graph->InsertEdge(*Cluster->GetEdge(Chain->Seed.Edge), OutEdge, IOIndex);
+				}
+				for (const FLink& Link : Chain->Links)
+				{
+					Graph->InsertEdge(*Cluster->GetEdge(Link.Edge), OutEdge, IOIndex);
+				}
 			}
 		}
 	}
@@ -94,7 +103,10 @@ namespace PCGExClusters::ChainHelpers
 				MergedEdges.Reserve(Chain->Links.Num());
 
 				// TODO : Possible missing edge in some edge cases
-				for (const FLink& Link : Chain->Links) { MergedEdges.Add(Link.Edge); }
+				for (const FLink& Link : Chain->Links)
+				{
+					MergedEdges.Add(Link.Edge);
+				}
 
 				SparseUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add_Unsafe(IOIndex, MergedEdges);
 			}

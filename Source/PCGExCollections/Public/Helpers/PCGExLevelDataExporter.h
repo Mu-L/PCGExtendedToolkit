@@ -36,5 +36,8 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "PCGEx|LevelExport")
 	bool ExportLevelData(UWorld* World, UPCGDataAsset* OutAsset);
 
-	virtual bool ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset) { return false; }
+	virtual bool ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset)
+	{
+		return false;
+	}
 };

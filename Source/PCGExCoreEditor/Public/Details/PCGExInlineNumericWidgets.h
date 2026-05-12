@@ -33,7 +33,7 @@ namespace PCGExInlineNumericWidgets
 	 * Numeric type interface that displays values with a trailing degree symbol (e.g. 90.0 -> "90.0°")
 	 * and tolerates the symbol on input parsing. Used by the Rotator editor to match FTransform's UX.
 	 */
-	struct PCGEXCOREEDITOR_API FDegreesNumericTypeInterface : public TDefaultNumericTypeInterface<double>
+	struct PCGEXCOREEDITOR_API FDegreesNumericTypeInterface : TDefaultNumericTypeInterface<double>
 	{
 		virtual FString ToString(const double& Value) const override;
 		virtual TOptional<double> FromString(const FString& InString, const double& ExistingValue) override;

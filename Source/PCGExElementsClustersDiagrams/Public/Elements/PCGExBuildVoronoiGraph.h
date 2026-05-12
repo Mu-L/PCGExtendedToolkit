@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Math/Geo/PCGExGeo.h"
-#include "Clusters/PCGExClusterCommon.h"
 
 #include "PCGExBuildVoronoiGraph.generated.h"
 
@@ -44,7 +44,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BuildVoronoiGraph, "Cluster : Voronoi 3D", "Create a 3D Voronoi graph for each input dataset.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
 #endif
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
@@ -54,7 +58,11 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual FName GetMainOutputPin() const override { return PCGExClusters::Labels::OutputVerticesLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExClusters::Labels::OutputVerticesLabel;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 	/** Method used to find Voronoi cell location */

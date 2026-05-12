@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExSocketOutputDetails.h"
+#include "Factories/PCGExFactories.h"
 
 #include "PCGExSampleSockets.generated.h"
 
@@ -34,8 +34,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SampleSockets, "Sample : Sockets", "Parse static mesh paths and output sockets as points.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Sampler; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Sampler;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
 #endif
 
 protected:
@@ -61,7 +69,10 @@ public:
 	FPCGExSocketOutputDetails OutputSocketDetails;
 
 protected:
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 };
 
 struct FPCGExSampleSocketsContext final : FPCGExPointsProcessorContext
@@ -85,7 +96,11 @@ protected:
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
 };
 
 namespace PCGExSampleSockets

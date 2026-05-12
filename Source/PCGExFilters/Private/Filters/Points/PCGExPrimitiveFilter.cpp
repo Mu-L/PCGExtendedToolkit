@@ -3,10 +3,10 @@
 
 #include "Filters/Points/PCGExPrimitiveFilter.h"
 
+#include "Components/PrimitiveComponent.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGPrimitiveData.h"
-#include "Components/PrimitiveComponent.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPrimitiveFilterDefinition"
 #define PCGEX_NAMESPACE PCGExPrimitiveFilterDefinition
@@ -31,17 +31,26 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExPrimitiveFilterFactory::CreateFilter
 PCGExFactories::EPreparationResult UPCGExPrimitiveFilterFactory::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	const TArray<FPCGTaggedData> Inputs = InContext->InputData.GetInputsByPin(FName("Primitives"));
 
 	for (const FPCGTaggedData& TaggedData : Inputs)
 	{
 		const UPCGPrimitiveData* PrimitiveData = Cast<UPCGPrimitiveData>(TaggedData.Data);
-		if (!PrimitiveData) { continue; }
+		if (!PrimitiveData)
+		{
+			continue;
+		}
 
 		const TWeakObjectPtr<UPrimitiveComponent> Component = PrimitiveData->GetComponent();
-		if (!Component.IsValid()) { continue; }
+		if (!Component.IsValid())
+		{
+			continue;
+		}
 
 		PCGExPointFilter::FCachedPrimitive& Entry = CachedPrimitives.AddDefaulted_GetRef();
 		Entry.WorldBounds = PrimitiveData->GetBounds();
@@ -50,16 +59,25 @@ PCGExFactories::EPreparationResult UPCGExPrimitiveFilterFactory::Prepare(FPCGExC
 
 	if (CachedPrimitives.IsEmpty())
 	{
-		if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error) { PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Missing primitive data.")) }
+		if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error)
+		{
+			PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Missing primitive data."))
+		}
 		return PCGExFactories::EPreparationResult::MissingData;
 	}
 
 	// Build octree from cached primitive bounds
 	FBox OctreeBounds(ForceInit);
-	for (const PCGExPointFilter::FCachedPrimitive& Entry : CachedPrimitives) { OctreeBounds += Entry.WorldBounds; }
+	for (const PCGExPointFilter::FCachedPrimitive& Entry : CachedPrimitives)
+	{
+		OctreeBounds += Entry.WorldBounds;
+	}
 
 	Octree = MakeShared<PCGExOctree::FItemOctree>(OctreeBounds.GetCenter(), OctreeBounds.GetExtent().Length());
-	for (int32 i = 0; i < CachedPrimitives.Num(); i++) { Octree->AddElement(PCGExOctree::FItem(i, CachedPrimitives[i].WorldBounds)); }
+	for (int32 i = 0; i < CachedPrimitives.Num(); i++)
+	{
+		Octree->AddElement(PCGExOctree::FItem(i, CachedPrimitives[i].WorldBounds));
+	}
 
 	return Result;
 }
@@ -77,11 +95,17 @@ void UPCGExPrimitiveFilterFactory::BeginDestroy()
 
 bool PCGExPointFilter::FPrimitiveFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	CachedPrimitives = &TypedFilterFactory->CachedPrimitives;
 	Octree = TypedFilterFactory->Octree.Get();
-	if (!CachedPrimitives || CachedPrimitives->IsEmpty() || !Octree) { return false; }
+	if (!CachedPrimitives || CachedPrimitives->IsEmpty() || !Octree)
+	{
+		return false;
+	}
 
 	const FPCGExPrimitiveFilterConfig& Cfg = TypedFilterFactory->Config;
 	BoundsSource = Cfg.BoundsSource;

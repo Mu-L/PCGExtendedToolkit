@@ -38,13 +38,29 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(StagedTypeFilter, "Staging : Type Filter", "Filters staged points by their collection entry type.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Filter); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Filter);
+	}
+
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
-	virtual bool HasDynamicPins() const override { return FilterMode == EPCGExStagedTypeFilterMode::PinPerType; }
-	virtual bool OutputPinsCanBeDeactivated() const override { return FilterMode == EPCGExStagedTypeFilterMode::PinPerType; }
+	virtual bool HasDynamicPins() const override
+	{
+		return FilterMode == EPCGExStagedTypeFilterMode::PinPerType;
+	}
+
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return FilterMode == EPCGExStagedTypeFilterMode::PinPerType;
+	}
 
 protected:
 	virtual FPCGElementPtr CreateElement() const override;

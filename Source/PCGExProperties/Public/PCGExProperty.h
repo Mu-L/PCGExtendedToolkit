@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "StructUtils/InstancedStruct.h"
 #include "Data/PCGExData.h"
+#include "StructUtils/InstancedStruct.h"
 #include "Types/PCGExTypeTraits.h"
 
 #include "PCGExProperty.generated.h"
@@ -166,7 +166,10 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * @param OutputName The attribute name to use
 	 * @return true if initialization succeeded
 	 */
-	virtual bool InitializeOutput(const TSharedRef<PCGExData::FFacade>& OutputFacade, FName OutputName) { return false; }
+	virtual bool InitializeOutput(const TSharedRef<PCGExData::FFacade>& OutputFacade, FName OutputName)
+	{
+		return false;
+	}
 
 	/**
 	 * Write this property's value(s) to the initialized buffer(s).
@@ -201,19 +204,28 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	/**
 	 * Check if this property type supports attribute output.
 	 */
-	virtual bool SupportsOutput() const { return false; }
+	virtual bool SupportsOutput() const
+	{
+		return false;
+	}
 
 	/**
 	 * Get the PCG metadata type for this property (for UI/validation).
 	 * Return EPCGMetadataTypes::Unknown if not applicable or multi-valued.
 	 */
-	virtual EPCGMetadataTypes GetOutputType() const { return EPCGMetadataTypes::Unknown; }
+	virtual EPCGMetadataTypes GetOutputType() const
+	{
+		return EPCGMetadataTypes::Unknown;
+	}
 
 	/**
 	 * Get the human-readable type name for this property (e.g., "String", "Int32", "Vector").
 	 * Used for registry display.
 	 */
-	virtual FName GetTypeName() const { return FName("Unknown"); }
+	virtual FName GetTypeName() const
+	{
+		return FName("Unknown");
+	}
 
 	// --- Metadata Interface (for Tuple/ParamData) ---
 
@@ -224,7 +236,10 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * @param AttributeName The attribute name to use
 	 * @return Pointer to created attribute, or nullptr if failed
 	 */
-	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const { return nullptr; }
+	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const
+	{
+		return nullptr;
+	}
 
 	/**
 	 * Write this property's value to a metadata attribute.
@@ -240,7 +255,10 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * Similar to CopyValueFrom but called during header initialization.
 	 * @param Source The source property to copy from
 	 */
-	virtual void InitializeFrom(const FPCGExProperty* Source) { CopyValueFrom(Source); }
+	virtual void InitializeFrom(const FPCGExProperty* Source)
+	{
+		CopyValueFrom(Source);
+	}
 
 	/**
 	 * Copy "structural" sub-fields from a sibling schema entry.
@@ -259,7 +277,9 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * @param Schema The matching schema-side property to copy structural fields from.
 	 *               Same script struct as `this` is guaranteed by the caller.
 	 */
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) {}
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema)
+	{
+	}
 
 	// --- Value Read Interface (type-erased) ---
 
@@ -279,7 +299,10 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 *
 	 * Prefer the templated TryGetValue<T> wrapper at call sites.
 	 */
-	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const { return false; }
+	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const
+	{
+		return false;
+	}
 
 	/**
 	 * Templated value read: resolves T to its EPCGMetadataTypes at compile time and
@@ -290,7 +313,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	bool TryGetValue(T& Out) const
 	{
 		static_assert(PCGExTypes::TTraits<T>::Type != EPCGMetadataTypes::Unknown,
-			"TryGetValue<T>: T must be a PCG-supported metadata type.");
+		              "TryGetValue<T>: T must be a PCG-supported metadata type.");
 		return TryWriteValue(PCGExTypes::TTraits<T>::Type, &Out);
 	}
 
@@ -449,7 +472,10 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrides
 		int32 Count = 0;
 		for (const FPCGExPropertyOverrideEntry& Entry : Overrides)
 		{
-			if (Entry.bEnabled) { ++Count; }
+			if (Entry.bEnabled)
+			{
+				++Count;
+			}
 		}
 		return Count;
 	}
@@ -586,7 +612,10 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	const FPCGExPropertySchema* FindByName(FName PropertyName) const;
 
 	/** Check if property exists by name */
-	bool HasProperty(FName PropertyName) const { return FindByName(PropertyName) != nullptr; }
+	bool HasProperty(FName PropertyName) const
+	{
+		return FindByName(PropertyName) != nullptr;
+	}
 
 	/** Get property instance by name (returns FInstancedStruct for compatibility with existing code) */
 	const FInstancedStruct* GetPropertyByName(FName PropertyName) const
@@ -613,8 +642,15 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	}
 
 	/** Count valid schemas */
-	int32 Num() const { return Schemas.Num(); }
-	bool IsEmpty() const { return Schemas.IsEmpty(); }
+	int32 Num() const
+	{
+		return Schemas.Num();
+	}
+
+	bool IsEmpty() const
+	{
+		return Schemas.IsEmpty();
+	}
 
 	/**
 	 * Sync all schemas - updates PropertyName and HeaderId into each Property.

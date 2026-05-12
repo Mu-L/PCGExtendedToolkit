@@ -57,12 +57,15 @@ namespace PCGExGraphs
 	}
 
 	FGraphNodeMetadata::FGraphNodeMetadata(const int32 InNodeIndex, const EPCGExIntersectionType InType)
-		: NodeIndex(InNodeIndex), Type(InType)
+		: NodeIndex(InNodeIndex)
+		  , Type(InType)
 	{
 	}
 
 	FGraphEdgeMetadata::FGraphEdgeMetadata(const int32 InEdgeIndex, const int32 InRootIndex, const EPCGExIntersectionType InType)
-		: EdgeIndex(InEdgeIndex), RootIndex(InRootIndex < 0 ? InEdgeIndex : InRootIndex), Type(InType)
+		: EdgeIndex(InEdgeIndex)
+		  , RootIndex(InRootIndex < 0 ? InEdgeIndex : InRootIndex)
+		  , Type(InType)
 	{
 	}
 

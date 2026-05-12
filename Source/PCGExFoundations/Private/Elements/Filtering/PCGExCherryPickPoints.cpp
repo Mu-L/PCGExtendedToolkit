@@ -5,9 +5,9 @@
 
 
 #include "Core/PCGExPickerFactoryProvider.h"
-#include "Factories/PCGExFactories.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Factories/PCGExFactories.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCherryPickPointsElement"
 #define PCGEX_NAMESPACE CherryPickPoints
@@ -25,13 +25,19 @@ TArray<FPCGPinProperties> UPCGExCherryPickPointsSettings::InputPinProperties() c
 TArray<FPCGPinProperties> UPCGExCherryPickPointsSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
-	if (bOutputDiscardedPoints) { PCGEX_PIN_POINTS(PCGExCommon::Labels::OutputDiscardedLabel, "Discarded points", Normal) }
+	if (bOutputDiscardedPoints)
+	{
+		PCGEX_PIN_POINTS(PCGExCommon::Labels::OutputDiscardedLabel, "Discarded points", Normal)
+	}
 	return PinProperties;
 }
 
 bool FPCGExCherryPickPointsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(CherryPickPoints)
 
@@ -47,7 +53,10 @@ bool FPCGExCherryPickPointsElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -70,7 +79,10 @@ namespace PCGExCherryPickPoints
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExCherryPickPoints::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PointDataFacade->Source->bAllowEmptyOutput = Settings->bAllowEmptyOutputs;
 
@@ -82,18 +94,30 @@ namespace PCGExCherryPickPoints
 		{
 			if (Settings->bOutputDiscardedPoints)
 			{
-				if (!Settings->bInvert) { PointDataFacade->Source->OutputPin = PCGExCommon::Labels::OutputDiscardedLabel; }
+				if (!Settings->bInvert)
+				{
+					PointDataFacade->Source->OutputPin = PCGExCommon::Labels::OutputDiscardedLabel;
+				}
 				PointDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
 			}
 			else
 			{
-				if (Settings->bInvert) { PointDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward); }
-				else { PointDataFacade->Source->Disable(); }
+				if (Settings->bInvert)
+				{
+					PointDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
+				}
+				else
+				{
+					PointDataFacade->Source->Disable();
+				}
 			}
 			return true;
 		}
 
-		if (!PointDataFacade->Source->InitializeOutput(PCGExData::EIOInit::New)) { return false; }
+		if (!PointDataFacade->Source->InitializeOutput(PCGExData::EIOInit::New))
+		{
+			return false;
+		}
 
 		const UPCGBasePointData* SourcePoints = PointDataFacade->GetIn();
 		const int32 NumPoints = SourcePoints->GetNumPoints();
@@ -109,16 +133,28 @@ namespace PCGExCherryPickPoints
 		{
 			for (int i = 0; i < NumPoints; i++)
 			{
-				if (!UniqueIndices.Contains(i)) { PickedIndices.Add(i); }
-				else { DiscardedIndices.Add(i); }
+				if (!UniqueIndices.Contains(i))
+				{
+					PickedIndices.Add(i);
+				}
+				else
+				{
+					DiscardedIndices.Add(i);
+				}
 			}
 		}
 		else
 		{
 			for (int i = 0; i < NumPoints; i++)
 			{
-				if (UniqueIndices.Contains(i)) { PickedIndices.Add(i); }
-				else { DiscardedIndices.Add(i); }
+				if (UniqueIndices.Contains(i))
+				{
+					PickedIndices.Add(i);
+				}
+				else
+				{
+					DiscardedIndices.Add(i);
+				}
 			}
 		}
 

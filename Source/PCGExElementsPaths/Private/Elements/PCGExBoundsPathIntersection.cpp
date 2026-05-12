@@ -13,8 +13,8 @@
 #include "Helpers/PCGExMatchingHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Helpers/PCGExTargetsHandler.h"
-#include "Math/OBB/PCGExOBBCollection.h"
 #include "Math/PCGExMathBounds.h"
+#include "Math/OBB/PCGExOBBCollection.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
 #include "SubPoints/DataBlending/PCGExSubPointsBlendInterpolate.h"
@@ -27,7 +27,10 @@ void UPCGExBoundsPathIntersectionSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!Blending) { Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending")); }
+		if (!Blending)
+		{
+			Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending"));
+		}
 	}
 	Super::PostInitProperties();
 }
@@ -54,19 +57,31 @@ PCGEX_INITIALIZE_ELEMENT(BoundsPathIntersection)
 
 void UPCGExBoundsPathIntersectionSettings::AddTags(const TSharedPtr<PCGExData::FPointIO>& IO, bool bIsCut) const
 {
-	if (bIsCut && bTagIfHasCuts) { IO->Tags->AddRaw(HasCutsTag); }
-	else if (!bIsCut && bTagIfUncut) { IO->Tags->AddRaw(UncutTag); }
+	if (bIsCut && bTagIfHasCuts)
+	{
+		IO->Tags->AddRaw(HasCutsTag);
+	}
+	else if (!bIsCut && bTagIfUncut)
+	{
+		IO->Tags->AddRaw(UncutTag);
+	}
 }
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BoundsPathIntersection)
 
 bool FPCGExBoundsPathIntersectionElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BoundsPathIntersection)
 
-	if (!Settings->OutputSettings.Validate(Context)) { return false; }
+	if (!Settings->OutputSettings.Validate(Context))
+	{
+		return false;
+	}
 
 	PCGEX_BIND_INSTANCED_FACTORY(Blending, UPCGExSubPointsBlendInstancedFactory, PCGExBlending::Labels::SourceOverridesBlendingOps)
 
@@ -179,7 +194,10 @@ namespace PCGExBoundsPathIntersection
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn());
 
@@ -187,7 +205,8 @@ namespace PCGExBoundsPathIntersection
 		SubBlending->bClosedLoop = bClosedLoop;
 
 		IgnoreList.Add(PointDataFacade->GetIn());
-		if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true); !Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
+		if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true);
+			!Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
 		{
 			(void)Context->TargetsHandler->HandleUnmatchedOutput(PointDataFacade, true);
 			return false;
@@ -218,8 +237,14 @@ namespace PCGExBoundsPathIntersection
 
 			if (Index == LastIndex)
 			{
-				if (bClosedLoop) { NextIndex = 0; }
-				else { continue; }
+				if (bClosedLoop)
+				{
+					NextIndex = 0;
+				}
+				else
+				{
+					continue;
+				}
 			}
 
 			TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->Source->GetIn()->GetConstTransformValueRange();
@@ -250,7 +275,10 @@ namespace PCGExBoundsPathIntersection
 
 			TSharedPtr<PCGExMath::OBB::FIntersections> LocalIntersection = Intersections[i];
 
-			if (!LocalIntersection) { continue; }
+			if (!LocalIntersection)
+			{
+				continue;
+			}
 
 			const int32 CutsNum = LocalIntersection->Cuts.Num();
 			NewPointsNum += CutsNum;
@@ -302,7 +330,10 @@ namespace PCGExBoundsPathIntersection
 
 			TSharedPtr<PCGExMath::OBB::FIntersections> LocalIntersection = Intersections[i];
 
-			if (!LocalIntersection) { continue; }
+			if (!LocalIntersection)
+			{
+				continue;
+			}
 
 			for (int j = 0; j < LocalIntersection->Cuts.Num(); j++)
 			{
@@ -346,14 +377,23 @@ namespace PCGExBoundsPathIntersection
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			TSharedPtr<PCGExMath::OBB::FIntersections> LocalIntersection = Intersections[Index];
-			if (!LocalIntersection) { continue; }
+			if (!LocalIntersection)
+			{
+				continue;
+			}
 
 			int32 NextIndex = Index + 1;
 
 			if (Index == LastIndex)
 			{
-				if (bClosedLoop) { NextIndex = 0; }
-				else { continue; }
+				if (bClosedLoop)
+				{
+					NextIndex = 0;
+				}
+				else
+				{
+					continue;
+				}
 			}
 
 			const int32 StartIndex = StartIndices[Index];
@@ -371,7 +411,10 @@ namespace PCGExBoundsPathIntersection
 				OutSeeds[CutIndex] = PCGExRandomHelpers::ComputeSpatialSeed(Cut.Position);
 				OutTransforms[CutIndex].SetLocation(Cut.Position);
 
-				if (bWillWriteAny) { Details.SetIntersection(CutIndex, Cut); }
+				if (bWillWriteAny)
+				{
+					Details.SetIntersection(CutIndex, Cut);
+				}
 			}
 
 			Metrics.Add(OutTransforms[EndIndex].GetLocation());

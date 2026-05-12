@@ -4,26 +4,26 @@
 #include "PCGExCollectionsEditor.h"
 
 #include "AssetToolsModule.h"
-#include "AssetRegistry/AssetData.h"
-#include "AssetRegistry/AssetRegistryModule.h"
-#include "AssetRegistry/IAssetRegistry.h"
 #include "ContentBrowserMenuContexts.h"
-#include "Core/PCGExAssetCollection.h"
 #include "Editor.h"
-#include "TimerManager.h"
 #include "PCGExAssetTypesMacros.h"
 #include "PCGExCollectionsEditorMenuUtils.h"
 #include "PCGExCollectionsEditorSettings.h"
 #include "PropertyEditorModule.h"
-#include "UObject/UObjectGlobals.h"
+#include "TimerManager.h"
+#include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "Core/PCGExAssetCollection.h"
 #include "Details/Collections/PCGExActorCollectionActions.h"
 #include "Details/Collections/PCGExAssetEntryCustomization.h"
 #include "Details/Collections/PCGExAssetGrammarCustomization.h"
 #include "Details/Collections/PCGExFittingVariationsCustomization.h"
+#include "Details/Collections/PCGExLevelCollectionActions.h"
 #include "Details/Collections/PCGExMaterialPicksCustomization.h"
 #include "Details/Collections/PCGExMeshCollectionActions.h"
-#include "Details/Collections/PCGExLevelCollectionActions.h"
 #include "Details/Collections/PCGExPCGDataAssetCollectionActions.h"
+#include "UObject/UObjectGlobals.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExCollectionsEditorModule"
 
@@ -87,19 +87,31 @@ void FPCGExCollectionsEditorModule::ShutdownModule()
 
 void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& AssetData)
 {
-	if (!GEditor) { return; }
-	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale) { return; }
+	if (!GEditor)
+	{
+		return;
+	}
+	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale)
+	{
+		return;
+	}
 
 	const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	const IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 
 	// Defense in depth -- shouldn't happen given the deferred subscription, but harmless.
-	if (AssetRegistry.IsLoadingAssets()) { return; }
+	if (AssetRegistry.IsLoadingAssets())
+	{
+		return;
+	}
 
 	// Find packages that reference this asset (no load).
 	TArray<FName> Referencers;
 	AssetRegistry.GetReferencers(AssetData.PackageName, Referencers, UE::AssetRegistry::EDependencyCategory::Package);
-	if (Referencers.IsEmpty()) { return; }
+	if (Referencers.IsEmpty())
+	{
+		return;
+	}
 
 	const UClass* CollectionClass = UPCGExAssetCollection::StaticClass();
 
@@ -112,12 +124,18 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 		for (const FAssetData& ReferencerAsset : ReferencerAssets)
 		{
 			const UClass* AssetClass = ReferencerAsset.GetClass();
-			if (!AssetClass || !AssetClass->IsChildOf(CollectionClass)) { continue; }
+			if (!AssetClass || !AssetClass->IsChildOf(CollectionClass))
+			{
+				continue;
+			}
 
 			// Only act on collections that are already loaded. Unloaded ones are not touched
 			// here -- they'll be considered when the user next opens them via manual rebuild.
 			UPCGExAssetCollection* Collection = Cast<UPCGExAssetCollection>(ReferencerAsset.GetSoftObjectPath().ResolveObject());
-			if (!Collection) { continue; }
+			if (!Collection)
+			{
+				continue;
+			}
 
 			// Per-entry rebuild: match against the entry's advertised source paths.
 			// EDITOR_GetSourceAssetPaths() returns the *external* refs that should trigger
@@ -126,7 +144,10 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 			// handles BP class paths where the path ends in "_C".
 			Collection->ForEachEntry([Collection, &AssetData](const FPCGExAssetCollectionEntry* InEntry, int32 i)
 			{
-				if (InEntry->bIsSubCollection) { return; }
+				if (InEntry->bIsSubCollection)
+				{
+					return;
+				}
 
 				TSet<FSoftObjectPath> SourcePaths;
 				InEntry->EDITOR_GetSourceAssetPaths(SourcePaths);
@@ -146,10 +167,19 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 
 void FPCGExCollectionsEditorModule::OnObjectsReinstanced(const TMap<UObject*, UObject*>& OldToNewMap)
 {
-	if (!GEditor) { return; }
+	if (!GEditor)
+	{
+		return;
+	}
 	// Failsafe for early startup
-	if (!GEditor->IsTimerManagerValid()) { return; }
-	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale) { return; }
+	if (!GEditor->IsTimerManagerValid())
+	{
+		return;
+	}
+	if (!GetDefault<UPCGExCollectionsEditorSettings>()->bAutoRebuildOnStale)
+	{
+		return;
+	}
 
 	// Reinstancing fires DURING the BP recompile flow -- the new class exists but isn't
 	// fully settled (CDO, components, etc. may still be finalising). Spawning a temp actor
@@ -159,18 +189,30 @@ void FPCGExCollectionsEditorModule::OnObjectsReinstanced(const TMap<UObject*, UO
 	for (const TPair<UObject*, UObject*>& Pair : OldToNewMap)
 	{
 		UObject* NewObj = Pair.Value;
-		if (!NewObj) { continue; }
+		if (!NewObj)
+		{
+			continue;
+		}
 		UPackage* Package = NewObj->GetOutermost();
-		if (!Package || Package == GetTransientPackage()) { continue; }
+		if (!Package || Package == GetTransientPackage())
+		{
+			continue;
+		}
 		ChangedPackages.Add(Package->GetFName());
 	}
 
-	if (ChangedPackages.IsEmpty()) { return; }
+	if (ChangedPackages.IsEmpty())
+	{
+		return;
+	}
 
 	GEditor->GetTimerManager()->SetTimerForNextTick(
 		[this, ChangedPackages]()
 		{
-			if (!GEditor) { return; }
+			if (!GEditor)
+			{
+				return;
+			}
 			const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 			const IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 
@@ -199,7 +241,10 @@ void FPCGExCollectionsEditorModule::RegisterMenuExtensions()
 			"PCGEx", FNewToolMenuDelegate::CreateLambda(
 				[this](UToolMenu* ToolMenu)
 				{
-					if (!GEditor || GEditor->GetPIEWorldContext() || !ToolMenu) { return; }
+					if (!GEditor || GEditor->GetPIEWorldContext() || !ToolMenu)
+					{
+						return;
+					}
 					if (UContentBrowserAssetContextMenuContext* AssetMenuContext = ToolMenu->Context.FindContext<UContentBrowserAssetContextMenuContext>())
 					{
 						PCGExCollectionsEditorMenuUtils::CreateOrUpdatePCGExAssetCollectionsFromMenu(ToolMenu, AssetMenuContext->SelectedAssets);

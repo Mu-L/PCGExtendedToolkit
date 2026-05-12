@@ -64,14 +64,26 @@ namespace PCGExMT
 		FScope(const int32 InStart, const int32 InCount, const int32 InLoopIndex = -1);
 
 		~FScope() = default;
-		bool IsValid() const { return Start != -1 && Count > 0; }
-		int32 GetNextScopeIndex() const { return LoopIndex + 1; }
+
+		bool IsValid() const
+		{
+			return Start != -1 && Count > 0;
+		}
+
+		int32 GetNextScopeIndex() const
+		{
+			return LoopIndex + 1;
+		}
+
 		void GetIndices(TArray<int32>& OutIndices) const;
 
 		static int32 GetMaxRange(const TArray<FScope>& InScopes)
 		{
 			int32 MaxRange = 0;
-			for (const FScope& S : InScopes) { MaxRange = FMath::Max(MaxRange, S.Count); }
+			for (const FScope& S : InScopes)
+			{
+				MaxRange = FMath::Max(MaxRange, S.Count);
+			}
 			return MaxRange;
 		}
 

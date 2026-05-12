@@ -23,7 +23,10 @@ void FPCGExEdgeKeepHighestScore::ProcessNode(PCGExClusters::FNode& Node)
 		}
 	}
 
-	if (BestIndex == -1) { return; }
+	if (BestIndex == -1)
+	{
+		return;
+	}
 	//if (!*(EdgesFilters->GetData() + BestIndex)) { return; }
 
 	FPlatformAtomics::InterlockedExchange(&Cluster->GetEdge(BestIndex)->bValid, 1);

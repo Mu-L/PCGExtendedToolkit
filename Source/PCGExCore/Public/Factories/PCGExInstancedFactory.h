@@ -50,7 +50,10 @@ public:
 	virtual void Cleanup() override;
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other);
 
-	virtual bool WantsPerDataInstance() { return false; }
+	virtual bool WantsPerDataInstance()
+	{
+		return false;
+	}
 
 	virtual void RegisterAssetDependencies(FPCGExContext* InContext);
 
@@ -63,7 +66,11 @@ public:
 	virtual void RegisterPrimaryBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const;
 
 	virtual void BeginDestroy() override;
-	virtual bool CanOnlyExecuteOnMainThread() const { return false; }
+
+	virtual bool CanOnlyExecuteOnMainThread() const
+	{
+		return false;
+	}
 
 protected:
 	FPCGExContext* Context = nullptr;

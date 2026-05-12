@@ -21,7 +21,10 @@ namespace PCGExData
 
 	public:
 		virtual ~IDataValue() = default;
-		FORCEINLINE EPCGMetadataTypes GetTypeId() const { return Type; }
+		FORCEINLINE EPCGMetadataTypes GetTypeId() const
+		{
+			return Type;
+		}
 
 		IDataValue() = default;
 

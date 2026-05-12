@@ -13,12 +13,22 @@ UPCGExPathProcessorSettings::UPCGExPathProcessorSettings(const FObjectInitialize
 {
 }
 
-FName UPCGExPathProcessorSettings::GetMainInputPin() const { return PCGExPaths::Labels::SourcePathsLabel; }
-FName UPCGExPathProcessorSettings::GetMainOutputPin() const { return PCGExPaths::Labels::OutputPathsLabel; }
+FName UPCGExPathProcessorSettings::GetMainInputPin() const
+{
+	return PCGExPaths::Labels::SourcePathsLabel;
+}
+
+FName UPCGExPathProcessorSettings::GetMainOutputPin() const
+{
+	return PCGExPaths::Labels::OutputPathsLabel;
+}
 
 bool FPCGExPathProcessorElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathProcessor)
 

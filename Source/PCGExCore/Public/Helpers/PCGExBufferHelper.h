@@ -45,7 +45,10 @@ namespace PCGExData
 			FReadScopeLock ReadScopeLock(BufferLock);
 			if (TSharedPtr<IBuffer>* BufferPtr = BufferMap.Find(InName))
 			{
-				if (!(*BufferPtr)->IsA<T>()) { return nullptr; }
+				if (!(*BufferPtr)->IsA<T>())
+				{
+					return nullptr;
+				}
 				return StaticCastSharedPtr<TArrayBuffer<T>>(*BufferPtr);
 			}
 
@@ -147,7 +150,10 @@ namespace PCGExData
 		bool SetValue(const FName& InAttributeName, const int32 InIndex, const T& InValue)
 		{
 			TSharedPtr<TArrayBuffer<T>> Buffer = GetBuffer<T>(InAttributeName);
-			if (!Buffer) { return false; }
+			if (!Buffer)
+			{
+				return false;
+			}
 
 			if constexpr (Mode == EBufferHelperMode::Write)
 			{
@@ -173,7 +179,10 @@ namespace PCGExData
 		bool GetValue(const FName& InAttributeName, const int32 InIndex, T& OutValue)
 		{
 			TSharedPtr<TArrayBuffer<T>> Buffer = GetBuffer<T>(InAttributeName);
-			if (!Buffer) { return false; }
+			if (!Buffer)
+			{
+				return false;
+			}
 
 			if constexpr (Mode == EBufferHelperMode::Write)
 			{

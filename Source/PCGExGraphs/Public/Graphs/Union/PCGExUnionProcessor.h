@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Details/PCGExBlendingDetails.h"
 #include "Data/PCGExPointIO.h"
+#include "Details/PCGExBlendingDetails.h"
 #include "Details/PCGExIntersectionDetails.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Graphs/PCGExGraphMetadata.h"

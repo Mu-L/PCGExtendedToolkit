@@ -44,8 +44,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE bool Min() { return false; }
-		static FORCEINLINE bool Max() { return true; }
+		static FORCEINLINE bool Min()
+		{
+			return false;
+		}
+
+		static FORCEINLINE bool Max()
+		{
+			return true;
+		}
 	};
 
 	template <>
@@ -62,8 +69,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE int32 Min() { return TNumericLimits<int32>::Min(); }
-		static FORCEINLINE int32 Max() { return TNumericLimits<int32>::Max(); }
+		static FORCEINLINE int32 Min()
+		{
+			return TNumericLimits<int32>::Min();
+		}
+
+		static FORCEINLINE int32 Max()
+		{
+			return TNumericLimits<int32>::Max();
+		}
 	};
 
 	template <>
@@ -80,8 +94,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE int64 Min() { return TNumericLimits<int64>::Min(); }
-		static FORCEINLINE int64 Max() { return TNumericLimits<int64>::Max(); }
+		static FORCEINLINE int64 Min()
+		{
+			return TNumericLimits<int64>::Min();
+		}
+
+		static FORCEINLINE int64 Max()
+		{
+			return TNumericLimits<int64>::Max();
+		}
 	};
 
 	template <>
@@ -98,8 +119,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE float Min() { return TNumericLimits<float>::Min(); }
-		static FORCEINLINE float Max() { return TNumericLimits<float>::Max(); }
+		static FORCEINLINE float Min()
+		{
+			return TNumericLimits<float>::Min();
+		}
+
+		static FORCEINLINE float Max()
+		{
+			return TNumericLimits<float>::Max();
+		}
 	};
 
 	template <>
@@ -116,8 +144,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE double Min() { return TNumericLimits<double>::Min(); }
-		static FORCEINLINE double Max() { return TNumericLimits<double>::Max(); }
+		static FORCEINLINE double Min()
+		{
+			return TNumericLimits<double>::Min();
+		}
+
+		static FORCEINLINE double Max()
+		{
+			return TNumericLimits<double>::Max();
+		}
 	};
 
 	// Vector types
@@ -135,8 +170,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FVector2D Min() { return FVector2D(MAX_dbl); }
-		static FORCEINLINE FVector2D Max() { return FVector2D(MIN_dbl_neg); }
+		static FORCEINLINE FVector2D Min()
+		{
+			return FVector2D(MAX_dbl);
+		}
+
+		static FORCEINLINE FVector2D Max()
+		{
+			return FVector2D(MIN_dbl_neg);
+		}
 	};
 
 	template <>
@@ -153,8 +195,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FVector Min() { return FVector(MAX_dbl); }
-		static FORCEINLINE FVector Max() { return FVector(MIN_dbl_neg); }
+		static FORCEINLINE FVector Min()
+		{
+			return FVector(MAX_dbl);
+		}
+
+		static FORCEINLINE FVector Max()
+		{
+			return FVector(MIN_dbl_neg);
+		}
 	};
 
 	template <>
@@ -171,8 +220,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FVector4 Min() { return FVector4(MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl); }
-		static FORCEINLINE FVector4 Max() { return FVector4(MIN_dbl_neg,MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg); }
+		static FORCEINLINE FVector4 Min()
+		{
+			return FVector4(MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl);
+		}
+
+		static FORCEINLINE FVector4 Max()
+		{
+			return FVector4(MIN_dbl_neg,MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
+		}
 	};
 
 	// Rotation types
@@ -191,8 +247,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FRotator Min() { return FRotator(MAX_dbl, MAX_dbl, MAX_dbl); }
-		static FORCEINLINE FRotator Max() { return FRotator(MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg); }
+		static FORCEINLINE FRotator Min()
+		{
+			return FRotator(MAX_dbl, MAX_dbl, MAX_dbl);
+		}
+
+		static FORCEINLINE FRotator Max()
+		{
+			return FRotator(MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
+		}
 	};
 
 
@@ -210,8 +273,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FQuat Min() { return TTraits<FRotator>::Min().Quaternion(); }
-		static FORCEINLINE FQuat Max() { return TTraits<FRotator>::Max().Quaternion(); }
+		static FORCEINLINE FQuat Min()
+		{
+			return TTraits<FRotator>::Min().Quaternion();
+		}
+
+		static FORCEINLINE FQuat Max()
+		{
+			return TTraits<FRotator>::Max().Quaternion();
+		}
 	};
 
 	template <>
@@ -228,8 +298,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FTransform Min() { return FTransform(TTraits<FQuat>::Min(), TTraits<FVector>::Min(), TTraits<FVector>::Min()); }
-		static FORCEINLINE FTransform Max() { return FTransform(TTraits<FQuat>::Max(), TTraits<FVector>::Max(), TTraits<FVector>::Max()); }
+		static FORCEINLINE FTransform Min()
+		{
+			return FTransform(TTraits<FQuat>::Min(), TTraits<FVector>::Min(), TTraits<FVector>::Min());
+		}
+
+		static FORCEINLINE FTransform Max()
+		{
+			return FTransform(TTraits<FQuat>::Max(), TTraits<FVector>::Max(), TTraits<FVector>::Max());
+		}
 	};
 
 	// String types
@@ -247,8 +324,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FString Min() { return FString(); }
-		static FORCEINLINE FString Max() { return FString(); }
+		static FORCEINLINE FString Min()
+		{
+			return FString();
+		}
+
+		static FORCEINLINE FString Max()
+		{
+			return FString();
+		}
 	};
 
 	template <>
@@ -265,8 +349,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FName Min() { return NAME_None; }
-		static FORCEINLINE FName Max() { return NAME_None; }
+		static FORCEINLINE FName Min()
+		{
+			return NAME_None;
+		}
+
+		static FORCEINLINE FName Max()
+		{
+			return NAME_None;
+		}
 	};
 
 	template <>
@@ -283,8 +374,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FSoftObjectPath Min() { return FSoftObjectPath(); }
-		static FORCEINLINE FSoftObjectPath Max() { return FSoftObjectPath(); }
+		static FORCEINLINE FSoftObjectPath Min()
+		{
+			return FSoftObjectPath();
+		}
+
+		static FORCEINLINE FSoftObjectPath Max()
+		{
+			return FSoftObjectPath();
+		}
 	};
 
 	template <>
@@ -301,8 +399,15 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FSoftClassPath Min() { return FSoftClassPath(); }
-		static FORCEINLINE FSoftClassPath Max() { return FSoftClassPath(); }
+		static FORCEINLINE FSoftClassPath Min()
+		{
+			return FSoftClassPath();
+		}
+
+		static FORCEINLINE FSoftClassPath Max()
+		{
+			return FSoftClassPath();
+		}
 	};
 
 }

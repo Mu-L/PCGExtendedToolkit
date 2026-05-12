@@ -4,12 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
+#include "PCGExHeuristicsHandler.h"
 #include "Core/PCGExFillControlOperation.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
-#include "PCGExHeuristicsHandler.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "UObject/Object.h"
 #include "Utils/PCGExCompare.h"
 
 #include "PCGExFillControlHxThreshold.generated.h"
@@ -73,8 +73,15 @@ class FPCGExFillControlHeuristicsThreshold : public FPCGExFillControlOperation
 	friend class UPCGExFillControlsFactoryHxThreshold;
 
 public:
-	virtual bool DoesScoring() const override { return true; }
-	virtual bool ChecksCandidate() const override { return true; }
+	virtual bool DoesScoring() const override
+	{
+		return true;
+	}
+
+	virtual bool ChecksCandidate() const override
+	{
+		return true;
+	}
 
 	virtual bool PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler) override;
 	virtual void ScoreCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, PCGExFloodFill::FCandidate& OutCandidate) override;
@@ -118,7 +125,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(FillControlsHeuristicsThreshold, "Fill Control : Heuristics Threshold", "Stop diffusion when instantaneous heuristic crosses a threshold.", FName(GetDisplayName()))
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_BLEND(FillControl, Heuristics); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_BLEND(FillControl, Heuristics);
+	}
 #endif
 	//~End UPCGSettings
 

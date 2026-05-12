@@ -41,8 +41,8 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorFactoryBaseConfig
 	/** What to do when a point's Category attribute does not match any named category in the collection. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, EditCondition="bUseCategories"))
 	EPCGExMissingCategoryBehavior MissingCategoryBehavior = EPCGExMissingCategoryBehavior::Skip;
-	
-	
+
+
 	/** Which components contribute to per-point seed generation. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Seed", meta=(PCG_Overridable, Bitmask, BitmaskEnum="/Script/PCGExCore.EPCGExSeedComponents"))
 	uint8 SeedComponents = 0;

@@ -4,14 +4,14 @@
 #include "Elements/PCGExFilterVtx.h"
 
 
+#include "PCGExVersion.h"
+#include "Async/ParallelFor.h"
+#include "Clusters/PCGExCluster.h"
+#include "Clusters/PCGExClustersHelpers.h"
+#include "Core/PCGExClusterFilter.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
-#include "Core/PCGExClusterFilter.h"
-#include "Async/ParallelFor.h"
-#include "PCGExVersion.h"
-#include "Clusters/PCGExCluster.h"
-#include "Clusters/PCGExClustersHelpers.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Graphs/PCGExGraphCommon.h"
 
@@ -68,9 +68,12 @@ PCGExData::EIOInit UPCGExFilterVtxSettings::GetMainOutputInitMode() const
 	switch (Mode)
 	{
 	default:
-	case EPCGExVtxFilterOutput::Clusters: return PCGExData::EIOInit::New;
-	case EPCGExVtxFilterOutput::Points: return PCGExData::EIOInit::NoInit;
-	case EPCGExVtxFilterOutput::Attribute: return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	case EPCGExVtxFilterOutput::Clusters:
+		return PCGExData::EIOInit::New;
+	case EPCGExVtxFilterOutput::Points:
+		return PCGExData::EIOInit::NoInit;
+	case EPCGExVtxFilterOutput::Attribute:
+		return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 	}
 }
 
@@ -80,8 +83,10 @@ PCGExData::EIOInit UPCGExFilterVtxSettings::GetEdgeOutputInitMode() const
 	{
 	default:
 	case EPCGExVtxFilterOutput::Attribute:
-	case EPCGExVtxFilterOutput::Clusters: return PCGExData::EIOInit::Forward;
-	case EPCGExVtxFilterOutput::Points: return PCGExData::EIOInit::NoInit;
+	case EPCGExVtxFilterOutput::Clusters:
+		return PCGExData::EIOInit::Forward;
+	case EPCGExVtxFilterOutput::Points:
+		return PCGExData::EIOInit::NoInit;
 	}
 }
 
@@ -90,7 +95,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(FilterVtx)
 
 bool FPCGExFilterVtxElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FilterVtx)
 
@@ -136,12 +144,18 @@ bool FPCGExFilterVtxElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
-			NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
-			if (!Context->EdgeFilterFactories.IsEmpty()) { NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories; }
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
+			                                      NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
+			                                      if (!Context->EdgeFilterFactories.IsEmpty())
+			                                      {
+				                                      NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories;
+			                                      }
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -151,7 +165,10 @@ bool FPCGExFilterVtxElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 
 	if (Settings->Mode == EPCGExVtxFilterOutput::Clusters)
 	{
-		if (!Context->CompileGraphBuilders(true, PCGExCommon::States::State_Done)) { return false; }
+		if (!Context->CompileGraphBuilders(true, PCGExCommon::States::State_Done))
+		{
+			return false;
+		}
 		Context->MainPoints->StageOutputs();
 	}
 	else if (Settings->Mode == EPCGExVtxFilterOutput::Attribute)
@@ -185,7 +202,10 @@ namespace PCGExFilterVtx
 
 		bAllowEdgesDataFacadeScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (!VtxFiltersManager)
 		{
@@ -200,7 +220,10 @@ namespace PCGExFilterVtx
 		}
 
 		StartParallelLoopForNodes();
-		if (!Context->EdgeFilterFactories.IsEmpty()) { StartParallelLoopForEdges(); }
+		if (!Context->EdgeFilterFactories.IsEmpty())
+		{
+			StartParallelLoopForEdges();
+		}
 
 		return true;
 	}
@@ -217,7 +240,10 @@ namespace PCGExFilterVtx
 			Node.bValid = VtxFiltersManager->Test(Node) ? !Settings->bInvert : Settings->bInvert;
 			if (!Node.bValid && bNodeInvalidateEdges)
 			{
-				for (const PCGExGraphs::FLink& Lk : Node.Links) { FPlatformAtomics::InterlockedExchange(&Edges[Lk.Edge].bValid, 0); }
+				for (const PCGExGraphs::FLink& Lk : Node.Links)
+				{
+					FPlatformAtomics::InterlockedExchange(&Edges[Lk.Edge].bValid, 0);
+				}
 			}
 		}
 	}
@@ -252,12 +278,21 @@ namespace PCGExFilterVtx
 				if (Node.bValid)
 				{
 					int32 ValidCount = 0;
-					for (const PCGExGraphs::FLink& Lk : Node.Links) { ValidCount += Edges[Lk.Edge].bValid; }
+					for (const PCGExGraphs::FLink& Lk : Node.Links)
+					{
+						ValidCount += Edges[Lk.Edge].bValid;
+					}
 					Node.bValid = static_cast<bool>(ValidCount);
 				}
 
-				if (Node.bValid) { FPlatformAtomics::InterlockedIncrement(&PassNum); }
-				else { FPlatformAtomics::InterlockedIncrement(&FailNum); }
+				if (Node.bValid)
+				{
+					FPlatformAtomics::InterlockedIncrement(&PassNum);
+				}
+				else
+				{
+					FPlatformAtomics::InterlockedIncrement(&FailNum);
+				}
 			});
 		}
 		else
@@ -267,12 +302,21 @@ namespace PCGExFilterVtx
 				if (Node.bValid)
 				{
 					int32 ValidCount = 0;
-					for (const PCGExGraphs::FLink& Lk : Node.Links) { ValidCount += Edges[Lk.Edge].bValid; }
+					for (const PCGExGraphs::FLink& Lk : Node.Links)
+					{
+						ValidCount += Edges[Lk.Edge].bValid;
+					}
 					Node.bValid = static_cast<bool>(ValidCount);
 				}
 
-				if (Node.bValid) { PassNum++; }
-				else { FailNum++; }
+				if (Node.bValid)
+				{
+					PassNum++;
+				}
+				else
+				{
+					FailNum++;
+				}
 			}
 		}
 
@@ -284,7 +328,10 @@ namespace PCGExFilterVtx
 				Node.bValid = true;
 			}
 
-			for (PCGExClusters::FEdge& Edge : Edges) { Edge.bValid = true; }
+			for (PCGExClusters::FEdge& Edge : Edges)
+			{
+				Edge.bValid = true;
+			}
 
 			return;
 		}
@@ -294,7 +341,10 @@ namespace PCGExFilterVtx
 			TArray<PCGExGraphs::FEdge> ValidEdges;
 			Cluster->GetValidEdges(ValidEdges);
 
-			if (ValidEdges.IsEmpty()) { return; }
+			if (ValidEdges.IsEmpty())
+			{
+				return;
+			}
 			ValidEdges.Sort();
 
 			GraphBuilder->Graph->InsertEdges(ValidEdges);
@@ -309,7 +359,10 @@ namespace PCGExFilterVtx
 
 				const TSharedPtr<PCGExData::FPointIO> OutIO = (PassNum == 0 ? Context->Outside : Context->Inside)->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
 
-				if (!OutIO) { return; }
+				if (!OutIO)
+				{
+					return;
+				}
 
 				PCGExClusters::Helpers::CleanupVtxData(OutIO);
 
@@ -317,7 +370,10 @@ namespace PCGExFilterVtx
 				OutIO->IOIndex = VtxDataFacade->Source->IOIndex * 100000 + BatchIndex;
 
 				ReadIndices.SetNumUninitialized(NumNodes);
-				for (int i = 0; i < NumNodes; i++) { ReadIndices[i] = Nodes[i].PointIndex; }
+				for (int i = 0; i < NumNodes; i++)
+				{
+					ReadIndices[i] = Nodes[i].PointIndex;
+				}
 
 				ReadIndices.Sort();
 				OutIO->InheritPoints(ReadIndices, 0);
@@ -328,7 +384,10 @@ namespace PCGExFilterVtx
 			const TSharedPtr<PCGExData::FPointIO> Inside = Context->Inside->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
 			const TSharedPtr<PCGExData::FPointIO> Outside = Context->Outside->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
 
-			if (!Inside || !Outside) { return; }
+			if (!Inside || !Outside)
+			{
+				return;
+			}
 
 			PCGExClusters::Helpers::CleanupVtxData(Inside);
 			PCGExClusters::Helpers::CleanupVtxData(Outside);
@@ -391,7 +450,10 @@ namespace PCGExFilterVtx
 
 			const TSharedPtr<PCGExData::FPointIO> OutIO = (PassNum == 0 ? Context->Outside : Context->Inside)->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::Duplicate);
 
-			if (!OutIO) { return; }
+			if (!OutIO)
+			{
+				return;
+			}
 
 			PCGExClusters::Helpers::CleanupVtxData(OutIO);
 
@@ -403,7 +465,10 @@ namespace PCGExFilterVtx
 		const TSharedPtr<PCGExData::FPointIO> Inside = Context->Inside->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
 		const TSharedPtr<PCGExData::FPointIO> Outside = Context->Outside->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
 
-		if (!Inside || !Outside) { return; }
+		if (!Inside || !Outside)
+		{
+			return;
+		}
 
 		PCGExClusters::Helpers::CleanupVtxData(Inside);
 		PCGExClusters::Helpers::CleanupVtxData(Outside);
@@ -414,7 +479,8 @@ namespace PCGExFilterVtx
 		for (int Pi = 0; Pi < Processors.Num(); Pi++)
 		{
 			const TSharedPtr<FProcessor> P = GetProcessor<FProcessor>(Pi);
-			for (const TArray<PCGExClusters::FNode>& Nodes = *P->Cluster->Nodes.Get(); const PCGExClusters::FNode& Node : Nodes)
+			for (const TArray<PCGExClusters::FNode>& Nodes = *P->Cluster->Nodes.Get();
+			     const PCGExClusters::FNode& Node : Nodes)
 			{
 				Mask[Node.PointIndex] = Node.bValid ? 1 : 0;
 			}

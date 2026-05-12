@@ -14,14 +14,34 @@ class FPCGExMeshCollectionEditor : public FPCGExAssetCollectionEditor
 public:
 	FPCGExMeshCollectionEditor();
 
-	virtual FName GetToolkitFName() const override { return FName("PCGExMeshCollectionEditor"); }
-	virtual FText GetBaseToolkitName() const override { return INVTEXT("PCGEx Mesh Collection Editor"); }
-	virtual FString GetWorldCentricTabPrefix() const override { return TEXT("PCGEx"); }
-	virtual FLinearColor GetWorldCentricTabColorScale() const override { return FLinearColor::White; }
+	virtual FName GetToolkitFName() const override
+	{
+		return FName("PCGExMeshCollectionEditor");
+	}
+
+	virtual FText GetBaseToolkitName() const override
+	{
+		return INVTEXT("PCGEx Mesh Collection Editor");
+	}
+
+	virtual FString GetWorldCentricTabPrefix() const override
+	{
+		return TEXT("PCGEx");
+	}
+
+	virtual FLinearColor GetWorldCentricTabColorScale() const override
+	{
+		return FLinearColor::White;
+	}
 
 protected:
 	virtual void RegisterPropertyNameMapping(TMap<FName, FName>& Mapping) override;
 	virtual void BuildAssetHeaderToolbar(FToolBarBuilder& ToolbarBuilder) override;
-	virtual FName GetTilePickerPropertyName() const override { return FName("StaticMesh"); }
+
+	virtual FName GetTilePickerPropertyName() const override
+	{
+		return FName("StaticMesh");
+	}
+
 	virtual const UClass* GetTilePickerAllowedClass() const override;
 };

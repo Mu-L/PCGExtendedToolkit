@@ -74,7 +74,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FNumericCompareFilter(const TObjectPtr<const UPCGExNumericCompareFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

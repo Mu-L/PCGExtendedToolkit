@@ -70,7 +70,10 @@ struct PCGEXCORE_API FPCGExPathEdgeIntersectionDetails
 
 	void Init();
 
-	FORCEINLINE bool CheckDot(const double InDot) const { return InDot <= MaxDot && InDot >= MinDot; }
+	FORCEINLINE bool CheckDot(const double InDot) const
+	{
+		return InDot <= MaxDot && InDot >= MinDot;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -138,5 +141,8 @@ struct PCGEXCORE_API FPCGExPathIntersectionDetails
 
 	void Init();
 
-	FORCEINLINE bool CheckDot(const double InDot) const { return InDot <= MaxDot && InDot >= MinDot; }
+	FORCEINLINE bool CheckDot(const double InDot) const
+	{
+		return InDot <= MaxDot && InDot >= MinDot;
+	}
 };

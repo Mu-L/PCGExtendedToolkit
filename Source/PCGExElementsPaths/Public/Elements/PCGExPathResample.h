@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blenders/PCGExMetadataBlender.h"
 #include "Core/PCGExPathProcessor.h"
 #include "Details/PCGExBlendingDetails.h"
-#include "Blenders/PCGExMetadataBlender.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Math/PCGExMath.h"
 

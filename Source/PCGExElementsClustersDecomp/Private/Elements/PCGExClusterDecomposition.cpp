@@ -4,8 +4,8 @@
 #include "Elements/PCGExClusterDecomposition.h"
 
 #include "PCGParamData.h"
-#include "Data/PCGExData.h"
 #include "Clusters/PCGExCluster.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 
 #define LOCTEXT_NAMESPACE "ClusterDecomposition"
@@ -13,7 +13,10 @@
 
 bool UPCGExClusterDecompositionSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExHeuristics::Labels::SourceHeuristicsLabel) { return Decomposition && Decomposition->WantsHeuristics(); }
+	if (InPin->Properties.Label == PCGExHeuristics::Labels::SourceHeuristicsLabel)
+	{
+		return Decomposition && Decomposition->WantsHeuristics();
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
@@ -21,23 +24,39 @@ TArray<FPCGPinProperties> UPCGExClusterDecompositionSettings::InputPinProperties
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
 
-	if (Decomposition && Decomposition->WantsHeuristics()) { PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some decompositions.", Required, FPCGExDataTypeInfoHeuristics::AsId()) }
-	else { PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some decompositions.", Advanced, FPCGExDataTypeInfoHeuristics::AsId()) }
+	if (Decomposition && Decomposition->WantsHeuristics())
+	{
+		PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some decompositions.", Required, FPCGExDataTypeInfoHeuristics::AsId())
+	}
+	else
+	{
+		PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some decompositions.", Advanced, FPCGExDataTypeInfoHeuristics::AsId())
+	}
 
 	PCGEX_PIN_OPERATION_OVERRIDES(PCGExClusterDecomposition::SourceOverridesDecomposition)
 
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExClusterDecompositionSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Duplicate; }
-PCGExData::EIOInit UPCGExClusterDecompositionSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExClusterDecompositionSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
+
+PCGExData::EIOInit UPCGExClusterDecompositionSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 PCGEX_INITIALIZE_ELEMENT(ClusterDecomposition)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ClusterDecomposition)
 
 bool FPCGExClusterDecompositionElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(ClusterDecomposition)
 
@@ -66,11 +85,17 @@ bool FPCGExClusterDecompositionElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bRequiresWriteStep = true;
-			if (Context->Decomposition->WantsHeuristics()) { NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode); }
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bRequiresWriteStep = true;
+			                                      if (Context->Decomposition->WantsHeuristics())
+			                                      {
+				                                      NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+			                                      }
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -91,10 +116,16 @@ namespace PCGExClusterDecomposition
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExClusterDecomposition::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		Operation = Context->Decomposition->CreateOperation();
-		if (!Operation) { return false; }
+		if (!Operation)
+		{
+			return false;
+		}
 
 		Operation->PrimaryDataFacade = VtxDataFacade;
 		Operation->SecondaryDataFacade = EdgeDataFacade;
@@ -110,7 +141,10 @@ namespace PCGExClusterDecomposition
 			for (int32 NodeIndex = 0; NodeIndex < Result.NodeCellIDs.Num(); NodeIndex++)
 			{
 				const int32 CellID = Result.NodeCellIDs[NodeIndex];
-				if (CellID < 0) { continue; }
+				if (CellID < 0)
+				{
+					continue;
+				}
 				CellIDBuffer->SetValue(Cluster->GetNodePointIndex(NodeIndex), Offset + CellID);
 			}
 
@@ -121,14 +155,20 @@ namespace PCGExClusterDecomposition
 				for (int32 NodeIndex = 0; NodeIndex < Result.NodeCellIDs.Num(); NodeIndex++)
 				{
 					const int32 CellID = Result.NodeCellIDs[NodeIndex];
-					if (CellID >= 0) { CellNodeCounts.FindOrAdd(CellID)++; }
+					if (CellID >= 0)
+					{
+						CellNodeCounts.FindOrAdd(CellID)++;
+					}
 				}
 
 				// Write per-node cell count
 				for (int32 NodeIndex = 0; NodeIndex < Result.NodeCellIDs.Num(); NodeIndex++)
 				{
 					const int32 CellID = Result.NodeCellIDs[NodeIndex];
-					if (CellID < 0) { continue; }
+					if (CellID < 0)
+					{
+						continue;
+					}
 					CellCountBuffer->SetValue(Cluster->GetNodePointIndex(NodeIndex), CellNodeCounts[CellID]);
 				}
 			}
@@ -182,7 +222,10 @@ namespace PCGExClusterDecomposition
 
 	bool FBatch::PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor)
 	{
-		if (!TBatch<FProcessor>::PrepareSingle(InProcessor)) { return false; }
+		if (!TBatch<FProcessor>::PrepareSingle(InProcessor))
+		{
+			return false;
+		}
 		PCGEX_TYPED_PROCESSOR
 
 		TypedProcessor->CellIDBuffer = CellIDBuffer;

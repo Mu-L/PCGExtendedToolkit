@@ -5,12 +5,12 @@
 
 #include "PCGComponent.h"
 #include "UDynamicMesh.h"
+#include "Async/ParallelFor.h"
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGDynamicMeshData.h" // Redundant but required for build on Linux 
 #include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
-#include "Async/ParallelFor.h"
 #include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
 #include "Math/PCGExBestFitPlane.h"
 #include "Math/PCGExProjectionDetails.h"
 
@@ -47,7 +47,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(TopologyPointSurface)
 
 bool FPCGExTopologyPointSurfaceElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(TopologyPointSurface)
 
@@ -97,14 +100,20 @@ namespace PCGExTopologyPointSurface
 
 		PointDataFacade->bSupportsScopedGet = false;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		// Prep data
 
 		bIsPreviewMode = ExecutionContext->GetComponent()->IsInPreviewMode();
 
 		InternalMeshData = Context->ManagedObjects->New<UPCGDynamicMeshData>();
-		if (!InternalMeshData) { return false; }
+		if (!InternalMeshData)
+		{
+			return false;
+		}
 
 		InternalMesh = Context->ManagedObjects->New<UDynamicMesh>();
 		InternalMesh->InitializeMesh();
@@ -113,13 +122,19 @@ namespace PCGExTopologyPointSurface
 		{
 			InternalMeshData->Initialize(InternalMesh, true);
 			InternalMesh = InternalMeshData->GetMutableDynamicMesh();
-			if (UMaterialInterface* Material = Settings->Topology.Material.Get()) { InternalMeshData->SetMaterials({Material}); }
+			if (UMaterialInterface* Material = Settings->Topology.Material.Get())
+			{
+				InternalMeshData->SetMaterials({Material});
+			}
 		}
 
 		// Project points
 
 		ProjectionDetails = Settings->ProjectionDetails;
-		if (!ProjectionDetails.Init(PointDataFacade)) { return false; }
+		if (!ProjectionDetails.Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		// Build delaunay
 
@@ -138,7 +153,10 @@ namespace PCGExTopologyPointSurface
 
 		UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendDelaunayTriangulation2D(InternalMesh, Settings->Topology.PrimitiveOptions, FTransform::Identity, VertexPositions, ConstrainedEdges, TriangulationOptions, PositionsToVertexIDs, bHasBadVertices, nullptr);
 
-		if (PositionsToVertexIDs.IsEmpty()) { return false; }
+		if (PositionsToVertexIDs.IsEmpty())
+		{
+			return false;
+		}
 
 		UVDetails = Settings->Topology.UVChannels;
 		UVDetails.Prepare(PointDataFacade);
@@ -167,7 +185,10 @@ namespace PCGExTopologyPointSurface
 				TArray<int32> ElemIDs;
 				ElemIDs.SetNum(VtxCount);
 
-				for (int32 i = 0; i < VtxCount; i++) { ElemIDs[i] = Colors->AppendElement(DefaultVertexColor); }
+				for (int32 i = 0; i < VtxCount; i++)
+				{
+					ElemIDs[i] = Colors->AppendElement(DefaultVertexColor);
+				}
 
 				ParallelFor(VtxCount, [&](int32 i)
 				{
@@ -215,7 +236,10 @@ namespace PCGExTopologyPointSurface
 
 	void FProcessor::Output()
 	{
-		if (!this->bIsProcessorValid) { return; }
+		if (!this->bIsProcessorValid)
+		{
+			return;
+		}
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(UPCGExPathSplineMesh::FProcessor::Output);
 

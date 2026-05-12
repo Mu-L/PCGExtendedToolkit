@@ -37,7 +37,11 @@ namespace PCGExData
 
 		void ValidateIdentities(FValidateFn&& Fn);
 
-		bool IsEmpty() const { return Identities.IsEmpty(); }
+		bool IsEmpty() const
+		{
+			return Identities.IsEmpty();
+		}
+
 		void Forward(const int32 SourceIndex, const int32 TargetIndex);
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade);
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade, const TArray<int32>& Indices);

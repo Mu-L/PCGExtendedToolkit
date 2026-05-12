@@ -14,13 +14,19 @@
 
 PCGEX_INITIALIZE_ELEMENT(TransformPoints)
 
-PCGExData::EIOInit UPCGExTransformPointsSettings::GetMainDataInitializationPolicy() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExTransformPointsSettings::GetMainDataInitializationPolicy() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(TransformPoints)
 
 bool FPCGExTransformPointsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(TransformPoints)
 
@@ -36,7 +42,10 @@ bool FPCGExTransformPointsElement::AdvanceWork(FPCGExContext* InContext, const U
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -65,7 +74,10 @@ namespace PCGExTransformPoints
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
@@ -86,54 +98,99 @@ namespace PCGExTransformPoints
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
 		OffsetMin = Settings->OffsetMin.GetValueSetting();
-		if (!OffsetMin->Init(PointDataFacade)) { return false; }
+		if (!OffsetMin->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		OffsetMax = Settings->OffsetMax.GetValueSetting();
-		if (!OffsetMax->Init(PointDataFacade)) { return false; }
+		if (!OffsetMax->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		OffsetScale = Settings->OffsetScaling.GetValueSetting();
-		if (!OffsetScale->Init(PointDataFacade)) { return false; }
+		if (!OffsetScale->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		OffsetSnap = Settings->OffsetSnap.GetValueSetting();
-		if (!OffsetSnap->Init(PointDataFacade)) { return false; }
+		if (!OffsetSnap->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		AbsoluteOffset = Settings->AbsoluteOffset.GetValueSetting();
-		if (!AbsoluteOffset->Init(PointDataFacade)) { return false; }
+		if (!AbsoluteOffset->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 
 		RotMin = Settings->RotationMin.GetValueSetting();
-		if (!RotMin->Init(PointDataFacade)) { return false; }
+		if (!RotMin->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		RotMax = Settings->RotationMax.GetValueSetting();
-		if (!RotMax->Init(PointDataFacade)) { return false; }
+		if (!RotMax->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		RotScale = Settings->RotationScaling.GetValueSetting();
-		if (!RotScale->Init(PointDataFacade)) { return false; }
+		if (!RotScale->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		RotSnap = Settings->RotationSnap.GetValueSetting();
-		if (!RotSnap->Init(PointDataFacade)) { return false; }
+		if (!RotSnap->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 
 		ScaleMin = Settings->ScaleMin.GetValueSetting();
-		if (!ScaleMin->Init(PointDataFacade)) { return false; }
+		if (!ScaleMin->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		ScaleMax = Settings->ScaleMax.GetValueSetting();
-		if (!ScaleMax->Init(PointDataFacade)) { return false; }
+		if (!ScaleMax->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		ScaleScale = Settings->ScaleScaling.GetValueSetting();
-		if (!ScaleScale->Init(PointDataFacade)) { return false; }
+		if (!ScaleScale->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		ScaleSnap = Settings->ScaleSnap.GetValueSetting();
-		if (!ScaleSnap->Init(PointDataFacade)) { return false; }
+		if (!ScaleSnap->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		UniformScale = Settings->UniformScale.GetValueSetting();
-		if (!UniformScale->Init(PointDataFacade)) { return false; }
+		if (!UniformScale->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 
 		if (bResetPointCenter)
 		{
 			PointCenter = Settings->PointCenterLocation.GetValueSetting();
-			if (!PointCenter->Init(PointDataFacade)) { return false; }
+			if (!PointCenter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		StartParallelLoopForPoints();
@@ -184,15 +241,24 @@ namespace PCGExTransformPoints
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const int32 i = Index - Scope.Start;
 
 			RandomSource.Initialize(Seeds[Index]);
 
 			FTransform& OutTransform = OutTransforms[Index];
-			if (bResetScale) { OutTransform.SetScale3D(FVector::OneVector); }
-			if (bResetRotation) { OutTransform.SetRotation(FQuat::Identity); }
+			if (bResetScale)
+			{
+				OutTransform.SetScale3D(FVector::OneVector);
+			}
+			if (bResetRotation)
+			{
+				OutTransform.SetRotation(FQuat::Identity);
+			}
 
 			const FVector& OffsetScaleV = PCGEX_SV_READ(OffsetScale, i);
 			Variations.OffsetMin = PCGEX_SV_READ(OffsetMin, i) * OffsetScaleV;

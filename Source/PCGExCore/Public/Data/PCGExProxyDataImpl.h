@@ -6,12 +6,12 @@
 #include "CoreMinimal.h"
 #include "PCGExDataCommon.h"
 #include "PCGExProxyData.h"
-#include "Types/PCGExTypes.h"
+#include "Data/PCGExCachedSubSelection.h"
 #include "Data/PCGExSubSelection.h"
 #include "Metadata/PCGAttributePropertySelector.h"
 #include "Types/PCGExTypeOps.h"
+#include "Types/PCGExTypes.h"
 #include "UObject/Object.h"
-#include "Data/PCGExCachedSubSelection.h"
 
 struct FPCGExContext;
 class UPCGBasePointData;
@@ -141,7 +141,12 @@ namespace PCGExData
 		void SetConstant(const T& InValue);
 
 		virtual void GetVoid(const int32 Index, void* OutValue) const override;
-		virtual void SetVoid(const int32 Index, const void* Value) const override { check(false); }
+
+		virtual void SetVoid(const int32 Index, const void* Value) const override
+		{
+			check(false);
+		}
+
 		virtual bool Validate(const FProxyDescriptor& InDescriptor) const override;
 		virtual PCGExValueHash ReadValueHash(const int32 Index) const override;
 	};

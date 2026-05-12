@@ -12,6 +12,8 @@
 
 #include "Metadata/PCGMetadataAttributeTpl.h"
 #include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttributeTpl.h"
+#include "Metadata/PCGMetadataAttributeTraits.h"
 
 class UPCGManagedComponent;
 class UPCGData;
@@ -78,15 +80,24 @@ namespace PCGExMetaHelpers
 
 	static bool HasAttribute(const UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
 	{
-		if (!InData) { return false; }
+		if (!InData)
+		{
+			return false;
+		}
 		return HasAttribute(InData->ConstMetadata(), Identifier);
 	}
 
 	template <typename T>
 	static const FPCGMetadataAttributeBase* TryGetConstAttribute(const UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier)
 	{
-		if (!InMetadata) { return nullptr; }
-		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain)) { return nullptr; }
+		if (!InMetadata)
+		{
+			return nullptr;
+		}
+		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain))
+		{
+			return nullptr;
+		}
 
 		// 'template' spec required for clang on mac, and rider keeps removing it without the comment below.
 		// ReSharper disable once CppRedundantTemplateKeyword
@@ -96,15 +107,24 @@ namespace PCGExMetaHelpers
 	template <typename T>
 	static const FPCGMetadataAttributeBase* TryGetConstAttribute(const UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
 	{
-		if (!InData) { return nullptr; }
+		if (!InData)
+		{
+			return nullptr;
+		}
 		return TryGetConstAttribute<T>(InData->ConstMetadata(), Identifier);
 	}
 
 	template <typename T>
 	static FPCGMetadataAttributeBase* TryGetMutableAttribute(UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier)
 	{
-		if (!InMetadata) { return nullptr; }
-		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain)) { return nullptr; }
+		if (!InMetadata)
+		{
+			return nullptr;
+		}
+		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain))
+		{
+			return nullptr;
+		}
 
 		// 'template' spec required for clang on mac, and rider keeps removing it without the comment below.
 		// ReSharper disable once CppRedundantTemplateKeyword
@@ -114,7 +134,10 @@ namespace PCGExMetaHelpers
 	template <typename T>
 	static FPCGMetadataAttributeBase* TryGetMutableAttribute(UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
 	{
-		if (!InData) { return nullptr; }
+		if (!InData)
+		{
+			return nullptr;
+		}
 		return TryGetMutableAttribute<T>(InData->MutableMetadata(), Identifier);
 	}
 
@@ -123,7 +146,8 @@ namespace PCGExMetaHelpers
 		switch (Property)
 		{
 		case EPCGPointProperties::Density:
-		case EPCGPointProperties::Steepness: return EPCGMetadataTypes::Float;
+		case EPCGPointProperties::Steepness:
+			return EPCGMetadataTypes::Float;
 		case EPCGPointProperties::BoundsMin:
 		case EPCGPointProperties::BoundsMax:
 		case EPCGPointProperties::Extents:
@@ -131,12 +155,18 @@ namespace PCGExMetaHelpers
 		case EPCGPointProperties::Scale:
 		case EPCGPointProperties::LocalCenter:
 		case EPCGPointProperties::LocalSize:
-		case EPCGPointProperties::ScaledLocalSize: return EPCGMetadataTypes::Vector;
-		case EPCGPointProperties::Color: return EPCGMetadataTypes::Vector4;
-		case EPCGPointProperties::Rotation: return EPCGMetadataTypes::Quaternion;
-		case EPCGPointProperties::Transform: return EPCGMetadataTypes::Transform;
-		case EPCGPointProperties::Seed: return EPCGMetadataTypes::Integer32;
-		default: return EPCGMetadataTypes::Unknown;
+		case EPCGPointProperties::ScaledLocalSize:
+			return EPCGMetadataTypes::Vector;
+		case EPCGPointProperties::Color:
+			return EPCGMetadataTypes::Vector4;
+		case EPCGPointProperties::Rotation:
+			return EPCGMetadataTypes::Quaternion;
+		case EPCGPointProperties::Transform:
+			return EPCGMetadataTypes::Transform;
+		case EPCGPointProperties::Seed:
+			return EPCGMetadataTypes::Integer32;
+		default:
+			return EPCGMetadataTypes::Unknown;
 		}
 	}
 
@@ -144,21 +174,34 @@ namespace PCGExMetaHelpers
 	{
 		switch (Property)
 		{
-		case EPCGPointProperties::Density: return EPCGPointNativeProperties::Density;
-		case EPCGPointProperties::BoundsMin: return EPCGPointNativeProperties::BoundsMin;
-		case EPCGPointProperties::BoundsMax: return EPCGPointNativeProperties::BoundsMax;
-		case EPCGPointProperties::Color: return EPCGPointNativeProperties::Color;
-		case EPCGPointProperties::Position: return EPCGPointNativeProperties::Transform;
-		case EPCGPointProperties::Rotation: return EPCGPointNativeProperties::Transform;
-		case EPCGPointProperties::Scale: return EPCGPointNativeProperties::Transform;
-		case EPCGPointProperties::Transform: return EPCGPointNativeProperties::Transform;
-		case EPCGPointProperties::Steepness: return EPCGPointNativeProperties::Steepness;
-		case EPCGPointProperties::Seed: return EPCGPointNativeProperties::Seed;
+		case EPCGPointProperties::Density:
+			return EPCGPointNativeProperties::Density;
+		case EPCGPointProperties::BoundsMin:
+			return EPCGPointNativeProperties::BoundsMin;
+		case EPCGPointProperties::BoundsMax:
+			return EPCGPointNativeProperties::BoundsMax;
+		case EPCGPointProperties::Color:
+			return EPCGPointNativeProperties::Color;
+		case EPCGPointProperties::Position:
+			return EPCGPointNativeProperties::Transform;
+		case EPCGPointProperties::Rotation:
+			return EPCGPointNativeProperties::Transform;
+		case EPCGPointProperties::Scale:
+			return EPCGPointNativeProperties::Transform;
+		case EPCGPointProperties::Transform:
+			return EPCGPointNativeProperties::Transform;
+		case EPCGPointProperties::Steepness:
+			return EPCGPointNativeProperties::Steepness;
+		case EPCGPointProperties::Seed:
+			return EPCGPointNativeProperties::Seed;
 		case EPCGPointProperties::Extents:
 		case EPCGPointProperties::LocalCenter:
-		case EPCGPointProperties::LocalSize: return EPCGPointNativeProperties::BoundsMin | EPCGPointNativeProperties::BoundsMax;
-		case EPCGPointProperties::ScaledLocalSize: return EPCGPointNativeProperties::BoundsMin | EPCGPointNativeProperties::BoundsMax | EPCGPointNativeProperties::Transform;
-		default: return EPCGPointNativeProperties::None;
+		case EPCGPointProperties::LocalSize:
+			return EPCGPointNativeProperties::BoundsMin | EPCGPointNativeProperties::BoundsMax;
+		case EPCGPointProperties::ScaledLocalSize:
+			return EPCGPointNativeProperties::BoundsMin | EPCGPointNativeProperties::BoundsMax | EPCGPointNativeProperties::Transform;
+		default:
+			return EPCGPointNativeProperties::None;
 		}
 	}
 
@@ -166,8 +209,10 @@ namespace PCGExMetaHelpers
 	{
 		switch (Property)
 		{
-		case EPCGExtraProperties::Index: return EPCGMetadataTypes::Integer32;
-		default: return EPCGMetadataTypes::Unknown;
+		case EPCGExtraProperties::Index:
+			return EPCGMetadataTypes::Integer32;
+		default:
+			return EPCGMetadataTypes::Unknown;
 		}
 	}
 

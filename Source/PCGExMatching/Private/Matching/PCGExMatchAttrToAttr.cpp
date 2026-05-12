@@ -6,8 +6,8 @@
 #include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExDataHelpers.h"
-#include "Data/PCGExTaggedData.h"
 #include "Data/PCGExPointElements.h"
+#include "Data/PCGExTaggedData.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExMatchAttrToAttr"
@@ -24,13 +24,17 @@ void FPCGExMatchAttrToAttrConfig::Init()
 
 bool FPCGExMatchAttrToAttr::PrepareForMatchableSources(FPCGExContext* InContext, const TSharedPtr<TArray<FPCGExTaggedData>>& InMatchableSources)
 {
-	if (!FPCGExMatchRuleOperation::PrepareForMatchableSources(InContext, InMatchableSources)) { return false; }
+	if (!FPCGExMatchRuleOperation::PrepareForMatchableSources(InContext, InMatchableSources))
+	{
+		return false;
+	}
 
 	TArray<FPCGExTaggedData>& MatchableSourcesRef = *InMatchableSources.Get();
 
 	switch (Config.Check)
 	{
-	case EPCGExComparisonDataType::Numeric: NumGetters.Reserve(MatchableSourcesRef.Num());
+	case EPCGExComparisonDataType::Numeric:
+		NumGetters.Reserve(MatchableSourcesRef.Num());
 		for (const FPCGExTaggedData& TaggedData : MatchableSourcesRef)
 		{
 			TSharedPtr<PCGExData::TAttributeBroadcaster<double>> Getter = MakeShared<PCGExData::TAttributeBroadcaster<double>>();
@@ -44,7 +48,8 @@ bool FPCGExMatchAttrToAttr::PrepareForMatchableSources(FPCGExContext* InContext,
 			NumGetters.Add(Getter);
 		}
 		break;
-	case EPCGExComparisonDataType::String: StrGetters.Reserve(MatchableSourcesRef.Num());
+	case EPCGExComparisonDataType::String:
+		StrGetters.Reserve(MatchableSourcesRef.Num());
 		for (const FPCGExTaggedData& TaggedData : MatchableSourcesRef)
 		{
 			TSharedPtr<PCGExData::TAttributeBroadcaster<FString>> Getter = MakeShared<PCGExData::TAttributeBroadcaster<FString>>();
@@ -70,12 +75,15 @@ bool FPCGExMatchAttrToAttr::Test(const PCGExData::FConstPoint& InTargetElement, 
 		const double TargetValue = NumGetters[InTargetElement.IO]->FetchSingle(InTargetElement, MAX_dbl);
 		double CandidateValue = 0;
 
-		if (!PCGExData::Helpers::TryReadDataValue<double>(Context, InCandidate.Data, Config.CandidateAttributeName_Sanitized, CandidateValue)) { return Config.bInvert; }
+		if (!PCGExData::Helpers::TryReadDataValue<double>(Context, InCandidate.Data, Config.CandidateAttributeName_Sanitized, CandidateValue))
+		{
+			return Config.bInvert;
+		}
 
 		const bool bResult =
 			Config.bSwapOperands
-				? PCGExCompare::Compare(Config.NumericComparison, TargetValue, CandidateValue, Config.Tolerance)
-				: PCGExCompare::Compare(Config.NumericComparison, CandidateValue, TargetValue, Config.Tolerance);
+			? PCGExCompare::Compare(Config.NumericComparison, TargetValue, CandidateValue, Config.Tolerance)
+			: PCGExCompare::Compare(Config.NumericComparison, CandidateValue, TargetValue, Config.Tolerance);
 
 		return Config.bInvert ? !bResult : bResult;
 	}
@@ -83,12 +91,15 @@ bool FPCGExMatchAttrToAttr::Test(const PCGExData::FConstPoint& InTargetElement, 
 	const FString TargetValue = StrGetters[InTargetElement.IO]->FetchSingle(InTargetElement, TEXT(""));
 	FString CandidateValue = TEXT("");
 
-	if (!PCGExData::Helpers::TryReadDataValue<FString>(Context, InCandidate.Data, Config.CandidateAttributeName_Sanitized, CandidateValue)) { return Config.bInvert; }
+	if (!PCGExData::Helpers::TryReadDataValue<FString>(Context, InCandidate.Data, Config.CandidateAttributeName_Sanitized, CandidateValue))
+	{
+		return Config.bInvert;
+	}
 
 	const bool bResult =
 		Config.bSwapOperands
-			? PCGExCompare::Compare(Config.StringComparison, TargetValue, CandidateValue)
-			: PCGExCompare::Compare(Config.StringComparison, CandidateValue, TargetValue);
+		? PCGExCompare::Compare(Config.StringComparison, TargetValue, CandidateValue)
+		: PCGExCompare::Compare(Config.StringComparison, CandidateValue, TargetValue);
 
 	return Config.bInvert ? !bResult : bResult;
 }

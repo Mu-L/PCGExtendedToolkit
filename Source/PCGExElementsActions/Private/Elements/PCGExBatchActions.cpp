@@ -5,16 +5,19 @@
 
 #include "PCGExActionsCommon.h"
 #include "Core/PCGExActionFactoryProvider.h"
-#include "Elements/Metadata/PCGMetadataElementCommon.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Elements/Metadata/PCGMetadataElementCommon.h"
 #include "Types/PCGExAttributeIdentity.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
 #define PCGEX_NAMESPACE BatchActions
 
-PCGExData::EIOInit UPCGExBatchActionsSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExBatchActionsSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 TArray<FPCGPinProperties> UPCGExBatchActionsSettings::InputPinProperties() const
 {
@@ -26,13 +29,19 @@ TArray<FPCGPinProperties> UPCGExBatchActionsSettings::InputPinProperties() const
 
 PCGEX_INITIALIZE_ELEMENT(BatchActions)
 
-PCGExData::EIOInit UPCGExBatchActionsSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBatchActionsSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BatchActions)
 
 bool FPCGExBatchActionsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	// Grab all param set attributes
 
@@ -49,7 +58,10 @@ bool FPCGExBatchActionsElement::Boot(FPCGExContext* InContext) const
 	DefaultAttributesFilter.Init();
 	Context->DefaultAttributes = PCGExData::GatherAttributeInfos(InContext, PCGExActions::Labels::SourceDefaultsLabel, DefaultAttributesFilter, true);
 
-	if (!Context->DefaultAttributes) { return false; }
+	if (!Context->DefaultAttributes)
+	{
+		return false;
+	}
 
 	FString Message = TEXT("An unspecified error occured.");
 	bool bIsBatchActionsValid = true;
@@ -64,7 +76,10 @@ bool FPCGExBatchActionsElement::Boot(FPCGExContext* InContext) const
 		}
 	}
 
-	if (!bIsBatchActionsValid) { return false; }
+	if (!bIsBatchActionsValid)
+	{
+		return false;
+	}
 
 	// TODO : Also check against provided default values
 
@@ -82,7 +97,10 @@ bool FPCGExBatchActionsElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		if (!Context->ActionsFactories.IsEmpty())
 		{
 			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+				{
+					return true;
+				},
 				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 				}))
@@ -118,7 +136,10 @@ namespace PCGExBatchActions
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		// Initialize writers with provided default value
 		for (const PCGExData::FAttributeIdentity& Identity : Context->DefaultAttributes->Identities)
@@ -142,7 +163,10 @@ namespace PCGExBatchActions
 		for (const UPCGExActionFactoryData* Factory : Context->ActionsFactories)
 		{
 			TSharedPtr<FPCGExActionOperation> Operation = Factory->CreateOperation(Context);
-			if (!Operation->PrepareForData(ExecutionContext, PointDataFacade)) { return false; }
+			if (!Operation->PrepareForData(ExecutionContext, PointDataFacade))
+			{
+				return false;
+			}
 			Operations.Add(Operation);
 		}
 
@@ -159,7 +183,10 @@ namespace PCGExBatchActions
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			for (const TSharedPtr<FPCGExActionOperation>& Op : Operations) { Op->ProcessPoint(Index); }
+			for (const TSharedPtr<FPCGExActionOperation>& Op : Operations)
+			{
+				Op->ProcessPoint(Index);
+			}
 		}
 	}
 
@@ -169,7 +196,10 @@ namespace PCGExBatchActions
 		{
 			for (const TSharedPtr<PCGExData::IBuffer>& DataCache : PointDataFacade->Buffers)
 			{
-				if (!DataCache->InAttribute || !Settings->ConsumeProcessedAttributes.Test(DataCache->InAttribute) || PCGExMetaHelpers::IsPCGExAttribute(DataCache->Identifier.Name)) { continue; }
+				if (!DataCache->InAttribute || !Settings->ConsumeProcessedAttributes.Test(DataCache->InAttribute) || PCGExMetaHelpers::IsPCGExAttribute(DataCache->Identifier.Name))
+				{
+					continue;
+				}
 
 				PointDataFacade->Source->DeleteAttribute(DataCache->InAttribute->Name);
 			}

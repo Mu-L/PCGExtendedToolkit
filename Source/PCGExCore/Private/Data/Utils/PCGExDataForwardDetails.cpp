@@ -51,7 +51,10 @@ bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSh
 	{
 		if (IgnoreAttributes)
 		{
-			if (IgnoreAttributes->Contains(Selector.GetAttributeName())) { continue; }
+			if (IgnoreAttributes->Contains(Selector.GetAttributeName()))
+			{
+				continue;
+			}
 		}
 
 		const TSharedPtr<PCGExData::IAttributeBroadcaster>& Getter = PCGExData::MakeBroadcaster(Selector, InSourceFacade->Source, true);
@@ -70,7 +73,10 @@ bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSh
 
 void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, TSet<FString>& InTags) const
 {
-	if (bAddIndexTag) { InTags.Add(IndexTagPrefix + ":" + FString::Printf(TEXT("%d"), TagSource.Index)); }
+	if (bAddIndexTag)
+	{
+		InTags.Add(IndexTagPrefix + ":" + FString::Printf(TEXT("%d"), TagSource.Index));
+	}
 
 	if (!Getters.IsEmpty())
 	{
@@ -80,22 +86,34 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, T
 			{
 				using T = decltype(DummyValue);
 				TSharedPtr<PCGExData::TAttributeBroadcaster<T>> TypedGetter = StaticCastSharedPtr<PCGExData::TAttributeBroadcaster<T>>(Getter);
-				if (!TypedGetter) { return; }
+				if (!TypedGetter)
+				{
+					return;
+				}
 
 				const FString Prefix = TypedGetter->GetName().ToString();
 
 				T TypedValue = T{};
-				if (!TypedGetter->TryFetchSingle(TagSource, TypedValue)) { return; }
+				if (!TypedGetter->TryFetchSingle(TagSource, TypedValue))
+				{
+					return;
+				}
 
 				if constexpr (std::is_same_v<T, bool>)
 				{
 					// Booleans tag by presence: add the attribute name when true, omit when false.
-					if (TypedValue) { InTags.Add(Prefix); }
+					if (TypedValue)
+					{
+						InTags.Add(Prefix);
+					}
 				}
 				else
 				{
 					FString StringValue = PCGExTypeOps::Convert<T, FString>(TypedValue);
-					if (StringValue.IsEmpty()) { return; }
+					if (StringValue.IsEmpty())
+					{
+						return;
+					}
 
 					InTags.Add(bPrefixWithAttributeName ? (Prefix + TEXT(":") + StringValue) : StringValue);
 				}

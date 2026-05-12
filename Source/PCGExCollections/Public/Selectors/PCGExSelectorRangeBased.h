@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "Details/PCGExInputShorthandsDetails.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExSelectorSharedData.h"
 
 #include "PCGExSelectorRangeBased.generated.h"
@@ -90,10 +90,14 @@ protected:
 		switch (BoundaryMode)
 		{
 		default:
-		case EPCGExRangeBoundaryMode::ClosedOpen:   return V >= Min && V <  Max;
-		case EPCGExRangeBoundaryMode::ClosedClosed: return V >= Min && V <= Max;
-		case EPCGExRangeBoundaryMode::OpenClosed:   return V >  Min && V <= Max;
-		case EPCGExRangeBoundaryMode::OpenOpen:     return V >  Min && V <  Max;
+		case EPCGExRangeBoundaryMode::ClosedOpen:
+			return V >= Min && V < Max;
+		case EPCGExRangeBoundaryMode::ClosedClosed:
+			return V >= Min && V <= Max;
+		case EPCGExRangeBoundaryMode::OpenClosed:
+			return V > Min && V <= Max;
+		case EPCGExRangeBoundaryMode::OpenOpen:
+			return V > Min && V < Max;
 		}
 	}
 };

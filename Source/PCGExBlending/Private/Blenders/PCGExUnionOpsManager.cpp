@@ -4,17 +4,18 @@
 #include "Blenders/PCGExUnionOpsManager.h"
 
 #include "Containers/PCGExIndexLookup.h"
-#include "Core/PCGExBlendOpsManager.h"
 #include "Core/PCGExBlendOpFactory.h"
+#include "Core/PCGExBlendOpsManager.h"
+#include "Core/PCGExOpStats.h"
+#include "Core/PCGExUnionData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Core/PCGExUnionData.h"
-#include "Core/PCGExOpStats.h"
 
 namespace PCGExBlending
 {
 	FUnionOpsManager::FUnionOpsManager(const TArray<TObjectPtr<const UPCGExBlendOpFactory>>* InBlendingFactories, const PCGExMath::IDistances* InDistances)
-		: BlendingFactories(InBlendingFactories), Distances(InDistances)
+		: BlendingFactories(InBlendingFactories)
+		  , Distances(InDistances)
 	{
 	}
 
@@ -30,7 +31,10 @@ namespace PCGExBlending
 
 		Blenders.Reserve(BlendingFactories->Num());
 
-		for (const TSharedRef<PCGExData::FFacade>& Src : InSources) { MaxIndex = FMath::Max(Src->Source->IOIndex, MaxIndex); }
+		for (const TSharedRef<PCGExData::FFacade>& Src : InSources)
+		{
+			MaxIndex = FMath::Max(Src->Source->IOIndex, MaxIndex);
+		}
 		IOLookup = MakeShared<PCGEx::FIndexLookup>(MaxIndex + 1);
 
 		for (const TSharedRef<PCGExData::FFacade>& Src : InSources)
@@ -40,7 +44,10 @@ namespace PCGExBlending
 			TSharedPtr<FBlendOpsManager> BlendOpsManager = MakeShared<FBlendOpsManager>(TargetData, true);
 			BlendOpsManager->SetSourceA(Src, PCGExData::EIOSide::In);
 
-			if (!BlendOpsManager->Init(InContext, *BlendingFactories)) { return false; }
+			if (!BlendOpsManager->Init(InContext, *BlendingFactories))
+			{
+				return false;
+			}
 
 			Blenders.Add(BlendOpsManager);
 		}
@@ -107,30 +114,51 @@ namespace PCGExBlending
 
 		const PCGExData::FConstPoint Target = CurrentTargetData->Source->GetOutPoint(WriteIndex);
 
-		if (InWeightedPoints.IsEmpty()) { return; }
+		if (InWeightedPoints.IsEmpty())
+		{
+			return;
+		}
 
 		// Begin/End use UniqueOps: one prepared op per attribute, ensures
 		// every tracker slot is initialized/finalized exactly once.
-		for (const auto Op : UniqueOps) { Trackers[Op->OpIdx] = Op->BeginMultiBlend(WriteIndex); }
-		for (const PCGExData::FWeightedPoint& P : InWeightedPoints) { Blenders[P.IO]->MultiBlend(P.Index, WriteIndex, P.Weight, Trackers); }
-		for (const auto Op : UniqueOps) { Op->EndMultiBlend(WriteIndex, Trackers[Op->OpIdx]); }
+		for (const auto Op : UniqueOps)
+		{
+			Trackers[Op->OpIdx] = Op->BeginMultiBlend(WriteIndex);
+		}
+		for (const PCGExData::FWeightedPoint& P : InWeightedPoints)
+		{
+			Blenders[P.IO]->MultiBlend(P.Index, WriteIndex, P.Weight, Trackers);
+		}
+		for (const auto Op : UniqueOps)
+		{
+			Op->EndMultiBlend(WriteIndex, Trackers[Op->OpIdx]);
+		}
 	}
 
 	void FUnionOpsManager::MergeSingle(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
 	{
 		check(InUnionData)
-		if (!ComputeWeights(WriteIndex, InUnionData, OutWeightedPoints)) { return; }
+		if (!ComputeWeights(WriteIndex, InUnionData, OutWeightedPoints))
+		{
+			return;
+		}
 		Blend(WriteIndex, OutWeightedPoints, Trackers);
 	}
 
 	void FUnionOpsManager::MergeSingle(const int32 UnionIndex, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints, TArray<PCGEx::FOpStats>& Trackers) const
 	{
-		if (!ComputeWeights(UnionIndex, CurrentUnionMetadata->Get(UnionIndex), OutWeightedPoints)) { return; }
+		if (!ComputeWeights(UnionIndex, CurrentUnionMetadata->Get(UnionIndex), OutWeightedPoints))
+		{
+			return;
+		}
 		Blend(UnionIndex, OutWeightedPoints, Trackers);
 	}
 
 	void FUnionOpsManager::Cleanup(FPCGExContext* InContext)
 	{
-		for (const TSharedPtr<FBlendOpsManager>& Blender : Blenders) { Blender->Cleanup(InContext); }
+		for (const TSharedPtr<FBlendOpsManager>& Blender : Blenders)
+		{
+			Blender->Cleanup(InContext);
+		}
 	}
 }

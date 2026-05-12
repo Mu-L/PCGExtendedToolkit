@@ -3,13 +3,13 @@
 
 #pragma once
 #include "CoreMinimal.h"
+#include "Curves/CurveFloat.h"
+#include "Curves/RichCurve.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Fitting/PCGExFittingCommon.h"
 #include "Math/PCGExMath.h"
 #include "Sampling/PCGExSamplingCommon.h"
 #include "Utils/PCGExCurveLookup.h"
-#include "Curves/CurveFloat.h"
-#include "Curves/RichCurve.h"
 
 #include "PCGExRemapDetails.generated.h"
 

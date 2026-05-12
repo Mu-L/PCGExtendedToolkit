@@ -4,12 +4,12 @@
 #include "Elements/PCGExSubdivide.h"
 
 
-#include "Helpers/PCGExRandomHelpers.h"
 #include "PCGParamData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExArrayHelpers.h"
+#include "Helpers/PCGExRandomHelpers.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
 
@@ -26,7 +26,10 @@ void UPCGExSubdivideSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!Blending) { Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending")); }
+		if (!Blending)
+		{
+			Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending"));
+		}
 	}
 	Super::PostInitProperties();
 }
@@ -44,12 +47,21 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(Subdivide)
 
 bool FPCGExSubdivideElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(Subdivide)
 
-	if (Settings->bFlagSubPoints) { PCGEX_VALIDATE_NAME(Settings->SubPointFlagName) }
-	if (Settings->bWriteAlpha) { PCGEX_VALIDATE_NAME(Settings->AlphaAttributeName) }
+	if (Settings->bFlagSubPoints)
+	{
+		PCGEX_VALIDATE_NAME(Settings->SubPointFlagName)
+	}
+	if (Settings->bWriteAlpha)
+	{
+		PCGEX_VALIDATE_NAME(Settings->AlphaAttributeName)
+	}
 
 	PCGEX_BIND_INSTANCED_FACTORY(Blending, UPCGExSubPointsBlendInstancedFactory, PCGExBlending::Labels::SourceOverridesBlendingOps)
 
@@ -102,7 +114,10 @@ namespace PCGExSubdivide
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::New)
 
@@ -111,7 +126,10 @@ namespace PCGExSubdivide
 		if (Settings->SubdivideMethod == EPCGExSubdivideMode::Manhattan)
 		{
 			ManhattanDetails = Settings->ManhattanDetails;
-			if (!ManhattanDetails.Init(Context, PointDataFacade)) { return false; }
+			if (!ManhattanDetails.Init(Context, PointDataFacade))
+			{
+				return false;
+			}
 
 			ManhattanPoints.Init(nullptr, PointDataFacade->GetNum());
 			bIsManhattan = true;
@@ -119,7 +137,10 @@ namespace PCGExSubdivide
 		else
 		{
 			AmountGetter = Settings->GetValueSettingSubdivisionAmount();
-			if (!AmountGetter->Init(PointDataFacade)) { return false; }
+			if (!AmountGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		bUseCount = Settings->SubdivideMethod == EPCGExSubdivideMode::Count;
@@ -154,7 +175,10 @@ namespace PCGExSubdivide
 			Sub.InEnd = Index + 1 == PointIO->GetNum() ? 0 : Index + 1;
 			Sub.Dist = FVector::Distance(InTransforms[Sub.InEnd].GetLocation(), InTransforms[Sub.InStart].GetLocation());
 
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			if (bIsManhattan)
 			{
@@ -162,7 +186,10 @@ namespace PCGExSubdivide
 				TArray<FVector>& SubPoints = *Subs.Get();
 				Sub.NumSubdivisions = ManhattanDetails.ComputeSubdivisions(InTransforms[Sub.InStart].GetLocation(), InTransforms[Sub.InEnd].GetLocation(), Index, SubPoints, Sub.Dist);
 
-				if (Sub.NumSubdivisions > 0) { ManhattanPoints[Index] = Subs; }
+				if (Sub.NumSubdivisions > 0)
+				{
+					ManhattanPoints[Index] = Subs;
+				}
 
 				continue;
 			}
@@ -202,7 +229,10 @@ namespace PCGExSubdivide
 
 		int32 NumPoints = 0;
 
-		if (!bClosedLoop) { Subdivisions[Subdivisions.Num() - 1].NumSubdivisions = 0; }
+		if (!bClosedLoop)
+		{
+			Subdivisions[Subdivisions.Num() - 1].NumSubdivisions = 0;
+		}
 
 		for (FSubdivision& Sub : Subdivisions)
 		{
@@ -211,15 +241,27 @@ namespace PCGExSubdivide
 			Sub.OutEnd = NumPoints;
 		}
 
-		if (bClosedLoop) { Subdivisions[Subdivisions.Num() - 1].OutEnd = 0; }
-		else { Subdivisions[Subdivisions.Num() - 1].NumSubdivisions = 0; }
+		if (bClosedLoop)
+		{
+			Subdivisions[Subdivisions.Num() - 1].OutEnd = 0;
+		}
+		else
+		{
+			Subdivisions[Subdivisions.Num() - 1].NumSubdivisions = 0;
+		}
 
 		if (NumPoints == PointIO->GetNum())
 		{
 			PCGEX_INIT_IO_VOID(PointIO, PCGExData::EIOInit::Duplicate)
 
-			if (Settings->bFlagSubPoints) { WriteMark(PointIO, Settings->SubPointFlagName, false); }
-			if (Settings->bWriteAlpha) { WriteMark(PointIO, Settings->AlphaAttributeName, Settings->DefaultAlpha); }
+			if (Settings->bFlagSubPoints)
+			{
+				WriteMark(PointIO, Settings->SubPointFlagName, false);
+			}
+			if (Settings->bWriteAlpha)
+			{
+				WriteMark(PointIO, Settings->AlphaAttributeName, Settings->DefaultAlpha);
+			}
 			return;
 		}
 
@@ -246,7 +288,10 @@ namespace PCGExSubdivide
 			OutMetadataEntries[Sub.OutStart] = InMetadataEntries[i];
 			Metadata->InitializeOnSet(OutMetadataEntries[Sub.OutStart]);
 
-			if (Sub.NumSubdivisions == 0) { continue; }
+			if (Sub.NumSubdivisions == 0)
+			{
+				continue;
+			}
 
 			const int32 SubStart = Sub.OutStart + 1;
 
@@ -292,10 +337,19 @@ namespace PCGExSubdivide
 			const FSubdivision& Sub = Subdivisions[Index];
 			const TSharedPtr<TArray<FVector>> ManhattanSubdivs = bIsManhattan ? ManhattanPoints[Index] : nullptr;
 
-			if (FlagWriter) { FlagWriter->SetValue(Sub.OutStart, false); }
-			if (AlphaWriter) { AlphaWriter->SetValue(Sub.OutStart, Settings->DefaultAlpha); }
+			if (FlagWriter)
+			{
+				FlagWriter->SetValue(Sub.OutStart, false);
+			}
+			if (AlphaWriter)
+			{
+				AlphaWriter->SetValue(Sub.OutStart, Settings->DefaultAlpha);
+			}
 
-			if (Sub.NumSubdivisions == 0) { continue; }
+			if (Sub.NumSubdivisions == 0)
+			{
+				continue;
+			}
 
 			const FVector Start = InTransforms[Sub.InStart].GetLocation();
 			const FVector End = InTransforms[Sub.InEnd].GetLocation();
@@ -308,12 +362,18 @@ namespace PCGExSubdivide
 			{
 				const int32 SubIndex = SubStart + s;
 
-				if (FlagWriter) { FlagWriter->SetValue(SubIndex, true); }
+				if (FlagWriter)
+				{
+					FlagWriter->SetValue(SubIndex, true);
+				}
 
 				const FVector Position = bIsManhattan ? *(ManhattanSubdivs->GetData() + s) : Start + Dir * (Sub.StartOffset + s * Sub.StepSize);
 				OutTransforms[SubIndex].SetLocation(Position);
 				const double Alpha = Metrics.Add(Position) / Sub.Dist;
-				if (AlphaWriter) { AlphaWriter->SetValue(SubStart + s, Alpha); }
+				if (AlphaWriter)
+				{
+					AlphaWriter->SetValue(SubStart + s, Alpha);
+				}
 			}
 
 			Metrics.Add(End);
@@ -321,7 +381,10 @@ namespace PCGExSubdivide
 			PCGExData::FScope SubScope = PointDataFacade->GetOutScope(SubStart, Sub.NumSubdivisions);
 			SubBlending->ProcessSubPoints(PointDataFacade->GetOutPoint(Sub.OutStart), PointDataFacade->GetOutPoint(Sub.OutEnd), SubScope, Metrics);
 
-			for (int i = Sub.OutStart + 1; i < Sub.OutEnd; i++) { OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation()); }
+			for (int i = Sub.OutStart + 1; i < Sub.OutEnd; i++)
+			{
+				OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation());
+			}
 		}
 	}
 

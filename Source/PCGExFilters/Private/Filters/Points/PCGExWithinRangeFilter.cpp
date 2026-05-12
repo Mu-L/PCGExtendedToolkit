@@ -23,7 +23,10 @@ bool UPCGExWithinRangeFilterFactory::Init(FPCGExContext* InContext)
 	{
 		FPCGExPickerAttributeSetRangesConfig DummyConfig;
 		DummyConfig.Attributes = Config.Attributes;
-		if (!UPCGExPickerAttributeSetRangesFactory::GetUniqueRanges(InContext, FName("Ranges"), DummyConfig, Ranges)) { return false; }
+		if (!UPCGExPickerAttributeSetRangesFactory::GetUniqueRanges(InContext, FName("Ranges"), DummyConfig, Ranges))
+		{
+			return false;
+		}
 	}
 	else
 	{
@@ -45,15 +48,24 @@ TArray<FPCGPinProperties> UPCGExWithinRangeFilterProviderSettings::InputPinPrope
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
 
-	if (Config.Source == EPCGExRangeSource::AttributeSet) { PCGEX_PIN_ANY(FName("Ranges"), "Data to read attribute ranges from", Required) }
-	else { PCGEX_PIN_ANY(FName("Ranges"), "Data to read attribute ranges from", Advanced) }
+	if (Config.Source == EPCGExRangeSource::AttributeSet)
+	{
+		PCGEX_PIN_ANY(FName("Ranges"), "Data to read attribute ranges from", Required)
+	}
+	else
+	{
+		PCGEX_PIN_ANY(FName("Ranges"), "Data to read attribute ranges from", Advanced)
+	}
 
 	return PinProperties;
 }
 
 bool PCGExPointFilter::FWithinRangeFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	OperandA = PointDataFacade->GetBroadcaster<double>(TypedFilterFactory->Config.OperandA, true, false, PCGEX_QUIET_HANDLING);
 
@@ -75,30 +87,60 @@ bool PCGExPointFilter::FWithinRangeFilter::Test(const int32 PointIndex) const
 
 	if (bInclusive)
 	{
-		for (const FPCGExPickerConstantRangeConfig& Range : Ranges) { if (Range.IsWithinInclusive(A)) { return !bInvert; } }
+		for (const FPCGExPickerConstantRangeConfig& Range : Ranges)
+		{
+			if (Range.IsWithinInclusive(A))
+			{
+				return !bInvert;
+			}
+		}
 		return bInvert;
 	}
-	for (const FPCGExPickerConstantRangeConfig& Range : Ranges) { if (Range.IsWithin(A)) { return !bInvert; } }
+	for (const FPCGExPickerConstantRangeConfig& Range : Ranges)
+	{
+		if (Range.IsWithin(A))
+		{
+			return !bInvert;
+		}
+	}
 	return bInvert;
 }
 
 bool PCGExPointFilter::FWithinRangeFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
 {
 	double A = 0;
-	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, A, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, A, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
 
 	if (bInclusive)
 	{
-		for (const FPCGExPickerConstantRangeConfig& Range : Ranges) { if (Range.IsWithinInclusive(A)) { return !bInvert; } }
+		for (const FPCGExPickerConstantRangeConfig& Range : Ranges)
+		{
+			if (Range.IsWithinInclusive(A))
+			{
+				return !bInvert;
+			}
+		}
 		return bInvert;
 	}
-	for (const FPCGExPickerConstantRangeConfig& Range : Ranges) { if (Range.IsWithin(A)) { return !bInvert; } }
+	for (const FPCGExPickerConstantRangeConfig& Range : Ranges)
+	{
+		if (Range.IsWithin(A))
+		{
+			return !bInvert;
+		}
+	}
 	return bInvert;
 }
 
 bool UPCGExWithinRangeFilterProviderSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == FName("Ranges")) { return Config.Source == EPCGExRangeSource::AttributeSet; }
+	if (InPin->Properties.Label == FName("Ranges"))
+	{
+		return Config.Source == EPCGExRangeSource::AttributeSet;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 

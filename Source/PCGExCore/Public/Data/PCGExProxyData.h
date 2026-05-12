@@ -5,7 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "PCGExDataCommon.h"
-#include "Types/PCGExTypes.h"
+#include "Data/PCGExCachedSubSelection.h"
 #include "Data/PCGExSubSelection.h"
 #include "Metadata/PCGAttributePropertySelector.h"
 #include "Metadata/PCGMetadataCommon.h"
@@ -13,6 +13,9 @@
 #include "UObject/Object.h"
 #include "Data/PCGExCachedSubSelection.h"
 #include "Misc/ScopeRWLock.h"
+#include "Types/PCGExTypeOps.h"
+#include "Types/PCGExTypes.h"
+#include "UObject/Object.h"
 
 struct FPCGExContext;
 class UPCGBasePointData;
@@ -98,13 +101,21 @@ namespace PCGExData
 		const UPCGBasePointData* PointData = nullptr;
 
 		EProxyFlags Flags = EProxyFlags::None;
-		FORCEINLINE bool HasFlag(const EProxyFlags InFlags) const { return EnumHasAnyFlags(Flags, InFlags); }
-		FORCEINLINE void AddFlags(const EProxyFlags InFlags) { EnumAddFlags(Flags, InFlags); }
+		FORCEINLINE bool HasFlag(const EProxyFlags InFlags) const
+		{
+			return EnumHasAnyFlags(Flags, InFlags);
+		}
+
+		FORCEINLINE void AddFlags(const EProxyFlags InFlags)
+		{
+			EnumAddFlags(Flags, InFlags);
+		}
 
 		FProxyDescriptor() = default;
 
 		explicit FProxyDescriptor(const TSharedPtr<FFacade>& InDataFacade, const EProxyRole InRole = EProxyRole::Read)
-			: Role(InRole), DataFacade(InDataFacade)
+			: Role(InRole)
+			  , DataFacade(InDataFacade)
 		{
 		}
 
@@ -164,8 +175,15 @@ namespace PCGExData
 		virtual bool Validate(const FProxyDescriptor& InDescriptor) const;
 
 		// Buffer access (for attribute proxies)
-		virtual TSharedPtr<IBuffer> GetBuffer() const { return nullptr; }
-		virtual bool EnsureReadable() const { return true; }
+		virtual TSharedPtr<IBuffer> GetBuffer() const
+		{
+			return nullptr;
+		}
+
+		virtual bool EnsureReadable() const
+		{
+			return true;
+		}
 
 		// SubSelection configuration. SourceDesc is forwarded to the compiled
 		// chain so container-aware steps can classify against the attribute's
@@ -181,7 +199,11 @@ namespace PCGExData
 		//
 		virtual void GetVoid(const int32 Index, void* OutValue) const = 0;
 		virtual void SetVoid(const int32 Index, const void* Value) const = 0;
-		virtual void GetCurrentVoid(const int32 Index, void* OutValue) const { GetVoid(Index, OutValue); }
+
+		virtual void GetCurrentVoid(const int32 Index, void* OutValue) const
+		{
+			GetVoid(Index, OutValue);
+		}
 
 		// Hash computation
 		virtual PCGExValueHash ReadValueHash(const int32 Index) const = 0;
@@ -189,10 +211,25 @@ namespace PCGExData
 		//
 		// Type information accessors
 		//
-		FORCEINLINE const PCGExTypeOps::ITypeOpsBase* GetRealOps() const { return RealOps; }
-		FORCEINLINE const PCGExTypeOps::ITypeOpsBase* GetWorkingOps() const { return WorkingOps; }
-		FORCEINLINE bool HasSubSelection() const { return bWantsSubSelection; }
-		FORCEINLINE bool WorkingTypeNeedsLifecycle() const { return bWorkingTypeNeedsLifecycle; }
+		FORCEINLINE const PCGExTypeOps::ITypeOpsBase* GetRealOps() const
+		{
+			return RealOps;
+		}
+
+		FORCEINLINE const PCGExTypeOps::ITypeOpsBase* GetWorkingOps() const
+		{
+			return WorkingOps;
+		}
+
+		FORCEINLINE bool HasSubSelection() const
+		{
+			return bWantsSubSelection;
+		}
+
+		FORCEINLINE bool WorkingTypeNeedsLifecycle() const
+		{
+			return bWorkingTypeNeedsLifecycle;
+		}
 
 		// Value size/alignment for blend operation sizing.
 		// Returns the size from WorkingOps if available, otherwise falls back to descriptor or FScopedTypedValue::GetTypeSize.
@@ -214,7 +251,10 @@ namespace PCGExData
 				PCGExTypes::FScopedTypedValue WorkingValue(WorkingType);
 				GetVoid(Index, WorkingValue.GetRaw());
 
-				if (RequestedType == WorkingType) { return WorkingValue.As<T>(); }
+				if (RequestedType == WorkingType)
+				{
+					return WorkingValue.As<T>();
+				}
 
 				T Result{};
 				PCGExTypeOps::FConversionTable::Convert(WorkingType, WorkingValue.GetRaw(), RequestedType, &Result);
@@ -235,7 +275,10 @@ namespace PCGExData
 				PCGExTypes::FScopedTypedValue WorkingValue(WorkingType);
 				GetVoid(Index, WorkingValue.GetRaw());
 
-				if (RequestedType == WorkingType) { return *reinterpret_cast<const T*>(WorkingValue.GetRaw()); }
+				if (RequestedType == WorkingType)
+				{
+					return *reinterpret_cast<const T*>(WorkingValue.GetRaw());
+				}
 
 				T Result{};
 				PCGExTypeOps::FConversionTable::Convert(WorkingType, WorkingValue.GetRaw(), RequestedType, &Result);
@@ -272,8 +315,14 @@ namespace PCGExData
 
 			if (RequestedType == WorkingType)
 			{
-				if constexpr (TypeTraits::TIsComplexType<T>) { return WorkingValue.As<T>(); }
-				else { return *reinterpret_cast<const T*>(WorkingValue.GetRaw()); }
+				if constexpr (TypeTraits::TIsComplexType<T>)
+				{
+					return WorkingValue.As<T>();
+				}
+				else
+				{
+					return *reinterpret_cast<const T*>(WorkingValue.GetRaw());
+				}
 			}
 
 			T Result{};

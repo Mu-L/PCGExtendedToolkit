@@ -7,8 +7,8 @@
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "UObject/Object.h"
 
-#include "Core/PCGExPointFilter.h"
 #include "PCGExFilterCommon.h"
+#include "Core/PCGExPointFilter.h"
 #include "Data/PCGExTaggedData.h"
 #include "Math/PCGExMathBounds.h"
 #include "PCGExMatching/Public/Core/PCGExMatchRuleFactoryProvider.h"
@@ -110,12 +110,23 @@ public:
 
 	virtual bool Init(FPCGExContext* InContext) override;
 
-	virtual bool SupportsCollectionEvaluation() const override { return Config.bCheckAgainstDataBounds; }
-	virtual bool SupportsProxyEvaluation() const override { return true; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return Config.bCheckAgainstDataBounds;
+	}
+
+	virtual bool SupportsProxyEvaluation() const override
+	{
+		return true;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
 
 	virtual void BeginDestroy() override;
@@ -127,7 +138,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FBoundsFilter(const TObjectPtr<const UPCGExBoundsFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 
@@ -193,6 +205,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

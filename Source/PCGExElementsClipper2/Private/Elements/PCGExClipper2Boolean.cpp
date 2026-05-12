@@ -3,8 +3,8 @@
 
 #include "Elements/PCGExClipper2Boolean.h"
 
-#include "Data/PCGExPointIO.h"
 #include "Clipper2Lib/clipper.h"
+#include "Data/PCGExPointIO.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2BooleanElement"
 #define PCGEX_NAMESPACE Clipper2Boolean
@@ -51,11 +51,15 @@ FString UPCGExClipper2BooleanSettings::GetDisplayName() const
 {
 	switch (Operation)
 	{
-	case EPCGExClipper2BooleanOp::Intersection: return TEXT("PCGEx | Clipper2 : Intersection");
+	case EPCGExClipper2BooleanOp::Intersection:
+		return TEXT("PCGEx | Clipper2 : Intersection");
 	default:
-	case EPCGExClipper2BooleanOp::Union: return TEXT("PCGEx | Clipper2 : Union");
-	case EPCGExClipper2BooleanOp::Difference: return TEXT("PCGEx | Clipper2 : Difference");
-	case EPCGExClipper2BooleanOp::Xor: return TEXT("PCGEx | Clipper2 : Xor");
+	case EPCGExClipper2BooleanOp::Union:
+		return TEXT("PCGEx | Clipper2 : Union");
+	case EPCGExClipper2BooleanOp::Difference:
+		return TEXT("PCGEx | Clipper2 : Difference");
+	case EPCGExClipper2BooleanOp::Xor:
+		return TEXT("PCGEx | Clipper2 : Xor");
 	}
 }
 #endif
@@ -64,19 +68,34 @@ void FPCGExClipper2BooleanContext::Process(const TSharedPtr<PCGExClipper2::FProc
 {
 	const UPCGExClipper2BooleanSettings* Settings = GetInputSettings<UPCGExClipper2BooleanSettings>();
 
-	if (!Group->IsValid()) { return; }
+	if (!Group->IsValid())
+	{
+		return;
+	}
 
 	// Create clipper and set up ZCallback for intersection tracking
 	PCGExClipper2Lib::Clipper64 Clipper;
 	Clipper.SetZCallback(Group->CreateZCallback());
 
 	// Add subject paths
-	if (!Group->SubjectPaths.empty()) { Clipper.AddSubject(Group->SubjectPaths); }
-	if (!Group->OpenSubjectPaths.empty()) { Clipper.AddOpenSubject(Group->OpenSubjectPaths); }
+	if (!Group->SubjectPaths.empty())
+	{
+		Clipper.AddSubject(Group->SubjectPaths);
+	}
+	if (!Group->OpenSubjectPaths.empty())
+	{
+		Clipper.AddOpenSubject(Group->OpenSubjectPaths);
+	}
 
 	// Add operand paths as clips if available
-	if (!Group->OperandPaths.empty()) { Clipper.AddClip(Group->OperandPaths); }
-	if (!Group->OpenOperandPaths.empty()) { Clipper.AddClip(Group->OpenOperandPaths); }
+	if (!Group->OperandPaths.empty())
+	{
+		Clipper.AddClip(Group->OperandPaths);
+	}
+	if (!Group->OpenOperandPaths.empty())
+	{
+		Clipper.AddClip(Group->OpenOperandPaths);
+	}
 
 	// Determine clip type
 	PCGExClipper2Lib::ClipType ClipType;
@@ -103,7 +122,10 @@ void FPCGExClipper2BooleanContext::Process(const TSharedPtr<PCGExClipper2::FProc
 	PCGExClipper2Lib::Paths64 ClosedResults;
 	PCGExClipper2Lib::Paths64 OpenResults;
 
-	if (!Clipper.Execute(ClipType, PCGExClipper2::ConvertFillRule(Settings->FillRule), ClosedResults, OpenResults)) { return; }
+	if (!Clipper.Execute(ClipType, PCGExClipper2::ConvertFillRule(Settings->FillRule), ClosedResults, OpenResults))
+	{
+		return;
+	}
 
 	if (!ClosedResults.empty())
 	{

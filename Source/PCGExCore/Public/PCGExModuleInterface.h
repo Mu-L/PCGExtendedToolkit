@@ -4,12 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Modules/ModuleManager.h"
 #include "PCGExVersion.h"
+#include "Modules/ModuleManager.h"
 
 #if WITH_EDITOR
-#include "Styling/SlateStyle.h"
 #include "PCGExCoreSettingsCache.h"
+#include "Styling/SlateStyle.h"
 #endif
 
 #define PCGEX_ADD_CLASS_ICON(_NAME) \
@@ -72,7 +72,10 @@ class FPCGDataTypeRegistry;
 class PCGEXCORE_API IPCGExModuleInterface : public IModuleInterface
 {
 public:
-	virtual FString GetModuleName() const { return TEXT(""); }
+	virtual FString GetModuleName() const
+	{
+		return TEXT("");
+	}
 
 	static TArray<IPCGExModuleInterface*> RegisteredModules;
 

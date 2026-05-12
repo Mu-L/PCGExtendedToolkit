@@ -6,8 +6,8 @@
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Helpers/PCGExArrayHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCompareFilterDefinition"
@@ -21,13 +21,19 @@ bool UPCGExValueHashFilterFactory::WantsPreparation(FPCGExContext* InContext)
 PCGExFactories::EPreparationResult UPCGExValueHashFilterFactory::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	PCGExData::TryGetFacades(InContext, FName("Sets"), SetSources, false, true);
 
 	if (SetSources.IsEmpty())
 	{
-		if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error) { PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("No valid set found")) }
+		if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error)
+		{
+			PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("No valid set found"))
+		}
 		return PCGExFactories::EPreparationResult::MissingData;
 	}
 
@@ -43,12 +49,18 @@ PCGExFactories::EPreparationResult UPCGExValueHashFilterFactory::Prepare(FPCGExC
 		if (Config.Mode == EPCGExValueHashMode::Merged)
 		{
 			TSet<PCGExValueHash>& MergedSet = Hashes[0];
-			for (TSet<PCGExValueHash>& H : Hashes) { MergedSet.Append(H); }
+			for (TSet<PCGExValueHash>& H : Hashes)
+			{
+				MergedSet.Append(H);
+			}
 			Hashes.SetNum(1);
 
 			if (Hashes[0].IsEmpty())
 			{
-				if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error) { PCGEX_LOG_MISSING_INPUT(SharedContext.Get(), FTEXT("Merged sets are empty")) }
+				if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error)
+				{
+					PCGEX_LOG_MISSING_INPUT(SharedContext.Get(), FTEXT("Merged sets are empty"))
+				}
 				PrepResult = PCGExFactories::EPreparationResult::MissingData;
 			}
 		}
@@ -57,7 +69,10 @@ PCGExFactories::EPreparationResult UPCGExValueHashFilterFactory::Prepare(FPCGExC
 			int32 WriteIndex = 0;
 			for (TSet<PCGExValueHash>& H : Hashes)
 			{
-				if (H.IsEmpty()) { continue; }
+				if (H.IsEmpty())
+				{
+					continue;
+				}
 				Hashes[WriteIndex++] = MoveTemp(H);
 			}
 
@@ -65,7 +80,10 @@ PCGExFactories::EPreparationResult UPCGExValueHashFilterFactory::Prepare(FPCGExC
 
 			if (Hashes.IsEmpty())
 			{
-				if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error) { PCGEX_LOG_MISSING_INPUT(SharedContext.Get(), FTEXT("Merged sets are empty")) }
+				if (MissingDataPolicy == EPCGExFilterNoDataFallback::Error)
+				{
+					PCGEX_LOG_MISSING_INPUT(SharedContext.Get(), FTEXT("Merged sets are empty"))
+				}
 				PrepResult = PCGExFactories::EPreparationResult::MissingData;
 			}
 		}
@@ -107,7 +125,10 @@ PCGExFactories::EPreparationResult UPCGExValueHashFilterFactory::Prepare(FPCGExC
 		}
 
 		const int32 NumValues = Buffer->GetNumValues(PCGExData::EIOSide::In);
-		for (int i = 0; i < NumValues; i++) { UniqueValues.Add(Buffer->ReadValueHash(i)); }
+		for (int i = 0; i < NumValues; i++)
+		{
+			UniqueValues.Add(Buffer->ReadValueHash(i));
+		}
 	};
 
 	GrabUniqueValues->StartIterations(SetSources.Num(), 1);
@@ -133,14 +154,20 @@ void UPCGExValueHashFilterFactory::RegisterBuffersDependencies(FPCGExContext* In
 
 bool UPCGExValueHashFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 	InContext->AddConsumableAttributeName(Config.OperandA);
 	return true;
 }
 
 bool PCGExPointFilter::FValueHashFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	bInvert = TypedFilterFactory->Config.bInvert;
 	// In Merged mode, all sets are combined into one, so "any vs all" is meaningless -- force bAnyPass = true.
@@ -193,7 +220,10 @@ bool PCGExPointFilter::FValueHashFilter::Test(const TSharedPtr<PCGExData::FPoint
 {
 	double H = 0;
 
-	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, H, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+	if (!PCGExData::Helpers::TryReadDataValue(IO, TypedFilterFactory->Config.OperandA, H, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
 
 	bool bPass = false;
 	if (bAnyPass)

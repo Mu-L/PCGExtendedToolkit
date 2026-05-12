@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widgets/SCompoundWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
+#include "Widgets/SCompoundWidget.h"
 
 #include "SPCGExCollectionGridTile.h"
 
@@ -57,7 +57,11 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
-	virtual bool SupportsKeyboardFocus() const override { return true; }
+	virtual bool SupportsKeyboardFocus() const override
+	{
+		return true;
+	}
+
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& InDragDropEvent) override;
 	virtual FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& InDragDropEvent) override;
@@ -166,7 +170,11 @@ private:
 		FArrayProperty* ArrayProp = nullptr;
 		FStructProperty* InnerProp = nullptr;
 		void* ArrayData = nullptr;
-		bool IsValid() const { return ArrayProp && ArrayData; }
+
+		bool IsValid() const
+		{
+			return ArrayProp && ArrayData;
+		}
 	};
 
 	FEntriesArrayAccess GetEntriesAccess() const;

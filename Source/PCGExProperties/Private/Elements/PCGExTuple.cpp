@@ -3,16 +3,16 @@
 
 #include "Elements/PCGExTuple.h"
 
+#include "PCGExPropertyTypes.h"
 #include "PCGGraph.h"
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Helpers/PCGExArrayHelpers.h"
-#include "PCGExPropertyTypes.h"
 
 #if WITH_EDITOR
-#include "UObject/UObjectGlobals.h"
 #include "Editor.h"
+#include "UObject/UObjectGlobals.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
@@ -77,7 +77,7 @@ void UPCGExTupleSettings::PostEditChangeProperty(struct FPropertyChangedEvent& P
 			FCoreUObjectDelegates::OnObjectPropertyChanged.Broadcast(this, RefreshEvent);
 		}
 	}
-	
+
 	DirtyCache();
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -98,7 +98,10 @@ TArray<FPCGPinProperties> UPCGExTupleSettings::OutputPinProperties() const
 	return PinProperties;
 }
 
-FPCGElementPtr UPCGExTupleSettings::CreateElement() const { return MakeShared<FPCGExTupleElement>(); }
+FPCGElementPtr UPCGExTupleSettings::CreateElement() const
+{
+	return MakeShared<FPCGExTupleElement>();
+}
 
 
 bool FPCGExTupleElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
@@ -141,7 +144,10 @@ bool FPCGExTupleElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSetti
 	}
 
 	// Create all keys
-	for (int i = 0; i < Settings->Values.Num(); ++i) { Keys.Add(TupleData->Metadata->AddEntry()); }
+	for (int i = 0; i < Settings->Values.Num(); ++i)
+	{
+		Keys.Add(TupleData->Metadata->AddEntry());
+	}
 
 	// Write values to attributes (only enabled overrides).
 	// Iterates column-first (outer = schema column, inner = row).
@@ -150,14 +156,20 @@ bool FPCGExTupleElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSetti
 	for (int i = 0; i < Settings->Composition.Num(); ++i)
 	{
 		FPCGMetadataAttributeBase* Attribute = Attributes[i];
-		if (!Attribute) { continue; }
+		if (!Attribute)
+		{
+			continue;
+		}
 
 		for (int k = 0; k < Keys.Num(); k++)
 		{
 			const FPCGExPropertyOverrides& Row = Settings->Values[k];
 
 			// Only write if this column is enabled in this row
-			if (!Row.IsOverrideEnabled(i)) { continue; }
+			if (!Row.IsOverrideEnabled(i))
+			{
+				continue;
+			}
 
 			if (const FPCGExProperty* Property = Row.Overrides[i].GetProperty())
 			{

@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 
-#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExVtxPropertyFactoryProvider.h"
+#include "Factories/PCGExFactoryProvider.h"
 
 #include "PCGExVtxPropertyAmplitude.generated.h"
 

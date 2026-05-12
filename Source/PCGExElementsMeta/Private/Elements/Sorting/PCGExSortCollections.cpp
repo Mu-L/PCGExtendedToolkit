@@ -34,7 +34,10 @@ PCGEX_INITIALIZE_ELEMENT(SortCollections)
 
 bool FPCGExSortCollectionsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SortCollections)
 
@@ -65,9 +68,15 @@ bool FPCGExSortCollectionsElement::AdvanceWork(FPCGExContext* InContext, const U
 	{
 		TArray<int32> Indices;
 		PCGExArrayHelpers::ArrayOfIndices(Indices, Context->Datas.Num());
-		Indices.Sort([&](const int32 A, const int32 B) { return Context->Sorter->SortData(A, B); });
+		Indices.Sort([&](const int32 A, const int32 B)
+		{
+			return Context->Sorter->SortData(A, B);
+		});
 
-		for (const int32 i : Indices) { Context->OutputData.TaggedData.Add(Context->Datas[i]); }
+		for (const int32 i : Indices)
+		{
+			Context->OutputData.TaggedData.Add(Context->Datas[i]);
+		}
 
 		Context->Done();
 	}

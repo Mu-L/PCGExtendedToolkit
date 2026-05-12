@@ -19,47 +19,129 @@ namespace PCGExTypeOps
 	{
 		using Type = FVector2D;
 
-		static FORCEINLINE Type GetDefault() { return FVector2D::ZeroVector; }
-		static FORCEINLINE PCGExValueHash Hash(const Type& Value) { return GetTypeHash(Value); }
+		static FORCEINLINE Type GetDefault()
+		{
+			return FVector2D::ZeroVector;
+		}
+
+		static FORCEINLINE PCGExValueHash Hash(const Type& Value)
+		{
+			return GetTypeHash(Value);
+		}
 
 		template <typename TTo>
 		static TTo ConvertTo(const Type& Value)
 		{
-			if constexpr (std::is_same_v<TTo, bool>) { return Value.SquaredLength() > 0.0; }
-			else if constexpr (std::is_same_v<TTo, int32>) { return static_cast<int32>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, int64>) { return static_cast<int64>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, float>) { return static_cast<float>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, double>) { return Value.X; }
-			else if constexpr (std::is_same_v<TTo, FVector2D>) { return Value; }
-			else if constexpr (std::is_same_v<TTo, FVector>) { return FVector(Value.X, Value.Y, 0.0); }
-			else if constexpr (std::is_same_v<TTo, FVector4>) { return FVector4(Value.X, Value.Y, 0.0, 0.0); }
-			else if constexpr (std::is_same_v<TTo, FQuat>) { return FRotator(Value.X, Value.Y, 0.0).Quaternion(); }
-			else if constexpr (std::is_same_v<TTo, FRotator>) { return FRotator(Value.X, Value.Y, 0.0); }
-			else if constexpr (std::is_same_v<TTo, FTransform>) { return FTransform(FVector(Value.X, Value.Y, 0.0)); }
-			else if constexpr (std::is_same_v<TTo, FString>) { return Value.ToString(); }
-			else if constexpr (std::is_same_v<TTo, FName>) { return FName(*Value.ToString()); }
-			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>) { return FSoftObjectPath(); }
-			else if constexpr (std::is_same_v<TTo, FSoftClassPath>) { return FSoftClassPath(); }
-			else { return TTo{}; }
+			if constexpr (std::is_same_v<TTo, bool>)
+			{
+				return Value.SquaredLength() > 0.0;
+			}
+			else if constexpr (std::is_same_v<TTo, int32>)
+			{
+				return static_cast<int32>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, int64>)
+			{
+				return static_cast<int64>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, float>)
+			{
+				return static_cast<float>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, double>)
+			{
+				return Value.X;
+			}
+			else if constexpr (std::is_same_v<TTo, FVector2D>)
+			{
+				return Value;
+			}
+			else if constexpr (std::is_same_v<TTo, FVector>)
+			{
+				return FVector(Value.X, Value.Y, 0.0);
+			}
+			else if constexpr (std::is_same_v<TTo, FVector4>)
+			{
+				return FVector4(Value.X, Value.Y, 0.0, 0.0);
+			}
+			else if constexpr (std::is_same_v<TTo, FQuat>)
+			{
+				return FRotator(Value.X, Value.Y, 0.0).Quaternion();
+			}
+			else if constexpr (std::is_same_v<TTo, FRotator>)
+			{
+				return FRotator(Value.X, Value.Y, 0.0);
+			}
+			else if constexpr (std::is_same_v<TTo, FTransform>)
+			{
+				return FTransform(FVector(Value.X, Value.Y, 0.0));
+			}
+			else if constexpr (std::is_same_v<TTo, FString>)
+			{
+				return Value.ToString();
+			}
+			else if constexpr (std::is_same_v<TTo, FName>)
+			{
+				return FName(*Value.ToString());
+			}
+			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>)
+			{
+				return FSoftObjectPath();
+			}
+			else if constexpr (std::is_same_v<TTo, FSoftClassPath>)
+			{
+				return FSoftClassPath();
+			}
+			else
+			{
+				return TTo{};
+			}
 		}
 
 		template <typename TFrom>
 		static Type ConvertFrom(const TFrom& Value)
 		{
-			if constexpr (std::is_same_v<TFrom, bool>) { return Type(Value ? 1.0 : 0.0); }
-			else if constexpr (std::is_same_v<TFrom, int32>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, int64>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, float>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, double>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, FVector2D>) { return Value; }
-			else if constexpr (std::is_same_v<TFrom, FVector>) { return Type(Value.X, Value.Y); }
-			else if constexpr (std::is_same_v<TFrom, FVector4>) { return Type(Value.X, Value.Y); }
+			if constexpr (std::is_same_v<TFrom, bool>)
+			{
+				return Type(Value ? 1.0 : 0.0);
+			}
+			else if constexpr (std::is_same_v<TFrom, int32>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, int64>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, float>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, double>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector2D>)
+			{
+				return Value;
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector>)
+			{
+				return Type(Value.X, Value.Y);
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector4>)
+			{
+				return Type(Value.X, Value.Y);
+			}
 			else if constexpr (std::is_same_v<TFrom, FQuat>)
 			{
 				const FRotator R = Value.Rotator();
 				return Type(R.Pitch, R.Yaw);
 			}
-			else if constexpr (std::is_same_v<TFrom, FRotator>) { return Type(Value.Pitch, Value.Yaw); }
+			else if constexpr (std::is_same_v<TFrom, FRotator>)
+			{
+				return Type(Value.Pitch, Value.Yaw);
+			}
 			else if constexpr (std::is_same_v<TFrom, FTransform>)
 			{
 				const FVector L = Value.GetLocation();
@@ -77,24 +159,80 @@ namespace PCGExTypeOps
 				Result.InitFromString(Value.ToString());
 				return Result;
 			}
-			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>) { return Type::ZeroVector; }
-			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>) { return Type::ZeroVector; }
-			else { return Type::ZeroVector; }
+			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>)
+			{
+				return Type::ZeroVector;
+			}
+			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>)
+			{
+				return Type::ZeroVector;
+			}
+			else
+			{
+				return Type::ZeroVector;
+			}
 		}
 
 		// Blend operations
-		static FORCEINLINE Type Add(const Type& A, const Type& B) { return A + B; }
-		static FORCEINLINE Type Sub(const Type& A, const Type& B) { return A - B; }
-		static FORCEINLINE Type Mult(const Type& A, const Type& B) { return A * B; }
-		static FORCEINLINE Type Div(const Type& A, double D) { return D != 0.0 ? A / D : A; }
-		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W) { return FMath::Lerp(A, B, W); }
-		static FORCEINLINE Type Min(const Type& A, const Type& B) { return Type(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y)); }
-		static FORCEINLINE Type Max(const Type& A, const Type& B) { return Type(FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y)); }
-		static FORCEINLINE Type Average(const Type& A, const Type& B) { return (A + B) * 0.5; }
-		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W) { return A + B * W; }
-		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W) { return A - B * W; }
-		static FORCEINLINE Type CopyA(const Type& A, const Type& B) { return A; }
-		static FORCEINLINE Type CopyB(const Type& A, const Type& B) { return B; }
+		static FORCEINLINE Type Add(const Type& A, const Type& B)
+		{
+			return A + B;
+		}
+
+		static FORCEINLINE Type Sub(const Type& A, const Type& B)
+		{
+			return A - B;
+		}
+
+		static FORCEINLINE Type Mult(const Type& A, const Type& B)
+		{
+			return A * B;
+		}
+
+		static FORCEINLINE Type Div(const Type& A, double D)
+		{
+			return D != 0.0 ? A / D : A;
+		}
+
+		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W)
+		{
+			return FMath::Lerp(A, B, W);
+		}
+
+		static FORCEINLINE Type Min(const Type& A, const Type& B)
+		{
+			return Type(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y));
+		}
+
+		static FORCEINLINE Type Max(const Type& A, const Type& B)
+		{
+			return Type(FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y));
+		}
+
+		static FORCEINLINE Type Average(const Type& A, const Type& B)
+		{
+			return (A + B) * 0.5;
+		}
+
+		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
+		{
+			return A + B * W;
+		}
+
+		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
+		{
+			return A - B * W;
+		}
+
+		static FORCEINLINE Type CopyA(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyB(const Type& A, const Type& B)
+		{
+			return B;
+		}
 
 		static FORCEINLINE Type UnsignedMin(const Type& A, const Type& B)
 		{
@@ -150,12 +288,25 @@ namespace PCGExTypeOps
 				B.Y != 0.0 ? FMath::Fmod(A.Y, B.Y) : A.Y);
 		}
 
-		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W) { return W != 0.0 ? (A + B) / W : A; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W != 0.0 ? (A + B) / W : A;
+		}
 
-		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW) { return TW != 0.0 ? A * (1.0 / TW) : A; }
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return TW != 0.0 ? A * (1.0 / TW) : A;
+		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return Type(FMath::Abs(A.X), FMath::Abs(A.Y)); }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return Type(FMath::Abs(A.X), FMath::Abs(A.Y));
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A * Factor;
+		}
 
 	};
 
@@ -166,48 +317,133 @@ namespace PCGExTypeOps
 	{
 		using Type = FVector;
 
-		static FORCEINLINE Type GetDefault() { return FVector::ZeroVector; }
-		static FORCEINLINE PCGExValueHash Hash(const Type& Value) { return GetTypeHash(Value); }
+		static FORCEINLINE Type GetDefault()
+		{
+			return FVector::ZeroVector;
+		}
+
+		static FORCEINLINE PCGExValueHash Hash(const Type& Value)
+		{
+			return GetTypeHash(Value);
+		}
 
 		template <typename TTo>
 		static TTo ConvertTo(const Type& Value)
 		{
-			if constexpr (std::is_same_v<TTo, bool>) { return Value.SquaredLength() > 0.0; }
-			else if constexpr (std::is_same_v<TTo, int32>) { return static_cast<int32>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, int64>) { return static_cast<int64>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, float>) { return static_cast<float>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, double>) { return Value.X; }
-			else if constexpr (std::is_same_v<TTo, FVector2D>) { return FVector2D(Value.X, Value.Y); }
-			else if constexpr (std::is_same_v<TTo, FVector>) { return Value; }
-			else if constexpr (std::is_same_v<TTo, FVector4>) { return FVector4(Value.X, Value.Y, Value.Z, 0.0); }
-			else if constexpr (std::is_same_v<TTo, FQuat>) { return FRotator(Value.X, Value.Y, Value.Z).Quaternion(); }
-			else if constexpr (std::is_same_v<TTo, FRotator>) { return FRotator(Value.X, Value.Y, Value.Z); }
-			else if constexpr (std::is_same_v<TTo, FTransform>) { return FTransform(Value); }
-			else if constexpr (std::is_same_v<TTo, FString>) { return Value.ToString(); }
-			else if constexpr (std::is_same_v<TTo, FName>) { return FName(*Value.ToString()); }
-			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>) { return FSoftObjectPath(); }
-			else if constexpr (std::is_same_v<TTo, FSoftClassPath>) { return FSoftClassPath(); }
-			else { return TTo{}; }
+			if constexpr (std::is_same_v<TTo, bool>)
+			{
+				return Value.SquaredLength() > 0.0;
+			}
+			else if constexpr (std::is_same_v<TTo, int32>)
+			{
+				return static_cast<int32>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, int64>)
+			{
+				return static_cast<int64>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, float>)
+			{
+				return static_cast<float>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, double>)
+			{
+				return Value.X;
+			}
+			else if constexpr (std::is_same_v<TTo, FVector2D>)
+			{
+				return FVector2D(Value.X, Value.Y);
+			}
+			else if constexpr (std::is_same_v<TTo, FVector>)
+			{
+				return Value;
+			}
+			else if constexpr (std::is_same_v<TTo, FVector4>)
+			{
+				return FVector4(Value.X, Value.Y, Value.Z, 0.0);
+			}
+			else if constexpr (std::is_same_v<TTo, FQuat>)
+			{
+				return FRotator(Value.X, Value.Y, Value.Z).Quaternion();
+			}
+			else if constexpr (std::is_same_v<TTo, FRotator>)
+			{
+				return FRotator(Value.X, Value.Y, Value.Z);
+			}
+			else if constexpr (std::is_same_v<TTo, FTransform>)
+			{
+				return FTransform(Value);
+			}
+			else if constexpr (std::is_same_v<TTo, FString>)
+			{
+				return Value.ToString();
+			}
+			else if constexpr (std::is_same_v<TTo, FName>)
+			{
+				return FName(*Value.ToString());
+			}
+			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>)
+			{
+				return FSoftObjectPath();
+			}
+			else if constexpr (std::is_same_v<TTo, FSoftClassPath>)
+			{
+				return FSoftClassPath();
+			}
+			else
+			{
+				return TTo{};
+			}
 		}
 
 		template <typename TFrom>
 		static Type ConvertFrom(const TFrom& Value)
 		{
-			if constexpr (std::is_same_v<TFrom, bool>) { return Type(Value ? 1.0 : 0.0); }
-			else if constexpr (std::is_same_v<TFrom, int32>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, int64>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, float>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, double>) { return Type(Value); }
-			else if constexpr (std::is_same_v<TFrom, FVector2D>) { return Type(Value.X, Value.Y, 0.0); }
-			else if constexpr (std::is_same_v<TFrom, FVector>) { return Value; }
-			else if constexpr (std::is_same_v<TFrom, FVector4>) { return Type(Value.X, Value.Y, Value.Z); }
+			if constexpr (std::is_same_v<TFrom, bool>)
+			{
+				return Type(Value ? 1.0 : 0.0);
+			}
+			else if constexpr (std::is_same_v<TFrom, int32>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, int64>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, float>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, double>)
+			{
+				return Type(Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector2D>)
+			{
+				return Type(Value.X, Value.Y, 0.0);
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector>)
+			{
+				return Value;
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector4>)
+			{
+				return Type(Value.X, Value.Y, Value.Z);
+			}
 			else if constexpr (std::is_same_v<TFrom, FQuat>)
 			{
 				const FRotator R = Value.Rotator();
 				return Type(R.Pitch, R.Yaw, R.Roll);
 			}
-			else if constexpr (std::is_same_v<TFrom, FRotator>) { return Type(Value.Pitch, Value.Yaw, Value.Roll); }
-			else if constexpr (std::is_same_v<TFrom, FTransform>) { return Value.GetLocation(); }
+			else if constexpr (std::is_same_v<TFrom, FRotator>)
+			{
+				return Type(Value.Pitch, Value.Yaw, Value.Roll);
+			}
+			else if constexpr (std::is_same_v<TFrom, FTransform>)
+			{
+				return Value.GetLocation();
+			}
 			else if constexpr (std::is_same_v<TFrom, FString>)
 			{
 				Type Result;
@@ -220,24 +456,80 @@ namespace PCGExTypeOps
 				Result.InitFromString(Value.ToString());
 				return Result;
 			}
-			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>) { return Type::ZeroVector; }
-			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>) { return Type::ZeroVector; }
-			else { return Type::ZeroVector; }
+			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>)
+			{
+				return Type::ZeroVector;
+			}
+			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>)
+			{
+				return Type::ZeroVector;
+			}
+			else
+			{
+				return Type::ZeroVector;
+			}
 		}
 
 		// Blend operations
-		static FORCEINLINE Type Add(const Type& A, const Type& B) { return A + B; }
-		static FORCEINLINE Type Sub(const Type& A, const Type& B) { return A - B; }
-		static FORCEINLINE Type Mult(const Type& A, const Type& B) { return A * B; }
-		static FORCEINLINE Type Div(const Type& A, double D) { return D != 0.0 ? A / D : A; }
-		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W) { return FMath::Lerp(A, B, W); }
-		static FORCEINLINE Type Min(const Type& A, const Type& B) { return A.ComponentMin(B); }
-		static FORCEINLINE Type Max(const Type& A, const Type& B) { return A.ComponentMax(B); }
-		static FORCEINLINE Type Average(const Type& A, const Type& B) { return (A + B) * 0.5; }
-		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W) { return A + B * W; }
-		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W) { return A - B * W; }
-		static FORCEINLINE Type CopyA(const Type& A, const Type& B) { return A; }
-		static FORCEINLINE Type CopyB(const Type& A, const Type& B) { return B; }
+		static FORCEINLINE Type Add(const Type& A, const Type& B)
+		{
+			return A + B;
+		}
+
+		static FORCEINLINE Type Sub(const Type& A, const Type& B)
+		{
+			return A - B;
+		}
+
+		static FORCEINLINE Type Mult(const Type& A, const Type& B)
+		{
+			return A * B;
+		}
+
+		static FORCEINLINE Type Div(const Type& A, double D)
+		{
+			return D != 0.0 ? A / D : A;
+		}
+
+		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W)
+		{
+			return FMath::Lerp(A, B, W);
+		}
+
+		static FORCEINLINE Type Min(const Type& A, const Type& B)
+		{
+			return A.ComponentMin(B);
+		}
+
+		static FORCEINLINE Type Max(const Type& A, const Type& B)
+		{
+			return A.ComponentMax(B);
+		}
+
+		static FORCEINLINE Type Average(const Type& A, const Type& B)
+		{
+			return (A + B) * 0.5;
+		}
+
+		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
+		{
+			return A + B * W;
+		}
+
+		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
+		{
+			return A - B * W;
+		}
+
+		static FORCEINLINE Type CopyA(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyB(const Type& A, const Type& B)
+		{
+			return B;
+		}
 
 		static FORCEINLINE Type UnsignedMin(const Type& A, const Type& B)
 		{
@@ -300,12 +592,25 @@ namespace PCGExTypeOps
 				B.Z != 0.0 ? FMath::Fmod(A.Z, B.Z) : A.Z);
 		}
 
-		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W) { return W != 0.0 ? (A + B) / W : A; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W != 0.0 ? (A + B) / W : A;
+		}
 
-		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW) { return TW != 0.0 ? A * (1.0 / TW) : A; }
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return TW != 0.0 ? A * (1.0 / TW) : A;
+		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return Type(FMath::Abs(A.X), FMath::Abs(A.Y), FMath::Abs(A.Z)); }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return Type(FMath::Abs(A.X), FMath::Abs(A.Y), FMath::Abs(A.Z));
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A * Factor;
+		}
 
 	};
 
@@ -316,28 +621,83 @@ namespace PCGExTypeOps
 	{
 		using Type = FVector4;
 
-		static FORCEINLINE Type GetDefault() { return FVector4(0.0, 0.0, 0.0, 0.0); }
-		static FORCEINLINE PCGExValueHash Hash(const Type& Value) { return GetTypeHash(Value); }
+		static FORCEINLINE Type GetDefault()
+		{
+			return FVector4(0.0, 0.0, 0.0, 0.0);
+		}
+
+		static FORCEINLINE PCGExValueHash Hash(const Type& Value)
+		{
+			return GetTypeHash(Value);
+		}
 
 		template <typename TTo>
 		static TTo ConvertTo(const Type& Value)
 		{
-			if constexpr (std::is_same_v<TTo, bool>) { return FVector(Value.X, Value.Y, Value.Z).SquaredLength() > 0.0; }
-			else if constexpr (std::is_same_v<TTo, int32>) { return static_cast<int32>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, int64>) { return static_cast<int64>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, float>) { return static_cast<float>(Value.X); }
-			else if constexpr (std::is_same_v<TTo, double>) { return Value.X; }
-			else if constexpr (std::is_same_v<TTo, FVector2D>) { return FVector2D(Value.X, Value.Y); }
-			else if constexpr (std::is_same_v<TTo, FVector>) { return FVector(Value.X, Value.Y, Value.Z); }
-			else if constexpr (std::is_same_v<TTo, FVector4>) { return Value; }
-			else if constexpr (std::is_same_v<TTo, FQuat>) { return FQuat(Value.X, Value.Y, Value.Z, Value.W); }
-			else if constexpr (std::is_same_v<TTo, FRotator>) { return FRotator(Value.X, Value.Y, Value.Z); }
-			else if constexpr (std::is_same_v<TTo, FTransform>) { return FTransform(FVector(Value.X, Value.Y, Value.Z)); }
-			else if constexpr (std::is_same_v<TTo, FString>) { return Value.ToString(); }
-			else if constexpr (std::is_same_v<TTo, FName>) { return FName(*Value.ToString()); }
-			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>) { return FSoftObjectPath(); }
-			else if constexpr (std::is_same_v<TTo, FSoftClassPath>) { return FSoftClassPath(); }
-			else { return TTo{}; }
+			if constexpr (std::is_same_v<TTo, bool>)
+			{
+				return FVector(Value.X, Value.Y, Value.Z).SquaredLength() > 0.0;
+			}
+			else if constexpr (std::is_same_v<TTo, int32>)
+			{
+				return static_cast<int32>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, int64>)
+			{
+				return static_cast<int64>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, float>)
+			{
+				return static_cast<float>(Value.X);
+			}
+			else if constexpr (std::is_same_v<TTo, double>)
+			{
+				return Value.X;
+			}
+			else if constexpr (std::is_same_v<TTo, FVector2D>)
+			{
+				return FVector2D(Value.X, Value.Y);
+			}
+			else if constexpr (std::is_same_v<TTo, FVector>)
+			{
+				return FVector(Value.X, Value.Y, Value.Z);
+			}
+			else if constexpr (std::is_same_v<TTo, FVector4>)
+			{
+				return Value;
+			}
+			else if constexpr (std::is_same_v<TTo, FQuat>)
+			{
+				return FQuat(Value.X, Value.Y, Value.Z, Value.W);
+			}
+			else if constexpr (std::is_same_v<TTo, FRotator>)
+			{
+				return FRotator(Value.X, Value.Y, Value.Z);
+			}
+			else if constexpr (std::is_same_v<TTo, FTransform>)
+			{
+				return FTransform(FVector(Value.X, Value.Y, Value.Z));
+			}
+			else if constexpr (std::is_same_v<TTo, FString>)
+			{
+				return Value.ToString();
+			}
+			else if constexpr (std::is_same_v<TTo, FName>)
+			{
+				return FName(*Value.ToString());
+			}
+			else if constexpr (std::is_same_v<TTo, FSoftObjectPath>)
+			{
+				return FSoftObjectPath();
+			}
+			else if constexpr (std::is_same_v<TTo, FSoftClassPath>)
+			{
+				return FSoftClassPath();
+			}
+			else
+			{
+				return TTo{};
+			}
 		}
 
 		template <typename TFrom>
@@ -348,15 +708,42 @@ namespace PCGExTypeOps
 				const double D = Value ? 1.0 : 0.0;
 				return Type(D, D, D, D);
 			}
-			else if constexpr (std::is_same_v<TFrom, int32>) { return Type(Value, Value, Value, Value); }
-			else if constexpr (std::is_same_v<TFrom, int64>) { return Type(Value, Value, Value, Value); }
-			else if constexpr (std::is_same_v<TFrom, float>) { return Type(Value, Value, Value, Value); }
-			else if constexpr (std::is_same_v<TFrom, double>) { return Type(Value, Value, Value, Value); }
-			else if constexpr (std::is_same_v<TFrom, FVector2D>) { return Type(Value.X, Value.Y, 0.0, 0.0); }
-			else if constexpr (std::is_same_v<TFrom, FVector>) { return Type(Value.X, Value.Y, Value.Z, 0.0); }
-			else if constexpr (std::is_same_v<TFrom, FVector4>) { return Value; }
-			else if constexpr (std::is_same_v<TFrom, FQuat>) { return Type(Value.X, Value.Y, Value.Z, Value.W); }
-			else if constexpr (std::is_same_v<TFrom, FRotator>) { return Type(Value.Pitch, Value.Yaw, Value.Roll, 0.0); }
+			else if constexpr (std::is_same_v<TFrom, int32>)
+			{
+				return Type(Value, Value, Value, Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, int64>)
+			{
+				return Type(Value, Value, Value, Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, float>)
+			{
+				return Type(Value, Value, Value, Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, double>)
+			{
+				return Type(Value, Value, Value, Value);
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector2D>)
+			{
+				return Type(Value.X, Value.Y, 0.0, 0.0);
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector>)
+			{
+				return Type(Value.X, Value.Y, Value.Z, 0.0);
+			}
+			else if constexpr (std::is_same_v<TFrom, FVector4>)
+			{
+				return Value;
+			}
+			else if constexpr (std::is_same_v<TFrom, FQuat>)
+			{
+				return Type(Value.X, Value.Y, Value.Z, Value.W);
+			}
+			else if constexpr (std::is_same_v<TFrom, FRotator>)
+			{
+				return Type(Value.Pitch, Value.Yaw, Value.Roll, 0.0);
+			}
 			else if constexpr (std::is_same_v<TFrom, FTransform>)
 			{
 				const FVector L = Value.GetLocation();
@@ -374,17 +761,45 @@ namespace PCGExTypeOps
 				Result.InitFromString(Value.ToString());
 				return Result;
 			}
-			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>) { return Type(0.0, 0.0, 0.0, 0.0); }
-			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>) { return Type(0.0, 0.0, 0.0, 0.0); }
-			else { return Type(0.0, 0.0, 0.0, 0.0); }
+			else if constexpr (std::is_same_v<TFrom, FSoftObjectPath>)
+			{
+				return Type(0.0, 0.0, 0.0, 0.0);
+			}
+			else if constexpr (std::is_same_v<TFrom, FSoftClassPath>)
+			{
+				return Type(0.0, 0.0, 0.0, 0.0);
+			}
+			else
+			{
+				return Type(0.0, 0.0, 0.0, 0.0);
+			}
 		}
 
 		// Blend operations
-		static FORCEINLINE Type Add(const Type& A, const Type& B) { return A + B; }
-		static FORCEINLINE Type Sub(const Type& A, const Type& B) { return A - B; }
-		static FORCEINLINE Type Mult(const Type& A, const Type& B) { return A * B; }
-		static FORCEINLINE Type Div(const Type& A, double D) { return D != 0.0 ? A / D : A; }
-		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W) { return A + (B - A) * W; }
+		static FORCEINLINE Type Add(const Type& A, const Type& B)
+		{
+			return A + B;
+		}
+
+		static FORCEINLINE Type Sub(const Type& A, const Type& B)
+		{
+			return A - B;
+		}
+
+		static FORCEINLINE Type Mult(const Type& A, const Type& B)
+		{
+			return A * B;
+		}
+
+		static FORCEINLINE Type Div(const Type& A, double D)
+		{
+			return D != 0.0 ? A / D : A;
+		}
+
+		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W)
+		{
+			return A + (B - A) * W;
+		}
 
 		static FORCEINLINE Type Min(const Type& A, const Type& B)
 		{
@@ -400,11 +815,30 @@ namespace PCGExTypeOps
 				FMath::Max(A.Z, B.Z), FMath::Max(A.W, B.W));
 		}
 
-		static FORCEINLINE Type Average(const Type& A, const Type& B) { return (A + B) * 0.5; }
-		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W) { return A + B * W; }
-		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W) { return A - B * W; }
-		static FORCEINLINE Type CopyA(const Type& A, const Type& B) { return A; }
-		static FORCEINLINE Type CopyB(const Type& A, const Type& B) { return B; }
+		static FORCEINLINE Type Average(const Type& A, const Type& B)
+		{
+			return (A + B) * 0.5;
+		}
+
+		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
+		{
+			return A + B * W;
+		}
+
+		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
+		{
+			return A - B * W;
+		}
+
+		static FORCEINLINE Type CopyA(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyB(const Type& A, const Type& B)
+		{
+			return B;
+		}
 
 		static FORCEINLINE Type UnsignedMin(const Type& A, const Type& B)
 		{
@@ -474,12 +908,25 @@ namespace PCGExTypeOps
 				B.W != 0.0 ? FMath::Fmod(A.W, B.W) : A.W);
 		}
 
-		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W) { return W != 0.0 ? (A + B) / W : A; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W != 0.0 ? (A + B) / W : A;
+		}
 
-		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW) { return TW != 0.0 ? A * (1.0 / TW) : A; }
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return TW != 0.0 ? A * (1.0 / TW) : A;
+		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return Type(FMath::Abs(A.X), FMath::Abs(A.Y), FMath::Abs(A.Z), FMath::Abs(A.W)); }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return Type(A.X * Factor, A.Y * Factor, A.Z * Factor, A.W * Factor); }
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return Type(FMath::Abs(A.X), FMath::Abs(A.Y), FMath::Abs(A.Z), FMath::Abs(A.W));
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return Type(A.X * Factor, A.Y * Factor, A.Z * Factor, A.W * Factor);
+		}
 
 	};
 }

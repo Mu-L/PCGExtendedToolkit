@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "Metadata/PCGMetadataCommon.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Metadata/PCGMetadataCommon.h"
 #include "PCGExBlendingCommon.generated.h"
 
 UENUM(BlueprintType)

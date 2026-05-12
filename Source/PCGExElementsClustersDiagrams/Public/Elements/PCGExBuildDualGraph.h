@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "Core/PCGExClustersProcessor.h"
 #include "Details/PCGExBlendingDetails.h"
-#include "Graphs/PCGExGraphDetails.h"
 #include "Graphs/PCGExGraphCommon.h"
+#include "Graphs/PCGExGraphDetails.h"
 #include "Math/PCGExProjectionDetails.h"
 
 #include "PCGExBuildDualGraph.generated.h"
@@ -50,7 +50,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BuildDualGraph, "Cluster : Dual Graph", "Build the edge dual graph: edges become vertices that connect to sequential edges around shared endpoints.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_BLEND(ClusterGenerator, Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_BLEND(ClusterGenerator, Pathfinding);
+	}
 #endif
 
 protected:

@@ -18,11 +18,17 @@ namespace PCGExMath::OBB
 		FBounds() = default;
 
 		FBounds(const FVector& InOrigin, const FVector& InExtents, int32 InIndex)
-			: Origin(InOrigin), Radius(InExtents.Size()), Extents(InExtents), Index(InIndex)
+			: Origin(InOrigin)
+			  , Radius(InExtents.Size())
+			  , Extents(InExtents)
+			  , Index(InIndex)
 		{
 		}
 
-		FORCEINLINE float GetRadiusSq() const { return Radius * Radius; }
+		FORCEINLINE float GetRadiusSq() const
+		{
+			return Radius * Radius;
+		}
 	};
 
 	// Cold data - only touched when doing full OBB tests 
@@ -38,9 +44,20 @@ namespace PCGExMath::OBB
 		}
 
 		// Axes computed on demand
-		FORCEINLINE FVector GetAxisX() const { return Rotation.GetAxisX(); }
-		FORCEINLINE FVector GetAxisY() const { return Rotation.GetAxisY(); }
-		FORCEINLINE FVector GetAxisZ() const { return Rotation.GetAxisZ(); }
+		FORCEINLINE FVector GetAxisX() const
+		{
+			return Rotation.GetAxisX();
+		}
+
+		FORCEINLINE FVector GetAxisY() const
+		{
+			return Rotation.GetAxisY();
+		}
+
+		FORCEINLINE FVector GetAxisZ() const
+		{
+			return Rotation.GetAxisZ();
+		}
 
 		// Transform point to local space
 		FORCEINLINE FVector ToLocal(const FVector& WorldPoint, const FVector& Origin) const
@@ -70,16 +87,36 @@ namespace PCGExMath::OBB
 		FOBB() = default;
 
 		FOBB(const FBounds& InBounds, const FOrientation& InOrientation)
-			: Bounds(InBounds), Orientation(InOrientation)
+			: Bounds(InBounds)
+			  , Orientation(InOrientation)
 		{
 		}
 
 		// Convenience accessors
-		FORCEINLINE const FVector& GetOrigin() const { return Bounds.Origin; }
-		FORCEINLINE const FVector& GetExtents() const { return Bounds.Extents; }
-		FORCEINLINE float GetRadius() const { return Bounds.Radius; }
-		FORCEINLINE int32 GetIndex() const { return Bounds.Index; }
-		FORCEINLINE const FQuat& GetRotation() const { return Orientation.Rotation; }
+		FORCEINLINE const FVector& GetOrigin() const
+		{
+			return Bounds.Origin;
+		}
+
+		FORCEINLINE const FVector& GetExtents() const
+		{
+			return Bounds.Extents;
+		}
+
+		FORCEINLINE float GetRadius() const
+		{
+			return Bounds.Radius;
+		}
+
+		FORCEINLINE int32 GetIndex() const
+		{
+			return Bounds.Index;
+		}
+
+		FORCEINLINE const FQuat& GetRotation() const
+		{
+			return Orientation.Rotation;
+		}
 
 		FORCEINLINE FVector ToLocal(const FVector& WorldPoint) const
 		{
@@ -98,7 +135,7 @@ namespace PCGExMath::OBB
 		}
 
 		// World-space corners. i bit 0 = X sign, bit 1 = Y, bit 2 = Z (-extent / +extent).
-		FORCEINLINE void GetCorners(FVector(&OutCorners)[8]) const
+		FORCEINLINE void GetCorners(FVector (&OutCorners)[8]) const
 		{
 			const FVector& E = Bounds.Extents;
 			for (int32 i = 0; i < 8; ++i)
@@ -135,7 +172,7 @@ namespace PCGExMath::OBB
 				FPlane(Y.X, Y.Y, Y.Z, 0),
 				FPlane(Z.X, Z.Y, Z.Z, 0),
 				FPlane(Bounds.Origin.X, Bounds.Origin.Y, Bounds.Origin.Z, 1)
-			);
+				);
 		}
 	};
 
@@ -152,7 +189,7 @@ namespace PCGExMath::OBB
 			return FOBB(
 				FBounds(WorldOrigin, Extents, Index),
 				FOrientation(Rotation)
-			);
+				);
 		}
 
 		FORCEINLINE FOBB FromTransform(const FTransform& Transform, const FVector& Extents, int32 Index)
@@ -160,7 +197,7 @@ namespace PCGExMath::OBB
 			return FOBB(
 				FBounds(Transform.GetLocation(), Extents, Index),
 				FOrientation(Transform.GetRotation())
-			);
+				);
 		}
 
 		FORCEINLINE FOBB FromAABB(const FBox& WorldBox, int32 Index)
@@ -168,7 +205,7 @@ namespace PCGExMath::OBB
 			return FOBB(
 				FBounds(WorldBox.GetCenter(), WorldBox.GetExtent(), Index),
 				FOrientation()
-			);
+				);
 		}
 
 		FORCEINLINE FOBB Expanded(const FOBB& Source, float Expansion)

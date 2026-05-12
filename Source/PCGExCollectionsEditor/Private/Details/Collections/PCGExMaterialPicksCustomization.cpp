@@ -8,9 +8,9 @@
 #include "IDetailChildrenBuilder.h"
 #include "PropertyHandle.h"
 #include "Collections/PCGExMeshCollection.h"
-#include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 #pragma region FPCGExMaterialOverrideSingleEntryCustomization
 
@@ -127,7 +127,10 @@ void FPCGExMaterialOverrideEntryCustomization::CustomizeHeader(
 							int32 V = -1;
 							SlotIndexHandle->GetValue(V);
 							const int32 Index = PropertyHandle->GetIndexInArray();
-							if (Index == INDEX_NONE || V >= 0) { return FText::FromString(TEXT("")); }
+							if (Index == INDEX_NONE || V >= 0)
+							{
+								return FText::FromString(TEXT(""));
+							}
 							return FText::FromString(FString::Printf(TEXT("→ %d"), Index));
 						})
 					.Font(IDetailLayoutBuilder::GetDetailFont())

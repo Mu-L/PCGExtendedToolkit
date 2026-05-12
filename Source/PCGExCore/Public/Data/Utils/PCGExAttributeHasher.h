@@ -83,7 +83,10 @@ namespace PCGEx
 		bool RequiresCompilation();
 		void Compile(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, PCGExMT::FSimpleCallback&& InCallback);
 
-		uint32 GetHash() const { return OutHash; }
+		uint32 GetHash() const
+		{
+			return OutHash;
+		}
 
 	protected:
 		void CompileScope(const PCGExMT::FScope& Scope);

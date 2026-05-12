@@ -9,20 +9,36 @@
 
 bool FPCGExUnionMetadataDetails::SanityCheck(FPCGExContext* InContext) const
 {
-	if (bWriteIsUnion) { PCGEX_VALIDATE_NAME_C(InContext, IsUnionAttributeName) }
-	if (bWriteUnionSize) { PCGEX_VALIDATE_NAME_C(InContext, UnionSizeAttributeName) }
+	if (bWriteIsUnion)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, IsUnionAttributeName)
+	}
+	if (bWriteUnionSize)
+	{
+		PCGEX_VALIDATE_NAME_C(InContext, UnionSizeAttributeName)
+	}
 	return true;
 }
 
 FPCGExPointPointIntersectionDetails::FPCGExPointPointIntersectionDetails(const bool InSupportEdges)
-	: bSupportsEdges(InSupportEdges), FuseDetails(FPCGExFuseDetails(!InSupportEdges))
+	: bSupportsEdges(InSupportEdges)
+	  , FuseDetails(FPCGExFuseDetails(!InSupportEdges))
 {
 }
 
 bool FPCGExPointPointIntersectionDetails::SanityCheck(FPCGExContext* InContext) const
 {
-	if (bSupportsEdges) { if (!EdgeUnionData.SanityCheck(InContext)) { return false; } }
-	if (!PointUnionData.SanityCheck(InContext)) { return false; }
+	if (bSupportsEdges)
+	{
+		if (!EdgeUnionData.SanityCheck(InContext))
+		{
+			return false;
+		}
+	}
+	if (!PointUnionData.SanityCheck(InContext))
+	{
+		return false;
+	}
 	return true;
 }
 

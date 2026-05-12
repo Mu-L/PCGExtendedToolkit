@@ -4,10 +4,10 @@
 #include "Elements/PCGExStagingTypeFilter.h"
 
 #include "PCGParamData.h"
+#include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Containers/PCGExScopedContainers.h"
 #include "Helpers/PCGExPointArrayDataHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagedTypeFilterElement"
@@ -30,7 +30,10 @@ void UPCGExStagedTypeFilterSettings::PostEditChangeProperty(FPropertyChangedEven
 	{
 		PCGExAssetCollection::FTypeRegistry::Get().ForEach([this](const PCGExAssetCollection::FTypeInfo& Info)
 		{
-			if (Info.Id == PCGExAssetCollection::TypeIds::Base || Info.Id == PCGExAssetCollection::TypeIds::None) { return; }
+			if (Info.Id == PCGExAssetCollection::TypeIds::Base || Info.Id == PCGExAssetCollection::TypeIds::None)
+			{
+				return;
+			}
 
 			const bool* Value = TypeConfig.TypeFilter.Find(Info.Id);
 			if (Value && *Value)
@@ -104,7 +107,10 @@ int32 FPCGExStagedTypeFilterContext::FindTypeBucket(PCGExAssetCollection::FTypeI
 	}
 
 	const int32* Bucket = TypeToBucketMap.Find(TypeId);
-	if (Bucket) { return *Bucket; }
+	if (Bucket)
+	{
+		return *Bucket;
+	}
 
 	// Walk parent chain
 	const PCGExAssetCollection::FTypeInfo* Info = PCGExAssetCollection::FTypeRegistry::Get().Find(TypeId);
@@ -125,7 +131,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(StagedTypeFilter)
 
 bool FPCGExStagedTypeFilterElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagedTypeFilter)
 
@@ -207,7 +216,10 @@ bool FPCGExStagedTypeFilterElement::AdvanceWork(FPCGExContext* InContext, const 
 			}
 
 			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+				{
+					return true;
+				},
 				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 					NewBatch->bSkipCompletion = true;
@@ -236,13 +248,19 @@ bool FPCGExStagedTypeFilterElement::AdvanceWork(FPCGExContext* InContext, const 
 
 		if (Settings->bOutputDiscarded)
 		{
-			if (!Context->UnmatchedOutput->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->UnmatchedOutput->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
 		}
 
 		for (int32 i = 0; i < Context->TypeOutputs.Num(); i++)
 		{
-			if (!Context->TypeOutputs[i]->StageOutputs()) { Mask |= 1ULL << PinIndex; }
+			if (!Context->TypeOutputs[i]->StageOutputs())
+			{
+				Mask |= 1ULL << PinIndex;
+			}
 			PinIndex++;
 		}
 
@@ -252,7 +270,10 @@ bool FPCGExStagedTypeFilterElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bRequiresWriteStep = true;
@@ -286,7 +307,10 @@ namespace PCGExStagedTypeFilter
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Settings->FilterMode == EPCGExStagedTypeFilterMode::PinPerType)
 		{
@@ -299,7 +323,10 @@ namespace PCGExStagedTypeFilter
 
 		// Get hash attribute -- silently skip data without staging hashes
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
-		if (!EntryHashGetter) { return false; }
+		if (!EntryHashGetter)
+		{
+			return false;
+		}
 
 		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType)
 		{
@@ -314,7 +341,10 @@ namespace PCGExStagedTypeFilter
 
 	void FProcessor::PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops)
 	{
-		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType) { return; }
+		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType)
+		{
+			return;
+		}
 
 		const int32 NumBuckets = Context->TypeOutputs.Num();
 		const int32 TotalBuckets = NumBuckets + 1; // +1 for unmatched
@@ -418,7 +448,10 @@ namespace PCGExStagedTypeFilter
 	{
 		TSharedPtr<PCGExData::FPointIO> NewPointIO = PCGExData::NewPointIO(PointDataFacade->Source, InCollection->OutputPin);
 
-		if (!NewPointIO->InitializeOutput(InitMode)) { return nullptr; }
+		if (!NewPointIO->InitializeOutput(InitMode))
+		{
+			return nullptr;
+		}
 
 		InCollection->Pairs[BatchIndex] = NewPointIO;
 		return NewPointIO;
@@ -426,7 +459,10 @@ namespace PCGExStagedTypeFilter
 
 	void FProcessor::OnPointsProcessingComplete()
 	{
-		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType) { return; }
+		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType)
+		{
+			return;
+		}
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExStagedTypeFilter::OnPointsProcessingComplete);
 
@@ -465,13 +501,19 @@ namespace PCGExStagedTypeFilter
 		// Mixed distribution -- create new outputs per bucket
 		for (int32 i = 0; i < NumBuckets; i++)
 		{
-			if (BucketCounts[i] <= 0) { continue; }
+			if (BucketCounts[i] <= 0)
+			{
+				continue;
+			}
 
 			TArray<int32> ReadIndices;
 			BucketIndices[i]->Collapse(ReadIndices);
 
 			TSharedPtr<PCGExData::FPointIO> BucketIO = CreateIO(Context->TypeOutputs[i].ToSharedRef(), PCGExData::EIOInit::New);
-			if (!BucketIO) { continue; }
+			if (!BucketIO)
+			{
+				continue;
+			}
 
 			PCGExPointArrayDataHelpers::SetNumPointsAllocated(BucketIO->GetOut(), ReadIndices.Num(), BucketIO->GetAllocations());
 			BucketIO->InheritProperties(ReadIndices, BucketIO->GetAllocations());
@@ -484,7 +526,10 @@ namespace PCGExStagedTypeFilter
 			BucketIndices[UnmatchedIdx]->Collapse(ReadIndices);
 
 			TSharedPtr<PCGExData::FPointIO> UnmatchedIO = CreateIO(Context->UnmatchedOutput.ToSharedRef(), PCGExData::EIOInit::New);
-			if (!UnmatchedIO) { return; }
+			if (!UnmatchedIO)
+			{
+				return;
+			}
 
 			PCGExPointArrayDataHelpers::SetNumPointsAllocated(UnmatchedIO->GetOut(), ReadIndices.Num(), UnmatchedIO->GetAllocations());
 			UnmatchedIO->InheritProperties(ReadIndices, UnmatchedIO->GetAllocations());
@@ -494,7 +539,10 @@ namespace PCGExStagedTypeFilter
 	void FProcessor::CompleteWork()
 	{
 		// PinPerType mode is handled entirely by OnPointsProcessingComplete
-		if (Settings->FilterMode == EPCGExStagedTypeFilterMode::PinPerType) { return; }
+		if (Settings->FilterMode == EPCGExStagedTypeFilterMode::PinPerType)
+		{
+			return;
+		}
 
 		const int32 NumPoints = PointDataFacade->GetNum();
 		const int32 NumFiltered = NumPoints - NumKept;
@@ -525,10 +573,16 @@ namespace PCGExStagedTypeFilter
 			// Create inverted mask for filtered out points
 			TArray<int8> InvertedMask;
 			InvertedMask.SetNum(NumPoints);
-			for (int32 i = 0; i < NumPoints; i++) { InvertedMask[i] = Mask[i] ? 0 : 1; }
+			for (int32 i = 0; i < NumPoints; i++)
+			{
+				InvertedMask[i] = Mask[i] ? 0 : 1;
+			}
 
 			TSharedPtr<PCGExData::FPointIO> FilteredIO = Context->FilteredOutCollection->Emplace_GetRef(PointDataFacade->GetIn(), PCGExData::EIOInit::Duplicate);
-			if (FilteredIO) { (void)FilteredIO->Gather(InvertedMask); }
+			if (FilteredIO)
+			{
+				(void)FilteredIO->Gather(InvertedMask);
+			}
 		}
 
 		// Gather kept points

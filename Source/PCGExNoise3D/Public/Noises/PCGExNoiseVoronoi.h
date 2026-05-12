@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExNoise3DOperation.h"
+#include "UObject/Object.h"
 
 #include "PCGExNoiseVoronoi.generated.h"
 
@@ -61,7 +61,10 @@ private:
 	/** Smooth minimum for blending cells */
 	FORCEINLINE double SmoothMin(double A, double B, double K) const
 	{
-		if (K <= 0.0) { return FMath::Min(A, B); }
+		if (K <= 0.0)
+		{
+			return FMath::Min(A, B);
+		}
 		const double H = FMath::Max(K - FMath::Abs(A - B), 0.0) / K;
 		return FMath::Min(A, B) - H * H * K * 0.25;
 	}

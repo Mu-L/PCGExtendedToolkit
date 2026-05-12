@@ -81,10 +81,19 @@ namespace PCGExFactories
 	static bool GetInputFactories(FPCGExContext* InContext, const FName InLabel, TArray<TObjectPtr<const T_DEF>>& OutFactories, const TSet<EType>& Types, const bool bRequired = true)
 	{
 		TArray<TObjectPtr<const UPCGExFactoryData>> BaseFactories;
-		if (!GetInputFactories_Internal(InContext, InLabel, BaseFactories, Types, bRequired)) { return false; }
+		if (!GetInputFactories_Internal(InContext, InLabel, BaseFactories, Types, bRequired))
+		{
+			return false;
+		}
 
 		// Cast back to T_DEF
-		for (const TObjectPtr<const UPCGExFactoryData>& Base : BaseFactories) { if (const T_DEF* Derived = Cast<T_DEF>(Base)) { OutFactories.Add(Derived); } }
+		for (const TObjectPtr<const UPCGExFactoryData>& Base : BaseFactories)
+		{
+			if (const T_DEF* Derived = Cast<T_DEF>(Base))
+			{
+				OutFactories.Add(Derived);
+			}
+		}
 
 		return !OutFactories.IsEmpty();
 	}
@@ -100,7 +109,10 @@ namespace PCGExFactories
 	{
 		TArray<TObjectPtr<const UPCGExFactoryData>> BaseFactories;
 		BaseFactories.Reserve(InFactories.Num());
-		for (const TObjectPtr<const T_DEF>& Factory : InFactories) { BaseFactories.Add(Factory); }
+		for (const TObjectPtr<const T_DEF>& Factory : InFactories)
+		{
+			BaseFactories.Add(Factory);
+		}
 		RegisterConsumableAttributesWithData_Internal(BaseFactories, InContext, InData);
 	}
 
@@ -109,7 +121,10 @@ namespace PCGExFactories
 	{
 		TArray<TObjectPtr<const UPCGExFactoryData>> BaseFactories;
 		BaseFactories.Reserve(InFactories.Num());
-		for (const TObjectPtr<const T_DEF>& Factory : InFactories) { BaseFactories.Add(Factory); }
+		for (const TObjectPtr<const T_DEF>& Factory : InFactories)
+		{
+			BaseFactories.Add(Factory);
+		}
 		RegisterConsumableAttributesWithFacade_Internal(BaseFactories, InFacade);
 	}
 }

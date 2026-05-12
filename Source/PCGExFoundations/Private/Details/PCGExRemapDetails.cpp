@@ -13,18 +13,19 @@ double FPCGExRemapDetails::GetRemappedValue(const double Value, const double Ste
 {
 	switch (Snapping)
 	{
-	default: case EPCGExVariationSnapping::None: return PCGExMath::TruncateDbl(RemapLUT->Eval(PCGExMath::Remap(Value, InMin, InMax, 0, 1)) * Scale, TruncateOutput) * PostTruncateScale + Offset;
+	default: case EPCGExVariationSnapping::None:
+		return PCGExMath::TruncateDbl(RemapLUT->Eval(PCGExMath::Remap(Value, InMin, InMax, 0, 1)) * Scale, TruncateOutput) * PostTruncateScale + Offset;
 	case EPCGExVariationSnapping::SnapOffset:
-		{
-			double V = PCGExMath::TruncateDbl(RemapLUT->Eval(PCGExMath::Remap(Value, InMin, InMax, 0, 1)) * Scale, TruncateOutput) * PostTruncateScale;
-			PCGExMath::Snap(V, Step);
-			return V + Offset;
-		}
+	{
+		double V = PCGExMath::TruncateDbl(RemapLUT->Eval(PCGExMath::Remap(Value, InMin, InMax, 0, 1)) * Scale, TruncateOutput) * PostTruncateScale;
+		PCGExMath::Snap(V, Step);
+		return V + Offset;
+	}
 	case EPCGExVariationSnapping::SnapResult:
-		{
-			double V = PCGExMath::TruncateDbl(RemapLUT->Eval(PCGExMath::Remap(Value, InMin, InMax, 0, 1)) * Scale, TruncateOutput) * PostTruncateScale + Offset;
-			PCGExMath::Snap(V, Step);
-			return V;
-		}
+	{
+		double V = PCGExMath::TruncateDbl(RemapLUT->Eval(PCGExMath::Remap(Value, InMin, InMax, 0, 1)) * Scale, TruncateOutput) * PostTruncateScale + Offset;
+		PCGExMath::Snap(V, Step);
+		return V;
+	}
 	}
 }

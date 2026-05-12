@@ -7,15 +7,15 @@
 #include "UObject/Object.h"
 #include "UObject/UObjectGlobals.h"
 
-#include "PCGExPointElements.h"
+#include "PCGCommon.h"
 #include "PCGExCommon.h"
 #include "PCGExDataCommon.h"
 #include "PCGExDataMacros.h"
-#include "PCGCommon.h"
+#include "PCGExPointElements.h"
 #include "Core/PCGExMTCommon.h"
 #include "Helpers/PCGExMetaHelpersMacros.h"
-#include "Metadata/PCGMetadataCommon.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
+#include "Metadata/PCGMetadataCommon.h"
 #include "Types/PCGExTypes.h"
 
 
@@ -91,9 +91,21 @@ namespace PCGExData
 		FPCGAttributeIdentifier Identifier;
 		bool bResetWithFirstValue = false;
 
-		bool IsEnabled() const { return bIsEnabled.load(std::memory_order_acquire); }
-		void Disable() { bIsEnabled.store(false, std::memory_order_release); }
-		void Enable() { bIsEnabled.store(true, std::memory_order_release); }
+		bool IsEnabled() const
+		{
+			return bIsEnabled.load(std::memory_order_acquire);
+		}
+
+		void Disable()
+		{
+			bIsEnabled.store(false, std::memory_order_release);
+		}
+
+		void Enable()
+		{
+			bIsEnabled.store(true, std::memory_order_release);
+		}
+
 		virtual void EnableValueHashCache();
 
 		// Unsafe read value hash from input
@@ -113,9 +125,20 @@ namespace PCGExData
 
 		IBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
 
-		FORCEINLINE uint64 GetUID() const { return UID; }
-		FORCEINLINE EPCGMetadataTypes GetTypeId() const { return Type; }
-		FORCEINLINE EDomainType GetUnderlyingDomain() const { return UnderlyingDomain; }
+		FORCEINLINE uint64 GetUID() const
+		{
+			return UID;
+		}
+
+		FORCEINLINE EPCGMetadataTypes GetTypeId() const
+		{
+			return Type;
+		}
+
+		FORCEINLINE EDomainType GetUnderlyingDomain() const
+		{
+			return UnderlyingDomain;
+		}
 
 		template <typename T>
 		bool IsA() const;
@@ -129,7 +152,10 @@ namespace PCGExData
 		{
 		}
 
-		virtual bool IsSparse() const { return false; }
+		virtual bool IsSparse() const
+		{
+			return false;
+		}
 
 		virtual bool IsWritable() = 0;
 		virtual bool IsReadable() = 0;
@@ -383,7 +409,10 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 			for (int i = 0; i < Buffers.Num(); i++)
 			{
 				const TSharedPtr<IBuffer> Buffer = Buffers[i];
-				if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled()) { continue; }
+				if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled())
+				{
+					continue;
+				}
 				Callback(Buffer);
 			}
 		}

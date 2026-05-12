@@ -105,15 +105,24 @@ void UPCGExSubSystem::EnsureIndexBufferSize(const int32 Count)
 {
 	{
 		FReadScopeLock ReadScopeLock(IndexBufferLock);
-		if (IndexBuffer.Num() >= Count) { return; }
+		if (IndexBuffer.Num() >= Count)
+		{
+			return;
+		}
 	}
 	{
 		FWriteScopeLock WriteScopeLock(IndexBufferLock);
-		if (IndexBuffer.Num() >= Count) { return; }
+		if (IndexBuffer.Num() >= Count)
+		{
+			return;
+		}
 
 		const int32 StartIndex = IndexBuffer.Num();
 		IndexBuffer.SetNumUninitialized(Count + 1024);
-		for (int i = StartIndex; i < Count; i++) { IndexBuffer[i] = i; }
+		for (int i = StartIndex; i < Count; i++)
+		{
+			IndexBuffer[i] = i;
+		}
 	}
 }
 
@@ -130,14 +139,26 @@ double UPCGExSubSystem::GetTickBudgetInSeconds()
 #if WITH_EDITOR
 	if (GEditor && !GEditor->IsPlaySessionInProgress())
 	{
-		if (!CVarEditorTimePerFrame) { CVarEditorTimePerFrame = IConsoleManager::Get().FindConsoleVariable(TEXT("pcg.EditorFrameTime")); }
-		if (CVarEditorTimePerFrame) { Val = CVarEditorTimePerFrame->GetFloat(); }
+		if (!CVarEditorTimePerFrame)
+		{
+			CVarEditorTimePerFrame = IConsoleManager::Get().FindConsoleVariable(TEXT("pcg.EditorFrameTime"));
+		}
+		if (CVarEditorTimePerFrame)
+		{
+			Val = CVarEditorTimePerFrame->GetFloat();
+		}
 	}
 	else
 #endif
 	{
-		if (!CVarTimePerFrame) { CVarTimePerFrame = IConsoleManager::Get().FindConsoleVariable(TEXT("pcg.FrameTime")); }
-		if (CVarTimePerFrame) { Val = CVarTimePerFrame->GetFloat(); }
+		if (!CVarTimePerFrame)
+		{
+			CVarTimePerFrame = IConsoleManager::Get().FindConsoleVariable(TEXT("pcg.FrameTime"));
+		}
+		if (CVarTimePerFrame)
+		{
+			Val = CVarTimePerFrame->GetFloat();
+		}
 	}
 
 	return FMath::Max(Val, 1.0) / 1000.0;
@@ -164,6 +185,12 @@ void UPCGExSubSystem::ExecuteBeginTickActions()
 		PolledEvents.Reset();
 	}
 
-	for (const PCGEx::FPolledEvent& Event : Events) { OnGlobalEvent.Broadcast(Event.Source, Event.Type, Event.EventId); }
-	for (FTickAction& Action : Actions) { Action(); }
+	for (const PCGEx::FPolledEvent& Event : Events)
+	{
+		OnGlobalEvent.Broadcast(Event.Source, Event.Type, Event.EventId);
+	}
+	for (FTickAction& Action : Actions)
+	{
+		Action();
+	}
 }

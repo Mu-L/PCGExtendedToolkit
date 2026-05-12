@@ -7,9 +7,9 @@
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "UObject/Object.h"
 
-#include "Core/PCGExPointFilter.h"
 #include "PCGExFilterCommon.h"
 #include "PCGExOctree.h"
+#include "Core/PCGExPointFilter.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 
 #include "PCGExVolumeFilter.generated.h"
@@ -69,8 +69,14 @@ namespace PCGExPointFilter
 
 	FORCEINLINE static double ComputeEffectiveRadius(const double InRadius, const bool bUsePenetration, const EPCGExVolumePenetrationMode PenetrationMode, const double PenetrationThreshold)
 	{
-		if (!bUsePenetration) { return InRadius; }
-		if (PenetrationMode == EPCGExVolumePenetrationMode::Discrete) { return FMath::Max(0.0, InRadius - PenetrationThreshold); }
+		if (!bUsePenetration)
+		{
+			return InRadius;
+		}
+		if (PenetrationMode == EPCGExVolumePenetrationMode::Discrete)
+		{
+			return FMath::Max(0.0, InRadius - PenetrationThreshold);
+		}
 		return InRadius * FMath::Clamp(1.0 - PenetrationThreshold, 0.0, 1.0);
 	}
 }
@@ -140,7 +146,11 @@ public:
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
 
 	virtual void BeginDestroy() override;
@@ -155,7 +165,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FVolumeFilter(const TObjectPtr<const UPCGExVolumeFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 
@@ -213,6 +224,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

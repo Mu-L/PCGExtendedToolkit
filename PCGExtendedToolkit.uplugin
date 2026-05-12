@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
   "Version": 1,
-  "VersionName": "0.75.15",
+  "VersionName": "0.76",
   "FriendlyName": "PCGEx",
   "Description": "A rather large toolset that expand on existing PCG capabilities in unique ways.",
   "Category": "PCG",
@@ -488,6 +488,19 @@
         "Mac",
         "Linux"
       ]
+    },
+    {
+      "Name": "PCGExSpatialDomains",
+      "Type": "Runtime",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64",
+        "Mac",
+        "IOS",
+        "Android",
+        "Linux",
+        "LinuxArm64"
+      ]
     }
   ],
   "Plugins": [
@@ -501,10 +514,6 @@
     },
     {
       "Name": "PCGGeometryScriptInterop",
-      "Enabled": true
-    },
-    {
-      "Name": "StructUtils",
       "Enabled": true
     }
   ]

@@ -18,7 +18,10 @@ TArray<FPCGPinProperties> UPCGExDiscardByPointCountSettings::OutputPinProperties
 	return PinProperties;
 }
 
-FPCGElementPtr UPCGExDiscardByPointCountSettings::CreateElement() const { return MakeShared<FPCGExDiscardByPointCountElement>(); }
+FPCGElementPtr UPCGExDiscardByPointCountSettings::CreateElement() const
+{
+	return MakeShared<FPCGExDiscardByPointCountElement>();
+}
 
 bool FPCGExDiscardByPointCountElement::Boot(FPCGExContext* InContext) const
 {
@@ -61,8 +64,14 @@ bool FPCGExDiscardByPointCountElement::AdvanceWork(FPCGExContext* InContext, con
 
 		Context->MainPoints->StageOutputs();
 
-		if (NumDiscarded == NumTotal) { Context->OutputData.InactiveOutputPinBitmask |= 1ULL << 0; }
-		if (!NumDiscarded) { Context->OutputData.InactiveOutputPinBitmask |= 1ULL << 1; }
+		if (NumDiscarded == NumTotal)
+		{
+			Context->OutputData.InactiveOutputPinBitmask |= 1ULL << 0;
+		}
+		if (!NumDiscarded)
+		{
+			Context->OutputData.InactiveOutputPinBitmask |= 1ULL << 1;
+		}
 
 		Context->Done();
 	}

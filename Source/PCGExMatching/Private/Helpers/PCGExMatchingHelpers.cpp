@@ -60,7 +60,10 @@ namespace PCGExMatching::Helpers
 		const int32 NumSources = Matcher->GetNumSources();
 		check(NumSources == Facades.Num())
 
-		if (NumSources == 0) { return 0; }
+		if (NumSources == 0)
+		{
+			return 0;
+		}
 
 		OutPartitions.Reserve(NumSources);
 
@@ -72,7 +75,10 @@ namespace PCGExMatching::Helpers
 
 			for (int32 i = 0; i < NumSources; ++i)
 			{
-				if (DistributedIndices[i]) { continue; }
+				if (DistributedIndices[i])
+				{
+					continue;
+				}
 
 				TArray<int32>& Partition = OutPartitions.Emplace_GetRef();
 				Partition.Reserve(NumSources);
@@ -82,7 +88,10 @@ namespace PCGExMatching::Helpers
 				Partition.AddUnique(i);
 
 				// Remove any indices that were already distributed (defensive check for recursive matching)
-				Partition.RemoveAll([&DistributedIndices](const int32 Idx) { return DistributedIndices[Idx]; });
+				Partition.RemoveAll([&DistributedIndices](const int32 Idx)
+				{
+					return DistributedIndices[Idx];
+				});
 
 				// Mark all partition members as distributed
 				for (const int32 Idx : Partition)
@@ -119,7 +128,10 @@ namespace PCGExMatching::Helpers
 				// Mark OnceIndices in this partition as distributed
 				for (const int32 Idx : Partition)
 				{
-					if (OnceIndices->Contains(Idx)) { OnceDistributed[Idx] = true; }
+					if (OnceIndices->Contains(Idx))
+					{
+						OnceDistributed[Idx] = true;
+					}
 				}
 			}
 		}

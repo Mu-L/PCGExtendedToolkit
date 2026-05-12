@@ -8,11 +8,11 @@
 #include "PCGExCoreMacros.h"
 #include "PCGExCoreSettingsCache.h"
 
+#include "PCGExProperty.h"
 #include "PCGSettings.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
-#include "PCGExProperty.h"
 
 #include "PCGExTuple.generated.h"
 
@@ -46,8 +46,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(Tuple, "Tuple", "A Simple Tuple attribute.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Constant); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Constant);
+	}
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif

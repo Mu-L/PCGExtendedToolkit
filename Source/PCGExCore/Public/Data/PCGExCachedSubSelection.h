@@ -151,13 +151,19 @@ namespace PCGExData
 		/** No sub-selection: just convert RealType -> WorkingType. */
 		FORCEINLINE void ConvertGet(const void* Source, void* OutValue) const
 		{
-			if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
+			if (ConvertRealToWorking)
+			{
+				ConvertRealToWorking(Source, OutValue);
+			}
 		}
 
 		/** No sub-selection: just convert WorkingType -> RealType. */
 		FORCEINLINE void ConvertSet(void* Target, const void* Source) const
 		{
-			if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
+			if (ConvertWorkingToReal)
+			{
+				ConvertWorkingToReal(Source, Target);
+			}
 		}
 	};
 }

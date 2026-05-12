@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "Core/PCGExPointFilter.h"
 #include "Data/Bitmasks/PCGExBitmaskDetails.h"
@@ -80,7 +80,9 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FBitmaskFilter(const TObjectPtr<const UPCGExBitmaskFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition), Bitmask(InDefinition->Config.Bitmask)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
+			  , Bitmask(InDefinition->Config.Bitmask)
 		{
 		}
 

@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExPartition.h"
 #include "PCGExPartitionByValues.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExModularPartitionByValues.generated.h"
 
 USTRUCT(meta=(PCG_DataTypeDisplayName="PCGEx | Partition Rule"))
@@ -28,7 +28,11 @@ class UPCGExPartitionRule : public UPCGExFactoryData
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoPartitionRule)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::RulePartition; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::RulePartition;
+	}
+
 	FPCGExPartitonRuleConfig Config;
 };
 
@@ -44,12 +48,20 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(PartitionRuleFactory, "Partition Rule", "Creates an single partition rule to be used with the Partition by Values node.", FName(GetDisplayName()))
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(PartitionRule); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(PartitionRule);
+	}
 #endif
 	//~End UPCGSettings
 
 	//~Begin UPCGExFactoryProviderSettings
-	virtual FName GetMainOutputPin() const override { return FName("PartitionRule"); }
+	virtual FName GetMainOutputPin() const override
+	{
+		return FName("PartitionRule");
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 #if WITH_EDITOR
@@ -74,8 +86,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(ModularPartitionByValues, "Partition by Values", "Outputs separate buckets of points based on an attribute' value. Each bucket is named after a unique attribute value. Note that it is recommended to use a Merge before.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spatial; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscAdd); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spatial;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscAdd);
+	}
 #endif
 
 protected:

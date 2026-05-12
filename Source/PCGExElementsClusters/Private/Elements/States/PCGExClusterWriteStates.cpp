@@ -3,16 +3,23 @@
 
 #include "Elements/States/PCGExClusterWriteStates.h"
 
-#include "Data/PCGExData.h"
 #include "Clusters/PCGExCluster.h"
 #include "Core/PCGExClusterStates.h"
 #include "Core/PCGExPointStates.h"
+#include "Data/PCGExData.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
 #define PCGEX_NAMESPACE FlagNodes
 
-PCGExData::EIOInit UPCGExFlagNodesSettings::GetMainOutputInitMode() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
-PCGExData::EIOInit UPCGExFlagNodesSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
+PCGExData::EIOInit UPCGExFlagNodesSettings::GetMainOutputInitMode() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
+
+PCGExData::EIOInit UPCGExFlagNodesSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
 
 #if WITH_EDITOR
 void UPCGExFlagNodesSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
@@ -34,7 +41,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(FlagNodes)
 
 bool FPCGExFlagNodesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FlagNodes)
 
@@ -49,9 +59,12 @@ bool FPCGExFlagNodesElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -74,7 +87,10 @@ namespace PCGExFlagNodes
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExFindNodeState::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		Cluster->ComputeEdgeLengths();
 
@@ -125,7 +141,10 @@ namespace PCGExFlagNodes
 
 	bool FBatch::PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor)
 	{
-		if (!TBatch<FProcessor>::PrepareSingle(InProcessor)) { return false; }
+		if (!TBatch<FProcessor>::PrepareSingle(InProcessor))
+		{
+			return false;
+		}
 		PCGEX_TYPED_PROCESSOR
 		TypedProcessor->StateFlags = StateFlags;
 		return true;

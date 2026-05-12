@@ -3,10 +3,10 @@
 
 #include "Filters/Points/PCGExFilterGroup.h"
 
-#include "PCGExFiltersSubSystem.h"
-#include "Containers/PCGExManagedObjects.h"
 #include "PCGExFilterCommon.h"
+#include "PCGExFiltersSubSystem.h"
 #include "Clusters/PCGExCluster.h"
+#include "Containers/PCGExManagedObjects.h"
 
 namespace PCGExFilterGroup
 {
@@ -95,8 +95,14 @@ namespace PCGExFilterGroup
 			ManagedFilters.Add(NewFilter);
 		};
 
-		if (bWantsFalseConstant) { RegisterConstant(false); }
-		if (bWantsTrueConstant) { RegisterConstant(true); }
+		if (bWantsFalseConstant)
+		{
+			RegisterConstant(false);
+		}
+		if (bWantsTrueConstant)
+		{
+			RegisterConstant(true);
+		}
 
 		return PostInitManaged(InContext);
 	}
@@ -124,7 +130,10 @@ namespace PCGExFilterGroup
 			if (!bInitForCluster)
 			{
 				// Other filter types require cluster data, which we don't have :/
-				if (!bQuiet) { PCGEX_LOG_INVALID_INPUT(InContext, FTEXT("Using a Cluster filter without cluster data")); }
+				if (!bQuiet)
+				{
+					PCGEX_LOG_INVALID_INPUT(InContext, FTEXT("Using a Cluster filter without cluster data"));
+				}
 				return false;
 			}
 
@@ -140,10 +149,16 @@ namespace PCGExFilterGroup
 	{
 		bValid = !ManagedFilters.IsEmpty();
 
-		if (!bValid) { return false; }
+		if (!bValid)
+		{
+			return false;
+		}
 
 		// Sort mappings so higher priorities come last, as they have to potential to override values.
-		ManagedFilters.Sort([](const TSharedPtr<PCGExPointFilter::IFilter>& A, const TSharedPtr<PCGExPointFilter::IFilter>& B) { return A->Factory->Priority < B->Factory->Priority; });
+		ManagedFilters.Sort([](const TSharedPtr<PCGExPointFilter::IFilter>& A, const TSharedPtr<PCGExPointFilter::IFilter>& B)
+		{
+			return A->Factory->Priority < B->Factory->Priority;
+		});
 
 		// Update index & post-init
 		Stack.Reserve(ManagedFilters.Num());
@@ -165,61 +180,121 @@ namespace PCGExFilterGroup
 
 	bool FFilterGroupAND::Test(const int32 Index) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (!Filter->Test(Index)) { return bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Index))
+			{
+				return bInvert;
+			}
+		}
 		return !bInvert;
 	}
 
 	bool FFilterGroupAND::Test(const PCGExClusters::FNode& Node) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (!Filter->Test(Node)) { return bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Node))
+			{
+				return bInvert;
+			}
+		}
 		return !bInvert;
 	}
 
 	bool FFilterGroupAND::Test(const PCGExGraphs::FEdge& Edge) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (!Filter->Test(Edge)) { return bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Edge))
+			{
+				return bInvert;
+			}
+		}
 		return !bInvert;
 	}
 
 	bool FFilterGroupAND::Test(const PCGExData::FProxyPoint& Point) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (!Filter->Test(Point)) { return bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(Point))
+			{
+				return bInvert;
+			}
+		}
 		return !bInvert;
 	}
 
 	bool FFilterGroupAND::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (!Filter->Test(IO, ParentCollection)) { return bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (!Filter->Test(IO, ParentCollection))
+			{
+				return bInvert;
+			}
+		}
 		return !bInvert;
 	}
 
 	bool FFilterGroupOR::Test(const int32 Index) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (Filter->Test(Index)) { return !bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (Filter->Test(Index))
+			{
+				return !bInvert;
+			}
+		}
 		return bInvert;
 	}
 
 	bool FFilterGroupOR::Test(const PCGExClusters::FNode& Node) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (Filter->Test(Node)) { return !bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (Filter->Test(Node))
+			{
+				return !bInvert;
+			}
+		}
 		return bInvert;
 	}
 
 	bool FFilterGroupOR::Test(const PCGExGraphs::FEdge& Edge) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (Filter->Test(Edge)) { return !bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (Filter->Test(Edge))
+			{
+				return !bInvert;
+			}
+		}
 		return bInvert;
 	}
 
 	bool FFilterGroupOR::Test(const PCGExData::FProxyPoint& Point) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (Filter->Test(Point)) { return !bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (Filter->Test(Point))
+			{
+				return !bInvert;
+			}
+		}
 		return bInvert;
 	}
 
 	bool FFilterGroupOR::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
 	{
-		for (const PCGExPointFilter::IFilter* Filter : Stack) { if (Filter->Test(IO, ParentCollection)) { return !bInvert; } }
+		for (const PCGExPointFilter::IFilter* Filter : Stack)
+		{
+			if (Filter->Test(IO, ParentCollection))
+			{
+				return !bInvert;
+			}
+		}
 		return bInvert;
 	}
 }
@@ -293,7 +368,10 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExFilterGroupFactoryDataOR::CreateFilt
 #pragma region UPCGExFilterGroupProvider
 
 #if WITH_EDITOR
-FString UPCGExFilterGroupProviderSettings::GetDisplayName() const { return Mode == EPCGExFilterGroupMode::OR ? TEXT("OR") : TEXT("AND"); }
+FString UPCGExFilterGroupProviderSettings::GetDisplayName() const
+{
+	return Mode == EPCGExFilterGroupMode::OR ? TEXT("OR") : TEXT("AND");
+}
 
 
 TArray<FPCGPreConfiguredSettingsInfo> UPCGExFilterGroupProviderSettings::GetPreconfiguredInfo() const
@@ -325,14 +403,23 @@ TArray<FPCGPinProperties> UPCGExFilterGroupProviderSettings::OutputPinProperties
 	return PinProperties;
 }
 
-FName UPCGExFilterGroupProviderSettings::GetMainOutputPin() const { return PCGExFilters::Labels::OutputFilterLabel; }
+FName UPCGExFilterGroupProviderSettings::GetMainOutputPin() const
+{
+	return PCGExFilters::Labels::OutputFilterLabel;
+}
 
 UPCGExFactoryData* UPCGExFilterGroupProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
 {
 	UPCGExFilterGroupFactoryData* NewFactory;
 
-	if (Mode == EPCGExFilterGroupMode::AND) { NewFactory = InContext->ManagedObjects->New<UPCGExFilterGroupFactoryDataAND>(); }
-	else { NewFactory = InContext->ManagedObjects->New<UPCGExFilterGroupFactoryDataOR>(); }
+	if (Mode == EPCGExFilterGroupMode::AND)
+	{
+		NewFactory = InContext->ManagedObjects->New<UPCGExFilterGroupFactoryDataAND>();
+	}
+	else
+	{
+		NewFactory = InContext->ManagedObjects->New<UPCGExFilterGroupFactoryDataOR>();
+	}
 
 	if (!GetInputFactories(InContext, PCGExFilters::Labels::SourceFiltersLabel, NewFactory->FilterFactories, PCGExFactories::AnyFilters))
 	{
@@ -341,7 +428,10 @@ UPCGExFactoryData* UPCGExFilterGroupProviderSettings::CreateFactory(FPCGExContex
 	}
 
 	int32 MaxPriority = Priority;
-	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : NewFactory->FilterFactories) { MaxPriority = FMath::Max(MaxPriority, Factory->Priority); }
+	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : NewFactory->FilterFactories)
+	{
+		MaxPriority = FMath::Max(MaxPriority, Factory->Priority);
+	}
 
 	NewFactory->Priority = MaxPriority;
 	NewFactory->bInvert = bInvert;

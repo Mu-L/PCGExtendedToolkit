@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Elements/PCGExTensorsTransform.h"
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExTensor.h"
 #include "Data/PCGExData.h"
+#include "Elements/PCGExTensorsTransform.h"
 #include "Math/PCGExMath.h"
 #include "Paths/PCGExPathIntersectionDetails.h"
 #include "Paths/PCGExPathsCommon.h"
@@ -144,7 +144,10 @@ namespace PCGExExtrusion
 		EStopReason Reason = EStopReason::None;
 		int32 OtherIndex = -1; // Index of other path/extrusion if applicable
 
-		explicit operator bool() const { return bHasCollision; }
+		explicit operator bool() const
+		{
+			return bHasCollision;
+		}
 
 		void Set(const FVector& InPosition, EStopReason InReason, int32 InOtherIndex = -1)
 		{
@@ -283,12 +286,35 @@ namespace PCGExExtrusion
 		void Cleanup();
 
 		//~ State queries
-		FORCEINLINE bool IsActive() const { return State == EExtrusionState::Probing || State == EExtrusionState::Extruding; }
-		FORCEINLINE bool IsComplete() const { return State == EExtrusionState::Completed || State == EExtrusionState::Stopped; }
-		FORCEINLINE bool IsValidPath() const { return (State == EExtrusionState::Completed || State == EExtrusionState::Stopped) && ExtrudedPoints.Num() >= 2; }
-		FORCEINLINE int32 GetPointCount() const { return ExtrudedPoints.Num(); }
-		FORCEINLINE bool HasStopReason(EStopReason InReason) const { return EnumHasAnyFlags(StopReason, InReason); }
-		FORCEINLINE bool AdvancedOnly() const { return bAdvancedOnly; }
+		FORCEINLINE bool IsActive() const
+		{
+			return State == EExtrusionState::Probing || State == EExtrusionState::Extruding;
+		}
+
+		FORCEINLINE bool IsComplete() const
+		{
+			return State == EExtrusionState::Completed || State == EExtrusionState::Stopped;
+		}
+
+		FORCEINLINE bool IsValidPath() const
+		{
+			return (State == EExtrusionState::Completed || State == EExtrusionState::Stopped) && ExtrudedPoints.Num() >= 2;
+		}
+
+		FORCEINLINE int32 GetPointCount() const
+		{
+			return ExtrudedPoints.Num();
+		}
+
+		FORCEINLINE bool HasStopReason(EStopReason InReason) const
+		{
+			return EnumHasAnyFlags(StopReason, InReason);
+		}
+
+		FORCEINLINE bool AdvancedOnly() const
+		{
+			return bAdvancedOnly;
+		}
 
 	protected:
 		//~ Internal data

@@ -5,10 +5,10 @@
 
 #include "CoreMinimal.h"
 #include "AssetDefinitionDefault.h"
+#include "PCGExDataAssetFactory.h"
+#include "AssetRegistry/AssetData.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Engine/World.h"
-#include "AssetRegistry/AssetData.h"
-#include "PCGExDataAssetFactory.h"
 
 #include "PCGExActorCollectionActions.generated.h"
 
@@ -29,7 +29,10 @@ class UPCGExActorCollectionFactory : public UPCGExDataAssetFactoryBase
 	GENERATED_BODY()
 
 public:
-	UPCGExActorCollectionFactory() { SupportedClass = UPCGExActorCollection::StaticClass(); }
+	UPCGExActorCollectionFactory()
+	{
+		SupportedClass = UPCGExActorCollection::StaticClass();
+	}
 };
 
 UCLASS()
@@ -38,10 +41,25 @@ class UAssetDefinition_PCGExActorCollection : public UAssetDefinitionDefault
 	GENERATED_BODY()
 
 public:
-	virtual FText GetAssetDisplayName() const override { return INVTEXT("Actor Collection"); }
-	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(67, 142, 245)); }
-	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("A weighted collection of actor classes for spawning."); }
-	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExActorCollection::StaticClass(); }
+	virtual FText GetAssetDisplayName() const override
+	{
+		return INVTEXT("Actor Collection");
+	}
+
+	virtual FLinearColor GetAssetColor() const override
+	{
+		return FLinearColor(FColor(67, 142, 245));
+	}
+
+	virtual FText GetAssetDescription(const FAssetData& AssetData) const override
+	{
+		return INVTEXT("A weighted collection of actor classes for spawning.");
+	}
+
+	virtual TSoftClassPtr<UObject> GetAssetClass() const override
+	{
+		return UPCGExActorCollection::StaticClass();
+	}
 
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{

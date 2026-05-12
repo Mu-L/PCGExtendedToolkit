@@ -75,7 +75,10 @@ public:
 	UPROPERTY()
 	FPCGExMeanFilterConfig Config;
 
-	virtual bool SupportsCollectionEvaluation() const override { return false; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
@@ -88,7 +91,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FMeanFilter(const TObjectPtr<const UPCGExMeanFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 

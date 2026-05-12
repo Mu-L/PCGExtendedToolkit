@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExTagValueFilter.generated.h"
 
@@ -81,7 +81,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FTagValueFilter(const TObjectPtr<const UPCGExTagValueFilterFactory>& InDefinition)
-			: ICollectionFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ICollectionFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

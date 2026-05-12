@@ -30,7 +30,10 @@ struct PCGEXPROPERTIES_API FPCGExEnumSelector
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enum")
 	int64 Value = 0;
 
-	bool IsValid() const { return Class != nullptr; }
+	bool IsValid() const
+	{
+		return Class != nullptr;
+	}
 
 	FText GetDisplayName() const;
 	FString GetCultureInvariantDisplayName() const;

@@ -37,7 +37,9 @@ namespace PCGExClusters
 		FHalfEdge() = default;
 
 		FHalfEdge(int32 InOrigin, int32 InTarget, double InAngle)
-			: OriginNode(InOrigin), TargetNode(InTarget), Angle(InAngle)
+			: OriginNode(InOrigin)
+			  , TargetNode(InTarget)
+			  , Angle(InAngle)
 		{
 		}
 	};
@@ -178,20 +180,48 @@ namespace PCGExClusters
 		 */
 		int32 GetWrapperFaceIndex() const;
 
-		FORCEINLINE bool IsBuilt() const { return !HalfEdges.IsEmpty(); }
-		FORCEINLINE bool IsLocalTangent() const { return bIsLocalTangent; }
-		FORCEINLINE int32 GetNumHalfEdges() const { return HalfEdges.Num(); }
-		FORCEINLINE int32 GetNumFaces() const { return NumFaces; }
-		FORCEINLINE const FCluster* GetCluster() const { return Cluster; }
+		FORCEINLINE bool IsBuilt() const
+		{
+			return !HalfEdges.IsEmpty();
+		}
+
+		FORCEINLINE bool IsLocalTangent() const
+		{
+			return bIsLocalTangent;
+		}
+
+		FORCEINLINE int32 GetNumHalfEdges() const
+		{
+			return HalfEdges.Num();
+		}
+
+		FORCEINLINE int32 GetNumFaces() const
+		{
+			return NumFaces;
+		}
+
+		FORCEINLINE const FCluster* GetCluster() const
+		{
+			return Cluster;
+		}
 
 		/** Get a half-edge by index */
-		FORCEINLINE const FHalfEdge& GetHalfEdge(int32 Index) const { return HalfEdges[Index]; }
+		FORCEINLINE const FHalfEdge& GetHalfEdge(int32 Index) const
+		{
+			return HalfEdges[Index];
+		}
 
 		/** Get read-only access to all half-edges */
-		FORCEINLINE const TArray<FHalfEdge>& GetHalfEdges() const { return HalfEdges; }
+		FORCEINLINE const TArray<FHalfEdge>& GetHalfEdges() const
+		{
+			return HalfEdges;
+		}
 
 		/** Get node-indexed projected positions (access via NodeIndex, not PointIndex) */
-		FORCEINLINE const TSharedPtr<TArray<FVector2D>>& GetProjectedPositions() const { return ProjectedPositions; }
+		FORCEINLINE const TSharedPtr<TArray<FVector2D>>& GetProjectedPositions() const
+		{
+			return ProjectedPositions;
+		}
 
 		/**
 		 * Get half-edge index for a directed edge.

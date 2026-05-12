@@ -5,11 +5,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "UObject/Interface.h"
-#include "UObject/UObjectGlobals.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "UObject/Interface.h"
+#include "UObject/Object.h"
+#include "UObject/UObjectGlobals.h"
 
 #include "PCGExFunctionPrototypes.generated.h"
 
@@ -21,7 +21,10 @@ class PCGEXCORE_API UPCGExFunctionPrototypes : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	static UFunction* GetPrototypeWithNoParams() { return FindObject<UFunction>(StaticClass(), TEXT("PrototypeWithNoParams")); }
+	static UFunction* GetPrototypeWithNoParams()
+	{
+		return FindObject<UFunction>(StaticClass(), TEXT("PrototypeWithNoParams"));
+	}
 
 private:
 	UFUNCTION()

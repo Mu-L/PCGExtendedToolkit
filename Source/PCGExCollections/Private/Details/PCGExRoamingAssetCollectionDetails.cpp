@@ -5,14 +5,15 @@
 #include "Details/PCGExRoamingAssetCollectionDetails.h"
 
 #include "Containers/PCGExManagedObjects.h"
-#include "UObject/Object.h"
-#include "UObject/Package.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExCollectionHelpers.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "UObject/Object.h"
+#include "UObject/Package.h"
 
 FPCGExRoamingAssetCollectionDetails::FPCGExRoamingAssetCollectionDetails(const TSubclassOf<UPCGExAssetCollection>& InAssetCollectionType)
-	: bSupportCustomType(false), AssetCollectionType(InAssetCollectionType)
+	: bSupportCustomType(false)
+	  , AssetCollectionType(InAssetCollectionType)
 {
 }
 
@@ -29,9 +30,15 @@ bool FPCGExRoamingAssetCollectionDetails::Validate(FPCGExContext* InContext) con
 
 UPCGExAssetCollection* FPCGExRoamingAssetCollectionDetails::TryBuildCollection(FPCGExContext* InContext, const UPCGParamData* InAttributeSet, const bool bBuildStaging) const
 {
-	if (!AssetCollectionType) { return nullptr; }
+	if (!AssetCollectionType)
+	{
+		return nullptr;
+	}
 	UPCGExAssetCollection* Collection = InContext->ManagedObjects->New<UPCGExAssetCollection>(GetTransientPackage(), AssetCollectionType.Get(), NAME_None);
-	if (!Collection) { return nullptr; }
+	if (!Collection)
+	{
+		return nullptr;
+	}
 
 	if (!PCGExCollectionHelpers::BuildFromAttributeSet(Collection, InContext, InAttributeSet, *this, bBuildStaging))
 	{
@@ -44,9 +51,15 @@ UPCGExAssetCollection* FPCGExRoamingAssetCollectionDetails::TryBuildCollection(F
 
 UPCGExAssetCollection* FPCGExRoamingAssetCollectionDetails::TryBuildCollection(FPCGExContext* InContext, const FName InputPin, const bool bBuildStaging) const
 {
-	if (!AssetCollectionType) { return nullptr; }
+	if (!AssetCollectionType)
+	{
+		return nullptr;
+	}
 	UPCGExAssetCollection* Collection = InContext->ManagedObjects->New<UPCGExAssetCollection>(GetTransientPackage(), AssetCollectionType.Get(), NAME_None);
-	if (!Collection) { return nullptr; }
+	if (!Collection)
+	{
+		return nullptr;
+	}
 
 	if (!PCGExCollectionHelpers::BuildFromAttributeSet(Collection, InContext, InputPin, *this, bBuildStaging))
 	{

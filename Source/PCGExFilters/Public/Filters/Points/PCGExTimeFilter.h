@@ -4,12 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
-#include "Core/PCGExPointFilter.h"
 #include "PCGExPolyPathFilterFactory.h"
+#include "Core/PCGExPointFilter.h"
 #include "Data/PCGExTaggedData.h"
 
 #include "PCGExTimeFilter.generated.h"
@@ -125,7 +125,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FTimeFilter(const TObjectPtr<const UPCGExTimeFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 			Handler = TypedFilterFactory->CreateHandler();
 		}
@@ -180,6 +181,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

@@ -5,27 +5,27 @@
 #include "Details/Collections/PCGExCollectionEditorMacros.h"
 
 #include "AssetThumbnail.h"
-#include "Engine/AssetManager.h"
 #include "PCGExCollectionsEditorSettings.h"
 #include "ToolMenus.h"
-#include "Widgets/Input/SButton.h"
+#include "Engine/AssetManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Widgets/Input/SButton.h"
 
+#include "PCGExProperty.h"
 #include "PropertyCustomizationHelpers.h"
 #include "PropertyEditorModule.h"
 #include "ScopedTransaction.h"
 #include "Core/PCGExAssetCollection.h"
-#include "UObject/UnrealType.h"
 #include "Details/Collections/PCGExCollectionEditorUtils.h"
 #include "Details/Collections/SPCGExCollectionGridView.h"
-#include "PCGExProperty.h"
-#include "Widgets/Docking/SDockTab.h"
-#include "Widgets/Layout/SBox.h"
 #include "Modules/ModuleManager.h"
-#include "Widgets/Images/SImage.h"
-#include "Widgets/Layout/SUniformGridPanel.h"
-#include "Widgets/Input/SComboButton.h"
+#include "UObject/UnrealType.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/Docking/SDockTab.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Input/SComboButton.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SUniformGridPanel.h"
 
 FPCGExAssetCollectionEditor::FPCGExAssetCollectionEditor()
 {
@@ -165,7 +165,10 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 	}
 	Area->Split(MainStack);
 
-	if (!Tabs.IsEmpty()) { MainStack->SetForegroundTab(Tabs.Last().Id); }
+	if (!Tabs.IsEmpty())
+	{
+		MainStack->SetForegroundTab(Tabs.Last().Id);
+	}
 
 	InitAssetEditor(EToolkitMode::Standalone, InitToolkitHost, FName("PCGExAssetCollectionEditor"), Layout, bCreateDefaultStandaloneMenu, bCreateDefaultToolbar, ObjectsToEdit);
 
@@ -176,7 +179,7 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		EExtensionHook::After,
 		GetToolkitCommands(),
 		FToolBarExtensionDelegate::CreateSP(this, &FPCGExAssetCollectionEditor::BuildEditorToolbar)
-	);
+		);
 
 	AddToolbarExtender(ToolbarExtender);
 	RegenerateMenusAndToolbars();
@@ -383,7 +386,10 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 		.Visibility_Lambda([WeakColl, Idx]()
 		{
 			const UPCGExAssetCollection* Coll = WeakColl.Get();
-			if (!Coll) { return EVisibility::Collapsed; }
+			if (!Coll)
+			{
+				return EVisibility::Collapsed;
+			}
 			const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
 			return (Result.IsValid() && Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
 		})
@@ -393,18 +399,30 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 			.ObjectPath_Lambda([WeakColl, Idx]() -> FString
 			{
 				const UPCGExAssetCollection* Coll = WeakColl.Get();
-				if (!Coll) { return FString(); }
+				if (!Coll)
+				{
+					return FString();
+				}
 				const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-				if (!Result.IsValid()) { return FString(); }
+				if (!Result.IsValid())
+				{
+					return FString();
+				}
 				const UPCGExAssetCollection* SubColl = Result.Entry->GetSubCollectionPtr();
 				return SubColl ? SubColl->GetPathName() : FString();
 			})
 			.OnObjectChanged_Lambda([WeakColl, Idx, OnAssetChanged](const FAssetData& AssetData)
 			{
 				UPCGExAssetCollection* Coll = WeakColl.Get();
-				if (!Coll) { return; }
+				if (!Coll)
+				{
+					return;
+				}
 				FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-				if (!Entry) { return; }
+				if (!Entry)
+				{
+					return;
+				}
 				FScopedTransaction Transaction(INVTEXT("Set SubCollection"));
 				Coll->Modify();
 				// Write the InternalSubCollection via the base class pointer
@@ -444,7 +462,10 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 				.Visibility_Lambda([WeakColl, Idx]()
 				{
 					const UPCGExAssetCollection* Coll = WeakColl.Get();
-					if (!Coll) { return EVisibility::Collapsed; }
+					if (!Coll)
+					{
+						return EVisibility::Collapsed;
+					}
 					const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
 					return (Result.IsValid() && !Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
 				})
@@ -454,34 +475,64 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 					.SelectedClass_Lambda([WeakColl, Idx, PickerPropName]() -> const UClass*
 					{
 						UPCGExAssetCollection* Coll = WeakColl.Get();
-						if (!Coll) { return nullptr; }
+						if (!Coll)
+						{
+							return nullptr;
+						}
 						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-						if (!ArrayProp) { return nullptr; }
+						if (!ArrayProp)
+						{
+							return nullptr;
+						}
 						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-						if (!InnerProp || !InnerProp->Struct) { return nullptr; }
+						if (!InnerProp || !InnerProp->Struct)
+						{
+							return nullptr;
+						}
 						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
 						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return nullptr; }
+						if (Idx < 0 || Idx >= ArrayHelper.Num())
+						{
+							return nullptr;
+						}
 						const uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
 						const FSoftClassProperty* ClassProp = CastField<FSoftClassProperty>(InnerProp->Struct->FindPropertyByName(PickerPropName));
-						if (!ClassProp) { return nullptr; }
+						if (!ClassProp)
+						{
+							return nullptr;
+						}
 						const FSoftObjectPtr& SoftRef = *ClassProp->GetPropertyValuePtr_InContainer(EntryPtr);
 						return Cast<UClass>(SoftRef.Get());
 					})
 					.OnSetClass_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const UClass* NewClass)
 					{
 						UPCGExAssetCollection* Coll = WeakColl.Get();
-						if (!Coll) { return; }
+						if (!Coll)
+						{
+							return;
+						}
 						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-						if (!ArrayProp) { return; }
+						if (!ArrayProp)
+						{
+							return;
+						}
 						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-						if (!InnerProp || !InnerProp->Struct) { return; }
+						if (!InnerProp || !InnerProp->Struct)
+						{
+							return;
+						}
 						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
 						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return; }
+						if (Idx < 0 || Idx >= ArrayHelper.Num())
+						{
+							return;
+						}
 						uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
 						const FSoftClassProperty* ClassProp = CastField<FSoftClassProperty>(InnerProp->Struct->FindPropertyByName(PickerPropName));
-						if (!ClassProp) { return; }
+						if (!ClassProp)
+						{
+							return;
+						}
 
 						FScopedTransaction Transaction(INVTEXT("Set Class"));
 						Coll->Modify();
@@ -503,7 +554,10 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 				.Visibility_Lambda([WeakColl, Idx]()
 				{
 					const UPCGExAssetCollection* Coll = WeakColl.Get();
-					if (!Coll) { return EVisibility::Collapsed; }
+					if (!Coll)
+					{
+						return EVisibility::Collapsed;
+					}
 					const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
 					return (Result.IsValid() && !Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
 				})
@@ -513,18 +567,33 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 					.ObjectPath_Lambda([WeakColl, Idx, PickerPropName]() -> FString
 					{
 						UPCGExAssetCollection* Coll = WeakColl.Get();
-						if (!Coll) { return FString(); }
+						if (!Coll)
+						{
+							return FString();
+						}
 						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-						if (!ArrayProp) { return FString(); }
+						if (!ArrayProp)
+						{
+							return FString();
+						}
 						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-						if (!InnerProp || !InnerProp->Struct) { return FString(); }
+						if (!InnerProp || !InnerProp->Struct)
+						{
+							return FString();
+						}
 						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
 						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return FString(); }
+						if (Idx < 0 || Idx >= ArrayHelper.Num())
+						{
+							return FString();
+						}
 
 						const uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
 						const FProperty* Prop = InnerProp->Struct->FindPropertyByName(PickerPropName);
-						if (!Prop) { return FString(); }
+						if (!Prop)
+						{
+							return FString();
+						}
 
 						// Handle TSoftObjectPtr<T>
 						if (const FSoftObjectProperty* SoftProp = CastField<FSoftObjectProperty>(Prop))
@@ -543,18 +612,33 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 					.OnObjectChanged_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const FAssetData& AssetData)
 					{
 						UPCGExAssetCollection* Coll = WeakColl.Get();
-						if (!Coll) { return; }
+						if (!Coll)
+						{
+							return;
+						}
 						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-						if (!ArrayProp) { return; }
+						if (!ArrayProp)
+						{
+							return;
+						}
 						FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-						if (!InnerProp || !InnerProp->Struct) { return; }
+						if (!InnerProp || !InnerProp->Struct)
+						{
+							return;
+						}
 						void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
 						FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-						if (Idx < 0 || Idx >= ArrayHelper.Num()) { return; }
+						if (Idx < 0 || Idx >= ArrayHelper.Num())
+						{
+							return;
+						}
 
 						uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
 						const FProperty* Prop = InnerProp->Struct->FindPropertyByName(PickerPropName);
-						if (!Prop) { return; }
+						if (!Prop)
+						{
+							return;
+						}
 
 						FScopedTransaction Transaction(INVTEXT("Set Asset"));
 						Coll->Modify();
@@ -600,42 +684,51 @@ void FPCGExAssetCollectionEditor::BuildEditorToolbar(FToolBarBuilder& ToolbarBui
 				FExecuteAction::CreateLambda(
 					[this]()
 					{
-						PCGEX_CURRENT_COLLECTION { Collection->EDITOR_RebuildStagingData(); }
+						PCGEX_CURRENT_COLLECTION
+						{
+							Collection->EDITOR_RebuildStagingData();
+						}
 					})
-			),
+				),
 			NAME_None,
 			FText::FromString(TEXT("Rebuild")),
 			INVTEXT("Rebuild Staging for this asset collection."),
 			PCGEX_SLATE_ICON(RebuildStaging)
-		);
+			);
 
 		ToolbarBuilder.AddToolBarButton(
 			FUIAction(
 				FExecuteAction::CreateLambda(
 					[this]()
 					{
-						PCGEX_CURRENT_COLLECTION { Collection->EDITOR_RebuildStagingData_Recursive(); }
+						PCGEX_CURRENT_COLLECTION
+						{
+							Collection->EDITOR_RebuildStagingData_Recursive();
+						}
 					})
-			),
+				),
 			NAME_None,
 			FText::GetEmpty(),
 			INVTEXT("Rebuild staging recursively (this and all subcollections)."),
 			PCGEX_SLATE_ICON(RebuildStagingRecursive)
-		);
+			);
 
 		ToolbarBuilder.AddToolBarButton(
 			FUIAction(
 				FExecuteAction::CreateLambda(
 					[this]()
 					{
-						PCGEX_CURRENT_COLLECTION { Collection->EDITOR_RebuildStagingData_Project(); }
+						PCGEX_CURRENT_COLLECTION
+						{
+							Collection->EDITOR_RebuildStagingData_Project();
+						}
 					})
-			),
+				),
 			NAME_None,
 			FText::GetEmpty(),
 			INVTEXT("Rebuild staging for the entire project. (Will go through all collection assets)"),
 			PCGEX_SLATE_ICON(RebuildStagingProject)
-		);
+			);
 	}
 	ToolbarBuilder.EndSection();
 
@@ -665,7 +758,7 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 					BuildAddMenuContent(MenuBox);
 					return MenuBox;
 				})
-		);
+			);
 
 
 		ToolbarBuilder.AddWidget(
@@ -692,7 +785,10 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 								.OnClicked_Lambda(
 									[this]()
 									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::NormalizedWeightToSum(Collection); }
+										PCGEX_CURRENT_COLLECTION
+										{
+											PCGExCollectionEditorUtils::NormalizedWeightToSum(Collection);
+										}
 										return FReply::Handled();
 									})
 								.ToolTipText(INVTEXT("Normalize weight sum to 100"))
@@ -710,7 +806,10 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 									.OnClicked_Lambda(
 										[this]()
 										{
-											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::SetWeightIndex(Collection); }
+											PCGEX_CURRENT_COLLECTION
+											{
+												PCGExCollectionEditorUtils::SetWeightIndex(Collection);
+											}
 											return FReply::Handled();
 										})
 									.ToolTipText(FText::FromString("Set the weight index to the entry index."))
@@ -722,7 +821,10 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 									.OnClicked_Lambda(
 										[this]()
 										{
-											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::WeightOne(Collection); }
+											PCGEX_CURRENT_COLLECTION
+											{
+												PCGExCollectionEditorUtils::WeightOne(Collection);
+											}
 											return FReply::Handled();
 										})
 									.ToolTipText(FText::FromString("Reset all weights to 100"))
@@ -734,7 +836,10 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 									.OnClicked_Lambda(
 										[this]()
 										{
-											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::PadWeight(Collection); }
+											PCGEX_CURRENT_COLLECTION
+											{
+												PCGExCollectionEditorUtils::PadWeight(Collection);
+											}
 											return FReply::Handled();
 										})
 									.ToolTipText(FText::FromString("Add 1 to all weights"))
@@ -746,7 +851,10 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 									.OnClicked_Lambda(
 										[this]()
 										{
-											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::MultWeight(Collection, 2); }
+											PCGEX_CURRENT_COLLECTION
+											{
+												PCGExCollectionEditorUtils::MultWeight(Collection, 2);
+											}
 											return FReply::Handled();
 										})
 									.ToolTipText(FText::FromString("Multiply weights by 2"))
@@ -758,7 +866,10 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 									.OnClicked_Lambda(
 										[this]()
 										{
-											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::MultWeight(Collection, 10); }
+											PCGEX_CURRENT_COLLECTION
+											{
+												PCGExCollectionEditorUtils::MultWeight(Collection, 10);
+											}
 											return FReply::Handled();
 										})
 									.ToolTipText(FText::FromString("Multiply weights by 10"))
@@ -770,14 +881,17 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 									.OnClicked_Lambda(
 										[this]()
 										{
-											PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::WeightRandom(Collection); }
+											PCGEX_CURRENT_COLLECTION
+											{
+												PCGExCollectionEditorUtils::WeightRandom(Collection);
+											}
 											return FReply::Handled();
 										})
 									.ToolTipText(FText::FromString("Assign random weights"))
 								]
 							];
 				})
-		);
+			);
 
 		ToolbarBuilder.AddWidget(
 			SNew(SComboButton)
@@ -802,7 +916,10 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 								.OnClicked_Lambda(
 									[this]()
 									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::SortByWeightAscending(Collection); }
+										PCGEX_CURRENT_COLLECTION
+										{
+											PCGExCollectionEditorUtils::SortByWeightAscending(Collection);
+										}
 										return FReply::Handled();
 									})
 								.ToolTipText(FText::FromString("Sort collection by ascending weight"))
@@ -814,13 +931,16 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 								.OnClicked_Lambda(
 									[this]()
 									{
-										PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::SortByWeightDescending(Collection); }
+										PCGEX_CURRENT_COLLECTION
+										{
+											PCGExCollectionEditorUtils::SortByWeightDescending(Collection);
+										}
 										return FReply::Handled();
 									})
 								.ToolTipText(FText::FromString("Sort collection by descending weight"))
 							];
 				})
-		);
+			);
 	}
 	ToolbarBuilder.EndSection();
 
@@ -838,7 +958,10 @@ void FPCGExAssetCollectionEditor::BuildAddMenuContent(const TSharedRef<SVertical
 		.OnClicked_Lambda(
 			[this]()
 			{
-				PCGEX_CURRENT_COLLECTION { PCGExCollectionEditorUtils::AddBrowserSelection(Collection); }
+				PCGEX_CURRENT_COLLECTION
+				{
+					PCGExCollectionEditorUtils::AddBrowserSelection(Collection);
+				}
 				return FReply::Handled();
 			})
 		.ToolTipText(INVTEXT("Append the current content browser selection to this collection."))
@@ -953,7 +1076,7 @@ void FPCGExAssetCollectionEditor::RegisterTabSpawners(const TSharedRef<FTabManag
 								            ]
 							            ];
 					            })
-			            )
+				            )
 			            .SetDisplayName(FText::FromName(Tab.Label));
 
 		Tab.WeakView = Tab.View;
@@ -971,7 +1094,10 @@ void FPCGExAssetCollectionEditor::RegisterTabSpawners(const TSharedRef<FTabManag
 		}
 	}
 
-	if (!Tabs.IsEmpty()) { InTabManager->SetMainTab(Tabs[0].Id); }
+	if (!Tabs.IsEmpty())
+	{
+		InTabManager->SetMainTab(Tabs[0].Id);
+	}
 
 	FAssetEditorToolkit::RegisterTabSpawners(InTabManager);
 }
@@ -989,7 +1115,10 @@ void FPCGExAssetCollectionEditor::ForceRefreshTabs()
 {
 	for (const PCGExAssetCollectionEditor::TabInfos& Tab : Tabs)
 	{
-		if (!Tab.bIsDetailsView) { continue; }
+		if (!Tab.bIsDetailsView)
+		{
+			continue;
+		}
 		if (TSharedPtr<IDetailsView> DetailsView = StaticCastSharedPtr<IDetailsView>(Tab.WeakView.Pin()))
 		{
 			DetailsView->ForceRefresh();

@@ -4,12 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "Core/PCGExFillControlOperation.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
-#include "Clusters/PCGExClusterCommon.h"
-#include "Utils/PCGExCompare.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExFillControlAttributeThreshold.generated.h"
 

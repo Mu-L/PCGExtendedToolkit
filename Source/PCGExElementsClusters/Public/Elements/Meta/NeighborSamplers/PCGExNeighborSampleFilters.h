@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 
-#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExNeighborSampleFactoryProvider.h"
+#include "Factories/PCGExFactoryProvider.h"
 #include "PCGExNeighborSampleFilters.generated.h"
 
 ///

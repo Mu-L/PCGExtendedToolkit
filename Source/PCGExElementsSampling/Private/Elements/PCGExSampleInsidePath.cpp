@@ -31,7 +31,10 @@
 UPCGExSampleInsidePathSettings::UPCGExSampleInsidePathSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	if (!WeightOverDistance) { WeightOverDistance = PCGExCurves::WeightDistributionLinear; }
+	if (!WeightOverDistance)
+	{
+		WeightOverDistance = PCGExCurves::WeightDistributionLinear;
+	}
 }
 
 #if WITH_EDITOR
@@ -60,9 +63,15 @@ void UPCGExSampleInsidePathSettings::ApplyDeprecation(UPCGNode* InOutNode)
 }
 #endif
 
-FName UPCGExSampleInsidePathSettings::GetMainInputPin() const { return PCGExPaths::Labels::SourcePathsLabel; }
+FName UPCGExSampleInsidePathSettings::GetMainInputPin() const
+{
+	return PCGExPaths::Labels::SourcePathsLabel;
+}
 
-FName UPCGExSampleInsidePathSettings::GetMainOutputPin() const { return PCGExPaths::Labels::OutputPathsLabel; }
+FName UPCGExSampleInsidePathSettings::GetMainOutputPin() const
+{
+	return PCGExPaths::Labels::OutputPathsLabel;
+}
 
 TArray<FPCGPinProperties> UPCGExSampleInsidePathSettings::InputPinProperties() const
 {
@@ -79,26 +88,38 @@ TArray<FPCGPinProperties> UPCGExSampleInsidePathSettings::InputPinProperties() c
 TArray<FPCGPinProperties> UPCGExSampleInsidePathSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
-	if (OutputMode == EPCGExSampleInsidePathOutput::Split) { PCGEX_PIN_POINTS(PCGExCommon::Labels::OutputDiscardedLabel, "Discard inputs are paths that failed to sample any points, despite valid targets.", Normal) }
+	if (OutputMode == EPCGExSampleInsidePathOutput::Split)
+	{
+		PCGEX_PIN_POINTS(PCGExCommon::Labels::OutputDiscardedLabel, "Discard inputs are paths that failed to sample any points, despite valid targets.", Normal)
+	}
 	PCGExMatching::Helpers::DeclareMatchingRulesOutputs(DataMatching, PinProperties);
 	return PinProperties;
 }
 
 bool UPCGExSampleInsidePathSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules) { return SampleMethod == EPCGExSampleMethod::BestCandidate; }
+	if (InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules)
+	{
+		return SampleMethod == EPCGExSampleMethod::BestCandidate;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
 PCGEX_INITIALIZE_ELEMENT(SampleInsidePath)
 
-PCGExData::EIOInit UPCGExSampleInsidePathSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSampleInsidePathSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(SampleInsidePath)
 
 bool FPCGExSampleInsidePathElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SampleInsidePath)
 
@@ -125,10 +146,19 @@ bool FPCGExSampleInsidePathElement::Boot(FPCGExContext* InContext) const
 
 		switch (Settings->ProcessInputs)
 		{
-		default: case EPCGExPathSamplingIncludeMode::All: break;
-		case EPCGExPathSamplingIncludeMode::ClosedLoopOnly: if (!bClosedLoop) { return FBox(ForceInit); }
+		default: case EPCGExPathSamplingIncludeMode::All:
 			break;
-		case EPCGExPathSamplingIncludeMode::OpenLoopsOnly: if (bClosedLoop) { return FBox(ForceInit); }
+		case EPCGExPathSamplingIncludeMode::ClosedLoopOnly:
+			if (!bClosedLoop)
+			{
+				return FBox(ForceInit);
+			}
+			break;
+		case EPCGExPathSamplingIncludeMode::OpenLoopsOnly:
+			if (bClosedLoop)
+			{
+				return FBox(ForceInit);
+			}
 			break;
 		}
 
@@ -190,7 +220,10 @@ bool FPCGExSampleInsidePathElement::AdvanceWork(FPCGExContext* InContext, const 
 			Context->TargetsHandler->SetMatchingDetails(Context, &Settings->DataMatching);
 
 			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+				{
+					return true;
+				},
 				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 				}))
@@ -200,7 +233,10 @@ bool FPCGExSampleInsidePathElement::AdvanceWork(FPCGExContext* InContext, const 
 		};
 
 		Context->TargetsHandler->StartLoading(Context->GetTaskManager());
-		if (Context->IsWaitingForTasks()) { return false; }
+		if (Context->IsWaitingForTasks())
+		{
+			return false;
+		}
 	}
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
@@ -222,10 +258,17 @@ namespace PCGExSampleInsidePath
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
-		if (Settings->bIgnoreSelf) { IgnoreList.Add(PointDataFacade->GetIn()); }
-		if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true); !Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
+		if (Settings->bIgnoreSelf)
+		{
+			IgnoreList.Add(PointDataFacade->GetIn());
+		}
+		if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true);
+			!Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
 		{
 			(void)Context->TargetsHandler->HandleUnmatchedOutput(PointDataFacade, true);
 			return false;
@@ -255,7 +298,10 @@ namespace PCGExSampleInsidePath
 		if (!Context->BlendingFactories.IsEmpty())
 		{
 			UnionBlendOpsManager = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, Distances);
-			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades())) { return false; }
+			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades()))
+			{
+				return false;
+			}
 			DataBlender = UnionBlendOpsManager;
 		}
 
@@ -271,10 +317,19 @@ namespace PCGExSampleInsidePath
 			PCGEX_FOREACH_FIELD_INSIDEPATH(PCGEX_OUTPUT_INIT)
 		}
 
-		if (!Settings->MinRange.TryReadDataValue(Context, PointDataFacade->GetIn(), RangeMin)) { return false; }
-		if (!Settings->MaxRange.TryReadDataValue(Context, PointDataFacade->GetIn(), RangeMax)) { return false; }
+		if (!Settings->MinRange.TryReadDataValue(Context, PointDataFacade->GetIn(), RangeMin))
+		{
+			return false;
+		}
+		if (!Settings->MaxRange.TryReadDataValue(Context, PointDataFacade->GetIn(), RangeMax))
+		{
+			return false;
+		}
 
-		if (RangeMin > RangeMax) { std::swap(RangeMin, RangeMax); }
+		if (RangeMin > RangeMax)
+		{
+			std::swap(RangeMin, RangeMax);
+		}
 
 
 		bSingleSample = Settings->SampleMethod != EPCGExSampleMethod::WithinRange;
@@ -322,10 +377,19 @@ namespace PCGExSampleInsidePath
 
 			const bool bIsInside = Path->IsInsideProjection(Transform.GetLocation());
 
-			if (Settings->bOnlySampleWhenInside && !bIsInside) { return; }
+			if (Settings->bOnlySampleWhenInside && !bIsInside)
+			{
+				return;
+			}
 
 			int32 NumInsideIncrement = 0;
-			if (bIsInside) { if (!bOnlyIncrementInsideNumIfClosed || Path->IsClosedLoop()) { NumInsideIncrement = 1; } }
+			if (bIsInside)
+			{
+				if (!bOnlyIncrementInsideNumIfClosed || Path->IsClosedLoop())
+				{
+					NumInsideIncrement = 1;
+				}
+			}
 
 			float Alpha = 0;
 			const int32 EdgeIndex = Path->GetClosestEdge(SampleLocation, Alpha);
@@ -335,7 +399,10 @@ namespace PCGExSampleInsidePath
 
 			if (RangeMax > 0 && (DistSquared < RangeMinSquared || DistSquared > RangeMaxSquared))
 			{
-				if (!Settings->bAlwaysSampleWhenInside || !bIsInside) { return; }
+				if (!Settings->bAlwaysSampleWhenInside || !bIsInside)
+				{
+					return;
+				}
 			}
 
 			const double Time = (static_cast<double>(EdgeIndex) + Alpha) / static_cast<double>(Path->NumEdges);
@@ -348,7 +415,10 @@ namespace PCGExSampleInsidePath
 
 				if (Settings->SampleMethod == EPCGExSampleMethod::BestCandidate)
 				{
-					if (SinglePick.Index != -1) { bReplaceWithCurrent = Context->Sorter->Sort(static_cast<PCGExData::FElement>(Target), SinglePick); }
+					if (SinglePick.Index != -1)
+					{
+						bReplaceWithCurrent = Context->Sorter->Sort(static_cast<PCGExData::FElement>(Target), SinglePick);
+					}
 				}
 				else if (Settings->SampleMethod == EPCGExSampleMethod::ClosestTarget && WeightedDistance > DistSquared)
 				{
@@ -394,7 +464,10 @@ namespace PCGExSampleInsidePath
 			return;
 		}
 
-		if (Settings->WeightMethod == EPCGExRangeType::FullRange && RangeMax > 0) { Union->WeightRange = RangeMaxSquared; }
+		if (Settings->WeightMethod == EPCGExRangeType::FullRange && RangeMax > 0)
+		{
+			Union->WeightRange = RangeMaxSquared;
+		}
 		DataBlender->ComputeWeights(Index, Union, OutWeightedPoints);
 
 		FTransform WeightedTransform = FTransform::Identity;
@@ -460,7 +533,10 @@ namespace PCGExSampleInsidePath
 
 	void FProcessor::CompleteWork()
 	{
-		if (NumSampled == 0 && Settings->OutputMode == EPCGExSampleInsidePathOutput::SuccessOnly) { return; }
+		if (NumSampled == 0 && Settings->OutputMode == EPCGExSampleInsidePathOutput::SuccessOnly)
+		{
+			return;
+		}
 
 		// bResetWithFirstValue collapses an array buffer to its first element as the attribute's
 		// default value (TArrayBuffer<T>::Write special path). It's a no-op on Data-domain buffers
@@ -474,12 +550,21 @@ namespace PCGExSampleInsidePath
 			}
 		}
 
-		if (UnionBlendOpsManager) { UnionBlendOpsManager->Cleanup(Context); }
+		if (UnionBlendOpsManager)
+		{
+			UnionBlendOpsManager->Cleanup(Context);
+		}
 
 		PointDataFacade->WriteFastest(TaskManager);
 
-		if (Settings->bTagIfHasSuccesses && bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag); }
-		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag); }
+		if (Settings->bTagIfHasSuccesses && bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag);
+		}
+		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag);
+		}
 
 		if (NumSampled == 0 && Settings->OutputMode == EPCGExSampleInsidePathOutput::Split)
 		{

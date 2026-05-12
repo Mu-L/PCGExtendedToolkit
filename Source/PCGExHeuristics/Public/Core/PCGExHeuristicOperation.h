@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "Clusters/PCGExClusterCommon.h"
-#include "UObject/Object.h"
 #include "Factories/PCGExOperation.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "UObject/Object.h"
 #include "Utils/PCGExCurveLookup.h"
 
 namespace PCGEx
@@ -59,7 +59,10 @@ public:
 	bool bHasCustomLocalWeightMultiplier = false;
 
 	/** Returns the category of this heuristic for optimization purposes */
-	virtual EPCGExHeuristicCategory GetCategory() const { return EPCGExHeuristicCategory::GoalDependent; }
+	virtual EPCGExHeuristicCategory GetCategory() const
+	{
+		return EPCGExHeuristicCategory::GoalDependent;
+	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster);
 
@@ -71,8 +74,15 @@ public:
 
 	double GetCustomWeightMultiplier(const int32 PointIndex, const int32 EdgeIndex) const;
 
-	FORCEINLINE FVector GetSeedUVW() const { return UVWSeed; }
-	FORCEINLINE FVector GetGoalUVW() const { return UVWGoal; }
+	FORCEINLINE FVector GetSeedUVW() const
+	{
+		return UVWSeed;
+	}
+
+	FORCEINLINE FVector GetGoalUVW() const
+	{
+		return UVWGoal;
+	}
 
 	const PCGExClusters::FNode* GetRoamingSeed() const;
 	const PCGExClusters::FNode* GetRoamingGoal() const;

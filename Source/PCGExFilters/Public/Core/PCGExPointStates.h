@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "Data/Bitmasks/PCGExBitmaskDetails.h"
 #include "Core/PCGExClusterFilter.h"
+#include "Data/Bitmasks/PCGExBitmaskDetails.h"
+#include "UObject/Object.h"
 
 #include "PCGExPointStates.generated.h"
 
@@ -83,8 +83,16 @@ public:
 	UPROPERTY()
 	TArray<TObjectPtr<const UPCGExPointFilterFactoryData>> FilterFactories;
 
-	virtual bool GetRequiresFilters() const { return true; }
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::PointState; }
+	virtual bool GetRequiresFilters() const
+	{
+		return true;
+	}
+
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::PointState;
+	}
+
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
@@ -114,7 +122,8 @@ namespace PCGExPointStates
 		const UPCGExPointStateFactoryData* StateFactory = nullptr;
 
 		explicit FState(const TObjectPtr<const UPCGExPointStateFactoryData>& InFactory)
-			: IFilter(InFactory), StateFactory(InFactory)
+			: IFilter(InFactory)
+			  , StateFactory(InFactory)
 		{
 		}
 
@@ -160,7 +169,11 @@ public:
 #if WITH_EDITOR
 	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	PCGEX_NODE_INFOS(PointStateDefinition, "Abstract Point State Definition", "Base class for state factory management.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterState); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterState);
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
@@ -181,7 +194,11 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
 	bool bOutputBitmasks = true;
 
-	virtual bool CanOutputBitmasks() const { return true; }
+	virtual bool CanOutputBitmasks() const
+	{
+		return true;
+	}
+
 	virtual FName GetMainOutputPin() const override;
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 

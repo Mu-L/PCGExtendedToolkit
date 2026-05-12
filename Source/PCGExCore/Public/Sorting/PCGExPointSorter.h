@@ -116,10 +116,16 @@ namespace PCGExSorting
 		static TSharedPtr<FSortCache> Build(const FSorter& Sorter, int32 InNumElements);
 
 		/** Get number of cached elements */
-		FORCEINLINE int32 Num() const { return NumElements; }
+		FORCEINLINE int32 Num() const
+		{
+			return NumElements;
+		}
 
 		/** Get number of rules */
-		FORCEINLINE int32 NumRules() const { return CachedNumRules; }
+		FORCEINLINE int32 NumRules() const
+		{
+			return CachedNumRules;
+		}
 
 		/** Fast comparison using cached values. No virtual calls. */
 		FORCEINLINE bool Compare(const int32 A, const int32 B) const
@@ -133,14 +139,23 @@ namespace PCGExSorting
 				const double ValueA = Rule.Values[A];
 				const double ValueB = Rule.Values[B];
 
-				if (FMath::IsNearlyEqual(ValueA, ValueB, Rule.Tolerance)) { continue; }
+				if (FMath::IsNearlyEqual(ValueA, ValueB, Rule.Tolerance))
+				{
+					continue;
+				}
 
 				Result = ValueA < ValueB ? -1 : 1;
-				if (Rule.bInvertRule) { Result = -Result; }
+				if (Rule.bInvertRule)
+				{
+					Result = -Result;
+				}
 				break;
 			}
 
-			if (bDescending) { Result = -Result; }
+			if (bDescending)
+			{
+				Result = -Result;
+			}
 			return Result < 0;
 		}
 	};

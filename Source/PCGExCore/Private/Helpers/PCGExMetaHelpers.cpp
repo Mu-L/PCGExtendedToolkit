@@ -7,11 +7,20 @@
 
 namespace PCGExMetaHelpers
 {
-	bool IsPCGExAttribute(const FString& InStr) { return InStr.Contains(PCGExCommon::PCGExPrefix); }
+	bool IsPCGExAttribute(const FString& InStr)
+	{
+		return InStr.Contains(PCGExCommon::PCGExPrefix);
+	}
 
-	bool IsPCGExAttribute(const FName InName) { return IsPCGExAttribute(InName.ToString()); }
+	bool IsPCGExAttribute(const FName InName)
+	{
+		return IsPCGExAttribute(InName.ToString());
+	}
 
-	bool IsPCGExAttribute(const FText& InText) { return IsPCGExAttribute(InText.ToString()); }
+	bool IsPCGExAttribute(const FText& InText)
+	{
+		return IsPCGExAttribute(InText.ToString());
+	}
 
 	FName MakePCGExAttributeName(const FString& Str0)
 	{
@@ -26,16 +35,25 @@ namespace PCGExMetaHelpers
 	bool IsWritableAttributeName(const FName Name)
 	{
 		// This is a very expensive check, however it's also futureproofing
-		if (Name.IsNone()) { return false; }
+		if (Name.IsNone())
+		{
+			return false;
+		}
 
 		FPCGAttributePropertyInputSelector DummySelector;
-		if (!DummySelector.Update(Name.ToString())) { return false; }
+		if (!DummySelector.Update(Name.ToString()))
+		{
+			return false;
+		}
 		return DummySelector.GetSelection() == EPCGAttributePropertySelection::Attribute && DummySelector.IsValid();
 	}
 
 	FName SanitizeAttributeName(const FName InName)
 	{
-		if (InName.IsNone()) { return NAME_None; }
+		if (InName.IsNone())
+		{
+			return NAME_None;
+		}
 
 		// Allowed character set mirrors FPCGMetadataAttributeBase::IsValidName:
 		// alphanumerics plus space, underscore, hyphen, forward slash.
@@ -55,7 +73,10 @@ namespace PCGExMetaHelpers
 			{
 				if (C == TEXT('_'))
 				{
-					if (bLastUnderscore) { continue; }
+					if (bLastUnderscore)
+					{
+						continue;
+					}
 					bLastUnderscore = true;
 				}
 				else
@@ -66,7 +87,10 @@ namespace PCGExMetaHelpers
 			}
 			else
 			{
-				if (bLastUnderscore) { continue; }
+				if (bLastUnderscore)
+				{
+					continue;
+				}
 				Out.AppendChar(TEXT('_'));
 				bLastUnderscore = true;
 			}
@@ -74,24 +98,42 @@ namespace PCGExMetaHelpers
 
 		// Trim leading/trailing underscores
 		int32 Start = 0;
-		while (Start < Out.Len() && Out[Start] == TEXT('_')) { ++Start; }
+		while (Start < Out.Len() && Out[Start] == TEXT('_'))
+		{
+			++Start;
+		}
 		int32 End = Out.Len();
-		while (End > Start && Out[End - 1] == TEXT('_')) { --End; }
-		if (Start > 0 || End < Out.Len()) { Out = Out.Mid(Start, End - Start); }
+		while (End > Start && Out[End - 1] == TEXT('_'))
+		{
+			--End;
+		}
+		if (Start > 0 || End < Out.Len())
+		{
+			Out = Out.Mid(Start, End - Start);
+		}
 
-		if (Out.IsEmpty()) { return NAME_None; }
+		if (Out.IsEmpty())
+		{
+			return NAME_None;
+		}
 		return FName(*Out);
 	}
 
 	FString StringTagFromName(const FName Name)
 	{
-		if (Name.IsNone()) { return TEXT(""); }
+		if (Name.IsNone())
+		{
+			return TEXT("");
+		}
 		return Name.ToString().TrimStartAndEnd();
 	}
 
 	bool IsValidStringTag(const FString& Tag)
 	{
-		if (Tag.TrimStartAndEnd().IsEmpty()) { return false; }
+		if (Tag.TrimStartAndEnd().IsEmpty())
+		{
+			return false;
+		}
 		return true;
 	}
 
@@ -112,8 +154,14 @@ namespace PCGExMetaHelpers
 	bool TryGetAttributeName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData, FName& OutName)
 	{
 		FPCGAttributePropertyInputSelector FixedSelector = InSelector.CopyAndFixLast(InData);
-		if (!FixedSelector.IsValid()) { return false; }
-		if (FixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute) { return false; }
+		if (!FixedSelector.IsValid())
+		{
+			return false;
+		}
+		if (FixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute)
+		{
+			return false;
+		}
 		OutName = FixedSelector.GetName();
 		return true;
 	}
@@ -135,7 +183,10 @@ namespace PCGExMetaHelpers
 
 	void AppendUniqueSelectorsFromCommaSeparatedList(const FString& InCommaSeparatedString, TArray<FPCGAttributePropertyInputSelector>& OutSelectors)
 	{
-		if (InCommaSeparatedString.IsEmpty()) { return; }
+		if (InCommaSeparatedString.IsEmpty())
+		{
+			return;
+		}
 
 		TArray<FString> Result;
 		InCommaSeparatedString.ParseIntoArray(Result, TEXT(","));
@@ -144,7 +195,10 @@ namespace PCGExMetaHelpers
 		{
 			FString& String = Result[i];
 			String.TrimStartAndEndInline();
-			if (String.IsEmpty()) { continue; }
+			if (String.IsEmpty())
+			{
+				continue;
+			}
 
 			FPCGAttributePropertyInputSelector Selector;
 			Selector.Update(String);
@@ -158,11 +212,17 @@ namespace PCGExMetaHelpers
 		// This return a domain-less unique identifier for the provided selector
 		// It's mostly used to create uniquely identified value buffers
 
-		if (!InData) { return InvalidName; }
+		if (!InData)
+		{
+			return InvalidName;
+		}
 
 		if (bInitialized)
 		{
-			if (InSelector.GetExtraNames().IsEmpty()) { return FName(InSelector.GetName().ToString()); }
+			if (InSelector.GetExtraNames().IsEmpty())
+			{
+				return FName(InSelector.GetName().ToString());
+			}
 			return FName(InSelector.GetName().ToString() + TEXT(".") + FString::Join(InSelector.GetExtraNames(), TEXT(".")));
 		}
 		if (InSelector.GetSelection() == EPCGAttributePropertySelection::Attribute && InSelector.GetName() == "@Last")
@@ -179,7 +239,10 @@ namespace PCGExMetaHelpers
 
 		FPCGAttributeIdentifier Identifier;
 
-		if (!InData) { return FPCGAttributeIdentifier(InvalidName, EPCGMetadataDomainFlag::Invalid); }
+		if (!InData)
+		{
+			return FPCGAttributeIdentifier(InvalidName, EPCGMetadataDomainFlag::Invalid);
+		}
 
 		if (bInitialized)
 		{
@@ -253,18 +316,30 @@ namespace PCGExMetaHelpers
 
 	bool HasAttribute(const UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier)
 	{
-		if (!InMetadata) { return false; }
-		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain)) { return false; }
+		if (!InMetadata)
+		{
+			return false;
+		}
+		if (!InMetadata->GetConstMetadataDomain(Identifier.MetadataDomain))
+		{
+			return false;
+		}
 		return InMetadata->HasAttribute(Identifier);
 	}
 
 	FString GetSelectorDisplayName(const FPCGAttributePropertyInputSelector& InSelector)
 	{
 		const FName Name = InSelector.GetName();
-		if (Name.IsNone()) { return TEXT("<none>"); }
+		if (Name.IsNone())
+		{
+			return TEXT("<none>");
+		}
 
 		const TArray<FString>& ExtraNames = InSelector.GetExtraNames();
-		if (ExtraNames.IsEmpty()) { return Name.ToString(); }
+		if (ExtraNames.IsEmpty())
+		{
+			return Name.ToString();
+		}
 
 		return Name.ToString() + TEXT(".") + FString::Join(ExtraNames, TEXT("."));
 	}

@@ -60,13 +60,20 @@ FString SPCGExEdgeEndpointsCheckPreview::GetModeName(const EPCGExEdgeEndpointsCh
 {
 	switch (InMode)
 	{
-	case EPCGExEdgeEndpointsCheckMode::None: return TEXT("None");
-	case EPCGExEdgeEndpointsCheckMode::Both: return TEXT("Both");
-	case EPCGExEdgeEndpointsCheckMode::Any: return TEXT("Any");
-	case EPCGExEdgeEndpointsCheckMode::Start: return TEXT("Start");
-	case EPCGExEdgeEndpointsCheckMode::End: return TEXT("End");
-	case EPCGExEdgeEndpointsCheckMode::SeeSaw: return TEXT("SeeSaw");
-	default: return TEXT("?");
+	case EPCGExEdgeEndpointsCheckMode::None:
+		return TEXT("None");
+	case EPCGExEdgeEndpointsCheckMode::Both:
+		return TEXT("Both");
+	case EPCGExEdgeEndpointsCheckMode::Any:
+		return TEXT("Any");
+	case EPCGExEdgeEndpointsCheckMode::Start:
+		return TEXT("Start");
+	case EPCGExEdgeEndpointsCheckMode::End:
+		return TEXT("End");
+	case EPCGExEdgeEndpointsCheckMode::SeeSaw:
+		return TEXT("SeeSaw");
+	default:
+		return TEXT("?");
 	}
 }
 
@@ -149,7 +156,10 @@ int32 SPCGExEdgeEndpointsCheckPreview::OnPaint(
 	// Top label: Mode name
 	{
 		FString TopLabel = GetModeName(CurrentMode);
-		if (bCurrentInvert) { TopLabel += TEXT(" (inv)"); }
+		if (bCurrentInvert)
+		{
+			TopLabel += TEXT(" (inv)");
+		}
 		const FVector2D LabelPos(LocalSize.X * 0.5 - 30.0, 2.0);
 		FSlateDrawElement::MakeText(
 			OutDrawElements, LayerId + 4,

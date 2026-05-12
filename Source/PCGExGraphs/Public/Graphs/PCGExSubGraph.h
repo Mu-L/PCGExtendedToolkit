@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExGraphCommon.h"
-#include "Clusters/PCGExEdge.h"
 #include "PCGExH.h"
+#include "Clusters/PCGExEdge.h"
 
 namespace PCGExBlending
 {
@@ -74,7 +74,10 @@ namespace PCGExGraphs
 
 		void Compile(const TWeakPtr<PCGExMT::IAsyncHandleGroup>& InParentHandle, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<FGraphBuilder>& InBuilder);
 
-		TSharedPtr<FGraphBuilder> GetBuilder() const { return WeakBuilder.Pin(); }
+		TSharedPtr<FGraphBuilder> GetBuilder() const
+		{
+			return WeakBuilder.Pin();
+		}
 
 	protected:
 		TWeakPtr<PCGExMT::FTaskManager> WeakTaskManager;

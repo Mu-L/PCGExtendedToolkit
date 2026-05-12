@@ -63,7 +63,10 @@ struct FPCGExHeuristicAttributeConfig : public FPCGExHeuristicConfigBase
 class FPCGExHeuristicAttribute : public FPCGExHeuristicOperation
 {
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override { return EPCGExHeuristicCategory::FullyStatic; }
+	virtual EPCGExHeuristicCategory GetCategory() const override
+	{
+		return EPCGExHeuristicCategory::FullyStatic;
+	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 
@@ -107,7 +110,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(HeuristicsAttribute, "Heuristics : Attribute", "Read a vtx or edge attribute as an heuristic value.", FName(GetDisplayName()))
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_BLEND(Heuristics, ColorMisc); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_BLEND(Heuristics, ColorMisc);
+	}
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif

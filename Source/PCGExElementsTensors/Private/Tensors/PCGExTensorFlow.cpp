@@ -14,7 +14,10 @@
 
 bool FPCGExTensorFlow::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorPointOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorPointOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -57,7 +60,10 @@ namespace PCGExTensor
 			DirectionMultiplier = Config.bInvertDirection ? -1 : 1;
 		}
 
-		if (!FEffectorsArray::Init(InContext, InFactory)) { return false; }
+		if (!FEffectorsArray::Init(InContext, InFactory))
+		{
+			return false;
+		}
 
 		DirectionBuffer.Reset();
 

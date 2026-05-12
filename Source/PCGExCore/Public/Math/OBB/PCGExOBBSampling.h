@@ -48,14 +48,14 @@ namespace PCGExMath::OBB
 			E.X > KINDA_SMALL_NUMBER ? Local.X / E.X : 0.0f,
 			E.Y > KINDA_SMALL_NUMBER ? Local.Y / E.Y : 0.0f,
 			E.Z > KINDA_SMALL_NUMBER ? Local.Z / E.Z : 0.0f
-		);
+			);
 
 		// Weight: 1 at center, 0 at edge (based on max axis ratio)
 		const double MaxRatio = FMath::Max3(
 			FMath::Abs(OutSample.UVW.X),
 			FMath::Abs(OutSample.UVW.Y),
 			FMath::Abs(OutSample.UVW.Z)
-		);
+			);
 		OutSample.Weight = OutSample.bIsInside ? FMath::Clamp(1.0 - MaxRatio, 0.0, 1.0) : 0.0;
 	}
 
@@ -99,7 +99,7 @@ namespace PCGExMath::OBB
 			E.X > KINDA_SMALL_NUMBER ? Local.X / E.X : 0.0f,
 			E.Y > KINDA_SMALL_NUMBER ? Local.Y / E.Y : 0.0f,
 			E.Z > KINDA_SMALL_NUMBER ? Local.Z / E.Z : 0.0f
-		);
+			);
 
 		OutSample.Weight = OutSample.bIsInside ? ComputeWeight(OutSample.UVW) : 0.0;
 	}

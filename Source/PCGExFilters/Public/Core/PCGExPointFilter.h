@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "UObject/Object.h"
-#include "Factories/PCGExFactoryProvider.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
+#include "UObject/Object.h"
 
 #include "PCGExPointFilter.generated.h"
 
@@ -75,13 +75,27 @@ class PCGEXFILTERS_API UPCGExFilterFactoryData : public UPCGExFactoryData
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoFilter)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Filter; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Filter;
+	}
 
 	virtual bool DomainCheck();
-	virtual bool GetOnlyUseDataDomain() const { return bOnlyUseDataDomain; }
 
-	virtual bool SupportsCollectionEvaluation() const { return bOnlyUseDataDomain; }
-	virtual bool SupportsProxyEvaluation() const { return false; }
+	virtual bool GetOnlyUseDataDomain() const
+	{
+		return bOnlyUseDataDomain;
+	}
+
+	virtual bool SupportsCollectionEvaluation() const
+	{
+		return bOnlyUseDataDomain;
+	}
+
+	virtual bool SupportsProxyEvaluation() const
+	{
+		return false;
+	}
 
 	virtual bool Init(FPCGExContext* InContext);
 
@@ -110,7 +124,10 @@ class PCGEXFILTERS_API UPCGExPointFilterFactoryData : public UPCGExFilterFactory
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoFilterPoint)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FilterPoint; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FilterPoint;
+	}
 };
 
 namespace PCGExPointFilter
@@ -151,7 +168,10 @@ namespace PCGExPointFilter
 
 		int32 FilterIndex = 0;
 
-		virtual PCGExFilters::EType GetFilterType() const { return PCGExFilters::EType::Point; }
+		virtual PCGExFilters::EType GetFilterType() const
+		{
+			return PCGExFilters::EType::Point;
+		}
 
 		virtual bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade);
 		virtual void PostInit();
@@ -208,7 +228,10 @@ namespace PCGExPointFilter
 		{
 		}
 
-		virtual PCGExFilters::EType GetFilterType() const override { return PCGExFilters::EType::Collection; }
+		virtual PCGExFilters::EType GetFilterType() const override
+		{
+			return PCGExFilters::EType::Collection;
+		}
 
 		virtual bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade) override;
 
@@ -311,8 +334,16 @@ class PCGEXFILTERS_API UPCGExFilterCollectionFactoryData : public UPCGExPointFil
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoFilterCollection)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::FilterCollection; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::FilterCollection;
+	}
+
 	virtual bool DomainCheck() override;
 	virtual bool SupportsCollectionEvaluation() const override;
-	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override { return nullptr; }
+
+	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override
+	{
+		return nullptr;
+	}
 };

@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "PCGExMatchingCommon.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "Core/PCGExPointFilter.h"
 #include "Details/PCGExMatchingDetails.h"
+#include "UObject/Object.h"
 
 #include "PCGExDataMatchFilter.generated.h"
 
@@ -59,11 +59,18 @@ public:
 	TArray<TSharedRef<PCGExData::FFacade>> TargetFacades;
 	TSharedPtr<PCGExMatching::FDataMatcher> DataMatcher;
 
-	virtual bool SupportsCollectionEvaluation() const override { return true; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return true;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
 
 	virtual void BeginDestroy() override;
@@ -75,7 +82,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FDataMatchFilter(const TObjectPtr<const UPCGExDataMatchFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 
@@ -117,9 +125,16 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 
 protected:
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 };

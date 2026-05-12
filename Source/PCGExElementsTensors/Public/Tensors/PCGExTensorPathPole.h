@@ -72,7 +72,10 @@ public:
 #endif
 	//~End UPCGSettings
 
-	virtual bool GetBuildFromPoints() const override { return true; }
+	virtual bool GetBuildFromPoints() const override
+	{
+		return true;
+	}
 
 	/** Tensor properties */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))

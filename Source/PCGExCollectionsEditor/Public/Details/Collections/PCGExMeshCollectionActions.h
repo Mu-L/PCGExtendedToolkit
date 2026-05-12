@@ -6,10 +6,10 @@
 #include "CoreMinimal.h"
 #include "AssetDefinitionDefault.h"
 
+#include "PCGExDataAssetFactory.h"
+#include "AssetRegistry/AssetData.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Engine/World.h"
-#include "AssetRegistry/AssetData.h"
-#include "PCGExDataAssetFactory.h"
 
 #include "PCGExMeshCollectionActions.generated.h"
 
@@ -30,7 +30,10 @@ class UPCGExMeshCollectionFactory : public UPCGExDataAssetFactoryBase
 	GENERATED_BODY()
 
 public:
-	UPCGExMeshCollectionFactory() { SupportedClass = UPCGExMeshCollection::StaticClass(); }
+	UPCGExMeshCollectionFactory()
+	{
+		SupportedClass = UPCGExMeshCollection::StaticClass();
+	}
 };
 
 UCLASS()
@@ -39,10 +42,25 @@ class UAssetDefinition_PCGExMeshCollection : public UAssetDefinitionDefault
 	GENERATED_BODY()
 
 public:
-	virtual FText GetAssetDisplayName() const override { return INVTEXT("Mesh Collection"); }
-	virtual FLinearColor GetAssetColor() const override { return FLinearColor(FColor(0, 255, 255)); }
-	virtual FText GetAssetDescription(const FAssetData& AssetData) const override { return INVTEXT("A weighted collection of static meshes with optional material overrides."); }
-	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExMeshCollection::StaticClass(); }
+	virtual FText GetAssetDisplayName() const override
+	{
+		return INVTEXT("Mesh Collection");
+	}
+
+	virtual FLinearColor GetAssetColor() const override
+	{
+		return FLinearColor(FColor(0, 255, 255));
+	}
+
+	virtual FText GetAssetDescription(const FAssetData& AssetData) const override
+	{
+		return INVTEXT("A weighted collection of static meshes with optional material overrides.");
+	}
+
+	virtual TSoftClassPtr<UObject> GetAssetClass() const override
+	{
+		return UPCGExMeshCollection::StaticClass();
+	}
 
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{

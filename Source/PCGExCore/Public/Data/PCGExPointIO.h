@@ -4,16 +4,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/UObjectGlobals.h"
+#include "PCGPoint.h"
 #include "UObject/Object.h"
 #include "UObject/Package.h"
-#include "PCGPoint.h"
+#include "UObject/UObjectGlobals.h"
 
 #include "PCGExCommon.h"
-#include "Core/PCGExContext.h"
 #include "PCGExPointElements.h"
 #include "PCGExTaggedData.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExContext.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGSpatialData.h"
 #include "Helpers/PCGExMetaHelpers.h"
@@ -41,8 +41,6 @@ namespace PCGExData
 		bool bMutable = false;
 		bool bPinless = false;
 
-		TWeakPtr<FPCGContextHandle> ContextHandle;
-
 		mutable FRWLock PointsLock;
 		mutable FRWLock InKeysLock;
 		mutable FRWLock OutKeysLock;
@@ -55,6 +53,7 @@ namespace PCGExData
 		TSharedPtr<IPCGAttributeAccessorKeys> InKeys; // Shared because reused by duplicates
 		TSharedPtr<IPCGAttributeAccessorKeys> OutKeys;
 
+
 		const UPCGData* OriginalIn = nullptr;  // Input PointData	
 		const UPCGBasePointData* In = nullptr; // Input PointData	
 		UPCGBasePointData* Out = nullptr;      // Output PointData
@@ -63,6 +62,8 @@ namespace PCGExData
 		std::atomic<bool> bIsEnabled{true};
 
 		TSharedPtr<TArray<int32>> IdxMapping;
+		
+		TWeakPtr<FPCGContextHandle> ContextHandle;
 
 	public:
 		TSharedPtr<FTags> Tags;
@@ -72,7 +73,10 @@ namespace PCGExData
 
 		bool bAllowEmptyOutput = false;
 
-		FORCEINLINE bool IsForwarding() const { return Out && Out == In; }
+		FORCEINLINE bool IsForwarding() const
+		{
+			return Out && Out == In;
+		}
 
 		explicit FPointIO(const TWeakPtr<FPCGContextHandle>& InContextHandle);
 		explicit FPointIO(const TWeakPtr<FPCGContextHandle>& InContextHandle, const UPCGBasePointData* InData);
@@ -83,7 +87,11 @@ namespace PCGExData
 			return In ? In->GetAllocatedProperties() : EPCGPointNativeProperties::None;
 		}
 
-		TWeakPtr<FPCGContextHandle> GetContextHandle() const { return ContextHandle; }
+		TWeakPtr<FPCGContextHandle> GetContextHandle() const
+		{
+			return ContextHandle;
+		}
+
 		FPCGExContext* GetContext() const;
 
 		void SetInfos(const int32 InIndex, const FName InOutputPin, const TSet<FString>* InTags = nullptr);
@@ -95,7 +103,10 @@ namespace PCGExData
 		{
 			PCGEX_SHARED_CONTEXT(ContextHandle)
 
-			if (LastInit == InitOut) { return true; }
+			if (LastInit == InitOut)
+			{
+				return true;
+			}
 
 			if (InitOut == EIOInit::Forward && IsValid(Out) && Out == In)
 			{
@@ -131,7 +142,10 @@ namespace PCGExData
 			if (InitOut == EIOInit::New)
 			{
 				T* TypedOut = SharedContext.Get()->ManagedObjects->New<T>();
-				if (!TypedOut) { return false; }
+				if (!TypedOut)
+				{
+					return false;
+				}
 
 				Out = Cast<UPCGBasePointData>(TypedOut);
 				check(Out)
@@ -155,14 +169,20 @@ namespace PCGExData
 				if (const T* TypedIn = Cast<T>(In))
 				{
 					T* TypedOut = SharedContext.Get()->ManagedObjects->DuplicateData<T>(TypedIn);
-					if (!TypedOut) { return false; }
+					if (!TypedOut)
+					{
+						return false;
+					}
 
 					Out = Cast<UPCGBasePointData>(TypedOut);
 				}
 				else
 				{
 					T* TypedOut = SharedContext.Get()->ManagedObjects->New<T>();
-					if (!TypedOut) { return false; }
+					if (!TypedOut)
+					{
+						return false;
+					}
 
 					Out = Cast<UPCGBasePointData>(TypedOut);
 
@@ -193,8 +213,16 @@ namespace PCGExData
 			return const_cast<UPCGBasePointData*>(InSide == EIOSide::In ? In : Out);
 		}
 
-		FORCEINLINE const UPCGBasePointData* GetIn() const { return In; }
-		FORCEINLINE UPCGBasePointData* GetOut() const { return Out; }
+		FORCEINLINE const UPCGBasePointData* GetIn() const
+		{
+			return In;
+		}
+
+		FORCEINLINE UPCGBasePointData* GetOut() const
+		{
+			return Out;
+		}
+
 		FORCEINLINE const UPCGBasePointData* GetOutIn() const
 		{
 			return Out ? Out : In;
@@ -226,17 +254,42 @@ namespace PCGExData
 		TSharedPtr<IPCGAttributeAccessorKeys> GetInKeys();
 		TSharedPtr<IPCGAttributeAccessorKeys> GetOutKeys(const bool bEnsureValidKeys = false);
 
-		FORCEINLINE FConstPoint GetInPoint(const int32 Index) const { return FConstPoint(In, Index, IOIndex); }
-		FORCEINLINE FMutablePoint GetOutPoint(const int32 Index) const { return FMutablePoint(Out, Index, IOIndex); }
+		FORCEINLINE FConstPoint GetInPoint(const int32 Index) const
+		{
+			return FConstPoint(In, Index, IOIndex);
+		}
+
+		FORCEINLINE FMutablePoint GetOutPoint(const int32 Index) const
+		{
+			return FMutablePoint(Out, Index, IOIndex);
+		}
 
 		FScope GetInScope(const int32 Start, const int32 Count, const bool bInclusive = true) const;
-		FScope GetInScope(const PCGExMT::FScope& Scope) const { return GetInScope(Scope.Start, Scope.Count, true); }
-		FScope GetInFullScope() const { return GetInScope(0, In->GetNumPoints(), true); }
+
+		FScope GetInScope(const PCGExMT::FScope& Scope) const
+		{
+			return GetInScope(Scope.Start, Scope.Count, true);
+		}
+
+		FScope GetInFullScope() const
+		{
+			return GetInScope(0, In->GetNumPoints(), true);
+		}
+
 		FScope GetInRange(const int32 Start, const int32 End, const bool bInclusive = true) const;
 
 		FScope GetOutScope(const int32 Start, const int32 Count, const bool bInclusive = true) const;
-		FScope GetOutScope(const PCGExMT::FScope& Scope) const { return GetOutScope(Scope.Start, Scope.Count, true); }
-		FScope GetOutFullScope() const { return GetOutScope(0, Out->GetNumPoints(), true); }
+
+		FScope GetOutScope(const PCGExMT::FScope& Scope) const
+		{
+			return GetOutScope(Scope.Start, Scope.Count, true);
+		}
+
+		FScope GetOutFullScope() const
+		{
+			return GetOutScope(0, Out->GetNumPoints(), true);
+		}
+
 		FScope GetOutRange(const int32 Start, const int32 End, const bool bInclusive = true) const;
 
 		void SetPoints(const TArray<FPCGPoint>& InPCGPoints);
@@ -300,9 +353,20 @@ namespace PCGExData
 
 		void ClearCachedKeys();
 
-		void Disable() { bIsEnabled.store(false, std::memory_order_release); }
-		void Enable() { bIsEnabled.store(true, std::memory_order_release); }
-		bool IsEnabled() const { return bIsEnabled.load(std::memory_order_acquire); }
+		void Disable()
+		{
+			bIsEnabled.store(false, std::memory_order_release);
+		}
+
+		void Enable()
+		{
+			bIsEnabled.store(true, std::memory_order_release);
+		}
+
+		bool IsEnabled() const
+		{
+			return bIsEnabled.load(std::memory_order_acquire);
+		}
 
 		bool StageOutput(FPCGExContext* TargetContext) const;
 		bool StageOutput(FPCGExContext* TargetContext, const int32 MinPointCount, const int32 MaxPointCount) const;
@@ -438,7 +502,10 @@ namespace PCGExData
 			FWriteScopeLock WriteLock(PairsLock);
 			TSharedPtr<FPointIO> NewIO = Pairs.Add_GetRef(MakeShared<FPointIO>(ContextHandle, In));
 			NewIO->SetInfos(Pairs.Num() - 1, OutputPin, Tags);
-			if (!NewIO->InitializeOutput<T>(InitOut)) { return nullptr; }
+			if (!NewIO->InitializeOutput<T>(InitOut))
+			{
+				return nullptr;
+			}
 			return NewIO;
 		}
 
@@ -448,7 +515,10 @@ namespace PCGExData
 			FWriteScopeLock WriteLock(PairsLock);
 			TSharedPtr<FPointIO> NewIO = Pairs.Add_GetRef(MakeShared<FPointIO>(ContextHandle));
 			NewIO->SetInfos(Pairs.Num() - 1, OutputPin);
-			if (!NewIO->InitializeOutput<T>(InitOut)) { return nullptr; }
+			if (!NewIO->InitializeOutput<T>(InitOut))
+			{
+				return nullptr;
+			}
 			return NewIO;
 		}
 
@@ -456,7 +526,10 @@ namespace PCGExData
 		TSharedPtr<FPointIO> Emplace_GetRef(const TSharedPtr<FPointIO>& PointIO, const EIOInit InitOut = EIOInit::NoInit)
 		{
 			TSharedPtr<FPointIO> Branch = Emplace_GetRef<T>(PointIO->GetIn(), InitOut);
-			if (!Branch) { return nullptr; }
+			if (!Branch)
+			{
+				return nullptr;
+			}
 
 			OverrideTags(PointIO, Branch);
 			Branch->RootIO = PointIO;
@@ -465,10 +538,20 @@ namespace PCGExData
 
 		static void OverrideTags(const TSharedPtr<FPointIO>& InFrom, const TSharedPtr<FPointIO>& InTo);
 
-		bool IsEmpty() const { return Pairs.IsEmpty(); }
-		int32 Num() const { return Pairs.Num(); }
+		bool IsEmpty() const
+		{
+			return Pairs.IsEmpty();
+		}
 
-		TSharedPtr<FPointIO> operator[](const int32 Index) const { return Pairs[Index]; }
+		int32 Num() const
+		{
+			return Pairs.Num();
+		}
+
+		TSharedPtr<FPointIO> operator[](const int32 Index) const
+		{
+			return Pairs[Index];
+		}
 
 		void IncreaseReserve(int32 InIncreaseNum);
 
@@ -497,7 +580,9 @@ namespace PCGExData
 		TArray<TSharedRef<FPointIO>> Entries;
 
 		FPointIOTaggedEntries(TSharedPtr<FPointIO> InKey, const FString& InTagId, const PCGExDataId& InTagValue)
-			: Key(InKey), TagId(InTagId), TagValue(InTagValue)
+			: Key(InKey)
+			  , TagId(InTagId)
+			  , TagValue(InTagValue)
 		{
 		}
 

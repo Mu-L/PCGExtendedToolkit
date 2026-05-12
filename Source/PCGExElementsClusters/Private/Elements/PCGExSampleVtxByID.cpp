@@ -5,13 +5,13 @@
 
 #include "Blenders/PCGExUnionOpsManager.h"
 
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExClusterCommon.h"
 #include "Core/PCGExBlendOpsManager.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataPreloader.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Graphs/PCGExGraph.h"
 #include "Math/PCGExMathDistances.h"
 #include "Sampling/PCGExSamplingUnionData.h"
@@ -38,13 +38,19 @@ TArray<FPCGPinProperties> UPCGExSampleVtxByIDSettings::InputPinProperties() cons
 
 PCGEX_INITIALIZE_ELEMENT(SampleVtxByID)
 
-PCGExData::EIOInit UPCGExSampleVtxByIDSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSampleVtxByIDSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(SampleVtxByID)
 
 bool FPCGExSampleVtxByIDElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SampleVtxByID)
 
@@ -67,7 +73,10 @@ bool FPCGExSampleVtxByIDElement::Boot(FPCGExContext* InContext) const
 
 	for (const TSharedPtr<PCGExData::FPointIO>& IO : Targets->Pairs)
 	{
-		if (!IO->FindConstAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx)) { continue; }
+		if (!IO->FindConstAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx))
+		{
+			continue;
+		}
 
 		TSharedPtr<PCGExData::FFacade> TargetFacade = MakeShared<PCGExData::FFacade>(IO.ToSharedRef());
 		TargetFacade->Idx = Context->TargetFacades.Num();
@@ -115,7 +124,10 @@ bool FPCGExSampleVtxByIDElement::AdvanceWork(FPCGExContext* InContext, const UPC
 			PCGEX_SHARED_CONTEXT_VOID(WeakHandle)
 
 			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+				{
+					return true;
+				},
 				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 					NewBatch->bRequiresWriteStep = Settings->bPruneFailedSamples;
@@ -153,18 +165,27 @@ namespace PCGExSampleVtxByID
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		// Allocate edge native properties
 
 		EPCGPointNativeProperties AllocateFor = EPCGPointNativeProperties::None;
-		if (Context->ApplySampling.WantsApply()) { AllocateFor |= EPCGPointNativeProperties::Transform; }
+		if (Context->ApplySampling.WantsApply())
+		{
+			AllocateFor |= EPCGPointNativeProperties::Transform;
+		}
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
 		LookAtUpGetter = Settings->GetValueSettingLookAtUp();
-		if (!LookAtUpGetter->Init(PointDataFacade)) { return false; }
+		if (!LookAtUpGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		VtxID32Getter = PointDataFacade->GetReadable<int32>(Settings->VtxIdSource, PCGExData::EIOSide::In, true);
 		if (!VtxID32Getter)
@@ -184,7 +205,10 @@ namespace PCGExSampleVtxByID
 		if (!Context->BlendingFactories.IsEmpty())
 		{
 			UnionBlendOpsManager = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, PCGExMath::GetDistances());
-			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetFacades)) { return false; }
+			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetFacades))
+			{
+				return false;
+			}
 			DataBlender = UnionBlendOpsManager;
 		}
 
@@ -225,7 +249,10 @@ namespace PCGExSampleVtxByID
 
 			if (!PointFilterCache[Index])
 			{
-				if (Settings->bProcessFilteredOutAsFails) { SamplingFailed(Index); }
+				if (Settings->bProcessFilteredOutAsFails)
+				{
+					SamplingFailed(Index);
+				}
 				continue;
 			}
 
@@ -264,16 +291,28 @@ namespace PCGExSampleVtxByID
 			bLocalAnySuccess = true;
 		}
 
-		if (bLocalAnySuccess) { FPlatformAtomics::InterlockedExchange(&bAnySuccess, 1); }
+		if (bLocalAnySuccess)
+		{
+			FPlatformAtomics::InterlockedExchange(&bAnySuccess, 1);
+		}
 	}
 
 	void FProcessor::CompleteWork()
 	{
-		if (UnionBlendOpsManager) { UnionBlendOpsManager->Cleanup(Context); }
+		if (UnionBlendOpsManager)
+		{
+			UnionBlendOpsManager->Cleanup(Context);
+		}
 		PointDataFacade->WriteFastest(TaskManager);
 
-		if (Settings->bTagIfHasSuccesses && bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag); }
-		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag); }
+		if (Settings->bTagIfHasSuccesses && bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag);
+		}
+		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag);
+		}
 	}
 
 	void FProcessor::Write()

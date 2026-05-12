@@ -17,7 +17,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(UnpackClusters, "Cluster : Unpack", "Restores vtx/edge clusters from packed dataset.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
 #endif
 
 protected:
@@ -28,8 +32,16 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual FName GetMainInputPin() const override { return PCGExClusters::Labels::SourcePackedClustersLabel; }
-	virtual FName GetMainOutputPin() const override { return PCGExClusters::Labels::OutputVerticesLabel; }
+	virtual FName GetMainInputPin() const override
+	{
+		return PCGExClusters::Labels::SourcePackedClustersLabel;
+	}
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExClusters::Labels::OutputVerticesLabel;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 	/** Flatten unpacked metadata  Depending on your setup this is a tradeoff between memory and speed.*/

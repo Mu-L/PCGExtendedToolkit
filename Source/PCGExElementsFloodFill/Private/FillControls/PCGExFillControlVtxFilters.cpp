@@ -11,7 +11,10 @@
 
 bool FPCGExFillControlVtxFilters::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryVtxFilters* TypedFactory = Cast<UPCGExFillControlsFactoryVtxFilters>(Factory);
 
@@ -27,7 +30,10 @@ bool FPCGExFillControlVtxFilters::IsValidCapture(const PCGExFloodFill::FDiffusio
 
 bool FPCGExFillControlVtxFilters::IsValidProbe(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate)
 {
-	if (Candidate.Link.Edge == -1) { return true; } // That's the seed
+	if (Candidate.Link.Edge == -1)
+	{
+		return true;
+	} // That's the seed
 	return VtxFilterManager->Test(*Candidate.Node);
 }
 
@@ -55,11 +61,17 @@ void UPCGExFillControlsFactoryVtxFilters::RegisterBuffersDependencies(FPCGExCont
 
 bool UPCGExFillControlsFactoryVtxFilters::RegisterConsumableAttributes(FPCGExContext* InContext) const
 {
-	if (!Super::RegisterConsumableAttributes(InContext)) { return false; }
+	if (!Super::RegisterConsumableAttributes(InContext))
+	{
+		return false;
+	}
 
 	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : FilterFactories)
 	{
-		if (!Factory->RegisterConsumableAttributes(InContext)) { return false; }
+		if (!Factory->RegisterConsumableAttributes(InContext))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -67,11 +79,17 @@ bool UPCGExFillControlsFactoryVtxFilters::RegisterConsumableAttributes(FPCGExCon
 
 bool UPCGExFillControlsFactoryVtxFilters::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : FilterFactories)
 	{
-		if (!Factory->RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+		if (!Factory->RegisterConsumableAttributesWithData(InContext, InData))
+		{
+			return false;
+		}
 	}
 
 	return true;

@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseCurl.h"
-#include "Helpers/PCGExNoise3DMath.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Helpers/PCGExNoise3DMath.h"
 
 using namespace PCGExNoise3D::Math;
 
@@ -88,7 +88,7 @@ FVector FPCGExNoiseCurl::ComputeCurl(const FVector& Position) const
 		dFz_dy - dFy_dz,
 		dFx_dz - dFz_dx,
 		dFy_dx - dFx_dy
-	) * CurlScale;
+		) * CurlScale;
 }
 
 double FPCGExNoiseCurl::GenerateRaw(const FVector& Position) const
@@ -118,7 +118,7 @@ double FPCGExNoiseCurl::GenerateRaw(const FVector& Position) const
 		dFz_dy - dFy_dz,
 		dFx_dz - dFz_dx,
 		dFy_dx - dFx_dy
-	);
+		);
 
 	return Curl.Size() * CurlScale;
 }
@@ -157,7 +157,10 @@ FVector FPCGExNoiseCurl::GetVector(const FVector& Position) const
 		Curl *= Bounding;
 	}
 
-	for (int i = 0; i < 3; i++) { Curl[i] = ApplyRemap(Curl[i] * 0.5 + 0.5); }
+	for (int i = 0; i < 3; i++)
+	{
+		Curl[i] = ApplyRemap(Curl[i] * 0.5 + 0.5);
+	}
 
 	return Curl;
 }

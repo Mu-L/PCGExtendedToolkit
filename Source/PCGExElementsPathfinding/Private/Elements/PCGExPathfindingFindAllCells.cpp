@@ -3,15 +3,15 @@
 
 #include "Elements/PCGExPathfindingFindAllCells.h"
 
-#include "Data/PCGExData.h"
-#include "Data/PCGPointArrayData.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCell.h"
 #include "Clusters/Artifacts/PCGExCellPathBuilder.h"
 #include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGPointArrayData.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
@@ -34,22 +34,35 @@ TArray<FPCGPinProperties> UPCGExFindAllCellsSettings::OutputPinProperties() cons
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExFindAllCellsSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExFindAllCellsSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExFindAllCellsSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExFindAllCellsSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(FindAllCells)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL(FindAllCells)
 
 bool FPCGExFindAllCellsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FindAllCells)
 
 	PCGEX_FWD(Artifacts)
 
 	// Initialize Artifacts (output settings + OBB settings)
-	if (!Context->Artifacts.Init(Context)) { return false; }
+	if (!Context->Artifacts.Init(Context))
+	{
+		return false;
+	}
 
 	Context->HolesFacade = PCGExData::TryGetSingleFacade(Context, PCGExClusters::Labels::SourceHolesLabel, false, false);
 	if (Context->HolesFacade && Settings->ProjectionDetails.Method == EPCGExProjectionMethod::Normal)
@@ -103,11 +116,14 @@ bool FPCGExFindAllCellsElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->bSkipCompletion = true;
-			NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->bSkipCompletion = true;
+			                                      NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -143,12 +159,18 @@ namespace PCGExFindAllCells
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExFindAllCells::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Context->HolesFacade)
 		{
 			Holes = Context->Holes ? Context->Holes : MakeShared<PCGExClusters::FProjectedPointSet>(Context, Context->HolesFacade.ToSharedRef(), ProjectionDetails);
-			if (Holes) { Holes->EnsureProjected(); }
+			if (Holes)
+			{
+				Holes->EnsureProjected();
+			}
 		}
 
 		// Set up cell constraints
@@ -175,7 +197,10 @@ namespace PCGExFindAllCells
 			const int32 NumHoles = Context->HolesFacade->GetNum();
 			for (const TSharedPtr<PCGExClusters::FCell>& FailedCell : FailedCells)
 			{
-				if (!FailedCell || FailedCell->Polygon.IsEmpty() || FailedCell->FaceIndex < 0) { continue; }
+				if (!FailedCell || FailedCell->Polygon.IsEmpty() || FailedCell->FaceIndex < 0)
+				{
+					continue;
+				}
 
 				// Check if this cell contains a hole
 				bool bContainsHole = false;
@@ -223,7 +248,10 @@ namespace PCGExFindAllCells
 			TArray<TSharedPtr<PCGExClusters::FCell>> Merged = PCGExClusters::MergeAdjacentCells(
 				ValidCells, CellsConstraints.ToSharedRef(), Cluster.Get(), ProjectedPositions);
 
-			if (!Merged.IsEmpty()) { ValidCells = MoveTemp(Merged); }
+			if (!Merged.IsEmpty())
+			{
+				ValidCells = MoveTemp(Merged);
+			}
 		}
 
 		// Initialize cell processor
@@ -245,8 +273,12 @@ namespace PCGExFindAllCells
 
 				if (Settings->Artifacts.bOutputCellBounds)
 				{
-					TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-						Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+					TSharedPtr<PCGExData::FPointIO> OBBPointIO = Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+					if (!OBBPointIO)
+					{
+						return false;
+					}
+
 					OBBPointIO->Tags->Reset();
 					OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 					PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
@@ -265,8 +297,12 @@ namespace PCGExFindAllCells
 
 		if (Settings->Artifacts.bOutputCellBounds)
 		{
-			TSharedPtr<PCGExData::FPointIO> OBBPointIO =
-				Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			TSharedPtr<PCGExData::FPointIO> OBBPointIO = Context->OutputCellBounds->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+			if (!OBBPointIO)
+			{
+				return false;
+			}
+
 			OBBPointIO->Tags->Reset();
 			OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 			PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
@@ -279,7 +315,10 @@ namespace PCGExFindAllCells
 		{
 			CellsIO.Reserve(NumCells);
 			Context->OutputPaths->IncreaseReserve(NumCells + 1);
-			for (int32 i = 0; i < NumCells; i++) { CellsIO.Add(Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New)); }
+			for (int32 i = 0; i < NumCells; i++)
+			{
+				CellsIO.Add(Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
+			}
 
 			StartParallelLoopForRange(NumCells);
 		}
@@ -301,8 +340,14 @@ namespace PCGExFindAllCells
 
 	void FProcessor::ExpandHoleExclusion(int32 HoleIndex, int32 InitialFaceIndex, int32 MaxGrowth)
 	{
-		if (MaxGrowth <= 0) { return; }
-		if (CellAdjacencyMap.IsEmpty()) { return; }
+		if (MaxGrowth <= 0)
+		{
+			return;
+		}
+		if (CellAdjacencyMap.IsEmpty())
+		{
+			return;
+		}
 
 		TSet<int32> Visited;
 		Visited.Add(InitialFaceIndex); // Don't re-visit the initial cell
@@ -353,7 +398,10 @@ namespace PCGExFindAllCells
 	void FProcessor::Cleanup()
 	{
 		TProcessor<FPCGExFindAllCellsContext, UPCGExFindAllCellsSettings>::Cleanup();
-		if (CellsConstraints) { CellsConstraints->Cleanup(); }
+		if (CellsConstraints)
+		{
+			CellsConstraints->Cleanup();
+		}
 	}
 }
 

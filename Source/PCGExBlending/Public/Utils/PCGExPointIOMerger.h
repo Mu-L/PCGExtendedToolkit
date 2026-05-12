@@ -109,7 +109,10 @@ namespace PCGExPointIOMerger
 				// From elements domain
 				TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, TypedInAttribute->GetMetadataDomain());
 
-				if (!InAccessor.IsValid()) { return; }
+				if (!InAccessor.IsValid())
+				{
+					return;
+				}
 
 				TArrayView<T> InRange = MakeArrayView(OutElementsBuffer->GetOutValues()->GetData() + Scope.Write.Start, Scope.Write.Count);
 
@@ -119,7 +122,10 @@ namespace PCGExPointIOMerger
 					PCGExArrayHelpers::InitArray(ReadData, Scope.Write.Count);
 
 					InAccessor->GetRange<T>(ReadData, Scope.Read.Start, *SourceIO->GetInKeys());
-					for (int i = 0; i < Scope.Read.Count; i++) { InRange[i] = ReadData.Last(i); }
+					for (int i = 0; i < Scope.Read.Count; i++)
+					{
+						InRange[i] = ReadData.Last(i);
+					}
 				}
 				else
 				{

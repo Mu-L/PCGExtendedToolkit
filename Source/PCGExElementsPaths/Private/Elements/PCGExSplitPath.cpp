@@ -27,7 +27,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(SplitPath)
 
 bool FPCGExSplitPathElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SplitPath)
 
@@ -52,8 +55,14 @@ bool FPCGExSplitPathElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 			{
 				if (Entry->GetNum() < 2)
 				{
-					if (!Settings->bOmitSinglePointOutputs) { Entry->InitializeOutput(PCGExData::EIOInit::Forward); }
-					else { bHasInvalidInputs = true; }
+					if (!Settings->bOmitSinglePointOutputs)
+					{
+						Entry->InitializeOutput(PCGExData::EIOInit::Forward);
+					}
+					else
+					{
+						bHasInvalidInputs = true;
+					}
 					return false;
 				}
 				return true;
@@ -85,7 +94,10 @@ namespace PCGExSplitPath
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn());
 
@@ -108,13 +120,17 @@ namespace PCGExSplitPath
 
 			switch (Settings->InitialBehavior)
 			{
-			default: case EPCGExPathSplitInitialValue::Constant: bLastResult = static_cast<int8>(Settings->bInitialValue);
+			default: case EPCGExPathSplitInitialValue::Constant:
+				bLastResult = static_cast<int8>(Settings->bInitialValue);
 				break;
-			case EPCGExPathSplitInitialValue::ConstantPreserve: bLastResult = static_cast<int8>(Settings->bInitialValue) == PointFilterCache[0] ? !bLastResult : bLastResult;
+			case EPCGExPathSplitInitialValue::ConstantPreserve:
+				bLastResult = static_cast<int8>(Settings->bInitialValue) == PointFilterCache[0] ? !bLastResult : bLastResult;
 				break;
-			case EPCGExPathSplitInitialValue::FromPoint: bLastResult = PointFilterCache[0];
+			case EPCGExPathSplitInitialValue::FromPoint:
+				bLastResult = PointFilterCache[0];
 				break;
-			case EPCGExPathSplitInitialValue::FromPointPreserve: bLastResult = !PointFilterCache[0];
+			case EPCGExPathSplitInitialValue::FromPointPreserve:
+				bLastResult = !PointFilterCache[0];
 				break;
 			}
 		}
@@ -278,7 +294,10 @@ namespace PCGExSplitPath
 			CurrentSubPath = -1;
 		};
 
-		if (PointFilterCache[Index]) { bLastResult = !bLastResult; }
+		if (PointFilterCache[Index])
+		{
+			bLastResult = !bLastResult;
+		}
 
 		if (bLastResult)
 		{
@@ -306,7 +325,10 @@ namespace PCGExSplitPath
 			//if (PathInfos.Count < 1 || PathInfos.Start == -1) { continue; }                                    // This should never happen
 			//if (PathInfos.End == -1 && (PathInfos.Start + PathInfos.Count) != PointIO->GetNum()) { continue; } // This should never happen
 
-			if (Index == 0 && bWrapLastPath) { continue; }
+			if (Index == 0 && bWrapLastPath)
+			{
+				continue;
+			}
 			const bool bLastPath = SubPath.End == -1;
 
 			const bool bAppendStartPath = bWrapLastPath && bLastPath;
@@ -327,7 +349,10 @@ namespace PCGExSplitPath
 				}
 			}
 
-			if (NumPathPoints == 1 && Settings->bOmitSinglePointOutputs) { continue; }
+			if (NumPathPoints == 1 && Settings->bOmitSinglePointOutputs)
+			{
+				continue;
+			}
 
 			const TSharedPtr<PCGExData::FPointIO> SubPathIO = NewPointIO(PointDataFacade->Source);
 			PCGEX_INIT_IO_VOID(SubPathIO, PCGExData::EIOInit::New)
@@ -341,13 +366,19 @@ namespace PCGExSplitPath
 			TArray<int32>& IdxMapping = SubPathIO->GetIdxMapping();
 
 			const int32 IndexWrap = OriginalPoints->GetNumPoints();
-			for (int i = 0; i < NumIterations; i++) { IdxMapping[i] = (SubPath.Start + i) % IndexWrap; }
+			for (int i = 0; i < NumIterations; i++)
+			{
+				IdxMapping[i] = (SubPath.Start + i) % IndexWrap;
+			}
 
 			if (bAppendStartPath)
 			{
 				// There was a cut somewhere in the closed path.
 				const FSubPath& StartPathInfos = SubPaths[0];
-				for (int i = 0; i < StartPathInfos.Count; i++) { IdxMapping[SubPath.Count + i] = StartPathInfos.Start + i; }
+				for (int i = 0; i < StartPathInfos.Count; i++)
+				{
+					IdxMapping[SubPath.Count + i] = StartPathInfos.Start + i;
+				}
 			}
 
 			SubPathIO->ConsumeIdxMapping(EPCGPointNativeProperties::All);
@@ -422,12 +453,24 @@ namespace PCGExSplitPath
 		int32 OddEven = 0;
 		for (const TSharedPtr<PCGExData::FPointIO>& PathIO : SubPathsIOs)
 		{
-			if (!PathIO) { continue; }
+			if (!PathIO)
+			{
+				continue;
+			}
 
 			PCGExPaths::Helpers::SetClosedLoop(PathIO->GetOut(), false);
 
-			if ((OddEven & 1) == 0) { if (Settings->bTagIfEvenSplit) { PathIO->Tags->AddRaw(Settings->IsEvenTag); } }
-			else if (Settings->bTagIfOddSplit) { PathIO->Tags->AddRaw(Settings->IsOddTag); }
+			if ((OddEven & 1) == 0)
+			{
+				if (Settings->bTagIfEvenSplit)
+				{
+					PathIO->Tags->AddRaw(Settings->IsEvenTag);
+				}
+			}
+			else if (Settings->bTagIfOddSplit)
+			{
+				PathIO->Tags->AddRaw(Settings->IsOddTag);
+			}
 			Context->MainPaths->Add_Unsafe(PathIO);
 			OddEven++;
 		}

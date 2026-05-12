@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseVoronoi.h"
-#include "Helpers/PCGExNoise3DMath.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Helpers/PCGExNoise3DMath.h"
 
 using namespace PCGExNoise3D::Math;
 
@@ -65,12 +65,12 @@ double FPCGExNoiseVoronoi::GenerateRaw(const FVector& Position) const
 		Result = VF1;
 		break;
 	case EPCGExVoronoiOutput::EdgeDistance:
-		{
-			// Approximate edge distance
-			const double Edge = (VF2 - VF1) * 0.5;
-			Result = 1.0 - FMath::Clamp(Edge * 2.0, 0.0, 1.0);
-		}
-		break;
+	{
+		// Approximate edge distance
+		const double Edge = (VF2 - VF1) * 0.5;
+		Result = 1.0 - FMath::Clamp(Edge * 2.0, 0.0, 1.0);
+	}
+	break;
 	case EPCGExVoronoiOutput::Crackle:
 		Result = VF2 - VF1;
 		break;

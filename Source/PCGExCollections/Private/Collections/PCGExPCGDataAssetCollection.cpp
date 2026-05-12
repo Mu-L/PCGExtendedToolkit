@@ -4,24 +4,24 @@
 #include "Collections/PCGExPCGDataAssetCollection.h"
 
 #include "Engine/World.h"
-#include "UObject/UObjectGlobals.h"
 #include "UObject/Package.h"
+#include "UObject/UObjectGlobals.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetData.h"
 #endif
 
 #include "PCGDataAsset.h"
-#include "Data/PCGSpatialData.h"
-#include "Helpers/PCGExLevelDataExporter.h"
-#include "Helpers/PCGExDefaultLevelDataExporter.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExLog.h"
 #include "PCGExSocketProvider.h"
-#include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Collections/PCGExLevelCollection.h"
-#include "PCGExLog.h"
+#include "Collections/PCGExMeshCollection.h"
+#include "Data/PCGSpatialData.h"
 #include "Engine/Level.h"
+#include "Helpers/PCGExDefaultLevelDataExporter.h"
+#include "Helpers/PCGExLevelDataExporter.h"
 
 
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
@@ -46,11 +46,17 @@ bool FPCGExPCGDataAssetCollectionEntry::Validate(const UPCGExAssetCollection* Pa
 	{
 		if (Source == EPCGExDataAssetEntrySource::Level)
 		{
-			if (!Level.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries) { return false; }
+			if (!Level.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries)
+			{
+				return false;
+			}
 		}
 		else
 		{
-			if (!DataAsset.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries) { return false; }
+			if (!DataAsset.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries)
+			{
+				return false;
+			}
 		}
 	}
 
@@ -109,7 +115,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		if (ExportedDataAsset)
 		{
 			ExportedDataAsset->Rename(nullptr, GetTransientPackage(),
-				REN_DontCreateRedirectors | REN_NonTransactional);
+			                          REN_DontCreateRedirectors | REN_NonTransactional);
 		}
 		ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
 
@@ -125,8 +131,8 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		{
 			const auto& Settings = PCGEX_COLLECTIONS_SETTINGS;
 			UClass* ExporterClass = Settings.DefaultLevelExporterClass
-				                        ? Settings.DefaultLevelExporterClass.Get()
-				                        : UPCGExDefaultLevelDataExporter::StaticClass();
+				? Settings.DefaultLevelExporterClass.Get()
+				: UPCGExDefaultLevelDataExporter::StaticClass();
 #if PCGEX_ENGINE_VERSION < 507
 			FallbackExporter = NewObject<UPCGExLevelDataExporter>(GetTransientPackage(), ExporterClass);
 #else
@@ -244,19 +250,28 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_Sanitize()
 
 void FPCGExPCGDataAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
 {
-	if (bIsSubCollection) { return; }
+	if (bIsSubCollection)
+	{
+		return;
+	}
 
 	// Source refs trigger rebuild — not Staging.Path, which for Source==Level points at
 	// an embedded ExportedDataAsset inside the collection's own package.
 	if (Source == EPCGExDataAssetEntrySource::Level)
 	{
 		const FSoftObjectPath LevelPath = Level.ToSoftObjectPath();
-		if (LevelPath.IsValid()) { OutPaths.Emplace(LevelPath); }
+		if (LevelPath.IsValid())
+		{
+			OutPaths.Emplace(LevelPath);
+		}
 	}
 	else
 	{
 		const FSoftObjectPath AssetPath = DataAsset.ToSoftObjectPath();
-		if (AssetPath.IsValid()) { OutPaths.Emplace(AssetPath); }
+		if (AssetPath.IsValid())
+		{
+			OutPaths.Emplace(AssetPath);
+		}
 	}
 }
 #endif
@@ -286,7 +301,10 @@ void UPCGExPCGDataAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArr
 				}
 			}
 
-			if (bAlreadyExists) { continue; }
+			if (bAlreadyExists)
+			{
+				continue;
+			}
 
 			FPCGExPCGDataAssetCollectionEntry Entry;
 			Entry.Source = EPCGExDataAssetEntrySource::Level;
@@ -297,7 +315,10 @@ void UPCGExPCGDataAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArr
 
 		// Try as UPCGDataAsset (DataAsset source)
 		TSoftObjectPtr<UPCGDataAsset> Asset = TSoftObjectPtr<UPCGDataAsset>(SelectedAsset.ToSoftObjectPath());
-		if (!Asset.LoadSynchronous()) { continue; }
+		if (!Asset.LoadSynchronous())
+		{
+			continue;
+		}
 
 		bool bAlreadyExists = false;
 		for (const FPCGExPCGDataAssetCollectionEntry& ExistingEntry : Entries)
@@ -309,7 +330,10 @@ void UPCGExPCGDataAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArr
 			}
 		}
 
-		if (bAlreadyExists) { continue; }
+		if (bAlreadyExists)
+		{
+			continue;
+		}
 
 		FPCGExPCGDataAssetCollectionEntry Entry;
 		Entry.Source = EPCGExDataAssetEntrySource::DataAsset;

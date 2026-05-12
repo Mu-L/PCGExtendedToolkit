@@ -15,9 +15,15 @@ bool FPCGExSubPointsBlendOperation::PrepareForData(FPCGExContext* InContext, con
 
 bool FPCGExSubPointsBlendOperation::PrepareForData(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InTargetFacade, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const PCGExData::EIOSide InSourceSide, const TSet<FName>* IgnoreAttributeSet)
 {
-	if (!FPCGExSubPointsOperation::PrepareForData(InContext, InTargetFacade, IgnoreAttributeSet)) { return false; }
+	if (!FPCGExSubPointsOperation::PrepareForData(InContext, InTargetFacade, IgnoreAttributeSet))
+	{
+		return false;
+	}
 
-	if (bPreserveTransform) { bPreservePosition = bPreserveRotation = bPreserveScale = true; }
+	if (bPreserveTransform)
+	{
+		bPreservePosition = bPreserveRotation = bPreserveScale = true;
+	}
 
 	BlendingDetails = BlendFactory->BlendingDetails;
 
@@ -64,7 +70,10 @@ void FPCGExSubPointsBlendOperation::BlendSubPoints(PCGExData::FScope& Scope, con
 UPCGExSubPointsBlendInstancedFactory::UPCGExSubPointsBlendInstancedFactory(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	if (BlendingDetails.DefaultBlending == EPCGExBlendingType::Unset) { BlendingDetails.DefaultBlending = GetDefaultBlending(); }
+	if (BlendingDetails.DefaultBlending == EPCGExBlendingType::Unset)
+	{
+		BlendingDetails.DefaultBlending = GetDefaultBlending();
+	}
 }
 
 void UPCGExSubPointsBlendInstancedFactory::CopySettingsFrom(const UPCGExInstancedFactory* Other)

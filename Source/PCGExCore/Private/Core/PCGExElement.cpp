@@ -5,9 +5,9 @@
 
 #include "PCGExCoreSettingsCache.h"
 #include "Core/PCGExContext.h"
-#include "Factories/PCGExInstancedFactory.h"
 #include "Core/PCGExSettings.h"
 #include "Details/PCGExWaitMacros.h"
+#include "Factories/PCGExInstancedFactory.h"
 #include "Helpers/PCGAsync.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGSettingsHelpers.h"
@@ -28,7 +28,10 @@ bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 
 bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSettings* InSettings) const
 {
-	if (!Context->GetInputSettings<UPCGSettings>()->bEnabled) { return Context->CancelExecution(FString()); }
+	if (!Context->GetInputSettings<UPCGSettings>()->bEnabled)
+	{
+		return Context->CancelExecution(FString());
+	}
 
 	PCGEX_EXECUTION_CHECK_C(Context)
 
@@ -41,12 +44,21 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 	// returning false to yield to the scheduler in the meantime.
 	if (Context->IsState(PCGExCommon::States::State_Preparation))
 	{
-		if (!Boot(Context)) { return Context->CancelExecution(FString()); }
+		if (!Boot(Context))
+		{
+			return Context->CancelExecution(FString());
+		}
 
-		for (UPCGExInstancedFactory* Op : Context->InternalOperations) { Op->RegisterAssetDependencies(Context); }
+		for (UPCGExInstancedFactory* Op : Context->InternalOperations)
+		{
+			Op->RegisterAssetDependencies(Context);
+		}
 
 		Context->RegisterAssetDependencies();
-		if (Context->HasAssetRequirements() && Context->LoadAssets()) { return false; }
+		if (Context->HasAssetRequirements() && Context->LoadAssets())
+		{
+			return false;
+		}
 
 		PostLoadAssetsDependencies(Context);
 	}
@@ -97,7 +109,8 @@ FPCGContext* IPCGExElement::Initialize(const FPCGInitializeElementParams& InPara
 
 	if (Context->bCleanupConsumableAttributes)
 	{
-		for (const TArray<FString> Names = PCGExArrayHelpers::GetStringArrayFromCommaSeparatedList(Settings->CommaSeparatedProtectedAttributesName); const FString& Name : Names)
+		for (const TArray<FString> Names = PCGExArrayHelpers::GetStringArrayFromCommaSeparatedList(Settings->CommaSeparatedProtectedAttributesName);
+		     const FString& Name : Names)
 		{
 			Context->AddProtectedAttributeName(FName(Name));
 		}
@@ -119,7 +132,10 @@ bool IPCGExElement::IsCacheable(const UPCGSettings* InSettings) const
 	return Settings->ShouldCache();
 }
 
-FPCGContext* IPCGExElement::CreateContext() { return new FPCGExContext(); }
+FPCGContext* IPCGExElement::CreateContext()
+{
+	return new FPCGExContext();
+}
 
 void IPCGExElement::OnContextInitialized(FPCGExContext* InContext) const
 {
@@ -128,7 +144,10 @@ void IPCGExElement::OnContextInitialized(FPCGExContext* InContext) const
 
 bool IPCGExElement::Boot(FPCGExContext* InContext) const
 {
-	if (InContext->InputData.bCancelExecution) { return false; }
+	if (InContext->InputData.bCancelExecution)
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -145,7 +164,10 @@ void IPCGExElement::AbortInternal(FPCGContext* Context) const
 {
 	IPCGElement::AbortInternal(Context);
 
-	if (!Context) { return; }
+	if (!Context)
+	{
+		return;
+	}
 
 	//UE_LOG(LogTemp, Warning, TEXT(">> ABORTING @%s"), *Context->GetInputSettings<UPCGExSettings>()->GetName());
 
@@ -174,7 +196,10 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 	const UPCGExSettings* InSettings = Context->GetInputSettings<UPCGExSettings>();
 	check(InSettings);
 
-	if (InContext->IsInitialExecution()) { InitializeData(InContext, InSettings); }
+	if (InContext->IsInitialExecution())
+	{
+		InitializeData(InContext, InSettings);
+	}
 
 	// Execution policy controls whether we block the calling thread or return to the scheduler.
 	// On the game thread, or when the policy says don't block, we just drive one step and return.
@@ -212,8 +237,14 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 		}
 		else if (WaitCounter < YIELD_PHASE_ITERATIONS)
 		{
-			if ((WaitCounter & 0x7) == 0) { FPlatformProcess::SleepNoStats(SHORT_SLEEP_MS); }
-			else { FPlatformProcess::YieldThread(); }
+			if ((WaitCounter & 0x7) == 0)
+			{
+				FPlatformProcess::SleepNoStats(SHORT_SLEEP_MS);
+			}
+			else
+			{
+				FPlatformProcess::YieldThread();
+			}
 		}
 		else if (WaitCounter < LONG_SLEEP_THRESHOLD)
 		{

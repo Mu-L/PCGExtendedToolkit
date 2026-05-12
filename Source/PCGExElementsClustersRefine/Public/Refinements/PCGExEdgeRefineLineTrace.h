@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/HitResult.h"
+#include "Clusters/PCGExCluster.h"
 #include "Core/PCGExEdgeRefineOperation.h"
 #include "Details/PCGExCollisionDetails.h"
-#include "Clusters/PCGExCluster.h"
+#include "Engine/HitResult.h"
 #include "Math/PCGExMath.h"
 #include "PCGExEdgeRefineLineTrace.generated.h"
 
@@ -41,14 +41,24 @@ class UPCGExEdgeRefineLineTrace : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool GetDefaultEdgeValidity() const override { return !bInvert; }
+	virtual bool GetDefaultEdgeValidity() const override
+	{
+		return !bInvert;
+	}
 
 	// Required for initializing collision settings
-	virtual bool CanOnlyExecuteOnMainThread() const override { return true; }
+	virtual bool CanOnlyExecuteOnMainThread() const override
+	{
+		return true;
+	}
 
 	virtual void InitializeInContext(FPCGExContext* InContext, FName InOverridesPinLabel) override;
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
-	virtual bool WantsIndividualEdgeProcessing() const override { return true; }
+
+	virtual bool WantsIndividualEdgeProcessing() const override
+	{
+		return true;
+	}
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExCollisionDetails CollisionSettings;

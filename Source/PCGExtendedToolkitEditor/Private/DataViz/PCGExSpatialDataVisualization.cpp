@@ -461,7 +461,7 @@ FPCGSetupSceneFunc IPCGExSpatialDataVisualization::GetViewportSetupFunc(const UP
 					BoundsMax = BoundsMax.ComponentMax(CurrentBoundsMax);
 				}
 			}
-		);
+			);
 
 		if (bInitializedBounds)
 		{

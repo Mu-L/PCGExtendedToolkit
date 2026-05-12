@@ -3,12 +3,12 @@
 
 #include "Elements/PCGExSelfPruning.h"
 
-#include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGPointData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExArrayHelpers.h"
+#include "Helpers/PCGExRandomHelpers.h"
 #include "Math/OBB/PCGExOBBTests.h"
 #include "Sorting/PCGExPointSorter.h"
 #include "Sorting/PCGExSortingDetails.h"
@@ -22,7 +22,10 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExSelfPruningSettings, SecondaryExpansion, double, 
 
 bool UPCGExSelfPruningSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if ((Mode != EPCGExSelfPruningMode::Prune || bRandomize) && InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules) { return false; }
+	if ((Mode != EPCGExSelfPruningMode::Prune || bRandomize) && InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules)
+	{
+		return false;
+	}
 
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
@@ -44,7 +47,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(SelfPruning)
 
 bool FPCGExSelfPruningElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SelfPruning)
 
@@ -63,7 +69,10 @@ bool FPCGExSelfPruningElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -88,24 +97,39 @@ namespace PCGExSelfPruning
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExSelfPruning::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Settings->PrimaryMode != EPCGExSelfPruningExpandOrder::None)
 		{
 			PrimaryExpansion = Settings->GetValueSettingPrimaryExpansion();
-			if (!PrimaryExpansion->Init(PointDataFacade)) { return false; }
+			if (!PrimaryExpansion->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->SecondaryMode != EPCGExSelfPruningExpandOrder::None)
 		{
 			SecondaryExpansion = Settings->GetValueSettingSecondaryExpansion();
-			if (!SecondaryExpansion->Init(PointDataFacade)) { return false; }
+			if (!SecondaryExpansion->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		const int32 NumPoints = PointDataFacade->GetNum();
 
-		if (Settings->Mode == EPCGExSelfPruningMode::WriteResult) { PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate) }
-		else { Mask.Init(true, NumPoints); }
+		if (Settings->Mode == EPCGExSelfPruningMode::WriteResult)
+		{
+			PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
+		}
+		else
+		{
+			Mask.Init(true, NumPoints);
+		}
 
 		TArray<int32> Order;
 		PCGExArrayHelpers::ArrayOfIndices(Order, NumPoints);
@@ -131,11 +155,17 @@ namespace PCGExSelfPruning
 			{
 				if (TSharedPtr<PCGExSorting::FSortCache> Cache = Sorter->BuildCache(NumPoints))
 				{
-					Order.Sort([&](const int32 A, const int32 B) { return Cache->Compare(A, B); });
+					Order.Sort([&](const int32 A, const int32 B)
+					{
+						return Cache->Compare(A, B);
+					});
 				}
 				else
 				{
-					Order.Sort([&](const int32 A, const int32 B) { return Sorter->Sort(A, B); });
+					Order.Sort([&](const int32 A, const int32 B)
+					{
+						return Sorter->Sort(A, B);
+					});
 				}
 			}
 
@@ -144,13 +174,31 @@ namespace PCGExSelfPruning
 				TConstPCGValueRange<int32> Seeds = PointDataFacade->GetIn()->GetConstSeedValueRange();
 				const int32 MaxRange = NumPoints * Settings->RandomRange;
 				const int32 MinRange = -MaxRange;
-				for (int i = 0; i < NumPoints; i++) { Priority[i] = Order[i] + PCGExRandomHelpers::GetRandomStreamFromPoint(Seeds[i], 0, Settings).RandRange(MinRange, MaxRange); }
-				if (Settings->SortDirection == EPCGExSortDirection::Descending) { Order.Sort([&](const int32 A, const int32 B) { return Priority[A] > Priority[B]; }); }
-				else { Order.Sort([&](const int32 A, const int32 B) { return Priority[A] < Priority[B]; }); }
+				for (int i = 0; i < NumPoints; i++)
+				{
+					Priority[i] = Order[i] + PCGExRandomHelpers::GetRandomStreamFromPoint(Seeds[i], 0, Settings).RandRange(MinRange, MaxRange);
+				}
+				if (Settings->SortDirection == EPCGExSortDirection::Descending)
+				{
+					Order.Sort([&](const int32 A, const int32 B)
+					{
+						return Priority[A] > Priority[B];
+					});
+				}
+				else
+				{
+					Order.Sort([&](const int32 A, const int32 B)
+					{
+						return Priority[A] < Priority[B];
+					});
+				}
 			}
 		}
 
-		for (int32 i = 0; i < NumPoints; i++) { Priority[Order[i]] = i; }
+		for (int32 i = 0; i < NumPoints; i++)
+		{
+			Priority[Order[i]] = i;
+		}
 
 		// Only force single-threaded for Prune mode (Mask is shared state)
 		// WriteResult mode can run in parallel since each candidate's overlap count is independent
@@ -180,14 +228,23 @@ namespace PCGExSelfPruning
 		switch (Settings->SecondaryMode)
 		{
 		case EPCGExSelfPruningExpandOrder::Before:
-			PCGEX_SCOPE_LOOP(Index) { BoxSecondary[Index] = InData->GetLocalBounds(Index).ExpandBy(SecondaryExpansion->Read(Index)).TransformBy(Transforms[Index]); }
+			PCGEX_SCOPE_LOOP(Index)
+			{
+				BoxSecondary[Index] = InData->GetLocalBounds(Index).ExpandBy(SecondaryExpansion->Read(Index)).TransformBy(Transforms[Index]);
+			}
 			break;
 		case EPCGExSelfPruningExpandOrder::After:
-			PCGEX_SCOPE_LOOP(Index) { BoxSecondary[Index] = InData->GetLocalBounds(Index).TransformBy(Transforms[Index]).ExpandBy(SecondaryExpansion->Read(Index)); }
+			PCGEX_SCOPE_LOOP(Index)
+			{
+				BoxSecondary[Index] = InData->GetLocalBounds(Index).TransformBy(Transforms[Index]).ExpandBy(SecondaryExpansion->Read(Index));
+			}
 			break;
 		default:
 		case EPCGExSelfPruningExpandOrder::None:
-			PCGEX_SCOPE_LOOP(Index) { BoxSecondary[Index] = InData->GetLocalBounds(Index).TransformBy(Transforms[Index]); }
+			PCGEX_SCOPE_LOOP(Index)
+			{
+				BoxSecondary[Index] = InData->GetLocalBounds(Index).TransformBy(Transforms[Index]);
+			}
 			break;
 		}
 
@@ -256,7 +313,10 @@ namespace PCGExSelfPruning
 
 	void FProcessor::OnPointsProcessingComplete()
 	{
-		Candidates.Sort([&](const FCandidateInfos& A, const FCandidateInfos& B) { return Priority[A.Index] > Priority[B.Index]; });
+		Candidates.Sort([&](const FCandidateInfos& A, const FCandidateInfos& B)
+		{
+			return Priority[A.Index] > Priority[B.Index];
+		});
 		LastCandidatesCount = Candidates.Num();
 
 		StartParallelLoopForRange(Candidates.Num());
@@ -302,13 +362,19 @@ namespace PCGExSelfPruning
 					const int32 OtherIndex = Other.Index;
 
 					// Ignore self
-					if (OtherIndex == Index || !PointFilterCache[OtherIndex]) { return; }
+					if (OtherIndex == Index || !PointFilterCache[OtherIndex])
+					{
+						return;
+					}
 					if (Box.Intersect(BoxSecondary[Other.Index]))
 					{
 						if (Settings->bPreciseTest)
 						{
 							// Use pre-built OBBs instead of constructing them each time
-							if (!PCGExMath::OBB::SATOverlap(PrimaryOBBs[Index], SecondaryOBBs[OtherIndex])) { return; }
+							if (!PCGExMath::OBB::SATOverlap(PrimaryOBBs[Index], SecondaryOBBs[OtherIndex]))
+							{
+								return;
+							}
 						}
 
 						Candidate.Overlaps++;
@@ -325,7 +391,10 @@ namespace PCGExSelfPruning
 
 				const int32 Index = Candidate.Index;
 
-				if (!PointFilterCache[Index]) { continue; }
+				if (!PointFilterCache[Index])
+				{
+					continue;
+				}
 
 				const int32 CurrentPriority = Priority[Index];
 				const FTransform& Transform = Transforms[Index];
@@ -353,17 +422,26 @@ namespace PCGExSelfPruning
 					const int32 OtherIndex = Other.Index;
 
 					// Ignore self
-					if (OtherIndex == Index || !PointFilterCache[OtherIndex] || !Mask[OtherIndex]) { return true; }
+					if (OtherIndex == Index || !PointFilterCache[OtherIndex] || !Mask[OtherIndex])
+					{
+						return true;
+					}
 
 					// Ignore lower priorities, those will be pruned by this candidate when their turn comes
-					if (Priority[OtherIndex] < CurrentPriority) { return true; }
+					if (Priority[OtherIndex] < CurrentPriority)
+					{
+						return true;
+					}
 
 					if (Box.Intersect(BoxSecondary[OtherIndex]))
 					{
 						if (Settings->bPreciseTest)
 						{
 							// Use pre-built OBBs instead of constructing them each time
-							if (!PCGExMath::OBB::SATOverlap(PrimaryOBBs[Index], SecondaryOBBs[OtherIndex])) { return true; }
+							if (!PCGExMath::OBB::SATOverlap(PrimaryOBBs[Index], SecondaryOBBs[OtherIndex]))
+							{
+								return true;
+							}
 						}
 
 						Mask[Index] = false;
@@ -384,23 +462,38 @@ namespace PCGExSelfPruning
 			{
 				TSharedPtr<PCGExData::TBuffer<double>> Buffer = PointDataFacade->GetWritable<double>(Settings->NumOverlapAttributeName, 0, true, PCGExData::EBufferInit::New);
 				double Max = 0;
-				for (int i = 0; i < Candidates.Num(); i++) { Max = FMath::Max(Max, Candidates[i].Overlaps); }
+				for (int i = 0; i < Candidates.Num(); i++)
+				{
+					Max = FMath::Max(Max, Candidates[i].Overlaps);
+				}
 
-				if (Max == 0) { return; } // Shoo shoo divide by zero
+				if (Max == 0)
+				{
+					return;
+				} // Shoo shoo divide by zero
 
 				if (Settings->bOutputOneMinusOverlap)
 				{
-					for (const FCandidateInfos& Candidate : Candidates) { Buffer->SetValue(Candidate.Index, 1 - (static_cast<double>(Candidate.Overlaps) / Max)); }
+					for (const FCandidateInfos& Candidate : Candidates)
+					{
+						Buffer->SetValue(Candidate.Index, 1 - (static_cast<double>(Candidate.Overlaps) / Max));
+					}
 				}
 				else
 				{
-					for (const FCandidateInfos& Candidate : Candidates) { Buffer->SetValue(Candidate.Index, (static_cast<double>(Candidate.Overlaps) / Max)); }
+					for (const FCandidateInfos& Candidate : Candidates)
+					{
+						Buffer->SetValue(Candidate.Index, (static_cast<double>(Candidate.Overlaps) / Max));
+					}
 				}
 			}
 			else
 			{
 				TSharedPtr<PCGExData::TBuffer<int32>> Buffer = PointDataFacade->GetWritable<int32>(Settings->NumOverlapAttributeName, 0, true, PCGExData::EBufferInit::New);
-				for (const FCandidateInfos& Candidate : Candidates) { Buffer->SetValue(Candidate.Index, Candidate.Overlaps); }
+				for (const FCandidateInfos& Candidate : Candidates)
+				{
+					Buffer->SetValue(Candidate.Index, Candidate.Overlaps);
+				}
 			}
 
 			return;
@@ -410,7 +503,10 @@ namespace PCGExSelfPruning
 		for (int32 i = 0; i < Candidates.Num(); i++)
 		{
 			FCandidateInfos& Candidate = Candidates[i];
-			if (!Candidate.bSkip) { Candidates[WriteIndex++] = MoveTemp(Candidate); }
+			if (!Candidate.bSkip)
+			{
+				Candidates[WriteIndex++] = MoveTemp(Candidate);
+			}
 		}
 
 		Candidates.SetNum(WriteIndex);

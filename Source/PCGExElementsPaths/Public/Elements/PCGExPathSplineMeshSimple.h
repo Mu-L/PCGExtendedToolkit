@@ -44,8 +44,16 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS(PathSplineMeshSimple, "Path : Spline Mesh (Simple)", "Create spline mesh components from paths.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spawner; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN(UPCGExPathProcessorSettings::GetNodeTitleColor()); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spawner;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN(UPCGExPathProcessorSettings::GetNodeTitleColor());
+	}
 
 	virtual void PostInitProperties() override;
 #endif
@@ -173,7 +181,10 @@ public:
 	TArray<FName> PostProcessFunctionNames;
 
 protected:
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 };
 
 struct FPCGExPathSplineMeshSimpleContext final : FPCGExPathProcessorContext
@@ -195,7 +206,10 @@ class FPCGExPathSplineMeshSimpleElement final : public FPCGExPathProcessorElemen
 {
 public:
 	// Generates artifacts
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 protected:
 	PCGEX_CAN_ONLY_EXECUTE_ON_MAIN_THREAD(true)

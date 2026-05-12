@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "Core/PCGExPointFilter.h"
 
@@ -70,7 +70,12 @@ public:
 	virtual bool DomainCheck() override;
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
-	virtual bool SupportsCollectionEvaluation() const override { return false; }
+
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return false;
+	}
+
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
 };
@@ -81,7 +86,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FAngleFilter(const TObjectPtr<const UPCGExAngleFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 			DotComparison = TypedFilterFactory->Config.DotComparisonDetails;
 		}

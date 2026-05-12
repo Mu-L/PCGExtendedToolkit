@@ -3,13 +3,13 @@
 
 #include "Tensors/PCGExTensorSurface.h"
 
+#include "Components/PrimitiveComponent.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExTensorOperation.h"
-#include "Data/PCGSurfaceData.h"
 #include "Data/PCGExData.h"
-#include "Engine/World.h"
+#include "Data/PCGSurfaceData.h"
 #include "Engine/OverlapResult.h"
-#include "Components/PrimitiveComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Sampling/PCGExSamplingHelpers.h"
 
@@ -24,10 +24,16 @@ namespace PCGExTensorSurface
 
 bool FPCGExTensorSurface::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 
 	const UPCGExTensorSurfaceFactory* TypedFactory = Cast<UPCGExTensorSurfaceFactory>(InFactory);
-	if (!TypedFactory) { return false; }
+	if (!TypedFactory)
+	{
+		return false;
+	}
 
 	World = TypedFactory->CachedWorld;
 	CachedPrimitives = TypedFactory->CachedPrimitives;
@@ -77,16 +83,28 @@ bool FPCGExTensorSurface::FindNearestSurface(const FVector& Position, FPCGExSurf
 	OutHit = FPCGExSurfaceHit(); // Reset
 
 	// Check all available sources and keep the closest hit
-	if (bHasSurfaces) { CheckPCGSurfaces(Position, OutHit); }
-	if (bHasPrimitives) { CheckPrimitives(Position, OutHit); }
-	if (bHasWorldCollision) { CheckWorldCollision(Position, OutHit); }
+	if (bHasSurfaces)
+	{
+		CheckPCGSurfaces(Position, OutHit);
+	}
+	if (bHasPrimitives)
+	{
+		CheckPrimitives(Position, OutHit);
+	}
+	if (bHasWorldCollision)
+	{
+		CheckWorldCollision(Position, OutHit);
+	}
 
 	return OutHit.IsValid() && OutHit.Distance <= Config.MaxDistance;
 }
 
 void FPCGExTensorSurface::CheckWorldCollision(const FVector& Position, FPCGExSurfaceHit& OutHit) const
 {
-	if (!World.IsValid()) { return; }
+	if (!World.IsValid())
+	{
+		return;
+	}
 
 	const UWorld* WorldPtr = World.Get();
 	const FCollisionShape CollisionShape = FCollisionShape::MakeSphere(Config.MaxDistance);
@@ -121,17 +139,26 @@ void FPCGExTensorSurface::CheckWorldCollision(const FVector& Position, FPCGExSur
 		return;
 	}
 
-	if (!bHasOverlaps || OutOverlaps.IsEmpty()) { return; }
+	if (!bHasOverlaps || OutOverlaps.IsEmpty())
+	{
+		return;
+	}
 
 	// Find closest surface point among all overlaps
 	for (const FOverlapResult& Overlap : OutOverlaps)
 	{
-		if (!Overlap.Component.IsValid()) { continue; }
+		if (!Overlap.Component.IsValid())
+		{
+			continue;
+		}
 
 		FVector ClosestPoint;
 		const float Dist = Overlap.Component->GetClosestPointOnCollision(Position, ClosestPoint);
 
-		if (Dist < 0) { continue; } // Invalid result
+		if (Dist < 0)
+		{
+			continue;
+		} // Invalid result
 
 		// Get normal via line trace for accuracy
 		FVector Normal = FVector::UpVector;
@@ -167,14 +194,20 @@ void FPCGExTensorSurface::CheckPrimitives(const FVector& Position, FPCGExSurface
 {
 	for (const TWeakObjectPtr<UPrimitiveComponent>& WeakPrimitive : CachedPrimitives)
 	{
-		if (!WeakPrimitive.IsValid()) { continue; }
+		if (!WeakPrimitive.IsValid())
+		{
+			continue;
+		}
 
 		UPrimitiveComponent* Primitive = WeakPrimitive.Get();
 
 		FVector ClosestPoint;
 		const float Dist = Primitive->GetClosestPointOnCollision(Position, ClosestPoint);
 
-		if (Dist < 0 || Dist > Config.MaxDistance) { continue; }
+		if (Dist < 0 || Dist > Config.MaxDistance)
+		{
+			continue;
+		}
 
 		// Get normal
 		FVector Normal = FVector::UpVector;
@@ -210,7 +243,10 @@ void FPCGExTensorSurface::CheckPCGSurfaces(const FVector& Position, FPCGExSurfac
 {
 	for (const TWeakObjectPtr<const UPCGSurfaceData>& WeakSurface : CachedSurfaces)
 	{
-		if (!WeakSurface.IsValid()) { continue; }
+		if (!WeakSurface.IsValid())
+		{
+			continue;
+		}
 
 		const UPCGSurfaceData* Surface = WeakSurface.Get();
 
@@ -224,7 +260,10 @@ void FPCGExTensorSurface::CheckPCGSurfaces(const FVector& Position, FPCGExSurfac
 		const FVector ProjectedLocation = ProjectedPoint.Transform.GetLocation();
 		const double Dist = FVector::Dist(Position, ProjectedLocation);
 
-		if (Dist > Config.MaxDistance) { continue; }
+		if (Dist > Config.MaxDistance)
+		{
+			continue;
+		}
 
 		// Estimate normal from nearby samples for landscapes
 		FVector Normal = FVector::UpVector;
@@ -244,8 +283,14 @@ void FPCGExTensorSurface::CheckPCGSurfaces(const FVector& Position, FPCGExSurfac
 			FVector ComputedNormal = FVector::CrossProduct(DX, DY).GetSafeNormal();
 
 			// Ensure normal points upward (away from surface for landscapes)
-			if (ComputedNormal.Z < 0) { ComputedNormal *= -1; }
-			if (!ComputedNormal.IsNearlyZero()) { Normal = ComputedNormal; }
+			if (ComputedNormal.Z < 0)
+			{
+				ComputedNormal *= -1;
+			}
+			if (!ComputedNormal.IsNearlyZero())
+			{
+				Normal = ComputedNormal;
+			}
 		}
 		else if (bHasPX && bHasPY)
 		{
@@ -253,8 +298,14 @@ void FPCGExTensorSurface::CheckPCGSurfaces(const FVector& Position, FPCGExSurfac
 			const FVector DX = SamplePX.Transform.GetLocation() - ProjectedLocation;
 			const FVector DY = SamplePY.Transform.GetLocation() - ProjectedLocation;
 			FVector ComputedNormal = FVector::CrossProduct(DX, DY).GetSafeNormal();
-			if (ComputedNormal.Z < 0) { ComputedNormal *= -1; }
-			if (!ComputedNormal.IsNearlyZero()) { Normal = ComputedNormal; }
+			if (ComputedNormal.Z < 0)
+			{
+				ComputedNormal *= -1;
+			}
+			if (!ComputedNormal.IsNearlyZero())
+			{
+				Normal = ComputedNormal;
+			}
 		}
 
 		OutHit.UpdateIfCloser(ProjectedLocation, Normal, Dist);
@@ -269,23 +320,23 @@ FVector FPCGExTensorSurface::ComputeDirection(const FTransform& InProbe, const F
 	switch (Config.Mode)
 	{
 	case EPCGExSurfaceTensorMode::AlongSurface:
+	{
+		// Project reference direction onto surface tangent plane
+		const FVector RefDir = PCGExMath::GetDirection(InProbe.GetRotation(), Config.ReferenceAxis);
+
+		// Project onto tangent plane (perpendicular to normal)
+		FVector Projected = RefDir - (FVector::DotProduct(RefDir, Hit.Normal) * Hit.Normal);
+
+		if (Projected.IsNearlyZero())
 		{
-			// Project reference direction onto surface tangent plane
-			const FVector RefDir = PCGExMath::GetDirection(InProbe.GetRotation(), Config.ReferenceAxis);
-
-			// Project onto tangent plane (perpendicular to normal)
-			FVector Projected = RefDir - (FVector::DotProduct(RefDir, Hit.Normal) * Hit.Normal);
-
-			if (Projected.IsNearlyZero())
-			{
-				// Reference is parallel to normal - use any tangent direction
-				// Find a vector perpendicular to the normal
-				const FVector Arbitrary = FMath::Abs(Hit.Normal.Z) < 0.9f ? FVector::UpVector : FVector::ForwardVector;
-				Projected = FVector::CrossProduct(Hit.Normal, Arbitrary);
-			}
-
-			return Projected.GetSafeNormal();
+			// Reference is parallel to normal - use any tangent direction
+			// Find a vector perpendicular to the normal
+			const FVector Arbitrary = FMath::Abs(Hit.Normal.Z) < 0.9f ? FVector::UpVector : FVector::ForwardVector;
+			Projected = FVector::CrossProduct(Hit.Normal, Arbitrary);
 		}
+
+		return Projected.GetSafeNormal();
+	}
 
 	case EPCGExSurfaceTensorMode::TowardSurface:
 		return ToSurface;
@@ -301,20 +352,20 @@ FVector FPCGExTensorSurface::ComputeDirection(const FTransform& InProbe, const F
 		return Hit.Normal;
 
 	case EPCGExSurfaceTensorMode::Orbit:
+	{
+		// Orbit around surface - perpendicular to both normal and reference
+		const FVector RefDir = PCGExMath::GetDirection(InProbe.GetRotation(), Config.ReferenceAxis);
+		FVector OrbitDir = FVector::CrossProduct(Hit.Normal, RefDir);
+
+		if (OrbitDir.IsNearlyZero())
 		{
-			// Orbit around surface - perpendicular to both normal and reference
-			const FVector RefDir = PCGExMath::GetDirection(InProbe.GetRotation(), Config.ReferenceAxis);
-			FVector OrbitDir = FVector::CrossProduct(Hit.Normal, RefDir);
-
-			if (OrbitDir.IsNearlyZero())
-			{
-				// Reference is parallel to normal - use arbitrary perpendicular
-				const FVector Arbitrary = FMath::Abs(Hit.Normal.Z) < 0.9f ? FVector::UpVector : FVector::ForwardVector;
-				OrbitDir = FVector::CrossProduct(Hit.Normal, Arbitrary);
-			}
-
-			return OrbitDir.GetSafeNormal();
+			// Reference is parallel to normal - use arbitrary perpendicular
+			const FVector Arbitrary = FMath::Abs(Hit.Normal.Z) < 0.9f ? FVector::UpVector : FVector::ForwardVector;
+			OrbitDir = FVector::CrossProduct(Hit.Normal, Arbitrary);
 		}
+
+		return OrbitDir.GetSafeNormal();
+	}
 
 	default:
 		return ToSurface;
@@ -328,7 +379,10 @@ PCGEX_TENSOR_BOILERPLATE(Surface, {}, {})
 PCGExFactories::EPreparationResult UPCGExTensorSurfaceFactory::InitInternalData(FPCGExContext* InContext)
 {
 	PCGExFactories::EPreparationResult Result = Super::InitInternalData(InContext);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	// Cache world
 	CachedWorld = InContext->GetWorld();
@@ -380,7 +434,10 @@ bool UPCGExTensorSurfaceFactory::InitActorReferences(FPCGExContext* InContext)
 	TSet<UPrimitiveComponent*> PrimitiveSet;
 	for (const TPair<AActor*, int32>& Pair : IncludedActors)
 	{
-		if (!IsValid(Pair.Key)) { continue; }
+		if (!IsValid(Pair.Key))
+		{
+			continue;
+		}
 
 		TArray<UPrimitiveComponent*> FoundPrimitives;
 		Pair.Key->GetComponents(UPrimitiveComponent::StaticClass(), FoundPrimitives);

@@ -28,7 +28,10 @@ namespace PCGExData
 	{
 		FPCGAttributePropertyInputSelector ProxySelector = FPCGAttributePropertyInputSelector();
 		ProxySelector.Update(Path);
-		if (InData) { ProxySelector = ProxySelector.CopyAndFixLast(InData); }
+		if (InData)
+		{
+			ProxySelector = ProxySelector.CopyAndFixLast(InData);
+		}
 		Init(ProxySelector.GetExtraNames());
 	}
 
@@ -430,14 +433,23 @@ namespace PCGExData
 	{
 		OutType = EPCGMetadataTypes::Unknown;
 
-		if (!IsValid(InData)) { return false; }
+		if (!IsValid(InData))
+		{
+			return false;
+		}
 
 		const FPCGAttributePropertyInputSelector FixedSelector = InputSelector.CopyAndFixLast(InData);
-		if (!FixedSelector.IsValid()) { return false; }
+		if (!FixedSelector.IsValid())
+		{
+			return false;
+		}
 
 		if (FixedSelector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 		{
-			if (!InData->Metadata) { return false; }
+			if (!InData->Metadata)
+			{
+				return false;
+			}
 			if (const FPCGMetadataAttributeBase* AttributeBase = InData->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(FixedSelector, InData)))
 			{
 				OutType = static_cast<EPCGMetadataTypes>(AttributeBase->GetTypeId());
@@ -462,14 +474,20 @@ namespace PCGExData
 		{
 			if (!TryGetType(InputSelector, InDataFacade->GetIn(), OutType))
 			{
-				if (TryGetType(InputSelector, InDataFacade->GetOut(), OutType)) { InOutSide = EIOSide::Out; }
+				if (TryGetType(InputSelector, InDataFacade->GetOut(), OutType))
+				{
+					InOutSide = EIOSide::Out;
+				}
 			}
 		}
 		else
 		{
 			if (!TryGetType(InputSelector, InDataFacade->GetOut(), OutType))
 			{
-				if (TryGetType(InputSelector, InDataFacade->GetIn(), OutType)) { InOutSide = EIOSide::In; }
+				if (TryGetType(InputSelector, InDataFacade->GetIn(), OutType))
+				{
+					InOutSide = EIOSide::In;
+				}
 			}
 		}
 

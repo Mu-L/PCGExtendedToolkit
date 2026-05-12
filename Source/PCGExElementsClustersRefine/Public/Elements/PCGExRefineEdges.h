@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExClusterMT.h"
 #include "Core/PCGExClustersProcessor.h"
-#include "Core/PCGExClusterFilter.h"
-#include "Details/PCGExFilterDetails.h"
 #include "Core/PCGExEdgeRefineOperation.h"
+#include "Details/PCGExFilterDetails.h"
 
 #include "PCGExRefineEdges.generated.h"
 
@@ -46,8 +46,16 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(RefineEdges, "Cluster : Refine", "Refine edges according to special rules.", (Refinement ? FName(Refinement.GetClass()->GetMetaData(TEXT("DisplayName"))) : FName("...")));
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(ClusterOp); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(ClusterOp);
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
@@ -125,7 +133,10 @@ class FPCGExRefineEdgesElement final : public FPCGExClustersProcessorElement
 {
 	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* InContext) const override
 	{
-		if (!InContext) { return true; }
+		if (!InContext)
+		{
+			return true;
+		}
 		PCGEX_CONTEXT(RefineEdges)
 		return Context->Refinement ? Context->Refinement->CanOnlyExecuteOnMainThread() : false;
 	}

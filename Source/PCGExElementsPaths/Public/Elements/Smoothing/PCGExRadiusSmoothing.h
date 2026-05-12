@@ -18,7 +18,10 @@ public:
 	{
 		const double RadiusSquared = Smoothing * Smoothing;
 
-		if (Influence == 0) { return; }
+		if (Influence == 0)
+		{
+			return;
+		}
 
 		TConstPCGValueRange<FTransform> InTransforms = Path->GetIn()->GetConstTransformValueRange();
 
@@ -29,7 +32,10 @@ public:
 		Path->GetIn()->GetPointOctree().FindElementsWithBoundsTest(FBoxCenterAndExtent(Origin, FVector(Smoothing)), [&](const PCGPointOctree::FPointRef& PointRef)
 		{
 			const double Dist = FVector::DistSquared(Origin, InTransforms[PointRef.Index].GetLocation());
-			if (Dist >= RadiusSquared || PointRef.Index == TargetIndex) { return; }
+			if (Dist >= RadiusSquared || PointRef.Index == TargetIndex)
+			{
+				return;
+			}
 
 			Blender->MultiBlend(PointRef.Index, TargetIndex, (1 - (Dist / RadiusSquared)) * Influence, Trackers);
 		});

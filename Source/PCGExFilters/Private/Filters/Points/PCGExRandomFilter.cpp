@@ -4,8 +4,8 @@
 #include "Filters/Points/PCGExRandomFilter.h"
 
 #include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExRandomHelpers.h"
 
@@ -35,8 +35,14 @@ bool UPCGExRandomFilterFactory::SupportsProxyEvaluation() const
 void UPCGExRandomFilterFactory::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
-	if (Config.bPerPointWeight && Config.bRemapWeightInternally) { FacadePreloader.Register<double>(InContext, Config.Weight); }
-	if (Config.ThresholdInput != EPCGExInputValueType::Constant && Config.bRemapThresholdInternally) { FacadePreloader.Register<double>(InContext, Config.ThresholdAttribute); }
+	if (Config.bPerPointWeight && Config.bRemapWeightInternally)
+	{
+		FacadePreloader.Register<double>(InContext, Config.Weight);
+	}
+	if (Config.ThresholdInput != EPCGExInputValueType::Constant && Config.bRemapThresholdInternally)
+	{
+		FacadePreloader.Register<double>(InContext, Config.ThresholdAttribute);
+	}
 }
 
 void UPCGExRandomFilterFactory::RegisterAssetDependencies(FPCGExContext* InContext) const
@@ -47,7 +53,10 @@ void UPCGExRandomFilterFactory::RegisterAssetDependencies(FPCGExContext* InConte
 
 bool UPCGExRandomFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.bPerPointWeight, Config.Weight, Consumable)
@@ -65,7 +74,10 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExRandomFilterFactory::CreateFilter() 
 
 bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	Threshold = TypedFilterFactory->Config.Threshold;
 
@@ -76,7 +88,10 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 	{
 		if (TypedFilterFactory->Config.bRemapWeightInternally)
 		{
-			if (!WeightBuffer->Init(PointDataFacade, false, true)) { return false; }
+			if (!WeightBuffer->Init(PointDataFacade, false, true))
+			{
+				return false;
+			}
 			WeightRange = WeightBuffer->Max();
 
 			if (WeightBuffer->Min() < 0)
@@ -87,7 +102,10 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 		}
 		else
 		{
-			if (!WeightBuffer->Init(PointDataFacade)) { return false; }
+			if (!WeightBuffer->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 	}
 
@@ -96,7 +114,10 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 	{
 		if (TypedFilterFactory->Config.bRemapThresholdInternally)
 		{
-			if (!ThresholdBuffer->Init(PointDataFacade, false, true)) { return false; }
+			if (!ThresholdBuffer->Init(PointDataFacade, false, true))
+			{
+				return false;
+			}
 			ThresholdRange = ThresholdBuffer->Max();
 
 			if (ThresholdBuffer->Min() < 0)
@@ -107,7 +128,10 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 		}
 		else
 		{
-			if (!ThresholdBuffer->Init(PointDataFacade)) { return false; }
+			if (!ThresholdBuffer->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 	}
 

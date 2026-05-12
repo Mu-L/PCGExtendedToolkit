@@ -51,19 +51,28 @@ TArray<FPCGPinProperties> UPCGExWritePathPropertiesSettings::OutputPinProperties
 		PCGEX_PIN_POINTS(PCGExWritePathProperties::OutputPathInner, "Paths that are inside at least another path", Normal)
 		PCGEX_PIN_POINTS(PCGExWritePathProperties::OutputPathMedian, "Paths that are inside at least another path, with an even inclusion depth", Normal)
 	}
-	if (WriteAnyPathData()) { PCGEX_PIN_PARAMS(PCGExWritePathProperties::OutputPathProperties, "...", Advanced) }
+	if (WriteAnyPathData())
+	{
+		PCGEX_PIN_PARAMS(PCGExWritePathProperties::OutputPathProperties, "...", Advanced)
+	}
 	return PinProperties;
 }
 
 PCGEX_INITIALIZE_ELEMENT(WritePathProperties)
 
-PCGExData::EIOInit UPCGExWritePathPropertiesSettings::GetMainDataInitializationPolicy() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExWritePathPropertiesSettings::GetMainDataInitializationPolicy() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(WritePathProperties)
 
 bool FPCGExWritePathPropertiesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(WritePathProperties)
 
@@ -138,12 +147,18 @@ namespace PCGExWritePathProperties
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
 		ProjectionDetails = Settings->ProjectionDetails;
-		if (!ProjectionDetails.Init(PointDataFacade)) { return false; }
+		if (!ProjectionDetails.Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
 
@@ -156,8 +171,14 @@ namespace PCGExWritePathProperties
 
 		Path->IOIndex = PointDataFacade->Source->IOIndex;
 		PathLength = Path->AddExtra<PCGExPaths::FPathEdgeLength>(true); // Force compute length
-		if (Settings->bWritePointNormal || Settings->bWritePointBinormal) { PathBinormal = Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Settings->UpVector); }
-		if (Settings->bWritePointAvgNormal) { PathAvgNormal = Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, Settings->UpVector); }
+		if (Settings->bWritePointNormal || Settings->bWritePointBinormal)
+		{
+			PathBinormal = Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Settings->UpVector);
+		}
+		if (Settings->bWritePointAvgNormal)
+		{
+			PathAvgNormal = Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, Settings->UpVector);
+		}
 
 		{
 			const TSharedRef<PCGExData::FFacade>& OutputFacade = PointDataFacade;
@@ -228,7 +249,10 @@ namespace PCGExWritePathProperties
 		// Compute path-wide data (DistanceToStart/DistanceToEnd/PointTime are now computed in parallel in ProcessPoints)
 		for (int i = 0; i < Path->NumPoints; i++)
 		{
-			if (Settings->bTagConcave || Settings->bTagConvex) { Path->UpdateConvexity(i); }
+			if (Settings->bTagConcave || Settings->bTagConvex)
+			{
+				Path->UpdateConvexity(i);
+			}
 
 			PathDir += Details[i].ToNext;
 			PathCentroid += Path->GetPos_Unsafe(i);
@@ -268,7 +292,8 @@ namespace PCGExWritePathProperties
 			bool bIsOdd = false;
 			bool bInner = false;
 
-			if (PCGExPaths::FInclusionInfos Infos; Context->InclusionHelper && Context->InclusionHelper->Find(Path->Idx, Infos))
+			if (PCGExPaths::FInclusionInfos Infos;
+				Context->InclusionHelper && Context->InclusionHelper->Find(Path->Idx, Infos))
 			{
 				bIsOdd = Infos.bOdd;
 				bInner = Infos.Depth > 0;
@@ -276,14 +301,32 @@ namespace PCGExWritePathProperties
 				PCGEX_OUTPUT_PATH_VALUE(NumInside, int32, Infos.Children)
 			}
 
-			if (bIsOdd && Settings->bTagOddInclusionDepth && (!Settings->bOuterIsNotOdd || bInner)) { PointIO->Tags->AddRaw(Settings->OddInclusionDepthTag); }
-			if (bInner) { if (Settings->bTagInner) { PointIO->Tags->AddRaw(Settings->InnerTag); } }
-			else { if (Settings->bTagOuter) { PointIO->Tags->AddRaw(Settings->OuterTag); } }
+			if (bIsOdd && Settings->bTagOddInclusionDepth && (!Settings->bOuterIsNotOdd || bInner))
+			{
+				PointIO->Tags->AddRaw(Settings->OddInclusionDepthTag);
+			}
+			if (bInner)
+			{
+				if (Settings->bTagInner)
+				{
+					PointIO->Tags->AddRaw(Settings->InnerTag);
+				}
+			}
+			else
+			{
+				if (Settings->bTagOuter)
+				{
+					PointIO->Tags->AddRaw(Settings->OuterTag);
+				}
+			}
 
 			if (Settings->bWriteBoundingBoxCenter || Settings->bWriteBoundingBoxExtent || Settings->bWriteBoundingBoxOrientation)
 			{
 				UE::Geometry::TMinVolumeBox3<double> Box;
-				if (Box.Solve(Path->NumPoints, [PathPtr = Path.Get()](int32 i) { return PathPtr->GetPos_Unsafe(i); }))
+				if (Box.Solve(Path->NumPoints, [PathPtr = Path.Get()](int32 i)
+				{
+					return PathPtr->GetPos_Unsafe(i);
+				}))
 				{
 					UE::Geometry::FOrientedBox3d Result;
 					Box.GetResult(Result);
@@ -309,8 +352,14 @@ namespace PCGExWritePathProperties
 
 		if (Path->ConvexitySign != 0)
 		{
-			if (Settings->bTagConcave && !Path->bIsConvex) { PointIO->Tags->AddRaw(Settings->ConcaveTag); }
-			if (Settings->bTagConvex && Path->bIsConvex) { PointIO->Tags->AddRaw(Settings->ConvexTag); }
+			if (Settings->bTagConcave && !Path->bIsConvex)
+			{
+				PointIO->Tags->AddRaw(Settings->ConcaveTag);
+			}
+			if (Settings->bTagConvex && Path->bIsConvex)
+			{
+				PointIO->Tags->AddRaw(Settings->ConvexTag);
+			}
 		}
 
 		PointDataFacade->WriteFastest(TaskManager);
@@ -326,7 +375,8 @@ namespace PCGExWritePathProperties
 			Context->StageOutput(PathAttributeSet, OutputPathProperties, PCGExData::EStaging::None, FlattenedTags);
 		}
 
-		if (PCGExPaths::FInclusionInfos Infos; Settings->bUseInclusionPins && Context->InclusionHelper && Context->InclusionHelper->Find(Path->Idx, Infos))
+		if (PCGExPaths::FInclusionInfos Infos;
+			Settings->bUseInclusionPins && Context->InclusionHelper && Context->InclusionHelper->Find(Path->Idx, Infos))
 		{
 			if (!Infos.Depth)
 			{
@@ -362,7 +412,10 @@ namespace PCGExWritePathProperties
 			TArray<TSharedPtr<PCGExPaths::FPath>> Paths;
 			Paths.Reserve(Processors.Num());
 
-			for (const TSharedRef<PCGExPointsMT::IProcessor>& P : Processors) { Paths.Add(StaticCastSharedRef<FProcessor>(P)->Path); }
+			for (const TSharedRef<PCGExPointsMT::IProcessor>& P : Processors)
+			{
+				Paths.Add(StaticCastSharedRef<FProcessor>(P)->Path);
+			}
 			Context->InclusionHelper->AddPaths(Paths, Settings->InclusionDetails.InclusionTolerance);
 		}
 	}

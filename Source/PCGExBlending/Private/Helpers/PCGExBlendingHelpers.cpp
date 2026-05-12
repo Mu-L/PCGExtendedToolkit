@@ -22,7 +22,10 @@ namespace PCGExBlending::Helpers
 		{
 			const TSharedPtr<PCGExData::FPointIO> IO = Collections[i];
 
-			if (BestIndices[i] == -1 || !IO) { continue; }
+			if (BestIndices[i] == -1 || !IO)
+			{
+				continue;
+			}
 
 			PCGMetadataEntryKey InKey = IO->GetIn()->GetMetadataEntry(BestIndices[i]);
 			PCGMetadataEntryKey OutKey = Target->GetOut()->GetMetadataEntry(i);

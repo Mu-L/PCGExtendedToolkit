@@ -27,7 +27,10 @@ TArray<FPCGPinProperties> UPCGExBitmaskMergeSettings::OutputPinProperties() cons
 	return PinProperties;
 }
 
-FPCGElementPtr UPCGExBitmaskMergeSettings::CreateElement() const { return MakeShared<FPCGExBitmaskMergeElement>(); }
+FPCGElementPtr UPCGExBitmaskMergeSettings::CreateElement() const
+{
+	return MakeShared<FPCGExBitmaskMergeElement>();
+}
 
 #pragma endregion
 
@@ -43,10 +46,16 @@ bool FPCGExBitmaskMergeElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	for (FPCGTaggedData& TaggedData : InputParams)
 	{
 		const UPCGParamData* ParamData = Cast<UPCGParamData>(TaggedData.Data);
-		if (!ParamData) { continue; }
+		if (!ParamData)
+		{
+			continue;
+		}
 
 		const UPCGMetadata* Metadata = ParamData->Metadata;
-		if (!Metadata) { continue; }
+		if (!Metadata)
+		{
+			continue;
+		}
 
 		const TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(Metadata);
 

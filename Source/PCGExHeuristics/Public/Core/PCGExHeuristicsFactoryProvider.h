@@ -6,11 +6,11 @@
 #include "CoreMinimal.h"
 #include "PCGExHeuristicsCommon.h"
 #include "Clusters/PCGExClusterCommon.h"
-#include "Factories/PCGExFactoryProvider.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Factories/PCGExFactoryProvider.h"
+#include "UObject/Object.h"
 #include "Utils/PCGExCurveLookup.h"
 
 #include "PCGExHeuristicsFactoryProvider.generated.h"
@@ -125,7 +125,10 @@ public:
 
 	FPCGExHeuristicConfigBase ConfigBase;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::Heuristics; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::Heuristics;
+	}
 
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
 
@@ -145,10 +148,18 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(AbstractHeuristics, "Heuristics Definition", "Creates a single heuristic computational node, to be used with pathfinding nodes.")
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Heuristics); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Heuristics);
+	}
 #endif
 	//~End UPCGSettings
 
-	virtual FName GetMainOutputPin() const override { return PCGExHeuristics::Labels::OutputHeuristicsLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExHeuristics::Labels::OutputHeuristicsLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 };

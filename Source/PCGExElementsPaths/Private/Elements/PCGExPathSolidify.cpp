@@ -4,10 +4,10 @@
 #include "Elements/PCGExPathSolidify.h"
 
 
+#include "PCGExVersion.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "PCGExVersion.h"
 #include "Paths/PCGExPathsHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPathSolidifyElement"
@@ -87,7 +87,10 @@ else{_TARGET##Axis.RadiusInput = EPCGExInputValueToggle::Disabled;}
 
 PCGEX_INITIALIZE_ELEMENT(PathSolidify)
 
-PCGExData::EIOInit UPCGExPathSolidifySettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExPathSolidifySettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(PathSolidify)
 
@@ -96,7 +99,10 @@ PCGEX_SETTING_VALUE_IMPL_BOOL(FPCGExPathSolidificationRadiusDetails, Radius, dou
 
 bool FPCGExPathSolidifyElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathSolidify)
 
@@ -151,7 +157,10 @@ namespace PCGExPathSolidify
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -168,68 +177,101 @@ namespace PCGExPathSolidify
 		if (Settings->Normal == EPCGExPathNormalDirection::Custom)
 		{
 			NormalGetter = Settings->NormalValue.GetValueSetting();
-			if (!NormalGetter->Init(PointDataFacade)) { return false; }
+			if (!NormalGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 		else
 		{
 			switch (Settings->Normal)
 			{
 			default:
-			case EPCGExPathNormalDirection::Normal: PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeNormal>(false, Up));
+			case EPCGExPathNormalDirection::Normal:
+				PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeNormal>(false, Up));
 				break;
-			case EPCGExPathNormalDirection::Binormal: PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Up));
+			case EPCGExPathNormalDirection::Binormal:
+				PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Up));
 				break;
-			case EPCGExPathNormalDirection::AverageNormal: PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, Up));
+			case EPCGExPathNormalDirection::AverageNormal:
+				PathNormal = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, Up));
 				break;
 			}
 		}
 
-		if (!bClosedLoop && Settings->bRemoveLastPoint) { PointDataFacade->GetOut()->SetNumPoints(Path->LastIndex); }
+		if (!bClosedLoop && Settings->bRemoveLastPoint)
+		{
+			PointDataFacade->GetOut()->SetNumPoints(Path->LastIndex);
+		}
 
 		// Axis order overrides
 
 		if (Settings->bReadOrderFromAttribute)
 		{
 			AxisOrder = PointDataFacade->GetBroadcaster<int32>(Settings->OrderAttribute, true);
-			if (!AxisOrder) { PCGEX_LOG_INVALID_ATTR_C(ExecutionContext, Axis Order, Settings->OrderAttribute) }
+			if (!AxisOrder)
+			{
+				PCGEX_LOG_INVALID_ATTR_C(ExecutionContext, Axis Order, Settings->OrderAttribute)
+			}
 		}
 
 		// Axis construction overrides
 		if (Settings->bReadConstructionFromAttribute)
 		{
 			RotationConstruction = PointDataFacade->GetBroadcaster<int32>(Settings->ConstructionAttribute, true);
-			if (!AxisOrder) { PCGEX_LOG_INVALID_ATTR_C(ExecutionContext, Rotation Construction, Settings->ConstructionAttribute) }
+			if (!AxisOrder)
+			{
+				PCGEX_LOG_INVALID_ATTR_C(ExecutionContext, Rotation Construction, Settings->ConstructionAttribute)
+			}
 		}
 
 		// Flip settings
 
 		PrimaryFlip = Settings->PrimaryAxis.GetValueSettingFlip();
-		if (!PrimaryFlip->Init(PointDataFacade)) { return false; }
+		if (!PrimaryFlip->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		SecondaryFlip = Settings->SecondaryAxis.GetValueSettingFlip();
-		if (!SecondaryFlip->Init(PointDataFacade)) { return false; }
+		if (!SecondaryFlip->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		TertiaryFlip = Settings->TertiaryAxis.GetValueSettingFlip();
-		if (!TertiaryFlip->Init(PointDataFacade)) { return false; }
+		if (!TertiaryFlip->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		// Radius settings
 
 		if (Settings->TertiaryAxis.RadiusInput != EPCGExInputValueToggle::Disabled)
 		{
 			TertiaryRadius = Settings->TertiaryAxis.GetValueSettingRadius();
-			if (!TertiaryRadius->Init(PointDataFacade)) { return false; }
+			if (!TertiaryRadius->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->SecondaryAxis.RadiusInput != EPCGExInputValueToggle::Disabled)
 		{
 			SecondaryRadius = Settings->SecondaryAxis.GetValueSettingRadius();
-			if (!SecondaryRadius->Init(PointDataFacade)) { return false; }
+			if (!SecondaryRadius->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::BoundsMin | EPCGPointNativeProperties::BoundsMax);
 
 		SolidificationLerp = Settings->SolidificationLerp.GetValueSetting();
-		if (!SolidificationLerp->Init(PointDataFacade, false)) { return false; }
+		if (!SolidificationLerp->Init(PointDataFacade, false))
+		{
+			return false;
+		}
 
 		Path->ComputeAllEdgeExtra();
 
@@ -240,9 +282,15 @@ namespace PCGExPathSolidify
 
 	EPCGExAxisOrder FProcessor::GetOrder(const int32 Index) const
 	{
-		if (!AxisOrder) { return Settings->SolidificationOrder; }
+		if (!AxisOrder)
+		{
+			return Settings->SolidificationOrder;
+		}
 		int32 CustomValue = PCGExMath::SanitizeIndex(AxisOrder->Read(Index), 5);
-		if (CustomValue == -1) { return Settings->SolidificationOrder; }
+		if (CustomValue == -1)
+		{
+			return Settings->SolidificationOrder;
+		}
 		return static_cast<EPCGExAxisOrder>(CustomValue);
 	}
 
@@ -250,13 +298,19 @@ namespace PCGExPathSolidify
 	{
 		if (!RotationConstruction)
 		{
-			if (Settings->bUseConstructionMapping) { return Context->RotationConstructionsMap[static_cast<int32>(Order)]; }
+			if (Settings->bUseConstructionMapping)
+			{
+				return Context->RotationConstructionsMap[static_cast<int32>(Order)];
+			}
 			return Settings->RotationConstruction;
 		}
 		int32 CustomValue = PCGExMath::SanitizeIndex(AxisOrder->Read(Index), 5);
 		if (CustomValue == -1)
 		{
-			if (Settings->bUseConstructionMapping) { return Context->RotationConstructionsMap[static_cast<int32>(Order)]; }
+			if (Settings->bUseConstructionMapping)
+			{
+				return Context->RotationConstructionsMap[static_cast<int32>(Order)];
+			}
 			return Settings->RotationConstruction;
 		}
 		return static_cast<EPCGExMakeRotAxis>(CustomValue);

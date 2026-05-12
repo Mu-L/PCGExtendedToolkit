@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExClustersProcessor.h"
+#include "Core/PCGExPathfinding.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Details/PCGExMatchingDetails.h"
 #include "Paths/PCGExPathOutputDetails.h"
@@ -55,7 +55,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PathfindingPlotEdges, "Pathfinding : Plot Edges", "Extract a single path from edges clusters, going through every seed points in order.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Pathfinding);
+	}
 #endif
 
 protected:

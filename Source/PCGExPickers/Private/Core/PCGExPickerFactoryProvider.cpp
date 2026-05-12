@@ -17,7 +17,10 @@ void UPCGExPickerFactoryData::AddPicks(const int32 InNum, TSet<int32>& OutPicks)
 PCGExFactories::EPreparationResult UPCGExPickerFactoryData::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 	return InitInternalData(InContext);
 }
 
@@ -46,10 +49,16 @@ namespace PCGExPickers
 {
 	bool GetPicks(const TArray<TObjectPtr<const UPCGExPickerFactoryData>>& Factories, const TSharedPtr<PCGExData::FFacade>& InFacade, TSet<int32>& OutPicks)
 	{
-		if (Factories.IsEmpty()) { return false; }
+		if (Factories.IsEmpty())
+		{
+			return false;
+		}
 
 		const int32 Num = InFacade->GetNum();
-		for (const TObjectPtr<const UPCGExPickerFactoryData>& Op : Factories) { Op->AddPicks(Num, OutPicks); }
+		for (const TObjectPtr<const UPCGExPickerFactoryData>& Op : Factories)
+		{
+			Op->AddPicks(Num, OutPicks);
+		}
 		return true;
 	}
 }

@@ -4,10 +4,10 @@
 #include "Math/Geo/PCGExGeo.h"
 
 #include "CoreMinimal.h"
-#include "Math/ConvexHull2d.h"
 #include "GeomTools.h"
-#include "Data/PCGExPointIO.h"
 #include "Async/ParallelFor.h"
+#include "Data/PCGExPointIO.h"
+#include "Math/ConvexHull2d.h"
 #include "Math/PCGExMath.h"
 #include "Math/PCGExMathAxis.h"
 #include "Math/OBB/PCGExOBB.h"
@@ -23,7 +23,10 @@ namespace PCGExMath::Geo
 		const double W = S_U(A, C, D, B, B, D, A, C);
 		const double UVW = 2 * (U + V + W);
 
-		if (UVW == 0.0) { return false; } // Coplanar
+		if (UVW == 0.0)
+		{
+			return false;
+		} // Coplanar
 
 		constexpr int C_X = 0;
 		constexpr int C_Y = 1;
@@ -109,14 +112,20 @@ namespace PCGExMath::Geo
 	void GetCentroid(const TArrayView<FVector>& Positions, const int32 (&Vtx)[4], FVector& OutCentroid)
 	{
 		OutCentroid = FVector::ZeroVector;
-		for (int i = 0; i < 4; i++) { OutCentroid += Positions[Vtx[i]]; }
+		for (int i = 0; i < 4; i++)
+		{
+			OutCentroid += Positions[Vtx[i]];
+		}
 		OutCentroid /= 4;
 	}
 
 	void GetCentroid(const TArrayView<FVector>& Positions, const int32 (&Vtx)[3], FVector& OutCentroid)
 	{
 		OutCentroid = FVector::ZeroVector;
-		for (int i = 0; i < 3; i++) { OutCentroid += Positions[Vtx[i]]; }
+		for (int i = 0; i < 3; i++)
+		{
+			OutCentroid += Positions[Vtx[i]];
+		}
 		OutCentroid /= 3;
 	}
 
@@ -215,7 +224,10 @@ namespace PCGExMath::Geo
 
 		Center = SafeLinePlaneIntersection(C, C + GetNormal(B, C, C + Up), A, (A - B).GetSafeNormal(), bIntersect);
 
-		if (!bIntersect) { Center = FMath::Lerp(A, C, 0.5); } // Parallel lines, place center right in the middle
+		if (!bIntersect)
+		{
+			Center = FMath::Lerp(A, C, 0.5);
+		} // Parallel lines, place center right in the middle
 
 		Radius = FVector::Dist(C, Center);
 
@@ -283,9 +295,70 @@ namespace PCGExMath::Geo
 
 	bool IsAnyPointInPolygon(const TArray<FVector2D>& Points, const TArray<FVector2D>& Polygon)
 	{
-		if (Points.IsEmpty()) { return false; }
-		for (const FVector2D& P : Points) { if (FGeomTools2D::IsPointInPolygon(P, Polygon)) { return true; } }
+		if (Points.IsEmpty())
+		{
+			return false;
+		}
+		for (const FVector2D& P : Points)
+		{
+			if (FGeomTools2D::IsPointInPolygon(P, Polygon))
+			{
+				return true;
+			}
+		}
 		return false;
+	}
+
+	float SignedDistanceToPolygonPrism(
+		const FVector& LocalPoint,
+		TConstArrayView<FVector2D> Outline,
+		const float ZMin, const float ZMax)
+	{
+		const int32 N = Outline.Num();
+		if (N < 3)
+		{
+			return TNumericLimits<float>::Max();
+		}
+
+		const FVector2D P2D(LocalPoint.X, LocalPoint.Y);
+
+		// Single pass: closest-edge distance + winding-number inside test.
+		// Trailing-index idiom: j wraps via the prior iteration's i, no modulo.
+		float MinDistSq = TNumericLimits<float>::Max();
+		int32 Winding = 0;
+		for (int32 i = 0, j = N - 1; i < N; j = i, ++i)
+		{
+			const FVector2D& A = Outline[j];
+			const FVector2D& B = Outline[i];
+			MinDistSq = FMath::Min(MinDistSq, DistancePointToSegmentSquared2D(P2D, A, B));
+			const float Cross = (B.X - A.X) * (P2D.Y - A.Y) - (B.Y - A.Y) * (P2D.X - A.X);
+			if (A.Y <= P2D.Y && B.Y > P2D.Y && Cross > 0.0f)
+			{
+				++Winding;
+			}
+			else if (A.Y > P2D.Y && B.Y <= P2D.Y && Cross < 0.0f)
+			{
+				--Winding;
+			}
+		}
+
+		const float DZ = FMath::Max(ZMin - LocalPoint.Z, LocalPoint.Z - ZMax);
+		if (Winding == 0 && DZ > 0.0f)
+		{
+			return FMath::Sqrt(MinDistSq + DZ * DZ);
+		}
+
+		const float EdgeDist = FMath::Sqrt(MinDistSq);
+		const float D2D = (Winding != 0) ? -EdgeDist : EdgeDist;
+		if (D2D > 0.0f)
+		{
+			return D2D;
+		}
+		if (DZ > 0.0f)
+		{
+			return DZ;
+		}
+		return FMath::Max(D2D, DZ);
 	}
 
 	FBox ProjectPrismToWorldAABB(
@@ -294,10 +367,16 @@ namespace PCGExMath::Geo
 		const FVector& WorldOrigin,
 		const FQuat& ProjectionQuat)
 	{
-		if (Outline.Num() < 3 || ZMax <= ZMin) { return FBox(ForceInit); }
+		if (Outline.Num() < 3 || ZMax <= ZMin)
+		{
+			return FBox(ForceInit);
+		}
 
 		FBox2D Bounds2D(ForceInit);
-		for (const FVector2D& V : Outline) { Bounds2D += V; }
+		for (const FVector2D& V : Outline)
+		{
+			Bounds2D += V;
+		}
 
 		const FVector LocalCorners[8] = {
 			FVector(Bounds2D.Min.X, Bounds2D.Min.Y, ZMin),
@@ -311,7 +390,10 @@ namespace PCGExMath::Geo
 		};
 
 		FBox AABB(ForceInit);
-		for (const FVector& Local : LocalCorners) { AABB += WorldOrigin + ProjectionQuat.RotateVector(Local); }
+		for (const FVector& Local : LocalCorners)
+		{
+			AABB += WorldOrigin + ProjectionQuat.RotateVector(Local);
+		}
 		return AABB;
 	}
 
@@ -319,7 +401,10 @@ namespace PCGExMath::Geo
 	{
 		const int32 N = A.Num();
 		const int32 M = B.Num();
-		if (N < 3 || M < 3) { return false; }
+		if (N < 3 || M < 3)
+		{
+			return false;
+		}
 
 		// Crossing-number test against an arbitrary polygon (concave or convex).
 		// Inlined here so the polygon argument can be a TConstArrayView -- the
@@ -344,11 +429,17 @@ namespace PCGExMath::Geo
 		// Vertex-in-other tier rejects the common nested case before any edge work.
 		for (const FVector2D& V : B)
 		{
-			if (PointInPolygon(V, A)) { return true; }
+			if (PointInPolygon(V, A))
+			{
+				return true;
+			}
 		}
 		for (const FVector2D& V : A)
 		{
-			if (PointInPolygon(V, B)) { return true; }
+			if (PointInPolygon(V, B))
+			{
+				return true;
+			}
 		}
 
 		FVector IntersectionPt;
@@ -360,14 +451,17 @@ namespace PCGExMath::Geo
 			{
 				const FVector B1(B[j].X, B[j].Y, 0.0);
 				const FVector B2(B[(j + 1) % M].X, B[(j + 1) % M].Y, 0.0);
-				if (FMath::SegmentIntersection2D(A1, A2, B1, B2, IntersectionPt)) { return true; }
+				if (FMath::SegmentIntersection2D(A1, A2, B1, B2, IntersectionPt))
+				{
+					return true;
+				}
 			}
 		}
 		return false;
 	}
 
 	void ProjectOBBToFrame(
-		const PCGExMath::OBB::FOBB& OBB,
+		const OBB::FOBB& OBB,
 		const FVector& TargetWorldOrigin,
 		const FQuat& TargetProjectionQuat,
 		TArray<FVector2D, TInlineAllocator<8>>& OutHull,
@@ -390,7 +484,10 @@ namespace PCGExMath::Geo
 		ConvexHull2D::ComputeConvexHull(Corners2D, HullIndices);
 
 		OutHull.Reset();
-		for (int32 Idx : HullIndices) { OutHull.Add(Corners2D[Idx]); }
+		for (int32 Idx : HullIndices)
+		{
+			OutHull.Add(Corners2D[Idx]);
+		}
 	}
 
 	void ProjectPrismToFrame(

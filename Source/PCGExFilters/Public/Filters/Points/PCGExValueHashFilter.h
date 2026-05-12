@@ -99,7 +99,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FValueHashFilter(const TObjectPtr<const UPCGExValueHashFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 			Hashes = &TypedFilterFactory->Hashes;
 		}

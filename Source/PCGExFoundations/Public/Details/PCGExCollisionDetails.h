@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "CollisionQueryParams.h"
-#include "Elements/PCGActorSelector.h"
 #include "Details/PCGExInputShorthandsDetails.h"
+#include "Elements/PCGActorSelector.h"
 
 #include "PCGExCollisionDetails.generated.h"
 

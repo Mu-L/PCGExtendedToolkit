@@ -88,7 +88,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FWithinRangeFilter(const UPCGExWithinRangeFilterFactory* InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 			Ranges = InDefinition->Ranges;
 		}

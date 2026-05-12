@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/PCGExPointsProcessor.h"
 #include "PCGSettings.h"
+#include "Core/PCGExPointsProcessor.h"
 
 #include "PCGExIterations.generated.h"
 
@@ -31,8 +31,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(Iterations, "Iterations", "A Simple Iterations data generator. It create a single instance of a lightweight dummy data object and adds duplicate entries to the node output to be used as individual iterations for a loop node.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Constant); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Constant);
+	}
 #endif
 
 protected:
@@ -61,5 +69,9 @@ public:
 
 protected:
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
-	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override { return true; }
+
+	virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override
+	{
+		return true;
+	}
 };

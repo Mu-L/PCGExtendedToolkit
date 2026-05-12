@@ -5,10 +5,10 @@
 
 #include "CoreMinimal.h"
 
-#include "Helpers/PCGExLevelDataExporter.h"
 #include "Helpers/PCGExActorContentFilter.h"
 #include "Helpers/PCGExActorMeshClassificator.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
+#include "Helpers/PCGExLevelDataExporter.h"
 
 #include "PCGExDefaultLevelDataExporter.generated.h"
 
@@ -18,9 +18,9 @@ class UStaticMeshComponent;
 UENUM()
 enum class EPCGExValueTagMode : uint8
 {
-	NoParsing    UMETA(DisplayName = "No Parsing"),
+	NoParsing UMETA(DisplayName = "No Parsing"),
 	// Tags are written as-is to the instance tag string; no attribute parsing.
-	Parse        UMETA(DisplayName = "Parse"),
+	Parse UMETA(DisplayName = "Parse"),
 	// Plain tags become bool=true attributes; Name:Value tags become typed attributes.
 	// The instance tag string is never written in this mode.
 	ParseAndKeep UMETA(DisplayName = "Parse and Keep"),

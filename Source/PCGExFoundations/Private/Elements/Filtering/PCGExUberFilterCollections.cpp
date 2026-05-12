@@ -7,8 +7,8 @@
 
 #include "PCGExPickersCommon.h"
 #include "Core/PCGExPickerFactoryProvider.h"
-#include "Data/PCGExData.h"
 #include "Core/PCGExPointFilter.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 
 
@@ -17,11 +17,17 @@
 
 bool UPCGExUberFilterCollectionsSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExPickers::Labels::SourcePickersLabel) { return InPin->EdgeCount() > 0; }
+	if (InPin->Properties.Label == PCGExPickers::Labels::SourcePickersLabel)
+	{
+		return InPin->EdgeCount() > 0;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
-bool UPCGExUberFilterCollectionsSettings::HasDynamicPins() const { return true; }
+bool UPCGExUberFilterCollectionsSettings::HasDynamicPins() const
+{
+	return true;
+}
 
 TArray<FPCGPinProperties> UPCGExUberFilterCollectionsSettings::InputPinProperties() const
 {
@@ -47,11 +53,17 @@ FName UPCGExUberFilterCollectionsSettings::GetMainOutputPin() const
 	return PCGExFilters::Labels::OutputInsideFiltersLabel;
 }
 
-bool UPCGExUberFilterCollectionsSettings::GetIsMainTransactional() const { return true; }
+bool UPCGExUberFilterCollectionsSettings::GetIsMainTransactional() const
+{
+	return true;
+}
 
 bool FPCGExUberFilterCollectionsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(UberFilterCollections)
 
@@ -95,7 +107,10 @@ bool FPCGExUberFilterCollectionsElement::AdvanceWork(FPCGExContext* InContext, c
 			Context->NumPairs = Context->MainPoints->Pairs.Num();
 
 			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+				{
+					return true;
+				},
 				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 					NewBatch->bSkipCompletion = Context->bHasOnlyCollectionFilters;
@@ -113,8 +128,14 @@ bool FPCGExUberFilterCollectionsElement::AdvanceWork(FPCGExContext* InContext, c
 
 			while (Context->AdvancePointsIO())
 			{
-				if (PrimaryFilters->Test(Context->CurrentIO, Context->MainPoints)) { Context->Inside->Emplace_GetRef(Context->CurrentIO, PCGExData::EIOInit::Forward); }
-				else { Context->Outside->Emplace_GetRef(Context->CurrentIO, PCGExData::EIOInit::Forward); }
+				if (PrimaryFilters->Test(Context->CurrentIO, Context->MainPoints))
+				{
+					Context->Inside->Emplace_GetRef(Context->CurrentIO, PCGExData::EIOInit::Forward);
+				}
+				else
+				{
+					Context->Outside->Emplace_GetRef(Context->CurrentIO, PCGExData::EIOInit::Forward);
+				}
 			}
 
 			Context->Done();
@@ -128,8 +149,14 @@ bool FPCGExUberFilterCollectionsElement::AdvanceWork(FPCGExContext* InContext, c
 	}
 
 	uint64& Mask = Context->OutputData.InactiveOutputPinBitmask;
-	if (!Context->Inside->StageOutputs()) { Mask |= 1ULL << (Settings->bSwap ? 1 : 0); }
-	if (!Context->Outside->StageOutputs()) { Mask |= 1ULL << (Settings->bSwap ? 0 : 1); }
+	if (!Context->Inside->StageOutputs())
+	{
+		Mask |= 1ULL << (Settings->bSwap ? 1 : 0);
+	}
+	if (!Context->Outside->StageOutputs())
+	{
+		Mask |= 1ULL << (Settings->bSwap ? 0 : 1);
+	}
 
 	return Context->TryComplete();
 }
@@ -147,7 +174,10 @@ namespace PCGExUberFilterCollections
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PointDataFacade->Source->bAllowEmptyOutput = true;
 
@@ -180,17 +210,32 @@ namespace PCGExUberFilterCollections
 		{
 			PCGEX_SCOPE_LOOP(Index)
 			{
-				if (!Picks.Contains(Index)) { continue; }
-				if (PointFilterCache[Index]) { FPlatformAtomics::InterlockedAdd(&NumInside, 1); }
-				else { FPlatformAtomics::InterlockedAdd(&NumOutside, 1); }
+				if (!Picks.Contains(Index))
+				{
+					continue;
+				}
+				if (PointFilterCache[Index])
+				{
+					FPlatformAtomics::InterlockedAdd(&NumInside, 1);
+				}
+				else
+				{
+					FPlatformAtomics::InterlockedAdd(&NumOutside, 1);
+				}
 			}
 		}
 		else
 		{
 			PCGEX_SCOPE_LOOP(Index)
 			{
-				if (PointFilterCache[Index]) { FPlatformAtomics::InterlockedAdd(&NumInside, 1); }
-				else { FPlatformAtomics::InterlockedAdd(&NumOutside, 1); }
+				if (PointFilterCache[Index])
+				{
+					FPlatformAtomics::InterlockedAdd(&NumInside, 1);
+				}
+				else
+				{
+					FPlatformAtomics::InterlockedAdd(&NumOutside, 1);
+				}
 			}
 		}
 	}
@@ -201,22 +246,49 @@ namespace PCGExUberFilterCollections
 
 		switch (Settings->Mode)
 		{
-		default: case EPCGExUberFilterCollectionsMode::All: if (NumInside == NumPoints) { Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
-			else { Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
-			break;
-		case EPCGExUberFilterCollectionsMode::Any: if (NumInside != 0) { Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
-			else { Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
-			break;
-		case EPCGExUberFilterCollectionsMode::Partial: if (Settings->Measure == EPCGExMeanMeasure::Discrete)
+		default: case EPCGExUberFilterCollectionsMode::All:
+			if (NumInside == NumPoints)
 			{
-				if (PCGExCompare::Compare(Settings->Comparison, NumInside, Settings->IntThreshold, 0)) { Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
-				else { Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
+				Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+			}
+			else
+			{
+				Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+			}
+			break;
+		case EPCGExUberFilterCollectionsMode::Any:
+			if (NumInside != 0)
+			{
+				Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+			}
+			else
+			{
+				Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+			}
+			break;
+		case EPCGExUberFilterCollectionsMode::Partial:
+			if (Settings->Measure == EPCGExMeanMeasure::Discrete)
+			{
+				if (PCGExCompare::Compare(Settings->Comparison, NumInside, Settings->IntThreshold, 0))
+				{
+					Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				}
+				else
+				{
+					Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				}
 			}
 			else
 			{
 				const double Ratio = static_cast<double>(NumInside) / static_cast<double>(NumPoints);
-				if (PCGExCompare::Compare(Settings->Comparison, Ratio, Settings->DblThreshold, Settings->Tolerance)) { Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
-				else { Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward); }
+				if (PCGExCompare::Compare(Settings->Comparison, Ratio, Settings->DblThreshold, Settings->Tolerance))
+				{
+					Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				}
+				else
+				{
+					Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				}
 			}
 			break;
 		}

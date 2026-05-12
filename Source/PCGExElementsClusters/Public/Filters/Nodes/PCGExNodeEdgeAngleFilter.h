@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Filters/PCGExAdjacency.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Filters/PCGExAdjacency.h"
 
 #include "PCGExNodeEdgeAngleFilter.generated.h"
 
@@ -58,7 +58,8 @@ class FNodeEdgeAngleFilter final : public PCGExClusterFilter::IVtxFilter
 {
 public:
 	explicit FNodeEdgeAngleFilter(const UPCGExNodeEdgeAngleFilterFactory* InFactory)
-		: IVtxFilter(InFactory), TypedFilterFactory(InFactory)
+		: IVtxFilter(InFactory)
+		  , TypedFilterFactory(InFactory)
 	{
 		DotComparison = InFactory->Config.DotComparisonDetails;
 	}
@@ -88,7 +89,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(NodeEdgeAngleFilterFactory, "Vtx Filter : Edge Angle", "Dot product comparison of connected edges against themselves. Mostly useful on binary nodes only.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster);
+	}
 #endif
 
 	/** Test Config.*/

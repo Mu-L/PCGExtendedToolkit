@@ -7,8 +7,8 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Helpers/PCGExArrayHelpers.h"
 #include "Elements/Layout/PCGExLayout.h"
+#include "Helpers/PCGExArrayHelpers.h"
 #include "Math/PCGExMathBounds.h"
 #include "Sorting/PCGExPointSorter.h"
 #include "Sorting/PCGExSortingDetails.h"
@@ -40,13 +40,19 @@ TArray<FPCGPinProperties> UPCGExBinPackingSettings::OutputPinProperties() const
 
 PCGEX_INITIALIZE_ELEMENT(BinPacking)
 
-PCGExData::EIOInit UPCGExBinPackingSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBinPackingSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BinPacking)
 
 bool FPCGExBinPackingElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BinPacking)
 
@@ -95,7 +101,10 @@ bool FPCGExBinPackingElement::Boot(FPCGExContext* InContext) const
 		}
 	}
 
-	for (int i = 0; i < NumBins; i++) { Context->Bins->Pairs[i]->OutputPin = Context->Bins->OutputPin; }
+	for (int i = 0; i < NumBins; i++)
+	{
+		Context->Bins->Pairs[i]->OutputPin = Context->Bins->OutputPin;
+	}
 
 	Context->Discarded = MakeShared<PCGExData::FPointIOCollection>(InContext);
 	Context->Discarded->OutputPin = PCGExCommon::Labels::OutputDiscardedLabel;
@@ -205,7 +214,10 @@ namespace PCGExBinPacking
 		const FVector ItemSize = InItem.Box.GetSize();
 		FVector ItemMin = Space.Box.Min;
 
-		for (int C = 0; C < 3; C++) { ItemMin[C] = FMath::Clamp(Seed[C] - ItemSize[C] * 0.5, Space.Box.Min[C], Space.Box.Max[C] - ItemSize[C]); }
+		for (int C = 0; C < 3; C++)
+		{
+			ItemMin[C] = FMath::Clamp(Seed[C] - ItemSize[C] * 0.5, Space.Box.Min[C], Space.Box.Max[C] - ItemSize[C]);
+		}
 
 		FBox ItemBox = FBox(ItemMin, ItemMin + ItemSize);
 		InItem.Box = ItemBox;
@@ -224,7 +236,10 @@ namespace PCGExBinPacking
 		Spaces.RemoveAt(SpaceIndex);
 		Spaces.Reserve(Spaces.Num() + NewPartitions.Num());
 
-		for (const FBox& Partition : NewPartitions) { AddSpace(Partition); }
+		for (const FBox& Partition : NewPartitions)
+		{
+			AddSpace(Partition);
+		}
 	}
 
 	bool FBin::Insert(FItem& InItem)
@@ -234,7 +249,10 @@ namespace PCGExBinPacking
 
 		const int32 BestIndex = GetBestSpaceScore(InItem, OutScore, OutRotation);
 
-		if (BestIndex == -1) { return false; }
+		if (BestIndex == -1)
+		{
+			return false;
+		}
 
 		// TODO : Check other bins as well, while it fits, this one may not be the ideal candidate
 
@@ -267,7 +285,10 @@ namespace PCGExBinPacking
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 		PointDataFacade->Source->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
@@ -276,7 +297,10 @@ namespace PCGExBinPacking
 		PCGEX_INIT_IO(TargetBins, PCGExData::EIOInit::Duplicate)
 
 		PaddingBuffer = Settings->OccupationPadding.GetValueSetting();
-		if (!PaddingBuffer->Init(PointDataFacade)) { return false; }
+		if (!PaddingBuffer->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 #define PCGEX_SWITCH_ON_SPLIT_MODE(_DIRECTION)\
 		switch (Settings->SplitMode){\
@@ -333,11 +357,17 @@ namespace PCGExBinPacking
 		{
 			if (TSharedPtr<PCGExSorting::FSortCache> Cache = Sorter->BuildCache(NumPoints))
 			{
-				ProcessingOrder.Sort([&](const int32 A, const int32 B) { return Cache->Compare(A, B); });
+				ProcessingOrder.Sort([&](const int32 A, const int32 B)
+				{
+					return Cache->Compare(A, B);
+				});
 			}
 			else
 			{
-				ProcessingOrder.Sort([&](const int32 A, const int32 B) { return Sorter->Sort(A, B); });
+				ProcessingOrder.Sort([&](const int32 A, const int32 B)
+				{
+					return Sorter->Sort(A, B);
+				});
 			}
 		}
 
@@ -413,7 +443,10 @@ namespace PCGExBinPacking
 			}
 
 			Fitted[PointIndex] = bPlaced;
-			if (!bPlaced) { bHasUnfitted = true; }
+			if (!bPlaced)
+			{
+				bHasUnfitted = true;
+			}
 
 			// TODO : post process pass to move things around based on initial placement
 		}

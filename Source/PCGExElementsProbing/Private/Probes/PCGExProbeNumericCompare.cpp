@@ -5,9 +5,9 @@
 
 
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExProbingCandidates.h"
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Core/PCGExProbingCandidates.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExProbeConfigNumericCompare, MaxConnections, int32, MaxConnectionsInput, MaxConnectionsAttribute, MaxConnectionsConstant)
@@ -15,10 +15,16 @@ PCGEX_CREATE_PROBE_FACTORY(NumericCompare, {}, {})
 
 bool FPCGExProbeNumericCompare::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	MaxConnections = Config.GetValueSettingMaxConnections();
-	if (!MaxConnections->Init(PrimaryDataFacade)) { return false; }
+	if (!MaxConnections->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	ValuesBuffer = PrimaryDataFacade->GetBroadcaster<double>(Config.Attribute, true);
 
@@ -40,25 +46,37 @@ void FPCGExProbeNumericCompare::ProcessCandidates(const int32 Index, TArray<PCGE
 	const int32 MaxIterations = FMath::Min(MaxConnections->Read(Index), Candidates.Num());
 	const double R = GetSearchRadius(Index);
 
-	if (MaxIterations <= 0) { return; }
+	if (MaxIterations <= 0)
+	{
+		return;
+	}
 
 	TSet<uint64> LocalCoincidence;
 	int32 Additions = 0;
 
 	for (PCGExProbing::FCandidate& C : Candidates)
 	{
-		if (C.Distance > R) { return; } // Candidates are sorted, stop there.
+		if (C.Distance > R)
+		{
+			return;
+		} // Candidates are sorted, stop there.
 
 		if (Coincidence)
 		{
 			Coincidence->Add(C.GH, &bIsAlreadyConnected);
-			if (bIsAlreadyConnected) { continue; }
+			if (bIsAlreadyConnected)
+			{
+				continue;
+			}
 		}
 
 		if (Config.bPreventCoincidence)
 		{
 			LocalCoincidence.Add(PCGEx::SH3(C.Direction, CWCoincidenceTolerance), &bIsAlreadyConnected);
-			if (bIsAlreadyConnected) { continue; }
+			if (bIsAlreadyConnected)
+			{
+				continue;
+			}
 		}
 
 		if (PCGExCompare::Compare(Config.Comparison, ValuesBuffer->Read(Index), ValuesBuffer->Read(C.PointIndex), Config.Tolerance))
@@ -66,7 +84,10 @@ void FPCGExProbeNumericCompare::ProcessCandidates(const int32 Index, TArray<PCGE
 			OutEdges->Add(PCGEx::H64U(Index, C.PointIndex));
 
 			Additions++;
-			if (Additions >= MaxIterations) { return; }
+			if (Additions >= MaxIterations)
+			{
+				return;
+			}
 		}
 	}
 }

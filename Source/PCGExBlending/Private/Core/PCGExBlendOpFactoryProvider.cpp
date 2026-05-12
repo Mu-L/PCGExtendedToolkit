@@ -42,13 +42,19 @@ bool UPCGExBlendOpFactoryProviderSettings::IsPinDefaultValueEnabled(FName PinLab
 
 bool UPCGExBlendOpFactoryProviderSettings::IsPinDefaultValueActivated(FName PinLabel) const
 {
-	if (!IsPinDefaultValueEnabled(PinLabel)) { return false; }
+	if (!IsPinDefaultValueEnabled(PinLabel))
+	{
+		return false;
+	}
 	return DefaultValues.IsPropertyActivated(PinLabel);
 }
 
 EPCGMetadataTypes UPCGExBlendOpFactoryProviderSettings::GetPinDefaultValueType(FName PinLabel) const
 {
-	if (DefaultValues.FindProperty(PinLabel)) { return DefaultValues.GetCurrentPropertyType(PinLabel); }
+	if (DefaultValues.FindProperty(PinLabel))
+	{
+		return DefaultValues.GetCurrentPropertyType(PinLabel);
+	}
 	return GetPinInitialDefaultValueType(PinLabel);
 }
 
@@ -92,7 +98,10 @@ void UPCGExBlendOpFactoryProviderSettings::SetPinDefaultValueIsActivated(FName P
 {
 	if (ensure(IsPinDefaultValueEnabled(PinLabel)))
 	{
-		if (bDirtySettings) { Modify(); }
+		if (bDirtySettings)
+		{
+			Modify();
+		}
 
 		const bool bPropertyChanged = DefaultValues.SetPropertyActivated(PinLabel, bIsActivated);
 		if (bPropertyChanged && bDirtySettings)
@@ -117,7 +126,10 @@ FString UPCGExBlendOpFactoryProviderSettings::GetPinDefaultValueAsString(FName P
 {
 	if (ensure(IsPinDefaultValueActivated(PinLabel)))
 	{
-		if (DefaultValues.FindProperty(PinLabel)) { return DefaultValues.GetPropertyValueAsString(PinLabel); }
+		if (DefaultValues.FindProperty(PinLabel))
+		{
+			return DefaultValues.GetPropertyValueAsString(PinLabel);
+		}
 		return GetPinInitialDefaultValueString(PinLabel);
 	}
 
@@ -138,8 +150,14 @@ void UPCGExBlendOpFactoryProviderSettings::ResetDefaultValue(FName PinLabel)
 
 bool UPCGExBlendOpFactoryProviderSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExBlending::Labels::SourceConstantA && Config.OperandASource == EPCGExOperandSource::Constant) { return true; }
-	if (InPin->Properties.Label == PCGExBlending::Labels::SourceConstantB && Config.OperandBSource == EPCGExOperandSource::Constant) { return true; }
+	if (InPin->Properties.Label == PCGExBlending::Labels::SourceConstantA && Config.OperandASource == EPCGExOperandSource::Constant)
+	{
+		return true;
+	}
+	if (InPin->Properties.Label == PCGExBlending::Labels::SourceConstantB && Config.OperandBSource == EPCGExOperandSource::Constant)
+	{
+		return true;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
@@ -201,14 +219,33 @@ FString UPCGExBlendOpFactoryProviderSettings::GetDisplayName() const
 
 		switch (Config.OutputMode)
 		{
-		case EPCGExBlendOpOutputMode::SameAsA: break;
-		case EPCGExBlendOpOutputMode::SameAsB: if (Config.bUseOperandB) { Str += FString::Printf(TEXT(" ⇌ %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB)); }
-			else { Str += FString::Printf(TEXT(" → %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB)); }
+		case EPCGExBlendOpOutputMode::SameAsA:
 			break;
-		case EPCGExBlendOpOutputMode::New: if (Config.bUseOperandB) { Str += FString::Printf(TEXT(" & %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB)); }
-			else { Str += FString::Printf(TEXT(" → %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OutputTo)); }
+		case EPCGExBlendOpOutputMode::SameAsB:
+			if (Config.bUseOperandB)
+			{
+				Str += FString::Printf(TEXT(" ⇌ %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB));
+			}
+			else
+			{
+				Str += FString::Printf(TEXT(" → %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB));
+			}
 			break;
-		case EPCGExBlendOpOutputMode::Transient: if (Config.bUseOperandB) { Str += FString::Printf(TEXT(" & %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB)); }
+		case EPCGExBlendOpOutputMode::New:
+			if (Config.bUseOperandB)
+			{
+				Str += FString::Printf(TEXT(" & %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB));
+			}
+			else
+			{
+				Str += FString::Printf(TEXT(" → %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OutputTo));
+			}
+			break;
+		case EPCGExBlendOpOutputMode::Transient:
+			if (Config.bUseOperandB)
+			{
+				Str += FString::Printf(TEXT(" & %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB));
+			}
 			Str += FString::Printf(TEXT(" ⇢ %s"), *PCGExMetaHelpers::GetSelectorDisplayName(Config.OutputTo));
 			break;
 		}

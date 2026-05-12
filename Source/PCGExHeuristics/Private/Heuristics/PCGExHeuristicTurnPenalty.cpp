@@ -14,11 +14,17 @@ double FPCGExHeuristicTurnPenalty::GetGlobalScore(const PCGExClusters::FNode& Fr
 
 double FPCGExHeuristicTurnPenalty::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
 {
-	if (!TravelStack) { return GetScoreInternal(FallbackScore); }
+	if (!TravelStack)
+	{
+		return GetScoreInternal(FallbackScore);
+	}
 
 	// Get the previous node index from TravelStack
 	const int32 PrevNodeIndex = PCGEx::NH64A(TravelStack->Get(From.Index));
-	if (PrevNodeIndex == -1) { return GetScoreInternal(FallbackScore); } // No previous node (at seed)
+	if (PrevNodeIndex == -1)
+	{
+		return GetScoreInternal(FallbackScore);
+	} // No previous node (at seed)
 
 	// Get directions
 	const FVector IncomingDir = Cluster->GetDir(PrevNodeIndex, From.Index);
@@ -37,7 +43,10 @@ double FPCGExHeuristicTurnPenalty::GetEdgeScore(const PCGExClusters::FNode& From
 	{
 		// Use cross product to determine turn direction (positive = left, negative = right in XY plane)
 		const FVector Cross = FVector::CrossProduct(IncomingDir, OutgoingDir);
-		if (Cross.Z < 0) { Angle = -Angle; }
+		if (Cross.Z < 0)
+		{
+			Angle = -Angle;
+		}
 	}
 	else
 	{
@@ -45,8 +54,14 @@ double FPCGExHeuristicTurnPenalty::GetEdgeScore(const PCGExClusters::FNode& From
 	}
 
 	// Remap angle to 0-1 range based on thresholds
-	if (Angle <= MinAngleRad) { return GetScoreInternal(0); }
-	if (Angle >= MaxAngleRad) { return GetScoreInternal(1); }
+	if (Angle <= MinAngleRad)
+	{
+		return GetScoreInternal(0);
+	}
+	if (Angle >= MaxAngleRad)
+	{
+		return GetScoreInternal(1);
+	}
 
 	const double NormalizedAngle = (Angle - MinAngleRad) / AngleRange;
 	return GetScoreInternal(NormalizedAngle);

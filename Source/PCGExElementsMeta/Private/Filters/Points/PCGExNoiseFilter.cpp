@@ -18,10 +18,16 @@
 
 bool UPCGExNoiseFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
 
 	NoiseGenerator = MakeShared<PCGExNoise3D::FNoiseGenerator>();
-	if (!NoiseGenerator->Init(InContext)) { return false; }
+	if (!NoiseGenerator->Init(InContext))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -39,7 +45,10 @@ void UPCGExNoiseFilterFactory::RegisterBuffersDependencies(FPCGExContext* InCont
 
 bool UPCGExNoiseFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.Comparison.Input == EPCGExInputValueType::Attribute, Config.Comparison.Attribute, Consumable)
@@ -49,12 +58,18 @@ bool UPCGExNoiseFilterFactory::RegisterConsumableAttributesWithData(FPCGExContex
 
 bool PCGExPointFilter::FNoiseFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	NoiseGenerator = TypedFilterFactory->NoiseGenerator;
 
 	OperandB = TypedFilterFactory->Config.Comparison.GetValueSetting(PCGEX_QUIET_HANDLING);
-	if (!OperandB->Init(PointDataFacade)) { return false; }
+	if (!OperandB->Init(PointDataFacade))
+	{
+		return false;
+	}
 
 	InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
 
@@ -72,7 +87,10 @@ bool PCGExPointFilter::FNoiseFilter::Test(const TSharedPtr<PCGExData::FPointIO>&
 {
 	double B = 0;
 
-	if (!TypedFilterFactory->Config.Comparison.TryReadDataValue(IO, B, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+	if (!TypedFilterFactory->Config.Comparison.TryReadDataValue(IO, B, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
 	return TypedFilterFactory->Config.Comparison.Compare(
 		NoiseGenerator->GetDouble(IO->GetIn()->GetBounds().GetCenter()),
 		B);

@@ -33,12 +33,18 @@ PCGExTensor::FTensorSample UPCGExTensorSampler::RawSample(
 	for (const TSharedPtr<PCGExTensorOperation>& Op : InTensors)
 	{
 		PCGExTensor::FTensorSample Sample = Op->Sample(InSeedIndex, InProbe);
-		if (Sample.Effectors == 0) { continue; }
+		if (Sample.Effectors == 0)
+		{
+			continue;
+		}
 		TotalWeight += Sample.Weight;
 		Samples.Emplace(MoveTemp(Sample));
 	}
 
-	if (Samples.IsEmpty()) { return PCGExTensor::FTensorSample(); }
+	if (Samples.IsEmpty())
+	{
+		return PCGExTensor::FTensorSample();
+	}
 
 	// Early out for single sample (common case)
 	if (Samples.Num() == 1)

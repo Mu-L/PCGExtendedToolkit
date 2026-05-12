@@ -7,16 +7,18 @@
 
 #include "PCGComponent.h"
 #include "PCGElement.h"
-#include "PCGParamData.h"
 #include "PCGExSocketProvider.h"
-#include "Helpers/PCGExManagedResourceHelpers.h"
-#include "Helpers/PCGHelpers.h"
+#include "PCGParamData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
+#include "GameFramework/WorldSettings.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
+#include "Helpers/PCGExManagedResourceHelpers.h"
+#include "Helpers/PCGHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagingLoadLevelElement"
 #define PCGEX_NAMESPACE StagingLoadLevel
@@ -49,11 +51,17 @@ void UPCGExLevelStreamingDynamic::OnLevelLoadedChanged(ULevel* Level)
 {
 	Super::OnLevelLoadedChanged(Level);
 
-	if (!Level) { return; }
+	if (!Level)
+	{
+		return;
+	}
 
 	for (AActor* Actor : Level->Actors)
 	{
-		if (!Actor) { continue; }
+		if (!Actor)
+		{
+			continue;
+		}
 
 #if WITH_EDITOR
 		if (Actor->bIsMainWorldOnly)
@@ -91,7 +99,10 @@ void UPCGExLevelStreamingLevelInstance::OnLevelLoadedChanged(ULevel* Level)
 {
 	Super::OnLevelLoadedChanged(Level);
 
-	if (!Level) { return; }
+	if (!Level)
+	{
+		return;
+	}
 
 #if WITH_EDITOR
 	// Read folder path from the owning level instance actor
@@ -107,7 +118,10 @@ void UPCGExLevelStreamingLevelInstance::OnLevelLoadedChanged(ULevel* Level)
 
 	for (AActor* Actor : Level->Actors)
 	{
-		if (!Actor) { continue; }
+		if (!Actor)
+		{
+			continue;
+		}
 
 #if WITH_EDITOR
 		if (Actor->bIsMainWorldOnly)
@@ -149,7 +163,10 @@ void UPCGExStagingLoadLevelSettings::InputPinPropertiesBeforeFilters(TArray<FPCG
 
 bool FPCGExStagingLoadLevelElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagingLoadLevel)
 
@@ -194,10 +211,10 @@ bool FPCGExStagingLoadLevelElement::AdvanceWork(FPCGExContext* InContext, const 
 		// Compute CRC for managed resource reuse detection
 		GetDependenciesCrc(FPCGGetDependenciesCrcParams(&Context->InputData, Settings, nullptr), Context->DependenciesCrc);
 
+		UPCGComponent* SourceComponent = Context->GetMutableComponent();
+
 		if (Context->DependenciesCrc.IsValid())
 		{
-			UPCGComponent* SourceComponent = Context->GetMutableComponent();
-
 			// Try streaming levels first, then LevelInstance actors
 			if (PCGExManagedHelpers::TryReuseManagedResource<UPCGExManagedStreamingLevels>(SourceComponent, Context->DependenciesCrc))
 			{
@@ -211,8 +228,47 @@ bool FPCGExStagingLoadLevelElement::AdvanceWork(FPCGExContext* InContext, const 
 #endif
 		}
 
+		// Decide spawn mode and create the managed resource here, on the game thread, before any
+		// parallel/async work dispatches. Doing this from a worker callback (e.g. OnPointsProcessingComplete)
+		// causes NewObject to tag the resulting UObject with the async-loading root, which pins its
+		// outer chain (component → volume → level → world → package) and leaks the host package on
+		// world unload. One resource per execute (per context), shared across all processors.
+		if (!Context->bReusedManagedResources)
+		{
+			check(IsInGameThread());
+
+#if WITH_EDITOR
+			const bool bIsRuntime = SourceComponent->GenerationTrigger == EPCGComponentGenerationTrigger::GenerateAtRuntime;
+			Context->bUseLevelInstance = Settings->bSpawnAsLevelInstance && !bIsRuntime;
+			Context->bUseLooseActors = !Context->bUseLevelInstance && !bIsRuntime;
+
+			if (Context->bUseLevelInstance)
+			{
+				Context->ManagedLevelInstances = NewObject<UPCGManagedActors>(SourceComponent);
+				Context->ManagedLevelInstances->SetCrc(Context->DependenciesCrc);
+				SourceComponent->AddToManagedResources(Context->ManagedLevelInstances);
+			}
+			else if (Context->bUseLooseActors)
+			{
+				Context->ManagedLooseActors = NewObject<UPCGManagedActors>(SourceComponent);
+				Context->ManagedLooseActors->SetCrc(Context->DependenciesCrc);
+				Context->ManagedLooseActors->SetIsPreview(SourceComponent->IsInPreviewMode());
+				SourceComponent->AddToManagedResources(Context->ManagedLooseActors);
+			}
+			else
+#endif
+			{
+				Context->ManagedStreamingLevels = NewObject<UPCGExManagedStreamingLevels>(SourceComponent);
+				Context->ManagedStreamingLevels->SetCrc(Context->DependenciesCrc);
+				SourceComponent->AddToManagedResources(Context->ManagedStreamingLevels);
+			}
+		}
+
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -239,16 +295,25 @@ namespace PCGExStagingLoadLevel
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Forward)
 
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
-		if (!EntryHashGetter) { return false; }
+		if (!EntryHashGetter)
+		{
+			return false;
+		}
 
 		// Init root-actor source. Constant-mode short-circuits per-point materialization.
 		RootActorSV = Settings->RootActor.GetValueSetting();
-		if (!RootActorSV->Init(PointDataFacade)) { return false; }
+		if (!RootActorSV->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
@@ -263,7 +328,10 @@ namespace PCGExStagingLoadLevel
 		FilterScope(Scope);
 
 		UWorld* World = ExecutionContext->GetWorld();
-		if (!World) { return; }
+		if (!World)
+		{
+			return;
+		}
 
 		TConstPCGValueRange<FTransform> Transforms = PointDataFacade->Source->GetIn()->GetConstTransformValueRange();
 
@@ -276,19 +344,34 @@ namespace PCGExStagingLoadLevel
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const uint64 Hash = EntryHashGetter->Read(Index);
-			if (Hash == 0 || Hash == static_cast<uint64>(-1)) { continue; }
+			if (Hash == 0 || Hash == static_cast<uint64>(-1))
+			{
+				continue;
+			}
 
 			FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
-			if (!Result.IsValid()) { continue; }
+			if (!Result.IsValid())
+			{
+				continue;
+			}
 
 			// Check if this is a Level entry
-			if (!Result.Entry->IsType(PCGExAssetCollection::TypeIds::Level)) { continue; }
+			if (!Result.Entry->IsType(PCGExAssetCollection::TypeIds::Level))
+			{
+				continue;
+			}
 
 			const FSoftObjectPath& LevelPath = Result.Entry->Staging.Path;
-			if (!LevelPath.IsValid()) { continue; }
+			if (!LevelPath.IsValid())
+			{
+				continue;
+			}
 
 			const FSoftObjectPath PerPointRoot = bRootIsConstant
 				? FSoftObjectPath()
@@ -310,7 +393,10 @@ namespace PCGExStagingLoadLevel
 		// TODO : Collapse SpawnRequests TScopedArray here
 
 		// CRC reuse: managed resources from a previous execution match, skip spawning entirely
-		if (Context->bReusedManagedResources) { return; }
+		if (Context->bReusedManagedResources)
+		{
+			return;
+		}
 
 		if (SpawnRequests.IsEmpty())
 		{
@@ -318,13 +404,60 @@ namespace PCGExStagingLoadLevel
 			return;
 		}
 
-		// Monotonic generation counter for unique streaming level package names
-		// Prevents name collisions with levels pending async unload from previous cycles
+		// Monotonic generation counter for unique streaming level package names.
+		// Prevents name collisions with levels pending async unload from previous cycles.
 		static std::atomic<uint32> GenerationCounter{0};
 		Generation = GenerationCounter.fetch_add(1);
 
+		// Managed resources were created up-front in AdvanceWork on the game thread.
+		// Creating them here (worker thread) would tag the resulting UObject with the
+		// async-loading root and leak the host world's package on unload.
+
+#if WITH_EDITOR
+		if (Context->bUseLooseActors)
+		{
+			// The loose-actors path needs source UWorld objects in memory to iterate their
+			// PersistentLevel->Actors. Batch-load all unique level assets asynchronously,
+			// then start the time-sliced spawn loop once they are resident.
+			TSet<FSoftObjectPath> UniquePaths;
+			for (const FLevelSpawnRequest& Req : SpawnRequests)
+			{
+				UniquePaths.Add(Req.LevelPath);
+			}
+
+			TArray<FSoftObjectPath> PathsToLoad = UniquePaths.Array();
+
+			PCGExHelpers::Load(
+				TaskManager,
+				[PCGEX_ASYNC_THIS_CAPTURE, PathsToLoad = MoveTemp(PathsToLoad)]() -> TArray<FSoftObjectPath>
+				{
+					PCGEX_ASYNC_THIS_RET({})
+					return PathsToLoad;
+				},
+				[PCGEX_ASYNC_THIS_CAPTURE](const bool bSuccess, TSharedPtr<FStreamableHandle> StreamableHandle)
+				{
+					PCGEX_ASYNC_THIS
+
+					This->LevelLoadHandle = StreamableHandle;
+
+					This->MainThreadLoop = MakeShared<PCGExMT::FTimeSlicedMainThreadLoop>(This->SpawnRequests.Num());
+					This->MainThreadLoop->OnIterationCallback = [This](const int32 Index, const PCGExMT::FScope& Scope)
+					{
+						This->SpawnLevelInstance(Index);
+					};
+
+					PCGEX_ASYNC_HANDLE_CHKD_VOID(This->TaskManager, This->MainThreadLoop)
+				});
+
+			return;
+		}
+#endif
+
 		MainThreadLoop = MakeShared<PCGExMT::FTimeSlicedMainThreadLoop>(SpawnRequests.Num());
-		MainThreadLoop->OnIterationCallback = [&](const int32 Index, const PCGExMT::FScope& Scope) { SpawnLevelInstance(Index); };
+		MainThreadLoop->OnIterationCallback = [&](const int32 Index, const PCGExMT::FScope& Scope)
+		{
+			SpawnLevelInstance(Index);
+		};
 
 		PCGEX_ASYNC_HANDLE_CHKD_VOID(TaskManager, MainThreadLoop)
 	}
@@ -355,7 +488,10 @@ namespace PCGExStagingLoadLevel
 	void FProcessor::SpawnAsLevelInstance(FLevelSpawnRequest& Request)
 	{
 		UWorld* World = Request.Params.World;
-		if (!World) { return; }
+		if (!World)
+		{
+			return;
+		}
 
 		AActor* TargetActor = ResolveTargetActor(Request);
 		if (!TargetActor)
@@ -368,7 +504,10 @@ namespace PCGExStagingLoadLevel
 
 		// Resolve actor class -- user override or our default
 		UClass* ActorClass = Settings->LevelInstanceClass.Get();
-		if (!ActorClass) { ActorClass = APCGExLevelInstance::StaticClass(); }
+		if (!ActorClass)
+		{
+			ActorClass = APCGExLevelInstance::StaticClass();
+		}
 
 		// Defer construction so we can set WorldAsset BEFORE PostRegisterAllComponents.
 		// The registration flow (PostRegisterAllComponents → RegisterLevelInstance → LoadLevelInstance)
@@ -416,58 +555,37 @@ namespace PCGExStagingLoadLevel
 		// AttachOptions semantics for the LevelInstance host actor itself.
 		PCGHelpers::AttachToParent(LevelInstanceActor, TargetActor, Settings->AttachOptions, ExecutionContext);
 
-		// Track via PCG managed resources -- engine handles cleanup on re-execution
-		if (ManagedLevelInstances)
+		// Track via PCG managed resources -- engine handles cleanup on re-execution.
+		// Resource is context-owned; SpawnLevelInstance runs main-thread via FTimeSlicedMainThreadLoop,
+		// so cross-processor adds to the shared array serialize naturally.
+		if (Context->ManagedLevelInstances)
 		{
-			ManagedLevelInstances->GetMutableGeneratedActors().Add(LevelInstanceActor);
+			Context->ManagedLevelInstances->GetMutableGeneratedActors().Add(LevelInstanceActor);
 		}
 	}
 #endif
 
 	void FProcessor::SpawnLevelInstance(const int32 RequestIndex)
 	{
-		// This runs on the game thread via FTimeSlicedMainThreadLoop
+		// This runs on the game thread via FTimeSlicedMainThreadLoop.
+		// Managed resources are created in AdvanceWork before any async/parallel work dispatches.
 
 		FLevelSpawnRequest& Request = SpawnRequests[RequestIndex];
 
-		const FString& BaseSuffix = Settings->LevelNameSuffix;
-
-		UPCGComponent* SourceComponent = ExecutionContext->GetMutableComponent();
-
-		// On first iteration, create and register managed resources for PCG cleanup tracking.
-		// Registering immediately ensures that if the time-sliced loop is interrupted by a
-		// graph regeneration, already-spawned levels/actors are tracked and will be cleaned up.
-		if (RequestIndex == 0)
-		{
 #if WITH_EDITOR
-			// ALevelInstance actors persist across save/load -- skip for runtime components
-			// whose output is transient and would otherwise leave stale actors in the level.
-			bUseLevelInstance = Settings->bSpawnAsLevelInstance
-				&& SourceComponent->GenerationTrigger != EPCGComponentGenerationTrigger::GenerateAtRuntime;
-
-			if (bUseLevelInstance)
-			{
-				ManagedLevelInstances = NewObject<UPCGManagedActors>(SourceComponent);
-				ManagedLevelInstances->SetCrc(Context->DependenciesCrc);
-				SourceComponent->AddToManagedResources(ManagedLevelInstances);
-			}
-			else
-#endif
-			{
-				ManagedStreamingLevels = NewObject<UPCGExManagedStreamingLevels>(SourceComponent);
-				ManagedStreamingLevels->SetCrc(Context->DependenciesCrc);
-				SourceComponent->AddToManagedResources(ManagedStreamingLevels);
-			}
-		}
-
-#if WITH_EDITOR
-		if (bUseLevelInstance)
+		if (Context->bUseLevelInstance)
 		{
 			SpawnAsLevelInstance(Request);
 			return;
 		}
+		if (Context->bUseLooseActors)
+		{
+			SpawnAsLooseActors(Request);
+			return;
+		}
 #endif
 
+		const FString& BaseSuffix = Settings->LevelNameSuffix;
 		const FString InstanceSuffix = FString::Printf(TEXT("%s_%u_%d"), *BaseSuffix, Generation, Request.PointIndex);
 		Request.Params.OptionalLevelNameOverride = &InstanceSuffix;
 
@@ -497,12 +615,198 @@ namespace PCGExStagingLoadLevel
 #endif
 		}
 
-		// Track via PCG managed resources (already registered with component)
-		if (ManagedStreamingLevels)
+		// Track via PCG managed resources (already registered with component).
+		// Resource is context-owned, shared across all processors; main-thread serialization
+		// via FTimeSlicedMainThreadLoop makes the cross-processor add safe.
+		if (Context->ManagedStreamingLevels)
 		{
-			ManagedStreamingLevels->StreamingLevels.Add(StreamingLevel);
+			Context->ManagedStreamingLevels->StreamingLevels.Add(StreamingLevel);
 		}
 	}
+
+#if WITH_EDITOR
+	void FProcessor::SpawnAsLooseActors(FLevelSpawnRequest& Request)
+	{
+		UWorld* GameWorld = Request.Params.World;
+		if (!GameWorld)
+		{
+			return;
+		}
+
+		AActor* TargetActor = ResolveTargetActor(Request);
+		if (!TargetActor)
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
+			           FText::Format(LOCTEXT("InvalidTargetActorLoose", "No target actor available for loose-actor spawn at point {0}; ensure either RootActor or the component's target actor is set."),
+				           FText::AsNumber(Request.PointIndex)));
+			return;
+		}
+
+		UWorld* LevelWorld = Cast<UWorld>(Request.LevelPath.ResolveObject());
+		if (!LevelWorld || !LevelWorld->PersistentLevel)
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext,
+			           FText::Format(LOCTEXT("FailedToResolveLevelWorld", "Failed to resolve level world for '{0}' at point {1}; ensure the level asset was loaded."),
+				           FText::FromString(Request.LevelPath.GetAssetName()), FText::AsNumber(Request.PointIndex)));
+			return;
+		}
+
+		ULevel* SourceLevel = LevelWorld->PersistentLevel;
+		const FTransform& LevelTransform = Request.Params.LevelTransform;
+		const bool bIsPreview = ExecutionContext->GetComponent() && ExecutionContext->GetComponent()->IsInPreviewMode();
+
+		// Build the spawnable set. Applies the same actor filters as OnLevelLoadedChanged:
+		// skip null, AWorldSettings, bIsMainWorldOnly, and socket-provider export markers.
+		TArray<AActor*> SpawnableActors;
+		TSet<AActor*> SpawnableSet;
+		for (AActor* Actor : SourceLevel->Actors)
+		{
+			if (!Actor || Actor->IsA<AWorldSettings>() || Actor->bIsMainWorldOnly)
+			{
+				continue;
+			}
+			if (const IPCGExSocketProvider* Provider = Cast<IPCGExSocketProvider>(Actor))
+			{
+				if (Provider->ShouldStripFromExport_Implementation())
+				{
+					continue;
+				}
+			}
+			SpawnableActors.Add(Actor);
+			SpawnableSet.Add(Actor);
+		}
+
+		if (SpawnableActors.IsEmpty())
+		{
+			return;
+		}
+
+		// Pre-compute root flags once. SpawnableSet must be fully built first (needed for parent membership check).
+		TArray<bool> bIsRootActor;
+		bIsRootActor.Reserve(SpawnableActors.Num());
+		for (const AActor* Actor : SpawnableActors)
+		{
+			const AActor* Parent = Actor->GetAttachParentActor();
+			bIsRootActor.Add(!Parent || !SpawnableSet.Contains(Parent));
+		}
+
+		ULevel* TargetLevel = TargetActor->GetLevel();
+		const bool bTransient = PCGHelpers::IsRuntimeOrPIE() || bIsPreview;
+
+		// Pass 1 — deep-copy each source actor via StaticDuplicateObject to faithfully
+		// preserve all component state including construction-script instance overrides
+		// (e.g. per-instance spline shapes, mesh overrides). SpawnActor(Template) with a
+		// cross-world actor doesn't transfer the instance override cache, so components
+		// like USplineComponent revert to CDO defaults when the construction script reruns.
+		TMap<AActor*, AActor*> SourceToSpawned;
+		SourceToSpawned.Reserve(SpawnableActors.Num());
+
+		for (AActor* SourceActor : SpawnableActors)
+		{
+			AActor* Duplicated = Cast<AActor>(StaticDuplicateObject(SourceActor, TargetLevel));
+			if (!Duplicated)
+			{
+				continue;
+			}
+
+			if (bTransient)
+			{
+				Duplicated->SetFlags(RF_Transient | RF_NonPIEDuplicateTransient);
+			}
+
+			TargetLevel->Actors.Add(Duplicated);
+
+			// Clear any attachment state deep-copied from the source world before registration.
+			// Pass 2 rebuilds the hierarchy using spawned-world actors.
+			if (USceneComponent* Root = Duplicated->GetRootComponent())
+			{
+				Root->SetupAttachment(nullptr);
+			}
+
+			Duplicated->RegisterAllComponents();
+			SourceToSpawned.Add(SourceActor, Duplicated);
+		}
+
+		// Pass 2 — restore parent-child relationships between spawned actors.
+		// ComponentToWorld is transient (not serialized) and is NOT recomputed when a UWorld is
+		// loaded as an asset. GetActorTransform() / GetRelativeTransform() via ComponentToWorld
+		// cannot be trusted. Snap to the parent first, then apply the serialized relative
+		// transform directly from RelativeLocation/Rotation/Scale3D, which ARE serialized.
+		for (int32 i = 0; i < SpawnableActors.Num(); ++i)
+		{
+			if (bIsRootActor[i])
+			{
+				continue;
+			}
+
+			AActor* SourceActor = SpawnableActors[i];
+			AActor* SourceParent = SourceActor->GetAttachParentActor(); // guaranteed non-null and in set
+			AActor** SpawnedChild = SourceToSpawned.Find(SourceActor);
+			AActor** SpawnedParent = SourceToSpawned.Find(SourceParent);
+			if (!SpawnedChild || !SpawnedParent)
+			{
+				continue;
+			}
+
+			(*SpawnedChild)->AttachToActor(*SpawnedParent, FAttachmentTransformRules::SnapToTargetIncludingScale);
+
+			if (USceneComponent* ChildRoot = (*SpawnedChild)->GetRootComponent())
+			{
+				if (const USceneComponent* SourceRoot = SourceActor->GetRootComponent())
+				{
+					ChildRoot->SetRelativeTransform(SourceRoot->GetRelativeTransform());
+				}
+			}
+		}
+
+		// Pass 3 — reposition root actors into PCG-point space, attach to target, finalize all.
+		// Only root actors receive the explicit transform; children follow through the hierarchy.
+		// Root actor world transforms are composed by walking the attachment chain and accumulating
+		// serialized RelativeTransforms — GetActorTransform() returns ComponentToWorld which is
+		// transient and stays at identity for asset-loaded worlds.
+		const FName FolderPath = ComputeInnerFolderPath(TargetActor);
+
+		for (int32 i = 0; i < SpawnableActors.Num(); ++i)
+		{
+			AActor* SourceActor = SpawnableActors[i];
+			AActor** SpawnedPtr = SourceToSpawned.Find(SourceActor);
+			if (!SpawnedPtr)
+			{
+				continue;
+			}
+			AActor* Spawned = *SpawnedPtr;
+
+			if (bIsRootActor[i])
+			{
+				FTransform SourceWorldTransform = FTransform::Identity;
+				if (const USceneComponent* SrcRoot = SourceActor->GetRootComponent())
+				{
+					SourceWorldTransform = SrcRoot->GetRelativeTransform();
+					const AActor* ChainActor = SourceActor->GetAttachParentActor();
+					while (ChainActor)
+					{
+						if (const USceneComponent* ChainRoot = ChainActor->GetRootComponent())
+						{
+							// child * parent: A*B applies B.Scale to A.Translation, which is "A in B's space"
+							SourceWorldTransform = SourceWorldTransform * ChainRoot->GetRelativeTransform();
+						}
+						ChainActor = ChainActor->GetAttachParentActor();
+					}
+				}
+				// child * parent: authored transform in LevelTransform's space
+				Spawned->SetActorTransform(SourceWorldTransform * LevelTransform);
+				PCGHelpers::AttachToParent(Spawned, TargetActor, Settings->AttachOptions, ExecutionContext);
+			}
+
+			if (FolderPath != NAME_None)
+			{
+				Spawned->SetFolderPath(FolderPath);
+			}
+
+			PCGExCollections::FinalizeSpawnedActor(Spawned, Context->ManagedLooseActors, bIsPreview);
+		}
+	}
+#endif
 }
 
 #pragma endregion

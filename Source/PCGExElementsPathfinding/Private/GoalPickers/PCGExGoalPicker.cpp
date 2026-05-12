@@ -4,8 +4,8 @@
 
 #include "GoalPickers/PCGExGoalPicker.h"
 
-#include "Data/PCGExPointElements.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointElements.h"
 #include "Data/PCGExPointIO.h"
 
 
@@ -38,4 +38,7 @@ void UPCGExGoalPicker::GetGoalIndices(const PCGExData::FConstPoint& Seed, TArray
 {
 }
 
-bool UPCGExGoalPicker::OutputMultipleGoals() const { return false; }
+bool UPCGExGoalPicker::OutputMultipleGoals() const
+{
+	return false;
+}

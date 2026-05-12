@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "UObject/Object.h"
 #include "CoreMinimal.h"
 #include "PCGExPointStates.h"
+#include "UObject/Object.h"
 
 #include "Core/PCGExClusterFilter.h"
 #include "PCGExClusterStates.generated.h"
@@ -44,7 +44,11 @@ public:
 	UPROPERTY()
 	FPCGExClusterStateConfigBase Config;
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::ClusterState; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::ClusterState;
+	}
+
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
 	virtual void BeginDestroy() override;
@@ -61,7 +65,8 @@ namespace PCGExClusterStates
 		const UPCGExClusterStateFactoryData* StateFactory = nullptr;
 
 		explicit FState(const UPCGExClusterStateFactoryData* InFactory)
-			: IFilter(InFactory), StateFactory(InFactory)
+			: IFilter(InFactory)
+			  , StateFactory(InFactory)
 		{
 		}
 
@@ -113,7 +118,11 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ClusterNodeFlag, "State : Cluster", "A single, filter-driven vtx state.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterState); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterState);
+	}
 #endif
 	//~End UPCGSettings
 

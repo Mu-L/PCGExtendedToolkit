@@ -3,13 +3,13 @@
 
 #include "Elements/Bitmasks/PCGExBitmask.h"
 
+#include "PCGExCoreMacros.h"
+#include "PCGExVersion.h"
 #include "PCGGraph.h"
 #include "PCGParamData.h"
 #include "PCGPin.h"
-#include "PCGExVersion.h"
-#include "Data/Bitmasks/PCGExBitmaskDetails.h"
 #include "Containers/PCGExManagedObjects.h"
-#include "PCGExCoreMacros.h"
+#include "Data/Bitmasks/PCGExBitmaskDetails.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
 #define PCGEX_NAMESPACE Bitmask
@@ -36,7 +36,10 @@ FName UPCGExBitmaskSettings::GetDisplayName() const
 	{
 		TArray<FString> Ss;
 		Ss.Reserve(Bitmask.Compositions.Num());
-		for (const FPCGExBitmaskRef& Ref : Bitmask.Compositions) { Ss.Add(Ref.Identifier.ToString()); }
+		for (const FPCGExBitmaskRef& Ref : Bitmask.Compositions)
+		{
+			Ss.Add(Ref.Identifier.ToString());
+		}
 		S = FString::Join(Ss, TEXT(", "));
 	}
 
@@ -63,7 +66,10 @@ TArray<FPCGPinProperties> UPCGExBitmaskSettings::OutputPinProperties() const
 	return PinProperties;
 }
 
-FPCGElementPtr UPCGExBitmaskSettings::CreateElement() const { return MakeShared<FPCGExBitmaskElement>(); }
+FPCGElementPtr UPCGExBitmaskSettings::CreateElement() const
+{
+	return MakeShared<FPCGExBitmaskElement>();
+}
 
 
 bool FPCGExBitmaskElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const

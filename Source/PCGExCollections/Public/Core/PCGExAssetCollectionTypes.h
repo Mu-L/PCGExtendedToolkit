@@ -61,7 +61,10 @@ namespace PCGExAssetCollection
 		FTypeId ParentType = NAME_None; // For inheritance checking
 		bool bCanBeSubCollection = true;
 
-		bool IsValid() const { return Id != NAME_None && CollectionClass.IsValid(); }
+		bool IsValid() const
+		{
+			return Id != NAME_None && CollectionClass.IsValid();
+		}
 	};
 
 	/**
@@ -98,7 +101,10 @@ namespace PCGExAssetCollection
 		void ForEach(Func&& Callback) const
 		{
 			FReadScopeLock Lock(RegistryLock);
-			for (const auto& Pair : Types) { Callback(Pair.Value); }
+			for (const auto& Pair : Types)
+			{
+				Callback(Pair.Value);
+			}
 		}
 
 		static void AddPendingRegistration(TFunction<void()>&& Func);
@@ -153,11 +159,30 @@ struct PCGEXCOLLECTIONS_API FPCGExCollectionTypeSet
 
 	FPCGExCollectionTypeSet(std::initializer_list<PCGExAssetCollection::FTypeId> InTypes);
 
-	void Add(PCGExAssetCollection::FTypeId Type) { Types.Add(Type); }
-	void Remove(PCGExAssetCollection::FTypeId Type) { Types.Remove(Type); }
-	bool Contains(PCGExAssetCollection::FTypeId Type) const { return Types.Contains(Type); }
-	bool IsEmpty() const { return Types.IsEmpty(); }
-	int32 Num() const { return Types.Num(); }
+	void Add(PCGExAssetCollection::FTypeId Type)
+	{
+		Types.Add(Type);
+	}
+
+	void Remove(PCGExAssetCollection::FTypeId Type)
+	{
+		Types.Remove(Type);
+	}
+
+	bool Contains(PCGExAssetCollection::FTypeId Type) const
+	{
+		return Types.Contains(Type);
+	}
+
+	bool IsEmpty() const
+	{
+		return Types.IsEmpty();
+	}
+
+	int32 Num() const
+	{
+		return Types.Num();
+	}
 
 	// Check if this set contains a type or any of its parent types
 	bool ContainsOrDerives(PCGExAssetCollection::FTypeId Type) const;

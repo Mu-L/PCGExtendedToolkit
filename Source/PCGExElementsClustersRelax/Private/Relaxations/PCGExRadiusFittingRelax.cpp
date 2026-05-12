@@ -8,15 +8,24 @@
 void UPCGExRadiusFittingRelax::RegisterPrimaryBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterPrimaryBuffersDependencies(InContext, FacadePreloader);
-	if (RadiusInput == EPCGExInputValueType::Attribute) { FacadePreloader.Register<double>(InContext, RadiusAttribute); }
+	if (RadiusInput == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<double>(InContext, RadiusAttribute);
+	}
 }
 
 bool UPCGExRadiusFittingRelax::PrepareForCluster(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster)
 {
-	if (!Super::PrepareForCluster(InContext, InCluster)) { return false; }
+	if (!Super::PrepareForCluster(InContext, InCluster))
+	{
+		return false;
+	}
 
 	RadiusBuffer = GetValueSettingRadius();
-	if (!RadiusBuffer->Init(PrimaryDataFacade)) { return false; }
+	if (!RadiusBuffer->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -37,7 +46,10 @@ void UPCGExRadiusFittingRelax::Step2(const PCGExClusters::FNode& Node)
 		const double Distance = Delta.Size();
 		const double Overlap = (CurrentRadius + RadiusBuffer->Read(OtherNode->PointIndex)) - Distance;
 
-		if (Overlap <= 0 || Distance <= KINDA_SMALL_NUMBER) { continue; }
+		if (Overlap <= 0 || Distance <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
 
 		AddDelta(OtherNode->Index, Node.Index, (RepulsionConstant * (Overlap / FMath::Square(Distance)) * (Delta / Distance)));
 	}

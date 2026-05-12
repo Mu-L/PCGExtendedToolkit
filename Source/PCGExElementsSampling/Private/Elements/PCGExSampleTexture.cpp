@@ -5,10 +5,10 @@
 
 
 #include "Core/PCGExTexCommon.h"
+#include "Core/PCGExTexParamFactoryProvider.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Core/PCGExTexParamFactoryProvider.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExSampleTextureElement"
@@ -30,13 +30,19 @@ TArray<FPCGPinProperties> UPCGExSampleTextureSettings::InputPinProperties() cons
 
 PCGEX_INITIALIZE_ELEMENT(SampleTexture)
 
-PCGExData::EIOInit UPCGExSampleTextureSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSampleTextureSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(SampleTexture)
 
 bool FPCGExSampleTextureElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SampleTexture)
 
@@ -80,10 +86,16 @@ bool FPCGExSampleTextureElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				if (Settings->bPruneFailedSamples) { NewBatch->bRequiresWriteStep = true; }
+				if (Settings->bPruneFailedSamples)
+				{
+					NewBatch->bRequiresWriteStep = true;
+				}
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to sample."));
@@ -100,11 +112,15 @@ bool FPCGExSampleTextureElement::AdvanceWork(FPCGExContext* InContext, const UPC
 namespace PCGExSampleTexture
 {
 	FSampler::FSampler(const FPCGExTextureParamConfig& InConfig, const TSharedPtr<PCGExTexture::FLookup>& InTextureMap, const TSharedRef<PCGExData::FFacade>& InDataFacade)
-		: Config(InConfig), TextureMap(InTextureMap)
+		: Config(InConfig)
+		  , TextureMap(InTextureMap)
 	{
 		IDGetter = MakeShared<PCGExData::TAttributeBroadcaster<FString>>();
 		bValid = IDGetter->Prepare(Config.TextureIDAttributeName, InDataFacade->Source);
-		if (!bValid) { return; }
+		if (!bValid)
+		{
+			return;
+		}
 	}
 
 	FProcessor::~FProcessor()
@@ -118,7 +134,10 @@ namespace PCGExSampleTexture
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -134,7 +153,10 @@ namespace PCGExSampleTexture
 
 		for (const TObjectPtr<const UPCGExTexParamFactoryData>& Factory : Context->TexParamsFactories)
 		{
-			if (Factory->Config.OutputType == EPCGExTexSampleAttributeType::Invalid) { continue; }
+			if (Factory->Config.OutputType == EPCGExTexSampleAttributeType::Invalid)
+			{
+				continue;
+			}
 
 			PCGExMetaHelpers::ExecuteWithRightType(Factory->Config.MetadataType, [&](auto DummyValue)
 			{
@@ -176,7 +198,10 @@ namespace PCGExSampleTexture
 
 			if (!PointFilterCache[Index])
 			{
-				if (Settings->bProcessFilteredOutAsFails) { SamplingFailed(); }
+				if (Settings->bProcessFilteredOutAsFails)
+				{
+					SamplingFailed();
+				}
 				continue;
 			}
 
@@ -187,7 +212,10 @@ namespace PCGExSampleTexture
 
 			for (const TSharedRef<FSampler>& Sampler : Samplers)
 			{
-				if (Sampler->Sample(Point, UV)) { bSuccess = true; }
+				if (Sampler->Sample(Point, UV))
+				{
+					bSuccess = true;
+				}
 			}
 
 			if (!bSuccess)
@@ -200,20 +228,32 @@ namespace PCGExSampleTexture
 			bAnySuccessLocal = true;
 		}
 
-		if (bAnySuccessLocal) { FPlatformAtomics::InterlockedExchange(&bAnySuccess, 1); }
+		if (bAnySuccessLocal)
+		{
+			FPlatformAtomics::InterlockedExchange(&bAnySuccess, 1);
+		}
 	}
 
 	void FProcessor::CompleteWork()
 	{
 		PointDataFacade->WriteFastest(TaskManager);
 
-		if (Settings->bTagIfHasSuccesses && bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag); }
-		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag); }
+		if (Settings->bTagIfHasSuccesses && bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag);
+		}
+		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag);
+		}
 	}
 
 	void FProcessor::Write()
 	{
-		if (Settings->bPruneFailedSamples) { (void)PointDataFacade->Source->Gather(SamplingMask); }
+		if (Settings->bPruneFailedSamples)
+		{
+			(void)PointDataFacade->Source->Gather(SamplingMask);
+		}
 	}
 }
 

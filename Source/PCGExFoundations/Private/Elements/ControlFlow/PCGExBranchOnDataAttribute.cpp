@@ -4,10 +4,10 @@
 #include "Elements/ControlFlow/PCGExBranchOnDataAttribute.h"
 
 
-#include "Types/PCGExTypes.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Metadata/PCGMetadata.h"
+#include "Types/PCGExTypes.h"
 
 #define LOCTEXT_NAMESPACE "PCGExBranchOnDataAttributeElement"
 #define PCGEX_NAMESPACE BranchOnDataAttribute
@@ -46,7 +46,10 @@ void UPCGExBranchOnDataAttributeSettings::PostEditChangeProperty(FPropertyChange
 	else
 	{
 		InternalBranches.Reset(Branches.Num());
-		for (FPCGExBranchOnDataPin& Pin : Branches) { InternalBranches.Add(Pin); }
+		for (FPCGExBranchOnDataPin& Pin : Branches)
+		{
+			InternalBranches.Add(Pin);
+		}
 	}
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -66,7 +69,10 @@ TArray<FPCGPinProperties> UPCGExBranchOnDataAttributeSettings::OutputPinProperti
 	TArray<FPCGPinProperties> PinProperties;
 
 	PCGEX_PIN_ANY(GetMainOutputPin(), "Default output -- Any collection that couldn't be dispatched to an output pin will end up here.", Normal)
-	for (const FPCGExBranchOnDataPin& OutPin : InternalBranches) { PinProperties.Emplace(OutPin.Label); }
+	for (const FPCGExBranchOnDataPin& OutPin : InternalBranches)
+	{
+		PinProperties.Emplace(OutPin.Label);
+	}
 
 	return PinProperties;
 }
@@ -75,13 +81,19 @@ PCGEX_INITIALIZE_ELEMENT(BranchOnDataAttribute)
 
 TObjectPtr<UEnum> UPCGExBranchOnDataAttributeSettings::GetEnumClass() const
 {
-	if (EnumSource == EPCGExEnumConstantSourceType::Picker) { return EnumClass; }
+	if (EnumSource == EPCGExEnumConstantSourceType::Picker)
+	{
+		return EnumClass;
+	}
 	return EnumPicker.Class;
 }
 
 bool FPCGExBranchOnDataAttributeElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BranchOnDataAttribute)
 
@@ -113,10 +125,16 @@ bool FPCGExBranchOnDataAttributeElement::AdvanceWork(FPCGExContext* InContext, c
 
 		for (const FPCGTaggedData& TaggedData : Inputs)
 		{
-			if (!TaggedData.Data || !TaggedData.Data->Metadata) { continue; }
+			if (!TaggedData.Data || !TaggedData.Data->Metadata)
+			{
+				continue;
+			}
 			const FPCGMetadataAttributeBase* Attr = nullptr;
 
-			if (PCGExMetaHelpers::HasAttribute(TaggedData.Data, ReadIdentifier)) { Attr = TaggedData.Data->Metadata->GetConstAttribute(ReadIdentifier); }
+			if (PCGExMetaHelpers::HasAttribute(TaggedData.Data, ReadIdentifier))
+			{
+				Attr = TaggedData.Data->Metadata->GetConstAttribute(ReadIdentifier);
+			}
 
 			FName OutputPin = Settings->GetMainOutputPin();
 			bool bDistributed = false;
@@ -143,8 +161,14 @@ bool FPCGExBranchOnDataAttributeElement::AdvanceWork(FPCGExContext* InContext, c
 					{
 						const FPCGExBranchOnDataPin& Pin = Settings->InternalBranches[i];
 
-						if (Pin.Check == EPCGExComparisonDataType::Numeric) { bDistributed = PCGExCompare::Compare(Pin.NumericCompare, static_cast<double>(Pin.NumericValue), AsNumeric, Pin.Tolerance); }
-						else { bDistributed = PCGExCompare::Compare(Pin.StringCompare, Pin.StringValue, AsString); }
+						if (Pin.Check == EPCGExComparisonDataType::Numeric)
+						{
+							bDistributed = PCGExCompare::Compare(Pin.NumericCompare, static_cast<double>(Pin.NumericValue), AsNumeric, Pin.Tolerance);
+						}
+						else
+						{
+							bDistributed = PCGExCompare::Compare(Pin.StringCompare, Pin.StringValue, AsString);
+						}
 
 						if (bDistributed)
 						{
@@ -160,7 +184,13 @@ bool FPCGExBranchOnDataAttributeElement::AdvanceWork(FPCGExContext* InContext, c
 		}
 	}
 
-	for (int i = 0; i < NumBranches; i++) { if (!Context->Dispatch[i]) { Context->OutputData.InactiveOutputPinBitmask |= 1ULL << (i + 1); } }
+	for (int i = 0; i < NumBranches; i++)
+	{
+		if (!Context->Dispatch[i])
+		{
+			Context->OutputData.InactiveOutputPinBitmask |= 1ULL << (i + 1);
+		}
+	}
 
 	Context->Done();
 	return Context->TryComplete();

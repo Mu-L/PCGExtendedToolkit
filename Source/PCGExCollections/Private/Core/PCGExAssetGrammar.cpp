@@ -4,10 +4,10 @@
 
 #include "Core/PCGExAssetGrammar.h"
 
-#include "UObject/Object.h"
-#include "UObject/Package.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
+#include "UObject/Object.h"
+#include "UObject/Package.h"
 
 double FPCGExAssetGrammarDetails::GetSize(const FBox& InBounds, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
 {
@@ -22,20 +22,38 @@ double FPCGExAssetGrammarDetails::GetSize(const FBox& InBounds, TMap<const FPCGE
 		const FVector S = InBounds.GetSize();
 		switch (Size)
 		{
-		case EPCGExGrammarSizeReference::X: Resolved = S.X; break;
-		case EPCGExGrammarSizeReference::Y: Resolved = S.Y; break;
-		case EPCGExGrammarSizeReference::Z: Resolved = S.Z; break;
-		case EPCGExGrammarSizeReference::Min: Resolved = FMath::Min3(S.X, S.Y, S.Z); break;
-		case EPCGExGrammarSizeReference::Max: Resolved = FMath::Max3(S.X, S.Y, S.Z); break;
-		case EPCGExGrammarSizeReference::Average: Resolved = (S.X + S.Y + S.Z) / 3; break;
-		default: break;
+		case EPCGExGrammarSizeReference::X:
+			Resolved = S.X;
+			break;
+		case EPCGExGrammarSizeReference::Y:
+			Resolved = S.Y;
+			break;
+		case EPCGExGrammarSizeReference::Z:
+			Resolved = S.Z;
+			break;
+		case EPCGExGrammarSizeReference::Min:
+			Resolved = FMath::Min3(S.X, S.Y, S.Z);
+			break;
+		case EPCGExGrammarSizeReference::Max:
+			Resolved = FMath::Max3(S.X, S.Y, S.Z);
+			break;
+		case EPCGExGrammarSizeReference::Average:
+			Resolved = (S.X + S.Y + S.Z) / 3;
+			break;
+		default:
+			break;
 		}
 
 		switch (SizeOp)
 		{
-		case EPCGExGrammarSizeOp::Offset: Resolved += FixedSize; break;
-		case EPCGExGrammarSizeOp::Multiply: Resolved *= FixedSize; break;
-		default: break;
+		case EPCGExGrammarSizeOp::Offset:
+			Resolved += FixedSize;
+			break;
+		case EPCGExGrammarSizeOp::Multiply:
+			Resolved *= FixedSize;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -68,7 +86,8 @@ double FPCGExCollectionGrammarDetails::GetSize(const UPCGExAssetCollection* InCo
 
 		for (int i = 0; i < NumEntries; i++)
 		{
-			if (FPCGExEntryAccessResult Result = Collection->GetEntryAt(i); Result.IsValid())
+			if (FPCGExEntryAccessResult Result = Collection->GetEntryAt(i);
+				Result.IsValid())
 			{
 				CompoundSize = FMath::Min(CompoundSize, Result.Entry->GetGrammarSize(Result.Host, SizeCache));
 			}
@@ -80,7 +99,8 @@ double FPCGExCollectionGrammarDetails::GetSize(const UPCGExAssetCollection* InCo
 
 		for (int i = 0; i < NumEntries; i++)
 		{
-			if (FPCGExEntryAccessResult Result = Collection->GetEntryAt(i); Result.IsValid())
+			if (FPCGExEntryAccessResult Result = Collection->GetEntryAt(i);
+				Result.IsValid())
 			{
 				CompoundSize = FMath::Max(CompoundSize, Result.Entry->GetGrammarSize(Result.Host, SizeCache));
 			}
@@ -92,7 +112,8 @@ double FPCGExCollectionGrammarDetails::GetSize(const UPCGExAssetCollection* InCo
 
 		for (int i = 0; i < NumEntries; i++)
 		{
-			if (FPCGExEntryAccessResult Result = Collection->GetEntryAt(i); Result.IsValid())
+			if (FPCGExEntryAccessResult Result = Collection->GetEntryAt(i);
+				Result.IsValid())
 			{
 				CompoundSize += Result.Entry->GetGrammarSize(Result.Host, SizeCache);
 				NumSamples++;

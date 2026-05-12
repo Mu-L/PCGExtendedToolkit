@@ -7,7 +7,10 @@
 #define PCGEX_NAMESPACE PCGExCreateNeighborSample
 
 #if WITH_EDITOR
-FString UPCGExNeighborSamplePropertiesSettings::GetDisplayName() const { return TEXT("DEPRECATED"); }
+FString UPCGExNeighborSamplePropertiesSettings::GetDisplayName() const
+{
+	return TEXT("DEPRECATED");
+}
 #endif
 
 TSharedPtr<FPCGExNeighborSampleOperation> UPCGExNeighborSamplerFactoryProperties::CreateOperation(FPCGExContext* InContext) const

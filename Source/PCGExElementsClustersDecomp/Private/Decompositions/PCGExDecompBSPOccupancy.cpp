@@ -7,19 +7,28 @@
 
 bool FPCGExDecompBSPOccupancy::Decompose(FPCGExDecompositionResult& OutResult)
 {
-	if (!Cluster || Cluster->Nodes->Num() == 0) { return false; }
+	if (!Cluster || Cluster->Nodes->Num() == 0)
+	{
+		return false;
+	}
 
 	// Resolve voxel size (auto-detect from edges or use manual)
 	const FVector ResolvedVoxelSize = FPCGExDecompOccupancyGrid::ResolveVoxelSize(Cluster, VoxelSizeMode, VoxelSize);
 
 	// Build occupancy grid
 	FPCGExDecompOccupancyGrid Grid;
-	if (!Grid.Build(Cluster, TransformSpace, ResolvedVoxelSize, CustomTransform)) { return false; }
+	if (!Grid.Build(Cluster, TransformSpace, ResolvedVoxelSize, CustomTransform))
+	{
+		return false;
+	}
 
 	// Per-voxel CellID array (indexed by flat voxel index)
 	TArray<int32> VoxelCellIDs;
 	VoxelCellIDs.SetNumUninitialized(Grid.TotalVoxels);
-	for (int32& ID : VoxelCellIDs) { ID = -1; }
+	for (int32& ID : VoxelCellIDs)
+	{
+		ID = -1;
+	}
 
 	// Start recursive BSP over entire grid bounds
 	FRegion FullRegion;
@@ -57,7 +66,10 @@ void FPCGExDecompBSPOccupancy::SplitRecursive(
 	const int32 OccupiedCount = CountOccupied(Grid, Region);
 
 	// Base cases: make this a leaf cell
-	if (OccupiedCount == 0) { return; }
+	if (OccupiedCount == 0)
+	{
+		return;
+	}
 
 	if (Depth >= MaxDepth || OccupiedCount <= MinVoxelsPerCell)
 	{
@@ -120,7 +132,8 @@ void FPCGExDecompBSPOccupancy::SplitRecursive(
 		Left.Max.Z = SplitPos;
 		Right.Min.Z = SplitPos + 1;
 		break;
-	default: break;
+	default:
+		break;
 	}
 
 	SplitRecursive(Grid, Left, Depth + 1, VoxelCellIDs, NextCellID);
@@ -138,7 +151,10 @@ int32 FPCGExDecompBSPOccupancy::CountOccupied(
 		{
 			for (int32 X = Region.Min.X; X <= Region.Max.X; X++)
 			{
-				if (Grid.IsOccupied(X, Y, Z)) { Count++; }
+				if (Grid.IsOccupied(X, Y, Z))
+				{
+					Count++;
+				}
 			}
 		}
 	}
@@ -164,7 +180,10 @@ bool FPCGExDecompBSPOccupancy::FindBestSplit(
 
 	for (int32 Axis = 0; Axis < 3; Axis++)
 	{
-		if (RegionSize[Axis] < 2) { continue; }
+		if (RegionSize[Axis] < 2)
+		{
+			continue;
+		}
 
 		// Compute per-slice occupancy counts along this axis
 		const int32 SliceCount = RegionSize[Axis];
@@ -182,21 +201,27 @@ bool FPCGExDecompBSPOccupancy::FindBestSplit(
 					int32 X, Y, Z;
 					switch (Axis)
 					{
-					case 0: X = SliceCoord;
+					case 0:
+						X = SliceCoord;
 						Y = A;
 						Z = B;
 						break;
-					case 1: X = A;
+					case 1:
+						X = A;
 						Y = SliceCoord;
 						Z = B;
 						break;
-					default: X = A;
+					default:
+						X = A;
 						Y = B;
 						Z = SliceCoord;
 						break;
 					}
 
-					if (Grid.IsOccupied(X, Y, Z)) { SliceOccupancy[S]++; }
+					if (Grid.IsOccupied(X, Y, Z))
+					{
+						SliceOccupancy[S]++;
+					}
 				}
 			}
 		}
@@ -215,7 +240,10 @@ bool FPCGExDecompBSPOccupancy::FindBestSplit(
 			const int32 LeftCount = PrefixSum[S + 1];
 			const int32 RightCount = TotalOccupied - LeftCount;
 
-			if (LeftCount == 0 || RightCount == 0) { continue; }
+			if (LeftCount == 0 || RightCount == 0)
+			{
+				continue;
+			}
 
 			const double Imbalance = FMath::Abs(static_cast<double>(LeftCount - RightCount)) / TotalOccupied;
 
@@ -250,14 +278,20 @@ void FPCGExDecompBSPOccupancy::SplitNonContiguousCells(
 
 	TArray<int32> FinalCellIDs;
 	FinalCellIDs.SetNumUninitialized(Grid.TotalVoxels);
-	for (int32& ID : FinalCellIDs) { ID = -1; }
+	for (int32& ID : FinalCellIDs)
+	{
+		ID = -1;
+	}
 
 	int32 FinalNextCellID = 0;
 	TArray<int32> Queue;
 
 	for (int32 Flat = 0; Flat < Grid.TotalVoxels; Flat++)
 	{
-		if (VoxelCellIDs[Flat] < 0 || Visited[Flat]) { continue; }
+		if (VoxelCellIDs[Flat] < 0 || Visited[Flat])
+		{
+			continue;
+		}
 
 		const int32 OrigCellID = VoxelCellIDs[Flat];
 		const int32 NewCellID = FinalNextCellID++;
@@ -279,7 +313,10 @@ void FPCGExDecompBSPOccupancy::SplitNonContiguousCells(
 				const int32 NY = Coord.Y + Dy[Dir];
 				const int32 NZ = Coord.Z + Dz[Dir];
 
-				if (!Grid.IsInBounds(NX, NY, NZ)) { continue; }
+				if (!Grid.IsInBounds(NX, NY, NZ))
+				{
+					continue;
+				}
 
 				const int32 NFlat = Grid.FlatIndex(NX, NY, NZ);
 				if (!Visited[NFlat] && VoxelCellIDs[NFlat] == OrigCellID)

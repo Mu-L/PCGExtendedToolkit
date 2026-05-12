@@ -33,15 +33,40 @@ namespace PCGExGraphs
 
 		~FNode() = default;
 
-		FORCEINLINE int32 Num() const { return Links.Num(); }
-		FORCEINLINE int32 IsEmpty() const { return Links.IsEmpty(); }
+		FORCEINLINE int32 Num() const
+		{
+			return Links.Num();
+		}
 
-		FORCEINLINE bool IsLeaf() const { return Links.Num() == 1; }
-		FORCEINLINE bool IsBinary() const { return Links.Num() == 2; }
-		FORCEINLINE bool IsComplex() const { return Links.Num() > 2; }
+		FORCEINLINE int32 IsEmpty() const
+		{
+			return Links.IsEmpty();
+		}
 
-		FORCEINLINE void LinkEdge(const int32 EdgeIndex) { Links.AddUnique(FLink(0, EdgeIndex)); }
-		FORCEINLINE void Link(const int32 NodeIndex, const int32 EdgeIndex) { Links.AddUnique(FLink(NodeIndex, EdgeIndex)); }
+		FORCEINLINE bool IsLeaf() const
+		{
+			return Links.Num() == 1;
+		}
+
+		FORCEINLINE bool IsBinary() const
+		{
+			return Links.Num() == 2;
+		}
+
+		FORCEINLINE bool IsComplex() const
+		{
+			return Links.Num() > 2;
+		}
+
+		FORCEINLINE void LinkEdge(const int32 EdgeIndex)
+		{
+			Links.AddUnique(FLink(0, EdgeIndex));
+		}
+
+		FORCEINLINE void Link(const int32 NodeIndex, const int32 EdgeIndex)
+		{
+			Links.AddUnique(FLink(NodeIndex, EdgeIndex));
+		}
 
 		bool IsAdjacentTo(const int32 OtherNodeIndex) const;
 

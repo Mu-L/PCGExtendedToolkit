@@ -58,11 +58,17 @@ namespace PCGExBlending
 		{
 			// These modes require the first operation to be a copy of the first blended value
 			// before they can be properly blended -- this should be handled by the blend op?
-			if (bInitWithSource) { OutTracker.Count = -1; }
+			if (bInitWithSource)
+			{
+				OutTracker.Count = -1;
+			}
 			else if (bConsiderOriginalValue)
 			{
 				// Some BlendModes can leverage this
-				if (bResetForMulti) { InitDefault(Accumulator); }
+				if (bResetForMulti)
+				{
+					InitDefault(Accumulator);
+				}
 				else
 				{
 					// Otherwise, bump up original count so EndBlend can account for pre-existing value as "one blend step"
@@ -80,8 +86,15 @@ namespace PCGExBlending
 
 		// Properties
 		virtual EPCGMetadataTypes GetWorkingType() const = 0;
-		FORCEINLINE EPCGExABBlendingType GetBlendMode() const { return Mode; }
-		FORCEINLINE bool RequiresReset() const { return bResetForMulti; }
+		FORCEINLINE EPCGExABBlendingType GetBlendMode() const
+		{
+			return Mode;
+		}
+
+		FORCEINLINE bool RequiresReset() const
+		{
+			return bResetForMulti;
+		}
 
 		// Stack buffer helpers
 		virtual int32 GetValueSize() const = 0;
@@ -247,34 +260,61 @@ namespace PCGExBlending
 		{
 			switch (Mode)
 			{
-			case EPCGExABBlendingType::Add: return &Add<T>;
-			case EPCGExABBlendingType::Subtract: return &Sub<T>;
-			case EPCGExABBlendingType::Multiply: return &Mult<T>;
-			case EPCGExABBlendingType::Divide: return &Divide<T>;
-			case EPCGExABBlendingType::Lerp: return &Lerp<T>;
-			case EPCGExABBlendingType::Min: return &Min<T>;
-			case EPCGExABBlendingType::Max: return &Max<T>;
-			case EPCGExABBlendingType::Average: return &Average<T>;
-			case EPCGExABBlendingType::Weight: return &Weight<T>;
-			case EPCGExABBlendingType::WeightedAdd: return &WeightedAdd<T>;
-			case EPCGExABBlendingType::WeightedSubtract: return &WeightedSub<T>;
-			case EPCGExABBlendingType::CopyTarget: return &CopyA<T>;
-			case EPCGExABBlendingType::CopySource: return &CopyB<T>;
-			case EPCGExABBlendingType::UnsignedMin: return &UnsignedMin<T>;
-			case EPCGExABBlendingType::UnsignedMax: return &UnsignedMax<T>;
-			case EPCGExABBlendingType::AbsoluteMin: return &AbsoluteMin<T>;
-			case EPCGExABBlendingType::AbsoluteMax: return &AbsoluteMax<T>;
-			case EPCGExABBlendingType::Hash: return &NaiveHash<T>;
-			case EPCGExABBlendingType::UnsignedHash: return &UnsignedHash<T>;
-			case EPCGExABBlendingType::Mod: return &ModSimple<T>;
-			case EPCGExABBlendingType::ModCW: return &ModComplex<T>;
-			case EPCGExABBlendingType::WeightNormalize: return &Weight<T>; // TBD
-			case EPCGExABBlendingType::GeometricMean: return &Weight<T>;   // TBD
-			case EPCGExABBlendingType::HarmonicMean: return &Weight<T>;    // TBD
-			case EPCGExABBlendingType::RMS: return &Weight<T>;             // TBD
-			case EPCGExABBlendingType::Step: return &Weight<T>;            // TBD
+			case EPCGExABBlendingType::Add:
+				return &Add<T>;
+			case EPCGExABBlendingType::Subtract:
+				return &Sub<T>;
+			case EPCGExABBlendingType::Multiply:
+				return &Mult<T>;
+			case EPCGExABBlendingType::Divide:
+				return &Divide<T>;
+			case EPCGExABBlendingType::Lerp:
+				return &Lerp<T>;
+			case EPCGExABBlendingType::Min:
+				return &Min<T>;
+			case EPCGExABBlendingType::Max:
+				return &Max<T>;
+			case EPCGExABBlendingType::Average:
+				return &Average<T>;
+			case EPCGExABBlendingType::Weight:
+				return &Weight<T>;
+			case EPCGExABBlendingType::WeightedAdd:
+				return &WeightedAdd<T>;
+			case EPCGExABBlendingType::WeightedSubtract:
+				return &WeightedSub<T>;
+			case EPCGExABBlendingType::CopyTarget:
+				return &CopyA<T>;
+			case EPCGExABBlendingType::CopySource:
+				return &CopyB<T>;
+			case EPCGExABBlendingType::UnsignedMin:
+				return &UnsignedMin<T>;
+			case EPCGExABBlendingType::UnsignedMax:
+				return &UnsignedMax<T>;
+			case EPCGExABBlendingType::AbsoluteMin:
+				return &AbsoluteMin<T>;
+			case EPCGExABBlendingType::AbsoluteMax:
+				return &AbsoluteMax<T>;
+			case EPCGExABBlendingType::Hash:
+				return &NaiveHash<T>;
+			case EPCGExABBlendingType::UnsignedHash:
+				return &UnsignedHash<T>;
+			case EPCGExABBlendingType::Mod:
+				return &ModSimple<T>;
+			case EPCGExABBlendingType::ModCW:
+				return &ModComplex<T>;
+			case EPCGExABBlendingType::WeightNormalize:
+				return &Weight<T>; // TBD
+			case EPCGExABBlendingType::GeometricMean:
+				return &Weight<T>; // TBD
+			case EPCGExABBlendingType::HarmonicMean:
+				return &Weight<T>; // TBD
+			case EPCGExABBlendingType::RMS:
+				return &Weight<T>; // TBD
+			case EPCGExABBlendingType::Step:
+				return &Weight<T>; // TBD
 			case EPCGExABBlendingType::None:
-			default: return &None<T>;
+			default:
+				return &None<T>;
 			}
 		}
 
@@ -284,8 +324,10 @@ namespace PCGExBlending
 		{
 			switch (Mode)
 			{
-			case EPCGExABBlendingType::Average: return &Add<T>; // Average does /2 internally, we don't want to accumulate that
-			default: return GetBlendFunction<T>(Mode);
+			case EPCGExABBlendingType::Average:
+				return &Add<T>; // Average does /2 internally, we don't want to accumulate that
+			default:
+				return GetBlendFunction<T>(Mode);
 			}
 		}
 
@@ -330,10 +372,14 @@ namespace PCGExBlending
 		{
 			switch (Mode)
 			{
-			case EPCGExABBlendingType::Average: return &FinalizeAverage<T>;
-			case EPCGExABBlendingType::Weight: return &FinalizeWeight<T>;
-			case EPCGExABBlendingType::WeightNormalize: return &FinalizeWeightNormalize<T>;
-			default: return &FinalizeNoop<T>;
+			case EPCGExABBlendingType::Average:
+				return &FinalizeAverage<T>;
+			case EPCGExABBlendingType::Weight:
+				return &FinalizeWeight<T>;
+			case EPCGExABBlendingType::WeightNormalize:
+				return &FinalizeWeightNormalize<T>;
+			default:
+				return &FinalizeNoop<T>;
 			}
 		}
 
@@ -375,14 +421,45 @@ namespace PCGExBlending
 			BlendFunctions::DivValue<T>(Value, Divisor);
 		}
 
-		virtual EPCGMetadataTypes GetWorkingType() const override { return PCGExTypes::TTraits<T>::Type; }
-		virtual int32 GetValueSize() const override { return sizeof(T); }
-		virtual int32 GetValueAlignment() const override { return alignof(T); }
-		virtual void InitDefault(void* Value) const override { new(Value) T(); }
-		virtual bool NeedsLifecycleManagement() const override { return !std::is_trivially_copyable_v<T>; }
-		virtual void ConstructValue(void* Value) const override { new(Value) T(); }
-		virtual void DestroyValue(void* Value) const override { static_cast<T*>(Value)->~T(); }
-		virtual void CopyValue(const void* Src, void* Dst) const override { *static_cast<T*>(Dst) = *static_cast<const T*>(Src); }
+		virtual EPCGMetadataTypes GetWorkingType() const override
+		{
+			return PCGExTypes::TTraits<T>::Type;
+		}
+
+		virtual int32 GetValueSize() const override
+		{
+			return sizeof(T);
+		}
+
+		virtual int32 GetValueAlignment() const override
+		{
+			return alignof(T);
+		}
+
+		virtual void InitDefault(void* Value) const override
+		{
+			new(Value) T();
+		}
+
+		virtual bool NeedsLifecycleManagement() const override
+		{
+			return !std::is_trivially_copyable_v<T>;
+		}
+
+		virtual void ConstructValue(void* Value) const override
+		{
+			new(Value) T();
+		}
+
+		virtual void DestroyValue(void* Value) const override
+		{
+			static_cast<T*>(Value)->~T();
+		}
+
+		virtual void CopyValue(const void* Src, void* Dst) const override
+		{
+			*static_cast<T*>(Dst) = *static_cast<const T*>(Src);
+		}
 
 		//~ End IBlendOperation interface
 	};

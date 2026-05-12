@@ -17,7 +17,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BoundsAxisToPoints)
 
 bool FPCGExBoundsAxisToPointsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BoundsAxisToPoints)
 
@@ -33,7 +36,10 @@ bool FPCGExBoundsAxisToPointsElement::AdvanceWork(FPCGExContext* InContext, cons
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -56,7 +62,10 @@ namespace PCGExBoundsAxisToPoints
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBoundsAxisToPoints::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->bGeneratePerPointData ? PCGExData::EIOInit::NoInit : PCGExData::EIOInit::Duplicate)
 
@@ -67,7 +76,10 @@ namespace PCGExBoundsAxisToPoints
 		Scale = Settings->Scale;
 
 		PointAttributesToOutputTags = Settings->PointAttributesToOutputTags;
-		if (!PointAttributesToOutputTags.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!PointAttributesToOutputTags.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		NumPoints = PointDataFacade->GetNum();
 		bGeneratePerPointData = Settings->bGeneratePerPointData;
@@ -121,11 +133,17 @@ namespace PCGExBoundsAxisToPoints
 
 			if (Settings->DirectionConstraint != EPCGExAxisDirectionConstraint::None)
 			{
-				for (int i = 0; i < 3; i++) { Dots[i] = FVector::DotProduct(Direction[i], Settings->Direction); }
+				for (int i = 0; i < 3; i++)
+				{
+					Dots[i] = FVector::DotProduct(Direction[i], Settings->Direction);
+				}
 				// Sort with index tie-breaker for determinism when dot products are equal
 				Algo::Sort(DotsIndices, [&](const int32 A, const int32 B)
 				{
-					if (Dots[A] != Dots[B]) { return Dots[A] < Dots[B]; }
+					if (Dots[A] != Dots[B])
+					{
+						return Dots[A] < Dots[B];
+					}
 					return A < B;
 				});
 			}
@@ -133,17 +151,23 @@ namespace PCGExBoundsAxisToPoints
 			// Sort with index tie-breaker for determinism when sizes are equal
 			Algo::Sort(Indices, [&](const int32 A, const int32 B)
 			{
-				if (Size[A] != Size[B]) { return Size[A] < Size[B]; }
+				if (Size[A] != Size[B])
+				{
+					return Size[A] < Size[B];
+				}
 				return A < B;
 			});
 
 			switch (Settings->Priority)
 			{
-			case EPCGExBoundAxisPriority::Shortest: Idx = 0;
+			case EPCGExBoundAxisPriority::Shortest:
+				Idx = 0;
 				break;
-			case EPCGExBoundAxisPriority::Median: Idx = 1;
+			case EPCGExBoundAxisPriority::Median:
+				Idx = 1;
 				break;
-			case EPCGExBoundAxisPriority::Longest: Idx = 2;
+			case EPCGExBoundAxisPriority::Longest:
+				Idx = 2;
 				break;
 			}
 
@@ -151,11 +175,23 @@ namespace PCGExBoundsAxisToPoints
 			{
 				if (Settings->SizeConstraint == EPCGExAxisSizeConstraint::Greater)
 				{
-					for (int i = FMath::Clamp(Idx, 0, 2); i < 3; i++) { if (Size[Indices[i]] < Settings->SizeThreshold) { Idx++; } }
+					for (int i = FMath::Clamp(Idx, 0, 2); i < 3; i++)
+					{
+						if (Size[Indices[i]] < Settings->SizeThreshold)
+						{
+							Idx++;
+						}
+					}
 				}
 				else
 				{
-					for (int i = FMath::Clamp(Idx, 0, 2); i >= 0; i--) { if (Size[Indices[i]] > Settings->SizeThreshold) { Idx--; } }
+					for (int i = FMath::Clamp(Idx, 0, 2); i >= 0; i--)
+					{
+						if (Size[Indices[i]] > Settings->SizeThreshold)
+						{
+							Idx--;
+						}
+					}
 				}
 			};
 
@@ -165,25 +201,43 @@ namespace PCGExBoundsAxisToPoints
 				{
 					// If selected direction is the worst
 					// Back off
-					if (Indices[FMath::Clamp(Idx, 0, 2)] == DotsIndices[2]) { Idx = 1; }
+					if (Indices[FMath::Clamp(Idx, 0, 2)] == DotsIndices[2])
+					{
+						Idx = 1;
+					}
 				}
 				else
 				{
 					// If selected direction is not the best
 					// Nudge toward it
-					if (Indices[FMath::Clamp(Idx, 0, 2)] != DotsIndices[2]) { Idx++; }
+					if (Indices[FMath::Clamp(Idx, 0, 2)] != DotsIndices[2])
+					{
+						Idx++;
+					}
 				}
 			};
 
 			if (Settings->ConstraintsOrder == EPCGExAxisConstraintSorting::SizeMatters)
 			{
-				if (Settings->DirectionConstraint != EPCGExAxisDirectionConstraint::None) { ApplyDirectionConstraint(); }
-				if (Settings->SizeConstraint != EPCGExAxisSizeConstraint::None) { ApplySizeConstraint(); }
+				if (Settings->DirectionConstraint != EPCGExAxisDirectionConstraint::None)
+				{
+					ApplyDirectionConstraint();
+				}
+				if (Settings->SizeConstraint != EPCGExAxisSizeConstraint::None)
+				{
+					ApplySizeConstraint();
+				}
 			}
 			else
 			{
-				if (Settings->SizeConstraint != EPCGExAxisSizeConstraint::None) { ApplySizeConstraint(); }
-				if (Settings->DirectionConstraint != EPCGExAxisDirectionConstraint::None) { ApplyDirectionConstraint(); }
+				if (Settings->SizeConstraint != EPCGExAxisSizeConstraint::None)
+				{
+					ApplySizeConstraint();
+				}
+				if (Settings->DirectionConstraint != EPCGExAxisDirectionConstraint::None)
+				{
+					ApplyDirectionConstraint();
+				}
 			}
 
 			Axis = AxisEnum[Indices[FMath::Clamp(Idx, 0, 2)]];
@@ -191,11 +245,14 @@ namespace PCGExBoundsAxisToPoints
 			switch (Axis)
 			{
 			case EPCGExMinimalAxis::None:
-			case EPCGExMinimalAxis::X: UVW.U = Settings->U;
+			case EPCGExMinimalAxis::X:
+				UVW.U = Settings->U;
 				break;
-			case EPCGExMinimalAxis::Y: UVW.V = Settings->U;
+			case EPCGExMinimalAxis::Y:
+				UVW.V = Settings->U;
 				break;
-			case EPCGExMinimalAxis::Z: UVW.W = Settings->U;
+			case EPCGExMinimalAxis::Z:
+				UVW.W = Settings->U;
 				break;
 			}
 

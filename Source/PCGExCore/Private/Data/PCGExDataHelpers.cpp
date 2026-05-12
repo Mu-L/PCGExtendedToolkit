@@ -5,7 +5,6 @@
 
 #include "PCGExLog.h"
 #include "Data/PCGExData.h"
-#include "Data/PCGExSubSelection.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
 #include "Helpers/PCGExMetaHelpers.h"
@@ -159,7 +158,10 @@ namespace PCGExData::Helpers
 			const FPCGMetadataAttributeBase* Parent = Attr->GetParent();
 			while (Parent)
 			{
-				if (!Parent->GetNumberOfEntries()) { Parent = Parent->GetParent(); }
+				if (!Parent->GetNumberOfEntries())
+				{
+					Parent = Parent->GetParent();
+				}
 				else
 				{
 					Attr = Parent;
@@ -227,7 +229,10 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 		bool bSuccess = false;
 		const UPCGMetadata* InMetadata = InData->Metadata;
 
-		if (!InMetadata) { return false; }
+		if (!InMetadata)
+		{
+			return false;
+		}
 
 		FSubSelection SubSelection(InSelector);
 		FPCGAttributeIdentifier SanitizedIdentifier = PCGExMetaHelpers::GetAttributeIdentifier(InSelector, InData);
@@ -250,7 +255,10 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 		}
 		else
 		{
-			if (!bQuiet && InContext) { PCGEX_LOG_INVALID_SELECTOR_C(InContext, Attribute, InSelector) }
+			if (!bQuiet && InContext)
+			{
+				PCGEX_LOG_INVALID_SELECTOR_C(InContext, Attribute, InSelector)
+			}
 			return false;
 		}
 

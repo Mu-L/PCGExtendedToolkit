@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/StaticMesh.h"
 #include "Details/PCGExSocketFitDetails.h"
+#include "Engine/StaticMesh.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
 namespace PCGExMT

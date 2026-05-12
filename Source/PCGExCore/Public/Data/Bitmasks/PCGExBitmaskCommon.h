@@ -54,15 +54,20 @@ namespace PCGExBitmask
 		switch (Op)
 		{
 		default: ;
-		case EPCGExBitOp::Set: Flags = Mask;
+		case EPCGExBitOp::Set:
+			Flags = Mask;
 			break;
-		case EPCGExBitOp::AND: Flags &= Mask;
+		case EPCGExBitOp::AND:
+			Flags &= Mask;
 			break;
-		case EPCGExBitOp::OR: Flags |= Mask;
+		case EPCGExBitOp::OR:
+			Flags |= Mask;
 			break;
-		case EPCGExBitOp::NOT: Flags &= ~Mask;
+		case EPCGExBitOp::NOT:
+			Flags &= ~Mask;
 			break;
-		case EPCGExBitOp::XOR: Flags ^= Mask;
+		case EPCGExBitOp::XOR:
+			Flags ^= Mask;
 			break;
 		}
 	}
@@ -71,7 +76,10 @@ namespace PCGExBitmask
 
 	constexpr EPCGExBitOp OR_Ops[5] = {EPCGExBitOp::OR, EPCGExBitOp::Set, EPCGExBitOp::AND, EPCGExBitOp::NOT, EPCGExBitOp::XOR,};
 
-	FORCEINLINE constexpr EPCGExBitOp GetBitOp(EPCGExBitOp_OR BitOp) { return OR_Ops[static_cast<uint8>(BitOp)]; }
+	FORCEINLINE constexpr EPCGExBitOp GetBitOp(EPCGExBitOp_OR BitOp)
+	{
+		return OR_Ops[static_cast<uint8>(BitOp)];
+	}
 
 	PCGEXCORE_API bool Compare(const EPCGExBitflagComparison Method, const int64& Flags, const int64& Mask);
 
@@ -79,15 +87,20 @@ namespace PCGExBitmask
 	{
 		switch (Operation)
 		{
-		case EPCGExBitOp::Set: Flags = Mask;
+		case EPCGExBitOp::Set:
+			Flags = Mask;
 			break;
-		case EPCGExBitOp::AND: Flags &= Mask;
+		case EPCGExBitOp::AND:
+			Flags &= Mask;
 			break;
-		case EPCGExBitOp::OR: Flags |= Mask;
+		case EPCGExBitOp::OR:
+			Flags |= Mask;
 			break;
-		case EPCGExBitOp::NOT: Flags &= ~Mask;
+		case EPCGExBitOp::NOT:
+			Flags &= ~Mask;
 			break;
-		case EPCGExBitOp::XOR: Flags ^= Mask;
+		case EPCGExBitOp::XOR:
+			Flags ^= Mask;
 			break;
 		default: ;
 		}

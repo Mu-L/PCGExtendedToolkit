@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExAssetCollection.h"
-#include "Core/PCGExContext.h"
 #include "PCGParamData.h"
+#include "Core/PCGExContext.h"
 #include "Details/PCGExStagingDetails.h"
 
 /**

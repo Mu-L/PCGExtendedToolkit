@@ -14,7 +14,10 @@
 
 PCGEX_INITIALIZE_ELEMENT(PathSlide)
 
-PCGExData::EIOInit UPCGExPathSlideSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExPathSlideSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(PathSlide)
 
@@ -22,7 +25,10 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExPathSlideSettings, SlideAmount, double, SlideAmou
 
 bool FPCGExPathSlideElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathSlide)
 
@@ -76,7 +82,10 @@ namespace PCGExPathSlide
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -91,12 +100,18 @@ namespace PCGExPathSlide
 			Path->IOIndex = PointDataFacade->Source->IOIndex;
 
 			SlideAmountGetter = Settings->GetValueSettingSlideAmount();
-			if (!SlideAmountGetter->Init(PointDataFacade, false)) { return false; }
+			if (!SlideAmountGetter->Init(PointDataFacade, false))
+			{
+				return false;
+			}
 
 			if (Settings->bWriteOldPosition)
 			{
 				RestorePositionBuffer = PointDataFacade->GetWritable<FVector>(Settings->RestorePositionAttributeName, FVector::ZeroVector, true, PCGExData::EBufferInit::New);
-				if (!RestorePositionBuffer) { return false; }
+				if (!RestorePositionBuffer)
+				{
+					return false;
+				}
 			}
 
 			StartParallelLoopForPoints();
@@ -104,7 +119,10 @@ namespace PCGExPathSlide
 		else
 		{
 			RestorePositionBuffer = PointDataFacade->GetBroadcaster<FVector>(Settings->RestorePositionAttributeName, true);
-			if (!RestorePositionBuffer) { return false; }
+			if (!RestorePositionBuffer)
+			{
+				return false;
+			}
 
 			StartParallelLoopForRange(PointDataFacade->GetNum());
 		}
@@ -126,9 +144,15 @@ namespace PCGExPathSlide
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			const FVector From = Path->GetPos(Index);
-			if (RestorePositionBuffer) { RestorePositionBuffer->SetValue(Index, From); }
+			if (RestorePositionBuffer)
+			{
+				RestorePositionBuffer->SetValue(Index, From);
+			}
 
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			FVector To = Path->GetPos(Index + Offset);
 
@@ -159,7 +183,10 @@ namespace PCGExPathSlide
 
 	void FProcessor::OnPointsProcessingComplete()
 	{
-		if (RestorePositionBuffer) { PointDataFacade->WriteFastest(TaskManager); }
+		if (RestorePositionBuffer)
+		{
+			PointDataFacade->WriteFastest(TaskManager);
+		}
 	}
 
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
@@ -173,7 +200,10 @@ namespace PCGExPathSlide
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 			OutTransforms[Index].SetLocation(RestorePositionBuffer->Read(Index));
 		}
 	}

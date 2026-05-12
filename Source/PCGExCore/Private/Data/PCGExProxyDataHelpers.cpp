@@ -4,9 +4,9 @@
 #include "Data/PCGExProxyDataHelpers.h"
 
 #include "Data/PCGExData.h"
-#include "Data/PCGExProxyData.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGExProxyData.h"
 #include "Data/PCGExProxyDataImpl.h"
 #include "Data/PCGExSubAccessor.h"
 
@@ -168,8 +168,14 @@ namespace PCGExData
 		{
 			TSharedPtr<TArray<T_REAL>> Buffer = MakeShared<TArray<T_REAL>>();
 
-			if (InDescriptor.Role == EProxyRole::Read) { Buffer->Init(T_REAL{}, InDataFacade->GetNum(EIOSide::In)); }
-			else { Buffer->Init(T_REAL{}, InDataFacade->GetNum(EIOSide::Out)); }
+			if (InDescriptor.Role == EProxyRole::Read)
+			{
+				Buffer->Init(T_REAL{}, InDataFacade->GetNum(EIOSide::In));
+			}
+			else
+			{
+				Buffer->Init(T_REAL{}, InDataFacade->GetNum(EIOSide::Out));
+			}
 
 			auto Proxy = MakeShared<TRawBufferProxy<T_REAL>>(InDescriptor.WorkingType);
 			Proxy->Buffer = Buffer;
@@ -232,31 +238,44 @@ namespace PCGExData
 
 				switch (InDescriptor.Selector.GetPointProperty())
 				{
-				case EPCGPointProperties::Density: Proxy->SetConstant(Point.GetDensity());
+				case EPCGPointProperties::Density:
+					Proxy->SetConstant(Point.GetDensity());
 					break;
-				case EPCGPointProperties::BoundsMin: Proxy->SetConstant(Point.GetBoundsMin());
+				case EPCGPointProperties::BoundsMin:
+					Proxy->SetConstant(Point.GetBoundsMin());
 					break;
-				case EPCGPointProperties::BoundsMax: Proxy->SetConstant(Point.GetBoundsMax());
+				case EPCGPointProperties::BoundsMax:
+					Proxy->SetConstant(Point.GetBoundsMax());
 					break;
-				case EPCGPointProperties::Extents: Proxy->SetConstant(Point.GetExtents());
+				case EPCGPointProperties::Extents:
+					Proxy->SetConstant(Point.GetExtents());
 					break;
-				case EPCGPointProperties::Color: Proxy->SetConstant(Point.GetColor());
+				case EPCGPointProperties::Color:
+					Proxy->SetConstant(Point.GetColor());
 					break;
-				case EPCGPointProperties::Position: Proxy->SetConstant(Point.GetLocation());
+				case EPCGPointProperties::Position:
+					Proxy->SetConstant(Point.GetLocation());
 					break;
-				case EPCGPointProperties::Rotation: Proxy->SetConstant(Point.GetRotation());
+				case EPCGPointProperties::Rotation:
+					Proxy->SetConstant(Point.GetRotation());
 					break;
-				case EPCGPointProperties::Scale: Proxy->SetConstant(Point.GetScale3D());
+				case EPCGPointProperties::Scale:
+					Proxy->SetConstant(Point.GetScale3D());
 					break;
-				case EPCGPointProperties::Transform: Proxy->SetConstant(Point.GetTransform());
+				case EPCGPointProperties::Transform:
+					Proxy->SetConstant(Point.GetTransform());
 					break;
-				case EPCGPointProperties::Steepness: Proxy->SetConstant(Point.GetSteepness());
+				case EPCGPointProperties::Steepness:
+					Proxy->SetConstant(Point.GetSteepness());
 					break;
-				case EPCGPointProperties::LocalCenter: Proxy->SetConstant(Point.GetLocalCenter());
+				case EPCGPointProperties::LocalCenter:
+					Proxy->SetConstant(Point.GetLocalCenter());
 					break;
-				case EPCGPointProperties::Seed: Proxy->SetConstant(Point.GetSeed());
+				case EPCGPointProperties::Seed:
+					Proxy->SetConstant(Point.GetSeed());
 					break;
-				default: Proxy->SetConstant(T_CONST{});
+				default:
+					Proxy->SetConstant(T_CONST{});
 					break;
 				}
 			}
@@ -330,13 +349,19 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 		if (InDescriptor.HasFlag(EProxyFlags::Shared))
 		{
 			OutProxy = InContext->BufferProxyPool->TryGet(InDescriptor);
-			if (OutProxy) { return OutProxy; }
+			if (OutProxy)
+			{
+				return OutProxy;
+			}
 		}
 
 		{
 			ON_SCOPE_EXIT
 			{
-				if (OutProxy.IsValid() && InDescriptor.HasFlag(EProxyFlags::Shared)) { InContext->BufferProxyPool->Add(InDescriptor, OutProxy); }
+				if (OutProxy.IsValid() && InDescriptor.HasFlag(EProxyFlags::Shared))
+				{
+					InContext->BufferProxyPool->Add(InDescriptor, OutProxy);
+				}
 			};
 
 			// Handle raw proxy
@@ -357,8 +382,8 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			{
 				const PCGMetadataEntryKey Key =
 					InDataFacade->GetIn()->IsEmpty()
-						? PCGInvalidEntryKey
-						: InDataFacade->GetIn()->GetMetadataEntry(0);
+					? PCGInvalidEntryKey
+					: InDataFacade->GetIn()->GetMetadataEntry(0);
 
 				PCGExMetaHelpers::ExecuteWithRightType(InDescriptor.RealType, [&](auto DummyValue)
 				{
@@ -527,7 +552,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			{
 				// Single specific field - use same proxy for all
 				const TSharedPtr<IBufferProxy> Proxy = GetProxyBuffer(InContext, InBaseDescriptor);
-				if (!Proxy) { return false; }
+				if (!Proxy)
+				{
+					return false;
+				}
 
 				for (int i = 0; i < NumDesiredFields; i++)
 				{
@@ -543,7 +571,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 				SingleFieldCopy.SetFieldIndex(FMath::Clamp(i, 0, MaxIndex));
 
 				const TSharedPtr<IBufferProxy> Proxy = GetProxyBuffer(InContext, SingleFieldCopy);
-				if (!Proxy) { return false; }
+				if (!Proxy)
+				{
+					return false;
+				}
 				OutProxies.Add(Proxy);
 			}
 		}
@@ -556,7 +587,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 				SingleFieldCopy.SetFieldIndex(FMath::Clamp(i, 0, MaxIndex));
 
 				const TSharedPtr<IBufferProxy> Proxy = GetProxyBuffer(InContext, SingleFieldCopy);
-				if (!Proxy) { return false; }
+				if (!Proxy)
+				{
+					return false;
+				}
 				OutProxies.Add(Proxy);
 			}
 		}

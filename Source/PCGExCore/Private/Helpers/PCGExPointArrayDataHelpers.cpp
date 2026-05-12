@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 
 #include "PCGContext.h"
-#include "Data/PCGPointArrayData.h"
 #include "Core/PCGExMTCommon.h"
+#include "Data/PCGPointArrayData.h"
 #include "Helpers/PCGExArrayHelpers.h"
 
 namespace PCGExPointArrayDataHelpers
@@ -34,7 +34,10 @@ namespace PCGExPointArrayDataHelpers
 
 	int32 FReadWriteScope::Add(const TArrayView<int32> ReadIndicesRange, int32& OutWriteIndex)
 	{
-		for (const int32 ReadIndex : ReadIndicesRange) { Add(ReadIndex, OutWriteIndex++); }
+		for (const int32 ReadIndex : ReadIndicesRange)
+		{
+			Add(ReadIndex, OutWriteIndex++);
+		}
 		return ReadIndices.Num() - 1;
 	}
 
@@ -54,7 +57,10 @@ namespace PCGExPointArrayDataHelpers
 			Read->CopyPropertiesTo(Write, ReadIndices, WriteIndices, Properties);
 
 			TPCGValueRange<int64> OutMetadataEntries = Write->GetMetadataEntryValueRange();
-			for (const int32 WriteIndex : WriteIndices) { Write->Metadata->InitializeOnSet(OutMetadataEntries[WriteIndex]); }
+			for (const int32 WriteIndex : WriteIndices)
+			{
+				Write->Metadata->InitializeOnSet(OutMetadataEntries[WriteIndex]);
+			}
 		}
 		else
 		{
@@ -106,8 +112,14 @@ namespace PCGExPointArrayDataHelpers
 		PCGExArrayHelpers::InitArray(ValuesCopy, NumIndices);
 		if (NumIndices < 4096)
 		{
-			for (int i = 0; i < NumIndices; i++) { ValuesCopy[i] = MoveTemp(InRange[InOrder[i]]); }
-			for (int i = 0; i < NumIndices; i++) { InRange[i] = MoveTemp(ValuesCopy[i]); }
+			for (int i = 0; i < NumIndices; i++)
+			{
+				ValuesCopy[i] = MoveTemp(InRange[InOrder[i]]);
+			}
+			for (int i = 0; i < NumIndices; i++)
+			{
+				InRange[i] = MoveTemp(ValuesCopy[i]);
+			}
 		}
 		else
 		{
@@ -150,7 +162,10 @@ template PCGEXCORE_API void ReorderValueRange<_TYPE>(TPCGValueRange<_TYPE>& InRa
 		const UPCGPointArrayData* FromPoints = Cast<UPCGPointArrayData>(From);
 		UPCGPointArrayData* ToPoints = Cast<UPCGPointArrayData>(To);
 
-		if (!FromPoints || !ToPoints || FromPoints == ToPoints) { return; }
+		if (!FromPoints || !ToPoints || FromPoints == ToPoints)
+		{
+			return;
+		}
 
 		ToPoints->CopyUnallocatedPropertiesFrom(FromPoints);
 		ToPoints->AllocateProperties(FromPoints->GetAllocatedProperties());
@@ -161,14 +176,38 @@ template PCGEXCORE_API void ReorderValueRange<_TYPE>(TPCGValueRange<_TYPE>& InRa
 		const EPCGExPointNativeProperties InFlags = static_cast<EPCGExPointNativeProperties>(Flags);
 		EPCGPointNativeProperties OutFlags = EPCGPointNativeProperties::None;
 
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Transform)) { OutFlags |= EPCGPointNativeProperties::Transform; }
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Density)) { OutFlags |= EPCGPointNativeProperties::Density; }
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::BoundsMin)) { OutFlags |= EPCGPointNativeProperties::BoundsMin; }
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::BoundsMax)) { OutFlags |= EPCGPointNativeProperties::BoundsMax; }
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Color)) { OutFlags |= EPCGPointNativeProperties::Color; }
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Steepness)) { OutFlags |= EPCGPointNativeProperties::Steepness; }
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Seed)) { OutFlags |= EPCGPointNativeProperties::Seed; }
-		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::MetadataEntry)) { OutFlags |= EPCGPointNativeProperties::MetadataEntry; }
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Transform))
+		{
+			OutFlags |= EPCGPointNativeProperties::Transform;
+		}
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Density))
+		{
+			OutFlags |= EPCGPointNativeProperties::Density;
+		}
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::BoundsMin))
+		{
+			OutFlags |= EPCGPointNativeProperties::BoundsMin;
+		}
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::BoundsMax))
+		{
+			OutFlags |= EPCGPointNativeProperties::BoundsMax;
+		}
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Color))
+		{
+			OutFlags |= EPCGPointNativeProperties::Color;
+		}
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Steepness))
+		{
+			OutFlags |= EPCGPointNativeProperties::Steepness;
+		}
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::Seed))
+		{
+			OutFlags |= EPCGPointNativeProperties::Seed;
+		}
+		if (EnumHasAnyFlags(InFlags, EPCGExPointNativeProperties::MetadataEntry))
+		{
+			OutFlags |= EPCGPointNativeProperties::MetadataEntry;
+		}
 
 		return OutFlags;
 	}

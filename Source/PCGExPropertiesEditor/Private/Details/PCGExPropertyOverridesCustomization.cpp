@@ -7,11 +7,11 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "IPropertyUtilities.h"
-#include "PropertyHandle.h"
 #include "PCGExProperty.h"
+#include "PropertyHandle.h"
+#include "Delegates/Delegate.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Text/STextBlock.h"
-#include "Delegates/Delegate.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertyOverridesCustomization::MakeInstance()
 {
@@ -45,7 +45,10 @@ void FPCGExPropertyOverridesCustomization::CustomizeHeader(
 
 FText FPCGExPropertyOverridesCustomization::GetHeaderText() const
 {
-	if (!PropertyHandlePtr.IsValid()) { return FText::FromString(TEXT("0 / 0 active")); }
+	if (!PropertyHandlePtr.IsValid())
+	{
+		return FText::FromString(TEXT("0 / 0 active"));
+	}
 
 	// Get raw access to count enabled
 	TArray<void*> RawData;
@@ -69,7 +72,10 @@ void FPCGExPropertyOverridesCustomization::CustomizeChildren(
 {
 	// Get the Overrides array handle
 	TSharedPtr<IPropertyHandle> OverridesArrayHandle = PropertyHandle->GetChildHandle(TEXT("Overrides"));
-	if (!OverridesArrayHandle.IsValid()) { return; }
+	if (!OverridesArrayHandle.IsValid())
+	{
+		return;
+	}
 
 	// Structural changes (add/remove/reorder) need a refresh to recreate
 	// FStructOnScope instances with fresh pointers, but it MUST be deferred:

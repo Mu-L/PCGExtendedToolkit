@@ -9,9 +9,9 @@
 namespace PCGExBlending
 {
 	IBlendOperation::IBlendOperation(const EPCGExABBlendingType InMode, const bool bInResetForMulti)
-		: Mode(InMode),
-		  bResetForMulti(bInResetForMulti),
-		  bInitWithSource(
+		: Mode(InMode)
+		  , bResetForMulti(bInResetForMulti)
+		  , bInitWithSource(
 			  InMode == EPCGExABBlendingType::Min ||
 			  InMode == EPCGExABBlendingType::Max ||
 			  InMode == EPCGExABBlendingType::UnsignedMin ||
@@ -19,8 +19,8 @@ namespace PCGExBlending
 			  InMode == EPCGExABBlendingType::AbsoluteMin ||
 			  InMode == EPCGExABBlendingType::AbsoluteMax ||
 			  InMode == EPCGExABBlendingType::Hash ||
-			  InMode == EPCGExABBlendingType::UnsignedHash),
-		  bConsiderOriginalValue(
+			  InMode == EPCGExABBlendingType::UnsignedHash)
+		  , bConsiderOriginalValue(
 			  InMode == EPCGExABBlendingType::Average ||
 			  InMode == EPCGExABBlendingType::Add ||
 			  InMode == EPCGExABBlendingType::Subtract ||
@@ -132,7 +132,10 @@ namespace PCGExBlending
 
 		{
 			FScopeLock Lock(&CacheLock);
-			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key)) { return *Found; }
+			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key))
+			{
+				return *Found;
+			}
 		}
 
 		// Create new operation outside lock
@@ -142,7 +145,10 @@ namespace PCGExBlending
 		{
 			FScopeLock Lock(&CacheLock);
 			// Check again in case another thread added it
-			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key)) { return *Found; }
+			if (TSharedPtr<IBlendOperation>* Found = Cache.Find(Key))
+			{
+				return *Found;
+			}
 			Cache.Add(Key, NewOp);
 		}
 

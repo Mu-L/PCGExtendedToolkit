@@ -107,7 +107,10 @@ namespace PCGExClusters
 		for (int32 NodeIdx = 0; NodeIdx < NumNodes; ++NodeIdx)
 		{
 			TArray<int32>& Outgoing = OutgoingByNode[NodeIdx];
-			if (Outgoing.Num() <= 1) { continue; }
+			if (Outgoing.Num() <= 1)
+			{
+				continue;
+			}
 
 			// Sort by angle (ascending = CCW order)
 			Outgoing.Sort([this](const int32 A, const int32 B)
@@ -215,7 +218,10 @@ namespace PCGExClusters
 		for (int32 NodeIdx = 0; NodeIdx < NumNodes; ++NodeIdx)
 		{
 			TArray<int32>& Outgoing = OutgoingByNode[NodeIdx];
-			if (Outgoing.Num() <= 1) { continue; }
+			if (Outgoing.Num() <= 1)
+			{
+				continue;
+			}
 
 			Outgoing.Sort([this](const int32 A, const int32 B)
 			{
@@ -252,8 +258,14 @@ namespace PCGExClusters
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FPlanarFaceEnumerator::EnumerateRawFaces);
 
-		if (bRawFacesEnumerated) { return CachedRawFaces; }
-		if (!IsBuilt()) { return CachedRawFaces; }
+		if (bRawFacesEnumerated)
+		{
+			return CachedRawFaces;
+		}
+		if (!IsBuilt())
+		{
+			return CachedRawFaces;
+		}
 
 		bRawFacesEnumerated = true;
 
@@ -266,7 +278,10 @@ namespace PCGExClusters
 		// Enumerate faces by following "next" pointers
 		for (int32 StartHE = 0; StartHE < HalfEdges.Num(); ++StartHE)
 		{
-			if (Visited[StartHE]) { continue; }
+			if (Visited[StartHE])
+			{
+				continue;
+			}
 
 			FRawFace& RawFace = CachedRawFaces.Emplace_GetRef(NumFaces);
 			RawFace.Nodes.Reserve(64);
@@ -336,7 +351,10 @@ namespace PCGExClusters
 		const TArray<FRawFace>& RawFaces = EnumerateRawFaces();
 		const int32 NumRawFaces = RawFaces.Num();
 
-		if (NumRawFaces == 0) { return; }
+		if (NumRawFaces == 0)
+		{
+			return;
+		}
 
 		// For small face counts, serial is faster due to parallel overhead
 		constexpr int32 ParallelThreshold = 32;
@@ -394,7 +412,10 @@ namespace PCGExClusters
 		SuccessCells.SetNum(NumRawFaces);
 
 		TArray<TSharedPtr<FCell>> FailedCells;
-		if (OutFailedCells) { FailedCells.SetNum(NumRawFaces); }
+		if (OutFailedCells)
+		{
+			FailedCells.SetNum(NumRawFaces);
+		}
 
 		// Process cells in parallel - each thread writes to its own index (no contention)
 		ParallelFor(NumRawFaces, [&](const int32 RawFaceIdx)
@@ -422,7 +443,10 @@ namespace PCGExClusters
 
 		for (TSharedPtr<FCell>& Cell : SuccessCells)
 		{
-			if (!Cell) { continue; }
+			if (!Cell)
+			{
+				continue;
+			}
 
 			if (bDetectWrapper && IsWrapperCandidate(*Cell) && Cell->Data.Area > WrapperArea)
 			{
@@ -444,7 +468,10 @@ namespace PCGExClusters
 			OutFailedCells->Reserve(OutFailedCells->Num() + NumRawFaces);
 			for (TSharedPtr<FCell>& Cell : FailedCells)
 			{
-				if (Cell) { OutFailedCells->Add(MoveTemp(Cell)); }
+				if (Cell)
+				{
+					OutFailedCells->Add(MoveTemp(Cell));
+				}
 			}
 		}
 	}
@@ -462,7 +489,10 @@ namespace PCGExClusters
 		const TArray<FRawFace>& RawFaces = EnumerateRawFaces();
 		const int32 NumRawFaces = RawFaces.Num();
 
-		if (NumRawFaces == 0) { return; }
+		if (NumRawFaces == 0)
+		{
+			return;
+		}
 
 		// Early exit if no culling possible (include outside or invalid bounds)
 		if (bIncludeOutside || !BoundsFilter.IsValid)
@@ -475,7 +505,10 @@ namespace PCGExClusters
 		int32 PotentialCount = 0;
 		for (const FRawFace& RawFace : RawFaces)
 		{
-			if (BoundsFilter.Intersect(RawFace.Bounds3D)) { PotentialCount++; }
+			if (BoundsFilter.Intersect(RawFace.Bounds3D))
+			{
+				PotentialCount++;
+			}
 		}
 
 		// Wrapper detection lambda (same logic as EnumerateAllFaces)
@@ -496,7 +529,10 @@ namespace PCGExClusters
 			for (const FRawFace& RawFace : RawFaces)
 			{
 				// EARLY CULLING: Skip faces whose bounds don't intersect filter
-				if (!BoundsFilter.Intersect(RawFace.Bounds3D)) { continue; }
+				if (!BoundsFilter.Intersect(RawFace.Bounds3D))
+				{
+					continue;
+				}
 
 				TSharedPtr<FCell> Cell = MakeShared<FCell>(Constraints);
 				const ECellResult Result = BuildCellFromRawFace(RawFace, Cell, Constraints);
@@ -535,7 +571,10 @@ namespace PCGExClusters
 		SuccessCells.SetNum(NumRawFaces);
 
 		TArray<TSharedPtr<FCell>> FailedCells;
-		if (OutFailedCells) { FailedCells.SetNum(NumRawFaces); }
+		if (OutFailedCells)
+		{
+			FailedCells.SetNum(NumRawFaces);
+		}
 
 		// Process cells in parallel - each thread writes to its own index (no contention)
 		// Early culling happens inside the parallel loop
@@ -544,7 +583,10 @@ namespace PCGExClusters
 			const FRawFace& RawFace = RawFaces[RawFaceIdx];
 
 			// EARLY CULLING: Skip faces whose bounds don't intersect filter
-			if (!BoundsFilter.Intersect(RawFace.Bounds3D)) { return; }
+			if (!BoundsFilter.Intersect(RawFace.Bounds3D))
+			{
+				return;
+			}
 
 			TSharedPtr<FCell> Cell = MakeShared<FCell>(Constraints);
 			const ECellResult Result = BuildCellFromRawFace(RawFace, Cell, Constraints);
@@ -568,7 +610,10 @@ namespace PCGExClusters
 
 		for (TSharedPtr<FCell>& Cell : SuccessCells)
 		{
-			if (!Cell) { continue; }
+			if (!Cell)
+			{
+				continue;
+			}
 
 			if (bDetectWrapper && IsWrapperCandidate(*Cell) && Cell->Data.Area > WrapperArea)
 			{
@@ -590,7 +635,10 @@ namespace PCGExClusters
 			OutFailedCells->Reserve(OutFailedCells->Num() + PotentialCount);
 			for (TSharedPtr<FCell>& Cell : FailedCells)
 			{
-				if (Cell) { OutFailedCells->Add(MoveTemp(Cell)); }
+				if (Cell)
+				{
+					OutFailedCells->Add(MoveTemp(Cell));
+				}
 			}
 		}
 	}
@@ -601,7 +649,10 @@ namespace PCGExClusters
 		const TSharedRef<FCellConstraints>& Constraints) const
 	{
 		const int32 NumUniqueNodes = FaceNodes.Num();
-		if (NumUniqueNodes < 3) { return ECellResult::Leaf; }
+		if (NumUniqueNodes < 3)
+		{
+			return ECellResult::Leaf;
+		}
 
 		// Check point count limits (based on unique nodes)
 		if (NumUniqueNodes < Constraints->MinPointCount || NumUniqueNodes > Constraints->MaxPointCount)
@@ -675,7 +726,10 @@ namespace PCGExClusters
 		PCGExArrayHelpers::ShiftArrayToSmallest(OutCell->Nodes);
 
 		// Check for duplicate
-		if (!Constraints->IsUniqueCellHash(OutCell)) { return ECellResult::Duplicate; }
+		if (!Constraints->IsUniqueCellHash(OutCell))
+		{
+			return ECellResult::Duplicate;
+		}
 
 		OutCell->Data.Centroid /= NumUniqueNodes;
 		OutCell->Data.Perimeter = Perimeter;
@@ -706,7 +760,10 @@ namespace PCGExClusters
 		{
 			// Compute best-fit plane from the face nodes' 3D positions
 			PCGExMath::FBestFitPlane FacePlane(NumUniqueNodes,
-			                                   [&](int32 i) { return Cluster->GetPos(FaceNodes[i]); });
+			                                   [&](int32 i)
+			                                   {
+				                                   return Cluster->GetPos(FaceNodes[i]);
+			                                   });
 			FaceProjection.Init(FacePlane);
 
 			for (int32 i = 0; i < NumOutputNodes; ++i)
@@ -798,7 +855,10 @@ namespace PCGExClusters
 	int32 FPlanarFaceEnumerator::FindFaceContaining(const FVector2D& Point) const
 	{
 		// LocalTangent: 2D point query is meaningless (no global 2D space)
-		if (bIsLocalTangent) { return -1; }
+		if (bIsLocalTangent)
+		{
+			return -1;
+		}
 
 		// Simple point-in-polygon test for each face
 		// This could be optimized with spatial indexing
@@ -807,7 +867,10 @@ namespace PCGExClusters
 		for (int32 StartHE = 0; StartHE < HalfEdges.Num(); ++StartHE)
 		{
 			const int32 FaceIdx = HalfEdges[StartHE].FaceIndex;
-			if (FaceIdx < 0) { continue; }
+			if (FaceIdx < 0)
+			{
+				continue;
+			}
 
 			// Check if we've already tested this face
 			bool bAlreadyTested = false;
@@ -819,7 +882,10 @@ namespace PCGExClusters
 					break;
 				}
 			}
-			if (bAlreadyTested) { continue; }
+			if (bAlreadyTested)
+			{
+				continue;
+			}
 
 			// Build face polygon (ProjectedPositions is node-indexed)
 			FacePolygon.Reset();
@@ -831,7 +897,10 @@ namespace PCGExClusters
 				const FHalfEdge& HE = HalfEdges[CurrentHE];
 				FacePolygon.Add((*ProjectedPositions)[HE.OriginNode]);
 				CurrentHE = HE.NextIndex;
-				if (CurrentHE == StartHE) { break; }
+				if (CurrentHE == StartHE)
+				{
+					break;
+				}
 			}
 
 			if (FacePolygon.Num() >= 3 && PCGExMath::Geo::IsPointInPolygon(Point, FacePolygon))
@@ -849,7 +918,10 @@ namespace PCGExClusters
 
 		TMap<int32, TSet<int32>> AdjacencyMap;
 
-		if (!bRawFacesEnumerated || HalfEdges.IsEmpty()) { return AdjacencyMap; }
+		if (!bRawFacesEnumerated || HalfEdges.IsEmpty())
+		{
+			return AdjacencyMap;
+		}
 
 		// Reserve space for the map
 		AdjacencyMap.Reserve(NumFaces);
@@ -858,14 +930,23 @@ namespace PCGExClusters
 		for (const FHalfEdge& HE : HalfEdges)
 		{
 			const int32 FaceA = HE.FaceIndex;
-			if (FaceA < 0 || FaceA == WrapperFaceIndex) { continue; }
+			if (FaceA < 0 || FaceA == WrapperFaceIndex)
+			{
+				continue;
+			}
 
 			// Get the twin's face
-			if (HE.TwinIndex < 0 || HE.TwinIndex >= HalfEdges.Num()) { continue; }
+			if (HE.TwinIndex < 0 || HE.TwinIndex >= HalfEdges.Num())
+			{
+				continue;
+			}
 			const int32 FaceB = HalfEdges[HE.TwinIndex].FaceIndex;
 
 			// Skip if same face, invalid, or wrapper
-			if (FaceB < 0 || FaceB == FaceA || FaceB == WrapperFaceIndex) { continue; }
+			if (FaceB < 0 || FaceB == FaceA || FaceB == WrapperFaceIndex)
+			{
+				continue;
+			}
 
 			// Add bidirectional adjacency
 			AdjacencyMap.FindOrAdd(FaceA).Add(FaceB);
@@ -908,21 +989,33 @@ namespace PCGExClusters
 	{
 		OutAdjacentFaces.Reset();
 
-		if (!bRawFacesEnumerated || FaceIndex < 0 || HalfEdges.IsEmpty()) { return; }
+		if (!bRawFacesEnumerated || FaceIndex < 0 || HalfEdges.IsEmpty())
+		{
+			return;
+		}
 
 		TSet<int32> UniqueAdjacent;
 
 		// Find all half-edges belonging to this face and check their twins
 		for (const FHalfEdge& HE : HalfEdges)
 		{
-			if (HE.FaceIndex != FaceIndex) { continue; }
+			if (HE.FaceIndex != FaceIndex)
+			{
+				continue;
+			}
 
 			// Get the twin's face
-			if (HE.TwinIndex < 0 || HE.TwinIndex >= HalfEdges.Num()) { continue; }
+			if (HE.TwinIndex < 0 || HE.TwinIndex >= HalfEdges.Num())
+			{
+				continue;
+			}
 			const int32 AdjacentFace = HalfEdges[HE.TwinIndex].FaceIndex;
 
 			// Skip if invalid or wrapper
-			if (AdjacentFace < 0 || AdjacentFace == WrapperFaceIndex) { continue; }
+			if (AdjacentFace < 0 || AdjacentFace == WrapperFaceIndex)
+			{
+				continue;
+			}
 
 			UniqueAdjacent.Add(AdjacentFace);
 		}
@@ -934,7 +1027,10 @@ namespace PCGExClusters
 	{
 		OutHalfEdgeIndices.Reset();
 
-		if (!bRawFacesEnumerated || FaceIndex < 0 || HalfEdges.IsEmpty()) { return; }
+		if (!bRawFacesEnumerated || FaceIndex < 0 || HalfEdges.IsEmpty())
+		{
+			return;
+		}
 
 		for (int32 HEIdx = 0; HEIdx < HalfEdges.Num(); ++HEIdx)
 		{
@@ -948,7 +1044,10 @@ namespace PCGExClusters
 	int32 FPlanarFaceEnumerator::GetWrapperFaceIndex() const
 	{
 		// LocalTangent: closed manifolds have no unbounded exterior face
-		if (bIsLocalTangent) { return -1; }
+		if (bIsLocalTangent)
+		{
+			return -1;
+		}
 
 		// The wrapper face is the one with the largest (most negative for CCW) signed area
 		// or equivalently the face that would have CW winding when all others have CCW
@@ -961,7 +1060,10 @@ namespace PCGExClusters
 		for (int32 StartHE = 0; StartHE < HalfEdges.Num(); ++StartHE)
 		{
 			const int32 FaceIdx = HalfEdges[StartHE].FaceIndex;
-			if (FaceIdx < 0 || ProcessedFaces.Contains(FaceIdx)) { continue; }
+			if (FaceIdx < 0 || ProcessedFaces.Contains(FaceIdx))
+			{
+				continue;
+			}
 			ProcessedFaces.Add(FaceIdx);
 
 			// Build face polygon (ProjectedPositions is node-indexed)
@@ -974,7 +1076,10 @@ namespace PCGExClusters
 				const FHalfEdge& HE = HalfEdges[CurrentHE];
 				FacePolygon.Add((*ProjectedPositions)[HE.OriginNode]);
 				CurrentHE = HE.NextIndex;
-				if (CurrentHE == StartHE) { break; }
+				if (CurrentHE == StartHE)
+				{
+					break;
+				}
 			}
 
 			if (FacePolygon.Num() >= 3)

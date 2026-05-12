@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExCoreMacros.h"
 #include "Factories/PCGExInstancedFactory.h"
 #include "Factories/PCGExOperation.h"
-#include "PCGExCoreMacros.h"
 
 #include "UObject/Object.h"
 

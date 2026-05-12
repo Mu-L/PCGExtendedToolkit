@@ -3,21 +3,21 @@
 
 #include "PCGExPropertiesEditor.h"
 
-#include "PropertyEditorModule.h"
-#include "Details/PCGExEnumSelectorCustomization.h"
-#include "Details/PCGExPropertyOverridesCustomization.h"
-#include "Details/PCGExPropertyOverrideEntryCustomization.h"
-#include "Details/PCGExWeightedPropertyOverridesCustomization.h"
-#include "Details/PCGExPropertyCompiledCustomization.h"
-#include "Details/PCGExPropertySchemaCollectionCustomization.h"
-#include "Details/PCGExPropertySchemaCustomization.h"
-#include "Details/PCGExPropertyOutputConfigCustomization.h"
 #include "PCGExBuiltInInlineWidgets.h"
 #include "PCGExEnumSelector.h"
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyTypes.h"
 #include "PCGExPropertyWriter.h"
+#include "PropertyEditorModule.h"
+#include "Details/PCGExEnumSelectorCustomization.h"
+#include "Details/PCGExPropertyCompiledCustomization.h"
+#include "Details/PCGExPropertyOutputConfigCustomization.h"
+#include "Details/PCGExPropertyOverrideEntryCustomization.h"
+#include "Details/PCGExPropertyOverridesCustomization.h"
+#include "Details/PCGExPropertySchemaCollectionCustomization.h"
+#include "Details/PCGExPropertySchemaCustomization.h"
+#include "Details/PCGExWeightedPropertyOverridesCustomization.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExPropertiesEditorModule"
 
@@ -32,46 +32,46 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExEnumSelector::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExEnumSelectorCustomization::MakeInstance)
-	);
+		);
 
 	// Register FPCGExPropertySchemaCollection customization - handles schema array changes
 	// Used by Tuple (Composition), Collections (CollectionProperties), Valency (DefaultProperties)
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExPropertySchemaCollection::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertySchemaCollectionCustomization::MakeInstance)
-	);
+		);
 
 	// Register FPCGExPropertySchema customization - handles individual schema entry changes
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExPropertySchema::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertySchemaCustomization::MakeInstance)
-	);
+		);
 
 	// Register FPCGExPropertyOverrides customization - provides toggle-checkbox UI
 	// Used by Collections (entry overrides) and Tuple (row values)
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExPropertyOverrides::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOverridesCustomization::MakeInstance)
-	);
+		);
 
 	// Register FPCGExPropertyOverrideEntry customization - handles individual entry display
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExPropertyOverrideEntry::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOverrideEntryCustomization::MakeInstance)
-	);
+		);
 
 	// Register FPCGExPropertyOutputConfig customization - compact inline [x] Prop -> Attribute row
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExPropertyOutputConfig::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOutputConfigCustomization::MakeInstance)
-	);
+		);
 
 	// Register FPCGExWeightedPropertyOverrides customization - weight in header + flattened overrides
 	// Used by DistributeTuple (Values array)
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExWeightedPropertyOverrides::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExWeightedPropertyOverridesCustomization::MakeInstance)
-	);
+		);
 
 	// Register FPCGExPropertyCompiled customization for all 17 concrete types
 	// This hides PropertyName field (shown in entry header) and only shows value fields

@@ -10,15 +10,24 @@
 
 bool FPCGExDecompThreshold::Decompose(FPCGExDecompositionResult& OutResult)
 {
-	if (!Cluster || Cluster->Nodes->Num() == 0) { return false; }
-	if (AttributeName == NAME_None) { return false; }
+	if (!Cluster || Cluster->Nodes->Num() == 0)
+	{
+		return false;
+	}
+	if (AttributeName == NAME_None)
+	{
+		return false;
+	}
 
 	const int32 NumNodes = Cluster->Nodes->Num();
 	const int32 SafeNumBins = FMath::Max(NumBins, 2);
 
 	// Read attribute values from VtxFacade (set as PrimaryDataFacade)
 	const TSharedPtr<PCGExData::TBuffer<double>> Buffer = PrimaryDataFacade->GetReadable<double>(AttributeName);
-	if (!Buffer) { return false; }
+	if (!Buffer)
+	{
+		return false;
+	}
 
 	// Gather valid node values
 	struct FNodeValue
@@ -32,13 +41,19 @@ bool FPCGExDecompThreshold::Decompose(FPCGExDecompositionResult& OutResult)
 
 	for (int32 i = 0; i < NumNodes; i++)
 	{
-		if (!Cluster->GetNode(i)->bValid) { continue; }
+		if (!Cluster->GetNode(i)->bValid)
+		{
+			continue;
+		}
 
 		const int32 PointIndex = Cluster->GetNodePointIndex(i);
 		NodeValues.Add({i, Buffer->Read(PointIndex)});
 	}
 
-	if (NodeValues.Num() == 0) { return false; }
+	if (NodeValues.Num() == 0)
+	{
+		return false;
+	}
 
 	if (BinningMode == EPCGExDecompBinningMode::Uniform)
 	{
@@ -55,7 +70,10 @@ bool FPCGExDecompThreshold::Decompose(FPCGExDecompositionResult& OutResult)
 		if (Range < KINDA_SMALL_NUMBER)
 		{
 			// All same value - single cell
-			for (const FNodeValue& NV : NodeValues) { OutResult.NodeCellIDs[NV.NodeIndex] = 0; }
+			for (const FNodeValue& NV : NodeValues)
+			{
+				OutResult.NodeCellIDs[NV.NodeIndex] = 0;
+			}
 			OutResult.NumCells = 1;
 			return true;
 		}
@@ -73,7 +91,10 @@ bool FPCGExDecompThreshold::Decompose(FPCGExDecompositionResult& OutResult)
 	else // Quantile
 	{
 		// Sort by value
-		NodeValues.Sort([](const FNodeValue& A, const FNodeValue& B) { return A.Value < B.Value; });
+		NodeValues.Sort([](const FNodeValue& A, const FNodeValue& B)
+		{
+			return A.Value < B.Value;
+		});
 
 		const int32 TotalNodes = NodeValues.Num();
 		const int32 NodesPerBin = FMath::Max(1, TotalNodes / SafeNumBins);

@@ -71,7 +71,10 @@ namespace PCGExMath
 		FVector Size = InBox.GetSize();
 		for (int i = 0; i < 3; i++)
 		{
-			if (FMath::IsNaN(Size[i]) || FMath::IsNearlyZero(Size[i])) { InBox.Min[i] -= UE_SMALL_NUMBER; }
+			if (FMath::IsNaN(Size[i]) || FMath::IsNearlyZero(Size[i]))
+			{
+				InBox.Min[i] -= UE_SMALL_NUMBER;
+			}
 		}
 	}
 

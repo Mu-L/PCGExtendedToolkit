@@ -6,11 +6,11 @@
 #include <functional>
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExProbeFactoryProvider.h"
 #include "Core/PCGExProbeOperation.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Math/PCGExMath.h"
+#include "UObject/Object.h"
 
 #include "PCGExGlobalProbeKNN.generated.h"
 

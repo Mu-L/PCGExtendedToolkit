@@ -23,7 +23,10 @@ namespace PCGExEditor
 	 */
 	FORCEINLINE void NotifyObjectChanged(UObject* Object)
 	{
-		if (!Object) { return; }
+		if (!Object)
+		{
+			return;
+		}
 		FCoreUObjectDelegates::BroadcastOnObjectModified(Object);
 		FPropertyChangedEvent EmptyEvent(nullptr);
 		FCoreUObjectDelegates::OnObjectPropertyChanged.Broadcast(Object, EmptyEvent);

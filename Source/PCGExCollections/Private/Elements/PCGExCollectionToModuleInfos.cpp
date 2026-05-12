@@ -4,14 +4,14 @@
 #include "Elements/PCGExCollectionToModuleInfos.h"
 
 
+#include "PCGExProperty.h"
 #include "PCGGraph.h"
 #include "PCGParamData.h"
 #include "PCGPin.h"
-#include "Helpers/PCGExMetaHelpers.h"
-#include "Helpers/PCGExCollectionPropertySetWriter.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
-#include "PCGExProperty.h"
+#include "Helpers/PCGExCollectionPropertySetWriter.h"
+#include "Helpers/PCGExMetaHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
 #define PCGEX_NAMESPACE CollectionToModuleInfos
@@ -32,7 +32,10 @@ TArray<FPCGPinProperties> UPCGExCollectionToModuleInfosSettings::OutputPinProper
 	return PinProperties;
 }
 
-FPCGElementPtr UPCGExCollectionToModuleInfosSettings::CreateElement() const { return MakeShared<FPCGExCollectionToModuleInfosElement>(); }
+FPCGElementPtr UPCGExCollectionToModuleInfosSettings::CreateElement() const
+{
+	return MakeShared<FPCGExCollectionToModuleInfosElement>();
+}
 
 #pragma endregion
 
@@ -98,10 +101,16 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 		TSet<const UPCGExAssetCollection*> Seen;
 		for (const PCGExCollectionToGrammar::FModule& Module : Modules)
 		{
-			if (!Module.Host || Module.Host == MainCollection) { continue; }
+			if (!Module.Host || Module.Host == MainCollection)
+			{
+				continue;
+			}
 			bool bAlreadyIn = false;
 			Seen.Add(Module.Host, &bAlreadyIn);
-			if (!bAlreadyIn) { FallbackHosts.Add(Module.Host); }
+			if (!bAlreadyIn)
+			{
+				FallbackHosts.Add(Module.Host);
+			}
 		}
 	}
 
@@ -142,7 +151,10 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 	TSet<FName>& UniqueSymbols,
 	TMap<const FPCGExAssetCollectionEntry*, double>& SizeCache) const
 {
-	if (!Collection) { return; }
+	if (!Collection)
+	{
+		return;
+	}
 
 	const PCGExAssetCollection::FCache* Cache = const_cast<UPCGExAssetCollection*>(Collection)->LoadCache();
 	const int32 NumEntries = Cache->Main->Order.Num();
@@ -154,9 +166,15 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 		FPCGExEntryAccessResult Result = Collection->GetEntryAt(i);
 		Entry = Result.Entry;
 
-		if (!Entry) { continue; }
+		if (!Entry)
+		{
+			continue;
+		}
 
-		if (!CategoryFilters.Test(Entry->Category.ToString())) { continue; }
+		if (!CategoryFilters.Test(Entry->Category.ToString()))
+		{
+			continue;
+		}
 
 		if (Entry->bIsSubCollection && Entry->SubGrammarMode == EPCGExGrammarSubCollectionMode::Flatten)
 		{

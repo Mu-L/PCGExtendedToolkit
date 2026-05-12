@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExBlendOpFactory.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
+#include "UObject/Object.h"
 
 #include "Factories/PCGExFactoryProvider.h"
 #include "Metadata/PCGDefaultValueInterface.h"
@@ -41,7 +41,11 @@ public:
 	//~End UObject interface
 
 	//~Begin IPCGSettingsDefaultValueProvider interface
-	virtual bool DefaultValuesAreEnabled() const override { return true; }
+	virtual bool DefaultValuesAreEnabled() const override
+	{
+		return true;
+	}
+
 	virtual bool IsPinDefaultValueEnabled(FName PinLabel) const override;
 	virtual bool IsPinDefaultValueActivated(FName PinLabel) const override;
 	virtual EPCGMetadataTypes GetPinDefaultValueType(FName PinLabel) const override;
@@ -64,10 +68,19 @@ protected:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(BlendOp, "BlendOp", "Creates a single Blend Operation node, to be used with the Attribute Blender.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(BlendOp); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(BlendOp);
+	}
+
 	//PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourceFiltersLabel, "Filters", PCGExFactories::PointFilters, true)
 
-	virtual bool CanUserEditTitle() const override { return false; }
+	virtual bool CanUserEditTitle() const override
+	{
+		return false;
+	}
+
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 
@@ -80,7 +93,11 @@ protected:
 public:
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 
-	virtual FName GetMainOutputPin() const override { return PCGExBlending::Labels::OutputBlendingLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExBlending::Labels::OutputBlendingLabel;
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 	/** Filter Priority.*/

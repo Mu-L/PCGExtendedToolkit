@@ -13,7 +13,10 @@ PCGEX_CREATE_PROBE_FACTORY(Anisotropic, {}, {})
 
 bool FPCGExProbeAnisotropic::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 	MinDot = PCGExMath::DegreesToDot(Config.MaxAngle);
 	return true;
 }
@@ -50,9 +53,15 @@ void FPCGExProbeAnisotropic::ProcessCandidates(const int32 Index, TArray<PCGExPr
 	{
 		const PCGExProbing::FCandidate& C = Candidates[i];
 
-		if (C.Distance > R) { continue; }
+		if (C.Distance > R)
+		{
+			continue;
+		}
 
-		if (Coincidence && Coincidence->Contains(C.GH)) { continue; }
+		if (Coincidence && Coincidence->Contains(C.GH))
+		{
+			continue;
+		}
 
 		int32 BestIndex = -1;
 
@@ -71,7 +80,10 @@ void FPCGExProbeAnisotropic::ProcessCandidates(const int32 Index, TArray<PCGExPr
 			if (Coincidence)
 			{
 				Coincidence->Add(C.GH, &bIsAlreadyConnected);
-				if (bIsAlreadyConnected) { continue; }
+				if (bIsAlreadyConnected)
+				{
+					continue;
+				}
 			}
 
 			BestCandidate[BestIndex] = i;
@@ -80,7 +92,10 @@ void FPCGExProbeAnisotropic::ProcessCandidates(const int32 Index, TArray<PCGExPr
 
 	for (int d = 0; d < 16; d++)
 	{
-		if (BestCandidate[d] == -1) { continue; }
+		if (BestCandidate[d] == -1)
+		{
+			continue;
+		}
 		const PCGExProbing::FCandidate& C = Candidates[BestCandidate[d]];
 		OutEdges->Add(PCGEx::H64U(Index, C.PointIndex));
 	}

@@ -23,7 +23,9 @@
 namespace PCGExFloodFill
 {
 	FDiffusion::FDiffusion(const TSharedPtr<FFillControlsHandler>& InFillControlsHandler, const TSharedPtr<PCGExClusters::FCluster>& InCluster, const PCGExClusters::FNode* InSeedNode)
-		: FillControlsHandler(InFillControlsHandler), SeedNode(InSeedNode), Cluster(InCluster)
+		: FillControlsHandler(InFillControlsHandler)
+		  , SeedNode(InSeedNode)
+		  , Cluster(InCluster)
 	{
 		TravelStack = MakeShared<PCGEx::FHashLookupMap>(0, 0);
 
@@ -76,7 +78,10 @@ namespace PCGExFloodFill
 			const int32 OtherIndex = OtherNode->Index;
 
 			// Fast array lookup instead of TSet hash lookup
-			if (Visited[OtherIndex]) { continue; }
+			if (Visited[OtherIndex])
+			{
+				continue;
+			}
 			Visited[OtherIndex] = true;
 
 			FVector OtherPosition = Cluster->GetPos(OtherNode);
@@ -105,7 +110,10 @@ namespace PCGExFloodFill
 
 	void FDiffusion::Grow()
 	{
-		if (bStopped) { return; }
+		if (bStopped)
+		{
+			return;
+		}
 
 		bool bSearch = true;
 		while (bSearch)
@@ -120,7 +128,10 @@ namespace PCGExFloodFill
 			FCandidate Candidate;
 			Candidates.HeapPop(Candidate, HeapComparator, EAllowShrinking::No);
 
-			if (!FillControlsHandler->TryCapture(this, Candidate)) { continue; }
+			if (!FillControlsHandler->TryCapture(this, Candidate))
+			{
+				continue;
+			}
 
 			// Update max depth & max distance
 			MaxDepth = FMath::Max(MaxDepth, Candidate.Depth);
@@ -172,7 +183,11 @@ namespace PCGExFloodFill
 	}
 
 	FFillControlsHandler::FFillControlsHandler(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataCache, const TSharedPtr<PCGExData::FFacade>& InEdgeDataCache, const TSharedPtr<PCGExData::FFacade>& InSeedsDataCache, const TArray<TObjectPtr<const UPCGExFillControlsFactoryData>>& InFactories)
-		: ExecutionContext(InContext), Cluster(InCluster), VtxDataFacade(InVtxDataCache), EdgeDataFacade(InEdgeDataCache), SeedsDataFacade(InSeedsDataCache)
+		: ExecutionContext(InContext)
+		  , Cluster(InCluster)
+		  , VtxDataFacade(InVtxDataCache)
+		  , EdgeDataFacade(InEdgeDataCache)
+		  , SeedsDataFacade(InSeedsDataCache)
 	{
 		bIsValidHandler = BuildFrom(InContext, InFactories);
 	}
@@ -190,13 +205,28 @@ namespace PCGExFloodFill
 			for (const TObjectPtr<const UPCGExFillControlsFactoryData>& Factory : InFactories)
 			{
 				TSharedPtr<FPCGExFillControlOperation> Op = Factory->CreateOperation(InContext);
-				if (!Op) { return false; }
+				if (!Op)
+				{
+					return false;
+				}
 
 				Operations.Add(Op);
-				if (Op->DoesScoring()) { SubOpsScoring.Add(Op); }
-				if (Op->ChecksProbe()) { SubOpsProbe.Add(Op); }
-				if (Op->ChecksCandidate()) { SubOpsCandidate.Add(Op); }
-				if (Op->ChecksCapture()) { SubOpsCapture.Add(Op); }
+				if (Op->DoesScoring())
+				{
+					SubOpsScoring.Add(Op);
+				}
+				if (Op->ChecksProbe())
+				{
+					SubOpsProbe.Add(Op);
+				}
+				if (Op->ChecksCandidate())
+				{
+					SubOpsCandidate.Add(Op);
+				}
+				if (Op->ChecksCapture())
+				{
+					SubOpsCapture.Add(Op);
+				}
 			}
 		}
 
@@ -232,7 +262,10 @@ namespace PCGExFloodFill
 		for (const TSharedPtr<FPCGExFillControlOperation>& Op : Operations)
 		{
 			Op->SettingsIndex = Op->Factory->ConfigBase.Source == EPCGExFloodFillSettingSource::Seed ? SeedIndices : SeedNodeIndices;
-			if (!Op->PrepareForDiffusions(ExecutionContext, ThisPtr)) { return false; }
+			if (!Op->PrepareForDiffusions(ExecutionContext, ThisPtr))
+			{
+				return false;
+			}
 		}
 
 		return true;
@@ -248,20 +281,41 @@ namespace PCGExFloodFill
 
 	bool FFillControlsHandler::TryCapture(const FDiffusion* Diffusion, const FCandidate& Candidate)
 	{
-		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsCapture) { if (!Op->IsValidCapture(Diffusion, Candidate)) { return false; } }
-		if (FPlatformAtomics::InterlockedCompareExchange((InfluencesCount->GetData() + Candidate.Node->PointIndex), 1, 0) == 1) { return false; }
+		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsCapture)
+		{
+			if (!Op->IsValidCapture(Diffusion, Candidate))
+			{
+				return false;
+			}
+		}
+		if (FPlatformAtomics::InterlockedCompareExchange((InfluencesCount->GetData() + Candidate.Node->PointIndex), 1, 0) == 1)
+		{
+			return false;
+		}
 		return true;
 	}
 
 	bool FFillControlsHandler::IsValidProbe(const FDiffusion* Diffusion, const FCandidate& Candidate)
 	{
-		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsProbe) { if (!Op->IsValidProbe(Diffusion, Candidate)) { return false; } }
+		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsProbe)
+		{
+			if (!Op->IsValidProbe(Diffusion, Candidate))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
 	bool FFillControlsHandler::IsValidCandidate(const FDiffusion* Diffusion, const FCandidate& From, const FCandidate& Candidate)
 	{
-		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsCandidate) { if (!Op->IsValidCandidate(Diffusion, From, Candidate)) { return false; } }
+		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsCandidate)
+		{
+			if (!Op->IsValidCandidate(Diffusion, From, Candidate))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -290,10 +344,16 @@ namespace PCGExFloodFill
 		const EPCGExFloodFillNormalizedPathDepthMode Mode,
 		const TArray<double>* CascadeValues)
 	{
-		if (NormalizedPathDepthName == NAME_None || !DiffusionDepths || PathIndices.IsEmpty()) { return; }
+		if (NormalizedPathDepthName == NAME_None || !DiffusionDepths || PathIndices.IsEmpty())
+		{
+			return;
+		}
 
 		TSharedPtr<PCGExData::TBuffer<double>> NormBuffer = PathFacade->GetWritable<double>(FPCGAttributeIdentifier(NormalizedPathDepthName), 0.0, true, PCGExData::EBufferInit::New);
-		if (!NormBuffer) { return; }
+		if (!NormBuffer)
+		{
+			return;
+		}
 
 		const TArray<int32>& Depths = *DiffusionDepths;
 
@@ -322,20 +382,20 @@ namespace PCGExFloodFill
 			break;
 
 		case EPCGExFloodFillNormalizedPathDepthMode::Partition:
+		{
+			const int32 MinDepth = Depths[PathIndices[0]];
+			const int32 MaxDepth = Depths[PathIndices.Last()];
+			const int32 Range = MaxDepth - MinDepth;
+			if (Range > 0)
 			{
-				const int32 MinDepth = Depths[PathIndices[0]];
-				const int32 MaxDepth = Depths[PathIndices.Last()];
-				const int32 Range = MaxDepth - MinDepth;
-				if (Range > 0)
+				const double InvRange = 1.0 / static_cast<double>(Range);
+				for (int32 i = 0; i < PathIndices.Num(); i++)
 				{
-					const double InvRange = 1.0 / static_cast<double>(Range);
-					for (int32 i = 0; i < PathIndices.Num(); i++)
-					{
-						NormBuffer->SetValue(i, static_cast<double>(Depths[PathIndices[i]] - MinDepth) * InvRange);
-					}
+					NormBuffer->SetValue(i, static_cast<double>(Depths[PathIndices[i]] - MinDepth) * InvRange);
 				}
 			}
-			break;
+		}
+		break;
 
 		case EPCGExFloodFillNormalizedPathDepthMode::Cascade:
 			if (CascadeValues)
@@ -375,7 +435,10 @@ namespace PCGExFloodFill
 			}
 		}
 
-		if (PathIndices.Num() < 2) { return; }
+		if (PathIndices.Num() < 2)
+		{
+			return;
+		}
 
 		Algo::Reverse(PathIndices);
 
@@ -395,7 +458,7 @@ namespace PCGExFloodFill
 		WriteNormalizedPathDepth(PathFacade, PathIndices, EndpointDepth, MaxDiffusionDepth, NormalizedPathDepthName, NormalizedPathDepthMode);
 
 		PCGExClusters::Helpers::CleanupClusterData(PathIO);
-		
+
 		PathFacade->WriteFastest(TaskManager);
 		SeedTags.Tag(SeedsDataFacade->GetInPoint(Diffusion.SeedIndex), PathIO);
 
@@ -413,7 +476,10 @@ namespace PCGExFloodFill
 		const TSharedRef<PCGExData::FFacade>& SeedsDataFacade,
 		const TArray<double>* CascadeValues)
 	{
-		if (PathIndices.Num() < 2) { return; }
+		if (PathIndices.Num() < 2)
+		{
+			return;
+		}
 
 		Algo::Reverse(PathIndices);
 

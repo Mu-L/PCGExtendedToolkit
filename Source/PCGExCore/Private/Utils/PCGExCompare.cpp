@@ -7,8 +7,8 @@
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataCommon.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Data/PCGExDataTags.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Math/PCGExMath.h"
 
@@ -18,15 +18,24 @@ namespace PCGExCompare
 	{
 		switch (Comparison)
 		{
-		case EPCGExComparison::StrictlyEqual: return " == ";
-		case EPCGExComparison::StrictlyNotEqual: return " != ";
-		case EPCGExComparison::EqualOrGreater: return " >= ";
-		case EPCGExComparison::EqualOrSmaller: return " <= ";
-		case EPCGExComparison::StrictlyGreater: return " > ";
-		case EPCGExComparison::StrictlySmaller: return " < ";
-		case EPCGExComparison::NearlyEqual: return " ~= ";
-		case EPCGExComparison::NearlyNotEqual: return " !~= ";
-		default: return " ?? ";
+		case EPCGExComparison::StrictlyEqual:
+			return " == ";
+		case EPCGExComparison::StrictlyNotEqual:
+			return " != ";
+		case EPCGExComparison::EqualOrGreater:
+			return " >= ";
+		case EPCGExComparison::EqualOrSmaller:
+			return " <= ";
+		case EPCGExComparison::StrictlyGreater:
+			return " > ";
+		case EPCGExComparison::StrictlySmaller:
+			return " < ";
+		case EPCGExComparison::NearlyEqual:
+			return " ~= ";
+		case EPCGExComparison::NearlyNotEqual:
+			return " !~= ";
+		default:
+			return " ?? ";
 		}
 	}
 
@@ -34,21 +43,36 @@ namespace PCGExCompare
 	{
 		switch (Comparison)
 		{
-		case EPCGExStringComparison::StrictlyEqual: return " == ";
-		case EPCGExStringComparison::StrictlyNotEqual: return " != ";
-		case EPCGExStringComparison::LengthStrictlyEqual: return " L == L ";
-		case EPCGExStringComparison::LengthStrictlyUnequal: return " L != L ";
-		case EPCGExStringComparison::LengthEqualOrGreater: return " L >= L ";
-		case EPCGExStringComparison::LengthEqualOrSmaller: return " L <= L ";
-		case EPCGExStringComparison::StrictlyGreater: return " L > L ";
-		case EPCGExStringComparison::StrictlySmaller: return " L < L ";
-		case EPCGExStringComparison::LocaleStrictlyGreater: return " > ";
-		case EPCGExStringComparison::LocaleStrictlySmaller: return " < ";
-		case EPCGExStringComparison::Contains: return " contains ";
-		case EPCGExStringComparison::StartsWith: return " starts with ";
-		case EPCGExStringComparison::EndsWith: return " ends with ";
-		case EPCGExStringComparison::Matches: return " matches ";
-		default: return " ?? ";
+		case EPCGExStringComparison::StrictlyEqual:
+			return " == ";
+		case EPCGExStringComparison::StrictlyNotEqual:
+			return " != ";
+		case EPCGExStringComparison::LengthStrictlyEqual:
+			return " L == L ";
+		case EPCGExStringComparison::LengthStrictlyUnequal:
+			return " L != L ";
+		case EPCGExStringComparison::LengthEqualOrGreater:
+			return " L >= L ";
+		case EPCGExStringComparison::LengthEqualOrSmaller:
+			return " L <= L ";
+		case EPCGExStringComparison::StrictlyGreater:
+			return " L > L ";
+		case EPCGExStringComparison::StrictlySmaller:
+			return " L < L ";
+		case EPCGExStringComparison::LocaleStrictlyGreater:
+			return " > ";
+		case EPCGExStringComparison::LocaleStrictlySmaller:
+			return " < ";
+		case EPCGExStringComparison::Contains:
+			return " contains ";
+		case EPCGExStringComparison::StartsWith:
+			return " starts with ";
+		case EPCGExStringComparison::EndsWith:
+			return " ends with ";
+		case EPCGExStringComparison::Matches:
+			return " matches ";
+		default:
+			return " ?? ";
 		}
 	}
 
@@ -56,12 +80,18 @@ namespace PCGExCompare
 	{
 		switch (MatchMode)
 		{
-		case EPCGExStringMatchMode::Equals: return " == ";
-		case EPCGExStringMatchMode::Contains: return " contains ";
-		case EPCGExStringMatchMode::StartsWith: return " starts w ";
-		case EPCGExStringMatchMode::EndsWith: return " ends w ";
-		case EPCGExStringMatchMode::Matches: return " matches w ";
-		default: return " ?? ";
+		case EPCGExStringMatchMode::Equals:
+			return " == ";
+		case EPCGExStringMatchMode::Contains:
+			return " contains ";
+		case EPCGExStringMatchMode::StartsWith:
+			return " starts w ";
+		case EPCGExStringMatchMode::EndsWith:
+			return " ends w ";
+		case EPCGExStringMatchMode::Matches:
+			return " matches w ";
+		default:
+			return " ?? ";
 		}
 	}
 
@@ -69,21 +99,36 @@ namespace PCGExCompare
 	{
 		switch (Method)
 		{
-		case EPCGExStringComparison::StrictlyEqual: return A == B;
-		case EPCGExStringComparison::StrictlyNotEqual: return A != B;
-		case EPCGExStringComparison::LengthStrictlyEqual: return A.Len() == B.Len();
-		case EPCGExStringComparison::LengthStrictlyUnequal: return A.Len() != B.Len();
-		case EPCGExStringComparison::LengthEqualOrGreater: return A.Len() >= B.Len();
-		case EPCGExStringComparison::LengthEqualOrSmaller: return A.Len() <= B.Len();
-		case EPCGExStringComparison::StrictlyGreater: return A.Len() > B.Len();
-		case EPCGExStringComparison::StrictlySmaller: return A.Len() < B.Len();
-		case EPCGExStringComparison::LocaleStrictlyGreater: return A > B;
-		case EPCGExStringComparison::LocaleStrictlySmaller: return A < B;
-		case EPCGExStringComparison::Contains: return A.Contains(B);
-		case EPCGExStringComparison::StartsWith: return A.StartsWith(B);
-		case EPCGExStringComparison::EndsWith: return A.EndsWith(B);
-		case EPCGExStringComparison::Matches: return A.MatchesWildcard(B);
-		default: return false;
+		case EPCGExStringComparison::StrictlyEqual:
+			return A == B;
+		case EPCGExStringComparison::StrictlyNotEqual:
+			return A != B;
+		case EPCGExStringComparison::LengthStrictlyEqual:
+			return A.Len() == B.Len();
+		case EPCGExStringComparison::LengthStrictlyUnequal:
+			return A.Len() != B.Len();
+		case EPCGExStringComparison::LengthEqualOrGreater:
+			return A.Len() >= B.Len();
+		case EPCGExStringComparison::LengthEqualOrSmaller:
+			return A.Len() <= B.Len();
+		case EPCGExStringComparison::StrictlyGreater:
+			return A.Len() > B.Len();
+		case EPCGExStringComparison::StrictlySmaller:
+			return A.Len() < B.Len();
+		case EPCGExStringComparison::LocaleStrictlyGreater:
+			return A > B;
+		case EPCGExStringComparison::LocaleStrictlySmaller:
+			return A < B;
+		case EPCGExStringComparison::Contains:
+			return A.Contains(B);
+		case EPCGExStringComparison::StartsWith:
+			return A.StartsWith(B);
+		case EPCGExStringComparison::EndsWith:
+			return A.EndsWith(B);
+		case EPCGExStringComparison::Matches:
+			return A.MatchesWildcard(B);
+		default:
+			return false;
 		}
 	}
 
@@ -91,24 +136,36 @@ namespace PCGExCompare
 	{
 		switch (Method)
 		{
-		case EPCGExStringMatchMode::Equals: return A == B;
-		case EPCGExStringMatchMode::Contains: return A.Contains(B);
-		case EPCGExStringMatchMode::StartsWith: return A.StartsWith(B);
-		case EPCGExStringMatchMode::EndsWith: return A.EndsWith(B);
-		case EPCGExStringMatchMode::Matches: return A.MatchesWildcard(B);
-		default: return false;
+		case EPCGExStringMatchMode::Equals:
+			return A == B;
+		case EPCGExStringMatchMode::Contains:
+			return A.Contains(B);
+		case EPCGExStringMatchMode::StartsWith:
+			return A.StartsWith(B);
+		case EPCGExStringMatchMode::EndsWith:
+			return A.EndsWith(B);
+		case EPCGExStringMatchMode::Matches:
+			return A.MatchesWildcard(B);
+		default:
+			return false;
 		}
 	}
 
 	bool Compare(const EPCGExComparison Method, const TSharedPtr<PCGExData::IDataValue>& A, const double B, const double Tolerance)
 	{
-		if (!A->IsNumeric()) { return false; }
+		if (!A->IsNumeric())
+		{
+			return false;
+		}
 		return Compare(Method, A->AsDouble(), B, Tolerance);
 	}
 
 	bool Compare(const EPCGExStringComparison Method, const TSharedPtr<PCGExData::IDataValue>& A, const FString B)
 	{
-		if (!A->IsText()) { return false; }
+		if (!A->IsText())
+		{
+			return false;
+		}
 		return Compare(Method, A->AsString(), B);
 	}
 
@@ -118,12 +175,18 @@ namespace PCGExCompare
 		{
 			for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : InTags->ValueTags)
 			{
-				if (Compare(MatchMode, Pair.Key, Query)) { return true; }
+				if (Compare(MatchMode, Pair.Key, Query))
+				{
+					return true;
+				}
 			}
 
 			for (const FString& Tag : InTags->RawTags)
 			{
-				if (Compare(MatchMode, Tag, Query)) { return true; }
+				if (Compare(MatchMode, Tag, Query))
+				{
+					return true;
+				}
 			}
 		}
 		else
@@ -131,7 +194,10 @@ namespace PCGExCompare
 			TArray<FString> FlattenedTags = InTags->FlattenToArray();
 			for (const FString& Tag : FlattenedTags)
 			{
-				if (Compare(MatchMode, Tag, Query)) { return true; }
+				if (Compare(MatchMode, Tag, Query))
+				{
+					return true;
+				}
 			}
 		}
 
@@ -142,7 +208,10 @@ namespace PCGExCompare
 	{
 		for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : InTags->ValueTags)
 		{
-			if (Compare(MatchMode, Pair.Key, Query)) { OutValues.Add(Pair.Value); }
+			if (Compare(MatchMode, Pair.Key, Query))
+			{
+				OutValues.Add(Pair.Value);
+			}
 		}
 
 		return !OutValues.IsEmpty();
@@ -154,7 +223,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExVectorHashComparisonDetails, Tolerance, double, H
 bool FPCGExVectorHashComparisonDetails::Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InPrimaryDataFacade, const bool bQuiet)
 {
 	Tolerance = GetValueSettingTolerance(bQuiet);
-	if (!Tolerance->Init(InPrimaryDataFacade, false)) { return false; }
+	if (!Tolerance->Init(InPrimaryDataFacade, false))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -224,17 +296,29 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExDotComparisonDetails, Threshold, double, Threshol
 bool FPCGExDotComparisonDetails::Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InPrimaryDataCache, const bool bQuiet)
 {
 	ThresholdGetter = GetValueSettingThreshold(bQuiet);
-	if (!ThresholdGetter->Init(InPrimaryDataCache, false)) { return false; }
+	if (!ThresholdGetter->Init(InPrimaryDataCache, false))
+	{
+		return false;
+	}
 
-	if (Domain == EPCGExAngularDomain::Degrees) { ComparisonTolerance = (1 + PCGExMath::DegreesToDot(180 - DegreesTolerance)) * 0.5; }
-	else { ComparisonTolerance = DotTolerance; }
+	if (Domain == EPCGExAngularDomain::Degrees)
+	{
+		ComparisonTolerance = (1 + PCGExMath::DegreesToDot(180 - DegreesTolerance)) * 0.5;
+	}
+	else
+	{
+		ComparisonTolerance = DotTolerance;
+	}
 
 	return true;
 }
 
 double FPCGExDotComparisonDetails::GetComparisonThreshold(const int32 PointIndex) const
 {
-	if (Domain == EPCGExAngularDomain::Scalar) { return ThresholdGetter->Read(PointIndex); }
+	if (Domain == EPCGExAngularDomain::Scalar)
+	{
+		return ThresholdGetter->Read(PointIndex);
+	}
 	return PCGExMath::DegreesToDot(180 - ThresholdGetter->Read(PointIndex));
 }
 
@@ -250,7 +334,10 @@ bool FPCGExDotComparisonDetails::Test(const double A, const int32 Index) const
 
 void FPCGExDotComparisonDetails::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
-	if (ThresholdInput == EPCGExInputValueType::Attribute) { FacadePreloader.Register<double>(InContext, ThresholdAttribute); }
+	if (ThresholdInput == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<double>(InContext, ThresholdAttribute);
+	}
 }
 
 void FPCGExDotComparisonDetails::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
@@ -270,8 +357,14 @@ FString FPCGExDotComparisonDetails::GetDisplayComparison() const
 	FString AngleStr = ThresholdInput == EPCGExInputValueType::Attribute ? PCGExMetaHelpers::GetSelectorDisplayName(ThresholdAttribute) : TEXT("");
 	if (ThresholdInput == EPCGExInputValueType::Constant)
 	{
-		if (Domain == EPCGExAngularDomain::Degrees) { AngleStr = FString::Printf(TEXT("%.1f°"), DegreesConstant); }
-		else { AngleStr = FString::Printf(TEXT("%.1f°"), FMath::RadiansToDegrees(FMath::Acos(DotConstant))); }
+		if (Domain == EPCGExAngularDomain::Degrees)
+		{
+			AngleStr = FString::Printf(TEXT("%.1f°"), DegreesConstant);
+		}
+		else
+		{
+			AngleStr = FString::Printf(TEXT("%.1f°"), FMath::RadiansToDegrees(FMath::Acos(DotConstant)));
+		}
 	}
 
 	FString Str = PCGExCompare::ToString(Comparison) + (bUnsignedComparison ? TEXT("±") : TEXT("")) + AngleStr;

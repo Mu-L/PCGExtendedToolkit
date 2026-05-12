@@ -5,12 +5,12 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExRoamingAssetCollectionDetails.h"
 #include "Details/PCGExSocketOutputDetails.h"
 #include "Details/PCGExStagedTypeFilterDetails.h"
 #include "Details/PCGExStagingDetails.h"
+#include "Factories/PCGExFactories.h"
 #include "Fitting/PCGExFitting.h"
 
 #include "PCGExStagingDistribute.generated.h"
@@ -64,19 +64,34 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR	
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AssetStaging, "Staging : Distribute", "Distribute PCGEx Asset Collection entries to points.", FName(GetDisplayName()));
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Sampler; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
-	virtual bool CanDynamicallyTrackKeys() const override { return true; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Sampler;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
+
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
-	
+
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
 
 protected:
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 	virtual FPCGElementPtr CreateElement() const override;
 	virtual void InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const override;
@@ -203,7 +218,7 @@ struct FPCGExAssetStagingContext final : FPCGExPointsProcessorContext
 	friend class FPCGExAssetStagingElement;
 
 	virtual void RegisterAssetDependencies() override;
-	
+
 	EPCGExStagingOutputMode OutputMode = EPCGExStagingOutputMode::CollectionMap;
 
 	TSharedPtr<PCGEx::TAssetLoader<UPCGExAssetCollection>> CollectionsLoader;

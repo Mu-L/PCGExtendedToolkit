@@ -3,10 +3,10 @@
 
 #include "Helpers/PCGExCollectionPropertySetWriter.h"
 
+#include "PCGExProperty.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExContext.h"
 #include "Metadata/PCGMetadata.h"
-#include "PCGExProperty.h"
 
 namespace PCGExCollections
 {
@@ -14,7 +14,10 @@ namespace PCGExCollections
 	{
 		for (const UPCGExAssetCollection* Collection : Collections)
 		{
-			if (!Collection) { continue; }
+			if (!Collection)
+			{
+				continue;
+			}
 			if (const FInstancedStruct* Found = Collection->CollectionProperties.GetPropertyByName(PropertyName);
 				Found && Found->IsValid())
 			{
@@ -54,34 +57,52 @@ namespace PCGExCollections
 	{
 		Writers.Reset();
 
-		if (!Metadata || !OutputSettings.HasOutputs()) { return false; }
+		if (!Metadata || !OutputSettings.HasOutputs())
+		{
+			return false;
+		}
 
 		// Build a flat search list: root + fallback hosts (skipping dupes of the root).
 		TArray<const UPCGExAssetCollection*> SearchOrder;
 		SearchOrder.Reserve(FallbackHosts.Num() + 1);
-		if (RootCollection) { SearchOrder.Add(RootCollection); }
+		if (RootCollection)
+		{
+			SearchOrder.Add(RootCollection);
+		}
 		for (const UPCGExAssetCollection* Host : FallbackHosts)
 		{
-			if (Host && Host != RootCollection) { SearchOrder.Add(Host); }
+			if (Host && Host != RootCollection)
+			{
+				SearchOrder.Add(Host);
+			}
 		}
 
 		for (const FPCGExPropertyOutputConfig& Config : OutputSettings.Configs)
 		{
-			if (!Config.IsValid()) { continue; }
+			if (!Config.IsValid())
+			{
+				continue;
+			}
 
 			const FName OutputName = Config.GetEffectiveOutputName();
-			if (OutputName.IsNone()) { continue; }
+			if (OutputName.IsNone())
+			{
+				continue;
+			}
 
 			const FInstancedStruct* Prototype = FindPrototypeProperty(Config.PropertyName, SearchOrder);
 			if (!Prototype)
 			{
 				PCGE_LOG_C(Warning, GraphAndLog, InContext,
-					FText::FromString(FString::Printf(TEXT("Property '%s' not found in collection schema."), *Config.PropertyName.ToString())));
+				           FText::FromString(FString::Printf(TEXT("Property '%s' not found in collection schema."), *Config.PropertyName.ToString())));
 				continue;
 			}
 
 			const FPCGExProperty* PrototypeProp = Prototype->GetPtr<FPCGExProperty>();
-			if (!PrototypeProp || !PrototypeProp->SupportsOutput()) { continue; }
+			if (!PrototypeProp || !PrototypeProp->SupportsOutput())
+			{
+				continue;
+			}
 
 			FWriter& Writer = Writers.Emplace_GetRef();
 			Writer.PropertyName = Config.PropertyName;
@@ -92,7 +113,10 @@ namespace PCGExCollections
 				Writer.Attribute = MutableWriter->CreateMetadataAttribute(Metadata, OutputName);
 			}
 
-			if (!Writer.Attribute) { Writers.Pop(EAllowShrinking::No); }
+			if (!Writer.Attribute)
+			{
+				Writers.Pop(EAllowShrinking::No);
+			}
 		}
 
 		return HasOutputs();
@@ -100,19 +124,31 @@ namespace PCGExCollections
 
 	void FPCGExCollectionPropertySetWriter::WriteEntry(const int64 Key, const FPCGExAssetCollectionEntry* Entry, const UPCGExAssetCollection* Host)
 	{
-		if (Writers.IsEmpty()) { return; }
+		if (Writers.IsEmpty())
+		{
+			return;
+		}
 
 		for (FWriter& Writer : Writers)
 		{
 			const FInstancedStruct* Source = ResolveEntrySourceProperty(Entry, Host, Writer.PropertyName);
-			if (!Source) { continue; }
+			if (!Source)
+			{
+				continue;
+			}
 
 			const FPCGExProperty* SourceProp = Source->GetPtr<FPCGExProperty>();
 			FPCGExProperty* WriterProp = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>();
-			if (!SourceProp || !WriterProp) { continue; }
+			if (!SourceProp || !WriterProp)
+			{
+				continue;
+			}
 
 			// Only copy when source and writer have matching concrete types.
-			if (Source->GetScriptStruct() != Writer.WriterInstance.GetScriptStruct()) { continue; }
+			if (Source->GetScriptStruct() != Writer.WriterInstance.GetScriptStruct())
+			{
+				continue;
+			}
 
 			WriterProp->CopyValueFrom(SourceProp);
 			WriterProp->WriteMetadataValue(Writer.Attribute, Key);

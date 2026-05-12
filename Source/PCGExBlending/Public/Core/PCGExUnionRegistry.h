@@ -31,7 +31,10 @@ namespace PCGExData
 			int32 FuseCount = 0;
 			int32 RepIndex = -1;
 
-			FORCEINLINE FVector GetCenter() const { return CenterAccum / static_cast<double>(FuseCount); }
+			FORCEINLINE FVector GetCenter() const
+			{
+				return CenterAccum / static_cast<double>(FuseCount);
+			}
 
 			FORCEINLINE void Accumulate(const FVector& Position)
 			{
@@ -55,10 +58,20 @@ namespace PCGExData
 		// running Center and returns its RepIndex. On miss, inserts a new rep and returns its index.
 		int32 FindOrInsert(const FConstPoint& Point, const FPCGExFuseDetails& FuseDetails);
 
-		FORCEINLINE int32 Num() const { return Reps.Num(); }
-		FORCEINLINE const FRep& Get(const int32 RepIndex) const { return Reps[RepIndex]; }
+		FORCEINLINE int32 Num() const
+		{
+			return Reps.Num();
+		}
 
-		void Reserve(const int32 ExpectedNum) { Reps.Reserve(ExpectedNum); }
+		FORCEINLINE const FRep& Get(const int32 RepIndex) const
+		{
+			return Reps[RepIndex];
+		}
+
+		void Reserve(const int32 ExpectedNum)
+		{
+			Reps.Reserve(ExpectedNum);
+		}
 
 	private:
 		TArray<FRep> Reps;
