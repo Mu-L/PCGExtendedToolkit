@@ -6,10 +6,13 @@
 #include "Collections/PCGExActorCollection.h"
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExMeshCollection.h"
+#include "Collections/PCGExSkinnedMeshCollection.h"
 #include "Details/Collections/PCGExActorCollectionActions.h"
 #include "Details/Collections/PCGExLevelCollectionActions.h"
 #include "Details/Collections/PCGExMeshCollectionActions.h"
+#include "Details/Collections/PCGExSkinnedMeshCollectionActions.h"
 #include "Engine/Blueprint.h"
+#include "Engine/SkinnedAsset.h"
 #include "Engine/World.h"
 #include "Misc/ScopedSlowTask.h"
 
@@ -35,6 +38,9 @@ namespace PCGExCollectionsEditorMenuUtils
 		TArray<FAssetData> TempStaticMeshes;
 		TArray<TObjectPtr<UPCGExMeshCollection>> TempMeshCollections;
 
+		TArray<FAssetData> TempSkinnedAssets;
+		TArray<TObjectPtr<UPCGExSkinnedMeshCollection>> TempSkinnedCollections;
+
 		TArray<FAssetData> TempActorAssets;
 		TArray<TObjectPtr<UPCGExActorCollection>> TempActorCollections;
 
@@ -54,6 +60,23 @@ namespace PCGExCollectionsEditorMenuUtils
 				if (UPCGExMeshCollection* Collection = TSoftObjectPtr<UPCGExMeshCollection>(Asset.GetSoftObjectPath()).LoadSynchronous())
 				{
 					TempMeshCollections.Add(Collection);
+				}
+
+				continue;
+			}
+
+			// Filter on USkinnedAsset to catch skeletal meshes and any other engine-shipped subclass.
+			if (Asset.IsInstanceOf<USkinnedAsset>())
+			{
+				TempSkinnedAssets.Add(Asset);
+				continue;
+			}
+
+			if (Asset.IsInstanceOf<UPCGExSkinnedMeshCollection>())
+			{
+				if (UPCGExSkinnedMeshCollection* Collection = TSoftObjectPtr<UPCGExSkinnedMeshCollection>(Asset.GetSoftObjectPath()).LoadSynchronous())
+				{
+					TempSkinnedCollections.Add(Collection);
 				}
 
 				continue;
@@ -90,20 +113,22 @@ namespace PCGExCollectionsEditorMenuUtils
 			}
 		}
 
-		if (TempStaticMeshes.IsEmpty() && TempActorAssets.IsEmpty() && TempLevelAssets.IsEmpty())
+		if (TempStaticMeshes.IsEmpty() && TempSkinnedAssets.IsEmpty() && TempActorAssets.IsEmpty() && TempLevelAssets.IsEmpty())
 		{
 			return;
 		}
 
 		FToolMenuSection& Section = CreatePCGExSection(Menu);
 
-		if (!TempStaticMeshes.IsEmpty() || !TempActorAssets.IsEmpty() || !TempLevelAssets.IsEmpty())
+		if (!TempStaticMeshes.IsEmpty() || !TempSkinnedAssets.IsEmpty() || !TempActorAssets.IsEmpty() || !TempLevelAssets.IsEmpty())
 		{
 			FToolUIAction UIAction;
 			UIAction.ExecuteAction.BindLambda(
 				[
 					Meshes = MoveTemp(TempStaticMeshes),
 					MeshCollections = MoveTemp(TempMeshCollections),
+					Skinned = MoveTemp(TempSkinnedAssets),
+					SkinnedCollections = MoveTemp(TempSkinnedCollections),
 					Actors = MoveTemp(TempActorAssets),
 					ActorCollections = MoveTemp(TempActorCollections),
 					Levels = MoveTemp(TempLevelAssets),
@@ -118,6 +143,15 @@ namespace PCGExCollectionsEditorMenuUtils
 					else
 					{
 						PCGExMeshCollectionActions::UpdateCollectionsFrom(MeshCollections, Meshes);
+					}
+
+					if (SkinnedCollections.IsEmpty())
+					{
+						PCGExSkinnedMeshCollectionActions::CreateCollectionFrom(Skinned);
+					}
+					else
+					{
+						PCGExSkinnedMeshCollectionActions::UpdateCollectionsFrom(SkinnedCollections, Skinned);
 					}
 
 					if (ActorCollections.IsEmpty())

@@ -23,6 +23,7 @@
 #include "Details/Collections/PCGExMaterialPicksCustomization.h"
 #include "Details/Collections/PCGExMeshCollectionActions.h"
 #include "Details/Collections/PCGExPCGDataAssetCollectionActions.h"
+#include "Details/Collections/PCGExSkinnedMeshCollectionActions.h"
 #include "UObject/UObjectGlobals.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExCollectionsEditorModule"
