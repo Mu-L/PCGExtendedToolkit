@@ -57,10 +57,12 @@ protected:
 
 #define PCGEX_FOREACH_ENTRY_TYPE(MACRO)\
 MACRO(Mesh, "StaticMesh")\
+MACRO(SkinnedMesh, "SkinnedAsset")\
 MACRO(Level, "Level")
 
 #define PCGEX_FOREACH_ENTRY_TYPE_ALL(MACRO)\
 MACRO(Mesh, "StaticMesh")\
+MACRO(SkinnedMesh, "SkinnedAsset")\
 MACRO(Actor, "Actor")\
 MACRO(PCGDataAsset, "DataAsset")\
 MACRO(Level, "Level")

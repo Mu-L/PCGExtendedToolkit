@@ -9,12 +9,7 @@
 #include "Core/PCGExContext.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Math/PCGExProjectionDetails.h"
-
-#if PCGEX_ENGINE_VERSION > 506
 #include "PCGPointPropertiesTraits.h"
-#else
-#include "PCGCommon.h"
-#endif
 
 namespace PCGExData
 {
