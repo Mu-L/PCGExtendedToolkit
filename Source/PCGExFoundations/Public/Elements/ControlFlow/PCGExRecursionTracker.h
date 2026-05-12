@@ -73,11 +73,7 @@ public:
 	virtual bool HasDynamicPins() const override;
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 
-#if PCGEX_ENGINE_VERSION < 507
-	virtual EPCGDataType GetCurrentPinTypes(const UPCGPin* InPin) const override;
-#else
 	virtual FPCGDataTypeIdentifier GetCurrentPinTypesID(const UPCGPin* InPin) const override;
-#endif
 
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;

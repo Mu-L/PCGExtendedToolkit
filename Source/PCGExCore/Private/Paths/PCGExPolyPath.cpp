@@ -13,10 +13,7 @@ PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Math/PCGExBestFitPlane.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
-
-#if PCGEX_ENGINE_VERSION > 506
 #include "Data/PCGPolygon2DData.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "PCGExPaths"
 #define PCGEX_NAMESPACE PCGExPaths
@@ -97,7 +94,6 @@ namespace PCGExPaths
 		this->BuildPath(Expansion);
 	}
 
-#if PCGEX_ENGINE_VERSION > 506
 	FPolyPath::FPolyPath(const UPCGPolygon2DData* PolygonData, const FPCGExGeo2DProjectionDetails& InProjection, const double Expansion, const double ExpansionZ, const EPCGExWindingMutation WindingMutation)
 	{
 		const UE::Geometry::TPolygon2<double>& Polygon = PolygonData->GetPolygon().GetOuter();
@@ -131,7 +127,6 @@ namespace PCGExPaths
 		// Need to force-build path post initializations
 		this->BuildPath(Expansion);
 	}
-#endif
 
 	void FPolyPath::InitFromTransforms(const EPCGExWindingMutation WindingMutation)
 	{

@@ -3,119 +3,39 @@
 
 #include "Details/Collections/PCGExSkinnedMeshCollectionActions.h"
 
-#include "FileHelpers.h"
-#include "ToolMenuSection.h"
-#include "AssetRegistry/AssetRegistryModule.h"
 #include "Collections/PCGExSkinnedMeshCollection.h"
-#include "Details/Collections/PCGExAssetCollectionEditor.h"
+#include "Details/Collections/PCGExCollectionEditorHelpers.h"
+#include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
 #include "Details/Collections/PCGExSkinnedMeshCollectionEditor.h"
-#include "Misc/MessageDialog.h"
-#include "UObject/Package.h"
-#include "UObject/UObjectGlobals.h"
-#include "Widgets/Views/SListView.h"
+#include "Engine/SkinnedAsset.h"
+
+PCGEX_REGISTER_COLLECTION_EDITOR_TYPE(
+	SkinnedMesh,
+	UPCGExSkinnedMeshCollection,
+	USkinnedAsset,
+	"SMC_NewSkinnedMeshCollection",
+	FLinearColor(FColor(0, 255, 255)),
+	"Skinned Mesh Collection",
+	"A weighted collection of skinned meshes with optional material overrides.",
+	FPCGExSkinnedMeshCollectionEditor)
 
 namespace PCGExSkinnedMeshCollectionActions
 {
 	void CreateCollectionFrom(const TArray<FAssetData>& SelectedAssets)
 	{
-		if (SelectedAssets.IsEmpty())
-		{
-			return;
-		}
-
-		FString CollectionAssetName = TEXT("SMC_NewSkinnedMeshCollection");
-		FString CollectionAssetPath = SelectedAssets[0].PackagePath.ToString();
-		FString PackageName = FPaths::Combine(CollectionAssetPath, CollectionAssetName);
-
-		FText Reason;
-		if (!FPackageName::IsValidObjectPath(PackageName, &Reason))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Invalid package path '%s': %s."), *PackageName, *Reason.ToString());
-			return;
-		}
-
-		UPackage* Package = FPackageName::DoesPackageExist(PackageName) ? LoadPackage(nullptr, *PackageName, LOAD_None) : nullptr;
-
-		UPCGExSkinnedMeshCollection* TargetCollection = nullptr;
-		bool bIsNewCollection = false;
-
-		if (Package)
-		{
-			UObject* Object = FindObjectFast<UObject>(Package, *CollectionAssetName);
-			if (Object && Object->GetClass() != UPCGExSkinnedMeshCollection::StaticClass())
-			{
-				Object->SetFlags(RF_Transient);
-				Object->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
-				bIsNewCollection = true;
-			}
-			else
-			{
-				TargetCollection = Cast<UPCGExSkinnedMeshCollection>(Object);
-			}
-		}
-		else
-		{
-			Package = CreatePackage(*PackageName);
-
-			if (Package)
-			{
-				bIsNewCollection = true;
-			}
-			else
-			{
-				UE_LOG(LogTemp, Error, TEXT("Unable to create package with name '%s'."), *PackageName);
-				return;
-			}
-		}
-
-		if (!TargetCollection)
-		{
-			constexpr EObjectFlags Flags = RF_Public | RF_Standalone | RF_Transactional;
-			TargetCollection = NewObject<UPCGExSkinnedMeshCollection>(Package, UPCGExSkinnedMeshCollection::StaticClass(), FName(*CollectionAssetName), Flags);
-		}
-
-		if (TargetCollection)
-		{
-			if (bIsNewCollection)
-			{
-				FAssetRegistryModule::AssetCreated(TargetCollection);
-			}
-
-			TArray<TObjectPtr<UPCGExSkinnedMeshCollection>> SelectedCollections;
-			SelectedCollections.Add(TargetCollection);
-
-			UpdateCollectionsFrom(SelectedCollections, SelectedAssets, bIsNewCollection);
-		}
-
-		if (Package)
-		{
-			FEditorFileUtils::PromptForCheckoutAndSave({Package}, /*bCheckDirty=*/false, /*bPromptToSave=*/false);
-		}
+		PCGExCollectionEditorHelpers::CreateCollectionFromTyped(SelectedAssets, UPCGExSkinnedMeshCollection::StaticClass(), TEXT("SMC_NewSkinnedMeshCollection"));
 	}
 
 	void UpdateCollectionsFrom(
 		const TArray<TObjectPtr<UPCGExSkinnedMeshCollection>>& SelectedCollections,
-		const TArray<FAssetData>& SelectedAssets,
-		bool bIsNewCollection)
+		const TArray<FAssetData>& SelectedAssets)
 	{
-		if (SelectedCollections.IsEmpty() || SelectedAssets.IsEmpty())
+		TArray<TObjectPtr<UPCGExAssetCollection>> AsBase;
+		AsBase.Reserve(SelectedCollections.Num());
+		for (const TObjectPtr<UPCGExSkinnedMeshCollection>& C : SelectedCollections)
 		{
-			return;
+			AsBase.Add(C);
 		}
-
-		for (const TObjectPtr<UPCGExSkinnedMeshCollection>& Collection : SelectedCollections)
-		{
-			Collection->EDITOR_AddBrowserSelectionTyped(SelectedAssets);
-		}
+		PCGExCollectionEditorHelpers::UpdateCollectionsFromTyped(AsBase, SelectedAssets);
 	}
-}
-
-EAssetCommandResult UAssetDefinition_PCGExSkinnedMeshCollection::OpenAssets(const FAssetOpenArgs& OpenArgs) const
-{
-	for (UPCGExSkinnedMeshCollection* Collection : OpenArgs.LoadObjects<UPCGExSkinnedMeshCollection>())
-	{
-		TSharedRef<FPCGExSkinnedMeshCollectionEditor> Editor = MakeShared<FPCGExSkinnedMeshCollectionEditor>();
-		Editor->InitEditor(Collection, OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost);
-	}
-	return EAssetCommandResult::Handled;
 }

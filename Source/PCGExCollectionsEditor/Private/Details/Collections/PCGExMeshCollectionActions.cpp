@@ -3,158 +3,39 @@
 
 #include "Details/Collections/PCGExMeshCollectionActions.h"
 
-#include "FileHelpers.h"
-#include "ToolMenuSection.h"
-#include "AssetRegistry/AssetRegistryModule.h"
 #include "Collections/PCGExMeshCollection.h"
-#include "Details/Collections/PCGExAssetCollectionEditor.h"
+#include "Details/Collections/PCGExCollectionEditorHelpers.h"
+#include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
 #include "Details/Collections/PCGExMeshCollectionEditor.h"
-#include "Misc/MessageDialog.h"
-#include "UObject/Package.h"
-#include "UObject/Package.h"
-#include "UObject/UObjectGlobals.h"
-#include "UObject/UObjectGlobals.h"
-#include "Widgets/Views/SListView.h"
+#include "Engine/StaticMesh.h"
+
+PCGEX_REGISTER_COLLECTION_EDITOR_TYPE(
+	Mesh,
+	UPCGExMeshCollection,
+	UStaticMesh,
+	"SMC_NewMeshCollection",
+	FLinearColor(FColor(0, 255, 255)),
+	"Mesh Collection",
+	"A weighted collection of static meshes with optional material overrides.",
+	FPCGExMeshCollectionEditor)
 
 namespace PCGExMeshCollectionActions
 {
 	void CreateCollectionFrom(const TArray<FAssetData>& SelectedAssets)
 	{
-		if (SelectedAssets.IsEmpty())
-		{
-			return;
-		}
-
-		//FPCGAssetExporterParameters Parameters = InParameters;
-
-		if (SelectedAssets.Num() > 1)
-		{
-			//Parameters.bOpenSaveDialog = false;
-		}
-
-		FString CollectionAssetName = TEXT("SMC_NewMeshCollection");
-		FString CollectionAssetPath = SelectedAssets[0].PackagePath.ToString();
-		FString PackageName = FPaths::Combine(CollectionAssetPath, CollectionAssetName);
-
-		/*
-		if (Parameters.bOpenSaveDialog)
-		{
-			FSaveAssetDialogConfig SaveAssetDialogConfig;
-			SaveAssetDialogConfig.DefaultPath = AssetPath;
-			SaveAssetDialogConfig.DefaultAssetName = AssetName;
-			SaveAssetDialogConfig.AssetClassNames.Add(AssetClass->GetClassPathName());
-			SaveAssetDialogConfig.ExistingAssetPolicy = ESaveAssetDialogExistingAssetPolicy::AllowButWarn;
-			SaveAssetDialogConfig.DialogTitleOverride = NSLOCTEXT("PCGAssetExporter", "SaveAssetToFileDialogTitle", "Save PCG Asset");
-	
-			FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-			FString SaveObjectPath = ContentBrowserModule.Get().CreateModalSaveAssetDialog(SaveAssetDialogConfig);
-			if (!SaveObjectPath.IsEmpty())
-			{
-				AssetName = FPackageName::ObjectPathToObjectName(SaveObjectPath);
-				AssetPath = FString(); // not going to be reused
-				PackageName = FPackageName::ObjectPathToPackageName(SaveObjectPath);
-			}
-			else
-			{
-				return nullptr;
-			}
-		}
-		else
-		{
-			*/
-		// Perform some validation on the package name, so we can prevent crashes downstream when trying to create or save the package.
-		FText Reason;
-		if (!FPackageName::IsValidObjectPath(PackageName, &Reason))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Invalid package path '%s': %s."), *PackageName, *Reason.ToString());
-			return;
-		}
-		//}
-
-		UPackage* Package = FPackageName::DoesPackageExist(PackageName) ? LoadPackage(nullptr, *PackageName, LOAD_None) : nullptr;
-
-		UPCGExMeshCollection* TargetCollection = nullptr;
-		bool bIsNewCollection = false;
-
-		if (Package)
-		{
-			UObject* Object = FindObjectFast<UObject>(Package, *CollectionAssetName);
-			if (Object && Object->GetClass() != UPCGExMeshCollection::StaticClass())
-			{
-				Object->SetFlags(RF_Transient);
-				Object->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
-				bIsNewCollection = true;
-			}
-			else
-			{
-				TargetCollection = Cast<UPCGExMeshCollection>(Object);
-			}
-		}
-		else
-		{
-			Package = CreatePackage(*PackageName);
-
-			if (Package)
-			{
-				bIsNewCollection = true;
-			}
-			else
-			{
-				UE_LOG(LogTemp, Error, TEXT("Unable to create package with name '%s'."), *PackageName);
-				return;
-			}
-		}
-
-		if (!TargetCollection)
-		{
-			constexpr EObjectFlags Flags = RF_Public | RF_Standalone | RF_Transactional;
-			TargetCollection = NewObject<UPCGExMeshCollection>(Package, UPCGExMeshCollection::StaticClass(), FName(*CollectionAssetName), Flags);
-		}
-
-		if (TargetCollection)
-		{
-			if (bIsNewCollection)
-			{
-				// Notify the asset registry
-				FAssetRegistryModule::AssetCreated(TargetCollection);
-			}
-
-			TArray<TObjectPtr<UPCGExMeshCollection>> SelectedCollections;
-			SelectedCollections.Add(TargetCollection);
-
-			UpdateCollectionsFrom(SelectedCollections, SelectedAssets, bIsNewCollection);
-		}
-
-		// Save the file
-		if (Package) // && Parameters.bSaveOnExportEnded)
-		{
-			FEditorFileUtils::PromptForCheckoutAndSave({Package}, /*bCheckDirty=*/false, /*bPromptToSave=*/false);
-		}
+		PCGExCollectionEditorHelpers::CreateCollectionFromTyped(SelectedAssets, UPCGExMeshCollection::StaticClass(), TEXT("SMC_NewMeshCollection"));
 	}
 
 	void UpdateCollectionsFrom(
 		const TArray<TObjectPtr<UPCGExMeshCollection>>& SelectedCollections,
-		const TArray<FAssetData>& SelectedAssets,
-		bool bIsNewCollection)
+		const TArray<FAssetData>& SelectedAssets)
 	{
-		if (SelectedCollections.IsEmpty() || SelectedAssets.IsEmpty())
+		TArray<TObjectPtr<UPCGExAssetCollection>> AsBase;
+		AsBase.Reserve(SelectedCollections.Num());
+		for (const TObjectPtr<UPCGExMeshCollection>& C : SelectedCollections)
 		{
-			return;
+			AsBase.Add(C);
 		}
-
-		for (const TObjectPtr<UPCGExMeshCollection>& Collection : SelectedCollections)
-		{
-			Collection->EDITOR_AddBrowserSelectionTyped(SelectedAssets);
-		}
+		PCGExCollectionEditorHelpers::UpdateCollectionsFromTyped(AsBase, SelectedAssets);
 	}
-}
-
-EAssetCommandResult UAssetDefinition_PCGExMeshCollection::OpenAssets(const FAssetOpenArgs& OpenArgs) const
-{
-	for (UPCGExMeshCollection* Collection : OpenArgs.LoadObjects<UPCGExMeshCollection>())
-	{
-		TSharedRef<FPCGExMeshCollectionEditor> Editor = MakeShared<FPCGExMeshCollectionEditor>();
-		Editor->InitEditor(Collection, OpenArgs.GetToolkitMode(), OpenArgs.ToolkitHost);
-	}
-	return EAssetCommandResult::Handled;
 }

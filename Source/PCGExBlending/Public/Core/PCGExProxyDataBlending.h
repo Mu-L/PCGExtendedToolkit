@@ -8,15 +8,7 @@
 #include "Data/PCGExProxyData.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 
-#if PCGEX_ENGINE_VERSION > 506
 #include "PCGPointPropertiesTraits.h"
-#else
-namespace PCGExMT
-{
-	struct FScope;
-}
-#include "PCGCommon.h"
-#endif
 
 struct FPCGExContext;
 class UPCGBasePointData;

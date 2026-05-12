@@ -5,11 +5,7 @@
 
 
 #if WITH_EDITOR
-
-#if PCGEX_ENGINE_VERSION > 506
-#include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
-#endif
-
+#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "AssetTypeActions_Base.h"
 #include "Data/Bitmasks/PCGExBitmaskCollection.h"
 #include "PCGExCoreEditor/Public/PCGExAssetTypesMacros.h"

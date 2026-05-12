@@ -6,12 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGExVersion.h"
 #include "UObject/Object.h"
-
-#if PCGEX_ENGINE_VERSION < 507
-#include "MaterialTypes.h"
-#else
 #include "Materials/MaterialParameters.h"
-#endif
 #include "Factories/PCGExFactoryProvider.h"
 
 class UPCGTexture2DSingleBaseData;

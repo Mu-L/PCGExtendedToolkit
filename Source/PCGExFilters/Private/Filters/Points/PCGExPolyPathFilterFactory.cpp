@@ -7,9 +7,7 @@
 #include "Data/PCGExPointIO.h"
 #include "PCGExMatching/Public/Helpers/PCGExDataMatcher.h"
 #include "PCGExMatching/Public/Helpers/PCGExMatchingHelpers.h"
-#if PCGEX_ENGINE_VERSION > 506
 #include "Data/PCGPolygon2DData.h"
-#endif
 #include "Data/PCGSplineData.h"
 #include "Paths/PCGExPathsHelpers.h"
 #include "Paths/PCGExPolyPath.h"
@@ -178,7 +176,6 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 			Path = MakeShared<PCGExPaths::FPolyPath>(SplineData, LocalFidelity, LocalProjection, SafeExpansion, LocalExpansionZ, WindingMutation);
 			Path->OffsetProjection(InclusionOffset);
 		}
-#if PCGEX_ENGINE_VERSION > 506
 		else if (const UPCGPolygon2DData* PolygonData = Cast<UPCGPolygon2DData>(Data))
 		{
 			if (PolygonData->GetNumSegments() < 1)
@@ -190,7 +187,6 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 			Path = MakeShared<PCGExPaths::FPolyPath>(PolygonData, LocalProjection, SafeExpansion, LocalExpansionZ, WindingMutation);
 			Path->OffsetProjection(InclusionOffset);
 		}
-#endif
 
 		if (Path)
 		{
@@ -251,22 +247,16 @@ void UPCGExPolyPathFilterFactory::BeginDestroy()
 	Super::BeginDestroy();
 }
 
-#if PCGEX_ENGINE_VERSION > 506
 FPCGDataTypeIdentifier PCGExPathInclusion::GetInclusionIdentifier()
 {
 	return FPCGDataTypeIdentifier::Construct({FPCGDataTypeInfoSpline::AsId(), FPCGDataTypeInfoPolyline::AsId(), FPCGDataTypeInfoPolygon2D::AsId(), FPCGDataTypeInfoPoint::AsId()});
 }
-#endif
 
 namespace PCGExPathInclusion
 {
 	void DeclareInclusionPin(TArray<FPCGPinProperties>& PinProperties)
 	{
-#if PCGEX_ENGINE_VERSION < 507
-		PCGEX_PIN_ANY(PCGExCommon::Labels::SourceTargetsLabel, TEXT("Path, splines, polygons, ... will be used for testing"), Required)
-#else
 		PCGEX_PIN_FACTORIES(PCGExCommon::Labels::SourceTargetsLabel, TEXT("Path, splines, polygons, ... will be used for testing"), Required, PCGExPathInclusion::GetInclusionIdentifier())
-#endif
 	}
 
 	FHandler::FHandler(const UPCGExPolyPathFilterFactory* InFactory)
