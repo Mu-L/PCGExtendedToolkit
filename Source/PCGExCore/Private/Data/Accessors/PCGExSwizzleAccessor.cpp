@@ -15,11 +15,20 @@ namespace PCGExData
 		{
 			switch (Ch)
 			{
-			case TEXT('X'): OutIndex = 0; return true;
-			case TEXT('Y'): OutIndex = 1; return true;
-			case TEXT('Z'): OutIndex = 2; return true;
-			case TEXT('W'): OutIndex = 3; return true;
-			default: return false;
+			case TEXT('X'):
+				OutIndex = 0;
+				return true;
+			case TEXT('Y'):
+				OutIndex = 1;
+				return true;
+			case TEXT('Z'):
+				OutIndex = 2;
+				return true;
+			case TEXT('W'):
+				OutIndex = 3;
+				return true;
+			default:
+				return false;
 			}
 		}
 
@@ -31,19 +40,49 @@ namespace PCGExData
 		template <>
 		FORCEINLINE double GetComponent<FVector2D>(const FVector2D& V, uint8 Index)
 		{
-			switch (Index) { case 0: return V.X; case 1: return V.Y; default: return 0.0; }
+			switch (Index)
+			{
+			case 0:
+				return V.X;
+			case 1:
+				return V.Y;
+			default:
+				return 0.0;
+			}
 		}
 
 		template <>
 		FORCEINLINE double GetComponent<FVector>(const FVector& V, uint8 Index)
 		{
-			switch (Index) { case 0: return V.X; case 1: return V.Y; case 2: return V.Z; default: return 0.0; }
+			switch (Index)
+			{
+			case 0:
+				return V.X;
+			case 1:
+				return V.Y;
+			case 2:
+				return V.Z;
+			default:
+				return 0.0;
+			}
 		}
 
 		template <>
 		FORCEINLINE double GetComponent<FVector4>(const FVector4& V, uint8 Index)
 		{
-			switch (Index) { case 0: return V.X; case 1: return V.Y; case 2: return V.Z; case 3: return V.W; default: return 0.0; }
+			switch (Index)
+			{
+			case 0:
+				return V.X;
+			case 1:
+				return V.Y;
+			case 2:
+				return V.Z;
+			case 3:
+				return V.W;
+			default:
+				return 0.0;
+			}
 		}
 
 		template <>
@@ -54,10 +93,14 @@ namespace PCGExData
 			const FRotator R = Q.Rotator();
 			switch (Index)
 			{
-			case 0: return R.Roll;
-			case 1: return R.Yaw;
-			case 2: return R.Pitch;
-			default: return 0.0;
+			case 0:
+				return R.Roll;
+			case 1:
+				return R.Yaw;
+			case 2:
+				return R.Pitch;
+			default:
+				return 0.0;
 			}
 		}
 
@@ -66,10 +109,14 @@ namespace PCGExData
 		{
 			switch (Index)
 			{
-			case 0: return R.Roll;
-			case 1: return R.Yaw;
-			case 2: return R.Pitch;
-			default: return 0.0;
+			case 0:
+				return R.Roll;
+			case 1:
+				return R.Yaw;
+			case 2:
+				return R.Pitch;
+			default:
+				return 0.0;
 			}
 		}
 
@@ -131,10 +178,17 @@ namespace PCGExData
 			const double V = static_cast<double>(Src);
 			switch (Parsed.SwizzleLength)
 			{
-			case 2: WriteVector2(ChildOut, V, V); break;
-			case 3: WriteVector(ChildOut, V, V, V); break;
-			case 4: WriteVector4(ChildOut, V, V, V, V); break;
-			default: break;
+			case 2:
+				WriteVector2(ChildOut, V, V);
+				break;
+			case 3:
+				WriteVector(ChildOut, V, V, V);
+				break;
+			case 4:
+				WriteVector4(ChildOut, V, V, V, V);
+				break;
+			default:
+				break;
 			}
 		}
 	}
@@ -142,13 +196,19 @@ namespace PCGExData
 	bool FSwizzleAccessor::MatchesToken(const FString& UpperToken, FAccessorParseResult& OutParsed) const
 	{
 		const int32 Len = UpperToken.Len();
-		if (Len < 2 || Len > 4) { return false; }
+		if (Len < 2 || Len > 4)
+		{
+			return false;
+		}
 
 		uint8 Mask[4] = {0, 0, 0, 0};
 		for (int32 i = 0; i < Len; ++i)
 		{
 			uint8 Index = 0;
-			if (!ComponentIndexFromChar(UpperToken[i], Index)) { return false; }
+			if (!ComponentIndexFromChar(UpperToken[i], Index))
+			{
+				return false;
+			}
 			Mask[i] = Index;
 		}
 
@@ -169,10 +229,17 @@ namespace PCGExData
 		// Hint: swizzles always produce a vector of some length.
 		switch (Len)
 		{
-		case 2: OutParsed.SourceTypeHint = EPCGMetadataTypes::Vector2; break;
-		case 3: OutParsed.SourceTypeHint = EPCGMetadataTypes::Vector; break;
-		case 4: OutParsed.SourceTypeHint = EPCGMetadataTypes::Vector4; break;
-		default: break;
+		case 2:
+			OutParsed.SourceTypeHint = EPCGMetadataTypes::Vector2;
+			break;
+		case 3:
+			OutParsed.SourceTypeHint = EPCGMetadataTypes::Vector;
+			break;
+		case 4:
+			OutParsed.SourceTypeHint = EPCGMetadataTypes::Vector4;
+			break;
+		default:
+			break;
 		}
 		return true;
 	}
@@ -184,10 +251,18 @@ namespace PCGExData
 		(void)InType;
 		switch (Parsed.SwizzleLength)
 		{
-		case 2: OutType = EPCGMetadataTypes::Vector2; return true;
-		case 3: OutType = EPCGMetadataTypes::Vector; return true;
-		case 4: OutType = EPCGMetadataTypes::Vector4; return true;
-		default: OutType = EPCGMetadataTypes::Unknown; return false;
+		case 2:
+			OutType = EPCGMetadataTypes::Vector2;
+			return true;
+		case 3:
+			OutType = EPCGMetadataTypes::Vector;
+			return true;
+		case 4:
+			OutType = EPCGMetadataTypes::Vector4;
+			return true;
+		default:
+			OutType = EPCGMetadataTypes::Unknown;
+			return false;
 		}
 	}
 
@@ -203,16 +278,36 @@ namespace PCGExData
 
 		switch (InType)
 		{
-		case EPCGMetadataTypes::Vector2:    SwizzleStep<FVector2D>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Vector:     SwizzleStep<FVector>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Vector4:    SwizzleStep<FVector4>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Quaternion: SwizzleStep<FQuat>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Rotator:    SwizzleStep<FRotator>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Float:      SwizzleStepScalar<float>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Double:     SwizzleStepScalar<double>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Integer32:  SwizzleStepScalar<int32>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Integer64:  SwizzleStepScalar<int64>(Source, OutValue, Parsed); break;
-		case EPCGMetadataTypes::Boolean:    SwizzleStepScalar<bool>(Source, OutValue, Parsed); break;
+		case EPCGMetadataTypes::Vector2:
+			SwizzleStep<FVector2D>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Vector:
+			SwizzleStep<FVector>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Vector4:
+			SwizzleStep<FVector4>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Quaternion:
+			SwizzleStep<FQuat>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Rotator:
+			SwizzleStep<FRotator>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Float:
+			SwizzleStepScalar<float>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Double:
+			SwizzleStepScalar<double>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Integer32:
+			SwizzleStepScalar<int32>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Integer64:
+			SwizzleStepScalar<int64>(Source, OutValue, Parsed);
+			break;
+		case EPCGMetadataTypes::Boolean:
+			SwizzleStepScalar<bool>(Source, OutValue, Parsed);
+			break;
 		default:
 			// Unsupported source type: leave OutValue uninitialized. Chain
 			// compiler should have dropped this step via ClassifyForInType
@@ -225,17 +320,28 @@ namespace PCGExData
 	{
 		switch (InType)
 		{
-		case EPCGMetadataTypes::Vector2:    return &SwizzleStep<FVector2D>;
-		case EPCGMetadataTypes::Vector:     return &SwizzleStep<FVector>;
-		case EPCGMetadataTypes::Vector4:    return &SwizzleStep<FVector4>;
-		case EPCGMetadataTypes::Quaternion: return &SwizzleStep<FQuat>;
-		case EPCGMetadataTypes::Rotator:    return &SwizzleStep<FRotator>;
-		case EPCGMetadataTypes::Float:      return &SwizzleStepScalar<float>;
-		case EPCGMetadataTypes::Double:     return &SwizzleStepScalar<double>;
-		case EPCGMetadataTypes::Integer32:  return &SwizzleStepScalar<int32>;
-		case EPCGMetadataTypes::Integer64:  return &SwizzleStepScalar<int64>;
-		case EPCGMetadataTypes::Boolean:    return &SwizzleStepScalar<bool>;
-		default: return nullptr;
+		case EPCGMetadataTypes::Vector2:
+			return &SwizzleStep<FVector2D>;
+		case EPCGMetadataTypes::Vector:
+			return &SwizzleStep<FVector>;
+		case EPCGMetadataTypes::Vector4:
+			return &SwizzleStep<FVector4>;
+		case EPCGMetadataTypes::Quaternion:
+			return &SwizzleStep<FQuat>;
+		case EPCGMetadataTypes::Rotator:
+			return &SwizzleStep<FRotator>;
+		case EPCGMetadataTypes::Float:
+			return &SwizzleStepScalar<float>;
+		case EPCGMetadataTypes::Double:
+			return &SwizzleStepScalar<double>;
+		case EPCGMetadataTypes::Integer32:
+			return &SwizzleStepScalar<int32>;
+		case EPCGMetadataTypes::Integer64:
+			return &SwizzleStepScalar<int64>;
+		case EPCGMetadataTypes::Boolean:
+			return &SwizzleStepScalar<bool>;
+		default:
+			return nullptr;
 		}
 	}
 

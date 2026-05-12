@@ -106,7 +106,10 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 				}
 
 				const TSharedPtr<PCGExData::TAttributeBroadcaster<double>> Values = PCGExData::MakeTypedBroadcaster<double>(Infos->Identities[0].Name, Facade->Source);
-				if (!Values) { continue; }
+				if (!Values)
+				{
+					continue;
+				}
 				Values->GrabUniqueValues(UniqueIndices);
 			}
 			else
@@ -140,7 +143,10 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 				}
 
 				const TSharedPtr<PCGExData::TAttributeBroadcaster<int32>> Values = PCGExData::MakeTypedBroadcaster<int32>(Infos->Identities[0].Name, Facade->Source);
-				if (!Values) { continue; }
+				if (!Values)
+				{
+					continue;
+				}
 				Values->GrabUniqueValues(UniqueIndices);
 			}
 			else

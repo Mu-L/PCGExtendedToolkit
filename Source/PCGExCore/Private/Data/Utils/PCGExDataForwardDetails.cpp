@@ -149,8 +149,11 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, U
 			{
 				using T = decltype(DummyValue);
 				TSharedPtr<PCGExData::TAttributeBroadcaster<T>> TypedGetter = StaticCastSharedPtr<PCGExData::TAttributeBroadcaster<T>>(Getter);
-				
-				if (!TypedGetter) { return; }
+
+				if (!TypedGetter)
+				{
+					return;
+				}
 
 				const FPCGAttributeIdentifier Identifier = FPCGAttributeIdentifier(Getter->GetName(), PCGMetadataDomainID::Data);
 				InMetadata->DeleteAttribute(Identifier);

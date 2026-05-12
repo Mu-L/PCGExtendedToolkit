@@ -124,7 +124,11 @@ namespace PCGExData
 		EPCGMetadataTypes SourceTypeHint = EPCGMetadataTypes::Unknown;
 		bool bIsValid = false;
 
-		FORCEINLINE bool IsEmpty() const { return Steps.Num() == 0; }
+		FORCEINLINE bool IsEmpty() const
+		{
+			return Steps.Num() == 0;
+		}
+
 		void Reset();
 	};
 
@@ -236,7 +240,11 @@ namespace PCGExData
 		 * Inject counterpart to GetStepGetFn. Returns nullptr for read-only
 		 * accessors (Axis) and for types where inject is not meaningful.
 		 */
-		virtual FStepSetFn GetStepSetFn(EPCGMetadataTypes InType) const { (void)InType; return nullptr; }
+		virtual FStepSetFn GetStepSetFn(EPCGMetadataTypes InType) const
+		{
+			(void)InType;
+			return nullptr;
+		}
 
 		/**
 		 * Chain compilation classifier for the parser-time chain vs the

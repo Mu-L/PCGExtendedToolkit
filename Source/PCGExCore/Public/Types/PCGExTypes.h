@@ -48,7 +48,7 @@ namespace PCGExTypes
 		alignas(BufferAlignment) uint8 Storage[BufferSize];
 		void* ActiveStorage = Storage; // Points to Storage (inline) or heap allocation
 		EPCGMetadataTypes Type;
-		int32 ValueSize = 0; // Actual size of stored value (0 = computed from Type)
+		int32 ValueSize = 0;                 // Actual size of stored value (0 = computed from Type)
 		const FProperty* Property = nullptr; // If set, lifecycle routes through FProperty
 		bool bConstructed;
 		bool bHeapAllocated = false;
@@ -76,24 +76,55 @@ namespace PCGExTypes
 		FScopedTypedValue& operator=(FScopedTypedValue&&) = delete;
 
 		// Raw access - returns active storage pointer (inline or heap)
-		FORCEINLINE void* GetRaw() { return ActiveStorage; }
-		FORCEINLINE const void* GetRaw() const { return ActiveStorage; }
+		FORCEINLINE void* GetRaw()
+		{
+			return ActiveStorage;
+		}
+
+		FORCEINLINE const void* GetRaw() const
+		{
+			return ActiveStorage;
+		}
 
 		// Typed access
 		template <typename T>
-		FORCEINLINE T& As() { return *reinterpret_cast<T*>(ActiveStorage); }
+		FORCEINLINE T& As()
+		{
+			return *reinterpret_cast<T*>(ActiveStorage);
+		}
 
 		template <typename T>
-		FORCEINLINE const T& As() const { return *reinterpret_cast<const T*>(ActiveStorage); }
+		FORCEINLINE const T& As() const
+		{
+			return *reinterpret_cast<const T*>(ActiveStorage);
+		}
 
 		// Type info
-		FORCEINLINE EPCGMetadataTypes GetType() const { return Type; }
-		FORCEINLINE bool IsConstructed() const { return bConstructed; }
-		FORCEINLINE int32 GetValueSize() const { return ValueSize; }
-		FORCEINLINE bool IsHeapAllocated() const { return bHeapAllocated; }
+		FORCEINLINE EPCGMetadataTypes GetType() const
+		{
+			return Type;
+		}
+
+		FORCEINLINE bool IsConstructed() const
+		{
+			return bConstructed;
+		}
+
+		FORCEINLINE int32 GetValueSize() const
+		{
+			return ValueSize;
+		}
+
+		FORCEINLINE bool IsHeapAllocated() const
+		{
+			return bHeapAllocated;
+		}
 
 		// Get the underlying FProperty if the value was constructed from one
-		FORCEINLINE const FProperty* GetProperty() const { return Property; }
+		FORCEINLINE const FProperty* GetProperty() const
+		{
+			return Property;
+		}
 
 		// Manual lifecycle control (for reuse scenarios)
 		void Destruct();

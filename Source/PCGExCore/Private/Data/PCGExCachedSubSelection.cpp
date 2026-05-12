@@ -17,7 +17,10 @@ namespace PCGExData
 
 	FCachedSubSelection::~FCachedSubSelection()
 	{
-		for (FProperty* Prop : OwnedProperties) { delete Prop; }
+		for (FProperty* Prop : OwnedProperties)
+		{
+			delete Prop;
+		}
 	}
 
 	FCachedSubSelection::FCachedSubSelection(FCachedSubSelection&& Other) noexcept
@@ -29,7 +32,10 @@ namespace PCGExData
 	{
 		if (this != &Other)
 		{
-			for (FProperty* Prop : OwnedProperties) { delete Prop; }
+			for (FProperty* Prop : OwnedProperties)
+			{
+				delete Prop;
+			}
 
 			bIsValid = Other.bIsValid;
 			RealType = Other.RealType;
@@ -66,7 +72,10 @@ namespace PCGExData
 		// each remaining step's typed fn pointers, so the hot path has zero
 		// per-call lookups.
 		// Clean up any previously owned properties from a prior Initialize.
-		for (FProperty* Prop : OwnedProperties) { delete Prop; }
+		for (FProperty* Prop : OwnedProperties)
+		{
+			delete Prop;
+		}
 		OwnedProperties.Reset();
 
 		CompiledChain = Selection.GetChain();
@@ -122,8 +131,8 @@ namespace PCGExData
 		// ConvertGet/ConvertSet. ConvertFinal*Working are used on the
 		// chain-active path to bridge the chain's final OutType and the
 		// blender's WorkingType.
-		ConvertRealToWorking  = PCGExTypeOps::FConversionTable::GetConversionFn(RealType, WorkingType);
-		ConvertWorkingToReal  = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, RealType);
+		ConvertRealToWorking = PCGExTypeOps::FConversionTable::GetConversionFn(RealType, WorkingType);
+		ConvertWorkingToReal = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, RealType);
 		ConvertFinalToWorking = PCGExTypeOps::FConversionTable::GetConversionFn(FinalChainType, WorkingType);
 		ConvertWorkingToFinal = PCGExTypeOps::FConversionTable::GetConversionFn(WorkingType, FinalChainType);
 
@@ -143,7 +152,10 @@ namespace PCGExData
 	{
 		if (CompiledChain.Steps.IsEmpty())
 		{
-			if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
+			if (ConvertRealToWorking)
+			{
+				ConvertRealToWorking(Source, OutValue);
+			}
 			return;
 		}
 
@@ -162,7 +174,10 @@ namespace PCGExData
 			{
 				alignas(16) uint8 Tmp[96];
 				SingleStepGetFn(Source, Tmp, SingleStepParsed);
-				if (ConvertFinalToWorking) { ConvertFinalToWorking(Tmp, OutValue); }
+				if (ConvertFinalToWorking)
+				{
+					ConvertFinalToWorking(Tmp, OutValue);
+				}
 			}
 			return;
 		}
@@ -170,7 +185,7 @@ namespace PCGExData
 		// Multi-step path: double-buffered intermediates.
 		alignas(16) uint8 BufA[96];
 		alignas(16) uint8 BufB[96];
-		void* Bufs[2] = { BufA, BufB };
+		void* Bufs[2] = {BufA, BufB};
 
 		const void* CurrentIn = Source;
 		int32 BufIdx = 0;
@@ -195,7 +210,10 @@ namespace PCGExData
 		{
 			void* FinalBuf = Bufs[BufIdx];
 			Last.StepGetFn(CurrentIn, FinalBuf, Last.Parsed);
-			if (ConvertFinalToWorking) { ConvertFinalToWorking(FinalBuf, OutValue); }
+			if (ConvertFinalToWorking)
+			{
+				ConvertFinalToWorking(FinalBuf, OutValue);
+			}
 		}
 	}
 
@@ -203,7 +221,10 @@ namespace PCGExData
 	{
 		if (CompiledChain.Steps.IsEmpty())
 		{
-			if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
+			if (ConvertWorkingToReal)
+			{
+				ConvertWorkingToReal(Source, Target);
+			}
 			return;
 		}
 
@@ -213,7 +234,10 @@ namespace PCGExData
 		// for inject. Defensive check -- AppliesToTargetWrite also guards.
 		for (const FSubSelectionStep& Step : CompiledChain.Steps)
 		{
-			if (!Step.StepSetFn) { return; }
+			if (!Step.StepSetFn)
+			{
+				return;
+			}
 		}
 
 		// Convert Source (WorkingType) to FinalChainType so it matches
@@ -222,8 +246,14 @@ namespace PCGExData
 		const void* NewChild = Source;
 		if (WorkingType != FinalChainType)
 		{
-			if (ConvertWorkingToFinal) { ConvertWorkingToFinal(Source, NewChildBuf); }
-			else { return; }
+			if (ConvertWorkingToFinal)
+			{
+				ConvertWorkingToFinal(Source, NewChildBuf);
+			}
+			else
+			{
+				return;
+			}
 			NewChild = NewChildBuf;
 		}
 
@@ -238,8 +268,8 @@ namespace PCGExData
 		// Multi-step path: extract-modify-inject.
 		constexpr int32 MaxSteps = 4;
 		checkf(NumSteps <= MaxSteps,
-			TEXT("FCachedSubSelection chain exceeded MaxSteps (%d > %d)"),
-			NumSteps, MaxSteps);
+		       TEXT("FCachedSubSelection chain exceeded MaxSteps (%d > %d)"),
+		       NumSteps, MaxSteps);
 
 		const int32 LastIdx = NumSteps - 1;
 		alignas(16) uint8 Buffers[MaxSteps][96];

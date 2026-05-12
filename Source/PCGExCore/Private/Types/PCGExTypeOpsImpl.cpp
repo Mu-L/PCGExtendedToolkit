@@ -18,7 +18,8 @@ namespace PCGExTypeOps
 		switch (Type)
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
-		default: return &FCopyOnlyTypeOps::GetInstance();
+		default:
+			return &FCopyOnlyTypeOps::GetInstance();
 		}
 #undef PCGEX_TPL
 	}
@@ -35,7 +36,9 @@ namespace PCGExTypeOps
 
 	namespace
 	{
-		void NoOpConvert(const void* /*Src*/, void* /*Dst*/) {}
+		void NoOpConvert(const void* /*Src*/, void* /*Dst*/)
+		{
+		}
 
 		// Helper to populate a row of the conversion table at the correct enum indices
 		template <typename TFrom>

@@ -350,7 +350,10 @@ namespace PCGExBlending
 		TSharedPtr<FProxyDataBlender> Blender = MakeShared<FProxyDataBlender>();
 		Blender->UnderlyingType = WorkingType;
 		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend, InProperty);
-		if (!Blender->Operation) { return nullptr; }
+		if (!Blender->Operation)
+		{
+			return nullptr;
+		}
 		Blender->ValueSize = Blender->Operation->GetValueSize();
 		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
 		return Blender;

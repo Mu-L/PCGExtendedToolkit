@@ -4,9 +4,9 @@
 
 #include "Utils/PCGExPointIOMerger.h"
 
+#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
-#include "Data/PCGExDataHelpers.h"
 #include "Details/PCGExBlendingDetails.h"
 
 namespace PCGExPointIOMerger
@@ -102,8 +102,8 @@ namespace PCGExPointIOMerger
 					TSharedPtr<PCGExData::TBuffer<T>> Buffer = Merger->UnionDataFacade->GetWritable(
 						TargetIdentifier,
 						bInitDefault && Identity.Attribute
-							? Identity.Attribute->GetValueFromItemKey<T>(PCGDefaultValueKey)
-							: T{},
+						? Identity.Attribute->GetValueFromItemKey<T>(PCGDefaultValueKey)
+						: T{},
 						bAllowsInterp, PCGExData::EBufferInit::New);
 
 					for (int i = 0; i < Merger->IOSources.Num(); i++)
@@ -111,8 +111,14 @@ namespace PCGExPointIOMerger
 						TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
 						const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identifier);
 
-						if (!Attribute) { continue; }                // Missing attribute
-						if (!Attribute->IsOfType<T>()) { continue; } // Type mismatch
+						if (!Attribute)
+						{
+							continue;
+						} // Missing attribute
+						if (!Attribute->IsOfType<T>())
+						{
+							continue;
+						} // Type mismatch
 
 						PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer)
 					}
@@ -125,8 +131,8 @@ namespace PCGExPointIOMerger
 					if (!Identity.Attribute)
 					{
 						PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(
-							FTEXT("Cannot merge attribute '{0}' — no source attribute resolved on identity (extended/container type with null Attribute pointer)."),
-							FText::FromName(Identity.Name)));
+							           FTEXT("Cannot merge attribute '{0}' — no source attribute resolved on identity (extended/container type with null Attribute pointer)."),
+							           FText::FromName(Identity.Name)));
 						return;
 					}
 
@@ -135,8 +141,8 @@ namespace PCGExPointIOMerger
 					if (!RawBuffer || !RawBuffer->IsPropertyBacked())
 					{
 						PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(
-							FTEXT("Cannot merge attribute '{0}' — failed to create property-backed writable buffer."),
-							FText::FromName(Identity.Name)));
+							           FTEXT("Cannot merge attribute '{0}' — failed to create property-backed writable buffer."),
+							           FText::FromName(Identity.Name)));
 						return;
 					}
 					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(RawBuffer);
@@ -146,9 +152,15 @@ namespace PCGExPointIOMerger
 					{
 						TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
 						const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identifier);
-						if (!Attribute) { continue; }
+						if (!Attribute)
+						{
+							continue;
+						}
 						// Desc-aware mismatch — same gate the typed path applies via IsOfType<T>.
-						if (!Attribute->GetAttributeDesc().IsSameType(Identity.Attribute->GetAttributeDesc())) { continue; }
+						if (!Attribute->GetAttributeDesc().IsSameType(Identity.Attribute->GetAttributeDesc()))
+						{
+							continue;
+						}
 
 						PCGEX_LAUNCH_INTERNAL(FWriteAttributePropertyScopeTask, SourceIO, Merger->Scopes[i], Identity, PropBufferRef)
 					}
@@ -262,10 +274,16 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 		UPCGMetadata* Metadata = Source->GetIn()->Metadata;
 		PCGExData::FAttributeIdentity::ForEach(Metadata, [&](const PCGExData::FAttributeIdentity& SourceIdentity, const int32)
 		{
-			if (InIgnoredAttributes && InIgnoredAttributes->Contains(SourceIdentity.Name)) { return; }
+			if (InIgnoredAttributes && InIgnoredAttributes->Contains(SourceIdentity.Name))
+			{
+				return;
+			}
 
 			FString StrName = SourceIdentity.Name.ToString();
-			if (!InCarryOverDetails->Attributes.Test(StrName)) { return; }
+			if (!InCarryOverDetails->Attributes.Test(StrName))
+			{
+				return;
+			}
 
 			const FPCGAttributeIdentifier SourceIdentifier = SourceIdentity.GetIdentifier();
 			const int32* ExpectedType = ExpectedTypes.Find(SourceIdentifier);

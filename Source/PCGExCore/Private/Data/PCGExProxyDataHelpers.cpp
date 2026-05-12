@@ -373,7 +373,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 					OutProxy = Internal::CreateRawProxy<T>(InContext, InDescriptor, InDataFacade);
 				});
 
-				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr); }
+				if (OutProxy)
+				{
+					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr);
+				}
 				return OutProxy;
 			}
 
@@ -402,7 +405,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 					}
 				});
 
-				if (OutProxy) { OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr); }
+				if (OutProxy)
+				{
+					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr);
+				}
 				return OutProxy;
 			}
 
@@ -476,7 +482,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 						{
 							// For writes, find the source attribute and use the type-erased writable path
 							const FPCGMetadataAttributeBase* SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::In);
-							if (!SrcAttr) { SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::Out); }
+							if (!SrcAttr)
+							{
+								SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::Out);
+							}
 
 							if (SrcAttr)
 							{

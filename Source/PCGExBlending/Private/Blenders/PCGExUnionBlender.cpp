@@ -9,16 +9,16 @@
 
 #include "Containers/PCGExIndexLookup.h"
 #include "Core/PCGExOpStats.h"
-#include "Data/PCGExData.h"
-#include "Data/Buffers/PCGExBufferProperty.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
 #include "Core/PCGExUnionData.h"
 #include "Core/PCGExUnionTable.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/Buffers/PCGExBufferProperty.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Details/PCGExBlendingDetails.h"
 
@@ -57,8 +57,8 @@ namespace PCGExBlending
 			const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
 			TSharedPtr<PCGExData::IBuffer> InitializationBuffer = nullptr;
 
-			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identity.Identifier);
-				ExistingAttribute && ExistingAttribute->GetTypeId() == static_cast<int16>(Identity.UnderlyingType))
+			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identifier);
+				ExistingAttribute && ExistingAttribute->GetTypeId() == Identity.GetTypeId())
 			{
 				// This attribute exists on target already
 				InitializationBuffer = InTargetData->GetWritable(WorkingType, ExistingAttribute, PCGExData::EBufferInit::Inherit);

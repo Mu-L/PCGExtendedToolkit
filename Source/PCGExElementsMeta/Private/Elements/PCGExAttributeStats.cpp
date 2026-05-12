@@ -218,7 +218,10 @@ namespace PCGExAttributeStats
 		{
 			const PCGExData::FAttributeIdentity& Identity = Context->AttributesInfos->Identities[i];
 
-			if (Settings->bOutputPerUniqueValuesStats) { PerAttributeStatMap.Add(Identity.Name, i); }
+			if (Settings->bOutputPerUniqueValuesStats)
+			{
+				PerAttributeStatMap.Add(Identity.Name, i);
+			}
 
 			PCGExMetaHelpers::ExecuteWithRightType(
 				Identity,
@@ -258,7 +261,10 @@ namespace PCGExAttributeStats
 		{
 			PCGEX_ASYNC_THIS
 			// Skip nullptr slots — those are container/extended-typed attributes that stats can't analyze.
-			if (const TSharedPtr<IAttributeStats>& Slot = This->Stats[Scope.Start]) { Slot->Process(This->PointDataFacade, This->Context, This->Settings, This->PointFilterCache); }
+			if (const TSharedPtr<IAttributeStats>& Slot = This->Stats[Scope.Start])
+			{
+				Slot->Process(This->PointDataFacade, This->Context, This->Settings, This->PointFilterCache);
+			}
 		};
 
 		AttributeStatProcessing->StartSubLoops(Stats.Num(), 1);

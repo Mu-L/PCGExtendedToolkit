@@ -154,7 +154,8 @@ namespace PCGExSampleTexture
 			FVector4 SampledValue = FVector4::Zero();
 			float SampledDensity = 1;
 
-			if (const UPCGTexture2DSingleBaseData* Tex = TextureMap->TryGetTextureData(IDGetter->FetchSingle(Point, TEXT(""))); !Tex || !Tex->SamplePointLocal(UV, SampledValue, SampledDensity))
+			if (const UPCGTexture2DSingleBaseData* Tex = TextureMap->TryGetTextureData(IDGetter->FetchSingle(Point, TEXT("")));
+				!Tex || !Tex->SamplePointLocal(UV, SampledValue, SampledDensity))
 			{
 				return false;
 			}

@@ -6,15 +6,15 @@
 #include "CoreMinimal.h"
 #include "PCGExDataCommon.h"
 #include "Data/PCGExCachedSubSelection.h"
+#include "Data/PCGExCachedSubSelection.h"
 #include "Data/PCGExSubSelection.h"
 #include "Metadata/PCGAttributePropertySelector.h"
 #include "Metadata/PCGMetadataCommon.h"
-#include "Types/PCGExTypeOps.h"
-#include "UObject/Object.h"
-#include "Data/PCGExCachedSubSelection.h"
 #include "Misc/ScopeRWLock.h"
 #include "Types/PCGExTypeOps.h"
+#include "Types/PCGExTypeOps.h"
 #include "Types/PCGExTypes.h"
+#include "UObject/Object.h"
 #include "UObject/Object.h"
 
 struct FPCGExContext;
@@ -62,8 +62,10 @@ namespace PCGExData
 			case EPCGMetadataTypes::Name:
 			case EPCGMetadataTypes::SoftObjectPath:
 			case EPCGMetadataTypes::SoftClassPath:
-			case EPCGMetadataTypes::Text: return true;
-			default: return false;
+			case EPCGMetadataTypes::Text:
+				return true;
+			default:
+				return false;
 			}
 		}
 

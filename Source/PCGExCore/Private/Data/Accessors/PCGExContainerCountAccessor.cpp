@@ -79,7 +79,10 @@ namespace PCGExData
 		// container types store their element count at a compatible binary
 		// offset, so the single hot-path function works for all of them.
 		// IsSingleValue() returns true iff ContainerTypes is empty.
-		if (!SourceDesc || SourceDesc->IsSingleValue()) { return ECompileAction::Drop; }
+		if (!SourceDesc || SourceDesc->IsSingleValue())
+		{
+			return ECompileAction::Drop;
+		}
 		return ECompileAction::Keep;
 	}
 

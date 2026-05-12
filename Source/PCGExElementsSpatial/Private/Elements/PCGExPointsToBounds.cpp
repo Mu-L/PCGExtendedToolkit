@@ -40,10 +40,16 @@ void FPCGExPointsToBoundsDataDetails::Output(const UPCGBasePointData* InBoundsDa
 				[&]()
 				{
 					// Property-backed: carry the first-element value into a data-domain target attribute.
-					if (!Source) { return; }
+					if (!Source)
+					{
+						return;
+					}
 					FPCGMetadataAttributeBase* Target = OutData->Metadata->CreateAttribute(
 						DataIdentifier, Source->GetAttributeDesc(), Source->AllowsInterpolation(), /*bOverrideParent=*/true);
-					if (!Target) { return; }
+					if (!Target)
+					{
+						return;
+					}
 					PCGExData::Helpers::PropertyCopyAttribute(Source, PCGFirstEntryKey, Target, PCGDefaultValueKey);
 				});
 		}
@@ -93,10 +99,16 @@ void FPCGExPointsToBoundsDataDetails::OutputInverse(const UPCGBasePointData* InP
 				},
 				[&]()
 				{
-					if (!Source) { return; }
+					if (!Source)
+					{
+						return;
+					}
 					FPCGMetadataAttributeBase* Target = OutData->Metadata->CreateAttribute(
 						DataIdentifier, Source->GetAttributeDesc(), Source->AllowsInterpolation(), /*bOverrideParent=*/true);
-					if (!Target) { return; }
+					if (!Target)
+					{
+						return;
+					}
 					PCGExData::Helpers::PropertyCopyAttribute(Source, PCGFirstEntryKey, Target, PCGDefaultValueKey);
 				});
 		}

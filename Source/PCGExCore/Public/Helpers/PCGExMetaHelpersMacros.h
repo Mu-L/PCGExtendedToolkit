@@ -42,7 +42,7 @@ MACRO(_TYPE_A, _NAME_A, bool, Boolean, __VA_ARGS__) \
 MACRO(_TYPE_A, _NAME_A, FRotator, Rotator, __VA_ARGS__) \
 MACRO(_TYPE_A, _NAME_A, FName, Name, __VA_ARGS__) \
 MACRO(_TYPE_A, _NAME_A, FSoftObjectPath, SoftObjectPath, __VA_ARGS__) \
-MACRO(_TYPE_A, _NAME_A, FSoftClassPath, SoftClassPath, __VA_ARGS__) 
+MACRO(_TYPE_A, _NAME_A, FSoftClassPath, SoftClassPath, __VA_ARGS__)
 //MACRO(_TYPE_A, _NAME_A, uint8, Byte, __VA_ARGS__) \
 //MACRO(_TYPE_A, _NAME_A, FText, Text, __VA_ARGS__)
 

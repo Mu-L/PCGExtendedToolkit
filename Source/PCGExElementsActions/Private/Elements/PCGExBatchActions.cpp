@@ -145,7 +145,10 @@ namespace PCGExBatchActions
 		for (const PCGExData::FAttributeIdentity& Identity : Context->DefaultAttributes->Identities)
 		{
 			const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
-			if (!AttributeBase) { continue; }
+			if (!AttributeBase)
+			{
+				continue;
+			}
 			PCGExMetaHelpers::ExecuteWithRightType(
 				AttributeBase,
 				[&](auto DummyValue)

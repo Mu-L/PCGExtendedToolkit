@@ -8,8 +8,8 @@
 #include "PCGExH.h"
 #include "PCGExLog.h"
 #include "PCGExSettingsCacheBody.h"
-#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExAttributeBroadcaster.h"
+#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExMetaHelpersMacros.h"
@@ -30,10 +30,16 @@ namespace PCGExData
 	}
 
 	template <typename T>
-	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetInValues() { return InValues; }
+	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetInValues()
+	{
+		return InValues;
+	}
 
 	template <typename T>
-	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetOutValues() { return OutValues; }
+	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetOutValues()
+	{
+		return OutValues;
+	}
 
 	template <typename T>
 	int32 TArrayBuffer<T>::GetNumValues(const EIOSide InSide)
@@ -58,35 +64,56 @@ namespace PCGExData
 	}
 
 	template <typename T>
-	bool TArrayBuffer<T>::ReadsFromOutput() { return InValues == OutValues; }
+	bool TArrayBuffer<T>::ReadsFromOutput()
+	{
+		return InValues == OutValues;
+	}
 
 	template <typename T>
-	const T& TArrayBuffer<T>::Read(const int32 Index) const { return *(InValues->GetData() + Index); }
+	const T& TArrayBuffer<T>::Read(const int32 Index) const
+	{
+		return *(InValues->GetData() + Index);
+	}
 
 	template <typename T>
 	const void TArrayBuffer<T>::Read(const int32 Start, TArrayView<T> OutResults) const
 	{
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = *(InValues->GetData() + (Start + i)); }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = *(InValues->GetData() + (Start + i));
+		}
 	}
 
 	template <typename T>
-	const T& TArrayBuffer<T>::GetValue(const int32 Index) { return *(OutValues->GetData() + Index); }
+	const T& TArrayBuffer<T>::GetValue(const int32 Index)
+	{
+		return *(OutValues->GetData() + Index);
+	}
 
 	template <typename T>
 	const void TArrayBuffer<T>::GetValues(const int32 Start, TArrayView<T> OutResults)
 	{
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = *(OutValues->GetData() + (Start + i)); }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = *(OutValues->GetData() + (Start + i));
+		}
 	}
 
 	template <typename T>
-	void TArrayBuffer<T>::SetValue(const int32 Index, const T& Value) { *(OutValues->GetData() + Index) = Value; }
+	void TArrayBuffer<T>::SetValue(const int32 Index, const T& Value)
+	{
+		*(OutValues->GetData() + Index) = Value;
+	}
 
 	template <typename T>
 	PCGExValueHash TArrayBuffer<T>::ReadValueHash(const int32 Index)
 	{
-		if (bCacheValueHashes) { return InHashes[Index]; }
+		if (bCacheValueHashes)
+		{
+			return InHashes[Index];
+		}
 		return PCGExTypes::ComputeHash(Read(Index));
 	}
 
@@ -94,19 +121,28 @@ namespace PCGExData
 	void TArrayBuffer<T>::ComputeValueHashes(const PCGExMT::FScope& Scope)
 	{
 		const TArray<T>& InValuesRef = *InValues.Get();
-		PCGEX_SCOPE_LOOP(Index) { InHashes[Index] = PCGExTypes::ComputeHash(InValuesRef[Index]); }
+		PCGEX_SCOPE_LOOP(Index)
+		{
+			InHashes[Index] = PCGExTypes::ComputeHash(InValuesRef[Index]);
+		}
 	}
 
 	template <typename T>
 	void TArrayBuffer<T>::InitForReadInternal(const bool bScoped, const FPCGMetadataAttributeBase* Attribute)
 	{
-		if (InValues) { return; }
+		if (InValues)
+		{
+			return;
+		}
 
 		const int32 NumReadValue = Source->GetIn()->GetNumPoints();
 		InValues = MakeShared<TArray<T>>();
 		PCGExArrayHelpers::InitArray(InValues, NumReadValue);
 
-		if (bCacheValueHashes) { InHashes.Init(0, NumReadValue); }
+		if (bCacheValueHashes)
+		{
+			InHashes.Init(0, NumReadValue);
+		}
 
 		InAttribute = Attribute;
 
@@ -116,7 +152,10 @@ namespace PCGExData
 	template <typename T>
 	void TArrayBuffer<T>::InitForWriteInternal(FPCGMetadataAttributeBase* Attribute, const T& InDefaultValue, const EBufferInit Init)
 	{
-		if (OutValues) { return; }
+		if (OutValues)
+		{
+			return;
+		}
 
 		OutValues = MakeShared<TArray<T>>();
 		OutValues->Init(InDefaultValue, Source->GetOut()->GetNumPoints());
@@ -127,7 +166,10 @@ namespace PCGExData
 	template <typename T>
 	bool TArrayBuffer<T>::EnsureReadable()
 	{
-		if (InValues) { return true; }
+		if (InValues)
+		{
+			return true;
+		}
 		InValues = OutValues;
 		return InValues ? true : false;
 	}
@@ -135,12 +177,18 @@ namespace PCGExData
 	template <typename T>
 	void TArrayBuffer<T>::EnableValueHashCache()
 	{
-		if (bCacheValueHashes) { return; }
+		if (bCacheValueHashes)
+		{
+			return;
+		}
 		bCacheValueHashes = true;
 
 		if (bReadComplete)
 		{
-			if (InHashes.Num() != InValues->Num()) { InHashes.Init(0, InValues->Num()); }
+			if (InHashes.Num() != InValues->Num())
+			{
+				InHashes.Init(0, InValues->Num());
+			}
 			Fetch(PCGExMT::FScope(0, InValues->Num()));
 		}
 	}
@@ -219,8 +267,14 @@ namespace PCGExData
 			if (bSparseBuffer && !bScoped)
 			{
 				// Un-scoping reader.
-				if (!InternalBroadcaster) { InternalBroadcaster = MakeShared<TAttributeBroadcaster<T>>(); }
-				if (!InternalBroadcaster->Prepare(InSelector, Source)) { return false; }
+				if (!InternalBroadcaster)
+				{
+					InternalBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
+				}
+				if (!InternalBroadcaster->Prepare(InSelector, Source))
+				{
+					return false;
+				}
 
 				InternalBroadcaster->GrabAndDump(*InValues, bCaptureMinMax, this->Min, this->Max);
 				bReadComplete = true;
@@ -275,20 +329,17 @@ namespace PCGExData
 		UPCGBasePointData* OutData = Source->GetOut();
 
 		FPCGMetadataDomain* Domain = OutData->Metadata->GetMetadataDomain(Identifier.MetadataDomain);
-		if (!Domain) { Domain = OutData->Metadata->GetDefaultMetadataDomain(); }
-
-		FPCGMetadataAttributeBase* CreatedAttribute = nullptr;
-
-		if (this->bIsNewOutput)
+		if (!Domain)
 		{
-			CreatedAttribute = Domain->template CreateGenericAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation);
-		}
-		else
-		{
-			CreatedAttribute = Domain->template FindOrCreateAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation, true, true);
+			Domain = OutData->Metadata->GetDefaultMetadataDomain();
 		}
 
-		if (!CreatedAttribute) { return false; }
+		FPCGMetadataAttributeBase* CreatedAttribute = Domain->FindOrCreateAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation, true, true);
+
+		if (!CreatedAttribute)
+		{
+			return false;
+		}
 
 		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(CreatedAttribute, const_cast<FPCGMetadataDomain*>(CreatedAttribute->GetMetadataDomain()));
 
@@ -312,8 +363,15 @@ namespace PCGExData
 			}
 		};
 
-		if (Init == EBufferInit::Inherit) { GrabExistingValues(); }
-		else if (!bHasIn && ExistingEntryCount != 0) { GrabExistingValues(); }
+		if (Init == EBufferInit::Inherit)
+		{
+			GrabExistingValues();
+		}
+		else
+			if (!bHasIn && ExistingEntryCount != 0)
+			{
+				GrabExistingValues();
+			}
 
 		return true;
 	}
@@ -323,7 +381,10 @@ namespace PCGExData
 	{
 		{
 			FWriteScopeLock WriteScopeLock(BufferLock);
-			if (OutValues) { return true; }
+			if (OutValues)
+			{
+				return true;
+			}
 		}
 
 		if (const FPCGMetadataAttributeBase* ExistingAttribute = Source->FindConstAttribute(Identifier, EIOSide::In))
@@ -341,7 +402,10 @@ namespace PCGExData
 
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 
-		if (!IsWritable() || !OutValues || !IsEnabled()) { return; }
+		if (!IsWritable() || !OutValues || !IsEnabled())
+		{
+			return;
+		}
 
 		if (!Source->GetOut())
 		{
@@ -349,7 +413,10 @@ namespace PCGExData
 			return;
 		}
 
-		if (!OutAttribute) { return; }
+		if (!OutAttribute)
+		{
+			return;
+		}
 
 		// bResetWithFirstValue: collapse the entire attribute to a single default value.
 		// Used for @Data-domain attributes that should carry one value for the whole dataset.
@@ -361,7 +428,10 @@ namespace PCGExData
 		}
 
 		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(OutAttribute, const_cast<FPCGMetadataDomain*>(OutAttribute->GetMetadataDomain()));
-		if (!OutAccessor.IsValid()) { return; }
+		if (!OutAccessor.IsValid())
+		{
+			return;
+		}
 
 		// Mark this attribute as protected so the consumable-attributes cleanup
 		// in StageOutput won't delete data we just wrote.
@@ -374,21 +444,31 @@ namespace PCGExData
 	template <typename T>
 	void TArrayBuffer<T>::Fetch(const PCGExMT::FScope& Scope)
 	{
-		if (!IsSparse() || bReadComplete || !IsEnabled()) { return; }
+		if (!IsSparse() || bReadComplete || !IsEnabled())
+		{
+			return;
+		}
 		if (InternalBroadcaster)
 		{
 			InternalBroadcaster->Fetch(*InValues, Scope);
-			if (bCacheValueHashes) { ComputeValueHashes(Scope); }
-			return;;
+			if (bCacheValueHashes)
+			{
+				ComputeValueHashes(Scope);
+			}
+			return;
 		}
-		
-		if (TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(InAttribute, InAttribute->GetMetadataDomain()); InAccessor.IsValid())
+
+		if (TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(InAttribute, InAttribute->GetMetadataDomain());
+			InAccessor.IsValid())
 		{
 			TArrayView<T> ReadRange = MakeArrayView(InValues->GetData() + Scope.Start, Scope.Count);
 			InAccessor->GetRange<T>(ReadRange, Scope.Start, *Source->GetInKeys());
 		}
 
-		if (bCacheValueHashes) { ComputeValueHashes(Scope); }
+		if (bCacheValueHashes)
+		{
+			ComputeValueHashes(Scope);
+		}
 	}
 
 	template <typename T>
@@ -412,7 +492,10 @@ namespace PCGExData
 	template <typename T>
 	bool TSingleValueBuffer<T>::EnsureReadable()
 	{
-		if (bReadInitialized) { return true; }
+		if (bReadInitialized)
+		{
+			return true;
+		}
 
 		InValue = OutValue;
 
@@ -431,13 +514,22 @@ namespace PCGExData
 	}
 
 	template <typename T>
-	bool TSingleValueBuffer<T>::IsWritable() { return bWriteInitialized; }
+	bool TSingleValueBuffer<T>::IsWritable()
+	{
+		return bWriteInitialized;
+	}
 
 	template <typename T>
-	bool TSingleValueBuffer<T>::IsReadable() { return bReadInitialized; }
+	bool TSingleValueBuffer<T>::IsReadable()
+	{
+		return bReadInitialized;
+	}
 
 	template <typename T>
-	bool TSingleValueBuffer<T>::ReadsFromOutput() { return bReadFromOutput; }
+	bool TSingleValueBuffer<T>::ReadsFromOutput()
+	{
+		return bReadFromOutput;
+	}
 
 	template <typename T>
 	const T& TSingleValueBuffer<T>::Read(const int32 Index) const
@@ -449,7 +541,10 @@ namespace PCGExData
 	const void TSingleValueBuffer<T>::Read(const int32 Start, TArrayView<T> OutResults) const
 	{
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = InValue; }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = InValue;
+		}
 	}
 
 	template <typename T>
@@ -464,7 +559,10 @@ namespace PCGExData
 	{
 		FReadScopeLock ReadScopeLock(BufferLock);
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = OutValue; }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = OutValue;
+		}
 	}
 
 	template <typename T>
@@ -472,7 +570,10 @@ namespace PCGExData
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 		OutValue = Value;
-		if (bReadFromOutput) { InValue = Value; }
+		if (bReadFromOutput)
+		{
+			InValue = Value;
+		}
 	}
 
 	template <typename T>
@@ -545,7 +646,10 @@ namespace PCGExData
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 
-		if (bWriteInitialized) { return true; }
+		if (bWriteInitialized)
+		{
+			return true;
+		}
 
 		this->bIsNewOutput = !PCGExMetaHelpers::HasAttribute(Source->GetOut(), Identifier);
 
@@ -553,20 +657,17 @@ namespace PCGExData
 		UPCGBasePointData* OutData = Source->GetOut();
 
 		FPCGMetadataDomain* Domain = OutData->Metadata->GetMetadataDomain(Identifier.MetadataDomain);
-		if (!Domain) { Domain = OutData->Metadata->GetDefaultMetadataDomain(); }
-
-		FPCGMetadataAttributeBase* CreatedAttribute = nullptr;
-
-		if (this->bIsNewOutput)
+		if (!Domain)
 		{
-			CreatedAttribute = Domain->template CreateGenericAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation);
-		}
-		else
-		{
-			CreatedAttribute = Domain->template FindOrCreateAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation, true, true);
+			Domain = OutData->Metadata->GetDefaultMetadataDomain();
 		}
 
-		if (!CreatedAttribute) { return false; }
+		FPCGMetadataAttributeBase* CreatedAttribute = Domain->FindOrCreateAttribute<T>(Identifier.Name, DefaultValue, bAllowInterpolation, true, true);
+
+		if (!CreatedAttribute)
+		{
+			return false;
+		}
 
 		OutAttribute = CreatedAttribute;
 		bWriteInitialized = true;
@@ -581,8 +682,15 @@ namespace PCGExData
 			OutValue = CreatedAttribute->GetValueFromItemKey<T>(PCGDefaultValueKey);
 		};
 
-		if (Init == EBufferInit::Inherit) { GrabExistingValues(); }
-		else if (!bHasIn && ExistingEntryCount != 0) { GrabExistingValues(); }
+		if (Init == EBufferInit::Inherit)
+		{
+			GrabExistingValues();
+		}
+		else
+			if (!bHasIn && ExistingEntryCount != 0)
+			{
+				GrabExistingValues();
+			}
 
 		return bWriteInitialized;
 	}
@@ -592,7 +700,10 @@ namespace PCGExData
 	{
 		{
 			FWriteScopeLock WriteScopeLock(BufferLock);
-			if (bWriteInitialized) { return true; }
+			if (bWriteInitialized)
+			{
+				return true;
+			}
 		}
 
 		if (const FPCGMetadataAttributeBase* ExistingAttribute = Source->FindConstAttribute(Identifier, EIOSide::In))
@@ -610,7 +721,10 @@ namespace PCGExData
 
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 
-		if (!IsWritable() || !IsEnabled()) { return; }
+		if (!IsWritable() || !IsEnabled())
+		{
+			return;
+		}
 
 		if (!Source->GetOut())
 		{
@@ -618,7 +732,10 @@ namespace PCGExData
 			return;
 		}
 
-		if (!OutAttribute) { return; }
+		if (!OutAttribute)
+		{
+			return;
+		}
 
 		// CRITICAL — DO NOT REPLACE WITH SetValue<T>(PCGDefaultValueKey, OutValue).
 		// PCGDefaultValueKey == -1 == PCGInvalidEntryKey; the engine's SetValueFromValueKey_Unsafe

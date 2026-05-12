@@ -24,29 +24,29 @@ namespace PCGExData
 		const TMap<FString, FFieldEntry>& GetFieldTable()
 		{
 			static const TMap<FString, FFieldEntry> Table = {
-				{TEXT("X"),             {PCGExTypeOps::ESingleField::X,             EPCGMetadataTypes::Vector,     0}},
-				{TEXT("R"),             {PCGExTypeOps::ESingleField::X,             EPCGMetadataTypes::Quaternion, 0}},
-				{TEXT("ROLL"),          {PCGExTypeOps::ESingleField::X,             EPCGMetadataTypes::Quaternion, 0}},
-				{TEXT("RX"),            {PCGExTypeOps::ESingleField::X,             EPCGMetadataTypes::Quaternion, 0}},
-				{TEXT("Y"),             {PCGExTypeOps::ESingleField::Y,             EPCGMetadataTypes::Vector,     1}},
-				{TEXT("G"),             {PCGExTypeOps::ESingleField::Y,             EPCGMetadataTypes::Vector4,    1}},
-				{TEXT("YAW"),           {PCGExTypeOps::ESingleField::Y,             EPCGMetadataTypes::Quaternion, 1}},
-				{TEXT("RY"),            {PCGExTypeOps::ESingleField::Y,             EPCGMetadataTypes::Quaternion, 1}},
-				{TEXT("Z"),             {PCGExTypeOps::ESingleField::Z,             EPCGMetadataTypes::Vector,     2}},
-				{TEXT("B"),             {PCGExTypeOps::ESingleField::Z,             EPCGMetadataTypes::Vector4,    2}},
-				{TEXT("P"),             {PCGExTypeOps::ESingleField::Z,             EPCGMetadataTypes::Quaternion, 2}},
-				{TEXT("PITCH"),         {PCGExTypeOps::ESingleField::Z,             EPCGMetadataTypes::Quaternion, 2}},
-				{TEXT("RZ"),            {PCGExTypeOps::ESingleField::Z,             EPCGMetadataTypes::Quaternion, 2}},
-				{TEXT("W"),             {PCGExTypeOps::ESingleField::W,             EPCGMetadataTypes::Vector4,    3}},
-				{TEXT("A"),             {PCGExTypeOps::ESingleField::W,             EPCGMetadataTypes::Vector4,    3}},
-				{TEXT("L"),             {PCGExTypeOps::ESingleField::Length,        EPCGMetadataTypes::Vector,     0}},
-				{TEXT("LEN"),           {PCGExTypeOps::ESingleField::Length,        EPCGMetadataTypes::Vector,     0}},
-				{TEXT("LENGTH"),        {PCGExTypeOps::ESingleField::Length,        EPCGMetadataTypes::Vector,     0}},
-				{TEXT("SQUAREDLENGTH"), {PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector,     0}},
-				{TEXT("LENSQR"),        {PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector,     0}},
-				{TEXT("VOL"),           {PCGExTypeOps::ESingleField::Volume,        EPCGMetadataTypes::Vector,     0}},
-				{TEXT("VOLUME"),        {PCGExTypeOps::ESingleField::Volume,        EPCGMetadataTypes::Vector,     0}},
-				{TEXT("SUM"),           {PCGExTypeOps::ESingleField::Sum,           EPCGMetadataTypes::Vector,     0}},
+				{TEXT("X"), {PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("R"), {PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
+				{TEXT("ROLL"), {PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
+				{TEXT("RX"), {PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
+				{TEXT("Y"), {PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Vector, 1}},
+				{TEXT("G"), {PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Vector4, 1}},
+				{TEXT("YAW"), {PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Quaternion, 1}},
+				{TEXT("RY"), {PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Quaternion, 1}},
+				{TEXT("Z"), {PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Vector, 2}},
+				{TEXT("B"), {PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Vector4, 2}},
+				{TEXT("P"), {PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
+				{TEXT("PITCH"), {PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
+				{TEXT("RZ"), {PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
+				{TEXT("W"), {PCGExTypeOps::ESingleField::W, EPCGMetadataTypes::Vector4, 3}},
+				{TEXT("A"), {PCGExTypeOps::ESingleField::W, EPCGMetadataTypes::Vector4, 3}},
+				{TEXT("L"), {PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("LEN"), {PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("LENGTH"), {PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("SQUAREDLENGTH"), {PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("LENSQR"), {PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("VOL"), {PCGExTypeOps::ESingleField::Volume, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("VOLUME"), {PCGExTypeOps::ESingleField::Volume, EPCGMetadataTypes::Vector, 0}},
+				{TEXT("SUM"), {PCGExTypeOps::ESingleField::Sum, EPCGMetadataTypes::Vector, 0}},
 			};
 			return Table;
 		}
@@ -73,13 +73,20 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: return V.X;
-			case ESingleField::Y: return V.Y;
-			case ESingleField::Length: return V.Length();
-			case ESingleField::SquaredLength: return V.SquaredLength();
-			case ESingleField::Volume: return V.X * V.Y;
-			case ESingleField::Sum: return V.X + V.Y;
-			default: return V.X;
+			case ESingleField::X:
+				return V.X;
+			case ESingleField::Y:
+				return V.Y;
+			case ESingleField::Length:
+				return V.Length();
+			case ESingleField::SquaredLength:
+				return V.SquaredLength();
+			case ESingleField::Volume:
+				return V.X * V.Y;
+			case ESingleField::Sum:
+				return V.X + V.Y;
+			default:
+				return V.X;
 			}
 		}
 
@@ -88,14 +95,22 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: return V.X;
-			case ESingleField::Y: return V.Y;
-			case ESingleField::Z: return V.Z;
-			case ESingleField::Length: return V.Length();
-			case ESingleField::SquaredLength: return V.SquaredLength();
-			case ESingleField::Volume: return V.X * V.Y * V.Z;
-			case ESingleField::Sum: return V.X + V.Y + V.Z;
-			default: return V.X;
+			case ESingleField::X:
+				return V.X;
+			case ESingleField::Y:
+				return V.Y;
+			case ESingleField::Z:
+				return V.Z;
+			case ESingleField::Length:
+				return V.Length();
+			case ESingleField::SquaredLength:
+				return V.SquaredLength();
+			case ESingleField::Volume:
+				return V.X * V.Y * V.Z;
+			case ESingleField::Sum:
+				return V.X + V.Y + V.Z;
+			default:
+				return V.X;
 			}
 		}
 
@@ -104,15 +119,24 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: return V.X;
-			case ESingleField::Y: return V.Y;
-			case ESingleField::Z: return V.Z;
-			case ESingleField::W: return V.W;
-			case ESingleField::Length: return FVector(V.X, V.Y, V.Z).Length();
-			case ESingleField::SquaredLength: return FVector(V.X, V.Y, V.Z).SquaredLength();
-			case ESingleField::Volume: return V.X * V.Y * V.Z * V.W;
-			case ESingleField::Sum: return V.X + V.Y + V.Z + V.W;
-			default: return V.X;
+			case ESingleField::X:
+				return V.X;
+			case ESingleField::Y:
+				return V.Y;
+			case ESingleField::Z:
+				return V.Z;
+			case ESingleField::W:
+				return V.W;
+			case ESingleField::Length:
+				return FVector(V.X, V.Y, V.Z).Length();
+			case ESingleField::SquaredLength:
+				return FVector(V.X, V.Y, V.Z).SquaredLength();
+			case ESingleField::Volume:
+				return V.X * V.Y * V.Z * V.W;
+			case ESingleField::Sum:
+				return V.X + V.Y + V.Z + V.W;
+			default:
+				return V.X;
 			}
 		}
 
@@ -122,10 +146,14 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: return R.Roll;
-			case ESingleField::Y: return R.Yaw;
-			case ESingleField::Z: return R.Pitch;
-			default: return R.Roll;
+			case ESingleField::X:
+				return R.Roll;
+			case ESingleField::Y:
+				return R.Yaw;
+			case ESingleField::Z:
+				return R.Pitch;
+			default:
+				return R.Roll;
 			}
 		}
 
@@ -144,10 +172,29 @@ namespace PCGExData
 		}
 
 		// String types: return 0. Unreachable via ClassifyForInType (Drop on strings).
-		template <> FORCEINLINE double ExtractFieldFromValue<FString>(const FString& /*V*/, ESingleField /*F*/) { return 0.0; }
-		template <> FORCEINLINE double ExtractFieldFromValue<FName>(const FName& /*V*/, ESingleField /*F*/) { return 0.0; }
-		template <> FORCEINLINE double ExtractFieldFromValue<FSoftObjectPath>(const FSoftObjectPath& /*V*/, ESingleField /*F*/) { return 0.0; }
-		template <> FORCEINLINE double ExtractFieldFromValue<FSoftClassPath>(const FSoftClassPath& /*V*/, ESingleField /*F*/) { return 0.0; }
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FString>(const FString& /*V*/, ESingleField /*F*/)
+		{
+			return 0.0;
+		}
+
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FName>(const FName& /*V*/, ESingleField /*F*/)
+		{
+			return 0.0;
+		}
+
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FSoftObjectPath>(const FSoftObjectPath& /*V*/, ESingleField /*F*/)
+		{
+			return 0.0;
+		}
+
+		template <>
+		FORCEINLINE double ExtractFieldFromValue<FSoftClassPath>(const FSoftClassPath& /*V*/, ESingleField /*F*/)
+		{
+			return 0.0;
+		}
 
 		// --- InjectField ---
 
@@ -163,11 +210,20 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: V.X = Value; break;
-			case ESingleField::Y: V.Y = Value; break;
-			case ESingleField::Length: V = V.GetSafeNormal() * Value; break;
-			case ESingleField::SquaredLength: V = V.GetSafeNormal() * FMath::Sqrt(Value); break;
-			default: break;
+			case ESingleField::X:
+				V.X = Value;
+				break;
+			case ESingleField::Y:
+				V.Y = Value;
+				break;
+			case ESingleField::Length:
+				V = V.GetSafeNormal() * Value;
+				break;
+			case ESingleField::SquaredLength:
+				V = V.GetSafeNormal() * FMath::Sqrt(Value);
+				break;
+			default:
+				break;
 			}
 		}
 
@@ -176,12 +232,23 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: V.X = Value; break;
-			case ESingleField::Y: V.Y = Value; break;
-			case ESingleField::Z: V.Z = Value; break;
-			case ESingleField::Length: V = V.GetSafeNormal() * Value; break;
-			case ESingleField::SquaredLength: V = V.GetSafeNormal() * FMath::Sqrt(Value); break;
-			default: break;
+			case ESingleField::X:
+				V.X = Value;
+				break;
+			case ESingleField::Y:
+				V.Y = Value;
+				break;
+			case ESingleField::Z:
+				V.Z = Value;
+				break;
+			case ESingleField::Length:
+				V = V.GetSafeNormal() * Value;
+				break;
+			case ESingleField::SquaredLength:
+				V = V.GetSafeNormal() * FMath::Sqrt(Value);
+				break;
+			default:
+				break;
 			}
 		}
 
@@ -190,25 +257,34 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: V.X = Value; break;
-			case ESingleField::Y: V.Y = Value; break;
-			case ESingleField::Z: V.Z = Value; break;
-			case ESingleField::W: V.W = Value; break;
+			case ESingleField::X:
+				V.X = Value;
+				break;
+			case ESingleField::Y:
+				V.Y = Value;
+				break;
+			case ESingleField::Z:
+				V.Z = Value;
+				break;
+			case ESingleField::W:
+				V.W = Value;
+				break;
 			case ESingleField::Length:
-				{
-					FVector Vec(V.X, V.Y, V.Z);
-					Vec = Vec.GetSafeNormal() * Value;
-					V = FVector4(Vec.X, Vec.Y, Vec.Z, V.W);
-				}
-				break;
+			{
+				FVector Vec(V.X, V.Y, V.Z);
+				Vec = Vec.GetSafeNormal() * Value;
+				V = FVector4(Vec.X, Vec.Y, Vec.Z, V.W);
+			}
+			break;
 			case ESingleField::SquaredLength:
-				{
-					FVector Vec(V.X, V.Y, V.Z);
-					Vec = Vec.GetSafeNormal() * FMath::Sqrt(Value);
-					V = FVector4(Vec.X, Vec.Y, Vec.Z, V.W);
-				}
+			{
+				FVector Vec(V.X, V.Y, V.Z);
+				Vec = Vec.GetSafeNormal() * FMath::Sqrt(Value);
+				V = FVector4(Vec.X, Vec.Y, Vec.Z, V.W);
+			}
+			break;
+			default:
 				break;
-			default: break;
 			}
 		}
 
@@ -218,12 +294,23 @@ namespace PCGExData
 		{
 			switch (Field)
 			{
-			case ESingleField::X: R.Roll = Value; break;
-			case ESingleField::Y: R.Yaw = Value; break;
-			case ESingleField::Z: R.Pitch = Value; break;
-			case ESingleField::Length: R = R.GetNormalized() * Value; break;
-			case ESingleField::SquaredLength: R = R.GetNormalized() * FMath::Sqrt(Value); break;
-			default: break;
+			case ESingleField::X:
+				R.Roll = Value;
+				break;
+			case ESingleField::Y:
+				R.Yaw = Value;
+				break;
+			case ESingleField::Z:
+				R.Pitch = Value;
+				break;
+			case ESingleField::Length:
+				R = R.GetNormalized() * Value;
+				break;
+			case ESingleField::SquaredLength:
+				R = R.GetNormalized() * FMath::Sqrt(Value);
+				break;
+			default:
+				break;
 			}
 		}
 
@@ -247,10 +334,25 @@ namespace PCGExData
 		}
 
 		// String types: no-op. Unreachable via ClassifyForInType (Drop on strings).
-		template <> FORCEINLINE void InjectFieldIntoValue<FString>(FString& /*V*/, double /*Val*/, ESingleField /*F*/) {}
-		template <> FORCEINLINE void InjectFieldIntoValue<FName>(FName& /*V*/, double /*Val*/, ESingleField /*F*/) {}
-		template <> FORCEINLINE void InjectFieldIntoValue<FSoftObjectPath>(FSoftObjectPath& /*V*/, double /*Val*/, ESingleField /*F*/) {}
-		template <> FORCEINLINE void InjectFieldIntoValue<FSoftClassPath>(FSoftClassPath& /*V*/, double /*Val*/, ESingleField /*F*/) {}
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FString>(FString& /*V*/, double /*Val*/, ESingleField /*F*/)
+		{
+		}
+
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FName>(FName& /*V*/, double /*Val*/, ESingleField /*F*/)
+		{
+		}
+
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FSoftObjectPath>(FSoftObjectPath& /*V*/, double /*Val*/, ESingleField /*F*/)
+		{
+		}
+
+		template <>
+		FORCEINLINE void InjectFieldIntoValue<FSoftClassPath>(FSoftClassPath& /*V*/, double /*Val*/, ESingleField /*F*/)
+		{
+		}
 
 		//
 		// Typed fn pointers for compiled-chain hot path
@@ -344,7 +446,8 @@ namespace PCGExData
 #define PCGEX_CASE(_TYPE, _NAME, ...) case EPCGMetadataTypes::_NAME: return &FieldGetStep<_TYPE>;
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_CASE)
 #undef PCGEX_CASE
-		default: return nullptr;
+		default:
+			return nullptr;
 		}
 	}
 
@@ -355,7 +458,8 @@ namespace PCGExData
 #define PCGEX_CASE(_TYPE, _NAME, ...) case EPCGMetadataTypes::_NAME: return &FieldSetStep<_TYPE>;
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_CASE)
 #undef PCGEX_CASE
-		default: return nullptr;
+		default:
+			return nullptr;
 		}
 	}
 

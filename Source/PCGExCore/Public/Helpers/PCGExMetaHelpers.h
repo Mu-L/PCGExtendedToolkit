@@ -10,8 +10,8 @@
 #include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Types/PCGExAttributeIdentity.h"
 
-#include "Metadata/PCGMetadataAttributeTpl.h"
 #include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttributeTpl.h"
 #include "Metadata/PCGMetadataAttributeTpl.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 
@@ -276,7 +276,7 @@ namespace PCGExMetaHelpers
 	// arithmetic / typed-conversion-only and has no defined semantics for container or extended types.
 	// _IDENTITY can be any expression with a `.Name` member (FAttributeIdentity, FPCGMetadataAttributeDesc).
 	// _OPERATION is a FText literal naming the operation, e.g. FTEXT("Attribute Stats").
-	#define PCGEX_LOG_UNSUPPORTED_TYPE(_CONTEXT, _IDENTITY, _OPERATION) \
+#define PCGEX_LOG_UNSUPPORTED_TYPE(_CONTEXT, _IDENTITY, _OPERATION) \
 		PCGE_LOG_C(Warning, GraphAndLog, _CONTEXT, FText::Format( \
 			FTEXT("Attribute '{0}' is a container or extended type and cannot be used by {1} — skipped."), \
 			FText::FromName((_IDENTITY).Name), _OPERATION))
@@ -304,7 +304,10 @@ namespace PCGExMetaHelpers
 	template <typename TypedFn>
 	static bool ExecuteWithRightType(const PCGExData::FAttributeIdentity& Identity, TypedFn&& Typed)
 	{
-		if (!IsBasicSingleValue(Identity)) { return false; }
+		if (!IsBasicSingleValue(Identity))
+		{
+			return false;
+		}
 		ExecuteWithRightType(Identity.GetType(), std::forward<TypedFn>(Typed));
 		return true;
 	}
@@ -314,7 +317,11 @@ namespace PCGExMetaHelpers
 	template <typename TypedFn, typename FallbackFn>
 	static bool ExecuteWithRightType(const FPCGMetadataAttributeBase* Attr, TypedFn&& Typed, FallbackFn&& Fallback)
 	{
-		if (!Attr) { Fallback(); return false; }
+		if (!Attr)
+		{
+			Fallback();
+			return false;
+		}
 		if (IsBasicSingleValue(Attr->GetAttributeDesc()))
 		{
 			ExecuteWithRightType(static_cast<EPCGMetadataTypes>(Attr->GetTypeId()), std::forward<TypedFn>(Typed));
@@ -329,7 +336,10 @@ namespace PCGExMetaHelpers
 	template <typename TypedFn>
 	static bool ExecuteWithRightType(const FPCGMetadataAttributeBase* Attr, TypedFn&& Typed)
 	{
-		if (!Attr || !IsBasicSingleValue(Attr->GetAttributeDesc())) { return false; }
+		if (!Attr || !IsBasicSingleValue(Attr->GetAttributeDesc()))
+		{
+			return false;
+		}
 		ExecuteWithRightType(static_cast<EPCGMetadataTypes>(Attr->GetTypeId()), std::forward<TypedFn>(Typed));
 		return true;
 	}

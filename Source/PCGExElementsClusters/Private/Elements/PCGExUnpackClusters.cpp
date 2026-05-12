@@ -75,7 +75,10 @@ public:
 			// Support for legacy data that was storing the edge count as a point index
 			EdgeCountIdentifier = PCGExMetaHelpers::GetAttributeIdentifier(PCGExClusters::Labels::Tag_PackedClusterEdgeCount_LEGACY, PointIO->GetIn());
 			EdgeCount = PCGExMetaHelpers::TryGetConstAttribute<int32>(PointIO->GetIn(), EdgeCountIdentifier);
-			if (EdgeCount) { NumEdges = PCGExData::Helpers::ReadDataValue<int32>(EdgeCount); }
+			if (EdgeCount)
+			{
+				NumEdges = PCGExData::Helpers::ReadDataValue<int32>(EdgeCount);
+			}
 		}
 		else
 		{

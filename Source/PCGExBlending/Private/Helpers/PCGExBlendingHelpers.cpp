@@ -47,7 +47,10 @@ namespace PCGExBlending::Helpers
 							OutAttribute = Target->FindOrCreateAttribute<T>(Identifier, InAttribute->GetValueFromItemKey(PCGDefaultValueKey), InAttribute->AllowsInterpolation());
 						}
 
-						if (!OutAttribute) { return; }
+						if (!OutAttribute)
+						{
+							return;
+						}
 
 						OutAttribute->SetValue(OutKey, InAttribute->GetValueFromItemKey(InKey));
 					},
@@ -55,14 +58,20 @@ namespace PCGExBlending::Helpers
 					{
 						// Property-backed: copy single value from source attribute → target attribute via FProperty.
 						const FPCGMetadataAttributeBase* InAttribute = InMetadata->GetConstAttribute(Identifier);
-						if (!InAttribute) { return; }
+						if (!InAttribute)
+						{
+							return;
+						}
 
 						FPCGMetadataAttributeBase* OutAttribute = OutMetadata->GetMutableAttribute(Identifier);
 						if (!OutAttribute)
 						{
 							OutAttribute = OutMetadata->CreateAttribute(Identifier, InAttribute->GetAttributeDesc(), InAttribute->AllowsInterpolation(), /*bOverrideParent=*/true);
 						}
-						if (!OutAttribute) { return; }
+						if (!OutAttribute)
+						{
+							return;
+						}
 
 						PCGExData::Helpers::PropertyCopyAttribute(InAttribute, InKey, OutAttribute, OutKey);
 					});

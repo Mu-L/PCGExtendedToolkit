@@ -51,18 +51,31 @@ namespace PCGExData
 		FPropertyBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
 		virtual ~FPropertyBuffer() override;
 
-		FORCEINLINE int32 GetElementSize() const { return ElementSize; }
+		FORCEINLINE int32 GetElementSize() const
+		{
+			return ElementSize;
+		}
 
 		bool InitProperty(const FPCGMetadataAttributeBase* InGenericAttribute);
 
-		const FPCGMetadataAttributeBase* GetGenericInAttribute() const { return GenericInAttribute; }
-		FPCGMetadataAttributeBase* GetGenericOutAttribute() const { return GenericOutAttribute; }
+		const FPCGMetadataAttributeBase* GetGenericInAttribute() const
+		{
+			return GenericInAttribute;
+		}
+
+		FPCGMetadataAttributeBase* GetGenericOutAttribute() const
+		{
+			return GenericOutAttribute;
+		}
 
 		// Non-owning accessor to the cached property that drives this buffer's reads/writes.
 		// Lifetime-tied to the buffer itself — do not retain past the buffer's lifetime.
 		// Used by FBlendOperationFactory / CreateProxyBlender to construct property-aware blend ops
 		// for container/extended types where (EnumType, VTO)-based sizing returns 0.
-		const FProperty* GetCachedProperty() const { return CachedInnerProperty; }
+		const FProperty* GetCachedProperty() const
+		{
+			return CachedInnerProperty;
+		}
 
 		// Runtime type via reflection — FScopedTypedValue(FProperty*) handles arbitrary UStructs/UEnums/etc.
 		// Precondition: CachedInnerProperty is valid (i.e. InitForRead or InitForWrite succeeded).
@@ -73,7 +86,10 @@ namespace PCGExData
 		}
 
 		// Property-backed buffer — see IBuffer::IsPropertyBacked() rationale.
-		virtual bool IsPropertyBacked() const override { return true; }
+		virtual bool IsPropertyBacked() const override
+		{
+			return true;
+		}
 
 		// Static factory: build an FProperty matching the attribute's full descriptor.
 		// Handles container types (TArray/TSet/TMap), scalar legacy types, struct/enum, and

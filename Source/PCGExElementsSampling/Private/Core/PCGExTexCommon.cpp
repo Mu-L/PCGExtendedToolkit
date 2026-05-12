@@ -165,7 +165,10 @@ namespace PCGExTexture
 		for (const FPCGTaggedData& TaggedData : TaggedTexData)
 		{
 			const UPCGTexture2DSingleBaseData* BaseTextureData = Cast<UPCGTexture2DSingleBaseData>(TaggedData.Data);
-			if (!BaseTextureData) { continue; }
+			if (!BaseTextureData)
+			{
+				continue;
+			}
 
 			if (const UPCGTextureData* TextureData = Cast<UPCGTextureData>(BaseTextureData))
 			{

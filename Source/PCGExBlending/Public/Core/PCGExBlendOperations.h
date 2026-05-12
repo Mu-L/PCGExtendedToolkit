@@ -51,7 +51,10 @@ namespace PCGExBlending
 		// Core blend: Out = Blend(A, B, Weight)
 		// Virtual to allow FCopyOnlyBlendOperation to override with size-aware memcpy.
 		// Default implementation dispatches through function pointer (zero overhead for typed ops).
-		virtual void Blend(const void* A, const void* B, double Weight, void* Out) const { BlendFunc(A, B, Weight, Out); }
+		virtual void Blend(const void* A, const void* B, double Weight, void* Out) const
+		{
+			BlendFunc(A, B, Weight, Out);
+		}
 
 		// Multi-blend operations for accumulation patterns
 		virtual void BeginMulti(void* Accumulator, const void* InitialValue, PCGEx::FOpStats& OutTracker) const
@@ -78,8 +81,15 @@ namespace PCGExBlending
 			}
 		}
 
-		virtual void Accumulate(const void* Source, void* Accumulator, double Weight) const { AccumulateFunc(Accumulator, Source, Weight, Accumulator); }
-		virtual void EndMulti(void* Accumulator, double TotalWeight, int32 Count) const { FinalizeFunc(Accumulator, TotalWeight, Count); }
+		virtual void Accumulate(const void* Source, void* Accumulator, double Weight) const
+		{
+			AccumulateFunc(Accumulator, Source, Weight, Accumulator);
+		}
+
+		virtual void EndMulti(void* Accumulator, double TotalWeight, int32 Count) const
+		{
+			FinalizeFunc(Accumulator, TotalWeight, Count);
+		}
 
 		// Division helper (for external averaging)
 		virtual void Div(void* Value, double Divisor) const = 0;
@@ -484,8 +494,8 @@ namespace PCGExBlending
 	public:
 		FCopyOnlyBlendOperation(int32 InValueSize, int32 InValueAlignment, EPCGExABBlendingType InMode, bool bInResetForMulti)
 			: IBlendOperation(InMode, bInResetForMulti)
-			, ValueSize(InValueSize)
-			, ValueAlignment(InValueAlignment)
+			  , ValueSize(InValueSize)
+			  , ValueAlignment(InValueAlignment)
 		{
 			// Function pointers unused — all dispatch goes through virtual overrides
 			BlendFunc = nullptr;
@@ -512,17 +522,52 @@ namespace PCGExBlending
 			FMemory::Memcpy(Accumulator, Source, ValueSize);
 		}
 
-		virtual void EndMulti(void* /*Accumulator*/, double /*TotalWeight*/, int32 /*Count*/) const override {}
+		virtual void EndMulti(void* /*Accumulator*/, double /*TotalWeight*/, int32 /*Count*/) const override
+		{
+		}
 
-		virtual void Div(void* /*Value*/, double /*Divisor*/) const override {}
-		virtual EPCGMetadataTypes GetWorkingType() const override { return EPCGMetadataTypes::Unknown; }
-		virtual int32 GetValueSize() const override { return ValueSize; }
-		virtual int32 GetValueAlignment() const override { return ValueAlignment; }
-		virtual void InitDefault(void* Value) const override { FMemory::Memzero(Value, ValueSize); }
-		virtual bool NeedsLifecycleManagement() const override { return false; }
-		virtual void ConstructValue(void* Value) const override { FMemory::Memzero(Value, ValueSize); }
-		virtual void DestroyValue(void* /*Value*/) const override {}
-		virtual void CopyValue(const void* Src, void* Dst) const override { FMemory::Memcpy(Dst, Src, ValueSize); }
+		virtual void Div(void* /*Value*/, double /*Divisor*/) const override
+		{
+		}
+
+		virtual EPCGMetadataTypes GetWorkingType() const override
+		{
+			return EPCGMetadataTypes::Unknown;
+		}
+
+		virtual int32 GetValueSize() const override
+		{
+			return ValueSize;
+		}
+
+		virtual int32 GetValueAlignment() const override
+		{
+			return ValueAlignment;
+		}
+
+		virtual void InitDefault(void* Value) const override
+		{
+			FMemory::Memzero(Value, ValueSize);
+		}
+
+		virtual bool NeedsLifecycleManagement() const override
+		{
+			return false;
+		}
+
+		virtual void ConstructValue(void* Value) const override
+		{
+			FMemory::Memzero(Value, ValueSize);
+		}
+
+		virtual void DestroyValue(void* /*Value*/) const override
+		{
+		}
+
+		virtual void CopyValue(const void* Src, void* Dst) const override
+		{
+			FMemory::Memcpy(Dst, Src, ValueSize);
+		}
 	};
 
 	//
@@ -548,9 +593,9 @@ namespace PCGExBlending
 	public:
 		FPropertyCopyBlendOperation(const FProperty* InProperty, EPCGExABBlendingType InMode, bool bInResetForMulti)
 			: IBlendOperation(InMode, bInResetForMulti)
-			, TypedProperty(InProperty)
-			, ValueSize(InProperty ? InProperty->GetSize() : 0)
-			, ValueAlignment(InProperty ? InProperty->GetMinAlignment() : 1)
+			  , TypedProperty(InProperty)
+			  , ValueSize(InProperty ? InProperty->GetSize() : 0)
+			  , ValueAlignment(InProperty ? InProperty->GetMinAlignment() : 1)
 		{
 			check(InProperty);
 			BlendFunc = nullptr;
@@ -577,17 +622,53 @@ namespace PCGExBlending
 			TypedProperty->CopyCompleteValue(Accumulator, Source);
 		}
 
-		virtual void EndMulti(void* /*Accumulator*/, double /*TotalWeight*/, int32 /*Count*/) const override {}
+		virtual void EndMulti(void* /*Accumulator*/, double /*TotalWeight*/, int32 /*Count*/) const override
+		{
+		}
 
-		virtual void Div(void* /*Value*/, double /*Divisor*/) const override {}
-		virtual EPCGMetadataTypes GetWorkingType() const override { return EPCGMetadataTypes::Unknown; }
-		virtual int32 GetValueSize() const override { return ValueSize; }
-		virtual int32 GetValueAlignment() const override { return ValueAlignment; }
-		virtual void InitDefault(void* Value) const override { TypedProperty->InitializeValue(Value); }
-		virtual bool NeedsLifecycleManagement() const override { return true; }
-		virtual void ConstructValue(void* Value) const override { TypedProperty->InitializeValue(Value); }
-		virtual void DestroyValue(void* Value) const override { TypedProperty->DestroyValue(Value); }
-		virtual void CopyValue(const void* Src, void* Dst) const override { TypedProperty->CopyCompleteValue(Dst, Src); }
+		virtual void Div(void* /*Value*/, double /*Divisor*/) const override
+		{
+		}
+
+		virtual EPCGMetadataTypes GetWorkingType() const override
+		{
+			return EPCGMetadataTypes::Unknown;
+		}
+
+		virtual int32 GetValueSize() const override
+		{
+			return ValueSize;
+		}
+
+		virtual int32 GetValueAlignment() const override
+		{
+			return ValueAlignment;
+		}
+
+		virtual void InitDefault(void* Value) const override
+		{
+			TypedProperty->InitializeValue(Value);
+		}
+
+		virtual bool NeedsLifecycleManagement() const override
+		{
+			return true;
+		}
+
+		virtual void ConstructValue(void* Value) const override
+		{
+			TypedProperty->InitializeValue(Value);
+		}
+
+		virtual void DestroyValue(void* Value) const override
+		{
+			TypedProperty->DestroyValue(Value);
+		}
+
+		virtual void CopyValue(const void* Src, void* Dst) const override
+		{
+			TypedProperty->CopyCompleteValue(Dst, Src);
+		}
 	};
 
 	//

@@ -228,8 +228,115 @@ namespace PCGExTypeOps
 			return A && !B;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return A; }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return FMath::IsNearlyZero(Factor) ? false : A; }
+		static FORCEINLINE Type Mult(const Type& A, const Type& B)
+		{
+			return A && B;
+		}
+
+		static FORCEINLINE Type Div(const Type& A, double D)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W)
+		{
+			return W < 0.5 ? A : B;
+		}
+
+		static FORCEINLINE Type Min(const Type& A, const Type& B)
+		{
+			return A && B;
+		}
+
+		static FORCEINLINE Type Max(const Type& A, const Type& B)
+		{
+			return A || B;
+		}
+
+		static FORCEINLINE Type Average(const Type& A, const Type& B)
+		{
+			return A || B;
+		}
+
+		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
+		{
+			return W > 0.5 ? (A || B) : A;
+		}
+
+		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
+		{
+			return W > 0.5 ? (A && !B) : A;
+		}
+
+		static FORCEINLINE Type CopyA(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyB(const Type& A, const Type& B)
+		{
+			return B;
+		}
+
+		static FORCEINLINE Type UnsignedMin(const Type& A, const Type& B)
+		{
+			return A && B;
+		}
+
+		static FORCEINLINE Type UnsignedMax(const Type& A, const Type& B)
+		{
+			return A || B;
+		}
+
+		static FORCEINLINE Type AbsoluteMin(const Type& A, const Type& B)
+		{
+			return A && B;
+		}
+
+		static FORCEINLINE Type AbsoluteMax(const Type& A, const Type& B)
+		{
+			return A || B;
+		}
+
+		static FORCEINLINE Type NaiveHash(const Type& A, const Type& B)
+		{
+			return A != B;
+		}
+
+		static FORCEINLINE Type UnsignedHash(const Type& A, const Type& B)
+		{
+			return A != B;
+		}
+
+		static FORCEINLINE Type ModSimple(const Type& A, double M)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type ModComplex(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W > 0.5 ? B : A;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return FMath::IsNearlyZero(Factor) ? false : A;
+		}
 	};
 
 	// Numeric Type Operations - int32
@@ -491,8 +598,25 @@ namespace PCGExTypeOps
 			return B != 0 ? A % B : A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return FMath::Abs(A); }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W != 0.0 ? static_cast<Type>((A + B) / W) : A;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return TW != 0.0 ? A * (1.0 / TW) : A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return FMath::Abs(A);
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A * Factor;
+		}
 	};
 
 	// Numeric Type Operations - int64
@@ -754,8 +878,25 @@ namespace PCGExTypeOps
 			return B != 0 ? A % B : A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return FMath::Abs(A); }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W != 0.0 ? static_cast<Type>((A + B) / W) : A;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return TW != 0.0 ? A * (1.0 / TW) : A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return FMath::Abs(A);
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A * Factor;
+		}
 	};
 
 	// Numeric Type Operations - float
@@ -1017,8 +1158,25 @@ namespace PCGExTypeOps
 			return B != 0.0f ? FMath::Fmod(A, B) : A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return FMath::Abs(A); }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W != 0.0 ? static_cast<Type>((A + B) / W) : A;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return TW != 0.0 ? A * (1.0 / TW) : A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return FMath::Abs(A);
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A * Factor;
+		}
 	};
 
 	// Numeric Type Operations - double
@@ -1280,8 +1438,25 @@ namespace PCGExTypeOps
 			return B != 0.0 ? FMath::Fmod(A, B) : A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return FMath::Abs(A); }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A * Factor; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W != 0.0 ? (A + B) / W : A;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return TW != 0.0 ? A * (1.0 / TW) : A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return FMath::Abs(A);
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A * Factor;
+		}
 	};
 
 }

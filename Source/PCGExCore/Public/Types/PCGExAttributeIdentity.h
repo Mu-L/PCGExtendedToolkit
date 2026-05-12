@@ -6,11 +6,11 @@
 #include <functional>
 
 #include "CoreMinimal.h"
+#include "Metadata/PCGAttributePropertySelector.h"
 #include "Metadata/PCGMetadataAttribute.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
-#include "Metadata/PCGMetadataCommon.h"
-#include "Metadata/PCGAttributePropertySelector.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
+#include "Metadata/PCGMetadataCommon.h"
 #include "Metadata/PCGMetadataCommon.h"
 
 struct FPCGContext;
@@ -31,7 +31,7 @@ namespace PCGExData
 	// This is PCGEx's runtime type carrier; it is not a USTRUCT and is not serialized — it lives on the stack
 	// or inside TArray members of non-UObject state. TObjectPtr fields on the base are safe because
 	// UStruct/UEnum/UClass are module-lifetime and never GC'd.
-	struct PCGEXCORE_API FAttributeIdentity : public FPCGMetadataAttributeDesc
+	struct PCGEXCORE_API FAttributeIdentity : FPCGMetadataAttributeDesc
 	{
 		// Inherited from FPCGMetadataAttributeDesc:
 		//   FName Name
@@ -57,21 +57,46 @@ namespace PCGExData
 		FAttributeIdentity(const FPCGMetadataAttributeDesc& InDesc, const FPCGMetadataDomainID& InDomain);
 
 		// --- Identity accessors ---
-		FPCGAttributeIdentifier GetIdentifier() const { return FPCGAttributeIdentifier(Name, MetadataDomain); }
-		bool InDataDomain() const { return MetadataDomain.Flag == EPCGMetadataDomainFlag::Data; }
+		FPCGAttributeIdentifier GetIdentifier() const
+		{
+			return FPCGAttributeIdentifier(Name, MetadataDomain);
+		}
+
+		bool InDataDomain() const
+		{
+			return MetadataDomain.Flag == EPCGMetadataDomainFlag::Data;
+		}
 
 		// --- Type accessors ---
-		EPCGMetadataTypes GetType() const { return ValueType; }
-		int16 GetTypeId() const { return static_cast<int16>(ValueType); }
-		bool IsA(const int16 InType) const { return GetTypeId() == InType; }
-		bool IsA(const EPCGMetadataTypes InType) const { return ValueType == InType; }
+		EPCGMetadataTypes GetType() const
+		{
+			return ValueType;
+		}
+
+		int16 GetTypeId() const
+		{
+			return static_cast<int16>(ValueType);
+		}
+
+		bool IsA(const int16 InType) const
+		{
+			return GetTypeId() == InType;
+		}
+
+		bool IsA(const EPCGMetadataTypes InType) const
+		{
+			return ValueType == InType;
+		}
 
 		// Templated IsA<T>: defers to the attribute (correct for Struct/Enum/Object with ValueTypeObject),
 		// falls back to static enum mapping for synthesized identities.
 		template <typename T>
 		bool IsA() const
 		{
-			if (Attribute) { return Attribute->IsOfType<T>(); }
+			if (Attribute)
+			{
+				return Attribute->IsOfType<T>();
+			}
 			return static_cast<uint16>(ValueType) == PCG::Private::MetadataTypes<T>::Id;
 		}
 

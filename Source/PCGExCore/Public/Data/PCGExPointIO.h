@@ -62,7 +62,7 @@ namespace PCGExData
 		std::atomic<bool> bIsEnabled{true};
 
 		TSharedPtr<TArray<int32>> IdxMapping;
-		
+
 		TWeakPtr<FPCGContextHandle> ContextHandle;
 
 	public:
@@ -385,7 +385,10 @@ namespace PCGExData
 		FPCGMetadataAttributeBase* CreateAttribute(const FPCGAttributeIdentifier& Identifier, const T& DefaultValue = T{}, bool bAllowsInterpolation = true, bool bOverrideParent = true)
 		{
 			FPCGMetadataAttributeBase* OutAttribute = nullptr;
-			if (!Out) { return OutAttribute; }
+			if (!Out)
+			{
+				return OutAttribute;
+			}
 
 			FPCGAttributeIdentifier SanitizedIdentifier = Identifier.MetadataDomain.IsDefault() ? PCGExMetaHelpers::GetAttributeIdentifier(Identifier.Name, Out) : Identifier;
 
@@ -401,7 +404,10 @@ namespace PCGExData
 		FPCGMetadataAttributeBase* FindOrCreateAttribute(const FPCGAttributeIdentifier& Identifier, const T& DefaultValue = T{}, bool bAllowsInterpolation = true, bool bOverrideParent = true, bool bOverwriteIfTypeMismatch = true)
 		{
 			FPCGMetadataAttributeBase* OutAttribute = nullptr;
-			if (!Out) { return OutAttribute; }
+			if (!Out)
+			{
+				return OutAttribute;
+			}
 
 			FPCGAttributeIdentifier SanitizedIdentifier = Identifier.MetadataDomain.IsDefault() ? PCGExMetaHelpers::GetAttributeIdentifier(Identifier.Name, Out) : Identifier;
 

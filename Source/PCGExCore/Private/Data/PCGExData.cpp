@@ -14,11 +14,11 @@
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGPointData.h"
 #include "Helpers/PCGExArrayHelpers.h"
+#include "Metadata/PCGMetadataDomain.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGCustomAccessor.h"
 #include "Types/PCGExAttributeIdentity.h"
 #include "Types/PCGExTypes.h"
-#include "Metadata/PCGMetadataDomain.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
 
@@ -462,32 +462,38 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TYPED_WRITABLE)
 		default:
+		{
+			// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES.
+			if (!InAttribute)
 			{
-				// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES.
-				if (!InAttribute) { return nullptr; }
-
-				const FPCGMetadataDomainID DomainID = InAttribute->GetMetadataDomain()->GetDomainID();
-				FPCGAttributeIdentifier AttrIdentifier(InAttribute->Name, DomainID);
-
-				if (DomainID.Flag == EPCGMetadataDomainFlag::Data)
-				{
-					auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, AttrIdentifier);
-					if (!PropBuf->InitProperty(InAttribute) || !PropBuf->InitForWrite(InAttribute, Init)) { return nullptr; }
-					FWriteScopeLock WriteScopeLock(BufferLock);
-					PropBuf->BufferIndex = Buffers.Add(PropBuf);
-					BufferMap.Add(PropBuf->GetUID(), PropBuf);
-					return PropBuf;
-				}
-				else
-				{
-					auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, AttrIdentifier);
-					if (!PropBuf->InitProperty(InAttribute) || !PropBuf->InitForWrite(InAttribute, Init)) { return nullptr; }
-					FWriteScopeLock WriteScopeLock(BufferLock);
-					PropBuf->BufferIndex = Buffers.Add(PropBuf);
-					BufferMap.Add(PropBuf->GetUID(), PropBuf);
-					return PropBuf;
-				}
+				return nullptr;
 			}
+
+			const FPCGMetadataDomainID DomainID = InAttribute->GetMetadataDomain()->GetDomainID();
+			FPCGAttributeIdentifier AttrIdentifier(InAttribute->Name, DomainID);
+
+			if (DomainID.Flag == EPCGMetadataDomainFlag::Data)
+			{
+				auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, AttrIdentifier);
+				if (!PropBuf->InitProperty(InAttribute) || !PropBuf->InitForWrite(InAttribute, Init))
+				{
+					return nullptr;
+				}
+				FWriteScopeLock WriteScopeLock(BufferLock);
+				PropBuf->BufferIndex = Buffers.Add(PropBuf);
+				BufferMap.Add(PropBuf->GetUID(), PropBuf);
+				return PropBuf;
+			}
+			auto PropBuf = MakeShared<FPropertyArrayBuffer>(Source, AttrIdentifier);
+			if (!PropBuf->InitProperty(InAttribute) || !PropBuf->InitForWrite(InAttribute, Init))
+			{
+				return nullptr;
+			}
+			FWriteScopeLock WriteScopeLock(BufferLock);
+			PropBuf->BufferIndex = Buffers.Add(PropBuf);
+			BufferMap.Add(PropBuf->GetUID(), PropBuf);
+			return PropBuf;
+		}
 		}
 #undef PCGEX_TYPED_WRITABLE
 	}
@@ -499,28 +505,34 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TYPED_WRITABLE)
 		default:
+		{
+			// For generic types by name, look up the attribute first to get size info
+			FPCGAttributeIdentifier AttrId;
+			AttrId.Name = InName;
+
+			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(AttrId, EIOSide::In);
+			if (!RawAttribute)
 			{
-				// For generic types by name, look up the attribute first to get size info
-				FPCGAttributeIdentifier AttrId;
-				AttrId.Name = InName;
-
-				const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(AttrId, EIOSide::In);
-				if (!RawAttribute)
-				{
-					RawAttribute = Source->FindConstAttribute(AttrId, EIOSide::Out);
-				}
-
-				if (!RawAttribute) { return nullptr; }
-
-				return GetWritable(Type, RawAttribute, Init);
+				RawAttribute = Source->FindConstAttribute(AttrId, EIOSide::Out);
 			}
+
+			if (!RawAttribute)
+			{
+				return nullptr;
+			}
+
+			return GetWritable(Type, RawAttribute, Init);
+		}
 		}
 #undef PCGEX_TYPED_WRITABLE
 	}
 
 	TSharedPtr<IBuffer> FFacade::GetWritableFromAttribute(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init)
 	{
-		if (!InAttribute) { return nullptr; }
+		if (!InAttribute)
+		{
+			return nullptr;
+		}
 		const EPCGMetadataTypes Type = static_cast<EPCGMetadataTypes>(InAttribute->GetTypeId());
 		return GetWritable(Type, InAttribute, Init);
 	}
@@ -992,7 +1004,10 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 		// 'template' spec required for clang on mac, and rider keeps removing it without the comment below.
 		// ReSharper disable once CppRedundantTemplateKeyword
 		const FPCGMetadataAttributeBase* Mark = PCGExMetaHelpers::TryGetConstAttribute<T>(Metadata, MarkID);
-		if (!Mark) { return false; }
+		if (!Mark)
+		{
+			return false;
+		}
 		OutMark = Helpers::ReadDataValue<T>(Mark);
 		return true;
 	}

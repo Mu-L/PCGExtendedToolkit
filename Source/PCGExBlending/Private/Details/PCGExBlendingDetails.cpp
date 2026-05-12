@@ -186,7 +186,10 @@ void FPCGExBlendingDetails::GetBlendingParams(const UPCGMetadata* SourceMetadata
 			if (const PCGExData::FAttributeIdentity* TargetIdentityPtr = TargetIdentityMap.Find(SourceIdentifier))
 			{
 				// Type mismatch -- Simply ignore it (Desc-aware: catches Struct<A> vs Struct<B>, TArray<int> vs int, etc.)
-				if (!TargetIdentityPtr->IsSameType(SourceIdentity)) { Identities.Remove(*TargetIdentityPtr); }
+				if (!TargetIdentityPtr->IsSameType(SourceIdentity))
+				{
+					Identities.Remove(*TargetIdentityPtr);
+				}
 			}
 			else if (CanBlend(SourceIdentity.Name))
 			{
@@ -204,7 +207,10 @@ void FPCGExBlendingDetails::GetBlendingParams(const UPCGMetadata* SourceMetadata
 	{
 		const PCGExData::FAttributeIdentity& Identity = Identities[i];
 
-		if (IgnoreAttributeSet && IgnoreAttributeSet->Contains(Identity.Name)) { continue; }
+		if (IgnoreAttributeSet && IgnoreAttributeSet->Contains(Identity.Name))
+		{
+			continue;
+		}
 
 		PCGExBlending::FBlendingParam Param{};
 		Param.bIsNewAttribute = MissingAttribute.Contains(i);

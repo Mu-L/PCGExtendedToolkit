@@ -3,13 +3,13 @@
 
 #include "Data/PCGExSubAccessor.h"
 
-#include "Metadata/PCGMetadataCommon.h"
 #include "Data/Accessors/PCGExAxisAccessor.h"
 #include "Data/Accessors/PCGExContainerCountAccessor.h"
 #include "Data/Accessors/PCGExContainerIndexAccessor.h"
 #include "Data/Accessors/PCGExSingleFieldAccessor.h"
 #include "Data/Accessors/PCGExSwizzleAccessor.h"
 #include "Data/Accessors/PCGExTransformPartAccessor.h"
+#include "Metadata/PCGMetadataCommon.h"
 
 namespace PCGExData
 {
@@ -45,7 +45,10 @@ namespace PCGExData
 
 	void FSubAccessorRegistry::Initialize()
 	{
-		if (bInitialized) { return; }
+		if (bInitialized)
+		{
+			return;
+		}
 
 		// Registration order = priority order: when a token could match
 		// multiple accessors, the earlier-registered one wins. Order is
@@ -89,37 +92,55 @@ namespace PCGExData
 
 	TConstArrayView<const ISubAccessor*> FSubAccessorRegistry::GetAll()
 	{
-		if (!bInitialized) { Initialize(); }
+		if (!bInitialized)
+		{
+			Initialize();
+		}
 		return OrderedView;
 	}
 
 	const ISubAccessor* FSubAccessorRegistry::GetAxisAccessor()
 	{
-		if (!bInitialized) { Initialize(); }
+		if (!bInitialized)
+		{
+			Initialize();
+		}
 		return GAxisAccessor;
 	}
 
 	const ISubAccessor* FSubAccessorRegistry::GetTransformPartAccessor()
 	{
-		if (!bInitialized) { Initialize(); }
+		if (!bInitialized)
+		{
+			Initialize();
+		}
 		return GTransformPartAccessor;
 	}
 
 	const ISubAccessor* FSubAccessorRegistry::GetSingleFieldAccessor()
 	{
-		if (!bInitialized) { Initialize(); }
+		if (!bInitialized)
+		{
+			Initialize();
+		}
 		return GSingleFieldAccessor;
 	}
 
 	const ISubAccessor* FSubAccessorRegistry::GetContainerIndexAccessor()
 	{
-		if (!bInitialized) { Initialize(); }
+		if (!bInitialized)
+		{
+			Initialize();
+		}
 		return GContainerIndexAccessor;
 	}
 
 	const ISubAccessor* FSubAccessorRegistry::GetContainerCountAccessor()
 	{
-		if (!bInitialized) { Initialize(); }
+		if (!bInitialized)
+		{
+			Initialize();
+		}
 		return GContainerCountAccessor;
 	}
 
@@ -127,13 +148,18 @@ namespace PCGExData
 	{
 		switch (Type)
 		{
-		case EPCGMetadataTypes::Vector2:    return 2;
+		case EPCGMetadataTypes::Vector2:
+			return 2;
 		case EPCGMetadataTypes::Vector:
-		case EPCGMetadataTypes::Rotator:    return 3;
+		case EPCGMetadataTypes::Rotator:
+			return 3;
 		case EPCGMetadataTypes::Vector4:
-		case EPCGMetadataTypes::Quaternion: return 4;
-		case EPCGMetadataTypes::Transform:  return 9;
-		default:                            return 1;
+		case EPCGMetadataTypes::Quaternion:
+			return 4;
+		case EPCGMetadataTypes::Transform:
+			return 9;
+		default:
+			return 1;
 		}
 	}
 
@@ -141,12 +167,18 @@ namespace PCGExData
 	                                      EPCGMetadataTypes SourceTypeHint,
 	                                      FSubSelectionChain& OutChain)
 	{
-		if (!bInitialized) { Initialize(); }
+		if (!bInitialized)
+		{
+			Initialize();
+		}
 
 		OutChain.Reset();
 		OutChain.SourceTypeHint = SourceTypeHint;
 
-		if (ExtraNames.IsEmpty()) { return false; }
+		if (ExtraNames.IsEmpty())
+		{
+			return false;
+		}
 
 		// True left-to-right walk. For each token in input order, try each
 		// accessor in registration order; first match wins. Steps are
@@ -161,7 +193,10 @@ namespace PCGExData
 			for (const ISubAccessor* Accessor : OrderedView)
 			{
 				FAccessorParseResult Parsed;
-				if (!Accessor->MatchesToken(Upper, Parsed)) { continue; }
+				if (!Accessor->MatchesToken(Upper, Parsed))
+				{
+					continue;
+				}
 
 				FSubSelectionStep Step;
 				Step.Accessor = Accessor;
@@ -235,13 +270,19 @@ namespace PCGExData
 		// ContainerTypes rather than mutating a copy (avoids O(N) RemoveAt
 		// per container step). Non-container steps clear the Desc entirely.
 		const FPCGMetadataAttributeDesc* BaseDesc = SourceDesc;
-		int32 ContainerDepth = 0; // number of container layers consumed
+		int32 ContainerDepth = 0;                                 // number of container layers consumed
 		TOptional<FPCGMetadataAttributeDesc> StrippedDescStorage; // lazy, only if needed
 
 		auto GetCurrentDesc = [&]() -> const FPCGMetadataAttributeDesc*
 		{
-			if (!BaseDesc) { return nullptr; }
-			if (ContainerDepth == 0) { return BaseDesc; }
+			if (!BaseDesc)
+			{
+				return nullptr;
+			}
+			if (ContainerDepth == 0)
+			{
+				return BaseDesc;
+			}
 			// Synthesize a stripped view on demand (rare — only for nested containers).
 			if (!StrippedDescStorage.IsSet())
 			{

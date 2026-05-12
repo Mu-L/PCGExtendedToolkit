@@ -10,7 +10,7 @@
 // TArrayBuffer<T> / TSingleValueBuffer<T>
 //
 // Unified buffers using FPCGMetadataAttributeBase* (from IBuffer).
-// Attribute creation goes through Domain->CreateGenericAttribute<T>() — the UE 5.8 canonical path.
+// Attribute creation goes through Domain->FindOrCreateAttribute<T>() — the UE 5.8 canonical path.
 //
 // FPCGMetadataAttribute<T> still exists for basic types; use GetTypedInAttribute()/GetTypedOutAttribute()
 // on TBuffer<T> for a convenience static_cast when you need the typed pointer.
@@ -35,7 +35,10 @@ namespace PCGExData
 	public:
 		TArrayBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
 
-		virtual bool IsSparse() const override { return bSparseBuffer || InternalBroadcaster; }
+		virtual bool IsSparse() const override
+		{
+			return bSparseBuffer || InternalBroadcaster;
+		}
 
 		TSharedPtr<TArray<T>> GetInValues();
 		TSharedPtr<TArray<T>> GetOutValues();

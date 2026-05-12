@@ -63,7 +63,8 @@ namespace PCGExData
 		const UObject* VTO = nullptr;
 		if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 		{
-			if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
+			if (const UPCGData* InData = InFacade->Source->GetData(Side);
+				InData && InData->Metadata)
 			{
 				if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
 					PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
@@ -115,7 +116,8 @@ namespace PCGExData
 		const UObject* VTO = nullptr;
 		if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 		{
-			if (const UPCGData* InData = InFacade->Source->GetData(Side); InData && InData->Metadata)
+			if (const UPCGData* InData = InFacade->Source->GetData(Side);
+				InData && InData->Metadata)
 			{
 				if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
 					PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
@@ -262,7 +264,10 @@ namespace PCGExData
 	                                   const FPCGMetadataAttributeDesc* SourceDesc)
 	{
 		bWantsSubSelection = InSubSelection.HasSelection();
-		if (bWantsSubSelection) { CachedSubSelection.Initialize(InSubSelection, RealType, WorkingType, SourceDesc); }
+		if (bWantsSubSelection)
+		{
+			CachedSubSelection.Initialize(InSubSelection, RealType, WorkingType, SourceDesc);
+		}
 	}
 
 	void IBufferProxy::InitForRole(EProxyRole InRole)
@@ -292,13 +297,19 @@ namespace PCGExData
 
 	int32 IBufferProxy::GetValueSize() const
 	{
-		if (WorkingOps) { return WorkingOps->GetTypeSize(); }
+		if (WorkingOps)
+		{
+			return WorkingOps->GetTypeSize();
+		}
 		return PCGExTypes::FScopedTypedValue::GetTypeSize(WorkingType);
 	}
 
 	int32 IBufferProxy::GetValueAlignment() const
 	{
-		if (WorkingOps) { return WorkingOps->GetTypeAlignment(); }
+		if (WorkingOps)
+		{
+			return WorkingOps->GetTypeAlignment();
+		}
 		return 1;
 	}
 

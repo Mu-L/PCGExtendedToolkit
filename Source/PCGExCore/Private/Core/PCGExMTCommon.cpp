@@ -47,7 +47,10 @@ namespace PCGExMT
 
 	void ParallelOrSequentialScoped(const int32 Num, const FScopedLoopBody& Body, const int32 Threshold)
 	{
-		if (Num <= 0) { return; }
+		if (Num <= 0)
+		{
+			return;
+		}
 
 		if (Num >= Threshold)
 		{

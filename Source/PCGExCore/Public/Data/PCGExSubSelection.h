@@ -57,13 +57,14 @@ namespace PCGExData
 		// IsFieldSelection / etc. are O(1) bit tests instead of chain walks.
 		enum EClassifierBits : uint8
 		{
-			Bit_HasSelection      = 1 << 0,
-			Bit_Field             = 1 << 1,
-			Bit_Axis              = 1 << 2,
-			Bit_Component         = 1 << 3,
-			Bit_ContainerIndex    = 1 << 4,
-			Bit_ContainerCount    = 1 << 5,
+			Bit_HasSelection   = 1 << 0,
+			Bit_Field          = 1 << 1,
+			Bit_Axis           = 1 << 2,
+			Bit_Component      = 1 << 3,
+			Bit_ContainerIndex = 1 << 4,
+			Bit_ContainerCount = 1 << 5,
 		};
+
 		uint8 ClassifierMask = 0;
 
 		// Constructors
@@ -81,7 +82,10 @@ namespace PCGExData
 		 * CompileChainForSource); FSubSelection's type-erased path also
 		 * walks the chain via accessor virtual calls.
 		 */
-		FORCEINLINE const FSubSelectionChain& GetChain() const { return ParsedChain; }
+		FORCEINLINE const FSubSelectionChain& GetChain() const
+		{
+			return ParsedChain;
+		}
 
 		//
 		// Public classifier methods (chain-backed).
@@ -92,29 +96,50 @@ namespace PCGExData
 		//
 
 		/** True if the parsed chain has at least one step. */
-		FORCEINLINE bool HasSelection() const { return (ClassifierMask & Bit_HasSelection) != 0; }
+		FORCEINLINE bool HasSelection() const
+		{
+			return (ClassifierMask & Bit_HasSelection) != 0;
+		}
 
 		/** True if the chain contains a SingleField step (resolves to Double). */
-		FORCEINLINE bool IsFieldSelection() const { return (ClassifierMask & Bit_Field) != 0; }
+		FORCEINLINE bool IsFieldSelection() const
+		{
+			return (ClassifierMask & Bit_Field) != 0;
+		}
 
 		/** True if the chain contains an Axis step. */
-		FORCEINLINE bool IsAxisSelection() const { return (ClassifierMask & Bit_Axis) != 0; }
+		FORCEINLINE bool IsAxisSelection() const
+		{
+			return (ClassifierMask & Bit_Axis) != 0;
+		}
 
 		/** True if the chain contains a TransformPart step. */
-		FORCEINLINE bool IsComponentSelection() const { return (ClassifierMask & Bit_Component) != 0; }
+		FORCEINLINE bool IsComponentSelection() const
+		{
+			return (ClassifierMask & Bit_Component) != 0;
+		}
 
 		/** True if the chain contains an FContainerIndexAccessor step. */
-		FORCEINLINE bool IsContainerIndexSelection() const { return (ClassifierMask & Bit_ContainerIndex) != 0; }
+		FORCEINLINE bool IsContainerIndexSelection() const
+		{
+			return (ClassifierMask & Bit_ContainerIndex) != 0;
+		}
 
 		/** True if the chain contains an FContainerCountAccessor step. */
-		FORCEINLINE bool IsContainerCountSelection() const { return (ClassifierMask & Bit_ContainerCount) != 0; }
+		FORCEINLINE bool IsContainerCountSelection() const
+		{
+			return (ClassifierMask & Bit_ContainerCount) != 0;
+		}
 
 		/**
 		 * Best-guess hint for the source-side type this selection assumes.
 		 * E.g., ".R" hints Quaternion, ".X" hints Vector. Returns Unknown
 		 * when the parser couldn't infer a hint (empty or unmatched tokens).
 		 */
-		FORCEINLINE EPCGMetadataTypes GetHintedSourceType() const { return PossibleSourceType; }
+		FORCEINLINE EPCGMetadataTypes GetHintedSourceType() const
+		{
+			return PossibleSourceType;
+		}
 
 		/**
 		 * Get the resulting type when this sub-selection is applied.

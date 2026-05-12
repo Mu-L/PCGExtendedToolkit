@@ -104,7 +104,7 @@ public:
 	 * External uses a factory on the Selector input pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
 	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::External;
-		
+
 	/** Distribution details
 	 * Note : LEGACY Nodes only. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="!bUseStagedPoints && SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))

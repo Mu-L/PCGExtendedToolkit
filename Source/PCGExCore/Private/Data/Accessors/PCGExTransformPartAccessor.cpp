@@ -20,11 +20,11 @@ namespace PCGExData
 		{
 			static const TMap<FString, FComponentEntry> Table = {
 				{TEXT("POSITION"), {PCGExTypeOps::ETransformPart::Position, EPCGMetadataTypes::Vector}},
-				{TEXT("POS"),      {PCGExTypeOps::ETransformPart::Position, EPCGMetadataTypes::Vector}},
+				{TEXT("POS"), {PCGExTypeOps::ETransformPart::Position, EPCGMetadataTypes::Vector}},
 				{TEXT("ROTATION"), {PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-				{TEXT("ROT"),      {PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-				{TEXT("ORIENT"),   {PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-				{TEXT("SCALE"),    {PCGExTypeOps::ETransformPart::Scale,    EPCGMetadataTypes::Vector}},
+				{TEXT("ROT"), {PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
+				{TEXT("ORIENT"), {PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
+				{TEXT("SCALE"), {PCGExTypeOps::ETransformPart::Scale, EPCGMetadataTypes::Vector}},
 			};
 			return Table;
 		}
@@ -33,9 +33,12 @@ namespace PCGExData
 		{
 			switch (Part)
 			{
-			case PCGExTypeOps::ETransformPart::Position: return EPCGMetadataTypes::Vector;
-			case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
-			case PCGExTypeOps::ETransformPart::Scale:    return EPCGMetadataTypes::Vector;
+			case PCGExTypeOps::ETransformPart::Position:
+				return EPCGMetadataTypes::Vector;
+			case PCGExTypeOps::ETransformPart::Rotation:
+				return EPCGMetadataTypes::Quaternion;
+			case PCGExTypeOps::ETransformPart::Scale:
+				return EPCGMetadataTypes::Vector;
 			}
 			return EPCGMetadataTypes::Unknown;
 		}

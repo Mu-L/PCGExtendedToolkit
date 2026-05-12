@@ -62,7 +62,7 @@ class UPCGExAssetStagingSettings : public UPCGExPointsProcessorSettings
 
 public:
 	//~Begin UPCGSettings
-#if WITH_EDITOR	
+#if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AssetStaging, "Staging : Distribute", "Distribute PCGEx Asset Collection entries to points.", FName(GetDisplayName()));
 
 	virtual EPCGSettingsType GetType() const override
@@ -124,7 +124,7 @@ public:
 	 * External uses a factory on the Selector input pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
 	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::External;
-				
+
 	/** Distribution details
 	 * Note : LEGACY Nodes only. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))

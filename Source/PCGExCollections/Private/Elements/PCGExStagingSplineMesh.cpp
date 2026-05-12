@@ -45,7 +45,7 @@ void UPCGExPathSplineMeshSettings::ApplyDeprecation(UPCGNode* InOutNode)
 			bUseStagedPoints = false;
 		}
 	}
-	
+
 	Super::ApplyDeprecation(InOutNode);
 }
 

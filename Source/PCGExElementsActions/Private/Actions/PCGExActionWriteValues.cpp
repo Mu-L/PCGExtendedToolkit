@@ -26,7 +26,10 @@ bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, 
 	for (const PCGExData::FAttributeIdentity& Identity : TypedFactory->CheckSuccessInfos->Identities)
 	{
 		const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
-		if (!AttributeBase) { continue; }
+		if (!AttributeBase)
+		{
+			continue;
+		}
 		PCGExMetaHelpers::ExecuteWithRightType(
 			AttributeBase,
 			[&](auto DummyValue)
@@ -40,14 +43,21 @@ bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, 
 			{
 				// Property-backed: route through the generic GetWritableFromAttribute fallback.
 				TSharedPtr<PCGExData::IBuffer> Writer = InPointDataFacade->GetWritableFromAttribute(AttributeBase, PCGExData::EBufferInit::Inherit);
-				if (Writer) { SuccessAttributes.Add(AttributeBase); SuccessWriters.Add(Writer); }
+				if (Writer)
+				{
+					SuccessAttributes.Add(AttributeBase);
+					SuccessWriters.Add(Writer);
+				}
 			});
 	}
 
 	for (const PCGExData::FAttributeIdentity& Identity : TypedFactory->CheckFailInfos->Identities)
 	{
 		const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
-		if (!AttributeBase) { continue; }
+		if (!AttributeBase)
+		{
+			continue;
+		}
 		PCGExMetaHelpers::ExecuteWithRightType(
 			AttributeBase,
 			[&](auto DummyValue)
@@ -60,7 +70,11 @@ bool FPCGExActionWriteValuesOperation::PrepareForData(FPCGExContext* InContext, 
 			[&]()
 			{
 				TSharedPtr<PCGExData::IBuffer> Writer = InPointDataFacade->GetWritableFromAttribute(AttributeBase, PCGExData::EBufferInit::Inherit);
-				if (Writer) { FailAttributes.Add(AttributeBase); FailWriters.Add(Writer); }
+				if (Writer)
+				{
+					FailAttributes.Add(AttributeBase);
+					FailWriters.Add(Writer);
+				}
 			});
 	}
 

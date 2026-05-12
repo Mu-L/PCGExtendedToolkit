@@ -62,7 +62,10 @@ bool FPCGExBitmaskMergeElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		for (int i = 0; i < Infos->Identities.Num(); i++)
 		{
 			const PCGExData::FAttributeIdentity& Identity = Infos->Identities[i];
-			if (Identity.ValueType != EPCGMetadataTypes::Integer64 || !Identity.Attribute) { continue; }
+			if (Identity.ValueType != EPCGMetadataTypes::Integer64 || !Identity.Attribute)
+			{
+				continue;
+			}
 
 			const int64 InputMask = PCGExData::Helpers::ReadDataValue<int64>(Identity.Attribute);
 

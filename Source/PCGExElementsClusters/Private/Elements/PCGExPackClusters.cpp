@@ -153,16 +153,25 @@ namespace PCGExPackClusters
 					TSharedPtr<PCGExData::TBuffer<T>> OutValues = This->PackedIOFacade->GetWritable<T>(InValues->InAttribute, PCGExData::EBufferInit::New);
 
 					const TArray<int32>& VtxSelection = This->VtxPointSelection;
-					for (int i = 0; i < VtxSelection.Num(); i++) { OutValues->SetValue(This->VtxStartIndex + i, InValues->Read(VtxSelection[i])); }
+					for (int i = 0; i < VtxSelection.Num(); i++)
+					{
+						OutValues->SetValue(This->VtxStartIndex + i, InValues->Read(VtxSelection[i]));
+					}
 				},
 				[&]()
 				{
 					// Property-backed: scatter selected vtx values into packed output via FProperty.
-					if (!Identity.Attribute) { return; }
+					if (!Identity.Attribute)
+					{
+						return;
+					}
 
 					TSharedPtr<PCGExData::IBuffer> InBuf = This->VtxDataFacade->GetReadable(Identity, PCGExData::EIOSide::In, false);
 					TSharedPtr<PCGExData::IBuffer> OutBuf = This->PackedIOFacade->GetWritable(Identity.GetType(), Identity.Attribute, PCGExData::EBufferInit::New);
-					if (!InBuf || !OutBuf) { return; }
+					if (!InBuf || !OutBuf)
+					{
+						return;
+					}
 
 					PCGExTypes::FScopedTypedValue Scratch = OutBuf->MakeScopedValue();
 					const TArray<int32>& VtxSelection = This->VtxPointSelection;

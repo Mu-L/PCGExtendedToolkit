@@ -283,8 +283,25 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return A; }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W < 0.5 ? A : B;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A;
+		}
 	};
 
 	// Name Type Operations - FName
@@ -557,8 +574,25 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return A; }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A; }
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W < 0.5 ? A : B;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A;
+		}
 	};
 
 	// Path Type Operations - FSoftObjectPath
@@ -727,8 +761,115 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return A; }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A; }
+		static FORCEINLINE Type Mult(const Type& A, const Type& B)
+		{
+			return A.IsValid() && B.IsValid() ? A : Type();
+		}
+
+		static FORCEINLINE Type Div(const Type& A, double D)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W)
+		{
+			return W < 0.5 ? A : B;
+		}
+
+		static FORCEINLINE Type Min(const Type& A, const Type& B)
+		{
+			return A.ToString() < B.ToString() ? A : B;
+		}
+
+		static FORCEINLINE Type Max(const Type& A, const Type& B)
+		{
+			return A.ToString() > B.ToString() ? A : B;
+		}
+
+		static FORCEINLINE Type Average(const Type& A, const Type& B)
+		{
+			return A.IsValid() ? A : B;
+		}
+
+		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
+		{
+			return W > 0.5 && B.IsValid() ? B : A;
+		}
+
+		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyA(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyB(const Type& A, const Type& B)
+		{
+			return B;
+		}
+
+		static FORCEINLINE Type UnsignedMin(const Type& A, const Type& B)
+		{
+			return Min(A, B);
+		}
+
+		static FORCEINLINE Type UnsignedMax(const Type& A, const Type& B)
+		{
+			return Max(A, B);
+		}
+
+		static FORCEINLINE Type AbsoluteMin(const Type& A, const Type& B)
+		{
+			return Min(A, B);
+		}
+
+		static FORCEINLINE Type AbsoluteMax(const Type& A, const Type& B)
+		{
+			return Max(A, B);
+		}
+
+		static FORCEINLINE Type NaiveHash(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type UnsignedHash(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type ModSimple(const Type& A, double M)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type ModComplex(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W < 0.5 ? A : B;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A;
+		}
 	};
 
 	// Path Type Operations - FSoftClassPath
@@ -897,8 +1038,115 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE Type Abs(const Type& A) { return A; }
-		static FORCEINLINE Type Factor(const Type& A, const double Factor) { return A; }
+		static FORCEINLINE Type Mult(const Type& A, const Type& B)
+		{
+			return A.IsValid() && B.IsValid() ? A : Type();
+		}
+
+		static FORCEINLINE Type Div(const Type& A, double D)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Lerp(const Type& A, const Type& B, double W)
+		{
+			return W < 0.5 ? A : B;
+		}
+
+		static FORCEINLINE Type Min(const Type& A, const Type& B)
+		{
+			return A.ToString() < B.ToString() ? A : B;
+		}
+
+		static FORCEINLINE Type Max(const Type& A, const Type& B)
+		{
+			return A.ToString() > B.ToString() ? A : B;
+		}
+
+		static FORCEINLINE Type Average(const Type& A, const Type& B)
+		{
+			return A.IsValid() ? A : B;
+		}
+
+		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
+		{
+			return W > 0.5 && B.IsValid() ? B : A;
+		}
+
+		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyA(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type CopyB(const Type& A, const Type& B)
+		{
+			return B;
+		}
+
+		static FORCEINLINE Type UnsignedMin(const Type& A, const Type& B)
+		{
+			return Min(A, B);
+		}
+
+		static FORCEINLINE Type UnsignedMax(const Type& A, const Type& B)
+		{
+			return Max(A, B);
+		}
+
+		static FORCEINLINE Type AbsoluteMin(const Type& A, const Type& B)
+		{
+			return Min(A, B);
+		}
+
+		static FORCEINLINE Type AbsoluteMax(const Type& A, const Type& B)
+		{
+			return Max(A, B);
+		}
+
+		static FORCEINLINE Type NaiveHash(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type UnsignedHash(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type ModSimple(const Type& A, double M)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type ModComplex(const Type& A, const Type& B)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Weight(const Type& A, const Type& B, double W)
+		{
+			return W < 0.5 ? A : B;
+		}
+
+		static FORCEINLINE Type NormalizeWeight(const Type& A, double TW)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Abs(const Type& A)
+		{
+			return A;
+		}
+
+		static FORCEINLINE Type Factor(const Type& A, const double Factor)
+		{
+			return A;
+		}
 	};
 
 	// Text Type Operations - FText -- DELETED (Byte/Text cleanup).

@@ -76,11 +76,14 @@ namespace PCGExData
 
 					switch (Mode)
 					{
-					case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier(), EIOSide::In, true);
+					case EBufferPreloadType::RawAttribute:
+						Reader = InFacade->GetReadable<T>(Identity.GetIdentifier(), EIOSide::In, true);
 						break;
-					case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name, true);
+					case EBufferPreloadType::BroadcastFromName:
+						Reader = InFacade->GetBroadcaster<T>(Identity.Name, true);
 						break;
-					case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector, true);
+					case EBufferPreloadType::BroadcastFromSelector:
+						Reader = InFacade->GetBroadcaster<T>(Selector, true);
 						break;
 					}
 
@@ -120,11 +123,14 @@ namespace PCGExData
 				TSharedPtr<TBuffer<T>> Reader = nullptr;
 				switch (Mode)
 				{
-				case EBufferPreloadType::RawAttribute: Reader = InFacade->GetReadable<T>(Identity.GetIdentifier());
+				case EBufferPreloadType::RawAttribute:
+					Reader = InFacade->GetReadable<T>(Identity.GetIdentifier());
 					break;
-				case EBufferPreloadType::BroadcastFromName: Reader = InFacade->GetBroadcaster<T>(Identity.Name);
+				case EBufferPreloadType::BroadcastFromName:
+					Reader = InFacade->GetBroadcaster<T>(Identity.Name);
 					break;
-				case EBufferPreloadType::BroadcastFromSelector: Reader = InFacade->GetBroadcaster<T>(Selector);
+				case EBufferPreloadType::BroadcastFromSelector:
+					Reader = InFacade->GetBroadcaster<T>(Selector);
 					break;
 				}
 			},

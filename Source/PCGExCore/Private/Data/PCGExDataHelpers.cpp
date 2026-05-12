@@ -6,6 +6,7 @@
 #include "PCGExLog.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGExSubSelection.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Types/PCGExAttributeIdentity.h"
@@ -28,14 +29,23 @@ namespace PCGExData::Helpers
 			}
 
 			// TODO: support Data domain. Currently only Elements.
-			if (SrcBuffer->GetUnderlyingDomain() != EDomainType::Elements) { continue; }
+			if (SrcBuffer->GetUnderlyingDomain() != EDomainType::Elements)
+			{
+				continue;
+			}
 
 			const FPCGMetadataAttributeBase* SrcAttr = SrcBuffer->OutAttribute;
-			if (!SrcAttr) { continue; }
+			if (!SrcAttr)
+			{
+				continue;
+			}
 
 			// Attribute-driven: tier-agnostic, no EPCGMetadataTypes surfaces here.
 			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritableFromAttribute(SrcAttr, EBufferInit::Inherit);
-			if (!DstBuffer) { continue; }
+			if (!DstBuffer)
+			{
+				continue;
+			}
 
 			const int32 NumCopy = SourcePointIndices.Num();
 
@@ -47,8 +57,8 @@ namespace PCGExData::Helpers
 				PCGExTypes::FScopedTypedValue Temp = SrcBuffer->MakeScopedValue();
 				PCGEX_SCOPE_LOOP(i)
 				{
-					SrcBuffer->GetVoid(SourcePointIndices[i], Temp);
-					DstBuffer->SetVoid(i, Temp);
+				SrcBuffer->GetVoid(SourcePointIndices[i], Temp);
+				DstBuffer->SetVoid(i, Temp);
 				}
 				})
 		}
@@ -58,10 +68,16 @@ namespace PCGExData::Helpers
 		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
 		FPCGMetadataAttributeBase* TargetAttr, const PCGMetadataEntryKey TargetKey)
 	{
-		if (!SourceAttr || !TargetAttr) { return false; }
+		if (!SourceAttr || !TargetAttr)
+		{
+			return false;
+		}
 
 		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
-		if (!SrcAddr) { return false; }
+		if (!SrcAddr)
+		{
+			return false;
+		}
 
 		// PERF — this allocates a transient FProperty per call (CreateInnerPropertyFromDesc walks the
 		// desc + heap-allocates) and deletes it. Fine for one-shot single-value carry (DataForward,
@@ -69,7 +85,10 @@ namespace PCGExData::Helpers
 		// if you need that, drive the loop through an FPropertyBuffer instance whose CachedInnerProperty
 		// is built once at InitForRead/InitForWrite, and call SetFromVoidProperty per element.
 		FProperty* TempProp = FPropertyBuffer::CreateInnerPropertyFromDesc(SourceAttr->GetAttributeDesc());
-		if (!TempProp) { return false; }
+		if (!TempProp)
+		{
+			return false;
+		}
 
 		TargetAttr->SetValueFromProperty(TargetKey, SrcAddr, TempProp);
 		delete TempProp;
@@ -80,18 +99,30 @@ namespace PCGExData::Helpers
 		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
 		const TSharedPtr<IBuffer>& TargetWriter)
 	{
-		if (!SourceAttr || !TargetWriter) { return false; }
+		if (!SourceAttr || !TargetWriter)
+		{
+			return false;
+		}
 
 		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
-		if (!SrcAddr) { return false; }
+		if (!SrcAddr)
+		{
+			return false;
+		}
 
 		PCGExTypes::FScopedTypedValue Scratch = TargetWriter->MakeScopedValue();
 		const FProperty* Prop = Scratch.GetProperty();
-		if (!Prop) { return false; }
+		if (!Prop)
+		{
+			return false;
+		}
 
 		Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
 		const int32 NumSlots = TargetWriter->GetNumValues(EIOSide::Out);
-		for (int32 s = 0; s < NumSlots; s++) { TargetWriter->SetVoid(s, Scratch); }
+		for (int32 s = 0; s < NumSlots; s++)
+		{
+			TargetWriter->SetVoid(s, Scratch);
+		}
 		return NumSlots > 0;
 	}
 
@@ -99,17 +130,29 @@ namespace PCGExData::Helpers
 		const FPCGMetadataAttributeBase* SourceAttr, const PCGMetadataEntryKey SourceKey,
 		const TSharedPtr<IBuffer>& TargetWriter, TArrayView<const int32> Indices)
 	{
-		if (!SourceAttr || !TargetWriter || Indices.IsEmpty()) { return false; }
+		if (!SourceAttr || !TargetWriter || Indices.IsEmpty())
+		{
+			return false;
+		}
 
 		const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(SourceKey);
-		if (!SrcAddr) { return false; }
+		if (!SrcAddr)
+		{
+			return false;
+		}
 
 		PCGExTypes::FScopedTypedValue Scratch = TargetWriter->MakeScopedValue();
 		const FProperty* Prop = Scratch.GetProperty();
-		if (!Prop) { return false; }
+		if (!Prop)
+		{
+			return false;
+		}
 
 		Prop->CopyCompleteValue(Scratch.GetRaw(), SrcAddr);
-		for (int32 Index : Indices) { TargetWriter->SetVoid(Index, Scratch); }
+		for (int32 Index : Indices)
+		{
+			TargetWriter->SetVoid(Index, Scratch);
+		}
 		return true;
 	}
 
@@ -120,16 +163,28 @@ namespace PCGExData::Helpers
 	{
 		check(ReadScope.Count == WriteScope.Count);
 
-		if (!SourceIO || ReadScope.Count <= 0) { return false; }
+		if (!SourceIO || ReadScope.Count <= 0)
+		{
+			return false;
+		}
 
 		const UPCGBasePointData* SourceData = SourceIO->GetIn();
-		if (!SourceData || !SourceData->Metadata) { return false; }
+		if (!SourceData || !SourceData->Metadata)
+		{
+			return false;
+		}
 
 		const FPCGMetadataAttributeBase* SourceAttr = SourceData->Metadata->GetConstAttribute(SourceIdentity.GetIdentifier());
-		if (!SourceAttr) { return false; }
+		if (!SourceAttr)
+		{
+			return false;
+		}
 
 		auto EntryKeys = SourceData->GetConstMetadataEntryValueRange();
-		if (EntryKeys.Num() < ReadScope.End) { return false; }
+		if (EntryKeys.Num() < ReadScope.End)
+		{
+			return false;
+		}
 
 		bool bAnyCopied = false;
 		for (int32 i = 0; i < ReadScope.Count; i++)
@@ -137,7 +192,10 @@ namespace PCGExData::Helpers
 			const int32 ReadIdx = bReverse ? (ReadScope.End - 1 - i) : (ReadScope.Start + i);
 			const PCGMetadataEntryKey EntryKey = EntryKeys[ReadIdx];
 			const void* SrcAddr = SourceAttr->GetReadAddressFromEntryKey_Unsafe(EntryKey);
-			if (!SrcAddr) { continue; }
+			if (!SrcAddr)
+			{
+				continue;
+			}
 			TargetBuffer->SetFromVoidProperty(WriteScope.Start + i, SrcAddr);
 			bAnyCopied = true;
 		}
@@ -247,8 +305,14 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 
 				const T_VALUE Value = ReadDataValue<T_VALUE>(SourceAttribute);
 
-				if (SubSelection.HasSelection()) { OutValue = SubSelection.Get<T_VALUE, T>(Value); }
-				else { OutValue = PCGExTypeOps::Convert<T_VALUE, T>(Value); }
+				if (SubSelection.HasSelection())
+				{
+					OutValue = SubSelection.Get<T_VALUE, T>(Value);
+				}
+				else
+				{
+					OutValue = PCGExTypeOps::Convert<T_VALUE, T>(Value);
+				}
 
 				bSuccess = true;
 			});

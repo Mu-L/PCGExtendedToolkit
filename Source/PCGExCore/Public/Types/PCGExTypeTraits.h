@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
-#include "UObject/SoftObjectPath.h"
 #include "Helpers/PCGExMetaHelpers.h" // FText shims + MetadataTraits<FText> specialization
+#include "UObject/SoftObjectPath.h"
 
 namespace PCGExTypes
 {

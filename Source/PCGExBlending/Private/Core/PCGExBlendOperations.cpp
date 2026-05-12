@@ -3,8 +3,8 @@
 
 #include "Core/PCGExBlendOperations.h"
 
-#include "Core/PCGExOpStats.h"
 #include "PCGExLog.h"
+#include "Core/PCGExOpStats.h"
 
 namespace PCGExBlending
 {
@@ -41,21 +41,36 @@ namespace PCGExBlending
 	{
 		switch (WorkingType)
 		{
-		case EPCGMetadataTypes::Boolean: return CreateTyped<bool>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Integer32: return CreateTyped<int32>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Integer64: return CreateTyped<int64>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Float: return CreateTyped<float>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Double: return CreateTyped<double>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector2: return CreateTyped<FVector2D>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector: return CreateTyped<FVector>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector4: return CreateTyped<FVector4>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Quaternion: return CreateTyped<FQuat>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Rotator: return CreateTyped<FRotator>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Transform: return CreateTyped<FTransform>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::String: return CreateTyped<FString>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Name: return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::SoftObjectPath: return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::SoftClassPath: return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Boolean:
+			return CreateTyped<bool>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer32:
+			return CreateTyped<int32>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer64:
+			return CreateTyped<int64>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Float:
+			return CreateTyped<float>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Double:
+			return CreateTyped<double>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector2:
+			return CreateTyped<FVector2D>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector:
+			return CreateTyped<FVector>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector4:
+			return CreateTyped<FVector4>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Quaternion:
+			return CreateTyped<FQuat>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Rotator:
+			return CreateTyped<FRotator>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Transform:
+			return CreateTyped<FTransform>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::String:
+			return CreateTyped<FString>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Name:
+			return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftObjectPath:
+			return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftClassPath:
+			return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
 		// Byte/Text: no typed blend ops. Falls through to default (Tier 3 copy-only).
 		default:
 			if (InValueSize > 0)
@@ -65,7 +80,7 @@ namespace PCGExBlending
 					BlendMode != EPCGExABBlendingType::CopyTarget)
 				{
 					UE_LOG(LogPCGEx, Warning, TEXT("Blend mode %d requested for generic type %d (size %d) — arithmetic not supported, falling back to copy."),
-						static_cast<int32>(BlendMode), static_cast<int32>(WorkingType), InValueSize);
+					       static_cast<int32>(BlendMode), static_cast<int32>(WorkingType), InValueSize);
 				}
 				return MakeShared<FCopyOnlyBlendOperation>(InValueSize, InValueAlignment, BlendMode, bResetForMultiBlend);
 			}
@@ -81,21 +96,36 @@ namespace PCGExBlending
 	{
 		switch (WorkingType)
 		{
-		case EPCGMetadataTypes::Boolean: return CreateTyped<bool>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Integer32: return CreateTyped<int32>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Integer64: return CreateTyped<int64>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Float: return CreateTyped<float>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Double: return CreateTyped<double>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector2: return CreateTyped<FVector2D>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector: return CreateTyped<FVector>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Vector4: return CreateTyped<FVector4>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Quaternion: return CreateTyped<FQuat>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Rotator: return CreateTyped<FRotator>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Transform: return CreateTyped<FTransform>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::String: return CreateTyped<FString>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::Name: return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::SoftObjectPath: return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
-		case EPCGMetadataTypes::SoftClassPath: return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Boolean:
+			return CreateTyped<bool>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer32:
+			return CreateTyped<int32>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Integer64:
+			return CreateTyped<int64>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Float:
+			return CreateTyped<float>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Double:
+			return CreateTyped<double>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector2:
+			return CreateTyped<FVector2D>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector:
+			return CreateTyped<FVector>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Vector4:
+			return CreateTyped<FVector4>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Quaternion:
+			return CreateTyped<FQuat>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Rotator:
+			return CreateTyped<FRotator>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Transform:
+			return CreateTyped<FTransform>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::String:
+			return CreateTyped<FString>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::Name:
+			return CreateTyped<FName>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftObjectPath:
+			return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
+		case EPCGMetadataTypes::SoftClassPath:
+			return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
 		// Byte/Text: no typed blend ops. Falls through to default (Tier 3 copy-only).
 		default:
 			if (InProperty)
@@ -105,7 +135,7 @@ namespace PCGExBlending
 					BlendMode != EPCGExABBlendingType::CopyTarget)
 				{
 					UE_LOG(LogPCGEx, Warning, TEXT("Blend mode %d requested for property-backed type %d (%s) — arithmetic not supported, falling back to copy."),
-						static_cast<int32>(BlendMode), static_cast<int32>(WorkingType), *InProperty->GetClass()->GetName());
+					       static_cast<int32>(BlendMode), static_cast<int32>(WorkingType), *InProperty->GetClass()->GetName());
 				}
 				return MakeShared<FPropertyCopyBlendOperation>(InProperty, BlendMode, bResetForMultiBlend);
 			}

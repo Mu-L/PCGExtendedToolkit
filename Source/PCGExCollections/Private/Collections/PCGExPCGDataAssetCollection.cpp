@@ -173,9 +173,18 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			EmbeddedLevelCollection = nullptr;
 			ForEachObjectWithOuter(ExportedDataAsset, [this](UObject* Inner)
 			{
-				if (UPCGExMeshCollection* MC = Cast<UPCGExMeshCollection>(Inner)) { EmbeddedMeshCollection = MC; }
-				if (UPCGExActorCollection* AC = Cast<UPCGExActorCollection>(Inner)) { EmbeddedActorCollection = AC; }
-				if (UPCGExLevelCollection* LC = Cast<UPCGExLevelCollection>(Inner)) { EmbeddedLevelCollection = LC; }
+				if (UPCGExMeshCollection* MC = Cast<UPCGExMeshCollection>(Inner))
+				{
+					EmbeddedMeshCollection = MC;
+				}
+				if (UPCGExActorCollection* AC = Cast<UPCGExActorCollection>(Inner))
+				{
+					EmbeddedActorCollection = AC;
+				}
+				if (UPCGExLevelCollection* LC = Cast<UPCGExLevelCollection>(Inner))
+				{
+					EmbeddedLevelCollection = LC;
+				}
 			}, EGetObjectsFlags::None);
 		}
 		else

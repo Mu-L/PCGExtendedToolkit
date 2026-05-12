@@ -33,9 +33,18 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 
 			if (TypedFilterFactory->Config.Domain != EPCGExAttribtueDomainCheck::Any)
 			{
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Data && !Identity.InDataDomain()) { continue; }
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Elements && Identity.InDataDomain()) { continue; }
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain) { continue; }
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Data && !Identity.InDataDomain())
+				{
+					continue;
+				}
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Elements && Identity.InDataDomain())
+				{
+					continue;
+				}
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain)
+				{
+					continue;
+				}
 			}
 
 			if (PCGExCompare::Compare(TypedFilterFactory->Config.Match, Str, IdentifierStr))
@@ -62,9 +71,18 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 
 			if (TypedFilterFactory->Config.Domain != EPCGExAttribtueDomainCheck::Any)
 			{
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Data && Identity.InDataDomain()) { continue; }
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Elements && Identity.InDataDomain()) { continue; }
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain) { continue; }
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Data && Identity.InDataDomain())
+				{
+					continue;
+				}
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Elements && Identity.InDataDomain())
+				{
+					continue;
+				}
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain)
+				{
+					continue;
+				}
 			}
 
 			if (PCGExCompare::Compare(TypedFilterFactory->Config.Match, Str, IdentifierStr))

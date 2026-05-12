@@ -6,8 +6,8 @@
 #include "PCGExLog.h"
 #include "PCGExSettingsCacheBody.h"
 #include "Data/PCGExPointIO.h"
-#include "Types/PCGExTypes.h"
 #include "Metadata/PCGMetadataDomain.h"
+#include "Types/PCGExTypes.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
 
@@ -39,8 +39,8 @@ namespace PCGExData
 		// The innermost wrapper holds the leaf scalar/struct property.
 		if (Desc.ContainerTypes.Num() > 0)
 		{
-			FProperty* Prop = nullptr;             // The outermost wrapper (returned at the end)
-			FProperty** ValuePropertyPtr = &Prop;  // Slot to fill on each iteration (Inner / ElementProp / ValueProp)
+			FProperty* Prop = nullptr;            // The outermost wrapper (returned at the end)
+			FProperty** ValuePropertyPtr = &Prop; // Slot to fill on each iteration (Inner / ElementProp / ValueProp)
 			FFieldVariant PropertyOwner = PropertyScope;
 
 			for (EPCGMetadataAttributeContainerTypes ContainerType : Desc.ContainerTypes)
@@ -48,42 +48,42 @@ namespace PCGExData
 				switch (ContainerType)
 				{
 				case EPCGMetadataAttributeContainerTypes::Array:
-					{
-						FArrayProperty* ArrayProperty = new FArrayProperty(PropertyOwner, Desc.Name);
-						*ValuePropertyPtr = ArrayProperty;
-						ValuePropertyPtr = &ArrayProperty->Inner;
-						PropertyOwner = ArrayProperty;
-						break;
-					}
+				{
+					FArrayProperty* ArrayProperty = new FArrayProperty(PropertyOwner, Desc.Name);
+					*ValuePropertyPtr = ArrayProperty;
+					ValuePropertyPtr = &ArrayProperty->Inner;
+					PropertyOwner = ArrayProperty;
+					break;
+				}
 				case EPCGMetadataAttributeContainerTypes::Set:
-					{
-						FSetProperty* SetProperty = new FSetProperty(PropertyOwner, Desc.Name);
-						*ValuePropertyPtr = SetProperty;
-						ValuePropertyPtr = &SetProperty->ElementProp;
-						PropertyOwner = SetProperty;
-						break;
-					}
+				{
+					FSetProperty* SetProperty = new FSetProperty(PropertyOwner, Desc.Name);
+					*ValuePropertyPtr = SetProperty;
+					ValuePropertyPtr = &SetProperty->ElementProp;
+					PropertyOwner = SetProperty;
+					break;
+				}
 				case EPCGMetadataAttributeContainerTypes::Map:
-					{
-						FMapProperty* MapProperty = new FMapProperty(PropertyOwner, Desc.Name);
-						*ValuePropertyPtr = MapProperty;
-						ValuePropertyPtr = &MapProperty->ValueProp;
-						PropertyOwner = MapProperty;
+				{
+					FMapProperty* MapProperty = new FMapProperty(PropertyOwner, Desc.Name);
+					*ValuePropertyPtr = MapProperty;
+					ValuePropertyPtr = &MapProperty->ValueProp;
+					PropertyOwner = MapProperty;
 
-						// Map key — container types are not supported for keys.
-						FPCGMetadataAttributeDesc KeyDesc;
-						KeyDesc.ValueType = Desc.KeyType;
-						KeyDesc.ValueTypeObject = Desc.KeyTypeObject;
-						KeyDesc.Name = Desc.Name;
-						FProperty* KeyProp = CreateInnerPropertyFromDesc(KeyDesc, PropertyOwner);
-						if (!KeyProp)
-						{
-							delete MapProperty;  // Recursive delete cascades through nested wrappers + Inner via ~FProperty.
-							return nullptr;
-						}
-						MapProperty->KeyProp = KeyProp;
-						break;
+					// Map key — container types are not supported for keys.
+					FPCGMetadataAttributeDesc KeyDesc;
+					KeyDesc.ValueType = Desc.KeyType;
+					KeyDesc.ValueTypeObject = Desc.KeyTypeObject;
+					KeyDesc.Name = Desc.Name;
+					FProperty* KeyProp = CreateInnerPropertyFromDesc(KeyDesc, PropertyOwner);
+					if (!KeyProp)
+					{
+						delete MapProperty; // Recursive delete cascades through nested wrappers + Inner via ~FProperty.
+						return nullptr;
 					}
+					MapProperty->KeyProp = KeyProp;
+					break;
+				}
 				default:
 					ensureMsgf(false, TEXT("Unsupported container type %d"), static_cast<int32>(ContainerType));
 					delete Prop;
@@ -109,59 +109,59 @@ namespace PCGExData
 		switch (Desc.ValueType)
 		{
 		case EPCGMetadataTypes::Boolean:
-			{
-				FBoolProperty* Prop = new FBoolProperty(PropertyScope, Desc.Name);
-				Prop->SetBoolSize(sizeof(bool), true);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FBoolProperty* Prop = new FBoolProperty(PropertyScope, Desc.Name);
+			Prop->SetBoolSize(sizeof(bool), true);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Byte:
-			{
-				FByteProperty* Prop = new FByteProperty(PropertyScope, Desc.Name);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FByteProperty* Prop = new FByteProperty(PropertyScope, Desc.Name);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Integer32:
-			{
-				FIntProperty* Prop = new FIntProperty(PropertyScope, Desc.Name);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FIntProperty* Prop = new FIntProperty(PropertyScope, Desc.Name);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Integer64:
-			{
-				FInt64Property* Prop = new FInt64Property(PropertyScope, Desc.Name);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FInt64Property* Prop = new FInt64Property(PropertyScope, Desc.Name);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Float:
-			{
-				FFloatProperty* Prop = new FFloatProperty(PropertyScope, Desc.Name);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FFloatProperty* Prop = new FFloatProperty(PropertyScope, Desc.Name);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Double:
-			{
-				FDoubleProperty* Prop = new FDoubleProperty(PropertyScope, Desc.Name);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FDoubleProperty* Prop = new FDoubleProperty(PropertyScope, Desc.Name);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Name:
-			{
-				FNameProperty* Prop = new FNameProperty(PropertyScope, Desc.Name);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FNameProperty* Prop = new FNameProperty(PropertyScope, Desc.Name);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::String:
-			{
-				FStrProperty* Prop = new FStrProperty(PropertyScope, Desc.Name);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
-			}
+		{
+			FStrProperty* Prop = new FStrProperty(PropertyScope, Desc.Name);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Text:
-			{
-				FTextProperty* Prop = new FTextProperty(PropertyScope, Desc.Name);
-				return Prop;
-			}
+		{
+			FTextProperty* Prop = new FTextProperty(PropertyScope, Desc.Name);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Enum:
 			if (const UEnum* Enum = Cast<UEnum>(Desc.ValueTypeObject))
 			{
@@ -180,55 +180,67 @@ namespace PCGExData
 		// short PCG processing window). Do not persist these to long-lived UObject-owned storage
 		// without re-rooting. Soft variants (SoftObject/SoftClass) are safer (path-based).
 		case EPCGMetadataTypes::Object:
+		{
+			FObjectProperty* Prop = new FObjectProperty(PropertyScope, Desc.Name);
+			UClass* Class = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
+			if (!Class)
 			{
-				FObjectProperty* Prop = new FObjectProperty(PropertyScope, Desc.Name);
-				UClass* Class = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
-				if (!Class) { Class = UObject::StaticClass(); }
-				if (Class->HasAnyClassFlags(CLASS_DefaultToInstanced))
-				{
-					Prop->SetPropertyFlags(CPF_InstancedReference);
-				}
-				Prop->SetPropertyClass(Class);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash | CPF_TObjectPtr);
-				return Prop;
+				Class = UObject::StaticClass();
 			}
+			if (Class->HasAnyClassFlags(CLASS_DefaultToInstanced))
+			{
+				Prop->SetPropertyFlags(CPF_InstancedReference);
+			}
+			Prop->SetPropertyClass(Class);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash | CPF_TObjectPtr);
+			return Prop;
+		}
 		case EPCGMetadataTypes::SoftObject:
+		{
+			FSoftObjectProperty* Prop = new FSoftObjectProperty(PropertyScope, Desc.Name);
+			UClass* Class = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
+			if (!Class)
 			{
-				FSoftObjectProperty* Prop = new FSoftObjectProperty(PropertyScope, Desc.Name);
-				UClass* Class = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
-				if (!Class) { Class = UObject::StaticClass(); }
-				Prop->SetPropertyClass(Class);
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
+				Class = UObject::StaticClass();
 			}
+			Prop->SetPropertyClass(Class);
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::Class:
+		{
+			FClassProperty* Prop = new FClassProperty(PropertyScope, Desc.Name);
+			UClass* MetaClass = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
+			if (!MetaClass)
 			{
-				FClassProperty* Prop = new FClassProperty(PropertyScope, Desc.Name);
-				UClass* MetaClass = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
-				if (!MetaClass) { MetaClass = UObject::StaticClass(); }
-#if WITH_EDITORONLY_DATA
-				Prop->SetMetaClass(MetaClass);
-#else
-				Prop->SetMetaClass(MetaClass);
-#endif
-				Prop->PropertyClass = UClass::StaticClass();
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
+				MetaClass = UObject::StaticClass();
 			}
+#if WITH_EDITORONLY_DATA
+			Prop->SetMetaClass(MetaClass);
+#else
+			Prop->SetMetaClass(MetaClass);
+#endif
+			Prop->PropertyClass = UClass::StaticClass();
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::SoftClass:
+		{
+			FSoftClassProperty* Prop = new FSoftClassProperty(PropertyScope, Desc.Name);
+			UClass* MetaClass = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
+			if (!MetaClass)
 			{
-				FSoftClassProperty* Prop = new FSoftClassProperty(PropertyScope, Desc.Name);
-				UClass* MetaClass = const_cast<UClass*>(Cast<UClass>(Desc.ValueTypeObject));
-				if (!MetaClass) { MetaClass = UObject::StaticClass(); }
-#if WITH_EDITORONLY_DATA
-				Prop->SetMetaClass(MetaClass);
-#else
-				Prop->SetMetaClass(MetaClass);
-#endif
-				Prop->PropertyClass = UClass::StaticClass();
-				Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
-				return Prop;
+				MetaClass = UObject::StaticClass();
 			}
+#if WITH_EDITORONLY_DATA
+			Prop->SetMetaClass(MetaClass);
+#else
+			Prop->SetMetaClass(MetaClass);
+#endif
+			Prop->PropertyClass = UClass::StaticClass();
+			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			return Prop;
+		}
 		case EPCGMetadataTypes::SoftObjectPath:
 			ScriptStruct = TBaseStructure<FSoftObjectPath>::Get();
 			break;
@@ -293,7 +305,10 @@ namespace PCGExData
 		// but depends on the wrapper. Construct a transient property and ask it for its element size.
 		// This is a one-time cost per attribute description; result is cached on the buffer.
 		FProperty* Prop = CreateInnerPropertyFromDesc(Desc);
-		if (!Prop) { return 0; }
+		if (!Prop)
+		{
+			return 0;
+		}
 		const int32 Size = Prop->GetSize();
 		delete Prop;
 		return Size;
@@ -307,7 +322,10 @@ namespace PCGExData
 		}
 
 		FProperty* Prop = CreateInnerPropertyFromDesc(Desc);
-		if (!Prop) { return 1; }
+		if (!Prop)
+		{
+			return 1;
+		}
 		const int32 Alignment = Prop->GetMinAlignment();
 		delete Prop;
 		return Alignment;
@@ -340,7 +358,10 @@ namespace PCGExData
 
 	int32 FPropertyBuffer::GetContainerNum(const void* ContainerBytes)
 	{
-		if (!ContainerBytes) { return 0; }
+		if (!ContainerBytes)
+		{
+			return 0;
+		}
 		// TArray, TSet, and TMap all store their element count at a
 		// layout-compatible binary offset. We cast to FScriptArray as the
 		// canonical representative — FScriptSet and FScriptMap place Num()
@@ -351,10 +372,16 @@ namespace PCGExData
 
 	const void* FPropertyBuffer::GetArrayElementAt(const void* ArrayBytes, int32 Index, int32 ElementSize)
 	{
-		if (!ArrayBytes || ElementSize <= 0) { return nullptr; }
+		if (!ArrayBytes || ElementSize <= 0)
+		{
+			return nullptr;
+		}
 		const FScriptArray* Arr = static_cast<const FScriptArray*>(ArrayBytes);
 		const int32 Num = Arr->Num();
-		if (Index < 0 || Index >= Num) { return nullptr; }
+		if (Index < 0 || Index >= Num)
+		{
+			return nullptr;
+		}
 		// GetData() on FScriptArray returns a raw const void* into the contiguous
 		// element storage; stride by ElementSize to reach element [Index].
 		return static_cast<const uint8*>(Arr->GetData()) + static_cast<SIZE_T>(Index) * static_cast<SIZE_T>(ElementSize);
@@ -362,23 +389,35 @@ namespace PCGExData
 
 	void* FPropertyBuffer::GetMutableArrayElementAt(void* ArrayBytes, int32 Index, int32 ElementSize)
 	{
-		if (!ArrayBytes || ElementSize <= 0) { return nullptr; }
+		if (!ArrayBytes || ElementSize <= 0)
+		{
+			return nullptr;
+		}
 		FScriptArray* Arr = static_cast<FScriptArray*>(ArrayBytes);
 		const int32 Num = Arr->Num();
-		if (Index < 0 || Index >= Num) { return nullptr; }
+		if (Index < 0 || Index >= Num)
+		{
+			return nullptr;
+		}
 		return static_cast<uint8*>(Arr->GetData()) + static_cast<SIZE_T>(Index) * static_cast<SIZE_T>(ElementSize);
 	}
 
 	bool FPropertyBuffer::InitProperty(const FPCGMetadataAttributeBase* InGenericAttribute)
 	{
-		if (!InGenericAttribute) { return false; }
+		if (!InGenericAttribute)
+		{
+			return false;
+		}
 
 		const FPCGMetadataAttributeDesc& Desc = InGenericAttribute->GetAttributeDesc();
 
 		// Build the FULL property — including container wrapping, so reads/writes/copies
 		// of TArray/TSet/TMap attributes route through FArrayProperty/FSetProperty/FMapProperty.
 		CachedInnerProperty = CreateInnerPropertyFromDesc(Desc);
-		if (!CachedInnerProperty) { return false; }
+		if (!CachedInnerProperty)
+		{
+			return false;
+		}
 
 		ElementSize = GetElementSizeFromDesc(Desc);
 		return ElementSize > 0;
@@ -407,7 +446,10 @@ namespace PCGExData
 
 	void FPropertyArrayBuffer::DestroyAllElements(const TSharedPtr<TArray<uint8>>& Bytes) const
 	{
-		if (!Bytes || !CachedInnerProperty || ElementSize <= 0) { return; }
+		if (!Bytes || !CachedInnerProperty || ElementSize <= 0)
+		{
+			return;
+		}
 		const int32 NumElements = Bytes->Num() / ElementSize;
 		uint8* Data = Bytes->GetData();
 		for (int32 i = 0; i < NumElements; i++)
@@ -418,17 +460,34 @@ namespace PCGExData
 
 	int32 FPropertyArrayBuffer::GetNumValues(const EIOSide InSide)
 	{
-		if (InSide == EIOSide::In) { return InBytes ? InBytes->Num() / FMath::Max(1, ElementSize) : 0; }
+		if (InSide == EIOSide::In)
+		{
+			return InBytes ? InBytes->Num() / FMath::Max(1, ElementSize) : 0;
+		}
 		return OutBytes ? OutBytes->Num() / FMath::Max(1, ElementSize) : 0;
 	}
 
-	bool FPropertyArrayBuffer::IsWritable() { return OutBytes != nullptr; }
-	bool FPropertyArrayBuffer::IsReadable() { return InBytes != nullptr; }
-	bool FPropertyArrayBuffer::ReadsFromOutput() { return InBytes == OutBytes; }
+	bool FPropertyArrayBuffer::IsWritable()
+	{
+		return OutBytes != nullptr;
+	}
+
+	bool FPropertyArrayBuffer::IsReadable()
+	{
+		return InBytes != nullptr;
+	}
+
+	bool FPropertyArrayBuffer::ReadsFromOutput()
+	{
+		return InBytes == OutBytes;
+	}
 
 	bool FPropertyArrayBuffer::EnsureReadable()
 	{
-		if (InBytes) { return true; }
+		if (InBytes)
+		{
+			return true;
+		}
 
 		if (OutBytes)
 		{
@@ -497,13 +556,19 @@ namespace PCGExData
 
 	PCGExValueHash FPropertyArrayBuffer::ReadValueHash(const int32 Index)
 	{
-		if (!InBytes || ElementSize <= 0) { return 0; }
+		if (!InBytes || ElementSize <= 0)
+		{
+			return 0;
+		}
 		return FCrc::MemCrc32(InBytes->GetData() + Index * ElementSize, ElementSize);
 	}
 
 	PCGExValueHash FPropertyArrayBuffer::GetValueHash(const int32 Index)
 	{
-		if (OutBytes && ElementSize > 0) { return FCrc::MemCrc32(OutBytes->GetData() + Index * ElementSize, ElementSize); }
+		if (OutBytes && ElementSize > 0)
+		{
+			return FCrc::MemCrc32(OutBytes->GetData() + Index * ElementSize, ElementSize);
+		}
 		return ReadValueHash(Index);
 	}
 
@@ -511,21 +576,39 @@ namespace PCGExData
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 
-		if (InBytes) { return true; }
+		if (InBytes)
+		{
+			return true;
+		}
 
-		if (ElementSize <= 0) { return false; }
+		if (ElementSize <= 0)
+		{
+			return false;
+		}
 
 		const UPCGBasePointData* PointData = (InSide == EIOSide::In) ? Source->GetIn() : Source->GetOut();
-		if (!PointData) { return false; }
+		if (!PointData)
+		{
+			return false;
+		}
 
 		const FPCGMetadataAttributeBase* Attr = Source->FindConstAttribute(Identifier, InSide);
-		if (!Attr) { return false; }
+		if (!Attr)
+		{
+			return false;
+		}
 
 		GenericInAttribute = Attr;
 		InAttribute = Attr;
 
-		if (!CachedInnerProperty) { InitProperty(GenericInAttribute); }
-		if (!CachedInnerProperty || ElementSize <= 0) { return false; }
+		if (!CachedInnerProperty)
+		{
+			InitProperty(GenericInAttribute);
+		}
+		if (!CachedInnerProperty || ElementSize <= 0)
+		{
+			return false;
+		}
 
 		const int32 NumPoints = PointData->GetNumPoints();
 
@@ -556,12 +639,21 @@ namespace PCGExData
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 
-		if (OutBytes) { return true; }
+		if (OutBytes)
+		{
+			return true;
+		}
 
-		if (ElementSize <= 0) { return false; }
+		if (ElementSize <= 0)
+		{
+			return false;
+		}
 
 		const UPCGBasePointData* OutData = Source->GetOut();
-		if (!OutData) { return false; }
+		if (!OutData)
+		{
+			return false;
+		}
 
 		// Resolve the output generic attribute
 		if (SourceAttribute)
@@ -593,7 +685,10 @@ namespace PCGExData
 			}
 		}
 
-		if (!CachedInnerProperty || ElementSize <= 0) { return false; }
+		if (!CachedInnerProperty || ElementSize <= 0)
+		{
+			return false;
+		}
 
 		const int32 NumPoints = OutData->GetNumPoints();
 
@@ -631,11 +726,20 @@ namespace PCGExData
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FPropertyArrayBuffer::Write);
 
-		if (!IsWritable() || !IsEnabled() || !OutBytes) { return; }
-		if (!GenericOutAttribute || !CachedInnerProperty) { return; }
+		if (!IsWritable() || !IsEnabled() || !OutBytes)
+		{
+			return;
+		}
+		if (!GenericOutAttribute || !CachedInnerProperty)
+		{
+			return;
+		}
 
 		const UPCGBasePointData* OutData = Source->GetOut();
-		if (!OutData) { return; }
+		if (!OutData)
+		{
+			return;
+		}
 
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 		SharedContext.Get()->AddProtectedAttributeName(GenericOutAttribute->Name);
@@ -663,7 +767,10 @@ namespace PCGExData
 
 	void FPropertyArrayBuffer::SetFromVoidProperty(const int32 Index, const void* SrcPtr)
 	{
-		if (!OutBytes || !CachedInnerProperty || !SrcPtr || ElementSize <= 0) { return; }
+		if (!OutBytes || !CachedInnerProperty || !SrcPtr || ElementSize <= 0)
+		{
+			return;
+		}
 		const int32 Offset = Index * ElementSize;
 		check(Offset + ElementSize <= OutBytes->Num());
 		// Slot was InitializeValue'd in InitForWrite, so it's in a property-valid state and
@@ -700,15 +807,32 @@ namespace PCGExData
 		}
 	}
 
-	int32 FPropertySingleValueBuffer::GetNumValues(const EIOSide InSide) { return 1; }
+	int32 FPropertySingleValueBuffer::GetNumValues(const EIOSide InSide)
+	{
+		return 1;
+	}
 
-	bool FPropertySingleValueBuffer::IsWritable() { return bWriteInitialized; }
-	bool FPropertySingleValueBuffer::IsReadable() { return bReadInitialized; }
-	bool FPropertySingleValueBuffer::ReadsFromOutput() { return bReadFromOutput; }
+	bool FPropertySingleValueBuffer::IsWritable()
+	{
+		return bWriteInitialized;
+	}
+
+	bool FPropertySingleValueBuffer::IsReadable()
+	{
+		return bReadInitialized;
+	}
+
+	bool FPropertySingleValueBuffer::ReadsFromOutput()
+	{
+		return bReadFromOutput;
+	}
 
 	bool FPropertySingleValueBuffer::EnsureReadable()
 	{
-		if (bReadInitialized) { return true; }
+		if (bReadInitialized)
+		{
+			return true;
+		}
 
 		if (bWriteInitialized && OutValue.Num() > 0)
 		{
@@ -772,13 +896,19 @@ namespace PCGExData
 
 	PCGExValueHash FPropertySingleValueBuffer::ReadValueHash(const int32 Index)
 	{
-		if (InValue.Num() < ElementSize || ElementSize <= 0) { return 0; }
+		if (InValue.Num() < ElementSize || ElementSize <= 0)
+		{
+			return 0;
+		}
 		return FCrc::MemCrc32(InValue.GetData(), ElementSize);
 	}
 
 	PCGExValueHash FPropertySingleValueBuffer::GetValueHash(const int32 Index)
 	{
-		if (OutValue.Num() >= ElementSize && ElementSize > 0) { return FCrc::MemCrc32(OutValue.GetData(), ElementSize); }
+		if (OutValue.Num() >= ElementSize && ElementSize > 0)
+		{
+			return FCrc::MemCrc32(OutValue.GetData(), ElementSize);
+		}
 		return ReadValueHash(Index);
 	}
 
@@ -786,18 +916,33 @@ namespace PCGExData
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 
-		if (bReadInitialized) { return true; }
+		if (bReadInitialized)
+		{
+			return true;
+		}
 
-		if (ElementSize <= 0) { return false; }
+		if (ElementSize <= 0)
+		{
+			return false;
+		}
 
 		const FPCGMetadataAttributeBase* Attr = Source->FindConstAttribute(Identifier, InSide);
-		if (!Attr) { return false; }
+		if (!Attr)
+		{
+			return false;
+		}
 
 		GenericInAttribute = Attr;
 		InAttribute = Attr;
 
-		if (!CachedInnerProperty) { InitProperty(GenericInAttribute); }
-		if (!CachedInnerProperty || ElementSize <= 0) { return false; }
+		if (!CachedInnerProperty)
+		{
+			InitProperty(GenericInAttribute);
+		}
+		if (!CachedInnerProperty || ElementSize <= 0)
+		{
+			return false;
+		}
 
 		InValue.SetNumZeroed(ElementSize);
 		// Property-aware deep copy: see FPropertyArrayBuffer::InitForRead for rationale.
@@ -816,9 +961,15 @@ namespace PCGExData
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 
-		if (bWriteInitialized) { return true; }
+		if (bWriteInitialized)
+		{
+			return true;
+		}
 
-		if (ElementSize <= 0) { return false; }
+		if (ElementSize <= 0)
+		{
+			return false;
+		}
 
 		if (SourceAttribute)
 		{
@@ -827,7 +978,8 @@ namespace PCGExData
 			// Create-on-the-fly when not already present (data forward path).
 			if (!MutableAttr)
 			{
-				if (const UPCGBasePointData* OutData = Source->GetOut(); OutData && OutData->Metadata)
+				if (const UPCGBasePointData* OutData = Source->GetOut();
+					OutData && OutData->Metadata)
 				{
 					MutableAttr = OutData->Metadata->CreateAttribute(
 						Identifier,
@@ -849,7 +1001,10 @@ namespace PCGExData
 			}
 		}
 
-		if (!CachedInnerProperty || ElementSize <= 0) { return false; }
+		if (!CachedInnerProperty || ElementSize <= 0)
+		{
+			return false;
+		}
 
 		OutValue.SetNumZeroed(ElementSize);
 		CachedInnerProperty->InitializeValue(OutValue.GetData());
@@ -871,8 +1026,14 @@ namespace PCGExData
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FPropertySingleValueBuffer::Write);
 
-		if (!IsWritable() || !IsEnabled()) { return; }
-		if (!GenericOutAttribute || !CachedInnerProperty) { return; }
+		if (!IsWritable() || !IsEnabled())
+		{
+			return;
+		}
+		if (!GenericOutAttribute || !CachedInnerProperty)
+		{
+			return;
+		}
 
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 		SharedContext.Get()->AddProtectedAttributeName(GenericOutAttribute->Name);

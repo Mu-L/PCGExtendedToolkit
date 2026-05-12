@@ -122,15 +122,25 @@ namespace PCGExData
 		 * True iff the compiled chain has at least one step (i.e., the
 		 * sub-selection actually changes the output).
 		 */
-		FORCEINLINE bool AppliesToSourceRead() const { return !CompiledChain.Steps.IsEmpty(); }
+		FORCEINLINE bool AppliesToSourceRead() const
+		{
+			return !CompiledChain.Steps.IsEmpty();
+		}
+
 		FORCEINLINE bool AppliesToTargetWrite() const
 		{
 			// Inject needs every step to have a writable SetFn. Axis-only
 			// chains (read-only) can't drive inject.
-			if (CompiledChain.Steps.IsEmpty()) { return false; }
+			if (CompiledChain.Steps.IsEmpty())
+			{
+				return false;
+			}
 			for (const FSubSelectionStep& Step : CompiledChain.Steps)
 			{
-				if (!Step.StepSetFn) { return false; }
+				if (!Step.StepSetFn)
+				{
+					return false;
+				}
 			}
 			return true;
 		}

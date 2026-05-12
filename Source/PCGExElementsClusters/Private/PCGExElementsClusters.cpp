@@ -4,7 +4,6 @@
 #include "PCGExElementsClusters.h"
 
 
-
 #if WITH_EDITOR
 #include "Styling/AppStyle.h"
 

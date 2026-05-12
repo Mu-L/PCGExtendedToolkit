@@ -42,14 +42,26 @@ namespace PCGExData
 
 	EPCGMetadataTypes FSubSelection::GetSubType(const EPCGMetadataTypes Fallback) const
 	{
-		if (!HasSelection()) { return Fallback; }
-		if (IsFieldSelection()) { return EPCGMetadataTypes::Double; }
-		if (IsAxisSelection()) { return EPCGMetadataTypes::Vector; }
+		if (!HasSelection())
+		{
+			return Fallback;
+		}
+		if (IsFieldSelection())
+		{
+			return EPCGMetadataTypes::Double;
+		}
+		if (IsAxisSelection())
+		{
+			return EPCGMetadataTypes::Vector;
+		}
 
 		// ContainerCount always yields Double (the count). Checked
 		// after field/axis so a chain like `.1.X` (ContainerIndex + Field)
 		// still reports Double via the field path.
-		if (IsContainerCountSelection()) { return EPCGMetadataTypes::Double; }
+		if (IsContainerCountSelection())
+		{
+			return EPCGMetadataTypes::Double;
+		}
 
 		// Component selection: Vector (Pos/Scale) or Quaternion (Rotation).
 		// NOTE: intentionally ungated — even chains without an explicit
@@ -62,8 +74,10 @@ namespace PCGExData
 		switch (Component)
 		{
 		case PCGExTypeOps::ETransformPart::Position:
-		case PCGExTypeOps::ETransformPart::Scale:    return EPCGMetadataTypes::Vector;
-		case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
+		case PCGExTypeOps::ETransformPart::Scale:
+			return EPCGMetadataTypes::Vector;
+		case PCGExTypeOps::ETransformPart::Rotation:
+			return EPCGMetadataTypes::Quaternion;
 		}
 
 		// ContainerIndex-only (and any other non-type-changing chain) falls
@@ -114,10 +128,18 @@ namespace PCGExData
 		PCGExTypeOps::ESingleField NewField = PCGExTypeOps::ESingleField::X;
 		switch (InFieldIndex)
 		{
-		case 0: NewField = PCGExTypeOps::ESingleField::X; break;
-		case 1: NewField = PCGExTypeOps::ESingleField::Y; break;
-		case 2: NewField = PCGExTypeOps::ESingleField::Z; break;
-		case 3: NewField = PCGExTypeOps::ESingleField::W; break;
+		case 0:
+			NewField = PCGExTypeOps::ESingleField::X;
+			break;
+		case 1:
+			NewField = PCGExTypeOps::ESingleField::Y;
+			break;
+		case 2:
+			NewField = PCGExTypeOps::ESingleField::Z;
+			break;
+		case 3:
+			NewField = PCGExTypeOps::ESingleField::W;
+			break;
 		}
 
 		const ISubAccessor* Accessor = FSubAccessorRegistry::GetSingleFieldAccessor();
@@ -153,7 +175,10 @@ namespace PCGExData
 		// token. Malformed inputs like {Garbage} produce an empty chain.
 		ParsedChain.Reset();
 
-		if (ExtraNames.IsEmpty()) { return; }
+		if (ExtraNames.IsEmpty())
+		{
+			return;
+		}
 
 		FSubAccessorRegistry::ParseChain(ExtraNames, EPCGMetadataTypes::Unknown, ParsedChain);
 
@@ -167,9 +192,19 @@ namespace PCGExData
 		const FSubSelectionStep* FieldStep = nullptr;
 		for (const FSubSelectionStep& Step : ParsedChain.Steps)
 		{
-			if (Step.Accessor == AxisAccessor) { AxisStep = &Step; }
-			else if (Step.Accessor == TransformAccessor) { CompStep = &Step; }
-			else if (Step.Accessor == FieldAccessor) { FieldStep = &Step; }
+			if (Step.Accessor == AxisAccessor)
+			{
+				AxisStep = &Step;
+			}
+			else if (Step.Accessor == TransformAccessor)
+			{
+				CompStep = &Step;
+			}
+			else
+				if (Step.Accessor == FieldAccessor)
+				{
+					FieldStep = &Step;
+				}
 		}
 
 		Axis = AxisStep ? AxisStep->Parsed.Axis : EPCGExAxis::Forward;
@@ -182,24 +217,55 @@ namespace PCGExData
 		// PossibleSourceType: component hint wins, else field hint, else axis hint, else Unknown.
 		// Axis tokens are parsed with a Quaternion hint -- an axis alone strongly
 		// suggests the source is rotational (FQuat/FRotator/FTransform).
-		if (CompStep) { PossibleSourceType = CompStep->Parsed.SourceTypeHint; }
-		else if (FieldStep) { PossibleSourceType = FieldStep->Parsed.SourceTypeHint; }
-		else if (AxisStep) { PossibleSourceType = AxisStep->Parsed.SourceTypeHint; }
-		else { PossibleSourceType = EPCGMetadataTypes::Unknown; }
+		if (CompStep)
+		{
+			PossibleSourceType = CompStep->Parsed.SourceTypeHint;
+		}
+		else if (FieldStep)
+		{
+			PossibleSourceType = FieldStep->Parsed.SourceTypeHint;
+		}
+		else if (AxisStep)
+		{
+			PossibleSourceType = AxisStep->Parsed.SourceTypeHint;
+		}
+		else
+		{
+			PossibleSourceType = EPCGMetadataTypes::Unknown;
+		}
 
 		// Build classifier bitmask from the chain's step accessor identities.
 		ClassifierMask = 0;
 		const ISubAccessor* ContainerIndexAccessor = FSubAccessorRegistry::GetContainerIndexAccessor();
 		const ISubAccessor* ContainerCountAccessor = FSubAccessorRegistry::GetContainerCountAccessor();
 
-		if (!ParsedChain.Steps.IsEmpty()) { ClassifierMask |= Bit_HasSelection; }
+		if (!ParsedChain.Steps.IsEmpty())
+		{
+			ClassifierMask |= Bit_HasSelection;
+		}
 		for (const FSubSelectionStep& Step : ParsedChain.Steps)
 		{
-			if (Step.Accessor == FieldAccessor)           { ClassifierMask |= Bit_Field; }
-			else if (Step.Accessor == AxisAccessor)       { ClassifierMask |= Bit_Axis; }
-			else if (Step.Accessor == TransformAccessor)  { ClassifierMask |= Bit_Component; }
-			else if (Step.Accessor == ContainerIndexAccessor) { ClassifierMask |= Bit_ContainerIndex; }
-			else if (Step.Accessor == ContainerCountAccessor) { ClassifierMask |= Bit_ContainerCount; }
+			if (Step.Accessor == FieldAccessor)
+			{
+				ClassifierMask |= Bit_Field;
+			}
+			else if (Step.Accessor == AxisAccessor)
+			{
+				ClassifierMask |= Bit_Axis;
+			}
+			else if (Step.Accessor == TransformAccessor)
+			{
+				ClassifierMask |= Bit_Component;
+			}
+			else if (Step.Accessor == ContainerIndexAccessor)
+			{
+				ClassifierMask |= Bit_ContainerIndex;
+			}
+			else
+				if (Step.Accessor == ContainerCountAccessor)
+				{
+					ClassifierMask |= Bit_ContainerCount;
+				}
 		}
 	}
 
@@ -321,8 +387,8 @@ namespace PCGExData
 		// Extract phase: walk forward to populate intermediates.
 		constexpr int32 MaxSteps = 4;
 		checkf(Compiled.Steps.Num() <= MaxSteps,
-			TEXT("FSubSelection chain exceeded MaxSteps (%d > %d)"),
-			Compiled.Steps.Num(), MaxSteps);
+		       TEXT("FSubSelection chain exceeded MaxSteps (%d > %d)"),
+		       Compiled.Steps.Num(), MaxSteps);
 
 		alignas(16) uint8 Buffers[MaxSteps][96];
 
@@ -401,7 +467,10 @@ namespace PCGExData
 		if (IntermediateType == WorkingType)
 		{
 			const PCGExTypeOps::ITypeOpsBase* TypeOps = PCGExTypeOps::FTypeOpsRegistry::Get(IntermediateType);
-			if (TypeOps) { TypeOps->Copy(IntermediateBuffer, Target); }
+			if (TypeOps)
+			{
+				TypeOps->Copy(IntermediateBuffer, Target);
+			}
 		}
 		else if (IntermediateType != EPCGMetadataTypes::Unknown)
 		{

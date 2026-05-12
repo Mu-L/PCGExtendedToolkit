@@ -53,7 +53,10 @@ bool UPCGExPickerAttributeSetRangesFactory::GetUniqueRanges(FPCGExContext* InCon
 			}
 
 			const TSharedPtr<PCGExData::TAttributeBroadcaster<FVector2D>> Values = PCGExData::MakeTypedBroadcaster<FVector2D>(Infos->Identities[0].Name, Facade->Source);
-			if (!Values) { continue; }
+			if (!Values)
+			{
+				continue;
+			}
 			Values->GrabUniqueValues(UniqueRanges);
 		}
 		else

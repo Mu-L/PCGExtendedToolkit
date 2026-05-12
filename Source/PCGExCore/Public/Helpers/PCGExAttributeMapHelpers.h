@@ -35,10 +35,16 @@ namespace PCGExAttributeMapHelpers
 		}
 
 		TUniquePtr<const IPCGAttributeAccessor> KeysAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(KeyAttr, KeyAttr->GetMetadataDomain(), true);
-		if (!KeysAccessor) { return 0; }
+		if (!KeysAccessor)
+		{
+			return 0;
+		}
 
 		TUniquePtr<const IPCGAttributeAccessor> ValuesAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(ValueAttr, ValueAttr->GetMetadataDomain(), true);
-		if (!ValuesAccessor) { return 0; }
+		if (!ValuesAccessor)
+		{
+			return 0;
+		}
 
 		TArray<T_KEY> KeysArray;
 		TArray<T_VALUE> ValuesArray;
@@ -115,7 +121,10 @@ namespace PCGExAttributeMapHelpers
 			}
 
 			TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(ParamData->Metadata);
-			if (!Infos || Infos->Identities.IsEmpty()) { continue; }
+			if (!Infos || Infos->Identities.IsEmpty())
+			{
+				continue;
+			}
 
 			const FPCGMetadataAttributeBase* KeyCandidate = nullptr;
 			const FPCGMetadataAttributeBase* ValueCandidate = nullptr;
@@ -123,7 +132,10 @@ namespace PCGExAttributeMapHelpers
 			for (const PCGExData::FAttributeIdentity& Identity : Infos->Identities)
 			{
 				const FPCGMetadataAttributeBase* Candidate = Identity.Attribute;
-				if (!Candidate) { continue; }
+				if (!Candidate)
+				{
+					continue;
+				}
 
 				if (!KeyCandidate && Candidate->GetTypeId() == KeyType)
 				{

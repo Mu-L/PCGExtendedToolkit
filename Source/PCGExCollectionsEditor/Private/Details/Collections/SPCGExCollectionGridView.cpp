@@ -11,7 +11,6 @@
 #include "InputCoreTypes.h"
 #include "ScopedTransaction.h"
 
-#include "InstancedStruct.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Details/Collections/FPCGExCollectionTileDragDropOp.h"
 #include "Details/Collections/PCGExAssetCollectionEditor.h"

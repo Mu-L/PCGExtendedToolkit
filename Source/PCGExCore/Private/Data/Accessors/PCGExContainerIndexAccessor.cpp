@@ -20,7 +20,10 @@ namespace PCGExData
 		bool ParseContainerIndexToken(const FString& UpperToken, int32& OutIndex)
 		{
 			const int32 Len = UpperToken.Len();
-			if (Len == 0) { return false; }
+			if (Len == 0)
+			{
+				return false;
+			}
 
 			int32 Begin = 0;
 			int32 End = Len;
@@ -28,8 +31,14 @@ namespace PCGExData
 			// Bracket-wrapped form requires both ends + at least one digit between.
 			if (UpperToken[0] == TEXT('['))
 			{
-				if (Len < 3) { return false; } // "[]" or "[" alone
-				if (UpperToken[Len - 1] != TEXT(']')) { return false; }
+				if (Len < 3)
+				{
+					return false;
+				} // "[]" or "[" alone
+				if (UpperToken[Len - 1] != TEXT(']'))
+				{
+					return false;
+				}
 				Begin = 1;
 				End = Len - 1;
 			}
@@ -38,7 +47,10 @@ namespace PCGExData
 			for (int32 i = Begin; i < End; ++i)
 			{
 				const TCHAR C = UpperToken[i];
-				if (C < TEXT('0') || C > TEXT('9')) { return false; }
+				if (C < TEXT('0') || C > TEXT('9'))
+				{
+					return false;
+				}
 			}
 
 			// Accumulate. Guard against overflow by clamping to INT32_MAX.
@@ -46,7 +58,10 @@ namespace PCGExData
 			for (int32 i = Begin; i < End; ++i)
 			{
 				Acc = Acc * 10 + (UpperToken[i] - TEXT('0'));
-				if (Acc > TNumericLimits<int32>::Max()) { return false; }
+				if (Acc > TNumericLimits<int32>::Max())
+				{
+					return false;
+				}
 			}
 
 			OutIndex = static_cast<int32>(Acc);
@@ -107,7 +122,10 @@ namespace PCGExData
 	bool FContainerIndexAccessor::MatchesToken(const FString& UpperToken, FAccessorParseResult& OutParsed) const
 	{
 		int32 Index = -1;
-		if (!ParseContainerIndexToken(UpperToken, Index)) { return false; }
+		if (!ParseContainerIndexToken(UpperToken, Index))
+		{
+			return false;
+		}
 
 		OutParsed.ContainerIndex = Index;
 		// No source-type hint: a numeric index gives us nothing about the
@@ -178,13 +196,16 @@ namespace PCGExData
 		(void)Parsed;
 		// Keep iff the source is an Array-backed container. Set/Map aren't
 		// positionally-indexed meaningfully -- Drop for 5b.
-		if (!SourceDesc || !SourceDesc->IsArray()) { return ECompileAction::Drop; }
+		if (!SourceDesc || !SourceDesc->IsArray())
+		{
+			return ECompileAction::Drop;
+		}
 		return ECompileAction::Keep;
 	}
 
 	void FContainerIndexAccessor::PostClassifyFinalize(EPCGMetadataTypes InType,
-	                                                    FAccessorParseResult& InOutParsed,
-	                                                    const FPCGMetadataAttributeDesc* SourceDesc) const
+	                                                   FAccessorParseResult& InOutParsed,
+	                                                   const FPCGMetadataAttributeDesc* SourceDesc) const
 	{
 		(void)InType;
 		// Classify has already verified SourceDesc + Array container.

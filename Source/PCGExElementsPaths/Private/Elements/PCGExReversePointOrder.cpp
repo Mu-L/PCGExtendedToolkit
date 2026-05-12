@@ -105,8 +105,14 @@ namespace PCGExReversePointOrder
 		{
 			PCGExData::FAttributeIdentity* FirstIdentity = AttributesInfos->Find(OriginalPair.FirstAttributeName);
 			PCGExData::FAttributeIdentity* SecondIdentity = AttributesInfos->Find(OriginalPair.SecondAttributeName);
-			if (!FirstIdentity || !SecondIdentity) { continue; }
-			if (!FirstIdentity->IsSameType(*SecondIdentity)) { continue; }
+			if (!FirstIdentity || !SecondIdentity)
+			{
+				continue;
+			}
+			if (!FirstIdentity->IsSameType(*SecondIdentity))
+			{
+				continue;
+			}
 
 			const int32 AddIndex = SwapPairs.Add(OriginalPair);
 
@@ -230,7 +236,10 @@ namespace PCGExReversePointOrder
 		for (const FPCGExSwapAttributePairDetails& WorkingPair : SwapPairs)
 		{
 			// Container/extended pairs were nulled at writer-fetch time — skip them here too.
-			if (!WorkingPair.FirstWriter || !WorkingPair.SecondWriter) { continue; }
+			if (!WorkingPair.FirstWriter || !WorkingPair.SecondWriter)
+			{
+				continue;
+			}
 
 			PCGExMetaHelpers::ExecuteWithRightType(*WorkingPair.FirstIdentity, [&](auto DummyValue)
 			{

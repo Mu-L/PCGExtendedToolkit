@@ -430,14 +430,14 @@ namespace PCGExData
 		check(Buffer);
 		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
 		FMemory::Memcpy(Wrapped.GetRaw(), Value, Wrapped.GetValueSize());
-		const_cast<IBuffer*>(Buffer.Get())->SetVoid(Index, Wrapped);
+		Buffer.Get()->SetVoid(Index, Wrapped);
 	}
 
 	void FPropertyBufferProxy::GetCurrentVoid(const int32 Index, void* OutValue) const
 	{
 		check(Buffer);
 		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
-		const_cast<IBuffer*>(Buffer.Get())->GetVoid(Index, Wrapped);
+		Buffer.Get()->GetVoid(Index, Wrapped);
 		FMemory::Memcpy(OutValue, Wrapped.GetRaw(), Wrapped.GetValueSize());
 	}
 

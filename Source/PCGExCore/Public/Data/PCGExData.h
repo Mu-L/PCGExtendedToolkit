@@ -174,7 +174,10 @@ namespace PCGExData
 		// fallback path for extended/container types). False for typed TBuffer<T> instances.
 		// Use this to safely gate StaticCastSharedPtr<FPropertyBuffer>(buf) — the typed and property
 		// buffer hierarchies are siblings under IBuffer, so an unconditional static cast would be UB.
-		virtual bool IsPropertyBacked() const { return false; }
+		virtual bool IsPropertyBacked() const
+		{
+			return false;
+		}
 
 		virtual void Flush()
 		{
@@ -267,8 +270,10 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 	using TBuffer<T>::bCacheValueHashes;
 
 	// Forward declarations for buffer leaf classes (defined in Buffers/ headers)
-	template <typename T> class TArrayBuffer;
-	template <typename T> class TSingleValueBuffer;
+	template <typename T>
+	class TArrayBuffer;
+	template <typename T>
+	class TSingleValueBuffer;
 	class FPropertyBuffer;
 	class FPropertyArrayBuffer;
 	class FPropertySingleValueBuffer;

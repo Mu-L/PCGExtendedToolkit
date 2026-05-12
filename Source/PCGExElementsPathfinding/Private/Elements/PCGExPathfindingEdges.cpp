@@ -207,7 +207,10 @@ bool FPCGExPathfindingEdgesElement::Boot(FPCGExContext* InContext) const
 	}
 
 
-	auto ValidIdentity = [](const PCGExData::FAttributeIdentity& Identity) { return Identity.GetIdentifier() != PCGExPaths::Labels::ClosedLoopIdentifier; };
+	auto ValidIdentity = [](const PCGExData::FAttributeIdentity& Identity)
+	{
+		return Identity.GetIdentifier() != PCGExPaths::Labels::ClosedLoopIdentifier;
+	};
 
 	Context->SeedForwardHandler = Settings->SeedForwarding.GetHandler(Context->SeedsDataFacade);
 	Context->SeedForwardHandler->ValidateIdentities(ValidIdentity);

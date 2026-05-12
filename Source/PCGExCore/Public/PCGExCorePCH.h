@@ -17,8 +17,15 @@
 // and TSet<FText> instantiation. Must be defined BEFORE PCGMetadataAttributeTraits.h is included.
 #ifndef PCGEX_FTEXT_SHIMS_DEFINED
 #define PCGEX_FTEXT_SHIMS_DEFINED
-FORCEINLINE uint32 GetTypeHash(const FText& Value) { return GetTypeHash(Value.ToString()); }
-FORCEINLINE bool operator==(const FText& A, const FText& B) { return A.EqualTo(B); }
+FORCEINLINE uint32 GetTypeHash(const FText& Value)
+{
+	return GetTypeHash(Value.ToString());
+}
+
+FORCEINLINE bool operator==(const FText& A, const FText& B)
+{
+	return A.EqualTo(B);
+}
 #endif
 
 // PCG core - precompiled here so modules don't re-process them

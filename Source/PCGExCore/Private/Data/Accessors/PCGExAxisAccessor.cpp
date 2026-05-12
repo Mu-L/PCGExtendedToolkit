@@ -13,16 +13,16 @@ namespace PCGExData
 		const TMap<FString, EPCGExAxis>& GetAxisTable()
 		{
 			static const TMap<FString, EPCGExAxis> Table = {
-				{TEXT("FORWARD"),  EPCGExAxis::Forward},
-				{TEXT("FRONT"),    EPCGExAxis::Forward},
+				{TEXT("FORWARD"), EPCGExAxis::Forward},
+				{TEXT("FRONT"), EPCGExAxis::Forward},
 				{TEXT("BACKWARD"), EPCGExAxis::Backward},
-				{TEXT("BACK"),     EPCGExAxis::Backward},
-				{TEXT("RIGHT"),    EPCGExAxis::Right},
-				{TEXT("LEFT"),     EPCGExAxis::Left},
-				{TEXT("UP"),       EPCGExAxis::Up},
-				{TEXT("TOP"),      EPCGExAxis::Up},
-				{TEXT("DOWN"),     EPCGExAxis::Down},
-				{TEXT("BOTTOM"),   EPCGExAxis::Down},
+				{TEXT("BACK"), EPCGExAxis::Backward},
+				{TEXT("RIGHT"), EPCGExAxis::Right},
+				{TEXT("LEFT"), EPCGExAxis::Left},
+				{TEXT("UP"), EPCGExAxis::Up},
+				{TEXT("TOP"), EPCGExAxis::Up},
+				{TEXT("DOWN"), EPCGExAxis::Down},
+				{TEXT("BOTTOM"), EPCGExAxis::Down},
 			};
 			return Table;
 		}
@@ -117,9 +117,12 @@ namespace PCGExData
 	{
 		switch (InType)
 		{
-		case EPCGMetadataTypes::Quaternion: return &AxisGetStep_Quat;
-		case EPCGMetadataTypes::Rotator:    return &AxisGetStep_Rotator;
-		default: return nullptr;
+		case EPCGMetadataTypes::Quaternion:
+			return &AxisGetStep_Quat;
+		case EPCGMetadataTypes::Rotator:
+			return &AxisGetStep_Rotator;
+		default:
+			return nullptr;
 		}
 	}
 

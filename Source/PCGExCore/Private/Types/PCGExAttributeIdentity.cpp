@@ -15,7 +15,10 @@ namespace PCGExData
 {
 	FAttributeIdentity::FAttributeIdentity(const FPCGMetadataAttributeBase* InAttribute)
 	{
-		if (!InAttribute) { return; }
+		if (!InAttribute)
+		{
+			return;
+		}
 
 		// Copy the base desc from the attribute (name, value type, containers, value type object, key type/object).
 		static_cast<FPCGMetadataAttributeDesc&>(*this) = InAttribute->GetAttributeDesc();
@@ -25,7 +28,7 @@ namespace PCGExData
 
 	FAttributeIdentity::FAttributeIdentity(const FPCGMetadataAttributeDesc& InDesc, const FPCGMetadataDomainID& InDomain)
 		: FPCGMetadataAttributeDesc(InDesc)
-		, MetadataDomain(InDomain)
+		  , MetadataDomain(InDomain)
 	{
 	}
 
@@ -51,7 +54,10 @@ namespace PCGExData
 
 		for (int i = 0; i < NumAttributes; i++)
 		{
-			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifiers[i].Name)) { continue; }
+			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifiers[i].Name))
+			{
+				continue;
+			}
 			OutIdentities.AddUnique(FAttributeIdentity(InMetadata->GetConstAttribute(Identifiers[i])));
 		}
 	}
@@ -72,7 +78,10 @@ namespace PCGExData
 		for (int i = 0; i < NumAttributes; i++)
 		{
 			const FPCGAttributeIdentifier& Identifier = OutIdentifiers[i];
-			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifier.Name)) { continue; }
+			if (OptionalIgnoreList && OptionalIgnoreList->Contains(Identifier.Name))
+			{
+				continue;
+			}
 			OutIdentities.Add(Identifier, FAttributeIdentity(InMetadata->GetConstAttribute(Identifier)));
 		}
 	}
@@ -86,7 +95,10 @@ namespace PCGExData
 		}
 
 		const FPCGMetadataAttributeBase* SourceAttribute = InData->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(FixedSelector, InData));
-		if (!SourceAttribute) { return false; }
+		if (!SourceAttribute)
+		{
+			return false;
+		}
 
 		OutIdentity = FAttributeIdentity(SourceAttribute);
 		return true;
@@ -118,19 +130,37 @@ namespace PCGExData
 
 	bool FAttributesInfos::Contains(const FName AttributeName, const EPCGMetadataTypes Type)
 	{
-		for (FAttributeIdentity& Identity : Identities) { if (Identity.Name == AttributeName && Identity.ValueType == Type) { return true; } }
+		for (FAttributeIdentity& Identity : Identities)
+		{
+			if (Identity.Name == AttributeName && Identity.ValueType == Type)
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 
 	bool FAttributesInfos::Contains(const FName AttributeName)
 	{
-		for (FAttributeIdentity& Identity : Identities) { if (Identity.Name == AttributeName) { return true; } }
+		for (FAttributeIdentity& Identity : Identities)
+		{
+			if (Identity.Name == AttributeName)
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 
 	FAttributeIdentity* FAttributesInfos::Find(const FName AttributeName)
 	{
-		for (FAttributeIdentity& Identity : Identities) { if (Identity.Name == AttributeName) { return &Identity; } }
+		for (FAttributeIdentity& Identity : Identities)
+		{
+			if (Identity.Name == AttributeName)
+			{
+				return &Identity;
+			}
+		}
 		return nullptr;
 	}
 
@@ -168,7 +198,10 @@ namespace PCGExData
 		{
 			const FAttributeIdentity& OtherId = Other->Identities[i];
 
-			if (!InGatherDetails.Test(OtherId.Name.ToString())) { continue; }
+			if (!InGatherDetails.Test(OtherId.Name.ToString()))
+			{
+				continue;
+			}
 
 			const FPCGAttributeIdentifier OtherIdentifier = OtherId.GetIdentifier();
 			if (const int32* Index = Map.Find(OtherIdentifier))
@@ -195,7 +228,10 @@ namespace PCGExData
 		{
 			const FAttributeIdentity& OtherId = Other->Identities[i];
 
-			if (InIgnoredAttributes && InIgnoredAttributes->Contains(OtherId.Name)) { continue; }
+			if (InIgnoredAttributes && InIgnoredAttributes->Contains(OtherId.Name))
+			{
+				continue;
+			}
 
 			const FPCGAttributeIdentifier OtherIdentifier = OtherId.GetIdentifier();
 			if (const int32* Index = Map.Find(OtherIdentifier))
@@ -249,7 +285,10 @@ namespace PCGExData
 		}
 
 		// Refresh indices
-		for (int i = 0; i < Identities.Num(); i++) { Map.Add(Identities[i].GetIdentifier(), i); }
+		for (int i = 0; i < Identities.Num(); i++)
+		{
+			Map.Add(Identities[i].GetIdentifier(), i);
+		}
 	}
 
 	TSharedPtr<FAttributesInfos> FAttributesInfos::Get(const UPCGMetadata* InMetadata, const TSet<FName>* IgnoredAttributes)

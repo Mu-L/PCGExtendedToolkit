@@ -50,10 +50,10 @@ namespace PCGExTypes
 
 	FScopedTypedValue::FScopedTypedValue(FScopedTypedValue&& Other) noexcept
 		: Type(Other.Type)
-		, ValueSize(Other.ValueSize)
-		, Property(Other.Property)
-		, bConstructed(Other.bConstructed)
-		, bHeapAllocated(Other.bHeapAllocated)
+		  , ValueSize(Other.ValueSize)
+		  , Property(Other.Property)
+		  , bConstructed(Other.bConstructed)
+		  , bHeapAllocated(Other.bHeapAllocated)
 	{
 		if (bHeapAllocated)
 		{
@@ -78,17 +78,23 @@ namespace PCGExTypes
 				// Move construct complex types
 				switch (Type)
 				{
-				case EPCGMetadataTypes::String: new(Storage) FString(MoveTemp(*reinterpret_cast<FString*>(Other.Storage)));
+				case EPCGMetadataTypes::String:
+					new(Storage) FString(MoveTemp(*reinterpret_cast<FString*>(Other.Storage)));
 					break;
-				case EPCGMetadataTypes::Name: new(Storage) FName(MoveTemp(*reinterpret_cast<FName*>(Other.Storage)));
+				case EPCGMetadataTypes::Name:
+					new(Storage) FName(MoveTemp(*reinterpret_cast<FName*>(Other.Storage)));
 					break;
-				case EPCGMetadataTypes::SoftObjectPath: new(Storage) FSoftObjectPath(MoveTemp(*reinterpret_cast<FSoftObjectPath*>(Other.Storage)));
+				case EPCGMetadataTypes::SoftObjectPath:
+					new(Storage) FSoftObjectPath(MoveTemp(*reinterpret_cast<FSoftObjectPath*>(Other.Storage)));
 					break;
-				case EPCGMetadataTypes::SoftClassPath: new(Storage) FSoftClassPath(MoveTemp(*reinterpret_cast<FSoftClassPath*>(Other.Storage)));
+				case EPCGMetadataTypes::SoftClassPath:
+					new(Storage) FSoftClassPath(MoveTemp(*reinterpret_cast<FSoftClassPath*>(Other.Storage)));
 					break;
-				case EPCGMetadataTypes::Text: new(Storage) FText(MoveTemp(*reinterpret_cast<FText*>(Other.Storage)));
+				case EPCGMetadataTypes::Text:
+					new(Storage) FText(MoveTemp(*reinterpret_cast<FText*>(Other.Storage)));
 					break;
-				default: FMemory::Memcpy(Storage, Other.Storage, ValueSize > 0 ? ValueSize : BufferSize);
+				default:
+					FMemory::Memcpy(Storage, Other.Storage, ValueSize > 0 ? ValueSize : BufferSize);
 					break;
 				}
 			}
@@ -119,17 +125,23 @@ namespace PCGExTypes
 			{
 				switch (Type)
 				{
-				case EPCGMetadataTypes::String: reinterpret_cast<FString*>(ActiveStorage)->~FString();
+				case EPCGMetadataTypes::String:
+					reinterpret_cast<FString*>(ActiveStorage)->~FString();
 					break;
-				case EPCGMetadataTypes::Name: reinterpret_cast<FName*>(ActiveStorage)->~FName();
+				case EPCGMetadataTypes::Name:
+					reinterpret_cast<FName*>(ActiveStorage)->~FName();
 					break;
-				case EPCGMetadataTypes::SoftObjectPath: reinterpret_cast<FSoftObjectPath*>(ActiveStorage)->~FSoftObjectPath();
+				case EPCGMetadataTypes::SoftObjectPath:
+					reinterpret_cast<FSoftObjectPath*>(ActiveStorage)->~FSoftObjectPath();
 					break;
-				case EPCGMetadataTypes::SoftClassPath: reinterpret_cast<FSoftClassPath*>(ActiveStorage)->~FSoftClassPath();
+				case EPCGMetadataTypes::SoftClassPath:
+					reinterpret_cast<FSoftClassPath*>(ActiveStorage)->~FSoftClassPath();
 					break;
-				case EPCGMetadataTypes::Text: reinterpret_cast<FText*>(ActiveStorage)->~FText();
+				case EPCGMetadataTypes::Text:
+					reinterpret_cast<FText*>(ActiveStorage)->~FText();
 					break;
-				default: break;
+				default:
+					break;
 				}
 			}
 		}
@@ -184,7 +196,7 @@ namespace PCGExTypes
 	{
 		if (InSize > BufferSize)
 		{
-			ActiveStorage = FMemory::Malloc(InSize, FMath::Max(InAlignment, static_cast<int32>(BufferAlignment)));
+			ActiveStorage = FMemory::Malloc(InSize, FMath::Max(InAlignment, BufferAlignment));
 			bHeapAllocated = true;
 		}
 		else
@@ -219,15 +231,20 @@ namespace PCGExTypes
 		{
 			switch (Type)
 			{
-			case EPCGMetadataTypes::String: new(ActiveStorage) FString();
+			case EPCGMetadataTypes::String:
+				new(ActiveStorage) FString();
 				break;
-			case EPCGMetadataTypes::Name: new(ActiveStorage) FName();
+			case EPCGMetadataTypes::Name:
+				new(ActiveStorage) FName();
 				break;
-			case EPCGMetadataTypes::SoftObjectPath: new(ActiveStorage) FSoftObjectPath();
+			case EPCGMetadataTypes::SoftObjectPath:
+				new(ActiveStorage) FSoftObjectPath();
 				break;
-			case EPCGMetadataTypes::SoftClassPath: new(ActiveStorage) FSoftClassPath();
+			case EPCGMetadataTypes::SoftClassPath:
+				new(ActiveStorage) FSoftClassPath();
 				break;
-			case EPCGMetadataTypes::Text: new(ActiveStorage) FText();
+			case EPCGMetadataTypes::Text:
+				new(ActiveStorage) FText();
 				break;
 			}
 			bConstructed = true;
@@ -249,8 +266,10 @@ namespace PCGExTypes
 		case EPCGMetadataTypes::Name:
 		case EPCGMetadataTypes::SoftObjectPath:
 		case EPCGMetadataTypes::SoftClassPath:
-		case EPCGMetadataTypes::Text: return true;
-		default: return false;
+		case EPCGMetadataTypes::Text:
+			return true;
+		default:
+			return false;
 		}
 	}
 
@@ -270,14 +289,20 @@ namespace PCGExTypes
 	{
 		// First try known types (covers legacy 0-14)
 		const int32 KnownSize = FScopedTypedValue::GetTypeSize(InType);
-		if (KnownSize > 0) { return KnownSize; }
+		if (KnownSize > 0)
+		{
+			return KnownSize;
+		}
 
 		// Handle new 5.8 hidden types
 		switch (InType)
 		{
-		case EPCGMetadataTypes::Byte: return sizeof(uint8);
-		case EPCGMetadataTypes::Text: return sizeof(FText);
-		case EPCGMetadataTypes::Enum: return sizeof(uint8); // UE enums backed by uint8
+		case EPCGMetadataTypes::Byte:
+			return sizeof(uint8);
+		case EPCGMetadataTypes::Text:
+			return sizeof(FText);
+		case EPCGMetadataTypes::Enum:
+			return sizeof(uint8); // UE enums backed by uint8
 		case EPCGMetadataTypes::Struct:
 			if (const UScriptStruct* Struct = Cast<UScriptStruct>(ValueTypeObject))
 			{
@@ -287,9 +312,12 @@ namespace PCGExTypes
 		case EPCGMetadataTypes::Object:
 		case EPCGMetadataTypes::Class:
 			return sizeof(TObjectPtr<UObject>);
-		case EPCGMetadataTypes::SoftObject: return sizeof(FSoftObjectPath);
-		case EPCGMetadataTypes::SoftClass: return sizeof(FSoftClassPath);
-		default: return 0;
+		case EPCGMetadataTypes::SoftObject:
+			return sizeof(FSoftObjectPath);
+		case EPCGMetadataTypes::SoftClass:
+			return sizeof(FSoftClassPath);
+		default:
+			return 0;
 		}
 	}
 
@@ -298,8 +326,10 @@ namespace PCGExTypes
 		switch (InType)
 		{
 		case EPCGMetadataTypes::Byte:
-		case EPCGMetadataTypes::Enum: return alignof(uint8);
-		case EPCGMetadataTypes::Text: return alignof(FText);
+		case EPCGMetadataTypes::Enum:
+			return alignof(uint8);
+		case EPCGMetadataTypes::Text:
+			return alignof(FText);
 		case EPCGMetadataTypes::Struct:
 			if (const UScriptStruct* Struct = Cast<UScriptStruct>(ValueTypeObject))
 			{
@@ -307,21 +337,27 @@ namespace PCGExTypes
 			}
 			return 1;
 		case EPCGMetadataTypes::Object:
-		case EPCGMetadataTypes::Class: return alignof(TObjectPtr<UObject>);
-		case EPCGMetadataTypes::SoftObject: return alignof(FSoftObjectPath);
-		case EPCGMetadataTypes::SoftClass: return alignof(FSoftClassPath);
+		case EPCGMetadataTypes::Class:
+			return alignof(TObjectPtr<UObject>);
+		case EPCGMetadataTypes::SoftObject:
+			return alignof(FSoftObjectPath);
+		case EPCGMetadataTypes::SoftClass:
+			return alignof(FSoftClassPath);
 		default:
-			{
-				// For known types, use their natural alignment
-				const int32 Size = FScopedTypedValue::GetTypeSize(InType);
-				return Size > 0 ? FMath::Min(Size, 16) : 1;
-			}
+		{
+			// For known types, use their natural alignment
+			const int32 Size = FScopedTypedValue::GetTypeSize(InType);
+			return Size > 0 ? FMath::Min(Size, 16) : 1;
+		}
 		}
 	}
 
 	int32 GetElementSizeFromAttribute(const FPCGMetadataAttributeBase* InAttribute)
 	{
-		if (!InAttribute) { return 0; }
+		if (!InAttribute)
+		{
+			return 0;
+		}
 
 		const EPCGMetadataTypes Type = static_cast<EPCGMetadataTypes>(InAttribute->GetTypeId());
 		const FPCGMetadataAttributeDesc& Desc = InAttribute->GetAttributeDesc();
@@ -335,7 +371,10 @@ namespace PCGExTypes
 
 		// Known scalar types: use compile-time size
 		const int32 KnownSize = FScopedTypedValue::GetTypeSize(Type);
-		if (KnownSize > 0) { return KnownSize; }
+		if (KnownSize > 0)
+		{
+			return KnownSize;
+		}
 
 		// Non-basic scalar types: extract size from (type, VTO).
 		return GetElementSizeFromType(Desc.ValueType, Desc.ValueTypeObject);
@@ -343,7 +382,10 @@ namespace PCGExTypes
 
 	int32 GetElementAlignmentFromAttribute(const FPCGMetadataAttributeBase* InAttribute)
 	{
-		if (!InAttribute) { return 1; }
+		if (!InAttribute)
+		{
+			return 1;
+		}
 
 		const FPCGMetadataAttributeDesc& Desc = InAttribute->GetAttributeDesc();
 		if (!Desc.ContainerTypes.IsEmpty())

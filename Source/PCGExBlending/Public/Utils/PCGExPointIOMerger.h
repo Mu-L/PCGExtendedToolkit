@@ -59,8 +59,15 @@ public:
 	void Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& InData);
 	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr);
 
-	bool WantsDataToElements() const { return bDataDomainToElements; }
-	bool WantsInitDefault() const { return bInitDefault; }
+	bool WantsDataToElements() const
+	{
+		return bDataDomainToElements;
+	}
+
+	bool WantsInitDefault() const
+	{
+		return bInitDefault;
+	}
 
 protected:
 	void CopyProperties(const int32 Index);
@@ -87,7 +94,10 @@ namespace PCGExPointIOMerger
 		UPCGMetadata* InMetadata = SourceIO->GetIn()->Metadata;
 
 		const FPCGMetadataAttributeBase* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(InMetadata, Identity.GetIdentifier());
-		if (!TypedInAttribute) { return; }
+		if (!TypedInAttribute)
+		{
+			return;
+		}
 
 		TSharedPtr<PCGExData::TArrayBuffer<T>> OutElementsBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(OutBuffer);
 		TSharedPtr<PCGExData::TSingleValueBuffer<T>> OutDataBuffer = StaticCastSharedPtr<PCGExData::TSingleValueBuffer<T>>(OutBuffer);
@@ -100,7 +110,10 @@ namespace PCGExPointIOMerger
 			{
 				// From a data domain
 				const T Value = PCGExData::Helpers::ReadDataValue<T>(TypedInAttribute);
-				for (int Index = Scope.Write.Start; Index < Scope.Write.End; Index++) { OutElementsBuffer->SetValue(Index, Value); }
+				for (int Index = Scope.Write.Start; Index < Scope.Write.End; Index++)
+				{
+					OutElementsBuffer->SetValue(Index, Value);
+				}
 			}
 			else
 			{
@@ -146,8 +159,15 @@ namespace PCGExPointIOMerger
 			{
 				// From elements domain
 				TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, TypedInAttribute->GetMetadataDomain());
-				if (!InAccessor.IsValid()) { return; }
-				if (T Value = T{}; InAccessor->Get(Value, Scope.Read.Start, *SourceIO->GetInKeys())) { OutDataBuffer->SetValue(0, Value); }
+				if (!InAccessor.IsValid())
+				{
+					return;
+				}
+				if (T Value = T{};
+					InAccessor->Get(Value, Scope.Read.Start, *SourceIO->GetInKeys()))
+				{
+					OutDataBuffer->SetValue(0, Value);
+				}
 			}
 		}
 	}

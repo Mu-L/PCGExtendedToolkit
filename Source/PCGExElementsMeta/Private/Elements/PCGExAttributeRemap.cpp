@@ -5,15 +5,15 @@
 #include "Elements/PCGExAttributeRemap.h"
 
 #include "PCGExVersion.h"
+#include "PCGExVersion.h"
+#include "Containers/PCGExScopedContainers.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyData.h"
 #include "Data/PCGExProxyDataHelpers.h"
-#include "Details/PCGExSettingsDetails.h"
-#include "PCGExVersion.h"
-#include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExSubAccessor.h"
+#include "Details/PCGExSettingsDetails.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExAttributeRemap"
