@@ -76,9 +76,9 @@ public:
 	{
 		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
 	}
-
-	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters", PCGExFactories::PointFilters, false)
 #endif
+	
+	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters", PCGExFactories::PointFilters, false)
 
 protected:
 	virtual bool OutputPinsCanBeDeactivated() const override
