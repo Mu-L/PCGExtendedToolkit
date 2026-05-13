@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/PCGExAssetCollection.h"
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExMeshCollection.h"
+#include "Core/PCGExAssetCollection.h"
 #include "Helpers/PCGExArrayHelpers.h"
 
 #include "PCGExPCGDataAssetCollection.generated.h"
@@ -258,12 +258,18 @@ private:
 
 	/** True when external storage is both requested and configurable. ExportFolder is required
 	 *  in external mode; an empty folder silently falls back to embedded for that rebuild. */
-	bool IsExternalActive() const { return bUseExternalAssets && !ExportFolder.Path.IsEmpty(); }
+	bool IsExternalActive() const
+	{
+		return bUseExternalAssets && !ExportFolder.Path.IsEmpty();
+	}
 
 	/** Per-collection prefix used to derive external asset names. The collection's GUID makes
 	 *  it stable across rebuilds (P4-friendly overwrites) and unique across collections that
 	 *  share an ExportFolder. */
-	FString GetExternalAssetPrefix() const { return FString::Printf(TEXT("G_%08X"), GetCollectionGUID()); }
+	FString GetExternalAssetPrefix() const
+	{
+		return FString::Printf(TEXT("G_%08X"), GetCollectionGUID());
+	}
 
 	/** External-storage helpers. Each is a no-op unless IsExternalActive(). Externalize* must
 	 *  run in the right order around RebuildCollectionMaps so the baked CollectionMap soft

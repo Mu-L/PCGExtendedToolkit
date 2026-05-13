@@ -4,11 +4,11 @@
 #include "Collections/PCGExPCGDataAssetCollection.h"
 
 #include "Engine/World.h"
+#include "Misc/PackageName.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
 #include "UObject/UObjectGlobals.h"
-#include "Misc/PackageName.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetData.h"
@@ -16,14 +16,14 @@
 #endif
 
 #include "PCGDataAsset.h"
-#include "PCGParamData.h"
-#include "Data/PCGPointArrayData.h"
 #include "PCGExCollectionsSettingsCache.h"
 #include "PCGExLog.h"
 #include "PCGExSocketProvider.h"
+#include "PCGParamData.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExMeshCollection.h"
+#include "Data/PCGPointArrayData.h"
 #include "Data/PCGSpatialData.h"
 #include "Engine/Level.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
@@ -326,7 +326,10 @@ namespace PCGExSharedCompact
 {
 	static UPCGBasePointData* FindPointDataByPin(UPCGDataAsset* Asset, FName PinName)
 	{
-		if (!Asset) { return nullptr; }
+		if (!Asset)
+		{
+			return nullptr;
+		}
 		for (FPCGTaggedData& TD : Asset->Data.TaggedData)
 		{
 			if (TD.Pin == PinName)
@@ -373,7 +376,10 @@ namespace PCGExSharedCompact
 	static FSoftObjectPath ExternalizeUObject(UObject* Source, const FString& DesiredPackagePath, const FString& DesiredAssetName)
 	{
 #if WITH_EDITOR
-		if (!Source) { return FSoftObjectPath(); }
+		if (!Source)
+		{
+			return FSoftObjectPath();
+		}
 
 		UPackage* CurrentPackage = Source->GetOutermost();
 		if (CurrentPackage && CurrentPackage->GetName() == DesiredPackagePath && Source->GetName() == DesiredAssetName)
@@ -454,36 +460,75 @@ namespace PCGExSharedCompact
 
 	static bool MaterialOverrideEquals(const FPCGExMaterialOverrideCollection& A, const FPCGExMaterialOverrideCollection& B)
 	{
-		if (A.Weight != B.Weight) { return false; }
-		if (A.Overrides.Num() != B.Overrides.Num()) { return false; }
+		if (A.Weight != B.Weight)
+		{
+			return false;
+		}
+		if (A.Overrides.Num() != B.Overrides.Num())
+		{
+			return false;
+		}
 		for (int32 i = 0; i < A.Overrides.Num(); i++)
 		{
-			if (!MaterialOverrideEquals(A.Overrides[i], B.Overrides[i])) { return false; }
+			if (!MaterialOverrideEquals(A.Overrides[i], B.Overrides[i]))
+			{
+				return false;
+			}
 		}
 		return true;
 	}
 
 	static bool MeshContentEquals(const FPCGExMeshCollectionEntry& A, const FPCGExMeshCollectionEntry& B)
 	{
-		if (A.StaticMesh.ToSoftObjectPath() != B.StaticMesh.ToSoftObjectPath()) { return false; }
-		if (A.MaterialVariants != B.MaterialVariants) { return false; }
-		if (A.SlotIndex != B.SlotIndex) { return false; }
-		if (A.DescriptorSource != B.DescriptorSource) { return false; }
+		if (A.StaticMesh.ToSoftObjectPath() != B.StaticMesh.ToSoftObjectPath())
+		{
+			return false;
+		}
+		if (A.MaterialVariants != B.MaterialVariants)
+		{
+			return false;
+		}
+		if (A.SlotIndex != B.SlotIndex)
+		{
+			return false;
+		}
+		if (A.DescriptorSource != B.DescriptorSource)
+		{
+			return false;
+		}
 
-		if (A.MaterialOverrideVariants.Num() != B.MaterialOverrideVariants.Num()) { return false; }
+		if (A.MaterialOverrideVariants.Num() != B.MaterialOverrideVariants.Num())
+		{
+			return false;
+		}
 		for (int32 i = 0; i < A.MaterialOverrideVariants.Num(); i++)
 		{
-			if (!MaterialOverrideEquals(A.MaterialOverrideVariants[i], B.MaterialOverrideVariants[i])) { return false; }
+			if (!MaterialOverrideEquals(A.MaterialOverrideVariants[i], B.MaterialOverrideVariants[i]))
+			{
+				return false;
+			}
 		}
 
-		if (A.MaterialOverrideVariantsList.Num() != B.MaterialOverrideVariantsList.Num()) { return false; }
+		if (A.MaterialOverrideVariantsList.Num() != B.MaterialOverrideVariantsList.Num())
+		{
+			return false;
+		}
 		for (int32 i = 0; i < A.MaterialOverrideVariantsList.Num(); i++)
 		{
-			if (!MaterialOverrideEquals(A.MaterialOverrideVariantsList[i], B.MaterialOverrideVariantsList[i])) { return false; }
+			if (!MaterialOverrideEquals(A.MaterialOverrideVariantsList[i], B.MaterialOverrideVariantsList[i]))
+			{
+				return false;
+			}
 		}
 
-		if (!FSoftISMComponentDescriptor::StaticStruct()->CompareScriptStruct(&A.ISMDescriptor, &B.ISMDescriptor, 0)) { return false; }
-		if (!FPCGExStaticMeshComponentDescriptor::StaticStruct()->CompareScriptStruct(&A.SMDescriptor, &B.SMDescriptor, 0)) { return false; }
+		if (!FSoftISMComponentDescriptor::StaticStruct()->CompareScriptStruct(&A.ISMDescriptor, &B.ISMDescriptor, 0))
+		{
+			return false;
+		}
+		if (!FPCGExStaticMeshComponentDescriptor::StaticStruct()->CompareScriptStruct(&A.SMDescriptor, &B.SMDescriptor, 0))
+		{
+			return false;
+		}
 
 		return true;
 	}
@@ -494,12 +539,36 @@ namespace PCGExSharedCompact
 		using EntryType = FPCGExMeshCollectionEntry;
 		using CollectionType = UPCGExMeshCollection;
 
-		static FName PinName() { return PCGExCollections::Labels::MeshesPin; }
-		static uint32 Hash(const FPCGExMeshCollectionEntry& E) { return MeshContentHash(E); }
-		static bool Equals(const FPCGExMeshCollectionEntry& A, const FPCGExMeshCollectionEntry& B) { return MeshContentEquals(A, B); }
-		static FString SortKey(const FPCGExMeshCollectionEntry& E) { return E.StaticMesh.ToSoftObjectPath().ToString(); }
-		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E) { return E.EditorMeshContributions; }
-		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E) { return E.EditorLocalPicks; }
+		static FName PinName()
+		{
+			return PCGExCollections::Labels::MeshesPin;
+		}
+
+		static uint32 Hash(const FPCGExMeshCollectionEntry& E)
+		{
+			return MeshContentHash(E);
+		}
+
+		static bool Equals(const FPCGExMeshCollectionEntry& A, const FPCGExMeshCollectionEntry& B)
+		{
+			return MeshContentEquals(A, B);
+		}
+
+		static FString SortKey(const FPCGExMeshCollectionEntry& E)
+		{
+			return E.StaticMesh.ToSoftObjectPath().ToString();
+		}
+
+		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorMeshContributions;
+		}
+
+		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorLocalPicks;
+		}
+
 		static int16 UnpackSec(int32 Packed, int32& OutLocal)
 		{
 			int16 Sec;
@@ -513,13 +582,41 @@ namespace PCGExSharedCompact
 		using EntryType = FPCGExLevelCollectionEntry;
 		using CollectionType = UPCGExLevelCollection;
 
-		static FName PinName() { return PCGExCollections::Labels::LevelsPin; }
-		static uint32 Hash(const FPCGExLevelCollectionEntry& E) { return GetTypeHash(E.Level.ToSoftObjectPath()); }
-		static bool Equals(const FPCGExLevelCollectionEntry& A, const FPCGExLevelCollectionEntry& B) { return A.Level.ToSoftObjectPath() == B.Level.ToSoftObjectPath(); }
-		static FString SortKey(const FPCGExLevelCollectionEntry& E) { return E.Level.ToSoftObjectPath().ToString(); }
-		static const TArray<FPCGExLevelCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E) { return E.EditorLevelContributions; }
-		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E) { return E.EditorLevelLocalPicks; }
-		static int16 UnpackSec(int32 Packed, int32& OutLocal) { OutLocal = Packed; return -1; }
+		static FName PinName()
+		{
+			return PCGExCollections::Labels::LevelsPin;
+		}
+
+		static uint32 Hash(const FPCGExLevelCollectionEntry& E)
+		{
+			return GetTypeHash(E.Level.ToSoftObjectPath());
+		}
+
+		static bool Equals(const FPCGExLevelCollectionEntry& A, const FPCGExLevelCollectionEntry& B)
+		{
+			return A.Level.ToSoftObjectPath() == B.Level.ToSoftObjectPath();
+		}
+
+		static FString SortKey(const FPCGExLevelCollectionEntry& E)
+		{
+			return E.Level.ToSoftObjectPath().ToString();
+		}
+
+		static const TArray<FPCGExLevelCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorLevelContributions;
+		}
+
+		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorLevelLocalPicks;
+		}
+
+		static int16 UnpackSec(int32 Packed, int32& OutLocal)
+		{
+			OutLocal = Packed;
+			return -1;
+		}
 	};
 
 	// Merge every entry's local contributions into one deduplicated shared collection
@@ -534,8 +631,8 @@ namespace PCGExSharedCompact
 		TObjectPtr<typename TPolicy::CollectionType>& SharedCollectionRef,
 		TSoftObjectPtr<typename TPolicy::CollectionType>* ExternalFallback)
 	{
-		using TEntry = typename TPolicy::EntryType;
-		using TCollection = typename TPolicy::CollectionType;
+		using TEntry = TPolicy::EntryType;
+		using TCollection = TPolicy::CollectionType;
 
 		// Skip everything when there's nothing to merge AND no existing shared state to clear.
 		// Avoids a synchronous external-asset load on unrelated edits (e.g. weight tweak on a
@@ -543,7 +640,11 @@ namespace PCGExSharedCompact
 		bool bHasContributions = false;
 		for (const FPCGExPCGDataAssetCollectionEntry& E : Entries)
 		{
-			if (TPolicy::Contributions(E).Num() > 0) { bHasContributions = true; break; }
+			if (TPolicy::Contributions(E).Num() > 0)
+			{
+				bHasContributions = true;
+				break;
+			}
 		}
 		if (!bHasContributions && !SharedCollectionRef
 			&& (!ExternalFallback || ExternalFallback->IsNull()))
@@ -633,11 +734,17 @@ namespace PCGExSharedCompact
 		TArray<FGroup> AllGroups;
 		for (auto& Pair : HashBuckets)
 		{
-			for (FGroup& G : Pair.Value) { AllGroups.Add(MoveTemp(G)); }
+			for (FGroup& G : Pair.Value)
+			{
+				AllGroups.Add(MoveTemp(G));
+			}
 		}
 		AllGroups.Sort([](const FGroup& A, const FGroup& B)
 		{
-			if (A.Hash != B.Hash) { return A.Hash < B.Hash; }
+			if (A.Hash != B.Hash)
+			{
+				return A.Hash < B.Hash;
+			}
 			return A.SortKey < B.SortKey;
 		});
 
@@ -693,17 +800,29 @@ namespace PCGExSharedCompact
 		for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); EntryIdx++)
 		{
 			FPCGExPCGDataAssetCollectionEntry& Entry = Entries[EntryIdx];
-			if (!Entry.ExportedDataAsset) { continue; }
+			if (!Entry.ExportedDataAsset)
+			{
+				continue;
+			}
 
 			UPCGBasePointData* PD = FindPointDataByPin(Entry.ExportedDataAsset, PinName);
-			if (!PD) { continue; }
+			if (!PD)
+			{
+				continue;
+			}
 			UPCGMetadata* Meta = PD->MutableMetadata();
-			if (!Meta) { continue; }
+			if (!Meta)
+			{
+				continue;
+			}
 
 			TPCGValueRange<int64> MetaEntries = PD->GetMetadataEntryValueRange();
 			FPCGMetadataAttribute<int64>* EntryHashAttr = Meta->CreateAttribute<int64>(
 				PCGExCollections::Labels::Tag_EntryIdx, 0, false, true);
-			if (!EntryHashAttr) { continue; }
+			if (!EntryHashAttr)
+			{
+				continue;
+			}
 
 			const TArray<int32>& LocalToShared = LocalToSharedByEntry[EntryIdx];
 			const TArray<int32>& LocalPicks = TPolicy::LocalPicks(Entry);
@@ -711,12 +830,21 @@ namespace PCGExSharedCompact
 			for (int32 i = 0; i < N; i++)
 			{
 				const int32 Packed = LocalPicks[i];
-				if (Packed == -1) { continue; }
+				if (Packed == -1)
+				{
+					continue;
+				}
 				int32 LocalIdx;
 				const int16 Sec = TPolicy::UnpackSec(Packed, LocalIdx);
-				if (!LocalToShared.IsValidIndex(LocalIdx)) { continue; }
+				if (!LocalToShared.IsValidIndex(LocalIdx))
+				{
+					continue;
+				}
 				const int32 SharedIdx = LocalToShared[LocalIdx];
-				if (SharedIdx < 0) { continue; }
+				if (SharedIdx < 0)
+				{
+					continue;
+				}
 				const uint64 Hash = Packer.GetPickIdx(SharedCollectionRef, static_cast<int16>(SharedIdx), Sec);
 				EntryHashAttr->SetValue(MetaEntries[i], static_cast<int64>(Hash));
 			}
@@ -750,12 +878,24 @@ void UPCGExPCGDataAssetCollection::RebuildCollectionMaps()
 {
 	for (FPCGExPCGDataAssetCollectionEntry& Entry : Entries)
 	{
-		if (!Entry.ExportedDataAsset) { continue; }
+		if (!Entry.ExportedDataAsset)
+		{
+			continue;
+		}
 
 		PCGExCollections::FPickPacker FullPacker;
-		if (SharedMeshCollection) { FullPacker.RegisterCollection(SharedMeshCollection); }
-		if (SharedLevelCollection) { FullPacker.RegisterCollection(SharedLevelCollection); }
-		if (Entry.EmbeddedActorCollection) { FullPacker.RegisterCollection(Entry.EmbeddedActorCollection); }
+		if (SharedMeshCollection)
+		{
+			FullPacker.RegisterCollection(SharedMeshCollection);
+		}
+		if (SharedLevelCollection)
+		{
+			FullPacker.RegisterCollection(SharedLevelCollection);
+		}
+		if (Entry.EmbeddedActorCollection)
+		{
+			FullPacker.RegisterCollection(Entry.EmbeddedActorCollection);
+		}
 
 		Entry.ExportedDataAsset->Data.TaggedData.RemoveAll([](const FPCGTaggedData& TD)
 		{
@@ -773,7 +913,10 @@ void UPCGExPCGDataAssetCollection::RebuildCollectionMaps()
 void UPCGExPCGDataAssetCollection::ExternalizeSharedAndActorCollections()
 {
 #if WITH_EDITOR
-	if (!IsExternalActive()) { return; }
+	if (!IsExternalActive())
+	{
+		return;
+	}
 
 	// Naming uses the collection's GUID for cross-collection uniqueness in a shared export
 	// folder, and is short enough to stay within filesystem path budgets. GUID is stable
@@ -798,7 +941,10 @@ void UPCGExPCGDataAssetCollection::ExternalizeSharedAndActorCollections()
 	for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); EntryIdx++)
 	{
 		FPCGExPCGDataAssetCollectionEntry& Entry = Entries[EntryIdx];
-		if (!Entry.EmbeddedActorCollection) { continue; }
+		if (!Entry.EmbeddedActorCollection)
+		{
+			continue;
+		}
 
 		const FString AssetName = FString::Printf(TEXT("%s_E%03d_Actors"), *GuidPrefix, EntryIdx);
 		Entry.ExternalActorCollection = PCGExSharedCompact::ExternalizeUObject(Entry.EmbeddedActorCollection, FolderPath / AssetName, AssetName);
@@ -809,7 +955,10 @@ void UPCGExPCGDataAssetCollection::ExternalizeSharedAndActorCollections()
 void UPCGExPCGDataAssetCollection::ExternalizeExportedDataAssets()
 {
 #if WITH_EDITOR
-	if (!IsExternalActive()) { return; }
+	if (!IsExternalActive())
+	{
+		return;
+	}
 
 	const FString FolderPath = ExportFolder.Path;
 	const FString GuidPrefix = GetExternalAssetPrefix();
@@ -817,7 +966,10 @@ void UPCGExPCGDataAssetCollection::ExternalizeExportedDataAssets()
 	for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); EntryIdx++)
 	{
 		FPCGExPCGDataAssetCollectionEntry& Entry = Entries[EntryIdx];
-		if (!Entry.ExportedDataAsset) { continue; }
+		if (!Entry.ExportedDataAsset)
+		{
+			continue;
+		}
 
 		const FString AssetName = FString::Printf(TEXT("%s_E%03d_Data"), *GuidPrefix, EntryIdx);
 		Entry.ExternalExportedDataAsset = PCGExSharedCompact::ExternalizeUObject(Entry.ExportedDataAsset, FolderPath / AssetName, AssetName);
@@ -863,10 +1015,16 @@ void UPCGExPCGDataAssetCollection::SaveExternalPackages()
 
 	auto AddPackageFor = [&Packages](UObject* Obj)
 	{
-		if (!Obj) { return; }
+		if (!Obj)
+		{
+			return;
+		}
 		if (UPackage* Pkg = Obj->GetOutermost())
 		{
-			if (Pkg != GetTransientPackage()) { Packages.Add(Pkg); }
+			if (Pkg != GetTransientPackage())
+			{
+				Packages.Add(Pkg);
+			}
 		}
 	};
 
@@ -880,7 +1038,10 @@ void UPCGExPCGDataAssetCollection::SaveExternalPackages()
 
 	for (UPackage* Pkg : Packages)
 	{
-		if (Pkg == GetOutermost()) { continue; } // never re-enter saving ourselves
+		if (Pkg == GetOutermost())
+		{
+			continue;
+		} // never re-enter saving ourselves
 
 		const FString FileName = FPackageName::LongPackageNameToFilename(Pkg->GetName(), FPackageName::GetAssetPackageExtension());
 		FSavePackageArgs SaveArgs;
