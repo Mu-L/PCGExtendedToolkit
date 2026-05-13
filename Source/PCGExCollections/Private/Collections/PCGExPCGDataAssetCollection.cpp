@@ -817,7 +817,7 @@ namespace PCGExSharedCompact
 			}
 
 			TPCGValueRange<int64> MetaEntries = PD->GetMetadataEntryValueRange();
-			FPCGMetadataAttribute<int64>* EntryHashAttr = Meta->CreateAttribute<int64>(
+			FPCGMetadataAttribute<int64>* EntryHashAttr = Meta->FindOrCreateAttribute<int64>(
 				PCGExCollections::Labels::Tag_EntryIdx, 0, false, true);
 			if (!EntryHashAttr)
 			{
