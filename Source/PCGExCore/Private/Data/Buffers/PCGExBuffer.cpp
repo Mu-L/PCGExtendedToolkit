@@ -166,10 +166,12 @@ namespace PCGExData
 	template <typename T>
 	bool TArrayBuffer<T>::EnsureReadable()
 	{
-		if (InValues)
 		{
-			return true;
+			FReadScopeLock ReadLock(BufferLock);
+			if (InValues) { return true; }
 		}
+		FWriteScopeLock WriteLock(BufferLock);
+		if (InValues) { return true; }
 		InValues = OutValues;
 		return InValues ? true : false;
 	}
@@ -492,16 +494,15 @@ namespace PCGExData
 	template <typename T>
 	bool TSingleValueBuffer<T>::EnsureReadable()
 	{
-		if (bReadInitialized)
 		{
-			return true;
+			FReadScopeLock ReadLock(BufferLock);
+			if (bReadInitialized) { return true; }
 		}
-
+		FWriteScopeLock WriteLock(BufferLock);
+		if (bReadInitialized) { return true; }
 		InValue = OutValue;
-
 		bReadFromOutput = true;
 		bReadInitialized = bWriteInitialized;
-
 		return bReadInitialized;
 	}
 

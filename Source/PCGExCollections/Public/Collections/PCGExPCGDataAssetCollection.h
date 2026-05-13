@@ -46,7 +46,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 
 	/** Source mode toggle (default = DataAsset for backward compatibility) */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
-	EPCGExDataAssetEntrySource Source = EPCGExDataAssetEntrySource::DataAsset;
+	EPCGExDataAssetEntrySource Source = EPCGExDataAssetEntrySource::Level;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="Source == EPCGExDataAssetEntrySource::DataAsset && !bIsSubCollection", EditConditionHides))
 	TSoftObjectPtr<UPCGDataAsset> DataAsset = nullptr;

@@ -1135,31 +1135,39 @@ int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 		{
 			return;
 		}
-		const FSoftObjectPath& Path = InEntry->Staging.Path;
-		if (!Path.IsValid())
-		{
-			return;
-		}
+		// Use EDITOR_GetSourceAssetPaths so entry types that bake into an embedded asset
+		// (e.g. PCGDataAsset collection entries with Source==Level) check the real source
+		// file rather than Staging.Path, which resolves to the collection's own package.
+		TSet<FSoftObjectPath> SourcePaths;
+		InEntry->EDITOR_GetSourceAssetPaths(SourcePaths);
 
-		FString Filename;
-		if (!FPackageName::TryConvertLongPackageNameToFilename(Path.GetLongPackageName(), Filename))
+		for (const FSoftObjectPath& Path : SourcePaths)
 		{
-			return;
-		}
-		const FString UAsset = Filename + FPackageName::GetAssetPackageExtension();
-		const FString UMap = Filename + FPackageName::GetMapPackageExtension();
-		FDateTime AssetTime = IFileManager::Get().GetTimeStamp(*UAsset);
-		if (AssetTime == FDateTime::MinValue())
-		{
-			AssetTime = IFileManager::Get().GetTimeStamp(*UMap);
-		}
-		if (AssetTime == FDateTime::MinValue())
-		{
-			return;
-		}
-		if (AssetTime > LastRebuiltUtc)
-		{
-			StaleIndices.Add(i);
+			if (!Path.IsValid())
+			{
+				continue;
+			}
+			FString Filename;
+			if (!FPackageName::TryConvertLongPackageNameToFilename(Path.GetLongPackageName(), Filename))
+			{
+				continue;
+			}
+			const FString UAsset = Filename + FPackageName::GetAssetPackageExtension();
+			const FString UMap = Filename + FPackageName::GetMapPackageExtension();
+			FDateTime AssetTime = IFileManager::Get().GetTimeStamp(*UAsset);
+			if (AssetTime == FDateTime::MinValue())
+			{
+				AssetTime = IFileManager::Get().GetTimeStamp(*UMap);
+			}
+			if (AssetTime == FDateTime::MinValue())
+			{
+				continue;
+			}
+			if (AssetTime > LastRebuiltUtc)
+			{
+				StaleIndices.Add(i);
+				break;
+			}
 		}
 	});
 

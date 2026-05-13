@@ -484,17 +484,16 @@ namespace PCGExData
 
 	bool FPropertyArrayBuffer::EnsureReadable()
 	{
-		if (InBytes)
 		{
-			return true;
+			FReadScopeLock ReadLock(BufferLock);
+			if (InBytes) { return true; }
 		}
-
-		if (OutBytes)
 		{
-			InBytes = OutBytes;
-			return true;
+			FWriteScopeLock WriteLock(BufferLock);
+			if (InBytes) { return true; }
+			if (OutBytes) { InBytes = OutBytes; return true; }
 		}
-
+		// InitForRead acquires its own WriteScopeLock — must not hold ours when calling it.
 		return InitForRead(EIOSide::In);
 	}
 
@@ -829,19 +828,22 @@ namespace PCGExData
 
 	bool FPropertySingleValueBuffer::EnsureReadable()
 	{
-		if (bReadInitialized)
 		{
-			return true;
+			FReadScopeLock ReadLock(BufferLock);
+			if (bReadInitialized) { return true; }
 		}
-
-		if (bWriteInitialized && OutValue.Num() > 0)
 		{
-			InValue = OutValue;
-			bReadFromOutput = true;
-			bReadInitialized = true;
-			return true;
+			FWriteScopeLock WriteLock(BufferLock);
+			if (bReadInitialized) { return true; }
+			if (bWriteInitialized && OutValue.Num() > 0)
+			{
+				InValue = OutValue;
+				bReadFromOutput = true;
+				bReadInitialized = true;
+				return true;
+			}
 		}
-
+		// InitForRead acquires its own WriteScopeLock — must not hold ours when calling it.
 		return InitForRead(EIOSide::In);
 	}
 

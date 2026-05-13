@@ -8,6 +8,7 @@
 #include "Blenders/PCGExUnionBlender.h"
 
 #include "Containers/PCGExIndexLookup.h"
+#include "Core/PCGExMTCommon.h"
 #include "Core/PCGExOpStats.h"
 #include "Core/PCGExUnionData.h"
 #include "Core/PCGExUnionTable.h"
@@ -75,8 +76,6 @@ namespace PCGExBlending
 				return false;
 			}
 
-			bool bError = false;
-
 			// Property-backed buffers (containers, extended types, Object family) cache an FProperty
 			// that handles container layout and deep-copy semantics. Route those to CreateProxyBlender's
 			// FProperty overload. IBuffer::IsPropertyBacked() is the safe gate for the static cast —
@@ -95,23 +94,21 @@ namespace PCGExBlending
 				? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
 				: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 
-			for (int i = 0; i < Sources.Num(); i++)
 			{
-				TSharedPtr<PCGExData::FFacade> Source = Sources[i];
-				if (!SupportedSources.Contains(i))
-				{
-					continue;
-				}
-
-				TSharedPtr<FProxyDataBlender> SubBlender = InitProperty
-					? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
-					: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
-				SubBlenders[i] = SubBlender;
-
-				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags))
-				{
-					return false;
-				}
+				TArray<int32> SupportedList(SupportedSources.Array());
+				std::atomic<bool> bSubBlendersInitOk{true};
+				PCGEX_PARALLEL_FOR_THRESHOLD(SupportedList.Num(), 32, {
+					const int32 SourceIdx = SupportedList[i];
+					TSharedPtr<FProxyDataBlender> SubBlender = InitProperty
+						? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
+						: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
+					SubBlenders[SourceIdx] = SubBlender;
+					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
+					{
+						bSubBlendersInitOk.store(false, std::memory_order_relaxed);
+					}
+				})
+				if (!bSubBlendersInitOk.load(std::memory_order_relaxed)) { return false; }
 			}
 
 			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags))
@@ -127,22 +124,28 @@ namespace PCGExBlending
 
 			MainBlender = CreateProxyBlender(WorkingType, Param.Blending);
 
-			for (int i = 0; i < Sources.Num(); i++)
 			{
-				// Optimization: skip sources that aren't relevant (if filtering is enabled)
-				if (!SupportedSources.IsEmpty() && !SupportedSources.Contains(i))
+				TArray<int32> SupportedList;
+				if (SupportedSources.IsEmpty())
 				{
-					continue;
+					SupportedList.Reserve(Sources.Num());
+					for (int32 j = 0; j < Sources.Num(); j++) { SupportedList.Add(j); }
 				}
-
-				TSharedPtr<PCGExData::FFacade> Source = Sources[i];
-				TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
-				SubBlenders[i] = SubBlender;
-
-				if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[i], PCGExData::EIOSide::In, InProxyFlags))
+				else
 				{
-					return false;
+					SupportedList = SupportedSources.Array();
 				}
+				std::atomic<bool> bSubBlendersInitOk{true};
+				PCGEX_PARALLEL_FOR_THRESHOLD(SupportedList.Num(), 32, {
+					const int32 SourceIdx = SupportedList[i];
+					TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+					SubBlenders[SourceIdx] = SubBlender;
+					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
+					{
+						bSubBlendersInitOk.store(false, std::memory_order_relaxed);
+					}
+				})
+				if (!bSubBlendersInitOk.load(std::memory_order_relaxed)) { return false; }
 			}
 
 			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags))
@@ -196,6 +199,8 @@ namespace PCGExBlending
 		Sources.Reserve(NumSources);
 		SourcesData.SetNumUninitialized(NumSources);
 
+		TMap<FName, TSharedPtr<FMultiSourceBlender>> BlenderLookup;
+
 		for (int i = 0; i < InSources.Num(); i++)
 		{
 			const TSharedRef<PCGExData::FFacade>& Facade = InSources[i];
@@ -238,19 +243,7 @@ namespace PCGExBlending
 					continue;
 				}
 
-				TSharedPtr<FMultiSourceBlender> MultiAttribute = nullptr;
-
-				// Search for an existing multi attribute
-				// This could be done more efficiently with a map, but we need the array later on
-				for (const TSharedPtr<FMultiSourceBlender>& ExistingMultiSourceBlender : Blenders)
-				{
-					if (ExistingMultiSourceBlender->Identity == Identity)
-					{
-						// We found one with the same name
-						MultiAttribute = ExistingMultiSourceBlender;
-						break;
-					}
-				}
+				TSharedPtr<FMultiSourceBlender> MultiAttribute = BlenderLookup.FindRef(Identity.Name);
 
 				if (MultiAttribute)
 				{
@@ -272,6 +265,7 @@ namespace PCGExBlending
 					MultiAttribute->Param = Param;
 					MultiAttribute->DefaultValue = SourceAttribute;
 					MultiAttribute->SetNum(NumSources);
+					BlenderLookup.Add(Identity.Name, MultiAttribute);
 				}
 
 				check(MultiAttribute)
