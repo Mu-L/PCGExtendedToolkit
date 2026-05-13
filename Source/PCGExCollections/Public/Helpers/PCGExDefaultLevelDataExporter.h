@@ -109,6 +109,7 @@ public:
 	FName InstanceTagsAttributeName = FName("InstanceTags");
 
 	virtual bool ExportLevelData_Implementation(UWorld* World, UPCGDataAsset* OutAsset) override;
+	virtual bool ExportLevelData(UWorld* World, UPCGDataAsset* OutAsset, FPCGExLevelExportContext& OutContext) override;
 
 	/** Classify an actor. Override for custom logic.
 	 *  Default: delegates to MeshClassificator; if it approves, checks for a valid
