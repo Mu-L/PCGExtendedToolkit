@@ -74,7 +74,6 @@ protected:
 		return PCGEX_NODE_COLOR_NAME(BlendOp);
 	}
 
-	//PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourceFiltersLabel, "Filters", PCGExFactories::PointFilters, true)
 
 	virtual bool CanUserEditTitle() const override
 	{
@@ -84,6 +83,7 @@ protected:
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 
+	//PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourceFiltersLabel, "Filters", PCGExFactories::PointFilters, true)
 
 	PCGEX_FACTORY_TYPE_ID(FPCGExDataTypeInfoBlendOp)
 
