@@ -14,13 +14,6 @@
 
 class UPCGDynamicMeshData;
 
-UENUM()
-enum class EPCGExTopologyOutputMode : uint8
-{
-	Legacy         = 0 UMETA(DisplayName = "Legacy (Deprecated)", ToolTip="DEPRECATED: No longer supported. Use PCG Dynamic Mesh instead."),
-	PCGDynamicMesh = 1 UMETA(DisplayName = "PCG Dynamic Mesh", ToolTip="Creates a PCG dynamic mesh."),
-};
-
 UCLASS(Abstract, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters")
 class PCGEXELEMENTSTOPOLOGY_API UPCGExTopologyClustersProcessorSettings : public UPCGExClustersProcessorSettings
 {
@@ -29,7 +22,6 @@ class PCGEXELEMENTSTOPOLOGY_API UPCGExTopologyClustersProcessorSettings : public
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	PCGEX_NODE_INFOS(TopologyProcessor, "Topology", "Base processor to output meshes from clusters");
 
 	virtual EPCGSettingsType GetType() const override
@@ -58,10 +50,6 @@ protected:
 	//~End UPCGSettings
 
 public:
-	/** Output mode. Legacy mode is deprecated and will log an error if used. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
-	EPCGExTopologyOutputMode OutputMode = EPCGExTopologyOutputMode::PCGDynamicMesh;
-
 	/** Projection settings. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExGeo2DProjectionDetails ProjectionDetails = FPCGExGeo2DProjectionDetails(true);

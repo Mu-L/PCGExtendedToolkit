@@ -77,7 +77,7 @@ public:
 		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
 	}
 #endif
-	
+
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters", PCGExFactories::PointFilters, false)
 
 protected:

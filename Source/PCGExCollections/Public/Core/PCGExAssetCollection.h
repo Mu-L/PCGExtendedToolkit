@@ -670,6 +670,22 @@ public:
 	void EDITOR_SanitizeAndRebuildStagingData(bool bRecursive);
 	void EDITOR_AddBrowserSelectionTyped(const TArray<FAssetData>& InAssetData);
 
+	/**
+	 * Post-rebuild extension point. Called once at the tail of any user-triggered editor
+	 * rebuild path (single entry, full, recursive, or stale-entry batch) AFTER all entries
+	 * have had UpdateStaging applied and the cache has been invalidated.
+	 *
+	 * Subclasses override this when they need to run cross-entry work that depends on every
+	 * entry's freshly-staged state — typically post-processing that's too expensive to fold
+	 * into per-entry UpdateStaging without N² blowup. Default implementation is a no-op.
+	 *
+	 * The hook is automatically suppressed inside batch loops (e.g. EDITOR_RebuildStaleEntries
+	 * calling EDITOR_RebuildEntryStaging per stale index) and fires once at the batch end.
+	 */
+	virtual void EDITOR_OnPostStagingRebuild()
+	{
+	}
+
 	/** Re-stage a single entry. Mirrors the dirty/broadcast behaviour of editing the entry's properties so UI refreshes. Returns true if the entry was rebuilt. */
 	bool EDITOR_RebuildEntryStaging(int32 EntryIndex);
 
@@ -795,6 +811,14 @@ protected:
 	bool bCacheNeedsRebuild = true;
 
 	TSharedPtr<PCGExAssetCollection::FCache> Cache;
+
+#if WITH_EDITOR
+	/** Reentrance depth for suppressing EDITOR_OnPostStagingRebuild mid-batch. Incremented
+	 *  by one per nested batch scope (TGuardValue pattern); hook fires only when it returns
+	 *  to zero. Kept as int32 rather than bool so future nested batch calls work without
+	 *  API changes. */
+	int32 EDITOR_PostStagingRebuildSuppressDepth = 0;
+#endif
 };
 
 // Validates each entry, registers valid ones to the cache (Main + named categories),

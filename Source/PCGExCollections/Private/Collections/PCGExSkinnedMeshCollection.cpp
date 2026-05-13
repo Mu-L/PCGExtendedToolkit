@@ -175,7 +175,10 @@ void FPCGExSkinnedMeshCollectionEntry::UpdateStaging(const UPCGExAssetCollection
 		{
 			for (const USkeletalMeshSocket* MSocket : SkelMesh->GetActiveSocketList())
 			{
-				if (!MSocket) { continue; }
+				if (!MSocket)
+				{
+					continue;
+				}
 				FPCGExSocket& NewSocket = Staging.Sockets.Emplace_GetRef(
 					MSocket->SocketName, MSocket->RelativeLocation, MSocket->RelativeRotation, MSocket->RelativeScale, MSocket->BoneName.ToString());
 				NewSocket.bManaged = true;

@@ -4,22 +4,29 @@
 #include "Collections/PCGExPCGDataAssetCollection.h"
 
 #include "Engine/World.h"
+#include "Misc/PackageName.h"
+#include "UObject/ObjectSaveContext.h"
 #include "UObject/Package.h"
+#include "UObject/SavePackage.h"
 #include "UObject/UObjectGlobals.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #endif
 
 #include "PCGDataAsset.h"
 #include "PCGExCollectionsSettingsCache.h"
 #include "PCGExLog.h"
 #include "PCGExSocketProvider.h"
+#include "PCGParamData.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExMeshCollection.h"
+#include "Data/PCGPointArrayData.h"
 #include "Data/PCGSpatialData.h"
 #include "Engine/Level.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExDefaultLevelDataExporter.h"
 #include "Helpers/PCGExLevelDataExporter.h"
 
@@ -27,7 +34,7 @@
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
 PCGEX_REGISTER_COLLECTION_TYPE(PCGDataAsset, UPCGExPCGDataAssetCollection, FPCGExPCGDataAssetCollectionEntry, "PCG Data Asset Collection", Base)
 
-// PCGDataAsset Collection Entry
+#pragma region FPCGExPCGDataAssetCollectionEntry
 
 UPCGExAssetCollection* FPCGExPCGDataAssetCollectionEntry::GetSubCollectionPtr() const
 {
@@ -84,6 +91,13 @@ namespace PCGExPCGDataAssetCollectionInternal
 }
 
 // Loads the PCG data asset (or exports level data) and computes combined bounds.
+//
+// Level-sourced entries route through the 3-arg exporter API so EditorMeshContributions /
+// EditorLocalPicks + EditorLevelContributions / EditorLevelLocalPicks are captured directly
+// into the entry's UPROPERTY storage. Tag_EntryIdx hashes (Meshes + Levels pins) and the
+// CollectionMap pin are NOT written here — those are produced by the parent collection's
+// CompactSharedMesh / CompactSharedLevel / RebuildCollectionMaps, which see every entry's
+// contributions and resolve final shared indices.
 void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollection* OwningCollection, int32 InInternalIndex, bool bRecursive)
 {
 	ClearManagedSockets();
@@ -104,6 +118,12 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		{
 			Staging.Bounds = FBox(ForceInit);
 			Staging.Path = FSoftObjectPath();
+#if WITH_EDITORONLY_DATA
+			EditorMeshContributions.Reset();
+			EditorLocalPicks.Reset();
+			EditorLevelContributions.Reset();
+			EditorLevelLocalPicks.Reset();
+#endif
 			PCGExHelpers::SafeReleaseHandle(Handle);
 			FPCGExAssetCollectionEntry::UpdateStaging(OwningCollection, InInternalIndex, bRecursive);
 			return;
@@ -142,8 +162,27 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			Exporter = FallbackExporter;
 		}
 
-		// Run export
-		const bool bSuccess = Exporter->ExportLevelData(LoadedWorld, ExportedDataAsset);
+		// Wire the export context to write directly into the entry's UPROPERTY storage —
+		// no copy at the API boundary. Only available in editor builds; shipping builds run
+		// the exporter without capturing contributions (the shared collections are already
+		// baked into the per-entry ExportedDataAsset hashes at cook time).
+		FPCGExLevelExportContext ExportContext;
+#if WITH_EDITORONLY_DATA
+		// Reset editor-only capture buffers so a failed export doesn't leave stale data
+		// from a prior rebuild contributing to CompactSharedMesh / CompactSharedLevel.
+		EditorMeshContributions.Reset();
+		EditorLocalPicks.Reset();
+		EditorLevelContributions.Reset();
+		EditorLevelLocalPicks.Reset();
+		ExportContext.MeshContributions = &EditorMeshContributions;
+		ExportContext.MeshLocalPicks = &EditorLocalPicks;
+		ExportContext.LevelContributions = &EditorLevelContributions;
+		ExportContext.LevelLocalPicks = &EditorLevelLocalPicks;
+#endif
+		ExportContext.ActorCollectionOut = &EmbeddedActorCollection;
+
+		EmbeddedActorCollection = nullptr;
+		const bool bSuccess = Exporter->ExportLevelData(LoadedWorld, ExportedDataAsset, ExportContext);
 
 		if (bSuccess)
 		{
@@ -166,41 +205,24 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 					}
 				}
 			}
-
-			// Extract embedded collections (created by exporter when bGenerateCollections is enabled)
-			EmbeddedMeshCollection = nullptr;
-			EmbeddedActorCollection = nullptr;
-			EmbeddedLevelCollection = nullptr;
-			ForEachObjectWithOuter(ExportedDataAsset, [this](UObject* Inner)
-			{
-				if (UPCGExMeshCollection* MC = Cast<UPCGExMeshCollection>(Inner))
-				{
-					EmbeddedMeshCollection = MC;
-				}
-				if (UPCGExActorCollection* AC = Cast<UPCGExActorCollection>(Inner))
-				{
-					EmbeddedActorCollection = AC;
-				}
-				if (UPCGExLevelCollection* LC = Cast<UPCGExLevelCollection>(Inner))
-				{
-					EmbeddedLevelCollection = LC;
-				}
-			}, EGetObjectsFlags::None);
 		}
 		else
 		{
 			Staging.Path = FSoftObjectPath();
 			Staging.Bounds = FBox(ForceInit);
-			EmbeddedMeshCollection = nullptr;
-			EmbeddedActorCollection = nullptr;
-			EmbeddedLevelCollection = nullptr;
+#if WITH_EDITORONLY_DATA
+			EditorMeshContributions.Reset();
+			EditorLocalPicks.Reset();
+			EditorLevelContributions.Reset();
+			EditorLevelLocalPicks.Reset();
+#endif
 		}
 
 		PCGExHelpers::SafeReleaseHandle(Handle);
 	}
 	else
 	{
-		// DataAsset source: existing behavior
+		// DataAsset source: existing behavior. No mesh/level contributions captured.
 		Staging.Path = DataAsset.ToSoftObjectPath();
 		TSharedPtr<FStreamableHandle> Handle = PCGExHelpers::LoadBlocking_AnyThreadTpl(DataAsset);
 
@@ -212,6 +234,15 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		{
 			Staging.Bounds = FBox(ForceInit);
 		}
+
+#if WITH_EDITORONLY_DATA
+		// DataAsset-sourced entries don't contribute to the shared collections — clear any
+		// stale contributions left behind by a prior Source==Level rebuild.
+		EditorMeshContributions.Reset();
+		EditorLocalPicks.Reset();
+		EditorLevelContributions.Reset();
+		EditorLevelLocalPicks.Reset();
+#endif
 
 		PCGExHelpers::SafeReleaseHandle(Handle);
 	}
@@ -251,9 +282,11 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_Sanitize()
 	if (Source != EPCGExDataAssetEntrySource::Level)
 	{
 		ExportedDataAsset = nullptr;
-		EmbeddedMeshCollection = nullptr;
 		EmbeddedActorCollection = nullptr;
-		EmbeddedLevelCollection = nullptr;
+		EditorMeshContributions.Reset();
+		EditorLocalPicks.Reset();
+		EditorLevelContributions.Reset();
+		EditorLevelLocalPicks.Reset();
 	}
 }
 
@@ -285,9 +318,859 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObj
 }
 #endif
 
+#pragma endregion
+
+#pragma region SharedCompact internals
+
+namespace PCGExSharedCompact
+{
+	static UPCGBasePointData* FindPointDataByPin(UPCGDataAsset* Asset, FName PinName)
+	{
+		if (!Asset)
+		{
+			return nullptr;
+		}
+		for (FPCGTaggedData& TD : Asset->Data.TaggedData)
+		{
+			if (TD.Pin == PinName)
+			{
+				if (UPCGBasePointData* PD = const_cast<UPCGBasePointData*>(Cast<UPCGBasePointData>(TD.Data)))
+				{
+					return PD;
+				}
+			}
+		}
+		return nullptr;
+	}
+
+	/**
+	 * Symmetric to ExternalizeUObject. Loads the asset behind External (when valid) and
+	 * renames it into NewOuter's package, populating Instanced. External is always reset.
+	 * Guarded: if Instanced is already set we skip the load — never overwrite an in-memory
+	 * working buffer with a (possibly stale) on-disk copy.
+	 */
+	template <typename T>
+	static void Internalize(TObjectPtr<T>& Instanced, TSoftObjectPtr<T>& External, UObject* NewOuter)
+	{
+#if WITH_EDITOR
+		if (!Instanced && !External.IsNull())
+		{
+			if (T* Loaded = External.LoadSynchronous())
+			{
+				Loaded->Rename(nullptr, NewOuter, REN_DontCreateRedirectors | REN_NonTransactional);
+				Loaded->ClearFlags(RF_Public | RF_Standalone);
+				Instanced = Loaded;
+			}
+		}
+		External.Reset();
+#endif
+	}
+
+	/**
+	 * Rename Source into the package at DesiredPackagePath as DesiredAssetName, evicting any
+	 * existing UObject sitting at that path to the transient package first. On first emit,
+	 * notifies the asset registry. Idempotent: skips work if Source is already in place.
+	 *
+	 * Returns the resulting soft path (empty if Source was null).
+	 */
+	static FSoftObjectPath ExternalizeUObject(UObject* Source, const FString& DesiredPackagePath, const FString& DesiredAssetName)
+	{
+#if WITH_EDITOR
+		if (!Source)
+		{
+			return FSoftObjectPath();
+		}
+
+		UPackage* CurrentPackage = Source->GetOutermost();
+		if (CurrentPackage && CurrentPackage->GetName() == DesiredPackagePath && Source->GetName() == DesiredAssetName)
+		{
+			return FSoftObjectPath(Source);
+		}
+
+		UPackage* TargetPackage = CreatePackage(*DesiredPackagePath);
+		check(TargetPackage);
+
+		// If something already owns the target name in the target package, evict it. Renaming
+		// onto a name conflict would otherwise assert; we expect this on subsequent rebuilds
+		// when an old externalized asset is still loaded in the editor.
+		const FName TargetName(*DesiredAssetName);
+		if (UObject* Existing = StaticFindObjectFast(UObject::StaticClass(), TargetPackage, TargetName))
+		{
+			if (Existing != Source)
+			{
+				Existing->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
+			}
+		}
+
+		Source->Rename(*DesiredAssetName, TargetPackage, REN_DontCreateRedirectors | REN_NonTransactional);
+		Source->SetFlags(RF_Public | RF_Standalone);
+		TargetPackage->SetFlags(RF_Public | RF_Standalone);
+		TargetPackage->MarkPackageDirty();
+
+		FAssetRegistryModule::AssetCreated(Source);
+
+		return FSoftObjectPath(Source);
+#else
+		return Source ? FSoftObjectPath(Source) : FSoftObjectPath();
+#endif
+	}
+
+	// --- Mesh identity ---
+	// Identity hash deliberately omits Weight/Tags/Category/PropertyOverrides — Weight
+	// accumulates from contributors, the rest are user-owned on the shared entry.
+	// Descriptor fields are not hashed (large structs); ContentEquals resolves collisions.
+	static uint32 MeshContentHash(const FPCGExMeshCollectionEntry& E)
+	{
+		uint32 H = GetTypeHash(E.StaticMesh.ToSoftObjectPath());
+		H = HashCombine(H, GetTypeHash(static_cast<uint8>(E.MaterialVariants)));
+		H = HashCombine(H, GetTypeHash(E.SlotIndex));
+		H = HashCombine(H, GetTypeHash(static_cast<uint8>(E.DescriptorSource)));
+
+		H = HashCombine(H, GetTypeHash(E.MaterialOverrideVariants.Num()));
+		for (const FPCGExMaterialOverrideSingleEntry& S : E.MaterialOverrideVariants)
+		{
+			H = HashCombine(H, GetTypeHash(S.Weight));
+			H = HashCombine(H, GetTypeHash(S.Material.ToSoftObjectPath()));
+		}
+
+		H = HashCombine(H, GetTypeHash(E.MaterialOverrideVariantsList.Num()));
+		for (const FPCGExMaterialOverrideCollection& V : E.MaterialOverrideVariantsList)
+		{
+			H = HashCombine(H, GetTypeHash(V.Weight));
+			H = HashCombine(H, GetTypeHash(V.Overrides.Num()));
+			for (const FPCGExMaterialOverrideEntry& O : V.Overrides)
+			{
+				H = HashCombine(H, GetTypeHash(O.SlotIndex));
+				H = HashCombine(H, GetTypeHash(O.Material.ToSoftObjectPath()));
+			}
+		}
+
+		return H;
+	}
+
+	static bool MaterialOverrideEquals(const FPCGExMaterialOverrideSingleEntry& A, const FPCGExMaterialOverrideSingleEntry& B)
+	{
+		return A.Weight == B.Weight && A.Material.ToSoftObjectPath() == B.Material.ToSoftObjectPath();
+	}
+
+	static bool MaterialOverrideEquals(const FPCGExMaterialOverrideEntry& A, const FPCGExMaterialOverrideEntry& B)
+	{
+		return A.SlotIndex == B.SlotIndex && A.Material.ToSoftObjectPath() == B.Material.ToSoftObjectPath();
+	}
+
+	static bool MaterialOverrideEquals(const FPCGExMaterialOverrideCollection& A, const FPCGExMaterialOverrideCollection& B)
+	{
+		if (A.Weight != B.Weight)
+		{
+			return false;
+		}
+		if (A.Overrides.Num() != B.Overrides.Num())
+		{
+			return false;
+		}
+		for (int32 i = 0; i < A.Overrides.Num(); i++)
+		{
+			if (!MaterialOverrideEquals(A.Overrides[i], B.Overrides[i]))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	static bool MeshContentEquals(const FPCGExMeshCollectionEntry& A, const FPCGExMeshCollectionEntry& B)
+	{
+		if (A.StaticMesh.ToSoftObjectPath() != B.StaticMesh.ToSoftObjectPath())
+		{
+			return false;
+		}
+		if (A.MaterialVariants != B.MaterialVariants)
+		{
+			return false;
+		}
+		if (A.SlotIndex != B.SlotIndex)
+		{
+			return false;
+		}
+		if (A.DescriptorSource != B.DescriptorSource)
+		{
+			return false;
+		}
+
+		if (A.MaterialOverrideVariants.Num() != B.MaterialOverrideVariants.Num())
+		{
+			return false;
+		}
+		for (int32 i = 0; i < A.MaterialOverrideVariants.Num(); i++)
+		{
+			if (!MaterialOverrideEquals(A.MaterialOverrideVariants[i], B.MaterialOverrideVariants[i]))
+			{
+				return false;
+			}
+		}
+
+		if (A.MaterialOverrideVariantsList.Num() != B.MaterialOverrideVariantsList.Num())
+		{
+			return false;
+		}
+		for (int32 i = 0; i < A.MaterialOverrideVariantsList.Num(); i++)
+		{
+			if (!MaterialOverrideEquals(A.MaterialOverrideVariantsList[i], B.MaterialOverrideVariantsList[i]))
+			{
+				return false;
+			}
+		}
+
+		if (!FSoftISMComponentDescriptor::StaticStruct()->CompareScriptStruct(&A.ISMDescriptor, &B.ISMDescriptor, 0))
+		{
+			return false;
+		}
+		if (!FPCGExStaticMeshComponentDescriptor::StaticStruct()->CompareScriptStruct(&A.SMDescriptor, &B.SMDescriptor, 0))
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	// --- Policy structs supplying entry-specific knowledge to CompactShared<>. ---
+	struct FMeshPolicy
+	{
+		using EntryType = FPCGExMeshCollectionEntry;
+		using CollectionType = UPCGExMeshCollection;
+
+		static FName PinName()
+		{
+			return PCGExCollections::Labels::MeshesPin;
+		}
+
+		static uint32 Hash(const FPCGExMeshCollectionEntry& E)
+		{
+			return MeshContentHash(E);
+		}
+
+		static bool Equals(const FPCGExMeshCollectionEntry& A, const FPCGExMeshCollectionEntry& B)
+		{
+			return MeshContentEquals(A, B);
+		}
+
+		static FString SortKey(const FPCGExMeshCollectionEntry& E)
+		{
+			return E.StaticMesh.ToSoftObjectPath().ToString();
+		}
+
+		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorMeshContributions;
+		}
+
+		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorLocalPicks;
+		}
+
+		static int16 UnpackSec(int32 Packed, int32& OutLocal)
+		{
+			int16 Sec;
+			FPCGExLevelExportContext::UnpackLocalPick(Packed, OutLocal, Sec);
+			return Sec;
+		}
+	};
+
+	struct FLevelPolicy
+	{
+		using EntryType = FPCGExLevelCollectionEntry;
+		using CollectionType = UPCGExLevelCollection;
+
+		static FName PinName()
+		{
+			return PCGExCollections::Labels::LevelsPin;
+		}
+
+		static uint32 Hash(const FPCGExLevelCollectionEntry& E)
+		{
+			return GetTypeHash(E.Level.ToSoftObjectPath());
+		}
+
+		static bool Equals(const FPCGExLevelCollectionEntry& A, const FPCGExLevelCollectionEntry& B)
+		{
+			return A.Level.ToSoftObjectPath() == B.Level.ToSoftObjectPath();
+		}
+
+		static FString SortKey(const FPCGExLevelCollectionEntry& E)
+		{
+			return E.Level.ToSoftObjectPath().ToString();
+		}
+
+		static const TArray<FPCGExLevelCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorLevelContributions;
+		}
+
+		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorLevelLocalPicks;
+		}
+
+		static int16 UnpackSec(int32 Packed, int32& OutLocal)
+		{
+			OutLocal = Packed;
+			return -1;
+		}
+	};
+
+	// Merge every entry's local contributions into one deduplicated shared collection
+	// (identity via TPolicy::Hash + TPolicy::Equals), then rewrite Tag_EntryIdx on the
+	// policy's pin against the resulting shared indices. Tags/Category/PropertyOverrides
+	// on existing shared entries are preserved across rebuilds when identity survives.
+	// Deterministic ordering: (hash, sort-key) ascending — stable across cold cooks.
+	template <typename TPolicy>
+	static void CompactShared(
+		UObject* Outer,
+		TArray<FPCGExPCGDataAssetCollectionEntry>& Entries,
+		TObjectPtr<typename TPolicy::CollectionType>& SharedCollectionRef,
+		TSoftObjectPtr<typename TPolicy::CollectionType>* ExternalFallback)
+	{
+		using TEntry = TPolicy::EntryType;
+		using TCollection = TPolicy::CollectionType;
+
+		// Skip everything when there's nothing to merge AND no existing shared state to clear.
+		// Avoids a synchronous external-asset load on unrelated edits (e.g. weight tweak on a
+		// non-level entry) when no entry contributes to this policy.
+		bool bHasContributions = false;
+		for (const FPCGExPCGDataAssetCollectionEntry& E : Entries)
+		{
+			if (TPolicy::Contributions(E).Num() > 0)
+			{
+				bHasContributions = true;
+				break;
+			}
+		}
+		if (!bHasContributions && !SharedCollectionRef
+			&& (!ExternalFallback || ExternalFallback->IsNull()))
+		{
+			return;
+		}
+
+		// External mode: if the in-memory ref was nulled by a prior externalization, pull the
+		// asset back into the collection package as the working buffer so the preserved-fields
+		// pass below sees the previous entries' user edits (Tags/Category/PropertyOverrides).
+		// The next ExternalizeSharedAndActorCollections will overwrite the same external uasset.
+		if (!SharedCollectionRef && ExternalFallback && !ExternalFallback->IsNull())
+		{
+			if (TCollection* Loaded = ExternalFallback->LoadSynchronous())
+			{
+				Loaded->Rename(nullptr, Outer, REN_DontCreateRedirectors | REN_NonTransactional);
+				SharedCollectionRef = Loaded;
+			}
+		}
+
+		// Reuse the same UObject across calls so its CollectionGUID — baked into every
+		// per-entry Tag_EntryIdx — stays stable. Replacing it would invalidate on-disk hashes.
+		if (!SharedCollectionRef)
+		{
+			SharedCollectionRef = NewObject<TCollection>(Outer);
+		}
+
+		struct FPreserved
+		{
+			TEntry Identity;
+			TSet<FName> Tags;
+			FName Category = NAME_None;
+			FPCGExPropertyOverrides PropertyOverrides;
+		};
+		TMap<uint32, TArray<FPreserved>> PreservedByHash;
+		for (const TEntry& E : SharedCollectionRef->Entries)
+		{
+			const uint32 H = TPolicy::Hash(E);
+			FPreserved& P = PreservedByHash.FindOrAdd(H).AddDefaulted_GetRef();
+			P.Identity = E;
+			P.Tags = E.Tags;
+			P.Category = E.Category;
+			P.PropertyOverrides = E.PropertyOverrides;
+		}
+
+		struct FGroup
+		{
+			uint32 Hash = 0;
+			const TEntry* Representative = nullptr;
+			FString SortKey;
+			TArray<TPair<int32, int32>> Contributors; // (entryIdx, localContribIdx)
+			int32 WeightSum = 0;
+		};
+		TMap<uint32, TArray<FGroup>> HashBuckets;
+
+		for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); EntryIdx++)
+		{
+			const TArray<TEntry>& Contribs = TPolicy::Contributions(Entries[EntryIdx]);
+			for (int32 LocalIdx = 0; LocalIdx < Contribs.Num(); LocalIdx++)
+			{
+				const TEntry& Contrib = Contribs[LocalIdx];
+				const uint32 H = TPolicy::Hash(Contrib);
+
+				TArray<FGroup>& Bucket = HashBuckets.FindOrAdd(H);
+				FGroup* Match = nullptr;
+				for (FGroup& G : Bucket)
+				{
+					if (TPolicy::Equals(*G.Representative, Contrib))
+					{
+						Match = &G;
+						break;
+					}
+				}
+				if (!Match)
+				{
+					FGroup NewGroup;
+					NewGroup.Hash = H;
+					NewGroup.Representative = &Contrib;
+					NewGroup.SortKey = TPolicy::SortKey(Contrib);
+					Match = &Bucket.Add_GetRef(MoveTemp(NewGroup));
+				}
+				Match->Contributors.Emplace(EntryIdx, LocalIdx);
+				Match->WeightSum += FMath::Max(0, Contrib.Weight);
+			}
+		}
+
+		TArray<FGroup> AllGroups;
+		for (auto& Pair : HashBuckets)
+		{
+			for (FGroup& G : Pair.Value)
+			{
+				AllGroups.Add(MoveTemp(G));
+			}
+		}
+		AllGroups.Sort([](const FGroup& A, const FGroup& B)
+		{
+			if (A.Hash != B.Hash)
+			{
+				return A.Hash < B.Hash;
+			}
+			return A.SortKey < B.SortKey;
+		});
+
+		TArray<TEntry> MergedEntries;
+		MergedEntries.Reserve(AllGroups.Num());
+
+		TArray<TArray<int32>> LocalToSharedByEntry;
+		LocalToSharedByEntry.SetNum(Entries.Num());
+		for (int32 i = 0; i < Entries.Num(); i++)
+		{
+			// -1 = no shared mapping; rewrite pass leaves the hash unwritten.
+			LocalToSharedByEntry[i].Init(-1, TPolicy::Contributions(Entries[i]).Num());
+		}
+
+		for (int32 SharedIdx = 0; SharedIdx < AllGroups.Num(); SharedIdx++)
+		{
+			const FGroup& G = AllGroups[SharedIdx];
+			TEntry Merged = *G.Representative;
+			Merged.Weight = FMath::Max(1, G.WeightSum);
+
+			if (const TArray<FPreserved>* Bucket = PreservedByHash.Find(G.Hash))
+			{
+				for (const FPreserved& P : *Bucket)
+				{
+					if (TPolicy::Equals(P.Identity, *G.Representative))
+					{
+						Merged.Tags = P.Tags;
+						Merged.Category = P.Category;
+						Merged.PropertyOverrides = P.PropertyOverrides;
+						break;
+					}
+				}
+			}
+
+			MergedEntries.Add(MoveTemp(Merged));
+
+			for (const TPair<int32, int32>& C : G.Contributors)
+			{
+				LocalToSharedByEntry[C.Key][C.Value] = SharedIdx;
+			}
+		}
+
+		SharedCollectionRef->Entries = MoveTemp(MergedEntries);
+		SharedCollectionRef->RebuildStagingData(true);
+
+		// Per-entry Tag_EntryIdx rewrite. CollectionMap is rebuilt separately so it can
+		// register the other shared collection too. Sequential: UPCGMetadata mutation is
+		// not safe on worker threads in editor flow.
+		PCGExCollections::FPickPacker Packer;
+		Packer.RegisterCollection(SharedCollectionRef);
+
+		const FName PinName = TPolicy::PinName();
+		for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); EntryIdx++)
+		{
+			FPCGExPCGDataAssetCollectionEntry& Entry = Entries[EntryIdx];
+			if (!Entry.ExportedDataAsset)
+			{
+				continue;
+			}
+
+			UPCGBasePointData* PD = FindPointDataByPin(Entry.ExportedDataAsset, PinName);
+			if (!PD)
+			{
+				continue;
+			}
+			UPCGMetadata* Meta = PD->MutableMetadata();
+			if (!Meta)
+			{
+				continue;
+			}
+
+			TPCGValueRange<int64> MetaEntries = PD->GetMetadataEntryValueRange();
+			FPCGMetadataAttribute<int64>* EntryHashAttr = Meta->FindOrCreateAttribute<int64>(
+				PCGExCollections::Labels::Tag_EntryIdx, 0, false, true);
+			if (!EntryHashAttr)
+			{
+				continue;
+			}
+
+			const TArray<int32>& LocalToShared = LocalToSharedByEntry[EntryIdx];
+			const TArray<int32>& LocalPicks = TPolicy::LocalPicks(Entry);
+			const int32 N = FMath::Min(LocalPicks.Num(), MetaEntries.Num());
+			for (int32 i = 0; i < N; i++)
+			{
+				const int32 Packed = LocalPicks[i];
+				if (Packed == -1)
+				{
+					continue;
+				}
+				int32 LocalIdx;
+				const int16 Sec = TPolicy::UnpackSec(Packed, LocalIdx);
+				if (!LocalToShared.IsValidIndex(LocalIdx))
+				{
+					continue;
+				}
+				const int32 SharedIdx = LocalToShared[LocalIdx];
+				if (SharedIdx < 0)
+				{
+					continue;
+				}
+				const uint64 Hash = Packer.GetPickIdx(SharedCollectionRef, static_cast<int16>(SharedIdx), Sec);
+				EntryHashAttr->SetValue(MetaEntries[i], static_cast<int64>(Hash));
+			}
+		}
+	}
+}
+
+#pragma endregion
+
+#pragma region UPCGExPCGDataAssetCollection
+
+void UPCGExPCGDataAssetCollection::CompactSharedMesh()
+{
+#if WITH_EDITORONLY_DATA
+	PCGExSharedCompact::CompactShared<PCGExSharedCompact::FMeshPolicy>(
+		this, Entries, SharedMeshCollection,
+		IsExternalActive() ? &ExternalSharedMeshCollection : nullptr);
+#endif
+}
+
+void UPCGExPCGDataAssetCollection::CompactSharedLevel()
+{
+#if WITH_EDITORONLY_DATA
+	PCGExSharedCompact::CompactShared<PCGExSharedCompact::FLevelPolicy>(
+		this, Entries, SharedLevelCollection,
+		IsExternalActive() ? &ExternalSharedLevelCollection : nullptr);
+#endif
+}
+
+void UPCGExPCGDataAssetCollection::RebuildCollectionMaps()
+{
+	for (FPCGExPCGDataAssetCollectionEntry& Entry : Entries)
+	{
+		if (!Entry.ExportedDataAsset)
+		{
+			continue;
+		}
+
+		PCGExCollections::FPickPacker FullPacker;
+		if (SharedMeshCollection)
+		{
+			FullPacker.RegisterCollection(SharedMeshCollection);
+		}
+		if (SharedLevelCollection)
+		{
+			FullPacker.RegisterCollection(SharedLevelCollection);
+		}
+		if (Entry.EmbeddedActorCollection)
+		{
+			FullPacker.RegisterCollection(Entry.EmbeddedActorCollection);
+		}
+
+		Entry.ExportedDataAsset->Data.TaggedData.RemoveAll([](const FPCGTaggedData& TD)
+		{
+			return TD.Pin == PCGExCollections::Labels::CollectionMapPin;
+		});
+
+		UPCGParamData* MapData = NewObject<UPCGParamData>(Entry.ExportedDataAsset);
+		FullPacker.PackToDataset(MapData);
+		FPCGTaggedData& MapTaggedData = Entry.ExportedDataAsset->Data.TaggedData.Emplace_GetRef();
+		MapTaggedData.Data = MapData;
+		MapTaggedData.Pin = PCGExCollections::Labels::CollectionMapPin;
+	}
+}
+
+void UPCGExPCGDataAssetCollection::ExternalizeSharedAndActorCollections()
+{
+#if WITH_EDITOR
+	if (!IsExternalActive())
+	{
+		return;
+	}
+
+	// Naming uses the collection's GUID for cross-collection uniqueness in a shared export
+	// folder, and is short enough to stay within filesystem path budgets. GUID is stable
+	// across rebuilds — filenames are reused (P4-friendly overwrites).
+	const FString FolderPath = ExportFolder.Path;
+	const FString GuidPrefix = GetExternalAssetPrefix();
+
+	if (SharedMeshCollection)
+	{
+		const FString AssetName = GuidPrefix + TEXT("_Meshes");
+		ExternalSharedMeshCollection = PCGExSharedCompact::ExternalizeUObject(SharedMeshCollection, FolderPath / AssetName, AssetName);
+	}
+
+	if (SharedLevelCollection)
+	{
+		const FString AssetName = GuidPrefix + TEXT("_Levels");
+		ExternalSharedLevelCollection = PCGExSharedCompact::ExternalizeUObject(SharedLevelCollection, FolderPath / AssetName, AssetName);
+	}
+
+	// Per-entry actor collections. Done before RebuildCollectionMaps so the soft paths the
+	// packer bakes into the CollectionMap pin already point at the external assets.
+	for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); EntryIdx++)
+	{
+		FPCGExPCGDataAssetCollectionEntry& Entry = Entries[EntryIdx];
+		if (!Entry.EmbeddedActorCollection)
+		{
+			continue;
+		}
+
+		const FString AssetName = FString::Printf(TEXT("%s_E%03d_Actors"), *GuidPrefix, EntryIdx);
+		Entry.ExternalActorCollection = PCGExSharedCompact::ExternalizeUObject(Entry.EmbeddedActorCollection, FolderPath / AssetName, AssetName);
+	}
+#endif
+}
+
+void UPCGExPCGDataAssetCollection::ExternalizeExportedDataAssets()
+{
+#if WITH_EDITOR
+	if (!IsExternalActive())
+	{
+		return;
+	}
+
+	const FString FolderPath = ExportFolder.Path;
+	const FString GuidPrefix = GetExternalAssetPrefix();
+
+	for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); EntryIdx++)
+	{
+		FPCGExPCGDataAssetCollectionEntry& Entry = Entries[EntryIdx];
+		if (!Entry.ExportedDataAsset)
+		{
+			continue;
+		}
+
+		const FString AssetName = FString::Printf(TEXT("%s_E%03d_Data"), *GuidPrefix, EntryIdx);
+		Entry.ExternalExportedDataAsset = PCGExSharedCompact::ExternalizeUObject(Entry.ExportedDataAsset, FolderPath / AssetName, AssetName);
+
+		// Staging.Path is the runtime soft-load address for this entry. Repoint it at the
+		// external location so LoadPCGData soft-loads from the external uasset, not the
+		// (now-orphaned) inner-subobject path.
+		Entry.Staging.Path = Entry.ExternalExportedDataAsset.ToSoftObjectPath();
+	}
+#endif
+}
+
+void UPCGExPCGDataAssetCollection::InternalizeSubobjects()
+{
+#if WITH_EDITOR
+	// Pull each externalized subobject back into the collection's package and null the
+	// soft refs. Used on External -> Embedded toggle. CompactShared's load-back path
+	// also rehydrates shared collections lazily, but per-entry assets need explicit
+	// internalization here because they have no equivalent build-time fallback.
+	using namespace PCGExSharedCompact;
+
+	Internalize(SharedMeshCollection, ExternalSharedMeshCollection, this);
+	Internalize(SharedLevelCollection, ExternalSharedLevelCollection, this);
+
+	for (FPCGExPCGDataAssetCollectionEntry& Entry : Entries)
+	{
+		Internalize(Entry.EmbeddedActorCollection, Entry.ExternalActorCollection, this);
+		Internalize(Entry.ExportedDataAsset, Entry.ExternalExportedDataAsset, this);
+		if (Entry.ExportedDataAsset)
+		{
+			Entry.Staging.Path = FSoftObjectPath(Entry.ExportedDataAsset);
+		}
+	}
+#endif
+}
+
+void UPCGExPCGDataAssetCollection::SaveExternalPackages()
+{
+#if WITH_EDITOR
+	// TSet dedup is defensive — Shared* and per-entry packages are distinct by GUID-prefixed
+	// name, but unrelated future callers could legitimately produce duplicates.
+	TSet<UPackage*> Packages;
+
+	auto AddPackageFor = [&Packages](UObject* Obj)
+	{
+		if (!Obj)
+		{
+			return;
+		}
+		if (UPackage* Pkg = Obj->GetOutermost())
+		{
+			if (Pkg != GetTransientPackage())
+			{
+				Packages.Add(Pkg);
+			}
+		}
+	};
+
+	AddPackageFor(SharedMeshCollection);
+	AddPackageFor(SharedLevelCollection);
+	for (const FPCGExPCGDataAssetCollectionEntry& Entry : Entries)
+	{
+		AddPackageFor(Entry.EmbeddedActorCollection);
+		AddPackageFor(Entry.ExportedDataAsset);
+	}
+
+	for (UPackage* Pkg : Packages)
+	{
+		if (Pkg == GetOutermost())
+		{
+			continue;
+		} // never re-enter saving ourselves
+
+		const FString FileName = FPackageName::LongPackageNameToFilename(Pkg->GetName(), FPackageName::GetAssetPackageExtension());
+		FSavePackageArgs SaveArgs;
+		SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+		SaveArgs.SaveFlags = SAVE_NoError;
+		UPackage::SavePackage(Pkg, nullptr, *FileName, SaveArgs);
+	}
+#endif
+}
+
+void UPCGExPCGDataAssetCollection::RebuildSharedCollections()
+{
+	CompactSharedMesh();
+	CompactSharedLevel();
+
+	// Externalize Shared* + per-entry actor collections BEFORE the CollectionMap is baked
+	// so the soft paths recorded in the map already point at their external packages.
+	// Externalize* methods short-circuit internally when !IsExternalActive().
+	ExternalizeSharedAndActorCollections();
+
+	RebuildCollectionMaps();
+
+	// Externalize ExportedDataAsset AFTER the map is baked. The map lives inside
+	// ExportedDataAsset as an inner UPCGParamData and moves with the rename; the
+	// FSoftObjectPath values it carries are by-value and unaffected.
+	ExternalizeExportedDataAssets();
+}
+
+void UPCGExPCGDataAssetCollection::Serialize(FArchive& Ar)
+{
+	// External mode: the Instanced fields are working buffers during the editor session — their
+	// targets live in separate external packages once externalization has run. Without this
+	// scrub, UE's Instanced-property serializer would chase those pointers and bake hard
+	// references into our saved package, eagerly loading every external asset alongside us
+	// and defeating the lazy-load goal. Soft refs + Staging.Path remain the on-disk addresses.
+	// Skipped for transacting (undo/redo) so the transaction buffer can round-trip the in-memory
+	// state without loss.
+	if (IsExternalActive() && Ar.IsSaving() && !Ar.IsTransacting())
+	{
+		const TObjectPtr<UPCGExMeshCollection> KeepMesh = SharedMeshCollection;
+		const TObjectPtr<UPCGExLevelCollection> KeepLevel = SharedLevelCollection;
+		TArray<TObjectPtr<UPCGDataAsset>> KeepData;
+		TArray<TObjectPtr<UPCGExActorCollection>> KeepActors;
+		KeepData.Reserve(Entries.Num());
+		KeepActors.Reserve(Entries.Num());
+
+		for (FPCGExPCGDataAssetCollectionEntry& E : Entries)
+		{
+			KeepData.Add(E.ExportedDataAsset);
+			KeepActors.Add(E.EmbeddedActorCollection);
+			E.ExportedDataAsset = nullptr;
+			E.EmbeddedActorCollection = nullptr;
+		}
+		SharedMeshCollection = nullptr;
+		SharedLevelCollection = nullptr;
+
+		Super::Serialize(Ar);
+
+		SharedMeshCollection = KeepMesh;
+		SharedLevelCollection = KeepLevel;
+		for (int32 i = 0; i < Entries.Num(); i++)
+		{
+			Entries[i].ExportedDataAsset = KeepData[i];
+			Entries[i].EmbeddedActorCollection = KeepActors[i];
+		}
+		return;
+	}
+
+	Super::Serialize(Ar);
+}
+
+void UPCGExPCGDataAssetCollection::PostDuplicate(bool bDuplicateForPIE)
+{
+	Super::PostDuplicate(bDuplicateForPIE);
+
+	// On a real duplicate (not PIE), both this collection AND its outered shared collections
+	// receive new CollectionGUIDs while per-entry ExportedDataAssets still carry hashes keyed
+	// to the ORIGINAL shared GUIDs. Re-stamp them so the duplicate is consistent without a
+	// manual rebuild.
+	if (!bDuplicateForPIE)
+	{
+		RebuildSharedCollections();
+	}
+}
+
+void UPCGExPCGDataAssetCollection::PreSave(FObjectPreSaveContext ObjectSaveContext)
+{
+	// Cook-time safety net for users who edited a source level and cooked without a manual
+	// rebuild (or recovered from a mid-edit editor crash). Idempotent.
+	if (ObjectSaveContext.IsCooking())
+	{
+		RebuildSharedCollections();
+		if (IsExternalActive())
+		{
+			SaveExternalPackages();
+		}
+	}
+	Super::PreSave(ObjectSaveContext);
+}
+
 #if WITH_EDITOR
 
-// PCGDataAsset Collection - Editor Functions
+void UPCGExPCGDataAssetCollection::EDITOR_OnPostStagingRebuild()
+{
+	RebuildSharedCollections();
+}
+
+void UPCGExPCGDataAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	const FName PropName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
+	const bool bToggledExternal = (PropName == GET_MEMBER_NAME_CHECKED(UPCGExPCGDataAssetCollection, bUseExternalAssets));
+	const bool bChangedFolder = (PropName == GET_MEMBER_NAME_CHECKED(UPCGExPCGDataAssetCollection, ExportFolder));
+
+	if (bToggledExternal && !bUseExternalAssets)
+	{
+		// External -> Embedded: pull subobjects back into the collection package, null soft
+		// refs, then re-bake the CollectionMap with the now-inner paths.
+		InternalizeSubobjects();
+		RebuildSharedCollections();
+	}
+	else if (bToggledExternal || bChangedFolder)
+	{
+		// Embedded -> External, or External folder moved: re-externalize using the
+		// (new) settings. CompactShared's load-back rehydrates the working buffers.
+		RebuildSharedCollections();
+	}
+}
 
 void UPCGExPCGDataAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData)
 {
@@ -351,3 +1234,5 @@ void UPCGExPCGDataAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArr
 	}
 }
 #endif
+
+#pragma endregion

@@ -1102,6 +1102,10 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData()
 	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
+	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+	{
+		EDITOR_OnPostStagingRebuild();
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
@@ -1112,6 +1116,10 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
+	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+	{
+		EDITOR_OnPostStagingRebuild();
+	}
 }
 
 int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
@@ -1171,9 +1179,17 @@ int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 		}
 	});
 
-	for (int32 Index : StaleIndices)
 	{
-		EDITOR_RebuildEntryStaging(Index);
+		// Suppress per-entry post-rebuild hook firings; emit one tail call after the batch.
+		TGuardValue<int32> SuppressGuard(EDITOR_PostStagingRebuildSuppressDepth, EDITOR_PostStagingRebuildSuppressDepth + 1);
+		for (int32 Index : StaleIndices)
+		{
+			EDITOR_RebuildEntryStaging(Index);
+		}
+	}
+	if (!StaleIndices.IsEmpty())
+	{
+		EDITOR_OnPostStagingRebuild();
 	}
 	return StaleIndices.Num();
 }
@@ -1203,6 +1219,10 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 		InvalidateCache();
 		(void)MarkPackageDirty();
 		PCGExEditor::NotifyObjectChanged(this);
+		if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+		{
+			EDITOR_OnPostStagingRebuild();
+		}
 	}
 	return bRebuilt;
 }

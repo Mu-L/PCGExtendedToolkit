@@ -9,12 +9,12 @@
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGPointData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
 #include "Helpers/PCGHelpers.h"
 #include "MeshSelectors/PCGMeshSelectorBase.h"
 #include "MeshSelectors/PCGSkinnedMeshSelector.h"
-#include "Data/PCGPointData.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
@@ -454,15 +454,29 @@ namespace PCGExCollections
 	template <>
 	struct TInstanceListTraits<FPCGMeshInstanceList>
 	{
-		static TArray<int32>& GetIndices(FPCGMeshInstanceList& InList) { return InList.InstancesIndices; }
-		static void SetPointData(FPCGMeshInstanceList& InList, const UPCGBasePointData* InPointData) { InList.PointData = InPointData; }
+		static TArray<int32>& GetIndices(FPCGMeshInstanceList& InList)
+		{
+			return InList.InstancesIndices;
+		}
+
+		static void SetPointData(FPCGMeshInstanceList& InList, const UPCGBasePointData* InPointData)
+		{
+			InList.PointData = InPointData;
+		}
 	};
 
 	template <>
 	struct TInstanceListTraits<FPCGSkinnedMeshInstanceList>
 	{
-		static TArray<int32>& GetIndices(FPCGSkinnedMeshInstanceList& InList) { return InList.InstancePointIndices; }
-		static void SetPointData(FPCGSkinnedMeshInstanceList& InList, const UPCGBasePointData* InPointData) { InList.PointData = Cast<UPCGPointData>(InPointData); }
+		static TArray<int32>& GetIndices(FPCGSkinnedMeshInstanceList& InList)
+		{
+			return InList.InstancePointIndices;
+		}
+
+		static void SetPointData(FPCGSkinnedMeshInstanceList& InList, const UPCGBasePointData* InPointData)
+		{
+			InList.PointData = Cast<UPCGPointData>(InPointData);
+		}
 	};
 
 	template <typename T>
