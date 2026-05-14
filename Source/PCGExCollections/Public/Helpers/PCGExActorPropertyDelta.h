@@ -18,8 +18,14 @@ namespace PCGExActorDelta
 	 * Returns empty array if actor and all components match defaults exactly.
 	 *
 	 * Format is opaque -- use ApplyPropertyDelta to deserialize.
+	 *
+	 * @param Actor             Source actor to capture.
+	 * @param OutCollaterals    Optional. When provided, asset soft paths the delta
+	 *                          references are APPENDED (deduplicated). Caller is
+	 *                          responsible for clearing the array between reuse.
+	 *                          Pass nullptr to skip collection.
 	 */
-	PCGEXCOLLECTIONS_API TArray<uint8> SerializeActorDelta(AActor* Actor);
+	PCGEXCOLLECTIONS_API TArray<uint8> SerializeActorDelta(AActor* Actor, TArray<FSoftObjectPath>* OutCollaterals = nullptr);
 
 	/**
 	 * Apply a previously serialized property delta to an actor and its components.

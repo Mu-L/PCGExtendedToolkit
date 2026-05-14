@@ -250,6 +250,7 @@ namespace PCGExDefaultLevelDataExporterInternal
 		bool bFirstActor = true;
 		int32 Count = 0;
 		TArray<uint8> SerializedDelta;
+		TArray<FSoftObjectPath> CollateralPaths;
 	};
 
 	struct FActorInstanceKey
@@ -721,10 +722,11 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 		FClassifiedActor& CA = ActorActors[i];
 
 		TArray<uint8> DeltaBytes;
+		TArray<FSoftObjectPath> DeltaCollaterals;
 		uint32 DeltaHash = 0;
 		if (bCapturePropertyDeltas && bGenerateCollections)
 		{
-			DeltaBytes = PCGExActorDelta::SerializeActorDelta(CA.Actor);
+			DeltaBytes = PCGExActorDelta::SerializeActorDelta(CA.Actor, &DeltaCollaterals);
 			DeltaHash = PCGExActorDelta::HashDelta(DeltaBytes);
 		}
 		CA.DeltaHash = DeltaHash;
@@ -772,6 +774,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 			if (!DeltaBytes.IsEmpty())
 			{
 				Info.SerializedDelta = MoveTemp(DeltaBytes);
+				Info.CollateralPaths = MoveTemp(DeltaCollaterals);
 			}
 			Info.IntersectedTags = BuildEffectiveTags();
 		}
@@ -1156,6 +1159,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 				if (!Elem.Value.SerializedDelta.IsEmpty())
 				{
 					ActorEntry.SerializedPropertyDelta = Elem.Value.SerializedDelta;
+					ActorEntry.DeltaCollateralPaths = Elem.Value.CollateralPaths;
 				}
 
 				ActorIdx++;

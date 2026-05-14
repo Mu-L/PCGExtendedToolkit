@@ -8,6 +8,7 @@
 #include "PCGCrc.h"
 #include "PCGManagedResource.h"
 #include "Collections/PCGExActorCollection.h"
+#include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
@@ -185,6 +186,17 @@ namespace PCGExStagingSpawnActors
 		/** Pre-sized to NumPoints -- each parallel thread writes to its own index, no locks */
 		TArray<FResolvedEntry> ResolvedEntries;
 
+		/** Per-loop-scope dedup set for the soft paths we need pre-loaded before spawn.
+		 *  Populated in parallel during ProcessPoints (each scope writes its own set, no
+		 *  contention), collapsed on OnPointsProcessingComplete. Carries both the per-entry
+		 *  actor class path AND the delta collateral paths (when bApplyPropertyDeltas) so a
+		 *  single async batch load covers everything spawning needs. */
+		TSharedPtr<PCGExMT::TScopedSet<FSoftObjectPath>> ScopedUniquePaths;
+
+		/** Cached at Process time. Read inside the hot ProcessPoints loop to decide whether
+		 *  to enqueue delta collateral paths alongside the actor class path. */
+		bool bApplyDeltas = false;
+
 		/** Main thread loop for spawning */
 		TSharedPtr<PCGExMT::FTimeSlicedMainThreadLoop> MainThreadLoop;
 
@@ -216,6 +228,7 @@ namespace PCGExStagingSpawnActors
 		virtual ~FProcessor() override = default;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
+		virtual void PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops) override;
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
 		virtual void OnPointsProcessingComplete() override;
 
