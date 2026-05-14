@@ -23,6 +23,7 @@
 #include "Details/Collections/PCGExMaterialPicksCustomization.h"
 #include "Details/Collections/PCGExMeshCollectionActions.h"
 #include "Details/Collections/PCGExPCGDataAssetCollectionActions.h"
+#include "Details/Collections/PCGExSelectorClosestMatchAxisCustomization.h"
 #include "Details/Collections/PCGExSelectorRangeAxisCustomization.h"
 #include "UObject/UObjectGlobals.h"
 
@@ -42,6 +43,7 @@ void FPCGExCollectionsEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO("PCGExMaterialOverrideCollection", FPCGExMaterialOverrideCollectionCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExAssetGrammarDetails", FPCGExAssetGrammarCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExSelectorRangeAxis", FPCGExSelectorRangeAxisCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExSelectorClosestMatchAxis", FPCGExSelectorClosestMatchAxisCustomization)
 
 #define PCGEX_REGISTER_ENTRY_CUSTOMIZATION(_CLASS, _NAME)\
 	PCGEX_REGISTER_CUSTO("PCGEx"#_CLASS"CollectionEntry", FPCGEx##_CLASS##EntryCustomization)

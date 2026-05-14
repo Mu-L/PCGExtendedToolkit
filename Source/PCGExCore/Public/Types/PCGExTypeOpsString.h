@@ -311,6 +311,12 @@ namespace PCGExTypeOps
 		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
 		{
 		}
+
+		// Categorical: 0 when equal, 1 otherwise — used by closest-match scoring for non-ordered types.
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A.Equals(B) ? 0.0 : 1.0;
+		}
 	};
 
 	// Name Type Operations - FName
@@ -611,6 +617,11 @@ namespace PCGExTypeOps
 		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
 		{
 		}
+
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A == B ? 0.0 : 1.0;
+		}
 	};
 
 	// Path Type Operations - FSoftObjectPath
@@ -897,6 +908,11 @@ namespace PCGExTypeOps
 		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
 		{
 		}
+
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A == B ? 0.0 : 1.0;
+		}
 	};
 
 	// Path Type Operations - FSoftClassPath
@@ -1182,6 +1198,11 @@ namespace PCGExTypeOps
 
 		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
 		{
+		}
+
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A == B ? 0.0 : 1.0;
 		}
 	};
 }

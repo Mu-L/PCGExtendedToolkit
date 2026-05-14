@@ -27,6 +27,14 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = false;
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
+
+		// Euclidean-style numeric distance: |a-b|, length(a-b), or angular for FQuat.
+		// Mutually exclusive with bSupportsMatchScore.
+		static constexpr bool bSupportsDistance = false;
+		// Categorical 0/1 equality distance (for types with no continuous ordering).
+		static constexpr bool bSupportsMatchScore = false;
+		// Per-side remap to [0, 1] before distance is meaningful (excludes ints, bool, FQuat, categoricals).
+		static constexpr bool bSupportsNormalization = false;
 	};
 
 	// Numeric types
@@ -43,6 +51,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = false;
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = false;
+
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false;
 
 		static FORCEINLINE bool Min()
 		{
@@ -69,6 +81,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false; // integer remap loses precision
+
 		static FORCEINLINE int32 Min()
 		{
 			return TNumericLimits<int32>::Min();
@@ -93,6 +109,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = true;
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
+
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false; // integer remap loses precision
 
 		static FORCEINLINE int64 Min()
 		{
@@ -119,6 +139,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
 		static FORCEINLINE float Min()
 		{
 			return TNumericLimits<float>::Min();
@@ -143,6 +167,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = true;
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
+
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
 
 		static FORCEINLINE double Min()
 		{
@@ -170,14 +198,18 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
 		static FORCEINLINE FVector2D Min()
 		{
-			return FVector2D(MAX_dbl);
+			return FVector2D(MIN_dbl_neg);
 		}
 
 		static FORCEINLINE FVector2D Max()
 		{
-			return FVector2D(MIN_dbl_neg);
+			return FVector2D(MAX_dbl);
 		}
 	};
 
@@ -195,14 +227,18 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
 		static FORCEINLINE FVector Min()
 		{
-			return FVector(MAX_dbl);
+			return FVector(MIN_dbl_neg);
 		}
 
 		static FORCEINLINE FVector Max()
 		{
-			return FVector(MIN_dbl_neg);
+			return FVector(MAX_dbl);
 		}
 	};
 
@@ -220,14 +256,18 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
 		static FORCEINLINE FVector4 Min()
 		{
-			return FVector4(MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl);
+			return FVector4(MIN_dbl_neg,MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
 		}
 
 		static FORCEINLINE FVector4 Max()
 		{
-			return FVector4(MIN_dbl_neg,MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
+			return FVector4(MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl);
 		}
 	};
 
@@ -247,14 +287,18 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
 		static FORCEINLINE FRotator Min()
 		{
-			return FRotator(MAX_dbl, MAX_dbl, MAX_dbl);
+			return FRotator(MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
 		}
 
 		static FORCEINLINE FRotator Max()
 		{
-			return FRotator(MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
+			return FRotator(MAX_dbl, MAX_dbl, MAX_dbl);
 		}
 	};
 
@@ -272,6 +316,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = true;
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
+
+		static constexpr bool bSupportsDistance = true; // angular: 1 - |dot|
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false; // angular distance already in [0, 1]
 
 		static FORCEINLINE FQuat Min()
 		{
@@ -297,6 +345,11 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = true;
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
+
+		// FTransform has no meaningful single-scalar distance — composite of pos+rot+scale.
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false;
 
 		static FORCEINLINE FTransform Min()
 		{
@@ -324,6 +377,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
+
 		static FORCEINLINE FString Min()
 		{
 			return FString();
@@ -348,6 +405,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = false;
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
+
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
 
 		static FORCEINLINE FName Min()
 		{
@@ -374,6 +435,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
+
 		static FORCEINLINE FSoftObjectPath Min()
 		{
 			return FSoftObjectPath();
@@ -398,6 +463,10 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = false;
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
+
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
 
 		static FORCEINLINE FSoftClassPath Min()
 		{
