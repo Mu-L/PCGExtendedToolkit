@@ -65,7 +65,8 @@ bool UPCGExActorContentFilter::IsInfrastructureActor(AActor* Actor)
 		return true;
 	}
 
-	if (PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetClass()->GetFName()))
+	if (PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetClass()->GetFName()) ||
+		PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetFName()))
 	{
 		return true;
 	}
