@@ -64,8 +64,9 @@ namespace PCGExClusterMT
 	}
 
 	IProcessor::IProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
-		: EdgeDataFacade(InEdgeDataFacade),
-		  VtxDataFacade(InVtxDataFacade)
+		: VtxDataFacade(InVtxDataFacade),
+		  EdgeDataFacade(InEdgeDataFacade)
+
 	{
 	}
 
@@ -434,9 +435,9 @@ namespace PCGExClusterMT
 	}
 
 	IBatch::IBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges)
-		: VtxDataFacade(MakeShared<PCGExData::FFacade>(InVtx))
+		: ExecutionContext(InContext)
 		  , WorkHandle(InContext->GetWorkHandle())
-		  , ExecutionContext(InContext)
+		  , VtxDataFacade(MakeShared<PCGExData::FFacade>(InVtx))
 	{
 		SetExecutionContext(InContext);
 		Edges.Append(InEdges);

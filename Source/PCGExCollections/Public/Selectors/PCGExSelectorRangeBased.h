@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Details/PCGExInputShorthandsDetails.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
 #include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExSelectorHelpers.h"
