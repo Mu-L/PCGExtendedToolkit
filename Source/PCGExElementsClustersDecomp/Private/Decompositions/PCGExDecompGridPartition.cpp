@@ -107,7 +107,7 @@ bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
 				SmallCentroid /= NodesPtr->Num();
 
 				int32 BestTargetID = -1;
-				double BestDistSq = MAX_dbl;
+				double BestDistSq = TNumericLimits<double>::Max();
 
 				for (const auto& Pair : CellNodes)
 				{

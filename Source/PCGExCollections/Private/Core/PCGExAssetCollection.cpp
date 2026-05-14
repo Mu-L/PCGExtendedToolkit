@@ -429,7 +429,7 @@ namespace
 	// Aggregate child entry extents per the collection's SubcollectionBoundsMode.
 	// Children must have their Staging.Bounds already filled (caller ensures this via the
 	// recursive pass before this runs). Invalid or zero-volume children are skipped.
-	// Returned box is centered at origin — center offsets are intentionally not aggregated.
+	// Returned box is centered at origin -- center offsets are intentionally not aggregated.
 	FBox AggregateSubcollectionBounds(const UPCGExAssetCollection* Child, EPCGExSubcollectionBoundsMode Mode)
 	{
 		if (!Child)

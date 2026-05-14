@@ -14,7 +14,7 @@
  * (translation) + ProjectionQuat (world->frame). To test a world point P:
  *   LocalP = ProjectionQuat.UnrotateVector(P - WorldOrigin); 2D test on Outline; Z vs band.
  *
- * Pure data — UPROPERTY-less inner fields keep the struct trivially copyable
+ * Pure data -- UPROPERTY-less inner fields keep the struct trivially copyable
  * at the CPU level. Stored inside FPCGExFootprintShape_Polygon at runtime;
  * never serialized through reflection (the placed-modules tracker is rebuilt
  * per growth run).
@@ -80,7 +80,7 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape
 	}
 
 	/**
-	 * World-space AABB. Must be implementable for any shape — the broadphase
+	 * World-space AABB. Must be implementable for any shape -- the broadphase
 	 * indexes entries by AABB and never inspects shape-specific fields.
 	 */
 	virtual FBox GetWorldAABB() const
@@ -89,7 +89,7 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape
 	}
 };
 
-/** Oriented-box shape — the default contribution kind for cage modules. */
+/** Oriented-box shape -- the default contribution kind for cage modules. */
 USTRUCT()
 struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape_OBB : public FPCGExFootprintShape
 {
@@ -110,7 +110,7 @@ struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape_OBB : public FPCGExFootprint
 	virtual FBox GetWorldAABB() const override;
 };
 
-/** Extruded-prism polygon shape — concave allowed, projection-frame aware. */
+/** Extruded-prism polygon shape -- concave allowed, projection-frame aware. */
 USTRUCT()
 struct PCGEXSPATIALDOMAINS_API FPCGExFootprintShape_Polygon : public FPCGExFootprintShape
 {

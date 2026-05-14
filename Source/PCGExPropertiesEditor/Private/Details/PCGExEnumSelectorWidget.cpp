@@ -149,7 +149,7 @@ namespace PCGExEnumSelectorWidget
 	 * Resolves the bitmask stored for entry Index of a Bitflags enum.
 	 *
 	 * UENUM(meta=(Bitflags)) declarations store **bit positions** in their values by default
-	 * — FlagA=0 means "bit 0", which the editor packs as the mask 1<<0=1. Authors who want
+	 * -- FlagA=0 means "bit 0", which the editor packs as the mask 1<<0=1. Authors who want
 	 * the declared values to be the masks themselves opt in with the
 	 * UseEnumValuesAsMaskValuesInEditor meta. Both forms appear in the wild, so the picker
 	 * has to ask the enum which mode it is in rather than guess.
@@ -181,7 +181,7 @@ namespace PCGExEnumSelectorWidget
 	 * Filters: Hidden / Spacer / BlueprintInternalUseOnly / HiddenByDefault metadata, plus the
 	 * synthetic <EnumName>_MAX sentinel UHT auto-appends to most native UENUMs. The MAX filter
 	 * is by name suffix because (a) it's not always present, (b) real values never end in _MAX,
-	 * and (c) it can sit anywhere in the array — blindly stripping the last index is unsafe.
+	 * and (c) it can sit anywhere in the array -- blindly stripping the last index is unsafe.
 	 *
 	 * Callers iterate the full Enum->NumEnums() range and skip indices where this returns true.
 	 */
@@ -249,7 +249,7 @@ namespace PCGExEnumSelectorWidget
 		UEnum* Enum = ReadUnanimousClass(ValueHandle, bMultiClass);
 		if (bMultiClass || !Enum)
 		{
-			return LOCTEXT("NoValue", "—");
+			return LOCTEXT("NoValue", "--");
 		}
 
 		bool bMultiValue = false;
@@ -306,7 +306,7 @@ namespace PCGExEnumSelectorWidget
 		FAssetData LazyAsset;
 		// Cached display string used for both sort and search filtering. For lazy entries
 		// we don't have the localized display name without loading, so the asset name is
-		// used as a stand-in — for user-authored BP enums these usually match anyway.
+		// used as a stand-in -- for user-authored BP enums these usually match anyway.
 		FString DisplayName;
 
 		bool IsLazy() const
@@ -379,7 +379,7 @@ namespace PCGExEnumSelectorWidget
 		{
 			AllEntries.Reset();
 
-			// Pass 1 — native UEnums and any already-loaded blueprint enums. Tracked by raw
+			// Pass 1 -- native UEnums and any already-loaded blueprint enums. Tracked by raw
 			// pointer so we can skip the same enums when scanning the asset registry below.
 			TSet<UEnum*> LoadedSeen;
 			for (TObjectIterator<UEnum> It; It; ++It)
@@ -397,7 +397,7 @@ namespace PCGExEnumSelectorWidget
 				AllEntries.Add(Entry);
 			}
 
-			// Pass 2 — UUserDefinedEnum assets. Listed by AssetData only; we deliberately do
+			// Pass 2 -- UUserDefinedEnum assets. Listed by AssetData only; we deliberately do
 			// NOT load them here. GetAsset() is deferred to OnSelectionChanged so the picker
 			// is cheap to open even in projects with many BP enums.
 			if (FAssetRegistryModule* AssetRegistryModule = FModuleManager::GetModulePtr<FAssetRegistryModule>(TEXT("AssetRegistry")))
@@ -406,7 +406,7 @@ namespace PCGExEnumSelectorWidget
 				AssetRegistryModule->Get().GetAssetsByClass(UUserDefinedEnum::StaticClass()->GetClassPathName(), UserEnumAssets);
 				for (const FAssetData& Data : UserEnumAssets)
 				{
-					// If the asset is already loaded it's in LoadedSeen — skip to avoid dupes.
+					// If the asset is already loaded it's in LoadedSeen -- skip to avoid dupes.
 					// FastGetAsset(false) is the no-load fast path: returns the in-memory
 					// instance via FindObject or nullptr without ever triggering a load.
 					if (UEnum* Already = Cast<UEnum>(Data.FastGetAsset(false)))
@@ -452,7 +452,7 @@ namespace PCGExEnumSelectorWidget
 						continue;
 					}
 					// For loaded enums also match against the localized display name, which
-					// may differ from the C++ identifier. Lazy entries skip this — checking
+					// may differ from the C++ identifier. Lazy entries skip this -- checking
 					// it would force a load.
 					if (const UEnum* Enum = Entry->Loaded.Get())
 					{
@@ -498,7 +498,7 @@ namespace PCGExEnumSelectorWidget
 				return;
 			}
 
-			// Resolve here — this is the one moment we accept the cost of loading a BP enum
+			// Resolve here -- this is the one moment we accept the cost of loading a BP enum
 			// asset that wasn't already in memory.
 			UEnum* NewClass = Selected->Resolve();
 			if (!NewClass)
@@ -518,7 +518,7 @@ namespace PCGExEnumSelectorWidget
 			           [NewClass](FPCGExEnumSelector& Selector)
 			           {
 				           Selector.Class = NewClass;
-				           // Previous Value is unlikely to map cleanly to a different enum — reset.
+				           // Previous Value is unlikely to map cleanly to a different enum -- reset.
 				           Selector.Value = 0;
 			           });
 
@@ -537,7 +537,7 @@ namespace PCGExEnumSelectorWidget
 
 	// ---------- Value picker menu (single-select) ----------------------------------------------
 
-	/** Single-select enum value menu. One item per non-hidden enum index. No search box —
+	/** Single-select enum value menu. One item per non-hidden enum index. No search box --
 	 *  enum value lists are short enough to scan visually, and a search box just adds noise. */
 	class SEnumValueMenu : public SCompoundWidget
 	{
@@ -684,7 +684,7 @@ namespace PCGExEnumSelectorWidget
 					const int64 Bit = GetBitflagMaskAtIndex(Enum, i);
 					// Skip the "None" entry (only possible under UseEnumValuesAsMaskValuesInEditor,
 					// where authors can declare a literal 0 mask). Bit-position mode can't produce
-					// a zero mask — 1<<0 = 1 — so this check is conditionally relevant.
+					// a zero mask -- 1<<0 = 1 -- so this check is conditionally relevant.
 					if (Bit == 0)
 					{
 						continue;
@@ -825,7 +825,7 @@ namespace PCGExEnumSelectorWidget
 			}));
 		}
 
-		// Value picker — content lambda inspects the current Class each time the menu opens
+		// Value picker -- content lambda inspects the current Class each time the menu opens
 		// and switches between the single-select and bitflags variants accordingly.
 		// Memoize the formatted label by (Class, Value, bMulti) tuple: for bitflags enums,
 		// FormatValueButtonLabel iterates the entire enum range every paint, which compounds

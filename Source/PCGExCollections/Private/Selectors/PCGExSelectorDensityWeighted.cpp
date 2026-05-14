@@ -12,7 +12,7 @@
 
 void FPCGExEntryDensityWeightedPickerOp::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Density-Weighted — failed to build shared weight tables. Check that the target category has at least one valid entry."));
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Density-Weighted -- failed to build shared weight tables. Check that the target category has at least one valid entry."));
 }
 
 bool FPCGExEntryDensityWeightedPickerOp::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
@@ -47,7 +47,7 @@ int32 FPCGExEntryDensityWeightedPickerOp::Pick(int32 PointIndex, int32 Seed, FPC
 	const TArray<double>& EntryLogWeights = Shared->EntryLogWeights;
 
 	// Build per-point effective weights. Inline allocator covers typical category sizes
-	// without heap pressure. O(N) per pick — acceptable for the usual small-N cases.
+	// without heap pressure. O(N) per pick -- acceptable for the usual small-N cases.
 	TArray<double, TInlineAllocator<32>> EffectiveWeights;
 	EffectiveWeights.SetNumUninitialized(N);
 	double TotalWeight = 0.0;
@@ -61,7 +61,7 @@ int32 FPCGExEntryDensityWeightedPickerOp::Pick(int32 PointIndex, int32 Seed, FPC
 		// DI=1 & density=0   -> exp=0               -> uniform (all weights become 1)
 		// DI=1 & density=0.5 -> exp=1               -> plain weighted
 		// DI=1 & density=1   -> exp=2               -> amplified bias toward higher weights
-		// Pow(W, Exp) rewritten as exp(LogW * Exp). Shared data hosts LogW once per category —
+		// Pow(W, Exp) rewritten as exp(LogW * Exp). Shared data hosts LogW once per category --
 		// per-pick cost drops from one log+one exp to one exp, with no precision change for W >= 0.
 		const double Exponent = FMath::Lerp(1.0, Density * 2.0, DensityInfluence);
 		for (int32 i = 0; i < N; ++i)
@@ -134,7 +134,7 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorDensityWeightedF
 	{
 		const double W = PCGExCollections::Selectors::EntryEffectiveWeight(Target->Entries[i]);
 		NewShared->EntryWeights[i] = W;
-		// EntryEffectiveWeight returns Weight + 1, so W >= 1 for any valid entry — log is well-defined.
+		// EntryEffectiveWeight returns Weight + 1, so W >= 1 for any valid entry -- log is well-defined.
 		// W==0 only occurs when Entry is null; we treat that as log(1)=0 to keep Exp() finite (Pow path
 		// would have produced 0^Exp anyway, which is the same numerical floor when the entry can't be picked).
 		NewShared->EntryLogWeights[i] = W > 0.0 ? FMath::Loge(W) : 0.0;

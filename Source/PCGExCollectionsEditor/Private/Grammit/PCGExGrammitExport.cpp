@@ -188,7 +188,7 @@ namespace PCGExGrammitExport
 				}
 
 				// Read DebugColor directly from the source grammar struct rather than from
-				// Submodule.DebugColor — that field is FVector4 and the FLinearColor → FVector4
+				// Submodule.DebugColor -- that field is FVector4 and the FLinearColor → FVector4
 				// assignment inside Fix() goes silently wrong on some collection types (the
 				// resulting V.X/Y/Z come through as 1.0 even when the user picked a color).
 				// Native FLinearColor read is unambiguous.

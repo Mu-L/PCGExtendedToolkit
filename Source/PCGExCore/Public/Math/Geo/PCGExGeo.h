@@ -193,7 +193,7 @@ namespace PCGExMath::Geo
 	 * Signed distance from a pre-projected local-space point to an extruded polygon
 	 * prism (outline in local XY, extruded along local Z by [ZMin, ZMax]).
 	 * Negative inside, positive outside, zero on surface.
-	 * LocalPoint must already be in the prism's projection frame — the caller handles
+	 * LocalPoint must already be in the prism's projection frame -- the caller handles
 	 * the WorldOrigin offset and quaternion unrotation before calling.
 	 * Returns +MAX_float for degenerate outlines (< 3 vertices).
 	 */

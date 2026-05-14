@@ -96,7 +96,7 @@ namespace PCGEx
 		{
 			Heap.Reserve(InSize);
 			HeapIndex.Init(-1, InSize);
-			Scores.Init(MAX_dbl, InSize);
+			Scores.Init(TNumericLimits<double>::Max(), InSize);
 		}
 
 		FORCEINLINE bool IsEmpty() const
@@ -176,7 +176,7 @@ namespace PCGEx
 			Size = 0;
 			for (double& Score : Scores)
 			{
-				Score = MAX_dbl;
+				Score = TNumericLimits<double>::Max();
 			}
 		}
 	};

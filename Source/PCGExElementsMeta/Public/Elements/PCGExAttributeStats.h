@@ -334,7 +334,7 @@ namespace PCGExAttributeStats
 
 			TSharedPtr<PCGExData::TBuffer<T>> Buffer = InDataFacade->GetReadable<T>(Identity.GetIdentifier());
 			SetMinValue = MinValue = Traits::Max();
-			SetMinValue = MinValue = Traits::Min();
+			SetMaxValue = MaxValue = Traits::Min();
 
 #define PCGEX_NO_AVERAGE if constexpr (std::is_same_v<T, FString> || std::is_same_v<T, FName> || std::is_same_v<T, FSoftObjectPath> || std::is_same_v<T, FSoftClassPath>)
 

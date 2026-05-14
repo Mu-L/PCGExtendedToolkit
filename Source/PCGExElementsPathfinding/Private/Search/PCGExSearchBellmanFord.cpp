@@ -55,7 +55,7 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 		for (int32 NodeIndex = 0; NodeIndex < NumNodes; NodeIndex++)
 		{
 			const double CurrentDist = Distance[NodeIndex];
-			if (CurrentDist == MAX_dbl)
+			if (CurrentDist == TNumericLimits<double>::Max())
 			{
 				continue;
 			} // Not yet reachable
@@ -89,7 +89,7 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 		}
 
 		// Early exit if goal is reachable and we want to exit early
-		if (bEarlyExit && Distance[GoalNode.Index] != MAX_dbl && !bAnyRelaxation)
+		if (bEarlyExit && Distance[GoalNode.Index] != TNumericLimits<double>::Max() && !bAnyRelaxation)
 		{
 			break;
 		}
@@ -101,7 +101,7 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 		for (int32 NodeIndex = 0; NodeIndex < NumNodes; NodeIndex++)
 		{
 			const double CurrentDist = Distance[NodeIndex];
-			if (CurrentDist == MAX_dbl)
+			if (CurrentDist == TNumericLimits<double>::Max())
 			{
 				continue;
 			}
@@ -129,7 +129,7 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 	}
 
 	// Check if goal is reachable
-	if (Distance[GoalNode.Index] == MAX_dbl)
+	if (Distance[GoalNode.Index] == TNumericLimits<double>::Max())
 	{
 		return false;
 	}
@@ -159,7 +159,7 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 TSharedPtr<PCGExPathfinding::FSearchAllocations> FPCGExSearchOperationBellmanFord::NewAllocations() const
 {
 	TSharedPtr<PCGExPathfinding::FSearchAllocations> NewAllocations = FPCGExSearchOperation::NewAllocations();
-	NewAllocations->GScore.Init(MAX_dbl, Cluster->Nodes->Num()); // Use MAX_dbl as infinity
+	NewAllocations->GScore.Init(TNumericLimits<double>::Max(), Cluster->Nodes->Num()); // Use TNumericLimits<double>::Max() as infinity
 	return NewAllocations;
 }
 

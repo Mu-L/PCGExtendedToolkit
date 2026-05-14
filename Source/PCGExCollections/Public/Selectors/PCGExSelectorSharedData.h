@@ -29,7 +29,7 @@ namespace PCGExCollections
 	 * Context-scoped cache of FSelectorSharedData instances, keyed by (factory, category).
 	 *
 	 * Lifetime: owned by a consumer context (e.g. UPCGExStagingDistributeContext) alongside
-	 * FPickPacker. Dies with the context — no staleness across graph runs.
+	 * FPickPacker. Dies with the context -- no staleness across graph runs.
 	 *
 	 * Thread safety: GetOrBuild locks a critical section for the map insert. Shared data
 	 * objects themselves are read-only after construction.

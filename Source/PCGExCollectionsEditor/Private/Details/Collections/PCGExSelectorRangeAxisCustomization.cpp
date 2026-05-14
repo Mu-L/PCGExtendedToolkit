@@ -61,7 +61,7 @@ void FPCGExSelectorRangeAxisCustomization::CustomizeHeader(
 		[
 			SNew(SHorizontalBox)
 
-			// Property fields — switched on SourceMode. SWidgetSwitcher (rather than sibling slots
+			// Property fields -- switched on SourceMode. SWidgetSwitcher (rather than sibling slots
 			// with toggled Visibility) keeps the inactive variant from claiming FillWidth.
 			+ SHorizontalBox::Slot()
 			.FillWidth(1)
@@ -79,7 +79,7 @@ void FPCGExSelectorRangeAxisCustomization::CustomizeHeader(
 						return 0;
 					})
 
-				// Slot 0 — TwoNumerics: "min:[MinPropertyName] max:[MaxPropertyName]"
+				// Slot 0 -- TwoNumerics: "min:[MinPropertyName] max:[MaxPropertyName]"
 				+ SWidgetSwitcher::Slot()
 				[
 					SNew(SHorizontalBox)
@@ -101,7 +101,7 @@ void FPCGExSelectorRangeAxisCustomization::CustomizeHeader(
 					]
 				]
 
-				// Slot 1 — Vector2: "min:max [RangePropertyName]"
+				// Slot 1 -- Vector2: "min:max [RangePropertyName]"
 				+ SWidgetSwitcher::Slot()
 				[
 					SNew(SHorizontalBox)
@@ -116,7 +116,7 @@ void FPCGExSelectorRangeAxisCustomization::CustomizeHeader(
 				]
 			]
 
-			// BoundaryMode — compact cycle button trailing the property fields.
+			// BoundaryMode -- compact cycle button trailing the property fields.
 			+ SHorizontalBox::Slot()
 			.AutoWidth()
 			.VAlign(VAlign_Center)
@@ -132,7 +132,7 @@ void FPCGExSelectorRangeAxisCustomization::CustomizeChildren(
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// The only child surfaced is ValueSource — its registered FPCGExInputShorthandSelectorDouble
+	// The only child surfaced is ValueSource -- its registered FPCGExInputShorthandSelectorDouble
 	// customization renders the shorthand row, untouched.
 	const TSharedPtr<IPropertyHandle> ValueSourceHandle = PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExSelectorRangeAxis, ValueSource));
 	if (ValueSourceHandle.IsValid())

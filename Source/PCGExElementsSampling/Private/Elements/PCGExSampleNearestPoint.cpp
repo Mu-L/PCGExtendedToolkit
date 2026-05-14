@@ -416,7 +416,7 @@ namespace PCGExSampleNearestPoint
 		const TSharedPtr<PCGExSampling::FSampingUnionData> Union = MakeShared<PCGExSampling::FSampingUnionData>();
 
 		const bool bProcessFilteredOutAsFails = Settings->bProcessFilteredOutAsFails;
-		const double DefaultDet = Settings->SampleMethod == EPCGExSampleMethod::ClosestTarget ? MAX_dbl : MIN_dbl;
+		const double DefaultDet = Settings->SampleMethod == EPCGExSampleMethod::ClosestTarget ? TNumericLimits<double>::Max() : TNumericLimits<double>::Min();
 
 		PCGEX_SCOPE_LOOP(Index)
 		{

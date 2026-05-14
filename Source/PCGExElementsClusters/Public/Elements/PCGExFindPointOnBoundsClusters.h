@@ -130,7 +130,7 @@ namespace PCGExFindPointOnBoundsClusters
 	{
 		mutable FRWLock BestIndexLock;
 
-		double BestDistance = MAX_dbl;
+		double BestDistance = TNumericLimits<double>::Max();
 		FVector BestPosition = FVector::ZeroVector;
 		FVector SearchPosition = FVector::ZeroVector;
 		int32 BestIndex = -1;

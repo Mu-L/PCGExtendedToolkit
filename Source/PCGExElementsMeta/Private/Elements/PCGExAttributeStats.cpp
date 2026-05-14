@@ -140,7 +140,7 @@ bool FPCGExAttributeStatsElement::Boot(FPCGExContext* InContext) const
 			},
 			[&]()
 			{
-				// Stats are inherently arithmetic (min/max/avg/etc.) — no meaningful semantics for
+				// Stats are inherently arithmetic (min/max/avg/etc.) -- no meaningful semantics for
 				// container or extended (Struct/Object/...) attributes.
 				PCGEX_LOG_UNSUPPORTED_TYPE(Context, Identity, FTEXT("Attribute Stats"));
 			});
@@ -260,7 +260,7 @@ namespace PCGExAttributeStats
 		AttributeStatProcessing->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
-			// Skip nullptr slots — those are container/extended-typed attributes that stats can't analyze.
+			// Skip nullptr slots -- those are container/extended-typed attributes that stats can't analyze.
 			if (const TSharedPtr<IAttributeStats>& Slot = This->Stats[Scope.Start])
 			{
 				Slot->Process(This->PointDataFacade, This->Context, This->Settings, This->PointFilterCache);

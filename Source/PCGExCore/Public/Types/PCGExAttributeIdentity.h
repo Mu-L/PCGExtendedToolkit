@@ -28,7 +28,7 @@ namespace PCGExData
 {
 	// Inherits the full 5.8 attribute type descriptor (Name, ValueType, ContainerTypes, ValueTypeObject, KeyType, KeyTypeObject)
 	// and extends it with a metadata domain and an optional pointer back to the source attribute.
-	// This is PCGEx's runtime type carrier; it is not a USTRUCT and is not serialized — it lives on the stack
+	// This is PCGEx's runtime type carrier; it is not a USTRUCT and is not serialized -- it lives on the stack
 	// or inside TArray members of non-UObject state. TObjectPtr fields on the base are safe because
 	// UStruct/UEnum/UClass are module-lifetime and never GC'd.
 	struct PCGEXCORE_API FAttributeIdentity : FPCGMetadataAttributeDesc

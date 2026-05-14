@@ -105,7 +105,7 @@ void UPCGExInstancedFactory::ApplyOverrides()
 			continue;
 		}
 
-		// Container/extended source attributes can't drive the typed FProperty setter — skip silently
+		// Container/extended source attributes can't drive the typed FProperty setter -- skip silently
 		// (the override is a best-effort name-match anyway).
 		PCGExMetaHelpers::ExecuteWithRightType(PossibleOverride.Value, [&](auto DummyValue)
 		{

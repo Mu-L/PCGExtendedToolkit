@@ -18,7 +18,7 @@
 
 namespace PCGExCollectionGrammarCustomization
 {
-	// See PCGExAssetGrammarCustomization::MakeColorWidget for rationale — same issue with
+	// See PCGExAssetGrammarCustomization::MakeColorWidget for rationale -- same issue with
 	// FLinearColor nested inside an entry struct inside the collection's array.
 	static TSharedRef<SWidget> MakeColorWidget(TSharedPtr<IPropertyHandle> Handle)
 	{

@@ -150,7 +150,7 @@ bool FNodeAdjacencyFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGEx
 			{
 				PCGEX_SUB_TEST_FUNC
 				{
-					double B = MAX_dbl;
+					double B = TNumericLimits<double>::Max();
 					for (const PCGExGraphs::FLink Lk : Node.Links)
 					{
 						B = FMath::Min(B, OperandB->Read(NodesRef[Lk.Node].PointIndex));
@@ -162,7 +162,7 @@ bool FNodeAdjacencyFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGEx
 			{
 				PCGEX_SUB_TEST_FUNC
 				{
-					double B = MAX_dbl;
+					double B = TNumericLimits<double>::Max();
 					for (const PCGExGraphs::FLink Lk : Node.Links)
 					{
 						B = FMath::Min(B, OperandB->Read(Lk.Edge));
@@ -176,7 +176,7 @@ bool FNodeAdjacencyFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGEx
 			{
 				PCGEX_SUB_TEST_FUNC
 				{
-					double B = MIN_dbl_neg;
+					double B = TNumericLimits<double>::Lowest();
 					for (const PCGExGraphs::FLink Lk : Node.Links)
 					{
 						B = FMath::Max(B, OperandB->Read(NodesRef[Lk.Node].PointIndex));
@@ -188,7 +188,7 @@ bool FNodeAdjacencyFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGEx
 			{
 				PCGEX_SUB_TEST_FUNC
 				{
-					double B = MIN_dbl_neg;
+					double B = TNumericLimits<double>::Lowest();
 					for (const PCGExGraphs::FLink Lk : Node.Links)
 					{
 						B = FMath::Max(B, OperandB->Read(Lk.Edge));

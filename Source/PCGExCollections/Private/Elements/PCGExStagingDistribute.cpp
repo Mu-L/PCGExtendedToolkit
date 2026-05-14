@@ -495,7 +495,7 @@ namespace PCGExAssetStaging
 		}
 
 		// Pre-register every collection (and its flat host set) with the packer before going
-		// parallel. GetPickIdx is lock-free and assumes all reachable Hosts are mapped — without
+		// parallel. GetPickIdx is lock-free and assumes all reachable Hosts are mapped -- without
 		// this call, PackToDataset would omit any Host that only surfaces via GetEntry recursion.
 		if (Context->CollectionPickDatasetPacker)
 		{
@@ -504,7 +504,7 @@ namespace PCGExAssetStaging
 
 		// Pre-register + seal the socket helper: Add() in the parallel loop becomes lock-free.
 		// Every leaf entry reachable via FlatHosts gets an FSocketInfos slot upfront (even ones
-		// that never get picked) — the trade-off is memory for contention-free parallel writes.
+		// that never get picked) -- the trade-off is memory for contention-free parallel writes.
 		if (SocketHelper)
 		{
 			Source->RegisterSocketsTo(*SocketHelper);

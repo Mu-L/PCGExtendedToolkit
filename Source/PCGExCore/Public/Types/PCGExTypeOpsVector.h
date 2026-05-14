@@ -308,6 +308,35 @@ namespace PCGExTypeOps
 			return A * Factor;
 		}
 
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return (A - B).Size();
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return (Max - Min).Size();
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = Type::Min(OutMin, InMin);
+			OutMax = Type::Max(OutMax, InMax);
+		}
+
+		// Per-component inverse range; degenerate components yield 0 so ApplyRemap collapses them.
+		static FORCEINLINE Type ComputeInvRange(const Type& Min, const Type& Max)
+		{
+			const Type R = Max - Min;
+			return Type(
+				FMath::Abs(R.X) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / R.X : 0.0,
+				FMath::Abs(R.Y) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / R.Y : 0.0);
+		}
+
+		static FORCEINLINE Type ApplyRemap(const Type& V, const Type& Min, const Type& InvRange)
+		{
+			return Type((V.X - Min.X) * InvRange.X, (V.Y - Min.Y) * InvRange.Y);
+		}
 	};
 
 	// Vector Type Operations - FVector
@@ -612,6 +641,35 @@ namespace PCGExTypeOps
 			return A * Factor;
 		}
 
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return (A - B).Size();
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return (Max - Min).Size();
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = OutMin.ComponentMin(InMin);
+			OutMax = OutMax.ComponentMax(InMax);
+		}
+
+		static FORCEINLINE Type ComputeInvRange(const Type& Min, const Type& Max)
+		{
+			const Type R = Max - Min;
+			return Type(
+				FMath::Abs(R.X) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / R.X : 0.0,
+				FMath::Abs(R.Y) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / R.Y : 0.0,
+				FMath::Abs(R.Z) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / R.Z : 0.0);
+		}
+
+		static FORCEINLINE Type ApplyRemap(const Type& V, const Type& Min, const Type& InvRange)
+		{
+			return Type((V.X - Min.X) * InvRange.X, (V.Y - Min.Y) * InvRange.Y, (V.Z - Min.Z) * InvRange.Z);
+		}
 	};
 
 	// Vector Type Operations - FVector4
@@ -928,5 +986,34 @@ namespace PCGExTypeOps
 			return Type(A.X * Factor, A.Y * Factor, A.Z * Factor, A.W * Factor);
 		}
 
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return FMath::Sqrt(FMath::Square(A.X - B.X) + FMath::Square(A.Y - B.Y) + FMath::Square(A.Z - B.Z) + FMath::Square(A.W - B.W));
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return Distance(Min, Max);
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = Type(FMath::Min(OutMin.X, InMin.X), FMath::Min(OutMin.Y, InMin.Y), FMath::Min(OutMin.Z, InMin.Z), FMath::Min(OutMin.W, InMin.W));
+			OutMax = Type(FMath::Max(OutMax.X, InMax.X), FMath::Max(OutMax.Y, InMax.Y), FMath::Max(OutMax.Z, InMax.Z), FMath::Max(OutMax.W, InMax.W));
+		}
+
+		static FORCEINLINE Type ComputeInvRange(const Type& Min, const Type& Max)
+		{
+			return Type(
+				FMath::Abs(Max.X - Min.X) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / (Max.X - Min.X) : 0.0,
+				FMath::Abs(Max.Y - Min.Y) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / (Max.Y - Min.Y) : 0.0,
+				FMath::Abs(Max.Z - Min.Z) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / (Max.Z - Min.Z) : 0.0,
+				FMath::Abs(Max.W - Min.W) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / (Max.W - Min.W) : 0.0);
+		}
+
+		static FORCEINLINE Type ApplyRemap(const Type& V, const Type& Min, const Type& InvRange)
+		{
+			return Type((V.X - Min.X) * InvRange.X, (V.Y - Min.Y) * InvRange.Y, (V.Z - Min.Z) * InvRange.Z, (V.W - Min.W) * InvRange.W);
+		}
 	};
 }

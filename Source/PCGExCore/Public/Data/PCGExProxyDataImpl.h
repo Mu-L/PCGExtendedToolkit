@@ -195,7 +195,7 @@ namespace PCGExData
 	//
 	// Wraps an IBuffer (typically FPropertyArrayBuffer or FPropertySingleValueBuffer) and
 	// delegates all access through the void* API (ReadVoid/SetVoid/GetVoid). No type
-	// conversion is performed — RealType and WorkingType are both EPCGMetadataTypes::Unknown.
+	// conversion is performed -- RealType and WorkingType are both EPCGMetadataTypes::Unknown.
 	//
 	// This enables blending/data-forwarding code to carry generic attribute data even when
 	// the underlying type isn't in PCGEX_FOREACH_SUPPORTEDTYPES. The blend system's

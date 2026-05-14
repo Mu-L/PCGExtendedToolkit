@@ -58,14 +58,14 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorDensityWeightedConfig
 /**
  * Collection-derived state for Density-Weighted. Caches per-entry effective weight (Weight + 1)
  * and its natural log so the WeightModulation branch can resolve `Pow(W, Exp)` as the cheaper
- * `exp(LogW * Exp)` — one transcendental per entry per pick instead of two. The RandomnessModulation
+ * `exp(LogW * Exp)` -- one transcendental per entry per pick instead of two. The RandomnessModulation
  * branch reads EntryWeights to skip per-pick entry dereferences.
  */
 class FPCGExDensityWeightedSharedData : public PCGExCollections::FSelectorSharedData
 {
 public:
 	TArray<double> EntryWeights;    // (Weight + 1), parallel to Target->Entries
-	TArray<double> EntryLogWeights; // log(EntryWeights[i]) — for the WeightModulation fast path
+	TArray<double> EntryLogWeights; // log(EntryWeights[i]) -- for the WeightModulation fast path
 };
 
 /**

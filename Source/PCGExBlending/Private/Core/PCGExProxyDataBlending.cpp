@@ -322,7 +322,7 @@ namespace PCGExBlending
 
 		// For extended types (Struct/Enum/etc.), InValueTypeObject must be non-null so size can be computed.
 		// For basic types, size comes from the enum alone and VTO is ignored.
-		// NOTE: container types CANNOT be sized via this VTO-only overload — callers with container
+		// NOTE: container types CANNOT be sized via this VTO-only overload -- callers with container
 		// attributes must use the FProperty-based overload (next).
 		const int32 DerivedSize = PCGExTypes::GetElementSizeFromType(WorkingType, InValueTypeObject);
 		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize);
@@ -378,7 +378,7 @@ namespace PCGExBlending
 		// Set type info
 		Blender->UnderlyingType = A.WorkingType;
 
-		// Create blend operation — forward size from descriptor for generic types
+		// Create blend operation -- forward size from descriptor for generic types
 		const int32 DerivedSize = A.ValueSize > 0 ? A.ValueSize : PCGExTypes::GetElementSizeFromType(A.WorkingType);
 		const int32 DerivedAlign = A.ValueAlignment > 1 ? A.ValueAlignment : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
 		Blender->Operation = FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);
@@ -442,7 +442,7 @@ namespace PCGExBlending
 		// Set type info
 		Blender->UnderlyingType = A.WorkingType;
 
-		// Create blend operation — forward size from descriptor for generic types
+		// Create blend operation -- forward size from descriptor for generic types
 		const int32 DerivedSize = A.ValueSize > 0 ? A.ValueSize : PCGExTypes::GetElementSizeFromType(A.WorkingType);
 		const int32 DerivedAlign = A.ValueAlignment > 1 ? A.ValueAlignment : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
 		Blender->Operation = FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);

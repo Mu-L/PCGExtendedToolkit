@@ -75,11 +75,11 @@ struct FPCGExSurfaceHit
 {
 	FVector Location = FVector::ZeroVector;
 	FVector Normal = FVector::UpVector;
-	double Distance = MAX_dbl;
+	double Distance = TNumericLimits<double>::Max();
 
 	bool IsValid() const
 	{
-		return Distance < MAX_dbl;
+		return Distance < TNumericLimits<double>::Max();
 	}
 
 	void UpdateIfCloser(const FVector& InLocation, const FVector& InNormal, double InDistance)

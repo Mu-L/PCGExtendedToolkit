@@ -488,7 +488,7 @@ namespace PCGExSampleNearestPath
 			FVector Origin = Transform.GetLocation();
 
 			PCGExData::FElement SinglePick(-1, -1);
-			double BestDist = Settings->SampleMethod == EPCGExSampleMethod::ClosestTarget ? MAX_dbl : MIN_dbl;
+			double BestDist = Settings->SampleMethod == EPCGExSampleMethod::ClosestTarget ? TNumericLimits<double>::Max() : TNumericLimits<double>::Min();
 
 			double WeightedTime = 0;
 			double WeightedSegmentTime = 0;
@@ -681,7 +681,7 @@ namespace PCGExSampleNearestPath
 			const int32 NumSampled = SampleEntries.Num();
 
 			// Compute per-sample range stats for weight curve
-			double SampledRangeMin = MAX_dbl;
+			double SampledRangeMin = TNumericLimits<double>::Max();
 			double SampledRangeMax = 0;
 			for (const FSampleEntry& Entry : SampleEntries)
 			{

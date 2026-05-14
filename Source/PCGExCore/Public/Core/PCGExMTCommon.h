@@ -34,7 +34,7 @@ namespace PCGExMT
 	 * (e.g., allocating scratch storage like FScopedTypedValue for type-erased buffer access).
 	 *
 	 * @param Num Total number of iterations
-	 * @param Body Function taking (const FScope&) — Body is responsible for iterating Scope.Start..Scope.End
+	 * @param Body Function taking (const FScope&) -- Body is responsible for iterating Scope.Start..Scope.End
 	 * @param Threshold Iteration count below which we use sequential execution (single scope, no dispatch)
 	 */
 	PCGEXCORE_API void ParallelOrSequentialScoped(int32 Num, const FScopedLoopBody& Body, int32 Threshold = DefaultParallelThreshold);

@@ -54,7 +54,7 @@ namespace PCGExClusters
 	 * the remaining directed boundary edges to extract one closed path per connected loop.
 	 * Running on a per-seed group (FindCells) dissolves the seed's grown region.
 	 * Running on all valid cells (FindAllCells) produces one merged cell per connected component.
-	 * @note Synthetic output cells do not populate Polygon — only required if used for containment testing.
+	 * @note Synthetic output cells do not populate Polygon -- only required if used for containment testing.
 	 */
 	PCGEXGRAPHS_API TArray<TSharedPtr<FCell>> MergeAdjacentCells(
 		const TArray<TSharedPtr<FCell>>& InCells,
@@ -163,20 +163,20 @@ namespace PCGExClusters
 		int32 MaxPointCount = MAX_int32;
 		int32 MinPointCount = MIN_int32;
 
-		double MaxBoundsSize = MAX_dbl;
-		double MinBoundsSize = MIN_dbl_neg;
+		double MaxBoundsSize = TNumericLimits<double>::Max();
+		double MinBoundsSize = TNumericLimits<double>::Lowest();
 
-		double MaxArea = MAX_dbl;
-		double MinArea = MIN_dbl_neg;
+		double MaxArea = TNumericLimits<double>::Max();
+		double MinArea = TNumericLimits<double>::Lowest();
 
-		double MaxPerimeter = MAX_dbl;
-		double MinPerimeter = MIN_dbl_neg;
+		double MaxPerimeter = TNumericLimits<double>::Max();
+		double MinPerimeter = TNumericLimits<double>::Lowest();
 
-		double MaxSegmentLength = MAX_dbl;
-		double MinSegmentLength = MIN_dbl_neg;
+		double MaxSegmentLength = TNumericLimits<double>::Max();
+		double MinSegmentLength = TNumericLimits<double>::Lowest();
 
-		double MaxCompactness = MAX_dbl;
-		double MinCompactness = MIN_dbl_neg;
+		double MaxCompactness = TNumericLimits<double>::Max();
+		double MinCompactness = TNumericLimits<double>::Lowest();
 
 		bool bBuildWrapper = true;
 

@@ -72,7 +72,7 @@ bool FPCGExMatchAttrToAttr::Test(const PCGExData::FConstPoint& InTargetElement, 
 {
 	if (Config.Check == EPCGExComparisonDataType::Numeric)
 	{
-		const double TargetValue = NumGetters[InTargetElement.IO]->FetchSingle(InTargetElement, MAX_dbl);
+		const double TargetValue = NumGetters[InTargetElement.IO]->FetchSingle(InTargetElement, TNumericLimits<double>::Max());
 		double CandidateValue = 0;
 
 		if (!PCGExData::Helpers::TryReadDataValue<double>(Context, InCandidate.Data, Config.CandidateAttributeName_Sanitized, CandidateValue))

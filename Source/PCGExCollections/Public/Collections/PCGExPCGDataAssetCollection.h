@@ -69,7 +69,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	TSoftObjectPtr<UWorld> Level;
 
 	/** Embedded exported data asset (hidden, serialized, outered to collection in embedded
-	 *  mode; null in external mode — see ExternalExportedDataAsset). */
+	 *  mode; null in external mode -- see ExternalExportedDataAsset). */
 	UPROPERTY(Instanced)
 	TObjectPtr<UPCGDataAsset> ExportedDataAsset;
 
@@ -105,7 +105,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	 *
 	 *  Persisted (NOT Transient) on purpose: when ANY sibling entry rebuilds and shifts shared
 	 *  composition, every other entry's Tag_EntryIdx must be rewritten. Storing local picks here
-	 *  lets the rewrite pass run without re-walking source levels — it just reads local picks,
+	 *  lets the rewrite pass run without re-walking source levels -- it just reads local picks,
 	 *  applies the new LocalToShared map, and writes final hashes. Stripped at cook. */
 	UPROPERTY()
 	TArray<int32> EditorLocalPicks;
@@ -203,7 +203,7 @@ public:
 	 *  level-sourced entries' EditorMeshContributions. Outered to the collection in embedded
 	 *  mode, persists for the lifetime of the asset, and carries the stable CollectionGUID
 	 *  that gets baked into every per-entry ExportedDataAsset's "Meshes"-pin Tag_EntryIdx
-	 *  hashes. Null in external mode — see ExternalSharedMeshCollection. */
+	 *  hashes. Null in external mode -- see ExternalSharedMeshCollection. */
 	UPROPERTY(Instanced)
 	TObjectPtr<UPCGExMeshCollection> SharedMeshCollection;
 
@@ -273,7 +273,7 @@ private:
 
 	/** External-storage helpers. Each is a no-op unless IsExternalActive(). Externalize* must
 	 *  run in the right order around RebuildCollectionMaps so the baked CollectionMap soft
-	 *  paths reflect the final external locations — see RebuildSharedCollections. */
+	 *  paths reflect the final external locations -- see RebuildSharedCollections. */
 	void ExternalizeSharedAndActorCollections();
 	void ExternalizeExportedDataAssets();
 	void InternalizeSubobjects();

@@ -202,7 +202,7 @@ namespace PCGExPathInsert
 		}
 
 		// Read range value once if constant (optimization for most common case)
-		const double MaxRange = RangeGetter ? RangeGetter->Read(0) : MAX_dbl;
+		const double MaxRange = RangeGetter ? RangeGetter->Read(0) : TNumericLimits<double>::Max();
 		const float MaxRangeF = static_cast<float>(MaxRange);
 
 		// Chunked parallelism - zero contention, each chunk has its own array
@@ -225,7 +225,7 @@ namespace PCGExPathInsert
 				const PCGExData::FConstPoint TargetPoint = Context->TargetsHandler->GetPointByFlatIndex(i, TargetPrefixSums, nullptr);
 				const FVector TargetLocation = TargetPoint.GetLocation();
 
-				double BestDistSq = MAX_dbl;
+				double BestDistSq = TNumericLimits<double>::Max();
 				int32 BestEdgeIndex = -1;
 				double BestAlpha = 0;
 

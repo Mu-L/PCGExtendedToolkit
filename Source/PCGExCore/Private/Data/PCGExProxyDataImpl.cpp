@@ -418,7 +418,7 @@ namespace PCGExData
 		// Adapter: IBuffer takes FScopedTypedValue&, but IBufferProxy's void* contract
 		// is preserved for proxy callers. Wrap the incoming void* in a matching FScopedTypedValue.
 		// NOTE: this requires the caller to have properly-constructed memory at OutValue
-		// (FScopedTypedValue or typed stack var) — same contract as before.
+		// (FScopedTypedValue or typed stack var) -- same contract as before.
 		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
 		Buffer->ReadVoid(Index, Wrapped);
 		// Copy result into caller's buffer

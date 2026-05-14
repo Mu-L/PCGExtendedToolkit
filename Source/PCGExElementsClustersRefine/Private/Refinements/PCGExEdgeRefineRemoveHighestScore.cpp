@@ -8,7 +8,7 @@
 void FPCGExEdgeRemoveHighestScore::ProcessNode(PCGExClusters::FNode& Node)
 {
 	int32 BestIndex = -1;
-	double HighestScore = MIN_dbl_neg;
+	double HighestScore = TNumericLimits<double>::Lowest();
 
 	const PCGExClusters::FNode& RoamingSeedNode = *Heuristics->GetRoamingSeed();
 	const PCGExClusters::FNode& RoamingGoalNode = *Heuristics->GetRoamingGoal();

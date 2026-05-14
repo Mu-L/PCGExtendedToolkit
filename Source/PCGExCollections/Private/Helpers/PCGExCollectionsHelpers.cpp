@@ -767,7 +767,7 @@ namespace PCGExCollections
 
 	// Lock-free hot path: InfosKeys is populated once at init via RegisterCollection and
 	// immutable during parallel Add(). A miss means a node forgot to register a collection
-	// that can surface as a Host — setup bug, not a runtime condition. checkSlow catches it
+	// that can surface as a Host -- setup bug, not a runtime condition. checkSlow catches it
 	// in debug builds; shipping builds treat it as a no-op to stay crash-free.
 	void FSocketHelper::Add(const int32 Index, const uint64 EntryHash, const FPCGExAssetCollectionEntry* Entry)
 	{
@@ -810,7 +810,7 @@ namespace PCGExCollections
 
 			Host->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 /*Idx*/)
 			{
-				// Leaf-entry only: sub-collection entries don't carry Staging/Sockets themselves —
+				// Leaf-entry only: sub-collection entries don't carry Staging/Sockets themselves --
 				// their socket data lives on the sub-collection's own leaf entries, which we
 				// reach via the FlatHosts walk.
 				if (!Entry || Entry->bIsSubCollection)

@@ -251,7 +251,7 @@ namespace PCGExPathInsert
 		struct FClaim
 		{
 			int32 ProcessorIdx = -1;
-			double Distance = MAX_dbl;
+			double Distance = TNumericLimits<double>::Max();
 		};
 
 		PCGExMT::TH64MapShards<FClaim> Claims;

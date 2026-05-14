@@ -333,7 +333,7 @@ namespace PCGExData
 
 		this->bIsNewOutput = !PCGExMetaHelpers::HasAttribute(Source->GetOut(), Identifier);
 
-		// Create attribute through domain — canonical UE 5.8 path
+		// Create attribute through domain -- canonical UE 5.8 path
 		UPCGBasePointData* OutData = Source->GetOut();
 
 		FPCGMetadataDomain* Domain = OutData->Metadata->GetMetadataDomain(Identifier.MetadataDomain);
@@ -665,7 +665,7 @@ namespace PCGExData
 
 		this->bIsNewOutput = !PCGExMetaHelpers::HasAttribute(Source->GetOut(), Identifier);
 
-		// Create attribute through domain — canonical UE 5.8 path
+		// Create attribute through domain -- canonical UE 5.8 path
 		UPCGBasePointData* OutData = Source->GetOut();
 
 		FPCGMetadataDomain* Domain = OutData->Metadata->GetMetadataDomain(Identifier.MetadataDomain);
@@ -748,12 +748,12 @@ namespace PCGExData
 			return;
 		}
 
-		// CRITICAL — DO NOT REPLACE WITH SetValue<T>(PCGDefaultValueKey, OutValue).
+		// CRITICAL -- DO NOT REPLACE WITH SetValue<T>(PCGDefaultValueKey, OutValue).
 		// PCGDefaultValueKey == -1 == PCGInvalidEntryKey; the engine's SetValueFromValueKey_Unsafe
 		// early-returns for invalid entry keys and the write is silently dropped. Use SetDefaultValue<T>
 		// which goes through the proper default-value slot (ExistingIndexForDefaultValue) and persists.
 		// (FPropertySingleValueBuffer::Write CAN safely use SetValueFromProperty with PCGDefaultValueKey
-		// because that engine API specifically handles InvalidEntryKey via the default slot — different
+		// because that engine API specifically handles InvalidEntryKey via the default slot -- different
 		// code path, different behavior. See the comment there for context.)
 		OutAttribute->template SetDefaultValue<T>(OutValue);
 	}

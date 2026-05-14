@@ -259,7 +259,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	/**
 	 * Editor-only: paths whose on-disk updates should trigger a rebuild of this entry.
 	 * Base returns Staging.Path. Override when the entry is driven by a *source* asset
-	 * that differs from Staging.Path — e.g. a level that gets exported into an embedded
+	 * that differs from Staging.Path -- e.g. a level that gets exported into an embedded
 	 * UPCGDataAsset living inside the collection package.
 	 */
 	virtual void EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const;
@@ -288,7 +288,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	 * preferring enabled overrides on this entry, then falling back to collection defaults.
 	 * Returns nullptr if the property isn't defined.
 	 *
-	 * Use this when you don't know (or don't care about) the concrete property type —
+	 * Use this when you don't know (or don't care about) the concrete property type --
 	 * typically in combination with TryGetPropertyValue<T> for type-erased value reads.
 	 */
 	const FPCGExProperty* GetResolvedPropertyBase(const UPCGExAssetCollection* OwningCollection, FName PropertyName) const;
@@ -684,7 +684,7 @@ public:
 	 * have had UpdateStaging applied and the cache has been invalidated.
 	 *
 	 * Subclasses override this when they need to run cross-entry work that depends on every
-	 * entry's freshly-staged state — typically post-processing that's too expensive to fold
+	 * entry's freshly-staged state -- typically post-processing that's too expensive to fold
 	 * into per-entry UpdateStaging without N² blowup. Default implementation is a no-op.
 	 *
 	 * The hook is automatically suppressed inside batch loops (e.g. EDITOR_RebuildStaleEntries
@@ -880,7 +880,7 @@ bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 	Cache->Compile();
 
 	// Materialize FlatHosts: self + every transitively reachable subcollection, deduplicated.
-	// Walks sub-collections via ForEachEntry (direct Entries array read — no lock on the
+	// Walks sub-collections via ForEachEntry (direct Entries array read -- no lock on the
 	// sub-collection's cache). This avoids calling LoadCache() on sub-collections, which
 	// could re-enter BuildCacheFromEntries on a cycle (A→B→A) and deadlock on our own
 	// CacheLock. Cycles are handled by the Visited set.

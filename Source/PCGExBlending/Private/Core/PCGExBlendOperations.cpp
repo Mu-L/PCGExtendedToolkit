@@ -79,7 +79,7 @@ namespace PCGExBlending
 					BlendMode != EPCGExABBlendingType::CopySource &&
 					BlendMode != EPCGExABBlendingType::CopyTarget)
 				{
-					UE_LOG(LogPCGEx, Warning, TEXT("Blend mode %d requested for generic type %d (size %d) — arithmetic not supported, falling back to copy."),
+					UE_LOG(LogPCGEx, Warning, TEXT("Blend mode %d requested for generic type %d (size %d) -- arithmetic not supported, falling back to copy."),
 					       static_cast<int32>(BlendMode), static_cast<int32>(WorkingType), InValueSize);
 				}
 				return MakeShared<FCopyOnlyBlendOperation>(InValueSize, InValueAlignment, BlendMode, bResetForMultiBlend);
@@ -134,7 +134,7 @@ namespace PCGExBlending
 					BlendMode != EPCGExABBlendingType::CopySource &&
 					BlendMode != EPCGExABBlendingType::CopyTarget)
 				{
-					UE_LOG(LogPCGEx, Warning, TEXT("Blend mode %d requested for property-backed type %d (%s) — arithmetic not supported, falling back to copy."),
+					UE_LOG(LogPCGEx, Warning, TEXT("Blend mode %d requested for property-backed type %d (%s) -- arithmetic not supported, falling back to copy."),
 					       static_cast<int32>(BlendMode), static_cast<int32>(WorkingType), *InProperty->GetClass()->GetName());
 				}
 				return MakeShared<FPropertyCopyBlendOperation>(InProperty, BlendMode, bResetForMultiBlend);
@@ -152,7 +152,7 @@ namespace PCGExBlending
 		int32 InValueSize,
 		int32 InValueAlignment)
 	{
-		// Copy-only operations are size-specific per attribute — don't cache them
+		// Copy-only operations are size-specific per attribute -- don't cache them
 		if (InValueSize > 0 && WorkingType == EPCGMetadataTypes::Unknown)
 		{
 			return FBlendOperationFactory::Create(WorkingType, BlendMode, bResetForMultiBlend, InValueSize, InValueAlignment);

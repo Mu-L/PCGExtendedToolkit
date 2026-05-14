@@ -23,7 +23,7 @@ namespace
 	}
 
 	// Resolve a Vector2D-style range property on an entry. Any vector-compatible property
-	// projects via TryGetPropertyValue<FVector2D> — FVector drops Z to give (X, Y),
+	// projects via TryGetPropertyValue<FVector2D> -- FVector drops Z to give (X, Y),
 	// FVector4 drops Z/W. X -> Min, Y -> Max.
 	bool ResolveRangeFromVector(const FPCGExAssetCollectionEntry* Entry, const UPCGExAssetCollection* Collection, FName Name, double& OutMin, double& OutMax)
 	{
@@ -58,7 +58,7 @@ namespace
 		{
 			return false;
 		}
-		// Auto-swap out-of-order ranges — matches PCGEx convention for numeric range inputs.
+		// Auto-swap out-of-order ranges -- matches PCGEx convention for numeric range inputs.
 		if (Min > Max)
 		{
 			Swap(Min, Max);
@@ -73,7 +73,7 @@ namespace
 
 void FPCGExEntryRangeBasedPickerOpBase::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based — no entries resolved every configured axis. Check property names and types in the collection."));
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based -- no entries resolved every configured axis. Check property names and types in the collection."));
 }
 
 bool FPCGExEntryRangeBasedPickerOpBase::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
@@ -81,7 +81,7 @@ bool FPCGExEntryRangeBasedPickerOpBase::OnInitForData(FPCGExContext* InContext, 
 	const int32 AxisCount = Axes.Num();
 	if (AxisCount == 0)
 	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based — Axes array is empty. At least one axis is required."));
+		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based -- Axes array is empty. At least one axis is required."));
 		return false;
 	}
 
@@ -176,7 +176,7 @@ int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed, FPCG
 
 	// Hypervolume = product of per-axis widths. For AxisCount=1 this is just (Max - Min), so
 	// behavior is identical to the original single-axis Narrowest. For AxisCount>1 this picks
-	// the most specific range region — the geometric analogue of "narrowest".
+	// the most specific range region -- the geometric analogue of "narrowest".
 	double MinHypervolume = TNumericLimits<double>::Max();
 	TArray<int32, TInlineAllocator<8>> TieBucket;
 

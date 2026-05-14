@@ -95,7 +95,7 @@ namespace PCGExPCGDataAssetCollectionInternal
 // Level-sourced entries route through the 3-arg exporter API so EditorMeshContributions /
 // EditorLocalPicks + EditorLevelContributions / EditorLevelLocalPicks are captured directly
 // into the entry's UPROPERTY storage. Tag_EntryIdx hashes (Meshes + Levels pins) and the
-// CollectionMap pin are NOT written here — those are produced by the parent collection's
+// CollectionMap pin are NOT written here -- those are produced by the parent collection's
 // CompactSharedMesh / CompactSharedLevel / RebuildCollectionMaps, which see every entry's
 // contributions and resolve final shared indices.
 void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollection* OwningCollection, int32 InInternalIndex, bool bRecursive)
@@ -162,7 +162,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			Exporter = FallbackExporter;
 		}
 
-		// Wire the export context to write directly into the entry's UPROPERTY storage —
+		// Wire the export context to write directly into the entry's UPROPERTY storage --
 		// no copy at the API boundary. Only available in editor builds; shipping builds run
 		// the exporter without capturing contributions (the shared collections are already
 		// baked into the per-entry ExportedDataAsset hashes at cook time).
@@ -190,7 +190,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			Staging.Bounds = PCGExPCGDataAssetCollectionInternal::ComputeBoundsFromAsset(ExportedDataAsset);
 
 			// Scan for socket actors after export so the world is in the same initialized
-			// state the exporter used — transforms are reliable at this point.
+			// state the exporter used -- transforms are reliable at this point.
 			if (LoadedWorld->PersistentLevel)
 			{
 				for (AActor* Actor : LoadedWorld->PersistentLevel->Actors)
@@ -236,7 +236,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		}
 
 #if WITH_EDITORONLY_DATA
-		// DataAsset-sourced entries don't contribute to the shared collections — clear any
+		// DataAsset-sourced entries don't contribute to the shared collections -- clear any
 		// stale contributions left behind by a prior Source==Level rebuild.
 		EditorMeshContributions.Reset();
 		EditorLocalPicks.Reset();
@@ -297,7 +297,7 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObj
 		return;
 	}
 
-	// Source refs trigger rebuild — not Staging.Path, which for Source==Level points at
+	// Source refs trigger rebuild -- not Staging.Path, which for Source==Level points at
 	// an embedded ExportedDataAsset inside the collection's own package.
 	if (Source == EPCGExDataAssetEntrySource::Level)
 	{
@@ -346,7 +346,7 @@ namespace PCGExSharedCompact
 	/**
 	 * Symmetric to ExternalizeUObject. Loads the asset behind External (when valid) and
 	 * renames it into NewOuter's package, populating Instanced. External is always reset.
-	 * Guarded: if Instanced is already set we skip the load — never overwrite an in-memory
+	 * Guarded: if Instanced is already set we skip the load -- never overwrite an in-memory
 	 * working buffer with a (possibly stale) on-disk copy.
 	 */
 	template <typename T>
@@ -416,7 +416,7 @@ namespace PCGExSharedCompact
 	}
 
 	// --- Mesh identity ---
-	// Identity hash deliberately omits Weight/Tags/Category/PropertyOverrides — Weight
+	// Identity hash deliberately omits Weight/Tags/Category/PropertyOverrides -- Weight
 	// accumulates from contributors, the rest are user-owned on the shared entry.
 	// Descriptor fields are not hashed (large structs); ContentEquals resolves collisions.
 	static uint32 MeshContentHash(const FPCGExMeshCollectionEntry& E)
@@ -623,7 +623,7 @@ namespace PCGExSharedCompact
 	// (identity via TPolicy::Hash + TPolicy::Equals), then rewrite Tag_EntryIdx on the
 	// policy's pin against the resulting shared indices. Tags/Category/PropertyOverrides
 	// on existing shared entries are preserved across rebuilds when identity survives.
-	// Deterministic ordering: (hash, sort-key) ascending — stable across cold cooks.
+	// Deterministic ordering: (hash, sort-key) ascending -- stable across cold cooks.
 	template <typename TPolicy>
 	static void CompactShared(
 		UObject* Outer,
@@ -665,8 +665,8 @@ namespace PCGExSharedCompact
 			}
 		}
 
-		// Reuse the same UObject across calls so its CollectionGUID — baked into every
-		// per-entry Tag_EntryIdx — stays stable. Replacing it would invalidate on-disk hashes.
+		// Reuse the same UObject across calls so its CollectionGUID -- baked into every
+		// per-entry Tag_EntryIdx -- stays stable. Replacing it would invalidate on-disk hashes.
 		if (!SharedCollectionRef)
 		{
 			SharedCollectionRef = NewObject<TCollection>(Outer);
@@ -920,7 +920,7 @@ void UPCGExPCGDataAssetCollection::ExternalizeSharedAndActorCollections()
 
 	// Naming uses the collection's GUID for cross-collection uniqueness in a shared export
 	// folder, and is short enough to stay within filesystem path budgets. GUID is stable
-	// across rebuilds — filenames are reused (P4-friendly overwrites).
+	// across rebuilds -- filenames are reused (P4-friendly overwrites).
 	const FString FolderPath = ExportFolder.Path;
 	const FString GuidPrefix = GetExternalAssetPrefix();
 
@@ -1009,7 +1009,7 @@ void UPCGExPCGDataAssetCollection::InternalizeSubobjects()
 void UPCGExPCGDataAssetCollection::SaveExternalPackages()
 {
 #if WITH_EDITOR
-	// TSet dedup is defensive — Shared* and per-entry packages are distinct by GUID-prefixed
+	// TSet dedup is defensive -- Shared* and per-entry packages are distinct by GUID-prefixed
 	// name, but unrelated future callers could legitimately produce duplicates.
 	TSet<UPackage*> Packages;
 
@@ -1072,7 +1072,7 @@ void UPCGExPCGDataAssetCollection::RebuildSharedCollections()
 
 void UPCGExPCGDataAssetCollection::Serialize(FArchive& Ar)
 {
-	// External mode: the Instanced fields are working buffers during the editor session — their
+	// External mode: the Instanced fields are working buffers during the editor session -- their
 	// targets live in separate external packages once externalization has run. Without this
 	// scrub, UE's Instanced-property serializer would chase those pointers and bake hard
 	// references into our saved package, eagerly loading every external asset alongside us

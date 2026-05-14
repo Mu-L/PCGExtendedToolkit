@@ -383,11 +383,11 @@ namespace PCGExSampleNearestBounds
 			break;
 		default: case EPCGExBoundsSampleMethod::ClosestBounds:
 		case EPCGExBoundsSampleMethod::SmallestBounds:
-			DefaultDet = MAX_dbl;
+			DefaultDet = TNumericLimits<double>::Max();
 			break;
 		case EPCGExBoundsSampleMethod::FarthestBounds:
 		case EPCGExBoundsSampleMethod::LargestBounds:
-			DefaultDet = MIN_dbl;
+			DefaultDet = TNumericLimits<double>::Min();
 			break;
 		}
 

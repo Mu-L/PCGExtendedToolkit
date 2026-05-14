@@ -62,7 +62,7 @@ public:
 
 	/** Optional root actor that owns the spawned actors. Resolves per-point (constant, data-domain attribute, or
 	 *  per-point attribute). When the resolved soft path is null, falls back to the PCG component's target actor.
-	 *  Resolution is by ResolveObject only — paths must point to live actors. */
+	 *  Resolution is by ResolveObject only -- paths must point to live actors. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning", meta=(PCG_Overridable))
 	FPCGExInputShorthandNameSoftObjectPath RootActor;
 

@@ -107,7 +107,7 @@ extern template void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeIdentifi
 	 * Single-value property-aware attribute copy (data domain).
 	 * Reads source attribute's value at SourceKey via void* and writes to target attribute at TargetKey
 	 * using FProperty reflection (CopyCompleteValue under the hood). Works for ANY attribute type the
-	 * property factory supports — basic scalars, extended scalars (Struct/Enum/Object/...) and containers
+	 * property factory supports -- basic scalars, extended scalars (Struct/Enum/Object/...) and containers
 	 * (TArray/TSet/TMap). Source and target descs must be compatible.
 	 *
 	 * @param SourceAttr Source attribute (must be non-null)

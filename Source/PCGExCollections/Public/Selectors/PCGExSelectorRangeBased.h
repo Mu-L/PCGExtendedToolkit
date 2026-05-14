@@ -44,7 +44,7 @@ enum class EPCGExRangeBoundaryMode : uint8
  * One range axis: per-point value driver + per-entry range property source(s) + boundary mode.
  *
  * Designed to be used both standalone (single-axis Range-Based selection) and inside a
- * TArray for multi-axis (N-D AND-policy) selection. Each axis is independent — its own
+ * TArray for multi-axis (N-D AND-policy) selection. Each axis is independent -- its own
  * value source, its own property sources, its own boundary mode.
  */
 USTRUCT(BlueprintType)
@@ -72,7 +72,7 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorRangeAxis
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="SourceMode == EPCGExRangeSourceMode::Vector2", EditConditionHides))
 	FName RangePropertyName = NAME_None;
 
-	/** Inclusivity at range boundaries. Per-axis — each axis can independently include/exclude its endpoints. */
+	/** Inclusivity at range boundaries. Per-axis -- each axis can independently include/exclude its endpoints. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExRangeBoundaryMode BoundaryMode = EPCGExRangeBoundaryMode::ClosedOpen;
 };
@@ -107,7 +107,7 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorRangeBasedConfig
 
 /**
  * Collection-derived state for Range-Based selection. Multi-axis layout: per-entry × per-axis
- * mins and maxs in a flat entry-major array (Mins[E * AxisCount + A]) — sequential per-entry
+ * mins and maxs in a flat entry-major array (Mins[E * AxisCount + A]) -- sequential per-entry
  * read pattern is cache-friendly for the AND-gated early-exit scan.
  */
 class FPCGExRangeBasedSharedData : public PCGExCollections::FSelectorSharedData
@@ -139,7 +139,7 @@ class FPCGExEntryRangeBasedPickerOpBase : public PCGExCollections::Selectors::TT
 {
 public:
 	// Copied from factory before PrepareForData. Used to init per-axis getters; ValueSource
-	// fields are read at init only — the resolved getters are what the hot path uses.
+	// fields are read at init only -- the resolved getters are what the hot path uses.
 	TArray<FPCGExSelectorRangeAxis> Axes;
 
 	// One getter per axis, parallel to Axes. Resolved in OnInitForData.

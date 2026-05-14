@@ -100,7 +100,7 @@ void FPCGExProbeDBSCAN::ProcessAll(TSet<uint64>& OutEdges) const
 			if (Config.bBorderToNearestCoreOnly)
 			{
 				// Find nearest core point
-				double BestDist = MAX_dbl;
+				double BestDist = TNumericLimits<double>::Max();
 				int32 BestCore = INDEX_NONE;
 
 				for (const int32 j : Neighborhoods[i])

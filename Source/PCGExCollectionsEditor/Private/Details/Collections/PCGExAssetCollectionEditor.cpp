@@ -156,7 +156,7 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		{
 			// SidebarSizeCoefficient 0.25 = expanded-overlay width as a fraction of the area.
 			// bPinnedInSidebar=false keeps it collapsed on open; user clicks the vertical tab
-			// to expand, and it collapses again when focus leaves — matches the native UE
+			// to expand, and it collapses again when focus leaves -- matches the native UE
 			// "outliner in sidebar" pattern.
 			MainStack->AddTab(Tabs[i].Id, ETabState::SidebarTab, ESidebarLocation::Left, 0.25f, /*bPinnedInSidebar=*/ false);
 		}

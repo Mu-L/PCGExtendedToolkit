@@ -52,7 +52,7 @@ namespace PCGExData
 				Identity,
 				[&](auto DummyValue)
 				{
-					// Typed path — fast, directly typed buffers stored as IBuffer.
+					// Typed path -- fast, directly typed buffers stored as IBuffer.
 					using T = decltype(DummyValue);
 					TSharedPtr<TBuffer<T>> Reader = SourceDataFacade->GetReadable<T>(Identity.GetIdentifier());
 					if (!Reader)
@@ -69,7 +69,7 @@ namespace PCGExData
 				},
 				[&]()
 				{
-					// Property-backed path — extended/container types route through FFacade's
+					// Property-backed path -- extended/container types route through FFacade's
 					// generic GetReadable/GetWritable which already fall back to FPropertyBuffer.
 					if (!Identity.Attribute)
 					{
@@ -210,7 +210,7 @@ namespace PCGExData
 						// via the buffer's domain. For simplicity in the property path, only support the same-domain case here.
 						if (bElementDomainToDataDomain)
 						{
-							UE_LOG(LogPCGEx, Warning, TEXT("Element-to-Data domain conversion not supported on property-backed attribute '%s' — skipped."), *Identity.Name.ToString());
+							UE_LOG(LogPCGEx, Warning, TEXT("Element-to-Data domain conversion not supported on property-backed attribute '%s' -- skipped."), *Identity.Name.ToString());
 							return;
 						}
 
@@ -273,7 +273,7 @@ namespace PCGExData
 
 					if (bElementDomainToDataDomain)
 					{
-						UE_LOG(LogPCGEx, Warning, TEXT("Element-to-Data domain conversion not supported on property-backed attribute '%s' — skipped."), *Identity.Name.ToString());
+						UE_LOG(LogPCGEx, Warning, TEXT("Element-to-Data domain conversion not supported on property-backed attribute '%s' -- skipped."), *Identity.Name.ToString());
 						return;
 					}
 

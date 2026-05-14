@@ -283,7 +283,7 @@ namespace PCGExData
 			{
 				return BaseDesc;
 			}
-			// Synthesize a stripped view on demand (rare — only for nested containers).
+			// Synthesize a stripped view on demand (rare -- only for nested containers).
 			if (!StrippedDescStorage.IsSet())
 			{
 				StrippedDescStorage.Emplace(*BaseDesc);
@@ -351,7 +351,7 @@ namespace PCGExData
 				FSubSelectionStep Inserted = MakeTransformPartStep(Part);
 				CurrentType = Inserted.OutType;
 				// TransformPart promotion doesn't consume a container layer.
-				// Clear Desc — the promoted value is a scalar sub-component
+				// Clear Desc -- the promoted value is a scalar sub-component
 				// of a Transform, no container semantics.
 				BaseDesc = nullptr;
 				InOutChain.Steps.Add(MoveTemp(Inserted));

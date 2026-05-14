@@ -26,7 +26,7 @@ double FPCGExProbeSpanner::GetGraphDistance(int32 From, int32 To,
 
 	const int32 NumPoints = Positions.Num();
 	TArray<double> Dist;
-	Dist.Init(MAX_dbl, NumPoints);
+	Dist.Init(TNumericLimits<double>::Max(), NumPoints);
 	Dist[From] = 0.0;
 
 	// Simple Dijkstra with priority queue
@@ -69,7 +69,7 @@ double FPCGExProbeSpanner::GetGraphDistance(int32 From, int32 To,
 		}
 	}
 
-	return MAX_dbl; // Not reachable
+	return TNumericLimits<double>::Max(); // Not reachable
 }
 
 void FPCGExProbeSpanner::ProcessAll(TSet<uint64>& OutEdges) const

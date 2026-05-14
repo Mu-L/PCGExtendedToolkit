@@ -285,8 +285,8 @@ namespace PCGExBinPacking3D
 
 		const FQuat Quat = Rotation.Quaternion();
 		const FVector HalfSize = Size * 0.5;
-		FVector Min = FVector(MAX_dbl);
-		FVector Max = FVector(-MAX_dbl);
+		FVector Min = FVector(TNumericLimits<double>::Max());
+		FVector Max = FVector(TNumericLimits<double>::Lowest());
 
 		for (int32 i = 0; i < 8; i++)
 		{
@@ -901,7 +901,7 @@ namespace PCGExBinPacking3D
 	FBP3DPlacementCandidate FProcessor::FindBestPlacement(const FBP3DItem& InItem)
 	{
 		FBP3DPlacementCandidate BestCandidate;
-		double BestScore = MAX_dbl;
+		double BestScore = TNumericLimits<double>::Max();
 
 		const FVector OriginalSize = InItem.OriginalSize;
 
@@ -1012,7 +1012,7 @@ namespace PCGExBinPacking3D
 			{
 				for (int32 BinIdx = 0; BinIdx < Bins.Num(); BinIdx++)
 				{
-					BestScore = MAX_dbl;
+					BestScore = TNumericLimits<double>::Max();
 					BestCandidate = FBP3DPlacementCandidate();
 
 					EvaluateBin(BinIdx);
@@ -1230,7 +1230,7 @@ namespace PCGExBinPacking3D
 			}
 			else
 			{
-				NewBin->MaxWeight = MAX_dbl;
+				NewBin->MaxWeight = TNumericLimits<double>::Max();
 			}
 
 			BinMaxWeights[i] = NewBin->MaxWeight;

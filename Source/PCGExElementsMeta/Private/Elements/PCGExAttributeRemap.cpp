@@ -236,11 +236,11 @@ namespace PCGExAttributeRemap
 			FPCGExComponentRemapRule& Rule = Rules.Add_GetRef(FPCGExComponentRemapRule(Context->RemapSettings[Context->RemapIndices[i]]));
 			if (!Rule.RemapDetails.bUseInMin)
 			{
-				Rule.RemapDetails.InMin = MAX_dbl;
+				Rule.RemapDetails.InMin = TNumericLimits<double>::Max();
 			}
 			if (!Rule.RemapDetails.bUseInMax)
 			{
-				Rule.RemapDetails.InMax = MIN_dbl_neg;
+				Rule.RemapDetails.InMax = TNumericLimits<double>::Lowest();
 			}
 		}
 
@@ -253,8 +253,8 @@ namespace PCGExAttributeRemap
 	{
 		for (FPCGExComponentRemapRule& Rule : Rules)
 		{
-			Rule.MinCache = MakeShared<PCGExMT::TScopedNumericValue<double>>(Loops, MAX_dbl);
-			Rule.MaxCache = MakeShared<PCGExMT::TScopedNumericValue<double>>(Loops, MIN_dbl_neg);
+			Rule.MinCache = MakeShared<PCGExMT::TScopedNumericValue<double>>(Loops, TNumericLimits<double>::Max());
+			Rule.MaxCache = MakeShared<PCGExMT::TScopedNumericValue<double>>(Loops, TNumericLimits<double>::Lowest());
 			Rule.SnapCache = Rule.RemapDetails.Snap.GetValueSetting();
 		}
 	}
@@ -271,8 +271,8 @@ namespace PCGExAttributeRemap
 		PCGExData::IBufferProxy* OutProxy[4] = {nullptr, nullptr, nullptr, nullptr};
 		FPCGExClampDetails* Clamp[4] = {nullptr, nullptr, nullptr, nullptr};
 		bool bAbs[4] = {false, false, false, false};
-		double Min[4] = {MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl};
-		double Max[4] = {MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg};
+		double Min[4] = {TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max()};
+		double Max[4] = {TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest()};
 
 		for (int d = 0; d < Dimensions; d++)
 		{

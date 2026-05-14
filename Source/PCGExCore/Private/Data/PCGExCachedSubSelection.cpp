@@ -161,8 +161,8 @@ namespace PCGExData
 
 		const int32 NumSteps = CompiledChain.Steps.Num();
 
-		// Fast path: single-step chain (the common case — .X, .Position,
-		// .Forward, etc.). Uses cached fn pointer + parsed data — zero
+		// Fast path: single-step chain (the common case -- .X, .Position,
+		// .Forward, etc.). Uses cached fn pointer + parsed data -- zero
 		// array dereference, zero bounds check.
 		if (bIsSingleStep)
 		{
@@ -257,7 +257,7 @@ namespace PCGExData
 			NewChild = NewChildBuf;
 		}
 
-		// Fast path: single-step chain. Uses cached fn pointer — inject
+		// Fast path: single-step chain. Uses cached fn pointer -- inject
 		// directly into Target with zero array dereference.
 		if (bIsSingleStep)
 		{

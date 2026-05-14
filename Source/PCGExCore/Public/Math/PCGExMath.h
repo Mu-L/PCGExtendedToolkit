@@ -58,7 +58,7 @@ namespace PCGExMath
 		int32 Index = -1;
 		FVector Origin = FVector::ZeroVector;
 		FVector Location = FVector::ZeroVector;
-		double DistSquared = MAX_dbl;
+		double DistSquared = TNumericLimits<double>::Max();
 
 		FClosestPosition() = default;
 		explicit FClosestPosition(const FVector& InOrigin);

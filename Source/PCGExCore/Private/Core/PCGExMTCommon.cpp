@@ -54,7 +54,7 @@ namespace PCGExMT
 
 		if (Num >= Threshold)
 		{
-			// Divide into one chunk per worker thread — amortizes Body's per-scope setup
+			// Divide into one chunk per worker thread -- amortizes Body's per-scope setup
 			// (e.g., FScopedTypedValue construction for type-erased buffer access).
 			// ParallelFor handles work-stealing across the resulting chunks.
 			const int32 NumWorkers = FMath::Max(1, FTaskGraphInterface::Get().GetNumWorkerThreads());

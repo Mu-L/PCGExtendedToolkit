@@ -74,7 +74,7 @@ public:
 	 * once per processing scope, before entering the parallel point loop. The returned scratch
 	 * is passed back into Pick() on every call within that scope and may be mutated freely there.
 	 *
-	 * Default returns nullptr — ops that don't need scratch leave this alone.
+	 * Default returns nullptr -- ops that don't need scratch leave this alone.
 	 * @param MaxPointsInScope Upper bound the consumer expects to process in this scope; ops can size buffers accordingly.
 	 */
 	virtual TSharedPtr<FPCGExPickerScratchBase> CreateScratchForScope(int32 MaxPointsInScope) const
@@ -84,7 +84,7 @@ public:
 
 	/**
 	 * Pick a raw Entries-array index from the bound target. Returns -1 if no valid pick.
-	 * Called per-point in parallel scopes — must be thread-safe and free of mutation on any
+	 * Called per-point in parallel scopes -- must be thread-safe and free of mutation on any
 	 * shared state. Scratch is owned by the caller and is the only mutable surface available
 	 * to the op during the call; ops that don't need it ignore the parameter.
 	 */

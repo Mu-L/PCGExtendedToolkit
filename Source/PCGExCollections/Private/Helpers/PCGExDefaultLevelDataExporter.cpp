@@ -86,7 +86,7 @@ EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Acto
 
 	if (MeshClassificator && MeshClassificator->ShouldClassifyAsMesh(Actor))
 	{
-		// Any UStaticMeshComponent (or subclass — ISMC, HISM, splines, future kinds)
+		// Any UStaticMeshComponent (or subclass -- ISMC, HISM, splines, future kinds)
 		// with a valid mesh AND geometry to contribute qualifies the actor as a Mesh
 		// container. ISMCs with zero instances contribute nothing and don't count.
 		TInlineComponentArray<UStaticMeshComponent*> SMCs;
@@ -195,7 +195,7 @@ namespace PCGExDefaultLevelDataExporterInternal
 	}
 
 	// Components share an entry only when they agree on mesh, source kind, AND the
-	// descriptor fingerprint (every UPROPERTY except OverrideMaterials — those become
+	// descriptor fingerprint (every UPROPERTY except OverrideMaterials -- those become
 	// per-entry variants instead). Different mobility / collision / body instance /
 	// light map / etc. → distinct entry, descriptor preserved on each.
 	struct FMeshEntryKey
@@ -326,7 +326,7 @@ namespace PCGExDefaultLevelDataExporterInternal
 
 	// Non-const ref because FSoftISMComponentDescriptor's copy ctor is `explicit`,
 	// blocking a local-copy form. Save-restore on the original lets us strip
-	// OverrideMaterials transiently without mutating observable state — those go on
+	// OverrideMaterials transiently without mutating observable state -- those go on
 	// the entry as variants, so they shouldn't influence descriptor identity.
 	template <typename TDescriptor>
 	static uint32 FingerprintDescriptor(TDescriptor& Descriptor)
@@ -343,7 +343,7 @@ namespace PCGExDefaultLevelDataExporterInternal
 	}
 
 	// Unified mesh-point extraction for a single Mesh-classified actor. Mesh and
-	// Actor classifications are mutually exclusive — Actor-classified actors with
+	// Actor classifications are mutually exclusive -- Actor-classified actors with
 	// ISMCs are intentionally NOT harvested here. Bounds are the mesh's intrinsic
 	// local AABB; BoundsEvaluator is not consulted because component variation
 	// belongs on per-entry descriptor data, not a coarse per-actor world AABB.
@@ -611,7 +611,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 	// The exporter never builds inline embedded mesh/level collections, never writes
 	// Tag_EntryIdx, and never emplaces the CollectionMap pin. It captures mesh + level
 	// contributions through OutContext (when pointers are non-null) and leaves final
-	// compaction + hashing to the caller — typically
+	// compaction + hashing to the caller -- typically
 	// UPCGExPCGDataAssetCollection::CompactSharedMesh / CompactSharedLevel /
 	// RebuildCollectionMaps. The 2-arg BP-facing path delegates here with an empty
 	// context; in that case the asset is produced without hashes (raw attributes only).
@@ -1064,7 +1064,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 	// Builds the in-memory mesh + level entry lists and the per-entry actor collection,
 	// then assigns local-pick indices to each point. No inline shared collections are
 	// built, no Tag_EntryIdx attribute is written, and no CollectionMap pin is emplaced
-	// here — those are the caller's responsibility (see UPCGExPCGDataAssetCollection
+	// here -- those are the caller's responsibility (see UPCGExPCGDataAssetCollection
 	// shared-collection API). The per-entry actor collection IS built here because it
 	// has no cross-entry mutualization story.
 	if (bGenerateCollections)
@@ -1183,7 +1183,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 				const FMeshInfo* Info = MeshInfoMap.Find(Point.EntryKey);
 				if (!Info)
 				{
-					// Sentinel: -1 means "no pick" — rewrite pass leaves the hash unwritten.
+					// Sentinel: -1 means "no pick" -- rewrite pass leaves the hash unwritten.
 					LocalPicksOut[i] = -1;
 					continue;
 				}
@@ -1196,7 +1196,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 			}
 		}
 
-		// Encode actor hashes inline — actor collection is per-entry, so the hash is resolved
+		// Encode actor hashes inline -- actor collection is per-entry, so the hash is resolved
 		// here against EmbeddedActorCollection's own GUID. The caller does not rewrite actor
 		// hashes (the CollectionMap rebuild simply re-registers the same actor collection).
 		if (ActorPointData && EmbeddedActorCollection)

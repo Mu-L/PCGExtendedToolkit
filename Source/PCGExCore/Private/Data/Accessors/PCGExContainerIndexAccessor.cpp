@@ -80,7 +80,7 @@ namespace PCGExData
 			if (!Dest)
 			{
 				// Out-of-range: nothing to write to. Silent no-op rather than
-				// crash — mirrors the read path's zero-fill convention.
+				// crash -- mirrors the read path's zero-fill convention.
 				return;
 			}
 

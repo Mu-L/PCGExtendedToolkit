@@ -6,6 +6,8 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExSubSelection.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Types/PCGExTypeOps.h"
+#include "Types/PCGExTypeOpsImpl.h"
 #include "Types/PCGExTypeTraits.h"
 #include "Types/PCGExTypes.h"
 
@@ -55,52 +57,19 @@ template PCGEXCORE_API _TYPE IDataValue::GetValue<_TYPE>();
 	template <typename T>
 	FString TDataValue<T>::Flatten(const FString& LeftSide)
 	{
-		if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
-		{
-			return FString::Printf(TEXT("%s:%.2f"), *LeftSide, Value);
-		}
-		else if constexpr (std::is_same_v<T, int32> || std::is_same_v<T, int64>)
-		{
-			return FString::Printf(TEXT("%s:%d"), *LeftSide, Value);
-		}
-		else if constexpr (std::is_same_v<T, FVector2D> || std::is_same_v<T, FVector> || std::is_same_v<T, FVector4>)
-		{
-			return FString::Printf(TEXT("%s:%s"), *LeftSide, *Value.ToString());
-		}
-		else if constexpr (std::is_same_v<T, FString>)
-		{
-			return FString::Printf(TEXT("%s:%s"), *LeftSide, *Value);
-		}
-		else
-		{
-			return LeftSide;
-		}
+		return FString::Printf(TEXT("%s:%s"), *LeftSide, *PCGExTypeOps::FTypeOps<T>::template ConvertTo<FString>(Value));
 	}
 
 	template <typename T>
 	bool TDataValue<T>::IsNumeric() const
 	{
-		if constexpr (std::is_same_v<T, bool> || std::is_same_v<T, int32> || std::is_same_v<T, int64> || std::is_same_v<T, float> || std::is_same_v<T, double>)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
+		return PCGExTypes::TTraits<T>::bIsNumeric;
 	}
 
 	template <typename T>
 	bool TDataValue<T>::IsText() const
 	{
-		if constexpr (std::is_same_v<T, FString> || std::is_same_v<T, FSoftClassPath> || std::is_same_v<T, FSoftObjectPath> || std::is_same_v<T, FName>)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
+		return PCGExTypes::TTraits<T>::bIsString;
 	}
 
 	template <typename T>
@@ -111,21 +80,7 @@ template PCGEXCORE_API _TYPE IDataValue::GetValue<_TYPE>();
 			return CachedDouble.GetValue();
 		}
 
-		double V = 0;
-
-		if constexpr (std::is_same_v<T, bool>)
-		{
-			V = Value ? 1 : 0;
-		}
-		else if constexpr (std::is_same_v<T, int32> || std::is_same_v<T, int64> || std::is_same_v<T, float> || std::is_same_v<T, double>)
-		{
-			V = static_cast<double>(Value);
-		}
-		else if constexpr (std::is_same_v<T, FVector2D> || std::is_same_v<T, FVector> || std::is_same_v<T, FVector4>)
-		{
-			V = Value.X;
-		}
-
+		const double V = PCGExTypeOps::FTypeOps<T>::template ConvertTo<double>(Value);
 		CachedDouble.Emplace(V);
 		return V;
 	}
@@ -138,37 +93,7 @@ template PCGEXCORE_API _TYPE IDataValue::GetValue<_TYPE>();
 			return CachedString.GetValue();
 		}
 
-		FString V = TEXT("");
-
-		if constexpr (std::is_same_v<T, bool>)
-		{
-			V = Value ? TEXT("true") : TEXT("false");
-		}
-		else if constexpr (std::is_same_v<T, FName>)
-		{
-			V = Value.ToString();
-		}
-		else if constexpr (std::is_same_v<T, FString>)
-		{
-			V = Value;
-		}
-		else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
-		{
-			V = FString::Printf(TEXT("%.2f"), Value);
-		}
-		else if constexpr (std::is_same_v<T, int32> || std::is_same_v<T, int64>)
-		{
-			V = FString::Printf(TEXT("%d"), Value);
-		}
-		else if constexpr (std::is_same_v<T, FVector2D> || std::is_same_v<T, FVector> || std::is_same_v<T, FVector4>)
-		{
-			V = FString::Printf(TEXT("%s"), *Value.ToString());
-		}
-		else if constexpr (std::is_same_v<T, FString>)
-		{
-			V = FString::Printf(TEXT("%s"), *Value);
-		}
-
+		FString V = PCGExTypeOps::FTypeOps<T>::template ConvertTo<FString>(Value);
 		CachedString.Emplace(V);
 		return V;
 	}
@@ -279,7 +204,7 @@ template class PCGEXCORE_API TDataValue<_TYPE>;
 
 		if (const FPCGMetadataAttributeBase* SourceAttribute = InMetadata->GetConstAttribute(SanitizedIdentifier))
 		{
-			// Container/extended source types fall through — TDataValue<T> is templated on basic types only,
+			// Container/extended source types fall through -- TDataValue<T> is templated on basic types only,
 			// so we can't represent them. Caller gets nullptr DataValue and skips.
 			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute, [&](auto DummyValue)
 			{

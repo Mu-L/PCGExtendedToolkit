@@ -404,7 +404,7 @@ namespace PCGExData
 		}
 
 		TSharedPtr<IAttributeBroadcaster> Broadcaster = nullptr;
-		// Container/extended types fall through silently — broadcasting requires a templated T,
+		// Container/extended types fall through silently -- broadcasting requires a templated T,
 		// which has no meaning for TArray/Struct/Object. Caller gets nullptr and handles it.
 		PCGExMetaHelpers::ExecuteWithRightType(Attribute, [&](auto DummyValue)
 		{

@@ -82,7 +82,7 @@ double FPCGExCollectionGrammarDetails::GetSize(const UPCGExAssetCollection* InCo
 	double CompoundSize = 0;
 	if (SizeMode == EPCGExCollectionGrammarSize::Min)
 	{
-		CompoundSize = MAX_dbl;
+		CompoundSize = TNumericLimits<double>::Max();
 
 		for (int i = 0; i < NumEntries; i++)
 		{

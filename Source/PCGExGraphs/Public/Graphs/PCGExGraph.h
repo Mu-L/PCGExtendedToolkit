@@ -35,7 +35,7 @@ namespace PCGExGraphs
 		TArray<FNode> Nodes;
 		TArray<FEdge> Edges;
 
-		// Read interface — concrete type is FUnionMetadata (sparse, mutable) or FUnionTable (dense, immutable)
+		// Read interface -- concrete type is FUnionMetadata (sparse, mutable) or FUnionTable (dense, immutable)
 		// depending on which builder populated it. Consumers needing the rich legacy write API
 		// (NewEntryAt_Unsafe, etc.) should keep their own TSharedPtr<FUnionMetadata> reference.
 		TSharedPtr<PCGExData::IUnionMetadata> NodesUnion;

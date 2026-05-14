@@ -497,7 +497,7 @@ namespace PCGExBlending
 			  , ValueSize(InValueSize)
 			  , ValueAlignment(InValueAlignment)
 		{
-			// Function pointers unused — all dispatch goes through virtual overrides
+			// Function pointers unused -- all dispatch goes through virtual overrides
 			BlendFunc = nullptr;
 			AccumulateFunc = nullptr;
 			FinalizeFunc = nullptr;
@@ -582,7 +582,7 @@ namespace PCGExBlending
 	// FPropertyBuffer that the blend op was created against.
 	//
 	// Blending semantics: copy-only (CopyA / CopyB / no-arithmetic). All "blend" modes degrade to
-	// "first wins" — same as FCopyOnlyBlendOperation.
+	// "first wins" -- same as FCopyOnlyBlendOperation.
 	//
 	class PCGEXBLENDING_API FPropertyCopyBlendOperation final : public IBlendOperation
 	{
@@ -691,9 +691,9 @@ namespace PCGExBlending
 			int32 InValueAlignment = 1);
 
 		// Property-aware overload. Use when an FProperty is available (e.g. from FPropertyBuffer).
-		// For known WorkingType, returns a strongly-typed blend op (ignoring InProperty — typed paths
+		// For known WorkingType, returns a strongly-typed blend op (ignoring InProperty -- typed paths
 		// don't need it). For unknown WorkingType, returns FPropertyCopyBlendOperation with deep-copy
-		// semantics — required for containers and non-trivially-copyable types.
+		// semantics -- required for containers and non-trivially-copyable types.
 		static TSharedPtr<IBlendOperation> Create(
 			EPCGMetadataTypes WorkingType,
 			EPCGExABBlendingType BlendMode,

@@ -371,7 +371,7 @@ namespace PCGExClusters
 		{
 			// Serial path for small counts
 			OutCells.Reserve(OutCells.Num() + NumRawFaces);
-			double WrapperArea = -MAX_dbl;
+			double WrapperArea = TNumericLimits<double>::Lowest();
 
 			for (const FRawFace& RawFace : RawFaces)
 			{
@@ -439,7 +439,7 @@ namespace PCGExClusters
 
 		// Compact results - remove null entries, detect wrapper during compaction
 		OutCells.Reserve(OutCells.Num() + NumRawFaces);
-		double WrapperArea = -MAX_dbl;
+		double WrapperArea = TNumericLimits<double>::Lowest();
 
 		for (TSharedPtr<FCell>& Cell : SuccessCells)
 		{
@@ -524,7 +524,7 @@ namespace PCGExClusters
 		{
 			// Serial path
 			OutCells.Reserve(OutCells.Num() + PotentialCount);
-			double WrapperArea = -MAX_dbl;
+			double WrapperArea = TNumericLimits<double>::Lowest();
 
 			for (const FRawFace& RawFace : RawFaces)
 			{
@@ -606,7 +606,7 @@ namespace PCGExClusters
 
 		// Compact results - remove null entries, detect wrapper during compaction
 		OutCells.Reserve(OutCells.Num() + PotentialCount);
-		double WrapperArea = -MAX_dbl;
+		double WrapperArea = TNumericLimits<double>::Lowest();
 
 		for (TSharedPtr<FCell>& Cell : SuccessCells)
 		{
@@ -1051,7 +1051,7 @@ namespace PCGExClusters
 
 		// The wrapper face is the one with the largest (most negative for CCW) signed area
 		// or equivalently the face that would have CW winding when all others have CCW
-		double LargestArea = -MAX_dbl;
+		double LargestArea = TNumericLimits<double>::Lowest();
 		int32 WrapperIdx = -1;
 
 		TArray<FVector2D> FacePolygon;

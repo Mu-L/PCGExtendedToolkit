@@ -6,17 +6,15 @@
 #include "IPropertyTypeCustomization.h"
 
 /**
- * Compact layout for FPCGExSelectorRangeAxis.
+ * Compact single-row layout for FPCGExSelectorClosestMatchAxis.
  *
- * Header row carries everything that's not the shorthand so array-element previews are useful
- * without expanding:
- *   NameContent  : [property name] + SourceMode radio
- *   ValueContent : Min/Max (or Range) property names + BoundaryMode cycle button
+ * Entire axis lives on the header row so array elements preview inline:
+ *   NameContent  : [property name] + Property attribute field
+ *   ValueContent : Attribute name field + Weight spinner + Normalize toggle
  *
- * Expanding the element reveals the single child row -- ValueSource -- which retains its
- * registered FPCGExInputShorthandSelectorDouble customization.
+ * No CustomizeChildren -- there's no shorthand here, so nothing to expand into.
  */
-class FPCGExSelectorRangeAxisCustomization : public IPropertyTypeCustomization
+class FPCGExSelectorClosestMatchAxisCustomization : public IPropertyTypeCustomization
 {
 public:
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();

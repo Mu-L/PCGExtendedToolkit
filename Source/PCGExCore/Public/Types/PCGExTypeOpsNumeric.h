@@ -337,6 +337,23 @@ namespace PCGExTypeOps
 		{
 			return FMath::IsNearlyZero(Factor) ? false : A;
 		}
+
+		// Distance / range -- bool treated as 0/1 scalar; suitable for closest-match scoring.
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return A == B ? 0.0 : 1.0;
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return Min == Max ? 0.0 : 1.0;
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = OutMin && InMin;
+			OutMax = OutMax || InMax;
+		}
 	};
 
 	// Numeric Type Operations - int32
@@ -616,6 +633,22 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Factor(const Type& A, const double Factor)
 		{
 			return A * Factor;
+		}
+
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return FMath::Abs(static_cast<double>(A) - static_cast<double>(B));
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return FMath::Max(0.0, static_cast<double>(Max) - static_cast<double>(Min));
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = FMath::Min(OutMin, InMin);
+			OutMax = FMath::Max(OutMax, InMax);
 		}
 	};
 
@@ -897,6 +930,22 @@ namespace PCGExTypeOps
 		{
 			return A * Factor;
 		}
+
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return FMath::Abs(static_cast<double>(A) - static_cast<double>(B));
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return FMath::Max(0.0, static_cast<double>(Max) - static_cast<double>(Min));
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = FMath::Min(OutMin, InMin);
+			OutMax = FMath::Max(OutMax, InMax);
+		}
 	};
 
 	// Numeric Type Operations - float
@@ -1177,6 +1226,35 @@ namespace PCGExTypeOps
 		{
 			return A * Factor;
 		}
+
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return FMath::Abs(static_cast<double>(A) - static_cast<double>(B));
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return FMath::Max(0.0, static_cast<double>(Max) - static_cast<double>(Min));
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = FMath::Min(OutMin, InMin);
+			OutMax = FMath::Max(OutMax, InMax);
+		}
+
+		// Per-side normalize: (v - Min) / (Max - Min). InvRange is 0 when range is degenerate,
+		// which makes ApplyRemap collapse that value to 0 -- no NaN, no information loss elsewhere.
+		static FORCEINLINE Type ComputeInvRange(const Type& Min, const Type& Max)
+		{
+			const Type R = Max - Min;
+			return FMath::Abs(R) > UE_KINDA_SMALL_NUMBER ? 1.0f / R : 0.0f;
+		}
+
+		static FORCEINLINE Type ApplyRemap(const Type& V, const Type& Min, const Type& InvRange)
+		{
+			return (V - Min) * InvRange;
+		}
 	};
 
 	// Numeric Type Operations - double
@@ -1456,6 +1534,33 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Factor(const Type& A, const double Factor)
 		{
 			return A * Factor;
+		}
+
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return FMath::Abs(A - B);
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return FMath::Max(0.0, Max - Min);
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = FMath::Min(OutMin, InMin);
+			OutMax = FMath::Max(OutMax, InMax);
+		}
+
+		static FORCEINLINE Type ComputeInvRange(const Type& Min, const Type& Max)
+		{
+			const Type R = Max - Min;
+			return FMath::Abs(R) > UE_DOUBLE_KINDA_SMALL_NUMBER ? 1.0 / R : 0.0;
+		}
+
+		static FORCEINLINE Type ApplyRemap(const Type& V, const Type& Min, const Type& InvRange)
+		{
+			return (V - Min) * InvRange;
 		}
 	};
 

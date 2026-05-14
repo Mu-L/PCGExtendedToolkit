@@ -30,7 +30,7 @@ namespace PCGExData
 	FProperty* FPropertyBuffer::CreateInnerPropertyFromDesc(const FPCGMetadataAttributeDesc& Desc, FFieldVariant PropertyScope)
 	{
 		// Construct an FProperty matching a metadata attribute's full descriptor.
-		// Mirrors PCG::Private::CreatePropertyFromDesc — supports containers (Array/Set/Map),
+		// Mirrors PCG::Private::CreatePropertyFromDesc -- supports containers (Array/Set/Map),
 		// nested containers (TArray<TArray<T>>), all scalar legacy types, struct/enum, and
 		// the Object family (Object/SoftObject/Class/SoftClass).
 		// The constructed property passes SameType() against the attribute's internal property.
@@ -70,7 +70,7 @@ namespace PCGExData
 					ValuePropertyPtr = &MapProperty->ValueProp;
 					PropertyOwner = MapProperty;
 
-					// Map key — container types are not supported for keys.
+					// Map key -- container types are not supported for keys.
 					FPCGMetadataAttributeDesc KeyDesc;
 					KeyDesc.ValueType = Desc.KeyType;
 					KeyDesc.ValueTypeObject = Desc.KeyTypeObject;
@@ -295,7 +295,7 @@ namespace PCGExData
 
 	int32 FPropertyBuffer::GetElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc)
 	{
-		// For non-container types, fall back to the type/VTO based sizing — cheap, no allocations.
+		// For non-container types, fall back to the type/VTO based sizing -- cheap, no allocations.
 		if (Desc.ContainerTypes.IsEmpty())
 		{
 			return PCGExTypes::GetElementSizeFromType(Desc.ValueType, Desc.ValueTypeObject);
@@ -364,7 +364,7 @@ namespace PCGExData
 		}
 		// TArray, TSet, and TMap all store their element count at a
 		// layout-compatible binary offset. We cast to FScriptArray as the
-		// canonical representative — FScriptSet and FScriptMap place Num()
+		// canonical representative -- FScriptSet and FScriptMap place Num()
 		// at the same offset.
 		const FScriptArray* Arr = static_cast<const FScriptArray*>(ContainerBytes);
 		return Arr->Num();
@@ -411,7 +411,7 @@ namespace PCGExData
 
 		const FPCGMetadataAttributeDesc& Desc = InGenericAttribute->GetAttributeDesc();
 
-		// Build the FULL property — including container wrapping, so reads/writes/copies
+		// Build the FULL property -- including container wrapping, so reads/writes/copies
 		// of TArray/TSet/TMap attributes route through FArrayProperty/FSetProperty/FMapProperty.
 		CachedInnerProperty = CreateInnerPropertyFromDesc(Desc);
 		if (!CachedInnerProperty)
@@ -438,7 +438,7 @@ namespace PCGExData
 	{
 		// Each element in InBytes/OutBytes was initialized via CachedInnerProperty->InitializeValue
 		// (and possibly CopyCompleteValue), so we owe a matching DestroyValue to release any
-		// allocated state — array allocator memory, FString character storage, FText shared data, etc.
+		// allocated state -- array allocator memory, FString character storage, FText shared data, etc.
 		// Without this, container-typed and string-typed attributes would leak per-element heap on every Flush.
 		DestroyAllElements(InBytes);
 		DestroyAllElements(OutBytes);
@@ -503,7 +503,7 @@ namespace PCGExData
 				return true;
 			}
 		}
-		// InitForRead acquires its own WriteScopeLock — must not hold ours when calling it.
+		// InitForRead acquires its own WriteScopeLock -- must not hold ours when calling it.
 		return InitForRead(EIOSide::In);
 	}
 
@@ -627,7 +627,7 @@ namespace PCGExData
 		auto EntryKeys = PointData->GetConstMetadataEntryValueRange();
 
 		// Deep-copy each source value into our owned storage. Memcpy would shallow-alias container
-		// allocators / FString data / etc. — fine while source lives, but bytes we own here would
+		// allocators / FString data / etc. -- fine while source lives, but bytes we own here would
 		// either dangle or double-free on cleanup. CopyCompleteValue gives us independent ownership.
 		uint8* Data = InBytes->GetData();
 		for (int32 i = 0; i < NumPoints; i++)
@@ -670,7 +670,7 @@ namespace PCGExData
 			// Prefer an existing matching attribute on output (typically present from data duplication).
 			FPCGMetadataAttributeBase* MutableAttr = Source->FindMutableAttribute(Identifier, EIOSide::Out);
 
-			// Otherwise create it on-the-fly using the source attribute's desc — mirrors what TBuffer<T>
+			// Otherwise create it on-the-fly using the source attribute's desc -- mirrors what TBuffer<T>
 			// does via FindOrCreateAttribute<T>. Required for the data forward path where target starts
 			// without the attribute.
 			if (!MutableAttr && OutData->Metadata)
@@ -859,7 +859,7 @@ namespace PCGExData
 				return true;
 			}
 		}
-		// InitForRead acquires its own WriteScopeLock — must not hold ours when calling it.
+		// InitForRead acquires its own WriteScopeLock -- must not hold ours when calling it.
 		return InitForRead(EIOSide::In);
 	}
 

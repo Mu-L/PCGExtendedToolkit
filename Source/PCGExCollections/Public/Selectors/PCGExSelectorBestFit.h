@@ -122,10 +122,10 @@ public:
 	EPCGExBestFitAxisAggregation AxisAggregation = EPCGExBestFitAxisAggregation::Sum;
 	double VolumeInfluence = 0.0;
 	bool bApplyPointScale = false;
-	// Resolved by the factory — holds whichever of TopK/Tolerance applies to the chosen strategy.
+	// Resolved by the factory -- holds whichever of TopK/Tolerance applies to the chosen strategy.
 	FPCGExInputShorthandSelectorDouble PoolSize;
 
-	// Per-point extent sources — cached at PrepareForData, read directly in the hot path.
+	// Per-point extent sources -- cached at PrepareForData, read directly in the hot path.
 	TConstPCGValueRange<FVector> BoundsMinRange;
 	TConstPCGValueRange<FVector> BoundsMaxRange;
 	TConstPCGValueRange<FTransform> TransformRange;

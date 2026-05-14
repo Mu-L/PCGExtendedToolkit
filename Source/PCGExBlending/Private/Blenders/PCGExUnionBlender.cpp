@@ -78,7 +78,7 @@ namespace PCGExBlending
 
 			// Property-backed buffers (containers, extended types, Object family) cache an FProperty
 			// that handles container layout and deep-copy semantics. Route those to CreateProxyBlender's
-			// FProperty overload. IBuffer::IsPropertyBacked() is the safe gate for the static cast —
+			// FProperty overload. IBuffer::IsPropertyBacked() is the safe gate for the static cast --
 			// typed and property buffers are siblings under IBuffer, so an unconditional
 			// StaticCastSharedPtr would be UB.
 			const FProperty* InitProperty = nullptr;

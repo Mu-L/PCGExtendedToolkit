@@ -302,6 +302,12 @@ namespace PCGExTypeOps
 		{
 			return A;
 		}
+
+		// Categorical: 0 when equal, 1 otherwise -- used by closest-match scoring for non-ordered types.
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A.Equals(B) ? 0.0 : 1.0;
+		}
 	};
 
 	// Name Type Operations - FName
@@ -593,6 +599,11 @@ namespace PCGExTypeOps
 		{
 			return A;
 		}
+
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A == B ? 0.0 : 1.0;
+		}
 	};
 
 	// Path Type Operations - FSoftObjectPath
@@ -869,6 +880,11 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Factor(const Type& A, const double Factor)
 		{
 			return A;
+		}
+
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A == B ? 0.0 : 1.0;
 		}
 	};
 
@@ -1147,11 +1163,12 @@ namespace PCGExTypeOps
 		{
 			return A;
 		}
+
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B) { return A == B ? 0.0 : 1.0; }
 	};
 
 	// Text Type Operations - FText -- DELETED (Byte/Text cleanup).
 	// FText is not in PCGEX_FOREACH_SUPPORTEDTYPES. If encountered at
 	// runtime, the Tier 3 FPropertyCopyBlendOperation fallback handles it.
 	// FScopedTypedValue and FPropertyBuffer still handle FText lifecycle.
-
 }

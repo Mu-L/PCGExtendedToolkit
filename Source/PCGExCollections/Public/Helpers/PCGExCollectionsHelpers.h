@@ -117,7 +117,7 @@ namespace PCGExCollections
 		TSharedPtr<PCGExDetails::TSettingValue<FName>> CategoryGetter;
 		TSharedPtr<FPCGExEntryPickerOperation> MainPickerOp;
 
-		// Parallel to Cache->CategoryNameToIndex. Slots may be null when the op's PrepareForData failed —
+		// Parallel to Cache->CategoryNameToIndex. Slots may be null when the op's PrepareForData failed --
 		// ResolvePickerForPoint treats null as "fall back to Main per MissingCategoryBehavior".
 		TArray<TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOpsByIndex;
 
@@ -238,7 +238,7 @@ namespace PCGExCollections
 	 *   - Tag_CollectionIdx (int32): packed collection identifier
 	 *   - Tag_CollectionPath (FSoftObjectPath): collection asset path for loading
 	 *
-	 * GetPickIdx() is a pure hash computation — it does not register the collection.
+	 * GetPickIdx() is a pure hash computation -- it does not register the collection.
 	 * Callers MUST call RegisterCollection() at init (single-threaded) for every collection
 	 * that can appear as a Host at runtime. RegisterCollection pulls the full flat host set
 	 * from the collection's cache, so a single call covers the entire nested-collection tree.
@@ -273,7 +273,7 @@ namespace PCGExCollections
 		void RegisterCollection(UPCGExAssetCollection* InCollection);
 
 		/**
-		 * Compute the packed identifier for a collection entry pick. Pure hash — no lock,
+		 * Compute the packed identifier for a collection entry pick. Pure hash -- no lock,
 		 * no map lookup. InCollection must have been passed to RegisterCollection (or reached
 		 * via another collection's FlatHosts) prior to PackToDataset, otherwise the downstream
 		 * mapping will be missing.
@@ -481,11 +481,11 @@ namespace PCGExCollections
 	 *   1. Construct.
 	 *   2. RegisterCollection(...) once for each top-level collection (covers subcollections
 	 *      via FlatHosts). Single-threaded init.
-	 *   3. Parallel Add() from ProcessPoints — lock-free.
+	 *   3. Parallel Add() from ProcessPoints -- lock-free.
 	 *   4. Compile() to produce socket outputs.
 	 *
 	 * Add() is always lock-free and assumes every (Host, EntryIndex) pair it sees has been
-	 * pre-registered. Unregistered entries are a programming error — Add() is a no-op in
+	 * pre-registered. Unregistered entries are a programming error -- Add() is a no-op in
 	 * that case, guarded by checkSlow in debug builds.
 	 */
 	class PCGEXCOLLECTIONS_API FSocketHelper : public PCGExStaging::FSocketHelper

@@ -74,7 +74,7 @@ void FPCGExProbeTensor::ProcessCandidates(const int32 Index, TArray<PCGExProbing
 	bool bIsAlreadyConnected;
 	const double R = GetSearchRadius(Index);
 	double BestDot = -1;
-	double BestDist = MAX_dbl;
+	double BestDist = TNumericLimits<double>::Max();
 	int32 BestCandidateIndex = -1;
 
 	bool bSuccess = false;
@@ -164,7 +164,7 @@ void FPCGExProbeTensor::PrepareBestCandidate(const int32 Index, PCGExProbing::FB
 {
 	InBestCandidate.BestIndex = -1;
 	InBestCandidate.BestPrimaryValue = -1;
-	InBestCandidate.BestSecondaryValue = MAX_dbl;
+	InBestCandidate.BestSecondaryValue = TNumericLimits<double>::Max();
 }
 
 void FPCGExProbeTensor::ProcessCandidateChained(const int32 Index, const int32 CandidateIndex, PCGExProbing::FCandidate& Candidate, PCGExProbing::FBestCandidate& InBestCandidate, PCGExMT::FScopedContainer* Container)

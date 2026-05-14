@@ -265,7 +265,7 @@ namespace PCGExMetaHelpers
 	// True iff the desc describes a single-valued attribute of a basic legacy type
 	// covered by PCGEX_FOREACH_SUPPORTEDTYPES (Float..SoftClassPath). Container types
 	// (TArray/TSet/TMap) and extended 5.8 types (Struct/Enum/Object/SoftObject/Class/SoftClass/Byte/Text)
-	// return false — these need to route through FPropertyBuffer / FPropertyCopyBlendOperation.
+	// return false -- these need to route through FPropertyBuffer / FPropertyCopyBlendOperation.
 	FORCEINLINE bool IsBasicSingleValue(const FPCGMetadataAttributeDesc& Desc)
 	{
 		return Desc.ContainerTypes.IsEmpty()
@@ -278,12 +278,12 @@ namespace PCGExMetaHelpers
 	// _OPERATION is a FText literal naming the operation, e.g. FTEXT("Attribute Stats").
 #define PCGEX_LOG_UNSUPPORTED_TYPE(_CONTEXT, _IDENTITY, _OPERATION) \
 		PCGE_LOG_C(Warning, GraphAndLog, _CONTEXT, FText::Format( \
-			FTEXT("Attribute '{0}' is a container or extended type and cannot be used by {1} — skipped."), \
+			FTEXT("Attribute '{0}' is a container or extended type and cannot be used by {1} -- skipped."), \
 			FText::FromName((_IDENTITY).Name), _OPERATION))
 
 	// Identity-aware dispatch with explicit fallback for extended/container types.
 	// Returns true if the typed branch ran, false if the fallback ran.
-	// Use this everywhere consumers used to call ExecuteWithRightType(Identity.GetType(), ...) —
+	// Use this everywhere consumers used to call ExecuteWithRightType(Identity.GetType(), ...) --
 	// the fallback branch is where you wire up PropertyBuffer-based copy semantics (or a "drop+log"
 	// for arithmetic-only sites).
 	template <typename TypedFn, typename FallbackFn>
@@ -299,7 +299,7 @@ namespace PCGExMetaHelpers
 	}
 
 	// Identity-aware dispatch, single callback. Returns true if the typed branch ran. No fallback
-	// runs for extended/container types — useful at sites where the fallback decision was already
+	// runs for extended/container types -- useful at sites where the fallback decision was already
 	// taken upstream (e.g., Reverse swap nulls the writer at fetch time and skips matching pairs here).
 	template <typename TypedFn>
 	static bool ExecuteWithRightType(const PCGExData::FAttributeIdentity& Identity, TypedFn&& Typed)

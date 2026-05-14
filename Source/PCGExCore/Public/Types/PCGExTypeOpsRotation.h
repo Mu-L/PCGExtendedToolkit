@@ -337,6 +337,36 @@ namespace PCGExTypeOps
 			return A * Factor;
 		}
 
+		// Treats FRotator as a 3-tuple of Euler angles for distance/range. Doesn't account for
+		// angular wrap-around -- callers wanting true angular distance should use FQuat instead.
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return FMath::Sqrt(FMath::Square(A.Pitch - B.Pitch) + FMath::Square(A.Yaw - B.Yaw) + FMath::Square(A.Roll - B.Roll));
+		}
+
+		static FORCEINLINE double RangeMagnitude(const Type& Min, const Type& Max)
+		{
+			return Distance(Min, Max);
+		}
+
+		static FORCEINLINE void ExtendRange(Type& OutMin, Type& OutMax, const Type& InMin, const Type& InMax)
+		{
+			OutMin = Type(FMath::Min(OutMin.Pitch, InMin.Pitch), FMath::Min(OutMin.Yaw, InMin.Yaw), FMath::Min(OutMin.Roll, InMin.Roll));
+			OutMax = Type(FMath::Max(OutMax.Pitch, InMax.Pitch), FMath::Max(OutMax.Yaw, InMax.Yaw), FMath::Max(OutMax.Roll, InMax.Roll));
+		}
+
+		static FORCEINLINE Type ComputeInvRange(const Type& Min, const Type& Max)
+		{
+			return Type(
+				FMath::Abs(Max.Pitch - Min.Pitch) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / (Max.Pitch - Min.Pitch) : 0.0,
+				FMath::Abs(Max.Yaw - Min.Yaw) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / (Max.Yaw - Min.Yaw) : 0.0,
+				FMath::Abs(Max.Roll - Min.Roll) > UE_DOUBLE_SMALL_NUMBER ? 1.0 / (Max.Roll - Min.Roll) : 0.0);
+		}
+
+		static FORCEINLINE Type ApplyRemap(const Type& V, const Type& Min, const Type& InvRange)
+		{
+			return Type((V.Pitch - Min.Pitch) * InvRange.Pitch, (V.Yaw - Min.Yaw) * InvRange.Yaw, (V.Roll - Min.Roll) * InvRange.Roll);
+		}
 	};
 
 	template <>
@@ -645,6 +675,11 @@ namespace PCGExTypeOps
 			return (A.Rotator() * Factor).Quaternion();
 		}
 
+		// Canonical angular distance -- in [0, 1] (so RangeMagnitude / ExtendRange aren't meaningful here).
+		static FORCEINLINE double Distance(const Type& A, const Type& B)
+		{
+			return 1.0 - FMath::Abs(A | B);
+		}
 	};
 
 	// Transform Type Operations - FTransform

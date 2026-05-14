@@ -120,7 +120,7 @@ public:
 	 *   - Otherwise → Actor.
 	 *  An actor is either an Actor (full identity, property delta, etc.) or a Mesh
 	 *  container (every SMC-derived component is harvested). The two are mutually
-	 *  exclusive — Actor-classified actors do NOT contribute mesh points, even when
+	 *  exclusive -- Actor-classified actors do NOT contribute mesh points, even when
 	 *  they own ISMCs. */
 	virtual EPCGExActorExportType ClassifyActor(AActor* Actor) const;
 

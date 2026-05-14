@@ -136,7 +136,7 @@ namespace PCGExData
 			},
 			[&]()
 			{
-				// Property-backed: same constraints as Fetch — only RawAttribute makes sense.
+				// Property-backed: same constraints as Fetch -- only RawAttribute makes sense.
 				if (Mode == EBufferPreloadType::RawAttribute)
 				{
 					InFacade->GetReadable(Identity, EIOSide::In, false);

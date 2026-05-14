@@ -50,7 +50,7 @@ void FPCGExVtxPropertyEdgeMatch::ProcessNode(PCGExClusters::FNode& Node, const T
 {
 	const FTransform& PointTransform = PrimaryDataFacade->Source->GetIn()->GetTransform(Node.PointIndex);
 
-	double BestDot = MIN_dbl_neg;
+	double BestDot = TNumericLimits<double>::Lowest();
 	int32 IBest = -1;
 	const double DotThreshold = Config.DotComparisonDetails.GetComparisonThreshold(Node.PointIndex);
 

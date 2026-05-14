@@ -3,14 +3,14 @@
 
 #pragma once
 
-// NOTE: This header is included at the bottom of PCGExData.h — do NOT include PCGExData.h here.
+// NOTE: This header is included at the bottom of PCGExData.h -- do NOT include PCGExData.h here.
 // All base types (IBuffer, FFacade, etc.) are already visible.
 
 //
-// FPropertyBuffer hierarchy — Tier 3: truly opaque attribute types.
+// FPropertyBuffer hierarchy -- Tier 3: truly opaque attribute types.
 //
 // Use this ONLY when T is unknowable at compile time (arbitrary UStructs, UEnums, UObjects).
-// If T is known, prefer TBuffer<T> (Tier 2) — it's type-safe, faster, and supports
+// If T is known, prefer TBuffer<T> (Tier 2) -- it's type-safe, faster, and supports
 // the accessor API for bulk reads/writes.
 //
 // Container types (TArray, TSet, TMap) with KNOWN element types should use
@@ -20,7 +20,7 @@
 // Read path:  GetReadAddressFromEntryKey_Unsafe() → void* memcpy per element
 // Write path: SetValueFromProperty(EntryKey, void*, FProperty*) per element
 //
-// The per-element write is sequential — acceptable since truly opaque types are rare
+// The per-element write is sequential -- acceptable since truly opaque types are rare
 // in hot paths. For bulk operations on known types, Tier 2's accessor-based path is faster.
 //
 // ── UE 5.8 migration notes ──
@@ -69,7 +69,7 @@ namespace PCGExData
 		}
 
 		// Non-owning accessor to the cached property that drives this buffer's reads/writes.
-		// Lifetime-tied to the buffer itself — do not retain past the buffer's lifetime.
+		// Lifetime-tied to the buffer itself -- do not retain past the buffer's lifetime.
 		// Used by FBlendOperationFactory / CreateProxyBlender to construct property-aware blend ops
 		// for container/extended types where (EnumType, VTO)-based sizing returns 0.
 		const FProperty* GetCachedProperty() const
@@ -77,7 +77,7 @@ namespace PCGExData
 			return CachedInnerProperty;
 		}
 
-		// Runtime type via reflection — FScopedTypedValue(FProperty*) handles arbitrary UStructs/UEnums/etc.
+		// Runtime type via reflection -- FScopedTypedValue(FProperty*) handles arbitrary UStructs/UEnums/etc.
 		// Precondition: CachedInnerProperty is valid (i.e. InitForRead or InitForWrite succeeded).
 		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const override
 		{
@@ -85,7 +85,7 @@ namespace PCGExData
 			return PCGExTypes::FScopedTypedValue(CachedInnerProperty);
 		}
 
-		// Property-backed buffer — see IBuffer::IsPropertyBacked() rationale.
+		// Property-backed buffer -- see IBuffer::IsPropertyBacked() rationale.
 		virtual bool IsPropertyBacked() const override
 		{
 			return true;
@@ -93,7 +93,7 @@ namespace PCGExData
 
 		// Static factory: build an FProperty matching the attribute's full descriptor.
 		// Handles container types (TArray/TSet/TMap), scalar legacy types, struct/enum, and
-		// the Object family (Object/SoftObject/Class/SoftClass — transient processing only;
+		// the Object family (Object/SoftObject/Class/SoftClass -- transient processing only;
 		// values are not GC-tracked, do not persist outputs to UObject-owned storage).
 		// Returns nullptr if the desc cannot be mapped to a property.
 		// PropertyScope: pass the parent FProperty when constructing nested container inner
@@ -115,7 +115,7 @@ namespace PCGExData
 		static int32 GetInnerElementSizeFromDesc(const FPCGMetadataAttributeDesc& Desc);
 
 		// Read the element count from a container attribute's raw bytes.
-		// Works for TArray, TSet, and TMap — all three UE container types
+		// Works for TArray, TSet, and TMap -- all three UE container types
 		// store a layout-compatible element count at the same binary offset
 		// (the Num field in the underlying FScriptArray / FScriptSet /
 		// FScriptMap). Returns 0 if ContainerBytes is null.
@@ -169,7 +169,7 @@ namespace PCGExData
 
 		// Property-aware write at a specific index. SrcPtr must point to bytes matching
 		// CachedInnerProperty's layout (typically obtained from an attribute with the same desc).
-		// Performs deep-copy via FProperty::CopyCompleteValue — correct for containers, FString, etc.
+		// Performs deep-copy via FProperty::CopyCompleteValue -- correct for containers, FString, etc.
 		// No-op if the buffer isn't initialized for write or SrcPtr is null.
 		void SetFromVoidProperty(int32 Index, const void* SrcPtr);
 

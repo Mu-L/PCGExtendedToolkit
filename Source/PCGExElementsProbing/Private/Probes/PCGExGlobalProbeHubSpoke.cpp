@@ -54,7 +54,7 @@ void FPCGExProbeHubSpoke::SelectHubsByDensity(TArray<int32>& OutHubs) const
 
 		for (int32 j = 0; j < NumPoints; ++j)
 		{
-			Distances[j] = (j != i) ? FVector::DistSquared(Positions[i], Positions[j]) : MAX_dbl;
+			Distances[j] = (j != i) ? FVector::DistSquared(Positions[i], Positions[j]) : TNumericLimits<double>::Max();
 		}
 
 		Algo::Sort(Distances);
@@ -217,7 +217,7 @@ void FPCGExProbeHubSpoke::SelectHubsByKMeans(TArray<int32>& OutHubs) const
 				continue;
 			}
 
-			double BestDist = MAX_dbl;
+			double BestDist = TNumericLimits<double>::Max();
 			int32 BestCluster = 0;
 
 			for (int32 c = 0; c < K; ++c)
@@ -260,7 +260,7 @@ void FPCGExProbeHubSpoke::SelectHubsByKMeans(TArray<int32>& OutHubs) const
 	// Find point closest to each centroid
 	for (int32 c = 0; c < K; ++c)
 	{
-		double BestDist = MAX_dbl;
+		double BestDist = TNumericLimits<double>::Max();
 		int32 BestPoint = INDEX_NONE;
 
 		for (int32 i = 0; i < NumPoints; ++i)
@@ -355,7 +355,7 @@ void FPCGExProbeHubSpoke::ProcessAll(TSet<uint64>& OutEdges) const
 		if (Config.bNearestHubOnly)
 		{
 			// Find nearest hub
-			double BestDist = MAX_dbl;
+			double BestDist = TNumericLimits<double>::Max();
 			int32 BestHub = INDEX_NONE;
 
 			for (const int32 Hub : Hubs)

@@ -35,7 +35,7 @@ void FPCGExVtxPropertySpecialEdges::ProcessNode(PCGExClusters::FNode& Node, cons
 	double LLongest = 0;
 	int32 ILongest = -1;
 
-	double LShortest = MAX_dbl;
+	double LShortest = TNumericLimits<double>::Max();
 	int32 IShortest = -1;
 
 	double LAverage = 0;

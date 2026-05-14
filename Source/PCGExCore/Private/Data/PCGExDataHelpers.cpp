@@ -79,9 +79,9 @@ namespace PCGExData::Helpers
 			return false;
 		}
 
-		// PERF — this allocates a transient FProperty per call (CreateInnerPropertyFromDesc walks the
+		// PERF -- this allocates a transient FProperty per call (CreateInnerPropertyFromDesc walks the
 		// desc + heap-allocates) and deletes it. Fine for one-shot single-value carry (DataForward,
-		// PointsToBounds, BlendingHelpers per-attribute outer loop). NOT fine for per-element loops —
+		// PointsToBounds, BlendingHelpers per-attribute outer loop). NOT fine for per-element loops --
 		// if you need that, drive the loop through an FPropertyBuffer instance whose CachedInnerProperty
 		// is built once at InitForRead/InitForWrite, and call SetFromVoidProperty per element.
 		FProperty* TempProp = FPropertyBuffer::CreateInnerPropertyFromDesc(SourceAttr->GetAttributeDesc());
@@ -234,7 +234,7 @@ namespace PCGExData::Helpers
 	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute, T Fallback)
 	{
 		T Value = Fallback;
-		// Container/extended types fall through (no meaningful conversion to templated T) — fallback wins.
+		// Container/extended types fall through (no meaningful conversion to templated T) -- fallback wins.
 		PCGExMetaHelpers::ExecuteWithRightType(Attribute, [&](auto DummyValue)
 		{
 			using T_VALUE = decltype(DummyValue);

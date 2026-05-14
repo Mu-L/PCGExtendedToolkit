@@ -40,7 +40,7 @@ namespace PCGExPointIOMerger
 #undef PCGEX_TPL
 
 	// Property-backed counterpart to FWriteAttributeScopeTask<T>. Used for extended/container-typed
-	// attributes that aren't covered by PCGEX_FOREACH_SUPPORTEDTYPES. Not templated — relies on
+	// attributes that aren't covered by PCGEX_FOREACH_SUPPORTEDTYPES. Not templated -- relies on
 	// PropertyCopyAttributeRange to do property-aware deep copy via the target buffer's CachedInnerProperty.
 	class FWriteAttributePropertyScopeTask final : public PCGExMT::FTask
 	{
@@ -85,7 +85,7 @@ namespace PCGExPointIOMerger
 
 			const PCGExData::FAttributeIdentity& Identity = Merger->UniqueIdentities[TaskIndex];
 			const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
-			// Merger routes data-domain attributes into Elements when WantsDataToElements() — compute that here.
+			// Merger routes data-domain attributes into Elements when WantsDataToElements() -- compute that here.
 			const FPCGAttributeIdentifier TargetIdentifier = Merger->WantsDataToElements()
 				? FPCGAttributeIdentifier(Identity.Name, PCGMetadataDomainID::Elements)
 				: Identifier;
@@ -96,7 +96,7 @@ namespace PCGExPointIOMerger
 				Identity,
 				[&](auto DummyValue)
 				{
-					// Typed path — basic legacy types covered by PCGEX_FOREACH_SUPPORTEDTYPES.
+					// Typed path -- basic legacy types covered by PCGEX_FOREACH_SUPPORTEDTYPES.
 					using T = decltype(DummyValue);
 
 					TSharedPtr<PCGExData::TBuffer<T>> Buffer = Merger->UnionDataFacade->GetWritable(
@@ -125,13 +125,13 @@ namespace PCGExPointIOMerger
 				},
 				[&]()
 				{
-					// Property-backed path — Struct/Enum/Object/SoftObject/Class/SoftClass/Byte/Text + containers.
+					// Property-backed path -- Struct/Enum/Object/SoftObject/Class/SoftClass/Byte/Text + containers.
 					// The facade's generic GetWritable routes unknown types to FPropertyArrayBuffer, which
 					// builds CachedInnerProperty from the source attribute's desc (handles container wrapping).
 					if (!Identity.Attribute)
 					{
 						PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(
-							           FTEXT("Cannot merge attribute '{0}' — no source attribute resolved on identity (extended/container type with null Attribute pointer)."),
+							           FTEXT("Cannot merge attribute '{0}' -- no source attribute resolved on identity (extended/container type with null Attribute pointer)."),
 							           FText::FromName(Identity.Name)));
 						return;
 					}
@@ -141,7 +141,7 @@ namespace PCGExPointIOMerger
 					if (!RawBuffer || !RawBuffer->IsPropertyBacked())
 					{
 						PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(
-							           FTEXT("Cannot merge attribute '{0}' — failed to create property-backed writable buffer."),
+							           FTEXT("Cannot merge attribute '{0}' -- failed to create property-backed writable buffer."),
 							           FText::FromName(Identity.Name)));
 						return;
 					}
@@ -156,7 +156,7 @@ namespace PCGExPointIOMerger
 						{
 							continue;
 						}
-						// Desc-aware mismatch — same gate the typed path applies via IsOfType<T>.
+						// Desc-aware mismatch -- same gate the typed path applies via IsOfType<T>.
 						if (!Attribute->GetAttributeDesc().IsSameType(Identity.Attribute->GetAttributeDesc()))
 						{
 							continue;

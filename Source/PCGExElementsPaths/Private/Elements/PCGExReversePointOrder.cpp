@@ -217,7 +217,7 @@ namespace PCGExReversePointOrder
 				[&]()
 				{
 					// Swap pair on container/extended-typed attribute would need property-aware
-					// per-element swap with a scratch slot. Not wired yet — drop the pair with a log.
+					// per-element swap with a scratch slot. Not wired yet -- drop the pair with a log.
 					PCGEX_LOG_UNSUPPORTED_TYPE(This->Context, *WorkingPair.FirstIdentity, FTEXT("Reverse Point Order swap"));
 					WorkingPair.FirstWriter.Reset();
 					WorkingPair.SecondWriter.Reset();
@@ -235,7 +235,7 @@ namespace PCGExReversePointOrder
 
 		for (const FPCGExSwapAttributePairDetails& WorkingPair : SwapPairs)
 		{
-			// Container/extended pairs were nulled at writer-fetch time — skip them here too.
+			// Container/extended pairs were nulled at writer-fetch time -- skip them here too.
 			if (!WorkingPair.FirstWriter || !WorkingPair.SecondWriter)
 			{
 				continue;

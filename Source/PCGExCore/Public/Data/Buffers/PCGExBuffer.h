@@ -3,14 +3,14 @@
 
 #pragma once
 
-// NOTE: This header is included at the bottom of PCGExData.h — do NOT include PCGExData.h here.
+// NOTE: This header is included at the bottom of PCGExData.h -- do NOT include PCGExData.h here.
 // All base types (IBuffer, TBuffer, FFacade, etc.) are already visible.
 
 //
 // TArrayBuffer<T> / TSingleValueBuffer<T>
 //
 // Unified buffers using FPCGMetadataAttributeBase* (from IBuffer).
-// Attribute creation goes through Domain->FindOrCreateAttribute<T>() — the UE 5.8 canonical path.
+// Attribute creation goes through Domain->FindOrCreateAttribute<T>() -- the UE 5.8 canonical path.
 //
 // FPCGMetadataAttribute<T> still exists for basic types; use GetTypedInAttribute()/GetTypedOutAttribute()
 // on TBuffer<T> for a convenience static_cast when you need the typed pointer.

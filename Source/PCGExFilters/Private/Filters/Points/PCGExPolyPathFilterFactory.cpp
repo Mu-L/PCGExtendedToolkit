@@ -93,8 +93,8 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 
 			if (LocalExpansionZ < 0)
 			{
-				DataBounds.Max.Z = MAX_dbl * 0.5;
-				DataBounds.Min.Z = MAX_dbl * -0.5;
+				DataBounds.Max.Z = TNumericLimits<double>::Max() * 0.5;
+				DataBounds.Min.Z = TNumericLimits<double>::Max() * -0.5;
 			}
 			else
 			{
@@ -393,7 +393,7 @@ namespace PCGExPathInclusion
 		{
 			if (bClosestOnly)
 			{
-				double BestDist = MAX_dbl;
+				double BestDist = TNumericLimits<double>::Max();
 
 				if (Check == EPCGExSplineCheckType::IsOn)
 				{

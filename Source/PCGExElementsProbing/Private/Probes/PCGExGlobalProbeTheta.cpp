@@ -69,7 +69,7 @@ void FPCGExProbeTheta::ProcessAll(TSet<uint64>& OutEdges) const
 		TArray<int32> BestPerCone;
 		TArray<double> BestDistPerCone;
 		BestPerCone.Init(INDEX_NONE, Config.NumCones);
-		BestDistPerCone.Init(MAX_dbl, Config.NumCones);
+		BestDistPerCone.Init(TNumericLimits<double>::Max(), Config.NumCones);
 
 		Octree->FindElementsWithBoundsTest(
 			FBox(Pos - FVector(MaxDist), Pos + FVector(MaxDist)),

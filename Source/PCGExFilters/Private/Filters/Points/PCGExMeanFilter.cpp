@@ -76,8 +76,8 @@ void PCGExPointFilter::FMeanFilter::PostInit()
 	// DataMin/DataMax are recomputed from normalized values for subsequent mean calculation.
 	if (TypedFilterFactory->Config.Measure == EPCGExMeanMeasure::Relative)
 	{
-		double RelativeMinEdgeLength = MAX_dbl;
-		double RelativeMaxEdgeLength = MIN_dbl;
+		double RelativeMinEdgeLength = TNumericLimits<double>::Max();
+		double RelativeMaxEdgeLength = TNumericLimits<double>::Min();
 		SumValue = 0;
 		for (int i = 0; i < NumPoints; i++)
 		{
@@ -113,8 +113,8 @@ void PCGExPointFilter::FMeanFilter::PostInit()
 	}
 
 	// Build the acceptable range around the reference mean. Disabled sides default to +/-infinity.
-	const double RMin = TypedFilterFactory->Config.bDoExcludeBelowMean ? ReferenceValue - TypedFilterFactory->Config.ExcludeBelow : MIN_dbl_neg;
-	const double RMax = TypedFilterFactory->Config.bDoExcludeAboveMean ? ReferenceValue + TypedFilterFactory->Config.ExcludeAbove : MAX_dbl;
+	const double RMin = TypedFilterFactory->Config.bDoExcludeBelowMean ? ReferenceValue - TypedFilterFactory->Config.ExcludeBelow : TNumericLimits<double>::Lowest();
+	const double RMax = TypedFilterFactory->Config.bDoExcludeAboveMean ? ReferenceValue + TypedFilterFactory->Config.ExcludeAbove : TNumericLimits<double>::Max();
 
 	// Min/Max swap ensures ReferenceMin <= ReferenceMax regardless of which sides are enabled.
 	ReferenceMin = FMath::Min(RMin, RMax);

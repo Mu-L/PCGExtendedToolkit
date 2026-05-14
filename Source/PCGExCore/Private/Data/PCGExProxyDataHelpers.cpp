@@ -419,7 +419,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 				// through FPropertyBuffer, not TBuffer<T>. The Desc-based
 				// RealType is the inner element type (e.g. Vector for
 				// TArray<FVector>), so the normal ExecuteWithRightType path
-				// would instantiate TBuffer<FVector> — wrong for container
+				// would instantiate TBuffer<FVector> -- wrong for container
 				// storage (which is FScriptArray layout). Skip straight to
 				// the Tier 3 FPropertyBuffer fallback for containers.
 				const bool bIsContainer = InDescriptor.bHasSourceDesc && !InDescriptor.SourceDesc.IsSingleValue();
@@ -448,7 +448,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 				}
 
 				// Tier 3 fallback: generic/unknown attribute types not in PCGEX_FOREACH_SUPPORTEDTYPES.
-				// Uses FPropertyBufferProxy wrapping FPropertyBuffer via void* R/W — no type conversion,
+				// Uses FPropertyBufferProxy wrapping FPropertyBuffer via void* R/W -- no type conversion,
 				// but enables FCopyOnlyBlendOperation (memcpy-based) to carry the data through blending.
 				if (!OutProxy)
 				{
@@ -456,7 +456,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 						InDescriptor.Selector,
 						InDescriptor.Side == EIOSide::In ? InDataFacade->GetIn() : InDataFacade->GetOut());
 
-					// Resolve element size — descriptor may have it, or we derive from the attribute
+					// Resolve element size -- descriptor may have it, or we derive from the attribute
 					int32 ElemSize = InDescriptor.ValueSize;
 					int32 ElemAlign = InDescriptor.ValueAlignment;
 

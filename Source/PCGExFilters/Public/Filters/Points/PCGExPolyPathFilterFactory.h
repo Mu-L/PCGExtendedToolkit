@@ -192,8 +192,8 @@ namespace PCGExPathInclusion
 		ESplineMatch FlagScope = Any;
 
 	public:
-		double Tolerance = MAX_dbl;
-		double ToleranceSquared = MAX_dbl;
+		double Tolerance = TNumericLimits<double>::Max();
+		double ToleranceSquared = TNumericLimits<double>::Max();
 		bool bScaleTolerance = false;
 		FVector ToleranceScaleFactor = FVector(1, 1, 1);
 		TSet<const UPCGData*> MatchIgnoreList;

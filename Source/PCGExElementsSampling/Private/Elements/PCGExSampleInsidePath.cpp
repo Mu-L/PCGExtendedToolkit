@@ -365,7 +365,7 @@ namespace PCGExSampleInsidePath
 		const double RangeMaxSquared = FMath::Square(RangeMax);
 
 		PCGExData::FElement SinglePick(-1, -1);
-		double WeightedDistance = Settings->SampleMethod == EPCGExSampleMethod::ClosestTarget ? MAX_dbl : MIN_dbl;
+		double WeightedDistance = Settings->SampleMethod == EPCGExSampleMethod::ClosestTarget ? TNumericLimits<double>::Max() : TNumericLimits<double>::Min();
 
 		double WeightedTime = 0;
 		double WeightedSegmentTime = 0;

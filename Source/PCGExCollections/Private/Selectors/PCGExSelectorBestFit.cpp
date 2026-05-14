@@ -15,7 +15,7 @@
 
 void FPCGExEntryBestFitPickerOpBase::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Best Fit — no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."));
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Best Fit -- no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."));
 }
 
 bool FPCGExEntryBestFitPickerOpBase::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
@@ -256,7 +256,7 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorBestFitFactoryData::CreateE
 	NewOp->AxisAggregation = Config.AxisAggregation;
 	NewOp->VolumeInfluence = Config.VolumeInfluence;
 	NewOp->bApplyPointScale = Config.bApplyPointScale;
-	// Pick the shorthand that matches the chosen strategy — op reads a single PoolSize regardless.
+	// Pick the shorthand that matches the chosen strategy -- op reads a single PoolSize regardless.
 	NewOp->PoolSize = (Config.PoolStrategy == EPCGExBestFitPoolStrategy::TopK) ? Config.TopK : Config.Tolerance;
 	return NewOp;
 }

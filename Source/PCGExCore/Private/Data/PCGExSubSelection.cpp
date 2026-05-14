@@ -64,7 +64,7 @@ namespace PCGExData
 		}
 
 		// Component selection: Vector (Pos/Scale) or Quaternion (Rotation).
-		// NOTE: intentionally ungated — even chains without an explicit
+		// NOTE: intentionally ungated -- even chains without an explicit
 		// component step may have Component populated from Init's default
 		// (Position). Gating on IsComponentSelection() changes WorkingType
 		// for chains that don't have a component step (Swizzle-only, etc.),
@@ -277,7 +277,7 @@ namespace PCGExData
 	// NOTE: Container steps require compile-time ContainerElementSize
 	// (populated by PostClassifyFinalize at FCachedSubSelection::Initialize
 	// time). FSubSelection doesn't have a SourceDesc, so container steps
-	// in the parsed chain won't have ElementSize populated — they produce
+	// in the parsed chain won't have ElementSize populated -- they produce
 	// zero-filled output (graceful degradation). For container-aware
 	// dispatch, callers should use FCachedSubSelection.
 	//

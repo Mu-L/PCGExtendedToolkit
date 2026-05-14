@@ -17,7 +17,7 @@ namespace PCGExData
 struct FPCGExContext;
 
 /**
- * Shared utilities for selector implementations. All inline / header-only — no .cpp.
+ * Shared utilities for selector implementations. All inline / header-only -- no .cpp.
  * Lives outside any UCLASS / USTRUCT so it has zero reflection / link-time cost.
  *
  * Use these whenever a new selector needs the same primitive (weight resolution, extent
@@ -68,7 +68,7 @@ namespace PCGExCollections::Selectors
 				return k;
 			}
 		}
-		// Numerical drift fallback — last bucket wins.
+		// Numerical drift fallback -- last bucket wins.
 		return Cumulative.Num() - 1;
 	}
 
@@ -106,7 +106,7 @@ namespace PCGExCollections::Selectors
 	 *   2. Cast SharedData → typed Shared. If null, invoke OnSharedDataMissing then bail.
 	 *   3. Defer remaining init to OnInitForData (subclass).
 	 *
-	 * Subclasses must implement OnInitForData. OnSharedDataMissing is optional — default
+	 * Subclasses must implement OnInitForData. OnSharedDataMissing is optional -- default
 	 * is silent. Concrete pickers typically log a selector-specific message there.
 	 */
 	template <typename TSharedDataType>

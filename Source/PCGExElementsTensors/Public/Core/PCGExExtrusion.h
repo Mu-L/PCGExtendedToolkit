@@ -258,7 +258,7 @@ namespace PCGExExtrusion
 		//~ Seed and limits
 		int32 SeedIndex = -1;
 		int32 RemainingIterations = 0;
-		double MaxLength = MAX_dbl;
+		double MaxLength = TNumericLimits<double>::Max();
 		int32 MaxPointCount = MAX_int32;
 
 		//~ Path data

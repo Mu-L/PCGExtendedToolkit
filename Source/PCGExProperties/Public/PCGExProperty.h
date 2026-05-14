@@ -268,7 +268,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * on every preserved override, so the structural parts continue to mirror the schema
 	 * while the user-overridable parts stay intact.
 	 *
-	 * Default implementation is a no-op — types whose Value is entirely user-overridable
+	 * Default implementation is a no-op -- types whose Value is entirely user-overridable
 	 * (the common case) need not override this.
 	 *
 	 * Example: FPCGExProperty_Enum's Value.Class is structural (the schema decides the

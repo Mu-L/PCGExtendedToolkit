@@ -166,13 +166,13 @@ namespace PCGExData
 		virtual void GetVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) = 0;
 
 		// Creates a FScopedTypedValue appropriately sized & constructed for this buffer's type.
-		// Callers don't need to know EPCGMetadataTypes — the buffer knows its own type.
+		// Callers don't need to know EPCGMetadataTypes -- the buffer knows its own type.
 		// TBuffer<T> uses compile-time TTraits<T>::Type; FPropertyBuffer uses its cached FProperty.
 		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const = 0;
 
 		// True iff this buffer is property-backed (FPropertyArrayBuffer / FPropertySingleValueBuffer
 		// fallback path for extended/container types). False for typed TBuffer<T> instances.
-		// Use this to safely gate StaticCastSharedPtr<FPropertyBuffer>(buf) — the typed and property
+		// Use this to safely gate StaticCastSharedPtr<FPropertyBuffer>(buf) -- the typed and property
 		// buffer hierarchies are siblings under IBuffer, so an unconditional static cast would be UB.
 		virtual bool IsPropertyBacked() const
 		{
@@ -334,7 +334,7 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		TSharedPtr<IBuffer> GetWritable(EPCGMetadataTypes Type, const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init);
 		TSharedPtr<IBuffer> GetWritable(EPCGMetadataTypes Type, const FName InName, EBufferInit Init);
 
-		// Attribute-driven writable lookup — callers don't need to extract EPCGMetadataTypes.
+		// Attribute-driven writable lookup -- callers don't need to extract EPCGMetadataTypes.
 		// Internally delegates to GetWritable(EPCGMetadataTypes, FPCGMetadataAttributeBase*, EBufferInit).
 		TSharedPtr<IBuffer> GetWritableFromAttribute(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init);
 
@@ -484,6 +484,6 @@ extern template bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& PointIO, con
 	void WriteBuffer(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<IBuffer>& InBuffer, const bool InEnsureValidKeys = true);
 }
 
-// Buffer leaf class definitions — must come after FFacade and base buffer declarations
+// Buffer leaf class definitions -- must come after FFacade and base buffer declarations
 #include "Data/Buffers/PCGExBuffer.h"
 #include "Data/Buffers/PCGExBufferProperty.h"

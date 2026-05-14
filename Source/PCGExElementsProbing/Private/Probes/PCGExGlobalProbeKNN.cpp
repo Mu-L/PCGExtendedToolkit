@@ -68,7 +68,7 @@ void FPCGExProbeKNN::ProcessAll(TSet<uint64>& OutEdges) const
 		// Compute distances to all other points
 		for (int32 j = 0; j < NumPoints; ++j)
 		{
-			Distances[j] = {(AcceptConnectionsRef[j] && j != i) ? FVector::DistSquared(Positions[i], Positions[j]) : MAX_dbl, j};
+			Distances[j] = {(AcceptConnectionsRef[j] && j != i) ? FVector::DistSquared(Positions[i], Positions[j]) : TNumericLimits<double>::Max(), j};
 		}
 
 		// Partial sort to get K smallest

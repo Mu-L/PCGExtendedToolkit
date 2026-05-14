@@ -13,7 +13,7 @@
 #include "UObject/Object.h"
 #include "UObject/UObjectGlobals.h"
 
-// FText lacks native GetTypeHash and operator== — required by engine's DefaultOperationTraits<FText>::Equal()
+// FText lacks native GetTypeHash and operator== -- required by engine's DefaultOperationTraits<FText>::Equal()
 // and TSet<FText> instantiation. Must be defined BEFORE PCGMetadataAttributeTraits.h is included.
 #ifndef PCGEX_FTEXT_SHIMS_DEFINED
 #define PCGEX_FTEXT_SHIMS_DEFINED

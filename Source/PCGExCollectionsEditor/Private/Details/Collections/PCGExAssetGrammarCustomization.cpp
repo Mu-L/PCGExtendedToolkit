@@ -22,7 +22,7 @@ namespace PCGExAssetGrammarCustomization
 {
 	// Manual color picker plumbing. The default CreatePropertyValueWidget() for an FLinearColor
 	// nested inside FPCGExAssetGrammarDetails inside an entry struct inside the collection's
-	// Entries array doesn't propagate writes back to the collection — picking a color updates
+	// Entries array doesn't propagate writes back to the collection -- picking a color updates
 	// nothing and leaves the package clean. Driving the picker manually and calling
 	// NotifyFinishedChangingProperties() forces PostEditChangeProperty + MarkPackageDirty
 	// the same way FColorStructCustomization does it for top-level FLinearColor properties.

@@ -136,7 +136,7 @@ bool FPCGExBranchOnDataAttributeElement::AdvanceWork(FPCGExContext* InContext, c
 			}
 			else
 			{
-				// Container/extended attributes have no defined Numeric/String conversion — silently skip;
+				// Container/extended attributes have no defined Numeric/String conversion -- silently skip;
 				// caller falls into the "no branch matched" default path below.
 				PCGExMetaHelpers::ExecuteWithRightType(Attr, [&](auto ValueType)
 				{

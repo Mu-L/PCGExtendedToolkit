@@ -5,7 +5,7 @@
 
 #include "Details/PCGExInlineNumericWidgets.h"
 
-// Thin aliases over PCGExInlineNumericWidgets::Make*Widget — kept for backward compatibility.
+// Thin aliases over PCGExInlineNumericWidgets::Make*Widget -- kept for backward compatibility.
 // Use the namespaced helpers directly in new code.
 #define PCGEX_VECTORINPUTBOX(_HANDLE) PCGExInlineNumericWidgets::MakeVectorWidget((_HANDLE).ToSharedRef())
 #define PCGEX_ROTATORINPUTBOX(_HANDLE) PCGExInlineNumericWidgets::MakeRotatorWidget((_HANDLE).ToSharedRef())
