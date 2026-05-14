@@ -18,6 +18,7 @@
 #include "Core/PCGExAssetCollection.h"
 #include "Details/Collections/PCGExCollectionEditorUtils.h"
 #include "Details/Collections/SPCGExCollectionGridView.h"
+#include "Grammit/PCGExGrammitExport.h"
 #include "Modules/ModuleManager.h"
 #include "UObject/UnrealType.h"
 #include "Widgets/SBoxPanel.h"
@@ -25,6 +26,7 @@
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
 
 FPCGExAssetCollectionEditor::FPCGExAssetCollectionEditor()
@@ -728,6 +730,29 @@ void FPCGExAssetCollectionEditor::BuildEditorToolbar(FToolBarBuilder& ToolbarBui
 			FText::GetEmpty(),
 			INVTEXT("Rebuild staging for the entire project. (Will go through all collection assets)"),
 			PCGEX_SLATE_ICON(RebuildStagingProject)
+			);
+	}
+	ToolbarBuilder.EndSection();
+
+	ToolbarBuilder.AddWidget(SNew(SSpacer).Size(FVector2D(48.f, 1.f)));
+
+	ToolbarBuilder.BeginSection("GrammitSection");
+	{
+		ToolbarBuilder.AddToolBarButton(
+			FUIAction(
+				FExecuteAction::CreateLambda(
+					[this]()
+					{
+						PCGEX_CURRENT_COLLECTION
+						{
+							PCGExGrammitExport::OpenInGrammit(Collection);
+						}
+					})
+				),
+			NAME_None,
+			FText::GetEmpty(),
+			INVTEXT("Open in Grammit\nGenerate a Grammit snapshot from this collection's top-level entries (one atom per entry, one group per Category) and open it in your browser."),
+			PCGEX_SLATE_ICON(Grammit)
 			);
 	}
 	ToolbarBuilder.EndSection();

@@ -156,6 +156,21 @@ void FPCGExAssetEntryCustomization::CustomizeChildren(
 	{
 		ChildBuilder.AddProperty(PropertyOverridesHandle.ToSharedRef());
 	}
+
+	// Same reason as above: the grammar struct customizations host an async color picker
+	// (FColorPicker modal) whose OnColorCommitted write-back fails when the row is wrapped
+	// in a dynamic-visibility lambda. EditCondition meta on these properties still hides
+	// them appropriately based on bIsSubCollection / SubGrammarMode.
+	TSharedPtr<IPropertyHandle> AssetGrammarHandle = PropertyHandle->GetChildHandle(TEXT("AssetGrammar"));
+	if (AssetGrammarHandle.IsValid())
+	{
+		ChildBuilder.AddProperty(AssetGrammarHandle.ToSharedRef());
+	}
+	TSharedPtr<IPropertyHandle> CollectionGrammarHandle = PropertyHandle->GetChildHandle(TEXT("CollectionGrammar"));
+	if (CollectionGrammarHandle.IsValid())
+	{
+		ChildBuilder.AddProperty(CollectionGrammarHandle.ToSharedRef());
+	}
 }
 
 void FPCGExAssetEntryCustomization::FillCustomizedTopLevelPropertiesNames()
@@ -165,6 +180,8 @@ void FPCGExAssetEntryCustomization::FillCustomizedTopLevelPropertiesNames()
 	CustomizedTopLevelProperties.Add(FName("bIsSubCollection"));
 	CustomizedTopLevelProperties.Add(FName("SubCollection"));
 	CustomizedTopLevelProperties.Add(FName("PropertyOverrides")); // Handled separately - no visibility filter
+	CustomizedTopLevelProperties.Add(FName("AssetGrammar"));      // Handled separately - no visibility filter
+	CustomizedTopLevelProperties.Add(FName("CollectionGrammar")); // Handled separately - no visibility filter
 }
 
 #define PCGEX_SUBCOLLECTION_VISIBLE \

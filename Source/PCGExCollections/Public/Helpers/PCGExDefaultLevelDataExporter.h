@@ -112,9 +112,17 @@ public:
 	virtual bool ExportLevelData(UWorld* World, UPCGDataAsset* OutAsset, FPCGExLevelExportContext& OutContext) override;
 
 	/** Classify an actor. Override for custom logic.
-	 *  Default: delegates to MeshClassificator; if it approves, checks for a valid
-	 *  UStaticMeshComponent. Falls back to Actor if not approved or no mesh found. */
-	virtual EPCGExActorExportType ClassifyActor(AActor* Actor, UStaticMeshComponent*& OutMeshComponent) const;
+	 *  Default behaviour:
+	 *   - ALevelInstance with a non-null world asset → Level.
+	 *   - Otherwise, if MeshClassificator approves AND the actor owns at least one
+	 *     UStaticMeshComponent (or subclass, e.g. ISMC) carrying a valid UStaticMesh
+	 *     and contributing geometry → Mesh.
+	 *   - Otherwise → Actor.
+	 *  An actor is either an Actor (full identity, property delta, etc.) or a Mesh
+	 *  container (every SMC-derived component is harvested). The two are mutually
+	 *  exclusive — Actor-classified actors do NOT contribute mesh points, even when
+	 *  they own ISMCs. */
+	virtual EPCGExActorExportType ClassifyActor(AActor* Actor) const;
 
 	/** Called after all points are created, before collection generation. */
 	virtual void OnExportComplete(UPCGDataAsset* OutAsset);
