@@ -14,7 +14,7 @@
  *  - Picker/customization is owned by this plugin, so we control the entire detail-panel
  *    flow (no crashes from the engine's ReloadValueOptions on ForceRefresh re-entry).
  *  - Native UEnum and UUserDefinedEnum (blueprint enumerations) are both selectable, with
- *    no special-casing — UUserDefinedEnum derives from UEnum and is treated uniformly.
+ *    no special-casing -- UUserDefinedEnum derives from UEnum and is treated uniformly.
  *
  * Layout intentionally mirrors FEnumSelector field-for-field so a struct redirect carries
  * pre-existing serialized data forward without loss.

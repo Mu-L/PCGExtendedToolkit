@@ -204,7 +204,7 @@ namespace PCGExEdgeOrder
 
 		// Iterative DFS: stack discipline gives each reached node its DFS tree depth.
 		// Depth strictly increases along the discovery path, so non-tree edges (back/cross)
-		// always connect nodes at different depths — orientation is unambiguous.
+		// always connect nodes at different depths -- orientation is unambiguous.
 		TArray<int32> Stack;
 		Stack.Reserve(Nodes.Num());
 

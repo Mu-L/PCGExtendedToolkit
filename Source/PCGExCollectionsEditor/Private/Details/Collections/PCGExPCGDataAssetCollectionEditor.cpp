@@ -117,7 +117,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 	];
 
 	// Source enum combobox (visible when not subcollection)
-	// SourceOptions lives on this editor instance — SComboBox stores a raw pointer into it.
+	// SourceOptions lives on this editor instance -- SComboBox stores a raw pointer into it.
 	Box->AddSlot()
 	   .AutoHeight()
 	   .Padding(0, 0, 0, 2)

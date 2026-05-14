@@ -132,6 +132,11 @@ namespace PCGExDetailsCustomization
 		PCGEX_ADD_ACTION_ICON(SnapResult, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(Snap, AIS_Small)
 
+		PCGEX_ADD_ACTION_ICON(ClosedClosed, AIS_Small)
+		PCGEX_ADD_ACTION_ICON(ClosedOpen, AIS_Small)
+		PCGEX_ADD_ACTION_ICON(OpenClosed, AIS_Small)
+		PCGEX_ADD_ACTION_ICON(OpenOpen, AIS_Small)
+
 		PCGEX_ADD_ACTION_ICON(Round, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(Floor, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(Ceil, AIS_Small)

@@ -23,6 +23,7 @@
 #include "Details/Collections/PCGExMaterialPicksCustomization.h"
 #include "Details/Collections/PCGExMeshCollectionActions.h"
 #include "Details/Collections/PCGExPCGDataAssetCollectionActions.h"
+#include "Details/Collections/PCGExSelectorRangeAxisCustomization.h"
 #include "UObject/UObjectGlobals.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExCollectionsEditorModule"
@@ -40,6 +41,7 @@ void FPCGExCollectionsEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO("PCGExMaterialOverrideSingleEntry", FPCGExMaterialOverrideSingleEntryCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExMaterialOverrideCollection", FPCGExMaterialOverrideCollectionCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExAssetGrammarDetails", FPCGExAssetGrammarCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExSelectorRangeAxis", FPCGExSelectorRangeAxisCustomization)
 
 #define PCGEX_REGISTER_ENTRY_CUSTOMIZATION(_CLASS, _NAME)\
 	PCGEX_REGISTER_CUSTO("PCGEx"#_CLASS"CollectionEntry", FPCGEx##_CLASS##EntryCustomization)
@@ -139,7 +141,7 @@ void FPCGExCollectionsEditorModule::OnAssetUpdatedOnDisk(const FAssetData& Asset
 
 			// Per-entry rebuild: match against the entry's advertised source paths.
 			// EDITOR_GetSourceAssetPaths() returns the *external* refs that should trigger
-			// a rebuild when updated on disk — which for some entry types (e.g. PCGDataAsset
+			// a rebuild when updated on disk -- which for some entry types (e.g. PCGDataAsset
 			// entries in Level mode) is NOT Staging.Path. Matching by package name also
 			// handles BP class paths where the path ends in "_C".
 			Collection->ForEachEntry([Collection, &AssetData](const FPCGExAssetCollectionEntry* InEntry, int32 i)

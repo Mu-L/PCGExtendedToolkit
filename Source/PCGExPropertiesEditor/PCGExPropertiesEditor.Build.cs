@@ -50,6 +50,7 @@ public class PCGExPropertiesEditor : ModuleRules
 				"PropertyEditor",
 				"EditorStyle",
 				"InputCore",
+				"AssetRegistry",
 			}
 		);
 

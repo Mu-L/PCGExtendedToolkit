@@ -331,7 +331,7 @@ namespace PCGExBFSDepth
 
 		if (Settings->NormalizedDepthMode == EPCGExBFSNormalizedDepthMode::Global)
 		{
-			// Simple depth / MaxDepth — parallelizable
+			// Simple depth / MaxDepth -- parallelizable
 			const double InvMax = 1.0 / static_cast<double>(MaxBFSDepth);
 			PCGEX_PARALLEL_FOR(
 				TotalNodes,
@@ -361,7 +361,7 @@ namespace PCGExBFSDepth
 			return Depths[A] > Depths[B];
 		});
 
-		// Reusable path buffer — avoids per-leaf allocation
+		// Reusable path buffer -- avoids per-leaf allocation
 		TArray<int32> Path;
 		Path.Reserve(MaxBFSDepth + 1);
 

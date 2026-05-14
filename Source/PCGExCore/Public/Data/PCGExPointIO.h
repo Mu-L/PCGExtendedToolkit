@@ -62,7 +62,7 @@ namespace PCGExData
 		std::atomic<bool> bIsEnabled{true};
 
 		TSharedPtr<TArray<int32>> IdxMapping;
-		
+
 		TWeakPtr<FPCGContextHandle> ContextHandle;
 
 	public:

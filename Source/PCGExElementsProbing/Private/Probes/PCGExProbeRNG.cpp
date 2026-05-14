@@ -29,7 +29,7 @@ void FPCGExProbeRNG::ProcessCandidates(const int32 Index, TArray<PCGExProbing::F
 	if (FMath::IsNearlyEqual(Config.Beta, 2.0))
 	{
 		// Optimized RNG path (β=2): C1=Pj, C2=Pi, radius=d_ij.
-		// C2 check reduces to d_ik < d_ij, which is guaranteed by the inner break —
+		// C2 check reduces to d_ik < d_ij, which is guaranteed by the inner break --
 		// so only one DistSquared per inner iteration is needed.
 		for (int32 c = 0; c < Candidates.Num(); ++c)
 		{

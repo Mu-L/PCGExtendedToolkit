@@ -45,7 +45,7 @@ FPCGElementPtr UPCGExAssetCollectionToSetSettings::CreateElement() const
 
 #pragma endregion
 
-// Note: Weight and Category are intentionally NOT in this list — they're handled explicitly.
+// Note: Weight and Category are intentionally NOT in this list -- they're handled explicitly.
 // Weight: attribute type (int32 vs float) and value (raw vs normalized) depend on WeightNormalization.
 // Category: value is read from FEntryWithHost::Category (resolved during recursion via CategoryInheritance),
 // not from E->Category.
@@ -318,7 +318,7 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 		return;
 	}
 
-	// Filters always run on the authored category, never on the resolved one — inheritance is an
+	// Filters always run on the authored category, never on the resolved one -- inheritance is an
 	// output concern.
 	if (!Ctx.CategoryFilters->Test(InEntry->Category.ToString()))
 	{
@@ -371,7 +371,7 @@ void FPCGExAssetCollectionToSetElement::ProcessEntry(
 			return;
 		} // !! Circular dependency !!
 
-		// Cascade: a None-stub doesn't reset the chain — the closest non-None ancestor wins.
+		// Cascade: a None-stub doesn't reset the chain -- the closest non-None ancestor wins.
 		const FName NextParent = InEntry->Category.IsNone() ? EffectiveParentCategory : InEntry->Category;
 
 		FPCGExEntryAccessResult SubResult;

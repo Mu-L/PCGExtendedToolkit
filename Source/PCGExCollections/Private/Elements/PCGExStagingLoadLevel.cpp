@@ -693,7 +693,7 @@ namespace PCGExStagingLoadLevel
 		ULevel* TargetLevel = TargetActor->GetLevel();
 		const bool bTransient = PCGHelpers::IsRuntimeOrPIE() || bIsPreview;
 
-		// Pass 1 — deep-copy each source actor via StaticDuplicateObject to faithfully
+		// Pass 1 -- deep-copy each source actor via StaticDuplicateObject to faithfully
 		// preserve all component state including construction-script instance overrides
 		// (e.g. per-instance spline shapes, mesh overrides). SpawnActor(Template) with a
 		// cross-world actor doesn't transfer the instance override cache, so components
@@ -727,7 +727,7 @@ namespace PCGExStagingLoadLevel
 			SourceToSpawned.Add(SourceActor, Duplicated);
 		}
 
-		// Pass 2 — restore parent-child relationships between spawned actors.
+		// Pass 2 -- restore parent-child relationships between spawned actors.
 		// ComponentToWorld is transient (not serialized) and is NOT recomputed when a UWorld is
 		// loaded as an asset. GetActorTransform() / GetRelativeTransform() via ComponentToWorld
 		// cannot be trusted. Snap to the parent first, then apply the serialized relative
@@ -759,10 +759,10 @@ namespace PCGExStagingLoadLevel
 			}
 		}
 
-		// Pass 3 — reposition root actors into PCG-point space, attach to target, finalize all.
+		// Pass 3 -- reposition root actors into PCG-point space, attach to target, finalize all.
 		// Only root actors receive the explicit transform; children follow through the hierarchy.
 		// Root actor world transforms are composed by walking the attachment chain and accumulating
-		// serialized RelativeTransforms — GetActorTransform() returns ComponentToWorld which is
+		// serialized RelativeTransforms -- GetActorTransform() returns ComponentToWorld which is
 		// transient and stays at identity for asset-loaded worlds.
 		const FName FolderPath = ComputeInnerFolderPath(TargetActor);
 

@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -18,7 +18,7 @@ struct FPCGExLevelCollectionEntry;
  *
  * Assign the output pointers before calling the 3-arg ExportLevelData. The exporter never
  * builds inline UPCGExMeshCollection / UPCGExLevelCollection and never writes Tag_EntryIdx
- * or the CollectionMap pin itself — it captures contributions through these pointers and
+ * or the CollectionMap pin itself -- it captures contributions through these pointers and
  * leaves final hashing + CollectionMap emission to the caller.
  *
  * MeshLocalPicks layout (one int32 per "Meshes" pin point):
@@ -78,7 +78,7 @@ struct PCGEXCOLLECTIONS_API FPCGExLevelExportContext
  *    used by UPCGExPCGDataAssetCollection to capture editor-only mesh + level
  *    contributions that feed shared-collection compaction (CompactSharedMesh /
  *    CompactSharedLevel). The exporter never builds inline embedded collections,
- *    never writes Tag_EntryIdx, and never emplaces the CollectionMap pin —
+ *    never writes Tag_EntryIdx, and never emplaces the CollectionMap pin --
  *    those responsibilities live on the caller. Default impl on the base forwards
  *    to the BP-facing path.
  */

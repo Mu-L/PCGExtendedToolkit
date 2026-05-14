@@ -308,10 +308,16 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	{
 		{
 			FReadScopeLock ReadLock(BufferLock);
-			if (InValues) { return true; }
+			if (InValues)
+			{
+				return true;
+			}
 		}
 		FWriteScopeLock WriteLock(BufferLock);
-		if (InValues) { return true; }
+		if (InValues)
+		{
+			return true;
+		}
 		InValues = OutValues;
 		return InValues ? true : false;
 	}
@@ -631,10 +637,16 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	{
 		{
 			FReadScopeLock ReadLock(BufferLock);
-			if (bReadInitialized) { return true; }
+			if (bReadInitialized)
+			{
+				return true;
+			}
 		}
 		FWriteScopeLock WriteLock(BufferLock);
-		if (bReadInitialized) { return true; }
+		if (bReadInitialized)
+		{
+			return true;
+		}
 		InValue = OutValue;
 		bReadFromOutput = true;
 		bReadInitialized = bWriteInitialized;

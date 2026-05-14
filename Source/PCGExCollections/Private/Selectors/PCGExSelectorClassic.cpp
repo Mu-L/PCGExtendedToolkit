@@ -8,12 +8,12 @@
 
 TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorClassicFactoryData::CreateEntryOperation(FPCGExContext* InContext) const
 {
-	switch (Mode)
+	switch (Config.Mode)
 	{
 	case EPCGExDistribution::Index:
 	{
 		TSharedPtr<FPCGExEntryIndexPickerOp> NewOp = MakeShared<FPCGExEntryIndexPickerOp>();
-		NewOp->IndexConfig = IndexConfig;
+		NewOp->IndexConfig = Config.IndexConfig;
 		return NewOp;
 	}
 	case EPCGExDistribution::Random:
@@ -27,20 +27,19 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorClassicFactoryData::CreateE
 UPCGExFactoryData* UPCGExSelectorClassicFactoryProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
 {
 	UPCGExSelectorClassicFactoryData* NewFactory = InContext->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
-	NewFactory->Mode = Mode;
 	NewFactory->BaseConfig = BaseConfig;
-	NewFactory->IndexConfig = IndexConfig;
+	NewFactory->Config = Config;
 	return Super::CreateFactory(InContext, NewFactory);
 }
 
 #if WITH_EDITOR
 FString UPCGExSelectorClassicFactoryProviderSettings::GetDisplayName() const
 {
-	switch (Mode)
+	switch (Config.Mode)
 	{
 	default:
 	case EPCGExDistribution::Index:
-		return TEXT("Select : Indexed on ") + PCGExMetaHelpers::GetSelectorDisplayName(IndexConfig.IndexSource);
+		return TEXT("Select : Indexed on ") + PCGExMetaHelpers::GetSelectorDisplayName(Config.IndexConfig.IndexSource);
 	case EPCGExDistribution::Random:
 		return TEXT("Select : Random");
 	case EPCGExDistribution::WeightedRandom:

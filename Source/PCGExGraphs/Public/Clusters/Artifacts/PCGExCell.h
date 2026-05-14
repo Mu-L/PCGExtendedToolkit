@@ -54,7 +54,7 @@ namespace PCGExClusters
 	 * the remaining directed boundary edges to extract one closed path per connected loop.
 	 * Running on a per-seed group (FindCells) dissolves the seed's grown region.
 	 * Running on all valid cells (FindAllCells) produces one merged cell per connected component.
-	 * @note Synthetic output cells do not populate Polygon — only required if used for containment testing.
+	 * @note Synthetic output cells do not populate Polygon -- only required if used for containment testing.
 	 */
 	PCGEXGRAPHS_API TArray<TSharedPtr<FCell>> MergeAdjacentCells(
 		const TArray<TSharedPtr<FCell>>& InCells,

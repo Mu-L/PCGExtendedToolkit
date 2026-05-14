@@ -201,7 +201,7 @@ namespace PCGExFusePoints
 
 		IOIndex = PointDataFacade->Source->IOIndex;
 
-		// Init a per-processor mutable copy of the FuseDetails — its ToleranceGetter binds to this facade.
+		// Init a per-processor mutable copy of the FuseDetails -- its ToleranceGetter binds to this facade.
 		FuseDetailsCopy = Settings->PointPointIntersectionDetails.FuseDetails;
 		if (!FuseDetailsCopy.Init(Context, PointDataFacade))
 		{

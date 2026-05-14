@@ -550,7 +550,7 @@ namespace PCGExClusters
 
 		// Build boundary edge set via undirected hash deduplication.
 		// TMap::Remove returns the count of removed elements: 0 = first occurrence (boundary candidate),
-		// 1 = second occurrence (shared interior edge — already removed, nothing to re-add).
+		// 1 = second occurrence (shared interior edge -- already removed, nothing to re-add).
 		TMap<uint64, TPair<int32, int32>> DirectedEdges;
 
 		for (const TSharedPtr<FCell>& Cell : InCells)
@@ -614,7 +614,7 @@ namespace PCGExClusters
 				{
 					bValid = false;
 					break;
-				} // dead end — non-manifold boundary
+				} // dead end -- non-manifold boundary
 				Current = *Next;
 				if (Current == StartNode)
 				{
@@ -652,7 +652,7 @@ namespace PCGExClusters
 			MergedCell->Data.Centroid = Centroid / LoopNodes.Num();
 
 			// Compute 2D polygon metrics if projected positions are available.
-			// Polygon is intentionally not populated — synthetic cells only need it for containment testing,
+			// Polygon is intentionally not populated -- synthetic cells only need it for containment testing,
 			// which never runs on merged cells (seeding/hole detection precedes the merge step).
 			if (InProjectedPositions && !InProjectedPositions->IsEmpty())
 			{
