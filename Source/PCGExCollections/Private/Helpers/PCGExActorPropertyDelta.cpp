@@ -82,9 +82,11 @@ namespace PCGExActorDelta
 				&& !InProperty->HasAnyPropertyFlags(CPF_EditConst | CPF_DisableEditOnInstance);
 		}
 
-		/** Root-component transform props are driven by the PCG point, never by the source
-		 *  actor. Including them in the delta would overwrite the spawn transform with the
-		 *  source actor's (often near-origin) values. */
+		/** Relative-transform props on the root component are driven by the PCG point, never
+		 *  by the source actor. Including them in the delta would overwrite the spawn
+		 *  transform with the source actor's (often near-origin) values. Non-root scene
+		 *  components legitimately use these props to describe their attachment offset, so
+		 *  the filter only fires when the caller flags the object as "this is the root". */
 		static bool IsTransformProperty(const FProperty* InProperty)
 		{
 			const FName PropName = InProperty->GetFName();
@@ -100,14 +102,16 @@ namespace PCGExActorDelta
 		 * Top-level property filter, branching on whether we're serializing an actor /
 		 * component (bIsSubobject=false) or a subobject (true).
 		 *
-		 *  - Top level: user-editable, non-transform properties only. Engine bookkeeping and
-		 *    transform fields would drown the delta in noise or fight the spawn transform.
+		 *  - Top level: user-editable properties only. Engine bookkeeping would drown the
+		 *    delta in noise. Root-component relative transform fields are additionally
+		 *    excluded when bSkipTransformProps is set, because they fight the spawn
+		 *    transform; non-root components keep them so child-component offsets survive.
 		 *  - Subobject: any non-transient, non-deprecated UPROPERTY field. Subobject state is
 		 *    typically internal (no details-panel exposure), so requiring CPF_Edit would drop
 		 *    exactly the state we came to capture -- UVoxelSplineMetadata::GuidToValues and
 		 *    similar plain-UPROPERTY TMap/TArray backing stores.
 		 */
-		static bool ShouldIncludeProperty(const FProperty* Property, bool bIsSubobject)
+		static bool ShouldIncludeProperty(const FProperty* Property, bool bIsSubobject, bool bSkipTransformProps)
 		{
 			if (bIsSubobject)
 			{
@@ -117,7 +121,7 @@ namespace PCGExActorDelta
 			{
 				return false;
 			}
-			if (IsTransformProperty(Property))
+			if (bSkipTransformProps && IsTransformProperty(Property))
 			{
 				return false;
 			}
@@ -128,7 +132,8 @@ namespace PCGExActorDelta
 		// nested-Instanced recursion.
 		static void SerializeObjectDelta(
 			UObject* Object, UObject* Defaults, TArray<uint8>& OutBytes,
-			TSet<const UObject*>& VisitedSources, bool bIsSubobject);
+			TSet<const UObject*>& VisitedSources, bool bIsSubobject, bool bSkipTransformProps,
+			TSet<FSoftObjectPath>* CollateralSink);
 
 		static void DeserializeObjectDelta(UObject* Object, const TArray<uint8>& InBytes);
 
@@ -184,6 +189,14 @@ namespace PCGExActorDelta
 			 *  recursion propagates this into the SerializeObjectDelta call so the same
 			 *  source object never serializes twice. */
 			TSet<const UObject*>* VisitedSources = nullptr;
+
+			/** Optional sink for FSoftObjectPath strings emitted via the soft-path fallback
+			 *  in operator<<(UObject*&). Populated for any non-null external reference the
+			 *  delta captures (asset refs, foreign-outer object refs). The spawn element
+			 *  reads these to async-batch-load referenced assets before applying the delta,
+			 *  so FSoftObjectPath::ResolveObject inside the reader succeeds without sync
+			 *  loads. nullptr = don't collect. */
+			TSet<FSoftObjectPath>* CollateralSink = nullptr;
 
 			virtual FArchive& operator<<(FName& Name) override
 			{
@@ -332,7 +345,9 @@ namespace PCGExActorDelta
 			UObject* Defaults,
 			TArray<uint8>& OutBytes,
 			TSet<const UObject*>& VisitedSources,
-			bool bIsSubobject = false)
+			bool bIsSubobject = false,
+			bool bSkipTransformProps = false,
+			TSet<FSoftObjectPath>* CollateralSink = nullptr)
 		{
 			if (!Object || !Defaults)
 			{
@@ -354,7 +369,7 @@ namespace PCGExActorDelta
 			TArray<FProperty*> PropsToWrite;
 			for (FProperty* Property = Class->PropertyLink; Property; Property = Property->PropertyLinkNext)
 			{
-				if (!ShouldIncludeProperty(Property, bIsSubobject))
+				if (!ShouldIncludeProperty(Property, bIsSubobject, bSkipTransformProps))
 				{
 					continue;
 				}
@@ -392,7 +407,10 @@ namespace PCGExActorDelta
 			for (const FSubobjectBinding& Sub : Subobjects)
 			{
 				TArray<uint8> SubBytes;
-				SerializeObjectDelta(Sub.Instance, Sub.Defaults, SubBytes, VisitedSources, /*bIsSubobject=*/true);
+				// Subobjects are by definition not the root component, so transform filtering
+				// never applies in this branch. Forward the collateral sink so soft-path
+				// references inside nested subobject state still get collected.
+				SerializeObjectDelta(Sub.Instance, Sub.Defaults, SubBytes, VisitedSources, /*bIsSubobject=*/true, /*bSkipTransformProps=*/false, CollateralSink);
 				if (!SubBytes.IsEmpty())
 				{
 					SubDeltas.Add({Sub.PropName, MoveTemp(SubBytes)});
@@ -406,6 +424,7 @@ namespace PCGExActorDelta
 
 			FDeltaWriter Writer(OutBytes);
 			Writer.VisitedSources = &VisitedSources;
+			Writer.CollateralSink = CollateralSink;
 
 			uint32 Count = PropsToWrite.Num();
 			Writer << Count;
@@ -421,10 +440,13 @@ namespace PCGExActorDelta
 					FDeltaWriter ValueWriter(ValueBytes);
 					// Inherit the outer writer's archive state so custom-versioned structs
 					// (FSpline uses FFortniteMainBranchObjectVersion etc.) round-trip with
-					// consistent versions, and share the visited set so nested
-					// operator<<(UObject*&) recursion can be cycle-safe.
+					// consistent versions, share the visited set so nested
+					// operator<<(UObject*&) recursion can be cycle-safe, and share the
+					// collateral sink so soft paths emitted by per-property writes land
+					// in the same outer collection.
 					ValueWriter.SetCustomVersions(Writer.GetCustomVersions());
 					ValueWriter.VisitedSources = &VisitedSources;
+					ValueWriter.CollateralSink = CollateralSink;
 					Property->SerializeItem(
 						FStructuredArchiveFromArchive(ValueWriter).GetSlot(),
 						Property->ContainerPtrToValuePtr<void>(Object),
@@ -454,10 +476,10 @@ namespace PCGExActorDelta
 		}
 
 		/** Public wrapper: allocate a fresh visited set and defer to the recursive impl. */
-		static void SerializeObjectDelta(UObject* Object, UObject* Defaults, TArray<uint8>& OutBytes, bool bIsSubobject = false)
+		static void SerializeObjectDelta(UObject* Object, UObject* Defaults, TArray<uint8>& OutBytes, bool bIsSubobject = false, bool bSkipTransformProps = false, TSet<FSoftObjectPath>* CollateralSink = nullptr)
 		{
 			TSet<const UObject*> Visited;
-			SerializeObjectDelta(Object, Defaults, OutBytes, Visited, bIsSubobject);
+			SerializeObjectDelta(Object, Defaults, OutBytes, Visited, bIsSubobject, bSkipTransformProps, CollateralSink);
 		}
 
 		/** Read per-property segments, then descend into the subobject section. Missing /
@@ -500,10 +522,13 @@ namespace PCGExActorDelta
 
 				const int64 ValueStart = Reader.Tell();
 
+				// The writer filters root-component relative-transform fields at capture; we
+				// trust that contract instead of mirroring the filter here. Filtering on read
+				// would silently drop legitimate non-root transform overrides that the writer
+				// intentionally emitted.
 				FProperty* Property = Class->FindPropertyByName(FName(*PropName));
 				if (!Property
-					|| Property->HasAnyPropertyFlags(CPF_Transient | CPF_DuplicateTransient | CPF_Deprecated)
-					|| IsTransformProperty(Property))
+					|| Property->HasAnyPropertyFlags(CPF_Transient | CPF_DuplicateTransient | CPF_Deprecated))
 				{
 					Reader.Seek(ValueStart + ValueSize);
 					continue;
@@ -623,6 +648,7 @@ namespace PCGExActorDelta
 					FDeltaWriter SubWriter(SubBytes);
 					SubWriter.SetCustomVersions(GetCustomVersions());
 					SubWriter.VisitedSources = VisitedSources;
+					SubWriter.CollateralSink = CollateralSink;
 
 					// Diff against the subobject's class CDO -- at this depth we don't
 					// have a per-instance archetype handle. Target and source share the
@@ -631,7 +657,9 @@ namespace PCGExActorDelta
 					// state for fields source customized past the CDO, and leaves
 					// archetype-level customizations intact where source didn't touch them.
 					UObject* CDO = Res->GetClass()->GetDefaultObject();
-					SerializeObjectDelta(Res, CDO, SubBytes, *VisitedSources, /*bIsSubobject=*/true);
+					// Nested-Instanced subobjects are never the root component, so transform
+					// filtering never applies in this branch.
+					SerializeObjectDelta(Res, CDO, SubBytes, *VisitedSources, /*bIsSubobject=*/true, /*bSkipTransformProps=*/false, CollateralSink);
 				}
 
 				uint32 SubSize = SubBytes.Num();
@@ -649,6 +677,14 @@ namespace PCGExActorDelta
 			// across sessions.
 			FString PathStr = Res ? FSoftObjectPath(Res).ToString() : FString();
 			*this << PathStr;
+
+			// IsAsset filter: intra-level refs (component AttachParent, cross-actor
+			// pointers) serialize through here too, with sub-object paths the streamable
+			// manager treats as load failures -- one bad path fails the whole batch.
+			if (CollateralSink && Res && Res->IsAsset() && !PathStr.IsEmpty())
+			{
+				CollateralSink->Add(FSoftObjectPath(PathStr));
+			}
 			return *this;
 		}
 
@@ -1027,19 +1063,24 @@ namespace PCGExActorDelta
 		return FPostApplyFixupHandleFactory::Make(Id);
 	}
 
-	TArray<uint8> SerializeActorDelta(AActor* Actor)
+	TArray<uint8> SerializeActorDelta(AActor* Actor, TArray<FSoftObjectPath>* OutCollaterals)
 	{
 		if (!Actor)
 		{
 			return {};
 		}
 
-		// Actor-level: diff instance against its CDO
+		// nullptr sink short-circuits the emit site, keeping the no-collateral path cost-free.
+		TSet<FSoftObjectPath> CollateralSet;
+		TSet<FSoftObjectPath>* CollateralSinkPtr = OutCollaterals ? &CollateralSet : nullptr;
+
 		UClass* ActorClass = Actor->GetClass();
 		UObject* ActorCDO = ActorClass->GetDefaultObject();
 
+		const USceneComponent* RootComp = Actor->GetRootComponent();
+
 		TArray<uint8> ActorBytes;
-		Internal::SerializeObjectDelta(Actor, ActorCDO, ActorBytes);
+		Internal::SerializeObjectDelta(Actor, ActorCDO, ActorBytes, /*bIsSubobject=*/false, /*bSkipTransformProps=*/false, CollateralSinkPtr);
 
 		// Collect component deltas
 		struct FComponentDelta
@@ -1074,8 +1115,9 @@ namespace PCGExActorDelta
 			// the class CDO anyway so dynamic state (spline points, metadata) survives,
 			// and record the class path so the apply side can recreate the component if
 			// the spawned target doesn't include it.
+			const bool bIsRoot = (Component == RootComp);
 			TArray<uint8> CompBytes;
-			Internal::SerializeObjectDelta(Component, Archetype, CompBytes);
+			Internal::SerializeObjectDelta(Component, Archetype, CompBytes, /*bIsSubobject=*/false, /*bSkipTransformProps=*/bIsRoot, CollateralSinkPtr);
 
 			if (!CompBytes.IsEmpty())
 			{
@@ -1090,6 +1132,13 @@ namespace PCGExActorDelta
 		if (ActorBytes.IsEmpty() && ComponentDeltas.IsEmpty())
 		{
 			return {};
+		}
+
+		// Drain before the wire-format pack so callers don't get a stale partial list when
+		// capture happens to be empty above.
+		if (OutCollaterals)
+		{
+			OutCollaterals->Append(CollateralSet.Array());
 		}
 
 		// Outer wire format:

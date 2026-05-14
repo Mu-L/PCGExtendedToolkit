@@ -17,6 +17,7 @@
 #include "Editor.h"
 #include "PropertyEditorModule.h"
 #include "ScopedTransaction.h"
+#include "TimerManager.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "HAL/FileManager.h"
@@ -891,6 +892,33 @@ void UPCGExAssetCollection::PostEditImport()
 
 #if WITH_EDITOR
 	EDITOR_SetDirty();
+#endif
+}
+
+void UPCGExAssetCollection::PostLoad()
+{
+	Super::PostLoad();
+
+#if WITH_EDITOR
+	// Defer to next tick: the rebuild cascades into UpdateStaging -> SpawnActor, which is
+	// unsafe during PostLoad (load chain may re-enter, GWorld mid-transition). Trade-off:
+	// a PCG graph that triggered THIS soft-load sees pre-rebuild state for its current
+	// run; subsequent runs see fresh data. Complements OnAssetUpdatedOnDisk which only
+	// fires for collections already loaded when a referenced asset is saved.
+	if (!GEditor || !GEditor->IsTimerManagerValid() || !bAutoRebuildStaging)
+	{
+		return;
+	}
+
+	TWeakObjectPtr<UPCGExAssetCollection> WeakThis(this);
+	GEditor->GetTimerManager()->SetTimerForNextTick(
+		[WeakThis]()
+		{
+			if (UPCGExAssetCollection* This = WeakThis.Get())
+			{
+				This->EDITOR_RebuildStaleEntries();
+			}
+		});
 #endif
 }
 

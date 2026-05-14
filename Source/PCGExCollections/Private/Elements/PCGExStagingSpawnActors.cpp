@@ -174,9 +174,19 @@ namespace PCGExStagingSpawnActors
 			RootActorPaths.SetNum(NumPoints);
 		}
 
+		// Hoist out of the parallel hot path; checked per-point inside ProcessPoints.
+		bApplyDeltas = Settings->bApplyPropertyDeltas;
+
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
 		return true;
+	}
+
+	void FProcessor::PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops)
+	{
+		// Reserve hint of 8 paths per scope: actor class + a handful of delta-collateral assets
+		// (typical: 1 static mesh + a couple of materials). Sets grow if needed.
+		ScopedUniquePaths = MakeShared<PCGExMT::TScopedSet<FSoftObjectPath>>(Loops, 8);
 	}
 
 	void FProcessor::ProcessPoints(const PCGExMT::FScope& Scope)
@@ -190,6 +200,10 @@ namespace PCGExStagingSpawnActors
 		// from settings on the main thread.
 		const bool bRootIsConstant = RootActorSV->IsConstant();
 		PCGEX_SV_VIEW_COND(RootActorSV, !bRootIsConstant)
+
+		// Per-scope local set. Writes during the loop don't touch other scopes; collapse on
+		// OnPointsProcessingComplete merges everything in a single pass.
+		TSet<FSoftObjectPath>& LocalPaths = ScopedUniquePaths->Get_Ref(Scope);
 
 		int16 MaterialPick = 0;
 
@@ -222,13 +236,22 @@ namespace PCGExStagingSpawnActors
 			}
 
 			const FPCGExActorCollectionEntry* ActorEntry = static_cast<const FPCGExActorCollectionEntry*>(Result.Entry);
-			if (!ActorEntry->Actor.ToSoftObjectPath().IsValid())
+			const FSoftObjectPath ActorClassPath = ActorEntry->Actor.ToSoftObjectPath();
+			if (!ActorClassPath.IsValid())
 			{
 				continue;
 			}
 
 			// Write directly to our index -- no lock, each thread writes unique indices
 			ResolvedEntries[Index].Entry = ActorEntry;
+
+			// Delta collateral paths are skipped when deltas are disabled -- prefetching
+			// them would be wasted IO since the apply path won't run.
+			LocalPaths.Add(ActorClassPath);
+			if (bApplyDeltas)
+			{
+				LocalPaths.Append(ActorEntry->DeltaCollateralPaths);
+			}
 
 			if (!bRootIsConstant)
 			{
@@ -241,20 +264,11 @@ namespace PCGExStagingSpawnActors
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::OnPointsProcessingComplete);
 
-		// Collect unique actor class paths from resolved entries
-		TSet<FSoftObjectPath> UniqueClasses;
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::CollectUniqueClasses);
-			for (const FResolvedEntry& Resolved : ResolvedEntries)
-			{
-				if (Resolved.Entry)
-				{
-					UniqueClasses.Add(Resolved.Entry->Actor.ToSoftObjectPath());
-				}
-			}
-		}
+		TSet<FSoftObjectPath> UniquePaths;
+		ScopedUniquePaths->Collapse(UniquePaths);
+		ScopedUniquePaths.Reset();
 
-		if (UniqueClasses.IsEmpty())
+		if (UniquePaths.IsEmpty())
 		{
 			bIsProcessorValid = false;
 			return;
@@ -279,8 +293,7 @@ namespace PCGExStagingSpawnActors
 		// Cache transforms for the spawn loop
 		Transforms = PointDataFacade->Source->GetIn()->GetConstTransformValueRange();
 
-		// Batch-load all unique actor classes asynchronously, then start spawning
-		TArray<FSoftObjectPath> PathsToLoad = UniqueClasses.Array();
+		TArray<FSoftObjectPath> PathsToLoad = UniquePaths.Array();
 
 		PCGExHelpers::Load(
 			TaskManager,
@@ -407,11 +420,10 @@ namespace PCGExStagingSpawnActors
 		{
 			PCGExActorDelta::ApplyPropertyDelta(SpawnedActor, ActorEntry->SerializedPropertyDelta);
 
-			// Delta application writes the source actor's root component transform
-			// (RelativeLocation/Rotation/Scale3D are user-editable UPROPERTYs so they're
-			// captured in the delta). That overwrites the location we spawned at, so the
-			// actor ends up at the source actor's original position instead of the PCG
-			// point's position. Re-apply the spawn transform so the PCG point wins.
+			// Defensive re-apply of the spawn transform. The writer filters the root
+			// component's relative-transform fields, so the delta itself shouldn't move the
+			// actor -- but BP construction scripts or post-apply fixups occasionally touch
+			// the root, and we want the PCG point to be the source of truth either way.
 			SpawnedActor->SetActorTransform(SpawnTransform);
 		}
 

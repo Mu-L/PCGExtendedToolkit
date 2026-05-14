@@ -629,6 +629,7 @@ public:
 
 	virtual void PostDuplicate(bool bDuplicateForPIE) override;
 	virtual void PostEditImport() override;
+	virtual void PostLoad() override;
 	virtual void BeginDestroy() override;
 
 	void RebuildStagingData(bool bRecursive);
