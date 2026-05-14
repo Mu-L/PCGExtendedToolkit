@@ -785,7 +785,7 @@ public:
 	 * Read-only registry of available properties (built from CollectionProperties).
 	 * Used for UI display and validation.
 	 */
-	UPROPERTY(VisibleAnywhere, Category = "Properties")
+	UPROPERTY()
 	TArray<FPCGExPropertyRegistryEntry> PropertyRegistry;
 
 protected:
