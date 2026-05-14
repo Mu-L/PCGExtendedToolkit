@@ -533,6 +533,10 @@ namespace PCGExSharedCompact
 		return true;
 	}
 
+#if WITH_EDITOR
+	// Policies + CompactShared reference Editor* fields on FPCGExPCGDataAssetCollectionEntry
+	// which are themselves WITH_EDITORONLY_DATA. Their callers (CompactSharedMesh /
+	// CompactSharedLevel) are body-guarded the same way.
 	// --- Policy structs supplying entry-specific knowledge to CompactShared<>. ---
 	struct FMeshPolicy
 	{
@@ -850,6 +854,7 @@ namespace PCGExSharedCompact
 			}
 		}
 	}
+#endif // WITH_EDITOR
 }
 
 #pragma endregion
