@@ -89,6 +89,7 @@ namespace PCGExDetailsCustomization
 
 		PCGEX_ADD_ACTION_ICON(AddContentBrowserSelection, AIS_Med)
 		PCGEX_ADD_ACTION_ICON(NormalizeWeight, AIS_Med)
+		PCGEX_ADD_ACTION_ICON(Grammit, AIS_Med)
 
 		PCGEX_ADD_ACTION_ICON(Entries, AIS_Med)
 		PCGEX_ADD_ACTION_ICON(Settings, AIS_Med)

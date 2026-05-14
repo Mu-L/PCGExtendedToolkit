@@ -31,8 +31,12 @@
 
 #include "PCGExLog.h"
 #include "Data/PCGExDataValue.h"
+#include "Data/Descriptors/PCGExComponentDescriptors.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
 #include "Helpers/PCGExMetaHelpersMacros.h"
+
+#include "ISMPartition/ISMComponentDescriptor.h"
+#include "Serialization/ArchiveCrc32.h"
 
 #include "PCGExCollectionsSettingsCache.h"
 
@@ -65,7 +69,7 @@ UPCGExDefaultLevelDataExporter::UPCGExDefaultLevelDataExporter(const FObjectInit
 		                                         UPCGExBoundsEvaluator::StaticClass(), EvalClass, false, false));
 }
 
-EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Actor, UStaticMeshComponent*& OutMeshComponent) const
+EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Actor) const
 {
 	// Level instances precede the mesh check: an ALevelInstance can incidentally have
 	// a UStaticMeshComponent (gizmo/visualizer) but the meaningful payload is the
@@ -82,9 +86,24 @@ EPCGExActorExportType UPCGExDefaultLevelDataExporter::ClassifyActor(AActor* Acto
 
 	if (MeshClassificator && MeshClassificator->ShouldClassifyAsMesh(Actor))
 	{
-		OutMeshComponent = Actor->FindComponentByClass<UStaticMeshComponent>();
-		if (OutMeshComponent && OutMeshComponent->GetStaticMesh())
+		// Any UStaticMeshComponent (or subclass — ISMC, HISM, splines, future kinds)
+		// with a valid mesh AND geometry to contribute qualifies the actor as a Mesh
+		// container. ISMCs with zero instances contribute nothing and don't count.
+		TInlineComponentArray<UStaticMeshComponent*> SMCs;
+		Actor->GetComponents<UStaticMeshComponent>(SMCs);
+		for (UStaticMeshComponent* SMC : SMCs)
 		{
+			if (!SMC || !SMC->GetStaticMesh())
+			{
+				continue;
+			}
+			if (const UInstancedStaticMeshComponent* ISMC = Cast<UInstancedStaticMeshComponent>(SMC))
+			{
+				if (ISMC->GetInstanceCount() == 0)
+				{
+					continue;
+				}
+			}
 			return EPCGExActorExportType::Mesh;
 		}
 	}
@@ -103,7 +122,6 @@ namespace PCGExDefaultLevelDataExporterInternal
 	{
 		AActor* Actor = nullptr;
 		EPCGExActorExportType Type = EPCGExActorExportType::Skip;
-		UStaticMeshComponent* MeshComponent = nullptr;
 		uint32 DeltaHash = 0;
 	};
 
@@ -176,12 +194,37 @@ namespace PCGExDefaultLevelDataExporterInternal
 		WorldBoundsToLocal(WorldBounds, ActorTransform, BoundsMin[Index], BoundsMax[Index]);
 	}
 
+	// Components share an entry only when they agree on mesh, source kind, AND the
+	// descriptor fingerprint (every UPROPERTY except OverrideMaterials — those become
+	// per-entry variants instead). Different mobility / collision / body instance /
+	// light map / etc. → distinct entry, descriptor preserved on each.
+	struct FMeshEntryKey
+	{
+		FSoftObjectPath MeshPath;
+		uint32 DescriptorFingerprint = 0;
+		bool bIsISMSource = false;
+
+		bool operator==(const FMeshEntryKey& Other) const
+		{
+			return MeshPath == Other.MeshPath
+				&& DescriptorFingerprint == Other.DescriptorFingerprint
+				&& bIsISMSource == Other.bIsISMSource;
+		}
+
+		friend uint32 GetTypeHash(const FMeshEntryKey& Key)
+		{
+			return HashCombine(
+				HashCombine(GetTypeHash(Key.MeshPath), Key.DescriptorFingerprint),
+				Key.bIsISMSource ? 1u : 0u);
+		}
+	};
+
 	struct FMeshPoint
 	{
 		FTransform Transform;
 		FVector BoundsMin = FVector::ZeroVector;
 		FVector BoundsMax = FVector::ZeroVector;
-		FSoftObjectPath MeshPath;
+		FMeshEntryKey EntryKey;
 		const UStaticMeshComponent* SourceComponent = nullptr;
 		AActor* SourceActor = nullptr;
 		int32 MaterialVariantIndex = -1;
@@ -190,8 +233,12 @@ namespace PCGExDefaultLevelDataExporterInternal
 	struct FMeshInfo
 	{
 		int32 EntryIndex = -1;
-		const UStaticMeshComponent* FirstComponent = nullptr;
 		int32 TotalCount = 0;
+		// Authoritative for the entry; the kind matching the source key is populated,
+		// the other stays at engine defaults. Subsequent contributors share the
+		// fingerprint by construction, so first-write-wins is a tautology, not a guess.
+		FSoftISMComponentDescriptor ISMDescriptor;
+		FPCGExStaticMeshComponentDescriptor SMDescriptor;
 		TArray<TArray<FSoftObjectPath>> UniqueVariantMaterials;
 		TMap<uint32, int32> VariantHashToIndex;
 	};
@@ -275,6 +322,133 @@ namespace PCGExDefaultLevelDataExporterInternal
 		}
 
 		return VariantIdx;
+	}
+
+	// Non-const ref because FSoftISMComponentDescriptor's copy ctor is `explicit`,
+	// blocking a local-copy form. Save-restore on the original lets us strip
+	// OverrideMaterials transiently without mutating observable state — those go on
+	// the entry as variants, so they shouldn't influence descriptor identity.
+	template <typename TDescriptor>
+	static uint32 FingerprintDescriptor(TDescriptor& Descriptor)
+	{
+		decltype(Descriptor.OverrideMaterials) SavedMaterials = MoveTemp(Descriptor.OverrideMaterials);
+		Descriptor.OverrideMaterials.Reset();
+
+		FArchiveCrc32 CrcArchive;
+		TDescriptor::StaticStruct()->SerializeBin(CrcArchive, &Descriptor);
+		const uint32 Crc = CrcArchive.GetCrc();
+
+		Descriptor.OverrideMaterials = MoveTemp(SavedMaterials);
+		return Crc;
+	}
+
+	// Unified mesh-point extraction for a single Mesh-classified actor. Mesh and
+	// Actor classifications are mutually exclusive — Actor-classified actors with
+	// ISMCs are intentionally NOT harvested here. Bounds are the mesh's intrinsic
+	// local AABB; BoundsEvaluator is not consulted because component variation
+	// belongs on per-entry descriptor data, not a coarse per-actor world AABB.
+	static void ExtractMeshPointsFromActor(
+		AActor* Actor,
+		bool bCaptureMaterialOverrides,
+		TArray<FMeshPoint>& OutPoints,
+		TMap<FMeshEntryKey, FMeshInfo>& InOutMeshInfoMap)
+	{
+		TInlineComponentArray<UStaticMeshComponent*> SMCs;
+		Actor->GetComponents<UStaticMeshComponent>(SMCs);
+
+		for (UStaticMeshComponent* SMC : SMCs)
+		{
+			if (!SMC)
+			{
+				continue;
+			}
+
+			UStaticMesh* Mesh = SMC->GetStaticMesh();
+			if (!Mesh)
+			{
+				continue;
+			}
+
+			UInstancedStaticMeshComponent* ISMC = Cast<UInstancedStaticMeshComponent>(SMC);
+			const bool bIsISM = ISMC != nullptr;
+
+			FMeshEntryKey Key;
+			Key.MeshPath = FSoftObjectPath(Mesh);
+			Key.bIsISMSource = bIsISM;
+
+			FSoftISMComponentDescriptor TentativeISM;
+			FPCGExStaticMeshComponentDescriptor TentativeSM;
+
+			if (bIsISM)
+			{
+				TentativeISM.InitFrom(SMC, /*bInitBodyInstance=*/false);
+				Key.DescriptorFingerprint = FingerprintDescriptor(TentativeISM);
+			}
+			else
+			{
+				TentativeSM.InitFrom(SMC, /*bInitBodyInstance=*/false);
+				Key.DescriptorFingerprint = FingerprintDescriptor(TentativeSM);
+			}
+
+			FMeshInfo& Info = InOutMeshInfoMap.FindOrAdd(Key);
+
+			// First contribution stores the descriptor; subsequent contributors are
+			// equivalent by fingerprint so the stored value is canonical.
+			if (Info.TotalCount == 0)
+			{
+				if (bIsISM)
+				{
+					Info.ISMDescriptor = MoveTemp(TentativeISM);
+				}
+				else
+				{
+					Info.SMDescriptor = MoveTemp(TentativeSM);
+				}
+			}
+
+			const int32 VariantIdx = bCaptureMaterialOverrides
+				? TrackMaterialVariant(SMC, Info)
+				: -1;
+
+			const FBox MeshBounds = Mesh->GetBoundingBox();
+
+			if (bIsISM)
+			{
+				const int32 InstanceCount = ISMC->GetInstanceCount();
+				if (InstanceCount == 0)
+				{
+					continue;
+				}
+
+				Info.TotalCount += InstanceCount;
+				OutPoints.Reserve(OutPoints.Num() + InstanceCount);
+
+				for (int32 Idx = 0; Idx < InstanceCount; Idx++)
+				{
+					FMeshPoint& Point = OutPoints.AddDefaulted_GetRef();
+					Point.EntryKey = Key;
+					Point.SourceComponent = ISMC;
+					Point.SourceActor = Actor;
+					Point.MaterialVariantIndex = VariantIdx;
+					Point.BoundsMin = MeshBounds.Min;
+					Point.BoundsMax = MeshBounds.Max;
+					ISMC->GetInstanceTransform(Idx, Point.Transform, /*bWorldSpace=*/true);
+				}
+			}
+			else
+			{
+				Info.TotalCount++;
+
+				FMeshPoint& Point = OutPoints.AddDefaulted_GetRef();
+				Point.EntryKey = Key;
+				Point.SourceComponent = SMC;
+				Point.SourceActor = Actor;
+				Point.MaterialVariantIndex = VariantIdx;
+				Point.Transform = SMC->GetComponentTransform();
+				Point.BoundsMin = MeshBounds.Min;
+				Point.BoundsMax = MeshBounds.Max;
+			}
+		}
 	}
 
 	// Registry that tracks which attribute name maps to which PCG metadata type.
@@ -475,7 +649,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 
 		FClassifiedActor Classified;
 		Classified.Actor = Actor;
-		Classified.Type = ClassifyActor(Actor, Classified.MeshComponent);
+		Classified.Type = ClassifyActor(Actor);
 
 		if (Classified.Type != EPCGExActorExportType::Skip)
 		{
@@ -609,98 +783,12 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 
 	// Phase 2: Create typed point data
 
-	// --- Unified Meshes (SM actors + ISM instances) ---
 	TArray<FMeshPoint> AllMeshPoints;
-	TMap<FSoftObjectPath, FMeshInfo> MeshInfoMap;
+	TMap<FMeshEntryKey, FMeshInfo> MeshInfoMap;
 
-	// Collect from SM actors
 	for (const FClassifiedActor& CA : MeshActors)
 	{
-		if (!CA.MeshComponent)
-		{
-			continue;
-		}
-		UStaticMesh* Mesh = CA.MeshComponent->GetStaticMesh();
-		if (!Mesh)
-		{
-			continue;
-		}
-
-		const FSoftObjectPath MeshPath(Mesh);
-		FMeshInfo& Info = MeshInfoMap.FindOrAdd(MeshPath);
-		Info.TotalCount++;
-		if (!Info.FirstComponent)
-		{
-			Info.FirstComponent = CA.MeshComponent;
-		}
-
-		FMeshPoint& Point = AllMeshPoints.AddDefaulted_GetRef();
-		Point.MeshPath = MeshPath;
-		Point.SourceComponent = CA.MeshComponent;
-		Point.SourceActor = CA.Actor;
-
-		const FTransform ActorTransform = CA.Actor->GetActorTransform();
-		Point.Transform = ActorTransform;
-
-		const FBox WorldBounds = BoundsEvaluator ? BoundsEvaluator->EvaluateActorBounds(CA.Actor, nullptr, -1) : FBox(ForceInit);
-		WorldBoundsToLocal(WorldBounds, ActorTransform, Point.BoundsMin, Point.BoundsMax);
-
-		if (bCaptureMaterialOverrides)
-		{
-			Point.MaterialVariantIndex = TrackMaterialVariant(CA.MeshComponent, Info);
-		}
-	}
-
-	// Collect from ISM instances on all classified actors
-	for (const FClassifiedActor& CA : ClassifiedActors)
-	{
-		TArray<UInstancedStaticMeshComponent*> ISMComponents;
-		CA.Actor->GetComponents<UInstancedStaticMeshComponent>(ISMComponents);
-
-		for (const UInstancedStaticMeshComponent* ISM : ISMComponents)
-		{
-			if (!ISM || ISM->GetInstanceCount() == 0)
-			{
-				continue;
-			}
-
-			UStaticMesh* Mesh = ISM->GetStaticMesh();
-			if (!Mesh)
-			{
-				continue;
-			}
-
-			const FSoftObjectPath MeshPath(Mesh);
-			const int32 InstanceCount = ISM->GetInstanceCount();
-
-			FMeshInfo& Info = MeshInfoMap.FindOrAdd(MeshPath);
-			Info.TotalCount += InstanceCount;
-			if (!Info.FirstComponent)
-			{
-				Info.FirstComponent = ISM;
-			}
-
-			const FBox MeshBounds = Mesh->GetBoundingBox();
-
-			int32 VariantIdx = -1;
-			if (bCaptureMaterialOverrides)
-			{
-				VariantIdx = TrackMaterialVariant(ISM, Info);
-			}
-
-			for (int32 Idx = 0; Idx < InstanceCount; Idx++)
-			{
-				FMeshPoint& Point = AllMeshPoints.AddDefaulted_GetRef();
-				Point.MeshPath = MeshPath;
-				Point.SourceComponent = ISM;
-				Point.SourceActor = CA.Actor;
-				Point.MaterialVariantIndex = VariantIdx;
-
-				ISM->GetInstanceTransform(Idx, Point.Transform, true);
-				Point.BoundsMin = MeshBounds.Min;
-				Point.BoundsMax = MeshBounds.Max;
-			}
-		}
+		ExtractMeshPointsFromActor(CA.Actor, bCaptureMaterialOverrides, AllMeshPoints, MeshInfoMap);
 	}
 
 	// Create mesh point data
@@ -763,7 +851,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 				}
 				if (MeshAttr)
 				{
-					MeshAttr->SetValue(Entry, AllMeshPoints[i].MeshPath);
+					MeshAttr->SetValue(Entry, AllMeshPoints[i].EntryKey.MeshPath);
 				}
 			}
 		}
@@ -993,14 +1081,16 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 				Elem.Value.EntryIndex = MeshIdx;
 
 				FPCGExMeshCollectionEntry& MeshEntry = MeshEntries[MeshIdx];
-				MeshEntry.StaticMesh = TSoftObjectPtr<UStaticMesh>(Elem.Key);
+				MeshEntry.StaticMesh = TSoftObjectPtr<UStaticMesh>(Elem.Key.MeshPath);
 				MeshEntry.Weight = Elem.Value.TotalCount;
 
-				// Populate ISM/SM descriptors from first source component
-				if (Elem.Value.FirstComponent)
+				if (Elem.Key.bIsISMSource)
 				{
-					MeshEntry.ISMDescriptor.InitFrom(Elem.Value.FirstComponent, false);
-					MeshEntry.SMDescriptor.InitFrom(Elem.Value.FirstComponent, false);
+					MeshEntry.ISMDescriptor = Elem.Value.ISMDescriptor;
+				}
+				else
+				{
+					MeshEntry.SMDescriptor = Elem.Value.SMDescriptor;
 				}
 
 				// Material variants
@@ -1090,7 +1180,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 			for (int32 i = 0; i < AllMeshPoints.Num(); i++)
 			{
 				const FMeshPoint& Point = AllMeshPoints[i];
-				const FMeshInfo* Info = MeshInfoMap.Find(Point.MeshPath);
+				const FMeshInfo* Info = MeshInfoMap.Find(Point.EntryKey);
 				if (!Info)
 				{
 					// Sentinel: -1 means "no pick" — rewrite pass leaves the hash unwritten.

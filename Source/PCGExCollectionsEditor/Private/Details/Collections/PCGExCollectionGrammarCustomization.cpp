@@ -9,10 +9,75 @@
 #include "Core/PCGExAssetCollection.h"
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/Colors/SColorBlock.h"
+#include "Widgets/Colors/SColorPicker.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
+
+namespace PCGExCollectionGrammarCustomization
+{
+	// See PCGExAssetGrammarCustomization::MakeColorWidget for rationale — same issue with
+	// FLinearColor nested inside an entry struct inside the collection's array.
+	static TSharedRef<SWidget> MakeColorWidget(TSharedPtr<IPropertyHandle> Handle)
+	{
+		return SNew(SColorBlock)
+			.Color_Lambda([Handle]() -> FLinearColor
+			{
+				FLinearColor C = FLinearColor::White;
+				if (Handle.IsValid())
+				{
+					void* Data = nullptr;
+					if (Handle->GetValueData(Data) == FPropertyAccess::Success && Data)
+					{
+						C = *static_cast<const FLinearColor*>(Data);
+					}
+				}
+				return C;
+			})
+			.AlphaDisplayMode(EColorBlockAlphaDisplayMode::Ignore)
+			.ShowBackgroundForAlpha(false)
+			.Size(FVector2D(22.f, 18.f))
+			.OnMouseButtonDown_Lambda([Handle](const FGeometry&, const FPointerEvent& MouseEvent) -> FReply
+			{
+				if (MouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+				{
+					return FReply::Unhandled();
+				}
+				if (!Handle.IsValid())
+				{
+					return FReply::Unhandled();
+				}
+
+				FLinearColor Initial = FLinearColor::White;
+				void* Data = nullptr;
+				if (Handle->GetValueData(Data) == FPropertyAccess::Success && Data)
+				{
+					Initial = *static_cast<const FLinearColor*>(Data);
+				}
+
+				FColorPickerArgs PickerArgs;
+				PickerArgs.bUseAlpha = false;
+				PickerArgs.bOnlyRefreshOnMouseUp = false;
+				PickerArgs.bOnlyRefreshOnOk = false;
+				PickerArgs.InitialColor = Initial;
+				PickerArgs.OnColorCommitted = FOnLinearColorValueChanged::CreateLambda(
+					[Handle](FLinearColor NewColor)
+					{
+						if (!Handle.IsValid())
+						{
+							return;
+						}
+						Handle->SetValueFromFormattedString(NewColor.ToString());
+						Handle->NotifyFinishedChangingProperties();
+					});
+
+				OpenColorPicker(PickerArgs);
+				return FReply::Handled();
+			});
+	}
+}
 
 #define PCGEX_SMALL_LABEL(_TEXT) \
 + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(1, 0)\
@@ -166,12 +231,12 @@ void FPCGExCollectionGrammarCustomization::CustomizeHeader(
 			]
 			// Debug color
 			PCGEX_SMALL_LABEL("·· ")
-			+ SHorizontalBox::Slot().Padding(1).MaxWidth(25)
+			+ SHorizontalBox::Slot().Padding(1).AutoWidth().VAlign(VAlign_Center)
 			[
 				SNew(SBox)
 				.IsEnabled_Lambda(IsLocalData)
 				[
-					DebugColorHandle->CreatePropertyValueWidget()
+					PCGExCollectionGrammarCustomization::MakeColorWidget(DebugColorHandle)
 				]
 			]
 		]
