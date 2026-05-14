@@ -168,7 +168,7 @@ bool FPCGExDecompBSPOccupancy::FindBestSplit(
 	int32& OutAxis,
 	int32& OutPosition) const
 {
-	double BestScore = -MAX_dbl;
+	double BestScore = TNumericLimits<double>::Lowest();
 	OutAxis = -1;
 	OutPosition = -1;
 

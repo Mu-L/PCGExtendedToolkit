@@ -111,7 +111,7 @@ namespace PCGExFindPointOnBounds
 	{
 		mutable FRWLock BestIndexLock;
 
-		double BestDistance = MAX_dbl;
+		double BestDistance = TNumericLimits<double>::Max();
 		FVector SearchPosition = FVector::ZeroVector;
 		FVector BestPosition = FVector::ZeroVector;
 		int32 BestIndex = -1;

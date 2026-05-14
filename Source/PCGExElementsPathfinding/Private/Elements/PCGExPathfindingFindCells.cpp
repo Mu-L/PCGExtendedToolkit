@@ -388,7 +388,7 @@ namespace PCGExFindContours
 
 			// Seed is exterior - find closest edge distance
 			const FVector& SeedPos = SeedTransforms[SeedIdx].GetLocation();
-			double ClosestEdgeDistSq = MAX_dbl;
+			double ClosestEdgeDistSq = TNumericLimits<double>::Max();
 
 			Cluster->GetEdgeOctree()->FindNearbyElements(SeedPos, [&](const PCGExOctree::FItem& Item)
 			{
@@ -611,7 +611,7 @@ namespace PCGExFindContours
 				}
 
 				const FVector& SeedPos = SeedTransforms[SeedIdx].GetLocation();
-				double ClosestEdgeDistSq = MAX_dbl;
+				double ClosestEdgeDistSq = TNumericLimits<double>::Max();
 
 				Cluster->GetEdgeOctree()->FindNearbyElements(SeedPos, [&](const PCGExOctree::FItem& Item)
 				{

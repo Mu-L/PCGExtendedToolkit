@@ -106,8 +106,8 @@ void FPCGExVtxPropertyAmplitude::ProcessNode(PCGExClusters::FNode& Node, const T
 	const int32 NumAdjacency = Adjacency.Num();
 
 	FVector AverageDirection = FVector::ZeroVector;
-	FVector MinAmplitude = FVector(MAX_dbl);
-	FVector MaxAmplitude = FVector(MIN_dbl_neg);
+	FVector MinAmplitude = FVector(TNumericLimits<double>::Max());
+	FVector MaxAmplitude = FVector(TNumericLimits<double>::Lowest());
 
 	TArray<double> Sizes;
 	Sizes.SetNum(NumAdjacency);

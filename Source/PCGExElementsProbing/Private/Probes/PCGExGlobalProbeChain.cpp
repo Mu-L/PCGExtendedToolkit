@@ -105,7 +105,7 @@ void FPCGExProbeChain::ComputeGreedyTSPOrder(TArray<int32>& OutOrder) const
 	// Greedily pick nearest unvisited
 	while (Remaining.Num() > 0)
 	{
-		double BestDist = MAX_dbl;
+		double BestDist = TNumericLimits<double>::Max();
 		int32 BestNext = INDEX_NONE;
 
 		for (const int32 Candidate : Remaining)

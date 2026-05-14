@@ -45,7 +45,7 @@ namespace PCGExProbeBitmasks
 		for (int i = 0; i < BestDotsBuffer.Num(); i++)
 		{
 			BestDotsBuffer[i] = -1;
-			BestDistsBuffer[i] = MAX_dbl;
+			BestDistsBuffer[i] = TNumericLimits<double>::Max();
 			BestIdxBuffer[i] = -1;
 		}
 	}

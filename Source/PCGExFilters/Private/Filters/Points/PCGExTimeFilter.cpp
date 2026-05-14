@@ -139,7 +139,7 @@ namespace PCGExPointFilter
 
 		if (TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest)
 		{
-			double BestDist = MAX_dbl;
+			double BestDist = TNumericLimits<double>::Max();
 
 			TypedFilterFactory->Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, FVector::OneVector), [&](const PCGExOctree::FItem& Item)
 			{
@@ -225,7 +225,7 @@ namespace PCGExPointFilter
 
 		if (TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest)
 		{
-			double BestDist = MAX_dbl;
+			double BestDist = TNumericLimits<double>::Max();
 
 			TypedFilterFactory->Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, FVector::OneVector), [&](const PCGExOctree::FItem& Item)
 			{

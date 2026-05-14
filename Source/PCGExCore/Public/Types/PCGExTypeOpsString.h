@@ -312,7 +312,7 @@ namespace PCGExTypeOps
 		{
 		}
 
-		// Categorical: 0 when equal, 1 otherwise — used by closest-match scoring for non-ordered types.
+		// Categorical: 0 when equal, 1 otherwise -- used by closest-match scoring for non-ordered types.
 		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
 		{
 			return A.Equals(B) ? 0.0 : 1.0;

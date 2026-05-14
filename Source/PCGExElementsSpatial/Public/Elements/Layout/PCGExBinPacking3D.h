@@ -311,7 +311,7 @@ namespace PCGExBinPacking3D
 		FVector RotatedSize = FVector::ZeroVector;
 		FVector PlacementMin = FVector::ZeroVector;
 		FVector EffectivePadding = FVector::ZeroVector;
-		double Score = MAX_dbl;
+		double Score = TNumericLimits<double>::Max();
 
 		// Paper objective scores (all [0,1], lower = better)
 		double BinUsageScore = 0.0;

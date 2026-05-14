@@ -95,7 +95,7 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 	const PCGExHeuristics::FLocalFeedbackHandler* Feedback = LocalFeedback.Get();
 
 	int32 MeetingNode = -1;
-	double BestPathCost = MAX_dbl;
+	double BestPathCost = TNumericLimits<double>::Max();
 
 	// Alternate between forward and backward searches
 	while (!QueueForward->IsEmpty() || !QueueBackward->IsEmpty())

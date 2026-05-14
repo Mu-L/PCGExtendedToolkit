@@ -469,7 +469,7 @@ namespace PCGExSampleSurfaceGuided
 
 			if (Settings->SurfaceSource == EPCGExSurfaceSource::Primitives)
 			{
-				double ClosestDistSq = MAX_dbl;
+				double ClosestDistSq = TNumericLimits<double>::Max();
 
 				for (UPrimitiveComponent* Primitive : Context->IncludedPrimitives)
 				{

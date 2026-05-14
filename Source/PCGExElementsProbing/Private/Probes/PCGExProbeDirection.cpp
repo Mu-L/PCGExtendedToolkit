@@ -44,7 +44,7 @@ void FPCGExProbeDirection::ProcessCandidates(const int32 Index, TArray<PCGExProb
 	bool bIsAlreadyConnected;
 	const double R = GetSearchRadius(Index);
 	double BestDot = -1;
-	double BestDist = MAX_dbl;
+	double BestDist = TNumericLimits<double>::Max();
 	int32 BestCandidateIndex = -1;
 
 	const FTransform& WorkingTransform = *(WorkingTransforms->GetData() + Index);
@@ -135,7 +135,7 @@ void FPCGExProbeDirection::PrepareBestCandidate(const int32 Index, PCGExProbing:
 {
 	InBestCandidate.BestIndex = -1;
 	InBestCandidate.BestPrimaryValue = -1;
-	InBestCandidate.BestSecondaryValue = MAX_dbl;
+	InBestCandidate.BestSecondaryValue = TNumericLimits<double>::Max();
 }
 
 void FPCGExProbeDirection::ProcessCandidateChained(const int32 Index, const int32 CandidateIndex, PCGExProbing::FCandidate& Candidate, PCGExProbing::FBestCandidate& InBestCandidate, PCGExMT::FScopedContainer* Container)

@@ -395,7 +395,7 @@ namespace PCGExSampleNearestSpline
 
 			double MinSampledRange = BaseRangeMin;
 			double MaxSampledRange = BaseRangeMax;
-			double Depth = MAX_dbl;
+			double Depth = TNumericLimits<double>::Max();
 			double DepthSamples = Settings->DepthMode == EPCGExSplineDepthMode::Average ? 0 : 1;
 			double WeightedDistance = 0;
 

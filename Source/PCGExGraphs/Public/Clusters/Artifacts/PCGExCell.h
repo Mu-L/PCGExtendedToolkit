@@ -163,20 +163,20 @@ namespace PCGExClusters
 		int32 MaxPointCount = MAX_int32;
 		int32 MinPointCount = MIN_int32;
 
-		double MaxBoundsSize = MAX_dbl;
-		double MinBoundsSize = MIN_dbl_neg;
+		double MaxBoundsSize = TNumericLimits<double>::Max();
+		double MinBoundsSize = TNumericLimits<double>::Lowest();
 
-		double MaxArea = MAX_dbl;
-		double MinArea = MIN_dbl_neg;
+		double MaxArea = TNumericLimits<double>::Max();
+		double MinArea = TNumericLimits<double>::Lowest();
 
-		double MaxPerimeter = MAX_dbl;
-		double MinPerimeter = MIN_dbl_neg;
+		double MaxPerimeter = TNumericLimits<double>::Max();
+		double MinPerimeter = TNumericLimits<double>::Lowest();
 
-		double MaxSegmentLength = MAX_dbl;
-		double MinSegmentLength = MIN_dbl_neg;
+		double MaxSegmentLength = TNumericLimits<double>::Max();
+		double MinSegmentLength = TNumericLimits<double>::Lowest();
 
-		double MaxCompactness = MAX_dbl;
-		double MinCompactness = MIN_dbl_neg;
+		double MaxCompactness = TNumericLimits<double>::Max();
+		double MinCompactness = TNumericLimits<double>::Lowest();
 
 		bool bBuildWrapper = true;
 

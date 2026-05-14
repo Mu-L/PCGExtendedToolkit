@@ -56,7 +56,7 @@ namespace PCGExPathfindingGrowPaths
 
 		const PCGExClusters::FNode& CurrentNode = NodesRef[LastGrowthIndex];
 
-		double BestScore = MAX_dbl;
+		double BestScore = TNumericLimits<double>::Max();
 		NextGrowthIndex = -1;
 		NextGrowthEdgeIndex = -1;
 

@@ -203,7 +203,7 @@ namespace PCGExSmooth
 				continue;
 			}
 
-			const double LocalSmoothing = FMath::Clamp(Smoothing->Read(Index), 0, MAX_dbl) * Settings->ScaleSmoothingAmountAttribute;
+			const double LocalSmoothing = FMath::Clamp(Smoothing->Read(Index), 0, TNumericLimits<double>::Max()) * Settings->ScaleSmoothingAmountAttribute;
 
 			if ((Settings->bPreserveEnd && Index == NumPoints - 1) || (Settings->bPreserveStart && Index == 0))
 			{

@@ -65,10 +65,18 @@ bool UPCGExActorContentFilter::IsInfrastructureActor(AActor* Actor)
 		return true;
 	}
 
-	if (PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetClass()->GetFName()) ||
-		PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(Actor->GetFName()))
+	// Match by class name (e.g. PCGWorldActor) OR actor instance name (e.g. ChaosDebugDrawActor,
+	// which is a bare AActor instance with no dedicated C++ class of its own).
+	// KnownSystemActorClasses is a C++ static initializer and is always populated; the settings
+	// cache is the combined set but may be empty if IsInfrastructureActor is called before PostLoad.
 	{
-		return true;
+		const FName ClassName = Actor->GetClass()->GetFName();
+		const FName ActorName = Actor->GetFName();
+		if (KnownSystemActorClasses.Contains(ClassName) || KnownSystemActorClasses.Contains(ActorName) ||
+			PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(ClassName) || PCGEX_COLLECTIONS_SETTINGS.SystemActorClasses.Contains(ActorName))
+		{
+			return true;
+		}
 	}
 #endif
 

@@ -349,7 +349,7 @@ namespace PCGExTypeOps
 			*static_cast<Type*>(Target) = static_cast<Type>(Value);
 		}
 
-		// Distance / range — bool treated as 0/1 scalar; suitable for closest-match scoring.
+		// Distance / range -- bool treated as 0/1 scalar; suitable for closest-match scoring.
 		static FORCEINLINE double Distance(const Type& A, const Type& B)
 		{
 			return A == B ? 0.0 : 1.0;
@@ -1285,7 +1285,7 @@ namespace PCGExTypeOps
 		}
 
 		// Per-side normalize: (v - Min) / (Max - Min). InvRange is 0 when range is degenerate,
-		// which makes ApplyRemap collapse that value to 0 — no NaN, no information loss elsewhere.
+		// which makes ApplyRemap collapse that value to 0 -- no NaN, no information loss elsewhere.
 		static FORCEINLINE Type ComputeInvRange(const Type& Min, const Type& Max)
 		{
 			const Type R = Max - Min;

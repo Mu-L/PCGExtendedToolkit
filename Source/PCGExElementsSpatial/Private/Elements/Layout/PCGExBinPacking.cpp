@@ -245,7 +245,7 @@ namespace PCGExBinPacking
 	bool FBin::Insert(FItem& InItem)
 	{
 		FRotator OutRotation = FRotator::ZeroRotator;
-		double OutScore = MAX_dbl;
+		double OutScore = TNumericLimits<double>::Max();
 
 		const int32 BestIndex = GetBestSpaceScore(InItem, OutScore, OutRotation);
 
@@ -373,7 +373,7 @@ namespace PCGExBinPacking
 
 		if (Settings->bAvoidWastedSpace)
 		{
-			MinOccupation = MAX_dbl;
+			MinOccupation = TNumericLimits<double>::Max();
 			const UPCGBasePointData* InPoints = PointDataFacade->GetIn();
 			for (int i = 0; i < InPoints->GetNumPoints(); i++)
 			{

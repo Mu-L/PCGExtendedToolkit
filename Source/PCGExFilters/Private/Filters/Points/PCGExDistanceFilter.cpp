@@ -165,7 +165,7 @@ bool PCGExPointFilter::FDistanceFilter::Test(const PCGExData::FProxyPoint& Point
 	const double SearchExtent = B + TypedFilterFactory->Config.Tolerance;
 	const FBoxCenterAndExtent QueryBounds(ProbeLocation, FVector(SearchExtent));
 
-	double BestDist = MAX_dbl;
+	double BestDist = TNumericLimits<double>::Max();
 	const PCGExMath::IDistances* Dist = TargetsHandler->GetDistances();
 
 	TargetsHandler->FindElementsWithBoundsTest(QueryBounds, [&](const PCGExData::FConstPoint& CandidatePoint)
@@ -212,7 +212,7 @@ bool PCGExPointFilter::FDistanceFilter::Test(const int32 PointIndex) const
 	const double SearchExtent = B + TypedFilterFactory->Config.Tolerance;
 	const FBoxCenterAndExtent QueryBounds(InTransforms[PointIndex].GetLocation(), FVector(SearchExtent));
 
-	double BestDist = MAX_dbl;
+	double BestDist = TNumericLimits<double>::Max();
 	TargetsHandler->FindClosestTarget(SourcePt, QueryBounds, TargetPt, BestDist, ExcludePtr);
 
 	return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, FMath::Sqrt(BestDist), B, TypedFilterFactory->Config.Tolerance);

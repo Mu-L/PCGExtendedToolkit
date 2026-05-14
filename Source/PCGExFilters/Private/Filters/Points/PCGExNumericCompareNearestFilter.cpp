@@ -179,7 +179,7 @@ bool PCGExPointFilter::FNumericCompareNearestFilter::Test(const int32 PointIndex
 	const PCGExData::FConstPoint SourcePt = PointDataFacade->GetInPoint(PointIndex);
 	PCGExData::FConstPoint TargetPt = PCGExData::FConstPoint();
 
-	double BestDist = MAX_dbl;
+	double BestDist = TNumericLimits<double>::Max();
 	TargetsHandler->FindClosestTarget(SourcePt, TargetPt, BestDist, ExcludePtr);
 
 	if (!TargetPt.IsValid())

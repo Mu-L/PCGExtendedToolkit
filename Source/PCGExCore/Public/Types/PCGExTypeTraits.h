@@ -87,7 +87,7 @@ namespace PCGExTypes
 
 		static FORCEINLINE int32 Min()
 		{
-			return TNumericLimits<int32>::Min();
+			return TNumericLimits<int32>::Lowest();
 		}
 
 		static FORCEINLINE int32 Max()
@@ -116,7 +116,7 @@ namespace PCGExTypes
 
 		static FORCEINLINE int64 Min()
 		{
-			return TNumericLimits<int64>::Min();
+			return TNumericLimits<int64>::Lowest();
 		}
 
 		static FORCEINLINE int64 Max()
@@ -143,9 +143,11 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMatchScore = false;
 		static constexpr bool bSupportsNormalization = true;
 
+		// "Smallest possible value" -- the most-negative finite float. NOT TNumericLimits<float>::Min(),
+		// which returns the smallest *positive* normal value and would break Max-accumulator sentinels.
 		static FORCEINLINE float Min()
 		{
-			return TNumericLimits<float>::Min();
+			return TNumericLimits<float>::Lowest();
 		}
 
 		static FORCEINLINE float Max()
@@ -172,9 +174,11 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMatchScore = false;
 		static constexpr bool bSupportsNormalization = true;
 
+		// "Smallest possible value" -- the most-negative finite double. NOT TNumericLimits<double>::Min(),
+		// which returns the smallest *positive* normal value and would break Max-accumulator sentinels.
 		static FORCEINLINE double Min()
 		{
-			return TNumericLimits<double>::Min();
+			return TNumericLimits<double>::Lowest();
 		}
 
 		static FORCEINLINE double Max()
@@ -204,12 +208,12 @@ namespace PCGExTypes
 
 		static FORCEINLINE FVector2D Min()
 		{
-			return FVector2D(MIN_dbl_neg);
+			return FVector2D(TNumericLimits<double>::Lowest());
 		}
 
 		static FORCEINLINE FVector2D Max()
 		{
-			return FVector2D(MAX_dbl);
+			return FVector2D(TNumericLimits<double>::Max());
 		}
 	};
 
@@ -233,12 +237,12 @@ namespace PCGExTypes
 
 		static FORCEINLINE FVector Min()
 		{
-			return FVector(MIN_dbl_neg);
+			return FVector(TNumericLimits<double>::Lowest());
 		}
 
 		static FORCEINLINE FVector Max()
 		{
-			return FVector(MAX_dbl);
+			return FVector(TNumericLimits<double>::Max());
 		}
 	};
 
@@ -262,12 +266,12 @@ namespace PCGExTypes
 
 		static FORCEINLINE FVector4 Min()
 		{
-			return FVector4(MIN_dbl_neg,MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
+			return FVector4(TNumericLimits<double>::Lowest(),TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
 		}
 
 		static FORCEINLINE FVector4 Max()
 		{
-			return FVector4(MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl);
+			return FVector4(TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
 		}
 	};
 
@@ -293,12 +297,12 @@ namespace PCGExTypes
 
 		static FORCEINLINE FRotator Min()
 		{
-			return FRotator(MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg);
+			return FRotator(TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
 		}
 
 		static FORCEINLINE FRotator Max()
 		{
-			return FRotator(MAX_dbl, MAX_dbl, MAX_dbl);
+			return FRotator(TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
 		}
 	};
 
@@ -346,7 +350,7 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		// FTransform has no meaningful single-scalar distance — composite of pos+rot+scale.
+		// FTransform has no meaningful single-scalar distance -- composite of pos+rot+scale.
 		static constexpr bool bSupportsDistance = false;
 		static constexpr bool bSupportsMatchScore = false;
 		static constexpr bool bSupportsNormalization = false;

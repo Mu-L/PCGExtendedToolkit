@@ -384,7 +384,7 @@ namespace PCGExTypeOps
 		}
 
 		// Treats FRotator as a 3-tuple of Euler angles for distance/range. Doesn't account for
-		// angular wrap-around — callers wanting true angular distance should use FQuat instead.
+		// angular wrap-around -- callers wanting true angular distance should use FQuat instead.
 		static FORCEINLINE double Distance(const Type& A, const Type& B)
 		{
 			return FMath::Sqrt(FMath::Square(A.Pitch - B.Pitch) + FMath::Square(A.Yaw - B.Yaw) + FMath::Square(A.Roll - B.Roll));
@@ -740,7 +740,7 @@ namespace PCGExTypeOps
 			return PCGExMath::GetDirection(*static_cast<const Type*>(Value), Axis);
 		}
 
-		// Canonical angular distance — in [0, 1] (so RangeMagnitude / ExtendRange aren't meaningful here).
+		// Canonical angular distance -- in [0, 1] (so RangeMagnitude / ExtendRange aren't meaningful here).
 		static FORCEINLINE double Distance(const Type& A, const Type& B)
 		{
 			return 1.0 - FMath::Abs(A | B);

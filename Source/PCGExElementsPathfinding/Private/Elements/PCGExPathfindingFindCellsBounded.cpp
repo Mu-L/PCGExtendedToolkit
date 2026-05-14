@@ -569,7 +569,7 @@ namespace PCGExFindContoursBounded
 			}
 
 			const FVector& SeedPos = SeedTransforms[SeedIdx].GetLocation();
-			double ClosestEdgeDistSq = MAX_dbl;
+			double ClosestEdgeDistSq = TNumericLimits<double>::Max();
 
 			Cluster->GetEdgeOctree()->FindNearbyElements(SeedPos, [&](const PCGExOctree::FItem& Item)
 			{
@@ -869,7 +869,7 @@ namespace PCGExFindContoursBounded
 				}
 
 				const FVector& SeedPos = SeedTransforms[SeedIdx].GetLocation();
-				double ClosestEdgeDistSq = MAX_dbl;
+				double ClosestEdgeDistSq = TNumericLimits<double>::Max();
 
 				Cluster->GetEdgeOctree()->FindNearbyElements(SeedPos, [&](const PCGExOctree::FItem& Item)
 				{

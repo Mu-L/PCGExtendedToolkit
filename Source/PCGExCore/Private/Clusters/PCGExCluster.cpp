@@ -537,7 +537,7 @@ namespace PCGExClusters
 
 	int32 FCluster::FindClosestNode(const FVector& Position, const int32 MinNeighbors) const
 	{
-		double MaxDistance = MAX_dbl;
+		double MaxDistance = TNumericLimits<double>::Max();
 		int32 ClosestIndex = -1;
 
 		const TArray<FNode>& NodesRef = *Nodes;
@@ -583,7 +583,7 @@ namespace PCGExClusters
 
 	int32 FCluster::FindClosestNodeFromEdge(const FVector& Position, const int32 MinNeighbors) const
 	{
-		double MaxDistance = MAX_dbl;
+		double MaxDistance = TNumericLimits<double>::Max();
 		int32 ClosestIndex = -1;
 
 		if (EdgeOctree)
@@ -662,8 +662,8 @@ namespace PCGExClusters
 		}
 		const FNode& Node = *(NodesDataPtr + InNodeIndex);
 
-		double BestDist = MAX_dbl;
-		double BestDot = MAX_dbl;
+		double BestDist = TNumericLimits<double>::Max();
+		double BestDot = TNumericLimits<double>::Max();
 
 		int32 BestIndex = -1;
 
@@ -700,7 +700,7 @@ namespace PCGExClusters
 		const TArray<FNode>& NodesRef = *Nodes;
 		const FNode& Node = NodesRef[NodeIndex];
 		int32 Result = -1;
-		double LastDist = MAX_dbl;
+		double LastDist = TNumericLimits<double>::Max();
 		const FVector NodePosition = GetPos(NodeIndex);
 
 		if (NodeOctree)
@@ -746,7 +746,7 @@ namespace PCGExClusters
 		const TArray<FNode>& NodesRef = *Nodes;
 		const FNode& Node = NodesRef[NodeIndex];
 		int32 Result = -1;
-		double LastDist = MAX_dbl;
+		double LastDist = TNumericLimits<double>::Max();
 		const FVector NodePosition = GetPos(NodeIndex);
 
 		if (NodeOctree)
@@ -806,8 +806,8 @@ namespace PCGExClusters
 		TArray<double>& LengthsRef = *EdgeLengths;
 
 		const int32 NumEdges = Edges->Num();
-		double Min = MAX_dbl;
-		double Max = MIN_dbl;
+		double Min = TNumericLimits<double>::Max();
+		double Max = TNumericLimits<double>::Min();
 		EdgeLengths->SetNumUninitialized(NumEdges);
 
 		for (int i = 0; i < NumEdges; i++)

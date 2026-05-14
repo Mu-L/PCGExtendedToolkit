@@ -155,7 +155,7 @@ namespace PCGExBestMatchAxis
 			if (bUseTargets)
 			{
 				PCGExData::FConstPoint TargetPoint;
-				double Distance = MAX_dbl;
+				double Distance = TNumericLimits<double>::Max();
 				Context->TargetsHandler->FindClosestTarget(PointDataFacade->GetInPoint(Index), TargetPoint, Distance, &IgnoreList);
 				if (TargetPoint.Index == -1)
 				{

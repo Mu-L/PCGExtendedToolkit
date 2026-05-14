@@ -33,8 +33,8 @@ bool FPCGExProbeLevelSet::Prepare(FPCGExContext* InContext)
 	// Find min/max for normalization
 	if (Config.bNormalizeLevels)
 	{
-		LevelMin = MAX_dbl;
-		LevelMax = -MAX_dbl;
+		LevelMin = TNumericLimits<double>::Max();
+		LevelMax = TNumericLimits<double>::Lowest();
 		const int32 NumPoints = WorkingPositions->Num();
 		for (int32 i = 0; i < NumPoints; ++i)
 		{
