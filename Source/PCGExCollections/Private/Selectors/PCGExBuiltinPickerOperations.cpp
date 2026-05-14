@@ -9,18 +9,20 @@
 
 #pragma region FPCGExEntryWeightedRandomPickerOp
 
-int32 FPCGExEntryWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
-	return Target ? Target->GetPickRandomWeighted(Seed) : -1;
+	checkSlow(Target && !Target->IsEmpty());
+	return Target->GetPickRandomWeighted(Seed);
 }
 
 #pragma endregion
 
 #pragma region FPCGExEntryRandomPickerOp
 
-int32 FPCGExEntryRandomPickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryRandomPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
-	return Target ? Target->GetPickRandom(Seed) : -1;
+	checkSlow(Target && !Target->IsEmpty());
+	return Target->GetPickRandom(Seed);
 }
 
 #pragma endregion
@@ -45,12 +47,9 @@ bool FPCGExEntryIndexPickerOp::PrepareForData(FPCGExContext* InContext, const TS
 	return true;
 }
 
-int32 FPCGExEntryIndexPickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryIndexPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
-	if (!Target || Target->IsEmpty())
-	{
-		return -1;
-	}
+	checkSlow(Target && !Target->IsEmpty());
 
 	const int32 MaxIndex = Target->Num() - 1;
 	double UserIndex = IndexGetter->Read(PointIndex);

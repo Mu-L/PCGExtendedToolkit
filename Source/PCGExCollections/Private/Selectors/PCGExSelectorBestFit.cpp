@@ -9,23 +9,17 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Selectors/PCGExSelectorHelpers.h"
 
 #pragma region FPCGExEntryBestFitPickerOpBase
 
-bool FPCGExEntryBestFitPickerOpBase::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection)
+void FPCGExEntryBestFitPickerOpBase::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection))
-	{
-		return false;
-	}
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Best Fit — no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."));
+}
 
-	Shared = StaticCastSharedPtr<FPCGExBestFitSharedData>(SharedData);
-	if (!Shared)
-	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Best Fit — no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."));
-		return false;
-	}
-
+bool FPCGExEntryBestFitPickerOpBase::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
+{
 	const UPCGBasePointData* PointData = InDataFacade->Source->GetIn();
 	if (!PointData)
 	{
@@ -56,12 +50,10 @@ bool FPCGExEntryBestFitPickerOpBase::PrepareForData(FPCGExContext* InContext, co
 
 FVector FPCGExEntryBestFitPickerOpBase::GetPointExtents(int32 PointIndex) const
 {
-	FVector Ext = (BoundsMaxRange[PointIndex] - BoundsMinRange[PointIndex]) * 0.5;
-	if (bApplyPointScale)
-	{
-		Ext *= TransformRange[PointIndex].GetScale3D().GetAbs();
-	}
-	return Ext;
+	using namespace PCGExCollections::Selectors;
+	return bApplyPointScale
+		? ExtentFromBoundsScaled(BoundsMinRange[PointIndex], BoundsMaxRange[PointIndex], TransformRange[PointIndex].GetScale3D())
+		: ExtentFromBounds(BoundsMinRange[PointIndex], BoundsMaxRange[PointIndex]);
 }
 
 double FPCGExEntryBestFitPickerOpBase::ComputeScore(const FVector& P, int32 EntryIndex) const
@@ -137,12 +129,13 @@ double FPCGExEntryBestFitPickerOpBase::ComputeScore(const FVector& P, int32 Entr
 
 #pragma region FPCGExEntryBestFitTopKPickerOp
 
-int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
+	checkSlow(Target && !Target->IsEmpty());
 	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
 	const TArray<double>& EntryWeights = Shared->EntryWeights;
 
-	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty())
+	if (ValidEntryIndices.IsEmpty())
 	{
 		return -1;
 	}
@@ -180,32 +173,21 @@ int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed) const
 		Cumulative.Add(TotalWeight);
 	}
 
-	if (Pool.IsEmpty() || TotalWeight <= 0.0)
-	{
-		return -1;
-	}
-
-	const double Roll = FRandomStream(Seed).FRandRange(0.0, TotalWeight);
-	for (int32 k = 0; k < Pool.Num(); ++k)
-	{
-		if (Roll <= Cumulative[k])
-		{
-			return Target->Indices[Pool[k]];
-		}
-	}
-	return Target->Indices[Pool.Last()];
+	const int32 k = PCGExCollections::Selectors::RollCumulativeWeighted(MakeArrayView(Cumulative), TotalWeight, Seed);
+	return k == INDEX_NONE ? -1 : Target->Indices[Pool[k]];
 }
 
 #pragma endregion
 
 #pragma region FPCGExEntryBestFitTolerancePickerOp
 
-int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
+	checkSlow(Target && !Target->IsEmpty());
 	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
 	const TArray<double>& EntryWeights = Shared->EntryWeights;
 
-	if (!Target || Target->IsEmpty() || ValidEntryIndices.IsEmpty())
+	if (ValidEntryIndices.IsEmpty())
 	{
 		return -1;
 	}
@@ -246,20 +228,8 @@ int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed) co
 		Cumulative.Add(TotalWeight);
 	}
 
-	if (Pool.IsEmpty() || TotalWeight <= 0.0)
-	{
-		return -1;
-	}
-
-	const double Roll = FRandomStream(Seed).FRandRange(0.0, TotalWeight);
-	for (int32 k = 0; k < Pool.Num(); ++k)
-	{
-		if (Roll <= Cumulative[k])
-		{
-			return Target->Indices[Pool[k]];
-		}
-	}
-	return Target->Indices[Pool.Last()];
+	const int32 k = PCGExCollections::Selectors::RollCumulativeWeighted(MakeArrayView(Cumulative), TotalWeight, Seed);
+	return k == INDEX_NONE ? -1 : Target->Indices[Pool[k]];
 }
 
 #pragma endregion
@@ -270,7 +240,7 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorBestFitFactoryData::CreateE
 {
 	TSharedPtr<FPCGExEntryBestFitPickerOpBase> NewOp;
 
-	switch (PoolStrategy)
+	switch (Config.PoolStrategy)
 	{
 	default:
 	case EPCGExBestFitPoolStrategy::TopK:
@@ -281,13 +251,13 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorBestFitFactoryData::CreateE
 		break;
 	}
 
-	NewOp->Metric = Metric;
-	NewOp->AxisMask = AxisMask;
-	NewOp->AxisAggregation = AxisAggregation;
-	NewOp->VolumeInfluence = VolumeInfluence;
-	NewOp->bApplyPointScale = bApplyPointScale;
+	NewOp->Metric = Config.Metric;
+	NewOp->AxisMask = Config.AxisMask;
+	NewOp->AxisAggregation = Config.AxisAggregation;
+	NewOp->VolumeInfluence = Config.VolumeInfluence;
+	NewOp->bApplyPointScale = Config.bApplyPointScale;
 	// Pick the shorthand that matches the chosen strategy — op reads a single PoolSize regardless.
-	NewOp->PoolSize = (PoolStrategy == EPCGExBestFitPoolStrategy::TopK) ? TopK : Tolerance;
+	NewOp->PoolSize = (Config.PoolStrategy == EPCGExBestFitPoolStrategy::TopK) ? Config.TopK : Config.Tolerance;
 	return NewOp;
 }
 
@@ -323,7 +293,7 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorBestFitFactoryDa
 
 		NewShared->EntryExtents[i] = Ext;
 		NewShared->EntryVolumes[i] = Vol;
-		NewShared->EntryWeights[i] = Entry ? static_cast<double>(Entry->Weight + 1) : 0.0;
+		NewShared->EntryWeights[i] = PCGExCollections::Selectors::EntryEffectiveWeight(Entry);
 
 		// Max-component normalized for AspectRatio metric. Zero when Ext is degenerate.
 		const double MaxExt = FMath::Max3(Ext.X, Ext.Y, Ext.Z);
@@ -352,21 +322,14 @@ UPCGExFactoryData* UPCGExSelectorBestFitFactoryProviderSettings::CreateFactory(F
 {
 	UPCGExSelectorBestFitFactoryData* NewFactory = InContext->ManagedObjects->New<UPCGExSelectorBestFitFactoryData>();
 	NewFactory->BaseConfig = BaseConfig;
-	NewFactory->Metric = Metric;
-	NewFactory->AxisMask = AxisMask;
-	NewFactory->AxisAggregation = AxisAggregation;
-	NewFactory->VolumeInfluence = VolumeInfluence;
-	NewFactory->bApplyPointScale = bApplyPointScale;
-	NewFactory->PoolStrategy = PoolStrategy;
-	NewFactory->TopK = TopK;
-	NewFactory->Tolerance = Tolerance;
+	NewFactory->Config = Config;
 	return Super::CreateFactory(InContext, NewFactory);
 }
 
 #if WITH_EDITOR
 FString UPCGExSelectorBestFitFactoryProviderSettings::GetDisplayName() const
 {
-	switch (Metric)
+	switch (Config.Metric)
 	{
 	default:
 	case EPCGExBestFitMetric::ClosestVolume:

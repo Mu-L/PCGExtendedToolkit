@@ -5,11 +5,11 @@
 #include "PCGExCommon.h"
 #include "PCGExHeuristicsHandler.h"
 #include "PCGExVersion.h"
+#include "PCGPointPropertiesTraits.h"
 #include "Clusters/PCGExEdgeDirectionDetails.h"
 #include "Core/PCGExContext.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Math/PCGExProjectionDetails.h"
-#include "PCGPointPropertiesTraits.h"
 
 namespace PCGExData
 {

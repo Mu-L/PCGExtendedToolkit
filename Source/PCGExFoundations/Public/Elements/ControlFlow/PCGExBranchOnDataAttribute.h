@@ -140,13 +140,6 @@ public:
 	UPROPERTY(meta = (PCG_NotOverridable))
 	TArray<FPCGExBranchOnDataPin> InternalBranches;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings", meta=(PCG_NotOverridable, EditCondition="SelectionMode != EPCGExControlFlowSelectionMode::UserDefined", EditConditionHides))
-	EPCGExEnumConstantSourceType EnumSource = EPCGExEnumConstantSourceType::Selector;
-
-	/** Determines which Enum be used. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_NotOverridable, EditCondition="SelectionMode != EPCGExControlFlowSelectionMode::UserDefined && EnumSource == EPCGExEnumConstantSourceType::Picker", EditConditionHides))
-	TObjectPtr<UEnum> EnumClass;
-
 	/** Determines which Enum be used. Enum selection is ignored here, it's only using the class value internally. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_NotOverridable, EditCondition="SelectionMode != EPCGExControlFlowSelectionMode::UserDefined && EnumSource == EPCGExEnumConstantSourceType::Selector", EditConditionHides, ShowOnlyInnerProperties))
 	FPCGExEnumSelector EnumPicker;
@@ -155,7 +148,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, AdvancedDisplay)
 	FName DefaultPinName = FName("Default");
 
-	TObjectPtr<UEnum> GetEnumClass() const;
 };
 
 struct FPCGExBranchOnDataAttributeContext final : FPCGExPointsProcessorContext

@@ -200,11 +200,10 @@ namespace PCGExData
 			{
 				CompStep = &Step;
 			}
-			else
-				if (Step.Accessor == FieldAccessor)
-				{
-					FieldStep = &Step;
-				}
+			else if (Step.Accessor == FieldAccessor)
+			{
+				FieldStep = &Step;
+			}
 		}
 
 		Axis = AxisStep ? AxisStep->Parsed.Axis : EPCGExAxis::Forward;
@@ -261,11 +260,10 @@ namespace PCGExData
 			{
 				ClassifierMask |= Bit_ContainerIndex;
 			}
-			else
-				if (Step.Accessor == ContainerCountAccessor)
-				{
-					ClassifierMask |= Bit_ContainerCount;
-				}
+			else if (Step.Accessor == ContainerCountAccessor)
+			{
+				ClassifierMask |= Bit_ContainerCount;
+			}
 		}
 	}
 

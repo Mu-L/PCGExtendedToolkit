@@ -7,6 +7,10 @@
 #include "PCGExEnumSelector.h"
 #include "PropertyHandle.h"
 #include "ScopedTransaction.h"
+#include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "Engine/UserDefinedEnum.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectIterator.h"
 #include "Widgets/SBoxPanel.h"
@@ -142,6 +146,35 @@ namespace PCGExEnumSelectorWidget
 	}
 
 	/**
+	 * Resolves the bitmask stored for entry Index of a Bitflags enum.
+	 *
+	 * UENUM(meta=(Bitflags)) declarations store **bit positions** in their values by default
+	 * — FlagA=0 means "bit 0", which the editor packs as the mask 1<<0=1. Authors who want
+	 * the declared values to be the masks themselves opt in with the
+	 * UseEnumValuesAsMaskValuesInEditor meta. Both forms appear in the wild, so the picker
+	 * has to ask the enum which mode it is in rather than guess.
+	 *
+	 * Without this normalisation, ticking a checkbox would write the bit *position* to the
+	 * value (e.g. FlagB writing 1 instead of 2), causing different entries to collide on the
+	 * same physical bits and the checkbox state to read back wrong.
+	 */
+	static int64 GetBitflagMaskAtIndex(const UEnum* Enum, int32 Index)
+	{
+		const int64 Raw = Enum->GetValueByIndex(Index);
+		if (Enum->HasMetaData(TEXT("UseEnumValuesAsMaskValuesInEditor")))
+		{
+			return Raw;
+		}
+		// Defensive: a malformed enum with a negative or out-of-range bit position would
+		// shift by an undefined amount. Clamp to the int64 range.
+		if (Raw < 0 || Raw >= 64)
+		{
+			return 0;
+		}
+		return static_cast<int64>(1ULL << static_cast<uint64>(Raw));
+	}
+
+	/**
 	 * Mirrors the engine's own SEnumComboBox visibility filter so behavior matches what users
 	 * see in stock detail panels for enum-typed UPROPERTYs.
 	 *
@@ -240,7 +273,7 @@ namespace PCGExEnumSelectorWidget
 				{
 					continue;
 				}
-				const int64 Bit = Enum->GetValueByIndex(i);
+				const int64 Bit = GetBitflagMaskAtIndex(Enum, i);
 				if (Bit != 0 && (Value & Bit) == Bit)
 				{
 					Parts.Add(Enum->GetDisplayNameTextByIndex(i).ToString());
@@ -258,6 +291,39 @@ namespace PCGExEnumSelectorWidget
 	}
 
 	// ---------- Class picker menu --------------------------------------------------------------
+
+	/**
+	 * One row in the class picker. Native UEnums and already-loaded blueprint enums are kept
+	 * as a TWeakObjectPtr; unloaded blueprint enums are kept as FAssetData and only resolved
+	 * to a UEnum* on selection. This avoids force-loading the (typically hundreds of) BP
+	 * enums shipped by the engine and plugins just to populate the picker.
+	 */
+	struct FEnumClassEntry
+	{
+		// Set when this entry was sourced from a loaded UEnum (native or already-loaded BP).
+		TWeakObjectPtr<UEnum> Loaded;
+		// Set when this entry is a lazy reference to a UUserDefinedEnum asset.
+		FAssetData LazyAsset;
+		// Cached display string used for both sort and search filtering. For lazy entries
+		// we don't have the localized display name without loading, so the asset name is
+		// used as a stand-in — for user-authored BP enums these usually match anyway.
+		FString DisplayName;
+
+		bool IsLazy() const
+		{
+			return !Loaded.IsValid() && LazyAsset.IsValid();
+		}
+
+		/** Resolves to a usable UEnum*, force-loading the asset if needed. */
+		UEnum* Resolve() const
+		{
+			if (UEnum* E = Loaded.Get())
+			{
+				return E;
+			}
+			return Cast<UEnum>(LazyAsset.GetAsset());
+		}
+	};
 
 	/**
 	 * Searchable menu listing all eligible UEnum classes. Picks one and writes Class to the
@@ -298,7 +364,7 @@ namespace PCGExEnumSelectorWidget
 					]
 					+ SVerticalBox::Slot().FillHeight(1.0f).Padding(4, 0, 4, 4)
 					[
-						SAssignNew(ListView, SListView<TWeakObjectPtr<UEnum>>)
+						SAssignNew(ListView, SListView<TSharedPtr<FEnumClassEntry>>)
 						.ListItemsSource(&FilteredEntries)
 						.SelectionMode(ESelectionMode::Single)
 						.OnGenerateRow(this, &SEnumClassMenu::OnGenerateRow)
@@ -312,6 +378,10 @@ namespace PCGExEnumSelectorWidget
 		void BuildAllEntries()
 		{
 			AllEntries.Reset();
+
+			// Pass 1 — native UEnums and any already-loaded blueprint enums. Tracked by raw
+			// pointer so we can skip the same enums when scanning the asset registry below.
+			TSet<UEnum*> LoadedSeen;
 			for (TObjectIterator<UEnum> It; It; ++It)
 			{
 				UEnum* Enum = *It;
@@ -319,17 +389,44 @@ namespace PCGExEnumSelectorWidget
 				{
 					continue;
 				}
-				AllEntries.Add(Enum);
+				LoadedSeen.Add(Enum);
+
+				TSharedPtr<FEnumClassEntry> Entry = MakeShared<FEnumClassEntry>();
+				Entry->Loaded = Enum;
+				Entry->DisplayName = Enum->GetName();
+				AllEntries.Add(Entry);
 			}
-			AllEntries.Sort([](const TWeakObjectPtr<UEnum>& A, const TWeakObjectPtr<UEnum>& B)
+
+			// Pass 2 — UUserDefinedEnum assets. Listed by AssetData only; we deliberately do
+			// NOT load them here. GetAsset() is deferred to OnSelectionChanged so the picker
+			// is cheap to open even in projects with many BP enums.
+			if (FAssetRegistryModule* AssetRegistryModule = FModuleManager::GetModulePtr<FAssetRegistryModule>(TEXT("AssetRegistry")))
 			{
-				const UEnum* EA = A.Get();
-				const UEnum* EB = B.Get();
-				if (!EA || !EB)
+				TArray<FAssetData> UserEnumAssets;
+				AssetRegistryModule->Get().GetAssetsByClass(UUserDefinedEnum::StaticClass()->GetClassPathName(), UserEnumAssets);
+				for (const FAssetData& Data : UserEnumAssets)
 				{
-					return EA != nullptr;
+					// If the asset is already loaded it's in LoadedSeen — skip to avoid dupes.
+					// FastGetAsset(false) is the no-load fast path: returns the in-memory
+					// instance via FindObject or nullptr without ever triggering a load.
+					if (UEnum* Already = Cast<UEnum>(Data.FastGetAsset(false)))
+					{
+						if (LoadedSeen.Contains(Already))
+						{
+							continue;
+						}
+					}
+
+					TSharedPtr<FEnumClassEntry> Entry = MakeShared<FEnumClassEntry>();
+					Entry->LazyAsset = Data;
+					Entry->DisplayName = Data.AssetName.ToString();
+					AllEntries.Add(Entry);
 				}
-				return EA->GetName() < EB->GetName();
+			}
+
+			AllEntries.Sort([](const TSharedPtr<FEnumClassEntry>& A, const TSharedPtr<FEnumClassEntry>& B)
+			{
+				return A->DisplayName < B->DisplayName;
 			});
 		}
 
@@ -343,17 +440,26 @@ namespace PCGExEnumSelectorWidget
 			else
 			{
 				FilteredEntries.Reset();
-				for (const TWeakObjectPtr<UEnum>& Weak : AllEntries)
+				for (const TSharedPtr<FEnumClassEntry>& Entry : AllEntries)
 				{
-					const UEnum* Enum = Weak.Get();
-					if (!Enum)
+					if (!Entry.IsValid())
 					{
 						continue;
 					}
-					if (Enum->GetName().Contains(Query, ESearchCase::IgnoreCase) ||
-						Enum->GetDisplayNameText().ToString().Contains(Query, ESearchCase::IgnoreCase))
+					if (Entry->DisplayName.Contains(Query, ESearchCase::IgnoreCase))
 					{
-						FilteredEntries.Add(Weak);
+						FilteredEntries.Add(Entry);
+						continue;
+					}
+					// For loaded enums also match against the localized display name, which
+					// may differ from the C++ identifier. Lazy entries skip this — checking
+					// it would force a load.
+					if (const UEnum* Enum = Entry->Loaded.Get())
+					{
+						if (Enum->GetDisplayNameText().ToString().Contains(Query, ESearchCase::IgnoreCase))
+						{
+							FilteredEntries.Add(Entry);
+						}
 					}
 				}
 			}
@@ -363,13 +469,15 @@ namespace PCGExEnumSelectorWidget
 			}
 		}
 
-		TSharedRef<ITableRow> OnGenerateRow(TWeakObjectPtr<UEnum> Item, const TSharedRef<STableViewBase>& OwnerTable)
+		TSharedRef<ITableRow> OnGenerateRow(TSharedPtr<FEnumClassEntry> Item, const TSharedRef<STableViewBase>& OwnerTable)
 		{
-			const UEnum* Enum = Item.Get();
-			const FString Name = Enum ? Enum->GetName() : FString(TEXT("(missing)"));
+			const UEnum* Enum = Item.IsValid() ? Item->Loaded.Get() : nullptr;
+			const FString Name = Item.IsValid() ? Item->DisplayName : FString(TEXT("(missing)"));
+			// Tooltip only available without loading for entries already resolved. Lazy
+			// entries get an empty tooltip; the asset name itself is already the row label.
 			const FText Tooltip = Enum ? Enum->GetToolTipText() : FText::GetEmpty();
 
-			return SNew(STableRow<TWeakObjectPtr<UEnum>>, OwnerTable)
+			return SNew(STableRow<TSharedPtr<FEnumClassEntry>>, OwnerTable)
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(Name))
@@ -378,16 +486,26 @@ namespace PCGExEnumSelectorWidget
 				];
 		}
 
-		void OnSelectionChanged(TWeakObjectPtr<UEnum> Selected, ESelectInfo::Type SelectInfo)
+		void OnSelectionChanged(TSharedPtr<FEnumClassEntry> Selected, ESelectInfo::Type SelectInfo)
 		{
 			// Ignore programmatic selection changes from list refresh; only act on user clicks.
 			if (SelectInfo == ESelectInfo::Direct)
 			{
 				return;
 			}
+			if (!Selected.IsValid())
+			{
+				return;
+			}
 
-			UEnum* NewClass = Selected.Get();
+			// Resolve here — this is the one moment we accept the cost of loading a BP enum
+			// asset that wasn't already in memory.
+			UEnum* NewClass = Selected->Resolve();
 			if (!NewClass)
+			{
+				return;
+			}
+			if (ShouldHideEnumClass(NewClass))
 			{
 				return;
 			}
@@ -412,9 +530,9 @@ namespace PCGExEnumSelectorWidget
 
 		TSharedPtr<IPropertyHandle> ValueHandle;
 		TWeakPtr<SComboButton> OwningCombo;
-		TArray<TWeakObjectPtr<UEnum>> AllEntries;
-		TArray<TWeakObjectPtr<UEnum>> FilteredEntries;
-		TSharedPtr<SListView<TWeakObjectPtr<UEnum>>> ListView;
+		TArray<TSharedPtr<FEnumClassEntry>> AllEntries;
+		TArray<TSharedPtr<FEnumClassEntry>> FilteredEntries;
+		TSharedPtr<SListView<TSharedPtr<FEnumClassEntry>>> ListView;
 	};
 
 	// ---------- Value picker menu (single-select) ----------------------------------------------
@@ -563,7 +681,10 @@ namespace PCGExEnumSelectorWidget
 					{
 						continue;
 					}
-					const int64 Bit = Enum->GetValueByIndex(i);
+					const int64 Bit = GetBitflagMaskAtIndex(Enum, i);
+					// Skip the "None" entry (only possible under UseEnumValuesAsMaskValuesInEditor,
+					// where authors can declare a literal 0 mask). Bit-position mode can't produce
+					// a zero mask — 1<<0 = 1 — so this check is conditionally relevant.
 					if (Bit == 0)
 					{
 						continue;

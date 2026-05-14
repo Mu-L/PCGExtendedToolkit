@@ -168,10 +168,16 @@ namespace PCGExData
 	{
 		{
 			FReadScopeLock ReadLock(BufferLock);
-			if (InValues) { return true; }
+			if (InValues)
+			{
+				return true;
+			}
 		}
 		FWriteScopeLock WriteLock(BufferLock);
-		if (InValues) { return true; }
+		if (InValues)
+		{
+			return true;
+		}
 		InValues = OutValues;
 		return InValues ? true : false;
 	}
@@ -369,11 +375,10 @@ namespace PCGExData
 		{
 			GrabExistingValues();
 		}
-		else
-			if (!bHasIn && ExistingEntryCount != 0)
-			{
-				GrabExistingValues();
-			}
+		else if (!bHasIn && ExistingEntryCount != 0)
+		{
+			GrabExistingValues();
+		}
 
 		return true;
 	}
@@ -496,10 +501,16 @@ namespace PCGExData
 	{
 		{
 			FReadScopeLock ReadLock(BufferLock);
-			if (bReadInitialized) { return true; }
+			if (bReadInitialized)
+			{
+				return true;
+			}
 		}
 		FWriteScopeLock WriteLock(BufferLock);
-		if (bReadInitialized) { return true; }
+		if (bReadInitialized)
+		{
+			return true;
+		}
 		InValue = OutValue;
 		bReadFromOutput = true;
 		bReadInitialized = bWriteInitialized;
@@ -687,11 +698,10 @@ namespace PCGExData
 		{
 			GrabExistingValues();
 		}
-		else
-			if (!bHasIn && ExistingEntryCount != 0)
-			{
-				GrabExistingValues();
-			}
+		else if (!bHasIn && ExistingEntryCount != 0)
+		{
+			GrabExistingValues();
+		}
 
 		return bWriteInitialized;
 	}

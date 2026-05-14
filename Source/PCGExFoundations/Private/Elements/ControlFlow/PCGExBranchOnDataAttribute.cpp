@@ -19,7 +19,7 @@ void UPCGExBranchOnDataAttributeSettings::PostEditChangeProperty(FPropertyChange
 	{
 		InternalBranches.Reset();
 
-		if (const TObjectPtr<UEnum> Enum = GetEnumClass())
+		if (const TObjectPtr<UEnum> Enum = EnumPicker.Class)
 		{
 			// -1 to bypass the MAX value
 			for (int32 Index = 0; Enum && Index < Enum->NumEnums() - 1; ++Index)
@@ -78,15 +78,6 @@ TArray<FPCGPinProperties> UPCGExBranchOnDataAttributeSettings::OutputPinProperti
 }
 
 PCGEX_INITIALIZE_ELEMENT(BranchOnDataAttribute)
-
-TObjectPtr<UEnum> UPCGExBranchOnDataAttributeSettings::GetEnumClass() const
-{
-	if (EnumSource == EPCGExEnumConstantSourceType::Picker)
-	{
-		return EnumClass;
-	}
-	return EnumPicker.Class;
-}
 
 bool FPCGExBranchOnDataAttributeElement::Boot(FPCGExContext* InContext) const
 {

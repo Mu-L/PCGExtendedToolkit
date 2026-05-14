@@ -10,10 +10,10 @@ PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Curve/CurveUtil.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGPolygon2DData.h"
 #include "Math/PCGExBestFitPlane.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
-#include "Data/PCGPolygon2DData.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPaths"
 #define PCGEX_NAMESPACE PCGExPaths

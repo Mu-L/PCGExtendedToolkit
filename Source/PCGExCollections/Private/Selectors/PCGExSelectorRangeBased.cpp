@@ -9,6 +9,7 @@
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Selectors/PCGExSelectorHelpers.h"
 
 namespace
 {
@@ -35,103 +36,90 @@ namespace
 		OutMax = XY.Y;
 		return true;
 	}
+
+	// Resolve one axis's (Min, Max) for one entry, applying SourceMode + auto-swap.
+	// Returns false if the property could not be resolved on this entry/axis combination.
+	bool ResolveAxisForEntry(const FPCGExSelectorRangeAxis& Axis, const FPCGExAssetCollectionEntry* Entry, const UPCGExAssetCollection* Collection, double& OutMin, double& OutMax)
+	{
+		bool bResolved = false;
+		double Min = 0.0;
+		double Max = 0.0;
+		switch (Axis.SourceMode)
+		{
+		case EPCGExRangeSourceMode::TwoNumerics:
+			bResolved = ResolveNumericAsDouble(Entry, Collection, Axis.MinPropertyName, Min)
+				&& ResolveNumericAsDouble(Entry, Collection, Axis.MaxPropertyName, Max);
+			break;
+		case EPCGExRangeSourceMode::Vector2:
+			bResolved = ResolveRangeFromVector(Entry, Collection, Axis.RangePropertyName, Min, Max);
+			break;
+		}
+		if (!bResolved)
+		{
+			return false;
+		}
+		// Auto-swap out-of-order ranges — matches PCGEx convention for numeric range inputs.
+		if (Min > Max)
+		{
+			Swap(Min, Max);
+		}
+		OutMin = Min;
+		OutMax = Max;
+		return true;
+	}
 }
 
 #pragma region FPCGExEntryRangeBasedPickerOpBase
 
-bool FPCGExEntryRangeBasedPickerOpBase::PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection)
+void FPCGExEntryRangeBasedPickerOpBase::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	if (!FPCGExEntryPickerOperation::PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection))
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based — no entries resolved every configured axis. Check property names and types in the collection."));
+}
+
+bool FPCGExEntryRangeBasedPickerOpBase::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
+{
+	const int32 AxisCount = Axes.Num();
+	if (AxisCount == 0)
 	{
+		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based — Axes array is empty. At least one axis is required."));
 		return false;
 	}
 
-	// Shared data is always produced by the factory's BuildSharedData (directly or via cache).
-	// A null Shared here means the factory decided the collection has nothing usable for Range-Based.
-	Shared = StaticCastSharedPtr<FPCGExRangeBasedSharedData>(SharedData);
-	if (!Shared)
+	ValueGetters.SetNum(AxisCount);
+	for (int32 A = 0; A < AxisCount; ++A)
 	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based — no entries resolved the referenced range property. Check property names and types in the collection."));
-		return false;
-	}
-
-	ValueGetter = ValueSource.GetValueSetting();
-	if (!ValueGetter->Init(InDataFacade))
-	{
-		return false;
+		ValueGetters[A] = Axes[A].ValueSource.GetValueSetting();
+		if (!ValueGetters[A]->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 
 	return true;
-}
-
-// Binary-search fast path for non-overlapping range layouts. V can match at most one range,
-// so all three overlap modes collapse to the same lookup. Returns raw Target index or -1.
-int32 FPCGExEntryRangeBasedPickerOpBase::FastPathPick(double V) const
-{
-	const TArray<double>& SortedMins = Shared->SortedMins;
-	const TArray<int32>& SortedIndices = Shared->SortedIndices;
-
-	// Manual upper_bound — first k where SortedMins[k] > V.
-	int32 Lo = 0;
-	int32 Hi = SortedMins.Num();
-	while (Lo < Hi)
-	{
-		const int32 Mid = (Lo + Hi) >> 1;
-		if (SortedMins[Mid] <= V)
-		{
-			Lo = Mid + 1;
-		}
-		else
-		{
-			Hi = Mid;
-		}
-	}
-
-	if (Lo <= 0)
-	{
-		return -1;
-	}
-	const int32 i = SortedIndices[Lo - 1];
-	return Contains(V, Shared->EntryMins[i], Shared->EntryMaxs[i]) ? Target->Indices[i] : -1;
 }
 
 #pragma endregion
 
 #pragma region FPCGExEntryRangeWeightedRandomPickerOp
 
-int32 FPCGExEntryRangeWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryRangeWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
-	if (!Target || Target->IsEmpty())
-	{
-		return -1;
-	}
+	checkSlow(Target && !Target->IsEmpty());
 
-	const double V = ValueGetter->Read(PointIndex);
+	TArray<double, TInlineAllocator<8>> PointValues;
+	ReadPointValues(PointIndex, PointValues);
 
-	if (Shared->bNonOverlapping)
-	{
-		return FastPathPick(V);
-	}
-
-	const TArray<double>& EntryMins = Shared->EntryMins;
-	const TArray<double>& EntryMaxs = Shared->EntryMaxs;
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
 	const TArray<double>& EntryWeights = Shared->EntryWeights;
-	const TArray<int32>& SortedIndices = Shared->SortedIndices;
 
-	// Sorted early-exit scan over valid entries; accumulate cumulative weights for matches.
+	// Scan valid entries; accumulate cumulative weights for entries that pass all axes.
 	TArray<int32, TInlineAllocator<32>> Matches;
 	TArray<double, TInlineAllocator<32>> Cumulative;
 	double TotalWeight = 0.0;
 
-	const int32 NValid = SortedIndices.Num();
-	for (int32 k = 0; k < NValid; ++k)
+	for (const int32 i : ValidEntryIndices)
 	{
-		const int32 i = SortedIndices[k];
-		if (EntryMins[i] > V)
-		{
-			break;
-		}
-		if (!Contains(V, EntryMins[i], EntryMaxs[i]))
+		if (!MatchesAllAxes(i, PointValues.GetData()))
 		{
 			continue;
 		}
@@ -140,50 +128,26 @@ int32 FPCGExEntryRangeWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed)
 		Cumulative.Add(TotalWeight);
 	}
 
-	if (Matches.IsEmpty() || TotalWeight <= 0.0)
-	{
-		return -1;
-	}
-
-	const double Roll = FRandomStream(Seed).FRandRange(0.0, TotalWeight);
-	for (int32 k = 0; k < Matches.Num(); ++k)
-	{
-		if (Roll <= Cumulative[k])
-		{
-			return Target->Indices[Matches[k]];
-		}
-	}
-
-	// Numerical fallback — last match wins (mirrors FCategory weighted fallback).
-	return Target->Indices[Matches.Last()];
+	const int32 k = PCGExCollections::Selectors::RollCumulativeWeighted(MakeArrayView(Cumulative), TotalWeight, Seed);
+	return k == INDEX_NONE ? -1 : Target->Indices[Matches[k]];
 }
 
 #pragma endregion
 
 #pragma region FPCGExEntryRangeFirstMatchPickerOp
 
-int32 FPCGExEntryRangeFirstMatchPickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryRangeFirstMatchPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
-	if (!Target || Target->IsEmpty())
-	{
-		return -1;
-	}
+	checkSlow(Target && !Target->IsEmpty());
 
-	const double V = ValueGetter->Read(PointIndex);
+	TArray<double, TInlineAllocator<8>> PointValues;
+	ReadPointValues(PointIndex, PointValues);
 
-	// Non-overlapping => at most one match, same answer as unsorted scan.
-	if (Shared->bNonOverlapping)
+	// ValidEntryIndices is built in ascending entry order, so iterating it preserves
+	// "first in entry order" semantics while skipping unresolved entries.
+	for (const int32 i : Shared->ValidEntryIndices)
 	{
-		return FastPathPick(V);
-	}
-
-	// Overlapping case: preserve "first in category order" semantics by iterating unsorted.
-	const TArray<double>& EntryMins = Shared->EntryMins;
-	const TArray<double>& EntryMaxs = Shared->EntryMaxs;
-	const int32 N = Target->Entries.Num();
-	for (int32 i = 0; i < N; ++i)
-	{
-		if (Contains(V, EntryMins[i], EntryMaxs[i]))
+		if (MatchesAllAxes(i, PointValues.GetData()))
 		{
 			return Target->Indices[i];
 		}
@@ -196,50 +160,47 @@ int32 FPCGExEntryRangeFirstMatchPickerOp::Pick(int32 PointIndex, int32 Seed) con
 
 #pragma region FPCGExEntryRangeNarrowestPickerOp
 
-int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed) const
+int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
 {
-	if (!Target || Target->IsEmpty())
-	{
-		return -1;
-	}
+	checkSlow(Target && !Target->IsEmpty());
 
-	const double V = ValueGetter->Read(PointIndex);
+	const int32 AxisCount = Shared->AxisCount;
 
-	if (Shared->bNonOverlapping)
-	{
-		return FastPathPick(V);
-	}
+	TArray<double, TInlineAllocator<8>> PointValues;
+	ReadPointValues(PointIndex, PointValues);
 
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
 	const TArray<double>& EntryMins = Shared->EntryMins;
 	const TArray<double>& EntryMaxs = Shared->EntryMaxs;
 	const TArray<double>& EntryWeights = Shared->EntryWeights;
-	const TArray<int32>& SortedIndices = Shared->SortedIndices;
 
-	// Sorted early-exit scan; track current minimum width and accumulate same-width ties.
-	double MinWidth = TNumericLimits<double>::Max();
+	// Hypervolume = product of per-axis widths. For AxisCount=1 this is just (Max - Min), so
+	// behavior is identical to the original single-axis Narrowest. For AxisCount>1 this picks
+	// the most specific range region — the geometric analogue of "narrowest".
+	double MinHypervolume = TNumericLimits<double>::Max();
 	TArray<int32, TInlineAllocator<8>> TieBucket;
 
-	const int32 NValid = SortedIndices.Num();
-	for (int32 k = 0; k < NValid; ++k)
+	for (const int32 i : ValidEntryIndices)
 	{
-		const int32 i = SortedIndices[k];
-		if (EntryMins[i] > V)
-		{
-			break;
-		}
-		if (!Contains(V, EntryMins[i], EntryMaxs[i]))
+		if (!MatchesAllAxes(i, PointValues.GetData()))
 		{
 			continue;
 		}
-		const double W = EntryMaxs[i] - EntryMins[i];
 
-		if (W < MinWidth - RangeTieEpsilon)
+		const int32 Base = i * AxisCount;
+		double Hypervolume = 1.0;
+		for (int32 A = 0; A < AxisCount; ++A)
 		{
-			MinWidth = W;
+			Hypervolume *= (EntryMaxs[Base + A] - EntryMins[Base + A]);
+		}
+
+		if (Hypervolume < MinHypervolume - RangeTieEpsilon)
+		{
+			MinHypervolume = Hypervolume;
 			TieBucket.Reset();
 			TieBucket.Add(i);
 		}
-		else if (FMath::Abs(W - MinWidth) <= RangeTieEpsilon)
+		else if (FMath::Abs(Hypervolume - MinHypervolume) <= RangeTieEpsilon)
 		{
 			TieBucket.Add(i);
 		}
@@ -254,7 +215,7 @@ int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed) cons
 		return Target->Indices[TieBucket[0]];
 	}
 
-	// Tie-break by weight.
+	// Tie-break by weight via streaming roll (no need to materialize a cumulative array).
 	double TotalWeight = 0.0;
 	for (const int32 i : TieBucket)
 	{
@@ -265,18 +226,14 @@ int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed) cons
 		return Target->Indices[TieBucket[0]];
 	}
 
-	const double Roll = FRandomStream(Seed).FRandRange(0.0, TotalWeight);
-	double Acc = 0.0;
-	for (const int32 i : TieBucket)
-	{
-		Acc += EntryWeights[i];
-		if (Roll <= Acc)
+	const int32 k = PCGExCollections::Selectors::RollWeightedStreaming(
+		TieBucket.Num(),
+		[&](int32 LocalIdx)
 		{
-			return Target->Indices[i];
-		}
-	}
-
-	return Target->Indices[TieBucket.Last()];
+			return EntryWeights[TieBucket[LocalIdx]];
+		},
+		TotalWeight, Seed);
+	return Target->Indices[TieBucket[k]];
 }
 
 #pragma endregion
@@ -287,7 +244,7 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorRangeBasedFactoryData::Crea
 {
 	TSharedPtr<FPCGExEntryRangeBasedPickerOpBase> NewOp;
 
-	switch (OverlapMode)
+	switch (Config.OverlapMode)
 	{
 	default:
 	case EPCGExRangeOverlapMode::WeightedRandom:
@@ -301,10 +258,9 @@ TSharedPtr<FPCGExEntryPickerOperation> UPCGExSelectorRangeBasedFactoryData::Crea
 		break;
 	}
 
-	// BoundaryMode is needed in the hot path for Contains(); ValueSource drives the per-facade getter.
-	// Everything else (MinPropertyName, SourceMode, etc.) is consumed by BuildSharedData on the factory side.
-	NewOp->BoundaryMode = BoundaryMode;
-	NewOp->ValueSource = ValueSource;
+	// Per-axis ValueSource drives per-facade getters; per-entry property names are consumed
+	// only by BuildSharedData. Copying Axes wholesale keeps the op self-contained for getter init.
+	NewOp->Axes = Config.Axes;
 	return NewOp;
 }
 
@@ -317,103 +273,82 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorRangeBasedFactor
 		return nullptr;
 	}
 
-	const int32 N = Target->Entries.Num();
-
-	TSharedPtr<FPCGExRangeBasedSharedData> NewShared = MakeShared<FPCGExRangeBasedSharedData>();
-	NewShared->EntryMins.SetNumUninitialized(N);
-	NewShared->EntryMaxs.SetNumUninitialized(N);
-
-	// Sentinel range that never matches any value (Contains() returns false for all Boundary modes).
-	auto MarkInvalid = [&](int32 i)
-	{
-		NewShared->EntryMins[i] = 1.0;
-		NewShared->EntryMaxs[i] = -1.0;
-	};
-
-	int32 ResolvedCount = 0;
-	for (int32 i = 0; i < N; ++i)
-	{
-		const FPCGExAssetCollectionEntry* Entry = Target->Entries[i];
-		double Min = 0.0;
-		double Max = 0.0;
-		bool bResolved = false;
-
-		switch (SourceMode)
-		{
-		case EPCGExRangeSourceMode::TwoNumerics:
-			bResolved = ResolveNumericAsDouble(Entry, Collection, MinPropertyName, Min)
-				&& ResolveNumericAsDouble(Entry, Collection, MaxPropertyName, Max);
-			break;
-		case EPCGExRangeSourceMode::Vector2:
-			bResolved = ResolveRangeFromVector(Entry, Collection, RangePropertyName, Min, Max);
-			break;
-		}
-
-		if (!bResolved)
-		{
-			MarkInvalid(i);
-			continue;
-		}
-
-		// Auto-swap out-of-order ranges — matches PCGEx convention for numeric range inputs.
-		if (Min > Max)
-		{
-			Swap(Min, Max);
-		}
-		NewShared->EntryMins[i] = Min;
-		NewShared->EntryMaxs[i] = Max;
-		++ResolvedCount;
-	}
-
-	// Caller (FSelectorHelper::PrepareForData) reports the error when Shared is null.
-	if (ResolvedCount == 0)
+	const int32 AxisCount = Config.Axes.Num();
+	if (AxisCount == 0)
 	{
 		return nullptr;
 	}
 
-	// Cache (Weight + 1) as double for the hot path.
-	NewShared->EntryWeights.SetNumUninitialized(N);
+	const int32 N = Target->Entries.Num();
+	if (N == 0)
+	{
+		return nullptr;
+	}
+
+	TSharedPtr<FPCGExRangeBasedSharedData> NewShared = MakeShared<FPCGExRangeBasedSharedData>();
+	NewShared->AxisCount = AxisCount;
+	NewShared->EntryCount = N;
+	NewShared->EntryMins.SetNumUninitialized(N * AxisCount);
+	NewShared->EntryMaxs.SetNumUninitialized(N * AxisCount);
+	NewShared->EntryWeights.SetNumZeroed(N);
+
+	NewShared->AxisBoundaryModes.SetNumUninitialized(AxisCount);
+	for (int32 A = 0; A < AxisCount; ++A)
+	{
+		NewShared->AxisBoundaryModes[A] = Config.Axes[A].BoundaryMode;
+	}
+
+	// Entries are valid only when every axis resolved; partial resolution => entry excluded entirely.
+	// Excluded entries get a sentinel range (Min=1, Max=-1) per axis so MatchesAllAxes can never accept them.
+	auto MarkInvalid = [&](int32 Base)
+	{
+		for (int32 A = 0; A < AxisCount; ++A)
+		{
+			NewShared->EntryMins[Base + A] = 1.0;
+			NewShared->EntryMaxs[Base + A] = -1.0;
+		}
+	};
+
+	NewShared->ValidEntryIndices.Reserve(N);
 	for (int32 i = 0; i < N; ++i)
 	{
-		NewShared->EntryWeights[i] = (NewShared->EntryMins[i] <= NewShared->EntryMaxs[i])
-			? static_cast<double>(Target->Entries[i]->Weight + 1)
-			: 0.0;
-	}
+		const FPCGExAssetCollectionEntry* Entry = Target->Entries[i];
+		const int32 Base = i * AxisCount;
 
-	// Build sorted view over valid entries (invalid entries have Min > Max sentinel).
-	NewShared->SortedIndices.Reserve(ResolvedCount);
-	for (int32 i = 0; i < N; ++i)
-	{
-		if (NewShared->EntryMins[i] <= NewShared->EntryMaxs[i])
+		if (!Entry)
 		{
-			NewShared->SortedIndices.Add(i);
+			MarkInvalid(Base);
+			continue;
 		}
-	}
-	const TArray<double>& MinsRef = NewShared->EntryMins;
-	NewShared->SortedIndices.Sort([&MinsRef](int32 A, int32 B)
-	{
-		return MinsRef[A] < MinsRef[B];
-	});
 
-	const int32 NValid = NewShared->SortedIndices.Num();
-	NewShared->SortedMins.SetNumUninitialized(NValid);
-	for (int32 k = 0; k < NValid; ++k)
-	{
-		NewShared->SortedMins[k] = NewShared->EntryMins[NewShared->SortedIndices[k]];
-	}
-
-	// Strict non-overlap detection — any adjacent pair with next_Min <= prev_Max disables the fast path.
-	// Strictness avoids the shared-endpoint ambiguity (same V may land in two ranges under Closed boundaries).
-	NewShared->bNonOverlapping = true;
-	for (int32 k = 1; k < NValid; ++k)
-	{
-		const double PrevMax = NewShared->EntryMaxs[NewShared->SortedIndices[k - 1]];
-		const double CurMin = NewShared->EntryMins[NewShared->SortedIndices[k]];
-		if (CurMin <= PrevMax)
+		bool bAllResolved = true;
+		for (int32 A = 0; A < AxisCount; ++A)
 		{
-			NewShared->bNonOverlapping = false;
-			break;
+			double Min = 0.0;
+			double Max = 0.0;
+			if (!ResolveAxisForEntry(Config.Axes[A], Entry, Collection, Min, Max))
+			{
+				bAllResolved = false;
+				break;
+			}
+			NewShared->EntryMins[Base + A] = Min;
+			NewShared->EntryMaxs[Base + A] = Max;
 		}
+
+		if (!bAllResolved)
+		{
+			MarkInvalid(Base);
+			continue;
+		}
+
+		NewShared->EntryWeights[i] = PCGExCollections::Selectors::EntryEffectiveWeight(Entry);
+		NewShared->ValidEntryIndices.Add(i);
+	}
+
+	// Caller (op's PrepareForData → OnSharedDataMissing) reports the error when Shared is null.
+	if (NewShared->ValidEntryIndices.IsEmpty())
+	{
+		return nullptr;
 	}
 
 	return NewShared;
@@ -427,20 +362,14 @@ UPCGExFactoryData* UPCGExSelectorRangeBasedFactoryProviderSettings::CreateFactor
 {
 	UPCGExSelectorRangeBasedFactoryData* NewFactory = InContext->ManagedObjects->New<UPCGExSelectorRangeBasedFactoryData>();
 	NewFactory->BaseConfig = BaseConfig;
-	NewFactory->ValueSource = ValueSource;
-	NewFactory->SourceMode = SourceMode;
-	NewFactory->MinPropertyName = MinPropertyName;
-	NewFactory->MaxPropertyName = MaxPropertyName;
-	NewFactory->RangePropertyName = RangePropertyName;
-	NewFactory->BoundaryMode = BoundaryMode;
-	NewFactory->OverlapMode = OverlapMode;
+	NewFactory->Config = Config;
 	return Super::CreateFactory(InContext, NewFactory);
 }
 
 #if WITH_EDITOR
 FString UPCGExSelectorRangeBasedFactoryProviderSettings::GetDisplayName() const
 {
-	switch (OverlapMode)
+	switch (Config.OverlapMode)
 	{
 	default:
 	case EPCGExRangeOverlapMode::WeightedRandom:

@@ -439,7 +439,15 @@ namespace PCGExAssetCollection
 	public:
 		int32 WeightSum = 0;
 		TSharedPtr<FCategory> Main;
-		TMap<FName, TSharedPtr<FCategory>> Categories;
+
+		// Dense array of named sub-categories, in registration order. Indexed by the value side
+		// of CategoryNameToIndex, which is the canonical name -> slot lookup.
+		TArray<TSharedPtr<FCategory>> Categories;
+
+		// Name -> index into Categories. Populated incrementally by RegisterEntry; stable for
+		// the cache's lifetime. Consumers can maintain parallel TArrays keyed by the same index
+		// to avoid FName hash lookups on the hot path.
+		TMap<FName, int32> CategoryNameToIndex;
 
 		// Flattened set of all collections transitively reachable from this one (self + every
 		// subcollection returnable as a Host from GetEntry). Built during BuildCacheFromEntries

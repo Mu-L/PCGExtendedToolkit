@@ -4,9 +4,9 @@
 #include "PCGExElementsActions.h"
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
-#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "Core/PCGExActionFactoryProvider.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
+#include "Styling/AppStyle.h"
 
 #endif
 

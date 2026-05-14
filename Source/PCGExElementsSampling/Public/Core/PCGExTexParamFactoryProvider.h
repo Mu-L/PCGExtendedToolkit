@@ -6,9 +6,9 @@
 #include "CoreMinimal.h"
 #include "PCGExVersion.h"
 #include "Factories/PCGExFactoryData.h"
-#include "UObject/Object.h"
-#include "Materials/MaterialParameters.h"
 #include "Factories/PCGExFactoryProvider.h"
+#include "Materials/MaterialParameters.h"
+#include "UObject/Object.h"
 
 
 #include "PCGExTexParamFactoryProvider.generated.h"

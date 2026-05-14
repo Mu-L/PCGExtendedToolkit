@@ -27,7 +27,7 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorFactoryBaseConfig
 	virtual ~FPCGExSelectorFactoryBaseConfig() = default;
 
 	/** Entry-level (micro) distribution -- picks material variants etc. within a picked entry. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Distribution", meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExMicroCacheDistributionDetails SubDistribution;
 
 	/** If enabled, limit picks to entries flagged with a specific category. */

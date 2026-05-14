@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExVersion.h"
-#include "UObject/Object.h"
-#include "Materials/MaterialParameters.h"
 #include "Factories/PCGExFactoryProvider.h"
+#include "Materials/MaterialParameters.h"
+#include "UObject/Object.h"
 
 class UPCGTexture2DSingleBaseData;
 class UMaterialInterface;

@@ -5,8 +5,8 @@
 
 #if WITH_EDITOR
 #include "Core/PCGExBlendOpFactory.h"
-#include "Styling/AppStyle.h"
 #include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
+#include "Styling/AppStyle.h"
 
 #endif
 

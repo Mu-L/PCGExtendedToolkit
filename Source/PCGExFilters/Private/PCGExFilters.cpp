@@ -4,12 +4,12 @@
 #include "PCGExFilters.h"
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
-#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "PCGEditorSettings.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointStates.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
+#include "Styling/AppStyle.h"
 #endif
 
 

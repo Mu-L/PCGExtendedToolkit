@@ -5,9 +5,9 @@
 
 
 #if WITH_EDITOR
-#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "AssetTypeActions_Base.h"
 #include "Data/Bitmasks/PCGExBitmaskCollection.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "PCGExCoreEditor/Public/PCGExAssetTypesMacros.h"
 #include "Sorting/PCGExSortingRuleProvider.h"
 #endif

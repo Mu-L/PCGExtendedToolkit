@@ -32,8 +32,8 @@ namespace PCGExCollections
 	{
 		UPCGExSelectorClassicFactoryData* Factory = InContext->ManagedObjects->New<UPCGExSelectorClassicFactoryData>();
 
-		Factory->Mode = InDetails.Distribution;
-		Factory->IndexConfig = InDetails.IndexSettings;
+		Factory->Config.Mode = InDetails.Distribution;
+		Factory->Config.IndexConfig = InDetails.IndexSettings;
 		Factory->BaseConfig.SeedComponents = InDetails.SeedComponents;
 		Factory->BaseConfig.LocalSeed = InDetails.LocalSeed;
 		Factory->BaseConfig.bUseCategories = InDetails.bUseCategories;
@@ -156,18 +156,22 @@ namespace PCGExCollections
 
 		if (BaseConfig.bUseCategories)
 		{
-			CategoryPickerOps.Reserve(Cache->Categories.Num());
-			for (const TPair<FName, TSharedPtr<PCGExAssetCollection::FCategory>>& Pair : Cache->Categories)
+			// Parallel array indexed by Cache->CategoryNameToIndex. Slots stay null when the
+			// op fails PrepareForData; ResolvePickerForPoint treats null as "use Main or skip".
+			const int32 NumCategories = Cache->Categories.Num();
+			CategoryPickerOpsByIndex.SetNum(NumCategories);
+			for (int32 i = 0; i < NumCategories; ++i)
 			{
+				PCGExAssetCollection::FCategory* CategoryPtr = Cache->Categories[i].Get();
 				TSharedPtr<FPCGExEntryPickerOperation> Op = ActiveFactory->CreateEntryOperation(Ctx);
 				if (!Op)
 				{
 					continue;
 				}
-				Op->SharedData = ObtainSharedData(Pair.Value.Get());
-				if (Op->PrepareForData(Ctx, InDataFacade, Pair.Value.Get(), Collection))
+				Op->SharedData = ObtainSharedData(CategoryPtr);
+				if (Op->PrepareForData(Ctx, InDataFacade, CategoryPtr, Collection))
 				{
-					CategoryPickerOps.Add(Pair.Key, Op);
+					CategoryPickerOpsByIndex[i] = Op;
 				}
 			}
 		}
@@ -192,10 +196,15 @@ namespace PCGExCollections
 		}
 
 		const FName CategoryKey = CategoryGetter->Read(PointIndex);
-		if (const TSharedPtr<FPCGExEntryPickerOperation>* Found = CategoryPickerOps.Find(CategoryKey);
-			Found && Found->IsValid())
+		if (const int32* IdxPtr = Cache->CategoryNameToIndex.Find(CategoryKey))
 		{
-			return Found->Get();
+			if (CategoryPickerOpsByIndex.IsValidIndex(*IdxPtr))
+			{
+				if (const TSharedPtr<FPCGExEntryPickerOperation>& Op = CategoryPickerOpsByIndex[*IdxPtr])
+				{
+					return Op.Get();
+				}
+			}
 		}
 
 		return ActiveFactory->BaseConfig.MissingCategoryBehavior == EPCGExMissingCategoryBehavior::UseMain

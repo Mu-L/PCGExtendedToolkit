@@ -5,8 +5,8 @@
 
 
 #if WITH_EDITOR
-#include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
 #include "Core/PCGExPointStates.h"
+#include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExFoundationsModule"

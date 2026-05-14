@@ -486,12 +486,22 @@ namespace PCGExData
 	{
 		{
 			FReadScopeLock ReadLock(BufferLock);
-			if (InBytes) { return true; }
+			if (InBytes)
+			{
+				return true;
+			}
 		}
 		{
 			FWriteScopeLock WriteLock(BufferLock);
-			if (InBytes) { return true; }
-			if (OutBytes) { InBytes = OutBytes; return true; }
+			if (InBytes)
+			{
+				return true;
+			}
+			if (OutBytes)
+			{
+				InBytes = OutBytes;
+				return true;
+			}
 		}
 		// InitForRead acquires its own WriteScopeLock — must not hold ours when calling it.
 		return InitForRead(EIOSide::In);
@@ -830,11 +840,17 @@ namespace PCGExData
 	{
 		{
 			FReadScopeLock ReadLock(BufferLock);
-			if (bReadInitialized) { return true; }
+			if (bReadInitialized)
+			{
+				return true;
+			}
 		}
 		{
 			FWriteScopeLock WriteLock(BufferLock);
-			if (bReadInitialized) { return true; }
+			if (bReadInitialized)
+			{
+				return true;
+			}
 			if (bWriteInitialized && OutValue.Num() > 0)
 			{
 				InValue = OutValue;

@@ -4,9 +4,9 @@
 #include "PCGExNoise3D.h"
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
-#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "Core/PCGExNoise3DFactoryProvider.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
+#include "Styling/AppStyle.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExNoise3DModule"

@@ -5,11 +5,11 @@
 
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
-#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "Core/PCGExClusterStates.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "Elements/Meta/NeighborSamplers/PCGExNeighborSampleFactoryProvider.h"
 #include "Elements/Meta/VtxProperties/PCGExVtxPropertyFactoryProvider.h"
+#include "Styling/AppStyle.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExElementsClustersModule"

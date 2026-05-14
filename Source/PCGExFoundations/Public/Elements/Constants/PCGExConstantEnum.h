@@ -74,6 +74,7 @@ public:
 	virtual void PostLoad() override;
 
 #if WITH_EDITOR
+	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
@@ -87,19 +88,19 @@ public:
 
 	TObjectPtr<UEnum> GetEnumClass() const;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings")
-	EPCGExEnumConstantSourceType Source = EPCGExEnumConstantSourceType::Selector;
+	UPROPERTY()
+	EPCGExEnumConstantSourceType Source_DEPRECATED = EPCGExEnumConstantSourceType::Selector;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category= Settings)
 	EPCGExEnumOutputMode OutputMode = EPCGExEnumOutputMode::EEOM_All;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(EditCondition="Source == EPCGExEnumConstantSourceType::Picker", EditConditionHides), Category="Settings")
-	TObjectPtr<UEnum> PickerEnum;
+	UPROPERTY()
+	TObjectPtr<UEnum> PickerEnum_DEPRECATED;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(EditCondition="Source == EPCGExEnumConstantSourceType::Selector", EditConditionHides, ShowOnlyInnerProperties), Category="Settings")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(PCG_NotOverridable), Category= Settings)
 	FPCGExEnumSelector SelectedEnum;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings", EditFixedSize, meta=( ReadOnlyKeys, EditCondition="OutputMode == EPCGExEnumOutputMode::EEOM_Selection || OutputMode == EPCGExEnumOutputMode::EEOM_SelectionToMultiplePins", EditConditionHides ))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category= Settings, EditFixedSize, meta=( ReadOnlyKeys, EditCondition="OutputMode == EPCGExEnumOutputMode::EEOM_Selection || OutputMode == EPCGExEnumOutputMode::EEOM_SelectionToMultiplePins", EditConditionHides ))
 	TMap<FName, bool> EnabledExportValues;
 
 	// Hidden for now
@@ -173,6 +174,7 @@ protected:
 class FPCGExConstantEnumElement : public IPCGExElement
 {
 protected:
+	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
 	// Stage to separate pins for each value

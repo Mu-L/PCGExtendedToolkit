@@ -262,29 +262,30 @@ namespace PCGExAssetCollection
 	}
 
 	// Every valid entry goes into Main. Additionally, entries with a non-None Category
-	// are registered to a named sub-category (created on first encounter).
+	// are registered to a named sub-category (created on first encounter, assigned a dense
+	// index in CategoryNameToIndex). Subsequent entries on the same name reuse that slot.
 	void FCache::RegisterEntry(int32 Index, const FPCGExAssetCollectionEntry* InEntry)
 	{
 		Main->RegisterEntry(Index, InEntry);
-		if (const TSharedPtr<FCategory>* CategoryPtr = Categories.Find(InEntry->Category);
-			!CategoryPtr)
+		if (const int32* IdxPtr = CategoryNameToIndex.Find(InEntry->Category))
 		{
-			TSharedPtr<FCategory> Category = MakeShared<FCategory>(InEntry->Category);
-			Categories.Add(InEntry->Category, Category);
-			Category->RegisterEntry(Index, InEntry);
+			Categories[*IdxPtr]->RegisterEntry(Index, InEntry);
 		}
 		else
 		{
-			(*CategoryPtr)->RegisterEntry(Index, InEntry);
+			TSharedPtr<FCategory> Category = MakeShared<FCategory>(InEntry->Category);
+			const int32 NewIdx = Categories.Add(Category);
+			CategoryNameToIndex.Add(InEntry->Category, NewIdx);
+			Category->RegisterEntry(Index, InEntry);
 		}
 	}
 
 	void FCache::Compile()
 	{
 		Main->Compile();
-		for (const auto& Pair : Categories)
+		for (const TSharedPtr<FCategory>& Category : Categories)
 		{
-			Pair.Value->Compile();
+			Category->Compile();
 		}
 	}
 #pragma endregion

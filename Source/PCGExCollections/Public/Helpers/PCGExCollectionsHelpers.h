@@ -116,7 +116,10 @@ namespace PCGExCollections
 
 		TSharedPtr<PCGExDetails::TSettingValue<FName>> CategoryGetter;
 		TSharedPtr<FPCGExEntryPickerOperation> MainPickerOp;
-		TMap<FName, TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOps;
+
+		// Parallel to Cache->CategoryNameToIndex. Slots may be null when the op's PrepareForData failed —
+		// ResolvePickerForPoint treats null as "fall back to Main per MissingCategoryBehavior".
+		TArray<TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOpsByIndex;
 
 		// Optional cache for collection-derived shared state. Typically supplied by the consumer
 		// context (mirrors FPickPacker lifetime pattern). When null, ops self-build as before.

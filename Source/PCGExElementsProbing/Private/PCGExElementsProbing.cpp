@@ -4,9 +4,9 @@
 #include "PCGExElementsProbing.h"
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
-#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "Core/PCGExProbeFactoryProvider.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
+#include "Styling/AppStyle.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExElementsProbingModule"
