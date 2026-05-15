@@ -211,6 +211,7 @@ namespace PCGExPointsMT
 		: ExecutionContext(InContext),
 		  PointsCollection(InPointsCollection)
 
+
 	{
 		SetExecutionContext(InContext);
 	}

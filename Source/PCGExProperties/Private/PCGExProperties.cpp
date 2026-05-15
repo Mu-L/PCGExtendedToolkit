@@ -17,13 +17,9 @@ PCGEX_IMPLEMENT_MODULE(FPCGExPropertiesModule, PCGExProperties)
 
 #pragma region FPCGExPropertySchema
 
-// Default constructor initializes with Float type and a unique HeaderId.
-// HeaderId is generated once and preserved through the lifetime of this schema entry,
-// even if the user changes the property type or renames it.
 FPCGExPropertySchema::FPCGExPropertySchema()
 {
 #if WITH_EDITOR
-	HeaderId = GetTypeHash(FGuid::NewGuid());
 	Property.InitializeAs<FPCGExProperty_Float>();
 #endif
 }
@@ -92,6 +88,13 @@ void FPCGExPropertySchemaCollection::SyncAllSchemas()
 {
 	for (FPCGExPropertySchema& Schema : Schemas)
 	{
+#if WITH_EDITOR
+		// Bootstrap a stable identity for entries whose ctor left HeaderId at 0
+		if (Schema.HeaderId == 0)
+		{
+			Schema.HeaderId = GetTypeHash(FGuid::NewGuid());
+		}
+#endif
 		Schema.SyncPropertyName();
 	}
 }
@@ -111,6 +114,108 @@ void FPCGExPropertySchemaCollection::SyncOverridesArray(TArray<FPCGExPropertyOve
 	{
 		Overrides.SyncToSchema(Schema);
 	}
+}
+
+void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchemaCollection& Archetype)
+{
+#if WITH_EDITOR
+	// Fast path: structure already mirrors the archetype. Hits on every register after the first sync.
+	if (Schemas.Num() == Archetype.Schemas.Num())
+	{
+		bool bStructureMatches = true;
+		for (int32 i = 0; i < Schemas.Num(); ++i)
+		{
+			const FPCGExProperty* MyProp = Schemas[i].GetProperty();
+			const FPCGExProperty* ArchProp = Archetype.Schemas[i].GetProperty();
+			if (!MyProp || !ArchProp ||
+				Schemas[i].Property.GetScriptStruct() != Archetype.Schemas[i].Property.GetScriptStruct() ||
+				MyProp->HeaderId != ArchProp->HeaderId)
+			{
+				bStructureMatches = false;
+				break;
+			}
+		}
+
+		if (bStructureMatches)
+		{
+			return;
+		}
+	}
+
+	TArray<FPCGExPropertySchema> OldSchemas = MoveTemp(Schemas);
+
+	TMap<int32, int32> OldIndexByInnerHeaderId;
+	OldIndexByInnerHeaderId.Reserve(OldSchemas.Num());
+	for (int32 i = 0; i < OldSchemas.Num(); ++i)
+	{
+		if (const FPCGExProperty* Prop = OldSchemas[i].GetProperty())
+		{
+			if (Prop->HeaderId != 0)
+			{
+				OldIndexByInnerHeaderId.Add(Prop->HeaderId, i);
+			}
+		}
+	}
+
+	// Built lazily on the first HeaderId miss -- covers legacy instances saved before the
+	// ctor change, when HeaderIds were random and won't match the CDO's
+	TMap<FName, int32> OldIndexByName;
+	bool bNameMapBuilt = false;
+
+	Schemas.Reset(Archetype.Schemas.Num());
+
+	for (const FPCGExPropertySchema& ArchetypeSchema : Archetype.Schemas)
+	{
+		FPCGExPropertySchema& NewSchema = Schemas.AddDefaulted_GetRef();
+		NewSchema.HeaderId = ArchetypeSchema.HeaderId;
+		NewSchema.Name = ArchetypeSchema.Name;
+
+		int32 ExistingIndex = INDEX_NONE;
+		if (const FPCGExProperty* ArchProp = ArchetypeSchema.GetProperty())
+		{
+			if (ArchProp->HeaderId != 0)
+			{
+				if (const int32* Found = OldIndexByInnerHeaderId.Find(ArchProp->HeaderId))
+				{
+					ExistingIndex = *Found;
+				}
+			}
+		}
+
+		if (ExistingIndex == INDEX_NONE && !ArchetypeSchema.Name.IsNone())
+		{
+			if (!bNameMapBuilt)
+			{
+				bNameMapBuilt = true;
+				OldIndexByName.Reserve(OldSchemas.Num());
+				for (int32 i = 0; i < OldSchemas.Num(); ++i)
+				{
+					if (!OldSchemas[i].Name.IsNone())
+					{
+						OldIndexByName.Add(OldSchemas[i].Name, i);
+					}
+				}
+			}
+			if (const int32* Found = OldIndexByName.Find(ArchetypeSchema.Name))
+			{
+				ExistingIndex = *Found;
+			}
+		}
+
+		FPCGExPropertySchema* Existing = OldSchemas.IsValidIndex(ExistingIndex) ? &OldSchemas[ExistingIndex] : nullptr;
+
+		if (Existing && Existing->Property.GetScriptStruct() == ArchetypeSchema.Property.GetScriptStruct())
+		{
+			NewSchema.Property = MoveTemp(Existing->Property);
+		}
+		else
+		{
+			NewSchema.Property = ArchetypeSchema.Property;
+		}
+
+		NewSchema.SyncPropertyName();
+	}
+#endif
 }
 
 #pragma endregion

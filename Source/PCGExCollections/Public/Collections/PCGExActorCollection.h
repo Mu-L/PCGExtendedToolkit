@@ -10,6 +10,7 @@
 #include "GameFramework/Actor.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
+#include "PCGExSchemaMerging.h"
 
 #include "PCGExActorCollection.generated.h"
 
@@ -116,8 +117,49 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExActorCollectionEntry> Entries;
 
+	/**
+	 * Policy used when merging actor-component schemas into CollectionProperties on staging
+	 * rebuild. Applies to the editor auto-rebuild path (EDITOR_OnPostStagingRebuild).
+	 *
+	 * For embedded collections built by UPCGExDefaultLevelDataExporter, this field is
+	 * overwritten on each export to mirror the exporter's SchemaMergePolicy so manual
+	 * rebuilds of the embedded asset stay consistent with how it was generated.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Properties")
+	EPCGExSchemaMergePolicy SchemaMergePolicy = EPCGExSchemaMergePolicy::StrictTypeMatch;
+
+	/**
+	 * Scan each entry's source actor for a UPCGExPropertyCollectionComponent, merge its
+	 * schemas into CollectionProperties, and populate per-entry PropertyOverrides from the
+	 * component's authored values.
+	 *
+	 * Source resolution per entry:
+	 *   1. If RepresentativeInstances is non-empty and its slot at the entry's index is
+	 *      non-null, that live actor is the donor. (Level-exporter path: instance in-hand.)
+	 *   2. Else, if entry.DeltaSourceLevel + DeltaSourceActorName resolves to a placed actor
+	 *      whose class matches entry.Actor, that actor is the donor. (Standalone authored
+	 *      path: user pointed the entry at a level-placed actor.)
+	 *   3. Else, the entry contributes no schema and gets no overrides (its row in the merged
+	 *      override array is left disabled).
+	 *
+	 * Existing manually-authored CollectionProperties participates in the merge as source #0,
+	 * so under FirstWins / StrictTypeMatch (default) manual entries are always preserved.
+	 *
+	 * Auto-invoked at the tail of editor-driven staging rebuilds via EDITOR_OnPostStagingRebuild.
+	 * The level exporter calls it explicitly with a representative-instance map before invoking
+	 * RebuildStagingData on the embedded collection.
+	 *
+	 * @param Policy            Conflict resolution policy. Defaults to StrictTypeMatch.
+	 * @param RepresentativeInstances Parallel to Entries; entries with null/missing slots fall
+	 *                          through to DeltaSourceLevel resolution. May be empty.
+	 */
+	void RebuildPropertiesFromActorComponents(
+		EPCGExSchemaMergePolicy Policy = EPCGExSchemaMergePolicy::StrictTypeMatch,
+		TArrayView<AActor*> RepresentativeInstances = {});
+
 #if WITH_EDITOR
 	// Editor Functions
 	virtual void EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData) override;
+	virtual void EDITOR_OnPostStagingRebuild() override;
 #endif
 };

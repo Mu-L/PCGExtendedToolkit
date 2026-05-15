@@ -5,15 +5,17 @@
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetData.h"
-#include "Engine/World.h"
 #endif
 
 #include "PCGComponent.h"
 #include "PCGExCollectionsSettingsCache.h"
 #include "PCGExLog.h"
+#include "PCGExPropertyCollectionComponent.h"
+#include "PCGExSchemaMerging.h"
 #include "PCGExSocketProvider.h"
 #include "Engine/Blueprint.h"
 #include "Engine/Level.h"
+#include "Engine/World.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
 
 // Static-init type registration: TypeId=Actor, parent=Base
@@ -261,7 +263,184 @@ void FPCGExActorCollectionEntry::EDITOR_Sanitize()
 
 #pragma endregion
 
+#pragma region UPCGExActorCollection::RebuildPropertiesFromActorComponents
+
+namespace PCGExActorCollectionInternal
+{
+	// Resolve the donor actor for a given entry: prefer an explicit live instance from the
+	// caller, fall back to loading entry.DeltaSourceLevel and finding entry.DeltaSourceActorName.
+	// Class match on the level-loaded path mirrors the existing UpdateStaging delta-capture
+	// constraint -- prevents silently scanning the wrong actor when multiple actors share a
+	// name across classes.
+	AActor* ResolveDonorActor(
+		const FPCGExActorCollectionEntry& Entry,
+		AActor* RepresentativeInstance,
+		TSharedPtr<FStreamableHandle>& OutHandle)
+	{
+		if (RepresentativeInstance)
+		{
+			return RepresentativeInstance;
+		}
+
+		if (!Entry.DeltaSourceLevel.ToSoftObjectPath().IsValid() || Entry.DeltaSourceActorName.IsNone())
+		{
+			return nullptr;
+		}
+
+		OutHandle = PCGExHelpers::LoadBlocking_AnyThread(Entry.DeltaSourceLevel.ToSoftObjectPath());
+		const UWorld* World = Entry.DeltaSourceLevel.Get();
+		if (!World || !World->PersistentLevel)
+		{
+			return nullptr;
+		}
+
+		UClass* ExpectedClass = Entry.Actor.Get();
+		for (AActor* LevelActor : World->PersistentLevel->Actors)
+		{
+			if (!LevelActor || LevelActor->GetFName() != Entry.DeltaSourceActorName)
+			{
+				continue;
+			}
+			if (!ExpectedClass || LevelActor->IsA(ExpectedClass))
+			{
+				return LevelActor;
+			}
+		}
+
+		return nullptr;
+	}
+}
+
+void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
+	EPCGExSchemaMergePolicy Policy,
+	TArrayView<AActor*> RepresentativeInstances)
+{
+	CollectionProperties.SyncAllSchemas();
+
+	TArray<TArray<FInstancedStruct>> Sources;
+	Sources.Reserve(1 + Entries.Num());
+	Sources.Add(CollectionProperties.BuildSchema()); // source 0: manual schema
+
+	// Parallel to Entries; INDEX_NONE means "this entry contributed no source".
+	TArray<int32> EntrySourceIdx;
+	EntrySourceIdx.Init(INDEX_NONE, Entries.Num());
+
+	// Loaded-level handle holders, kept alive across the merge call so donor pointers stay
+	// valid. One handle per entry that needed a level load.
+	TArray<TSharedPtr<FStreamableHandle>> LevelHandles;
+	LevelHandles.Reserve(Entries.Num());
+
+	for (int32 i = 0; i < Entries.Num(); ++i)
+	{
+		const FPCGExActorCollectionEntry& Entry = Entries[i];
+		if (Entry.bIsSubCollection)
+		{
+			continue;
+		}
+
+		AActor* Instance = RepresentativeInstances.IsValidIndex(i) ? RepresentativeInstances[i] : nullptr;
+		TSharedPtr<FStreamableHandle> Handle;
+		AActor* Donor = PCGExActorCollectionInternal::ResolveDonorActor(Entry, Instance, Handle);
+		if (Handle.IsValid())
+		{
+			LevelHandles.Add(Handle);
+		}
+
+		if (!Donor)
+		{
+			continue;
+		}
+
+		TArray<FInstancedStruct> CompSchema = UPCGExPropertyCollectionComponent::ExtractSchemaFromActor(Donor);
+		if (CompSchema.IsEmpty())
+		{
+			continue;
+		}
+
+		EntrySourceIdx[i] = Sources.Add(MoveTemp(CompSchema));
+	}
+
+	// Nothing authored anywhere: leave existing state untouched (avoids no-op churn).
+	if (Sources.Num() <= 1 && Sources[0].IsEmpty())
+	{
+		for (TSharedPtr<FStreamableHandle>& H : LevelHandles)
+		{
+			PCGExHelpers::SafeReleaseHandle(H);
+		}
+		return;
+	}
+
+	const PCGExProperties::FSchemaMergeResult MergeResult = PCGExProperties::MergeSchemas(Sources, Policy);
+	PCGExProperties::LogSchemaConflicts(MergeResult, this);
+	PCGExProperties::ApplyMergeResultToSchemas(CollectionProperties, MergeResult.Merged);
+
+	TArray<FInstancedStruct> CanonicalSchema = CollectionProperties.BuildSchema();
+
+	// SyncToSchema preserves overrides via HeaderId match; then per-source contributors get
+	// their authored values written into the matching slot and flipped enabled.
+	for (int32 i = 0; i < Entries.Num(); ++i)
+	{
+		FPCGExActorCollectionEntry& Entry = Entries[i];
+		Entry.PropertyOverrides.SyncToSchema(CanonicalSchema);
+
+		const int32 SourceIdx = EntrySourceIdx[i];
+		if (SourceIdx == INDEX_NONE)
+		{
+			continue;
+		}
+
+		const TArray<int32>& LocalToMerged = MergeResult.SourceToMergedIdx[SourceIdx];
+		const TArray<FInstancedStruct>& SourceProps = Sources[SourceIdx];
+
+		for (int32 LocalIdx = 0; LocalIdx < SourceProps.Num(); ++LocalIdx)
+		{
+			const int32 MergedIdx = LocalToMerged[LocalIdx];
+			if (MergedIdx == INDEX_NONE || !Entry.PropertyOverrides.Overrides.IsValidIndex(MergedIdx))
+			{
+				continue;
+			}
+
+			FPCGExPropertyOverrideEntry& Slot = Entry.PropertyOverrides.Overrides[MergedIdx];
+			Slot.Value = SourceProps[LocalIdx];
+			Slot.bEnabled = true;
+
+			// FInstancedStruct came in from the donor's component with that component's
+			// identity bits; restamp so the override's inner property matches the canonical
+			// schema's identity (lets future SyncToSchema preserve values via HeaderId).
+			if (FPCGExProperty* OverrideProp = Slot.GetPropertyMutable())
+			{
+				if (const FPCGExProperty* SchemaProp = CanonicalSchema[MergedIdx].GetPtr<FPCGExProperty>())
+				{
+					OverrideProp->PropertyName = SchemaProp->PropertyName;
 #if WITH_EDITOR
+					OverrideProp->HeaderId = SchemaProp->HeaderId;
+#endif
+				}
+			}
+		}
+	}
+
+	RebuildPropertyRegistry();
+
+	for (TSharedPtr<FStreamableHandle>& H : LevelHandles)
+	{
+		PCGExHelpers::SafeReleaseHandle(H);
+	}
+}
+
+#pragma endregion
+
+#if WITH_EDITOR
+void UPCGExActorCollection::EDITOR_OnPostStagingRebuild()
+{
+	Super::EDITOR_OnPostStagingRebuild();
+
+	// User-driven editor rebuilds only -- the non-editor RebuildStagingData variant used by
+	// the level exporter doesn't fire this hook, so embedded actor collections built during
+	// PCGDataAsset export don't double-scan.
+	RebuildPropertiesFromActorComponents(SchemaMergePolicy);
+}
+
 void UPCGExActorCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData)
 {
 	UPCGExAssetCollection::EDITOR_AddBrowserSelectionInternal(InAssetData);

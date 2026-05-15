@@ -3,6 +3,7 @@
 
 #include "Core/PCGExAssetCollection.h"
 
+#include "PCGExLog.h"
 #include "PCGExProperty.h"
 #include "StaticMeshResources.h"
 #include "Algo/RemoveIf.h"
@@ -1018,6 +1019,97 @@ void UPCGExAssetCollection::GetAssetPaths(TSet<FSoftObjectPath>& OutPaths, PCGEx
 
 		InEntry->GetAssetPaths(OutPaths);
 	});
+}
+
+void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(EPCGExSchemaMergePolicy Policy)
+{
+	// Source #0: manual CollectionProperties (preserves user-authored schema entries through
+	// the merge under FirstWins / StrictTypeMatch).
+	CollectionProperties.SyncAllSchemas();
+
+	TArray<TArray<FInstancedStruct>> Sources;
+	Sources.Reserve(1 + NumEntries());
+	Sources.Add(CollectionProperties.BuildSchema());
+
+	// One source per entry whose enabled overrides carry self-contained (name+type+value)
+	// FInstancedStructs -- the same shape BuildSchema produces on the collection side, so
+	// they double as schema declarations for the union.
+	ForEachEntry([&Sources](const FPCGExAssetCollectionEntry* InEntry, int32 /*Idx*/)
+	{
+		if (!InEntry)
+		{
+			return;
+		}
+		TArray<FInstancedStruct> EntrySource;
+		for (const FPCGExPropertyOverrideEntry& Slot : InEntry->PropertyOverrides.Overrides)
+		{
+			if (Slot.bEnabled && Slot.Value.IsValid())
+			{
+				EntrySource.Add(Slot.Value);
+			}
+		}
+		if (!EntrySource.IsEmpty())
+		{
+			Sources.Add(MoveTemp(EntrySource));
+		}
+	});
+
+	// Nothing authored anywhere: leave existing state untouched (avoids no-op churn).
+	if (Sources.Num() <= 1 && Sources[0].IsEmpty())
+	{
+		return;
+	}
+
+	const PCGExProperties::FSchemaMergeResult MergeResult = PCGExProperties::MergeSchemas(Sources, Policy);
+	PCGExProperties::LogSchemaConflicts(MergeResult, this);
+	PCGExProperties::ApplyMergeResultToSchemas(CollectionProperties, MergeResult.Merged);
+
+	// Overrides may have arrived from heterogenous sources (e.g. per-actor components whose
+	// schemas had their own HeaderIds), so SyncToSchema's HeaderId match would miss and
+	// reset values to defaults. Realign HeaderIds by name first.
+	TArray<FInstancedStruct> CanonicalSchema = CollectionProperties.BuildSchema();
+
+#if WITH_EDITOR
+	TMap<FName, int32> CanonicalHeaderIdsByName;
+	CanonicalHeaderIdsByName.Reserve(CanonicalSchema.Num());
+	for (const FInstancedStruct& SchemaProp : CanonicalSchema)
+	{
+		if (const FPCGExProperty* P = SchemaProp.GetPtr<FPCGExProperty>())
+		{
+			if (P->HeaderId != 0 && !P->PropertyName.IsNone())
+			{
+				CanonicalHeaderIdsByName.Add(P->PropertyName, P->HeaderId);
+			}
+		}
+	}
+#endif
+
+	ForEachEntry([&CanonicalSchema
+#if WITH_EDITOR
+				, &CanonicalHeaderIdsByName
+#endif
+			](FPCGExAssetCollectionEntry* InEntry, int32 /*Idx*/)
+	{
+		if (!InEntry)
+		{
+			return;
+		}
+#if WITH_EDITOR
+		for (FPCGExPropertyOverrideEntry& Slot : InEntry->PropertyOverrides.Overrides)
+		{
+			if (FPCGExProperty* P = Slot.GetPropertyMutable())
+			{
+				if (const int32* CanonicalId = CanonicalHeaderIdsByName.Find(P->PropertyName))
+				{
+					P->HeaderId = *CanonicalId;
+				}
+			}
+		}
+#endif
+		InEntry->PropertyOverrides.SyncToSchema(CanonicalSchema);
+	});
+
+	RebuildPropertyRegistry();
 }
 
 #if WITH_EDITOR
