@@ -7,25 +7,14 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "PropertyHandle.h"
+#include "Details/Collections/PCGExCollectionEditorSlateUtils.h"
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
 #include "Selectors/PCGExSelectorRangeBased.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
-#include "Widgets/Text/STextBlock.h"
 
-namespace
-{
-	// Inline gray label for compact field annotations ("min:", "max:", "min:max").
-	TSharedRef<SWidget> MakeSmallLabel(const FString& Text)
-	{
-		return SNew(STextBlock)
-			.Text(FText::FromString(Text))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-			.ColorAndOpacity(FSlateColor(FLinearColor::Gray))
-			.MinDesiredWidth(20);
-	}
-}
+using PCGExCollectionEditorSlateUtils::MakeSmallLabel;
 
 TSharedRef<IPropertyTypeCustomization> FPCGExSelectorRangeAxisCustomization::MakeInstance()
 {

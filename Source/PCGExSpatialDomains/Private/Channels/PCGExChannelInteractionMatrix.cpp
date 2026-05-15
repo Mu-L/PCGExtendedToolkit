@@ -9,7 +9,7 @@ static_assert(static_cast<uint8>(EPCGExChannelResponse::Block) == 0,
               "FMemory::Memset relies on Block having underlying byte value 0 -- "
               "see ResetResponsesToBlock().");
 
-namespace
+namespace PCGExChannelInteractionMatrix
 {
 	FORCEINLINE void ResetResponsesToBlock(EPCGExChannelResponse* Cells, size_t NumBytes)
 	{
@@ -21,14 +21,14 @@ namespace
 
 FPCGExChannelInteractionMatrix::FPCGExChannelInteractionMatrix()
 {
-	ResetResponsesToBlock(&Responses[0][0], sizeof(Responses));
+	PCGExChannelInteractionMatrix::ResetResponsesToBlock(&Responses[0][0], sizeof(Responses));
 }
 
 void FPCGExChannelInteractionMatrix::Compile(
 	TConstArrayView<FName> InChannelKeys,
 	TConstArrayView<FPCGExChannelProfile> InProfiles)
 {
-	ResetResponsesToBlock(&Responses[0][0], sizeof(Responses));
+	PCGExChannelInteractionMatrix::ResetResponsesToBlock(&Responses[0][0], sizeof(Responses));
 
 	// Snapshot channel keys (capped at MaxChannels -- excess registered
 	// channels can't be addressed by the uint32 mask anyway; if we ever
