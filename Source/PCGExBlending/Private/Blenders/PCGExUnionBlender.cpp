@@ -219,7 +219,7 @@ namespace PCGExBlending
 		Sources.Reserve(NumSources);
 		SourcesData.SetNumUninitialized(NumSources);
 
-		TMap<FName, TSharedPtr<FMultiSourceBlender>> BlenderLookup;
+		TMap<FPCGAttributeIdentifier, TSharedPtr<FMultiSourceBlender>> BlenderLookup;
 
 		for (int i = 0; i < InSources.Num(); i++)
 		{
@@ -263,7 +263,7 @@ namespace PCGExBlending
 					continue;
 				}
 
-				TSharedPtr<FMultiSourceBlender> MultiAttribute = BlenderLookup.FindRef(Identity.Name);
+				TSharedPtr<FMultiSourceBlender> MultiAttribute = BlenderLookup.FindRef(Identifier);
 
 				if (MultiAttribute)
 				{
@@ -285,7 +285,7 @@ namespace PCGExBlending
 					MultiAttribute->Param = Param;
 					MultiAttribute->DefaultValue = SourceAttribute;
 					MultiAttribute->SetNum(NumSources);
-					BlenderLookup.Add(Identity.Name, MultiAttribute);
+					BlenderLookup.Add(Identifier, MultiAttribute);
 				}
 
 				check(MultiAttribute)

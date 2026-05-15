@@ -308,6 +308,7 @@ namespace PCGExTypeOps
 		{
 			return A.Equals(B) ? 0.0 : 1.0;
 		}
+
 	};
 
 	// Name Type Operations - FName
@@ -604,6 +605,7 @@ namespace PCGExTypeOps
 		{
 			return A == B ? 0.0 : 1.0;
 		}
+
 	};
 
 	// Path Type Operations - FSoftObjectPath
