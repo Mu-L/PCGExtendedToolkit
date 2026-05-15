@@ -3,6 +3,14 @@
 
 #include "PCGExInlineWidgetRegistry.h"
 
+#include "DetailWidgetRow.h"
+#include "IDetailChildrenBuilder.h"
+#include "IDetailPropertyRow.h"
+#include "PropertyHandle.h"
+#include "UObject/StructOnScope.h"
+#include "Widgets/SNullWidget.h"
+#include "Widgets/Layout/SBox.h"
+
 namespace PCGExInlineWidgetRegistry_Private
 {
 	struct FKey
@@ -66,4 +74,72 @@ const FPCGExMakeInlineWidgetFn* FPCGExInlineWidgetRegistry::Find(FName StructNam
 void FPCGExInlineWidgetRegistry::Clear()
 {
 	PCGExInlineWidgetRegistry_Private::GetMap().Empty();
+}
+
+bool FPCGExInlineWidgetRegistry::AddCompactValueRow(
+	IDetailChildrenBuilder& ChildBuilder,
+	TSharedRef<FStructOnScope> Scope,
+	UScriptStruct* InnerStruct,
+	TSharedRef<SWidget> NameContent,
+	TAttribute<bool> IsEnabled)
+{
+	const FProperty* ValueProperty = InnerStruct->FindPropertyByName(TEXT("Value"));
+	if (!ValueProperty)
+	{
+		return false;
+	}
+
+	IDetailPropertyRow& Row = *ChildBuilder.AddExternalStructureProperty(Scope, ValueProperty->GetFName());
+
+	const FPCGExMakeInlineWidgetFn* Factory = Find(InnerStruct->GetFName(), EPCGExInlineWidgetMode::Compact);
+	TSharedPtr<IPropertyHandle> ValuePropertyHandle = Row.GetPropertyHandle();
+	TSharedRef<SWidget> ValueWidget = SNullWidget::NullWidget;
+	if (ValuePropertyHandle.IsValid())
+	{
+		ValueWidget = Factory
+			? (*Factory)(ValuePropertyHandle.ToSharedRef())
+			: ValuePropertyHandle->CreatePropertyValueWidget();
+	}
+
+	const bool bHasCustomFactory = (Factory != nullptr);
+	Row.CustomWidget()
+	   .NameContent()
+		[NameContent]
+		.ValueContent()
+		.MinDesiredWidth(bHasCustomFactory ? 250.0f : 125.0f)
+		.MaxDesiredWidth(bHasCustomFactory ? 3000.0f : 600.0f)
+		[
+			SNew(SBox)
+			.IsEnabled(IsEnabled)
+			[
+				ValueWidget
+			]
+		];
+
+	return true;
+}
+
+void FPCGExInlineWidgetRegistry::AddComplexValueRows(
+	IDetailChildrenBuilder& ChildBuilder,
+	TSharedRef<FStructOnScope> Scope,
+	UScriptStruct* InnerStruct,
+	TAttribute<bool> IsEnabled)
+{
+	for (TFieldIterator<FProperty> It(InnerStruct); It; ++It)
+	{
+		const FProperty* Property = *It;
+		if (!Property)
+		{
+			continue;
+		}
+
+		const FName PropName = Property->GetFName();
+		if (PropName == TEXT("PropertyName") || PropName == TEXT("HeaderId") || PropName == TEXT("OutputBuffer"))
+		{
+			continue;
+		}
+
+		IDetailPropertyRow& PropRow = *ChildBuilder.AddExternalStructureProperty(Scope, PropName);
+		PropRow.IsEnabled(IsEnabled);
+	}
 }

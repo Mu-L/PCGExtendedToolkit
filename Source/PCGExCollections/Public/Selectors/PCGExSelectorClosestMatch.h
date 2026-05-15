@@ -70,7 +70,7 @@ namespace PCGExClosestMatch
  * (point attribute is broadcast to that type via FFacade::GetBroadcaster<T>).
  *
  * Weight scales the axis contribution to the total per-entry distance. bNormalize remaps
- * each side to [0, 1] independently using its own observed range — see the field comment.
+ * each side to [0, 1] independently using its own observed range -- see the field comment.
  */
 USTRUCT(BlueprintType)
 struct PCGEXCOLLECTIONS_API FPCGExSelectorClosestMatchAxis
@@ -148,7 +148,7 @@ public:
  * Collection-derived state for Closest Match. Built once per (Factory, Category) via the
  * factory's BuildSharedData override; reused across facades via FSelectorSharedDataCache.
  *
- * AxisData is parallel to Config.Axes — entries left as nullptr where an axis failed to
+ * AxisData is parallel to Config.Axes -- entries left as nullptr where an axis failed to
  * resolve (unsupported type, missing property, no resolvable entries). ValidEntryIndices
  * is the intersection of resolved entries across all non-null axes.
  */
@@ -187,7 +187,7 @@ public:
 	TSharedPtr<TPCGExClosestMatchAxisData<T>> Shared;
 
 	// When bRemap is true, Query and Entry values are independently mapped to [0, 1] using
-	// PointMin/PointInvRange and EntryMin/EntryInvRange before distance — only set up for
+	// PointMin/PointInvRange and EntryMin/EntryInvRange before distance -- only set up for
 	// types satisfying IsNormalizable<T>.
 	bool bRemap = false;
 	T PointMin{};
@@ -216,7 +216,7 @@ public:
 /**
  * Closest-match entry picker. Returns the entry whose weighted multi-axis distance to
  * the point's query values is smallest. Deterministic: first encountered minimum wins
- * (no random tie-break — floating-point ties are vanishingly rare in practice).
+ * (no random tie-break -- floating-point ties are vanishingly rare in practice).
  */
 class PCGEXCOLLECTIONS_API FPCGExEntryClosestMatchPickerOp : public PCGExCollections::Selectors::TTypedSharedPickerOpBase<FPCGExClosestMatchSharedData>
 {
@@ -225,7 +225,7 @@ public:
 	TArray<FPCGExSelectorClosestMatchAxis> Axes;
 
 	// Built in OnInitForData via PCGEX_EXECUTEWITHRIGHTTYPE dispatch. Axes that fail to bind
-	// (unsupported type, missing attribute) are skipped — only successfully bound evaluators
+	// (unsupported type, missing attribute) are skipped -- only successfully bound evaluators
 	// land here, so the hot path never has to null-check.
 	TArray<TSharedPtr<FPCGExClosestMatchAxisEvaluator>> ActiveEvaluators;
 

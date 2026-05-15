@@ -113,6 +113,88 @@ void FPCGExPropertySchemaCollection::SyncOverridesArray(TArray<FPCGExPropertyOve
 	}
 }
 
+void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchemaCollection& Archetype)
+{
+#if WITH_EDITOR
+	// Identity matching uses the INNER FPCGExProperty::HeaderId (the one stored inside the
+	// FInstancedStruct payload), not the outer FPCGExPropertySchema::HeaderId. Both fields
+	// are auto-randomized in their default constructors, but FInstancedStruct serializes
+	// its payload atomically -- so the inner HeaderId propagates reliably from CDO to
+	// instance, while the outer struct-level editor-only field does not. This matches the
+	// pattern FPCGExPropertyOverrides::SyncToSchema already uses for the same reason.
+
+	// Fast path: structure already mirrors the archetype. Hits on every register after the
+	// first sync, keeping the per-register cost minimal.
+	if (Schemas.Num() == Archetype.Schemas.Num())
+	{
+		bool bStructureMatches = true;
+		for (int32 i = 0; i < Schemas.Num(); ++i)
+		{
+			const FPCGExProperty* MyProp = Schemas[i].GetProperty();
+			const FPCGExProperty* ArchProp = Archetype.Schemas[i].GetProperty();
+			if (!MyProp || !ArchProp ||
+				Schemas[i].Property.GetScriptStruct() != Archetype.Schemas[i].Property.GetScriptStruct() ||
+				MyProp->HeaderId != ArchProp->HeaderId)
+			{
+				bStructureMatches = false;
+				break;
+			}
+		}
+
+		if (bStructureMatches)
+		{
+			return;
+		}
+	}
+
+	TArray<FPCGExPropertySchema> OldSchemas = MoveTemp(Schemas);
+
+	TMap<int32, FPCGExPropertySchema> ExistingByInnerHeaderId;
+	ExistingByInnerHeaderId.Reserve(OldSchemas.Num());
+	for (FPCGExPropertySchema& Old : OldSchemas)
+	{
+		if (const FPCGExProperty* Prop = Old.GetProperty())
+		{
+			if (Prop->HeaderId != 0)
+			{
+				ExistingByInnerHeaderId.Add(Prop->HeaderId, MoveTemp(Old));
+			}
+		}
+	}
+
+	Schemas.Reset(Archetype.Schemas.Num());
+
+	for (const FPCGExPropertySchema& ArchetypeSchema : Archetype.Schemas)
+	{
+		FPCGExPropertySchema& NewSchema = Schemas.AddDefaulted_GetRef();
+		NewSchema.HeaderId = ArchetypeSchema.HeaderId;
+		NewSchema.Name = ArchetypeSchema.Name;
+
+		FPCGExPropertySchema* Existing = nullptr;
+		if (const FPCGExProperty* ArchProp = ArchetypeSchema.GetProperty())
+		{
+			if (ArchProp->HeaderId != 0)
+			{
+				Existing = ExistingByInnerHeaderId.Find(ArchProp->HeaderId);
+			}
+		}
+
+		if (Existing && Existing->Property.GetScriptStruct() == ArchetypeSchema.Property.GetScriptStruct())
+		{
+			// Inner HeaderId matches and type is unchanged -- preserve this collection's Value
+			NewSchema.Property = MoveTemp(Existing->Property);
+		}
+		else
+		{
+			// No match or type changed -- take the archetype's entry verbatim
+			NewSchema.Property = ArchetypeSchema.Property;
+		}
+
+		NewSchema.SyncPropertyName();
+	}
+#endif
+}
+
 #pragma endregion
 
 #pragma region FPCGExPropertyOverrides

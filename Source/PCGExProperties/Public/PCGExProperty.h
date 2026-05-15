@@ -669,6 +669,32 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 * Convenience method that syncs all schemas then syncs each override.
 	 */
 	void SyncOverridesArray(TArray<FPCGExPropertyOverrides>& OverridesArray);
+
+	/**
+	 * Rebuild this collection's structure to match Archetype, preserving Value overrides for
+	 * entries whose identity matches between this and Archetype.
+	 *
+	 * Used to repair instance components after their owning Blueprint's schema is edited:
+	 * UE's per-property propagation can leave FInstancedStruct entries default-constructed
+	 * on existing instances (type falling through to the first registered FPCGExProperty
+	 * subclass), which this method restores by copying the archetype's entry verbatim for
+	 * any HeaderId that doesn't match.
+	 *
+	 * Identity is the INNER FPCGExProperty::HeaderId (stored inside the FInstancedStruct
+	 * payload), not the outer FPCGExPropertySchema::HeaderId. FInstancedStruct serializes
+	 * its payload atomically, so the inner HeaderId propagates reliably from CDO to instance;
+	 * the outer struct-level editor-only field does not. This matches the pattern
+	 * FPCGExPropertyOverrides::SyncToSchema uses for the same reason.
+	 *
+	 * Matching policy (editor-only, since HeaderId is editor-only):
+	 * - Same inner HeaderId + same UScriptStruct: keep this collection's Value.
+	 * - Same inner HeaderId + different UScriptStruct: take Archetype's entry (type changed).
+	 * - No HeaderId match in this collection: take Archetype's entry (new property).
+	 * - Entries in this collection with no HeaderId match in Archetype: dropped.
+	 *
+	 * At runtime (cooked, no editor data), this is a no-op -- cooked data is finalized.
+	 */
+	void SyncFromArchetype(const FPCGExPropertySchemaCollection& Archetype);
 };
 
 /**

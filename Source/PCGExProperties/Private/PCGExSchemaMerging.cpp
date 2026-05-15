@@ -23,7 +23,10 @@ namespace PCGExProperties
 		for (const FInstancedStruct& MergedProp : MergedProperties)
 		{
 			const FPCGExProperty* Prop = MergedProp.GetPtr<FPCGExProperty>();
-			if (!Prop) { continue; }
+			if (!Prop)
+			{
+				continue;
+			}
 
 			FPCGExPropertySchema& NewSchema = InOutCollection.Schemas.AddDefaulted_GetRef();
 			if (FPCGExPropertySchema* Existing = OldByName.Find(Prop->PropertyName))
@@ -171,7 +174,10 @@ namespace PCGExProperties
 			Result.Merged.Reset();
 			for (TArray<int32>& Map : Result.SourceToMergedIdx)
 			{
-				for (int32& V : Map) { V = INDEX_NONE; }
+				for (int32& V : Map)
+				{
+					V = INDEX_NONE;
+				}
 			}
 		}
 

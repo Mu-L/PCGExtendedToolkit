@@ -32,6 +32,8 @@ class PCGEXPROPERTIES_API UPCGExPropertyCollectionComponent : public UActorCompo
 public:
 	UPCGExPropertyCollectionComponent();
 
+	virtual void OnRegister() override;
+
 	/**
 	 * Property collection with schema definitions and default values.
 	 * These compile into runtime property data during cage/pattern builds.

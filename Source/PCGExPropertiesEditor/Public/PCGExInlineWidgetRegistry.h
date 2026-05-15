@@ -4,11 +4,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Misc/Attribute.h"
 #include "Templates/Function.h"
 #include "Templates/SharedPointer.h"
 
+class IDetailChildrenBuilder;
+class FStructOnScope;
 class IPropertyHandle;
 class SWidget;
+class UScriptStruct;
 
 /**
  * Factory signature for an inline widget.
@@ -63,4 +67,30 @@ public:
 	static const FPCGExMakeInlineWidgetFn* Find(FName StructName, EPCGExInlineWidgetMode Mode);
 
 	static void Clear();
+
+	/**
+	 * Adds a flat CustomWidget row for a PCGExInlineValue struct's Value field using the Compact registry.
+	 * Falls back to IPropertyHandle::CreatePropertyValueWidget() when no factory is registered.
+	 * NameContent is caller-supplied -- pass a plain STextBlock for locked schemas, an SHorizontalBox
+	 * with a checkbox for override entries, etc.
+	 * Scope must outlive the detail panel session; caller is responsible for keeping it alive.
+	 * Returns true if a "Value" FProperty was found on InnerStruct and the row was added.
+	 */
+	static bool AddCompactValueRow(
+		IDetailChildrenBuilder& ChildBuilder,
+		TSharedRef<FStructOnScope> Scope,
+		UScriptStruct* InnerStruct,
+		TSharedRef<SWidget> NameContent,
+		TAttribute<bool> IsEnabled = TAttribute<bool>(true));
+
+	/**
+	 * Adds all non-metadata properties of InnerStruct as child rows, skipping the internal fields
+	 * PropertyName, HeaderId, and OutputBuffer. Applies IsEnabled to each row.
+	 * Used for complex (non-PCGExInlineValue) property types shown in override or read-only-schema contexts.
+	 */
+	static void AddComplexValueRows(
+		IDetailChildrenBuilder& ChildBuilder,
+		TSharedRef<FStructOnScope> Scope,
+		UScriptStruct* InnerStruct,
+		TAttribute<bool> IsEnabled = TAttribute<bool>(true));
 };

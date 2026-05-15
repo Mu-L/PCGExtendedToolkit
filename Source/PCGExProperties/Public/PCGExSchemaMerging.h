@@ -80,7 +80,10 @@ namespace PCGExProperties
 		TArray<TArray<int32>> SourceToMergedIdx;
 		TArray<FSchemaMergeConflict> Conflicts;
 
-		bool HasConflicts() const { return !Conflicts.IsEmpty(); }
+		bool HasConflicts() const
+		{
+			return !Conflicts.IsEmpty();
+		}
 
 		void Reset()
 		{
