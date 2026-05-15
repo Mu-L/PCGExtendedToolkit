@@ -315,6 +315,34 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 		return TryWriteValue(PCGExTypes::TTraits<T>::Type, &Out);
 	}
 
+	/**
+	 * Type-erased value write: read InBuffer as SourceType and store it in this property's
+	 * authored Value. Inverse of TryWriteValue; uses the same FConversionTable for N×N
+	 * conversion. Converting properties (Color, Enum) override this manually to first
+	 * receive the buffer as their projection type, then assign back to Value.
+	 *
+	 * Returns false if this property does not accept a value write.
+	 *
+	 * Prefer the templated TrySetValue<T> wrapper at call sites.
+	 */
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer)
+	{
+		return false;
+	}
+
+	/**
+	 * Templated value write: resolves T to its EPCGMetadataTypes at compile time and
+	 * forwards to TryReadValue. Returns false if T is not a supported PCG type or the
+	 * property does not accept a value write.
+	 */
+	template <typename T>
+	bool TrySetValue(const T& In)
+	{
+		static_assert(PCGExTypes::TTraits<T>::Type != EPCGMetadataTypes::Unknown,
+		              "TrySetValue<T>: T must be a PCG-supported metadata type.");
+		return TryReadValue(PCGExTypes::TTraits<T>::Type, &In);
+	}
+
 	// --- Registry ---
 
 	/**
@@ -608,6 +636,9 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 
 	/** Find schema by property name */
 	const FPCGExPropertySchema* FindByName(FName PropertyName) const;
+
+	/** Find schema by property name (mutable). */
+	FPCGExPropertySchema* FindByNameMutable(FName PropertyName);
 
 	/** Check if property exists by name */
 	bool HasProperty(FName PropertyName) const

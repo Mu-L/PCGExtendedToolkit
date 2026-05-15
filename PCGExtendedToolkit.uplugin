@@ -481,7 +481,7 @@
     },
     {
       "Name": "PCGExPropertiesEditor",
-      "Type": "Editor",
+      "Type": "UncookedOnly",
       "LoadingPhase": "Default",
       "PlatformAllowList": [
         "Win64",
