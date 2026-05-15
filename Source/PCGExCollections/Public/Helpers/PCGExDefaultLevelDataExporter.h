@@ -9,6 +9,7 @@
 #include "Helpers/PCGExActorMeshClassificator.h"
 #include "Helpers/PCGExBoundsEvaluator.h"
 #include "Helpers/PCGExLevelDataExporter.h"
+#include "PCGExSchemaMerging.h"
 
 #include "PCGExDefaultLevelDataExporter.generated.h"
 
@@ -91,6 +92,13 @@ public:
 	 *  (CDO diff) on actor collection entries. Only applies to "Actor"-classified actors. */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bGenerateCollections"))
 	bool bCapturePropertyDeltas = true;
+
+	/** Policy used when merging actor-component schemas into the generated embedded actor
+	 *  collection's CollectionProperties + per-entry PropertyOverrides. Forwarded to
+	 *  UPCGExActorCollection::RebuildPropertiesFromActorComponents and also mirrored onto the
+	 *  embedded collection's own SchemaMergePolicy field so manual rebuilds stay consistent. */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bGenerateCollections"))
+	EPCGExSchemaMergePolicy SchemaMergePolicy = EPCGExSchemaMergePolicy::StrictTypeMatch;
 
 	/** Controls how actor tags in the form Name:Value are handled.
 	 *  Parse: plain tags → bool=true attributes; Name:Value tags → typed attributes; tag string not written.

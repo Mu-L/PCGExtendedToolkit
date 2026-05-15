@@ -445,6 +445,11 @@ namespace PCGExSharedCompact
 			}
 		}
 
+		// Property-component identity. Zero (no source component) hashes as zero, so entries
+		// without a property collection still aggregate alongside each other -- only entries
+		// that actually authored distinct property data split into separate buckets.
+		H = HashCombine(H, E.PropertyComponentHash);
+
 		return H;
 	}
 
@@ -526,6 +531,14 @@ namespace PCGExSharedCompact
 			return false;
 		}
 		if (!FPCGExStaticMeshComponentDescriptor::StaticStruct()->CompareScriptStruct(&A.SMDescriptor, &B.SMDescriptor, 0))
+		{
+			return false;
+		}
+
+		// Property-component identity must match for two entries to dedup. Crucial when
+		// otherwise-identical mesh actors carry distinct property values: we want them in
+		// separate shared entries so their per-instance PropertyOverrides survive.
+		if (A.PropertyComponentHash != B.PropertyComponentHash)
 		{
 			return false;
 		}
@@ -792,6 +805,15 @@ namespace PCGExSharedCompact
 		}
 
 		SharedCollectionRef->Entries = MoveTemp(MergedEntries);
+
+		// Rebuild CollectionProperties from the union of every merged entry's enabled
+		// PropertyOverrides. Mesh entries authored by UPCGExDefaultLevelDataExporter carry
+		// their source actor's property-component values in their overrides; this collapses
+		// them into a canonical schema on the shared collection and re-syncs the per-entry
+		// overrides against it. No-op for collection types whose entries don't carry
+		// property data (e.g. UPCGExLevelCollection in current usage).
+		SharedCollectionRef->RefreshCollectionPropertiesFromEntries();
+
 		SharedCollectionRef->RebuildStagingData(true);
 
 		// Per-entry Tag_EntryIdx rewrite. CollectionMap is rebuilt separately so it can

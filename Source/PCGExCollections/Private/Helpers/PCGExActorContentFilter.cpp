@@ -21,6 +21,7 @@ TSet<FName> UPCGExActorContentFilter::KnownSystemActorClasses =
 	// Add new entries here as they are discovered; external plugins call RegisterSystemActorClass().
 	TEXT("ChaosDebugDrawActor"),
 	TEXT("PCGWorldActor"),
+	TEXT("GameplayDebuggerPlayerManager"),
 	TEXT("Valency Editor Cache"),
 	TEXT("ValencyEditorCache"),
 };
