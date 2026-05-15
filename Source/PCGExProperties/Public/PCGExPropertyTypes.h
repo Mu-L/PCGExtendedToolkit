@@ -84,6 +84,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -124,6 +125,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -164,6 +166,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -204,6 +207,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -244,6 +248,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -284,6 +289,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -324,6 +330,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -364,6 +371,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -404,6 +412,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -444,6 +453,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -492,6 +502,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -532,6 +543,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -572,6 +584,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -612,6 +625,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -652,6 +666,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -692,6 +707,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 /**
@@ -738,6 +754,7 @@ public:
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
 };
 
 #pragma endregion

@@ -68,6 +68,11 @@ bool FPCGExProperty_##_NAME::TryWriteValue(EPCGMetadataTypes TargetType, void* O
 { \
 	PCGExTypeOps::FConversionTable::Convert(PCGExTypes::TTraits<_TYPE>::Type, &Value, TargetType, OutBuffer); \
 	return true; \
+} \
+bool FPCGExProperty_##_NAME::TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) \
+{ \
+	PCGExTypeOps::FConversionTable::Convert(SourceType, InBuffer, PCGExTypes::TTraits<_TYPE>::Type, &Value); \
+	return true; \
 }
 
 #pragma region Standard Types
@@ -140,6 +145,14 @@ bool FPCGExProperty_Color::TryWriteValue(EPCGMetadataTypes TargetType, void* Out
 	return true;
 }
 
+bool FPCGExProperty_Color::TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer)
+{
+	FVector4 Projected;
+	PCGExTypeOps::FConversionTable::Convert(SourceType, InBuffer, EPCGMetadataTypes::Vector4, &Projected);
+	Value = FLinearColor(Projected.X, Projected.Y, Projected.Z, Projected.W);
+	return true;
+}
+
 #pragma endregion
 
 #pragma region Enum (FPCGExEnumSelector -> int64)
@@ -193,6 +206,18 @@ bool FPCGExProperty_Enum::TryWriteValue(EPCGMetadataTypes TargetType, void* OutB
 {
 	const int64 Projected = Value.Value;
 	PCGExTypeOps::FConversionTable::Convert(EPCGMetadataTypes::Integer64, &Projected, TargetType, OutBuffer);
+	return true;
+}
+
+bool FPCGExProperty_Enum::TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer)
+{
+	// Project the incoming value through int64. The enum's UEnum class is structural and
+	// owned by the schema -- not touched here. If the projected int64 doesn't correspond to
+	// a member of the current class, Value.Value still stores it and the picker UI surfaces
+	// the raw integer, matching the SyncStructuralFromSchema convention.
+	int64 Projected = 0;
+	PCGExTypeOps::FConversionTable::Convert(SourceType, InBuffer, EPCGMetadataTypes::Integer64, &Projected);
+	Value.Value = Projected;
 	return true;
 }
 

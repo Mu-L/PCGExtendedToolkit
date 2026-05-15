@@ -45,6 +45,11 @@ const FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByName(FName Pro
 	return nullptr;
 }
 
+FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByNameMutable(FName PropertyName)
+{
+	return const_cast<FPCGExPropertySchema*>(AsConst(*this).FindByName(PropertyName));
+}
+
 TArray<FInstancedStruct> FPCGExPropertySchemaCollection::BuildSchema() const
 {
 	TArray<FInstancedStruct> Result;
