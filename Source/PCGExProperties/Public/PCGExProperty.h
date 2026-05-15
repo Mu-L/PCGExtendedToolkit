@@ -144,16 +144,14 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * - Type changes (HeaderId preserved, bEnabled state preserved, value reset to default)
 	 * Custom properties inherit this automatically - no action needed.
 	 */
-	UPROPERTY(meta=(IgnoreForMemberInitializationTest))
+	UPROPERTY()
 	int32 HeaderId = 0;
 #endif
 
-	FPCGExProperty()
-	{
-#if WITH_EDITOR
-		HeaderId = GetTypeHash(FGuid::NewGuid());
-#endif
-	}
+	// HeaderId is left at 0 by the ctor; assigning it here would defeat UE's CDO->instance
+	// propagation for arrays-of-structs (fresh values on every default-construction that
+	// UE then never overrides). FPCGExPropertySchemaCollection::SyncAllSchemas assigns it.
+	FPCGExProperty() = default;
 
 	virtual ~FPCGExProperty() = default;
 
@@ -315,6 +313,34 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 		static_assert(PCGExTypes::TTraits<T>::Type != EPCGMetadataTypes::Unknown,
 		              "TryGetValue<T>: T must be a PCG-supported metadata type.");
 		return TryWriteValue(PCGExTypes::TTraits<T>::Type, &Out);
+	}
+
+	/**
+	 * Type-erased value write: read InBuffer as SourceType and store it in this property's
+	 * authored Value. Inverse of TryWriteValue; uses the same FConversionTable for N×N
+	 * conversion. Converting properties (Color, Enum) override this manually to first
+	 * receive the buffer as their projection type, then assign back to Value.
+	 *
+	 * Returns false if this property does not accept a value write.
+	 *
+	 * Prefer the templated TrySetValue<T> wrapper at call sites.
+	 */
+	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer)
+	{
+		return false;
+	}
+
+	/**
+	 * Templated value write: resolves T to its EPCGMetadataTypes at compile time and
+	 * forwards to TryReadValue. Returns false if T is not a supported PCG type or the
+	 * property does not accept a value write.
+	 */
+	template <typename T>
+	bool TrySetValue(const T& In)
+	{
+		static_assert(PCGExTypes::TTraits<T>::Type != EPCGMetadataTypes::Unknown,
+		              "TrySetValue<T>: T must be a PCG-supported metadata type.");
+		return TryReadValue(PCGExTypes::TTraits<T>::Type, &In);
 	}
 
 	// --- Registry ---
@@ -530,7 +556,7 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 
 #if WITH_EDITORONLY_DATA
 	/** Stable identity for override matching, preserved through type changes */
-	UPROPERTY(meta=(IgnoreForMemberInitializationTest))
+	UPROPERTY()
 	int32 HeaderId = 0;
 #endif
 
@@ -611,6 +637,9 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	/** Find schema by property name */
 	const FPCGExPropertySchema* FindByName(FName PropertyName) const;
 
+	/** Find schema by property name (mutable). */
+	FPCGExPropertySchema* FindByNameMutable(FName PropertyName);
+
 	/** Check if property exists by name */
 	bool HasProperty(FName PropertyName) const
 	{
@@ -669,6 +698,31 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 * Convenience method that syncs all schemas then syncs each override.
 	 */
 	void SyncOverridesArray(TArray<FPCGExPropertyOverrides>& OverridesArray);
+
+	/**
+	 * Rebuild this collection's structure to match Archetype, preserving Value overrides for
+	 * entries whose identity matches between this and Archetype.
+	 *
+	 * Used to repair instance components after their owning Blueprint's schema is edited:
+	 * UE's per-property propagation can leave FInstancedStruct entries default-constructed
+	 * on existing instances (type falling through to the first registered FPCGExProperty
+	 * subclass), which this method restores by copying the archetype's entry verbatim for
+	 * any unmatched entry.
+	 *
+	 * Matching policy (editor-only, since HeaderId is editor-only):
+	 * - Inner FPCGExProperty::HeaderId is the primary key. Constructors leave HeaderId at 0;
+	 *   SyncAllSchemas assigns it explicitly, so CDO->instance propagation reliably ships
+	 *   the CDO's HeaderId onto instances and matches line up.
+	 * - Name is a fallback for entries with no HeaderId match. Catches legacy instances
+	 *   saved before the ctor change (which still carry stale random HeaderIds on disk) so
+	 *   their values aren't wiped on the first sync after upgrade.
+	 * - When neither matches: take Archetype's entry verbatim (new property, or genuinely
+	 *   unmatched after both lookups).
+	 * - Entries in this collection with no match in Archetype: dropped (removed property).
+	 *
+	 * At runtime (cooked, no editor data), this is a no-op -- cooked data is finalized.
+	 */
+	void SyncFromArchetype(const FPCGExPropertySchemaCollection& Archetype);
 };
 
 /**

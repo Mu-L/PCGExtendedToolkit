@@ -12,7 +12,7 @@
  *   NameContent  : [property name] + Property attribute field
  *   ValueContent : Attribute name field + Weight spinner + Normalize toggle
  *
- * No CustomizeChildren — there's no shorthand here, so nothing to expand into.
+ * No CustomizeChildren -- there's no shorthand here, so nothing to expand into.
  */
 class FPCGExSelectorClosestMatchAxisCustomization : public IPropertyTypeCustomization
 {

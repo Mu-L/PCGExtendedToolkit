@@ -46,7 +46,7 @@ namespace PCGExSelectorClosestMatch
 		AxisData->EntryResolved.Init(false, N);
 
 		// Entry-side min/max is only consumed by the remap path, so gate capture on IsNormalizable
-		// — int32/int64 axes still get bNormalize honored as a UI knob but produce no remap state.
+		// -- int32/int64 axes still get bNormalize honored as a UI knob but produce no remap state.
 		constexpr bool bTypeIsNormalizable = PCGExClosestMatch::IsNormalizable<T>();
 		const bool bTrackRange = bTypeIsNormalizable && Axis.bNormalize;
 		bool bFirstResolved = true;
@@ -90,7 +90,7 @@ namespace PCGExSelectorClosestMatch
 	}
 
 	// Construct + bind a typed evaluator for one axis. Returns null if the broadcaster
-	// fails to attach (missing/incompatible attribute) — caller treats null as "axis
+	// fails to attach (missing/incompatible attribute) -- caller treats null as "axis
 	// disabled for this facade".
 	template <typename T>
 	TSharedPtr<FPCGExClosestMatchAxisEvaluator> BuildEvaluatorT(
@@ -105,7 +105,7 @@ namespace PCGExSelectorClosestMatch
 		}
 
 		const bool bWantRemap = Axis.bNormalize && PCGExClosestMatch::IsNormalizable<T>();
-		// bCaptureMinMax piggybacks on bWantRemap — the only consumer of the broadcaster's
+		// bCaptureMinMax piggybacks on bWantRemap -- the only consumer of the broadcaster's
 		// Min/Max is the remap path. Scoped reads are disabled when we need the full scan.
 		TSharedPtr<PCGExData::TBuffer<T>> Broadcaster = Facade->GetBroadcaster<T>(Axis.AttributeName, !bWantRemap, bWantRemap, true);
 		if (!Broadcaster.IsValid())
@@ -126,7 +126,7 @@ namespace PCGExSelectorClosestMatch
 				const double EntryRangeMag = PCGExTypeOps::FTypeOps<T>::RangeMagnitude(Typed->EntryMin, Typed->EntryMax);
 
 				// Both sides need a non-degenerate range. If either side has all values collapsed
-				// onto a single point, the per-side remap can't differentiate — fall back to raw
+				// onto a single point, the per-side remap can't differentiate -- fall back to raw
 				// distance (bRemap=false) so the axis still contributes argmin-relevant information.
 				if (FMath::IsFinite(PointRangeMag) && PointRangeMag > UE_DOUBLE_SMALL_NUMBER &&
 					FMath::IsFinite(EntryRangeMag) && EntryRangeMag > UE_DOUBLE_SMALL_NUMBER)
@@ -148,7 +148,7 @@ namespace PCGExSelectorClosestMatch
 
 void FPCGExEntryClosestMatchPickerOp::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match — no entries resolved every configured axis. Check axis property names / types in the collection."));
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match -- no entries resolved every configured axis. Check axis property names / types in the collection."));
 }
 
 bool FPCGExEntryClosestMatchPickerOp::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
@@ -156,7 +156,7 @@ bool FPCGExEntryClosestMatchPickerOp::OnInitForData(FPCGExContext* InContext, co
 	const int32 AxisCount = Axes.Num();
 	if (AxisCount == 0 || AxisCount != Shared->AxisCount)
 	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match — axis configuration mismatch between op and shared data."));
+		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match -- axis configuration mismatch between op and shared data."));
 		return false;
 	}
 

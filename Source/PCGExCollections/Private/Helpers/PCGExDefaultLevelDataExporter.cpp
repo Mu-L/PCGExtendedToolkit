@@ -30,6 +30,7 @@
 #include "LevelInstance/LevelInstanceActor.h"
 
 #include "PCGExLog.h"
+#include "PCGExPropertyCollectionComponent.h"
 #include "Data/PCGExDataValue.h"
 #include "Data/Descriptors/PCGExComponentDescriptors.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
@@ -198,24 +199,32 @@ namespace PCGExDefaultLevelDataExporterInternal
 	// descriptor fingerprint (every UPROPERTY except OverrideMaterials -- those become
 	// per-entry variants instead). Different mobility / collision / body instance /
 	// light map / etc. → distinct entry, descriptor preserved on each.
+	//
+	// PropertyComponentHash is folded in so two mesh actors that share mesh+descriptor but
+	// author distinct UPCGExPropertyCollectionComponent values land in distinct entries --
+	// otherwise their per-instance property data would silently collapse into one bucket.
 	struct FMeshEntryKey
 	{
 		FSoftObjectPath MeshPath;
 		uint32 DescriptorFingerprint = 0;
 		bool bIsISMSource = false;
+		uint32 PropertyComponentHash = 0;
 
 		bool operator==(const FMeshEntryKey& Other) const
 		{
 			return MeshPath == Other.MeshPath
 				&& DescriptorFingerprint == Other.DescriptorFingerprint
-				&& bIsISMSource == Other.bIsISMSource;
+				&& bIsISMSource == Other.bIsISMSource
+				&& PropertyComponentHash == Other.PropertyComponentHash;
 		}
 
 		friend uint32 GetTypeHash(const FMeshEntryKey& Key)
 		{
 			return HashCombine(
-				HashCombine(GetTypeHash(Key.MeshPath), Key.DescriptorFingerprint),
-				Key.bIsISMSource ? 1u : 0u);
+				HashCombine(
+					HashCombine(GetTypeHash(Key.MeshPath), Key.DescriptorFingerprint),
+					Key.bIsISMSource ? 1u : 0u),
+				Key.PropertyComponentHash);
 		}
 	};
 
@@ -241,6 +250,11 @@ namespace PCGExDefaultLevelDataExporterInternal
 		FPCGExStaticMeshComponentDescriptor SMDescriptor;
 		TArray<TArray<FSoftObjectPath>> UniqueVariantMaterials;
 		TMap<uint32, int32> VariantHashToIndex;
+
+		// Source actor we treat as the representative donor for property-component scanning.
+		// Captured on first contribution; all subsequent contributors share the same property
+		// hash by construction (it's part of the key), so any one of them is a valid donor.
+		TWeakObjectPtr<AActor> RepresentativeActor;
 	};
 
 	struct FActorClassInfo
@@ -251,6 +265,13 @@ namespace PCGExDefaultLevelDataExporterInternal
 		int32 Count = 0;
 		TArray<uint8> SerializedDelta;
 		TArray<FSoftObjectPath> CollateralPaths;
+
+		// Live actor we treat as the representative for this (class, delta) bucket. Captured
+		// when the first actor of the bucket is seen; carried through so the post-build property-
+		// component scan can pull authored values directly from a real instance instead of
+		// re-resolving the delta. All actors in the bucket share an identical delta hash, so
+		// any one of them is a valid donor; "first wins" matches the SerializedDelta capture.
+		TWeakObjectPtr<AActor> RepresentativeActor;
 	};
 
 	struct FActorInstanceKey
@@ -286,6 +307,40 @@ namespace PCGExDefaultLevelDataExporterInternal
 			}
 		}
 		return H;
+	}
+
+	// Session-stable hash of an actor's UPCGExPropertyCollectionComponent.Properties UPROPERTY,
+	// computed by routing the property serializer through FArchiveCrc32. Different schemas or
+	// different inner values produce different CRCs -- distinct enough to use as part of an
+	// FMeshEntryKey so mesh actors with distinct property authoring don't collapse into one
+	// shared mesh entry. 0 means "no property component on the actor".
+	static uint32 HashPropertyCollectionComponent(AActor* Actor)
+	{
+		UPCGExPropertyCollectionComponent* Comp = UPCGExPropertyCollectionComponent::FindOnActor(Actor);
+		if (!Comp)
+		{
+			return 0;
+		}
+
+		for (FPCGExPropertySchema& Schema : Comp->GetPropertiesMutable().Schemas)
+		{
+			Schema.SyncPropertyName();
+		}
+
+		// FProperty descriptor is class-static -- cache after the first lookup so subsequent
+		// per-actor hashes skip the reflection walk.
+		static FProperty* const PropertiesField = UPCGExPropertyCollectionComponent::StaticClass()->FindPropertyByName(
+			GET_MEMBER_NAME_CHECKED(UPCGExPropertyCollectionComponent, Properties));
+		if (!PropertiesField)
+		{
+			return 0;
+		}
+
+		FArchiveCrc32 Crc;
+		PropertiesField->SerializeItem(
+			FStructuredArchiveFromArchive(Crc).GetSlot(),
+			PropertiesField->ContainerPtrToValuePtr<void>(Comp));
+		return Crc.GetCrc();
 	}
 
 	static int32 TrackMaterialVariant(const UStaticMeshComponent* Comp, FMeshInfo& Info)
@@ -354,6 +409,11 @@ namespace PCGExDefaultLevelDataExporterInternal
 		TArray<FMeshPoint>& OutPoints,
 		TMap<FMeshEntryKey, FMeshInfo>& InOutMeshInfoMap)
 	{
+		// Property-component identity is computed once per actor and folded into every mesh
+		// entry this actor contributes to. Actors that author distinct property values land
+		// in distinct mesh buckets so their per-instance PropertyOverrides survive merging.
+		const uint32 PropertyComponentHash = HashPropertyCollectionComponent(Actor);
+
 		TInlineComponentArray<UStaticMeshComponent*> SMCs;
 		Actor->GetComponents<UStaticMeshComponent>(SMCs);
 
@@ -376,6 +436,7 @@ namespace PCGExDefaultLevelDataExporterInternal
 			FMeshEntryKey Key;
 			Key.MeshPath = FSoftObjectPath(Mesh);
 			Key.bIsISMSource = bIsISM;
+			Key.PropertyComponentHash = PropertyComponentHash;
 
 			FSoftISMComponentDescriptor TentativeISM;
 			FPCGExStaticMeshComponentDescriptor TentativeSM;
@@ -405,6 +466,9 @@ namespace PCGExDefaultLevelDataExporterInternal
 				{
 					Info.SMDescriptor = MoveTemp(TentativeSM);
 				}
+				// All contributors to this bucket share PropertyComponentHash by construction,
+				// so the first actor's property data is canonical for the bucket.
+				Info.RepresentativeActor = Actor;
 			}
 
 			const int32 VariantIdx = bCaptureMaterialOverrides
@@ -777,6 +841,7 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 				Info.CollateralPaths = MoveTemp(DeltaCollaterals);
 			}
 			Info.IntersectedTags = BuildEffectiveTags();
+			Info.RepresentativeActor = CA.Actor;
 		}
 		else
 		{
@@ -1086,6 +1151,9 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 				FPCGExMeshCollectionEntry& MeshEntry = MeshEntries[MeshIdx];
 				MeshEntry.StaticMesh = TSoftObjectPtr<UStaticMesh>(Elem.Key.MeshPath);
 				MeshEntry.Weight = Elem.Value.TotalCount;
+				// Carry the per-bucket property-component identity onto the entry so
+				// CompactSharedMesh dedup honors it.
+				MeshEntry.PropertyComponentHash = Elem.Key.PropertyComponentHash;
 
 				if (Elem.Key.bIsISMSource)
 				{
@@ -1112,6 +1180,24 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 							MatEntry.SlotIndex = SlotIdx;
 							MatEntry.Material = TSoftObjectPtr<UMaterialInterface>(VariantMats[SlotIdx]);
 						}
+					}
+				}
+
+				// Pull property-component values from the representative actor and stage them
+				// onto the mesh entry's PropertyOverrides. CompactSharedMesh preserves these
+				// across cross-entry aggregation; the SharedMeshCollection's CollectionProperties
+				// gets rebuilt from the union of all entries' overrides afterwards via
+				// RefreshCollectionPropertiesFromEntries.
+				TArray<FInstancedStruct> Authored = UPCGExPropertyCollectionComponent::ExtractSchemaFromActor(
+					Elem.Value.RepresentativeActor.Get());
+				if (!Authored.IsEmpty())
+				{
+					MeshEntry.PropertyOverrides.Overrides.Reset(Authored.Num());
+					for (const FInstancedStruct& Prop : Authored)
+					{
+						FPCGExPropertyOverrideEntry& Slot = MeshEntry.PropertyOverrides.Overrides.AddDefaulted_GetRef();
+						Slot.Value = Prop;
+						Slot.bEnabled = true;
 					}
 				}
 
@@ -1146,6 +1232,13 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 			EmbeddedActorCollection = NewObject<UPCGExActorCollection>(OutAsset);
 			EmbeddedActorCollection->InitNumEntries(ActorClassInfoMap.Num());
 
+			// Parallel to Entries: one live donor per entry, used by the property-component scan
+			// below. The bucket's RepresentativeActor was captured at the same point we captured
+			// SerializedDelta, so the scan reads from the actor whose authored state the delta
+			// already reflects.
+			TArray<AActor*> RepresentativeInstances;
+			RepresentativeInstances.Init(nullptr, ActorClassInfoMap.Num());
+
 			int32 ActorIdx = 0;
 			for (auto& Elem : ActorClassInfoMap)
 			{
@@ -1162,8 +1255,23 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 					ActorEntry.DeltaCollateralPaths = Elem.Value.CollateralPaths;
 				}
 
+				RepresentativeInstances[ActorIdx] = Elem.Value.RepresentativeActor.Get();
+
 				ActorIdx++;
 			}
+
+			// Scan UPCGExPropertyCollectionComponent on each representative actor and merge into
+			// the embedded collection's schema + per-entry overrides. Runs BEFORE RebuildStagingData
+			// so the staging pass observes the final schema; the non-editor RebuildStagingData
+			// variant does not fire EDITOR_OnPostStagingRebuild, so there is no double-scan from
+			// the UPCGExActorCollection auto-hook on this code path.
+			//
+			// The exporter's policy is also mirrored onto the embedded collection's own field so
+			// a user-triggered manual rebuild of the embedded asset uses the same policy that
+			// generated it.
+			EmbeddedActorCollection->SchemaMergePolicy = SchemaMergePolicy;
+			EmbeddedActorCollection->RebuildPropertiesFromActorComponents(
+				SchemaMergePolicy, RepresentativeInstances);
 
 			EmbeddedActorCollection->RebuildStagingData(true);
 		}

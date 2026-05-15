@@ -156,6 +156,20 @@ struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionEntry : public FPCGExAssetCollec
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ SM Settings", EditCondition="!bIsSubCollection && DescriptorSource == EPCGExEntryVariationMode::Local", EditConditionHides, DisplayAfter="ISMDescriptor"))
 	FPCGExStaticMeshComponentDescriptor SMDescriptor;
 
+	/** Identity hash of the source actor's UPCGExPropertyCollectionComponent (when present).
+	 *  Folded into the entry's content hash so two mesh-classified actors that share the
+	 *  same mesh + descriptor + materials but author distinct property-component values land
+	 *  in distinct shared entries -- preserving their per-instance PropertyOverrides through
+	 *  CompactSharedMesh. 0 means "no property component on the source actor".
+	 *
+	 *  Persisted: CompactSharedMesh's PreservedByHash lookup (which carries user edits to
+	 *  Tags/Category/PropertyOverrides across rebuilds) matches entries by content hash;
+	 *  loaded shared entries need the same hash they had at export so the match resolves.
+	 *  If the hashing algorithm ever changes, one full rebuild regenerates every entry's
+	 *  hash to the new scheme. */
+	UPROPERTY()
+	uint32 PropertyComponentHash = 0;
+
 	// Subcollection Access
 
 	virtual UPCGExAssetCollection* GetSubCollectionPtr() const override;

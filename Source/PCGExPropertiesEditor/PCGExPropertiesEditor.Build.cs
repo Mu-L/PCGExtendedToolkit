@@ -51,6 +51,10 @@ public class PCGExPropertiesEditor : ModuleRules
 				"EditorStyle",
 				"InputCore",
 				"AssetRegistry",
+				"BlueprintGraph",
+				"KismetCompiler",
+				"Kismet",
+				"ToolMenus",
 			}
 		);
 
