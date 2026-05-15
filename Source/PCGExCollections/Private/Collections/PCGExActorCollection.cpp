@@ -9,8 +9,8 @@
 #endif
 
 #include "PCGComponent.h"
-#include "PCGExLog.h"
 #include "PCGExCollectionsSettingsCache.h"
+#include "PCGExLog.h"
 #include "PCGExSocketProvider.h"
 #include "Engine/Blueprint.h"
 #include "Engine/Level.h"
@@ -24,8 +24,8 @@ UPCGExActorCollection::UPCGExActorCollection(const FObjectInitializer& ObjectIni
 	const auto& Settings = PCGEX_COLLECTIONS_SETTINGS;
 
 	UClass* EvalClass = Settings.DefaultBoundsEvaluatorClass
-		                    ? Settings.DefaultBoundsEvaluatorClass.Get()
-		                    : UPCGExDefaultBoundsEvaluator::StaticClass();
+		? Settings.DefaultBoundsEvaluatorClass.Get()
+		: UPCGExDefaultBoundsEvaluator::StaticClass();
 
 	BoundsEvaluator = Cast<UPCGExBoundsEvaluator>(
 		ObjectInitializer.CreateDefaultSubobject(this, TEXT("BoundsEvaluator"),
@@ -49,7 +49,10 @@ bool FPCGExActorCollectionEntry::Validate(const UPCGExAssetCollection* ParentCol
 {
 	if (!bIsSubCollection)
 	{
-		if (!Actor.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries) { return false; }
+		if (!Actor.ToSoftObjectPath().IsValid() && ParentCollection->bDoNotIgnoreInvalidEntries)
+		{
+			return false;
+		}
 	}
 
 	return FPCGExAssetCollectionEntry::Validate(ParentCollection);
@@ -77,6 +80,25 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		if (!World)
 		{
 			UE_LOG(LogPCGEx, Error, TEXT("No world to compute actor bounds!"));
+			return;
+		}
+
+		// SpawnActor asserts hard if the world is mid-transition. UpdateStaging is reached
+		// from several paths (manual rebuild, OnAssetUpdatedOnDisk, deferred PostLoad,
+		// recursive cascades from the level exporter) and not all guarantee a settled
+		// world. IsAsyncLoading is intentionally NOT checked: it's globally true during
+		// PCG graph execution that soft-loads assets, and would silently strip bounds.
+		if (World->bIsTearingDown
+			|| !World->PersistentLevel
+			|| World->WorldType == EWorldType::Inactive
+			|| World->WorldType == EWorldType::None)
+		{
+			UE_LOG(LogPCGEx, Warning,
+			       TEXT("World not in a spawn-safe state (type=%d, tearing=%d, hasLevel=%d); skipping bounds for '%s'."),
+			       static_cast<int32>(World->WorldType.GetValue()),
+			       World->bIsTearingDown ? 1 : 0,
+			       World->PersistentLevel ? 1 : 0,
+			       *ActorClass->GetPathName());
 			return;
 		}
 
@@ -111,8 +133,8 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		TempActor->GetComponents(PCGComps);
 		bHasPCGComponent = !PCGComps.IsEmpty();
 		CachedPCGGraph = (bHasPCGComponent && PCGComps[0]->GetGraph())
-			                 ? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
-			                 : nullptr;
+			? TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(PCGComps[0]->GetGraph()))
+			: nullptr;
 
 		// Temp actor is at FTransform::Identity, so component world transform == relative to actor
 		TArray<UPCGExSocketComponent*> SocketComps;
@@ -166,14 +188,16 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 			{
 				if (Actor.Get() && FoundActor->IsA(Actor.Get()))
 				{
-					SerializedPropertyDelta = PCGExActorDelta::SerializeActorDelta(FoundActor);
+					DeltaCollateralPaths.Reset();
+					SerializedPropertyDelta = PCGExActorDelta::SerializeActorDelta(FoundActor, &DeltaCollateralPaths);
 				}
 				else if (!Actor.ToSoftObjectPath().IsValid())
 				{
 					// Auto-populate Actor class from the found actor
 					Actor = TSoftClassPtr<AActor>(FSoftClassPath(FoundActor->GetClass()));
 					Staging.Path = Actor.ToSoftObjectPath();
-					SerializedPropertyDelta = PCGExActorDelta::SerializeActorDelta(FoundActor);
+					DeltaCollateralPaths.Reset();
+					SerializedPropertyDelta = PCGExActorDelta::SerializeActorDelta(FoundActor, &DeltaCollateralPaths);
 				}
 				else
 				{
@@ -230,6 +254,7 @@ void FPCGExActorCollectionEntry::EDITOR_Sanitize()
 		bHasPCGComponent = false;
 		CachedPCGGraph = nullptr;
 		SerializedPropertyDelta.Empty();
+		DeltaCollateralPaths.Empty();
 	}
 }
 #endif
@@ -264,7 +289,10 @@ void UPCGExActorCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAss
 				}
 			}
 
-			if (bAlreadyExists) { continue; }
+			if (bAlreadyExists)
+			{
+				continue;
+			}
 
 			FPCGExActorCollectionEntry Entry = FPCGExActorCollectionEntry();
 			Entry.Actor = ActorClass;

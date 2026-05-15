@@ -4,10 +4,10 @@
 #include "Core/PCGExPlotQuery.h"
 
 #include "PCGExHeuristicsHandler.h"
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
 #include "Clusters/PCGExCluster.h"
 #include "Core/PCGExPathQuery.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Search/PCGExSearchOperation.h"
 
 namespace PCGExPathfinding
@@ -51,14 +51,20 @@ namespace PCGExPathfinding
 			PCGEX_ASYNC_THIS
 			HeuristicsHandler->ReleaseLocalFeedbackHandler(This->LocalFeedbackHandler);
 			This->LocalFeedbackHandler.Reset();
-			if (This->OnCompleteCallback) { This->OnCompleteCallback(This); }
+			if (This->OnCompleteCallback)
+			{
+				This->OnCompleteCallback(This);
+			}
 		};
 
 		PlotTasks->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, SearchOperation, Allocations, HeuristicsHandler](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
 			TSharedPtr<FSearchAllocations> LocalAllocations = Allocations;
-			if (!Allocations) { LocalAllocations = SearchOperation->NewAllocations(); }
+			if (!Allocations)
+			{
+				LocalAllocations = SearchOperation->NewAllocations();
+			}
 			PCGEX_SCOPE_LOOP(Index)
 			{
 				This->SubQueries[Index]->FindPath(SearchOperation, LocalAllocations, HeuristicsHandler, This->LocalFeedbackHandler);
@@ -69,13 +75,18 @@ namespace PCGExPathfinding
 	}
 
 	FPlotQuery::FPlotQuery(const TSharedRef<PCGExClusters::FCluster>& InCluster, bool ClosedLoop, const int32 InQueryIndex)
-		: Cluster(InCluster), bIsClosedLoop(ClosedLoop), QueryIndex(InQueryIndex)
+		: Cluster(InCluster)
+		  , bIsClosedLoop(ClosedLoop)
+		  , QueryIndex(InQueryIndex)
 	{
 	}
 
 	void FPlotQuery::Cleanup()
 	{
-		for (const TSharedPtr<FPathQuery>& Query : SubQueries) { Query->Cleanup(); }
+		for (const TSharedPtr<FPathQuery>& Query : SubQueries)
+		{
+			Query->Cleanup();
+		}
 		SubQueries.Empty();
 	}
 }

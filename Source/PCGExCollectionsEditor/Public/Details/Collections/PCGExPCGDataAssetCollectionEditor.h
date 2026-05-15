@@ -14,13 +14,32 @@ class FPCGExPCGDataAssetCollectionEditor : public FPCGExAssetCollectionEditor
 public:
 	FPCGExPCGDataAssetCollectionEditor();
 
-	virtual FName GetToolkitFName() const override { return FName("PCGExPCGDataAssetCollectionEditor"); }
-	virtual FText GetBaseToolkitName() const override { return INVTEXT("PCGEx PCGDataAsset Collection Editor"); }
-	virtual FString GetWorldCentricTabPrefix() const override { return TEXT("PCGEx"); }
-	virtual FLinearColor GetWorldCentricTabColorScale() const override { return FLinearColor::White; }
+	virtual FName GetToolkitFName() const override
+	{
+		return FName("PCGExPCGDataAssetCollectionEditor");
+	}
+
+	virtual FText GetBaseToolkitName() const override
+	{
+		return INVTEXT("PCGEx PCGDataAsset Collection Editor");
+	}
+
+	virtual FString GetWorldCentricTabPrefix() const override
+	{
+		return TEXT("PCGEx");
+	}
+
+	virtual FLinearColor GetWorldCentricTabColorScale() const override
+	{
+		return FLinearColor::White;
+	}
 
 protected:
-	virtual FName GetTilePickerPropertyName() const override { return FName("DataAsset"); }
+	virtual FName GetTilePickerPropertyName() const override
+	{
+		return FName("DataAsset");
+	}
+
 	virtual TSharedRef<SWidget> BuildTilePickerWidget(
 		TWeakObjectPtr<UPCGExAssetCollection> Collection,
 		int32 EntryIndex,

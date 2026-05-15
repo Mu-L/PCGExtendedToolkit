@@ -30,7 +30,10 @@ TArray<FPCGPinProperties> UPCGExSmoothSettings::InputPinProperties() const
 
 bool UPCGExSmoothSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExBlending::Labels::SourceBlendingLabel) { return BlendingInterface == EPCGExBlendingInterface::Individual; }
+	if (InPin->Properties.Label == PCGExBlending::Labels::SourceBlendingLabel)
+	{
+		return BlendingInterface == EPCGExBlendingInterface::Individual;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
@@ -39,7 +42,10 @@ void UPCGExSmoothSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!SmoothingMethod) { SmoothingMethod = NewObject<UPCGExMovingAverageSmoothing>(this, TEXT("SmoothingMethod")); }
+		if (!SmoothingMethod)
+		{
+			SmoothingMethod = NewObject<UPCGExMovingAverageSmoothing>(this, TEXT("SmoothingMethod"));
+		}
 	}
 	Super::PostInitProperties();
 }
@@ -47,13 +53,19 @@ void UPCGExSmoothSettings::PostInitProperties()
 
 PCGEX_INITIALIZE_ELEMENT(Smooth)
 
-PCGExData::EIOInit UPCGExSmoothSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSmoothSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(Smooth)
 
 bool FPCGExSmoothElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(Smooth)
 	PCGEX_BIND_INSTANCED_FACTORY(SmoothingMethod, UPCGExSmoothingInstancedFactory, PCGExSmooth::SourceOverridesSmoothing)
@@ -112,7 +124,10 @@ namespace PCGExSmooth
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -123,7 +138,10 @@ namespace PCGExSmooth
 		{
 			BlendOpsManager = MakeShared<PCGExBlending::FBlendOpsManager>(PointDataFacade);
 
-			if (!BlendOpsManager->Init(Context, Context->BlendingFactories)) { return false; }
+			if (!BlendOpsManager->Init(Context, Context->BlendingFactories))
+			{
+				return false;
+			}
 
 			DataBlender = BlendOpsManager;
 		}
@@ -133,18 +151,30 @@ namespace PCGExSmooth
 			MetadataBlender->SetTargetData(PointDataFacade);
 			MetadataBlender->SetSourceData(PointDataFacade, PCGExData::EIOSide::In, true);
 
-			if (!MetadataBlender->Init(Context, Settings->BlendingSettings)) { return false; }
+			if (!MetadataBlender->Init(Context, Settings->BlendingSettings))
+			{
+				return false;
+			}
 
 			DataBlender = MetadataBlender;
 		}
 
-		if (!DataBlender) { DataBlender = MakeShared<PCGExBlending::FDummyBlender>(); }
+		if (!DataBlender)
+		{
+			DataBlender = MakeShared<PCGExBlending::FDummyBlender>();
+		}
 
 		Influence = Settings->GetValueSettingInfluence();
-		if (!Influence->Init(PointDataFacade)) { return false; }
+		if (!Influence->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		Smoothing = Settings->GetValueSettingSmoothingAmount();
-		if (!Smoothing->Init(PointDataFacade)) { return false; }
+		if (!Smoothing->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		SmoothingOperation = Context->SmoothingMethod->CreateOperation();
 		SmoothingOperation->Path = PointDataFacade->Source;
@@ -168,9 +198,12 @@ namespace PCGExSmooth
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
-			const double LocalSmoothing = FMath::Clamp(Smoothing->Read(Index), 0, MAX_dbl) * Settings->ScaleSmoothingAmountAttribute;
+			const double LocalSmoothing = FMath::Clamp(Smoothing->Read(Index), 0, TNumericLimits<double>::Max()) * Settings->ScaleSmoothingAmountAttribute;
 
 			if ((Settings->bPreserveEnd && Index == NumPoints - 1) || (Settings->bPreserveStart && Index == 0))
 			{
@@ -184,7 +217,10 @@ namespace PCGExSmooth
 
 	void FProcessor::CompleteWork()
 	{
-		if (BlendOpsManager) { BlendOpsManager->Cleanup(Context); }
+		if (BlendOpsManager)
+		{
+			BlendOpsManager->Cleanup(Context);
+		}
 
 		SmoothingOperation.Reset();
 		PointDataFacade->WriteFastest(TaskManager);

@@ -2,15 +2,15 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
-#include "PCGSettings.h"
 #include "PCGExCoreMacros.h"
 #include "PCGExCoreSettingsCache.h"
+#include "PCGSettings.h"
 
+#include "PCGExEnumSelector.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
 #include "Details/PCGExEnumCommon.h"
-#include "PCGExEnumSelector.h"
 #include "PCGExConstantEnum.generated.h"
 
 struct FPCGExBitmask;
@@ -58,37 +58,49 @@ public:
 	// Begin unrolling of Tim's lovely macro
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(EnumConstant, "Enum Constant", "Break an enum into handy constant values.", FName(GetDisplayName())); // Tim says nope! :D
 	FString GetDisplayName() const;
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Param; };
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Constant); };
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Param;
+	};
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Constant);
+	};
 	// End unrolling of Tim's lovely macro
 #endif
 
 	virtual void PostLoad() override;
 
 #if WITH_EDITOR
+	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 	virtual void FillEnabledExportValues();
 	virtual void OnOverrideSettingsDuplicatedInternal(bool bSkippedPostLoad) override;
 
-	virtual bool HasDynamicPins() const override { return true; };
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	};
 
 	TObjectPtr<UEnum> GetEnumClass() const;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings")
-	EPCGExEnumConstantSourceType Source = EPCGExEnumConstantSourceType::Selector;
+	UPROPERTY()
+	EPCGExEnumConstantSourceType Source_DEPRECATED = EPCGExEnumConstantSourceType::Selector;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category= Settings)
 	EPCGExEnumOutputMode OutputMode = EPCGExEnumOutputMode::EEOM_All;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(EditCondition="Source == EPCGExEnumConstantSourceType::Picker", EditConditionHides), Category="Settings")
-	TObjectPtr<UEnum> PickerEnum;
+	UPROPERTY()
+	TObjectPtr<UEnum> PickerEnum_DEPRECATED;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(EditCondition="Source == EPCGExEnumConstantSourceType::Selector", EditConditionHides, ShowOnlyInnerProperties), Category="Settings")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(PCG_NotOverridable), Category= Settings)
 	FPCGExEnumSelector SelectedEnum;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings", EditFixedSize, meta=( ReadOnlyKeys, EditCondition="OutputMode == EPCGExEnumOutputMode::EEOM_Selection || OutputMode == EPCGExEnumOutputMode::EEOM_SelectionToMultiplePins", EditConditionHides ))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category= Settings, EditFixedSize, meta=( ReadOnlyKeys, EditCondition="OutputMode == EPCGExEnumOutputMode::EEOM_Selection || OutputMode == EPCGExEnumOutputMode::EEOM_SelectionToMultiplePins", EditConditionHides ))
 	TMap<FName, bool> EnabledExportValues;
 
 	// Hidden for now
@@ -151,7 +163,10 @@ protected:
 	virtual EPCGChangeType GetChangeTypeForProperty(const FName& PropName) const override;
 #endif
 
-	virtual TArray<FPCGPinProperties> InputPinProperties() const override { return {}; };
+	virtual TArray<FPCGPinProperties> InputPinProperties() const override
+	{
+		return {};
+	};
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 };
@@ -159,6 +174,7 @@ protected:
 class FPCGExConstantEnumElement : public IPCGExElement
 {
 protected:
+	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
 	// Stage to separate pins for each value
@@ -170,5 +186,8 @@ protected:
 	// Stage bitflags
 	static void StageBitFlags(FPCGExContext* InContext, const UPCGExConstantEnumSettings* Settings, FPCGExBitmask& OutBitflags);
 
-	virtual FPCGContext* CreateContext() override { return new FPCGExContext(); }
+	virtual FPCGContext* CreateContext() override
+	{
+		return new FPCGExContext();
+	}
 };

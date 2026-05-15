@@ -6,8 +6,8 @@
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Math/Geo/PCGExDelaunay.h"
 #include "Details/PCGExInfluenceDetails.h"
+#include "Math/Geo/PCGExDelaunay.h"
 #include "Math/Geo/PCGExGeo.h"
 
 #define LOCTEXT_NAMESPACE "PCGExLloydRelaxElement"
@@ -15,13 +15,19 @@
 
 PCGEX_INITIALIZE_ELEMENT(LloydRelax)
 
-PCGExData::EIOInit UPCGExLloydRelaxSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExLloydRelaxSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(LloydRelax)
 
 bool FPCGExLloydRelaxElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(LloydRelax)
 
@@ -69,7 +75,10 @@ namespace PCGExLloydRelax
 	{
 	public:
 		FLloydRelaxTask(const int32 InTaskIndex, const TSharedPtr<FProcessor>& InProcessor, const FPCGExInfluenceDetails* InInfluenceSettings, const int32 InNumIterations)
-			: FPCGExIndexedTask(InTaskIndex), Processor(InProcessor), InfluenceSettings(InInfluenceSettings), NumIterations(InNumIterations)
+			: FPCGExIndexedTask(InTaskIndex)
+			  , Processor(InProcessor)
+			  , InfluenceSettings(InInfluenceSettings)
+			  , NumIterations(InNumIterations)
 		{
 		}
 
@@ -85,7 +94,10 @@ namespace PCGExLloydRelax
 			TArray<FVector>& Positions = Processor->ActivePositions;
 
 			const TArrayView<FVector> View = MakeArrayView(Positions);
-			if (!Delaunay->Process<false, false>(View)) { return; }
+			if (!Delaunay->Process<false, false>(View))
+			{
+				return;
+			}
 
 			const int32 NumPoints = Positions.Num();
 
@@ -124,13 +136,19 @@ namespace PCGExLloydRelax
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExLloydRelax::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
 
 		InfluenceDetails = Settings->InfluenceDetails;
-		if (!InfluenceDetails.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!InfluenceDetails.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		PCGExPointArrayDataHelpers::PointsToPositions(PointDataFacade->GetIn(), ActivePositions);
 
@@ -151,7 +169,7 @@ namespace PCGExLloydRelax
 			PCGEX_PARALLEL_FOR(
 				OutTransforms.Num(),
 				OutTransforms[i].SetLocation(ActivePositions[i]);
-			)
+				)
 		}
 		else
 		{
@@ -159,7 +177,7 @@ namespace PCGExLloydRelax
 				OutTransforms.Num(),
 				FTransform& Transform = OutTransforms[i];
 				Transform.SetLocation(FMath::Lerp(Transform.GetLocation(), ActivePositions[i], InfluenceDetails.GetInfluence(i)));
-			)
+				)
 		}
 	}
 }

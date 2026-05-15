@@ -22,7 +22,8 @@ namespace PCGExPartition
 		FPartitionRange() = default;
 
 		FPartitionRange(const int32 InStart, const int32 InCount)
-			: Start(InStart), Count(InCount)
+			: Start(InStart)
+			  , Count(InCount)
 		{
 		}
 	};
@@ -41,8 +42,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PartitionByValuesStatic, "Partition by Values (Static)", "Outputs separate buckets of points based on an attribute' value. Each bucket is named after a unique attribute value. Note that it is recommended to use a Merge before.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spatial; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscAdd); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spatial;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscAdd);
+	}
 #endif
 
 protected:

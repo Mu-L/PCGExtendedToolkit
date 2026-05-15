@@ -4,12 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Channels/PCGExChannelInteractionMatrix.h"
 #include "Domains/PCGExSpatialDomain.h"
 #include "Math/OBB/PCGExOBB.h"
 #include "Math/OBB/PCGExOBBCollection.h"
-#include "Shapes/PCGExFootprintShape.h"
-#include "Channels/PCGExChannelInteractionMatrix.h"
 #include "NarrowPhase/PCGExNarrowPhase.h"
+#include "Shapes/PCGExFootprintShape.h"
 #include "StructUtils/InstancedStruct.h"
 
 /**
@@ -82,12 +82,23 @@ public:
 		int32 SkipOwnerIndex = INDEX_NONE,
 		uint32 CandidateChannelMask = 0) const override;
 
-	virtual FBox GetBounds() const override { return WorldBounds; }
-	virtual bool IsValid() const override { return NumValidEntries > 0; }
+	virtual FBox GetBounds() const override
+	{
+		return WorldBounds;
+	}
+
+	virtual bool IsValid() const override
+	{
+		return NumValidEntries > 0;
+	}
 
 	// ========== Mutation + snapshot ==========
 
-	virtual bool IsMutable() const override { return true; }
+	virtual bool IsMutable() const override
+	{
+		return true;
+	}
+
 	virtual int32 Append(
 		const FPCGExFootprintShape& Shape,
 		int32 OwnerIndex,
@@ -98,8 +109,15 @@ public:
 
 	// ========== Inspection (tests / debug) ==========
 
-	int32 Num() const { return Entries.Num(); }
-	int32 NumValid() const { return NumValidEntries; }
+	int32 Num() const
+	{
+		return Entries.Num();
+	}
+
+	int32 NumValid() const
+	{
+		return NumValidEntries;
+	}
 
 private:
 	struct FEntry

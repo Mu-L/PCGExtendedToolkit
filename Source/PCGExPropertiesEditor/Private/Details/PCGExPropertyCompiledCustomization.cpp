@@ -6,9 +6,9 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "IDetailPropertyRow.h"
-#include "PropertyHandle.h"
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
+#include "PropertyHandle.h"
 #include "Widgets/Layout/SBox.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertyCompiledCustomization::MakeInstance()
@@ -42,7 +42,10 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 		FName OuterStructName = NAME_None;
 		if (const FStructProperty* OuterStructProp = CastField<FStructProperty>(PropertyHandle->GetProperty()))
 		{
-			if (OuterStructProp->Struct) { OuterStructName = OuterStructProp->Struct->GetFName(); }
+			if (OuterStructProp->Struct)
+			{
+				OuterStructName = OuterStructProp->Struct->GetFName();
+			}
 		}
 
 		// Edit-mode lookup: this customization is only invoked from the schema-edit path
@@ -76,14 +79,19 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 	for (uint32 i = 0; i < NumChildren; ++i)
 	{
 		TSharedPtr<IPropertyHandle> ChildHandle = PropertyHandle->GetChildHandle(i);
-		if (!ChildHandle.IsValid()) { continue; }
+		if (!ChildHandle.IsValid())
+		{
+			continue;
+		}
 
 		const FName ChildName = ChildHandle->GetProperty() ? ChildHandle->GetProperty()->GetFName() : NAME_None;
 
 		// Skip PropertyName - it's shown in the outer schema header
-		if (ChildName == TEXT("PropertyName")) { continue; }
+		if (ChildName == TEXT("PropertyName"))
+		{
+			continue;
+		}
 
 		ChildBuilder.AddProperty(ChildHandle.ToSharedRef());
 	}
 }
-

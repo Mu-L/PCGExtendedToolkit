@@ -6,21 +6,27 @@
 
 
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExFillControlsFactoryProvider.h"
 #include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Core/PCGExFillControlsFactoryProvider.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigLength, MaxLength, double, MaxLengthInput, MaxLengthAttribute, MaxLength)
 
 bool FPCGExFillControlLength::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryLength* TypedFactory = Cast<UPCGExFillControlsFactoryLength>(Factory);
 	bUsePathLength = TypedFactory->Config.bUsePathLength;
 
 	DistanceLimit = TypedFactory->Config.GetValueSettingMaxLength();
-	if (!DistanceLimit->Init(GetSourceFacade())) { return false; }
+	if (!DistanceLimit->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -69,8 +75,14 @@ FString UPCGExFillControlsLengthProviderSettings::GetDisplayName() const
 {
 	FString DName = GetDefaultNodeTitle().ToString().Replace(TEXT("PCGEx | Fill Control"), TEXT("FC")) + TEXT(" @ ");
 
-	if (Config.MaxLengthInput == EPCGExInputValueType::Attribute) { DName += Config.MaxLengthAttribute.ToString(); }
-	else { DName += FString::Printf(TEXT("%.1f"), Config.MaxLength); }
+	if (Config.MaxLengthInput == EPCGExInputValueType::Attribute)
+	{
+		DName += Config.MaxLengthAttribute.ToString();
+	}
+	else
+	{
+		DName += FString::Printf(TEXT("%.1f"), Config.MaxLength);
+	}
 
 	return DName;
 }

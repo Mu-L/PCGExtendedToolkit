@@ -23,11 +23,17 @@ void UPCGExEdgeEndpointsCheckFilterFactory::RegisterBuffersDependencies(FPCGExCo
 
 bool UPCGExEdgeEndpointsCheckFilterFactory::RegisterConsumableAttributes(FPCGExContext* InContext) const
 {
-	if (!Super::RegisterConsumableAttributes(InContext)) { return false; }
+	if (!Super::RegisterConsumableAttributes(InContext))
+	{
+		return false;
+	}
 
 	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : FilterFactories)
 	{
-		if (!Factory->RegisterConsumableAttributes(InContext)) { return false; }
+		if (!Factory->RegisterConsumableAttributes(InContext))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -35,11 +41,17 @@ bool UPCGExEdgeEndpointsCheckFilterFactory::RegisterConsumableAttributes(FPCGExC
 
 bool UPCGExEdgeEndpointsCheckFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : FilterFactories)
 	{
-		if (!Factory->RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+		if (!Factory->RegisterConsumableAttributesWithData(InContext, InData))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -54,11 +66,17 @@ namespace PCGExEdgeEndpointsCheck
 {
 	bool FFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 	{
-		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
+		{
+			return false;
+		}
 
 		VtxFiltersManager = MakeShared<PCGExClusterFilter::FManager>(Cluster.ToSharedRef(), InPointDataFacade, InEdgeDataFacade);
 		VtxFiltersManager->SetSupportedTypes(&PCGExFactories::ClusterNodeFilters);
-		if (!VtxFiltersManager->Init(InContext, TypedFilterFactory->FilterFactories)) { return false; }
+		if (!VtxFiltersManager->Init(InContext, TypedFilterFactory->FilterFactories))
+		{
+			return false;
+		}
 
 		ResultCache.Init(-1, Cluster->Nodes->Num());
 
@@ -91,17 +109,23 @@ namespace PCGExEdgeEndpointsCheck
 		bool bPass = true;
 		switch (TypedFilterFactory->Config.Mode)
 		{
-		case EPCGExEdgeEndpointsCheckMode::None: bPass = StartResult != Expected && EndResult != Expected;
+		case EPCGExEdgeEndpointsCheckMode::None:
+			bPass = StartResult != Expected && EndResult != Expected;
 			break;
-		case EPCGExEdgeEndpointsCheckMode::Both: bPass = StartResult == Expected && EndResult == Expected;
+		case EPCGExEdgeEndpointsCheckMode::Both:
+			bPass = StartResult == Expected && EndResult == Expected;
 			break;
-		case EPCGExEdgeEndpointsCheckMode::Any: bPass = StartResult == Expected || EndResult == Expected;
+		case EPCGExEdgeEndpointsCheckMode::Any:
+			bPass = StartResult == Expected || EndResult == Expected;
 			break;
-		case EPCGExEdgeEndpointsCheckMode::Start: bPass = StartResult == Expected;
+		case EPCGExEdgeEndpointsCheckMode::Start:
+			bPass = StartResult == Expected;
 			break;
-		case EPCGExEdgeEndpointsCheckMode::End: bPass = EndResult == Expected;
+		case EPCGExEdgeEndpointsCheckMode::End:
+			bPass = EndResult == Expected;
 			break;
-		case EPCGExEdgeEndpointsCheckMode::SeeSaw: bPass = StartResult != EndResult;
+		case EPCGExEdgeEndpointsCheckMode::SeeSaw:
+			bPass = StartResult != EndResult;
 			break;
 		}
 

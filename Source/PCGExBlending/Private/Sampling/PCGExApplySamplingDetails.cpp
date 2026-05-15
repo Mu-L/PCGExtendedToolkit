@@ -46,19 +46,31 @@ void FPCGExApplySamplingDetails::Apply(PCGExData::FMutablePoint& InPoint, const 
 	if (bApplyTransform)
 	{
 		const FVector InTrRot = InTransform.GetRotation().Euler();
-		for (const int32 C : TrRotComponents) { OutRotation[C] = InTrRot[C]; }
+		for (const int32 C : TrRotComponents)
+		{
+			OutRotation[C] = InTrRot[C];
+		}
 
 		FVector InTrPos = InTransform.GetLocation();
-		for (const int32 C : TrPosComponents) { OutPosition[C] = InTrPos[C]; }
+		for (const int32 C : TrPosComponents)
+		{
+			OutPosition[C] = InTrPos[C];
+		}
 
 		FVector InTrSca = InTransform.GetScale3D();
-		for (const int32 C : TrScaComponents) { OutScale[C] = InTrSca[C]; }
+		for (const int32 C : TrScaComponents)
+		{
+			OutScale[C] = InTrSca[C];
+		}
 	}
 
 	if (bApplyLookAt)
 	{
 		const FVector InLkRot = InLookAt.GetRotation().Euler();
-		for (const int32 C : LkRotComponents) { OutRotation[C] = InLkRot[C]; }
+		for (const int32 C : LkRotComponents)
+		{
+			OutRotation[C] = InLkRot[C];
+		}
 
 		//FVector InLkPos = InLookAt.GetLocation();
 		//for (const int32 C : LkPosComponents) { OutPosition[C] = InLkPos[C]; }

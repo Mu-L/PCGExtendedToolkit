@@ -21,7 +21,10 @@ TSharedPtr<PCGExTensorOperation> UPCGExTensorFactoryData::CreateOperation(FPCGEx
 PCGExFactories::EPreparationResult UPCGExTensorFactoryData::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 	return InitInternalData(InContext);
 }
 
@@ -55,7 +58,10 @@ UPCGExFactoryData* UPCGExTensorFactoryProviderSettings::CreateFactory(FPCGExCont
 {
 	TArray<FPCGTaggedData> Collection = InContext->InputData.GetInputsByPin(PCGExTensor::SourceTensorConfigSourceLabel);
 	const UPCGExTensorFactoryData* InTensorReference = Collection.IsEmpty() ? nullptr : Cast<UPCGExTensorFactoryData>(Collection[0].Data);
-	if (InTensorReference) { Cast<UPCGExTensorFactoryData>(InFactory)->InheritFromOtherTensor(InTensorReference); }
+	if (InTensorReference)
+	{
+		Cast<UPCGExTensorFactoryData>(InFactory)->InheritFromOtherTensor(InTensorReference);
+	}
 
 	return Super::CreateFactory(InContext, InFactory);
 }
@@ -63,14 +69,23 @@ UPCGExFactoryData* UPCGExTensorFactoryProviderSettings::CreateFactory(FPCGExCont
 PCGExFactories::EPreparationResult UPCGExTensorPointFactoryData::InitInternalData(FPCGExContext* InContext)
 {
 	PCGExFactories::EPreparationResult Result = Super::InitInternalData(InContext);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
-	if (!InitInternalFacade(InContext)) { return PCGExFactories::EPreparationResult::Fail; }
+	if (!InitInternalFacade(InContext))
+	{
+		return PCGExFactories::EPreparationResult::Fail;
+	}
 
 	EffectorsArray = GetEffectorsArray();
 
 	// Bulk of the work happens here
-	if (!EffectorsArray->Init(InContext, this)) { return PCGExFactories::EPreparationResult::Fail; }
+	if (!EffectorsArray->Init(InContext, this))
+	{
+		return PCGExFactories::EPreparationResult::Fail;
+	}
 
 	InputDataFacade->Flush(); // Flush cached buffers
 	InputDataFacade.Reset();
@@ -86,7 +101,10 @@ TSharedPtr<PCGExTensor::FEffectorsArray> UPCGExTensorPointFactoryData::GetEffect
 bool UPCGExTensorPointFactoryData::InitInternalFacade(FPCGExContext* InContext)
 {
 	InputDataFacade = PCGExData::TryGetSingleFacade(InContext, PCGExTensor::SourceEffectorsLabel, false, true);
-	if (!InputDataFacade) { return false; }
+	if (!InputDataFacade)
+	{
+		return false;
+	}
 	return true;
 }
 

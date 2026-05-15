@@ -8,10 +8,10 @@
 #include "Components/PrimitiveComponent.h"
 #include "Materials/MaterialInterface.h"
 
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/External/PCGExMesh.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
+#include "Factories/PCGExFactories.h"
 
 #include "Details/PCGExCollisionDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
@@ -82,7 +82,11 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS(SampleSurfaceGuided, "Sample : Line Trace", "Find the collision point on the nearest collidable surface in a given direction.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Sampling);
+	}
 #endif
 
 protected:

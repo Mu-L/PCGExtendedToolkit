@@ -4,9 +4,9 @@
 
 #include "Graphs/PCGExGraphHelpers.h"
 
-#include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExEdge.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Clusters/PCGExEdge.h"
+#include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExBufferHelper.h"
 
@@ -17,7 +17,10 @@ namespace PCGExGraphs::Helpers
 		TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExEdge::BuildIndexedEdges-Vanilla);
 
 		const TUniquePtr<PCGExData::TArrayBuffer<int64>> EndpointsBuffer = MakeUnique<PCGExData::TArrayBuffer<int64>>(EdgeIO.ToSharedRef(), PCGExClusters::Labels::Attr_PCGExEdgeIdx);
-		if (!EndpointsBuffer->InitForRead()) { return false; }
+		if (!EndpointsBuffer->InitForRead())
+		{
+			return false;
+		}
 
 		const TArray<int64>& Endpoints = *EndpointsBuffer->GetInValues().Get();
 		const int32 EdgeIOIndex = EdgeIO->IOIndex;
@@ -40,7 +43,10 @@ namespace PCGExGraphs::Helpers
 				const int32* StartPointIndexPtr = EndpointsLookup.Find(A);
 				const int32* EndPointIndexPtr = EndpointsLookup.Find(B);
 
-				if ((!StartPointIndexPtr || !EndPointIndexPtr)) { continue; }
+				if ((!StartPointIndexPtr || !EndPointIndexPtr))
+				{
+					continue;
+				}
 
 				OutEdges[EdgeIndex] = FEdge(EdgeIndex, *StartPointIndexPtr, *EndPointIndexPtr, i, EdgeIOIndex);
 				EdgeIndex++;
@@ -68,7 +74,7 @@ namespace PCGExGraphs::Helpers
 				}
 
 				OutEdges[i] = FEdge(i, *StartPointIndexPtr, *EndPointIndexPtr, i, EdgeIOIndex);
-			)
+				)
 		}
 
 		return static_cast<bool>(bValid);
@@ -82,7 +88,10 @@ namespace PCGExGraphs::Helpers
 		OutIndices.Empty();
 
 		const TUniquePtr<PCGExData::TArrayBuffer<int64>> IndexBuffer = MakeUnique<PCGExData::TArrayBuffer<int64>>(InPointIO.ToSharedRef(), PCGExClusters::Labels::Attr_PCGExVtxIdx);
-		if (!IndexBuffer->InitForRead()) { return false; }
+		if (!IndexBuffer->InitForRead())
+		{
+			return false;
+		}
 
 		const TArray<int64>& Indices = *IndexBuffer->GetInValues().Get();
 

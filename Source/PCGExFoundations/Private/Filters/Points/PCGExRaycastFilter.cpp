@@ -7,8 +7,8 @@
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Elements/Debug/PCGExDrawAttributes.h"
-#include "Sampling/PCGExSamplingHelpers.h"
 #include "Engine/HitResult.h"
+#include "Sampling/PCGExSamplingHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExRaycastFilterDefinition"
 #define PCGEX_NAMESPACE PCGExRaycastFilterDefinition
@@ -17,7 +17,10 @@
 
 bool UPCGExRaycastFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
 	Config.Sanitize();
 	Config.CollisionSettings.Init(InContext);
 
@@ -35,7 +38,10 @@ bool UPCGExRaycastFilterFactory::Init(FPCGExContext* InContext)
 		}
 
 		const TSharedPtr<PCGExData::FFacade> ActorReferenceDataFacade = PCGExData::TryGetSingleFacade(InContext, PCGExRaycastFilter::SourceActorReferencesLabel, false, true);
-		if (!ActorReferenceDataFacade) { return false; }
+		if (!ActorReferenceDataFacade)
+		{
+			return false;
+		}
 
 		if (!PCGExSampling::Helpers::GetIncludedActors(InContext, ActorReferenceDataFacade.ToSharedRef(), Config.ActorReference, IncludedActors))
 		{
@@ -83,7 +89,10 @@ void UPCGExRaycastFilterFactory::RegisterBuffersDependencies(FPCGExContext* InCo
 
 bool PCGExPointFilter::FRaycastFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	const FPCGExRaycastFilterConfig& Config = TypedFilterFactory->Config;
 
@@ -92,30 +101,48 @@ bool PCGExPointFilter::FRaycastFilter::Init(FPCGExContext* InContext, const TSha
 	if (Config.OriginMode != EPCGExRaycastOriginMode::PointPosition)
 	{
 		OriginGetter = Config.Origin.GetValueSetting();
-		if (!OriginGetter->Init(InPointDataFacade)) { return false; }
+		if (!OriginGetter->Init(InPointDataFacade))
+		{
+			return false;
+		}
 	}
 
 	DirectionGetter = Config.Direction.GetValueSetting();
-	if (!DirectionGetter->Init(InPointDataFacade)) { return false; }
+	if (!DirectionGetter->Init(InPointDataFacade))
+	{
+		return false;
+	}
 
 	MaxDistanceGetter = Config.MaxDistance.GetValueSetting();
-	if (!MaxDistanceGetter->Init(InPointDataFacade)) { return false; }
+	if (!MaxDistanceGetter->Init(InPointDataFacade))
+	{
+		return false;
+	}
 
 	if (CollisionSettings.TraceMode == EPCGExTraceMode::Sphere)
 	{
 		SphereRadiusGetter = CollisionSettings.SphereRadius.GetValueSetting();
-		if (!SphereRadiusGetter->Init(InPointDataFacade)) { return false; }
+		if (!SphereRadiusGetter->Init(InPointDataFacade))
+		{
+			return false;
+		}
 	}
 	else if (CollisionSettings.TraceMode == EPCGExTraceMode::Box)
 	{
 		BoxHalfExtentsGetter = CollisionSettings.BoxHalfExtents.GetValueSetting();
-		if (!BoxHalfExtentsGetter->Init(InPointDataFacade)) { return false; }
+		if (!BoxHalfExtentsGetter->Init(InPointDataFacade))
+		{
+			return false;
+		}
 	}
 
 	if (Config.TestMode == EPCGExRaycastTestMode::CompareDistance)
 	{
 		DistanceThresholdGetter = Config.DistanceThreshold.GetValueSetting();
-		if (!DistanceThresholdGetter->Init(InPointDataFacade)) { return false; }
+		if (!DistanceThresholdGetter->Init(InPointDataFacade))
+		{
+			return false;
+		}
 	}
 
 	InTransforms = InPointDataFacade->GetIn()->GetConstTransformValueRange();
@@ -206,8 +233,14 @@ bool PCGExPointFilter::FRaycastFilter::Test(const int32 PointIndex) const
 	}
 
 	FVector Direction = DirectionGetter->Read(PointIndex);
-	if (Config.Direction.bFlip) { Direction *= -1; }
-	if (Config.bTransformDirection) { Direction = Transform.TransformVectorNoScale(Direction); }
+	if (Config.Direction.bFlip)
+	{
+		Direction *= -1;
+	}
+	if (Config.bTransformDirection)
+	{
+		Direction = Transform.TransformVectorNoScale(Direction);
+	}
 	Direction = Direction.GetSafeNormal();
 
 	const double MaxDistance = MaxDistanceGetter->Read(PointIndex);
@@ -273,20 +306,25 @@ FString UPCGExRaycastFilterProviderSettings::GetDisplayName() const
 	FString TraceModeStr;
 	switch (Config.CollisionSettings.TraceMode)
 	{
-	case EPCGExTraceMode::Line: TraceModeStr = TEXT("Line");
+	case EPCGExTraceMode::Line:
+		TraceModeStr = TEXT("Line");
 		break;
-	case EPCGExTraceMode::Sphere: TraceModeStr = TEXT("Sphere");
+	case EPCGExTraceMode::Sphere:
+		TraceModeStr = TEXT("Sphere");
 		break;
-	case EPCGExTraceMode::Box: TraceModeStr = TEXT("Box");
+	case EPCGExTraceMode::Box:
+		TraceModeStr = TEXT("Box");
 		break;
 	}
 
 	FString TestModeStr;
 	switch (Config.TestMode)
 	{
-	case EPCGExRaycastTestMode::AnyHit: TestModeStr = TEXT("Any Hit");
+	case EPCGExRaycastTestMode::AnyHit:
+		TestModeStr = TEXT("Any Hit");
 		break;
-	case EPCGExRaycastTestMode::CompareDistance: TestModeStr = PCGExCompare::ToString(Config.Comparison);
+	case EPCGExRaycastTestMode::CompareDistance:
+		TestModeStr = PCGExCompare::ToString(Config.Comparison);
 		break;
 	}
 

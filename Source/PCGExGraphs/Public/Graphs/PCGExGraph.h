@@ -6,8 +6,8 @@
 #include "CoreMinimal.h"
 #include "PCGExGraphMetadata.h"
 #include "Clusters/PCGExEdge.h"
-#include "Graphs/PCGExGraphDetails.h"
 #include "Clusters/PCGExNode.h"
+#include "Graphs/PCGExGraphDetails.h"
 
 namespace PCGEx
 {
@@ -35,7 +35,7 @@ namespace PCGExGraphs
 		TArray<FNode> Nodes;
 		TArray<FEdge> Edges;
 
-		// Read interface — concrete type is FUnionMetadata (sparse, mutable) or FUnionTable (dense, immutable)
+		// Read interface -- concrete type is FUnionMetadata (sparse, mutable) or FUnionTable (dense, immutable)
 		// depending on which builder populated it. Consumers needing the rich legacy write API
 		// (NewEntryAt_Unsafe, etc.) should keep their own TSharedPtr<FUnionMetadata> reference.
 		TSharedPtr<PCGExData::IUnionMetadata> NodesUnion;
@@ -81,8 +81,15 @@ namespace PCGExGraphs
 
 #pragma region metadata
 
-		FORCEINLINE bool HasAnyNodeMetadata() const { return bHasAnyNodeMetadata; }
-		FORCEINLINE bool HasAnyEdgeMetadata() const { return bHasAnyEdgeMetadata; }
+		FORCEINLINE bool HasAnyNodeMetadata() const
+		{
+			return bHasAnyNodeMetadata;
+		}
+
+		FORCEINLINE bool HasAnyEdgeMetadata() const
+		{
+			return bHasAnyEdgeMetadata;
+		}
 
 		FORCEINLINE FGraphEdgeMetadata& GetOrCreateEdgeMetadata_Unsafe(const int32 EdgeIndex, const int32 RootIndex = -1)
 		{
@@ -108,19 +115,28 @@ namespace PCGExGraphs
 
 		FORCEINLINE FGraphNodeMetadata* FindNodeMetadata_Unsafe(const int32 NodeIndex)
 		{
-			if (NodeIndex < 0 || NodeIndex >= NodeMetadata.Num() || NodeMetadata[NodeIndex].NodeIndex == -1) { return nullptr; }
+			if (NodeIndex < 0 || NodeIndex >= NodeMetadata.Num() || NodeMetadata[NodeIndex].NodeIndex == -1)
+			{
+				return nullptr;
+			}
 			return &NodeMetadata[NodeIndex];
 		}
 
 		FORCEINLINE FGraphEdgeMetadata* FindEdgeMetadata_Unsafe(const int32 EdgeIndex)
 		{
-			if (EdgeIndex < 0 || EdgeIndex >= EdgeMetadata.Num() || EdgeMetadata[EdgeIndex].EdgeIndex == -1) { return nullptr; }
+			if (EdgeIndex < 0 || EdgeIndex >= EdgeMetadata.Num() || EdgeMetadata[EdgeIndex].EdgeIndex == -1)
+			{
+				return nullptr;
+			}
 			return &EdgeMetadata[EdgeIndex];
 		}
 
 		FORCEINLINE int32 FindEdgeMetadataRootIndex_Unsafe(const int32 EdgeIndex)
 		{
-			if (EdgeIndex < 0 || EdgeIndex >= EdgeMetadata.Num() || EdgeMetadata[EdgeIndex].EdgeIndex == -1) { return -1; }
+			if (EdgeIndex < 0 || EdgeIndex >= EdgeMetadata.Num() || EdgeMetadata[EdgeIndex].EdgeIndex == -1)
+			{
+				return -1;
+			}
 			return EdgeMetadata[EdgeIndex].RootIndex;
 		}
 

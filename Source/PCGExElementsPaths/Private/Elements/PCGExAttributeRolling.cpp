@@ -44,13 +44,19 @@ TArray<FPCGPinProperties> UPCGExAttributeRollingSettings::InputPinProperties() c
 
 PCGEX_INITIALIZE_ELEMENT(AttributeRolling)
 
-PCGExData::EIOInit UPCGExAttributeRollingSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExAttributeRollingSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(AttributeRolling)
 
 bool FPCGExAttributeRollingElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(AttributeRolling)
 
@@ -143,7 +149,10 @@ namespace PCGExAttributeRolling
 
 		//PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -153,24 +162,36 @@ namespace PCGExAttributeRolling
 			PCGEX_FOREACH_FIELD_ATTRIBUTE_ROLL(PCGEX_OUTPUT_INIT)
 		}
 
-		if (Settings->bReverseRolling) { SourceOffset = 1; }
+		if (Settings->bReverseRolling)
+		{
+			SourceOffset = 1;
+		}
 
 		if (!Context->PinFilterFactories.IsEmpty())
 		{
 			PinFilterManager = MakeShared<PCGExPointFilter::FManager>(PointDataFacade);
-			if (!PinFilterManager->Init(Context, Context->PinFilterFactories)) { return false; }
+			if (!PinFilterManager->Init(Context, Context->PinFilterFactories))
+			{
+				return false;
+			}
 		}
 
 		if (!Context->StartFilterFactories.IsEmpty())
 		{
 			StartFilterManager = MakeShared<PCGExPointFilter::FManager>(PointDataFacade);
-			if (!StartFilterManager->Init(Context, Context->StartFilterFactories)) { return false; }
+			if (!StartFilterManager->Init(Context, Context->StartFilterFactories))
+			{
+				return false;
+			}
 		}
 
 		if (!Context->StopFilterFactories.IsEmpty())
 		{
 			StopFilterManager = MakeShared<PCGExPointFilter::FManager>(PointDataFacade);
-			if (!StopFilterManager->Init(Context, Context->StopFilterFactories)) { return false; }
+			if (!StopFilterManager->Init(Context, Context->StopFilterFactories))
+			{
+				return false;
+			}
 		}
 
 		if (!Context->BlendingFactories.IsEmpty())
@@ -220,7 +241,10 @@ namespace PCGExAttributeRolling
 
 			if (Settings->ValueControl == EPCGExRollingValueControl::Pin)
 			{
-				if (PinFilterManager->Test(Index)) { SourceIndex = Index; }
+				if (PinFilterManager->Test(Index))
+				{
+					SourceIndex = Index;
+				}
 			}
 			else if (Settings->ValueControl == EPCGExRollingValueControl::Previous)
 			{
@@ -294,7 +318,10 @@ namespace PCGExAttributeRolling
 				{
 					// Don't skip that one roll
 				}
-				else { continue; }
+				else
+				{
+					continue;
+				}
 			}
 
 			if (SourceIndex != -1 && BlendOpsManager)
@@ -306,7 +333,10 @@ namespace PCGExAttributeRolling
 
 	void FProcessor::CompleteWork()
 	{
-		if (BlendOpsManager) { BlendOpsManager->Cleanup(Context); }
+		if (BlendOpsManager)
+		{
+			BlendOpsManager->Cleanup(Context);
+		}
 		PointDataFacade->WriteFastest(TaskManager);
 	}
 }

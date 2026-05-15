@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExPointsProcessor.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Details/PCGExBoundsCommon.h"
 #include "Math/PCGExMathAxis.h"
 
@@ -24,8 +24,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(FindPointOnBounds, "Find point on Bounds", "Find the closest point on the dataset bounds.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spatial; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscAdd); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spatial;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscAdd);
+	}
 #endif
 
 protected:
@@ -103,7 +111,7 @@ namespace PCGExFindPointOnBounds
 	{
 		mutable FRWLock BestIndexLock;
 
-		double BestDistance = MAX_dbl;
+		double BestDistance = TNumericLimits<double>::Max();
 		FVector SearchPosition = FVector::ZeroVector;
 		FVector BestPosition = FVector::ZeroVector;
 		int32 BestIndex = -1;

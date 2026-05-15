@@ -71,7 +71,10 @@ public:
 	void Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& InData);
 	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr);
 
-	bool WantsDataToElements() const { return bDataDomainToElements; }
+	bool WantsDataToElements() const
+	{
+		return bDataDomainToElements;
+	}
 
 protected:
 	void CopyProperties(const int32 Index);
@@ -95,7 +98,10 @@ namespace PCGExPointIOMerger
 		UPCGMetadata* InMetadata = SourceIO->GetIn()->Metadata;
 
 		const FPCGMetadataAttribute<T>* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(InMetadata, Identity.Identifier);
-		if (!TypedInAttribute) { return; }
+		if (!TypedInAttribute)
+		{
+			return;
+		}
 
 		TSharedPtr<PCGExData::TArrayBuffer<T>> OutElementsBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(OutBuffer);
 		TSharedPtr<PCGExData::TSingleValueBuffer<T>> OutDataBuffer = StaticCastSharedPtr<PCGExData::TSingleValueBuffer<T>>(OutBuffer);
@@ -108,7 +114,10 @@ namespace PCGExPointIOMerger
 			{
 				// From a data domain
 				const T Value = PCGExData::Helpers::ReadDataValue(TypedInAttribute);
-				for (int Index = Scope.Write.Start; Index < Scope.Write.End; Index++) { OutElementsBuffer->SetValue(Index, Value); }
+				for (int Index = Scope.Write.Start; Index < Scope.Write.End; Index++)
+				{
+					OutElementsBuffer->SetValue(Index, Value);
+				}
 			}
 			else
 			{
@@ -117,7 +126,10 @@ namespace PCGExPointIOMerger
 				// From elements domain
 				TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, InMetadata);
 
-				if (!InAccessor.IsValid()) { return; }
+				if (!InAccessor.IsValid())
+				{
+					return;
+				}
 
 				TArrayView<T> InRange = MakeArrayView(OutElementsBuffer->GetOutValues()->GetData() + Scope.Write.Start, Scope.Write.Count);
 
@@ -127,7 +139,10 @@ namespace PCGExPointIOMerger
 					PCGExArrayHelpers::InitArray(ReadData, Scope.Write.Count);
 
 					InAccessor->GetRange<T>(ReadData, Scope.Read.Start, *SourceIO->GetInKeys());
-					for (int i = 0; i < Scope.Read.Count; i++) { InRange[i] = ReadData.Last(i); }
+					for (int i = 0; i < Scope.Read.Count; i++)
+					{
+						InRange[i] = ReadData.Last(i);
+					}
 				}
 				else
 				{
@@ -148,8 +163,15 @@ namespace PCGExPointIOMerger
 			{
 				// From elements domain
 				TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, InMetadata);
-				if (!InAccessor.IsValid()) { return; }
-				if (T Value = T{}; InAccessor->Get(Value, Scope.Read.Start, *SourceIO->GetInKeys())) { OutDataBuffer->SetValue(0, Value); }
+				if (!InAccessor.IsValid())
+				{
+					return;
+				}
+				if (T Value = T{};
+					InAccessor->Get(Value, Scope.Read.Start, *SourceIO->GetInKeys()))
+				{
+					OutDataBuffer->SetValue(0, Value);
+				}
 			}
 		}
 	}

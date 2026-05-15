@@ -66,13 +66,26 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PCGDataAssetLoader, "Staging : Load PCGData", "Loads and spawns PCGDataAsset contents from staged points.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Sampler; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
-	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters", PCGExFactories::PointFilters, false)
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Sampler;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
 #endif
 
+	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters", PCGExFactories::PointFilters, false)
+
 protected:
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
 	virtual void InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
@@ -189,7 +202,10 @@ public:
 	/**
 	 * Get read-only access to the entry map.
 	 */
-	const TMap<uint64, const FPCGExPCGDataAssetCollectionEntry*>& GetEntryMap() const { return EntryMap; }
+	const TMap<uint64, const FPCGExPCGDataAssetCollectionEntry*>& GetEntryMap() const
+	{
+		return EntryMap;
+	}
 };
 
 struct FPCGExPCGDataAssetLoaderContext final : FPCGExPointsProcessorContext
@@ -258,7 +274,10 @@ namespace PCGExPCGDataAssetLoader
 		/** Get or create a new ID for the given original ID */
 		FORCEINLINE int32 GetRemappedId(int32 OriginalId)
 		{
-			if (int32* Found = IdMap.Find(OriginalId)) { return *Found; }
+			if (int32* Found = IdMap.Find(OriginalId))
+			{
+				return *Found;
+			}
 
 			int32 NewId = ++SharedIdCounter;
 			IdMap.Add(OriginalId, NewId);

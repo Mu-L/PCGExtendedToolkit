@@ -5,8 +5,8 @@
 
 #include "PCGExLog.h"
 #include "Data/PCGExData.h"
-#include "Data/PCGExSubSelection.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGExSubSelection.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Types/PCGExTypes.h"
 
@@ -28,15 +28,18 @@ namespace PCGExData::Helpers
 
 			EPCGMetadataTypes SrcType = SrcBuffer->GetTypeId();
 			TSharedPtr<IBuffer> DstBuffer = TargetFacade->GetWritable(SrcType, SrcBuffer->Identifier.Name, EBufferInit::Inherit);
-			if (!DstBuffer) { continue; }
+			if (!DstBuffer)
+			{
+				continue;
+			}
 
 			PCGExMetaHelpers::ExecuteWithRightType(SrcType, [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
 				if (SrcBuffer->GetUnderlyingDomain() == EDomainType::Elements)
 				{
-					TArray<T>& SrcValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(SrcBuffer)->GetOutValues().Get();
-					TArray<T>& DstValues = *StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(DstBuffer)->GetOutValues().Get();
+					TArray<T>& SrcValues = *StaticCastSharedPtr<TArrayBuffer<T>>(SrcBuffer)->GetOutValues().Get();
+					TArray<T>& DstValues = *StaticCastSharedPtr<TArrayBuffer<T>>(DstBuffer)->GetOutValues().Get();
 
 					for (int32 i = 0; i < SourcePointIndices.Num(); i++)
 					{
@@ -65,7 +68,10 @@ namespace PCGExData::Helpers
 			const FPCGMetadataAttribute<T>* Parent = Attr->GetParent();
 			while (Parent)
 			{
-				if (!Parent->GetNumberOfEntries()) { Parent = Parent->GetParent(); }
+				if (!Parent->GetNumberOfEntries())
+				{
+					Parent = Parent->GetParent();
+				}
 				else
 				{
 					Attr = Parent;
@@ -132,7 +138,10 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 		bool bSuccess = false;
 		const UPCGMetadata* InMetadata = InData->Metadata;
 
-		if (!InMetadata) { return false; }
+		if (!InMetadata)
+		{
+			return false;
+		}
 
 		FSubSelection SubSelection(InSelector);
 		FPCGAttributeIdentifier SanitizedIdentifier = PCGExMetaHelpers::GetAttributeIdentifier(InSelector, InData);
@@ -147,15 +156,24 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 				const FPCGMetadataAttribute<T_VALUE>* TypedSource = static_cast<const FPCGMetadataAttribute<T_VALUE>*>(SourceAttribute);
 				const T_VALUE Value = ReadDataValue(TypedSource);
 
-				if (SubSelection.bIsValid) { OutValue = SubSelection.Get<T_VALUE, T>(Value); }
-				else { OutValue = PCGExTypeOps::Convert<T_VALUE, T>(Value); }
+				if (SubSelection.bIsValid)
+				{
+					OutValue = SubSelection.Get<T_VALUE, T>(Value);
+				}
+				else
+				{
+					OutValue = PCGExTypeOps::Convert<T_VALUE, T>(Value);
+				}
 
 				bSuccess = true;
 			});
 		}
 		else
 		{
-			if (!bQuiet && InContext) { PCGEX_LOG_INVALID_SELECTOR_C(InContext, Attribute, InSelector) }
+			if (!bQuiet && InContext)
+			{
+				PCGEX_LOG_INVALID_SELECTOR_C(InContext, Attribute, InSelector)
+			}
 			return false;
 		}
 

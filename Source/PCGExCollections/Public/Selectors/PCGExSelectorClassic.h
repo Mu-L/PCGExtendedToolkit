@@ -4,12 +4,31 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Details/PCGExStagingDetails.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
-#include "Helpers/PCGExMetaHelpers.h"
 #include "PCGExCollectionsCommon.h"
+#include "Details/PCGExStagingDetails.h"
+#include "Helpers/PCGExMetaHelpers.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
 
 #include "PCGExSelectorClassic.generated.h"
+
+/**
+ * Selector-specific configuration for the Classic selector. Shared verbatim between the
+ * palette node settings (EditAnywhere, drives the UI) and the FactoryData (UPROPERTY for
+ * serialization). Eliminates the field-by-field copy in CreateFactory.
+ */
+USTRUCT(BlueprintType)
+struct PCGEXCOLLECTIONS_API FPCGExSelectorClassicConfig
+{
+	GENERATED_BODY()
+
+	/** Distribution strategy. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	EPCGExDistribution Mode = EPCGExDistribution::WeightedRandom;
+
+	/** Index picking configuration. Only used when Mode is Index. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Index Settings", EditCondition="Mode == EPCGExDistribution::Index", EditConditionHides))
+	FPCGExAssetDistributionIndexDetails IndexConfig;
+};
 
 /**
  * Classic (built-in) selector factory data. Supports Index, Random, and WeightedRandom
@@ -26,10 +45,7 @@ class PCGEXCOLLECTIONS_API UPCGExSelectorClassicFactoryData : public UPCGExSelec
 
 public:
 	UPROPERTY()
-	EPCGExDistribution Mode = EPCGExDistribution::WeightedRandom;
-
-	UPROPERTY()
-	FPCGExAssetDistributionIndexDetails IndexConfig;
+	FPCGExSelectorClassicConfig Config;
 
 	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const override;
 };
@@ -52,13 +68,9 @@ public:
 #endif
 	//~End UPCGSettings
 
-	/** Distribution strategy. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	EPCGExDistribution Mode = EPCGExDistribution::WeightedRandom;
-
-	/** Index picking configuration. Only used when Mode is Index. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Index Settings", EditCondition="Mode == EPCGExDistribution::Index", EditConditionHides))
-	FPCGExAssetDistributionIndexDetails IndexConfig;
+	/** Selector-specific configuration. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
+	FPCGExSelectorClassicConfig Config;
 
 	/** Shared distribution configuration (seed, entry distribution, categories). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))

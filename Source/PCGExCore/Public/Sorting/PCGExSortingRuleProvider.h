@@ -34,7 +34,10 @@ class PCGEXCORE_API UPCGExSortingRule : public UPCGExFactoryData
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExDataTypeInfoSortRule)
 
-	virtual PCGExFactories::EType GetFactoryType() const override { return PCGExFactories::EType::RuleSort; }
+	virtual PCGExFactories::EType GetFactoryType() const override
+	{
+		return PCGExFactories::EType::RuleSort;
+	}
 
 	int32 Priority;
 	FPCGExSortRuleConfig Config;
@@ -54,12 +57,20 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(SortingRuleFactory, "Sorting Rule", "Creates an single sorting rule to be used with the Sort Points node.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(SortRule); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(SortRule);
+	}
 #endif
 	//~End UPCGSettings
 
 	//~Begin UPCGExFactoryProviderSettings
-	virtual FName GetMainOutputPin() const override { return FName("SortingRule"); }
+	virtual FName GetMainOutputPin() const override
+	{
+		return FName("SortingRule");
+	}
+
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 #if WITH_EDITOR

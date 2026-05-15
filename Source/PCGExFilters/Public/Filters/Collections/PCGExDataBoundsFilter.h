@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "Details/PCGExCompareShorthandsDetails.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Details/PCGExCompareShorthandsDetails.h"
+#include "UObject/Object.h"
 
 #include "PCGExDataBoundsFilter.generated.h"
 
@@ -94,7 +94,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FDataBoundsFilter(const TObjectPtr<const UPCGExDataBoundsFilterFactory>& InDefinition)
-			: ICollectionFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ICollectionFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

@@ -8,25 +8,46 @@
 void UPCGExVerletRelax::RegisterPrimaryBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterPrimaryBuffersDependencies(InContext, FacadePreloader);
-	if (GravityInput == EPCGExInputValueType::Attribute) { FacadePreloader.Register<FVector>(InContext, GravityAttribute); }
-	if (FrictionInput == EPCGExInputValueType::Attribute) { FacadePreloader.Register<FVector>(InContext, FrictionAttribute); }
+	if (GravityInput == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<FVector>(InContext, GravityAttribute);
+	}
+	if (FrictionInput == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<FVector>(InContext, FrictionAttribute);
+	}
 }
 
 bool UPCGExVerletRelax::PrepareForCluster(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster)
 {
-	if (!Super::PrepareForCluster(InContext, InCluster)) { return false; }
+	if (!Super::PrepareForCluster(InContext, InCluster))
+	{
+		return false;
+	}
 
 	GravityBuffer = GetValueSettingGravity();
-	if (!GravityBuffer->Init(PrimaryDataFacade)) { return false; }
+	if (!GravityBuffer->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	FrictionBuffer = GetValueSettingFriction();
-	if (!FrictionBuffer->Init(PrimaryDataFacade)) { return false; }
+	if (!FrictionBuffer->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	ScalingBuffer = GetValueSettingEdgeScaling();
-	if (!ScalingBuffer->Init(SecondaryDataFacade)) { return false; }
+	if (!ScalingBuffer->Init(SecondaryDataFacade))
+	{
+		return false;
+	}
 
 	StiffnessBuffer = GetValueSettingEdgeStiffness();
-	if (!StiffnessBuffer->Init(SecondaryDataFacade)) { return false; }
+	if (!StiffnessBuffer->Init(SecondaryDataFacade))
+	{
+		return false;
+	}
 
 	Deltas.Init(FInt64Vector3(0), Cluster->Nodes->Num());
 
@@ -97,7 +118,10 @@ void UPCGExVerletRelax::Step2(const PCGExGraphs::FEdge& Edge)
 void UPCGExVerletRelax::Step3(const PCGExClusters::FNode& Node)
 {
 	// Update positions based on accumulated forces
-	if (FrictionBuffer->Read(Node.PointIndex) >= 1) { return; }
+	if (FrictionBuffer->Read(Node.PointIndex) >= 1)
+	{
+		return;
+	}
 	(*WriteBuffer)[Node.Index].SetLocation((*WriteBuffer)[Node.Index].GetLocation() + GetDelta(Node.Index));
 }
 

@@ -30,7 +30,11 @@ protected:
 
 	EPCGExSplineSamplingIncludeMode SampleInputs = EPCGExSplineSamplingIncludeMode::All;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult InitInternalData(FPCGExContext* InContext) override;
 	virtual bool InitInternalFacade(FPCGExContext* InContext);
 
@@ -43,6 +47,10 @@ class PCGEXELEMENTSTENSORS_API UPCGExTensorSplineFactoryProviderSettings : publi
 	GENERATED_BODY()
 
 protected:
-	virtual bool GetBuildFromPoints() const { return false; }
+	virtual bool GetBuildFromPoints() const
+	{
+		return false;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 };

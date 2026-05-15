@@ -43,10 +43,16 @@ void UPCGExPickerAttributeSetFactory::AddPicks(const int32 InNum, TSet<int32>& O
 		{
 			TargetIndex = PCGExMath::TruncateDbl(static_cast<double>(MaxIndex) * Pick, Config.TruncateMode);
 
-			if (TargetIndex < 0) { TargetIndex = InNum + TargetIndex; }
+			if (TargetIndex < 0)
+			{
+				TargetIndex = InNum + TargetIndex;
+			}
 			TargetIndex = PCGExMath::SanitizeIndex(TargetIndex, MaxIndex, Config.Safety);
 
-			if (FMath::IsWithin(TargetIndex, 0, InNum)) { OutPicks.Add(TargetIndex); }
+			if (FMath::IsWithin(TargetIndex, 0, InNum))
+			{
+				OutPicks.Add(TargetIndex);
+			}
 		}
 	}
 	else
@@ -56,10 +62,16 @@ void UPCGExPickerAttributeSetFactory::AddPicks(const int32 InNum, TSet<int32>& O
 		{
 			TargetIndex = Pick;
 
-			if (TargetIndex < 0) { TargetIndex = InNum + TargetIndex; }
+			if (TargetIndex < 0)
+			{
+				TargetIndex = InNum + TargetIndex;
+			}
 			TargetIndex = PCGExMath::SanitizeIndex(TargetIndex, MaxIndex, Config.Safety);
 
-			if (FMath::IsWithin(TargetIndex, 0, InNum)) { OutPicks.Add(TargetIndex); }
+			if (FMath::IsWithin(TargetIndex, 0, InNum))
+			{
+				OutPicks.Add(TargetIndex);
+			}
 		}
 	}
 }
@@ -67,7 +79,10 @@ void UPCGExPickerAttributeSetFactory::AddPicks(const int32 InNum, TSet<int32>& O
 PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternalData(FPCGExContext* InContext)
 {
 	PCGExFactories::EPreparationResult Result = Super::InitInternalData(InContext);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	TArray<TSharedPtr<PCGExData::FFacade>> Facades;
 	if (!TryGetFacades(InContext, FName("Indices"), Facades, false, true))
@@ -91,7 +106,10 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 				}
 
 				const TSharedPtr<PCGExData::TAttributeBroadcaster<double>> Values = PCGExData::MakeTypedBroadcaster<double>(Infos->Attributes[0]->Name, Facade->Source);
-				if (!Values) { continue; }
+				if (!Values)
+				{
+					continue;
+				}
 				Values->GrabUniqueValues(UniqueIndices);
 			}
 			else
@@ -99,7 +117,10 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 				for (const FPCGAttributePropertyInputSelector& Selector : Config.Attributes)
 				{
 					const TSharedPtr<PCGExData::TAttributeBroadcaster<double>> Values = PCGExData::MakeTypedBroadcaster<double>(Selector, Facade->Source);
-					if (!Values) { continue; }
+					if (!Values)
+					{
+						continue;
+					}
 					Values->GrabUniqueValues(UniqueIndices);
 				}
 			}
@@ -122,7 +143,10 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 				}
 
 				const TSharedPtr<PCGExData::TAttributeBroadcaster<int32>> Values = PCGExData::MakeTypedBroadcaster<int32>(Infos->Attributes[0]->Name, Facade->Source);
-				if (!Values) { continue; }
+				if (!Values)
+				{
+					continue;
+				}
 				Values->GrabUniqueValues(UniqueIndices);
 			}
 			else
@@ -130,7 +154,10 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 				for (const FPCGAttributePropertyInputSelector& Selector : Config.Attributes)
 				{
 					const TSharedPtr<PCGExData::TAttributeBroadcaster<int32>> Values = PCGExData::MakeTypedBroadcaster<int32>(Selector, Facade->Source);
-					if (!Values) { continue; }
+					if (!Values)
+					{
+						continue;
+					}
 					Values->GrabUniqueValues(UniqueIndices);
 				}
 			}

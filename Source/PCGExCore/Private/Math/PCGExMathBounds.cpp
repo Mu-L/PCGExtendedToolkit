@@ -13,11 +13,16 @@ namespace PCGExMath
 	{
 		switch (Source)
 		{
-		case EPCGExPointBoundsSource::ScaledBounds: return GetLocalBounds<EPCGExPointBoundsSource::ScaledBounds>(Point);
-		case EPCGExPointBoundsSource::DensityBounds: return GetLocalBounds<EPCGExPointBoundsSource::Bounds>(Point);
-		case EPCGExPointBoundsSource::Bounds: return GetLocalBounds<EPCGExPointBoundsSource::DensityBounds>(Point);
-		case EPCGExPointBoundsSource::Center: return GetLocalBounds<EPCGExPointBoundsSource::Center>(Point);
-		default: return FBox(FVector::OneVector * -1, FVector::OneVector);
+		case EPCGExPointBoundsSource::ScaledBounds:
+			return GetLocalBounds<EPCGExPointBoundsSource::ScaledBounds>(Point);
+		case EPCGExPointBoundsSource::DensityBounds:
+			return GetLocalBounds<EPCGExPointBoundsSource::Bounds>(Point);
+		case EPCGExPointBoundsSource::Bounds:
+			return GetLocalBounds<EPCGExPointBoundsSource::DensityBounds>(Point);
+		case EPCGExPointBoundsSource::Center:
+			return GetLocalBounds<EPCGExPointBoundsSource::Center>(Point);
+		default:
+			return FBox(FVector::OneVector * -1, FVector::OneVector);
 		}
 	}
 
@@ -25,18 +30,26 @@ namespace PCGExMath
 	{
 		switch (Source)
 		{
-		case EPCGExPointBoundsSource::ScaledBounds: return GetLocalBounds<EPCGExPointBoundsSource::ScaledBounds>(Point);
-		case EPCGExPointBoundsSource::DensityBounds: return GetLocalBounds<EPCGExPointBoundsSource::Bounds>(Point);
-		case EPCGExPointBoundsSource::Bounds: return GetLocalBounds<EPCGExPointBoundsSource::DensityBounds>(Point);
-		case EPCGExPointBoundsSource::Center: return GetLocalBounds<EPCGExPointBoundsSource::Center>(Point);
-		default: return FBox(FVector::OneVector * -1, FVector::OneVector);
+		case EPCGExPointBoundsSource::ScaledBounds:
+			return GetLocalBounds<EPCGExPointBoundsSource::ScaledBounds>(Point);
+		case EPCGExPointBoundsSource::DensityBounds:
+			return GetLocalBounds<EPCGExPointBoundsSource::Bounds>(Point);
+		case EPCGExPointBoundsSource::Bounds:
+			return GetLocalBounds<EPCGExPointBoundsSource::DensityBounds>(Point);
+		case EPCGExPointBoundsSource::Center:
+			return GetLocalBounds<EPCGExPointBoundsSource::Center>(Point);
+		default:
+			return FBox(FVector::OneVector * -1, FVector::OneVector);
 		}
 	}
 
 	FBox GetBounds(const TArrayView<FVector> InPositions)
 	{
 		FBox Bounds = FBox(ForceInit);
-		for (const FVector& Position : InPositions) { Bounds += Position; }
+		for (const FVector& Position : InPositions)
+		{
+			Bounds += Position;
+		}
 		SanitizeBounds(Bounds);
 		return Bounds;
 	}
@@ -44,7 +57,10 @@ namespace PCGExMath
 	FBox GetBounds(const TConstPCGValueRange<FTransform>& InTransforms)
 	{
 		FBox Bounds = FBox(ForceInit);
-		for (const FTransform& Transform : InTransforms) { Bounds += Transform.GetLocation(); }
+		for (const FTransform& Transform : InTransforms)
+		{
+			Bounds += Transform.GetLocation();
+		}
 		SanitizeBounds(Bounds);
 		return Bounds;
 	}

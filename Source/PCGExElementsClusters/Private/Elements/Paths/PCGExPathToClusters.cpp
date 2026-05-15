@@ -4,12 +4,12 @@
 #include "Elements/Paths/PCGExPathToClusters.h"
 
 
-#include "Data/PCGExPointIO.h"
 #include "Core/PCGExUnionData.h"
-#include "Core/PCGExUnionTable.h"
 #include "Core/PCGExUnionRegistry.h"
+#include "Core/PCGExUnionTable.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Graphs/Union/PCGExUnionProcessor.h"
@@ -32,13 +32,19 @@ PCGEX_INITIALIZE_ELEMENT(PathToClusters)
 TSharedPtr<PCGExPointsMT::IBatch> FPCGExPathToClustersContext::CreatePointBatchInstance(const TArray<TWeakPtr<PCGExData::FPointIO>>& InData) const
 {
 	PCGEX_SETTINGS_LOCAL(PathToClusters)
-	if (Settings->bFusePaths) { return MakeShared<PCGExPointsMT::TBatch<PCGExPathToClusters::FFusingProcessor>>(const_cast<FPCGExPathToClustersContext*>(this), InData); }
+	if (Settings->bFusePaths)
+	{
+		return MakeShared<PCGExPointsMT::TBatch<PCGExPathToClusters::FFusingProcessor>>(const_cast<FPCGExPathToClustersContext*>(this), InData);
+	}
 	return MakeShared<PCGExPointsMT::TBatch<PCGExPathToClusters::FNonFusingProcessor>>(const_cast<FPCGExPathToClustersContext*>(this), InData);
 }
 
 bool FPCGExPathToClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathToClusters)
 
@@ -56,14 +62,20 @@ bool FPCGExPathToClustersElement::Boot(FPCGExContext* InContext) const
 
 		Context->FuseDetails = Settings->PointPointIntersectionDetails.FuseDetails;
 		// TODO : Support local fuse distance, requires access to all input facades
-		if (!Context->FuseDetails.Init(Context, nullptr)) { return false; }
+		if (!Context->FuseDetails.Init(Context, nullptr))
+		{
+			return false;
+		}
 
 		Context->FuseBounds = Context->MainPoints->GetInBounds().ExpandBy(10);
 		Context->bUseOctreeMode = (Context->FuseDetails.GetEffectiveMethod() == EPCGExFuseMethod::Octree);
 
 		Context->NodeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
 		Context->EdgeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
-		if (Context->bUseOctreeMode) { Context->NodeRegistry = MakeShared<PCGExData::FUnionRegistry>(Context->FuseBounds); }
+		if (Context->bUseOctreeMode)
+		{
+			Context->NodeRegistry = MakeShared<PCGExData::FUnionRegistry>(Context->FuseBounds);
+		}
 
 		Context->UnionProcessor = MakeShared<PCGExGraphs::FUnionProcessor>(Context, Context->UnionDataFacade.ToSharedRef(), Settings->PointPointIntersectionDetails, Settings->DefaultPointsBlendingDetails, Settings->DefaultEdgesBlendingDetails);
 
@@ -165,7 +177,10 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 			for (int32 Pi = 0; Pi < NumProcs; Pi++)
 			{
 				const TSharedPtr<FFusingProcessor> P = MainBatch->GetProcessor<FFusingProcessor>(Pi);
-				if (!P.IsValid() || !P->bIsProcessorValid) { continue; }
+				if (!P.IsValid() || !P->bIsProcessorValid)
+				{
+					continue;
+				}
 				EstNodeRecords += P->NodeRecords.Num();
 				EstStagedEdges += P->StagedEdges.Num();
 			}
@@ -175,7 +190,10 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 			for (int32 Pi = 0; Pi < NumProcs; Pi++)
 			{
 				const TSharedPtr<FFusingProcessor> P = MainBatch->GetProcessor<FFusingProcessor>(Pi);
-				if (!P.IsValid() || !P->bIsProcessorValid) { continue; }
+				if (!P.IsValid() || !P->bIsProcessorValid)
+				{
+					continue;
+				}
 				Context->PathsFacades.Add(P->PointDataFacade);
 				NodeScope.Append(MoveTemp(P->NodeRecords));
 				AllStagedEdges.Append(MoveTemp(P->StagedEdges));
@@ -189,11 +207,17 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 			Context->NodeBuilder.Reset();
 
 			const int32 NumUnionNodes = NodesTable->Num();
-			if (NumUnionNodes == 0) { return Context->CancelExecution(TEXT("Union table is empty after fuse build.")); }
+			if (NumUnionNodes == 0)
+			{
+				return Context->CancelExecution(TEXT("Union table is empty after fuse build."));
+			}
 
 			TMap<uint64, int32> KeyToNode;
 			KeyToNode.Reserve(NumUnionNodes);
-			for (int32 i = 0; i < NumUnionNodes; i++) { KeyToNode.Add(NodesTable->Keys[i], i); }
+			for (int32 i = 0; i < NumUnionNodes; i++)
+			{
+				KeyToNode.Add(NodesTable->Keys[i], i);
+			}
 
 			// Phase 2 -- emit abstract edges. Placeholder (IO=-1, Index=0) so each unique edge has an
 			// entry whose Size is the count of incoming paths that produced it; ComputeWeights skips
@@ -204,7 +228,10 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 			{
 				const int32* NodeA = KeyToNode.Find(Staged.KeyA);
 				const int32* NodeB = KeyToNode.Find(Staged.KeyB);
-				if (!NodeA || !NodeB || *NodeA == *NodeB) { continue; }
+				if (!NodeA || !NodeB || *NodeA == *NodeB)
+				{
+					continue;
+				}
 				const uint64 EdgeKey = PCGEx::H64U(static_cast<uint32>(*NodeA), static_cast<uint32>(*NodeB));
 				EdgeScope.Emplace(EdgeKey, -1, 0);
 			}
@@ -235,15 +262,24 @@ bool FPCGExPathToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 			Context->NodeRegistry.Reset();
 		}
 
-		if (!Context->UnionProcessor->Execute()) { return false; }
+		if (!Context->UnionProcessor->Execute())
+		{
+			return false;
+		}
 
 		Context->Done();
 	}
 
 #pragma endregion
 
-	if (Settings->bFusePaths) { (void)Context->UnionDataFacade->Source->StageOutput(Context); }
-	else { Context->MainPoints->StageOutputs(); }
+	if (Settings->bFusePaths)
+	{
+		(void)Context->UnionDataFacade->Source->StageOutput(Context);
+	}
+	else
+	{
+		Context->MainPoints->StageOutputs();
+	}
 
 	return Context->TryComplete();
 }
@@ -258,7 +294,10 @@ namespace PCGExPathToClusters
 
 	bool FNonFusingProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
 
@@ -315,14 +354,20 @@ namespace PCGExPathToClusters
 
 	bool FFusingProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const int32 NumPoints = PointDataFacade->GetNum();
 
 		IOIndex = PointDataFacade->Source->IOIndex;
 		LastIndex = NumPoints - 1;
 
-		if (NumPoints < 2) { return false; }
+		if (NumPoints < 2)
+		{
+			return false;
+		}
 
 		bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn());
 
@@ -348,7 +393,10 @@ namespace PCGExPathToClusters
 
 		auto KeyOf = [&](const PCGExData::FConstPoint& Pt) -> uint64
 		{
-			if (bUseOctree) { return static_cast<uint64>(Registry->FindOrInsert(Pt, FuseDetails)); }
+			if (bUseOctree)
+			{
+				return static_cast<uint64>(Registry->FindOrInsert(Pt, FuseDetails));
+			}
 			return FuseDetails.GetGridKey(Pt.GetLocation(), Pt.Index);
 		};
 
@@ -366,7 +414,10 @@ namespace PCGExPathToClusters
 			const int32 NextIndex = i + 1;
 			if (NextIndex > LastIndex)
 			{
-				if (bClosedLoop) { EmitPathEdge(PointDataFacade->GetInPoint(LastIndex), PointDataFacade->GetInPoint(0)); }
+				if (bClosedLoop)
+				{
+					EmitPathEdge(PointDataFacade->GetInPoint(LastIndex), PointDataFacade->GetInPoint(0));
+				}
 				return;
 			}
 			EmitPathEdge(PointDataFacade->GetInPoint(i), PointDataFacade->GetInPoint(NextIndex));

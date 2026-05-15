@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Clusters/Artifacts/PCGExCell.h"
 #include "PCGExTopology.h"
+#include "Clusters/Artifacts/PCGExCell.h"
 #include "Clusters/Artifacts/PCGExCellDetails.h"
 #include "Core/PCGExClustersProcessor.h"
 
@@ -31,19 +31,30 @@ public:
 #if WITH_EDITOR
 	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	PCGEX_NODE_INFOS(TopologyProcessor, "Topology", "Base processor to output meshes from clusters");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::DynamicMesh; }
-	virtual FLinearColor GetNodeTitleColor() const override { return FLinearColor::White; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::DynamicMesh;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return FLinearColor::White;
+	}
 #endif
 
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
 
-	virtual bool SupportsEdgeConstraints() const { return true; }
+	virtual bool SupportsEdgeConstraints() const
+	{
+		return true;
+	}
 
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
-	
+
 	//~End UPCGSettings
 
 public:
@@ -63,7 +74,10 @@ public:
 	FPCGExTopologyDetails Topology;
 
 protected:
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 
 private:
 	friend class FPCGExTopologyClustersProcessorElement;
@@ -85,7 +99,11 @@ class PCGEXELEMENTSTOPOLOGY_API FPCGExTopologyClustersProcessorElement : public 
 {
 protected:
 	virtual bool Boot(FPCGExContext* InContext) const override;
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
 };
 
 namespace PCGExTopologyEdges
@@ -116,7 +134,10 @@ namespace PCGExTopologyEdges
 	public:
 		TSharedPtr<TMap<uint64, int32>> ProjectedHashMap;
 
-		TObjectPtr<UDynamicMesh> GetInternalMesh() { return InternalMesh; }
+		TObjectPtr<UDynamicMesh> GetInternalMesh()
+		{
+			return InternalMesh;
+		}
 
 		IProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade);
 
@@ -158,8 +179,15 @@ namespace PCGExTopologyEdges
 			Settings = InContext->GetInputSettings<TSettings>();
 		}
 
-		TContext* GetContext() { return Context; }
-		const TSettings* GetSettings() { return Settings; }
+		TContext* GetContext()
+		{
+			return Context;
+		}
+
+		const TSettings* GetSettings()
+		{
+			return Settings;
+		}
 	};
 
 	class PCGEXELEMENTSTOPOLOGY_API IBatch : public PCGExClusterMT::IBatch

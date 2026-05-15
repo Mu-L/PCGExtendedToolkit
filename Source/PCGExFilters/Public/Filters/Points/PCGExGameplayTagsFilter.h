@@ -68,7 +68,10 @@ class UPCGExGameplayTagsFilterFactory : public UPCGExPointFilterFactoryData
 public:
 	FPCGExGameplayTagsFilterConfig Config;
 
-	virtual bool SupportsCollectionEvaluation() const override { return false; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
@@ -80,7 +83,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FGameplayTagsFilter(const TObjectPtr<const UPCGExGameplayTagsFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 
@@ -120,6 +124,9 @@ public:
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 #if WITH_EDITOR
-	virtual FString GetDisplayName() const override { return TEXT("Gameplay Tags"); }
+	virtual FString GetDisplayName() const override
+	{
+		return TEXT("Gameplay Tags");
+	}
 #endif
 };

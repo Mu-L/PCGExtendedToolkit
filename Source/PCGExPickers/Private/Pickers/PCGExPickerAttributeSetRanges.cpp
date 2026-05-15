@@ -53,7 +53,10 @@ bool UPCGExPickerAttributeSetRangesFactory::GetUniqueRanges(FPCGExContext* InCon
 			}
 
 			const TSharedPtr<PCGExData::TAttributeBroadcaster<FVector2D>> Values = PCGExData::MakeTypedBroadcaster<FVector2D>(Infos->Attributes[0]->Name, Facade->Source);
-			if (!Values) { continue; }
+			if (!Values)
+			{
+				continue;
+			}
 			Values->GrabUniqueValues(UniqueRanges);
 		}
 		else
@@ -61,13 +64,19 @@ bool UPCGExPickerAttributeSetRangesFactory::GetUniqueRanges(FPCGExContext* InCon
 			for (const FPCGAttributePropertyInputSelector& Selector : InConfig.Attributes)
 			{
 				const TSharedPtr<PCGExData::TAttributeBroadcaster<FVector2D>> Values = PCGExData::MakeTypedBroadcaster<FVector2D>(Selector, Facade->Source);
-				if (!Values) { continue; }
+				if (!Values)
+				{
+					continue;
+				}
 				Values->GrabUniqueValues(UniqueRanges);
 			}
 		}
 	}
 
-	if (UniqueRanges.IsEmpty()) { return false; }
+	if (UniqueRanges.IsEmpty())
+	{
+		return false;
+	}
 
 	// Create a range config per unique range found
 	for (const FVector2D& Range : UniqueRanges)
@@ -92,13 +101,19 @@ bool UPCGExPickerAttributeSetRangesFactory::GetUniqueRanges(FPCGExContext* InCon
 
 void UPCGExPickerAttributeSetRangesFactory::AddPicks(const int32 InNum, TSet<int32>& OutPicks) const
 {
-	for (const FPCGExPickerConstantRangeConfig& RangeConfig : Ranges) { UPCGExPickerConstantRangeFactory::AddPicksFromConfig(RangeConfig, InNum, OutPicks); }
+	for (const FPCGExPickerConstantRangeConfig& RangeConfig : Ranges)
+	{
+		UPCGExPickerConstantRangeFactory::AddPicksFromConfig(RangeConfig, InNum, OutPicks);
+	}
 }
 
 PCGExFactories::EPreparationResult UPCGExPickerAttributeSetRangesFactory::InitInternalData(FPCGExContext* InContext)
 {
 	PCGExFactories::EPreparationResult Result = Super::InitInternalData(InContext);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 	return GetUniqueRanges(InContext, FName("Ranges"), Config, Ranges) ? Result : PCGExFactories::EPreparationResult::Fail;
 }
 

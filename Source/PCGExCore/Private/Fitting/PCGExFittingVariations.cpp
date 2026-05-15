@@ -47,14 +47,32 @@ void FPCGExFittingVariations::ApplyRotation(const FRandomStream& RandomStream, F
 
 	FRotator OutRotation = BaseRotation.Rotator();
 
-	if (AbsoluteRotation & static_cast<uint8>(EPCGExAbsoluteRotationFlags::X)) { OutRotation.Roll = RandRot.Roll; }
-	else { OutRotation.Roll += RandRot.Roll; }
+	if (AbsoluteRotation & static_cast<uint8>(EPCGExAbsoluteRotationFlags::X))
+	{
+		OutRotation.Roll = RandRot.Roll;
+	}
+	else
+	{
+		OutRotation.Roll += RandRot.Roll;
+	}
 
-	if (AbsoluteRotation & static_cast<uint8>(EPCGExAbsoluteRotationFlags::Y)) { OutRotation.Pitch = RandRot.Pitch; }
-	else { OutRotation.Pitch += RandRot.Pitch; }
+	if (AbsoluteRotation & static_cast<uint8>(EPCGExAbsoluteRotationFlags::Y))
+	{
+		OutRotation.Pitch = RandRot.Pitch;
+	}
+	else
+	{
+		OutRotation.Pitch += RandRot.Pitch;
+	}
 
-	if (AbsoluteRotation & static_cast<uint8>(EPCGExAbsoluteRotationFlags::Z)) { OutRotation.Yaw = RandRot.Yaw; }
-	else { OutRotation.Yaw += RandRot.Yaw; }
+	if (AbsoluteRotation & static_cast<uint8>(EPCGExAbsoluteRotationFlags::Z))
+	{
+		OutRotation.Yaw = RandRot.Yaw;
+	}
+	else
+	{
+		OutRotation.Yaw += RandRot.Yaw;
+	}
 
 	if (SnapRotation == EPCGExVariationSnapping::SnapResult)
 	{

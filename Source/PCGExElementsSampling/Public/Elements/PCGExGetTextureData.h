@@ -52,8 +52,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(GetTextureData, "Get Texture Data", "Create texture data object from paths.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(TexParam); }
-	virtual bool CanDynamicallyTrackKeys() const override { return true; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(TexParam);
+	}
+
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 #endif
 
 protected:
@@ -62,7 +70,10 @@ protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual EPCGExExecutionPolicy GetExecutionPolicy() const override { return EPCGExExecutionPolicy::Ignored; }
+	virtual EPCGExExecutionPolicy GetExecutionPolicy() const override
+	{
+		return EPCGExExecutionPolicy::Ignored;
+	}
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
@@ -155,7 +166,10 @@ protected:
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
 };
 
 namespace PCGExGetTextureData

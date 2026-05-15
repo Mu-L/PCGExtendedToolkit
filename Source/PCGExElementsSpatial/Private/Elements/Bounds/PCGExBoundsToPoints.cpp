@@ -15,7 +15,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(BoundsToPoints)
 
 bool FPCGExBoundsToPointsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BoundsToPoints)
 
@@ -31,7 +34,10 @@ bool FPCGExBoundsToPointsElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				//NewBatch->bRequiresWriteStep = true;
@@ -56,7 +62,10 @@ namespace PCGExBoundsToPoints
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->bGeneratePerPointData ? PCGExData::EIOInit::NoInit : PCGExData::EIOInit::Duplicate)
 
@@ -68,10 +77,16 @@ namespace PCGExBoundsToPoints
 
 		Axis = Settings->SymmetryAxis;
 		UVW = Settings->UVW;
-		if (!UVW.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!UVW.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		PointAttributesToOutputTags = Settings->PointAttributesToOutputTags;
-		if (!PointAttributesToOutputTags.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!PointAttributesToOutputTags.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		NumPoints = PointDataFacade->GetNum();
 		bGeneratePerPointData = Settings->bGeneratePerPointData;
@@ -131,7 +146,10 @@ namespace PCGExBoundsToPoints
 				const TSharedPtr<PCGExData::FPointIO>& NewOutput = NewOutputs[Index];
 
 				NewOutput->CopyToNewPoint(Index, A);
-				if (bSymmetry) { NewOutput->CopyToNewPoint(Index, B); }
+				if (bSymmetry)
+				{
+					NewOutput->CopyToNewPoint(Index, B);
+				}
 
 				TPCGValueRange<FTransform> Transforms = NewOutput->GetOut()->GetTransformValueRange(false);
 				TPCGValueRange<FVector> BoundsMin = NewOutput->GetOut()->GetBoundsMinValueRange(false);
@@ -145,7 +163,10 @@ namespace PCGExBoundsToPoints
 
 				Transforms[A].SetLocation(UVW.GetPosition(Index));
 
-				if (bSetScale) { Transforms[A].SetScale3D(Scale); }
+				if (bSetScale)
+				{
+					Transforms[A].SetScale3D(Scale);
+				}
 
 				if (bSymmetry)
 				{
@@ -157,7 +178,10 @@ namespace PCGExBoundsToPoints
 
 					Transforms[B].SetLocation(UVW.GetPosition(Index, Axis, true));
 
-					if (bSetScale) { Transforms[B].SetScale3D(Scale); }
+					if (bSetScale)
+					{
+						Transforms[B].SetScale3D(Scale);
+					}
 				}
 
 				PointAttributesToOutputTags.Tag(Point, NewOutput);
@@ -179,7 +203,10 @@ namespace PCGExBoundsToPoints
 
 				Transforms[A].SetLocation(UVW.GetPosition(Index));
 
-				if (bSetScale) { Transforms[A].SetScale3D(Scale); }
+				if (bSetScale)
+				{
+					Transforms[A].SetScale3D(Scale);
+				}
 
 				if (bSymmetry)
 				{
@@ -191,7 +218,10 @@ namespace PCGExBoundsToPoints
 
 					Transforms[B].SetLocation(UVW.GetPosition(Index, Axis, true));
 
-					if (bSetScale) { Transforms[B].SetScale3D(Scale); }
+					if (bSetScale)
+					{
+						Transforms[B].SetScale3D(Scale);
+					}
 				}
 			}
 		}

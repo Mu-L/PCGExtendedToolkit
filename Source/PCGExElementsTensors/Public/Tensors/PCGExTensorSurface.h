@@ -75,9 +75,12 @@ struct FPCGExSurfaceHit
 {
 	FVector Location = FVector::ZeroVector;
 	FVector Normal = FVector::UpVector;
-	double Distance = MAX_dbl;
+	double Distance = TNumericLimits<double>::Max();
 
-	bool IsValid() const { return Distance < MAX_dbl; }
+	bool IsValid() const
+	{
+		return Distance < TNumericLimits<double>::Max();
+	}
 
 	void UpdateIfCloser(const FVector& InLocation, const FVector& InNormal, double InDistance)
 	{
@@ -164,7 +167,11 @@ public:
 	virtual TSharedPtr<PCGExTensorOperation> CreateOperation(FPCGExContext* InContext) const override;
 
 protected:
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult InitInternalData(FPCGExContext* InContext) override;
 
 	/** Initialize actor references from input data */

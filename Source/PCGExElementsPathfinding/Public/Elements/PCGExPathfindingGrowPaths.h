@@ -99,7 +99,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PathfindingGrowPaths, "Pathfinding : Grow Paths", "Grow paths from seeds.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Pathfinding); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Pathfinding);
+	}
 #endif
 
 protected:
@@ -302,7 +306,8 @@ namespace PCGExPathfindingGrowPaths
 		PCGEX_ASYNC_TASK_NAME(FGrowTask)
 
 		FGrowTask(const TSharedPtr<FProcessor>& InProcessor)
-			: FTask(), Processor(InProcessor)
+			: FTask()
+			  , Processor(InProcessor)
 		{
 		}
 

@@ -47,20 +47,32 @@ TArray<FPCGPinProperties> UPCGExCopyToPathsSettings::OutputPinProperties() const
 
 bool UPCGExCopyToPathsSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExCommon::Labels::SourceBoundsLabel) { return InPin->EdgeCount() > 0; }
+	if (InPin->Properties.Label == PCGExCommon::Labels::SourceBoundsLabel)
+	{
+		return InPin->EdgeCount() > 0;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
 bool FPCGExCopyToPathsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(CopyToPaths)
 
-	if (!Settings->MainAxisSettings.Validate(InContext)) { return false; }
+	if (!Settings->MainAxisSettings.Validate(InContext))
+	{
+		return false;
+	}
 	//if (!Settings->TwistSettings.Validate(InContext, true)) { return false; }
 
-	if (!Context->Tangents.Init(Context, Settings->Tangents)) { return false; }
+	if (!Context->Tangents.Init(Context, Settings->Tangents))
+	{
+		return false;
+	}
 
 	TArray<FPCGTaggedData> UnifiedBounds = Context->InputData.GetSpatialInputsByPin(PCGExCommon::Labels::SourceBoundsLabel);
 	for (int i = 0; i < UnifiedBounds.Num(); ++i)
@@ -90,7 +102,10 @@ bool FPCGExCopyToPathsElement::Boot(FPCGExContext* InContext) const
 
 		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(TaggedData.Data))
 		{
-			if (PointData->GetNumPoints() < 2) { continue; }
+			if (PointData->GetNumPoints() < 2)
+			{
+				continue;
+			}
 
 			TSharedPtr<PCGExData::FPointIO> PointIO = MakeShared<PCGExData::FPointIO>(Context->GetOrCreateHandle(), PointData);
 			const TSharedPtr<PCGExData::FFacade> Facade = MakeShared<PCGExData::FFacade>(PointIO.ToSharedRef());
@@ -109,7 +124,10 @@ bool FPCGExCopyToPathsElement::Boot(FPCGExContext* InContext) const
 
 		if (const UPCGSplineData* SplineData = Cast<UPCGSplineData>(TaggedData.Data))
 		{
-			if (SplineData->SplineStruct.GetNumberOfPoints() < 2) { continue; }
+			if (SplineData->SplineStruct.GetNumberOfPoints() < 2)
+			{
+				continue;
+			}
 
 			Context->Deformers.Add(&SplineData->SplineStruct);
 			const TSharedPtr<PCGExData::FTags> Tags = MakeShared<PCGExData::FTags>(TaggedData.Tags);
@@ -125,14 +143,23 @@ bool FPCGExCopyToPathsElement::Boot(FPCGExContext* InContext) const
 	}
 
 	PCGEX_FWD(MainAxisSettings)
-	if (!Context->MainAxisSettings.Init(Context, Context->DeformersData)) { return false; }
+	if (!Context->MainAxisSettings.Init(Context, Context->DeformersData))
+	{
+		return false;
+	}
 
 	PCGEX_FWD(TwistSettings)
-	if (!Context->TwistSettings.Init(Context, Context->DeformersData)) { return false; }
+	if (!Context->TwistSettings.Init(Context, Context->DeformersData))
+	{
+		return false;
+	}
 
 	Context->DataMatcher = MakeShared<PCGExMatching::FDataMatcher>();
 	Context->DataMatcher->SetDetails(&Settings->DataMatching);
-	if (!Context->DataMatcher->Init(Context, Context->DeformersData, true)) { return false; }
+	if (!Context->DataMatcher->Init(Context, Context->DeformersData, true))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -178,7 +205,10 @@ namespace PCGExCopyToPaths
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		AxisTransform = PCGExMath::GetIdentity(Settings->AxisOrder);
 
@@ -196,10 +226,16 @@ namespace PCGExCopyToPaths
 		// Init settings once from context copy
 		// so we can graph an initialized local setting getter if one is created
 		FPCGExAxisDeformDetails BaseMainAxisSettings = Context->MainAxisSettings;
-		if (!BaseMainAxisSettings.Init(Context, Context->MainAxisSettings, PointDataFacade, -1)) { return false; }
+		if (!BaseMainAxisSettings.Init(Context, Context->MainAxisSettings, PointDataFacade, -1))
+		{
+			return false;
+		}
 
 		FPCGExAxisDeformDetails BaseTwistSettings = Context->TwistSettings;
-		if (!BaseTwistSettings.Init(Context, Context->TwistSettings, PointDataFacade, -1)) { return false; }
+		if (!BaseTwistSettings.Init(Context, Context->TwistSettings, PointDataFacade, -1))
+		{
+			return false;
+		}
 
 		for (const int32 Index : Deformers)
 		{
@@ -208,10 +244,16 @@ namespace PCGExCopyToPaths
 			Dupe->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
 
 			FPCGExAxisDeformDetails& MainAxisDeform = MainAxisDeformDetails.Emplace_GetRef();
-			if (!MainAxisDeform.Init(Context, BaseMainAxisSettings, PointDataFacade, Index)) { return false; }
+			if (!MainAxisDeform.Init(Context, BaseMainAxisSettings, PointDataFacade, Index))
+			{
+				return false;
+			}
 
 			FPCGExAxisDeformDetails& TwistDeform = TwistSettings.Emplace_GetRef();
-			if (!TwistDeform.Init(Context, BaseTwistSettings, PointDataFacade, Index, true)) { return false; }
+			if (!TwistDeform.Init(Context, BaseTwistSettings, PointDataFacade, Index, true))
+			{
+				return false;
+			}
 
 			Origins.Emplace(FTransform::Identity); // TODO : Expose this
 			//Origins.Emplace(Deformers.Last()->GetTransformAtSplineInputKey(0, ESplineCoordinateSpace::World).Inverse()); // Move this to CompleteWork
@@ -221,8 +263,14 @@ namespace PCGExCopyToPaths
 
 		// Set up box reference for this data
 
-		if (Context->bUseUnifiedBounds) { Box = Context->UnifiedBounds; }
-		else { Box = PCGExMath::GetBounds(PointDataFacade->GetIn(), Settings->BoundsSource); }
+		if (Context->bUseUnifiedBounds)
+		{
+			Box = Context->UnifiedBounds;
+		}
+		else
+		{
+			Box = PCGExMath::GetBounds(PointDataFacade->GetIn(), Settings->BoundsSource);
+		}
 
 		Box = FBox(Box.Min + Settings->MinBoundsOffset, Box.Max + Settings->MaxBoundsOffset);
 		PCGExMath::Swizzle(Box.Min, Settings->AxisOrder);
@@ -300,15 +348,30 @@ namespace PCGExCopyToPaths
 
 				FTransform Anchor = FTransform::Identity;
 
-				if (bWrap) { Anchor = Deformer->GetTransformAtSplineInputKey(NumSegments * PCGExMath::Tile<double>(UVW[0], 0.0, 1.0), ESplineCoordinateSpace::World, true); }
-				else { Anchor = Deformer->GetTransformAtSplineInputKey(NumSegments * FMath::Clamp<double>(UVW[0], 0.0, 1.0), ESplineCoordinateSpace::World, true); }
+				if (bWrap)
+				{
+					Anchor = Deformer->GetTransformAtSplineInputKey(NumSegments * PCGExMath::Tile<double>(UVW[0], 0.0, 1.0), ESplineCoordinateSpace::World, true);
+				}
+				else
+				{
+					Anchor = Deformer->GetTransformAtSplineInputKey(NumSegments * FMath::Clamp<double>(UVW[0], 0.0, 1.0), ESplineCoordinateSpace::World, true);
+				}
 
 				if (bMutateScale)
 				{
 					FVector MutatedScale = Anchor.GetScale3D();
-					if (bMutateScaleX) { MutatedScale.X = 1; }
-					if (bMutateScaleY) { MutatedScale.Y = 1; }
-					if (bMutateScaleZ) { MutatedScale.Z = 1; }
+					if (bMutateScaleX)
+					{
+						MutatedScale.X = 1;
+					}
+					if (bMutateScaleY)
+					{
+						MutatedScale.Y = 1;
+					}
+					if (bMutateScaleZ)
+					{
+						MutatedScale.Z = 1;
+					}
 					Anchor.SetScale3D(MutatedScale);
 				}
 
@@ -326,11 +389,17 @@ namespace PCGExCopyToPaths
 					Anchor = FTransform(FRotationMatrix::MakeFromXY(Q.GetForwardVector(), Q.GetRightVector()).ToQuat(), Anchor.GetLocation(), Anchor.GetScale3D());
 				}
 
-				if (Settings->bPreserveAspectRatio) { Anchor.SetScale3D(Anchor.GetScale3D() * CoverageRatio); }
+				if (Settings->bPreserveAspectRatio)
+				{
+					Anchor.SetScale3D(Anchor.GetScale3D() * CoverageRatio);
+				}
 
 				OutTransforms[Index] = WorkingTransform * Anchor;
 
-				if (Settings->bPreserveOriginalInputScale) { OutTransforms[Index].SetScale3D(WorkingTransform.GetScale3D()); }
+				if (Settings->bPreserveOriginalInputScale)
+				{
+					OutTransforms[Index].SetScale3D(WorkingTransform.GetScale3D());
+				}
 
 				j++;
 			}
@@ -369,7 +438,10 @@ namespace PCGExCopyToPaths
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(CopyToPaths)
 
 		TSharedPtr<FPCGSplineStruct> SplineStruct = Context->LocalDeformers[InSplineIndex];
-		if (!SplineStruct) { return; }
+		if (!SplineStruct)
+		{
+			return;
+		}
 
 		TSharedPtr<PCGExData::FFacade> PathFacade = Context->DeformersFacades[InSplineIndex];
 		PathFacade->bSupportsScopedGet = false;
@@ -393,7 +465,10 @@ namespace PCGExCopyToPaths
 		if (Settings->bApplyCustomPointType || Settings->DefaultPointType == EPCGExSplinePointType::CurveCustomTangent)
 		{
 			TangentsHandler = MakeShared<PCGExTangents::FTangentsHandler>(bClosedLoop);
-			if (!TangentsHandler->Init(Context, Context->Tangents, PathFacade)) { return; }
+			if (!TangentsHandler->Init(Context, Context->Tangents, PathFacade))
+			{
+				return;
+			}
 		}
 
 		const int32 NumPoints = PathFacade->GetNum();
@@ -408,7 +483,10 @@ namespace PCGExCopyToPaths
 			FVector OutArrive = FVector::ZeroVector;
 			FVector OutLeave = FVector::ZeroVector;
 
-			if (TangentsHandler) { TangentsHandler->GetSegmentTangents(i, OutArrive, OutLeave); }
+			if (TangentsHandler)
+			{
+				TangentsHandler->GetSegmentTangents(i, OutArrive, OutLeave);
+			}
 
 			const FTransform& TR = InTransforms[i];
 
@@ -418,20 +496,28 @@ namespace PCGExCopyToPaths
 			if (CustomPointType)
 			{
 				const int32 Value = CustomPointType->Read(i);
-				if (FMath::IsWithinInclusive(Value, 0, 4)) { PointTypeProxy = static_cast<EPCGExSplinePointType>(static_cast<uint8>(Value)); }
+				if (FMath::IsWithinInclusive(Value, 0, 4))
+				{
+					PointTypeProxy = static_cast<EPCGExSplinePointType>(static_cast<uint8>(Value));
+				}
 			}
 
 			switch (PointTypeProxy)
 			{
-			case EPCGExSplinePointType::Linear: PointType = ESplinePointType::Linear;
+			case EPCGExSplinePointType::Linear:
+				PointType = ESplinePointType::Linear;
 				break;
-			case EPCGExSplinePointType::Curve: PointType = ESplinePointType::Curve;
+			case EPCGExSplinePointType::Curve:
+				PointType = ESplinePointType::Curve;
 				break;
-			case EPCGExSplinePointType::Constant: PointType = ESplinePointType::Constant;
+			case EPCGExSplinePointType::Constant:
+				PointType = ESplinePointType::Constant;
 				break;
-			case EPCGExSplinePointType::CurveClamped: PointType = ESplinePointType::CurveClamped;
+			case EPCGExSplinePointType::CurveClamped:
+				PointType = ESplinePointType::CurveClamped;
 				break;
-			case EPCGExSplinePointType::CurveCustomTangent: PointType = ESplinePointType::CurveCustomTangent;
+			case EPCGExSplinePointType::CurveCustomTangent:
+				PointType = ESplinePointType::CurveCustomTangent;
 				break;
 			}
 

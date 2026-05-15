@@ -35,10 +35,20 @@ struct PCGEXCORE_API FPCGExInputConfig
 	FPCGMetadataAttributeBase* Attribute = nullptr;
 	int16 UnderlyingType = 255; //static_cast<int16>(EPCGMetadataTypes::Unknown);
 
-	FPCGAttributePropertyInputSelector& GetMutableSelector() { return Selector; }
+	FPCGAttributePropertyInputSelector& GetMutableSelector()
+	{
+		return Selector;
+	}
 
-	EPCGAttributePropertySelection GetSelection() const { return Selector.GetSelection(); }
-	FName GetName() const { return Selector.GetName(); }
+	EPCGAttributePropertySelection GetSelection() const
+	{
+		return Selector.GetSelection();
+	}
+
+	FName GetName() const
+	{
+		return Selector.GetName();
+	}
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const;
 	void UpdateUserFacingInfos();
@@ -49,7 +59,11 @@ struct PCGEXCORE_API FPCGExInputConfig
 	 * @return 
 	 */
 	virtual bool Validate(const UPCGData* InData);
-	FString ToString() const { return GetName().ToString(); }
+
+	FString ToString() const
+	{
+		return GetName().ToString();
+	}
 };
 
 #pragma endregion
@@ -62,7 +76,9 @@ struct PCGEXCORE_API FPCGExAttributeSourceToTargetDetails
 	FPCGExAttributeSourceToTargetDetails() = default;
 
 	explicit FPCGExAttributeSourceToTargetDetails(const FName DefaultName, const bool InOutputToDifferentName = false, const FName DefaultTargetName = NAME_None)
-		: Source(DefaultName), bOutputToDifferentName(InOutputToDifferentName), Target(DefaultTargetName)
+		: Source(DefaultName)
+		  , bOutputToDifferentName(InOutputToDifferentName)
+		  , Target(DefaultTargetName)
 	{
 	}
 
@@ -77,7 +93,10 @@ struct PCGEXCORE_API FPCGExAttributeSourceToTargetDetails
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bOutputToDifferentName"))
 	FName Target = NAME_None;
 
-	bool WantsRemappedOutput() const { return (bOutputToDifferentName && Source != GetOutputName()); }
+	bool WantsRemappedOutput() const
+	{
+		return (bOutputToDifferentName && Source != GetOutputName());
+	}
 
 	bool ValidateNames(FPCGExContext* InContext) const;
 	bool ValidateNamesOrProperties(FPCGExContext* InContext) const;
@@ -98,8 +117,15 @@ struct PCGEXCORE_API FPCGExAttributeSourceToTargetList
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, TitleProperty="{Source}"))
 	TArray<FPCGExAttributeSourceToTargetDetails> Attributes;
 
-	bool IsEmpty() const { return Attributes.IsEmpty(); }
-	int32 Num() const { return Attributes.Num(); }
+	bool IsEmpty() const
+	{
+		return Attributes.IsEmpty();
+	}
+
+	int32 Num() const
+	{
+		return Attributes.Num();
+	}
 
 	bool ValidateNames(FPCGExContext* InContext) const;
 	void GetSources(TArray<FName>& OutNames) const;

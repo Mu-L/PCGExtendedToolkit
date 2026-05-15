@@ -8,10 +8,10 @@
 #include "UObject/Object.h"
 
 #include "CollisionShape.h"
-#include "Core/PCGExPointFilter.h"
-#include "Math/PCGExMathBounds.h"
 #include "PCGExOctree.h"
 #include "Components/PrimitiveComponent.h"
+#include "Core/PCGExPointFilter.h"
+#include "Math/PCGExMathBounds.h"
 
 #include "PCGExPrimitiveFilter.generated.h"
 
@@ -65,7 +65,11 @@ public:
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
-	virtual bool WantsPreparation(FPCGExContext* InContext) override { return true; }
+	virtual bool WantsPreparation(FPCGExContext* InContext) override
+	{
+		return true;
+	}
+
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
 
 	virtual void BeginDestroy() override;
@@ -77,7 +81,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FPrimitiveFilter(const TObjectPtr<const UPCGExPrimitiveFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 
@@ -115,10 +120,16 @@ namespace PCGExPointFilter
 				FBoxCenterAndExtent(BoxCenter, ScaledExtent),
 				[&](const PCGExOctree::FItem& Item)
 				{
-					if (bResult != bInvert) { return; } // Already matched
+					if (bResult != bInvert)
+					{
+						return;
+					} // Already matched
 
 					const FCachedPrimitive& Primitive = (*CachedPrimitives)[Item.Index];
-					if (!Primitive.PrimitiveComponent.IsValid()) { return; }
+					if (!Primitive.PrimitiveComponent.IsValid())
+					{
+						return;
+					}
 
 					if (Primitive.PrimitiveComponent->OverlapComponent(BoxCenter, Rotation, CollisionShape))
 					{
@@ -155,6 +166,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

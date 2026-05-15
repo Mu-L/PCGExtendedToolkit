@@ -27,25 +27,37 @@ void FPCGExEdgeRemoveOverlap::ProcessEdge(PCGExGraphs::FEdge& Edge)
 
 		const PCGExGraphs::FEdge& OtherEdge = *Cluster->GetEdge(Item.Index);
 
-		if (Edge.Index == OtherEdge.Index || Edge.Start == OtherEdge.Start || Edge.Start == OtherEdge.End || Edge.End == OtherEdge.End || Edge.End == OtherEdge.Start) { return true; }
+		if (Edge.Index == OtherEdge.Index || Edge.Start == OtherEdge.Start || Edge.Start == OtherEdge.End || Edge.End == OtherEdge.End || Edge.End == OtherEdge.Start)
+		{
+			return true;
+		}
 
 
 		if (bUseMinAngle || bUseMaxAngle)
 		{
 			const double Dot = FMath::Abs(FVector::DotProduct(Cluster->GetEdgeDir(Edge), Cluster->GetEdgeDir(OtherEdge)));
-			if (!(Dot >= MaxDot && Dot <= MinDot)) { return true; }
+			if (!(Dot >= MaxDot && Dot <= MinDot))
+			{
+				return true;
+			}
 		}
 
 		const double OtherLength = Cluster->GetDistSquared(OtherEdge);
 
 		FVector A;
 		FVector B;
-		if (Cluster->EdgeDistToEdgeSquared(&Edge, &OtherEdge, A, B) >= ToleranceSquared) { return true; }
+		if (Cluster->EdgeDistToEdgeSquared(&Edge, &OtherEdge, A, B) >= ToleranceSquared)
+		{
+			return true;
+		}
 
 		const FVector A2 = Cluster->GetStartPos(OtherEdge);
 		const FVector B2 = Cluster->GetEndPos(OtherEdge);
 
-		if (A == A1 || A == B1 || A == A2 || A == B2 || B == A2 || B == B2 || B == A1 || B == B1) { return true; }
+		if (A == A1 || A == B1 || A == A2 || A == B2 || B == A2 || B == B2 || B == A1 || B == B1)
+		{
+			return true;
+		}
 
 		// Overlap!
 		if (Keep == EPCGExEdgeOverlapPick::Longest)

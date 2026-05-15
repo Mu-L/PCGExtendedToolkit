@@ -51,7 +51,10 @@ int32 SPCGExEdgeEndpointsCompareNumPreview::OnPaint(
 
 		// Evaluate
 		bool bPass = PCGExCompare::Compare(CurrentComparison, SVal, EVal, DBL_COMPARE_TOLERANCE);
-		if (bCurrentInvert) { bPass = !bPass; }
+		if (bCurrentInvert)
+		{
+			bPass = !bPass;
+		}
 
 		// Panel background
 		const FLinearColor& BgColor = bPass ? PanelPassBg : PanelFailBg;
@@ -120,7 +123,10 @@ int32 SPCGExEdgeEndpointsCompareNumPreview::OnPaint(
 	// Top label
 	{
 		FString TopLabel = TEXT("Start vs End");
-		if (bCurrentInvert) { TopLabel += TEXT(" (inv)"); }
+		if (bCurrentInvert)
+		{
+			TopLabel += TEXT(" (inv)");
+		}
 		const FVector2D LabelPos(LocalSize.X * 0.5 - 30.0, 2.0);
 		FSlateDrawElement::MakeText(
 			OutDrawElements, LayerId + 4,

@@ -4,10 +4,10 @@
 #include "Filters/Nodes/PCGExNodeEdgeDirectionFilter.h"
 
 
-#include "Data/PCGExData.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Data/PCGExData.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Graphs/PCGExGraph.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
@@ -23,37 +23,64 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExNodeEdgeDirectionFilterFactory::Crea
 
 bool UPCGExNodeEdgeDirectionFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 
 	FName Consumable = NAME_None;
 	PCGEX_CONSUMABLE_CONDITIONAL(Config.CompareAgainst == EPCGExInputValueType::Attribute, Config.Direction, Consumable)
 
-	if (Config.ComparisonQuality == EPCGExDirectionCheckMode::Dot) { Config.DotComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData); }
-	else { Config.HashComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData); }
+	if (Config.ComparisonQuality == EPCGExDirectionCheckMode::Dot)
+	{
+		Config.DotComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData);
+	}
+	else
+	{
+		Config.HashComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData);
+	}
 
 	return true;
 }
 
 bool FNodeEdgeDirectionFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 {
-	if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
+	{
+		return false;
+	}
 
 	bFromNode = TypedFilterFactory->Config.DirectionOrder == EPCGExAdjacencyDirectionOrigin::FromNode;
 
 	OperandDirection = TypedFilterFactory->Config.GetValueSettingDirection(PCGEX_QUIET_HANDLING);
-	if (!OperandDirection->Init(PointDataFacade, false)) { return false; }
-	if (!OperandDirection->IsConstant()) { DirectionMultiplier = TypedFilterFactory->Config.bInvertDirection ? -1 : 1; }
+	if (!OperandDirection->Init(PointDataFacade, false))
+	{
+		return false;
+	}
+	if (!OperandDirection->IsConstant())
+	{
+		DirectionMultiplier = TypedFilterFactory->Config.bInvertDirection ? -1 : 1;
+	}
 
-	if (!Adjacency.Init(InContext, PointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING)) { return false; }
+	if (!Adjacency.Init(InContext, PointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING))
+	{
+		return false;
+	}
 
 	if (TypedFilterFactory->Config.ComparisonQuality == EPCGExDirectionCheckMode::Dot)
 	{
-		if (!DotComparison.Init(InContext, PointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING)) { return false; }
+		if (!DotComparison.Init(InContext, PointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING))
+		{
+			return false;
+		}
 	}
 	else
 	{
 		bUseDot = false;
-		if (!HashComparison.Init(InContext, PointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING)) { return false; }
+		if (!HashComparison.Init(InContext, PointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING))
+		{
+			return false;
+		}
 	}
 
 	VtxTransforms = InPointDataFacade->GetIn()->GetConstTransformValueRange();
@@ -71,7 +98,10 @@ bool FNodeEdgeDirectionFilter::TestDot(const PCGExClusters::FNode& Node) const
 	const int32 PointIndex = Node.PointIndex;
 
 	FVector RefDir = OperandDirection->Read(PointIndex).GetSafeNormal() * DirectionMultiplier;
-	if (TypedFilterFactory->Config.bTransformDirection) { RefDir = VtxTransforms[PointIndex].TransformVectorNoScale(RefDir); }
+	if (TypedFilterFactory->Config.bTransformDirection)
+	{
+		RefDir = VtxTransforms[PointIndex].TransformVectorNoScale(RefDir);
+	}
 
 	const double DotThreshold = DotComparison.GetComparisonThreshold(PointIndex);
 
@@ -100,23 +130,45 @@ bool FNodeEdgeDirectionFilter::TestDot(const PCGExClusters::FNode& Node) const
 		double A = 0;
 		if (Adjacency.Consolidation == EPCGExAdjacencyGatherMode::Individual)
 		{
-			for (const double Dot : Dots) { if (!DotComparison.Test(Dot, DotThreshold)) { return false; } }
+			for (const double Dot : Dots)
+			{
+				if (!DotComparison.Test(Dot, DotThreshold))
+				{
+					return false;
+				}
+			}
 			return true;
 		}
 
 		// First, build the consolidated operand B
 		switch (Adjacency.Consolidation)
 		{
-		default: case EPCGExAdjacencyGatherMode::Average: for (const double Dot : Dots) { A += Dot; }
+		default: case EPCGExAdjacencyGatherMode::Average:
+			for (const double Dot : Dots)
+			{
+				A += Dot;
+			}
 			A /= Node.Links.Num();
 			break;
-		case EPCGExAdjacencyGatherMode::Min: A = MAX_dbl;
-			for (const double Dot : Dots) { A = FMath::Min(A, Dot); }
+		case EPCGExAdjacencyGatherMode::Min:
+			A = TNumericLimits<double>::Max();
+			for (const double Dot : Dots)
+			{
+				A = FMath::Min(A, Dot);
+			}
 			break;
-		case EPCGExAdjacencyGatherMode::Max: A = MIN_dbl_neg;
-			for (const double Dot : Dots) { A = FMath::Max(A, Dot); }
+		case EPCGExAdjacencyGatherMode::Max:
+			A = TNumericLimits<double>::Lowest();
+			for (const double Dot : Dots)
+			{
+				A = FMath::Max(A, Dot);
+			}
 			break;
-		case EPCGExAdjacencyGatherMode::Sum: for (const double Dot : Dots) { A += Dot; }
+		case EPCGExAdjacencyGatherMode::Sum:
+			for (const double Dot : Dots)
+			{
+				A += Dot;
+			}
 			break;
 		}
 
@@ -127,10 +179,19 @@ bool FNodeEdgeDirectionFilter::TestDot(const PCGExClusters::FNode& Node) const
 	const int32 Threshold = Adjacency.GetThreshold(Node);
 
 	// Early exit on impossible thresholds (i.e node has less neighbor that the minimum or exact requirements)		
-	if (Threshold == -1) { return false; }
+	if (Threshold == -1)
+	{
+		return false;
+	}
 
 	int32 LocalSuccessCount = 0;
-	for (const double Dot : Dots) { if (DotComparison.Test(Dot, DotThreshold)) { LocalSuccessCount++; } }
+	for (const double Dot : Dots)
+	{
+		if (DotComparison.Test(Dot, DotThreshold))
+		{
+			LocalSuccessCount++;
+		}
+	}
 
 	return PCGExCompare::Compare(Adjacency.ThresholdComparison, LocalSuccessCount, Threshold);
 }
@@ -140,7 +201,10 @@ bool FNodeEdgeDirectionFilter::TestHash(const PCGExClusters::FNode& Node) const
 	const int32 PointIndex = Node.PointIndex;
 
 	FVector RefDir = OperandDirection->Read(PointIndex).GetSafeNormal() * DirectionMultiplier;
-	if (TypedFilterFactory->Config.bTransformDirection) { RefDir = VtxTransforms[PointIndex].TransformVectorNoScale(RefDir); }
+	if (TypedFilterFactory->Config.bTransformDirection)
+	{
+		RefDir = VtxTransforms[PointIndex].TransformVectorNoScale(RefDir);
+	}
 
 	const FVector CWTolerance = HashComparison.GetCWTolerance(PointIndex);
 	const uint64 A = PCGEx::SH3(RefDir, CWTolerance);
@@ -167,7 +231,13 @@ bool FNodeEdgeDirectionFilter::TestHash(const PCGExClusters::FNode& Node) const
 
 	if (Adjacency.bTestAllNeighbors)
 	{
-		for (const uint64 Hash : Hashes) { if (A != Hash) { return false; } }
+		for (const uint64 Hash : Hashes)
+		{
+			if (A != Hash)
+			{
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -175,10 +245,19 @@ bool FNodeEdgeDirectionFilter::TestHash(const PCGExClusters::FNode& Node) const
 	const int32 Threshold = Adjacency.GetThreshold(Node);
 
 	// Early exit on impossible thresholds (i.e node has less neighbor that the minimum or exact requirements)		
-	if (Threshold == -1) { return false; }
+	if (Threshold == -1)
+	{
+		return false;
+	}
 
 	int32 LocalSuccessCount = 0;
-	for (const uint64 Hash : Hashes) { if (A == Hash) { LocalSuccessCount++; } }
+	for (const uint64 Hash : Hashes)
+	{
+		if (A == Hash)
+		{
+			LocalSuccessCount++;
+		}
+	}
 
 	return PCGExCompare::Compare(Adjacency.ThresholdComparison, LocalSuccessCount, Threshold);
 }
@@ -196,16 +275,24 @@ FString UPCGExNodeEdgeDirectionFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = TEXT("Edge Direction ") + PCGExCompare::ToString(Config.DotComparisonDetails.Comparison);
 
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute) { DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.Direction); }
-	else { DisplayName += TEXT("Constant"); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	{
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.Direction);
+	}
+	else
+	{
+		DisplayName += TEXT("Constant");
+	}
 
 	DisplayName += TEXT(" (");
 
 	switch (Config.Adjacency.Mode)
 	{
-	case EPCGExAdjacencyTestMode::All: DisplayName += TEXT("All");
+	case EPCGExAdjacencyTestMode::All:
+		DisplayName += TEXT("All");
 		break;
-	case EPCGExAdjacencyTestMode::Some: DisplayName += TEXT("Some");
+	case EPCGExAdjacencyTestMode::Some:
+		DisplayName += TEXT("Some");
 		break;
 	default: ;
 	}

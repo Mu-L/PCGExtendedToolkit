@@ -15,7 +15,10 @@
 
 bool UPCGExAngleFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext)) { return false; }
+	if (!Super::Init(InContext))
+	{
+		return false;
+	}
 	Config.Sanitize();
 	return true;
 }
@@ -38,17 +41,26 @@ void UPCGExAngleFilterFactory::RegisterBuffersDependencies(FPCGExContext* InCont
 
 bool UPCGExAngleFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
 {
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData)) { return false; }
+	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
+	{
+		return false;
+	}
 	Config.DotComparisonDetails.RegisterConsumableAttributesWithData(InContext, InData);
 	return true;
 }
 
 bool PCGExPointFilter::FAngleFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+	if (!IFilter::Init(InContext, InPointDataFacade))
+	{
+		return false;
+	}
 
 	DotComparison = TypedFilterFactory->Config.DotComparisonDetails;
-	if (!DotComparison.Init(InContext, InPointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING)) { return false; }
+	if (!DotComparison.Init(InContext, InPointDataFacade.ToSharedRef(), PCGEX_QUIET_HANDLING))
+	{
+		return false;
+	}
 
 	bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(InPointDataFacade->GetIn());
 	LastIndex = InPointDataFacade->GetNum() - 1;
@@ -66,13 +78,25 @@ bool PCGExPointFilter::FAngleFilter::Test(const int32 PointIndex) const
 
 	if (bClosedLoop)
 	{
-		if (PointIndex == 0) { PrevIndex = LastIndex; }
-		else if (PointIndex == LastIndex) { NextIndex = 0; }
+		if (PointIndex == 0)
+		{
+			PrevIndex = LastIndex;
+		}
+		else if (PointIndex == LastIndex)
+		{
+			NextIndex = 0;
+		}
 	}
 	else
 	{
-		if (PointIndex == 0) { return TypedFilterFactory->Config.FirstPointFallback == EPCGExFilterFallback::Fail ? !bResult : bResult; }
-		if (PointIndex == LastIndex) { return TypedFilterFactory->Config.LastPointFallback == EPCGExFilterFallback::Fail ? !bResult : bResult; }
+		if (PointIndex == 0)
+		{
+			return TypedFilterFactory->Config.FirstPointFallback == EPCGExFilterFallback::Fail ? !bResult : bResult;
+		}
+		if (PointIndex == LastIndex)
+		{
+			return TypedFilterFactory->Config.LastPointFallback == EPCGExFilterFallback::Fail ? !bResult : bResult;
+		}
 	}
 
 	const FVector Prev = InTransforms[PrevIndex].GetLocation();

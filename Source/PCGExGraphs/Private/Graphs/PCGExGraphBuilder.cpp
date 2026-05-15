@@ -3,15 +3,15 @@
 
 #include "Graphs/PCGExGraphBuilder.h"
 
+#include "Clusters/PCGExCluster.h"
+#include "Clusters/PCGExClusterCommon.h"
+#include "Clusters/PCGExClustersHelpers.h"
 #include "Core/PCGExContext.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
-#include "Clusters/PCGExClustersHelpers.h"
 #include "Graphs/PCGExGraph.h"
-#include "Clusters/PCGExClusterCommon.h"
 #include "Graphs/PCGExSubGraph.h"
 #include "Sorting/PCGExSortingHelpers.h"
 
@@ -23,7 +23,10 @@ namespace PCGExGraphTask
 		PCGEX_ASYNC_TASK_NAME(FCompileGraph)
 
 		FCompileGraph(const TSharedPtr<PCGExGraphs::FGraphBuilder>& InGraphBuilder, const bool bInWriteNodeFacade, const PCGExGraphs::FGraphMetadataDetails* InMetadataDetails = nullptr)
-			: FTask(), Builder(InGraphBuilder), bWriteNodeFacade(bInWriteNodeFacade), MetadataDetails(InMetadataDetails)
+			: FTask()
+			  , Builder(InGraphBuilder)
+			  , bWriteNodeFacade(bInWriteNodeFacade)
+			  , MetadataDetails(InMetadataDetails)
 		{
 		}
 
@@ -42,7 +45,8 @@ namespace PCGExGraphTask
 namespace PCGExGraphs
 {
 	FGraphBuilder::FGraphBuilder(const TSharedRef<PCGExData::FFacade>& InNodeDataFacade, const FPCGExGraphBuilderDetails* InDetails)
-		: OutputDetails(InDetails), NodeDataFacade(InNodeDataFacade)
+		: OutputDetails(InDetails)
+		  , NodeDataFacade(InNodeDataFacade)
 	{
 		PCGEX_SHARED_CONTEXT_VOID(NodeDataFacade->Source->GetContextHandle())
 
@@ -107,7 +111,10 @@ namespace PCGExGraphs
 
 		TArray<int32> InternalValidNodes;
 		TArray<int32>& ValidNodes = InternalValidNodes;
-		if (OutputNodeIndices) { ValidNodes = *OutputNodeIndices.Get(); }
+		if (OutputNodeIndices)
+		{
+			ValidNodes = *OutputNodeIndices.Get();
+		}
 
 		// Building subgraphs isolate connected edge clusters
 		// and invalidate roaming (isolated) nodes
@@ -159,7 +166,7 @@ namespace PCGExGraphs
 						FNode& Node = Nodes[ValidNodes[i]];
 						ReadIndices[i] = Node.PointIndex; // { NewIndex : InheritedIndex }
 						Node.PointIndex = i;              // Update node point index
-					)
+						)
 
 					// Truncate output if need be
 					OutNodeData->SetNumPoints(NumValidNodes);
@@ -195,7 +202,7 @@ namespace PCGExGraphs
 						FNode& Node = Nodes[Idx];
 						ReadIndices[i] = Node.PointIndex;
 						Node.PointIndex = i;
-					)
+						)
 				}
 				else
 				{
@@ -209,7 +216,7 @@ namespace PCGExGraphs
 						N,
 						const int32 Idx = ValidNodes[i];
 						MortonHash[i] = PCGEx::FIndexKey(Idx, PCGEx::MH64(NodePointsTransforms[Idx].GetLocation()));
-					)
+						)
 
 					PCGExSortingHelpers::RadixSort(MortonHash);
 
@@ -220,7 +227,7 @@ namespace PCGExGraphs
 						FNode& Node = Nodes[Idx];
 						ReadIndices[i] = Node.PointIndex;
 						Node.PointIndex = i;
-					)
+						)
 				}
 
 				// There is no points to inherit from; meaning we need to reorder the existing data
@@ -243,7 +250,10 @@ namespace PCGExGraphs
 			// Reorder output indices if provided
 			// Needed for delaunay etc that rely on original indices to identify sites etc
 			TArray<int32>& OutputPointIndicesRef = *OutputPointIndices.Get();
-			for (int32 i = 0; i < NumValidNodes; i++) { OutputPointIndicesRef[i] = ReadIndices[i]; }
+			for (int32 i = 0; i < NumValidNodes; i++)
+			{
+				OutputPointIndicesRef[i] = ReadIndices[i];
+			}
 		}
 
 		{
@@ -257,7 +267,7 @@ namespace PCGExGraphs
 				ValidNodes.Num(),
 				const FNode& Node = Nodes[ValidNodes[i]];
 				VtxEndpoints[Node.PointIndex] = PCGEx::H64(Node.PointIndex, Node.NumExportedEdges);
-			)
+				)
 		}
 
 		if (MetadataDetails && Graph->HasAnyNodeMetadata())
@@ -280,7 +290,7 @@ namespace PCGExGraphs
 				const int32 PointIndex = Nodes[i].PointIndex;
 				PCGEX_FOREACH_NODE_METADATA(PCGEX_NODE_METADATA_OUTPUT)
 				}
-			)
+				)
 
 #undef PCGEX_FOREACH_NODE_METADATA
 #undef PCGEX_NODE_METADATA_DECL
@@ -319,7 +329,8 @@ namespace PCGExGraphs
 
 				TSharedPtr<PCGExData::FPointIO> EdgeIO;
 
-				if (const int32 IOIndex = SubGraph->GetFirstInIOIndex(); SubGraph->EdgesInIOIndices.Num() == 1 && SourceEdgeFacades && SourceEdgeFacades->IsValidIndex(IOIndex))
+				if (const int32 IOIndex = SubGraph->GetFirstInIOIndex();
+					SubGraph->EdgesInIOIndices.Num() == 1 && SourceEdgeFacades && SourceEdgeFacades->IsValidIndex(IOIndex))
 				{
 					// Don't grab original point IO if we have metadata.
 					EdgeIO = EdgesIO->Emplace_GetRef<UPCGExClusterEdgesData>((*SourceEdgeFacades)[IOIndex]->Source, PCGExData::EIOInit::New);
@@ -329,7 +340,10 @@ namespace PCGExGraphs
 					EdgeIO = EdgesIO->Emplace_GetRef<UPCGExClusterEdgesData>(PCGExData::EIOInit::New);
 				}
 
-				if (!EdgeIO) { return; }
+				if (!EdgeIO)
+				{
+					return;
+				}
 
 				EdgeIO->IOIndex = i;
 

@@ -9,7 +9,10 @@
 
 bool UPCGExFittingRelaxBase::PrepareForCluster(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster)
 {
-	if (!Super::PrepareForCluster(InContext, InCluster)) { return false; }
+	if (!Super::PrepareForCluster(InContext, InCluster))
+	{
+		return false;
+	}
 	Deltas.Init(FInt64Vector3(0), Cluster->Nodes->Num());
 
 	if (EdgeFitting == EPCGExRelaxEdgeFitting::Attribute)
@@ -65,7 +68,10 @@ void UPCGExFittingRelaxBase::Step1(const PCGExGraphs::FEdge& Edge)
 	// Apply spring forces for each edge
 
 	// TODO : Refactor relax host to skip edge processing entirely
-	if (EdgeFitting == EPCGExRelaxEdgeFitting::Ignore) { return; }
+	if (EdgeFitting == EPCGExRelaxEdgeFitting::Ignore)
+	{
+		return;
+	}
 
 	const int32 Start = Cluster->GetEdgeStart(Edge)->Index;
 	const int32 End = Cluster->GetEdgeEnd(Edge)->Index;
@@ -76,7 +82,10 @@ void UPCGExFittingRelaxBase::Step1(const PCGExGraphs::FEdge& Edge)
 	const FVector Delta = EndPos - StartPos;
 	const double CurrentLength = Delta.Size();
 
-	if (CurrentLength <= KINDA_SMALL_NUMBER) { return; }
+	if (CurrentLength <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
 
 	const FVector Direction = Delta / CurrentLength;
 	const double Displacement = CurrentLength - (*(EdgeLengths->GetData() + Edge.Index) * Scale);

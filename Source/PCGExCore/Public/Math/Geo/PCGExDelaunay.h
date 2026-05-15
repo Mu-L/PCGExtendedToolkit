@@ -28,9 +28,20 @@ namespace PCGExMath::Geo
 		uint64 GetSharedEdge(const FDelaunaySite2* Other) const;
 		void PushAdjacency(const int32 SiteId);
 
-		FORCEINLINE uint64 AB() const { return PCGEx::H64U(Vtx[0], Vtx[1]); }
-		FORCEINLINE uint64 BC() const { return PCGEx::H64U(Vtx[1], Vtx[2]); }
-		FORCEINLINE uint64 AC() const { return PCGEx::H64U(Vtx[0], Vtx[2]); }
+		FORCEINLINE uint64 AB() const
+		{
+			return PCGEx::H64U(Vtx[0], Vtx[1]);
+		}
+
+		FORCEINLINE uint64 BC() const
+		{
+			return PCGEx::H64U(Vtx[1], Vtx[2]);
+		}
+
+		FORCEINLINE uint64 AC() const
+		{
+			return PCGEx::H64U(Vtx[0], Vtx[2]);
+		}
 	};
 
 	class PCGEXCORE_API TDelaunay2
@@ -96,7 +107,10 @@ namespace PCGExMath::Geo
 		bool Process(const TArrayView<FVector>& Positions)
 		{
 			Clear();
-			if (Positions.IsEmpty() || Positions.Num() <= 3) { return false; }
+			if (Positions.IsEmpty() || Positions.Num() <= 3)
+			{
+				return false;
+			}
 
 			UE::Geometry::FDelaunay3 Tetrahedralization;
 
@@ -116,8 +130,14 @@ namespace PCGExMath::Geo
 			DelaunayEdges.Reserve(NumReserve);
 
 			TSet<uint32> FacesUsage;
-			if constexpr (bComputeAdjacency) { Adjacency.Reserve(NumSites * 4); }
-			if constexpr (bComputeHull) { FacesUsage.Reserve(NumSites); }
+			if constexpr (bComputeAdjacency)
+			{
+				Adjacency.Reserve(NumSites * 4);
+			}
+			if constexpr (bComputeHull)
+			{
+				FacesUsage.Reserve(NumSites);
+			}
 
 			//PCGExArrayHelpers::InitArray(Sites, NumSites);
 			Sites.SetNumUninitialized(NumSites);
@@ -135,7 +155,10 @@ namespace PCGExMath::Geo
 					}
 				}
 
-				if constexpr (bComputeHull || bComputeAdjacency) { Site.ComputeFaces(); }
+				if constexpr (bComputeHull || bComputeAdjacency)
+				{
+					Site.ComputeFaces();
+				}
 
 				if constexpr (bComputeHull && bComputeAdjacency)
 				{
@@ -145,10 +168,19 @@ namespace PCGExMath::Geo
 
 						bool bAlreadySet = false;
 						FacesUsage.Add(FH, &bAlreadySet);
-						if (bAlreadySet) { FacesUsage.Remove(FH); }
+						if (bAlreadySet)
+						{
+							FacesUsage.Remove(FH);
+						}
 
-						if (const uint64* AH = Adjacency.Find(FH)) { Adjacency.Add(FH, PCGEx::NH64(i, PCGEx::NH64B(*AH))); }
-						else { Adjacency.Add(FH, PCGEx::NH64(-1, i)); }
+						if (const uint64* AH = Adjacency.Find(FH))
+						{
+							Adjacency.Add(FH, PCGEx::NH64(i, PCGEx::NH64B(*AH)));
+						}
+						else
+						{
+							Adjacency.Add(FH, PCGEx::NH64(-1, i));
+						}
 					}
 				}
 				else if constexpr (bComputeHull)
@@ -158,7 +190,10 @@ namespace PCGExMath::Geo
 						const uint32 FH = Site.Faces[f];
 						bool bAlreadySet = false;
 						FacesUsage.Add(FH, &bAlreadySet);
-						if (bAlreadySet) { FacesUsage.Remove(FH); }
+						if (bAlreadySet)
+						{
+							FacesUsage.Remove(FH);
+						}
 					}
 				}
 				else if constexpr (bComputeAdjacency)
@@ -166,8 +201,14 @@ namespace PCGExMath::Geo
 					for (int f = 0; f < 4; f++)
 					{
 						const uint32 FH = Site.Faces[f];
-						if (const uint64* AH = Adjacency.Find(FH)) { Adjacency.Add(FH, PCGEx::NH64(i, PCGEx::NH64B(*AH))); }
-						else { Adjacency.Add(FH, PCGEx::NH64(-1, i)); }
+						if (const uint64* AH = Adjacency.Find(FH))
+						{
+							Adjacency.Add(FH, PCGEx::NH64(i, PCGEx::NH64B(*AH)));
+						}
+						else
+						{
+							Adjacency.Add(FH, PCGEx::NH64(-1, i));
+						}
 					}
 				}
 			}
@@ -180,7 +221,10 @@ namespace PCGExMath::Geo
 					{
 						if (FacesUsage.Contains(Site.Faces[f]))
 						{
-							for (int fi = 0; fi < 3; fi++) { DelaunayHull.Add(Site.Vtx[MTX[f][fi]]); }
+							for (int fi = 0; fi < 3; fi++)
+							{
+								DelaunayHull.Add(Site.Vtx[MTX[f][fi]]);
+							}
 							Site.bOnHull = true;
 						}
 					}

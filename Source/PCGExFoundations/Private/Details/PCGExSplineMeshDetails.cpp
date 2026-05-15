@@ -12,20 +12,26 @@ namespace PCGExPaths
 	void GetAxisForEntry(const FPCGExStaticMeshComponentDescriptor& InDescriptor, ESplineMeshAxis::Type& OutAxis, int32& OutC1, int32& OutC2, const EPCGExSplineMeshAxis Default)
 	{
 		EPCGExSplineMeshAxis Axis = InDescriptor.SplineMeshAxis;
-		if (Axis == EPCGExSplineMeshAxis::Default) { Axis = Default; }
+		if (Axis == EPCGExSplineMeshAxis::Default)
+		{
+			Axis = Default;
+		}
 
 		switch (Axis)
 		{
 		default: case EPCGExSplineMeshAxis::Default:
-		case EPCGExSplineMeshAxis::X: OutAxis = ESplineMeshAxis::X;
+		case EPCGExSplineMeshAxis::X:
+			OutAxis = ESplineMeshAxis::X;
 			OutC1 = 1;
 			OutC2 = 2;
 			break;
-		case EPCGExSplineMeshAxis::Y: OutC1 = 0;
+		case EPCGExSplineMeshAxis::Y:
+			OutC1 = 0;
 			OutC2 = 2;
 			OutAxis = ESplineMeshAxis::Y;
 			break;
-		case EPCGExSplineMeshAxis::Z: OutC1 = 1;
+		case EPCGExSplineMeshAxis::Z:
+			OutC1 = 1;
 			OutC2 = 0;
 			OutAxis = ESplineMeshAxis::Z;
 			break;
@@ -38,8 +44,15 @@ namespace PCGExPaths
 
 		const FVector A = Params.StartTangent.GetSafeNormal(0.001);
 		const FVector B = Params.EndTangent.GetSafeNormal(0.001);
-		if (const float Dot = A | B; Dot > 0.99 || Dot <= -0.99) { UpVector = FVector(A.Y, A.Z, A.X); }
-		else { UpVector = A ^ B; }
+		if (const float Dot = A | B;
+			Dot > 0.99 || Dot <= -0.99)
+		{
+			UpVector = FVector(A.Y, A.Z, A.X);
+		}
+		else
+		{
+			UpVector = A ^ B;
+		}
 	}
 
 	void FSplineMeshSegment::ApplySettings(USplineMeshComponent* Component) const
@@ -49,12 +62,24 @@ namespace PCGExPaths
 		Component->SetStartAndEnd(Params.StartPos, Params.StartTangent, Params.EndPos, Params.EndTangent, false);
 
 		Component->SetStartScale(Params.StartScale, false);
-		if (bUseDegrees) { Component->SetStartRollDegrees(Params.StartRoll, false); }
-		else { Component->SetStartRoll(Params.StartRoll, false); }
+		if (bUseDegrees)
+		{
+			Component->SetStartRollDegrees(Params.StartRoll, false);
+		}
+		else
+		{
+			Component->SetStartRoll(Params.StartRoll, false);
+		}
 
 		Component->SetEndScale(Params.EndScale, false);
-		if (bUseDegrees) { Component->SetEndRollDegrees(Params.EndRoll, false); }
-		else { Component->SetEndRoll(Params.EndRoll, false); }
+		if (bUseDegrees)
+		{
+			Component->SetEndRollDegrees(Params.EndRoll, false);
+		}
+		else
+		{
+			Component->SetEndRoll(Params.EndRoll, false);
+		}
 
 		Component->SetForwardAxis(SplineMeshAxis, false);
 		Component->SetSplineUpDir(UpVector, false);
@@ -76,18 +101,27 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExSplineMeshMutationDetails, EndPush, double, EndPu
 
 bool FPCGExSplineMeshMutationDetails::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade)
 {
-	if (!bPushStart && !bPushEnd) { return true; }
+	if (!bPushStart && !bPushEnd)
+	{
+		return true;
+	}
 
 	if (bPushStart)
 	{
 		StartAmount = GetValueSettingStartPush();
-		if (!StartAmount->Init(InDataFacade)) { return false; }
+		if (!StartAmount->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 
 	if (bPushEnd)
 	{
 		EndAmount = GetValueSettingEndPush();
-		if (!EndAmount->Init(InDataFacade)) { return false; }
+		if (!EndAmount->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -95,7 +129,10 @@ bool FPCGExSplineMeshMutationDetails::Init(const TSharedPtr<PCGExData::FFacade>&
 
 void FPCGExSplineMeshMutationDetails::Mutate(const int32 PointIndex, PCGExPaths::FSplineMeshSegment& InSegment)
 {
-	if (!bPushStart && !bPushEnd) { return; }
+	if (!bPushStart && !bPushEnd)
+	{
+		return;
+	}
 
 	const double Size = (bPushStart || bPushEnd) && (bRelativeStart || bRelativeEnd) ? FVector::Dist(InSegment.Params.StartPos, InSegment.Params.EndPos) : 1;
 	const FVector StartDir = InSegment.Params.StartTangent.GetSafeNormal();

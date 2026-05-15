@@ -5,10 +5,10 @@
 
 #include "CoreMinimal.h"
 #include "PCGExNoise3DCommon.h"
-#include "UObject/Object.h"
 #include "Factories/PCGExOperation.h"
 #include "Helpers/PCGExNoise3DMath.h"
 #include "Math/PCGExMathContrast.h"
+#include "UObject/Object.h"
 #include "Utils/PCGExCurveLookup.h"
 
 /**
@@ -121,7 +121,10 @@ protected:
 	 * Generate raw noise value (without remapping)
 	 * Override this in derived classes for the core noise algorithm
 	 */
-	virtual double GenerateRaw(const FVector& Position) const { return 0.0; }
+	virtual double GenerateRaw(const FVector& Position) const
+	{
+		return 0.0;
+	}
 
 	/**
 	 * Apply post-processing: invert, remap curve, contrast, scale
@@ -129,8 +132,14 @@ protected:
 	 */
 	FORCEINLINE double ApplyRemap(double Value) const
 	{
-		if (bInvert) { Value = 1.0 - Value; }
-		if (RemapLUT) { Value = RemapLUT->Eval(Value); }
+		if (bInvert)
+		{
+			Value = 1.0 - Value;
+		}
+		if (RemapLUT)
+		{
+			Value = RemapLUT->Eval(Value);
+		}
 		if (!FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
 		{
 			Value = PCGExMath::Contrast::ApplyContrast(Value, Contrast, static_cast<int32>(ContrastCurve));

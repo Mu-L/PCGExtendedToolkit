@@ -21,7 +21,10 @@ namespace PCGExAssetCollectionEditor
 		TabInfos() = default;
 
 		TabInfos(const FName InId, const TSharedPtr<SWidget>& InView, const FName InLabel = NAME_None, const ETabRole InRole = PanelTab)
-			: Id(InId), View(InView), Label(InLabel.IsNone() ? InId : InLabel), Role(InRole)
+			: Id(InId)
+			  , View(InView)
+			  , Label(InLabel.IsNone() ? InId : InLabel)
+			  , Role(InRole)
 		{
 		}
 
@@ -41,7 +44,9 @@ namespace PCGExAssetCollectionEditor
 		FilterInfos() = default;
 
 		FilterInfos(const FName InId, const FText& InLabel, const FText& InToolTip)
-			: Id(InId), Label(InLabel), ToolTip(InToolTip)
+			: Id(InId)
+			  , Label(InLabel)
+			  , ToolTip(InToolTip)
 		{
 		}
 
@@ -73,10 +78,25 @@ public:
 	virtual void InitEditor(UPCGExAssetCollection* InCollection, const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& InitToolkitHost);
 	virtual UPCGExAssetCollection* GetEditedCollection() const;
 
-	virtual FName GetToolkitFName() const override { return FName("PCGExAssetCollectionEditor"); }
-	virtual FText GetBaseToolkitName() const override { return INVTEXT("PCGEx Collection Editor"); }
-	virtual FString GetWorldCentricTabPrefix() const override { return TEXT("PCGEx"); }
-	virtual FLinearColor GetWorldCentricTabColorScale() const override { return FLinearColor::White; }
+	virtual FName GetToolkitFName() const override
+	{
+		return FName("PCGExAssetCollectionEditor");
+	}
+
+	virtual FText GetBaseToolkitName() const override
+	{
+		return INVTEXT("PCGEx Collection Editor");
+	}
+
+	virtual FString GetWorldCentricTabPrefix() const override
+	{
+		return TEXT("PCGEx");
+	}
+
+	virtual FLinearColor GetWorldCentricTabColorScale() const override
+	{
+		return FLinearColor::White;
+	}
 
 	TMap<FName, PCGExAssetCollectionEditor::FilterInfos> FilterInfos;
 
@@ -114,7 +134,10 @@ protected:
 
 	/** Returns the property name of the type-specific asset picker (e.g., "StaticMesh", "Actor").
 	 *  Override in derived editors. Used by the grid view to build tile picker widgets. */
-	virtual FName GetTilePickerPropertyName() const { return NAME_None; }
+	virtual FName GetTilePickerPropertyName() const
+	{
+		return NAME_None;
+	}
 
 	/** Build the picker widget for a single tile entry. Override for custom picker logic. */
 	virtual TSharedRef<SWidget> BuildTilePickerWidget(
@@ -123,7 +146,10 @@ protected:
 		FSimpleDelegate OnAssetChanged);
 
 	/** Returns the allowed UClass for the type-specific asset picker. Override in subclasses. */
-	virtual const UClass* GetTilePickerAllowedClass() const { return nullptr; }
+	virtual const UClass* GetTilePickerAllowedClass() const
+	{
+		return nullptr;
+	}
 
 	TArray<PCGExAssetCollectionEditor::TabInfos> Tabs;
 	FDelegateHandle OnHiddenAssetPropertyNamesChanged;

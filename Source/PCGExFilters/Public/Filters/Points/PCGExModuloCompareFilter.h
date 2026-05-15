@@ -91,7 +91,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FModuloComparisonFilter(const TObjectPtr<const UPCGExModuloCompareFilterFactory>& InDefinition)
-			: ISimpleFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ISimpleFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

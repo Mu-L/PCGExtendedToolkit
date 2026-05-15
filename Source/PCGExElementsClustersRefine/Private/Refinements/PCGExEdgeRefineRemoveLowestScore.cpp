@@ -8,7 +8,7 @@
 void FPCGExEdgeRemoveLowestScore::ProcessNode(PCGExClusters::FNode& Node)
 {
 	int32 BestIndex = -1;
-	double LowestScore = MAX_dbl;
+	double LowestScore = TNumericLimits<double>::Max();
 
 	const PCGExClusters::FNode& RoamingSeedNode = *Heuristics->GetRoamingSeed();
 	const PCGExClusters::FNode& RoamingGoalNode = *Heuristics->GetRoamingGoal();
@@ -23,7 +23,10 @@ void FPCGExEdgeRemoveLowestScore::ProcessNode(PCGExClusters::FNode& Node)
 		}
 	}
 
-	if (BestIndex == -1) { return; }
+	if (BestIndex == -1)
+	{
+		return;
+	}
 	//if (!*(EdgesFilters->GetData() + BestIndex)) { return; }
 
 	FPlatformAtomics::InterlockedExchange(&Cluster->GetEdge(BestIndex)->bValid, 0);

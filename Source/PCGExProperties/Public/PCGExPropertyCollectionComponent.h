@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
 #include "PCGExProperty.h"
+#include "Components/ActorComponent.h"
 
 #include "PCGExPropertyCollectionComponent.generated.h"
 
@@ -42,11 +42,17 @@ public:
 	 * Get the property collection.
 	 * @return Reference to the property schema collection
 	 */
-	const FPCGExPropertySchemaCollection& GetProperties() const { return Properties; }
+	const FPCGExPropertySchemaCollection& GetProperties() const
+	{
+		return Properties;
+	}
 
 	/**
 	 * Get the property collection (mutable).
 	 * @return Reference to the property schema collection
 	 */
-	FPCGExPropertySchemaCollection& GetPropertiesMutable() { return Properties; }
+	FPCGExPropertySchemaCollection& GetPropertiesMutable()
+	{
+		return Properties;
+	}
 };

@@ -4,9 +4,9 @@
 
 #include "Elements/PCGExAttributeStats.h"
 
+#include "Core/PCGExPointFilter.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExData.h"
-#include "Core/PCGExPointFilter.h"
 
 
 #define PCGEX_FOREACH_STAT(MACRO, _TYPE)\
@@ -48,7 +48,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(AttributeStats)
 
 bool FPCGExAttributeStatsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 	PCGEX_CONTEXT_AND_SETTINGS(AttributeStats)
 
 	FPCGExNameFiltersDetails Filters = Settings->Filters;
@@ -94,7 +97,13 @@ bool FPCGExAttributeStatsElement::Boot(FPCGExContext* InContext) const
 		Context->AttributesInfos->Filter([&Affixes](const FName& InName)
 		{
 			const FString StrName = InName.ToString();
-			for (const FString& Affix : Affixes) { if (StrName.StartsWith(Affix) || StrName.EndsWith(Affix)) { return false; } }
+			for (const FString& Affix : Affixes)
+			{
+				if (StrName.StartsWith(Affix) || StrName.EndsWith(Affix))
+				{
+					return false;
+				}
+			}
 			return true;
 		});
 	}
@@ -117,7 +126,10 @@ bool FPCGExAttributeStatsElement::Boot(FPCGExContext* InContext) const
 		Context->OutputParams.Add(NewParamData);
 		Context->OutputParamsMap.Add(Identity.Identifier.Name, NewParamData);
 
-		for (int i = 0; i < NumRows; i++) { Context->Rows.Add(NewParamData->Metadata->AddEntry()); }
+		for (int i = 0; i < NumRows; i++)
+		{
+			Context->Rows.Add(NewParamData->Metadata->AddEntry());
+		}
 
 		PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
 		{
@@ -139,7 +151,10 @@ bool FPCGExAttributeStatsElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -174,7 +189,10 @@ namespace PCGExAttributeStats
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExAttributeStats::Process);
 
 		// Must be set before process for filters
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->OutputToPoints == EPCGExStatsOutputToPoints::None ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate)
 
@@ -192,7 +210,10 @@ namespace PCGExAttributeStats
 		{
 			const PCGExData::FAttributeIdentity& Identity = Context->AttributesInfos->Identities[i];
 
-			if (Settings->bOutputPerUniqueValuesStats) { PerAttributeStatMap.Add(Identity.Identifier.Name, i); }
+			if (Settings->bOutputPerUniqueValuesStats)
+			{
+				PerAttributeStatMap.Add(Identity.Identifier.Name, i);
+			}
 
 			PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
 			{

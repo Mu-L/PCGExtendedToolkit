@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExOpStats.h"
 #include "Factories/PCGExInstancedFactory.h"
 #include "Factories/PCGExOperation.h"
-#include "Core/PCGExOpStats.h"
 
 #include "PCGExSmoothingInstancedFactory.generated.h"
 

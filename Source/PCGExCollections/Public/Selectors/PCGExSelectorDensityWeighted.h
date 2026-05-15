@@ -5,8 +5,10 @@
 
 #include "CoreMinimal.h"
 #include "Details/PCGExInputShorthandsDetails.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorHelpers.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 
 #include "PCGExSelectorDensityWeighted.generated.h"
 
@@ -27,13 +29,53 @@ enum class EPCGExDensityOutOfRangePolicy : uint8
 };
 
 /**
+ * Selector-specific configuration for Density-Weighted. Shared verbatim between the palette
+ * node settings (EditAnywhere, drives the UI) and the FactoryData (UPROPERTY for serialization).
+ * Eliminates the field-by-field copy in CreateFactory.
+ */
+USTRUCT(BlueprintType)
+struct PCGEXCOLLECTIONS_API FPCGExSelectorDensityWeightedConfig
+{
+	GENERATED_BODY()
+
+	/** Algorithm for how density influences the pick. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	EPCGExDensityWeightMode Mode = EPCGExDensityWeightMode::RandomnessModulation;
+
+	/** Per-point density source (attribute or constant). Defaults to the point's $Density property. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
+	FPCGExInputShorthandSelectorDouble DensitySource = FPCGExInputShorthandSelectorDouble(FName("$Density"), 1.0, true);
+
+	/** Blend factor (0..1) between plain weighted random (0) and full density-driven pick (1). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin=0, ClampMax=1, UIMin=0, UIMax=1))
+	double DensityInfluence = 1.0;
+
+	/** Behavior when density falls outside the expected [0, 1] range. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	EPCGExDensityOutOfRangePolicy OutOfRangePolicy = EPCGExDensityOutOfRangePolicy::Clamp;
+};
+
+/**
+ * Collection-derived state for Density-Weighted. Caches per-entry effective weight (Weight + 1)
+ * and its natural log so the WeightModulation branch can resolve `Pow(W, Exp)` as the cheaper
+ * `exp(LogW * Exp)` -- one transcendental per entry per pick instead of two. The RandomnessModulation
+ * branch reads EntryWeights to skip per-pick entry dereferences.
+ */
+class FPCGExDensityWeightedSharedData : public PCGExCollections::FSelectorSharedData
+{
+public:
+	TArray<double> EntryWeights;    // (Weight + 1), parallel to Target->Entries
+	TArray<double> EntryLogWeights; // log(EntryWeights[i]) -- for the WeightModulation fast path
+};
+
+/**
  * Density-driven weighted pick operation. Reads a per-point density value and modulates the
  * pick using one of two algorithms (see EPCGExDensityWeightMode).
  *
  * Not shared with the base factory's micro dispatch (density-weighting applies to entry picks
  * only, not to material variant picks). Lives alongside the factory UCLASSes.
  */
-class FPCGExEntryDensityWeightedPickerOp : public FPCGExEntryPickerOperation
+class FPCGExEntryDensityWeightedPickerOp : public PCGExCollections::Selectors::TTypedSharedPickerOpBase<FPCGExDensityWeightedSharedData>
 {
 public:
 	EPCGExDensityWeightMode Mode = EPCGExDensityWeightMode::RandomnessModulation;
@@ -43,8 +85,11 @@ public:
 
 	TSharedPtr<PCGExDetails::TSettingValue<double>> DensityGetter;
 
-	virtual bool PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection) override;
-	virtual int32 Pick(int32 PointIndex, int32 Seed) const override;
+	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+
+protected:
+	virtual void OnSharedDataMissing(FPCGExContext* InContext) const override;
+	virtual bool OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade) override;
 };
 
 /**
@@ -58,18 +103,12 @@ class PCGEXCOLLECTIONS_API UPCGExSelectorDensityWeightedFactoryData : public UPC
 
 public:
 	UPROPERTY()
-	EPCGExDensityWeightMode Mode = EPCGExDensityWeightMode::RandomnessModulation;
-
-	UPROPERTY()
-	FPCGExInputShorthandSelectorDouble DensitySource = FPCGExInputShorthandSelectorDouble(FName("$Density"), 1.0, true);
-
-	UPROPERTY()
-	double DensityInfluence = 1.0;
-
-	UPROPERTY()
-	EPCGExDensityOutOfRangePolicy OutOfRangePolicy = EPCGExDensityOutOfRangePolicy::Clamp;
+	FPCGExSelectorDensityWeightedConfig Config;
 
 	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const override;
+	virtual TSharedPtr<PCGExCollections::FSelectorSharedData> BuildSharedData(
+		const UPCGExAssetCollection* Collection,
+		const PCGExAssetCollection::FCategory* Target) const override;
 };
 
 /**
@@ -90,21 +129,9 @@ public:
 #endif
 	//~End UPCGSettings
 
-	/** Algorithm for how density influences the pick. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	EPCGExDensityWeightMode Mode = EPCGExDensityWeightMode::RandomnessModulation;
-
-	/** Per-point density source (attribute or constant). Defaults to the point's $Density property. */
+	/** Selector-specific configuration. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
-	FPCGExInputShorthandSelectorDouble DensitySource = FPCGExInputShorthandSelectorDouble(FName("$Density"), 1.0, true);
-
-	/** Blend factor (0..1) between plain weighted random (0) and full density-driven pick (1). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin=0, ClampMax=1, UIMin=0, UIMax=1))
-	double DensityInfluence = 1.0;
-
-	/** Behavior when density falls outside the expected [0, 1] range. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	EPCGExDensityOutOfRangePolicy OutOfRangePolicy = EPCGExDensityOutOfRangePolicy::Clamp;
+	FPCGExSelectorDensityWeightedConfig Config;
 
 	/** Shared distribution configuration (seed, entry distribution, categories). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))

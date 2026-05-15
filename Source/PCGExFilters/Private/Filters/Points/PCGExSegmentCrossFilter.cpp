@@ -6,10 +6,10 @@
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Paths/PCGExPath.h"
-#include "Paths/PCGExPathsHelpers.h"
 #include "PCGExMatching/Public/Helpers/PCGExDataMatcher.h"
 #include "PCGExMatching/Public/Helpers/PCGExMatchingHelpers.h"
+#include "Paths/PCGExPath.h"
+#include "Paths/PCGExPathsHelpers.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExSegmentCrossFilterDefinition"
@@ -47,7 +47,10 @@ namespace PCGExPointFilter
 {
 	bool FSegmentCrossFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 	{
-		if (!IFilter::Init(InContext, InPointDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InPointDataFacade))
+		{
+			return false;
+		}
 
 		const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
 			&& TypedFilterFactory->HasMatchRuleFactories();
@@ -66,7 +69,10 @@ namespace PCGExPointFilter
 			{
 				bNoMatchResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
 			}
-			else { InverseMatcher.Reset(); }
+			else
+			{
+				InverseMatcher.Reset();
+			}
 		}
 
 		if (!InverseMatcher)
@@ -89,7 +95,10 @@ namespace PCGExPointFilter
 
 	bool FSegmentCrossFilter::Test(const int32 PointIndex) const
 	{
-		if (bMatchingFailed) { return bCollectionTestResult; }
+		if (bMatchingFailed)
+		{
+			return bCollectionTestResult;
+		}
 
 		// Build segment from current point to neighbor. For open paths, endpoints have no valid
 		// neighbor segment, so return the default (no-intersection) result immediately.
@@ -100,7 +109,10 @@ namespace PCGExPointFilter
 			NextIndex++;
 			if (NextIndex > LastIndex)
 			{
-				if (!bClosedLoop) { return TypedFilterFactory->Config.bInvert; }
+				if (!bClosedLoop)
+				{
+					return TypedFilterFactory->Config.bInvert;
+				}
 				NextIndex = 0;
 			}
 		}
@@ -109,7 +121,10 @@ namespace PCGExPointFilter
 			NextIndex--;
 			if (NextIndex < 0)
 			{
-				if (!bClosedLoop) { return TypedFilterFactory->Config.bInvert; }
+				if (!bClosedLoop)
+				{
+					return TypedFilterFactory->Config.bInvert;
+				}
 				NextIndex = LastIndex;
 			}
 		}

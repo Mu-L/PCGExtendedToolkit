@@ -6,8 +6,15 @@
 
 PCGEX_CREATE_PROBE_FACTORY(DBSCAN, {}, {})
 
-bool FPCGExProbeDBSCAN::IsGlobalProbe() const { return true; }
-bool FPCGExProbeDBSCAN::WantsOctree() const { return true; }
+bool FPCGExProbeDBSCAN::IsGlobalProbe() const
+{
+	return true;
+}
+
+bool FPCGExProbeDBSCAN::WantsOctree() const
+{
+	return true;
+}
 
 bool FPCGExProbeDBSCAN::Prepare(FPCGExContext* InContext)
 {
@@ -18,7 +25,10 @@ void FPCGExProbeDBSCAN::ProcessAll(TSet<uint64>& OutEdges) const
 {
 	const TArray<FVector>& Positions = *WorkingPositions;
 	const int32 NumPoints = Positions.Num();
-	if (NumPoints < 2) { return; }
+	if (NumPoints < 2)
+	{
+		return;
+	}
 
 	const TArray<int8>& CanGenerateRef = *CanGenerate;
 	const TArray<int8>& AcceptConnectionsRef = *AcceptConnections;
@@ -31,7 +41,10 @@ void FPCGExProbeDBSCAN::ProcessAll(TSet<uint64>& OutEdges) const
 
 	for (int32 i = 0; i < NumPoints; ++i)
 	{
-		if (!CanGenerateRef[i] && !AcceptConnectionsRef[i]) { continue; }
+		if (!CanGenerateRef[i] && !AcceptConnectionsRef[i])
+		{
+			continue;
+		}
 
 		const FVector& Pos = Positions[i];
 		const double MaxDistSq = GetSearchRadius(i);
@@ -42,8 +55,14 @@ void FPCGExProbeDBSCAN::ProcessAll(TSet<uint64>& OutEdges) const
 			[&](const PCGExOctree::FItem& Other)
 			{
 				const int32 j = Other.Index;
-				if (i == j) { return; }
-				if (!CanGenerateRef[j] && !AcceptConnectionsRef[j]) { return; }
+				if (i == j)
+				{
+					return;
+				}
+				if (!CanGenerateRef[j] && !AcceptConnectionsRef[j])
+				{
+					return;
+				}
 
 				if (FVector::DistSquared(Pos, Positions[j]) <= MaxDistSq)
 				{
@@ -57,14 +76,20 @@ void FPCGExProbeDBSCAN::ProcessAll(TSet<uint64>& OutEdges) const
 	// Second pass: create edges
 	for (int32 i = 0; i < NumPoints; ++i)
 	{
-		if (!CanGenerateRef[i]) { continue; }
+		if (!CanGenerateRef[i])
+		{
+			continue;
+		}
 
 		if (IsCore[i])
 		{
 			// Core point: connect to neighbors
 			for (const int32 j : Neighborhoods[i])
 			{
-				if (Config.bCoreToCorOnly && !IsCore[j]) { continue; }
+				if (Config.bCoreToCorOnly && !IsCore[j])
+				{
+					continue;
+				}
 
 				OutEdges.Add(PCGEx::H64U(i, j));
 			}
@@ -75,7 +100,7 @@ void FPCGExProbeDBSCAN::ProcessAll(TSet<uint64>& OutEdges) const
 			if (Config.bBorderToNearestCoreOnly)
 			{
 				// Find nearest core point
-				double BestDist = MAX_dbl;
+				double BestDist = TNumericLimits<double>::Max();
 				int32 BestCore = INDEX_NONE;
 
 				for (const int32 j : Neighborhoods[i])

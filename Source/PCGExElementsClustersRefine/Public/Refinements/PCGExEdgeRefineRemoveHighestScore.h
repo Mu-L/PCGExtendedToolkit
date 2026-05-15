@@ -25,8 +25,15 @@ class UPCGExEdgeRemoveHighestScore : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool WantsHeuristics() const override { return true; }
-	virtual bool WantsIndividualNodeProcessing() const override { return true; }
+	virtual bool WantsHeuristics() const override
+	{
+		return true;
+	}
+
+	virtual bool WantsIndividualNodeProcessing() const override
+	{
+		return true;
+	}
 
 	PCGEX_CREATE_REFINE_OPERATION(EdgeRemoveHighestScore, {})
 };

@@ -14,7 +14,7 @@ PCGEX_CREATE_PROBE_FACTORY(
 	Bitmasks,
 	{ NewFactory->BitmaskData = PCGExBitmask::FBitmaskData::Make(Config.Collections, Config.Compositions, Config.Angle); },
 	{ NewOperation->BitmaskData = BitmaskData; }
-)
+	)
 
 namespace PCGExProbeBitmasks
 {
@@ -30,8 +30,14 @@ namespace PCGExProbeBitmasks
 		BestDistsBuffer.SetNumUninitialized(NumDirs);
 		BestIdxBuffer.SetNumUninitialized(NumDirs);
 
-		if (bCopyDirs) { WorkingDirs = BitmaskData->Directions; }
-		else { WorkingDirs.SetNumUninitialized(NumDirs); }
+		if (bCopyDirs)
+		{
+			WorkingDirs = BitmaskData->Directions;
+		}
+		else
+		{
+			WorkingDirs.SetNumUninitialized(NumDirs);
+		}
 	}
 
 	void FScopedContainer::Reset()
@@ -39,7 +45,7 @@ namespace PCGExProbeBitmasks
 		for (int i = 0; i < BestDotsBuffer.Num(); i++)
 		{
 			BestDotsBuffer[i] = -1;
-			BestDistsBuffer[i] = MAX_dbl;
+			BestDistsBuffer[i] = TNumericLimits<double>::Max();
 			BestIdxBuffer[i] = -1;
 		}
 	}
@@ -52,11 +58,17 @@ TSharedPtr<PCGExMT::FScopedContainer> FPCGExProbeBitmasks::GetScopedContainer(co
 	return ScopedContainer;
 }
 
-bool FPCGExProbeBitmasks::RequiresChainProcessing() const { return false; }
+bool FPCGExProbeBitmasks::RequiresChainProcessing() const
+{
+	return false;
+}
 
 bool FPCGExProbeBitmasks::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	/*
 	bUseBestDot = Config.Favor == EPCGExProbeBitmasksPriorization::Dot;
@@ -75,7 +87,10 @@ bool FPCGExProbeBitmasks::Prepare(FPCGExContext* InContext)
 void FPCGExProbeBitmasks::ProcessCandidates(const int32 Index, TArray<PCGExProbing::FCandidate>& Candidates, TSet<uint64>* Coincidence, const FVector& ST, TSet<uint64>* OutEdges, PCGExMT::FScopedContainer* Container)
 {
 	const int32 DirCount = BitmaskData->Directions.Num();
-	if (DirCount == 0) { return; }
+	if (DirCount == 0)
+	{
+		return;
+	}
 
 	PCGExProbeBitmasks::FScopedContainer* LocalContainer = static_cast<PCGExProbeBitmasks::FScopedContainer*>(Container);
 	LocalContainer->Reset();
@@ -92,7 +107,10 @@ void FPCGExProbeBitmasks::ProcessCandidates(const int32 Index, TArray<PCGExProbi
 	{
 		const FTransform& WorkingTransform = *(WorkingTransforms->GetData() + Index);
 		const TArray<FVector>& Directions = BitmaskData->Directions;
-		for (int32 d = 0; d < DirCount; ++d) { WorkingDirs[d] = WorkingTransform.TransformVectorNoScale(Directions[d]); }
+		for (int32 d = 0; d < DirCount; ++d)
+		{
+			WorkingDirs[d] = WorkingTransform.TransformVectorNoScale(Directions[d]);
+		}
 	}
 
 	const double R = GetSearchRadius(Index);
@@ -106,14 +124,23 @@ void FPCGExProbeBitmasks::ProcessCandidates(const int32 Index, TArray<PCGExProbi
 
 		if (bUseBestDot)
 		{
-			if (C.Distance > R) { continue; }
+			if (C.Distance > R)
+			{
+				continue;
+			}
 		}
 		else
 		{
-			if (C.Distance > R) { break; }
+			if (C.Distance > R)
+			{
+				break;
+			}
 		}
 
-		if (Coincidence && Coincidence->Contains(C.GH)) { continue; }
+		if (Coincidence && Coincidence->Contains(C.GH))
+		{
+			continue;
+		}
 
 		const double CandDist = C.Distance;
 		const FVector& CandDir = C.Direction;
@@ -122,7 +149,10 @@ void FPCGExProbeBitmasks::ProcessCandidates(const int32 Index, TArray<PCGExProbi
 		for (int32 d = 0; d < DirCount; ++d)
 		{
 			const double dot = FVector::DotProduct(WorkingDirs[d], CandDir);
-			if (dot < DotThresholds[d]) { continue; }
+			if (dot < DotThresholds[d])
+			{
+				continue;
+			}
 
 			if (dot >= BestDotsBuffer[d] && CandDist < BestDistsBuffer[d])
 			{
@@ -136,7 +166,10 @@ void FPCGExProbeBitmasks::ProcessCandidates(const int32 Index, TArray<PCGExProbi
 	for (int32 d = 0; d < DirCount; ++d)
 	{
 		const int32 CI = BestIdxBuffer[d];
-		if (CI < 0) { continue; }
+		if (CI < 0)
+		{
+			continue;
+		}
 
 		const PCGExProbing::FCandidate& C = CandData[CI];
 
@@ -144,7 +177,10 @@ void FPCGExProbeBitmasks::ProcessCandidates(const int32 Index, TArray<PCGExProbi
 		{
 			bool bAlready;
 			Coincidence->Add(C.GH, &bAlready);
-			if (bAlready) { continue; }
+			if (bAlready)
+			{
+				continue;
+			}
 		}
 
 		OutEdges->Add(PCGEx::H64U(Index, C.PointIndex));

@@ -25,8 +25,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(CollocationCount, "Collocation Count", "Write the number of time a point shares its location with another.", CollicationNumAttributeName);
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite);
+	}
 #endif
 
 protected:

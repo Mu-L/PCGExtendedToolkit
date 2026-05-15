@@ -62,7 +62,10 @@ namespace PCGExGraphs
 	bool FGraph::InsertEdge_Unsafe(const FEdge& Edge)
 	{
 		uint64 H = Edge.H64U();
-		if (UniqueEdges.Contains(H)) { return false; }
+		if (UniqueEdges.Contains(H))
+		{
+			return false;
+		}
 
 		FEdge& NewEdge = Edges.Emplace_GetRef(Edge);
 		UniqueEdges.Add(H, (NewEdge.Index = Edges.Num() - 1));
@@ -102,7 +105,10 @@ namespace PCGExGraphs
 
 		for (const uint64 E : InEdges)
 		{
-			if (UniqueEdges.Contains(E)) { continue; }
+			if (UniqueEdges.Contains(E))
+			{
+				continue;
+			}
 
 			PCGEx::H64(E, A, B);
 
@@ -128,7 +134,10 @@ namespace PCGExGraphs
 		UniqueEdges.Reserve(UniqueEdges.Num() + InEdges.Num());
 		Edges.Reserve(Edges.Num() + InEdges.Num());
 
-		for (const FEdge& E : InEdges) { InsertEdge_Unsafe(E); }
+		for (const FEdge& E : InEdges)
+		{
+			InsertEdge_Unsafe(E);
+		}
 		return StartIndex;
 	}
 
@@ -158,7 +167,10 @@ namespace PCGExGraphs
 	FEdge* FGraph::FindEdge_Unsafe(const uint64 Hash)
 	{
 		const int32* Index = UniqueEdges.Find(Hash);
-		if (!Index) { return nullptr; }
+		if (!Index)
+		{
+			return nullptr;
+		}
 		return (Edges.GetData() + *Index);
 	}
 
@@ -171,7 +183,10 @@ namespace PCGExGraphs
 	{
 		FReadScopeLock ReadScopeLock(GraphLock);
 		const int32* Index = UniqueEdges.Find(Hash);
-		if (!Index) { return nullptr; }
+		if (!Index)
+		{
+			return nullptr;
+		}
 		return (Edges.GetData() + *Index);
 	}
 
@@ -184,7 +199,10 @@ namespace PCGExGraphs
 	{
 		{
 			FReadScopeLock ReadScopeLock(MetadataLock);
-			if (EdgeIndex < EdgeMetadata.Num() && EdgeMetadata[EdgeIndex].EdgeIndex != -1) { return EdgeMetadata[EdgeIndex]; }
+			if (EdgeIndex < EdgeMetadata.Num() && EdgeMetadata[EdgeIndex].EdgeIndex != -1)
+			{
+				return EdgeMetadata[EdgeIndex];
+			}
 		}
 		{
 			FWriteScopeLock WriteScopeLock(MetadataLock);
@@ -211,7 +229,10 @@ namespace PCGExGraphs
 
 		for (const uint64& E : InEdges)
 		{
-			if (UniqueEdges.Contains(E)) { continue; }
+			if (UniqueEdges.Contains(E))
+			{
+				continue;
+			}
 
 			PCGEx::H64(E, A, B);
 
@@ -239,7 +260,10 @@ namespace PCGExGraphs
 		OutStartIndex = Nodes.Num();
 		const int32 TotalNum = OutStartIndex + NumNewNodes;
 		Nodes.Reserve(TotalNum);
-		for (int i = OutStartIndex; i < TotalNum; i++) { Nodes.Emplace(i, i); }
+		for (int i = OutStartIndex; i < TotalNum; i++)
+		{
+			Nodes.Emplace(i, i);
+		}
 
 		// Grow node metadata arrays to match
 		if (TotalNum > NodeMetadata.Num())
@@ -303,16 +327,25 @@ namespace PCGExGraphs
 				for (const FLink& Lk : Node.Links)
 				{
 					const int32 E = Lk.Edge;
-					if (VisitedEdges[E]) { continue; }
+					if (VisitedEdges[E])
+					{
+						continue;
+					}
 
 					VisitedEdges[E] = true;
 					VisitedEdgesNum++;
 
 					FEdge& Edge = Edges[E];
-					if (!Edge.bValid) { continue; }
+					if (!Edge.bValid)
+					{
+						continue;
+					}
 
 					const int32 OtherIndex = Edge.Other(NodeIndex);
-					if (!Nodes[OtherIndex].bValid) { continue; }
+					if (!Nodes[OtherIndex].bValid)
+					{
+						continue;
+					}
 
 					SubGraph->Add(Edge);
 
@@ -327,8 +360,14 @@ namespace PCGExGraphs
 
 			if (!Limits.IsValid(SubGraph->Nodes.Num(), SubGraph->Edges.Num()))
 			{
-				for (const int32 j : SubGraph->Nodes) { Nodes[j].bValid = false; }
-				for (const PCGEx::FIndexKey j : SubGraph->Edges) { Edges[j.Index].bValid = false; }
+				for (const int32 j : SubGraph->Nodes)
+				{
+					Nodes[j].bValid = false;
+				}
+				for (const PCGEx::FIndexKey j : SubGraph->Edges)
+				{
+					Edges[j.Index].bValid = false;
+				}
 			}
 			else if (!SubGraph->Edges.IsEmpty())
 			{
@@ -353,7 +392,7 @@ namespace PCGExGraphs
 			const FEdge& Edge = Edges[Lk.Edge];
 			if (Edge.bValid && Nodes[Edge.Other(NodeIdx)].bValid) { Node.NumExportedEdges++; }
 			}
-		)
+			)
 	}
 
 	void FGraph::GetConnectedNodes(const int32 FromIndex, TArray<int32>& OutIndices, const int32 SearchDepth) const
@@ -364,13 +403,22 @@ namespace PCGExGraphs
 		for (const FLink Lk : RootNode.Links)
 		{
 			const FEdge& Edge = Edges[Lk.Edge];
-			if (!Edge.bValid) { continue; }
+			if (!Edge.bValid)
+			{
+				continue;
+			}
 
 			int32 OtherIndex = Edge.Other(FromIndex);
-			if (OutIndices.Contains(OtherIndex)) { continue; }
+			if (OutIndices.Contains(OtherIndex))
+			{
+				continue;
+			}
 
 			OutIndices.Add(OtherIndex);
-			if (NextDepth > 0) { GetConnectedNodes(OtherIndex, OutIndices, NextDepth); }
+			if (NextDepth > 0)
+			{
+				GetConnectedNodes(OtherIndex, OutIndices, NextDepth);
+			}
 		}
 	}
 }

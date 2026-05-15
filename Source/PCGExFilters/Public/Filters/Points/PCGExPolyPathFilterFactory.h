@@ -4,15 +4,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
-#include "Core/PCGExPointFilter.h"
-#include "PCGExVersion.h"
-#include "Data/PCGExTaggedData.h"
 #include "PCGExFilterCommon.h"
-#include "PCGExMatching/Public/Core/PCGExMatchRuleFactoryProvider.h"
+#include "PCGExVersion.h"
+#include "Core/PCGExPointFilter.h"
+#include "Data/PCGExTaggedData.h"
 #include "Math/PCGExWinding.h"
+#include "PCGExMatching/Public/Core/PCGExMatchRuleFactoryProvider.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
+#include "UObject/Object.h"
 #include "PCGExPolyPathFilterFactory.generated.h"
 
 namespace PCGExPaths
@@ -63,7 +63,10 @@ class UPCGExPolyPathFilterFactory : public UPCGExPointFilterFactoryData
 	friend PCGExPathInclusion::FHandler;
 
 public:
-	virtual bool SupportsProxyEvaluation() const override { return true; } // TODO Change this one we support per-point tolerance from attribute
+	virtual bool SupportsProxyEvaluation() const override
+	{
+		return true;
+	} // TODO Change this one we support per-point tolerance from attribute
 
 	TSharedPtr<TArray<FPCGExTaggedData>> Datas;
 	TArray<TSharedPtr<PCGExPaths::FPolyPath>> PolyPaths;
@@ -82,14 +85,24 @@ public:
 	bool PopulateMatchIgnoreList(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InFacade, TSet<const UPCGData*>& OutIgnoreList) const;
 
 	/** Whether match rule factories were provided (matching pin connected). */
-	bool HasMatchRuleFactories() const { return !MatchRuleFactories.IsEmpty(); }
+	bool HasMatchRuleFactories() const
+	{
+		return !MatchRuleFactories.IsEmpty();
+	}
+
 	/** Access match rule factories for creating per-point FDataMatcher instances in filter Init(). */
-	const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& GetMatchRuleFactories() const { return MatchRuleFactories; }
+	const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& GetMatchRuleFactories() const
+	{
+		return MatchRuleFactories;
+	}
 
 	virtual void BeginDestroy() override;
 
 protected:
-	virtual FName GetInputLabel() const { return PCGExPaths::Labels::SourcePathsLabel; }
+	virtual FName GetInputLabel() const
+	{
+		return PCGExPaths::Labels::SourcePathsLabel;
+	}
 
 	virtual void InitConfig_Internal()
 	{
@@ -145,14 +158,22 @@ namespace PCGExPathInclusion
 	{
 		switch (Check)
 		{
-		default: case EPCGExSplineCheckType::IsInside: return TEXT("Is Inside");
-		case EPCGExSplineCheckType::IsInsideOrOn: return TEXT("Is Inside or On");
-		case EPCGExSplineCheckType::IsInsideAndOn: return TEXT("Is Outside and On");
-		case EPCGExSplineCheckType::IsOutside: return TEXT("Is Outside");
-		case EPCGExSplineCheckType::IsOutsideOrOn: return TEXT("Is Outside or On");
-		case EPCGExSplineCheckType::IsOutsideAndOn: return TEXT("Is Outside and On");
-		case EPCGExSplineCheckType::IsOn: return TEXT("Is On");
-		case EPCGExSplineCheckType::IsNotOn: return TEXT("Is not On");
+		default: case EPCGExSplineCheckType::IsInside:
+			return TEXT("Is Inside");
+		case EPCGExSplineCheckType::IsInsideOrOn:
+			return TEXT("Is Inside or On");
+		case EPCGExSplineCheckType::IsInsideAndOn:
+			return TEXT("Is Outside and On");
+		case EPCGExSplineCheckType::IsOutside:
+			return TEXT("Is Outside");
+		case EPCGExSplineCheckType::IsOutsideOrOn:
+			return TEXT("Is Outside or On");
+		case EPCGExSplineCheckType::IsOutsideAndOn:
+			return TEXT("Is Outside and On");
+		case EPCGExSplineCheckType::IsOn:
+			return TEXT("Is On");
+		case EPCGExSplineCheckType::IsNotOn:
+			return TEXT("Is not On");
 		}
 	}
 #endif
@@ -173,8 +194,8 @@ namespace PCGExPathInclusion
 		ESplineMatch FlagScope = Any;
 
 	public:
-		double Tolerance = MAX_dbl;
-		double ToleranceSquared = MAX_dbl;
+		double Tolerance = TNumericLimits<double>::Max();
+		double ToleranceSquared = TNumericLimits<double>::Max();
 		bool bScaleTolerance = false;
 		FVector ToleranceScaleFactor = FVector(1, 1, 1);
 		TSet<const UPCGData*> MatchIgnoreList;
@@ -189,9 +210,9 @@ namespace PCGExPathInclusion
 			if (bPass && FlagScope != Skip)
 			{
 				bPass = FlagScope == Any
-					        ? EnumHasAnyFlags(InFlags, GoodFlags)
-					        :                                    // Any of the good flags
-					        EnumHasAllFlags(InFlags, GoodFlags); // All of the good flags
+					? EnumHasAnyFlags(InFlags, GoodFlags)
+					:                                    // Any of the good flags
+					EnumHasAllFlags(InFlags, GoodFlags); // All of the good flags
 			}
 			return bPass;
 		}

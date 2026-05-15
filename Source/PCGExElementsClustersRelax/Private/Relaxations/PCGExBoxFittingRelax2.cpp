@@ -8,15 +8,24 @@
 void UPCGExBoxFittingRelax2::RegisterPrimaryBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterPrimaryBuffersDependencies(InContext, FacadePreloader);
-	if (ExtentsInput == EPCGExInputValueType::Attribute) { FacadePreloader.Register<FVector>(InContext, ExtentsAttribute); }
+	if (ExtentsInput == EPCGExInputValueType::Attribute)
+	{
+		FacadePreloader.Register<FVector>(InContext, ExtentsAttribute);
+	}
 }
 
 bool UPCGExBoxFittingRelax2::PrepareForCluster(FPCGExContext* InContext, const TSharedPtr<PCGExClusters::FCluster>& InCluster)
 {
-	if (!Super::PrepareForCluster(InContext, InCluster)) { return false; }
+	if (!Super::PrepareForCluster(InContext, InCluster))
+	{
+		return false;
+	}
 
 	ExtentsBuffer = GetValueSettingExtents();
-	if (!ExtentsBuffer->Init(PrimaryDataFacade)) { return false; }
+	if (!ExtentsBuffer->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -40,14 +49,20 @@ void UPCGExBoxFittingRelax2::Step2(const PCGExClusters::FNode& Node)
 		const FBox OtherBox(OtherPos - OtherExtents, OtherPos + OtherExtents);
 
 		// Check for overlap
-		if (!CurrentBox.Intersect(OtherBox)) { continue; }
+		if (!CurrentBox.Intersect(OtherBox))
+		{
+			continue;
+		}
 
 		// Calculate overlap in each axis
 		const FVector OverlapMin = FVector::Max(CurrentBox.Min, OtherBox.Min);
 		const FVector OverlapMax = FVector::Min(CurrentBox.Max, OtherBox.Max);
 		const FVector OverlapSize = OverlapMax - OverlapMin;
 
-		if (OverlapSize.X <= 0 || OverlapSize.Y <= 0 || OverlapSize.Z <= 0) { continue; }
+		if (OverlapSize.X <= 0 || OverlapSize.Y <= 0 || OverlapSize.Z <= 0)
+		{
+			continue;
+		}
 
 		FVector SeparationDir;
 		double SeparationMagnitude;
@@ -55,61 +70,61 @@ void UPCGExBoxFittingRelax2::Step2(const PCGExClusters::FNode& Node)
 		switch (SeparationMode)
 		{
 		case EPCGExBoxFittingSeparation::MinimumPenetration:
-			{
-				// Find axis with minimum penetration
-				const int32 MinAxis = (OverlapSize.X <= OverlapSize.Y && OverlapSize.X <= OverlapSize.Z) ? 0 : (OverlapSize.Y <= OverlapSize.Z) ? 1 : 2;
+		{
+			// Find axis with minimum penetration
+			const int32 MinAxis = (OverlapSize.X <= OverlapSize.Y && OverlapSize.X <= OverlapSize.Z) ? 0 : (OverlapSize.Y <= OverlapSize.Z) ? 1 : 2;
 
+			SeparationDir = FVector::ZeroVector;
+			SeparationDir[MinAxis] = (CurrentPos[MinAxis] < OtherPos[MinAxis]) ? -1.0 : 1.0;
+			SeparationMagnitude = OverlapSize[MinAxis];
+		}
+		break;
+
+		case EPCGExBoxFittingSeparation::EdgeDirection:
+		{
+			// Check if nodes are connected and use edge direction
+			bool bConnected = false;
+			for (const PCGExGraphs::FEdge& Edge : *Cluster->Edges)
+			{
+				if ((Cluster->GetEdgeStart(Edge)->Index == Node.Index && Cluster->GetEdgeEnd(Edge)->Index == OtherNodeIndex) ||
+					(Cluster->GetEdgeStart(Edge)->Index == OtherNodeIndex && Cluster->GetEdgeEnd(Edge)->Index == Node.Index))
+				{
+					bConnected = true;
+					break;
+				}
+			}
+
+			if (bConnected)
+			{
+				SeparationDir = (OtherPos - CurrentPos).GetSafeNormal();
+				SeparationMagnitude = FMath::Min3(OverlapSize.X, OverlapSize.Y, OverlapSize.Z);
+			}
+			else
+			{
+				// Fall back to minimum penetration for non-connected nodes
+				const int32 MinAxis = (OverlapSize.X <= OverlapSize.Y && OverlapSize.X <= OverlapSize.Z) ? 0 : (OverlapSize.Y <= OverlapSize.Z) ? 1 : 2;
 				SeparationDir = FVector::ZeroVector;
 				SeparationDir[MinAxis] = (CurrentPos[MinAxis] < OtherPos[MinAxis]) ? -1.0 : 1.0;
 				SeparationMagnitude = OverlapSize[MinAxis];
 			}
-			break;
-
-		case EPCGExBoxFittingSeparation::EdgeDirection:
-			{
-				// Check if nodes are connected and use edge direction
-				bool bConnected = false;
-				for (const PCGExGraphs::FEdge& Edge : *Cluster->Edges)
-				{
-					if ((Cluster->GetEdgeStart(Edge)->Index == Node.Index && Cluster->GetEdgeEnd(Edge)->Index == OtherNodeIndex) ||
-						(Cluster->GetEdgeStart(Edge)->Index == OtherNodeIndex && Cluster->GetEdgeEnd(Edge)->Index == Node.Index))
-					{
-						bConnected = true;
-						break;
-					}
-				}
-
-				if (bConnected)
-				{
-					SeparationDir = (OtherPos - CurrentPos).GetSafeNormal();
-					SeparationMagnitude = FMath::Min3(OverlapSize.X, OverlapSize.Y, OverlapSize.Z);
-				}
-				else
-				{
-					// Fall back to minimum penetration for non-connected nodes
-					const int32 MinAxis = (OverlapSize.X <= OverlapSize.Y && OverlapSize.X <= OverlapSize.Z) ? 0 : (OverlapSize.Y <= OverlapSize.Z) ? 1 : 2;
-					SeparationDir = FVector::ZeroVector;
-					SeparationDir[MinAxis] = (CurrentPos[MinAxis] < OtherPos[MinAxis]) ? -1.0 : 1.0;
-					SeparationMagnitude = OverlapSize[MinAxis];
-				}
-			}
-			break;
+		}
+		break;
 
 		case EPCGExBoxFittingSeparation::Centroid:
 		default:
+		{
+			const FVector Delta = OtherPos - CurrentPos;
+			const double Distance = Delta.Size();
+			if (Distance <= KINDA_SMALL_NUMBER)
 			{
-				const FVector Delta = OtherPos - CurrentPos;
-				const double Distance = Delta.Size();
-				if (Distance <= KINDA_SMALL_NUMBER)
-				{
-					SeparationDir = FVector(1, 0, 0); // Arbitrary direction for coincident points
-				}
-				else
-				{
-					SeparationDir = Delta / Distance;
-				}
-				SeparationMagnitude = FMath::Min3(OverlapSize.X, OverlapSize.Y, OverlapSize.Z);
+				SeparationDir = FVector(1, 0, 0); // Arbitrary direction for coincident points
 			}
+			else
+			{
+				SeparationDir = Delta / Distance;
+			}
+			SeparationMagnitude = FMath::Min3(OverlapSize.X, OverlapSize.Y, OverlapSize.Z);
+		}
 			break;
 		}
 

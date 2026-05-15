@@ -14,8 +14,15 @@
 
 #pragma region UPCGSettings interface
 
-PCGExData::EIOInit UPCGExSanitizeClustersSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Duplicate; }
-PCGExData::EIOInit UPCGExSanitizeClustersSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExSanitizeClustersSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
+
+PCGExData::EIOInit UPCGExSanitizeClustersSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 #pragma endregion
 
@@ -24,7 +31,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(SanitizeClusters)
 
 bool FPCGExSanitizeClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SanitizeClusters)
 	PCGEX_FWD(GraphBuilderDetails)
@@ -40,10 +50,13 @@ bool FPCGExSanitizeClustersElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not find any clusters."));
 		}
@@ -67,13 +80,19 @@ namespace PCGExSanitizeClusters
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExSanitizeClusters::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		TArray<PCGExGraphs::FEdge> IndexedEdges;
 
 		PCGExGraphs::Helpers::BuildIndexedEdges(EdgeDataFacade->Source, *EndpointsLookup, IndexedEdges);
 
-		if (IndexedEdges.IsEmpty()) { return false; }
+		if (IndexedEdges.IsEmpty())
+		{
+			return false;
+		}
 
 		GraphBuilder->Graph->InsertEdges(IndexedEdges);
 		EdgeDataFacade->Source->ClearCachedKeys();
@@ -88,8 +107,14 @@ namespace PCGExSanitizeClusters
 
 	void FBatch::Output()
 	{
-		if (GraphBuilder->bCompiledSuccessfully) { GraphBuilder->StageEdgesOutputs(); }
-		else { VtxDataFacade->Source->InitializeOutput(PCGExData::EIOInit::NoInit); }
+		if (GraphBuilder->bCompiledSuccessfully)
+		{
+			GraphBuilder->StageEdgesOutputs();
+		}
+		else
+		{
+			VtxDataFacade->Source->InitializeOutput(PCGExData::EIOInit::NoInit);
+		}
 	}
 }
 

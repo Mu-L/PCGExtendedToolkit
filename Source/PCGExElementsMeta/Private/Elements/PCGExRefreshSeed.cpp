@@ -4,9 +4,9 @@
 #include "Elements/PCGExRefreshSeed.h"
 
 
-#include "Helpers/PCGExRandomHelpers.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Helpers/PCGExRandomHelpers.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExRefreshSeedElement"
@@ -16,7 +16,10 @@ PCGEX_INITIALIZE_ELEMENT(RefreshSeed)
 
 bool FPCGExRefreshSeedElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(RefreshSeed)
 
@@ -27,7 +30,8 @@ class FPCGExRefreshSeedTask final : public PCGExMT::FPCGExIndexedTask
 {
 public:
 	explicit FPCGExRefreshSeedTask(const int32 InPointIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO)
-		: FPCGExIndexedTask(InPointIndex), PointIO(InPointIO)
+		: FPCGExIndexedTask(InPointIndex)
+		  , PointIO(InPointIO)
 	{
 	}
 
@@ -41,7 +45,10 @@ public:
 		TConstPCGValueRange<FTransform> Transforms = PointIO->GetOut()->GetConstTransformValueRange();
 
 		const FVector BaseOffset = FVector(TaskIndex) * 0.001;
-		for (int i = 0; i < PointIO->GetNum(); i++) { Seeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(Transforms[i].GetLocation(), BaseOffset); }
+		for (int i = 0; i < PointIO->GetNum(); i++)
+		{
+			Seeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(Transforms[i].GetLocation(), BaseOffset);
+		}
 	}
 };
 

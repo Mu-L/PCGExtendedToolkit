@@ -29,7 +29,10 @@ namespace PCGExArrayHelpers
 
 	void AppendEntriesFromCommaSeparatedList(const FString& InCommaSeparatedString, TSet<FString>& OutStrings)
 	{
-		if (InCommaSeparatedString.IsEmpty()) { return; }
+		if (InCommaSeparatedString.IsEmpty())
+		{
+			return;
+		}
 
 		TArray<FString> Result;
 		InCommaSeparatedString.ParseIntoArray(Result, TEXT(","));
@@ -38,7 +41,10 @@ namespace PCGExArrayHelpers
 		{
 			FString& String = Result[i];
 			String.TrimStartAndEndInline();
-			if (String.IsEmpty()) { continue; }
+			if (String.IsEmpty())
+			{
+				continue;
+			}
 
 			OutStrings.Add(String);
 		}
@@ -46,7 +52,10 @@ namespace PCGExArrayHelpers
 
 	void AppendUniqueEntriesFromCommaSeparatedList(const FString& InCommaSeparatedString, TArray<FString>& OutStrings)
 	{
-		if (InCommaSeparatedString.IsEmpty()) { return; }
+		if (InCommaSeparatedString.IsEmpty())
+		{
+			return;
+		}
 
 		TArray<FString> Result;
 		InCommaSeparatedString.ParseIntoArray(Result, TEXT(","));
@@ -55,7 +64,10 @@ namespace PCGExArrayHelpers
 		{
 			FString& String = Result[i];
 			String.TrimStartAndEndInline();
-			if (String.IsEmpty()) { continue; }
+			if (String.IsEmpty())
+			{
+				continue;
+			}
 
 			OutStrings.AddUnique(String);
 		}
@@ -64,7 +76,10 @@ namespace PCGExArrayHelpers
 	void ArrayOfIndices(TArray<int32>& OutArray, const int32 InNum, const int32 Offset)
 	{
 		OutArray.Reserve(InNum);
-		for (int i = 0; i < InNum; i++) { OutArray.Add(Offset + i); }
+		for (int i = 0; i < InNum; i++)
+		{
+			OutArray.Add(Offset + i);
+		}
 	}
 
 	int32 ArrayOfIndices(TArray<int32>& OutArray, const TArrayView<const int8>& Mask, const int32 Offset, const bool bInvert)
@@ -74,8 +89,26 @@ namespace PCGExArrayHelpers
 		OutArray.Reset();
 		OutArray.Reserve(InNum);
 
-		if (bInvert) { for (int i = 0; i < InNum; i++) { if (!Mask[i]) { OutArray.Add(Offset + i); } } }
-		else { for (int i = 0; i < InNum; i++) { if (Mask[i]) { OutArray.Add(Offset + i); } } }
+		if (bInvert)
+		{
+			for (int i = 0; i < InNum; i++)
+			{
+				if (!Mask[i])
+				{
+					OutArray.Add(Offset + i);
+				}
+			}
+		}
+		else
+		{
+			for (int i = 0; i < InNum; i++)
+			{
+				if (Mask[i])
+				{
+					OutArray.Add(Offset + i);
+				}
+			}
+		}
 
 		OutArray.Shrink();
 		return OutArray.Num();
@@ -88,8 +121,26 @@ namespace PCGExArrayHelpers
 		OutArray.Reset();
 		OutArray.Reserve(InNum);
 
-		if (bInvert) { for (int i = 0; i < InNum; i++) { if (!Mask[i]) { OutArray.Add(Offset + i); } } }
-		else { for (int i = 0; i < InNum; i++) { if (Mask[i]) { OutArray.Add(Offset + i); } } }
+		if (bInvert)
+		{
+			for (int i = 0; i < InNum; i++)
+			{
+				if (!Mask[i])
+				{
+					OutArray.Add(Offset + i);
+				}
+			}
+		}
+		else
+		{
+			for (int i = 0; i < InNum; i++)
+			{
+				if (Mask[i])
+				{
+					OutArray.Add(Offset + i);
+				}
+			}
+		}
 
 		OutArray.Shrink();
 		return OutArray.Num();

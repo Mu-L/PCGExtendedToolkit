@@ -4,9 +4,9 @@
 #include "Elements/Meta/PCGExSampleNeighbors.h"
 
 
-#include "Data/PCGExData.h"
 #include "Clusters/PCGExCluster.h"
 #include "Core/PCGExClusterFilter.h"
+#include "Data/PCGExData.h"
 #include "Elements/Meta/NeighborSamplers/PCGExNeighborSampleFactoryProvider.h"
 
 #define LOCTEXT_NAMESPACE "PCGExSampleNeighbors"
@@ -19,15 +19,25 @@ TArray<FPCGPinProperties> UPCGExSampleNeighborsSettings::InputPinProperties() co
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExSampleNeighborsSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::Forward; }
-PCGExData::EIOInit UPCGExSampleNeighborsSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSampleNeighborsSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
+
+PCGExData::EIOInit UPCGExSampleNeighborsSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_INITIALIZE_ELEMENT(SampleNeighbors)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(SampleNeighbors)
 
 bool FPCGExSampleNeighborsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SampleNeighbors)
 
@@ -37,7 +47,10 @@ bool FPCGExSampleNeighborsElement::Boot(FPCGExContext* InContext) const
 	}
 
 	// Sort samplers so higher priorities come last, as they have to potential to override values.
-	Context->SamplerFactories.Sort([&](const UPCGExNeighborSamplerFactoryData& A, const UPCGExNeighborSamplerFactoryData& B) { return A.Priority < B.Priority; });
+	Context->SamplerFactories.Sort([&](const UPCGExNeighborSamplerFactoryData& A, const UPCGExNeighborSamplerFactoryData& B)
+	{
+		return A.Priority < B.Priority;
+	});
 
 	return true;
 }
@@ -50,10 +63,16 @@ bool FPCGExSampleNeighborsElement::AdvanceWork(FPCGExContext* InContext, const U
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			if (!Context->FilterFactories.IsEmpty()) { NewBatch->VtxFilterFactories = &Context->FilterFactories; }
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      if (!Context->FilterFactories.IsEmpty())
+			                                      {
+				                                      NewBatch->VtxFilterFactories = &Context->FilterFactories;
+			                                      }
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -77,7 +96,10 @@ namespace PCGExSampleNeighbors
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExSampleNeighbors::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		for (const UPCGExNeighborSamplerFactoryData* OperationFactory : Context->SamplerFactories)
 		{
@@ -85,16 +107,28 @@ namespace PCGExSampleNeighbors
 			SamplingOperation->BindContext(Context);
 			SamplingOperation->PrepareForCluster(ExecutionContext, Cluster.ToSharedRef(), VtxDataFacade, EdgeDataFacade);
 
-			if (!SamplingOperation->IsOperationValid()) { continue; }
+			if (!SamplingOperation->IsOperationValid())
+			{
+				continue;
+			}
 
 			SamplingOperations.Add(SamplingOperation);
-			if (SamplingOperation->ValueFilters) { OpsWithValueTest.Add(SamplingOperation); }
+			if (SamplingOperation->ValueFilters)
+			{
+				OpsWithValueTest.Add(SamplingOperation);
+			}
 		}
 
 		Cluster->ComputeEdgeLengths();
 
-		if (!OpsWithValueTest.IsEmpty()) { StartParallelLoopForRange(NumNodes); }
-		else { StartParallelLoopForNodes(); }
+		if (!OpsWithValueTest.IsEmpty())
+		{
+			StartParallelLoopForRange(NumNodes);
+		}
+		else
+		{
+			StartParallelLoopForNodes();
+		}
 
 
 		return true;
@@ -118,21 +152,33 @@ namespace PCGExSampleNeighbors
 
 	void FProcessor::PrepareLoopScopesForNodes(const TArray<PCGExMT::FScope>& Loops)
 	{
-		for (const TSharedPtr<FPCGExNeighborSampleOperation>& Op : SamplingOperations) { Op->PrepareForLoops(Loops); }
+		for (const TSharedPtr<FPCGExNeighborSampleOperation>& Op : SamplingOperations)
+		{
+			Op->PrepareForLoops(Loops);
+		}
 	}
 
 	void FProcessor::ProcessNodes(const PCGExMT::FScope& Scope)
 	{
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (VtxFiltersManager && !VtxFiltersManager->Test(*Cluster->GetNode(Index))) { continue; }
-			for (const TSharedPtr<FPCGExNeighborSampleOperation>& Op : SamplingOperations) { Op->ProcessNode(Index, Scope); }
+			if (VtxFiltersManager && !VtxFiltersManager->Test(*Cluster->GetNode(Index)))
+			{
+				continue;
+			}
+			for (const TSharedPtr<FPCGExNeighborSampleOperation>& Op : SamplingOperations)
+			{
+				Op->ProcessNode(Index, Scope);
+			}
 		}
 	}
 
 	void FProcessor::Write()
 	{
-		for (const TSharedPtr<FPCGExNeighborSampleOperation>& Op : SamplingOperations) { Op->CompleteOperation(); }
+		for (const TSharedPtr<FPCGExNeighborSampleOperation>& Op : SamplingOperations)
+		{
+			Op->CompleteOperation();
+		}
 		EdgeDataFacade->WriteFastest(TaskManager);
 	}
 

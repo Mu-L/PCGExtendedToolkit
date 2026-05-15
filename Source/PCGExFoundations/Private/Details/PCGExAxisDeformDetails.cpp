@@ -59,13 +59,19 @@ bool FPCGExAxisDeformDetails::Init(FPCGExContext* InContext, const TArray<FPCGEx
 	if (FirstAlphaInput == EPCGExSampleSource::Target)
 	{
 		TargetsFirstValueGetter.Init(nullptr, InTargets.Num());
-		for (int i = 0; i < InTargets.Num(); i++) { TargetsFirstValueGetter[i] = GetValueSettingFirstAlpha(InContext, InTargets[i].Data); }
+		for (int i = 0; i < InTargets.Num(); i++)
+		{
+			TargetsFirstValueGetter[i] = GetValueSettingFirstAlpha(InContext, InTargets[i].Data);
+		}
 	}
 
 	if (SecondAlphaInput == EPCGExSampleSource::Target)
 	{
 		TargetsSecondValueGetter.Init(nullptr, InTargets.Num());
-		for (int i = 0; i < InTargets.Num(); i++) { TargetsSecondValueGetter[i] = GetValueSettingSecondAlpha(InContext, InTargets[i].Data); }
+		for (int i = 0; i < InTargets.Num(); i++)
+		{
+			TargetsSecondValueGetter[i] = GetValueSettingSecondAlpha(InContext, InTargets[i].Data);
+		}
 	}
 
 	return true;
@@ -88,7 +94,10 @@ bool FPCGExAxisDeformDetails::Init(FPCGExContext* InContext, const FPCGExAxisDef
 			if (bSupportPoint)
 			{
 				FirstValueGetter = Parent.GetValueSettingFirstAlpha();
-				if (!FirstValueGetter->Init(InDataFacade)) { return false; }
+				if (!FirstValueGetter->Init(InDataFacade))
+				{
+					return false;
+				}
 			}
 			else
 			{
@@ -112,7 +121,10 @@ bool FPCGExAxisDeformDetails::Init(FPCGExContext* InContext, const FPCGExAxisDef
 			if (bSupportPoint)
 			{
 				SecondValueGetter = Parent.GetValueSettingSecondAlpha();
-				if (!SecondValueGetter->Init(InDataFacade)) { return false; }
+				if (!SecondValueGetter->Init(InDataFacade))
+				{
+					return false;
+				}
 			}
 			else
 			{
@@ -140,5 +152,8 @@ void FPCGExAxisDeformDetails::GetAlphas(const int32 Index, double& OutFirst, dou
 		OutSecond += OutFirst;
 	}
 
-	if (bSort && OutFirst > OutSecond) { std::swap(OutFirst, OutSecond); }
+	if (bSort && OutFirst > OutSecond)
+	{
+		std::swap(OutFirst, OutSecond);
+	}
 }

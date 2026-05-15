@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "Core/PCGExTensorHandler.h"
 #include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExTensorDotFilter.generated.h"
 
@@ -58,7 +58,10 @@ public:
 
 	virtual bool Init(FPCGExContext* InContext) override;
 
-	virtual bool SupportsCollectionEvaluation() const override { return false; }
+	virtual bool SupportsCollectionEvaluation() const override
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
@@ -71,7 +74,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FTensorDotFilter(const TObjectPtr<const UPCGExTensorDotFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 			DotComparison = TypedFilterFactory->Config.DotComparisonDetails;
 			TensorsHandler = TypedFilterFactory->TensorsHandler;
@@ -121,6 +125,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

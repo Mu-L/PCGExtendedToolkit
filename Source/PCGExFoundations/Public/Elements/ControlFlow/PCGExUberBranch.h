@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExPointsProcessor.h"
+#include "Utils/PCGExCompare.h"
 #include "PCGExUberBranch.generated.h"
 
 UENUM(BlueprintType)
@@ -31,11 +31,23 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(UberBranch, "Uber Branch", "Branch collections based on multiple rules & conditions.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::ControlFlow; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::ControlFlow;
+	}
 #endif
 
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
 	virtual bool HasDynamicPins() const override;
 
 protected:

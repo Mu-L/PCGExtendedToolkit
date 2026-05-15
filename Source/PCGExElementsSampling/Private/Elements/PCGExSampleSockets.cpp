@@ -3,8 +3,8 @@
 
 #include "Elements/PCGExSampleSockets.h"
 
-#include "Engine/StaticMesh.h"
 #include "PCGComponent.h"
+#include "Engine/StaticMesh.h"
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
@@ -32,12 +32,18 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(SampleSockets)
 
 bool FPCGExSampleSocketsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SampleSockets)
 
 	PCGEX_FWD(OutputSocketDetails)
-	if (!Context->OutputSocketDetails.Init(Context)) { return false; }
+	if (!Context->OutputSocketDetails.Init(Context))
+	{
+		return false;
+	}
 
 	if (Settings->AssetType == EPCGExInputValueType::Attribute)
 	{
@@ -98,7 +104,10 @@ bool FPCGExSampleSocketsElement::AdvanceWork(FPCGExContext* InContext, const UPC
 		PCGEX_ON_INVALILD_INPUTS(FTEXT("Some inputs have less than 2 points and won't be processed."))
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -121,7 +130,10 @@ namespace PCGExSampleSockets
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (Settings->AssetType == EPCGExInputValueType::Attribute)
 		{
@@ -146,10 +158,16 @@ namespace PCGExSampleSockets
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const TObjectPtr<UStaticMesh>* SM = Keys ? Context->StaticMeshLoader->GetAsset(KeysRef[Index]) : &Context->StaticMesh;
-			if (!SM) { continue; }
+			if (!SM)
+			{
+				continue;
+			}
 			SocketHelper->Add(Index, *SM);
 		}
 	}

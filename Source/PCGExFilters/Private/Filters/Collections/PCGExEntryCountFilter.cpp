@@ -20,7 +20,10 @@ bool PCGExPointFilter::FEntryCountFilter::Test(const TSharedPtr<PCGExData::FPoin
 	int32 B = TypedFilterFactory->Config.OperandB;
 	if (TypedFilterFactory->Config.CompareAgainst == EPCGExInputValueType::Attribute)
 	{
-		if (!PCGExData::Helpers::TryReadDataValue(IO->GetContext(), IO->GetIn(), TypedFilterFactory->Config.OperandBAttr, B, PCGEX_QUIET_HANDLING)) { PCGEX_QUIET_HANDLING_RET }
+		if (!PCGExData::Helpers::TryReadDataValue(IO->GetContext(), IO->GetIn(), TypedFilterFactory->Config.OperandBAttr, B, PCGEX_QUIET_HANDLING))
+		{
+			PCGEX_QUIET_HANDLING_RET
+		}
 	}
 
 	return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, IO->GetNum(), B, TypedFilterFactory->Config.Tolerance);
@@ -32,8 +35,14 @@ PCGEX_CREATE_FILTER_FACTORY(EntryCount)
 FString UPCGExEntryCountFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = TEXT("Entry Count ") + PCGExCompare::ToString(Config.Comparison);
-	if (Config.CompareAgainst == EPCGExInputValueType::Constant) { DisplayName += FString::Printf(TEXT("%d"), Config.OperandB); }
-	else { DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandBAttr); }
+	if (Config.CompareAgainst == EPCGExInputValueType::Constant)
+	{
+		DisplayName += FString::Printf(TEXT("%d"), Config.OperandB);
+	}
+	else
+	{
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandBAttr);
+	}
 	return DisplayName;
 }
 #endif

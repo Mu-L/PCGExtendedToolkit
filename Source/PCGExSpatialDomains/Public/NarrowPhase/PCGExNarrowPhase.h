@@ -25,7 +25,7 @@ namespace PCGExSpatial::NarrowPhase
 	 * static_cast to their concrete shape types -- the cast is type-safe by
 	 * construction (the registry only invokes the fn when both tags match).
 	 */
-	using FPairOverlapFn     = bool (*)(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B);
+	using FPairOverlapFn = bool (*)(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B);
 	using FPairPenetrationFn = float (*)(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B);
 
 	/**
@@ -47,7 +47,7 @@ namespace PCGExSpatial::NarrowPhase
 	 */
 	struct PCGEXSPATIALDOMAINS_API FPairFns
 	{
-		FPairOverlapFn     Overlap     = nullptr;
+		FPairOverlapFn Overlap = nullptr;
 		FPairPenetrationFn Penetration = nullptr;
 	};
 

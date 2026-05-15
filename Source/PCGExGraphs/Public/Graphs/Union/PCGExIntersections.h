@@ -8,8 +8,8 @@
 #include "PCGExOctree.h"
 #include "Core/PCGExOpStats.h"
 
-#include "Data/PCGExPointElements.h"
 #include "Clusters/PCGExEdge.h"
+#include "Data/PCGExPointElements.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Utils/PCGValueRange.h"
 
@@ -104,7 +104,10 @@ namespace PCGExGraphs
 		FPECollinear() = default;
 
 		FPECollinear(const int32 InEdgeIdx, const int32 InNodeIdx, const double InTime, const FVector& InClosest)
-			: EdgeIdx(InEdgeIdx), NodeIdx(InNodeIdx), Time(InTime), ClosestPoint(InClosest)
+			: EdgeIdx(InEdgeIdx)
+			  , NodeIdx(InNodeIdx)
+			  , Time(InTime)
+			  , ClosestPoint(InClosest)
 		{
 		}
 	};
@@ -160,8 +163,15 @@ namespace PCGExGraphs
 
 		FEECrossing() = default;
 
-		FORCEINLINE uint64 Key() const { return PCGEx::H64U(EdgeA, EdgeB); }
-		FORCEINLINE double GetTime(const int32 EdgeIdx) const { return EdgeIdx == EdgeA ? TimeA : TimeB; }
+		FORCEINLINE uint64 Key() const
+		{
+			return PCGEx::H64U(EdgeA, EdgeB);
+		}
+
+		FORCEINLINE double GetTime(const int32 EdgeIdx) const
+		{
+			return EdgeIdx == EdgeA ? TimeA : TimeB;
+		}
 	};
 
 	namespace EdgeEdgePass

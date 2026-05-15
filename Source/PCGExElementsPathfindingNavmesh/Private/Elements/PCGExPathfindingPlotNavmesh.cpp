@@ -3,8 +3,8 @@
 
 #include "Elements/PCGExPathfindingPlotNavmesh.h"
 
-#include "Clusters/PCGExClusterCommon.h"
 #include "PCGParamData.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Paths/PCGExPathsCommon.h"
@@ -32,26 +32,38 @@ void UPCGExPathfindingPlotNavmeshSettings::PostInitProperties()
 {
 	if (!HasAnyFlags(RF_ClassDefaultObject) && IsInGameThread())
 	{
-		if (!Blending) { Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending")); }
+		if (!Blending)
+		{
+			Blending = NewObject<UPCGExSubPointsBlendInterpolate>(this, TEXT("Blending"));
+		}
 	}
 	Super::PostInitProperties();
 }
 
 void UPCGExPathfindingPlotNavmeshSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	if (Blending) { Blending->UpdateUserFacingInfos(); }
+	if (Blending)
+	{
+		Blending->UpdateUserFacingInfos();
+	}
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
 
-FName UPCGExPathfindingPlotNavmeshSettings::GetMainInputPin() const { return PCGExClusters::Labels::SourcePlotsLabel; }
+FName UPCGExPathfindingPlotNavmeshSettings::GetMainInputPin() const
+{
+	return PCGExClusters::Labels::SourcePlotsLabel;
+}
 
 PCGEX_INITIALIZE_ELEMENT(PathfindingPlotNavmesh)
 
 
 bool FPCGExPathfindingPlotNavmeshElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathfindingPlotNavmesh)
 
@@ -84,7 +96,10 @@ bool FPCGExPathfindingPlotNavmeshElement::AdvanceWork(FPCGExContext* InContext, 
 		const TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
 		while (Context->AdvancePointsIO(false))
 		{
-			if (Context->CurrentIO->GetNum() < 2) { continue; }
+			if (Context->CurrentIO->GetNum() < 2)
+			{
+				continue;
+			}
 			PCGEX_LAUNCH(FPCGExPlotNavmeshTask, Context->CurrentIO)
 		}
 		Context->SetState(PCGExCommon::States::State_ProcessingPoints);
@@ -123,7 +138,10 @@ void FPCGExPlotNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>&
 	}
 
 	const int32 NumQueries = PlotQueries.Num();
-	if (NumQueries == 0) { return; }
+	if (NumQueries == 0)
+	{
+		return;
+	}
 
 	// Trim boundary duplicates from positions.
 	// Navmesh paths include start/end points that overlap with explicit seed/goal/plot points
@@ -131,7 +149,10 @@ void FPCGExPlotNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>&
 	for (int32 qi = 0; qi < NumQueries; qi++)
 	{
 		TArray<FVector>& Positions = PlotQueries[qi].Positions;
-		if (Positions.IsEmpty()) { continue; }
+		if (Positions.IsEmpty())
+		{
+			continue;
+		}
 
 		const bool bIsLast = (qi == NumQueries - 1);
 		const bool bIsClosingQuery = Settings->bClosedLoop && bIsLast;
@@ -141,12 +162,27 @@ void FPCGExPlotNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>&
 
 		// Skip last position: it duplicates the explicit point that follows
 		bool bSkipLast = false;
-		if (bIsClosingQuery) { bSkipLast = true; }
-		else if (bIsLast && !Settings->bClosedLoop && Settings->bAddGoalToPath) { bSkipLast = true; }
-		else if (!bIsLast && Settings->bAddPlotPointsToPath) { bSkipLast = true; }
+		if (bIsClosingQuery)
+		{
+			bSkipLast = true;
+		}
+		else if (bIsLast && !Settings->bClosedLoop && Settings->bAddGoalToPath)
+		{
+			bSkipLast = true;
+		}
+		else if (!bIsLast && Settings->bAddPlotPointsToPath)
+		{
+			bSkipLast = true;
+		}
 
-		if (bSkipFirst && !Positions.IsEmpty()) { Positions.RemoveAt(0); }
-		if (bSkipLast && !Positions.IsEmpty()) { Positions.Pop(); }
+		if (bSkipFirst && !Positions.IsEmpty())
+		{
+			Positions.RemoveAt(0);
+		}
+		if (bSkipLast && !Positions.IsEmpty())
+		{
+			Positions.Pop();
+		}
 	}
 
 	// Count total points
@@ -174,7 +210,10 @@ void FPCGExPlotNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>&
 		}
 	}
 
-	if (NumPoints <= 2) { return; }
+	if (NumPoints <= 2)
+	{
+		return;
+	}
 
 	// Initialize data
 	TSharedPtr<PCGExData::FPointIO> PathIO = Context->OutputPaths->Emplace_GetRef(PointIO, PCGExData::EIOInit::New);
@@ -187,7 +226,10 @@ void FPCGExPlotNavmeshTask::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>&
 	PlotScope.CopyPoints(PointIO->GetIn(), PathIO->GetOut());
 
 	TSharedPtr<FPCGExSubPointsBlendOperation> SubBlending = Context->Blending->CreateOperation();
-	if (!SubBlending->PrepareForData(Context, PathDataFacade)) { return; }
+	if (!SubBlending->PrepareForData(Context, PathDataFacade))
+	{
+		return;
+	}
 
 	TPCGValueRange<FTransform> OutTransforms = OutPathData->GetTransformValueRange(false);
 

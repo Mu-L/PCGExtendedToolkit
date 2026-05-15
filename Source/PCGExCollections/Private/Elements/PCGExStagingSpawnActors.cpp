@@ -7,18 +7,18 @@
 #include "PCGElement.h"
 #include "PCGManagedResource.h"
 #include "PCGParamData.h"
-#include "Helpers/PCGExManagedResourceHelpers.h"
-#include "Helpers/PCGHelpers.h"
-#include "Helpers/PCGActorHelpers.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataForward.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
-#include "Data/PCGExDataMacros.h"
-#include "Details/PCGExSettingsDetails.h"
-#include "Helpers/PCGExStreamingHelpers.h"
+#include "Helpers/PCGActorHelpers.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
+#include "Helpers/PCGExManagedResourceHelpers.h"
+#include "Helpers/PCGExStreamingHelpers.h"
+#include "Helpers/PCGHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagingSpawnActorsElement"
 #define PCGEX_NAMESPACE StagingSpawnActors
@@ -47,12 +47,18 @@ TArray<FPCGPinProperties> UPCGExStagingSpawnActorsSettings::OutputPinProperties(
 
 bool FPCGExStagingSpawnActorsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagingSpawnActors)
 
 	PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReferenceAttribute)
-	if (Settings->bApplyInstanceTags) { PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->InstanceTagsAttributeName) }
+	if (Settings->bApplyInstanceTags)
+	{
+		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->InstanceTagsAttributeName)
+	}
 
 	Context->CollectionUnpacker = MakeShared<PCGExCollections::FPickUnpacker>();
 	Context->CollectionUnpacker->UnpackPin(InContext, PCGExCollections::Labels::SourceCollectionMapLabel);
@@ -84,7 +90,10 @@ bool FPCGExStagingSpawnActorsElement::AdvanceWork(FPCGExContext* InContext, cons
 		}
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -111,12 +120,18 @@ namespace PCGExStagingSpawnActors
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
-		if (!EntryHashGetter) { return false; }
+		if (!EntryHashGetter)
+		{
+			return false;
+		}
 
 		if (Settings->bApplyInstanceTags)
 		{
@@ -131,7 +146,10 @@ namespace PCGExStagingSpawnActors
 
 		// Init root-actor source. Constant-mode short-circuits per-point materialization.
 		RootActorSV = Settings->RootActor.GetValueSetting();
-		if (!RootActorSV->Init(PointDataFacade)) { return false; }
+		if (!RootActorSV->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		// Init PCG generation watcher if requested
 		if (Settings->bTriggerPCGGeneration)
@@ -149,11 +167,24 @@ namespace PCGExStagingSpawnActors
 		NumPoints = PointDataFacade->Source->GetNum(PCGExData::EIOSide::In);
 		ResolvedEntries.SetNumZeroed(NumPoints);
 
-		if (!RootActorSV->IsConstant()) { RootActorPaths.SetNum(NumPoints); }
+		if (!RootActorSV->IsConstant())
+		{
+			RootActorPaths.SetNum(NumPoints);
+		}
+
+		// Hoist out of the parallel hot path; checked per-point inside ProcessPoints.
+		bApplyDeltas = Settings->bApplyPropertyDeltas;
 
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 
 		return true;
+	}
+
+	void FProcessor::PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops)
+	{
+		// Reserve hint of 8 paths per scope: actor class + a handful of delta-collateral assets
+		// (typical: 1 static mesh + a couple of materials). Sets grow if needed.
+		ScopedUniquePaths = MakeShared<PCGExMT::TScopedSet<FSoftObjectPath>>(Loops, 8);
 	}
 
 	void FProcessor::ProcessPoints(const PCGExMT::FScope& Scope)
@@ -168,17 +199,30 @@ namespace PCGExStagingSpawnActors
 		const bool bRootIsConstant = RootActorSV->IsConstant();
 		PCGEX_SV_VIEW_COND(RootActorSV, !bRootIsConstant)
 
+		// Per-scope local set. Writes during the loop don't touch other scopes; collapse on
+		// OnPointsProcessingComplete merges everything in a single pass.
+		TSet<FSoftObjectPath>& LocalPaths = ScopedUniquePaths->Get_Ref(Scope);
+
 		int16 MaterialPick = 0;
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const uint64 Hash = EntryHashGetter->Read(Index);
-			if (Hash == 0 || Hash == static_cast<uint64>(-1)) { continue; }
+			if (Hash == 0 || Hash == static_cast<uint64>(-1))
+			{
+				continue;
+			}
 
 			FPCGExEntryAccessResult Result = Context->CollectionUnpacker->ResolveEntry(Hash, MaterialPick);
-			if (!Result.IsValid()) { continue; }
+			if (!Result.IsValid())
+			{
+				continue;
+			}
 
 			if (Result.Host->GetTypeId() != PCGExAssetCollection::TypeIds::Actor)
 			{
@@ -190,12 +234,27 @@ namespace PCGExStagingSpawnActors
 			}
 
 			const FPCGExActorCollectionEntry* ActorEntry = static_cast<const FPCGExActorCollectionEntry*>(Result.Entry);
-			if (!ActorEntry->Actor.ToSoftObjectPath().IsValid()) { continue; }
+			const FSoftObjectPath ActorClassPath = ActorEntry->Actor.ToSoftObjectPath();
+			if (!ActorClassPath.IsValid())
+			{
+				continue;
+			}
 
 			// Write directly to our index -- no lock, each thread writes unique indices
 			ResolvedEntries[Index].Entry = ActorEntry;
 
-			if (!bRootIsConstant) { RootActorPaths[Index] = PCGEX_SV_READ(RootActorSV, Index - Scope.Start); }
+			// Delta collateral paths are skipped when deltas are disabled -- prefetching
+			// them would be wasted IO since the apply path won't run.
+			LocalPaths.Add(ActorClassPath);
+			if (bApplyDeltas)
+			{
+				LocalPaths.Append(ActorEntry->DeltaCollateralPaths);
+			}
+
+			if (!bRootIsConstant)
+			{
+				RootActorPaths[Index] = PCGEX_SV_READ(RootActorSV, Index - Scope.Start);
+			}
 		}
 	}
 
@@ -203,20 +262,11 @@ namespace PCGExStagingSpawnActors
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::OnPointsProcessingComplete);
 
-		// Collect unique actor class paths from resolved entries
-		TSet<FSoftObjectPath> UniqueClasses;
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::StagingSpawnActors::CollectUniqueClasses);
-			for (const FResolvedEntry& Resolved : ResolvedEntries)
-			{
-				if (Resolved.Entry)
-				{
-					UniqueClasses.Add(Resolved.Entry->Actor.ToSoftObjectPath());
-				}
-			}
-		}
+		TSet<FSoftObjectPath> UniquePaths;
+		ScopedUniquePaths->Collapse(UniquePaths);
+		ScopedUniquePaths.Reset();
 
-		if (UniqueClasses.IsEmpty())
+		if (UniquePaths.IsEmpty())
 		{
 			bIsProcessorValid = false;
 			return;
@@ -241,8 +291,7 @@ namespace PCGExStagingSpawnActors
 		// Cache transforms for the spawn loop
 		Transforms = PointDataFacade->Source->GetIn()->GetConstTransformValueRange();
 
-		// Batch-load all unique actor classes asynchronously, then start spawning
-		TArray<FSoftObjectPath> PathsToLoad = UniqueClasses.Array();
+		TArray<FSoftObjectPath> PathsToLoad = UniquePaths.Array();
 
 		PCGExHelpers::Load(
 			TaskManager,
@@ -260,7 +309,10 @@ namespace PCGExStagingSpawnActors
 				This->LoadHandle = StreamableHandle;
 
 				This->MainThreadLoop = MakeShared<PCGExMT::FTimeSlicedMainThreadLoop>(This->NumPoints);
-				This->MainThreadLoop->OnIterationCallback = [This](const int32 Index, const PCGExMT::FScope& Scope) { This->SpawnAtPoint(Index); };
+				This->MainThreadLoop->OnIterationCallback = [This](const int32 Index, const PCGExMT::FScope& Scope)
+				{
+					This->SpawnAtPoint(Index);
+				};
 
 				PCGEX_ASYNC_HANDLE_CHKD_VOID(This->TaskManager, This->MainThreadLoop)
 			});
@@ -275,7 +327,10 @@ namespace PCGExStagingSpawnActors
 	void FProcessor::SpawnAtPoint(const int32 PointIndex)
 	{
 		const FPCGExActorCollectionEntry* ActorEntry = ResolvedEntries[PointIndex].Entry;
-		if (!ActorEntry) { return; }
+		if (!ActorEntry)
+		{
+			return;
+		}
 
 		// Class is already pre-loaded in OnPointsProcessingComplete
 		UClass* ActorClass = ActorEntry->Actor.Get();
@@ -292,7 +347,10 @@ namespace PCGExStagingSpawnActors
 		}
 
 		UWorld* World = ExecutionContext->GetWorld();
-		if (!World) { return; }
+		if (!World)
+		{
+			return;
+		}
 
 		AActor* TargetActor = ResolveTargetActor(PointIndex);
 		if (!TargetActor)
@@ -360,11 +418,10 @@ namespace PCGExStagingSpawnActors
 		{
 			PCGExActorDelta::ApplyPropertyDelta(SpawnedActor, ActorEntry->SerializedPropertyDelta);
 
-			// Delta application writes the source actor's root component transform
-			// (RelativeLocation/Rotation/Scale3D are user-editable UPROPERTYs so they're
-			// captured in the delta). That overwrites the location we spawned at, so the
-			// actor ends up at the source actor's original position instead of the PCG
-			// point's position. Re-apply the spawn transform so the PCG point wins.
+			// Defensive re-apply of the spawn transform. The writer filters the root
+			// component's relative-transform fields, so the delta itself shouldn't move the
+			// actor -- but BP construction scripts or post-apply fixups occasionally touch
+			// the root, and we want the PCG point to be the source of truth either way.
 			SpawnedActor->SetActorTransform(SpawnTransform);
 		}
 

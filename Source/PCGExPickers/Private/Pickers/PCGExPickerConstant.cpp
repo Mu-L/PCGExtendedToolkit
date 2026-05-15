@@ -34,13 +34,25 @@ void UPCGExPickerConstantFactory::AddPicks(const int32 InNum, TSet<int32>& OutPi
 	int32 TargetIndex = 0;
 	const int32 MaxIndex = InNum - 1;
 
-	if (!Config.bTreatAsNormalized) { TargetIndex = Config.DiscreteIndex; }
-	else { TargetIndex = PCGExMath::TruncateDbl(static_cast<double>(MaxIndex) * Config.RelativeIndex, Config.TruncateMode); }
+	if (!Config.bTreatAsNormalized)
+	{
+		TargetIndex = Config.DiscreteIndex;
+	}
+	else
+	{
+		TargetIndex = PCGExMath::TruncateDbl(static_cast<double>(MaxIndex) * Config.RelativeIndex, Config.TruncateMode);
+	}
 
-	if (TargetIndex < 0) { TargetIndex = InNum + TargetIndex; }
+	if (TargetIndex < 0)
+	{
+		TargetIndex = InNum + TargetIndex;
+	}
 	TargetIndex = PCGExMath::SanitizeIndex(TargetIndex, MaxIndex, Config.Safety);
 
-	if (!FMath::IsWithin(TargetIndex, 0, InNum)) { return; }
+	if (!FMath::IsWithin(TargetIndex, 0, InNum))
+	{
+		return;
+	}
 
 	OutPicks.Add(TargetIndex);
 }

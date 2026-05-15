@@ -5,16 +5,16 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Utils/PCGExCompare.h"
 #include "Factories/PCGExFactories.h"
+#include "Utils/PCGExCompare.h"
 
 
-#include "Core/PCGExPointsProcessor.h"
 #include "PCGParamData.h"
+#include "Core/PCGExPointsProcessor.h"
 #include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Types/PCGExAttributeIdentity.h"
 #include "Types/PCGExTypeOps.h"
 #include "Types/PCGExTypeTraits.h"
@@ -44,7 +44,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(AttributeStats, "Attribute Stats", "Output attribute statistics.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Misc); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Misc);
+	}
 #endif
 
 protected:
@@ -268,7 +272,8 @@ namespace PCGExAttributeStats
 		const int64 Key;
 
 		explicit IAttributeStats(const PCGExData::FAttributeIdentity& InIdentity, const int64 InKey)
-			: Identity(InIdentity), Key(InKey)
+			: Identity(InIdentity)
+			  , Key(InKey)
 		{
 		}
 
@@ -314,7 +319,10 @@ namespace PCGExAttributeStats
 
 			const PCGExTypeOps::ITypeOpsBase* TypeOps = PCGExTypeOps::FTypeOpsRegistry::Get<T>();
 
-			if (Settings->OutputToPoints != EPCGExStatsOutputToPoints::None) { PointsMetadata = InDataFacade->GetOut()->Metadata; }
+			if (Settings->OutputToPoints != EPCGExStatsOutputToPoints::None)
+			{
+				PointsMetadata = InDataFacade->GetOut()->Metadata;
+			}
 
 #define PCGEX_OUTPUT_STAT(_NAME, _TYPE, _VALUE) \
 	if(Settings->bOutput##_NAME){ ParamData->Metadata->GetMutableTypedAttribute<_TYPE>(Settings->_NAME##AttributeName)->SetValue(Key, _VALUE); \
@@ -326,7 +334,7 @@ namespace PCGExAttributeStats
 
 			TSharedPtr<PCGExData::TBuffer<T>> Buffer = InDataFacade->GetReadable<T>(Identity.Identifier);
 			SetMinValue = MinValue = Traits::Max();
-			SetMinValue = MinValue = Traits::Min();
+			SetMaxValue = MaxValue = Traits::Min();
 
 #define PCGEX_NO_AVERAGE if constexpr (std::is_same_v<T, FString> || std::is_same_v<T, FName> || std::is_same_v<T, FSoftObjectPath> || std::is_same_v<T, FSoftClassPath>)
 
@@ -370,7 +378,10 @@ namespace PCGExAttributeStats
 
 				for (int i = 0; i < NumPoints; i++)
 				{
-					if (!Filter[i]) { continue; }
+					if (!Filter[i])
+					{
+						continue;
+					}
 					NumValues++;
 
 					const T& Value = Buffer->Read(i);
@@ -446,13 +457,25 @@ namespace PCGExAttributeStats
 				if (Settings->bOutputUniqueValuesNum)
 				{
 					UniqueValuesNum = 0;
-					for (const TPair<T, int32>& Pair : ValuesCount) { if (Pair.Value == 1) { UniqueValuesNum++; } }
+					for (const TPair<T, int32>& Pair : ValuesCount)
+					{
+						if (Pair.Value == 1)
+						{
+							UniqueValuesNum++;
+						}
+					}
 				}
 
 				if (Settings->bOutputUniqueSetValuesNum)
 				{
 					UniqueSetValuesNum = 0;
-					for (const TPair<T, int32>& Pair : SetValuesCount) { if (Pair.Value == 1) { UniqueSetValuesNum++; } }
+					for (const TPair<T, int32>& Pair : SetValuesCount)
+					{
+						if (Pair.Value == 1)
+						{
+							UniqueSetValuesNum++;
+						}
+					}
 				}
 
 				DifferentValuesNum = ValuesCount.Num();

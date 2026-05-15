@@ -54,10 +54,14 @@ FString SPCGExEdgeNeighborsCountPreview::GetModeName(const EPCGExRefineEdgeThres
 {
 	switch (InMode)
 	{
-	case EPCGExRefineEdgeThresholdMode::Sum: return TEXT("Sum");
-	case EPCGExRefineEdgeThresholdMode::Any: return TEXT("Any");
-	case EPCGExRefineEdgeThresholdMode::Both: return TEXT("Both");
-	default: return TEXT("?");
+	case EPCGExRefineEdgeThresholdMode::Sum:
+		return TEXT("Sum");
+	case EPCGExRefineEdgeThresholdMode::Any:
+		return TEXT("Any");
+	case EPCGExRefineEdgeThresholdMode::Both:
+		return TEXT("Both");
+	default:
+		return TEXT("?");
 	}
 }
 
@@ -72,7 +76,10 @@ void SPCGExEdgeNeighborsCountPreview::DrawNeighborStubs(
 	using namespace PCGExEdgeFilterPreview;
 
 	const int32 VisualCount = FMath::Min(Count, 6);
-	if (VisualCount <= 0) { return; }
+	if (VisualCount <= 0)
+	{
+		return;
+	}
 
 	// Fan angles in upper semicircle
 	// Left endpoint: stubs fan in upper-left semicircle (-170° to -60°)
@@ -274,7 +281,10 @@ int32 SPCGExEdgeNeighborsCountPreview::OnPaint(
 	// Top label: Mode name + "T: N"
 	{
 		FString TopLabel = FString::Printf(TEXT("%s | T: %d"), *GetModeName(CurrentMode), T);
-		if (bCurrentInvert) { TopLabel += TEXT(" (inv)"); }
+		if (bCurrentInvert)
+		{
+			TopLabel += TEXT(" (inv)");
+		}
 		const FVector2D LabelPos(LocalSize.X * 0.5 - 36.0, 2.0);
 		FSlateDrawElement::MakeText(
 			OutDrawElements, LayerId + 6,

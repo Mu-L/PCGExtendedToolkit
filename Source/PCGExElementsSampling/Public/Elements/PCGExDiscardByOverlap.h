@@ -5,11 +5,11 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Factories/PCGExFactories.h"
-#include "Math/PCGExMathMean.h"
 #include "PCGExOctree.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/PCGExPointElements.h"
+#include "Factories/PCGExFactories.h"
+#include "Math/PCGExMathMean.h"
 
 #include "PCGExDiscardByOverlap.generated.h"
 
@@ -116,8 +116,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(DiscardByOverlap, "Discard By Overlap", "Discard entire datasets based on how they overlap with each other.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
 #endif
 
 protected:
@@ -249,13 +257,19 @@ namespace PCGExDiscardByOverlap
 		FOverlapStats Stats;
 
 		FOverlap(FProcessor* InManager, FProcessor* InManaged, const FBox& InIntersection);
-		FORCEINLINE FProcessor* GetOther(const FProcessor* InCandidate) const { return Manager == InCandidate ? Managed : Manager; }
+		FORCEINLINE FProcessor* GetOther(const FProcessor* InCandidate) const
+		{
+			return Manager == InCandidate ? Managed : Manager;
+		}
 	};
 
 	struct PCGEXELEMENTSSAMPLING_API FPointBounds
 	{
 		FPointBounds(const int32 InIndex, const PCGExData::FConstPoint& InPoint, const FBox& InBounds)
-			: Index(InIndex), Point(InPoint), LocalBounds(InBounds), Bounds(InBounds.TransformBy(InPoint.GetTransform().ToMatrixNoScale()))
+			: Index(InIndex)
+			  , Point(InPoint)
+			  , LocalBounds(InBounds)
+			  , Bounds(InBounds.TransformBy(InPoint.GetTransform().ToMatrixNoScale()))
 		{
 		}
 
@@ -306,11 +320,25 @@ namespace PCGExDiscardByOverlap
 		{
 		}
 
-		FORCEINLINE const FBox& GetBounds() const { return Bounds; }
-		FORCEINLINE const TArray<TSharedPtr<FPointBounds>>& GetPointBounds() const { return LocalPointBounds; }
-		FORCEINLINE const FPointBoundsOctree* GetOctree() const { return Octree.Get(); }
+		FORCEINLINE const FBox& GetBounds() const
+		{
+			return Bounds;
+		}
 
-		FORCEINLINE bool HasOverlaps() const { return !Overlaps.IsEmpty(); }
+		FORCEINLINE const TArray<TSharedPtr<FPointBounds>>& GetPointBounds() const
+		{
+			return LocalPointBounds;
+		}
+
+		FORCEINLINE const FPointBoundsOctree* GetOctree() const
+		{
+			return Octree.Get();
+		}
+
+		FORCEINLINE bool HasOverlaps() const
+		{
+			return !Overlaps.IsEmpty();
+		}
 
 		void RegisterOverlap(FProcessor* InOtherProcessor, const FBox& Intersection);
 		void RemoveOverlap(const TSharedPtr<FOverlap>& InOverlap, TArray<FProcessor*>& RemaininStack);

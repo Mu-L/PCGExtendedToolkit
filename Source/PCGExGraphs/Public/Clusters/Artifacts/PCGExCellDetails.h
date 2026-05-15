@@ -4,13 +4,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Clusters/PCGExEdge.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Math/PCGExWinding.h"
 #include "Math/PCGExMathAxis.h"
+#include "Math/PCGExWinding.h"
 #include "Types/PCGExAttributeIdentity.h"
 #include "PCGExCellDetails.generated.h"
 
@@ -92,9 +92,12 @@ namespace PCGExCellTriage
 	{
 		switch (InResult)
 		{
-		case EPCGExCellTriageResult::Inside: return TagInside;
-		case EPCGExCellTriageResult::Touching: return TagTouching;
-		default: return TagOutside;
+		case EPCGExCellTriageResult::Inside:
+			return TagInside;
+		case EPCGExCellTriageResult::Touching:
+			return TagTouching;
+		default:
+			return TagOutside;
 		}
 	}
 
@@ -103,10 +106,14 @@ namespace PCGExCellTriage
 	{
 		switch (InResult)
 		{
-		case EPCGExCellTriageResult::Inside: return !!(InFlags & static_cast<uint8>(EPCGExCellTriageFlags::Inside));
-		case EPCGExCellTriageResult::Touching: return !!(InFlags & static_cast<uint8>(EPCGExCellTriageFlags::Touching));
-		case EPCGExCellTriageResult::Outside: return !!(InFlags & static_cast<uint8>(EPCGExCellTriageFlags::Outside));
-		default: return false;
+		case EPCGExCellTriageResult::Inside:
+			return !!(InFlags & static_cast<uint8>(EPCGExCellTriageFlags::Inside));
+		case EPCGExCellTriageResult::Touching:
+			return !!(InFlags & static_cast<uint8>(EPCGExCellTriageFlags::Touching));
+		case EPCGExCellTriageResult::Outside:
+			return !!(InFlags & static_cast<uint8>(EPCGExCellTriageFlags::Outside));
+		default:
+			return false;
 		}
 	}
 }

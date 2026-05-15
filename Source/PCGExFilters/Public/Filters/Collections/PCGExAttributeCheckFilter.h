@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
-#include "Core/PCGExPointFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Core/PCGExPointFilter.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExAttributeCheckFilter.generated.h"
 
@@ -73,7 +73,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FAttributeCheckFilter(const TObjectPtr<const UPCGExAttributeCheckFilterFactory>& InDefinition)
-			: ICollectionFilter(InDefinition), TypedFilterFactory(InDefinition)
+			: ICollectionFilter(InDefinition)
+			  , TypedFilterFactory(InDefinition)
 		{
 		}
 

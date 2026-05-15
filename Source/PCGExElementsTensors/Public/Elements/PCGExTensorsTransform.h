@@ -10,9 +10,9 @@
 #include "Core/PCGExPointsProcessor.h"
 #include "Core/PCGExTensor.h"
 #include "Core/PCGExTensorHandler.h"
-#include "Paths/PCGExPath.h"
 #include "Factories/PCGExFactories.h"
 #include "Math/PCGExMathAxis.h"
+#include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
@@ -43,7 +43,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(TensorsTransform, "Tensors Transform", "Transform input points using tensors.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Transform); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Transform);
+	}
 #endif
 
 protected:
@@ -175,7 +179,10 @@ namespace PCGExTensorsTransform
 
 		virtual ~FProcessor() override;
 
-		virtual bool IsTrivial() const override { return false; }
+		virtual bool IsTrivial() const override
+		{
+			return false;
+		}
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;

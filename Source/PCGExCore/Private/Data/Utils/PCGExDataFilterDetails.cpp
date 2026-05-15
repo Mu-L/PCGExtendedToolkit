@@ -11,28 +11,39 @@
 
 void FPCGExNameFiltersDetails::Init()
 {
-	for (const TArray<FString> Names = PCGExArrayHelpers::GetStringArrayFromCommaSeparatedList(CommaSeparatedNames); const FString& Name : Names) { Matches.Add(Name, CommaSeparatedNameFilter); }
+	for (const TArray<FString> Names = PCGExArrayHelpers::GetStringArrayFromCommaSeparatedList(CommaSeparatedNames);
+	     const FString& Name : Names)
+	{
+		Matches.Add(Name, CommaSeparatedNameFilter);
+	}
 }
 
 bool FPCGExNameFiltersDetails::Test(const FString& Name) const
 
 {
-	if (bPreservePCGExData && Name.StartsWith(PCGExCommon::PCGExPrefix)) { return !bFilterToRemove; }
+	if (bPreservePCGExData && Name.StartsWith(PCGExCommon::PCGExPrefix))
+	{
+		return !bFilterToRemove;
+	}
 
 	switch (FilterMode)
 	{
 	default: ;
-	case EPCGExAttributeFilter::All: return true;
+	case EPCGExAttributeFilter::All:
+		return true;
 	case EPCGExAttributeFilter::Include:
 	case EPCGExAttributeFilter::Exclude:
+	{
+		const bool bResult = FilterMode == EPCGExAttributeFilter::Include;
+		for (const TPair<FString, EPCGExStringMatchMode>& Filter : Matches)
 		{
-			const bool bResult = FilterMode == EPCGExAttributeFilter::Include;
-			for (const TPair<FString, EPCGExStringMatchMode>& Filter : Matches)
+			if (PCGExCompare::Compare(Filter.Value, Name, Filter.Key))
 			{
-				if (PCGExCompare::Compare(Filter.Value, Name, Filter.Key)) { return bResult; }
+				return bResult;
 			}
-			return !bResult;
 		}
+		return !bResult;
+	}
 	}
 }
 
@@ -72,8 +83,26 @@ void FPCGExNameFiltersDetails::Prune(TSet<FName>& Names, bool bInvert) const
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExNameFiltersDetails::Prune);
 	TArray<FName> ValidNames;
 	ValidNames.Reserve(Names.Num());
-	if (bInvert) { for (FName Name : Names) { if (!Test(Name.ToString())) { ValidNames.Add(Name); } } }
-	else { for (FName Name : Names) { if (Test(Name.ToString())) { ValidNames.Add(Name); } } }
+	if (bInvert)
+	{
+		for (FName Name : Names)
+		{
+			if (!Test(Name.ToString()))
+			{
+				ValidNames.Add(Name);
+			}
+		}
+	}
+	else
+	{
+		for (FName Name : Names)
+		{
+			if (Test(Name.ToString()))
+			{
+				ValidNames.Add(Name);
+			}
+		}
+	}
 	Names.Empty();
 	Names.Append(ValidNames);
 }
@@ -81,8 +110,20 @@ void FPCGExNameFiltersDetails::Prune(TSet<FName>& Names, bool bInvert) const
 void FPCGExNameFiltersDetails::Prune(PCGExData::FAttributesInfos& InAttributeInfos, const bool bInvert) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExNameFiltersDetails::Prune);
-	if (bInvert) { InAttributeInfos.Filter([&](const FName& InName) { return Test(InName.ToString()); }); }
-	else { InAttributeInfos.Filter([&](const FName& InName) { return !Test(InName.ToString()); }); }
+	if (bInvert)
+	{
+		InAttributeInfos.Filter([&](const FName& InName)
+		{
+			return Test(InName.ToString());
+		});
+	}
+	else
+	{
+		InAttributeInfos.Filter([&](const FName& InName)
+		{
+			return !Test(InName.ToString());
+		});
+	}
 }
 
 FPCGExAttributeGatherDetails::FPCGExAttributeGatherDetails()
@@ -98,13 +139,26 @@ void FPCGExCarryOverDetails::Init()
 
 void FPCGExCarryOverDetails::Prune(TSet<FString>& InValues) const
 {
-	if (Tags.FilterMode == EPCGExAttributeFilter::All) { return; }
-	for (TArray<FString> TagList = InValues.Array(); const FString& Tag : TagList) { if (!Tags.Test(Tag)) { InValues.Remove(Tag); } }
+	if (Tags.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return;
+	}
+	for (TArray<FString> TagList = InValues.Array();
+	     const FString& Tag : TagList)
+	{
+		if (!Tags.Test(Tag))
+		{
+			InValues.Remove(Tag);
+		}
+	}
 }
 
 void FPCGExCarryOverDetails::Prune(TArray<FString>& InValues) const
 {
-	if (Tags.FilterMode == EPCGExAttributeFilter::All) { return; }
+	if (Tags.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return;
+	}
 	InValues.SetNum(Algo::StableRemoveIf(
 		InValues,
 		[&](const FString& Value)
@@ -121,7 +175,10 @@ void FPCGExCarryOverDetails::Prune(const PCGExData::FPointIO* PointIO) const
 
 void FPCGExCarryOverDetails::Prune(TArray<PCGExData::FAttributeIdentity>& Identities) const
 {
-	if (Attributes.FilterMode == EPCGExAttributeFilter::All) { return; }
+	if (Attributes.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return;
+	}
 	Identities.SetNum(Algo::StableRemoveIf(
 		Identities,
 		[&](const PCGExData::FAttributeIdentity& Identity)
@@ -132,7 +189,10 @@ void FPCGExCarryOverDetails::Prune(TArray<PCGExData::FAttributeIdentity>& Identi
 
 void FPCGExCarryOverDetails::Prune(PCGExData::FTags* InTags) const
 {
-	if (Tags.FilterMode == EPCGExAttributeFilter::All) { return; }
+	if (Tags.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return;
+	}
 
 	TSet<FString> ToBeRemoved;
 	ToBeRemoved.Reserve(InTags->Num());
@@ -140,12 +200,31 @@ void FPCGExCarryOverDetails::Prune(PCGExData::FTags* InTags) const
 	if (bTestTagsWithValues)
 	{
 		// Test flattened tags; this is rather expensive.
-		for (TSet<FString> Flattened = InTags->Flatten(); const FString& Tag : Flattened) { if (!Tags.Test(Tag)) { ToBeRemoved.Add(Tag); } }
+		for (TSet<FString> Flattened = InTags->Flatten();
+		     const FString& Tag : Flattened)
+		{
+			if (!Tags.Test(Tag))
+			{
+				ToBeRemoved.Add(Tag);
+			}
+		}
 	}
 	else
 	{
-		for (const FString& Tag : InTags->RawTags) { if (!Tags.Test(Tag)) { ToBeRemoved.Add(Tag); } }
-		for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : InTags->ValueTags) { if (!Tags.Test(Pair.Key)) { ToBeRemoved.Add(Pair.Key); } }
+		for (const FString& Tag : InTags->RawTags)
+		{
+			if (!Tags.Test(Tag))
+			{
+				ToBeRemoved.Add(Tag);
+			}
+		}
+		for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : InTags->ValueTags)
+		{
+			if (!Tags.Test(Pair.Key))
+			{
+				ToBeRemoved.Add(Pair.Key);
+			}
+		}
 	}
 
 	InTags->Remove(ToBeRemoved);
@@ -153,24 +232,52 @@ void FPCGExCarryOverDetails::Prune(PCGExData::FTags* InTags) const
 
 bool FPCGExCarryOverDetails::Test(const PCGExData::FPointIO* PointIO) const
 {
-	if (!Test(PointIO->GetOutIn()->Metadata)) { return false; }
-	if (!Test(PointIO->Tags.Get())) { return false; }
+	if (!Test(PointIO->GetOutIn()->Metadata))
+	{
+		return false;
+	}
+	if (!Test(PointIO->Tags.Get()))
+	{
+		return false;
+	}
 	return true;
 }
 
 bool FPCGExCarryOverDetails::Test(PCGExData::FTags* InTags) const
 {
-	if (Tags.FilterMode == EPCGExAttributeFilter::All) { return true; }
+	if (Tags.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return true;
+	}
 
 	if (bTestTagsWithValues)
 	{
 		// Test flattened tags; this is rather expensive.
-		for (TSet<FString> Flattened = InTags->Flatten(); const FString& Tag : Flattened) { if (!Tags.Test(Tag)) { return false; } }
+		for (TSet<FString> Flattened = InTags->Flatten();
+		     const FString& Tag : Flattened)
+		{
+			if (!Tags.Test(Tag))
+			{
+				return false;
+			}
+		}
 	}
 	else
 	{
-		for (const FString& Tag : InTags->RawTags) { if (!Tags.Test(Tag)) { return false; } }
-		for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : InTags->ValueTags) { if (!Tags.Test(Pair.Key)) { return false; } }
+		for (const FString& Tag : InTags->RawTags)
+		{
+			if (!Tags.Test(Tag))
+			{
+				return false;
+			}
+		}
+		for (const TPair<FString, TSharedPtr<PCGExData::IDataValue>>& Pair : InTags->ValueTags)
+		{
+			if (!Tags.Test(Pair.Key))
+			{
+				return false;
+			}
+		}
 	}
 
 	return true;
@@ -178,26 +285,50 @@ bool FPCGExCarryOverDetails::Test(PCGExData::FTags* InTags) const
 
 void FPCGExCarryOverDetails::Prune(UPCGMetadata* Metadata) const
 {
-	if (Attributes.FilterMode == EPCGExAttributeFilter::All) { return; }
+	if (Attributes.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return;
+	}
 
 	TArray<FPCGAttributeIdentifier> Identifiers;
 	TArray<EPCGMetadataTypes> Types;
 	Metadata->GetAllAttributes(Identifiers, Types);
-	for (const FPCGAttributeIdentifier& Identifier : Identifiers) { if (!Attributes.Test(Identifier.Name.ToString())) { Metadata->DeleteAttribute(Identifier); } }
+	for (const FPCGAttributeIdentifier& Identifier : Identifiers)
+	{
+		if (!Attributes.Test(Identifier.Name.ToString()))
+		{
+			Metadata->DeleteAttribute(Identifier);
+		}
+	}
 }
 
 bool FPCGExCarryOverDetails::Test(const UPCGMetadata* Metadata) const
 {
-	if (Attributes.FilterMode == EPCGExAttributeFilter::All) { return true; }
+	if (Attributes.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return true;
+	}
 
 	TArray<FPCGAttributeIdentifier> Identifiers;
 	TArray<EPCGMetadataTypes> Types;
 	Metadata->GetAllAttributes(Identifiers, Types);
 	if (Attributes.FilterMode == EPCGExAttributeFilter::Exclude)
 	{
-		for (const FPCGAttributeIdentifier& Identifier : Identifiers) { if (!Attributes.Test(Identifier.Name.ToString())) { return false; } }
+		for (const FPCGAttributeIdentifier& Identifier : Identifiers)
+		{
+			if (!Attributes.Test(Identifier.Name.ToString()))
+			{
+				return false;
+			}
+		}
 		return true;
 	}
-	for (const FPCGAttributeIdentifier& Identifier : Identifiers) { if (Attributes.Test(Identifier.Name.ToString())) { return true; } }
+	for (const FPCGAttributeIdentifier& Identifier : Identifiers)
+	{
+		if (Attributes.Test(Identifier.Name.ToString()))
+		{
+			return true;
+		}
+	}
 	return false;
 }

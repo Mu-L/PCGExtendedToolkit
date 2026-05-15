@@ -44,8 +44,14 @@ namespace PCGExPolyPath
 UPCGExSampleNearestSplineSettings::UPCGExSampleNearestSplineSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	if (LookAtUpSource.GetName() == FName("@Last")) { LookAtUpSource.Update(TEXT("$Transform.Up")); }
-	if (!WeightOverDistance) { WeightOverDistance = PCGExCurves::WeightDistributionLinearInv; }
+	if (LookAtUpSource.GetName() == FName("@Last"))
+	{
+		LookAtUpSource.Update(TEXT("$Transform.Up"));
+	}
+	if (!WeightOverDistance)
+	{
+		WeightOverDistance = PCGExCurves::WeightDistributionLinearInv;
+	}
 }
 
 #if WITH_EDITOR
@@ -74,7 +80,7 @@ void UPCGExSampleNearestSplineSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		MinRange.Update(RangeMinInput_DEPRECATED, RangeMinAttribute_DEPRECATED, RangeMin_DEPRECATED);
 		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
 	}
-	
+
 	Super::ApplyDeprecation(InOutNode);
 }
 #endif
@@ -88,13 +94,19 @@ TArray<FPCGPinProperties> UPCGExSampleNearestSplineSettings::InputPinProperties(
 
 PCGEX_INITIALIZE_ELEMENT(SampleNearestSpline)
 
-PCGExData::EIOInit UPCGExSampleNearestSplineSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSampleNearestSplineSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(SampleNearestSpline)
 
 bool FPCGExSampleNearestSplineElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SampleNearestSpline)
 
@@ -108,15 +120,27 @@ bool FPCGExSampleNearestSplineElement::Boot(FPCGExContext* InContext) const
 		for (const FPCGTaggedData& TaggedData : Targets)
 		{
 			const UPCGSplineData* SplineData = Cast<UPCGSplineData>(TaggedData.Data);
-			if (!SplineData || SplineData->SplineStruct.GetNumberOfSplineSegments() <= 0) { continue; }
+			if (!SplineData || SplineData->SplineStruct.GetNumberOfSplineSegments() <= 0)
+			{
+				continue;
+			}
 
 			switch (Settings->SampleInputs)
 			{
-			default: case EPCGExSplineSamplingIncludeMode::All: Context->Targets.Add(SplineData);
+			default: case EPCGExSplineSamplingIncludeMode::All:
+				Context->Targets.Add(SplineData);
 				break;
-			case EPCGExSplineSamplingIncludeMode::ClosedLoopOnly: if (SplineData->SplineStruct.bClosedLoop) { Context->Targets.Add(SplineData); }
+			case EPCGExSplineSamplingIncludeMode::ClosedLoopOnly:
+				if (SplineData->SplineStruct.bClosedLoop)
+				{
+					Context->Targets.Add(SplineData);
+				}
 				break;
-			case EPCGExSplineSamplingIncludeMode::OpenSplineOnly: if (!SplineData->SplineStruct.bClosedLoop) { Context->Targets.Add(SplineData); }
+			case EPCGExSplineSamplingIncludeMode::OpenSplineOnly:
+				if (!SplineData->SplineStruct.bClosedLoop)
+				{
+					Context->Targets.Add(SplineData);
+				}
 				break;
 			}
 		}
@@ -131,7 +155,10 @@ bool FPCGExSampleNearestSplineElement::Boot(FPCGExContext* InContext) const
 	}
 
 	Context->Splines.Reserve(Context->NumTargets);
-	for (const UPCGSplineData* SplineData : Context->Targets) { Context->Splines.Add(SplineData->SplineStruct); }
+	for (const UPCGSplineData* SplineData : Context->Targets)
+	{
+		Context->Splines.Add(SplineData->SplineStruct);
+	}
 
 	TArray<FBox> SplineBounds;
 
@@ -151,7 +178,10 @@ bool FPCGExSampleNearestSplineElement::Boot(FPCGExContext* InContext) const
 			Spline.ConvertSplineToPolyLine(ESplineCoordinateSpace::World, FMath::Square(50), SplinePoints);
 
 			FBox& Box = SplineBounds.Emplace_GetRef(ForceInit);
-			for (const FVector& Point : SplinePoints) { Box += Point; }
+			for (const FVector& Point : SplinePoints)
+			{
+				Box += Point;
+			}
 			Context->OctreeBounds += Box;
 		}
 	}
@@ -159,7 +189,10 @@ bool FPCGExSampleNearestSplineElement::Boot(FPCGExContext* InContext) const
 	if (Settings->bUseOctree)
 	{
 		Context->SplineOctree = MakeShared<PCGExOctree::FItemOctree>(Context->OctreeBounds.GetCenter(), Context->OctreeBounds.GetExtent().Length());
-		for (int i = 0; i < Context->NumTargets; i++) { Context->SplineOctree->AddElement(PCGExOctree::FItem(i, SplineBounds[i])); }
+		for (int i = 0; i < Context->NumTargets; i++)
+		{
+			Context->SplineOctree->AddElement(PCGExOctree::FItem(i, SplineBounds[i]));
+		}
 	}
 
 	PCGEX_FOREACH_FIELD_NEARESTPOLYLINE(PCGEX_OUTPUT_VALIDATE_NAME)
@@ -186,7 +219,10 @@ bool FPCGExSampleNearestSplineElement::AdvanceWork(FPCGExContext* InContext, con
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -214,7 +250,10 @@ namespace PCGExSampleNearestSpline
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -250,18 +289,30 @@ namespace PCGExSampleNearestSpline
 		}
 
 		RangeMinGetter = Settings->MinRange.GetValueSetting();
-		if (!RangeMinGetter->Init(PointDataFacade)) { return false; }
+		if (!RangeMinGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		RangeMaxGetter = Settings->MaxRange.GetValueSetting();
-		if (!RangeMaxGetter->Init(PointDataFacade)) { return false; }
+		if (!RangeMaxGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		SampleAlphaGetter = Settings->SampleAlpha.GetValueSetting();
-		if (!SampleAlphaGetter->Init(PointDataFacade)) { return false; }
+		if (!SampleAlphaGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		if (Settings->LookAtUpSelection == EPCGExSampleSource::Source)
 		{
 			LookAtUpGetter = PointDataFacade->GetBroadcaster<FVector>(Settings->LookAtUpSource, true);
-			if (!LookAtUpGetter) { PCGEX_LOG_INVALID_SELECTOR_C(Context, LookAt Up, Settings->LookAtUpSource) }
+			if (!LookAtUpGetter)
+			{
+				PCGEX_LOG_INVALID_SELECTOR_C(Context, LookAt Up, Settings->LookAtUpSource)
+			}
 		}
 
 		bSingleSample = Settings->SampleMethod != EPCGExSampleMethod::WithinRange;
@@ -322,7 +373,10 @@ namespace PCGExSampleNearestSpline
 		{
 			if (!PointFilterCache[Index])
 			{
-				if (Settings->bProcessFilteredOutAsFails) { SamplingFailed(Index, 0); }
+				if (Settings->bProcessFilteredOutAsFails)
+				{
+					SamplingFailed(Index, 0);
+				}
 				continue;
 			}
 
@@ -334,15 +388,21 @@ namespace PCGExSampleNearestSpline
 
 			double BaseRangeMin = RangeMinGetter->Read(Index);
 			double BaseRangeMax = RangeMaxGetter->Read(Index);
-			if (BaseRangeMin > BaseRangeMax) { std::swap(BaseRangeMin, BaseRangeMax); }
+			if (BaseRangeMin > BaseRangeMax)
+			{
+				std::swap(BaseRangeMin, BaseRangeMax);
+			}
 
 			double MinSampledRange = BaseRangeMin;
 			double MaxSampledRange = BaseRangeMax;
-			double Depth = MAX_dbl;
+			double Depth = TNumericLimits<double>::Max();
 			double DepthSamples = Settings->DepthMode == EPCGExSplineDepthMode::Average ? 0 : 1;
 			double WeightedDistance = 0;
 
-			if (Settings->DepthMode == EPCGExSplineDepthMode::Max || Settings->DepthMode == EPCGExSplineDepthMode::Average) { Depth = 0; }
+			if (Settings->DepthMode == EPCGExSplineDepthMode::Max || Settings->DepthMode == EPCGExSplineDepthMode::Average)
+			{
+				Depth = 0;
+			}
 
 			Samples.Reset();
 
@@ -374,23 +434,32 @@ namespace PCGExSampleNearestSpline
 				{
 					switch (Settings->DepthMode)
 					{
-					default: case EPCGExSplineDepthMode::Min: Depth = FMath::Min(Depth, FMath::Clamp(Dist, 0, DepthRange) / DepthRange);
+					default: case EPCGExSplineDepthMode::Min:
+						Depth = FMath::Min(Depth, FMath::Clamp(Dist, 0, DepthRange) / DepthRange);
 						break;
-					case EPCGExSplineDepthMode::Max: Depth = FMath::Max(Depth, FMath::Clamp(Dist, 0, DepthRange) / DepthRange);
+					case EPCGExSplineDepthMode::Max:
+						Depth = FMath::Max(Depth, FMath::Clamp(Dist, 0, DepthRange) / DepthRange);
 						break;
-					case EPCGExSplineDepthMode::Average: Depth += FMath::Clamp(Dist, 0, DepthRange);
+					case EPCGExSplineDepthMode::Average:
+						Depth += FMath::Clamp(Dist, 0, DepthRange);
 						DepthSamples++;
 						break;
 					}
 				}
 
-				if (LocalRangeMax > 0 && (Dist < LocalRangeMin || Dist > LocalRangeMax)) { return; }
+				if (LocalRangeMax > 0 && (Dist < LocalRangeMin || Dist > LocalRangeMax))
+				{
+					return;
+				}
 
 				int32 NumInsideIncrement = 0;
 
 				if (FVector::DotProduct((SampleLocation - ModifiedOrigin).GetSafeNormal(), Transform.GetRotation().GetRightVector()) > 0)
 				{
-					if (!bOnlyIncrementInsideNumIfClosed || InSpline.bClosedLoop) { NumInsideIncrement = 1; }
+					if (!bOnlyIncrementInsideNumIfClosed || InSpline.bClosedLoop)
+					{
+						NumInsideIncrement = 1;
+					}
 				}
 
 				bool IsNewClosest = false;
@@ -412,7 +481,10 @@ namespace PCGExSampleNearestSpline
 				{
 					Stats.Update(Infos, IsNewClosest, IsNewFarthest);
 
-					if ((bClosestSample && !IsNewClosest) || !IsNewFarthest) { return; }
+					if ((bClosestSample && !IsNewClosest) || !IsNewFarthest)
+					{
+						return;
+					}
 
 					bSampledClosedLoop = InSpline.bClosedLoop;
 
@@ -457,11 +529,17 @@ namespace PCGExSampleNearestSpline
 				{
 					Context->SplineOctree->FindElementsWithBoundsTest(
 						FBox(Origin - FVector(BaseRangeMax), Origin + FVector(BaseRangeMax)),
-						[&](const PCGExOctree::FItem& Item) { ProcessClosestAlpha(Item.Index); });
+						[&](const PCGExOctree::FItem& Item)
+						{
+							ProcessClosestAlpha(Item.Index);
+						});
 				}
 				else
 				{
-					for (int i = 0; i < Context->NumTargets; i++) { ProcessClosestAlpha(i); }
+					for (int i = 0; i < Context->NumTargets; i++)
+					{
+						ProcessClosestAlpha(i);
+					}
 				}
 			}
 			else
@@ -475,26 +553,38 @@ namespace PCGExSampleNearestSpline
 
 					switch (Settings->SampleAlphaMode)
 					{
-					default: case EPCGExSplineSampleAlphaMode::Alpha: Time = InputKey * NumSegments;
+					default: case EPCGExSplineSampleAlphaMode::Alpha:
+						Time = InputKey * NumSegments;
 						break;
-					case EPCGExSplineSampleAlphaMode::Time: Time = InputKey / NumSegments;
+					case EPCGExSplineSampleAlphaMode::Time:
+						Time = InputKey / NumSegments;
 						break;
-					case EPCGExSplineSampleAlphaMode::Distance: Time = (InputKey / Context->Lengths[TargetIndex]) * NumSegments;
+					case EPCGExSplineSampleAlphaMode::Distance:
+						Time = (InputKey / Context->Lengths[TargetIndex]) * NumSegments;
 						break;
 					}
 
-					if (Settings->bWrapClosedLoopAlpha && Line.bClosedLoop) { Time = PCGExMath::Tile(Time, 0.0, NumSegments); }
+					if (Settings->bWrapClosedLoopAlpha && Line.bClosedLoop)
+					{
+						Time = PCGExMath::Tile(Time, 0.0, NumSegments);
+					}
 					ProcessTarget(Line.GetTransformAtSplineInputKey(static_cast<float>(Time), ESplineCoordinateSpace::World, Settings->bSplineScalesRanges), Time, NumSegments, Line);
 				};
 
 				// At specific alpha
 				if (Settings->bUseOctree)
 				{
-					Context->SplineOctree->FindElementsWithBoundsTest(FBox(Origin - FVector(BaseRangeMax), Origin + FVector(BaseRangeMax)), [&](const PCGExOctree::FItem& Item) { ProcessSpecificAlpha(Item.Index); });
+					Context->SplineOctree->FindElementsWithBoundsTest(FBox(Origin - FVector(BaseRangeMax), Origin + FVector(BaseRangeMax)), [&](const PCGExOctree::FItem& Item)
+					{
+						ProcessSpecificAlpha(Item.Index);
+					});
 				}
 				else
 				{
-					for (int i = 0; i < Context->NumTargets; i++) { ProcessSpecificAlpha(i); }
+					for (int i = 0; i < Context->NumTargets; i++)
+					{
+						ProcessSpecificAlpha(i);
+					}
 				}
 			}
 
@@ -617,7 +707,10 @@ namespace PCGExSampleNearestSpline
 			bAnySuccessLocal = true;
 		}
 
-		if (bAnySuccessLocal) { FPlatformAtomics::InterlockedExchange(&bAnySuccess, 1); }
+		if (bAnySuccessLocal)
+		{
+			FPlatformAtomics::InterlockedExchange(&bAnySuccess, 1);
+		}
 	}
 
 	void FProcessor::OnPointsProcessingComplete()
@@ -653,13 +746,22 @@ namespace PCGExSampleNearestSpline
 
 		PointDataFacade->WriteFastest(TaskManager);
 
-		if (Settings->bTagIfHasSuccesses && bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag); }
-		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag); }
+		if (Settings->bTagIfHasSuccesses && bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag);
+		}
+		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag);
+		}
 	}
 
 	void FProcessor::CompleteWork()
 	{
-		if (Settings->bPruneFailedSamples) { (void)PointDataFacade->Source->Gather(SamplingMask); }
+		if (Settings->bPruneFailedSamples)
+		{
+			(void)PointDataFacade->Source->Gather(SamplingMask);
+		}
 	}
 }
 

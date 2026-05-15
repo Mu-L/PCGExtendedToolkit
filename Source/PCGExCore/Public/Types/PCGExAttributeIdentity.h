@@ -6,9 +6,9 @@
 #include <functional>
 
 #include "CoreMinimal.h"
-#include "Metadata/PCGMetadataCommon.h"
-#include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Metadata/PCGMetadataAttributeTraits.h"
+#include "Metadata/PCGMetadataCommon.h"
 
 struct FPCGContext;
 
@@ -33,14 +33,28 @@ namespace PCGExData
 		FAttributeIdentity() = default;
 
 		FAttributeIdentity(const FPCGAttributeIdentifier& InIdentifier, const EPCGMetadataTypes InUnderlyingType, const bool InAllowsInterpolation)
-			: Identifier(InIdentifier), UnderlyingType(InUnderlyingType), bAllowsInterpolation(InAllowsInterpolation)
+			: Identifier(InIdentifier)
+			  , UnderlyingType(InUnderlyingType)
+			  , bAllowsInterpolation(InAllowsInterpolation)
 		{
 		}
 
 		bool InDataDomain() const;
-		int16 GetTypeId() const { return static_cast<int16>(UnderlyingType); }
-		bool IsA(const int16 InType) const { return GetTypeId() == InType; }
-		bool IsA(const EPCGMetadataTypes InType) const { return UnderlyingType == InType; }
+
+		int16 GetTypeId() const
+		{
+			return static_cast<int16>(UnderlyingType);
+		}
+
+		bool IsA(const int16 InType) const
+		{
+			return GetTypeId() == InType;
+		}
+
+		bool IsA(const EPCGMetadataTypes InType) const
+		{
+			return UnderlyingType == InType;
+		}
 
 		FString GetDisplayName() const;
 		bool operator==(const FAttributeIdentity& Other) const;

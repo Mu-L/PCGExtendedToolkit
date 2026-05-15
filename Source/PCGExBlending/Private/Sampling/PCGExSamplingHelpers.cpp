@@ -33,8 +33,14 @@ namespace PCGExSampling::Helpers
 			OutAngle = FMath::Acos(MainDot) * FMath::Sign(MainDot);
 			break;
 		case EPCGExAngleRange::TAURadians: // 0 .. 6.28
-			if (C.Z < 0) { OutAngle = TWO_PI - FMath::Atan2(C.Size(), MainDot); }
-			else { OutAngle = FMath::Atan2(C.Size(), MainDot); }
+			if (C.Z < 0)
+			{
+				OutAngle = TWO_PI - FMath::Atan2(C.Size(), MainDot);
+			}
+			else
+			{
+				OutAngle = FMath::Atan2(C.Size(), MainDot);
+			}
 			break;
 		case EPCGExAngleRange::UDegrees: // 0 .. 180
 			OutAngle = FMath::RadiansToDegrees(FMath::Acos(MainDot));
@@ -43,23 +49,41 @@ namespace PCGExSampling::Helpers
 			OutAngle = FMath::RadiansToDegrees(FMath::Acos(MainDot)) * FMath::Sign(MainDot);
 			break;
 		case EPCGExAngleRange::TAUDegrees: // 0 .. 360
-			if (C.Z < 0) { OutAngle = 360 - FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot)); }
-			else { OutAngle = FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot)); }
+			if (C.Z < 0)
+			{
+				OutAngle = 360 - FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot));
+			}
+			else
+			{
+				OutAngle = FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot));
+			}
 			break;
 		case EPCGExAngleRange::NormalizedHalf: // 0 .. 180 -> 0 .. 1
 			OutAngle = FMath::RadiansToDegrees(FMath::Acos(MainDot)) / 180;
 			break;
 		case EPCGExAngleRange::Normalized: // 0 .. 360 -> 0 .. 1
-			if (C.Z < 0) { OutAngle = 360 - FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot)); }
-			else { OutAngle = FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot)); }
+			if (C.Z < 0)
+			{
+				OutAngle = 360 - FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot));
+			}
+			else
+			{
+				OutAngle = FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot));
+			}
 			OutAngle /= 360;
 			break;
 		case EPCGExAngleRange::InvertedNormalizedHalf: // 0 .. 180 -> 1 .. 0
 			OutAngle = 1 - (FMath::RadiansToDegrees(FMath::Acos(MainDot)) / 180);
 			break;
 		case EPCGExAngleRange::InvertedNormalized: // 0 .. 360 -> 1 .. 0
-			if (C.Z < 0) { OutAngle = 360 - FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot)); }
-			else { OutAngle = FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot)); }
+			if (C.Z < 0)
+			{
+				OutAngle = 360 - FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot));
+			}
+			else
+			{
+				OutAngle = FMath::RadiansToDegrees(FMath::Atan2(C.Size(), MainDot));
+			}
 			OutAngle /= 360;
 			OutAngle = 1 - OutAngle;
 			break;
@@ -86,8 +110,14 @@ namespace PCGExSampling::Helpers
 		for (int i = 0; i < ActorReferences->Values.Num(); i++)
 		{
 			const FSoftObjectPath& Path = ActorReferences->Values[i];
-			if (!Path.IsValid()) { continue; }
-			if (AActor* TargetActor = Cast<AActor>(Path.ResolveObject())) { OutActorSet.FindOrAdd(TargetActor, i); }
+			if (!Path.IsValid())
+			{
+				continue;
+			}
+			if (AActor* TargetActor = Cast<AActor>(Path.ResolveObject()))
+			{
+				OutActorSet.FindOrAdd(TargetActor, i);
+			}
 		}
 
 		return true;

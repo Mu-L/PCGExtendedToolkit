@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 
-#include "PCGExShapesCommon.h"
 #include "PCGExShapeBuilderFactoryProvider.h"
+#include "PCGExShapesCommon.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "PCGExShapeProcessor.generated.h"
 
@@ -24,14 +24,21 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Path); }
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Path);
+	}
 #endif
 	//~End UPCGSettings
 
 	//~Begin UPCGExPointsProcessorSettings
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual FName GetMainInputPin() const override;
-	virtual FString GetPointFilterTooltip() const override { return TEXT("Path points processing filters"); }
+
+	virtual FString GetPointFilterTooltip() const override
+	{
+		return TEXT("Path points processing filters");
+	}
 
 	//~End UPCGExPointsProcessorSettings
 

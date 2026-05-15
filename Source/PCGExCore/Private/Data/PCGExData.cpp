@@ -8,8 +8,8 @@
 #include "PCGExH.h"
 #include "PCGExLog.h"
 #include "PCGExSettingsCacheBody.h"
-#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExAttributeBroadcaster.h"
+#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGPointData.h"
@@ -28,7 +28,10 @@ namespace PCGExData
 		// Combine attribute name, domain, and value type into a single 64-bit key for buffer deduplication.
 		// "Default" domain is treated as "Elements" so they share the same buffer.
 		EPCGMetadataDomainFlag SaneFlagForUID = Identifier.MetadataDomain.Flag;
-		if (SaneFlagForUID == EPCGMetadataDomainFlag::Default) { SaneFlagForUID = EPCGMetadataDomainFlag::Elements; }
+		if (SaneFlagForUID == EPCGMetadataDomainFlag::Default)
+		{
+			SaneFlagForUID = EPCGMetadataDomainFlag::Elements;
+		}
 		return PCGEx::H64(HashCombine(GetTypeHash(Identifier.Name), GetTypeHash(SaneFlagForUID)), static_cast<int32>(Type));
 	}
 
@@ -38,12 +41,21 @@ namespace PCGExData
 
 		FPCGAttributeIdentifier Identifier;
 
-		if (!InData) { return FPCGAttributeIdentifier(PCGExMetaHelpers::InvalidName, EPCGMetadataDomainFlag::Invalid); }
+		if (!InData)
+		{
+			return FPCGAttributeIdentifier(PCGExMetaHelpers::InvalidName, EPCGMetadataDomainFlag::Invalid);
+		}
 
 		FPCGAttributePropertyInputSelector FixedSelector = InSelector.CopyAndFixLast(InData);
 
-		if (InSelector.GetExtraNames().IsEmpty()) { Identifier.Name = FixedSelector.GetName(); }
-		else { Identifier.Name = FName(FixedSelector.GetName().ToString() + TEXT(".") + FString::Join(FixedSelector.GetExtraNames(), TEXT("."))); }
+		if (InSelector.GetExtraNames().IsEmpty())
+		{
+			Identifier.Name = FixedSelector.GetName();
+		}
+		else
+		{
+			Identifier.Name = FName(FixedSelector.GetName().ToString() + TEXT(".") + FString::Join(FixedSelector.GetExtraNames(), TEXT(".")));
+		}
 
 		Identifier.MetadataDomain = InData->GetMetadataDomainIDFromSelector(FixedSelector);
 
@@ -56,7 +68,8 @@ namespace PCGExData
 	}
 
 	IBuffer::IBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier)
-		: Identifier(InIdentifier), Source(InSource)
+		: Identifier(InIdentifier)
+		  , Source(InSource)
 	{
 	}
 
@@ -66,7 +79,10 @@ namespace PCGExData
 	}
 
 	template <typename T>
-	bool IBuffer::IsA() const { return Type == PCGExTypes::TTraits<T>::Type; }
+	bool IBuffer::IsA() const
+	{
+		return Type == PCGExTypes::TTraits<T>::Type;
+	}
 
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
 template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
@@ -87,31 +103,61 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	}
 
 	template <typename T>
-	const FPCGMetadataAttribute<T>* TBuffer<T>::GetTypedInAttribute() const { return TypedInAttribute; }
+	const FPCGMetadataAttribute<T>* TBuffer<T>::GetTypedInAttribute() const
+	{
+		return TypedInAttribute;
+	}
 
 	template <typename T>
-	FPCGMetadataAttribute<T>* TBuffer<T>::GetTypedOutAttribute() const { return TypedOutAttribute; }
+	FPCGMetadataAttribute<T>* TBuffer<T>::GetTypedOutAttribute() const
+	{
+		return TypedOutAttribute;
+	}
 
 	template <typename T>
-	void TBuffer<T>::ReadVoid(const int32 Index, void* OutValue) const { *static_cast<T*>(OutValue) = Read(Index); }
+	void TBuffer<T>::ReadVoid(const int32 Index, void* OutValue) const
+	{
+		*static_cast<T*>(OutValue) = Read(Index);
+	}
 
 	template <typename T>
-	void TBuffer<T>::SetVoid(const int32 Index, const void* Value) { SetValue(Index, *static_cast<const T*>(Value)); }
+	void TBuffer<T>::SetVoid(const int32 Index, const void* Value)
+	{
+		SetValue(Index, *static_cast<const T*>(Value));
+	}
 
 	template <typename T>
-	void TBuffer<T>::GetVoid(const int32 Index, void* OutValue) { *static_cast<T*>(OutValue) = GetValue(Index); }
+	void TBuffer<T>::GetVoid(const int32 Index, void* OutValue)
+	{
+		*static_cast<T*>(OutValue) = GetValue(Index);
+	}
 
 	template <typename T>
-	PCGExValueHash TBuffer<T>::ReadValueHash(const int32 Index) { return PCGExTypes::ComputeHash(Read(Index)); }
+	PCGExValueHash TBuffer<T>::ReadValueHash(const int32 Index)
+	{
+		return PCGExTypes::ComputeHash(Read(Index));
+	}
 
 	template <typename T>
-	PCGExValueHash TBuffer<T>::GetValueHash(const int32 Index) { return PCGExTypes::ComputeHash(GetValue(Index)); }
+	PCGExValueHash TBuffer<T>::GetValueHash(const int32 Index)
+	{
+		return PCGExTypes::ComputeHash(GetValue(Index));
+	}
 
 	template <typename T>
-	void TBuffer<T>::DumpValues(TArray<T>& OutValues) const { for (int i = 0; i < OutValues.Num(); i++) { OutValues[i] = Read(i); } }
+	void TBuffer<T>::DumpValues(TArray<T>& OutValues) const
+	{
+		for (int i = 0; i < OutValues.Num(); i++)
+		{
+			OutValues[i] = Read(i);
+		}
+	}
 
 	template <typename T>
-	void TBuffer<T>::DumpValues(const TSharedPtr<TArray<T>>& OutValues) const { DumpValues(*OutValues.Get()); }
+	void TBuffer<T>::DumpValues(const TSharedPtr<TArray<T>>& OutValues) const
+	{
+		DumpValues(*OutValues.Get());
+	}
 
 	template <typename T>
 	TArrayBuffer<T>::TArrayBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier)
@@ -122,10 +168,16 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	}
 
 	template <typename T>
-	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetInValues() { return InValues; }
+	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetInValues()
+	{
+		return InValues;
+	}
 
 	template <typename T>
-	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetOutValues() { return OutValues; }
+	TSharedPtr<TArray<T>> TArrayBuffer<T>::GetOutValues()
+	{
+		return OutValues;
+	}
 
 	template <typename T>
 	int32 TArrayBuffer<T>::GetNumValues(const EIOSide InSide)
@@ -150,35 +202,56 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	}
 
 	template <typename T>
-	bool TArrayBuffer<T>::ReadsFromOutput() { return InValues == OutValues; }
+	bool TArrayBuffer<T>::ReadsFromOutput()
+	{
+		return InValues == OutValues;
+	}
 
 	template <typename T>
-	const T& TArrayBuffer<T>::Read(const int32 Index) const { return *(InValues->GetData() + Index); }
+	const T& TArrayBuffer<T>::Read(const int32 Index) const
+	{
+		return *(InValues->GetData() + Index);
+	}
 
 	template <typename T>
 	const void TArrayBuffer<T>::Read(const int32 Start, TArrayView<T> OutResults) const
 	{
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = *(InValues->GetData() + (Start + i)); }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = *(InValues->GetData() + (Start + i));
+		}
 	}
 
 	template <typename T>
-	const T& TArrayBuffer<T>::GetValue(const int32 Index) { return *(OutValues->GetData() + Index); }
+	const T& TArrayBuffer<T>::GetValue(const int32 Index)
+	{
+		return *(OutValues->GetData() + Index);
+	}
 
 	template <typename T>
 	const void TArrayBuffer<T>::GetValues(const int32 Start, TArrayView<T> OutResults)
 	{
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = *(OutValues->GetData() + (Start + i)); }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = *(OutValues->GetData() + (Start + i));
+		}
 	}
 
 	template <typename T>
-	void TArrayBuffer<T>::SetValue(const int32 Index, const T& Value) { *(OutValues->GetData() + Index) = Value; }
+	void TArrayBuffer<T>::SetValue(const int32 Index, const T& Value)
+	{
+		*(OutValues->GetData() + Index) = Value;
+	}
 
 	template <typename T>
 	PCGExValueHash TArrayBuffer<T>::ReadValueHash(const int32 Index)
 	{
-		if (bCacheValueHashes) { return InHashes[Index]; }
+		if (bCacheValueHashes)
+		{
+			return InHashes[Index];
+		}
 		return PCGExTypes::ComputeHash(Read(Index));
 	}
 
@@ -186,19 +259,28 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	void TArrayBuffer<T>::ComputeValueHashes(const PCGExMT::FScope& Scope)
 	{
 		const TArray<T>& InValuesRef = *InValues.Get();
-		PCGEX_SCOPE_LOOP(Index) { InHashes[Index] = PCGExTypes::ComputeHash(InValuesRef[Index]); }
+		PCGEX_SCOPE_LOOP(Index)
+		{
+			InHashes[Index] = PCGExTypes::ComputeHash(InValuesRef[Index]);
+		}
 	}
 
 	template <typename T>
 	void TArrayBuffer<T>::InitForReadInternal(const bool bScoped, const FPCGMetadataAttributeBase* Attribute)
 	{
-		if (InValues) { return; }
+		if (InValues)
+		{
+			return;
+		}
 
 		const int32 NumReadValue = Source->GetIn()->GetNumPoints();
 		InValues = MakeShared<TArray<T>>();
 		PCGExArrayHelpers::InitArray(InValues, NumReadValue);
 
-		if (bCacheValueHashes) { InHashes.Init(0, NumReadValue); }
+		if (bCacheValueHashes)
+		{
+			InHashes.Init(0, NumReadValue);
+		}
 
 		InAttribute = Attribute;
 		TypedInAttribute = Attribute ? static_cast<const FPCGMetadataAttribute<T>*>(Attribute) : nullptr;
@@ -209,7 +291,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	template <typename T>
 	void TArrayBuffer<T>::InitForWriteInternal(FPCGMetadataAttributeBase* Attribute, const T& InDefaultValue, const EBufferInit Init)
 	{
-		if (OutValues) { return; }
+		if (OutValues)
+		{
+			return;
+		}
 
 		OutValues = MakeShared<TArray<T>>();
 		OutValues->Init(InDefaultValue, Source->GetOut()->GetNumPoints());
@@ -221,7 +306,18 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	template <typename T>
 	bool TArrayBuffer<T>::EnsureReadable()
 	{
-		if (InValues) { return true; }
+		{
+			FReadScopeLock ReadLock(BufferLock);
+			if (InValues)
+			{
+				return true;
+			}
+		}
+		FWriteScopeLock WriteLock(BufferLock);
+		if (InValues)
+		{
+			return true;
+		}
 		InValues = OutValues;
 		return InValues ? true : false;
 	}
@@ -229,12 +325,18 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	template <typename T>
 	void TArrayBuffer<T>::EnableValueHashCache()
 	{
-		if (bCacheValueHashes) { return; }
+		if (bCacheValueHashes)
+		{
+			return;
+		}
 		bCacheValueHashes = true;
 
 		if (bReadComplete)
 		{
-			if (InHashes.Num() != InValues->Num()) { InHashes.Init(0, InValues->Num()); }
+			if (InHashes.Num() != InValues->Num())
+			{
+				InHashes.Init(0, InValues->Num());
+			}
 			Fetch(PCGExMT::FScope(0, InValues->Num()));
 		}
 	}
@@ -318,8 +420,14 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 			if (bSparseBuffer && !bScoped)
 			{
 				// Un-scoping reader.
-				if (!InternalBroadcaster) { InternalBroadcaster = MakeShared<TAttributeBroadcaster<T>>(); }
-				if (!InternalBroadcaster->Prepare(InSelector, Source)) { return false; }
+				if (!InternalBroadcaster)
+				{
+					InternalBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
+				}
+				if (!InternalBroadcaster->Prepare(InSelector, Source))
+				{
+					return false;
+				}
 
 				InternalBroadcaster->GrabAndDump(*InValues, bCaptureMinMax, this->Min, this->Max);
 				bReadComplete = true;
@@ -371,10 +479,19 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 
 		this->bIsNewOutput = !PCGExMetaHelpers::HasAttribute(Source->GetOut(), Identifier);
 
-		if (this->bIsNewOutput) { TypedOutAttribute = Source->CreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
-		else { TypedOutAttribute = Source->FindOrCreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
+		if (this->bIsNewOutput)
+		{
+			TypedOutAttribute = Source->CreateAttribute(Identifier, DefaultValue, bAllowInterpolation);
+		}
+		else
+		{
+			TypedOutAttribute = Source->FindOrCreateAttribute(Identifier, DefaultValue, bAllowInterpolation);
+		}
 
-		if (!TypedOutAttribute) { return false; }
+		if (!TypedOutAttribute)
+		{
+			return false;
+		}
 
 		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(TypedOutAttribute, Source->GetOut()->Metadata);
 
@@ -399,8 +516,14 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 			}
 		};
 
-		if (Init == EBufferInit::Inherit) { GrabExistingValues(); }
-		else if (!bHasIn && ExistingEntryCount != 0) { GrabExistingValues(); }
+		if (Init == EBufferInit::Inherit)
+		{
+			GrabExistingValues();
+		}
+		else if (!bHasIn && ExistingEntryCount != 0)
+		{
+			GrabExistingValues();
+		}
 
 		return true;
 	}
@@ -410,7 +533,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	{
 		{
 			FWriteScopeLock WriteScopeLock(BufferLock);
-			if (OutValues) { return true; }
+			if (OutValues)
+			{
+				return true;
+			}
 		}
 
 		if (const FPCGMetadataAttribute<T>* ExistingAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(Source->GetIn(), Identifier))
@@ -428,7 +554,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 
-		if (!IsWritable() || !OutValues || !IsEnabled()) { return; }
+		if (!IsWritable() || !OutValues || !IsEnabled())
+		{
+			return;
+		}
 
 		if (!Source->GetOut())
 		{
@@ -436,7 +565,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 			return;
 		}
 
-		if (!TypedOutAttribute) { return; }
+		if (!TypedOutAttribute)
+		{
+			return;
+		}
 
 		// bResetWithFirstValue: collapse the entire attribute to a single default value.
 		// Used for @Data-domain attributes that should carry one value for the whole dataset.
@@ -448,7 +580,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 		}
 
 		TUniquePtr<IPCGAttributeAccessor> OutAccessor = PCGAttributeAccessorHelpers::CreateAccessor(TypedOutAttribute, Source->GetOut()->Metadata);
-		if (!OutAccessor.IsValid()) { return; }
+		if (!OutAccessor.IsValid())
+		{
+			return;
+		}
 
 		// Mark this attribute as protected so the consumable-attributes cleanup
 		// in StageOutput won't delete data we just wrote.
@@ -461,16 +596,26 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	template <typename T>
 	void TArrayBuffer<T>::Fetch(const PCGExMT::FScope& Scope)
 	{
-		if (!IsSparse() || bReadComplete || !IsEnabled()) { return; }
-		if (InternalBroadcaster) { InternalBroadcaster->Fetch(*InValues, Scope); }
+		if (!IsSparse() || bReadComplete || !IsEnabled())
+		{
+			return;
+		}
+		if (InternalBroadcaster)
+		{
+			InternalBroadcaster->Fetch(*InValues, Scope);
+		}
 
-		if (TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, Source->GetIn()->Metadata); InAccessor.IsValid())
+		if (TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, Source->GetIn()->Metadata);
+			InAccessor.IsValid())
 		{
 			TArrayView<T> ReadRange = MakeArrayView(InValues->GetData() + Scope.Start, Scope.Count);
 			InAccessor->GetRange<T>(ReadRange, Scope.Start, *Source->GetInKeys());
 		}
 
-		if (bCacheValueHashes) { ComputeValueHashes(Scope); }
+		if (bCacheValueHashes)
+		{
+			ComputeValueHashes(Scope);
+		}
 	}
 
 	template <typename T>
@@ -490,13 +635,21 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	template <typename T>
 	bool TSingleValueBuffer<T>::EnsureReadable()
 	{
-		if (bReadInitialized) { return true; }
-
+		{
+			FReadScopeLock ReadLock(BufferLock);
+			if (bReadInitialized)
+			{
+				return true;
+			}
+		}
+		FWriteScopeLock WriteLock(BufferLock);
+		if (bReadInitialized)
+		{
+			return true;
+		}
 		InValue = OutValue;
-
 		bReadFromOutput = true;
 		bReadInitialized = bWriteInitialized;
-
 		return bReadInitialized;
 	}
 
@@ -509,13 +662,22 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	}
 
 	template <typename T>
-	bool TSingleValueBuffer<T>::IsWritable() { return bWriteInitialized; }
+	bool TSingleValueBuffer<T>::IsWritable()
+	{
+		return bWriteInitialized;
+	}
 
 	template <typename T>
-	bool TSingleValueBuffer<T>::IsReadable() { return bReadInitialized; }
+	bool TSingleValueBuffer<T>::IsReadable()
+	{
+		return bReadInitialized;
+	}
 
 	template <typename T>
-	bool TSingleValueBuffer<T>::ReadsFromOutput() { return bReadFromOutput; }
+	bool TSingleValueBuffer<T>::ReadsFromOutput()
+	{
+		return bReadFromOutput;
+	}
 
 	template <typename T>
 	const T& TSingleValueBuffer<T>::Read(const int32 Index) const
@@ -527,7 +689,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	const void TSingleValueBuffer<T>::Read(const int32 Start, TArrayView<T> OutResults) const
 	{
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = InValue; }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = InValue;
+		}
 	}
 
 	template <typename T>
@@ -542,7 +707,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	{
 		FReadScopeLock ReadScopeLock(BufferLock);
 		const int32 Count = OutResults.Num();
-		for (int i = 0; i < Count; i++) { OutResults[i] = OutValue; }
+		for (int i = 0; i < Count; i++)
+		{
+			OutResults[i] = OutValue;
+		}
 	}
 
 	template <typename T>
@@ -550,7 +718,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 		OutValue = Value;
-		if (bReadFromOutput) { InValue = Value; }
+		if (bReadFromOutput)
+		{
+			InValue = Value;
+		}
 	}
 
 	template <typename T>
@@ -623,14 +794,26 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	{
 		FWriteScopeLock WriteScopeLock(BufferLock);
 
-		if (bWriteInitialized) { return true; }
+		if (bWriteInitialized)
+		{
+			return true;
+		}
 
 		this->bIsNewOutput = !PCGExMetaHelpers::HasAttribute(Source->GetOut(), Identifier);
 
-		if (this->bIsNewOutput) { TypedOutAttribute = Source->CreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
-		else { TypedOutAttribute = Source->FindOrCreateAttribute(Identifier, DefaultValue, bAllowInterpolation); }
+		if (this->bIsNewOutput)
+		{
+			TypedOutAttribute = Source->CreateAttribute(Identifier, DefaultValue, bAllowInterpolation);
+		}
+		else
+		{
+			TypedOutAttribute = Source->FindOrCreateAttribute(Identifier, DefaultValue, bAllowInterpolation);
+		}
 
-		if (!TypedOutAttribute) { return false; }
+		if (!TypedOutAttribute)
+		{
+			return false;
+		}
 
 		OutAttribute = TypedOutAttribute;
 		bWriteInitialized = true;
@@ -645,8 +828,14 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 			OutValue = Helpers::ReadDataValue(TypedOutAttribute);
 		};
 
-		if (Init == EBufferInit::Inherit) { GrabExistingValues(); }
-		else if (!bHasIn && ExistingEntryCount != 0) { GrabExistingValues(); }
+		if (Init == EBufferInit::Inherit)
+		{
+			GrabExistingValues();
+		}
+		else if (!bHasIn && ExistingEntryCount != 0)
+		{
+			GrabExistingValues();
+		}
 
 		return bWriteInitialized;
 	}
@@ -656,7 +845,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 	{
 		{
 			FWriteScopeLock WriteScopeLock(BufferLock);
-			if (bWriteInitialized) { return true; }
+			if (bWriteInitialized)
+			{
+				return true;
+			}
 		}
 
 		if (const FPCGMetadataAttribute<T>* ExistingAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(Source->GetIn(), Identifier))
@@ -674,7 +866,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 
-		if (!IsWritable() || !IsEnabled()) { return; }
+		if (!IsWritable() || !IsEnabled())
+		{
+			return;
+		}
 
 		if (!Source->GetOut())
 		{
@@ -682,7 +877,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 			return;
 		}
 
-		if (!TypedOutAttribute) { return; }
+		if (!TypedOutAttribute)
+		{
+			return;
+		}
 
 		Helpers::SetDataValue(TypedOutAttribute, OutValue);
 	}
@@ -704,12 +902,18 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 
 #pragma region FFacade
 
-	int32 FFacade::GetNum(const EIOSide InSide) const { return Source->GetNum(InSide); }
+	int32 FFacade::GetNum(const EIOSide InSide) const
+	{
+		return Source->GetNum(InSide);
+	}
 
 	TSharedPtr<IBuffer> FFacade::FindBuffer_Unsafe(const uint64 UID)
 	{
 		TSharedPtr<IBuffer>* Found = BufferMap.Find(UID);
-		if (!Found) { return nullptr; }
+		if (!Found)
+		{
+			return nullptr;
+		}
 		return *Found;
 	}
 
@@ -724,8 +928,14 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 		FReadScopeLock ReadScopeLock(BufferLock);
 		for (const TSharedPtr<IBuffer>& Buffer : Buffers)
 		{
-			if (!Buffer->IsReadable()) { continue; }
-			if (Buffer->InAttribute && Buffer->InAttribute->Name == InIdentifier.Name) { return Buffer; }
+			if (!Buffer->IsReadable())
+			{
+				continue;
+			}
+			if (Buffer->InAttribute && Buffer->InAttribute->Name == InIdentifier.Name)
+			{
+				return Buffer;
+			}
 		}
 		return nullptr;
 	}
@@ -735,13 +945,22 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 		FReadScopeLock ReadScopeLock(BufferLock);
 		for (const TSharedPtr<IBuffer>& Buffer : Buffers)
 		{
-			if (!Buffer->IsWritable()) { continue; }
-			if (Buffer->Identifier == InIdentifier) { return Buffer; }
+			if (!Buffer->IsWritable())
+			{
+				continue;
+			}
+			if (Buffer->Identifier == InIdentifier)
+			{
+				return Buffer;
+			}
 		}
 		return nullptr;
 	}
 
-	EPCGPointNativeProperties FFacade::GetAllocations() const { return Source->GetAllocations(); }
+	EPCGPointNativeProperties FFacade::GetAllocations() const
+	{
+		return Source->GetAllocations();
+	}
 
 	FPCGExContext* FFacade::GetContext() const
 	{
@@ -750,19 +969,29 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 	}
 
 	FFacade::FFacade(const TSharedRef<FPointIO>& InSource)
-		: Source(InSource), Idx(InSource->IOIndex)
+		: Source(InSource)
+		  , Idx(InSource->IOIndex)
 	{
 	}
 
-	bool FFacade::IsDataValid(const EIOSide InSide) const { return Source->IsDataValid(InSide); }
+	bool FFacade::IsDataValid(const EIOSide InSide) const
+	{
+		return Source->IsDataValid(InSide);
+	}
 
-	bool FFacade::ShareSource(const FFacade* OtherManager) const { return this == OtherManager || OtherManager->Source == Source; }
+	bool FFacade::ShareSource(const FFacade* OtherManager) const
+	{
+		return this == OtherManager || OtherManager->Source == Source;
+	}
 
 	template <typename T>
 	TSharedPtr<TBuffer<T>> FFacade::FindBuffer_Unsafe(const FPCGAttributeIdentifier& InIdentifier)
 	{
 		const TSharedPtr<IBuffer>& Found = FindBuffer_Unsafe(BufferUID(InIdentifier, PCGExTypes::TTraits<T>::Type));
-		if (!Found) { return nullptr; }
+		if (!Found)
+		{
+			return nullptr;
+		}
 		return StaticCastSharedPtr<TBuffer<T>>(Found);
 	}
 
@@ -770,7 +999,10 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 	TSharedPtr<TBuffer<T>> FFacade::FindBuffer(const FPCGAttributeIdentifier& InIdentifier)
 	{
 		const TSharedPtr<IBuffer> Found = FindBuffer(BufferUID(InIdentifier, PCGExTypes::TTraits<T>::Type));
-		if (!Found) { return nullptr; }
+		if (!Found)
+		{
+			return nullptr;
+		}
 		return StaticCastSharedPtr<TBuffer<T>>(Found);
 	}
 
@@ -784,13 +1016,19 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 		}
 
 		TSharedPtr<TBuffer<T>> Buffer = FindBuffer<T>(InIdentifier);
-		if (Buffer) { return Buffer; }
+		if (Buffer)
+		{
+			return Buffer;
+		}
 
 		{
 			FWriteScopeLock WriteScopeLock(BufferLock);
 
 			Buffer = FindBuffer_Unsafe<T>(InIdentifier);
-			if (Buffer) { return Buffer; }
+			if (Buffer)
+			{
+				return Buffer;
+			}
 
 			if (InIdentifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Default || InIdentifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Elements)
 			{
@@ -830,7 +1068,10 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 			Buffer = GetBuffer<T>(InIdentifier);
 		}
 
-		if (!Buffer || !Buffer->InitForWrite(DefaultValue, bAllowInterpolation, Init)) { return nullptr; }
+		if (!Buffer || !Buffer->InitForWrite(DefaultValue, bAllowInterpolation, Init))
+		{
+			return nullptr;
+		}
 		return Buffer;
 	}
 
@@ -856,7 +1097,10 @@ template class PCGEXCORE_API TSingleValueBuffer<_TYPE>;
 			Buffer = GetBuffer<T>(InIdentifier);
 		}
 
-		if (!Buffer || !Buffer->InitForWrite(Init)) { return nullptr; }
+		if (!Buffer || !Buffer->InitForWrite(Init))
+		{
+			return nullptr;
+		}
 		return Buffer;
 	}
 
@@ -952,7 +1196,8 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		switch (Type)
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TYPED_WRITABLE)
-		default: return nullptr;
+		default:
+			return nullptr;
 		}
 #undef PCGEX_TYPED_WRITABLE
 	}
@@ -963,7 +1208,8 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		switch (Type)
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TYPED_WRITABLE)
-		default: return nullptr;
+		default:
+			return nullptr;
 		}
 #undef PCGEX_TYPED_WRITABLE
 	}
@@ -984,7 +1230,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		TSharedPtr<IBuffer> Buffer = nullptr;
 		const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(InIdentifier, InSide);
 
-		if (!RawAttribute) { return nullptr; }
+		if (!RawAttribute)
+		{
+			return nullptr;
+		}
 
 #define PCGEX_TYPED_EXEC(_TYPE, _NAME) Buffer = Buffer = GetReadable<_TYPE>(InIdentifier, InSide, bSupportScoped);
 		PCGEX_EXECUTEWITHRIGHTTYPE(static_cast<EPCGMetadataTypes>(RawAttribute->GetTypeId()), PCGEX_TYPED_EXEC)
@@ -1003,22 +1252,37 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		return Source->FindConstAttribute(InIdentifier, InSide);
 	}
 
-	const UPCGBasePointData* FFacade::GetData(const EIOSide InSide) const { return Source->GetData(InSide); }
+	const UPCGBasePointData* FFacade::GetData(const EIOSide InSide) const
+	{
+		return Source->GetData(InSide);
+	}
 
-	const UPCGBasePointData* FFacade::GetIn() const { return Source->GetIn(); }
+	const UPCGBasePointData* FFacade::GetIn() const
+	{
+		return Source->GetIn();
+	}
 
-	UPCGBasePointData* FFacade::GetOut() const { return Source->GetOut(); }
+	UPCGBasePointData* FFacade::GetOut() const
+	{
+		return Source->GetOut();
+	}
 
 	void FFacade::CreateReadables(const TArray<FAttributeIdentity>& Identities, const bool bWantsScoped)
 	{
-		for (const FAttributeIdentity& Identity : Identities) { GetReadable(Identity, EIOSide::In, bWantsScoped); }
+		for (const FAttributeIdentity& Identity : Identities)
+		{
+			GetReadable(Identity, EIOSide::In, bWantsScoped);
+		}
 	}
 
 	void FFacade::MarkCurrentBuffersReadAsComplete()
 	{
 		for (const TSharedPtr<IBuffer>& Buffer : Buffers)
 		{
-			if (!Buffer.IsValid() || !Buffer->IsReadable()) { continue; }
+			if (!Buffer.IsValid() || !Buffer->IsReadable())
+			{
+				continue;
+			}
 			Buffer->bReadComplete = true;
 		}
 	}
@@ -1032,11 +1296,17 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 
 	void FFacade::Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const bool bEnsureValidKeys)
 	{
-		if (!TaskManager || !TaskManager->IsAvailable() || !Source->GetOut()) { return; }
+		if (!TaskManager || !TaskManager->IsAvailable() || !Source->GetOut())
+		{
+			return;
+		}
 
 		if (ValidateOutputsBeforeWriting())
 		{
-			if (bEnsureValidKeys) { Source->GetOutKeys(true); }
+			if (bEnsureValidKeys)
+			{
+				Source->GetOutKeys(true);
+			}
 
 			{
 				FWriteScopeLock WriteScopeLock(BufferLock);
@@ -1045,7 +1315,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 				for (int i = 0; i < Buffers.Num(); i++)
 				{
 					const TSharedPtr<IBuffer> Buffer = Buffers[i];
-					if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled()) { continue; }
+					if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled())
+					{
+						continue;
+					}
 					WriteBuffer(TaskManager, Buffer, false);
 				}
 			}
@@ -1075,8 +1348,14 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 			for (int i = 0; i < Buffers.Num(); i++)
 			{
 				const TSharedPtr<IBuffer> Buffer = Buffers[i];
-				if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled()) { continue; }
-				Callbacks.Add([BufferRef = Buffer]() { BufferRef->Write(); });
+				if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled())
+				{
+					continue;
+				}
+				Callbacks.Add([BufferRef = Buffer]()
+				{
+					BufferRef->Write();
+				});
 			}
 		}
 
@@ -1088,14 +1367,20 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		if (!ValidateOutputsBeforeWriting())
 		{
 			Flush();
-			if (Callback) { Callback(); }
+			if (Callback)
+			{
+				Callback();
+			}
 			return;
 		}
 
 		if (Source->GetNum(EIOSide::Out) < PCGEX_CORE_SETTINGS.SmallPointsSize)
 		{
 			WriteSynchronous(true);
-			if (Callback) { Callback(); }
+			if (Callback)
+			{
+				Callback();
+			}
 			return;
 		}
 
@@ -1105,7 +1390,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		if (WriteCallbacks.IsEmpty())
 		{
 			Flush();
-			if (Callback) { Callback(); }
+			if (Callback)
+			{
+				Callback();
+			}
 			return;
 		}
 
@@ -1114,7 +1402,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		{
 			PCGEX_ASYNC_THIS
 			This->Flush();
-			if (Callback) { Callback(); }
+			if (Callback)
+			{
+				Callback();
+			}
 		};
 
 		WriteBuffersWithCallback->AddSimpleCallbacks(MoveTemp(WriteCallbacks));
@@ -1123,13 +1414,19 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 
 	int32 FFacade::WriteSynchronous(const bool bEnsureValidKeys)
 	{
-		if (!Source->GetOut()) { return -1; }
+		if (!Source->GetOut())
+		{
+			return -1;
+		}
 
 		int32 WritableCount = 0;
 
 		if (ValidateOutputsBeforeWriting())
 		{
-			if (bEnsureValidKeys) { Source->GetOutKeys(true); }
+			if (bEnsureValidKeys)
+			{
+				Source->GetOutKeys(true);
+			}
 
 			{
 				FWriteScopeLock WriteScopeLock(BufferLock);
@@ -1137,7 +1434,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 				for (int i = 0; i < Buffers.Num(); i++)
 				{
 					const TSharedPtr<IBuffer> Buffer = Buffers[i];
-					if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled()) { continue; }
+					if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled())
+					{
+						continue;
+					}
 					Buffer->Write(false);
 					WritableCount++;
 				}
@@ -1150,31 +1450,83 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 
 	void FFacade::WriteFastest(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const bool bEnsureValidKeys)
 	{
-		if (!Source->GetOut()) { return; }
+		if (!Source->GetOut())
+		{
+			return;
+		}
 
-		if (Source->GetNum(EIOSide::Out) < PCGEX_CORE_SETTINGS.SmallPointsSize) { WriteSynchronous(bEnsureValidKeys); }
-		else { Write(TaskManager, bEnsureValidKeys); }
+		if (Source->GetNum(EIOSide::Out) < PCGEX_CORE_SETTINGS.SmallPointsSize)
+		{
+			WriteSynchronous(bEnsureValidKeys);
+		}
+		else
+		{
+			Write(TaskManager, bEnsureValidKeys);
+		}
 	}
 
 	void FFacade::Fetch(const PCGExMT::FScope& Scope)
 	{
-		if (!bSupportsScopedGet) { return; }
+		if (!bSupportsScopedGet)
+		{
+			return;
+		}
 		TRACE_CPUPROFILER_EVENT_SCOPE(FFacade::Fetch);
-		for (const TSharedPtr<IBuffer>& Buffer : Buffers) { Buffer->Fetch(Scope); }
+		for (const TSharedPtr<IBuffer>& Buffer : Buffers)
+		{
+			Buffer->Fetch(Scope);
+		}
 	}
 
-	FConstPoint FFacade::GetInPoint(const int32 Index) const { return Source->GetInPoint(Index); }
-	FMutablePoint FFacade::GetOutPoint(const int32 Index) const { return Source->GetOutPoint(Index); }
+	FConstPoint FFacade::GetInPoint(const int32 Index) const
+	{
+		return Source->GetInPoint(Index);
+	}
 
-	FScope FFacade::GetInScope(const int32 Start, const int32 Count, const bool bInclusive) const { return Source->GetInScope(Start, Count, bInclusive); }
-	FScope FFacade::GetInScope(const PCGExMT::FScope& Scope) const { return Source->GetInScope(Scope); }
-	FScope FFacade::GetInFullScope() const { return Source->GetInFullScope(); }
-	FScope FFacade::GetInRange(const int32 Start, const int32 End, const bool bInclusive) const { return Source->GetInRange(Start, End, bInclusive); }
+	FMutablePoint FFacade::GetOutPoint(const int32 Index) const
+	{
+		return Source->GetOutPoint(Index);
+	}
 
-	FScope FFacade::GetOutScope(const int32 Start, const int32 Count, const bool bInclusive) const { return Source->GetOutScope(Start, Count, bInclusive); }
-	FScope FFacade::GetOutScope(const PCGExMT::FScope& Scope) const { return Source->GetOutScope(Scope); }
-	FScope FFacade::GetOutFullScope() const { return Source->GetOutFullScope(); }
-	FScope FFacade::GetOutRange(const int32 Start, const int32 End, const bool bInclusive) const { return Source->GetOutRange(Start, End, bInclusive); }
+	FScope FFacade::GetInScope(const int32 Start, const int32 Count, const bool bInclusive) const
+	{
+		return Source->GetInScope(Start, Count, bInclusive);
+	}
+
+	FScope FFacade::GetInScope(const PCGExMT::FScope& Scope) const
+	{
+		return Source->GetInScope(Scope);
+	}
+
+	FScope FFacade::GetInFullScope() const
+	{
+		return Source->GetInFullScope();
+	}
+
+	FScope FFacade::GetInRange(const int32 Start, const int32 End, const bool bInclusive) const
+	{
+		return Source->GetInRange(Start, End, bInclusive);
+	}
+
+	FScope FFacade::GetOutScope(const int32 Start, const int32 Count, const bool bInclusive) const
+	{
+		return Source->GetOutScope(Start, Count, bInclusive);
+	}
+
+	FScope FFacade::GetOutScope(const PCGExMT::FScope& Scope) const
+	{
+		return Source->GetOutScope(Scope);
+	}
+
+	FScope FFacade::GetOutFullScope() const
+	{
+		return Source->GetOutFullScope();
+	}
+
+	FScope FFacade::GetOutRange(const int32 Start, const int32 End, const bool bInclusive) const
+	{
+		return Source->GetOutRange(Start, End, bInclusive);
+	}
 
 	bool FFacade::ValidateOutputsBeforeWriting() const
 	{
@@ -1188,7 +1540,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 			for (int i = 0; i < Buffers.Num(); i++)
 			{
 				const TSharedPtr<IBuffer> Buffer = Buffers[i];
-				if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled()) { continue; }
+				if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled())
+				{
+					continue;
+				}
 
 				FPCGAttributeIdentifier Identifier = Buffer->Identifier;
 				bool bAlreadySet = false;
@@ -1207,12 +1562,18 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 
 	void FFacade::Flush(const TSharedPtr<IBuffer>& Buffer)
 	{
-		if (!Buffer || !Buffer.IsValid()) { return; }
+		if (!Buffer || !Buffer.IsValid())
+		{
+			return;
+		}
 
 		{
 			FWriteScopeLock WriteScopeLock(BufferLock);
 
-			if (Buffers.IsValidIndex(Buffer->BufferIndex)) { Buffers.RemoveAt(Buffer->BufferIndex); }
+			if (Buffers.IsValidIndex(Buffer->BufferIndex))
+			{
+				Buffers.RemoveAt(Buffer->BufferIndex);
+			}
 			BufferMap.Remove(Buffer->UID);
 
 			int32 WriteIndex = 0;
@@ -1220,7 +1581,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 			{
 				TSharedPtr<IBuffer> TempBuffer = Buffers[i];
 
-				if (!TempBuffer || !TempBuffer.IsValid()) { continue; }
+				if (!TempBuffer || !TempBuffer.IsValid())
+				{
+					continue;
+				}
 				TempBuffer->BufferIndex = WriteIndex++;
 				Buffers[TempBuffer->BufferIndex] = TempBuffer;
 			}
@@ -1232,7 +1596,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 	{
 		UPCGMetadata* Metadata = InData->MutableMetadata();
 
-		if (!Metadata) { return nullptr; }
+		if (!Metadata)
+		{
+			return nullptr;
+		}
 
 		Metadata->DeleteAttribute(MarkID);
 		FPCGMetadataAttribute<T>* Mark = Metadata->CreateAttribute<T>(MarkID, MarkValue, true, true);
@@ -1253,7 +1620,10 @@ template PCGEXCORE_API const FPCGMetadataAttribute<_TYPE>* FFacade::FindConstAtt
 		// 'template' spec required for clang on mac, and rider keeps removing it without the comment below.
 		// ReSharper disable once CppRedundantTemplateKeyword
 		const FPCGMetadataAttribute<T>* Mark = PCGExMetaHelpers::TryGetConstAttribute<T>(Metadata, MarkID);
-		if (!Mark) { return false; }
+		if (!Mark)
+		{
+			return false;
+		}
 		OutMark = Helpers::ReadDataValue(Mark);
 		return true;
 	}
@@ -1278,16 +1648,25 @@ template PCGEXCORE_API bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& Point
 	void WriteId(const TSharedRef<FPointIO>& PointIO, const FName IdName, const int64 Id)
 	{
 		PointIO->Tags->Set<int64>(IdName.ToString(), Id);
-		if (PointIO->GetOut()) { WriteMark(PointIO, IdName, Id); }
+		if (PointIO->GetOut())
+		{
+			WriteMark(PointIO, IdName, Id);
+		}
 	}
 
 	UPCGBasePointData* GetMutablePointData(FPCGContext* Context, const FPCGTaggedData& Source)
 	{
 		const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(Source.Data);
-		if (!SpatialData) { return nullptr; }
+		if (!SpatialData)
+		{
+			return nullptr;
+		}
 
 		const UPCGBasePointData* PointData = SpatialData->ToPointData(Context);
-		if (!PointData) { return nullptr; }
+		if (!PointData)
+		{
+			return nullptr;
+		}
 
 		return const_cast<UPCGBasePointData*>(PointData);
 	}
@@ -1298,7 +1677,9 @@ template PCGEXCORE_API bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& Point
 		PCGEX_ASYNC_TASK_NAME(FWriteTask)
 
 		explicit FWriteBufferTask(const TSharedPtr<IBuffer>& InBuffer, const bool InEnsureValidKeys = true)
-			: FTask(), bEnsureValidKeys(InEnsureValidKeys), Buffer(InBuffer)
+			: FTask()
+			  , bEnsureValidKeys(InEnsureValidKeys)
+			  , Buffer(InBuffer)
 		{
 		}
 
@@ -1307,7 +1688,10 @@ template PCGEXCORE_API bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& Point
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
-			if (!Buffer) { return; }
+			if (!Buffer)
+			{
+				return;
+			}
 			Buffer->Write(bEnsureValidKeys);
 		}
 	};
@@ -1324,7 +1708,10 @@ template PCGEXCORE_API bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& Point
 		}
 		else
 		{
-			if (!TaskManager || !TaskManager->IsAvailable()) { InBuffer->Write(InEnsureValidKeys); }
+			if (!TaskManager || !TaskManager->IsAvailable())
+			{
+				InBuffer->Write(InEnsureValidKeys);
+			}
 			PCGEX_LAUNCH(FWriteBufferTask, InBuffer, InEnsureValidKeys)
 		}
 	}
@@ -1346,12 +1733,18 @@ template PCGEXCORE_API bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& Point
 		TSharedPtr<FPointIOCollection> TargetsCollection = MakeShared<FPointIOCollection>(InContext, InputPinLabel, EIOInit::NoInit, bIsTransactional);
 		if (TargetsCollection->IsEmpty())
 		{
-			if (bRequired) { PCGEX_LOG_MISSING_INPUT(InContext, FText::Format(FText::FromString(TEXT("Missing or zero-points '{0}' inputs")), FText::FromName(InputPinLabel))) }
+			if (bRequired)
+			{
+				PCGEX_LOG_MISSING_INPUT(InContext, FText::Format(FText::FromString(TEXT("Missing or zero-points '{0}' inputs")), FText::FromName(InputPinLabel)))
+			}
 			return false;
 		}
 
 		OutFacades.Reserve(OutFacades.Num() + TargetsCollection->Num());
-		for (const TSharedPtr<FPointIO>& IO : TargetsCollection->Pairs) { OutFacades.Add(MakeShared<FFacade>(IO.ToSharedRef())); }
+		for (const TSharedPtr<FPointIO>& IO : TargetsCollection->Pairs)
+		{
+			OutFacades.Add(MakeShared<FFacade>(IO.ToSharedRef()));
+		}
 
 		return true;
 	}

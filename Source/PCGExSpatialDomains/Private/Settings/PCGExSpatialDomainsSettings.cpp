@@ -9,7 +9,7 @@ UPCGExSpatialDomainsSettings::UPCGExSpatialDomainsSettings()
 {
 	// Seed with the always-present Default channel. NormalizeSpatialChannels
 	// re-asserts this on every load/edit, so the seed is just for fresh installs.
-	SpatialChannels = { FPCGExSpatialChannelDefinition{PCGExSpatialChannels::Default} };
+	SpatialChannels = {FPCGExSpatialChannelDefinition{PCGExSpatialChannels::Default}};
 }
 
 void UPCGExSpatialDomainsSettings::PostInitProperties()
@@ -52,13 +52,16 @@ TArray<FName> UPCGExSpatialDomainsSettings::GetRegisteredKeys()
 		}
 		return Out;
 	}
-	return { PCGExSpatialChannels::Default };
+	return {PCGExSpatialChannels::Default};
 }
 
 void UPCGExSpatialDomainsSettings::ValidateChannelKey(FName& InOutKey, const UObject* Context)
 {
 	const UPCGExSpatialDomainsSettings* Settings = GetDefault<UPCGExSpatialDomainsSettings>();
-	if (!Settings) { return; }
+	if (!Settings)
+	{
+		return;
+	}
 
 	const bool bKnown = !InOutKey.IsNone()
 		&& Settings->SpatialChannels.ContainsByPredicate(
@@ -66,12 +69,15 @@ void UPCGExSpatialDomainsSettings::ValidateChannelKey(FName& InOutKey, const UOb
 			{
 				return Existing.Key.IsEqual(Key, ENameCase::IgnoreCase);
 			});
-	if (bKnown) { return; }
+	if (bKnown)
+	{
+		return;
+	}
 
 	UE_LOG(LogPCGExSpatialDomainsSettings, Warning,
-		TEXT("Spatial channel key '%s' (context: %s) not in project registry; falling back to 'Default'."),
-		*InOutKey.ToString(),
-		Context ? *Context->GetPathName() : TEXT("<unknown>"));
+	       TEXT("Spatial channel key '%s' (context: %s) not in project registry; falling back to 'Default'."),
+	       *InOutKey.ToString(),
+	       Context ? *Context->GetPathName() : TEXT("<unknown>"));
 	InOutKey = PCGExSpatialChannels::Default;
 }
 
@@ -93,7 +99,10 @@ void UPCGExSpatialDomainsSettings::RebuildCompiledMatrix()
 	// SpatialChannels positions exactly.
 	TArray<FName> Keys;
 	Keys.Reserve(SpatialChannels.Num());
-	for (const FPCGExSpatialChannelDefinition& Entry : SpatialChannels) { Keys.Add(Entry.Key); }
+	for (const FPCGExSpatialChannelDefinition& Entry : SpatialChannels)
+	{
+		Keys.Add(Entry.Key);
+	}
 
 	CompiledMatrix.Compile(Keys, ChannelProfiles);
 }
@@ -106,13 +115,19 @@ void UPCGExSpatialDomainsSettings::NormalizeSpatialChannels()
 
 	for (const FPCGExSpatialChannelDefinition& Entry : SpatialChannels)
 	{
-		if (Entry.Key.IsNone()) { continue; }
+		if (Entry.Key.IsNone())
+		{
+			continue;
+		}
 		const bool bAlready = Cleaned.ContainsByPredicate(
 			[Key = Entry.Key](const FPCGExSpatialChannelDefinition& Existing)
 			{
 				return Existing.Key.IsEqual(Key, ENameCase::IgnoreCase);
 			});
-		if (!bAlready) { Cleaned.Add(Entry); }
+		if (!bAlready)
+		{
+			Cleaned.Add(Entry);
+		}
 	}
 
 	// Default is reserved -- always present at index 0. Re-add even if the user removed it.

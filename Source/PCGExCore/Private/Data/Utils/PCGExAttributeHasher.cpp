@@ -20,14 +20,20 @@ namespace PCGEx
 	bool FAttributeHasher::Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InFacade)
 	{
 		NumValues = InFacade->GetNum();
-		if (NumValues <= 0) { return false; }
+		if (NumValues <= 0)
+		{
+			return false;
+		}
 
 		DataFacade = InFacade;
 
 		bool bDirectFetch = !RequiresCompilation();
 
 		PCGExData::FProxyDescriptor Descriptor(DataFacade, PCGExData::EProxyRole::Read);
-		if (bDirectFetch) { Descriptor.AddFlags(PCGExData::EProxyFlags::Direct); }
+		if (bDirectFetch)
+		{
+			Descriptor.AddFlags(PCGExData::EProxyFlags::Direct);
+		}
 
 		if (!Descriptor.CaptureStrict(InContext, Config.SourceAttribute, PCGExData::EIOSide::In, true))
 		{
@@ -50,8 +56,14 @@ namespace PCGEx
 			const PCGExValueHash A = ValuesBuffer->ReadValueHash(0);
 			const PCGExValueHash B = ValuesBuffer->ReadValueHash(NumValues - 1);
 
-			if (Config.Scope == EPCGExDataHashScope::First) { OutHash = A; }
-			else if (Config.Scope == EPCGExDataHashScope::Last) { OutHash = B; }
+			if (Config.Scope == EPCGExDataHashScope::First)
+			{
+				OutHash = A;
+			}
+			else if (Config.Scope == EPCGExDataHashScope::Last)
+			{
+				OutHash = B;
+			}
 			else if (Config.Scope == EPCGExDataHashScope::FirstAndLast)
 			{
 				if (Config.bSortInputValues)
@@ -65,7 +77,10 @@ namespace PCGEx
 						OutHash = A < B ? HashCombineFast(B, A) : HashCombineFast(A, B);
 					}
 				}
-				else { OutHash = HashCombineFast(A, B); }
+				else
+				{
+					OutHash = HashCombineFast(A, B);
+				}
 			}
 		}
 
@@ -77,10 +92,12 @@ namespace PCGEx
 		switch (Config.Scope)
 		{
 		case EPCGExDataHashScope::All:
-		case EPCGExDataHashScope::Uniques: return true;
+		case EPCGExDataHashScope::Uniques:
+			return true;
 		case EPCGExDataHashScope::FirstAndLast:
 		case EPCGExDataHashScope::First:
-		case EPCGExDataHashScope::Last: return false;
+		case EPCGExDataHashScope::Last:
+			return false;
 		}
 
 		return false;
@@ -141,7 +158,10 @@ namespace PCGEx
 			{
 				bool bIsAlreadySet = false;
 				HashesSet.Add(V, &bIsAlreadySet);
-				if (!bIsAlreadySet) { UniqueHashes.Add(V); }
+				if (!bIsAlreadySet)
+				{
+					UniqueHashes.Add(V);
+				}
 			}
 
 			Hashes.Empty();
@@ -150,13 +170,28 @@ namespace PCGEx
 
 		if (Config.bSortInputValues)
 		{
-			if (Config.Sorting == EPCGExSortDirection::Ascending) { Hashes.Sort([](const int32 A, const int32 B) { return A < B; }); }
-			else { Hashes.Sort([](const int32 A, const int32 B) { return A > B; }); }
+			if (Config.Sorting == EPCGExSortDirection::Ascending)
+			{
+				Hashes.Sort([](const int32 A, const int32 B)
+				{
+					return A < B;
+				});
+			}
+			else
+			{
+				Hashes.Sort([](const int32 A, const int32 B)
+				{
+					return A > B;
+				});
+			}
 		}
 
 		//FXxHash64::HashBuffer(Hashes.GetData(), Hashes.Num() * sizeof(uint32)).Hash
 		OutHash = CityHash32(reinterpret_cast<const char*>(Hashes.GetData()), Hashes.Num() * sizeof(uint32));
 
-		if (CompleteCallback) { CompleteCallback(); }
+		if (CompleteCallback)
+		{
+			CompleteCallback();
+		}
 	}
 }

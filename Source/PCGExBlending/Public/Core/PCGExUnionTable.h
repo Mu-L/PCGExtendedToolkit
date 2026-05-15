@@ -37,7 +37,9 @@ namespace PCGExData
 		FUnionStreamRecord() = default;
 
 		FUnionStreamRecord(const uint64 InKey, const int32 InIO, const int32 InIndex)
-			: Key(InKey), IO(InIO), Index(InIndex)
+			: Key(InKey)
+			  , IO(InIO)
+			  , Index(InIndex)
 		{
 		}
 	};
@@ -56,8 +58,15 @@ namespace PCGExData
 		virtual ~FUnionTable() override = default;
 
 		// IUnionMetadata
-		virtual int32 Num() const override { return Offsets.Num() > 0 ? Offsets.Num() - 1 : 0; }
-		virtual int32 Size(const int32 EntryIndex) const override { return Offsets[EntryIndex + 1] - Offsets[EntryIndex]; }
+		virtual int32 Num() const override
+		{
+			return Offsets.Num() > 0 ? Offsets.Num() - 1 : 0;
+		}
+
+		virtual int32 Size(const int32 EntryIndex) const override
+		{
+			return Offsets[EntryIndex + 1] - Offsets[EntryIndex];
+		}
 
 		virtual int32 ComputeWeights(
 			int32 EntryIndex,
@@ -72,7 +81,10 @@ namespace PCGExData
 		virtual bool IOIndexOverlap(int32 EntryIndex, const TSet<int32>& InIndices) const override;
 
 		// FUnionTable-specific (not on interface)
-		FORCEINLINE uint64 GetKey(const int32 EntryIndex) const { return Keys[EntryIndex]; }
+		FORCEINLINE uint64 GetKey(const int32 EntryIndex) const
+		{
+			return Keys[EntryIndex];
+		}
 
 		FORCEINLINE TConstArrayView<FElement> Get(const int32 EntryIndex) const
 		{
@@ -99,17 +111,37 @@ namespace PCGExData
 	public:
 		FUnionTableBuilder() = default;
 
-		explicit FUnionTableBuilder(const int32 NumScopes) { Init(NumScopes); }
+		explicit FUnionTableBuilder(const int32 NumScopes)
+		{
+			Init(NumScopes);
+		}
 
 		~FUnionTableBuilder() = default;
 
-		void Init(const int32 NumScopes) { ScopedRecords.SetNum(NumScopes); }
-		FORCEINLINE int32 NumScopes() const { return ScopedRecords.Num(); }
+		void Init(const int32 NumScopes)
+		{
+			ScopedRecords.SetNum(NumScopes);
+		}
 
-		FORCEINLINE TArray<FUnionStreamRecord>& GetScope(const int32 ScopeIndex) { return ScopedRecords[ScopeIndex]; }
-		FORCEINLINE const TArray<FUnionStreamRecord>& GetScope(const int32 ScopeIndex) const { return ScopedRecords[ScopeIndex]; }
+		FORCEINLINE int32 NumScopes() const
+		{
+			return ScopedRecords.Num();
+		}
 
-		FORCEINLINE void Reserve(const int32 ScopeIndex, const int32 ExpectedRecords) { ScopedRecords[ScopeIndex].Reserve(ExpectedRecords); }
+		FORCEINLINE TArray<FUnionStreamRecord>& GetScope(const int32 ScopeIndex)
+		{
+			return ScopedRecords[ScopeIndex];
+		}
+
+		FORCEINLINE const TArray<FUnionStreamRecord>& GetScope(const int32 ScopeIndex) const
+		{
+			return ScopedRecords[ScopeIndex];
+		}
+
+		FORCEINLINE void Reserve(const int32 ScopeIndex, const int32 ExpectedRecords)
+		{
+			ScopedRecords[ScopeIndex].Reserve(ExpectedRecords);
+		}
 
 		FORCEINLINE void Emit(const int32 ScopeIndex, const uint64 Key, const int32 IO, const int32 Index)
 		{

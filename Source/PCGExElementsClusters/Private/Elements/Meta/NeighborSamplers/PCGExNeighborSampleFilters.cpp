@@ -29,14 +29,26 @@ void FPCGExNeighborSampleFilters::PrepareForCluster(FPCGExContext* InContext, co
 
 	if (Config.bWriteInsideNum)
 	{
-		if (!Config.bNormalizeInsideNum) { NumInsideBuffer = VtxDataFacade->GetWritable<int32>(Config.InsideNumAttributeName, 0, true, PCGExData::EBufferInit::New); }
-		else { NormalizedNumInsideBuffer = VtxDataFacade->GetWritable<double>(Config.InsideNumAttributeName, 0, true, PCGExData::EBufferInit::New); }
+		if (!Config.bNormalizeInsideNum)
+		{
+			NumInsideBuffer = VtxDataFacade->GetWritable<int32>(Config.InsideNumAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
+		else
+		{
+			NormalizedNumInsideBuffer = VtxDataFacade->GetWritable<double>(Config.InsideNumAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
 	}
 
 	if (Config.bWriteOutsideNum)
 	{
-		if (!Config.bNormalizeInsideNum) { NumOutsideBuffer = VtxDataFacade->GetWritable<int32>(Config.OutsideNumAttributeName, 0, true, PCGExData::EBufferInit::New); }
-		else { NormalizedNumOutsideBuffer = VtxDataFacade->GetWritable<double>(Config.OutsideNumAttributeName, 0, true, PCGExData::EBufferInit::New); }
+		if (!Config.bNormalizeInsideNum)
+		{
+			NumOutsideBuffer = VtxDataFacade->GetWritable<int32>(Config.OutsideNumAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
+		else
+		{
+			NormalizedNumOutsideBuffer = VtxDataFacade->GetWritable<double>(Config.OutsideNumAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
 	}
 
 	if (Config.bWriteTotalNum)
@@ -46,14 +58,26 @@ void FPCGExNeighborSampleFilters::PrepareForCluster(FPCGExContext* InContext, co
 
 	if (Config.bWriteInsideWeight)
 	{
-		if (!Config.bNormalizeInsideWeight) { WeightInsideBuffer = VtxDataFacade->GetWritable<double>(Config.InsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New); }
-		else { NormalizedWeightInsideBuffer = VtxDataFacade->GetWritable<double>(Config.InsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New); }
+		if (!Config.bNormalizeInsideWeight)
+		{
+			WeightInsideBuffer = VtxDataFacade->GetWritable<double>(Config.InsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
+		else
+		{
+			NormalizedWeightInsideBuffer = VtxDataFacade->GetWritable<double>(Config.InsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
 	}
 
 	if (Config.bWriteOutsideWeight)
 	{
-		if (!Config.bNormalizeOutsideWeight) { WeightOutsideBuffer = VtxDataFacade->GetWritable<double>(Config.OutsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New); }
-		else { NormalizedWeightOutsideBuffer = VtxDataFacade->GetWritable<double>(Config.OutsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New); }
+		if (!Config.bNormalizeOutsideWeight)
+		{
+			WeightOutsideBuffer = VtxDataFacade->GetWritable<double>(Config.OutsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
+		else
+		{
+			NormalizedWeightOutsideBuffer = VtxDataFacade->GetWritable<double>(Config.OutsideWeightAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
 	}
 
 	if (Config.bWriteTotalWeight)
@@ -120,21 +144,51 @@ void FPCGExNeighborSampleFilters::FinalizeNode(const PCGExClusters::FNode& Targe
 	const int32 WriteIndex = TargetNode.PointIndex;
 	const int32 ReadIndex = TargetNode.Index;
 
-	if (NumInsideBuffer) { NumInsideBuffer->SetValue(WriteIndex, Inside[ReadIndex]); }
-	else if (NormalizedNumInsideBuffer) { NormalizedNumInsideBuffer->SetValue(WriteIndex, static_cast<double>(Inside[ReadIndex]) / static_cast<double>(Count)); }
+	if (NumInsideBuffer)
+	{
+		NumInsideBuffer->SetValue(WriteIndex, Inside[ReadIndex]);
+	}
+	else if (NormalizedNumInsideBuffer)
+	{
+		NormalizedNumInsideBuffer->SetValue(WriteIndex, static_cast<double>(Inside[ReadIndex]) / static_cast<double>(Count));
+	}
 
-	if (NumOutsideBuffer) { NumOutsideBuffer->SetValue(WriteIndex, Outside[ReadIndex]); }
-	else if (NormalizedNumOutsideBuffer) { NormalizedNumOutsideBuffer->SetValue(WriteIndex, static_cast<double>(Outside[ReadIndex]) / static_cast<double>(Count)); }
+	if (NumOutsideBuffer)
+	{
+		NumOutsideBuffer->SetValue(WriteIndex, Outside[ReadIndex]);
+	}
+	else if (NormalizedNumOutsideBuffer)
+	{
+		NormalizedNumOutsideBuffer->SetValue(WriteIndex, static_cast<double>(Outside[ReadIndex]) / static_cast<double>(Count));
+	}
 
-	if (TotalNumBuffer) { TotalNumBuffer->SetValue(WriteIndex, Count); }
+	if (TotalNumBuffer)
+	{
+		TotalNumBuffer->SetValue(WriteIndex, Count);
+	}
 
-	if (WeightInsideBuffer) { WeightInsideBuffer->SetValue(WriteIndex, InsideWeight[ReadIndex]); }
-	else if (NormalizedWeightInsideBuffer) { NormalizedWeightInsideBuffer->SetValue(WriteIndex, InsideWeight[ReadIndex] / TotalWeight); }
+	if (WeightInsideBuffer)
+	{
+		WeightInsideBuffer->SetValue(WriteIndex, InsideWeight[ReadIndex]);
+	}
+	else if (NormalizedWeightInsideBuffer)
+	{
+		NormalizedWeightInsideBuffer->SetValue(WriteIndex, InsideWeight[ReadIndex] / TotalWeight);
+	}
 
-	if (WeightOutsideBuffer) { WeightOutsideBuffer->SetValue(WriteIndex, Outside[ReadIndex]); }
-	else if (NormalizedWeightOutsideBuffer) { NormalizedWeightOutsideBuffer->SetValue(WriteIndex, OutsideWeight[ReadIndex] / TotalWeight); }
+	if (WeightOutsideBuffer)
+	{
+		WeightOutsideBuffer->SetValue(WriteIndex, Outside[ReadIndex]);
+	}
+	else if (NormalizedWeightOutsideBuffer)
+	{
+		NormalizedWeightOutsideBuffer->SetValue(WriteIndex, OutsideWeight[ReadIndex] / TotalWeight);
+	}
 
-	if (TotalWeightBuffer) { TotalWeightBuffer->SetValue(WriteIndex, TotalWeight); }
+	if (TotalWeightBuffer)
+	{
+		TotalWeightBuffer->SetValue(WriteIndex, TotalWeight);
+	}
 }
 
 void FPCGExNeighborSampleFilters::CompleteOperation()
@@ -173,12 +227,30 @@ bool UPCGExNeighborSampleFiltersSettings::SupportsEdgeFilters(bool& bIsRequired)
 
 UPCGExFactoryData* UPCGExNeighborSampleFiltersSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
 {
-	if (Config.bWriteInsideNum) { PCGEX_VALIDATE_NAME_C_RET(InContext, Config.InsideNumAttributeName, nullptr) }
-	if (Config.bWriteOutsideNum) { PCGEX_VALIDATE_NAME_C_RET(InContext, Config.OutsideNumAttributeName, nullptr) }
-	if (Config.bWriteTotalNum) { PCGEX_VALIDATE_NAME_C_RET(InContext, Config.TotalNumAttributeName, nullptr) }
-	if (Config.bWriteInsideWeight) { PCGEX_VALIDATE_NAME_C_RET(InContext, Config.InsideWeightAttributeName, nullptr) }
-	if (Config.bWriteOutsideWeight) { PCGEX_VALIDATE_NAME_C_RET(InContext, Config.OutsideWeightAttributeName, nullptr) }
-	if (Config.bWriteTotalWeight) { PCGEX_VALIDATE_NAME_C_RET(InContext, Config.TotalWeightAttributeName, nullptr) }
+	if (Config.bWriteInsideNum)
+	{
+		PCGEX_VALIDATE_NAME_C_RET(InContext, Config.InsideNumAttributeName, nullptr)
+	}
+	if (Config.bWriteOutsideNum)
+	{
+		PCGEX_VALIDATE_NAME_C_RET(InContext, Config.OutsideNumAttributeName, nullptr)
+	}
+	if (Config.bWriteTotalNum)
+	{
+		PCGEX_VALIDATE_NAME_C_RET(InContext, Config.TotalNumAttributeName, nullptr)
+	}
+	if (Config.bWriteInsideWeight)
+	{
+		PCGEX_VALIDATE_NAME_C_RET(InContext, Config.InsideWeightAttributeName, nullptr)
+	}
+	if (Config.bWriteOutsideWeight)
+	{
+		PCGEX_VALIDATE_NAME_C_RET(InContext, Config.OutsideWeightAttributeName, nullptr)
+	}
+	if (Config.bWriteTotalWeight)
+	{
+		PCGEX_VALIDATE_NAME_C_RET(InContext, Config.TotalWeightAttributeName, nullptr)
+	}
 
 	UPCGExNeighborSamplerFactoryFilters* SamplerFactory = InContext->ManagedObjects->New<UPCGExNeighborSamplerFactoryFilters>();
 	SamplerFactory->Config = Config;

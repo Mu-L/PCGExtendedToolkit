@@ -131,7 +131,10 @@ namespace PCGExData
 		template <typename T>
 		T GetValue(const FString& Key, const T FallbackValue) const
 		{
-			if (const TSharedPtr<IDataValue> Value = GetValue(Key)) { return Value->GetValue<T>(); }
+			if (const TSharedPtr<IDataValue> Value = GetValue(Key))
+			{
+				return Value->GetValue<T>();
+			}
 			return FallbackValue;
 		}
 

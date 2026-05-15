@@ -47,8 +47,16 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS(DiscardSame, "Discard Same", "Discard entire datasets based on a selection of parameters");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
 #endif
 
 protected:

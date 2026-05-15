@@ -5,18 +5,18 @@
 
 #include "PCGDataAsset.h"
 #include "PCGParamData.h"
+#include "Collections/PCGExPCGDataAssetCollection.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Data/PCGSpatialData.h"
+#include "Data/PCGLandscapeData.h"
 #include "Data/PCGPointData.h"
-#include "Data/PCGSplineData.h"
 #include "Data/PCGPolyLineData.h"
 #include "Data/PCGPrimitiveData.h"
+#include "Data/PCGSpatialData.h"
+#include "Data/PCGSplineData.h"
 #include "Data/PCGSurfaceData.h"
 #include "Data/PCGVolumeData.h"
-#include "Data/PCGLandscapeData.h"
-#include "Collections/PCGExPCGDataAssetCollection.h"
-#include "Data/PCGExDataTags.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "Helpers/PCGExRandomHelpers.h"
 
@@ -70,7 +70,10 @@ void FPCGExSharedAssetPool::LoadAllAssets(const TSharedPtr<PCGExMT::FTaskManager
 
 	PCGExHelpers::Load(
 		TaskManager,
-		[PathsToLoad]() { return PathsToLoad->Array(); },
+		[PathsToLoad]()
+		{
+			return PathsToLoad->Array();
+		},
 		[PCGEX_ASYNC_THIS_CAPTURE, OnLoadEnd](const bool bSuccess, TSharedPtr<FStreamableHandle> StreamableHandle)
 		{
 			PCGEX_ASYNC_THIS
@@ -140,7 +143,8 @@ namespace PCGExPCGDataAssetLoader
 
 
 	FSpatialTransformResult::FSpatialTransformResult(const TSharedPtr<PCGExMT::FTask>& InTask)
-		: Result(ETransformResult::Success), Task(InTask)
+		: Result(ETransformResult::Success)
+		  , Task(InTask)
 	{
 	}
 
@@ -150,7 +154,8 @@ namespace PCGExPCGDataAssetLoader
 		PCGEX_ASYNC_TASK_NAME(FTransformTask)
 
 		FTransformTask(const FTransform& InTransform)
-			: FTask(), Transform(InTransform)
+			: FTask()
+			  , Transform(InTransform)
 		{
 		}
 
@@ -163,7 +168,8 @@ namespace PCGExPCGDataAssetLoader
 		PCGEX_ASYNC_TASK_NAME(FTransformPoints)
 
 		FTransformPoints(const FTransform& InTransform, UPCGBasePointData* InData)
-			: FTransformTask(InTransform), Data(InData)
+			: FTransformTask(InTransform)
+			  , Data(InData)
 		{
 		}
 
@@ -190,7 +196,8 @@ namespace PCGExPCGDataAssetLoader
 		PCGEX_ASYNC_TASK_NAME(FTransformSpline)
 
 		FTransformSpline(const FTransform& InTransform, UPCGSplineData* InData)
-			: FTransformTask(InTransform), Data(InData)
+			: FTransformTask(InTransform)
+			  , Data(InData)
 		{
 		}
 
@@ -233,7 +240,8 @@ namespace PCGExPCGDataAssetLoader
 		PCGEX_ASYNC_TASK_NAME(FTransformPolyline)
 
 		FTransformPolyline(const FTransform& InTransform, UPCGPolyLineData* InData)
-			: FTransformTask(InTransform), Data(InData)
+			: FTransformTask(InTransform)
+			  , Data(InData)
 		{
 		}
 
@@ -250,7 +258,8 @@ namespace PCGExPCGDataAssetLoader
 		PCGEX_ASYNC_TASK_NAME(FTransformVolume)
 
 		FTransformVolume(const FTransform& InTransform, UPCGVolumeData* InData)
-			: FTransformTask(InTransform), Data(InData)
+			: FTransformTask(InTransform)
+			  , Data(InData)
 		{
 		}
 
@@ -264,23 +273,35 @@ namespace PCGExPCGDataAssetLoader
 
 	FSpatialTransformResult PrepareTransformTask(UPCGSpatialData* InData, const FTransform& InTransform, const bool bOmitIfEmpty)
 	{
-		if (!InData) { return FSpatialTransformResult(); }
+		if (!InData)
+		{
+			return FSpatialTransformResult();
+		}
 
 		if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
 		{
-			if (bOmitIfEmpty && PointData->IsEmpty()) { return FSpatialTransformResult(); }
+			if (bOmitIfEmpty && PointData->IsEmpty())
+			{
+				return FSpatialTransformResult();
+			}
 			return FSpatialTransformResult(MakeShared<FTransformPoints>(InTransform, PointData));
 		}
 
 		if (UPCGSplineData* SplineData = Cast<UPCGSplineData>(InData))
 		{
-			if (bOmitIfEmpty && !SplineData->GetNumSegments()) { return FSpatialTransformResult(); }
+			if (bOmitIfEmpty && !SplineData->GetNumSegments())
+			{
+				return FSpatialTransformResult();
+			}
 			return FSpatialTransformResult(MakeShared<FTransformSpline>(InTransform, SplineData));
 		}
 
 		if (UPCGPolyLineData* PolyLineData = Cast<UPCGPolyLineData>(InData))
 		{
-			if (bOmitIfEmpty && !PolyLineData->GetNumSegments()) { return FSpatialTransformResult(); }
+			if (bOmitIfEmpty && !PolyLineData->GetNumSegments())
+			{
+				return FSpatialTransformResult();
+			}
 			return FSpatialTransformResult(MakeShared<FTransformPolyline>(InTransform, PolyLineData));
 		}
 
@@ -313,12 +334,18 @@ namespace PCGExPCGDataAssetLoader
 
 void FPCGExPCGDataAssetLoaderContext::RegisterOutput(const FPCGTaggedData& InTaggedData, bool bAddPinTag, const int32 InIndex)
 {
-	if (!InTaggedData.Data) { return; }
+	if (!InTaggedData.Data)
+	{
+		return;
+	}
 
 	FName TargetPin = PCGExPCGDataAssetLoader::OutputPinDefault;
 
 	// Check if we have a custom pin that matches
-	if (CustomPinNames.Contains(InTaggedData.Pin)) { TargetPin = InTaggedData.Pin; }
+	if (CustomPinNames.Contains(InTaggedData.Pin))
+	{
+		TargetPin = InTaggedData.Pin;
+	}
 
 	FPCGTaggedData LocalOutputData = InTaggedData;
 
@@ -339,13 +366,19 @@ void FPCGExPCGDataAssetLoaderContext::RegisterOutput(const FPCGTaggedData& InTag
 
 void FPCGExPCGDataAssetLoaderContext::RegisterNonSpatialData(const FPCGTaggedData& InTaggedData, const int32 InIndex)
 {
-	if (!InTaggedData.Data) { return; }
+	if (!InTaggedData.Data)
+	{
+		return;
+	}
 
 	const uint32 UID = InTaggedData.Data->GetUniqueID();
 
 	{
 		FReadScopeLock ReadLock(NonSpatialLock);
-		if (UniqueNonSpatialUIDs.Contains(UID)) { return; }
+		if (UniqueNonSpatialUIDs.Contains(UID))
+		{
+			return;
+		}
 	}
 
 	{
@@ -353,7 +386,10 @@ void FPCGExPCGDataAssetLoaderContext::RegisterNonSpatialData(const FPCGTaggedDat
 
 		bool bAlreadyInSet = false;
 		UniqueNonSpatialUIDs.Add(UID, &bAlreadyInSet);
-		if (bAlreadyInSet) { return; }
+		if (bAlreadyInSet)
+		{
+			return;
+		}
 
 		// Non-spatial goes to appropriate pin, with Pin: tag if going to default
 		RegisterOutput(InTaggedData, true, InIndex * -1);
@@ -402,7 +438,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(PCGDataAssetLoader)
 
 bool FPCGExPCGDataAssetLoaderElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PCGDataAssetLoader)
 
@@ -442,7 +481,10 @@ bool FPCGExPCGDataAssetLoaderElement::AdvanceWork(FPCGExContext* InContext, cons
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -456,7 +498,10 @@ bool FPCGExPCGDataAssetLoaderElement::AdvanceWork(FPCGExContext* InContext, cons
 	// Stage outputs from all pins
 	for (auto& Pair : Context->OutputByPin)
 	{
-		Pair.Value.Sort([&](const FPCGTaggedData& A, const FPCGTaggedData& B) { return Context->OutputIndices[A.Data->GetUniqueID()] < Context->OutputIndices[A.Data->GetUniqueID()]; });
+		Pair.Value.Sort([&](const FPCGTaggedData& A, const FPCGTaggedData& B)
+		{
+			return Context->OutputIndices[A.Data->GetUniqueID()] < Context->OutputIndices[A.Data->GetUniqueID()];
+		});
 		Context->OutputData.TaggedData.Append(Pair.Value);
 	}
 
@@ -505,7 +550,10 @@ namespace PCGExPCGDataAssetLoader
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::NoInit)
 
@@ -542,18 +590,30 @@ namespace PCGExPCGDataAssetLoader
 		// Collect entry hashes and register to shared pool - no loading here (parallel safe)
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const int64 Hash = EntryHashGetter->Read(Index);
-			if (Hash == 0 || Hash == -1) { continue; }
+			if (Hash == 0 || Hash == -1)
+			{
+				continue;
+			}
 
 			int16 SecondaryIndex = 0;
 			FPCGExEntryAccessResult Result = Context->CollectionUnpacker->ResolveEntry(Hash, SecondaryIndex);
 
-			if (!Result.IsValid()) { continue; }
+			if (!Result.IsValid())
+			{
+				continue;
+			}
 
 			// Check if this is a PCGDataAsset entry
-			if (!Result.Entry->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset)) { continue; }
+			if (!Result.Entry->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset))
+			{
+				continue;
+			}
 
 			const FPCGExPCGDataAssetCollectionEntry* PCGDataEntry = static_cast<const FPCGExPCGDataAssetCollectionEntry*>(Result.Entry);
 
@@ -600,7 +660,10 @@ namespace PCGExPCGDataAssetLoader
 	FSpatialTransformResult FProcessor::ProcessTaggedData(int32 PointIndex, const FTransform& TargetTransform, const FPCGTaggedData& InTaggedData, FClusterIdRemapper& ClusterRemapper)
 	{
 		UPCGData* Data = const_cast<UPCGData*>(InTaggedData.Data.Get());
-		if (!Data) { return FSpatialTransformResult(); }
+		if (!Data)
+		{
+			return FSpatialTransformResult();
+		}
 
 		const int32 OutIdx = BatchIndex * 1000000 + PointIndex;
 
@@ -699,8 +762,14 @@ namespace PCGExPCGDataAssetLoader
 		}
 
 		// Apply replacements
-		for (const FString& Tag : TagsToRemove) { Tags.Remove(Tag); }
-		for (const FString& Tag : TagsToAdd) { Tags.Add(Tag); }
+		for (const FString& Tag : TagsToRemove)
+		{
+			Tags.Remove(Tag);
+		}
+		for (const FString& Tag : TagsToAdd)
+		{
+			Tags.Add(Tag);
+		}
 	}
 
 	void FProcessor::CompleteWork()
@@ -716,14 +785,23 @@ namespace PCGExPCGDataAssetLoader
 
 		for (int32 Index = 0; Index < NumPoints; Index++)
 		{
-			if (!PointFilterCache[Index]) { continue; }
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
 
 			const uint64 EntryHash = PointEntryHashes[Index];
-			if (EntryHash == 0) { continue; }
+			if (EntryHash == 0)
+			{
+				continue;
+			}
 
 			// Get asset from shared pool
 			UPCGDataAsset* DataAsset = Context->SharedAssetPool->GetAsset(EntryHash);
-			if (!DataAsset) { continue; }
+			if (!DataAsset)
+			{
+				continue;
+			}
 
 			const FTransform& TargetTransform = InTransforms[Index];
 
@@ -735,14 +813,23 @@ namespace PCGExPCGDataAssetLoader
 			for (const FPCGTaggedData& TaggedData : DataAsset->Data.GetAllInputs())
 			{
 				// Strip embedded CollectionMap entries (consumed by merge in FBatch::OnLoadAssetsComplete)
-				if (Settings->bMergeEmbeddedCollectionMaps && TaggedData.Pin == FName(TEXT("CollectionMap"))) { continue; }
+				if (Settings->bMergeEmbeddedCollectionMaps && TaggedData.Pin == FName(TEXT("CollectionMap")))
+				{
+					continue;
+				}
 
 				// Apply tag filtering
-				if (!PassesTagFilter(TaggedData)) { continue; }
+				if (!PassesTagFilter(TaggedData))
+				{
+					continue;
+				}
 
 				// Process the data (cluster remapper ensures paired data gets consistent new IDs)
 				FSpatialTransformResult Result = ProcessTaggedData(Index, TargetTransform, TaggedData, ClusterRemapper);
-				if (Result.Task) { Tasks.Add(Result.Task); }
+				if (Result.Task)
+				{
+					Tasks.Add(Result.Task);
+				}
 			}
 		}
 
@@ -801,14 +888,23 @@ namespace PCGExPCGDataAssetLoader
 				for (const auto& Pair : Context->SharedAssetPool->GetEntryMap())
 				{
 					UPCGDataAsset* Asset = Context->SharedAssetPool->GetAsset(Pair.Key);
-					if (!Asset) { continue; }
+					if (!Asset)
+					{
+						continue;
+					}
 
 					for (const FPCGTaggedData& TD : Asset->Data.TaggedData)
 					{
-						if (TD.Pin != FName(TEXT("CollectionMap"))) { continue; }
+						if (TD.Pin != FName(TEXT("CollectionMap")))
+						{
+							continue;
+						}
 
 						const UPCGParamData* ParamData = Cast<UPCGParamData>(TD.Data);
-						if (!ParamData) { continue; }
+						if (!ParamData)
+						{
+							continue;
+						}
 
 						// Unpack into temporary unpacker (accumulates all GUID→Path pairs)
 						TempUnpacker.UnpackDataset(Context, ParamData);

@@ -121,4 +121,10 @@ namespace PCGExCollections::Labels
 	const FName Tag_CollectionPath = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Path"));
 	const FName Tag_CollectionIdx = FName(PCGExCommon::PCGExPrefix + TEXT("Collection/Idx"));
 	const FName Tag_EntryIdx = FName(PCGExCommon::PCGExPrefix + TEXT("CollectionEntry"));
+
+	const FName CollectionMapPin = TEXT("CollectionMap");
+
+	const FName MeshesPin = TEXT("Meshes");
+	const FName ActorsPin = TEXT("Actors");
+	const FName LevelsPin = TEXT("Levels");
 }

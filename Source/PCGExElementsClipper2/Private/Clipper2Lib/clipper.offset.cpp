@@ -8,8 +8,8 @@
 *******************************************************************************/
 
 #include "Clipper2Lib/clipper.offset.h"
-#include "Math/UnrealMathUtility.h"
 #include "Clipper2Lib/clipper.h"
+#include "Math/UnrealMathUtility.h"
 
 namespace PCGExClipper2Lib
 {
@@ -140,7 +140,9 @@ namespace PCGExClipper2Lib
 	//------------------------------------------------------------------------------
 
 	ClipperOffset::Group::Group(const Paths64& _paths, JoinType _join_type, EndType _end_type)
-		: paths_in(_paths), join_type(_join_type), end_type(_end_type)
+		: paths_in(_paths)
+		  , join_type(_join_type)
+		  , end_type(_end_type)
 	{
 		bool is_joined =
 			(end_type == EndType::Polygon) ||

@@ -6,14 +6,14 @@
 #include <functional>
 
 #include "CoreMinimal.h"
-#include "PCGPin.h"
 #include "PCGExCoreMacros.h"
+#include "PCGPin.h"
 
+#include "PCGExCoreSettingsCache.h" // Boilerplate
+#include "PCGExPointsMT.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
-#include "PCGExCoreSettingsCache.h" // Boilerplate
-#include "PCGExPointsMT.h"
 
 #include "PCGExPointsProcessor.generated.h"
 
@@ -70,33 +70,76 @@ public:
 	//~Begin UPCGSettings	
 #if WITH_EDITOR
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::PointOps; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::PointOps;
+	}
 #endif
 
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual void InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
-	virtual bool OnlyPassThroughOneEdgeWhenDisabled() const override { return false; }
+
+	virtual bool OnlyPassThroughOneEdgeWhenDisabled() const override
+	{
+		return false;
+	}
+
 	//~End UPCGSettings
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual bool IsInputless() const { return false; }
+	virtual bool IsInputless() const
+	{
+		return false;
+	}
 
-	virtual FName GetMainInputPin() const { return PCGPinConstants::DefaultInputLabel; }
-	virtual FName GetMainOutputPin() const { return PCGPinConstants::DefaultOutputLabel; }
-	virtual bool GetMainAcceptMultipleData() const { return true; }
-	virtual bool GetIsMainTransactional() const { return false; }
+	virtual FName GetMainInputPin() const
+	{
+		return PCGPinConstants::DefaultInputLabel;
+	}
+
+	virtual FName GetMainOutputPin() const
+	{
+		return PCGPinConstants::DefaultOutputLabel;
+	}
+
+	virtual bool GetMainAcceptMultipleData() const
+	{
+		return true;
+	}
+
+	virtual bool GetIsMainTransactional() const
+	{
+		return false;
+	}
 
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const;
 
-	virtual FName GetPointFilterPin() const { return NAME_None; }
-	virtual FString GetPointFilterTooltip() const { return TEXT("Filters"); }
-	virtual TSet<PCGExFactories::EType> GetPointFilterTypes() const;
-	virtual bool RequiresPointFilters() const { return false; }
+	virtual FName GetPointFilterPin() const
+	{
+		return NAME_None;
+	}
 
-	bool SupportsPointFilters() const { return !GetPointFilterPin().IsNone(); }
+	virtual FString GetPointFilterTooltip() const
+	{
+		return TEXT("Filters");
+	}
+
+	virtual TSet<PCGExFactories::EType> GetPointFilterTypes() const;
+
+	virtual bool RequiresPointFilters() const
+	{
+		return false;
+	}
+
+	bool SupportsPointFilters() const
+	{
+		return !GetPointFilterPin().IsNone();
+	}
+
 	//~End UPCGExPointsProcessorSettings
 };
 

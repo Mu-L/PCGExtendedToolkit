@@ -11,9 +11,9 @@
 // Type-specific implementations
 #include "Helpers/PCGExMetaHelpersMacros.h"
 #include "Types/PCGExTypeOpsNumeric.h"
-#include "Types/PCGExTypeOpsVector.h"
 #include "Types/PCGExTypeOpsRotation.h"
 #include "Types/PCGExTypeOpsString.h"
+#include "Types/PCGExTypeOpsVector.h"
 
 // Type-erased buffers
 //#include "PCGExTypeErasedBuffer.h"
@@ -61,19 +61,39 @@ namespace PCGExTypes
 		FScopedTypedValue& operator=(FScopedTypedValue&&) = delete;
 
 		// Raw access
-		FORCEINLINE void* GetRaw() { return Storage; }
-		FORCEINLINE const void* GetRaw() const { return Storage; }
+		FORCEINLINE void* GetRaw()
+		{
+			return Storage;
+		}
+
+		FORCEINLINE const void* GetRaw() const
+		{
+			return Storage;
+		}
 
 		// Typed access
 		template <typename T>
-		FORCEINLINE T& As() { return *reinterpret_cast<T*>(Storage); }
+		FORCEINLINE T& As()
+		{
+			return *reinterpret_cast<T*>(Storage);
+		}
 
 		template <typename T>
-		FORCEINLINE const T& As() const { return *reinterpret_cast<const T*>(Storage); }
+		FORCEINLINE const T& As() const
+		{
+			return *reinterpret_cast<const T*>(Storage);
+		}
 
 		// Type info
-		FORCEINLINE EPCGMetadataTypes GetType() const { return Type; }
-		FORCEINLINE bool IsConstructed() const { return bConstructed; }
+		FORCEINLINE EPCGMetadataTypes GetType() const
+		{
+			return Type;
+		}
+
+		FORCEINLINE bool IsConstructed() const
+		{
+			return bConstructed;
+		}
 
 		// Manual lifecycle control (for reuse scenarios)
 		void Destruct();

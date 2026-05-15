@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPathProcessor.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "Factories/PCGExFactories.h"
 #include "Math/PCGExMathMean.h"
 
 #include "PCGExPathSlide.generated.h"

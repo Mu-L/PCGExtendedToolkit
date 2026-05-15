@@ -115,7 +115,10 @@ namespace PCGExCollections
 
 		TSharedPtr<PCGExDetails::TSettingValue<FName>> CategoryGetter;
 		TSharedPtr<FPCGExEntryPickerOperation> MainPickerOp;
-		TMap<FName, TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOps;
+
+		// Parallel to Cache->CategoryNameToIndex. Slots may be null when the op's PrepareForData failed --
+		// ResolvePickerForPoint treats null as "fall back to Main per MissingCategoryBehavior".
+		TArray<TSharedPtr<FPCGExEntryPickerOperation>> CategoryPickerOpsByIndex;
 
 		// Optional cache for collection-derived shared state. Typically supplied by the consumer
 		// context (mirrors FPickPacker lifetime pattern). When null, ops self-build as before.
@@ -133,7 +136,10 @@ namespace PCGExCollections
 		 * Wire a context-scoped shared-data cache. Call before Init. Ops will receive cached
 		 * collection-derived state via FSelectorSharedDataCache::GetOrBuild instead of self-building.
 		 */
-		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache)
+		{
+			SharedDataCache = InCache;
+		}
 
 		/**
 		 * Initialize the helper with a data facade and optional external selector factory.
@@ -144,7 +150,10 @@ namespace PCGExCollections
 		bool Init(const TSharedRef<PCGExData::FFacade>& InDataFacade, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
 
 		/** Active factory (either the External one passed to Init, or the transient built-in built from Details in Legacy mode). */
-		const UPCGExSelectorFactoryData* GetActiveFactory() const { return ActiveFactory; }
+		const UPCGExSelectorFactoryData* GetActiveFactory() const
+		{
+			return ActiveFactory;
+		}
 
 		/**
 		 * Get an entry for a specific point
@@ -165,7 +174,10 @@ namespace PCGExCollections
 		FPCGExEntryAccessResult GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const;
 
 		/** Get the underlying collection */
-		UPCGExAssetCollection* GetCollection() const { return Collection; }
+		UPCGExAssetCollection* GetCollection() const
+		{
+			return Collection;
+		}
 
 		/** Get the collection's type ID */
 		PCGExAssetCollection::FTypeId GetCollectionTypeId() const
@@ -225,7 +237,7 @@ namespace PCGExCollections
 	 *   - Tag_CollectionIdx (int32): packed collection identifier
 	 *   - Tag_CollectionPath (FSoftObjectPath): collection asset path for loading
 	 *
-	 * GetPickIdx() is a pure hash computation — it does not register the collection.
+	 * GetPickIdx() is a pure hash computation -- it does not register the collection.
 	 * Callers MUST call RegisterCollection() at init (single-threaded) for every collection
 	 * that can appear as a Host at runtime. RegisterCollection pulls the full flat host set
 	 * from the collection's cache, so a single call covers the entire nested-collection tree.
@@ -260,7 +272,7 @@ namespace PCGExCollections
 		void RegisterCollection(UPCGExAssetCollection* InCollection);
 
 		/**
-		 * Compute the packed identifier for a collection entry pick. Pure hash — no lock,
+		 * Compute the packed identifier for a collection entry pick. Pure hash -- no lock,
 		 * no map lookup. InCollection must have been passed to RegisterCollection (or reached
 		 * via another collection's FlatHosts) prior to PackToDataset, otherwise the downstream
 		 * mapping will be missing.
@@ -315,10 +327,16 @@ namespace PCGExCollections
 		FPickUnpacker() = default;
 		~FPickUnpacker();
 
-		bool HasValidMapping() const { return !CollectionMap.IsEmpty(); }
+		bool HasValidMapping() const
+		{
+			return !CollectionMap.IsEmpty();
+		}
 
 		/** Get read-only access to the collection map */
-		const TMap<uint32, UPCGExAssetCollection*>& GetCollections() const { return CollectionMap; }
+		const TMap<uint32, UPCGExAssetCollection*>& GetCollections() const
+		{
+			return CollectionMap;
+		}
 
 		/** Unpack collection mappings from an attribute set */
 		bool UnpackDataset(FPCGContext* InContext, const UPCGParamData* InAttributeSet);
@@ -395,7 +413,10 @@ namespace PCGExCollections
 		explicit FCollectionSource(const TSharedPtr<PCGExData::FFacade>& InDataFacade);
 
 		/** Wire a context-scoped shared-data cache. Call before Init. */
-		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache) { SharedDataCache = InCache; }
+		void SetSharedDataCache(TSharedPtr<FSelectorSharedDataCache> InCache)
+		{
+			SharedDataCache = InCache;
+		}
 
 		/** Initialize with a single collection. ExternalFactory drives picking in External mode; nullptr falls back to Legacy inline details. */
 		bool Init(UPCGExAssetCollection* InCollection, const UPCGExSelectorFactoryData* ExternalFactory = nullptr);
@@ -413,10 +434,16 @@ namespace PCGExCollections
 		bool TryGetHelpers(int32 Index, FSelectorHelper*& OutHelper, FMicroSelectorHelper*& OutMicroHelper);
 
 		/** Check if this is a single source */
-		bool IsSingleSource() const { return SingleSource != nullptr; }
+		bool IsSingleSource() const
+		{
+			return SingleSource != nullptr;
+		}
 
 		/** Get the single source collection (if applicable) */
-		UPCGExAssetCollection* GetSingleSource() const { return SingleSource; }
+		UPCGExAssetCollection* GetSingleSource() const
+		{
+			return SingleSource;
+		}
 
 		/**
 		 * Pre-register every collection this source can surface as a Host with the given
@@ -444,11 +471,11 @@ namespace PCGExCollections
 	 *   1. Construct.
 	 *   2. RegisterCollection(...) once for each top-level collection (covers subcollections
 	 *      via FlatHosts). Single-threaded init.
-	 *   3. Parallel Add() from ProcessPoints — lock-free.
+	 *   3. Parallel Add() from ProcessPoints -- lock-free.
 	 *   4. Compile() to produce socket outputs.
 	 *
 	 * Add() is always lock-free and assumes every (Host, EntryIndex) pair it sees has been
-	 * pre-registered. Unregistered entries are a programming error — Add() is a no-op in
+	 * pre-registered. Unregistered entries are a programming error -- Add() is a no-op in
 	 * that case, guarded by checkSlow in debug builds.
 	 */
 	class PCGEXCOLLECTIONS_API FSocketHelper : public PCGExStaging::FSocketHelper

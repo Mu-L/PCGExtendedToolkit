@@ -13,21 +13,27 @@ namespace PCGExTypes
 	// construction and explicit destructor calls; POD types are simply zero-initialized.
 
 	FScopedTypedValue::FScopedTypedValue(EPCGMetadataTypes InType)
-		: Type(InType), bConstructed(false)
+		: Type(InType)
+		  , bConstructed(false)
 	{
 		if (NeedsLifecycleManagement(Type))
 		{
 			switch (Type)
 			{
-			case EPCGMetadataTypes::String: new(Storage) FString();
+			case EPCGMetadataTypes::String:
+				new(Storage) FString();
 				break;
-			case EPCGMetadataTypes::Name: new(Storage) FName();
+			case EPCGMetadataTypes::Name:
+				new(Storage) FName();
 				break;
-			case EPCGMetadataTypes::SoftObjectPath: new(Storage) FSoftObjectPath();
+			case EPCGMetadataTypes::SoftObjectPath:
+				new(Storage) FSoftObjectPath();
 				break;
-			case EPCGMetadataTypes::SoftClassPath: new(Storage) FSoftClassPath();
+			case EPCGMetadataTypes::SoftClassPath:
+				new(Storage) FSoftClassPath();
 				break;
-			default: break;
+			default:
+				break;
 			}
 			bConstructed = true;
 		}
@@ -53,15 +59,20 @@ namespace PCGExTypes
 			// Move construct complex types
 			switch (Type)
 			{
-			case EPCGMetadataTypes::String: new(Storage) FString(MoveTemp(*reinterpret_cast<FString*>(Other.Storage)));
+			case EPCGMetadataTypes::String:
+				new(Storage) FString(MoveTemp(*reinterpret_cast<FString*>(Other.Storage)));
 				break;
-			case EPCGMetadataTypes::Name: new(Storage) FName(MoveTemp(*reinterpret_cast<FName*>(Other.Storage)));
+			case EPCGMetadataTypes::Name:
+				new(Storage) FName(MoveTemp(*reinterpret_cast<FName*>(Other.Storage)));
 				break;
-			case EPCGMetadataTypes::SoftObjectPath: new(Storage) FSoftObjectPath(MoveTemp(*reinterpret_cast<FSoftObjectPath*>(Other.Storage)));
+			case EPCGMetadataTypes::SoftObjectPath:
+				new(Storage) FSoftObjectPath(MoveTemp(*reinterpret_cast<FSoftObjectPath*>(Other.Storage)));
 				break;
-			case EPCGMetadataTypes::SoftClassPath: new(Storage) FSoftClassPath(MoveTemp(*reinterpret_cast<FSoftClassPath*>(Other.Storage)));
+			case EPCGMetadataTypes::SoftClassPath:
+				new(Storage) FSoftClassPath(MoveTemp(*reinterpret_cast<FSoftClassPath*>(Other.Storage)));
 				break;
-			default: FMemory::Memcpy(Storage, Other.Storage, BufferSize);
+			default:
+				FMemory::Memcpy(Storage, Other.Storage, BufferSize);
 				break;
 			}
 		}
@@ -81,15 +92,20 @@ namespace PCGExTypes
 		{
 			switch (Type)
 			{
-			case EPCGMetadataTypes::String: reinterpret_cast<FString*>(Storage)->~FString();
+			case EPCGMetadataTypes::String:
+				reinterpret_cast<FString*>(Storage)->~FString();
 				break;
-			case EPCGMetadataTypes::Name: reinterpret_cast<FName*>(Storage)->~FName();
+			case EPCGMetadataTypes::Name:
+				reinterpret_cast<FName*>(Storage)->~FName();
 				break;
-			case EPCGMetadataTypes::SoftObjectPath: reinterpret_cast<FSoftObjectPath*>(Storage)->~FSoftObjectPath();
+			case EPCGMetadataTypes::SoftObjectPath:
+				reinterpret_cast<FSoftObjectPath*>(Storage)->~FSoftObjectPath();
 				break;
-			case EPCGMetadataTypes::SoftClassPath: reinterpret_cast<FSoftClassPath*>(Storage)->~FSoftClassPath();
+			case EPCGMetadataTypes::SoftClassPath:
+				reinterpret_cast<FSoftClassPath*>(Storage)->~FSoftClassPath();
 				break;
-			default: break;
+			default:
+				break;
 			}
 		}
 		bConstructed = false;
@@ -106,15 +122,20 @@ namespace PCGExTypes
 		{
 			switch (Type)
 			{
-			case EPCGMetadataTypes::String: new(Storage) FString();
+			case EPCGMetadataTypes::String:
+				new(Storage) FString();
 				break;
-			case EPCGMetadataTypes::Name: new(Storage) FName();
+			case EPCGMetadataTypes::Name:
+				new(Storage) FName();
 				break;
-			case EPCGMetadataTypes::SoftObjectPath: new(Storage) FSoftObjectPath();
+			case EPCGMetadataTypes::SoftObjectPath:
+				new(Storage) FSoftObjectPath();
 				break;
-			case EPCGMetadataTypes::SoftClassPath: new(Storage) FSoftClassPath();
+			case EPCGMetadataTypes::SoftClassPath:
+				new(Storage) FSoftClassPath();
 				break;
-			default: break;
+			default:
+				break;
 			}
 			bConstructed = true;
 		}
@@ -132,8 +153,10 @@ namespace PCGExTypes
 		case EPCGMetadataTypes::String:
 		case EPCGMetadataTypes::Name:
 		case EPCGMetadataTypes::SoftObjectPath:
-		case EPCGMetadataTypes::SoftClassPath: return true;
-		default: return false;
+		case EPCGMetadataTypes::SoftClassPath:
+			return true;
+		default:
+			return false;
 		}
 	}
 
@@ -143,7 +166,8 @@ namespace PCGExTypes
 		switch (InType)
 		{
 		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TPL)
-		default: return 0;
+		default:
+			return 0;
 		}
 #undef PCGEX_TPL
 	}

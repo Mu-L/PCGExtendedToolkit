@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
+#include "Utils/PCGExCompare.h"
 
 #include "Details/PCGExMatchingDetails.h"
 #include "Fitting/PCGExFitting.h"
@@ -28,8 +28,17 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(CopyToPoints, "Copy to Points", "Copy source points to target points, with size-to-fit and justification goodies.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite);
+	}
+
 	//PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourceFiltersLabel, "Filters", PCGExFactories::PointFilters, true)
 #endif
 

@@ -7,8 +7,8 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Math/PCGExMathAxis.h"
-#include "Paths/PCGExPathsHelpers.h"
 #include "Paths/PCGExPathIntersectionDetails.h"
+#include "Paths/PCGExPathsHelpers.h"
 
 #if PCGEX_ENGINE_VERSION > 506
 #include "Data/PCGPolygon2DData.h"
@@ -20,7 +20,9 @@
 namespace PCGExPaths
 {
 	FPathEdge::FPathEdge(const int32 InStart, const int32 InEnd, const TConstPCGValueRange<FTransform>& Positions, const double Expansion)
-		: Start(InStart), End(InEnd), AltStart(InStart)
+		: Start(InStart)
+		  , End(InEnd)
+		  , AltStart(InStart)
 	{
 		Update(Positions, Expansion);
 	}
@@ -85,19 +87,28 @@ namespace PCGExPaths
 
 	int32 FPath::SafePointIndex(const int32 Index) const
 	{
-		if (bClosedLoop) { return PCGExMath::Tile(Index, 0, LastIndex); }
+		if (bClosedLoop)
+		{
+			return PCGExMath::Tile(Index, 0, LastIndex);
+		}
 		return Index < 0 ? 0 : Index > LastIndex ? LastIndex : Index;
 	}
 
 	FVector FPath::DirToNextPoint(const int32 Index) const
 	{
-		if (bClosedLoop) { return Edges[Index].Dir; }
+		if (bClosedLoop)
+		{
+			return Edges[Index].Dir;
+		}
 		return Index == LastIndex ? Edges[Index - 1].Dir : Edges[Index].Dir;
 	}
 
 	FVector FPath::DirToNeighbor(const int32 Index, const int32 Offset) const
 	{
-		if (Offset < 0) { return DirToPrevPoint(Index); }
+		if (Offset < 0)
+		{
+			return DirToPrevPoint(Index);
+		}
 		return DirToNextPoint(Index);
 	}
 
@@ -105,7 +116,10 @@ namespace PCGExPaths
 	{
 		PCGExMath::FClosestPosition Closest(Segment.A);
 
-		if (!Bounds.Intersect(Segment.Bounds)) { return Closest; }
+		if (!Bounds.Intersect(Segment.Bounds))
+		{
+			return Closest;
+		}
 
 		const uint8 Strictness = InDetails.Strictness;
 
@@ -113,7 +127,10 @@ namespace PCGExPaths
 		{
 			if (InDetails.bWantsDotCheck)
 			{
-				if (!InDetails.CheckDot(FMath::Abs(Segment.Dot(PathEdge->Dir)))) { return; }
+				if (!InDetails.CheckDot(FMath::Abs(Segment.Dot(PathEdge->Dir))))
+				{
+					return;
+				}
 			}
 
 			FVector OnSegment = FVector::ZeroVector;
@@ -134,7 +151,10 @@ namespace PCGExPaths
 	{
 		PCGExMath::FClosestPosition Closest(Segment.A);
 
-		if (!Bounds.Intersect(Segment.Bounds)) { return Closest; }
+		if (!Bounds.Intersect(Segment.Bounds))
+		{
+			return Closest;
+		}
 
 		const uint8 Strictness = InDetails.Strictness;
 
@@ -142,7 +162,10 @@ namespace PCGExPaths
 		{
 			if (InDetails.bWantsDotCheck)
 			{
-				if (!InDetails.CheckDot(FMath::Abs(Segment.Dot(PathEdge->Dir)))) { return; }
+				if (!InDetails.CheckDot(FMath::Abs(Segment.Dot(PathEdge->Dir))))
+				{
+					return;
+				}
 			}
 
 			FVector OnSegment = FVector::ZeroVector;
@@ -163,42 +186,63 @@ namespace PCGExPaths
 
 	void FPath::BuildEdgeOctree()
 	{
-		if (EdgeOctree) { return; }
+		if (EdgeOctree)
+		{
+			return;
+		}
 		EdgeOctree = MakeUnique<FPathEdgeOctree>(Bounds.GetCenter(), Bounds.GetExtent().Length() + 10);
 		for (FPathEdge& Edge : Edges)
 		{
-			if (!IsEdgeValid(Edge)) { continue; } // Skip zero-length edges
-			EdgeOctree->AddElement(&Edge);        // Might be a problem if edges gets reallocated
+			if (!IsEdgeValid(Edge))
+			{
+				continue;
+			}                              // Skip zero-length edges
+			EdgeOctree->AddElement(&Edge); // Might be a problem if edges gets reallocated
 		}
 	}
 
 	void FPath::BuildPartialEdgeOctree(const TArray<int8>& Filter)
 	{
-		if (EdgeOctree) { return; }
+		if (EdgeOctree)
+		{
+			return;
+		}
 		EdgeOctree = MakeUnique<FPathEdgeOctree>(Bounds.GetCenter(), Bounds.GetExtent().Length() + 10);
 		for (int i = 0; i < Edges.Num(); i++)
 		{
 			FPathEdge& Edge = Edges[i];
-			if (!Filter[i] || !IsEdgeValid(Edge)) { continue; } // Skip filtered out & zero-length edges
-			EdgeOctree->AddElement(&Edge);                      // Might be a problem if edges gets reallocated
+			if (!Filter[i] || !IsEdgeValid(Edge))
+			{
+				continue;
+			}                              // Skip filtered out & zero-length edges
+			EdgeOctree->AddElement(&Edge); // Might be a problem if edges gets reallocated
 		}
 	}
 
 	void FPath::BuildPartialEdgeOctree(const TBitArray<>& Filter)
 	{
-		if (EdgeOctree) { return; }
+		if (EdgeOctree)
+		{
+			return;
+		}
 		EdgeOctree = MakeUnique<FPathEdgeOctree>(Bounds.GetCenter(), Bounds.GetExtent().Length() + 10);
 		for (int i = 0; i < Edges.Num(); i++)
 		{
 			FPathEdge& Edge = Edges[i];
-			if (!Filter[i] || !IsEdgeValid(Edge)) { continue; } // Skip filtered out & zero-length edges
-			EdgeOctree->AddElement(&Edge);                      // Might be a problem if edges gets reallocated
+			if (!Filter[i] || !IsEdgeValid(Edge))
+			{
+				continue;
+			}                              // Skip filtered out & zero-length edges
+			EdgeOctree->AddElement(&Edge); // Might be a problem if edges gets reallocated
 		}
 	}
 
 	void FPath::UpdateConvexity(const int32 Index)
 	{
-		if (!bIsConvex) { return; }
+		if (!bIsConvex)
+		{
+			return;
+		}
 
 		const int32 A = SafePointIndex(Index - 1);
 		const int32 B = SafePointIndex(Index + 1);
@@ -215,19 +259,43 @@ namespace PCGExPaths
 	{
 		if (NumEdges == 1)
 		{
-			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessSingleEdge(this, Edges[0]); }
+			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+			{
+				Extra->ProcessSingleEdge(this, Edges[0]);
+			}
 		}
 		else
 		{
-			if (Index == 0) { for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessFirstEdge(this, Edges[0]); } }
-			else if (Index == LastEdge) { for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessLastEdge(this, Edges[LastEdge]); } }
-			else { for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessEdge(this, Edges[Index]); } }
+			if (Index == 0)
+			{
+				for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+				{
+					Extra->ProcessFirstEdge(this, Edges[0]);
+				}
+			}
+			else if (Index == LastEdge)
+			{
+				for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+				{
+					Extra->ProcessLastEdge(this, Edges[LastEdge]);
+				}
+			}
+			else
+			{
+				for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+				{
+					Extra->ProcessEdge(this, Edges[Index]);
+				}
+			}
 		}
 	}
 
 	void FPath::ExtraComputingDone()
 	{
-		for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessingDone(this); }
+		for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+		{
+			Extra->ProcessingDone(this);
+		}
 		Extras.Empty(); // So we don't update them anymore
 	}
 
@@ -235,13 +303,28 @@ namespace PCGExPaths
 	{
 		if (NumEdges == 1)
 		{
-			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessSingleEdge(this, Edges[0]); }
+			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+			{
+				Extra->ProcessSingleEdge(this, Edges[0]);
+			}
 		}
 		else
 		{
-			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessFirstEdge(this, Edges[0]); }
-			for (int i = 1; i < LastEdge; i++) { for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessEdge(this, Edges[i]); } }
-			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras) { Extra->ProcessLastEdge(this, Edges[LastEdge]); }
+			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+			{
+				Extra->ProcessFirstEdge(this, Edges[0]);
+			}
+			for (int i = 1; i < LastEdge; i++)
+			{
+				for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+				{
+					Extra->ProcessEdge(this, Edges[i]);
+				}
+			}
+			for (const TSharedPtr<IPathEdgeExtra>& Extra : Extras)
+			{
+				Extra->ProcessLastEdge(this, Edges[LastEdge]);
+			}
 		}
 
 		ExtraComputingDone();
@@ -250,7 +333,10 @@ namespace PCGExPaths
 	bool FPath::IsInsideProjection(const FVector& WorldPosition) const
 	{
 		const FVector2D ProjectedPoint = FVector2D(Projection.ProjectFlat(WorldPosition));
-		if (!ProjectedBounds.IsInside(ProjectedPoint)) { return false; }
+		if (!ProjectedBounds.IsInside(ProjectedPoint))
+		{
+			return false;
+		}
 		return FGeomTools2D::IsPointInPolygon(ProjectedPoint, ProjectedPoints);
 	}
 
@@ -266,7 +352,10 @@ namespace PCGExPaths
 			if (IsInsideProjection(InPositions[i].GetLocation()))
 			{
 				InsideCount++;
-				if (InsideCount >= Threshold) { return true; }
+				if (InsideCount >= Threshold)
+				{
+					return true;
+				}
 			}
 		}
 
@@ -299,7 +388,10 @@ namespace PCGExPaths
 		// a smooth offset direction, then shift the vertex along that direction.
 		// This is a simple normal-averaging approach (not Minkowski-based), so it can
 		// produce self-intersections on sharp concave corners with large offsets.
-		if (FMath::IsNearlyZero(Offset)) { return; }
+		if (FMath::IsNearlyZero(Offset))
+		{
+			return;
+		}
 
 		const int32 N = ProjectedPoints.Num();
 		if (N < 3)
@@ -332,15 +424,24 @@ namespace PCGExPaths
 			ProjectedBounds += Pos;
 		}
 
-		if (Offset > 0) { ProjectedBounds = ProjectedBounds.ExpandBy(Offset); }
+		if (Offset > 0)
+		{
+			ProjectedBounds = ProjectedBounds.ExpandBy(Offset);
+		}
 
 		ProjectedPoints = MoveTemp(InsetPositions);
 	}
 
 	void FPath::BuildPath(const double Expansion)
 	{
-		if (bClosedLoop) { NumEdges = NumPoints; }
-		else { NumEdges = LastIndex; }
+		if (bClosedLoop)
+		{
+			NumEdges = NumPoints;
+		}
+		else
+		{
+			NumEdges = LastIndex;
+		}
 
 		LastEdge = NumEdges - 1;
 
@@ -369,7 +470,10 @@ namespace PCGExPaths
 		TPathEdgeExtra<double>::ProcessingDone(Path);
 		CumulativeLength.SetNumUninitialized(Data.Num());
 		CumulativeLength[0] = Data[0];
-		for (int i = 1; i < Data.Num(); i++) { CumulativeLength[i] = CumulativeLength[i - 1] + Data[i]; }
+		for (int i = 1; i < Data.Num(); i++)
+		{
+			CumulativeLength[i] = CumulativeLength[i - 1] + Data[i];
+		}
 	}
 
 #pragma endregion
@@ -419,7 +523,10 @@ namespace PCGExPaths
 		const FVector A = Path->DirToPrevPoint(Edge.Start);
 		FVector D = FQuat(FVector::CrossProduct(A, Edge.Dir).GetSafeNormal(), FMath::Acos(FVector::DotProduct(A, Edge.Dir)) * 0.5f).RotateVector(A);
 
-		if (FVector::DotProduct(N, D) < 0.0f) { D *= -1; }
+		if (FVector::DotProduct(N, D) < 0.0f)
+		{
+			D *= -1;
+		}
 
 		GetMutable(Edge.Start) = D;
 	}

@@ -7,8 +7,8 @@
 #include "Factories/PCGExFactories.h"
 
 
-#include "Core/PCGExPointsProcessor.h"
 #include "Core/PCGExPointFilter.h"
+#include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExFilterDetails.h"
 
 #include "PCGExUberFilter.generated.h"
@@ -51,8 +51,16 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS(UberFilter, "Uber Filter", "Filter points based on multiple rules & conditions.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
@@ -64,7 +72,10 @@ protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return Mode == EPCGExUberFilterMode::Write; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return Mode == EPCGExUberFilterMode::Write;
+	}
 
 	//~Begin UPCGExPointsProcessorSettings
 public:

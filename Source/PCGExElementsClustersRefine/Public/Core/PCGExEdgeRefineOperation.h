@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExHeuristicsHandler.h"
-#include "Factories/PCGExInstancedFactory.h"
 #include "Clusters/PCGExCluster.h"
+#include "Factories/PCGExInstancedFactory.h"
 #include "Factories/PCGExOperation.h"
 
 #include "PCGExEdgeRefineOperation.generated.h"
@@ -37,8 +37,14 @@ public:
 		Cluster = InCluster;
 		Heuristics = InHeuristics;
 
-		if (bWantsNodeOctree) { Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Vtx); }
-		if (bWantsEdgeOctree) { Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Edge); }
+		if (bWantsNodeOctree)
+		{
+			Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Vtx);
+		}
+		if (bWantsEdgeOctree)
+		{
+			Cluster->RebuildOctree(EPCGExClusterClosestSearchMode::Edge);
+		}
 
 		if (bWantsHeuristics && Heuristics)
 		{
@@ -83,13 +89,40 @@ public:
 	{
 	}
 
-	virtual bool SupportFilters() const { return false; }
-	virtual bool GetDefaultEdgeValidity() const { return true; }
-	virtual bool WantsNodeOctree() const { return false; }
-	virtual bool WantsEdgeOctree() const { return false; }
-	virtual bool WantsHeuristics() const { return false; }
-	virtual bool WantsIndividualNodeProcessing() const { return false; }
-	virtual bool WantsIndividualEdgeProcessing() const { return false; }
+	virtual bool SupportFilters() const
+	{
+		return false;
+	}
+
+	virtual bool GetDefaultEdgeValidity() const
+	{
+		return true;
+	}
+
+	virtual bool WantsNodeOctree() const
+	{
+		return false;
+	}
+
+	virtual bool WantsEdgeOctree() const
+	{
+		return false;
+	}
+
+	virtual bool WantsHeuristics() const
+	{
+		return false;
+	}
+
+	virtual bool WantsIndividualNodeProcessing() const
+	{
+		return false;
+	}
+
+	virtual bool WantsIndividualEdgeProcessing() const
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<FPCGExEdgeRefineOperation> CreateOperation() const PCGEX_NOT_IMPLEMENTED_RET(CreateOperation(), nullptr);
 

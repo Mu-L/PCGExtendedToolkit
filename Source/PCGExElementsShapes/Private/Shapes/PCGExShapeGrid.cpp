@@ -15,7 +15,10 @@
 
 bool FPCGExShapeGridBuilder::PrepareForSeeds(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InSeedDataFacade)
 {
-	if (!FPCGExShapeBuilderOperation::PrepareForSeeds(InContext, InSeedDataFacade)) { return false; }
+	if (!FPCGExShapeBuilderOperation::PrepareForSeeds(InContext, InSeedDataFacade))
+	{
+		return false;
+	}
 
 
 	return true;
@@ -42,11 +45,17 @@ void FPCGExShapeGridBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 	// Compute grid counts based on resolution mode
 	if (Config.ResolutionMode == EPCGExResolutionMode::Fixed)
 	{
-		for (int i = 0; i < 3; i++) { Grid->Count[i] = FMath::Max(1, PCGExMath::TruncateDbl(Res[i], Truncate[i])); }
+		for (int i = 0; i < 3; i++)
+		{
+			Grid->Count[i] = FMath::Max(1, PCGExMath::TruncateDbl(Res[i], Truncate[i]));
+		}
 	}
 	else
 	{
-		for (int i = 0; i < 3; i++) { Grid->Count[i] = FMath::Max(1, PCGExMath::TruncateDbl(Size[i] / Res[i], Truncate[i])); }
+		for (int i = 0; i < 3; i++)
+		{
+			Grid->Count[i] = FMath::Max(1, PCGExMath::TruncateDbl(Size[i] / Res[i], Truncate[i]));
+		}
 	}
 
 	ApplyClamp();
@@ -56,11 +65,17 @@ void FPCGExShapeGridBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 	{
 		if (Config.ResolutionMode == EPCGExResolutionMode::Fixed)
 		{
-			for (int i = 0; i < 3; i++) { Grid->Extents[i] = (Size[i] / Grid->Count[i]) * 0.5; }
+			for (int i = 0; i < 3; i++)
+			{
+				Grid->Extents[i] = (Size[i] / Grid->Count[i]) * 0.5;
+			}
 		}
 		else
 		{
-			for (int i = 0; i < 3; i++) { Grid->Extents[i] = Res[i] * 0.5; }
+			for (int i = 0; i < 3; i++)
+			{
+				Grid->Extents[i] = Res[i] * 0.5;
+			}
 		}
 
 		// Apply per-axis fit adjustments
@@ -80,7 +95,10 @@ void FPCGExShapeGridBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 		Grid->Extents = BaseConfig.DefaultExtents;
 	}
 
-	for (int i = 0; i < 3; i++) { Grid->Offset[i] = Grid->Extents[i] + (Size[i] - (Grid->Count[i] * (Grid->Extents[i] * 2))) * 0.5; }
+	for (int i = 0; i < 3; i++)
+	{
+		Grid->Offset[i] = Grid->Extents[i] + (Size[i] - (Grid->Count[i] * (Grid->Extents[i] * 2))) * 0.5;
+	}
 
 	Grid->bClosedLoop = false;
 	Grid->NumPoints = Grid->Count.X * Grid->Count.Y * Grid->Count.Z;
@@ -151,7 +169,7 @@ void FPCGExShapeGridBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> In
 			Point, FVector::OneVector
 		);
 		}
-	)
+		)
 
 	if (bOwnsData && Grid->bClosedLoop)
 	{
@@ -166,7 +184,7 @@ void UPCGExCreateShapeGridSettings::ApplyDeprecation(UPCGNode* InOutNode)
 	{
 		Config.ApplyDeprecation();
 	}
-	
+
 	Super::ApplyDeprecation(InOutNode);
 }
 #endif

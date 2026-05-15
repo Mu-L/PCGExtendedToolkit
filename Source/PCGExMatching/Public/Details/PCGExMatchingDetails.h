@@ -30,7 +30,8 @@ struct PCGEXMATCHING_API FPCGExMatchingDetails
 	}
 
 	explicit FPCGExMatchingDetails(const EPCGExMatchingDetailsUsage InUsage, const EPCGExMapMatchMode InMode = EPCGExMapMatchMode::Disabled)
-		: Usage(InUsage), Mode(InMode)
+		: Usage(InUsage)
+		  , Mode(InMode)
 	{
 	}
 
@@ -74,7 +75,13 @@ struct PCGEXMATCHING_API FPCGExMatchingDetails
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Limit", EditCondition="bLimitMatches && LimitInput == EPCGExInputValueType::Constant && Mode != EPCGExMapMatchMode::Disabled && Usage != EPCGExMatchingDetailsUsage::Sampling && Usage != EPCGExMatchingDetailsUsage::Filter", EditConditionHides))
 	int32 Limit = 1;
 
-	bool IsEnabled() const { return Mode != EPCGExMapMatchMode::Disabled; }
+	bool IsEnabled() const
+	{
+		return Mode != EPCGExMapMatchMode::Disabled;
+	}
 
-	bool WantsUnmatchedSplit() const { return Mode != EPCGExMapMatchMode::Disabled && bSplitUnmatched; }
+	bool WantsUnmatchedSplit() const
+	{
+		return Mode != EPCGExMapMatchMode::Disabled && bSplitUnmatched;
+	}
 };

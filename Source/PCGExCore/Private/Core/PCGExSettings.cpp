@@ -3,11 +3,11 @@
 
 #include "Core/PCGExSettings.h"
 
-#include "Styling/SlateStyle.h"
-#include "PCGPin.h"
 #include "PCGExCoreMacros.h"
 #include "PCGExCoreSettingsCache.h"
 #include "PCGExSettingsCacheBody.h"
+#include "PCGPin.h"
+#include "Styling/SlateStyle.h"
 
 #include "Helpers/PCGSettingsHelpers.h"
 
@@ -31,7 +31,7 @@ void UPCGExSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArra
 
 void UPCGExSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	Super::ApplyDeprecation(InOutNode);	
+	Super::ApplyDeprecation(InOutNode);
 	PCGEX_UPDATE_DATA_VERSION_TO_LATEST
 }
 
@@ -45,7 +45,10 @@ void UPCGExSettings::PostEditChangeProperty(struct FPropertyChangedEvent& Proper
 	if (FProperty* Property = PropertyChangedEvent.Property)
 	{
 		const bool bIsInstanced = Property->HasAnyPropertyFlags(CPF_InstancedReference | CPF_ContainsInstancedReference);
-		if (bIsInstanced) { DirtyCache(); }
+		if (bIsInstanced)
+		{
+			DirtyCache();
+		}
 	}
 
 	bCachedSupportsDataStealing = SupportsDataStealing();
@@ -64,11 +67,17 @@ void UPCGExSettings::PostLoad()
 
 bool UPCGExSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (PCGEX_CORE_SETTINGS.bToneDownOptionalPins && !InPin->Properties.IsRequiredPin() && !InPin->IsOutputPin()) { return InPin->EdgeCount() > 0; }
+	if (PCGEX_CORE_SETTINGS.bToneDownOptionalPins && !InPin->Properties.IsRequiredPin() && !InPin->IsOutputPin())
+	{
+		return InPin->EdgeCount() > 0;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
-PCGExData::EIOInit UPCGExSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 #if WITH_EDITOR
 void UPCGExSettings::EDITOR_OpenNodeDocumentation() const
@@ -88,7 +97,10 @@ bool UPCGExSettings::SupportsDataStealing() const
 
 bool UPCGExSettings::ShouldCache() const
 {
-	if (!IsCacheable()) { return false; }
+	if (!IsCacheable())
+	{
+		return false;
+	}
 	PCGEX_GET_OPTION_STATE(CacheData, bDefaultCacheNodeOutput)
 }
 

@@ -27,10 +27,16 @@ bool FPCGExShapePolygonBuilder::PrepareForSeeds(FPCGExContext* InContext, const 
 		return false;
 	}
 	NumVertices = Config.NumVertices.GetValueSetting();
-	if (!NumVertices->Init(InSeedDataFacade)) { return false; }
+	if (!NumVertices->Init(InSeedDataFacade))
+	{
+		return false;
+	}
 
 	HasSkeleton = Config.AddSkeleton.GetValueSetting();
-	if (!HasSkeleton->Init(InSeedDataFacade)) { return false; }
+	if (!HasSkeleton->Init(InSeedDataFacade))
+	{
+		return false;
+	}
 
 	PCGEX_VALIDATE_NAME_C(InContext, Config.AngleAttribute)
 	PCGEX_VALIDATE_NAME_C(InContext, Config.EdgeIndexAttribute)
@@ -59,10 +65,13 @@ void FPCGExShapePolygonBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 	const double Increment = TWO_PI / static_cast<double>(Polygon->NumVertices);
 	switch (Config.PolygonOrientation)
 	{
-	case EPCGExPolygonFittingMethod::VertexForward: break;
-	case EPCGExPolygonFittingMethod::EdgeForward: Polygon->Orientation = Increment * .5;
+	case EPCGExPolygonFittingMethod::VertexForward:
 		break;
-	case EPCGExPolygonFittingMethod::Custom: Polygon->Orientation = Config.CustomPolygonOrientation;
+	case EPCGExPolygonFittingMethod::EdgeForward:
+		Polygon->Orientation = Increment * .5;
+		break;
+	case EPCGExPolygonFittingMethod::Custom:
+		Polygon->Orientation = Config.CustomPolygonOrientation;
 		break;
 	}
 
@@ -87,7 +96,8 @@ void FPCGExShapePolygonBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 	// Get the lowest of those two
 
 	// Scale up by 1 / (1 - min diff) so if min diff is 0, this will be 1, but if greater, it will expand to fit
-	if (const float MinScaleDiff = FMath::Min(MinXScaleDiff, MinYScaleDiff); !FMath::IsNearlyZero(MinScaleDiff))
+	if (const float MinScaleDiff = FMath::Min(MinXScaleDiff, MinYScaleDiff);
+		!FMath::IsNearlyZero(MinScaleDiff))
 	{
 		Polygon->ScaleAdjustment = 1.0; //1.0 / (1.0 - MinXScaleDiff);
 		Polygon->EdgeLength *= Polygon->ScaleAdjustment;
@@ -103,17 +113,26 @@ void FPCGExShapePolygonBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 	{
 		switch (Config.SkeletonConnectionMode)
 		{
-		case EPCGExPolygonSkeletonConnectionType::Vertex: Polygon->bConnectSkeletonToVertices = true;
+		case EPCGExPolygonSkeletonConnectionType::Vertex:
+			Polygon->bConnectSkeletonToVertices = true;
 			break;
-		case EPCGExPolygonSkeletonConnectionType::Edge: Polygon->bConnectSkeletonToEdges = true;
+		case EPCGExPolygonSkeletonConnectionType::Edge:
+			Polygon->bConnectSkeletonToEdges = true;
 			break;
-		case EPCGExPolygonSkeletonConnectionType::Both: Polygon->bConnectSkeletonToVertices = true;
+		case EPCGExPolygonSkeletonConnectionType::Both:
+			Polygon->bConnectSkeletonToVertices = true;
 			Polygon->bConnectSkeletonToEdges = true;
 			break;
 		}
 
-		if (Polygon->bConnectSkeletonToVertices) { Polygon->PointsPerSpoke = UseDistance ? FMath::Max(Polygon->Radius / Res, 1) : Res; }
-		if (Polygon->bConnectSkeletonToEdges) { Polygon->PointsPerEdgeSpoke = UseDistance ? FMath::Max(Polygon->InRadius / Res, 1) : Res; }
+		if (Polygon->bConnectSkeletonToVertices)
+		{
+			Polygon->PointsPerSpoke = UseDistance ? FMath::Max(Polygon->Radius / Res, 1) : Res;
+		}
+		if (Polygon->bConnectSkeletonToEdges)
+		{
+			Polygon->PointsPerEdgeSpoke = UseDistance ? FMath::Max(Polygon->InRadius / Res, 1) : Res;
+		}
 	}
 
 
@@ -143,28 +162,40 @@ void FPCGExShapePolygonBuilder::BuildShape(TSharedPtr<PCGExShapes::FShape> InSha
 	if (Polygon->Config->bWriteAngleAttribute)
 	{
 		AngleBuffer = InDataFacade->GetWritable<double>(Polygon->Config->AngleAttribute, 0, true, PCGExData::EBufferInit::New);
-		if (!AngleBuffer) { return; }
+		if (!AngleBuffer)
+		{
+			return;
+		}
 	}
 
 	TSharedPtr<PCGExData::TBuffer<int32>> EdgeIndexBuffer = nullptr;
 	if (Polygon->Config->bWriteEdgeIndexAttribute)
 	{
 		EdgeIndexBuffer = InDataFacade->GetWritable<int32>(Polygon->Config->EdgeIndexAttribute, -1, true, PCGExData::EBufferInit::New);
-		if (!EdgeIndexBuffer) { return; }
+		if (!EdgeIndexBuffer)
+		{
+			return;
+		}
 	}
 
 	TSharedPtr<PCGExData::TBuffer<double>> EdgeAlphaBuffer = nullptr;
 	if (Polygon->Config->bWriteEdgeAlphaAttribute)
 	{
 		EdgeAlphaBuffer = InDataFacade->GetWritable<double>(Polygon->Config->EdgeAlphaAttribute, 0, true, PCGExData::EBufferInit::New);
-		if (!EdgeAlphaBuffer) { return; }
+		if (!EdgeAlphaBuffer)
+		{
+			return;
+		}
 	}
 
 	TSharedPtr<PCGExData::TBuffer<bool>> HullFlagBuffer = nullptr;
 	if (Polygon->Config->bWriteHullAttribute)
 	{
 		HullFlagBuffer = InDataFacade->GetWritable<bool>(Polygon->Config->OnHullAttribute, false, false, PCGExData::EBufferInit::New);
-		if (!HullFlagBuffer) { return; }
+		if (!HullFlagBuffer)
+		{
+			return;
+		}
 	}
 
 	const double Increment = TWO_PI / static_cast<double>(Polygon->NumVertices);
@@ -215,7 +246,10 @@ void FPCGExShapePolygonBuilder::BuildShape(TSharedPtr<PCGExShapes::FShape> InSha
 		for (int32 j = 0; j < Polygon->PointsPerEdge; j++)
 		{
 			const FVector Point = Start + Delta * j;
-			if (Config.PointsLookAt == EPCGExShapePointLookAt::None) { Target = End; }
+			if (Config.PointsLookAt == EPCGExShapePointLookAt::None)
+			{
+				Target = End;
+			}
 			AppendPoint(Point, Degrees, true, i, static_cast<double>(j) / static_cast<double>(Polygon->PointsPerEdge));
 
 			WriteIndex++;
@@ -227,7 +261,10 @@ void FPCGExShapePolygonBuilder::BuildShape(TSharedPtr<PCGExShapes::FShape> InSha
 		{
 			FVector Point = Center + Delta * j;
 
-			if (Config.PointsLookAt == EPCGExShapePointLookAt::None) { Target = Start; }
+			if (Config.PointsLookAt == EPCGExShapePointLookAt::None)
+			{
+				Target = Start;
+			}
 			AppendPoint(Point, Degrees, false, i, static_cast<double>(j) / static_cast<double>(Polygon->PointsPerSpoke));
 
 			WriteIndex++;
@@ -240,13 +277,19 @@ void FPCGExShapePolygonBuilder::BuildShape(TSharedPtr<PCGExShapes::FShape> InSha
 		{
 			FVector Point = Center + Delta * j;
 
-			if (Config.PointsLookAt == EPCGExShapePointLookAt::None) { Target = MidPoint; }
+			if (Config.PointsLookAt == EPCGExShapePointLookAt::None)
+			{
+				Target = MidPoint;
+			}
 			AppendPoint(Point, Degrees, false, i, static_cast<double>(j) / static_cast<double>(Polygon->PointsPerEdgeSpoke));
 
 			WriteIndex++;
 		}
 
-		if (!Polygon->bHasSkeleton && Polygon->Config->bIsClosedLoop && bIsolated) { PCGExPaths::Helpers::SetClosedLoop(InDataFacade->Source, true); }
+		if (!Polygon->bHasSkeleton && Polygon->Config->bIsClosedLoop && bIsolated)
+		{
+			PCGExPaths::Helpers::SetClosedLoop(InDataFacade->Source, true);
+		}
 	}
 }
 

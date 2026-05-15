@@ -17,19 +17,28 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExBestMatchAxisSettings, Match, FVector, MatchInput
 TArray<FPCGPinProperties> UPCGExBestMatchAxisSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	if (Mode == EPCGExBestMatchAxisTargetMode::ClosestTarget) { PCGEX_PIN_POINTS(PCGExCommon::Labels::SourceTargetsLabel, TEXT("Target points"), Required) }
+	if (Mode == EPCGExBestMatchAxisTargetMode::ClosestTarget)
+	{
+		PCGEX_PIN_POINTS(PCGExCommon::Labels::SourceTargetsLabel, TEXT("Target points"), Required)
+	}
 	return PinProperties;
 }
 
 PCGEX_INITIALIZE_ELEMENT(BestMatchAxis)
 
-PCGExData::EIOInit UPCGExBestMatchAxisSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExBestMatchAxisSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BestMatchAxis)
 
 bool FPCGExBestMatchAxisElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BestMatchAxis)
 
@@ -61,7 +70,10 @@ bool FPCGExBestMatchAxisElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -88,7 +100,10 @@ namespace PCGExBestMatchAxis
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBestMatchAxis::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -96,7 +111,8 @@ namespace PCGExBestMatchAxis
 		{
 			IgnoreList.Add(PointDataFacade->GetIn());
 
-			if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true); !Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
+			if (PCGExMatching::FScope MatchingScope(Context->InitialMainPointsNum, true);
+				!Context->TargetsHandler->PopulateIgnoreList(PointDataFacade->Source, MatchingScope, IgnoreList))
 			{
 				(void)Context->TargetsHandler->HandleUnmatchedOutput(PointDataFacade, true);
 				return false;
@@ -105,7 +121,10 @@ namespace PCGExBestMatchAxis
 		else
 		{
 			MatchGetter = Settings->GetValueSettingMatch();
-			if (!MatchGetter->Init(PointDataFacade)) { return false; }
+			if (!MatchGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		EPCGPointNativeProperties AllocateFor = EPCGPointNativeProperties::None;
@@ -136,7 +155,7 @@ namespace PCGExBestMatchAxis
 			if (bUseTargets)
 			{
 				PCGExData::FConstPoint TargetPoint;
-				double Distance = MAX_dbl;
+				double Distance = TNumericLimits<double>::Max();
 				Context->TargetsHandler->FindClosestTarget(PointDataFacade->GetInPoint(Index), TargetPoint, Distance, &IgnoreList);
 				if (TargetPoint.Index == -1)
 				{

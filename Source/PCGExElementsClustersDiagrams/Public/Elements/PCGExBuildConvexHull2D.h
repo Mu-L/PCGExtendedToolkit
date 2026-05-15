@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExPointsProcessor.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Core/PCGExPointsProcessor.h"
 #include "Elements/Paths/PCGExBreakClustersToPaths.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Math/PCGExProjectionDetails.h"
@@ -28,7 +28,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BuildConvexHull2D, "Cluster : Convex Hull 2D", "Create a 2D Convex Hull triangulation for each input dataset. Deprecated as of 5.4; use Find Convex Hull 2D instead.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
 #endif
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
@@ -38,7 +42,11 @@ protected:
 
 	//~Begin UPCGExPointsProcessorSettings
 public:
-	virtual FName GetMainOutputPin() const override { return PCGExClusters::Labels::OutputVerticesLabel; }
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGExClusters::Labels::OutputVerticesLabel;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 	/** Output the hull as a cluster (vtx + edges) instead of paths. */

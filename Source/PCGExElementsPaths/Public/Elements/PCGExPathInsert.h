@@ -8,10 +8,10 @@
 
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExPathProcessor.h"
-#include "Math/PCGExMath.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Details/PCGExMatchingDetails.h"
+#include "Math/PCGExMath.h"
 #include "PCGExPathInsert.generated.h"
 
 namespace PCGExPathInsert
@@ -251,12 +251,15 @@ namespace PCGExPathInsert
 		struct FClaim
 		{
 			int32 ProcessorIdx = -1;
-			double Distance = MAX_dbl;
+			double Distance = TNumericLimits<double>::Max();
 		};
 
 		PCGExMT::TH64MapShards<FClaim> Claims;
 
-		void Reserve(const int32 TotalReserve) { Claims.Reserve(TotalReserve); }
+		void Reserve(const int32 TotalReserve)
+		{
+			Claims.Reserve(TotalReserve);
+		}
 
 		void RegisterCandidate(const uint64 TargetHash, const int32 ProcessorIdx, const double Distance)
 		{
@@ -299,19 +302,40 @@ namespace PCGExPathInsert
 		FVector PathLocation = FVector::ZeroVector;
 		FVector OriginalLocation = FVector::ZeroVector;
 
-		FORCEINLINE uint64 GetTargetHash() const { return PCGEx::H64(TargetPointIndex, TargetIOIndex); }
+		FORCEINLINE uint64 GetTargetHash() const
+		{
+			return PCGEx::H64(TargetPointIndex, TargetIOIndex);
+		}
 
-		bool operator<(const FInsertCandidate& Other) const { return Alpha < Other.Alpha; }
+		bool operator<(const FInsertCandidate& Other) const
+		{
+			return Alpha < Other.Alpha;
+		}
 	};
 
 	struct FEdgeInserts
 	{
 		TArray<FInsertCandidate> Inserts;
 
-		void Add(const FInsertCandidate& Candidate) { Inserts.Add(Candidate); }
-		void SortByAlpha() { Inserts.Sort(); }
-		int32 Num() const { return Inserts.Num(); }
-		bool IsEmpty() const { return Inserts.IsEmpty(); }
+		void Add(const FInsertCandidate& Candidate)
+		{
+			Inserts.Add(Candidate);
+		}
+
+		void SortByAlpha()
+		{
+			Inserts.Sort();
+		}
+
+		int32 Num() const
+		{
+			return Inserts.Num();
+		}
+
+		bool IsEmpty() const
+		{
+			return Inserts.IsEmpty();
+		}
 	};
 
 	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExPathInsertContext, UPCGExPathInsertSettings>
@@ -360,7 +384,10 @@ namespace PCGExPathInsert
 		{
 		}
 
-		virtual bool IsTrivial() const override { return false; }
+		virtual bool IsTrivial() const override
+		{
+			return false;
+		}
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void CompleteWork() override;

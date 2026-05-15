@@ -42,13 +42,19 @@ void UPCGExOffsetPathSettings::ApplyDeprecation(UPCGNode* InOutNode)
 
 PCGEX_INITIALIZE_ELEMENT(OffsetPath)
 
-PCGExData::EIOInit UPCGExOffsetPathSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExOffsetPathSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(OffsetPath)
 
 bool FPCGExOffsetPathElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(OffsetPath)
 
@@ -94,15 +100,27 @@ namespace PCGExOffsetPath
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExOffsetPath::Process);
 
-		if (Settings->OffsetMethod == EPCGExOffsetMethod::Slide) { PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet; }
-		else { PointDataFacade->bSupportsScopedGet = false; }
+		if (Settings->OffsetMethod == EPCGExOffsetMethod::Slide)
+		{
+			PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
+		}
+		else
+		{
+			PointDataFacade->bSupportsScopedGet = false;
+		}
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 		PointDataFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
 
-		if (Settings->bInvertDirection) { DirectionFactor *= -1; }
+		if (Settings->bInvertDirection)
+		{
+			DirectionFactor *= -1;
+		}
 
 		InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
 
@@ -120,15 +138,24 @@ namespace PCGExOffsetPath
 		}
 
 		OffsetGetter = Settings->Offset.GetValueSetting();
-		if (!OffsetGetter->Init(PointDataFacade)) { return false; }
+		if (!OffsetGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		OffsetScaleGetter = Settings->OffsetScale.GetValueSetting();
-		if (!OffsetScaleGetter->Init(PointDataFacade)) { return false; }
+		if (!OffsetScaleGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		if (Settings->DirectionConstant == EPCGExPathNormalDirection::Custom)
 		{
 			DirectionGetter = Settings->Direction.GetValueSetting();
-			if (!DirectionGetter->Init(PointDataFacade)) { return false; }
+			if (!DirectionGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 		else
 		{
@@ -141,11 +168,14 @@ namespace PCGExOffsetPath
 				switch (Settings->DirectionConstant)
 				{
 				default:
-				case EPCGExPathNormalDirection::Normal: OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeNormal>(false, Up));
+				case EPCGExPathNormalDirection::Normal:
+					OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeNormal>(false, Up));
 					break;
-				case EPCGExPathNormalDirection::Binormal: OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Up));
+				case EPCGExPathNormalDirection::Binormal:
+					OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Up));
 					break;
-				case EPCGExPathNormalDirection::AverageNormal: OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, Up));
+				case EPCGExPathNormalDirection::AverageNormal:
+					OffsetDirection = StaticCastSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>>(Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, Up));
 					break;
 				}
 			}
@@ -172,7 +202,10 @@ namespace PCGExOffsetPath
 			FVector Dir = (OffsetDirection ? OffsetDirection->Get(EdgeIndex) : DirectionGetter->Read(Index)) * DirectionFactor;
 			double Offset = OffsetGetter->Read(Index) * OffsetScaleGetter->Read(Index);
 
-			if (Settings->bApplyPointScaleToOffset) { Dir *= InTransforms[Index].GetScale3D(); }
+			if (Settings->bApplyPointScaleToOffset)
+			{
+				Dir *= InTransforms[Index].GetScale3D();
+			}
 
 			if (Settings->OffsetMethod == EPCGExOffsetMethod::Slide)
 			{
@@ -190,7 +223,10 @@ namespace PCGExOffsetPath
 					else if (Settings->Adjustment == EPCGExOffsetAdjustment::Mitre)
 					{
 						double MitreLength = Offset / FMath::Sin(PathAngles->Get(EdgeIndex) / 2);
-						if (MitreLength > Settings->MitreLimit * Offset) { Offset *= Settings->MitreLimit; } // Should bevel :(
+						if (MitreLength > Settings->MitreLimit * Offset)
+						{
+							Offset *= Settings->MitreLimit;
+						} // Should bevel :(
 					}
 				}
 
@@ -213,12 +249,21 @@ namespace PCGExOffsetPath
 				else
 				{
 					const FVector Candidate = FMath::LinePlaneIntersection(A, A + NextDir * 10, PlaneOrigin, PlaneDir * -1);
-					if (Candidate.ContainsNaN()) { OutTransforms[Index].SetLocation(A); }
-					else { OutTransforms[Index].SetLocation(Candidate); }
+					if (Candidate.ContainsNaN())
+					{
+						OutTransforms[Index].SetLocation(A);
+					}
+					else
+					{
+						OutTransforms[Index].SetLocation(Candidate);
+					}
 				}
 			}
 
-			if (!PointFilterCache[Index]) { OutTransforms[Index].SetLocation(InTransforms[Index].GetLocation()); }
+			if (!PointFilterCache[Index])
+			{
+				OutTransforms[Index].SetLocation(InTransforms[Index].GetLocation());
+			}
 		}
 	}
 }

@@ -37,7 +37,11 @@ public:
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
 
 protected:
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings

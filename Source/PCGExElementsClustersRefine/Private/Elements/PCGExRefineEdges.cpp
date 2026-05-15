@@ -4,15 +4,15 @@
 #include "Elements/PCGExRefineEdges.h"
 
 
+#include "PCGExVersion.h"
 #include "PCGParamData.h"
+#include "Async/ParallelFor.h"
+#include "Core/PCGExClusterFilter.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Graphs/PCGExGraph.h"
-#include "Refinements/PCGExEdgeRefinePrimMST.h"
-#include "Core/PCGExClusterFilter.h"
-#include "Async/ParallelFor.h"
-#include "PCGExVersion.h"
 #include "Graphs/PCGExGraphBuilder.h"
+#include "Refinements/PCGExEdgeRefinePrimMST.h"
 
 #define LOCTEXT_NAMESPACE "PCGExRefineEdges"
 #define PCGEX_NAMESPACE RefineEdges
@@ -22,7 +22,10 @@ void UPCGExRefineEdgesSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
-		if (bOutputEdgesOnly_DEPRECATED) { Mode = EPCGExRefineEdgesOutput::Points; }
+		if (bOutputEdgesOnly_DEPRECATED)
+		{
+			Mode = EPCGExRefineEdgesOutput::Points;
+		}
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 71, 2)
@@ -37,8 +40,14 @@ void UPCGExRefineEdgesSettings::ApplyDeprecation(UPCGNode* InOutNode)
 
 bool UPCGExRefineEdgesSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExHeuristics::Labels::SourceHeuristicsLabel) { return Refinement && Refinement->WantsHeuristics(); }
-	if (InPin->Properties.Label == PCGExClusters::Labels::SourceEdgeFiltersLabel) { return Refinement && Refinement->SupportFilters(); }
+	if (InPin->Properties.Label == PCGExHeuristics::Labels::SourceHeuristicsLabel)
+	{
+		return Refinement && Refinement->WantsHeuristics();
+	}
+	if (InPin->Properties.Label == PCGExClusters::Labels::SourceEdgeFiltersLabel)
+	{
+		return Refinement && Refinement->SupportFilters();
+	}
 
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
@@ -46,11 +55,23 @@ bool UPCGExRefineEdgesSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) c
 TArray<FPCGPinProperties> UPCGExRefineEdgesSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	if (Refinement && Refinement->WantsHeuristics()) { PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some refinements.", Required, FPCGExDataTypeInfoHeuristics::AsId()) }
-	else { PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some refinements.", Advanced, FPCGExDataTypeInfoHeuristics::AsId()) }
+	if (Refinement && Refinement->WantsHeuristics())
+	{
+		PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some refinements.", Required, FPCGExDataTypeInfoHeuristics::AsId())
+	}
+	else
+	{
+		PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics may be required by some refinements.", Advanced, FPCGExDataTypeInfoHeuristics::AsId())
+	}
 
-	if (Refinement && Refinement->SupportFilters()) { PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceEdgeFiltersLabel, "Refinements filters.", Normal) }
-	else { PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceEdgeFiltersLabel, "Refinements filters.", Advanced) }
+	if (Refinement && Refinement->SupportFilters())
+	{
+		PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceEdgeFiltersLabel, "Refinements filters.", Normal)
+	}
+	else
+	{
+		PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceEdgeFiltersLabel, "Refinements filters.", Advanced)
+	}
 
 	if (Sanitization == EPCGExRefineSanitization::Filters)
 	{
@@ -64,7 +85,10 @@ TArray<FPCGPinProperties> UPCGExRefineEdgesSettings::InputPinProperties() const
 
 TArray<FPCGPinProperties> UPCGExRefineEdgesSettings::OutputPinProperties() const
 {
-	if (Mode != EPCGExRefineEdgesOutput::Points) { return Super::OutputPinProperties(); }
+	if (Mode != EPCGExRefineEdgesOutput::Points)
+	{
+		return Super::OutputPinProperties();
+	}
 
 	TArray<FPCGPinProperties> PinProperties;
 	PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputKeptEdgesLabel, "Kept edges but as simple points.", Required)
@@ -76,9 +100,12 @@ PCGExData::EIOInit UPCGExRefineEdgesSettings::GetMainOutputInitMode() const
 {
 	switch (Mode)
 	{
-	default: case EPCGExRefineEdgesOutput::Clusters: return PCGExData::EIOInit::New;
-	case EPCGExRefineEdgesOutput::Points: return PCGExData::EIOInit::NoInit;
-	case EPCGExRefineEdgesOutput::Attribute: return PCGExData::EIOInit::Duplicate;
+	default: case EPCGExRefineEdgesOutput::Clusters:
+		return PCGExData::EIOInit::New;
+	case EPCGExRefineEdgesOutput::Points:
+		return PCGExData::EIOInit::NoInit;
+	case EPCGExRefineEdgesOutput::Attribute:
+		return PCGExData::EIOInit::Duplicate;
 	}
 }
 
@@ -92,7 +119,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(RefineEdges)
 
 bool FPCGExRefineEdgesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(RefineEdges)
 
@@ -147,8 +177,14 @@ bool FPCGExRefineEdgesElement::Boot(FPCGExContext* InContext) const
 	}
 	else if (Settings->Mode == EPCGExRefineEdgesOutput::Attribute)
 	{
-		if (!Settings->ResultOutputVtx.Validate(Context)) { return false; }
-		if (!Settings->ResultOutputEdges.Validate(Context)) { return false; }
+		if (!Settings->ResultOutputVtx.Validate(Context))
+		{
+			return false;
+		}
+		if (!Settings->ResultOutputEdges.Validate(Context))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -162,12 +198,18 @@ bool FPCGExRefineEdgesElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-			NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
-			if (Context->Refinement->WantsHeuristics()) { NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode); }
-			NewBatch->bRequiresWriteStep = Settings->Mode == EPCGExRefineEdgesOutput::Attribute;
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+			                                      NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
+			                                      if (Context->Refinement->WantsHeuristics())
+			                                      {
+				                                      NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+			                                      }
+			                                      NewBatch->bRequiresWriteStep = Settings->Mode == EPCGExRefineEdgesOutput::Attribute;
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -178,7 +220,10 @@ bool FPCGExRefineEdgesElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	if (Settings->Mode == EPCGExRefineEdgesOutput::Clusters)
 	{
 		// Wait for compilation
-		if (!Context->CompileGraphBuilders(true, PCGExCommon::States::State_Done)) { return false; }
+		if (!Context->CompileGraphBuilders(true, PCGExCommon::States::State_Done))
+		{
+			return false;
+		}
 		Context->MainPoints->StageOutputs();
 	}
 	else if (Settings->Mode == EPCGExRefineEdgesOutput::Points)
@@ -200,7 +245,8 @@ namespace PCGExRefineEdges
 	{
 	public:
 		explicit FSanitizeRangeTask(const TSharedPtr<FProcessor>& InProcessor)
-			: FScopeIterationTask(), Processor(InProcessor)
+			: FScopeIterationTask()
+			  , Processor(InProcessor)
 		{
 		}
 
@@ -210,7 +256,10 @@ namespace PCGExRefineEdges
 		{
 			auto RestoreEdge = [&](const int32 EdgeIndex)
 			{
-				if (EdgeIndex == -1) { return; }
+				if (EdgeIndex == -1)
+				{
+					return;
+				}
 				FPlatformAtomics::InterlockedExchange(&Processor->Cluster->GetEdge(EdgeIndex)->bValid, 1);
 				FPlatformAtomics::InterlockedExchange(&Processor->Cluster->GetEdgeStart(EdgeIndex)->bValid, 1);
 				FPlatformAtomics::InterlockedExchange(&Processor->Cluster->GetEdgeEnd(EdgeIndex)->bValid, 1);
@@ -245,7 +294,7 @@ namespace PCGExRefineEdges
 					const PCGExClusters::FNode* Node = Processor->Cluster->GetNode(i);
 
 					int32 BestIndex = -1;
-					double ShortestDist = MAX_dbl;
+					double ShortestDist = TNumericLimits<double>::Max();
 
 					for (const PCGExGraphs::FLink Lk : Node->Links)
 					{
@@ -279,12 +328,18 @@ namespace PCGExRefineEdges
 
 		EdgeFilterFactories = &Context->EdgeFilterFactories; // So filters can be initialized
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		Sanitization = Settings->Sanitization;
 
 		Refinement = Context->Refinement->CreateOperation();
-		if (!Refinement) { return false; }
+		if (!Refinement)
+		{
+			return false;
+		}
 
 		Refinement->PrimaryDataFacade = VtxDataFacade;
 		Refinement->SecondaryDataFacade = EdgeDataFacade;
@@ -301,7 +356,10 @@ namespace PCGExRefineEdges
 			ResultOutputVtx = StaticCastSharedPtr<FBatch>(ParentBatch.Pin())->ResultOutputVtx;
 
 			ResultOutputEdges = Settings->ResultOutputEdges;
-			if (ResultOutputEdges.bEnabled) { ResultOutputEdges.Init(EdgeDataFacade); }
+			if (ResultOutputEdges.bEnabled)
+			{
+				ResultOutputEdges.Init(EdgeDataFacade);
+			}
 		}
 
 		if (Settings->Sanitization == EPCGExRefineSanitization::Filters)
@@ -311,7 +369,10 @@ namespace PCGExRefineEdges
 				SanitizationFilterManager = MakeShared<PCGExClusterFilter::FManager>(Cluster.ToSharedRef(), VtxDataFacade, EdgeDataFacade);
 				SanitizationFilterManager->bUseEdgeAsPrimary = true;
 				SanitizationFilterManager->SetSupportedTypes(&PCGExFactories::ClusterEdgeFilters);
-				if (!SanitizationFilterManager->Init(ExecutionContext, Context->SanitizationFilterFactories)) { return false; }
+				if (!SanitizationFilterManager->Init(ExecutionContext, Context->SanitizationFilterFactories))
+				{
+					return false;
+				}
 			}
 		}
 
@@ -328,8 +389,14 @@ namespace PCGExRefineEdges
 			EdgeScopeLoop->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 			{
 				PCGEX_ASYNC_THIS
-				if (This->Context->Refinement->WantsIndividualNodeProcessing()) { This->StartParallelLoopForNodes(); }
-				else { This->Refinement->Process(); }
+				if (This->Context->Refinement->WantsIndividualNodeProcessing())
+				{
+					This->StartParallelLoopForNodes();
+				}
+				else
+				{
+					This->Refinement->Process();
+				}
 			};
 
 			EdgeScopeLoop->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
@@ -362,7 +429,10 @@ namespace PCGExRefineEdges
 		TArray<PCGExGraphs::FEdge>& Edges = *Cluster->Edges;
 
 		const bool bDefaultValidity = Context->Refinement->GetDefaultEdgeValidity();
-		PCGEX_SCOPE_LOOP(i) { Edges[i].bValid = bDefaultValidity; }
+		PCGEX_SCOPE_LOOP(i)
+		{
+			Edges[i].bValid = bDefaultValidity;
+		}
 	}
 
 	void FProcessor::ProcessEdges(const PCGExMT::FScope& Scope)
@@ -378,7 +448,10 @@ namespace PCGExRefineEdges
 
 	void FProcessor::OnEdgesProcessingComplete()
 	{
-		if (!Settings->bRestoreEdgesThatConnectToValidNodes) { return; }
+		if (!Settings->bRestoreEdgesThatConnectToValidNodes)
+		{
+			return;
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, InvalidateNodes)
 
@@ -388,7 +461,11 @@ namespace PCGExRefineEdges
 			const PCGExClusters::FCluster* LocalCluster = This->Cluster.Get();
 			PCGEX_SCOPE_LOOP(i)
 			{
-				if (PCGExClusters::FNode* Node = LocalCluster->GetNode(i); !Node->HasAnyValidEdges(LocalCluster)) { Node->bValid = false; }
+				if (PCGExClusters::FNode* Node = LocalCluster->GetNode(i);
+					!Node->HasAnyValidEdges(LocalCluster))
+				{
+					Node->bValid = false;
+				}
 			}
 		};
 
@@ -404,8 +481,14 @@ namespace PCGExRefineEdges
 				PCGEX_SCOPE_LOOP(i)
 				{
 					PCGExGraphs::FEdge* Edge = LocalCluster->GetEdge(i);
-					if (Edge->bValid) { continue; }
-					if (LocalCluster->GetEdgeStart(i)->bValid && LocalCluster->GetEdgeEnd(i)->bValid) { Edge->bValid = true; }
+					if (Edge->bValid)
+					{
+						continue;
+					}
+					if (LocalCluster->GetEdgeStart(i)->bValid && LocalCluster->GetEdgeEnd(i)->bValid)
+					{
+						Edge->bValid = true;
+					}
 				}
 			};
 
@@ -441,7 +524,10 @@ namespace PCGExRefineEdges
 				PCGEX_SCOPE_LOOP(i)
 				{
 					PCGExGraphs::FEdge& Edge = *LocalCluster->GetEdge(i);
-					if (SanitizationFilters->Test(Edge)) { Edge.bValid = true; }
+					if (SanitizationFilters->Test(Edge))
+					{
+						Edge.bValid = true;
+					}
 				}
 			};
 			SanitizeTaskGroup->StartSubLoops(EdgeDataFacade->GetNum(), PLI);
@@ -471,7 +557,10 @@ namespace PCGExRefineEdges
 						if (Node.bValid)
 						{
 							int32 ValidCount = 0;
-							for (const PCGExGraphs::FLink& Lk : Node.Links) { ValidCount += Edges[Lk.Edge].bValid; }
+							for (const PCGExGraphs::FLink& Lk : Node.Links)
+							{
+								ValidCount += Edges[Lk.Edge].bValid;
+							}
 							ResultOutputVtx.Write(Node.PointIndex, static_cast<bool>(ValidCount));
 						}
 						else
@@ -488,7 +577,10 @@ namespace PCGExRefineEdges
 						if (Node.bValid)
 						{
 							int32 ValidCount = 0;
-							for (const PCGExGraphs::FLink& Lk : Node.Links) { ValidCount += Edges[Lk.Edge].bValid; }
+							for (const PCGExGraphs::FLink& Lk : Node.Links)
+							{
+								ValidCount += Edges[Lk.Edge].bValid;
+							}
 							ResultOutputVtx.Write(Node.PointIndex, static_cast<bool>(ValidCount));
 						}
 						else
@@ -530,12 +622,18 @@ namespace PCGExRefineEdges
 		}
 		else if (Settings->Mode == EPCGExRefineEdgesOutput::Clusters)
 		{
-			if (!GraphBuilder) { return; }
+			if (!GraphBuilder)
+			{
+				return;
+			}
 
 			TArray<PCGExGraphs::FEdge> ValidEdges;
 			Cluster->GetValidEdges(ValidEdges);
 
-			if (ValidEdges.IsEmpty()) { return; }
+			if (ValidEdges.IsEmpty())
+			{
+				return;
+			}
 
 			GraphBuilder->Graph->InsertEdges(ValidEdges);
 		}
@@ -566,7 +664,10 @@ namespace PCGExRefineEdges
 		if (Settings->Mode == EPCGExRefineEdgesOutput::Attribute)
 		{
 			ResultOutputVtx = Settings->ResultOutputVtx;
-			if (ResultOutputVtx.bEnabled) { ResultOutputVtx.Init(VtxDataFacade); }
+			if (ResultOutputVtx.bEnabled)
+			{
+				ResultOutputVtx.Init(VtxDataFacade);
+			}
 		}
 
 		TBatch<FProcessor>::RegisterBuffersDependencies(FacadePreloader);

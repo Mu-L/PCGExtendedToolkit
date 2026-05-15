@@ -126,7 +126,10 @@ namespace PCGExMath
 		double V = 0;
 		double W = 0;
 
-		FORCEINLINE FVector GetUVW() const { return FVector(U, V, W); }
+		FORCEINLINE FVector GetUVW() const
+		{
+			return FVector(U, V, W);
+		}
 
 		FVector GetPosition(const PCGExData::FConstPoint& Point) const;
 

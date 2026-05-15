@@ -4,10 +4,10 @@
 #include "Elements/Meta/VtxProperties/PCGExVtxPropertyEdgeMatch.h"
 
 #include "PCGPin.h"
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Clusters/PCGExCluster.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExVtxPropertyEdgeMatch"
@@ -15,7 +15,10 @@
 
 bool FPCGExVtxPropertyEdgeMatch::PrepareForCluster(FPCGExContext* InContext, TSharedPtr<PCGExClusters::FCluster> InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataFacade, const TSharedPtr<PCGExData::FFacade>& InEdgeDataFacade)
 {
-	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade)) { return false; }
+	if (!FPCGExVtxPropertyOperation::PrepareForCluster(InContext, InCluster, InVtxDataFacade, InEdgeDataFacade))
+	{
+		return false;
+	}
 
 	if (!Config.MatchingEdge.Validate(InContext))
 	{
@@ -47,12 +50,15 @@ void FPCGExVtxPropertyEdgeMatch::ProcessNode(PCGExClusters::FNode& Node, const T
 {
 	const FTransform& PointTransform = PrimaryDataFacade->Source->GetIn()->GetTransform(Node.PointIndex);
 
-	double BestDot = MIN_dbl_neg;
+	double BestDot = TNumericLimits<double>::Lowest();
 	int32 IBest = -1;
 	const double DotThreshold = Config.DotComparisonDetails.GetComparisonThreshold(Node.PointIndex);
 
 	FVector NodeDirection = DirCache->Read(Node.PointIndex).GetSafeNormal() * DirectionMultiplier;
-	if (Config.bTransformDirection) { NodeDirection = PointTransform.TransformVectorNoScale(NodeDirection); }
+	if (Config.bTransformDirection)
+	{
+		NodeDirection = PointTransform.TransformVectorNoScale(NodeDirection);
+	}
 
 	for (int i = 0; i < Adjacency.Num(); i++)
 	{
@@ -69,8 +75,14 @@ void FPCGExVtxPropertyEdgeMatch::ProcessNode(PCGExClusters::FNode& Node, const T
 		}
 	}
 
-	if (IBest != -1) { Config.MatchingEdge.Set(Node.PointIndex, Adjacency[IBest], Cluster->GetNode(Adjacency[IBest].NodeIndex)->Num()); }
-	else { Config.MatchingEdge.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0); }
+	if (IBest != -1)
+	{
+		Config.MatchingEdge.Set(Node.PointIndex, Adjacency[IBest], Cluster->GetNode(Adjacency[IBest].NodeIndex)->Num());
+	}
+	else
+	{
+		Config.MatchingEdge.Set(Node.PointIndex, 0, FVector::ZeroVector, -1, -1, 0);
+	}
 }
 
 #if WITH_EDITOR

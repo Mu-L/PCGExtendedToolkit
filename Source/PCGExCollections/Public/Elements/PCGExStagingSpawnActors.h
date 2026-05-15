@@ -4,16 +4,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExPointsProcessor.h"
+#include "PCGCommon.h"
+#include "PCGCrc.h"
+#include "PCGManagedResource.h"
+#include "Collections/PCGExActorCollection.h"
+#include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExPointFilter.h"
+#include "Core/PCGExPointsProcessor.h"
+#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
-#include "Collections/PCGExActorCollection.h"
-#include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Helpers/PCGExPCGGenerationWatcher.h"
-#include "PCGCommon.h"
-#include "PCGManagedResource.h"
-#include "PCGCrc.h"
 
 #include "PCGExStagingSpawnActors.generated.h"
 
@@ -33,8 +34,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(StagingSpawnActors, "Staging : Spawn Actors", "Spawns actors from staged collection entries.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spawner; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spawner;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
 #endif
 
 protected:
@@ -44,14 +53,17 @@ protected:
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters which points spawn an actor.", PCGExFactories::PointFilters, false)
 	//~End UPCGSettings
 
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 
 public:
 	// --- Targeting ---
 
 	/** Optional root actor that owns the spawned actors. Resolves per-point (constant, data-domain attribute, or
 	 *  per-point attribute). When the resolved soft path is null, falls back to the PCG component's target actor.
-	 *  Resolution is by ResolveObject only — paths must point to live actors. */
+	 *  Resolution is by ResolveObject only -- paths must point to live actors. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning", meta=(PCG_Overridable))
 	FPCGExInputShorthandNameSoftObjectPath RootActor;
 
@@ -88,7 +100,7 @@ public:
 	/** Attribute name that contains the per-instance tags string (comma-separated). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable, EditCondition="bApplyInstanceTags"))
 	FName InstanceTagsAttributeName = FName("InstanceTags");
-	
+
 	// --- PCG Generation ---
 
 	/** If enabled, trigger PCG generation on spawned actors that have PCG components. */
@@ -136,7 +148,10 @@ protected:
 class FPCGExStagingSpawnActorsElement final : public FPCGExPointsProcessorElement
 {
 public:
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 protected:
 	PCGEX_CAN_ONLY_EXECUTE_ON_MAIN_THREAD(true)
@@ -171,6 +186,17 @@ namespace PCGExStagingSpawnActors
 		/** Pre-sized to NumPoints -- each parallel thread writes to its own index, no locks */
 		TArray<FResolvedEntry> ResolvedEntries;
 
+		/** Per-loop-scope dedup set for the soft paths we need pre-loaded before spawn.
+		 *  Populated in parallel during ProcessPoints (each scope writes its own set, no
+		 *  contention), collapsed on OnPointsProcessingComplete. Carries both the per-entry
+		 *  actor class path AND the delta collateral paths (when bApplyPropertyDeltas) so a
+		 *  single async batch load covers everything spawning needs. */
+		TSharedPtr<PCGExMT::TScopedSet<FSoftObjectPath>> ScopedUniquePaths;
+
+		/** Cached at Process time. Read inside the hot ProcessPoints loop to decide whether
+		 *  to enqueue delta collateral paths alongside the actor class path. */
+		bool bApplyDeltas = false;
+
 		/** Main thread loop for spawning */
 		TSharedPtr<PCGExMT::FTimeSlicedMainThreadLoop> MainThreadLoop;
 
@@ -202,6 +228,7 @@ namespace PCGExStagingSpawnActors
 		virtual ~FProcessor() override = default;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
+		virtual void PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops) override;
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
 		virtual void OnPointsProcessingComplete() override;
 

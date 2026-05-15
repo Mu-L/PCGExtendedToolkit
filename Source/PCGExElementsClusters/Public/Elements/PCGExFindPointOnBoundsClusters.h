@@ -19,8 +19,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(FindPointOnBoundsClusters, "Cluster : Find point on Bounds", "Find the closest vtx or edge on each cluster' bounds.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spatial; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(ClusterOp); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spatial;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(ClusterOp);
+	}
 #endif
 
 protected:
@@ -31,7 +39,12 @@ protected:
 public:
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
-	virtual FName GetMainOutputPin() const override { return PCGPinConstants::DefaultOutputLabel; }
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return PCGPinConstants::DefaultOutputLabel;
+	}
+
 	//~End UPCGExPointsProcessorSettings
 
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
@@ -117,7 +130,7 @@ namespace PCGExFindPointOnBoundsClusters
 	{
 		mutable FRWLock BestIndexLock;
 
-		double BestDistance = MAX_dbl;
+		double BestDistance = TNumericLimits<double>::Max();
 		FVector BestPosition = FVector::ZeroVector;
 		FVector SearchPosition = FVector::ZeroVector;
 		int32 BestIndex = -1;

@@ -6,20 +6,27 @@
 
 #include "PCGExHeuristicsCommon.h"
 #include "PCGExHeuristicsHandler.h"
-#include "Core/PCGExBlendOpFactoryProvider.h"
 #include "Blenders/PCGExMetadataBlender.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExBlendOpFactoryProvider.h"
 #include "Core/PCGExBlendOpsManager.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
 #include "Data/PCGExData.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
 #define LOCTEXT_NAMESPACE "WriteEdgeProperties"
 #define PCGEX_NAMESPACE WriteEdgeProperties
 
-PCGExData::EIOInit UPCGExWriteEdgePropertiesSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Forward; }
-PCGExData::EIOInit UPCGExWriteEdgePropertiesSettings::GetEdgeOutputInitMode() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExWriteEdgePropertiesSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Forward;
+}
+
+PCGExData::EIOInit UPCGExWriteEdgePropertiesSettings::GetEdgeOutputInitMode() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_SETTING_VALUE_IMPL(UPCGExWriteEdgePropertiesSettings, SolidificationLerp, double, SolidificationLerpInput, SolidificationLerpAttribute, SolidificationLerpConstant)
 
@@ -27,13 +34,19 @@ TArray<FPCGPinProperties> UPCGExWriteEdgePropertiesSettings::InputPinProperties(
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
 	PCGExBlending::DeclareBlendOpsInputs(PinProperties, bEndpointsBlending ? EPCGPinStatus::Normal : EPCGPinStatus::Advanced);
-	if (bWriteHeuristics) { PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics that will be computed and written.", Required, FPCGExDataTypeInfoHeuristics::AsId()) }
+	if (bWriteHeuristics)
+	{
+		PCGEX_PIN_FACTORIES(PCGExHeuristics::Labels::SourceHeuristicsLabel, "Heuristics that will be computed and written.", Required, FPCGExDataTypeInfoHeuristics::AsId())
+	}
 	return PinProperties;
 }
 
 bool UPCGExWriteEdgePropertiesSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExBlending::Labels::SourceBlendingLabel) { return BlendingInterface == EPCGExBlendingInterface::Individual && bEndpointsBlending; }
+	if (InPin->Properties.Label == PCGExBlending::Labels::SourceBlendingLabel)
+	{
+		return BlendingInterface == EPCGExBlendingInterface::Individual && bEndpointsBlending;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
@@ -42,7 +55,10 @@ PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(WriteEdgeProperties)
 
 bool FPCGExWriteEdgePropertiesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(WriteEdgeProperties)
 
@@ -65,7 +81,10 @@ bool FPCGExWriteEdgePropertiesElement::AdvanceWork(FPCGExContext* InContext, con
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartProcessingClusters(
-			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; },
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
 			{
 				NewBatch->SetWantsHeuristics(Settings->bWriteHeuristics, Settings->HeuristicScoreMode);
@@ -95,7 +114,10 @@ namespace PCGExWriteEdgeProperties
 
 		EdgeDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		if (!DirectionSettings.InitFromParent(ExecutionContext, GetParentBatch<FBatch>()->DirectionSettings, EdgeDataFacade))
 		{
@@ -134,7 +156,10 @@ namespace PCGExWriteEdgeProperties
 #undef PCGEX_CREATE_LOCAL_AXIS_SET_CONST
 
 			SolidificationLerp = Settings->GetValueSettingSolidificationLerp();
-			if (!SolidificationLerp->Init(EdgeDataFacade, false)) { return false; }
+			if (!SolidificationLerp->Init(EdgeDataFacade, false))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->bEndpointsBlending)
@@ -146,7 +171,10 @@ namespace PCGExWriteEdgeProperties
 					BlendOpsManager = MakeShared<PCGExBlending::FBlendOpsManager>(EdgeDataFacade);
 					BlendOpsManager->SetSources(VtxDataFacade); // We want operands A & B to be the vtx here
 
-					if (!BlendOpsManager->Init(Context, Context->BlendingFactories)) { return false; }
+					if (!BlendOpsManager->Init(Context, Context->BlendingFactories))
+					{
+						return false;
+					}
 				}
 
 				DataBlender = BlendOpsManager;
@@ -168,7 +196,10 @@ namespace PCGExWriteEdgeProperties
 			}
 		}
 
-		if (!DataBlender) { DataBlender = MakeShared<PCGExBlending::FDummyBlender>(); }
+		if (!DataBlender)
+		{
+			DataBlender = MakeShared<PCGExBlending::FDummyBlender>();
+		}
 
 		StartParallelLoopForEdges();
 
@@ -247,11 +278,14 @@ TargetBoundsMax._AXIS = Rad * InvScale._AXIS;\
 
 				switch (Settings->SolidificationAxis)
 				{
-				default: case EPCGExMinimalAxis::X: EdgeRot = FRotationMatrix::MakeFromX(EdgeDirection).Rotator();
+				default: case EPCGExMinimalAxis::X:
+					EdgeRot = FRotationMatrix::MakeFromX(EdgeDirection).Rotator();
 					break;
-				case EPCGExMinimalAxis::Y: EdgeRot = FRotationMatrix::MakeFromY(EdgeDirection).Rotator();
+				case EPCGExMinimalAxis::Y:
+					EdgeRot = FRotationMatrix::MakeFromY(EdgeDirection).Rotator();
 					break;
-				case EPCGExMinimalAxis::Z: EdgeRot = FRotationMatrix::MakeFromZ(EdgeDirection).Rotator();
+				case EPCGExMinimalAxis::Z:
+					EdgeRot = FRotationMatrix::MakeFromZ(EdgeDirection).Rotator();
 					break;
 				}
 
@@ -276,7 +310,10 @@ TargetBoundsMax._AXIS = Rad * InvScale._AXIS;\
 
 	void FProcessor::CompleteWork()
 	{
-		if (BlendOpsManager) { BlendOpsManager->Cleanup(Context); }
+		if (BlendOpsManager)
+		{
+			BlendOpsManager->Cleanup(Context);
+		}
 		EdgeDataFacade->WriteFastest(TaskManager);
 	}
 

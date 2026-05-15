@@ -8,8 +8,8 @@
 #include "Core/PCGExMTCommon.h"
 #include "Misc/ScopeRWLock.h"
 #include "Types/PCGExTypes.h"
-#include "UObject/SoftObjectPtr.h"
 #include "UObject/SoftObjectPath.h"
+#include "UObject/SoftObjectPtr.h"
 
 struct FPCGExContext;
 
@@ -58,8 +58,16 @@ namespace PCGEx
 		IAssetLoader(FPCGExContext* InContext, const TSharedPtr<PCGExData::FPointIOCollection>& InIOCollection, const TArray<FName>& InAttributeNames);
 		virtual ~IAssetLoader();
 
-		virtual bool IsEmpty() { return true; }
-		bool HasEnded() const { return bEnded ? true : false; }
+		virtual bool IsEmpty()
+		{
+			return true;
+		}
+
+		bool HasEnded() const
+		{
+			return bEnded ? true : false;
+		}
+
 		void Cancel();
 
 		void AddUniquePaths(const TSet<FSoftObjectPath>& InPaths);
@@ -86,12 +94,22 @@ namespace PCGEx
 		{
 		}
 
-		virtual bool IsEmpty() override { return AssetsMap.IsEmpty(); }
-		TObjectPtr<T>* GetAsset(const PCGExValueHash Key) { return AssetsMap.Find(Key); }
+		virtual bool IsEmpty() override
+		{
+			return AssetsMap.IsEmpty();
+		}
+
+		TObjectPtr<T>* GetAsset(const PCGExValueHash Key)
+		{
+			return AssetsMap.Find(Key);
+		}
 
 		virtual void End(const bool bBuildMap = false) override
 		{
-			if (bEnded) { return; }
+			if (bEnded)
+			{
+				return;
+			}
 
 			FPlatformAtomics::InterlockedExchange(&bEnded, 1);
 
@@ -100,7 +118,10 @@ namespace PCGEx
 				for (FSoftObjectPath Path : UniquePaths)
 				{
 					TSoftObjectPtr<T> SoftPtr = TSoftObjectPtr<T>(Path);
-					if (SoftPtr.Get()) { AssetsMap.Add(PCGExTypes::ComputeHash(Path), SoftPtr.Get()); }
+					if (SoftPtr.Get())
+					{
+						AssetsMap.Add(PCGExTypes::ComputeHash(Path), SoftPtr.Get());
+					}
 				}
 			}
 

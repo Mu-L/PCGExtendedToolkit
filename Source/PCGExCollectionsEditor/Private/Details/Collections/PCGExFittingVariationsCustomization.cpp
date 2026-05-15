@@ -9,21 +9,21 @@
 #include "PCGExCollectionsEditorSettings.h"
 #include "PropertyHandle.h"
 #include "Core/PCGExAssetCollection.h"
-#include "Details/Enums/PCGExInlineEnumCustomization.h"
 #include "Details/PCGExInlineNumericWidgets.h"
-#include "Widgets/Text/STextBlock.h"
+#include "Details/Enums/PCGExInlineEnumCustomization.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 namespace
 {
 	// Row-prefix tints: softer-than-canon axis colors so vertical stacking still reads as
 	// separate axes (since this layout is vertical rather than UE's canonical inline triplet),
 	// without fighting the per-field colored labels supplied by MakeAxisEntry.
-	static const FLinearColor AxisRowTintX = FLinearColor(0.85f, 0.45f, 0.45f, 0.65f);
-	static const FLinearColor AxisRowTintY = FLinearColor(0.45f, 0.80f, 0.45f, 0.65f);
-	static const FLinearColor AxisRowTintZ = FLinearColor(0.45f, 0.55f, 0.85f, 0.65f);
+	constexpr FLinearColor AxisRowTintX = FLinearColor(0.85f, 0.45f, 0.45f, 0.65f);
+	constexpr FLinearColor AxisRowTintY = FLinearColor(0.45f, 0.80f, 0.45f, 0.65f);
+	constexpr FLinearColor AxisRowTintZ = FLinearColor(0.45f, 0.55f, 0.85f, 0.65f);
 }
 
 // Row-prefix axis label: small, subtly tinted toward the axis so vertically-stacked rows
@@ -105,15 +105,15 @@ void FPCGExFittingVariationsCustomization::CustomizeHeader(
 					[Collection]()
 					{
 						return Collection->GlobalVariationMode == EPCGExGlobalVariationRule::Overrule
-							       ? FText::FromString(TEXT("··· Overruled"))
-							       : FText::GetEmpty();
+							? FText::FromString(TEXT("··· Overruled"))
+							: FText::GetEmpty();
 					})
 				.ColorAndOpacity_Lambda(
 					[Collection]()
 					{
 						return Collection->GlobalVariationMode == EPCGExGlobalVariationRule::Overrule
-							       ? FLinearColor(1.0f, 0.5f, 0.1f, 0.5)
-							       : FLinearColor::Transparent;
+							? FLinearColor(1.0f, 0.5f, 0.1f, 0.5)
+							: FLinearColor::Transparent;
 					})
 			]
 

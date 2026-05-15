@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
+#include "PCGExEnumSelector.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExEnumCommon.h"
-#include "PCGExEnumSelector.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExBranchOnDataAttribute.generated.h"
 
@@ -81,17 +81,44 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(BranchOnDataAttribute, "Branch on Data", "Branch on @Data domain attribute.", BranchSource);
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::ControlFlow; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::ControlFlow;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
+	}
 #endif
 
-	virtual bool HasDynamicPins() const override { return true; }
-	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
-	virtual FName GetMainInputPin() const override { return PCGPinConstants::DefaultInputLabel; }
-	virtual FName GetMainOutputPin() const override { return DefaultPinName; }
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	}
+
+	virtual bool OutputPinsCanBeDeactivated() const override
+	{
+		return true;
+	}
+
+	virtual FName GetMainInputPin() const override
+	{
+		return PCGPinConstants::DefaultInputLabel;
+	}
+
+	virtual FName GetMainOutputPin() const override
+	{
+		return DefaultPinName;
+	}
 
 protected:
-	virtual bool IsInputless() const override { return true; }
+	virtual bool IsInputless() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
@@ -113,13 +140,6 @@ public:
 	UPROPERTY(meta = (PCG_NotOverridable))
 	TArray<FPCGExBranchOnDataPin> InternalBranches;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Settings", meta=(PCG_NotOverridable, EditCondition="SelectionMode != EPCGExControlFlowSelectionMode::UserDefined", EditConditionHides))
-	EPCGExEnumConstantSourceType EnumSource = EPCGExEnumConstantSourceType::Selector;
-
-	/** Determines which Enum be used. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_NotOverridable, EditCondition="SelectionMode != EPCGExControlFlowSelectionMode::UserDefined && EnumSource == EPCGExEnumConstantSourceType::Picker", EditConditionHides))
-	TObjectPtr<UEnum> EnumClass;
-
 	/** Determines which Enum be used. Enum selection is ignored here, it's only using the class value internally. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, meta=(PCG_NotOverridable, EditCondition="SelectionMode != EPCGExControlFlowSelectionMode::UserDefined && EnumSource == EPCGExEnumConstantSourceType::Selector", EditConditionHides, ShowOnlyInnerProperties))
 	FPCGExEnumSelector EnumPicker;
@@ -128,7 +148,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category=Settings, AdvancedDisplay)
 	FName DefaultPinName = FName("Default");
 
-	TObjectPtr<UEnum> GetEnumClass() const;
 };
 
 struct FPCGExBranchOnDataAttributeContext final : FPCGExPointsProcessorContext

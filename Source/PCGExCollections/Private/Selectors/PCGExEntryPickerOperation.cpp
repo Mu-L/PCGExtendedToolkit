@@ -11,5 +11,8 @@ bool FPCGExEntryPickerOperation::PrepareForData(FPCGExContext* InContext, const 
 	PrimaryDataFacade = InDataFacade;
 	Target = InTarget;
 	OwningCollection = InOwningCollection;
-	return Target != nullptr;
+	// Reject null and empty up-front so the hot path (Pick) can assume Target is valid + non-empty.
+	// Empty categories should never reach here in practice (FCache::RegisterEntry only creates
+	// categories on first valid entry), but the assertion belongs at the boundary.
+	return Target != nullptr && !Target->IsEmpty();
 }

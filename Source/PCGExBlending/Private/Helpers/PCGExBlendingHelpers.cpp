@@ -21,7 +21,10 @@ namespace PCGExBlending::Helpers
 		{
 			const TSharedPtr<PCGExData::FPointIO> IO = Collections[i];
 
-			if (BestIndices[i] == -1 || !IO) { continue; }
+			if (BestIndices[i] == -1 || !IO)
+			{
+				continue;
+			}
 
 			PCGMetadataEntryKey InKey = IO->GetIn()->GetMetadataEntry(BestIndices[i]);
 			PCGMetadataEntryKey OutKey = Target->GetOut()->GetMetadataEntry(i);
@@ -40,7 +43,10 @@ namespace PCGExBlending::Helpers
 						OutAttribute = Target->FindOrCreateAttribute<T>(Identity.Identifier, InAttribute->GetValueFromItemKey(PCGDefaultValueKey), InAttribute->AllowsInterpolation());
 					}
 
-					if (!OutAttribute) { return; }
+					if (!OutAttribute)
+					{
+						return;
+					}
 
 					OutAttribute->SetValue(OutKey, InAttribute->GetValueFromItemKey(InKey));
 				});

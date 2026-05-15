@@ -18,36 +18,66 @@ namespace PCGExArrayHelpers
 	static void Reverse(TArrayView<T> View)
 	{
 		const int32 Count = View.Num();
-		for (int32 i = 0; i < Count / 2; ++i) { Swap(View[i], View[Count - 1 - i]); }
+		for (int32 i = 0; i < Count / 2; ++i)
+		{
+			Swap(View[i], View[Count - 1 - i]);
+		}
 	}
 
 	template <typename T>
 	static void InitArray(TArray<T>& InArray, const int32 Num)
 	{
-		if constexpr (std::is_trivially_copyable_v<T>) { InArray.SetNumUninitialized(Num); }
-		else { InArray.SetNum(Num); }
+		if constexpr (std::is_trivially_copyable_v<T>)
+		{
+			InArray.SetNumUninitialized(Num);
+		}
+		else
+		{
+			InArray.SetNum(Num);
+		}
 	}
 
 	template <typename T>
 	static void InitArray(TSharedPtr<TArray<T>>& InArray, const int32 Num)
 	{
-		if (!InArray) { InArray = MakeShared<TArray<T>>(); }
-		if constexpr (std::is_trivially_copyable_v<T>) { InArray->SetNumUninitialized(Num); }
-		else { InArray->SetNum(Num); }
+		if (!InArray)
+		{
+			InArray = MakeShared<TArray<T>>();
+		}
+		if constexpr (std::is_trivially_copyable_v<T>)
+		{
+			InArray->SetNumUninitialized(Num);
+		}
+		else
+		{
+			InArray->SetNum(Num);
+		}
 	}
 
 	template <typename T>
 	static void InitArray(TSharedRef<TArray<T>> InArray, const int32 Num)
 	{
-		if constexpr (std::is_trivially_copyable_v<T>) { InArray.SetNumUninitialized(Num); }
-		else { InArray.SetNum(Num); }
+		if constexpr (std::is_trivially_copyable_v<T>)
+		{
+			InArray.SetNumUninitialized(Num);
+		}
+		else
+		{
+			InArray.SetNum(Num);
+		}
 	}
 
 	template <typename T>
 	static void InitArray(TArray<T>* InArray, const int32 Num)
 	{
-		if constexpr (std::is_trivially_copyable_v<T>) { InArray->SetNumUninitialized(Num); }
-		else { InArray->SetNum(Num); }
+		if constexpr (std::is_trivially_copyable_v<T>)
+		{
+			InArray->SetNumUninitialized(Num);
+		}
+		else
+		{
+			InArray->SetNum(Num);
+		}
 	}
 
 	template <typename T>
@@ -98,7 +128,8 @@ namespace PCGExArrayHelpers
 		D Det;
 
 		TOrder(const int32 InIndex, const D& InDet)
-			: Index(InIndex), Det(InDet)
+			: Index(InIndex)
+			  , Det(InDet)
 		{
 		}
 	};
@@ -107,10 +138,19 @@ namespace PCGExArrayHelpers
 	static void ShiftArrayToSmallest(TArray<T>& InArray)
 	{
 		const int32 Num = InArray.Num();
-		if (Num <= 1) { return; }
+		if (Num <= 1)
+		{
+			return;
+		}
 
 		int32 MinIndex = 0;
-		for (int32 i = 1; i < Num; ++i) { if (InArray[i] < InArray[MinIndex]) { MinIndex = i; } }
+		for (int32 i = 1; i < Num; ++i)
+		{
+			if (InArray[i] < InArray[MinIndex])
+			{
+				MinIndex = i;
+			}
+		}
 
 		if (MinIndex > 0)
 		{
@@ -126,10 +166,19 @@ namespace PCGExArrayHelpers
 	static void ShiftArrayToPredicate(TArray<T>& InArray, FPredicate&& Predicate)
 	{
 		const int32 Num = InArray.Num();
-		if (Num <= 1) { return; }
+		if (Num <= 1)
+		{
+			return;
+		}
 
 		int32 MinIndex = 0;
-		for (int32 i = 1; i < Num; ++i) { if (Predicate(InArray[i], InArray[MinIndex])) { MinIndex = i; } }
+		for (int32 i = 1; i < Num; ++i)
+		{
+			if (Predicate(InArray[i], InArray[MinIndex]))
+			{
+				MinIndex = i;
+			}
+		}
 
 		if (MinIndex > 0)
 		{

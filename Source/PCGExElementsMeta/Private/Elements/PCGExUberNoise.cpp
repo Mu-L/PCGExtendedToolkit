@@ -5,15 +5,15 @@
 #include "Elements/PCGExUberNoise.h"
 
 #include "PCGExBlendingCommon.h"
-#include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
-#include "Data/PCGExProxyData.h"
-#include "Data/PCGExProxyDataHelpers.h"
 #include "PCGExVersion.h"
 #include "Async/ParallelFor.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExProxyDataBlending.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGExProxyData.h"
+#include "Data/PCGExProxyDataHelpers.h"
 #include "Data/PCGExProxyDataImpl.h"
 #include "Data/PCGExSubSelectionOps.h"
 #include "Details/PCGExSettingsDetails.h"
@@ -45,20 +45,32 @@ TArray<FPCGPinProperties> UPCGExUberNoiseSettings::InputPinProperties() const
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExUberNoiseSettings::GetMainDataInitializationPolicy() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExUberNoiseSettings::GetMainDataInitializationPolicy() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(UberNoise)
 
 bool FPCGExUberNoiseElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(UberNoise)
 
-	if (!Settings->Attributes.ValidateNamesOrProperties(Context)) { return false; }
+	if (!Settings->Attributes.ValidateNamesOrProperties(Context))
+	{
+		return false;
+	}
 
 	Context->NoiseGenerator = MakeShared<PCGExNoise3D::FNoiseGenerator>();
-	if (!Context->NoiseGenerator->Init(Context)) { return false; }
+	if (!Context->NoiseGenerator->Init(Context))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -72,7 +84,10 @@ bool FPCGExUberNoiseElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -99,7 +114,10 @@ namespace PCGExUberNoise
 	{
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
@@ -130,7 +148,10 @@ namespace PCGExUberNoise
 		else
 		{
 			WeightBuffer = Settings->SourceValueWeight.GetValueSetting();
-			if (!WeightBuffer->Init(PointDataFacade)) { return false; }
+			if (!WeightBuffer->Init(PointDataFacade))
+			{
+				return false;
+			}
 
 			A.DataFacade = PointDataFacade;
 			A.Role = PCGExData::EProxyRole::Read;
@@ -144,8 +165,14 @@ namespace PCGExUberNoise
 			{
 				if (!C.Capture(Context, Settings->Attributes.GetTargetSelector(), PCGExData::EIOSide::Out, false))
 				{
-					if (C.RealType == EPCGMetadataTypes::Unknown) { C.RealType = A.WorkingType; }
-					if (C.WorkingType == EPCGMetadataTypes::Unknown) { C.WorkingType = A.WorkingType; }
+					if (C.RealType == EPCGMetadataTypes::Unknown)
+					{
+						C.RealType = A.WorkingType;
+					}
+					if (C.WorkingType == EPCGMetadataTypes::Unknown)
+					{
+						C.WorkingType = A.WorkingType;
+					}
 				}
 			}
 			else
@@ -174,10 +201,19 @@ namespace PCGExUberNoise
 		N.WorkingType = NoiseType;
 		C.WorkingType = NoiseType;
 
-		if (bIsNewOutput) { Blender = PCGExBlending::CreateProxyBlender(Context, BlendMode, N, C); }
-		else { Blender = PCGExBlending::CreateProxyBlender(Context, BlendMode, A, N, C); }
+		if (bIsNewOutput)
+		{
+			Blender = PCGExBlending::CreateProxyBlender(Context, BlendMode, N, C);
+		}
+		else
+		{
+			Blender = PCGExBlending::CreateProxyBlender(Context, BlendMode, A, N, C);
+		}
 
-		if (!Blender) { return false; }
+		if (!Blender)
+		{
+			return false;
+		}
 
 		NoiseBuffer = bIsNewOutput ? Blender->A : Blender->B;
 
@@ -197,7 +233,10 @@ namespace PCGExUberNoise
 
 		TArray<FVector> Positions;
 		PCGExArrayHelpers::InitArray(Positions, Scope.Count);
-		for (int i = 0; i < Scope.Count; i++) { Positions[i] = InTransforms[Scope.Start + i].GetLocation(); }
+		for (int i = 0; i < Scope.Count; i++)
+		{
+			Positions[i] = InTransforms[Scope.Start + i].GetLocation();
+		}
 
 		TArray<double> Weights;
 		if (WeightBuffer)
@@ -221,13 +260,13 @@ namespace PCGExUberNoise
 		{
 		default: /* no-op */ break;
 		case EPCGMetadataTypes::Double: PCGEX_LOOP_NOISE(double)
-			break;
+		break;
 		case EPCGMetadataTypes::Vector2: PCGEX_LOOP_NOISE(FVector2D)
-			break;
+		break;
 		case EPCGMetadataTypes::Vector: PCGEX_LOOP_NOISE(FVector)
-			break;
+		break;
 		case EPCGMetadataTypes::Vector4: PCGEX_LOOP_NOISE(FVector4)
-			break;
+		break;
 		}
 
 #undef PCGEX_LOOP_NOISE

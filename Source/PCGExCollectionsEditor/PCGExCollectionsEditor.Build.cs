@@ -65,7 +65,7 @@ public class PCGExCollectionsEditor : ModuleRules
 				"SlateCore",
 				"PropertyEditor",
 				"EditorWidgets",
-				"ToolMenus"
+				"ToolMenus", "AppFramework"
 			}
 		);
 

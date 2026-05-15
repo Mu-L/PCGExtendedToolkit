@@ -3,10 +3,10 @@
 
 #include "Heuristics/PCGExHeuristicAttribute.h"
 
-#include "Data/PCGExData.h"
-#include "Data/Utils/PCGExDataPreloader.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Data/PCGExData.h"
+#include "Data/Utils/PCGExDataPreloader.h"
 #include "Math/PCGExMath.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCreateHeuristicAttribute"
@@ -39,11 +39,17 @@ void FPCGExHeuristicAttribute::PrepareForCluster(const TSharedPtr<const PCGExClu
 	{
 		if (Source == EPCGExClusterElement::Vtx)
 		{
-			for (const PCGExClusters::FNode& Node : (*InCluster->Nodes)) { CachedScores[Node.Index] += FMath::Max(0, Values->Read(Node.PointIndex)) * Factor; }
+			for (const PCGExClusters::FNode& Node : (*InCluster->Nodes))
+			{
+				CachedScores[Node.Index] += FMath::Max(0, Values->Read(Node.PointIndex)) * Factor;
+			}
 		}
 		else
 		{
-			for (int i = 0; i < NumPoints; i++) { CachedScores[i] += FMath::Max(0, Values->Read(i)) * Factor; }
+			for (int i = 0; i < NumPoints; i++)
+			{
+				CachedScores[i] += FMath::Max(0, Values->Read(i)) * Factor;
+			}
 		}
 	}
 	else

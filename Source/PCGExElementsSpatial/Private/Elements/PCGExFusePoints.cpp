@@ -4,12 +4,12 @@
 #include "Elements/PCGExFusePoints.h"
 
 
-#include "Data/PCGExPointIO.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Clusters/PCGExClusterCommon.h"
 #include "Core/PCGExUnionRegistry.h"
 #include "Core/PCGExUnionTable.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Math/PCGExBestFitPlane.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFusePointsElement"
@@ -25,11 +25,17 @@ namespace
 	void ReorderUnionTableByPrimary(PCGExData::FUnionTable& Table)
 	{
 		const int32 N = Table.Num();
-		if (N <= 1) { return; }
+		if (N <= 1)
+		{
+			return;
+		}
 
 		TArray<int32> Order;
 		Order.SetNumUninitialized(N);
-		for (int32 i = 0; i < N; ++i) { Order[i] = i; }
+		for (int32 i = 0; i < N; ++i)
+		{
+			Order[i] = i;
+		}
 
 		Order.Sort([&Table](const int32 A, const int32 B)
 		{
@@ -40,12 +46,19 @@ namespace
 		bool bAlreadySorted = true;
 		for (int32 i = 0; i < N; ++i)
 		{
-			if (Order[i] != i) { bAlreadySorted = false; break; }
+			if (Order[i] != i)
+			{
+				bAlreadySorted = false;
+				break;
+			}
 		}
-		if (bAlreadySorted) { return; }
+		if (bAlreadySorted)
+		{
+			return;
+		}
 
-		TArray<int32>               NewOffsets;
-		TArray<uint64>              NewKeys;
+		TArray<int32> NewOffsets;
+		TArray<uint64> NewKeys;
 		TArray<PCGExData::FElement> NewElements;
 
 		NewOffsets.SetNumUninitialized(N + 1);
@@ -64,31 +77,37 @@ namespace
 			NewOffsets[NewIdx + 1] = NewOffsets[NewIdx] + SpanNum;
 		}
 
-		Table.Offsets  = MoveTemp(NewOffsets);
-		Table.Keys     = MoveTemp(NewKeys);
+		Table.Offsets = MoveTemp(NewOffsets);
+		Table.Keys = MoveTemp(NewKeys);
 		Table.Elements = MoveTemp(NewElements);
 	}
 
-	static FVector ComputeSpanCentroid(const TConstArrayView<PCGExData::FElement>& Span, const TConstPCGValueRange<FTransform>& InTransforms)
+	FVector ComputeSpanCentroid(const TConstArrayView<PCGExData::FElement>& Span, const TConstPCGValueRange<FTransform>& InTransforms)
 	{
 		FVector Sum = FVector::ZeroVector;
-		for (const PCGExData::FElement& E : Span) { Sum += InTransforms[E.Index].GetLocation(); }
+		for (const PCGExData::FElement& E : Span)
+		{
+			Sum += InTransforms[E.Index].GetLocation();
+		}
 		return Sum / static_cast<double>(Span.Num());
 	}
 
-	static void EnforceMinExtent(FBox& Bounds, const double MinExtent)
+	void EnforceMinExtent(FBox& Bounds, const double MinExtent)
 	{
-		if (MinExtent <= 0) { return; }
+		if (MinExtent <= 0)
+		{
+			return;
+		}
 		const FVector HalfMin(MinExtent);
-		const FVector Center       = Bounds.GetCenter();
-		const FVector HalfSize     = Bounds.GetExtent();
+		const FVector Center = Bounds.GetCenter();
+		const FVector HalfSize = Bounds.GetExtent();
 		const FVector EnforcedHalf = FVector::Max(HalfSize, HalfMin);
 		Bounds = FBox(Center - EnforcedHalf, Center + EnforcedHalf);
 	}
 
-	static void AccumulateBounds(FBox& Bounds, const FTransform& InvTransform, const PCGExData::FElement& Element,
-	                             const UPCGBasePointData* InData, const TConstPCGValueRange<FTransform>& InTransforms,
-	                             const EPCGExPointBoundsSource BoundsSource)
+	void AccumulateBounds(FBox& Bounds, const FTransform& InvTransform, const PCGExData::FElement& Element,
+	                      const UPCGBasePointData* InData, const TConstPCGValueRange<FTransform>& InTransforms,
+	                      const EPCGExPointBoundsSource BoundsSource)
 	{
 		const FVector PointPos = InTransforms[Element.Index].GetLocation();
 		switch (BoundsSource)
@@ -115,12 +134,18 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(FusePoints)
 
 bool FPCGExFusePointsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FusePoints)
 
 	Context->Distances = Settings->PointPointIntersectionDetails.FuseDetails.GetDistances();
-	if (!Settings->PointPointIntersectionDetails.SanityCheck(Context)) { return false; }
+	if (!Settings->PointPointIntersectionDetails.SanityCheck(Context))
+	{
+		return false;
+	}
 
 	PCGEX_FWD(CarryOverDetails)
 	Context->CarryOverDetails.Init();
@@ -137,7 +162,10 @@ bool FPCGExFusePointsElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bRequiresWriteStep = Settings->Mode != EPCGExFusedPointOutput::MostCentral;
@@ -164,15 +192,21 @@ namespace PCGExFusePoints
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::New)
 
 		IOIndex = PointDataFacade->Source->IOIndex;
 
-		// Init a per-processor mutable copy of the FuseDetails — its ToleranceGetter binds to this facade.
+		// Init a per-processor mutable copy of the FuseDetails -- its ToleranceGetter binds to this facade.
 		FuseDetailsCopy = Settings->PointPointIntersectionDetails.FuseDetails;
-		if (!FuseDetailsCopy.Init(Context, PointDataFacade)) { return false; }
+		if (!FuseDetailsCopy.Init(Context, PointDataFacade))
+		{
+			return false;
+		}
 
 		EffectiveMethod = FuseDetailsCopy.GetEffectiveMethod();
 
@@ -217,7 +251,10 @@ namespace PCGExFusePoints
 
 	void FProcessor::PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops)
 	{
-		if (EffectiveMethod != EPCGExFuseMethod::Voxel) { return; }
+		if (EffectiveMethod != EPCGExFuseMethod::Voxel)
+		{
+			return;
+		}
 
 		const int32 NumLoops = Loops.Num();
 		UnionTableBuilder = MakeShared<PCGExData::FUnionTableBuilder>(NumLoops);
@@ -256,7 +293,7 @@ namespace PCGExFusePoints
 
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
 	{
-		TPCGValueRange<FTransform>      Transforms   = PointDataFacade->GetOut()->GetTransformValueRange(false);
+		TPCGValueRange<FTransform> Transforms = PointDataFacade->GetOut()->GetTransformValueRange(false);
 		TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
 
 		// The "primary" input point for entry i is Get(i)[0] -- the lowest (ScopeIndex, in-scope-position)
@@ -270,7 +307,7 @@ namespace PCGExFusePoints
 		}
 
 		TArray<PCGExData::FWeightedPoint> WeightedPoints;
-		TArray<PCGEx::FOpStats>           Trackers;
+		TArray<PCGEx::FOpStats> Trackers;
 		UnionBlender->InitTrackers(Trackers);
 
 		const bool bUpdateCenter = Settings->BlendingDetails.PropertiesOverrides.bOverridePosition && Settings->BlendingDetails.PropertiesOverrides.PositionBlending == EPCGExBlendingType::None;
@@ -285,21 +322,30 @@ namespace PCGExFusePoints
 			// order keeps the FP sum sequence deterministic regardless of how scopes were partitioned.
 			const FVector Center = ComputeSpanCentroid(Span, InTransforms);
 
-			if (bUpdateCenter) { Transforms[Index].SetLocation(Center); }
+			if (bUpdateCenter)
+			{
+				Transforms[Index].SetLocation(Center);
+			}
 
 			UnionBlender->MergeSingle(Index, Span, WeightedPoints, Trackers);
-			if (IsUnionWriter) { IsUnionWriter->SetValue(Index, WeightedPoints.Num() > 1); }
-			if (UnionSizeWriter) { UnionSizeWriter->SetValue(Index, WeightedPoints.Num()); }
+			if (IsUnionWriter)
+			{
+				IsUnionWriter->SetValue(Index, WeightedPoints.Num() > 1);
+			}
+			if (UnionSizeWriter)
+			{
+				UnionSizeWriter->SetValue(Index, WeightedPoints.Num());
+			}
 		}
 
 		if (Settings->FusedBoundsMode != EPCGExFusedBoundsMode::None)
 		{
-			UPCGBasePointData*       OutData      = PointDataFacade->GetOut();
-			const UPCGBasePointData* InData       = PointDataFacade->GetIn();
-			TPCGValueRange<FVector>  OutBoundsMin = OutData->GetBoundsMinValueRange(false);
-			TPCGValueRange<FVector>  OutBoundsMax = OutData->GetBoundsMaxValueRange(false);
+			UPCGBasePointData* OutData = PointDataFacade->GetOut();
+			const UPCGBasePointData* InData = PointDataFacade->GetIn();
+			TPCGValueRange<FVector> OutBoundsMin = OutData->GetBoundsMinValueRange(false);
+			TPCGValueRange<FVector> OutBoundsMax = OutData->GetBoundsMaxValueRange(false);
 			const EPCGExPointBoundsSource BoundsSource = Settings->BoundsSource;
-			const double             MinExtent    = Settings->MinBoundsExtent;
+			const double MinExtent = Settings->MinBoundsExtent;
 
 			if (Settings->FusedBoundsMode == EPCGExFusedBoundsMode::AABB)
 			{
@@ -311,7 +357,10 @@ namespace PCGExFusePoints
 					const TConstArrayView<PCGExData::FElement> Span = UnionTable->Get(Index);
 
 					FBox Bounds(ForceInit);
-					for (const PCGExData::FElement& Element : Span) { AccumulateBounds(Bounds, Identity, Element, InData, InTransforms, BoundsSource); }
+					for (const PCGExData::FElement& Element : Span)
+					{
+						AccumulateBounds(Bounds, Identity, Element, InData, InTransforms, BoundsSource);
+					}
 					EnforceMinExtent(Bounds, MinExtent);
 
 					OutBoundsMin[Index] = Bounds.Min - FusedPosition;
@@ -336,7 +385,10 @@ namespace PCGExFusePoints
 					const FTransform InvTransform = OBBTransform.Inverse();
 
 					FBox Bounds(ForceInit);
-					for (const PCGExData::FElement& Element : Span) { AccumulateBounds(Bounds, InvTransform, Element, InData, InTransforms, BoundsSource); }
+					for (const PCGExData::FElement& Element : Span)
+					{
+						AccumulateBounds(Bounds, InvTransform, Element, InData, InTransforms, BoundsSource);
+					}
 					EnforceMinExtent(Bounds, MinExtent);
 
 					Transforms[Index].SetRotation(OBBTransform.GetRotation());
@@ -356,7 +408,10 @@ namespace PCGExFusePoints
 		UnionTableBuilder.Reset();
 		Registry.Reset();
 
-		if (Settings->bPreserveOrder) { ReorderUnionTableByPrimary(*UnionTable); }
+		if (Settings->bPreserveOrder)
+		{
+			ReorderUnionTableByPrimary(*UnionTable);
+		}
 
 		const int32 NumUnionEntries = UnionTable->Num();
 
@@ -379,22 +434,22 @@ namespace PCGExFusePoints
 				const TConstArrayView<PCGExData::FElement> Span = Table->Get(i);
 				const FVector Center = ComputeSpanCentroid(Span, InTransforms);
 
-				double BestDist = MAX_dbl;
-				int32  BestIndex = -1;
+				double BestDist = TNumericLimits<double>::Max();
+				int32 BestIndex = -1;
 
 				Octree.FindNearbyElements(Center, [&](const PCGPointOctree::FPointRef& PointRef)
-				{
+					{
 					const double Dist = FVector::DistSquared(Center, InTransforms[PointRef.Index].GetLocation());
 					if (Dist < BestDist)
 					{
 					BestDist = Dist;
 					BestIndex = PointRef.Index;
 					}
-				});
+					});
 
 				if (BestIndex == -1) { BestIndex = Span[0].Index; }
 				IdxMapping[i] = BestIndex;
-			);
+				);
 
 			PointDataFacade->Source->ConsumeIdxMapping(PointDataFacade->GetAllocations());
 
@@ -402,10 +457,10 @@ namespace PCGExFusePoints
 			{
 				const UPCGBasePointData* InData = PointDataFacade->GetIn();
 				TPCGValueRange<FTransform> OutTransformsMut = OutData->GetTransformValueRange(false);
-				TPCGValueRange<FVector>    OutBoundsMin     = OutData->GetBoundsMinValueRange(true);
-				TPCGValueRange<FVector>    OutBoundsMax     = OutData->GetBoundsMaxValueRange(true);
-				const EPCGExPointBoundsSource BoundsSource  = Settings->BoundsSource;
-				const double               MinExtent        = Settings->MinBoundsExtent;
+				TPCGValueRange<FVector> OutBoundsMin = OutData->GetBoundsMinValueRange(true);
+				TPCGValueRange<FVector> OutBoundsMax = OutData->GetBoundsMaxValueRange(true);
+				const EPCGExPointBoundsSource BoundsSource = Settings->BoundsSource;
+				const double MinExtent = Settings->MinBoundsExtent;
 
 				if (Settings->FusedBoundsMode == EPCGExFusedBoundsMode::AABB)
 				{
@@ -423,7 +478,7 @@ namespace PCGExFusePoints
 
 						OutBoundsMin[i] = Bounds.Min - FusedPosition;
 						OutBoundsMax[i] = Bounds.Max - FusedPosition;
-					);
+						);
 				}
 				else // OBB
 				{
@@ -436,9 +491,9 @@ namespace PCGExFusePoints
 						const int32 NumElements = Span.Num();
 
 						const PCGExMath::FBestFitPlane BestFitPlane(NumElements, [&](const int32 e) -> FVector
-						{
+							{
 							return InTransforms[Span[e].Index].GetLocation();
-						});
+							});
 
 						const FTransform OBBTransform = BestFitPlane.GetTransform(AxisOrder);
 						const FTransform InvTransform = OBBTransform.Inverse();
@@ -451,7 +506,7 @@ namespace PCGExFusePoints
 						OutTransformsMut[i].SetLocation(OBBTransform.GetLocation());
 						OutBoundsMin[i] = Bounds.Min;
 						OutBoundsMax[i] = Bounds.Max;
-					);
+						);
 				}
 			}
 

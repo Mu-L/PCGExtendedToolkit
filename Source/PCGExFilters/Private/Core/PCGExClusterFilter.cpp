@@ -3,22 +3,31 @@
 
 #include "Core/PCGExClusterFilter.h"
 
+#include "Clusters/PCGExCluster.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExCluster.h"
 
 PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoFilterCluster, UPCGExClusterFilterFactoryData)
 PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoFilterVtx, UPCGExNodeFilterFactoryData)
 
-FName UPCGExVtxFilterProviderSettings::GetMainOutputPin() const { return PCGExFilters::Labels::OutputFilterLabelNode; }
+FName UPCGExVtxFilterProviderSettings::GetMainOutputPin() const
+{
+	return PCGExFilters::Labels::OutputFilterLabelNode;
+}
 
 PCG_DEFINE_TYPE_INFO(FPCGExDataTypeInfoFilterEdge, UPCGExEdgeFilterFactoryData)
 
-FName UPCGExEdgeFilterProviderSettings::GetMainOutputPin() const { return PCGExFilters::Labels::OutputFilterLabelEdge; }
+FName UPCGExEdgeFilterProviderSettings::GetMainOutputPin() const
+{
+	return PCGExFilters::Labels::OutputFilterLabelEdge;
+}
 
 namespace PCGExClusterFilter
 {
-	PCGExFilters::EType IFilter::GetFilterType() const { return PCGExFilters::EType::Node; }
+	PCGExFilters::EType IFilter::GetFilterType() const
+	{
+		return PCGExFilters::EType::Node;
+	}
 
 	// Guard: cluster filters must be initialized through the cluster Init() path first.
 	// If called directly (e.g. from a non-cluster context), this fails with an error.
@@ -37,7 +46,10 @@ namespace PCGExClusterFilter
 		bInitForCluster = true;
 		Cluster = InCluster;
 		EdgeDataFacade = InEdgeDataFacade;
-		if (!PCGExPointFilter::IFilter::Init(InContext, InPointDataFacade)) { return false; }
+		if (!PCGExPointFilter::IFilter::Init(InContext, InPointDataFacade))
+		{
+			return false;
+		}
 		return true;
 	}
 
@@ -45,24 +57,42 @@ namespace PCGExClusterFilter
 	// edge filters cache per-edge.
 	void IFilter::PostInit()
 	{
-		if (!bCacheResults) { return; }
+		if (!bCacheResults)
+		{
+			return;
+		}
 		const int32 NumResults = GetFilterType() == PCGExFilters::EType::Node ? Cluster->Nodes->Num() : EdgeDataFacade->Source->GetNum();
 		Results.Init(false, NumResults);
 	}
 
-	bool IVtxFilter::Test(const int32 Index) const { return IFilter::Test(*Cluster->GetNode(Index)); }
-	bool IVtxFilter::Test(const PCGExClusters::FNode& Node) const { return IFilter::Test(Node); }
+	bool IVtxFilter::Test(const int32 Index) const
+	{
+		return IFilter::Test(*Cluster->GetNode(Index));
+	}
+
+	bool IVtxFilter::Test(const PCGExClusters::FNode& Node) const
+	{
+		return IFilter::Test(Node);
+	}
 
 	bool IVtxFilter::Test(const PCGExGraphs::FEdge& Edge) const PCGEX_NOT_IMPLEMENTED_RET(TVtxFilter::Test(const PCGExGraphs::FIndexedEdge& Edge), false)
 
-	bool IEdgeFilter::Test(const int32 Index) const { return IFilter::Test(*Cluster->GetEdge(Index)); }
+	bool IEdgeFilter::Test(const int32 Index) const
+	{
+		return IFilter::Test(*Cluster->GetEdge(Index));
+	}
 
 	bool IEdgeFilter::Test(const PCGExClusters::FNode& Node) const PCGEX_NOT_IMPLEMENTED_RET(TEdgeFilter::Test(const PCGExClusters::FNode& Node), false)
 
-	bool IEdgeFilter::Test(const PCGExGraphs::FEdge& Edge) const { return IFilter::Test(Edge); }
+	bool IEdgeFilter::Test(const PCGExGraphs::FEdge& Edge) const
+	{
+		return IFilter::Test(Edge);
+	}
 
 	FManager::FManager(const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
-		: PCGExPointFilter::FManager(InPointDataFacade), Cluster(InCluster), EdgeDataFacade(InEdgeDataFacade)
+		: PCGExPointFilter::FManager(InPointDataFacade)
+		  , Cluster(InCluster)
+		  , EdgeDataFacade(InEdgeDataFacade)
 	{
 	}
 

@@ -21,11 +21,17 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(CreateShapes)
 
 bool FPCGExCreateShapesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExShapeProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExShapeProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(CreateShapes)
 
-	if (Settings->bWriteShapeId) { PCGEX_VALIDATE_NAME(Settings->ShapeIdAttributeName) }
+	if (Settings->bWriteShapeId)
+	{
+		PCGEX_VALIDATE_NAME(Settings->ShapeIdAttributeName)
+	}
 
 	return true;
 }
@@ -39,7 +45,10 @@ bool FPCGExCreateShapesElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				//NewBatch->bRequiresWriteStep = true;
@@ -71,7 +80,10 @@ namespace PCGExCreateShapes
 		PCGEX_ASYNC_TASK_NAME(FBuildShape)
 
 		FBuildShape(const TSharedPtr<FPCGExShapeBuilderOperation>& InOperation, const TSharedRef<PCGExData::FFacade>& InShapeDataFacade, const TSharedPtr<PCGExShapes::FShape>& InShape)
-			: FTask(), ShapeDataFacade(InShapeDataFacade), Operation(InOperation), Shape(InShape)
+			: FTask()
+			  , ShapeDataFacade(InShapeDataFacade)
+			  , Operation(InOperation)
+			  , Shape(InShape)
 		{
 		}
 
@@ -98,13 +110,19 @@ namespace PCGExCreateShapes
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		Builders.Reserve(Context->BuilderFactories.Num());
 		for (const TObjectPtr<const UPCGExShapeBuilderFactoryData>& Factory : Context->BuilderFactories)
 		{
 			TSharedPtr<FPCGExShapeBuilderOperation> Op = Factory->CreateOperation(Context);
-			if (!Op->PrepareForSeeds(Context, PointDataFacade)) { return false; }
+			if (!Op->PrepareForSeeds(Context, PointDataFacade))
+			{
+				return false;
+			}
 			Builders.Add(Op);
 		}
 
@@ -122,7 +140,10 @@ namespace PCGExCreateShapes
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			const PCGExData::FConstPoint PointRef = PointDataFacade->GetInPoint(Index);
-			for (const TSharedPtr<FPCGExShapeBuilderOperation>& Op : Builders) { Op->PrepareShape(PointRef); }
+			for (const TSharedPtr<FPCGExShapeBuilderOperation>& Op : Builders)
+			{
+				Op->PrepareShape(PointRef);
+			}
 		}
 	}
 
@@ -130,11 +151,14 @@ namespace PCGExCreateShapes
 	{
 		switch (Settings->OutputMode)
 		{
-		case EPCGExShapeOutputMode::PerDataset: OutputPerDataSet();
+		case EPCGExShapeOutputMode::PerDataset:
+			OutputPerDataSet();
 			break;
-		case EPCGExShapeOutputMode::PerSeed: OutputPerSeed();
+		case EPCGExShapeOutputMode::PerSeed:
+			OutputPerSeed();
 			break;
-		case EPCGExShapeOutputMode::PerShape: OutputPerShape();
+		case EPCGExShapeOutputMode::PerShape:
+			OutputPerShape();
 			break;
 		}
 	}
@@ -156,9 +180,18 @@ namespace PCGExCreateShapes
 
 	bool FProcessor::IsShapeValid(const TSharedPtr<PCGExShapes::FShape>& Shape) const
 	{
-		if (!Shape->IsValid()) { return false; }
-		if (Settings->bRemoveBelow && Shape->NumPoints < Settings->MinPointCount) { return false; }
-		if (Settings->bRemoveAbove && Shape->NumPoints > Settings->MaxPointCount) { return false; }
+		if (!Shape->IsValid())
+		{
+			return false;
+		}
+		if (Settings->bRemoveBelow && Shape->NumPoints < Settings->MinPointCount)
+		{
+			return false;
+		}
+		if (Settings->bRemoveAbove && Shape->NumPoints > Settings->MaxPointCount)
+		{
+			return false;
+		}
 		return true;
 	}
 
@@ -178,7 +211,10 @@ namespace PCGExCreateShapes
 			{
 				TSharedPtr<PCGExShapes::FShape> Shape = Builders[j]->Shapes[i];
 
-				if (!IsShapeValid(Shape)) { continue; }
+				if (!IsShapeValid(Shape))
+				{
+					continue;
+				}
 
 				Shape->StartIndex = StartIndex;
 				StartIndex += Shape->NumPoints;
@@ -194,7 +230,10 @@ namespace PCGExCreateShapes
 			for (int j = 0; j < NumBuilders; j++)
 			{
 				TSharedPtr<PCGExShapes::FShape> Shape = Builders[j]->Shapes[i];
-				if (!IsShapeValid(Shape)) { continue; }
+				if (!IsShapeValid(Shape))
+				{
+					continue;
+				}
 				PCGEX_LAUNCH(FBuildShape, Builders[j], PointDataFacade, Shape)
 			}
 		}
@@ -217,14 +256,20 @@ namespace PCGExCreateShapes
 			{
 				TSharedPtr<PCGExShapes::FShape> Shape = Builders[j]->Shapes[i];
 
-				if (!IsShapeValid(Shape)) { continue; }
+				if (!IsShapeValid(Shape))
+				{
+					continue;
+				}
 
 				Shape->StartIndex = StartIndex;
 				StartIndex += Shape->NumPoints;
 				NumPoints += Shape->NumPoints;
 			}
 
-			if (NumPoints <= 0) { continue; }
+			if (NumPoints <= 0)
+			{
+				continue;
+			}
 
 			TSharedPtr<PCGExData::FPointIO> IO = NewPointIO(PointDataFacade->Source, Settings->GetMainOutputPin(), i);
 			PCGEX_INIT_IO_VOID(IO, PCGExData::EIOInit::New)
@@ -237,7 +282,10 @@ namespace PCGExCreateShapes
 			for (int j = 0; j < NumBuilders; j++)
 			{
 				TSharedPtr<PCGExShapes::FShape> Shape = Builders[j]->Shapes[i];
-				if (!IsShapeValid(Shape)) { continue; }
+				if (!IsShapeValid(Shape))
+				{
+					continue;
+				}
 				PCGEX_LAUNCH(FBuildShape, Builders[j], IOFacade.ToSharedRef(), Shape)
 			}
 		}
@@ -253,7 +301,10 @@ namespace PCGExCreateShapes
 
 		for (int j = 0; j < NumBuilders; j++)
 		{
-			if (Builders[j]->Shapes.IsEmpty()) { continue; }
+			if (Builders[j]->Shapes.IsEmpty())
+			{
+				continue;
+			}
 
 			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, BuildSeedShape)
 			BuildSeedShape->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE, BuilderIndex = j](const int32 ShapeIndex, const PCGExMT::FScope& Scope)
@@ -263,7 +314,10 @@ namespace PCGExCreateShapes
 				const TSharedRef<FPCGExShapeBuilderOperation> Builder = This->Builders[BuilderIndex].ToSharedRef();
 				const TSharedPtr<PCGExShapes::FShape> Shape = Builder->Shapes[ShapeIndex];
 
-				if (!This->IsShapeValid(Shape)) { return; }
+				if (!This->IsShapeValid(Shape))
+				{
+					return;
+				}
 
 				const TSharedPtr<PCGExData::FPointIO> IO = This->Context->MainPoints->Emplace_GetRef(This->PointDataFacade->Source, PCGExData::EIOInit::New);
 				IO->IOIndex = BuilderIndex * 10000 + ShapeIndex;
@@ -314,7 +368,10 @@ namespace PCGExCreateShapes
 				Identifier.MetadataDomain = EPCGMetadataDomainFlag::Elements;
 				const TSharedPtr<PCGExData::TBuffer<int32>> ShapeIdBuffer = ShapeDataFacade->GetWritable<int32>(Identifier, PCGExData::EBufferInit::New);
 				const int32 MaxIndex = Shape->StartIndex + Shape->NumPoints;
-				for (int i = Shape->StartIndex; i < MaxIndex; i++) { ShapeIdBuffer->SetValue(i, Operation->BaseConfig.ShapeId); }
+				for (int i = Shape->StartIndex; i < MaxIndex; i++)
+				{
+					ShapeIdBuffer->SetValue(i, Operation->BaseConfig.ShapeId);
+				}
 			}
 		}
 
@@ -338,7 +395,10 @@ namespace PCGExCreateShapes
 
 	void FProcessor::Output()
 	{
-		for (const TSharedPtr<PCGExData::FFacade>& IO : PerSeedFacades) { (void)IO->Source->StageOutput(Context); }
+		for (const TSharedPtr<PCGExData::FFacade>& IO : PerSeedFacades)
+		{
+			(void)IO->Source->StageOutput(Context);
+		}
 	}
 }
 

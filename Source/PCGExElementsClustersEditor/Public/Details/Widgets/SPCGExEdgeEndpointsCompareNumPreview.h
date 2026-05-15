@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widgets/SLeafWidget.h"
 #include "Utils/PCGExCompare.h"
+#include "Widgets/SLeafWidget.h"
 
 /**
  * Read-only 3-panel visualization for FPCGExEdgeEndpointsCompareNumFilterConfig.

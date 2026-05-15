@@ -8,7 +8,10 @@
 
 #include "PCGExGeo.generated.h"
 
-namespace PCGExMath::OBB { struct FOBB; }
+namespace PCGExMath::OBB
+{
+	struct FOBB;
+}
 
 UENUM()
 enum class EPCGExCellCenter : uint8
@@ -34,7 +37,10 @@ namespace PCGExMath::Geo
 	}
 
 	template <typename T>
-	FORCEINLINE double Det(const T& A, const T& B) { return A.X * B.Y - A.Y * B.X; }
+	FORCEINLINE double Det(const T& A, const T& B)
+	{
+		return A.X * B.Y - A.Y * B.X;
+	}
 
 	FORCEINLINE static double S_U(const FVector& A, const FVector& B, const FVector& C, const FVector& D, const FVector& E, const FVector& F, const FVector& G, const FVector& H)
 	{
@@ -51,7 +57,10 @@ namespace PCGExMath::Geo
 		return (RA * S_D(FirstComponent, SecondComponent, B, C, D) - RB * S_D(FirstComponent, SecondComponent, C, D, A) + RC * S_D(FirstComponent, SecondComponent, D, A, B) - RD * S_D(FirstComponent, SecondComponent, A, B, C)) / UVW;
 	};
 
-	static double S_SQ(const FVector& P) { return P.X * P.X + P.Y * P.Y + P.Z * P.Z; };
+	static double S_SQ(const FVector& P)
+	{
+		return P.X * P.X + P.Y * P.Y + P.Z * P.Z;
+	};
 
 
 	PCGEXCORE_API bool FindSphereFrom4Points(const FVector& A, const FVector& B, const FVector& C, const FVector& D, FSphere& OutSphere);
@@ -88,13 +97,23 @@ namespace PCGExMath::Geo
 		FVector TowardEnd = FVector::ZeroVector;
 		double Alpha = 0;
 
-		FVector GetAnchorNormal(const FVector& Location) const { return (Anchor - Location).GetSafeNormal(); }
+		FVector GetAnchorNormal(const FVector& Location) const
+		{
+			return (Anchor - Location).GetSafeNormal();
+		}
 
 		void Scale(const double InScale);
 		void Extend(const double InSize);
 
-		static FApex FromStartOnly(const FVector& Start, const FVector& InApex) { return FApex(Start, InApex, InApex); }
-		static FApex FromEndOnly(const FVector& End, const FVector& InApex) { return FApex(InApex, End, InApex); }
+		static FApex FromStartOnly(const FVector& Start, const FVector& InApex)
+		{
+			return FApex(Start, InApex, InApex);
+		}
+
+		static FApex FromEndOnly(const FVector& End, const FVector& InApex)
+		{
+			return FApex(InApex, End, InApex);
+		}
 	};
 
 	struct PCGEXCORE_API FExCenterArc
@@ -135,7 +154,10 @@ namespace PCGExMath::Geo
 			 */
 		FExCenterArc(const FVector& A1, const FVector& B1, const FVector& A2, const FVector& B2, const double MaxLength = 100000);
 
-		FORCEINLINE double GetLength() const { return Radius * Theta; }
+		FORCEINLINE double GetLength() const
+		{
+			return Radius * Theta;
+		}
 
 		/**
 			 * 
@@ -158,7 +180,10 @@ namespace PCGExMath::Geo
 	{
 		const FVector2D AB = B - A;
 		const float L2 = static_cast<float>(AB.SquaredLength());
-		if (L2 <= UE_SMALL_NUMBER) { return static_cast<float>((P - A).SquaredLength()); }
+		if (L2 <= UE_SMALL_NUMBER)
+		{
+			return static_cast<float>((P - A).SquaredLength());
+		}
 		const float T = FMath::Clamp(static_cast<float>(FVector2D::DotProduct(P - A, AB) / L2), 0.0f, 1.0f);
 		const FVector2D Closest = A + AB * T;
 		return static_cast<float>((P - Closest).SquaredLength());
@@ -168,7 +193,7 @@ namespace PCGExMath::Geo
 	 * Signed distance from a pre-projected local-space point to an extruded polygon
 	 * prism (outline in local XY, extruded along local Z by [ZMin, ZMax]).
 	 * Negative inside, positive outside, zero on surface.
-	 * LocalPoint must already be in the prism's projection frame — the caller handles
+	 * LocalPoint must already be in the prism's projection frame -- the caller handles
 	 * the WorldOrigin offset and quaternion unrotation before calling.
 	 * Returns +MAX_float for degenerate outlines (< 3 vertices).
 	 */
@@ -207,7 +232,7 @@ namespace PCGExMath::Geo
 	 * spanned by the corners.
 	 */
 	PCGEXCORE_API void ProjectOBBToFrame(
-		const PCGExMath::OBB::FOBB& OBB,
+		const OBB::FOBB& OBB,
 		const FVector& TargetWorldOrigin,
 		const FQuat& TargetProjectionQuat,
 		TArray<FVector2D, TInlineAllocator<8>>& OutHull,
@@ -239,10 +264,16 @@ namespace PCGExMath::Geo
 	// L1/L∞ Voronoi edge path computation
 
 	/** Transform 2D coordinates for L1/L∞ Voronoi computation: (x,y) -> (x+y, x-y) */
-	FORCEINLINE static FVector2D TransformToLInf(const FVector2D& P) { return FVector2D(P.X + P.Y, P.X - P.Y); }
+	FORCEINLINE static FVector2D TransformToLInf(const FVector2D& P)
+	{
+		return FVector2D(P.X + P.Y, P.X - P.Y);
+	}
 
 	/** Inverse transform: (u,v) -> ((u+v)/2, (u-v)/2) */
-	FORCEINLINE static FVector2D TransformFromLInf(const FVector2D& P) { return FVector2D((P.X + P.Y) * 0.5, (P.X - P.Y) * 0.5); }
+	FORCEINLINE static FVector2D TransformFromLInf(const FVector2D& P)
+	{
+		return FVector2D((P.X + P.Y) * 0.5, (P.X - P.Y) * 0.5);
+	}
 
 	/**
 	 * Compute the edge path between two Voronoi cell centers for L∞ metric.

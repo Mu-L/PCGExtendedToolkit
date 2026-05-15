@@ -4,17 +4,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/StreamableManager.h"
-#include "Core/PCGExPointsProcessor.h"
-#include "Core/PCGExPointFilter.h"
-#include "Details/PCGExInputShorthandsDetails.h"
-#include "Helpers/PCGExCollectionsHelpers.h"
-#include "Engine/LevelStreamingDynamic.h"
-#include "LevelInstance/LevelInstanceLevelStreaming.h"
-#include "LevelInstance/LevelInstanceActor.h"
 #include "PCGCommon.h"
-#include "PCGManagedResource.h"
 #include "PCGCrc.h"
+#include "PCGManagedResource.h"
+#include "Core/PCGExPointFilter.h"
+#include "Core/PCGExPointsProcessor.h"
+#include "Details/PCGExInputShorthandsDetails.h"
+#include "Engine/LevelStreamingDynamic.h"
+#include "Engine/StreamableManager.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
+#include "LevelInstance/LevelInstanceActor.h"
+#include "LevelInstance/LevelInstanceLevelStreaming.h"
 
 #include "PCGExStagingLoadLevel.generated.h"
 
@@ -107,8 +107,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(StagingLoadLevel, "Staging : Spawn Level", "Spawns level instances from staged points.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Spawner; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Spawner;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
+	}
 #endif
 
 protected:
@@ -117,7 +125,10 @@ protected:
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters which points spawn a level instance.", PCGExFactories::PointFilters, false)
 	//~End UPCGSettings
 
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 
 public:
 	// --- Targeting ---
@@ -140,7 +151,7 @@ public:
 	/** Streaming level class used for the runtime (non-LevelInstance) path.
 	 *  Override with a custom subclass for advanced streaming behavior.
 	 *  If None, defaults to UPCGExLevelStreamingDynamic.
-	 *  WARNING: Do NOT use ULevelStreamingLevelInstance subclasses here — they require the
+	 *  WARNING: Do NOT use ULevelStreamingLevelInstance subclasses here -- they require the
 	 *  ALevelInstance actor path and will not work with raw streaming level spawning. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	TSubclassOf<ULevelStreamingDynamic> StreamingLevelClass;
@@ -174,6 +185,24 @@ struct FPCGExStagingLoadLevelContext final : FPCGExPointsProcessorContext
 	FPCGCrc DependenciesCrc;
 	bool bReusedManagedResources = false;
 
+	/** Managed resource for streaming level cleanup via PCG's native resource tracking.
+	 *  One per execute, shared across all processors. Created game-thread in AdvanceWork. */
+	UPCGExManagedStreamingLevels* ManagedStreamingLevels = nullptr;
+
+#if WITH_EDITOR
+	/** True when using ALevelInstance path (bSpawnAsLevelInstance=true, editor, non-runtime). */
+	bool bUseLevelInstance = false;
+
+	/** True when spawning level content as individual persistent actors (bSpawnAsLevelInstance=false, editor, non-runtime). */
+	bool bUseLooseActors = false;
+
+	/** Managed resource for ALevelInstance cleanup. One per execute. */
+	UPCGManagedActors* ManagedLevelInstances = nullptr;
+
+	/** Managed resource for loose-actor cleanup. One per execute. */
+	UPCGManagedActors* ManagedLooseActors = nullptr;
+#endif
+
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
 };
@@ -181,7 +210,10 @@ protected:
 class FPCGExStagingLoadLevelElement final : public FPCGExPointsProcessorElement
 {
 public:
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 protected:
 	PCGEX_CAN_ONLY_EXECUTE_ON_MAIN_THREAD(true)
@@ -229,22 +261,7 @@ namespace PCGExStagingLoadLevel
 		/** Generation counter for unique level instance names */
 		uint32 Generation = 0;
 
-		/** Managed resource for streaming level cleanup via PCG's native resource tracking */
-		UPCGExManagedStreamingLevels* ManagedStreamingLevels = nullptr;
-
 #if WITH_EDITOR
-		/** True when using ALevelInstance path (bSpawnAsLevelInstance=true, editor, non-runtime). */
-		bool bUseLevelInstance = false;
-
-		/** True when spawning level content as individual persistent actors (bSpawnAsLevelInstance=false, editor, non-runtime). */
-		bool bUseLooseActors = false;
-
-		/** Managed resource for ALevelInstance cleanup via PCG's native resource tracking */
-		UPCGManagedActors* ManagedLevelInstances = nullptr;
-
-		/** Managed resource for loose-actor cleanup via PCG's native resource tracking */
-		UPCGManagedActors* ManagedLooseActors = nullptr;
-
 		/** Keeps source UWorld assets alive for the duration of the loose-actor spawn loop */
 		TSharedPtr<FStreamableHandle> LevelLoadHandle;
 #endif

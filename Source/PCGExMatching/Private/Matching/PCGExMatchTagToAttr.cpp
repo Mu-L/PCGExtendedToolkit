@@ -22,7 +22,10 @@ void FPCGExMatchTagToAttrConfig::Init()
 
 bool FPCGExMatchTagToAttr::PrepareForMatchableSources(FPCGExContext* InContext, const TSharedPtr<TArray<FPCGExTaggedData>>& InMatchableSources)
 {
-	if (!FPCGExMatchRuleOperation::PrepareForMatchableSources(InContext, InMatchableSources)) { return false; }
+	if (!FPCGExMatchRuleOperation::PrepareForMatchableSources(InContext, InMatchableSources))
+	{
+		return false;
+	}
 
 	TArray<FPCGExTaggedData>& MatchableSourcesRef = *InMatchableSources.Get();
 
@@ -43,11 +46,15 @@ bool FPCGExMatchTagToAttr::PrepareForMatchableSources(FPCGExContext* InContext, 
 		}
 	}
 
-	if (!Config.bDoValueMatch) { return true; }
+	if (!Config.bDoValueMatch)
+	{
+		return true;
+	}
 
 	switch (Config.ValueType)
 	{
-	case EPCGExComparisonDataType::Numeric: NumGetters.Reserve(MatchableSourcesRef.Num());
+	case EPCGExComparisonDataType::Numeric:
+		NumGetters.Reserve(MatchableSourcesRef.Num());
 		for (const FPCGExTaggedData& TaggedData : MatchableSourcesRef)
 		{
 			TSharedPtr<PCGExData::TAttributeBroadcaster<double>> Getter = MakeShared<PCGExData::TAttributeBroadcaster<double>>();
@@ -61,7 +68,8 @@ bool FPCGExMatchTagToAttr::PrepareForMatchableSources(FPCGExContext* InContext, 
 			NumGetters.Add(Getter);
 		}
 		break;
-	case EPCGExComparisonDataType::String: StrGetters.Reserve(MatchableSourcesRef.Num());
+	case EPCGExComparisonDataType::String:
+		StrGetters.Reserve(MatchableSourcesRef.Num());
 		for (const FPCGExTaggedData& TaggedData : MatchableSourcesRef)
 		{
 			TSharedPtr<PCGExData::TAttributeBroadcaster<FString>> Getter = MakeShared<PCGExData::TAttributeBroadcaster<FString>>();
@@ -91,14 +99,20 @@ bool FPCGExMatchTagToAttr::Test(const PCGExData::FConstPoint& InTargetElement, c
 
 
 	TArray<TSharedPtr<PCGExData::IDataValue>> TagValues;
-	if (!PCGExCompare::GetMatchingValueTags(InCandidate.GetTags(), TestTagName, Config.NameMatch, TagValues)) { return Config.bInvert; }
+	if (!PCGExCompare::GetMatchingValueTags(InCandidate.GetTags(), TestTagName, Config.NameMatch, TagValues))
+	{
+		return Config.bInvert;
+	}
 
 	if (Config.ValueType == EPCGExComparisonDataType::Numeric)
 	{
 		const double OperandBNumeric = NumGetters[InTargetElement.IO]->FetchSingle(InTargetElement, 0);
 		for (const TSharedPtr<PCGExData::IDataValue>& TagValue : TagValues)
 		{
-			if (!PCGExCompare::Compare(Config.NumericComparison, TagValue, OperandBNumeric, Config.Tolerance)) { return Config.bInvert; }
+			if (!PCGExCompare::Compare(Config.NumericComparison, TagValue, OperandBNumeric, Config.Tolerance))
+			{
+				return Config.bInvert;
+			}
 		}
 	}
 	else
@@ -106,7 +120,10 @@ bool FPCGExMatchTagToAttr::Test(const PCGExData::FConstPoint& InTargetElement, c
 		const FString OperandBString = StrGetters[InTargetElement.IO]->FetchSingle(InTargetElement, TEXT(""));
 		for (const TSharedPtr<PCGExData::IDataValue>& TagValue : TagValues)
 		{
-			if (!PCGExCompare::Compare(Config.StringComparison, TagValue, OperandBString)) { return Config.bInvert; }
+			if (!PCGExCompare::Compare(Config.StringComparison, TagValue, OperandBString))
+			{
+				return Config.bInvert;
+			}
 		}
 	}
 
@@ -115,8 +132,14 @@ bool FPCGExMatchTagToAttr::Test(const PCGExData::FConstPoint& InTargetElement, c
 
 bool UPCGExMatchTagToAttrFactory::WantsPoints()
 {
-	if (Config.TagNameInput == EPCGExInputValueType::Attribute && !PCGExMetaHelpers::IsDataDomainAttribute(Config.TagNameAttribute)) { return true; }
-	if (!Config.bDoValueMatch) { return false; }
+	if (Config.TagNameInput == EPCGExInputValueType::Attribute && !PCGExMetaHelpers::IsDataDomainAttribute(Config.TagNameAttribute))
+	{
+		return true;
+	}
+	if (!Config.bDoValueMatch)
+	{
+		return false;
+	}
 	return !PCGExMetaHelpers::IsDataDomainAttribute(Config.ValueAttribute);
 }
 
@@ -131,8 +154,14 @@ FString UPCGExCreateMatchTagToAttrSettings::GetDisplayName() const
 	{
 		TagSourceStr += TEXT("::Value ") + PCGExCompare::ToString(Config.NameMatch);
 
-		if (Config.ValueType == EPCGExComparisonDataType::Numeric) { TagSourceStr += PCGExCompare::ToString(Config.NumericComparison); }
-		else { TagSourceStr += PCGExCompare::ToString(Config.StringComparison); }
+		if (Config.ValueType == EPCGExComparisonDataType::Numeric)
+		{
+			TagSourceStr += PCGExCompare::ToString(Config.NumericComparison);
+		}
+		else
+		{
+			TagSourceStr += PCGExCompare::ToString(Config.StringComparison);
+		}
 
 		TagSourceStr += TEXT("Target' @") + PCGExMetaHelpers::GetSelectorDisplayName(Config.ValueAttribute);
 	}

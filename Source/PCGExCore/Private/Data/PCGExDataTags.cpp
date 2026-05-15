@@ -24,7 +24,10 @@ namespace PCGExData
 	FTags::FTags(const TSet<FString>& InTags)
 		: FTags()
 	{
-		for (const FString& TagString : InTags) { ParseAndAdd(TagString); }
+		for (const FString& TagString : InTags)
+		{
+			ParseAndAdd(TagString);
+		}
 	}
 
 	FTags::FTags(const TSharedPtr<FTags>& InTags)
@@ -41,13 +44,19 @@ namespace PCGExData
 	void FTags::Append(const TArray<FString>& InTags)
 	{
 		FWriteScopeLock WriteScopeLock(TagsLock);
-		for (const FString& TagString : InTags) { ParseAndAdd(TagString); }
+		for (const FString& TagString : InTags)
+		{
+			ParseAndAdd(TagString);
+		}
 	}
 
 	void FTags::Append(const TSet<FString>& InTags)
 	{
 		FWriteScopeLock WriteScopeLock(TagsLock);
-		for (const FString& TagString : InTags) { ParseAndAdd(TagString); }
+		for (const FString& TagString : InTags)
+		{
+			ParseAndAdd(TagString);
+		}
 	}
 
 	void FTags::Reset()
@@ -62,7 +71,10 @@ namespace PCGExData
 	{
 		Reset();
 
-		if (InTags) { Append(InTags.ToSharedRef()); }
+		if (InTags)
+		{
+			Append(InTags.ToSharedRef());
+		}
 	}
 
 	void FTags::DumpTo(TSet<FString>& InTags, const bool bFlatten) const
@@ -72,8 +84,20 @@ namespace PCGExData
 		InTags.Reserve(InTags.Num() + Num());
 		InTags.Append(RawTags);
 
-		if (bFlatten) { for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags) { InTags.Add(Pair.Value->Flatten(Pair.Key)); } }
-		else { for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags) { InTags.Add(Pair.Key); } }
+		if (bFlatten)
+		{
+			for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags)
+			{
+				InTags.Add(Pair.Value->Flatten(Pair.Key));
+			}
+		}
+		else
+		{
+			for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags)
+			{
+				InTags.Add(Pair.Key);
+			}
+		}
 	}
 
 	void FTags::DumpTo(TArray<FName>& InTags, const bool bFlatten) const
@@ -97,10 +121,25 @@ namespace PCGExData
 		TArray<FString> Flattened;
 		Flattened.Reserve(Num());
 
-		for (const FString& Key : RawTags) { Flattened.Add(Key); }
+		for (const FString& Key : RawTags)
+		{
+			Flattened.Add(Key);
+		}
 
-		if (bIncludeValue) { for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags) { Flattened.Add(Pair.Value->Flatten(Pair.Key)); } }
-		else { for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags) { Flattened.Add(Pair.Key); } }
+		if (bIncludeValue)
+		{
+			for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags)
+			{
+				Flattened.Add(Pair.Value->Flatten(Pair.Key));
+			}
+		}
+		else
+		{
+			for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags)
+			{
+				Flattened.Add(Pair.Key);
+			}
+		}
 
 		return Flattened;
 	}
@@ -112,10 +151,25 @@ namespace PCGExData
 		TArray<FName> Flattened;
 		Flattened.Reserve(Num());
 
-		for (const FString& Key : RawTags) { Flattened.Add(FName(Key)); }
+		for (const FString& Key : RawTags)
+		{
+			Flattened.Add(FName(Key));
+		}
 
-		if (bIncludeValue) { for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags) { Flattened.Add(FName(Pair.Value->Flatten(Pair.Key))); } }
-		else { for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags) { Flattened.Add(FName(Pair.Key)); } }
+		if (bIncludeValue)
+		{
+			for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags)
+			{
+				Flattened.Add(FName(Pair.Value->Flatten(Pair.Key)));
+			}
+		}
+		else
+		{
+			for (const TPair<FString, TSharedPtr<IDataValue>>& Pair : ValueTags)
+			{
+				Flattened.Add(FName(Pair.Key));
+			}
+		}
 
 		return Flattened;
 	}
@@ -157,7 +211,10 @@ namespace PCGExData
 	TSharedPtr<IDataValue> FTags::GetValue(const FString& Key) const
 	{
 		FReadScopeLock ReadScopeLock(TagsLock);
-		if (const TSharedPtr<IDataValue>* ValueTagPtr = ValueTags.Find(Key)) { return *ValueTagPtr; }
+		if (const TSharedPtr<IDataValue>* ValueTagPtr = ValueTags.Find(Key))
+		{
+			return *ValueTagPtr;
+		}
 		return nullptr;
 	}
 
@@ -189,7 +246,10 @@ namespace PCGExData
 	bool FTags::GetTagFromString(const FString& Input, FString& OutKey, FString& OutValue)
 	{
 		int32 SepIndex = INDEX_NONE;
-		if (!Input.FindChar(TagSeparator[0], SepIndex)) { return false; }
+		if (!Input.FindChar(TagSeparator[0], SepIndex))
+		{
+			return false;
+		}
 
 		OutKey = Input.Left(SepIndex);
 		OutValue = Input.Mid(SepIndex + 1);

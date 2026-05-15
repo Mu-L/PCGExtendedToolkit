@@ -4,8 +4,8 @@
 #include "Elements/Meta/NeighborSamplers/PCGExNeighborSampleFactoryProvider.h"
 
 #include "PCGPin.h"
-#include "Data/PCGExData.h"
 #include "Clusters/PCGExCluster.h"
+#include "Data/PCGExData.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExCreateNeighborSample"
@@ -40,9 +40,15 @@ void FPCGExNeighborSampleOperation::PrepareForCluster(FPCGExContext* InContext, 
 	}
 }
 
-bool FPCGExNeighborSampleOperation::IsOperationValid() { return bIsValidOperation; }
+bool FPCGExNeighborSampleOperation::IsOperationValid()
+{
+	return bIsValidOperation;
+}
 
-TSharedRef<PCGExData::FPointIO> FPCGExNeighborSampleOperation::GetSourceIO() const { return GetSourceDataFacade()->Source; }
+TSharedRef<PCGExData::FPointIO> FPCGExNeighborSampleOperation::GetSourceIO() const
+{
+	return GetSourceDataFacade()->Source;
+}
 
 TSharedRef<PCGExData::FFacade> FPCGExNeighborSampleOperation::GetSourceDataFacade() const
 {
@@ -58,7 +64,10 @@ void FPCGExNeighborSampleOperation::ProcessNode(const int32 NodeIndex, const PCG
 {
 	const PCGExClusters::FNode& Node = (*Cluster->Nodes)[NodeIndex];
 
-	if (PointFilters && !PointFilters->Test(Node)) { return; }
+	if (PointFilters && !PointFilters->Test(Node))
+	{
+		return;
+	}
 
 	int32 CurrentDepth = 0;
 	int32 Count = 0;
@@ -81,7 +90,10 @@ void FPCGExNeighborSampleOperation::ProcessNode(const int32 NodeIndex, const PCG
 
 	while (CurrentDepth <= SafeMaxDepth)
 	{
-		if (CurrentNeighbors->IsEmpty()) { break; }
+		if (CurrentNeighbors->IsEmpty())
+		{
+			break;
+		}
 		CurrentDepth++;
 
 		for (const PCGExGraphs::FLink Lk : (*CurrentNeighbors))
@@ -92,7 +104,10 @@ void FPCGExNeighborSampleOperation::ProcessNode(const int32 NodeIndex, const PCG
 			if (SamplingConfig.BlendOver == EPCGExBlendOver::Distance)
 			{
 				const double Dist = FVector::Dist(Origin, Cluster->GetPos(Lk)); // Use Neighbor.FromNode to accumulate per-path distance 
-				if (Dist > SamplingConfig.MaxDistance) { continue; }
+				if (Dist > SamplingConfig.MaxDistance)
+				{
+					continue;
+				}
 				LocalWeight = 1 - (Dist / SamplingConfig.MaxDistance);
 			}
 			else
@@ -102,14 +117,23 @@ void FPCGExNeighborSampleOperation::ProcessNode(const int32 NodeIndex, const PCG
 
 			LocalWeight = WeightLUT->Eval(LocalWeight);
 
-			if (SamplingConfig.NeighborSource == EPCGExClusterElement::Vtx) { SampleNeighborNode(Node, Lk, LocalWeight, Scope); }
-			else { SampleNeighborEdge(Node, Lk, LocalWeight, Scope); }
+			if (SamplingConfig.NeighborSource == EPCGExClusterElement::Vtx)
+			{
+				SampleNeighborNode(Node, Lk, LocalWeight, Scope);
+			}
+			else
+			{
+				SampleNeighborEdge(Node, Lk, LocalWeight, Scope);
+			}
 
 			Count++;
 			TotalWeight += LocalWeight;
 		}
 
-		if (CurrentDepth >= SamplingConfig.MaxDepth) { break; }
+		if (CurrentDepth >= SamplingConfig.MaxDepth)
+		{
+			break;
+		}
 
 		// Gather next depth
 
@@ -122,7 +146,10 @@ void FPCGExNeighborSampleOperation::ProcessNode(const int32 NodeIndex, const PCG
 				for (const PCGExGraphs::FLink Next : Neighbors)
 				{
 					int32 NextIndex = Next.Node;
-					if (VisitedNodes.Contains(NextIndex)) { continue; }
+					if (VisitedNodes.Contains(NextIndex))
+					{
+						continue;
+					}
 					if (!ValueFilters->Results[Cluster->GetNodePointIndex(Next)])
 					{
 						VisitedNodes.Add(NextIndex);
@@ -135,7 +162,10 @@ void FPCGExNeighborSampleOperation::ProcessNode(const int32 NodeIndex, const PCG
 			{
 				for (const PCGExGraphs::FLink Next : Neighbors)
 				{
-					if (VisitedNodes.Contains(Next.Node)) { continue; }
+					if (VisitedNodes.Contains(Next.Node))
+					{
+						continue;
+					}
 					NextNeighbors->Add(Next);
 				}
 			}
@@ -185,12 +215,18 @@ void UPCGExNeighborSamplerFactoryData::RegisterVtxBuffersDependencies(FPCGExCont
 {
 	if (!VtxFilterFactories.IsEmpty())
 	{
-		for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Filter : VtxFilterFactories) { Filter->RegisterBuffersDependencies(InContext, FacadePreloader); }
+		for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Filter : VtxFilterFactories)
+		{
+			Filter->RegisterBuffersDependencies(InContext, FacadePreloader);
+		}
 	}
 
 	if (!ValueFilterFactories.IsEmpty())
 	{
-		for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Filter : ValueFilterFactories) { Filter->RegisterBuffersDependencies(InContext, FacadePreloader); }
+		for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Filter : ValueFilterFactories)
+		{
+			Filter->RegisterBuffersDependencies(InContext, FacadePreloader);
+		}
 	}
 }
 
@@ -206,13 +242,25 @@ TArray<FPCGPinProperties> UPCGExNeighborSampleProviderSettings::InputPinProperti
 	bool bIsRequired = false;
 	if (SupportsVtxFilters(bIsRequired))
 	{
-		if (bIsRequired) { PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceVtxFiltersLabel, "Filters applied to vtx", Required) }
-		else { PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceVtxFiltersLabel, "Filters applied to vtx", Advanced) }
+		if (bIsRequired)
+		{
+			PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceVtxFiltersLabel, "Filters applied to vtx", Required)
+		}
+		else
+		{
+			PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceVtxFiltersLabel, "Filters applied to vtx", Advanced)
+		}
 	}
 	if (SupportsEdgeFilters(bIsRequired))
 	{
-		if (bIsRequired) { PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceEdgeFiltersLabel, "Filters applied to edges", Required) }
-		else { PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceEdgeFiltersLabel, "Filters applied to edges", Advanced) }
+		if (bIsRequired)
+		{
+			PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceEdgeFiltersLabel, "Filters applied to edges", Required)
+		}
+		else
+		{
+			PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceEdgeFiltersLabel, "Filters applied to edges", Advanced)
+		}
 	}
 	PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceUseValueIfFilters, "Filters used to check if a node can be used as a value source or not.", Advanced)
 	return PinProperties;

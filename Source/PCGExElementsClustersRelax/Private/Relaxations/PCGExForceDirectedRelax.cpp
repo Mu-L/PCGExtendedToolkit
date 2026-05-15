@@ -30,7 +30,10 @@ void UPCGExForceDirectedRelax::Step1(const PCGExClusters::FNode& Node)
 	// Repulsive forces: between ALL node pairs (electrostatic repulsion)
 	for (int32 OtherNodeIndex = 0; OtherNodeIndex < Cluster->Nodes->Num(); OtherNodeIndex++)
 	{
-		if (OtherNodeIndex == Node.Index) { continue; }
+		if (OtherNodeIndex == Node.Index)
+		{
+			continue;
+		}
 		const FVector OtherPosition = (ReadBuffer->GetData() + OtherNodeIndex)->GetLocation();
 		CalculateRepulsiveForce(Force, Position, OtherPosition);
 	}

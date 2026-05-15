@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExHeuristicOperation.h"
-#include "UObject/Object.h"
 #include "Core/PCGExHeuristicsFactoryProvider.h"
+#include "UObject/Object.h"
 
 #include "PCGExHeuristicFeedback.generated.h"
 
@@ -56,7 +56,10 @@ public:
 	bool bBleed = true;
 	bool bBinary = false;
 
-	virtual EPCGExHeuristicCategory GetCategory() const override { return EPCGExHeuristicCategory::Feedback; }
+	virtual EPCGExHeuristicCategory GetCategory() const override
+	{
+		return EPCGExHeuristicCategory::Feedback;
+	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 
@@ -83,7 +86,10 @@ public:
 	UPROPERTY()
 	FPCGExHeuristicConfigFeedback Config;
 
-	virtual bool IsGlobal() const { return Config.bGlobalFeedback; }
+	virtual bool IsGlobal() const
+	{
+		return Config.bGlobalFeedback;
+	}
 
 	virtual TSharedPtr<FPCGExHeuristicOperation> CreateOperation(FPCGExContext* InContext) const override;
 	PCGEX_HEURISTIC_FACTORY_BOILERPLATE
@@ -98,7 +104,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(HeuristicsFeedback, "Heuristics : Feedback", "Heuristics based on visited score feedback.", FName(GetDisplayName()))
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(HeuristicsFeedback); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(HeuristicsFeedback);
+	}
 #endif
 	//~End UPCGSettings
 

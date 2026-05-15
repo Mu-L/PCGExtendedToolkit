@@ -7,8 +7,8 @@
 #include "PCGExHeuristicsHandler.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
-#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExPathQuery.h"
+#include "Core/PCGExPathfinding.h"
 #include "Core/PCGExSearchAllocations.h"
 #include "Utils/PCGExScoredQueue.h"
 
@@ -21,8 +21,14 @@ bool FPCGExSearchOperationAStar::ResolveQuery(
 	check(InQuery->PickResolution == PCGExPathfinding::EQueryPickResolution::Success)
 
 	TSharedPtr<PCGExPathfinding::FSearchAllocations> LocalAllocations = Allocations;
-	if (!LocalAllocations) { LocalAllocations = NewAllocations(); }
-	else { LocalAllocations->Reset(); }
+	if (!LocalAllocations)
+	{
+		LocalAllocations = NewAllocations();
+	}
+	else
+	{
+		LocalAllocations->Reset();
+	}
 
 	const TArray<PCGExClusters::FNode>& NodesRef = *Cluster->Nodes;
 	const TArray<PCGExGraphs::FEdge>& EdgesRef = *Cluster->Edges;
@@ -47,12 +53,18 @@ bool FPCGExSearchOperationAStar::ResolveQuery(
 	double CurrentFScore;
 	while (ScoredQueue->Dequeue(CurrentNodeIndex, CurrentFScore))
 	{
-		if (bEarlyExit && CurrentNodeIndex == GoalNode.Index) { break; } // Exit early
+		if (bEarlyExit && CurrentNodeIndex == GoalNode.Index)
+		{
+			break;
+		} // Exit early
 
 		const double CurrentGScore = GScore[CurrentNodeIndex];
 		const PCGExClusters::FNode& Current = NodesRef[CurrentNodeIndex];
 
-		if (Visited[CurrentNodeIndex]) { continue; }
+		if (Visited[CurrentNodeIndex])
+		{
+			continue;
+		}
 		Visited[CurrentNodeIndex] = true;
 		VisitedNum++;
 
@@ -61,7 +73,10 @@ bool FPCGExSearchOperationAStar::ResolveQuery(
 			const uint32 NeighborIndex = Lk.Node;
 			const uint32 EdgeIndex = Lk.Edge;
 
-			if (Visited[NeighborIndex]) { continue; }
+			if (Visited[NeighborIndex])
+			{
+				continue;
+			}
 
 			const PCGExClusters::FNode& AdjacentNode = NodesRef[NeighborIndex];
 			const PCGExGraphs::FEdge& Edge = EdgesRef[EdgeIndex];
@@ -70,7 +85,10 @@ bool FPCGExSearchOperationAStar::ResolveQuery(
 			const double TentativeGScore = CurrentGScore + EScore;
 
 			const double PreviousGScore = GScore[NeighborIndex];
-			if (PreviousGScore != -1 && TentativeGScore >= PreviousGScore) { continue; }
+			if (PreviousGScore != -1 && TentativeGScore >= PreviousGScore)
+			{
+				continue;
+			}
 
 			TravelStack->Set(NeighborIndex, PCGEx::NH64(CurrentNodeIndex, EdgeIndex));
 			GScore[NeighborIndex] = TentativeGScore;

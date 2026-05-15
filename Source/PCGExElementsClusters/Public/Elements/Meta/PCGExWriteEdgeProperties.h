@@ -4,10 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Details/PCGExBlendingDetails.h"
-#include "Details/PCGExSettingsMacros.h"
 #include "Core/PCGExClusterMT.h"
 #include "Core/PCGExClustersProcessor.h"
+#include "Details/PCGExBlendingDetails.h"
+#include "Details/PCGExSettingsMacros.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
 #include "PCGExWriteEdgeProperties.generated.h"
@@ -43,11 +43,23 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(WriteEdgeProperties, "Cluster : Edge Properties", "Extract & write extra edge informations to the point representing the edge.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(NeighborSampler); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(NeighborSampler);
+	}
 #endif
 
-	virtual bool SupportsDataStealing() const override { return true; }
-	virtual bool SupportsEdgeSorting() const override { return DirectionSettings.RequiresSortingRules(); }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
+
+	virtual bool SupportsEdgeSorting() const override
+	{
+		return DirectionSettings.RequiresSortingRules();
+	}
+
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
 

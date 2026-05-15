@@ -5,7 +5,8 @@
 namespace PCGExPaths
 {
 	FSimplifiedPoint::FSimplifiedPoint(const FTransform& InTransform, int8 bCanRemove)
-		: Transform(InTransform), bIsRemovable(bCanRemove)
+		: Transform(InTransform)
+		  , bIsRemovable(bCanRemove)
 	{
 		TangentIn = FVector::ZeroVector;
 		TangentOut = FVector::ZeroVector;
@@ -567,8 +568,8 @@ namespace PCGExPaths
 			{
 				const int32 OrigIdx = SimplifiedPoints[i].OriginalIndex;
 				Smoothing = (OrigIdx >= 0 && OrigIdx < InSmoothingValues.Num())
-					            ? FMath::Clamp(InSmoothingValues[OrigIdx], 0.0, 1.0)
-					            : 0.0;
+					? FMath::Clamp(InSmoothingValues[OrigIdx], 0.0, 1.0)
+					: 0.0;
 			}
 			else
 			{

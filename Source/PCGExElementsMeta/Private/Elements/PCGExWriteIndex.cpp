@@ -9,8 +9,8 @@
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGPointData.h"
 #include "Data/PCGSplineData.h"
-#include "Types/PCGExTypes.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
+#include "Types/PCGExTypes.h"
 
 #define LOCTEXT_NAMESPACE "PCGExWriteIndexElement"
 #define PCGEX_NAMESPACE WriteIndex
@@ -70,7 +70,10 @@ bool UPCGExWriteIndexSettings::HasDynamicPins() const
 
 TArray<FPCGPinProperties> UPCGExWriteIndexSettings::InputPinProperties() const
 {
-	if (!IsInputless()) { return Super::InputPinProperties(); }
+	if (!IsInputless())
+	{
+		return Super::InputPinProperties();
+	}
 	TArray<FPCGPinProperties> PinProperties;
 	PCGEX_PIN_ANY(GetMainInputPin(), "Inputs", Required)
 	return PinProperties;
@@ -78,7 +81,10 @@ TArray<FPCGPinProperties> UPCGExWriteIndexSettings::InputPinProperties() const
 
 TArray<FPCGPinProperties> UPCGExWriteIndexSettings::OutputPinProperties() const
 {
-	if (!IsInputless()) { return Super::OutputPinProperties(); }
+	if (!IsInputless())
+	{
+		return Super::OutputPinProperties();
+	}
 	TArray<FPCGPinProperties> PinProperties;
 	PCGEX_PIN_ANY(GetMainOutputPin(), "Output", Required)
 	return PinProperties;
@@ -98,13 +104,19 @@ FString UPCGExWriteIndexSettings::GetDisplayName() const
 
 PCGEX_INITIALIZE_ELEMENT(WriteIndex)
 
-PCGExData::EIOInit UPCGExWriteIndexSettings::GetMainDataInitializationPolicy() const { return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExWriteIndexSettings::GetMainDataInitializationPolicy() const
+{
+	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(WriteIndex)
 
 bool FPCGExWriteIndexElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(WriteIndex)
 
@@ -127,7 +139,10 @@ bool FPCGExWriteIndexElement::Boot(FPCGExContext* InContext) const
 
 	if (Settings->bOutputCollectionNumEntries)
 	{
-		if (!Settings->bNormalizeNumEntries) { PCGEX_VALIDATE_NAME(Settings->NumEntriesAttributeName) }
+		if (!Settings->bNormalizeNumEntries)
+		{
+			PCGEX_VALIDATE_NAME(Settings->NumEntriesAttributeName)
+		}
 		Context->NumEntriesIdentifier = PCGExMetaHelpers::GetAttributeIdentifier(Settings->NumEntriesAttributeName);
 		bTagOnly = false;
 	}
@@ -139,7 +154,10 @@ bool FPCGExWriteIndexElement::Boot(FPCGExContext* InContext) const
 
 		for (FPCGTaggedData& TaggedData : Context->WorkingData)
 		{
-			if (!bTagOnly) { TaggedData.Data = TaggedData.Data->DuplicateData(Context); }
+			if (!bTagOnly)
+			{
+				TaggedData.Data = TaggedData.Data->DuplicateData(Context);
+			}
 
 			if (const UPCGParamData* ParamData = Cast<UPCGParamData>(TaggedData.Data))
 			{
@@ -193,7 +211,10 @@ bool FPCGExWriteIndexElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 		PCGEX_ON_INITIAL_EXECUTION
 		{
 			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+				{
+					return true;
+				},
 				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 					NewBatch->bSkipCompletion = true;
@@ -265,7 +286,10 @@ namespace PCGExWriteIndex
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExWriteIndex::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
@@ -304,14 +328,26 @@ namespace PCGExWriteIndex
 			if (Settings->bNormalizedEntryIndex)
 			{
 				DoubleWriter = PointDataFacade->GetWritable<double>(Context->EntryIndexIdentifier, -1, Settings->bAllowInterpolation, PCGExData::EBufferInit::Inherit);
-				if (Settings->bOneMinus) { PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), DoubleWriter->SetValue(i, 1 - (static_cast<double>(i) / MaxIndex));) }
-				else { PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), DoubleWriter->SetValue(i, static_cast<double>(i) / MaxIndex);) }
+				if (Settings->bOneMinus)
+				{
+					PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), DoubleWriter->SetValue(i, 1 - (static_cast<double>(i) / MaxIndex));)
+				}
+				else
+				{
+					PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), DoubleWriter->SetValue(i, static_cast<double>(i) / MaxIndex);)
+				}
 			}
 			else
 			{
 				IntWriter = PointDataFacade->GetWritable<int32>(Context->EntryIndexIdentifier, -1, Settings->bAllowInterpolation, PCGExData::EBufferInit::Inherit);
-				if (Settings->bOneMinus) { PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), IntWriter->SetValue(i, MaxIndex - i);) }
-				else { PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), IntWriter->SetValue(i, i);) }
+				if (Settings->bOneMinus)
+				{
+					PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), IntWriter->SetValue(i, MaxIndex - i);)
+				}
+				else
+				{
+					PCGEX_PARALLEL_FOR(PointDataFacade->GetNum(), IntWriter->SetValue(i, i);)
+				}
 			}
 		}
 

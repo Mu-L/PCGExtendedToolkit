@@ -11,8 +11,8 @@
 #include "PCGExLayout.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExInputShorthandsDetails.h"
-#include "Sorting/PCGExSortingCommon.h"
 #include "Math/PCGExUVW.h"
+#include "Sorting/PCGExSortingCommon.h"
 
 #include "PCGExBinPacking3D.generated.h"
 
@@ -85,8 +85,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BinPacking3D, "Bin Packing 3D (Q4RealBPP)", "3D bin packing with real-world constraints from the Q4RealBPP paper: weight limits, category affinities, load bearing, and multi-objective scoring.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Transform); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Transform);
+	}
 #endif
 
 protected:
@@ -303,7 +311,7 @@ namespace PCGExBinPacking3D
 		FVector RotatedSize = FVector::ZeroVector;
 		FVector PlacementMin = FVector::ZeroVector;
 		FVector EffectivePadding = FVector::ZeroVector;
-		double Score = MAX_dbl;
+		double Score = TNumericLimits<double>::Max();
 
 		// Paper objective scores (all [0,1], lower = better)
 		double BinUsageScore = 0.0;
@@ -311,7 +319,10 @@ namespace PCGExBinPacking3D
 		double LoadBalanceScore = 0.0;
 		double ContactScore = 0.0;
 
-		bool IsValid() const { return BinIndex >= 0 && EPIndex >= 0; }
+		bool IsValid() const
+		{
+			return BinIndex >= 0 && EPIndex >= 0;
+		}
 	};
 
 	// Paper's 6 orientations with symmetry reduction
@@ -358,9 +369,20 @@ namespace PCGExBinPacking3D
 		FBP3DBin(int32 InBinIndex, const PCGExData::FConstPoint& InBinPoint, const FVector& InSeed);
 		~FBP3DBin() = default;
 
-		double GetFillRatio() const { return MaxVolume > 0 ? UsedVolume / MaxVolume : 0; }
-		int32 GetEPCount() const { return ExtremePoints.Num(); }
-		FVector GetBinCenter() const { return Bounds.GetCenter(); }
+		double GetFillRatio() const
+		{
+			return MaxVolume > 0 ? UsedVolume / MaxVolume : 0;
+		}
+
+		int32 GetEPCount() const
+		{
+			return ExtremePoints.Num();
+		}
+
+		FVector GetBinCenter() const
+		{
+			return Bounds.GetCenter();
+		}
 
 		bool HasOverlap(const FBox& TestBox) const;
 		double ComputeContactScore(const FBox& TestBox) const;

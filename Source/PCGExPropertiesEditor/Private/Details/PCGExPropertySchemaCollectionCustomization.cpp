@@ -7,8 +7,8 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "IPropertyUtilities.h"
-#include "PropertyHandle.h"
 #include "PCGExProperty.h"
+#include "PropertyHandle.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCollectionCustomization::MakeInstance()
@@ -41,7 +41,10 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeHeader(
 
 FText FPCGExPropertySchemaCollectionCustomization::GetHeaderText() const
 {
-	if (!PropertyHandlePtr.IsValid()) { return FText::FromString(TEXT("0 properties")); }
+	if (!PropertyHandlePtr.IsValid())
+	{
+		return FText::FromString(TEXT("0 properties"));
+	}
 
 	// Get raw access to count schemas
 	TArray<void*> RawData;
@@ -58,12 +61,18 @@ FText FPCGExPropertySchemaCollectionCustomization::GetHeaderText() const
 
 void FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged()
 {
-	if (!PropertyHandlePtr.IsValid()) { return; }
+	if (!PropertyHandlePtr.IsValid())
+	{
+		return;
+	}
 
 	// Access the collection to sync schemas
 	TArray<void*> RawData;
 	PropertyHandlePtr.Pin()->AccessRawData(RawData);
-	if (RawData.IsEmpty() || !RawData[0]) { return; }
+	if (RawData.IsEmpty() || !RawData[0])
+	{
+		return;
+	}
 
 	FPCGExPropertySchemaCollection* Collection = static_cast<FPCGExPropertySchemaCollection*>(RawData[0]);
 
@@ -85,7 +94,10 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
 	TSharedPtr<IPropertyHandle> SchemasArrayHandle = PropertyHandle->GetChildHandle(TEXT("Schemas"));
-	if (!SchemasArrayHandle.IsValid()) { return; }
+	if (!SchemasArrayHandle.IsValid())
+	{
+		return;
+	}
 
 	SchemasArrayHandlePtr = SchemasArrayHandle;
 

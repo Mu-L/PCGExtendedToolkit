@@ -25,11 +25,14 @@ namespace PCGExClipper2Lib
 			PointInPolygonResult pip = PointInPolygon(pt, path1);
 			switch (pip)
 			{
-			case PointInPolygonResult::IsOutside: ++io_count;
+			case PointInPolygonResult::IsOutside:
+				++io_count;
 				break;
-			case PointInPolygonResult::IsInside: --io_count;
+			case PointInPolygonResult::IsInside:
+				--io_count;
 				break;
-			default: continue;
+			default:
+				continue;
 			}
 			if (std::abs(io_count) > 1)
 			{
@@ -176,105 +179,105 @@ namespace PCGExClipper2Lib
 		switch (loc)
 		{
 		case Location::Left:
+		{
+			if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
 			{
-				if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
-				{
-					return true;
-				}
-				if ((p.y < rectPath[0].y) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
-				{
-					loc = Location::Top;
-					return true;
-				}
-				if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
-				{
-					loc = Location::Bottom;
-					return true;
-				}
-				return false;
+				return true;
 			}
+			if ((p.y < rectPath[0].y) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
+			{
+				loc = Location::Top;
+				return true;
+			}
+			if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
+			{
+				loc = Location::Bottom;
+				return true;
+			}
+			return false;
+		}
 
 		case Location::Top:
+		{
+			if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
 			{
-				if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
-				{
-					return true;
-				}
-				if ((p.x < rectPath[0].x) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
-				{
-					loc = Location::Left;
-					return true;
-				}
-				if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
-				{
-					loc = Location::Right;
-					return true;
-				}
-				return false;
+				return true;
 			}
+			if ((p.x < rectPath[0].x) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
+			{
+				loc = Location::Left;
+				return true;
+			}
+			if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
+			{
+				loc = Location::Right;
+				return true;
+			}
+			return false;
+		}
 
 		case Location::Right:
+		{
+			if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
 			{
-				if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
-				{
-					return true;
-				}
-				if ((p.y < rectPath[1].y) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
-				{
-					loc = Location::Top;
-					return true;
-				}
-				if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
-				{
-					loc = Location::Bottom;
-					return true;
-				}
-				return false;
+				return true;
 			}
+			if ((p.y < rectPath[1].y) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
+			{
+				loc = Location::Top;
+				return true;
+			}
+			if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
+			{
+				loc = Location::Bottom;
+				return true;
+			}
+			return false;
+		}
 
 		case Location::Bottom:
+		{
+			if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
 			{
-				if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
-				{
-					return true;
-				}
-				if ((p.x < rectPath[3].x) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
-				{
-					loc = Location::Left;
-					return true;
-				}
-				if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
-				{
-					loc = Location::Right;
-					return true;
-				}
-				return false;
+				return true;
 			}
+			if ((p.x < rectPath[3].x) && GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
+			{
+				loc = Location::Left;
+				return true;
+			}
+			if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
+			{
+				loc = Location::Right;
+				return true;
+			}
+			return false;
+		}
 
 		default: // loc == rInside
+		{
+			if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
 			{
-				if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], ip))
-				{
-					loc = Location::Left;
-					return true;
-				}
-				if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
-				{
-					loc = Location::Top;
-					return true;
-				}
-				if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
-				{
-					loc = Location::Right;
-					return true;
-				}
-				if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
-				{
-					loc = Location::Bottom;
-					return true;
-				}
-				return false;
+				loc = Location::Left;
+				return true;
 			}
+			if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], ip))
+			{
+				loc = Location::Top;
+				return true;
+			}
+			if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], ip))
+			{
+				loc = Location::Right;
+				return true;
+			}
+			if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], ip))
+			{
+				loc = Location::Bottom;
+				return true;
+			}
+			return false;
+		}
 		}
 	}
 
@@ -352,10 +355,14 @@ namespace PCGExClipper2Lib
 	{
 		switch (edgeIdx)
 		{
-		case 0: return pt2.y < pt1.y;
-		case 1: return pt2.x > pt1.x;
-		case 2: return pt2.y > pt1.y;
-		default: return pt2.x < pt1.x;
+		case 0:
+			return pt2.y < pt1.y;
+		case 1:
+			return pt2.x > pt1.x;
+		case 2:
+			return pt2.y > pt1.y;
+		default:
+			return pt2.x < pt1.x;
 		}
 	}
 
@@ -627,13 +634,17 @@ namespace PCGExClipper2Lib
 			int d = static_cast<int>(startlocs[i]) - static_cast<int>(startlocs[i - 1]);
 			switch (d)
 			{
-			case -1: result -= 1;
+			case -1:
+				result -= 1;
 				break;
-			case 1: result += 1;
+			case 1:
+				result += 1;
 				break;
-			case -3: result += 1;
+			case -3:
+				result += 1;
 				break;
-			case 3: result -= 1;
+			case 3:
+				result -= 1;
 				break;
 			}
 		}

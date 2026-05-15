@@ -24,12 +24,20 @@ struct PCGEXCORE_API FPCGExClampedBit
 	bool bValue;
 
 	FPCGExClampedBit()
-		: BitIndex(0), bValue(false)
+		: BitIndex(0)
+		  , bValue(false)
 	{
 	}
 
-	bool operator==(const FPCGExClampedBit& Other) const { return BitIndex == Other.BitIndex; }
-	friend uint32 GetTypeHash(const FPCGExClampedBit& Key) { return HashCombine(0, GetTypeHash(Key.BitIndex)); }
+	bool operator==(const FPCGExClampedBit& Other) const
+	{
+		return BitIndex == Other.BitIndex;
+	}
+
+	friend uint32 GetTypeHash(const FPCGExClampedBit& Key)
+	{
+		return HashCombine(0, GetTypeHash(Key.BitIndex));
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -45,8 +53,15 @@ struct PCGEXCORE_API FPCGExClampedBitOp : public FPCGExClampedBit
 
 	void Mutate(int64& Flags) const;
 
-	bool operator==(const FPCGExClampedBitOp& Other) const { return BitIndex == Other.BitIndex; }
-	friend uint32 GetTypeHash(const FPCGExClampedBitOp& Key) { return HashCombine(0, GetTypeHash(Key.BitIndex)); }
+	bool operator==(const FPCGExClampedBitOp& Other) const
+	{
+		return BitIndex == Other.BitIndex;
+	}
+
+	friend uint32 GetTypeHash(const FPCGExClampedBitOp& Key)
+	{
+		return HashCombine(0, GetTypeHash(Key.BitIndex));
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -64,7 +79,10 @@ struct PCGEXCORE_API FPCGExSimpleBitmask
 	UPROPERTY(EditAnywhere, Category = Settings)
 	EPCGExBitOp Op = EPCGExBitOp::OR;
 
-	FORCEINLINE void Mutate(int64& Flags) const { PCGExBitmask::Mutate(Op, Flags, Bitmask); }
+	FORCEINLINE void Mutate(int64& Flags) const
+	{
+		PCGExBitmask::Mutate(Op, Flags, Bitmask);
+	}
 };
 
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Bitmask Ref")
@@ -153,7 +171,10 @@ struct PCGEXCORE_API FPCGExBitmask
 #pragma endregion
 
 	int64 Get() const;
-	FORCEINLINE void Mutate(const EPCGExBitOp Op, int64& Flags) const { PCGExBitmask::Mutate(Op, Flags, Get()); }
+	FORCEINLINE void Mutate(const EPCGExBitOp Op, int64& Flags) const
+	{
+		PCGExBitmask::Mutate(Op, Flags, Get());
+	}
 
 	void EDITOR_RegisterTrackingKeys(FPCGExContext* Context) const;
 

@@ -12,10 +12,10 @@
 #ifndef PCGEX_CLIPPER_H_ENGINE
 #define PCGEX_CLIPPER_H_ENGINE
 
-#include "Clipper2Lib/clipper.core.h"
-#include <queue>
 #include <functional>
 #include <memory>
+#include <queue>
+#include "Clipper2Lib/clipper.core.h"
 
 namespace PCGExClipper2Lib
 {
@@ -86,7 +86,8 @@ namespace PCGExClipper2Lib
 		HorzSegment* horz = nullptr;
 
 		OutPt(const Point64& pt_, OutRec* outrec_)
-			: pt(pt_), outrec(outrec_)
+			: pt(pt_)
+			  , outrec(outrec_)
 		{
 			next = this;
 			prev = this;
@@ -169,7 +170,9 @@ namespace PCGExClipper2Lib
 		bool is_open;
 
 		LocalMinima(Vertex* v, PathType pt, bool open)
-			: vertex(v), polytype(pt), is_open(open)
+			: vertex(v)
+			  , polytype(pt)
+			  , is_open(open)
 		{
 		}
 	};
@@ -181,12 +184,16 @@ namespace PCGExClipper2Lib
 		Active* edge2;
 
 		IntersectNode()
-			: pt(Point64(0, 0)), edge1(nullptr), edge2(nullptr)
+			: pt(Point64(0, 0))
+			  , edge1(nullptr)
+			  , edge2(nullptr)
 		{
 		}
 
 		IntersectNode(Active* e1, Active* e2, Point64& pt_)
-			: pt(pt_), edge1(e1), edge2(e2)
+			: pt(pt_)
+			  , edge1(e1)
+			  , edge2(e2)
 		{
 		}
 	};
@@ -218,7 +225,8 @@ namespace PCGExClipper2Lib
 		};
 
 		explicit HorzJoin(OutPt* ltr, OutPt* rtl)
-			: op1(ltr), op2(rtl)
+			: op1(ltr)
+			  , op2(rtl)
 		{
 		}
 	};
@@ -338,11 +346,31 @@ namespace PCGExClipper2Lib
 
 	public:
 		virtual ~ClipperBase();
-		int ErrorCode() const { return error_code_; };
-		void PreserveCollinear(bool val) { preserve_collinear_ = val; };
-		bool PreserveCollinear() const { return preserve_collinear_; };
-		void ReverseSolution(bool val) { reverse_solution_ = val; };
-		bool ReverseSolution() const { return reverse_solution_; };
+
+		int ErrorCode() const
+		{
+			return error_code_;
+		};
+
+		void PreserveCollinear(bool val)
+		{
+			preserve_collinear_ = val;
+		};
+
+		bool PreserveCollinear() const
+		{
+			return preserve_collinear_;
+		};
+
+		void ReverseSolution(bool val)
+		{
+			reverse_solution_ = val;
+		};
+
+		bool ReverseSolution() const
+		{
+			return reverse_solution_;
+		};
 		void Clear();
 		void AddReuseableData(const ReuseableDataContainer64& reuseable_data);
 		int64_t DefaultZ = 0;
@@ -388,9 +416,16 @@ namespace PCGExClipper2Lib
 		virtual PolyPath* AddChild(const Path64& path) = 0;
 
 		virtual void Clear() = 0;
-		virtual size_t Count() const { return 0; }
 
-		const PolyPath* Parent() const { return parent_; }
+		virtual size_t Count() const
+		{
+			return 0;
+		}
+
+		const PolyPath* Parent() const
+		{
+			return parent_;
+		}
 
 		bool IsHole() const
 		{
@@ -414,7 +449,11 @@ namespace PCGExClipper2Lib
 		{
 		}
 
-		explicit PolyPath64(PolyPath64* parent, const Path64& path) : PolyPath(parent) { polygon_ = path; }
+		explicit PolyPath64(PolyPath64* parent, const Path64& path)
+			: PolyPath(parent)
+		{
+			polygon_ = path;
+		}
 
 		virtual ~PolyPath64() override
 		{
@@ -431,8 +470,15 @@ namespace PCGExClipper2Lib
 			return childs_[index].get();
 		}
 
-		PolyPath64List::const_iterator begin() const { return childs_.cbegin(); }
-		PolyPath64List::const_iterator end() const { return childs_.cend(); }
+		PolyPath64List::const_iterator begin() const
+		{
+			return childs_.cbegin();
+		}
+
+		PolyPath64List::const_iterator end() const
+		{
+			return childs_.cend();
+		}
 
 		virtual PolyPath64* AddChild(const Path64& path) override
 		{
@@ -449,13 +495,19 @@ namespace PCGExClipper2Lib
 			return childs_.size();
 		}
 
-		const Path64& Polygon() const { return polygon_; };
+		const Path64& Polygon() const
+		{
+			return polygon_;
+		};
 
 		double Area() const
 		{
 			return std::accumulate(childs_.cbegin(), childs_.cend(),
 			                       PCGExClipper2Lib::Area<int64_t>(polygon_),
-			                       [](double a, const auto& child) { return a + child->Area(); });
+			                       [](double a, const auto& child)
+			                       {
+				                       return a + child->Area();
+			                       });
 		}
 	};
 
@@ -502,11 +554,25 @@ namespace PCGExClipper2Lib
 			return childs_[index].get();
 		}
 
-		PolyPathDList::const_iterator begin() const { return childs_.cbegin(); }
-		PolyPathDList::const_iterator end() const { return childs_.cend(); }
+		PolyPathDList::const_iterator begin() const
+		{
+			return childs_.cbegin();
+		}
 
-		void SetScale(double value) { scale_ = value; }
-		double Scale() const { return scale_; }
+		PolyPathDList::const_iterator end() const
+		{
+			return childs_.cend();
+		}
+
+		void SetScale(double value)
+		{
+			scale_ = value;
+		}
+
+		double Scale() const
+		{
+			return scale_;
+		}
 
 		virtual PolyPathD* AddChild(const Path64& path) override
 		{
@@ -528,13 +594,19 @@ namespace PCGExClipper2Lib
 			return childs_.size();
 		}
 
-		const PathD& Polygon() const { return polygon_; };
+		const PathD& Polygon() const
+		{
+			return polygon_;
+		};
 
 		double Area() const
 		{
 			return std::accumulate(childs_.begin(), childs_.end(),
 			                       PCGExClipper2Lib::Area<double>(polygon_),
-			                       [](double a, const auto& child) { return a + child->Area(); });
+			                       [](double a, const auto& child)
+			                       {
+				                       return a + child->Area();
+			                       });
 		}
 	};
 
@@ -544,7 +616,10 @@ namespace PCGExClipper2Lib
 		void BuildTree64(PolyPath64& polytree, Paths64& open_paths);
 
 	public:
-		void SetZCallback(ZCallback64 cb) { zCallback_ = cb; }
+		void SetZCallback(ZCallback64 cb)
+		{
+			zCallback_ = cb;
+		}
 
 		void AddSubject(const Paths64& subjects)
 		{
@@ -620,7 +695,10 @@ namespace PCGExClipper2Lib
 			invScale_ = 1 / scale_;
 		}
 
-		void SetZCallback(ZCallbackD cb) { zCallbackD_ = cb; };
+		void SetZCallback(ZCallbackD cb)
+		{
+			zCallbackD_ = cb;
+		};
 
 		void ZCB(const Point64& e1bot, const Point64& e1top,
 		         const Point64& e2bot, const Point64& e2top, Point64& pt)

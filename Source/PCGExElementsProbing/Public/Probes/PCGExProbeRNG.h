@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExProbeFactoryProvider.h"
 #include "Core/PCGExProbeOperation.h"
+#include "UObject/Object.h"
 
 #include "PCGExProbeRNG.generated.h"
 

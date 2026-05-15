@@ -11,8 +11,8 @@
 
 // Filters -- base classes used by virtually all nodes
 #include "PCGExFilterCommon.h"
-#include "Core/PCGExPointFilter.h"
 #include "Core/PCGExClusterFilter.h"
+#include "Core/PCGExPointFilter.h"
 
 // Blending -- config & sampling types
 #include "Details/PCGExBlendingDetails.h"

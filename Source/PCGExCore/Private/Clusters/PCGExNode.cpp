@@ -8,20 +8,33 @@
 namespace PCGExGraphs
 {
 	FNode::FNode(const int32 InNodeIndex, const int32 InPointIndex)
-		: Index(InNodeIndex), PointIndex(InPointIndex)
+		: Index(InNodeIndex)
+		  , PointIndex(InPointIndex)
 	{
 		Links.Empty();
 	}
 
 	bool FNode::IsAdjacentTo(const int32 OtherNodeIndex) const
 	{
-		for (const FLink Lk : Links) { if (Lk.Node == OtherNodeIndex) { return true; } }
+		for (const FLink Lk : Links)
+		{
+			if (Lk.Node == OtherNodeIndex)
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 
 	int32 FNode::GetEdgeIndex(const int32 AdjacentNodeIndex) const
 	{
-		for (const FLink Lk : Links) { if (Lk.Node == AdjacentNodeIndex) { return Lk.Edge; } }
+		for (const FLink Lk : Links)
+		{
+			if (Lk.Node == AdjacentNodeIndex)
+			{
+				return Lk.Edge;
+			}
+		}
 		return -1;
 	}
 }
@@ -35,12 +48,18 @@ namespace PCGExClusters
 
 	FVector FNode::GetCentroid(const FCluster* InCluster) const
 	{
-		if (Links.IsEmpty()) { return InCluster->GetPos(Index); }
+		if (Links.IsEmpty())
+		{
+			return InCluster->GetPos(Index);
+		}
 
 		FVector Centroid = FVector::ZeroVector;
 		const int32 NumPoints = Links.Num();
 
-		for (int i = 0; i < NumPoints; i++) { Centroid += InCluster->GetPos(Links[i].Node); }
+		for (int i = 0; i < NumPoints; i++)
+		{
+			Centroid += InCluster->GetPos(Links[i].Node);
+		}
 
 		if (Links.Num() < 2)
 		{
@@ -56,13 +75,25 @@ namespace PCGExClusters
 	int32 FNode::ValidEdges(const FCluster* InCluster)
 	{
 		int32 ValidNum = 0;
-		for (const FLink Lk : Links) { if (InCluster->GetEdge(Lk.Edge)->bValid) { ValidNum++; } }
+		for (const FLink Lk : Links)
+		{
+			if (InCluster->GetEdge(Lk.Edge)->bValid)
+			{
+				ValidNum++;
+			}
+		}
 		return ValidNum;
 	}
 
 	bool FNode::HasAnyValidEdges(const FCluster* InCluster)
 	{
-		for (const FLink Lk : Links) { if (InCluster->GetEdge(Lk.Edge)->bValid) { return true; } }
+		for (const FLink Lk : Links)
+		{
+			if (InCluster->GetEdge(Lk.Edge)->bValid)
+			{
+				return true;
+			}
+		}
 		return false;
 	}
 }

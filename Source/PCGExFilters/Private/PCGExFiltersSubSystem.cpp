@@ -71,6 +71,9 @@ UPCGExFiltersSubSystem* UPCGExFiltersSubSystem::GetInstance(UWorld* World)
 
 TSharedPtr<PCGExPointFilter::IFilter> UPCGExFiltersSubSystem::GetConstantFilter(const bool bValue) const
 {
-	if (bValue) { return ConstantFilterFactory_TRUE->CreateFilter(); }
+	if (bValue)
+	{
+		return ConstantFilterFactory_TRUE->CreateFilter();
+	}
 	return ConstantFilterFactory_FALSE->CreateFilter();
 }

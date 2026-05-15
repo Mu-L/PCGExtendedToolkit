@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/DeveloperSettings.h"
-#include "Channels/PCGExSpatialChannels.h"
 #include "Channels/PCGExChannelInteractionMatrix.h"
+#include "Channels/PCGExSpatialChannels.h"
+#include "Engine/DeveloperSettings.h"
 
 #include "PCGExSpatialDomainsSettings.generated.h"
 
@@ -30,7 +30,11 @@ struct PCGEXSPATIALDOMAINS_API FPCGExSpatialChannelDefinition
 	//   UPROPERTY(EditAnywhere) FText Description;
 
 	FPCGExSpatialChannelDefinition() = default;
-	explicit FPCGExSpatialChannelDefinition(const FName InKey) : Key(InKey) {}
+
+	explicit FPCGExSpatialChannelDefinition(const FName InKey)
+		: Key(InKey)
+	{
+	}
 };
 
 /**
@@ -58,9 +62,21 @@ public:
 #endif
 
 	//~ Begin UDeveloperSettings Interface
-	virtual FName GetContainerName() const override { return "Project"; }
-	virtual FName GetCategoryName() const override { return "Plugins"; }
-	virtual FName GetSectionName() const override { return FName("PCGEx | Spatial Domains"); }
+	virtual FName GetContainerName() const override
+	{
+		return "Project";
+	}
+
+	virtual FName GetCategoryName() const override
+	{
+		return "Plugins";
+	}
+
+	virtual FName GetSectionName() const override
+	{
+		return FName("PCGEx | Spatial Domains");
+	}
+
 	//~ End UDeveloperSettings Interface
 
 	/**

@@ -4,12 +4,12 @@
 #include "Math/PCGExUVW.h"
 
 #include "Data/PCGBasePointData.h"
-#include "Math/PCGExMathBounds.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointElements.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Engine/EngineTypes.h"
 #include "Math/PCGExMathAxis.h"
+#include "Math/PCGExMathBounds.h"
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExUVW, U, double, UInput, UAttribute, UConstant)
 PCGEX_SETTING_VALUE_IMPL(FPCGExUVW, V, double, VInput, VAttribute, VConstant)
@@ -18,16 +18,28 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExUVW, W, double, WInput, WAttribute, WConstant)
 bool FPCGExUVW::Init(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
 {
 	UGetter = GetValueSettingU();
-	if (!UGetter->Init(InDataFacade)) { return false; }
+	if (!UGetter->Init(InDataFacade))
+	{
+		return false;
+	}
 
 	VGetter = GetValueSettingV();
-	if (!VGetter->Init(InDataFacade)) { return false; }
+	if (!VGetter->Init(InDataFacade))
+	{
+		return false;
+	}
 
 	WGetter = GetValueSettingW();
-	if (!WGetter->Init(InDataFacade)) { return false; }
+	if (!WGetter->Init(InDataFacade))
+	{
+		return false;
+	}
 
 	PointData = InDataFacade->GetIn();
-	if (!PointData) { return false; }
+	if (!PointData)
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -59,12 +71,16 @@ FVector FPCGExUVW::GetUVW(const int32 PointIndex, const EPCGExMinimalAxis Axis, 
 		switch (Axis)
 		{
 		default: ;
-		case EPCGExMinimalAxis::None: break;
-		case EPCGExMinimalAxis::X: Value.X *= -1;
+		case EPCGExMinimalAxis::None:
 			break;
-		case EPCGExMinimalAxis::Y: Value.Y *= -1;
+		case EPCGExMinimalAxis::X:
+			Value.X *= -1;
 			break;
-		case EPCGExMinimalAxis::Z: Value.Z *= -1;
+		case EPCGExMinimalAxis::Y:
+			Value.Y *= -1;
+			break;
+		case EPCGExMinimalAxis::Z:
+			Value.Z *= -1;
 			break;
 		}
 	}
@@ -111,12 +127,16 @@ namespace PCGExMath
 			switch (Axis)
 			{
 			default: ;
-			case EPCGExMinimalAxis::None: break;
-			case EPCGExMinimalAxis::X: Value.X *= -1;
+			case EPCGExMinimalAxis::None:
 				break;
-			case EPCGExMinimalAxis::Y: Value.Y *= -1;
+			case EPCGExMinimalAxis::X:
+				Value.X *= -1;
 				break;
-			case EPCGExMinimalAxis::Z: Value.Z *= -1;
+			case EPCGExMinimalAxis::Y:
+				Value.Y *= -1;
+				break;
+			case EPCGExMinimalAxis::Z:
+				Value.Z *= -1;
 				break;
 			}
 		}

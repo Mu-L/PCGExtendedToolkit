@@ -5,8 +5,8 @@
 
 #include "Math/OBB/PCGExOBB.h"
 #include "NarrowPhase/PCGExNarrowPhase.h"
-#include "Shapes/PCGExFootprintShape.h"
 #include "Settings/PCGExSpatialDomainsSettings.h"
+#include "Shapes/PCGExFootprintShape.h"
 
 FPCGExSpatialDomain_Broadphase::FPCGExSpatialDomain_Broadphase()
 	: MatrixRef(&UPCGExSpatialDomainsSettings::GetCompiledMatrix())
@@ -27,18 +27,30 @@ float FPCGExSpatialDomain_Broadphase::QueryPoint(const FVector& Point) const
 	// AABB-to-point distance exceeds it -- but for the external-constraint
 	// use case (single-digit entries per channel typically) the walk is
 	// already cheap. Add the pruner if profiling demands.
-	if (NumValidEntries == 0) { return TNumericLimits<float>::Max(); }
+	if (NumValidEntries == 0)
+	{
+		return TNumericLimits<float>::Max();
+	}
 
 	float Best = TNumericLimits<float>::Max();
 	for (int32 i = 0; i < Entries.Num(); ++i)
 	{
-		if (!ValidMask[i]) { continue; }
+		if (!ValidMask[i])
+		{
+			continue;
+		}
 		const FEntry& E = Entries[i];
-		if (E.KindTag == PCGExSpatial::NarrowPhase::InvalidKindTag) { continue; }
+		if (E.KindTag == PCGExSpatial::NarrowPhase::InvalidKindTag)
+		{
+			continue;
+		}
 
 		const FPCGExFootprintShape* ShapePtr =
 			reinterpret_cast<const FPCGExFootprintShape*>(E.Shape.GetMemory());
-		if (!ShapePtr) { continue; }
+		if (!ShapePtr)
+		{
+			continue;
+		}
 
 		const float D = PCGExSpatial::NarrowPhase::QueryPoint(E.KindTag, Point, *ShapePtr);
 		Best = FMath::Min(Best, D);
@@ -53,17 +65,26 @@ bool FPCGExSpatialDomain_Broadphase::Overlaps(
 	uint32 CandidateChannelMask) const
 {
 	check(MatrixRef);
-	if (NumValidEntries == 0) { return false; }
+	if (NumValidEntries == 0)
+	{
+		return false;
+	}
 
 	const FBox CandidateAABB = Candidate.GetWorldAABB();
-	if (!CandidateAABB.IsValid) { return false; }
+	if (!CandidateAABB.IsValid)
+	{
+		return false;
+	}
 
 	// Resolve the candidate tag once. Unregistered kinds have no pair tests
 	// in any direction -- early-out matches the "no impl => no overlap" safe
 	// default (same as the slow-path TestOverlap wrapper).
 	const PCGExSpatial::NarrowPhase::FShapeKindTag CandidateTag =
 		PCGExSpatial::NarrowPhase::FindShapeKindTag(Candidate.GetScriptStruct());
-	if (CandidateTag == PCGExSpatial::NarrowPhase::InvalidKindTag) { return false; }
+	if (CandidateTag == PCGExSpatial::NarrowPhase::InvalidKindTag)
+	{
+		return false;
+	}
 
 	// Candidate enters the broadphase as an identity-orientation OBB so
 	// the collection's SAT path is AABB-vs-AABB on both sides -- cheap,
@@ -76,7 +97,10 @@ bool FPCGExSpatialDomain_Broadphase::Overlaps(
 	// owner index via Entries[].OwnerIndex.
 	auto SkipPredicate = [this, SkipOwnerIndex, &ShouldSkip](int32 StorageIdx) -> bool
 	{
-		if (!ValidMask.IsValidIndex(StorageIdx) || !ValidMask[StorageIdx]) { return true; }
+		if (!ValidMask.IsValidIndex(StorageIdx) || !ValidMask[StorageIdx])
+		{
+			return true;
+		}
 		const int32 OwnerIdx = Entries[StorageIdx].OwnerIndex;
 		return (SkipOwnerIndex != INDEX_NONE && OwnerIdx == SkipOwnerIndex)
 			|| ShouldSkip(OwnerIdx);
@@ -104,7 +128,7 @@ bool FPCGExSpatialDomain_Broadphase::Overlaps(
 	};
 
 	return BroadphaseAABBs.ForEachOverlapping(CandidateOBB, INDEX_NONE,
-		SkipPredicate, ConfirmOverlap);
+	                                          SkipPredicate, ConfirmOverlap);
 }
 
 bool FPCGExSpatialDomain_Broadphase::OverlapsBeyondThreshold(
@@ -114,20 +138,32 @@ bool FPCGExSpatialDomain_Broadphase::OverlapsBeyondThreshold(
 	uint32 CandidateChannelMask) const
 {
 	check(MatrixRef);
-	if (NumValidEntries == 0) { return false; }
+	if (NumValidEntries == 0)
+	{
+		return false;
+	}
 
 	const FBox CandidateAABB = Candidate.GetWorldAABB();
-	if (!CandidateAABB.IsValid) { return false; }
+	if (!CandidateAABB.IsValid)
+	{
+		return false;
+	}
 
 	const PCGExSpatial::NarrowPhase::FShapeKindTag CandidateTag =
 		PCGExSpatial::NarrowPhase::FindShapeKindTag(Candidate.GetScriptStruct());
-	if (CandidateTag == PCGExSpatial::NarrowPhase::InvalidKindTag) { return false; }
+	if (CandidateTag == PCGExSpatial::NarrowPhase::InvalidKindTag)
+	{
+		return false;
+	}
 
 	const PCGExMath::OBB::FOBB CandidateOBB = PCGExMath::OBB::Factory::FromAABB(CandidateAABB, INDEX_NONE);
 
 	auto SkipPredicate = [this, SkipOwnerIndex](int32 StorageIdx) -> bool
 	{
-		if (!ValidMask.IsValidIndex(StorageIdx) || !ValidMask[StorageIdx]) { return true; }
+		if (!ValidMask.IsValidIndex(StorageIdx) || !ValidMask[StorageIdx])
+		{
+			return true;
+		}
 		const int32 OwnerIdx = Entries[StorageIdx].OwnerIndex;
 		return SkipOwnerIndex != INDEX_NONE && OwnerIdx == SkipOwnerIndex;
 	};
@@ -153,7 +189,7 @@ bool FPCGExSpatialDomain_Broadphase::OverlapsBeyondThreshold(
 	};
 
 	return BroadphaseAABBs.ForEachOverlapping(CandidateOBB, INDEX_NONE,
-		SkipPredicate, ConfirmExceedsThreshold);
+	                                          SkipPredicate, ConfirmExceedsThreshold);
 }
 
 int32 FPCGExSpatialDomain_Broadphase::Append(
@@ -166,10 +202,16 @@ int32 FPCGExSpatialDomain_Broadphase::Append(
 	check(OwnerIndex >= 0);
 
 	UScriptStruct* StructType = Shape.GetScriptStruct();
-	if (!StructType) { return INDEX_NONE; }
+	if (!StructType)
+	{
+		return INDEX_NONE;
+	}
 
 	const FBox WorldAABB = Shape.GetWorldAABB();
-	if (!WorldAABB.IsValid) { return INDEX_NONE; }
+	if (!WorldAABB.IsValid)
+	{
+		return INDEX_NONE;
+	}
 
 	// Auto-tag the kind so future Appends with the same struct hit the
 	// cache. Pair tests register tags too, so by the time Append runs
@@ -216,8 +258,11 @@ FPCGExSpatialDomain::FSnapshotHandle FPCGExSpatialDomain_Broadphase::BeginSnapsh
 
 void FPCGExSpatialDomain_Broadphase::RollbackToScope(FSnapshotHandle Handle)
 {
-	const int32 RollbackTo = static_cast<int32>(Handle);
-	if (RollbackTo < 0 || RollbackTo >= Entries.Num()) { return; }
+	const int32 RollbackTo = Handle;
+	if (RollbackTo < 0 || RollbackTo >= Entries.Num())
+	{
+		return;
+	}
 
 	for (int32 i = RollbackTo; i < Entries.Num(); ++i)
 	{

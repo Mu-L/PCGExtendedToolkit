@@ -15,8 +15,14 @@ namespace PCGExLayout
 		InBox = InBox.ExpandBy(Expansion);
 		for (int C = 0; C < 3; C++)
 		{
-			if (InBox.Min[C] < Box.Min[C]) { InBox.Min[C] = Box.Min[C]; }
-			if (InBox.Max[C] > Box.Max[C]) { InBox.Max[C] = Box.Max[C]; }
+			if (InBox.Min[C] < Box.Min[C])
+			{
+				InBox.Min[C] = Box.Min[C];
+			}
+			if (InBox.Max[C] > Box.Max[C])
+			{
+				InBox.Max[C] = Box.Max[C];
+			}
 		}
 	}
 
@@ -27,11 +33,23 @@ namespace PCGExLayout
 
 		for (int C = 0; C < 3; C++)
 		{
-			if (FMath::Abs(AmplitudeMin[C]) < Thresholds[C]) { InBox.Min[C] = Box.Min[C]; }
-			else { AmplitudeMin[C] = 0; }
+			if (FMath::Abs(AmplitudeMin[C]) < Thresholds[C])
+			{
+				InBox.Min[C] = Box.Min[C];
+			}
+			else
+			{
+				AmplitudeMin[C] = 0;
+			}
 
-			if (FMath::Abs(AmplitudeMax[C]) < Thresholds[C]) { InBox.Max[C] = Box.Max[C]; }
-			else { AmplitudeMax[C] = 0; }
+			if (FMath::Abs(AmplitudeMax[C]) < Thresholds[C])
+			{
+				InBox.Max[C] = Box.Max[C];
+			}
+			else
+			{
+				AmplitudeMax[C] = 0;
+			}
 		}
 
 		return AmplitudeMin + AmplitudeMax;
@@ -42,8 +60,14 @@ namespace PCGExLayout
 		InBox = InBox.ExpandBy(Expansion);
 		for (int C = 0; C < 3; C++)
 		{
-			if (InBox.Min[C] < InSpace.Min[C]) { InBox.Min[C] = InSpace.Min[C]; }
-			if (InBox.Max[C] > InSpace.Max[C]) { InBox.Max[C] = InSpace.Max[C]; }
+			if (InBox.Min[C] < InSpace.Min[C])
+			{
+				InBox.Min[C] = InSpace.Min[C];
+			}
+			if (InBox.Max[C] > InSpace.Max[C])
+			{
+				InBox.Max[C] = InSpace.Max[C];
+			}
 		}
 	}
 }

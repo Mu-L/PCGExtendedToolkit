@@ -25,8 +25,14 @@ namespace PCGExMath
 			}
 			else if (LastCount == UpdatedCount)
 			{
-				if (bHighest) { Mode = FMath::Max(Mode, AdjustedValue); }
-				else { Mode = FMath::Min(Mode, AdjustedValue); }
+				if (bHighest)
+				{
+					Mode = FMath::Max(Mode, AdjustedValue);
+				}
+				else
+				{
+					Mode = FMath::Min(Mode, AdjustedValue);
+				}
 			}
 		}
 

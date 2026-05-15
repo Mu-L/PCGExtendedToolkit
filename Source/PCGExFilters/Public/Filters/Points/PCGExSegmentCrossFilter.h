@@ -77,7 +77,10 @@ public:
 	UPROPERTY()
 	FPCGExSegmentCrossFilterConfig Config;
 
-	virtual bool SupportsProxyEvaluation() const override { return false; }
+	virtual bool SupportsProxyEvaluation() const override
+	{
+		return false;
+	}
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 
@@ -92,7 +95,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FSegmentCrossFilter(const TObjectPtr<const UPCGExSegmentCrossFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 			Handler = TypedFilterFactory->CreateHandler();
 			Handler->Init(EPCGExSplineCheckType::IsOn);
@@ -148,6 +152,10 @@ public:
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
-	virtual bool ShowMissingDataPolicy_Internal() const override { return true; }
+
+	virtual bool ShowMissingDataPolicy_Internal() const override
+	{
+		return true;
+	}
 #endif
 };

@@ -6,13 +6,14 @@
 #include "PropertyHandle.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
-#include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
+#include "Widgets/Text/STextBlock.h"
 
 FPCGExGridEnumCustomization::FPCGExGridEnumCustomization(const FString& InEnumName, const int32 InColumns)
-	: EnumName(InEnumName), Columns(InColumns)
+	: EnumName(InEnumName)
+	  , Columns(InColumns)
 {
 }
 
@@ -32,7 +33,10 @@ void FPCGExGridEnumCustomization::CustomizeHeader(
 	}
 
 	UEnum* Enum = FindFirstObjectSafe<UEnum>(*EnumName);
-	if (!Enum) { return; }
+	if (!Enum)
+	{
+		return;
+	}
 
 	HeaderRow.NameContent()[PropertyHandle->CreatePropertyNameWidget()]
 		.ValueContent()
@@ -67,7 +71,10 @@ TSharedRef<SWidget> FPCGExGridEnumCustomization::GenerateEnumButtons(UEnum* Enum
 
 	for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 	{
-		if (Enum->HasMetaData(TEXT("Hidden"), i)) { continue; }
+		if (Enum->HasMetaData(TEXT("Hidden"), i))
+		{
+			continue;
+		}
 		const FString KeyName = Enum->GetNameStringByIndex(i);
 
 		FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), i);
@@ -124,8 +131,8 @@ TSharedRef<SWidget> FPCGExGridEnumCustomization::GenerateEnumButtons(UEnum* Enum
 							EnumHandle->GetValueAsFormattedString(CurrentValue);
 							const FString KeyName = Enum->GetNameStringByIndex(i);
 							return (CurrentValue == KeyName)
-								       ? FLinearColor::White
-								       : FLinearColor::Gray;
+								? FLinearColor::White
+								: FLinearColor::Gray;
 						})
 				]
 			];

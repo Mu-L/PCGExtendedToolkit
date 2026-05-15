@@ -7,8 +7,8 @@
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Helpers/PCGExArrayHelpers.h"
 #include "Elements/Sorting/PCGExModularSortPoints.h"
+#include "Helpers/PCGExArrayHelpers.h"
 #include "Sorting/PCGExPointSorter.h"
 
 
@@ -18,14 +18,23 @@
 #if WITH_EDITOR
 void UPCGExSortPointsSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	for (FPCGExSortRuleConfig& Config : Rules) { Config.UpdateUserFacingInfos(); }
+	for (FPCGExSortRuleConfig& Config : Rules)
+	{
+		Config.UpdateUserFacingInfos();
+	}
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
 
-FPCGElementPtr UPCGExSortPointsBaseSettings::CreateElement() const { return MakeShared<FPCGExSortPointsBaseElement>(); }
+FPCGElementPtr UPCGExSortPointsBaseSettings::CreateElement() const
+{
+	return MakeShared<FPCGExSortPointsBaseElement>();
+}
 
-PCGExData::EIOInit UPCGExSortPointsBaseSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSortPointsBaseSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 bool UPCGExSortPointsBaseSettings::GetSortingRules(FPCGExContext* InContext, TArray<FPCGExSortRuleConfig>& OutRules) const
 {
@@ -34,8 +43,14 @@ bool UPCGExSortPointsBaseSettings::GetSortingRules(FPCGExContext* InContext, TAr
 
 bool UPCGExSortPointsSettings::GetSortingRules(FPCGExContext* InContext, TArray<FPCGExSortRuleConfig>& OutRules) const
 {
-	if (Rules.IsEmpty()) { return false; }
-	for (const FPCGExSortRuleConfig& Config : Rules) { OutRules.Add(Config); }
+	if (Rules.IsEmpty())
+	{
+		return false;
+	}
+	for (const FPCGExSortRuleConfig& Config : Rules)
+	{
+		OutRules.Add(Config);
+	}
 	return true;
 }
 
@@ -57,7 +72,10 @@ bool FPCGExSortPointsBaseElement::AdvanceWork(FPCGExContext* InContext, const UP
 		}
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bPrefetchData = true;
@@ -91,7 +109,10 @@ namespace PCGExSortPoints
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExSortPoints::Process);
 
-		if (!TProcessor::Process(InTaskManager)) { return false; }
+		if (!TProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -107,14 +128,23 @@ namespace PCGExSortPoints
 
 		if (TSharedPtr<PCGExSorting::FSortCache> Cache = Sorter->BuildCache(NumPoints))
 		{
-			Order.Sort([&](const int32 A, const int32 B) { return Cache->Compare(A, B); });
+			Order.Sort([&](const int32 A, const int32 B)
+			{
+				return Cache->Compare(A, B);
+			});
 		}
 		else
 		{
-			Order.Sort([&](const int32 A, const int32 B) { return Sorter->Sort(A, B); });
+			Order.Sort([&](const int32 A, const int32 B)
+			{
+				return Sorter->Sort(A, B);
+			});
 		}
 
-		Order.Sort([&](const int32 A, const int32 B) { return Sorter->Sort(A, B); });
+		Order.Sort([&](const int32 A, const int32 B)
+		{
+			return Sorter->Sort(A, B);
+		});
 
 		PointDataFacade->Source->InheritPoints(Order, 0);
 

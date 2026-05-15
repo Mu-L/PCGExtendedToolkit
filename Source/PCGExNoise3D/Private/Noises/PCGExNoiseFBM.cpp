@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseFBM.h"
-#include "Helpers/PCGExNoise3DMath.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Helpers/PCGExNoise3DMath.h"
 
 using namespace PCGExNoise3D::Math;
 
@@ -147,7 +147,7 @@ double FPCGExNoiseFBM::GenerateWarped(const FVector& Position) const
 		BaseNoise(Position * WarpFreq),
 		BaseNoise((Position + FVector(5.2, 1.3, 2.8)) * WarpFreq),
 		BaseNoise((Position + FVector(1.7, 9.2, 3.1)) * WarpFreq)
-	);
+		);
 
 	const FVector WarpedPos = Position + Warp1 * WarpStrength;
 
@@ -156,7 +156,7 @@ double FPCGExNoiseFBM::GenerateWarped(const FVector& Position) const
 		BaseNoise((WarpedPos + FVector(1.7, 9.2, 3.1)) * WarpFreq),
 		BaseNoise((WarpedPos + FVector(8.3, 2.8, 4.7)) * WarpFreq),
 		BaseNoise((WarpedPos + FVector(2.1, 6.4, 1.8)) * WarpFreq)
-	);
+		);
 
 	const FVector FinalPos = WarpedPos + Warp2 * WarpStrength;
 

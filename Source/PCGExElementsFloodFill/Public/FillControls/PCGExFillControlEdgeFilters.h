@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExFillControlOperation.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
+#include "UObject/Object.h"
 
 #include "PCGExFillControlEdgeFilters.generated.h"
 
@@ -64,7 +64,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(FillControlsEdgeFilters, "Fill Control : Edge Filters", "Filter edges along which the diffusion can occur.", FName(GetDisplayName()))
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_BLEND(FillControl, Filter); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_BLEND(FillControl, Filter);
+	}
 #endif
 	//~End UPCGSettings
 

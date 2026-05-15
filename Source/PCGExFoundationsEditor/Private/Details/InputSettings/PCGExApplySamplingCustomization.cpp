@@ -7,9 +7,9 @@
 #include "IDetailChildrenBuilder.h"
 #include "PropertyHandle.h"
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
-#include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExApplySamplingCustomization::MakeInstance()
 {
@@ -64,7 +64,10 @@ void FPCGExApplySamplingCustomization::CustomizeChildren(
 				.Visibility(TAttribute<EVisibility>::CreateLambda([ConditionHandle]()
 				{
 					bool bApply = false;
-					if (ConditionHandle.IsValid()) { ConditionHandle->GetValue(bApply); }
+					if (ConditionHandle.IsValid())
+					{
+						ConditionHandle->GetValue(bApply);
+					}
 					return bApply ? EVisibility::Visible : EVisibility::Collapsed;
 				}))
 				.NameContent()

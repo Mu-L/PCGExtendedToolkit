@@ -5,15 +5,15 @@
 
 #include "PCGExBlendingCommon.h"
 #include "Containers/PCGExIndexLookup.h"
-#include "Types/PCGExTypes.h"
+#include "Core/PCGExBlendOperations.h"
+#include "Core/PCGExOpStats.h"
+#include "Core/PCGExUnionData.h"
+#include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyData.h"
 #include "Data/PCGExProxyDataHelpers.h"
-#include "Core/PCGExUnionData.h"
-#include "Core/PCGExBlendOperations.h"
-#include "Core/PCGExOpStats.h"
-#include "Data/PCGExData.h"
 #include "Math/PCGExMathDistances.h"
+#include "Types/PCGExTypes.h"
 
 namespace PCGExBlending
 {
@@ -24,9 +24,15 @@ namespace PCGExBlending
 		CurrentTargetData = TargetData;
 
 		int32 MaxIndex = 0;
-		for (const TSharedRef<PCGExData::FFacade>& Src : InSources) { MaxIndex = FMath::Max(Src->Source->IOIndex, MaxIndex); }
+		for (const TSharedRef<PCGExData::FFacade>& Src : InSources)
+		{
+			MaxIndex = FMath::Max(Src->Source->IOIndex, MaxIndex);
+		}
 		IOLookup = MakeShared<PCGEx::FIndexLookup>(MaxIndex + 1);
-		for (const TSharedRef<PCGExData::FFacade>& Src : InSources) { IOLookup->Set(Src->Source->IOIndex, SourcesData.Add(Src->GetIn())); }
+		for (const TSharedRef<PCGExData::FFacade>& Src : InSources)
+		{
+			IOLookup->Set(Src->Source->IOIndex, SourcesData.Add(Src->GetIn()));
+		}
 
 		Distances = PCGExMath::GetDistances();
 	}
@@ -41,7 +47,10 @@ namespace PCGExBlending
 
 	void FProxyDataBlender::Blend(const int32 SourceIndexA, const int32 SourceIndexB, const int32 TargetIndex, const double Weight) const
 	{
-		if (!Operation || !A || !C) { return; }
+		if (!Operation || !A || !C)
+		{
+			return;
+		}
 
 		// Use FScopedTypedValue for safe working buffers
 		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
@@ -57,7 +66,10 @@ namespace PCGExBlending
 
 	void FProxyDataBlender::BlendScope(const PCGExMT::FScope& Scope, const double Weight) const
 	{
-		if (!Operation || !A || !C) { return; }
+		if (!Operation || !A || !C)
+		{
+			return;
+		}
 
 		// Use FScopedTypedValue for safe working buffers
 		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
@@ -76,7 +88,10 @@ namespace PCGExBlending
 
 	void FProxyDataBlender::BlendScope(const PCGExMT::FScope& Scope, TArrayView<const double> Weights) const
 	{
-		if (!Operation || !A || !C) { return; }
+		if (!Operation || !A || !C)
+		{
+			return;
+		}
 
 		// Use FScopedTypedValue for safe working buffers
 		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
@@ -95,7 +110,10 @@ namespace PCGExBlending
 
 	void FProxyDataBlender::BlendScope(const PCGExMT::FScope& Scope, TArrayView<const int8> Mask, const double Weight) const
 	{
-		if (!Operation || !A || !C) { return; }
+		if (!Operation || !A || !C)
+		{
+			return;
+		}
 
 		// Use FScopedTypedValue for safe working buffers
 		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
@@ -104,7 +122,10 @@ namespace PCGExBlending
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			if (!Mask[Index - Scope.Start]) { continue; }
+			if (!Mask[Index - Scope.Start])
+			{
+				continue;
+			}
 
 			A->GetVoid(Index, ValA.GetRaw());
 			B->GetVoid(Index, ValB.GetRaw());
@@ -116,7 +137,10 @@ namespace PCGExBlending
 
 	void FProxyDataBlender::BlendScope(const PCGExMT::FScope& Scope, TArrayView<const int8> Mask, TArrayView<const double> Weights) const
 	{
-		if (!Operation || !A || !C) { return; }
+		if (!Operation || !A || !C)
+		{
+			return;
+		}
 
 		// Use FScopedTypedValue for safe working buffers
 		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
@@ -126,7 +150,10 @@ namespace PCGExBlending
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			const int32 i = Index - Scope.Start;
-			if (!Mask[i]) { continue; }
+			if (!Mask[i])
+			{
+				continue;
+			}
 
 			A->GetVoid(Index, ValA.GetRaw());
 			B->GetVoid(Index, ValB.GetRaw());
@@ -186,7 +213,10 @@ namespace PCGExBlending
 		check(Operation)
 		check(C)
 
-		if (!Tracker.Count) { return; }
+		if (!Tracker.Count)
+		{
+			return;
+		}
 
 		PCGExTypes::FScopedTypedValue Current(UnderlyingType);
 
@@ -198,7 +228,10 @@ namespace PCGExBlending
 
 	void FProxyDataBlender::Div(const int32 TargetIndex, const double Divider)
 	{
-		if (!Operation || !C || Divider == 0.0) { return; }
+		if (!Operation || !C || Divider == 0.0)
+		{
+			return;
+		}
 
 		PCGExTypes::FScopedTypedValue Value(UnderlyingType);
 
@@ -226,7 +259,10 @@ namespace PCGExBlending
 		PCGExData::FProxyDescriptor Desc_A = PCGExData::FProxyDescriptor(InSourceFacade, PCGExData::EProxyRole::Read);
 		PCGExData::FProxyDescriptor Desc_B = PCGExData::FProxyDescriptor(InTargetFacade, PCGExData::EProxyRole::Read);
 
-		if (!Desc_A.Capture(InContext, InParam.Selector, InSide)) { return false; }
+		if (!Desc_A.Capture(InContext, InParam.Selector, InSide))
+		{
+			return false;
+		}
 
 		if (InParam.bIsNewAttribute)
 		{
@@ -241,7 +277,10 @@ namespace PCGExBlending
 		else
 		{
 			// Strict capture may fail here, TBD
-			if (!Desc_B.CaptureStrict(InContext, InParam.Selector, PCGExData::EIOSide::Out)) { return false; }
+			if (!Desc_B.CaptureStrict(InContext, InParam.Selector, PCGExData::EIOSide::Out))
+			{
+				return false;
+			}
 		}
 
 		PCGExData::FProxyDescriptor Desc_C = Desc_B;
@@ -287,7 +326,10 @@ namespace PCGExBlending
 		Blender->UnderlyingType = WorkingType;
 		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend);
 
-		if (!Blender->Operation) { return nullptr; }
+		if (!Blender->Operation)
+		{
+			return nullptr;
+		}
 
 		return Blender;
 	}

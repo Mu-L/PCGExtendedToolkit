@@ -9,11 +9,17 @@
 PCGEX_SETTING_VALUE_IMPL(FPCGExProbeConfigIndex, Index, int32, IndexInput, IndexAttribute, IndexConstant)
 PCGEX_CREATE_PROBE_FACTORY(Index, {}, {})
 
-bool FPCGExProbeIndex::IsDirectProbe() const { return true; }
+bool FPCGExProbeIndex::IsDirectProbe() const
+{
+	return true;
+}
 
 bool FPCGExProbeIndex::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	MaxIndex = PointIO->GetNum() - 1;
 
@@ -48,7 +54,10 @@ bool FPCGExProbeIndex::Prepare(FPCGExContext* InContext)
 	case EPCGExProbeTargetMode::TwoWayOffset: PCGEX_FOREACH_SANITIZEINDEX(PCGEX_TARGET_CONNECT_TWOWAY, _VALUE) break; }
 
 	TargetCache = Config.GetValueSettingIndex();
-	if (!TargetCache->Init(PrimaryDataFacade)) { return false; }
+	if (!TargetCache->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	PCGEX_TARGET_CONNECT_SWITCH(TargetCache->Read(Index))
 

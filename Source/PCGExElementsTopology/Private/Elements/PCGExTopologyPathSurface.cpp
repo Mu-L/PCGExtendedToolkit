@@ -37,7 +37,10 @@ void FPCGExTopologyPathSurfaceContext::RegisterAssetDependencies()
 
 bool FPCGExTopologyPathSurfaceElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(TopologyPathSurface)
 
@@ -84,12 +87,18 @@ namespace PCGExTopologyPathSurface
 	{
 		PointDataFacade->bSupportsScopedGet = false; //Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		bIsPreviewMode = ExecutionContext->GetComponent()->IsInPreviewMode();
 
 		InternalMeshData = Context->ManagedObjects->New<UPCGDynamicMeshData>();
-		if (!InternalMeshData) { return false; }
+		if (!InternalMeshData)
+		{
+			return false;
+		}
 
 		InternalMesh = Context->ManagedObjects->New<UDynamicMesh>();
 		InternalMesh->InitializeMesh();
@@ -98,7 +107,10 @@ namespace PCGExTopologyPathSurface
 		{
 			InternalMeshData->Initialize(InternalMesh, true);
 			InternalMesh = InternalMeshData->GetMutableDynamicMesh();
-			if (UMaterialInterface* Material = Settings->Topology.Material.Get()) { InternalMeshData->SetMaterials({Material}); }
+			if (UMaterialInterface* Material = Settings->Topology.Material.Get())
+			{
+				InternalMeshData->SetMaterials({Material});
+			}
 		}
 
 		TArray<FVector> ActivePositions;
@@ -159,7 +171,10 @@ namespace PCGExTopologyPathSurface
 
 	void FProcessor::Output()
 	{
-		if (!this->bIsProcessorValid) { return; }
+		if (!this->bIsProcessorValid)
+		{
+			return;
+		}
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(UPCGExPathSplineMesh::FProcessor::Output);
 

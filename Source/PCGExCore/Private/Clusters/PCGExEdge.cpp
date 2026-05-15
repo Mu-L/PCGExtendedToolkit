@@ -11,12 +11,14 @@ namespace PCGExGraphs
 namespace PCGExClusters
 {
 	FBoundedEdge::FBoundedEdge(const FCluster* Cluster, const int32 InEdgeIndex)
-		: Index(InEdgeIndex), Bounds(FBoxSphereBounds(FSphere(FMath::Lerp(Cluster->GetStartPos(InEdgeIndex), Cluster->GetEndPos(InEdgeIndex), 0.5), Cluster->GetDist(InEdgeIndex) * 0.5)))
+		: Index(InEdgeIndex)
+		  , Bounds(FBoxSphereBounds(FSphere(FMath::Lerp(Cluster->GetStartPos(InEdgeIndex), Cluster->GetEndPos(InEdgeIndex), 0.5), Cluster->GetDist(InEdgeIndex) * 0.5)))
 	{
 	}
 
 	FBoundedEdge::FBoundedEdge()
-		: Index(-1), Bounds(FBoxSphereBounds(ForceInit))
+		: Index(-1)
+		  , Bounds(FBoxSphereBounds(ForceInit))
 	{
 	}
 }

@@ -20,9 +20,9 @@ namespace PCGExSpatial::NarrowPhase
 		 */
 		struct FPairSlot
 		{
-			FPairOverlapFn     Overlap     = nullptr;
+			FPairOverlapFn Overlap = nullptr;
 			FPairPenetrationFn Penetration = nullptr;
-			bool               bSwapArgs   = false;
+			bool bSwapArgs = false;
 		};
 
 		/**
@@ -38,9 +38,9 @@ namespace PCGExSpatial::NarrowPhase
 		 */
 		struct FRegistryState
 		{
-			TArray<TArray<FPairSlot>>             Matrix;
+			TArray<TArray<FPairSlot>> Matrix;
 			TMap<const UScriptStruct*, FShapeKindTag> StructToTag;
-			TArray<const UScriptStruct*>          TagToStruct;
+			TArray<const UScriptStruct*> TagToStruct;
 
 			/**
 			 * Single-axis table for signed-distance dispatch, indexed by
@@ -63,21 +63,33 @@ namespace PCGExSpatial::NarrowPhase
 			FRegistryState& S = State();
 			if (S.Matrix.Num() >= NumKinds)
 			{
-				if (S.QueryPointFns.Num() < NumKinds) { S.QueryPointFns.SetNumZeroed(NumKinds); }
+				if (S.QueryPointFns.Num() < NumKinds)
+				{
+					S.QueryPointFns.SetNumZeroed(NumKinds);
+				}
 				return;
 			}
 			S.Matrix.SetNum(NumKinds);
-			for (TArray<FPairSlot>& Row : S.Matrix) { Row.SetNum(NumKinds); }
+			for (TArray<FPairSlot>& Row : S.Matrix)
+			{
+				Row.SetNum(NumKinds);
+			}
 			S.QueryPointFns.SetNumZeroed(NumKinds);
 		}
 	}
 
 	FShapeKindTag RegisterShapeKind(UScriptStruct* Struct)
 	{
-		if (!Struct) { return InvalidKindTag; }
+		if (!Struct)
+		{
+			return InvalidKindTag;
+		}
 
 		FRegistryState& S = State();
-		if (const FShapeKindTag* Existing = S.StructToTag.Find(Struct)) { return *Existing; }
+		if (const FShapeKindTag* Existing = S.StructToTag.Find(Struct))
+		{
+			return *Existing;
+		}
 
 		const FShapeKindTag Tag = S.TagToStruct.Add(Struct);
 		S.StructToTag.Add(Struct, Tag);
@@ -87,14 +99,20 @@ namespace PCGExSpatial::NarrowPhase
 
 	FShapeKindTag FindShapeKindTag(const UScriptStruct* Struct)
 	{
-		if (!Struct) { return InvalidKindTag; }
+		if (!Struct)
+		{
+			return InvalidKindTag;
+		}
 		const FShapeKindTag* Found = State().StructToTag.Find(Struct);
 		return Found ? *Found : InvalidKindTag;
 	}
 
 	void Register(UScriptStruct* StructA, UScriptStruct* StructB, FPairFns Fns)
 	{
-		if (!ensureMsgf(StructA && StructB, TEXT("PCGExSpatial::NarrowPhase::Register: null UScriptStruct*"))) { return; }
+		if (!ensureMsgf(StructA && StructB, TEXT("PCGExSpatial::NarrowPhase::Register: null UScriptStruct*")))
+		{
+			return;
+		}
 
 		const FShapeKindTag TagA = RegisterShapeKind(StructA);
 		const FShapeKindTag TagB = RegisterShapeKind(StructB);
@@ -105,13 +123,13 @@ namespace PCGExSpatial::NarrowPhase
 		if (Slot.Overlap != nullptr || Slot.Penetration != nullptr)
 		{
 			ensureMsgf(false,
-				TEXT("PCGExSpatial::NarrowPhase: duplicate registration for (%s, %s) -- last write wins."),
-				*StructA->GetName(), *StructB->GetName());
+			           TEXT("PCGExSpatial::NarrowPhase: duplicate registration for (%s, %s) -- last write wins."),
+			           *StructA->GetName(), *StructB->GetName());
 		}
 
-		Slot.Overlap     = Fns.Overlap;
+		Slot.Overlap = Fns.Overlap;
 		Slot.Penetration = Fns.Penetration;
-		Slot.bSwapArgs   = false;
+		Slot.bSwapArgs = false;
 
 		if (TagA != TagB)
 		{
@@ -120,12 +138,12 @@ namespace PCGExSpatial::NarrowPhase
 			// arg order the registration specified.
 			FPairSlot& Mirror = S.Matrix[TagB][TagA];
 			ensureMsgf(Mirror.Overlap == nullptr,
-				TEXT("PCGExSpatial::NarrowPhase: pair (%s, %s) is already registered in the reverse direction. "
-				     "Register only one orientation; lookups in the other direction resolve via arg swap."),
-				*StructA->GetName(), *StructB->GetName());
-			Mirror.Overlap     = Fns.Overlap;
+			           TEXT("PCGExSpatial::NarrowPhase: pair (%s, %s) is already registered in the reverse direction. "
+				           "Register only one orientation; lookups in the other direction resolve via arg swap."),
+			           *StructA->GetName(), *StructB->GetName());
+			Mirror.Overlap = Fns.Overlap;
 			Mirror.Penetration = Fns.Penetration;
-			Mirror.bSwapArgs   = true;
+			Mirror.bSwapArgs = true;
 		}
 	}
 
@@ -140,8 +158,14 @@ namespace PCGExSpatial::NarrowPhase
 
 	void RegisterQueryPoint(UScriptStruct* Struct, FQueryPointFn Fn)
 	{
-		if (!ensureMsgf(Struct, TEXT("PCGExSpatial::NarrowPhase::RegisterQueryPoint: null UScriptStruct*"))) { return; }
-		if (!ensureMsgf(Fn, TEXT("PCGExSpatial::NarrowPhase::RegisterQueryPoint: null FQueryPointFn for %s"), *Struct->GetName())) { return; }
+		if (!ensureMsgf(Struct, TEXT("PCGExSpatial::NarrowPhase::RegisterQueryPoint: null UScriptStruct*")))
+		{
+			return;
+		}
+		if (!ensureMsgf(Fn, TEXT("PCGExSpatial::NarrowPhase::RegisterQueryPoint: null FQueryPointFn for %s"), *Struct->GetName()))
+		{
+			return;
+		}
 
 		const FShapeKindTag Tag = RegisterShapeKind(Struct);
 		FRegistryState& S = State();
@@ -149,8 +173,8 @@ namespace PCGExSpatial::NarrowPhase
 		if (S.QueryPointFns[Tag] != nullptr)
 		{
 			ensureMsgf(false,
-				TEXT("PCGExSpatial::NarrowPhase: duplicate QueryPoint registration for %s -- last write wins."),
-				*Struct->GetName());
+			           TEXT("PCGExSpatial::NarrowPhase: duplicate QueryPoint registration for %s -- last write wins."),
+			           *Struct->GetName());
 		}
 
 		S.QueryPointFns[Tag] = Fn;
@@ -162,14 +186,20 @@ namespace PCGExSpatial::NarrowPhase
 		check(StoredKind >= 0 && StoredKind < S.QueryPointFns.Num());
 
 		const FQueryPointFn Fn = S.QueryPointFns[StoredKind];
-		if (!Fn) { return TNumericLimits<float>::Max(); }
+		if (!Fn)
+		{
+			return TNumericLimits<float>::Max();
+		}
 		return Fn(Point, Stored);
 	}
 
 	float QueryPoint(const FVector& Point, const FPCGExFootprintShape& Stored)
 	{
 		const FShapeKindTag Kind = FindShapeKindTag(Stored.GetScriptStruct());
-		if (Kind == InvalidKindTag) { return TNumericLimits<float>::Max(); }
+		if (Kind == InvalidKindTag)
+		{
+			return TNumericLimits<float>::Max();
+		}
 		return QueryPoint(Kind, Point, Stored);
 	}
 
@@ -182,7 +212,10 @@ namespace PCGExSpatial::NarrowPhase
 		check(BKind >= 0 && BKind < S.Matrix.Num());
 
 		const FPairSlot& Slot = S.Matrix[AKind][BKind];
-		if (!Slot.Overlap) { return false; }
+		if (!Slot.Overlap)
+		{
+			return false;
+		}
 		return Slot.bSwapArgs ? Slot.Overlap(B, A) : Slot.Overlap(A, B);
 	}
 
@@ -217,7 +250,10 @@ namespace PCGExSpatial::NarrowPhase
 	{
 		const FShapeKindTag AKind = FindShapeKindTag(A.GetScriptStruct());
 		const FShapeKindTag BKind = FindShapeKindTag(B.GetScriptStruct());
-		if (AKind == InvalidKindTag || BKind == InvalidKindTag) { return false; }
+		if (AKind == InvalidKindTag || BKind == InvalidKindTag)
+		{
+			return false;
+		}
 		return TestOverlap(AKind, A, BKind, B);
 	}
 
@@ -225,7 +261,10 @@ namespace PCGExSpatial::NarrowPhase
 	{
 		const FShapeKindTag AKind = FindShapeKindTag(A.GetScriptStruct());
 		const FShapeKindTag BKind = FindShapeKindTag(B.GetScriptStruct());
-		if (AKind == InvalidKindTag || BKind == InvalidKindTag) { return TNumericLimits<float>::Max(); }
+		if (AKind == InvalidKindTag || BKind == InvalidKindTag)
+		{
+			return TNumericLimits<float>::Max();
+		}
 		return QueryPenetration(AKind, A, BKind, B);
 	}
 }

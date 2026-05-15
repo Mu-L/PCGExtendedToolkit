@@ -13,7 +13,10 @@
 
 bool FPCGExTensorInertia::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorPointOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorPointOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -29,7 +32,10 @@ PCGExTensor::FTensorSample FPCGExTensorInertia::Sample(const int32 InSeedIndex, 
 		auto ProcessNeighbor = [&](const PCGExOctree::FItem& InEffector)
 		{
 			PCGExTensor::FEffectorMetrics Metrics;
-			if (!ComputeFactor(InPosition, InEffector.Index, Metrics)) { return; }
+			if (!ComputeFactor(InPosition, InEffector.Index, Metrics))
+			{
+				return;
+			}
 
 			Samples.Emplace_GetRef(PCGExMath::GetDirection(PrimaryDataFacade->GetIn()->GetTransform(InSeedIndex).GetRotation() * FRotationMatrix::MakeFromX(Metrics.Guide).ToQuat(), Config.Axis), Metrics.Potency, Metrics.Weight);
 		};
@@ -41,7 +47,10 @@ PCGExTensor::FTensorSample FPCGExTensorInertia::Sample(const int32 InSeedIndex, 
 		auto ProcessNeighbor = [&](const PCGExOctree::FItem& InEffector)
 		{
 			PCGExTensor::FEffectorMetrics Metrics;
-			if (!ComputeFactor(InPosition, InEffector.Index, Metrics)) { return; }
+			if (!ComputeFactor(InPosition, InEffector.Index, Metrics))
+			{
+				return;
+			}
 
 			Samples.Emplace_GetRef(PCGExMath::GetDirection(InProbe.GetRotation() * FRotationMatrix::MakeFromX(Metrics.Guide).ToQuat(), Config.Axis), Metrics.Potency, Metrics.Weight);
 		};

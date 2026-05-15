@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExHeuristicDistance.h"
-#include "UObject/Object.h"
 #include "Core/PCGExHeuristicOperation.h"
+#include "UObject/Object.h"
 
 #include "PCGExHeuristicSteepness.generated.h"
 
@@ -45,7 +45,10 @@ class FPCGExHeuristicSteepness : public FPCGExHeuristicOperation
 	friend class UPCGExHeuristicsFactorySteepness;
 
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override { return bAccumulate ? EPCGExHeuristicCategory::TravelDependent : EPCGExHeuristicCategory::GoalDependent; }
+	virtual EPCGExHeuristicCategory GetCategory() const override
+	{
+		return bAccumulate ? EPCGExHeuristicCategory::TravelDependent : EPCGExHeuristicCategory::GoalDependent;
+	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 

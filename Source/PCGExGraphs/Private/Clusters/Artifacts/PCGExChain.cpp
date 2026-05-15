@@ -4,8 +4,8 @@
 #include "Clusters/Artifacts/PCGExChain.h"
 
 #include "Algo/RemoveIf.h"
-#include "Data/PCGExPointIO.h"
 #include "Clusters/PCGExCluster.h"
+#include "Data/PCGExPointIO.h"
 
 namespace PCGExClusters
 {
@@ -42,7 +42,10 @@ namespace PCGExClusters
 		ON_SCOPE_EXIT
 		{
 			bIsLeaf = Cluster->GetNode(Seed.Node)->IsLeaf() || Cluster->GetNode(Links.Last().Node)->IsLeaf();
-			if (bIsClosedLoop) { bIsLeaf = false; }
+			if (bIsClosedLoop)
+			{
+				bIsLeaf = false;
+			}
 			FixUniqueHash();
 		};
 
@@ -62,8 +65,11 @@ namespace PCGExClusters
 				break;
 			}
 
-			FLink NextLink = FromNode->Links[0];                               // Get next node
-			if (NextLink.Node == Last.Node) { NextLink = FromNode->Links[1]; } // Get other next
+			FLink NextLink = FromNode->Links[0]; // Get next node
+			if (NextLink.Node == Last.Node)
+			{
+				NextLink = FromNode->Links[1];
+			} // Get other next
 
 			if (NextLink.Node == Seed.Node)
 			{
@@ -92,7 +98,10 @@ namespace PCGExClusters
 
 	FVector FNodeChain::GetEdgeDir(const TSharedPtr<FCluster>& Cluster, const bool bFirst) const
 	{
-		if (bFirst) { return GetFirstEdgeDir(Cluster); }
+		if (bFirst)
+		{
+			return GetFirstEdgeDir(Cluster);
+		}
 		return GetLastEdgeDir(Cluster);
 	}
 
@@ -140,13 +149,19 @@ namespace PCGExClusters
 
 		if (bReverse)
 		{
-			for (int i = ChainSize - 1; i >= 0; i--) { OutNodes.Add(Links[i].Node); }
+			for (int i = ChainSize - 1; i >= 0; i--)
+			{
+				OutNodes.Add(Links[i].Node);
+			}
 			OutNodes.Add(Seed.Node);
 		}
 		else
 		{
 			OutNodes.Add(Seed.Node);
-			for (int i = 0; i < ChainSize; i++) { OutNodes.Add(Links[i].Node); }
+			for (int i = 0; i < ChainSize; i++)
+			{
+				OutNodes.Add(Links[i].Node);
+			}
 		}
 
 		return OutNodes.Num();
@@ -162,7 +177,10 @@ namespace PCGExClusters
 			FNode* Node = Cluster->GetNode(i);
 			ensure(!Node->IsEmpty());
 
-			if (Node->IsEmpty()) { continue; }
+			if (Node->IsEmpty())
+			{
+				continue;
+			}
 			if (Node->IsLeaf())
 			{
 				PCGEX_MAKE_SHARED(NewChain, FNodeChain, FLink(Node->Index, Node->Links[0].Edge))
@@ -182,7 +200,10 @@ namespace PCGExClusters
 			for (const FLink& Lk : Node->Links)
 			{
 				// Skip immediately known leaves or already seeded nodes. Avoid double-sampling simple cases
-				if (Cluster->GetNode(Lk.Node)->IsLeaf()) { continue; }
+				if (Cluster->GetNode(Lk.Node)->IsLeaf())
+				{
+					continue;
+				}
 
 				PCGEX_MAKE_SHARED(NewChain, FNodeChain, FLink(Node->Index, Lk.Edge))
 				Chains.Add(NewChain);
@@ -214,14 +235,20 @@ namespace PCGExClusters
 		{
 			FNode* Node = Cluster->GetNode(i);
 			ensure(!Node->IsEmpty());
-			if (!Node->IsLeaf() || Node->IsEmpty()) { continue; }
+			if (!Node->IsLeaf() || Node->IsEmpty())
+			{
+				continue;
+			}
 
 			PCGEX_MAKE_SHARED(NewChain, FNodeChain, FLink(Node->Index, Node->Links[0].Edge))
 			Chains.Add(NewChain);
 		}
 
 		Chains.Shrink();
-		if (Chains.IsEmpty()) { return false; }
+		if (Chains.IsEmpty())
+		{
+			return false;
+		}
 		return DispatchTasks(TaskManager);
 	}
 
@@ -263,6 +290,6 @@ namespace PCGExClusters
 				UniqueHashSet.Add(Chain->UniqueHash, &bAlreadySet);
 				return bAlreadySet; // remove duplicates
 			}
-		));
+			));
 	}
 }

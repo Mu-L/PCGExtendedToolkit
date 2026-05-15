@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExRegex.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Utils/PCGExRegex.h"
 
 #include "PCGExEdgeEndpointsRegexFilter.generated.h"
 
@@ -66,7 +66,8 @@ namespace PCGExEdgeEndpointsRegex
 	{
 	public:
 		explicit FFilter(const UPCGExEdgeEndpointsRegexFilterFactory* InFactory)
-			: IEdgeFilter(InFactory), TypedFilterFactory(InFactory)
+			: IEdgeFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 		}
 
@@ -93,7 +94,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(EdgeEndpointsRegexFilterFactory, "Edge Filter : Endpoints Regex", "Test the value of an attribute on each of the edge endpoints against a regex pattern.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster);
+	}
 #endif
 	//~End UPCGSettings
 

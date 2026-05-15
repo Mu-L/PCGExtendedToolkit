@@ -3,8 +3,8 @@
 
 #include "Factories/PCGExFactoryProvider.h"
 
-#include "Core/PCGExContext.h"
 #include "PCGPin.h"
+#include "Core/PCGExContext.h"
 #include "Data/PCGExPointIO.h"
 #include "Factories/PCGExFactoryData.h"
 #include "Tasks/Task.h"
@@ -49,7 +49,10 @@ FPCGElementPtr UPCGExFactoryProviderSettings::CreateElement() const
 }
 
 #if WITH_EDITOR
-FString UPCGExFactoryProviderSettings::GetDisplayName() const { return TEXT(""); }
+FString UPCGExFactoryProviderSettings::GetDisplayName() const
+{
+	return TEXT("");
+}
 #endif
 
 UPCGExFactoryData* UPCGExFactoryProviderSettings::CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const
@@ -68,7 +71,10 @@ bool FPCGExFactoryProviderElement::AdvanceWork(FPCGExContext* InContext, const U
 	{
 		Context->OutFactory = Settings->CreateFactory(Context, nullptr);
 
-		if (!Context->OutFactory) { return true; }
+		if (!Context->OutFactory)
+		{
+			return true;
+		}
 
 		Context->OutFactory->OutputConfigToMetadata();
 
@@ -100,7 +106,10 @@ bool FPCGExFactoryProviderElement::AdvanceWork(FPCGExContext* InContext, const U
 	for (const FPCGPinProperties& Pin : InputPins)
 	{
 		const TArray<FPCGTaggedData>& InputData = Context->InputData.GetInputsByPin(Pin.Label);
-		for (const FPCGTaggedData& TaggedData : InputData) { Context->OutFactory->AddDataDependency(TaggedData.Data); }
+		for (const FPCGTaggedData& TaggedData : InputData)
+		{
+			Context->OutFactory->AddDataDependency(TaggedData.Data);
+		}
 	}
 
 	// We use a dummy attribute to update the factory CRC

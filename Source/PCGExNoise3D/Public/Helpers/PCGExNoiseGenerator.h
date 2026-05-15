@@ -49,17 +49,26 @@ namespace PCGExNoise3D
 		/**
 		 * Get number of operations
 		 */
-		int32 Num() const { return Operations.Num(); }
+		int32 Num() const
+		{
+			return Operations.Num();
+		}
 
 		/**
 		 * Check if generator has any operations
 		 */
-		bool IsValid() const { return Operations.Num() > 0; }
+		bool IsValid() const
+		{
+			return Operations.Num() > 0;
+		}
 
 		/**
 		 * Get total weight of all operations
 		 */
-		double GetTotalWeight() const { return TotalWeight; }
+		double GetTotalWeight() const
+		{
+			return TotalWeight;
+		}
 
 		/**
 		 * Set how GenerateInPlace combines initial value with noise
@@ -72,8 +81,15 @@ namespace PCGExNoise3D
 			InPlaceBlendMode = BlendMode;
 		}
 
-		EPCGExNoiseInPlaceMode GetInPlaceMode() const { return InPlaceMode; }
-		EPCGExNoiseBlendMode GetInPlaceBlendMode() const { return InPlaceBlendMode; }
+		EPCGExNoiseInPlaceMode GetInPlaceMode() const
+		{
+			return InPlaceMode;
+		}
+
+		EPCGExNoiseBlendMode GetInPlaceBlendMode() const
+		{
+			return InPlaceBlendMode;
+		}
 
 		//
 		// Single-point generation

@@ -10,8 +10,8 @@
 #include "PCGParamData.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExContext.h"
-#include "Data/PCGExData.h"
 #include "Data/PCGExAttributeBroadcaster.h"
+#include "Data/PCGExData.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Helpers/PCGExPropertyHelpers.h"
 
@@ -35,7 +35,10 @@ void UPCGExInstancedFactory::FindSettingsOverrides(FPCGExContext* InContext, FNa
 	{
 		const UPCGParamData* ParamData = Cast<UPCGParamData>(InTaggedData.Data);
 
-		if (!ParamData) { continue; }
+		if (!ParamData)
+		{
+			continue;
+		}
 		const TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(ParamData->Metadata);
 
 		for (PCGExData::FAttributeIdentity& Identity : Infos->Identities)
@@ -63,7 +66,10 @@ void UPCGExInstancedFactory::Cleanup()
 
 UPCGExInstancedFactory* UPCGExInstancedFactory::CreateNewInstance(PCGEx::FManagedObjects* InManagedObjects) const
 {
-	if (!InManagedObjects) { return nullptr; }
+	if (!InManagedObjects)
+	{
+		return nullptr;
+	}
 	UPCGExInstancedFactory* TypedInstance = InManagedObjects->New<UPCGExInstancedFactory>(GetTransientPackage(), this->GetClass());
 
 	check(TypedInstance)
@@ -94,7 +100,10 @@ void UPCGExInstancedFactory::ApplyOverrides()
 	{
 		// Find the property by name
 		FProperty* Property = ObjectClass->FindPropertyByName(PossibleOverride.Key);
-		if (!Property) { continue; }
+		if (!Property)
+		{
+			continue;
+		}
 
 		PCGExMetaHelpers::ExecuteWithRightType(PossibleOverride.Value->GetTypeId(), [&](auto DummyValue)
 		{

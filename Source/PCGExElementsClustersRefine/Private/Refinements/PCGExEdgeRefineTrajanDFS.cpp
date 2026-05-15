@@ -51,8 +51,17 @@ void FPCGExEdgeRefineTrajanDFS::Process()
 		}
 	};
 
-	for (int32 i = 0; i < NumNodes; ++i) { if (Disc[i] == -1) { DFS(i); } }
-	for (const int32 BridgeIndex : Bridges) { Cluster->GetEdge(BridgeIndex)->bValid = bInvert; }
+	for (int32 i = 0; i < NumNodes; ++i)
+	{
+		if (Disc[i] == -1)
+		{
+			DFS(i);
+		}
+	}
+	for (const int32 BridgeIndex : Bridges)
+	{
+		Cluster->GetEdge(BridgeIndex)->bValid = bInvert;
+	}
 }
 
 #pragma endregion

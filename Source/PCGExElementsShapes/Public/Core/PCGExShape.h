@@ -23,7 +23,10 @@ namespace PCGExShapes
 		FBox Fit = FBox(ForceInit);
 		FVector Extents = FVector::OneVector * 50;
 
-		bool IsValid() const { return bValid && Fit.IsValid && NumPoints > 0; }
+		bool IsValid() const
+		{
+			return bValid && Fit.IsValid && NumPoints > 0;
+		}
 
 		explicit FShape(const PCGExData::FConstPoint& InPointRef)
 			: Seed(InPointRef)

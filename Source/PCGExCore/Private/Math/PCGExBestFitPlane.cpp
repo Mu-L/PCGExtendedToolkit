@@ -40,7 +40,10 @@ namespace PCGExMath
 
 			// Normalize
 			const double Scale = 1.0 / NumPoints;
-			for (int32 i = 0; i < 6; i++) { Cov[i] *= Scale; }
+			for (int32 i = 0; i < 6; i++)
+			{
+				Cov[i] *= Scale;
+			}
 
 			// Find largest eigenvalue/eigenvector using power iteration (primary axis)
 			// Try different starting vectors in case one aligns with a zero-variance direction
@@ -56,19 +59,28 @@ namespace PCGExMath
 						Cov[0] * V0.X + Cov[3] * V0.Y + Cov[4] * V0.Z,
 						Cov[3] * V0.X + Cov[1] * V0.Y + Cov[5] * V0.Z,
 						Cov[4] * V0.X + Cov[5] * V0.Y + Cov[2] * V0.Z
-					);
+						);
 					// Normalize every 4th iteration to prevent numerical overflow while reducing sqrt calls
-					if ((Iter & 3) == 3) { V0 = V0.GetSafeNormal(); }
+					if ((Iter & 3) == 3)
+					{
+						V0 = V0.GetSafeNormal();
+					}
 				}
 				V0 = V0.GetSafeNormal();
 
 				// If we found a non-zero eigenvector, we're done
-				if (V0.SizeSquared() > KINDA_SMALL_NUMBER) { break; }
+				if (V0.SizeSquared() > KINDA_SMALL_NUMBER)
+				{
+					break;
+				}
 			}
 
 			// Find second eigenvector perpendicular to first
 			FVector V1 = FVector::CrossProduct(V0, FVector::UpVector);
-			if (V1.SizeSquared() < KINDA_SMALL_NUMBER) { V1 = FVector::CrossProduct(V0, FVector::ForwardVector); }
+			if (V1.SizeSquared() < KINDA_SMALL_NUMBER)
+			{
+				V1 = FVector::CrossProduct(V0, FVector::ForwardVector);
+			}
 			V1 = V1.GetSafeNormal();
 
 			// Store initial perpendicular vector - needed if this direction has zero variance
@@ -80,7 +92,7 @@ namespace PCGExMath
 					Cov[0] * V1.X + Cov[3] * V1.Y + Cov[4] * V1.Z,
 					Cov[3] * V1.X + Cov[1] * V1.Y + Cov[5] * V1.Z,
 					Cov[4] * V1.X + Cov[5] * V1.Y + Cov[2] * V1.Z
-				);
+					);
 				Temp = Temp - FVector::DotProduct(Temp, V0) * V0; // Gram-Schmidt
 
 				// If covariance sends V1 to near-zero, this direction has zero variance
@@ -93,7 +105,10 @@ namespace PCGExMath
 
 				V1 = Temp;
 				// Normalize every 4th iteration
-				if ((Iter & 3) == 3) { V1 = V1.GetSafeNormal(); }
+				if ((Iter & 3) == 3)
+				{
+					V1 = V1.GetSafeNormal();
+				}
 			}
 			V1 = V1.GetSafeNormal(); // Final normalization
 
@@ -109,7 +124,7 @@ namespace PCGExMath
 					Cov[0] * V.X + Cov[3] * V.Y + Cov[4] * V.Z,
 					Cov[3] * V.X + Cov[1] * V.Y + Cov[5] * V.Z,
 					Cov[4] * V.X + Cov[5] * V.Y + Cov[2] * V.Z
-				);
+					);
 				Variance[AxisIdx] = FVector::DotProduct(V, Temp);
 			}
 
@@ -119,7 +134,10 @@ namespace PCGExMath
 			OutSwizzle[2] = 2;
 			Algo::Sort(TArrayView<int32>(OutSwizzle, 3), [&](const int32 A, const int32 B)
 			{
-				if (Variance[A] != Variance[B]) { return Variance[A] > Variance[B]; }
+				if (Variance[A] != Variance[B])
+				{
+					return Variance[A] > Variance[B];
+				}
 				return A < B; // Tie-breaker by index for determinism
 			});
 
@@ -132,7 +150,10 @@ namespace PCGExMath
 			Y = FVector::CrossProduct(Z, X);
 
 			// Make Z point upward
-			if (FVector::DotProduct(Z, FVector::UpVector) < 0) { Z *= -1; }
+			if (FVector::DotProduct(Z, FVector::UpVector) < 0)
+			{
+				Z *= -1;
+			}
 
 			// X, Y, Z are already normalized from cross products of unit vectors
 			OutAxis[0] = X;
@@ -140,8 +161,8 @@ namespace PCGExMath
 			OutAxis[2] = Z;
 
 			// Compute extents by projecting all points onto axes
-			FVector MinProj(MAX_dbl, MAX_dbl, MAX_dbl);
-			FVector MaxProj(-MAX_dbl, -MAX_dbl, -MAX_dbl);
+			FVector MinProj(TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
+			FVector MaxProj(TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), -TNumericLimits<double>::Max());
 
 			for (int32 i = 0; i < NumPoints; i++)
 			{
@@ -188,9 +209,12 @@ namespace PCGExMath
 		{
 			BestFitPlaneInternal::ComputePCA(
 				InTransforms.Num(),
-				[&](int32 i) { return InTransforms[i].GetLocation(); },
+				[&](int32 i)
+				{
+					return InTransforms[i].GetLocation();
+				},
 				Centroid, Axis, Extents, Swizzle
-			);
+				);
 		}
 	}
 
@@ -224,9 +248,12 @@ namespace PCGExMath
 		{
 			BestFitPlaneInternal::ComputePCA(
 				InIndices.Num(),
-				[&](int32 i) { return InTransforms[InIndices[i]].GetLocation(); },
+				[&](int32 i)
+				{
+					return InTransforms[InIndices[i]].GetLocation();
+				},
 				Centroid, Axis, Extents, Swizzle
-			);
+				);
 		}
 	}
 
@@ -260,9 +287,12 @@ namespace PCGExMath
 		{
 			BestFitPlaneInternal::ComputePCA(
 				InPositions.Num(),
-				[&](int32 i) { return InPositions[i]; },
+				[&](int32 i)
+				{
+					return InPositions[i];
+				},
 				Centroid, Axis, Extents, Swizzle
-			);
+				);
 		}
 	}
 
@@ -296,9 +326,12 @@ namespace PCGExMath
 		{
 			BestFitPlaneInternal::ComputePCA(
 				InPositions.Num(),
-				[&](int32 i) { return FVector(InPositions[i], 0); },
+				[&](int32 i)
+				{
+					return FVector(InPositions[i], 0);
+				},
 				Centroid, Axis, Extents, Swizzle
-			);
+				);
 		}
 	}
 
@@ -332,9 +365,12 @@ namespace PCGExMath
 		{
 			BestFitPlaneInternal::ComputePCA(
 				NumElements,
-				[&](int32 i) { return GetPointFunc(i); },
+				[&](int32 i)
+				{
+					return GetPointFunc(i);
+				},
 				Centroid, Axis, Extents, Swizzle
-			);
+				);
 		}
 	}
 
@@ -368,9 +404,12 @@ namespace PCGExMath
 		{
 			BestFitPlaneInternal::ComputePCA(
 				NumElements + 1,
-				[&](int32 i) { return i == NumElements ? Extra : GetPointFunc(i); },
+				[&](int32 i)
+				{
+					return i == NumElements ? Extra : GetPointFunc(i);
+				},
 				Centroid, Axis, Extents, Swizzle
-			);
+				);
 		}
 	}
 
@@ -409,7 +448,10 @@ namespace PCGExMath
 		// Sort by extents with index tie-breaker for determinism
 		Algo::Sort(Swizzle, [&](const int32 A, const int32 B)
 		{
-			if (Box.Extents[A] != Box.Extents[B]) { return Box.Extents[A] > Box.Extents[B]; }
+			if (Box.Extents[A] != Box.Extents[B])
+			{
+				return Box.Extents[A] > Box.Extents[B];
+			}
 			return A < B; // Tie-breaker by index for determinism
 		});
 
@@ -427,7 +469,10 @@ namespace PCGExMath
 		Y = FVector::CrossProduct(Z, X);
 
 		// Make sure Z points upward
-		if (FVector::DotProduct(Z, FVector::UpVector) < 0) { Z *= -1; }
+		if (FVector::DotProduct(Z, FVector::UpVector) < 0)
+		{
+			Z *= -1;
+		}
 
 		// Axes are already normalized
 		Axis[0] = X;

@@ -2,13 +2,13 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
-#include "PCGExVersion.h"
 #include "PCGExCommon.h"
+#include "PCGExHeuristicsHandler.h"
+#include "PCGExVersion.h"
 #include "Clusters/PCGExEdgeDirectionDetails.h"
 #include "Core/PCGExContext.h"
 #include "Graphs/PCGExGraphDetails.h"
 #include "Math/PCGExProjectionDetails.h"
-#include "PCGExHeuristicsHandler.h"
 
 #if PCGEX_ENGINE_VERSION > 506
 #include "PCGPointPropertiesTraits.h"
@@ -111,9 +111,15 @@ namespace PCGExClusterMT
 		TWeakPtr<IBatch> ParentBatch;
 
 		template <typename T>
-		T* GetParentBatch() { return static_cast<T*>(ParentBatch.Pin().Get()); }
+		T* GetParentBatch()
+		{
+			return static_cast<T*>(ParentBatch.Pin().Get());
+		}
 
-		TSharedPtr<PCGExMT::FTaskManager> GetTaskManager() { return TaskManager; }
+		TSharedPtr<PCGExMT::FTaskManager> GetTaskManager()
+		{
+			return TaskManager;
+		}
 
 		bool bAllowEdgesDataFacadeScopedGet = false;
 
@@ -144,7 +150,10 @@ namespace PCGExClusterMT
 
 		virtual void RegisterConsumableAttributesWithFacade() const;
 
-		virtual bool IsTrivial() const { return bIsTrivial; }
+		virtual bool IsTrivial() const
+		{
+			return bIsTrivial;
+		}
 
 		void SetWantsHeuristics(const bool bRequired, const TArray<TObjectPtr<const UPCGExHeuristicsFactoryData>>* InHeuristicsFactories, EPCGExHeuristicScoreMode ScoreMode);
 
@@ -213,8 +222,15 @@ namespace PCGExClusterMT
 			Settings = InContext->GetInputSettings<TSettings>();
 		}
 
-		TContext* GetContext() { return Context; }
-		const TSettings* GetSettings() { return Settings; }
+		TContext* GetContext()
+		{
+			return Context;
+		}
+
+		const TSettings* GetSettings()
+		{
+			return Settings;
+		}
 	};
 
 	class PCGEXGRAPHS_API IBatch : public TSharedFromThis<IBatch>
@@ -246,7 +262,11 @@ namespace PCGExClusterMT
 
 	public:
 		TArray<TSharedRef<IProcessor>> Processors;
-		int32 GetNumProcessors() const { return Processors.Num(); }
+
+		int32 GetNumProcessors() const
+		{
+			return Processors.Num();
+		}
 
 		bool bIsBatchValid = true;
 		FPCGExContext* ExecutionContext = nullptr;
@@ -277,10 +297,25 @@ namespace PCGExClusterMT
 		bool DefaultVtxFilterValue = true;
 		TSharedPtr<TArray<int8>> VtxFilterCache;
 
-		bool PreparationSuccessful() const { return bPreparationSuccessful; }
-		bool RequiresGraphBuilder() const { return bRequiresGraphBuilder; }
-		bool WantsHeuristics() const { return bWantsHeuristics; }
-		EPCGExHeuristicScoreMode GetHeuristicsScoreMode() const { return HeuristicsScoreMode; }
+		bool PreparationSuccessful() const
+		{
+			return bPreparationSuccessful;
+		}
+
+		bool RequiresGraphBuilder() const
+		{
+			return bRequiresGraphBuilder;
+		}
+
+		bool WantsHeuristics() const
+		{
+			return bWantsHeuristics;
+		}
+
+		EPCGExHeuristicScoreMode GetHeuristicsScoreMode() const
+		{
+			return HeuristicsScoreMode;
+		}
 
 		virtual void SetWantsHeuristics(const bool bRequired, const EPCGExHeuristicScoreMode ScoreMode)
 		{
@@ -299,16 +334,33 @@ namespace PCGExClusterMT
 		virtual void SetExecutionContext(FPCGExContext* InContext);
 
 		template <typename T>
-		T* GetContext() { return static_cast<T*>(ExecutionContext); }
+		T* GetContext()
+		{
+			return static_cast<T*>(ExecutionContext);
+		}
 
 		template <typename T>
-		TSharedPtr<T> GetProcessor(const int32 Index) { return StaticCastSharedPtr<T>(Processors[Index].ToSharedPtr()); }
+		TSharedPtr<T> GetProcessor(const int32 Index)
+		{
+			return StaticCastSharedPtr<T>(Processors[Index].ToSharedPtr());
+		}
 
 		template <typename T>
-		TSharedRef<T> GetProcessorRef(const int32 Index) { return StaticCastSharedRef<T>(Processors[Index]); }
+		TSharedRef<T> GetProcessorRef(const int32 Index)
+		{
+			return StaticCastSharedRef<T>(Processors[Index]);
+		}
 
-		bool WantsProjection() const { return bWantsProjection; }
-		bool WantsPerClusterProjection() const { return bWantsPerClusterProjection; }
+		bool WantsProjection() const
+		{
+			return bWantsProjection;
+		}
+
+		bool WantsPerClusterProjection() const
+		{
+			return bWantsPerClusterProjection;
+		}
+
 		virtual void SetProjectionDetails(const FPCGExGeo2DProjectionDetails& InProjectionDetails);
 
 		virtual void PrepareProcessing(const TSharedPtr<PCGExMT::FTaskManager> TaskManagerPtr, const bool bScopedIndexLookupBuild);

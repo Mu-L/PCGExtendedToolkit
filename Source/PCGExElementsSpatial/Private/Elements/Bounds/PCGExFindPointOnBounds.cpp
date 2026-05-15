@@ -5,8 +5,8 @@
 
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Math/PCGExBestFitPlane.h"
 #include "Helpers/PCGExBlendingHelpers.h"
+#include "Math/PCGExBestFitPlane.h"
 #include "Types/PCGExAttributeIdentity.h"
 
 
@@ -20,7 +20,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(FindPointOnBounds)
 
 bool FPCGExFindPointOnBoundsElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FindPointOnBounds)
 
@@ -61,7 +64,10 @@ bool FPCGExFindPointOnBoundsElement::AdvanceWork(FPCGExContext* InContext, const
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				//NewBatch->bRequiresWriteStep = true;
@@ -98,7 +104,10 @@ namespace PCGExFindPointOnBounds
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExFindPointOnBounds::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		FBox Bounds = FBox(ForceInit);
 		FVector UVW = Settings->GetValueSettingUVW(Context, PointDataFacade->GetIn())->Read(0);
@@ -135,13 +144,19 @@ namespace PCGExFindPointOnBounds
 
 			{
 				FWriteScopeLock WriteLock(BestIndexLock);
-				if (Dist > BestDistance) { continue; }
+				if (Dist > BestDistance)
+				{
+					continue;
+				}
 			}
 
 			{
 				FWriteScopeLock WriteLock(BestIndexLock);
 
-				if (Dist > BestDistance) { continue; }
+				if (Dist > BestDistance)
+				{
+					continue;
+				}
 
 				BestPosition = InTransforms[Index].GetLocation();
 				BestIndex = Index;

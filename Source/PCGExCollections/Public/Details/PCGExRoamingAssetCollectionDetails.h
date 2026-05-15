@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCollectionsCommon.h"
-#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "PCGExRoamingAssetCollectionDetails.generated.h"
 
 class UPCGExBitmaskCollection;

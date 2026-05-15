@@ -121,7 +121,10 @@ void UPCGExCustomActorDataPacker::PreloadObjectPaths(const FName& InAttributeNam
 		if (TSharedPtr<PCGExData::TArrayBuffer<FString>> Buffer = ReadBuffers->GetBuffer<FString>(InAttributeName))
 		{
 			const TArray<FString>& Values = *Buffer->GetInValues().Get();
-			for (const FString& V : Values) { RequiredAssetsPaths.Add(FSoftObjectPath(V)); }
+			for (const FString& V : Values)
+			{
+				RequiredAssetsPaths.Add(FSoftObjectPath(V));
+			}
 		}
 	}
 
@@ -130,7 +133,10 @@ void UPCGExCustomActorDataPacker::PreloadObjectPaths(const FName& InAttributeNam
 		if (TSharedPtr<PCGExData::TArrayBuffer<FSoftObjectPath>> Buffer = ReadBuffers->GetBuffer<FSoftObjectPath>(InAttributeName))
 		{
 			const TArray<FSoftObjectPath>& Values = *Buffer->GetInValues().Get();
-			for (const FSoftObjectPath& V : Values) { RequiredAssetsPaths.Add(V); }
+			for (const FSoftObjectPath& V : Values)
+			{
+				RequiredAssetsPaths.Add(V);
+			}
 		}
 	}
 }
@@ -220,7 +226,10 @@ FName UPCGExPackActorDataSettings::GetMainInputPin() const
 
 bool FPCGExPackActorDataElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PackActorData)
 
@@ -249,7 +258,10 @@ bool FPCGExPackActorDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->PrimaryInstancedFactory = Context->Packer;
@@ -286,7 +298,10 @@ namespace PCGExPackActorData
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPackActorData::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
@@ -316,12 +331,18 @@ namespace PCGExPackActorData
 		{
 			AActor* ActorRef = Cast<AActor>(ActorReferences->Values[i].ResolveObject());
 			Packer->InputActors[i] = ActorRef;
-			if (ActorRef) { UniqueActors.Add(ActorRef); }
+			if (ActorRef)
+			{
+				UniqueActors.Add(ActorRef);
+			}
 		}
 
 		if (Settings->bTrackActors)
 		{
-			for (AActor* ActorRef : UniqueActors) { Context->EDITOR_TrackPath(ActorRef); }
+			for (AActor* ActorRef : UniqueActors)
+			{
+				Context->EDITOR_TrackPath(ActorRef);
+			}
 		}
 
 		bool bSuccess = false;
@@ -436,7 +457,10 @@ namespace PCGExPackActorData
 		Attributes.Reserve(PointDataFacade->Buffers.Num());
 		for (const TSharedPtr<PCGExData::IBuffer>& Buffer : PointDataFacade->Buffers)
 		{
-			if (!Buffer->IsWritable()) { continue; }
+			if (!Buffer->IsWritable())
+			{
+				continue;
+			}
 			Attributes.Add(Buffer->OutAttribute);
 		}
 
@@ -445,7 +469,10 @@ namespace PCGExPackActorData
 
 	void FProcessor::Write()
 	{
-		if (Settings->bOmitUnresolvedEntries) { (void)PointDataFacade->Source->Gather(PointMask); }
+		if (Settings->bOmitUnresolvedEntries)
+		{
+			(void)PointDataFacade->Source->Gather(PointMask);
+		}
 
 		/*
 		UPCGParamData* ParamData = Context->ManagedObjects->New<UPCGParamData>();

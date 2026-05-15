@@ -41,10 +41,18 @@ namespace PCGExClusters
 	public:
 		static inline const FName CacheKey = FName("FaceEnumerator");
 
-		virtual FName GetCacheKey() const override { return CacheKey; }
+		virtual FName GetCacheKey() const override
+		{
+			return CacheKey;
+		}
+
 		virtual FText GetDisplayName() const override;
 		virtual FText GetTooltip() const override;
-		virtual EClusterCacheType GetCacheType() const override { return EClusterCacheType::PreBuild; }
+
+		virtual EClusterCacheType GetCacheType() const override
+		{
+			return EClusterCacheType::PreBuild;
+		}
 
 		virtual TSharedPtr<ICachedClusterData> Build(const FClusterCacheBuildContext& Context) const override;
 

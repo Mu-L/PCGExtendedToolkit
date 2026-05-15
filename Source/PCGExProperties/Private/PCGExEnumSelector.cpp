@@ -5,12 +5,18 @@
 
 FText FPCGExEnumSelector::GetDisplayName() const
 {
-	if (!Class) { return FText::GetEmpty(); }
+	if (!Class)
+	{
+		return FText::GetEmpty();
+	}
 	return Class->GetDisplayNameTextByValue(Value);
 }
 
 FString FPCGExEnumSelector::GetCultureInvariantDisplayName() const
 {
-	if (!Class) { return FString(); }
+	if (!Class)
+	{
+		return FString();
+	}
 	return Class->GetDisplayNameTextByValue(Value).BuildSourceString();
 }

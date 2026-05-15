@@ -58,7 +58,10 @@ int32 FPCGExSpatialDomain_Polygon2D::Append(const FPCGExFootprintShape& Shape, i
 void FPCGExSpatialDomain_Polygon2D::RecomputeBounds()
 {
 	Bounds2D = FBox2D(ForceInit);
-	for (const FVector2D& V : Outline) { Bounds2D += V; }
+	for (const FVector2D& V : Outline)
+	{
+		Bounds2D += V;
+	}
 
 	WorldBounds = PCGExMath::Geo::ProjectPrismToWorldAABB(
 		Outline, ZMin, ZMax, FVector::ZeroVector, ProjectionQuat);

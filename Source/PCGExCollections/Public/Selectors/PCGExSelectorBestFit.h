@@ -4,11 +4,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Details/PCGExInputShorthandsDetails.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
-#include "Selectors/PCGExEntryPickerOperation.h"
-#include "Selectors/PCGExSelectorSharedData.h"
 #include "Data/PCGBasePointData.h"
+#include "Details/PCGExInputShorthandsDetails.h"
+#include "Selectors/PCGExEntryPickerOperation.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorHelpers.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 
 #include "PCGExSelectorBestFit.generated.h"
 
@@ -46,133 +47,18 @@ enum class EPCGExAxisMask : uint8
 	Y    = 1 << 1,
 	Z    = 1 << 2,
 };
+
 ENUM_CLASS_FLAGS(EPCGExAxisMask)
 
 /**
- * Collection-derived state for Best Fit. Built once per (Factory, Category) via the factory's
- * BuildSharedData override; reused across facades via FSelectorSharedDataCache.
+ * Selector-specific configuration for Best Fit. Shared verbatim between the palette node
+ * settings (EditAnywhere, drives the UI) and the FactoryData (UPROPERTY for serialization).
+ * Eliminates the field-by-field copy in CreateFactory.
  */
-class FPCGExBestFitSharedData : public PCGExCollections::FSelectorSharedData
-{
-public:
-	TArray<FVector> EntryExtents;
-	TArray<FVector> EntryExtentsMaxNorm;   // max-component normalized, for AspectRatio
-	TArray<double> EntryVolumes;
-	TArray<double> EntryWeights;
-	TArray<int32> ValidEntryIndices;       // entries with Volume > UE_DOUBLE_SMALL_NUMBER
-};
-
-/**
- * Shared base for Best Fit picker operations. Caches the per-point extent source at Init,
- * scores all valid entries per point, and produces a pool for the concrete subclass to weighted-pick from.
- *
- * Concrete subclasses differ only in pool selection (TopK vs Tolerance). Scoring is uniform across them.
- */
-class FPCGExEntryBestFitPickerOpBase : public FPCGExEntryPickerOperation
-{
-public:
-	// Copied from factory before PrepareForData. Used in the hot path (ComputeScore).
-	EPCGExBestFitMetric Metric = EPCGExBestFitMetric::ClosestVolume;
-	uint8 AxisMask = static_cast<uint8>(EPCGExAxisMask::X) | static_cast<uint8>(EPCGExAxisMask::Y) | static_cast<uint8>(EPCGExAxisMask::Z);
-	EPCGExBestFitAxisAggregation AxisAggregation = EPCGExBestFitAxisAggregation::Sum;
-	double VolumeInfluence = 0.0;
-	bool bApplyPointScale = false;
-	// Resolved by the factory — holds whichever of TopK/Tolerance applies to the chosen strategy.
-	FPCGExInputShorthandSelectorDouble PoolSize;
-
-	// Typed view of SharedData. Resolved once in PrepareForData; hot path reads through this.
-	TSharedPtr<FPCGExBestFitSharedData> Shared;
-
-	// Per-point extent sources — cached at PrepareForData, read directly in the hot path.
-	TConstPCGValueRange<FVector> BoundsMinRange;
-	TConstPCGValueRange<FVector> BoundsMaxRange;
-	TConstPCGValueRange<FTransform> TransformRange;
-
-	// Per-point pool size driver.
-	TSharedPtr<PCGExDetails::TSettingValue<double>> PoolSizeGetter;
-
-	virtual bool PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection) override;
-	virtual int32 Pick(int32 PointIndex, int32 Seed) const override = 0;
-
-protected:
-	/** Resolve the point's extent (half-size) from its bounds data; optionally apply transform scale. */
-	FVector GetPointExtents(int32 PointIndex) const;
-
-	/** Score a single entry against the given point extents. Lower is better. */
-	double ComputeScore(const FVector& PointExtents, int32 EntryIndex) const;
-};
-
-/** Pool = K best-scoring entries; weighted random among the pool. */
-class FPCGExEntryBestFitTopKPickerOp : public FPCGExEntryBestFitPickerOpBase
-{
-public:
-	virtual int32 Pick(int32 PointIndex, int32 Seed) const override;
-};
-
-/** Pool = entries within tolerance * best_score of the best score; weighted random among the pool. */
-class FPCGExEntryBestFitTolerancePickerOp : public FPCGExEntryBestFitPickerOpBase
-{
-public:
-	virtual int32 Pick(int32 PointIndex, int32 Seed) const override;
-};
-
-/**
- * Factory data for Best Fit selection. Scores all entries in the target category against the
- * per-point extent, builds a pool per PoolStrategy, and weighted-random picks from it.
- */
-UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Data")
-class PCGEXCOLLECTIONS_API UPCGExSelectorBestFitFactoryData : public UPCGExSelectorFactoryData
+USTRUCT(BlueprintType)
+struct PCGEXCOLLECTIONS_API FPCGExSelectorBestFitConfig
 {
 	GENERATED_BODY()
-
-public:
-	UPROPERTY()
-	EPCGExBestFitMetric Metric = EPCGExBestFitMetric::ClosestVolume;
-
-	UPROPERTY()
-	uint8 AxisMask = 7;
-
-	UPROPERTY()
-	EPCGExBestFitAxisAggregation AxisAggregation = EPCGExBestFitAxisAggregation::Sum;
-
-	UPROPERTY()
-	double VolumeInfluence = 0.0;
-
-	UPROPERTY()
-	bool bApplyPointScale = false;
-
-	UPROPERTY()
-	EPCGExBestFitPoolStrategy PoolStrategy = EPCGExBestFitPoolStrategy::TopK;
-
-	UPROPERTY()
-	FPCGExInputShorthandSelectorDouble TopK = FPCGExInputShorthandSelectorDouble(NAME_None, 3.0, false);
-
-	UPROPERTY()
-	FPCGExInputShorthandSelectorDouble Tolerance = FPCGExInputShorthandSelectorDouble(NAME_None, 0.1, false);
-
-	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const override;
-	virtual TSharedPtr<PCGExCollections::FSelectorSharedData> BuildSharedData(
-		const UPCGExAssetCollection* Collection,
-		const PCGExAssetCollection::FCategory* Target) const override;
-};
-
-/**
- * Palette node: "Selector : Best Fit".
- */
-UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-best-fit"))
-class PCGEXCOLLECTIONS_API UPCGExSelectorBestFitFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
-{
-	GENERATED_BODY()
-
-public:
-	//~Begin UPCGSettings
-#if WITH_EDITOR
-	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(
-		SelectorBestFit, "Selector : Best Fit",
-		"Pick entries whose bounds extents best match the per-point extent. Three metrics (volume / per-axis / aspect-ratio) with configurable pool strategy.",
-		FName(GetDisplayName()))
-#endif
-	//~End UPCGSettings
 
 	/** How entry extents score against the point's extent. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -205,6 +91,115 @@ public:
 	/** Tolerance ratio. Pool = entries with score ≤ best * (1 + Tolerance). 0 = exact-tie only. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="PoolStrategy == EPCGExBestFitPoolStrategy::Tolerance", EditConditionHides))
 	FPCGExInputShorthandSelectorDouble Tolerance = FPCGExInputShorthandSelectorDouble(NAME_None, 0.1, false);
+};
+
+/**
+ * Collection-derived state for Best Fit. Built once per (Factory, Category) via the factory's
+ * BuildSharedData override; reused across facades via FSelectorSharedDataCache.
+ */
+class FPCGExBestFitSharedData : public PCGExCollections::FSelectorSharedData
+{
+public:
+	TArray<FVector> EntryExtents;
+	TArray<FVector> EntryExtentsMaxNorm; // max-component normalized, for AspectRatio
+	TArray<double> EntryVolumes;
+	TArray<double> EntryWeights;
+	TArray<int32> ValidEntryIndices; // entries with Volume > UE_DOUBLE_SMALL_NUMBER
+};
+
+/**
+ * Shared base for Best Fit picker operations. Caches the per-point extent source at Init,
+ * scores all valid entries per point, and produces a pool for the concrete subclass to weighted-pick from.
+ *
+ * Concrete subclasses differ only in pool selection (TopK vs Tolerance). Scoring is uniform across them.
+ */
+class FPCGExEntryBestFitPickerOpBase : public PCGExCollections::Selectors::TTypedSharedPickerOpBase<FPCGExBestFitSharedData>
+{
+public:
+	// Copied from factory before PrepareForData. Used in the hot path (ComputeScore).
+	EPCGExBestFitMetric Metric = EPCGExBestFitMetric::ClosestVolume;
+	uint8 AxisMask = static_cast<uint8>(EPCGExAxisMask::X) | static_cast<uint8>(EPCGExAxisMask::Y) | static_cast<uint8>(EPCGExAxisMask::Z);
+	EPCGExBestFitAxisAggregation AxisAggregation = EPCGExBestFitAxisAggregation::Sum;
+	double VolumeInfluence = 0.0;
+	bool bApplyPointScale = false;
+	// Resolved by the factory -- holds whichever of TopK/Tolerance applies to the chosen strategy.
+	FPCGExInputShorthandSelectorDouble PoolSize;
+
+	// Per-point extent sources -- cached at PrepareForData, read directly in the hot path.
+	TConstPCGValueRange<FVector> BoundsMinRange;
+	TConstPCGValueRange<FVector> BoundsMaxRange;
+	TConstPCGValueRange<FTransform> TransformRange;
+
+	// Per-point pool size driver.
+	TSharedPtr<PCGExDetails::TSettingValue<double>> PoolSizeGetter;
+
+	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override = 0;
+
+protected:
+	virtual void OnSharedDataMissing(FPCGExContext* InContext) const override;
+	virtual bool OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade) override;
+
+	/** Resolve the point's extent (half-size) from its bounds data; optionally apply transform scale. */
+	FVector GetPointExtents(int32 PointIndex) const;
+
+	/** Score a single entry against the given point extents. Lower is better. */
+	double ComputeScore(const FVector& PointExtents, int32 EntryIndex) const;
+};
+
+/** Pool = K best-scoring entries; weighted random among the pool. */
+class FPCGExEntryBestFitTopKPickerOp : public FPCGExEntryBestFitPickerOpBase
+{
+public:
+	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+};
+
+/** Pool = entries within tolerance * best_score of the best score; weighted random among the pool. */
+class FPCGExEntryBestFitTolerancePickerOp : public FPCGExEntryBestFitPickerOpBase
+{
+public:
+	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+};
+
+/**
+ * Factory data for Best Fit selection. Scores all entries in the target category against the
+ * per-point extent, builds a pool per PoolStrategy, and weighted-random picks from it.
+ */
+UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Data")
+class PCGEXCOLLECTIONS_API UPCGExSelectorBestFitFactoryData : public UPCGExSelectorFactoryData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	FPCGExSelectorBestFitConfig Config;
+
+	virtual TSharedPtr<FPCGExEntryPickerOperation> CreateEntryOperation(FPCGExContext* InContext) const override;
+	virtual TSharedPtr<PCGExCollections::FSelectorSharedData> BuildSharedData(
+		const UPCGExAssetCollection* Collection,
+		const PCGExAssetCollection::FCategory* Target) const override;
+};
+
+/**
+ * Palette node: "Selector : Best Fit".
+ */
+UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-best-fit"))
+class PCGEXCOLLECTIONS_API UPCGExSelectorBestFitFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
+{
+	GENERATED_BODY()
+
+public:
+	//~Begin UPCGSettings
+#if WITH_EDITOR
+	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(
+		SelectorBestFit, "Selector : Best Fit",
+		"Pick entries whose bounds extents best match the per-point extent. Three metrics (volume / per-axis / aspect-ratio) with configurable pool strategy.",
+		FName(GetDisplayName()))
+#endif
+	//~End UPCGSettings
+
+	/** Selector-specific configuration. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
+	FPCGExSelectorBestFitConfig Config;
 
 	/** Shared distribution configuration (seed, entry distribution, categories). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))

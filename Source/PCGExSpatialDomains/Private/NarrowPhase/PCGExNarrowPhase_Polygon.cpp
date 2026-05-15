@@ -1,11 +1,11 @@
 // Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
-#include "NarrowPhase/PCGExNarrowPhaseRegistrations.h"
-#include "NarrowPhase/PCGExNarrowPhase.h"
-#include "Shapes/PCGExFootprintShape.h"
-#include "Math/OBB/PCGExOBB.h"
 #include "Math/Geo/PCGExGeo.h"
+#include "Math/OBB/PCGExOBB.h"
+#include "NarrowPhase/PCGExNarrowPhase.h"
+#include "NarrowPhase/PCGExNarrowPhaseRegistrations.h"
+#include "Shapes/PCGExFootprintShape.h"
 
 namespace PCGExSpatial::NarrowPhase
 {
@@ -20,7 +20,7 @@ namespace PCGExSpatial::NarrowPhase
 		 */
 		bool OBBvsPolygon_Overlap(const FPCGExFootprintShape& A, const FPCGExFootprintShape& B)
 		{
-			const auto& OBB     = static_cast<const FPCGExFootprintShape_OBB&>(A);
+			const auto& OBB = static_cast<const FPCGExFootprintShape_OBB&>(A);
 			const auto& Polygon = static_cast<const FPCGExFootprintShape_Polygon&>(B);
 			const FPCGExSpatialPolygonEntry& Entry = Polygon.Entry;
 
@@ -30,7 +30,10 @@ namespace PCGExSpatial::NarrowPhase
 				OBB.Bounds, Entry.WorldOrigin, Entry.ProjectionQuat,
 				Shadow, ShadowZMin, ShadowZMax);
 
-			if (ShadowZMax < Entry.ZMin || ShadowZMin > Entry.ZMax) { return false; }
+			if (ShadowZMax < Entry.ZMin || ShadowZMin > Entry.ZMax)
+			{
+				return false;
+			}
 			return PCGExMath::Geo::PolygonsOverlap2D(Entry.Outline, Shadow);
 		}
 
@@ -44,7 +47,7 @@ namespace PCGExSpatial::NarrowPhase
 			const auto& PolyA = static_cast<const FPCGExFootprintShape_Polygon&>(A);
 			const auto& PolyB = static_cast<const FPCGExFootprintShape_Polygon&>(B);
 			const FPCGExSpatialPolygonEntry& Candidate = PolyA.Entry;
-			const FPCGExSpatialPolygonEntry& Stored    = PolyB.Entry;
+			const FPCGExSpatialPolygonEntry& Stored = PolyB.Entry;
 
 			// Inline storage sized for typical floor-plan outlines; falls back
 			// to heap on overflow. Avoids per-call allocation in the hot path.
@@ -56,7 +59,10 @@ namespace PCGExSpatial::NarrowPhase
 				Stored.WorldOrigin, Stored.ProjectionQuat,
 				CandidateInStored, CandidateZMin, CandidateZMax);
 
-			if (CandidateZMax < Stored.ZMin || CandidateZMin > Stored.ZMax) { return false; }
+			if (CandidateZMax < Stored.ZMin || CandidateZMin > Stored.ZMax)
+			{
+				return false;
+			}
 			return PCGExMath::Geo::PolygonsOverlap2D(Stored.Outline, CandidateInStored);
 		}
 
@@ -104,13 +110,13 @@ namespace PCGExSpatial::NarrowPhase
 		Register(
 			FPCGExFootprintShape_OBB::StaticStruct(),
 			FPCGExFootprintShape_Polygon::StaticStruct(),
-			{ &OBBvsPolygon_Overlap, /*Penetration*/ nullptr });
+			{&OBBvsPolygon_Overlap, /*Penetration*/ nullptr});
 
 		// Polygon-vs-Polygon. Same Penetration story as above.
 		Register(
 			FPCGExFootprintShape_Polygon::StaticStruct(),
 			FPCGExFootprintShape_Polygon::StaticStruct(),
-			{ &PolygonVsPolygon_Overlap, /*Penetration*/ nullptr });
+			{&PolygonVsPolygon_Overlap, /*Penetration*/ nullptr});
 
 		RegisterQueryPoint(
 			FPCGExFootprintShape_Polygon::StaticStruct(),

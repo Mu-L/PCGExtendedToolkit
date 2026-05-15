@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Clusters/Artifacts/PCGExCachedFaceEnumerator.h"
-#include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
 #include "Clusters/PCGExCluster.h"
+#include "Clusters/Artifacts/PCGExPlanarFaceEnumerator.h"
 #include "Math/PCGExProjectionDetails.h"
 
 #define LOCTEXT_NAMESPACE "PCGExCachedFaceEnumerator"
@@ -56,7 +56,10 @@ namespace PCGExClusters
 		uint32 Hash = GetTypeHash(Projection.Method);
 
 		// LocalTangent: topology is fully determined by cluster geometry, no projection params to hash
-		if (Projection.Method == EPCGExProjectionMethod::LocalTangent) { return Hash; }
+		if (Projection.Method == EPCGExProjectionMethod::LocalTangent)
+		{
+			return Hash;
+		}
 
 		Hash = HashCombine(Hash, GetTypeHash(Projection.Normal.X));
 		Hash = HashCombine(Hash, GetTypeHash(Projection.Normal.Y));

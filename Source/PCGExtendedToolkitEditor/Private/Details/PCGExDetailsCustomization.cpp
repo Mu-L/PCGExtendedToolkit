@@ -89,6 +89,7 @@ namespace PCGExDetailsCustomization
 
 		PCGEX_ADD_ACTION_ICON(AddContentBrowserSelection, AIS_Med)
 		PCGEX_ADD_ACTION_ICON(NormalizeWeight, AIS_Med)
+		PCGEX_ADD_ACTION_ICON(Grammit, AIS_Med)
 
 		PCGEX_ADD_ACTION_ICON(Entries, AIS_Med)
 		PCGEX_ADD_ACTION_ICON(Settings, AIS_Med)
@@ -130,6 +131,11 @@ namespace PCGExDetailsCustomization
 		PCGEX_ADD_ACTION_ICON(SnapOffset, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(SnapResult, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(Snap, AIS_Small)
+
+		PCGEX_ADD_ACTION_ICON(ClosedClosed, AIS_Small)
+		PCGEX_ADD_ACTION_ICON(ClosedOpen, AIS_Small)
+		PCGEX_ADD_ACTION_ICON(OpenClosed, AIS_Small)
+		PCGEX_ADD_ACTION_ICON(OpenOpen, AIS_Small)
 
 		PCGEX_ADD_ACTION_ICON(Round, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(Floor, AIS_Small)

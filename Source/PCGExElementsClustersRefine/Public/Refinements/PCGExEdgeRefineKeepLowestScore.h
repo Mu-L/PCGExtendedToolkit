@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExEdgeRefineOperation.h"
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExEdgeRefineOperation.h"
 #include "PCGExEdgeRefineKeepLowestScore.generated.h"
 
 class UPCGExHeuristicLocalDistance;
@@ -29,9 +29,20 @@ class UPCGExEdgeKeepLowestScore : public UPCGExEdgeRefineInstancedFactory
 	GENERATED_BODY()
 
 public:
-	virtual bool GetDefaultEdgeValidity() const override { return false; }
-	virtual bool WantsHeuristics() const override { return true; }
-	virtual bool WantsIndividualNodeProcessing() const override { return true; }
+	virtual bool GetDefaultEdgeValidity() const override
+	{
+		return false;
+	}
+
+	virtual bool WantsHeuristics() const override
+	{
+		return true;
+	}
+
+	virtual bool WantsIndividualNodeProcessing() const override
+	{
+		return true;
+	}
 
 	PCGEX_CREATE_REFINE_OPERATION(EdgeKeepLowestScore, {})
 };

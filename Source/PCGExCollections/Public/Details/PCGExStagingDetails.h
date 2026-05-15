@@ -78,7 +78,10 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetTaggingDetails : public FPCGExComponentTa
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, Bitmask, BitmaskEnum="/Script/PCGExCollections.EPCGExAssetTagInheritance"))
 	uint8 GrabTags = static_cast<uint8>(EPCGExAssetTagInheritance::Asset);
 
-	bool IsEnabled() const { return GrabTags != 0; }
+	bool IsEnabled() const
+	{
+		return GrabTags != 0;
+	}
 };
 
 /**
@@ -96,15 +99,15 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetDistributionDetails
 	FPCGExAssetDistributionDetails() = default;
 
 	/** If enabled, will limit pick to entries flagged with a specific category. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bUseCategories = false;
 
 	/** Category name source (constant or per-point attribute). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, EditCondition="bUseCategories"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bUseCategories"))
 	FPCGExInputShorthandNameName Category = FPCGExInputShorthandNameName(FName("Category"), FName("MyCategory"), false);
 
 	/** What to do when a point's Category attribute does not match any named category in the collection. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Category", meta=(PCG_Overridable, EditCondition="bUseCategories"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName = " └─ Missing Category Behavior", EditCondition="bUseCategories", HideEditConditionToggle))
 	EPCGExMissingCategoryBehavior MissingCategoryBehavior = EPCGExMissingCategoryBehavior::Skip;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, Bitmask, BitmaskEnum="/Script/PCGExCore.EPCGExSeedComponents"))

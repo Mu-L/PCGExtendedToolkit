@@ -11,7 +11,10 @@
 
 bool FPCGExTensorPathFlow::Init(FPCGExContext* InContext, const UPCGExTensorFactoryData* InFactory)
 {
-	if (!PCGExTensorOperation::Init(InContext, InFactory)) { return false; }
+	if (!PCGExTensorOperation::Init(InContext, InFactory))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -24,7 +27,10 @@ PCGExTensor::FTensorSample FPCGExTensorPathFlow::Sample(const int32 InSeedIndex,
 	{
 		FTransform T = FTransform::Identity;
 		PCGExTensor::FEffectorMetrics Metrics;
-		if (!ComputeFactor(InPosition, *Spline.Get(), Config.Radius, T, Metrics)) { continue; }
+		if (!ComputeFactor(InPosition, *Spline.Get(), Config.Radius, T, Metrics))
+		{
+			continue;
+		}
 
 		Samples.Emplace_GetRef(FRotationMatrix::MakeFromX(PCGExMath::GetDirection(T.GetRotation(), Config.SplineDirection)).ToQuat().RotateVector(Metrics.Guide), Metrics.Potency, Metrics.Weight);
 	}

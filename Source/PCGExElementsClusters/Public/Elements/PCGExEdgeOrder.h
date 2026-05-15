@@ -12,7 +12,7 @@
 
 namespace PCGExMT
 {
-	template<typename T>
+	template <typename T>
 	class TScopedArray;
 }
 
@@ -32,15 +32,27 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(EdgeOrder, "Cluster : Edge Order", "Fix an order for edge start & end endpoints.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(ClusterGenerator); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+	}
 #endif
 
-	virtual bool SupportsEdgeSorting() const override { return Mode == EPCGExEdgeOrderMode::DirectionSettings && DirectionSettings.RequiresSortingRules(); }
+	virtual bool SupportsEdgeSorting() const override
+	{
+		return Mode == EPCGExEdgeOrderMode::DirectionSettings && DirectionSettings.RequiresSortingRules();
+	}
+
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
 
 protected:
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings

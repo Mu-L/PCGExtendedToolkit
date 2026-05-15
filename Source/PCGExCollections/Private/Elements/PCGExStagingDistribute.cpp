@@ -13,19 +13,19 @@
 #include "PCGExLog.h"
 #include "PCGGraph.h"
 #include "PCGParamData.h"
-#include "Core/PCGExAssetCollection.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Containers/PCGExScopedContainers.h"
+#include "Core/PCGExAssetCollection.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Selectors/PCGExSelectorFactoryProvider.h"
-#include "Selectors/PCGExSelectorSharedData.h"
 #include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExAssetLoader.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Helpers/PCGExSocketHelpers.h"
 #include "Selectors/PCGExSelectorClassic.h"
+#include "Selectors/PCGExSelectorFactoryProvider.h"
+#include "Selectors/PCGExSelectorSharedData.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExAssetStagingElement"
@@ -57,14 +57,20 @@ void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedE
 
 bool UPCGExAssetStagingSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode != EPCGExSelectorMode::External) { return false; }
+	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode != EPCGExSelectorMode::External)
+	{
+		return false;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
 PCGExData::EIOInit UPCGExAssetStagingSettings::GetMainDataInitializationPolicy() const
 {
 	// Forward is more efficient but we need Duplicate when pruning since we'll remove points
-	if (StealData == EPCGExOptionState::Enabled && !bPruneEmptyPoints) { return PCGExData::EIOInit::Forward; }
+	if (StealData == EPCGExOptionState::Enabled && !bPruneEmptyPoints)
+	{
+		return PCGExData::EIOInit::Forward;
+	}
 	return PCGExData::EIOInit::Duplicate;
 }
 
@@ -130,12 +136,15 @@ void FPCGExAssetStagingContext::RegisterAssetDependencies()
 
 bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
-
 	PCGEX_CONTEXT_AND_SETTINGS(AssetStaging)
 
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
+
 	Context->OutputMode = Settings->OutputMode;
-	
+
 	if (Settings->bOutputMaterialPicks)
 	{
 		PCGEX_VALIDATE_NAME(Settings->MaterialAttributePrefix)
@@ -228,7 +237,10 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	if (Settings->bDoOutputSockets)
 	{
 		PCGEX_FWD(OutputSocketDetails)
-		if (!Context->OutputSocketDetails.Init(Context)) { return false; }
+		if (!Context->OutputSocketDetails.Init(Context))
+		{
+			return false;
+		}
 
 		Context->SocketsCollection = MakeShared<PCGExData::FPointIOCollection>(Context);
 		Context->SocketsCollection->OutputPin = PCGExStaging::Labels::OutputSocketLabel;
@@ -244,7 +256,10 @@ FString UPCGExAssetStagingSettings::GetDisplayName() const
 	switch (CollectionSource)
 	{
 	case EPCGExCollectionSource::Asset:
-		if (!AssetCollection.IsNull()) { DisplayName = AssetCollection.GetAssetName(); }
+		if (!AssetCollection.IsNull())
+		{
+			DisplayName = AssetCollection.GetAssetName();
+		}
 		break;
 	case EPCGExCollectionSource::AttributeSet:
 		DisplayName = TEXT("Set");
@@ -314,7 +329,10 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		else
 		{
 			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+				{
+					return true;
+				},
 				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 				{
 					NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
@@ -338,7 +356,10 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		}
 
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -362,7 +383,10 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 		OutData.Data = OutputSet;
 	}
 
-	if (Context->SocketsCollection) { Context->SocketsCollection->StageOutputs(); }
+	if (Context->SocketsCollection)
+	{
+		Context->SocketsCollection->StageOutputs();
+	}
 
 	return Context->TryComplete();
 }
@@ -379,7 +403,10 @@ namespace PCGExAssetStaging
 
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
@@ -394,7 +421,10 @@ namespace PCGExAssetStaging
 		FittingHandler.ScaleToFit = Settings->ScaleToFit;
 		FittingHandler.Justification = Settings->Justification;
 
-		if (!FittingHandler.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!FittingHandler.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		Variations = Settings->Variations;
 		Variations.Init(Settings->Seed);
@@ -413,10 +443,16 @@ namespace PCGExAssetStaging
 		}
 		else
 		{
-			if (!Source->Init(Context->MainCollection, Context->SelectorFactory)) { return false; }
+			if (!Source->Init(Context->MainCollection, Context->SelectorFactory))
+			{
+				return false;
+			}
 		}
 
-		if (Settings->bDoOutputSockets) { SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, NumPoints); }
+		if (Settings->bDoOutputSockets)
+		{
+			SocketHelper = MakeShared<PCGExCollections::FSocketHelper>(&Context->OutputSocketDetails, NumPoints);
+		}
 
 		bOutputWeight = Settings->WeightToAttribute != EPCGExWeightOutputMode::NoOutput;
 		bNormalizedWeight = Settings->WeightToAttribute != EPCGExWeightOutputMode::Raw;
@@ -467,10 +503,13 @@ namespace PCGExAssetStaging
 
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
-		if (Settings->bPruneEmptyPoints) { Mask.Init(1, PointDataFacade->GetNum()); }
+		if (Settings->bPruneEmptyPoints)
+		{
+			Mask.Init(1, PointDataFacade->GetNum());
+		}
 
 		// Pre-register every collection (and its flat host set) with the packer before going
-		// parallel. GetPickIdx is lock-free and assumes all reachable Hosts are mapped — without
+		// parallel. GetPickIdx is lock-free and assumes all reachable Hosts are mapped -- without
 		// this call, PackToDataset would omit any Host that only surfaces via GetEntry recursion.
 		if (Context->CollectionPickDatasetPacker)
 		{
@@ -479,7 +518,7 @@ namespace PCGExAssetStaging
 
 		// Pre-register + seal the socket helper: Add() in the parallel loop becomes lock-free.
 		// Every leaf entry reachable via FlatHosts gets an FSocketInfos slot upfront (even ones
-		// that never get picked) — the trade-off is memory for contention-free parallel writes.
+		// that never get picked) -- the trade-off is memory for contention-free parallel writes.
 		if (SocketHelper)
 		{
 			Source->RegisterSocketsTo(*SocketHelper);
@@ -518,7 +557,10 @@ namespace PCGExAssetStaging
 		// Otherwise we either mark for pruning or write sentinel values.
 		auto InvalidPoint = [&](const int32 Index)
 		{
-			if (bInherit) { return; } // Keep existing values from upstream staging
+			if (bInherit)
+			{
+				return;
+			} // Keep existing values from upstream staging
 
 			if (Settings->bPruneEmptyPoints)
 			{
@@ -528,16 +570,31 @@ namespace PCGExAssetStaging
 			}
 
 			// Write sentinel values so downstream nodes can detect unstaged points
-			if (PathWriter) { PathWriter->SetValue(Index, FSoftObjectPath{}); }
-			else { HashWriter->SetValue(Index, -1); }
+			if (PathWriter)
+			{
+				PathWriter->SetValue(Index, FSoftObjectPath{});
+			}
+			else
+			{
+				HashWriter->SetValue(Index, -1);
+			}
 
 			if (bOutputWeight)
 			{
-				if (WeightWriter) { WeightWriter->SetValue(Index, -1); }
-				else if (NormalizedWeightWriter) { NormalizedWeightWriter->SetValue(Index, -1); }
+				if (WeightWriter)
+				{
+					WeightWriter->SetValue(Index, -1);
+				}
+				else if (NormalizedWeightWriter)
+				{
+					NormalizedWeightWriter->SetValue(Index, -1);
+				}
 			}
 
-			if (Context->bPickMaterials) { MaterialPick[Index] = -1; }
+			if (Context->bPickMaterials)
+			{
+				MaterialPick[Index] = -1;
+			}
 		};
 
 		const UPCGComponent* Component = Context->GetComponent();
@@ -605,14 +662,32 @@ namespace PCGExAssetStaging
 			if (bOutputWeight)
 			{
 				double Weight = bNormalizedWeight ? static_cast<double>(Entry->Weight) / static_cast<double>(const_cast<UPCGExAssetCollection*>(EntryHost)->LoadCache()->WeightSum) : Entry->Weight;
-				if (bOneMinusWeight) { Weight = 1 - Weight; }
-				if (WeightWriter) { WeightWriter->SetValue(Index, Weight); }
-				else if (NormalizedWeightWriter) { NormalizedWeightWriter->SetValue(Index, Weight); }
-				else { Densities[Index] = Weight; }
+				if (bOneMinusWeight)
+				{
+					Weight = 1 - Weight;
+				}
+				if (WeightWriter)
+				{
+					WeightWriter->SetValue(Index, Weight);
+				}
+				else if (NormalizedWeightWriter)
+				{
+					NormalizedWeightWriter->SetValue(Index, Weight);
+				}
+				else
+				{
+					Densities[Index] = Weight;
+				}
 			}
 
-			if (PathWriter) { PathWriter->SetValue(Index, Staging.Path); }
-			else { HashWriter->SetValue(Index, Context->CollectionPickDatasetPacker->GetPickIdx(EntryHost, Staging.InternalIndex, SecondaryIndex)); }
+			if (PathWriter)
+			{
+				PathWriter->SetValue(Index, Staging.Path);
+			}
+			else
+			{
+				HashWriter->SetValue(Index, Context->CollectionPickDatasetPacker->GetPickIdx(EntryHost, Staging.InternalIndex, SecondaryIndex));
+			}
 
 			RandomSource.Initialize(PCGExRandomHelpers::GetSeed(Seed, Variations.Seed));
 
@@ -629,7 +704,10 @@ namespace PCGExAssetStaging
 				FittingHandler.ComputeTransform(Index, OutTransform, OutBounds, OutTranslation);
 			}
 
-			if (TranslationWriter) { TranslationWriter->SetValue(Index, OutTranslation); }
+			if (TranslationWriter)
+			{
+				TranslationWriter->SetValue(Index, OutTranslation);
+			}
 
 			OutBoundsMin[Index] = OutBounds.Min;
 			OutBoundsMax[Index] = OutBounds.Max;
@@ -659,14 +737,20 @@ namespace PCGExAssetStaging
 
 	void FProcessor::OnPointsProcessingComplete()
 	{
-		if (SocketHelper) { SocketHelper->Compile(TaskManager, PointDataFacade, Context->SocketsCollection); }
+		if (SocketHelper)
+		{
+			SocketHelper->Compile(TaskManager, PointDataFacade, Context->SocketsCollection);
+		}
 
 		if (Context->bPickMaterials)
 		{
 			// Create one attribute per material slot used across all picked entries.
 			// HighestSlotIndex was tracked during ProcessPoints to know how many we need.
 			int8 WriterCount = HighestSlotIndex->Max() + 1;
-			if (Settings->MaxMaterialPicks > 0) { WriterCount = Settings->MaxMaterialPicks; }
+			if (Settings->MaxMaterialPicks > 0)
+			{
+				WriterCount = Settings->MaxMaterialPicks;
+			}
 
 			if (WriterCount > 0)
 			{
@@ -696,15 +780,24 @@ namespace PCGExAssetStaging
 		{
 			const int32 Pick = MaterialPick[Index];
 
-			if (Pick == -1 || (Settings->bPruneEmptyPoints && !Mask[Index])) { continue; }
+			if (Pick == -1 || (Settings->bPruneEmptyPoints && !Mask[Index]))
+			{
+				continue;
+			}
 
 			const FPCGExMeshCollectionEntry* Entry = static_cast<const FPCGExMeshCollectionEntry*>(CachedPicks[Index]);
-			if (Entry->MaterialVariants == EPCGExMaterialVariantsMode::None) { continue; }
+			if (Entry->MaterialVariants == EPCGExMaterialVariantsMode::None)
+			{
+				continue;
+			}
 
 			// Single mode: one material slot override
 			if (Entry->MaterialVariants == EPCGExMaterialVariantsMode::Single)
 			{
-				if (!MaterialWriters.IsValidIndex(Entry->SlotIndex)) { continue; }
+				if (!MaterialWriters.IsValidIndex(Entry->SlotIndex))
+				{
+					continue;
+				}
 				MaterialWriters[Entry->SlotIndex]->SetValue(Index, Entry->MaterialOverrideVariants[Pick].Material.ToSoftObjectPath());
 			}
 			// Multi mode: multiple material slot overrides per variant
@@ -717,7 +810,10 @@ namespace PCGExAssetStaging
 					const FPCGExMaterialOverrideEntry& SlotEntry = MEntry.Overrides[i];
 
 					const int32 SlotIndex = SlotEntry.SlotIndex == -1 ? 0 : SlotEntry.SlotIndex;
-					if (!MaterialWriters.IsValidIndex(SlotIndex)) { continue; }
+					if (!MaterialWriters.IsValidIndex(SlotIndex))
+					{
+						continue;
+					}
 					MaterialWriters[SlotIndex]->SetValue(Index, SlotEntry.Material.ToSoftObjectPath());
 				}
 			}

@@ -5,10 +5,10 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Utils/PCGExCurveLookup.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
+#include "UObject/Object.h"
+#include "Utils/PCGExCurveLookup.h"
 
 
 #include "Core/PCGExPointsProcessor.h"
@@ -71,7 +71,9 @@ namespace PCGExPolyPath
 		}
 
 		FSample(const FTransform& InTransform, const double InDistance, const double InTime)
-			: Transform(InTransform), Distance(InDistance), Time(InTime)
+			: Transform(InTransform)
+			  , Distance(InDistance)
+			  , Time(InTime)
 		{
 		}
 
@@ -90,7 +92,7 @@ namespace PCGExPolyPath
 
 		int32 NumTargets = 0;
 		double TotalWeight = 0;
-		double SampledRangeMin = MAX_dbl;
+		double SampledRangeMin = TNumericLimits<double>::Max();
 		double SampledRangeMax = 0;
 		double SampledRangeWidth = 0;
 		int32 UpdateCount = 0;
@@ -100,8 +102,15 @@ namespace PCGExPolyPath
 
 		void Update(const FSample& Infos, bool& IsNewClosest, bool& IsNewFarthest);
 
-		FORCEINLINE double GetRangeRatio(const double Distance) const { return FMath::Clamp(Distance - SampledRangeMin, 0, SampledRangeWidth) / SampledRangeWidth; }
-		FORCEINLINE bool IsValid() const { return UpdateCount > 0; }
+		FORCEINLINE double GetRangeRatio(const double Distance) const
+		{
+			return FMath::Clamp(Distance - SampledRangeMin, 0, SampledRangeWidth) / SampledRangeWidth;
+		}
+
+		FORCEINLINE bool IsValid() const
+		{
+			return UpdateCount > 0;
+		}
 	};
 }
 
@@ -121,9 +130,13 @@ public:
 #if WITH_EDITOR
 	virtual void PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
-	
+
 	PCGEX_NODE_INFOS(SampleNearestSpline, "Sample : Nearest Spline", "Find the closest transform on nearest polylines.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Sampling);
+	}
 #endif
 
 protected:

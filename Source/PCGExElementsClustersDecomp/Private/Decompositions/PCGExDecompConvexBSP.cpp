@@ -19,20 +19,32 @@ namespace PCGExDecompConvexBSPInternal
 		const int32 NumPoints = Points.Num();
 		if (NumPoints < 4)
 		{
-			for (int32 i = 0; i < NumPoints; i++) { OutHullIndices.Add(i); }
+			for (int32 i = 0; i < NumPoints; i++)
+			{
+				OutHullIndices.Add(i);
+			}
 			return;
 		}
 
 		int32 MinX = 0, MaxX = 0;
 		for (int32 i = 1; i < NumPoints; i++)
 		{
-			if (Points[i].X < Points[MinX].X) { MinX = i; }
-			if (Points[i].X > Points[MaxX].X) { MaxX = i; }
+			if (Points[i].X < Points[MinX].X)
+			{
+				MinX = i;
+			}
+			if (Points[i].X > Points[MaxX].X)
+			{
+				MaxX = i;
+			}
 		}
 
 		if (MinX == MaxX)
 		{
-			for (int32 i = 0; i < NumPoints; i++) { OutHullIndices.Add(i); }
+			for (int32 i = 0; i < NumPoints; i++)
+			{
+				OutHullIndices.Add(i);
+			}
 			return;
 		}
 
@@ -42,7 +54,10 @@ namespace PCGExDecompConvexBSPInternal
 
 		for (int32 i = 0; i < NumPoints; i++)
 		{
-			if (i == MinX || i == MaxX) { continue; }
+			if (i == MinX || i == MaxX)
+			{
+				continue;
+			}
 
 			const FVector ToPoint = Points[i] - Points[MinX];
 			const FVector Projected = Points[MinX] + LineDir * FVector::DotProduct(ToPoint, LineDir);
@@ -71,7 +86,10 @@ namespace PCGExDecompConvexBSPInternal
 
 		for (int32 i = 0; i < NumPoints; i++)
 		{
-			if (i == MinX || i == MaxX || i == ThirdPoint) { continue; }
+			if (i == MinX || i == MaxX || i == ThirdPoint)
+			{
+				continue;
+			}
 
 			const double Dist = FMath::Abs(FVector::DotProduct(Points[i] - Points[MinX], PlaneNormal));
 			if (Dist > MaxPlaneDist)
@@ -141,7 +159,10 @@ namespace PCGExDecompConvexBSPInternal
 
 		for (int32 i = 0; i < NumPoints; i++)
 		{
-			if (HullSet.Contains(i)) { continue; }
+			if (HullSet.Contains(i))
+			{
+				continue;
+			}
 
 			bool bOutside = false;
 			for (const FFace& Face : Faces)
@@ -153,7 +174,10 @@ namespace PCGExDecompConvexBSPInternal
 				}
 			}
 
-			if (bOutside) { HullSet.Add(i); }
+			if (bOutside)
+			{
+				HullSet.Add(i);
+			}
 		}
 
 		OutHullIndices = HullSet.Array();
@@ -161,12 +185,18 @@ namespace PCGExDecompConvexBSPInternal
 
 	static double ComputeConvexityRatio(const TArray<FVector>& Positions)
 	{
-		if (Positions.Num() <= 4) { return 0.0; }
+		if (Positions.Num() <= 4)
+		{
+			return 0.0;
+		}
 
 		TArray<int32> HullIndices;
 		ComputeConvexHull(Positions, HullIndices);
 
-		if (HullIndices.Num() == 0) { return 1.0; }
+		if (HullIndices.Num() == 0)
+		{
+			return 1.0;
+		}
 
 		const int32 InteriorCount = Positions.Num() - HullIndices.Num();
 		return static_cast<double>(InteriorCount) / Positions.Num();
@@ -177,10 +207,16 @@ namespace PCGExDecompConvexBSPInternal
 		FVector& OutPlaneOrigin,
 		FVector& OutPlaneNormal)
 	{
-		if (Positions.Num() < 2) { return false; }
+		if (Positions.Num() < 2)
+		{
+			return false;
+		}
 
 		FVector Centroid = FVector::ZeroVector;
-		for (const FVector& P : Positions) { Centroid += P; }
+		for (const FVector& P : Positions)
+		{
+			Centroid += P;
+		}
 		Centroid /= Positions.Num();
 
 		double Cov[3][3] = {{0}};
@@ -207,13 +243,19 @@ namespace PCGExDecompConvexBSPInternal
 			NewAxis.Z = Cov[2][0] * Axis.X + Cov[2][1] * Axis.Y + Cov[2][2] * Axis.Z;
 
 			const double Len = NewAxis.Size();
-			if (Len > KINDA_SMALL_NUMBER) { Axis = NewAxis / Len; }
+			if (Len > KINDA_SMALL_NUMBER)
+			{
+				Axis = NewAxis / Len;
+			}
 		}
 
 		OutPlaneOrigin = Centroid;
 		OutPlaneNormal = Axis.GetSafeNormal();
 
-		if (OutPlaneNormal.IsNearlyZero()) { OutPlaneNormal = FVector::UpVector; }
+		if (OutPlaneNormal.IsNearlyZero())
+		{
+			OutPlaneNormal = FVector::UpVector;
+		}
 
 		return true;
 	}
@@ -237,13 +279,25 @@ namespace PCGExDecompConvexBSPInternal
 
 		bool bShouldTerminate = false;
 
-		if (Depth >= InMaxDepth) { bShouldTerminate = true; }
-		else if (OutCells.Num() >= MaxCells) { bShouldTerminate = true; }
-		else if (NodeIndices.Num() <= MinNodesPerCell) { bShouldTerminate = true; }
+		if (Depth >= InMaxDepth)
+		{
+			bShouldTerminate = true;
+		}
+		else if (OutCells.Num() >= MaxCells)
+		{
+			bShouldTerminate = true;
+		}
+		else if (NodeIndices.Num() <= MinNodesPerCell)
+		{
+			bShouldTerminate = true;
+		}
 		else
 		{
 			const double ConvexityRatio = ComputeConvexityRatio(Positions);
-			if (ConvexityRatio <= InMaxConcavityRatio) { bShouldTerminate = true; }
+			if (ConvexityRatio <= InMaxConcavityRatio)
+			{
+				bShouldTerminate = true;
+			}
 		}
 
 		if (bShouldTerminate)
@@ -268,8 +322,14 @@ namespace PCGExDecompConvexBSPInternal
 		for (int32 i = 0; i < NodeIndices.Num(); i++)
 		{
 			const double Dist = FVector::DotProduct(Positions[i] - PlaneOrigin, PlaneNormal);
-			if (Dist >= 0) { FrontNodes.Add(NodeIndices[i]); }
-			else { BackNodes.Add(NodeIndices[i]); }
+			if (Dist >= 0)
+			{
+				FrontNodes.Add(NodeIndices[i]);
+			}
+			else
+			{
+				BackNodes.Add(NodeIndices[i]);
+			}
 		}
 
 		if (FrontNodes.Num() < MinNodesPerCell || BackNodes.Num() < MinNodesPerCell)
@@ -283,7 +343,10 @@ namespace PCGExDecompConvexBSPInternal
 			bool bFoundValidSplit = false;
 			for (const FVector& AltNormal : AltNormals)
 			{
-				if (AltNormal.IsNearlyZero()) { continue; }
+				if (AltNormal.IsNearlyZero())
+				{
+					continue;
+				}
 
 				FrontNodes.Empty();
 				BackNodes.Empty();
@@ -291,8 +354,14 @@ namespace PCGExDecompConvexBSPInternal
 				for (int32 i = 0; i < NodeIndices.Num(); i++)
 				{
 					const double Dist = FVector::DotProduct(Positions[i] - PlaneOrigin, AltNormal);
-					if (Dist >= 0) { FrontNodes.Add(NodeIndices[i]); }
-					else { BackNodes.Add(NodeIndices[i]); }
+					if (Dist >= 0)
+					{
+						FrontNodes.Add(NodeIndices[i]);
+					}
+					else
+					{
+						BackNodes.Add(NodeIndices[i]);
+					}
 				}
 
 				if (FrontNodes.Num() >= MinNodesPerCell && BackNodes.Num() >= MinNodesPerCell)
@@ -320,22 +389,34 @@ namespace PCGExDecompConvexBSPInternal
 
 bool FPCGExDecompConvexBSP::Decompose(FPCGExDecompositionResult& OutResult)
 {
-	if (!Cluster || Cluster->Nodes->Num() < 4) { return false; }
+	if (!Cluster || Cluster->Nodes->Num() < 4)
+	{
+		return false;
+	}
 
 	TArray<int32> AllNodes;
 	AllNodes.Reserve(Cluster->Nodes->Num());
 	for (int32 i = 0; i < Cluster->Nodes->Num(); i++)
 	{
-		if (Cluster->GetNode(i)->bValid) { AllNodes.Add(i); }
+		if (Cluster->GetNode(i)->bValid)
+		{
+			AllNodes.Add(i);
+		}
 	}
 
-	if (AllNodes.Num() < MinNodesPerCell) { return false; }
+	if (AllNodes.Num() < MinNodesPerCell)
+	{
+		return false;
+	}
 
 	TArray<PCGExDecompConvexBSPInternal::FConvexCell3D> Cells;
 	PCGExDecompConvexBSPInternal::DecomposeRecursive(
 		Cluster.Get(), AllNodes, MinNodesPerCell, MaxCells, MaxDepth, MaxConcavityRatio, Cells, 0);
 
-	if (Cells.Num() == 0) { return false; }
+	if (Cells.Num() == 0)
+	{
+		return false;
+	}
 
 	OutResult.NumCells = Cells.Num();
 	for (int32 CellIdx = 0; CellIdx < Cells.Num(); CellIdx++)

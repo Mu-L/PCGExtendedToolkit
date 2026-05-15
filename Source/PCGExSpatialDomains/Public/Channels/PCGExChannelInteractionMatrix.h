@@ -21,7 +21,7 @@ UENUM(BlueprintType)
 enum class EPCGExChannelResponse : uint8
 {
 	/** Pair runs the narrow-phase overlap test (default). */
-	Block  = 0,
+	Block = 0,
 	/** Pair is skipped entirely; never runs narrow phase. */
 	Ignore = 1,
 };
@@ -138,7 +138,10 @@ public:
 	bool ShouldRunNarrowPhase(uint32 CandidateMask, uint32 StoredMask) const;
 
 	/** Inspection -- count of registered channels (= ChannelKeys.Num(), capped to MaxChannels). */
-	int32 GetNumChannels() const { return ChannelKeys.Num(); }
+	int32 GetNumChannels() const
+	{
+		return ChannelKeys.Num();
+	}
 
 	/** Inspection -- registered channel key at a given bit index, or NAME_None if out of range. */
 	FName GetChannelKey(int32 BitIndex) const;

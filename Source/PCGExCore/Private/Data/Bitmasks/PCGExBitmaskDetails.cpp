@@ -11,59 +11,100 @@ void FPCGExClampedBitOp::Mutate(int64& Flags) const
 	const int64 BitMask = static_cast<int64>(1) << BitIndex;
 	switch (Op)
 	{
-	case EPCGExBitOp::Set: if (bValue) { Flags |= BitMask; }
-		else { Flags &= ~BitMask; }
+	case EPCGExBitOp::Set:
+		if (bValue)
+		{
+			Flags |= BitMask;
+		}
+		else
+		{
+			Flags &= ~BitMask;
+		}
 		break;
-	case EPCGExBitOp::AND: if (!bValue) { Flags &= ~BitMask; } // AND false -> clear bit 
+	case EPCGExBitOp::AND:
+		if (!bValue)
+		{
+			Flags &= ~BitMask;
+		} // AND false -> clear bit 
 		// AND true -> leave bit as is, nothing to do
 		break;
-	case EPCGExBitOp::OR: if (bValue) { Flags |= BitMask; } // OR true -> set bit 
+	case EPCGExBitOp::OR:
+		if (bValue)
+		{
+			Flags |= BitMask;
+		} // OR true -> set bit 
 		// OR false -> leave bit as is, nothing to do
 		break;
-	case EPCGExBitOp::NOT: if (bValue) { Flags ^= BitMask; } // flip the bit
+	case EPCGExBitOp::NOT:
+		if (bValue)
+		{
+			Flags ^= BitMask;
+		} // flip the bit
 		break;
-	case EPCGExBitOp::XOR: if (bValue) { Flags ^= BitMask; } // XOR with true flips the bit
+	case EPCGExBitOp::XOR:
+		if (bValue)
+		{
+			Flags ^= BitMask;
+		} // XOR with true flips the bit
 		// XOR false -> do nothing
 		break;
-	default: break;
+	default:
+		break;
 	}
 }
 
 FPCGExBitmaskRef::FPCGExBitmaskRef(const TObjectPtr<UPCGExBitmaskCollection> InSource, const FName InIdentifier)
-	: Source(InSource), Identifier(InIdentifier)
+	: Source(InSource)
+	  , Identifier(InIdentifier)
 {
 }
 
 #if WITH_EDITOR
 TArray<FName> FPCGExBitmaskRef::EDITOR_GetIdentifierOptions() const
 {
-	if (Source) { return Source->EDITOR_GetIdentifierOptions(); }
+	if (Source)
+	{
+		return Source->EDITOR_GetIdentifierOptions();
+	}
 	return {TEXT("INVALID")};
 }
 #endif
 
 void FPCGExBitmaskRef::EDITOR_RegisterTrackingKeys(FPCGExContext* Context) const
 {
-	if (Source) { Context->EDITOR_TrackPath(Source); }
+	if (Source)
+	{
+		Context->EDITOR_TrackPath(Source);
+	}
 }
 
 void FPCGExBitmaskRef::Mutate(int64& Flags) const
 {
 	int64 Mask = 0;
-	if (Source && Source->LoadCache()->TryGetBitmask(Identifier, Mask)) { PCGExBitmask::Mutate(Op, Flags, Mask); }
+	if (Source && Source->LoadCache()->TryGetBitmask(Identifier, Mask))
+	{
+		PCGExBitmask::Mutate(Op, Flags, Mask);
+	}
 }
 
 FPCGExSimpleBitmask FPCGExBitmaskRef::GetSimpleBitmask() const
 {
 	FPCGExSimpleBitmask SimpleBitmask;
-	if (Source && Source->LoadCache()->TryGetBitmask(Identifier, SimpleBitmask.Bitmask)) { SimpleBitmask.Op = Op; }
-	else { SimpleBitmask.Op = EPCGExBitOp::OR; }
+	if (Source && Source->LoadCache()->TryGetBitmask(Identifier, SimpleBitmask.Bitmask))
+	{
+		SimpleBitmask.Op = Op;
+	}
+	else
+	{
+		SimpleBitmask.Op = EPCGExBitOp::OR;
+	}
 	return SimpleBitmask;
 }
 
 bool FPCGExBitmaskRef::TryGetAdjacencyInfos(FVector& OutDirection, FPCGExSimpleBitmask& OutSimpleBitmask) const
 {
-	if (PCGExBitmask::FCachedRef Cache = PCGExBitmask::FCachedRef{}; Source && Source->LoadCache()->TryGetBitmask(Identifier, Cache))
+	if (PCGExBitmask::FCachedRef Cache = PCGExBitmask::FCachedRef{};
+		Source && Source->LoadCache()->TryGetBitmask(Identifier, Cache))
 	{
 		OutSimpleBitmask = FPCGExSimpleBitmask();
 		OutSimpleBitmask.Bitmask = Cache.Bitmask;
@@ -80,14 +121,23 @@ bool FPCGExBitmaskRef::TryGetAdjacencyInfos(FVector& OutDirection, FPCGExSimpleB
 int64 FPCGExBitmask::Get() const
 {
 	int64 Mask = Bitmask;
-	if (Mode == EPCGExBitmaskMode::Individual) { for (const FPCGExClampedBitOp& Bit : Mutations) { Bit.Mutate(Mask); } }
+	if (Mode == EPCGExBitmaskMode::Individual)
+	{
+		for (const FPCGExClampedBitOp& Bit : Mutations)
+		{
+			Bit.Mutate(Mask);
+		}
+	}
 	PCGExBitmask::Mutate(Compositions, Mask);
 	return Mask;
 }
 
 void FPCGExBitmask::EDITOR_RegisterTrackingKeys(FPCGExContext* Context) const
 {
-	for (const FPCGExBitmaskRef& Comp : Compositions) { Comp.EDITOR_RegisterTrackingKeys(Context); }
+	for (const FPCGExBitmaskRef& Comp : Compositions)
+	{
+		Comp.EDITOR_RegisterTrackingKeys(Context);
+	}
 }
 
 #if WITH_EDITOR
@@ -111,7 +161,10 @@ void FPCGExBitmask::ApplyDeprecation()
 		Mutations.Reserve(Bits.Num());
 		for (const FPCGExClampedBit& Bit : Bits)
 		{
-			if (Bit.bValue) { Bitmask |= (static_cast<int64>(1) << Bit.BitIndex); }
+			if (Bit.bValue)
+			{
+				Bitmask |= (static_cast<int64>(1) << Bit.BitIndex);
+			}
 			FPCGExClampedBitOp& Mutation = Mutations.Emplace_GetRef();
 			Mutation.BitIndex = Bit.BitIndex;
 			Mutation.bValue = Bit.bValue;
@@ -127,7 +180,13 @@ void FPCGExBitmask::ApplyDeprecation()
 int64 FPCGExBitmaskWithOperation::Get() const
 {
 	int64 Mask = Bitmask;
-	if (Mode == EPCGExBitmaskMode::Individual) { for (const FPCGExClampedBitOp& Bit : Mutations) { Bit.Mutate(Mask); } }
+	if (Mode == EPCGExBitmaskMode::Individual)
+	{
+		for (const FPCGExClampedBitOp& Bit : Mutations)
+		{
+			Bit.Mutate(Mask);
+		}
+	}
 	PCGExBitmask::Mutate(Compositions, Mask);
 
 	return Mask;
@@ -136,13 +195,25 @@ int64 FPCGExBitmaskWithOperation::Get() const
 void FPCGExBitmaskWithOperation::Mutate(int64& Flags) const
 {
 	PCGExBitmask::Mutate(Op, Flags, Get());
-	if (Mode == EPCGExBitmaskMode::Individual) { for (const FPCGExClampedBitOp& Bit : Mutations) { Bit.Mutate(Flags); } }
-	else { PCGExBitmask::Mutate(Compositions, Flags); }
+	if (Mode == EPCGExBitmaskMode::Individual)
+	{
+		for (const FPCGExClampedBitOp& Bit : Mutations)
+		{
+			Bit.Mutate(Flags);
+		}
+	}
+	else
+	{
+		PCGExBitmask::Mutate(Compositions, Flags);
+	}
 }
 
 void FPCGExBitmaskWithOperation::EDITOR_RegisterTrackingKeys(FPCGExContext* Context) const
 {
-	for (const FPCGExBitmaskRef& Comp : Compositions) { Comp.EDITOR_RegisterTrackingKeys(Context); }
+	for (const FPCGExBitmaskRef& Comp : Compositions)
+	{
+		Comp.EDITOR_RegisterTrackingKeys(Context);
+	}
 }
 
 #if WITH_EDITOR

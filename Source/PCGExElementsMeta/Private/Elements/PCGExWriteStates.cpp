@@ -9,7 +9,10 @@
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
 #define PCGEX_NAMESPACE WriteStates
 
-PCGExData::EIOInit UPCGExWriteStatesSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExWriteStatesSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 TArray<FPCGPinProperties> UPCGExWriteStatesSettings::InputPinProperties() const
 {
@@ -23,7 +26,10 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(WriteStates)
 
 bool FPCGExWriteStatesElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(WriteStates)
 
@@ -39,7 +45,10 @@ bool FPCGExWriteStatesElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 			}))
@@ -74,7 +83,10 @@ namespace PCGExWriteStates
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExFindNodeState::Process);
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		const TSharedPtr<PCGExData::TBuffer<int64>> Writer = PointDataFacade->GetWritable(Settings->FlagAttribute, Settings->InitialFlags, false, PCGExData::EBufferInit::Inherit);
 		const TSharedPtr<PCGExData::TArrayBuffer<int64>> ElementsWriter = StaticCastSharedPtr<PCGExData::TArrayBuffer<int64>>(Writer);
@@ -89,7 +101,10 @@ namespace PCGExWriteStates
 	void FProcessor::ProcessPoints(const PCGExMT::FScope& Scope)
 	{
 		PointDataFacade->Fetch(Scope);
-		PCGEX_SCOPE_LOOP(Index) { StateManager->Test(Index); }
+		PCGEX_SCOPE_LOOP(Index)
+		{
+			StateManager->Test(Index);
+		}
 	}
 
 	void FProcessor::CompleteWork()

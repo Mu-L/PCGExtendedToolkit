@@ -3,12 +3,12 @@
 
 #include "Helpers/PCGExDataMatcher.h"
 
+#include "Core/PCGExMatchRuleFactoryProvider.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
-#include "Helpers/PCGExArrayHelpers.h"
-#include "Core/PCGExMatchRuleFactoryProvider.h"
 #include "Details/PCGExMatchingDetails.h"
+#include "Helpers/PCGExArrayHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
 #include "Metadata/Accessors/PCGCustomAccessor.h"
 
@@ -18,7 +18,10 @@
 PCGExMatching::FScope::FScope(const int32 InNumCandidates, const bool bUnlimited)
 {
 	NumCandidates = InNumCandidates;
-	if (bUnlimited) { Counter = -MAX_int32; }
+	if (bUnlimited)
+	{
+		Counter = -MAX_int32;
+	}
 }
 
 void PCGExMatching::FScope::RegisterMatch()
@@ -72,7 +75,10 @@ namespace PCGExMatching
 		check(InMatchableSources.Num() == InTags.Num());
 
 		MatchableSources->Reserve(InMatchableSources.Num());
-		for (int i = 0; i < InMatchableSources.Num(); i++) { RegisterTaggedData(InContext, FPCGExTaggedData(InMatchableSources[i], i, InTags[i], nullptr)); }
+		for (int i = 0; i < InMatchableSources.Num(); i++)
+		{
+			RegisterTaggedData(InContext, FPCGExTaggedData(InMatchableSources[i], i, InTags[i], nullptr));
+		}
 		return InitInternal(InContext, InFactoriesLabel);
 	}
 
@@ -85,7 +91,10 @@ namespace PCGExMatching
 
 		MatchableSources->Reserve(InMatchableSources.Num());
 
-		for (int i = 0; i < InMatchableSources.Num(); i++) { RegisterTaggedData(InContext, InMatchableSources[i]->Source->GetTaggedData(PCGExData::EIOSide::In, i)); }
+		for (int i = 0; i < InMatchableSources.Num(); i++)
+		{
+			RegisterTaggedData(InContext, InMatchableSources[i]->Source->GetTaggedData(PCGExData::EIOSide::In, i));
+		}
 		return InitInternal(InContext, InFactoriesLabel);
 	}
 
@@ -96,7 +105,10 @@ namespace PCGExMatching
 	{
 		MatchableSources->Reserve(InMatchableSources.Num());
 
-		for (int i = 0; i < InMatchableSources.Num(); i++) { RegisterTaggedData(InContext, InMatchableSources[i]->Source->GetTaggedData(PCGExData::EIOSide::In, i)); }
+		for (int i = 0; i < InMatchableSources.Num(); i++)
+		{
+			RegisterTaggedData(InContext, InMatchableSources[i]->Source->GetTaggedData(PCGExData::EIOSide::In, i));
+		}
 		return InitInternal(InContext, InFactoriesLabel);
 	}
 
@@ -106,7 +118,10 @@ namespace PCGExMatching
 		const bool bThrowError, const FName InFactoriesLabel)
 	{
 		MatchableSources->Reserve(InMatchableSources.Num());
-		for (const FPCGExTaggedData& TaggedData : InMatchableSources) { RegisterTaggedData(InContext, TaggedData); }
+		for (const FPCGExTaggedData& TaggedData : InMatchableSources)
+		{
+			RegisterTaggedData(InContext, TaggedData);
+		}
 		return InitInternal(InContext, InFactoriesLabel);
 	}
 
@@ -128,18 +143,33 @@ namespace PCGExMatching
 		const bool bThrowError)
 	{
 		MatchableSources->Reserve(InMatchableSources.Num());
-		for (int i = 0; i < InMatchableSources.Num(); i++) { RegisterTaggedData(nullptr, InMatchableSources[i]->Source->GetTaggedData(PCGExData::EIOSide::In, i)); }
+		for (int i = 0; i < InMatchableSources.Num(); i++)
+		{
+			RegisterTaggedData(nullptr, InMatchableSources[i]->Source->GetTaggedData(PCGExData::EIOSide::In, i));
+		}
 		return InitInternal(InFactories);
 	}
 
 	bool FDataMatcher::Test(const UPCGData* InMatchableSource, const FPCGExTaggedData& InDataCandidate, FScope& InMatchingScope) const
 	{
-		if (MatchMode == EPCGExMapMatchMode::Disabled || Operations.IsEmpty()) { return true; }
+		if (MatchMode == EPCGExMapMatchMode::Disabled || Operations.IsEmpty())
+		{
+			return true;
+		}
 
-		if (Details->bLimitMatches) { if (!InMatchingScope.IsValid()) { return false; } }
+		if (Details->bLimitMatches)
+		{
+			if (!InMatchingScope.IsValid())
+			{
+				return false;
+			}
+		}
 
 		const int32* DataIndexPtr = MatchableSourcesMap.Find(InMatchableSource);
-		if (!DataIndexPtr) { return false; }
+		if (!DataIndexPtr)
+		{
+			return false;
+		}
 
 		const int32 DataIndex = *DataIndexPtr;
 		const PCGExData::FConstPoint& TargetElement = *(MatchableSourceFirstElements->GetData() + DataIndex);
@@ -197,7 +227,10 @@ namespace PCGExMatching
 		if (bMatch)
 		{
 			InMatchingScope.RegisterMatch();
-			if (InMatchingScope.GetCounter() > GetMatchLimitFor(InDataCandidate)) { InMatchingScope.Invalidate(); }
+			if (InMatchingScope.GetCounter() > GetMatchLimitFor(InDataCandidate))
+			{
+				InMatchingScope.Invalidate();
+			}
 		}
 
 		return bMatch;
@@ -208,16 +241,31 @@ namespace PCGExMatching
 		const FPCGExTaggedData& InDataCandidate,
 		FScope& InMatchingScope) const
 	{
-		if (MatchMode == EPCGExMapMatchMode::Disabled || Operations.IsEmpty()) { return true; }
+		if (MatchMode == EPCGExMapMatchMode::Disabled || Operations.IsEmpty())
+		{
+			return true;
+		}
 
-		if (Details->bLimitMatches) { if (!InMatchingScope.IsValid()) { return false; } }
+		if (Details->bLimitMatches)
+		{
+			if (!InMatchingScope.IsValid())
+			{
+				return false;
+			}
+		}
 
 		// Normalize IO index: getter arrays are 0-indexed by MatchableSources position,
 		// but callers may pass points with an IOIndex from collection ordering.
 		// For single-source, IO must be 0. For multi-source, clamp to valid range.
 		PCGExData::FConstPoint MatchableElement = InInMatchableElement;
-		if (NumSources == 1) { MatchableElement.IO = 0; }
-		else if (MatchableElement.IO >= NumSources) { MatchableElement.IO = FMath::Clamp(MatchableElement.IO, 0, NumSources - 1); }
+		if (NumSources == 1)
+		{
+			MatchableElement.IO = 0;
+		}
+		else if (MatchableElement.IO >= NumSources)
+		{
+			MatchableElement.IO = FMath::Clamp(MatchableElement.IO, 0, NumSources - 1);
+		}
 
 		bool bMatch = true;
 
@@ -272,7 +320,10 @@ namespace PCGExMatching
 		if (bMatch)
 		{
 			InMatchingScope.RegisterMatch();
-			if (InMatchingScope.GetCounter() >= GetMatchLimitFor(InDataCandidate)) { InMatchingScope.Invalidate(); }
+			if (InMatchingScope.GetCounter() >= GetMatchLimitFor(InDataCandidate))
+			{
+				InMatchingScope.Invalidate();
+			}
 		}
 
 		return bMatch;
@@ -282,7 +333,10 @@ namespace PCGExMatching
 		const FPCGExTaggedData& InDataCandidate,
 		FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const
 	{
-		if (MatchMode == EPCGExMapMatchMode::Disabled) { return true; }
+		if (MatchMode == EPCGExMapMatchMode::Disabled)
+		{
+			return true;
+		}
 
 		int32 NumIgnored = 0;
 		TArray<FPCGExTaggedData>& MatchableSourcesRef = *MatchableSources.Get();
@@ -302,7 +356,10 @@ namespace PCGExMatching
 		const TArray<FPCGExTaggedData>& InCandidates,
 		FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const
 	{
-		if (MatchMode == EPCGExMapMatchMode::Disabled) { return true; }
+		if (MatchMode == EPCGExMapMatchMode::Disabled)
+		{
+			return true;
+		}
 
 		check(NumSources == 1); // Inverse matching uses a single source (the input)
 
@@ -331,8 +388,14 @@ namespace PCGExMatching
 		for (const FPCGExTaggedData& Candidate : InCandidates)
 		{
 			FScope Scope(1, true);
-			if (Test(InPoint, Candidate, Scope)) { bAnyMatch = true; }
-			else { OutExclude.Add(Candidate.Data); }
+			if (Test(InPoint, Candidate, Scope))
+			{
+				bAnyMatch = true;
+			}
+			else
+			{
+				OutExclude.Add(Candidate.Data);
+			}
 		}
 
 		return bAnyMatch;
@@ -349,7 +412,10 @@ namespace PCGExMatching
 			{
 				for (int32 i = 0; i < NumSources; i++)
 				{
-					if (InExcludedSources->Contains(i)) { continue; }
+					if (InExcludedSources->Contains(i))
+					{
+						continue;
+					}
 					OutMatches.Add(i);
 				}
 
@@ -358,15 +424,24 @@ namespace PCGExMatching
 
 			for (int32 i = 0; i < NumSources; i++)
 			{
-				if (InExcludedSources->Contains(i)) { continue; }
-				if (Test(MatchableSourcesRef[i].Data, InDataCandidate, InMatchingScope)) { OutMatches.Add(i); }
+				if (InExcludedSources->Contains(i))
+				{
+					continue;
+				}
+				if (Test(MatchableSourcesRef[i].Data, InDataCandidate, InMatchingScope))
+				{
+					OutMatches.Add(i);
+				}
 			}
 
 			// Handle recursive/transitive matching
 			if (bWantsRecursion && !OutMatches.IsEmpty())
 			{
 				TBitArray<> Visited(false, NumSources);
-				for (const int32 Idx : OutMatches) { Visited[Idx] = true; }
+				for (const int32 Idx : OutMatches)
+				{
+					Visited[Idx] = true;
+				}
 
 				TArray<int32> CurrentLevel = OutMatches;
 				TArray<int32> NextLevel;
@@ -380,7 +455,10 @@ namespace PCGExMatching
 					{
 						for (int32 i = 0; i < NumSources; i++)
 						{
-							if (Visited[i] || InExcludedSources->Contains(i)) { continue; }
+							if (Visited[i] || InExcludedSources->Contains(i))
+							{
+								continue;
+							}
 							if (Test(MatchableSourcesRef[i].Data, MatchableSourcesRef[CurrentIdx], InMatchingScope))
 							{
 								Visited[i] = true;
@@ -406,14 +484,20 @@ namespace PCGExMatching
 
 		for (int32 i = 0; i < NumSources; i++)
 		{
-			if (Test(MatchableSourcesRef[i].Data, InDataCandidate, InMatchingScope)) { OutMatches.Add(i); }
+			if (Test(MatchableSourcesRef[i].Data, InDataCandidate, InMatchingScope))
+			{
+				OutMatches.Add(i);
+			}
 		}
 
 		// Handle recursive/transitive matching
 		if (bWantsRecursion && !OutMatches.IsEmpty())
 		{
 			TBitArray<> Visited(false, NumSources);
-			for (const int32 Idx : OutMatches) { Visited[Idx] = true; }
+			for (const int32 Idx : OutMatches)
+			{
+				Visited[Idx] = true;
+			}
 
 			TArray<int32> CurrentLevel = OutMatches;
 			TArray<int32> NextLevel;
@@ -427,7 +511,10 @@ namespace PCGExMatching
 				{
 					for (int32 i = 0; i < NumSources; i++)
 					{
-						if (Visited[i]) { continue; }
+						if (Visited[i])
+						{
+							continue;
+						}
 						if (Test(MatchableSourcesRef[i].Data, MatchableSourcesRef[CurrentIdx], InMatchingScope))
 						{
 							Visited[i] = true;
@@ -449,20 +536,29 @@ namespace PCGExMatching
 	{
 		if (!Details->bSplitUnmatched)
 		{
-			if (!Details->bQuietUnmatchedTargetWarning) { PCGE_LOG_C(Warning, GraphAndLog, InFacade->GetContext(), FTEXT("An input has no matching target.")); }
+			if (!Details->bQuietUnmatchedTargetWarning)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, InFacade->GetContext(), FTEXT("An input has no matching target."));
+			}
 		}
 		else
 		{
 			InFacade->Source->OutputPin = Labels::OutputUnmatchedLabel;
 		}
 
-		if (bForward && Details->bOutputUnmatched) { InFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward); }
+		if (bForward && Details->bOutputUnmatched)
+		{
+			InFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
+		}
 		return true;
 	}
 
 	int32 FDataMatcher::GetMatchLimitFor(const FPCGExTaggedData& InDataCandidate) const
 	{
-		if (!Details->bSplitUnmatched) { return MAX_int32; }
+		if (!Details->bSplitUnmatched)
+		{
+			return MAX_int32;
+		}
 
 		int32 OutLimit = 0;
 		if (!PCGExData::Helpers::TryGetSettingDataValue<int32>(nullptr, InDataCandidate.Data, Details->LimitInput, Details->LimitAttribute, Details->Limit, OutLimit))
@@ -489,8 +585,14 @@ namespace PCGExMatching
 
 		if (!TaggedData.Keys)
 		{
-			if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(TaggedData.Data)) { TaggedData.Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData); }
-			else if (TaggedData.Data->Metadata) { TaggedData.Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(TaggedData.Data->Metadata); }
+			if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(TaggedData.Data))
+			{
+				TaggedData.Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
+			}
+			else if (TaggedData.Data->Metadata)
+			{
+				TaggedData.Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(TaggedData.Data->Metadata);
+			}
 		}
 
 		NumSources = MatchableSources->Num();
@@ -498,7 +600,10 @@ namespace PCGExMatching
 
 	bool FDataMatcher::InitInternal(FPCGExContext* InContext, const FName InFactoriesLabel)
 	{
-		if (MatchMode == EPCGExMapMatchMode::Disabled) { return true; }
+		if (MatchMode == EPCGExMapMatchMode::Disabled)
+		{
+			return true;
+		}
 
 		if (MatchableSources->IsEmpty())
 		{
@@ -520,7 +625,10 @@ namespace PCGExMatching
 
 	bool FDataMatcher::InitInternal(const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& InFactories)
 	{
-		if (MatchMode == EPCGExMapMatchMode::Disabled) { return true; }
+		if (MatchMode == EPCGExMapMatchMode::Disabled)
+		{
+			return true;
+		}
 
 		if (MatchableSources->IsEmpty())
 		{
@@ -538,11 +646,20 @@ namespace PCGExMatching
 		for (const TObjectPtr<const UPCGExMatchRuleFactoryData>& Factory : InFactories)
 		{
 			TSharedPtr<FPCGExMatchRuleOperation> Operation = Factory->CreateOperation(nullptr);
-			if (!Operation || !Operation->PrepareForMatchableSources(nullptr, MatchableSources)) { return false; }
+			if (!Operation || !Operation->PrepareForMatchableSources(nullptr, MatchableSources))
+			{
+				return false;
+			}
 			Operations.Add(Operation);
 
-			if (Factory->BaseConfig.Strictness == EPCGExMatchStrictness::Required) { RequiredOperations.Add(Operation); }
-			else { OptionalOperations.Add(Operation); }
+			if (Factory->BaseConfig.Strictness == EPCGExMatchStrictness::Required)
+			{
+				RequiredOperations.Add(Operation);
+			}
+			else
+			{
+				OptionalOperations.Add(Operation);
+			}
 
 			if (Operation->WantsRecursion())
 			{

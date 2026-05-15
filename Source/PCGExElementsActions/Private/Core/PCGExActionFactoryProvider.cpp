@@ -21,15 +21,24 @@ bool FPCGExActionOperation::PrepareForData(FPCGExContext* InContext, const TShar
 
 	FilterManager = MakeShared<PCGExPointFilter::FManager>(PrimaryDataFacade.ToSharedRef());
 
-	if (!FilterManager->Init(InContext, Factory->FilterFactories)) { return false; }
+	if (!FilterManager->Init(InContext, Factory->FilterFactories))
+	{
+		return false;
+	}
 
 	return true;
 }
 
 void FPCGExActionOperation::ProcessPoint(const int32 Index)
 {
-	if (FilterManager->Test(Index)) { OnMatchSuccess(Index); }
-	else { OnMatchFail(Index); }
+	if (FilterManager->Test(Index))
+	{
+		OnMatchSuccess(Index);
+	}
+	else
+	{
+		OnMatchFail(Index);
+	}
 }
 
 void FPCGExActionOperation::OnMatchSuccess(int32 Index)
@@ -41,7 +50,10 @@ void FPCGExActionOperation::OnMatchFail(int32 Index)
 }
 
 #if WITH_EDITOR
-FString UPCGExActionProviderSettings::GetDisplayName() const { return TEXT(""); }
+FString UPCGExActionProviderSettings::GetDisplayName() const
+{
+	return TEXT("");
+}
 #endif
 
 TSharedPtr<FPCGExActionOperation> UPCGExActionFactoryData::CreateOperation(FPCGExContext* InContext) const
@@ -62,7 +74,10 @@ bool UPCGExActionFactoryData::AppendAndValidate(const TSharedPtr<PCGExData::FAtt
 
 	const FPCGExAttributeGatherDetails GatherDetails = FPCGExAttributeGatherDetails(); // Required for Append
 
-	if (CheckSuccessInfos) { InInfos->Append(CheckSuccessInfos, GatherDetails, Mismatch); }
+	if (CheckSuccessInfos)
+	{
+		InInfos->Append(CheckSuccessInfos, GatherDetails, Mismatch);
+	}
 	if (!Mismatch.IsEmpty())
 	{
 		for (const FName& MismatchName : Mismatch)
@@ -72,7 +87,10 @@ bool UPCGExActionFactoryData::AppendAndValidate(const TSharedPtr<PCGExData::FAtt
 		return false;
 	}
 
-	if (CheckFailInfos) { InInfos->Append(CheckFailInfos, GatherDetails, Mismatch); }
+	if (CheckFailInfos)
+	{
+		InInfos->Append(CheckFailInfos, GatherDetails, Mismatch);
+	}
 	if (!Mismatch.IsEmpty())
 	{
 		for (const FName& MismatchName : Mismatch)
@@ -93,8 +111,14 @@ void UPCGExActionFactoryData::BeginDestroy()
 TArray<FPCGPinProperties> UPCGExActionProviderSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	if (GetRequiresFilters()) { PCGEX_PIN_FILTERS(PCGExActions::Labels::SourceConditionsFilterLabel, "Filters used to define if there's a match or not.", Required) }
-	else { PCGEX_PIN_FILTERS(PCGExActions::Labels::SourceConditionsFilterLabel, "Filters used to define if there's a match or not.", Normal) }
+	if (GetRequiresFilters())
+	{
+		PCGEX_PIN_FILTERS(PCGExActions::Labels::SourceConditionsFilterLabel, "Filters used to define if there's a match or not.", Required)
+	}
+	else
+	{
+		PCGEX_PIN_FILTERS(PCGExActions::Labels::SourceConditionsFilterLabel, "Filters used to define if there's a match or not.", Normal)
+	}
 	return PinProperties;
 }
 
@@ -104,11 +128,17 @@ UPCGExFactoryData* UPCGExActionProviderSettings::CreateFactory(FPCGExContext* In
 
 	if (UPCGExActionFactoryData* TypedFactory = Cast<UPCGExActionFactoryData>(InFactory))
 	{
-		if (!GetInputFactories(InContext, PCGExActions::Labels::SourceConditionsFilterLabel, TypedFactory->FilterFactories, PCGExFactories::PointFilters)) { return nullptr; }
+		if (!GetInputFactories(InContext, PCGExActions::Labels::SourceConditionsFilterLabel, TypedFactory->FilterFactories, PCGExFactories::PointFilters))
+		{
+			return nullptr;
+		}
 
 		TypedFactory->Priority = Priority;
 
-		if (!TypedFactory->Boot(InContext)) { return nullptr; }
+		if (!TypedFactory->Boot(InContext))
+		{
+			return nullptr;
+		}
 	}
 	else
 	{

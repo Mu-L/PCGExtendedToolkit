@@ -4,14 +4,14 @@
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
 #include "DetailWidgetRow.h"
 #include "PropertyHandle.h"
-#include "Widgets/Images/SImage.h"
-#include "Widgets/Input/SButton.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
-#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
+#include "Widgets/Text/STextBlock.h"
 
 namespace PCGExEnumCustomization
 {
@@ -21,7 +21,10 @@ namespace PCGExEnumCustomization
 
 		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 		{
-			if (Enum->HasMetaData(TEXT("Hidden"), i)) { continue; }
+			if (Enum->HasMetaData(TEXT("Hidden"), i))
+			{
+				continue;
+			}
 			const FString KeyName = Enum->GetNameStringByIndex(i);
 
 			FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), i);
@@ -78,8 +81,8 @@ namespace PCGExEnumCustomization
 								PropertyHandle->GetValueAsFormattedString(CurrentValue);
 								const FString KeyName = Enum->GetNameStringByIndex(i);
 								return (CurrentValue == KeyName)
-									       ? FLinearColor::White
-									       : FLinearColor::Gray;
+									? FLinearColor::White
+									: FLinearColor::Gray;
 							})
 					]
 				];
@@ -100,7 +103,10 @@ namespace PCGExEnumCustomization
 
 		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 		{
-			if (Enum->HasMetaData(TEXT("Hidden"), i)) { continue; }
+			if (Enum->HasMetaData(TEXT("Hidden"), i))
+			{
+				continue;
+			}
 			const int32 EnumValue = static_cast<int32>(Enum->GetValueByIndex(i));
 
 			FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), i);
@@ -150,8 +156,8 @@ namespace PCGExEnumCustomization
 							[GetValue, EnumValue]
 							{
 								return GetValue() == EnumValue
-									       ? FLinearColor::White
-									       : FLinearColor::Gray;
+									? FLinearColor::White
+									: FLinearColor::Gray;
 							})
 					]
 				];
@@ -167,7 +173,10 @@ namespace PCGExEnumCustomization
 
 		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 		{
-			if (Enum->HasMetaData(TEXT("Hidden"), i) || SkipIndices.Contains(i)) { continue; }
+			if (Enum->HasMetaData(TEXT("Hidden"), i) || SkipIndices.Contains(i))
+			{
+				continue;
+			}
 
 			const FString KeyName = Enum->GetNameStringByIndex(i);
 			const uint8 Bit = Enum->GetValueByIndex(i); // or (1LL << i)
@@ -175,7 +184,10 @@ namespace PCGExEnumCustomization
 			auto IsActive = [PropertyHandle, Bit]() -> bool
 			{
 				uint8 Mask = 0;
-				if (PropertyHandle->GetValue(Mask) == FPropertyAccess::Success) { return (Mask & Bit) != 0; }
+				if (PropertyHandle->GetValue(Mask) == FPropertyAccess::Success)
+				{
+					return (Mask & Bit) != 0;
+				}
 				return false;
 			};
 
@@ -204,8 +216,8 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								       ? FLinearColor(0.005, 0.005, 0.005, 0.8)
-								       : FLinearColor::Transparent;
+								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)
 				];
@@ -223,8 +235,8 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								       ? FLinearColor(0.005, 0.005, 0.005, 0.8)
-								       : FLinearColor::Transparent;
+								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)
 					[
@@ -234,8 +246,8 @@ namespace PCGExEnumCustomization
 							[IsActive]
 							{
 								return IsActive()
-									       ? FLinearColor::White
-									       : FLinearColor::Gray;
+									? FLinearColor::White
+									: FLinearColor::Gray;
 							})
 					]
 				];
@@ -253,13 +265,22 @@ namespace PCGExEnumCustomization
 	static int32 FindNextVisibleEnumIndex(const UEnum* Enum, int32 FromIndex)
 	{
 		const int32 NumValues = Enum->NumEnums() - 1;
-		if (NumValues <= 0) { return INDEX_NONE; }
-		if (FromIndex < 0) { FromIndex = -1; }
+		if (NumValues <= 0)
+		{
+			return INDEX_NONE;
+		}
+		if (FromIndex < 0)
+		{
+			FromIndex = -1;
+		}
 
 		for (int32 Step = 1; Step <= NumValues; ++Step)
 		{
 			const int32 Next = (FromIndex + Step) % NumValues;
-			if (!Enum->HasMetaData(TEXT("Hidden"), Next)) { return Next; }
+			if (!Enum->HasMetaData(TEXT("Hidden"), Next))
+			{
+				return Next;
+			}
 		}
 		return INDEX_NONE;
 	}
@@ -268,8 +289,14 @@ namespace PCGExEnumCustomization
 	{
 		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 		{
-			if (Enum->HasMetaData(TEXT("Hidden"), i)) { continue; }
-			if (!Enum->GetMetaData(TEXT("ActionIcon"), i).IsEmpty()) { return true; }
+			if (Enum->HasMetaData(TEXT("Hidden"), i))
+			{
+				continue;
+			}
+			if (!Enum->GetMetaData(TEXT("ActionIcon"), i).IsEmpty())
+			{
+				return true;
+			}
 		}
 		return false;
 	}
@@ -360,9 +387,15 @@ namespace PCGExEnumCustomization
 						FString CurrentValue;
 						PropertyHandle->GetValueAsFormattedString(CurrentValue);
 						const int32 Idx = Enum->GetIndexByNameString(CurrentValue);
-						if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
+						if (Idx == INDEX_NONE)
+						{
+							return FAppStyle::Get().GetDefaultBrush();
+						}
 						FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
-						if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
+						if (IconName.IsEmpty())
+						{
+							return FAppStyle::Get().GetDefaultBrush();
+						}
 						IconName = TEXT("PCGEx.ActionIcon.") + IconName;
 						return FAppStyle::Get().GetBrush(*IconName);
 					})
@@ -448,9 +481,15 @@ namespace PCGExEnumCustomization
 					.Image_Lambda([GetValue, Enum]() -> const FSlateBrush*
 					{
 						const int32 Idx = Enum->GetIndexByValue(GetValue());
-						if (Idx == INDEX_NONE) { return FAppStyle::Get().GetDefaultBrush(); }
+						if (Idx == INDEX_NONE)
+						{
+							return FAppStyle::Get().GetDefaultBrush();
+						}
 						FString IconName = Enum->GetMetaData(TEXT("ActionIcon"), Idx);
-						if (IconName.IsEmpty()) { return FAppStyle::Get().GetDefaultBrush(); }
+						if (IconName.IsEmpty())
+						{
+							return FAppStyle::Get().GetDefaultBrush();
+						}
 						IconName = TEXT("PCGEx.ActionIcon.") + IconName;
 						return FAppStyle::Get().GetBrush(*IconName);
 					})
@@ -470,7 +509,10 @@ namespace PCGExEnumCustomization
 
 		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 		{
-			if (Enum->HasMetaData(TEXT("Hidden"), i) || SkipIndices.Contains(i)) { continue; }
+			if (Enum->HasMetaData(TEXT("Hidden"), i) || SkipIndices.Contains(i))
+			{
+				continue;
+			}
 
 			const uint8 Bit = static_cast<uint8>(Enum->GetValueByIndex(i));
 
@@ -498,8 +540,8 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								       ? FLinearColor(0.005, 0.005, 0.005, 0.8)
-								       : FLinearColor::Transparent;
+								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)
 				];
@@ -517,8 +559,8 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								       ? FLinearColor(0.005, 0.005, 0.005, 0.8)
-								       : FLinearColor::Transparent;
+								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)
 					[
@@ -528,8 +570,8 @@ namespace PCGExEnumCustomization
 							[IsActive]
 							{
 								return IsActive()
-									       ? FLinearColor::White
-									       : FLinearColor::Gray;
+									? FLinearColor::White
+									: FLinearColor::Gray;
 							})
 					]
 				];
@@ -551,7 +593,10 @@ void FPCGExInlineEnumCustomization::CustomizeHeader(
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
 	UEnum* Enum = FindFirstObjectSafe<UEnum>(*EnumName);
-	if (!Enum) { return; }
+	if (!Enum)
+	{
+		return;
+	}
 
 	HeaderRow.NameContent()[PropertyHandle->CreatePropertyNameWidget()]
 		.ValueContent()

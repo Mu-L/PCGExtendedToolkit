@@ -91,7 +91,10 @@ namespace PCGExGraphs
 
 		FGraphBuilder(const TSharedRef<PCGExData::FFacade>& InNodeDataFacade, const FPCGExGraphBuilderDetails* InDetails);
 
-		const FGraphMetadataDetails* GetMetadataDetails() const { return MetadataDetailsPtr; }
+		const FGraphMetadataDetails* GetMetadataDetails() const
+		{
+			return MetadataDetailsPtr;
+		}
 
 		void CompileAsync(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, const bool bWriteNodeFacade, const FGraphMetadataDetails* MetadataDetails = nullptr);
 		void Compile(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, const bool bWriteNodeFacade, const FGraphMetadataDetails* MetadataDetails = nullptr);

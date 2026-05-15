@@ -73,9 +73,20 @@ namespace PCGExGraphs
 		FGraphNodeMetadata() = default;
 		explicit FGraphNodeMetadata(const int32 InNodeIndex, const EPCGExIntersectionType InType = EPCGExIntersectionType::Unknown);
 
-		FORCEINLINE bool IsUnion() const { return UnionSize > 1; }
-		FORCEINLINE bool IsIntersector() const { return Type == EPCGExIntersectionType::PointEdge; }
-		FORCEINLINE bool IsCrossing() const { return Type == EPCGExIntersectionType::EdgeEdge; }
+		FORCEINLINE bool IsUnion() const
+		{
+			return UnionSize > 1;
+		}
+
+		FORCEINLINE bool IsIntersector() const
+		{
+			return Type == EPCGExIntersectionType::PointEdge;
+		}
+
+		FORCEINLINE bool IsCrossing() const
+		{
+			return Type == EPCGExIntersectionType::EdgeEdge;
+		}
 	};
 
 	struct PCGEXGRAPHS_API FGraphEdgeMetadata
@@ -87,8 +98,15 @@ namespace PCGExGraphs
 		int32 UnionSize = 0; // Fuse size
 		int8 bIsSubEdge = 0; // Sub Edge (result of a)
 
-		FORCEINLINE bool IsUnion() const { return UnionSize > 1; }
-		FORCEINLINE bool IsRoot() const { return EdgeIndex == RootIndex; }
+		FORCEINLINE bool IsUnion() const
+		{
+			return UnionSize > 1;
+		}
+
+		FORCEINLINE bool IsRoot() const
+		{
+			return EdgeIndex == RootIndex;
+		}
 
 		FGraphEdgeMetadata() = default;
 		explicit FGraphEdgeMetadata(const int32 InEdgeIndex, const int32 InRootIndex = -1, const EPCGExIntersectionType InType = EPCGExIntersectionType::Unknown);

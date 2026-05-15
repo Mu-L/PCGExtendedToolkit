@@ -16,7 +16,11 @@ namespace PCGExPointIOMerger
 		PCGEX_ASYNC_TASK_NAME(FWriteAttributeScopeTask)
 
 		FWriteAttributeScopeTask(const TSharedPtr<PCGExData::FPointIO>& InPointIO, const FMergeScope& InScope, const FIdentityRef& InIdentity, const TSharedPtr<PCGExData::TBuffer<T>>& InOutBuffer)
-			: FTask(), PointIO(InPointIO), Scope(InScope), Identity(InIdentity), OutBuffer(InOutBuffer)
+			: FTask()
+			  , PointIO(InPointIO)
+			  , Scope(InScope)
+			  , Identity(InIdentity)
+			  , OutBuffer(InOutBuffer)
 		{
 		}
 
@@ -41,7 +45,8 @@ namespace PCGExPointIOMerger
 	{
 	public:
 		FCopyAttributeTask(const int32 InTaskIndex, const TSharedPtr<FPCGExPointIOMerger>& InMerger)
-			: FPCGExIndexedTask(InTaskIndex), Merger(InMerger)
+			: FPCGExIndexedTask(InTaskIndex)
+			  , Merger(InMerger)
 		{
 		}
 
@@ -67,8 +72,14 @@ namespace PCGExPointIOMerger
 					TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
 					const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identity.Identifier);
 
-					if (!Attribute) { continue; }                            // Missing attribute
-					if (!Identity.IsA(Attribute->GetTypeId())) { continue; } // Type mismatch
+					if (!Attribute)
+					{
+						continue;
+					} // Missing attribute
+					if (!Identity.IsA(Attribute->GetTypeId()))
+					{
+						continue;
+					} // Type mismatch
 
 					PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer)
 				}
@@ -134,7 +145,10 @@ PCGExPointIOMerger::FMergeScope& FPCGExPointIOMerger::Append(const TSharedPtr<PC
 
 	const int32 NumPoints = ReadScope.Count;
 
-	if (NumPoints <= 0) { return NullScope; }
+	if (NumPoints <= 0)
+	{
+		return NullScope;
+	}
 
 	const PCGExMT::FScope WriteScope = PCGExMT::FScope(NumCompositePoints, NumPoints);
 
@@ -145,7 +159,10 @@ PCGExPointIOMerger::FMergeScope& FPCGExPointIOMerger::Append(const TSharedPtr<PC
 {
 	const int32 NumPoints = InData->GetNum();
 
-	if (NumPoints <= 0) { return NullScope; }
+	if (NumPoints <= 0)
+	{
+		return NullScope;
+	}
 
 	const PCGExMT::FScope ReadScope = PCGExMT::FScope(0, NumPoints);
 	const PCGExMT::FScope WriteScope = PCGExMT::FScope(NumCompositePoints, NumPoints);
@@ -155,7 +172,10 @@ PCGExPointIOMerger::FMergeScope& FPCGExPointIOMerger::Append(const TSharedPtr<PC
 
 void FPCGExPointIOMerger::Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& InData)
 {
-	for (const TSharedPtr<PCGExData::FPointIO>& PointIO : InData) { Append(PointIO); }
+	for (const TSharedPtr<PCGExData::FPointIO>& PointIO : InData)
+	{
+		Append(PointIO);
+	}
 }
 
 void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes)
@@ -192,10 +212,16 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 		UPCGMetadata* Metadata = Source->GetIn()->Metadata;
 		PCGExData::FAttributeIdentity::ForEach(Metadata, [&](const PCGExData::FAttributeIdentity& SourceIdentity, const int32)
 		{
-			if (InIgnoredAttributes && InIgnoredAttributes->Contains(SourceIdentity.Identifier.Name)) { return; }
+			if (InIgnoredAttributes && InIgnoredAttributes->Contains(SourceIdentity.Identifier.Name))
+			{
+				return;
+			}
 
 			FString StrName = SourceIdentity.Identifier.Name.ToString();
-			if (!InCarryOverDetails->Attributes.Test(StrName)) { return; }
+			if (!InCarryOverDetails->Attributes.Test(StrName))
+			{
+				return;
+			}
 
 			const int32* ExpectedType = ExpectedTypes.Find(SourceIdentity.Identifier);
 			if (!ExpectedType)
@@ -225,11 +251,17 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 
 	UPCGBasePointData* OutPointData = UnionDataFacade->GetOut();
 	const bool bHasAttributes = !UniqueIdentities.IsEmpty();
-	if (bHasAttributes) { EnumAddFlags(AllocateProperties, EPCGPointNativeProperties::MetadataEntry); }
+	if (bHasAttributes)
+	{
+		EnumAddFlags(AllocateProperties, EPCGPointNativeProperties::MetadataEntry);
+	}
 
 	PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutPointData, NumCompositePoints, AllocateProperties);
 
-	if (bHasAttributes) { OutPointData->SetMetadataEntry(PCGInvalidEntryKey); }
+	if (bHasAttributes)
+	{
+		OutPointData->SetMetadataEntry(PCGInvalidEntryKey);
+	}
 
 	PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, CopyProperties)
 	CopyProperties->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE](int32 Index, const PCGExMT::FScope& Scope)

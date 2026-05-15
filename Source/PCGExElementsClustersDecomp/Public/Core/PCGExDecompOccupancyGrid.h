@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Containers/BitArray.h"
 #include "Clusters/PCGExCluster.h"
+#include "Containers/BitArray.h"
 
 #include "PCGExDecompOccupancyGrid.generated.h"
 
@@ -89,7 +89,10 @@ struct FPCGExDecompOccupancyGrid
 
 	FORCEINLINE bool IsOccupied(const int32 X, const int32 Y, const int32 Z) const
 	{
-		if (!IsInBounds(X, Y, Z)) { return false; }
+		if (!IsInBounds(X, Y, Z))
+		{
+			return false;
+		}
 		return Occupied[FlatIndex(X, Y, Z)];
 	}
 };

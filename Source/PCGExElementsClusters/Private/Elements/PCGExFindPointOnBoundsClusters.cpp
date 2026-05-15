@@ -4,19 +4,26 @@
 #include "Elements/PCGExFindPointOnBoundsClusters.h"
 
 
-#include "Utils/PCGExPointIOMerger.h"
-#include "Details/PCGExSettingsDetails.h"
 #include "Clusters/PCGExCluster.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExBlendingHelpers.h"
 #include "Math/PCGExBestFitPlane.h"
+#include "Utils/PCGExPointIOMerger.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFindPointOnBoundsClusters"
 #define PCGEX_NAMESPACE FindPointOnBoundsClusters
 
 PCGEX_SETTING_DATA_VALUE_IMPL(UPCGExFindPointOnBoundsClustersSettings, UVW, FVector, UVWInput, LocalUVW, UVW)
 
-PCGExData::EIOInit UPCGExFindPointOnBoundsClustersSettings::GetEdgeOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
-PCGExData::EIOInit UPCGExFindPointOnBoundsClustersSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExFindPointOnBoundsClustersSettings::GetEdgeOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGExData::EIOInit UPCGExFindPointOnBoundsClustersSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 void FPCGExFindPointOnBoundsClustersContext::ClusterProcessing_InitialProcessingDone()
 {
@@ -36,7 +43,10 @@ TArray<FPCGPinProperties> UPCGExFindPointOnBoundsClustersSettings::OutputPinProp
 
 bool FPCGExFindPointOnBoundsClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExClustersProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExClustersProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 	PCGEX_CONTEXT_AND_SETTINGS(FindPointOnBoundsClusters)
 
 	PCGEX_FWD(CarryOverDetails)
@@ -78,9 +88,12 @@ bool FPCGExFindPointOnBoundsClustersElement::AdvanceWork(FPCGExContext* InContex
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries) { return true; }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		{
-		}))
+		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+		                                      {
+			                                      return true;
+		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+		                                      {
+		                                      }))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -97,8 +110,14 @@ bool FPCGExFindPointOnBoundsClustersElement::AdvanceWork(FPCGExContext* InContex
 	}
 	else
 	{
-		if (Settings->SearchMode == EPCGExClusterClosestSearchMode::Vtx) { Context->MainPoints->StageOutputs(); }
-		else { Context->MainEdges->StageOutputs(); }
+		if (Settings->SearchMode == EPCGExClusterClosestSearchMode::Vtx)
+		{
+			Context->MainPoints->StageOutputs();
+		}
+		else
+		{
+			Context->MainEdges->StageOutputs();
+		}
 	}
 
 	return Context->TryComplete();
@@ -113,7 +132,10 @@ namespace PCGExFindPointOnBoundsClusters
 
 	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		FBox Bounds = FBox(ForceInit);
 		FVector UVW = Settings->GetValueSettingUVW(Context, Settings->ClusterElement == EPCGExClusterElement::Edge ? EdgeDataFacade->GetIn() : VtxDataFacade->GetIn())->Read(0);
@@ -139,8 +161,14 @@ namespace PCGExFindPointOnBoundsClusters
 		SearchPosition = Bounds.GetCenter() + Bounds.GetExtent() * UVW;
 		Cluster->RebuildOctree(Settings->SearchMode);
 
-		if (Settings->SearchMode == EPCGExClusterClosestSearchMode::Vtx) { StartParallelLoopForNodes(); }
-		else { StartParallelLoopForEdges(); }
+		if (Settings->SearchMode == EPCGExClusterClosestSearchMode::Vtx)
+		{
+			StartParallelLoopForNodes();
+		}
+		else
+		{
+			StartParallelLoopForEdges();
+		}
 
 		return true;
 	}
@@ -151,13 +179,19 @@ namespace PCGExFindPointOnBoundsClusters
 
 		{
 			FWriteScopeLock WriteLock(BestIndexLock);
-			if (Dist > BestDistance) { return; }
+			if (Dist > BestDistance)
+			{
+				return;
+			}
 		}
 
 		{
 			FWriteScopeLock WriteLock(BestIndexLock);
 
-			if (Dist > BestDistance) { return; }
+			if (Dist > BestDistance)
+			{
+				return;
+			}
 
 			BestPosition = InPosition;
 			BestIndex = InIndex;

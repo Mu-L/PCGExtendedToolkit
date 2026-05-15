@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExNoise3DOperation.h"
+#include "UObject/Object.h"
 
 #include "PCGExNoiseOpenSimplex2.generated.h"
 
@@ -65,7 +65,10 @@ private:
 	FORCEINLINE double Contrib(int32 XSV, int32 YSV, int32 ZSV, double DX, double DY, double DZ) const
 	{
 		double Attn = 2.0 / 3.0 - DX * DX - DY * DY - DZ * DZ;
-		if (Attn <= 0) { return 0; }
+		if (Attn <= 0)
+		{
+			return 0;
+		}
 
 		const int32 GI = PCGExNoise3D::Math::Hash3DSeed(XSV, YSV, ZSV, Seed) % 24 * 3;
 		const double GX = PCGExOpenSimplex2::Gradients3D[GI];

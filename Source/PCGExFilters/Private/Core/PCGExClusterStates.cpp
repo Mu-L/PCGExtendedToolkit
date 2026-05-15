@@ -4,8 +4,8 @@
 #include "Core/PCGExClusterStates.h"
 
 
-#include "PCGParamData.h"
 #include "PCGExVersion.h"
+#include "PCGParamData.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExClusterFilter.h"
@@ -47,7 +47,10 @@ namespace PCGExClusterStates
 	{
 		Config.Init();
 
-		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade)) { return false; }
+		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
+		{
+			return false;
+		}
 
 		Manager = MakeShared<PCGExClusterFilter::FManager>(InCluster, PointDataFacade.ToSharedRef(), EdgeDataFacade.ToSharedRef());
 		Manager->SetSupportedTypes(&PCGExFactories::ClusterNodeFilters);
@@ -78,20 +81,38 @@ namespace PCGExClusterStates
 	// Each state can independently set, clear, or toggle specific flag bits.
 	void FState::ProcessFlags(const bool bSuccess, int64& InFlags, const int32 Index) const
 	{
-		if (Config.bOnTestPass && bSuccess) { Config.PassStateFlags.Mutate(InFlags); }
-		else if (Config.bOnTestFail && !bSuccess) { Config.FailStateFlags.Mutate(InFlags); }
+		if (Config.bOnTestPass && bSuccess)
+		{
+			Config.PassStateFlags.Mutate(InFlags);
+		}
+		else if (Config.bOnTestFail && !bSuccess)
+		{
+			Config.FailStateFlags.Mutate(InFlags);
+		}
 	}
 
 	void FState::ProcessFlags(const bool bSuccess, int64& InFlags, const PCGExClusters::FNode& Node) const
 	{
-		if (Config.bOnTestPass && bSuccess) { Config.PassStateFlags.Mutate(InFlags); }
-		else if (Config.bOnTestFail && !bSuccess) { Config.FailStateFlags.Mutate(InFlags); }
+		if (Config.bOnTestPass && bSuccess)
+		{
+			Config.PassStateFlags.Mutate(InFlags);
+		}
+		else if (Config.bOnTestFail && !bSuccess)
+		{
+			Config.FailStateFlags.Mutate(InFlags);
+		}
 	}
 
 	void FState::ProcessFlags(const bool bSuccess, int64& InFlags, const PCGExGraphs::FEdge& Edge) const
 	{
-		if (Config.bOnTestPass && bSuccess) { Config.PassStateFlags.Mutate(InFlags); }
-		else if (Config.bOnTestFail && !bSuccess) { Config.FailStateFlags.Mutate(InFlags); }
+		if (Config.bOnTestPass && bSuccess)
+		{
+			Config.PassStateFlags.Mutate(InFlags);
+		}
+		else if (Config.bOnTestFail && !bSuccess)
+		{
+			Config.FailStateFlags.Mutate(InFlags);
+		}
 	}
 
 	FStateManager::FStateManager(const TSharedPtr<TArray<int64>>& InFlags, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataCache, const TSharedRef<PCGExData::FFacade>& InEdgeDataCache)
@@ -105,21 +126,30 @@ namespace PCGExClusterStates
 	bool FStateManager::Test(const int32 Index)
 	{
 		int64& Flags = *(FlagsCache->GetData() + Index);
-		for (const TSharedPtr<FState>& State : States) { State->ProcessFlags(State->Test(Index), Flags, Index); }
+		for (const TSharedPtr<FState>& State : States)
+		{
+			State->ProcessFlags(State->Test(Index), Flags, Index);
+		}
 		return true;
 	}
 
 	bool FStateManager::Test(const PCGExClusters::FNode& Node)
 	{
 		int64& Flags = *(FlagsCache->GetData() + Node.PointIndex);
-		for (const TSharedPtr<FState>& State : States) { State->ProcessFlags(State->Test(Node), Flags, Node); }
+		for (const TSharedPtr<FState>& State : States)
+		{
+			State->ProcessFlags(State->Test(Node), Flags, Node);
+		}
 		return true;
 	}
 
 	bool FStateManager::Test(const PCGExGraphs::FEdge& Edge)
 	{
 		int64& Flags = *(FlagsCache->GetData() + Edge.PointIndex);
-		for (const TSharedPtr<FState>& State : States) { State->ProcessFlags(State->Test(Edge), Flags, Edge); }
+		for (const TSharedPtr<FState>& State : States)
+		{
+			State->ProcessFlags(State->Test(Edge), Flags, Edge);
+		}
 		return true;
 	}
 

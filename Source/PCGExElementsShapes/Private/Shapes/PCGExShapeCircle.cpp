@@ -24,13 +24,22 @@ void FPCGExShapeCircleConfig::ApplyDeprecation()
 
 bool FPCGExShapeCircleBuilder::PrepareForSeeds(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InSeedDataFacade)
 {
-	if (!FPCGExShapeBuilderOperation::PrepareForSeeds(InContext, InSeedDataFacade)) { return false; }
+	if (!FPCGExShapeBuilderOperation::PrepareForSeeds(InContext, InSeedDataFacade))
+	{
+		return false;
+	}
 
 	StartAngle = Config.StartAngle.GetValueSetting();
-	if (!StartAngle->Init(InSeedDataFacade)) { return false; }
+	if (!StartAngle->Init(InSeedDataFacade))
+	{
+		return false;
+	}
 
 	EndAngle = Config.EndAngle.GetValueSetting();
-	if (!EndAngle->Init(InSeedDataFacade)) { return false; }
+	if (!EndAngle->Init(InSeedDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -52,7 +61,10 @@ void FPCGExShapeCircleBuilder::PrepareShape(const PCGExData::FConstPoint& Seed)
 	{
 		Circle->NumPoints = (Circle->Radius * Circle->AngleRange) / GetResolution(Seed);
 	}
-	else { Circle->NumPoints = GetResolution(Seed); }
+	else
+	{
+		Circle->NumPoints = GetResolution(Seed);
+	}
 
 	// Compute extents based on bounds source
 	if (BaseConfig.BoundsSource == EPCGExShapeBoundsSource::Fit)
@@ -100,7 +112,10 @@ void FPCGExShapeCircleBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> 
 	}
 
 	// Mark @Data.IsClosed if a single circle "owns" the data
-	if (bOwnsData && Circle->bClosedLoop) { PCGExPaths::Helpers::SetClosedLoop(InDataFacade->GetOut(), true); }
+	if (bOwnsData && Circle->bClosedLoop)
+	{
+		PCGExPaths::Helpers::SetClosedLoop(InDataFacade->GetOut(), true);
+	}
 }
 
 #if WITH_EDITOR
@@ -124,7 +139,7 @@ void UPCGExCreateShapeCircleSettings::ApplyDeprecation(UPCGNode* InOutNode)
 	{
 		Config.ApplyDeprecation();
 	}
-	
+
 	Super::ApplyDeprecation(InOutNode);
 }
 #endif

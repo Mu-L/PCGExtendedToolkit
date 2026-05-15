@@ -31,8 +31,15 @@ struct PCGEXCORE_API FPCGExBitmaskCollectionEntry
 	UPROPERTY(EditAnywhere, Category = Settings)
 	FVector Direction = FVector::UpVector;
 
-	FORCEINLINE FVector GetDirection() const { return Direction.GetSafeNormal(); }
-	FORCEINLINE void GetDirection(FVector& OutDir) const { OutDir = Direction.GetSafeNormal(); }
+	FORCEINLINE FVector GetDirection() const
+	{
+		return Direction.GetSafeNormal();
+	}
+
+	FORCEINLINE void GetDirection(FVector& OutDir) const
+	{
+		OutDir = Direction.GetSafeNormal();
+	}
 
 	PCGExBitmask::FCachedRef CachedBitmask;
 
@@ -55,7 +62,10 @@ namespace PCGExBitmaskCollection
 		bool TryGetBitmask(const FName Identifier, int64& OutBitmask) const;
 		bool TryGetBitmask(const FName Identifier, PCGExBitmask::FCachedRef& OutCachedBitmask) const;
 
-		bool IsEmpty() const { return Bitmasks.IsEmpty(); }
+		bool IsEmpty() const
+		{
+			return Bitmasks.IsEmpty();
+		}
 	};
 }
 
@@ -96,8 +106,15 @@ public:
 
 	virtual void BuildCache();
 
-	virtual bool IsValidIndex(const int32 InIndex) const { return false; }
-	virtual int32 NumEntries() const { return 0; }
+	virtual bool IsValidIndex(const int32 InIndex) const
+	{
+		return false;
+	}
+
+	virtual int32 NumEntries() const
+	{
+		return 0;
+	}
 
 	/** Named bitmask entries in this collection. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(TitleProperty="{Identifier}   |   {Direction}"))

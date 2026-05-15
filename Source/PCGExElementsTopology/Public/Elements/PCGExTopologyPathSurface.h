@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExTopology.h"
-#include "Data/PCGDynamicMeshData.h"
 #include "Core/PCGExClusterMT.h"
 #include "Core/PCGExPathProcessor.h"
+#include "Data/PCGDynamicMeshData.h"
 
 #include "PCGExTopologyPathSurface.generated.h"
 
@@ -26,8 +26,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(TopologyClusterSurface, "Topology : Path Surface", "Create a path surface topology");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::DynamicMesh; }
-	virtual FLinearColor GetNodeTitleColor() const override { return FLinearColor::White; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::DynamicMesh;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return FLinearColor::White;
+	}
 #endif
 
 protected:
@@ -41,7 +49,10 @@ public:
 	FPCGExTopologyDetails Topology;
 
 protected:
-	virtual bool IsCacheable() const override { return false; }
+	virtual bool IsCacheable() const override
+	{
+		return false;
+	}
 
 private:
 	friend class FPCGExTopologyPathSurfaceElement;
@@ -62,7 +73,12 @@ protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(TopologyPathSurface)
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
+	{
+		return true;
+	}
+
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };
 
@@ -82,7 +98,10 @@ namespace PCGExTopologyPathSurface
 		int32 ConstrainedEdgesNum = 0;
 
 	public:
-		TObjectPtr<UDynamicMesh> GetInternalMesh() { return InternalMesh; }
+		TObjectPtr<UDynamicMesh> GetInternalMesh()
+		{
+			return InternalMesh;
+		}
 
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
 			: TProcessor<FPCGExTopologyPathSurfaceContext, UPCGExTopologyPathSurfaceSettings>(InPointDataFacade)

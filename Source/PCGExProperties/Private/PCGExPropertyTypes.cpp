@@ -171,7 +171,7 @@ void FPCGExProperty_Enum::CopyValueFrom(const FPCGExProperty* Source)
 
 void FPCGExProperty_Enum::SyncStructuralFromSchema(const FPCGExProperty& Schema)
 {
-	// The enum class is structural — the schema decides which UEnum the property targets,
+	// The enum class is structural -- the schema decides which UEnum the property targets,
 	// and overrides must follow it. The selected int64 value is intentionally preserved
 	// here; if it no longer corresponds to a member of the new class, the picker UI will
 	// surface the raw integer and the user can re-pick.

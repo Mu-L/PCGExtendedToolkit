@@ -3,9 +3,9 @@
 
 #include "Elements/Filtering/PCGExSpatialTriage.h"
 
-#include "Data/PCGSpatialData.h"
 #include "Async/ParallelFor.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGSpatialData.h"
 
 #define LOCTEXT_NAMESPACE "PCGExSpatialTriageElement"
 #define PCGEX_NAMESPACE SpatialTriage
@@ -35,7 +35,10 @@ PCGEX_INITIALIZE_ELEMENT(SpatialTriage)
 
 bool FPCGExSpatialTriageElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SpatialTriage)
 
@@ -56,7 +59,10 @@ bool FPCGExSpatialTriageElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		TArray<FPCGTaggedData> TaggedDatas = Context->InputData.GetSpatialInputsByPin(PCGExSpatialTriage::SourceLabelBounds);
-		if (TaggedDatas.IsEmpty()) { return Context->CancelExecution(TEXT("No valid bounds.")); }
+		if (TaggedDatas.IsEmpty())
+		{
+			return Context->CancelExecution(TEXT("No valid bounds."));
+		}
 
 		const FBox Filter = Cast<UPCGSpatialData>(TaggedDatas[0].Data)->GetBounds();
 
@@ -86,16 +92,28 @@ bool FPCGExSpatialTriageElement::AdvanceWork(FPCGExContext* InContext, const UPC
 				}
 			}
 
-			if (OutputTo == PCGExSpatialTriage::OutputLabelOutside) { FPlatformAtomics::InterlockedIncrement(&NumOutside); }
+			if (OutputTo == PCGExSpatialTriage::OutputLabelOutside)
+			{
+				FPlatformAtomics::InterlockedIncrement(&NumOutside);
+			}
 
 			TaggedData.Pin = OutputTo;
 		});
 	}
 
 	uint64& Mask = Context->OutputData.InactiveOutputPinBitmask;
-	if (!NumInside) { Mask |= 1ULL << 0; }
-	if (!NumTouching) { Mask |= 1ULL << 1; }
-	if (!NumOutside) { Mask |= 1ULL << 2; }
+	if (!NumInside)
+	{
+		Mask |= 1ULL << 0;
+	}
+	if (!NumTouching)
+	{
+		Mask |= 1ULL << 1;
+	}
+	if (!NumOutside)
+	{
+		Mask |= 1ULL << 2;
+	}
 
 	Context->Done();
 	return Context->TryComplete();

@@ -4,11 +4,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
-#include "UObject/Object.h"
 #include "Core/PCGExFillControlOperation.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "PCGExFillControlKeepDirection.generated.h"
 
@@ -52,9 +52,21 @@ class FPCGExFillControlKeepDirection : public FPCGExFillControlOperation
 public:
 	virtual bool PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler) override;
 
-	virtual bool ChecksCapture() const override { return false; }
-	virtual bool ChecksProbe() const override { return false; }
-	virtual bool ChecksCandidate() const override { return true; }
+	virtual bool ChecksCapture() const override
+	{
+		return false;
+	}
+
+	virtual bool ChecksProbe() const override
+	{
+		return false;
+	}
+
+	virtual bool ChecksCandidate() const override
+	{
+		return true;
+	}
+
 	virtual bool IsValidCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, const PCGExFloodFill::FCandidate& Candidate) override;
 
 protected:

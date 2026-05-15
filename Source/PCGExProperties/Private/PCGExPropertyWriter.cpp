@@ -16,7 +16,10 @@ FName FPCGExPropertyOutputConfig::GetEffectiveOutputName() const
 		return PCGExMetaHelpers::SanitizeAttributeName(PropertyName);
 	}
 
-	if (!PCGExMetaHelpers::IsWritableAttributeName(OutputAttributeName)) { return NAME_None; }
+	if (!PCGExMetaHelpers::IsWritableAttributeName(OutputAttributeName))
+	{
+		return NAME_None;
+	}
 	return OutputAttributeName;
 }
 
@@ -105,7 +108,10 @@ void FPCGExPropertyWriter::WriteProperties(int32 PointIndex, int32 SourceIndex)
 		{
 			const FName& PropName = KV.Key;
 			FPCGExProperty* Writer = KV.Value.GetMutablePtr<FPCGExProperty>();
-			if (!Writer) { continue; }
+			if (!Writer)
+			{
+				continue;
+			}
 
 			// Find the source property by name and copy its value into the writer
 			if (const FInstancedStruct* SourceProp = PCGExProperties::GetPropertyByName(SourceProperties, PropName))

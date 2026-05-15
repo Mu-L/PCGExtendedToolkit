@@ -3,17 +3,17 @@
 
 #include "Details/InputSettings/PCGExInputShorthandsCustomization.h"
 
-#include "UObject/TextProperty.h"
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "PropertyHandle.h"
 #include "Details/PCGExCustomizationMacros.h"
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
 #include "Metadata/PCGAttributePropertySelector.h"
-#include "Widgets/Text/STextBlock.h"
+#include "UObject/TextProperty.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExInputShorthandCustomization::MakeInstance()
 {
@@ -102,44 +102,47 @@ TSharedRef<SWidget> FPCGExInputShorthandCustomization::CreateAttributeWidget(TSh
 			SNew(SEditableTextBox)
 			.Font(IDetailLayoutBuilder::GetDetailFont())
 			.Text_Lambda(
-			[AttributeHandle]()
-			{
-				TArray<void*> RawData;
-				AttributeHandle->AccessRawData(RawData);
-
-				if (RawData.Num() > 0)
-				{
-					FPCGAttributePropertyInputSelector* Selector = static_cast<FPCGAttributePropertyInputSelector*>(RawData[0]);
-					if (Selector)
-					{
-						return FText::FromString(Selector->ToString());
-					}
-				}
-				return FText::GetEmpty();
-			})
-		.OnTextCommitted_Lambda(
-			[AttributeHandle](const FText& NewText, ETextCommit::Type CommitType)
-			{
-				// Only handle commits from Enter or losing focus
-				if (CommitType == ETextCommit::OnEnter || CommitType == ETextCommit::OnUserMovedFocus)
+				[AttributeHandle]()
 				{
 					TArray<void*> RawData;
 					AttributeHandle->AccessRawData(RawData);
 
-					bool bUpdated = false;
-					for (void* Ptr : RawData)
+					if (RawData.Num() > 0)
 					{
-						FPCGAttributePropertyInputSelector* Selector = static_cast<FPCGAttributePropertyInputSelector*>(Ptr);
+						FPCGAttributePropertyInputSelector* Selector = static_cast<FPCGAttributePropertyInputSelector*>(RawData[0]);
 						if (Selector)
 						{
-							Selector->Update(NewText.ToString());
-							bUpdated = true;
+							return FText::FromString(Selector->ToString());
 						}
 					}
+					return FText::GetEmpty();
+				})
+			.OnTextCommitted_Lambda(
+				[AttributeHandle](const FText& NewText, ETextCommit::Type CommitType)
+				{
+					// Only handle commits from Enter or losing focus
+					if (CommitType == ETextCommit::OnEnter || CommitType == ETextCommit::OnUserMovedFocus)
+					{
+						TArray<void*> RawData;
+						AttributeHandle->AccessRawData(RawData);
 
-					if (bUpdated) { AttributeHandle->NotifyPostChange(EPropertyChangeType::ValueSet); }
-				}
-			})
+						bool bUpdated = false;
+						for (void* Ptr : RawData)
+						{
+							FPCGAttributePropertyInputSelector* Selector = static_cast<FPCGAttributePropertyInputSelector*>(Ptr);
+							if (Selector)
+							{
+								Selector->Update(NewText.ToString());
+								bUpdated = true;
+							}
+						}
+
+						if (bUpdated)
+						{
+							AttributeHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
+						}
+					}
+				})
 		];
 }
 
@@ -262,7 +265,10 @@ TSharedRef<SWidget> FPCGExInputShorthandSoftObjectPathCustomization::CreateValue
 			.OnTextCommitted_Lambda(
 				[ValueHandle](const FText& NewText, ETextCommit::Type CommitType)
 				{
-					if (CommitType != ETextCommit::OnEnter && CommitType != ETextCommit::OnUserMovedFocus) { return; }
+					if (CommitType != ETextCommit::OnEnter && CommitType != ETextCommit::OnUserMovedFocus)
+					{
+						return;
+					}
 
 					ValueHandle->NotifyPreChange();
 
@@ -280,7 +286,10 @@ TSharedRef<SWidget> FPCGExInputShorthandSoftObjectPathCustomization::CreateValue
 						}
 					}
 
-					if (bUpdated) { ValueHandle->NotifyPostChange(EPropertyChangeType::ValueSet); }
+					if (bUpdated)
+					{
+						ValueHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
+					}
 				})
 		];
 }

@@ -4,12 +4,12 @@
 #include "Helpers/PCGExAssetLoader.h"
 
 #include "Core/PCGExContext.h"
-#include "Types/PCGExTypes.h"
 #include "Core/PCGExMT.h"
-#include "Helpers/PCGExStreamingHelpers.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExPointIO.h"
 #include "Engine/AssetManager.h"
+#include "Helpers/PCGExStreamingHelpers.h"
+#include "Types/PCGExTypes.h"
 
 namespace PCGEx
 {
@@ -19,7 +19,9 @@ namespace PCGEx
 		PCGEX_ASYNC_TASK_NAME(TDiscoverAssetsTask)
 
 		FDiscoverAssetsTask(const TSharedPtr<IAssetLoader>& InLoader, const TSharedPtr<PCGExData::TAttributeBroadcaster<FSoftObjectPath>>& InBroadcaster)
-			: FTask(), Loader(InLoader), Broadcaster(InBroadcaster)
+			: FTask()
+			  , Loader(InLoader)
+			  , Broadcaster(InBroadcaster)
 		{
 		}
 
@@ -48,7 +50,10 @@ namespace PCGEx
 			for (int i = 0; i < NumValues; i++)
 			{
 				const FSoftObjectPath& Path = ValueDump[i];
-				if (!Path.IsAsset()) { continue; }
+				if (!Path.IsAsset())
+				{
+					continue;
+				}
 
 				Keys[i] = PCGExTypes::ComputeHash(Path);
 				UniqueValidPaths.Add(Path);
@@ -60,7 +65,9 @@ namespace PCGEx
 	};
 
 	IAssetLoader::IAssetLoader(FPCGExContext* InContext, const TSharedPtr<PCGExData::FPointIOCollection>& InIOCollection, const TArray<FName>& InAttributeNames)
-		: AttributeNames(InAttributeNames), Context(InContext), IOCollection(InIOCollection)
+		: AttributeNames(InAttributeNames)
+		  , Context(InContext)
+		  , IOCollection(InIOCollection)
 	{
 		Keys.Init(nullptr, InIOCollection->Num());
 	}
@@ -111,7 +118,10 @@ namespace PCGEx
 			}
 		}
 
-		if (Tasks.IsEmpty()) { return false; }
+		if (Tasks.IsEmpty())
+		{
+			return false;
+		}
 
 		PCGEX_ASYNC_GROUP_CHKD(TaskManager, AssetDiscovery)
 
@@ -126,7 +136,10 @@ namespace PCGEx
 		return true;
 	}
 
-	TSharedPtr<TArray<PCGExValueHash>> IAssetLoader::GetKeys(const int32 IOIndex) { return Keys[IOIndex]; }
+	TSharedPtr<TArray<PCGExValueHash>> IAssetLoader::GetKeys(const int32 IOIndex)
+	{
+		return Keys[IOIndex];
+	}
 
 	bool IAssetLoader::Load(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 	{
@@ -157,7 +170,10 @@ namespace PCGEx
 
 	void IAssetLoader::End(const bool bBuildMap)
 	{
-		if (OnComplete) { OnComplete(); }
+		if (OnComplete)
+		{
+			OnComplete();
+		}
 		PCGEX_ASYNC_RELEASE_TOKEN(LoadToken)
 	}
 

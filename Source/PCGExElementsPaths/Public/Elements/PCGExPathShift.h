@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPathProcessor.h"
 #include "Details/PCGExBlendingDetails.h"
+#include "Factories/PCGExFactories.h"
 #include "Math/PCGExMath.h"
 #include "Paths/PCGExPathsCommon.h"
 

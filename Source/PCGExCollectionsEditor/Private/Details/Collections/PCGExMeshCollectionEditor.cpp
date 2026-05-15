@@ -5,16 +5,16 @@
 #include "Details/Collections/PCGExCollectionEditorMacros.h"
 
 #include "ToolMenus.h"
-#include "Widgets/Input/SButton.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Widgets/Input/SButton.h"
 
-#include "Core/PCGExAssetCollection.h"
 #include "Collections/PCGExMeshCollection.h"
+#include "Core/PCGExAssetCollection.h"
 #include "Engine/StaticMesh.h"
-#include "Widgets/Layout/SBox.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SComboButton.h"
-#include "Widgets/SBoxPanel.h"
+#include "Widgets/Layout/SBox.h"
 
 FPCGExMeshCollectionEditor::FPCGExMeshCollectionEditor()
 	: FPCGExAssetCollectionEditor()
@@ -75,13 +75,16 @@ void FPCGExMeshCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolba
 								.OnClicked_Lambda(
 									[this]()
 									{
-										PCGEX_CURRENT_COLLECTION { Collection->EDITOR_DisableCollisions(); }
+										PCGEX_CURRENT_COLLECTION
+										{
+											Collection->EDITOR_DisableCollisions();
+										}
 										return FReply::Handled();
 									})
 								.ToolTipText(INVTEXT("Disable collision on all assets within that collection."))
 							];
 				})
-		);
+			);
 
 		ToolbarBuilder.AddWidget(
 			SNew(SComboButton)
@@ -106,7 +109,10 @@ void FPCGExMeshCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolba
 								.OnClicked_Lambda(
 									[this]()
 									{
-										PCGEX_CURRENT_COLLECTION { Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Global); }
+										PCGEX_CURRENT_COLLECTION
+										{
+											Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Global);
+										}
 										return FReply::Handled();
 									})
 								.ToolTipText(INVTEXT("Set all entry Descriptor to \"Inherit from collection\".\nEach entry will inherit from the collection global descriptors.\nNOTE: Local settings are preserved, just hidden."))
@@ -135,7 +141,10 @@ void FPCGExMeshCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolba
 								.OnClicked_Lambda(
 									[this]()
 									{
-										PCGEX_CURRENT_COLLECTION { Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Local); }
+										PCGEX_CURRENT_COLLECTION
+										{
+											Collection->EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode::Local);
+										}
 										return FReply::Handled();
 									})
 								.ToolTipText(INVTEXT("Set all entry Descriptor to \"Local\".\nEach entry manages its own descriptors.\nNOTE: This will restore previous local settings."))
@@ -157,7 +166,7 @@ void FPCGExMeshCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolba
 								]
 							];
 				})
-		);
+			);
 	}
 	ToolbarBuilder.EndSection();
 

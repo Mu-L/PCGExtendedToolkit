@@ -5,13 +5,19 @@
 #include "Core/PCGExProbeOperation.h"
 
 
-#include "Details/PCGExSettingsDetails.h"
 #include "Core/PCGExProbingCandidates.h"
 #include "Data/PCGExData.h"
+#include "Details/PCGExSettingsDetails.h"
 
-bool FPCGExProbeOperation::IsDirectProbe() const { return false; }
+bool FPCGExProbeOperation::IsDirectProbe() const
+{
+	return false;
+}
 
-bool FPCGExProbeOperation::RequiresChainProcessing() const { return false; }
+bool FPCGExProbeOperation::RequiresChainProcessing() const
+{
+	return false;
+}
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExProbeConfigBase, SearchRadius, double, SearchRadiusInput, SearchRadiusAttribute, SearchRadiusConstant)
 
@@ -20,7 +26,10 @@ bool FPCGExProbeOperation::Prepare(FPCGExContext* InContext)
 	PointIO = PrimaryDataFacade->Source;
 
 	SearchRadius = BaseConfig->GetValueSettingSearchRadius();
-	if (!SearchRadius->Init(PrimaryDataFacade)) { return false; }
+	if (!SearchRadius->Init(PrimaryDataFacade))
+	{
+		return false;
+	}
 	SearchRadiusOffset = SearchRadius->IsConstant() ? 0 : BaseConfig->SearchRadiusOffset;
 
 	return true;

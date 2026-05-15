@@ -3,9 +3,9 @@
 
 #include "Elements/PCGExFindClustersData.h"
 
+#include "Clusters/PCGExClusterDataLibrary.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Clusters/PCGExClusterDataLibrary.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFindClustersDataElement"
 #define PCGEX_NAMESPACE BuildCustomGraph
@@ -14,7 +14,10 @@ TArray<FPCGPinProperties> UPCGExFindClustersDataSettings::InputPinProperties() c
 {
 	TArray<FPCGPinProperties> PinProperties;
 	PCGEX_PIN_ANY(GetMainInputPin(), "The point data to be processed.", Required)
-	if (SearchMode != EPCGExClusterDataSearchMode::All) { PCGEX_PIN_POINT(GetSearchOutputPin(), "The search data to match against.", Required) }
+	if (SearchMode != EPCGExClusterDataSearchMode::All)
+	{
+		PCGEX_PIN_POINT(GetSearchOutputPin(), "The search data to match against.", Required)
+	}
 	return PinProperties;
 }
 
@@ -26,13 +29,19 @@ TArray<FPCGPinProperties> UPCGExFindClustersDataSettings::OutputPinProperties() 
 	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExFindClustersDataSettings::GetMainOutputInitMode() const { return PCGExData::EIOInit::NoInit; }
+PCGExData::EIOInit UPCGExFindClustersDataSettings::GetMainOutputInitMode() const
+{
+	return PCGExData::EIOInit::NoInit;
+}
 
 PCGEX_INITIALIZE_ELEMENT(FindClustersData)
 
 bool FPCGExFindClustersDataElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(FindClustersData)
 
@@ -86,7 +95,10 @@ bool FPCGExFindClustersDataElement::AdvanceWork(FPCGExContext* InContext, const 
 
 	PCGEX_CONTEXT_AND_SETTINGS(FindClustersData)
 
-	if (!Boot(Context)) { return true; }
+	if (!Boot(Context))
+	{
+		return true;
+	}
 
 	const TSharedPtr<PCGExClusters::FDataLibrary> Library = MakeShared<PCGExClusters::FDataLibrary>(true);
 	if (!Library->Build(Context->MainPoints))
@@ -100,7 +112,10 @@ bool FPCGExFindClustersDataElement::AdvanceWork(FPCGExContext* InContext, const 
 	{
 		for (const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries : Library->InputDictionary->Entries)
 		{
-			if (!Entries.IsValid()) { continue; }
+			if (!Entries.IsValid())
+			{
+				continue;
+			}
 
 			Entries->Key->OutputPin = PCGExClusters::Labels::OutputVerticesLabel;
 			Entries->Key->InitializeOutput(PCGExData::EIOInit::Forward);

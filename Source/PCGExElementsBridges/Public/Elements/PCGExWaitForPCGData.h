@@ -101,9 +101,21 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(WaitForPCGData, "Wait for PCG Data", "Wait for PCG Components Generated output.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::ControlFlow; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Action); }
-	virtual bool CanDynamicallyTrackKeys() const override { return true; }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::ControlFlow;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Action);
+	}
+
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
@@ -289,8 +301,15 @@ namespace PCGExWaitForPCGData
 
 		~FComponentDiscovery();
 
-		void SetOnComponentFound(FOnDiscoveryComplete&& InCallback) { OnComponentFound = MoveTemp(InCallback); }
-		void SetOnDiscoveryComplete(TFunction<void()>&& InCallback) { OnDiscoveryComplete = MoveTemp(InCallback); }
+		void SetOnComponentFound(FOnDiscoveryComplete&& InCallback)
+		{
+			OnComponentFound = MoveTemp(InCallback);
+		}
+
+		void SetOnDiscoveryComplete(TFunction<void()>&& InCallback)
+		{
+			OnDiscoveryComplete = MoveTemp(InCallback);
+		}
 
 		bool Start(const TSet<FSoftObjectPath>& InActorReferences);
 		void Stop();

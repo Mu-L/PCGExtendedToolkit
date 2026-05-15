@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Details/PCGExStagingDetails.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
 #include "Selectors/PCGExMicroEntryPickerOperation.h"
-#include "Details/PCGExStagingDetails.h"
 
 namespace PCGExDetails
 {
@@ -30,14 +30,14 @@ namespace PCGExDetails
 class FPCGExEntryWeightedRandomPickerOp : public FPCGExEntryPickerOperation
 {
 public:
-	virtual int32 Pick(int32 PointIndex, int32 Seed) const override;
+	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 /** Uniform random pick on the bound FCategory target. */
 class FPCGExEntryRandomPickerOp : public FPCGExEntryPickerOperation
 {
 public:
-	virtual int32 Pick(int32 PointIndex, int32 Seed) const override;
+	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 /**
@@ -53,7 +53,7 @@ public:
 	double MaxInputIndex = 0.0;
 
 	virtual bool PrepareForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade, PCGExAssetCollection::FCategory* InTarget, const UPCGExAssetCollection* InOwningCollection) override;
-	virtual int32 Pick(int32 PointIndex, int32 Seed) const override;
+	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 // Micro pickers --------------------------------------------------------------

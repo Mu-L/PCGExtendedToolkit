@@ -14,10 +14,22 @@ namespace PCGExExtrusion
 	void FExtrusionConfig::ComputeFlags(bool bHasStopFilters, bool bHasExternalPaths)
 	{
 		uint32 FlagBits = 0;
-		if (bAllowChildExtrusions) { FlagBits |= static_cast<uint32>(EExtrusionFlags::AllowsChildren); }
-		if (bDetectClosedLoops) { FlagBits |= static_cast<uint32>(EExtrusionFlags::ClosedLoop); }
-		if (bHasStopFilters) { FlagBits |= static_cast<uint32>(EExtrusionFlags::Bounded); }
-		if (bHasExternalPaths || bDoSelfIntersections) { FlagBits |= static_cast<uint32>(EExtrusionFlags::CollisionCheck); }
+		if (bAllowChildExtrusions)
+		{
+			FlagBits |= static_cast<uint32>(EExtrusionFlags::AllowsChildren);
+		}
+		if (bDetectClosedLoops)
+		{
+			FlagBits |= static_cast<uint32>(EExtrusionFlags::ClosedLoop);
+		}
+		if (bHasStopFilters)
+		{
+			FlagBits |= static_cast<uint32>(EExtrusionFlags::Bounded);
+		}
+		if (bHasExternalPaths || bDoSelfIntersections)
+		{
+			FlagBits |= static_cast<uint32>(EExtrusionFlags::CollisionCheck);
+		}
 
 		Flags = static_cast<EExtrusionFlags>(FlagBits);
 	}
@@ -34,7 +46,10 @@ namespace PCGExExtrusion
 	//
 
 	FExtrusion::FExtrusion(const int32 InSeedIndex, const TSharedRef<PCGExData::FFacade>& InFacade, const int32 InMaxIterations, const FExtrusionConfig& InConfig)
-		: Config(InConfig), SeedIndex(InSeedIndex), RemainingIterations(InMaxIterations), PointDataFacade(InFacade)
+		: Config(InConfig)
+		  , SeedIndex(InSeedIndex)
+		  , RemainingIterations(InMaxIterations)
+		  , PointDataFacade(InFacade)
 	{
 		ExtrudedPoints.Reserve(InMaxIterations);
 		Origin = InFacade->Source->GetInPoint(SeedIndex);
@@ -233,7 +248,10 @@ namespace PCGExExtrusion
 
 	void FExtrusion::ApplyRotation(const PCGExTensor::FTensorSample& Sample)
 	{
-		if (!Config.bTransformRotation) { return; }
+		if (!Config.bTransformRotation)
+		{
+			return;
+		}
 
 		switch (Config.RotationMode)
 		{
@@ -266,7 +284,10 @@ namespace PCGExExtrusion
 
 	bool FExtrusion::CheckStopFilters()
 	{
-		if (!StopFilters) { return false; }
+		if (!StopFilters)
+		{
+			return false;
+		}
 		return StopFilters->Test(ProxyHead);
 	}
 
@@ -324,7 +345,10 @@ namespace PCGExExtrusion
 	{
 		FCollisionResult Result;
 
-		if (!Config.bDoExternalIntersections || !ExternalPaths || ExternalPaths->IsEmpty()) { return Result; }
+		if (!Config.bDoExternalIntersections || !ExternalPaths || ExternalPaths->IsEmpty())
+		{
+			return Result;
+		}
 
 		int32 PathIndex = -1;
 		PCGExMath::FClosestPosition Intersection = PCGExPaths::Helpers::FindClosestIntersection(
@@ -345,7 +369,10 @@ namespace PCGExExtrusion
 	{
 		FCollisionResult Result;
 
-		if (!Config.bDoSelfIntersections || !SolidPaths) { return Result; }
+		if (!Config.bDoSelfIntersections || !SolidPaths)
+		{
+			return Result;
+		}
 
 		int32 PathIndex = -1;
 		// Note: Uses ExternalPathIntersections for SolidPaths check, not SelfPathIntersections
@@ -366,9 +393,18 @@ namespace PCGExExtrusion
 
 	FCollisionResult FExtrusion::ResolveCollisionPriority(const FCollisionResult& Crossing, const FCollisionResult& Merge)
 	{
-		if (!Crossing && !Merge) { return FCollisionResult(); }
-		if (Crossing && !Merge) { return Crossing; }
-		if (!Crossing && Merge) { return Merge; }
+		if (!Crossing && !Merge)
+		{
+			return FCollisionResult();
+		}
+		if (Crossing && !Merge)
+		{
+			return Crossing;
+		}
+		if (!Crossing && Merge)
+		{
+			return Merge;
+		}
 
 		// Both exist - crossing takes priority by default
 		// Owner can configure this via Config if needed
@@ -377,7 +413,10 @@ namespace PCGExExtrusion
 
 	bool FExtrusion::TryMerge(const PCGExMath::FSegment& InSegment, const PCGExMath::FClosestPosition& InMerge)
 	{
-		if (!Config.bMergeOnProximity || !InMerge) { return false; }
+		if (!Config.bMergeOnProximity || !InMerge)
+		{
+			return false;
+		}
 
 		if (Config.MergeDetails.bWantsDotCheck)
 		{
@@ -392,10 +431,16 @@ namespace PCGExExtrusion
 
 	PCGExMath::FClosestPosition FExtrusion::FindCrossing(const PCGExMath::FSegment& InSegment, bool& OutIsLastSegment, PCGExMath::FClosestPosition& OutClosestPosition, const int32 TruncateSearch) const
 	{
-		if (!Bounds.Intersect(InSegment.Bounds)) { return PCGExMath::FClosestPosition(); }
+		if (!Bounds.Intersect(InSegment.Bounds))
+		{
+			return PCGExMath::FClosestPosition();
+		}
 
 		const int32 MaxSearches = SegmentBounds.Num() - TruncateSearch;
-		if (MaxSearches <= 0) { return PCGExMath::FClosestPosition(); }
+		if (MaxSearches <= 0)
+		{
+			return PCGExMath::FClosestPosition();
+		}
 
 		PCGExMath::FClosestPosition Crossing(InSegment.A);
 
@@ -405,7 +450,10 @@ namespace PCGExExtrusion
 
 		for (int32 i = 0; i < MaxSearches; i++)
 		{
-			if (!SegmentBounds[i].Intersect(InSegment.Bounds)) { continue; }
+			if (!SegmentBounds[i].Intersect(InSegment.Bounds))
+			{
+				continue;
+			}
 
 			FVector A = ExtrudedPoints[i].GetLocation();
 			FVector B = ExtrudedPoints[i + 1].GetLocation();
@@ -480,8 +528,8 @@ namespace PCGExExtrusion
 
 		// Validate path - use callback if available, otherwise default to >= 2 points
 		const bool bIsValid = Callbacks.OnValidatePath
-			                      ? Callbacks.OnValidatePath(ExtrudedPoints.Num())
-			                      : (ExtrudedPoints.Num() >= 2);
+			? Callbacks.OnValidatePath(ExtrudedPoints.Num())
+			: (ExtrudedPoints.Num() >= 2);
 
 		if (!bIsValid)
 		{
@@ -524,7 +572,10 @@ namespace PCGExExtrusion
 		{
 			// Cutoff connects back to own path - remove last point and stop
 			ExtrudedPoints.Pop();
-			if (SegmentBounds.Num() > 0) { SegmentBounds.Pop(); }
+			if (SegmentBounds.Num() > 0)
+			{
+				SegmentBounds.Pop();
+			}
 
 			StopReason |= EStopReason::SelfIntersection;
 			Complete();

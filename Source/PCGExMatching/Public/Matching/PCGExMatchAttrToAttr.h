@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExMatchRuleFactoryProvider.h"
+#include "Utils/PCGExCompare.h"
 
 
 #include "PCGExMatchAttrToAttr.generated.h"
@@ -110,7 +110,10 @@ public:
 	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
 
 protected:
-	virtual bool IsCacheable() const override { return true; }
+	virtual bool IsCacheable() const override
+	{
+		return true;
+	}
 
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;

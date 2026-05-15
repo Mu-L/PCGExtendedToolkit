@@ -31,7 +31,10 @@ PCGEX_INITIALIZE_ELEMENT(UnpackClusters)
 
 bool FPCGExUnpackClustersElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(UnpackClusters)
 
@@ -51,7 +54,8 @@ public:
 	PCGEX_ASYNC_TASK_NAME(FPCGExUnpackClusterTask)
 
 	explicit FPCGExUnpackClusterTask(const TSharedPtr<PCGExData::FPointIO>& InPointIO)
-		: FTask(), PointIO(InPointIO)
+		: FTask()
+		  , PointIO(InPointIO)
 	{
 	}
 
@@ -71,7 +75,10 @@ public:
 			// Support for legacy data that was storing the edge count as a point index
 			EdgeCountIdentifier = PCGExMetaHelpers::GetAttributeIdentifier(PCGExClusters::Labels::Tag_PackedClusterEdgeCount_LEGACY, PointIO->GetIn());
 			EdgeCount = PCGExMetaHelpers::TryGetConstAttribute<int32>(PointIO->GetIn(), EdgeCountIdentifier);
-			if (EdgeCount) { NumEdges = PCGExData::Helpers::ReadDataValue(EdgeCount); }
+			if (EdgeCount)
+			{
+				NumEdges = PCGExData::Helpers::ReadDataValue(EdgeCount);
+			}
 		}
 		else
 		{
@@ -127,7 +134,10 @@ bool FPCGExUnpackClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
-		while (Context->AdvancePointsIO(false)) { PCGEX_LAUNCH(FPCGExUnpackClusterTask, Context->CurrentIO) }
+		while (Context->AdvancePointsIO(false))
+		{
+			PCGEX_LAUNCH(FPCGExUnpackClusterTask, Context->CurrentIO)
+		}
 		Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
 	}
 

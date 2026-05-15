@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 #include "Core/PCGExTensorSampler.h"
+#include "UObject/Object.h"
 
 #include "PCGExTensorSamplerSixPoints.generated.h"
 

@@ -3,9 +3,9 @@
 
 #include "Elements/PCGExClipper2RectClip.h"
 
-#include "Data/PCGExPointIO.h"
 #include "Clipper2Lib/clipper.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2RectClipElement"
 #define PCGEX_NAMESPACE Clipper2RectClip
@@ -243,7 +243,10 @@ FBox FPCGExClipper2RectClipContext::ComputeCombinedBounds(const TArray<int32>& I
 
 	for (const int32 Idx : Indices)
 	{
-		if (Idx < 0 || Idx >= AllOpData->Facades.Num()) { continue; }
+		if (Idx < 0 || Idx >= AllOpData->Facades.Num())
+		{
+			continue;
+		}
 
 		const TSharedPtr<PCGExData::FFacade>& Facade = AllOpData->Facades[Idx];
 		const UPCGBasePointData* PointData = Facade->Source->GetIn();
@@ -325,7 +328,10 @@ void FPCGExClipper2RectClipContext::Process(const TSharedPtr<PCGExClipper2::FPro
 {
 	const UPCGExClipper2RectClipSettings* Settings = GetInputSettings<UPCGExClipper2RectClipSettings>();
 
-	if (!Group->IsValid()) { return; }
+	if (!Group->IsValid())
+	{
+		return;
+	}
 
 	// Compute the clipping rectangle
 	PCGExClipper2Lib::Rect64 ClipRect = ComputeClipRect(Group, Settings);
@@ -353,8 +359,14 @@ void FPCGExClipper2RectClipContext::Process(const TSharedPtr<PCGExClipper2::FPro
 		PCGExClipper2Lib::Clipper64 Clipper;
 		Clipper.SetZCallback(Group->CreateZCallback());
 
-		if (!Group->SubjectPaths.empty()) { Clipper.AddSubject(Group->SubjectPaths); }
-		if (!Group->OpenSubjectPaths.empty()) { Clipper.AddOpenSubject(Group->OpenSubjectPaths); }
+		if (!Group->SubjectPaths.empty())
+		{
+			Clipper.AddSubject(Group->SubjectPaths);
+		}
+		if (!Group->OpenSubjectPaths.empty())
+		{
+			Clipper.AddOpenSubject(Group->OpenSubjectPaths);
+		}
 		Clipper.AddClip(RectPaths);
 
 		PCGExClipper2Lib::Paths64 ClosedResults;

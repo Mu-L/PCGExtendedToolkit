@@ -21,11 +21,17 @@ TArray<FPCGPinProperties> UPCGExGetGUIDSettings::OutputPinProperties() const
 
 PCGEX_INITIALIZE_ELEMENT(GetGUID)
 
-bool UPCGExGetGUIDSettings::GetIsMainTransactional() const { return true; }
+bool UPCGExGetGUIDSettings::GetIsMainTransactional() const
+{
+	return true;
+}
 
 bool FPCGExGetGUIDElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(GetGUID)
 
@@ -52,8 +58,14 @@ bool FPCGExGetGUIDElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSet
 
 			Facade->bSupportsScopedGet = true;
 
-			if (!FacadeRef->Source->GetIn()->GetConstDensityValueRange().IsValidIndex(TargetIndex)) { return Context->CancelExecution(TEXT("Selected index is invalid.")); }
-			if (!Config.Init(Context, FacadeRef)) { return Context->CancelExecution(); }
+			if (!FacadeRef->Source->GetIn()->GetConstDensityValueRange().IsValidIndex(TargetIndex))
+			{
+				return Context->CancelExecution(TEXT("Selected index is invalid."));
+			}
+			if (!Config.Init(Context, FacadeRef))
+			{
+				return Context->CancelExecution();
+			}
 
 			PCGExMT::FScope FetchScope = PCGExMT::FScope(TargetIndex, 1);
 			Facade->Fetch(FetchScope);

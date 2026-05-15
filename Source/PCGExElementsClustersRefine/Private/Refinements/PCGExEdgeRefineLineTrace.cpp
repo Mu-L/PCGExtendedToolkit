@@ -25,14 +25,23 @@ void FPCGExEdgeRefineLineTrace::ProcessEdge(PCGExGraphs::FEdge& Edge)
 		{
 			uint32 Seed = Edge.Start * 73856093 ^ Edge.End * 19349663 ^ s;
 			bHit = InitializedCollisionSettings->Linecast(From, PCGExMath::RandomPointInSphere(To, ScatterRadius, Seed), bTwoWayCheck);
-			if (bHit) { break; }
+			if (bHit)
+			{
+				break;
+			}
 		}
 
-		if (!bHit) { return; }
+		if (!bHit)
+		{
+			return;
+		}
 	}
 	else
 	{
-		if (!InitializedCollisionSettings->Linecast(From, To, bTwoWayCheck)) { return; }
+		if (!InitializedCollisionSettings->Linecast(From, To, bTwoWayCheck))
+		{
+			return;
+		}
 	}
 
 	FPlatformAtomics::InterlockedExchange(&Edge.bValid, ExchangeValue);

@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPathProcessor.h"
+#include "Factories/PCGExFactories.h"
 
 #include "Core/PCGExPointsProcessor.h"
 #include "Math/PCGExMathAxis.h"
@@ -45,7 +45,10 @@ protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 	//~Begin UPCGExPointProcessorSettings
 public:

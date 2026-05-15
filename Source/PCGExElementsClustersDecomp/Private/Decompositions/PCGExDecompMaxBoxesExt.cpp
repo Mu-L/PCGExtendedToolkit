@@ -10,7 +10,10 @@
 
 bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 {
-	if (!Cluster || Cluster->Nodes->Num() == 0) { return false; }
+	if (!Cluster || Cluster->Nodes->Num() == 0)
+	{
+		return false;
+	}
 
 	const int32 NumNodes = Cluster->Nodes->Num();
 
@@ -19,7 +22,10 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 
 	// Build occupancy grid
 	FPCGExDecompOccupancyGrid Grid;
-	if (!Grid.Build(Cluster, TransformSpace, ResolvedVoxelSize, CustomTransform)) { return false; }
+	if (!Grid.Build(Cluster, TransformSpace, ResolvedVoxelSize, CustomTransform))
+	{
+		return false;
+	}
 
 	// Compute max extent in voxels from MaxCellSize (world units)
 	const FIntVector MaxExtent = FIntVector(
@@ -45,12 +51,18 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 		bUsePerNodeBias = true;
 		TArray<FVector> VoxelBias;
 		VoxelBias.SetNumUninitialized(Grid.TotalVoxels);
-		for (int32 i = 0; i < Grid.TotalVoxels; i++) { VoxelBias[i] = FVector(1.0); }
+		for (int32 i = 0; i < Grid.TotalVoxels; i++)
+		{
+			VoxelBias[i] = FVector(1.0);
+		}
 
 		for (int32 i = 0; i < NumNodes; i++)
 		{
 			const int32 VoxelIdx = Grid.NodeToVoxelIndex[i];
-			if (VoxelIdx >= 0) { VoxelBias[VoxelIdx] = BiasSetting->Read(Cluster->GetNodePointIndex(i)); }
+			if (VoxelIdx >= 0)
+			{
+				VoxelBias[VoxelIdx] = BiasSetting->Read(Cluster->GetNodePointIndex(i));
+			}
 		}
 
 		BuildBiasPrefixSums(Grid, VoxelBias, BiasPrefixSums);
@@ -74,12 +86,18 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 		bUseWeights = true;
 		TArray<double> VoxelWeights;
 		VoxelWeights.SetNumUninitialized(Grid.TotalVoxels);
-		for (int32 i = 0; i < Grid.TotalVoxels; i++) { VoxelWeights[i] = 1.0; }
+		for (int32 i = 0; i < Grid.TotalVoxels; i++)
+		{
+			VoxelWeights[i] = 1.0;
+		}
 
 		for (int32 i = 0; i < NumNodes; i++)
 		{
 			const int32 VoxelIdx = Grid.NodeToVoxelIndex[i];
-			if (VoxelIdx >= 0) { VoxelWeights[VoxelIdx] = WeightSetting->Read(Cluster->GetNodePointIndex(i)); }
+			if (VoxelIdx >= 0)
+			{
+				VoxelWeights[VoxelIdx] = WeightSetting->Read(Cluster->GetNodePointIndex(i));
+			}
 		}
 
 		BuildWeightPrefixSums(Grid, VoxelWeights, WeightPrefixSums);
@@ -106,7 +124,10 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 			for (int32 i = 0; i < NumEdges; i++)
 			{
 				const PCGExGraphs::FEdge& Edge = (*Cluster->Edges)[i];
-				if (!Edge.bValid) { continue; }
+				if (!Edge.bValid)
+				{
+					continue;
+				}
 				// Edge.Start/End are PointIndex -- use GetEdgeStart/End to resolve to FNode*
 				const PCGExClusters::FNode* StartNode = Cluster->GetEdgeStart(Edge);
 				const PCGExClusters::FNode* EndNode = Cluster->GetEdgeEnd(Edge);
@@ -120,12 +141,21 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 	TBitArray<> Available = Grid.Occupied;
 
 	int32 RemainingCount = 0;
-	for (int32 i = 0; i < Grid.TotalVoxels; i++) { if (Available[i]) { RemainingCount++; } }
+	for (int32 i = 0; i < Grid.TotalVoxels; i++)
+	{
+		if (Available[i])
+		{
+			RemainingCount++;
+		}
+	}
 
 	// Per-voxel CellID
 	TArray<int32> VoxelCellIDs;
 	VoxelCellIDs.SetNumUninitialized(Grid.TotalVoxels);
-	for (int32& ID : VoxelCellIDs) { ID = -1; }
+	for (int32& ID : VoxelCellIDs)
+	{
+		ID = -1;
+	}
 
 	int32 NextCellID = 0;
 	TArray<int32> CellVoxelCounts;
@@ -142,12 +172,18 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 			FIntVector BoxMin, BoxMax;
 			int32 BoxVolume = 0;
 
-			if (!FindLargestBox(Grid, Available, WeightPrefixSumsPtr, ConstantBias, BiasPrefixSumsPtr, BoxMin, BoxMax, BoxVolume) || BoxVolume == 0) { break; }
+			if (!FindLargestBox(Grid, Available, WeightPrefixSumsPtr, ConstantBias, BiasPrefixSumsPtr, BoxMin, BoxMax, BoxVolume) || BoxVolume == 0)
+			{
+				break;
+			}
 
 			// Check average weight of the box
 			const double WeightSum = QueryWeightSum(Grid, WeightPrefixSums, BoxMin, BoxMax);
 			const double AvgWeight = WeightSum / BoxVolume;
-			if (AvgWeight < PriorityThreshold) { break; } // No more high-priority boxes
+			if (AvgWeight < PriorityThreshold)
+			{
+				break;
+			} // No more high-priority boxes
 
 			SubdivideAndClaim(Grid, BoxMin, BoxMax, MaxExtent, Available, VoxelCellIDs, NextCellID, RemainingCount, CellVoxelCounts);
 		}
@@ -159,7 +195,10 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 		FIntVector BoxMin, BoxMax;
 		int32 BoxVolume = 0;
 
-		if (!FindLargestBox(Grid, Available, WeightPrefixSumsPtr, ConstantBias, BiasPrefixSumsPtr, BoxMin, BoxMax, BoxVolume) || BoxVolume == 0) { break; }
+		if (!FindLargestBox(Grid, Available, WeightPrefixSumsPtr, ConstantBias, BiasPrefixSumsPtr, BoxMin, BoxMax, BoxVolume) || BoxVolume == 0)
+		{
+			break;
+		}
 
 		SubdivideAndClaim(Grid, BoxMin, BoxMax, MaxExtent, Available, VoxelCellIDs, NextCellID, RemainingCount, CellVoxelCounts);
 	}
@@ -172,7 +211,10 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 	CellVoxelCounts.SetNumZeroed(NextCellID);
 	for (int32 i = 0; i < Grid.TotalVoxels; i++)
 	{
-		if (VoxelCellIDs[i] >= 0 && VoxelCellIDs[i] < NextCellID) { CellVoxelCounts[VoxelCellIDs[i]]++; }
+		if (VoxelCellIDs[i] >= 0 && VoxelCellIDs[i] < NextCellID)
+		{
+			CellVoxelCounts[VoxelCellIDs[i]]++;
+		}
 	}
 
 	// Discard cells below MinVoxelsPerCell (set their CellID to -1)
@@ -194,8 +236,14 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 		int32 CompactID = 0;
 		for (int32 i = 0; i < Grid.TotalVoxels; i++)
 		{
-			if (VoxelCellIDs[i] < 0) { continue; }
-			if (!Remap.Contains(VoxelCellIDs[i])) { Remap.Add(VoxelCellIDs[i], CompactID++); }
+			if (VoxelCellIDs[i] < 0)
+			{
+				continue;
+			}
+			if (!Remap.Contains(VoxelCellIDs[i]))
+			{
+				Remap.Add(VoxelCellIDs[i], CompactID++);
+			}
 			VoxelCellIDs[i] = Remap[VoxelCellIDs[i]];
 		}
 
@@ -252,7 +300,10 @@ bool FPCGExDecompMaxBoxesExt::FindLargestBox(
 	for (int32 Z1 = 0; Z1 < GZ; Z1++)
 	{
 		// Reset ColAvail for new Z1
-		for (int32 i = 0; i < GX * GY; i++) { ColAvail[i] = true; }
+		for (int32 i = 0; i < GX * GY; i++)
+		{
+			ColAvail[i] = true;
+		}
 
 		for (int32 Z2 = Z1; Z2 < GZ; Z2++)
 		{
@@ -272,7 +323,10 @@ bool FPCGExDecompMaxBoxesExt::FindLargestBox(
 			}
 
 			// Find largest rectangle in the 2D ColAvail mask using histogram method
-			for (int32 X = 0; X < GX; X++) { Hist[X] = 0; }
+			for (int32 X = 0; X < GX; X++)
+			{
+				Hist[X] = 0;
+			}
 
 			for (int32 Y = 0; Y < GY; Y++)
 			{
@@ -331,9 +385,18 @@ bool FPCGExDecompMaxBoxesExt::FindLargestBox(
 							}
 
 							// Sort descending
-							if (d1 < d2) { Swap(d1, d2); }
-							if (d1 < d3) { Swap(d1, d3); }
-							if (d2 < d3) { Swap(d2, d3); }
+							if (d1 < d2)
+							{
+								Swap(d1, d2);
+							}
+							if (d1 < d3)
+							{
+								Swap(d1, d3);
+							}
+							if (d2 < d3)
+							{
+								Swap(d2, d3);
+							}
 
 							const double Compactness = d1 > KINDA_SMALL_NUMBER ? d2 / d1 : 1.0;
 							Score = Volume * FMath::Pow(Compactness, Balance * 2.0);
@@ -416,7 +479,10 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 		for (int32 Flat = 0; Flat < Grid.TotalVoxels; Flat++)
 		{
 			const int32 CellID = VoxelCellIDs[Flat];
-			if (CellID < 0) { continue; }
+			if (CellID < 0)
+			{
+				continue;
+			}
 
 			const FIntVector Coord = Grid.UnflatIndex(Flat);
 			FCellInfo& Info = Cells.FindOrAdd(CellID);
@@ -431,14 +497,20 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 			Info.Count++;
 		}
 
-		if (Cells.Num() <= 1) { break; }
+		if (Cells.Num() <= 1)
+		{
+			break;
+		}
 
 		// Build face-adjacency between cells
 		TMap<int32, TSet<int32>> Adj;
 		for (int32 Flat = 0; Flat < Grid.TotalVoxels; Flat++)
 		{
 			const int32 CellID = VoxelCellIDs[Flat];
-			if (CellID < 0) { continue; }
+			if (CellID < 0)
+			{
+				continue;
+			}
 
 			const FIntVector Coord = Grid.UnflatIndex(Flat);
 			for (int32 Dir = 0; Dir < 6; Dir++)
@@ -446,7 +518,10 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 				const int32 NX = Coord.X + Dx[Dir];
 				const int32 NY = Coord.Y + Dy[Dir];
 				const int32 NZ = Coord.Z + Dz[Dir];
-				if (!Grid.IsInBounds(NX, NY, NZ)) { continue; }
+				if (!Grid.IsInBounds(NX, NY, NZ))
+				{
+					continue;
+				}
 
 				const int32 NCellID = VoxelCellIDs[Grid.FlatIndex(NX, NY, NZ)];
 				if (NCellID >= 0 && NCellID != CellID)
@@ -459,20 +534,32 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 		// Sort cells by count ascending (merge smallest cells first)
 		TArray<int32> SortedCellIDs;
 		Cells.GetKeys(SortedCellIDs);
-		SortedCellIDs.Sort([&Cells](int32 A, int32 B) { return Cells[A].Count < Cells[B].Count; });
+		SortedCellIDs.Sort([&Cells](int32 A, int32 B)
+		{
+			return Cells[A].Count < Cells[B].Count;
+		});
 
 		for (const int32 CellA : SortedCellIDs)
 		{
 			const FCellInfo* InfoA = Cells.Find(CellA);
-			if (!InfoA) { continue; }
+			if (!InfoA)
+			{
+				continue;
+			}
 
 			const TSet<int32>* AdjSet = Adj.Find(CellA);
-			if (!AdjSet) { continue; }
+			if (!AdjSet)
+			{
+				continue;
+			}
 
 			for (const int32 CellB : *AdjSet)
 			{
 				const FCellInfo* InfoB = Cells.Find(CellB);
-				if (!InfoB) { continue; }
+				if (!InfoB)
+				{
+					continue;
+				}
 
 				// Compute merged AABB
 				const FIntVector MMin(
@@ -486,11 +573,17 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 				const FIntVector MSize = MMax - MMin + FIntVector(1, 1, 1);
 
 				// Check MaxExtent
-				if (MSize.X > MaxExtent.X || MSize.Y > MaxExtent.Y || MSize.Z > MaxExtent.Z) { continue; }
+				if (MSize.X > MaxExtent.X || MSize.Y > MaxExtent.Y || MSize.Z > MaxExtent.Z)
+				{
+					continue;
+				}
 
 				// Perfect box check: merged AABB volume must equal combined voxel count
 				const int32 MergedVolume = MSize.X * MSize.Y * MSize.Z;
-				if (MergedVolume != InfoA->Count + InfoB->Count) { continue; }
+				if (MergedVolume != InfoA->Count + InfoB->Count)
+				{
+					continue;
+				}
 
 				// Heuristic merge gating: check boundary edge scores
 				if (EdgeScores)
@@ -502,16 +595,25 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 					for (int32 EdgeIdx = 0; EdgeIdx < NumEdgesTotal; EdgeIdx++)
 					{
 						const PCGExGraphs::FEdge& Edge = (*Cluster->Edges)[EdgeIdx];
-						if (!Edge.bValid) { continue; }
+						if (!Edge.bValid)
+						{
+							continue;
+						}
 
 						// Edge.Start/End are PointIndex -- convert to NodeIndex via lookup
 						const int32 NodeA = Cluster->NodeIndexLookup->Get(Edge.Start);
 						const int32 NodeB = Cluster->NodeIndexLookup->Get(Edge.End);
-						if (NodeA < 0 || NodeB < 0) { continue; }
+						if (NodeA < 0 || NodeB < 0)
+						{
+							continue;
+						}
 
 						const int32 VoxA = Grid.NodeToVoxelIndex[NodeA];
 						const int32 VoxB = Grid.NodeToVoxelIndex[NodeB];
-						if (VoxA < 0 || VoxB < 0) { continue; }
+						if (VoxA < 0 || VoxB < 0)
+						{
+							continue;
+						}
 
 						const int32 CA = VoxelCellIDs[VoxA];
 						const int32 CB = VoxelCellIDs[VoxB];
@@ -531,7 +633,10 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 				// Valid merge -- absorb B into A
 				for (int32 Flat = 0; Flat < Grid.TotalVoxels; Flat++)
 				{
-					if (VoxelCellIDs[Flat] == CellB) { VoxelCellIDs[Flat] = CellA; }
+					if (VoxelCellIDs[Flat] == CellB)
+					{
+						VoxelCellIDs[Flat] = CellA;
+					}
 				}
 
 				Cells.FindOrAdd(CellA) = FCellInfo{MMin, MMax, InfoA->Count + InfoB->Count};
@@ -541,7 +646,10 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 				break;
 			}
 
-			if (bChanged) { break; }
+			if (bChanged)
+			{
+				break;
+			}
 		}
 	}
 
@@ -550,8 +658,14 @@ void FPCGExDecompMaxBoxesExt::MergeAdjacentCells(
 	int32 CompactID = 0;
 	for (int32 Flat = 0; Flat < Grid.TotalVoxels; Flat++)
 	{
-		if (VoxelCellIDs[Flat] < 0) { continue; }
-		if (!Remap.Contains(VoxelCellIDs[Flat])) { Remap.Add(VoxelCellIDs[Flat], CompactID++); }
+		if (VoxelCellIDs[Flat] < 0)
+		{
+			continue;
+		}
+		if (!Remap.Contains(VoxelCellIDs[Flat]))
+		{
+			Remap.Add(VoxelCellIDs[Flat], CompactID++);
+		}
 		VoxelCellIDs[Flat] = Remap[VoxelCellIDs[Flat]];
 	}
 	NextCellID = CompactID;
@@ -641,15 +755,36 @@ void FPCGExDecompMaxBoxesExt::BuildWeightPrefixSums(
 				const int32 Flat = Grid.FlatIndex(X, Y, Z);
 				double Val = VoxelWeights[Flat];
 
-				if (X > 0) { Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z)]; }
-				if (Y > 0) { Val += OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z)]; }
-				if (Z > 0) { Val += OutPrefixSums[Grid.FlatIndex(X, Y, Z - 1)]; }
+				if (X > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z)];
+				}
+				if (Y > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z)];
+				}
+				if (Z > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X, Y, Z - 1)];
+				}
 
-				if (X > 0 && Y > 0) { Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z)]; }
-				if (X > 0 && Z > 0) { Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z - 1)]; }
-				if (Y > 0 && Z > 0) { Val -= OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z - 1)]; }
+				if (X > 0 && Y > 0)
+				{
+					Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z)];
+				}
+				if (X > 0 && Z > 0)
+				{
+					Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z - 1)];
+				}
+				if (Y > 0 && Z > 0)
+				{
+					Val -= OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z - 1)];
+				}
 
-				if (X > 0 && Y > 0 && Z > 0) { Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z - 1)]; }
+				if (X > 0 && Y > 0 && Z > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z - 1)];
+				}
 
 				OutPrefixSums[Flat] = Val;
 			}
@@ -671,7 +806,10 @@ double FPCGExDecompMaxBoxesExt::QueryWeightSum(
 
 	auto SafeGet = [&](int32 X, int32 Y, int32 Z) -> double
 	{
-		if (X < 0 || Y < 0 || Z < 0) { return 0.0; }
+		if (X < 0 || Y < 0 || Z < 0)
+		{
+			return 0.0;
+		}
 		return PrefixSums[Grid.FlatIndex(X, Y, Z)];
 	};
 
@@ -694,7 +832,10 @@ void FPCGExDecompMaxBoxesExt::BuildBiasPrefixSums(
 	const int32 GZ = Grid.GridDimensions.Z;
 
 	OutPrefixSums.SetNum(Grid.TotalVoxels);
-	for (FVector& V : OutPrefixSums) { V = FVector::ZeroVector; }
+	for (FVector& V : OutPrefixSums)
+	{
+		V = FVector::ZeroVector;
+	}
 
 	for (int32 Z = 0; Z < GZ; Z++)
 	{
@@ -705,15 +846,36 @@ void FPCGExDecompMaxBoxesExt::BuildBiasPrefixSums(
 				const int32 Flat = Grid.FlatIndex(X, Y, Z);
 				FVector Val = VoxelBias[Flat];
 
-				if (X > 0) { Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z)]; }
-				if (Y > 0) { Val += OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z)]; }
-				if (Z > 0) { Val += OutPrefixSums[Grid.FlatIndex(X, Y, Z - 1)]; }
+				if (X > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z)];
+				}
+				if (Y > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z)];
+				}
+				if (Z > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X, Y, Z - 1)];
+				}
 
-				if (X > 0 && Y > 0) { Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z)]; }
-				if (X > 0 && Z > 0) { Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z - 1)]; }
-				if (Y > 0 && Z > 0) { Val -= OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z - 1)]; }
+				if (X > 0 && Y > 0)
+				{
+					Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z)];
+				}
+				if (X > 0 && Z > 0)
+				{
+					Val -= OutPrefixSums[Grid.FlatIndex(X - 1, Y, Z - 1)];
+				}
+				if (Y > 0 && Z > 0)
+				{
+					Val -= OutPrefixSums[Grid.FlatIndex(X, Y - 1, Z - 1)];
+				}
 
-				if (X > 0 && Y > 0 && Z > 0) { Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z - 1)]; }
+				if (X > 0 && Y > 0 && Z > 0)
+				{
+					Val += OutPrefixSums[Grid.FlatIndex(X - 1, Y - 1, Z - 1)];
+				}
 
 				OutPrefixSums[Flat] = Val;
 			}
@@ -729,7 +891,10 @@ FVector FPCGExDecompMaxBoxesExt::QueryBiasSum(
 {
 	auto SafeGet = [&](int32 X, int32 Y, int32 Z) -> FVector
 	{
-		if (X < 0 || Y < 0 || Z < 0) { return FVector::ZeroVector; }
+		if (X < 0 || Y < 0 || Z < 0)
+		{
+			return FVector::ZeroVector;
+		}
 		return PrefixSums[Grid.FlatIndex(X, Y, Z)];
 	};
 

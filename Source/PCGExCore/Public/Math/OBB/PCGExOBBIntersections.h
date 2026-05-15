@@ -32,12 +32,23 @@ namespace PCGExMath::OBB
 		FCut() = default;
 
 		FCut(const FVector& InPos, const FVector& InNormal, int32 InBoxIdx, int32 InIdx, EPCGExCutType InType)
-			: Position(InPos), Normal(InNormal), BoxIndex(InBoxIdx), Idx(InIdx), Type(InType)
+			: Position(InPos)
+			  , Normal(InNormal)
+			  , BoxIndex(InBoxIdx)
+			  , Idx(InIdx)
+			  , Type(InType)
 		{
 		}
 
-		FORCEINLINE bool IsEntry() const { return Type == EPCGExCutType::Entry || Type == EPCGExCutType::EntryNoExit; }
-		FORCEINLINE bool IsExit() const { return Type == EPCGExCutType::Exit || Type == EPCGExCutType::ExitNoEntry; }
+		FORCEINLINE bool IsEntry() const
+		{
+			return Type == EPCGExCutType::Entry || Type == EPCGExCutType::EntryNoExit;
+		}
+
+		FORCEINLINE bool IsExit() const
+		{
+			return Type == EPCGExCutType::Exit || Type == EPCGExCutType::ExitNoEntry;
+		}
 	};
 
 	// Intersection collection
@@ -51,12 +62,20 @@ namespace PCGExMath::OBB
 		FIntersections() = default;
 
 		FIntersections(const FVector& InStart, const FVector& InEnd)
-			: Start(InStart), End(InEnd)
+			: Start(InStart)
+			  , End(InEnd)
 		{
 		}
 
-		FORCEINLINE bool IsEmpty() const { return Cuts.IsEmpty(); }
-		FORCEINLINE int32 Num() const { return Cuts.Num(); }
+		FORCEINLINE bool IsEmpty() const
+		{
+			return Cuts.IsEmpty();
+		}
+
+		FORCEINLINE int32 Num() const
+		{
+			return Cuts.Num();
+		}
 
 		void Reset(const FVector& InStart, const FVector& InEnd);
 

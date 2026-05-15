@@ -21,7 +21,10 @@ PCGEX_CREATE_PROBE_FACTORY(Tensor, {}, { NewOperation->TensorFactories = &Tensor
 PCGExFactories::EPreparationResult UPCGExProbeFactoryTensor::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	if (!PCGExFactories::GetInputFactories(InContext, PCGExTensor::SourceTensorsLabel, TensorFactories, {PCGExFactories::EType::Tensor}))
 	{
@@ -36,20 +39,32 @@ PCGExFactories::EPreparationResult UPCGExProbeFactoryTensor::Prepare(FPCGExConte
 	return Result;
 }
 
-bool FPCGExProbeTensor::RequiresChainProcessing() const { return Config.bDoChainedProcessing; }
+bool FPCGExProbeTensor::RequiresChainProcessing() const
+{
+	return Config.bDoChainedProcessing;
+}
 
 bool FPCGExProbeTensor::Prepare(FPCGExContext* InContext)
 {
-	if (!TensorFactories) { return false; }
+	if (!TensorFactories)
+	{
+		return false;
+	}
 
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	bUseBestDot = (Config.Favor == EPCGExProbeDirectionPriorization::Dot);
 	MinDot = PCGExMath::DegreesToDot(Config.MaxAngle);
 	Mirror = Config.bInvertTensorDirection ? -1 : 1;
 
 	TensorsHandler = MakeShared<PCGExTensor::FTensorsHandler>(Config.TensorHandlerDetails);
-	if (!TensorsHandler->Init(Context, *TensorFactories, PrimaryDataFacade)) { return false; }
+	if (!TensorsHandler->Init(Context, *TensorFactories, PrimaryDataFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
@@ -59,13 +74,16 @@ void FPCGExProbeTensor::ProcessCandidates(const int32 Index, TArray<PCGExProbing
 	bool bIsAlreadyConnected;
 	const double R = GetSearchRadius(Index);
 	double BestDot = -1;
-	double BestDist = MAX_dbl;
+	double BestDist = TNumericLimits<double>::Max();
 	int32 BestCandidateIndex = -1;
 
 	bool bSuccess = false;
 	const PCGExTensor::FTensorSample Sample = TensorsHandler->Sample(Index, *(WorkingTransforms->GetData() + Index), bSuccess);
 
-	if (!bSuccess) { return; }
+	if (!bSuccess)
+	{
+		return;
+	}
 
 	const FVector Dir = Sample.DirectionAndSize.GetSafeNormal() * Mirror;
 	const int32 MaxIndex = Candidates.Num() - 1;
@@ -75,21 +93,42 @@ void FPCGExProbeTensor::ProcessCandidates(const int32 Index, TArray<PCGExProbing
 		const PCGExProbing::FCandidate& C = Candidates[LocalIndex];
 
 		// When using best dot, we need to process the candidates backward, so can't break the loop.
-		if (bUseBestDot) { if (C.Distance > R) { continue; } }
-		else { if (C.Distance > R) { break; } }
+		if (bUseBestDot)
+		{
+			if (C.Distance > R)
+			{
+				continue;
+			}
+		}
+		else
+		{
+			if (C.Distance > R)
+			{
+				break;
+			}
+		}
 
-		if (Coincidence && Coincidence->Contains(C.GH)) { continue; }
+		if (Coincidence && Coincidence->Contains(C.GH))
+		{
+			continue;
+		}
 
 		double Dot = 0;
 		if (Config.bUseComponentWiseAngle)
 		{
-			if (PCGExMath::IsDirectionWithinTolerance(Dir, C.Direction, Config.MaxAngles)) { continue; }
+			if (PCGExMath::IsDirectionWithinTolerance(Dir, C.Direction, Config.MaxAngles))
+			{
+				continue;
+			}
 			Dot = FVector::DotProduct(Dir, C.Direction);
 		}
 		else
 		{
 			Dot = FVector::DotProduct(Dir, C.Direction);
-			if (Dot < MinDot) { continue; }
+			if (Dot < MinDot)
+			{
+				continue;
+			}
 		}
 
 
@@ -111,7 +150,10 @@ void FPCGExProbeTensor::ProcessCandidates(const int32 Index, TArray<PCGExProbing
 		if (Coincidence)
 		{
 			Coincidence->Add(C.GH, &bIsAlreadyConnected);
-			if (bIsAlreadyConnected) { return; }
+			if (bIsAlreadyConnected)
+			{
+				return;
+			}
 		}
 
 		OutEdges->Add(PCGEx::H64U(Index, C.PointIndex));
@@ -122,7 +164,7 @@ void FPCGExProbeTensor::PrepareBestCandidate(const int32 Index, PCGExProbing::FB
 {
 	InBestCandidate.BestIndex = -1;
 	InBestCandidate.BestPrimaryValue = -1;
-	InBestCandidate.BestSecondaryValue = MAX_dbl;
+	InBestCandidate.BestSecondaryValue = TNumericLimits<double>::Max();
 }
 
 void FPCGExProbeTensor::ProcessCandidateChained(const int32 Index, const int32 CandidateIndex, PCGExProbing::FCandidate& Candidate, PCGExProbing::FBestCandidate& InBestCandidate, PCGExMT::FScopedContainer* Container)
@@ -131,22 +173,34 @@ void FPCGExProbeTensor::ProcessCandidateChained(const int32 Index, const int32 C
 	bool bSuccess = false;
 	const PCGExTensor::FTensorSample Sample = TensorsHandler->Sample(Index, *(WorkingTransforms->GetData() + Index), bSuccess);
 
-	if (!bSuccess) { return; }
+	if (!bSuccess)
+	{
+		return;
+	}
 
 	const FVector Dir = Sample.DirectionAndSize.GetSafeNormal() * Mirror;
 
-	if (Candidate.Distance > R) { return; }
+	if (Candidate.Distance > R)
+	{
+		return;
+	}
 
 	double Dot = 0;
 	if (Config.bUseComponentWiseAngle)
 	{
-		if (PCGExMath::IsDirectionWithinTolerance(Dir, Candidate.Direction, Config.MaxAngles)) { return; }
+		if (PCGExMath::IsDirectionWithinTolerance(Dir, Candidate.Direction, Config.MaxAngles))
+		{
+			return;
+		}
 		Dot = FVector::DotProduct(Dir, Candidate.Direction);
 	}
 	else
 	{
 		Dot = FVector::DotProduct(Dir, Candidate.Direction);
-		if (Dot < MinDot) { return; }
+		if (Dot < MinDot)
+		{
+			return;
+		}
 	}
 
 	if (bUseBestDot)
@@ -171,7 +225,10 @@ void FPCGExProbeTensor::ProcessCandidateChained(const int32 Index, const int32 C
 
 void FPCGExProbeTensor::ProcessBestCandidate(const int32 Index, PCGExProbing::FBestCandidate& InBestCandidate, TArray<PCGExProbing::FCandidate>& Candidates, TSet<uint64>* Coincidence, const FVector& ST, TSet<uint64>* OutEdges, PCGExMT::FScopedContainer* Container)
 {
-	if (InBestCandidate.BestIndex == -1) { return; }
+	if (InBestCandidate.BestIndex == -1)
+	{
+		return;
+	}
 
 	const PCGExProbing::FCandidate& C = Candidates[InBestCandidate.BestIndex];
 
@@ -179,7 +236,10 @@ void FPCGExProbeTensor::ProcessBestCandidate(const int32 Index, PCGExProbing::FB
 	if (Coincidence)
 	{
 		Coincidence->Add(C.GH, &bIsAlreadyConnected);
-		if (bIsAlreadyConnected) { return; }
+		if (bIsAlreadyConnected)
+		{
+			return;
+		}
 	}
 
 	OutEdges->Add(PCGEx::H64U(Index, C.PointIndex));

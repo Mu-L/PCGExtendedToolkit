@@ -56,9 +56,20 @@ namespace PCGExPathfinding
 
 		const int32 QueryIndex = -1;
 
-		bool HasValidEndpoints() const { return Seed.IsValid() && Goal.IsValid() && PickResolution == EQueryPickResolution::Success; };
-		bool HasValidPathPoints() const { return PathNodes.Num() >= 2; };
-		bool IsQuerySuccessful() const { return Resolution == EPathfindingResolution::Success; };
+		bool HasValidEndpoints() const
+		{
+			return Seed.IsValid() && Goal.IsValid() && PickResolution == EQueryPickResolution::Success;
+		};
+
+		bool HasValidPathPoints() const
+		{
+			return PathNodes.Num() >= 2;
+		};
+
+		bool IsQuerySuccessful() const
+		{
+			return Resolution == EPathfindingResolution::Success;
+		};
 
 		EQueryPickResolution ResolvePicks(const FPCGExNodeSelectionDetails& SeedSelectionDetails, const FPCGExNodeSelectionDetails& GoalSelectionDetails);
 

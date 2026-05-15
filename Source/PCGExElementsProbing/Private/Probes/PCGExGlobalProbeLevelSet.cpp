@@ -7,21 +7,34 @@
 
 PCGEX_CREATE_PROBE_FACTORY(LevelSet, {}, {})
 
-bool FPCGExProbeLevelSet::IsGlobalProbe() const { return true; }
-bool FPCGExProbeLevelSet::WantsOctree() const { return true; }
+bool FPCGExProbeLevelSet::IsGlobalProbe() const
+{
+	return true;
+}
+
+bool FPCGExProbeLevelSet::WantsOctree() const
+{
+	return true;
+}
 
 bool FPCGExProbeLevelSet::Prepare(FPCGExContext* InContext)
 {
-	if (!FPCGExProbeOperation::Prepare(InContext)) { return false; }
+	if (!FPCGExProbeOperation::Prepare(InContext))
+	{
+		return false;
+	}
 
 	LevelBuffer = PrimaryDataFacade->GetBroadcaster<double>(Config.LevelAttribute, true, false);
-	if (!LevelBuffer) { return false; }
+	if (!LevelBuffer)
+	{
+		return false;
+	}
 
 	// Find min/max for normalization
 	if (Config.bNormalizeLevels)
 	{
-		LevelMin = MAX_dbl;
-		LevelMax = -MAX_dbl;
+		LevelMin = TNumericLimits<double>::Max();
+		LevelMax = TNumericLimits<double>::Lowest();
 		const int32 NumPoints = WorkingPositions->Num();
 		for (int32 i = 0; i < NumPoints; ++i)
 		{
@@ -38,7 +51,10 @@ void FPCGExProbeLevelSet::ProcessAll(TSet<uint64>& OutEdges) const
 {
 	const TArray<FVector>& Positions = *WorkingPositions;
 	const int32 NumPoints = Positions.Num();
-	if (NumPoints < 2) { return; }
+	if (NumPoints < 2)
+	{
+		return;
+	}
 
 	const TArray<int8>& CanGenerateRef = *CanGenerate;
 	const TArray<int8>& AcceptConnectionsRef = *AcceptConnections;
@@ -54,7 +70,10 @@ void FPCGExProbeLevelSet::ProcessAll(TSet<uint64>& OutEdges) const
 
 	for (int32 i = 0; i < NumPoints; ++i)
 	{
-		if (!CanGenerateRef[i]) { continue; }
+		if (!CanGenerateRef[i])
+		{
+			continue;
+		}
 
 		const FVector& Pos = Positions[i];
 		const double Level = GetNormalizedLevel(i);
@@ -69,10 +88,16 @@ void FPCGExProbeLevelSet::ProcessAll(TSet<uint64>& OutEdges) const
 			[&](const PCGExOctree::FItem& Other)
 			{
 				const int32 j = Other.Index;
-				if (i == j || !AcceptConnectionsRef[j]) { return; }
+				if (i == j || !AcceptConnectionsRef[j])
+				{
+					return;
+				}
 
 				const double DistSq = FVector::DistSquared(Pos, Positions[j]);
-				if (DistSq > MaxDistSq) { return; }
+				if (DistSq > MaxDistSq)
+				{
+					return;
+				}
 
 				const double OtherLevel = GetNormalizedLevel(j);
 				const double LevelDiff = FMath::Abs(Level - OtherLevel);
@@ -86,7 +111,10 @@ void FPCGExProbeLevelSet::ProcessAll(TSet<uint64>& OutEdges) const
 			});
 
 		// Sort and take best K
-		Algo::Sort(Candidates, [](const auto& A, const auto& B) { return A.Key < B.Key; });
+		Algo::Sort(Candidates, [](const auto& A, const auto& B)
+		{
+			return A.Key < B.Key;
+		});
 
 		const int32 MaxConnections = FMath::Min(Config.MaxConnectionsPerPoint, Candidates.Num());
 		for (int32 k = 0; k < MaxConnections; ++k)

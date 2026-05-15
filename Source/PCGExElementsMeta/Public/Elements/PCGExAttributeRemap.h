@@ -5,11 +5,11 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExPointsProcessor.h"
-#include "UObject/Object.h"
 #include "Details/PCGExAttributesDetails.h"
 #include "Details/PCGExClampDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Details/PCGExRemapDetails.h"
+#include "UObject/Object.h"
 #include "Utils/PCGExCurveLookup.h"
 
 #include "PCGExAttributeRemap.generated.h"
@@ -35,7 +35,9 @@ struct PCGEXELEMENTSMETA_API FPCGExComponentRemapRule
 	}
 
 	FPCGExComponentRemapRule(const FPCGExComponentRemapRule& Other)
-		: InputClampDetails(Other.InputClampDetails), RemapDetails(Other.RemapDetails), OutputClampDetails(Other.OutputClampDetails)
+		: InputClampDetails(Other.InputClampDetails)
+		  , RemapDetails(Other.RemapDetails)
+		  , OutputClampDetails(Other.OutputClampDetails)
 	{
 	}
 
@@ -64,15 +66,26 @@ public:
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AttributeRemap, "Attribute Remap", "Remap a single property or attribute.", FName(GetDisplayName()));
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Metadata; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Metadata;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(MiscWrite);
+	}
 #endif
 
 protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	virtual bool SupportsDataStealing() const override { return true; }
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
 
 public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;

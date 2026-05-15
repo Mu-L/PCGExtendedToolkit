@@ -1,11 +1,11 @@
 // Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
-#include "NarrowPhase/PCGExNarrowPhaseRegistrations.h"
-#include "NarrowPhase/PCGExNarrowPhase.h"
-#include "Shapes/PCGExFootprintShape.h"
 #include "Math/OBB/PCGExOBB.h"
 #include "Math/OBB/PCGExOBBTests.h"
+#include "NarrowPhase/PCGExNarrowPhase.h"
+#include "NarrowPhase/PCGExNarrowPhaseRegistrations.h"
+#include "Shapes/PCGExFootprintShape.h"
 
 namespace PCGExSpatial::NarrowPhase
 {
@@ -45,7 +45,7 @@ namespace PCGExSpatial::NarrowPhase
 		Register(
 			FPCGExFootprintShape_OBB::StaticStruct(),
 			FPCGExFootprintShape_OBB::StaticStruct(),
-			{ &OBBvsOBB_Overlap, &OBBvsOBB_Penetration });
+			{&OBBvsOBB_Overlap, &OBBvsOBB_Penetration});
 
 		RegisterQueryPoint(
 			FPCGExFootprintShape_OBB::StaticStruct(),

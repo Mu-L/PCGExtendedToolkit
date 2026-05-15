@@ -13,13 +13,19 @@
 
 PCGEX_INITIALIZE_ELEMENT(MovePivot)
 
-PCGExData::EIOInit UPCGExMovePivotSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExMovePivotSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(MovePivot)
 
 bool FPCGExMovePivotElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(MovePivot)
 
@@ -35,7 +41,10 @@ bool FPCGExMovePivotElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
 				NewBatch->bSkipCompletion = true;
@@ -62,12 +71,18 @@ namespace PCGExMovePivot
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExMovePivot::Process);
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
 		UVW = Settings->UVW;
-		if (!UVW.Init(ExecutionContext, PointDataFacade)) { return false; }
+		if (!UVW.Init(ExecutionContext, PointDataFacade))
+		{
+			return false;
+		}
 
 		// Cherry pick native properties allocations
 

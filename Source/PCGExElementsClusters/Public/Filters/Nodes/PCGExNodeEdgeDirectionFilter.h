@@ -5,11 +5,11 @@
 
 #include "CoreMinimal.h"
 #include "PCGExNodeAdjacencyFilter.h"
-#include "Graphs/PCGExGraphDetails.h"
-#include "Details/PCGExSettingsMacros.h"
-#include "Filters/PCGExAdjacency.h"
 #include "Core/PCGExClusterFilter.h"
 #include "Core/PCGExFilterFactoryProvider.h"
+#include "Details/PCGExSettingsMacros.h"
+#include "Filters/PCGExAdjacency.h"
+#include "Graphs/PCGExGraphDetails.h"
 
 #include "PCGExNodeEdgeDirectionFilter.generated.h"
 
@@ -83,7 +83,8 @@ class FNodeEdgeDirectionFilter final : public PCGExClusterFilter::IVtxFilter
 {
 public:
 	explicit FNodeEdgeDirectionFilter(const UPCGExNodeEdgeDirectionFilterFactory* InFactory)
-		: IVtxFilter(InFactory), TypedFilterFactory(InFactory)
+		: IVtxFilter(InFactory)
+		  , TypedFilterFactory(InFactory)
 	{
 		Adjacency = InFactory->Config.Adjacency;
 		DotComparison = InFactory->Config.DotComparisonDetails;
@@ -122,7 +123,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(NodeEdgeDirectionFilterFactory, "Vtx Filter : Edge Direction", "Dot product comparison of connected edges against a direction attribute stored on the vtx.", PCGEX_FACTORY_NAME_PRIORITY)
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterCluster);
+	}
 #endif
 
 	/** Test Config.*/

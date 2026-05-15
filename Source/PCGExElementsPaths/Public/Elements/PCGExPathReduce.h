@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Factories/PCGExFactories.h"
 #include "Core/PCGExPathProcessor.h"
 #include "Details/PCGExInputShorthandsDetails.h"
+#include "Factories/PCGExFactories.h"
 #include "Helpers/PCGExPathSimplifier.h"
 
 #include "PCGExPathReduce.generated.h"

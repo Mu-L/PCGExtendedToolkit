@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "StructUtils/InstancedStruct.h"
 #include "PCGExPropertyWriter.h"
+#include "StructUtils/InstancedStruct.h"
 
 class UPCGExAssetCollection;
 struct FPCGExAssetCollectionEntry;
@@ -83,7 +83,10 @@ namespace PCGExCollections
 		 */
 		void WriteEntry(int64 Key, const FPCGExAssetCollectionEntry* Entry, const UPCGExAssetCollection* Host);
 
-		bool HasOutputs() const { return Writers.Num() > 0; }
+		bool HasOutputs() const
+		{
+			return Writers.Num() > 0;
+		}
 
 	protected:
 		struct FWriter

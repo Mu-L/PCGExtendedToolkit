@@ -9,7 +9,10 @@
 
 bool FPCGExFillControlHeuristicsScoring::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryHxScoring* TypedFactory = Cast<UPCGExFillControlsFactoryHxScoring>(Factory);
 
@@ -41,7 +44,10 @@ bool FPCGExFillControlHeuristicsScoring::PrepareForDiffusions(FPCGExContext* InC
 
 void FPCGExFillControlHeuristicsScoring::ScoreCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, PCGExFloodFill::FCandidate& OutCandidate)
 {
-	if (!HeuristicsHandler) { return; }
+	if (!HeuristicsHandler)
+	{
+		return;
+	}
 
 	const PCGExClusters::FNode& FromNode = *From.Node;
 	const PCGExClusters::FNode& ToNode = *OutCandidate.Node;

@@ -5,11 +5,11 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Utils/PCGExCurveLookup.h"
-#include "Factories/PCGExFactories.h"
-#include "UObject/Object.h"
 #include "Curves/CurveFloat.h"
 #include "Curves/RichCurve.h"
+#include "Factories/PCGExFactories.h"
+#include "UObject/Object.h"
+#include "Utils/PCGExCurveLookup.h"
 
 
 #include "Core/PCGExPointsProcessor.h"
@@ -90,7 +90,11 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SampleNearestBounds, "Sample : Nearest Bounds", "Sample nearest target bounds.");
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_NAME(Sampling); }
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_NAME(Sampling);
+	}
 #endif
 
 protected:

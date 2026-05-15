@@ -21,14 +21,20 @@ bool FPCGExSocketFitDetails::Init(const TSharedPtr<PCGExData::FFacade>& InFacade
 
 	bMutate = true;
 	SocketNameBuffer = GetValueSettingSocketName();
-	if (!SocketNameBuffer->Init(InFacade)) { return false; }
+	if (!SocketNameBuffer->Init(InFacade))
+	{
+		return false;
+	}
 
 	return true;
 }
 
 void FPCGExSocketFitDetails::Mutate(const int32 Index, const TArray<FPCGExSocket>& InSockets, FTransform& InOutTransform) const
 {
-	if (!bMutate) { return; }
+	if (!bMutate)
+	{
+		return;
+	}
 
 	const FName SName = SocketNameBuffer->Read(Index);
 	for (const FPCGExSocket& Socket : InSockets)

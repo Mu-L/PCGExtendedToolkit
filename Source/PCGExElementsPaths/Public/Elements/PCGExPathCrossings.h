@@ -216,7 +216,10 @@ namespace PCGExPathCrossings
 		{
 		}
 
-		virtual bool IsTrivial() const override { return false; } // Force non-trivial because this shit is expensive
+		virtual bool IsTrivial() const override
+		{
+			return false;
+		} // Force non-trivial because this shit is expensive
 
 		const PCGExPaths::FPathEdgeOctree* GetEdgeOctree() const;
 

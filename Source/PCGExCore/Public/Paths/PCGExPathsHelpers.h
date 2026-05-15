@@ -97,7 +97,10 @@ namespace PCGExPaths
 		{
 		}
 
-		FORCEINLINE bool IsEmpty() const { return Crossings.IsEmpty(); }
+		FORCEINLINE bool IsEmpty() const
+		{
+			return Crossings.IsEmpty();
+		}
 
 		bool FindSplit(
 			const TSharedPtr<FPath>& Path, const FPathEdge& Edge, const TSharedPtr<FPathEdgeLength>& PathLength,

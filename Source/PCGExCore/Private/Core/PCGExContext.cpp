@@ -3,23 +3,23 @@
 
 #include "Core/PCGExContext.h"
 
-#include "Core/PCGExElement.h"
-#include "Core/PCGExSettings.h"
 #include "PCGComponent.h"
-#include "Factories/PCGExInstancedFactory.h"
 #include "PCGExCoreMacros.h"
-#include "Core/PCGExMT.h"
-#include "Helpers/PCGExStreamingHelpers.h"
 #include "PCGManagedResource.h"
-#include "Engine/AssetManager.h"
-#include "Helpers/PCGHelpers.h"
 #include "Async/Async.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExElement.h"
+#include "Core/PCGExMT.h"
+#include "Core/PCGExSettings.h"
 #include "Data/PCGExDataCommon.h"
 #include "Data/PCGExProxyData.h"
+#include "Engine/AssetManager.h"
 #include "Engine/EngineTypes.h"
+#include "Factories/PCGExInstancedFactory.h"
 #include "Helpers/PCGDynamicTrackingHelpers.h"
 #include "Helpers/PCGExFunctionPrototypes.h"
+#include "Helpers/PCGExStreamingHelpers.h"
+#include "Helpers/PCGHelpers.h"
 #include "Metadata/PCGMetadata.h"
 #include "Utils/PCGExUniqueNameGenerator.h"
 
@@ -30,7 +30,10 @@ UPCGExInstancedFactory* FPCGExContext::RegisterInstancedFactory(UPCGExInstancedF
 	BaseOperation->BindContext(this); // Temp so Copy doesn't crash
 
 	UPCGExInstancedFactory* RetValue = BaseOperation->CreateNewInstance(ManagedObjects.Get());
-	if (!RetValue) { return nullptr; }
+	if (!RetValue)
+	{
+		return nullptr;
+	}
 	InternalOperations.Add(RetValue);
 	RetValue->InitializeInContext(this, OverridePinLabel);
 	return RetValue;
@@ -54,7 +57,10 @@ void FPCGExContext::StageOutput(UPCGData* InData, const FName& InPin, const PCGE
 	{
 		FWriteScopeLock WriteScopeLock(StagingLock);
 
-		if (IsWorkCancelled() || IsWorkCompleted()) { return; }
+		if (IsWorkCancelled() || IsWorkCompleted())
+		{
+			return;
+		}
 
 		FPCGTaggedData& Output = StagedData.Emplace_GetRef();
 		Output.Data = InData;
@@ -64,7 +70,10 @@ void FPCGExContext::StageOutput(UPCGData* InData, const FName& InPin, const PCGE
 	}
 
 	// Managed: register with ManagedObjects so it survives GC until context teardown.
-	if (EnumHasAnyFlags(Staging, PCGExData::EStaging::Managed)) { ManagedObjects->Add(InData); }
+	if (EnumHasAnyFlags(Staging, PCGExData::EStaging::Managed))
+	{
+		ManagedObjects->Add(InData);
+	}
 
 	// Mutable: this is data we own and can modify. Clean up consumable attributes
 	// (internal PCGEx attributes not meant for downstream nodes) unless they're protected.
@@ -85,13 +94,19 @@ void FPCGExContext::StageOutput(UPCGData* InData, const FName& InPin, const PCGE
 			}
 		}
 
-		if (bFlattenOutput) { InData->Flatten(); }
+		if (bFlattenOutput)
+		{
+			InData->Flatten();
+		}
 	}
 }
 
 #pragma endregion
 
-UWorld* FPCGExContext::GetWorld() const { return GetComponent()->GetWorld(); }
+UWorld* FPCGExContext::GetWorld() const
+{
+	return GetComponent()->GetWorld();
+}
 
 const UPCGComponent* FPCGExContext::GetComponent() const
 {
@@ -111,23 +126,38 @@ TSharedPtr<PCGExMT::FTaskManager> FPCGExContext::GetTaskManager()
 		TaskManager = MakeShared<PCGExMT::FTaskManager>(this);
 		TaskManager->OnEndCallback = [CtxHandle = GetOrCreateHandle()](const bool bWasCancelled)
 		{
-			if (bWasCancelled) { return; }
+			if (bWasCancelled)
+			{
+				return;
+			}
 
 			PCGEX_SHARED_CONTEXT_VOID(CtxHandle);
 
 			FPCGExContext* Ctx = SharedContext.Get();
 
-			if (Ctx && Ctx->ElementHandle) { Ctx->OnAsyncWorkEnd(bWasCancelled); }
-			else { UE_LOG(LogTemp, Error, TEXT("OnEnd but no context or element handle!")) }
+			if (Ctx && Ctx->ElementHandle)
+			{
+				Ctx->OnAsyncWorkEnd(bWasCancelled);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("OnEnd but no context or element handle!"))
+			}
 		};
 	}
 
 	return TaskManager;
 }
 
-void FPCGExContext::PauseContext() { bIsPaused = true; }
+void FPCGExContext::PauseContext()
+{
+	bIsPaused = true;
+}
 
-void FPCGExContext::UnpauseContext() { bIsPaused = false; }
+void FPCGExContext::UnpauseContext()
+{
+	bIsPaused = false;
+}
 
 FPCGExContext::FPCGExContext()
 {
@@ -154,7 +184,10 @@ void FPCGExContext::ExecuteOnNotifyActors(const TArray<FName>& FunctionNames)
 			TArray<AActor*> NotifyActorsArray = NotifyActors.Array();
 			for (AActor* TargetActor : NotifyActorsArray)
 			{
-				if (!IsValid(TargetActor)) { continue; }
+				if (!IsValid(TargetActor))
+				{
+					continue;
+				}
 				for (UFunction* Function : PCGExHelpers::FindUserFunctions(TargetActor->GetClass(), FunctionNames, {UPCGExFunctionPrototypes::GetPrototypeWithNoParams()}, this))
 				{
 					TargetActor->ProcessEvent(Function, nullptr);
@@ -163,7 +196,10 @@ void FPCGExContext::ExecuteOnNotifyActors(const TArray<FName>& FunctionNames)
 		}
 		else
 		{
-			PCGExMT::ExecuteOnMainThreadAndWait([&]() { ExecuteOnNotifyActors(FunctionNames); });
+			PCGExMT::ExecuteOnMainThreadAndWait([&]()
+			{
+				ExecuteOnNotifyActors(FunctionNames);
+			});
 		}
 	}
 }
@@ -186,7 +222,10 @@ void FPCGExContext::AddNotifyActor(AActor* InActor)
 
 bool FPCGExContext::IsWaitingForTasks()
 {
-	if (TaskManager) { return TaskManager->IsWaitingForTasks(); }
+	if (TaskManager)
+	{
+		return TaskManager->IsWaitingForTasks();
+	}
 	return false;
 }
 
@@ -256,8 +295,14 @@ bool FPCGExContext::DriveAdvanceWork(const UPCGExSettings* InSettings)
 
 bool FPCGExContext::TryComplete(const bool bForce)
 {
-	if (IsWorkCancelled() || IsWorkCompleted()) { return true; }
-	if (!bForce && !IsDone()) { return false; }
+	if (IsWorkCancelled() || IsWorkCompleted())
+	{
+		return true;
+	}
+	if (!bForce && !IsDone())
+	{
+		return false;
+	}
 
 	bool bExpected = false;
 	if (bWorkCompleted.compare_exchange_strong(bExpected, true, std::memory_order_acq_rel))
@@ -272,7 +317,10 @@ void FPCGExContext::OnAsyncWorkEnd(const bool bWasCancelled)
 {
 	PCGEX_SHARED_CONTEXT_VOID(GetOrCreateHandle());
 
-	if (bWasCancelled || IsWorkCancelled()) { return; }
+	if (bWasCancelled || IsWorkCancelled())
+	{
+		return;
+	}
 
 	// Use DriveAdvanceWork which handles all coordination
 	// If someone else is driving, it will set bPendingAsyncWorkEnd for them to pick up
@@ -285,7 +333,8 @@ void FPCGExContext::OnAsyncWorkEnd(const bool bWasCancelled)
 	case EPCGExecutionPhase::Execute:
 		DriveAdvanceWork(Settings);
 		break;
-	default: break;
+	default:
+		break;
 	}
 }
 
@@ -293,7 +342,10 @@ void FPCGExContext::OnComplete()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExContext::OnComplete);
 
-	if (ElementHandle) { ElementHandle->CompleteWork(this); }
+	if (ElementHandle)
+	{
+		ElementHandle->CompleteWork(this);
+	}
 
 	PCGEX_TERMINATE_ASYNC
 
@@ -317,7 +369,10 @@ void FPCGExContext::OnComplete()
 TSet<FSoftObjectPath>& FPCGExContext::GetRequiredAssets()
 {
 	FWriteScopeLock WriteScopeLock(AssetsLock);
-	if (!RequiredAssets) { RequiredAssets = MakeShared<TSet<FSoftObjectPath>>(); }
+	if (!RequiredAssets)
+	{
+		RequiredAssets = MakeShared<TSet<FSoftObjectPath>>();
+	}
 	return *RequiredAssets.Get();
 }
 
@@ -328,13 +383,19 @@ void FPCGExContext::RegisterAssetDependencies()
 void FPCGExContext::AddAssetDependency(const FSoftObjectPath& Dependency)
 {
 	FWriteScopeLock WriteScopeLock(AssetsLock);
-	if (!RequiredAssets) { RequiredAssets = MakeShared<TSet<FSoftObjectPath>>(); }
+	if (!RequiredAssets)
+	{
+		RequiredAssets = MakeShared<TSet<FSoftObjectPath>>();
+	}
 	RequiredAssets->Add(Dependency);
 }
 
 bool FPCGExContext::LoadAssets()
 {
-	if (!RequiredAssets || RequiredAssets->IsEmpty()) { return false; }
+	if (!RequiredAssets || RequiredAssets->IsEmpty())
+	{
+		return false;
+	}
 
 	SetState(PCGExCommon::States::State_LoadingAssetDependencies);
 
@@ -348,7 +409,10 @@ bool FPCGExContext::LoadAssets()
 		{
 			PCGEX_SHARED_CONTEXT_VOID(CtxHandle)
 			SharedContext.Get()->TrackAssetsHandle(StreamableHandle);
-			if (!bSuccess) { SharedContext.Get()->CancelExecution("Error loading assets."); }
+			if (!bSuccess)
+			{
+				SharedContext.Get()->CancelExecution("Error loading assets.");
+			}
 		});
 
 
@@ -358,7 +422,10 @@ bool FPCGExContext::LoadAssets()
 
 void FPCGExContext::TrackAssetsHandle(const TSharedPtr<FStreamableHandle>& InHandle)
 {
-	if (!InHandle.IsValid() || !InHandle->IsActive()) { return; }
+	if (!InHandle.IsValid() || !InHandle->IsActive())
+	{
+		return;
+	}
 	{
 		FWriteScopeLock WriteScopeLock(AssetsLock);
 		TrackedAssets.Add(InHandle);
@@ -414,7 +481,10 @@ void FPCGExContext::AddConsumableAttributeName(const FName InName)
 {
 	{
 		FReadScopeLock ReadScopeLock(ConsumableAttributesLock);
-		if (ConsumableAttributesSet.Contains(InName)) { return; }
+		if (ConsumableAttributesSet.Contains(InName))
+		{
+			return;
+		}
 	}
 	{
 		FWriteScopeLock WriteScopeLock(ConsumableAttributesLock);
@@ -426,7 +496,10 @@ void FPCGExContext::AddProtectedAttributeName(const FName InName)
 {
 	{
 		FReadScopeLock ReadScopeLock(ProtectedAttributesLock);
-		if (ProtectedAttributesSet.Contains(InName)) { return; }
+		if (ProtectedAttributesSet.Contains(InName))
+		{
+			return;
+		}
 	}
 	{
 		FWriteScopeLock WriteScopeLock(ProtectedAttributesLock);
@@ -460,12 +533,18 @@ bool FPCGExContext::CancelExecution(const FString& InReason)
 	{
 		FSharedContext<FPCGExContext> SharedContext(GetOrCreateHandle());
 
-		if (!bQuietCancellationError && !InReason.IsEmpty()) { PCGE_LOG_C(Error, GraphAndLog, this, FTEXT(InReason)); }
+		if (!bQuietCancellationError && !InReason.IsEmpty())
+		{
+			PCGE_LOG_C(Error, GraphAndLog, this, FTEXT(InReason));
+		}
 
 		PCGEX_TERMINATE_ASYNC
 
 		OutputData.Reset();
-		if (bPropagateAbortedExecution) { OutputData.bCancelExecution = true; }
+		if (bPropagateAbortedExecution)
+		{
+			OutputData.bCancelExecution = true;
+		}
 
 		UnpauseContext();
 	}

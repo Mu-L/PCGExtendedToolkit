@@ -111,14 +111,32 @@ namespace PCGExCollectionsEditorMenuUtils
 				{
 					FScopedSlowTask SlowTask(0.0f, LOCTEXT("CreateOrUpdatePCGExMeshCollection", "Create or Update Asset Collection(s) from selection..."));
 
-					if (MeshCollections.IsEmpty()) { PCGExMeshCollectionActions::CreateCollectionFrom(Meshes); }
-					else { PCGExMeshCollectionActions::UpdateCollectionsFrom(MeshCollections, Meshes); }
+					if (MeshCollections.IsEmpty())
+					{
+						PCGExMeshCollectionActions::CreateCollectionFrom(Meshes);
+					}
+					else
+					{
+						PCGExMeshCollectionActions::UpdateCollectionsFrom(MeshCollections, Meshes);
+					}
 
-					if (ActorCollections.IsEmpty()) { PCGExActorCollectionActions::CreateCollectionFrom(Actors); }
-					else { PCGExActorCollectionActions::UpdateCollectionsFrom(ActorCollections, Actors); }
+					if (ActorCollections.IsEmpty())
+					{
+						PCGExActorCollectionActions::CreateCollectionFrom(Actors);
+					}
+					else
+					{
+						PCGExActorCollectionActions::UpdateCollectionsFrom(ActorCollections, Actors);
+					}
 
-					if (LevelCollections.IsEmpty()) { PCGExLevelCollectionActions::CreateCollectionFrom(Levels); }
-					else { PCGExLevelCollectionActions::UpdateCollectionsFrom(LevelCollections, Levels); }
+					if (LevelCollections.IsEmpty())
+					{
+						PCGExLevelCollectionActions::CreateCollectionFrom(Levels);
+					}
+					else
+					{
+						PCGExLevelCollectionActions::UpdateCollectionsFrom(LevelCollections, Levels);
+					}
 				});
 
 			Section.AddMenuEntry(

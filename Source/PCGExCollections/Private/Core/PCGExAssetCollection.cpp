@@ -4,19 +4,20 @@
 #include "Core/PCGExAssetCollection.h"
 
 #include "PCGExProperty.h"
-#include "UObject/UObjectGlobals.h"
-#include "UObject/Package.h"
-#include "Engine/StaticMesh.h"
 #include "StaticMeshResources.h"
 #include "Algo/RemoveIf.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExObjectNotifyHelpers.h"
+#include "UObject/Package.h"
+#include "UObject/UObjectGlobals.h"
 
 #if WITH_EDITOR
 #include "Editor.h"
 #include "PropertyEditorModule.h"
 #include "ScopedTransaction.h"
+#include "TimerManager.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "HAL/FileManager.h"
@@ -66,8 +67,14 @@ namespace PCGExAssetCollection
 	{
 		PCGExArrayHelpers::ArrayOfIndices(Order, Weights.Num());
 
-		Order.Sort([&Weights](int32 A, int32 B) { return Weights[A] < Weights[B]; });
-		Weights.Sort([](int32 A, int32 B) { return A < B; });
+		Order.Sort([&Weights](int32 A, int32 B)
+		{
+			return Weights[A] < Weights[B];
+		});
+		Weights.Sort([](int32 A, int32 B)
+		{
+			return A < B;
+		});
 
 		double WeightSum = 0;
 		for (int32 i = 0; i < Weights.Num(); i++)
@@ -85,10 +92,14 @@ namespace PCGExAssetCollection
 		switch (PickMode)
 		{
 		default:
-		case EPCGExIndexPickMode::Ascending: return GetPickAscending(Index);
-		case EPCGExIndexPickMode::Descending: return GetPickDescending(Index);
-		case EPCGExIndexPickMode::WeightAscending: return GetPickWeightAscending(Index);
-		case EPCGExIndexPickMode::WeightDescending: return GetPickWeightDescending(Index);
+		case EPCGExIndexPickMode::Ascending:
+			return GetPickAscending(Index);
+		case EPCGExIndexPickMode::Descending:
+			return GetPickDescending(Index);
+		case EPCGExIndexPickMode::WeightAscending:
+			return GetPickWeightAscending(Index);
+		case EPCGExIndexPickMode::WeightDescending:
+			return GetPickWeightDescending(Index);
 		}
 	}
 
@@ -130,7 +141,10 @@ namespace PCGExAssetCollection
 
 		const int32 Threshold = FRandomStream(Seed).RandRange(0, static_cast<int32>(WeightSum) - 1);
 		int32 Pick = 0;
-		while (Pick < Weights.Num() && Weights[Pick] <= Threshold) { Pick++; }
+		while (Pick < Weights.Num() && Weights[Pick] <= Threshold)
+		{
+			Pick++;
+		}
 		return Order[FMath::Min(Pick, Order.Num() - 1)];
 	}
 
@@ -156,10 +170,14 @@ namespace PCGExAssetCollection
 		switch (PickMode)
 		{
 		default:
-		case EPCGExIndexPickMode::Ascending: return GetPickAscending(Index);
-		case EPCGExIndexPickMode::Descending: return GetPickDescending(Index);
-		case EPCGExIndexPickMode::WeightAscending: return GetPickWeightAscending(Index);
-		case EPCGExIndexPickMode::WeightDescending: return GetPickWeightDescending(Index);
+		case EPCGExIndexPickMode::Ascending:
+			return GetPickAscending(Index);
+		case EPCGExIndexPickMode::Descending:
+			return GetPickDescending(Index);
+		case EPCGExIndexPickMode::WeightAscending:
+			return GetPickWeightAscending(Index);
+		case EPCGExIndexPickMode::WeightDescending:
+			return GetPickWeightDescending(Index);
 		}
 	}
 
@@ -185,16 +203,25 @@ namespace PCGExAssetCollection
 
 	int32 FCategory::GetPickRandom(int32 Seed) const
 	{
-		if (Order.IsEmpty()) { return -1; }
+		if (Order.IsEmpty())
+		{
+			return -1;
+		}
 		return Indices[Order[FRandomStream(Seed).RandRange(0, Order.Num() - 1)]];
 	}
 
 	int32 FCategory::GetPickRandomWeighted(int32 Seed) const
 	{
-		if (Order.IsEmpty()) { return -1; }
+		if (Order.IsEmpty())
+		{
+			return -1;
+		}
 		const int32 Threshold = FRandomStream(Seed).RandRange(0, static_cast<int32>(WeightSum) - 1);
 		int32 Pick = 0;
-		while (Pick < Weights.Num() && Weights[Pick] <= Threshold) { Pick++; }
+		while (Pick < Weights.Num() && Weights[Pick] <= Threshold)
+		{
+			Pick++;
+		}
 		return Indices[Order[FMath::Min(Pick, Order.Num() - 1)]];
 	}
 
@@ -236,26 +263,31 @@ namespace PCGExAssetCollection
 	}
 
 	// Every valid entry goes into Main. Additionally, entries with a non-None Category
-	// are registered to a named sub-category (created on first encounter).
+	// are registered to a named sub-category (created on first encounter, assigned a dense
+	// index in CategoryNameToIndex). Subsequent entries on the same name reuse that slot.
 	void FCache::RegisterEntry(int32 Index, const FPCGExAssetCollectionEntry* InEntry)
 	{
 		Main->RegisterEntry(Index, InEntry);
-		if (const TSharedPtr<FCategory>* CategoryPtr = Categories.Find(InEntry->Category); !CategoryPtr)
+		if (const int32* IdxPtr = CategoryNameToIndex.Find(InEntry->Category))
 		{
-			TSharedPtr<FCategory> Category = MakeShared<FCategory>(InEntry->Category);
-			Categories.Add(InEntry->Category, Category);
-			Category->RegisterEntry(Index, InEntry);
+			Categories[*IdxPtr]->RegisterEntry(Index, InEntry);
 		}
 		else
 		{
-			(*CategoryPtr)->RegisterEntry(Index, InEntry);
+			TSharedPtr<FCategory> Category = MakeShared<FCategory>(InEntry->Category);
+			const int32 NewIdx = Categories.Add(Category);
+			CategoryNameToIndex.Add(InEntry->Category, NewIdx);
+			Category->RegisterEntry(Index, InEntry);
 		}
 	}
 
 	void FCache::Compile()
 	{
 		Main->Compile();
-		for (const auto& Pair : Categories) { Pair.Value->Compile(); }
+		for (const TSharedPtr<FCategory>& Category : Categories)
+		{
+			Category->Compile();
+		}
 	}
 #pragma endregion
 }
@@ -266,7 +298,10 @@ const FPCGExProperty* FPCGExAssetCollectionEntry::GetResolvedPropertyBase(const 
 {
 	if (const FInstancedStruct* Override = PropertyOverrides.GetOverride(PropertyName))
 	{
-		if (const FPCGExProperty* Base = Override->GetPtr<FPCGExProperty>()) { return Base; }
+		if (const FPCGExProperty* Base = Override->GetPtr<FPCGExProperty>())
+		{
+			return Base;
+		}
 	}
 
 	if (OwningCollection)
@@ -293,15 +328,27 @@ double FPCGExAssetCollectionEntry::GetGrammarSize(const UPCGExAssetCollection* H
 {
 	if (!bIsSubCollection)
 	{
-		if (GrammarSource == EPCGExEntryVariationMode::Local) { return AssetGrammar.GetSize(Staging.Bounds); }
+		if (GrammarSource == EPCGExEntryVariationMode::Local)
+		{
+			return AssetGrammar.GetSize(Staging.Bounds);
+		}
 		return Host->GlobalAssetGrammar.GetSize(Staging.Bounds);
 	}
 
 	if (InternalSubCollection)
 	{
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Flatten) { return 0; }
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Inherit) { return InternalSubCollection->CollectionGrammar.GetSize(InternalSubCollection); }
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Override) { return CollectionGrammar.GetSize(InternalSubCollection); }
+		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Flatten)
+		{
+			return 0;
+		}
+		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Inherit)
+		{
+			return InternalSubCollection->CollectionGrammar.GetSize(InternalSubCollection);
+		}
+		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Override)
+		{
+			return CollectionGrammar.GetSize(InternalSubCollection);
+		}
 	}
 
 	return 0;
@@ -309,8 +356,14 @@ double FPCGExAssetCollectionEntry::GetGrammarSize(const UPCGExAssetCollection* H
 
 double FPCGExAssetCollectionEntry::GetGrammarSize(const UPCGExAssetCollection* Host, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
 {
-	if (!SizeCache) { return GetGrammarSize(Host); }
-	if (double* CachedSize = SizeCache->Find(this)) { return *CachedSize; }
+	if (!SizeCache)
+	{
+		return GetGrammarSize(Host);
+	}
+	if (double* CachedSize = SizeCache->Find(this))
+	{
+		return *CachedSize;
+	}
 	return SizeCache->Add(this, GetGrammarSize(Host));
 }
 
@@ -318,15 +371,30 @@ bool FPCGExAssetCollectionEntry::FixModuleInfos(const UPCGExAssetCollection* Hos
 {
 	if (!bIsSubCollection)
 	{
-		if (GrammarSource == EPCGExEntryVariationMode::Local) { AssetGrammar.Fix(Staging.Bounds, OutModule); }
-		else { Host->GlobalAssetGrammar.Fix(Staging.Bounds, OutModule); }
+		if (GrammarSource == EPCGExEntryVariationMode::Local)
+		{
+			AssetGrammar.Fix(Staging.Bounds, OutModule);
+		}
+		else
+		{
+			Host->GlobalAssetGrammar.Fix(Staging.Bounds, OutModule);
+		}
 	}
 
 	if (InternalSubCollection)
 	{
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Inherit) { InternalSubCollection->CollectionGrammar.Fix(InternalSubCollection, OutModule); }
-		else if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Override) { CollectionGrammar.Fix(InternalSubCollection, OutModule); }
-		else { return false; }
+		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Inherit)
+		{
+			InternalSubCollection->CollectionGrammar.Fix(InternalSubCollection, OutModule);
+		}
+		else if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Override)
+		{
+			CollectionGrammar.Fix(InternalSubCollection, OutModule);
+		}
+		else
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -341,11 +409,17 @@ void FPCGExAssetCollectionEntry::EDITOR_Sanitize()
 
 bool FPCGExAssetCollectionEntry::Validate(const UPCGExAssetCollection* ParentCollection)
 {
-	if (Weight <= 0) { return false; }
+	if (Weight <= 0)
+	{
+		return false;
+	}
 
 	if (bIsSubCollection)
 	{
-		if (!InternalSubCollection) { return false; }
+		if (!InternalSubCollection)
+		{
+			return false;
+		}
 		InternalSubCollection->LoadCache();
 	}
 	return true;
@@ -356,10 +430,13 @@ namespace
 	// Aggregate child entry extents per the collection's SubcollectionBoundsMode.
 	// Children must have their Staging.Bounds already filled (caller ensures this via the
 	// recursive pass before this runs). Invalid or zero-volume children are skipped.
-	// Returned box is centered at origin — center offsets are intentionally not aggregated.
+	// Returned box is centered at origin -- center offsets are intentionally not aggregated.
 	FBox AggregateSubcollectionBounds(const UPCGExAssetCollection* Child, EPCGExSubcollectionBoundsMode Mode)
 	{
-		if (!Child) { return FBox(ForceInit); }
+		if (!Child)
+		{
+			return FBox(ForceInit);
+		}
 
 		FVector UnionMin(FLT_MAX, FLT_MAX, FLT_MAX);
 		FVector UnionMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
@@ -371,12 +448,21 @@ namespace
 
 		Child->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32 /*Idx*/)
 		{
-			if (!Entry) { return; }
+			if (!Entry)
+			{
+				return;
+			}
 			const FBox& ChildBox = Entry->Staging.Bounds;
-			if (!ChildBox.IsValid) { return; }
+			if (!ChildBox.IsValid)
+			{
+				return;
+			}
 
 			const FVector ChildExt = ChildBox.GetExtent();
-			if (ChildExt.IsNearlyZero()) { return; }
+			if (ChildExt.IsNearlyZero())
+			{
+				return;
+			}
 
 			UnionMin = UnionMin.ComponentMin(ChildBox.Min);
 			UnionMax = UnionMax.ComponentMax(ChildBox.Max);
@@ -389,7 +475,10 @@ namespace
 			TotalWeight += W;
 		});
 
-		if (Count == 0) { return FBox(ForceInit); }
+		if (Count == 0)
+		{
+			return FBox(ForceInit);
+		}
 
 		FVector Extents;
 		switch (Mode)
@@ -424,7 +513,10 @@ void FPCGExAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 		if (InternalSubCollection)
 		{
 			Staging.Path = FSoftObjectPath(InternalSubCollection.GetPathName());
-			if (bRecursive) { InternalSubCollection->RebuildStagingData(true); }
+			if (bRecursive)
+			{
+				InternalSubCollection->RebuildStagingData(true);
+			}
 
 			// Aggregate child bounds per the owning collection's policy. Children are now staged
 			// (either because bRecursive ran them, or because they were already up-to-date).
@@ -456,7 +548,10 @@ void FPCGExAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath
 	// Default: the staged path is the source path for most entry types.
 	// Types that bake into an embedded asset (e.g. level → exported data asset)
 	// must override to advertise their external source reference instead.
-	if (Staging.Path.IsValid()) { OutPaths.Emplace(Staging.Path); }
+	if (Staging.Path.IsValid())
+	{
+		OutPaths.Emplace(Staging.Path);
+	}
 }
 #endif
 
@@ -467,7 +562,10 @@ void FPCGExAssetCollectionEntry::BuildMicroCache()
 
 void FPCGExAssetCollectionEntry::ClearManagedSockets()
 {
-	Staging.Sockets.SetNum(Algo::RemoveIf(Staging.Sockets, [](const FPCGExSocket& Socket) { return Socket.bManaged; }));
+	Staging.Sockets.SetNum(Algo::RemoveIf(Staging.Sockets, [](const FPCGExSocket& Socket)
+	{
+		return Socket.bManaged;
+	}));
 }
 
 #pragma endregion
@@ -742,8 +840,14 @@ PCGExAssetCollection::FCache* UPCGExAssetCollection::LoadCache()
 {
 	{
 		FReadScopeLock ReadScopeLock(CacheLock);
-		if (bCacheNeedsRebuild) { InvalidateCache(); }
-		if (Cache) { return Cache.Get(); }
+		if (bCacheNeedsRebuild)
+		{
+			InvalidateCache();
+		}
+		if (Cache)
+		{
+			return Cache.Get();
+		}
 	}
 
 	BuildCache();
@@ -769,7 +873,10 @@ void UPCGExAssetCollection::PostDuplicate(bool bDuplicateForPIE)
 	Super::PostDuplicate(bDuplicateForPIE);
 
 	// Duplicates get a new identity; PIE copies keep the same GUID
-	if (!bDuplicateForPIE) { CollectionGUID = GenerateNewGUID(); }
+	if (!bDuplicateForPIE)
+	{
+		CollectionGUID = GenerateNewGUID();
+	}
 
 #if WITH_EDITOR
 	EDITOR_SetDirty();
@@ -785,6 +892,33 @@ void UPCGExAssetCollection::PostEditImport()
 
 #if WITH_EDITOR
 	EDITOR_SetDirty();
+#endif
+}
+
+void UPCGExAssetCollection::PostLoad()
+{
+	Super::PostLoad();
+
+#if WITH_EDITOR
+	// Defer to next tick: the rebuild cascades into UpdateStaging -> SpawnActor, which is
+	// unsafe during PostLoad (load chain may re-enter, GWorld mid-transition). Trade-off:
+	// a PCG graph that triggered THIS soft-load sees pre-rebuild state for its current
+	// run; subsequent runs see fresh data. Complements OnAssetUpdatedOnDisk which only
+	// fires for collections already loaded when a referenced asset is saved.
+	if (!GEditor || !GEditor->IsTimerManagerValid() || !bAutoRebuildStaging)
+	{
+		return;
+	}
+
+	TWeakObjectPtr<UPCGExAssetCollection> WeakThis(this);
+	GEditor->GetTimerManager()->SetTimerForNextTick(
+		[WeakThis]()
+		{
+			if (UPCGExAssetCollection* This = WeakThis.Get())
+			{
+				This->EDITOR_RebuildStaleEntries();
+			}
+		});
 #endif
 }
 
@@ -808,7 +942,10 @@ void UPCGExAssetCollection::EDITOR_RegisterTrackingKeys(FPCGExContext* Context) 
 	Context->EDITOR_TrackPath(this);
 	ForEachEntry([Context](const FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
-		if (!InEntry->bIsSubCollection) { return; }
+		if (!InEntry->bIsSubCollection)
+		{
+			return;
+		}
 		if (const UPCGExAssetCollection* SubCollection = InEntry->GetSubCollectionPtr())
 		{
 			SubCollection->EDITOR_RegisterTrackingKeys(Context);
@@ -818,8 +955,14 @@ void UPCGExAssetCollection::EDITOR_RegisterTrackingKeys(FPCGExContext* Context) 
 
 bool UPCGExAssetCollection::HasCircularDependency(const UPCGExAssetCollection* OtherCollection) const
 {
-	if (!OtherCollection) { return false; }
-	if (OtherCollection == this) { return true; }
+	if (!OtherCollection)
+	{
+		return false;
+	}
+	if (OtherCollection == this)
+	{
+		return true;
+	}
 
 	TSet<const UPCGExAssetCollection*> References;
 	return OtherCollection->HasCircularDependency(References);
@@ -830,11 +973,17 @@ bool UPCGExAssetCollection::HasCircularDependency(TSet<const UPCGExAssetCollecti
 	bool bCircularDependency = false;
 	InReferences.Add(this, &bCircularDependency);
 
-	if (bCircularDependency) { return true; }
+	if (bCircularDependency)
+	{
+		return true;
+	}
 
 	ForEachEntry([&](const FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
-		if (bCircularDependency) { return; }
+		if (bCircularDependency)
+		{
+			return;
+		}
 		if (const UPCGExAssetCollection* Other = InEntry->GetSubCollectionPtr())
 		{
 			bCircularDependency = Other->HasCircularDependency(InReferences);
@@ -862,7 +1011,10 @@ void UPCGExAssetCollection::GetAssetPaths(TSet<FSoftObjectPath>& OutPaths, PCGEx
 			}
 			return;
 		}
-		if (bCollectionOnly) { return; }
+		if (bCollectionOnly)
+		{
+			return;
+		}
 
 		InEntry->GetAssetPaths(OutPaths);
 	});
@@ -979,6 +1131,10 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData()
 	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
+	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+	{
+		EDITOR_OnPostStagingRebuild();
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
@@ -989,45 +1145,99 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
+	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+	{
+		EDITOR_OnPostStagingRebuild();
+	}
 }
 
 int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 {
-	if (!bAutoRebuildStaging) { return 0; }
+	if (!bAutoRebuildStaging)
+	{
+		return 0;
+	}
 	// No baseline -- pre-existing collection that hasn't had a tracked rebuild yet. Skip
 	// rather than treating every entry as stale (which would mass-rebuild on first open
 	// after upgrade and risk silently changing serialised bounds).
-	if (LastRebuiltUtc == FDateTime::MinValue()) { return 0; }
+	if (LastRebuiltUtc == FDateTime::MinValue())
+	{
+		return 0;
+	}
 
 	TArray<int32> StaleIndices;
 	ForEachEntry([this, &StaleIndices](const FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
-		if (InEntry->bIsSubCollection) { return; }
-		const FSoftObjectPath& Path = InEntry->Staging.Path;
-		if (!Path.IsValid()) { return; }
+		if (InEntry->bIsSubCollection)
+		{
+			return;
+		}
 
-		FString Filename;
-		if (!FPackageName::TryConvertLongPackageNameToFilename(Path.GetLongPackageName(), Filename)) { return; }
-		const FString UAsset = Filename + FPackageName::GetAssetPackageExtension();
-		const FString UMap = Filename + FPackageName::GetMapPackageExtension();
-		FDateTime AssetTime = IFileManager::Get().GetTimeStamp(*UAsset);
-		if (AssetTime == FDateTime::MinValue()) { AssetTime = IFileManager::Get().GetTimeStamp(*UMap); }
-		if (AssetTime == FDateTime::MinValue()) { return; }
-		if (AssetTime > LastRebuiltUtc) { StaleIndices.Add(i); }
+		// Use EDITOR_GetSourceAssetPaths so entry types that bake into an embedded asset
+		// (e.g. PCGDataAsset collection entries with Source==Level) check the real source
+		// file rather than Staging.Path, which resolves to the collection's own package.
+		TSet<FSoftObjectPath> SourcePaths;
+		InEntry->EDITOR_GetSourceAssetPaths(SourcePaths);
+
+		for (const FSoftObjectPath& Path : SourcePaths)
+		{
+			if (!Path.IsValid())
+			{
+				continue;
+			}
+			FString Filename;
+			if (!FPackageName::TryConvertLongPackageNameToFilename(Path.GetLongPackageName(), Filename))
+			{
+				continue;
+			}
+			const FString UAsset = Filename + FPackageName::GetAssetPackageExtension();
+			const FString UMap = Filename + FPackageName::GetMapPackageExtension();
+			FDateTime AssetTime = IFileManager::Get().GetTimeStamp(*UAsset);
+			if (AssetTime == FDateTime::MinValue())
+			{
+				AssetTime = IFileManager::Get().GetTimeStamp(*UMap);
+			}
+			if (AssetTime == FDateTime::MinValue())
+			{
+				continue;
+			}
+			if (AssetTime > LastRebuiltUtc)
+			{
+				StaleIndices.Add(i);
+				break;
+			}
+		}
 	});
 
-	for (int32 Index : StaleIndices) { EDITOR_RebuildEntryStaging(Index); }
+	{
+		// Suppress per-entry post-rebuild hook firings; emit one tail call after the batch.
+		TGuardValue<int32> SuppressGuard(EDITOR_PostStagingRebuildSuppressDepth, EDITOR_PostStagingRebuildSuppressDepth + 1);
+		for (int32 Index : StaleIndices)
+		{
+			EDITOR_RebuildEntryStaging(Index);
+		}
+	}
+	if (!StaleIndices.IsEmpty())
+	{
+		EDITOR_OnPostStagingRebuild();
+	}
 	return StaleIndices.Num();
 }
 
 bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 {
-	if (!bAutoRebuildStaging) { return false; }
+	if (!bAutoRebuildStaging)
+	{
+		return false;
+	}
 
 	bool bRebuilt = false;
 	ForEachEntry([this, EntryIndex, &bRebuilt](FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
-		if (i != EntryIndex) { return; }
+		if (i != EntryIndex)
+		{
+			return;
+		}
 		Modify(true);
 		InEntry->EDITOR_Sanitize();
 		InEntry->UpdateStaging(this, i, false);
@@ -1039,6 +1249,10 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 		InvalidateCache();
 		(void)MarkPackageDirty();
 		PCGExEditor::NotifyObjectChanged(this);
+		if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+		{
+			EDITOR_OnPostStagingRebuild();
+		}
 	}
 	return bRebuilt;
 }

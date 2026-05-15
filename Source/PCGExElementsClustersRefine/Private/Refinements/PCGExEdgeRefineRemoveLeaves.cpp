@@ -10,15 +10,24 @@ void FPCGExEdgeRemoveLeaves::ProcessNode(PCGExClusters::FNode& Node)
 	int32 CurrentNodeIndex = Node.Index;
 	int32 PrevNodeIndex = -1;
 
-	if (!Node.IsLeaf()) { return; }
+	if (!Node.IsLeaf())
+	{
+		return;
+	}
 
 	while (CurrentNodeIndex != -1)
 	{
 		PCGExClusters::FNode* From = Cluster->GetNode(CurrentNodeIndex);
 
-		if (From->IsComplex()) { return; }
+		if (From->IsComplex())
+		{
+			return;
+		}
 
-		if (PrevNodeIndex == CurrentNodeIndex) { return; }
+		if (PrevNodeIndex == CurrentNodeIndex)
+		{
+			return;
+		}
 
 		From->bValid = false;
 		PrevNodeIndex = CurrentNodeIndex;

@@ -4,9 +4,9 @@
 #include "Data/PCGExSubSelection.h"
 
 #include "CoreMinimal.h"
-#include "Data/PCGExSubSelectionOpsImpl.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGExSubSelectionOpsImpl.h"
 
 namespace PCGExData
 {
@@ -16,7 +16,10 @@ namespace PCGExData
 
 	bool GetComponentSelection(const TArray<FString>& Names, FInputSelectorComponentData& OutSelection)
 	{
-		if (Names.IsEmpty()) { return false; }
+		if (Names.IsEmpty())
+		{
+			return false;
+		}
 		for (const FString& Name : Names)
 		{
 			if (const FInputSelectorComponentData* Selection = STRMAP_TRANSFORM_FIELD.Find(Name.ToUpper()))
@@ -30,7 +33,10 @@ namespace PCGExData
 
 	bool GetFieldSelection(const TArray<FString>& Names, FInputSelectorFieldData& OutSelection)
 	{
-		if (Names.IsEmpty()) { return false; }
+		if (Names.IsEmpty())
+		{
+			return false;
+		}
 		const FString& STR = Names.Num() > 1 ? Names[1].ToUpper() : Names[0].ToUpper();
 		if (const FInputSelectorFieldData* Selection = STRMAP_SINGLE_FIELD.Find(STR))
 		{
@@ -42,7 +48,10 @@ namespace PCGExData
 
 	bool GetAxisSelection(const TArray<FString>& Names, FInputSelectorAxisData& OutSelection)
 	{
-		if (Names.IsEmpty()) { return false; }
+		if (Names.IsEmpty())
+		{
+			return false;
+		}
 		for (const FString& Name : Names)
 		{
 			if (const FInputSelectorAxisData* Selection = STRMAP_AXIS.Find(Name.ToUpper()))
@@ -72,21 +81,35 @@ namespace PCGExData
 	{
 		FPCGAttributePropertyInputSelector ProxySelector = FPCGAttributePropertyInputSelector();
 		ProxySelector.Update(Path);
-		if (InData) { ProxySelector = ProxySelector.CopyAndFixLast(InData); }
+		if (InData)
+		{
+			ProxySelector = ProxySelector.CopyAndFixLast(InData);
+		}
 		Init(ProxySelector.GetExtraNames());
 	}
 
 	EPCGMetadataTypes FSubSelection::GetSubType(const EPCGMetadataTypes Fallback) const
 	{
-		if (!bIsValid) { return Fallback; }
-		if (bIsFieldSet) { return EPCGMetadataTypes::Double; }
-		if (bIsAxisSet) { return EPCGMetadataTypes::Vector; }
+		if (!bIsValid)
+		{
+			return Fallback;
+		}
+		if (bIsFieldSet)
+		{
+			return EPCGMetadataTypes::Double;
+		}
+		if (bIsAxisSet)
+		{
+			return EPCGMetadataTypes::Vector;
+		}
 
 		switch (Component)
 		{
 		case PCGExTypeOps::ETransformPart::Position:
-		case PCGExTypeOps::ETransformPart::Scale: return EPCGMetadataTypes::Vector;
-		case PCGExTypeOps::ETransformPart::Rotation: return EPCGMetadataTypes::Quaternion;
+		case PCGExTypeOps::ETransformPart::Scale:
+			return EPCGMetadataTypes::Vector;
+		case PCGExTypeOps::ETransformPart::Rotation:
+			return EPCGMetadataTypes::Quaternion;
 		}
 
 		return Fallback;
@@ -110,10 +133,22 @@ namespace PCGExData
 		bIsValid = true;
 		bIsFieldSet = true;
 
-		if (InFieldIndex == 0) { Field = PCGExTypeOps::ESingleField::X; }
-		else if (InFieldIndex == 1) { Field = PCGExTypeOps::ESingleField::Y; }
-		else if (InFieldIndex == 2) { Field = PCGExTypeOps::ESingleField::Z; }
-		else if (InFieldIndex == 3) { Field = PCGExTypeOps::ESingleField::W; }
+		if (InFieldIndex == 0)
+		{
+			Field = PCGExTypeOps::ESingleField::X;
+		}
+		else if (InFieldIndex == 1)
+		{
+			Field = PCGExTypeOps::ESingleField::Y;
+		}
+		else if (InFieldIndex == 2)
+		{
+			Field = PCGExTypeOps::ESingleField::Z;
+		}
+		else if (InFieldIndex == 3)
+		{
+			Field = PCGExTypeOps::ESingleField::W;
+		}
 
 		return true;
 	}
@@ -159,7 +194,10 @@ namespace PCGExData
 		if (bIsFieldSet)
 		{
 			bIsValid = true;
-			if (!bIsComponentSet) { PossibleSourceType = FieldIDMapping.Get<1>(); }
+			if (!bIsComponentSet)
+			{
+				PossibleSourceType = FieldIDMapping.Get<1>();
+			}
 		}
 	}
 
@@ -184,7 +222,10 @@ namespace PCGExData
 	                             EPCGMetadataTypes SourceType, const void* Source) const
 	{
 		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(TargetType);
-		if (!Ops) { return; }
+		if (!Ops)
+		{
+			return;
+		}
 
 		Ops->ApplySetSelection(Target, *this, Source, SourceType);
 	}
@@ -192,7 +233,10 @@ namespace PCGExData
 	double FSubSelection::ExtractFieldToDouble(EPCGMetadataTypes SourceType, const void* Source) const
 	{
 		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(SourceType);
-		if (!Ops) { return 0.0; }
+		if (!Ops)
+		{
+			return 0.0;
+		}
 
 		return Ops->ExtractField(Source, Field);
 	}
@@ -200,7 +244,10 @@ namespace PCGExData
 	void FSubSelection::InjectFieldFromDouble(EPCGMetadataTypes TargetType, void* Target, double Value) const
 	{
 		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(TargetType);
-		if (!Ops) { return; }
+		if (!Ops)
+		{
+			return;
+		}
 
 		Ops->InjectField(Target, Value, Field);
 	}
@@ -271,14 +318,23 @@ namespace PCGExData
 	{
 		OutType = EPCGMetadataTypes::Unknown;
 
-		if (!IsValid(InData)) { return false; }
+		if (!IsValid(InData))
+		{
+			return false;
+		}
 
 		const FPCGAttributePropertyInputSelector FixedSelector = InputSelector.CopyAndFixLast(InData);
-		if (!FixedSelector.IsValid()) { return false; }
+		if (!FixedSelector.IsValid())
+		{
+			return false;
+		}
 
 		if (FixedSelector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 		{
-			if (!InData->Metadata) { return false; }
+			if (!InData->Metadata)
+			{
+				return false;
+			}
 			if (const FPCGMetadataAttributeBase* AttributeBase = InData->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(FixedSelector, InData)))
 			{
 				OutType = static_cast<EPCGMetadataTypes>(AttributeBase->GetTypeId());
@@ -303,14 +359,20 @@ namespace PCGExData
 		{
 			if (!TryGetType(InputSelector, InDataFacade->GetIn(), OutType))
 			{
-				if (TryGetType(InputSelector, InDataFacade->GetOut(), OutType)) { InOutSide = EIOSide::Out; }
+				if (TryGetType(InputSelector, InDataFacade->GetOut(), OutType))
+				{
+					InOutSide = EIOSide::Out;
+				}
 			}
 		}
 		else
 		{
 			if (!TryGetType(InputSelector, InDataFacade->GetOut(), OutType))
 			{
-				if (TryGetType(InputSelector, InDataFacade->GetIn(), OutType)) { InOutSide = EIOSide::In; }
+				if (TryGetType(InputSelector, InDataFacade->GetIn(), OutType))
+				{
+					InOutSide = EIOSide::In;
+				}
 			}
 		}
 

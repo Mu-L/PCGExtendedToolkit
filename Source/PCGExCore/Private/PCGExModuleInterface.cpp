@@ -3,11 +3,11 @@
 
 #include "PCGExModuleInterface.h"
 
-#include "PCGExLog.h"
 #include "CoreMinimal.h"
-#include "UObject/UObjectIterator.h"
+#include "PCGExLog.h"
 #include "UObject/Class.h"
 #include "UObject/CoreRedirects.h"
+#include "UObject/UObjectIterator.h"
 
 #if WITH_EDITOR
 #include "Editor.h"

@@ -2,8 +2,8 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Core/PCGExNavmesh.h"
-#include "Core/PCGExPathfinding.h"
 #include "NavigationSystem.h"
+#include "Core/PCGExPathfinding.h"
 #include "Paths/PCGExPath.h"
 
 namespace PCGExNavmesh
@@ -15,12 +15,18 @@ namespace PCGExNavmesh
 
 	void FNavmeshQuery::FindPath(FPCGExNavmeshContext* InContext)
 	{
-		if (!SeedGoalPair.IsValid()) { return; }
+		if (!SeedGoalPair.IsValid())
+		{
+			return;
+		}
 
 		UWorld* World = InContext->GetWorld();
 		UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World);
 
-		if (!NavSys || !NavSys->GetDefaultNavDataInstance()) { return; }
+		if (!NavSys || !NavSys->GetDefaultNavDataInstance())
+		{
+			return;
+		}
 
 		FPathFindingQuery PathFindingQuery = FPathFindingQuery(World, *NavSys->GetDefaultNavDataInstance(), SeedGoalPair.SeedPosition, SeedGoalPair.GoalPosition, nullptr, nullptr, TNumericLimits<FVector::FReal>::Max(), InContext->bRequireNavigableEndLocation);
 
@@ -39,7 +45,10 @@ namespace PCGExNavmesh
 			Positions.Add(PathPoints[0].Location);
 			SeedGoalMetrics.Add(Positions[0]);
 
-			if (PathPoints.Num() == 1) { return; }
+			if (PathPoints.Num() == 1)
+			{
+				return;
+			}
 
 			PCGExPaths::FPathMetrics Metrics = PCGExPaths::FPathMetrics(Positions[0]);
 
@@ -50,8 +59,14 @@ namespace PCGExNavmesh
 
 				if (Metrics.IsLastWithinRange(Location, InContext->FuseDistance))
 				{
-					if (i == LastIndex) { Positions.Last() = Location; }
-					else { continue; }
+					if (i == LastIndex)
+					{
+						Positions.Last() = Location;
+					}
+					else
+					{
+						continue;
+					}
 				}
 
 				Positions.Add(Location);
@@ -64,9 +79,18 @@ namespace PCGExNavmesh
 
 	void FNavmeshQuery::CopyPositions(const TPCGValueRange<FTransform>& InRange, int32& OutStartIndex, const bool bAddSeed, const bool bAddGoal)
 	{
-		if (bAddSeed) { InRange[OutStartIndex++].SetLocation(SeedGoalPair.SeedPosition); }
-		for (const FVector& Position : Positions) { InRange[OutStartIndex++].SetLocation(Position); }
-		if (bAddGoal) { InRange[OutStartIndex++].SetLocation(SeedGoalPair.GoalPosition); }
+		if (bAddSeed)
+		{
+			InRange[OutStartIndex++].SetLocation(SeedGoalPair.SeedPosition);
+		}
+		for (const FVector& Position : Positions)
+		{
+			InRange[OutStartIndex++].SetLocation(Position);
+		}
+		if (bAddGoal)
+		{
+			InRange[OutStartIndex++].SetLocation(SeedGoalPair.GoalPosition);
+		}
 		Positions.Empty();
 	}
 }

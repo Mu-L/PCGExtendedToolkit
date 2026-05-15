@@ -7,12 +7,12 @@
 #include "PCGExH.h"
 #include "StaticMeshResources.h"
 
-#include "Core/PCGExContext.h"
 #include "PCGParamData.h"
 #include "StaticMeshResources.h"
-#include "Engine/StaticMesh.h"
 #include "Async/ParallelFor.h"
+#include "Core/PCGExContext.h"
 #include "Data/External/PCGExMeshImportDetails.h"
+#include "Engine/StaticMesh.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 
@@ -24,7 +24,8 @@ namespace PCGExMesh
 		PCGEX_ASYNC_TASK_NAME(FExtractStaticMeshTask)
 
 		explicit FExtractStaticMeshTask(const TSharedPtr<FGeoStaticMesh>& InGSM)
-			: FTask(), GSM(InGSM)
+			: FTask()
+			  , GSM(InGSM)
 		{
 		}
 
@@ -38,7 +39,10 @@ namespace PCGExMesh
 
 	void DeclareGeoMeshImportInputs(const FPCGExGeoMeshImportDetails& InDetails, TArray<FPCGPinProperties>& PinProperties)
 	{
-		if (!InDetails.bImportUVs) { return; }
+		if (!InDetails.bImportUVs)
+		{
+			return;
+		}
 
 		{
 			PCGEX_PIN_PARAMS(Labels::SourceUVImportRulesLabel, "Name/Channel output map. Attribute sets are expected to contain an FName attribute an int32 attribute.", Normal)
@@ -78,14 +82,19 @@ namespace PCGExMesh
 				TArray<FVector>* InVertices,
 				TArray<int32>* InRawIndices,
 				const FVector& InHashTolerance = FVector(DefaultVertexMergeHashTolerance))
-				: Vertices(InVertices), RawIndices(InRawIndices), HashTolerance(InHashTolerance)
+				: Vertices(InVertices)
+				  , RawIndices(InRawIndices)
+				  , HashTolerance(InHashTolerance)
 			{
 				/* Optimization to skip processing if tolerance is zero. */
 				bEnableVertexMerge = HashTolerance.SizeSquared() > 0.0f;
 
 				HashTolerance = bEnableVertexMerge ? PCGEx::SafeTolerance(InHashTolerance) : FVector(0.0f);
 				Vertices->Reserve(Size);
-				if (RawIndices) { RawIndices->Reserve(Size); }
+				if (RawIndices)
+				{
+					RawIndices->Reserve(Size);
+				}
 			}
 
 			virtual uint32 Add_GetIdx(const FVector& Position, const int32 RawIndex) = 0;
@@ -94,11 +103,17 @@ namespace PCGExMesh
 			FORCEINLINE int32 AddVertex(const FVector& Position, const int32 RawIndex) const
 			{
 				const int32 Idx = Vertices->Emplace(Position);
-				if (RawIndices) { RawIndices->Emplace(RawIndex); }
+				if (RawIndices)
+				{
+					RawIndices->Emplace(RawIndex);
+				}
 				return Idx;
 			}
 
-			FORCEINLINE int32 Num() const { return Data.Num(); }
+			FORCEINLINE int32 Num() const
+			{
+				return Data.Num();
+			}
 		};
 
 		template <bool bCollapse = true, bool bPrecise = true>
@@ -112,7 +127,10 @@ namespace PCGExMesh
 				const FVector& InHashTolerance = FVector(DefaultVertexMergeHashTolerance))
 				: IMeshLookup(Size, InVertices, InRawIndices, InHashTolerance)
 			{
-				if constexpr (bCollapse) { Data.Reserve(Size); }
+				if constexpr (bCollapse)
+				{
+					Data.Reserve(Size);
+				}
 			}
 
 			virtual uint32 Add_GetIdx(const FVector& Position, const int32 RawIndex) override
@@ -128,7 +146,10 @@ namespace PCGExMesh
 					const uint64 Key = PCGEx::SH3(Position, HashTolerance);
 
 					// Check if exact cell has a match
-					if (const int32* IdxPtr = Data.Find(Key)) { return *IdxPtr; }
+					if (const int32* IdxPtr = Data.Find(Key))
+					{
+						return *IdxPtr;
+					}
 
 					if constexpr (bPrecise)
 					{
@@ -136,13 +157,19 @@ namespace PCGExMesh
 						const uint64 OffsetKey = PCGEx::SH3(Position + (0.5 * HashTolerance), HashTolerance);
 						if (OffsetKey != Key)
 						{
-							if (const int32* IdxPtr = Data.Find(OffsetKey)) { return *IdxPtr; }
+							if (const int32* IdxPtr = Data.Find(OffsetKey))
+							{
+								return *IdxPtr;
+							}
 						}
 
 						// Register under both keys so future vertices can find us from either cell
 						const int32 Idx = AddVertex(Position, RawIndex);
 						Data.Add(Key, Idx);
-						if (OffsetKey != Key) { Data.Add(OffsetKey, Idx); }
+						if (OffsetKey != Key)
+						{
+							Data.Add(OffsetKey, Idx);
+						}
 						return Idx;
 					}
 					else
@@ -169,11 +196,17 @@ namespace PCGExMesh
 		{
 			if (bPreciseVertexMerge)
 			{
-				if (bMerge) { return MakeUnique<TMeshLookup<true, true>>(Size, InVertices, InRawIndices, InHashTolerance); }
+				if (bMerge)
+				{
+					return MakeUnique<TMeshLookup<true, true>>(Size, InVertices, InRawIndices, InHashTolerance);
+				}
 				return MakeUnique<TMeshLookup<false, true>>(Size, InVertices, InRawIndices, InHashTolerance);
 			}
 
-			if (bMerge) { return MakeUnique<TMeshLookup<true, false>>(Size, InVertices, InRawIndices, InHashTolerance); }
+			if (bMerge)
+			{
+				return MakeUnique<TMeshLookup<true, false>>(Size, InVertices, InRawIndices, InHashTolerance);
+			}
 			return MakeUnique<TMeshLookup<false, false>>(Size, InVertices, InRawIndices, InHashTolerance);
 		}
 	}
@@ -181,21 +214,36 @@ namespace PCGExMesh
 
 	FMeshData::FMeshData(const UStaticMesh* InStaticMesh)
 	{
-		if (!InStaticMesh) { return; }
+		if (!InStaticMesh)
+		{
+			return;
+		}
 
 		const FStaticMeshRenderData* RenderData = InStaticMesh->GetRenderData();
-		if (!RenderData || RenderData->LODResources.IsEmpty()) { return; }
+		if (!RenderData || RenderData->LODResources.IsEmpty())
+		{
+			return;
+		}
 
 		const FStaticMeshLODResources* LODResource = &RenderData->LODResources[0];
 
-		if (!LODResource) { return; }
+		if (!LODResource)
+		{
+			return;
+		}
 
 		NumTexCoords = LODResource->GetNumTexCoords();
 		Indices = LODResource->IndexBuffer.GetArrayView();
-		if (Indices.Num() <= 0) { return; }
+		if (Indices.Num() <= 0)
+		{
+			return;
+		}
 
 		Buffers = &LODResource->VertexBuffers;
-		if (Buffers->ColorVertexBuffer.IsInitialized() && Buffers->ColorVertexBuffer.GetNumVertices() > 0) { Colors = &Buffers->ColorVertexBuffer; }
+		if (Buffers->ColorVertexBuffer.IsInitialized() && Buffers->ColorVertexBuffer.GetNumVertices() > 0)
+		{
+			Colors = &Buffers->ColorVertexBuffer;
+		}
 
 		Positions = &Buffers->PositionVertexBuffer;
 
@@ -209,7 +257,10 @@ namespace PCGExMesh
 		// and edges connect adjacent triangles. The original vertex indices are stored in
 		// the Triangle entries for later reference. RawIndices are replaced with negative
 		// values (-(triIndex+1)) to distinguish dual vertices from original mesh vertices.
-		if (Triangles.IsEmpty()) { return; }
+		if (Triangles.IsEmpty())
+		{
+			return;
+		}
 
 		TArray<FVector> DualPositions;
 		PCGExArrayHelpers::InitArray(DualPositions, Triangles.Num());
@@ -226,14 +277,26 @@ namespace PCGExMesh
 			Triangle.Z = RawIndices[Triangle.Z];
 
 			const FIntVector3& Adjacency = Tri_Adjacency[i];
-			if (Adjacency.X != -1) { Edges.Add(PCGEx::H64U(i, Adjacency.X)); }
-			if (Adjacency.Y != -1) { Edges.Add(PCGEx::H64U(i, Adjacency.Y)); }
-			if (Adjacency.Z != -1) { Edges.Add(PCGEx::H64U(i, Adjacency.Z)); }
+			if (Adjacency.X != -1)
+			{
+				Edges.Add(PCGEx::H64U(i, Adjacency.X));
+			}
+			if (Adjacency.Y != -1)
+			{
+				Edges.Add(PCGEx::H64U(i, Adjacency.Y));
+			}
+			if (Adjacency.Z != -1)
+			{
+				Edges.Add(PCGEx::H64U(i, Adjacency.Z));
+			}
 		}
 
 		// Raw indices have been mutated and stored in triangles instead.
 		RawIndices.SetNum(Triangles.Num());
-		for (int i = 0; i < Triangles.Num(); i++) { RawIndices[i] = -(i + 1); }
+		for (int i = 0; i < Triangles.Num(); i++)
+		{
+			RawIndices[i] = -(i + 1);
+		}
 
 		Vertices.Reset(DualPositions.Num());
 		Vertices = MoveTemp(DualPositions);
@@ -244,7 +307,10 @@ namespace PCGExMesh
 	void FGeoMesh::MakeHollowDual()
 	// Need triangulate first
 	{
-		if (Triangles.IsEmpty()) { return; }
+		if (Triangles.IsEmpty())
+		{
+			return;
+		}
 
 		const int32 StartIndex = Vertices.Num();
 		const int32 NumTriangles = Triangles.Num();
@@ -273,14 +339,23 @@ namespace PCGExMesh
 		const TSoftObjectPtr<UStaticMesh>& InSoftStaticMesh,
 		const FVector& InCWTolerance,
 		const bool bInPreciseVertexMerge)
-		: CWTolerance(InCWTolerance),
-		  bPreciseVertexMerge(bInPreciseVertexMerge)
+		: CWTolerance(InCWTolerance)
+		  , bPreciseVertexMerge(bInPreciseVertexMerge)
 	{
-		if (!InSoftStaticMesh.ToSoftObjectPath().IsValid()) { return; }
-		if (!InSoftStaticMesh.Get()) { MeshHandle = PCGExHelpers::LoadBlocking_AnyThreadTpl(InSoftStaticMesh); }
+		if (!InSoftStaticMesh.ToSoftObjectPath().IsValid())
+		{
+			return;
+		}
+		if (!InSoftStaticMesh.Get())
+		{
+			MeshHandle = PCGExHelpers::LoadBlocking_AnyThreadTpl(InSoftStaticMesh);
+		}
 
 		StaticMesh = InSoftStaticMesh.Get();
-		if (!StaticMesh) { return; }
+		if (!StaticMesh)
+		{
+			return;
+		}
 
 		StaticMesh->GetRenderData();
 		bIsValid = true;
@@ -306,8 +381,14 @@ namespace PCGExMesh
 
 	void FGeoStaticMesh::ExtractMeshSynchronous()
 	{
-		if (bIsLoaded) { return; }
-		if (!bIsValid) { return; }
+		if (bIsLoaded)
+		{
+			return;
+		}
+		if (!bIsValid)
+		{
+			return;
+		}
 
 		RawData = FMeshData(StaticMesh);
 
@@ -334,9 +415,18 @@ namespace PCGExMesh
 			const uint32 B = MeshLookup->Add_GetIdx(FVector(PositionBuffer.VertexPosition(RawB)), RawB);
 			const uint32 C = MeshLookup->Add_GetIdx(FVector(PositionBuffer.VertexPosition(RawC)), RawC);
 
-			if (A != B) { Edges.Add(PCGEx::H64U(A, B)); }
-			if (B != C) { Edges.Add(PCGEx::H64U(B, C)); }
-			if (C != A) { Edges.Add(PCGEx::H64U(C, A)); }
+			if (A != B)
+			{
+				Edges.Add(PCGEx::H64U(A, B));
+			}
+			if (B != C)
+			{
+				Edges.Add(PCGEx::H64U(B, C));
+			}
+			if (C != A)
+			{
+				Edges.Add(PCGEx::H64U(C, A));
+			}
 		}
 
 		bIsLoaded = true;
@@ -346,8 +436,14 @@ namespace PCGExMesh
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FGeoStaticMesh::TriangulateMeshSynchronous);
 
-		if (bIsLoaded) { return; }
-		if (!bIsValid) { return; }
+		if (bIsLoaded)
+		{
+			return;
+		}
+		if (!bIsValid)
+		{
+			return;
+		}
 
 		RawData = FMeshData(StaticMesh);
 
@@ -382,7 +478,10 @@ namespace PCGExMesh
 				if (Adjacency[i] == -1)
 				{
 					Adjacency[i] = OtherTri;
-					if (i == 2) { Tri_IsOnHull[Tri] = false; }
+					if (i == 2)
+					{
+						Tri_IsOnHull[Tri] = false;
+					}
 					break;
 				}
 			}
@@ -394,7 +493,8 @@ namespace PCGExMesh
 			Edges.Add(Edge, &bIsAlreadySet);
 			if (bIsAlreadySet)
 			{
-				if (int32 OtherTri = -1; EdgeMap.RemoveAndCopyValue(Edge, OtherTri))
+				if (int32 OtherTri = -1;
+					EdgeMap.RemoveAndCopyValue(Edge, OtherTri))
 				{
 					PushAdjacency(OtherTri, Tri);
 					PushAdjacency(Tri, OtherTri);
@@ -417,7 +517,10 @@ namespace PCGExMesh
 			const uint32 B = MeshLookup->Add_GetIdx(FVector(PositionBuffer.VertexPosition(RawB)), RawB);
 			const uint32 C = MeshLookup->Add_GetIdx(FVector(PositionBuffer.VertexPosition(RawC)), RawC);
 
-			if (A == B || B == C || C == A) { continue; }
+			if (A == B || B == C || C == A)
+			{
+				continue;
+			}
 
 			Triangles[Ti] = FIntVector3(A, B, C);
 
@@ -477,8 +580,14 @@ namespace PCGExMesh
 
 	void FGeoStaticMesh::ExtractMeshAsync(PCGExMT::FTaskManager* TaskManager)
 	{
-		if (bIsLoaded) { return; }
-		if (!bIsValid) { return; }
+		if (bIsLoaded)
+		{
+			return;
+		}
+		if (!bIsValid)
+		{
+			return;
+		}
 
 		PCGEX_LAUNCH(FExtractStaticMeshTask, SharedThis(this))
 	}
@@ -490,10 +599,16 @@ namespace PCGExMesh
 
 	int32 FGeoStaticMeshMap::FindOrAdd(const FSoftObjectPath& InPath)
 	{
-		if (const int32* GSMPtr = Map.Find(InPath)) { return *GSMPtr; }
+		if (const int32* GSMPtr = Map.Find(InPath))
+		{
+			return *GSMPtr;
+		}
 
 		PCGEX_MAKE_SHARED(GSM, FGeoStaticMesh, InPath, CWTolerance, bPreciseVertexMerge)
-		if (!GSM->bIsValid) { return -1; }
+		if (!GSM->bIsValid)
+		{
+			return -1;
+		}
 
 		const int32 Index = GSMs.Add(GSM);
 		GSM->DesiredTriangulationType = DesiredTriangulationType;

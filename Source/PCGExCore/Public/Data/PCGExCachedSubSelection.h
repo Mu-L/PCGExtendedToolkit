@@ -52,7 +52,10 @@ namespace PCGExData
 	 */
 	namespace SubSelectionImpl
 	{
-		static FORCEINLINE FVector ExtractAxisDefault(const void* Value, EPCGExAxis Axis) { return FVector::ForwardVector; }
+		static FORCEINLINE FVector ExtractAxisDefault(const void* Value, EPCGExAxis Axis)
+		{
+			return FVector::ForwardVector;
+		}
 
 		PCGEXCORE_API FExtractFieldFn GetExtractFieldFn(EPCGMetadataTypes Type);
 		PCGEXCORE_API FInjectFieldFn GetInjectFieldFn(EPCGMetadataTypes Type);
@@ -182,7 +185,10 @@ namespace PCGExData
 		 */
 		FORCEINLINE void ConvertGet(const void* Source, void* OutValue) const
 		{
-			if (ConvertRealToWorking) { ConvertRealToWorking(Source, OutValue); }
+			if (ConvertRealToWorking)
+			{
+				ConvertRealToWorking(Source, OutValue);
+			}
 		}
 
 		/**
@@ -190,7 +196,10 @@ namespace PCGExData
 		 */
 		FORCEINLINE void ConvertSet(void* Target, const void* Source) const
 		{
-			if (ConvertWorkingToReal) { ConvertWorkingToReal(Source, Target); }
+			if (ConvertWorkingToReal)
+			{
+				ConvertWorkingToReal(Source, Target);
+			}
 		}
 
 	private:

@@ -5,12 +5,12 @@
 
 #include "CoreMinimal.h"
 #include "PCGExFilterCommon.h"
-#include "Factories/PCGExFactories.h"
-#include "Math/PCGExMathMean.h"
-#include "Math/OBB/PCGExOBB.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Details/PCGExSettingsMacros.h"
+#include "Factories/PCGExFactories.h"
+#include "Math/PCGExMathMean.h"
+#include "Math/OBB/PCGExOBB.h"
 #include "Sorting/PCGExSortingCommon.h"
 
 #include "PCGExSelfPruning.generated.h"
@@ -45,8 +45,16 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(SelfPruning, "Self Pruning", "A slower, more precise self pruning node.");
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::Filter; }
-	virtual FLinearColor GetNodeTitleColor() const override { return PCGEX_NODE_COLOR_OPTIN_NAME(Filter); }
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Filter;
+	}
+
+	virtual FLinearColor GetNodeTitleColor() const override
+	{
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Filter);
+	}
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;

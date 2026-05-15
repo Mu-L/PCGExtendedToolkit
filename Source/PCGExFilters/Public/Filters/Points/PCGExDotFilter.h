@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Utils/PCGExCompare.h"
 #include "Core/PCGExFilterFactoryProvider.h"
 #include "UObject/Object.h"
+#include "Utils/PCGExCompare.h"
 
 #include "Core/PCGExPointFilter.h"
 
@@ -91,7 +91,8 @@ namespace PCGExPointFilter
 	{
 	public:
 		explicit FDotFilter(const TObjectPtr<const UPCGExDotFilterFactory>& InFactory)
-			: ISimpleFilter(InFactory), TypedFilterFactory(InFactory)
+			: ISimpleFilter(InFactory)
+			  , TypedFilterFactory(InFactory)
 		{
 			DotComparison = TypedFilterFactory->Config.DotComparisonDetails;
 		}

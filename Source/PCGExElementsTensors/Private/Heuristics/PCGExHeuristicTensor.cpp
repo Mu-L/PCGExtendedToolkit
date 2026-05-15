@@ -32,7 +32,10 @@ double FPCGExHeuristicTensor::GetDot(const int32 InSeedIndex, const FVector& Fro
 {
 	bool bSuccess = false;
 	const PCGExTensor::FTensorSample Sample = TensorsHandler->Sample(InSeedIndex, FTransform(FRotationMatrix::MakeFromX((To - From).GetSafeNormal()).ToQuat(), From), bSuccess);
-	if (!bSuccess) { return 0; }
+	if (!bSuccess)
+	{
+		return 0;
+	}
 	const double Dot = FVector::DotProduct((To - From).GetSafeNormal(), Sample.DirectionAndSize.GetSafeNormal());
 	return bAbsoluteTensor ? 1 - FMath::Abs(Dot) : 1 - PCGExMath::Remap(Dot, -1, 1);
 }
@@ -52,7 +55,10 @@ PCGEX_HEURISTIC_FACTORY_BOILERPLATE_IMPL(Tensor, {})
 PCGExFactories::EPreparationResult UPCGExHeuristicsFactoryTensor::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 {
 	PCGExFactories::EPreparationResult Result = Super::Prepare(InContext, TaskManager);
-	if (Result != PCGExFactories::EPreparationResult::Success) { return Result; }
+	if (Result != PCGExFactories::EPreparationResult::Success)
+	{
+		return Result;
+	}
 
 	if (!PCGExFactories::GetInputFactories(InContext, PCGExTensor::SourceTensorsLabel, TensorFactories, {PCGExFactories::EType::Tensor}))
 	{

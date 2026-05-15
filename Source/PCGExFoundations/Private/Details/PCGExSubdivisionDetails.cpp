@@ -21,20 +21,38 @@ bool FPCGExManhattanDetails::Init(FPCGExContext* InContext, const TSharedPtr<PCG
 	if (bSupportAttribute)
 	{
 		GridSizeBuffer = GetValueSettingGridSize();
-		if (!GridSizeBuffer->Init(InDataFacade)) { return false; }
+		if (!GridSizeBuffer->Init(InDataFacade))
+		{
+			return false;
+		}
 
-		if (SpaceAlign == EPCGExManhattanAlign::Custom) { OrientBuffer = GetValueSettingOrient(); }
-		else if (SpaceAlign == EPCGExManhattanAlign::World) { OrientBuffer = PCGExDetails::MakeSettingValue(FQuat::Identity); }
+		if (SpaceAlign == EPCGExManhattanAlign::Custom)
+		{
+			OrientBuffer = GetValueSettingOrient();
+		}
+		else if (SpaceAlign == EPCGExManhattanAlign::World)
+		{
+			OrientBuffer = PCGExDetails::MakeSettingValue(FQuat::Identity);
+		}
 
-		if (OrientBuffer && !OrientBuffer->Init(InDataFacade)) { return false; }
+		if (OrientBuffer && !OrientBuffer->Init(InDataFacade))
+		{
+			return false;
+		}
 	}
 	else
 	{
 		GridSize = PCGExTypes::Abs(GridSize);
 		//GridIntSize = FIntVector3(FMath::Floor(GridSize.X), FMath::Floor(GridSize.Y), FMath::Floor(GridSize.Z));
 		GridSizeBuffer = PCGExDetails::MakeSettingValue(GridSize);
-		if (SpaceAlign == EPCGExManhattanAlign::Custom) { OrientBuffer = PCGExDetails::MakeSettingValue(OrientConstant); }
-		else if (SpaceAlign == EPCGExManhattanAlign::World) { OrientBuffer = PCGExDetails::MakeSettingValue(FQuat::Identity); }
+		if (SpaceAlign == EPCGExManhattanAlign::Custom)
+		{
+			OrientBuffer = PCGExDetails::MakeSettingValue(OrientConstant);
+		}
+		else if (SpaceAlign == EPCGExManhattanAlign::World)
+		{
+			OrientBuffer = PCGExDetails::MakeSettingValue(FQuat::Identity);
+		}
 	}
 
 	PCGExMath::GetAxesOrder(Order, Comps);
@@ -53,13 +71,17 @@ int32 FPCGExManhattanDetails::ComputeSubdivisions(const FVector& A, const FVecto
 	switch (SpaceAlign)
 	{
 	case EPCGExManhattanAlign::World:
-	case EPCGExManhattanAlign::Custom: Rotation = OrientBuffer->Read(Index);
+	case EPCGExManhattanAlign::Custom:
+		Rotation = OrientBuffer->Read(Index);
 		break;
-	case EPCGExManhattanAlign::SegmentX: Rotation = FRotationMatrix::MakeFromX(DirectionAndSize).ToQuat();
+	case EPCGExManhattanAlign::SegmentX:
+		Rotation = FRotationMatrix::MakeFromX(DirectionAndSize).ToQuat();
 		break;
-	case EPCGExManhattanAlign::SegmentY: Rotation = FRotationMatrix::MakeFromY(DirectionAndSize).ToQuat();
+	case EPCGExManhattanAlign::SegmentY:
+		Rotation = FRotationMatrix::MakeFromY(DirectionAndSize).ToQuat();
 		break;
-	case EPCGExManhattanAlign::SegmentZ: Rotation = FRotationMatrix::MakeFromZ(DirectionAndSize).ToQuat();
+	case EPCGExManhattanAlign::SegmentZ:
+		Rotation = FRotationMatrix::MakeFromZ(DirectionAndSize).ToQuat();
 		break;
 	}
 
@@ -75,12 +97,18 @@ int32 FPCGExManhattanDetails::ComputeSubdivisions(const FVector& A, const FVecto
 			const int32 Axis = Comps[i];
 			const double Dist = DirectionAndSize[Axis];
 
-			if (FMath::IsNearlyZero(Dist)) { continue; }
+			if (FMath::IsNearlyZero(Dist))
+			{
+				continue;
+			}
 
 			OutDist += Dist;
 			Sub[Axis] = Dist;
 
-			if (Sub == B) { break; }
+			if (Sub == B)
+			{
+				break;
+			}
 
 			OutSubdivisions.Emplace(Sub);
 		}
@@ -108,8 +136,15 @@ int32 FPCGExManhattanDetails::ComputeSubdivisions(const FVector& A, const FVecto
 				const int32 Axis = Comps[i];
 				double Dist = StepSize[Axis];
 
-				if (const double SubAbs = FMath::Abs(Sub[Axis]); SubAbs + Dist > Maxes[Axis]) { Dist = Maxes[Axis] - SubAbs; }
-				if (FMath::IsNearlyZero(Dist)) { continue; }
+				if (const double SubAbs = FMath::Abs(Sub[Axis]);
+					SubAbs + Dist > Maxes[Axis])
+				{
+					Dist = Maxes[Axis] - SubAbs;
+				}
+				if (FMath::IsNearlyZero(Dist))
+				{
+					continue;
+				}
 
 				OutDist += Dist;
 				Sub[Axis] += Dist * Sign[Axis];
@@ -123,11 +158,17 @@ int32 FPCGExManhattanDetails::ComputeSubdivisions(const FVector& A, const FVecto
 				OutSubdivisions.Emplace(Sub);
 			}
 
-			if (DistBefore == OutDist) { bAdvance = false; }
+			if (DistBefore == OutDist)
+			{
+				bAdvance = false;
+			}
 		}
 	}
 
-	for (int i = StartIndex; i < OutSubdivisions.Num(); i++) { OutSubdivisions[i] = A + Rotation.UnrotateVector(OutSubdivisions[i]); }
+	for (int i = StartIndex; i < OutSubdivisions.Num(); i++)
+	{
+		OutSubdivisions[i] = A + Rotation.UnrotateVector(OutSubdivisions[i]);
+	}
 
 	return OutSubdivisions.Num() - StartIndex;
 }

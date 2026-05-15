@@ -38,7 +38,11 @@ namespace PCGExGraphs
 		constexpr FEdge() = default;
 
 		constexpr FEdge(const int32 InIndex, const uint32 InStart, const uint32 InEnd, const int32 InPointIndex = -1, const int32 InIOIndex = -1)
-			: Start(InStart), End(InEnd), Index(InIndex), PointIndex(InPointIndex), IOIndex(InIOIndex)
+			: Start(InStart)
+			  , End(InEnd)
+			  , Index(InIndex)
+			  , PointIndex(InPointIndex)
+			  , IOIndex(InIOIndex)
 		{
 		}
 
@@ -48,14 +52,30 @@ namespace PCGExGraphs
 			return InIndex == Start ? End : Start;
 		}
 
-		FORCEINLINE bool Contains(const int32 InIndex) const { return Start == InIndex || End == InIndex; }
+		FORCEINLINE bool Contains(const int32 InIndex) const
+		{
+			return Start == InIndex || End == InIndex;
+		}
 
-		bool operator==(const FEdge& Other) const { return PCGEx::H64U(Start, End) == PCGEx::H64U(Other.Start, Other.End); }
-		FORCEINLINE uint64 H64U() const { return PCGEx::H64U(Start, End); }
+		bool operator==(const FEdge& Other) const
+		{
+			return PCGEx::H64U(Start, End) == PCGEx::H64U(Other.Start, Other.End);
+		}
 
-		FORCEINLINE uint32 GetTypeHash(const FLink& Key) { return HashCombineFast(Key.Node, Key.Edge); }
+		FORCEINLINE uint64 H64U() const
+		{
+			return PCGEx::H64U(Start, End);
+		}
 
-		FORCEINLINE bool operator<(const FEdge& Other) const { return H64U() < Other.H64U(); }
+		FORCEINLINE uint32 GetTypeHash(const FLink& Key)
+		{
+			return HashCombineFast(Key.Node, Key.Edge);
+		}
+
+		FORCEINLINE bool operator<(const FEdge& Other) const
+		{
+			return H64U() < Other.H64U();
+		}
 	};
 }
 
@@ -73,6 +93,9 @@ namespace PCGExClusters
 
 		~FBoundedEdge() = default;
 
-		bool operator==(const FBoundedEdge& ExpandedEdge) const { return (Index == ExpandedEdge.Index && Bounds == ExpandedEdge.Bounds); };
+		bool operator==(const FBoundedEdge& ExpandedEdge) const
+		{
+			return (Index == ExpandedEdge.Index && Bounds == ExpandedEdge.Bounds);
+		};
 	};
 }

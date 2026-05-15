@@ -5,8 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
-#include "UObject/SoftObjectPath.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
+#include "UObject/SoftObjectPath.h"
 
 namespace PCGExTypes
 {
@@ -27,6 +27,14 @@ namespace PCGExTypes
 		static constexpr bool bSupportsLerp = false;
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
+
+		// Euclidean-style numeric distance: |a-b|, length(a-b), or angular for FQuat.
+		// Mutually exclusive with bSupportsMatchScore.
+		static constexpr bool bSupportsDistance = false;
+		// Categorical 0/1 equality distance (for types with no continuous ordering).
+		static constexpr bool bSupportsMatchScore = false;
+		// Per-side remap to [0, 1] before distance is meaningful (excludes ints, bool, FQuat, categoricals).
+		static constexpr bool bSupportsNormalization = false;
 	};
 
 	// Numeric types
@@ -44,8 +52,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE bool Min() { return false; }
-		static FORCEINLINE bool Max() { return true; }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false;
+
+		static FORCEINLINE bool Min()
+		{
+			return false;
+		}
+
+		static FORCEINLINE bool Max()
+		{
+			return true;
+		}
 	};
 
 	template <>
@@ -62,8 +81,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE int32 Min() { return TNumericLimits<int32>::Min(); }
-		static FORCEINLINE int32 Max() { return TNumericLimits<int32>::Max(); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false; // integer remap loses precision
+
+		static FORCEINLINE int32 Min()
+		{
+			return TNumericLimits<int32>::Lowest();
+		}
+
+		static FORCEINLINE int32 Max()
+		{
+			return TNumericLimits<int32>::Max();
+		}
 	};
 
 	template <>
@@ -80,8 +110,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE int64 Min() { return TNumericLimits<int64>::Min(); }
-		static FORCEINLINE int64 Max() { return TNumericLimits<int64>::Max(); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false; // integer remap loses precision
+
+		static FORCEINLINE int64 Min()
+		{
+			return TNumericLimits<int64>::Lowest();
+		}
+
+		static FORCEINLINE int64 Max()
+		{
+			return TNumericLimits<int64>::Max();
+		}
 	};
 
 	template <>
@@ -98,8 +139,21 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE float Min() { return TNumericLimits<float>::Min(); }
-		static FORCEINLINE float Max() { return TNumericLimits<float>::Max(); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
+		// "Smallest possible value" -- the most-negative finite float. NOT TNumericLimits<float>::Min(),
+		// which returns the smallest *positive* normal value and would break Max-accumulator sentinels.
+		static FORCEINLINE float Min()
+		{
+			return TNumericLimits<float>::Lowest();
+		}
+
+		static FORCEINLINE float Max()
+		{
+			return TNumericLimits<float>::Max();
+		}
 	};
 
 	template <>
@@ -116,8 +170,21 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE double Min() { return TNumericLimits<double>::Min(); }
-		static FORCEINLINE double Max() { return TNumericLimits<double>::Max(); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
+		// "Smallest possible value" -- the most-negative finite double. NOT TNumericLimits<double>::Min(),
+		// which returns the smallest *positive* normal value and would break Max-accumulator sentinels.
+		static FORCEINLINE double Min()
+		{
+			return TNumericLimits<double>::Lowest();
+		}
+
+		static FORCEINLINE double Max()
+		{
+			return TNumericLimits<double>::Max();
+		}
 	};
 
 	// Vector types
@@ -135,8 +202,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FVector2D Min() { return FVector2D(MAX_dbl); }
-		static FORCEINLINE FVector2D Max() { return FVector2D(MIN_dbl_neg); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
+		static FORCEINLINE FVector2D Min()
+		{
+			return FVector2D(TNumericLimits<double>::Lowest());
+		}
+
+		static FORCEINLINE FVector2D Max()
+		{
+			return FVector2D(TNumericLimits<double>::Max());
+		}
 	};
 
 	template <>
@@ -153,8 +231,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FVector Min() { return FVector(MAX_dbl); }
-		static FORCEINLINE FVector Max() { return FVector(MIN_dbl_neg); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
+		static FORCEINLINE FVector Min()
+		{
+			return FVector(TNumericLimits<double>::Lowest());
+		}
+
+		static FORCEINLINE FVector Max()
+		{
+			return FVector(TNumericLimits<double>::Max());
+		}
 	};
 
 	template <>
@@ -171,8 +260,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FVector4 Min() { return FVector4(MAX_dbl, MAX_dbl, MAX_dbl, MAX_dbl); }
-		static FORCEINLINE FVector4 Max() { return FVector4(MIN_dbl_neg,MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
+		static FORCEINLINE FVector4 Min()
+		{
+			return FVector4(TNumericLimits<double>::Lowest(),TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
+		}
+
+		static FORCEINLINE FVector4 Max()
+		{
+			return FVector4(TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
+		}
 	};
 
 	// Rotation types
@@ -191,8 +291,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = true;
 		static constexpr bool bSupportsArithmetic = true;
 
-		static FORCEINLINE FRotator Min() { return FRotator(MAX_dbl, MAX_dbl, MAX_dbl); }
-		static FORCEINLINE FRotator Max() { return FRotator(MIN_dbl_neg, MIN_dbl_neg, MIN_dbl_neg); }
+		static constexpr bool bSupportsDistance = true;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = true;
+
+		static FORCEINLINE FRotator Min()
+		{
+			return FRotator(TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
+		}
+
+		static FORCEINLINE FRotator Max()
+		{
+			return FRotator(TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
+		}
 	};
 
 
@@ -210,8 +321,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FQuat Min() { return TTraits<FRotator>::Min().Quaternion(); }
-		static FORCEINLINE FQuat Max() { return TTraits<FRotator>::Max().Quaternion(); }
+		static constexpr bool bSupportsDistance = true; // angular: 1 - |dot|
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false; // angular distance already in [0, 1]
+
+		static FORCEINLINE FQuat Min()
+		{
+			return TTraits<FRotator>::Min().Quaternion();
+		}
+
+		static FORCEINLINE FQuat Max()
+		{
+			return TTraits<FRotator>::Max().Quaternion();
+		}
 	};
 
 	template <>
@@ -228,8 +350,20 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FTransform Min() { return FTransform(TTraits<FQuat>::Min(), TTraits<FVector>::Min(), TTraits<FVector>::Min()); }
-		static FORCEINLINE FTransform Max() { return FTransform(TTraits<FQuat>::Max(), TTraits<FVector>::Max(), TTraits<FVector>::Max()); }
+		// FTransform has no meaningful single-scalar distance -- composite of pos+rot+scale.
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = false;
+		static constexpr bool bSupportsNormalization = false;
+
+		static FORCEINLINE FTransform Min()
+		{
+			return FTransform(TTraits<FQuat>::Min(), TTraits<FVector>::Min(), TTraits<FVector>::Min());
+		}
+
+		static FORCEINLINE FTransform Max()
+		{
+			return FTransform(TTraits<FQuat>::Max(), TTraits<FVector>::Max(), TTraits<FVector>::Max());
+		}
 	};
 
 	// String types
@@ -247,8 +381,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FString Min() { return FString(); }
-		static FORCEINLINE FString Max() { return FString(); }
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
+
+		static FORCEINLINE FString Min()
+		{
+			return FString();
+		}
+
+		static FORCEINLINE FString Max()
+		{
+			return FString();
+		}
 	};
 
 	template <>
@@ -265,8 +410,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FName Min() { return NAME_None; }
-		static FORCEINLINE FName Max() { return NAME_None; }
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
+
+		static FORCEINLINE FName Min()
+		{
+			return NAME_None;
+		}
+
+		static FORCEINLINE FName Max()
+		{
+			return NAME_None;
+		}
 	};
 
 	template <>
@@ -283,8 +439,19 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FSoftObjectPath Min() { return FSoftObjectPath(); }
-		static FORCEINLINE FSoftObjectPath Max() { return FSoftObjectPath(); }
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
+
+		static FORCEINLINE FSoftObjectPath Min()
+		{
+			return FSoftObjectPath();
+		}
+
+		static FORCEINLINE FSoftObjectPath Max()
+		{
+			return FSoftObjectPath();
+		}
 	};
 
 	template <>
@@ -301,7 +468,18 @@ namespace PCGExTypes
 		static constexpr bool bSupportsMinMax = false;
 		static constexpr bool bSupportsArithmetic = false;
 
-		static FORCEINLINE FSoftClassPath Min() { return FSoftClassPath(); }
-		static FORCEINLINE FSoftClassPath Max() { return FSoftClassPath(); }
+		static constexpr bool bSupportsDistance = false;
+		static constexpr bool bSupportsMatchScore = true;
+		static constexpr bool bSupportsNormalization = false;
+
+		static FORCEINLINE FSoftClassPath Min()
+		{
+			return FSoftClassPath();
+		}
+
+		static FORCEINLINE FSoftClassPath Max()
+		{
+			return FSoftClassPath();
+		}
 	};
 }

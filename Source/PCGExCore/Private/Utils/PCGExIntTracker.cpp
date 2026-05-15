@@ -8,11 +8,17 @@ void FPCGExIntTracker::IncrementPending(const int32 Count)
 {
 	{
 		FReadScopeLock ReadScopeLock(Lock);
-		if (bTriggered) { return; }
+		if (bTriggered)
+		{
+			return;
+		}
 	}
 	{
 		FWriteScopeLock WriteScopeLock(Lock);
-		if (PendingCount == 0 && StartFn) { StartFn(); }
+		if (PendingCount == 0 && StartFn)
+		{
+			StartFn();
+		}
 		PendingCount += Count;
 	}
 }
@@ -21,12 +27,18 @@ void FPCGExIntTracker::IncrementCompleted(const int32 Count)
 {
 	{
 		FReadScopeLock ReadScopeLock(Lock);
-		if (bTriggered) { return; }
+		if (bTriggered)
+		{
+			return;
+		}
 	}
 	{
 		FWriteScopeLock WriteScopeLock(Lock);
 		CompletedCount += Count;
-		if (CompletedCount == PendingCount) { TriggerInternal(); }
+		if (CompletedCount == PendingCount)
+		{
+			TriggerInternal();
+		}
 	}
 }
 
@@ -39,7 +51,10 @@ void FPCGExIntTracker::Trigger()
 void FPCGExIntTracker::SafetyTrigger()
 {
 	FWriteScopeLock WriteScopeLock(Lock);
-	if (PendingCount > 0) { TriggerInternal(); }
+	if (PendingCount > 0)
+	{
+		TriggerInternal();
+	}
 }
 
 void FPCGExIntTracker::Reset()
@@ -59,7 +74,10 @@ void FPCGExIntTracker::Reset(const int32 InMax)
 
 void FPCGExIntTracker::TriggerInternal()
 {
-	if (bTriggered) { return; }
+	if (bTriggered)
+	{
+		return;
+	}
 	bTriggered = true;
 	ThresholdFn();
 	PendingCount = CompletedCount = 0;

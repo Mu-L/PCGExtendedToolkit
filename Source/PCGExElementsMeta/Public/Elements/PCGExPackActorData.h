@@ -44,13 +44,17 @@ class UPCGExCustomActorDataPacker : public UPCGExInstancedFactory
 		}
 
 		FComponentInfos(UActorComponent* InComponent, EAttachmentRule InLocationRule, EAttachmentRule InRotationRule, EAttachmentRule InScaleRule, bool InWeldSimulatedBodies)
-			: Component(InComponent), AttachmentTransformRules(FAttachmentTransformRules(InLocationRule, InRotationRule, InScaleRule, InWeldSimulatedBodies))
+			: Component(InComponent)
+			  , AttachmentTransformRules(FAttachmentTransformRules(InLocationRule, InRotationRule, InScaleRule, InWeldSimulatedBodies))
 		{
 		}
 	};
 
 public:
-	virtual bool WantsPerDataInstance() override { return true; }
+	virtual bool WantsPerDataInstance() override
+	{
+		return true;
+	}
 
 	TSharedPtr<FPCGExUniqueNameGenerator> UniqueNameGenerator;
 	bool bIsPreviewMode = false;
@@ -563,7 +567,10 @@ public:
 		return PCGEX_NODE_COLOR_NAME(Sampling);
 	}
 
-	virtual bool CanDynamicallyTrackKeys() const override { return bTrackActors; }
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return bTrackActors;
+	}
 #endif
 
 protected:

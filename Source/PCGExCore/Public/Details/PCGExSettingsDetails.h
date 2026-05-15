@@ -43,7 +43,11 @@ namespace PCGExDetails
 
 		bool bQuiet = false;
 
-		FORCEINLINE virtual bool IsConstant() { return false; }
+		FORCEINLINE virtual bool IsConstant()
+		{
+			return false;
+		}
+
 		FORCEINLINE virtual T Read(const int32 Index) = 0;
 		virtual void ReadScope(const int32 Start, TArrayView<T> OutResults) = 0;
 
@@ -85,7 +89,8 @@ namespace PCGExDetails
 
 	public:
 		explicit TSettingValueSelector(const FPCGAttributePropertyInputSelector& InSelector)
-			: TSettingValueBuffer<T>(InSelector.GetName()), Selector(InSelector)
+			: TSettingValueBuffer<T>(InSelector.GetName())
+			  , Selector(InSelector)
 		{
 		}
 
@@ -106,14 +111,33 @@ namespace PCGExDetails
 
 		virtual bool Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped = true, const bool bCaptureMinMax = false) override;
 
-		FORCEINLINE virtual bool IsConstant() override { return true; }
-		FORCEINLINE virtual void SetConstant(T InConstant) override { Constant = InConstant; };
+		FORCEINLINE virtual bool IsConstant() override
+		{
+			return true;
+		}
 
-		FORCEINLINE virtual T Read(const int32 Index) override { return Constant; }
+		FORCEINLINE virtual void SetConstant(T InConstant) override
+		{
+			Constant = InConstant;
+		};
+
+		FORCEINLINE virtual T Read(const int32 Index) override
+		{
+			return Constant;
+		}
+
 		virtual void ReadScope(const int32 Start, TArrayView<T> OutResults) override;
 
-		FORCEINLINE virtual T Min() override { return Constant; }
-		FORCEINLINE virtual T Max() override { return Constant; }
+		FORCEINLINE virtual T Min() override
+		{
+			return Constant;
+		}
+
+		FORCEINLINE virtual T Max() override
+		{
+			return Constant;
+		}
+
 		virtual uint32 ReadValueHash(const int32 Index) override;
 	};
 
@@ -125,7 +149,8 @@ namespace PCGExDetails
 
 	public:
 		explicit TSettingValueSelectorConstant(const FPCGAttributePropertyInputSelector& InSelector)
-			: TSettingValueConstant<T>(T{}), Selector(InSelector)
+			: TSettingValueConstant<T>(T{})
+			  , Selector(InSelector)
 		{
 		}
 
@@ -140,7 +165,8 @@ namespace PCGExDetails
 
 	public:
 		explicit TSettingValueBufferConstant(const FName InName)
-			: TSettingValueConstant<T>(T{}), Name(InName)
+			: TSettingValueConstant<T>(T{})
+			  , Name(InName)
 		{
 		}
 

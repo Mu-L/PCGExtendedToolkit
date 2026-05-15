@@ -12,7 +12,10 @@ PCGEX_SETTING_VALUE_IMPL(FPCGExFillControlConfigHeuristicsBudget, MaxBudget, dou
 
 bool FPCGExFillControlHeuristicsBudget::PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler)
 {
-	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler)) { return false; }
+	if (!FPCGExFillControlOperation::PrepareForDiffusions(InContext, InHandler))
+	{
+		return false;
+	}
 
 	const UPCGExFillControlsFactoryHxBudget* TypedFactory = Cast<UPCGExFillControlsFactoryHxBudget>(Factory);
 
@@ -20,7 +23,10 @@ bool FPCGExFillControlHeuristicsBudget::PrepareForDiffusions(FPCGExContext* InCo
 
 	// Initialize budget setting value
 	MaxBudget = TypedFactory->Config.GetValueSettingMaxBudget();
-	if (!MaxBudget->Init(GetSourceFacade())) { return false; }
+	if (!MaxBudget->Init(GetSourceFacade()))
+	{
+		return false;
+	}
 
 	if (TypedFactory->HeuristicsFactories.IsEmpty())
 	{

@@ -19,7 +19,10 @@ PCGExTensor::FTensorSample FPCGExTensorPathPole::Sample(const int32 InSeedIndex,
 		FTransform T = FTransform::Identity;
 		PCGExTensor::FEffectorMetrics Metrics;
 
-		if (!ComputeFactor(InPosition, *Spline.Get(), Config.Radius, T, Metrics)) { continue; }
+		if (!ComputeFactor(InPosition, *Spline.Get(), Config.Radius, T, Metrics))
+		{
+			continue;
+		}
 
 		Samples.Emplace_GetRef(FRotationMatrix::MakeFromX((InPosition - T.GetLocation()).GetSafeNormal()).ToQuat().RotateVector(Metrics.Guide), Metrics.Potency, Metrics.Weight);
 	}

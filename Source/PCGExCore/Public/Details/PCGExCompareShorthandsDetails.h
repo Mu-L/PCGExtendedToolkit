@@ -5,9 +5,9 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
-#include "Utils/PCGExCompare.h"
 #include "PCGExSettingsMacros.h"
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Utils/PCGExCompare.h"
 #include "PCGExCompareShorthandsDetails.generated.h"
 
 namespace PCGExData
@@ -23,7 +23,11 @@ struct PCGEXCORE_API FPCGExCompareSelectorDouble
 	GENERATED_BODY()
 
 	FPCGExCompareSelectorDouble() = default;
-	explicit FPCGExCompareSelectorDouble(const FString& DefaultName) { Attribute.Update(DefaultName); }
+
+	explicit FPCGExCompareSelectorDouble(const FString& DefaultName)
+	{
+		Attribute.Update(DefaultName);
+	}
 
 	FPCGExCompareSelectorDouble(const FString& DefaultName, const double DefaultValue)
 		: FPCGExCompareSelectorDouble(DefaultName)
@@ -54,7 +58,10 @@ struct PCGEXCORE_API FPCGExCompareSelectorDouble
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="Comparison == EPCGExComparison::NearlyEqual || Comparison == EPCGExComparison::NearlyNotEqual", EditConditionHides))
 	double Tolerance = DBL_COMPARE_TOLERANCE;
 
-	FORCEINLINE bool Compare(const double A, const double B) const { return PCGExCompare::Compare(Comparison, A, B, Tolerance); }
+	FORCEINLINE bool Compare(const double A, const double B) const
+	{
+		return PCGExCompare::Compare(Comparison, A, B, Tolerance);
+	}
 
 #if WITH_EDITOR
 	FString GetDisplayNamePostfix() const;

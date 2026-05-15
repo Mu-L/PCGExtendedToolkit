@@ -3,20 +3,20 @@
 
 #include "Elements/PCGExSampleSurfaceGuided.h"
 
-#include "Data/PCGExDataTags.h"
-#include "Data/PCGExPointIO.h"
-#include "Data/PCGPrimitiveData.h"
-#include "Kismet/GameplayStatics.h"
-#include "PhysicsEngine/PhysicsSettings.h"
-#include "PhysicalMaterials/PhysicalMaterial.h"
-#include "Core/PCGExTexParamFactoryProvider.h"
 #include "Async/ParallelFor.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExTexCommon.h"
+#include "Core/PCGExTexParamFactoryProvider.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
+#include "Data/PCGExPointIO.h"
+#include "Data/PCGPrimitiveData.h"
 #include "Data/External/PCGExMesh.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Kismet/GameplayStatics.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
+#include "PhysicsEngine/PhysicsSettings.h"
 #include "Sampling/PCGExSamplingHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExSampleSurfaceGuidedElement"
@@ -55,21 +55,36 @@ void UPCGExSampleSurfaceGuidedSettings::ApplyDeprecation(UPCGNode* InOutNode)
 TArray<FPCGPinProperties> UPCGExSampleSurfaceGuidedSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	if (SurfaceSource == EPCGExSurfaceSource::ActorReferences) { PCGEX_PIN_POINT(PCGExSampling::Labels::SourceActorReferencesLabel, "Points with actor reference paths.", Required) }
-	if (SurfaceSource == EPCGExSurfaceSource::Primitives) { PCGEX_PIN_PRIMITIVES(FName("Primitives"), TEXT("Primitive data to test against."), Required) }
-	if (bWriteRenderMat && bExtractTextureParameters) { PCGEX_PIN_FACTORIES(PCGExTexture::SourceTexLabel, "External texture params definitions.", Required, FPCGExDataTypeInfoTexParam::AsId()) }
+	if (SurfaceSource == EPCGExSurfaceSource::ActorReferences)
+	{
+		PCGEX_PIN_POINT(PCGExSampling::Labels::SourceActorReferencesLabel, "Points with actor reference paths.", Required)
+	}
+	if (SurfaceSource == EPCGExSurfaceSource::Primitives)
+	{
+		PCGEX_PIN_PRIMITIVES(FName("Primitives"), TEXT("Primitive data to test against."), Required)
+	}
+	if (bWriteRenderMat && bExtractTextureParameters)
+	{
+		PCGEX_PIN_FACTORIES(PCGExTexture::SourceTexLabel, "External texture params definitions.", Required, FPCGExDataTypeInfoTexParam::AsId())
+	}
 	return PinProperties;
 }
 
 PCGEX_INITIALIZE_ELEMENT(SampleSurfaceGuided)
 
-PCGExData::EIOInit UPCGExSampleSurfaceGuidedSettings::GetMainDataInitializationPolicy() const { return PCGExData::EIOInit::Duplicate; }
+PCGExData::EIOInit UPCGExSampleSurfaceGuidedSettings::GetMainDataInitializationPolicy() const
+{
+	return PCGExData::EIOInit::Duplicate;
+}
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(SampleSurfaceGuided)
 
 bool FPCGExSampleSurfaceGuidedElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(SampleSurfaceGuided)
 
@@ -87,7 +102,10 @@ bool FPCGExSampleSurfaceGuidedElement::Boot(FPCGExContext* InContext) const
 			return false;
 		}
 
-		for (const TObjectPtr<const UPCGExTexParamFactoryData>& Factory : Context->TexParamsFactories) { PCGEX_VALIDATE_NAME_C(InContext, Factory->Config.TextureIDAttributeName) }
+		for (const TObjectPtr<const UPCGExTexParamFactoryData>& Factory : Context->TexParamsFactories)
+		{
+			PCGEX_VALIDATE_NAME_C(InContext, Factory->Config.TextureIDAttributeName)
+		}
 	}
 
 	Context->bUseInclude = Settings->SurfaceSource != EPCGExSurfaceSource::All;
@@ -95,7 +113,10 @@ bool FPCGExSampleSurfaceGuidedElement::Boot(FPCGExContext* InContext) const
 	{
 		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->ActorReference)
 		Context->ActorReferenceDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExSampling::Labels::SourceActorReferencesLabel, false, true);
-		if (!Context->ActorReferenceDataFacade) { return false; }
+		if (!Context->ActorReferenceDataFacade)
+		{
+			return false;
+		}
 
 		if (!PCGExSampling::Helpers::GetIncludedActors(Context, Context->ActorReferenceDataFacade.ToSharedRef(), Settings->ActorReference, Context->IncludedActors))
 		{
@@ -108,10 +129,16 @@ bool FPCGExSampleSurfaceGuidedElement::Boot(FPCGExContext* InContext) const
 		for (const FPCGTaggedData& TaggedData : Inputs)
 		{
 			const UPCGPrimitiveData* PrimitiveData = Cast<UPCGPrimitiveData>(TaggedData.Data);
-			if (!PrimitiveData) { continue; }
+			if (!PrimitiveData)
+			{
+				continue;
+			}
 
 			UPrimitiveComponent* Component = PrimitiveData->GetComponent().Get();
-			if (!IsValid(Component)) { continue; }
+			if (!IsValid(Component))
+			{
+				continue;
+			}
 
 			Context->IncludedPrimitives.Add(Component);
 		}
@@ -148,10 +175,16 @@ bool FPCGExSampleSurfaceGuidedElement::AdvanceWork(FPCGExContext* InContext, con
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry) { return true; },
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				if (Settings->bPruneFailedSamples) { NewBatch->bRequiresWriteStep = true; }
+				if (Settings->bPruneFailedSamples)
+				{
+					NewBatch->bRequiresWriteStep = true;
+				}
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to sample."));
@@ -180,7 +213,10 @@ namespace PCGExSampleSurfaceGuided
 		// Must be set before process for filters
 		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
 
-		if (!IProcessor::Process(InTaskManager)) { return false; }
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
 
 		PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
 
@@ -188,15 +224,24 @@ namespace PCGExSampleSurfaceGuided
 
 		EPCGPointNativeProperties AllocateFor = EPCGPointNativeProperties::None;
 
-		if (Settings->bWriteVertexColor) { AllocateFor |= EPCGPointNativeProperties::Color; }
-		if (Context->ApplySampling.WantsApply()) { AllocateFor |= EPCGPointNativeProperties::Transform; }
+		if (Settings->bWriteVertexColor)
+		{
+			AllocateFor |= EPCGPointNativeProperties::Color;
+		}
+		if (Context->ApplySampling.WantsApply())
+		{
+			AllocateFor |= EPCGPointNativeProperties::Transform;
+		}
 
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
 		SamplingMask.SetNumUninitialized(PointDataFacade->GetNum());
 
 		CrossAxis = Settings->CrossAxis.GetValueSetting();
-		if (!CrossAxis->Init(PointDataFacade)) { return false; }
+		if (!CrossAxis->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		OriginGetter = PointDataFacade->GetBroadcaster<FVector>(Settings->Origin, true);
 		if (!OriginGetter)
@@ -219,21 +264,36 @@ namespace PCGExSampleSurfaceGuided
 
 		// So texture params are registered last, otherwise they're first in the list and it's confusing
 		TexParamLookup = MakeShared<PCGExTexture::FLookup>();
-		if (!TexParamLookup->BuildFrom(Context->TexParamsFactories)) { TexParamLookup.Reset(); }
-		else { TexParamLookup->PrepareForWrite(Context, PointDataFacade); }
+		if (!TexParamLookup->BuildFrom(Context->TexParamsFactories))
+		{
+			TexParamLookup.Reset();
+		}
+		else
+		{
+			TexParamLookup->PrepareForWrite(Context, PointDataFacade);
+		}
 
 		DistanceGetter = Settings->Distance.GetValueSetting();
-		if (!DistanceGetter->Init(PointDataFacade)) { return false; }
+		if (!DistanceGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
 
 		if (Context->CollisionSettings.TraceMode == EPCGExTraceMode::Sphere)
 		{
 			SphereRadiusGetter = Context->CollisionSettings.SphereRadius.GetValueSetting();
-			if (!SphereRadiusGetter->Init(PointDataFacade)) { return false; }
+			if (!SphereRadiusGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 		else if (Context->CollisionSettings.TraceMode == EPCGExTraceMode::Box)
 		{
 			BoxHalfExtentsGetter = Context->CollisionSettings.BoxHalfExtents.GetValueSetting();
-			if (!BoxHalfExtentsGetter->Init(PointDataFacade)) { return false; }
+			if (!BoxHalfExtentsGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		World = Context->GetWorld();
@@ -271,7 +331,10 @@ namespace PCGExSampleSurfaceGuided
 
 		{
 			const double Prev = MaxDistanceValue->Get(Scope);
-			if (HitDistance > Prev) { MaxDistanceValue->Set(Scope, HitDistance); }
+			if (HitDistance > Prev)
+			{
+				MaxDistanceValue->Set(Scope, HitDistance);
+			}
 		}
 
 		if (Context->ApplySampling.WantsApply())
@@ -334,7 +397,10 @@ namespace PCGExSampleSurfaceGuided
 			}
 		}
 
-		if (SurfacesForward && HitIndex) { SurfacesForward->Forward(*HitIndex, Index); }
+		if (SurfacesForward && HitIndex)
+		{
+			SurfacesForward->Forward(*HitIndex, Index);
+		}
 
 		FPlatformAtomics::InterlockedExchange(&bAnySuccess, 1);
 	}
@@ -373,13 +439,19 @@ namespace PCGExSampleSurfaceGuided
 				//PCGEX_OUTPUT_VALUE(Success, Index, false)
 				//PCGEX_OUTPUT_VALUE(ActorReference, Index, TEXT(""))
 				//PCGEX_OUTPUT_VALUE(PhysMat, Index, TEXT(""))
-				if (TexParamLookup) { TexParamLookup->ExtractParams(Index, nullptr); }
+				if (TexParamLookup)
+				{
+					TexParamLookup->ExtractParams(Index, nullptr);
+				}
 			};
 
 
 			if (!PointFilterCache[Index])
 			{
-				if (Settings->bProcessFilteredOutAsFails) { SamplingFailed(); }
+				if (Settings->bProcessFilteredOutAsFails)
+				{
+					SamplingFailed();
+				}
 				continue;
 			}
 
@@ -397,11 +469,14 @@ namespace PCGExSampleSurfaceGuided
 
 			if (Settings->SurfaceSource == EPCGExSurfaceSource::Primitives)
 			{
-				double ClosestDistSq = MAX_dbl;
+				double ClosestDistSq = TNumericLimits<double>::Max();
 
 				for (UPrimitiveComponent* Primitive : Context->IncludedPrimitives)
 				{
-					if (!IsValid(Primitive)) { continue; }
+					if (!IsValid(Primitive))
+					{
+						continue;
+					}
 
 					FHitResult TempHit;
 					bool bHit = false;
@@ -412,19 +487,19 @@ namespace PCGExSampleSurfaceGuided
 						bHit = Primitive->LineTraceComponent(TempHit, Origin, End, CollisionParams);
 						break;
 					case EPCGExTraceMode::Sphere:
-						{
-							const double Radius = SphereRadiusGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-							bHit = Primitive->SweepComponent(TempHit, Origin, End, FQuat::Identity, Shape, CollisionParams.bTraceComplex);
-						}
-						break;
+					{
+						const double Radius = SphereRadiusGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+						bHit = Primitive->SweepComponent(TempHit, Origin, End, FQuat::Identity, Shape, CollisionParams.bTraceComplex);
+					}
+					break;
 					case EPCGExTraceMode::Box:
-						{
-							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
-							bHit = Primitive->SweepComponent(TempHit, Origin, End, FQuat::Identity, Shape, CollisionParams.bTraceComplex);
-						}
-						break;
+					{
+						const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+						bHit = Primitive->SweepComponent(TempHit, Origin, End, FQuat::Identity, Shape, CollisionParams.bTraceComplex);
+					}
+					break;
 					}
 
 					if (bHit)
@@ -439,8 +514,14 @@ namespace PCGExSampleSurfaceGuided
 					}
 				}
 
-				if (bSuccess) { ProcessTraceResult(Scope, HitResult, Index, Origin, Direction, MutablePoint); }
-				if (!bSuccess) { SamplingFailed(); }
+				if (bSuccess)
+				{
+					ProcessTraceResult(Scope, HitResult, Index, Origin, Direction, MutablePoint);
+				}
+				if (!bSuccess)
+				{
+					SamplingFailed();
+				}
 				continue;
 			}
 
@@ -470,21 +551,24 @@ namespace PCGExSampleSurfaceGuided
 						bHit = World->LineTraceMultiByChannel(HitResults, Origin, End, Context->CollisionSettings.CollisionChannel, CollisionParams);
 						break;
 					case EPCGExTraceMode::Sphere:
-						{
-							const double Radius = SphereRadiusGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-							bHit = World->SweepMultiByChannel(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
-						}
-						break;
-					case EPCGExTraceMode::Box:
-						{
-							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
-							bHit = World->SweepMultiByChannel(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
-						}
-						break;
+					{
+						const double Radius = SphereRadiusGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+						bHit = World->SweepMultiByChannel(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
 					}
-					if (bHit) { ProcessMultipleTraceResult(); }
+					break;
+					case EPCGExTraceMode::Box:
+					{
+						const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+						bHit = World->SweepMultiByChannel(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
+					}
+					break;
+					}
+					if (bHit)
+					{
+						ProcessMultipleTraceResult();
+					}
 				}
 				else
 				{
@@ -495,19 +579,19 @@ namespace PCGExSampleSurfaceGuided
 						bHit = World->LineTraceSingleByChannel(HitResult, Origin, End, Context->CollisionSettings.CollisionChannel, CollisionParams);
 						break;
 					case EPCGExTraceMode::Sphere:
-						{
-							const double Radius = SphereRadiusGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-							bHit = World->SweepSingleByChannel(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
-						}
-						break;
+					{
+						const double Radius = SphereRadiusGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+						bHit = World->SweepSingleByChannel(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
+					}
+					break;
 					case EPCGExTraceMode::Box:
-						{
-							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
-							bHit = World->SweepSingleByChannel(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
-						}
-						break;
+					{
+						const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+						bHit = World->SweepSingleByChannel(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionChannel, Shape, CollisionParams);
+					}
+					break;
 					}
 					if (bHit)
 					{
@@ -526,21 +610,24 @@ namespace PCGExSampleSurfaceGuided
 						bHit = World->LineTraceMultiByObjectType(HitResults, Origin, End, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), CollisionParams);
 						break;
 					case EPCGExTraceMode::Sphere:
-						{
-							const double Radius = SphereRadiusGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-							bHit = World->SweepMultiByObjectType(HitResults, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
-						}
-						break;
-					case EPCGExTraceMode::Box:
-						{
-							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
-							bHit = World->SweepMultiByObjectType(HitResults, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
-						}
-						break;
+					{
+						const double Radius = SphereRadiusGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+						bHit = World->SweepMultiByObjectType(HitResults, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
 					}
-					if (bHit) { ProcessMultipleTraceResult(); }
+					break;
+					case EPCGExTraceMode::Box:
+					{
+						const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+						bHit = World->SweepMultiByObjectType(HitResults, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
+					}
+					break;
+					}
+					if (bHit)
+					{
+						ProcessMultipleTraceResult();
+					}
 				}
 				else
 				{
@@ -551,19 +638,19 @@ namespace PCGExSampleSurfaceGuided
 						bHit = World->LineTraceSingleByObjectType(HitResult, Origin, End, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), CollisionParams);
 						break;
 					case EPCGExTraceMode::Sphere:
-						{
-							const double Radius = SphereRadiusGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-							bHit = World->SweepSingleByObjectType(HitResult, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
-						}
-						break;
+					{
+						const double Radius = SphereRadiusGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+						bHit = World->SweepSingleByObjectType(HitResult, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
+					}
+					break;
 					case EPCGExTraceMode::Box:
-						{
-							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
-							bHit = World->SweepSingleByObjectType(HitResult, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
-						}
-						break;
+					{
+						const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+						bHit = World->SweepSingleByObjectType(HitResult, Origin, End, FQuat::Identity, FCollisionObjectQueryParams(Context->CollisionSettings.CollisionObjectType), Shape, CollisionParams);
+					}
+					break;
 					}
 					if (bHit)
 					{
@@ -582,21 +669,24 @@ namespace PCGExSampleSurfaceGuided
 						bHit = World->LineTraceMultiByProfile(HitResults, Origin, End, Context->CollisionSettings.CollisionProfileName, CollisionParams);
 						break;
 					case EPCGExTraceMode::Sphere:
-						{
-							const double Radius = SphereRadiusGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-							bHit = World->SweepMultiByProfile(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
-						}
-						break;
-					case EPCGExTraceMode::Box:
-						{
-							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
-							bHit = World->SweepMultiByProfile(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
-						}
-						break;
+					{
+						const double Radius = SphereRadiusGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+						bHit = World->SweepMultiByProfile(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
 					}
-					if (bHit) { ProcessMultipleTraceResult(); }
+					break;
+					case EPCGExTraceMode::Box:
+					{
+						const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+						bHit = World->SweepMultiByProfile(HitResults, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
+					}
+					break;
+					}
+					if (bHit)
+					{
+						ProcessMultipleTraceResult();
+					}
 				}
 				else
 				{
@@ -607,19 +697,19 @@ namespace PCGExSampleSurfaceGuided
 						bHit = World->LineTraceSingleByProfile(HitResult, Origin, End, Context->CollisionSettings.CollisionProfileName, CollisionParams);
 						break;
 					case EPCGExTraceMode::Sphere:
-						{
-							const double Radius = SphereRadiusGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
-							bHit = World->SweepSingleByProfile(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
-						}
-						break;
+					{
+						const double Radius = SphereRadiusGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+						bHit = World->SweepSingleByProfile(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
+					}
+					break;
 					case EPCGExTraceMode::Box:
-						{
-							const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
-							const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
-							bHit = World->SweepSingleByProfile(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
-						}
-						break;
+					{
+						const FVector HalfExtents = BoxHalfExtentsGetter->Read(Index);
+						const FCollisionShape Shape = FCollisionShape::MakeBox(HalfExtents);
+						bHit = World->SweepSingleByProfile(HitResult, Origin, End, FQuat::Identity, Context->CollisionSettings.CollisionProfileName, Shape, CollisionParams);
+					}
+					break;
 					}
 					if (bHit)
 					{
@@ -628,10 +718,14 @@ namespace PCGExSampleSurfaceGuided
 					}
 				}
 				break;
-			default: break;
+			default:
+				break;
 			}
 
-			if (!bSuccess) { SamplingFailed(); }
+			if (!bSuccess)
+			{
+				SamplingFailed();
+			}
 		}
 	}
 
@@ -640,11 +734,17 @@ namespace PCGExSampleSurfaceGuided
 		const int32 MIndex = MeshIndex[Index];
 		const int32 FIndex = FaceIndex[Index];
 
-		if (MIndex < 0 || FIndex < 0) { return; }
+		if (MIndex < 0 || FIndex < 0)
+		{
+			return;
+		}
 
 		const PCGExMesh::FMeshData& Data = MeshData[MIndex];
 
-		if (!Data.HasColor()) { return; }
+		if (!Data.HasColor())
+		{
+			return;
+		}
 
 		const int32 Index0 = Data.Indices[FIndex * 3 + 0];
 		const int32 Index1 = Data.Indices[FIndex * 3 + 1];
@@ -690,7 +790,10 @@ namespace PCGExSampleSurfaceGuided
 					if (IndexRef == -1)
 					{
 						PCGExMesh::FMeshData Data(Mesh);
-						if (Data.bIsValid) { IndexRef = MeshData.Add(Data); }
+						if (Data.bIsValid)
+						{
+							IndexRef = MeshData.Add(Data);
+						}
 					}
 
 					MeshIndex[j] = IndexRef;
@@ -701,10 +804,16 @@ namespace PCGExSampleSurfaceGuided
 			ScopedMeshes.Reset();
 			StaticMeshIndexMap.Empty();
 			TPCGValueRange<FVector4> OutColors = PointDataFacade->GetOut()->GetColorValueRange(false);
-			ParallelFor(FaceIndex.Num(), [&](int32 i) { GetVertexColorAtHit(i, OutColors[i]); });
+			ParallelFor(FaceIndex.Num(), [&](int32 i)
+			{
+				GetVertexColorAtHit(i, OutColors[i]);
+			});
 		}
 
-		if (!Settings->bOutputNormalizedDistance || !DistanceWriter) { return; }
+		if (!Settings->bOutputNormalizedDistance || !DistanceWriter)
+		{
+			return;
+		}
 
 		const int32 NumPoints = PointDataFacade->GetNum();
 		MaxSampledDistance = MaxDistanceValue->Max();
@@ -736,13 +845,22 @@ namespace PCGExSampleSurfaceGuided
 	{
 		PointDataFacade->WriteFastest(TaskManager);
 
-		if (Settings->bTagIfHasSuccesses && bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag); }
-		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess) { PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag); }
+		if (Settings->bTagIfHasSuccesses && bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasSuccessesTag);
+		}
+		if (Settings->bTagIfHasNoSuccesses && !bAnySuccess)
+		{
+			PointDataFacade->Source->Tags->AddRaw(Settings->HasNoSuccessesTag);
+		}
 	}
 
 	void FProcessor::Write()
 	{
-		if (Settings->bPruneFailedSamples) { (void)PointDataFacade->Source->Gather(SamplingMask); }
+		if (Settings->bPruneFailedSamples)
+		{
+			(void)PointDataFacade->Source->Gather(SamplingMask);
+		}
 	}
 }
 

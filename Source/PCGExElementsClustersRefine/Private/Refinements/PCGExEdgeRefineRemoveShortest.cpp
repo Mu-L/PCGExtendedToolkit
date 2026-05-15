@@ -8,7 +8,7 @@
 void FPCGExEdgeRemoveShortest::ProcessNode(PCGExClusters::FNode& Node)
 {
 	int32 BestIndex = -1;
-	double ShortestDist = MAX_dbl;
+	double ShortestDist = TNumericLimits<double>::Max();
 
 	for (const PCGExGraphs::FLink Lk : Node.Links)
 	{
@@ -20,7 +20,10 @@ void FPCGExEdgeRemoveShortest::ProcessNode(PCGExClusters::FNode& Node)
 		}
 	}
 
-	if (BestIndex == -1) { return; }
+	if (BestIndex == -1)
+	{
+		return;
+	}
 	//if (!*(EdgesFilters->GetData() + BestIndex)) { return; }
 
 	FPlatformAtomics::InterlockedExchange(&Cluster->GetEdge(BestIndex)->bValid, 0);

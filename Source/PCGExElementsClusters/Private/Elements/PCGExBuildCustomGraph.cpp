@@ -3,17 +3,17 @@
 
 #include "Elements/PCGExBuildCustomGraph.h"
 
-#include "GameFramework/Actor.h"
-#include "UObject/UObjectGlobals.h"
-#include "UObject/Package.h"
 #include "PCGComponent.h"
+#include "GameFramework/Actor.h"
+#include "UObject/Package.h"
+#include "UObject/UObjectGlobals.h"
 
 #include "PCGParamData.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExPointIO.h"
 
-#include "Graphs/PCGExGraph.h"
 #include "Elements/PCGExecuteBlueprint.h"
+#include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
 
 #define LOCTEXT_NAMESPACE "PCGExBuildCustomGraphElement"
@@ -30,7 +30,10 @@ void UPCGExCustomGraphSettings::InitializeSettings_Implementation(bool& OutSucce
 
 int32 UPCGExCustomGraphSettings::GetOrCreateNode(const int64 InIdx)
 {
-	if (const int32* IndexPtr = IdxMap.Find(InIdx)) { return *IndexPtr; }
+	if (const int32* IndexPtr = IdxMap.Find(InIdx))
+	{
+		return *IndexPtr;
+	}
 	const int32 Index = Idx.Add(InIdx);
 	IdxMap.Add(InIdx, Index);
 	return Index;
@@ -38,13 +41,19 @@ int32 UPCGExCustomGraphSettings::GetOrCreateNode(const int64 InIdx)
 
 void UPCGExCustomGraphSettings::AddEdge(const int64 InStartIdx, const int64 InEndIdx)
 {
-	if (InStartIdx == InEndIdx) { return; }
+	if (InStartIdx == InEndIdx)
+	{
+		return;
+	}
 	UniqueEdges.Add(PCGEx::H64U(GetOrCreateNode(InStartIdx), GetOrCreateNode(InEndIdx)));
 }
 
 void UPCGExCustomGraphSettings::RemoveEdge(const int64 InStartIdx, const int64 InEndIdx)
 {
-	if (InStartIdx == InEndIdx) { return; }
+	if (InStartIdx == InEndIdx)
+	{
+		return;
+	}
 	UniqueEdges.Remove(PCGEx::H64U(GetOrCreateNode(InStartIdx), GetOrCreateNode(InEndIdx)));
 }
 
@@ -147,7 +156,9 @@ namespace PCGExBuildCustomGraph
 		PCGEX_ASYNC_TASK_NAME(FBuildGraph)
 
 		FBuildGraph(const TSharedPtr<PCGExData::FPointIO>& InPointIO, UPCGExCustomGraphSettings* InGraphSettings)
-			: FTask(), PointIO(InPointIO), GraphSettings(InGraphSettings)
+			: FTask()
+			  , PointIO(InPointIO)
+			  , GraphSettings(InGraphSettings)
 		{
 		}
 
@@ -255,7 +266,10 @@ namespace PCGExBuildCustomGraph
 			InitNodesGroup->OnCompleteCallback = [WeakGraphBuilder, TaskManager]()
 			{
 				const TSharedPtr<PCGExGraphs::FGraphBuilder> GBuilder = WeakGraphBuilder.Pin();
-				if (!GBuilder) { return; }
+				if (!GBuilder)
+				{
+					return;
+				}
 
 				GBuilder->CompileAsync(TaskManager, true);
 			};
@@ -264,7 +278,10 @@ namespace PCGExBuildCustomGraph
 			InitNodesGroup->OnSubLoopStartCallback = [WeakIO, CustomGraphSettings](const PCGExMT::FScope& Scope)
 			{
 				const TSharedPtr<PCGExData::FPointIO> IO = WeakIO.Pin();
-				if (!IO) { return; }
+				if (!IO)
+				{
+					return;
+				}
 
 				TArray<FPCGPoint> MutablePoints;
 				GetPoints(IO->GetOutScope(Scope), MutablePoints);
@@ -302,7 +319,10 @@ PCGEX_INITIALIZE_ELEMENT(BuildCustomGraph)
 
 bool FPCGExBuildCustomGraphElement::Boot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(BuildCustomGraph)
 
@@ -351,7 +371,10 @@ bool FPCGExBuildCustomGraphElement::AdvanceWork(FPCGExContext* InContext, const 
 
 				for (FSoftObjectPath Path : ActorReferences->Values)
 				{
-					if (AActor* SourceActor = Cast<AActor>(Path.ResolveObject())) { UniqueActors.Add(SourceActor); }
+					if (AActor* SourceActor = Cast<AActor>(Path.ResolveObject()))
+					{
+						UniqueActors.Add(SourceActor);
+					}
 				}
 
 				Context->Builder->InputActors.Reserve(UniqueActors.Num());
@@ -396,7 +419,10 @@ bool FPCGExBuildCustomGraphElement::AdvanceWork(FPCGExContext* InContext, const 
 		{
 			bool bAlreadySet = false;
 			UniqueSettingsClasses.Add(GraphSettings->GetClass(), &bAlreadySet);
-			if (!bAlreadySet) { Context->EDITOR_TrackClass(GraphSettings->GetClass()); }
+			if (!bAlreadySet)
+			{
+				Context->EDITOR_TrackClass(GraphSettings->GetClass());
+			}
 
 			TSharedPtr<PCGExData::FPointIO> NodeIO = Context->MainPoints->Emplace_GetRef();
 			NodeIO->IOIndex = GraphSettings->SettingsIndex;
@@ -414,7 +440,10 @@ bool FPCGExBuildCustomGraphElement::AdvanceWork(FPCGExContext* InContext, const 
 	{
 		for (UPCGExCustomGraphSettings* GraphSettings : Context->Builder->GraphSettings)
 		{
-			if (!GraphSettings->GraphBuilder) { continue; }
+			if (!GraphSettings->GraphBuilder)
+			{
+				continue;
+			}
 			if (GraphSettings->GraphBuilder->bCompiledSuccessfully)
 			{
 				GraphSettings->GraphBuilder->StageEdgesOutputs();
