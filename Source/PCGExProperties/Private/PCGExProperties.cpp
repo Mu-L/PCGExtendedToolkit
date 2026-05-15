@@ -17,13 +17,9 @@ PCGEX_IMPLEMENT_MODULE(FPCGExPropertiesModule, PCGExProperties)
 
 #pragma region FPCGExPropertySchema
 
-// Default constructor initializes with Float type and a unique HeaderId.
-// HeaderId is generated once and preserved through the lifetime of this schema entry,
-// even if the user changes the property type or renames it.
 FPCGExPropertySchema::FPCGExPropertySchema()
 {
 #if WITH_EDITOR
-	HeaderId = GetTypeHash(FGuid::NewGuid());
 	Property.InitializeAs<FPCGExProperty_Float>();
 #endif
 }
@@ -92,6 +88,13 @@ void FPCGExPropertySchemaCollection::SyncAllSchemas()
 {
 	for (FPCGExPropertySchema& Schema : Schemas)
 	{
+#if WITH_EDITOR
+		// Bootstrap a stable identity for entries whose ctor left HeaderId at 0
+		if (Schema.HeaderId == 0)
+		{
+			Schema.HeaderId = GetTypeHash(FGuid::NewGuid());
+		}
+#endif
 		Schema.SyncPropertyName();
 	}
 }
@@ -116,15 +119,7 @@ void FPCGExPropertySchemaCollection::SyncOverridesArray(TArray<FPCGExPropertyOve
 void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchemaCollection& Archetype)
 {
 #if WITH_EDITOR
-	// Identity matching uses the INNER FPCGExProperty::HeaderId (the one stored inside the
-	// FInstancedStruct payload), not the outer FPCGExPropertySchema::HeaderId. Both fields
-	// are auto-randomized in their default constructors, but FInstancedStruct serializes
-	// its payload atomically -- so the inner HeaderId propagates reliably from CDO to
-	// instance, while the outer struct-level editor-only field does not. This matches the
-	// pattern FPCGExPropertyOverrides::SyncToSchema already uses for the same reason.
-
-	// Fast path: structure already mirrors the archetype. Hits on every register after the
-	// first sync, keeping the per-register cost minimal.
+	// Fast path: structure already mirrors the archetype. Hits on every register after the first sync.
 	if (Schemas.Num() == Archetype.Schemas.Num())
 	{
 		bool bStructureMatches = true;
@@ -149,18 +144,23 @@ void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchem
 
 	TArray<FPCGExPropertySchema> OldSchemas = MoveTemp(Schemas);
 
-	TMap<int32, FPCGExPropertySchema> ExistingByInnerHeaderId;
-	ExistingByInnerHeaderId.Reserve(OldSchemas.Num());
-	for (FPCGExPropertySchema& Old : OldSchemas)
+	TMap<int32, int32> OldIndexByInnerHeaderId;
+	OldIndexByInnerHeaderId.Reserve(OldSchemas.Num());
+	for (int32 i = 0; i < OldSchemas.Num(); ++i)
 	{
-		if (const FPCGExProperty* Prop = Old.GetProperty())
+		if (const FPCGExProperty* Prop = OldSchemas[i].GetProperty())
 		{
 			if (Prop->HeaderId != 0)
 			{
-				ExistingByInnerHeaderId.Add(Prop->HeaderId, MoveTemp(Old));
+				OldIndexByInnerHeaderId.Add(Prop->HeaderId, i);
 			}
 		}
 	}
+
+	// Built lazily on the first HeaderId miss -- covers legacy instances saved before the
+	// ctor change, when HeaderIds were random and won't match the CDO's
+	TMap<FName, int32> OldIndexByName;
+	bool bNameMapBuilt = false;
 
 	Schemas.Reset(Archetype.Schemas.Num());
 
@@ -170,23 +170,46 @@ void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchem
 		NewSchema.HeaderId = ArchetypeSchema.HeaderId;
 		NewSchema.Name = ArchetypeSchema.Name;
 
-		FPCGExPropertySchema* Existing = nullptr;
+		int32 ExistingIndex = INDEX_NONE;
 		if (const FPCGExProperty* ArchProp = ArchetypeSchema.GetProperty())
 		{
 			if (ArchProp->HeaderId != 0)
 			{
-				Existing = ExistingByInnerHeaderId.Find(ArchProp->HeaderId);
+				if (const int32* Found = OldIndexByInnerHeaderId.Find(ArchProp->HeaderId))
+				{
+					ExistingIndex = *Found;
+				}
 			}
 		}
 
+		if (ExistingIndex == INDEX_NONE && !ArchetypeSchema.Name.IsNone())
+		{
+			if (!bNameMapBuilt)
+			{
+				bNameMapBuilt = true;
+				OldIndexByName.Reserve(OldSchemas.Num());
+				for (int32 i = 0; i < OldSchemas.Num(); ++i)
+				{
+					if (!OldSchemas[i].Name.IsNone())
+					{
+						OldIndexByName.Add(OldSchemas[i].Name, i);
+					}
+				}
+			}
+			if (const int32* Found = OldIndexByName.Find(ArchetypeSchema.Name))
+			{
+				ExistingIndex = *Found;
+			}
+		}
+
+		FPCGExPropertySchema* Existing = OldSchemas.IsValidIndex(ExistingIndex) ? &OldSchemas[ExistingIndex] : nullptr;
+
 		if (Existing && Existing->Property.GetScriptStruct() == ArchetypeSchema.Property.GetScriptStruct())
 		{
-			// Inner HeaderId matches and type is unchanged -- preserve this collection's Value
 			NewSchema.Property = MoveTemp(Existing->Property);
 		}
 		else
 		{
-			// No match or type changed -- take the archetype's entry verbatim
 			NewSchema.Property = ArchetypeSchema.Property;
 		}
 

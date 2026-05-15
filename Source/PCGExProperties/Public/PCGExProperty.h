@@ -144,16 +144,14 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * - Type changes (HeaderId preserved, bEnabled state preserved, value reset to default)
 	 * Custom properties inherit this automatically - no action needed.
 	 */
-	UPROPERTY(meta=(IgnoreForMemberInitializationTest))
+	UPROPERTY()
 	int32 HeaderId = 0;
 #endif
 
-	FPCGExProperty()
-	{
-#if WITH_EDITOR
-		HeaderId = GetTypeHash(FGuid::NewGuid());
-#endif
-	}
+	// HeaderId is left at 0 by the ctor; assigning it here would defeat UE's CDO->instance
+	// propagation for arrays-of-structs (fresh values on every default-construction that
+	// UE then never overrides). FPCGExPropertySchemaCollection::SyncAllSchemas assigns it.
+	FPCGExProperty() = default;
 
 	virtual ~FPCGExProperty() = default;
 
@@ -530,7 +528,7 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 
 #if WITH_EDITORONLY_DATA
 	/** Stable identity for override matching, preserved through type changes */
-	UPROPERTY(meta=(IgnoreForMemberInitializationTest))
+	UPROPERTY()
 	int32 HeaderId = 0;
 #endif
 
@@ -678,19 +676,18 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 * UE's per-property propagation can leave FInstancedStruct entries default-constructed
 	 * on existing instances (type falling through to the first registered FPCGExProperty
 	 * subclass), which this method restores by copying the archetype's entry verbatim for
-	 * any HeaderId that doesn't match.
-	 *
-	 * Identity is the INNER FPCGExProperty::HeaderId (stored inside the FInstancedStruct
-	 * payload), not the outer FPCGExPropertySchema::HeaderId. FInstancedStruct serializes
-	 * its payload atomically, so the inner HeaderId propagates reliably from CDO to instance;
-	 * the outer struct-level editor-only field does not. This matches the pattern
-	 * FPCGExPropertyOverrides::SyncToSchema uses for the same reason.
+	 * any unmatched entry.
 	 *
 	 * Matching policy (editor-only, since HeaderId is editor-only):
-	 * - Same inner HeaderId + same UScriptStruct: keep this collection's Value.
-	 * - Same inner HeaderId + different UScriptStruct: take Archetype's entry (type changed).
-	 * - No HeaderId match in this collection: take Archetype's entry (new property).
-	 * - Entries in this collection with no HeaderId match in Archetype: dropped.
+	 * - Inner FPCGExProperty::HeaderId is the primary key. Constructors leave HeaderId at 0;
+	 *   SyncAllSchemas assigns it explicitly, so CDO->instance propagation reliably ships
+	 *   the CDO's HeaderId onto instances and matches line up.
+	 * - Name is a fallback for entries with no HeaderId match. Catches legacy instances
+	 *   saved before the ctor change (which still carry stale random HeaderIds on disk) so
+	 *   their values aren't wiped on the first sync after upgrade.
+	 * - When neither matches: take Archetype's entry verbatim (new property, or genuinely
+	 *   unmatched after both lookups).
+	 * - Entries in this collection with no match in Archetype: dropped (removed property).
 	 *
 	 * At runtime (cooked, no editor data), this is a no-op -- cooked data is finalized.
 	 */
