@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGExProperty.h"
 #include "Components/ActorComponent.h"
+#include "GameFramework/Actor.h"
 
 #include "PCGExPropertyCollectionComponent.generated.h"
 
@@ -31,6 +32,8 @@ class PCGEXPROPERTIES_API UPCGExPropertyCollectionComponent : public UActorCompo
 public:
 	UPCGExPropertyCollectionComponent();
 
+	virtual void OnRegister() override;
+
 	/**
 	 * Property collection with schema definitions and default values.
 	 * These compile into runtime property data during cage/pattern builds.
@@ -54,5 +57,60 @@ public:
 	FPCGExPropertySchemaCollection& GetPropertiesMutable()
 	{
 		return Properties;
+	}
+
+	/**
+	 * Locate the property-collection component on an actor with copy-paste resilience.
+	 *
+	 * FindComponentByClass walks the runtime-registered OwnedComponents set. Level-editor
+	 * copy-paste of an actor that carries an instance component sometimes produces a
+	 * duplicate whose component is present in the persisted InstanceComponents array but
+	 * never registered into OwnedComponents -- making FindComponentByClass return null
+	 * even though the data is on the actor. Fallback walks the persisted list so callers
+	 * (the actor-collection scan path, the level-exporter mesh path, and any future
+	 * downstream consumer) all see the same set of components.
+	 *
+	 * Const-on-input mirrors AActor::FindComponentByClass: walking the component set is a
+	 * read on the actor; the returned component is mutable because callers commonly need
+	 * to call mutating accessors on it.
+	 */
+	static UPCGExPropertyCollectionComponent* FindOnActor(const AActor* Actor)
+	{
+		if (!Actor)
+		{
+			return nullptr;
+		}
+		if (UPCGExPropertyCollectionComponent* Comp = Actor->FindComponentByClass<UPCGExPropertyCollectionComponent>())
+		{
+			return Comp;
+		}
+		for (UActorComponent* IC : Actor->GetInstanceComponents())
+		{
+			if (UPCGExPropertyCollectionComponent* Candidate = Cast<UPCGExPropertyCollectionComponent>(IC))
+			{
+				return Candidate;
+			}
+		}
+		return nullptr;
+	}
+
+	/**
+	 * Extract the authored schema from a donor actor's property-collection component, with
+	 * SyncPropertyName run on every schema first so each FInstancedStruct's inner property
+	 * carries up-to-date PropertyName + HeaderId identity. Returns an empty array when the
+	 * actor lacks a component.
+	 */
+	static TArray<FInstancedStruct> ExtractSchemaFromActor(const AActor* Actor)
+	{
+		UPCGExPropertyCollectionComponent* Comp = FindOnActor(Actor);
+		if (!Comp)
+		{
+			return {};
+		}
+		for (FPCGExPropertySchema& Schema : Comp->GetPropertiesMutable().Schemas)
+		{
+			Schema.SyncPropertyName();
+		}
+		return Comp->GetProperties().BuildSchema();
 	}
 };

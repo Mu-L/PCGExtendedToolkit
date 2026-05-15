@@ -9,6 +9,7 @@
 #include "PCGExAssetCollectionTypes.h"
 #include "PCGExAssetGrammar.h"
 #include "PCGExProperty.h"
+#include "PCGExSchemaMerging.h"
 #include "Core/PCGExContext.h"
 #include "Details/PCGExSocket.h"
 #include "Details/PCGExStagingDetails.h"
@@ -641,6 +642,31 @@ public:
 		TArray<FInstancedStruct> Schema = CollectionProperties.BuildSchema();
 		PCGExProperties::BuildRegistry(Schema, PropertyRegistry);
 	}
+
+	/**
+	 * Derive CollectionProperties from the union of every entry's currently-enabled
+	 * PropertyOverrides, then re-sync each entry's overrides against the resulting
+	 * canonical schema (preserves values via HeaderId).
+	 *
+	 * Use this when per-entry overrides are the source of truth and the collection-level
+	 * schema needs to mirror them. Counterpart to UPCGExActorCollection's actor-component
+	 * scan, which builds the schema from the component side. Callers:
+	 *
+	 *   - SharedMeshCollection after CompactSharedMesh has aggregated per-entry mesh
+	 *     contributions (each contribution may carry its own PropertyOverrides extracted
+	 *     from the source actor's UPCGExPropertyCollectionComponent).
+	 *   - Anywhere else a collection's schema should be reconstructed from the data
+	 *     authored on individual entries.
+	 *
+	 * The existing manual CollectionProperties participates as source #0 so manually
+	 * authored entries are preserved under FirstWins / StrictTypeMatch.
+	 *
+	 * @param Policy Conflict-resolution policy applied during the merge. Defaults to
+	 *               StrictTypeMatch: silent dedupe on same-name+same-type, conflict log
+	 *               on type mismatch.
+	 */
+	void RefreshCollectionPropertiesFromEntries(
+		EPCGExSchemaMergePolicy Policy = EPCGExSchemaMergePolicy::StrictTypeMatch);
 
 	/**
 	 * Get property from collection defaults by type.

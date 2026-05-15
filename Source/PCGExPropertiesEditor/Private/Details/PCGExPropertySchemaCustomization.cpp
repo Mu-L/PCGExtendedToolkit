@@ -74,12 +74,14 @@ void FPCGExPropertySchemaCustomization::OnSchemaChanged()
 
 bool FPCGExPropertySchemaCustomization::IsReadOnlySchema(TSharedRef<IPropertyHandle> PropertyHandle) const
 {
-	// Walk up the property hierarchy to find if we're under a property with ReadOnlySchema metadata
+	// Walk up the property hierarchy looking for ReadOnlySchema on any ancestor handle.
+	// IPropertyHandle::HasMetaData checks both compile-time UPROPERTY metadata and
+	// runtime instance metadata set via SetInstanceMetaData, so this works for both
+	// the static meta=(ReadOnlySchema) case and the dynamic per-instance locking case.
 	TSharedPtr<IPropertyHandle> ParentHandle = PropertyHandle->GetParentHandle();
 	while (ParentHandle.IsValid())
 	{
-		const FProperty* Property = ParentHandle->GetProperty();
-		if (Property && Property->HasMetaData(TEXT("ReadOnlySchema")))
+		if (ParentHandle->HasMetaData(TEXT("ReadOnlySchema")))
 		{
 			return true;
 		}
@@ -189,25 +191,7 @@ void FPCGExPropertySchemaCustomization::CustomizeChildren(
 		}
 		else
 		{
-			// For complex types, iterate all non-metadata properties
-			for (TFieldIterator<FProperty> It(InnerStruct); It; ++It)
-			{
-				const FProperty* Property = *It;
-				if (!Property)
-				{
-					continue;
-				}
-
-				FName PropName = Property->GetFName();
-
-				// Skip metadata properties
-				if (PropName == TEXT("PropertyName") || PropName == TEXT("HeaderId") || PropName == TEXT("OutputBuffer"))
-				{
-					continue;
-				}
-
-				ChildBuilder.AddExternalStructureProperty(StructOnScope, PropName);
-			}
+			FPCGExInlineWidgetRegistry::AddComplexValueRows(ChildBuilder, StructOnScope, InnerStruct);
 		}
 	}
 	else

@@ -10,7 +10,6 @@
 #include "PCGExProperty.h"
 #include "PropertyHandle.h"
 #include "UObject/StructOnScope.h"
-#include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertyOverrideEntryCustomization::MakeInstance()
@@ -182,93 +181,29 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 		return true;
 	});
 
-	// Only customize if this is a simple type that should be inlined
 	if (bShouldInline)
 	{
-		// For inline types, only show the "Value" property
-		if (const FProperty* ValueProperty = InnerStruct->FindPropertyByName(TEXT("Value")))
-		{
-			IDetailPropertyRow& Row = *ChildBuilder.AddExternalStructureProperty(InnerScope.ToSharedRef(), ValueProperty->GetFName());
+		const TSharedRef<SWidget> NameContent = SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.Padding(0, 0, 4, 0)
+			[
+				EnabledHandlePtr.IsValid() ? EnabledHandlePtr->CreatePropertyValueWidget() : SNullWidget::NullWidget
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock)
+				.Text(TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryLabelText)))
+				.Font(IDetailLayoutBuilder::GetDetailFont())
+			];
 
-			// Get the property handle for the value widget
-			TSharedPtr<IPropertyHandle> ValuePropertyHandle = Row.GetPropertyHandle();
-
-			// Query the inline widget registry - if a factory is registered for this outer
-			// struct type, use it instead of the default property value widget. The default
-			// path (CreatePropertyValueWidget) works for simple scalar types but falls back
-			// to expandable widgets for complex types (FVector, FRotator, etc.), which
-			// break the inline contract - custom factories exist to provide compact renders.
-			// Compact-mode lookup: override entry is value-editing only; the schema
-			// already pinned the property type and any "definition" controls would
-			// be misleading here.
-			const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(InnerStruct->GetFName(), EPCGExInlineWidgetMode::Compact);
-			TSharedRef<SWidget> ValueWidget = SNullWidget::NullWidget;
-			if (ValuePropertyHandle.IsValid())
-			{
-				ValueWidget = Factory
-					? (*Factory)(ValuePropertyHandle.ToSharedRef())
-					: ValuePropertyHandle->CreatePropertyValueWidget();
-			}
-
-			// Customize the row to show checkbox + label in NameContent and value widget in ValueContent.
-			// When a factory widget is used (multi-field compact editor), widen the value column
-			// so all sub-fields fit and fill the available horizontal space uniformly.
-			const bool bHasCustomFactory = Factory != nullptr;
-
-			Row.CustomWidget()
-			   .NameContent()
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot()
-					.AutoWidth()
-					.VAlign(VAlign_Center)
-					.Padding(0, 0, 4, 0)
-					[
-						EnabledHandlePtr.IsValid() ? EnabledHandlePtr->CreatePropertyValueWidget() : SNullWidget::NullWidget
-					]
-					+ SHorizontalBox::Slot()
-					.AutoWidth()
-					.VAlign(VAlign_Center)
-					[
-						SNew(STextBlock)
-						.Text(TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryLabelText)))
-						.Font(IDetailLayoutBuilder::GetDetailFont())
-					]
-				]
-				.ValueContent()
-				.MinDesiredWidth(bHasCustomFactory ? 250.0f : 125.0f)
-				.MaxDesiredWidth(bHasCustomFactory ? 3000.0f : 600.0f)
-				[
-					SNew(SBox)
-					.IsEnabled(IsEnabledAttr)
-					[
-						ValueWidget
-					]
-				];
-		}
+		FPCGExInlineWidgetRegistry::AddCompactValueRow(ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, NameContent, IsEnabledAttr);
 	}
 	else
 	{
-		// Complex type - iterate all non-metadata properties and add them as children
-		for (TFieldIterator<FProperty> It(InnerStruct); It; ++It)
-		{
-			const FProperty* Property = *It;
-			if (!Property)
-			{
-				continue;
-			}
-
-			FName PropName = Property->GetFName();
-
-			// Skip metadata properties
-			if (PropName == TEXT("PropertyName") || PropName == TEXT("HeaderId") || PropName == TEXT("OutputBuffer"))
-			{
-				continue;
-			}
-
-			// Add each property as a child row with enabled state
-			IDetailPropertyRow& PropRow = *ChildBuilder.AddExternalStructureProperty(InnerScope.ToSharedRef(), PropName);
-			PropRow.IsEnabled(IsEnabledAttr);
-		}
+		FPCGExInlineWidgetRegistry::AddComplexValueRows(ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, IsEnabledAttr);
 	}
 }

@@ -65,7 +65,7 @@ void FPCGExSelectorClosestMatchAxisCustomization::CustomizeHeader(
 			[
 				WeightHandle->CreatePropertyValueWidget()
 			]
-			// Normalize toggle — no label; tooltip on the property carries the explanation.
+			// Normalize toggle -- no label; tooltip on the property carries the explanation.
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6, 0, 0, 0)
 			[
 				NormalizeHandle->CreatePropertyValueWidget()
