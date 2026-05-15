@@ -11,7 +11,7 @@
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Selectors/PCGExSelectorHelpers.h"
 
-namespace
+namespace PCGExSelectorClosestMatch
 {
 	// Resolve the property's declared metadata type from the collection's schema. Returns
 	// EPCGMetadataTypes::Unknown when no schema with that name exists.
@@ -173,7 +173,7 @@ bool FPCGExEntryClosestMatchPickerOp::OnInitForData(FPCGExContext* InContext, co
 		TSharedPtr<FPCGExClosestMatchAxisEvaluator> Eval;
 
 #define PCGEX_CLOSEST_BIND_EVAL(_TYPE, _NAME) \
-		if constexpr (PCGExClosestMatch::IsSupported<_TYPE>()) { Eval = BuildEvaluatorT<_TYPE>(InDataFacade, Axes[A], SharedAxisData); }
+		if constexpr (PCGExClosestMatch::IsSupported<_TYPE>()) { Eval = PCGExSelectorClosestMatch::BuildEvaluatorT<_TYPE>(InDataFacade, Axes[A], SharedAxisData); }
 
 		PCGEX_EXECUTEWITHRIGHTTYPE(SharedAxisData->Type, PCGEX_CLOSEST_BIND_EVAL)
 #undef PCGEX_CLOSEST_BIND_EVAL
@@ -277,12 +277,12 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorClosestMatchFact
 	for (int32 A = 0; A < AxisCount; ++A)
 	{
 		const FPCGExSelectorClosestMatchAxis& Axis = Config.Axes[A];
-		const EPCGMetadataTypes Type = ResolveAxisType(Collection, Axis.PropertyName);
+		const EPCGMetadataTypes Type = PCGExSelectorClosestMatch::ResolveAxisType(Collection, Axis.PropertyName);
 
 		TSharedPtr<FPCGExClosestMatchAxisData> AxisData;
 
 #define PCGEX_CLOSEST_BUILD_AXIS(_TYPE, _NAME) \
-		if constexpr (PCGExClosestMatch::IsSupported<_TYPE>()) { AxisData = BuildAxisDataT<_TYPE>(Collection, Target, Axis); }
+		if constexpr (PCGExClosestMatch::IsSupported<_TYPE>()) { AxisData = PCGExSelectorClosestMatch::BuildAxisDataT<_TYPE>(Collection, Target, Axis); }
 
 		PCGEX_EXECUTEWITHRIGHTTYPE(Type, PCGEX_CLOSEST_BUILD_AXIS)
 #undef PCGEX_CLOSEST_BUILD_AXIS

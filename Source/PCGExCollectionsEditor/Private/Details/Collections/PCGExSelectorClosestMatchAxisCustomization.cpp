@@ -7,21 +7,11 @@
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "PropertyHandle.h"
+#include "Details/Collections/PCGExCollectionEditorSlateUtils.h"
 #include "Selectors/PCGExSelectorClosestMatch.h"
 #include "Widgets/SBoxPanel.h"
-#include "Widgets/Text/STextBlock.h"
 
-namespace
-{
-	TSharedRef<SWidget> MakeSmallLabel(const FString& Text)
-	{
-		return SNew(STextBlock)
-			.Text(FText::FromString(Text))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-			.ColorAndOpacity(FSlateColor(FLinearColor::Gray))
-			.MinDesiredWidth(20);
-	}
-}
+using PCGExCollectionEditorSlateUtils::MakeSmallLabel;
 
 TSharedRef<IPropertyTypeCustomization> FPCGExSelectorClosestMatchAxisCustomization::MakeInstance()
 {

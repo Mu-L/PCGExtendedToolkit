@@ -11,7 +11,7 @@
 #include "Details/PCGExSettingsDetails.h"
 #include "Selectors/PCGExSelectorHelpers.h"
 
-namespace
+namespace PCGExSelectorRangeBased
 {
 	constexpr double RangeTieEpsilon = 1e-6;
 
@@ -194,13 +194,13 @@ int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed, FPCG
 			Hypervolume *= (EntryMaxs[Base + A] - EntryMins[Base + A]);
 		}
 
-		if (Hypervolume < MinHypervolume - RangeTieEpsilon)
+		if (Hypervolume < MinHypervolume - PCGExSelectorRangeBased::RangeTieEpsilon)
 		{
 			MinHypervolume = Hypervolume;
 			TieBucket.Reset();
 			TieBucket.Add(i);
 		}
-		else if (FMath::Abs(Hypervolume - MinHypervolume) <= RangeTieEpsilon)
+		else if (FMath::Abs(Hypervolume - MinHypervolume) <= PCGExSelectorRangeBased::RangeTieEpsilon)
 		{
 			TieBucket.Add(i);
 		}
@@ -326,7 +326,7 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorRangeBasedFactor
 		{
 			double Min = 0.0;
 			double Max = 0.0;
-			if (!ResolveAxisForEntry(Config.Axes[A], Entry, Collection, Min, Max))
+			if (!PCGExSelectorRangeBased::ResolveAxisForEntry(Config.Axes[A], Entry, Collection, Min, Max))
 			{
 				bAllResolved = false;
 				break;
