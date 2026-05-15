@@ -15,7 +15,7 @@
 #define LOCTEXT_NAMESPACE "PCGExFusePointsElement"
 #define PCGEX_NAMESPACE FusePoints
 
-namespace
+namespace PCGExFusePoints
 {
 	// Reorder FUnionTable entries so they appear in ascending order of each group's lowest contributing
 	// input-index. Octree mode emits with dense Keys (0..N-1) in creation order, so the table is already
