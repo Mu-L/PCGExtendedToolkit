@@ -337,6 +337,7 @@ namespace PCGExTypeOps
 		{
 			return Type((V.X - Min.X) * InvRange.X, (V.Y - Min.Y) * InvRange.Y);
 		}
+
 	};
 
 	// Vector Type Operations - FVector
@@ -670,6 +671,7 @@ namespace PCGExTypeOps
 		{
 			return Type((V.X - Min.X) * InvRange.X, (V.Y - Min.Y) * InvRange.Y, (V.Z - Min.Z) * InvRange.Z);
 		}
+
 	};
 
 	// Vector Type Operations - FVector4

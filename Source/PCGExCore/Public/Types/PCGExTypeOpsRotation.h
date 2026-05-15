@@ -680,6 +680,7 @@ namespace PCGExTypeOps
 		{
 			return 1.0 - FMath::Abs(A | B);
 		}
+
 	};
 
 	// Transform Type Operations - FTransform

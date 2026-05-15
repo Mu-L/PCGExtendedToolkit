@@ -210,6 +210,7 @@ namespace PCGExPointsMT
 	IBatch::IBatch(FPCGExContext* InContext, const TArray<TWeakPtr<PCGExData::FPointIO>>& InPointsCollection)
 		: ExecutionContext(InContext),
 		  PointsCollection(InPointsCollection)
+
 	{
 		SetExecutionContext(InContext);
 	}

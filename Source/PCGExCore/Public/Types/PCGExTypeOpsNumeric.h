@@ -650,6 +650,7 @@ namespace PCGExTypeOps
 			OutMin = FMath::Min(OutMin, InMin);
 			OutMax = FMath::Max(OutMax, InMax);
 		}
+
 	};
 
 	// Numeric Type Operations - int64
@@ -1255,6 +1256,7 @@ namespace PCGExTypeOps
 		{
 			return (V - Min) * InvRange;
 		}
+
 	};
 
 	// Numeric Type Operations - double
