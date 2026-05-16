@@ -9,6 +9,7 @@
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "PropertyHandle.h"
+#include "Details/PCGExPropertyLabelRow.h"
 #include "UObject/StructOnScope.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -17,34 +18,36 @@ TSharedRef<IPropertyTypeCustomization> FPCGExPropertyOverrideEntryCustomization:
 	return MakeShareable(new FPCGExPropertyOverrideEntryCustomization());
 }
 
-FText FPCGExPropertyOverrideEntryCustomization::GetEntryLabelText() const
+const FPCGExProperty* FPCGExPropertyOverrideEntryCustomization::AccessEntryProperty() const
 {
 	if (!PropertyHandlePtr.IsValid())
 	{
-		return FText::FromString(TEXT("None (Unknown)"));
+		return nullptr;
 	}
-
-	// Access entry data directly - THIS RUNS EACH FRAME, reads fresh data after sync
 	TArray<void*> RawData;
 	PropertyHandlePtr.Pin()->AccessRawData(RawData);
-
-	FName PropertyName = NAME_None;
-	FString TypeName = TEXT("Unknown");
-
-	if (!RawData.IsEmpty() && RawData[0])
+	if (RawData.IsEmpty() || !RawData[0])
 	{
-		const FPCGExPropertyOverrideEntry* Entry = static_cast<FPCGExPropertyOverrideEntry*>(RawData[0]);
-		if (Entry && Entry->Value.IsValid())
-		{
-			if (const FPCGExProperty* Prop = Entry->Value.GetPtr<FPCGExProperty>())
-			{
-				PropertyName = Prop->PropertyName;
-				TypeName = Prop->GetTypeName().ToString();
-			}
-		}
+		return nullptr;
 	}
+	const FPCGExPropertyOverrideEntry* Entry = static_cast<FPCGExPropertyOverrideEntry*>(RawData[0]);
+	if (!Entry || !Entry->Value.IsValid())
+	{
+		return nullptr;
+	}
+	return Entry->Value.GetPtr<FPCGExProperty>();
+}
 
-	return FText::FromString(FString::Printf(TEXT("%s (%s)"), *PropertyName.ToString(), *TypeName));
+FText FPCGExPropertyOverrideEntryCustomization::GetEntryNameText() const
+{
+	const FPCGExProperty* Prop = AccessEntryProperty();
+	return Prop ? FText::FromName(Prop->PropertyName) : FText::FromString(TEXT("None"));
+}
+
+FText FPCGExPropertyOverrideEntryCustomization::GetEntryTypeText() const
+{
+	const FPCGExProperty* Prop = AccessEntryProperty();
+	return Prop ? FText::FromName(Prop->GetDisplayTypeName()) : FText::FromString(TEXT("Unknown"));
 }
 
 void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
@@ -98,9 +101,9 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
-					SNew(STextBlock)
-					.Text(TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryLabelText)))
-					.Font(IDetailLayoutBuilder::GetDetailFont())
+					PCGExPropertyLabelRow::Build(
+						TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryNameText)),
+						TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryTypeText)))
 				]
 			];
 	}
@@ -195,9 +198,10 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			.AutoWidth()
 			.VAlign(VAlign_Center)
 			[
-				SNew(STextBlock)
-				.Text(TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryLabelText)))
-				.Font(IDetailLayoutBuilder::GetDetailFont())
+				PCGExPropertyLabelRow::Build(
+					TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryNameText)),
+					TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertyOverrideEntryCustomization::GetEntryTypeText)),
+					/*bShowSeparator=*/false)
 			];
 
 		FPCGExInlineWidgetRegistry::AddCompactValueRow(ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, NameContent, IsEnabledAttr);

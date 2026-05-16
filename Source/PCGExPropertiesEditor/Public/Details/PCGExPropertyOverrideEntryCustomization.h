@@ -40,7 +40,9 @@ public:
 		IPropertyTypeCustomizationUtils& CustomizationUtils) override;
 
 private:
-	FText GetEntryLabelText() const;
+	const struct FPCGExProperty* AccessEntryProperty() const;
+	FText GetEntryNameText() const;
+	FText GetEntryTypeText() const;
 
 	TWeakPtr<IPropertyHandle> PropertyHandlePtr;
 	TSharedPtr<IPropertyHandle> ValueHandlePtr;

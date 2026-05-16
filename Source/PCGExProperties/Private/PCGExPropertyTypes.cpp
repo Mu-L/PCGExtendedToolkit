@@ -93,6 +93,61 @@ PCGEX_PROPERTY_IMPL(FTransform, Transform)
 PCGEX_PROPERTY_IMPL(FSoftObjectPath, SoftObjectPath)
 PCGEX_PROPERTY_IMPL(FSoftClassPath, SoftClassPath)
 
+// Editor-only structural meta propagation. AllowedClass and Range are schema-authored
+// and copied verbatim onto override entries so the override UI inherits the same picker
+// constraints. The fields themselves are WITH_EDITORONLY_DATA, so cooked builds get
+// no-op stubs to preserve the vtable.
+#if WITH_EDITOR
+#define PCGEX_SYNC_STRUCTURAL(_TYPE, _FIELD) \
+	void FPCGExProperty_##_TYPE::SyncStructuralFromSchema(const FPCGExProperty& Schema) \
+	{ _FIELD = static_cast<const FPCGExProperty_##_TYPE&>(Schema)._FIELD; }
+
+PCGEX_SYNC_STRUCTURAL(Int32, Range)
+PCGEX_SYNC_STRUCTURAL(Int64, Range)
+PCGEX_SYNC_STRUCTURAL(Float, Range)
+PCGEX_SYNC_STRUCTURAL(Double, Range)
+PCGEX_SYNC_STRUCTURAL(SoftObjectPath, AllowedClass)
+PCGEX_SYNC_STRUCTURAL(SoftClassPath, AllowedClass)
+#undef PCGEX_SYNC_STRUCTURAL
+
+// Surface the narrowed class name in UI labels when the schema author has constrained
+// the picker. Returning the FName of the UClass keeps it allocation-free.
+#define PCGEX_DISPLAY_TYPE_FROM_ALLOWED_CLASS(_TYPE) \
+	FName FPCGExProperty_##_TYPE::GetDisplayTypeName() const \
+	{ return AllowedClass ? AllowedClass->GetFName() : GetTypeName(); }
+
+PCGEX_DISPLAY_TYPE_FROM_ALLOWED_CLASS(SoftObjectPath)
+PCGEX_DISPLAY_TYPE_FROM_ALLOWED_CLASS(SoftClassPath)
+#undef PCGEX_DISPLAY_TYPE_FROM_ALLOWED_CLASS
+#else
+void FPCGExProperty_Int32::SyncStructuralFromSchema(const FPCGExProperty&)
+{
+}
+void FPCGExProperty_Int64::SyncStructuralFromSchema(const FPCGExProperty&)
+{
+}
+void FPCGExProperty_Float::SyncStructuralFromSchema(const FPCGExProperty&)
+{
+}
+void FPCGExProperty_Double::SyncStructuralFromSchema(const FPCGExProperty&)
+{
+}
+void FPCGExProperty_SoftObjectPath::SyncStructuralFromSchema(const FPCGExProperty&)
+{
+}
+void FPCGExProperty_SoftClassPath::SyncStructuralFromSchema(const FPCGExProperty&)
+{
+}
+FName FPCGExProperty_SoftObjectPath::GetDisplayTypeName() const
+{
+	return GetTypeName();
+}
+FName FPCGExProperty_SoftClassPath::GetDisplayTypeName() const
+{
+	return GetTypeName();
+}
+#endif
+
 #pragma endregion
 
 // ============================================================================

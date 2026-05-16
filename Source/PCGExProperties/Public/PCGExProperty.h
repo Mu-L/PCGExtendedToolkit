@@ -225,6 +225,20 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 		return FName("Unknown");
 	}
 
+	/**
+	 * Like GetTypeName but used for UI labels that show what the property actually targets.
+	 * Defaults to GetTypeName; types that carry a structural narrowing field (e.g. soft
+	 * paths with AllowedClass) override this to return the narrowed class name instead
+	 * of the generic "SoftObjectPath" / "SoftClassPath" string.
+	 *
+	 * Kept separate from GetTypeName so the registry / serialization side keeps a stable
+	 * type identifier regardless of editor-only narrowing fields.
+	 */
+	virtual FName GetDisplayTypeName() const
+	{
+		return GetTypeName();
+	}
+
 	// --- Metadata Interface (for Tuple/ParamData) ---
 
 	/**

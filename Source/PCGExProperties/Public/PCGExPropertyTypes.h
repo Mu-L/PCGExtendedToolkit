@@ -44,6 +44,47 @@
 //
 // ============================================================================
 
+/**
+ * Editor-only numeric range hint used by Float/Double/Int32/Int64 property types.
+ *
+ * Pure UX sugar: when bClampMin/bClampMax are set, the override-row numeric picker is
+ * built with the corresponding ClampMin/ClampMax + UIMin/UIMax slider attributes so
+ * the user can't drag out of range. Schema-edit view exposes the toggles + values as
+ * a compact strip via FPCGExNumericRangeCustomization.
+ *
+ * Zero runtime cost: all members live inside WITH_EDITORONLY_DATA, so the struct
+ * has no memory footprint in cooked builds. The struct itself remains defined so
+ * Range field declarations don't need to be conditionally compiled away -- they're
+ * already wrapped in WITH_EDITORONLY_DATA on the owning property type.
+ *
+ * UX-only: TryReadValue does NOT clamp programmatic writes against Min/Max -- those
+ * are picker hints, not invariants.
+ */
+USTRUCT()
+struct PCGEXPROPERTIES_API FPCGExNumericRange
+{
+	GENERATED_BODY()
+
+#if WITH_EDITORONLY_DATA
+	// EditCondition intentionally omitted on Min/Max: the compact strip lives in a custom
+	// widget row (FPCGExNumericRangeCustomization::CustomizeHeader) where the engine's
+	// EditCondition refresh hook isn't wired up, so toggling bClampMin wouldn't re-enable
+	// the Min widget. Keeping values always-editable is the clean fix -- the toggles
+	// only gate whether the bounds are PROPAGATED to the picker as clamp attributes.
+	UPROPERTY(EditAnywhere, Category = "Range")
+	bool bClampMin = false;
+
+	UPROPERTY(EditAnywhere, Category = "Range")
+	double Min = 0.0;
+
+	UPROPERTY(EditAnywhere, Category = "Range")
+	bool bClampMax = false;
+
+	UPROPERTY(EditAnywhere, Category = "Range")
+	double Max = 1.0;
+#endif
+};
+
 #pragma region Atomic Typed Properties
 
 /**
@@ -139,6 +180,12 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Int32 : public FPCGExProperty
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
 	int32 Value = 0;
 
+#if WITH_EDITORONLY_DATA
+	/** Editor-only picker constraint, schema-owned (synced to overrides as read-only). */
+	UPROPERTY(EditAnywhere, Category = "Property")
+	FPCGExNumericRange Range;
+#endif
+
 protected:
 	TSharedPtr<PCGExData::TBuffer<int32>> OutputBuffer;
 
@@ -147,6 +194,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -180,6 +228,11 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Int64 : public FPCGExProperty
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
 	int64 Value = 0;
 
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, Category = "Property")
+	FPCGExNumericRange Range;
+#endif
+
 protected:
 	TSharedPtr<PCGExData::TBuffer<int64>> OutputBuffer;
 
@@ -188,6 +241,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -221,6 +275,11 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Float : public FPCGExProperty
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
 	float Value = 0.0f;
 
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, Category = "Property")
+	FPCGExNumericRange Range;
+#endif
+
 protected:
 	TSharedPtr<PCGExData::TBuffer<float>> OutputBuffer;
 
@@ -229,6 +288,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -262,6 +322,11 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Double : public FPCGExProperty
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
 	double Value = 0.0;
 
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditAnywhere, Category = "Property")
+	FPCGExNumericRange Range;
+#endif
+
 protected:
 	TSharedPtr<PCGExData::TBuffer<double>> OutputBuffer;
 
@@ -270,6 +335,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -639,6 +705,16 @@ struct PCGEXPROPERTIES_API FPCGExProperty_SoftObjectPath : public FPCGExProperty
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
 	FSoftObjectPath Value;
 
+#if WITH_EDITORONLY_DATA
+	/**
+	 * Editor-only picker constraint, schema-owned (synced to overrides as read-only).
+	 * Null = generic UObject picker (legacy behavior). Set to a specific class to narrow
+	 * the picker to assets of that class (and its subclasses).
+	 */
+	UPROPERTY(EditAnywhere, Category = "Property", meta=(DisplayName="Allowed Class", AllowAbstract="true"))
+	TSubclassOf<UObject> AllowedClass;
+#endif
+
 protected:
 	TSharedPtr<PCGExData::TBuffer<FSoftObjectPath>> OutputBuffer;
 
@@ -647,6 +723,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -662,6 +739,8 @@ public:
 	{
 		return FName("SoftObjectPath");
 	}
+
+	virtual FName GetDisplayTypeName() const override;
 
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
@@ -680,6 +759,15 @@ struct PCGEXPROPERTIES_API FPCGExProperty_SoftClassPath : public FPCGExProperty
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
 	FSoftClassPath Value;
 
+#if WITH_EDITORONLY_DATA
+	/**
+	 * Editor-only picker constraint, schema-owned (synced to overrides as read-only).
+	 * Null = generic UClass picker. Set to a base class to narrow to its subclasses.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Property", meta=(DisplayName="Allowed Base Class", AllowAbstract="true"))
+	TSubclassOf<UObject> AllowedClass;
+#endif
+
 protected:
 	TSharedPtr<PCGExData::TBuffer<FSoftClassPath>> OutputBuffer;
 
@@ -688,6 +776,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -703,6 +792,8 @@ public:
 	{
 		return FName("SoftClassPath");
 	}
+
+	virtual FName GetDisplayTypeName() const override;
 
 	virtual FPCGMetadataAttributeBase* CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const override;
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
