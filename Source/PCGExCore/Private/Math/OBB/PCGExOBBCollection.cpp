@@ -159,6 +159,30 @@ namespace PCGExMath::OBB
 		return bFound;
 	}
 
+	bool FCollection::Contains(const FOBB& Query, EPCGExBoxCheckMode Mode, float Expansion) const
+	{
+		if (!Octree)
+		{
+			return false;
+		}
+
+		const float R = Query.Bounds.Radius + Expansion;
+		const FBoxCenterAndExtent QueryBounds(Query.Bounds.Origin, FVector4(R, R, R, R));
+
+		bool bFound = false;
+		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		{
+			if (TestContains(GetOBB(Item.Index), Query, Mode, Expansion))
+			{
+				bFound = true;
+				return false;
+			}
+			return true;
+		});
+
+		return bFound;
+	}
+
 	bool FCollection::FindFirstOverlap(const FOBB& Query, int32& OutIndex, EPCGExBoxCheckMode Mode, float Expansion) const
 	{
 		if (!Octree)
