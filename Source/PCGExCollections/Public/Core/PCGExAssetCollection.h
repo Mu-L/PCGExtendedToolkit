@@ -813,7 +813,7 @@ public:
 	 * Collection-level properties with default values.
 	 * Entries inherit these unless they provide overrides.
 	 */
-	UPROPERTY(EditAnywhere, Category = "Properties")
+	UPROPERTY(EditAnywhere, Category = Settings)
 	FPCGExPropertySchemaCollection CollectionProperties;
 
 	/**

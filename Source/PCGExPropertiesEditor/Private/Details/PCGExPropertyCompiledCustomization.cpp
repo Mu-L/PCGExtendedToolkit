@@ -32,47 +32,22 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// Try to get Value handle directly first
-	TSharedPtr<IPropertyHandle> ValueHandle = PropertyHandle->GetChildHandle(TEXT("Value"));
-	if (ValueHandle.IsValid())
+	// Resolve the outer property's USTRUCT name once; needed for inline-widget lookup
+	// and for deciding which auxiliary meta fields (AllowedClass / Range) to show.
+	FName OuterStructName = NAME_None;
+	if (const FStructProperty* OuterStructProp = CastField<FStructProperty>(PropertyHandle->GetProperty()))
 	{
-		// If a compact inline widget is registered for this outer property struct, use it
-		// instead of the default expandable struct widget. Keeps the Compiled (shorthand)
-		// view visually consistent with the override entry view for the same types.
-		FName OuterStructName = NAME_None;
-		if (const FStructProperty* OuterStructProp = CastField<FStructProperty>(PropertyHandle->GetProperty()))
+		if (OuterStructProp->Struct)
 		{
-			if (OuterStructProp->Struct)
-			{
-				OuterStructName = OuterStructProp->Struct->GetFName();
-			}
+			OuterStructName = OuterStructProp->Struct->GetFName();
 		}
-
-		// Edit-mode lookup: this customization is only invoked from the schema-edit path
-		// (FInstancedStruct expansion inside FPCGExPropertySchemaCustomization's non-readonly
-		// branch). Property *definition* controls (e.g. enum class picker) belong here.
-		if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(OuterStructName, EPCGExInlineWidgetMode::Edit))
-		{
-			IDetailPropertyRow& Row = ChildBuilder.AddProperty(ValueHandle.ToSharedRef());
-			Row.CustomWidget(/*bShowChildren=*/false)
-			   .NameContent()
-				[
-					ValueHandle->CreatePropertyNameWidget()
-				]
-				.ValueContent()
-				.MinDesiredWidth(250.0f)
-				.MaxDesiredWidth(3000.0f)
-				[
-					(*Factory)(ValueHandle.ToSharedRef())
-				];
-			return;
-		}
-
-		ChildBuilder.AddProperty(ValueHandle.ToSharedRef());
-		return;
 	}
 
-	// Fallback: Show all children except PropertyName
+	// Iterate all children and render in declaration order, skipping internal fields.
+	// "Value" gets the registered Edit-mode inline widget when available; all other
+	// authored fields (e.g. editor-only AllowedClass / Range on opted-in types) fall
+	// through to default rendering, which lets their own IPropertyTypeCustomization
+	// (if any) take over.
 	uint32 NumChildren = 0;
 	PropertyHandle->GetNumChildren(NumChildren);
 
@@ -85,11 +60,29 @@ void FPCGExPropertyCompiledCustomization::CustomizeChildren(
 		}
 
 		const FName ChildName = ChildHandle->GetProperty() ? ChildHandle->GetProperty()->GetFName() : NAME_None;
-
-		// Skip PropertyName - it's shown in the outer schema header
-		if (ChildName == TEXT("PropertyName"))
+		if (ChildName == TEXT("PropertyName") || ChildName == TEXT("HeaderId"))
 		{
 			continue;
+		}
+
+		if (ChildName == TEXT("Value"))
+		{
+			if (const FPCGExMakeInlineWidgetFn* Factory = FPCGExInlineWidgetRegistry::Find(OuterStructName, EPCGExInlineWidgetMode::Edit))
+			{
+				IDetailPropertyRow& Row = ChildBuilder.AddProperty(ChildHandle.ToSharedRef());
+				Row.CustomWidget(/*bShowChildren=*/false)
+				   .NameContent()
+					[
+						ChildHandle->CreatePropertyNameWidget()
+					]
+					.ValueContent()
+					.MinDesiredWidth(250.0f)
+					.MaxDesiredWidth(3000.0f)
+					[
+						(*Factory)(ChildHandle.ToSharedRef())
+					];
+				continue;
+			}
 		}
 
 		ChildBuilder.AddProperty(ChildHandle.ToSharedRef());

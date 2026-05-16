@@ -10,6 +10,7 @@
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "PropertyHandle.h"
+#include "Details/PCGExPropertyLabelRow.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCustomization::MakeInstance()
@@ -17,34 +18,36 @@ TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCustomization::MakeIn
 	return MakeShareable(new FPCGExPropertySchemaCustomization());
 }
 
-FText FPCGExPropertySchemaCustomization::GetHeaderText() const
+const FPCGExPropertySchema* FPCGExPropertySchemaCustomization::AccessSchema() const
 {
 	if (!PropertyHandlePtr.IsValid())
 	{
-		return FText::FromString(TEXT("None (Unknown)"));
+		return nullptr;
 	}
-
-	// Access schema data directly
 	TArray<void*> RawData;
 	PropertyHandlePtr.Pin()->AccessRawData(RawData);
-
-	FName PropertyName = NAME_None;
-	FString TypeName = TEXT("Unknown");
-
-	if (!RawData.IsEmpty() && RawData[0])
+	if (RawData.IsEmpty() || !RawData[0])
 	{
-		const FPCGExPropertySchema* Schema = static_cast<FPCGExPropertySchema*>(RawData[0]);
-		if (Schema)
-		{
-			PropertyName = Schema->Name;
-			if (const FPCGExProperty* Prop = Schema->GetProperty())
-			{
-				TypeName = Prop->GetTypeName().ToString();
-			}
-		}
+		return nullptr;
 	}
+	return static_cast<const FPCGExPropertySchema*>(RawData[0]);
+}
 
-	return FText::FromString(FString::Printf(TEXT("%s (%s)"), *PropertyName.ToString(), *TypeName));
+FText FPCGExPropertySchemaCustomization::GetHeaderNameText() const
+{
+	const FPCGExPropertySchema* Schema = AccessSchema();
+	return Schema ? FText::FromName(Schema->Name) : FText::FromString(TEXT("None"));
+}
+
+FText FPCGExPropertySchemaCustomization::GetHeaderTypeText() const
+{
+	const FPCGExPropertySchema* Schema = AccessSchema();
+	if (!Schema)
+	{
+		return FText::FromString(TEXT("Unknown"));
+	}
+	const FPCGExProperty* Prop = Schema->GetProperty();
+	return Prop ? FText::FromName(Prop->GetDisplayTypeName()) : FText::FromString(TEXT("Unknown"));
 }
 
 void FPCGExPropertySchemaCustomization::OnSchemaChanged()
@@ -101,9 +104,9 @@ void FPCGExPropertySchemaCustomization::CustomizeHeader(
 	HeaderRow
 		.NameContent()
 		[
-			SNew(STextBlock)
-			.Text(TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertySchemaCustomization::GetHeaderText)))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
+			PCGExPropertyLabelRow::Build(
+				TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertySchemaCustomization::GetHeaderNameText)),
+				TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertySchemaCustomization::GetHeaderTypeText)))
 		];
 }
 
