@@ -143,6 +143,72 @@ namespace PCGExMath::OBB
 		}
 	}
 
+	// Containment: Source OBB lies inside Target OBB (extents+Expansion).
+	FORCEINLINE bool OBBContains(const FOBB& Target, const FOBB& Source, float Expansion = 0.0f)
+	{
+		const FVector& TE = Target.Bounds.Extents;
+		const float EX = TE.X + Expansion;
+		const float EY = TE.Y + Expansion;
+		const float EZ = TE.Z + Expansion;
+
+		// Fast-path: project Source's bounding sphere into Target-local space and reason about its slab span.
+		// Source corner offsets in Target-local space are bounded by Source.Bounds.Radius along any axis
+		// (Cauchy-Schwarz: |Ax_i|*SE.X + |Ay_i|*SE.Y + |Az_i|*SE.Z <= sqrt(SE.X^2 + SE.Y^2 + SE.Z^2) = Radius).
+		const FVector LocalCenter = Target.ToLocal(Source.Bounds.Origin);
+		const float SR = Source.Bounds.Radius;
+		const float AX = FMath::Abs(LocalCenter.X);
+		const float AY = FMath::Abs(LocalCenter.Y);
+		const float AZ = FMath::Abs(LocalCenter.Z);
+
+		// Some Source corner is provably outside Target.
+		if (AX - SR > EX || AY - SR > EY || AZ - SR > EZ) { return false; }
+		// All Source corners provably inside Target.
+		if (AX + SR <= EX && AY + SR <= EY && AZ + SR <= EZ) { return true; }
+
+		// Borderline: exact 8-corner check.
+		const FVector& SE = Source.Bounds.Extents;
+		for (int32 i = 0; i < 8; ++i)
+		{
+			const FVector LocalCorner(
+				(i & 1) ? SE.X : -SE.X,
+				(i & 2) ? SE.Y : -SE.Y,
+				(i & 4) ? SE.Z : -SE.Z);
+			const FVector TargetLocal = Target.ToLocal(Source.ToWorld(LocalCorner));
+			if (FMath::Abs(TargetLocal.X) > EX || FMath::Abs(TargetLocal.Y) > EY || FMath::Abs(TargetLocal.Z) > EZ)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// Containment: Source's bounding sphere lies inside Target's bounding sphere (Radius+Expansion).
+	// Equivalent to "all 8 Source corners within Target sphere" because Source.Bounds.Radius is the tight
+	// bounding-sphere radius (Extents.Size() = diagonal corner distance).
+	FORCEINLINE bool SphereContains(const FOBB& Target, const FOBB& Source, float Expansion = 0.0f)
+	{
+		const float Allowed = Target.Bounds.Radius + Expansion - Source.Bounds.Radius;
+		if (Allowed < 0.0f) { return false; }
+		return FVector::DistSquared(Target.Bounds.Origin, Source.Bounds.Origin) <= Allowed * Allowed;
+	}
+
+	// Mode-aware containment dispatch -- true when Source is fully inside Target.
+	FORCEINLINE bool TestContains(const FOBB& Target, const FOBB& Source, EPCGExBoxCheckMode Mode, float Expansion = 0.0f)
+	{
+		switch (Mode)
+		{
+		case EPCGExBoxCheckMode::Sphere:
+			return SphereContains(Target, Source, 0.0f);
+		case EPCGExBoxCheckMode::ExpandedSphere:
+			return SphereContains(Target, Source, Expansion);
+		case EPCGExBoxCheckMode::ExpandedBox:
+			return OBBContains(Target, Source, Expansion);
+		case EPCGExBoxCheckMode::Box:
+		default:
+			return OBBContains(Target, Source, 0.0f);
+		}
+	}
+
 	// Template policy interface (for advanced compile-time dispatch)
 	// TODO : Refactor related classes, filters, samplers
 	template <EPCGExBoxCheckMode Mode>

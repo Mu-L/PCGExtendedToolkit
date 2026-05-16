@@ -28,10 +28,10 @@ namespace PCGExMatching
 UENUM()
 enum class EPCGExBoundsCheckType : uint8
 {
-	Intersects           = 0 UMETA(DisplayName = "Intersects", Tooltip="Point's OBB overlaps target OBBs", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Intersects"),
-	IsInside             = 1 UMETA(DisplayName = "Is Inside", Tooltip="Point center is inside target OBBs", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside"),
-	IsInsideOrOn         = 2 UMETA(DisplayName = "Is Inside or On", Tooltip="Point center is inside or on boundary of target OBBs", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside or On"),
-	IsInsideOrIntersects = 3 UMETA(DisplayName = "Is Inside or Intersects", Tooltip="Point center inside OR point's OBB overlaps target OBBs.", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside Intersects"),
+	Intersects           = 0 UMETA(DisplayName = "Intersects", Tooltip="Point's bounds overlap target OBBs", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Intersects"),
+	IsInside             = 1 UMETA(DisplayName = "Is Inside", Tooltip="Point's bounds are fully inside a target OBB", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside"),
+	IsInsideOrOn         = 2 UMETA(DisplayName = "Is Inside or On", Tooltip="Point's bounds are fully inside or on the boundary of a target OBB", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside or On"),
+	IsInsideOrIntersects = 3 UMETA(DisplayName = "Is Inside or Intersects", Tooltip="Point's bounds are fully inside a target OBB OR overlap one. Distinct from Intersects mainly for sphere modes.", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Inside Intersects"),
 };
 
 UENUM()
@@ -63,7 +63,7 @@ struct FPCGExBoundsFilterConfig
 	EPCGExBoundsCheckType CheckType = EPCGExBoundsCheckType::Intersects;
 
 	/** Bounds to use on input points (the points being filtered). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="CheckType == EPCGExBoundsCheckType::Intersects || CheckType == EPCGExBoundsCheckType::IsInsideOrIntersects", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	EPCGExPointBoundsSource BoundsSource = EPCGExPointBoundsSource::ScaledBounds;
 
 	/** Shape type for testing. */
@@ -173,8 +173,8 @@ namespace PCGExPointFilter
 		bool bNoMatchResult = false;
 
 		// Core test implementation
-		bool TestPoint(const FVector& Position, const FTransform& Transform, const FBox& LocalBox) const;
-		bool TestPoint(const FVector& Position, const FTransform& Transform, const FBox& LocalBox, const TArray<TSharedPtr<PCGExMath::OBB::FCollection>>& InCollections) const;
+		bool TestPoint(const FTransform& Transform, const FBox& LocalBox) const;
+		bool TestPoint(const FTransform& Transform, const FBox& LocalBox, const TArray<TSharedPtr<PCGExMath::OBB::FCollection>>& InCollections) const;
 	};
 }
 
