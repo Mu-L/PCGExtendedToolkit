@@ -113,6 +113,30 @@ namespace PCGExMatching
 		 *  for inverse matching with a single MatchableSource). Returns true if at least one candidate matched. */
 		bool BuildPerPointExclude(PCGExData::FConstPoint InPoint, const TArray<FPCGExTaggedData>& InCandidates, TSet<const UPCGData*>& OutExclude) const;
 
+		/** Per-point include builder for filters that need a positive list of matched candidates rather than an exclude set.
+		 *  Walks InCandidates and pushes the corresponding InSidecar[i] entry into OutInclude for each match. Sets InPoint.IO=0
+		 *  internally. Returns true if at least one entry was appended. InCandidates and InSidecar must be the same length. */
+		template <typename TVal, typename TAllocator>
+		bool BuildPerPointInclude(
+			PCGExData::FConstPoint InPoint,
+			const TArray<FPCGExTaggedData>& InCandidates,
+			const TArray<TVal>& InSidecar,
+			TArray<TVal, TAllocator>& OutInclude) const
+		{
+			check(InCandidates.Num() == InSidecar.Num());
+			InPoint.IO = 0; // Single MatchableSource -- indexes into per-source getter arrays
+			const int32 N = InCandidates.Num();
+			for (int32 i = 0; i < N; i++)
+			{
+				FScope Scope(1, true);
+				if (Test(InPoint, InCandidates[i], Scope))
+				{
+					OutInclude.Add(InSidecar[i]);
+				}
+			}
+			return !OutInclude.IsEmpty();
+		}
+
 		int32 GetMatchingSourcesIndices(const FPCGExTaggedData& InDataCandidate, FScope& InMatchingScope, TArray<int32>& OutMatches, const TSet<int32>* InExcludedSources = nullptr) const;
 
 		bool HandleUnmatchedOutput(const TSharedPtr<PCGExData::FFacade>& InFacade, const bool bForward = true) const;

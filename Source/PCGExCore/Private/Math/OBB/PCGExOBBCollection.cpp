@@ -72,49 +72,25 @@ namespace PCGExMath::OBB
 
 	bool FCollection::IsPointInside(const FVector& Point, const EPCGExBoxCheckMode Mode, const float Expansion) const
 	{
-		if (!Octree)
-		{
-			return false;
-		}
-
 		const FBoxCenterAndExtent QueryBounds(Point, FVector4(Expansion, Expansion, Expansion, Expansion));
-
-		bool bFound = false;
-		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		return FindFirstMatch(QueryBounds, [&](const PCGExOctree::FItem& Item)
 		{
-			if (TestPoint(GetOBB(Item.Index), Point, Mode, Expansion))
-			{
-				bFound = true;
-				return false;
-			}
-			return true;
+			return TestPoint(GetOBB(Item.Index), Point, Mode, Expansion);
 		});
-
-		return bFound;
 	}
 
 	bool FCollection::IsPointInside(const FVector& Point, int32& OutIndex, EPCGExBoxCheckMode Mode, float Expansion) const
 	{
-		if (!Octree)
-		{
-			return false;
-		}
-
 		const FBoxCenterAndExtent QueryBounds(Point, FVector4(Expansion, Expansion, Expansion, Expansion));
-
-		bool bFound = false;
-		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		return FindFirstMatch(QueryBounds, [&](const PCGExOctree::FItem& Item)
 		{
-			if (TestPoint(GetOBB(Item.Index), Point, Mode, Expansion))
+			if (!TestPoint(GetOBB(Item.Index), Point, Mode, Expansion))
 			{
-				OutIndex = Bounds[Item.Index].Index;
-				bFound = true;
 				return false;
 			}
+			OutIndex = Bounds[Item.Index].Index;
 			return true;
 		});
-
-		return bFound;
 	}
 
 	void FCollection::FindContaining(const FVector& Point, TArray<int32>& OutIndices, EPCGExBoxCheckMode Mode, float Expansion) const
@@ -137,75 +113,50 @@ namespace PCGExMath::OBB
 
 	bool FCollection::Overlaps(const FOBB& Query, EPCGExBoxCheckMode Mode, float Expansion) const
 	{
-		if (!Octree)
-		{
-			return false;
-		}
-
 		const float R = Query.Bounds.Radius + Expansion;
 		const FBoxCenterAndExtent QueryBounds(Query.Bounds.Origin, FVector4(R, R, R, R));
-
-		bool bFound = false;
-		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		return FindFirstMatch(QueryBounds, [&](const PCGExOctree::FItem& Item)
 		{
-			if (TestOverlap(GetOBB(Item.Index), Query, Mode, Expansion))
-			{
-				bFound = true;
-				return false;
-			}
-			return true;
+			return TestOverlap(GetOBB(Item.Index), Query, Mode, Expansion);
 		});
-
-		return bFound;
 	}
 
 	bool FCollection::Contains(const FOBB& Query, EPCGExBoxCheckMode Mode, float Expansion) const
 	{
-		if (!Octree)
-		{
-			return false;
-		}
-
 		const float R = Query.Bounds.Radius + Expansion;
 		const FBoxCenterAndExtent QueryBounds(Query.Bounds.Origin, FVector4(R, R, R, R));
-
-		bool bFound = false;
-		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		return FindFirstMatch(QueryBounds, [&](const PCGExOctree::FItem& Item)
 		{
-			if (TestContains(GetOBB(Item.Index), Query, Mode, Expansion))
-			{
-				bFound = true;
-				return false;
-			}
-			return true;
+			return TestContains(GetOBB(Item.Index), Query, Mode, Expansion);
 		});
+	}
 
-		return bFound;
+	bool FCollection::ContainsOrOverlaps(const FOBB& Query, EPCGExBoxCheckMode Mode, float Expansion) const
+	{
+		const float R = Query.Bounds.Radius + Expansion;
+		const FBoxCenterAndExtent QueryBounds(Query.Bounds.Origin, FVector4(R, R, R, R));
+		return FindFirstMatch(QueryBounds, [&](const PCGExOctree::FItem& Item)
+		{
+			// Overlap-first: octree-pre-filtered candidates overlap the query far more often than they contain it,
+			// and containment implies overlap, so an Overlap hit short-circuits the stricter Contains test.
+			const FOBB Stored = GetOBB(Item.Index);
+			return TestOverlap(Stored, Query, Mode, Expansion) || TestContains(Stored, Query, Mode, Expansion);
+		});
 	}
 
 	bool FCollection::FindFirstOverlap(const FOBB& Query, int32& OutIndex, EPCGExBoxCheckMode Mode, float Expansion) const
 	{
-		if (!Octree)
-		{
-			return false;
-		}
-
 		const float R = Query.Bounds.Radius + Expansion;
 		const FBoxCenterAndExtent QueryBounds(Query.Bounds.Origin, FVector4(R, R, R, R));
-
-		bool bFound = false;
-		Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+		return FindFirstMatch(QueryBounds, [&](const PCGExOctree::FItem& Item)
 		{
-			if (TestOverlap(GetOBB(Item.Index), Query, Mode, Expansion))
+			if (!TestOverlap(GetOBB(Item.Index), Query, Mode, Expansion))
 			{
-				OutIndex = Bounds[Item.Index].Index;
-				bFound = true;
 				return false;
 			}
+			OutIndex = Bounds[Item.Index].Index;
 			return true;
 		});
-
-		return bFound;
 	}
 
 	void FCollection::FindAllOverlaps(const FOBB& Query, TArray<int32>& OutIndices, EPCGExBoxCheckMode Mode, float Expansion) const

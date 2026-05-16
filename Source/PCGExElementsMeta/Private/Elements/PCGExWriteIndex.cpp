@@ -178,12 +178,6 @@ bool FPCGExWriteIndexElement::Boot(FPCGExContext* InContext) const
 				continue;
 			}
 
-			if (const UPCGPointData* PointData = Cast<UPCGPointData>(TaggedData.Data))
-			{
-				Context->MaxNumEntries = FMath::Max(Context->MaxNumEntries, Context->NumEntries.Emplace_GetRef(PointData->GetNumPoints()));
-				continue;
-			}
-
 			Context->NumEntries.Emplace(0);
 		}
 	}
