@@ -211,23 +211,21 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FTransform& Transform, con
 	return TestPoint(Transform, LocalBox, *Collections);
 }
 
-bool PCGExPointFilter::FBoundsFilter::TestPoint(const FTransform& Transform, const FBox& LocalBox, const TArray<TSharedPtr<PCGExMath::OBB::FCollection>>& InCollections) const
+bool PCGExPointFilter::FBoundsFilter::TestPoint(const FTransform& Transform, const FBox& LocalBox, TArrayView<const TSharedPtr<PCGExMath::OBB::FCollection>> InCollections) const
 {
 	using namespace PCGExBoundsFilterLocal;
 
-	const PCGExMath::OBB::FOBB QueryOBB = PCGExMath::OBB::Factory::FromTransform(Transform, LocalBox, -1);
-	const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-	const float CollectionRuntimeExpansion = IsExpandedMode(CheckMode) ? Expansion : 0.0f;
-
-	for (const TSharedPtr<PCGExMath::OBB::FCollection>& Collection : InCollections)
+	if (bUseCollectionBounds)
 	{
-		bool bPass = false;
+		const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
+		const float CollectionRuntimeExpansion = IsExpandedMode(CheckMode) ? Expansion : 0.0f;
 
-		if (bUseCollectionBounds)
+		for (const TSharedPtr<PCGExMath::OBB::FCollection>& Collection : InCollections)
 		{
 			const FBox& WorldBounds = Collection->GetWorldBounds();
 			const FBox ExpandedBounds = CollectionRuntimeExpansion > 0 ? WorldBounds.ExpandBy(CollectionRuntimeExpansion) : WorldBounds;
 
+			bool bPass = false;
 			switch (CheckType)
 			{
 			case EPCGExBoundsCheckType::Intersects:
@@ -240,31 +238,37 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FTransform& Transform, con
 				bPass = ExpandedBounds.IsInsideOrOn(QueryWorldBox);
 				break;
 			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-				bPass = ExpandedBounds.IsInside(QueryWorldBox) || ExpandedBounds.Intersect(QueryWorldBox);
+				// For AABBs, IsInside implies Intersect -- the union collapses to just Intersect.
+				bPass = ExpandedBounds.Intersect(QueryWorldBox);
 				break;
 			}
+
+			if (bPass) { return !bInvert; }
 		}
-		else
+
+		return bInvert;
+	}
+
+	const PCGExMath::OBB::FOBB QueryOBB = PCGExMath::OBB::Factory::FromTransform(Transform, LocalBox, -1);
+
+	for (const TSharedPtr<PCGExMath::OBB::FCollection>& Collection : InCollections)
+	{
+		bool bPass = false;
+		switch (CheckType)
 		{
-			switch (CheckType)
-			{
-			case EPCGExBoundsCheckType::Intersects:
-				bPass = Collection->Overlaps(QueryOBB, CheckMode, Expansion);
-				break;
-			case EPCGExBoundsCheckType::IsInside:
-				bPass = Collection->Contains(QueryOBB, CheckMode, Expansion);
-				break;
-			case EPCGExBoundsCheckType::IsInsideOrOn:
-				bPass = Collection->Contains(QueryOBB, ToBoundaryInclusiveMode(CheckMode),
-				                              IsExpandedMode(CheckMode) ? Expansion + KINDA_SMALL_NUMBER : KINDA_SMALL_NUMBER);
-				break;
-			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-				// Contains and Overlaps stay separate (rather than just Overlaps) to keep the two paths
-				// behaviorally decoupled -- future tweaks to either test won't silently change the union.
-				bPass = Collection->Contains(QueryOBB, CheckMode, Expansion) ||
-					Collection->Overlaps(QueryOBB, CheckMode, Expansion);
-				break;
-			}
+		case EPCGExBoundsCheckType::Intersects:
+			bPass = Collection->Overlaps(QueryOBB, CheckMode, Expansion);
+			break;
+		case EPCGExBoundsCheckType::IsInside:
+			bPass = Collection->Contains(QueryOBB, CheckMode, Expansion);
+			break;
+		case EPCGExBoundsCheckType::IsInsideOrOn:
+			bPass = Collection->Contains(QueryOBB, ToBoundaryInclusiveMode(CheckMode),
+			                              IsExpandedMode(CheckMode) ? Expansion + KINDA_SMALL_NUMBER : KINDA_SMALL_NUMBER);
+			break;
+		case EPCGExBoundsCheckType::IsInsideOrIntersects:
+			bPass = Collection->ContainsOrOverlaps(QueryOBB, CheckMode, Expansion);
+			break;
 		}
 
 		if (bPass) { return !bInvert; }
@@ -286,34 +290,21 @@ bool PCGExPointFilter::FBoundsFilter::Test(const int32 PointIndex) const
 		return bCollectionTestResult;
 	}
 
+	const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
+
 	if (InverseMatcher)
 	{
-		// Per-point matching -- build a filtered collections list for this specific point.
-		// Unlike other filters that build an exclude set, bounds uses an include list since
-		// TestPoint iterates collections directly (no octree intermediary with data pointers).
-		PCGExData::FConstPoint Pt = PointDataFacade->Source->GetInPoint(PointIndex);
-		Pt.IO = 0;
-		TArray<TSharedPtr<PCGExMath::OBB::FCollection>> PerPointCollections;
-		bool bAnyMatch = false;
-		for (int32 i = 0; i < BoundsCandidates.Num(); i++)
-		{
-			PCGExMatching::FScope Scope(1, true);
-			if (InverseMatcher->Test(Pt, BoundsCandidates[i], Scope))
-			{
-				PerPointCollections.Add(TypedFilterFactory->Collections[i]);
-				bAnyMatch = true;
-			}
-		}
-		if (!bAnyMatch)
+		// Bounds filter needs an include list rather than an exclude set because TestPoint iterates
+		// collections directly with no octree-level data-pointer indirection to filter on.
+		TArray<TSharedPtr<PCGExMath::OBB::FCollection>, TInlineAllocator<8>> PerPointCollections;
+		if (!InverseMatcher->BuildPerPointInclude(Point, BoundsCandidates, TypedFilterFactory->Collections, PerPointCollections))
 		{
 			return bNoMatchResult;
 		}
 
-		const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
 		return TestPoint(Point.GetTransform(), PCGExMath::GetLocalBounds(Point, BoundsSource), PerPointCollections);
 	}
 
-	const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
 	return TestPoint(Point.GetTransform(), PCGExMath::GetLocalBounds(Point, BoundsSource));
 }
 
