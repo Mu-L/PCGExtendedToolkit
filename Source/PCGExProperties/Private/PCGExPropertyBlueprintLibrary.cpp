@@ -64,14 +64,14 @@ namespace PCGExPropertyBlueprintLibrary_Private
 	{
 		if (const FObjectProperty* ObjProp = CastField<FObjectProperty>(InProp))
 		{
-			UObject* InObj = ObjProp->GetObjectPropertyValue(const_cast<void*>(InMem));
+			UObject* InObj = ObjProp->GetObjectPropertyValue(InMem);
 			FSoftObjectPath SoftPath(InObj);
 			return Prop->TryReadValue(EPCGMetadataTypes::SoftObjectPath, &SoftPath);
 		}
 
 		if (const FClassProperty* ClassProp = CastField<FClassProperty>(InProp))
 		{
-			UClass* InClass = Cast<UClass>(ClassProp->GetObjectPropertyValue(const_cast<void*>(InMem)));
+			UClass* InClass = Cast<UClass>(ClassProp->GetObjectPropertyValue(InMem));
 			FSoftClassPath SoftPath(InClass);
 			return Prop->TryReadValue(EPCGMetadataTypes::SoftClassPath, &SoftPath);
 		}

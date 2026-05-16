@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "EdGraph/EdGraphPin.h"
 #include "K2Node.h"
+#include "EdGraph/EdGraphPin.h"
 
 #include "K2Node_GetPCGExProperty.generated.h"
 
