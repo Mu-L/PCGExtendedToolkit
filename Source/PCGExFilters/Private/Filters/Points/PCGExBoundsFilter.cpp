@@ -49,13 +49,7 @@ PCGExFactories::EPreparationResult UPCGExBoundsFilterFactory::Prepare(FPCGExCont
 		return PCGExFactories::EPreparationResult::MissingData;
 	}
 
-	// Expansion is doubled for expanded modes (legacy behavior)
-	const float Expansion =
-		(Config.TestMode == EPCGExBoxCheckMode::ExpandedBox || Config.TestMode == EPCGExBoxCheckMode::ExpandedSphere)
-		? Config.Expansion * 2.0f
-		: Config.Expansion;
-
-	// Build OBB collections from bounds data
+	// Expansion is applied at test time per Mode by PCGExOBBTests.h; do not pre-inflate target OBBs here.
 	Collections.Reserve(BoundsDataFacades.Num());
 	for (const TSharedPtr<PCGExData::FFacade>& Facade : BoundsDataFacades)
 	{
@@ -67,16 +61,7 @@ PCGExFactories::EPreparationResult UPCGExBoundsFilterFactory::Prepare(FPCGExCont
 		for (int32 i = 0; i < NumPoints; i++)
 		{
 			const PCGExData::FConstPoint Point = Facade->Source->GetInPoint(i);
-			const FTransform Transform = Point.GetTransform();
-			FBox LocalBox = PCGExMath::GetLocalBounds(Point, Config.BoundsTarget);
-
-			// Apply expansion if needed
-			if (Expansion > 0)
-			{
-				LocalBox = LocalBox.ExpandBy(Expansion);
-			}
-
-			Collection->Add(Transform, LocalBox, i);
+			Collection->Add(Point.GetTransform(), PCGExMath::GetLocalBounds(Point, Config.BoundsTarget), i);
 		}
 
 		Collection->BuildOctree();
@@ -202,99 +187,37 @@ bool PCGExPointFilter::FBoundsFilter::Init(FPCGExContext* InContext, const TShar
 	return true;
 }
 
-bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const FTransform& Transform, const FBox& LocalBox) const
+namespace PCGExBoundsFilterLocal
 {
-	// Build query OBB from point (only needed for overlap tests)
-	PCGExMath::OBB::FOBB QueryOBB;
-	const bool bNeedQueryOBB = (CheckType == EPCGExBoundsCheckType::Intersects || CheckType == EPCGExBoundsCheckType::IsInsideOrIntersects);
-
-	if (bNeedQueryOBB)
+	// Box -> ExpandedBox so the KINDA_SMALL_NUMBER margin for IsInsideOrOn reaches the test (strict Box mode discards Expansion).
+	FORCEINLINE EPCGExBoxCheckMode ToBoundaryInclusiveMode(EPCGExBoxCheckMode Mode)
 	{
-		QueryOBB = PCGExMath::OBB::Factory::FromTransform(Transform, LocalBox, -1);
-	}
-
-	for (const TSharedPtr<PCGExMath::OBB::FCollection>& Collection : *Collections)
-	{
-		bool bPass = false;
-
-		if (bUseCollectionBounds)
+		switch (Mode)
 		{
-			// CollectionBounds mode: Test against combined world bounds of target collection
-			const FBox& WorldBounds = Collection->GetWorldBounds();
-			const FBox ExpandedBounds = Expansion > 0 ? WorldBounds.ExpandBy(Expansion) : WorldBounds;
-
-			switch (CheckType)
-			{
-			case EPCGExBoundsCheckType::Intersects:
-			{
-				// Query OBB intersects collection's world bounds
-				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-				bPass = ExpandedBounds.Intersect(QueryWorldBox);
-			}
-			break;
-
-			case EPCGExBoundsCheckType::IsInside:
-				bPass = ExpandedBounds.IsInside(Position);
-				break;
-
-			case EPCGExBoundsCheckType::IsInsideOrOn:
-				bPass = ExpandedBounds.IsInsideOrOn(Position);
-				break;
-
-			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-			{
-				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-				bPass = ExpandedBounds.IsInside(Position) || ExpandedBounds.Intersect(QueryWorldBox);
-			}
-			break;
-			}
-		}
-		else
-		{
-			// PerPointBounds mode: Test against individual OBBs in collection
-			switch (CheckType)
-			{
-			case EPCGExBoundsCheckType::Intersects:
-				// Point's OBB overlaps any target OBB
-				bPass = Collection->Overlaps(QueryOBB, CheckMode, Expansion);
-				break;
-
-			case EPCGExBoundsCheckType::IsInside:
-				// Point center is inside any target OBB
-				bPass = Collection->IsPointInside(Position, CheckMode, Expansion);
-				break;
-
-			case EPCGExBoundsCheckType::IsInsideOrOn:
-				// Point center is inside or on boundary (use small expansion for "on")
-				bPass = Collection->IsPointInside(Position, CheckMode, Expansion + KINDA_SMALL_NUMBER);
-				break;
-
-			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-				// Either point inside OR OBB overlaps
-				bPass = Collection->IsPointInside(Position, CheckMode, Expansion) ||
-					Collection->Overlaps(QueryOBB, CheckMode, Expansion);
-				break;
-			}
-		}
-
-		if (bPass)
-		{
-			return !bInvert;
+		case EPCGExBoxCheckMode::Box: return EPCGExBoxCheckMode::ExpandedBox;
+		case EPCGExBoxCheckMode::Sphere: return EPCGExBoxCheckMode::ExpandedSphere;
+		default: return Mode;
 		}
 	}
 
-	return bInvert; // No collection matched
+	FORCEINLINE bool IsExpandedMode(EPCGExBoxCheckMode Mode)
+	{
+		return Mode == EPCGExBoxCheckMode::ExpandedBox || Mode == EPCGExBoxCheckMode::ExpandedSphere;
+	}
 }
 
-bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const FTransform& Transform, const FBox& LocalBox, const TArray<TSharedPtr<PCGExMath::OBB::FCollection>>& InCollections) const
+bool PCGExPointFilter::FBoundsFilter::TestPoint(const FTransform& Transform, const FBox& LocalBox) const
 {
-	PCGExMath::OBB::FOBB QueryOBB;
-	const bool bNeedQueryOBB = (CheckType == EPCGExBoundsCheckType::Intersects || CheckType == EPCGExBoundsCheckType::IsInsideOrIntersects);
+	return TestPoint(Transform, LocalBox, *Collections);
+}
 
-	if (bNeedQueryOBB)
-	{
-		QueryOBB = PCGExMath::OBB::Factory::FromTransform(Transform, LocalBox, -1);
-	}
+bool PCGExPointFilter::FBoundsFilter::TestPoint(const FTransform& Transform, const FBox& LocalBox, const TArray<TSharedPtr<PCGExMath::OBB::FCollection>>& InCollections) const
+{
+	using namespace PCGExBoundsFilterLocal;
+
+	const PCGExMath::OBB::FOBB QueryOBB = PCGExMath::OBB::Factory::FromTransform(Transform, LocalBox, -1);
+	const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
+	const float CollectionRuntimeExpansion = IsExpandedMode(CheckMode) ? Expansion : 0.0f;
 
 	for (const TSharedPtr<PCGExMath::OBB::FCollection>& Collection : InCollections)
 	{
@@ -303,28 +226,22 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 		if (bUseCollectionBounds)
 		{
 			const FBox& WorldBounds = Collection->GetWorldBounds();
-			const FBox ExpandedBounds = Expansion > 0 ? WorldBounds.ExpandBy(Expansion) : WorldBounds;
+			const FBox ExpandedBounds = CollectionRuntimeExpansion > 0 ? WorldBounds.ExpandBy(CollectionRuntimeExpansion) : WorldBounds;
 
 			switch (CheckType)
 			{
 			case EPCGExBoundsCheckType::Intersects:
-			{
-				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
 				bPass = ExpandedBounds.Intersect(QueryWorldBox);
-			}
-			break;
+				break;
 			case EPCGExBoundsCheckType::IsInside:
-				bPass = ExpandedBounds.IsInside(Position);
+				bPass = ExpandedBounds.IsInside(QueryWorldBox);
 				break;
 			case EPCGExBoundsCheckType::IsInsideOrOn:
-				bPass = ExpandedBounds.IsInsideOrOn(Position);
+				bPass = ExpandedBounds.IsInsideOrOn(QueryWorldBox);
 				break;
 			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-			{
-				const FBox QueryWorldBox = LocalBox.TransformBy(Transform);
-				bPass = ExpandedBounds.IsInside(Position) || ExpandedBounds.Intersect(QueryWorldBox);
-			}
-			break;
+				bPass = ExpandedBounds.IsInside(QueryWorldBox) || ExpandedBounds.Intersect(QueryWorldBox);
+				break;
 			}
 		}
 		else
@@ -335,22 +252,22 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 				bPass = Collection->Overlaps(QueryOBB, CheckMode, Expansion);
 				break;
 			case EPCGExBoundsCheckType::IsInside:
-				bPass = Collection->IsPointInside(Position, CheckMode, Expansion);
+				bPass = Collection->Contains(QueryOBB, CheckMode, Expansion);
 				break;
 			case EPCGExBoundsCheckType::IsInsideOrOn:
-				bPass = Collection->IsPointInside(Position, CheckMode, Expansion + KINDA_SMALL_NUMBER);
+				bPass = Collection->Contains(QueryOBB, ToBoundaryInclusiveMode(CheckMode),
+				                              IsExpandedMode(CheckMode) ? Expansion + KINDA_SMALL_NUMBER : KINDA_SMALL_NUMBER);
 				break;
 			case EPCGExBoundsCheckType::IsInsideOrIntersects:
-				bPass = Collection->IsPointInside(Position, CheckMode, Expansion) ||
+				// Contains and Overlaps stay separate (rather than just Overlaps) to keep the two paths
+				// behaviorally decoupled -- future tweaks to either test won't silently change the union.
+				bPass = Collection->Contains(QueryOBB, CheckMode, Expansion) ||
 					Collection->Overlaps(QueryOBB, CheckMode, Expansion);
 				break;
 			}
 		}
 
-		if (bPass)
-		{
-			return !bInvert;
-		}
+		if (bPass) { return !bInvert; }
 	}
 
 	return bInvert;
@@ -359,8 +276,7 @@ bool PCGExPointFilter::FBoundsFilter::TestPoint(const FVector& Position, const F
 bool PCGExPointFilter::FBoundsFilter::Test(const PCGExData::FProxyPoint& Point) const
 {
 	const FTransform Transform = Point.GetTransform();
-	const FBox LocalBox = PCGExMath::GetLocalBounds(Point, BoundsSource);
-	return TestPoint(Transform.GetLocation(), Transform, LocalBox);
+	return TestPoint(Transform, PCGExMath::GetLocalBounds(Point, BoundsSource));
 }
 
 bool PCGExPointFilter::FBoundsFilter::Test(const int32 PointIndex) const
@@ -394,15 +310,11 @@ bool PCGExPointFilter::FBoundsFilter::Test(const int32 PointIndex) const
 		}
 
 		const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
-		const FTransform Transform = Point.GetTransform();
-		const FBox LocalBox = PCGExMath::GetLocalBounds(Point, BoundsSource);
-		return TestPoint(Transform.GetLocation(), Transform, LocalBox, PerPointCollections);
+		return TestPoint(Point.GetTransform(), PCGExMath::GetLocalBounds(Point, BoundsSource), PerPointCollections);
 	}
 
 	const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
-	const FTransform Transform = Point.GetTransform();
-	const FBox LocalBox = PCGExMath::GetLocalBounds(Point, BoundsSource);
-	return TestPoint(Transform.GetLocation(), Transform, LocalBox);
+	return TestPoint(Point.GetTransform(), PCGExMath::GetLocalBounds(Point, BoundsSource));
 }
 
 bool PCGExPointFilter::FBoundsFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const

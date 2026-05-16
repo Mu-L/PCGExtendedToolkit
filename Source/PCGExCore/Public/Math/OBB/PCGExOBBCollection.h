@@ -143,6 +143,9 @@ namespace PCGExMath::OBB
 		/** Test if query OBB overlaps any in collection */
 		bool Overlaps(const FOBB& Query, EPCGExBoxCheckMode Mode = EPCGExBoxCheckMode::Box, float Expansion = 0.0f) const;
 
+		/** Test if query OBB is fully contained inside any OBB in collection */
+		bool Contains(const FOBB& Query, EPCGExBoxCheckMode Mode = EPCGExBoxCheckMode::Box, float Expansion = 0.0f) const;
+
 		/** Template version for compile-time mode */
 		template <typename Policy>
 		bool Overlaps(const FOBB& Query, Policy TestPolicy = Policy{}) const
