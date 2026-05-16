@@ -45,6 +45,16 @@ void UK2Node_SetPCGExProperty::AllocateDefaultPins()
 	UEdGraphPin* ReadbackPin = CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Wildcard, ReadbackPinName);
 	ReadbackPin->PinFriendlyName = LOCTEXT("ReadbackPinFriendlyName", "Readback");
 
+	// Restore previously resolved type so manually-picked or previously-connected types
+	// survive save/reopen even when no connections exist on either wildcard. Both pins
+	// always share the same concrete type.
+	if (ResolvedPinType.PinCategory != NAME_None &&
+		ResolvedPinType.PinCategory != UEdGraphSchema_K2::PC_Wildcard)
+	{
+		NewValuePin->PinType = ResolvedPinType;
+		ReadbackPin->PinType = ResolvedPinType;
+	}
+
 	UEdGraphPin* SuccessPin = CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Boolean, SuccessPinName);
 	SuccessPin->PinFriendlyName = LOCTEXT("SuccessPinFriendlyName", "Success");
 
@@ -117,7 +127,7 @@ void UK2Node_SetPCGExProperty::PinConnectionListChanged(UEdGraphPin* Pin)
 	}
 	else if (NewValuePin->LinkedTo.Num() == 0 && ReadbackPin->LinkedTo.Num() == 0)
 	{
-		// Both wildcards fully disconnected — revert to wildcard so the node can adapt next time
+		// Both wildcards fully disconnected -- revert to wildcard so the node can adapt next time
 		if (NewValuePin->PinType.PinCategory != UEdGraphSchema_K2::PC_Wildcard ||
 			ReadbackPin->PinType.PinCategory != UEdGraphSchema_K2::PC_Wildcard)
 		{
@@ -190,32 +200,171 @@ void UK2Node_SetPCGExProperty::ExpandNode(FKismetCompilerContext& CompilerContex
 		return;
 	}
 
-	UK2Node_CallFunction* CallNode = CompilerContext.SpawnIntermediateNode<UK2Node_CallFunction>(this, SourceGraph);
-	CallNode->FunctionReference.SetExternalMember(
-		GET_FUNCTION_NAME_CHECKED(UPCGExPropertyBlueprintLibrary, TrySetPCGExPropertyValue),
-		UPCGExPropertyBlueprintLibrary::StaticClass());
-	CallNode->AllocateDefaultPins();
+	// Object/Class pins are dispatched to dedicated well-typed library functions to avoid
+	// the wildcard CustomStructureParam marshalling bug (the BP compiler stuffs UObject*
+	// into an `int32&` slot and corrupts the property's FSoftObjectPath payload). Struct
+	// and primitive pins continue to use the wildcard path where the marshalling is sound.
+	const FName Category = NewValuePin->PinType.PinCategory;
+	const bool bIsObjectLike =
+		Category == UEdGraphSchema_K2::PC_Object ||
+		Category == UEdGraphSchema_K2::PC_Interface ||
+		Category == UEdGraphSchema_K2::PC_SoftObject;
+	const bool bIsClassLike =
+		Category == UEdGraphSchema_K2::PC_Class ||
+		Category == UEdGraphSchema_K2::PC_SoftClass;
+	const bool bUseTypedPath = bIsObjectLike || bIsClassLike;
 
-	UEdGraphPin* CallExecPin = CallNode->GetExecPin();
-	UEdGraphPin* CallThenPin = CallNode->GetThenPin();
-	UEdGraphPin* CallComponentPin = CallNode->FindPinChecked(ComponentPinName);
-	UEdGraphPin* CallNamePin = CallNode->FindPinChecked(PropertyNamePinName);
-	UEdGraphPin* CallNewValuePin = CallNode->FindPinChecked(NewValuePinName);
-	UEdGraphPin* CallReadbackPin = CallNode->FindPinChecked(ReadbackPinName);
-	UEdGraphPin* CallReturnPin = CallNode->GetReturnValuePin();
+	UClass* TargetClass = nullptr;
+	if (bUseTypedPath)
+	{
+		TargetClass = Cast<UClass>(NewValuePin->PinType.PinSubCategoryObject.Get());
+		if (!TargetClass)
+		{
+			CompilerContext.MessageLog.Error(
+				*LOCTEXT("ObjectPinMissingClass",
+				         "@@ has an Object/Class pin with no resolved class.")
+				.ToString(),
+				this);
+			BreakAllNodeLinks();
+			return;
+		}
+	}
 
-	// Stamp both wildcards' resolved type onto the call pins before moving links so the
-	// BP compiler emits the matching concrete VM instructions.
-	CallNewValuePin->PinType = NewValuePin->PinType;
-	CallReadbackPin->PinType = ReadbackPin->PinType;
+	UEdGraphPin* OurComponent = GetComponentPin();
+	UEdGraphPin* OurName = GetPropertyNamePin();
 
-	CompilerContext.MovePinLinksToIntermediate(*GetExecPin(), *CallExecPin);
-	CompilerContext.MovePinLinksToIntermediate(*GetThenPin(), *CallThenPin);
-	CompilerContext.MovePinLinksToIntermediate(*GetComponentPin(), *CallComponentPin);
-	CompilerContext.MovePinLinksToIntermediate(*GetPropertyNamePin(), *CallNamePin);
-	CompilerContext.MovePinLinksToIntermediate(*NewValuePin, *CallNewValuePin);
-	CompilerContext.MovePinLinksToIntermediate(*ReadbackPin, *CallReadbackPin);
-	CompilerContext.MovePinLinksToIntermediate(*GetSuccessPin(), *CallReturnPin);
+	// Set call (impure). Carries the user's exec flow and Success bool. Choose the
+	// function based on the resolved pin category.
+	UK2Node_CallFunction* SetCall = CompilerContext.SpawnIntermediateNode<UK2Node_CallFunction>(this, SourceGraph);
+	{
+		FName SetFunc;
+		if (bIsObjectLike)
+		{
+			SetFunc = GET_FUNCTION_NAME_CHECKED(UPCGExPropertyBlueprintLibrary, TrySetPCGExPropertyObject);
+		}
+		else if (bIsClassLike)
+		{
+			SetFunc = GET_FUNCTION_NAME_CHECKED(UPCGExPropertyBlueprintLibrary, TrySetPCGExPropertyClass);
+		}
+		else
+		{
+			SetFunc = GET_FUNCTION_NAME_CHECKED(UPCGExPropertyBlueprintLibrary, TrySetPCGExPropertyValue);
+		}
+		SetCall->FunctionReference.SetExternalMember(SetFunc, UPCGExPropertyBlueprintLibrary::StaticClass());
+		SetCall->AllocateDefaultPins();
+	}
+
+	UEdGraphPin* SetCallExec = SetCall->GetExecPin();
+	UEdGraphPin* SetCallThen = SetCall->GetThenPin();
+	UEdGraphPin* SetCallComponent = SetCall->FindPinChecked(ComponentPinName);
+	UEdGraphPin* SetCallName = SetCall->FindPinChecked(PropertyNamePinName);
+	UEdGraphPin* SetCallReturn = SetCall->GetReturnValuePin();
+
+	// Resolve the NewValue input pin: the wildcard path needs type stamping; the typed
+	// paths have a concrete UObject*/UClass* pin that accepts the user's connection via
+	// the schema's standard upcast.
+	UEdGraphPin* SetCallNewValue = nullptr;
+	if (bIsObjectLike)
+	{
+		SetCallNewValue = SetCall->FindPinChecked(TEXT("NewObject"));
+	}
+	else if (bIsClassLike)
+	{
+		SetCallNewValue = SetCall->FindPinChecked(TEXT("NewClass"));
+	}
+	else
+	{
+		SetCallNewValue = SetCall->FindPinChecked(NewValuePinName);
+		SetCallNewValue->PinType = NewValuePin->PinType;
+	}
+
+	CompilerContext.MovePinLinksToIntermediate(*GetExecPin(), *SetCallExec);
+	CompilerContext.MovePinLinksToIntermediate(*GetThenPin(), *SetCallThen);
+	CompilerContext.MovePinLinksToIntermediate(*NewValuePin, *SetCallNewValue);
+	CompilerContext.MovePinLinksToIntermediate(*GetSuccessPin(), *SetCallReturn);
+
+	// Get call (pure). Pure nodes evaluate on demand when their output is consumed
+	// downstream -- which lands after the Set's exec has fired -- so the readback reflects
+	// post-write state. Single-wildcard (or fully-typed) calls only, since multi-wildcard
+	// CustomStructureParam doesn't reliably construct non-trivially-copyable output buffers.
+	UK2Node_CallFunction* GetCall = CompilerContext.SpawnIntermediateNode<UK2Node_CallFunction>(this, SourceGraph);
+	{
+		FName GetFunc;
+		if (bIsObjectLike)
+		{
+			GetFunc = GET_FUNCTION_NAME_CHECKED(UPCGExPropertyBlueprintLibrary, TryGetPCGExPropertyObject);
+		}
+		else if (bIsClassLike)
+		{
+			GetFunc = GET_FUNCTION_NAME_CHECKED(UPCGExPropertyBlueprintLibrary, TryGetPCGExPropertyClass);
+		}
+		else
+		{
+			GetFunc = GET_FUNCTION_NAME_CHECKED(UPCGExPropertyBlueprintLibrary, TryGetPCGExPropertyValue);
+		}
+		GetCall->FunctionReference.SetExternalMember(GetFunc, UPCGExPropertyBlueprintLibrary::StaticClass());
+		GetCall->AllocateDefaultPins();
+	}
+
+	UEdGraphPin* GetCallComponent = GetCall->FindPinChecked(ComponentPinName);
+	UEdGraphPin* GetCallName = GetCall->FindPinChecked(PropertyNamePinName);
+
+	// Resolve the readback output pin. Typed paths use DeterminesOutputType on the
+	// function's return value -- set ExpectedClass to TargetClass and trigger the call
+	// node's dynamic-output retyping. Wildcard path stamps the output pin's type.
+	UEdGraphPin* GetCallReadbackSource = nullptr;
+	if (bUseTypedPath)
+	{
+		UEdGraphPin* GetCallExpectedClass = GetCall->FindPinChecked(TEXT("ExpectedClass"));
+		GetCallExpectedClass->DefaultObject = TargetClass;
+		GetCall->PinDefaultValueChanged(GetCallExpectedClass);
+		GetCallReadbackSource = GetCall->GetReturnValuePin();
+	}
+	else
+	{
+		GetCallReadbackSource = GetCall->FindPinChecked(TEXT("OutValue"));
+		GetCallReadbackSource->PinType = ReadbackPin->PinType;
+	}
+
+	// Fan Component and PropertyName into both intermediate calls. Linked-to sources get
+	// connected to both; otherwise the literal default value is forwarded to both.
+	const UEdGraphSchema_K2* K2 = GetDefault<UEdGraphSchema_K2>();
+	if (OurComponent)
+	{
+		if (OurComponent->LinkedTo.Num() > 0)
+		{
+			for (UEdGraphPin* Source : OurComponent->LinkedTo)
+			{
+				K2->TryCreateConnection(Source, SetCallComponent);
+				K2->TryCreateConnection(Source, GetCallComponent);
+			}
+		}
+		else
+		{
+			SetCallComponent->DefaultObject = OurComponent->DefaultObject;
+			GetCallComponent->DefaultObject = OurComponent->DefaultObject;
+			SetCallComponent->DefaultValue = OurComponent->DefaultValue;
+			GetCallComponent->DefaultValue = OurComponent->DefaultValue;
+		}
+	}
+	if (OurName)
+	{
+		if (OurName->LinkedTo.Num() > 0)
+		{
+			for (UEdGraphPin* Source : OurName->LinkedTo)
+			{
+				K2->TryCreateConnection(Source, SetCallName);
+				K2->TryCreateConnection(Source, GetCallName);
+			}
+		}
+		else
+		{
+			SetCallName->DefaultValue = OurName->DefaultValue;
+			GetCallName->DefaultValue = OurName->DefaultValue;
+		}
+	}
+
+	CompilerContext.MovePinLinksToIntermediate(*ReadbackPin, *GetCallReadbackSource);
 
 	BreakAllNodeLinks();
 }
@@ -270,6 +419,9 @@ void UK2Node_SetPCGExProperty::ResetWildcardPinsToWildcard()
 
 	ResetOne(GetNewValuePin());
 	ResetOne(GetReadbackPin());
+
+	ResolvedPinType = FEdGraphPinType();
+	ResolvedPinType.PinCategory = UEdGraphSchema_K2::PC_Wildcard;
 }
 
 void UK2Node_SetPCGExProperty::AdoptTypeFromOther(const UEdGraphPin* OtherPin)
@@ -289,6 +441,7 @@ void UK2Node_SetPCGExProperty::AdoptTypeFromOther(const UEdGraphPin* OtherPin)
 	{
 		ReadbackPin->PinType = InType;
 	}
+	ResolvedPinType = InType;
 }
 
 void UK2Node_SetPCGExProperty::SetWildcardPinsType(const FEdGraphPinType& InType)
@@ -312,6 +465,7 @@ void UK2Node_SetPCGExProperty::SetWildcardPinsType(const FEdGraphPinType& InType
 
 	Apply(GetNewValuePin());
 	Apply(GetReadbackPin());
+	ResolvedPinType = InType;
 
 	GetGraph()->NotifyGraphChanged();
 

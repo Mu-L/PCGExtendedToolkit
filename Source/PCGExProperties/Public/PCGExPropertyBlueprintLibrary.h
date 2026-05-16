@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Templates/SubclassOf.h"
 
 #include "PCGExPropertyBlueprintLibrary.generated.h"
 
@@ -38,21 +39,71 @@ public:
 	DECLARE_FUNCTION(execTryGetPCGExPropertyValue);
 
 	/**
-	 * Try to write a value to a named property on a Property Collection Component, and
-	 * read back the value the property now stores. NewValue and Readback are wildcards
-	 * with the same concrete type at compile time.
+	 * Try to write a value to a named property on a Property Collection Component. NewValue
+	 * is a wildcard input whose concrete type at compile time drives the EPCGMetadataTypes
+	 * conversion that the property's virtual TryReadValue uses.
 	 *
-	 * Useful for surfacing how the property's authored type coerced the input (e.g.,
-	 * writing an int into a Vector property → Readback shows the resulting Vector).
+	 * The Set K2 node's readback is implemented by chaining a separate TryGetPCGExPropertyValue
+	 * call after this one -- multi-wildcard CustomStructureParam doesn't reliably size/construct
+	 * the output buffer for non-trivially-copyable structs (FSoftObjectPath, FString fields), so
+	 * each thunk here keeps a single wildcard.
 	 */
 	UFUNCTION(BlueprintCallable, CustomThunk, Category = "PCGEx|Property",
-		meta = (CustomStructureParam = "NewValue,Readback", BlueprintInternalUseOnly = "true",
+		meta = (CustomStructureParam = "NewValue", BlueprintInternalUseOnly = "true",
 			DisplayName = "Try Set PCGEx Property Value"))
 	static bool TrySetPCGExPropertyValue(
 		UPCGExPropertyCollectionComponent* Component,
 		FName PropertyName,
-		const int32& NewValue,
-		int32& Readback);
+		const int32& NewValue);
 
 	DECLARE_FUNCTION(execTrySetPCGExPropertyValue);
+
+	/**
+	 * Read a property as an object reference. The underlying property is treated as a soft
+	 * object path; the resolved object is filtered against ExpectedClass before being returned.
+	 *
+	 * Separate from the wildcard TryGetPCGExPropertyValue thunk because Object pins don't
+	 * round-trip cleanly through CustomStructureParam: the BP compiler doesn't have a
+	 * marshalling path for "Object pin → wildcard slot declared as `int32&`", which results
+	 * in mis-sized frame slots and downstream memory corruption inside FSoftObjectPath.
+	 *
+	 * DeterminesOutputType retypes the return pin to ExpectedClass at the BP call site.
+	 */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Property",
+		meta = (DeterminesOutputType = "ExpectedClass", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get PCGEx Property Object"))
+	static UObject* TryGetPCGExPropertyObject(
+		const UPCGExPropertyCollectionComponent* Component,
+		FName PropertyName,
+		UPARAM(meta = (AllowAbstract = "true")) TSubclassOf<UObject> ExpectedClass,
+		bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Property",
+		meta = (BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set PCGEx Property Object"))
+	static bool TrySetPCGExPropertyObject(
+		UPCGExPropertyCollectionComponent* Component,
+		FName PropertyName,
+		UObject* NewObject);
+
+	/**
+	 * Class-pin variants of the Object accessors. The underlying property is treated as a
+	 * soft class path; the resolved class is filtered against ExpectedClass.
+	 */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Property",
+		meta = (DeterminesOutputType = "ExpectedClass", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get PCGEx Property Class"))
+	static TSubclassOf<UObject> TryGetPCGExPropertyClass(
+		const UPCGExPropertyCollectionComponent* Component,
+		FName PropertyName,
+		UPARAM(meta = (AllowAbstract = "true")) TSubclassOf<UObject> ExpectedClass,
+		bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Property",
+		meta = (BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set PCGEx Property Class"))
+	static bool TrySetPCGExPropertyClass(
+		UPCGExPropertyCollectionComponent* Component,
+		FName PropertyName,
+		UClass* NewClass);
 };
