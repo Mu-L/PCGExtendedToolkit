@@ -29,7 +29,9 @@ public:
 		IPropertyTypeCustomizationUtils& CustomizationUtils) override;
 
 private:
-	FText GetHeaderText() const;
+	const struct FPCGExPropertySchema* AccessSchema() const;
+	FText GetHeaderNameText() const;
+	FText GetHeaderTypeText() const;
 
 	/** Called when Name or Property changes - syncs PropertyName/HeaderId */
 	void OnSchemaChanged();

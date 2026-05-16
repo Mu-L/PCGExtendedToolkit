@@ -7,6 +7,7 @@
 #include "PCGExPropertyTypes.h"
 #include "Details/PCGExEnumSelectorWidget.h"
 #include "Details/PCGExInlineNumericWidgets.h"
+#include "Details/PCGExPropertyInlineWidgets.h"
 
 namespace PCGExBuiltInInlineWidgets
 {
@@ -29,5 +30,30 @@ namespace PCGExBuiltInInlineWidgets
 			{
 				return PCGExEnumSelectorWidget::Make(ValueHandle, /*bAllowClassPicker=*/false);
 			});
+
+		// Soft path types: filtered pickers that read the sibling editor-only AllowedClass
+		// field. Registered under both modes -- the AllowedClass is schema-authored in Edit
+		// and inherited via SyncStructuralFromSchema in Compact, so the same widget works.
+		FPCGExInlineWidgetRegistry::RegisterAllModes(
+			FPCGExProperty_SoftObjectPath::StaticStruct()->GetFName(),
+			&PCGExPropertyInlineWidgets::MakeSoftObjectPathWidget);
+		FPCGExInlineWidgetRegistry::RegisterAllModes(
+			FPCGExProperty_SoftClassPath::StaticStruct()->GetFName(),
+			&PCGExPropertyInlineWidgets::MakeSoftClassPathWidget);
+
+		// Numeric types: clamp-aware widgets that read the sibling editor-only Range field.
+		// Registered under both modes -- Range is structural and propagated like AllowedClass.
+		FPCGExInlineWidgetRegistry::RegisterAllModes(
+			FPCGExProperty_Float::StaticStruct()->GetFName(),
+			&PCGExPropertyInlineWidgets::MakeClampedFloatWidget);
+		FPCGExInlineWidgetRegistry::RegisterAllModes(
+			FPCGExProperty_Double::StaticStruct()->GetFName(),
+			&PCGExPropertyInlineWidgets::MakeClampedDoubleWidget);
+		FPCGExInlineWidgetRegistry::RegisterAllModes(
+			FPCGExProperty_Int32::StaticStruct()->GetFName(),
+			&PCGExPropertyInlineWidgets::MakeClampedInt32Widget);
+		FPCGExInlineWidgetRegistry::RegisterAllModes(
+			FPCGExProperty_Int64::StaticStruct()->GetFName(),
+			&PCGExPropertyInlineWidgets::MakeClampedInt64Widget);
 	}
 }

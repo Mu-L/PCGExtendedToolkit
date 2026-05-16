@@ -11,6 +11,7 @@
 #include "PCGExPropertyWriter.h"
 #include "PropertyEditorModule.h"
 #include "Details/PCGExEnumSelectorCustomization.h"
+#include "Details/PCGExNumericRangeCustomization.h"
 #include "Details/PCGExPropertyCompiledCustomization.h"
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
 #include "Details/PCGExPropertyOverrideEntryCustomization.h"
@@ -32,6 +33,13 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExEnumSelector::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExEnumSelectorCustomization::MakeInstance)
+		);
+
+	// Register FPCGExNumericRange customization - compact one-row strip for numeric range
+	// meta on Float/Double/Int32/Int64 property types.
+	PropertyModule.RegisterCustomPropertyTypeLayout(
+		FPCGExNumericRange::StaticStruct()->GetFName(),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExNumericRangeCustomization::MakeInstance)
 		);
 
 	// Register FPCGExPropertySchemaCollection customization - handles schema array changes

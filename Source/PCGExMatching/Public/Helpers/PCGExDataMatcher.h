@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "PCGExMatchingCommon.h"
+#include "Data/PCGExPointElements.h" // FConstPoint must be complete for BuildPerPointInclude template (by-value param + member access)
 
 struct FPCGExContext;
 class FPCGExMatchRuleOperation;
@@ -16,7 +17,6 @@ namespace PCGExData
 	class FTags;
 	class FPointIO;
 	class FFacade;
-	struct FConstPoint;
 }
 
 struct FPCGExTaggedData;
