@@ -7,6 +7,7 @@
 #include "PropertyEditorDelegates.h"
 #include "PropertyEditorModule.h"
 #include "Details/PCGExDotComparisonCustomization.h"
+#include "Details/PCGExNameFiltersCustomization.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExCoreEditorModule"
 
@@ -21,6 +22,9 @@ void FPCGExCoreEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO_START
 	PCGEX_REGISTER_CUSTO("PCGExStaticDotComparisonDetails", FPCGExDotComparisonCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExDotComparisonDetails", FPCGExDotComparisonCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExNameFiltersDetails", FPCGExNameFiltersDetailsCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExAttributeGatherDetails", FPCGExNameFiltersDetailsCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExForwardDetails", FPCGExForwardDetailsCustomization)
 }
 
 void FPCGExCoreEditorModule::ShutdownModule()

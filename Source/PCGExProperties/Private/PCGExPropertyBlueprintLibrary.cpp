@@ -64,14 +64,14 @@ namespace PCGExPropertyBlueprintLibrary_Private
 	{
 		if (const FObjectProperty* ObjProp = CastField<FObjectProperty>(InProp))
 		{
-			UObject* InObj = ObjProp->GetObjectPropertyValue(const_cast<void*>(InMem));
+			UObject* InObj = ObjProp->GetObjectPropertyValue(InMem);
 			FSoftObjectPath SoftPath(InObj);
 			return Prop->TryReadValue(EPCGMetadataTypes::SoftObjectPath, &SoftPath);
 		}
 
 		if (const FClassProperty* ClassProp = CastField<FClassProperty>(InProp))
 		{
-			UClass* InClass = Cast<UClass>(ClassProp->GetObjectPropertyValue(const_cast<void*>(InMem)));
+			UClass* InClass = Cast<UClass>(ClassProp->GetObjectPropertyValue(InMem));
 			FSoftClassPath SoftPath(InClass);
 			return Prop->TryReadValue(EPCGMetadataTypes::SoftClassPath, &SoftPath);
 		}
@@ -111,15 +111,13 @@ namespace PCGExPropertyBlueprintLibrary_Private
 		return Prop->TryWriteValue(TargetType, OutMem);
 	}
 
-	bool WriteAndReadBack(
+	bool WriteFrom(
 		UPCGExPropertyCollectionComponent* Component,
 		FName PropertyName,
 		const FProperty* InProp,
-		const void* InMem,
-		const FProperty* OutProp,
-		void* OutMem)
+		const void* InMem)
 	{
-		if (!Component || !InProp || !InMem || !OutProp || !OutMem)
+		if (!Component || !InProp || !InMem)
 		{
 			return false;
 		}
@@ -137,25 +135,59 @@ namespace PCGExPropertyBlueprintLibrary_Private
 		}
 
 		const EPCGMetadataTypes SourceType = PCGPropertyHelpers::GetMetadataTypeFromProperty(InProp);
-		const bool bWriteOk = (SourceType != EPCGMetadataTypes::Unknown)
+		return (SourceType != EPCGMetadataTypes::Unknown)
 			? Prop->TryReadValue(SourceType, InMem)
 			: TryReadFromObjectPin(Prop, InProp, InMem);
-		if (!bWriteOk)
+	}
+
+	// Shared lookup helpers for the well-typed Object/Class accessors. These avoid the
+	// CustomThunk wildcard path entirely so the BP compiler marshalling stays correct
+	// for Object/Class pins (where the wildcard CustomStructureParam mechanism would
+	// otherwise mis-size the frame slot and corrupt the property's FSoftObjectPath::Value).
+	bool ReadSoftPath(
+		const UPCGExPropertyCollectionComponent* Component,
+		FName PropertyName,
+		EPCGMetadataTypes PathType,
+		void* OutPath)
+	{
+		if (!Component)
 		{
 			return false;
 		}
-
-		const EPCGMetadataTypes TargetType = PCGPropertyHelpers::GetMetadataTypeFromProperty(OutProp);
-		if (TargetType != EPCGMetadataTypes::Unknown)
+		const FPCGExPropertySchema* Schema = Component->GetProperties().FindByName(PropertyName);
+		if (!Schema)
 		{
-			Prop->TryWriteValue(TargetType, OutMem);
+			return false;
 		}
-		else
+		const FPCGExProperty* Prop = Schema->GetProperty();
+		if (!Prop)
 		{
-			TryWriteToObjectPin(Prop, OutProp, OutMem);
+			return false;
 		}
+		return Prop->TryWriteValue(PathType, OutPath);
+	}
 
-		return true;
+	bool WriteSoftPath(
+		UPCGExPropertyCollectionComponent* Component,
+		FName PropertyName,
+		EPCGMetadataTypes PathType,
+		const void* InPath)
+	{
+		if (!Component)
+		{
+			return false;
+		}
+		FPCGExPropertySchema* Schema = Component->GetPropertiesMutable().FindByNameMutable(PropertyName);
+		if (!Schema)
+		{
+			return false;
+		}
+		FPCGExProperty* Prop = Schema->GetPropertyMutable();
+		if (!Prop)
+		{
+			return false;
+		}
+		return Prop->TryReadValue(PathType, InPath);
 	}
 }
 
@@ -191,8 +223,7 @@ DEFINE_FUNCTION(UPCGExPropertyBlueprintLibrary::execTryGetPCGExPropertyValue)
 bool UPCGExPropertyBlueprintLibrary::TrySetPCGExPropertyValue(
 	UPCGExPropertyCollectionComponent* Component,
 	FName PropertyName,
-	const int32& NewValue,
-	int32& Readback)
+	const int32& NewValue)
 {
 	checkNoEntry();
 	return false;
@@ -203,24 +234,102 @@ DEFINE_FUNCTION(UPCGExPropertyBlueprintLibrary::execTrySetPCGExPropertyValue)
 	P_GET_OBJECT(UPCGExPropertyCollectionComponent, Component);
 	P_GET_PROPERTY(FNameProperty, PropertyName);
 
-	// Wildcard NewValue (input).
 	Stack.MostRecentProperty = nullptr;
 	Stack.MostRecentPropertyAddress = nullptr;
 	Stack.StepCompiledIn<FProperty>(nullptr);
 	const FProperty* InProp = Stack.MostRecentProperty;
 	const void* InMem = Stack.MostRecentPropertyAddress;
 
-	// Wildcard Readback (output).
-	Stack.MostRecentProperty = nullptr;
-	Stack.MostRecentPropertyAddress = nullptr;
-	Stack.StepCompiledIn<FProperty>(nullptr);
-	const FProperty* OutProp = Stack.MostRecentProperty;
-	void* OutMem = Stack.MostRecentPropertyAddress;
-
 	P_FINISH;
 
 	P_NATIVE_BEGIN;
-		*static_cast<bool*>(RESULT_PARAM) = PCGExPropertyBlueprintLibrary_Private::WriteAndReadBack(
-			Component, PropertyName, InProp, InMem, OutProp, OutMem);
+		*static_cast<bool*>(RESULT_PARAM) = PCGExPropertyBlueprintLibrary_Private::WriteFrom(
+			Component, PropertyName, InProp, InMem);
 	P_NATIVE_END;
+}
+
+UObject* UPCGExPropertyBlueprintLibrary::TryGetPCGExPropertyObject(
+	const UPCGExPropertyCollectionComponent* Component,
+	FName PropertyName,
+	TSubclassOf<UObject> ExpectedClass,
+	bool& bSuccess)
+{
+	bSuccess = false;
+
+	FSoftObjectPath SoftPath;
+	if (!PCGExPropertyBlueprintLibrary_Private::ReadSoftPath(
+		Component, PropertyName, EPCGMetadataTypes::SoftObjectPath, &SoftPath))
+	{
+		return nullptr;
+	}
+
+	UObject* Resolved = SoftPath.ResolveObject();
+	if (!Resolved)
+	{
+		Resolved = SoftPath.TryLoad();
+	}
+	if (!Resolved)
+	{
+		return nullptr;
+	}
+	if (*ExpectedClass && !Resolved->IsA(ExpectedClass))
+	{
+		return nullptr;
+	}
+
+	bSuccess = true;
+	return Resolved;
+}
+
+bool UPCGExPropertyBlueprintLibrary::TrySetPCGExPropertyObject(
+	UPCGExPropertyCollectionComponent* Component,
+	FName PropertyName,
+	UObject* NewObject)
+{
+	const FSoftObjectPath SoftPath(NewObject);
+	return PCGExPropertyBlueprintLibrary_Private::WriteSoftPath(
+		Component, PropertyName, EPCGMetadataTypes::SoftObjectPath, &SoftPath);
+}
+
+TSubclassOf<UObject> UPCGExPropertyBlueprintLibrary::TryGetPCGExPropertyClass(
+	const UPCGExPropertyCollectionComponent* Component,
+	FName PropertyName,
+	TSubclassOf<UObject> ExpectedClass,
+	bool& bSuccess)
+{
+	bSuccess = false;
+
+	FSoftClassPath SoftPath;
+	if (!PCGExPropertyBlueprintLibrary_Private::ReadSoftPath(
+		Component, PropertyName, EPCGMetadataTypes::SoftClassPath, &SoftPath))
+	{
+		return nullptr;
+	}
+
+	UClass* Resolved = Cast<UClass>(SoftPath.ResolveObject());
+	if (!Resolved)
+	{
+		Resolved = SoftPath.TryLoadClass<UObject>();
+	}
+	if (!Resolved)
+	{
+		return nullptr;
+	}
+	if (*ExpectedClass && !Resolved->IsChildOf(ExpectedClass))
+	{
+		return nullptr;
+	}
+
+	bSuccess = true;
+	return Resolved;
+}
+
+bool UPCGExPropertyBlueprintLibrary::TrySetPCGExPropertyClass(
+	UPCGExPropertyCollectionComponent* Component,
+	FName PropertyName,
+	UClass* NewClass)
+{
+	const FSoftClassPath SoftPath(NewClass);
+	return PCGExPropertyBlueprintLibrary_Private::WriteSoftPath(
+		Component, PropertyName, EPCGMetadataTypes::SoftClassPath, &SoftPath);
 }

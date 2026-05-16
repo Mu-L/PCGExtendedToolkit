@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "K2Node.h"
+#include "EdGraph/EdGraphPin.h"
 
 #include "K2Node_SetPCGExProperty.generated.h"
 
@@ -21,7 +22,7 @@ class UToolMenu;
  *
  * NewValue (input) and Readback (output) are wildcards locked to the same concrete type:
  * connecting either to a typed pin retypes both. Users can also pick the type explicitly
- * from either pin's right-click menu. Impure — has exec pins.
+ * from either pin's right-click menu. Impure -- has exec pins.
  *
  * Compiles down to a single CustomThunk call to UPCGExPropertyBlueprintLibrary::
  * TrySetPCGExPropertyValue with the resolved type stamped onto both wildcards.
@@ -52,6 +53,14 @@ public:
 	virtual void ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph) override;
 
 private:
+	/**
+	 * Persisted resolved pin type for both NewValue and Readback (which always share the
+	 * same concrete type). AllocateDefaultPins re-stamps this on graph reload so manually
+	 * picked types survive save/reopen even when no connections exist on either pin.
+	 */
+	UPROPERTY()
+	FEdGraphPinType ResolvedPinType;
+
 	UEdGraphPin* GetExecPin() const;
 	UEdGraphPin* GetThenPin() const;
 	UEdGraphPin* GetComponentPin() const;

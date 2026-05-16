@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "K2Node.h"
+#include "EdGraph/EdGraphPin.h"
 
 #include "K2Node_GetPCGExProperty.generated.h"
 
@@ -53,6 +54,15 @@ public:
 	virtual void ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph) override;
 
 private:
+	/**
+	 * Persisted resolved pin type for the Value output. AllocateDefaultPins re-stamps
+	 * this onto the freshly created wildcard pin on graph reload, so manually-picked
+	 * types (right-click menu) survive save/reopen even when no connections exist.
+	 * Cleared back to PC_Wildcard when the user resets the pin.
+	 */
+	UPROPERTY()
+	FEdGraphPinType ResolvedPinType;
+
 	UEdGraphPin* GetComponentPin() const;
 	UEdGraphPin* GetPropertyNamePin() const;
 	UEdGraphPin* GetValuePin() const;

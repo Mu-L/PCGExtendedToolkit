@@ -725,9 +725,9 @@ namespace PCGExPCGDataAssetLoader
 		// Forward attributes to point data if configured
 		if (ForwardHandler)
 		{
-			if (UPCGPointData* PointData = Cast<UPCGPointData>(DuplicatedData))
+			if (UPCGMetadata* TargetMetadata = DuplicatedData->MutableMetadata())
 			{
-				ForwardHandler->Forward(PointIndex, PointData->Metadata);
+				ForwardHandler->Forward(PointIndex, TargetMetadata);
 			}
 		}
 

@@ -174,7 +174,7 @@ namespace PCGExPointFilter
 
 		// Core test implementation
 		bool TestPoint(const FTransform& Transform, const FBox& LocalBox) const;
-		bool TestPoint(const FTransform& Transform, const FBox& LocalBox, const TArray<TSharedPtr<PCGExMath::OBB::FCollection>>& InCollections) const;
+		bool TestPoint(const FTransform& Transform, const FBox& LocalBox, TArrayView<const TSharedPtr<PCGExMath::OBB::FCollection>> InCollections) const;
 	};
 }
 

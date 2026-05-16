@@ -37,6 +37,28 @@ namespace PCGExMath::OBB
 		TUniquePtr<PCGExOctree::FItemOctree> Octree;
 		FBox WorldBounds = FBox(ForceInit);
 
+		// Shared skeleton for the FindFirst-style octree queries. Predicate returns true when matched
+		// (the octree's "stop" signal). Inlines per call site, so each query method stays branch-free.
+		template <typename PredicateFn>
+		bool FindFirstMatch(const FBoxCenterAndExtent& QueryBounds, PredicateFn&& Predicate) const
+		{
+			if (!Octree)
+			{
+				return false;
+			}
+			bool bFound = false;
+			Octree->FindFirstElementWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& Item) -> bool
+			{
+				if (Predicate(Item))
+				{
+					bFound = true;
+					return false;
+				}
+				return true;
+			});
+			return bFound;
+		}
+
 	public:
 		FCollection() = default;
 		virtual ~FCollection() = default;
@@ -145,6 +167,9 @@ namespace PCGExMath::OBB
 
 		/** Test if query OBB is fully contained inside any OBB in collection */
 		bool Contains(const FOBB& Query, EPCGExBoxCheckMode Mode = EPCGExBoxCheckMode::Box, float Expansion = 0.0f) const;
+
+		/** Test if query OBB is fully contained in OR overlaps any OBB in collection. Single octree traversal. */
+		bool ContainsOrOverlaps(const FOBB& Query, EPCGExBoxCheckMode Mode = EPCGExBoxCheckMode::Box, float Expansion = 0.0f) const;
 
 		/** Template version for compile-time mode */
 		template <typename Policy>
