@@ -71,7 +71,10 @@ namespace PCGExBlending
 			return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
 		case EPCGMetadataTypes::SoftClassPath:
 			return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
-		// Byte/Text: no typed blend ops. Falls through to default (Tier 3 copy-only).
+		// SILENT FALLBACK -- if arithmetic blend mysteriously became copy, this is why.
+		// Any non-switch type (extended scalars + containers) has no FPCGMetadataAttribute<T>,
+		// so non-copy BlendModes degrade to memcpy. UE_LOG breadcrumb only; not graph-visible.
+		// For graph-visible rejection, gate at PCGExBlendOpFactory.cpp's participation gate.
 		default:
 			if (InValueSize > 0)
 			{
@@ -126,7 +129,9 @@ namespace PCGExBlending
 			return CreateTyped<FSoftObjectPath>(BlendMode, bResetForMultiBlend);
 		case EPCGMetadataTypes::SoftClassPath:
 			return CreateTyped<FSoftClassPath>(BlendMode, bResetForMultiBlend);
-		// Byte/Text: no typed blend ops. Falls through to default (Tier 3 copy-only).
+		// SILENT FALLBACK -- see size-based overload above. Property-backed types route
+		// through FPropertyCopyBlendOperation (deep copy via CopyCompleteValue), which is
+		// correct for containers and structs with heap-owning members.
 		default:
 			if (InProperty)
 			{

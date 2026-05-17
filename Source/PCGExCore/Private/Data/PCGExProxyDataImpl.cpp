@@ -405,8 +405,8 @@ namespace PCGExData
 
 #pragma region FPropertyBufferProxy
 
-	FPropertyBufferProxy::FPropertyBufferProxy(int32 InElementSize, int32 InElementAlignment)
-		: IBufferProxy(EPCGMetadataTypes::Unknown, EPCGMetadataTypes::Unknown)
+	FPropertyBufferProxy::FPropertyBufferProxy(int32 InElementSize, int32 InElementAlignment, EPCGMetadataTypes InRealType, EPCGMetadataTypes InWorkingType)
+		: IBufferProxy(InRealType, InWorkingType)
 		  , ElementSize(InElementSize)
 		  , ElementAlignment(InElementAlignment)
 	{
@@ -415,20 +415,18 @@ namespace PCGExData
 	void FPropertyBufferProxy::GetVoid(const int32 Index, void* OutValue) const
 	{
 		check(Buffer);
-		// Adapter: IBuffer takes FScopedTypedValue&, but IBufferProxy's void* contract
-		// is preserved for proxy callers. Wrap the incoming void* in a matching FScopedTypedValue.
-		// NOTE: this requires the caller to have properly-constructed memory at OutValue
-		// (FScopedTypedValue or typed stack var) -- same contract as before.
-		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
+		// Buffer-driven scoped value: property buffers return FProperty-aware (correctly
+		// sized for extended scalars and containers); typed TBuffer<T> returns TTraits<T>-sized.
+		// Constructing FScopedTypedValue(WorkingType) directly would miss container/struct sizing.
+		PCGExTypes::FScopedTypedValue Wrapped = Buffer->MakeScopedValue();
 		Buffer->ReadVoid(Index, Wrapped);
-		// Copy result into caller's buffer
 		FMemory::Memcpy(OutValue, Wrapped.GetRaw(), Wrapped.GetValueSize());
 	}
 
 	void FPropertyBufferProxy::SetVoid(const int32 Index, const void* Value) const
 	{
 		check(Buffer);
-		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
+		PCGExTypes::FScopedTypedValue Wrapped = Buffer->MakeScopedValue();
 		FMemory::Memcpy(Wrapped.GetRaw(), Value, Wrapped.GetValueSize());
 		Buffer.Get()->SetVoid(Index, Wrapped);
 	}
@@ -436,7 +434,7 @@ namespace PCGExData
 	void FPropertyBufferProxy::GetCurrentVoid(const int32 Index, void* OutValue) const
 	{
 		check(Buffer);
-		PCGExTypes::FScopedTypedValue Wrapped(WorkingType);
+		PCGExTypes::FScopedTypedValue Wrapped = Buffer->MakeScopedValue();
 		Buffer.Get()->GetVoid(Index, Wrapped);
 		FMemory::Memcpy(OutValue, Wrapped.GetRaw(), Wrapped.GetValueSize());
 	}

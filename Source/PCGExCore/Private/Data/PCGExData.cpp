@@ -472,6 +472,24 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 			const FPCGMetadataDomainID DomainID = InAttribute->GetMetadataDomain()->GetDomainID();
 			FPCGAttributeIdentifier AttrIdentifier(InAttribute->Name, DomainID);
 
+			// Dedup -- mirror the typed GetBuffer<T> path. Property buffers all share
+			// Type=Unknown, so the UID is keyed on (name, domain) which is what we want:
+			// repeat calls for the same attribute return the existing buffer instead of
+			// stacking duplicates (which the engine rejects as "written to by different
+			// buffers"). Re-check under the write lock to close the construction race.
+			const uint64 ExpectedUID = BufferUID(AttrIdentifier, EPCGMetadataTypes::Unknown);
+			if (const TSharedPtr<IBuffer> Existing = FindBuffer(ExpectedUID))
+			{
+				return Existing;
+			}
+
+			FWriteScopeLock WriteScopeLock(BufferLock);
+
+			if (const TSharedPtr<IBuffer> Existing = FindBuffer_Unsafe(ExpectedUID))
+			{
+				return Existing;
+			}
+
 			if (DomainID.Flag == EPCGMetadataDomainFlag::Data)
 			{
 				auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, AttrIdentifier);
@@ -479,7 +497,6 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 				{
 					return nullptr;
 				}
-				FWriteScopeLock WriteScopeLock(BufferLock);
 				PropBuf->BufferIndex = Buffers.Add(PropBuf);
 				BufferMap.Add(PropBuf->GetUID(), PropBuf);
 				return PropBuf;
@@ -489,7 +506,6 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 			{
 				return nullptr;
 			}
-			FWriteScopeLock WriteScopeLock(BufferLock);
 			PropBuf->BufferIndex = Buffers.Add(PropBuf);
 			BufferMap.Add(PropBuf->GetUID(), PropBuf);
 			return PropBuf;
@@ -549,6 +565,13 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 		// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES
 		if (!Buffer)
 		{
+			// Dedup -- see FFacade::GetWritable default branch for rationale.
+			const uint64 ExpectedUID = BufferUID(Identifier, EPCGMetadataTypes::Unknown);
+			if (const TSharedPtr<IBuffer> Existing = FindBuffer(ExpectedUID))
+			{
+				return Existing;
+			}
+
 			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(Identifier, InSide);
 			if (RawAttribute)
 			{
@@ -558,6 +581,7 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);
+						if (const TSharedPtr<IBuffer> Existing = FindBuffer_Unsafe(ExpectedUID)) { return Existing; }
 						PropBuf->BufferIndex = Buffers.Add(PropBuf);
 						BufferMap.Add(PropBuf->GetUID(), PropBuf);
 						Buffer = PropBuf;
@@ -569,6 +593,7 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 					if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 					{
 						FWriteScopeLock WriteScopeLock(BufferLock);
+						if (const TSharedPtr<IBuffer> Existing = FindBuffer_Unsafe(ExpectedUID)) { return Existing; }
 						PropBuf->BufferIndex = Buffers.Add(PropBuf);
 						BufferMap.Add(PropBuf->GetUID(), PropBuf);
 						Buffer = PropBuf;
@@ -599,12 +624,20 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 		// Tier 3 fallback: FPropertyBuffer for types not in PCGEX_FOREACH_SUPPORTEDTYPES
 		if (!Buffer && RawAttribute)
 		{
+			// Dedup -- see FFacade::GetWritable default branch for rationale.
+			const uint64 ExpectedUID = BufferUID(InIdentifier, EPCGMetadataTypes::Unknown);
+			if (const TSharedPtr<IBuffer> Existing = FindBuffer(ExpectedUID))
+			{
+				return Existing;
+			}
+
 			if (InIdentifier.MetadataDomain.Flag == EPCGMetadataDomainFlag::Data)
 			{
 				auto PropBuf = MakeShared<FPropertySingleValueBuffer>(Source, InIdentifier);
 				if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 				{
 					FWriteScopeLock WriteScopeLock(BufferLock);
+					if (const TSharedPtr<IBuffer> Existing = FindBuffer_Unsafe(ExpectedUID)) { return Existing; }
 					PropBuf->BufferIndex = Buffers.Add(PropBuf);
 					BufferMap.Add(PropBuf->GetUID(), PropBuf);
 					Buffer = PropBuf;
@@ -616,6 +649,7 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 				if (PropBuf->InitProperty(RawAttribute) && PropBuf->InitForRead(InSide))
 				{
 					FWriteScopeLock WriteScopeLock(BufferLock);
+					if (const TSharedPtr<IBuffer> Existing = FindBuffer_Unsafe(ExpectedUID)) { return Existing; }
 					PropBuf->BufferIndex = Buffers.Add(PropBuf);
 					BufferMap.Add(PropBuf->GetUID(), PropBuf);
 					Buffer = PropBuf;

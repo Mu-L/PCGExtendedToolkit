@@ -167,6 +167,21 @@ namespace PCGExAttributeRemap
 			return false;
 		}
 
+		// Attribute Remap is a per-field numeric operation (clamp + remap arithmetic).
+		// It has no meaning on extended-type scalars (Struct, Object, Class, Soft*,
+		// Byte, Text, Enum) or container attributes (TArray/TSet/TMap). Reject those
+		// here -- previously this was caught (incidentally) by TryGetType returning
+		// Unknown and failing Capture; that's no longer true, so the guard is now
+		// explicit.
+		{
+			const bool bIsContainer = InputDescriptor.bHasSourceDesc && !InputDescriptor.SourceDesc.IsSingleValue();
+			if (bIsContainer || !PCGExMetaHelpers::IsLegacyScalarType(InputDescriptor.RealType))
+			{
+				PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Attribute Remap requires a numeric scalar attribute. Struct, Object, container, and other extended types are not supported."));
+				return false;
+			}
+		}
+
 		// Number of dimensions to be remapped
 		UnderlyingType = InputDescriptor.WorkingType;
 		Dimensions = FMath::Min(4, PCGExData::GetNumFieldsForType(UnderlyingType));

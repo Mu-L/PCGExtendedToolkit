@@ -179,6 +179,9 @@ namespace PCGExData
 		// stay valid only as long as something else keeps the referent alive (typically the
 		// short PCG processing window). Do not persist these to long-lived UObject-owned storage
 		// without re-rooting. Soft variants (SoftObject/SoftClass) are safer (path-based).
+		// Runtime-constructed FProperty subclasses skip LinkInternal, so ElementSize
+		// must be set explicitly -- otherwise GetSize() returns 0 and FScopedTypedValue
+		// allocates a zero-byte buffer, tripping size checks in the property buffers.
 		case EPCGMetadataTypes::Object:
 		{
 			FObjectProperty* Prop = new FObjectProperty(PropertyScope, Desc.Name);
@@ -193,6 +196,7 @@ namespace PCGExData
 			}
 			Prop->SetPropertyClass(Class);
 			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash | CPF_TObjectPtr);
+			Prop->SetElementSize(sizeof(FObjectPtr));
 			return Prop;
 		}
 		case EPCGMetadataTypes::SoftObject:
@@ -205,6 +209,7 @@ namespace PCGExData
 			}
 			Prop->SetPropertyClass(Class);
 			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			Prop->SetElementSize(sizeof(FSoftObjectPtr));
 			return Prop;
 		}
 		case EPCGMetadataTypes::Class:
@@ -222,6 +227,7 @@ namespace PCGExData
 #endif
 			Prop->PropertyClass = UClass::StaticClass();
 			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			Prop->SetElementSize(sizeof(FObjectPtr));
 			return Prop;
 		}
 		case EPCGMetadataTypes::SoftClass:
@@ -239,6 +245,7 @@ namespace PCGExData
 #endif
 			Prop->PropertyClass = UClass::StaticClass();
 			Prop->SetPropertyFlags(CPF_HasGetValueTypeHash);
+			Prop->SetElementSize(sizeof(FSoftObjectPtr));
 			return Prop;
 		}
 		case EPCGMetadataTypes::SoftObjectPath:
@@ -276,6 +283,7 @@ namespace PCGExData
 		{
 			FStructProperty* Prop = new FStructProperty(PropertyScope, Desc.Name);
 			Prop->Struct = const_cast<UScriptStruct*>(ScriptStruct);
+			Prop->SetElementSize(ScriptStruct->GetStructureSize());
 
 			if (ScriptStruct->GetCppStructOps() && ScriptStruct->GetCppStructOps()->HasGetTypeHash())
 			{

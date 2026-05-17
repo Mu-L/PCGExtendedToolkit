@@ -468,6 +468,13 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 							ElemSize = PCGExTypes::GetElementSizeFromAttribute(Attr);
 							ElemAlign = FMath::Max(1, ElemAlign);
 						}
+						else if (InDescriptor.bHasSourceDesc)
+						{
+							// Fresh write target: derive size from the template Desc the caller
+							// propagated onto the descriptor (e.g. PrepareForData mirrors A onto C).
+							ElemSize = FPropertyBuffer::GetElementSizeFromDesc(InDescriptor.SourceDesc);
+							ElemAlign = FMath::Max(1, ElemAlign);
+						}
 					}
 
 					if (ElemSize > 0)
@@ -487,6 +494,21 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 								SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::Out);
 							}
 
+							// Output Mode: New -- create the attribute from the template Desc
+							// the factory propagated (mirrors FPCGExProperty_Struct::InitializeOutput).
+							if (!SrcAttr && InDescriptor.bHasSourceDesc && InDescriptor.Role == EProxyRole::Write)
+							{
+								if (UPCGBasePointData* OutData = InDataFacade->GetOut();
+									OutData && OutData->Metadata)
+								{
+									FPCGMetadataAttributeDesc OutDesc = InDescriptor.SourceDesc;
+									OutDesc.Name = Identifier.Name;
+									SrcAttr = OutData->Metadata->CreateAttribute(
+										Identifier, OutDesc,
+										/*bAllowsInterp=*/true, /*bOverrideParent=*/true);
+								}
+							}
+
 							if (SrcAttr)
 							{
 								PropertyBuf = InDataFacade->GetWritable(
@@ -497,7 +519,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 						if (PropertyBuf)
 						{
-							auto Proxy = MakeShared<FPropertyBufferProxy>(ElemSize, ElemAlign);
+							auto Proxy = MakeShared<FPropertyBufferProxy>(ElemSize, ElemAlign, InDescriptor.RealType, InDescriptor.WorkingType);
 							Proxy->Buffer = PropertyBuf;
 							OutProxy = Proxy;
 						}

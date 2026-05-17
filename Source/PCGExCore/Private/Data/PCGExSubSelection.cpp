@@ -519,7 +519,7 @@ namespace PCGExData
 			}
 			if (const FPCGMetadataAttributeBase* AttributeBase = InData->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(FixedSelector, InData)))
 			{
-				OutType = static_cast<EPCGMetadataTypes>(AttributeBase->GetTypeId());
+				OutType = PCGExMetaHelpers::GetAttributeType(AttributeBase);
 			}
 		}
 		else if (FixedSelector.GetSelection() == EPCGAttributePropertySelection::ExtraProperty)

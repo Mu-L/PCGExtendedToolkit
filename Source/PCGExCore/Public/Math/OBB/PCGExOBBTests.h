@@ -161,9 +161,15 @@ namespace PCGExMath::OBB
 		const float AZ = FMath::Abs(LocalCenter.Z);
 
 		// Some Source corner is provably outside Target.
-		if (AX - SR > EX || AY - SR > EY || AZ - SR > EZ) { return false; }
+		if (AX - SR > EX || AY - SR > EY || AZ - SR > EZ)
+		{
+			return false;
+		}
 		// All Source corners provably inside Target.
-		if (AX + SR <= EX && AY + SR <= EY && AZ + SR <= EZ) { return true; }
+		if (AX + SR <= EX && AY + SR <= EY && AZ + SR <= EZ)
+		{
+			return true;
+		}
 
 		// Borderline: exact 8-corner check.
 		const FVector& SE = Source.Bounds.Extents;
@@ -188,7 +194,10 @@ namespace PCGExMath::OBB
 	FORCEINLINE bool SphereContains(const FOBB& Target, const FOBB& Source, float Expansion = 0.0f)
 	{
 		const float Allowed = Target.Bounds.Radius + Expansion - Source.Bounds.Radius;
-		if (Allowed < 0.0f) { return false; }
+		if (Allowed < 0.0f)
+		{
+			return false;
+		}
 		return FVector::DistSquared(Target.Bounds.Origin, Source.Bounds.Origin) <= Allowed * Allowed;
 	}
 

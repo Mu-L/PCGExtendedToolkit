@@ -266,7 +266,7 @@ namespace PCGExTypes
 
 		static FORCEINLINE FVector4 Min()
 		{
-			return FVector4(TNumericLimits<double>::Lowest(),TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
+			return FVector4(TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
 		}
 
 		static FORCEINLINE FVector4 Max()

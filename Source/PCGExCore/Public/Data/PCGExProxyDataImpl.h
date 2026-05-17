@@ -208,7 +208,7 @@ namespace PCGExData
 		int32 ElementSize = 0;
 		int32 ElementAlignment = 1;
 
-		FPropertyBufferProxy(int32 InElementSize, int32 InElementAlignment);
+		FPropertyBufferProxy(int32 InElementSize, int32 InElementAlignment, EPCGMetadataTypes InRealType, EPCGMetadataTypes InWorkingType);
 
 		virtual void GetVoid(const int32 Index, void* OutValue) const override;
 		virtual void SetVoid(const int32 Index, const void* Value) const override;

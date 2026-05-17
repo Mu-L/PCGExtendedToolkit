@@ -141,6 +141,28 @@ namespace PCGExMetaHelpers
 		return TryGetMutableAttribute<T>(InData->MutableMetadata(), Identifier);
 	}
 
+	/**
+	 * Returns the attribute's value type. Reads `GetTypeId()` first (set for legacy
+	 * templated attributes Float..SoftClassPath); falls back to `Desc.ValueType` for
+	 * desc-created attributes (Struct, Object, Class, Soft*, Byte, Text, Enum, containers)
+	 * where GetTypeId() is Unknown. For containers the returned type is the *element*
+	 * type -- pair with `GetAttributeDesc().IsSingleValue()` to distinguish.
+	 * Returns Unknown if InAttribute is null.
+	 */
+	PCGEXCORE_API EPCGMetadataTypes GetAttributeType(const FPCGMetadataAttributeBase* InAttribute);
+
+	/**
+	 * True for legacy templated scalar types (Float..SoftClassPath) -- i.e. those with a
+	 * `FPCGMetadataAttribute<T>` specialization. False for Unknown and extended types
+	 * (Byte/Text/Enum/Struct/Object/Soft/Class/SoftClass) `static_cast<FPCGMetadataAttribute<T>*>` on those is UB.
+	 * Does NOT distinguish containers -- TArray<float> reports ValueType = Float
+	 * static_cast<legacy>(but) is property-backed.Pair with `Desc.IsSingleValue()`	for the full check.
+	*/
+	constexpr static bool IsLegacyScalarType(const EPCGMetadataTypes Type)
+	{
+		return static_cast<uint8>(Type) < static_cast<uint8>(EPCGMetadataTypes::EndLegacyTypes);
+	}
+
 	constexpr static EPCGMetadataTypes GetPropertyType(const EPCGPointProperties Property)
 	{
 		switch (Property)

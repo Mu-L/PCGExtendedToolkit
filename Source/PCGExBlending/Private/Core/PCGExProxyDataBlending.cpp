@@ -359,6 +359,65 @@ namespace PCGExBlending
 		return Blender;
 	}
 
+	namespace
+	{
+		// Resolve the FProperty that backs a proxy when it wraps an FPropertyBuffer.
+		// Returns nullptr for typed TBuffer<T> proxies / constants / point-property proxies.
+		// The returned FProperty is non-owning -- its lifetime is tied to the buffer (which
+		// the blender holds via TSharedPtr through the proxy, so it outlives the operation).
+		const FProperty* ResolveBackingProperty(const TSharedPtr<PCGExData::IBufferProxy>& Proxy)
+		{
+			if (!Proxy)
+			{
+				return nullptr;
+			}
+			const TSharedPtr<PCGExData::IBuffer> Buf = Proxy->GetBuffer();
+			if (!Buf || !Buf->IsPropertyBacked())
+			{
+				return nullptr;
+			}
+			const TSharedPtr<PCGExData::FPropertyBuffer> PropBuf = StaticCastSharedPtr<PCGExData::FPropertyBuffer>(Buf);
+			return PropBuf->GetCachedProperty();
+		}
+
+		// Prefer the FProperty-aware path when any proxy is property-backed: routes through
+		// FPropertyCopyBlendOperation (CopyCompleteValue) -- correct for containers and structs
+		// with heap-owning members where memcpy would shallow-copy.
+		//
+		// WorkingType forced to Unknown so the factory's switch falls through to the default
+		// FProperty branch even when the descriptor's inner type happens to be legacy (e.g.
+		// TArray<float> reports RealType=Float; dispatching to TBlendOperationImpl<float>
+		// would memcpy FScriptArray bytes -- wrong).
+		TSharedPtr<IBlendOperation> CreateOperationForProxies(
+			const PCGExData::FProxyDescriptor& A,
+			const TSharedPtr<PCGExData::IBufferProxy>& AProxy,
+			const TSharedPtr<PCGExData::IBufferProxy>& BProxy,
+			const TSharedPtr<PCGExData::IBufferProxy>& CProxy,
+			EPCGExABBlendingType BlendMode,
+			bool bResetValueForMultiBlend)
+		{
+			const FProperty* Prop = ResolveBackingProperty(AProxy);
+			if (!Prop)
+			{
+				Prop = ResolveBackingProperty(BProxy);
+			}
+			if (!Prop)
+			{
+				Prop = ResolveBackingProperty(CProxy);
+			}
+
+			if (Prop)
+			{
+				return FBlendOperationFactory::Create(EPCGMetadataTypes::Unknown, BlendMode, bResetValueForMultiBlend, Prop);
+			}
+
+			// Legacy/typed path: size from descriptor for generic types in the supported set.
+			const int32 DerivedSize = A.ValueSize > 0 ? A.ValueSize : PCGExTypes::GetElementSizeFromType(A.WorkingType);
+			const int32 DerivedAlign = A.ValueAlignment > 1 ? A.ValueAlignment : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
+			return FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);
+		}
+	}
+
 	TSharedPtr<FProxyDataBlender> CreateProxyBlender(
 		FPCGExContext* InContext,
 		const EPCGExABBlendingType BlendMode,
@@ -378,20 +437,8 @@ namespace PCGExBlending
 		// Set type info
 		Blender->UnderlyingType = A.WorkingType;
 
-		// Create blend operation -- forward size from descriptor for generic types
-		const int32 DerivedSize = A.ValueSize > 0 ? A.ValueSize : PCGExTypes::GetElementSizeFromType(A.WorkingType);
-		const int32 DerivedAlign = A.ValueAlignment > 1 ? A.ValueAlignment : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
-		Blender->Operation = FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);
-		if (!Blender->Operation)
-		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
-			return nullptr;
-		}
-
-		Blender->ValueSize = Blender->Operation->GetValueSize();
-		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
-
-		// Create output first so we may read from it
+		// Create proxies first -- the operation now depends on whether any proxy is
+		// property-backed, which we can only know after they're built.
 		Blender->C = PCGExData::GetProxyBuffer(InContext, C);
 		Blender->A = PCGExData::GetProxyBuffer(InContext, A);
 		Blender->B = PCGExData::GetProxyBuffer(InContext, B);
@@ -413,6 +460,16 @@ namespace PCGExBlending
 			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to generate buffer for Output."));
 			return nullptr;
 		}
+
+		Blender->Operation = CreateOperationForProxies(A, Blender->A, Blender->B, Blender->C, BlendMode, bResetValueForMultiBlend);
+		if (!Blender->Operation)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
+			return nullptr;
+		}
+
+		Blender->ValueSize = Blender->Operation->GetValueSize();
+		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
 
 		// Ensure C is readable for MultiBlend, as those will use GetCurrent
 		if (!Blender->C->EnsureReadable())
@@ -442,20 +499,7 @@ namespace PCGExBlending
 		// Set type info
 		Blender->UnderlyingType = A.WorkingType;
 
-		// Create blend operation -- forward size from descriptor for generic types
-		const int32 DerivedSize = A.ValueSize > 0 ? A.ValueSize : PCGExTypes::GetElementSizeFromType(A.WorkingType);
-		const int32 DerivedAlign = A.ValueAlignment > 1 ? A.ValueAlignment : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
-		Blender->Operation = FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);
-		if (!Blender->Operation)
-		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
-			return nullptr;
-		}
-
-		Blender->ValueSize = Blender->Operation->GetValueSize();
-		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
-
-		// Create output first so we may read from it
+		// Create proxies first (see 3-source overload for rationale).
 		Blender->C = PCGExData::GetProxyBuffer(InContext, C);
 		Blender->A = PCGExData::GetProxyBuffer(InContext, A);
 		Blender->B = Blender->A; // Use B as fallback -- important for intrinsic properties such as $Index
@@ -471,6 +515,16 @@ namespace PCGExBlending
 			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to generate buffer for Output."));
 			return nullptr;
 		}
+
+		Blender->Operation = CreateOperationForProxies(A, Blender->A, Blender->B, Blender->C, BlendMode, bResetValueForMultiBlend);
+		if (!Blender->Operation)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
+			return nullptr;
+		}
+
+		Blender->ValueSize = Blender->Operation->GetValueSize();
+		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
 
 		// Ensure C is readable for MultiBlend, as those will use GetCurrent
 		if (!Blender->C->EnsureReadable())

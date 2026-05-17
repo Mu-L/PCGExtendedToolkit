@@ -1166,7 +1166,10 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE double MatchScore(const Type& A, const Type& B) { return A == B ? 0.0 : 1.0; }
+		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
+		{
+			return A == B ? 0.0 : 1.0;
+		}
 	};
 
 	// Text Type Operations - FText -- DELETED (Byte/Text cleanup).

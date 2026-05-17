@@ -9,6 +9,7 @@
 #include "Metadata/PCGMetadataAttributeTraits.h"
 
 #include "PCGPointPropertiesTraits.h"
+#include "Data/PCGExData.h"
 
 struct FPCGExContext;
 class UPCGBasePointData;
@@ -285,11 +286,19 @@ namespace PCGExBlending
 		int32 ValueSize = 0;
 		int32 ValueAlignment = 1;
 
-		// Create a FScopedTypedValue with correct sizing for the underlying type.
-		// Uses the 3-arg constructor when ValueSize is known (generic/new types),
-		// otherwise falls back to the 1-arg constructor (known legacy types).
+		// Build a FScopedTypedValue sized for the underlying type. Delegates to the source
+		// buffer when available (property buffers return FProperty-aware values, correct for
+		// containers and heap-owning structs); falls back to descriptor sizing for proxies
+		// without a buffer (TConstantProxy, point-property proxies).
 		FORCEINLINE PCGExTypes::FScopedTypedValue MakeScopedValue() const
 		{
+			if (A)
+			{
+				if (TSharedPtr<PCGExData::IBuffer> Buf = A->GetBuffer())
+				{
+					return Buf->MakeScopedValue();
+				}
+			}
 			if (ValueSize > 0 && PCGExTypes::FScopedTypedValue::GetTypeSize(UnderlyingType) == 0)
 			{
 				return PCGExTypes::FScopedTypedValue(UnderlyingType, ValueSize, ValueAlignment);
@@ -299,7 +308,7 @@ namespace PCGExBlending
 	};
 
 	//
-	// Factory functions for creating proxy blenders
+	// Factory functions for creating prMetoxy blenders
 	//
 
 	// Create blender with just type and mode - caller sets A, B, C proxies manually
