@@ -70,9 +70,14 @@ namespace PCGExData
 
 		// Non-owning accessor to the cached property that drives this buffer's reads/writes.
 		// Lifetime-tied to the buffer itself -- do not retain past the buffer's lifetime.
-		// Used by FBlendOperationFactory / CreateProxyBlender to construct property-aware blend ops
-		// for container/extended types where (EnumType, VTO)-based sizing returns 0.
+		// Prefer IBuffer::GetSourceProperty() at call sites that only hold an IBuffer pointer;
+		// this stays for backwards compatibility with code that already has an FPropertyBuffer.
 		const FProperty* GetCachedProperty() const
+		{
+			return CachedInnerProperty;
+		}
+
+		virtual const FProperty* GetSourceProperty() const override
 		{
 			return CachedInnerProperty;
 		}
@@ -83,12 +88,6 @@ namespace PCGExData
 		{
 			check(CachedInnerProperty);
 			return PCGExTypes::FScopedTypedValue(CachedInnerProperty);
-		}
-
-		// Property-backed buffer -- see IBuffer::IsPropertyBacked() rationale.
-		virtual bool IsPropertyBacked() const override
-		{
-			return true;
 		}
 
 		// Static factory: build an FProperty matching the attribute's full descriptor.

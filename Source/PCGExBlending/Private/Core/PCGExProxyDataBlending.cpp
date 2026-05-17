@@ -361,10 +361,9 @@ namespace PCGExBlending
 
 	namespace
 	{
-		// Resolve the FProperty that backs a proxy when it wraps an FPropertyBuffer.
-		// Returns nullptr for typed TBuffer<T> proxies / constants / point-property proxies.
-		// The returned FProperty is non-owning -- its lifetime is tied to the buffer (which
-		// the blender holds via TSharedPtr through the proxy, so it outlives the operation).
+		// Resolve the FProperty backing a proxy. Returns nullptr for typed TBuffer<T> proxies,
+		// constants, and point-property proxies. Non-owning -- the FProperty's lifetime is tied
+		// to the buffer, which the blender holds via TSharedPtr through the proxy.
 		const FProperty* ResolveBackingProperty(const TSharedPtr<PCGExData::IBufferProxy>& Proxy)
 		{
 			if (!Proxy)
@@ -372,12 +371,7 @@ namespace PCGExBlending
 				return nullptr;
 			}
 			const TSharedPtr<PCGExData::IBuffer> Buf = Proxy->GetBuffer();
-			if (!Buf || !Buf->IsPropertyBacked())
-			{
-				return nullptr;
-			}
-			const TSharedPtr<PCGExData::FPropertyBuffer> PropBuf = StaticCastSharedPtr<PCGExData::FPropertyBuffer>(Buf);
-			return PropBuf->GetCachedProperty();
+			return Buf ? Buf->GetSourceProperty() : nullptr;
 		}
 
 		// Prefer the FProperty-aware path when any proxy is property-backed: routes through

@@ -170,14 +170,20 @@ namespace PCGExData
 		// TBuffer<T> uses compile-time TTraits<T>::Type; FPropertyBuffer uses its cached FProperty.
 		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const = 0;
 
+		// Source FProperty backing this buffer. nullptr for typed TBuffer<T>; non-null for
+		// FPropertyBuffer post-InitProperty. Use for FProperty-aware operations (deep copy via
+		// CopyCompleteValue, sized scoped values). Lifetime tied to this buffer.
+		virtual const FProperty* GetSourceProperty() const { return nullptr; }
+
+		// Attribute descriptor for this buffer. Always non-null -- synthetic Desc on TBuffer<T>
+		// (Name + TTraits<T>::Type), real Desc on FPropertyBuffer (carries ContainerTypes,
+		// ValueTypeObject, KeyType). Use for shape introspection without downcasting.
+		FORCEINLINE const FPCGMetadataAttributeDesc* GetDesc() const { return &Desc; }
+
 		// True iff this buffer is property-backed (FPropertyArrayBuffer / FPropertySingleValueBuffer
-		// fallback path for extended/container types). False for typed TBuffer<T> instances.
-		// Use this to safely gate StaticCastSharedPtr<FPropertyBuffer>(buf) -- the typed and property
-		// buffer hierarchies are siblings under IBuffer, so an unconditional static cast would be UB.
-		virtual bool IsPropertyBacked() const
-		{
-			return false;
-		}
+		// fallback path for extended/container types). Derived from GetSourceProperty -- typed
+		// TBuffer<T> never carries an FProperty.
+		FORCEINLINE bool IsPropertyBacked() const { return GetSourceProperty() != nullptr; }
 
 		virtual void Flush()
 		{
@@ -185,6 +191,10 @@ namespace PCGExData
 
 	protected:
 		void SetType(const EPCGMetadataTypes InType);
+
+		// Attribute descriptor cache -- populated by subclass constructors / Init paths.
+		// Exposed read-only via GetDesc(); see comment there.
+		FPCGMetadataAttributeDesc Desc;
 	};
 
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
