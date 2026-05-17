@@ -132,7 +132,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * This name is used to match properties across schemas, overrides, and output configs.
 	 * Must be unique within a schema collection.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Settings, meta=(DisplayPriority = -1))
+	UPROPERTY()
 	FName PropertyName;
 
 #if WITH_EDITORONLY_DATA

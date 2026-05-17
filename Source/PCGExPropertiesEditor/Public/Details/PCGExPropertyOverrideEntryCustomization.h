@@ -6,6 +6,8 @@
 #include "IPropertyTypeCustomization.h"
 
 class FStructOnScope;
+class IPropertyUtilities;
+class UUserDefinedStruct;
 
 
 /**
@@ -29,6 +31,8 @@ class FPCGExPropertyOverrideEntryCustomization : public IPropertyTypeCustomizati
 public:
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();
 
+	virtual ~FPCGExPropertyOverrideEntryCustomization() override;
+
 	virtual void CustomizeHeader(
 		TSharedRef<IPropertyHandle> PropertyHandle,
 		class FDetailWidgetRow& HeaderRow,
@@ -40,6 +44,8 @@ public:
 		IPropertyTypeCustomizationUtils& CustomizationUtils) override;
 
 private:
+	void OnUserDefinedStructReinstanced(const UUserDefinedStruct& Struct);
+
 	const struct FPCGExProperty* AccessEntryProperty() const;
 	FText GetEntryNameText() const;
 	FText GetEntryTypeText() const;
@@ -48,4 +54,10 @@ private:
 	TSharedPtr<IPropertyHandle> ValueHandlePtr;
 	TSharedPtr<IPropertyHandle> EnabledHandlePtr;
 	TSharedPtr<FStructOnScope> InnerScope;
+
+	// Aliases FPCGExProperty_Struct::Value memory; must outlive every row that captures it.
+	TSharedPtr<FStructOnScope> NestedScope;
+
+	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
+	FDelegateHandle UserDefinedStructReinstancedHandle;
 };

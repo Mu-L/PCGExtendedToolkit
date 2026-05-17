@@ -753,6 +753,11 @@ namespace PCGExData
 		PCGEX_SHARED_CONTEXT_VOID(Source->GetContextHandle())
 		SharedContext.Get()->AddProtectedAttributeName(GenericOutAttribute->Name);
 
+		// Without GetOutKeys, fresh points share PCGDefaultValueKey (-1) and per-point
+		// SetValueFromProperty collapses into the default slot. Typed TBuffer<T> gets this
+		// via PCGAttributeAccessorHelpers; the property path has to trigger it manually.
+		Source->GetOutKeys(bEnsureValidKeys);
+
 		auto EntryKeys = OutData->GetConstMetadataEntryValueRange();
 		const int32 NumPoints = FMath::Min(EntryKeys.Num(), OutBytes->Num() / FMath::Max(1, ElementSize));
 
