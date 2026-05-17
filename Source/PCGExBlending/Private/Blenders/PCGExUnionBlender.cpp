@@ -58,8 +58,12 @@ namespace PCGExBlending
 			const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
 			TSharedPtr<PCGExData::IBuffer> InitializationBuffer = nullptr;
 
+			// FAttributeIdentity inherits from FPCGMetadataAttributeDesc -- use IsSameType for the
+			// shape comparison instead of GetTypeId. Property-backed attributes both report Unknown
+			// from FPCGMetadataAttributeBase::GetTypeId, so the legacy id check would false-positive
+			// match a Struct against a TArray<float> against an Object on the target side.
 			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identifier);
-				ExistingAttribute && ExistingAttribute->GetTypeId() == Identity.GetTypeId())
+				ExistingAttribute && ExistingAttribute->GetAttributeDesc().IsSameType(Identity))
 			{
 				// This attribute exists on target already
 				InitializationBuffer = InTargetData->GetWritable(WorkingType, ExistingAttribute, PCGExData::EBufferInit::Inherit);
@@ -76,19 +80,9 @@ namespace PCGExBlending
 				return false;
 			}
 
-			// Property-backed buffers (containers, extended types, Object family) cache an FProperty
-			// that handles container layout and deep-copy semantics. Route those to CreateProxyBlender's
-			// FProperty overload. IBuffer::IsPropertyBacked() is the safe gate for the static cast --
-			// typed and property buffers are siblings under IBuffer, so an unconditional
-			// StaticCastSharedPtr would be UB.
-			const FProperty* InitProperty = nullptr;
-			if (InitializationBuffer->IsPropertyBacked())
-			{
-				if (TSharedPtr<PCGExData::FPropertyBuffer> AsPropBuf = StaticCastSharedPtr<PCGExData::FPropertyBuffer>(InitializationBuffer))
-				{
-					InitProperty = AsPropBuf->GetCachedProperty();
-				}
-			}
+			// Property-backed buffers cache an FProperty for container layout / deep-copy semantics.
+			// IBuffer::GetSourceProperty returns null for typed TBuffer<T> -- no cast or gate needed.
+			const FProperty* InitProperty = InitializationBuffer->GetSourceProperty();
 
 			MainBlender = InitProperty
 				? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)

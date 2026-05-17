@@ -417,7 +417,10 @@ namespace PCGExData
 			return false;
 		}
 
-		const FPCGMetadataAttributeDesc& Desc = InGenericAttribute->GetAttributeDesc();
+		// Cache the real attribute descriptor onto the IBuffer member -- replaces the empty
+		// default-constructed Desc from the IBuffer base, so GetDesc() now reflects the actual
+		// attribute shape (ContainerTypes, ValueTypeObject, KeyType).
+		Desc = InGenericAttribute->GetAttributeDesc();
 
 		// Build the FULL property -- including container wrapping, so reads/writes/copies
 		// of TArray/TSet/TMap attributes route through FArrayProperty/FSetProperty/FMapProperty.

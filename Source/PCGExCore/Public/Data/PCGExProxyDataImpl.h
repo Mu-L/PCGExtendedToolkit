@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExData.h"
 #include "PCGExDataCommon.h"
 #include "PCGExProxyData.h"
 #include "Data/PCGExCachedSubSelection.h"
@@ -204,11 +205,9 @@ namespace PCGExData
 	class PCGEXCORE_API FPropertyBufferProxy : public IBufferProxy
 	{
 	public:
-		TSharedPtr<IBuffer> Buffer;
-		int32 ElementSize = 0;
-		int32 ElementAlignment = 1;
+		const TSharedPtr<IBuffer> Buffer;
 
-		FPropertyBufferProxy(int32 InElementSize, int32 InElementAlignment, EPCGMetadataTypes InRealType, EPCGMetadataTypes InWorkingType);
+		FPropertyBufferProxy(const TSharedPtr<IBuffer>& InBuffer, EPCGMetadataTypes InRealType, EPCGMetadataTypes InWorkingType);
 
 		virtual void GetVoid(const int32 Index, void* OutValue) const override;
 		virtual void SetVoid(const int32 Index, const void* Value) const override;
@@ -219,8 +218,9 @@ namespace PCGExData
 
 		virtual PCGExValueHash ReadValueHash(const int32 Index) const override;
 
-		virtual int32 GetValueSize() const override;
-		virtual int32 GetValueAlignment() const override;
+		// Forward size/alignment to the underlying buffer -- single source of truth.
+		virtual int32 GetValueSize() const override { return Buffer ? Buffer->GetValueSize() : 0; }
+		virtual int32 GetValueAlignment() const override { return Buffer ? Buffer->GetValueAlignment() : 1; }
 	};
 
 	//

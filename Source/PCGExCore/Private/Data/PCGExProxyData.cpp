@@ -31,59 +31,9 @@ namespace PCGExData
 
 	bool FProxyDescriptor::Capture(FPCGExContext* InContext, const FString& Path, const EIOSide InSide, const bool bRequired)
 	{
-		const TSharedPtr<FFacade> InFacade = DataFacade.Pin();
-		check(InFacade);
-
-		bool bValid = true;
-
-		Selector = FPCGAttributePropertyInputSelector();
-		Selector.Update(Path);
-
-		Side = InSide;
-
-		if (!TryGetTypeAndSource(Selector, InFacade, RealType, Side))
-		{
-			if (bRequired)
-			{
-				PCGEX_LOG_INVALID_SELECTOR_C(InContext, , Selector)
-			}
-			bValid = false;
-		}
-
-		Selector = Selector.CopyAndFixLast(InFacade->Source->GetData(Side));
-
-		UpdateSubSelection();
-		WorkingType = SubSelection.GetSubType(RealType);
-
-		// Cache the source attribute's Desc once, up front. Needed by both
-		// the VTO-based size/alignment branch below and by container-aware
-		// chain accessors. Stays default-constructed + bHasSourceDesc=false
-		// when the selector isn't an attribute (point property, extra property).
-		bHasSourceDesc = false;
-		const UObject* VTO = nullptr;
-		if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
-		{
-			if (const UPCGData* InData = InFacade->Source->GetData(Side);
-				InData && InData->Metadata)
-			{
-				if (const FPCGMetadataAttributeBase* Attr = InData->Metadata->GetConstAttribute(
-					PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
-				{
-					SourceDesc = Attr->GetAttributeDesc();
-					bHasSourceDesc = true;
-					VTO = SourceDesc.ValueTypeObject;
-				}
-			}
-		}
-
-		// Derive size/alignment for generic types that GetTypeSize doesn't know about
-		if (bValid && PCGExTypes::FScopedTypedValue::GetTypeSize(WorkingType) == 0)
-		{
-			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType, VTO);
-			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType, VTO);
-		}
-
-		return bValid;
+		FPCGAttributePropertyInputSelector NewSelector;
+		NewSelector.Update(Path);
+		return Capture(InContext, NewSelector, InSide, bRequired);
 	}
 
 	bool FProxyDescriptor::Capture(FPCGExContext* InContext, const FPCGAttributePropertyInputSelector& InSelector, const EIOSide InSide, const bool bRequired)
@@ -109,11 +59,9 @@ namespace PCGExData
 		UpdateSubSelection();
 		WorkingType = SubSelection.GetSubType(RealType);
 
-		// Mirror the Path-based Capture overload: cache attribute Desc once
-		// so both the VTO sizing branch below and container-aware chain
-		// classifiers can consult it.
-		bHasSourceDesc = false;
-		const UObject* VTO = nullptr;
+		// Cache the source attribute's Desc. Reset to default first so SourceDesc.IsValid()
+		// returns false when the selector isn't an attribute (point property, extra property).
+		SourceDesc = FPCGMetadataAttributeDesc{};
 		if (Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 		{
 			if (const UPCGData* InData = InFacade->Source->GetData(Side);
@@ -123,17 +71,8 @@ namespace PCGExData
 					PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData)))
 				{
 					SourceDesc = Attr->GetAttributeDesc();
-					bHasSourceDesc = true;
-					VTO = SourceDesc.ValueTypeObject;
 				}
 			}
-		}
-
-		// Derive size/alignment for generic types that GetTypeSize doesn't know about
-		if (bValid && PCGExTypes::FScopedTypedValue::GetTypeSize(WorkingType) == 0)
-		{
-			ValueSize = PCGExTypes::GetElementSizeFromType(WorkingType, VTO);
-			ValueAlignment = PCGExTypes::GetElementAlignmentFromType(WorkingType, VTO);
 		}
 
 		return bValid;

@@ -87,17 +87,12 @@ namespace PCGExData
 		EPCGMetadataTypes RealType = EPCGMetadataTypes::Unknown;
 		EPCGMetadataTypes WorkingType = EPCGMetadataTypes::Unknown;
 
-		// Element size/alignment for generic types (0 = derived from type enum)
-		int32 ValueSize = 0;
-		int32 ValueAlignment = 1;
-
-		// Cached attribute descriptor, populated by Capture() when the selector
-		// resolves to an actual attribute (as opposed to a point property or
-		// extra property). Used by container-aware accessors in the compiled
-		// chain (FContainerIndex / FContainerCount). Only valid when
-		// bHasSourceDesc is true.
+		// Cached attribute descriptor, populated by Capture() when the selector resolves to
+		// an actual attribute (point/extra-property selectors leave this default-constructed).
+		// Check SourceDesc.IsValid() before relying on its fields. Used by container-aware
+		// accessors in the compiled chain (FContainerIndex / FContainerCount); element size /
+		// alignment for the proxy itself is read from the underlying buffer via IBuffer::GetValueSize.
 		FPCGMetadataAttributeDesc SourceDesc;
-		bool bHasSourceDesc = false;
 
 		TWeakPtr<FFacade> DataFacade;
 		const UPCGBasePointData* PointData = nullptr;

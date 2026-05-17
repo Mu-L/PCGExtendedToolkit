@@ -361,10 +361,9 @@ namespace PCGExBlending
 
 	namespace
 	{
-		// Resolve the FProperty that backs a proxy when it wraps an FPropertyBuffer.
-		// Returns nullptr for typed TBuffer<T> proxies / constants / point-property proxies.
-		// The returned FProperty is non-owning -- its lifetime is tied to the buffer (which
-		// the blender holds via TSharedPtr through the proxy, so it outlives the operation).
+		// Resolve the FProperty backing a proxy. Returns nullptr for typed TBuffer<T> proxies,
+		// constants, and point-property proxies. Non-owning -- the FProperty's lifetime is tied
+		// to the buffer, which the blender holds via TSharedPtr through the proxy.
 		const FProperty* ResolveBackingProperty(const TSharedPtr<PCGExData::IBufferProxy>& Proxy)
 		{
 			if (!Proxy)
@@ -372,12 +371,7 @@ namespace PCGExBlending
 				return nullptr;
 			}
 			const TSharedPtr<PCGExData::IBuffer> Buf = Proxy->GetBuffer();
-			if (!Buf || !Buf->IsPropertyBacked())
-			{
-				return nullptr;
-			}
-			const TSharedPtr<PCGExData::FPropertyBuffer> PropBuf = StaticCastSharedPtr<PCGExData::FPropertyBuffer>(Buf);
-			return PropBuf->GetCachedProperty();
+			return Buf ? Buf->GetSourceProperty() : nullptr;
 		}
 
 		// Prefer the FProperty-aware path when any proxy is property-backed: routes through
@@ -411,9 +405,12 @@ namespace PCGExBlending
 				return FBlendOperationFactory::Create(EPCGMetadataTypes::Unknown, BlendMode, bResetValueForMultiBlend, Prop);
 			}
 
-			// Legacy/typed path: size from descriptor for generic types in the supported set.
-			const int32 DerivedSize = A.ValueSize > 0 ? A.ValueSize : PCGExTypes::GetElementSizeFromType(A.WorkingType);
-			const int32 DerivedAlign = A.ValueAlignment > 1 ? A.ValueAlignment : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
+			// Legacy/typed path: read sizes from the proxy's underlying buffer (typed TBuffer<T>
+			// reports sizeof(T)/alignof(T)). For proxies without a backing buffer (TConstantProxy,
+			// point-property proxies), fall back to type-only derivation from WorkingType.
+			const TSharedPtr<PCGExData::IBuffer> ABuf = AProxy ? AProxy->GetBuffer() : nullptr;
+			const int32 DerivedSize = ABuf ? ABuf->GetValueSize() : PCGExTypes::GetElementSizeFromType(A.WorkingType);
+			const int32 DerivedAlign = ABuf ? ABuf->GetValueAlignment() : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
 			return FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);
 		}
 	}

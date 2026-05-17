@@ -375,7 +375,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 				if (OutProxy)
 				{
-					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr);
+					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.SourceDesc.IsValid() ? &InDescriptor.SourceDesc : nullptr);
 				}
 				return OutProxy;
 			}
@@ -407,7 +407,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 				if (OutProxy)
 				{
-					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr);
+					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.SourceDesc.IsValid() ? &InDescriptor.SourceDesc : nullptr);
 				}
 				return OutProxy;
 			}
@@ -422,7 +422,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 				// would instantiate TBuffer<FVector> -- wrong for container
 				// storage (which is FScriptArray layout). Skip straight to
 				// the Tier 3 FPropertyBuffer fallback for containers.
-				const bool bIsContainer = InDescriptor.bHasSourceDesc && !InDescriptor.SourceDesc.IsSingleValue();
+				const bool bIsContainer = InDescriptor.SourceDesc.IsValid() && !InDescriptor.SourceDesc.IsSingleValue();
 
 				if (!bIsContainer && InDescriptor.HasFlag(EProxyFlags::Direct))
 				{
@@ -447,82 +447,56 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 					});
 				}
 
-				// Tier 3 fallback: generic/unknown attribute types not in PCGEX_FOREACH_SUPPORTEDTYPES.
-				// Uses FPropertyBufferProxy wrapping FPropertyBuffer via void* R/W -- no type conversion,
-				// but enables FCopyOnlyBlendOperation (memcpy-based) to carry the data through blending.
+				// Tier 3 fallback: wrap FPropertyBuffer via void* R/W for types not in
+				// PCGEX_FOREACH_SUPPORTEDTYPES. FFacade::GetWritable/GetDefaultReadable gate on
+				// InitProperty internally -- a failed size derivation returns nullptr.
 				if (!OutProxy)
 				{
 					const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(
 						InDescriptor.Selector,
 						InDescriptor.Side == EIOSide::In ? InDataFacade->GetIn() : InDataFacade->GetOut());
 
-					// Resolve element size -- descriptor may have it, or we derive from the attribute
-					int32 ElemSize = InDescriptor.ValueSize;
-					int32 ElemAlign = InDescriptor.ValueAlignment;
+					TSharedPtr<IBuffer> PropertyBuf;
 
-					if (ElemSize <= 0)
+					if (InDescriptor.Role == EProxyRole::Read)
 					{
-						const FPCGMetadataAttributeBase* Attr = InDataFacade->FindConstAttribute(Identifier, InDescriptor.Side == EIOSide::In ? EIOSide::In : EIOSide::Out);
-						if (Attr)
+						PropertyBuf = InDataFacade->GetDefaultReadable(Identifier, InDescriptor.Side);
+					}
+					else
+					{
+						// For writes, find the source attribute and use the type-erased writable path
+						const FPCGMetadataAttributeBase* SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::In);
+						if (!SrcAttr)
 						{
-							ElemSize = PCGExTypes::GetElementSizeFromAttribute(Attr);
-							ElemAlign = FMath::Max(1, ElemAlign);
+							SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::Out);
 						}
-						else if (InDescriptor.bHasSourceDesc)
+
+						// Output Mode: New -- create the attribute from the template Desc
+						// the factory propagated (mirrors FPCGExProperty_Struct::InitializeOutput).
+						if (!SrcAttr && InDescriptor.SourceDesc.IsValid())
 						{
-							// Fresh write target: derive size from the template Desc the caller
-							// propagated onto the descriptor (e.g. PrepareForData mirrors A onto C).
-							ElemSize = FPropertyBuffer::GetElementSizeFromDesc(InDescriptor.SourceDesc);
-							ElemAlign = FMath::Max(1, ElemAlign);
+							if (UPCGBasePointData* OutData = InDataFacade->GetOut();
+								OutData && OutData->Metadata)
+							{
+								FPCGMetadataAttributeDesc OutDesc = InDescriptor.SourceDesc;
+								OutDesc.Name = Identifier.Name;
+								SrcAttr = OutData->Metadata->CreateAttribute(
+									Identifier, OutDesc,
+									/*bAllowsInterp=*/true, /*bOverrideParent=*/true);
+							}
+						}
+
+						if (SrcAttr)
+						{
+							PropertyBuf = InDataFacade->GetWritable(
+								PCGExMetaHelpers::GetAttributeType(SrcAttr),
+								SrcAttr, EBufferInit::Inherit);
 						}
 					}
 
-					if (ElemSize > 0)
+					if (PropertyBuf)
 					{
-						TSharedPtr<IBuffer> PropertyBuf;
-
-						if (InDescriptor.Role == EProxyRole::Read)
-						{
-							PropertyBuf = InDataFacade->GetDefaultReadable(Identifier, InDescriptor.Side);
-						}
-						else
-						{
-							// For writes, find the source attribute and use the type-erased writable path
-							const FPCGMetadataAttributeBase* SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::In);
-							if (!SrcAttr)
-							{
-								SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::Out);
-							}
-
-							// Output Mode: New -- create the attribute from the template Desc
-							// the factory propagated (mirrors FPCGExProperty_Struct::InitializeOutput).
-							if (!SrcAttr && InDescriptor.bHasSourceDesc && InDescriptor.Role == EProxyRole::Write)
-							{
-								if (UPCGBasePointData* OutData = InDataFacade->GetOut();
-									OutData && OutData->Metadata)
-								{
-									FPCGMetadataAttributeDesc OutDesc = InDescriptor.SourceDesc;
-									OutDesc.Name = Identifier.Name;
-									SrcAttr = OutData->Metadata->CreateAttribute(
-										Identifier, OutDesc,
-										/*bAllowsInterp=*/true, /*bOverrideParent=*/true);
-								}
-							}
-
-							if (SrcAttr)
-							{
-								PropertyBuf = InDataFacade->GetWritable(
-									static_cast<EPCGMetadataTypes>(SrcAttr->GetTypeId()),
-									SrcAttr, EBufferInit::Inherit);
-							}
-						}
-
-						if (PropertyBuf)
-						{
-							auto Proxy = MakeShared<FPropertyBufferProxy>(ElemSize, ElemAlign, InDescriptor.RealType, InDescriptor.WorkingType);
-							Proxy->Buffer = PropertyBuf;
-							OutProxy = Proxy;
-						}
+						OutProxy = MakeShared<FPropertyBufferProxy>(PropertyBuf, InDescriptor.RealType, InDescriptor.WorkingType);
 					}
 				}
 			}
@@ -541,7 +515,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			if (OutProxy)
 			{
 				OutProxy->Data = PointData;
-				OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.bHasSourceDesc ? &InDescriptor.SourceDesc : nullptr);
+				OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.SourceDesc.IsValid() ? &InDescriptor.SourceDesc : nullptr);
 				OutProxy->InitForRole(InDescriptor.Role);
 
 				if (!OutProxy->Validate(InDescriptor))

@@ -103,6 +103,10 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 		: IBuffer(InSource, InIdentifier)
 	{
 		SetType(PCGExTypes::TTraits<T>::Type);
+		// Synthetic descriptor: typed buffers don't have a source FProperty, but we expose a
+		// shape Desc so introspection (GetDesc()) is uniform across typed and property buffers.
+		Desc.Name = InIdentifier.Name;
+		Desc.ValueType = PCGExTypes::TTraits<T>::Type;
 	}
 
 	template <typename T>
