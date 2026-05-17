@@ -405,10 +405,9 @@ namespace PCGExData
 
 #pragma region FPropertyBufferProxy
 
-	FPropertyBufferProxy::FPropertyBufferProxy(int32 InElementSize, int32 InElementAlignment, EPCGMetadataTypes InRealType, EPCGMetadataTypes InWorkingType)
+	FPropertyBufferProxy::FPropertyBufferProxy(const TSharedPtr<IBuffer>& InBuffer, EPCGMetadataTypes InRealType, EPCGMetadataTypes InWorkingType)
 		: IBufferProxy(InRealType, InWorkingType)
-		  , ElementSize(InElementSize)
-		  , ElementAlignment(InElementAlignment)
+		  , Buffer(InBuffer)
 	{
 	}
 
@@ -453,16 +452,6 @@ namespace PCGExData
 	{
 		check(Buffer);
 		return Buffer->ReadValueHash(Index);
-	}
-
-	int32 FPropertyBufferProxy::GetValueSize() const
-	{
-		return ElementSize;
-	}
-
-	int32 FPropertyBufferProxy::GetValueAlignment() const
-	{
-		return ElementAlignment;
 	}
 
 #pragma endregion

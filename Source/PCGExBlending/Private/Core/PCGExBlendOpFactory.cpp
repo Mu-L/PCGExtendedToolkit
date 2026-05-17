@@ -271,7 +271,7 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 			{
 				return true;
 			}
-			if (D.bHasSourceDesc && !D.SourceDesc.IsSingleValue())
+			if (D.SourceDesc.IsValid() && !D.SourceDesc.IsSingleValue())
 			{
 				return true;
 			}
@@ -313,15 +313,12 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 
 			// Propagate template Desc from whichever source matches RealTypeC,
 			// so GetProxyBuffer can create the output attribute on a fresh write.
-			if (!C.bHasSourceDesc)
+			if (!C.SourceDesc.IsValid())
 			{
 				const PCGExData::FProxyDescriptor& Template = bMatchesA ? A : B;
-				if (Template.bHasSourceDesc)
+				if (Template.SourceDesc.IsValid())
 				{
 					C.SourceDesc = Template.SourceDesc;
-					C.bHasSourceDesc = true;
-					C.ValueSize = Template.ValueSize;
-					C.ValueAlignment = Template.ValueAlignment;
 				}
 			}
 		}

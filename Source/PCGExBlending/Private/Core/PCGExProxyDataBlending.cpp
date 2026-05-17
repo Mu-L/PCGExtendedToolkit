@@ -405,9 +405,12 @@ namespace PCGExBlending
 				return FBlendOperationFactory::Create(EPCGMetadataTypes::Unknown, BlendMode, bResetValueForMultiBlend, Prop);
 			}
 
-			// Legacy/typed path: size from descriptor for generic types in the supported set.
-			const int32 DerivedSize = A.ValueSize > 0 ? A.ValueSize : PCGExTypes::GetElementSizeFromType(A.WorkingType);
-			const int32 DerivedAlign = A.ValueAlignment > 1 ? A.ValueAlignment : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
+			// Legacy/typed path: read sizes from the proxy's underlying buffer (typed TBuffer<T>
+			// reports sizeof(T)/alignof(T)). For proxies without a backing buffer (TConstantProxy,
+			// point-property proxies), fall back to type-only derivation from WorkingType.
+			const TSharedPtr<PCGExData::IBuffer> ABuf = AProxy ? AProxy->GetBuffer() : nullptr;
+			const int32 DerivedSize = ABuf ? ABuf->GetValueSize() : PCGExTypes::GetElementSizeFromType(A.WorkingType);
+			const int32 DerivedAlign = ABuf ? ABuf->GetValueAlignment() : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
 			return FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);
 		}
 	}

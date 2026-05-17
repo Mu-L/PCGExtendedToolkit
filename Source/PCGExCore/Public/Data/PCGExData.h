@@ -175,9 +175,16 @@ namespace PCGExData
 		// CopyCompleteValue, sized scoped values). Lifetime tied to this buffer.
 		virtual const FProperty* GetSourceProperty() const { return nullptr; }
 
+		// Element size/alignment of one stored value, in bytes. TBuffer<T> reports sizeof(T)/alignof(T);
+		// FPropertyBuffer reports its cached element size + the inner property's minimum alignment
+		// (correctly sized for container wrappers and struct/enum/object types).
+		virtual int32 GetValueSize() const = 0;
+		virtual int32 GetValueAlignment() const = 0;
+
 		// Attribute descriptor for this buffer. Always non-null -- synthetic Desc on TBuffer<T>
 		// (Name + TTraits<T>::Type), real Desc on FPropertyBuffer (carries ContainerTypes,
 		// ValueTypeObject, KeyType). Use for shape introspection without downcasting.
+		// Read-only pointer to internal state -- do not mutate.
 		FORCEINLINE const FPCGMetadataAttributeDesc* GetDesc() const { return &Desc; }
 
 		// True iff this buffer is property-backed (FPropertyArrayBuffer / FPropertySingleValueBuffer
@@ -223,6 +230,9 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		{
 			return PCGExTypes::FScopedTypedValue(PCGExTypes::TTraits<T>::Type);
 		}
+
+		virtual int32 GetValueSize() const override { return sizeof(T); }
+		virtual int32 GetValueAlignment() const override { return alignof(T); }
 
 		// Unsafe read from input
 		virtual const T& Read(const int32 Index) const = 0;

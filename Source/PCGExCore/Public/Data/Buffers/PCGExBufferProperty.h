@@ -82,6 +82,9 @@ namespace PCGExData
 			return CachedInnerProperty;
 		}
 
+		virtual int32 GetValueSize() const override { return ElementSize; }
+		virtual int32 GetValueAlignment() const override { return CachedInnerProperty ? CachedInnerProperty->GetMinAlignment() : 1; }
+
 		// Runtime type via reflection -- FScopedTypedValue(FProperty*) handles arbitrary UStructs/UEnums/etc.
 		// Precondition: CachedInnerProperty is valid (i.e. InitForRead or InitForWrite succeeded).
 		virtual PCGExTypes::FScopedTypedValue MakeScopedValue() const override
