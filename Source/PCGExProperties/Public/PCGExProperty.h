@@ -10,6 +10,8 @@
 
 #include "PCGExProperty.generated.h"
 
+class UPCGExPropertySchemaAsset;
+
 /**
  * Entry in the property registry.
  * Built at compile time to provide a read-only view of available properties.
@@ -614,6 +616,39 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 };
 
 /**
+ * Resolved entry produced by FPCGExPropertySchemaCollection::Resolve.
+ *
+ * A resolved entry is a pointer into the source FPCGExPropertySchemaCollection::Schemas
+ * array (either a local schema on the root collection, or one carried by an imported
+ * UPCGExPropertySchemaAsset somewhere down the import tree).
+ *
+ * The pointer is valid for as long as the collections and assets that participated
+ * in the resolution remain alive. Because the collection holds hard TObjectPtr refs
+ * to its ImportedSchemas, callers that keep the resolved list for the duration of a
+ * single operation (e.g. a node Execute) can safely use the raw pointers.
+ *
+ * Not a USTRUCT -- transient runtime view, not meant for serialization or BP reflection.
+ */
+struct PCGEXPROPERTIES_API FPCGExPropertyResolved
+{
+	/** Pointer into the source collection's Schemas array. Always non-null in a resolved entry. */
+	const FPCGExPropertySchema* Source = nullptr;
+
+	/** Asset that contributed this entry. Null when the entry comes from the root collection's locals. */
+	UPCGExPropertySchemaAsset* OwningAsset = nullptr;
+
+	/** Index within the source collection's Schemas array. */
+	int32 SourceIndex = INDEX_NONE;
+
+	FPCGExPropertyResolved() = default;
+
+	FPCGExPropertyResolved(const FPCGExPropertySchema* InSource, UPCGExPropertySchemaAsset* InOwningAsset, int32 InSourceIndex)
+		: Source(InSource), OwningAsset(InOwningAsset), SourceIndex(InSourceIndex)
+	{
+	}
+};
+
+/**
  * Collection of property schemas with embedded utilities.
  * This is the primary container for defining a set of typed properties.
  *
@@ -638,17 +673,53 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
  *
  *   // At runtime, access properties:
  *   const auto* FloatProp = MyProperties.GetProperty<FPCGExProperty_Float>(FName("MyFloat"));
+ *
+ * COMPOSITION via imported assets:
+ *
+ *   ImportedSchemas pulls in UPCGExPropertySchemaAsset entries (which themselves wrap
+ *   an FPCGExPropertySchemaCollection -- recursion supported with cycle detection).
+ *   Resolve() / BuildSchema() / FindByName() all walk locals first, then imports
+ *   depth-first, deduping by Name with first-wins semantics: locals beat imports,
+ *   earlier imports beat later ones.
  */
 USTRUCT(BlueprintType)
 struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 {
 	GENERATED_BODY()
 
-	/** Schema array */
+	/** Schema array (locals -- always take precedence over imported entries with matching names) */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(TitleProperty="{Name}"))
 	TArray<FPCGExPropertySchema> Schemas;
 
-	/** Find schema by property name */
+	/**
+	 * Imported schema assets, resolved in array order after locals.
+	 * Hard refs -- assets stay loaded as long as the owning collection exists.
+	 * Recursion through imported assets' own ImportedSchemas is supported with cycle detection.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName="Imported Schemas"))
+	TArray<TObjectPtr<UPCGExPropertySchemaAsset>> ImportedSchemas;
+
+	/**
+	 * Flatten the locals + imported asset tree into a name-deduped, first-wins resolved list.
+	 *
+	 * Walk order:
+	 * - This collection's locals (in array order)
+	 * - Each entry in ImportedSchemas (in array order), recursing depth-first
+	 *
+	 * Dedup is by FPCGExPropertySchema::Name; the first occurrence wins. Locals therefore
+	 * override any imported entry with the same name, and earlier imports override later ones.
+	 *
+	 * Cycles (an asset reachable from itself through ImportedSchemas) are skipped and logged
+	 * once per cycle via LogPCGEx. The first reach of an asset wins; subsequent reaches are no-ops.
+	 *
+	 * Entries with empty Name or invalid Property are skipped.
+	 *
+	 * Thread-safe: reads only. Mirrors the AssetCollection::BuildCache pattern -- the result
+	 * is built on demand and owned by the caller. The collection itself holds no cached state.
+	 */
+	void Resolve(TArray<FPCGExPropertyResolved>& Out) const;
+
+	/** Find schema by property name (walks locals first, then imported assets) */
 	const FPCGExPropertySchema* FindByName(FName PropertyName) const;
 
 	/** Find schema by property name (mutable). */

@@ -1,0 +1,61 @@
+// Copyright 2026 Timothé Lapetite and contributors
+// Released under the MIT license https://opensource.org/license/MIT/
+
+#include "PCGExPropertySchemaAsset.h"
+
+#if WITH_EDITOR
+#include "Misc/DataValidation.h"
+#endif
+
+#if WITH_EDITOR
+void UPCGExPropertySchemaAsset::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	// Keep HeaderId / PropertyName in sync for any newly added or edited local schemas.
+	// Imported assets sync themselves through their own PostEditChangeProperty.
+	Collection.SyncAllSchemas();
+}
+
+EDataValidationResult UPCGExPropertySchemaAsset::IsDataValid(FDataValidationContext& Context) const
+{
+	EDataValidationResult Result = Super::IsDataValid(Context);
+
+	// Only surface cycles that reach back to this asset -- other cycles in the graph are
+	// reported by their own participants' IsDataValid calls.
+	TSet<const UPCGExPropertySchemaAsset*> Visited;
+	Visited.Add(this);
+
+	TArray<const UPCGExPropertySchemaAsset*> Stack;
+
+	auto TryEnqueue = [&](UPCGExPropertySchemaAsset* Asset)
+	{
+		if (!Asset) { return; }
+		if (Asset == this)
+		{
+			Context.AddWarning(FText::FromString(FString::Printf(
+				TEXT("Schema asset '%s' is part of a cyclic import chain and will be skipped during resolution."),
+				*GetPathName())));
+			Result = CombineDataValidationResults(Result, EDataValidationResult::Invalid);
+			return;
+		}
+		if (Visited.Add(Asset).IsNewlyAdded()) { Stack.Add(Asset); }
+	};
+
+	for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Collection.ImportedSchemas)
+	{
+		TryEnqueue(AssetPtr.Get());
+	}
+
+	while (!Stack.IsEmpty())
+	{
+		const UPCGExPropertySchemaAsset* Current = Stack.Pop(EAllowShrinking::No);
+		for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Current->Collection.ImportedSchemas)
+		{
+			TryEnqueue(AssetPtr.Get());
+		}
+	}
+
+	return Result;
+}
+#endif

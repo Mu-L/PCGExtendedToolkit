@@ -213,5 +213,11 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 		SchemasArrayHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged));
 
 		ChildBuilder.AddProperty(SchemasArrayHandle.ToSharedRef());
+
+		// Imports are structural -- excluded from instance mode where the schema is locked.
+		if (TSharedPtr<IPropertyHandle> ImportedSchemasHandle = PropertyHandle->GetChildHandle(TEXT("ImportedSchemas")))
+		{
+			ChildBuilder.AddProperty(ImportedSchemasHandle.ToSharedRef());
+		}
 	}
 }

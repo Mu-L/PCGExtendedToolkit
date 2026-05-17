@@ -4,6 +4,8 @@
 #include "PCGExProperties.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyTypes.h"
+#include "PCGExPropertySchemaAsset.h"
+#include "PCGExLog.h"
 
 #if WITH_EDITOR
 void FPCGExPropertiesModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>& InStyle)
@@ -28,6 +30,100 @@ FPCGExPropertySchema::FPCGExPropertySchema()
 
 #pragma region FPCGExPropertySchemaCollection
 
+namespace PCGExPropertySchemaResolve
+{
+	// Depth-first walk: locals first, then ImportedSchemas in array order.
+	// Seen / Visited are accumulated across the whole walk to enforce first-wins dedup
+	// (by Name) and cycle detection (by asset pointer).
+	static void Walk(
+		const FPCGExPropertySchemaCollection& Collection,
+		UPCGExPropertySchemaAsset* OwningAsset,
+		TArray<FPCGExPropertyResolved>& Out,
+		TSet<FName>& Seen,
+		TSet<const UPCGExPropertySchemaAsset*>& Visited)
+	{
+		for (int32 i = 0; i < Collection.Schemas.Num(); ++i)
+		{
+			const FPCGExPropertySchema& Schema = Collection.Schemas[i];
+			if (!Schema.IsValid()) { continue; }
+
+			bool bAlreadySeen = false;
+			Seen.Add(Schema.Name, &bAlreadySeen);
+			if (bAlreadySeen) { continue; }
+
+			Out.Emplace(&Schema, OwningAsset, i);
+		}
+
+		for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Collection.ImportedSchemas)
+		{
+			UPCGExPropertySchemaAsset* Asset = AssetPtr.Get();
+			if (!Asset) { continue; }
+
+			bool bAlreadyVisited = false;
+			Visited.Add(Asset, &bAlreadyVisited);
+			if (bAlreadyVisited)
+			{
+				UE_LOG(LogPCGEx, Warning,
+				       TEXT("PCGExPropertySchemaCollection: cyclic or duplicate schema asset import skipped: %s"),
+				       *Asset->GetPathName());
+				continue;
+			}
+
+			Walk(Asset->Collection, Asset, Out, Seen, Visited);
+		}
+	}
+
+	// FindByName equivalent of Walk -- early-exits on the first matching name without allocating
+	// the full resolved list. Visited prevents infinite recursion through cyclic imports.
+	static const FPCGExPropertySchema* Find(
+		const FPCGExPropertySchemaCollection& Collection,
+		FName PropertyName,
+		TSet<const UPCGExPropertySchemaAsset*>& Visited)
+	{
+		for (const FPCGExPropertySchema& Schema : Collection.Schemas)
+		{
+			if (Schema.Name == PropertyName) { return &Schema; }
+		}
+
+		for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Collection.ImportedSchemas)
+		{
+			UPCGExPropertySchemaAsset* Asset = AssetPtr.Get();
+			if (!Asset) { continue; }
+
+			bool bAlreadyVisited = false;
+			Visited.Add(Asset, &bAlreadyVisited);
+			if (bAlreadyVisited) { continue; }
+
+			if (const FPCGExPropertySchema* Found = Find(Asset->Collection, PropertyName, Visited))
+			{
+				return Found;
+			}
+		}
+
+		return nullptr;
+	}
+}
+
+void FPCGExPropertySchemaCollection::Resolve(TArray<FPCGExPropertyResolved>& Out) const
+{
+	Out.Reset();
+
+	if (ImportedSchemas.IsEmpty())
+	{
+		Out.Reserve(Schemas.Num());
+		for (int32 i = 0; i < Schemas.Num(); ++i)
+		{
+			const FPCGExPropertySchema& Schema = Schemas[i];
+			if (Schema.IsValid()) { Out.Emplace(&Schema, nullptr, i); }
+		}
+		return;
+	}
+
+	TSet<FName> Seen;
+	TSet<const UPCGExPropertySchemaAsset*> Visited;
+	PCGExPropertySchemaResolve::Walk(*this, nullptr, Out, Seen, Visited);
+}
+
 const FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByName(FName PropertyName) const
 {
 	if (PropertyName.IsNone())
@@ -35,14 +131,17 @@ const FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByName(FName Pro
 		return nullptr;
 	}
 
-	for (const FPCGExPropertySchema& Schema : Schemas)
+	if (ImportedSchemas.IsEmpty())
 	{
-		if (Schema.Name == PropertyName)
+		for (const FPCGExPropertySchema& Schema : Schemas)
 		{
-			return &Schema;
+			if (Schema.Name == PropertyName) { return &Schema; }
 		}
+		return nullptr;
 	}
-	return nullptr;
+
+	TSet<const UPCGExPropertySchemaAsset*> Visited;
+	return PCGExPropertySchemaResolve::Find(*this, PropertyName, Visited);
 }
 
 FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByNameMutable(FName PropertyName)
@@ -52,15 +151,14 @@ FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByNameMutable(FName Pr
 
 TArray<FInstancedStruct> FPCGExPropertySchemaCollection::BuildSchema() const
 {
-	TArray<FInstancedStruct> Result;
-	Result.Reserve(Schemas.Num());
+	TArray<FPCGExPropertyResolved> Resolved;
+	Resolve(Resolved);
 
-	for (const FPCGExPropertySchema& Schema : Schemas)
+	TArray<FInstancedStruct> Result;
+	Result.Reserve(Resolved.Num());
+	for (const FPCGExPropertyResolved& Entry : Resolved)
 	{
-		if (Schema.IsValid())
-		{
-			Result.Add(Schema.Property);
-		}
+		Result.Add(Entry.Source->Property);
 	}
 	return Result;
 }
