@@ -6,16 +6,69 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
+#include "IPropertyUtilities.h"
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
+#include "PCGExPropertyType_Struct.h"
 #include "PropertyHandle.h"
+#include "StructUtilsDelegates.h"
 #include "Details/PCGExPropertyLabelRow.h"
+#include "StructUtils/UserDefinedStruct.h"
 #include "UObject/StructOnScope.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertyOverrideEntryCustomization::MakeInstance()
 {
 	return MakeShareable(new FPCGExPropertyOverrideEntryCustomization());
+}
+
+FPCGExPropertyOverrideEntryCustomization::~FPCGExPropertyOverrideEntryCustomization()
+{
+	if (UserDefinedStructReinstancedHandle.IsValid())
+	{
+		UE::StructUtils::Delegates::OnUserDefinedStructReinstanced.Remove(UserDefinedStructReinstancedHandle);
+	}
+}
+
+void FPCGExPropertyOverrideEntryCustomization::OnUserDefinedStructReinstanced(const UUserDefinedStruct& Struct)
+{
+	// UDS reinstance: UScriptStruct* survives but GetStructureSize() may change, leaving the
+	// FInstancedStruct allocation too small. Reinit drops payload but prevents OOB on next edit.
+	if (!ValueHandlePtr.IsValid())
+	{
+		return;
+	}
+
+	TArray<void*> RawData;
+	ValueHandlePtr->AccessRawData(RawData);
+	if (RawData.IsEmpty() || !RawData[0])
+	{
+		return;
+	}
+
+	FInstancedStruct* OuterInstance = static_cast<FInstancedStruct*>(RawData[0]);
+	if (!OuterInstance->IsValid())
+	{
+		return;
+	}
+	if (OuterInstance->GetScriptStruct() != FPCGExProperty_Struct::StaticStruct())
+	{
+		return;
+	}
+
+	FPCGExProperty_Struct* StructProp = reinterpret_cast<FPCGExProperty_Struct*>(OuterInstance->GetMutableMemory());
+	if (StructProp->Value.GetScriptStruct() != &Struct)
+	{
+		return;
+	}
+
+	StructProp->Value.InitializeAs(&Struct);
+
+	// Deferred refresh avoids tearing down the widget tree mid-event-handler stack.
+	if (TSharedPtr<IPropertyUtilities> Util = WeakPropertyUtilities.Pin())
+	{
+		Util->RequestRefresh();
+	}
 }
 
 const FPCGExProperty* FPCGExPropertyOverrideEntryCustomization::AccessEntryProperty() const
@@ -61,6 +114,10 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 	PropertyHandlePtr = PropertyHandle;
 	ValueHandlePtr = PropertyHandle->GetChildHandle(TEXT("Value"));
 	EnabledHandlePtr = PropertyHandle->GetChildHandle(TEXT("bEnabled"));
+
+	WeakPropertyUtilities = CustomizationUtils.GetPropertyUtilities();
+	UserDefinedStructReinstancedHandle = UE::StructUtils::Delegates::OnUserDefinedStructReinstanced.AddSP(
+		this, &FPCGExPropertyOverrideEntryCustomization::OnUserDefinedStructReinstanced);
 
 	// Check if this is an inline type (schema-driven, stable for the detail session)
 	bool bShouldInline = false;
@@ -205,6 +262,38 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			];
 
 		FPCGExInlineWidgetRegistry::AddCompactValueRow(ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, NameContent, IsEnabledAttr);
+	}
+	else if (InnerStruct == FPCGExProperty_Struct::StaticStruct())
+	{
+		// Bypass the FInstancedStruct wrapper row: walk Value's inner struct as siblings of the
+		// override header. Type is schema-pinned in override context so no combo is needed.
+		FPCGExProperty_Struct* StructProp = reinterpret_cast<FPCGExProperty_Struct*>(StructMemory);
+		const UScriptStruct* InnerInnerStruct = StructProp->Value.GetScriptStruct();
+		uint8* InnerInnerMemory = StructProp->Value.GetMutableMemory();
+		if (InnerInnerStruct && InnerInnerMemory)
+		{
+			NestedScope = MakeShared<FStructOnScope>(InnerInnerStruct, InnerInnerMemory);
+			for (TFieldIterator<FProperty> It(InnerInnerStruct); It; ++It)
+			{
+				// CPF_Edit filter: AddExternalStructureProperty returns null on non-editable
+				// fields and the dereference would crash. Arbitrary user structs may include
+				// VisibleAnywhere/no-spec fields, unlike the FPCGExProperty_* set.
+				if (!It->HasAnyPropertyFlags(CPF_Edit))
+				{
+					continue;
+				}
+				if (IDetailPropertyRow* RowPtr = ChildBuilder.AddExternalStructureProperty(NestedScope.ToSharedRef(), It->GetFName()))
+				{
+					RowPtr->IsEnabled(IsEnabledAttr);
+				}
+			}
+		}
+		else
+		{
+			// No struct type picked yet (or override is stale) -- show the default FInstancedStruct
+			// row so the user can pick a type from the combo.
+			FPCGExInlineWidgetRegistry::AddComplexValueRows(ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, IsEnabledAttr);
+		}
 	}
 	else
 	{

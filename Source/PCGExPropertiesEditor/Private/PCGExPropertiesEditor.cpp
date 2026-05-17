@@ -7,6 +7,7 @@
 #include "PCGExEnumSelector.h"
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
+#include "PCGExPropertyType_Struct.h"
 #include "PCGExPropertyTypes.h"
 #include "PCGExPropertyWriter.h"
 #include "PropertyEditorModule.h"
@@ -106,6 +107,7 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(SoftObjectPath)
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(SoftClassPath)
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(Enum)
+	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(Struct)
 
 #undef REGISTER_PROPERTY_COMPILED_CUSTOMIZATION
 
