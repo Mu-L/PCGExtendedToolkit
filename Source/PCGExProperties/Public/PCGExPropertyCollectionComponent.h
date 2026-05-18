@@ -4,14 +4,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ComponentInstanceDataCache.h"
 #include "PCGExProperty.h"
 #include "Components/ActorComponent.h"
-#include "ComponentInstanceDataCache.h"
 #include "GameFramework/Actor.h"
 
 #include "PCGExPropertyCollectionComponent.generated.h"
 
 class UPCGExPropertyCollectionComponent;
+struct FPropertyChangedChainEvent;
 
 // The capture/apply path solves the BP-recompile instance-wipe bug, which is an editor-only
 // problem. Cooked builds don't recompile BPs at runtime, so there's no reinstance gap to
@@ -121,6 +122,16 @@ struct PCGEXPROPERTIES_API FPCGExPropertyCollectionInstanceData : public FActorC
 	/** Instance-level divergences from the archetype's ImportOverrides.Overrides. */
 	UPROPERTY()
 	TArray<FPCGExCapturedImportOverride> DivergentImportOverrides;
+
+	/**
+	 * Snapshot of the instance's EnabledOverrides TSet. Captured unconditionally (the TSet IS
+	 * the authored state; even empty is meaningful) and replayed wholesale on apply.
+	 */
+	UPROPERTY()
+	TSet<FName> CapturedEnabledOverrides;
+
+	UPROPERTY()
+	bool bHasCapturedEnabledOverrides = false;
 #endif
 
 	virtual bool ContainsData() const override;
@@ -152,6 +163,20 @@ public:
 
 	virtual void OnRegister() override;
 
+	// Fresh non-CDO instances start with every ImportOverride disabled regardless of what the
+	// CDO authored -- the toggle is purely instance state. Resolution falls back through the BP
+	// class chain so the CDO's authored override stays effective on un-toggled instances.
+	// Does NOT fire on load: saved/authored instances keep their serialized bEnabled.
+	virtual void OnComponentCreated() override;
+
+#if WITH_EDITOR
+	// Mirror chain-leaf bEnabled edits into the TSet (the authoritative signal). On CDO/template
+	// edits also walk dependent instances and restore bEnabled from each instance's own TSet --
+	// UE's per-property propagation just clobbered bEnabled wherever it matched the old CDO; the
+	// TSet survives because UE's edit chain targets the nested bool, not the top-level TSet.
+	virtual void PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent) override;
+#endif
+
 	/**
 	 * Capture the live Properties collection into FPCGExPropertyCollectionInstanceData so it
 	 * survives Blueprint reinstancing. See the struct comment for why we can't rely on UE's
@@ -168,6 +193,41 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Properties")
 	FPCGExPropertySchemaCollection Properties;
+
+	/**
+	 * Authoritative per-instance "which import overrides are enabled" set.
+	 *
+	 * The matching bEnabled on each FPCGExPropertyOverrideEntry is a UI-bound mirror that UE's
+	 * per-property propagation overwrites on CDO edits (and we can't reliably block that).
+	 * The TSet survives because UE's edit chain targets the nested bool, not this top-level
+	 * field. PostEditChangeChainProperty keeps the two sides in sync.
+	 *
+	 * Empty on fresh instances (OnComponentCreated); captured/restored across BP reinstancing
+	 * via FPCGExPropertyCollectionInstanceData.
+	 *
+	 * Scoped to this component intentionally -- other consumers of FPCGExPropertyOverrides
+	 * (Tuple node, level exporter) aren't subject to CDO->instance propagation and use bEnabled
+	 * directly.
+	 */
+	UPROPERTY(meta = (DisableCopyOnInstances))
+	TSet<FName> EnabledOverrides;
+
+#if WITH_EDITOR
+	// Re-derive every entry's bEnabled from EnabledOverrides. Use after CDO->instance propagation
+	// may have clobbered bEnabled, or after restoring the TSet from instance data.
+	void SyncBEnabledFromOverrideSet();
+
+	// Inverse: rebuild the TSet from each entry's current bEnabled. Use after a checkbox toggle.
+	void SyncOverrideSetFromBEnabled();
+#endif
+
+	/**
+	 * Toggle an import-override entry atomically: writes the TSet (authoritative) and mirrors
+	 * into the matching entry's bEnabled (UI). Single entry point for activation paths
+	 * (notably SetProperty K2 thunks auto-enabling on write). No-op for unknown / None names.
+	 * Local schemas have no toggle; this only affects ImportOverrides entries.
+	 */
+	void SetOverrideEnabled(FName PropertyName, bool bEnabled);
 
 	/**
 	 * Dynamic multicast delegate fired alongside PreparePropertyValues. BP authors can BindEvent
@@ -215,6 +275,17 @@ public:
 	{
 		return Properties;
 	}
+
+	/**
+	 * Resolve the schema with the BP class chain as fallback override layers. Instance's own
+	 * ImportOverrides leads, then ancestors in inheritance order, then the asset's authored
+	 * value. First layer with bEnabled=true wins per entry.
+	 *
+	 * Editor walks SCS templates via FindSCSTemplateInClass (the GetArchetype() path hits the
+	 * FInstancedStruct-on-CDO-subobject duplication issue). Cooked walks GetArchetype() directly
+	 * -- the subobject duplicate is safe there.
+	 */
+	TArray<FInstancedStruct> BuildResolvedSchema() const;
 
 #if WITH_EDITOR
 	/**
@@ -271,14 +342,16 @@ public:
 
 	/**
 	 * Extract the authored schema from a donor actor's property-collection component, with
-	 * SyncPropertyName run on every schema first so each FInstancedStruct's inner property
-	 * carries up-to-date PropertyName + HeaderId identity. Returns an empty array when the
-	 * actor lacks a component.
+	 * SyncPropertyName run first so every inner property carries up-to-date PropertyName +
+	 * HeaderId. Returns empty when the actor lacks a component.
 	 *
-	 * Fires PreparePropertyValues on the component before reading -- BP override allows
-	 * computing values dynamically. The Properties collection is snapshotted before the
-	 * event and restored after, so dynamic writes inside the event don't persist on the
-	 * live component (they're export-time-only).
+	 * Fires PreparePropertyValues before reading (BP override computes values dynamically).
+	 * Per-schema inner Property values are snapshotted before the event and restored after,
+	 * so writes inside the event are export-time-only.
+	 *
+	 * Snapshot is NARROW (only Schemas[i].Property) rather than the whole collection: a wholesale
+	 * swap would reallocate every FInstancedStruct in ImportOverrides too, dangling any inspector
+	 * widget holding an FStructOnScope alias into that memory (the enum picker is one such).
 	 */
 	static TArray<FInstancedStruct> ExtractSchemaFromActor(const AActor* Actor)
 	{
@@ -288,16 +361,26 @@ public:
 			return {};
 		}
 
-		FPCGExPropertySchemaCollection Snapshot = Comp->Properties;
+		TArray<FInstancedStruct> SchemaPropertySnapshot;
+		SchemaPropertySnapshot.Reserve(Comp->Properties.Schemas.Num());
+		for (const FPCGExPropertySchema& Schema : Comp->Properties.Schemas)
+		{
+			SchemaPropertySnapshot.Add(Schema.Property);
+		}
+
 		Comp->PreparePropertyValues();
 
 		for (FPCGExPropertySchema& Schema : Comp->Properties.Schemas)
 		{
 			Schema.SyncPropertyName();
 		}
-		TArray<FInstancedStruct> Result = Comp->Properties.BuildSchema();
+		TArray<FInstancedStruct> Result = Comp->BuildResolvedSchema();
 
-		Comp->Properties = MoveTemp(Snapshot);
+		const int32 RestoreCount = FMath::Min(SchemaPropertySnapshot.Num(), Comp->Properties.Schemas.Num());
+		for (int32 i = 0; i < RestoreCount; ++i)
+		{
+			Comp->Properties.Schemas[i].Property = SchemaPropertySnapshot[i];
+		}
 		return Result;
 	}
 };

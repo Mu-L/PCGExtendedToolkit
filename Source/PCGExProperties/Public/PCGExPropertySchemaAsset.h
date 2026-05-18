@@ -4,8 +4,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/DataAsset.h"
 #include "PCGExProperty.h"
+#include "Engine/DataAsset.h"
 
 #include "PCGExPropertySchemaAsset.generated.h"
 

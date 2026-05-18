@@ -10,6 +10,7 @@
 
 class FStructOnScope;
 class IPropertyUtilities;
+class SWidget;
 class UPCGExPropertyCollectionComponent;
 
 
@@ -71,4 +72,15 @@ private:
 	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
 
 	FResetToDefaultOverride MakeArchetypeResetOverride() const;
+
+	/**
+	 * Build the toggle widget for the override's enable flag. In component context, returns a
+	 * custom SCheckBox that writes EnabledOverrides directly via SetOverrideEnabled -- bypasses
+	 * UE's property edit chain so CDO->instance propagation never fires for inspector toggles.
+	 * Non-component owners get the standard handle-bound widget.
+	 */
+	TSharedRef<SWidget> BuildOverrideToggleWidget() const;
+
+	/** Read the entry's PropertyName at the current OverrideIndex on the owning component. */
+	FName GetOverrideEntryName() const;
 };

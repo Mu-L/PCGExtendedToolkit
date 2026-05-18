@@ -2,10 +2,10 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "PCGExProperties.h"
-#include "PCGExProperty.h"
-#include "PCGExPropertyTypes.h"
-#include "PCGExPropertySchemaAsset.h"
 #include "PCGExLog.h"
+#include "PCGExProperty.h"
+#include "PCGExPropertySchemaAsset.h"
+#include "PCGExPropertyTypes.h"
 
 #if WITH_EDITOR
 void FPCGExPropertiesModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>& InStyle)
@@ -34,12 +34,12 @@ namespace PCGExPropertySchemaResolve
 {
 	// Depth-first walk: locals first, then ImportedSchemas in array order.
 	// Seen / Visited are accumulated across the whole walk to enforce first-wins dedup
-	// (by Name) and cycle detection (by asset pointer). RootOverrides apply only to
+	// (by Name) and cycle detection (by asset pointer). Override layers apply only to
 	// imported entries -- locals are edited in-place and never read overrides.
 	static void Walk(
 		const FPCGExPropertySchemaCollection& Collection,
 		UPCGExPropertySchemaAsset* OwningAsset,
-		const FPCGExPropertyOverrides* RootOverrides,
+		TConstArrayView<const FPCGExPropertyOverrides*> OverrideChain,
 		TArray<FPCGExPropertyResolved>& Out,
 		TSet<FName>& Seen,
 		TSet<const UPCGExPropertySchemaAsset*>& Visited)
@@ -47,15 +47,34 @@ namespace PCGExPropertySchemaResolve
 		for (int32 i = 0; i < Collection.Schemas.Num(); ++i)
 		{
 			const FPCGExPropertySchema& Schema = Collection.Schemas[i];
-			if (!Schema.IsValid()) { continue; }
+			if (!Schema.IsValid())
+			{
+				continue;
+			}
 
 			bool bAlreadySeen = false;
 			Seen.Add(Schema.Name, &bAlreadySeen);
-			if (bAlreadySeen) { continue; }
+			if (bAlreadySeen)
+			{
+				continue;
+			}
 
-			const FInstancedStruct* Override = (OwningAsset && RootOverrides)
-				? RootOverrides->GetOverride(Schema.Name)
-				: nullptr;
+			const FInstancedStruct* Override = nullptr;
+			if (OwningAsset)
+			{
+				for (const FPCGExPropertyOverrides* Layer : OverrideChain)
+				{
+					if (!Layer)
+					{
+						continue;
+					}
+					if (const FInstancedStruct* Found = Layer->GetOverride(Schema.Name))
+					{
+						Override = Found;
+						break;
+					}
+				}
+			}
 
 			Out.Emplace(&Schema, OwningAsset, i, Override);
 		}
@@ -63,7 +82,10 @@ namespace PCGExPropertySchemaResolve
 		for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Collection.ImportedSchemas)
 		{
 			UPCGExPropertySchemaAsset* Asset = AssetPtr.Get();
-			if (!Asset) { continue; }
+			if (!Asset)
+			{
+				continue;
+			}
 
 			bool bAlreadyVisited = false;
 			Visited.Add(Asset, &bAlreadyVisited);
@@ -75,7 +97,7 @@ namespace PCGExPropertySchemaResolve
 				continue;
 			}
 
-			Walk(Asset->Collection, Asset, RootOverrides, Out, Seen, Visited);
+			Walk(Asset->Collection, Asset, OverrideChain, Out, Seen, Visited);
 		}
 	}
 
@@ -88,17 +110,26 @@ namespace PCGExPropertySchemaResolve
 	{
 		for (const FPCGExPropertySchema& Schema : Collection.Schemas)
 		{
-			if (Schema.Name == PropertyName) { return &Schema; }
+			if (Schema.Name == PropertyName)
+			{
+				return &Schema;
+			}
 		}
 
 		for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Collection.ImportedSchemas)
 		{
 			UPCGExPropertySchemaAsset* Asset = AssetPtr.Get();
-			if (!Asset) { continue; }
+			if (!Asset)
+			{
+				continue;
+			}
 
 			bool bAlreadyVisited = false;
 			Visited.Add(Asset, &bAlreadyVisited);
-			if (bAlreadyVisited) { continue; }
+			if (bAlreadyVisited)
+			{
+				continue;
+			}
 
 			if (const FPCGExPropertySchema* Found = Find(Asset->Collection, PropertyName, Visited))
 			{
@@ -110,7 +141,7 @@ namespace PCGExPropertySchemaResolve
 	}
 }
 
-void FPCGExPropertySchemaCollection::Resolve(TArray<FPCGExPropertyResolved>& Out) const
+void FPCGExPropertySchemaCollection::Resolve(TArray<FPCGExPropertyResolved>& Out, TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain) const
 {
 	Out.Reset();
 
@@ -120,14 +151,26 @@ void FPCGExPropertySchemaCollection::Resolve(TArray<FPCGExPropertyResolved>& Out
 		for (int32 i = 0; i < Schemas.Num(); ++i)
 		{
 			const FPCGExPropertySchema& Schema = Schemas[i];
-			if (Schema.IsValid()) { Out.Emplace(&Schema, nullptr, i); }
+			if (Schema.IsValid())
+			{
+				Out.Emplace(&Schema, nullptr, i);
+			}
 		}
 		return;
 	}
 
+	// This collection's own ImportOverrides always lead the chain; fallback layers come after.
+	TArray<const FPCGExPropertyOverrides*, TInlineAllocator<4>> Chain;
+	Chain.Reserve(1 + FallbackChain.Num());
+	Chain.Add(&ImportOverrides);
+	for (const FPCGExPropertyOverrides* Layer : FallbackChain)
+	{
+		Chain.Add(Layer);
+	}
+
 	TSet<FName> Seen;
 	TSet<const UPCGExPropertySchemaAsset*> Visited;
-	PCGExPropertySchemaResolve::Walk(*this, nullptr, &ImportOverrides, Out, Seen, Visited);
+	PCGExPropertySchemaResolve::Walk(*this, nullptr, MakeArrayView(Chain), Out, Seen, Visited);
 }
 
 const FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByName(FName PropertyName) const
@@ -141,7 +184,10 @@ const FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByName(FName Pro
 	{
 		for (const FPCGExPropertySchema& Schema : Schemas)
 		{
-			if (Schema.Name == PropertyName) { return &Schema; }
+			if (Schema.Name == PropertyName)
+			{
+				return &Schema;
+			}
 		}
 		return nullptr;
 	}
@@ -152,11 +198,17 @@ const FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByName(FName Pro
 
 const FInstancedStruct* FPCGExPropertySchemaCollection::GetPropertyByName(FName PropertyName) const
 {
-	if (PropertyName.IsNone()) { return nullptr; }
+	if (PropertyName.IsNone())
+	{
+		return nullptr;
+	}
 
 	for (const FPCGExPropertySchema& Schema : Schemas)
 	{
-		if (Schema.Name == PropertyName) { return &Schema.Property; }
+		if (Schema.Name == PropertyName)
+		{
+			return &Schema.Property;
+		}
 	}
 
 	if (const FInstancedStruct* Override = ImportOverrides.GetOverride(PropertyName))
@@ -181,18 +233,24 @@ const FInstancedStruct* FPCGExPropertySchemaCollection::GetPropertyByName(FName 
 
 FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByNameMutable(FName PropertyName)
 {
-	if (PropertyName.IsNone()) { return nullptr; }
+	if (PropertyName.IsNone())
+	{
+		return nullptr;
+	}
 	for (FPCGExPropertySchema& Schema : Schemas)
 	{
-		if (Schema.Name == PropertyName) { return &Schema; }
+		if (Schema.Name == PropertyName)
+		{
+			return &Schema;
+		}
 	}
 	return nullptr;
 }
 
-TArray<FInstancedStruct> FPCGExPropertySchemaCollection::BuildSchema() const
+TArray<FInstancedStruct> FPCGExPropertySchemaCollection::BuildSchema(TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain) const
 {
 	TArray<FPCGExPropertyResolved> Resolved;
-	Resolve(Resolved);
+	Resolve(Resolved, FallbackChain);
 
 	TArray<FInstancedStruct> Result;
 	Result.Reserve(Resolved.Num());
@@ -272,7 +330,10 @@ void FPCGExPropertySchemaCollection::ReconcileImportOverrides(const TArray<FPCGE
 	ImportedOnlySchema.Reserve(Resolved.Num());
 	for (const FPCGExPropertyResolved& Entry : Resolved)
 	{
-		if (!Entry.OwningAsset) { continue; }
+		if (!Entry.OwningAsset)
+		{
+			continue;
+		}
 
 		// Feed a local copy of Source->Property patched with the canonical name/HeaderId from
 		// Schema. The asset's cached Property->PropertyName can be stale (no PostLoad sync), and
@@ -442,12 +503,24 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 		{
 			if (const FPCGExProperty* Prop = Entry.Value.GetPtr<FPCGExProperty>())
 			{
-				if (Entry.HeaderId == 0) { Entry.HeaderId = Prop->HeaderId; }
-				if (Entry.PropertyName.IsNone()) { Entry.PropertyName = Prop->PropertyName; }
+				if (Entry.HeaderId == 0)
+				{
+					Entry.HeaderId = Prop->HeaderId;
+				}
+				if (Entry.PropertyName.IsNone())
+				{
+					Entry.PropertyName = Prop->PropertyName;
+				}
 			}
 		}
-		if (Entry.HeaderId != 0) { IndexByHeaderId.Add(Entry.HeaderId, i); }
-		if (!Entry.PropertyName.IsNone()) { IndexByName.Add(Entry.PropertyName, i); }
+		if (Entry.HeaderId != 0)
+		{
+			IndexByHeaderId.Add(Entry.HeaderId, i);
+		}
+		if (!Entry.PropertyName.IsNone())
+		{
+			IndexByName.Add(Entry.PropertyName, i);
+		}
 	}
 #endif
 
@@ -457,7 +530,10 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 	{
 		const FInstancedStruct& SchemaProp = Schema[SchemaIndex];
 		const FPCGExProperty* SchemaData = SchemaProp.GetPtr<FPCGExProperty>();
-		if (!SchemaData) { continue; }
+		if (!SchemaData)
+		{
+			continue;
+		}
 
 		FPCGExPropertyOverrideEntry& NewEntry = Overrides.AddDefaulted_GetRef();
 #if WITH_EDITORONLY_DATA

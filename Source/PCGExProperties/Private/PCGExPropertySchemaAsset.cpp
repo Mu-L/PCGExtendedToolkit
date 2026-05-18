@@ -43,7 +43,10 @@ EDataValidationResult UPCGExPropertySchemaAsset::IsDataValid(FDataValidationCont
 
 	auto TryEnqueue = [&](UPCGExPropertySchemaAsset* Asset)
 	{
-		if (!Asset) { return; }
+		if (!Asset)
+		{
+			return;
+		}
 		if (Asset == this)
 		{
 			Context.AddWarning(FText::FromString(FString::Printf(
@@ -54,7 +57,10 @@ EDataValidationResult UPCGExPropertySchemaAsset::IsDataValid(FDataValidationCont
 		}
 		bool bAlreadyVisited = false;
 		Visited.Add(Asset, &bAlreadyVisited);
-		if (!bAlreadyVisited) { Stack.Add(Asset); }
+		if (!bAlreadyVisited)
+		{
+			Stack.Add(Asset);
+		}
 	};
 
 	for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Collection.ImportedSchemas)

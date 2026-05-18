@@ -5,7 +5,6 @@
 
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
-#include "GameFramework/Actor.h"
 #include "IDetailChildrenBuilder.h"
 #include "IDetailPropertyRow.h"
 #include "IPropertyUtilities.h"
@@ -14,6 +13,8 @@
 #include "PCGExPropertyCollectionComponent.h"
 #include "PCGExPropertySchemaAsset.h"
 #include "PropertyHandle.h"
+#include "Details/PCGExEditorCustomizationUtils.h"
+#include "GameFramework/Actor.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -39,18 +40,30 @@ namespace PCGExPropertySchemaCollectionCustomization
 		int32 SchemaIndex,
 		FInstancedStruct& OutValue)
 	{
-		if (!Live.Properties.Schemas.IsValidIndex(SchemaIndex)) { return false; }
+		if (!Live.Properties.Schemas.IsValidIndex(SchemaIndex))
+		{
+			return false;
+		}
 		const FInstancedStruct& LiveProp = Live.Properties.Schemas[SchemaIndex].Property;
 
 		const AActor* Owner = Live.GetOwner();
-		if (!Owner) { return false; }
+		if (!Owner)
+		{
+			return false;
+		}
 
 		for (UClass* Cls = Owner->GetClass(); Cls; Cls = Cls->GetSuperClass())
 		{
 			const UPCGExPropertyCollectionComponent* Template =
 				UPCGExPropertyCollectionComponent::FindSCSTemplateInClass(Cls, Live.GetFName());
-			if (!Template || Template == &Live) { continue; }
-			if (!Template->Properties.Schemas.IsValidIndex(SchemaIndex)) { continue; }
+			if (!Template || Template == &Live)
+			{
+				continue;
+			}
+			if (!Template->Properties.Schemas.IsValidIndex(SchemaIndex))
+			{
+				continue;
+			}
 
 			const FInstancedStruct& AncestorProp = Template->Properties.Schemas[SchemaIndex].Property;
 			if (AncestorProp != LiveProp)
@@ -149,14 +162,23 @@ FText FPCGExPropertySchemaCollectionCustomization::GetHeaderText() const
 void FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged()
 {
 	TSharedPtr<IPropertyHandle> PropertyHandle = PropertyHandlePtr.Pin();
-	if (!PropertyHandle.IsValid()) { return; }
+	if (!PropertyHandle.IsValid())
+	{
+		return;
+	}
 
 	TArray<void*> RawData;
 	PropertyHandle->AccessRawData(RawData);
-	if (RawData.IsEmpty() || !RawData[0]) { return; }
+	if (RawData.IsEmpty() || !RawData[0])
+	{
+		return;
+	}
 
 	FPCGExPropertySchemaCollection* Collection = static_cast<FPCGExPropertySchemaCollection*>(RawData[0]);
-	for (FPCGExPropertySchema& Schema : Collection->Schemas) { Schema.SyncPropertyName(); }
+	for (FPCGExPropertySchema& Schema : Collection->Schemas)
+	{
+		Schema.SyncPropertyName();
+	}
 	Collection->ReconcileImportOverrides();
 
 	CachedResolvedCount = -1;
@@ -169,7 +191,10 @@ void FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged()
 void FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged()
 {
 	TSharedPtr<IPropertyHandle> PropertyHandle = PropertyHandlePtr.Pin();
-	if (!PropertyHandle.IsValid()) { return; }
+	if (!PropertyHandle.IsValid())
+	{
+		return;
+	}
 
 	TArray<void*> RawData;
 	PropertyHandle->AccessRawData(RawData);
@@ -193,7 +218,10 @@ void FPCGExPropertySchemaCollectionCustomization::OnImportedAssetChanged(UPCGExP
 void FPCGExPropertySchemaCollectionCustomization::ReconcileAndNotify()
 {
 	TSharedPtr<IPropertyHandle> PropertyHandle = PropertyHandlePtr.Pin();
-	if (!PropertyHandle.IsValid()) { return; }
+	if (!PropertyHandle.IsValid())
+	{
+		return;
+	}
 
 	TArray<void*> RawData;
 	PropertyHandle->AccessRawData(RawData);
@@ -224,25 +252,31 @@ void FPCGExPropertySchemaCollectionCustomization::EmitSectionHeader(IDetailChild
 	// with the property tree's gutter rather than the value column.
 	ChildBuilder.AddCustomRow(FText::FromString(Title))
 	            .WholeRowContent()
+	[
+		SNew(SBox)
+		.Padding(FMargin(-16, 4, 0, 4))
+		.VAlign(VAlign_Center)
 		[
-			SNew(SBox)
-			.Padding(FMargin(-16, 4, 0, 4))
-			.VAlign(VAlign_Center)
-			[
-				SNew(STextBlock)
-				.Text(FText::FromString(Title.ToUpper()))
-				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 7))
-				.ColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.35f, 0.35f)))
-			]
-		];
+			SNew(STextBlock)
+			.Text(FText::FromString(Title.ToUpper()))
+			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 7))
+			.ColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.35f, 0.35f)))
+		]
+	];
 }
 
 void FPCGExPropertySchemaCollectionCustomization::EmitImportSections(IDetailChildrenBuilder& ChildBuilder, TSharedRef<IPropertyHandle> CollectionHandle, const TArray<FPCGExPropertyResolved>& Resolved)
 {
 	TSharedPtr<IPropertyHandle> ImportOverridesHandle = CollectionHandle->GetChildHandle(TEXT("ImportOverrides"));
-	if (!ImportOverridesHandle.IsValid()) { return; }
+	if (!ImportOverridesHandle.IsValid())
+	{
+		return;
+	}
 	TSharedPtr<IPropertyHandle> OverridesArrayHandle = ImportOverridesHandle->GetChildHandle(TEXT("Overrides"));
-	if (!OverridesArrayHandle.IsValid()) { return; }
+	if (!OverridesArrayHandle.IsValid())
+	{
+		return;
+	}
 
 	// Force the detail panel to build property nodes for the ImportOverrides subtree by
 	// adding the parent as a collapsed row. Without this, per-instance UPROPERTY delta
@@ -255,7 +289,10 @@ void FPCGExPropertySchemaCollectionCustomization::EmitImportSections(IDetailChil
 	UPCGExPropertySchemaAsset* CurrentSection = nullptr;
 	for (const FPCGExPropertyResolved& Entry : Resolved)
 	{
-		if (!Entry.OwningAsset) { continue; }
+		if (!Entry.OwningAsset)
+		{
+			continue;
+		}
 
 		if (Entry.OwningAsset != CurrentSection)
 		{
@@ -283,7 +320,10 @@ void FPCGExPropertySchemaCollectionCustomization::SubscribeToImportedAssets(cons
 	TSet<UPCGExPropertySchemaAsset*> Unique;
 	for (const FPCGExPropertyResolved& Entry : Resolved)
 	{
-		if (Entry.OwningAsset) { Unique.Add(Entry.OwningAsset); }
+		if (Entry.OwningAsset)
+		{
+			Unique.Add(Entry.OwningAsset);
+		}
 	}
 
 	for (UPCGExPropertySchemaAsset* Asset : Unique)
@@ -326,7 +366,10 @@ void FPCGExPropertySchemaCollectionCustomization::ApplyLocalSchemaResetOverride(
 		[WeakLive, SchemaIndex](TSharedPtr<IPropertyHandle>) -> bool
 		{
 			const UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
-			if (!Live) { return false; }
+			if (!Live)
+			{
+				return false;
+			}
 			FInstancedStruct Ignored;
 			return PCGExPropertySchemaCollectionCustomization::TryGetLocalSchemaResetSource(*Live, SchemaIndex, Ignored);
 		});
@@ -335,15 +378,24 @@ void FPCGExPropertySchemaCollectionCustomization::ApplyLocalSchemaResetOverride(
 		[WeakLive, SchemaIndex](TSharedPtr<IPropertyHandle> Handle)
 		{
 			UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
-			if (!Live || !Live->Properties.Schemas.IsValidIndex(SchemaIndex)) { return; }
+			if (!Live || !Live->Properties.Schemas.IsValidIndex(SchemaIndex))
+			{
+				return;
+			}
 
 			FInstancedStruct ResetValue;
-			if (!PCGExPropertySchemaCollectionCustomization::TryGetLocalSchemaResetSource(*Live, SchemaIndex, ResetValue)) { return; }
+			if (!PCGExPropertySchemaCollectionCustomization::TryGetLocalSchemaResetSource(*Live, SchemaIndex, ResetValue))
+			{
+				return;
+			}
 
 			Live->Modify();
 			Live->Properties.Schemas[SchemaIndex].Property = ResetValue;
 			Live->Properties.Schemas[SchemaIndex].SyncPropertyName();
-			if (Handle.IsValid()) { Handle->NotifyPostChange(EPropertyChangeType::ValueSet); }
+			if (Handle.IsValid())
+			{
+				Handle->NotifyPostChange(EPropertyChangeType::ValueSet);
+			}
 		});
 
 	Row.OverrideResetToDefault(FResetToDefaultOverride::Create(IsVisible, Handler, /*bPropagateToChildren*/ true));
@@ -398,11 +450,18 @@ bool FPCGExPropertySchemaCollectionCustomization::TryRenderFlatInline(
 
 	IDetailPropertyRow* Row = FPCGExInlineWidgetRegistry::AddCompactValueRow(
 		ChildBuilder, Scope.ToSharedRef(), InnerStruct, NameContent);
-	if (!Row) { return false; }
+	if (!Row)
+	{
+		return false;
+	}
 
 	if (bIsInstanceMode)
 	{
 		ApplyLocalSchemaResetOverride(*Row, ElementHandle->GetIndexInArray());
+
+		// Instance-side local schema edits need an explicit Modify() to dirty the actor; the
+		// external-structure row doesn't route through the owning UObject on its own.
+		PCGExEditorCustomizationUtils::HookModifyOnHandleChanged(Row->GetPropertyHandle(), WeakLiveComponent);
 	}
 	return true;
 }
@@ -468,8 +527,8 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 	TArray<void*> RawData;
 	PropertyHandle->AccessRawData(RawData);
 	FPCGExPropertySchemaCollection* Collection = (RawData.IsEmpty() || !RawData[0])
-		                                             ? nullptr
-		                                             : static_cast<FPCGExPropertySchemaCollection*>(RawData[0]);
+		? nullptr
+		: static_cast<FPCGExPropertySchemaCollection*>(RawData[0]);
 	if (Collection)
 	{
 		Collection->Resolve(Resolved);
@@ -492,7 +551,13 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 		//    comparison below; SyncToSchema's "type changed" branch rebuilds Value with the
 		//    schema default while preserving bEnabled.
 		int32 ExpectedImportCount = 0;
-		for (const FPCGExPropertyResolved& Entry : Resolved) { if (Entry.OwningAsset) { ++ExpectedImportCount; } }
+		for (const FPCGExPropertyResolved& Entry : Resolved)
+		{
+			if (Entry.OwningAsset)
+			{
+				++ExpectedImportCount;
+			}
+		}
 		bool bNeedsReconcile = (Collection->ImportOverrides.Overrides.Num() != ExpectedImportCount);
 
 		if (!bNeedsReconcile)
@@ -500,7 +565,10 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 			int32 ImportIndex = 0;
 			for (const FPCGExPropertyResolved& Entry : Resolved)
 			{
-				if (!Entry.OwningAsset || !Entry.Source) { continue; }
+				if (!Entry.OwningAsset || !Entry.Source)
+				{
+					continue;
+				}
 				if (Collection->ImportOverrides.Overrides.IsValidIndex(ImportIndex))
 				{
 					const UScriptStruct* ResolvedType = Entry.Source->Property.GetScriptStruct();

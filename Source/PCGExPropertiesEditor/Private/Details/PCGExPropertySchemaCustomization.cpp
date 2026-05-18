@@ -127,8 +127,13 @@ void FPCGExPropertySchemaCustomization::CustomizeHeader(
 	if (!bIsReadOnly)
 	{
 		HeaderRow.OverrideResetToDefault(FResetToDefaultOverride::Create(
-			FIsResetToDefaultVisible::CreateLambda([](TSharedPtr<IPropertyHandle>) { return false; }),
-			FResetToDefaultHandler::CreateLambda([](TSharedPtr<IPropertyHandle>) {}),
+			FIsResetToDefaultVisible::CreateLambda([](TSharedPtr<IPropertyHandle>)
+			{
+				return false;
+			}),
+			FResetToDefaultHandler::CreateLambda([](TSharedPtr<IPropertyHandle>)
+			{
+			}),
 			/*bPropagateToChildren*/ false));
 	}
 }

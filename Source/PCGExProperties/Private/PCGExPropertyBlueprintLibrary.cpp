@@ -111,6 +111,39 @@ namespace PCGExPropertyBlueprintLibrary_Private
 		return Prop->TryWriteValue(TargetType, OutMem);
 	}
 
+	// Resolve a writable FPCGExProperty target. Locals first (FindByNameMutable is locals-only --
+	// imports would mutate the source asset globally). Then ImportOverrides: an import hit
+	// auto-enables the toggle via SetOverrideEnabled so the just-written value participates in
+	// resolution.
+	FPCGExProperty* ResolveWritableProperty(UPCGExPropertyCollectionComponent* Component, FName PropertyName)
+	{
+		if (!Component)
+		{
+			return nullptr;
+		}
+
+		FPCGExPropertySchemaCollection& Props = Component->GetPropertiesMutable();
+
+		if (FPCGExPropertySchema* Schema = Props.FindByNameMutable(PropertyName))
+		{
+			if (FPCGExProperty* Prop = Schema->GetPropertyMutable())
+			{
+				return Prop;
+			}
+		}
+
+		if (FPCGExPropertyOverrideEntry* Entry = Props.ImportOverrides.FindEntryMutableByName(PropertyName))
+		{
+			if (FPCGExProperty* Prop = Entry->Value.GetMutablePtr<FPCGExProperty>())
+			{
+				Component->SetOverrideEnabled(PropertyName, true);
+				return Prop;
+			}
+		}
+
+		return nullptr;
+	}
+
 	bool WriteFrom(
 		UPCGExPropertyCollectionComponent* Component,
 		FName PropertyName,
@@ -122,15 +155,7 @@ namespace PCGExPropertyBlueprintLibrary_Private
 			return false;
 		}
 
-		// FindByNameMutable is locals-only by contract -- imports silently fail (writing through
-		// an asset-owned pointer would mutate the asset globally).
-		FPCGExPropertySchema* Schema = Component->GetPropertiesMutable().FindByNameMutable(PropertyName);
-		if (!Schema)
-		{
-			return false;
-		}
-
-		FPCGExProperty* Prop = Schema->GetPropertyMutable();
+		FPCGExProperty* Prop = ResolveWritableProperty(Component, PropertyName);
 		if (!Prop)
 		{
 			return false;
@@ -175,16 +200,7 @@ namespace PCGExPropertyBlueprintLibrary_Private
 		EPCGMetadataTypes PathType,
 		const void* InPath)
 	{
-		if (!Component)
-		{
-			return false;
-		}
-		FPCGExPropertySchema* Schema = Component->GetPropertiesMutable().FindByNameMutable(PropertyName);
-		if (!Schema)
-		{
-			return false;
-		}
-		FPCGExProperty* Prop = Schema->GetPropertyMutable();
+		FPCGExProperty* Prop = ResolveWritableProperty(Component, PropertyName);
 		if (!Prop)
 		{
 			return false;

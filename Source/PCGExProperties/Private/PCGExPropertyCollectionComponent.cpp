@@ -9,6 +9,7 @@
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
+#include "UObject/UObjectIterator.h"
 #endif
 
 #if WITH_EDITOR
@@ -22,11 +23,23 @@ namespace PCGExPropertyCollectionComponent
 	{
 		if (HeaderId != 0)
 		{
-			for (auto& S : Schemas) { if (S.HeaderId == HeaderId) { return &S; } }
+			for (auto& S : Schemas)
+			{
+				if (S.HeaderId == HeaderId)
+				{
+					return &S;
+				}
+			}
 		}
 		if (!Name.IsNone())
 		{
-			for (auto& S : Schemas) { if (S.Name == Name) { return &S; } }
+			for (auto& S : Schemas)
+			{
+				if (S.Name == Name)
+				{
+					return &S;
+				}
+			}
 		}
 		return nullptr;
 	}
@@ -38,6 +51,47 @@ namespace PCGExPropertyCollectionComponent
 UPCGExPropertyCollectionComponent::UPCGExPropertyCollectionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+}
+
+void UPCGExPropertyCollectionComponent::OnComponentCreated()
+{
+	Super::OnComponentCreated();
+
+	if (IsTemplate())
+	{
+		return;
+	}
+
+	// Strip any bEnabled flags + TSet entries inherited from the CDO at construction. Override
+	// toggles are instance-owned; resolution falls back through the BP chain to surface the
+	// CDO/asset value when the instance hasn't toggled.
+	for (FPCGExPropertyOverrideEntry& Entry : Properties.ImportOverrides.Overrides)
+	{
+		Entry.bEnabled = false;
+	}
+	EnabledOverrides.Empty();
+}
+
+void UPCGExPropertyCollectionComponent::SetOverrideEnabled(FName PropertyName, bool bEnabled)
+{
+	if (PropertyName.IsNone())
+	{
+		return;
+	}
+
+	if (bEnabled)
+	{
+		EnabledOverrides.Add(PropertyName);
+	}
+	else
+	{
+		EnabledOverrides.Remove(PropertyName);
+	}
+
+	if (FPCGExPropertyOverrideEntry* Entry = Properties.ImportOverrides.FindEntryMutableByName(PropertyName))
+	{
+		Entry->bEnabled = bEnabled;
+	}
 }
 
 void UPCGExPropertyCollectionComponent::OnRegister()
@@ -67,14 +121,128 @@ void UPCGExPropertyCollectionComponent::OnRegister()
 const UPCGExPropertyCollectionComponent* UPCGExPropertyCollectionComponent::FindSCSTemplateInClass(const UClass* Cls, FName ComponentName)
 {
 	const UBlueprintGeneratedClass* BPClass = Cast<UBlueprintGeneratedClass>(Cls);
-	if (!BPClass) { return nullptr; }
+	if (!BPClass)
+	{
+		return nullptr;
+	}
 	USimpleConstructionScript* SCS = BPClass->SimpleConstructionScript;
-	if (!SCS) { return nullptr; }
+	if (!SCS)
+	{
+		return nullptr;
+	}
 	const USCS_Node* Node = SCS->FindSCSNode(ComponentName);
-	if (!Node) { return nullptr; }
+	if (!Node)
+	{
+		return nullptr;
+	}
 	return Cast<UPCGExPropertyCollectionComponent>(Node->ComponentTemplate);
 }
+
+void UPCGExPropertyCollectionComponent::SyncBEnabledFromOverrideSet()
+{
+	for (FPCGExPropertyOverrideEntry& Entry : Properties.ImportOverrides.Overrides)
+	{
+		const FName Name = Entry.GetPropertyName();
+		Entry.bEnabled = !Name.IsNone() && EnabledOverrides.Contains(Name);
+	}
+}
+
+void UPCGExPropertyCollectionComponent::SyncOverrideSetFromBEnabled()
+{
+	EnabledOverrides.Reset();
+	for (const FPCGExPropertyOverrideEntry& Entry : Properties.ImportOverrides.Overrides)
+	{
+		if (!Entry.bEnabled)
+		{
+			continue;
+		}
+		const FName Name = Entry.GetPropertyName();
+		if (!Name.IsNone())
+		{
+			EnabledOverrides.Add(Name);
+		}
+	}
+}
+
+void UPCGExPropertyCollectionComponent::PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent)
+{
+	// Only chain edits whose leaf is FPCGExPropertyOverrideEntry::bEnabled are relevant.
+	const FProperty* Leaf = PropertyChangedEvent.Property;
+	const bool bIsBEnabledEdit =
+		Leaf &&
+		Leaf->GetFName() == GET_MEMBER_NAME_CHECKED(FPCGExPropertyOverrideEntry, bEnabled) &&
+		Leaf->GetOwnerStruct() == FPCGExPropertyOverrideEntry::StaticStruct();
+
+	// Sync TSet BEFORE Super: Super may synchronously RerunConstructionScripts, capturing
+	// InstanceData from this component pre-destroy. A stale TSet at capture would round-trip
+	// the just-toggled bEnabled back to its pre-edit value on apply.
+	if (bIsBEnabledEdit)
+	{
+		SyncOverrideSetFromBEnabled();
+	}
+
+	Super::PostEditChangeChainProperty(PropertyChangedEvent);
+
+	// On CDO/template edits Super propagates to dependents and clobbers their bEnabled. Restore
+	// each non-template's bEnabled from its own (untouched) TSet. No archetype-chain filter:
+	// BP editor paths (CDO subobject vs SCS template vs ICH template) put the propagation target
+	// and live-edit target in parallel branches, so IsBasedOnArchetype(this) silently misses real
+	// dependents. Re-syncing untouched components is a harmless no-op.
+	if (!bIsBEnabledEdit || !IsTemplate())
+	{
+		return;
+	}
+	for (TObjectIterator<UPCGExPropertyCollectionComponent> It; It; ++It)
+	{
+		UPCGExPropertyCollectionComponent* Dependent = *It;
+		if (Dependent == this)
+		{
+			continue;
+		}
+		if (Dependent->IsTemplate())
+		{
+			continue;
+		}
+
+		Dependent->SyncBEnabledFromOverrideSet();
+	}
+}
+
 #endif
+
+TArray<FInstancedStruct> UPCGExPropertyCollectionComponent::BuildResolvedSchema() const
+{
+	TArray<const FPCGExPropertyOverrides*, TInlineAllocator<4>> Chain;
+
+#if WITH_EDITOR
+	if (const AActor* Owner = GetOwner())
+	{
+		for (const UClass* Cls = Owner->GetClass(); Cls; Cls = Cls->GetSuperClass())
+		{
+			const UPCGExPropertyCollectionComponent* Template = FindSCSTemplateInClass(Cls, GetFName());
+			if (!Template || Template == this)
+			{
+				continue;
+			}
+			Chain.Add(&Template->Properties.ImportOverrides);
+		}
+	}
+#else
+	for (const UObject* Arch = GetArchetype(); Arch && Arch != this; Arch = Arch->GetArchetype())
+	{
+		if (const UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(Arch))
+		{
+			Chain.Add(&Comp->Properties.ImportOverrides);
+		}
+		if (Arch->GetArchetype() == Arch)
+		{
+			break;
+		}
+	}
+#endif
+
+	return Properties.BuildSchema(MakeArrayView(Chain));
+}
 
 void UPCGExPropertyCollectionComponent::PreparePropertyValues_Implementation()
 {
@@ -112,10 +280,13 @@ FPCGExPropertyCollectionInstanceData::FPCGExPropertyCollectionInstanceData(const
 		return;
 	}
 
-	// Diff against the archetype: capture only entries whose value differs from the CDO's
-	// matching entry. Matches UE's "instance-authored = diverges from CDO" semantics. Without
-	// an archetype to diff against (template / Instance-created with no parent / orphaned)
-	// we capture nothing -- the standard per-instance delta path is responsible for those.
+	// Capture EnabledOverrides unconditionally -- the TSet IS the per-instance authored state
+	// (even when empty) and OnComponentCreated wipes it on every reconstruction. Done before the
+	// archetype-required captures so orphaned-archetype cases still get the TSet replayed.
+	CapturedEnabledOverrides = SourceComponent->EnabledOverrides;
+	bHasCapturedEnabledOverrides = true;
+
+	// Local schemas: standard diff-against-CDO. Import overrides: hybrid (see per-entry comment).
 	const UPCGExPropertyCollectionComponent* Archetype = Cast<UPCGExPropertyCollectionComponent>(SourceComponent->GetArchetype());
 	if (!Archetype || Archetype == SourceComponent)
 	{
@@ -159,7 +330,10 @@ FPCGExPropertyCollectionInstanceData::FPCGExPropertyCollectionInstanceData(const
 	for (int32 i = 0; i < ArchCol.ImportOverrides.Overrides.Num(); ++i)
 	{
 		const FName ArchName = ArchCol.ImportOverrides.Overrides[i].GetPropertyName();
-		if (!ArchName.IsNone()) { ArchIndexByName.Add(ArchName, i); }
+		if (!ArchName.IsNone())
+		{
+			ArchIndexByName.Add(ArchName, i);
+		}
 	}
 
 	for (int32 InstanceIndex = 0; InstanceIndex < InstanceCol.ImportOverrides.Overrides.Num(); ++InstanceIndex)
@@ -182,12 +356,13 @@ FPCGExPropertyCollectionInstanceData::FPCGExPropertyCollectionInstanceData(const
 			MatchedArch = &ArchCol.ImportOverrides.Overrides[InstanceIndex];
 		}
 
-		// No archetype match: capture only when the instance actually enabled an override.
-		// A disabled "ghost" entry that exists only on the instance carries no information.
-		const bool bDiffers = MatchedArch
-			? (MatchedArch->bEnabled != InstanceEntry.bEnabled || MatchedArch->Value != InstanceEntry.Value)
-			: InstanceEntry.bEnabled;
-		if (!bDiffers)
+		// bEnabled is instance-owned (OnComponentCreated wipes it on every reconstruction), so any
+		// bEnabled=true must be preserved regardless of CDO match -- otherwise toggling on while
+		// the CDO matches would round-trip to false on reconstruct. Value is captured on diff even
+		// when disabled, so a toggle-off/toggle-on cycle preserves the previously-authored value
+		// (inspector value is iteration scratch space).
+		const bool bValueDiffers = MatchedArch && MatchedArch->Value != InstanceEntry.Value;
+		if (!InstanceEntry.bEnabled && !bValueDiffers)
 		{
 			continue;
 		}
@@ -204,7 +379,7 @@ FPCGExPropertyCollectionInstanceData::FPCGExPropertyCollectionInstanceData(const
 bool FPCGExPropertyCollectionInstanceData::ContainsData() const
 {
 #if WITH_EDITOR
-	return Super::ContainsData() || !DivergentSchemas.IsEmpty() || !DivergentImportOverrides.IsEmpty();
+	return Super::ContainsData() || !DivergentSchemas.IsEmpty() || !DivergentImportOverrides.IsEmpty() || bHasCapturedEnabledOverrides;
 #else
 	return Super::ContainsData();
 #endif
@@ -300,6 +475,14 @@ void FPCGExPropertyCollectionInstanceData::ApplyToComponent(UActorComponent* Com
 	// reconciled. Neither OnRegister (Schemas-only) nor the replay loop above (in-place writes)
 	// fixes that drift.
 	Live.ReconcileImportOverrides();
+
+	// Restore TSet wholesale and re-derive bEnabled from it. Must run after ReconcileImportOverrides
+	// (which can resize the array) so the bEnabled sync targets the post-reconcile entry set.
+	if (bHasCapturedEnabledOverrides)
+	{
+		Typed->EnabledOverrides = CapturedEnabledOverrides;
+		Typed->SyncBEnabledFromOverrideSet();
+	}
 #endif // WITH_EDITOR
 }
 

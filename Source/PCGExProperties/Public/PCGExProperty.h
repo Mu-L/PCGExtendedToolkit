@@ -437,7 +437,10 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
 	FName GetPropertyName() const
 	{
 #if WITH_EDITORONLY_DATA
-		if (!PropertyName.IsNone()) { return PropertyName; }
+		if (!PropertyName.IsNone())
+		{
+			return PropertyName;
+		}
 #endif
 		if (const FPCGExProperty* Prop = Value.GetPtr<FPCGExProperty>())
 		{
@@ -542,6 +545,27 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrides
 
 	/** Get enabled override by name (returns nullptr if not found or disabled) */
 	const FInstancedStruct* GetOverride(FName PropertyName) const;
+
+	/**
+	 * Find an entry by property name, ignoring bEnabled. Returns nullptr if no entry matches.
+	 * Use this when the caller needs to mutate the entry (e.g. enable it as part of a write);
+	 * GetOverride is the read-only, enabled-only counterpart.
+	 */
+	FPCGExPropertyOverrideEntry* FindEntryMutableByName(FName PropertyName)
+	{
+		if (PropertyName.IsNone())
+		{
+			return nullptr;
+		}
+		for (FPCGExPropertyOverrideEntry& Entry : Overrides)
+		{
+			if (Entry.GetPropertyName() == PropertyName)
+			{
+				return &Entry;
+			}
+		}
+		return nullptr;
+	}
 
 	/** Count enabled overrides */
 	int32 GetEnabledCount() const
@@ -784,8 +808,14 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 *
 	 * Thread-safe: reads only. Mirrors the AssetCollection::BuildCache pattern -- the result
 	 * is built on demand and owned by the caller. The collection itself holds no cached state.
+	 *
+	 * Optional FallbackChain layers extend the override lookup beyond this collection's own
+	 * ImportOverrides: when this collection's entry returns null from GetOverride (disabled
+	 * or missing), each fallback layer is tried in order. First non-null wins. Used by
+	 * UPCGExPropertyCollectionComponent to walk the BP class chain so an instance defers
+	 * to its CDO's authored override when the instance hasn't toggled its own.
 	 */
-	void Resolve(TArray<FPCGExPropertyResolved>& Out) const;
+	void Resolve(TArray<FPCGExPropertyResolved>& Out, TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}) const;
 
 	/** Find schema by property name (walks locals first, then imported assets) */
 	const FPCGExPropertySchema* FindByName(FName PropertyName) const;
@@ -817,8 +847,8 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 */
 	const FInstancedStruct* GetPropertyByName(FName PropertyName) const;
 
-	/** Build FInstancedStruct array for SyncToSchema calls */
-	TArray<FInstancedStruct> BuildSchema() const;
+	/** Build FInstancedStruct array for SyncToSchema calls. FallbackChain has the same meaning as Resolve's. */
+	TArray<FInstancedStruct> BuildSchema(TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}) const;
 
 	/** Validate all property names are unique (returns true if valid) */
 	bool ValidateUniqueNames(TArray<FName>& OutDuplicates) const;

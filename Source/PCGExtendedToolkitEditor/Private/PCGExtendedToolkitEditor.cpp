@@ -85,6 +85,7 @@ void FPCGExtendedToolkitEditorModule::StartupModule()
 		PCGEX_ADD_CLASS_ICON(PCGExCustomActorDataPacker)
 		PCGEX_ADD_CLASS_ICON(PCGExBeacon)
 		PCGEX_ADD_CLASS_ICON(PCGExBitmaskCollection)
+		PCGEX_ADD_CLASS_ICON(PCGExPropertySchemaAsset)
 
 		PCGEX_REGISTER_PIN_ICON(OUT_Special)
 		PCGEX_REGISTER_PIN_ICON(IN_Special)

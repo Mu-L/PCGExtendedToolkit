@@ -5,7 +5,6 @@
 
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
-#include "GameFramework/Actor.h"
 #include "IDetailChildrenBuilder.h"
 #include "IDetailPropertyRow.h"
 #include "IPropertyUtilities.h"
@@ -13,8 +12,12 @@
 #include "PCGExProperty.h"
 #include "PCGExPropertyCollectionComponent.h"
 #include "PropertyHandle.h"
+#include "Details/PCGExEditorCustomizationUtils.h"
 #include "Details/PCGExPropertyLabelRow.h"
+#include "GameFramework/Actor.h"
 #include "UObject/StructOnScope.h"
+#include "Widgets/SNullWidget.h"
+#include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 // Forward declarations for the file-local helper namespace (defined further down).
@@ -64,6 +67,83 @@ FText FPCGExPropertyOverrideEntryCustomization::GetEntryTypeText() const
 {
 	const FPCGExProperty* Prop = AccessEntryProperty();
 	return Prop ? FText::FromName(Prop->GetDisplayTypeName()) : FText::FromString(TEXT("Unknown"));
+}
+
+FName FPCGExPropertyOverrideEntryCustomization::GetOverrideEntryName() const
+{
+	const UPCGExPropertyCollectionComponent* Live = WeakLiveComponent.Get();
+	if (!Live)
+	{
+		return NAME_None;
+	}
+	if (!Live->Properties.ImportOverrides.Overrides.IsValidIndex(CachedOverrideIndex))
+	{
+		return NAME_None;
+	}
+	return Live->Properties.ImportOverrides.Overrides[CachedOverrideIndex].GetPropertyName();
+}
+
+TSharedRef<SWidget> FPCGExPropertyOverrideEntryCustomization::BuildOverrideToggleWidget() const
+{
+	// Non-component owners (Tuple node, level exporter rows): standard handle-bound checkbox.
+	if (!WeakLiveComponent.IsValid())
+	{
+		return EnabledHandlePtr.IsValid()
+			? EnabledHandlePtr->CreatePropertyValueWidget()
+			: SNullWidget::NullWidget;
+	}
+
+	// Component owners: custom SCheckBox that writes the TSet directly via SetOverrideEnabled.
+	// Bypasses UE's property edit chain entirely, so the CDO->instance per-property propagation
+	// we cannot block on the leaf bEnabled never fires for inspector toggles.
+	const TWeakObjectPtr<UPCGExPropertyCollectionComponent> WeakLive = WeakLiveComponent;
+	const int32 OverrideIndex = CachedOverrideIndex;
+
+	auto IsChecked = [WeakLive, OverrideIndex]() -> ECheckBoxState
+	{
+		const UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
+		if (!Live)
+		{
+			return ECheckBoxState::Undetermined;
+		}
+		if (!Live->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex))
+		{
+			return ECheckBoxState::Undetermined;
+		}
+
+		const FName Name = Live->Properties.ImportOverrides.Overrides[OverrideIndex].GetPropertyName();
+		if (Name.IsNone())
+		{
+			return ECheckBoxState::Undetermined;
+		}
+		return Live->EnabledOverrides.Contains(Name) ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+	};
+
+	auto OnCheckStateChanged = [WeakLive, OverrideIndex](ECheckBoxState NewState)
+	{
+		UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
+		if (!Live)
+		{
+			return;
+		}
+		if (!Live->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex))
+		{
+			return;
+		}
+
+		const FName Name = Live->Properties.ImportOverrides.Overrides[OverrideIndex].GetPropertyName();
+		if (Name.IsNone())
+		{
+			return;
+		}
+
+		Live->Modify();
+		Live->SetOverrideEnabled(Name, NewState == ECheckBoxState::Checked);
+	};
+
+	return SNew(SCheckBox)
+		.IsChecked_Lambda(IsChecked)
+		.OnCheckStateChanged_Lambda(OnCheckStateChanged);
 }
 
 void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
@@ -146,7 +226,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 				.VAlign(VAlign_Center)
 				.Padding(0, 0, 4, 0)
 				[
-					EnabledHandlePtr.IsValid() ? EnabledHandlePtr->CreatePropertyValueWidget() : SNullWidget::NullWidget
+					BuildOverrideToggleWidget()
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
@@ -193,7 +273,10 @@ namespace PCGExPropertyOverrideEntryCustomization
 		int32 ImportSeen = 0;
 		for (const FPCGExPropertyResolved& Entry : Resolved)
 		{
-			if (!Entry.OwningAsset || !Entry.Source) { continue; }
+			if (!Entry.OwningAsset || !Entry.Source)
+			{
+				continue;
+			}
 			if (ImportSeen == OverrideIndex)
 			{
 				OutEnabled = false; // Asset-default means "no override active"
@@ -234,8 +317,14 @@ namespace PCGExPropertyOverrideEntryCustomization
 			for (UClass* Cls = Owner->GetClass(); Cls; Cls = Cls->GetSuperClass())
 			{
 				const UPCGExPropertyCollectionComponent* Template = UPCGExPropertyCollectionComponent::FindSCSTemplateInClass(Cls, Live.GetFName());
-				if (!Template || Template == &Live) { continue; }
-				if (!Template->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex)) { continue; }
+				if (!Template || Template == &Live)
+				{
+					continue;
+				}
+				if (!Template->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex))
+				{
+					continue;
+				}
 
 				const FPCGExPropertyOverrideEntry& A = Template->Properties.ImportOverrides.Overrides[OverrideIndex];
 				if (A.bEnabled)
@@ -249,7 +338,10 @@ namespace PCGExPropertyOverrideEntryCustomization
 
 		if (CachedAssetDefault)
 		{
-			if (!CachedAssetDefault->IsValid()) { return false; }
+			if (!CachedAssetDefault->IsValid())
+			{
+				return false;
+			}
 			OutEnabled = false;
 			OutValue = *CachedAssetDefault;
 			return true;
@@ -275,11 +367,17 @@ FResetToDefaultOverride FPCGExPropertyOverrideEntryCustomization::MakeArchetypeR
 		[WeakLive, OverrideIndex, CachedAssetDefault](TSharedPtr<IPropertyHandle>) -> bool
 		{
 			const UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
-			if (!Live || !Live->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex)) { return false; }
+			if (!Live || !Live->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex))
+			{
+				return false;
+			}
 
 			bool SrcEnabled = false;
 			FInstancedStruct SrcValue;
-			if (!PCGExPropertyOverrideEntryCustomization::TryGetResetSource(*Live, OverrideIndex, &CachedAssetDefault, SrcEnabled, SrcValue)) { return false; }
+			if (!PCGExPropertyOverrideEntryCustomization::TryGetResetSource(*Live, OverrideIndex, &CachedAssetDefault, SrcEnabled, SrcValue))
+			{
+				return false;
+			}
 
 			const FPCGExPropertyOverrideEntry& L = Live->Properties.ImportOverrides.Overrides[OverrideIndex];
 			return L.bEnabled != SrcEnabled || L.Value != SrcValue;
@@ -289,11 +387,17 @@ FResetToDefaultOverride FPCGExPropertyOverrideEntryCustomization::MakeArchetypeR
 		[WeakLive, WeakUtils, OverrideIndex, CachedAssetDefault](TSharedPtr<IPropertyHandle> Handle)
 		{
 			UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
-			if (!Live || !Live->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex)) { return; }
+			if (!Live || !Live->Properties.ImportOverrides.Overrides.IsValidIndex(OverrideIndex))
+			{
+				return;
+			}
 
 			bool SrcEnabled = false;
 			FInstancedStruct SrcValue;
-			if (!PCGExPropertyOverrideEntryCustomization::TryGetResetSource(*Live, OverrideIndex, &CachedAssetDefault, SrcEnabled, SrcValue)) { return; }
+			if (!PCGExPropertyOverrideEntryCustomization::TryGetResetSource(*Live, OverrideIndex, &CachedAssetDefault, SrcEnabled, SrcValue))
+			{
+				return;
+			}
 
 			Live->Modify();
 			FPCGExPropertyOverrideEntry& L = Live->Properties.ImportOverrides.Overrides[OverrideIndex];
@@ -304,7 +408,10 @@ FResetToDefaultOverride FPCGExPropertyOverrideEntryCustomization::MakeArchetypeR
 			// ReconcileImportOverrides keeps types aligned so same-type is the common case;
 			// the refresh below is a defensive fallback for the type-mismatch reallocation path.
 			L.Value = SrcValue;
-			if (Handle.IsValid()) { Handle->NotifyPostChange(EPropertyChangeType::ValueSet); }
+			if (Handle.IsValid())
+			{
+				Handle->NotifyPostChange(EPropertyChangeType::ValueSet);
+			}
 
 			if (TSharedPtr<IPropertyUtilities> Utils = WeakUtils.Pin())
 			{
@@ -375,12 +482,23 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 	// for the session, and the inner type is pinned by the collection schema.
 	InnerScope = MakeShared<FStructOnScope>(InnerStruct, StructMemory);
 
-	// Enabled attribute: capture the member handle by TWeakPtr so the lambda can never
-	// keep a stale shared-ref alive after the customization is torn down. While this
-	// customization is alive, EnabledHandlePtr is alive, and the weak pin succeeds.
+	// In component context, read the TSet directly (the authoritative signal -- bEnabled may
+	// briefly disagree post-propagation until the PostEdit safety-net resyncs it). Other owners
+	// fall back to the property handle.
 	TWeakPtr<IPropertyHandle> WeakEnabledHandle = EnabledHandlePtr;
-	TAttribute<bool> IsEnabledAttr = TAttribute<bool>::Create([WeakEnabledHandle]()
+	const TWeakObjectPtr<UPCGExPropertyCollectionComponent> WeakLiveForEnabled = WeakLiveComponent;
+	const int32 EnabledQueryIndex = CachedOverrideIndex;
+	TAttribute<bool> IsEnabledAttr = TAttribute<bool>::Create([WeakLiveForEnabled, EnabledQueryIndex, WeakEnabledHandle]()
 	{
+		if (const UPCGExPropertyCollectionComponent* Live = WeakLiveForEnabled.Get())
+		{
+			if (Live->Properties.ImportOverrides.Overrides.IsValidIndex(EnabledQueryIndex))
+			{
+				const FName Name = Live->Properties.ImportOverrides.Overrides[EnabledQueryIndex].GetPropertyName();
+				return !Name.IsNone() && Live->EnabledOverrides.Contains(Name);
+			}
+			return false;
+		}
 		if (TSharedPtr<IPropertyHandle> Handle = WeakEnabledHandle.Pin())
 		{
 			bool bEnabled = false;
@@ -398,7 +516,7 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 			.VAlign(VAlign_Center)
 			.Padding(0, 0, 4, 0)
 			[
-				EnabledHandlePtr.IsValid() ? EnabledHandlePtr->CreatePropertyValueWidget() : SNullWidget::NullWidget
+				BuildOverrideToggleWidget()
 			]
 			+ SHorizontalBox::Slot()
 			.AutoWidth()
@@ -415,6 +533,10 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 		if (InnerRow && WeakLiveComponent.IsValid())
 		{
 			InnerRow->OverrideResetToDefault(MakeArchetypeResetOverride());
+
+			// Override Value edits need an explicit Modify() to dirty the actor; the
+			// external-structure row doesn't route through the owning UObject on its own.
+			PCGExEditorCustomizationUtils::HookModifyOnHandleChanged(InnerRow->GetPropertyHandle(), WeakLiveComponent);
 		}
 	}
 	else
