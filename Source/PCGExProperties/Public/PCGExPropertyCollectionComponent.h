@@ -6,9 +6,127 @@
 #include "CoreMinimal.h"
 #include "PCGExProperty.h"
 #include "Components/ActorComponent.h"
+#include "ComponentInstanceDataCache.h"
 #include "GameFramework/Actor.h"
 
 #include "PCGExPropertyCollectionComponent.generated.h"
+
+class UPCGExPropertyCollectionComponent;
+
+// The capture/apply path solves the BP-recompile instance-wipe bug, which is an editor-only
+// problem. Cooked builds don't recompile BPs at runtime, so there's no reinstance gap to
+// preserve state across. Struct definitions are kept un-gated (UHT rejects WITH_EDITOR
+// around UPROPERTYs), and only the captured-divergence UPROPERTY fields inside the
+// FActorComponentInstanceData subclass are WITH_EDITORONLY_DATA. The InstanceData methods
+// gate their bodies with WITH_EDITOR so cooked builds fall through to base no-op behavior.
+
+/**
+ * A single instance-level divergence from the archetype's local Schemas, keyed by stable
+ * identity (HeaderId primary, Name fallback for legacy / pre-sync entries).
+ *
+ * "Identity" mirrors FPCGExPropertySchemaCollection::SyncFromArchetype's matching policy --
+ * HeaderId is the editor-only stable key that survives renames, reorders, and type changes;
+ * Name is the fallback for entries that pre-date the HeaderId scheme.
+ *
+ * Only constructed inside the editor-only capture path; in cooked builds the type exists
+ * but has no live instances.
+ */
+USTRUCT()
+struct PCGEXPROPERTIES_API FPCGExCapturedSchemaOverride
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 HeaderId = 0;
+
+	UPROPERTY()
+	FName Name = NAME_None;
+
+	UPROPERTY()
+	FInstancedStruct Property;
+};
+
+/**
+ * A single instance-level divergence from the archetype's ImportOverrides.Overrides.
+ *
+ * Identity is PropertyName (primary). Index is captured as a parallel-array fallback for the
+ * case where the live instance's outer-and-inner identity were both missing at snapshot time
+ * (UE's per-property delta can blank inner FInstancedStruct content; outer identity may not
+ * have been migrated onto the CDO yet). The Overrides array is structurally parallel with the
+ * imports-only resolved schema by construction, so same-index pairing is safe when no other
+ * signal survives.
+ *
+ * Only constructed inside the editor-only capture path; in cooked builds the type exists
+ * but has no live instances.
+ */
+USTRUCT()
+struct PCGEXPROPERTIES_API FPCGExCapturedImportOverride
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FName PropertyName = NAME_None;
+
+	UPROPERTY()
+	int32 SourceIndex = INDEX_NONE;
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	UPROPERTY()
+	FInstancedStruct Value;
+};
+
+/**
+ * Instance data preserved across Blueprint reinstancing for UPCGExPropertyCollectionComponent.
+ *
+ * UE's default per-instance UPROPERTY delta serialization is unreliable for the shape
+ * FPCGExPropertySchemaCollection has -- TArray<FStruct> where each entry's Property is an
+ * FInstancedStruct. Across a BP recompile, the captured delta either drops the polymorphic
+ * inner-struct content or fails to re-apply it, leaving instances with CDO defaults and
+ * silently wiping user-authored values.
+ *
+ * Diff-against-archetype capture: at GetComponentInstanceData time, walk the live collection
+ * and capture only entries whose value differs from the matching archetype entry. This
+ * matches UE's standard "instance-authored = differs from CDO" semantics that the broken
+ * default delta path is supposed to provide (and would, if FInstancedStruct-in-TArray
+ * round-tripped correctly). The instance-data cache holds these captured entries as live
+ * in-memory structs (not as serialized bytes), so FInstancedStruct content survives the
+ * reinstance gap intact.
+ *
+ * ApplyToComponent walks the captured divergences and overwrites the matching entries on
+ * the freshly reinstanced (and structure-synced) component in the PostUserConstructionScript
+ * phase. Effect: inspector edits win over CS writes for the same field, while CS writes that
+ * match the CDO are not captured (so changing CS logic on the CDO between recompiles works
+ * for any field the instance hasn't diverged on). The inner property's per-field reset arrow
+ * is the un-stick mechanism -- resetting to CDO restores parity, the entry is no longer
+ * captured next recompile, and CS regains control of it.
+ *
+ * The captured-divergence UPROPERTY arrays are WITH_EDITORONLY_DATA -- cooked builds don't
+ * carry them, and the method bodies are WITH_EDITOR-gated to fall through to base behavior.
+ */
+USTRUCT()
+struct PCGEXPROPERTIES_API FPCGExPropertyCollectionInstanceData : public FActorComponentInstanceData
+{
+	GENERATED_BODY()
+
+	FPCGExPropertyCollectionInstanceData() = default;
+	explicit FPCGExPropertyCollectionInstanceData(const UPCGExPropertyCollectionComponent* SourceComponent);
+
+#if WITH_EDITORONLY_DATA
+	/** Instance-level divergences from the archetype's local Schemas. */
+	UPROPERTY()
+	TArray<FPCGExCapturedSchemaOverride> DivergentSchemas;
+
+	/** Instance-level divergences from the archetype's ImportOverrides.Overrides. */
+	UPROPERTY()
+	TArray<FPCGExCapturedImportOverride> DivergentImportOverrides;
+#endif
+
+	virtual bool ContainsData() const override;
+	virtual void ApplyToComponent(UActorComponent* Component, const ECacheApplyPhase CacheApplyPhase) override;
+	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
+};
 
 /**
  * Actor component for attaching property collections to any actor.
@@ -35,11 +153,50 @@ public:
 	virtual void OnRegister() override;
 
 	/**
+	 * Capture the live Properties collection into FPCGExPropertyCollectionInstanceData so it
+	 * survives Blueprint reinstancing. See the struct comment for why we can't rely on UE's
+	 * default per-instance delta path. The override is declared always (UFUNCTION
+	 * declarations can't be conditionally compiled) but its capture logic is WITH_EDITOR-only;
+	 * in cooked builds the captured-state struct has no editor-only fields populated and
+	 * ContainsData() returns false, so this falls back to Super::GetComponentInstanceData().
+	 */
+	virtual TStructOnScope<FActorComponentInstanceData> GetComponentInstanceData() const override;
+
+	/**
 	 * Property collection with schema definitions and default values.
 	 * These compile into runtime property data during cage/pattern builds.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Properties")
 	FPCGExPropertySchemaCollection Properties;
+
+	/**
+	 * Dynamic multicast delegate fired alongside PreparePropertyValues. BP authors can BindEvent
+	 * to this on any instance of the component without needing to subclass -- useful when a
+	 * level-placed actor wants to compute schema values from world state.
+	 *
+	 * The bound function runs inside the same snapshot/restore window as PreparePropertyValues,
+	 * so writes through SetProperty are export-time-only.
+	 */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPCGExOnPreparePropertyValues, UPCGExPropertyCollectionComponent*, CollectionComponent);
+
+	UPROPERTY(BlueprintAssignable, Category = "Properties", meta=(DisplayName="On Prepare Property Values"))
+	FPCGExOnPreparePropertyValues OnPreparePropertyValues;
+
+	/**
+	 * Fires immediately before the component's authored schema is read for level / actor
+	 * export (ExtractSchemaFromActor). BP override (subclass) and OnPreparePropertyValues
+	 * (instance bind) both flow through here -- the C++ default body broadcasts the delegate
+	 * so a single chokepoint serves both hook styles.
+	 *
+	 * Writes through SetProperty during this event are visible to the exporter but reverted
+	 * on the live component afterwards, so they don't get captured as instance-authored state
+	 * by the BP recompile machinery. Intended workaround for the "construction-script writes
+	 * become sticky" limitation: if a value needs to be derived (from world position, owning
+	 * actor state, world-state queries, etc.), set it here instead of in the construction
+	 * script and it stays out of the inspector-authored set.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category = "Properties", meta=(DisplayName="On Prepare Property Values"))
+	void PreparePropertyValues();
 
 	/**
 	 * Get the property collection.
@@ -58,6 +215,24 @@ public:
 	{
 		return Properties;
 	}
+
+#if WITH_EDITOR
+	/**
+	 * Find the SCS-authored template for the component named ComponentName on Cls's CDO.
+	 *
+	 * Walks UClass -> UBlueprintGeneratedClass -> SimpleConstructionScript -> FindSCSNode.
+	 * Returns nullptr for native / non-BP classes and classes that don't author this
+	 * component. Used by editor customizations to traverse a component instance's BP
+	 * class chain, resolving each parent layer's stored archetype state directly.
+	 *
+	 * GetArchetype() can't substitute here: it returns the CDO actor's component
+	 * subobject, which is a duplicate of the SCS template, and per UE's
+	 * FInstancedStruct-in-TArray issues the duplicate can lose inner Value content.
+	 * The SCS template is the authored source -- BP editor writes flow into it
+	 * directly, so it reads correctly even when the duplicate path is broken.
+	 */
+	static const UPCGExPropertyCollectionComponent* FindSCSTemplateInClass(const UClass* Cls, FName ComponentName);
+#endif
 
 	/**
 	 * Locate the property-collection component on an actor with copy-paste resilience.
@@ -99,6 +274,11 @@ public:
 	 * SyncPropertyName run on every schema first so each FInstancedStruct's inner property
 	 * carries up-to-date PropertyName + HeaderId identity. Returns an empty array when the
 	 * actor lacks a component.
+	 *
+	 * Fires PreparePropertyValues on the component before reading -- BP override allows
+	 * computing values dynamically. The Properties collection is snapshotted before the
+	 * event and restored after, so dynamic writes inside the event don't persist on the
+	 * live component (they're export-time-only).
 	 */
 	static TArray<FInstancedStruct> ExtractSchemaFromActor(const AActor* Actor)
 	{
@@ -107,10 +287,17 @@ public:
 		{
 			return {};
 		}
-		for (FPCGExPropertySchema& Schema : Comp->GetPropertiesMutable().Schemas)
+
+		FPCGExPropertySchemaCollection Snapshot = Comp->Properties;
+		Comp->PreparePropertyValues();
+
+		for (FPCGExPropertySchema& Schema : Comp->Properties.Schemas)
 		{
 			Schema.SyncPropertyName();
 		}
-		return Comp->GetProperties().BuildSchema();
+		TArray<FInstancedStruct> Result = Comp->Properties.BuildSchema();
+
+		Comp->Properties = MoveTemp(Snapshot);
+		return Result;
 	}
 };

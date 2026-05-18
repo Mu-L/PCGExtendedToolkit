@@ -3,9 +3,14 @@
 
 #pragma once
 
+#include "IDetailPropertyRow.h"
 #include "IPropertyTypeCustomization.h"
+#include "StructUtils/InstancedStruct.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 class FStructOnScope;
+class IPropertyUtilities;
+class UPCGExPropertyCollectionComponent;
 
 
 /**
@@ -48,4 +53,22 @@ private:
 	TSharedPtr<IPropertyHandle> ValueHandlePtr;
 	TSharedPtr<IPropertyHandle> EnabledHandlePtr;
 	TSharedPtr<FStructOnScope> InnerScope;
+
+	// Captured at CustomizeHeader -- inline-path external-structure rows return nothing from
+	// Handle->GetOuterObjects, so the reset delegates can't re-derive the component. Null when
+	// the entry isn't owned by a UPCGExPropertyCollectionComponent or is Instance-created (no
+	// BP chain to walk); UE's default reset behavior applies in those cases.
+	TWeakObjectPtr<UPCGExPropertyCollectionComponent> WeakLiveComponent;
+	int32 CachedOverrideIndex = INDEX_NONE;
+
+	// Asset-default resolved once at CustomizeHeader (imports tree is stable for the detail
+	// session). Invalid = "no asset default exists" -- TryGetResetSource relies on the distinction.
+	FInstancedStruct CachedAssetDefaultValue;
+
+	// Defensive-only: a type-mismatch reset reallocates and would invalidate InnerScope's alias.
+	// Same-type copy preserves the alias and needs no refresh, which is the common case under
+	// ReconcileImportOverrides.
+	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
+
+	FResetToDefaultOverride MakeArchetypeResetOverride() const;
 };

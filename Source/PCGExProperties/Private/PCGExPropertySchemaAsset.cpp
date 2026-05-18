@@ -8,6 +8,17 @@
 #endif
 
 #if WITH_EDITOR
+void UPCGExPropertySchemaAsset::PostLoad()
+{
+	Super::PostLoad();
+
+	// Self-heal: closes the "asset saved with stale caches because a referenced asset drifted
+	// after this asset's last save" gap at the source. Order matters -- ReconcileImportOverrides
+	// reads each Source schema's outer Name + HeaderId, which SyncAllSchemas canonicalizes first.
+	Collection.SyncAllSchemas();
+	Collection.ReconcileImportOverrides();
+}
+
 void UPCGExPropertySchemaAsset::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);

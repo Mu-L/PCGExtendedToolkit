@@ -108,6 +108,29 @@ void FPCGExPropertySchemaCustomization::CustomizeHeader(
 				TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertySchemaCustomization::GetHeaderNameText)),
 				TAttribute<FText>::Create(TAttribute<FText>::FGetter::CreateSP(this, &FPCGExPropertySchemaCustomization::GetHeaderTypeText)))
 		];
+
+	// Suppress UE's default reset arrow on the outer FPCGExPropertySchema row in author
+	// mode. The default reset would clear the schema (Name=None, empty Property
+	// FInstancedStruct), destroying the entry -- same destructive shape we suppress on
+	// FPCGExPropertyOverrideEntry's complex HeaderRow. The inner Property UPROPERTY
+	// carries NoResetToDefault, which handles arrow suppression on the value-child row;
+	// this handles the outer-row arrow that NoResetToDefault doesn't reach.
+	//
+	// Skipped in ReadOnlySchema mode: there, the parent
+	// FPCGExPropertySchemaCollectionCustomization installs its own archetype-aware
+	// override via ApplyLocalSchemaResetOverride at row-add time, and a second override
+	// here would conflict (UE asserts on duplicate handlers).
+	//
+	// bPropagateToChildren=false on purpose: only suppress the outer row's arrow. The
+	// Name child row keeps its default reset behavior so authors can clear just the name
+	// if they want.
+	if (!bIsReadOnly)
+	{
+		HeaderRow.OverrideResetToDefault(FResetToDefaultOverride::Create(
+			FIsResetToDefaultVisible::CreateLambda([](TSharedPtr<IPropertyHandle>) { return false; }),
+			FResetToDefaultHandler::CreateLambda([](TSharedPtr<IPropertyHandle>) {}),
+			/*bPropagateToChildren*/ false));
+	}
 }
 
 void FPCGExPropertySchemaCustomization::CustomizeChildren(

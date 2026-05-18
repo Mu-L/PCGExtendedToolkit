@@ -57,10 +57,14 @@ void UPCGExTupleSettings::PostEditChangeProperty(struct FPropertyChangedEvent& P
 		return; // Skip processing
 	}
 
-	// Sync composition schemas to values (only if we need to sync)
+	// Sync composition schemas to values (only if we need to sync). Explicit three-step
+	// pipeline: canonicalize outer->inner identity on Schemas, align ImportOverrides with
+	// the imports tree, then apply the resolved schema to every row's Overrides array.
 	if (bNeedsSync)
 	{
-		Composition.SyncOverridesArray(Values);
+		Composition.SyncAllSchemas();
+		Composition.ReconcileImportOverrides();
+		Composition.ApplyToOverrides(Values);
 	}
 
 	(void)MarkPackageDirty();
@@ -111,7 +115,9 @@ bool FPCGExTupleElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSetti
 
 	UPCGParamData* TupleData = Context->ManagedObjects->New<UPCGParamData>();
 
-	// ColCount must match Values[k].Overrides.Num() -- SyncOverridesArray keeps them parallel.
+	// ColCount must match Values[k].Overrides.Num() -- the SyncAllSchemas /
+	// ReconcileImportOverrides / ApplyToOverrides pipeline (PostEditChangeProperty) keeps
+	// them parallel.
 	TArray<FPCGExPropertyResolved> Resolved;
 	Settings->Composition.Resolve(Resolved);
 	const int32 ColCount = Resolved.Num();

@@ -387,12 +387,27 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
 {
 	GENERATED_BODY()
 
+#if WITH_EDITORONLY_DATA
+	// Outer identity cache. Lives outside Value (the FInstancedStruct) so it survives UE's
+	// broken per-property propagation for FInstancedStruct-in-TArray: when propagation drops
+	// the inner Value content on instances, the outer cache is the only signal SyncToSchema
+	// has for matching existing entries to the new schema.
+	UPROPERTY()
+	int32 HeaderId = 0;
+
+	UPROPERTY()
+	FName PropertyName = NAME_None;
+#endif
+
 	/** Whether this override is active (false = use collection default) */
 	UPROPERTY(EditAnywhere, Category = Settings)
 	bool bEnabled = false;
 
-	/** The typed property value (contains PropertyName internally) */
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, EditCondition="bEnabled"))
+	// NoResetToDefault: the default reset on the outer FInstancedStruct would clear the
+	// struct shape entirely. The inner property's per-UPROPERTY reset arrows provide the
+	// right-level "reset to CDO value" gesture; chaining to the outer would also fight the
+	// instance-data restore path (see FPCGExPropertyCollectionInstanceData).
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, EditCondition="bEnabled", NoResetToDefault))
 	FInstancedStruct Value;
 
 	FPCGExPropertyOverrideEntry() = default;
@@ -401,11 +416,29 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
 		: bEnabled(bInEnabled)
 		  , Value(InValue)
 	{
+#if WITH_EDITORONLY_DATA
+		SeedOuterIdentityFromInner();
+#endif
 	}
 
-	/** Get the property name from the inner struct */
+#if WITH_EDITORONLY_DATA
+	// Copy inner FPCGExProperty identity (PropertyName, HeaderId) into the outer cache fields.
+	// Idempotent; safe to call any time Value has been assigned a non-default content.
+	void SeedOuterIdentityFromInner()
+	{
+		if (const FPCGExProperty* Prop = Value.GetPtr<FPCGExProperty>())
+		{
+			PropertyName = Prop->PropertyName;
+			HeaderId = Prop->HeaderId;
+		}
+	}
+#endif
+
 	FName GetPropertyName() const
 	{
+#if WITH_EDITORONLY_DATA
+		if (!PropertyName.IsNone()) { return PropertyName; }
+#endif
 		if (const FPCGExProperty* Prop = Value.GetPtr<FPCGExProperty>())
 		{
 			return Prop->PropertyName;
@@ -445,8 +478,10 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
  *   FPCGExPropertySchemaCollection MySchema;           // Define columns
  *   TArray<FPCGExPropertyOverrides> MyRows;            // Row values
  *
- *   // In PostEditChangeProperty:
- *   MySchema.SyncOverridesArray(MyRows);               // Keep rows in sync
+ *   // In PostEditChangeProperty (structural change to schema collection):
+ *   MySchema.SyncAllSchemas();                          // canonicalize identity
+ *   MySchema.ReconcileImportOverrides();                // align imports
+ *   MySchema.ApplyToOverrides(MyRows);                  // apply to external rows
  *
  *   // At runtime, read values:
  *   for (int Col = 0; Col < MySchema.Num(); ++Col) {
@@ -580,8 +615,8 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings)
 	FName Name = NAME_None;
 
-	/** The typed property definition */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, ShowOnlyInnerProperties))
+	// NoResetToDefault: same reasoning as FPCGExPropertyOverrideEntry::Value.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, ShowOnlyInnerProperties, NoResetToDefault))
 	FInstancedStruct Property;
 
 	FPCGExPropertySchema(); // Implemented in .cpp (needs full type definitions)
@@ -681,8 +716,10 @@ struct PCGEXPROPERTIES_API FPCGExPropertyResolved
  *   UPROPERTY(EditAnywhere, Category = Settings)
  *   TArray<FPCGExPropertyOverrides> MyValues;
  *
- *   // In PostEditChangeProperty, sync on any schema change:
- *   MyProperties.SyncOverridesArray(MyValues);
+ *   // In PostEditChangeProperty, on any schema change:
+ *   MyProperties.SyncAllSchemas();
+ *   MyProperties.ReconcileImportOverrides();
+ *   MyProperties.ApplyToOverrides(MyValues);
  *
  *   // At runtime, access properties:
  *   const auto* FloatProp = MyProperties.GetProperty<FPCGExProperty_Float>(FName("MyFloat"));
@@ -815,16 +852,27 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	void SyncAllSchemas();
 
 	/**
-	 * Sync a single PropertyOverrides instance to this schema.
-	 * Convenience method that calls BuildSchema() then SyncToSchema().
+	 * Apply the currently-resolved schema to a PropertyOverrides container, bringing its
+	 * Overrides array into parallel structure with the resolved schema. Builds the schema
+	 * once via BuildSchema(), then calls FPCGExPropertyOverrides::SyncToSchema.
+	 *
+	 * Read-only on the collection (const) -- assumes Schemas and ImportOverrides are
+	 * already in canonical state. The typical full pipeline for a structural change is:
+	 *
+	 *   Collection.SyncAllSchemas();          // canonicalize outer -> inner identity
+	 *   Collection.ReconcileImportOverrides(); // align ImportOverrides with imports tree
+	 *   Collection.ApplyToOverrides(MyValues); // apply resolved schema to external overrides
+	 *
+	 * Skip the first two steps when the collection is known to be canonical (e.g., after
+	 * a Resolve walk that already reconciled, or when only the overrides target changed).
 	 */
-	void SyncOverrides(FPCGExPropertyOverrides& Overrides);
+	void ApplyToOverrides(FPCGExPropertyOverrides& Overrides) const;
 
 	/**
-	 * Sync an array of PropertyOverrides to this schema.
-	 * Convenience method that syncs all schemas then syncs each override.
+	 * Array overload. Builds the schema ONCE and applies it to every element, so prefer
+	 * this over a per-element loop when applying to multiple overrides containers.
 	 */
-	void SyncOverridesArray(TArray<FPCGExPropertyOverrides>& OverridesArray);
+	void ApplyToOverrides(TArray<FPCGExPropertyOverrides>& OverridesArray) const;
 
 	/**
 	 * Reconcile ImportOverrides against the current import tree.
@@ -845,7 +893,8 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 * PostEditChangeProperty handlers, customization callbacks, or asset broadcasts.
 	 *
 	 * Call after any change that may alter the import tree:
-	 * - Editing local schemas (SyncOverrides / SyncOverridesArray pipeline already does this)
+	 * - Editing local schemas (call as part of the SyncAllSchemas / ReconcileImportOverrides /
+	 *   ApplyToOverrides pipeline)
 	 * - ImportedSchemas array changes (add/remove an asset reference)
 	 * - A referenced UPCGExPropertySchemaAsset broadcasting OnSchemaAssetChanged
 	 */

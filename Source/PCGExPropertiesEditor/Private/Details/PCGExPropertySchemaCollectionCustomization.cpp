@@ -5,6 +5,7 @@
 
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
+#include "GameFramework/Actor.h"
 #include "IDetailChildrenBuilder.h"
 #include "IDetailPropertyRow.h"
 #include "IPropertyUtilities.h"
@@ -15,6 +16,52 @@
 #include "PropertyHandle.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
+
+
+namespace PCGExPropertySchemaCollectionCustomization
+{
+	// Resolve the reset target for a local schema entry by walking Owner's BP class chain
+	// from Live up to the topmost ancestor that authored this component, returning the
+	// closest ancestor whose Schemas[SchemaIndex].Property differs from Live's current value.
+	//
+	// Mental model: "reset to what my parent class set this to." A child BP that overrides
+	// the schema entry naturally wins over a more distant ancestor because the walk hits it
+	// first; a child that didn't override falls through to the layer that did. Same shape as
+	// FPCGExPropertyOverrideEntryCustomization's BP-chain walk for ImportOverrides --
+	// keeping the two reset behaviours symmetric.
+	//
+	// Returns false (no reset target) when:
+	// - Live has no owning actor (data-asset / Tuple / etc -- not a BP-instance context).
+	// - Live isn't actually in a BP class chain (native-only / template / Instance-created).
+	// - No ancestor diverges from Live (entry is already at parent default).
+	bool TryGetLocalSchemaResetSource(
+		const UPCGExPropertyCollectionComponent& Live,
+		int32 SchemaIndex,
+		FInstancedStruct& OutValue)
+	{
+		if (!Live.Properties.Schemas.IsValidIndex(SchemaIndex)) { return false; }
+		const FInstancedStruct& LiveProp = Live.Properties.Schemas[SchemaIndex].Property;
+
+		const AActor* Owner = Live.GetOwner();
+		if (!Owner) { return false; }
+
+		for (UClass* Cls = Owner->GetClass(); Cls; Cls = Cls->GetSuperClass())
+		{
+			const UPCGExPropertyCollectionComponent* Template =
+				UPCGExPropertyCollectionComponent::FindSCSTemplateInClass(Cls, Live.GetFName());
+			if (!Template || Template == &Live) { continue; }
+			if (!Template->Properties.Schemas.IsValidIndex(SchemaIndex)) { continue; }
+
+			const FInstancedStruct& AncestorProp = Template->Properties.Schemas[SchemaIndex].Property;
+			if (AncestorProp != LiveProp)
+			{
+				OutValue = AncestorProp;
+				return true;
+			}
+		}
+		return false;
+	}
+}
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCollectionCustomization::MakeInstance()
 {
@@ -42,15 +89,20 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeHeader(
 	// to the Blueprint. Other users of FPCGExPropertySchemaCollection (Tuple nodes, data assets,
 	// etc.) won't cast to the component type, so they are unaffected.
 	bIsInstanceMode = false;
+	WeakLiveComponent.Reset();
 	if (TSharedPtr<IPropertyUtilities> Utils = WeakPropertyUtilities.Pin())
 	{
 		for (const TWeakObjectPtr<UObject>& ObjPtr : Utils->GetSelectedObjects())
 		{
-			if (const UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(ObjPtr.Get()))
+			if (UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(ObjPtr.Get()))
 			{
 				if (!Comp->IsTemplate() && Comp->CreationMethod != EComponentCreationMethod::Instance)
 				{
 					bIsInstanceMode = true;
+					WeakLiveComponent = Comp;
+					// No archetype capture here: ApplyLocalSchemaResetOverride walks the BP
+					// class chain dynamically at reset time, so a stale-at-customize-time
+					// archetype reference would just trail the live BP CDO state.
 					break;
 				}
 			}
@@ -152,12 +204,17 @@ void FPCGExPropertySchemaCollectionCustomization::ReconcileAndNotify()
 
 	PropertyHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
 
-	// Deferred refresh: structural rebuild can fire during a Slate event chain, so we queue
-	// instead of forcing immediately. Matches FPCGExPropertyOverridesCustomization.
+	// ForceRefresh, not RequestRefresh: when this handler fires from an upstream asset's
+	// OnSchemaAssetChanged broadcast (e.g. A adds an entry, B is open and subscribed), the
+	// deferred RequestRefresh path doesn't reliably tick through to a rebuild from inside
+	// the broadcast event chain -- the rebuild only fires when the detail panel is otherwise
+	// invalidated (editor close/reopen). ForceRefresh runs the rebuild synchronously, which
+	// the sibling array-change handlers (OnSchemasArrayChanged, OnImportedSchemasArrayChanged)
+	// already use without re-entrancy issues.
 	CachedResolvedCount = -1;
 	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 	{
-		PropertyUtilities->RequestRefresh();
+		PropertyUtilities->ForceRefresh();
 	}
 }
 
@@ -211,6 +268,9 @@ void FPCGExPropertySchemaCollectionCustomization::EmitImportSections(IDetailChil
 		{
 			IDetailPropertyRow& Row = ChildBuilder.AddProperty(EntryHandle.ToSharedRef());
 			Row.ShowPropertyButtons(false);
+			// Reset-to-archetype on import overrides is handled by FPCGExPropertyOverrideEntryCustomization
+			// (the type customization that owns the actual visible row). Applying it here on the
+			// outer entry row in addition would trigger UE's duplicate-handler ensure.
 		}
 		++ImportIndex;
 	}
@@ -245,6 +305,50 @@ void FPCGExPropertySchemaCollectionCustomization::UnsubscribeImportedAssets()
 	}
 	AssetDelegateHandles.Reset();
 }
+
+void FPCGExPropertySchemaCollectionCustomization::ApplyLocalSchemaResetOverride(IDetailPropertyRow& Row, int32 SchemaIndex)
+{
+	// IsVisible / Handler use captured weak pointers, not Handle->GetOuterObjects.
+	// External-structure handles (the inline rendering path uses one) don't expose the owning
+	// component via outers, so the old approach silently hid the arrow for inline rows.
+	// FPCGExProperty subclasses carry meta=(NoResetToDefault) on their inner Value field
+	// to suppress UE's broken per-field arrow, so the arrow on this row is the only one users
+	// see -- one click resets the whole entry to the BP-chain parent's value.
+	//
+	// Reset target is resolved dynamically by walking Owner's BP class chain (see
+	// TryGetLocalSchemaResetSource). This mirrors the import-override reset behaviour
+	// (MakeArchetypeResetOverride) and is the correct semantics when a child BP overrides a
+	// schema entry authored on a parent BP -- the previous "direct archetype only" behaviour
+	// missed the chain entirely for components inherited from parent classes.
+	const TWeakObjectPtr<UPCGExPropertyCollectionComponent> WeakLive = WeakLiveComponent;
+
+	auto IsVisible = FIsResetToDefaultVisible::CreateLambda(
+		[WeakLive, SchemaIndex](TSharedPtr<IPropertyHandle>) -> bool
+		{
+			const UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
+			if (!Live) { return false; }
+			FInstancedStruct Ignored;
+			return PCGExPropertySchemaCollectionCustomization::TryGetLocalSchemaResetSource(*Live, SchemaIndex, Ignored);
+		});
+
+	auto Handler = FResetToDefaultHandler::CreateLambda(
+		[WeakLive, SchemaIndex](TSharedPtr<IPropertyHandle> Handle)
+		{
+			UPCGExPropertyCollectionComponent* Live = WeakLive.Get();
+			if (!Live || !Live->Properties.Schemas.IsValidIndex(SchemaIndex)) { return; }
+
+			FInstancedStruct ResetValue;
+			if (!PCGExPropertySchemaCollectionCustomization::TryGetLocalSchemaResetSource(*Live, SchemaIndex, ResetValue)) { return; }
+
+			Live->Modify();
+			Live->Properties.Schemas[SchemaIndex].Property = ResetValue;
+			Live->Properties.Schemas[SchemaIndex].SyncPropertyName();
+			if (Handle.IsValid()) { Handle->NotifyPostChange(EPropertyChangeType::ValueSet); }
+		});
+
+	Row.OverrideResetToDefault(FResetToDefaultOverride::Create(IsVisible, Handler, /*bPropagateToChildren*/ true));
+}
+
 
 bool FPCGExPropertySchemaCollectionCustomization::TryRenderFlatInline(
 	IDetailChildrenBuilder& ChildBuilder,
@@ -292,8 +396,15 @@ bool FPCGExPropertySchemaCollectionCustomization::TryRenderFlatInline(
 		.Text(LabelText)
 		.Font(IDetailLayoutBuilder::GetDetailFont());
 
-	return FPCGExInlineWidgetRegistry::AddCompactValueRow(
+	IDetailPropertyRow* Row = FPCGExInlineWidgetRegistry::AddCompactValueRow(
 		ChildBuilder, Scope.ToSharedRef(), InnerStruct, NameContent);
+	if (!Row) { return false; }
+
+	if (bIsInstanceMode)
+	{
+		ApplyLocalSchemaResetOverride(*Row, ElementHandle->GetIndexInArray());
+	}
+	return true;
 }
 
 void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
@@ -335,7 +446,9 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 			{
 				// Complex or unknown type: delegate to FPCGExPropertySchemaCustomization,
 				// which sees ReadOnlySchema on the parent handle and renders value-only.
-				ChildBuilder.AddProperty(ElementHandle.ToSharedRef()).ShowPropertyButtons(false);
+				IDetailPropertyRow& Row = ChildBuilder.AddProperty(ElementHandle.ToSharedRef());
+				Row.ShowPropertyButtons(false);
+				ApplyLocalSchemaResetOverride(Row, ElementHandle->GetIndexInArray());
 			}
 		}
 	}
@@ -361,9 +474,48 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 	{
 		Collection->Resolve(Resolved);
 
+		// Asset shape may have drifted since this collection was last reconciled. Asset-side
+		// PostLoad handles the "stale-on-load" case (UPCGExPropertySchemaAsset::PostLoad runs
+		// SyncAllSchemas + ReconcileImportOverrides), so this check primarily covers in-memory
+		// drift: an imported asset changed between this collection's load and now, but this
+		// customization wasn't open to catch the OnSchemaAssetChanged broadcast. Also covers
+		// non-asset hosts (Tuple node settings, level-instance component collections, etc.)
+		// where there's no PostLoad self-heal. Conditional rather than unconditional because
+		// an unconditional Reconcile would dirty unedited instances on every inspection.
+		//
+		// Drift comes in two shapes:
+		// 1. Count drift: imported assets gained/lost entries since last reconcile.
+		// 2. Type drift: imported assets retyped an entry (same Name/HeaderId, different
+		//    UScriptStruct). This collection's cached Overrides[i].Value still carries the
+		//    old type, so the OverrideEntry customization would render with stale type info
+		//    even though the resolved Source has the new type. Caught by per-entry type
+		//    comparison below; SyncToSchema's "type changed" branch rebuilds Value with the
+		//    schema default while preserving bEnabled.
 		int32 ExpectedImportCount = 0;
 		for (const FPCGExPropertyResolved& Entry : Resolved) { if (Entry.OwningAsset) { ++ExpectedImportCount; } }
-		if (Collection->ImportOverrides.Overrides.Num() != ExpectedImportCount)
+		bool bNeedsReconcile = (Collection->ImportOverrides.Overrides.Num() != ExpectedImportCount);
+
+		if (!bNeedsReconcile)
+		{
+			int32 ImportIndex = 0;
+			for (const FPCGExPropertyResolved& Entry : Resolved)
+			{
+				if (!Entry.OwningAsset || !Entry.Source) { continue; }
+				if (Collection->ImportOverrides.Overrides.IsValidIndex(ImportIndex))
+				{
+					const UScriptStruct* ResolvedType = Entry.Source->Property.GetScriptStruct();
+					const UScriptStruct* OverrideType = Collection->ImportOverrides.Overrides[ImportIndex].Value.GetScriptStruct();
+					if (ResolvedType != OverrideType)
+					{
+						bNeedsReconcile = true;
+						break;
+					}
+				}
+				++ImportIndex;
+			}
+		}
+
+		if (bNeedsReconcile)
 		{
 			// Reconcile reallocates ImportOverrides.Overrides, so the OverrideValue pointers
 			// cached in Resolved entries are now stale -- rebuild Resolved against the new state.

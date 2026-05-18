@@ -206,8 +206,9 @@ namespace PCGExDistributeTuple
 		}
 
 		// Resolve the composition tree (locals + imports) once. NumColumns drives the per-row
-		// override indexing into Values[k].Overrides, which SyncOverridesArray keeps parallel
-		// with BuildSchema()/Resolve() output.
+		// override indexing into Values[k].Overrides, which the SyncAllSchemas /
+		// ReconcileImportOverrides / ApplyToOverrides pipeline keeps parallel with
+		// BuildSchema()/Resolve() output.
 		TArray<FPCGExPropertyResolved> Resolved;
 		Settings->Composition.Resolve(Resolved);
 		const int32 NumColumns = Resolved.Num();

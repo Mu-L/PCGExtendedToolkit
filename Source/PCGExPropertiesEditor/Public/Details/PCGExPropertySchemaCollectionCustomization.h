@@ -6,7 +6,9 @@
 #include "IPropertyTypeCustomization.h"
 #include "UObject/StructOnScope.h"
 
+class IDetailPropertyRow;
 class IPropertyUtilities;
+class FResetToDefaultOverride;
 class UPCGExPropertySchemaAsset;
 struct FPCGExPropertyResolved;
 struct FPCGExPropertySchemaCollection;
@@ -80,12 +82,40 @@ private:
 	/** Remove all subscriptions registered through SubscribeToImportedAssets. Idempotent. */
 	void UnsubscribeImportedAssets();
 
+	/**
+	 * Replace UE's default reset-to-default arrow on Row with one that copies the archetype's
+	 * same-index local schema entry onto this collection's entry.
+	 *
+	 * Local-schema rows are built directly here (TryRenderFlatInline / fallback), so this
+	 * customization owns the row and can attach the override directly. Import-override rows
+	 * are built by FPCGExPropertyOverrideEntryCustomization, which handles its own reset.
+	 *
+	 * Only meaningful in bIsInstanceMode (the only context where an archetype exists). Caller
+	 * is responsible for the gate.
+	 */
+	void ApplyLocalSchemaResetOverride(IDetailPropertyRow& Row, int32 SchemaIndex);
+
 	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
 	TWeakPtr<IPropertyHandle> PropertyHandlePtr;
 	TWeakPtr<IPropertyHandle> SchemasArrayHandlePtr;
 
 	/** True when the outer object is a non-template UPCGExPropertyCollectionComponent instance */
 	bool bIsInstanceMode = false;
+
+	/**
+	 * Captured at CustomizeHeader for the instance-mode reset-to-archetype delegates.
+	 *
+	 * The handle UE passes to the IsVisible / Handler callbacks belongs to the row UE is
+	 * rendering -- which, for inline-rendered FInstancedStruct content, is an external
+	 * FStructOnScope row whose GetOuterObjects() returns nothing. Re-deriving the component
+	 * from the handle therefore can't work for inline rows; capturing once at customization
+	 * time and passing by-value into the lambdas does work for every row type.
+	 *
+	 * The archetype side of the reset (BP-chain walk) is resolved dynamically per paint
+	 * inside ApplyLocalSchemaResetOverride's lambdas -- see TryGetLocalSchemaResetSource --
+	 * so no separate WeakArchetypeComponent is cached here.
+	 */
+	TWeakObjectPtr<class UPCGExPropertyCollectionComponent> WeakLiveComponent;
 
 	/**
 	 * Struct scopes for inline flat rows in instance mode.

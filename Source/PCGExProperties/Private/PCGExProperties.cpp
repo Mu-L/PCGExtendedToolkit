@@ -242,19 +242,15 @@ void FPCGExPropertySchemaCollection::SyncAllSchemas()
 	}
 }
 
-void FPCGExPropertySchemaCollection::SyncOverrides(FPCGExPropertyOverrides& Overrides)
+void FPCGExPropertySchemaCollection::ApplyToOverrides(FPCGExPropertyOverrides& Overrides) const
 {
-	SyncAllSchemas();
-	ReconcileImportOverrides();
-	TArray<FInstancedStruct> Schema = BuildSchema();
+	const TArray<FInstancedStruct> Schema = BuildSchema();
 	Overrides.SyncToSchema(Schema);
 }
 
-void FPCGExPropertySchemaCollection::SyncOverridesArray(TArray<FPCGExPropertyOverrides>& OverridesArray)
+void FPCGExPropertySchemaCollection::ApplyToOverrides(TArray<FPCGExPropertyOverrides>& OverridesArray) const
 {
-	SyncAllSchemas();
-	ReconcileImportOverrides();
-	TArray<FInstancedStruct> Schema = BuildSchema();
+	const TArray<FInstancedStruct> Schema = BuildSchema();
 	for (FPCGExPropertyOverrides& Overrides : OverridesArray)
 	{
 		Overrides.SyncToSchema(Schema);
@@ -426,74 +422,104 @@ void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchem
 
 void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schema)
 {
-	// Save existing overrides
+	// Match existing entries to the new schema by OUTER identity (HeaderId primary, PropertyName
+	// fallback). Outer identity lives on FPCGExPropertyOverrideEntry directly, not inside Value's
+	// FInstancedStruct, so it survives UE's broken per-property delta propagation.
 	TArray<FPCGExPropertyOverrideEntry> OldOverrides = MoveTemp(Overrides);
 
-	// Build map by HeaderId (stable identity)
-	TMap<int32, FPCGExPropertyOverrideEntry> ExistingById;
 #if WITH_EDITOR
-	for (FPCGExPropertyOverrideEntry& Entry : OldOverrides)
+	// One-shot inner→outer migration for legacy data, then build identity maps in the same
+	// pass. Idempotent: skips entries that already carry outer identity. The CDO is the trigger
+	// -- once any reconcile fires for a CDO, its entries acquire outer identity here, and UE
+	// per-property delta propagates the outer scalars (FName, int32) to instances correctly
+	// on the next CDO edit.
+	TMap<int32, int32> IndexByHeaderId;
+	TMap<FName, int32> IndexByName;
+	for (int32 i = 0; i < OldOverrides.Num(); ++i)
 	{
-		if (const FPCGExProperty* Prop = Entry.Value.GetPtr<FPCGExProperty>())
+		FPCGExPropertyOverrideEntry& Entry = OldOverrides[i];
+		if (Entry.HeaderId == 0 || Entry.PropertyName.IsNone())
 		{
-			if (Prop->HeaderId != 0)
+			if (const FPCGExProperty* Prop = Entry.Value.GetPtr<FPCGExProperty>())
 			{
-				ExistingById.Add(Prop->HeaderId, MoveTemp(Entry));
+				if (Entry.HeaderId == 0) { Entry.HeaderId = Prop->HeaderId; }
+				if (Entry.PropertyName.IsNone()) { Entry.PropertyName = Prop->PropertyName; }
 			}
 		}
+		if (Entry.HeaderId != 0) { IndexByHeaderId.Add(Entry.HeaderId, i); }
+		if (!Entry.PropertyName.IsNone()) { IndexByName.Add(Entry.PropertyName, i); }
 	}
 #endif
 
-	// Rebuild array to match schema exactly (parallel arrays)
 	Overrides.Reset(Schema.Num());
 
-	for (const FInstancedStruct& SchemaProp : Schema)
+	for (int32 SchemaIndex = 0; SchemaIndex < Schema.Num(); ++SchemaIndex)
 	{
+		const FInstancedStruct& SchemaProp = Schema[SchemaIndex];
 		const FPCGExProperty* SchemaData = SchemaProp.GetPtr<FPCGExProperty>();
-		if (!SchemaData)
-		{
-			continue;
-		}
+		if (!SchemaData) { continue; }
 
 		FPCGExPropertyOverrideEntry& NewEntry = Overrides.AddDefaulted_GetRef();
+#if WITH_EDITORONLY_DATA
+		// Outer identity cache (editor-only). Cooked path skips this; the inner
+		// FPCGExProperty::PropertyName carried inside SchemaProp is sufficient at runtime.
+		NewEntry.PropertyName = SchemaData->PropertyName;
+		NewEntry.HeaderId = SchemaData->HeaderId;
+#endif
+
 		FPCGExPropertyOverrideEntry* Existing = nullptr;
 
 #if WITH_EDITOR
-		// Match by HeaderId (stable across rename/reorder/type change!)
 		if (SchemaData->HeaderId != 0)
 		{
-			Existing = ExistingById.Find(SchemaData->HeaderId);
+			if (const int32* Found = IndexByHeaderId.Find(SchemaData->HeaderId))
+			{
+				Existing = &OldOverrides[*Found];
+			}
+		}
+		if (!Existing && !SchemaData->PropertyName.IsNone())
+		{
+			if (const int32* Found = IndexByName.Find(SchemaData->PropertyName))
+			{
+				Existing = &OldOverrides[*Found];
+			}
+		}
+
+		// Last-resort parallel-index fallback. The Overrides array is structurally parallel to
+		// the imports-only schema by construction (every reconcile writes them in lockstep), so
+		// when an entry has no usable outer OR inner identity -- which happens when UE's
+		// per-property delta blanked the inner FInstancedStruct AND outer identity hadn't been
+		// migrated onto the CDO yet -- the same-index slot is the only signal left. Critical
+		// for preserving bEnabled toggles on instances of pre-fix authored data.
+		if (!Existing && OldOverrides.IsValidIndex(SchemaIndex))
+		{
+			Existing = &OldOverrides[SchemaIndex];
 		}
 #endif
 
 		if (Existing)
 		{
-			// Found existing by HeaderId - preserve state
 			NewEntry.bEnabled = Existing->bEnabled;
 
-			if (Existing->Value.GetScriptStruct() == SchemaProp.GetScriptStruct())
+			if (Existing->Value.IsValid() && Existing->Value.GetScriptStruct() == SchemaProp.GetScriptStruct())
 			{
-				// Same type - preserve value, update PropertyName from schema
+				// Same type - preserve value, refresh inner PropertyName / structural fields from schema
 				NewEntry.Value = MoveTemp(Existing->Value);
-
 				if (FPCGExProperty* Prop = NewEntry.GetPropertyMutable())
 				{
 					Prop->PropertyName = SchemaData->PropertyName;
-					// Sync structural sub-fields from the schema (e.g. FPCGExProperty_Enum's
-					// Value.Class). Keeps schema-owned parts in lockstep while leaving
-					// user-overridable parts of Value untouched.
 					Prop->SyncStructuralFromSchema(*SchemaData);
 				}
 			}
 			else
 			{
-				// Type changed - use schema default, preserve bEnabled
+				// Type changed, or inner Value lost to broken FInstancedStruct propagation.
+				// Take schema default; bEnabled (preserved above) carries the user's authoring intent.
 				NewEntry.Value = SchemaProp;
 			}
 		}
 		else
 		{
-			// New property - use schema default, disabled
 			NewEntry.Value = SchemaProp;
 			NewEntry.bEnabled = false;
 		}

@@ -1195,9 +1195,14 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 					MeshEntry.PropertyOverrides.Overrides.Reset(Authored.Num());
 					for (const FInstancedStruct& Prop : Authored)
 					{
+						// Seed outer identity from inner so the entry ships in canonical
+						// SyncToSchema shape; first reconcile would otherwise migrate it.
 						FPCGExPropertyOverrideEntry& Slot = MeshEntry.PropertyOverrides.Overrides.AddDefaulted_GetRef();
 						Slot.Value = Prop;
 						Slot.bEnabled = true;
+#if WITH_EDITORONLY_DATA
+						Slot.SeedOuterIdentityFromInner();
+#endif
 					}
 				}
 

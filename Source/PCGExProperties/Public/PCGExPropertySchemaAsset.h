@@ -54,6 +54,8 @@ public:
 	 */
 	FOnPCGExSchemaAssetChanged OnSchemaAssetChanged;
 
+	virtual void PostLoad() override;
+
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
