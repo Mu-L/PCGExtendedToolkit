@@ -79,15 +79,15 @@ namespace PCGExBlending
 					SupportedList.Num(),
 					32,
 					{
-						const int32 SourceIdx = SupportedList[i];
-						TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
-						
-						SubBlenders[SourceIdx] = SubBlender;
-						
-						if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
-						{
-							bSubBlendersInitOk.store(false, std::memory_order_relaxed);
-						}
+					const int32 SourceIdx = SupportedList[i];
+					TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+
+					SubBlenders[SourceIdx] = SubBlender;
+
+					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
+					{
+					bSubBlendersInitOk.store(false, std::memory_order_relaxed);
+					}
 					})
 				if (!bSubBlendersInitOk.load(std::memory_order_relaxed))
 				{
@@ -127,15 +127,15 @@ namespace PCGExBlending
 					SupportedList.Num(),
 					32,
 					{
-						const int32 SourceIdx = SupportedList[i];
-						TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
-						
-						SubBlenders[SourceIdx] = SubBlender;
-						
-						if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
-						{
-							bSubBlendersInitOk.store(false, std::memory_order_relaxed);
-						}
+					const int32 SourceIdx = SupportedList[i];
+					TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+
+					SubBlenders[SourceIdx] = SubBlender;
+
+					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
+					{
+					bSubBlendersInitOk.store(false, std::memory_order_relaxed);
+					}
 					})
 				if (!bSubBlendersInitOk.load(std::memory_order_relaxed))
 				{

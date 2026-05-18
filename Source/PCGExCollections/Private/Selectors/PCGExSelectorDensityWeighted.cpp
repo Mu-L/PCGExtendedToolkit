@@ -12,7 +12,7 @@
 
 void FPCGExEntryDensityWeightedPickerOp::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Density-Weighted -- failed to build shared weight tables. Check that the target category has at least one valid entry."));
+	PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Density-Weighted -- failed to build shared weight tables. Check that the target category has at least one valid entry."))
 }
 
 bool FPCGExEntryDensityWeightedPickerOp::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)

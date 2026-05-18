@@ -36,7 +36,8 @@ public class PCGExPropertiesEditor : ModuleRules
 				"PCG",
 				"PCGExCore",
 				"PCGExCoreEditor",
-				"PCGExProperties"
+				"PCGExProperties",
+				"AssetDefinition"
 				//"StructUtils"
 			}
 		);

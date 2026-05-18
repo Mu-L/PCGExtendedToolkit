@@ -95,7 +95,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_String : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FString Value;
 
 protected:
@@ -136,7 +136,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Name : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FName Value;
 
 protected:
@@ -177,7 +177,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Int32 : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	int32 Value = 0;
 
 #if WITH_EDITORONLY_DATA
@@ -225,7 +225,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Int64 : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	int64 Value = 0;
 
 #if WITH_EDITORONLY_DATA
@@ -272,7 +272,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Float : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	float Value = 0.0f;
 
 #if WITH_EDITORONLY_DATA
@@ -319,7 +319,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Double : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	double Value = 0.0;
 
 #if WITH_EDITORONLY_DATA
@@ -366,7 +366,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Bool : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	bool Value = false;
 
 protected:
@@ -407,7 +407,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Vector : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FVector Value = FVector::ZeroVector;
 
 protected:
@@ -448,7 +448,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Vector2 : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FVector2D Value = FVector2D::ZeroVector;
 
 protected:
@@ -489,7 +489,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Vector4 : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FVector4 Value = FVector4::Zero();
 
 protected:
@@ -538,7 +538,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Color : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FLinearColor Value = FLinearColor::White;
 
 protected:
@@ -579,7 +579,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Rotator : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FRotator Value = FRotator::ZeroRotator;
 
 protected:
@@ -620,7 +620,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Quat : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FQuat Value = FQuat::Identity;
 
 protected:
@@ -661,7 +661,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Transform : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FTransform Value = FTransform::Identity;
 
 protected:
@@ -702,7 +702,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_SoftObjectPath : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FSoftObjectPath Value;
 
 #if WITH_EDITORONLY_DATA
@@ -756,7 +756,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_SoftClassPath : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FSoftClassPath Value;
 
 #if WITH_EDITORONLY_DATA
@@ -814,7 +814,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty_Enum : public FPCGExProperty
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Property", meta=(NoResetToDefault))
 	FPCGExEnumSelector Value;
 
 protected:

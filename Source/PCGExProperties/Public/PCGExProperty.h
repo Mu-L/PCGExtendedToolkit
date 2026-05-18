@@ -10,6 +10,8 @@
 
 #include "PCGExProperty.generated.h"
 
+class UPCGExPropertySchemaAsset;
+
 /**
  * Entry in the property registry.
  * Built at compile time to provide a read-only view of available properties.
@@ -132,7 +134,7 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * This name is used to match properties across schemas, overrides, and output configs.
 	 * Must be unique within a schema collection.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Settings, meta=(DisplayPriority = -1))
+	UPROPERTY()
 	FName PropertyName;
 
 #if WITH_EDITORONLY_DATA
@@ -385,12 +387,27 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
 {
 	GENERATED_BODY()
 
+#if WITH_EDITORONLY_DATA
+	// Outer identity cache. Lives outside Value (the FInstancedStruct) so it survives UE's
+	// broken per-property propagation for FInstancedStruct-in-TArray: when propagation drops
+	// the inner Value content on instances, the outer cache is the only signal SyncToSchema
+	// has for matching existing entries to the new schema.
+	UPROPERTY()
+	int32 HeaderId = 0;
+
+	UPROPERTY()
+	FName PropertyName = NAME_None;
+#endif
+
 	/** Whether this override is active (false = use collection default) */
 	UPROPERTY(EditAnywhere, Category = Settings)
 	bool bEnabled = false;
 
-	/** The typed property value (contains PropertyName internally) */
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, EditCondition="bEnabled"))
+	// NoResetToDefault: the default reset on the outer FInstancedStruct would clear the
+	// struct shape entirely. The inner property's per-UPROPERTY reset arrows provide the
+	// right-level "reset to CDO value" gesture; chaining to the outer would also fight the
+	// instance-data restore path (see FPCGExPropertyCollectionInstanceData).
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, EditCondition="bEnabled", NoResetToDefault))
 	FInstancedStruct Value;
 
 	FPCGExPropertyOverrideEntry() = default;
@@ -399,11 +416,32 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
 		: bEnabled(bInEnabled)
 		  , Value(InValue)
 	{
+#if WITH_EDITORONLY_DATA
+		SeedOuterIdentityFromInner();
+#endif
 	}
 
-	/** Get the property name from the inner struct */
+#if WITH_EDITORONLY_DATA
+	// Copy inner FPCGExProperty identity (PropertyName, HeaderId) into the outer cache fields.
+	// Idempotent; safe to call any time Value has been assigned a non-default content.
+	void SeedOuterIdentityFromInner()
+	{
+		if (const FPCGExProperty* Prop = Value.GetPtr<FPCGExProperty>())
+		{
+			PropertyName = Prop->PropertyName;
+			HeaderId = Prop->HeaderId;
+		}
+	}
+#endif
+
 	FName GetPropertyName() const
 	{
+#if WITH_EDITORONLY_DATA
+		if (!PropertyName.IsNone())
+		{
+			return PropertyName;
+		}
+#endif
 		if (const FPCGExProperty* Prop = Value.GetPtr<FPCGExProperty>())
 		{
 			return Prop->PropertyName;
@@ -443,8 +481,10 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrideEntry
  *   FPCGExPropertySchemaCollection MySchema;           // Define columns
  *   TArray<FPCGExPropertyOverrides> MyRows;            // Row values
  *
- *   // In PostEditChangeProperty:
- *   MySchema.SyncOverridesArray(MyRows);               // Keep rows in sync
+ *   // In PostEditChangeProperty (structural change to schema collection):
+ *   MySchema.SyncAllSchemas();                          // canonicalize identity
+ *   MySchema.ReconcileImportOverrides();                // align imports
+ *   MySchema.ApplyToOverrides(MyRows);                  // apply to external rows
  *
  *   // At runtime, read values:
  *   for (int Col = 0; Col < MySchema.Num(); ++Col) {
@@ -505,6 +545,27 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrides
 
 	/** Get enabled override by name (returns nullptr if not found or disabled) */
 	const FInstancedStruct* GetOverride(FName PropertyName) const;
+
+	/**
+	 * Find an entry by property name, ignoring bEnabled. Returns nullptr if no entry matches.
+	 * Use this when the caller needs to mutate the entry (e.g. enable it as part of a write);
+	 * GetOverride is the read-only, enabled-only counterpart.
+	 */
+	FPCGExPropertyOverrideEntry* FindEntryMutableByName(FName PropertyName)
+	{
+		if (PropertyName.IsNone())
+		{
+			return nullptr;
+		}
+		for (FPCGExPropertyOverrideEntry& Entry : Overrides)
+		{
+			if (Entry.GetPropertyName() == PropertyName)
+			{
+				return &Entry;
+			}
+		}
+		return nullptr;
+	}
 
 	/** Count enabled overrides */
 	int32 GetEnabledCount() const
@@ -578,8 +639,8 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings)
 	FName Name = NAME_None;
 
-	/** The typed property definition */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, ShowOnlyInnerProperties))
+	// NoResetToDefault: same reasoning as FPCGExPropertyOverrideEntry::Value.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Settings, meta=(BaseStruct="/Script/PCGExProperties.PCGExProperty", ExcludeBaseStruct, ShowOnlyInnerProperties, NoResetToDefault))
 	FInstancedStruct Property;
 
 	FPCGExPropertySchema(); // Implemented in .cpp (needs full type definitions)
@@ -614,6 +675,52 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
 };
 
 /**
+ * Resolved entry produced by FPCGExPropertySchemaCollection::Resolve.
+ *
+ * A resolved entry is a pointer into the source FPCGExPropertySchemaCollection::Schemas
+ * array (either a local schema on the root collection, or one carried by an imported
+ * UPCGExPropertySchemaAsset somewhere down the import tree).
+ *
+ * The pointer is valid for as long as the collections and assets that participated
+ * in the resolution remain alive. Because the collection holds hard TObjectPtr refs
+ * to its ImportedSchemas, callers that keep the resolved list for the duration of a
+ * single operation (e.g. a node Execute) can safely use the raw pointers.
+ *
+ * Not a USTRUCT -- transient runtime view, not meant for serialization or BP reflection.
+ */
+struct PCGEXPROPERTIES_API FPCGExPropertyResolved
+{
+	/** Pointer into the source collection's Schemas array. Always non-null in a resolved entry. */
+	const FPCGExPropertySchema* Source = nullptr;
+
+	/** Asset that contributed this entry. Null when the entry comes from the root collection's locals. */
+	UPCGExPropertySchemaAsset* OwningAsset = nullptr;
+
+	/** Index within the source collection's Schemas array. */
+	int32 SourceIndex = INDEX_NONE;
+
+	/**
+	 * Non-null when the root collection's ImportOverrides supplies an enabled override for this entry's Name.
+	 * Points into ImportOverrides storage on the root collection; valid for the same lifetime as Source.
+	 * Only ever set for imported entries (OwningAsset != null) -- locals are edited in-place.
+	 */
+	const FInstancedStruct* OverrideValue = nullptr;
+
+	FPCGExPropertyResolved() = default;
+
+	FPCGExPropertyResolved(const FPCGExPropertySchema* InSource, UPCGExPropertySchemaAsset* InOwningAsset, int32 InSourceIndex, const FInstancedStruct* InOverrideValue = nullptr)
+		: Source(InSource), OwningAsset(InOwningAsset), SourceIndex(InSourceIndex), OverrideValue(InOverrideValue)
+	{
+	}
+
+	/** Returns the override Property if one applies, otherwise the source schema's Property. */
+	const FInstancedStruct& GetEffectiveProperty() const
+	{
+		return OverrideValue ? *OverrideValue : Source->Property;
+	}
+};
+
+/**
  * Collection of property schemas with embedded utilities.
  * This is the primary container for defining a set of typed properties.
  *
@@ -633,25 +740,97 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchema
  *   UPROPERTY(EditAnywhere, Category = Settings)
  *   TArray<FPCGExPropertyOverrides> MyValues;
  *
- *   // In PostEditChangeProperty, sync on any schema change:
- *   MyProperties.SyncOverridesArray(MyValues);
+ *   // In PostEditChangeProperty, on any schema change:
+ *   MyProperties.SyncAllSchemas();
+ *   MyProperties.ReconcileImportOverrides();
+ *   MyProperties.ApplyToOverrides(MyValues);
  *
  *   // At runtime, access properties:
  *   const auto* FloatProp = MyProperties.GetProperty<FPCGExProperty_Float>(FName("MyFloat"));
+ *
+ * COMPOSITION via imported assets:
+ *
+ *   ImportedSchemas pulls in UPCGExPropertySchemaAsset entries (which themselves wrap
+ *   an FPCGExPropertySchemaCollection -- recursion supported with cycle detection).
+ *   Resolve() / BuildSchema() / FindByName() all walk locals first, then imports
+ *   depth-first, deduping by Name with first-wins semantics: locals beat imports,
+ *   earlier imports beat later ones.
  */
 USTRUCT(BlueprintType)
 struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 {
 	GENERATED_BODY()
 
-	/** Schema array */
+	/** Schema array (locals -- always take precedence over imported entries with matching names) */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(TitleProperty="{Name}"))
 	TArray<FPCGExPropertySchema> Schemas;
 
-	/** Find schema by property name */
+	/**
+	 * Imported schema assets, resolved in array order after locals.
+	 * Hard refs -- assets stay loaded as long as the owning collection exists.
+	 * Recursion through imported assets' own ImportedSchemas is supported with cycle detection.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName="Imported Schemas"))
+	TArray<TObjectPtr<UPCGExPropertySchemaAsset>> ImportedSchemas;
+
+	/**
+	 * Per-entry value overrides for imported entries.
+	 *
+	 * EditAnywhere is required so the detail panel's GetChildHandle can reach this property's
+	 * children -- the registered FPCGExPropertySchemaCollectionCustomization takes over rendering
+	 * entirely (CustomizeChildren controls every visible row), so this never appears as a
+	 * top-level array editor in the inspector. The array is kept parallel with the imports-only
+	 * schema via ReconcileImportOverrides (which delegates to FPCGExPropertyOverrides::SyncToSchema).
+	 *
+	 * UE per-instance UPROPERTY delta serialization handles three-layer composition:
+	 * asset default -> template (collection on CDO) -> instance (collection on actor instance).
+	 * Each layer overrides the previous via bEnabled toggles on individual entries.
+	 *
+	 * Locals do not appear here -- they are edited in-place on Schemas.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings)
+	FPCGExPropertyOverrides ImportOverrides;
+
+	/**
+	 * Flatten the locals + imported asset tree into a name-deduped, first-wins resolved list.
+	 *
+	 * Walk order:
+	 * - This collection's locals (in array order)
+	 * - Each entry in ImportedSchemas (in array order), recursing depth-first
+	 *
+	 * Dedup is by FPCGExPropertySchema::Name; the first occurrence wins. Locals therefore
+	 * override any imported entry with the same name, and earlier imports override later ones.
+	 *
+	 * Cycles (an asset reachable from itself through ImportedSchemas) are skipped and logged
+	 * once per cycle via LogPCGEx. The first reach of an asset wins; subsequent reaches are no-ops.
+	 *
+	 * Entries with empty Name or invalid Property are skipped.
+	 *
+	 * Thread-safe: reads only. Mirrors the AssetCollection::BuildCache pattern -- the result
+	 * is built on demand and owned by the caller. The collection itself holds no cached state.
+	 *
+	 * Optional FallbackChain layers extend the override lookup beyond this collection's own
+	 * ImportOverrides: when this collection's entry returns null from GetOverride (disabled
+	 * or missing), each fallback layer is tried in order. First non-null wins. Used by
+	 * UPCGExPropertyCollectionComponent to walk the BP class chain so an instance defers
+	 * to its CDO's authored override when the instance hasn't toggled its own.
+	 */
+	void Resolve(TArray<FPCGExPropertyResolved>& Out, TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}) const;
+
+	/** Find schema by property name (walks locals first, then imported assets) */
 	const FPCGExPropertySchema* FindByName(FName PropertyName) const;
 
-	/** Find schema by property name (mutable). */
+	/**
+	 * Find schema by property name (mutable) -- LOCALS ONLY.
+	 *
+	 * Unlike FindByName, this never returns a pointer into an imported asset's schema array.
+	 * Writes through this pointer must only affect the owning collection's local data; an
+	 * asset-owned pointer would let callers silently mutate the source asset globally.
+	 *
+	 * To override an imported entry's value at the importing collection's level, modify the
+	 * corresponding FPCGExPropertyOverrideEntry in ImportOverrides instead (set bEnabled=true
+	 * and write to its inner Value).
+	 */
 	FPCGExPropertySchema* FindByNameMutable(FName PropertyName);
 
 	/** Check if property exists by name */
@@ -660,15 +839,16 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 		return FindByName(PropertyName) != nullptr;
 	}
 
-	/** Get property instance by name (returns FInstancedStruct for compatibility with existing code) */
-	const FInstancedStruct* GetPropertyByName(FName PropertyName) const
-	{
-		const FPCGExPropertySchema* Schema = FindByName(PropertyName);
-		return Schema ? &Schema->Property : nullptr;
-	}
+	/**
+	 * Get the effective property by name, honoring the three-layer composition:
+	 *   local schemas -> ImportOverrides (if enabled) -> imported asset's default.
+	 *
+	 * Read-only -- safe to call from any thread (see ReconcileImportOverrides contract).
+	 */
+	const FInstancedStruct* GetPropertyByName(FName PropertyName) const;
 
-	/** Build FInstancedStruct array for SyncToSchema calls */
-	TArray<FInstancedStruct> BuildSchema() const;
+	/** Build FInstancedStruct array for SyncToSchema calls. FallbackChain has the same meaning as Resolve's. */
+	TArray<FInstancedStruct> BuildSchema(TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}) const;
 
 	/** Validate all property names are unique (returns true if valid) */
 	bool ValidateUniqueNames(TArray<FName>& OutDuplicates) const;
@@ -702,16 +882,56 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	void SyncAllSchemas();
 
 	/**
-	 * Sync a single PropertyOverrides instance to this schema.
-	 * Convenience method that calls BuildSchema() then SyncToSchema().
+	 * Apply the currently-resolved schema to a PropertyOverrides container, bringing its
+	 * Overrides array into parallel structure with the resolved schema. Builds the schema
+	 * once via BuildSchema(), then calls FPCGExPropertyOverrides::SyncToSchema.
+	 *
+	 * Read-only on the collection (const) -- assumes Schemas and ImportOverrides are
+	 * already in canonical state. The typical full pipeline for a structural change is:
+	 *
+	 *   Collection.SyncAllSchemas();          // canonicalize outer -> inner identity
+	 *   Collection.ReconcileImportOverrides(); // align ImportOverrides with imports tree
+	 *   Collection.ApplyToOverrides(MyValues); // apply resolved schema to external overrides
+	 *
+	 * Skip the first two steps when the collection is known to be canonical (e.g., after
+	 * a Resolve walk that already reconciled, or when only the overrides target changed).
 	 */
-	void SyncOverrides(FPCGExPropertyOverrides& Overrides);
+	void ApplyToOverrides(FPCGExPropertyOverrides& Overrides) const;
 
 	/**
-	 * Sync an array of PropertyOverrides to this schema.
-	 * Convenience method that syncs all schemas then syncs each override.
+	 * Array overload. Builds the schema ONCE and applies it to every element, so prefer
+	 * this over a per-element loop when applying to multiple overrides containers.
 	 */
-	void SyncOverridesArray(TArray<FPCGExPropertyOverrides>& OverridesArray);
+	void ApplyToOverrides(TArray<FPCGExPropertyOverrides>& OverridesArray) const;
+
+	/**
+	 * Reconcile ImportOverrides against the current import tree.
+	 *
+	 * Builds an imports-only schema by resolving the tree, then calls
+	 * ImportOverrides.SyncToSchema() to:
+	 * - Preserve existing overrides whose imported entry still exists (HeaderId match)
+	 * - Update Name/PropertyName when the asset renamed an entry (HeaderId stable, Name drifted)
+	 * - Drop overrides whose imported entry was removed
+	 * - Reset to schema default when an imported entry's type changed
+	 *
+	 * Safe to call on a collection with no imports -- ImportOverrides becomes empty.
+	 *
+	 * **Game-thread only.** Mutates ImportOverrides without locking. Asserts via
+	 * check(IsInGameThread()) in dev builds. Runtime read paths (Resolve / BuildSchema /
+	 * GetPropertyByName / GetOverride) are safe off-thread only because no Reconcile is
+	 * allowed to run concurrently. All current call sites originate in editor
+	 * PostEditChangeProperty handlers, customization callbacks, or asset broadcasts.
+	 *
+	 * Call after any change that may alter the import tree:
+	 * - Editing local schemas (call as part of the SyncAllSchemas / ReconcileImportOverrides /
+	 *   ApplyToOverrides pipeline)
+	 * - ImportedSchemas array changes (add/remove an asset reference)
+	 * - A referenced UPCGExPropertySchemaAsset broadcasting OnSchemaAssetChanged
+	 */
+	void ReconcileImportOverrides();
+
+	/** Overload that accepts a precomputed Resolved view -- avoids re-walking the tree. */
+	void ReconcileImportOverrides(const TArray<FPCGExPropertyResolved>& Resolved);
 
 	/**
 	 * Rebuild this collection's structure to match Archetype, preserving Value overrides for
