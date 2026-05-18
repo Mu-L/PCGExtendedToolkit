@@ -37,7 +37,9 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FOnPCGExSchemaAssetChanged, UPCGExPropertySc
  * - Cycles are detected during resolution and skipped with a LogPCGEx warning.
  *   IsDataValid surfaces them in the editor as a Warning result.
  */
-UCLASS(BlueprintType)
+
+// Property Schema
+UCLASS(BlueprintType, DisplayName="[PCGEx] Property Schema", meta=(ToolTip = "A composable and inheritable library of properties definition."))
 class PCGEXPROPERTIES_API UPCGExPropertySchemaAsset : public UDataAsset
 {
 	GENERATED_BODY()

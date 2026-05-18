@@ -15,7 +15,7 @@
 
 void FPCGExEntryBestFitPickerOpBase::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Best Fit -- no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."));
+	PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Best Fit -- no entries with valid bounds. Check that the collection's entries have non-zero Staging.Bounds."))
 }
 
 bool FPCGExEntryBestFitPickerOpBase::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
