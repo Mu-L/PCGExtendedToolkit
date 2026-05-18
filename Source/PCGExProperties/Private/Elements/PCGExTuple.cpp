@@ -57,10 +57,14 @@ void UPCGExTupleSettings::PostEditChangeProperty(struct FPropertyChangedEvent& P
 		return; // Skip processing
 	}
 
-	// Sync composition schemas to values (only if we need to sync)
+	// Sync composition schemas to values (only if we need to sync). Explicit three-step
+	// pipeline: canonicalize outer->inner identity on Schemas, align ImportOverrides with
+	// the imports tree, then apply the resolved schema to every row's Overrides array.
 	if (bNeedsSync)
 	{
-		Composition.SyncOverridesArray(Values);
+		Composition.SyncAllSchemas();
+		Composition.ReconcileImportOverrides();
+		Composition.ApplyToOverrides(Values);
 	}
 
 	(void)MarkPackageDirty();
@@ -111,36 +115,38 @@ bool FPCGExTupleElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSetti
 
 	UPCGParamData* TupleData = Context->ManagedObjects->New<UPCGParamData>();
 
+	// ColCount must match Values[k].Overrides.Num() -- the SyncAllSchemas /
+	// ReconcileImportOverrides / ApplyToOverrides pipeline (PostEditChangeProperty) keeps
+	// them parallel.
+	TArray<FPCGExPropertyResolved> Resolved;
+	Settings->Composition.Resolve(Resolved);
+	const int32 ColCount = Resolved.Num();
+
 	TArray<FPCGMetadataAttributeBase*> Attributes;
 	TArray<int64> Keys;
 
-	Attributes.Reserve(Settings->Composition.Num());
-	Keys.Reserve(Settings->Composition.Num());
+	Attributes.Reserve(ColCount);
+	Keys.Reserve(Settings->Values.Num());
 
-	// Create one metadata attribute per schema column.
-	// Each property type knows how to create its own attribute type
-	// (e.g., FPCGExProperty_Float creates FPCGMetadataAttribute<float>).
-	// Custom property types participate here automatically via their
-	// CreateMetadataAttribute() override.
-	for (const FPCGExPropertySchema& SchemaEntry : Settings->Composition.Schemas)
+	for (const FPCGExPropertyResolved& Entry : Resolved)
 	{
-		// Check for existing attribute
-		const FPCGMetadataAttributeBase* ExistingAttr = TupleData->Metadata->GetConstAttribute(SchemaEntry.Name);
+		const FName ColumnName = Entry.Source->Name;
+		const FPCGMetadataAttributeBase* ExistingAttr = TupleData->Metadata->GetConstAttribute(ColumnName);
 		if (ExistingAttr)
 		{
-			PCGEX_LOG_INVALID_ATTR_C(Context, Header Name, SchemaEntry.Name)
+			PCGEX_LOG_INVALID_ATTR_C(Context, Header Name, ColumnName)
 			Attributes.Add(nullptr);
 			continue;
 		}
 
-		const FPCGExProperty* Property = SchemaEntry.GetProperty();
+		const FPCGExProperty* Property = Entry.GetEffectiveProperty().GetPtr<FPCGExProperty>();
 		if (!Property)
 		{
 			Attributes.Add(nullptr);
 			continue;
 		}
 
-		Attributes.Add(Property->CreateMetadataAttribute(TupleData->Metadata, SchemaEntry.Name));
+		Attributes.Add(Property->CreateMetadataAttribute(TupleData->Metadata, ColumnName));
 	}
 
 	// Create all keys
@@ -149,11 +155,8 @@ bool FPCGExTupleElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSetti
 		Keys.Add(TupleData->Metadata->AddEntry());
 	}
 
-	// Write values to attributes (only enabled overrides).
-	// Iterates column-first (outer = schema column, inner = row).
-	// Only writes a value if that column is enabled in that row (IsOverrideEnabled).
-	// This is the METADATA output path. For POINT ATTRIBUTE output, see FPCGExPropertyWriter.
-	for (int i = 0; i < Settings->Composition.Num(); ++i)
+	// Metadata output path. For POINT ATTRIBUTE output, see FPCGExPropertyWriter.
+	for (int i = 0; i < ColCount; ++i)
 	{
 		FPCGMetadataAttributeBase* Attribute = Attributes[i];
 		if (!Attribute)
@@ -165,7 +168,6 @@ bool FPCGExTupleElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSetti
 		{
 			const FPCGExPropertyOverrides& Row = Settings->Values[k];
 
-			// Only write if this column is enabled in this row
 			if (!Row.IsOverrideEnabled(i))
 			{
 				continue;

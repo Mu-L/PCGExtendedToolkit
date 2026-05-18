@@ -76,7 +76,7 @@ void FPCGExInlineWidgetRegistry::Clear()
 	PCGExInlineWidgetRegistry_Private::GetMap().Empty();
 }
 
-bool FPCGExInlineWidgetRegistry::AddCompactValueRow(
+IDetailPropertyRow* FPCGExInlineWidgetRegistry::AddCompactValueRow(
 	IDetailChildrenBuilder& ChildBuilder,
 	TSharedRef<FStructOnScope> Scope,
 	UScriptStruct* InnerStruct,
@@ -86,7 +86,7 @@ bool FPCGExInlineWidgetRegistry::AddCompactValueRow(
 	const FProperty* ValueProperty = InnerStruct->FindPropertyByName(TEXT("Value"));
 	if (!ValueProperty)
 	{
-		return false;
+		return nullptr;
 	}
 
 	IDetailPropertyRow& Row = *ChildBuilder.AddExternalStructureProperty(Scope, ValueProperty->GetFName());
@@ -116,7 +116,7 @@ bool FPCGExInlineWidgetRegistry::AddCompactValueRow(
 			]
 		];
 
-	return true;
+	return &Row;
 }
 
 void FPCGExInlineWidgetRegistry::AddComplexValueRows(
