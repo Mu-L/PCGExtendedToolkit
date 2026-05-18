@@ -10,6 +10,16 @@
 #include "PCGExPropertySchemaAsset.generated.h"
 
 class FDataValidationContext;
+class UPCGExPropertySchemaAsset;
+
+/**
+ * Editor-time notification that a schema asset's contents changed.
+ *
+ * Subscribers (typically the collection customization) react by reconciling their
+ * ImportOverrides and refreshing UI. The sender argument identifies the changed asset
+ * so listeners that subscribe to multiple assets can act selectively.
+ */
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnPCGExSchemaAssetChanged, UPCGExPropertySchemaAsset* /*ChangedAsset*/);
 
 /**
  * Reusable schema asset.
@@ -38,6 +48,12 @@ public:
 	FPCGExPropertySchemaCollection Collection;
 
 #if WITH_EDITOR
+	/**
+	 * Fires from PostEditChangeProperty after the asset's local schemas have been re-synced.
+	 * Editor-only: not registered or fired in cooked builds.
+	 */
+	FOnPCGExSchemaAssetChanged OnSchemaAssetChanged;
+
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif

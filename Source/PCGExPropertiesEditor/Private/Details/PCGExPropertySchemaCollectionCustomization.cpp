@@ -11,12 +11,19 @@
 #include "PCGExInlineWidgetRegistry.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyCollectionComponent.h"
+#include "PCGExPropertySchemaAsset.h"
 #include "PropertyHandle.h"
+#include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCollectionCustomization::MakeInstance()
 {
 	return MakeShareable(new FPCGExPropertySchemaCollectionCustomization());
+}
+
+FPCGExPropertySchemaCollectionCustomization::~FPCGExPropertySchemaCollectionCustomization()
+{
+	UnsubscribeImportedAssets();
 }
 
 void FPCGExPropertySchemaCollectionCustomization::CustomizeHeader(
@@ -66,51 +73,177 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeHeader(
 
 FText FPCGExPropertySchemaCollectionCustomization::GetHeaderText() const
 {
-	if (!PropertyHandlePtr.IsValid())
+	// Called per Slate redraw -- avoid the full Resolve walk by serving a cache populated by
+	// CustomizeChildren. First call (before the section is expanded) falls through to compute.
+	if (CachedResolvedCount < 0)
 	{
-		return FText::FromString(TEXT("0 properties"));
+		CachedResolvedCount = 0;
+		if (TSharedPtr<IPropertyHandle> Handle = PropertyHandlePtr.Pin())
+		{
+			TArray<void*> RawData;
+			Handle->AccessRawData(RawData);
+			if (!RawData.IsEmpty() && RawData[0])
+			{
+				TArray<FPCGExPropertyResolved> Resolved;
+				static_cast<const FPCGExPropertySchemaCollection*>(RawData[0])->Resolve(Resolved);
+				CachedResolvedCount = Resolved.Num();
+			}
+		}
 	}
 
-	// Get raw access to count schemas
-	TArray<void*> RawData;
-	PropertyHandlePtr.Pin()->AccessRawData(RawData);
-	int32 SchemaCount = 0;
-	if (!RawData.IsEmpty() && RawData[0])
-	{
-		const FPCGExPropertySchemaCollection* Collection = static_cast<FPCGExPropertySchemaCollection*>(RawData[0]);
-		SchemaCount = Collection->Schemas.Num();
-	}
-
-	return FText::FromString(FString::Printf(TEXT("%d %s"), SchemaCount, SchemaCount == 1 ? TEXT("property") : TEXT("properties")));
+	return FText::FromString(FString::Printf(TEXT("%d %s"), CachedResolvedCount, CachedResolvedCount == 1 ? TEXT("property") : TEXT("properties")));
 }
 
 void FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged()
 {
-	if (!PropertyHandlePtr.IsValid())
-	{
-		return;
-	}
+	TSharedPtr<IPropertyHandle> PropertyHandle = PropertyHandlePtr.Pin();
+	if (!PropertyHandle.IsValid()) { return; }
 
-	// Access the collection to sync schemas
 	TArray<void*> RawData;
-	PropertyHandlePtr.Pin()->AccessRawData(RawData);
-	if (RawData.IsEmpty() || !RawData[0])
-	{
-		return;
-	}
+	PropertyHandle->AccessRawData(RawData);
+	if (RawData.IsEmpty() || !RawData[0]) { return; }
 
 	FPCGExPropertySchemaCollection* Collection = static_cast<FPCGExPropertySchemaCollection*>(RawData[0]);
+	for (FPCGExPropertySchema& Schema : Collection->Schemas) { Schema.SyncPropertyName(); }
+	Collection->ReconcileImportOverrides();
 
-	// Sync PropertyName and HeaderId for all schemas
-	for (FPCGExPropertySchema& Schema : Collection->Schemas)
-	{
-		Schema.SyncPropertyName();
-	}
-
+	CachedResolvedCount = -1;
 	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 	{
 		PropertyUtilities->ForceRefresh();
 	}
+}
+
+void FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged()
+{
+	TSharedPtr<IPropertyHandle> PropertyHandle = PropertyHandlePtr.Pin();
+	if (!PropertyHandle.IsValid()) { return; }
+
+	TArray<void*> RawData;
+	PropertyHandle->AccessRawData(RawData);
+	if (!RawData.IsEmpty() && RawData[0])
+	{
+		static_cast<FPCGExPropertySchemaCollection*>(RawData[0])->ReconcileImportOverrides();
+	}
+
+	CachedResolvedCount = -1;
+	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
+	{
+		PropertyUtilities->ForceRefresh();
+	}
+}
+
+void FPCGExPropertySchemaCollectionCustomization::OnImportedAssetChanged(UPCGExPropertySchemaAsset* /*ChangedAsset*/)
+{
+	ReconcileAndNotify();
+}
+
+void FPCGExPropertySchemaCollectionCustomization::ReconcileAndNotify()
+{
+	TSharedPtr<IPropertyHandle> PropertyHandle = PropertyHandlePtr.Pin();
+	if (!PropertyHandle.IsValid()) { return; }
+
+	TArray<void*> RawData;
+	PropertyHandle->AccessRawData(RawData);
+	if (!RawData.IsEmpty() && RawData[0])
+	{
+		static_cast<FPCGExPropertySchemaCollection*>(RawData[0])->ReconcileImportOverrides();
+	}
+
+	PropertyHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
+
+	// Deferred refresh: structural rebuild can fire during a Slate event chain, so we queue
+	// instead of forcing immediately. Matches FPCGExPropertyOverridesCustomization.
+	CachedResolvedCount = -1;
+	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
+	{
+		PropertyUtilities->RequestRefresh();
+	}
+}
+
+void FPCGExPropertySchemaCollectionCustomization::EmitSectionHeader(IDetailChildrenBuilder& ChildBuilder, const FString& Title) const
+{
+	// Left padding of -16 preserves the ZoneGraph-style offset that aligns section labels
+	// with the property tree's gutter rather than the value column.
+	ChildBuilder.AddCustomRow(FText::FromString(Title))
+	            .WholeRowContent()
+		[
+			SNew(SBox)
+			.Padding(FMargin(-16, 4, 0, 4))
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(Title.ToUpper()))
+				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 7))
+				.ColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.35f, 0.35f)))
+			]
+		];
+}
+
+void FPCGExPropertySchemaCollectionCustomization::EmitImportSections(IDetailChildrenBuilder& ChildBuilder, TSharedRef<IPropertyHandle> CollectionHandle, const TArray<FPCGExPropertyResolved>& Resolved)
+{
+	TSharedPtr<IPropertyHandle> ImportOverridesHandle = CollectionHandle->GetChildHandle(TEXT("ImportOverrides"));
+	if (!ImportOverridesHandle.IsValid()) { return; }
+	TSharedPtr<IPropertyHandle> OverridesArrayHandle = ImportOverridesHandle->GetChildHandle(TEXT("Overrides"));
+	if (!OverridesArrayHandle.IsValid()) { return; }
+
+	// Force the detail panel to build property nodes for the ImportOverrides subtree by
+	// adding the parent as a collapsed row. Without this, per-instance UPROPERTY delta
+	// tracking can fail for writes through the entry handles below -- UE only builds the
+	// node tree for branches reached via AddProperty, and writes through unbuilt nodes
+	// silently revert on instances (CDO/archetype propagation re-reads stale memory).
+	ChildBuilder.AddProperty(ImportOverridesHandle.ToSharedRef()).Visibility(EVisibility::Collapsed);
+
+	int32 ImportIndex = 0;
+	UPCGExPropertySchemaAsset* CurrentSection = nullptr;
+	for (const FPCGExPropertyResolved& Entry : Resolved)
+	{
+		if (!Entry.OwningAsset) { continue; }
+
+		if (Entry.OwningAsset != CurrentSection)
+		{
+			CurrentSection = Entry.OwningAsset;
+			EmitSectionHeader(ChildBuilder, CurrentSection->GetName());
+		}
+
+		TSharedPtr<IPropertyHandle> EntryHandle = OverridesArrayHandle->GetChildHandle(static_cast<uint32>(ImportIndex));
+		if (EntryHandle.IsValid())
+		{
+			IDetailPropertyRow& Row = ChildBuilder.AddProperty(EntryHandle.ToSharedRef());
+			Row.ShowPropertyButtons(false);
+		}
+		++ImportIndex;
+	}
+}
+
+void FPCGExPropertySchemaCollectionCustomization::SubscribeToImportedAssets(const TArray<FPCGExPropertyResolved>& Resolved)
+{
+	UnsubscribeImportedAssets();
+
+	TSet<UPCGExPropertySchemaAsset*> Unique;
+	for (const FPCGExPropertyResolved& Entry : Resolved)
+	{
+		if (Entry.OwningAsset) { Unique.Add(Entry.OwningAsset); }
+	}
+
+	for (UPCGExPropertySchemaAsset* Asset : Unique)
+	{
+		FDelegateHandle Handle = Asset->OnSchemaAssetChanged.AddSP(
+			this, &FPCGExPropertySchemaCollectionCustomization::OnImportedAssetChanged);
+		AssetDelegateHandles.Emplace(TWeakObjectPtr<UPCGExPropertySchemaAsset>(Asset), Handle);
+	}
+}
+
+void FPCGExPropertySchemaCollectionCustomization::UnsubscribeImportedAssets()
+{
+	for (TPair<TWeakObjectPtr<UPCGExPropertySchemaAsset>, FDelegateHandle>& Pair : AssetDelegateHandles)
+	{
+		if (UPCGExPropertySchemaAsset* Asset = Pair.Key.Get())
+		{
+			Asset->OnSchemaAssetChanged.Remove(Pair.Value);
+		}
+	}
+	AssetDelegateHandles.Reset();
 }
 
 bool FPCGExPropertySchemaCollectionCustomization::TryRenderFlatInline(
@@ -213,11 +346,49 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 		SchemasArrayHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged));
 
 		ChildBuilder.AddProperty(SchemasArrayHandle.ToSharedRef());
+	}
 
-		// Imports are structural -- excluded from instance mode where the schema is locked.
+	// Resolve once and share with EmitImportSections, SubscribeToImportedAssets, and the header
+	// count cache. Reconcile only on shape divergence (e.g. CDO gained an import since this
+	// instance was saved) -- the no-op write would otherwise dirty unedited instances on inspection.
+	TArray<FPCGExPropertyResolved> Resolved;
+	TArray<void*> RawData;
+	PropertyHandle->AccessRawData(RawData);
+	FPCGExPropertySchemaCollection* Collection = (RawData.IsEmpty() || !RawData[0])
+		                                             ? nullptr
+		                                             : static_cast<FPCGExPropertySchemaCollection*>(RawData[0]);
+	if (Collection)
+	{
+		Collection->Resolve(Resolved);
+
+		int32 ExpectedImportCount = 0;
+		for (const FPCGExPropertyResolved& Entry : Resolved) { if (Entry.OwningAsset) { ++ExpectedImportCount; } }
+		if (Collection->ImportOverrides.Overrides.Num() != ExpectedImportCount)
+		{
+			// Reconcile reallocates ImportOverrides.Overrides, so the OverrideValue pointers
+			// cached in Resolved entries are now stale -- rebuild Resolved against the new state.
+			Collection->ReconcileImportOverrides(Resolved);
+			Collection->Resolve(Resolved);
+		}
+
+		EmitImportSections(ChildBuilder, PropertyHandle, Resolved);
+	}
+
+	if (!bIsInstanceMode)
+	{
+		// ImportedSchemas array editor (managing the imports list itself) -- structural,
+		// not exposed in instance mode where the schema shape is locked.
 		if (TSharedPtr<IPropertyHandle> ImportedSchemasHandle = PropertyHandle->GetChildHandle(TEXT("ImportedSchemas")))
 		{
+			ImportedSchemasHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged));
+			ImportedSchemasHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged));
 			ChildBuilder.AddProperty(ImportedSchemasHandle.ToSharedRef());
 		}
+	}
+
+	if (Collection)
+	{
+		SubscribeToImportedAssets(Resolved);
+		CachedResolvedCount = Resolved.Num();
 	}
 }

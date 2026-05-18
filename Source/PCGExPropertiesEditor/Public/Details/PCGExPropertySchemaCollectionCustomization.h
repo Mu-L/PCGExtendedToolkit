@@ -7,6 +7,9 @@
 #include "UObject/StructOnScope.h"
 
 class IPropertyUtilities;
+class UPCGExPropertySchemaAsset;
+struct FPCGExPropertyResolved;
+struct FPCGExPropertySchemaCollection;
 
 /**
  * Customizes FPCGExPropertySchemaCollection to:
@@ -24,6 +27,8 @@ class FPCGExPropertySchemaCollectionCustomization : public IPropertyTypeCustomiz
 public:
 	static TSharedRef<IPropertyTypeCustomization> MakeInstance();
 
+	virtual ~FPCGExPropertySchemaCollectionCustomization() override;
+
 	virtual void CustomizeHeader(
 		TSharedRef<IPropertyHandle> PropertyHandle,
 		class FDetailWidgetRow& HeaderRow,
@@ -37,8 +42,14 @@ public:
 private:
 	FText GetHeaderText() const;
 
-	/** Called when Schemas array changes - syncs PropertyNames and broadcasts refresh */
+	/** Called when Schemas array changes - syncs PropertyNames, reconciles imports, broadcasts refresh */
 	void OnSchemasArrayChanged();
+
+	/** Called when ImportedSchemas array changes -- imports tree shape changed, reconcile + refresh */
+	void OnImportedSchemasArrayChanged();
+
+	/** Called when a referenced UPCGExPropertySchemaAsset broadcasts OnSchemaAssetChanged */
+	void OnImportedAssetChanged(UPCGExPropertySchemaAsset* ChangedAsset);
 
 	/**
 	 * Render a single schema element as a flat single-row inline value editor.
@@ -46,6 +57,28 @@ private:
 	 * letting the caller fall back to FPCGExPropertySchemaCustomization's read-only rendering.
 	 */
 	bool TryRenderFlatInline(class IDetailChildrenBuilder& ChildBuilder, TSharedRef<IPropertyHandle> ElementHandle);
+
+	/** Emit a small uppercase gray section header row -- matches the ZoneGraph customization style. */
+	void EmitSectionHeader(class IDetailChildrenBuilder& ChildBuilder, const FString& Title) const;
+
+	/**
+	 * Emit one section header per imported asset and one row per override entry. Assumes the
+	 * caller has already reconciled ImportOverrides so its Overrides array is parallel with
+	 * the imports-only slice of Resolved.
+	 */
+	void EmitImportSections(class IDetailChildrenBuilder& ChildBuilder, TSharedRef<IPropertyHandle> CollectionHandle, const TArray<FPCGExPropertyResolved>& Resolved);
+
+	/**
+	 * Mutate the underlying collection: call ReconcileImportOverrides, then ask outer object's
+	 * PostEditChangeProperty pipeline to run (NotifyPostChange). Safe to call from change handlers.
+	 */
+	void ReconcileAndNotify();
+
+	/** Subscribe to OnSchemaAssetChanged on every asset present in the precomputed Resolved set. */
+	void SubscribeToImportedAssets(const TArray<FPCGExPropertyResolved>& Resolved);
+
+	/** Remove all subscriptions registered through SubscribeToImportedAssets. Idempotent. */
+	void UnsubscribeImportedAssets();
 
 	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
 	TWeakPtr<IPropertyHandle> PropertyHandlePtr;
@@ -60,4 +93,10 @@ private:
 	 * the widgets that reference it. Populated in CustomizeChildren; reset each rebuild.
 	 */
 	TArray<TSharedPtr<FStructOnScope>> InstanceScopes;
+
+	/** Active OnSchemaAssetChanged subscriptions. Cleared on customization teardown / rebuild. */
+	TArray<TPair<TWeakObjectPtr<UPCGExPropertySchemaAsset>, FDelegateHandle>> AssetDelegateHandles;
+
+	/** Cached resolved entry count for GetHeaderText (called per Slate redraw). -1 means unset. */
+	mutable int32 CachedResolvedCount = -1;
 };

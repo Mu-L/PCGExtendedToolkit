@@ -15,6 +15,8 @@ void UPCGExPropertySchemaAsset::PostEditChangeProperty(FPropertyChangedEvent& Pr
 	// Keep HeaderId / PropertyName in sync for any newly added or edited local schemas.
 	// Imported assets sync themselves through their own PostEditChangeProperty.
 	Collection.SyncAllSchemas();
+
+	OnSchemaAssetChanged.Broadcast(this);
 }
 
 EDataValidationResult UPCGExPropertySchemaAsset::IsDataValid(FDataValidationContext& Context) const
@@ -39,7 +41,9 @@ EDataValidationResult UPCGExPropertySchemaAsset::IsDataValid(FDataValidationCont
 			Result = CombineDataValidationResults(Result, EDataValidationResult::Invalid);
 			return;
 		}
-		if (Visited.Add(Asset).IsNewlyAdded()) { Stack.Add(Asset); }
+		bool bAlreadyVisited = false;
+		Visited.Add(Asset, &bAlreadyVisited);
+		if (!bAlreadyVisited) { Stack.Add(Asset); }
 	};
 
 	for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Collection.ImportedSchemas)

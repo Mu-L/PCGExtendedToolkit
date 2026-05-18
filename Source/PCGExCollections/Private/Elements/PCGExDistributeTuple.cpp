@@ -205,14 +205,19 @@ namespace PCGExDistributeTuple
 			}
 		}
 
-		// Initialize per-column output buffers
-		const int32 NumColumns = Settings->Composition.Num();
+		// Resolve the composition tree (locals + imports) once. NumColumns drives the per-row
+		// override indexing into Values[k].Overrides, which SyncOverridesArray keeps parallel
+		// with BuildSchema()/Resolve() output.
+		TArray<FPCGExPropertyResolved> Resolved;
+		Settings->Composition.Resolve(Resolved);
+		const int32 NumColumns = Resolved.Num();
 		Columns.SetNum(NumColumns);
 
 		for (int32 ColIdx = 0; ColIdx < NumColumns; ++ColIdx)
 		{
-			const FPCGExPropertySchema& Schema = Settings->Composition.Schemas[ColIdx];
-			const FPCGExProperty* SchemaProperty = Schema.GetProperty();
+			const FPCGExPropertyResolved& Entry = Resolved[ColIdx];
+			const FInstancedStruct& EffectiveProperty = Entry.GetEffectiveProperty();
+			const FPCGExProperty* SchemaProperty = EffectiveProperty.GetPtr<FPCGExProperty>();
 
 			if (!SchemaProperty || !SchemaProperty->SupportsOutput())
 			{
@@ -221,11 +226,11 @@ namespace PCGExDistributeTuple
 
 			FColumnOutput& Col = Columns[ColIdx];
 
-			// Deep-copy the schema property so we own the output buffer
-			Col.OwnedProperty = Schema.Property;
+			// Deep-copy the effective property (override-or-source) so we own the output buffer
+			Col.OwnedProperty = EffectiveProperty;
 
 			FPCGExProperty* OutputProperty = Col.OwnedProperty.GetMutablePtr<FPCGExProperty>();
-			if (!OutputProperty || !OutputProperty->InitializeOutput(PointDataFacade, Schema.Name))
+			if (!OutputProperty || !OutputProperty->InitializeOutput(PointDataFacade, Entry.Source->Name))
 			{
 				Col.OwnedProperty.Reset();
 				continue;

@@ -90,13 +90,13 @@ namespace PCGExPropertyBlueprintLibrary_Private
 			return false;
 		}
 
-		const FPCGExPropertySchema* Schema = Component->GetProperties().FindByName(PropertyName);
-		if (!Schema)
+		const FInstancedStruct* Source = Component->GetProperties().GetPropertyByName(PropertyName);
+		if (!Source)
 		{
 			return false;
 		}
 
-		const FPCGExProperty* Prop = Schema->GetProperty();
+		const FPCGExProperty* Prop = Source->GetPtr<FPCGExProperty>();
 		if (!Prop)
 		{
 			return false;
@@ -122,6 +122,8 @@ namespace PCGExPropertyBlueprintLibrary_Private
 			return false;
 		}
 
+		// FindByNameMutable is locals-only by contract -- imports silently fail (writing through
+		// an asset-owned pointer would mutate the asset globally).
 		FPCGExPropertySchema* Schema = Component->GetPropertiesMutable().FindByNameMutable(PropertyName);
 		if (!Schema)
 		{
@@ -154,12 +156,12 @@ namespace PCGExPropertyBlueprintLibrary_Private
 		{
 			return false;
 		}
-		const FPCGExPropertySchema* Schema = Component->GetProperties().FindByName(PropertyName);
-		if (!Schema)
+		const FInstancedStruct* Source = Component->GetProperties().GetPropertyByName(PropertyName);
+		if (!Source)
 		{
 			return false;
 		}
-		const FPCGExProperty* Prop = Schema->GetProperty();
+		const FPCGExProperty* Prop = Source->GetPtr<FPCGExProperty>();
 		if (!Prop)
 		{
 			return false;
