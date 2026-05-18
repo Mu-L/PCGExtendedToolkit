@@ -3,11 +3,16 @@
 
 #pragma once
 
+#include "IDetailPropertyRow.h"
 #include "IPropertyTypeCustomization.h"
+#include "StructUtils/InstancedStruct.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 class FStructOnScope;
 class IPropertyUtilities;
 class UUserDefinedStruct;
+class SWidget;
+class UPCGExPropertyCollectionComponent;
 
 
 /**
@@ -58,6 +63,33 @@ private:
 	// Aliases FPCGExProperty_Struct::Value memory; must outlive every row that captures it.
 	TSharedPtr<FStructOnScope> NestedScope;
 
-	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
 	FDelegateHandle UserDefinedStructReinstancedHandle;
+	// Captured at CustomizeHeader -- inline-path external-structure rows return nothing from
+	// Handle->GetOuterObjects, so the reset delegates can't re-derive the component. Null when
+	// the entry isn't owned by a UPCGExPropertyCollectionComponent or is Instance-created (no
+	// BP chain to walk); UE's default reset behavior applies in those cases.
+	TWeakObjectPtr<UPCGExPropertyCollectionComponent> WeakLiveComponent;
+	int32 CachedOverrideIndex = INDEX_NONE;
+
+	// Asset-default resolved once at CustomizeHeader (imports tree is stable for the detail
+	// session). Invalid = "no asset default exists" -- TryGetResetSource relies on the distinction.
+	FInstancedStruct CachedAssetDefaultValue;
+
+	// Defensive-only: a type-mismatch reset reallocates and would invalidate InnerScope's alias.
+	// Same-type copy preserves the alias and needs no refresh, which is the common case under
+	// ReconcileImportOverrides.
+	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
+
+	FResetToDefaultOverride MakeArchetypeResetOverride() const;
+
+	/**
+	 * Build the toggle widget for the override's enable flag. In component context, returns a
+	 * custom SCheckBox that writes EnabledOverrides directly via SetOverrideEnabled -- bypasses
+	 * UE's property edit chain so CDO->instance propagation never fires for inspector toggles.
+	 * Non-component owners get the standard handle-bound widget.
+	 */
+	TSharedRef<SWidget> BuildOverrideToggleWidget() const;
+
+	/** Read the entry's PropertyName at the current OverrideIndex on the owning component. */
+	FName GetOverrideEntryName() const;
 };

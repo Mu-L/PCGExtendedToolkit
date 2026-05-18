@@ -309,38 +309,61 @@ namespace PCGExDefaultLevelDataExporterInternal
 		return H;
 	}
 
-	// Session-stable hash of an actor's UPCGExPropertyCollectionComponent.Properties UPROPERTY,
-	// computed by routing the property serializer through FArchiveCrc32. Different schemas or
-	// different inner values produce different CRCs -- distinct enough to use as part of an
-	// FMeshEntryKey so mesh actors with distinct property authoring don't collapse into one
-	// shared mesh entry. 0 means "no property component on the actor".
-	static uint32 HashPropertyCollectionComponent(AActor* Actor)
+	// Per-export-pass cache of (Resolved schema, Hash) keyed by source actor. ExtractSchemaFromActor
+	// is the expensive step (BP PreparePropertyValues thunk + class-chain walk + per-entry struct
+	// copy) and we need its result twice per actor: once to bucket by PropertyComponentHash, once
+	// to seed PropertyOverrides on the bucket representative. Compute once, read twice.
+	struct FActorPropertySchemaCache
 	{
-		UPCGExPropertyCollectionComponent* Comp = UPCGExPropertyCollectionComponent::FindOnActor(Actor);
-		if (!Comp)
+		TArray<FInstancedStruct> Resolved;
+		uint32 Hash = 0;
+	};
+
+	// Resolve + hash an actor's property-component schema, memoized by AActor*. Empty/no-component
+	// actors land in the cache with Hash=0 and Resolved empty so subsequent lookups are O(1). The
+	// hash is over the *effective* extracted schema (matching ExtractSchemaFromActor semantics:
+	// BP class chain + PreparePropertyValues), not raw component state -- a raw-state hash would
+	// collapse actors that resolve to different values via the chain into the same bucket.
+	static const FActorPropertySchemaCache& GetOrComputeActorPropertySchema(
+		AActor* Actor,
+		TMap<AActor*, FActorPropertySchemaCache>& Cache)
+	{
+		if (const FActorPropertySchemaCache* Found = Cache.Find(Actor))
 		{
-			return 0;
+			return *Found;
+		}
+		FActorPropertySchemaCache& Entry = Cache.Add(Actor);
+
+		if (!Actor || !UPCGExPropertyCollectionComponent::FindOnActor(Actor))
+		{
+			return Entry;
 		}
 
-		for (FPCGExPropertySchema& Schema : Comp->GetPropertiesMutable().Schemas)
+		Entry.Resolved = UPCGExPropertyCollectionComponent::ExtractSchemaFromActor(Actor);
+		if (Entry.Resolved.IsEmpty())
 		{
-			Schema.SyncPropertyName();
-		}
-
-		// FProperty descriptor is class-static -- cache after the first lookup so subsequent
-		// per-actor hashes skip the reflection walk.
-		static FProperty* const PropertiesField = UPCGExPropertyCollectionComponent::StaticClass()->FindPropertyByName(
-			GET_MEMBER_NAME_CHECKED(UPCGExPropertyCollectionComponent, Properties));
-		if (!PropertiesField)
-		{
-			return 0;
+			return Entry;
 		}
 
 		FArchiveCrc32 Crc;
-		PropertiesField->SerializeItem(
-			FStructuredArchiveFromArchive(Crc).GetSlot(),
-			PropertiesField->ContainerPtrToValuePtr<void>(Comp));
-		return Crc.GetCrc();
+		for (const FInstancedStruct& Prop : Entry.Resolved)
+		{
+			const UScriptStruct* ScriptStruct = Prop.GetScriptStruct();
+			if (!ScriptStruct)
+			{
+				continue;
+			}
+
+			// Type path prefix so two values of different types but matching byte layout don't alias.
+			FString TypeName = ScriptStruct->GetPathName();
+			Crc << TypeName;
+
+			const_cast<UScriptStruct*>(ScriptStruct)->SerializeItem(
+				FStructuredArchiveFromArchive(Crc).GetSlot(),
+				const_cast<uint8*>(Prop.GetMemory()), nullptr);
+		}
+		Entry.Hash = Crc.GetCrc();
+		return Entry;
 	}
 
 	static int32 TrackMaterialVariant(const UStaticMeshComponent* Comp, FMeshInfo& Info)
@@ -407,12 +430,13 @@ namespace PCGExDefaultLevelDataExporterInternal
 		AActor* Actor,
 		bool bCaptureMaterialOverrides,
 		TArray<FMeshPoint>& OutPoints,
-		TMap<FMeshEntryKey, FMeshInfo>& InOutMeshInfoMap)
+		TMap<FMeshEntryKey, FMeshInfo>& InOutMeshInfoMap,
+		TMap<AActor*, FActorPropertySchemaCache>& PropertySchemaCache)
 	{
 		// Property-component identity is computed once per actor and folded into every mesh
 		// entry this actor contributes to. Actors that author distinct property values land
 		// in distinct mesh buckets so their per-instance PropertyOverrides survive merging.
-		const uint32 PropertyComponentHash = HashPropertyCollectionComponent(Actor);
+		const uint32 PropertyComponentHash = GetOrComputeActorPropertySchema(Actor, PropertySchemaCache).Hash;
 
 		TInlineComponentArray<UStaticMeshComponent*> SMCs;
 		Actor->GetComponents<UStaticMeshComponent>(SMCs);
@@ -853,10 +877,11 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 
 	TArray<FMeshPoint> AllMeshPoints;
 	TMap<FMeshEntryKey, FMeshInfo> MeshInfoMap;
+	TMap<AActor*, FActorPropertySchemaCache> PropertySchemaCache;
 
 	for (const FClassifiedActor& CA : MeshActors)
 	{
-		ExtractMeshPointsFromActor(CA.Actor, bCaptureMaterialOverrides, AllMeshPoints, MeshInfoMap);
+		ExtractMeshPointsFromActor(CA.Actor, bCaptureMaterialOverrides, AllMeshPoints, MeshInfoMap, PropertySchemaCache);
 	}
 
 	// Create mesh point data
@@ -1186,18 +1211,39 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 				// Pull property-component values from the representative actor and stage them
 				// onto the mesh entry's PropertyOverrides. CompactSharedMesh preserves these
 				// across cross-entry aggregation; the SharedMeshCollection's CollectionProperties
-				// gets rebuilt from the union of all entries' overrides afterwards via
+				// is rebuilt from the union of all entries' overrides afterwards via
 				// RefreshCollectionPropertiesFromEntries.
-				TArray<FInstancedStruct> Authored = UPCGExPropertyCollectionComponent::ExtractSchemaFromActor(
-					Elem.Value.RepresentativeActor.Get());
-				if (!Authored.IsEmpty())
+				//
+				// Read from the schema cache populated during the per-actor mesh-extract loop --
+				// the representative actor was hashed there, so its Resolved schema is already
+				// computed. Fall back to a fresh extract for the (rare) bucket without one (shouldn't
+				// happen for property-bearing actors, but the cache is non-authoritative).
+				const TArray<FInstancedStruct>* Authored = nullptr;
+				TArray<FInstancedStruct> FallbackAuthored;
+				if (const FActorPropertySchemaCache* Cached = PropertySchemaCache.Find(Elem.Value.RepresentativeActor.Get()))
 				{
-					MeshEntry.PropertyOverrides.Overrides.Reset(Authored.Num());
-					for (const FInstancedStruct& Prop : Authored)
+					Authored = &Cached->Resolved;
+				}
+				else
+				{
+					FallbackAuthored = UPCGExPropertyCollectionComponent::ExtractSchemaFromActor(
+						Elem.Value.RepresentativeActor.Get());
+					Authored = &FallbackAuthored;
+				}
+
+				if (!Authored->IsEmpty())
+				{
+					MeshEntry.PropertyOverrides.Overrides.Reset(Authored->Num());
+					for (const FInstancedStruct& Prop : *Authored)
 					{
+						// Seed outer identity from inner so the entry ships in canonical
+						// SyncToSchema shape; first reconcile would otherwise migrate it.
 						FPCGExPropertyOverrideEntry& Slot = MeshEntry.PropertyOverrides.Overrides.AddDefaulted_GetRef();
 						Slot.Value = Prop;
 						Slot.bEnabled = true;
+#if WITH_EDITORONLY_DATA
+						Slot.SeedOuterIdentityFromInner();
+#endif
 					}
 				}
 

@@ -8,6 +8,7 @@
 #include "Templates/Function.h"
 #include "Templates/SharedPointer.h"
 
+class IDetailPropertyRow;
 class IDetailChildrenBuilder;
 class FStructOnScope;
 class IPropertyHandle;
@@ -74,9 +75,11 @@ public:
 	 * NameContent is caller-supplied -- pass a plain STextBlock for locked schemas, an SHorizontalBox
 	 * with a checkbox for override entries, etc.
 	 * Scope must outlive the detail panel session; caller is responsible for keeping it alive.
-	 * Returns true if a "Value" FProperty was found on InnerStruct and the row was added.
+	 * Returns the IDetailPropertyRow when a "Value" FProperty was found and the row was added; nullptr
+	 * otherwise. Callers that need to attach a reset-to-default override (or any other row-level
+	 * customization) use the returned row pointer.
 	 */
-	static bool AddCompactValueRow(
+	static IDetailPropertyRow* AddCompactValueRow(
 		IDetailChildrenBuilder& ChildBuilder,
 		TSharedRef<FStructOnScope> Scope,
 		UScriptStruct* InnerStruct,
