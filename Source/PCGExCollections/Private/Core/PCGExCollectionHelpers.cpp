@@ -32,7 +32,7 @@ namespace PCGExCollectionHelpers
 		const FPCGMetadataAttributeBase* PathAttribute = Metadata->GetConstAttribute(Details.AssetPathSourceAttribute);
 		if (!PathAttribute)
 		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("Missing path attribute: {0}"), FText::FromName(Details.AssetPathSourceAttribute)));
+			PCGEX_LOG_INVALID_ATTR_C(InContext, Asset Path, Details.AssetPathSourceAttribute)
 			return false;
 		}
 

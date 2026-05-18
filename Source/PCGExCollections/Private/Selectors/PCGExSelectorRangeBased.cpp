@@ -73,7 +73,7 @@ namespace PCGExSelectorRangeBased
 
 void FPCGExEntryRangeBasedPickerOpBase::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based -- no entries resolved every configured axis. Check property names and types in the collection."));
+	PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Range-Based -- no entries resolved every configured axis. Check property names and types in the collection."))
 }
 
 bool FPCGExEntryRangeBasedPickerOpBase::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
@@ -81,7 +81,7 @@ bool FPCGExEntryRangeBasedPickerOpBase::OnInitForData(FPCGExContext* InContext, 
 	const int32 AxisCount = Axes.Num();
 	if (AxisCount == 0)
 	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Range-Based -- Axes array is empty. At least one axis is required."));
+		PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Range-Based -- Axes array is empty. At least one axis is required."))
 		return false;
 	}
 

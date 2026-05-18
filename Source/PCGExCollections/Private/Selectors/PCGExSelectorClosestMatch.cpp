@@ -148,7 +148,7 @@ namespace PCGExSelectorClosestMatch
 
 void FPCGExEntryClosestMatchPickerOp::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match -- no entries resolved every configured axis. Check axis property names / types in the collection."));
+	PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Closest Match -- no entries resolved every configured axis. Check axis property names / types in the collection."))
 }
 
 bool FPCGExEntryClosestMatchPickerOp::OnInitForData(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InDataFacade)
@@ -156,7 +156,7 @@ bool FPCGExEntryClosestMatchPickerOp::OnInitForData(FPCGExContext* InContext, co
 	const int32 AxisCount = Axes.Num();
 	if (AxisCount == 0 || AxisCount != Shared->AxisCount)
 	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match -- axis configuration mismatch between op and shared data."));
+		PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Closest Match -- axis configuration mismatch between op and shared data."))
 		return false;
 	}
 
