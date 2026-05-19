@@ -3,6 +3,7 @@
 
 #include "PCGExCore.h"
 
+#include "Data/PCGExSubAccessor.h"
 
 #if WITH_EDITOR
 #include "AssetTypeActions_Base.h"
@@ -13,6 +14,12 @@
 #endif
 
 PCGEX_IMPLEMENT_MODULE(FPCGExCoreModule, PCGExCore)
+
+void FPCGExCoreModule::StartupModule()
+{
+	IPCGExLegacyModuleInterface::StartupModule();
+	PCGExData::FSubAccessorRegistry::Initialize();
+}
 
 #if WITH_EDITOR
 void FPCGExCoreModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>& InStyle)
