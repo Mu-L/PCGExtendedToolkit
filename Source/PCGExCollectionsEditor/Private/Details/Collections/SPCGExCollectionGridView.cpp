@@ -10,6 +10,7 @@
 
 #include "InputCoreTypes.h"
 #include "ScopedTransaction.h"
+#include "Framework/Application/SlateApplication.h"
 
 #include "InstancedStruct.h"
 #include "Core/PCGExAssetCollection.h"
@@ -25,6 +26,7 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SComboButton.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSplitter.h"
@@ -59,6 +61,7 @@ void SPCGExCollectionGridView::Construct(const FArguments& InArgs)
 	ThumbnailPool = InArgs._ThumbnailPool;
 	OnGetPickerWidget = InArgs._OnGetPickerWidget;
 	TileSize = InArgs._TileSize;
+	PushOptions = InArgs._PushOptions;
 
 	RebuildCategoryCache();
 
@@ -173,6 +176,52 @@ void SPCGExCollectionGridView::Construct(const FArguments& InArgs)
 					.IsEnabled_Lambda([this]()
 					{
 						return !SelectedIndices.IsEmpty();
+					})
+				]
+
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.f)
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(SComboButton)
+					.ComboButtonStyle(&FAppStyle::Get(), "SimpleComboButton")
+					.HasDownArrow(true)
+					.ContentPadding(FMargin(4, 4))
+					.ToolTipText(INVTEXT("Push to selection\nCopy properties from the active entry (the one currently shown in this panel) to every other entry in the multi-selection."))
+					.Visibility_Lambda([this]()
+					{
+						return (SelectedIndices.Num() > 1 && CurrentDetailIndex != INDEX_NONE && !PushOptions.IsEmpty())
+							? EVisibility::Visible
+							: EVisibility::Collapsed;
+					})
+					.ButtonContent()
+					[
+						SNew(STextBlock)
+						.Text(INVTEXT("Push to selection"))
+					]
+					.OnGetMenuContent_Lambda([this]() -> TSharedRef<SWidget>
+					{
+						TSharedRef<SVerticalBox> MenuBox = SNew(SVerticalBox);
+						for (const PCGExAssetCollectionEditor::FPushOption& Option : PushOptions)
+						{
+							MenuBox->AddSlot()
+							       .AutoHeight()
+							       .Padding(4, 2)
+							[
+								SNew(SButton)
+								.Text(Option.Label)
+								.ToolTipText(Option.Tooltip)
+								.OnClicked_Lambda([this, Option]()
+								{
+									ExecutePush(Option);
+									FSlateApplication::Get().DismissAllMenus();
+									return FReply::Handled();
+								})
+							];
+						}
+						return MenuBox;
 					})
 				]
 			]
@@ -1436,6 +1485,182 @@ void SPCGExCollectionGridView::PropagateChangedProperties(
 			Prop->CopyCompleteValue(DstData + Offset, NewData + Offset);
 		}
 	}
+}
+
+// ── Push helpers ────────────────────────────────────────────────────────────
+
+void SPCGExCollectionGridView::PushStructGated(const UStruct* Struct, const uint8* Src, uint8* Dst)
+{
+	static const FName EnabledFieldName = TEXT("bEnabled");
+
+	for (TFieldIterator<FProperty> It(Struct); It; ++It)
+	{
+		const FProperty* Prop = *It;
+		const int32 Offset = Prop->GetOffset_ForInternal();
+
+		if (const FArrayProperty* ArrayProp = CastField<FArrayProperty>(Prop))
+		{
+			const FStructProperty* InnerStructProp = CastField<FStructProperty>(ArrayProp->Inner);
+			const FBoolProperty* EnabledProp = InnerStructProp
+				? CastField<FBoolProperty>(InnerStructProp->Struct->FindPropertyByName(EnabledFieldName))
+				: nullptr;
+
+			if (!EnabledProp)
+			{
+				Prop->CopyCompleteValue(Dst + Offset, Src + Offset);
+				continue;
+			}
+
+			FScriptArrayHelper SrcHelper(ArrayProp, Src + Offset);
+			FScriptArrayHelper DstHelper(ArrayProp, Dst + Offset);
+			const int32 Num = SrcHelper.Num();
+
+			// Differing sizes -- alignment isn't safe, fall back to full overwrite.
+			// Same-size arrays under FPCGExPropertyOverrides::Overrides are guaranteed
+			// parallel (same schema), so per-index gating is well-defined.
+			if (Num != DstHelper.Num())
+			{
+				Prop->CopyCompleteValue(Dst + Offset, Src + Offset);
+				continue;
+			}
+
+			const int32 EnabledOffset = EnabledProp->GetOffset_ForInternal();
+
+			for (int32 i = 0; i < Num; ++i)
+			{
+				if (EnabledProp->GetPropertyValue(DstHelper.GetRawPtr(i) + EnabledOffset))
+				{
+					continue;
+				}
+				ArrayProp->Inner->CopyCompleteValue(DstHelper.GetRawPtr(i), SrcHelper.GetRawPtr(i));
+			}
+		}
+		else if (const FStructProperty* NestedStruct = CastField<FStructProperty>(Prop))
+		{
+			// FInstancedStruct stores polymorphic data in an internal heap buffer,
+			// not as reflected UPROPERTYs -- recursing would find no meaningful fields.
+			if (NestedStruct->Struct == TBaseStructure<FInstancedStruct>::Get())
+			{
+				Prop->CopyCompleteValue(Dst + Offset, Src + Offset);
+			}
+			else
+			{
+				PushStructGated(NestedStruct->Struct, Src + Offset, Dst + Offset);
+			}
+		}
+		else
+		{
+			Prop->CopyCompleteValue(Dst + Offset, Src + Offset);
+		}
+	}
+}
+
+void SPCGExCollectionGridView::ExecutePush(const PCGExAssetCollectionEditor::FPushOption& Option)
+{
+	if (Option.EntryPropertyNames.IsEmpty() || CurrentDetailIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	UPCGExAssetCollection* Coll = Collection.Get();
+	if (!Coll)
+	{
+		return;
+	}
+
+	UScriptStruct* EntryStruct = GetEntryScriptStruct();
+	if (!EntryStruct)
+	{
+		return;
+	}
+
+	const uint8* SrcPtr = GetEntryRawPtr(CurrentDetailIndex);
+	if (!SrcPtr)
+	{
+		return;
+	}
+
+	TArray<int32> Targets = GetSelectedIndices();
+	Targets.Remove(CurrentDetailIndex);
+	if (Targets.IsEmpty())
+	{
+		return;
+	}
+
+	// Resolve properties once -- struct doesn't change between iterations.
+	// Missing names are silently skipped so cross-collection options can no-op gracefully.
+	TArray<const FProperty*, TInlineAllocator<8>> ResolvedProps;
+	ResolvedProps.Reserve(Option.EntryPropertyNames.Num());
+	for (const FName& PropName : Option.EntryPropertyNames)
+	{
+		if (const FProperty* Prop = EntryStruct->FindPropertyByName(PropName))
+		{
+			ResolvedProps.Add(Prop);
+		}
+	}
+	if (ResolvedProps.IsEmpty())
+	{
+		return;
+	}
+
+	// Guard suppresses the deferred OnObjectModified-driven refresh that would otherwise
+	// fire from our own Modify() call. Mirrors OnDuplicateSelected / OnDeleteSelected.
+	bIsBatchOperation = true;
+	{
+		FScopedTransaction Transaction(FText::Format(INVTEXT("Push {0} to selection"), Option.Label));
+		Coll->Modify();
+
+		for (int32 TargetIdx : Targets)
+		{
+			uint8* TgtPtr = GetEntryRawPtr(TargetIdx);
+			if (!TgtPtr)
+			{
+				continue;
+			}
+
+			for (const FProperty* Prop : ResolvedProps)
+			{
+				const int32 Offset = Prop->GetOffset_ForInternal();
+
+				// Gated path only descends into reflected structs. Everything else
+				// (non-struct members, FInstancedStruct opaque buffers) falls back to a
+				// straight overwrite since there's no inner bEnabled to gate on.
+				const FStructProperty* StructProp = Option.bRespectEnabledGate
+					? CastField<FStructProperty>(Prop)
+					: nullptr;
+
+				if (StructProp && StructProp->Struct != TBaseStructure<FInstancedStruct>::Get())
+				{
+					PushStructGated(StructProp->Struct, SrcPtr + Offset, TgtPtr + Offset);
+				}
+				else
+				{
+					Prop->CopyCompleteValue(TgtPtr + Offset, SrcPtr + Offset);
+				}
+			}
+		}
+
+		Coll->PostEditChange();
+	}
+	bIsBatchOperation = false;
+
+	// Refresh AFTER the transaction commits so we don't interleave widget updates with the
+	// transaction's serialize-on-close pass.
+	for (int32 TargetIdx : Targets)
+	{
+		if (TSharedPtr<SPCGExCollectionGridTile> Tile = ActiveTiles.FindRef(TargetIdx))
+		{
+			Tile->RefreshThumbnail();
+		}
+	}
+
+	// Deliberately do NOT call UpdateDetailForSelection() here. The active entry (source)
+	// is the one shown in the detail panel and its data is unchanged by the push, so the
+	// existing CurrentStructScope is still accurate. Rebuilding it would swap the
+	// FStructOnScope under FPCGExPropertyOverrideEntryCustomization::InnerScope -- a
+	// non-owning scope that aliases the outer scope's FInstancedStruct heap memory -- and
+	// strand the customization's widgets on freed memory (manifests as edits reverting and
+	// a paint-time crash inside MakeSoftClassPathWidget on the next detail repaint).
 }
 
 void SPCGExCollectionGridView::OnDetailPropertyChanged(const FPropertyChangedEvent& Event)

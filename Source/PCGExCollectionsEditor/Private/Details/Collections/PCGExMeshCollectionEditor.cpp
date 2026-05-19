@@ -41,6 +41,38 @@ void FPCGExMeshCollectionEditor::RegisterPropertyNameMapping(TMap<FName, FName>&
 #undef PCGEX_DECL_ASSET_FILTER
 }
 
+void FPCGExMeshCollectionEditor::RegisterPushOptions(TArray<PCGExAssetCollectionEditor::FPushOption>& OutOptions)
+{
+	FPCGExAssetCollectionEditor::RegisterPushOptions(OutOptions);
+
+#define PCGEX_DECL_PUSH_OPTION(_ID, _LABEL, _TOOLTIP, _GATE, ...) \
+{\
+	PCGExAssetCollectionEditor::FPushOption& Option = OutOptions.Emplace_GetRef();\
+	Option.Id = FName(_ID);\
+	Option.Label = FTEXT(_LABEL);\
+	Option.Tooltip = FTEXT(_TOOLTIP);\
+	Option.bRespectEnabledGate = _GATE;\
+	Option.EntryPropertyNames = { __VA_ARGS__ };\
+}
+
+	PCGEX_DECL_PUSH_OPTION(
+		"AssetEditor.Push.MaterialVariants",
+		"Material Variants",
+		"Push material variants configuration from the active entry to other selected entries.",
+		false,
+		FName("MaterialVariants"), FName("SlotIndex"),
+		FName("MaterialOverrideVariants"), FName("MaterialOverrideVariantsList"))
+
+	PCGEX_DECL_PUSH_OPTION(
+		"AssetEditor.Push.Descriptors",
+		"Descriptors",
+		"Push descriptor source and ISM/SM descriptors from the active entry to other selected entries.",
+		false,
+		FName("DescriptorSource"), FName("ISMDescriptor"), FName("SMDescriptor"))
+
+#undef PCGEX_DECL_PUSH_OPTION
+}
+
 void FPCGExMeshCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& ToolbarBuilder)
 {
 	FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(ToolbarBuilder);
