@@ -7,6 +7,7 @@
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SCompoundWidget.h"
 
+#include "Details/Collections/PCGExAssetCollectionEditor.h"
 #include "SPCGExCollectionGridTile.h"
 
 struct FAssetData;
@@ -53,6 +54,7 @@ public:
 		SLATE_ARGUMENT(TSharedPtr<FAssetThumbnailPool>, ThumbnailPool)
 		SLATE_ARGUMENT(FOnGetTilePickerWidget, OnGetPickerWidget)
 		SLATE_ARGUMENT(float, TileSize)
+		SLATE_ARGUMENT(TArray<PCGExAssetCollectionEditor::FPushOption>, PushOptions)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -80,6 +82,7 @@ private:
 	TSharedPtr<FAssetThumbnailPool> ThumbnailPool;
 	FOnGetTilePickerWidget OnGetPickerWidget;
 	float TileSize = 128.f;
+	TArray<PCGExAssetCollectionEditor::FPushOption> PushOptions;
 
 	// Category cache
 	TArray<FName> SortedCategoryNames;
@@ -192,6 +195,25 @@ private:
 	FReply OnAddEntry();
 	FReply OnDuplicateSelected();
 	FReply OnDeleteSelected();
+
+	/**
+	 * Push the listed entry properties from the currently displayed (active) entry
+	 * to every other entry in the multi-selection.
+	 *
+	 * When Option.bRespectEnabledGate is true, the push descends into the property and,
+	 * for arrays of structs whose inner type exposes a bEnabled field, skips elements
+	 * where the target has bEnabled == true. All other fields are unconditionally
+	 * overwritten with the source value.
+	 */
+	void ExecutePush(const PCGExAssetCollectionEditor::FPushOption& Option);
+
+	/**
+	 * Walk a UStruct, copying from Src to Dst.
+	 * Arrays of structs whose inner type has a bEnabled boolean are gated per-element:
+	 * elements where Dst[i].bEnabled is true are left untouched.
+	 * All other properties are unconditionally overwritten.
+	 */
+	static void PushStructGated(const UStruct* Struct, const uint8* Src, uint8* Dst);
 
 	// Undo/redo support
 	void OnObjectTransacted(UObject* Object, const FTransactionObjectEvent& Event);

@@ -371,6 +371,27 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 };
 
 /**
+ * Records a regenerated HeaderId. Name disambiguates which collided schema each remap
+ * refers to -- OldId alone aliased multiple entries pre-regeneration.
+ *
+ * Defined unconditionally so signatures referencing it compile outside the editor; the
+ * dedup pass that populates these only runs in WITH_EDITOR.
+ */
+struct PCGEXPROPERTIES_API FPCGExHeaderIdRemap
+{
+	int32 OldId = 0;
+	int32 NewId = 0;
+	FName Name = NAME_None;
+
+	FPCGExHeaderIdRemap() = default;
+
+	FPCGExHeaderIdRemap(int32 InOldId, int32 InNewId, FName InName)
+		: OldId(InOldId), NewId(InNewId), Name(InName)
+	{
+	}
+};
+
+/**
  * Single property override entry.
  * Stores enabled state + typed value. PropertyName comes from the inner struct.
  *
@@ -521,6 +542,13 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrides
 	 * @param Schema The schema to sync to (use FPCGExPropertySchemaCollection::BuildSchema())
 	 */
 	void SyncToSchema(const TArray<FInstancedStruct>& Schema);
+
+	/**
+	 * Apply HeaderId remaps from a schema dedup pass. Matches entries by (OldId, Name) --
+	 * OldId alone would alias the entries the dedup just split apart. Idempotent; no-op
+	 * outside the editor so call sites stay unguarded.
+	 */
+	void ApplyHeaderIdRemap(TConstArrayView<FPCGExHeaderIdRemap> Remaps);
 
 	/** Check if override at index is enabled */
 	bool IsOverrideEnabled(int32 Index) const
@@ -876,10 +904,46 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	}
 
 	/**
-	 * Sync all schemas - updates PropertyName and HeaderId into each Property.
-	 * Call this before BuildSchema() to ensure schema has current data.
+	 * Sync all schemas -- updates PropertyName and HeaderId into each Property.
+	 * Call before BuildSchema() to ensure schema has current data.
+	 *
+	 * Editor-only: zero HeaderIds and copy-paste-introduced duplicates are reassigned;
+	 * first occurrence keeps its identity. Skipping the dedup leaves SyncToSchema's
+	 * HeaderId index aliasing the duplicates and silently dropping one side's overrides.
 	 */
 	void SyncAllSchemas();
+
+	/**
+	 * Reports HeaderId reassignments via OutRemaps. Zero-bootstraps are NOT reported --
+	 * a HeaderId of 0 never appeared in any saved override. Outside the editor, OutRemaps
+	 * is always left empty. Most callers want SyncAllSchemasAndRemap[Rows] instead.
+	 */
+	void SyncAllSchemas(TArray<FPCGExHeaderIdRemap>& OutRemaps);
+
+	/**
+	 * Sync + invoke ApplyRemap iff any collisions were resolved. The empty-remap case
+	 * skips the callback entirely, so callers don't repeat the guard.
+	 *
+	 * In non-editor builds ApplyRemap is never invoked, but the lambda body must still
+	 * compile. FPCGExPropertyOverrides::ApplyHeaderIdRemap is no-op-stubbed there for
+	 * exactly that reason.
+	 */
+	void SyncAllSchemasAndRemap(TFunctionRef<void(TConstArrayView<FPCGExHeaderIdRemap>)> ApplyRemap);
+
+	/** Sync + apply remaps to a parallel array of row overrides. */
+	template <typename TRow>
+	void SyncAllSchemasAndRemapRows(TArray<TRow>& Rows)
+	{
+		static_assert(TIsDerivedFrom<TRow, FPCGExPropertyOverrides>::Value,
+		              "SyncAllSchemasAndRemapRows: TRow must derive from FPCGExPropertyOverrides.");
+		SyncAllSchemasAndRemap([&Rows](TConstArrayView<FPCGExHeaderIdRemap> Remaps)
+		{
+			for (TRow& Row : Rows)
+			{
+				Row.ApplyHeaderIdRemap(Remaps);
+			}
+		});
+	}
 
 	/**
 	 * Apply the currently-resolved schema to a PropertyOverrides container, bringing its

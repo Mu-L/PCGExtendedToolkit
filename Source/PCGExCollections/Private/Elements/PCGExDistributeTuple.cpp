@@ -55,7 +55,8 @@ void UPCGExDistributeTupleSettings::PostEditChangeProperty(struct FPropertyChang
 
 	if (bNeedsSync)
 	{
-		Composition.SyncAllSchemas();
+		// Remap rows before the SyncToSchema loop -- it aliases collided rows otherwise.
+		Composition.SyncAllSchemasAndRemapRows(Values);
 		TArray<FInstancedStruct> Schema = Composition.BuildSchema();
 		for (FPCGExWeightedPropertyOverrides& Row : Values)
 		{
