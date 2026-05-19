@@ -62,7 +62,9 @@ void UPCGExTupleSettings::PostEditChangeProperty(struct FPropertyChangedEvent& P
 	// the imports tree, then apply the resolved schema to every row's Overrides array.
 	if (bNeedsSync)
 	{
-		Composition.SyncAllSchemas();
+		// Remap rows before ApplyToOverrides -- it calls SyncToSchema per row, which aliases
+		// collided rows without the remap.
+		Composition.SyncAllSchemasAndRemapRows(Values);
 		Composition.ReconcileImportOverrides();
 		Composition.ApplyToOverrides(Values);
 	}

@@ -644,6 +644,12 @@ public:
 	}
 
 	/**
+	 * Sync CollectionProperties' schemas and propagate any HeaderId remaps to every entry's
+	 * PropertyOverrides. Returns true if a remap occurred (caller may want MarkPackageDirty).
+	 */
+	bool SyncPropertySchemaAndRemapEntries();
+
+	/**
 	 * Derive CollectionProperties from the union of every entry's currently-enabled
 	 * PropertyOverrides, then re-sync each entry's overrides against the resulting
 	 * canonical schema (preserves values via HeaderId).

@@ -315,7 +315,10 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 	EPCGExSchemaMergePolicy Policy,
 	TArrayView<AActor*> RepresentativeInstances)
 {
-	CollectionProperties.SyncAllSchemas();
+	// Remap entries before the downstream per-entry SyncToSchema -- otherwise SyncToSchema's
+	// HeaderId index aliases collided entries and per-entry authored values silently fall
+	// through to the schema default during the canonical rebuild below.
+	SyncPropertySchemaAndRemapEntries();
 
 	TArray<TArray<FInstancedStruct>> Sources;
 	Sources.Reserve(1 + Entries.Num());

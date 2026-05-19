@@ -901,6 +901,14 @@ void UPCGExAssetCollection::PostLoad()
 	Super::PostLoad();
 
 #if WITH_EDITOR
+	// Self-heal HeaderId collisions saved to disk before the dedup pass landed (or introduced
+	// later via copy-paste in a build that lacked the runtime fix). MarkPackageDirty only when
+	// something actually changed, so clean assets stay clean on load.
+	if (SyncPropertySchemaAndRemapEntries())
+	{
+		(void)MarkPackageDirty();
+	}
+
 	// Defer to next tick: the rebuild cascades into UpdateStaging -> SpawnActor, which is
 	// unsafe during PostLoad (load chain may re-enter, GWorld mid-transition). Trade-off:
 	// a PCG graph that triggered THIS soft-load sees pre-rebuild state for its current
@@ -1024,8 +1032,10 @@ void UPCGExAssetCollection::GetAssetPaths(TSet<FSoftObjectPath>& OutPaths, PCGEx
 void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(EPCGExSchemaMergePolicy Policy)
 {
 	// Source #0: manual CollectionProperties (preserves user-authored schema entries through
-	// the merge under FirstWins / StrictTypeMatch).
-	CollectionProperties.SyncAllSchemas();
+	// the merge under FirstWins / StrictTypeMatch). The dedup-and-remap pass upstream of the
+	// merge is distinct from the post-merge name-based restamp further down, which handles
+	// heterogenous component HeaderIds.
+	SyncPropertySchemaAndRemapEntries();
 
 	TArray<TArray<FInstancedStruct>> Sources;
 	Sources.Reserve(1 + NumEntries());
@@ -1204,10 +1214,27 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 	}
 }
 
+bool UPCGExAssetCollection::SyncPropertySchemaAndRemapEntries()
+{
+	bool bRemapped = false;
+	CollectionProperties.SyncAllSchemasAndRemap([this, &bRemapped](TConstArrayView<FPCGExHeaderIdRemap> Remaps)
+	{
+		bRemapped = true;
+		ForEachEntry([&Remaps](FPCGExAssetCollectionEntry* InEntry, int32 /*i*/)
+		{
+			InEntry->PropertyOverrides.ApplyHeaderIdRemap(Remaps);
+		});
+	});
+	return bRemapped;
+}
+
 void UPCGExAssetCollection::SyncPropertyOverridesToEntries()
 {
-	// Sync schema to all entry overrides using shared utility
-	CollectionProperties.SyncAllSchemas();
+	// Remap must happen before the SyncToSchema loop below -- SyncToSchema's HeaderId index
+	// aliases collided entries otherwise, and one side's authored values fall through to
+	// schema defaults.
+	SyncPropertySchemaAndRemapEntries();
+
 	TArray<FInstancedStruct> Schema = CollectionProperties.BuildSchema();
 	ForEachEntry([&Schema](FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
