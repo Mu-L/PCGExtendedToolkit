@@ -443,7 +443,7 @@ namespace PCGExFloodFill
 		Algo::Reverse(PathIndices);
 
 		// Create a copy of the final vtx, so we get all the goodies
-		TSharedPtr<PCGExData::FPointIO> PathIO = Paths->Emplace_GetRef(VtxDataFacade->Source->GetOut(), PCGExData::EIOInit::New);
+		TSharedPtr<PCGExData::FPointIO> PathIO = Paths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source->GetOut(), PCGExData::EIOInit::New);
 		PCGExPaths::Helpers::SetClosedLoop(PathIO, false);
 
 		(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(PathIO->GetOut(), PathIndices.Num(), VtxDataFacade->Source->GetIn()->GetAllocatedProperties());
@@ -484,7 +484,7 @@ namespace PCGExFloodFill
 		Algo::Reverse(PathIndices);
 
 		// Create a copy of the final vtx, so we get all the goodies
-		TSharedPtr<PCGExData::FPointIO> PathIO = Paths->Emplace_GetRef(VtxDataFacade->Source->GetOut(), PCGExData::EIOInit::New);
+		TSharedPtr<PCGExData::FPointIO> PathIO = Paths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source->GetOut(), PCGExData::EIOInit::New);
 		PCGExPaths::Helpers::SetClosedLoop(PathIO, false);
 
 		(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(PathIO->GetOut(), PathIndices.Num(), VtxDataFacade->Source->GetIn()->GetAllocatedProperties());

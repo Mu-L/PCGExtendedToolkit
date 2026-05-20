@@ -436,7 +436,7 @@ namespace PCGExFindContours
 			// Output to Paths if enabled
 			if (Settings->Artifacts.bOutputPaths)
 			{
-				CellProcessor->ProcessSeededCell(WrapperCell, Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
+				CellProcessor->ProcessSeededCell(WrapperCell, Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
 			}
 		}
 	}
@@ -671,7 +671,7 @@ namespace PCGExFindContours
 			Context->OutputPaths->IncreaseReserve(NumCells + 1);
 			for (int i = 0; i < NumCells; i++)
 			{
-				CellsIOIndices.Add(Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
+				CellsIOIndices.Add(Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
 			}
 
 			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ProcessCellsTask)
