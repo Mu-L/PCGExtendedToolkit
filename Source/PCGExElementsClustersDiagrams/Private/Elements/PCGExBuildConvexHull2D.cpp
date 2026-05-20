@@ -125,7 +125,7 @@ namespace PCGExBuildConvexHull2D
 			return false;
 		}
 
-		const TSharedPtr<PCGExData::FPointIO> PathIO = Context->PathsIO->Emplace_GetRef(PointDataFacade->GetIn(), PCGExData::EIOInit::New);
+		const TSharedPtr<PCGExData::FPointIO> PathIO = Context->PathsIO->Emplace_GetRef<UPCGPointArrayData>(PointDataFacade->GetIn(), PCGExData::EIOInit::New);
 		if (!PathIO)
 		{
 			return false;

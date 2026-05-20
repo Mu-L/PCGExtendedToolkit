@@ -289,7 +289,7 @@ namespace PCGExFindAllCells
 
 				if (Settings->Artifacts.bOutputPaths)
 				{
-					CellProcessor->ProcessCell(CellsConstraints->WrapperCell, Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
+					CellProcessor->ProcessCell(CellsConstraints->WrapperCell, Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
 				}
 			}
 			return true;
@@ -317,7 +317,7 @@ namespace PCGExFindAllCells
 			Context->OutputPaths->IncreaseReserve(NumCells + 1);
 			for (int32 i = 0; i < NumCells; i++)
 			{
-				CellsIO.Add(Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
+				CellsIO.Add(Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
 			}
 
 			StartParallelLoopForRange(NumCells);
