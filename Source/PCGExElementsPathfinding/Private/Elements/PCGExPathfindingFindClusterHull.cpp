@@ -172,7 +172,7 @@ namespace PCGExFindClusterHull
 
 	void FProcessor::ProcessCell(const TSharedPtr<PCGExClusters::FCell>& InCell)
 	{
-		const TSharedPtr<PCGExData::FPointIO> PathIO = Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
+		const TSharedPtr<PCGExData::FPointIO> PathIO = Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New);
 		if (!PathIO)
 		{
 			return;

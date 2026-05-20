@@ -119,7 +119,7 @@ namespace PCGExBreakClustersToPaths
 		Context->OutputPaths->IncreaseReserve(NumEdges);
 		for (int i = 0; i < NumEdges; ++i)
 		{
-			ChainsIO.Add(Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
+			ChainsIO.Add(Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
 		}
 
 		StartParallelLoopForEdges();
@@ -152,7 +152,7 @@ namespace PCGExBreakClustersToPaths
 		Context->OutputPaths->IncreaseReserve(NumChains);
 		for (int i = 0; i < NumChains; ++i)
 		{
-			ChainsIO.Add(Context->OutputPaths->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
+			ChainsIO.Add(Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
 		}
 
 		StartParallelLoopForRange(NumChains);
