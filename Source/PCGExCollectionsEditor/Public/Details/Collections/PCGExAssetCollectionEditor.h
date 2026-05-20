@@ -54,6 +54,31 @@ namespace PCGExAssetCollectionEditor
 		FText Label = FText::GetEmpty();
 		FText ToolTip = FText::GetEmpty();
 	};
+
+	/**
+	 * A push option exposed in the grid view's right-pane combo button.
+	 * When triggered, copies the listed top-level properties from the currently displayed
+	 * (active) entry to every other entry in the multi-selection.
+	 *
+	 * Missing property names on the entry struct are silently skipped, which lets a single
+	 * option safely target multiple collection types when shared (e.g. base options refer
+	 * to FPCGExAssetCollectionEntry members; mesh-specific options refer to mesh-only ones).
+	 */
+	struct PCGEXCOLLECTIONSEDITOR_API FPushOption
+	{
+		FName Id = NAME_None;
+		FText Label = FText::GetEmpty();
+		FText Tooltip = FText::GetEmpty();
+		TArray<FName> EntryPropertyNames;
+
+		/**
+		 * When true, the push respects per-element bEnabled gates: for an array of structs
+		 * whose inner type has a bEnabled boolean (FPCGExPropertyOverrides::Overrides being
+		 * the canonical case), elements whose target has bEnabled == true are skipped.
+		 * When false, properties are unconditionally overwritten with the source value.
+		 */
+		bool bRespectEnabledGate = false;
+	};
 }
 
 /**
@@ -116,6 +141,13 @@ public:
 protected:
 	TWeakObjectPtr<UPCGExAssetCollection> EditedCollection;
 	virtual void RegisterPropertyNameMapping(TMap<FName, FName>& Mapping);
+
+	/**
+	 * Register push options exposed by the grid view side panel.
+	 * Override in derived editors to append type-specific bundles (e.g. mesh adds Material
+	 * Variants and Descriptors). Always call Super first to keep shared options.
+	 */
+	virtual void RegisterPushOptions(TArray<PCGExAssetCollectionEditor::FPushOption>& OutOptions);
 
 	FReply FilterShowAll() const;
 	FReply FilterHideAll() const;

@@ -225,6 +225,49 @@ void FPCGExAssetCollectionEditor::RegisterPropertyNameMapping(TMap<FName, FName>
 #undef PCGEX_DECL_ASSET_FILTER
 }
 
+void FPCGExAssetCollectionEditor::RegisterPushOptions(TArray<PCGExAssetCollectionEditor::FPushOption>& OutOptions)
+{
+#define PCGEX_DECL_PUSH_OPTION(_ID, _LABEL, _TOOLTIP, _GATE, ...) \
+{\
+	PCGExAssetCollectionEditor::FPushOption& Option = OutOptions.Emplace_GetRef();\
+	Option.Id = FName(_ID);\
+	Option.Label = FTEXT(_LABEL);\
+	Option.Tooltip = FTEXT(_TOOLTIP);\
+	Option.bRespectEnabledGate = _GATE;\
+	Option.EntryPropertyNames = { __VA_ARGS__ };\
+}
+
+	PCGEX_DECL_PUSH_OPTION(
+		"AssetEditor.Push.Variations",
+		"Variations",
+		"Push variation mode and fitting variations from the active entry to other selected entries.",
+		false,
+		FName("VariationMode"), FName("Variations"))
+
+	PCGEX_DECL_PUSH_OPTION(
+		"AssetEditor.Push.Tags",
+		"Tags",
+		"Push tags from the active entry to other selected entries.",
+		false,
+		FName("Tags"))
+
+	PCGEX_DECL_PUSH_OPTION(
+		"AssetEditor.Push.PropertyOverrides",
+		"Property Overrides",
+		"Push property overrides from the active entry to other selected entries.\nPer-element gated: overrides that are already enabled on a target are preserved.",
+		true,
+		FName("PropertyOverrides"))
+
+	PCGEX_DECL_PUSH_OPTION(
+		"AssetEditor.Push.PropertyOverrides.Force",
+		"Property Overrides (Force)",
+		"Push property overrides from the active entry to other selected entries.\nOverwrites everything, including overrides that are already enabled on targets.",
+		false,
+		FName("PropertyOverrides"))
+
+#undef PCGEX_DECL_PUSH_OPTION
+}
+
 FReply FPCGExAssetCollectionEditor::FilterShowAll() const
 {
 	TArray<FName> Keys;
@@ -325,11 +368,15 @@ void FPCGExAssetCollectionEditor::CreateGridTab(TArray<PCGExAssetCollectionEdito
 		ThumbnailPool = MakeShared<FAssetThumbnailPool>(128);
 	}
 
+	TArray<PCGExAssetCollectionEditor::FPushOption> LocalPushOptions;
+	RegisterPushOptions(LocalPushOptions);
+
 	SAssignNew(GridView, SPCGExCollectionGridView)
 	.Collection(EditedCollection.Get())
 	.ThumbnailPool(ThumbnailPool)
 	.OnGetPickerWidget(FOnGetTilePickerWidget::CreateSP(this, &FPCGExAssetCollectionEditor::BuildTilePickerWidget))
-	.TileSize(128.f);
+	.TileSize(128.f)
+	.PushOptions(MoveTemp(LocalPushOptions));
 
 	PCGExAssetCollectionEditor::TabInfos& Infos = OutTabs.Emplace_GetRef(FName("Grid"), GridView, FName("Grid View"));
 	Infos.Icon = TEXT("Entries");

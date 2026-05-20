@@ -287,16 +287,63 @@ bool FPCGExPropertySchemaCollection::ValidateUniqueNames(TArray<FName>& OutDupli
 
 void FPCGExPropertySchemaCollection::SyncAllSchemas()
 {
+	// Discarded; in the typical (no collision) case the array never allocates.
+	TArray<FPCGExHeaderIdRemap> Unused;
+	SyncAllSchemas(Unused);
+}
+
+void FPCGExPropertySchemaCollection::SyncAllSchemas(TArray<FPCGExHeaderIdRemap>& OutRemaps)
+{
+#if WITH_EDITOR
+	TSet<int32> SeenHeaderIds;
+	SeenHeaderIds.Reserve(Schemas.Num());
+
+	auto GenerateUniqueHeaderId = [&SeenHeaderIds]() -> int32
+	{
+		int32 NewId = 0;
+		do { NewId = GetTypeHash(FGuid::NewGuid()); }
+		while (NewId == 0 || SeenHeaderIds.Contains(NewId));
+		return NewId;
+	};
+
 	for (FPCGExPropertySchema& Schema : Schemas)
 	{
-#if WITH_EDITOR
-		// Bootstrap a stable identity for entries whose ctor left HeaderId at 0
-		if (Schema.HeaderId == 0)
+		// Copy-paste preserves the source's HeaderId; without this catch, SyncToSchema's
+		// IndexByHeaderId aliases the duplicates and one side's overrides get silently dropped.
+		bool bAlreadySeen = false;
+		if (Schema.HeaderId != 0)
 		{
-			Schema.HeaderId = GetTypeHash(FGuid::NewGuid());
+			SeenHeaderIds.Add(Schema.HeaderId, &bAlreadySeen);
 		}
-#endif
+		if (Schema.HeaderId == 0 || bAlreadySeen)
+		{
+			const int32 OldId = Schema.HeaderId;
+			Schema.HeaderId = GenerateUniqueHeaderId();
+			SeenHeaderIds.Add(Schema.HeaderId);
+
+			// Zero-bootstraps never appeared in saved overrides, so there is nothing to remap.
+			if (bAlreadySeen)
+			{
+				OutRemaps.Emplace(OldId, Schema.HeaderId, Schema.Name);
+			}
+		}
 		Schema.SyncPropertyName();
+	}
+#else
+	for (FPCGExPropertySchema& Schema : Schemas)
+	{
+		Schema.SyncPropertyName();
+	}
+#endif
+}
+
+void FPCGExPropertySchemaCollection::SyncAllSchemasAndRemap(TFunctionRef<void(TConstArrayView<FPCGExHeaderIdRemap>)> ApplyRemap)
+{
+	TArray<FPCGExHeaderIdRemap> Remaps;
+	SyncAllSchemas(Remaps);
+	if (!Remaps.IsEmpty())
+	{
+		ApplyRemap(Remaps);
 	}
 }
 
@@ -513,11 +560,13 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 				}
 			}
 		}
-		if (Entry.HeaderId != 0)
+		// First-wins on both maps so legacy collided overrides resolve correctly through the
+		// Name fallback below; identical to last-wins when identities are unique.
+		if (Entry.HeaderId != 0 && !IndexByHeaderId.Contains(Entry.HeaderId))
 		{
 			IndexByHeaderId.Add(Entry.HeaderId, i);
 		}
-		if (!Entry.PropertyName.IsNone())
+		if (!Entry.PropertyName.IsNone() && !IndexByName.Contains(Entry.PropertyName))
 		{
 			IndexByName.Add(Entry.PropertyName, i);
 		}
@@ -600,6 +649,34 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 			NewEntry.bEnabled = false;
 		}
 	}
+}
+
+void FPCGExPropertyOverrides::ApplyHeaderIdRemap(TConstArrayView<FPCGExHeaderIdRemap> Remaps)
+{
+#if WITH_EDITOR
+	if (Remaps.IsEmpty())
+	{
+		return;
+	}
+
+	for (FPCGExPropertyOverrideEntry& Entry : Overrides)
+	{
+		// Match on (OldId, Name): OldId alone aliases multiple schema entries pre-regeneration,
+		// so Name is required to pin the remap to the specific entry whose HeaderId changed.
+		for (const FPCGExHeaderIdRemap& Remap : Remaps)
+		{
+			if (Entry.HeaderId == Remap.OldId && Entry.PropertyName == Remap.Name)
+			{
+				Entry.HeaderId = Remap.NewId;
+				if (FPCGExProperty* Prop = Entry.GetPropertyMutable())
+				{
+					Prop->HeaderId = Remap.NewId;
+				}
+				break;
+			}
+		}
+	}
+#endif
 }
 
 const FInstancedStruct* FPCGExPropertyOverrides::GetOverride(FName PropertyName) const

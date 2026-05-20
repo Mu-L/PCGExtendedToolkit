@@ -74,7 +74,7 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorRangeAxis
 
 	/** Inclusivity at range boundaries. Per-axis -- each axis can independently include/exclude its endpoints. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	EPCGExRangeBoundaryMode BoundaryMode = EPCGExRangeBoundaryMode::ClosedOpen;
+	EPCGExRangeBoundaryMode BoundaryMode = EPCGExRangeBoundaryMode::OpenOpen;
 };
 
 /**
