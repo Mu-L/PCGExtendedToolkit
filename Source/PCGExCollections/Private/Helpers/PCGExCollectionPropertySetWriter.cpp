@@ -57,7 +57,14 @@ namespace PCGExCollections
 	{
 		Writers.Reset();
 
-		if (!Metadata || !OutputSettings.HasOutputs())
+		if (!Metadata)
+		{
+			return false;
+		}
+
+		TArray<FPCGExPropertyOutputConfig> EffectiveConfigs;
+		OutputSettings.GetEffectiveConfigs(EffectiveConfigs);
+		if (EffectiveConfigs.IsEmpty())
 		{
 			return false;
 		}
@@ -77,7 +84,7 @@ namespace PCGExCollections
 			}
 		}
 
-		for (const FPCGExPropertyOutputConfig& Config : OutputSettings.Configs)
+		for (const FPCGExPropertyOutputConfig& Config : EffectiveConfigs)
 		{
 			if (!Config.IsValid())
 			{
