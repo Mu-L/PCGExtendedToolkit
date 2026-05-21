@@ -664,15 +664,27 @@ public:
 	 *   - Anywhere else a collection's schema should be reconstructed from the data
 	 *     authored on individual entries.
 	 *
-	 * The existing manual CollectionProperties participates as source #0 so manually
-	 * authored entries are preserved under FirstWins / StrictTypeMatch.
+	 * Source ordering under FirstWins / StrictTypeMatch:
+	 *   1. InheritedDefaults (if any)  -- highest priority. Caller-computed "common-ancestor"
+	 *      view: the value contributing actors would inherit if they didn't author per-instance
+	 *      overrides (typically the BP CDO's value when all actors share a class; the asset's
+	 *      default when CDOs disagree).
+	 *   2. Per-entry contributors (each entry's enabled override slots).
+	 *   3. Existing CollectionProperties -- lowest priority, survives only when the entry above
+	 *      does not contribute the property (manual-only schema entries).
 	 *
-	 * @param Policy Conflict-resolution policy applied during the merge. Defaults to
-	 *               StrictTypeMatch: silent dedupe on same-name+same-type, conflict log
-	 *               on type mismatch.
+	 * @param Policy            Conflict-resolution policy applied during the merge. Defaults to
+	 *                          StrictTypeMatch: silent dedupe on same-name+same-type, conflict log
+	 *                          on type mismatch.
+	 * @param InheritedDefaults Optional caller-computed inherited-defaults view. When provided,
+	 *                          becomes source #0 in the merge so the collection default snaps to
+	 *                          the common-ancestor value across contributors rather than to
+	 *                          whichever contributor was iterated first. Pass empty (default) to
+	 *                          fall back to the old "first contributor wins" behavior.
 	 */
 	void RefreshCollectionPropertiesFromEntries(
-		EPCGExSchemaMergePolicy Policy = EPCGExSchemaMergePolicy::StrictTypeMatch);
+		EPCGExSchemaMergePolicy Policy = EPCGExSchemaMergePolicy::StrictTypeMatch,
+		TConstArrayView<FInstancedStruct> InheritedDefaults = {});
 
 	/**
 	 * Get property from collection defaults by type.

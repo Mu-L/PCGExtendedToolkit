@@ -141,7 +141,7 @@ namespace PCGExPropertySchemaResolve
 	}
 }
 
-void FPCGExPropertySchemaCollection::Resolve(TArray<FPCGExPropertyResolved>& Out, TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain) const
+void FPCGExPropertySchemaCollection::Resolve(TArray<FPCGExPropertyResolved>& Out, TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain, bool bIncludeOwnOverrides) const
 {
 	Out.Reset();
 
@@ -159,10 +159,15 @@ void FPCGExPropertySchemaCollection::Resolve(TArray<FPCGExPropertyResolved>& Out
 		return;
 	}
 
-	// This collection's own ImportOverrides always lead the chain; fallback layers come after.
+	// This collection's own ImportOverrides leads the chain when bIncludeOwnOverrides is true;
+	// fallback layers come after. When false, only the fallback layers participate -- callers use
+	// this to extract the "no instance overrides" view (asset/CDO defaults only).
 	TArray<const FPCGExPropertyOverrides*, TInlineAllocator<4>> Chain;
-	Chain.Reserve(1 + FallbackChain.Num());
-	Chain.Add(&ImportOverrides);
+	Chain.Reserve((bIncludeOwnOverrides ? 1 : 0) + FallbackChain.Num());
+	if (bIncludeOwnOverrides)
+	{
+		Chain.Add(&ImportOverrides);
+	}
 	for (const FPCGExPropertyOverrides* Layer : FallbackChain)
 	{
 		Chain.Add(Layer);
@@ -247,10 +252,10 @@ FPCGExPropertySchema* FPCGExPropertySchemaCollection::FindByNameMutable(FName Pr
 	return nullptr;
 }
 
-TArray<FInstancedStruct> FPCGExPropertySchemaCollection::BuildSchema(TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain) const
+TArray<FInstancedStruct> FPCGExPropertySchemaCollection::BuildSchema(TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain, bool bIncludeOwnOverrides) const
 {
 	TArray<FPCGExPropertyResolved> Resolved;
-	Resolve(Resolved, FallbackChain);
+	Resolve(Resolved, FallbackChain, bIncludeOwnOverrides);
 
 	TArray<FInstancedStruct> Result;
 	Result.Reserve(Resolved.Num());

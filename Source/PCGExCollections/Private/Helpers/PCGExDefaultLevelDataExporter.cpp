@@ -31,6 +31,7 @@
 
 #include "PCGExLog.h"
 #include "PCGExPropertyCollectionComponent.h"
+#include "PCGExSchemaMerging.h"
 #include "Data/PCGExDataValue.h"
 #include "Data/Descriptors/PCGExComponentDescriptors.h"
 #include "Helpers/PCGExActorPropertyDelta.h"
@@ -1411,6 +1412,51 @@ bool UPCGExDefaultLevelDataExporter::ExportLevelData(UWorld* World, UPCGDataAsse
 
 				LocalPicksOut[i] = Info->EntryIndex;
 			}
+		}
+
+		// Compute the "common-ancestor" inherited-defaults view for the contributing actors:
+		// per property, the value all unique BP classes agree on at the CDO level (the
+		// BuildInheritedSchema chain walk WITHOUT instance overrides); when classes disagree,
+		// fall back to the asset's authored default. Consumed by CompactSharedMesh to seed the
+		// shared MeshCollection's CollectionProperties.
+		if (OutContext.MeshInheritedDefaults)
+		{
+			TMap<UClass*, TArray<FInstancedStruct>> InheritedByClass;
+			TMap<UClass*, TArray<FInstancedStruct>> AssetDefaultsByClass;
+			for (const TPair<AActor*, FActorPropertySchemaCache>& Pair : PropertySchemaCache)
+			{
+				AActor* Actor = Pair.Key;
+				if (!Actor)
+				{
+					continue;
+				}
+				UClass* Class = Actor->GetClass();
+				if (InheritedByClass.Contains(Class))
+				{
+					continue;
+				}
+				UPCGExPropertyCollectionComponent* Comp = UPCGExPropertyCollectionComponent::FindOnActor(Actor);
+				if (!Comp)
+				{
+					continue;
+				}
+				InheritedByClass.Add(Class, Comp->BuildInheritedSchema());
+				AssetDefaultsByClass.Add(Class, Comp->BuildAssetDefaultSchema());
+			}
+
+			TArray<TConstArrayView<FInstancedStruct>> InheritedViews;
+			InheritedViews.Reserve(InheritedByClass.Num());
+			for (const TPair<UClass*, TArray<FInstancedStruct>>& Pair : InheritedByClass)
+			{
+				InheritedViews.Emplace(Pair.Value);
+			}
+			TArray<TConstArrayView<FInstancedStruct>> AssetDefaultViews;
+			AssetDefaultViews.Reserve(AssetDefaultsByClass.Num());
+			for (const TPair<UClass*, TArray<FInstancedStruct>>& Pair : AssetDefaultsByClass)
+			{
+				AssetDefaultViews.Emplace(Pair.Value);
+			}
+			*OutContext.MeshInheritedDefaults = PCGExProperties::AggregateAgreedValuesByName(InheritedViews, AssetDefaultViews);
 		}
 
 		// Hand the captured mesh + level entry lists back to the caller for compaction.

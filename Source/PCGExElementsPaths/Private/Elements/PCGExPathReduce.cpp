@@ -85,6 +85,7 @@ namespace PCGExPathReduce
 		bClosedLoop = PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn());
 
 		FilterAll();
+		PointDataFacade->GetOut()->Flatten()
 
 		Mask.Init(true, PointDataFacade->GetNum());
 

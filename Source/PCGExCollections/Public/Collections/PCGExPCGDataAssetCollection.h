@@ -98,6 +98,16 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	UPROPERTY()
 	TArray<FPCGExMeshCollectionEntry> EditorMeshContributions;
 
+	/** Caller-computed "common-ancestor" inherited-defaults view for this export's contributing
+	 *  actors -- i.e., per property, the value the actors would resolve if they had no per-instance
+	 *  override. When all unique BP classes agree at the CDO level, that's the CDO value; when
+	 *  they disagree, the asset's authored default fills in. Transient -- recomputed on every
+	 *  export from the actors in this entry's source level. Consumed by CompactSharedMesh to
+	 *  derive the shared MeshCollection's CollectionProperties as a per-property union across all
+	 *  contributing entries' aggregates. */
+	UPROPERTY(Transient)
+	TArray<FInstancedStruct> EditorMeshInheritedDefaults;
+
 	/** Per-mesh-point packed local selection, parallel to ExportedDataAsset's "Meshes" pin.
 	 *  Layout: low 16 bits = local entry index into EditorMeshContributions,
 	 *  high 16 bits = secondary index + 1 (0 = no variant; matches FPickPacker convention).

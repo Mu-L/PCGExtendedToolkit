@@ -287,6 +287,30 @@ public:
 	 */
 	TArray<FInstancedStruct> BuildResolvedSchema() const;
 
+	/**
+	 * Same chain construction as BuildResolvedSchema, but does NOT include this instance's own
+	 * ImportOverrides. Returns "what value would this actor surface if it didn't author any
+	 * per-instance overrides?" -- i.e., the BP class chain / CDO view, with asset defaults at
+	 * the bottom.
+	 *
+	 * Used by collection ingestion paths to compute the "common-ancestor" collection default
+	 * across contributing actors: when all unique BP classes agree on the inherited value for a
+	 * property, the collection's default snaps to that value rather than to whichever actor's
+	 * per-instance override happened to be iterated first.
+	 */
+	TArray<FInstancedStruct> BuildInheritedSchema() const;
+
+	/**
+	 * Asset-default view: schemas walked with NO override chain whatsoever (no instance overrides,
+	 * no BP class chain). For imported schema entries this returns the asset's authored default;
+	 * for locals it returns the schema's in-place value. Used as the fallback when contributing
+	 * BP classes disagree at the CDO level (least-specific common point in the chain).
+	 */
+	TArray<FInstancedStruct> BuildAssetDefaultSchema() const
+	{
+		return Properties.BuildSchema({}, /*bIncludeOwnOverrides=*/false);
+	}
+
 #if WITH_EDITOR
 	/**
 	 * Find the SCS-authored template for the component named ComponentName on Cls's CDO.
@@ -367,6 +391,14 @@ public:
 		{
 			SchemaPropertySnapshot.Add(Schema.Property);
 		}
+
+#if WITH_EDITOR
+		// EnabledOverrides (TSet) is the authoritative signal; per-entry bEnabled is the UI mirror
+		// UE per-property delta can clobber. Without this sync, an instance whose user toggled an
+		// override off can still resolve to its cached Value (stuck bEnabled=true) and leak that
+		// value through the chain walk into downstream ingestion.
+		Comp->SyncBEnabledFromOverrideSet();
+#endif
 
 		Comp->PreparePropertyValues();
 

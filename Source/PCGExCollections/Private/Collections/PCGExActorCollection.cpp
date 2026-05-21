@@ -320,13 +320,20 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 	// through to the schema default during the canonical rebuild below.
 	SyncPropertySchemaAndRemapEntries();
 
-	TArray<TArray<FInstancedStruct>> Sources;
-	Sources.Reserve(1 + Entries.Num());
-	Sources.Add(CollectionProperties.BuildSchema()); // source 0: manual schema
+	// Source ordering under FirstWins / StrictTypeMatch:
+	//   1. Inherited-defaults aggregate (per-BP-class CDO views; asset-default fallback when
+	//      classes disagree) -- highest priority.
+	//   2. Per-actor effective schemas (the donor's resolved view including its own overrides).
+	//   3. Existing CollectionProperties -- lowest priority, survives only for manual-only entries.
 
-	// Parallel to Entries; INDEX_NONE means "this entry contributed no source".
-	TArray<int32> EntrySourceIdx;
-	EntrySourceIdx.Init(INDEX_NONE, Entries.Num());
+	// Per-class chain views captured during the actor scan. Aggregated after the loop so the
+	// inherited slot is computed before Sources is composed in priority order.
+	TMap<UClass*, TArray<FInstancedStruct>> InheritedByClass;
+	TMap<UClass*, TArray<FInstancedStruct>> AssetDefaultsByClass;
+
+	// Per-entry effective schemas, parallel to Entries (empty for entries with no donor).
+	TArray<TArray<FInstancedStruct>> EntryCompSchemas;
+	EntryCompSchemas.SetNum(Entries.Num());
 
 	// Loaded-level handle holders, kept alive across the merge call so donor pointers stay
 	// valid. One handle per entry that needed a level load.
@@ -360,11 +367,63 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 			continue;
 		}
 
-		EntrySourceIdx[i] = Sources.Add(MoveTemp(CompSchema));
+		// First donor of each class wins; subsequent donors share the same CDO so re-extracting
+		// is redundant.
+		UClass* DonorClass = Donor->GetClass();
+		if (!InheritedByClass.Contains(DonorClass))
+		{
+			if (UPCGExPropertyCollectionComponent* DonorComp = UPCGExPropertyCollectionComponent::FindOnActor(Donor))
+			{
+				InheritedByClass.Add(DonorClass, DonorComp->BuildInheritedSchema());
+				AssetDefaultsByClass.Add(DonorClass, DonorComp->BuildAssetDefaultSchema());
+			}
+		}
+
+		EntryCompSchemas[i] = MoveTemp(CompSchema);
 	}
 
+	TArray<TConstArrayView<FInstancedStruct>> InheritedViews;
+	InheritedViews.Reserve(InheritedByClass.Num());
+	for (const TPair<UClass*, TArray<FInstancedStruct>>& Pair : InheritedByClass)
+	{
+		InheritedViews.Emplace(Pair.Value);
+	}
+	TArray<TConstArrayView<FInstancedStruct>> AssetDefaultViews;
+	AssetDefaultViews.Reserve(AssetDefaultsByClass.Num());
+	for (const TPair<UClass*, TArray<FInstancedStruct>>& Pair : AssetDefaultsByClass)
+	{
+		AssetDefaultViews.Emplace(Pair.Value);
+	}
+	TArray<FInstancedStruct> InheritedAggregate = PCGExProperties::AggregateAgreedValuesByName(InheritedViews, AssetDefaultViews);
+
+	TArray<TArray<FInstancedStruct>> Sources;
+	Sources.Reserve(2 + Entries.Num());
+
+	// Parallel to Entries; INDEX_NONE means "this entry contributed no source".
+	TArray<int32> EntrySourceIdx;
+	EntrySourceIdx.Init(INDEX_NONE, Entries.Num());
+
+	Sources.Add(MoveTemp(InheritedAggregate));
+	for (int32 i = 0; i < Entries.Num(); ++i)
+	{
+		if (!EntryCompSchemas[i].IsEmpty())
+		{
+			EntrySourceIdx[i] = Sources.Add(MoveTemp(EntryCompSchemas[i]));
+		}
+	}
+	Sources.Add(CollectionProperties.BuildSchema());
+
 	// Nothing authored anywhere: leave existing state untouched (avoids no-op churn).
-	if (Sources.Num() <= 1 && Sources[0].IsEmpty())
+	bool bAnySource = false;
+	for (const TArray<FInstancedStruct>& S : Sources)
+	{
+		if (!S.IsEmpty())
+		{
+			bAnySource = true;
+			break;
+		}
+	}
+	if (!bAnySource)
 	{
 		for (TSharedPtr<FStreamableHandle>& H : LevelHandles)
 		{
