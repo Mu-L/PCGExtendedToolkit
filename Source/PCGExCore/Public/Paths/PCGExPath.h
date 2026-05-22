@@ -35,6 +35,12 @@ namespace PCGExData
 
 namespace PCGExPaths
 {
+	PCGEXCORE_API void BuildProjectedPoints2D(
+		const TConstPCGValueRange<FTransform>& Positions,
+		const FPCGExGeo2DProjectionDetails& Projection,
+		TArray<FVector2D>& OutProjectedPoints,
+		FBox2D& OutBounds);
+
 	struct PCGEXCORE_API FPathEdge
 	{
 		int32 Start = -1;

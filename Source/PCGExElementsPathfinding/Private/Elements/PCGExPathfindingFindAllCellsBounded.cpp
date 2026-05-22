@@ -228,14 +228,15 @@ bool FPCGExFindAllCellsBoundedElement::AdvanceWork(FPCGExContext* InContext, con
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      NewBatch->bSkipCompletion = true;
-			                                      NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				NewBatch->bSkipCompletion = true;
+				NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -530,13 +531,11 @@ namespace PCGExFindAllCellsBounded
 				return;
 			}
 
-			CellsIO.Reserve(Cells.Num());
-			CellTags.Reserve(Cells.Num());
-			OutputCollection->IncreaseReserve(Cells.Num() + 1);
-			for (int32 i = 0; i < Cells.Num(); i++)
+			CellsIO.SetNum(Cells.Num());
+			CellTags.Init(TriageTag, Cells.Num());
+			if (!OutputCollection->EmplaceBatch(CellsIO, VtxDataFacade->Source, PCGExData::EIOInit::New))
 			{
-				CellsIO.Add(OutputCollection->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New));
-				CellTags.Add(TriageTag);
+				return;
 			}
 		};
 

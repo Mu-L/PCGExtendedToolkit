@@ -61,24 +61,25 @@ bool FPCGExBreakClustersToPathsElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      if (Settings->Winding != EPCGExWindingMutation::Unchanged)
-			                                      {
-				                                      NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
-			                                      }
-			                                      if (Settings->OperateOn == EPCGExBreakClusterOperationTarget::Paths)
-			                                      {
-				                                      NewBatch->VtxFilterFactories = &Context->FilterFactories;
-			                                      }
-			                                      else
-			                                      {
-				                                      NewBatch->bSkipCompletion = true;
-			                                      }
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				if (Settings->Winding != EPCGExWindingMutation::Unchanged)
+				{
+					NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
+				}
+				if (Settings->OperateOn == EPCGExBreakClusterOperationTarget::Paths)
+				{
+					NewBatch->VtxFilterFactories = &Context->FilterFactories;
+				}
+				else
+				{
+					NewBatch->bSkipCompletion = true;
+				}
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -148,11 +149,11 @@ namespace PCGExBreakClustersToPaths
 			return;
 		}
 
-		ChainsIO.Reserve(NumChains);
-		Context->OutputPaths->IncreaseReserve(NumChains);
-		for (int i = 0; i < NumChains; ++i)
+		ChainsIO.SetNum(NumChains);
+		if (!Context->OutputPaths->EmplaceBatch<UPCGPointArrayData>(ChainsIO,VtxDataFacade->Source, PCGExData::EIOInit::New))
 		{
-			ChainsIO.Add(Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
+			bIsProcessorValid = false;
+			return;
 		}
 
 		StartParallelLoopForRange(NumChains);

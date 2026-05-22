@@ -198,18 +198,19 @@ bool FPCGExRefineEdgesElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
-			                                      if (Context->Refinement->WantsHeuristics())
-			                                      {
-				                                      NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
-			                                      }
-			                                      NewBatch->bRequiresWriteStep = Settings->Mode == EPCGExRefineEdgesOutput::Attribute;
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
+				if (Context->Refinement->WantsHeuristics())
+				{
+					NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+				}
+				NewBatch->bRequiresWriteStep = Settings->Mode == EPCGExRefineEdgesOutput::Attribute;
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
