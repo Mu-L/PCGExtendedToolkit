@@ -644,7 +644,7 @@ namespace PCGExAssetStaging
 				MicroHelper && MicroCache && MicroCache->GetTypeId() == PCGExAssetCollection::TypeIds::Mesh)
 			{
 				const PCGExMeshCollection::FMicroCache* EntryMicroCache = static_cast<const PCGExMeshCollection::FMicroCache*>(MicroCache);
-				SecondaryIndex = MicroHelper->GetPick(EntryMicroCache, Index, Seed + Index);
+				SecondaryIndex = MicroHelper->GetPick(EntryMicroCache, Index, PCGExRandomHelpers::GetSeed(Seed, Index));
 
 				if (Context->bPickMaterials)
 				{

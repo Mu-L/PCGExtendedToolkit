@@ -43,7 +43,6 @@ void UPCGExGlobalSettings::UpdateSettingsCaches() const
 	PCGEX_PUSH_SETTING(Core, bBulkInitData)
 	PCGEX_PUSH_SETTING(Core, bUseDelaunator)
 	PCGEX_PUSH_SETTING(Core, bAssertOnEmptyThread)
-	PCGEX_PUSH_SETTING(Core, ExecutionPolicy)
 
 	PCGEX_PUSH_SETTING(Core, bUseNativeColorsIfPossible)
 	PCGEX_PUSH_SETTING(Core, bToneDownOptionalPins)

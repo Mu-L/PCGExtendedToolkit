@@ -210,8 +210,6 @@ namespace PCGExPointsMT
 	IBatch::IBatch(FPCGExContext* InContext, const TArray<TWeakPtr<PCGExData::FPointIO>>& InPointsCollection)
 		: ExecutionContext(InContext),
 		  PointsCollection(InPointsCollection)
-
-
 	{
 		SetExecutionContext(InContext);
 	}
@@ -229,6 +227,8 @@ namespace PCGExPointsMT
 
 	void IBatch::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPointsMT::IBatch::Process);
+
 		if (PointsCollection.IsEmpty())
 		{
 			return;
@@ -241,44 +241,64 @@ namespace PCGExPointsMT
 
 		const bool bDoInitData = DataInitializationPolicy == PCGExData::EIOInit::Duplicate || DataInitializationPolicy == PCGExData::EIOInit::New;
 
-		for (const TWeakPtr<PCGExData::FPointIO>& WeakIO : PointsCollection)
+		TArray<TSharedPtr<IProcessor>> Candidates;
+		Candidates.SetNum(PointsCollection.Num());
+
+		PCGExMT::ParallelOrSequential(
+			Candidates.Num(),
+			[&](const int32 i)
+			{
+				TSharedPtr<PCGExData::FPointIO> IO = PointsCollection[i].Pin();
+
+				PCGEX_MAKE_SHARED(PointDataFacade, PCGExData::FFacade, IO.ToSharedRef())
+
+				const TSharedPtr<IProcessor> NewProcessor = NewProcessorInstance(PointDataFacade.ToSharedRef());
+
+				NewProcessor->SetExecutionContext(ExecutionContext);
+				NewProcessor->ParentBatch = SharedThis(this);
+				NewProcessor->BatchIndex = i;
+
+				if (FilterFactories)
+				{
+					NewProcessor->SetPointsFilterData(FilterFactories);
+				}
+				if (PrimaryInstancedFactory)
+				{
+					NewProcessor->PrimaryInstancedFactory = PrimaryInstancedFactory;
+				}
+
+				NewProcessor->RegisterConsumableAttributesWithFacade();
+
+				if (!PrepareSingle(NewProcessor.ToSharedRef()))
+				{
+					return;
+				}
+
+				NewProcessor->bIsTrivial = IO->GetNum() < PCGEX_CORE_SETTINGS.SmallPointsSize;
+				Candidates[i] = NewProcessor;
+
+			}, 1);
+
 		{
-			TSharedPtr<PCGExData::FPointIO> IO = WeakIO.Pin();
+			Processors.Reserve(Candidates.Num());
+			ProcessorFacades.Reserve(Candidates.Num());
+			SubProcessorMap->Reserve(Candidates.Num());
 
-			PCGEX_MAKE_SHARED(PointDataFacade, PCGExData::FFacade, IO.ToSharedRef())
-
-			const TSharedRef<IProcessor> NewProcessor = NewProcessorInstance(PointDataFacade.ToSharedRef()).ToSharedRef();
-
-			NewProcessor->SetExecutionContext(ExecutionContext);
-			NewProcessor->ParentBatch = SharedThis(this);
-			NewProcessor->BatchIndex = Processors.Num();
-
-			if (FilterFactories)
+			int Pi = 0;
+			for (const TSharedPtr<IProcessor>& C : Candidates)
 			{
-				NewProcessor->SetPointsFilterData(FilterFactories);
-			}
-			if (PrimaryInstancedFactory)
-			{
-				NewProcessor->PrimaryInstancedFactory = PrimaryInstancedFactory;
-			}
+				if (C)
+				{
+					TSharedRef<IProcessor>& P = Processors.Add_GetRef(C.ToSharedRef());
+					P->BatchIndex = Pi++;
+					ProcessorFacades.Add(P->PointDataFacade);
+					SubProcessorMap->Add(&P->PointDataFacade->Source.Get(), P);
 
-			NewProcessor->RegisterConsumableAttributesWithFacade();
-
-			if (!PrepareSingle(NewProcessor))
-			{
-				continue;
-			}
-
-			Processors.Add(NewProcessor);
-
-			ProcessorFacades.Add(NewProcessor->PointDataFacade);
-			SubProcessorMap->Add(&NewProcessor->PointDataFacade->Source.Get(), NewProcessor);
-
-			NewProcessor->bIsTrivial = IO->GetNum() < PCGEX_CORE_SETTINGS.SmallPointsSize;
-
-			if (bDoInitData)
-			{
-				NewProcessor->PointDataFacade->Source->InitializeOutput(DataInitializationPolicy);
+					if (bDoInitData)
+					{
+						P->PointDataFacade->Source->InitializeOutput(DataInitializationPolicy);
+					}
+				}
 			}
 		}
 
@@ -326,12 +346,60 @@ namespace PCGExPointsMT
 		{
 			return;
 		}
-		PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(CompleteWork, bForceSingleThreadedCompletion, { Processor->CompleteWork(); }, {})
+		//PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(CompleteWork, bForceSingleThreadedCompletion, { Processor->CompleteWork(); }, {})
+		PCGEX_CHECK_WORK_HANDLE_VOID
+		if (bForceSingleThreadedCompletion)
+		{
+			for (TSharedRef<IProcessor>& Processor : Processors)
+			{
+				if (Processor->bIsProcessorValid)
+				{
+					Processor->CompleteWork();
+				}
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				Processors.Num(),
+				[&](const int32 i)
+				{
+					const TSharedRef<IProcessor>& Processor = Processors[i];
+					if (Processor->bIsProcessorValid)
+					{
+						Processor->CompleteWork();
+					}
+				}, 1);
+		}
 	}
 
 	void IBatch::Write()
 	{
-		PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(Write, bForceSingleThreadedWrite, { Processor->Write(); }, {})
+		//PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(Write, bForceSingleThreadedWrite, { Processor->Write(); }, {})
+		PCGEX_CHECK_WORK_HANDLE_VOID
+		if (bForceSingleThreadedWrite)
+		{
+			for (TSharedRef<IProcessor>& Processor : Processors)
+			{
+				if (Processor->bIsProcessorValid)
+				{
+					Processor->Write();
+				}
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				Processors.Num(),
+				[&](const int32 i)
+				{
+					const TSharedRef<IProcessor>& Processor = Processors[i];
+					if (Processor->bIsProcessorValid)
+					{
+						Processor->Write();
+					}
+				}, 1);
+		}
 	}
 
 	void IBatch::Output()
@@ -359,7 +427,28 @@ namespace PCGExPointsMT
 
 	void IBatch::OnProcessingPreparationComplete()
 	{
-		PCGEX_ASYNC_MT_LOOP_TPL(Process, bForceSingleThreadedProcessing, { Processor->bIsProcessorValid = Processor->Process(This->TaskManager); }, { Process->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE](){ PCGEX_ASYNC_THIS This->OnInitialPostProcess(); };})
+		//	PCGEX_ASYNC_MT_LOOP_TPL(Process, bForceSingleThreadedProcessing, { Processor->bIsProcessorValid = Processor->Process(This->TaskManager); }, { Process->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE](){ PCGEX_ASYNC_THIS This->OnInitialPostProcess(); };})
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (bForceSingleThreadedProcessing)
+		{
+			for (TSharedRef<IProcessor>& Processor : Processors)
+			{
+				Processor->bIsProcessorValid = Processor->Process(TaskManager);
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				Processors.Num(),
+				[&](const int32 i)
+				{
+					const TSharedRef<IProcessor>& Processor = Processors[i];
+					Processor->bIsProcessorValid = Processor->Process(TaskManager);
+				}, 1);
+		}
+
+		OnInitialPostProcess();
 	}
 
 	void ScheduleBatch(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<IBatch>& Batch)

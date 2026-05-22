@@ -197,16 +197,21 @@ namespace PCGExNormalize
 				break;
 			}
 
-			PCGEX_PARALLEL_FOR(
+			PCGExMT::ParallelOrSequential(
 				InTransforms.Num(),
-				FVector UVW = Settings->Offset + ((TransformBuffer->Read(i).TransformPosition(InTransforms[i].GetLocation()) - Box.Min) * Settings->Tile) / Size;
-				for (int j = 0; j < 3; j++)
+				[&](const int32 i)
 				{
-				UVW[j] = Wrap(UVW[j]);
-				if (OneMinus[j]) { UVW[j] = 1 - UVW[j]; }
-				}
-				OutputBuffer->Set(i, UVW);
-				)
+					FVector UVW = Settings->Offset + ((TransformBuffer->Read(i).TransformPosition(InTransforms[i].GetLocation()) - Box.Min) * Settings->Tile) / Size;
+					for (int j = 0; j < 3; j++)
+					{
+						UVW[j] = Wrap(UVW[j]);
+						if (OneMinus[j])
+						{
+							UVW[j] = 1 - UVW[j];
+						}
+					}
+					OutputBuffer->Set(i, UVW);
+				});
 
 			PointDataFacade->WriteFastest(TaskManager);
 

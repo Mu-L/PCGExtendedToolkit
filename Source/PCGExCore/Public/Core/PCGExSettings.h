@@ -46,10 +46,6 @@ protected:
 	UPROPERTY()
 	bool bCachedSupportsDataStealing = false;
 
-	UPROPERTY()
-	bool bCachedSupportsInitPolicy = false;
-
-
 	//~Begin UPCGExPointsProcessorSettings
 public:
 	/** If enabled, will pre-allocate all data on a single thread to avoid contention. Not all nodes support this. */
@@ -68,18 +64,7 @@ public:
 	 * When enabling this you must make absolutely sure the data plugged into this node is not plugged in any other node. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsDataStealing", EditConditionHides, HideEditConditionToggle))
 	EPCGExOptionState StealData = EPCGExOptionState::Disabled;
-
-	virtual EPCGExExecutionPolicy GetExecutionPolicy() const
-	{
-		return ExecutionPolicy;
-	}
-
-	/** Forces the execution over a single frame.
-	 * Not safe on all nodes, some nodes will override this internally.
-	 * ONLY CHANGE THIS IF YOU KNOW WHAT YOU'RE DOING */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsInitPolicy", HideEditConditionToggle))
-	EPCGExExecutionPolicy ExecutionPolicy = EPCGExExecutionPolicy::Default;
-
+	
 	/** Flatten the output of this node. Merges hierarchical data into a single flat collection. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Cleanup", meta=(PCG_NotOverridable))
 	bool bFlattenOutput = false;

@@ -154,9 +154,14 @@ bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::Context
 		SetState(PCGExPointsMT::MTState_PointsCompletingWork);
 		if (!MainBatch->bSkipCompletion)
 		{
-			PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
-			MainBatch->CompleteWork();
-			return false;
+			{
+				PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
+				MainBatch->CompleteWork();
+			}
+			if (IsWaitingForTasks())
+			{
+				return false;
+			}
 		}
 	}
 
@@ -171,9 +176,14 @@ bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::Context
 		if (MainBatch->bRequiresWriteStep)
 		{
 			SetState(PCGExPointsMT::MTState_PointsWriting);
-			PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
-			MainBatch->Write();
-			return false;
+			{
+				PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
+				MainBatch->Write();
+			}
+			if (IsWaitingForTasks())
+			{
+				return false;
+			}
 		}
 		bBatchProcessingEnabled = false;
 		if (NextStateId == PCGExCommon::States::State_Done)
@@ -245,7 +255,7 @@ bool FPCGExPointsProcessorContext::StartBatchProcessingPoints(FBatchProcessingVa
 	{
 		SetState(PCGExPointsMT::MTState_PointsProcessing);
 		PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), bBatchProcessingEnabled)
-		ScheduleBatch(GetTaskManager(), MainBatch);
+		MainBatch->Process(GetTaskManager());
 	}
 	else
 	{

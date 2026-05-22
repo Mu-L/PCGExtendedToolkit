@@ -43,11 +43,7 @@ public:
 
 	/** Value applied by default to node bulk init data when `Default` is selected. */
 	UPROPERTY(EditAnywhere, config, Category = "Performance|Defaults")
-	bool bBulkInitData = false;
-
-	/** Default execution policy for PCGEx nodes (synchronous, async, etc.). */
-	UPROPERTY(EditAnywhere, config, Category = "Performance|Defaults")
-	EPCGExExecutionPolicy ExecutionPolicy = EPCGExExecutionPolicy::Default;
+	bool bBulkInitData = true;
 
 	UPROPERTY(EditAnywhere, config, Category = "Performance|Cluster")
 	bool bUseDelaunator = true;

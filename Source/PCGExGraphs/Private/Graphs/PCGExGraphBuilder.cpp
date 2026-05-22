@@ -282,15 +282,17 @@ namespace PCGExGraphs
 
 			PCGEX_FOREACH_NODE_METADATA(PCGEX_NODE_METADATA_DECL)
 
-			PCGEX_PARALLEL_FOR(
+			PCGExMT::ParallelOrSequential(
 				NumValidNodes,
-				const FGraphNodeMetadata* NodeMeta = Graph->FindNodeMetadata_Unsafe(i);
-				if (NodeMeta)
+				[&](const int32 i)
 				{
-				const int32 PointIndex = Nodes[i].PointIndex;
-				PCGEX_FOREACH_NODE_METADATA(PCGEX_NODE_METADATA_OUTPUT)
-				}
-				)
+					const FGraphNodeMetadata* NodeMeta = Graph->FindNodeMetadata_Unsafe(i);
+					if (NodeMeta)
+					{
+						const int32 PointIndex = Nodes[i].PointIndex;
+						PCGEX_FOREACH_NODE_METADATA(PCGEX_NODE_METADATA_OUTPUT)
+					}
+				});
 
 #undef PCGEX_FOREACH_NODE_METADATA
 #undef PCGEX_NODE_METADATA_DECL

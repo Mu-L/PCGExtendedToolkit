@@ -201,63 +201,7 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 		InitializeData(InContext, InSettings);
 	}
 
-	// Execution policy controls whether we block the calling thread or return to the scheduler.
-	// On the game thread, or when the policy says don't block, we just drive one step and return.
-	// "NoPauseButLoop" only blocks when inside a PCG loop (avoids frame-delay per loop iteration).
-	const EPCGExExecutionPolicy DesiredPolicy = InSettings->GetExecutionPolicy();
-	const EPCGExExecutionPolicy LocalPolicy = DesiredPolicy == EPCGExExecutionPolicy::Default ? PCGEX_CORE_SETTINGS.ExecutionPolicy : DesiredPolicy;
-
-	if (IsInGameThread()
-		|| LocalPolicy == EPCGExExecutionPolicy::Ignored
-		|| LocalPolicy == EPCGExExecutionPolicy::Default
-		|| (LocalPolicy == EPCGExExecutionPolicy::NoPauseButLoop && InContext->LoopIndex != INDEX_NONE)
-		|| (LocalPolicy == EPCGExExecutionPolicy::NoPauseButTopLoop && InContext->IsExecutingInsideLoop()))
-	{
-		return InContext->DriveAdvanceWork(InSettings);
-	}
-
-	// Adaptive spin-wait: blocks the scheduler thread until all async work completes.
-	// Phases escalate from hot spinning (low latency) to sleeping (low CPU usage):
-	//   0-50:    Yield only (sub-microsecond wake, max throughput)
-	//   50-200:  Mostly yield, occasional 1us sleep (reduce power draw)
-	//   200-1k:  1us sleeps (work is taking a while)
-	//   1k+:     5us sleeps (long-running work, minimize CPU waste)
-	constexpr int SPIN_PHASE_ITERATIONS = 50;
-	constexpr int YIELD_PHASE_ITERATIONS = 200;
-	constexpr float SHORT_SLEEP_MS = 0.001f;
-	constexpr float LONG_SLEEP_MS = 0.005f;
-	constexpr int LONG_SLEEP_THRESHOLD = 1000;
-	int WaitCounter = 0;
-
-	while (!InContext->DriveAdvanceWork(InSettings))
-	{
-		if (WaitCounter < SPIN_PHASE_ITERATIONS)
-		{
-			FPlatformProcess::YieldThread();
-		}
-		else if (WaitCounter < YIELD_PHASE_ITERATIONS)
-		{
-			if ((WaitCounter & 0x7) == 0)
-			{
-				FPlatformProcess::SleepNoStats(SHORT_SLEEP_MS);
-			}
-			else
-			{
-				FPlatformProcess::YieldThread();
-			}
-		}
-		else if (WaitCounter < LONG_SLEEP_THRESHOLD)
-		{
-			FPlatformProcess::SleepNoStats(SHORT_SLEEP_MS);
-		}
-		else
-		{
-			FPlatformProcess::SleepNoStats(LONG_SLEEP_MS);
-		}
-		++WaitCounter;
-	}
-
-	return true;
+	return InContext->DriveAdvanceWork(InSettings);
 }
 
 void IPCGExElement::InitializeData(FPCGExContext* InContext, const UPCGExSettings* InSettings) const

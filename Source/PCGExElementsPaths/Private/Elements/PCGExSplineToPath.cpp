@@ -135,11 +135,12 @@ namespace PCGExSplineToPath
 				}
 			};
 
+			const FTransform SplineTransform = Spline.GetTransform();
+
 			for (int i = 0; i < NumSegments; i++)
 			{
 				const int32 ReadIndex = bReverse ? (NumSegments - 1 - i) : i;
 				const double LengthAtPoint = Spline.GetDistanceAlongSplineAtSplinePoint(ReadIndex);
-				const FTransform SplineTransform = Spline.GetTransform();
 
 				ApplyTransform(i, Spline.GetTransformAtDistanceAlongSpline(LengthAtPoint, ESplineCoordinateSpace::Type::World, true));
 
@@ -168,8 +169,18 @@ namespace PCGExSplineToPath
 
 				PCGEX_OUTPUT_VALUE(LengthAtPoint, LastIndex, TotalLength);
 				PCGEX_OUTPUT_VALUE(Alpha, LastIndex, 1);
-				PCGEX_OUTPUT_VALUE(ArriveTangent, LastIndex, SplinePositions.Points[NumSegments].ArriveTangent);
-				PCGEX_OUTPUT_VALUE(LeaveTangent, LastIndex, SplinePositions.Points[NumSegments].LeaveTangent);
+
+				if (bReverse)
+				{
+					PCGEX_OUTPUT_VALUE(ArriveTangent, LastIndex, -SplineTransform.TransformVector(SplinePositions.Points[NumSegments].LeaveTangent));
+					PCGEX_OUTPUT_VALUE(LeaveTangent, LastIndex, -SplineTransform.TransformVector(SplinePositions.Points[NumSegments].ArriveTangent));
+				}
+				else
+				{
+					PCGEX_OUTPUT_VALUE(ArriveTangent, LastIndex, SplineTransform.TransformVector(SplinePositions.Points[NumSegments].ArriveTangent));
+					PCGEX_OUTPUT_VALUE(LeaveTangent, LastIndex, SplineTransform.TransformVector(SplinePositions.Points[NumSegments].LeaveTangent));
+				}
+
 				PCGEX_OUTPUT_VALUE(PointType, LastIndex, GetPointType(SplinePositions.Points[NumSegments].InterpMode));
 			}
 

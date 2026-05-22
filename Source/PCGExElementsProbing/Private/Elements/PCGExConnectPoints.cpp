@@ -276,18 +276,21 @@ namespace PCGExConnectPoints
 
 		const int32 NumPoints = OriginalTransforms.Num();
 
-		PCGEX_PARALLEL_FOR(
+		PCGExMT::ParallelOrSequential(
 			NumPoints,
-			if (bUseProjection)
+			[&](const int32 i)
 			{
-			WorkingTransforms[i] = ProjectionDetails.ProjectFlat(OriginalTransforms[i]);
-			WorkingPositions[i] = WorkingTransforms[i].GetLocation();
-			}
-			else
-			{
-			WorkingTransforms[i] = OriginalTransforms[i];
-			WorkingPositions[i] = OriginalTransforms[i].GetLocation();
-			})
+				if (bUseProjection)
+				{
+					WorkingTransforms[i] = ProjectionDetails.ProjectFlat(OriginalTransforms[i]);
+					WorkingPositions[i] = WorkingTransforms[i].GetLocation();
+				}
+				else
+				{
+					WorkingTransforms[i] = OriginalTransforms[i];
+					WorkingPositions[i] = OriginalTransforms[i].GetLocation();
+				}
+			});
 
 		if (bWantsOctree)
 		{

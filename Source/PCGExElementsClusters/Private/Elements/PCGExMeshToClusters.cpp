@@ -468,10 +468,12 @@ namespace PCGExMeshToCluster
 			{
 				TPCGValueRange<int32> OutVtxSeeds = VtxPoints->GetSeedValueRange();
 				TPCGValueRange<FTransform> OutTransforms = VtxPoints->GetTransformValueRange(false);
-				PCGEX_PARALLEL_FOR_THRESHOLD(
-					VtxPoints->GetNumPoints(), 1024, {
-					OutVtxSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation());
-					})
+				PCGExMT::ParallelOrSequential(
+					VtxPoints->GetNumPoints(),
+					[&](const int32 i)
+					{
+						OutVtxSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation());
+					}, 1024);
 			}
 
 			TSharedPtr<PCGExGraphs::FGraphBuilder> GraphBuilder = MakeShared<PCGExGraphs::FGraphBuilder>(RootVtxFacade.ToSharedRef(), &Context->GraphBuilderDetails);

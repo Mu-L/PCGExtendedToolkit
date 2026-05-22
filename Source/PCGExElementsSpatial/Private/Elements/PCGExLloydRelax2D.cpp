@@ -176,31 +176,33 @@ namespace PCGExLloydRelax2D
 
 		if (InfluenceDetails.bProgressiveInfluence)
 		{
-			PCGEX_PARALLEL_FOR(
+			PCGExMT::ParallelOrSequential(
 				OutTransforms.Num(),
+				[&](const int32 i)
+				{
+					FTransform& Transform = OutTransforms[i];
 
-				FTransform& Transform = OutTransforms[i];
+					FVector TargetPosition = Transform.GetLocation();
+					TargetPosition.X = ActivePositions[i].X;
+					TargetPosition.Y = ActivePositions[i].Y;
 
-				FVector TargetPosition = Transform.GetLocation();
-				TargetPosition.X = ActivePositions[i].X;
-				TargetPosition.Y = ActivePositions[i].Y;
-
-				Transform.SetLocation(TargetPosition);
-				)
+					Transform.SetLocation(TargetPosition);
+				});
 		}
 		else
 		{
-			PCGEX_PARALLEL_FOR(
+			PCGExMT::ParallelOrSequential(
 				OutTransforms.Num(),
+				[&](const int32 i)
+				{
+					FTransform& Transform = OutTransforms[i];
 
-				FTransform& Transform = OutTransforms[i];
+					FVector TargetPosition = Transform.GetLocation();
+					TargetPosition.X = ActivePositions[i].X;
+					TargetPosition.Y = ActivePositions[i].Y;
 
-				FVector TargetPosition = Transform.GetLocation();
-				TargetPosition.X = ActivePositions[i].X;
-				TargetPosition.Y = ActivePositions[i].Y;
-
-				Transform.SetLocation(FMath::Lerp(Transform.GetLocation(), TargetPosition, InfluenceDetails.GetInfluence(i)));
-				);
+					Transform.SetLocation(FMath::Lerp(Transform.GetLocation(), TargetPosition, InfluenceDetails.GetInfluence(i)));
+				});
 		}
 	}
 }

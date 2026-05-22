@@ -26,16 +26,6 @@ enum class EPCGExOptionState : uint8
 };
 
 UENUM(BlueprintType)
-enum class EPCGExExecutionPolicy : uint8
-{
-	Default           = 0 UMETA(DisplayName = "Default", Tooltip="Default PCGEx behavior"),
-	NoPause           = 1 UMETA(DisplayName = "No Pause", Tooltip="Execution will not pause context."),
-	NoPauseButLoop    = 2 UMETA(DisplayName = "No Pause (Loop)", Tooltip="Execution will not pause context except if the parent graph is a loop."),
-	NoPauseButTopLoop = 3 UMETA(DisplayName = "No Pause (Top Loop)", Tooltip="Execution will not pause context except if there is a loop in the parent stack."),
-	Ignored           = 255 UMETA(Hidden)
-};
-
-UENUM(BlueprintType)
 enum class EPCGExPointBoundsSource : uint8
 {
 	ScaledBounds  = 0 UMETA(DisplayName = "Scaled Bounds", ToolTip="Scaled Bounds", ActionIcon="ScaledBounds"),

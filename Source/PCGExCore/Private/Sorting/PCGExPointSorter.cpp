@@ -450,25 +450,27 @@ namespace PCGExSorting
 		PCGExData::IBufferProxy* const* BuffersData = Buffers.GetData();
 
 		// Single parallel pass - process all rules for each point
-		PCGEX_PARALLEL_FOR(
+		PCGExMT::ParallelOrSequential(
 			InNumElements,
-			for (int32 RuleIdx = 0; RuleIdx < NumRules; RuleIdx++)
+			[&](const int32 i)
 			{
-			if (UseTagFlagsData[RuleIdx])
-			{
-			// Tag-based: constant value for all points
-			ValueArrays[RuleIdx][i] = TagValuesData[RuleIdx];
-			}
-			else if (PCGExData::IBufferProxy* Buffer = BuffersData[RuleIdx])
-			{
-			ValueArrays[RuleIdx][i] = Buffer->ReadAsDouble(i);
-			}
-			else
-			{
-			ValueArrays[RuleIdx][i] = 0.0;
-			}
-			}
-			)
+				for (int32 RuleIdx = 0; RuleIdx < NumRules; RuleIdx++)
+				{
+					if (UseTagFlagsData[RuleIdx])
+					{
+						// Tag-based: constant value for all points
+						ValueArrays[RuleIdx][i] = TagValuesData[RuleIdx];
+					}
+					else if (PCGExData::IBufferProxy* Buffer = BuffersData[RuleIdx])
+					{
+						ValueArrays[RuleIdx][i] = Buffer->ReadAsDouble(i);
+					}
+					else
+					{
+						ValueArrays[RuleIdx][i] = 0.0;
+					}
+				}
+			});
 
 		return Cache;
 	}

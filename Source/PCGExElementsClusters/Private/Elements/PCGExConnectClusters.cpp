@@ -187,17 +187,21 @@ namespace PCGExConnectClusters
 		Merger->MergeAsync(TaskManager, &Context->CarryOverDetails);
 
 		TBatch<FProcessor>::Process();
+
+
 	}
 
-	bool FBatch::PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor)
+	void FBatch::StartProcessing()
 	{
-		if (!TBatch<FProcessor>::PrepareSingle(InProcessor))
+		// Aggregate per-processor edge tags into the compounded facade.
+		// MUST stay sequential — Tags->Append mutates a shared container that was unsafe
+		// in PrepareSingle once candidate construction was parallelized.
+		for (const TSharedRef<PCGExClusterMT::IProcessor>& P : Processors)
 		{
-			return false;
+			CompoundedEdgesDataFacade->Source->Tags->Append(P->EdgeDataFacade->Source->Tags.ToSharedRef());
 		}
-		PCGEX_TYPED_PROCESSOR
-		CompoundedEdgesDataFacade->Source->Tags->Append(TypedProcessor->EdgeDataFacade->Source->Tags.ToSharedRef());
-		return true;
+
+		TBatch<FProcessor>::StartProcessing();
 	}
 
 	void FBatch::CompleteWork()
