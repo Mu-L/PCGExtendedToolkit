@@ -1029,17 +1029,26 @@ void UPCGExAssetCollection::GetAssetPaths(TSet<FSoftObjectPath>& OutPaths, PCGEx
 	});
 }
 
-void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(EPCGExSchemaMergePolicy Policy)
+void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(
+	EPCGExSchemaMergePolicy Policy,
+	TConstArrayView<FInstancedStruct> InheritedDefaults)
 {
-	// Source #0: manual CollectionProperties (preserves user-authored schema entries through
-	// the merge under FirstWins / StrictTypeMatch). The dedup-and-remap pass upstream of the
-	// merge is distinct from the post-merge name-based restamp further down, which handles
-	// heterogenous component HeaderIds.
+	// Source ordering (see header for full reasoning):
+	//   1. InheritedDefaults (caller-computed common-ancestor view) -- wins under FirstWins.
+	//   2. Per-entry contributors (each entry's enabled override slots).
+	//   3. Existing CollectionProperties -- loses to both above; survives only for
+	//      manual-only schema entries.
 	SyncPropertySchemaAndRemapEntries();
 
 	TArray<TArray<FInstancedStruct>> Sources;
-	Sources.Reserve(1 + NumEntries());
-	Sources.Add(CollectionProperties.BuildSchema());
+	Sources.Reserve(2 + NumEntries());
+
+	// Source #0: caller-supplied inherited defaults. Empty when the caller has no chain context
+	// (manual collection rebuilds, etc.) -- in that case the merge falls through to contributors.
+	if (!InheritedDefaults.IsEmpty())
+	{
+		Sources.Add(TArray<FInstancedStruct>(InheritedDefaults));
+	}
 
 	// One source per entry whose enabled overrides carry self-contained (name+type+value)
 	// FInstancedStructs -- the same shape BuildSchema produces on the collection side, so
@@ -1064,8 +1073,12 @@ void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(EPCGExSchemaM
 		}
 	});
 
+	// Existing manual schema appended LAST -- loses on name collision under FirstWins, survives as
+	// the sole source for properties no entry contributes.
+	Sources.Add(CollectionProperties.BuildSchema());
+
 	// Nothing authored anywhere: leave existing state untouched (avoids no-op churn).
-	if (Sources.Num() <= 1 && Sources[0].IsEmpty())
+	if (Sources.Num() == 1 && Sources.Last().IsEmpty())
 	{
 		return;
 	}

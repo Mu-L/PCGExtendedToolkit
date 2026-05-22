@@ -3,7 +3,91 @@
 
 #include "PCGExPropertyWriter.h"
 #include "PCGExProperty.h"
+#include "PCGExPropertySchemaAsset.h"
 #include "Helpers/PCGExMetaHelpers.h"
+
+void FPCGExPropertyOutputSettings::GetEffectiveConfigs(TArray<FPCGExPropertyOutputConfig>& OutConfigs) const
+{
+	OutConfigs.Reset();
+	OutConfigs.Reserve(Configs.Num() + IncludedSchemas.Num());
+
+	TSet<FName> SeenNames;
+	SeenNames.Reserve(Configs.Num());
+
+	// Disabled explicit entries still suppress same-named schema-derived entries below.
+	for (const FPCGExPropertyOutputConfig& Config : Configs)
+	{
+		OutConfigs.Add(Config);
+		if (!Config.PropertyName.IsNone())
+		{
+			SeenNames.Add(Config.PropertyName);
+		}
+	}
+
+	// Resolve() handles recursion + cycle detection and skips entries with empty Name / invalid Property.
+	TArray<FPCGExPropertyResolved> Resolved;
+	for (const TObjectPtr<UPCGExPropertySchemaAsset>& SchemaAsset : IncludedSchemas)
+	{
+		if (!SchemaAsset)
+		{
+			continue;
+		}
+
+		SchemaAsset->Collection.Resolve(Resolved);
+
+		for (const FPCGExPropertyResolved& Entry : Resolved)
+		{
+			if (!Entry.Source)
+			{
+				continue;
+			}
+
+			const FName EntryName = Entry.Source->Name;
+			if (EntryName.IsNone() || SeenNames.Contains(EntryName))
+			{
+				continue;
+			}
+
+			FPCGExPropertyOutputConfig& NewConfig = OutConfigs.AddDefaulted_GetRef();
+			NewConfig.bEnabled = true;
+			NewConfig.PropertyName = EntryName;
+
+			SeenNames.Add(EntryName);
+		}
+	}
+}
+
+bool FPCGExPropertyOutputSettings::HasOutputs() const
+{
+	for (const FPCGExPropertyOutputConfig& Config : Configs)
+	{
+		if (Config.IsValid())
+		{
+			return true;
+		}
+	}
+
+	TArray<FPCGExPropertyResolved> Resolved;
+	for (const TObjectPtr<UPCGExPropertySchemaAsset>& SchemaAsset : IncludedSchemas)
+	{
+		if (!SchemaAsset)
+		{
+			continue;
+		}
+
+		SchemaAsset->Collection.Resolve(Resolved);
+
+		for (const FPCGExPropertyResolved& Entry : Resolved)
+		{
+			if (Entry.Source && !Entry.Source->Name.IsNone())
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
 
 FName FPCGExPropertyOutputConfig::GetEffectiveOutputName() const
 {
@@ -44,8 +128,10 @@ bool FPCGExPropertyWriter::Initialize(
 	Provider = InProvider;
 	Settings = OutputSettings;
 
-	// Initialize property writers from configs
-	for (const FPCGExPropertyOutputConfig& OutputConfig : Settings.Configs)
+	TArray<FPCGExPropertyOutputConfig> EffectiveConfigs;
+	Settings.GetEffectiveConfigs(EffectiveConfigs);
+
+	for (const FPCGExPropertyOutputConfig& OutputConfig : EffectiveConfigs)
 	{
 		if (!OutputConfig.IsValid())
 		{

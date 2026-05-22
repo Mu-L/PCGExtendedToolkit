@@ -187,8 +187,10 @@ namespace PCGExStagingLoadProperties
 			}
 		}
 
-		// For each configured property output
-		for (const FPCGExPropertyOutputConfig& Config : Context->PropertyOutputSettings.Configs)
+		TArray<FPCGExPropertyOutputConfig> EffectiveConfigs;
+		Context->PropertyOutputSettings.GetEffectiveConfigs(EffectiveConfigs);
+
+		for (const FPCGExPropertyOutputConfig& Config : EffectiveConfigs)
 		{
 			if (!Config.IsValid())
 			{

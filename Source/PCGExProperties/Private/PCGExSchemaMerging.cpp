@@ -41,6 +41,67 @@ namespace PCGExProperties
 		}
 	}
 
+	TArray<FInstancedStruct> AggregateAgreedValuesByName(
+		TConstArrayView<TConstArrayView<FInstancedStruct>> ValueSets,
+		TConstArrayView<TConstArrayView<FInstancedStruct>> FallbackSets)
+	{
+		// Tracked per name: the first FInstancedStruct seen, and whether every subsequent
+		// occurrence compared equal to it. Avoids holding every value array per name.
+		TMap<FName, FInstancedStruct> FirstSeen;
+		TMap<FName, bool> AllAgree;
+		for (const TConstArrayView<FInstancedStruct>& Set : ValueSets)
+		{
+			for (const FInstancedStruct& Prop : Set)
+			{
+				const FPCGExProperty* P = Prop.GetPtr<FPCGExProperty>();
+				if (!P)
+				{
+					continue;
+				}
+				const FName Name = P->PropertyName;
+				if (const FInstancedStruct* Existing = FirstSeen.Find(Name))
+				{
+					if (*Existing != Prop)
+					{
+						AllAgree[Name] = false;
+					}
+				}
+				else
+				{
+					FirstSeen.Add(Name, Prop);
+					AllAgree.Add(Name, true);
+				}
+			}
+		}
+
+		TMap<FName, FInstancedStruct> FallbackFirst;
+		for (const TConstArrayView<FInstancedStruct>& Set : FallbackSets)
+		{
+			for (const FInstancedStruct& Prop : Set)
+			{
+				if (const FPCGExProperty* P = Prop.GetPtr<FPCGExProperty>())
+				{
+					FallbackFirst.FindOrAdd(P->PropertyName, Prop);
+				}
+			}
+		}
+
+		TArray<FInstancedStruct> Out;
+		Out.Reserve(FirstSeen.Num());
+		for (TPair<FName, FInstancedStruct>& Pair : FirstSeen)
+		{
+			if (AllAgree.FindChecked(Pair.Key))
+			{
+				Out.Add(MoveTemp(Pair.Value));
+			}
+			else if (const FInstancedStruct* Fallback = FallbackFirst.Find(Pair.Key))
+			{
+				Out.Add(*Fallback);
+			}
+		}
+		return Out;
+	}
+
 	void LogSchemaConflicts(const FSchemaMergeResult& MergeResult, const UObject* ContextOwner)
 	{
 		for (const FSchemaMergeConflict& C : MergeResult.Conflicts)

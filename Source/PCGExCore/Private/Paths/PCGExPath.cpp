@@ -19,6 +19,24 @@
 
 namespace PCGExPaths
 {
+	void BuildProjectedPoints2D(
+		const TConstPCGValueRange<FTransform>& Positions,
+		const FPCGExGeo2DProjectionDetails& Projection,
+		TArray<FVector2D>& OutProjectedPoints,
+		FBox2D& OutBounds)
+	{
+		const int32 NumPts = Positions.Num();
+		OutProjectedPoints.SetNumUninitialized(NumPts);
+		OutBounds = FBox2D(ForceInit);
+		for (int32 i = 0; i < NumPts; ++i)
+		{
+			const FVector P = Projection.ProjectFlat(Positions[i].GetLocation());
+			const FVector2D P2D(P.X, P.Y);
+			OutProjectedPoints[i] = P2D;
+			OutBounds += P2D;
+		}
+	}
+
 	FPathEdge::FPathEdge(const int32 InStart, const int32 InEnd, const TConstPCGValueRange<FTransform>& Positions, const double Expansion)
 		: Start(InStart)
 		  , End(InEnd)
@@ -364,15 +382,7 @@ namespace PCGExPaths
 
 	void FPath::BuildProjection()
 	{
-		ProjectedPoints.SetNumUninitialized(NumPoints);
-		ProjectedBounds = FBox2D();
-
-		for (int i = 0; i < NumPoints; i++)
-		{
-			const FVector2D ProjectedPoint = FVector2D(Projection.ProjectFlat(GetPos_Unsafe(i)));
-			ProjectedBounds += ProjectedPoint;
-			ProjectedPoints[i] = ProjectedPoint;
-		}
+		BuildProjectedPoints2D(Positions, Projection, ProjectedPoints, ProjectedBounds);
 	}
 
 	void FPath::BuildProjection(const FPCGExGeo2DProjectionDetails& InProjectionDetails)
