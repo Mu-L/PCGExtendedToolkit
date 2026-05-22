@@ -865,7 +865,10 @@ namespace PCGExMT
 					[&](const int32 i)
 					{
 						// Honor cancellation per-scope, same as FScopeIterationTask::ExecuteTask does.
-						if (!IsAvailable()) { return; }
+						if (!IsAvailable())
+						{
+							return;
+						}
 						ExecScopeIteration(Loops[i], bPreparationOnly);
 					},
 					2); // Threshold=2: single scope runs inline; multi-scope parallelizes.
