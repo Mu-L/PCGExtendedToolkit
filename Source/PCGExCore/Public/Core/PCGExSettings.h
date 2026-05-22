@@ -64,10 +64,6 @@ public:
 	 * When enabling this you must make absolutely sure the data plugged into this node is not plugged in any other node. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsDataStealing", EditConditionHides, HideEditConditionToggle))
 	EPCGExOptionState StealData = EPCGExOptionState::Disabled;
-
-	/** */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable))
-	bool bForceSynchronousExecution = true;
 	
 	/** Flatten the output of this node. Merges hierarchical data into a single flat collection. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Cleanup", meta=(PCG_NotOverridable))

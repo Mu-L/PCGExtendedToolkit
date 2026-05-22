@@ -255,15 +255,7 @@ bool FPCGExPointsProcessorContext::StartBatchProcessingPoints(FBatchProcessingVa
 	{
 		SetState(PCGExPointsMT::MTState_PointsProcessing);
 		PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), bBatchProcessingEnabled)
-		
-		if (Settings->bForceSynchronousExecution)
-		{
-			MainBatch->Process(GetTaskManager());
-		}
-		else
-		{
-			ScheduleBatch(GetTaskManager(), MainBatch);
-		}
+		MainBatch->Process(GetTaskManager());
 	}
 	else
 	{
