@@ -104,17 +104,18 @@ bool FPCGExFuseClustersElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		const bool bUseOctree = Context->bUseOctreeMode;
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [bUseOctree](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      NewBatch->bSkipCompletion = true;
-			                                      // Octree-fuse mode routes through FUnionRegistry, which is sequential by contract.
-			                                      // Grid mode is fully parallel: each processor builds local records, then the post-batch
-			                                      // step collects and sort-groups them deterministically.
-			                                      NewBatch->bForceSingleThreadedProcessing = bUseOctree;
-		                                      }, true))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [bUseOctree](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				NewBatch->bSkipCompletion = true;
+				// Octree-fuse mode routes through FUnionRegistry, which is sequential by contract.
+				// Grid mode is fully parallel: each processor builds local records, then the post-batch
+				// step collects and sort-groups them deterministically.
+				NewBatch->bForceSingleThreadedProcessing = bUseOctree;
+			}, true))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}

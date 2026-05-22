@@ -130,4 +130,23 @@ namespace PCGExProperties
 	PCGEXPROPERTIES_API void LogSchemaConflicts(
 		const FSchemaMergeResult& MergeResult,
 		const UObject* ContextOwner);
+
+	/**
+	 * Per-property-name unanimity vote across multiple FInstancedStruct sources.
+	 *
+	 * For each ValueSet (typically one per contributing BP class / per-export view), every
+	 * FInstancedStruct is keyed by its FPCGExProperty::PropertyName. Per property name:
+	 *   - If every encountered value compares equal, emit the value.
+	 *   - Otherwise, emit the first match found in FallbackSets (e.g. asset-default views).
+	 *   - If neither path applies, the property is dropped from the aggregate.
+	 *
+	 * Used to derive a "common-ancestor" defaults view across heterogeneous contributors so
+	 * a downstream MergeSchemas pass can seed CollectionProperties without falling back to
+	 * whichever contributor happened to be iterated first.
+	 *
+	 * Empty ValueSets -> empty result. Emission order is the TMap walk order (non-deterministic).
+	 */
+	PCGEXPROPERTIES_API TArray<FInstancedStruct> AggregateAgreedValuesByName(
+		TConstArrayView<TConstArrayView<FInstancedStruct>> ValueSets,
+		TConstArrayView<TConstArrayView<FInstancedStruct>> FallbackSets = {});
 }

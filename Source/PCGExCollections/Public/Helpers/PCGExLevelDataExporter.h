@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "StructUtils/InstancedStruct.h"
 #include "UObject/Object.h"
 
 #include "PCGExLevelDataExporter.generated.h"
@@ -44,6 +45,14 @@ struct PCGEXCOLLECTIONS_API FPCGExLevelExportContext
 	/** Receives the per-entry actor collection built inline by the exporter. Lets the caller
 	 *  pick it up directly instead of walking the asset's inner-object graph. */
 	TObjectPtr<UPCGExActorCollection>* ActorCollectionOut = nullptr;
+
+	/** Receives the "common-ancestor" inherited-defaults view computed from the contributing
+	 *  actors' BP class chains -- per property, the value all unique classes agree on at the
+	 *  CDO level, or the asset's authored default when classes disagree. Used by the shared
+	 *  MeshCollection rebuild to set CollectionProperties without falling back to whichever
+	 *  per-instance override was iterated first. Optional: when null, the caller has no opinion
+	 *  and the merge falls through to per-entry contributors. */
+	TArray<FInstancedStruct>* MeshInheritedDefaults = nullptr;
 
 	/** Pack a (local entry index, secondary index) pair into the int32 stored in MeshLocalPicks. */
 	static FORCEINLINE int32 PackLocalPick(int32 LocalEntryIdx, int16 SecondaryIdx)

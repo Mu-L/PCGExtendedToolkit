@@ -58,22 +58,40 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOutputSettings
 	/**
 	 * Properties to output as point attributes.
 	 * Each config maps a property name to an output attribute name.
+	 *
+	 * Explicit entries here take precedence over schema-derived entries from IncludedSchemas:
+	 * if a name appears in both, the explicit Config wins (regardless of bEnabled). This lets
+	 * a disabled explicit entry suppress a schema-derived output for the same name.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName="Properties Mapping", TitleProperty="PropertyName"))
 	TArray<FPCGExPropertyOutputConfig> Configs;
 
-	/** Check if any outputs are configured */
-	bool HasOutputs() const
-	{
-		for (const FPCGExPropertyOutputConfig& Config : Configs)
-		{
-			if (Config.IsValid())
-			{
-				return true;
-			}
-		}
-		return false;
-	}
+	/**
+	 * Schema assets whose properties should be output as-is.
+	 * Each referenced asset's Collection is resolved recursively (locals + ImportedSchemas, with
+	 * cycle detection) and every resolved entry contributes an enabled config using its Name as
+	 * both PropertyName and (defaulted) OutputAttributeName. Entries whose name already appears
+	 * in Configs are skipped.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName="Included Schemas"))
+	TArray<TObjectPtr<UPCGExPropertySchemaAsset>> IncludedSchemas;
+
+	/**
+	 * Build the effective list of output configs:
+	 *   1. Every entry in Configs (preserved in order, including disabled ones).
+	 *   2. Followed by schema-derived entries from IncludedSchemas (recursively resolved),
+	 *      name-deduped against Configs and against each other (first-wins).
+	 *
+	 * @param OutConfigs Filled with the merged list. Reset before population.
+	 */
+	void GetEffectiveConfigs(TArray<FPCGExPropertyOutputConfig>& OutConfigs) const;
+
+	/**
+	 * Check if any outputs are configured.
+	 * Returns true on the first valid explicit Config or, failing that, on the first
+	 * named entry produced by resolving IncludedSchemas.
+	 */
+	bool HasOutputs() const;
 
 	/**
 	 * Auto-populate configs from a property registry.

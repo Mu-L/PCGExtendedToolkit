@@ -29,6 +29,7 @@
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExDefaultLevelDataExporter.h"
 #include "Helpers/PCGExLevelDataExporter.h"
+#include "PCGExSchemaMerging.h"
 
 
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
@@ -120,6 +121,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			Staging.Path = FSoftObjectPath();
 #if WITH_EDITORONLY_DATA
 			EditorMeshContributions.Reset();
+			EditorMeshInheritedDefaults.Reset();
 			EditorLocalPicks.Reset();
 			EditorLevelContributions.Reset();
 			EditorLevelLocalPicks.Reset();
@@ -171,10 +173,12 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		// Reset editor-only capture buffers so a failed export doesn't leave stale data
 		// from a prior rebuild contributing to CompactSharedMesh / CompactSharedLevel.
 		EditorMeshContributions.Reset();
+		EditorMeshInheritedDefaults.Reset();
 		EditorLocalPicks.Reset();
 		EditorLevelContributions.Reset();
 		EditorLevelLocalPicks.Reset();
 		ExportContext.MeshContributions = &EditorMeshContributions;
+		ExportContext.MeshInheritedDefaults = &EditorMeshInheritedDefaults;
 		ExportContext.MeshLocalPicks = &EditorLocalPicks;
 		ExportContext.LevelContributions = &EditorLevelContributions;
 		ExportContext.LevelLocalPicks = &EditorLevelLocalPicks;
@@ -212,6 +216,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			Staging.Bounds = FBox(ForceInit);
 #if WITH_EDITORONLY_DATA
 			EditorMeshContributions.Reset();
+			EditorMeshInheritedDefaults.Reset();
 			EditorLocalPicks.Reset();
 			EditorLevelContributions.Reset();
 			EditorLevelLocalPicks.Reset();
@@ -239,6 +244,7 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		// DataAsset-sourced entries don't contribute to the shared collections -- clear any
 		// stale contributions left behind by a prior Source==Level rebuild.
 		EditorMeshContributions.Reset();
+		EditorMeshInheritedDefaults.Reset();
 		EditorLocalPicks.Reset();
 		EditorLevelContributions.Reset();
 		EditorLevelLocalPicks.Reset();
@@ -284,6 +290,7 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_Sanitize()
 		ExportedDataAsset = nullptr;
 		EmbeddedActorCollection = nullptr;
 		EditorMeshContributions.Reset();
+		EditorMeshInheritedDefaults.Reset();
 		EditorLocalPicks.Reset();
 		EditorLevelContributions.Reset();
 		EditorLevelLocalPicks.Reset();
@@ -581,6 +588,11 @@ namespace PCGExSharedCompact
 			return E.EditorMeshContributions;
 		}
 
+		static const TArray<FInstancedStruct>& InheritedDefaults(const FPCGExPCGDataAssetCollectionEntry& E)
+		{
+			return E.EditorMeshInheritedDefaults;
+		}
+
 		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E)
 		{
 			return E.EditorLocalPicks;
@@ -622,6 +634,16 @@ namespace PCGExSharedCompact
 		static const TArray<FPCGExLevelCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
 		{
 			return E.EditorLevelContributions;
+		}
+
+		// Level entries don't carry property-component data, so there's no inherited-defaults
+		// view to aggregate. Returning an empty static makes the templated CompactShared body
+		// produce an empty aggregate that flows through to RefreshCollectionPropertiesFromEntries
+		// as the "no opinion, fall through to contributors" signal.
+		static const TArray<FInstancedStruct>& InheritedDefaults(const FPCGExPCGDataAssetCollectionEntry& /*E*/)
+		{
+			static const TArray<FInstancedStruct> Empty;
+			return Empty;
 		}
 
 		static const TArray<int32>& LocalPicks(const FPCGExPCGDataAssetCollectionEntry& E)
@@ -790,7 +812,10 @@ namespace PCGExSharedCompact
 					{
 						Merged.Tags = P.Tags;
 						Merged.Category = P.Category;
-						Merged.PropertyOverrides = P.PropertyOverrides;
+						// PropertyOverrides is intentionally NOT preserved: it's derived from
+						// per-export actor contributions, not user-authored on the shared
+						// collection. Preserving it perpetuates stale values across re-exports.
+						// Tags/Category ARE user-authored and have no per-export contributor.
 						break;
 					}
 				}
@@ -806,13 +831,29 @@ namespace PCGExSharedCompact
 
 		SharedCollectionRef->Entries = MoveTemp(MergedEntries);
 
+		// Aggregate the per-export "inherited defaults" views across every contributing entry.
+		// Each entry's view is the actor-class CDO/asset-fallback aggregate computed by the
+		// exporter (FPCGExLevelExportContext::MeshInheritedDefaults). Per property name, only
+		// values unanimously agreed across entries survive; disagreements drop out and fall
+		// through to per-entry contributors at merge time. Level-policy returns an empty array
+		// so this aggregate is naturally empty for the level path.
+		TArray<TConstArrayView<FInstancedStruct>> InheritedViews;
+		InheritedViews.Reserve(Entries.Num());
+		for (const FPCGExPCGDataAssetCollectionEntry& E : Entries)
+		{
+			InheritedViews.Emplace(TPolicy::InheritedDefaults(E));
+		}
+		TArray<FInstancedStruct> InheritedDefaultsAggregate = PCGExProperties::AggregateAgreedValuesByName(InheritedViews);
+
 		// Rebuild CollectionProperties from the union of every merged entry's enabled
 		// PropertyOverrides. Mesh entries authored by UPCGExDefaultLevelDataExporter carry
 		// their source actor's property-component values in their overrides; this collapses
 		// them into a canonical schema on the shared collection and re-syncs the per-entry
 		// overrides against it. No-op for collection types whose entries don't carry
 		// property data (e.g. UPCGExLevelCollection in current usage).
-		SharedCollectionRef->RefreshCollectionPropertiesFromEntries();
+		SharedCollectionRef->RefreshCollectionPropertiesFromEntries(
+			EPCGExSchemaMergePolicy::StrictTypeMatch,
+			InheritedDefaultsAggregate);
 
 		SharedCollectionRef->RebuildStagingData(true);
 

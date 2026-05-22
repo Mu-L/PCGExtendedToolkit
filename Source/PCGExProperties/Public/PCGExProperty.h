@@ -842,8 +842,12 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 * or missing), each fallback layer is tried in order. First non-null wins. Used by
 	 * UPCGExPropertyCollectionComponent to walk the BP class chain so an instance defers
 	 * to its CDO's authored override when the instance hasn't toggled its own.
+	 *
+	 * bIncludeOwnOverrides controls whether this collection's own ImportOverrides leads the
+	 * chain (default true). Set false to walk the chain WITHOUT the instance's own authoring --
+	 * used to extract "what value would surface if nothing was overridden?" (the CDO/asset view).
 	 */
-	void Resolve(TArray<FPCGExPropertyResolved>& Out, TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}) const;
+	void Resolve(TArray<FPCGExPropertyResolved>& Out, TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}, bool bIncludeOwnOverrides = true) const;
 
 	/** Find schema by property name (walks locals first, then imported assets) */
 	const FPCGExPropertySchema* FindByName(FName PropertyName) const;
@@ -875,8 +879,9 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 */
 	const FInstancedStruct* GetPropertyByName(FName PropertyName) const;
 
-	/** Build FInstancedStruct array for SyncToSchema calls. FallbackChain has the same meaning as Resolve's. */
-	TArray<FInstancedStruct> BuildSchema(TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}) const;
+	/** Build FInstancedStruct array for SyncToSchema calls. FallbackChain and bIncludeOwnOverrides
+	 *  have the same meaning as Resolve's. */
+	TArray<FInstancedStruct> BuildSchema(TConstArrayView<const FPCGExPropertyOverrides*> FallbackChain = {}, bool bIncludeOwnOverrides = true) const;
 
 	/** Validate all property names are unique (returns true if valid) */
 	bool ValidateUniqueNames(TArray<FName>& OutDuplicates) const;

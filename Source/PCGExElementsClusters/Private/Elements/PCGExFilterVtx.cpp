@@ -144,18 +144,19 @@ bool FPCGExFilterVtxElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
-			                                      NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
-			                                      if (!Context->EdgeFilterFactories.IsEmpty())
-			                                      {
-				                                      NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories;
-			                                      }
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
+				NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
+				if (!Context->EdgeFilterFactories.IsEmpty())
+				{
+					NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories;
+				}
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}

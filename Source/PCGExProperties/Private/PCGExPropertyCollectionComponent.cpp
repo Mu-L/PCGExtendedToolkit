@@ -210,38 +210,62 @@ void UPCGExPropertyCollectionComponent::PostEditChangeChainProperty(FPropertyCha
 
 #endif
 
+namespace PCGExPropertyCollectionComponent
+{
+	// Shared chain construction used by BuildResolvedSchema and BuildInheritedSchema.
+	// Editor walks SCS templates; cooked walks GetArchetype(). Skips Self so the same routine
+	// works for both "include own overrides at the head" and "exclude own overrides" callers --
+	// the caller decides via the bIncludeOwnOverrides flag on BuildSchema below.
+	static void BuildOverrideChain(
+		const UPCGExPropertyCollectionComponent* Self,
+		TArray<const FPCGExPropertyOverrides*, TInlineAllocator<4>>& OutChain)
+	{
+#if WITH_EDITOR
+		if (const AActor* Owner = Self->GetOwner())
+		{
+			for (const UClass* Cls = Owner->GetClass(); Cls; Cls = Cls->GetSuperClass())
+			{
+				const UPCGExPropertyCollectionComponent* Template =
+					UPCGExPropertyCollectionComponent::FindSCSTemplateInClass(Cls, Self->GetFName());
+				if (!Template || Template == Self)
+				{
+					continue;
+				}
+				OutChain.Add(&Template->Properties.ImportOverrides);
+			}
+		}
+#else
+		for (const UObject* Arch = Self->GetArchetype(); Arch && Arch != Self; Arch = Arch->GetArchetype())
+		{
+			if (const UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(Arch))
+			{
+				OutChain.Add(&Comp->Properties.ImportOverrides);
+			}
+			if (Arch->GetArchetype() == Arch)
+			{
+				break;
+			}
+		}
+#endif
+	}
+}
+
 TArray<FInstancedStruct> UPCGExPropertyCollectionComponent::BuildResolvedSchema() const
 {
 	TArray<const FPCGExPropertyOverrides*, TInlineAllocator<4>> Chain;
-
-#if WITH_EDITOR
-	if (const AActor* Owner = GetOwner())
-	{
-		for (const UClass* Cls = Owner->GetClass(); Cls; Cls = Cls->GetSuperClass())
-		{
-			const UPCGExPropertyCollectionComponent* Template = FindSCSTemplateInClass(Cls, GetFName());
-			if (!Template || Template == this)
-			{
-				continue;
-			}
-			Chain.Add(&Template->Properties.ImportOverrides);
-		}
-	}
-#else
-	for (const UObject* Arch = GetArchetype(); Arch && Arch != this; Arch = Arch->GetArchetype())
-	{
-		if (const UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(Arch))
-		{
-			Chain.Add(&Comp->Properties.ImportOverrides);
-		}
-		if (Arch->GetArchetype() == Arch)
-		{
-			break;
-		}
-	}
-#endif
-
+	PCGExPropertyCollectionComponent::BuildOverrideChain(this, Chain);
 	return Properties.BuildSchema(MakeArrayView(Chain));
+}
+
+TArray<FInstancedStruct> UPCGExPropertyCollectionComponent::BuildInheritedSchema() const
+{
+	// Same chain as BuildResolvedSchema, but pass bIncludeOwnOverrides=false so this instance's
+	// ImportOverrides does NOT participate -- the resulting view is "what would this actor
+	// surface if it didn't override anything", i.e., the BP CDO's chain-resolved value (or asset
+	// default at the bottom if no CDO authored anything for the property).
+	TArray<const FPCGExPropertyOverrides*, TInlineAllocator<4>> Chain;
+	PCGExPropertyCollectionComponent::BuildOverrideChain(this, Chain);
+	return Properties.BuildSchema(MakeArrayView(Chain), /*bIncludeOwnOverrides=*/false);
 }
 
 void UPCGExPropertyCollectionComponent::PreparePropertyValues_Implementation()

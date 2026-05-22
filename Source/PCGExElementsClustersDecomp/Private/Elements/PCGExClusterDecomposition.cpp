@@ -85,17 +85,18 @@ bool FPCGExClusterDecompositionElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      NewBatch->bRequiresWriteStep = true;
-			                                      if (Context->Decomposition->WantsHeuristics())
-			                                      {
-				                                      NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
-			                                      }
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				NewBatch->bRequiresWriteStep = true;
+				if (Context->Decomposition->WantsHeuristics())
+				{
+					NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+				}
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
