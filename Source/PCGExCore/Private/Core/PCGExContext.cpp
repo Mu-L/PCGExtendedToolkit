@@ -266,6 +266,13 @@ bool FPCGExContext::DriveAdvanceWork(const UPCGExSettings* InSettings)
 	do
 	{
 		bPendingAsyncWorkEnd.store(false, std::memory_order_release);
+
+		if (!CanExecute())
+		{
+			bResult = true;
+			break;
+		}
+
 		bResult = ElementHandle->AdvanceWork(this, InSettings);
 	}
 	while (bPendingAsyncWorkEnd.load(std::memory_order_acquire));
