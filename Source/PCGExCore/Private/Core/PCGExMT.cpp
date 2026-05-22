@@ -835,7 +835,44 @@ namespace PCGExMT
 		}
 		else
 		{
-			StartRanges<FScopeIterationTask>(NumIterations, SanitizedChunk, bPreparationOnly);
+			// Sync ParallelFor path -- replaces dispatching N FScopeIterationTask via UE::Tasks::Launch.
+			// We still register the scopes against the group so OnEnd / OnCompleteCallback /
+			// NotifyCompleted-on-parent fire correctly. The FRegistrationGuard suppresses
+			// premature completion checks during the registration + execution window.
+			//
+			// NOTE: keeps StartRanges<T> intact for custom FScopeIterationTask subclasses
+			// (e.g. FSanitizeRangeTask in PCGExRefineEdges) that still need the async path.
+
+			TArray<FScope> Loops;
+			const int32 NumScopes = SubLoopScopes(Loops, NumIterations, SanitizedChunk);
+
+			{
+				FRegistrationGuard Guard(SharedThis(this));
+
+				RegisterExpected(NumScopes);
+
+				if (OnPrepareSubLoopsCallback)
+				{
+					OnPrepareSubLoopsCallback(Loops);
+				}
+
+				// Counter bookkeeping: mark all scopes started in one shot so CheckCompletion's
+				// Started==Completed invariant holds when the guard destructor fires.
+				StartedCount.fetch_add(NumScopes, std::memory_order_acq_rel);
+
+				PCGExMT::ParallelOrSequential(
+					NumScopes,
+					[&](const int32 i)
+					{
+						// Honor cancellation per-scope, same as FScopeIterationTask::ExecuteTask does.
+						if (!IsAvailable()) { return; }
+						ExecScopeIteration(Loops[i], bPreparationOnly);
+					},
+					2); // Threshold=2: single scope runs inline; multi-scope parallelizes.
+
+				CompletedCount.fetch_add(NumScopes, std::memory_order_acq_rel);
+				// Guard destructor calls CheckCompletion → OnEnd → OnCompleteCallback → NotifyCompleted on parent
+			}
 		}
 	}
 
