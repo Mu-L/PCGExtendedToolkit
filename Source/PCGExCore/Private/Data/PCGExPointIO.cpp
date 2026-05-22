@@ -881,6 +881,57 @@ for (int i = 0; i < ReducedNum; i++){Range[i] = Range[InIndices[i]];}}
 		return Branch;
 	}
 
+	bool FPointIOCollection::EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const UPCGBasePointData* In, const EIOInit InitOut, const TSet<FString>* Tags)
+	{
+		const int32 Count = OutIOs.Num();
+		if (Count == 0) { return true; }
+
+		FWriteScopeLock WriteLock(PairsLock);
+		const int32 StartIndex = Pairs.Num();
+		Pairs.Reserve(StartIndex + Count);
+
+		for (int32 i = 0; i < Count; ++i)
+		{
+			TSharedPtr<FPointIO> NewIO = Pairs.Add_GetRef(MakeShared<FPointIO>(ContextHandle, In));
+			NewIO->SetInfos(StartIndex + i, OutputPin, Tags);
+			if (!NewIO->InitializeOutput(InitOut)) { return false; }
+			OutIOs[i] = NewIO;
+		}
+		return true;
+	}
+
+	bool FPointIOCollection::EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const EIOInit InitOut)
+	{
+		const int32 Count = OutIOs.Num();
+		if (Count == 0) { return true; }
+
+		FWriteScopeLock WriteLock(PairsLock);
+		const int32 StartIndex = Pairs.Num();
+		Pairs.Reserve(StartIndex + Count);
+
+		for (int32 i = 0; i < Count; ++i)
+		{
+			TSharedPtr<FPointIO> NewIO = Pairs.Add_GetRef(MakeShared<FPointIO>(ContextHandle));
+			NewIO->SetInfos(StartIndex + i, OutputPin);
+			if (!NewIO->InitializeOutput(InitOut)) { return false; }
+			OutIOs[i] = NewIO;
+		}
+		return true;
+	}
+
+	bool FPointIOCollection::EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const TSharedPtr<FPointIO>& PointIO, const EIOInit InitOut)
+	{
+		if (OutIOs.Num() == 0) { return true; }
+		if (!EmplaceBatch(OutIOs, PointIO->GetIn(), InitOut)) { return false; }
+		for (TSharedPtr<FPointIO>& Branch : OutIOs)
+		{
+			if (!Branch) { continue; }
+			Branch->Tags->Reset(PointIO->Tags);
+			Branch->RootIO = PointIO;
+		}
+		return true;
+	}
+
 	TSharedPtr<FPointIO> FPointIOCollection::Insert_Unsafe(const int32 Index, const TSharedPtr<FPointIO>& PointIO)
 	{
 		check(!Pairs[Index]) // should be an empty spot

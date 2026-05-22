@@ -492,6 +492,16 @@ namespace PCGExData
 		TSharedPtr<FPointIO> Emplace_GetRef(EIOInit InitOut = EIOInit::New);
 		TSharedPtr<FPointIO> Emplace_GetRef(const TSharedPtr<FPointIO>& PointIO, const EIOInit InitOut = EIOInit::NoInit);
 
+		/**
+		 * Batch-create FPointIO instances in a single locked pass and fill the caller-provided view.
+		 * Acquires the collection lock once, reserves slots once, then allocates + initializes each entry.
+		 * Returns false on the first InitializeOutput() failure (cancellation signal) — the caller
+		 * should treat that as a fatal abort. Mirrors the three Emplace_GetRef overloads.
+		 */
+		bool EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const UPCGBasePointData* In, EIOInit InitOut = EIOInit::NoInit, const TSet<FString>* Tags = nullptr);
+		bool EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, EIOInit InitOut = EIOInit::New);
+		bool EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const TSharedPtr<FPointIO>& PointIO, EIOInit InitOut = EIOInit::NoInit);
+
 		TSharedPtr<FPointIO> Insert_Unsafe(const int32 Index, const TSharedPtr<FPointIO>& PointIO);
 
 		bool ContainsData_Unsafe(const UPCGData* InData) const;
@@ -540,6 +550,59 @@ namespace PCGExData
 			OverrideTags(PointIO, Branch);
 			Branch->RootIO = PointIO;
 			return Branch;
+		}
+
+		template <typename T>
+		bool EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const UPCGBasePointData* In, const EIOInit InitOut = EIOInit::NoInit, const TSet<FString>* Tags = nullptr)
+		{
+			const int32 Count = OutIOs.Num();
+			if (Count == 0) { return true; }
+
+			FWriteScopeLock WriteLock(PairsLock);
+			const int32 StartIndex = Pairs.Num();
+			Pairs.Reserve(StartIndex + Count);
+
+			for (int32 i = 0; i < Count; ++i)
+			{
+				TSharedPtr<FPointIO> NewIO = Pairs.Add_GetRef(MakeShared<FPointIO>(ContextHandle, In));
+				NewIO->SetInfos(StartIndex + i, OutputPin, Tags);
+				if (!NewIO->InitializeOutput<T>(InitOut)) { return false; }
+				OutIOs[i] = NewIO;
+			}
+			return true;
+		}
+
+		template <typename T>
+		bool EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const EIOInit InitOut = EIOInit::New)
+		{
+			const int32 Count = OutIOs.Num();
+			if (Count == 0) { return true; }
+
+			FWriteScopeLock WriteLock(PairsLock);
+			const int32 StartIndex = Pairs.Num();
+			Pairs.Reserve(StartIndex + Count);
+
+			for (int32 i = 0; i < Count; ++i)
+			{
+				TSharedPtr<FPointIO> NewIO = Pairs.Add_GetRef(MakeShared<FPointIO>(ContextHandle));
+				NewIO->SetInfos(StartIndex + i, OutputPin);
+				if (!NewIO->InitializeOutput<T>(InitOut)) { return false; }
+				OutIOs[i] = NewIO;
+			}
+			return true;
+		}
+
+		template <typename T>
+		bool EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const TSharedPtr<FPointIO>& PointIO, const EIOInit InitOut = EIOInit::NoInit)
+		{
+			if (!EmplaceBatch<T>(OutIOs, PointIO->GetIn(), InitOut)) { return false; }
+			for (TSharedPtr<FPointIO>& Branch : OutIOs)
+			{
+				if (!Branch) { continue; }
+				OverrideTags(PointIO, Branch);
+				Branch->RootIO = PointIO;
+			}
+			return true;
 		}
 
 		static void OverrideTags(const TSharedPtr<FPointIO>& InFrom, const TSharedPtr<FPointIO>& InTo);

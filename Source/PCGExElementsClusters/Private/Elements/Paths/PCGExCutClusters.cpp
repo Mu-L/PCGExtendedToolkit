@@ -140,21 +140,22 @@ bool FPCGExCutEdgesElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSe
 
 	PCGEX_ON_ASYNC_STATE_READY(PCGExPaths::Labels::State_BuildingPaths)
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      if (Context->bWantsVtxProcessing)
-			                                      {
-				                                      NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
-			                                      }
-			                                      if (Context->bWantsEdgesProcessing)
-			                                      {
-				                                      NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories;
-			                                      }
-			                                      NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				if (Context->bWantsVtxProcessing)
+				{
+					NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
+				}
+				if (Context->bWantsEdgesProcessing)
+				{
+					NewBatch->EdgeFilterFactories = &Context->EdgeFilterFactories;
+				}
+				NewBatch->GraphBuilderDetails = Context->GraphBuilderDetails;
+			}))
 		{
 			PCGE_LOG(Warning, GraphAndLog, FTEXT("Could not build any clusters."));
 			return true;

@@ -82,13 +82,14 @@ bool FPCGExMergeVerticesElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      NewBatch->bRequiresWriteStep = true;
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				NewBatch->bRequiresWriteStep = true;
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}

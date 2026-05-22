@@ -155,15 +155,16 @@ bool FPCGExFindContoursElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      //NewBatch->bRequiresWriteStep = Settings->Artifacts.WriteAny();
-			                                      NewBatch->bSkipCompletion = true;
-			                                      NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				//NewBatch->bRequiresWriteStep = Settings->Artifacts.WriteAny();
+				NewBatch->bSkipCompletion = true;
+				NewBatch->SetProjectionDetails(Settings->ProjectionDetails);
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -666,12 +667,10 @@ namespace PCGExFindContours
 		// Output to Paths if enabled
 		if (Settings->Artifacts.bOutputPaths)
 		{
-			CellsIOIndices.Reserve(NumCells);
-
-			Context->OutputPaths->IncreaseReserve(NumCells + 1);
-			for (int i = 0; i < NumCells; i++)
+			CellsIOIndices.SetNum(NumCells);
+			if (!Context->OutputPaths->EmplaceBatch<UPCGPointArrayData>(CellsIOIndices, VtxDataFacade->Source, PCGExData::EIOInit::New))
 			{
-				CellsIOIndices.Add(Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
+				return;
 			}
 
 			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ProcessCellsTask)

@@ -250,13 +250,14 @@ bool FPCGExPathfindingEdgesElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!Context->StartProcessingClusters([](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
-		                                      {
-			                                      return true;
-		                                      }, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
-		                                      {
-			                                      NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
-		                                      }))
+		if (!Context->StartProcessingClusters(
+			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
+			{
+				return true;
+			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
+			{
+				NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
 		}
@@ -326,13 +327,14 @@ namespace PCGExPathfindingEdges
 		PCGExArrayHelpers::InitArray(Queries, NumQueries);
 		QueriesIO.Init(nullptr, NumQueries);
 
-		Context->OutputPaths->IncreaseReserve(NumQueries);
+		if (!Context->OutputPaths->EmplaceBatch<UPCGPointArrayData>(QueriesIO, ReferenceIO, PCGExData::EIOInit::New))
+		{
+			return false;
+		}
+
 		for (int i = 0; i < NumQueries; i++)
 		{
-			TSharedPtr<PCGExPathfinding::FPathQuery> Query = MakeShared<PCGExPathfinding::FPathQuery>(Cluster.ToSharedRef(), Context->SeedsDataFacade->Source->GetInPoint(PCGEx::H64A(Context->SeedGoalPairs[i])), Context->GoalsDataFacade->Source->GetInPoint(PCGEx::H64B(Context->SeedGoalPairs[i])), i);
-
-			Queries[i] = Query;
-			QueriesIO[i] = Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(ReferenceIO, PCGExData::EIOInit::New);
+			Queries[i] = MakeShared<PCGExPathfinding::FPathQuery>(Cluster.ToSharedRef(), Context->SeedsDataFacade->Source->GetInPoint(PCGEx::H64A(Context->SeedGoalPairs[i])), Context->GoalsDataFacade->Source->GetInPoint(PCGEx::H64B(Context->SeedGoalPairs[i])), i);
 			QueriesIO[i]->Disable();
 		}
 
