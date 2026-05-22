@@ -29,11 +29,11 @@ namespace PCGExMT
 
 #pragma region Parallel Helpers
 
-	void ParallelOrSequential(const int32 Num, const FLoopBody& Body, const int32 Threshold)
+	void ParallelOrSequential(const int32 Num, const FLoopBody& Body, const int32 Threshold, const EParallelForFlags Flags)
 	{
 		if (Num >= Threshold)
 		{
-			ParallelFor(Num, Body);
+			ParallelFor(Num, Body, Flags);
 		}
 		else
 		{

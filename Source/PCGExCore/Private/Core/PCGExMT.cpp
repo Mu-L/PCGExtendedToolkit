@@ -860,18 +860,26 @@ namespace PCGExMT
 				// Started==Completed invariant holds when the guard destructor fires.
 				StartedCount.fetch_add(NumScopes, std::memory_order_acq_rel);
 
-				PCGExMT::ParallelOrSequential(
-					NumScopes,
-					[&](const int32 i)
-					{
-						// Honor cancellation per-scope, same as FScopeIterationTask::ExecuteTask does.
-						if (!IsAvailable())
+				if (NumScopes == 1)
+				{
+					ExecScopeIteration(Loops[0], bPreparationOnly);
+				}
+				else
+				{
+					PCGExMT::ParallelOrSequential(
+						NumScopes,
+						[&](const int32 i)
 						{
-							return;
-						}
-						ExecScopeIteration(Loops[i], bPreparationOnly);
-					},
-					2); // Threshold=2: single scope runs inline; multi-scope parallelizes.
+							// Honor cancellation per-scope, same as FScopeIterationTask::ExecuteTask does.
+							if (!IsAvailable())
+							{
+								return;
+							}
+							ExecScopeIteration(Loops[i], bPreparationOnly);
+						},
+						2,                                  // Threshold=2: redundant given the NumScopes==1 branch above, but harmless.
+						EParallelForFlags::Unbalanced);     // Scope cost commonly varies (filtered points, data-dependent inner loops, cluster connectivity).
+				}
 
 				CompletedCount.fetch_add(NumScopes, std::memory_order_acq_rel);
 				// Guard destructor calls CheckCompletion → OnEnd → OnCompleteCallback → NotifyCompleted on parent

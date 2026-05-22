@@ -5,6 +5,7 @@
 
 #include <functional>
 #include "CoreMinimal.h"
+#include "Async/ParallelFor.h"
 
 namespace PCGExMT
 {
@@ -19,8 +20,10 @@ namespace PCGExMT
 	 * @param Num Number of iterations
 	 * @param Body Function taking (int32 i) to execute per iteration
 	 * @param Threshold Iteration count below which we use sequential execution (default 512)
+	 * @param Flags ParallelFor flags (default None). Pass EParallelForFlags::Unbalanced when
+	 *              per-iteration cost varies dramatically to enable dynamic work-stealing.
 	 */
-	PCGEXCORE_API void ParallelOrSequential(int32 Num, const FLoopBody& Body, int32 Threshold = DefaultParallelThreshold);
+	PCGEXCORE_API void ParallelOrSequential(int32 Num, const FLoopBody& Body, int32 Threshold = DefaultParallelThreshold, EParallelForFlags Flags = EParallelForFlags::None);
 
 	/**
 	 * Force sequential execution regardless of iteration count.
