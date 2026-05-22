@@ -215,18 +215,19 @@ namespace PCGExTensorsTransform
 			return;
 		}
 
-		PCGEX_PARALLEL_FOR(
+		PCGExMT::ParallelOrSequential(
 			PointDataFacade->GetNum(),
+			[&](const int32 i)
+			{
+				const PCGExPaths::FPathMetrics& Metric = Metrics[i];
+				const int32 UpdateCount = Metric.Count;
 
-			const PCGExPaths::FPathMetrics& Metric = Metrics[i];
-			const int32 UpdateCount = Metric.Count;
-
-			PCGEX_OUTPUT_VALUE(EffectorsPings, i, Pings[i])
-			PCGEX_OUTPUT_VALUE(UpdateCount, i, UpdateCount)
-			PCGEX_OUTPUT_VALUE(TraveledDistance, i, Metric.Length)
-			PCGEX_OUTPUT_VALUE(GracefullyStopped, i, UpdateCount < Settings->Iterations)
-			PCGEX_OUTPUT_VALUE(MaxIterationsReached, i, UpdateCount == Settings->Iterations)
-			)
+				PCGEX_OUTPUT_VALUE(EffectorsPings, i, Pings[i])
+				PCGEX_OUTPUT_VALUE(UpdateCount, i, UpdateCount)
+				PCGEX_OUTPUT_VALUE(TraveledDistance, i, Metric.Length)
+				PCGEX_OUTPUT_VALUE(GracefullyStopped, i, UpdateCount < Settings->Iterations)
+				PCGEX_OUTPUT_VALUE(MaxIterationsReached, i, UpdateCount == Settings->Iterations)
+			});
 
 		PointDataFacade->WriteFastest(TaskManager);
 	}

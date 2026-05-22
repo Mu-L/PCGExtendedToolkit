@@ -90,11 +90,6 @@ TArray<FPCGPinProperties> UPCGExWriteIndexSettings::OutputPinProperties() const
 	return PinProperties;
 }
 
-EPCGExExecutionPolicy UPCGExWriteIndexSettings::GetExecutionPolicy() const
-{
-	return EPCGExExecutionPolicy::NoPause;
-}
-
 #if WITH_EDITOR
 FString UPCGExWriteIndexSettings::GetDisplayName() const
 {

@@ -122,8 +122,6 @@ namespace PCGExMT
 #define PCGEX_SUBSCOPE_LOOP(_VAR) for(int _VAR = SubScope.Start; _VAR < SubScope.End; _VAR++)
 
 #define PCGEX_PARALLEL_FOR(_NUM, ...) PCGExMT::ParallelOrSequential(_NUM, [&](const int32 i){ __VA_ARGS__ });
-#define PCGEX_PARALLEL_FOR_THRESHOLD(_NUM, _THRESHOLD, ...) PCGExMT::ParallelOrSequential(_NUM, [&](const int32 i){ __VA_ARGS__ }, _THRESHOLD);
-#define PCGEX_SEQUENTIAL_FOR(_NUM, ...) PCGExMT::Sequential(_NUM, [&](const int32 i){ __VA_ARGS__ });
 
 #endif
 #pragma endregion

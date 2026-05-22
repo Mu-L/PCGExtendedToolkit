@@ -40,7 +40,6 @@ struct PCGEXCORE_API FPCGExCoreSettingsCache
 	bool bCacheClusters = true;
 	bool bDefaultScopedIndexLookupBuild = true;
 	bool bDefaultBuildAndCacheClusters = true;
-	EPCGExExecutionPolicy ExecutionPolicy = EPCGExExecutionPolicy::Default;
 
 	int32 SmallPointsSize = 1024;
 

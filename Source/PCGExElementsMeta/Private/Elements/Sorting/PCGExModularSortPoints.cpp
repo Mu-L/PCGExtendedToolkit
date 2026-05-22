@@ -14,11 +14,6 @@ TArray<FPCGPinProperties> UPCGExModularSortPointsSettings::InputPinProperties() 
 	return PinProperties;
 }
 
-EPCGExExecutionPolicy UPCGExModularSortPointsSettings::GetExecutionPolicy() const
-{
-	return EPCGExExecutionPolicy::NoPause;
-}
-
 bool UPCGExModularSortPointsSettings::GetSortingRules(FPCGExContext* InContext, TArray<FPCGExSortRuleConfig>& OutRules) const
 {
 	OutRules.Append(PCGExSorting::GetSortingRules(InContext, PCGExSorting::Labels::SourceSortingRules));

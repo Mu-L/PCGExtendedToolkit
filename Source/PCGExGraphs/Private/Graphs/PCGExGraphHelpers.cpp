@@ -56,25 +56,30 @@ namespace PCGExGraphs::Helpers
 		}
 		else
 		{
-			PCGEX_PARALLEL_FOR(
+			PCGExMT::ParallelOrSequential(
 				NumEdges,
-				if (!bValid){ return; }
-
-				uint32 A;
-				uint32 B;
-				PCGEx::H64(Endpoints[i], A, B);
-
-				const int32* StartPointIndexPtr = EndpointsLookup.Find(A);
-				const int32* EndPointIndexPtr = EndpointsLookup.Find(B);
-
-				if ((!StartPointIndexPtr || !EndPointIndexPtr))
+				[&](const int32 i)
 				{
-				FPlatformAtomics::InterlockedExchange(&bValid, 1);
-				return;
-				}
+					if (!bValid)
+					{
+						return;
+					}
 
-				OutEdges[i] = FEdge(i, *StartPointIndexPtr, *EndPointIndexPtr, i, EdgeIOIndex);
-				)
+					uint32 A;
+					uint32 B;
+					PCGEx::H64(Endpoints[i], A, B);
+
+					const int32* StartPointIndexPtr = EndpointsLookup.Find(A);
+					const int32* EndPointIndexPtr = EndpointsLookup.Find(B);
+
+					if ((!StartPointIndexPtr || !EndPointIndexPtr))
+					{
+						FPlatformAtomics::InterlockedExchange(&bValid, 1);
+						return;
+					}
+
+					OutEdges[i] = FEdge(i, *StartPointIndexPtr, *EndPointIndexPtr, i, EdgeIOIndex);
+				});
 		}
 
 		return static_cast<bool>(bValid);

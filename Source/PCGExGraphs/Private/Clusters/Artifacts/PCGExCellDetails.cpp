@@ -334,35 +334,56 @@ namespace PCGExClusters
 
 		TSharedPtr<PCGExData::TBuffer<int32>> NumNodesWriter = ArtifactSettings.bWriteNumNodes ? OutFacade->GetWritable<int32>(PCGExMetaHelpers::MakeElementIdentifier(ArtifactSettings.NumNodesAttributeName), 0, true, PCGExData::EBufferInit::New) : nullptr;
 
-		PCGEX_PARALLEL_FOR(
+		PCGExMT::ParallelOrSequential(
 			NumCells,
+			[&](const int32 i)
+			{
+				const TSharedPtr<FCell>& Cell = InCells[i];
+				if (!Cell)
+				{
+					return;;
+				}
 
-			const TSharedPtr<FCell>& Cell = InCells[i];
-			if (!Cell) { return;; }
+				// Build FBestFitPlane from cell vertices (thread-local, stack-allocated)
+				const PCGExMath::FBestFitPlane BFP = PCGExMath::FBestFitPlane(
+					Cell->Nodes.Num(),
+					[&](int32 j)
+					{
+						return ClusterTransforms[InCluster->GetNodePointIndex(Cell->Nodes[j])].GetLocation();
+					},
+					ArtifactSettings.OBBAttributes.bUseMinBoxFit
+					);
 
-			// Build FBestFitPlane from cell vertices (thread-local, stack-allocated)
-			const PCGExMath::FBestFitPlane BFP = PCGExMath::FBestFitPlane(
-				Cell->Nodes.Num(),
-				[&](int32 j) { return ClusterTransforms[InCluster->GetNodePointIndex(Cell->Nodes[j])].GetLocation(); },
-				ArtifactSettings.OBBAttributes.bUseMinBoxFit
-			);
+				// Get extents reordered to match axis order
+				FVector Extents = BFP.GetExtents(ArtifactSettings.OBBAttributes.AxisOrder);
+				for (int c = 0; c < 3; c++)
+				{
+					Extents[c] = FMath::Max(Extents[c], ArtifactSettings.OBBAttributes.MinExtent[c]);
+				}
 
-			// Get extents reordered to match axis order
-			FVector Extents = BFP.GetExtents(ArtifactSettings.OBBAttributes.AxisOrder);
-			for (int c = 0; c < 3; c++) {Extents[c] = FMath::Max(Extents[c], ArtifactSettings.OBBAttributes.MinExtent[c]);}
+				// Write OBB transform to unique index (thread-safe)
+				OutTransforms[i] = BFP.GetTransform(ArtifactSettings.OBBAttributes.AxisOrder);
+				OutBoundsMin[i] = -Extents;
+				OutBoundsMax[i] = Extents;
 
-			// Write OBB transform to unique index (thread-safe)
-			OutTransforms[i] = BFP.GetTransform(ArtifactSettings.OBBAttributes.AxisOrder);
-			OutBoundsMin[i] = -Extents;
-			OutBoundsMax[i] = Extents;
-
-			// Write all attributes
-			if (CellHashWriter) { CellHashWriter->SetValue(i, static_cast<int64>(Cell->GetCellHash())); }
-			if (AreaWriter) { AreaWriter->SetValue(i, Cell->Data.Area); }
-			if (CompactnessWriter) { CompactnessWriter->SetValue(i, Cell->Data.Compactness); }
-			if (NumNodesWriter) { NumNodesWriter->SetValue(i, Cell->Nodes.Num()); }
-
-			);
+				// Write all attributes
+				if (CellHashWriter)
+				{
+					CellHashWriter->SetValue(i, static_cast<int64>(Cell->GetCellHash()));
+				}
+				if (AreaWriter)
+				{
+					AreaWriter->SetValue(i, Cell->Data.Area);
+				}
+				if (CompactnessWriter)
+				{
+					CompactnessWriter->SetValue(i, Cell->Data.Compactness);
+				}
+				if (NumNodesWriter)
+				{
+					NumNodesWriter->SetValue(i, Cell->Nodes.Num());
+				}
+			});
 
 		// Commit facade
 		OutFacade->WriteFastest(TaskManager);

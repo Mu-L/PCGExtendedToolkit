@@ -124,25 +124,26 @@ namespace PCGExTensor
 		TempExtents.SetNumUninitialized(NumEffectors);
 
 		// Pack per-point data
-		PCGEX_PARALLEL_FOR(
+		PCGExMT::ParallelOrSequential(
 			NumEffectors,
+			[&](const int32 i)
+			{
+				const FTransform& Transform = InTransforms[i];
+				Rotations[i] = Transform.GetRotation();
 
-			const FTransform& Transform = InTransforms[i];
-			Rotations[i] = Transform.GetRotation();
+				FPackedEffector& PackedEffector = PackedEffectors[i];
+				PackedEffector.Location = Transform.GetLocation();
+				PackedEffector.Potency = PotencyValue->Read(i);
+				PackedEffector.Weight = WeightValue->Read(i);
 
-			FPackedEffector& PackedEffector = PackedEffectors[i];
-			PackedEffector.Location = Transform.GetLocation();
-			PackedEffector.Potency = PotencyValue->Read(i);
-			PackedEffector.Weight = WeightValue->Read(i);
+				PCGExData::FConstPoint Point(InPoints, i);
+				FVector Extents = PCGExMath::GetLocalBounds<EPCGExPointBoundsSource::ScaledBounds>(Point).GetExtent();
+				TempExtents[i] = Extents;
 
-			PCGExData::FConstPoint Point(InPoints, i);
-			FVector Extents = PCGExMath::GetLocalBounds<EPCGExPointBoundsSource::ScaledBounds>(Point).GetExtent();
-			TempExtents[i] = Extents;
+				PackedEffector.RadiusSquared = Extents.SquaredLength();
 
-			PackedEffector.RadiusSquared = Extents.SquaredLength();
-
-			PrepareSinglePoint(i, Transform, PackedEffector);
-			)
+				PrepareSinglePoint(i, Transform, PackedEffector);
+			});
 
 		// Build octree outside of parallel for :x
 		TConstPCGValueRange<float> InSteepness = InPoints->GetConstSteepnessValueRange();
