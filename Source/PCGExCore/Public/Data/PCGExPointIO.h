@@ -495,7 +495,7 @@ namespace PCGExData
 		/**
 		 * Batch-create FPointIO instances in a single locked pass and fill the caller-provided view.
 		 * Acquires the collection lock once, reserves slots once, then allocates + initializes each entry.
-		 * Returns false on the first InitializeOutput() failure (cancellation signal) — the caller
+		 * Returns false on the first InitializeOutput() failure (cancellation signal) -- the caller
 		 * should treat that as a fatal abort. Mirrors the three Emplace_GetRef overloads.
 		 */
 		bool EmplaceBatch(TArrayView<TSharedPtr<FPointIO>> OutIOs, const UPCGBasePointData* In, EIOInit InitOut = EIOInit::NoInit, const TSet<FString>* Tags = nullptr);

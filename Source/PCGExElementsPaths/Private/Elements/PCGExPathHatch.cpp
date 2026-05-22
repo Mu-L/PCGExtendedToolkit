@@ -3,6 +3,8 @@
 
 #include "Elements/PCGExPathHatch.h"
 
+#include "Algo/Sort.h"
+#include "Async/ParallelFor.h"
 #include "PCGParamData.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Core/PCGExUnionData.h"
@@ -12,6 +14,7 @@
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Math/PCGExBestFitPlane.h"
 #include "Math/PCGExMathDistances.h"
+#include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
 #include "Sampling/PCGExSamplingUnionData.h"
@@ -31,21 +34,6 @@ namespace PCGExPathHatch
 		return FMath::Min(A, B);
 	}
 
-	FORCEINLINE bool IntersectLineSegment2D(
-		const FVector2D& Origin, const FVector2D& Dir,
-		const FVector2D& E0, const FVector2D& E1,
-		double& OutT, float& OutU)
-	{
-		const FVector2D Edge = E1 - E0;
-		const double Denom = FVector2D::CrossProduct(Dir, Edge);
-		if (FMath::IsNearlyZero(Denom, 1e-12)) { return false; }
-		const FVector2D Delta = E0 - Origin;
-		const double U = FVector2D::CrossProduct(Delta, Dir) / Denom;
-		if (U < 0.0 || U > 1.0) { return false; }
-		OutT = FVector2D::CrossProduct(Delta, Edge) / Denom;
-		OutU = static_cast<float>(U);
-		return true;
-	}
 }
 
 #if WITH_EDITOR
@@ -111,6 +99,7 @@ bool FPCGExPathHatchElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 				return true;
 			}, [&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
+				NewBatch->bSkipCompletion = true;
 			}))
 		{
 			return Context->CancelExecution(TEXT("No valid closed-loop paths to hatch."));
@@ -154,43 +143,44 @@ namespace PCGExPathHatch
 
 		const TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
 		const int32 NumPts = InTransforms.Num();
-		Projected.SetNumUninitialized(NumPts);
-		for (int32 i = 0; i < NumPts; ++i)
+
+		FBox2D ProjectedBounds;
 		{
-			const FVector P = Projection.ProjectFlat(InTransforms[i].GetLocation());
-			Projected[i] = FVector2D(P.X, P.Y);
+			TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_Project);
+			PCGExPaths::BuildProjectedPoints2D(InTransforms, Projection, Projected, ProjectedBounds);
 		}
 
-		if (Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFit)
 		{
-			const PCGExMath::FBestFitPlane Plane2D(MakeArrayView(Projected.GetData(), Projected.Num()));
-			BoxAxisX = FVector2D(Plane2D.Axis[0].X, Plane2D.Axis[0].Y).GetSafeNormal();
-			BoxAxisY = FVector2D(Plane2D.Axis[1].X, Plane2D.Axis[1].Y).GetSafeNormal();
-			BoxCenter = FVector2D(Plane2D.Centroid.X, Plane2D.Centroid.Y);
-
-			// Plane.Centroid is the data mean, not the OBB midpoint along oriented axes — re-center
-			// onto the oriented AABB so line origins span the actual extent.
-			double MinX = MAX_dbl, MaxX = -MAX_dbl;
-			double MinY = MAX_dbl, MaxY = -MAX_dbl;
-			for (const FVector2D& P : Projected)
+			TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_BoxFit);
+			if (Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFit)
 			{
-				const FVector2D D = P - BoxCenter;
-				const double DX = FVector2D::DotProduct(D, BoxAxisX);
-				const double DY = FVector2D::DotProduct(D, BoxAxisY);
-				MinX = FMath::Min(MinX, DX); MaxX = FMath::Max(MaxX, DX);
-				MinY = FMath::Min(MinY, DY); MaxY = FMath::Max(MaxY, DY);
+				const PCGExMath::FBestFitPlane Plane2D(MakeArrayView(Projected.GetData(), Projected.Num()));
+				BoxAxisX = FVector2D(Plane2D.Axis[0].X, Plane2D.Axis[0].Y).GetSafeNormal();
+				BoxAxisY = FVector2D(Plane2D.Axis[1].X, Plane2D.Axis[1].Y).GetSafeNormal();
+				BoxCenter = FVector2D(Plane2D.Centroid.X, Plane2D.Centroid.Y);
+
+				// Plane.Centroid is the data mean, not the OBB midpoint along oriented axes -- re-center
+				// onto the oriented AABB so line origins span the actual extent.
+				double MinX = MAX_dbl, MaxX = -MAX_dbl;
+				double MinY = MAX_dbl, MaxY = -MAX_dbl;
+				for (const FVector2D& P : Projected)
+				{
+					const FVector2D D = P - BoxCenter;
+					const double DX = FVector2D::DotProduct(D, BoxAxisX);
+					const double DY = FVector2D::DotProduct(D, BoxAxisY);
+					MinX = FMath::Min(MinX, DX); MaxX = FMath::Max(MaxX, DX);
+					MinY = FMath::Min(MinY, DY); MaxY = FMath::Max(MaxY, DY);
+				}
+				BoxCenter += BoxAxisX * ((MinX + MaxX) * 0.5) + BoxAxisY * ((MinY + MaxY) * 0.5);
+				BoxHalfExtents = FVector2D((MaxX - MinX) * 0.5, (MaxY - MinY) * 0.5);
 			}
-			BoxCenter += BoxAxisX * ((MinX + MaxX) * 0.5) + BoxAxisY * ((MinY + MaxY) * 0.5);
-			BoxHalfExtents = FVector2D((MaxX - MinX) * 0.5, (MaxY - MinY) * 0.5);
-		}
-		else
-		{
-			FBox2D Bounds(ForceInit);
-			for (const FVector2D& P : Projected) { Bounds += P; }
-			BoxAxisX = FVector2D(1, 0);
-			BoxAxisY = FVector2D(0, 1);
-			BoxCenter = Bounds.GetCenter();
-			BoxHalfExtents = Bounds.GetExtent();
+			else
+			{
+				BoxAxisX = FVector2D(1, 0);
+				BoxAxisY = FVector2D(0, 1);
+				BoxCenter = ProjectedBounds.GetCenter();
+				BoxHalfExtents = ProjectedBounds.GetExtent();
+			}
 		}
 
 		const double AngleRad = FMath::DegreesToRadians(AngleOffsetDeg);
@@ -239,86 +229,159 @@ namespace PCGExPathHatch
 			}
 		}
 
+		const int32 NumLines = PerpOffsets.Num();
 		const int32 NumEdges = NumPts;
 		Segments.Reset();
 		// Tight upper bound for convex shapes (2 crossings/line); concave shapes will grow normally.
-		Segments.Reserve(PerpOffsets.Num() * 2);
+		Segments.Reserve(NumLines * 2);
 
-		TArray<FCrossing> LineCrossings;
-		for (int32 LineIdx = 0; LineIdx < PerpOffsets.Num(); ++LineIdx)
+		if (NumLines > 0 && NumEdges > 0)
 		{
-			LineCrossings.Reset();
-			const FVector2D LineOrigin = BoxCenter + LinePerp2D * PerpOffsets[LineIdx];
-
-			for (int32 EdgeIdx = 0; EdgeIdx < NumEdges; ++EdgeIdx)
+			// Project each edge onto LinePerp2D and LineDir2D once, then bucket-sweep crossings: each
+			// hatch line at perpendicular offset O crosses an edge iff O lies in the edge's perp range
+			// [pmin, pmax]. With PerpOffsets uniformly spaced (always true by construction), the index
+			// range of crossing lines is O(1) to compute. Total cost: O(E + total crossings) instead of
+			// O(L × E) brute force.
+			struct FEdgeProj
 			{
-				const int32 I0 = EdgeIdx;
-				const int32 I1 = (EdgeIdx + 1) % NumPts;
+				double P0, P1, D0, D1;
+				int32 I0, I1;
+			};
 
-				double T = 0.0;
-				float U = 0.0f;
-				if (!IntersectLineSegment2D(LineOrigin, LineDir2D, Projected[I0], Projected[I1], T, U)) { continue; }
+			const double PerpOffset0 = PerpOffsets[0];
+			const double PerpStep = (NumLines > 1) ? (PerpOffsets[1] - PerpOffsets[0]) : 1.0;
+			const double InvPerpStep = 1.0 / PerpStep;
 
-				FCrossing Crossing;
-				Crossing.EdgeI0 = I0;
-				Crossing.EdgeI1 = I1;
-				Crossing.TAlongLine = T;
-				Crossing.EdgeT = U;
-				LineCrossings.Add(Crossing);
-			}
+			TArray<FEdgeProj> EdgeProjs;
+			TArray<int32> LineCounts;
+			TArray<int32> LineStart;
+			TArray<FCrossing> Crossings;
+			int32 TotalCrossings = 0;
 
-			const int32 NumCrossings = LineCrossings.Num();
-			if (NumCrossings < 2) { continue; }
-
-			// Convex shapes hit each line exactly twice — fast-path the common case to skip the
-			// generic sort's lambda and recursion overhead.
-			if (NumCrossings == 2)
 			{
-				if (LineCrossings[1].TAlongLine < LineCrossings[0].TAlongLine)
+				TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_EdgeProjs);
+				EdgeProjs.SetNumUninitialized(NumEdges);
+				for (int32 e = 0; e < NumEdges; ++e)
 				{
-					Swap(LineCrossings[0], LineCrossings[1]);
+					const int32 I0 = e;
+					const int32 I1 = (e + 1) % NumPts;
+					const FVector2D D0v = Projected[I0] - BoxCenter;
+					const FVector2D D1v = Projected[I1] - BoxCenter;
+					FEdgeProj& EP = EdgeProjs[e];
+					EP.P0 = FVector2D::DotProduct(D0v, LinePerp2D);
+					EP.P1 = FVector2D::DotProduct(D1v, LinePerp2D);
+					EP.D0 = FVector2D::DotProduct(D0v, LineDir2D);
+					EP.D1 = FVector2D::DotProduct(D1v, LineDir2D);
+					EP.I0 = I0;
+					EP.I1 = I1;
 				}
 			}
-			else
+
 			{
-				LineCrossings.Sort([](const FCrossing& A, const FCrossing& B) { return A.TAlongLine < B.TAlongLine; });
+				TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_Count);
+				LineCounts.SetNumZeroed(NumLines);
+				for (const FEdgeProj& EP : EdgeProjs)
+				{
+					const double Lo = FMath::Min(EP.P0, EP.P1);
+					const double Hi = FMath::Max(EP.P0, EP.P1);
+					if (Hi - Lo < UE_DOUBLE_KINDA_SMALL_NUMBER) { continue; }
+					const int32 First = FMath::Max(0, FMath::CeilToInt((Lo - PerpOffset0) * InvPerpStep));
+					const int32 Last = FMath::Min(NumLines - 1, FMath::FloorToInt((Hi - PerpOffset0) * InvPerpStep));
+					for (int32 L = First; L <= Last; ++L) { ++LineCounts[L]; }
+				}
 			}
 
-			const int32 PairCount = NumCrossings / 2;
-			for (int32 P = 0; P < PairCount; ++P)
 			{
-				const FCrossing& Entry = LineCrossings[P * 2];
-				const FCrossing& Exit = LineCrossings[P * 2 + 1];
+				TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_Fill);
+				LineStart.SetNumUninitialized(NumLines + 1);
+				LineStart[0] = 0;
+				for (int32 L = 0; L < NumLines; ++L) { LineStart[L + 1] = LineStart[L] + LineCounts[L]; }
+				TotalCrossings = LineStart[NumLines];
 
-				FHatchSegment Seg;
-				Seg.StartEdgeI0 = Entry.EdgeI0; Seg.StartEdgeI1 = Entry.EdgeI1; Seg.StartEdgeT = Entry.EdgeT;
-				Seg.EndEdgeI0 = Exit.EdgeI0; Seg.EndEdgeI1 = Exit.EdgeI1; Seg.EndEdgeT = Exit.EdgeT;
+				// Reuse LineCounts as a per-line fill cursor for the bucket scatter below.
+				FMemory::Memzero(LineCounts.GetData(), LineCounts.Num() * sizeof(int32));
 
-				// World endpoints lerp the original world edges, not Projection.Unproject(2D crossing) —
-				// the projection is rotation-only, so unprojecting (x,y,0) collapses depth and snaps
-				// off-origin BestFit/LocalTangent inputs onto the world-origin plane.
-				Seg.WorldStart = FMath::Lerp(InTransforms[Entry.EdgeI0].GetLocation(), InTransforms[Entry.EdgeI1].GetLocation(), static_cast<double>(Entry.EdgeT));
-				Seg.WorldEnd = FMath::Lerp(InTransforms[Exit.EdgeI0].GetLocation(), InTransforms[Exit.EdgeI1].GetLocation(), static_cast<double>(Exit.EdgeT));
-				Seg.Length = FVector::Distance(Seg.WorldStart, Seg.WorldEnd);
+				Crossings.SetNumUninitialized(TotalCrossings);
 
-				Seg.SourceStart = NearestOfTwo(Entry.EdgeI0, Entry.EdgeI1, Entry.EdgeT);
-				Seg.SourceEnd = NearestOfTwo(Exit.EdgeI0, Exit.EdgeI1, Exit.EdgeT);
-
-				if (bFilterSegments && Seg.Length < MinSegmentLengthValue) { continue; }
-
-				int32 NumInterior = 0;
-				if (bUseSegmentCount)
+				for (const FEdgeProj& EP : EdgeProjs)
 				{
-					NumInterior = FMath::Max(0, FMath::FloorToInt(SegmentSpacingValue));
+					const double Lo = FMath::Min(EP.P0, EP.P1);
+					const double Hi = FMath::Max(EP.P0, EP.P1);
+					if (Hi - Lo < UE_DOUBLE_KINDA_SMALL_NUMBER) { continue; }
+					const int32 First = FMath::Max(0, FMath::CeilToInt((Lo - PerpOffset0) * InvPerpStep));
+					const int32 Last = FMath::Min(NumLines - 1, FMath::FloorToInt((Hi - PerpOffset0) * InvPerpStep));
+					if (Last < First) { continue; }
+
+					const double InvDeltaP = 1.0 / (EP.P1 - EP.P0);
+					for (int32 L = First; L <= Last; ++L)
+					{
+						const double U = (PerpOffsets[L] - EP.P0) * InvDeltaP;
+						const int32 Slot = LineStart[L] + LineCounts[L]++;
+						FCrossing& C = Crossings[Slot];
+						C.EdgeI0 = EP.I0;
+						C.EdgeI1 = EP.I1;
+						C.TAlongLine = FMath::Lerp(EP.D0, EP.D1, U);
+						C.EdgeT = static_cast<float>(U);
+					}
+				}
+			}
+
+			TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_PairSegments);
+			for (int32 L = 0; L < NumLines; ++L)
+			{
+				const int32 Begin = LineStart[L];
+				const int32 NumCrossings = LineStart[L + 1] - Begin;
+				if (NumCrossings < 2) { continue; }
+
+				FCrossing* CData = Crossings.GetData() + Begin;
+
+				// Convex shapes hit each line exactly twice -- fast-path the common case to skip the
+				// generic sort's lambda and recursion overhead.
+				if (NumCrossings == 2)
+				{
+					if (CData[1].TAlongLine < CData[0].TAlongLine) { Swap(CData[0], CData[1]); }
 				}
 				else
 				{
-					const double Step = FMath::Max(UE_DOUBLE_KINDA_SMALL_NUMBER, SegmentSpacingValue);
-					NumInterior = FMath::Max(0, FMath::FloorToInt(Seg.Length / Step));
+					Algo::Sort(MakeArrayView(CData, NumCrossings), [](const FCrossing& A, const FCrossing& B) { return A.TAlongLine < B.TAlongLine; });
 				}
-				Seg.NumPoints = NumInterior + 2;
 
-				Segments.Add(MoveTemp(Seg));
+				const int32 PairCount = NumCrossings / 2;
+				for (int32 P = 0; P < PairCount; ++P)
+				{
+					const FCrossing& Entry = CData[P * 2];
+					const FCrossing& Exit = CData[P * 2 + 1];
+
+					FHatchSegment Seg;
+					Seg.StartEdgeI0 = Entry.EdgeI0; Seg.StartEdgeI1 = Entry.EdgeI1; Seg.StartEdgeT = Entry.EdgeT;
+					Seg.EndEdgeI0 = Exit.EdgeI0; Seg.EndEdgeI1 = Exit.EdgeI1; Seg.EndEdgeT = Exit.EdgeT;
+
+					// World endpoints lerp the original world edges, not Projection.Unproject(2D crossing) --
+					// the projection is rotation-only, so unprojecting (x,y,0) collapses depth and snaps
+					// off-origin BestFit/LocalTangent inputs onto the world-origin plane.
+					Seg.WorldStart = FMath::Lerp(InTransforms[Entry.EdgeI0].GetLocation(), InTransforms[Entry.EdgeI1].GetLocation(), static_cast<double>(Entry.EdgeT));
+					Seg.WorldEnd = FMath::Lerp(InTransforms[Exit.EdgeI0].GetLocation(), InTransforms[Exit.EdgeI1].GetLocation(), static_cast<double>(Exit.EdgeT));
+					Seg.Length = FVector::Distance(Seg.WorldStart, Seg.WorldEnd);
+
+					Seg.SourceStart = NearestOfTwo(Entry.EdgeI0, Entry.EdgeI1, Entry.EdgeT);
+					Seg.SourceEnd = NearestOfTwo(Exit.EdgeI0, Exit.EdgeI1, Exit.EdgeT);
+
+					if (bFilterSegments && Seg.Length < MinSegmentLengthValue) { continue; }
+
+					int32 NumInterior = 0;
+					if (bUseSegmentCount)
+					{
+						NumInterior = FMath::Max(0, FMath::FloorToInt(SegmentSpacingValue));
+					}
+					else
+					{
+						const double Step = FMath::Max(UE_DOUBLE_KINDA_SMALL_NUMBER, SegmentSpacingValue);
+						NumInterior = FMath::Max(0, FMath::FloorToInt(Seg.Length / Step));
+					}
+					Seg.NumPoints = NumInterior + 2;
+
+					Segments.Add(MoveTemp(Seg));
+				}
 			}
 		}
 
@@ -327,11 +390,14 @@ namespace PCGExPathHatch
 			PCGE_LOG_C(Warning, GraphAndLog, Context, FTEXT("Hatch produced no kept segments for an input."));
 		}
 
-		return true;
+		CompleteWork();
+		
+		return bIsProcessorValid;
 	}
 
 	void FProcessor::CompleteWork()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_Complete);
 		const int32 NumSegments = Segments.Num();
 		if (NumSegments == 0) { return; }
 
@@ -356,7 +422,7 @@ namespace PCGExPathHatch
 		if (bDoEndpointBlending)
 		{
 			TempUnion = MakeShared<PCGExSampling::FSampingUnionData>();
-			TempUnion->WeightRange = -2; // pass weights verbatim — exact edge-T lerp
+			TempUnion->WeightRange = -2; // pass weights verbatim -- exact edge-T lerp
 		}
 
 		auto FillIdxMapping = [](TArray<int32>& IdxMapping, const int32 Base, const FHatchSegment& Seg)
@@ -371,24 +437,31 @@ namespace PCGExPathHatch
 			}
 		};
 
+		// Endpoint blending -- scratch (TempUnion / WeightedPoints / Trackers) passed in so callers
+		// can supply per-thread arrays when invoked from a parallel context.
 		auto BlendSegmentEndpoints = [&](
 			const TSharedPtr<PCGExBlending::FUnionBlender>& Blender,
 			const FHatchSegment& Seg,
 			const int32 OutA,
-			const int32 OutB)
+			const int32 OutB,
+			const TSharedPtr<PCGExSampling::FSampingUnionData>& InTempUnion,
+			TArray<PCGExData::FWeightedPoint>& InWeightedPoints,
+			TArray<PCGEx::FOpStats>& InTrackers)
 		{
-			TempUnion->Reset();
-			TempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.StartEdgeI0, InputIO), 1.0 - static_cast<double>(Seg.StartEdgeT));
-			TempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.StartEdgeI1, InputIO), static_cast<double>(Seg.StartEdgeT));
-			Blender->MergeSingle(OutA, TempUnion, WeightedPoints, Trackers);
+			InTempUnion->Reset();
+			InTempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.StartEdgeI0, InputIO), 1.0 - static_cast<double>(Seg.StartEdgeT));
+			InTempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.StartEdgeI1, InputIO), static_cast<double>(Seg.StartEdgeT));
+			Blender->MergeSingle(OutA, InTempUnion, InWeightedPoints, InTrackers);
 
-			TempUnion->Reset();
-			TempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.EndEdgeI0, InputIO), 1.0 - static_cast<double>(Seg.EndEdgeT));
-			TempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.EndEdgeI1, InputIO), static_cast<double>(Seg.EndEdgeT));
-			Blender->MergeSingle(OutB, TempUnion, WeightedPoints, Trackers);
+			InTempUnion->Reset();
+			InTempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.EndEdgeI0, InputIO), 1.0 - static_cast<double>(Seg.EndEdgeT));
+			InTempUnion->AddWeighted_Unsafe(PCGExData::FElement(Seg.EndEdgeI1, InputIO), static_cast<double>(Seg.EndEdgeT));
+			Blender->MergeSingle(OutB, InTempUnion, InWeightedPoints, InTrackers);
 		};
 
-		auto BuildEndpointBlender = [&](const TSharedPtr<PCGExData::FFacade>& TargetFacade) -> TSharedPtr<PCGExBlending::FUnionBlender>
+		auto BuildEndpointBlender = [&](
+			const TSharedPtr<PCGExData::FFacade>& TargetFacade,
+			TArray<PCGEx::FOpStats>& InTrackers) -> TSharedPtr<PCGExBlending::FUnionBlender>
 		{
 			TSharedPtr<PCGExBlending::FUnionBlender> Blender = MakeShared<PCGExBlending::FUnionBlender>(
 				&Context->EndpointBlending,
@@ -400,7 +473,7 @@ namespace PCGExPathHatch
 			Blender->AddSources(UnionSources, &ProtectedAttributes);
 
 			if (!Blender->Init(Context, TargetFacade, PCGExData::EProxyFlags::Direct)) { return nullptr; }
-			Blender->InitTrackers(Trackers);
+			Blender->InitTrackers(InTrackers);
 			return Blender;
 		};
 
@@ -439,12 +512,12 @@ namespace PCGExPathHatch
 
 			if (bDoEndpointBlending)
 			{
-				EndpointBlender = BuildEndpointBlender(MergedOutputFacade);
+				EndpointBlender = BuildEndpointBlender(MergedOutputFacade, Trackers);
 				if (!EndpointBlender) { bIsProcessorValid = false; return; }
 
 				for (const FHatchSegment& Seg : Segments)
 				{
-					BlendSegmentEndpoints(EndpointBlender, Seg, Seg.OutStart, Seg.OutStart + Seg.NumPoints - 1);
+					BlendSegmentEndpoints(EndpointBlender, Seg, Seg.OutStart, Seg.OutStart + Seg.NumPoints - 1, TempUnion, WeightedPoints, Trackers);
 				}
 			}
 		}
@@ -463,7 +536,13 @@ namespace PCGExPathHatch
 				return;
 			}
 
-			for (int32 SegIdx = 0; SegIdx < NumSegments; ++SegIdx)
+			// Initialize one segment in isolation. Takes per-call scratch so it's safe to invoke
+			// from either the serial pre-warm or the parallel sub-loop below.
+			auto InitSegment = [&](
+				const int32 SegIdx,
+				const TSharedPtr<PCGExSampling::FSampingUnionData>& InTempUnion,
+				TArray<PCGExData::FWeightedPoint>& InWeightedPoints,
+				TArray<PCGEx::FOpStats>& InTrackers) -> bool
 			{
 				const FHatchSegment& Seg = Segments[SegIdx];
 				const TSharedPtr<PCGExData::FPointIO>& SegIO = SegmentIOs[SegIdx];
@@ -487,18 +566,58 @@ namespace PCGExPathHatch
 				}
 
 				SubBlendings[SegIdx] = BuildSubBlender(SegFacade);
-				if (!SubBlendings[SegIdx]) { bIsProcessorValid = false; return; }
+				if (!SubBlendings[SegIdx]) { return false; }
 
 				if (bDoEndpointBlending)
 				{
-					EndpointBlenders[SegIdx] = BuildEndpointBlender(SegFacade);
-					if (!EndpointBlenders[SegIdx]) { bIsProcessorValid = false; return; }
-					BlendSegmentEndpoints(EndpointBlenders[SegIdx], Seg, 0, Seg.NumPoints - 1);
+					EndpointBlenders[SegIdx] = BuildEndpointBlender(SegFacade, InTrackers);
+					if (!EndpointBlenders[SegIdx]) { return false; }
+					BlendSegmentEndpoints(EndpointBlenders[SegIdx], Seg, 0, Seg.NumPoints - 1, InTempUnion, InWeightedPoints, InTrackers);
 				}
+
+				return true;
+			};
+
+			// Pre-warm segment 0 serially. FUnionBlender::AddSources/Init and PrepareForData may
+			// register attribute readers on the shared source facade via Capture; doing the first
+			// iteration single-threaded ensures any such state mutation lands before parallel
+			// iterations could race on it.
+			if (!InitSegment(0, TempUnion, WeightedPoints, Trackers))
+			{
+				bIsProcessorValid = false;
+				return;
+			}
+
+			// Parallel init for segments 1..N-1. Each iteration owns its scratch arrays so
+			// FUnionBlender::MergeSingle / InitTrackers don't contend on shared state.
+			std::atomic<bool> bParallelValid{true};
+			ParallelFor(NumSegments - 1, [&](int32 i)
+			{
+				if (!bParallelValid.load(std::memory_order_relaxed)) { return; }
+
+				TArray<PCGExData::FWeightedPoint> LocalWeightedPoints;
+				TArray<PCGEx::FOpStats> LocalTrackers;
+				TSharedPtr<PCGExSampling::FSampingUnionData> LocalTempUnion;
+				if (bDoEndpointBlending)
+				{
+					LocalTempUnion = MakeShared<PCGExSampling::FSampingUnionData>();
+					LocalTempUnion->WeightRange = -2;
+				}
+
+				if (!InitSegment(i + 1, LocalTempUnion, LocalWeightedPoints, LocalTrackers))
+				{
+					bParallelValid.store(false, std::memory_order_relaxed);
+				}
+			});
+
+			if (!bParallelValid.load(std::memory_order_relaxed))
+			{
+				bIsProcessorValid = false;
+				return;
 			}
 		}
 
-		StartParallelLoopForRange(NumSegments);
+		StartParallelLoopForRange(NumSegments, 16);
 	}
 
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
@@ -553,7 +672,7 @@ namespace PCGExPathHatch
 
 			if (bWriteAlpha)
 			{
-				// Alpha writers were pre-created in CompleteWork — no buffer-creation race here.
+				// Alpha writers were pre-created in CompleteWork -- no buffer-creation race here.
 				PCGExData::TBuffer<double>* W = (bPerSegmentOutput ? SegmentAlphaWriters[Index] : AlphaWriter).Get();
 				if (W)
 				{
@@ -578,21 +697,19 @@ namespace PCGExPathHatch
 					SubScope,
 					Metrics);
 			}
+			
+			if (bPerSegmentOutput)
+			{
+				OutFacade->WriteFastest(TaskManager);
+			}
 		}
 	}
 
-	void FProcessor::Write()
+	void FProcessor::OnRangeProcessingComplete()
 	{
 		if (!bPerSegmentOutput)
 		{
 			if (MergedOutputFacade) { MergedOutputFacade->WriteFastest(TaskManager); }
-		}
-		else
-		{
-			for (const TSharedPtr<PCGExData::FFacade>& Facade : SegmentFacades)
-			{
-				if (Facade) { Facade->WriteFastest(TaskManager); }
-			}
 		}
 	}
 }

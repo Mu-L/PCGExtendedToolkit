@@ -268,6 +268,6 @@ namespace PCGExPathHatch
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void CompleteWork() override;
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
-		virtual void Write() override;
+		virtual void OnRangeProcessingComplete() override;
 	};
 }
