@@ -208,15 +208,33 @@ namespace PCGExTensorsTransform
 	void FProcessor::OnPointsProcessingComplete()
 	{
 		bIteratedOnce = true;
-		RemainingIterations--;
-		if (RemainingIterations > 0)
+
+		// Drive remaining iterations as a flat while-loop instead of recursing
+		// through StartParallelLoopForPoints each iteration.
+		const int32 NumPoints = PointDataFacade->GetNum();
+
+		while (--RemainingIterations > 0)
 		{
-			StartParallelLoopForPoints(PCGExData::EIOSide::Out);
-			return;
+			TArray<PCGExMT::FScope> Loops;
+			const int32 NumScopes = PCGExMT::SubLoopScopes(
+				Loops, NumPoints,
+				FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumPoints, PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize())));
+
+			if (NumScopes == 1)
+			{
+				ProcessPoints(Loops[0]);
+			}
+			else
+			{
+				PCGExMT::ParallelOrSequential(
+					NumScopes,
+					[this, &Loops](const int32 i) { ProcessPoints(Loops[i]); },
+					2, EParallelForFlags::Unbalanced);
+			}
 		}
 
 		PCGExMT::ParallelOrSequential(
-			PointDataFacade->GetNum(),
+			NumPoints,
 			[&](const int32 i)
 			{
 				const PCGExPaths::FPathMetrics& Metric = Metrics[i];

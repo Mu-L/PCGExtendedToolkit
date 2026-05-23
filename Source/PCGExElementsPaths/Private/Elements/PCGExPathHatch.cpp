@@ -155,9 +155,9 @@ namespace PCGExPathHatch
 
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_BoxFit);
-			if (Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFit)
+			if (Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFit || Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFitAccurate)
 			{
-				const PCGExMath::FBestFitPlane Plane2D(MakeArrayView(Projected.GetData(), Projected.Num()));
+				const PCGExMath::FBestFitPlane Plane2D(MakeArrayView(Projected.GetData(), Projected.Num()), Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFitAccurate);
 				BoxAxisX = FVector2D(Plane2D.Axis[0].X, Plane2D.Axis[0].Y).GetSafeNormal();
 				BoxAxisY = FVector2D(Plane2D.Axis[1].X, Plane2D.Axis[1].Y).GetSafeNormal();
 				BoxCenter = FVector2D(Plane2D.Centroid.X, Plane2D.Centroid.Y);

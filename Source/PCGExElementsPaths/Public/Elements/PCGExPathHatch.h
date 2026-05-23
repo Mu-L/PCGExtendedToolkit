@@ -29,8 +29,9 @@ namespace PCGExSampling
 UENUM()
 enum class EPCGExHatchBoxFitMode : uint8
 {
-	AxisAligned = 0 UMETA(DisplayName = "Axis Aligned (AABB)", ToolTip="Use the axis-aligned bounding box of the projected input."),
-	BestFit     = 1 UMETA(DisplayName = "Best Fit (OBB)", ToolTip="Use a PCA-derived oriented bounding box of the projected input."),
+	AxisAligned     = 0 UMETA(DisplayName = "Axis Aligned (AABB)", ToolTip="Use the axis-aligned bounding box of the projected input."),
+	BestFit         = 1 UMETA(DisplayName = "Best Fit (OBB)", ToolTip="Use a PCA-derived oriented bounding box of the projected input."),
+	BestFitAccurate = 2 UMETA(DisplayName = "Best Fit (OBB, Accurate)", ToolTip="Use a Min-box3-derived oriented bounding box of the projected input."),
 };
 
 UENUM()
@@ -87,7 +88,7 @@ public:
 
 	/** Bounding box used to size and orient the line bundle in projected space. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
-	EPCGExHatchBoxFitMode BoxFitMode = EPCGExHatchBoxFitMode::AxisAligned;
+	EPCGExHatchBoxFitMode BoxFitMode = EPCGExHatchBoxFitMode::BestFit;
 
 	/** Rotation (degrees) of the line direction around the projection plane normal. 0 = aligned with the box X axis; add 90 for the Y axis. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Lines", meta=(PCG_Overridable))

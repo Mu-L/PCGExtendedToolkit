@@ -3,6 +3,7 @@
 
 #include "Core/PCGExPointsMT.h"
 
+#include "UObject/Class.h"
 
 #include "Core/PCGExPointFilter.h"
 #include "Data/PCGExData.h"
@@ -126,7 +127,57 @@ namespace PCGExPointsMT
 
 		const int32 NumPoints = CurrentProcessingSource->GetNumPoints();
 
-		PCGEX_ASYNC_POINT_PROCESSOR_LOOP(Points, NumPoints, PrepareLoopScopesForPoints, ProcessPoints, OnPointsProcessingComplete, bForceSingleThreadedProcessPoints)
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (IsTrivial())
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForPoints_Trivial);
+			const PCGExMT::FScope TrivialScope(0, NumPoints, 0);
+			PrepareLoopScopesForPoints({TrivialScope});
+			ProcessPoints(TrivialScope);
+			OnPointsProcessingComplete();
+			return;
+		}
+
+		PCGEX_ENSURE_NONZERO_LOOP_RANGE(NumPoints, StartParallelLoopForPoints);
+
+		TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForPoints);
+
+		const int32 PLI = PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize(PerLoopIterations);
+
+		TArray<PCGExMT::FScope> Loops;
+		const int32 NumScopes = PCGExMT::SubLoopScopes(
+			Loops, NumPoints, FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumPoints, PLI)));
+
+		PrepareLoopScopesForPoints(Loops);
+
+		if (NumScopes == 1 || bForceSingleThreadedProcessPoints)
+		{
+			for (const PCGExMT::FScope& S : Loops)
+			{
+				if (!WorkHandle.IsValid())
+				{
+					break;
+				}
+				ProcessPoints(S);
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				NumScopes,
+				[this, &Loops](const int32 i)
+				{
+					if (!WorkHandle.IsValid())
+					{
+						return;
+					}
+					ProcessPoints(Loops[i]);
+				},
+				2, EParallelForFlags::Unbalanced);
+		}
+
+		OnPointsProcessingComplete();
 	}
 
 	void IProcessor::PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops)
@@ -143,7 +194,57 @@ namespace PCGExPointsMT
 
 	void IProcessor::StartParallelLoopForRange(const int32 NumIterations, const int32 PerLoopIterations)
 	{
-		PCGEX_ASYNC_POINT_PROCESSOR_LOOP(Ranges, NumIterations, PrepareLoopScopesForRanges, ProcessRange, OnRangeProcessingComplete, bForceSingleThreadedProcessRange)
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (IsTrivial())
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForRanges_Trivial);
+			const PCGExMT::FScope TrivialScope(0, NumIterations, 0);
+			PrepareLoopScopesForRanges({TrivialScope});
+			ProcessRange(TrivialScope);
+			OnRangeProcessingComplete();
+			return;
+		}
+
+		PCGEX_ENSURE_NONZERO_LOOP_RANGE(NumIterations, StartParallelLoopForRange);
+
+		TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForRanges);
+
+		const int32 PLI = PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize(PerLoopIterations);
+
+		TArray<PCGExMT::FScope> Loops;
+		const int32 NumScopes = PCGExMT::SubLoopScopes(
+			Loops, NumIterations, FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumIterations, PLI)));
+
+		PrepareLoopScopesForRanges(Loops);
+
+		if (NumScopes == 1 || bForceSingleThreadedProcessRange)
+		{
+			for (const PCGExMT::FScope& S : Loops)
+			{
+				if (!WorkHandle.IsValid())
+				{
+					break;
+				}
+				ProcessRange(S);
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				NumScopes,
+				[this, &Loops](const int32 i)
+				{
+					if (!WorkHandle.IsValid())
+					{
+						return;
+					}
+					ProcessRange(Loops[i]);
+				},
+				2, EParallelForFlags::Unbalanced);
+		}
+
+		OnRangeProcessingComplete();
 	}
 
 	void IProcessor::PrepareLoopScopesForRanges(const TArray<PCGExMT::FScope>& Loops)
