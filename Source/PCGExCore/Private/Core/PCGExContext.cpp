@@ -247,6 +247,8 @@ void FPCGExContext::Done()
 
 bool FPCGExContext::DriveAdvanceWork(const UPCGExSettings* InSettings)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExContext::DriveAdvanceWork)
+	
 	// This pattern short-circuits the PCG scheduler to avoid frame delays.
 	// OnAsyncWorkEnd calls this directly so work continues immediately when async completes,
 	// rather than waiting for PCG's next-frame scheduling. The compare_exchange ensures

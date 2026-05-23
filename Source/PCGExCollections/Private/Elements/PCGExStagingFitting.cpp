@@ -17,13 +17,14 @@
 
 #pragma region UPCGExStagingFittingSettings
 
+bool UPCGExStagingFittingSettings::WantsDataStealing() const
+{
+	return Super::WantsDataStealing() && !bPruneEmptyPoints;
+}
+
 PCGExData::EIOInit UPCGExStagingFittingSettings::GetMainDataInitializationPolicy() const
 {
-	if (StealData == EPCGExOptionState::Enabled && !bPruneEmptyPoints)
-	{
-		return PCGExData::EIOInit::Forward;
-	}
-	return PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_INITIALIZE_ELEMENT(StagingFitting)

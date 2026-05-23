@@ -29,7 +29,7 @@ UPCGExClusterDiffusionSettings::UPCGExClusterDiffusionSettings(const FObjectInit
 
 PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetMainOutputInitMode() const
 {
-	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetEdgeOutputInitMode() const

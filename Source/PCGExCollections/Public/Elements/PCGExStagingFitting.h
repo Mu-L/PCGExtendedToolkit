@@ -47,6 +47,7 @@ public:
 	}
 #endif
 
+	virtual bool WantsDataStealing() const override;
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
 
 protected:

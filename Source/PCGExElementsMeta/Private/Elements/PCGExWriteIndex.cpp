@@ -101,7 +101,7 @@ PCGEX_INITIALIZE_ELEMENT(WriteIndex)
 
 PCGExData::EIOInit UPCGExWriteIndexSettings::GetMainDataInitializationPolicy() const
 {
-	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(WriteIndex)

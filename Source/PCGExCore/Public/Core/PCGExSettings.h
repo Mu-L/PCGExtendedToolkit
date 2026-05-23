@@ -61,9 +61,12 @@ public:
 	EPCGExOptionState ScopedAttributeGet = EPCGExOptionState::Default;
 
 	/** This node will not make any copy of the data and instead modify the inputs directly.
-	 * When enabling this you must make absolutely sure the data plugged into this node is not plugged in any other node. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsDataStealing", EditConditionHides, HideEditConditionToggle))
+	 * When enabling this you must make absolutely sure the data plugged into this node is not plugged in any other node.
+	 * Only supported by nodes set-up in a way that makes in-place mutations possible. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsDataStealing", EditConditionHides))
 	EPCGExOptionState StealData = EPCGExOptionState::Disabled;
+	
+	virtual bool WantsDataStealing() const { return SupportsDataStealing() && StealData == EPCGExOptionState::Enabled; };
 	
 	/** Flatten the output of this node. Merges hierarchical data into a single flat collection. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Cleanup", meta=(PCG_NotOverridable))

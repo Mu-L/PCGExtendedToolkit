@@ -24,6 +24,16 @@ namespace PCGExPaths
 	class FPath;
 }
 
+
+
+UENUM()
+enum class EPCGExInputValueToggle : uint8
+{
+	Constant  = 0 UMETA(DisplayName = "Constant", Tooltip="Use a constant, user-defined value.", ActionIcon="Constant"),
+	Attribute = 1 UMETA(DisplayName = "Attribute", Tooltip="Read the value from the input data.", ActionIcon="Attribute"),
+	Disabled  = 2 UMETA(DisplayName = "Disabled", Tooltip="Disabled", ActionIcon="STF_None"),
+};
+
 UENUM()
 enum class EPCGExSolidificationSpace : uint8
 {

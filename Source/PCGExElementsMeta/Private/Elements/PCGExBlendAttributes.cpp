@@ -23,7 +23,7 @@ PCGEX_INITIALIZE_ELEMENT(BlendAttributes)
 
 PCGExData::EIOInit UPCGExBlendAttributesSettings::GetMainDataInitializationPolicy() const
 {
-	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(BlendAttributes)

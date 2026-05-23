@@ -62,7 +62,7 @@ PCGEX_INITIALIZE_ELEMENT(WritePathProperties)
 
 PCGExData::EIOInit UPCGExWritePathPropertiesSettings::GetMainDataInitializationPolicy() const
 {
-	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(WritePathProperties)

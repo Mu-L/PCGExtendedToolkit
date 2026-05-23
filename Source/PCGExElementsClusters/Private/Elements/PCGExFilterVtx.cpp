@@ -73,7 +73,7 @@ PCGExData::EIOInit UPCGExFilterVtxSettings::GetMainOutputInitMode() const
 	case EPCGExVtxFilterOutput::Points:
 		return PCGExData::EIOInit::NoInit;
 	case EPCGExVtxFilterOutput::Attribute:
-		return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+		return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 	}
 }
 

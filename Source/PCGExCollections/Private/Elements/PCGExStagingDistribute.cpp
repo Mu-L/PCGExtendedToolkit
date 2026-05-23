@@ -64,14 +64,14 @@ bool UPCGExAssetStagingSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) 
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
+bool UPCGExAssetStagingSettings::WantsDataStealing() const
+{
+	return Super::WantsDataStealing() && !bPruneEmptyPoints;
+}
+
 PCGExData::EIOInit UPCGExAssetStagingSettings::GetMainDataInitializationPolicy() const
 {
-	// Forward is more efficient but we need Duplicate when pruning since we'll remove points
-	if (StealData == EPCGExOptionState::Enabled && !bPruneEmptyPoints)
-	{
-		return PCGExData::EIOInit::Forward;
-	}
-	return PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_INITIALIZE_ELEMENT(AssetStaging)

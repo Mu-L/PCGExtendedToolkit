@@ -185,11 +185,14 @@ bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::Context
 				return false;
 			}
 		}
+		
 		bBatchProcessingEnabled = false;
+		
 		if (NextStateId == PCGExCommon::States::State_Done)
 		{
 			Done();
 		}
+		
 		SetState(NextStateId);
 		return true;
 	}
@@ -204,6 +207,7 @@ bool FPCGExPointsProcessorContext::ProcessPointsBatch(const PCGExCommon::Context
 		{
 			Done();
 		}
+		
 		SetState(NextStateId);
 	}
 

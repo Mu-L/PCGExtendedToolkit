@@ -67,6 +67,8 @@ public:
 
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AssetStaging, "Staging : Distribute", "Distribute PCGEx Asset Collection entries to points.", FName(GetDisplayName()));
 
+	virtual bool WantsDataStealing() const override;
+	
 	virtual EPCGSettingsType GetType() const override
 	{
 		return EPCGSettingsType::Sampler;

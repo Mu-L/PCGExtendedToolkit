@@ -16,6 +16,8 @@
 
 bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::PrepareDataInternal)
+
 	check(Context);
 
 	FPCGExContext* InContext = static_cast<FPCGExContext*>(Context);
@@ -28,6 +30,8 @@ bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 
 bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSettings* InSettings) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::AdvancePreparation)
+
 	if (!Context->GetInputSettings<UPCGSettings>()->bEnabled)
 	{
 		return Context->CancelExecution(FString());
@@ -44,9 +48,12 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 	// returning false to yield to the scheduler in the meantime.
 	if (Context->IsState(PCGExCommon::States::State_Preparation))
 	{
-		if (!Boot(Context))
 		{
-			return Context->CancelExecution(FString());
+			TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::InitializeData::Boot)
+			if (!Boot(Context))
+			{
+				return Context->CancelExecution(FString());
+			}
 		}
 
 		for (UPCGExInstancedFactory* Op : Context->InternalOperations)
@@ -74,9 +81,12 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 		PCGEX_EXECUTION_CHECK_C(Context)
 	}
 
-	if (!PostBoot(Context))
 	{
-		return Context->CancelExecution(TEXT("There was a problem during post-data preparation."));
+		TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::InitializeData::PostBoot)
+		if (!PostBoot(Context))
+		{
+			return Context->CancelExecution(TEXT("There was a problem during post-data preparation."));
+		}
 	}
 
 	Context->ReadyForExecution();
@@ -85,6 +95,8 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 
 FPCGContext* IPCGExElement::Initialize(const FPCGInitializeElementParams& InParams)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::Initialize)
+
 	FPCGExContext* Context = static_cast<FPCGExContext*>(IPCGElement::Initialize(InParams));
 
 	const UPCGExSettings* Settings = Context->GetInputSettings<UPCGExSettings>();
@@ -99,11 +111,7 @@ FPCGContext* IPCGExElement::Initialize(const FPCGInitializeElementParams& InPara
 	Context->bQuietCancellationError = Settings->bQuietCancellationError;
 	Context->bCleanupConsumableAttributes = Settings->bCleanupConsumableAttributes;
 
-	if (Settings->SupportsDataStealing()
-		&& Settings->StealData == EPCGExOptionState::Enabled)
-	{
-		Context->bWantsDataStealing = true;
-	}
+	Context->bWantsDataStealing = Settings->WantsDataStealing();
 
 	Context->ElementHandle = this;
 
@@ -187,6 +195,8 @@ bool IPCGExElement::SupportsBasePointDataInputs(FPCGContext* InContext) const
 
 bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::ExecuteInternal)
+
 	check(Context);
 
 	FPCGExContext* InContext = static_cast<FPCGExContext*>(Context);
@@ -206,6 +216,8 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 
 void IPCGExElement::InitializeData(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::InitializeData)
+
 	const FPCGStack* Stack = InContext->GetStack();
 	if (!ensure(Stack))
 	{
