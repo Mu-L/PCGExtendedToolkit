@@ -63,6 +63,12 @@ bool FPCGExAssetCollectionToSetElement::IsCacheable(const UPCGSettings* InSettin
 	PCGEX_GET_OPTION_STATE(Settings->CacheData, bDefaultCacheNodeOutput)
 }
 
+bool FPCGExAssetCollectionToSetElement::Boot(FPCGExContext* InContext) const
+{
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Asset Collection to Set is DEPRECATED -- Use Get Collection Data instead."));
+	return IPCGExElement::Boot(InContext);
+}
+
 bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
 	PCGEX_SETTINGS_C(InContext, AssetCollectionToSet)
@@ -148,10 +154,17 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 	FPCGExNameFiltersDetails CategoryFilters = Settings->CategoryFilters;
 	CategoryFilters.Init();
 
+	EPCGExSubCollectionToSet EffectiveSubHandling = Settings->SubCollectionHandling;
+	if (EffectiveSubHandling == EPCGExSubCollectionToSet::Grammar)
+	{
+		PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Grammar sub-collection mode is only supported on the Get Collection Data node. Falling back to Ignore."));
+		EffectiveSubHandling = EPCGExSubCollectionToSet::Ignore;
+	}
+
 	FProcessEntryContext Ctx;
 	Ctx.Context = InContext;
 	Ctx.CategoryFilters = &CategoryFilters;
-	Ctx.SubHandling = Settings->SubCollectionHandling;
+	Ctx.SubHandling = EffectiveSubHandling;
 	Ctx.CategoryInheritance = CategoryInheritance;
 	Ctx.bOmitInvalidAndEmpty = Settings->bOmitInvalidAndEmpty;
 	Ctx.bNoDuplicates = !Settings->bAllowDuplicates;

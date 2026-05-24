@@ -153,6 +153,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 #if WITH_EDITOR
 	virtual void EDITOR_Sanitize() override;
 	virtual void EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
+	virtual FSoftObjectPath EDITOR_GetThumbnailAssetPath() const override;
 #endif
 };
 

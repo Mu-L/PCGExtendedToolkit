@@ -21,6 +21,7 @@ enum class EPCGExSubCollectionToSet : uint8
 	PickRandomWeighted = 3 UMETA(DisplayName = "Random weighted", Tooltip="Pick one at random, weighted"),
 	PickFirstItem      = 4 UMETA(DisplayName = "First item", Tooltip="Pick the first item"),
 	PickLastItem       = 5 UMETA(DisplayName = "Last item", Tooltip="Pick the last item"),
+	Grammar            = 6 UMETA(DisplayName = "Grammar", Tooltip="Defer to each sub-collection entry's own SubGrammarMode (Flatten recurses, Inherit/Override emit one row). Only supported on the Get Collection Data node."),
 };
 
 UENUM()
@@ -40,7 +41,7 @@ enum class EPCGExCategoryInheritance : uint8
 	Replace   = 2 UMETA(DisplayName = "Replace", Tooltip="The closest non-None category from the ancestor chain of sub-collection entries always wins. The entry's own category survives only when no ancestor provides one."),
 };
 
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), meta=(PCGExNodeLibraryDoc="staging/utilities/asset-collection-to-set"))
+UCLASS(Hidden, MinimalAPI, BlueprintType, ClassGroup = (Procedural), meta=(PCGExNodeLibraryDoc="staging/utilities/asset-collection-to-set"))
 class UPCGExAssetCollectionToSetSettings : public UPCGExSettings
 {
 	GENERATED_BODY()
@@ -205,6 +206,7 @@ public:
 protected:
 	PCGEX_ELEMENT_CREATE_DEFAULT_CONTEXT
 
+	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 	static void ProcessEntry(
 		const FProcessEntryContext& Ctx,

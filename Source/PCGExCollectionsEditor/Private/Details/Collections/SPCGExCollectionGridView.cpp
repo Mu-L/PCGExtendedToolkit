@@ -415,9 +415,13 @@ void SPCGExCollectionGridView::RebuildGroupedLayout()
 			for (const auto& Pair : ActiveTiles)
 			{
 				const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Pair.Key);
-				if (Result.IsValid() && !Result.Entry->Staging.Path.IsNull())
+				if (Result.IsValid())
 				{
-					ActivePaths.Add(Result.Entry->Staging.Path);
+					const FSoftObjectPath ThumbnailPath = Result.Entry->EDITOR_GetThumbnailAssetPath();
+					if (!ThumbnailPath.IsNull())
+					{
+						ActivePaths.Add(ThumbnailPath);
+					}
 				}
 			}
 		}
@@ -1210,6 +1214,24 @@ void SPCGExCollectionGridView::PopulateCategoryTiles(FName Category)
 
 void SPCGExCollectionGridView::UpdateDetailForSelection()
 {
+	// Force any focused detail-panel widget through its normal focus-lost path BEFORE
+	// we swap the FStructOnScope under it. Without this:
+	//   (a) Mid-edit values get dropped on selection change -- Slate destroying the
+	//       focused widget as part of the detail-tree rebuild skips OnTextCommitted,
+	//       so the IPropertyHandle->SetValue commit never runs.
+	//   (b) Tearing down a focused widget whose commit lambdas reference the just-
+	//       replaced FStructOnScope can hit dangling delegate instances during the
+	//       in-flight rebuild, manifesting as DEP crashes inside Slate widget Construct
+	//       (e.g. SNumericEntryBox lambda CreateCopy).
+	// ClearKeyboardFocus(Cleared) fires OnTextCommitted(OnUserMovedFocus) synchronously
+	// on the focused widget, which routes through the still-valid handle and lands the
+	// edit in CurrentStructScope -> OnDetailPropertyChanged -> SyncStructToCollection
+	// before we touch the struct pointer.
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().ClearKeyboardFocus(EFocusCause::Cleared);
+	}
+
 	if (SelectedIndices.IsEmpty())
 	{
 		CurrentDetailIndex = INDEX_NONE;

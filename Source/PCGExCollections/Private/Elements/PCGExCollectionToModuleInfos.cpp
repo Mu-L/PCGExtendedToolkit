@@ -53,6 +53,12 @@ bool FPCGExCollectionToModuleInfosElement::IsCacheable(const UPCGSettings* InSet
 	PCGEX_GET_OPTION_STATE(Settings->CacheData, bDefaultCacheNodeOutput)
 }
 
+bool FPCGExCollectionToModuleInfosElement::Boot(FPCGExContext* InContext) const
+{
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Collection to Module Infos is DEPRECATED -- Use Get Collection Data instead."));
+	return IPCGExElement::Boot(InContext);
+}
+
 bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
 	PCGEX_SETTINGS_C(InContext, CollectionToModuleInfos)

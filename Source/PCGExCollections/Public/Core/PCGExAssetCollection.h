@@ -264,6 +264,15 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	 * UPCGDataAsset living inside the collection package.
 	 */
 	virtual void EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath>& OutPaths) const;
+
+	/**
+	 * Editor-only: the asset path the collection grid should use for this entry's
+	 * thumbnail and for double-click "open asset" actions. Defaults to Staging.Path.
+	 * Override when the user-facing source asset differs from Staging.Path -- e.g.
+	 * level-sourced PCGDataAsset entries whose Staging.Path points at the embedded
+	 * exported data asset rather than the authored UWorld.
+	 */
+	virtual FSoftObjectPath EDITOR_GetThumbnailAssetPath() const;
 #endif
 
 
@@ -722,6 +731,17 @@ public:
 
 	void EDITOR_SanitizeAndRebuildStagingData(bool bRecursive);
 	void EDITOR_AddBrowserSelectionTyped(const TArray<FAssetData>& InAssetData);
+
+	/**
+	 * Append one entry per input subcollection. Each new entry has bIsSubCollection = true
+	 * and its SubCollection UPROPERTY pointed at the input collection. Uses reflection on
+	 * the entry struct (looks up bIsSubCollection + SubCollection by name) so it works for
+	 * every entry type without per-type wiring. Skips inputs that would create a cycle, that
+	 * point at self, or that are already referenced by an existing subcollection entry.
+	 * Does NOT open a transaction or mark dirty -- caller is responsible (matches the
+	 * EDITOR_AddBrowserSelectionTyped contract).
+	 */
+	void EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections);
 
 	/**
 	 * Post-rebuild extension point. Called once at the tail of any user-triggered editor

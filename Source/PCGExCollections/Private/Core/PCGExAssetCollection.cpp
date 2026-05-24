@@ -554,6 +554,11 @@ void FPCGExAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath
 		OutPaths.Emplace(Staging.Path);
 	}
 }
+
+FSoftObjectPath FPCGExAssetCollectionEntry::EDITOR_GetThumbnailAssetPath() const
+{
+	return Staging.Path;
+}
 #endif
 
 void FPCGExAssetCollectionEntry::BuildMicroCache()
@@ -1423,10 +1428,128 @@ void UPCGExAssetCollection::EDITOR_AddBrowserSelectionTyped(const TArray<FAssetD
 {
 	FScopedTransaction Transaction(INVTEXT("Add Browser Selection to Collection"));
 	Modify(true);
-	EDITOR_AddBrowserSelectionInternal(InAssetData);
+
+	// Partition: assets that are themselves a collection of (a subclass of) this collection's
+	// own class become subcollection entries; everything else falls through to the type-specific
+	// EDITOR_AddBrowserSelectionInternal. Resolving GetAsset() loads the package -- fine here
+	// since this only runs from user-driven editor actions (drag-drop / browser selection).
+	UClass* OwnClass = GetClass();
+	TArray<FAssetData> RegularAssets;
+	TArray<UPCGExAssetCollection*> SubCollectionAssets;
+	RegularAssets.Reserve(InAssetData.Num());
+
+	for (const FAssetData& AssetData : InAssetData)
+	{
+		UClass* AssetClass = AssetData.GetClass();
+		if (!AssetClass || !AssetClass->IsChildOf(OwnClass))
+		{
+			RegularAssets.Add(AssetData);
+			continue;
+		}
+
+		if (UPCGExAssetCollection* Sub = Cast<UPCGExAssetCollection>(AssetData.GetAsset()))
+		{
+			SubCollectionAssets.Add(Sub);
+			continue;
+		}
+
+		RegularAssets.Add(AssetData);
+	}
+
+	if (!SubCollectionAssets.IsEmpty())
+	{
+		EDITOR_AddSubCollectionEntries(SubCollectionAssets);
+	}
+
+	if (!RegularAssets.IsEmpty())
+	{
+		EDITOR_AddBrowserSelectionInternal(RegularAssets);
+	}
+
 	SyncPropertyOverridesToEntries();
 	(void)MarkPackageDirty();
 	FCoreUObjectDelegates::BroadcastOnObjectModified(this);
+}
+
+void UPCGExAssetCollection::EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections)
+{
+	if (InSubCollections.IsEmpty())
+	{
+		return;
+	}
+
+	// Reflection on the entry struct. Every entry type in this plugin exposes a
+	// `bIsSubCollection` bool (defined on FPCGExAssetCollectionEntry) and a typed
+	// `SubCollection` UPROPERTY -- this helper relies on those names.
+	FArrayProperty* ArrayProp = CastField<FArrayProperty>(GetClass()->FindPropertyByName(FName("Entries")));
+	if (!ArrayProp)
+	{
+		return;
+	}
+
+	FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
+	if (!InnerProp || !InnerProp->Struct)
+	{
+		return;
+	}
+	UScriptStruct* EntryStruct = InnerProp->Struct;
+
+	FBoolProperty* IsSubProp = CastField<FBoolProperty>(EntryStruct->FindPropertyByName(FName("bIsSubCollection")));
+	FObjectProperty* SubCollProp = CastField<FObjectProperty>(EntryStruct->FindPropertyByName(FName("SubCollection")));
+	if (!IsSubProp || !SubCollProp || !SubCollProp->PropertyClass)
+	{
+		return;
+	}
+
+	void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(this);
+	FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+
+	// Build a set of subcollections already referenced by existing subcollection entries
+	// so drag-dropping the same asset twice doesn't create duplicates -- matches the
+	// dedupe behavior of MeshCollection / ActorCollection / PCGDataAssetCollection's
+	// EDITOR_AddBrowserSelectionInternal implementations.
+	TSet<const UPCGExAssetCollection*> AlreadyReferenced;
+	const int32 ExistingNum = ArrayHelper.Num();
+	const int32 IsSubOffset = IsSubProp->GetOffset_ForInternal();
+	const int32 SubCollOffset = SubCollProp->GetOffset_ForInternal();
+
+	for (int32 i = 0; i < ExistingNum; ++i)
+	{
+		const uint8* EntryPtr = ArrayHelper.GetRawPtr(i);
+		if (IsSubProp->GetPropertyValue(EntryPtr + IsSubOffset))
+		{
+			if (const UObject* Existing = SubCollProp->GetObjectPropertyValue(EntryPtr + SubCollOffset))
+			{
+				AlreadyReferenced.Add(Cast<UPCGExAssetCollection>(Existing));
+			}
+		}
+	}
+
+	for (UPCGExAssetCollection* Sub : InSubCollections)
+	{
+		if (!Sub || Sub == this)
+		{
+			continue;
+		}
+		if (!Sub->GetClass()->IsChildOf(SubCollProp->PropertyClass))
+		{
+			continue;
+		}
+		if (AlreadyReferenced.Contains(Sub))
+		{
+			continue;
+		}
+		if (HasCircularDependency(Sub))
+		{
+			continue;
+		}
+
+		const int32 NewIdx = ArrayHelper.AddValue();
+		uint8* EntryPtr = ArrayHelper.GetRawPtr(NewIdx);
+		IsSubProp->SetPropertyValue(EntryPtr + IsSubOffset, true);
+		SubCollProp->SetObjectPropertyValue(EntryPtr + SubCollOffset, Sub);
+		AlreadyReferenced.Add(Sub);
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData)
