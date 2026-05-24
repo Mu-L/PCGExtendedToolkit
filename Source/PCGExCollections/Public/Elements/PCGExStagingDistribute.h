@@ -146,15 +146,20 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution (Entry)", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails EntryDistributionSettings;
 
+	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	bool bApplyFitting = true;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bApplyFitting", EditConditionHides))
 	FPCGExScaleToFitDetails ScaleToFit;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bApplyFitting", EditConditionHides))
 	FPCGExJustificationDetails Justification;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="bApplyFitting", EditConditionHides))
 	FPCGExFittingVariationsDetails Variations;
 
+	
 	//** If enabled, filter output based on whether a staging has been applied or not (empty entry).  Current implementation is slow. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))
 	bool bPruneEmptyPoints = true;
@@ -275,6 +280,7 @@ namespace PCGExAssetStaging
 
 		TArray<int8> Mask;
 
+		bool bApplyFitting = true;
 		FPCGExFittingDetailsHandler FittingHandler;
 		FPCGExFittingVariationsDetails Variations;
 
