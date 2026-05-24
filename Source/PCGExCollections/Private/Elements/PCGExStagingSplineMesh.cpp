@@ -349,6 +349,7 @@ bool FPCGExPathSplineMeshElement::AdvanceWork(FPCGExContext* InContext, const UP
 			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
 		}
 
+		Context->CollectionsLoader->FinalizeTracking();
 		Context->AssetPaths = MakeShared<TSet<FSoftObjectPath>>();
 
 		// Make sure cache is built for all collections

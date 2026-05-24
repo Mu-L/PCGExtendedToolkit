@@ -350,6 +350,8 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
 		}
 
+		Context->CollectionsLoader->FinalizeTracking();
+		
 		for (const TPair<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& Pair : Context->CollectionsLoader->AssetsMap)
 		{
 			Pair.Value->LoadCache();

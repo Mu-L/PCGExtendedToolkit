@@ -186,14 +186,25 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
 	EPCGExEntryVariationMode GrammarSource = EPCGExEntryVariationMode::Local;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName="Grammar Mode", EditCondition="bIsSubCollection", EditConditionHides))
+	EPCGExGrammarSubCollectionMode SubGrammarMode = EPCGExGrammarSubCollectionMode::Inherit;
+	
+	/**
+	 * Per-entry grammar configuration. Shared between leaf and subcollection entries; for
+	 * subcollections this slot is populated only when SubGrammarMode == Override (it then
+	 * replaces the subcollection's own SubCollectionGrammar wholesale). Customization
+	 * gates EPCGExGrammarAxisSize values based on bIsSubCollection.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName="Grammar", EditCondition="!bIsSubCollection || SubGrammarMode == EPCGExGrammarSubCollectionMode::Override", EditConditionHides))
 	FPCGExAssetGrammarDetails AssetGrammar;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bIsSubCollection", EditConditionHides))
-	EPCGExGrammarSubCollectionMode SubGrammarMode = EPCGExGrammarSubCollectionMode::Inherit;
-
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bIsSubCollection && SubGrammarMode == EPCGExGrammarSubCollectionMode::Override", EditConditionHides))
-	FPCGExCollectionGrammarDetails CollectionGrammar;
+#pragma region DEPRECATED
+	
+	/** LEGACY (schema v0). Migrated into AssetGrammar by PostLoad when SubGrammarMode==Override. */
+	UPROPERTY(meta=(DeprecatedProperty))
+	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
+	
+#pragma endregion
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
 	FPCGExAssetStagingData Staging;
@@ -242,15 +253,44 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	// Variations & Grammar
 
 	const FPCGExFittingVariations& GetVariations(const UPCGExAssetCollection* ParentCollection) const;
-	double GetGrammarSize(const UPCGExAssetCollection* Host) const;
-	double GetGrammarSize(const UPCGExAssetCollection* Host, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const;
-	bool FixModuleInfos(const UPCGExAssetCollection* Host, FPCGSubdivisionSubmodule& OutModule, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+
+	/**
+	 * Return the grammar struct that applies to this entry given GrammarSource / SubGrammarMode /
+	 * Overrule. Returns nullptr for Flatten or when a subcollection mode requires a missing
+	 * subcollection. Cheap struct lookup -- callers needing only Symbol / DebugColor / Axes
+	 * should prefer this over FixModuleInfos.
+	 */
+	const FPCGExAssetGrammarDetails* GetEffectiveGrammar(const UPCGExAssetCollection* Host) const;
+
+	/**
+	 * Resolve this entry's grammar module for the given axis. Routes to AssetGrammar / Host's
+	 * GlobalAssetGrammar / the subcollection's SubCollectionGrammar based on GrammarSource and
+	 * SubGrammarMode. Returns 0 when the resolved struct doesn't enable Axis, when the subcollection
+	 * is in Flatten mode, or when no subcollection is bound. Caller may pass an optional SizeCache
+	 * to deduplicate per-entry queries across recursive aggregation.
+	 */
+	double GetGrammarSize(
+		const UPCGExAssetCollection* Host,
+		EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X,
+		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+
+	/**
+	 * Resolve and populate OutModule for the given axis. Returns true when the resolved grammar
+	 * struct enables Axis (Symbol/DebugColor/Size/bScalable written); false otherwise (OutModule
+	 * untouched).
+	 */
+	bool FixModuleInfos(
+		const UPCGExAssetCollection* Host,
+		FPCGSubdivisionSubmodule& OutModule,
+		EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X,
+		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
 
 
 	// Lifecycle
 
 	virtual bool Validate(const UPCGExAssetCollection* ParentCollection);
 	virtual void UpdateStaging(const UPCGExAssetCollection* OwningCollection, int32 InInternalIndex, bool bRecursive);
+	virtual void PostUpdateStaging();
 	virtual void SetAssetPath(const FSoftObjectPath& InPath);
 	virtual void GetAssetPaths(TSet<FSoftObjectPath>& OutPaths) const;
 
@@ -834,8 +874,22 @@ public:
 	UPROPERTY(EditAnywhere, Category = Settings)
 	FPCGExAssetGrammarDetails GlobalAssetGrammar = FPCGExAssetGrammarDetails(FName("N/A"));
 
+	/**
+	 * This collection's identity as a grammar module when it is used as a subcollection entry
+	 * elsewhere (resolved when the parent entry has SubGrammarMode == Inherit). Per-axis like
+	 * any other grammar struct; customization gates EPCGExGrammarAxisSize values for the
+	 * subcollection-aggregation set (Min/Max/Average + Fixed).
+	 */
 	UPROPERTY(EditAnywhere, Category = Settings)
-	FPCGExCollectionGrammarDetails CollectionGrammar;
+	FPCGExAssetGrammarDetails SubCollectionGrammar;
+
+	/** LEGACY (schema v0). Migrated into SubCollectionGrammar by PostLoad. */
+	UPROPERTY(meta=(DeprecatedProperty))
+	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
+
+	/** Versioned grammar schema. PostLoad migrates legacy data to the current version. 0 = pre-v1 layout. */
+	UPROPERTY()
+	int32 GrammarSchemaVersion = 0;
 
 	UPROPERTY(EditAnywhere, Category = Settings)
 	bool bDoNotIgnoreInvalidEntries = false;

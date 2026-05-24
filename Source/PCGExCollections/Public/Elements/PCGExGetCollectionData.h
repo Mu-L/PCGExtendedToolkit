@@ -10,10 +10,23 @@
 #include "Elements/Grammar/PCGSubdivisionBase.h"
 #include "Elements/PCGExAssetCollectionToSet.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
+#include "Core/PCGExAssetGrammar.h"
 #include "PCGExGetCollectionData.generated.h"
 
 class UPCGExAssetCollection;
 struct FPCGExAssetCollectionEntry;
+
+/** Row-skip conditions for GetCollectionData. Multiple flags may be combined. */
+UENUM(meta=(Bitflags, UseEnumValuesAsMaskValuesInEditor="true"))
+enum class EPCGExGetCollectionDataSkipFlags : uint8
+{
+	None        = 0      UMETA(Hidden),
+	EmptySymbol = 1 << 0 UMETA(DisplayName = "Empty Symbol", Tooltip = "Skip entries whose resolved grammar Symbol is None."),
+	EmptyAxes   = 1 << 1 UMETA(DisplayName = "Empty Axes",   Tooltip = "Skip entries whose enabled axes don't intersect the requested OutputAxes (i.e. contribute nothing to the per-axis output)."),
+	Duplicates  = 1 << 2 UMETA(DisplayName = "Duplicates",   Tooltip = "Dedupe both pointer-identical entries reached through multiple subcollection paths (flatten phase) AND rows sharing the same Symbol (write phase)."),
+};
+
+ENUM_CLASS_FLAGS(EPCGExGetCollectionDataSkipFlags)
 
 UENUM()
 enum class EPCGExGetCollectionDataSourceMode : uint8
@@ -108,31 +121,27 @@ public:
 	// Recursion / filtering
 
 	/** How sub-collection entries are handled during flattening. Grammar defers to each entry's own SubGrammarMode (Flatten recurses, Inherit/Override emit one row). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_NotOverridable))
 	EPCGExSubCollectionToSet SubCollectionHandling = EPCGExSubCollectionToSet::Grammar;
 
-	/** Allow duplicate entries (same entry pointer) to appear in the output. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_Overridable))
-	bool bAllowDuplicates = true;
-
-	/** Drop entries whose resolved Symbol is None (only relevant when Symbol output is enabled). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_Overridable))
-	bool bSkipEmptySymbol = true;
+	/** Row-skip conditions. Default = EmptySymbol (matches the prior bSkipEmptySymbol = true behavior). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_NotOverridable, Bitmask, BitmaskEnum="/Script/PCGExCollections.EPCGExGetCollectionDataSkipFlags"))
+	uint8 SkipFlags = static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::EmptySymbol);
 
 	/** Drop entries that resolve to invalid / empty data instead of keeping them as placeholders. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_NotOverridable))
 	bool bOmitInvalidAndEmpty = true;
 
 	/** Optionally include/exclude entries by category name. Tested against both leaf entries and
 	 *  sub-collection containers; excluding a sub-collection skips its descendants entirely. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_NotOverridable))
 	FPCGExNameFiltersDetails CategoryFilters;
 
 
 	// Asset outputs
 
 	/** Write the asset path. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteAssetPath = true;
 
 	UPROPERTY(meta=(PCG_NotOverridable))
@@ -146,7 +155,7 @@ public:
 	FName AssetClassAttributeName = NAME_None;
 
 	/** Write the asset weight. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteWeight = true;
 
 	/** Name of the attribute the asset weight is written to. */
@@ -155,11 +164,11 @@ public:
 
 	/** How (and whether) to normalize the weight value. When set to anything other than None, the
 	 *  Weight attribute is written as a float in [0..1] instead of the raw int32. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName = " └─ Normalize", EditCondition="bWriteWeight", HideEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, DisplayName = " └─ Normalize", EditCondition="bWriteWeight", HideEditConditionToggle))
 	EPCGExWeightNormalization WeightNormalization = EPCGExWeightNormalization::None;
 
 	/** Write the asset category. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteCategory = false;
 
 	/** Name of the attribute the asset category is written to. */
@@ -168,32 +177,32 @@ public:
 
 	/** How (and whether) to fold parent sub-collection categories down into descendant entries during
 	 *  expansion. Also applies to Per Category weight normalization. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName = " └─ Inheritance", EditCondition="bWriteCategory", HideEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, DisplayName = " └─ Inheritance", EditCondition="bWriteCategory", HideEditConditionToggle))
 	EPCGExCategoryInheritance CategoryInheritance = EPCGExCategoryInheritance::None;
 
 	/** Write the asset bounds extents. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteExtents = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName="Extents", EditCondition="bWriteExtents"))
 	FName ExtentsAttributeName = FName("Extents");
 
 	/** Write the asset minimum bounds. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteBoundsMin = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName="BoundsMin", EditCondition="bWriteBoundsMin"))
 	FName BoundsMinAttributeName = FName("BoundsMin");
 
 	/** Write the asset maximum bounds. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteBoundsMax = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName="BoundsMax", EditCondition="bWriteBoundsMax"))
 	FName BoundsMaxAttributeName = FName("BoundsMax");
 
 	/** Write the asset nesting depth (0 = top-level). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteNestingDepth = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName="Nesting Depth", EditCondition="bWriteNestingDepth"))
@@ -202,29 +211,44 @@ public:
 
 	// Grammar outputs
 
+	/**
+	 * Which subdivision axes to emit per row. Bits are intersected with each entry's own Axes
+	 * bitmask at write time, so axes the entry doesn't enable produce no output for that row.
+	 * When exactly one axis ends up being emitted across all rows, the _X/_Y/_Z suffix is
+	 * dropped from per-axis attribute names (Size, Scalable) for the legacy single-axis shape --
+	 * unless bAlwaysSuffixAxes is set.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_NotOverridable, Bitmask, BitmaskEnum="/Script/PCGExCollections.EPCGExGrammarAxes"))
+	uint8 OutputAxes = static_cast<uint8>(EPCGExGrammarAxes::X);
+
+	/** Always append _X/_Y/_Z to per-axis attribute names, even when only one axis is emitted.
+	 *  Use this when downstream graphs expect suffixed names regardless of axis count. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable))
+	bool bAlwaysSuffixAxes = false;
+
 	/** Write the resolved grammar Symbol. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteSymbol = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, DisplayName="Symbol", EditCondition="bWriteSymbol"))
 	FName SymbolAttributeName = FName("Symbol");
 
 	/** Write the resolved grammar Size. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteSize = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, DisplayName="Size", EditCondition="bWriteSize"))
 	FName SizeAttributeName = FName("Size");
 
 	/** Write the resolved grammar Scalable flag. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteScalable = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, DisplayName="Scalable", EditCondition="bWriteScalable"))
 	FName ScalableAttributeName = FName("Scalable");
 
 	/** Write the resolved grammar DebugColor. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_NotOverridable, InlineEditConditionToggle))
 	bool bWriteDebugColor = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, DisplayName="DebugColor", EditCondition="bWriteDebugColor"))

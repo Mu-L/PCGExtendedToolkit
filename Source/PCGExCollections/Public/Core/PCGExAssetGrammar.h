@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -11,56 +11,157 @@ class UPCGExAssetCollection;
 struct FPCGExAssetCollectionEntry;
 struct FPCGSubdivisionSubmodule;
 
+// ============================================================================
+// LEGACY ENUMS (schema v0)
+// Retained ONLY so existing serialized data deserializes correctly for migration.
+// New code MUST NOT reference these. Removed in a future major version.
+// ============================================================================
+
 UENUM()
 enum class EPCGExGrammarScaleMode : uint8
 {
-	Fixed = 0 UMETA(DisplayName = "Fixed", Tooltip="Fixed size. Will use the bound size of the selected axis.", ActionIcon="Fixed"),
-	Flex  = 1 UMETA(DisplayName = "Flexible", Tooltip="Flexible size. Will use the bound size of the selected axis as a base but will be marked scalable.", ActionIcon="Flexible"),
+	Fixed = 0 UMETA(DisplayName = "Fixed"),
+	Flex  = 1 UMETA(DisplayName = "Flexible"),
 };
 
 UENUM()
 enum class EPCGExGrammarSizeReference : uint8
 {
-	X       = 0 UMETA(DisplayName = "X", Tooltip="X size", ActionIcon="X"),
-	Y       = 1 UMETA(DisplayName = "Y", Tooltip="Y size", ActionIcon="Y"),
-	Z       = 2 UMETA(DisplayName = "Z", Tooltip="Z axis", ActionIcon="Z"),
-	Min     = 3 UMETA(DisplayName = "Smallest", Tooltip="Use smallest axis size", ActionIcon="MinSize"),
-	Max     = 4 UMETA(DisplayName = "Largest", Tooltip="Use largest axis size", ActionIcon="MaxSize"),
-	Average = 5 UMETA(DisplayName = "Average", Tooltip="Average size of all axes.", ActionIcon="AverageSize"),
-	Fixed   = 6 UMETA(DisplayName = "Fixed", Tooltip="Use a manually specified size, independent of bounds.", ActionIcon="Constant"),
-};
-
-UENUM()
-enum class EPCGExGrammarSizeOp : uint8
-{
-	None     = 0 UMETA(DisplayName = "=", Tooltip="Use the axis size as-is."),
-	Offset   = 1 UMETA(DisplayName = "+", Tooltip="Add the specified value to the axis size."),
-	Multiply = 2 UMETA(DisplayName = "×", Tooltip="Multiply the axis size by the specified value."),
-};
-
-UENUM()
-enum class EPCGExGrammarSubCollectionMode : uint8
-{
-	Inherit  = 0 UMETA(DisplayName = "Inherit", Tooltip="Inherit the settings from the selected collection."),
-	Override = 1 UMETA(DisplayName = "Override", Tooltip="Override the collection internal settings with custom ones."),
-	Flatten  = 2 UMETA(DisplayName = "Flatten", Tooltip="Hoist the collection entries as if they were part of this collection."),
+	X       = 0 UMETA(DisplayName = "X"),
+	Y       = 1 UMETA(DisplayName = "Y"),
+	Z       = 2 UMETA(DisplayName = "Z"),
+	Min     = 3 UMETA(DisplayName = "Smallest"),
+	Max     = 4 UMETA(DisplayName = "Largest"),
+	Average = 5 UMETA(DisplayName = "Average"),
+	Fixed   = 6 UMETA(DisplayName = "Fixed"),
 };
 
 UENUM()
 enum class EPCGExCollectionGrammarSize : uint8
 {
-	Fixed   = 0 UMETA(DisplayName = "Fixed", Tooltip="Fixed size.", ActionIcon="Constant"),
-	Min     = 1 UMETA(DisplayName = "Smallest", Tooltip="Uses the smallest size found within the collection entries.", ActionIcon="MinSize"),
-	Max     = 2 UMETA(DisplayName = "Largest", Tooltip="Uses the largest size found within the collection entries.", ActionIcon="MaxSize"),
-	Average = 3 UMETA(DisplayName = "Average", Tooltip="Uses an average of the sizes of all the collection entries.", ActionIcon="AverageSize"),
+	Fixed   = 0 UMETA(DisplayName = "Fixed"),
+	Min     = 1 UMETA(DisplayName = "Smallest"),
+	Max     = 2 UMETA(DisplayName = "Largest"),
+	Average = 3 UMETA(DisplayName = "Average"),
+};
+
+// ============================================================================
+// CURRENT ENUMS (schema v1)
+// ============================================================================
+
+/**
+ * Bitmask of subdivision axes a grammar module participates in. None = not a valid module.
+ * UseEnumValuesAsMaskValuesInEditor tells the editor's BitmaskEnum widget that values are
+ * mask bits directly (1, 2, 4) rather than bit indices -- without it, the checkboxes are
+ * off-by-one and toggling "X" sets the Y bit.
+ */
+UENUM(meta=(Bitflags, UseEnumValuesAsMaskValuesInEditor="true"))
+enum class EPCGExGrammarAxes : uint8
+{
+	None = 0 UMETA(Hidden),
+	X    = 1 << 0 UMETA(DisplayName = "X", ActionIcon = "X"),
+	Y    = 1 << 1 UMETA(DisplayName = "Y", ActionIcon = "Y"),
+	Z    = 1 << 2 UMETA(DisplayName = "Z", ActionIcon = "Z"),
+};
+
+ENUM_CLASS_FLAGS(EPCGExGrammarAxes)
+
+namespace PCGExGrammarAxes
+{
+	/** Iteration order for axis-indexed loops. */
+	static constexpr EPCGExGrammarAxes Bits[3] = { EPCGExGrammarAxes::X, EPCGExGrammarAxes::Y, EPCGExGrammarAxes::Z };
+
+	/** Hardcoded attribute-name suffixes. Matches PCGExGetCollectionData / Grammit export. */
+	static constexpr const TCHAR* Suffixes[3] = { TEXT("_X"), TEXT("_Y"), TEXT("_Z") };
+
+	/** Number of set bits in an axis mask. Constrained to the 3 valid axis bits. */
+	FORCEINLINE int32 CountAxes(const uint8 Mask)
+	{
+		return ((Mask & static_cast<uint8>(EPCGExGrammarAxes::X)) ? 1 : 0)
+			+ ((Mask & static_cast<uint8>(EPCGExGrammarAxes::Y)) ? 1 : 0)
+			+ ((Mask & static_cast<uint8>(EPCGExGrammarAxes::Z)) ? 1 : 0);
+	}
+}
+
+/**
+ * Per-axis size source.
+ * Bounds/Fixed are valid for leaf entries; Min/Max/Average are valid for subcollection entries
+ * (aggregating their child entries' per-axis grammar sizes). Customization hides the
+ * non-applicable values based on the owning entry's bIsSubCollection.
+ */
+UENUM()
+enum class EPCGExGrammarAxisSize : uint8
+{
+	Bounds  = 0 UMETA(DisplayName = "Bounds", Tooltip = "Use the entry's bounds extent on this axis.", ActionIcon = "From_Center"),
+	Fixed   = 1 UMETA(DisplayName = "Fixed", Tooltip = "Use FixedSize as the literal size on this axis.", ActionIcon = "Constant"),
+	Min     = 2 UMETA(DisplayName = "Smallest", Tooltip = "Subcollection only: smallest per-axis size across child entries.", ActionIcon = "Fit_Min"),
+	Max     = 3 UMETA(DisplayName = "Largest", Tooltip = "Subcollection only: largest per-axis size across child entries.", ActionIcon = "Fit_Max"),
+	Average = 4 UMETA(DisplayName = "Average", Tooltip = "Subcollection only: average per-axis size across child entries.", ActionIcon = "Fit_Average"),
+};
+
+/** Arithmetic op applied on top of the resolved per-axis size. */
+UENUM()
+enum class EPCGExGrammarSizeOp : uint8
+{
+	None     = 0 UMETA(DisplayName = "=", Tooltip = "Use the resolved size as-is."),
+	Offset   = 1 UMETA(DisplayName = "+", Tooltip = "Add FixedSize to the resolved size."),
+	Multiply = 2 UMETA(DisplayName = "×", Tooltip = "Multiply the resolved size by FixedSize."),
+};
+
+UENUM()
+enum class EPCGExGrammarSubCollectionMode : uint8
+{
+	Inherit  = 0 UMETA(DisplayName = "Inherit", Tooltip = "Use the subcollection's own SubCollectionGrammar."),
+	Override = 1 UMETA(DisplayName = "Override", Tooltip = "Override with this entry's AssetGrammar."),
+	Flatten  = 2 UMETA(DisplayName = "Flatten", Tooltip = "Hoist the collection entries as if they were part of this collection."),
+};
+
+// ============================================================================
+// CURRENT TYPES (schema v1)
+// ============================================================================
+
+/**
+ * Per-axis sizing configuration. Shared across leaf and subcollection contexts;
+ * customization gates which EPCGExGrammarAxisSize values are available based on
+ * the surrounding entry's bIsSubCollection.
+ */
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Grammar Axis Details")
+struct PCGEXCOLLECTIONS_API FPCGExGrammarAxisDetails
+{
+	GENERATED_BODY()
+
+	FPCGExGrammarAxisDetails() = default;
+
+	/** Where the size for this axis comes from. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	EPCGExGrammarAxisSize Size = EPCGExGrammarAxisSize::Bounds;
+
+	/** Optional op applied on top of the resolved size. Ignored when Size == Fixed. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	EPCGExGrammarSizeOp SizeOp = EPCGExGrammarSizeOp::None;
+
+	/** Literal size when Size==Fixed, offset when SizeOp==Offset, multiplier when SizeOp==Multiply. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	double FixedSize = 100;
+
+	/** Whether the resolved module is scalable along this axis. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	bool bScalable = false;
+
+	/** Apply SizeOp + FixedSize on top of an already-resolved scalar (Bounds extent or aggregated value). */
+	double ApplyOp(double InResolved) const;
 };
 
 /**
- * Per-entry grammar configuration. Defines how a single entry participates in
- * PCG subdivision: its symbol name, whether it's fixed or flexible (scalable),
- * and which axis of its bounds determines its size.
+ * Unified grammar configuration. Lives at the entry level (as AssetGrammar) and at the
+ * collection level (as GlobalAssetGrammar / SubCollectionGrammar). Customization shows
+ * different EPCGExGrammarAxisSize options depending on whether the surrounding entry
+ * is bIsSubCollection.
+ *
+ * Axes is a bitmask: 0 means "not a valid module" (output skipped). When evaluated for
+ * a disabled axis, GetSize returns 0 and FixLeaf/FixSubCollection return false.
  */
-USTRUCT(BlueprintType, DisplayName="[PCGEx] Mesh Grammar Details")
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Grammar Details")
 struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 {
 	GENERATED_BODY()
@@ -72,67 +173,154 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 	{
 	}
 
-	/** Symbol for the grammar. */
+	/** Symbol for the grammar. Shared across all enabled axes. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	FName Symbol = NAME_None;
 
-	/** If the volume can be scaled to fit the remaining space or not. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
-	EPCGExGrammarScaleMode ScaleMode = EPCGExGrammarScaleMode::Fixed;
-
-	/** If the volume can be scaled to fit the remaining space or not. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
-	EPCGExGrammarSizeReference Size = EPCGExGrammarSizeReference::X;
-
-	/** Optional operation applied on top of the axis-derived size using FixedSize. Ignored when Size is Fixed. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="Size != EPCGExGrammarSizeReference::Fixed", EditConditionHides))
-	EPCGExGrammarSizeOp SizeOp = EPCGExGrammarSizeOp::None;
-
-	/** Manually specified size. Used as the absolute size when Size is Fixed, as an offset when SizeOp is Offset, or as a multiplier when SizeOp is Multiply. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="Size == EPCGExGrammarSizeReference::Fixed || SizeOp != EPCGExGrammarSizeOp::None", EditConditionHides))
-	double FixedSize = 100;
-
-	/** For easier debugging, using Point color in conjunction with PCG Debug Color Material. */
+	/** For easier debugging, using Point color in conjunction with PCG Debug Color Material. Shared across axes. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	FLinearColor DebugColor = FLinearColor::White;
 
-	double GetSize(const FBox& InBounds, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
-	void Fix(const FBox& InBounds, FPCGSubdivisionSubmodule& OutSubmodule, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+	/**
+	 * Subdivision axes this module participates in. None = not a valid module (skipped during export).
+	 * Defaults to X for new entries, matching the most common single-axis use case. PostLoad migration
+	 * overrides this explicitly for legacy entries (empty Symbol -> None; legacy Size axis -> matching bit).
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(Bitmask, BitmaskEnum="/Script/PCGExCollections.EPCGExGrammarAxes"))
+	uint8 Axes = static_cast<uint8>(EPCGExGrammarAxes::X);
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	FPCGExGrammarAxisDetails SizingX;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	FPCGExGrammarAxisDetails SizingY;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	FPCGExGrammarAxisDetails SizingZ;
+
+#pragma region DEPRECATED
+	// LEGACY (schema v0). Kept ONLY so prior serialized data deserializes for migration.
+	// UPCGExAssetCollection::PostLoad reads these when GrammarSchemaVersion < 1 and writes
+	// the canonical fields above. Do not read directly outside migration code.
+
+	UPROPERTY(meta=(DeprecatedProperty))
+	EPCGExGrammarScaleMode ScaleMode_DEPRECATED = EPCGExGrammarScaleMode::Fixed;
+
+	UPROPERTY(meta=(DeprecatedProperty))
+	EPCGExGrammarSizeReference Size_DEPRECATED = EPCGExGrammarSizeReference::X;
+
+	UPROPERTY(meta=(DeprecatedProperty))
+	EPCGExGrammarSizeOp SizeOp_DEPRECATED = EPCGExGrammarSizeOp::None;
+
+	UPROPERTY(meta=(DeprecatedProperty))
+	double FixedSize_DEPRECATED = 100;
+
+#pragma endregion
+
+	// Runtime API
+
+	FORCEINLINE bool IsValidModule() const { return Axes != 0; }
+	FORCEINLINE bool HasAxis(EPCGExGrammarAxes Axis) const { return (Axes & static_cast<uint8>(Axis)) != 0; }
+
+	const FPCGExGrammarAxisDetails& GetAxisDetails(EPCGExGrammarAxes Axis) const;
+	FPCGExGrammarAxisDetails& GetAxisDetailsMutable(EPCGExGrammarAxes Axis);
+
+	/**
+	 * Leaf-context size. Caller provides the entry's own bounds.
+	 * Returns 0 when the axis isn't enabled, or when the axis sizing mode is Min/Max/Average
+	 * (only valid for subcollections — invalid combination, caller should have used FixSubCollection).
+	 */
+	double GetLeafSize(const FBox& InBounds, EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X) const;
+
+	/**
+	 * Subcollection-context size. Aggregates child entries of SubCollection when Min/Max/Average,
+	 * returns FixedSize (with op applied) when Fixed. Bounds isn't meaningful for a subcollection
+	 * (no own bounds) and returns 0 — invalid combination, customization should prevent it.
+	 * SizeCache deduplicates per-entry queries across the recursion.
+	 */
+	double GetSubCollectionSize(
+		const UPCGExAssetCollection* SubCollection,
+		EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X,
+		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+
+	/**
+	 * Leaf-context Fix. Returns true and populates OutSubmodule (Symbol, DebugColor, Size, bScalable)
+	 * when the axis is enabled. Returns false otherwise; OutSubmodule untouched.
+	 */
+	bool FixLeaf(const FBox& InBounds, EPCGExGrammarAxes Axis, FPCGSubdivisionSubmodule& OutSubmodule) const;
+
+	/** Subcollection-context Fix. Same contract as FixLeaf, using GetSubCollectionSize. */
+	bool FixSubCollection(
+		const UPCGExAssetCollection* SubCollection,
+		EPCGExGrammarAxes Axis,
+		FPCGSubdivisionSubmodule& OutSubmodule,
+		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+
+
+#if WITH_EDITOR
+	
+	// Migration (schema v0 -> v1)
+
+	/**
+	 * Migrate the internal *_DEPRECATED fields into the new per-axis fields. Should be called
+	 * exactly once per struct during PostLoad gated by GrammarSchemaVersion. Mapping:
+	 *  - Symbol == NAME_None                 -> Axes = None (module disabled, info)
+	 *  - Size_DEPRECATED in {X, Y, Z}        -> Axes = matching bit, SizingN.Size = Bounds
+	 *  - Size_DEPRECATED == Fixed            -> Axes = X, SizingX.Size = Fixed
+	 *  - Size_DEPRECATED in {Min, Max, Avg}  -> Axes = X, SizingX.Size = Bounds (warning)
+	 * The old SizeOp / FixedSize copy into the targeted axis; old ScaleMode == Flex -> bScalable.
+	 * @return true when a Min/Max/Average legacy mode was downgraded (caller may log).
+	 */
+	bool MigrateFromV0Internal();
+
+	/** Overwrite this struct with the values of a legacy collection grammar (used for migrating
+	 *  entry CollectionGrammar_DEPRECATED into AssetGrammar when Override, and collection-level
+	 *  CollectionGrammar_DEPRECATED into SubCollectionGrammar). */
+	void MigrateFromLegacyCollectionGrammar(const struct FPCGExCollectionGrammarDetails& Legacy);
+
+	/**
+	 * Snap each axis's Size mode to one valid for the given context (leaf vs subcollection).
+	 * Bounds is leaf-only; Min/Max/Average are subcollection-only; Fixed is universal and the
+	 * fallback target. Invoked from PostEditChangeProperty to recover from context flips
+	 * (toggling bIsSubCollection, switching SubGrammarMode to/from Override) without leaving
+	 * the struct in an unevaluable state.
+	 * @return true if any axis was modified.
+	 */
+	bool ValidateContext(bool bIsSubCollection);
+
+#endif
+	
 };
 
+
+// ============================================================================
+// LEGACY TYPES (schema v0)
+// ============================================================================
+
 /**
- * Collection-level grammar configuration. Defines how an entire collection
- * is treated as a single grammar module during subdivision. SizeMode determines
- * whether the collection's representative size is the min/max/average of its entries
- * or a fixed user-specified value.
+ * LEGACY (schema v0). Retained ONLY so prior CollectionGrammar serialized data deserializes
+ * for migration in UPCGExAssetCollection::PostLoad. New code must use FPCGExAssetGrammarDetails.
+ * Removed in a future major version.
  */
-USTRUCT(BlueprintType, DisplayName="[PCGEx] Mesh Collection Grammar Details")
+USTRUCT()
 struct PCGEXCOLLECTIONS_API FPCGExCollectionGrammarDetails
 {
 	GENERATED_BODY()
 
 	FPCGExCollectionGrammarDetails() = default;
 
-	/** Symbol for the grammar. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	UPROPERTY()
 	FName Symbol = NAME_None;
 
-	/** If the volume can be scaled to fit the remaining space or not. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	UPROPERTY()
 	EPCGExGrammarScaleMode ScaleMode = EPCGExGrammarScaleMode::Fixed;
 
-	/** How to define the size of this collection "as a grammar module"*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	UPROPERTY()
 	EPCGExCollectionGrammarSize SizeMode = EPCGExCollectionGrammarSize::Min;
 
-	/** Fixed size */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="SizeMode == EPCGExCollectionGrammarSize::Fixed", EditConditionHides))
+	UPROPERTY()
 	double Size = 100;
 
-	/** For easier debugging, using Point color in conjunction with PCG Debug Color Material. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	UPROPERTY()
 	FLinearColor DebugColor = FLinearColor::White;
-
-	double GetSize(const UPCGExAssetCollection* InCollection, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
-	void Fix(const UPCGExAssetCollection* InCollection, FPCGSubdivisionSubmodule& OutSubmodule, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
 };

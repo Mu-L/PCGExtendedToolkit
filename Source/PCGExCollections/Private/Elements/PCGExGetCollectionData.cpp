@@ -21,6 +21,43 @@
 #define LOCTEXT_NAMESPACE "PCGExGetCollectionData"
 #define PCGEX_NAMESPACE GetCollectionData
 
+// Per-attribute tables driving validation, FUniqueOutput field declarations, attribute creation,
+// and the write loop. Row form:
+//   _(Type, FieldName, AttrNameMember, ToggleMember, Default, PerEntryValueExpr)
+//
+// FieldName drives the FUniqueOutput member name via FieldName##Attr.
+// PerEntryValueExpr is evaluated inside the write loop where `E` (entry) / `Module` (subdivision
+// submodule) are in scope -- LEAF rows reference E, GRAMMAR rows reference Module.
+//
+// Attributes that don't fit the uniform shape are kept bespoke:
+//   - AssetPath/AssetClass: one toggle declares two attributes (FSoftObjectPath/FSoftClassPath)
+//   - Weight:               int32 vs float depending on normalization mode
+//   - Category:             written always, not gated on bIsSubCollection
+//   - Entry:                always created, value derived from Packer
+#define PCGEX_GCD_LEAF_ATTRS(_) \
+	_(FVector, Extents,      ExtentsAttributeName,      bWriteExtents,      FVector::OneVector, E->Staging.Bounds.GetExtent()) \
+	_(FVector, BoundsMin,    BoundsMinAttributeName,    bWriteBoundsMin,    FVector::OneVector, E->Staging.Bounds.Min) \
+	_(FVector, BoundsMax,    BoundsMaxAttributeName,    bWriteBoundsMax,    FVector::OneVector, E->Staging.Bounds.Max) \
+	_(int32,   NestingDepth, NestingDepthAttributeName, bWriteNestingDepth, -1,                 -1)
+
+// Per-axis grammar attributes. Each row maps to an array-of-3 in FUniqueOutput (one slot per
+// axis bit), with attribute names produced by appending _X/_Y/_Z to the user-configured base name.
+//   _(Type, FieldName, AttrNameMember, ToggleMember, Default, PerEntryValueExpr)
+// PerEntryValueExpr references `Module` (FPCGSubdivisionSubmodule) populated by FixModuleInfos(Axis).
+#define PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS(_) \
+	_(double, Size,     SizeAttributeName,     bWriteSize,     0.0,  Module.Size) \
+	_(bool,   Scalable, ScalableAttributeName, bWriteScalable, true, Module.bScalable)
+
+// Shared-across-axes grammar attributes. One slot in FUniqueOutput, no suffix.
+// Symbol and DebugColor live at the grammar struct level (FPCGExAssetGrammarDetails), not per-axis,
+// so they're sourced from Grammar-> directly rather than from a per-axis Module.
+#define PCGEX_GCD_GRAMMAR_SHARED_ATTRS(_) \
+	_(FName,    Symbol,     SymbolAttributeName,     bWriteSymbol,     NAME_None,            Grammar->Symbol) \
+	_(FVector4, DebugColor, DebugColorAttributeName, bWriteDebugColor, FVector4(1, 1, 1, 1), FVector4(Grammar->DebugColor))
+
+#define PCGEX_VALIDATE_TOGGLED(InContext, Settings, Toggle, AttrName) \
+	if ((Settings)->Toggle) { PCGEX_VALIDATE_NAME_C(InContext, (Settings)->AttrName) }
+
 namespace PCGExGetCollectionData
 {
 	const FName SourcesPin = TEXT("Sources");
@@ -351,50 +388,15 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 	FPCGExGetCollectionDataContext* Context = static_cast<FPCGExGetCollectionDataContext*>(InContext);
 
 	// Validate attribute names up-front -- abort early on bad config.
-	if (Settings->bWriteAssetPath)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->AssetPathAttributeName)
-	}
-	if (Settings->bWriteWeight)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->WeightAttributeName)
-	}
-	if (Settings->bWriteCategory)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->CategoryAttributeName)
-	}
-	if (Settings->bWriteExtents)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->ExtentsAttributeName)
-	}
-	if (Settings->bWriteBoundsMin)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->BoundsMinAttributeName)
-	}
-	if (Settings->bWriteBoundsMax)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->BoundsMaxAttributeName)
-	}
-	if (Settings->bWriteNestingDepth)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->NestingDepthAttributeName)
-	}
-	if (Settings->bWriteSymbol)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->SymbolAttributeName)
-	}
-	if (Settings->bWriteSize)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->SizeAttributeName)
-	}
-	if (Settings->bWriteScalable)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->ScalableAttributeName)
-	}
-	if (Settings->bWriteDebugColor)
-	{
-		PCGEX_VALIDATE_NAME_C(InContext, Settings->DebugColorAttributeName)
-	}
+	PCGEX_VALIDATE_TOGGLED(InContext, Settings, bWriteAssetPath, AssetPathAttributeName)
+	PCGEX_VALIDATE_TOGGLED(InContext, Settings, bWriteWeight, WeightAttributeName)
+	PCGEX_VALIDATE_TOGGLED(InContext, Settings, bWriteCategory, CategoryAttributeName)
+#define PCGEX_GCD_VALIDATE(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+	PCGEX_VALIDATE_TOGGLED(InContext, Settings, Toggle, AttrName)
+	PCGEX_GCD_LEAF_ATTRS(PCGEX_GCD_VALIDATE)
+	PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS(PCGEX_GCD_VALIDATE)
+	PCGEX_GCD_GRAMMAR_SHARED_ATTRS(PCGEX_GCD_VALIDATE)
+#undef PCGEX_GCD_VALIDATE
 
 	if (Settings->SourceMode == EPCGExGetCollectionDataSourceMode::Collection)
 	{
@@ -586,7 +588,7 @@ namespace PCGExGetCollectionData
 	 *  set so the right attribute halves are declared. */
 	struct FUniqueOutput
 	{
-		UPCGExAssetCollection* Collection = nullptr;  // primary collection (root for PropertyWriter / FixModuleInfos host context)
+		UPCGExAssetCollection* Collection = nullptr; // primary collection (root for PropertyWriter / FixModuleInfos host context)
 		UPCGParamData* OutputSet = nullptr;
 		TSharedPtr<TArray<FFlattenedEntry>> Entries;
 		bool bWantAssetPath = false;
@@ -598,15 +600,18 @@ namespace PCGExGetCollectionData
 		FPCGMetadataAttribute<int32>* WeightAttrInt = nullptr;
 		FPCGMetadataAttribute<float>* WeightAttrFloat = nullptr;
 		FPCGMetadataAttribute<FName>* CategoryAttr = nullptr;
-		FPCGMetadataAttribute<FVector>* ExtentsAttr = nullptr;
-		FPCGMetadataAttribute<FVector>* BoundsMinAttr = nullptr;
-		FPCGMetadataAttribute<FVector>* BoundsMaxAttr = nullptr;
-		FPCGMetadataAttribute<int32>* NestingDepthAttr = nullptr;
-		FPCGMetadataAttribute<FName>* SymbolAttr = nullptr;
-		FPCGMetadataAttribute<double>* SizeAttr = nullptr;
-		FPCGMetadataAttribute<bool>* ScalableAttr = nullptr;
-		FPCGMetadataAttribute<FVector4>* DebugColorAttr = nullptr;
 		FPCGMetadataAttribute<int64>* EntryAttr = nullptr;
+#define PCGEX_GCD_DECL_FIELD(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+		FPCGMetadataAttribute<Type>* FieldName##Attr = nullptr;
+		PCGEX_GCD_LEAF_ATTRS(PCGEX_GCD_DECL_FIELD)
+		PCGEX_GCD_GRAMMAR_SHARED_ATTRS(PCGEX_GCD_DECL_FIELD)
+#undef PCGEX_GCD_DECL_FIELD
+		// Per-axis grammar attributes: arrays indexed by axis (0=X, 1=Y, 2=Z). Each slot is
+		// declared only when the corresponding axis bit is set in any entry's effective grammar.
+#define PCGEX_GCD_DECL_PERAXIS_FIELD(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+		FPCGMetadataAttribute<Type>* FieldName##Attr[3] = { nullptr, nullptr, nullptr };
+		PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS(PCGEX_GCD_DECL_PERAXIS_FIELD)
+#undef PCGEX_GCD_DECL_PERAXIS_FIELD
 
 		PCGExCollections::FPCGExCollectionPropertySetWriter PropertyWriter;
 	};
@@ -627,6 +632,36 @@ namespace PCGExGetCollectionData
 		bool bOutputCategory = false;
 		bool bAnyGrammarField = false;
 	};
+
+	/** Inline guarded setter -- write the value if the attribute pointer is non-null. Used by the
+	 *  X-macro-driven write block; FORCEINLINE so the call disappears entirely. */
+	template <typename T, typename V>
+	FORCEINLINE static void SetIf(FPCGMetadataAttribute<T>* Attr, int64 Key, const V& Value)
+	{
+		if (Attr)
+		{
+			Attr->SetValue(Key, Value);
+		}
+	}
+
+	/** Lookup `Slot.Path` in the per-context resolved map. Returns nullptr when the path is empty
+	 *  (leaf-failed slot) or when the resolve produced a null cast. */
+	FORCEINLINE static UPCGExAssetCollection* ResolveSlotCollection(
+		const FPCGExGetCollectionDataContext* Ctx,
+		const FPCGExGetCollectionDataContext::FSlot& Slot)
+	{
+		UPCGExAssetCollection* const* ResolvedPtr = Ctx->ResolvedCollections.Find(Slot.Path);
+		return (ResolvedPtr && *ResolvedPtr) ? *ResolvedPtr : nullptr;
+	}
+
+	/** Set the AssetPath / AssetClass declaration flags on U based on a single collection's type.
+	 *  Used by the non-merged paths where each output is tied to exactly one collection. */
+	FORCEINLINE static void SetAssetHalves(FUniqueOutput& U, const UPCGExAssetCollection* Collection)
+	{
+		const bool bIsActor = Cast<UPCGExActorCollection>(Collection) != nullptr;
+		U.bWantAssetPath = !bIsActor;
+		U.bWantAssetClass = bIsActor;
+	}
 
 	/** Append flattened entries from `Collection` into U.Entries. Never clobbers, so it's safe
 	 *  to call multiple times on the same U (Merged fanout walks every unique collection into
@@ -652,6 +687,26 @@ namespace PCGExGetCollectionData
 		// contributing collections so heterogeneous mixes get both halves).
 		const bool bOutputAssetPath = Settings->bWriteAssetPath && U.bWantAssetPath;
 		const bool bOutputAssetClass = Settings->bWriteAssetPath && U.bWantAssetClass;
+
+		// Pre-pass: resolve each entry's effective grammar once and cache it for the write loop,
+		// accumulating the union of per-entry Axes (intersected with the user-requested OutputAxes)
+		// to drive which per-axis attribute slots get declared. Caching skips a per-row
+		// GetEffectiveGrammar in the write loop AND lets the per-axis Fix path call Grammar->Fix*
+		// directly instead of going through Entry::FixModuleInfos (which would re-resolve internally).
+		uint8 LocalUsedAxes = 0;
+		TArray<const FPCGExAssetGrammarDetails*> ResolvedGrammars;
+		if (P.bAnyGrammarField && Settings->OutputAxes != 0)
+		{
+			ResolvedGrammars.SetNumZeroed(Entries.Num());
+			for (int32 i = 0; i < Entries.Num(); ++i)
+			{
+				const FFlattenedEntry& EH = Entries[i];
+				if (!EH.Entry) { continue; }
+				const FPCGExAssetGrammarDetails* G = EH.Entry->GetEffectiveGrammar(EH.Host);
+				ResolvedGrammars[i] = G;
+				if (G) { LocalUsedAxes |= (G->Axes & Settings->OutputAxes); }
+			}
+		}
 
 		// Declare attributes. CreateAttribute (vs FindOrCreate) skips the find lookup -- safe
 		// because we just allocated a fresh empty Metadata.
@@ -681,38 +736,37 @@ namespace PCGExGetCollectionData
 			{
 				U.CategoryAttr = Metadata->CreateAttribute<FName>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->CategoryAttributeName, U.OutputSet), NAME_None, false, true);
 			}
-			if (Settings->bWriteExtents)
-			{
-				U.ExtentsAttr = Metadata->CreateAttribute<FVector>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->ExtentsAttributeName, U.OutputSet), FVector::OneVector, false, true);
+#define PCGEX_GCD_DECLARE(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+			if (Settings->Toggle) \
+			{ \
+				U.FieldName##Attr = Metadata->CreateAttribute<Type>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->AttrName, U.OutputSet), Default, false, true); \
 			}
-			if (Settings->bWriteBoundsMin)
+			PCGEX_GCD_LEAF_ATTRS(PCGEX_GCD_DECLARE)
+			PCGEX_GCD_GRAMMAR_SHARED_ATTRS(PCGEX_GCD_DECLARE)
+#undef PCGEX_GCD_DECLARE
+
+			// Per-axis declarations. When exactly one axis ends up in UsedAxes, drop the
+			// _X/_Y/_Z suffix so single-axis outputs match the legacy attribute shape (Size,
+			// Scalable). When 2+ axes are used, suffix the user-configured base name with the
+			// matching axis tag for unambiguous downstream lookup.
 			{
-				U.BoundsMinAttr = Metadata->CreateAttribute<FVector>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->BoundsMinAttributeName, U.OutputSet), FVector::OneVector, false, true);
+				const bool bSuppressSuffix = (PCGExGrammarAxes::CountAxes(LocalUsedAxes) <= 1) && !Settings->bAlwaysSuffixAxes;
+#define PCGEX_GCD_DECLARE_PERAXIS(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+				if (Settings->Toggle) \
+				{ \
+					for (int32 _a = 0; _a < 3; _a++) \
+					{ \
+						if (!(LocalUsedAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[_a]))) { continue; } \
+						const FName _AttrName = bSuppressSuffix \
+							? Settings->AttrName \
+							: FName(*FString::Printf(TEXT("%s%s"), *Settings->AttrName.ToString(), PCGExGrammarAxes::Suffixes[_a])); \
+						U.FieldName##Attr[_a] = Metadata->CreateAttribute<Type>(PCGExMetaHelpers::GetAttributeIdentifier(_AttrName, U.OutputSet), Default, false, true); \
+					} \
+				}
+				PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS(PCGEX_GCD_DECLARE_PERAXIS)
+#undef PCGEX_GCD_DECLARE_PERAXIS
 			}
-			if (Settings->bWriteBoundsMax)
-			{
-				U.BoundsMaxAttr = Metadata->CreateAttribute<FVector>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->BoundsMaxAttributeName, U.OutputSet), FVector::OneVector, false, true);
-			}
-			if (Settings->bWriteNestingDepth)
-			{
-				U.NestingDepthAttr = Metadata->CreateAttribute<int32>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->NestingDepthAttributeName, U.OutputSet), -1, false, true);
-			}
-			if (Settings->bWriteSymbol)
-			{
-				U.SymbolAttr = Metadata->CreateAttribute<FName>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->SymbolAttributeName, U.OutputSet), NAME_None, false, true);
-			}
-			if (Settings->bWriteSize)
-			{
-				U.SizeAttr = Metadata->CreateAttribute<double>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->SizeAttributeName, U.OutputSet), 0.0, false, true);
-			}
-			if (Settings->bWriteScalable)
-			{
-				U.ScalableAttr = Metadata->CreateAttribute<bool>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->ScalableAttributeName, U.OutputSet), true, false, true);
-			}
-			if (Settings->bWriteDebugColor)
-			{
-				U.DebugColorAttr = Metadata->CreateAttribute<FVector4>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->DebugColorAttributeName, U.OutputSet), FVector4(1, 1, 1, 1), false, true);
-			}
+
 			U.EntryAttr = Metadata->CreateAttribute<int64>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->EntryAttributeName, U.OutputSet), 0, false, true);
 		} // end DeclareAttrs scope
 
@@ -768,10 +822,19 @@ namespace PCGExGetCollectionData
 			}
 		}
 
-		TMap<const FPCGExAssetCollectionEntry*, double> SizeCache;
+		// Per-axis SizeCache: subcollection aggregation queries within Grammar->FixSubCollection(Axis)
+		// only see child entries resolved at the same axis, so each axis gets its own map.
+		// Only allocate caches for axes that actually contribute output -- the others stay empty.
+		TMap<const FPCGExAssetCollectionEntry*, double> SizeCachePerAxis[3];
 		if (Settings->bWriteSize)
 		{
-			SizeCache.Reserve(Entries.Num());
+			for (int32 a = 0; a < 3; a++)
+			{
+				if (LocalUsedAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))
+				{
+					SizeCachePerAxis[a].Reserve(Entries.Num());
+				}
+			}
 		}
 
 		TSet<FName> UniqueSymbols;
@@ -780,28 +843,43 @@ namespace PCGExGetCollectionData
 			UniqueSymbols.Reserve(Entries.Num());
 		}
 
-		// Write rows.
+		const uint8 SkipFlags = Settings->SkipFlags;
+		const bool bSkipEmptySymbol = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::EmptySymbol)) != 0;
+		const bool bSkipEmptyAxes   = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::EmptyAxes)) != 0;
+		const bool bSkipDuplicates  = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::Duplicates)) != 0;
+
 		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_WriteRows);
-		for (const FFlattenedEntry& EH : Entries)
+		for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); ++EntryIdx)
 		{
+			const FFlattenedEntry& EH = Entries[EntryIdx];
 			const FPCGExAssetCollectionEntry* E = EH.Entry;
 
-			FPCGSubdivisionSubmodule Module;
-			bool bModuleResolved = false;
-			if (E && P.bAnyGrammarField)
-			{
-				bModuleResolved = E->FixModuleInfos(EH.Host, Module, Settings->bWriteSize ? &SizeCache : nullptr);
-			}
+			// Cached from the pre-pass (skips a second GetEffectiveGrammar per row).
+			// Symbol / DebugColor / Axes come straight off the cached pointer; per-axis Size /
+			// bScalable go through Grammar->FixLeaf/FixSubCollection directly, which avoids a third
+			// resolve that Entry::FixModuleInfos would otherwise do internally per axis.
+			const FPCGExAssetGrammarDetails* Grammar = ResolvedGrammars.IsValidIndex(EntryIdx) ? ResolvedGrammars[EntryIdx] : nullptr;
+			const uint8 RowAxes = Grammar ? (Grammar->Axes & Settings->OutputAxes) : 0;
+			const bool bHasGrammar = Grammar && Grammar->Axes != 0;
+			const FName SharedSymbol = Grammar ? Grammar->Symbol : NAME_None;
 
-			if (Settings->bWriteSymbol && Settings->bSkipEmptySymbol && E && bModuleResolved && Module.Symbol.IsNone())
+			// EmptyAxes: drop rows that contribute nothing to the requested output axes (includes
+			// Flatten-mode subcollections and entries with Axes & OutputAxes == 0).
+			if (bSkipEmptyAxes && RowAxes == 0)
 			{
 				continue;
 			}
-
-			if (Settings->bWriteSymbol && !Settings->bAllowDuplicates && E && bModuleResolved)
+			// EmptySymbol: drop rows whose grammar is enabled but Symbol is unset.
+			if (bSkipEmptySymbol && bHasGrammar && SharedSymbol.IsNone())
+			{
+				continue;
+			}
+			// Duplicates (symbol side): drop rows whose Symbol was already emitted earlier in this output.
+			// The pointer-side dedupe lives in ProcessEntry (Ctx.bNoDuplicates).
+			if (bSkipDuplicates && bHasGrammar && !SharedSymbol.IsNone())
 			{
 				bool bAlreadyInSet = false;
-				UniqueSymbols.Add(Module.Symbol, &bAlreadyInSet);
+				UniqueSymbols.Add(SharedSymbol, &bAlreadyInSet);
 				if (bAlreadyInSet)
 				{
 					continue;
@@ -816,14 +894,8 @@ namespace PCGExGetCollectionData
 
 			if (!E->bIsSubCollection)
 			{
-				if (U.AssetPathAttr)
-				{
-					U.AssetPathAttr->SetValue(Key, E->Staging.Path);
-				}
-				if (U.AssetClassAttr)
-				{
-					U.AssetClassAttr->SetValue(Key, FSoftClassPath(E->Staging.Path.ToString()));
-				}
+				SetIf(U.AssetPathAttr, Key, E->Staging.Path);
+				SetIf(U.AssetClassAttr, Key, FSoftClassPath(E->Staging.Path.ToString()));
 				if (U.WeightAttrInt)
 				{
 					U.WeightAttrInt->SetValue(Key, E->Weight);
@@ -846,46 +918,41 @@ namespace PCGExGetCollectionData
 					}
 					U.WeightAttrFloat->SetValue(Key, Denom > 0.0 ? static_cast<float>(static_cast<double>(E->Weight) / Denom) : 0.0f);
 				}
-				if (U.ExtentsAttr)
-				{
-					U.ExtentsAttr->SetValue(Key, E->Staging.Bounds.GetExtent());
-				}
-				if (U.BoundsMinAttr)
-				{
-					U.BoundsMinAttr->SetValue(Key, E->Staging.Bounds.Min);
-				}
-				if (U.BoundsMaxAttr)
-				{
-					U.BoundsMaxAttr->SetValue(Key, E->Staging.Bounds.Max);
-				}
-				if (U.NestingDepthAttr)
-				{
-					U.NestingDepthAttr->SetValue(Key, -1);
-				}
+#define PCGEX_GCD_WRITE_LEAF(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+				SetIf(U.FieldName##Attr, Key, ValueExpr);
+				PCGEX_GCD_LEAF_ATTRS(PCGEX_GCD_WRITE_LEAF)
+#undef PCGEX_GCD_WRITE_LEAF
 			}
 
-			if (U.CategoryAttr)
+			SetIf(U.CategoryAttr, Key, EH.Category);
+
+			if (bHasGrammar)
 			{
-				U.CategoryAttr->SetValue(Key, EH.Category);
-			}
-			if (bModuleResolved)
-			{
-				if (U.SymbolAttr)
+				// Iterate the bits this entry contributes (already filtered through OutputAxes above).
+				// Dispatch directly through Grammar-> to skip the resolve that Entry::FixModuleInfos
+				// would otherwise repeat on every call.
+				const bool bIsSub = E->bIsSubCollection;
+				for (int32 a = 0; a < 3; a++)
 				{
-					U.SymbolAttr->SetValue(Key, Module.Symbol);
+					if (!(RowAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))) { continue; }
+
+					FPCGSubdivisionSubmodule Module;
+					const bool bFixed = bIsSub
+						? Grammar->FixSubCollection(E->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCachePerAxis[a] : nullptr)
+						: Grammar->FixLeaf(E->Staging.Bounds, PCGExGrammarAxes::Bits[a], Module);
+					if (!bFixed) { continue; }
+
+#define PCGEX_GCD_WRITE_PERAXIS(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+					SetIf(U.FieldName##Attr[a], Key, ValueExpr);
+					PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS(PCGEX_GCD_WRITE_PERAXIS)
+#undef PCGEX_GCD_WRITE_PERAXIS
 				}
-				if (U.SizeAttr)
-				{
-					U.SizeAttr->SetValue(Key, Module.Size);
-				}
-				if (U.ScalableAttr)
-				{
-					U.ScalableAttr->SetValue(Key, Module.bScalable);
-				}
-				if (U.DebugColorAttr)
-				{
-					U.DebugColorAttr->SetValue(Key, Module.DebugColor);
-				}
+
+				// Shared grammar attributes (DebugColor) -- sourced from Grammar->, not the per-axis Module.
+#define PCGEX_GCD_WRITE_SHARED(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+				SetIf(U.FieldName##Attr, Key, ValueExpr);
+				PCGEX_GCD_GRAMMAR_SHARED_ATTRS(PCGEX_GCD_WRITE_SHARED)
+#undef PCGEX_GCD_WRITE_SHARED
 			}
 
 			const uint64 Hash = P.Packer->GetPickIdx(EH.Host, E->Staging.InternalIndex, 0);
@@ -928,7 +995,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 	Ctx.SubHandling = Settings->SubCollectionHandling;
 	Ctx.CategoryInheritance = CategoryInheritance;
 	Ctx.bOmitInvalidAndEmpty = Settings->bOmitInvalidAndEmpty;
-	Ctx.bNoDuplicates = !Settings->bAllowDuplicates;
+	Ctx.bNoDuplicates = (Settings->SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::Duplicates)) != 0;
 
 	// Shared FPickPacker (covers both fast path and slot path).
 	TSharedPtr<PCGExCollections::FPickPacker> Packer = MakeShared<PCGExCollections::FPickPacker>(InContext);
@@ -974,11 +1041,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 			U.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
 		}
 		U.Entries = MakeShared<TArray<PCGExGetCollectionData::FFlattenedEntry>>();
-		{
-			const bool bIsActor = Cast<UPCGExActorCollection>(MainCollection) != nullptr;
-			U.bWantAssetPath = !bIsActor;
-			U.bWantAssetClass = bIsActor;
-		}
+		PCGExGetCollectionData::SetAssetHalves(U, MainCollection);
 
 		if (MainCollection)
 		{
@@ -1030,17 +1093,28 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 		bool bAnyNonActor = false;
 		for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
 		{
-			UPCGExAssetCollection** ResolvedPtr = Context->ResolvedCollections.Find(Slot.Path);
-			UPCGExAssetCollection* Collection = (ResolvedPtr && *ResolvedPtr) ? *ResolvedPtr : nullptr;
-			if (!Collection) { continue; }
+			UPCGExAssetCollection* Collection = PCGExGetCollectionData::ResolveSlotCollection(Context, Slot);
+			if (!Collection)
+			{
+				continue;
+			}
 			bool bAlreadyIn = false;
 			SeenCollections.Add(Collection, &bAlreadyIn);
-			if (bAlreadyIn) { continue; }
+			if (bAlreadyIn)
+			{
+				continue;
+			}
 
 			UniqueCollections.Add(Collection);
 			Collection->EDITOR_RegisterTrackingKeys(InContext);
-			if (Cast<UPCGExActorCollection>(Collection)) { bAnyActor = true; }
-			else { bAnyNonActor = true; }
+			if (Cast<UPCGExActorCollection>(Collection))
+			{
+				bAnyActor = true;
+			}
+			else
+			{
+				bAnyNonActor = true;
+			}
 		}
 
 		// Allocate the single shared output. Packer registration covers every contributing host.
@@ -1105,8 +1179,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 
 	for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
 	{
-		UPCGExAssetCollection** ResolvedPtr = Context->ResolvedCollections.Find(Slot.Path);
-		UPCGExAssetCollection* Collection = (ResolvedPtr && *ResolvedPtr) ? *ResolvedPtr : nullptr;
+		UPCGExAssetCollection* Collection = PCGExGetCollectionData::ResolveSlotCollection(Context, Slot);
 		if (!Collection)
 		{
 			continue;
@@ -1123,11 +1196,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 		U.Collection = Collection;
 		U.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
 		U.Entries = MakeShared<TArray<PCGExGetCollectionData::FFlattenedEntry>>();
-		{
-			const bool bIsActor = Cast<UPCGExActorCollection>(Collection) != nullptr;
-			U.bWantAssetPath = !bIsActor;
-			U.bWantAssetClass = bIsActor;
-		}
+		PCGExGetCollectionData::SetAssetHalves(U, Collection);
 
 		Collection->EDITOR_RegisterTrackingKeys(InContext);
 	}
@@ -1173,8 +1242,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 
 	for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
 	{
-		UPCGExAssetCollection** ResolvedPtr = Context->ResolvedCollections.Find(Slot.Path);
-		UPCGExAssetCollection* Collection = (ResolvedPtr && *ResolvedPtr) ? *ResolvedPtr : nullptr;
+		UPCGExAssetCollection* Collection = PCGExGetCollectionData::ResolveSlotCollection(Context, Slot);
 
 		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
 		OutData.Pin = PCGExGetCollectionData::OutputAttributeSetPin;
@@ -1211,6 +1279,11 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 	InContext->Done();
 	return InContext->TryComplete();
 }
+
+#undef PCGEX_GCD_LEAF_ATTRS
+#undef PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS
+#undef PCGEX_GCD_GRAMMAR_SHARED_ATTRS
+#undef PCGEX_VALIDATE_TOGGLED
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

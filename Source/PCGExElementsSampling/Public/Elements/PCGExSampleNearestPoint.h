@@ -115,22 +115,22 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType RangeMinInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector RangeMinAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double RangeMin_DEPRECATED = 0;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType RangeMaxInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector RangeMaxAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double RangeMax_DEPRECATED = 300;
 
 #pragma endregion

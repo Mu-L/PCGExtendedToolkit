@@ -78,6 +78,7 @@ namespace PCGEx
 		virtual bool Load(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager);
 
 		virtual void End(const bool bBuildMap = false);
+		void FinalizeTracking() const;
 
 	protected:
 		virtual void PrepareLoading();

@@ -159,6 +159,12 @@ bool FPCGExPathSplineMeshSimpleElement::AdvanceWork(FPCGExContext* InContext, co
 			return Context->CancelExecution(TEXT("Failed to load any assets."));
 		}
 
+		Context->StaticMeshLoader->FinalizeTracking();
+		if (Context->MaterialLoader)
+		{
+			Context->MaterialLoader->FinalizeTracking();
+		}
+		
 		PCGEX_ON_INVALILD_INPUTS(FTEXT("Some inputs have less than 2 points and won't be processed."))
 
 		if (!Context->StartBatchProcessingPoints(

@@ -123,16 +123,16 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bApplyCustomTangents_DEPRECATED = false;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FName ArriveTangentAttribute_DEPRECATED = "ArriveTangent";
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FName LeaveTangentAttribute_DEPRECATED = "LeaveTangent";
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExMinimalAxis SplineMeshAxisConstant_DEPRECATED = EPCGExMinimalAxis::X;
 
 #pragma endregion

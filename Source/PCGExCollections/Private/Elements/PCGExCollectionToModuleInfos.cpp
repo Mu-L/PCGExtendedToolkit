@@ -189,7 +189,9 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 		}
 
 		PCGExCollectionToGrammar::FModule& Module = OutModules.Emplace_GetRef();
-		if (!Entry->FixModuleInfos(Collection, Module.Infos) || (Settings->bSkipEmptySymbol && Module.Infos.Symbol.IsNone()))
+		// Deprecated node: always queries the X axis (legacy single-axis behavior). Per-axis
+		// output is exclusive to the new PCGExGetCollectionData node.
+		if (!Entry->FixModuleInfos(Collection, Module.Infos, EPCGExGrammarAxes::X) || (Settings->bSkipEmptySymbol && Module.Infos.Symbol.IsNone()))
 		{
 			OutModules.Pop(EAllowShrinking::No);
 			continue;

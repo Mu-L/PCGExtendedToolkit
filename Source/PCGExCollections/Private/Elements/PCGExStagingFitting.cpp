@@ -122,6 +122,8 @@ bool FPCGExStagingFittingElement::AdvanceWork(FPCGExContext* InContext, const UP
 		{
 			return Context->CancelExecution(TEXT("Failed to load any meshes from points."));
 		}
+		
+		Context->StaticMeshLoader->FinalizeTracking();
 
 		if (!Context->StartBatchProcessingPoints(
 			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)

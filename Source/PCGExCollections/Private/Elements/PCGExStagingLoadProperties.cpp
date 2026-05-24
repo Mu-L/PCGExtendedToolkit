@@ -337,11 +337,12 @@ namespace PCGExStagingLoadProperties
 
 			// Grammar fields share a single FixModuleInfos call. Failure leaves the entry's points
 			// at their per-attribute default values, which matches CollectionToModuleInfos's
-			// "skip on bad symbol" behaviour at the per-module-info level.
+			// "skip on bad symbol" behaviour at the per-module-info level. This node operates
+			// on the X axis only -- per-axis output is exclusive to PCGExGetCollectionData.
 			if (bAnyGrammarEnabled)
 			{
 				FPCGSubdivisionSubmodule ModuleInfos;
-				if (Entry->FixModuleInfos(Host, ModuleInfos))
+				if (Entry->FixModuleInfos(Host, ModuleInfos, EPCGExGrammarAxes::X))
 				{
 #define PCGEX_LOAD_PROP_FIELD_FILL_GRAMMAR(_NAME, _TYPE, _DEFAULT, _GETTER) \
 					if (_NAME##Writer) { _NAME##ByHash.Add(Hash, _GETTER); }

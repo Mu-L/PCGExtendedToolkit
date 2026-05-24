@@ -8,6 +8,9 @@
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExPointIO.h"
 #include "Engine/AssetManager.h"
+#if WITH_EDITOR
+#include "Helpers/PCGDynamicTrackingHelpers.h"
+#endif
 #include "Helpers/PCGExStreamingHelpers.h"
 #include "Types/PCGExTypes.h"
 
@@ -175,6 +178,22 @@ namespace PCGEx
 			OnComplete();
 		}
 		PCGEX_ASYNC_RELEASE_TOKEN(LoadToken)
+	}
+
+	void IAssetLoader::FinalizeTracking() const
+	{
+#if WITH_EDITOR
+		if (Context)
+		{
+			FPCGDynamicTrackingHelper DynamicTracking;
+			DynamicTracking.EnableAndInitialize(Context, UniquePaths.Num());
+			for (const FSoftObjectPath& Path : UniquePaths)
+			{
+				DynamicTracking.AddToTracking(FPCGSelectionKey::CreateFromPath(Path), /*bIsCulled=*/ false);
+			}
+			DynamicTracking.Finalize(Context);
+		}
+#endif
 	}
 
 	void IAssetLoader::PrepareLoading()
