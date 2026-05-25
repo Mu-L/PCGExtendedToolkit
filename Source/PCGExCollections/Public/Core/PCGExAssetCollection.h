@@ -14,6 +14,7 @@
 #include "Details/PCGExSocket.h"
 #include "Details/PCGExStagingDetails.h"
 #include "Fitting/PCGExFittingVariations.h"
+#include "Helpers/PCGExCookDependencyProvider.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 
 #include "PCGExAssetCollection.generated.h"
@@ -549,7 +550,7 @@ namespace PCGExAssetCollection
  * All return FPCGExEntryAccessResult with entry + host collection.
  */
 UCLASS(Abstract, BlueprintType, DisplayName="[PCGEx] Asset Collection")
-class PCGEXCOLLECTIONS_API UPCGExAssetCollection : public UDataAsset
+class PCGEXCOLLECTIONS_API UPCGExAssetCollection : public UDataAsset, public IPCGExCookDependencyProvider
 {
 	mutable FRWLock CacheLock;
 
@@ -674,6 +675,12 @@ public:
 #pragma endregion
 
 	void GetAssetPaths(TSet<FSoftObjectPath>& OutPaths, PCGExAssetCollection::ELoadingFlags Flags) const;
+
+#if WITH_EDITOR
+	//~ Begin IPCGExCookDependencyProvider
+	virtual void GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
+	//~ End IPCGExCookDependencyProvider
+#endif
 
 #pragma region Lifecycle
 

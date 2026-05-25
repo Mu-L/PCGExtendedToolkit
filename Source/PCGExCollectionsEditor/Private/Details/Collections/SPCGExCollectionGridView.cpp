@@ -11,6 +11,8 @@
 #include "InputCoreTypes.h"
 #include "ScopedTransaction.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
 
 #include "InstancedStruct.h"
 #include "Core/PCGExAssetCollection.h"
@@ -714,7 +716,8 @@ FReply SPCGExCollectionGridView::OnTileDragDetected(int32 Index, const FPointerE
 	TArray<int32> DraggedIndices = SelectedIndices.Array();
 	DraggedIndices.Sort();
 
-	TSharedRef<FPCGExCollectionTileDragDropOp> DragOp = FPCGExCollectionTileDragDropOp::New(DraggedIndices, SourceCategory);
+	TSharedRef<FPCGExCollectionTileDragDropOp> DragOp =
+		FPCGExCollectionTileDragDropOp::New(DraggedIndices, SourceCategory, Collection.Get());
 	return FReply::Handled().BeginDragDrop(DragOp);
 }
 
@@ -737,11 +740,19 @@ void SPCGExCollectionGridView::OnTileCategoryChanged()
 
 // ── Category operations ─────────────────────────────────────────────────────
 
-void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const TArray<int32>& Indices, int32 InsertBeforeLocalIndex)
+void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, TSharedRef<FPCGExCollectionTileDragDropOp> DragOp, int32 InsertBeforeLocalIndex)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
+	const TArray<int32>& Indices = DragOp->DraggedIndices;
 	if (!Coll || Indices.IsEmpty())
 	{
+		return;
+	}
+
+	// Cross-collection drop: indices reference a different collection's Entries array.
+	if (DragOp->SourceCollection.Get() != Coll)
+	{
+		HandleCrossCollectionDrop(DragOp->SourceCollection.Get(), Indices, TargetCategory, InsertBeforeLocalIndex, DragOp->bIsCopyOperation);
 		return;
 	}
 
@@ -763,90 +774,28 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 			}
 		}
 
-		// Step 2: If a drop position was given, reorder within target category
-		// InsertBeforeLocalIndex was computed against the ORIGINAL tiles in the target
-		// category (i.e. the non-dragged entries), so use it directly -- no adjustment needed.
+		// InsertBeforeLocalIndex was computed against the ORIGINAL non-dragged tiles in the
+		// target category, so no pre-removal adjustment is needed here.
 		if (InsertBeforeLocalIndex != INDEX_NONE && EntryStruct && Access.IsValid())
 		{
 			RebuildCategoryCache();
 
-			const TArray<int32>* CatIndices = CategoryToEntryIndices.Find(TargetCategory);
-			if (CatIndices && CatIndices->Num() >= 2)
+			if (const TArray<int32>* CatIndices = CategoryToEntryIndices.Find(TargetCategory))
 			{
-				TSet<int32> DraggedSet(Indices);
-				TArray<int32> NonDragged;
-				TArray<int32> Dragged;
-
-				for (int32 Idx : *CatIndices)
+				if (CatIndices->Num() >= 2)
 				{
-					if (DraggedSet.Contains(Idx))
-					{
-						Dragged.Add(Idx);
-					}
-					else
-					{
-						NonDragged.Add(Idx);
-					}
-				}
-
-				if (!Dragged.IsEmpty())
-				{
-					const int32 ClampedInsert = FMath::Clamp(InsertBeforeLocalIndex, 0, NonDragged.Num());
-
-					TArray<int32> DesiredOrder;
-					DesiredOrder.Reserve(CatIndices->Num());
-					for (int32 i = 0; i < ClampedInsert; i++)
-					{
-						DesiredOrder.Add(NonDragged[i]);
-					}
-					DesiredOrder.Append(Dragged);
-					for (int32 i = ClampedInsert; i < NonDragged.Num(); i++)
-					{
-						DesiredOrder.Add(NonDragged[i]);
-					}
-
-					if (DesiredOrder != *CatIndices)
+					const TSet<int32> DraggedSet(Indices);
+					TArray<int32> DesiredOrder = ComputeCategoryDesiredOrder(*CatIndices, DraggedSet, InsertBeforeLocalIndex, /*bAdjustForDraggedBefore=*/false);
+					if (!DesiredOrder.IsEmpty())
 					{
 						FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
-
-						const int32 StructSize = EntryStruct->GetStructureSize();
-						TArray<uint8> Temp;
-						Temp.SetNumUninitialized(StructSize);
-						EntryStruct->InitializeStruct(Temp.GetData());
-
-						TArray<int32> CurrentOrder = *CatIndices;
-						for (int32 i = 0; i < DesiredOrder.Num(); i++)
+						TArray<int32> FinalPositions = ApplyCategoryPermutation(ArrayHelper, EntryStruct, *CatIndices, DesiredOrder, DraggedSet);
+						if (!FinalPositions.IsEmpty())
 						{
-							if (CurrentOrder[i] == DesiredOrder[i])
-							{
-								continue;
-							}
-
-							const int32 j = CurrentOrder.Find(DesiredOrder[i]);
-							check(j != INDEX_NONE);
-
-							uint8* PtrA = ArrayHelper.GetRawPtr((*CatIndices)[i]);
-							uint8* PtrB = ArrayHelper.GetRawPtr((*CatIndices)[j]);
-
-							EntryStruct->CopyScriptStruct(Temp.GetData(), PtrA);
-							EntryStruct->CopyScriptStruct(PtrA, PtrB);
-							EntryStruct->CopyScriptStruct(PtrB, Temp.GetData());
-
-							Swap(CurrentOrder[i], CurrentOrder[j]);
+							SelectedIndices.Reset();
+							for (int32 Idx : FinalPositions) { SelectedIndices.Add(Idx); }
+							LastClickedIndex = FinalPositions[0];
 						}
-
-						EntryStruct->DestroyStruct(Temp.GetData());
-
-						// Update selection to follow dragged entries to their new positions
-						SelectedIndices.Reset();
-						for (int32 i = 0; i < DesiredOrder.Num(); i++)
-						{
-							if (DraggedSet.Contains(DesiredOrder[i]))
-							{
-								SelectedIndices.Add((*CatIndices)[i]);
-							}
-						}
-						LastClickedIndex = SelectedIndices.Num() > 0 ? SelectedIndices.Array()[0] : INDEX_NONE;
 					}
 				}
 			}
@@ -861,6 +810,152 @@ void SPCGExCollectionGridView::OnTileDropOnCategory(FName TargetCategory, const 
 		SelectedIndices.Reset();
 		LastClickedIndex = INDEX_NONE;
 	}
+
+	IncrementalCategoryRefresh();
+	UpdateDetailForSelection();
+}
+
+void SPCGExCollectionGridView::HandleCrossCollectionDrop(
+	const UPCGExAssetCollection* SourceColl,
+	const TArray<int32>& SourceIndices,
+	FName TargetCategory,
+	int32 InsertBeforeLocalIndex,
+	bool bIsCopy)
+{
+	UPCGExAssetCollection* TargetColl = Collection.Get();
+	if (!TargetColl || !SourceColl || SourceIndices.IsEmpty())
+	{
+		return;
+	}
+
+	FEntriesArrayAccess SourceAccess = GetEntriesAccess(SourceColl);
+	FEntriesArrayAccess TargetAccess = GetEntriesAccess();
+	if (!SourceAccess.IsValid() || !TargetAccess.IsValid())
+	{
+		return;
+	}
+
+	UScriptStruct* SourceStruct = SourceAccess.InnerProp ? SourceAccess.InnerProp->Struct : nullptr;
+	UScriptStruct* TargetStruct = TargetAccess.InnerProp ? TargetAccess.InnerProp->Struct : nullptr;
+
+	// Different collection types use different entry structs (e.g. UPCGExMeshCollection vs
+	// UPCGExActorCollection); copying raw memory across would corrupt the destination.
+	if (!SourceStruct || !TargetStruct || SourceStruct != TargetStruct)
+	{
+		FNotificationInfo Info(INVTEXT("Cannot drop entries: incompatible collection types."));
+		Info.ExpireDuration = 4.0f;
+		Info.bUseSuccessFailIcons = true;
+		Info.bFireAndForget = true;
+		if (TSharedPtr<SNotificationItem> Item = FSlateNotificationManager::Get().AddNotification(Info))
+		{
+			Item->SetCompletionState(SNotificationItem::CS_Fail);
+		}
+		return;
+	}
+
+	FScriptArrayHelper SourceHelper(SourceAccess.ArrayProp, SourceAccess.ArrayData);
+	const int32 SourceNum = SourceHelper.Num();
+
+	TArray<int32> CleanIndices;
+	CleanIndices.Reserve(SourceIndices.Num());
+	for (int32 Idx : SourceIndices)
+	{
+		if (Idx >= 0 && Idx < SourceNum)
+		{
+			CleanIndices.Add(Idx);
+		}
+	}
+	if (CleanIndices.IsEmpty())
+	{
+		return;
+	}
+	CleanIndices.Sort();
+
+	// Snapshot source payloads before the MOVE deletes originals; SourceHelper pointers would
+	// otherwise be invalidated mid-copy.
+	const int32 StructSize = TargetStruct->GetStructureSize();
+	TArray<uint8> Snapshots;
+	Snapshots.SetNumUninitialized(CleanIndices.Num() * StructSize);
+	for (int32 i = 0; i < CleanIndices.Num(); ++i)
+	{
+		uint8* Dst = Snapshots.GetData() + i * StructSize;
+		TargetStruct->InitializeStruct(Dst);
+		TargetStruct->CopyScriptStruct(Dst, SourceHelper.GetRawPtr(CleanIndices[i]));
+	}
+
+	TArray<int32> InsertedIndices;
+	TArray<int32> FinalDraggedPositions;
+
+	bIsBatchOperation = true;
+	{
+		FScopedTransaction Transaction(bIsCopy
+			                               ? INVTEXT("Copy Entries Across Collections")
+			                               : INVTEXT("Move Entries Across Collections"));
+
+		TargetColl->Modify();
+		if (!bIsCopy)
+		{
+			const_cast<UPCGExAssetCollection*>(SourceColl)->Modify();
+		}
+
+		FScriptArrayHelper TargetHelper(TargetAccess.ArrayProp, TargetAccess.ArrayData);
+
+		InsertedIndices.Reserve(CleanIndices.Num());
+		for (int32 i = 0; i < CleanIndices.Num(); ++i)
+		{
+			const int32 NewIdx = TargetHelper.AddValue();
+			TargetStruct->CopyScriptStruct(TargetHelper.GetRawPtr(NewIdx), Snapshots.GetData() + i * StructSize);
+
+			if (FPCGExAssetCollectionEntry* NewEntry = TargetColl->EDITOR_GetMutableEntry(NewIdx))
+			{
+				NewEntry->Category = TargetCategory;
+			}
+
+			InsertedIndices.Add(NewIdx);
+		}
+
+		// Reverse iteration preserves earlier indices as later ones are removed.
+		if (!bIsCopy)
+		{
+			for (int32 i = CleanIndices.Num() - 1; i >= 0; --i)
+			{
+				SourceHelper.RemoveValues(CleanIndices[i], 1);
+			}
+			const_cast<UPCGExAssetCollection*>(SourceColl)->PostEditChange();
+		}
+
+		FinalDraggedPositions = InsertedIndices;
+
+		if (InsertBeforeLocalIndex != INDEX_NONE)
+		{
+			RebuildCategoryCache();
+			if (const TArray<int32>* CatIndices = CategoryToEntryIndices.Find(TargetCategory))
+			{
+				const TSet<int32> DraggedSet(InsertedIndices);
+				TArray<int32> DesiredOrder = ComputeCategoryDesiredOrder(*CatIndices, DraggedSet, InsertBeforeLocalIndex, /*bAdjustForDraggedBefore=*/false);
+				if (!DesiredOrder.IsEmpty())
+				{
+					TArray<int32> Reordered = ApplyCategoryPermutation(TargetHelper, TargetStruct, *CatIndices, DesiredOrder, DraggedSet);
+					if (!Reordered.IsEmpty()) { FinalDraggedPositions = MoveTemp(Reordered); }
+				}
+			}
+		}
+
+		TargetColl->PostEditChange();
+
+		SelectedIndices.Reset();
+		for (int32 Idx : FinalDraggedPositions) { SelectedIndices.Add(Idx); }
+		LastClickedIndex = FinalDraggedPositions.Num() > 0 ? FinalDraggedPositions[0] : INDEX_NONE;
+	}
+	bIsBatchOperation = false;
+
+	for (int32 i = 0; i < CleanIndices.Num(); ++i)
+	{
+		TargetStruct->DestroyStruct(Snapshots.GetData() + i * StructSize);
+	}
+
+	// Populate Staging.Path on new rows so thumbnails resolve immediately.
+	TargetColl->EDITOR_RebuildStagingData();
 
 	IncrementalCategoryRefresh();
 	UpdateDetailForSelection();
@@ -998,11 +1093,20 @@ void SPCGExCollectionGridView::OnCategoryExpansionChanged(FName Category, bool b
 	}
 }
 
-void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TArray<int32>& DraggedIndices, int32 InsertBeforeLocalIndex)
+void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, TSharedRef<FPCGExCollectionTileDragDropOp> DragOp, int32 InsertBeforeLocalIndex)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
+	const TArray<int32>& DraggedIndices = DragOp->DraggedIndices;
 	if (!Coll)
 	{
+		return;
+	}
+
+	// Cross-collection drop that happened to land on a same-named category: route to
+	// cross-collection handler instead of reordering this collection's entries.
+	if (DragOp->SourceCollection.Get() != Coll)
+	{
+		HandleCrossCollectionDrop(DragOp->SourceCollection.Get(), DraggedIndices, Category, InsertBeforeLocalIndex, DragOp->bIsCopyOperation);
 		return;
 	}
 
@@ -1018,60 +1122,15 @@ void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TAr
 		return;
 	}
 
-	// Build the desired category order via remove-then-insert
-	TSet<int32> DraggedSet(DraggedIndices);
-	TArray<int32> NonDragged;
-	TArray<int32> Dragged;
-
-	for (int32 Idx : *CatIndices)
-	{
-		if (DraggedSet.Contains(Idx))
-		{
-			Dragged.Add(Idx);
-		}
-		else
-		{
-			NonDragged.Add(Idx);
-		}
-	}
-
-	if (Dragged.IsEmpty())
-	{
-		return;
-	}
-
-	// Adjust insertion index for removed dragged items before the insert point
-	int32 AdjustedInsert = InsertBeforeLocalIndex;
-	for (int32 i = 0; i < InsertBeforeLocalIndex && i < CatIndices->Num(); i++)
-	{
-		if (DraggedSet.Contains((*CatIndices)[i]))
-		{
-			AdjustedInsert--;
-		}
-	}
-	AdjustedInsert = FMath::Clamp(AdjustedInsert, 0, NonDragged.Num());
-
-	// Build desired order: NonDragged[0..Adj) + Dragged + NonDragged[Adj..end)
-	TArray<int32> DesiredOrder;
-	DesiredOrder.Reserve(CatIndices->Num());
-	for (int32 i = 0; i < AdjustedInsert; i++)
-	{
-		DesiredOrder.Add(NonDragged[i]);
-	}
-	DesiredOrder.Append(Dragged);
-	for (int32 i = AdjustedInsert; i < NonDragged.Num(); i++)
-	{
-		DesiredOrder.Add(NonDragged[i]);
-	}
-
-	// Check if order actually changed
-	if (DesiredOrder == *CatIndices)
-	{
-		return;
-	}
-
 	UScriptStruct* EntryStruct = Access.InnerProp ? Access.InnerProp->Struct : nullptr;
 	if (!EntryStruct)
+	{
+		return;
+	}
+
+	const TSet<int32> DraggedSet(DraggedIndices);
+	TArray<int32> DesiredOrder = ComputeCategoryDesiredOrder(*CatIndices, DraggedSet, InsertBeforeLocalIndex, /*bAdjustForDraggedBefore=*/true);
+	if (DesiredOrder.IsEmpty())
 	{
 		return;
 	}
@@ -1083,51 +1142,13 @@ void SPCGExCollectionGridView::OnTileReorderInCategory(FName Category, const TAr
 		FScopedTransaction Transaction(INVTEXT("Reorder Entries"));
 		Coll->Modify();
 
-		// Selection-sort permutation using temp-buffer swap:
-		const int32 StructSize = EntryStruct->GetStructureSize();
-		TArray<uint8> Temp;
-		Temp.SetNumUninitialized(StructSize);
-		EntryStruct->InitializeStruct(Temp.GetData());
-
-		TArray<int32> CurrentOrder = *CatIndices;
-		for (int32 i = 0; i < DesiredOrder.Num(); i++)
-		{
-			if (CurrentOrder[i] == DesiredOrder[i])
-			{
-				continue;
-			}
-
-			// Find where the desired entry currently is
-			const int32 j = CurrentOrder.Find(DesiredOrder[i]);
-			check(j != INDEX_NONE);
-
-			// Swap array contents at the two raw array positions
-			uint8* PtrA = ArrayHelper.GetRawPtr((*CatIndices)[i]);
-			uint8* PtrB = ArrayHelper.GetRawPtr((*CatIndices)[j]);
-
-			EntryStruct->CopyScriptStruct(Temp.GetData(), PtrA);
-			EntryStruct->CopyScriptStruct(PtrA, PtrB);
-			EntryStruct->CopyScriptStruct(PtrB, Temp.GetData());
-
-			// Update tracking: the values at positions i and j swapped
-			Swap(CurrentOrder[i], CurrentOrder[j]);
-		}
-
-		EntryStruct->DestroyStruct(Temp.GetData());
+		TArray<int32> FinalPositions = ApplyCategoryPermutation(ArrayHelper, EntryStruct, *CatIndices, DesiredOrder, DraggedSet);
 
 		Coll->PostEditChange();
 
-		// Update selection to follow the dragged entries to their new positions
-		TSet<int32> NewSelection;
-		for (int32 i = 0; i < DesiredOrder.Num(); i++)
-		{
-			if (DraggedSet.Contains(DesiredOrder[i]))
-			{
-				NewSelection.Add((*CatIndices)[i]);
-			}
-		}
-		SelectedIndices = MoveTemp(NewSelection);
-		LastClickedIndex = SelectedIndices.Num() > 0 ? SelectedIndices.Array()[0] : INDEX_NONE;
+		SelectedIndices.Reset();
+		for (int32 Idx : FinalPositions) { SelectedIndices.Add(Idx); }
+		LastClickedIndex = FinalPositions.Num() > 0 ? FinalPositions[0] : INDEX_NONE;
 	}
 	bIsBatchOperation = false;
 
@@ -1733,7 +1754,7 @@ UScriptStruct* SPCGExCollectionGridView::GetEntryScriptStruct() const
 	}
 
 	FArrayProperty* ArrayProp = CastField<FArrayProperty>(
-		Coll->GetClass()->FindPropertyByName(FName("Entries")));
+		Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 	if (!ArrayProp)
 	{
 		return nullptr;
@@ -1752,7 +1773,7 @@ uint8* SPCGExCollectionGridView::GetEntryRawPtr(int32 Index) const
 	}
 
 	FArrayProperty* ArrayProp = CastField<FArrayProperty>(
-		Coll->GetClass()->FindPropertyByName(FName("Entries")));
+		Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 	if (!ArrayProp)
 	{
 		return nullptr;
@@ -1768,25 +1789,119 @@ uint8* SPCGExCollectionGridView::GetEntryRawPtr(int32 Index) const
 	return ArrayHelper.GetRawPtr(Index);
 }
 
-SPCGExCollectionGridView::FEntriesArrayAccess SPCGExCollectionGridView::GetEntriesAccess() const
+TArray<int32> SPCGExCollectionGridView::ComputeCategoryDesiredOrder(
+	const TArray<int32>& CatIndices,
+	const TSet<int32>& DraggedSet,
+	int32 InsertBeforeLocalIndex,
+	bool bAdjustForDraggedBefore)
+{
+	TArray<int32> Dragged;
+	TArray<int32> NonDragged;
+	NonDragged.Reserve(CatIndices.Num());
+	Dragged.Reserve(DraggedSet.Num());
+
+	for (int32 Idx : CatIndices)
+	{
+		if (DraggedSet.Contains(Idx)) { Dragged.Add(Idx); }
+		else { NonDragged.Add(Idx); }
+	}
+
+	if (Dragged.IsEmpty()) { return {}; }
+
+	int32 AdjustedInsert = InsertBeforeLocalIndex;
+	if (bAdjustForDraggedBefore)
+	{
+		for (int32 i = 0; i < InsertBeforeLocalIndex && i < CatIndices.Num(); i++)
+		{
+			if (DraggedSet.Contains(CatIndices[i])) { AdjustedInsert--; }
+		}
+	}
+	AdjustedInsert = FMath::Clamp(AdjustedInsert, 0, NonDragged.Num());
+
+	TArray<int32> DesiredOrder;
+	DesiredOrder.Reserve(CatIndices.Num());
+	for (int32 i = 0; i < AdjustedInsert; i++) { DesiredOrder.Add(NonDragged[i]); }
+	DesiredOrder.Append(Dragged);
+	for (int32 i = AdjustedInsert; i < NonDragged.Num(); i++) { DesiredOrder.Add(NonDragged[i]); }
+
+	if (DesiredOrder == CatIndices) { return {}; }
+
+	return DesiredOrder;
+}
+
+TArray<int32> SPCGExCollectionGridView::ApplyCategoryPermutation(
+	FScriptArrayHelper& Helper,
+	UScriptStruct* Struct,
+	const TArray<int32>& CatIndices,
+	const TArray<int32>& DesiredOrder,
+	const TSet<int32>& DraggedSet)
+{
+	const int32 StructSize = Struct->GetStructureSize();
+	TArray<uint8> Temp;
+	Temp.SetNumUninitialized(StructSize);
+	Struct->InitializeStruct(Temp.GetData());
+
+	TArray<int32> CurrentOrder = CatIndices;
+
+	// Position map keeps swap lookup O(1) so the overall permutation is O(N) rather than O(N²)
+	// -- matters once a category holds hundreds of entries.
+	TMap<int32, int32> Pos;
+	Pos.Reserve(CurrentOrder.Num());
+	for (int32 k = 0; k < CurrentOrder.Num(); k++) { Pos.Add(CurrentOrder[k], k); }
+
+	for (int32 i = 0; i < DesiredOrder.Num(); i++)
+	{
+		if (CurrentOrder[i] == DesiredOrder[i]) { continue; }
+
+		const int32* JPtr = Pos.Find(DesiredOrder[i]);
+		check(JPtr);
+		const int32 j = *JPtr;
+
+		uint8* PtrA = Helper.GetRawPtr(CatIndices[i]);
+		uint8* PtrB = Helper.GetRawPtr(CatIndices[j]);
+
+		Struct->CopyScriptStruct(Temp.GetData(), PtrA);
+		Struct->CopyScriptStruct(PtrA, PtrB);
+		Struct->CopyScriptStruct(PtrB, Temp.GetData());
+
+		Pos[CurrentOrder[i]] = j;
+		Pos[CurrentOrder[j]] = i;
+		Swap(CurrentOrder[i], CurrentOrder[j]);
+	}
+
+	Struct->DestroyStruct(Temp.GetData());
+
+	TArray<int32> FinalDraggedPositions;
+	FinalDraggedPositions.Reserve(DraggedSet.Num());
+	for (int32 i = 0; i < CurrentOrder.Num(); i++)
+	{
+		if (DraggedSet.Contains(CurrentOrder[i]))
+		{
+			FinalDraggedPositions.Add(CatIndices[i]);
+		}
+	}
+	return FinalDraggedPositions;
+}
+
+SPCGExCollectionGridView::FEntriesArrayAccess SPCGExCollectionGridView::GetEntriesAccess(const UPCGExAssetCollection* InColl) const
 {
 	FEntriesArrayAccess Result;
 
-	UPCGExAssetCollection* Coll = Collection.Get();
+	const UPCGExAssetCollection* Coll = InColl ? InColl : Collection.Get();
 	if (!Coll)
 	{
 		return Result;
 	}
 
 	Result.ArrayProp = CastField<FArrayProperty>(
-		Coll->GetClass()->FindPropertyByName(FName("Entries")));
+		Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 	if (!Result.ArrayProp)
 	{
 		return Result;
 	}
 
 	Result.InnerProp = CastField<FStructProperty>(Result.ArrayProp->Inner);
-	Result.ArrayData = Result.ArrayProp->ContainerPtrToValuePtr<void>(Coll);
+	Result.ArrayData = Result.ArrayProp->ContainerPtrToValuePtr<void>(const_cast<UPCGExAssetCollection*>(Coll));
 
 	return Result;
 }
@@ -1994,7 +2109,8 @@ FReply SPCGExCollectionGridView::OnDrop(const FGeometry& MyGeometry, const FDrag
 	// Internal tile drops outside any category group = move to uncategorized
 	if (const TSharedPtr<FPCGExCollectionTileDragDropOp> TileOp = InDragDropEvent.GetOperationAs<FPCGExCollectionTileDragDropOp>())
 	{
-		OnTileDropOnCategory(NAME_None, TileOp->DraggedIndices, INDEX_NONE);
+		TileOp->bIsCopyOperation = InDragDropEvent.IsAltDown();
+		OnTileDropOnCategory(NAME_None, TileOp.ToSharedRef(), INDEX_NONE);
 		return FReply::Handled();
 	}
 

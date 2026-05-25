@@ -294,61 +294,135 @@ namespace PCGExStagingLoadProperties
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExStagingLoadProperties::BuildEntryFieldsCache);
 
-		// Allocate enabled writers up-front so the per-point loop can branch on writer presence.
 #define PCGEX_LOAD_PROP_FIELD_INIT(_NAME, _TYPE, _DEFAULT, _GETTER) \
 		if (Settings->bWrite##_NAME) \
 		{ \
 			_NAME##Writer = PointDataFacade->GetWritable<_TYPE>(Settings->_NAME##AttributeName, _DEFAULT, false, PCGExData::EBufferInit::New); \
 			if (_NAME##Writer) { _NAME##ByHash.Reserve(UniqueEntryHashes.Num()); } \
 		}
-
 		PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_INIT)
-		PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_INIT)
-
 #undef PCGEX_LOAD_PROP_FIELD_INIT
+
+		const bool bWantGrammar =
+			(Settings->OutputAxes != 0) &&
+			(Settings->bWriteSymbol || Settings->bWriteSize || Settings->bWriteScalable || Settings->bWriteDebugColor);
+
+		// Pre-resolve each hash once and union the effective axes; per-axis writer allocation
+		// depends on which axes actually contribute output.
+		struct FResolved
+		{
+			uint64 Hash = 0;
+			const FPCGExAssetCollectionEntry* Entry = nullptr;
+			const UPCGExAssetCollection* Host = nullptr;
+			const FPCGExAssetGrammarDetails* Grammar = nullptr;
+		};
+
+		TArray<FResolved> Resolved;
+		Resolved.Reserve(UniqueEntryHashes.Num());
+		uint8 LocalUsedAxes = 0;
+		{
+			int16 MaterialPick = 0;
+			for (const uint64 Hash : UniqueEntryHashes)
+			{
+				FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
+				if (!Result.IsValid() || !Result.Entry) { continue; }
+
+				FResolved& R = Resolved.AddDefaulted_GetRef();
+				R.Hash = Hash;
+				R.Entry = Result.Entry;
+				R.Host = Result.Host;
+				if (bWantGrammar)
+				{
+					R.Grammar = Result.Entry->GetEffectiveGrammar(Result.Host);
+					if (R.Grammar) { LocalUsedAxes |= (R.Grammar->Axes & Settings->OutputAxes); }
+				}
+			}
+		}
+
+#define PCGEX_LOAD_PROP_FIELD_INIT_SHARED(_NAME, _TYPE, _DEFAULT, _GETTER) \
+		if (Settings->bWrite##_NAME) \
+		{ \
+			_NAME##Writer = PointDataFacade->GetWritable<_TYPE>(Settings->_NAME##AttributeName, _DEFAULT, false, PCGExData::EBufferInit::New); \
+			if (_NAME##Writer) { _NAME##ByHash.Reserve(Resolved.Num()); } \
+		}
+		PCGEX_FOREACH_GRAMMAR_SHARED_FIELD(PCGEX_LOAD_PROP_FIELD_INIT_SHARED)
+#undef PCGEX_LOAD_PROP_FIELD_INIT_SHARED
+
+		// Single-axis output drops the _X/_Y/_Z suffix to preserve the legacy attribute shape
+		// (override with bAlwaysSuffixAxes).
+		const bool bSuppressSuffix = (PCGExGrammarAxes::CountAxes(LocalUsedAxes) <= 1) && !Settings->bAlwaysSuffixAxes;
+#define PCGEX_LOAD_PROP_FIELD_INIT_PERAXIS(_NAME, _TYPE, _DEFAULT, _GETTER) \
+		if (Settings->bWrite##_NAME) \
+		{ \
+			for (int32 _a = 0; _a < 3; _a++) \
+			{ \
+				if (!(LocalUsedAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[_a]))) { continue; } \
+				const FName _AttrName = PCGExGrammarAxes::MakeAxisAttributeName(Settings->_NAME##AttributeName, _a, bSuppressSuffix); \
+				_NAME##Writer[_a] = PointDataFacade->GetWritable<_TYPE>(_AttrName, _DEFAULT, false, PCGExData::EBufferInit::New); \
+				if (_NAME##Writer[_a]) \
+				{ \
+					_NAME##ByHash[_a].Reserve(Resolved.Num()); \
+					_NAME##ActiveAxes.Add(_a); \
+				} \
+			} \
+		}
+		PCGEX_FOREACH_GRAMMAR_PERAXIS_FIELD(PCGEX_LOAD_PROP_FIELD_INIT_PERAXIS)
+#undef PCGEX_LOAD_PROP_FIELD_INIT_PERAXIS
 
 		if (!HasAnyEntryFieldWriter())
 		{
 			return;
 		}
 
-		// Determine whether any grammar field is enabled to decide whether FixModuleInfos must run.
-		bool bAnyGrammarEnabled = false;
-#define PCGEX_LOAD_PROP_FIELD_HAS_GRAMMAR(_NAME, _TYPE, _DEFAULT, _GETTER) bAnyGrammarEnabled |= (_NAME##Writer != nullptr);
-		PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_HAS_GRAMMAR)
-#undef PCGEX_LOAD_PROP_FIELD_HAS_GRAMMAR
-
-		int16 MaterialPick = 0;
-		for (const uint64 Hash : UniqueEntryHashes)
+		// FixSubCollection's child-aggregation queries are axis-scoped -- each axis needs its
+		// own dedupe map.
+		TMap<const FPCGExAssetCollectionEntry*, double> SizeCachePerAxis[3];
+		if (Settings->bWriteSize)
 		{
-			FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, MaterialPick);
-			if (!Result.IsValid() || !Result.Entry)
+			for (int32 a = 0; a < 3; a++)
 			{
-				continue;
+				if (LocalUsedAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))
+				{
+					SizeCachePerAxis[a].Reserve(Resolved.Num());
+				}
 			}
+		}
 
-			const FPCGExAssetCollectionEntry* Entry = Result.Entry;
-			const UPCGExAssetCollection* Host = Result.Host;
+		for (const FResolved& R : Resolved)
+		{
+			const uint64 Hash = R.Hash;
+			const FPCGExAssetCollectionEntry* Entry = R.Entry;
+			const UPCGExAssetCollection* Host = R.Host;
 
 #define PCGEX_LOAD_PROP_FIELD_FILL_ENTRY(_NAME, _TYPE, _DEFAULT, _GETTER) \
 			if (_NAME##Writer) { _NAME##ByHash.Add(Hash, _GETTER); }
 			PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_FILL_ENTRY)
 #undef PCGEX_LOAD_PROP_FIELD_FILL_ENTRY
 
-			// Grammar fields share a single FixModuleInfos call. Failure leaves the entry's points
-			// at their per-attribute default values, which matches CollectionToModuleInfos's
-			// "skip on bad symbol" behaviour at the per-module-info level. This node operates
-			// on the X axis only -- per-axis output is exclusive to PCGExGetCollectionData.
-			if (bAnyGrammarEnabled)
+			const FPCGExAssetGrammarDetails* Grammar = R.Grammar;
+			if (!Grammar || Grammar->Axes == 0) { continue; }
+
+#define PCGEX_LOAD_PROP_FIELD_FILL_SHARED(_NAME, _TYPE, _DEFAULT, _GETTER) \
+			if (_NAME##Writer) { _NAME##ByHash.Add(Hash, _GETTER); }
+			PCGEX_FOREACH_GRAMMAR_SHARED_FIELD(PCGEX_LOAD_PROP_FIELD_FILL_SHARED)
+#undef PCGEX_LOAD_PROP_FIELD_FILL_SHARED
+
+			// Dispatch directly through Grammar-> rather than Entry::FixModuleInfos to skip a redundant resolve.
+			const uint8 EntryAxes = Grammar->Axes & Settings->OutputAxes;
+			const bool bIsSub = Entry->bIsSubCollection;
+			for (int32 a = 0; a < 3; a++)
 			{
-				FPCGSubdivisionSubmodule ModuleInfos;
-				if (Entry->FixModuleInfos(Host, ModuleInfos, EPCGExGrammarAxes::X))
-				{
-#define PCGEX_LOAD_PROP_FIELD_FILL_GRAMMAR(_NAME, _TYPE, _DEFAULT, _GETTER) \
-					if (_NAME##Writer) { _NAME##ByHash.Add(Hash, _GETTER); }
-					PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_FILL_GRAMMAR)
-#undef PCGEX_LOAD_PROP_FIELD_FILL_GRAMMAR
-				}
+				if (!(EntryAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))) { continue; }
+				FPCGSubdivisionSubmodule Module;
+				const bool bFixed = bIsSub
+					? Grammar->FixSubCollection(Entry->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCachePerAxis[a] : nullptr)
+					: Grammar->FixLeaf(Entry->Staging.Bounds, PCGExGrammarAxes::Bits[a], Module);
+				if (!bFixed) { continue; }
+
+#define PCGEX_LOAD_PROP_FIELD_FILL_PERAXIS(_NAME, _TYPE, _DEFAULT, _GETTER) \
+				if (_NAME##Writer[a]) { _NAME##ByHash[a].Add(Hash, _GETTER); }
+				PCGEX_FOREACH_GRAMMAR_PERAXIS_FIELD(PCGEX_LOAD_PROP_FIELD_FILL_PERAXIS)
+#undef PCGEX_LOAD_PROP_FIELD_FILL_PERAXIS
 			}
 		}
 	}
@@ -357,8 +431,12 @@ namespace PCGExStagingLoadProperties
 	{
 #define PCGEX_LOAD_PROP_FIELD_HAS_WRITER(_NAME, _TYPE, _DEFAULT, _GETTER) if (_NAME##Writer) { return true; }
 		PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_HAS_WRITER)
-		PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_HAS_WRITER)
+		PCGEX_FOREACH_GRAMMAR_SHARED_FIELD(PCGEX_LOAD_PROP_FIELD_HAS_WRITER)
 #undef PCGEX_LOAD_PROP_FIELD_HAS_WRITER
+
+#define PCGEX_LOAD_PROP_FIELD_HAS_WRITER_PERAXIS(_NAME, _TYPE, _DEFAULT, _GETTER) if (!_NAME##ActiveAxes.IsEmpty()) { return true; }
+		PCGEX_FOREACH_GRAMMAR_PERAXIS_FIELD(PCGEX_LOAD_PROP_FIELD_HAS_WRITER_PERAXIS)
+#undef PCGEX_LOAD_PROP_FIELD_HAS_WRITER_PERAXIS
 		return false;
 	}
 
@@ -391,6 +469,10 @@ namespace PCGExStagingLoadProperties
 		}
 
 #define PCGEX_LOAD_PROP_FIELD_WRITE(_NAME, _TYPE, _DEFAULT, _GETTER) if (_NAME##Writer) { if (const _TYPE* Cached = _NAME##ByHash.Find(Hash)) { _NAME##Writer->SetValue(i, *Cached); } }
+#define PCGEX_LOAD_PROP_FIELD_WRITE_PERAXIS(_NAME, _TYPE, _DEFAULT, _GETTER) \
+		for (const int32 _a : _NAME##ActiveAxes) { \
+			if (const _TYPE* Cached = _NAME##ByHash[_a].Find(Hash)) { _NAME##Writer[_a]->SetValue(i, *Cached); } \
+		}
 
 		PCGExMT::ParallelOrSequential(
 			PointDataFacade->GetNum(),
@@ -423,10 +505,12 @@ namespace PCGExStagingLoadProperties
 				}
 
 				PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
-				PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
+				PCGEX_FOREACH_GRAMMAR_SHARED_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
+				PCGEX_FOREACH_GRAMMAR_PERAXIS_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE_PERAXIS)
 			});
 
 #undef PCGEX_LOAD_PROP_FIELD_WRITE
+#undef PCGEX_LOAD_PROP_FIELD_WRITE_PERAXIS
 
 		PointDataFacade->WriteFastest(TaskManager);
 	}

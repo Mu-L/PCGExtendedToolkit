@@ -62,7 +62,7 @@
 namespace PCGExGetCollectionData
 {
 	const FName SourcesPin = TEXT("Sources");
-	const FName OutputAttributeSetPin = TEXT("AttributeSet");
+	const FName OutputCollectionDataPin = TEXT("Data");
 	const FName EmptyTag = TEXT("empty");
 
 	/** Collected entry along with the collection that directly owns it and the resolved category. */
@@ -358,7 +358,7 @@ TArray<FPCGPinProperties> UPCGExGetCollectionDataSettings::InputPinProperties() 
 TArray<FPCGPinProperties> UPCGExGetCollectionDataSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
-	PCGEX_PIN_PARAMS(PCGExGetCollectionData::OutputAttributeSetPin, TEXT("One attribute set per resolved source (see Fanout)."), Required)
+	PCGEX_PIN_PARAMS(PCGExGetCollectionData::OutputCollectionDataPin, TEXT("One attribute set per resolved source (see Fanout)."), Required)
 	PCGEX_PIN_PARAM(PCGExCollections::Labels::OutputCollectionMapLabel, TEXT("Collection map covering every host referenced by the emitted attribute sets."), Required)
 	return PinProperties;
 }
@@ -893,9 +893,15 @@ namespace PCGExGetCollectionData
 				continue;
 			}
 
+			// AssetPath is written for both leaf and sub-collection entries. UpdateStaging
+			// populates Staging.Path with the sub-collection's own asset path when bIsSubCollection,
+			// so downstream consumers can resolve either kind through the same attribute.
+			// AssetClass and the other leaf-only fields (weights, bounds, nesting depth) stay
+			// gated -- sub-collections aren't UClass references and don't have meaningful bounds.
+			SetIf(U.AssetPathAttr, Key, E->Staging.Path);
+
 			if (!E->bIsSubCollection)
 			{
-				SetIf(U.AssetPathAttr, Key, E->Staging.Path);
 				SetIf(U.AssetClassAttr, Key, FSoftClassPath(E->Staging.Path.ToString()));
 				if (U.WeightAttrInt)
 				{
@@ -1061,7 +1067,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 		}
 
 		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
-		OutData.Pin = PCGExGetCollectionData::OutputAttributeSetPin;
+		OutData.Pin = PCGExGetCollectionData::OutputCollectionDataPin;
 		OutData.Data = U.OutputSet;
 		if (!MainCollection || U.Entries->IsEmpty())
 		{
@@ -1143,7 +1149,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 		InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + 2);
 
 		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
-		OutData.Pin = PCGExGetCollectionData::OutputAttributeSetPin;
+		OutData.Pin = PCGExGetCollectionData::OutputCollectionDataPin;
 		OutData.Data = Merged.OutputSet;
 		if (Merged.Entries->IsEmpty())
 		{
@@ -1246,7 +1252,7 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 		UPCGExAssetCollection* Collection = PCGExGetCollectionData::ResolveSlotCollection(Context, Slot);
 
 		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
-		OutData.Pin = PCGExGetCollectionData::OutputAttributeSetPin;
+		OutData.Pin = PCGExGetCollectionData::OutputCollectionDataPin;
 
 		if (!Collection)
 		{

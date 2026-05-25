@@ -10,6 +10,10 @@
 #include "Engine/AssetManager.h"
 #include "Engine/AssetManagerTypes.h"
 #include "UObject/ICookInfo.h"
+#include "UObject/UObjectIterator.h"
+#include "AssetRegistry/ARFilter.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "Helpers/PCGExCookDependencyProvider.h"
 #endif
 
 #include "PCGExGlobalSettings.h"
@@ -27,17 +31,68 @@ void FPCGExtendedToolkitModule::StartupModule()
 	ModifyCookDelegateHandle = UE::Cook::FDelegates::ModifyCook.AddLambda(
 		[](UE::Cook::ICookInfo& CookInfo, TArray<UE::Cook::FPackageCookRule>& InOutPackageCookRules)
 		{
+			IAssetRegistry& Registry = UAssetManager::Get().GetAssetRegistry();
+			const FName FolderInstigator(TEXT("PCGExAlwaysCookAssets"));
+			const FName ProviderInstigator(TEXT("PCGExCookDependencyProvider"));
+
 			// Thanks @jenkinsgage
-
-			// Grab all content assets
+			// Force-cook every asset shipped inside this plugin's content folder.
 			TArray<FAssetData> PCGExAssets;
-			UAssetManager::Get().GetAssetRegistry().GetAssetsByPath(TEXT("/PCGExtendedToolkit"), PCGExAssets, true);
-
-			// Add them to cook
-			FName Instigator = FName(TEXT("PCGExAlwaysCookAssets"));
-			for (FAssetData Asset : PCGExAssets)
+			Registry.GetAssetsByPath(TEXT("/PCGExtendedToolkit"), PCGExAssets, true);
+			for (const FAssetData& Asset : PCGExAssets)
 			{
-				InOutPackageCookRules.Emplace(Asset.PackageName, Instigator, UE::Cook::EPackageCookRule::AddToCook);
+				InOutPackageCookRules.Emplace(Asset.PackageName, FolderInstigator, UE::Cook::EPackageCookRule::AddToCook);
+			}
+
+			// Collect concrete UClasses implementing IPCGExCookDependencyProvider for a single batched registry query.
+			TArray<FTopLevelAssetPath> ProviderClassPaths;
+			for (TObjectIterator<UClass> It; It; ++It)
+			{
+				UClass* Class = *It;
+				if (Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
+				{
+					continue;
+				}
+				if (Class->ImplementsInterface(UPCGExCookDependencyProvider::StaticClass()))
+				{
+					ProviderClassPaths.Add(Class->GetClassPathName());
+				}
+			}
+
+			if (ProviderClassPaths.IsEmpty())
+			{
+				return;
+			}
+
+			FARFilter Filter;
+			Filter.ClassPaths = MoveTemp(ProviderClassPaths);
+			Filter.bRecursiveClasses = false; // leaves already enumerated
+
+			TArray<FAssetData> ProviderAssets;
+			Registry.GetAssets(Filter, ProviderAssets);
+
+			for (const FAssetData& Asset : ProviderAssets)
+			{
+				// Soft refs into /Game won't drag the provider asset into the cook on their own.
+				InOutPackageCookRules.Emplace(Asset.PackageName, ProviderInstigator, UE::Cook::EPackageCookRule::AddToCook);
+
+				UObject* Obj = Asset.GetAsset();
+				if (!Obj) { continue; }
+
+				IPCGExCookDependencyProvider* Provider = Cast<IPCGExCookDependencyProvider>(Obj);
+				if (!Provider) { continue; }
+
+				TSet<FSoftObjectPath> Paths;
+				Provider->GetCookDependencyAssetPaths(Paths);
+
+				for (const FSoftObjectPath& Path : Paths)
+				{
+					const FName PackageName = Path.GetLongPackageFName();
+					if (!PackageName.IsNone())
+					{
+						InOutPackageCookRules.Emplace(PackageName, ProviderInstigator, UE::Cook::EPackageCookRule::AddToCook);
+					}
+				}
 			}
 		}
 		);

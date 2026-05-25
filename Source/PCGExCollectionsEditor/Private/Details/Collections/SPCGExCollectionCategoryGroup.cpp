@@ -277,11 +277,13 @@ FReply SPCGExCollectionCategoryGroup::OnDragOver(const FGeometry& MyGeometry, co
 		// Update insertion indicator widget when position changes
 		if (DropInsertIndex != OldDropInsertIndex && InsertIndicator.IsValid())
 		{
-			if (DropInsertIndex != INDEX_NONE)
-			{
-				FChildren* IndicChildren = TilesWrapBox->GetChildren();
-				const int32 IndicNumChildren = IndicChildren->Num();
+			FChildren* IndicChildren = TilesWrapBox.IsValid() ? TilesWrapBox->GetChildren() : nullptr;
+			const int32 IndicNumChildren = IndicChildren ? IndicChildren->Num() : 0;
 
+			// Empty target category has no tile to anchor an insert line to. The category-level
+			// drop highlight (bIsDragOver border) is enough visual feedback; skip the indicator.
+			if (DropInsertIndex != INDEX_NONE && IndicNumChildren > 0)
+			{
 				FVector2D LineAbsPos;
 				float AbsHeight = 0;
 
@@ -346,15 +348,21 @@ FReply SPCGExCollectionCategoryGroup::OnDrop(const FGeometry& MyGeometry, const 
 
 	if (const TSharedPtr<FPCGExCollectionTileDragDropOp> TileOp = InDragDropEvent.GetOperationAs<FPCGExCollectionTileDragDropOp>())
 	{
+		// Ctrl is reserved for multi-select; Alt is the copy modifier.
+		TileOp->bIsCopyOperation = InDragDropEvent.IsAltDown();
+
+		const TSharedRef<FPCGExCollectionTileDragDropOp> TileOpRef = TileOp.ToSharedRef();
+
 		if (TileOp->SourceCategory == CategoryName && CapturedInsertIndex != INDEX_NONE)
 		{
-			// Same-category drop with valid insertion index → reorder
-			OnTileReorderInCategory.ExecuteIfBound(CategoryName, TileOp->DraggedIndices, CapturedInsertIndex);
+			// Same-category drop with valid insertion index → reorder (or cross-collection
+			// into the same-named category -- GridView dispatches on SourceCollection identity).
+			OnTileReorderInCategory.ExecuteIfBound(CategoryName, TileOpRef, CapturedInsertIndex);
 		}
 		else
 		{
 			// Cross-category drop → change category + position
-			OnTileDropOnCategory.ExecuteIfBound(CategoryName, TileOp->DraggedIndices, CapturedInsertIndex);
+			OnTileDropOnCategory.ExecuteIfBound(CategoryName, TileOpRef, CapturedInsertIndex);
 		}
 		return FReply::Handled();
 	}

@@ -1096,6 +1096,13 @@ void UPCGExAssetCollection::GetAssetPaths(TSet<FSoftObjectPath>& OutPaths, PCGEx
 	});
 }
 
+#if WITH_EDITOR
+void UPCGExAssetCollection::GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
+{
+	GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+}
+#endif
+
 void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(
 	EPCGExSchemaMergePolicy Policy,
 	TConstArrayView<FInstancedStruct> InheritedDefaults)
@@ -1202,6 +1209,20 @@ void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(
 	RebuildPropertyRegistry();
 }
 
+bool UPCGExAssetCollection::SyncPropertySchemaAndRemapEntries()
+{
+	bool bRemapped = false;
+	CollectionProperties.SyncAllSchemasAndRemap([this, &bRemapped](TConstArrayView<FPCGExHeaderIdRemap> Remaps)
+	{
+		bRemapped = true;
+		ForEachEntry([&Remaps](FPCGExAssetCollectionEntry* InEntry, int32 /*i*/)
+		{
+			InEntry->PropertyOverrides.ApplyHeaderIdRemap(Remaps);
+		});
+	});
+	return bRemapped;
+}
+
 #if WITH_EDITOR
 void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
@@ -1304,20 +1325,6 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 	{
 		EDITOR_RebuildStagingData();
 	}
-}
-
-bool UPCGExAssetCollection::SyncPropertySchemaAndRemapEntries()
-{
-	bool bRemapped = false;
-	CollectionProperties.SyncAllSchemasAndRemap([this, &bRemapped](TConstArrayView<FPCGExHeaderIdRemap> Remaps)
-	{
-		bRemapped = true;
-		ForEachEntry([&Remaps](FPCGExAssetCollectionEntry* InEntry, int32 /*i*/)
-		{
-			InEntry->PropertyOverrides.ApplyHeaderIdRemap(Remaps);
-		});
-	});
-	return bRemapped;
 }
 
 void UPCGExAssetCollection::SyncPropertyOverridesToEntries()
