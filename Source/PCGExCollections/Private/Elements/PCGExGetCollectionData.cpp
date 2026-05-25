@@ -7,6 +7,7 @@
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Collections/PCGExActorCollection.h"
+#include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExMTCommon.h"
 #include "Data/PCGBasePointData.h"
