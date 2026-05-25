@@ -189,13 +189,13 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType NormalType_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector NormalAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bInvertDirection_DEPRECATED = false;
 
 #pragma endregion
@@ -206,56 +206,56 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType SolidificationLerpInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector SolidificationLerpAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double SolidificationLerpConstant_DEPRECATED = 0;
 
 #pragma endregion
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExMinimalAxis SolidificationAxis_DEPRECATED = EPCGExMinimalAxis::X;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bWriteRadiusX_DEPRECATED = false;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType RadiusXInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector RadiusXSourceAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double RadiusXConstant_DEPRECATED = 1;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bWriteRadiusY_DEPRECATED = false;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType RadiusYInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector RadiusYSourceAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double RadiusYConstant_DEPRECATED = 1;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bWriteRadiusZ_DEPRECATED = false;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType RadiusZInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector RadiusZSourceAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double RadiusZConstant_DEPRECATED = 1;
 
 #pragma endregion

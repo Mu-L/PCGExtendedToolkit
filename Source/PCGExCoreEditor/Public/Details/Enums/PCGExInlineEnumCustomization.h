@@ -19,6 +19,13 @@ namespace PCGExEnumCustomization
 	PCGEXCOREEDITOR_API
 	TSharedRef<SWidget> CreateRadioGroup(UEnum* Enum, TFunction<int32()> GetValue, TFunction<void(int32)> SetValue);
 
+	/** Radio group variant that hides specific enum indices (e.g. to gate context-inapplicable values). */
+	PCGEXCOREEDITOR_API
+	TSharedRef<SWidget> CreateRadioGroup(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum, const TSet<int32>& SkipIndices);
+
+	PCGEXCOREEDITOR_API
+	TSharedRef<SWidget> CreateRadioGroup(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum, const TSet<int32>& SkipIndices);
+
 	PCGEXCOREEDITOR_API
 	TSharedRef<SWidget> CreateCheckboxGroup(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum, const TSet<int32>& SkipIndices);
 
@@ -27,6 +34,14 @@ namespace PCGExEnumCustomization
 
 	PCGEXCOREEDITOR_API
 	TSharedRef<SWidget> CreateCheckboxGroup(UEnum* Enum, TFunction<uint8()> GetValue, TFunction<void(uint8)> SetValue, const TSet<int32>& SkipIndices = {});
+
+	/** Standard dropdown (SComboButton + menu) for enum-typed property handles. Hides Hidden /
+	 *  SkipIndices entries. Use when an inline radio group becomes too dense (e.g. 5+ entries). */
+	PCGEXCOREEDITOR_API
+	TSharedRef<SWidget> CreateDropdown(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum, const TSet<int32>& SkipIndices = {});
+
+	PCGEXCOREEDITOR_API
+	TSharedRef<SWidget> CreateDropdown(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum, const TSet<int32>& SkipIndices = {});
 
 	/** Single compact button that cycles forward through non-hidden enum entries on click. Label shows the current entry's DisplayName. */
 	PCGEXCOREEDITOR_API

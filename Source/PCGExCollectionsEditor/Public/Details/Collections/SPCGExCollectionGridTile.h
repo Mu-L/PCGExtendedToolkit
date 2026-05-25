@@ -79,6 +79,7 @@ public:
 	// Mouse handling for selection and drag
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 	virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+	virtual FReply OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 	virtual FReply OnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
 private:
@@ -108,8 +109,10 @@ private:
 	// Batch flag -- pointer to grid view's bIsBatchOperation (suppresses OnObjectModified during tile edits)
 	bool* BatchFlagPtr = nullptr;
 
-	// Cached state for short-circuiting RefreshThumbnail when nothing visual changed
-	FSoftObjectPath CachedStagingPath;
+	// Cached state for short-circuiting RefreshThumbnail when nothing visual changed.
+	// CachedThumbnailPath is the entry's EDITOR_GetThumbnailAssetPath() result, which
+	// may differ from Staging.Path (e.g. level-sourced PCGDataAsset entries).
+	FSoftObjectPath CachedThumbnailPath;
 	bool bCachedIsSubCollection = false;
 
 	/** Build the thumbnail widget from the entry's Staging.Path */

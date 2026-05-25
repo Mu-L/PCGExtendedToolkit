@@ -53,6 +53,12 @@ bool FPCGExCollectionToModuleInfosElement::IsCacheable(const UPCGSettings* InSet
 	PCGEX_GET_OPTION_STATE(Settings->CacheData, bDefaultCacheNodeOutput)
 }
 
+bool FPCGExCollectionToModuleInfosElement::Boot(FPCGExContext* InContext) const
+{
+	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Collection to Module Infos is DEPRECATED -- Use Get Collection Data instead."));
+	return IPCGExElement::Boot(InContext);
+}
+
 bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
 	PCGEX_SETTINGS_C(InContext, CollectionToModuleInfos)
@@ -183,7 +189,9 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 		}
 
 		PCGExCollectionToGrammar::FModule& Module = OutModules.Emplace_GetRef();
-		if (!Entry->FixModuleInfos(Collection, Module.Infos) || (Settings->bSkipEmptySymbol && Module.Infos.Symbol.IsNone()))
+		// Deprecated node: always queries the X axis (legacy single-axis behavior). Per-axis
+		// output is exclusive to the new PCGExGetCollectionData node.
+		if (!Entry->FixModuleInfos(Collection, Module.Infos, EPCGExGrammarAxes::X) || (Settings->bSkipEmptySymbol && Module.Infos.Symbol.IsNone()))
 		{
 			OutModules.Pop(EAllowShrinking::No);
 			continue;

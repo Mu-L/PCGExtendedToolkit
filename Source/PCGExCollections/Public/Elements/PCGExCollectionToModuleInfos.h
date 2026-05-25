@@ -25,7 +25,7 @@ namespace PCGExCollectionToGrammar
 	};
 }
 
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), meta=(PCGExNodeLibraryDoc="staging/utilities/collection-to-module-infos"))
+UCLASS(Hidden, MinimalAPI, BlueprintType, ClassGroup = (Procedural), meta=(PCGExNodeLibraryDoc="staging/utilities/collection-to-module-infos"))
 class UPCGExCollectionToModuleInfosSettings : public UPCGExSettings
 {
 	GENERATED_BODY()
@@ -108,6 +108,7 @@ public:
 protected:
 	PCGEX_ELEMENT_CREATE_DEFAULT_CONTEXT
 
+	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
 	void FlattenCollection(

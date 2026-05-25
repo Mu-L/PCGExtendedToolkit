@@ -1,35 +1,25 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
-#include "Core/PCGExMTCommon.h"
-#include "Misc/ScopeRWLock.h"
 #include "Types/PCGExTypes.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/SoftObjectPtr.h"
 
 struct FPCGExContext;
+struct FStreamableHandle;
 
 namespace PCGExMT
 {
-	class FAsyncToken;
 	class FTaskManager;
 }
-
-struct FStreamableHandle;
 
 namespace PCGExData
 {
 	class FPointIOCollection;
-}
-
-namespace PCGExData
-{
-	template <typename T>
-	class TAttributeBroadcaster;
 }
 
 namespace PCGEx
@@ -37,20 +27,15 @@ namespace PCGEx
 	class PCGEXCORE_API IAssetLoader : public TSharedFromThis<IAssetLoader>
 	{
 	protected:
-		bool bBypass = false;
-		mutable FRWLock RegistrationLock;
-
 		TArray<FName> AttributeNames;
 		TSet<FSoftObjectPath> UniquePaths;
 
-		TWeakPtr<PCGExMT::FAsyncToken> LoadToken;
 		TSharedPtr<FStreamableHandle> LoadHandle;
-		int8 bEnded = 0;
+		int8 bFinalized = 0;
 
 		FPCGExContext* Context = nullptr;
 
 	public:
-		PCGExMT::FCompletionCallback OnComplete;
 		TSharedPtr<PCGExData::FPointIOCollection> IOCollection;
 		TArray<TSharedPtr<TArray<PCGExValueHash>>> Keys;
 
@@ -58,29 +43,37 @@ namespace PCGEx
 		IAssetLoader(FPCGExContext* InContext, const TSharedPtr<PCGExData::FPointIOCollection>& InIOCollection, const TArray<FName>& InAttributeNames);
 		virtual ~IAssetLoader();
 
-		virtual bool IsEmpty()
-		{
-			return true;
-		}
+		virtual bool IsEmpty() const { return true; }
 
-		bool HasEnded() const
-		{
-			return bEnded ? true : false;
-		}
+		// Synchronous discovery. For each (IO × attribute) builds an attribute accessor once,
+		// fans out per-scope reads via ParallelOrSequential, and merges per-scope unique paths
+		// via TScopedSet::Collapse. Populates Keys (per-IO hash array) and UniquePaths.
+		// Returns false if no valid paths were discovered.
+		bool Discover();
 
-		void Cancel();
+		// Merge discovered UniquePaths into the context's RequiredAssets set so PCG's normal
+		// LoadAssets() phase picks them up. Idempotent on empty.
+		void AddAssetDependencies();
 
-		void AddUniquePaths(const TSet<FSoftObjectPath>& InPaths);
+		// Blocking synchronous load via PCGExHelpers::LoadBlocking_AnyThread. The context tracks
+		// the streamable handle. Auto-invokes Finalize() so AssetsMap is ready on return.
+		// Returns false if no paths to load or load failed.
+		bool Load();
 
-		bool Start(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager);
+		// Async load via task manager. Used for the legacy standalone flow (not via context deps).
+		// Auto-invokes Finalize() when the streamable handle completes.
+		bool Load(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager);
+
+		// Validate UniquePaths and populate the typed AssetsMap. Call from the element's
+		// PostLoadAssetsDependencies() override (context deps flow). Idempotent.
+		virtual void Finalize();
+
 		TSharedPtr<TArray<PCGExValueHash>> GetKeys(const int32 IOIndex);
 
-		virtual bool Load(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager);
-
-		virtual void End(const bool bBuildMap = false);
-
 	protected:
-		virtual void PrepareLoading();
+		void FinalizeTracking() const;
+		virtual void PrepareFinalize() {}
+		virtual void BuildAssetsMap() {}
 	};
 
 	template <typename T>
@@ -94,44 +87,26 @@ namespace PCGEx
 		{
 		}
 
-		virtual bool IsEmpty() override
-		{
-			return AssetsMap.IsEmpty();
-		}
+		virtual bool IsEmpty() const override { return AssetsMap.IsEmpty(); }
 
-		TObjectPtr<T>* GetAsset(const PCGExValueHash Key)
-		{
-			return AssetsMap.Find(Key);
-		}
-
-		virtual void End(const bool bBuildMap = false) override
-		{
-			if (bEnded)
-			{
-				return;
-			}
-
-			FPlatformAtomics::InterlockedExchange(&bEnded, 1);
-
-			if (bBuildMap)
-			{
-				for (FSoftObjectPath Path : UniquePaths)
-				{
-					TSoftObjectPtr<T> SoftPtr = TSoftObjectPtr<T>(Path);
-					if (SoftPtr.Get())
-					{
-						AssetsMap.Add(PCGExTypes::ComputeHash(Path), SoftPtr.Get());
-					}
-				}
-			}
-
-			IAssetLoader::End();
-		}
+		TObjectPtr<T>* GetAsset(const PCGExValueHash Key) { return AssetsMap.Find(Key); }
 
 	protected:
-		virtual void PrepareLoading() override
+		virtual void PrepareFinalize() override
 		{
 			AssetsMap.Reserve(UniquePaths.Num());
+		}
+
+		virtual void BuildAssetsMap() override
+		{
+			for (const FSoftObjectPath& Path : UniquePaths)
+			{
+				TSoftObjectPtr<T> SoftPtr(Path);
+				if (T* Resolved = SoftPtr.Get())
+				{
+					AssetsMap.Add(PCGExTypes::ComputeHash(Path), Resolved);
+				}
+			}
 		}
 	};
 }

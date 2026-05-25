@@ -145,6 +145,13 @@ namespace PCGExData
 		void Fetch(TArray<T>& Dump, const PCGExMT::FScope& Scope);
 
 		/**
+		 * Slice-local variant of Fetch. Dest must be sized to Scope.Count and writes
+		 * start at Dest[0] (not Dest[Scope.Start]). Useful when the caller only needs
+		 * the scope's range, not a full-size buffer.
+		 */
+		void FetchSlice(TArrayView<T> Dest, const PCGExMT::FScope& Scope);
+
+		/**
 		 * Build and validate a property/attribute accessor for the selected
 		 * @param Dump
 		 * @param bCaptureMinMax

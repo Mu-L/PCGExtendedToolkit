@@ -85,6 +85,8 @@ struct FPCGExSampleSocketsContext final : FPCGExPointsProcessorContext
 	FPCGExSocketOutputDetails OutputSocketDetails;
 	TSharedPtr<PCGExData::FPointIOCollection> SocketsCollection;
 
+	virtual void RegisterAssetDependencies() override;
+
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
 };
@@ -95,12 +97,9 @@ protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(SampleSockets)
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
+	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
+	virtual bool PostBoot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
-
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
-	{
-		return true;
-	}
 };
 
 namespace PCGExSampleSockets

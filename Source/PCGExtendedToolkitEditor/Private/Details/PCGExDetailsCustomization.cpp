@@ -40,9 +40,9 @@ namespace PCGExDetailsCustomization
 		PCGEX_ADD_ACTION_ICON(DensityBounds, AIS_Med)
 		PCGEX_ADD_ACTION_ICON(Bounds, AIS_Med)
 		PCGEX_ADD_ACTION_ICON(Center, AIS_Med)
-		PCGEX_ADD_ACTION_ICON(X, AIS_Small)
-		PCGEX_ADD_ACTION_ICON(Y, AIS_Small)
-		PCGEX_ADD_ACTION_ICON(Z, AIS_Small)
+		PCGEX_ADD_ACTION_ICON(X, AIS_VerySmall)
+		PCGEX_ADD_ACTION_ICON(Y, AIS_VerySmall)
+		PCGEX_ADD_ACTION_ICON(Z, AIS_VerySmall)
 		PCGEX_ADD_ACTION_ICON(Dist_Center, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(Dist_SphereBounds, AIS_Small)
 		PCGEX_ADD_ACTION_ICON(Dist_BoxBounds, AIS_Small)
@@ -215,7 +215,6 @@ MACRO(EPCGExSortDirection)\
 MACRO(EPCGExTruncateMode)\
 MACRO(EPCGExVariationMode)\
 MACRO(EPCGExVariationSnapping)\
-MACRO(EPCGExGrammarScaleMode)\
 MACRO(EPCGExSampleSource)\
 MACRO(EPCGExBitmaskMode)\
 MACRO(EPCGExCellTriageFlags)\

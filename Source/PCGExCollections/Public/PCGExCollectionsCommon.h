@@ -14,7 +14,7 @@ UENUM()
 enum class EPCGExCollectionSource : uint8
 {
 	Asset        = 0 UMETA(DisplayName = "Asset", Tooltip="Use a single collection reference"),
-	AttributeSet = 1 UMETA(DisplayName = "Attribute Set", Tooltip="Use a single attribute set that will be converted to a dynamic collection on the fly"),
+	AttributeSet = 1 UMETA(Hidden, DisplayName = "Attribute Set", Tooltip="Use a single attribute set that will be converted to a dynamic collection on the fly"),
 	Attribute    = 2 UMETA(DisplayName = "Path Attribute", Tooltip="Use an attribute that's a path reference to an asset collection"),
 };
 

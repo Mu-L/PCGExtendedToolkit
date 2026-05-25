@@ -57,13 +57,13 @@ struct PCGEXCORE_API FPCGExGeo2DProjectionDetails
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FVector ProjectionNormal_DEPRECATED = FVector::UpVector;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bLocalProjectionNormal_DEPRECATED = false;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector LocalNormal_DEPRECATED;
 
 #pragma endregion

@@ -45,6 +45,10 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "Performance|Defaults")
 	bool bBulkInitData = true;
 
+	/** */
+	UPROPERTY(EditAnywhere, config, Category = "Performance|Defaults")
+	bool bRuntimeAlwaysOffThread = false;
+
 	UPROPERTY(EditAnywhere, config, Category = "Performance|Cluster")
 	bool bUseDelaunator = true;
 

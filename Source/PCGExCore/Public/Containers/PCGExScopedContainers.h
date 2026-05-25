@@ -174,6 +174,24 @@ namespace PCGExMT
 			UpdateFunc(Value);
 		}
 
+		// Read-locked callback: runs Func with a const reference to the stored value
+		// while holding the shard's read lock. Returns true if the key was found.
+		// Use this instead of Find(key) -> const T* when other threads may concurrently
+		// mutate the shard -- the bare pointer returned by Find is invalidated as soon
+		// as the const Find function returns and its read lock is released.
+		template <typename TConstFunc>
+		bool ReadOrSkip(uint64 Key, TConstFunc&& Func) const
+		{
+			const uint32 Index = FastHashToShard(Key);
+			FReadScopeLock ScopeLock(Locks[Index]);
+			if (const T* Found = Shards[Index].Find(Key))
+			{
+				Func(*Found);
+				return true;
+			}
+			return false;
+		}
+
 		bool Contains(uint64 Key) const
 		{
 			const uint32 Index = FastHashToShard(Key);

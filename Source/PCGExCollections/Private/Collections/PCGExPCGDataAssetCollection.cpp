@@ -323,6 +323,23 @@ void FPCGExPCGDataAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObj
 		}
 	}
 }
+
+FSoftObjectPath FPCGExPCGDataAssetCollectionEntry::EDITOR_GetThumbnailAssetPath() const
+{
+	if (bIsSubCollection)
+	{
+		return FPCGExAssetCollectionEntry::EDITOR_GetThumbnailAssetPath();
+	}
+
+	// Level-sourced entries stage an embedded ExportedDataAsset inside the collection
+	// package; show the user-facing source (the UWorld) instead.
+	if (Source == EPCGExDataAssetEntrySource::Level)
+	{
+		return Level.ToSoftObjectPath();
+	}
+
+	return DataAsset.ToSoftObjectPath();
+}
 #endif
 
 #pragma endregion

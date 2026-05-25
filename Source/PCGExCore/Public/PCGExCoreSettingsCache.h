@@ -33,6 +33,7 @@ struct PCGEXCORE_API FPCGExCoreSettingsCache
 	bool bBulkInitData = false;
 	bool bUseDelaunator = true;
 	bool bAssertOnEmptyThread = true;
+	bool bRuntimeAlwaysOffThread = false;
 
 	bool bUseNativeColorsIfPossible = true;
 	bool bToneDownOptionalPins = true;

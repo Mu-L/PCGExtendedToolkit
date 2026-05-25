@@ -30,6 +30,12 @@ TArray<FPCGPinProperties> UPCGExSampleSocketsSettings::OutputPinProperties() con
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(SampleSockets)
 
+void FPCGExSampleSocketsContext::RegisterAssetDependencies()
+{
+	FPCGExPointsProcessorContext::RegisterAssetDependencies();
+	if (StaticMeshLoader) { StaticMeshLoader->AddAssetDependencies(); }
+}
+
 bool FPCGExSampleSocketsElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))
@@ -51,6 +57,10 @@ bool FPCGExSampleSocketsElement::Boot(FPCGExContext* InContext) const
 
 		TArray<FName> Names = {Settings->AssetPathAttributeName};
 		Context->StaticMeshLoader = MakeShared<PCGEx::TAssetLoader<UStaticMesh>>(Context, Context->MainPoints, Names);
+		if (!Context->StaticMeshLoader->Discover())
+		{
+			return Context->CancelExecution(TEXT("Failed to find any asset to load."));
+		}
 	}
 	else
 	{
@@ -69,6 +79,29 @@ bool FPCGExSampleSocketsElement::Boot(FPCGExContext* InContext) const
 	return true;
 }
 
+void FPCGExSampleSocketsElement::PostLoadAssetsDependencies(FPCGExContext* InContext) const
+{
+	FPCGExPointsProcessorElement::PostLoadAssetsDependencies(InContext);
+
+	PCGEX_CONTEXT_AND_SETTINGS(SampleSockets)
+	if (Context->StaticMeshLoader)
+	{
+		Context->StaticMeshLoader->Finalize();
+	}
+}
+
+bool FPCGExSampleSocketsElement::PostBoot(FPCGExContext* InContext) const
+{
+	if (!FPCGExPointsProcessorElement::PostBoot(InContext)) { return false; }
+
+	PCGEX_CONTEXT_AND_SETTINGS(SampleSockets)
+	if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
+	{
+		return InContext->CancelExecution(TEXT("Failed to load any assets."));
+	}
+	return true;
+}
+
 bool FPCGExSampleSocketsElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExSampleSocketsElement::Execute);
@@ -77,30 +110,6 @@ bool FPCGExSampleSocketsElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (Context->StaticMesh)
-		{
-			Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-		}
-		else
-		{
-			Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-
-			if (!Context->StaticMeshLoader->Start(Context->GetTaskManager()))
-			{
-				return Context->CancelExecution(TEXT("Failed to find any asset to load."));
-			}
-
-			return false;
-		}
-	}
-
-	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
-	{
-		if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
-		{
-			return Context->CancelExecution(TEXT("Failed to load any assets."));
-		}
-
 		PCGEX_ON_INVALILD_INPUTS(FTEXT("Some inputs have less than 2 points and won't be processed."))
 
 		if (!Context->StartBatchProcessingPoints(

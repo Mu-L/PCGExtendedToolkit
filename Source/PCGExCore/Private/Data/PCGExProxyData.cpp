@@ -239,21 +239,44 @@ namespace PCGExData
 
 #pragma endregion
 
-	TSharedPtr<IBufferProxy> IBufferProxyPool::TryGet(const FProxyDescriptor& Descriptor)
+	TSharedPtr<IBufferProxy> IBufferProxyPool::GetOrCreate(
+		const FProxyDescriptor& Descriptor,
+		TFunctionRef<TSharedPtr<IBufferProxy>()> Factory)
 	{
-		FReadScopeLock ReadScopeLock(MapLock);
-		TWeakPtr<IBufferProxy>* ProxyPtr = ProxyMap.Find(GetTypeHash(Descriptor));
-		if (!ProxyPtr)
-		{
-			return nullptr;
-		}
-		return ProxyPtr->Pin();
-	}
+		const uint64 Key = GetTypeHash(Descriptor);
 
-	void IBufferProxyPool::Add(const FProxyDescriptor& Descriptor, const TSharedPtr<IBufferProxy>& Proxy)
-	{
-		// Will replace existing, it's fine, we can live with a few duplicate proxies
-		FWriteScopeLock WriteScopeLock(MapLock);
-		ProxyMap.Add(GetTypeHash(Descriptor), Proxy);
+		// Read-locked fast path: cache hits proceed in parallel across threads.
+		// Critical for hot descriptors requested many times (e.g. shared blending
+		// inputs across N IOs); without this, every repeat lookup would serialize on
+		// the shard's write lock and sharding alone wouldn't help.
+		//
+		// We Pin the weak ref while still holding the shard read lock -- a concurrent
+		// slow-path writer to the same shard can otherwise rehash the TMap or tear
+		// the TWeakPtr's two-pointer assignment, invalidating any pointer we'd held
+		// past the lock.
+		TSharedPtr<IBufferProxy> Pinned;
+		ProxyMap.ReadOrSkip(Key, [&](const TWeakPtr<IBufferProxy>& Slot)
+		{
+			Pinned = Slot.Pin();
+		});
+		if (Pinned) { return Pinned; }
+
+		// Slow path: shard write lock, re-check (another thread may have populated
+		// between our read unlock and the write acquire), then run Factory under lock.
+		TSharedPtr<IBufferProxy> Result;
+		ProxyMap.FindOrAddAndUpdate(
+			Key,
+			[&](TWeakPtr<IBufferProxy>& Slot)
+			{
+				if (TSharedPtr<IBufferProxy> Pinned = Slot.Pin())
+				{
+					Result = Pinned;
+					return;
+				}
+
+				Result = Factory();
+				if (Result) { Slot = Result; }
+			});
+		return Result;
 	}
 }

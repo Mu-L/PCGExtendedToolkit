@@ -170,19 +170,21 @@ namespace PCGExGrammitExport
 					continue;
 				}
 
-				FPCGSubdivisionSubmodule Submodule;
-				if (!Entry->FixModuleInfos(InCollection, Submodule))
+				// Resolve the entry's effective grammar struct -- gives us shared Symbol / DebugColor /
+				// Axes without paying for a per-axis Fix call unless the axis is actually emitted.
+				const FPCGExAssetGrammarDetails* Grammar = Entry->GetEffectiveGrammar(InCollection);
+				if (!Grammar || Grammar->Axes == 0)
 				{
 					continue;
 				}
 
 				// Empty / None Symbol = opt-out of grammar export.
-				if (Submodule.Symbol.IsNone())
+				if (Grammar->Symbol.IsNone())
 				{
 					continue;
 				}
-				const FString SymbolStr = Submodule.Symbol.ToString();
-				if (SymbolStr.IsEmpty())
+				const FString BaseSymbolStr = Grammar->Symbol.ToString();
+				if (BaseSymbolStr.IsEmpty())
 				{
 					continue;
 				}
@@ -192,49 +194,60 @@ namespace PCGExGrammitExport
 				// assignment inside Fix() goes silently wrong on some collection types (the
 				// resulting V.X/Y/Z come through as 1.0 even when the user picked a color).
 				// Native FLinearColor read is unambiguous.
-				FLinearColor SourceColor = FLinearColor::White;
-				if (!Entry->bIsSubCollection)
-				{
-					SourceColor = (Entry->GrammarSource == EPCGExEntryVariationMode::Local)
-						? Entry->AssetGrammar.DebugColor
-						: InCollection->GlobalAssetGrammar.DebugColor;
-				}
-				else if (const UPCGExAssetCollection* Inner = Entry->GetSubCollectionPtr())
-				{
-					SourceColor = (Entry->SubGrammarMode == EPCGExGrammarSubCollectionMode::Override)
-						? Entry->CollectionGrammar.DebugColor
-						: Inner->CollectionGrammar.DebugColor;
-				}
+				const FLinearColor SourceColor = Grammar->DebugColor;
 
 				// Treat pure-white (the default DebugColor) as "user didn't pick one" and
 				// substitute a hue derived from the symbol, so atoms in Grammit aren't all
 				// identical pills AND the same symbol always renders the same color across
-				// re-exports.
+				// re-exports. Hash off BaseSymbolStr (pre-suffix) so per-axis siblings share a hue.
 				const bool bIsDefaultWhite =
 					FMath::IsNearlyEqual(SourceColor.R, 1.0f) &&
 					FMath::IsNearlyEqual(SourceColor.G, 1.0f) &&
 					FMath::IsNearlyEqual(SourceColor.B, 1.0f);
 
 				const FLinearColor DebugLC = bIsDefaultWhite
-					? FLinearColor::MakeFromHSV8(static_cast<uint8>(GetTypeHash(SymbolStr) & 0xFF), 180, 220)
+					? FLinearColor::MakeFromHSV8(static_cast<uint8>(GetTypeHash(BaseSymbolStr) & 0xFF), 180, 220)
 					: SourceColor;
+				const FString ColorHex = LinearColorToHex(DebugLC);
 
-				FAtomOut Atom;
-				Atom.Name = SymbolStr;
-				Atom.Color = LinearColorToHex(DebugLC);
-				Atom.Size = Submodule.Size;
-				Atom.bScalable = Submodule.bScalable;
+				// Emit one atom per enabled axis. Single-axis entries get the bare Symbol; multi-axis
+				// entries get a _X/_Y/_Z suffix per axis so Grammit (which has no attribute concept)
+				// sees them as distinct modules with potentially different sizes / scalable flags.
+				// Dispatch through Grammar-> directly to skip Entry::FixModuleInfos's redundant
+				// GetEffectiveGrammar resolve (Grammar was just resolved above).
+				const bool bSuffix = PCGExGrammarAxes::CountAxes(Grammar->Axes) > 1;
+				const bool bIsSub = Entry->bIsSubCollection;
 
-				const int32 AtomIdx = OutAtoms.Add(MoveTemp(Atom));
-
-				if (!Entry->Category.IsNone())
+				for (int32 a = 0; a < 3; ++a)
 				{
-					TArray<int32>& Bucket = OutCategoryMembers.FindOrAdd(Entry->Category);
-					if (Bucket.Num() == 0)
+					if (!(Grammar->Axes & static_cast<uint8>(PCGExGrammarAxes::Bits[a])))
 					{
-						OutCategoryOrder.Add(Entry->Category);
+						continue;
 					}
-					Bucket.Add(AtomIdx);
+
+					FPCGSubdivisionSubmodule Submodule;
+					const bool bFixed = bIsSub
+						? Grammar->FixSubCollection(Entry->InternalSubCollection, PCGExGrammarAxes::Bits[a], Submodule, /*SizeCache=*/nullptr)
+						: Grammar->FixLeaf(Entry->Staging.Bounds, PCGExGrammarAxes::Bits[a], Submodule);
+					if (!bFixed) { continue; }
+
+					FAtomOut Atom;
+					Atom.Name = bSuffix ? (BaseSymbolStr + PCGExGrammarAxes::Suffixes[a]) : BaseSymbolStr;
+					Atom.Color = ColorHex;
+					Atom.Size = Submodule.Size;
+					Atom.bScalable = Submodule.bScalable;
+
+					const int32 AtomIdx = OutAtoms.Add(MoveTemp(Atom));
+
+					if (!Entry->Category.IsNone())
+					{
+						TArray<int32>& Bucket = OutCategoryMembers.FindOrAdd(Entry->Category);
+						if (Bucket.Num() == 0)
+						{
+							OutCategoryOrder.Add(Entry->Category);
+						}
+						Bucket.Add(AtomIdx);
+					}
 				}
 			}
 		}

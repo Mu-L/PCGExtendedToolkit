@@ -11,6 +11,9 @@
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
+#if WITH_EDITOR
+#include "Helpers/PCGDynamicTrackingHelpers.h"
+#endif
 #include "Helpers/PCGHelpers.h"
 #include "MeshSelectors/PCGMeshSelectorBase.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
@@ -385,10 +388,22 @@ namespace PCGExCollections
 
 		{
 			TSharedPtr<TSet<FSoftObjectPath>> CollectionPaths = MakeShared<TSet<FSoftObjectPath>>();
+
 			for (int32 i = 0; i < NumEntries; i++)
 			{
 				CollectionPaths->Add(CollectionPath->GetValueFromItemKey(i));
 			}
+
+#if WITH_EDITOR
+			FPCGDynamicTrackingHelper DynamicTracking;
+			DynamicTracking.EnableAndInitialize(InContext, CollectionPaths->Num());
+			for (const FSoftObjectPath& Path : *CollectionPaths.Get())
+			{
+				DynamicTracking.AddToTracking(FPCGSelectionKey::CreateFromPath(Path), /*bIsCulled=*/ false);
+			}
+			DynamicTracking.Finalize(InContext);
+#endif
+
 			CollectionsHandle = PCGExHelpers::LoadBlocking_AnyThread(CollectionPaths);
 		}
 
