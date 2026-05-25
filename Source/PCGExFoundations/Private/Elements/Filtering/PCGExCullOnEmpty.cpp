@@ -40,7 +40,7 @@ TArray<FPCGPinProperties> UPCGExCullOnEmptySettings::OutputPinProperties() const
 	{
 		(void)PinProperties.Emplace_GetRef(PCGPinConstants::DefaultOutputLabel, FPCGDataTypeInfo::AsId());
 	}
-	if (bOutputIsEmpty)
+	if (bCheckOnly || bOutputIsEmpty)
 	{
 		PCGEX_PIN_PARAM(PCGExCullOnEmpty::IsEmptyName, "", Normal)
 	}
