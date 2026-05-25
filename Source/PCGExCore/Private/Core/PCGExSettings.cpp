@@ -53,14 +53,12 @@ void UPCGExSettings::PostEditChangeProperty(struct FPropertyChangedEvent& Proper
 		}
 	}
 
-	bCachedSupportsDataStealing = SupportsDataStealing();
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
 
 void UPCGExSettings::PostLoad()
 {
-	bCachedSupportsDataStealing = SupportsDataStealing();
 	Super::PostLoad();
 }
 

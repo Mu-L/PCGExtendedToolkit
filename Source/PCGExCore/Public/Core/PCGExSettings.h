@@ -43,9 +43,6 @@ protected:
 
 	//~End UPCGSettings
 
-	UPROPERTY()
-	bool bCachedSupportsDataStealing = false;
-
 	//~Begin UPCGExPointsProcessorSettings
 public:
 	/** If enabled, will pre-allocate all data on a single thread to avoid contention. Not all nodes support this. */
@@ -63,7 +60,7 @@ public:
 	/** This node will not make any copy of the data and instead modify the inputs directly.
 	 * When enabling this you must make absolutely sure the data plugged into this node is not plugged in any other node.
 	 * Only supported by nodes set-up in a way that makes in-place mutations possible. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsDataStealing", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable))
 	EPCGExOptionState StealData = EPCGExOptionState::Disabled;
 	
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable))

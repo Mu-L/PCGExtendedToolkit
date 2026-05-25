@@ -18,6 +18,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 
 namespace PCGExCollectionGrid
 {
@@ -42,6 +43,12 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 
 	TWeakObjectPtr<UPCGExAssetCollection> WeakColl = Collection;
 	const int32 Idx = EntryIndex;
+
+	// Function-local static so the brush object is constructed once per process and
+	// shared across all tiles. White fill is intentional -- per-badge SBorder applies
+	// BorderBackgroundColor as a multiplicative tint, matching the prior Brushes.White
+	// behavior so radius is the only thing that changes.
+	static const FSlateRoundedBoxBrush BadgeBrush(FLinearColor::White, 3.0f);
 
 	// Build picker widget via delegate (type-specific)
 	TSharedRef<SWidget> PickerWidget = SNullWidget::NullWidget;
@@ -431,7 +438,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 						.Padding(2.f)
 						[
 							SNew(SBorder)
-							.BorderImage(FAppStyle::GetBrush("Brushes.White"))
+							.BorderImage(&BadgeBrush)
 							.BorderBackgroundColor(FLinearColor(0, 0, 0, 0.7f))
 							.Padding(FMargin(5, 2))
 							[
@@ -491,7 +498,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 										V.ScaleMin != FVector::OneVector || V.ScaleMax != FVector::OneVector;
 									return bHasVariations ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
-								.BorderImage(FAppStyle::GetBrush("Brushes.White"))
+								.BorderImage(&BadgeBrush)
 								.BorderBackgroundColor(FLinearColor(0.6f, 0.4f, 0.1f, 0.85f))
 								.Padding(FMargin(3, 1))
 								[
@@ -522,7 +529,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									}
 									return !Result.Entry->Staging.Sockets.IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
-								.BorderImage(FAppStyle::GetBrush("Brushes.White"))
+								.BorderImage(&BadgeBrush)
 								.BorderBackgroundColor(FLinearColor(0.1f, 0.5f, 0.6f, 0.85f))
 								.Padding(FMargin(3, 1))
 								[
@@ -566,7 +573,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									}
 									return !Result.Entry->Tags.IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
-								.BorderImage(FAppStyle::GetBrush("Brushes.White"))
+								.BorderImage(&BadgeBrush)
 								.BorderBackgroundColor(FLinearColor(0.4f, 0.2f, 0.6f, 0.85f))
 								.Padding(FMargin(3, 1))
 								[
@@ -597,7 +604,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									}
 									return Result.Entry->PropertyOverrides.GetEnabledCount() > 0 ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 								})
-								.BorderImage(FAppStyle::GetBrush("Brushes.White"))
+								.BorderImage(&BadgeBrush)
 								.BorderBackgroundColor(FLinearColor(0.2f, 0.6f, 0.3f, 0.85f))
 								.Padding(FMargin(3, 1))
 								[
@@ -606,6 +613,97 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									.Font(FCoreStyle::GetDefaultFontStyle("Bold", 6))
 									.ColorAndOpacity(FSlateColor(FLinearColor::White))
 								]
+							]
+						]
+
+						// Grammar symbol badge (bottom-left) -- background tinted by the entry's
+						// AssetGrammar.DebugColor so the symbol is visually identifiable at a glance.
+						// Reads AssetGrammar directly (not GetEffectiveGrammar): in Flatten/Inherit modes
+						// the effective grammar resolves to a different struct, but the user-authored
+						// symbol on this entry is still what they want to see on the tile.
+						// Extra bottom padding keeps the badge clear of Unreal's native asset-type
+						// color strip rendered along the thumbnail's bottom edge.
+						+ SOverlay::Slot()
+						.HAlign(HAlign_Left)
+						.VAlign(VAlign_Bottom)
+						.Padding(FMargin(2.f, 2.f, 2.f, 6.f))
+						[
+							SNew(SBorder)
+							.Visibility_Lambda([WeakColl, Idx]() -> EVisibility
+							{
+								const UPCGExAssetCollection* Coll = WeakColl.Get();
+								if (!Coll)
+								{
+									return EVisibility::Collapsed;
+								}
+								const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+								if (!Result.IsValid())
+								{
+									return EVisibility::Collapsed;
+								}
+								const FPCGExAssetGrammarDetails& G = Result.Entry->AssetGrammar;
+								// Both gates required: a symbol with no enabled axes is dormant
+								// (export skips it), and an axis mask with no symbol has nothing to label.
+								return (G.Symbol.IsNone() || !G.IsValidModule()) ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+							})
+							.BorderImage(&BadgeBrush)
+							.BorderBackgroundColor_Lambda([WeakColl, Idx]() -> FSlateColor
+							{
+								const UPCGExAssetCollection* Coll = WeakColl.Get();
+								if (!Coll)
+								{
+									return FSlateColor(FLinearColor(0, 0, 0, 0.85f));
+								}
+								const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+								if (!Result.IsValid())
+								{
+									return FSlateColor(FLinearColor(0, 0, 0, 0.85f));
+								}
+								FLinearColor C = Result.Entry->AssetGrammar.DebugColor;
+								C.A = 0.85f;
+								return FSlateColor(C);
+							})
+							.Padding(FMargin(3, 1))
+							[
+								SNew(STextBlock)
+								.Text_Lambda([WeakColl, Idx]() -> FText
+								{
+									const UPCGExAssetCollection* Coll = WeakColl.Get();
+									if (!Coll)
+									{
+										return FText::GetEmpty();
+									}
+									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+									if (!Result.IsValid())
+									{
+										return FText::GetEmpty();
+									}
+									return FText::FromName(Result.Entry->AssetGrammar.Symbol);
+								})
+								.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8))
+								.ColorAndOpacity_Lambda([WeakColl, Idx]() -> FSlateColor
+								{
+									// Pick black-on-light / white-on-dark from the background's
+									// perceived luminance. DebugColor is stored linear; sqrt is a
+									// cheap gamma~2 approximation of sRGB encoding, and Rec.601
+									// coefficients then map to perceived brightness.
+									const UPCGExAssetCollection* Coll = WeakColl.Get();
+									if (!Coll)
+									{
+										return FSlateColor(FLinearColor::White);
+									}
+									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+									if (!Result.IsValid())
+									{
+										return FSlateColor(FLinearColor::White);
+									}
+									const FLinearColor& C = Result.Entry->AssetGrammar.DebugColor;
+									const float Perceived =
+										0.299f * FMath::Sqrt(FMath::Max(0.f, C.R)) +
+										0.587f * FMath::Sqrt(FMath::Max(0.f, C.G)) +
+										0.114f * FMath::Sqrt(FMath::Max(0.f, C.B));
+									return FSlateColor(Perceived > 0.6f ? FLinearColor::Black : FLinearColor::White);
+								})
 							]
 						]
 					]

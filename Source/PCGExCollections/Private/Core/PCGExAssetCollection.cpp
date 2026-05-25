@@ -1100,6 +1100,12 @@ void UPCGExAssetCollection::GetAssetPaths(TSet<FSoftObjectPath>& OutPaths, PCGEx
 void UPCGExAssetCollection::GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
 {
 	GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+	PCGExProperties::GatherCookDependencyAssetPaths(CollectionProperties, OutPaths);
+
+	ForEachEntry([&OutPaths](const FPCGExAssetCollectionEntry* Entry, int32 /*Idx*/)
+	{
+		PCGExProperties::GatherCookDependencyAssetPaths(Entry->PropertyOverrides, OutPaths);
+	});
 }
 #endif
 
