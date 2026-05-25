@@ -405,7 +405,7 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 		UPCGExAssetCollection* MainCollection = Settings->AssetCollection;
 		if (!MainCollection)
 		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Asset collection is not set."));
+			PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Asset collection is not set."));
 			return false;
 		}
 		FPCGExGetCollectionDataContext::FSlot& Slot = Context->Slots.AddDefaulted_GetRef();
@@ -415,11 +415,7 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 	}
 
 	// FromInputs mode -- parse inputs, gather paths, register dependencies for async load.
-	if (Settings->SourceAttribute.IsNone())
-	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("SourceAttribute is required when SourceMode is FromInputs."));
-		return false;
-	}
+	PCGEX_VALIDATE_NAME(Settings->SourceAttribute)
 
 	TArray<FPCGTaggedData> Inputs = InContext->InputData.GetInputsByPin(PCGExGetCollectionData::SourcesPin);
 	if (Inputs.IsEmpty())
@@ -428,8 +424,6 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 	} // nothing to do
 
 	// EntryIdAndMap: resolve hashes to sub-collection paths via the unpacker.
-	// NOTE: FPickUnpacker::UnpackPin internally LoadBlocking_AnyThreads the map collections --
-	// out of scope for this pass; tracked as a known issue (depends on the unpacker itself).
 	TSharedPtr<PCGExCollections::FPickUnpacker> Unpacker;
 	if (Settings->SourceShape == EPCGExGetCollectionDataSourceShape::EntryIdAndMap)
 	{
@@ -437,7 +431,7 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 		Unpacker->UnpackPin(InContext, PCGExCollections::Labels::SourceCollectionMapLabel);
 		if (!Unpacker->HasValidMapping())
 		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("EntryIdAndMap mode requires a valid Collection Map on the Map pin."));
+			PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("EntryIdAndMap mode requires a valid Collection Map on the Map pin."));
 			return false;
 		}
 	}
@@ -702,10 +696,16 @@ namespace PCGExGetCollectionData
 			for (int32 i = 0; i < Entries.Num(); ++i)
 			{
 				const FFlattenedEntry& EH = Entries[i];
-				if (!EH.Entry) { continue; }
+				if (!EH.Entry)
+				{
+					continue;
+				}
 				const FPCGExAssetGrammarDetails* G = EH.Entry->GetEffectiveGrammar(EH.Host);
 				ResolvedGrammars[i] = G;
-				if (G) { LocalUsedAxes |= (G->Axes & Settings->OutputAxes); }
+				if (G)
+				{
+					LocalUsedAxes |= (G->Axes & Settings->OutputAxes);
+				}
 			}
 		}
 
@@ -846,8 +846,8 @@ namespace PCGExGetCollectionData
 
 		const uint8 SkipFlags = Settings->SkipFlags;
 		const bool bSkipEmptySymbol = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::EmptySymbol)) != 0;
-		const bool bSkipEmptyAxes   = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::EmptyAxes)) != 0;
-		const bool bSkipDuplicates  = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::Duplicates)) != 0;
+		const bool bSkipEmptyAxes = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::EmptyAxes)) != 0;
+		const bool bSkipDuplicates = (SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::Duplicates)) != 0;
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_WriteRows);
 		for (int32 EntryIdx = 0; EntryIdx < Entries.Num(); ++EntryIdx)
@@ -941,13 +941,19 @@ namespace PCGExGetCollectionData
 				const bool bIsSub = E->bIsSubCollection;
 				for (int32 a = 0; a < 3; a++)
 				{
-					if (!(RowAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))) { continue; }
+					if (!(RowAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a])))
+					{
+						continue;
+					}
 
 					FPCGSubdivisionSubmodule Module;
 					const bool bFixed = bIsSub
 						? Grammar->FixSubCollection(E->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCachePerAxis[a] : nullptr)
 						: Grammar->FixLeaf(E->Staging.Bounds, PCGExGrammarAxes::Bits[a], Module);
-					if (!bFixed) { continue; }
+					if (!bFixed)
+					{
+						continue;
+					}
 
 #define PCGEX_GCD_WRITE_PERAXIS(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
 					SetIf(U.FieldName##Attr[a], Key, ValueExpr);

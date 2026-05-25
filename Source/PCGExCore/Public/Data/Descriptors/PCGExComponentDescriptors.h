@@ -416,6 +416,7 @@ struct PCGEXCORE_API FPCGExPrimitiveComponentDescriptor
 
 	virtual void InitFrom(const UPrimitiveComponent* Component, bool bInitBodyInstance = false);
 	virtual void InitComponent(UPrimitiveComponent* InComponent) const;
+	virtual void GetAssetPaths(TSet<FSoftObjectPath>& InAssetPaths) const;
 };
 
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Mesh Component Descriptor")
@@ -447,6 +448,7 @@ struct PCGEXCORE_API FPCGExMeshComponentDescriptor : public FPCGExPrimitiveCompo
 
 	virtual void InitFrom(const UPrimitiveComponent* Component, bool bInitBodyInstance = false) override;
 	virtual void InitComponent(UPrimitiveComponent* InComponent) const override;
+	virtual void GetAssetPaths(TSet<FSoftObjectPath>& InAssetPaths) const override;
 };
 
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Static Mesh Component Descriptor")

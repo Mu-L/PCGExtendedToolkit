@@ -11,6 +11,11 @@
 
 #include "PCGExCullOnEmpty.generated.h"
 
+namespace PCGExCullOnEmpty
+{
+	const FName IsEmptyName("IsEmpty");
+}
+
 UCLASS(BlueprintType, ClassGroup = (Procedural), Category = "Misc")
 class UPCGExCullOnEmptySettings : public UPCGExSettings
 {
@@ -19,7 +24,7 @@ class UPCGExCullOnEmptySettings : public UPCGExSettings
 public:
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(CullOnEmpty, "Cull On Empty", "Deactivates output pin if all inputs are empty or missing.");
-
+	
 	virtual FLinearColor GetNodeTitleColor() const override
 	{
 		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
@@ -30,6 +35,20 @@ public:
 		return EPCGSettingsType::Filter;
 	}
 #endif
+	
+	virtual FPCGDataTypeIdentifier GetCurrentPinTypesID(const UPCGPin* InPin) const override;
+	
+	/** */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	bool bCheckOnly = false;
+	
+	/** */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(InlineEditConditionToggle))
+	bool bOutputIsEmpty = false;
+	
+	/**  */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bOutputIsEmpty"))
+	FName OutputIsEmpty = PCGExCullOnEmpty::IsEmptyName;
 
 	virtual bool OutputPinsCanBeDeactivated() const override
 	{

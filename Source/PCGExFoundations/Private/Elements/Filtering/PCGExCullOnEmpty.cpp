@@ -13,6 +13,18 @@
 
 #define LOCTEXT_NAMESPACE "CullOnEmptyElement"
 
+FPCGDataTypeIdentifier UPCGExCullOnEmptySettings::GetCurrentPinTypesID(const UPCGPin* InPin) const
+{
+	if (!InPin->IsOutputPin() || InPin->Properties.Label == PCGPinConstants::DefaultOutputLabel)
+	{
+		return Super::GetCurrentPinTypesID(InPin);
+	}
+
+	FPCGDataTypeIdentifier Id = FPCGDataTypeInfoParam::AsId();
+	Id.CustomSubtype = static_cast<int32>(EPCGMetadataTypes::Boolean);
+	return Id;
+}
+
 TArray<FPCGPinProperties> UPCGExCullOnEmptySettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
@@ -24,7 +36,14 @@ TArray<FPCGPinProperties> UPCGExCullOnEmptySettings::InputPinProperties() const
 TArray<FPCGPinProperties> UPCGExCullOnEmptySettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
-	(void)PinProperties.Emplace_GetRef(PCGPinConstants::DefaultOutputLabel, FPCGDataTypeInfo::AsId());
+	if (!bCheckOnly)
+	{
+		(void)PinProperties.Emplace_GetRef(PCGPinConstants::DefaultOutputLabel, FPCGDataTypeInfo::AsId());
+	}
+	if (bOutputIsEmpty)
+	{
+		PCGEX_PIN_PARAM(PCGExCullOnEmpty::IsEmptyName, "", Normal)
+	}
 	return PinProperties;
 }
 
@@ -69,24 +88,53 @@ namespace PCGExCullOnEmpty
 bool FPCGExCullOnEmptyElement::ExecuteInternal(FPCGContext* Context) const
 {
 	check(Context);
+	PCGEX_SETTINGS_C(Context, CullOnEmpty)
 
 	const TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(PCGPinConstants::DefaultInputLabel);
 
 	bool bHasValidData = false;
 
-	for (const FPCGTaggedData& TaggedData : Inputs)
+	if (Settings->bCheckOnly)
 	{
-		if (PCGExCullOnEmpty::IsDataNonEmpty(TaggedData.Data))
+		for (const FPCGTaggedData& TaggedData : Inputs)
 		{
-			FPCGTaggedData& Output = Context->OutputData.TaggedData.Add_GetRef(TaggedData);
-			Output.Pin = PCGPinConstants::DefaultOutputLabel;
-			bHasValidData = true;
+			if (PCGExCullOnEmpty::IsDataNonEmpty(TaggedData.Data))
+			{
+				bHasValidData = true;
+				break;
+			}
+		}
+	}
+	else
+	{
+		Context->OutputData.TaggedData.Reserve(Inputs.Num());
+		for (const FPCGTaggedData& TaggedData : Inputs)
+		{
+			if (PCGExCullOnEmpty::IsDataNonEmpty(TaggedData.Data))
+			{
+				FPCGTaggedData& Output = Context->OutputData.TaggedData.Add_GetRef(TaggedData);
+				Output.Pin = PCGPinConstants::DefaultOutputLabel;
+				bHasValidData = true;
+			}
+		}
+
+		if (!bHasValidData)
+		{
+			Context->OutputData.InactiveOutputPinBitmask |= 1ULL << 0;
 		}
 	}
 
-	if (!bHasValidData)
 	{
-		Context->OutputData.InactiveOutputPinBitmask |= 1ULL << 0;
+		if (Settings->bCheckOnly || Settings->bOutputIsEmpty)
+		{
+			UPCGParamData* ParamData = Context->NewObject_AnyThread<UPCGParamData>(Context);
+			FPCGMetadataAttribute<bool>* Attr = ParamData->Metadata->CreateAttribute<bool>(Settings->OutputIsEmpty, !bHasValidData, true, true);
+			Attr->AddValue(!bHasValidData);
+
+			FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef();
+			OutData.Data = ParamData;
+			OutData.Pin = PCGExCullOnEmpty::IsEmptyName;
+		}
 	}
 
 	return true;
