@@ -359,6 +359,19 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 		return TryReadValue(PCGExTypes::TTraits<T>::Type, &In);
 	}
 
+#if WITH_EDITOR
+	/**
+	 * Append every soft asset path this property contributes to cook dependencies.
+	 * Default no-op; concrete property types whose Value carries an FSoftObjectPath
+	 * or FSoftClassPath (e.g., FPCGExProperty_SoftObjectPath, FPCGExProperty_SoftClassPath)
+	 * override to emit their value.
+	 *
+	 * Editor-only: the only sanctioned call site is the cook-time dependency walk
+	 * driven by IPCGExCookDependencyProvider implementations.
+	 */
+	virtual void GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const {}
+#endif
+
 	// --- Registry ---
 
 	/**
@@ -1160,4 +1173,21 @@ namespace PCGExProperties
 			}
 		}
 	}
+
+#if WITH_EDITOR
+	/**
+	 * Cook-path helpers: gather every FSoftObjectPath / FSoftClassPath value carried by
+	 * a property graph. Drive the IPCGExCookDependencyProvider walk so cooked assets pull
+	 * in the soft refs their schemas / overrides hold.
+	 *
+	 * The schema-collection overload is cycle-safe: it threads a Visited set through
+	 * recursive descent into ImportedSchemas (UPCGExPropertySchemaAsset entries), so an
+	 * A->B->A loop in imports doesn't reprocess A.
+	 *
+	 * Accumulate into OutPaths -- do not clear -- so callers can batch across sources.
+	 * For a single property in hand, call its virtual GetCookDependencyAssetPaths directly.
+	 */
+	PCGEXPROPERTIES_API void GatherCookDependencyAssetPaths(const FPCGExPropertyOverrides& Overrides, TSet<FSoftObjectPath>& OutPaths);
+	PCGEXPROPERTIES_API void GatherCookDependencyAssetPaths(const FPCGExPropertySchemaCollection& Collection, TSet<FSoftObjectPath>& OutPaths);
+#endif
 }

@@ -119,6 +119,16 @@ PCGEX_SYNC_STRUCTURAL(SoftClassPath, AllowedClass)
 PCGEX_DISPLAY_TYPE_FROM_ALLOWED_CLASS(SoftObjectPath)
 PCGEX_DISPLAY_TYPE_FROM_ALLOWED_CLASS(SoftClassPath)
 #undef PCGEX_DISPLAY_TYPE_FROM_ALLOWED_CLASS
+
+// FSoftClassPath inherits from FSoftObjectPath, so the FSoftObjectPath output set
+// absorbs class paths cleanly -- packages cook the same either way.
+#define PCGEX_GET_COOK_DEPS(_TYPE) \
+	void FPCGExProperty_##_TYPE::GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const \
+	{ if (!Value.IsNull()) { OutPaths.Add(Value); } }
+
+PCGEX_GET_COOK_DEPS(SoftObjectPath)
+PCGEX_GET_COOK_DEPS(SoftClassPath)
+#undef PCGEX_GET_COOK_DEPS
 #else
 void FPCGExProperty_Int32::SyncStructuralFromSchema(const FPCGExProperty&)
 {
