@@ -746,6 +746,10 @@ public:
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
+
+#if WITH_EDITOR
+	virtual void GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
+#endif
 };
 
 /**
@@ -799,6 +803,10 @@ public:
 	virtual void WriteMetadataValue(FPCGMetadataAttributeBase* Attribute, int64 EntryKey) const override;
 	virtual bool TryWriteValue(EPCGMetadataTypes TargetType, void* OutBuffer) const override;
 	virtual bool TryReadValue(EPCGMetadataTypes SourceType, const void* InBuffer) override;
+
+#if WITH_EDITOR
+	virtual void GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
+#endif
 };
 
 /**
