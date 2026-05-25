@@ -84,7 +84,16 @@ void FPCGExPrimitiveComponentDescriptor::InitFrom(const UPrimitiveComponent* Com
 	CustomDepthStencilValue = PrimitiveComponent->CustomDepthStencilValue;
 	TranslucencySortPriority = PrimitiveComponent->TranslucencySortPriority;
 	TranslucencySortDistanceOffset = PrimitiveComponent->TranslucencySortDistanceOffset;
-	//RuntimeVirtualTextures = PrimitiveComponent->RuntimeVirtualTextures; // TODO : Load and forward
+
+	if (!PrimitiveComponent->RuntimeVirtualTextures.IsEmpty())
+	{
+		RuntimeVirtualTextures.Reserve(PrimitiveComponent->RuntimeVirtualTextures.Num());
+		for (const TObjectPtr<URuntimeVirtualTexture>& RVT : PrimitiveComponent->RuntimeVirtualTextures)
+		{
+			RuntimeVirtualTextures.Add(RVT);
+		}
+	}
+
 	VirtualTextureLodBias = PrimitiveComponent->VirtualTextureLodBias;
 	VirtualTextureCullMips = PrimitiveComponent->VirtualTextureCullMips;
 	VirtualTextureMinCoverage = PrimitiveComponent->VirtualTextureMinCoverage;
@@ -164,6 +173,20 @@ void FPCGExPrimitiveComponentDescriptor::InitComponent(UPrimitiveComponent* InCo
 	PrimitiveComponent->TranslucencySortPriority = TranslucencySortPriority;
 	PrimitiveComponent->TranslucencySortDistanceOffset = TranslucencySortDistanceOffset;
 	//TargetComponent->RuntimeVirtualTextures = RuntimeVirtualTextures; // TODO : Load & Forward
+
+	if (!RuntimeVirtualTextures.IsEmpty())
+	{
+		PrimitiveComponent->RuntimeVirtualTextures.Reserve(RuntimeVirtualTextures.Num());
+		for (const TSoftObjectPtr<URuntimeVirtualTexture>& SoftRVT : RuntimeVirtualTextures)
+		{
+			TObjectPtr<URuntimeVirtualTexture> RVT = SoftRVT.Get();
+			if (RVT)
+			{
+				PrimitiveComponent->RuntimeVirtualTextures.Add(RVT);
+			}
+		}
+	}
+
 	PrimitiveComponent->VirtualTextureLodBias = VirtualTextureLodBias;
 	PrimitiveComponent->VirtualTextureCullMips = VirtualTextureCullMips;
 	PrimitiveComponent->VirtualTextureMinCoverage = VirtualTextureMinCoverage;
@@ -171,6 +194,14 @@ void FPCGExPrimitiveComponentDescriptor::InitComponent(UPrimitiveComponent* InCo
 	PrimitiveComponent->BoundsScale = BoundsScale;
 	PrimitiveComponent->RayTracingGroupCullingPriority = RayTracingGroupCullingPriority;
 	PrimitiveComponent->CustomDepthStencilWriteMask = CustomDepthStencilWriteMask;
+}
+
+void FPCGExPrimitiveComponentDescriptor::GetAssetPaths(TSet<FSoftObjectPath>& InAssetPaths) const
+{
+	for (int i = 0; i < RuntimeVirtualTextures.Num(); i++)
+	{
+		InAssetPaths.Add(RuntimeVirtualTextures[i].ToSoftObjectPath());
+	}
 }
 
 FPCGExMeshComponentDescriptor::FPCGExMeshComponentDescriptor()
@@ -220,6 +251,24 @@ void FPCGExMeshComponentDescriptor::InitComponent(UPrimitiveComponent* InCompone
 	}
 
 	TargetComponent->OverlayMaterialMaxDrawDistance = OverlayMaterialMaxDrawDistance;
+}
+
+void FPCGExMeshComponentDescriptor::GetAssetPaths(TSet<FSoftObjectPath>& InAssetPaths) const
+{
+	FPCGExPrimitiveComponentDescriptor::GetAssetPaths(InAssetPaths);
+
+	for (int i = 0; i < RuntimeVirtualTextures.Num(); i++)
+	{
+		InAssetPaths.Add(RuntimeVirtualTextures[i].ToSoftObjectPath());
+	}
+	
+	for (int i = 0; i < OverrideMaterials.Num(); i++)
+	{
+		InAssetPaths.Add(OverrideMaterials[i].ToSoftObjectPath());
+	}
+
+	InAssetPaths.Add(OverlayMaterial.ToSoftObjectPath());
+
 }
 
 FPCGExStaticMeshComponentDescriptor::FPCGExStaticMeshComponentDescriptor()

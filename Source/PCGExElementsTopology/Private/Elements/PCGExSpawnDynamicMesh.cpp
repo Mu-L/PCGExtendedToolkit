@@ -8,6 +8,7 @@
 #include "PCGPin.h"
 #include "Components/PCGExDynamicMeshComponent.h"
 #include "Data/PCGDynamicMeshData.h"
+#include "Helpers/PCGExStreamingHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphSettings"
 #define PCGEX_NAMESPACE SpawnDynamicMesh
@@ -48,6 +49,13 @@ bool FPCGExSpawnDynamicMeshElement::AdvanceWork(FPCGExContext* InContext, const 
 
 	UPCGComponent* SourcePCGComponent = Context->GetMutableComponent();
 	const bool bIsPreviewMode = SourcePCGComponent->IsInPreviewMode();
+
+	PCGEX_MAKE_SHARED(TemplateResources, TSet<FSoftObjectPath>)
+	Settings->TemplateDescriptor.GetAssetPaths(*TemplateResources.Get());
+	if (!TemplateResources->IsEmpty())
+	{
+		PCGExHelpers::LoadBlocking_AnyThread(TemplateResources, Context);
+	}
 
 	int32 Index = -1;
 	for (const FPCGTaggedData& Input : InContext->InputData.GetInputsByPin(PCGExTopology::Labels::SourceMeshLabel))
