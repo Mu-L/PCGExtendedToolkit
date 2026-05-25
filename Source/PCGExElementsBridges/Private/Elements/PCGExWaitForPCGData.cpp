@@ -130,8 +130,22 @@ void UPCGExWaitForPCGDataSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* In
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 0)
 	{
-		// TODO : Reconstruct cached pins from old outputs
-		// CachedPinEx -> Read from OutputPins
+		// The old `CachedPins` member was renamed to `CachedPinsEx` because PCG 5.8
+		// introduced a same-named member on the base settings that shadowed ours.
+		CachedPinsEx.Reset();
+		for (const TObjectPtr<UPCGPin>& Pin : OutputPins)
+		{
+			if (!Pin) { continue; }
+			const FName Label = Pin->Properties.Label;
+			
+			{
+				// Known already, skip
+				if (Label == PCGPinConstants::DefaultExecutionDependencyLabel) { continue; }
+				if (bOutputRoaming && Label == RoamingPin) { continue; }
+			}
+			
+			CachedPinsEx.Add(Pin->Properties);
+		}
 	}
 
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
