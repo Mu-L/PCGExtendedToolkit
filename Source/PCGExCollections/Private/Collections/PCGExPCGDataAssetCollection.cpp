@@ -1318,6 +1318,53 @@ void UPCGExPCGDataAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArr
 		Entries.Add(Entry);
 	}
 }
+
+void UPCGExPCGDataAssetCollection::GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
+{
+	// Base = each entry's Staging.Path. For Level-sourced entries that path is the embedded
+	// (or repointed external) ExportedDataAsset; for DataAsset-sourced entries it's the
+	// user-referenced UPCGDataAsset.
+	Super::GetCookDependencyAssetPaths(OutPaths);
+
+	// Embedded shared collections live in this asset's package so the package itself is
+	// already in the cook -- but their *entries* hold soft refs to the actual meshes /
+	// levels which cook traversal won't reach on its own.
+	if (SharedMeshCollection)
+	{
+		SharedMeshCollection->GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+	}
+	if (SharedLevelCollection)
+	{
+		SharedLevelCollection->GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+	}
+
+	// Externalized shared collections sit in their own packages -- surface them so the
+	// ModifyCook scan force-cooks those packages too. Once cooked, our registry scan
+	// re-enters them (they're UPCGExAssetCollection subclasses and implement the interface),
+	// so their leaf soft refs follow automatically.
+	if (!ExternalSharedMeshCollection.IsNull())
+	{
+		OutPaths.Add(ExternalSharedMeshCollection.ToSoftObjectPath());
+	}
+	if (!ExternalSharedLevelCollection.IsNull())
+	{
+		OutPaths.Add(ExternalSharedLevelCollection.ToSoftObjectPath());
+	}
+
+	// Per-entry actor collections (embedded + external). Hang off the entry as hard
+	// subobjects rather than entries[], so the base walk skips them.
+	for (const FPCGExPCGDataAssetCollectionEntry& Entry : Entries)
+	{
+		if (Entry.EmbeddedActorCollection)
+		{
+			Entry.EmbeddedActorCollection->GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+		}
+		if (!Entry.ExternalActorCollection.IsNull())
+		{
+			OutPaths.Add(Entry.ExternalActorCollection.ToSoftObjectPath());
+		}
+	}
+}
 #endif
 
 #pragma endregion

@@ -260,6 +260,18 @@ public:
 	virtual void EDITOR_OnPostStagingRebuild() override;
 	virtual void EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData) override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
+	/**
+	 * Cook-path override -- adds the references that GetAssetPaths intentionally omits
+	 * (those are reserved for runtime cherry-picking). Walks embedded shared / actor
+	 * subcollections so their leaf soft refs reach the cook, and surfaces the
+	 * externalized-package soft paths so their on-disk assets cook too.
+	 *
+	 * Assumes external assets exist on disk from a prior editor save -- the normal
+	 * workflow (toggle external, save, commit). Re-running PreSave at cook time
+	 * overwrites them with current content but doesn't change which paths cook.
+	 */
+	virtual void GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
 #endif
 
 private:

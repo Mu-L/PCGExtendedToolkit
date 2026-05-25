@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGExPropertyWriter.h"
 #include "Containers/PCGExScopedContainers.h"
+#include "Core/PCGExAssetGrammar.h"
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
@@ -123,7 +124,22 @@ public:
 
 	// --- Grammar Data ---
 
-	/** Write the entry's resolved grammar Symbol. Resolved once per unique entry via FixModuleInfos(Host, ...). */
+	/**
+	 * Which subdivision axes to emit per row. Bits are intersected with each entry's own Axes
+	 * bitmask at write time, so axes the entry doesn't enable produce no output for that row.
+	 * When exactly one axis ends up being emitted across all rows, the _X/_Y/_Z suffix is
+	 * dropped from per-axis attribute names (Size, Scalable) for the legacy single-axis shape --
+	 * unless bAlwaysSuffixAxes is set.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Grammar Data", meta=(PCG_NotOverridable, Bitmask, BitmaskEnum="/Script/PCGExCollections.EPCGExGrammarAxes"))
+	uint8 OutputAxes = static_cast<uint8>(EPCGExGrammarAxes::X);
+
+	/** Always append _X/_Y/_Z to per-axis attribute names, even when only one axis is emitted.
+	 *  Use this when downstream graphs expect suffixed names regardless of axis count. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Grammar Data", meta=(PCG_Overridable))
+	bool bAlwaysSuffixAxes = false;
+
+	/** Write the entry's resolved grammar Symbol. Resolved once per unique entry via the entry's effective grammar. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Grammar Data", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteSymbol = false;
 
@@ -206,6 +222,15 @@ namespace PCGExStagingLoadProperties
 		TSharedPtr<PCGExData::TBuffer<_TYPE>> _NAME##Writer; \
 		TMap<uint64, _TYPE> _NAME##ByHash;
 
+		/** Per-axis grammar writers + caches. Index = axis bit (0=X, 1=Y, 2=Z); only slots whose
+		 *  bit appears in (entry Axes & Settings->OutputAxes) get allocated. ActiveAxes lists the
+		 *  populated slot indices so the per-point write loop avoids 2-of-3 null checks in the
+		 *  single-axis common case. */
+#define PCGEX_LOAD_PROP_PERAXIS_DECL(_NAME, _TYPE, _DEFAULT, _GETTER) \
+		TSharedPtr<PCGExData::TBuffer<_TYPE>> _NAME##Writer[3]; \
+		TMap<uint64, _TYPE> _NAME##ByHash[3]; \
+		TArray<int32, TInlineAllocator<3>> _NAME##ActiveAxes;
+
 #define PCGEX_FOREACH_ENTRY_DATA_FIELD(MACRO)\
 MACRO(AssetPath, FSoftObjectPath, FSoftObjectPath(), Entry->Staging.Path)\
 MACRO(Weight, int32, 0, Entry->Weight)\
@@ -215,16 +240,24 @@ MACRO(BoundsMin, FVector, FVector::ZeroVector, Entry->Staging.Bounds.Min)\
 MACRO(BoundsMax, FVector, FVector::ZeroVector, Entry->Staging.Bounds.Max)\
 MACRO(CollectionType, FName, NAME_None, Host ? Host->GetTypeId() : NAME_None)
 
-#define PCGEX_FOREACH_GRAMMAR_FIELD(MACRO)\
-MACRO(Symbol, FName, NAME_None, ModuleInfos.Symbol)\
-MACRO(Size, double, 0.0, ModuleInfos.Size)\
-MACRO(Scalable, bool, true, ModuleInfos.bScalable)\
-MACRO(DebugColor, FVector4, FVector4(1, 1, 1, 1), ModuleInfos.DebugColor)
+// Symbol/DebugColor are axis-invariant -- one writer + cache each, sourced from the effective
+// grammar pointer (not a per-axis Module).
+#define PCGEX_FOREACH_GRAMMAR_SHARED_FIELD(MACRO)\
+MACRO(Symbol, FName, NAME_None, Grammar->Symbol)\
+MACRO(DebugColor, FVector4, FVector4(1, 1, 1, 1), FVector4(Grammar->DebugColor))
+
+// Per-axis grammar attributes. Getter expressions assume a local `Module` (FPCGSubdivisionSubmodule)
+// populated by FixLeaf/FixSubCollection at the call site.
+#define PCGEX_FOREACH_GRAMMAR_PERAXIS_FIELD(MACRO)\
+MACRO(Size, double, 0.0, Module.Size)\
+MACRO(Scalable, bool, true, Module.bScalable)
 
 		PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_DECL)
-		PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_DECL)
+		PCGEX_FOREACH_GRAMMAR_SHARED_FIELD(PCGEX_LOAD_PROP_FIELD_DECL)
+		PCGEX_FOREACH_GRAMMAR_PERAXIS_FIELD(PCGEX_LOAD_PROP_PERAXIS_DECL)
 
 #undef PCGEX_LOAD_PROP_FIELD_DECL
+#undef PCGEX_LOAD_PROP_PERAXIS_DECL
 
 		/** Unique entry hashes found in this point set */
 		TSharedPtr<PCGExMT::TScopedSet<uint64>> ScopedUniqueEntryHashes;
