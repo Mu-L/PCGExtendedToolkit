@@ -512,9 +512,34 @@ namespace PCGExExtrudeTensors
 
 	void FProcessor::OnPointsProcessingComplete()
 	{
-		if (UpdateExtrusionQueue())
+		// Drive the extrusion as a flat while-loop instead of recursing through
+		// StartParallelLoopForRange / OnRangeProcessingComplete each iteration.
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExExtrudeTensors::ExtrusionLoop);
+
+		while (UpdateExtrusionQueue())
 		{
-			StartParallelLoopForRange(ExtrusionQueue.Num(), 32);
+			const int32 NumQueued = ExtrusionQueue.Num();
+
+			TArray<PCGExMT::FScope> Loops;
+			const int32 NumScopes = PCGExMT::SubLoopScopes(
+				Loops, NumQueued, FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumQueued, 32)));
+
+			PrepareLoopScopesForRanges(Loops);
+
+			if (NumScopes == 1)
+			{
+				ProcessRange(Loops[0]);
+			}
+			else
+			{
+				PCGExMT::ParallelOrSequential(
+					NumScopes,
+					[this, &Loops](const int32 i) { ProcessRange(Loops[i]); },
+					2, EParallelForFlags::Unbalanced);
+			}
+
+			RemainingIterations--;
+			ProcessSelfIntersectionsAndCutoffs();
 		}
 	}
 
@@ -531,10 +556,8 @@ namespace PCGExExtrudeTensors
 		}
 	}
 
-	void FProcessor::OnRangeProcessingComplete()
+	void FProcessor::ProcessSelfIntersectionsAndCutoffs()
 	{
-		RemainingIterations--;
-
 		if (Settings->bDoSelfPathIntersections)
 		{
 			const bool bMergeFirst = Settings->SelfIntersectionPriority == EPCGExSelfIntersectionPriority::Merge;
@@ -631,11 +654,6 @@ namespace PCGExExtrudeTensors
 					}
 				}
 			}
-		}
-
-		if (UpdateExtrusionQueue())
-		{
-			StartParallelLoopForRange(ExtrusionQueue.Num(), 32);
 		}
 	}
 

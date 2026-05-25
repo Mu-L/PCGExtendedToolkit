@@ -84,7 +84,7 @@ void UPCGExDistributeTupleSettings::PostEditChangeProperty(struct FPropertyChang
 
 PCGExData::EIOInit UPCGExDistributeTupleSettings::GetMainDataInitializationPolicy() const
 {
-	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_INITIALIZE_ELEMENT(DistributeTuple)

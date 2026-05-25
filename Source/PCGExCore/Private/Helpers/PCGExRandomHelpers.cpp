@@ -43,9 +43,7 @@ namespace PCGExRandomHelpers
 
 	int32 GetSeed(const int32 BaseSeed, const int32 Local, const UPCGSettings* Settings, const UPCGComponent* Component)
 	{
-		// From Epic git main, unexposed in 5.3
-
-		int Seed = BaseSeed + Local;
+		int32 Seed = PCGHelpers::ComputeSeed(BaseSeed, Local);
 
 		if (Settings && Component)
 		{

@@ -72,13 +72,13 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType OffsetInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector OffsetAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double OffsetConstant_DEPRECATED = 1.0;
 
 #pragma endregion
@@ -109,10 +109,10 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType DirectionType_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector DirectionAttribute_DEPRECATED;
 
 #pragma endregion

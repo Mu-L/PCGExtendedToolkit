@@ -208,25 +208,44 @@ namespace PCGExTensorsTransform
 	void FProcessor::OnPointsProcessingComplete()
 	{
 		bIteratedOnce = true;
-		RemainingIterations--;
-		if (RemainingIterations > 0)
+
+		// Drive remaining iterations as a flat while-loop instead of recursing
+		// through StartParallelLoopForPoints each iteration.
+		const int32 NumPoints = PointDataFacade->GetNum();
+
+		while (--RemainingIterations > 0)
 		{
-			StartParallelLoopForPoints(PCGExData::EIOSide::Out);
-			return;
+			TArray<PCGExMT::FScope> Loops;
+			const int32 NumScopes = PCGExMT::SubLoopScopes(
+				Loops, NumPoints,
+				FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumPoints, PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize())));
+
+			if (NumScopes == 1)
+			{
+				ProcessPoints(Loops[0]);
+			}
+			else
+			{
+				PCGExMT::ParallelOrSequential(
+					NumScopes,
+					[this, &Loops](const int32 i) { ProcessPoints(Loops[i]); },
+					2, EParallelForFlags::Unbalanced);
+			}
 		}
 
-		PCGEX_PARALLEL_FOR(
-			PointDataFacade->GetNum(),
+		PCGExMT::ParallelOrSequential(
+			NumPoints,
+			[&](const int32 i)
+			{
+				const PCGExPaths::FPathMetrics& Metric = Metrics[i];
+				const int32 UpdateCount = Metric.Count;
 
-			const PCGExPaths::FPathMetrics& Metric = Metrics[i];
-			const int32 UpdateCount = Metric.Count;
-
-			PCGEX_OUTPUT_VALUE(EffectorsPings, i, Pings[i])
-			PCGEX_OUTPUT_VALUE(UpdateCount, i, UpdateCount)
-			PCGEX_OUTPUT_VALUE(TraveledDistance, i, Metric.Length)
-			PCGEX_OUTPUT_VALUE(GracefullyStopped, i, UpdateCount < Settings->Iterations)
-			PCGEX_OUTPUT_VALUE(MaxIterationsReached, i, UpdateCount == Settings->Iterations)
-			)
+				PCGEX_OUTPUT_VALUE(EffectorsPings, i, Pings[i])
+				PCGEX_OUTPUT_VALUE(UpdateCount, i, UpdateCount)
+				PCGEX_OUTPUT_VALUE(TraveledDistance, i, Metric.Length)
+				PCGEX_OUTPUT_VALUE(GracefullyStopped, i, UpdateCount < Settings->Iterations)
+				PCGEX_OUTPUT_VALUE(MaxIterationsReached, i, UpdateCount == Settings->Iterations)
+			});
 
 		PointDataFacade->WriteFastest(TaskManager);
 	}

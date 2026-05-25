@@ -3,6 +3,8 @@
 
 #include "Core/PCGExClusterMT.h"
 
+#include "UObject/Class.h"
+
 #include "PCGExHeuristicsHandler.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
@@ -23,8 +25,6 @@ namespace PCGExClusterMT
 	const FName CachedTangentFramesKey = FName("TangentFrames");
 
 #pragma region Tasks
-
-#define PCGEX_ASYNC_CLUSTER_PROCESSOR_LOOP(_NAME, _NUM, _PREPARE, _PROCESS, _COMPLETE, _INLINE) PCGEX_ASYNC_PROCESSOR_LOOP(_NAME, _NUM, _PREPARE, _PROCESS, _COMPLETE, _INLINE, GetClusterBatchChunkSize)
 
 	template <typename T>
 	class FStartClusterBatchProcessing final : public PCGExMT::FTask
@@ -308,7 +308,57 @@ namespace PCGExClusterMT
 
 	void IProcessor::StartParallelLoopForNodes(const int32 PerLoopIterations)
 	{
-		PCGEX_ASYNC_CLUSTER_PROCESSOR_LOOP(Nodes, NumNodes, PrepareLoopScopesForNodes, ProcessNodes, OnNodesProcessingComplete, bForceSingleThreadedProcessNodes)
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (IsTrivial())
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForNodes_Trivial);
+			const PCGExMT::FScope TrivialScope(0, NumNodes, 0);
+			PrepareLoopScopesForNodes({TrivialScope});
+			ProcessNodes(TrivialScope);
+			OnNodesProcessingComplete();
+			return;
+		}
+
+		PCGEX_ENSURE_NONZERO_LOOP_RANGE(NumNodes, StartParallelLoopForNodes);
+
+		TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForNodes);
+
+		const int32 PLI = PCGEX_CORE_SETTINGS.GetClusterBatchChunkSize(PerLoopIterations);
+
+		TArray<PCGExMT::FScope> Loops;
+		const int32 NumScopes = PCGExMT::SubLoopScopes(
+			Loops, NumNodes, FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumNodes, PLI)));
+
+		PrepareLoopScopesForNodes(Loops);
+
+		if (NumScopes == 1 || bForceSingleThreadedProcessNodes)
+		{
+			for (const PCGExMT::FScope& S : Loops)
+			{
+				if (!WorkHandle.IsValid())
+				{
+					break;
+				}
+				ProcessNodes(S);
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				NumScopes,
+				[this, &Loops](const int32 i)
+				{
+					if (!WorkHandle.IsValid())
+					{
+						return;
+					}
+					ProcessNodes(Loops[i]);
+				},
+				2, EParallelForFlags::Unbalanced);
+		}
+
+		OnNodesProcessingComplete();
 	}
 
 	void IProcessor::PrepareLoopScopesForNodes(const TArray<PCGExMT::FScope>& Loops)
@@ -325,7 +375,57 @@ namespace PCGExClusterMT
 
 	void IProcessor::StartParallelLoopForEdges(const int32 PerLoopIterations)
 	{
-		PCGEX_ASYNC_CLUSTER_PROCESSOR_LOOP(Edges, NumEdges, PrepareLoopScopesForEdges, ProcessEdges, OnEdgesProcessingComplete, bForceSingleThreadedProcessEdges)
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (IsTrivial())
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForEdges_Trivial);
+			const PCGExMT::FScope TrivialScope(0, NumEdges, 0);
+			PrepareLoopScopesForEdges({TrivialScope});
+			ProcessEdges(TrivialScope);
+			OnEdgesProcessingComplete();
+			return;
+		}
+
+		PCGEX_ENSURE_NONZERO_LOOP_RANGE(NumEdges, StartParallelLoopForEdges);
+
+		TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForEdges);
+
+		const int32 PLI = PCGEX_CORE_SETTINGS.GetClusterBatchChunkSize(PerLoopIterations);
+
+		TArray<PCGExMT::FScope> Loops;
+		const int32 NumScopes = PCGExMT::SubLoopScopes(
+			Loops, NumEdges, FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumEdges, PLI)));
+
+		PrepareLoopScopesForEdges(Loops);
+
+		if (NumScopes == 1 || bForceSingleThreadedProcessEdges)
+		{
+			for (const PCGExMT::FScope& S : Loops)
+			{
+				if (!WorkHandle.IsValid())
+				{
+					break;
+				}
+				ProcessEdges(S);
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				NumScopes,
+				[this, &Loops](const int32 i)
+				{
+					if (!WorkHandle.IsValid())
+					{
+						return;
+					}
+					ProcessEdges(Loops[i]);
+				},
+				2, EParallelForFlags::Unbalanced);
+		}
+
+		OnEdgesProcessingComplete();
 	}
 
 	void IProcessor::PrepareLoopScopesForEdges(const TArray<PCGExMT::FScope>& Loops)
@@ -342,7 +442,57 @@ namespace PCGExClusterMT
 
 	void IProcessor::StartParallelLoopForRange(const int32 NumIterations, const int32 PerLoopIterations)
 	{
-		PCGEX_ASYNC_CLUSTER_PROCESSOR_LOOP(Ranges, NumIterations, PrepareLoopScopesForRanges, ProcessRange, OnRangeProcessingComplete, bForceSingleThreadedProcessRange)
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (IsTrivial())
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForRanges_Trivial);
+			const PCGExMT::FScope TrivialScope(0, NumIterations, 0);
+			PrepareLoopScopesForRanges({TrivialScope});
+			ProcessRange(TrivialScope);
+			OnRangeProcessingComplete();
+			return;
+		}
+
+		PCGEX_ENSURE_NONZERO_LOOP_RANGE(NumIterations, StartParallelLoopForRange);
+
+		TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopForRanges);
+
+		const int32 PLI = PCGEX_CORE_SETTINGS.GetClusterBatchChunkSize(PerLoopIterations);
+
+		TArray<PCGExMT::FScope> Loops;
+		const int32 NumScopes = PCGExMT::SubLoopScopes(
+			Loops, NumIterations, FMath::Max(1, PCGExMT::GetSanitizedBatchSize(NumIterations, PLI)));
+
+		PrepareLoopScopesForRanges(Loops);
+
+		if (NumScopes == 1 || bForceSingleThreadedProcessRange)
+		{
+			for (const PCGExMT::FScope& S : Loops)
+			{
+				if (!WorkHandle.IsValid())
+				{
+					break;
+				}
+				ProcessRange(S);
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				NumScopes,
+				[this, &Loops](const int32 i)
+				{
+					if (!WorkHandle.IsValid())
+					{
+						return;
+					}
+					ProcessRange(Loops[i]);
+				},
+				2, EParallelForFlags::Unbalanced);
+		}
+
+		OnRangeProcessingComplete();
 	}
 
 	void IProcessor::PrepareLoopScopesForRanges(const TArray<PCGExMT::FScope>& Loops)
@@ -623,6 +773,8 @@ namespace PCGExClusterMT
 
 	void IBatch::Process()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExClusterMT::IBatch::Process);
+
 		bIsBatchValid = false;
 
 		PCGEX_ASYNC_CHKD_VOID(TaskManager)
@@ -641,44 +793,63 @@ namespace PCGExClusterMT
 
 		bIsBatchValid = true;
 
-		for (const TSharedPtr<PCGExData::FPointIO>& IO : Edges)
+		TArray<TSharedPtr<IProcessor>> Candidates;
+		Candidates.SetNum(Edges.Num());
+
+		PCGExMT::ParallelOrSequential(
+			Candidates.Num(),
+			[&](const int32 i)
+			{
+				const TSharedPtr<PCGExData::FPointIO>& IO = Edges[i];
+				const TSharedPtr<IProcessor> NewProcessor = NewProcessorInstance(VtxDataFacade, (*EdgesDataFacades)[IO->IOIndex]);
+
+				NewProcessor->SetExecutionContext(ExecutionContext);
+
+				NewProcessor->ParentBatch = SharedThis(this);
+				NewProcessor->VtxFilterFactories = VtxFilterFactories;
+				NewProcessor->EdgeFilterFactories = EdgeFilterFactories;
+				NewProcessor->VtxFilterCache = VtxFilterCache;
+
+				NewProcessor->NodeIndexLookup = NodeIndexLookup;
+				NewProcessor->EndpointsLookup = &EndpointsLookup;
+				NewProcessor->ExpectedAdjacency = &ExpectedAdjacency;
+				NewProcessor->BatchIndex = i;
+
+				if (WantsProjection())
+				{
+					NewProcessor->SetProjectionDetails(ProjectionDetails, ProjectedVtxPositions, WantsPerClusterProjection());
+				}
+
+				if (RequiresGraphBuilder())
+				{
+					NewProcessor->GraphBuilder = GraphBuilder;
+				}
+
+				NewProcessor->SetWantsHeuristics(WantsHeuristics(), HeuristicsFactories, HeuristicsScoreMode);
+
+				NewProcessor->RegisterConsumableAttributesWithFacade();
+
+				if (!PrepareSingle(NewProcessor))
+				{
+					return;
+				}
+
+				NewProcessor->bIsTrivial = IO->GetNum() < PCGEX_CORE_SETTINGS.SmallClusterSize;
+				Candidates[i] = NewProcessor;
+			}, 1);
+
 		{
-			const TSharedPtr<IProcessor> NewProcessor = NewProcessorInstance(VtxDataFacade, (*EdgesDataFacades)[IO->IOIndex]);
+			Processors.Reserve(Candidates.Num());
 
-			NewProcessor->SetExecutionContext(ExecutionContext);
-
-			NewProcessor->ParentBatch = SharedThis(this);
-			NewProcessor->VtxFilterFactories = VtxFilterFactories;
-			NewProcessor->EdgeFilterFactories = EdgeFilterFactories;
-			NewProcessor->VtxFilterCache = VtxFilterCache;
-
-			NewProcessor->NodeIndexLookup = NodeIndexLookup;
-			NewProcessor->EndpointsLookup = &EndpointsLookup;
-			NewProcessor->ExpectedAdjacency = &ExpectedAdjacency;
-			NewProcessor->BatchIndex = Processors.Num();
-
-			if (WantsProjection())
+			int Pi = 0;
+			for (const TSharedPtr<IProcessor>& C : Candidates)
 			{
-				NewProcessor->SetProjectionDetails(ProjectionDetails, ProjectedVtxPositions, WantsPerClusterProjection());
+				if (C)
+				{
+					TSharedRef<IProcessor>& P = Processors.Add_GetRef(C.ToSharedRef());
+					P->BatchIndex = Pi++;
+				}
 			}
-
-			if (RequiresGraphBuilder())
-			{
-				NewProcessor->GraphBuilder = GraphBuilder;
-			}
-
-			NewProcessor->SetWantsHeuristics(WantsHeuristics(), HeuristicsFactories, HeuristicsScoreMode);
-
-			NewProcessor->RegisterConsumableAttributesWithFacade();
-
-			if (!PrepareSingle(NewProcessor))
-			{
-				continue;
-			}
-
-			Processors.Add(NewProcessor.ToSharedRef());
-
-			NewProcessor->bIsTrivial = IO->GetNum() < PCGEX_CORE_SETTINGS.SmallClusterSize;
 		}
 
 		StartProcessing();
@@ -691,9 +862,27 @@ namespace PCGExClusterMT
 			return;
 		}
 
-		PCGEX_ASYNC_MT_LOOP_TPL(
-			Process, bForceSingleThreadedProcessing, {Processor->bIsProcessorValid = Processor->Process(This->TaskManager); }, {
-			Process->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]() { PCGEX_ASYNC_THIS This->OnInitialPostProcess(); }; })
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (bForceSingleThreadedProcessing)
+		{
+			for (TSharedRef<IProcessor>& Processor : Processors)
+			{
+				Processor->bIsProcessorValid = Processor->Process(TaskManager);
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				Processors.Num(),
+				[&](const int32 i)
+				{
+					const TSharedRef<IProcessor>& Processor = Processors[i];
+					Processor->bIsProcessorValid = Processor->Process(TaskManager);
+				}, 1);
+		}
+
+		OnInitialPostProcess();
 	}
 
 	void IBatch::OnInitialPostProcess()
@@ -726,7 +915,31 @@ namespace PCGExClusterMT
 			return;
 		}
 
-		PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(CompleteWork, bForceSingleThreadedCompletion, {Processor->CompleteWork(); }, {})
+		PCGEX_CHECK_WORK_HANDLE_VOID
+
+		if (bForceSingleThreadedCompletion)
+		{
+			for (TSharedRef<IProcessor>& Processor : Processors)
+			{
+				if (Processor->bIsProcessorValid)
+				{
+					Processor->CompleteWork();
+				}
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				Processors.Num(),
+				[&](const int32 i)
+				{
+					const TSharedRef<IProcessor>& Processor = Processors[i];
+					if (Processor->bIsProcessorValid)
+					{
+						Processor->CompleteWork();
+					}
+				}, 1);
+		}
 	}
 
 	void IBatch::Write()
@@ -738,7 +951,29 @@ namespace PCGExClusterMT
 			return;
 		}
 
-		PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(Write, bForceSingleThreadedWrite, {Processor->Write(); }, {})
+		if (bForceSingleThreadedWrite)
+		{
+			for (TSharedRef<IProcessor>& Processor : Processors)
+			{
+				if (Processor->bIsProcessorValid)
+				{
+					Processor->Write();
+				}
+			}
+		}
+		else
+		{
+			PCGExMT::ParallelOrSequential(
+				Processors.Num(),
+				[&](const int32 i)
+				{
+					const TSharedRef<IProcessor>& Processor = Processors[i];
+					if (Processor->bIsProcessorValid)
+					{
+						Processor->Write();
+					}
+				}, 1);
+		}
 
 		if (bWriteVtxDataFacade && bIsBatchValid)
 		{
@@ -839,5 +1074,4 @@ namespace PCGExClusterMT
 		}
 	}
 
-#undef PCGEX_ASYNC_CLUSTER_PROCESSOR_LOOP
 }

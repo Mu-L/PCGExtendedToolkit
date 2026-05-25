@@ -103,13 +103,13 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bApplyCustomTangents_DEPRECATED = false;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FName ArriveTangentAttribute_DEPRECATED = "ArriveTangent";
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FName LeaveTangentAttribute_DEPRECATED = "LeaveTangent";
 
 #pragma endregion
@@ -164,7 +164,7 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExMinimalAxis SplineMeshAxisConstant_DEPRECATED = EPCGExMinimalAxis::X;
 
 #pragma endregion
@@ -198,6 +198,8 @@ struct FPCGExPathSplineMeshSimpleContext final : FPCGExPathProcessorContext
 
 	FPCGExTangentsDetails Tangents;
 
+	virtual void RegisterAssetDependencies() override;
+
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
 };
@@ -216,6 +218,8 @@ protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(PathSplineMeshSimple)
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
+	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
+	virtual bool PostBoot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };
 

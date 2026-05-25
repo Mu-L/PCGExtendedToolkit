@@ -116,11 +116,11 @@ namespace PCGExBreakClustersToPaths
 			}
 			return BuildChains();
 		}
-		ChainsIO.Reserve(NumEdges);
-		Context->OutputPaths->IncreaseReserve(NumEdges);
-		for (int i = 0; i < NumEdges; ++i)
+
+		ChainsIO.SetNum(NumEdges);
+		if (!Context->OutputPaths->EmplaceBatch<UPCGPointArrayData>(ChainsIO, VtxDataFacade->Source, PCGExData::EIOInit::New))
 		{
-			ChainsIO.Add(Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(VtxDataFacade->Source, PCGExData::EIOInit::New));
+			return false;
 		}
 
 		StartParallelLoopForEdges();
@@ -150,7 +150,7 @@ namespace PCGExBreakClustersToPaths
 		}
 
 		ChainsIO.SetNum(NumChains);
-		if (!Context->OutputPaths->EmplaceBatch<UPCGPointArrayData>(ChainsIO,VtxDataFacade->Source, PCGExData::EIOInit::New))
+		if (!Context->OutputPaths->EmplaceBatch<UPCGPointArrayData>(ChainsIO, VtxDataFacade->Source, PCGExData::EIOInit::New))
 		{
 			bIsProcessorValid = false;
 			return;

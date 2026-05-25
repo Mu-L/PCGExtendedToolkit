@@ -72,11 +72,6 @@ public:
 		return 0;
 	}
 
-	virtual EPCGExExecutionPolicy GetExecutionPolicy() const override
-	{
-		return EPCGExExecutionPolicy::Ignored;
-	}
-
 protected:
 	UPROPERTY()
 	int32 InternalCacheInvalidator = 0;

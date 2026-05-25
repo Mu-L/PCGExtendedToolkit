@@ -22,7 +22,7 @@ struct FPCGExHeuristicConfigFeedback : public FPCGExHeuristicConfigBase
 
 	/** If enabled, weight doesn't scale with overlap; the base score is either 0 or 1. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin=0, ClampMax=1))
-	bool bBinary = false;
+	bool bBinary = true;
 
 	/** Weight to add to points that are already part of the plotted path. This is used to sample the weight curve.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bBinary", ClampMin=0, ClampMax=1))
@@ -39,7 +39,7 @@ struct FPCGExHeuristicConfigFeedback : public FPCGExHeuristicConfigBase
 
 	/** Apply feedback to all edges connected to a visited node, not just the traversed edge. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	bool bAffectAllConnectedEdges = true;
+	bool bAffectAllConnectedEdges = false;
 };
 
 /**

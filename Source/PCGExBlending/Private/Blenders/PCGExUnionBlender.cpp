@@ -75,20 +75,21 @@ namespace PCGExBlending
 			{
 				TArray<int32> SupportedList(SupportedSources.Array());
 				std::atomic<bool> bSubBlendersInitOk{true};
-				PCGEX_PARALLEL_FOR_THRESHOLD(
+				PCGExMT::ParallelOrSequential(
 					SupportedList.Num(),
-					32,
+					[&](const int32 i)
 					{
-					const int32 SourceIdx = SupportedList[i];
-					TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+						const int32 SourceIdx = SupportedList[i];
+						TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
 
-					SubBlenders[SourceIdx] = SubBlender;
+						SubBlenders[SourceIdx] = SubBlender;
 
-					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
-					{
-					bSubBlendersInitOk.store(false, std::memory_order_relaxed);
-					}
-					})
+						if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
+						{
+							bSubBlendersInitOk.store(false, std::memory_order_relaxed);
+						}
+					}, 32);
+
 				if (!bSubBlendersInitOk.load(std::memory_order_relaxed))
 				{
 					return false;
@@ -123,20 +124,21 @@ namespace PCGExBlending
 					SupportedList = SupportedSources.Array();
 				}
 				std::atomic<bool> bSubBlendersInitOk{true};
-				PCGEX_PARALLEL_FOR_THRESHOLD(
+				PCGExMT::ParallelOrSequential(
 					SupportedList.Num(),
-					32,
+					[&](const int32 i)
 					{
-					const int32 SourceIdx = SupportedList[i];
-					TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+						const int32 SourceIdx = SupportedList[i];
+						TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
 
-					SubBlenders[SourceIdx] = SubBlender;
+						SubBlenders[SourceIdx] = SubBlender;
 
-					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
-					{
-					bSubBlendersInitOk.store(false, std::memory_order_relaxed);
-					}
-					})
+						if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
+						{
+							bSubBlendersInitOk.store(false, std::memory_order_relaxed);
+						}
+					}, 32);
+
 				if (!bSubBlendersInitOk.load(std::memory_order_relaxed))
 				{
 					return false;

@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "PCGExDataCommon.h"
+#include "Containers/PCGExScopedContainers.h"
 #include "Data/PCGExCachedSubSelection.h"
 #include "Data/PCGExSubSelection.h"
 #include "Metadata/PCGAttributePropertySelector.h"
@@ -321,13 +322,29 @@ namespace PCGExData
 
 	class PCGEXCORE_API IBufferProxyPool : public TSharedFromThis<IBufferProxyPool>
 	{
-		mutable FRWLock MapLock;
-		TMap<uint32, TWeakPtr<IBufferProxy>> ProxyMap;
+		// 32-way sharded map: descriptors are routed to one of 32 (shard, lock) pairs
+		// by hash, so two threads requesting different descriptors only contend when
+		// their hashes collide on the same shard (~3% probability). Replaces the prior
+		// single-lock design that serialized every proxy creation across the entire
+		// process -- a major bottleneck once Factory had to run under the lock.
+		PCGExMT::TH64MapShards<TWeakPtr<IBufferProxy>, 32> ProxyMap;
 
 	public:
 		IBufferProxyPool() = default;
 
-		TSharedPtr<IBufferProxy> TryGet(const FProxyDescriptor& Descriptor);
-		void Add(const FProxyDescriptor& Descriptor, const TSharedPtr<IBufferProxy>& Proxy);
+		// Atomic get-or-create on the descriptor's shard:
+		//   - Find under shard read lock first (fast path for cache hits).
+		//   - Miss: take shard write lock, re-check, run Factory, register.
+		// Factory's side effects (e.g. InitForRole → AllocateProperties on shared
+		// point data) are serialized per descriptor, so two threads racing for the
+		// same descriptor never double-construct or double-initialize. Unrelated
+		// descriptors in different shards proceed in parallel.
+		//
+		// Constraint: Factory must NOT call back into the pool with a descriptor that
+		// hashes to the same shard (would deadlock on the shard's write lock). Current
+		// proxy creation helpers do not call GetOrCreate recursively at all.
+		TSharedPtr<IBufferProxy> GetOrCreate(
+			const FProxyDescriptor& Descriptor,
+			TFunctionRef<TSharedPtr<IBufferProxy>()> Factory);
 	};
 }

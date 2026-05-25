@@ -40,7 +40,7 @@ TArray<FPCGPinProperties> UPCGExClusterDecompositionSettings::InputPinProperties
 
 PCGExData::EIOInit UPCGExClusterDecompositionSettings::GetMainOutputInitMode() const
 {
-	return PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGExData::EIOInit UPCGExClusterDecompositionSettings::GetEdgeOutputInitMode() const

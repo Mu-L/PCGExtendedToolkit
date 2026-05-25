@@ -123,13 +123,13 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExTraceSampleDistanceInput DistanceInput_DEPRECATED = EPCGExTraceSampleDistanceInput::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double MaxDistance_DEPRECATED = 1000;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector LocalMaxDistance_DEPRECATED;
 
 #pragma endregion

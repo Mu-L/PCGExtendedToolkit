@@ -2,13 +2,16 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
+#include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "PropertyHandle.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
 #include "Widgets/Text/STextBlock.h"
@@ -17,11 +20,21 @@ namespace PCGExEnumCustomization
 {
 	TSharedRef<SWidget> CreateRadioGroup(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum)
 	{
+		return CreateRadioGroup(PropertyHandle, Enum, /*SkipIndices=*/{});
+	}
+
+	TSharedRef<SWidget> CreateRadioGroup(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum)
+	{
+		return CreateRadioGroup(PropertyHandle, FindFirstObjectSafe<UEnum>(*Enum), /*SkipIndices=*/{});
+	}
+
+	TSharedRef<SWidget> CreateRadioGroup(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum, const TSet<int32>& SkipIndices)
+	{
 		TSharedRef<SHorizontalBox> Box = SNew(SHorizontalBox);
 
 		for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
 		{
-			if (Enum->HasMetaData(TEXT("Hidden"), i))
+			if (Enum->HasMetaData(TEXT("Hidden"), i) || SkipIndices.Contains(i))
 			{
 				continue;
 			}
@@ -92,9 +105,9 @@ namespace PCGExEnumCustomization
 		return Box;
 	}
 
-	TSharedRef<SWidget> CreateRadioGroup(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum)
+	TSharedRef<SWidget> CreateRadioGroup(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum, const TSet<int32>& SkipIndices)
 	{
-		return CreateRadioGroup(PropertyHandle, FindFirstObjectSafe<UEnum>(*Enum));
+		return CreateRadioGroup(PropertyHandle, FindFirstObjectSafe<UEnum>(*Enum), SkipIndices);
 	}
 
 	TSharedRef<SWidget> CreateRadioGroup(UEnum* Enum, TFunction<int32()> GetValue, TFunction<void(int32)> SetValue)
@@ -165,6 +178,66 @@ namespace PCGExEnumCustomization
 		}
 
 		return Box;
+	}
+
+	TSharedRef<SWidget> CreateDropdown(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum, const TSet<int32>& SkipIndices)
+	{
+		return SNew(SComboButton)
+			// Default ContentPadding -- match the standard property-value enum combobox height.
+			// The label below uses the smaller detail font so the visual weight stays consistent
+			// with surrounding inline controls.
+			.HasDownArrow(true)
+			.OnGetMenuContent_Lambda([PropertyHandle, Enum, SkipIndices]() -> TSharedRef<SWidget>
+			{
+				FMenuBuilder MenuBuilder(/*bCloseSelfOnly=*/true, /*CommandList=*/nullptr);
+				for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
+				{
+					if (Enum->HasMetaData(TEXT("Hidden"), i) || SkipIndices.Contains(i))
+					{
+						continue;
+					}
+					const FString KeyName = Enum->GetNameStringByIndex(i);
+					MenuBuilder.AddMenuEntry(
+						Enum->GetDisplayNameTextByIndex(i),
+						Enum->GetToolTipTextByIndex(i),
+						FSlateIcon(),
+						FUIAction(
+							FExecuteAction::CreateLambda([PropertyHandle, KeyName]()
+							{
+								PropertyHandle->SetValueFromFormattedString(KeyName);
+							}),
+							FCanExecuteAction(),
+							FIsActionChecked::CreateLambda([PropertyHandle, KeyName]()
+							{
+								FString Current;
+								PropertyHandle->GetValueAsFormattedString(Current);
+								return Current == KeyName;
+							})
+						),
+						NAME_None,
+						EUserInterfaceActionType::RadioButton);
+				}
+				return MenuBuilder.MakeWidget();
+			})
+			.ButtonContent()
+			[
+				SNew(STextBlock)
+				.Font(IDetailLayoutBuilder::GetDetailFont())
+				.Text_Lambda([PropertyHandle, Enum]()
+				{
+					FString Current;
+					PropertyHandle->GetValueAsFormattedString(Current);
+					const int32 Idx = Enum->GetIndexByNameString(Current);
+					return Idx != INDEX_NONE
+						? Enum->GetDisplayNameTextByIndex(Idx)
+						: FText::FromString(Current);
+				})
+			];
+	}
+
+	TSharedRef<SWidget> CreateDropdown(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum, const TSet<int32>& SkipIndices)
+	{
+		return CreateDropdown(PropertyHandle, FindFirstObjectSafe<UEnum>(*Enum), SkipIndices);
 	}
 
 	TSharedRef<SWidget> CreateCheckboxGroup(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum, const TSet<int32>& SkipIndices)

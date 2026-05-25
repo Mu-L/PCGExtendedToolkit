@@ -121,8 +121,6 @@ public:
 		return CollectionLevelOutputOnly();
 	}
 
-	virtual EPCGExExecutionPolicy GetExecutionPolicy() const override;
-
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const;
 #endif

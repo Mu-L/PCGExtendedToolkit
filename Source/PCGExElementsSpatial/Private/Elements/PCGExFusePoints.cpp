@@ -428,28 +428,33 @@ namespace PCGExFusePoints
 			// Local non-null reference for the parallel-for body to capture cleanly.
 			const TSharedRef<PCGExData::FUnionTable> Table = UnionTable.ToSharedRef();
 
-			PCGEX_PARALLEL_FOR(
+			PCGExMT::ParallelOrSequential(
 				NumUnionEntries,
+				[&](const int32 i)
+				{
 
-				const TConstArrayView<PCGExData::FElement> Span = Table->Get(i);
-				const FVector Center = ComputeSpanCentroid(Span, InTransforms);
+					const TConstArrayView<PCGExData::FElement> Span = Table->Get(i);
+					const FVector Center = ComputeSpanCentroid(Span, InTransforms);
 
-				double BestDist = TNumericLimits<double>::Max();
-				int32 BestIndex = -1;
+					double BestDist = TNumericLimits<double>::Max();
+					int32 BestIndex = -1;
 
-				Octree.FindNearbyElements(Center, [&](const PCGPointOctree::FPointRef& PointRef)
+					Octree.FindNearbyElements(Center, [&](const PCGPointOctree::FPointRef& PointRef)
 					{
-					const double Dist = FVector::DistSquared(Center, InTransforms[PointRef.Index].GetLocation());
-					if (Dist < BestDist)
-					{
-					BestDist = Dist;
-					BestIndex = PointRef.Index;
-					}
+						const double Dist = FVector::DistSquared(Center, InTransforms[PointRef.Index].GetLocation());
+						if (Dist < BestDist)
+						{
+							BestDist = Dist;
+							BestIndex = PointRef.Index;
+						}
 					});
 
-				if (BestIndex == -1) { BestIndex = Span[0].Index; }
-				IdxMapping[i] = BestIndex;
-				);
+					if (BestIndex == -1)
+					{
+						BestIndex = Span[0].Index;
+					}
+					IdxMapping[i] = BestIndex;
+				});
 
 			PointDataFacade->Source->ConsumeIdxMapping(PointDataFacade->GetAllocations());
 
@@ -466,47 +471,55 @@ namespace PCGExFusePoints
 				{
 					const FTransform Identity = FTransform::Identity;
 
-					PCGEX_PARALLEL_FOR(
+					PCGExMT::ParallelOrSequential(
 						NumUnionEntries,
+						[&](const int32 i)
+						{
+							const FVector FusedPosition = OutTransformsMut[i].GetLocation();
+							const TConstArrayView<PCGExData::FElement> Span = Table->Get(i);
 
-						const FVector FusedPosition = OutTransformsMut[i].GetLocation();
-						const TConstArrayView<PCGExData::FElement> Span = Table->Get(i);
+							FBox Bounds(ForceInit);
+							for (const PCGExData::FElement& Element : Span)
+							{
+								AccumulateBounds(Bounds, Identity, Element, InData, InTransforms, BoundsSource);
+							}
+							EnforceMinExtent(Bounds, MinExtent);
 
-						FBox Bounds(ForceInit);
-						for (const PCGExData::FElement& Element : Span) { AccumulateBounds(Bounds, Identity, Element, InData, InTransforms, BoundsSource); }
-						EnforceMinExtent(Bounds, MinExtent);
-
-						OutBoundsMin[i] = Bounds.Min - FusedPosition;
-						OutBoundsMax[i] = Bounds.Max - FusedPosition;
-						);
+							OutBoundsMin[i] = Bounds.Min - FusedPosition;
+							OutBoundsMax[i] = Bounds.Max - FusedPosition;
+						});
 				}
 				else // OBB
 				{
 					const EPCGExAxisOrder AxisOrder = Settings->AxisOrder;
 
-					PCGEX_PARALLEL_FOR(
+					PCGExMT::ParallelOrSequential(
 						NumUnionEntries,
+						[&](const int32 i)
+						{
+							const TConstArrayView<PCGExData::FElement> Span = Table->Get(i);
+							const int32 NumElements = Span.Num();
 
-						const TConstArrayView<PCGExData::FElement> Span = Table->Get(i);
-						const int32 NumElements = Span.Num();
-
-						const PCGExMath::FBestFitPlane BestFitPlane(NumElements, [&](const int32 e) -> FVector
+							const PCGExMath::FBestFitPlane BestFitPlane(NumElements, [&](const int32 e) -> FVector
 							{
-							return InTransforms[Span[e].Index].GetLocation();
+								return InTransforms[Span[e].Index].GetLocation();
 							});
 
-						const FTransform OBBTransform = BestFitPlane.GetTransform(AxisOrder);
-						const FTransform InvTransform = OBBTransform.Inverse();
+							const FTransform OBBTransform = BestFitPlane.GetTransform(AxisOrder);
+							const FTransform InvTransform = OBBTransform.Inverse();
 
-						FBox Bounds(ForceInit);
-						for (const PCGExData::FElement& Element : Span) { AccumulateBounds(Bounds, InvTransform, Element, InData, InTransforms, BoundsSource); }
-						EnforceMinExtent(Bounds, MinExtent);
+							FBox Bounds(ForceInit);
+							for (const PCGExData::FElement& Element : Span)
+							{
+								AccumulateBounds(Bounds, InvTransform, Element, InData, InTransforms, BoundsSource);
+							}
+							EnforceMinExtent(Bounds, MinExtent);
 
-						OutTransformsMut[i].SetRotation(OBBTransform.GetRotation());
-						OutTransformsMut[i].SetLocation(OBBTransform.GetLocation());
-						OutBoundsMin[i] = Bounds.Min;
-						OutBoundsMax[i] = Bounds.Max;
-						);
+							OutTransformsMut[i].SetRotation(OBBTransform.GetRotation());
+							OutTransformsMut[i].SetLocation(OBBTransform.GetLocation());
+							OutBoundsMin[i] = Bounds.Min;
+							OutBoundsMax[i] = Bounds.Max;
+						});
 				}
 			}
 
