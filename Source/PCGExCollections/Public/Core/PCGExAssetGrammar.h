@@ -71,7 +71,7 @@ namespace PCGExGrammarAxes
 	/** Iteration order for axis-indexed loops. */
 	static constexpr EPCGExGrammarAxes Bits[3] = { EPCGExGrammarAxes::X, EPCGExGrammarAxes::Y, EPCGExGrammarAxes::Z };
 
-	/** Hardcoded attribute-name suffixes. Matches PCGExGetCollectionData / Grammit export. */
+	/** Hardcoded attribute-name suffixes. */
 	static constexpr const TCHAR* Suffixes[3] = { TEXT("_X"), TEXT("_Y"), TEXT("_Z") };
 
 	/** Number of set bits in an axis mask. Constrained to the 3 valid axis bits. */
@@ -80,6 +80,14 @@ namespace PCGExGrammarAxes
 		return ((Mask & static_cast<uint8>(EPCGExGrammarAxes::X)) ? 1 : 0)
 			+ ((Mask & static_cast<uint8>(EPCGExGrammarAxes::Y)) ? 1 : 0)
 			+ ((Mask & static_cast<uint8>(EPCGExGrammarAxes::Z)) ? 1 : 0);
+	}
+
+	/** Builds the per-axis attribute name. When bSuppressSuffix is true, returns Base unchanged
+	 *  (single-axis legacy shape); otherwise appends the matching _X/_Y/_Z suffix. */
+	FORCEINLINE FName MakeAxisAttributeName(const FName& Base, const int32 AxisIndex, const bool bSuppressSuffix)
+	{
+		if (bSuppressSuffix) { return Base; }
+		return FName(*FString::Printf(TEXT("%s%s"), *Base.ToString(), Suffixes[AxisIndex]));
 	}
 }
 

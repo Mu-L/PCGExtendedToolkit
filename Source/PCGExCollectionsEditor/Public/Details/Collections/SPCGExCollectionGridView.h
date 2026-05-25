@@ -20,6 +20,8 @@ class SBorder;
 class SScrollBox;
 class STextBlock;
 class SPCGExCollectionCategoryGroup;
+class FPCGExCollectionTileDragDropOp;
+class FScriptArrayHelper;
 
 /** Flags describing what kind of structural change happened, so StructuralRefresh() can do the minimum work. */
 enum class EPCGExStructuralRefreshFlags : uint8
@@ -129,12 +131,25 @@ private:
 	void ApplySelectionVisuals();
 
 	// Category operations
-	void OnTileDropOnCategory(FName TargetCategory, const TArray<int32>& Indices, int32 InsertBeforeLocalIndex);
+	void OnTileDropOnCategory(FName TargetCategory, TSharedRef<FPCGExCollectionTileDragDropOp> DragOp, int32 InsertBeforeLocalIndex);
 	void OnAssetDropOnCategory(FName TargetCategory, const TArray<FAssetData>& Assets);
 	void OnCategoryRenamed(FName OldName, FName NewName);
 	void OnAddToCategory(FName Category);
 	void OnCategoryExpansionChanged(FName Category, bool bIsExpanded);
-	void OnTileReorderInCategory(FName Category, const TArray<int32>& DraggedIndices, int32 InsertBeforeLocalIndex);
+	void OnTileReorderInCategory(FName Category, TSharedRef<FPCGExCollectionTileDragDropOp> DragOp, int32 InsertBeforeLocalIndex);
+
+	/**
+	 * Cross-collection drop: move-or-copy entries from a different collection into this one.
+	 * Validates that the source and target share the same entry struct type; on mismatch,
+	 * shows a notification and aborts. When !bIsCopy, originals are removed from the source.
+	 * Both collections are wrapped in a single transaction.
+	 */
+	void HandleCrossCollectionDrop(
+		const UPCGExAssetCollection* SourceColl,
+		const TArray<int32>& SourceIndices,
+		FName TargetCategory,
+		int32 InsertBeforeLocalIndex,
+		bool bIsCopy);
 
 	// Lazy tile creation for a single category
 	void PopulateCategoryTiles(FName Category);
@@ -180,7 +195,33 @@ private:
 		}
 	};
 
-	FEntriesArrayAccess GetEntriesAccess() const;
+	/** Reflection access to a collection's Entries array. Defaults to the editor's own
+	 *  Collection when InColl is null; pass an explicit source for cross-collection ops. */
+	FEntriesArrayAccess GetEntriesAccess(const UPCGExAssetCollection* InColl = nullptr) const;
+
+	/**
+	 * Pure: computes the desired permutation of CatIndices so the subset matching DraggedSet
+	 * lands contiguous at InsertBeforeLocalIndex. Returns empty when no dragged entry belongs
+	 * to CatIndices or the resulting order matches CatIndices (i.e. no reordering needed).
+	 * When bAdjustForDraggedBefore is true, InsertBefore is treated as a pre-removal index.
+	 */
+	static TArray<int32> ComputeCategoryDesiredOrder(
+		const TArray<int32>& CatIndices,
+		const TSet<int32>& DraggedSet,
+		int32 InsertBeforeLocalIndex,
+		bool bAdjustForDraggedBefore);
+
+	/**
+	 * Applies a precomputed DesiredOrder via in-place swaps through Helper. Returns the final
+	 * raw entry indices of the dragged values after permutation. Position-map lookup keeps the
+	 * permutation O(N).
+	 */
+	static TArray<int32> ApplyCategoryPermutation(
+		FScriptArrayHelper& Helper,
+		UScriptStruct* Struct,
+		const TArray<int32>& CatIndices,
+		const TArray<int32>& DesiredOrder,
+		const TSet<int32>& DraggedSet);
 
 	// Incremental layout refresh (tile reuse, no flash)
 	void IncrementalCategoryRefresh();
