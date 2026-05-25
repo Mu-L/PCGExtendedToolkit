@@ -162,73 +162,75 @@ namespace PCGExPathStitch
 
 		bool bClosedLoop = false;
 
-		TSharedPtr<FProcessor> Start = SharedThis(this);
-		TSharedPtr<FProcessor> PreviousProcessor = Start;
-		TSharedPtr<FProcessor> NextProcessor = EndStitch ? EndStitch : StartStitch;
+		const TSharedPtr<FProcessor> Start = SharedThis(this);
 
-		TArray<TSharedPtr<FProcessor>> Chain;
-		Chain.Add(Start);
+		// Snapshot (processor, bReverse) for each link at walk time -- never re-read
+		// from StartStitch/EndStitch afterwards. In a 2-path closed loop both of
+		// Chain.Last()'s stitches alias to Start, so any post-walk mutation of those
+		// pointers (or even reading them to derive direction) would corrupt ordering.
+		struct FChainLink
+		{
+			TSharedPtr<FProcessor> Processor;
+			bool bReverse;
+		};
+
+		TArray<FChainLink> Chain;
+		Chain.Reserve(8);
+
+		// Prefer EndStitch when both are set; otherwise we are an endpoint.
+		const bool bStartGoesViaEnd = EndStitch != nullptr;
+		TSharedPtr<FProcessor> PreviousProcessor = Start;
+		TSharedPtr<FProcessor> NextProcessor = bStartGoesViaEnd ? EndStitch : StartStitch;
+
+		Chain.Add({Start, !bStartGoesViaEnd});
 
 		int32 SmallestWorkIndex = WorkIndex;
 
-		// Rebuild the chain
 		while (NextProcessor)
 		{
-			Chain.Add(NextProcessor);
+			// Whichever stitch points back to Previous is the endpoint we entered
+			// through; we'll exit via the other and the chosen entry dictates bReverse.
+			const bool bEnteredViaStart = (NextProcessor->StartStitch == PreviousProcessor);
+
+			Chain.Add({NextProcessor, !bEnteredViaStart});
 			SmallestWorkIndex = FMath::Min(SmallestWorkIndex, NextProcessor->WorkIndex);
 
-			TSharedPtr<FProcessor> OldPrev = PreviousProcessor;
 			PreviousProcessor = NextProcessor;
-			NextProcessor = NextProcessor->StartStitch == OldPrev ? NextProcessor->EndStitch : NextProcessor->StartStitch;
+			NextProcessor = bEnteredViaStart ? NextProcessor->EndStitch : NextProcessor->StartStitch;
 
 			if (NextProcessor == Start)
 			{
-				// That's a closed loop!
 				bClosedLoop = true;
 				NextProcessor = nullptr;
 			}
 		}
 
-		// Mid-path, will be merged
 		if (EndStitch && StartStitch)
 		{
+			// Closed-loop members all land here -- only the SmallestWorkIndex one
+			// proceeds; mid-chain processors of open chains also bail out.
 			if (!bClosedLoop || WorkIndex != SmallestWorkIndex)
 			{
 				return;
 			}
 		}
-
-		if (bClosedLoop)
-		{
-			// Nullify start so we go in order
-			StartStitch = nullptr;
-
-			if (Chain.Last()->StartStitch == Start)
-			{
-				Chain.Last()->StartStitch = nullptr;
-			}
-			else if (Chain.Last()->EndStitch == Start)
-			{
-				Chain.Last()->EndStitch = nullptr;
-			}
-		}
 		else
 		{
-			if (Chain.Last()->WorkIndex < WorkIndex)
+			// Open chain endpoint: lower-WorkIndex endpoint wins; the other bails
+			// so the merge runs once.
+			if (Chain.Last().Processor->WorkIndex < WorkIndex)
 			{
 				return;
 			}
 		}
-
-		// Other work index is smaller, will do the resolve.
 
 		PCGEX_INIT_IO_VOID(PointDataFacade->Source, PCGExData::EIOInit::New);
 		Merger = MakeShared<FPCGExPointIOMerger>(PointDataFacade);
 
 		for (int i = 0; i < Chain.Num(); ++i)
 		{
-			const TSharedPtr<FProcessor> Current = Chain[i];
-			const TSharedPtr<FProcessor> Previous = i == 0 ? nullptr : Chain[i - 1];
+			const FChainLink& Link = Chain[i];
+			const TSharedPtr<FProcessor>& Current = Link.Processor;
 
 			int32 ReadStart = 0;
 			int32 ReadCount = Current->PointDataFacade->GetNum();
@@ -249,14 +251,11 @@ namespace PCGExPathStitch
 						ReadStart++;
 					}
 				}
-				else
-				{
-				}
 			}
 
 			PCGExPointIOMerger::FMergeScope& MergeScope = Merger->Append(Current->PointDataFacade->Source, static_cast<PCGExMT::FScope>(Current->PointDataFacade->GetInScope(ReadStart, ReadCount)));
 
-			MergeScope.bReverse = i == 0 ? Current->EndStitch == nullptr : Current->StartStitch != Previous;
+			MergeScope.bReverse = Link.bReverse;
 		}
 
 		Merger->MergeAsync(TaskManager, &Context->CarryOverDetails);

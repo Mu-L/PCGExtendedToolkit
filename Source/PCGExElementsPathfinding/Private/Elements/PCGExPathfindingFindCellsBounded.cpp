@@ -3,6 +3,7 @@
 
 #include "Elements/PCGExPathfindingFindCellsBounded.h"
 
+#include "Containers/Queue.h"
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCell.h"

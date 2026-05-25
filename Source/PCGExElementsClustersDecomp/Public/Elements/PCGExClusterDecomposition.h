@@ -36,6 +36,11 @@ public:
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
+
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;

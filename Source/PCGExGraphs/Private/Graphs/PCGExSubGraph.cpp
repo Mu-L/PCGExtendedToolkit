@@ -227,28 +227,30 @@ namespace PCGExGraphs
 				const TConstPCGValueRange<int64> InMetadataEntries = InEdgeData->GetConstMetadataEntryValueRange();
 				std::atomic<int32> WriteIndex(0);
 
-				PCGEX_PARALLEL_FOR(
+				PCGExMT::ParallelOrSequential(
 					NumEdges,
-					const FEdge& OE = ParentGraphEdges[Edges[i].Index];
-
-					// Hijack edge IOIndex to store original edge index in the flattened
-					FlattenedEdges[i] = FEdge(i, ParentGraphNodes[OE.Start].PointIndex, ParentGraphNodes[OE.End].PointIndex, i, OE.Index);
-
-					const int32 OriginalPointIndex = OE.PointIndex;
-					int64 ParentEntry = PCGInvalidEntryKey;
-
-					if (InMetadataEntries.IsValidIndex(OriginalPointIndex))
+					[&](const int32 i)
 					{
-					// Grab existing metadata entry & cache read/write indices
-					ParentEntry = InMetadataEntries[OriginalPointIndex];
-					const int32 LocalWriteIndex = WriteIndex.fetch_add(1, std::memory_order_relaxed);
-					ReadEdgeIndices[LocalWriteIndex] = OriginalPointIndex;
-					WriteEdgeIndices[LocalWriteIndex] = i;
-					}
+						const FEdge& OE = ParentGraphEdges[Edges[i].Index];
 
-					OutMetadataEntries[i] = Metadata->AddEntryPlaceholder();
-					DelayedEntries[i] = MakeTuple(OutMetadataEntries[i], ParentEntry);
-					)
+						// Hijack edge IOIndex to store original edge index in the flattened
+						FlattenedEdges[i] = FEdge(i, ParentGraphNodes[OE.Start].PointIndex, ParentGraphNodes[OE.End].PointIndex, i, OE.Index);
+
+						const int32 OriginalPointIndex = OE.PointIndex;
+						int64 ParentEntry = PCGInvalidEntryKey;
+
+						if (InMetadataEntries.IsValidIndex(OriginalPointIndex))
+						{
+							// Grab existing metadata entry & cache read/write indices
+							ParentEntry = InMetadataEntries[OriginalPointIndex];
+							const int32 LocalWriteIndex = WriteIndex.fetch_add(1, std::memory_order_relaxed);
+							ReadEdgeIndices[LocalWriteIndex] = OriginalPointIndex;
+							WriteEdgeIndices[LocalWriteIndex] = i;
+						}
+
+						OutMetadataEntries[i] = Metadata->AddEntryPlaceholder();
+						DelayedEntries[i] = MakeTuple(OutMetadataEntries[i], ParentEntry);
+					});
 
 				ReadEdgeIndices.SetNum(WriteIndex);
 				WriteEdgeIndices.SetNum(WriteIndex);
@@ -259,14 +261,16 @@ namespace PCGExGraphs
 			{
 				TRACE_CPUPROFILER_EVENT_SCOPE(FWriteSubGraphEdges::CreatePoints);
 
-				PCGEX_PARALLEL_FOR(
+				PCGExMT::ParallelOrSequential(
 					NumEdges,
-					const FEdge& E = ParentGraphEdges[Edges[i].Index];
-					FlattenedEdges[i] = FEdge(i, ParentGraphNodes[E.Start].PointIndex, ParentGraphNodes[E.End].PointIndex, i, E.Index);
+					[&](const int32 i)
+					{
+						const FEdge& E = ParentGraphEdges[Edges[i].Index];
+						FlattenedEdges[i] = FEdge(i, ParentGraphNodes[E.Start].PointIndex, ParentGraphNodes[E.End].PointIndex, i, E.Index);
 
-					OutMetadataEntries[i] = Metadata->AddEntryPlaceholder();
-					DelayedEntries[i] = MakeTuple(OutMetadataEntries[i], PCGInvalidEntryKey);
-					)
+						OutMetadataEntries[i] = Metadata->AddEntryPlaceholder();
+						DelayedEntries[i] = MakeTuple(OutMetadataEntries[i], PCGInvalidEntryKey);
+					});
 			}
 
 			Metadata->AddDelayedEntries(DelayedEntries);

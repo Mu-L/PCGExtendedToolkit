@@ -140,6 +140,7 @@ bool FPCGExBevelPathElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 				return true;
 			}, [&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
+				//NewBatch->bSkipCompletion = true;
 				NewBatch->bRequiresWriteStep = (Settings->bFlagPoles || Settings->bFlagSubdivision || Settings->bFlagEndPoint || Settings->bFlagStartPoint);
 			}))
 		{
@@ -927,6 +928,11 @@ namespace PCGExBevelPath
 
 			Bevel->Compute(this);
 		}
+	}
+
+	void FProcessor::OnPointsProcessingComplete()
+	{
+		//CompleteWork();
 	}
 
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)

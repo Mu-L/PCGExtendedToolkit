@@ -50,14 +50,14 @@ bool UPCGExAssetStagingSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) 
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
+bool UPCGExAssetStagingSettings::WantsDataStealing() const
+{
+	return Super::WantsDataStealing() && !bPruneEmptyPoints;
+}
+
 PCGExData::EIOInit UPCGExAssetStagingSettings::GetMainDataInitializationPolicy() const
 {
-	// Forward is more efficient but we need Duplicate when pruning since we'll remove points
-	if (StealData == EPCGExOptionState::Enabled && !bPruneEmptyPoints)
-	{
-		return PCGExData::EIOInit::Forward;
-	}
-	return PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_INITIALIZE_ELEMENT(AssetStaging)
@@ -113,6 +113,13 @@ void FPCGExAssetStagingContext::RegisterAssetDependencies()
 	if (Settings->CollectionSource == EPCGExCollectionSource::AttributeSet)
 	{
 		MainCollection->GetAssetPaths(GetRequiredAssets(), PCGExAssetCollection::ELoadingFlags::Recursive);
+	}
+	else if (Settings->CollectionSource == EPCGExCollectionSource::Attribute && CollectionsLoader)
+	{
+		// Per-point: register the unique collection paths discovered in Boot so PCG
+		// loads them before PostLoadAssetsDependencies. Inner assets are not needed
+		// for Distribute -- it just emits paths/refs.
+		CollectionsLoader->AddAssetDependencies();
 	}
 }
 
@@ -193,12 +200,32 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	}
 	else if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 	{
-		// Per-point mode: defer loading to AdvanceWork since each point may reference a different collection
+		// Per-point mode: discover synchronously now, the framework loads the collection
+		// assets between RegisterAssetDependencies and PostLoadAssetsDependencies.
 		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->CollectionPathAttributeName)
 
 		TArray<FName> Names = {Settings->CollectionPathAttributeName};
 		Context->CollectionsLoader = MakeShared<PCGEx::TAssetLoader<UPCGExAssetCollection>>(Context, Context->MainPoints.ToSharedRef(), Names);
+
+		if (!Context->CollectionsLoader->Discover())
+		{
+			return Context->CancelExecution(TEXT("Failed to find any collections to load."));
+		}
+
+		if (!Context->CollectionsLoader->Load())
+		{
+			return Context->CancelExecution(TEXT("Failed to load any collections."));
+		}
+
+		Context->CollectionsLoader->Finalize();
+
+		// Cache lookups on each loaded collection.
+		for (const TPair<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& Pair : Context->CollectionsLoader->AssetsMap)
+		{
+			Pair.Value->LoadCache();
+		}
 	}
+
 
 	if (Context->bPickMaterials && Context->MainCollection && !Context->MainCollection->IsType(PCGExAssetCollection::TypeIds::Mesh))
 	{
@@ -276,8 +303,14 @@ bool FPCGExAssetStagingElement::PostBoot(FPCGExContext* InContext) const
 {
 	PCGEX_CONTEXT_AND_SETTINGS(AssetStaging)
 
-	// Skip validation for Attribute mode - collections load per-point in AdvanceWork
-	if (Settings->CollectionSource != EPCGExCollectionSource::Attribute)
+	if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
+	{
+		if (Context->CollectionsLoader && Context->CollectionsLoader->IsEmpty())
+		{
+			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
+		}
+	}
+	else
 	{
 		check(Context->MainCollection)
 		if (Context->MainCollection->LoadCache()->IsEmpty())
@@ -300,46 +333,9 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 
 	PCGEX_CONTEXT_AND_SETTINGS(AssetStaging)
 	PCGEX_EXECUTION_CHECK
-
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (Context->CollectionsLoader)
-		{
-			Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-
-			if (!Context->CollectionsLoader->Start(Context->GetTaskManager()))
-			{
-				return Context->CancelExecution(TEXT("Failed to find any collections to load."));
-			}
-		}
-		else
-		{
-			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
-				{
-					return true;
-				},
-				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
-				{
-					NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
-				}))
-			{
-				return Context->CancelExecution(TEXT("Could not find any points to process."));
-			}
-		}
-	}
-
-	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
-	{
-		if (Context->CollectionsLoader && Context->CollectionsLoader->IsEmpty())
-		{
-			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
-		}
-
-		for (const TPair<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& Pair : Context->CollectionsLoader->AssetsMap)
-		{
-			Pair.Value->LoadCache();
-		}
+		const bool bAttributeMode = (Settings->CollectionSource == EPCGExCollectionSource::Attribute);
 
 		if (!Context->StartBatchProcessingPoints(
 			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
@@ -348,7 +344,14 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				NewBatch->bSkipCompletion = true;
+				if (bAttributeMode)
+				{
+					NewBatch->bSkipCompletion = true;
+				}
+				else
+				{
+					NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
+				}
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
@@ -396,6 +399,7 @@ namespace PCGExAssetStaging
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
+		bApplyFitting = Settings->bApplyFitting;
 		NumPoints = PointDataFacade->GetNum();
 
 		if (Context->bPickMaterials)
@@ -404,16 +408,26 @@ namespace PCGExAssetStaging
 			MaterialPick.Init(-1, NumPoints);
 		}
 
-		FittingHandler.ScaleToFit = Settings->ScaleToFit;
-		FittingHandler.Justification = Settings->Justification;
-
-		if (!FittingHandler.Init(ExecutionContext, PointDataFacade))
+		if (bApplyFitting)
 		{
-			return false;
-		}
 
-		Variations = Settings->Variations;
-		Variations.Init(Settings->Seed);
+			FittingHandler.ScaleToFit = Settings->ScaleToFit;
+			FittingHandler.Justification = Settings->Justification;
+
+			if (!FittingHandler.Init(ExecutionContext, PointDataFacade))
+			{
+				return false;
+			}
+
+			if (Settings->bWriteTranslation)
+			{
+				TranslationWriter = PointDataFacade->GetWritable<FVector>(Settings->TranslationAttributeName, FVector::ZeroVector, true, PCGExData::EBufferInit::Inherit);
+			}
+
+			Variations = Settings->Variations;
+			Variations.Init(Settings->Seed);
+
+		}
 
 		Source = MakeShared<PCGExCollections::FCollectionSource>(PointDataFacade);
 		Source->DistributionSettings = Settings->DistributionSettings;
@@ -458,11 +472,6 @@ namespace PCGExAssetStaging
 			EntryTypeWriter = PointDataFacade->GetWritable<FName>(Settings->EntryTypeAttributeName, NAME_None, true, PCGExData::EBufferInit::Inherit);
 		}
 
-		if (Settings->bWriteTranslation)
-		{
-			TranslationWriter = PointDataFacade->GetWritable<FVector>(Settings->TranslationAttributeName, FVector::ZeroVector, true, PCGExData::EBufferInit::Inherit);
-		}
-
 		// bInherit: if the attribute already exists, preserve values for invalid points instead of clearing them
 		if (Context->OutputMode == EPCGExStagingOutputMode::Attributes)
 		{
@@ -477,9 +486,13 @@ namespace PCGExAssetStaging
 
 		EPCGPointNativeProperties AllocateFor = EPCGPointNativeProperties::None;
 
-		AllocateFor |= EPCGPointNativeProperties::BoundsMin;
-		AllocateFor |= EPCGPointNativeProperties::BoundsMax;
-		AllocateFor |= EPCGPointNativeProperties::Transform;
+		if (bApplyFitting)
+		{
+			AllocateFor |= EPCGPointNativeProperties::BoundsMin;
+			AllocateFor |= EPCGPointNativeProperties::BoundsMax;
+			AllocateFor |= EPCGPointNativeProperties::Transform;
+		}
+
 		if (bOutputWeight && !WeightWriter && !NormalizedWeightWriter)
 		{
 			// No explicit weight attribute - fall back to writing weight into Density
@@ -528,11 +541,13 @@ namespace PCGExAssetStaging
 		PointDataFacade->Fetch(Scope);
 		FilterScope(Scope);
 
+		const bool bLocalApplyFitting = bApplyFitting;
+		const bool bLocalOutputWeight = bOutputWeight;
 		UPCGBasePointData* OutPointData = PointDataFacade->GetOut();
 
 		const TPCGValueRange<FTransform> OutTransforms = OutPointData->GetTransformValueRange(false);
-		const TPCGValueRange<FVector> OutBoundsMin = OutPointData->GetBoundsMinValueRange(false);
-		const TPCGValueRange<FVector> OutBoundsMax = OutPointData->GetBoundsMaxValueRange(false);
+		const TPCGValueRange<FVector> OutBoundsMin = bLocalApplyFitting ? OutPointData->GetBoundsMinValueRange(false) : TPCGValueRange<FVector>();
+		const TPCGValueRange<FVector> OutBoundsMax = bLocalApplyFitting ? OutPointData->GetBoundsMaxValueRange(false) : TPCGValueRange<FVector>();
 		const TConstPCGValueRange<int32> Seeds = OutPointData->GetConstSeedValueRange();
 		const TPCGValueRange<float> Densities = bUsesDensity ? OutPointData->GetDensityValueRange(false) : TPCGValueRange<float>();
 
@@ -546,7 +561,9 @@ namespace PCGExAssetStaging
 			if (bInherit)
 			{
 				return;
-			} // Keep existing values from upstream staging
+			}
+
+			// Keep existing values from upstream staging
 
 			if (Settings->bPruneEmptyPoints)
 			{
@@ -565,7 +582,7 @@ namespace PCGExAssetStaging
 				HashWriter->SetValue(Index, -1);
 			}
 
-			if (bOutputWeight)
+			if (bLocalOutputWeight)
 			{
 				if (WeightWriter)
 				{
@@ -616,13 +633,9 @@ namespace PCGExAssetStaging
 			const FPCGExAssetCollectionEntry* Entry = Result.Entry;
 			const UPCGExAssetCollection* EntryHost = Result.Host;
 
-			FTransform& OutTransform = OutTransforms[Index];
-			FVector OutTranslation = FVector::ZeroVector;
-			FBox OutBounds = Entry->Staging.Bounds;
 			int16 SecondaryIndex = -1; // Material variant index within the entry
 
 			const FPCGExAssetStagingData& Staging = Entry->Staging;
-			const FPCGExFittingVariations& EntryVariations = Entry->GetVariations(EntryHost);
 
 			// MicroCache holds per-entry sub-distribution data (e.g., material variants for meshes).
 			// SecondaryIndex selects which variant to use for this point.
@@ -630,7 +643,7 @@ namespace PCGExAssetStaging
 				MicroHelper && MicroCache && MicroCache->GetTypeId() == PCGExAssetCollection::TypeIds::Mesh)
 			{
 				const PCGExMeshCollection::FMicroCache* EntryMicroCache = static_cast<const PCGExMeshCollection::FMicroCache*>(MicroCache);
-				SecondaryIndex = MicroHelper->GetPick(EntryMicroCache, Index, Seed + Index);
+				SecondaryIndex = MicroHelper->GetPick(EntryMicroCache, Index, PCGExRandomHelpers::GetSeed(Seed, Index));
 
 				if (Context->bPickMaterials)
 				{
@@ -645,7 +658,7 @@ namespace PCGExAssetStaging
 				MaterialPick[Index] = -1;
 			}
 
-			if (bOutputWeight)
+			if (bLocalOutputWeight)
 			{
 				double Weight = bNormalizedWeight ? static_cast<double>(Entry->Weight) / static_cast<double>(const_cast<UPCGExAssetCollection*>(EntryHost)->LoadCache()->WeightSum) : Entry->Weight;
 				if (bOneMinusWeight)
@@ -675,32 +688,42 @@ namespace PCGExAssetStaging
 				HashWriter->SetValue(Index, Context->CollectionPickDatasetPacker->GetPickIdx(EntryHost, Staging.InternalIndex, SecondaryIndex));
 			}
 
-			RandomSource.Initialize(PCGExRandomHelpers::GetSeed(Seed, Variations.Seed));
-
-			// "Before" variations modify asset bounds before fitting, affecting scale-to-fit calculation.
-			// "After" variations apply to the final transform without changing bounds.
-			if (Variations.bEnabledBefore)
+			if (bLocalApplyFitting)
 			{
-				FTransform LocalXForm = FTransform::Identity;
-				Variations.Apply(RandomSource, LocalXForm, EntryVariations, EPCGExVariationMode::Before);
-				FittingHandler.ComputeLocalTransform(Index, LocalXForm, OutTransform, OutBounds, OutTranslation);
-			}
-			else
-			{
-				FittingHandler.ComputeTransform(Index, OutTransform, OutBounds, OutTranslation);
-			}
 
-			if (TranslationWriter)
-			{
-				TranslationWriter->SetValue(Index, OutTranslation);
-			}
+				FTransform& OutTransform = OutTransforms[Index];
+				FVector OutTranslation = FVector::ZeroVector;
+				FBox OutBounds = Entry->Staging.Bounds;
 
-			OutBoundsMin[Index] = OutBounds.Min;
-			OutBoundsMax[Index] = OutBounds.Max;
+				const FPCGExFittingVariations& EntryVariations = Entry->GetVariations(EntryHost);
 
-			if (Variations.bEnabledAfter)
-			{
-				Variations.Apply(RandomSource, OutTransform, EntryVariations, EPCGExVariationMode::After);
+				RandomSource.Initialize(PCGExRandomHelpers::GetSeed(Seed, Variations.Seed));
+
+				// "Before" variations modify asset bounds before fitting, affecting scale-to-fit calculation.
+				// "After" variations apply to the final transform without changing bounds.
+				if (Variations.bEnabledBefore)
+				{
+					FTransform LocalXForm = FTransform::Identity;
+					Variations.Apply(RandomSource, LocalXForm, EntryVariations, EPCGExVariationMode::Before);
+					FittingHandler.ComputeLocalTransform(Index, LocalXForm, OutTransform, OutBounds, OutTranslation);
+				}
+				else
+				{
+					FittingHandler.ComputeTransform(Index, OutTransform, OutBounds, OutTranslation);
+				}
+
+				if (TranslationWriter)
+				{
+					TranslationWriter->SetValue(Index, OutTranslation);
+				}
+
+				OutBoundsMin[Index] = OutBounds.Min;
+				OutBoundsMax[Index] = OutBounds.Max;
+
+				if (Variations.bEnabledAfter)
+				{
+					Variations.Apply(RandomSource, OutTransform, EntryVariations, EPCGExVariationMode::After);
+				}
 			}
 
 			if (SocketHelper)

@@ -196,17 +196,27 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			SetState(PCGExClusterMT::MTState_ClusterCompletingWork);
 			if (!CurrentBatch->bSkipCompletion)
 			{
-				PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
-				CurrentBatch->CompleteWork();
-				return false;
+				{
+					PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
+					CurrentBatch->CompleteWork();
+				}
+				if (IsWaitingForTasks())
+				{
+					return false;
+				}
 			}
 		}
 
 		PCGEX_ON_ASYNC_STATE_READY_INTERNAL(PCGExClusterMT::MTState_ClusterCompletingWork)
 		{
-			PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
-			AdvanceBatch(NextStateId);
-			return false;
+			{
+				PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), false)
+				AdvanceBatch(NextStateId);
+			}
+			if (IsWaitingForTasks())
+			{
+				return false;
+			}
 		}
 
 		// TODO : We dont support writing step when daisy chaining...?
@@ -219,12 +229,17 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			SetState(PCGExClusterMT::MTState_ClusterCompletingWork);
 			if (!bSkipClusterBatchCompletionStep)
 			{
-				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
-				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
 				{
-					Batch->CompleteWork();
+					PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
+					for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+					{
+						Batch->CompleteWork();
+					}
 				}
-				return false;
+				if (IsWaitingForTasks())
+				{
+					return false;
+				}
 			}
 		}
 
@@ -238,19 +253,28 @@ bool FPCGExClustersProcessorContext::ProcessClusters(const PCGExCommon::ContextS
 			if (bDoClusterBatchWritingStep)
 			{
 				SetState(PCGExClusterMT::MTState_ClusterWriting);
-				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
-				for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
 				{
-					Batch->Write();
+					PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager, true)
+					for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+					{
+						Batch->Write();
+					}
 				}
-				return false;
+				if (IsWaitingForTasks())
+				{
+					return false;
+				}
 			}
-			bBatchProcessingEnabled = false;
-			if (NextStateId == PCGExCommon::States::State_Done)
+			else
 			{
-				Done();
+				bBatchProcessingEnabled = false;
+				if (NextStateId == PCGExCommon::States::State_Done)
+				{
+					Done();
+				}
+				SetState(NextStateId);
+				return true;
 			}
-			SetState(NextStateId);
 		}
 
 		PCGEX_ON_ASYNC_STATE_READY_INTERNAL(PCGExClusterMT::MTState_ClusterWriting)
@@ -291,6 +315,8 @@ bool FPCGExClustersProcessorContext::CompileGraphBuilders(const bool bOutputToCo
 
 bool FPCGExClustersProcessorContext::StartProcessingClusters(FBatchProcessingValidateEntries&& ValidateEntries, FBatchProcessingInitEdgeBatch&& InitBatch, const bool bDaisyChain)
 {
+	PCGEX_SETTINGS_LOCAL(ClustersProcessor)
+
 	Batches.Empty();
 
 	bDaisyChainClusterBatches = bDaisyChain;
@@ -362,9 +388,10 @@ bool FPCGExClustersProcessorContext::StartProcessingClusters(FBatchProcessingVal
 	{
 		SetState(PCGExClusterMT::MTState_ClusterProcessing);
 		PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), true)
+
 		for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
 		{
-			PCGExClusterMT::ScheduleBatch(GetTaskManager(), Batch, bScopedIndexLookupBuild);
+			Batch->PrepareProcessing(GetTaskManager(), bScopedIndexLookupBuild);
 		}
 	}
 

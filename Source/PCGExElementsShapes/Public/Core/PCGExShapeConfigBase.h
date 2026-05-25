@@ -50,16 +50,16 @@ struct PCGEXELEMENTSSHAPES_API FPCGExShapeConfigBase
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType ResolutionInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector ResolutionAttribute_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double ResolutionConstant_DEPRECATED = 10;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FVector ResolutionConstantVector_DEPRECATED = FVector(10);
 
 #pragma endregion

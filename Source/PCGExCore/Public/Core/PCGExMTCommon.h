@@ -5,6 +5,7 @@
 
 #include <functional>
 #include "CoreMinimal.h"
+#include "Async/ParallelFor.h"
 
 namespace PCGExMT
 {
@@ -23,8 +24,10 @@ namespace PCGExMT
 	 * @param Num Number of iterations
 	 * @param Body Function taking (int32 i) to execute per iteration
 	 * @param Threshold Iteration count below which we use sequential execution (default 512)
+	 * @param Flags ParallelFor flags (default None). Pass EParallelForFlags::Unbalanced when
+	 *              per-iteration cost varies dramatically to enable dynamic work-stealing.
 	 */
-	PCGEXCORE_API void ParallelOrSequential(int32 Num, const FLoopBody& Body, int32 Threshold = DefaultParallelThreshold);
+	PCGEXCORE_API void ParallelOrSequential(int32 Num, const FLoopBody& Body, int32 Threshold = DefaultParallelThreshold, EParallelForFlags Flags = EParallelForFlags::None);
 
 	/**
 	 * Scope-based variant: divides Num into chunks (roughly one per worker thread) and calls Body
@@ -139,9 +142,6 @@ namespace PCGExMT
 #define PCGEX_SUBSCOPE_LOOP(_VAR) for(int _VAR = SubScope.Start; _VAR < SubScope.End; _VAR++)
 
 #define PCGEX_PARALLEL_FOR(_NUM, ...) PCGExMT::ParallelOrSequential(_NUM, [&](const int32 i){ __VA_ARGS__ });
-#define PCGEX_PARALLEL_FOR_THRESHOLD(_NUM, _THRESHOLD, ...) PCGExMT::ParallelOrSequential(_NUM, [&](const int32 i){ __VA_ARGS__ }, _THRESHOLD);
-#define PCGEX_PARALLEL_FOR_SCOPED(_NUM, _THRESHOLD, ...) PCGExMT::ParallelOrSequentialScoped(_NUM, [&](const PCGExMT::FScope& Scope){ __VA_ARGS__ }, _THRESHOLD);
-#define PCGEX_SEQUENTIAL_FOR(_NUM, ...) PCGExMT::Sequential(_NUM, [&](const int32 i){ __VA_ARGS__ });
 
 #endif
 #pragma endregion

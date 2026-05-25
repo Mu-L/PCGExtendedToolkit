@@ -126,50 +126,51 @@ void FPCGExShapeGridBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> In
 	TPCGValueRange<FVector> OutBoundsMin = Scope.Data->GetBoundsMinValueRange(false);
 	TPCGValueRange<FVector> OutBoundsMax = Scope.Data->GetBoundsMaxValueRange(false);
 
-	PCGEX_PARALLEL_FOR(
+	PCGExMT::ParallelOrSequential(
 		Scope.Count,
-
-		const int32 WriteIndex = Scope.Start + i;
-
-		OutBoundsMin[WriteIndex] = MinBounds;
-		OutBoundsMax[WriteIndex] = MaxBounds;
-
-		const int32 X = i % Grid->Count.X;
-		const int32 Y = (i / Grid->Count.X) % Grid->Count.Y;
-		const int32 Z = i / (Grid->Count.X * Grid->Count.Y);
-
-		FVector Target;
-		FVector Point = FVector(
-			Corner.X + (X * XStep),
-			Corner.Y + (Y * YStep),
-			Corner.Z + (Z * ZStep))
-		+ Grid->Offset;
-
-		if (Config.PointsLookAt == EPCGExShapePointLookAt::None)
+		[&](const int32 i)
 		{
-		OutTransforms[WriteIndex] = FTransform(FRotator::ZeroRotator, Point, FVector::OneVector);
-		}
-		else
-		{
-		switch (Config.PointsLookAt)
-		{
-		case EPCGExShapePointLookAt::Seed:
-		Target = Center;
-		break;
-		case EPCGExShapePointLookAt::None:
-		Target = Point + FVector(0, 0, 1);
-		break;
-		default:
-		Target = Point;
-		break;
-		}
+			const int32 WriteIndex = Scope.Start + i;
 
-		OutTransforms[WriteIndex] = FTransform(
-			PCGExMath::MakeLookAtTransform(Point - Target, FVector::UpVector, Config.LookAtAxis).GetRotation(),
-			Point, FVector::OneVector
-		);
-		}
-		)
+			OutBoundsMin[WriteIndex] = MinBounds;
+			OutBoundsMax[WriteIndex] = MaxBounds;
+
+			const int32 X = i % Grid->Count.X;
+			const int32 Y = (i / Grid->Count.X) % Grid->Count.Y;
+			const int32 Z = i / (Grid->Count.X * Grid->Count.Y);
+
+			FVector Target;
+			FVector Point = FVector(
+					Corner.X + (X * XStep),
+					Corner.Y + (Y * YStep),
+					Corner.Z + (Z * ZStep))
+				+ Grid->Offset;
+
+			if (Config.PointsLookAt == EPCGExShapePointLookAt::None)
+			{
+				OutTransforms[WriteIndex] = FTransform(FRotator::ZeroRotator, Point, FVector::OneVector);
+			}
+			else
+			{
+				switch (Config.PointsLookAt)
+				{
+				case EPCGExShapePointLookAt::Seed:
+					Target = Center;
+					break;
+				case EPCGExShapePointLookAt::None:
+					Target = Point + FVector(0, 0, 1);
+					break;
+				default:
+					Target = Point;
+					break;
+				}
+
+				OutTransforms[WriteIndex] = FTransform(
+					PCGExMath::MakeLookAtTransform(Point - Target, FVector::UpVector, Config.LookAtAxis).GetRotation(),
+					Point, FVector::OneVector
+					);
+			}
+		});
 
 	if (bOwnsData && Grid->bClosedLoop)
 	{

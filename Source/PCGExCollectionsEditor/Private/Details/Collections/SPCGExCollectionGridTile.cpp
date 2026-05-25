@@ -6,6 +6,7 @@
 #include "AssetThumbnail.h"
 #include "Editor.h"
 #include "ScopedTransaction.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Widgets/SBoxPanel.h"
@@ -669,6 +670,49 @@ FReply SPCGExCollectionGridTile::OnMouseButtonUp(const FGeometry& MyGeometry, co
 	return FReply::Unhandled();
 }
 
+FReply SPCGExCollectionGridTile::OnMouseButtonDoubleClick(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	if (MouseEvent.GetEffectingButton() != EKeys::LeftMouseButton)
+	{
+		return FReply::Unhandled();
+	}
+
+	// Suppress the deferred selection toggle that OnMouseButtonDown armed -- otherwise
+	// the second click's mouse-up would clear the selection we want to keep.
+	bPendingClick = false;
+
+	const UPCGExAssetCollection* Coll = Collection.Get();
+	if (!Coll || EntryIndex == INDEX_NONE)
+	{
+		return FReply::Unhandled();
+	}
+
+	const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(EntryIndex);
+	if (!Result.IsValid())
+	{
+		return FReply::Unhandled();
+	}
+
+	const FSoftObjectPath AssetPath = Result.Entry->EDITOR_GetThumbnailAssetPath();
+	if (AssetPath.IsNull())
+	{
+		return FReply::Unhandled();
+	}
+
+	if (UObject* Asset = AssetPath.TryLoad())
+	{
+		if (GEditor)
+		{
+			if (UAssetEditorSubsystem* AssetEditor = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>())
+			{
+				AssetEditor->OpenEditorForAsset(Asset);
+			}
+		}
+	}
+
+	return FReply::Handled();
+}
+
 FReply SPCGExCollectionGridTile::OnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
 	bPendingClick = false;
@@ -694,9 +738,9 @@ void SPCGExCollectionGridTile::RefreshThumbnail()
 		if (Result.IsValid())
 		{
 			const bool bIsSub = Result.Entry->bIsSubCollection;
-			const FSoftObjectPath& CurrentPath = Result.Entry->Staging.Path;
+			const FSoftObjectPath CurrentPath = Result.Entry->EDITOR_GetThumbnailAssetPath();
 
-			if (CurrentPath == CachedStagingPath && bIsSub == bCachedIsSubCollection)
+			if (CurrentPath == CachedThumbnailPath && bIsSub == bCachedIsSubCollection)
 			{
 				return; // Nothing visual changed, skip rebuild
 			}
@@ -739,7 +783,7 @@ TSharedRef<SWidget> SPCGExCollectionGridTile::BuildThumbnailWidget()
 	const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(EntryIndex);
 	if (!Result.IsValid())
 	{
-		CachedStagingPath.Reset();
+		CachedThumbnailPath.Reset();
 		bCachedIsSubCollection = false;
 		return SNew(SBox)
 			.HAlign(HAlign_Center)
@@ -754,7 +798,7 @@ TSharedRef<SWidget> SPCGExCollectionGridTile::BuildThumbnailWidget()
 
 	// Update cache
 	bCachedIsSubCollection = Result.Entry->bIsSubCollection;
-	CachedStagingPath = Result.Entry->Staging.Path;
+	CachedThumbnailPath = Result.Entry->EDITOR_GetThumbnailAssetPath();
 
 	// Subcollection -- show collection icon
 	if (Result.Entry->bIsSubCollection)
@@ -769,8 +813,9 @@ TSharedRef<SWidget> SPCGExCollectionGridTile::BuildThumbnailWidget()
 			];
 	}
 
-	// Get asset path from staging data
-	const FSoftObjectPath& AssetPath = CachedStagingPath;
+	// Get asset path -- entry-specific source (may differ from Staging.Path for
+	// entry types that bake into an embedded asset, e.g. level-sourced PCGDataAsset).
+	const FSoftObjectPath& AssetPath = CachedThumbnailPath;
 	if (AssetPath.IsNull())
 	{
 		return SNew(SBox)

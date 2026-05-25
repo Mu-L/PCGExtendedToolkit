@@ -3,6 +3,7 @@
 
 #include "Elements/PCGExPathHatch.h"
 
+#include "Algo/BinarySearch.h"
 #include "Algo/Sort.h"
 #include "Async/ParallelFor.h"
 #include "PCGParamData.h"
@@ -13,6 +14,7 @@
 #include "Details/PCGExBlendingDetails.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Math/PCGExBestFitPlane.h"
+#include "Math/PCGExMath.h"
 #include "Math/PCGExMathDistances.h"
 #include "Paths/PCGExPath.h"
 #include "Paths/PCGExPathsCommon.h"
@@ -135,6 +137,7 @@ namespace PCGExPathHatch
 
 		if (!Settings->AngleOffset.TryReadDataValue(PointDataFacade->Source, AngleOffsetDeg)) { return false; }
 		if (!Settings->LineSpacing.TryReadDataValue(PointDataFacade->Source, LineSpacingValue)) { return false; }
+		if (!Settings->LineOriginSlide.TryReadDataValue(PointDataFacade->Source, LineOriginSlideValue)) { return false; }
 		if (!Settings->SegmentSpacing.TryReadDataValue(PointDataFacade->Source, SegmentSpacingValue)) { return false; }
 		if (bFilterSegments && !Settings->MinSegmentLength.TryReadDataValue(PointDataFacade->Source, MinSegmentLengthValue)) { return false; }
 
@@ -152,9 +155,9 @@ namespace PCGExPathHatch
 
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(PathHatch_BoxFit);
-			if (Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFit)
+			if (Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFit || Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFitAccurate)
 			{
-				const PCGExMath::FBestFitPlane Plane2D(MakeArrayView(Projected.GetData(), Projected.Num()));
+				const PCGExMath::FBestFitPlane Plane2D(MakeArrayView(Projected.GetData(), Projected.Num()), Settings->BoxFitMode == EPCGExHatchBoxFitMode::BestFitAccurate);
 				BoxAxisX = FVector2D(Plane2D.Axis[0].X, Plane2D.Axis[0].Y).GetSafeNormal();
 				BoxAxisY = FVector2D(Plane2D.Axis[1].X, Plane2D.Axis[1].Y).GetSafeNormal();
 				BoxCenter = FVector2D(Plane2D.Centroid.X, Plane2D.Centroid.Y);
@@ -198,13 +201,23 @@ namespace PCGExPathHatch
 		const double PerpRange = PerpMax - PerpMin;
 
 		TArray<double> PerpOffsets;
+		bool bPerpOffsetsWrapped = false;
 		if (PerpRange > UE_DOUBLE_KINDA_SMALL_NUMBER)
 		{
-			if (bUseLineCount)
+			const bool bSlideApplied = !FMath::IsNearlyZero(LineOriginSlideValue);
+			const bool bDoWrap = bSlideApplied && Settings->bWrapSlide;
+
+			// Snap-to-divisor branch: Count mode is naturally seamless (Step = PerpRange / N), and
+			// Distance mode with wrap snaps to the nearest divisor so the cyclic seam stays clean --
+			// otherwise the (PerpRange mod Step) residual becomes a visible spacing artifact at the
+			// wrap point. User's Step is treated as a density hint here, not an exact value.
+			if (bUseLineCount || bDoWrap)
 			{
-				const int32 N = FMath::Max(1, FMath::FloorToInt(LineSpacingValue));
-				PerpOffsets.SetNumUninitialized(N);
+				const int32 N = bUseLineCount
+					? FMath::Max(1, FMath::FloorToInt(LineSpacingValue))
+					: FMath::Max(1, FMath::RoundToInt(PerpRange / FMath::Max(UE_DOUBLE_KINDA_SMALL_NUMBER, LineSpacingValue)));
 				const double Step = PerpRange / static_cast<double>(N);
+				PerpOffsets.SetNumUninitialized(N);
 				const double StartOffset = (Settings->LineOrigin == EPCGExHatchLineOrigin::Center)
 					? -PerpRange * 0.5 + Step * 0.5
 					: PerpMin + Step * 0.5;
@@ -212,6 +225,7 @@ namespace PCGExPathHatch
 			}
 			else
 			{
+				// Distance mode without wrap: honor the requested Step exactly. Ends may not tile cleanly.
 				const double Step = FMath::Max(UE_DOUBLE_KINDA_SMALL_NUMBER, LineSpacingValue);
 				if (Settings->LineOrigin == EPCGExHatchLineOrigin::Center)
 				{
@@ -225,6 +239,25 @@ namespace PCGExPathHatch
 					const int32 N = FMath::FloorToInt(PerpRange / Step) + 1;
 					PerpOffsets.SetNumUninitialized(N);
 					for (int32 i = 0; i < N; ++i) { PerpOffsets[i] = PerpMin + i * Step; }
+				}
+			}
+
+			// Origin slide: Center treats the value as a fraction of the half-extent along LinePerp2D;
+			// Start treats it as a fraction of the full extent. Signed in both modes.
+			if (bSlideApplied)
+			{
+				const double SlideShift = (Settings->LineOrigin == EPCGExHatchLineOrigin::Center)
+					? LineOriginSlideValue * PerpMax
+					: LineOriginSlideValue * PerpRange;
+				for (double& Offset : PerpOffsets) { Offset += SlideShift; }
+
+				// Fold shifted-out lines back to the opposite side so the box stays tiled.
+				if (Settings->bWrapSlide)
+				{
+					for (double& Offset : PerpOffsets) { Offset = PCGExMath::Tile(Offset, PerpMin, PerpMax); }
+					// Wrap reshuffles the grid; re-sort so downstream lookups stay monotonic.
+					PerpOffsets.Sort();
+					bPerpOffsetsWrapped = true;
 				}
 			}
 		}
@@ -251,6 +284,23 @@ namespace PCGExPathHatch
 			const double PerpOffset0 = PerpOffsets[0];
 			const double PerpStep = (NumLines > 1) ? (PerpOffsets[1] - PerpOffsets[0]) : 1.0;
 			const double InvPerpStep = 1.0 / PerpStep;
+
+			// Wrap-aware: post-wrap the grid is still uniform on the cycle (Step is snapped for both
+			// Count and Distance+wrap), but fmod can introduce sub-epsilon drift -- fall back to binary
+			// search to stay robust against the closed-form rounding the wrong index at the seam.
+			auto FindLineRange = [&](const double Lo, const double Hi, int32& OutFirst, int32& OutLast)
+			{
+				if (bPerpOffsetsWrapped)
+				{
+					OutFirst = Algo::LowerBound(PerpOffsets, Lo);
+					OutLast = Algo::UpperBound(PerpOffsets, Hi) - 1;
+				}
+				else
+				{
+					OutFirst = FMath::Max(0, FMath::CeilToInt((Lo - PerpOffset0) * InvPerpStep));
+					OutLast = FMath::Min(NumLines - 1, FMath::FloorToInt((Hi - PerpOffset0) * InvPerpStep));
+				}
+			};
 
 			TArray<FEdgeProj> EdgeProjs;
 			TArray<int32> LineCounts;
@@ -285,8 +335,8 @@ namespace PCGExPathHatch
 					const double Lo = FMath::Min(EP.P0, EP.P1);
 					const double Hi = FMath::Max(EP.P0, EP.P1);
 					if (Hi - Lo < UE_DOUBLE_KINDA_SMALL_NUMBER) { continue; }
-					const int32 First = FMath::Max(0, FMath::CeilToInt((Lo - PerpOffset0) * InvPerpStep));
-					const int32 Last = FMath::Min(NumLines - 1, FMath::FloorToInt((Hi - PerpOffset0) * InvPerpStep));
+					int32 First, Last;
+					FindLineRange(Lo, Hi, First, Last);
 					for (int32 L = First; L <= Last; ++L) { ++LineCounts[L]; }
 				}
 			}
@@ -308,8 +358,8 @@ namespace PCGExPathHatch
 					const double Lo = FMath::Min(EP.P0, EP.P1);
 					const double Hi = FMath::Max(EP.P0, EP.P1);
 					if (Hi - Lo < UE_DOUBLE_KINDA_SMALL_NUMBER) { continue; }
-					const int32 First = FMath::Max(0, FMath::CeilToInt((Lo - PerpOffset0) * InvPerpStep));
-					const int32 Last = FMath::Min(NumLines - 1, FMath::FloorToInt((Hi - PerpOffset0) * InvPerpStep));
+					int32 First, Last;
+					FindLineRange(Lo, Hi, First, Last);
 					if (Last < First) { continue; }
 
 					const double InvDeltaP = 1.0 / (EP.P1 - EP.P0);

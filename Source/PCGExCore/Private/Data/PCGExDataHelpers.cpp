@@ -51,16 +51,18 @@ namespace PCGExData::Helpers
 
 			// Scope-based parallel: one FScopedTypedValue per worker task (not per iteration).
 			// Amortizes the scoped-value construction cost across each thread's chunk.
-			PCGEX_PARALLEL_FOR_SCOPED(
-				NumCopy, 1024,
+			PCGExMT::ParallelOrSequentialScoped(
+				NumCopy,
+				[&](const PCGExMT::FScope& Scope)
 				{
-				PCGExTypes::FScopedTypedValue Temp = SrcBuffer->MakeScopedValue();
-				PCGEX_SCOPE_LOOP(i)
-				{
-				SrcBuffer->GetVoid(SourcePointIndices[i], Temp);
-				DstBuffer->SetVoid(i, Temp);
-				}
-				})
+					PCGExTypes::FScopedTypedValue Temp = SrcBuffer->MakeScopedValue();
+					PCGEX_SCOPE_LOOP(i)
+					{
+						SrcBuffer->GetVoid(SourcePointIndices[i], Temp);
+						DstBuffer->SetVoid(i, Temp);
+					}
+				},
+				1024);
 		}
 	}
 

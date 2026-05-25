@@ -325,80 +325,66 @@ const FPCGExFittingVariations& FPCGExAssetCollectionEntry::GetVariations(const U
 	return Variations;
 }
 
-double FPCGExAssetCollectionEntry::GetGrammarSize(const UPCGExAssetCollection* Host) const
+const FPCGExAssetGrammarDetails* FPCGExAssetCollectionEntry::GetEffectiveGrammar(const UPCGExAssetCollection* Host) const
 {
 	if (!bIsSubCollection)
 	{
-		if (GrammarSource == EPCGExEntryVariationMode::Local)
-		{
-			return AssetGrammar.GetSize(Staging.Bounds);
-		}
-		return Host->GlobalAssetGrammar.GetSize(Staging.Bounds);
+		// Leaf: Local vs Global, honoring collection-level Overrule.
+		const bool bUseGlobal =
+			GrammarSource == EPCGExEntryVariationMode::Global ||
+			(Host && Host->GlobalGrammarMode == EPCGExGlobalVariationRule::Overrule);
+		return bUseGlobal && Host ? &Host->GlobalAssetGrammar : &AssetGrammar;
 	}
 
-	if (InternalSubCollection)
+	// Subcollection: Inherit / Override / Flatten.
+	if (!InternalSubCollection) { return nullptr; }
+	switch (SubGrammarMode)
 	{
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Flatten)
-		{
-			return 0;
-		}
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Inherit)
-		{
-			return InternalSubCollection->CollectionGrammar.GetSize(InternalSubCollection);
-		}
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Override)
-		{
-			return CollectionGrammar.GetSize(InternalSubCollection);
-		}
+	case EPCGExGrammarSubCollectionMode::Inherit:
+		return &InternalSubCollection->SubCollectionGrammar;
+	case EPCGExGrammarSubCollectionMode::Override:
+		return &AssetGrammar;
+	default: // Flatten -- no module emitted for the subcollection itself; leaves contribute directly.
+		return nullptr;
 	}
-
-	return 0;
 }
 
-double FPCGExAssetCollectionEntry::GetGrammarSize(const UPCGExAssetCollection* Host, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+double FPCGExAssetCollectionEntry::GetGrammarSize(
+	const UPCGExAssetCollection* Host,
+	const EPCGExGrammarAxes Axis,
+	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
 {
-	if (!SizeCache)
+	// SizeCache is keyed by entry only -- valid because callers fix a single Axis per pass.
+	if (SizeCache)
 	{
-		return GetGrammarSize(Host);
+		if (const double* CachedSize = SizeCache->Find(this))
+		{
+			return *CachedSize;
+		}
 	}
-	if (double* CachedSize = SizeCache->Find(this))
-	{
-		return *CachedSize;
-	}
-	return SizeCache->Add(this, GetGrammarSize(Host));
+
+	const FPCGExAssetGrammarDetails* Resolved = GetEffectiveGrammar(Host);
+	const double Size = !Resolved
+		? 0.0
+		: (bIsSubCollection
+			? Resolved->GetSubCollectionSize(InternalSubCollection, Axis, SizeCache)
+			: Resolved->GetLeafSize(Staging.Bounds, Axis));
+
+	if (SizeCache) { SizeCache->Add(this, Size); }
+	return Size;
 }
 
-bool FPCGExAssetCollectionEntry::FixModuleInfos(const UPCGExAssetCollection* Host, FPCGSubdivisionSubmodule& OutModule, TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+bool FPCGExAssetCollectionEntry::FixModuleInfos(
+	const UPCGExAssetCollection* Host,
+	FPCGSubdivisionSubmodule& OutModule,
+	const EPCGExGrammarAxes Axis,
+	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
 {
-	if (!bIsSubCollection)
-	{
-		if (GrammarSource == EPCGExEntryVariationMode::Local)
-		{
-			AssetGrammar.Fix(Staging.Bounds, OutModule);
-		}
-		else
-		{
-			Host->GlobalAssetGrammar.Fix(Staging.Bounds, OutModule);
-		}
-	}
-
-	if (InternalSubCollection)
-	{
-		if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Inherit)
-		{
-			InternalSubCollection->CollectionGrammar.Fix(InternalSubCollection, OutModule);
-		}
-		else if (SubGrammarMode == EPCGExGrammarSubCollectionMode::Override)
-		{
-			CollectionGrammar.Fix(InternalSubCollection, OutModule);
-		}
-		else
-		{
-			return false;
-		}
-	}
-
-	return true;
+	const FPCGExAssetGrammarDetails* Resolved = GetEffectiveGrammar(Host);
+	if (!Resolved) { return false; }
+	return bIsSubCollection
+		? Resolved->FixSubCollection(InternalSubCollection, Axis, OutModule, SizeCache)
+		: Resolved->FixLeaf(Staging.Bounds, Axis, OutModule);
 }
 
 #if WITH_EDITOR
@@ -533,6 +519,11 @@ void FPCGExAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 	}
 }
 
+void FPCGExAssetCollectionEntry::PostUpdateStaging()
+{
+	// TODO : Update grammar values where relevant
+}
+
 void FPCGExAssetCollectionEntry::SetAssetPath(const FSoftObjectPath& InPath)
 {
 	Staging.Path = InPath;
@@ -553,6 +544,11 @@ void FPCGExAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath
 	{
 		OutPaths.Emplace(Staging.Path);
 	}
+}
+
+FSoftObjectPath FPCGExAssetCollectionEntry::EDITOR_GetThumbnailAssetPath() const
+{
+	return Staging.Path;
 }
 #endif
 
@@ -896,9 +892,79 @@ void UPCGExAssetCollection::PostEditImport()
 #endif
 }
 
+#if WITH_EDITOR
+namespace PCGExAssetCollectionMigration
+{
+	static constexpr int32 CurrentGrammarSchemaVersion = 1;
+
+	/** Migrate one entry's grammar data from v0 to v1. Returns true if a downgrade warning
+	 *  should be emitted for this entry (legacy Min/Max/Average on a leaf). */
+	static bool MigrateEntryGrammarV0ToV1(FPCGExAssetCollectionEntry* Entry)
+	{
+		if (!Entry) { return false; }
+
+		bool bWarn = false;
+		if (Entry->bIsSubCollection && Entry->SubGrammarMode == EPCGExGrammarSubCollectionMode::Override)
+		{
+			// Old Override stored its data in CollectionGrammar_DEPRECATED. Hoist it into AssetGrammar.
+			Entry->AssetGrammar.MigrateFromLegacyCollectionGrammar(Entry->CollectionGrammar_DEPRECATED);
+		}
+		else if (!Entry->bIsSubCollection)
+		{
+			// Leaf: migrate AssetGrammar's internal _DEPRECATED fields.
+			bWarn = Entry->AssetGrammar.MigrateFromV0Internal();
+		}
+		// Subcollection entries with Inherit/Flatten: nothing to migrate at the entry level --
+		// the source data lives on the subcollection's own SubCollectionGrammar (migrated by
+		// that collection's own PostLoad).
+		return bWarn;
+	}
+}
+#endif
+
 void UPCGExAssetCollection::PostLoad()
 {
 	Super::PostLoad();
+
+#if WITH_EDITOR
+	// Grammar schema migration. Runs once per collection; subsequent loads no-op.
+	if (GrammarSchemaVersion < PCGExAssetCollectionMigration::CurrentGrammarSchemaVersion)
+	{
+		int32 DowngradedEntries = 0;
+		int32 DisabledEntries = 0;
+
+		if (GlobalAssetGrammar.MigrateFromV0Internal()) { DowngradedEntries++; }
+
+		// SubCollectionGrammar is a new v1 field; its source data lives on the legacy CollectionGrammar slot.
+		SubCollectionGrammar.MigrateFromLegacyCollectionGrammar(CollectionGrammar_DEPRECATED);
+
+		ForEachEntry([&DowngradedEntries, &DisabledEntries](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
+		{
+			if (PCGExAssetCollectionMigration::MigrateEntryGrammarV0ToV1(Entry)) { DowngradedEntries++; }
+			if (Entry && !Entry->bIsSubCollection && Entry->AssetGrammar.Axes == static_cast<uint8>(EPCGExGrammarAxes::None))
+			{
+				DisabledEntries++;
+			}
+		});
+
+		if (DowngradedEntries > 0)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[PCGEx] Grammar migration: %d entr%s in '%s' had legacy Min/Max/Average size mode -- downgraded to X-bounds. Review and reconfigure axes if needed."),
+				DowngradedEntries, DowngradedEntries == 1 ? TEXT("y") : TEXT("ies"), *GetName());
+		}
+		if (DisabledEntries > 0)
+		{
+			UE_LOG(LogTemp, Log,
+				TEXT("[PCGEx] Grammar migration: %d entr%s in '%s' had empty Symbol -- grammar disabled (Axes=None)."),
+				DisabledEntries, DisabledEntries == 1 ? TEXT("y") : TEXT("ies"), *GetName());
+		}
+
+		GrammarSchemaVersion = PCGExAssetCollectionMigration::CurrentGrammarSchemaVersion;
+		
+		(void)MarkPackageDirty();
+	}
+#endif
 
 #if WITH_EDITOR
 	// Self-heal HeaderId collisions saved to disk before the dedup pass landed (or introduced
@@ -942,6 +1008,7 @@ void UPCGExAssetCollection::RebuildStagingData(bool bRecursive)
 	ForEachEntry([this, bRecursive](FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
 		InEntry->UpdateStaging(this, i, bRecursive);
+		InEntry->PostUpdateStaging();
 	});
 	InvalidateCache();
 }
@@ -1138,6 +1205,18 @@ void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(
 #if WITH_EDITOR
 void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
+	// Cheap recovery pass: the same FPCGExAssetGrammarDetails struct is reused across leaf and
+	// subcollection contexts, and the editor customization filters Size enum options per context.
+	// When the user flips bIsSubCollection (or SubGrammarMode to/from Override) the stored Size
+	// can leave the valid set -- snap it back to Fixed. Also enforce fixed contexts on the two
+	// collection-level grammar slots.
+	GlobalAssetGrammar.ValidateContext(/*bIsSubCollection=*/false);
+	SubCollectionGrammar.ValidateContext(/*bIsSubCollection=*/true);
+	ForEachEntry([](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
+	{
+		if (Entry) { Entry->AssetGrammar.ValidateContext(Entry->bIsSubCollection); }
+	});
+
 	bool bNeedsSync = false;
 	bool bNeedsUIRefresh = false;
 
@@ -1372,6 +1451,7 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 		Modify(true);
 		InEntry->EDITOR_Sanitize();
 		InEntry->UpdateStaging(this, i, false);
+		InEntry->PostUpdateStaging();
 		bRebuilt = true;
 	});
 
@@ -1415,6 +1495,7 @@ void UPCGExAssetCollection::EDITOR_SanitizeAndRebuildStagingData(bool bRecursive
 	{
 		InEntry->EDITOR_Sanitize();
 		InEntry->UpdateStaging(this, i, bRecursive);
+		InEntry->PostUpdateStaging();
 	});
 }
 
@@ -1422,10 +1503,128 @@ void UPCGExAssetCollection::EDITOR_AddBrowserSelectionTyped(const TArray<FAssetD
 {
 	FScopedTransaction Transaction(INVTEXT("Add Browser Selection to Collection"));
 	Modify(true);
-	EDITOR_AddBrowserSelectionInternal(InAssetData);
+
+	// Partition: assets that are themselves a collection of (a subclass of) this collection's
+	// own class become subcollection entries; everything else falls through to the type-specific
+	// EDITOR_AddBrowserSelectionInternal. Resolving GetAsset() loads the package -- fine here
+	// since this only runs from user-driven editor actions (drag-drop / browser selection).
+	UClass* OwnClass = GetClass();
+	TArray<FAssetData> RegularAssets;
+	TArray<UPCGExAssetCollection*> SubCollectionAssets;
+	RegularAssets.Reserve(InAssetData.Num());
+
+	for (const FAssetData& AssetData : InAssetData)
+	{
+		UClass* AssetClass = AssetData.GetClass();
+		if (!AssetClass || !AssetClass->IsChildOf(OwnClass))
+		{
+			RegularAssets.Add(AssetData);
+			continue;
+		}
+
+		if (UPCGExAssetCollection* Sub = Cast<UPCGExAssetCollection>(AssetData.GetAsset()))
+		{
+			SubCollectionAssets.Add(Sub);
+			continue;
+		}
+
+		RegularAssets.Add(AssetData);
+	}
+
+	if (!SubCollectionAssets.IsEmpty())
+	{
+		EDITOR_AddSubCollectionEntries(SubCollectionAssets);
+	}
+
+	if (!RegularAssets.IsEmpty())
+	{
+		EDITOR_AddBrowserSelectionInternal(RegularAssets);
+	}
+
 	SyncPropertyOverridesToEntries();
 	(void)MarkPackageDirty();
 	FCoreUObjectDelegates::BroadcastOnObjectModified(this);
+}
+
+void UPCGExAssetCollection::EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections)
+{
+	if (InSubCollections.IsEmpty())
+	{
+		return;
+	}
+
+	// Reflection on the entry struct. Every entry type in this plugin exposes a
+	// `bIsSubCollection` bool (defined on FPCGExAssetCollectionEntry) and a typed
+	// `SubCollection` UPROPERTY -- this helper relies on those names.
+	FArrayProperty* ArrayProp = CastField<FArrayProperty>(GetClass()->FindPropertyByName(FName("Entries")));
+	if (!ArrayProp)
+	{
+		return;
+	}
+
+	FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
+	if (!InnerProp || !InnerProp->Struct)
+	{
+		return;
+	}
+	UScriptStruct* EntryStruct = InnerProp->Struct;
+
+	FBoolProperty* IsSubProp = CastField<FBoolProperty>(EntryStruct->FindPropertyByName(FName("bIsSubCollection")));
+	FObjectProperty* SubCollProp = CastField<FObjectProperty>(EntryStruct->FindPropertyByName(FName("SubCollection")));
+	if (!IsSubProp || !SubCollProp || !SubCollProp->PropertyClass)
+	{
+		return;
+	}
+
+	void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(this);
+	FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+
+	// Build a set of subcollections already referenced by existing subcollection entries
+	// so drag-dropping the same asset twice doesn't create duplicates -- matches the
+	// dedupe behavior of MeshCollection / ActorCollection / PCGDataAssetCollection's
+	// EDITOR_AddBrowserSelectionInternal implementations.
+	TSet<const UPCGExAssetCollection*> AlreadyReferenced;
+	const int32 ExistingNum = ArrayHelper.Num();
+	const int32 IsSubOffset = IsSubProp->GetOffset_ForInternal();
+	const int32 SubCollOffset = SubCollProp->GetOffset_ForInternal();
+
+	for (int32 i = 0; i < ExistingNum; ++i)
+	{
+		const uint8* EntryPtr = ArrayHelper.GetRawPtr(i);
+		if (IsSubProp->GetPropertyValue(EntryPtr + IsSubOffset))
+		{
+			if (const UObject* Existing = SubCollProp->GetObjectPropertyValue(EntryPtr + SubCollOffset))
+			{
+				AlreadyReferenced.Add(Cast<UPCGExAssetCollection>(Existing));
+			}
+		}
+	}
+
+	for (UPCGExAssetCollection* Sub : InSubCollections)
+	{
+		if (!Sub || Sub == this)
+		{
+			continue;
+		}
+		if (!Sub->GetClass()->IsChildOf(SubCollProp->PropertyClass))
+		{
+			continue;
+		}
+		if (AlreadyReferenced.Contains(Sub))
+		{
+			continue;
+		}
+		if (HasCircularDependency(Sub))
+		{
+			continue;
+		}
+
+		const int32 NewIdx = ArrayHelper.AddValue();
+		uint8* EntryPtr = ArrayHelper.GetRawPtr(NewIdx);
+		IsSubProp->SetPropertyValue(EntryPtr + IsSubOffset, true);
+		SubCollProp->SetObjectPropertyValue(EntryPtr + SubCollOffset, Sub);
+		AlreadyReferenced.Add(Sub);
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData)

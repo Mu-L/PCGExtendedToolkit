@@ -393,8 +393,8 @@ namespace PCGExExtrudeTensors
 		virtual void OnPointsProcessingComplete() override;
 
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
-		virtual void OnRangeProcessingComplete() override;
 
+		void ProcessSelfIntersectionsAndCutoffs();
 		bool UpdateExtrusionQueue();
 
 		virtual void CompleteWork() override;

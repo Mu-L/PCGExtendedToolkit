@@ -29,8 +29,9 @@ namespace PCGExSampling
 UENUM()
 enum class EPCGExHatchBoxFitMode : uint8
 {
-	AxisAligned = 0 UMETA(DisplayName = "Axis Aligned (AABB)", ToolTip="Use the axis-aligned bounding box of the projected input."),
-	BestFit     = 1 UMETA(DisplayName = "Best Fit (OBB)", ToolTip="Use a PCA-derived oriented bounding box of the projected input."),
+	AxisAligned     = 0 UMETA(DisplayName = "Axis Aligned (AABB)", ToolTip="Use the axis-aligned bounding box of the projected input."),
+	BestFit         = 1 UMETA(DisplayName = "Best Fit (OBB)", ToolTip="Use a PCA-derived oriented bounding box of the projected input."),
+	BestFitAccurate = 2 UMETA(DisplayName = "Best Fit (OBB, Accurate)", ToolTip="Use a Min-box3-derived oriented bounding box of the projected input."),
 };
 
 UENUM()
@@ -87,10 +88,10 @@ public:
 
 	/** Bounding box used to size and orient the line bundle in projected space. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
-	EPCGExHatchBoxFitMode BoxFitMode = EPCGExHatchBoxFitMode::AxisAligned;
+	EPCGExHatchBoxFitMode BoxFitMode = EPCGExHatchBoxFitMode::BestFit;
 
 	/** Rotation (degrees) of the line direction around the projection plane normal. 0 = aligned with the box X axis; add 90 for the Y axis. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Lines", meta=(PCG_Overridable))
 	FPCGExInputShorthandNameDouble AngleOffset = FPCGExInputShorthandNameDouble(FName("HatchAngle"), 0.0, false);
 
 	/** How line spacing along the perpendicular axis is interpreted. */
@@ -99,11 +100,21 @@ public:
 
 	/** Spacing value for lines. Interpreted as count or world distance depending on Line Spacing Mode. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Lines", meta=(PCG_Overridable))
-	FPCGExInputShorthandNameDouble LineSpacing = FPCGExInputShorthandNameDouble(FName("HatchLineSpacing"), 8.0, false);
+	FPCGExInputShorthandNameDouble LineSpacing = FPCGExInputShorthandNameDouble(FName("HatchLineSpacing"), 100.0, false);
 
 	/** Where the first line is anchored across the box. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Lines", meta=(PCG_NotOverridable))
 	EPCGExHatchLineOrigin LineOrigin = EPCGExHatchLineOrigin::Center;
+
+	/** Slide the line origin along the cross axis, as a normalized fraction of the available space.
+	 *  Center: 1 = box edge along the cross axis (fraction of the half-extent), signed.
+	 *  Start: 1 = opposite side along the cross axis (fraction of the full extent), signed. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Lines", meta=(PCG_Overridable))
+	FPCGExInputShorthandNameDouble LineOriginSlide = FPCGExInputShorthandNameDouble(FName("HatchLineSlide"), 0.0, false);
+
+	/** If enabled, lines pushed outside the cross-axis extent by the slide wrap around to the opposite side, keeping the box fully tiled. If disabled, shifted-out lines simply produce no crossings (existing behavior). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Lines", meta=(PCG_NotOverridable))
+	bool bWrapSlide = true;
 
 	/** How sub-point spacing along each kept segment is interpreted. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Segments", meta=(PCG_NotOverridable))
@@ -111,7 +122,7 @@ public:
 
 	/** Spacing value along each kept segment. Interpreted as count or world distance depending on Segment Spacing Mode. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Segments", meta=(PCG_Overridable))
-	FPCGExInputShorthandNameDouble SegmentSpacing = FPCGExInputShorthandNameDouble(FName("@Data.HatchSpacing"), 100.0, false);
+	FPCGExInputShorthandNameDouble SegmentSpacing = FPCGExInputShorthandNameDouble(FName("@Data.Spacing"), 100.0, false);
 
 	/** When using Distance mode, evenly redistribute computed sub-points across the segment. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Segments", meta=(PCG_Overridable, EditCondition="SegmentSpacingMode == EPCGExHatchSpacingMode::Distance", EditConditionHides))
@@ -123,7 +134,7 @@ public:
 
 	/** Minimum world-space length to keep a segment. Shorter clipped segments are discarded. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Segments", meta=(PCG_Overridable, EditCondition="bFilterSmallSegments"))
-	FPCGExInputShorthandNameDouble MinSegmentLength = FPCGExInputShorthandNameDouble(FName("HatchMinSegmentLength"), 10, false);
+	FPCGExInputShorthandNameDouble MinSegmentLength = FPCGExInputShorthandNameDouble(FName("@Data.MinSegmentLength"), 10, false);
 
 	/** How the generated points are emitted: one data per input, or one data per kept segment. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_NotOverridable))
@@ -229,6 +240,7 @@ namespace PCGExPathHatch
 
 		double AngleOffsetDeg = 0.0;
 		double LineSpacingValue = 0.0;
+		double LineOriginSlideValue = 0.0;
 		double SegmentSpacingValue = 0.0;
 		double MinSegmentLengthValue = 0.0;
 

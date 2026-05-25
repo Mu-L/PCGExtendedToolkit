@@ -16,7 +16,7 @@ PCGEX_INITIALIZE_ELEMENT(TransformPoints)
 
 PCGExData::EIOInit UPCGExTransformPointsSettings::GetMainDataInitializationPolicy() const
 {
-	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(TransformPoints)

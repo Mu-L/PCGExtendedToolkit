@@ -4,6 +4,7 @@
 #include "Core/PCGExElement.h"
 
 #include "PCGExCoreSettingsCache.h"
+#include "RHITransientResourceAllocator.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExSettings.h"
 #include "Details/PCGExWaitMacros.h"
@@ -16,6 +17,8 @@
 
 bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::PrepareDataInternal)
+
 	check(Context);
 
 	FPCGExContext* InContext = static_cast<FPCGExContext*>(Context);
@@ -23,11 +26,34 @@ bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 	const UPCGExSettings* InSettings = Context->GetInputSettings<UPCGExSettings>();
 	check(InSettings);
 
+	if (IsInGameThread()
+		&& InSettings->GetForceOffThreadPrepare(InContext)
+		&& !InContext->bPreparationDispatchedOffThread
+		&& !CanExecuteOnlyOnMainThread(InContext))
+	{
+		InContext->bPreparationDispatchedOffThread = true;
+		InContext->PauseContext();
+
+		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetOrCreateHandle();
+		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
+		{
+			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);
+			if (FPCGExContext* Ctx = Pinned.Get())
+			{
+				(void)AdvancePreparation(Ctx, InSettings);
+			}
+		});
+
+		return false;
+	}
+
 	return AdvancePreparation(InContext, InSettings);
 }
 
 bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSettings* InSettings) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::AdvancePreparation)
+
 	if (!Context->GetInputSettings<UPCGSettings>()->bEnabled)
 	{
 		return Context->CancelExecution(FString());
@@ -44,9 +70,12 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 	// returning false to yield to the scheduler in the meantime.
 	if (Context->IsState(PCGExCommon::States::State_Preparation))
 	{
-		if (!Boot(Context))
 		{
-			return Context->CancelExecution(FString());
+			TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::InitializeData::Boot)
+			if (!Boot(Context))
+			{
+				return Context->CancelExecution(FString());
+			}
 		}
 
 		for (UPCGExInstancedFactory* Op : Context->InternalOperations)
@@ -74,9 +103,12 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 		PCGEX_EXECUTION_CHECK_C(Context)
 	}
 
-	if (!PostBoot(Context))
 	{
-		return Context->CancelExecution(TEXT("There was a problem during post-data preparation."));
+		TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::InitializeData::PostBoot)
+		if (!PostBoot(Context))
+		{
+			return Context->CancelExecution(TEXT("There was a problem during post-data preparation."));
+		}
 	}
 
 	Context->ReadyForExecution();
@@ -85,6 +117,8 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 
 FPCGContext* IPCGExElement::Initialize(const FPCGInitializeElementParams& InParams)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::Initialize)
+
 	FPCGExContext* Context = static_cast<FPCGExContext*>(IPCGElement::Initialize(InParams));
 
 	const UPCGExSettings* Settings = Context->GetInputSettings<UPCGExSettings>();
@@ -99,11 +133,7 @@ FPCGContext* IPCGExElement::Initialize(const FPCGInitializeElementParams& InPara
 	Context->bQuietCancellationError = Settings->bQuietCancellationError;
 	Context->bCleanupConsumableAttributes = Settings->bCleanupConsumableAttributes;
 
-	if (Settings->SupportsDataStealing()
-		&& Settings->StealData == EPCGExOptionState::Enabled)
-	{
-		Context->bWantsDataStealing = true;
-	}
+	Context->bWantsDataStealing = Settings->WantsDataStealing();
 
 	Context->ElementHandle = this;
 
@@ -187,6 +217,8 @@ bool IPCGExElement::SupportsBasePointDataInputs(FPCGContext* InContext) const
 
 bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::ExecuteInternal)
+
 	check(Context);
 
 	FPCGExContext* InContext = static_cast<FPCGExContext*>(Context);
@@ -201,67 +233,34 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 		InitializeData(InContext, InSettings);
 	}
 
-	// Execution policy controls whether we block the calling thread or return to the scheduler.
-	// On the game thread, or when the policy says don't block, we just drive one step and return.
-	// "NoPauseButLoop" only blocks when inside a PCG loop (avoids frame-delay per loop iteration).
-	const EPCGExExecutionPolicy DesiredPolicy = InSettings->GetExecutionPolicy();
-	const EPCGExExecutionPolicy LocalPolicy = DesiredPolicy == EPCGExExecutionPolicy::Default ? PCGEX_CORE_SETTINGS.ExecutionPolicy : DesiredPolicy;
-
 	if (IsInGameThread()
-		|| LocalPolicy == EPCGExExecutionPolicy::Ignored
-		|| LocalPolicy == EPCGExExecutionPolicy::Default
-		|| (LocalPolicy == EPCGExExecutionPolicy::NoPauseButLoop && InContext->LoopIndex != INDEX_NONE)
-		|| (LocalPolicy == EPCGExExecutionPolicy::NoPauseButTopLoop && InContext->IsExecutingInsideLoop()))
+		&& (InSettings->GetForceOffThreadExecute(InContext))
+		&& !InContext->bExecutionDispatchedOffThread
+		&& !CanExecuteOnlyOnMainThread(InContext))
 	{
-		return InContext->DriveAdvanceWork(InSettings);
+		InContext->bExecutionDispatchedOffThread = true;
+		InContext->PauseContext();
+
+		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetOrCreateHandle();
+		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
+		{
+			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);
+			if (FPCGExContext* Ctx = Pinned.Get())
+			{
+				(void)Ctx->DriveAdvanceWork(InSettings);
+			}
+		});
+
+		return false;
 	}
 
-	// Adaptive spin-wait: blocks the scheduler thread until all async work completes.
-	// Phases escalate from hot spinning (low latency) to sleeping (low CPU usage):
-	//   0-50:    Yield only (sub-microsecond wake, max throughput)
-	//   50-200:  Mostly yield, occasional 1us sleep (reduce power draw)
-	//   200-1k:  1us sleeps (work is taking a while)
-	//   1k+:     5us sleeps (long-running work, minimize CPU waste)
-	constexpr int SPIN_PHASE_ITERATIONS = 50;
-	constexpr int YIELD_PHASE_ITERATIONS = 200;
-	constexpr float SHORT_SLEEP_MS = 0.001f;
-	constexpr float LONG_SLEEP_MS = 0.005f;
-	constexpr int LONG_SLEEP_THRESHOLD = 1000;
-	int WaitCounter = 0;
-
-	while (!InContext->DriveAdvanceWork(InSettings))
-	{
-		if (WaitCounter < SPIN_PHASE_ITERATIONS)
-		{
-			FPlatformProcess::YieldThread();
-		}
-		else if (WaitCounter < YIELD_PHASE_ITERATIONS)
-		{
-			if ((WaitCounter & 0x7) == 0)
-			{
-				FPlatformProcess::SleepNoStats(SHORT_SLEEP_MS);
-			}
-			else
-			{
-				FPlatformProcess::YieldThread();
-			}
-		}
-		else if (WaitCounter < LONG_SLEEP_THRESHOLD)
-		{
-			FPlatformProcess::SleepNoStats(SHORT_SLEEP_MS);
-		}
-		else
-		{
-			FPlatformProcess::SleepNoStats(LONG_SLEEP_MS);
-		}
-		++WaitCounter;
-	}
-
-	return true;
+	return InContext->DriveAdvanceWork(InSettings);
 }
 
 void IPCGExElement::InitializeData(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IPCGExElement::InitializeData)
+
 	const FPCGStack* Stack = InContext->GetStack();
 	if (!ensure(Stack))
 	{

@@ -100,25 +100,25 @@ struct PCGEXCORE_API FPCGExRandomRatioDetails
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType SeedInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector LocalSeed_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	int32 SeedValue_DEPRECATED = 42;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	EPCGExInputValueType AmountInput_DEPRECATED = EPCGExInputValueType::Constant;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector LocalAmount_DEPRECATED;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double Amount_DEPRECATED = 0.5;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	int32 FixedAmount_DEPRECATED = 1;
 
 #pragma endregion

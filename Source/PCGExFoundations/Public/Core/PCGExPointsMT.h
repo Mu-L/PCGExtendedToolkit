@@ -11,6 +11,12 @@
 #define PCGEX_TYPED_PROCESSOR_REF PCGEX_TYPED_PROCESSOR_NREF(TypedProcessor)
 #define PCGEX_TYPED_PROCESSOR const TSharedPtr<FProcessor> TypedProcessor = StaticCastSharedPtr<FProcessor>(InProcessor);
 
+#define PCGEX_ZERO_PROCESSOR_ELEMENT(_NUM, _NAME) \
+const UPCGSettings* DiagSettings = ExecutionContext ? ExecutionContext->GetInputSettings<UPCGSettings>() : nullptr; \
+if (!ensureMsgf(_NUM > 0, \
+	TEXT(#_NAME " invoked with " #_NUM "=0 (Settings: %s). Completion chain will NOT fire -- guard empty inputs at the call site."), \
+	*GetNameSafe(DiagSettings ? DiagSettings->GetClass() : nullptr))){ return; }
+
 struct FPCGExContext;
 
 namespace PCGExMT
@@ -40,41 +46,25 @@ namespace PCGExData
 	class FFacadePreloader;
 }
 
+// Guard against firing a processor parallel loop with 0 elements. OnComplete
+// would not fire, which stalls whatever state machine the caller is driving.
+// Surfaces as an ensureMsgf so the offending node type is identified on clients.
+// Expects ExecutionContext to be in scope (i.e. used inside an IProcessor method).
+#define PCGEX_ENSURE_NONZERO_LOOP_RANGE(_NUM, _CALLER) \
+	do { \
+		const UPCGSettings* PCGEX_DiagSettings = ExecutionContext ? ExecutionContext->GetInputSettings<UPCGSettings>() : nullptr; \
+		const UClass* PCGEX_DiagClass = PCGEX_DiagSettings ? PCGEX_DiagSettings->GetClass() : nullptr; \
+		if (!ensureMsgf((_NUM) > 0, \
+			TEXT(#_CALLER " invoked with " #_NUM "=0 (Settings: %s). Completion chain will NOT fire — guard empty inputs at the call site."), \
+			*GetNameSafe(PCGEX_DiagClass))) \
+		{ return; } \
+	} while(0)
+
 namespace PCGExPointsMT
 {
 	PCGEX_CTX_STATE(MTState_PointsProcessing)
 	PCGEX_CTX_STATE(MTState_PointsCompletingWork)
 	PCGEX_CTX_STATE(MTState_PointsWriting)
-
-#define PCGEX_ASYNC_MT_LOOP_TPL(_ID, _INLINE_CONDITION, _BODY, _JIT)\
-	PCGEX_CHECK_WORK_HANDLE_VOID\
-	if (_INLINE_CONDITION)  { \
-		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, _ID) \
-		_ID->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE](const int32 Index, const PCGExMT::FScope& Scope) { PCGEX_ASYNC_THIS const TSharedRef<IProcessor>& Processor = This->Processors[Index]; _BODY }; \
-		_JIT\
-		_ID->StartIterations( Processors.Num(), 1, true);\
-	} else {\
-		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, _ID)\
-		_ID->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE](const int32 Index, const PCGExMT::FScope& Scope) { PCGEX_ASYNC_THIS \
-		const TSharedRef<IProcessor>& Processor = This->Processors[Index]; _BODY }; \
-		_JIT\
-		_ID->StartIterations(Processors.Num(), 1, false);\
-	}
-
-#define PCGEX_ASYNC_PROCESSOR_LOOP(_NAME, _NUM, _PREPARE, _PROCESS, _COMPLETE, _INLINE, _PLI) \
-	PCGEX_CHECK_WORK_HANDLE_VOID\
-	if (IsTrivial()){ TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopFor##_NAME##_Trivial) PCGExMT::FScope TrivialScope = PCGExMT::FScope(0, _NUM, 0); _PREPARE({TrivialScope}); _PROCESS(TrivialScope); _COMPLETE(); }else{\
-	TRACE_CPUPROFILER_EVENT_SCOPE(StartParallelLoopFor##_NAME)\
-	const int32 PLI = PCGEX_CORE_SETTINGS._PLI(PerLoopIterations); \
-	PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ParallelLoopFor##_NAME) \
-	ParallelLoopFor##_NAME->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]() { PCGEX_ASYNC_THIS This->_COMPLETE(); }; \
-	ParallelLoopFor##_NAME->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops) { PCGEX_ASYNC_THIS This->_PREPARE(Loops); }; \
-	ParallelLoopFor##_NAME->OnSubLoopStartCallback =[PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope) { PCGEX_ASYNC_THIS This->_PROCESS(Scope); }; \
-    ParallelLoopFor##_NAME->StartSubLoops(_NUM, PLI, _INLINE);}
-
-#define PCGEX_ASYNC_POINT_PROCESSOR_LOOP(_NAME, _NUM, _PREPARE, _PROCESS, _COMPLETE, _INLINE) PCGEX_ASYNC_PROCESSOR_LOOP(_NAME, _NUM, _PREPARE, _PROCESS, _COMPLETE, _INLINE, GetPointsBatchChunkSize)
-
-#define PCGEX_ASYNC_MT_LOOP_VALID_PROCESSORS(_ID, _INLINE_CONDITION, _BODY, _JIT) PCGEX_ASYNC_MT_LOOP_TPL(_ID, _INLINE_CONDITION, if(Processor->bIsProcessorValid){ _BODY }, _JIT)
 
 	class IBatch;
 

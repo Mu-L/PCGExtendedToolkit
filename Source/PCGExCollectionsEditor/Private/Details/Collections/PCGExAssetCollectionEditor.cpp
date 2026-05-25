@@ -217,7 +217,7 @@ void FPCGExAssetCollectionEditor::RegisterPropertyNameMapping(TMap<FName, FName>
 	Mapping.Add(FName("GrammarSource"), Grammar.Id);
 	Mapping.Add(FName("AssetGrammar"), Grammar.Id);
 	Mapping.Add(FName("SubGrammarMode"), Grammar.Id);
-	Mapping.Add(FName("CollectionGrammar"), Grammar.Id);
+	Mapping.Add(FName("SubCollectionGrammar"), Grammar.Id);
 
 	PCGEX_DECL_ASSET_FILTER(Properties, "AssetEditor.Properties", "Properties", "Show/hide Property Overrides")
 	Mapping.Add(FName("PropertyOverrides"), Properties.Id);

@@ -24,7 +24,7 @@ void UPCGExStagingLoadPropertiesSettings::InputPinPropertiesBeforeFilters(TArray
 
 PCGExData::EIOInit UPCGExStagingLoadPropertiesSettings::GetMainDataInitializationPolicy() const
 {
-	return StealData == EPCGExOptionState::Enabled ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(StagingLoadProperties)
@@ -337,11 +337,12 @@ namespace PCGExStagingLoadProperties
 
 			// Grammar fields share a single FixModuleInfos call. Failure leaves the entry's points
 			// at their per-attribute default values, which matches CollectionToModuleInfos's
-			// "skip on bad symbol" behaviour at the per-module-info level.
+			// "skip on bad symbol" behaviour at the per-module-info level. This node operates
+			// on the X axis only -- per-axis output is exclusive to PCGExGetCollectionData.
 			if (bAnyGrammarEnabled)
 			{
 				FPCGSubdivisionSubmodule ModuleInfos;
-				if (Entry->FixModuleInfos(Host, ModuleInfos))
+				if (Entry->FixModuleInfos(Host, ModuleInfos, EPCGExGrammarAxes::X))
 				{
 #define PCGEX_LOAD_PROP_FIELD_FILL_GRAMMAR(_NAME, _TYPE, _DEFAULT, _GETTER) \
 					if (_NAME##Writer) { _NAME##ByHash.Add(Hash, _GETTER); }
@@ -391,34 +392,39 @@ namespace PCGExStagingLoadProperties
 
 #define PCGEX_LOAD_PROP_FIELD_WRITE(_NAME, _TYPE, _DEFAULT, _GETTER) if (_NAME##Writer) { if (const _TYPE* Cached = _NAME##ByHash.Find(Hash)) { _NAME##Writer->SetValue(i, *Cached); } }
 
-		PCGEX_PARALLEL_FOR(
+		PCGExMT::ParallelOrSequential(
 			PointDataFacade->GetNum(),
-			if (!PointFilterCache[i]) { return; }
-
-			const uint64 Hash = EntryHashGetter->Read(i);
-
-			// For each property, lookup cached source and write
-			for (const auto& CachePair : PropertyCaches)
+			[&](const int32 i)
 			{
-			const FPropertyCache& Cache = CachePair.Value;
+				if (!PointFilterCache[i])
+				{
+					return;
+				}
 
-			if (const FPCGExProperty* const* SourcePtr = Cache.SourceByHash.Find(Hash))
-			{
-			Cache.WriterPtr->WriteOutputFrom(i, *SourcePtr);
-			}
-			}
+				const uint64 Hash = EntryHashGetter->Read(i);
 
-			if (EntryTagsWriter)
-			{
-			if (const FString* Joined = EntryTagsByHash.Find(Hash))
-			{
-			EntryTagsWriter->SetValue(i, *Joined);
-			}
-			}
+				// For each property, lookup cached source and write
+				for (const auto& CachePair : PropertyCaches)
+				{
+					const FPropertyCache& Cache = CachePair.Value;
 
-			PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
-			PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
-			)
+					if (const FPCGExProperty* const* SourcePtr = Cache.SourceByHash.Find(Hash))
+					{
+						Cache.WriterPtr->WriteOutputFrom(i, *SourcePtr);
+					}
+				}
+
+				if (EntryTagsWriter)
+				{
+					if (const FString* Joined = EntryTagsByHash.Find(Hash))
+					{
+						EntryTagsWriter->SetValue(i, *Joined);
+					}
+				}
+
+				PCGEX_FOREACH_ENTRY_DATA_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
+				PCGEX_FOREACH_GRAMMAR_FIELD(PCGEX_LOAD_PROP_FIELD_WRITE)
+			});
 
 #undef PCGEX_LOAD_PROP_FIELD_WRITE
 

@@ -84,13 +84,13 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	double MaxDistance_DEPRECATED = 1000;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bUseLocalMaxDistance_DEPRECATED = false;
 
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGAttributePropertyInputSelector LocalMaxDistance_DEPRECATED;
 
 #pragma endregion

@@ -210,6 +210,10 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 
 			TArray<FName> Names = {Settings->CollectionPathAttributeName};
 			Context->CollectionsLoader = MakeShared<PCGEx::TAssetLoader<UPCGExAssetCollection>>(Context, Context->MainPoints.ToSharedRef(), Names);
+			if (!Context->CollectionsLoader->Discover())
+			{
+				return Context->CancelExecution(TEXT("Failed to find any collections to load."));
+			}
 		}
 	}
 
@@ -228,7 +232,27 @@ void FPCGExPathSplineMeshContext::RegisterAssetDependencies()
 	FPCGExPathProcessorContext::RegisterAssetDependencies();
 
 	PCGEX_SETTINGS_LOCAL(PathSplineMesh)
-	if (!Settings->bUseStagedPoints && Settings->CollectionSource != EPCGExCollectionSource::Attribute)
+	if (Settings->bUseStagedPoints) { return; }
+
+	if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
+	{
+		// Per-point: blocking-load the discovered collections now (small set), so we can walk
+		// their entries and add the recursive inner asset paths to the context's dependency set.
+		// PCG's normal LoadAssets() phase then loads all inner mesh/material assets async before
+		// PostLoadAssetsDependencies fires.
+		if (!CollectionsLoader) { return; }
+		if (!CollectionsLoader->Load()) { return; }		
+		CollectionsLoader->Finalize();
+
+		TSet<FSoftObjectPath>& Required = GetRequiredAssets();
+		for (const TPair<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& Pair : CollectionsLoader->AssetsMap)
+		{
+			if (!Pair.Value || Pair.Value->GetTypeId() != PCGExAssetCollection::TypeIds::Mesh) { continue; }
+			Pair.Value->LoadCache();
+			Pair.Value->GetAssetPaths(Required, PCGExAssetCollection::ELoadingFlags::Recursive);
+		}
+	}
+	else
 	{
 		MainCollection->GetAssetPaths(GetRequiredAssets(), PCGExAssetCollection::ELoadingFlags::Recursive);
 	}
@@ -255,9 +279,14 @@ bool FPCGExPathSplineMeshElement::PostBoot(FPCGExContext* InContext) const
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathSplineMesh)
 
-	// No main collection
-	if (Settings->bUseStagedPoints || Settings->CollectionSource == EPCGExCollectionSource::Attribute)
+	if (Settings->bUseStagedPoints) { return true; }
+
+	if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 	{
+		if (Context->CollectionsLoader && Context->CollectionsLoader->IsEmpty())
+		{
+			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
+		}
 		return true;
 	}
 
@@ -315,72 +344,10 @@ bool FPCGExPathSplineMeshElement::AdvanceWork(FPCGExContext* InContext, const UP
 
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (Context->CollectionsLoader)
+		if (!StartBatches(InContext->GetOrCreateHandle()))
 		{
-			Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-
-			if (!Context->CollectionsLoader->Start(Context->GetTaskManager()))
-			{
-				return Context->CancelExecution(TEXT("Failed to find any collections to load."));
-			}
+			return true;
 		}
-		else
-		{
-			if (!StartBatches(InContext->GetOrCreateHandle()))
-			{
-				return true;
-			}
-		}
-	}
-
-	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
-	{
-		if (Context->CollectionsLoader && Context->CollectionsLoader->IsEmpty())
-		{
-			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
-		}
-
-		Context->AssetPaths = MakeShared<TSet<FSoftObjectPath>>();
-
-		// Make sure cache is built for all collections
-		for (const TPair<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& Pair : Context->CollectionsLoader->AssetsMap)
-		{
-			// Skip non-mesh collections
-			if (Pair.Value->GetTypeId() != PCGExAssetCollection::TypeIds::Mesh)
-			{
-				continue;
-			}
-
-			// Load/build cache and grab all assets
-			Pair.Value->LoadCache();
-			Pair.Value->GetAssetPaths(*Context->AssetPaths.Get(), PCGExAssetCollection::ELoadingFlags::Recursive);
-		}
-
-		Context->SetState(PCGExCommon::States::State_Preparation);
-
-		// Load all asset as we'll need to assign them
-
-		// TODO : We should really only load the assets we need, not the full content collection
-		PCGExHelpers::Load(
-			Context->GetTaskManager(),
-			[Paths = Context->AssetPaths]()
-			{
-				return Paths->Array();
-			},
-			[&, Ctx = Context->GetOrCreateHandle()](const bool bSuccess, TSharedPtr<FStreamableHandle> StreamableHandle)
-			{
-				PCGEX_SHARED_CONTEXT_VOID(Ctx)
-				if (bSuccess)
-				{
-					SharedContext.Get()->TrackAssetsHandle(StreamableHandle);
-					StartBatches(Ctx);
-				}
-				else
-				{
-					SharedContext.Get()->CancelExecution("Could not load any assets");
-				}
-			}
-			);
 	}
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)

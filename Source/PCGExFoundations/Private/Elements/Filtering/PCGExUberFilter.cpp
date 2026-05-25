@@ -83,7 +83,7 @@ PCGExData::EIOInit UPCGExUberFilterSettings::GetMainDataInitializationPolicy() c
 {
 	return
 		Mode == EPCGExUberFilterMode::Write
-		? StealData == EPCGExOptionState::Enabled
+		? WantsDataStealing()
 		? PCGExData::EIOInit::Forward
 		: PCGExData::EIOInit::Duplicate
 		: PCGExData::EIOInit::NoInit;

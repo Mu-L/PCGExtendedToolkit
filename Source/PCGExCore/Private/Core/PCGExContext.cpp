@@ -159,6 +159,12 @@ void FPCGExContext::UnpauseContext()
 	bIsPaused = false;
 }
 
+bool FPCGExContext::IsRuntimeGen() const
+{
+	const UPCGComponent* Comp = GetComponent();
+	return Comp && Comp->GenerationTrigger == EPCGComponentGenerationTrigger::GenerateAtRuntime;
+}
+
 FPCGExContext::FPCGExContext()
 {
 	WorkHandle = MakeShared<PCGEx::FWorkHandle>();
@@ -247,6 +253,8 @@ void FPCGExContext::Done()
 
 bool FPCGExContext::DriveAdvanceWork(const UPCGExSettings* InSettings)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExContext::DriveAdvanceWork)
+	
 	// This pattern short-circuits the PCG scheduler to avoid frame delays.
 	// OnAsyncWorkEnd calls this directly so work continues immediately when async completes,
 	// rather than waiting for PCG's next-frame scheduling. The compare_exchange ensures
@@ -266,6 +274,13 @@ bool FPCGExContext::DriveAdvanceWork(const UPCGExSettings* InSettings)
 	do
 	{
 		bPendingAsyncWorkEnd.store(false, std::memory_order_release);
+
+		if (!CanExecute())
+		{
+			bResult = true;
+			break;
+		}
+
 		bResult = ElementHandle->AdvanceWork(this, InSettings);
 	}
 	while (bPendingAsyncWorkEnd.load(std::memory_order_acquire));

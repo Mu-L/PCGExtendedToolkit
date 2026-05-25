@@ -59,6 +59,9 @@ protected:
 	const IPCGExElement* ElementHandle = nullptr;
 	int32 LoopIndex = INDEX_NONE;
 	int32 TopLoopIndex = INDEX_NONE;
+	
+	bool bPreparationDispatchedOffThread = false;
+	bool bExecutionDispatchedOffThread = false;	
 
 public:
 	TWeakPtr<PCGEx::FWorkHandle> GetWorkHandle()
@@ -78,11 +81,11 @@ public:
 		return TopLoopIndex != INDEX_NONE;
 	}
 
-	// TODO : bool toggle for hoarder execution 
+	bool IsRuntimeGen() const; 
 
 	bool bScopedAttributeGet = false;
 	bool bPropagateAbortedExecution = false;
-
+	
 	FPCGExContext();
 
 	virtual ~FPCGExContext() override;

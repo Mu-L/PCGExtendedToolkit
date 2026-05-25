@@ -103,7 +103,7 @@ public:
 #pragma region DEPRECATED
 
 	/**  */
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	bool bTestAttributeHash_DEPRECATED = false;
 
 #pragma endregion

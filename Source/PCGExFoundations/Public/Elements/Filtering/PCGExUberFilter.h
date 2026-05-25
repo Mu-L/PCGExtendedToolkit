@@ -95,7 +95,7 @@ public:
 #pragma region DEPRECATED
 
 	/** Name of the attribute to write result to */
-	UPROPERTY()
+	UPROPERTY(meta=(DeprecatedProperty))
 	FName ResultAttributeName_DEPRECATED = NAME_None;
 
 #pragma endregion
