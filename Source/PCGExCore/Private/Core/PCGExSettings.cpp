@@ -76,6 +76,16 @@ PCGExData::EIOInit UPCGExSettings::GetMainDataInitializationPolicy() const
 	return PCGExData::EIOInit::NoInit;
 }
 
+bool UPCGExSettings::GetForceOffThreadPrepare(const FPCGExContext* InContext) const
+{
+	return bForceOffThreadPrepare || (PCGEX_CORE_SETTINGS.bRuntimeAlwaysOffThread && InContext->IsRuntimeGen());
+}
+
+bool UPCGExSettings::GetForceOffThreadExecute(const FPCGExContext* InContext) const
+{
+	return bForceOffThreadExecute || (PCGEX_CORE_SETTINGS.bRuntimeAlwaysOffThread && InContext->IsRuntimeGen());
+}
+
 #if WITH_EDITOR
 void UPCGExSettings::EDITOR_OpenNodeDocumentation() const
 {

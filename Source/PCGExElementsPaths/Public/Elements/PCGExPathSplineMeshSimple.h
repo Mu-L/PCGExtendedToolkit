@@ -198,6 +198,8 @@ struct FPCGExPathSplineMeshSimpleContext final : FPCGExPathProcessorContext
 
 	FPCGExTangentsDetails Tangents;
 
+	virtual void RegisterAssetDependencies() override;
+
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
 };
@@ -216,6 +218,8 @@ protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(PathSplineMeshSimple)
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
+	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
+	virtual bool PostBoot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };
 

@@ -304,12 +304,12 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 #undef PCGEX_TPL
 
 	// Central factory for creating buffer proxies from a descriptor.
-	// Dispatch order: Shared pool lookup → Raw → Constant → Attribute (Direct or Buffered) → Property → Extra.
-	// ON_SCOPE_EXIT ensures any successfully created proxy is auto-registered into the shared pool
-	// (if the Shared flag is set), regardless of which creation path was taken.
+	// Dispatch order: Raw → Constant → Attribute (Direct or Buffered) → Property → Extra.
+	// When the Shared flag is set, creation routes through the pool's atomic GetOrCreate
+	// so the side-effectful InitForRole (e.g. PointData->AllocateProperties) runs at most
+	// once per descriptor -- preventing concurrent UObject mutation from parallel callers.
 	TSharedPtr<IBufferProxy> GetProxyBuffer(FPCGExContext* InContext, const FProxyDescriptor& InDescriptor)
 	{
-		TSharedPtr<IBufferProxy> OutProxy = nullptr;
 		const TSharedPtr<FFacade> InDataFacade = InDescriptor.DataFacade.Pin();
 		UPCGBasePointData* PointData = nullptr;
 
@@ -346,23 +346,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			}
 		}
 
-		if (InDescriptor.HasFlag(EProxyFlags::Shared))
+		auto Factory = [&]() -> TSharedPtr<IBufferProxy>
 		{
-			OutProxy = InContext->BufferProxyPool->TryGet(InDescriptor);
-			if (OutProxy)
-			{
-				return OutProxy;
-			}
-		}
-
-		{
-			ON_SCOPE_EXIT
-			{
-				if (OutProxy.IsValid() && InDescriptor.HasFlag(EProxyFlags::Shared))
-				{
-					InContext->BufferProxyPool->Add(InDescriptor, OutProxy);
-				}
-			};
+			TSharedPtr<IBufferProxy> OutProxy = nullptr;
 
 			// Handle raw proxy
 			if (InDescriptor.HasFlag(EProxyFlags::Raw))
@@ -464,7 +450,13 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			}
 
 			return OutProxy;
+		};
+
+		if (InDescriptor.HasFlag(EProxyFlags::Shared))
+		{
+			return InContext->BufferProxyPool->GetOrCreate(InDescriptor, Factory);
 		}
+		return Factory();
 	}
 
 #pragma endregion

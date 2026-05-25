@@ -228,14 +228,14 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 	/**
 	 * Leaf-context size. Caller provides the entry's own bounds.
 	 * Returns 0 when the axis isn't enabled, or when the axis sizing mode is Min/Max/Average
-	 * (only valid for subcollections — invalid combination, caller should have used FixSubCollection).
+	 * (only valid for subcollections -- invalid combination, caller should have used FixSubCollection).
 	 */
 	double GetLeafSize(const FBox& InBounds, EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X) const;
 
 	/**
 	 * Subcollection-context size. Aggregates child entries of SubCollection when Min/Max/Average,
 	 * returns FixedSize (with op applied) when Fixed. Bounds isn't meaningful for a subcollection
-	 * (no own bounds) and returns 0 — invalid combination, customization should prevent it.
+	 * (no own bounds) and returns 0 -- invalid combination, customization should prevent it.
 	 * SizeCache deduplicates per-entry queries across the recursion.
 	 */
 	double GetSubCollectionSize(

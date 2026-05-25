@@ -66,6 +66,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, EditCondition="bCachedSupportsDataStealing", EditConditionHides))
 	EPCGExOptionState StealData = EPCGExOptionState::Disabled;
 	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable))
+	bool bForceOffThreadPrepare = false;
+	
+	bool GetForceOffThreadPrepare(const FPCGExContext* InContext) const;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable))
+	bool bForceOffThreadExecute = false;
+	
+	bool GetForceOffThreadExecute(const FPCGExContext* InContext) const;
+	
 	virtual bool WantsDataStealing() const { return SupportsDataStealing() && StealData == EPCGExOptionState::Enabled; };
 	
 	/** Flatten the output of this node. Merges hierarchical data into a single flat collection. */

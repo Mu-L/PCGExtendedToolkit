@@ -94,7 +94,7 @@ double FPCGExAssetGrammarDetails::GetSubCollectionSize(
 
 	if (A.Size == EPCGExGrammarAxisSize::Bounds)
 	{
-		// Subcollections have no own bounds — invalid combination, customization should prevent.
+		// Subcollections have no own bounds -- invalid combination, customization should prevent.
 		return 0.0;
 	}
 
@@ -115,7 +115,7 @@ double FPCGExAssetGrammarDetails::GetSubCollectionSize(
 		if (!Result.IsValid()) { continue; }
 
 		const double ChildSize = Result.Entry->GetGrammarSize(Result.Host, Axis, SizeCache);
-		if (ChildSize <= 0.0) { continue; } // disabled-axis on this child — skip the sample
+		if (ChildSize <= 0.0) { continue; } // disabled-axis on this child -- skip the sample
 
 		switch (A.Size)
 		{

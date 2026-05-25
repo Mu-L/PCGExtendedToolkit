@@ -4,6 +4,7 @@
 #include "Core/PCGExElement.h"
 
 #include "PCGExCoreSettingsCache.h"
+#include "RHITransientResourceAllocator.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExSettings.h"
 #include "Details/PCGExWaitMacros.h"
@@ -24,6 +25,27 @@ bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 
 	const UPCGExSettings* InSettings = Context->GetInputSettings<UPCGExSettings>();
 	check(InSettings);
+
+	if (IsInGameThread()
+		&& InSettings->GetForceOffThreadPrepare(InContext)
+		&& !InContext->bPreparationDispatchedOffThread
+		&& !CanExecuteOnlyOnMainThread(InContext))
+	{
+		InContext->bPreparationDispatchedOffThread = true;
+		InContext->PauseContext();
+
+		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetOrCreateHandle();
+		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
+		{
+			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);
+			if (FPCGExContext* Ctx = Pinned.Get())
+			{
+				(void)AdvancePreparation(Ctx, InSettings);
+			}
+		});
+
+		return false;
+	}
 
 	return AdvancePreparation(InContext, InSettings);
 }
@@ -209,6 +231,27 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 	if (InContext->IsInitialExecution())
 	{
 		InitializeData(InContext, InSettings);
+	}
+
+	if (IsInGameThread()
+		&& (InSettings->GetForceOffThreadExecute(InContext))
+		&& !InContext->bExecutionDispatchedOffThread
+		&& !CanExecuteOnlyOnMainThread(InContext))
+	{
+		InContext->bExecutionDispatchedOffThread = true;
+		InContext->PauseContext();
+
+		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetOrCreateHandle();
+		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
+		{
+			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);
+			if (FPCGExContext* Ctx = Pinned.Get())
+			{
+				(void)Ctx->DriveAdvanceWork(InSettings);
+			}
+		});
+
+		return false;
 	}
 
 	return InContext->DriveAdvanceWork(InSettings);

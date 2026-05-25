@@ -159,6 +159,12 @@ void FPCGExContext::UnpauseContext()
 	bIsPaused = false;
 }
 
+bool FPCGExContext::IsRuntimeGen() const
+{
+	const UPCGComponent* Comp = GetComponent();
+	return Comp && Comp->GenerationTrigger == EPCGComponentGenerationTrigger::GenerateAtRuntime;
+}
+
 FPCGExContext::FPCGExContext()
 {
 	WorkHandle = MakeShared<PCGEx::FWorkHandle>();

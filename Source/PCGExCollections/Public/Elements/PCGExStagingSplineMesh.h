@@ -228,7 +228,6 @@ struct FPCGExPathSplineMeshContext final : FPCGExPathProcessorContext
 	TSharedPtr<PCGEx::TAssetLoader<UPCGExAssetCollection>> CollectionsLoader;
 
 	TObjectPtr<UPCGExMeshCollection> MainCollection;
-	TSharedPtr<TSet<FSoftObjectPath>> AssetPaths;
 
 	const UPCGExSelectorFactoryData* SelectorFactory = nullptr;
 

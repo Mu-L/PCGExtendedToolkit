@@ -248,6 +248,31 @@ namespace PCGExData
 	}
 
 	template <typename T>
+	void TAttributeBroadcaster<T>::FetchSlice(TArrayView<T> Dest, const PCGExMT::FScope& Scope)
+	{
+		check(ProcessingInfos.bIsValid)
+		check(Dest.Num() == Scope.Count)
+
+		if (!ProcessingInfos.bIsValid)
+		{
+			for (int32 i = 0; i < Scope.Count; ++i) { Dest[i] = T{}; }
+			return;
+		}
+
+		if (DataValue)
+		{
+			for (int32 i = 0; i < Scope.Count; ++i) { Dest[i] = TypedDataValue; }
+			return;
+		}
+
+		const bool bSuccess = InternalAccessor->GetRange<T>(Dest, Scope.Start, *Keys.Get(), EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible);
+		if (!bSuccess)
+		{
+			// TODO : Log error
+		}
+	}
+
+	template <typename T>
 	void TAttributeBroadcaster<T>::GrabAndDump(TArray<T>& Dump, const bool bCaptureMinMax, T& OutMin, T& OutMax)
 	{
 		const int32 NumPoints = Keys->GetNum();

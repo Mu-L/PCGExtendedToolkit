@@ -69,6 +69,13 @@ UPCGExPathSplineMeshSimpleSettings::UPCGExPathSplineMeshSimpleSettings(const FOb
 	}
 }
 
+void FPCGExPathSplineMeshSimpleContext::RegisterAssetDependencies()
+{
+	FPCGExPathProcessorContext::RegisterAssetDependencies();
+	if (StaticMeshLoader) { StaticMeshLoader->AddAssetDependencies(); }
+	if (MaterialLoader) { MaterialLoader->AddAssetDependencies(); }
+}
+
 bool FPCGExPathSplineMeshSimpleElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPathProcessorElement::Boot(InContext))
@@ -89,6 +96,10 @@ bool FPCGExPathSplineMeshSimpleElement::Boot(FPCGExContext* InContext) const
 
 		TArray<FName> Names = {Settings->AssetPathAttributeName};
 		Context->StaticMeshLoader = MakeShared<PCGEx::TAssetLoader<UStaticMesh>>(Context, Context->MainPoints.ToSharedRef(), Names);
+		if (!Context->StaticMeshLoader->Discover())
+		{
+			return Context->CancelExecution(TEXT("Failed to find any asset to load."));
+		}
 	}
 	else
 	{
@@ -105,8 +116,39 @@ bool FPCGExPathSplineMeshSimpleElement::Boot(FPCGExContext* InContext) const
 	{
 		TArray<FName> Names = {Settings->MaterialAttributeName};
 		Context->MaterialLoader = MakeShared<PCGEx::TAssetLoader<UMaterialInterface>>(Context, Context->MainPoints.ToSharedRef(), Names);
+		if (!Context->MaterialLoader->Discover())
+		{
+			return Context->CancelExecution(TEXT("Failed to find any material to load."));
+		}
 	}
 
+	return true;
+}
+
+void FPCGExPathSplineMeshSimpleElement::PostLoadAssetsDependencies(FPCGExContext* InContext) const
+{
+	FPCGExPathProcessorElement::PostLoadAssetsDependencies(InContext);
+
+	PCGEX_CONTEXT_AND_SETTINGS(PathSplineMeshSimple)
+	if (Context->StaticMeshLoader)
+	{
+		Context->StaticMeshLoader->Finalize();
+	}
+	if (Context->MaterialLoader)
+	{
+		Context->MaterialLoader->Finalize();
+	}
+}
+
+bool FPCGExPathSplineMeshSimpleElement::PostBoot(FPCGExContext* InContext) const
+{
+	if (!FPCGExPathProcessorElement::PostBoot(InContext)) { return false; }
+
+	PCGEX_CONTEXT_AND_SETTINGS(PathSplineMeshSimple)
+	if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
+	{
+		return InContext->CancelExecution(TEXT("Failed to load any assets."));
+	}
 	return true;
 }
 
@@ -118,53 +160,6 @@ bool FPCGExPathSplineMeshSimpleElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-
-		if (Context->StaticMesh)
-		{
-			if (Context->MaterialLoader)
-			{
-				if (!Context->MaterialLoader->Start(Context->GetTaskManager()))
-				{
-					return Context->CancelExecution(TEXT("Failed to find any material to load."));
-				}
-			}
-		}
-		else
-		{
-			if (!Context->StaticMeshLoader->Start(Context->GetTaskManager()))
-			{
-				return Context->CancelExecution(TEXT("Failed to find any asset to load."));
-			}
-
-			if (Context->MaterialLoader)
-			{
-				if (!Context->MaterialLoader->Start(Context->GetTaskManager()))
-				{
-					return Context->CancelExecution(TEXT("Failed to find any material to load."));
-				}
-			}
-		}
-
-		if (Context->IsWaitingForTasks())
-		{
-			return false;
-		}
-	}
-
-	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
-	{
-		if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
-		{
-			return Context->CancelExecution(TEXT("Failed to load any assets."));
-		}
-
-		Context->StaticMeshLoader->FinalizeTracking();
-		if (Context->MaterialLoader)
-		{
-			Context->MaterialLoader->FinalizeTracking();
-		}
-		
 		PCGEX_ON_INVALILD_INPUTS(FTEXT("Some inputs have less than 2 points and won't be processed."))
 
 		if (!Context->StartBatchProcessingPoints(

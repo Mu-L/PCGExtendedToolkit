@@ -51,6 +51,12 @@ TArray<FPCGPinProperties> UPCGExStagingFittingSettings::OutputPinProperties() co
 
 #pragma region FPCGExStagingFittingElement
 
+void FPCGExStagingFittingContext::RegisterAssetDependencies()
+{
+	FPCGExPointsProcessorContext::RegisterAssetDependencies();
+	if (StaticMeshLoader) { StaticMeshLoader->AddAssetDependencies(); }
+}
+
 bool FPCGExStagingFittingElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))
@@ -77,8 +83,35 @@ bool FPCGExStagingFittingElement::Boot(FPCGExContext* InContext) const
 
 		TArray<FName> Names = {Settings->AssetPathAttributeName};
 		Context->StaticMeshLoader = MakeShared<PCGEx::TAssetLoader<UStaticMesh>>(Context, Context->MainPoints, Names);
+		if (!Context->StaticMeshLoader->Discover())
+		{
+			return Context->CancelExecution(TEXT("Failed to find any assets to load."));
+		}
 	}
 
+	return true;
+}
+
+void FPCGExStagingFittingElement::PostLoadAssetsDependencies(FPCGExContext* InContext) const
+{
+	FPCGExPointsProcessorElement::PostLoadAssetsDependencies(InContext);
+
+	PCGEX_CONTEXT_AND_SETTINGS(StagingFitting)
+	if (Context->StaticMeshLoader)
+	{
+		Context->StaticMeshLoader->Finalize();
+	}
+}
+
+bool FPCGExStagingFittingElement::PostBoot(FPCGExContext* InContext) const
+{
+	if (!FPCGExPointsProcessorElement::PostBoot(InContext)) { return false; }
+
+	PCGEX_CONTEXT_AND_SETTINGS(StagingFitting)
+	if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
+	{
+		return InContext->CancelExecution(TEXT("Failed to load any meshes from points."));
+	}
 	return true;
 }
 
@@ -90,41 +123,6 @@ bool FPCGExStagingFittingElement::AdvanceWork(FPCGExContext* InContext, const UP
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (Context->StaticMeshLoader)
-		{
-			Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-
-			if (!Context->StaticMeshLoader->Start(Context->GetTaskManager()))
-			{
-				return Context->CancelExecution(TEXT("Failed to find any assets to load."));
-			}
-
-			return false;
-		}
-
-		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
-			{
-				return true;
-			},
-			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
-			{
-				NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
-			}))
-		{
-			return Context->CancelExecution(TEXT("Could not find any points to process."));
-		}
-	}
-
-	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
-	{
-		if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
-		{
-			return Context->CancelExecution(TEXT("Failed to load any meshes from points."));
-		}
-		
-		Context->StaticMeshLoader->FinalizeTracking();
-
 		if (!Context->StartBatchProcessingPoints(
 			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
 			{

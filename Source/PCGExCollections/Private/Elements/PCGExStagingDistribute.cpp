@@ -128,6 +128,13 @@ void FPCGExAssetStagingContext::RegisterAssetDependencies()
 	{
 		MainCollection->GetAssetPaths(GetRequiredAssets(), PCGExAssetCollection::ELoadingFlags::Recursive);
 	}
+	else if (Settings->CollectionSource == EPCGExCollectionSource::Attribute && CollectionsLoader)
+	{
+		// Per-point: register the unique collection paths discovered in Boot so PCG
+		// loads them before PostLoadAssetsDependencies. Inner assets are not needed
+		// for Distribute -- it just emits paths/refs.
+		CollectionsLoader->AddAssetDependencies();
+	}
 }
 
 #pragma endregion
@@ -207,12 +214,32 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	}
 	else if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
 	{
-		// Per-point mode: defer loading to AdvanceWork since each point may reference a different collection
+		// Per-point mode: discover synchronously now, the framework loads the collection
+		// assets between RegisterAssetDependencies and PostLoadAssetsDependencies.
 		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->CollectionPathAttributeName)
 
 		TArray<FName> Names = {Settings->CollectionPathAttributeName};
 		Context->CollectionsLoader = MakeShared<PCGEx::TAssetLoader<UPCGExAssetCollection>>(Context, Context->MainPoints.ToSharedRef(), Names);
+
+		if (!Context->CollectionsLoader->Discover())
+		{
+			return Context->CancelExecution(TEXT("Failed to find any collections to load."));
+		}
+
+		if (!Context->CollectionsLoader->Load())
+		{
+			return Context->CancelExecution(TEXT("Failed to load any collections."));
+		}
+
+		Context->CollectionsLoader->Finalize();
+
+		// Cache lookups on each loaded collection.
+		for (const TPair<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& Pair : Context->CollectionsLoader->AssetsMap)
+		{
+			Pair.Value->LoadCache();
+		}
 	}
+
 
 	if (Context->bPickMaterials && Context->MainCollection && !Context->MainCollection->IsType(PCGExAssetCollection::TypeIds::Mesh))
 	{
@@ -290,8 +317,14 @@ bool FPCGExAssetStagingElement::PostBoot(FPCGExContext* InContext) const
 {
 	PCGEX_CONTEXT_AND_SETTINGS(AssetStaging)
 
-	// Skip validation for Attribute mode - collections load per-point in AdvanceWork
-	if (Settings->CollectionSource != EPCGExCollectionSource::Attribute)
+	if (Settings->CollectionSource == EPCGExCollectionSource::Attribute)
+	{
+		if (Context->CollectionsLoader && Context->CollectionsLoader->IsEmpty())
+		{
+			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
+		}
+	}
+	else
 	{
 		check(Context->MainCollection)
 		if (Context->MainCollection->LoadCache()->IsEmpty())
@@ -314,48 +347,9 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 
 	PCGEX_CONTEXT_AND_SETTINGS(AssetStaging)
 	PCGEX_EXECUTION_CHECK
-
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (Context->CollectionsLoader)
-		{
-			Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-
-			if (!Context->CollectionsLoader->Start(Context->GetTaskManager()))
-			{
-				return Context->CancelExecution(TEXT("Failed to find any collections to load."));
-			}
-		}
-		else
-		{
-			if (!Context->StartBatchProcessingPoints(
-				[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
-				{
-					return true;
-				},
-				[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
-				{
-					NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
-				}))
-			{
-				return Context->CancelExecution(TEXT("Could not find any points to process."));
-			}
-		}
-	}
-
-	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
-	{
-		if (Context->CollectionsLoader && Context->CollectionsLoader->IsEmpty())
-		{
-			return Context->CancelExecution(TEXT("Failed to load any collection from points."));
-		}
-
-		Context->CollectionsLoader->FinalizeTracking();
-		
-		for (const TPair<PCGExValueHash, TObjectPtr<UPCGExAssetCollection>>& Pair : Context->CollectionsLoader->AssetsMap)
-		{
-			Pair.Value->LoadCache();
-		}
+		const bool bAttributeMode = (Settings->CollectionSource == EPCGExCollectionSource::Attribute);
 
 		if (!Context->StartBatchProcessingPoints(
 			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
@@ -364,7 +358,14 @@ bool FPCGExAssetStagingElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				NewBatch->bSkipCompletion = true;
+				if (bAttributeMode)
+				{
+					NewBatch->bSkipCompletion = true;
+				}
+				else
+				{
+					NewBatch->bRequiresWriteStep = Settings->bPruneEmptyPoints;
+				}
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
