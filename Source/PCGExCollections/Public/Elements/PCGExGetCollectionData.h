@@ -79,6 +79,23 @@ public:
 	}
 #endif
 
+	// Output pin set varies with bAnnotateSources -- without this, the framework caches the
+	// initial pin list and silently drops anything emitted on the Annotated Sources pin when
+	// it's toggled on at runtime.
+	virtual bool HasDynamicPins() const override
+	{
+		return SourceMode == EPCGExGetCollectionDataSourceMode::FromInputs && bAnnotateSources;
+	}
+
+	// With HasDynamicPins=true the framework would auto-match every output pin's type from inputs.
+	// We need to pin the Data + Map outputs to Param explicitly, and let only the Annotated Sources
+	// pin fall through to Super so it correctly mirrors whatever the Sources input shape is.
+#if PCGEX_ENGINE_VERSION < 507
+	virtual EPCGDataType GetCurrentPinTypes(const UPCGPin* InPin) const override;
+#else
+	virtual FPCGDataTypeIdentifier GetCurrentPinTypesID(const UPCGPin* InPin) const override;
+#endif
+
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
@@ -87,7 +104,7 @@ protected:
 
 public:
 	// Data settings are public (BlueprintReadWrite anyway) so that helper functions outside the
-	// element class -- e.g. PCGExGetCollectionData::ProcessUniqueOutput -- can read them without
+	// element class -- e.g. PCGExGetCollectionData::WriteFromEntries -- can read them without
 	// needing a friend declaration.
 
 
@@ -116,6 +133,13 @@ public:
 	/** Forward source input data tags to the corresponding output attribute set. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Source", meta=(PCG_Overridable, EditCondition="SourceMode == EPCGExGetCollectionDataSourceMode::FromInputs", EditConditionHides))
 	bool bForwardInputTags = false;
+
+	/** Forward each input from Sources to an additional 'Annotated Sources' output pin with identity
+	 *  attributes added -- whichever of RootCollectionIndex / CollectionIndex / CollectionHash are
+	 *  enabled below. Attribute names mirror the output-side names. Domain matches Fanout:
+	 *  PerInputData -> @Data (one value per input), PerEntry / Merged -> @Element (one value per row). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Source", meta=(PCG_NotOverridable, EditCondition="SourceMode == EPCGExGetCollectionDataSourceMode::FromInputs", EditConditionHides))
+	bool bAnnotateSources = false;
 
 
 	// Recursion / filtering
@@ -201,14 +225,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName="BoundsMax", EditCondition="bWriteBoundsMax"))
 	FName BoundsMaxAttributeName = FName("BoundsMax");
 
-	/** Write the asset nesting depth (0 = top-level). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_NotOverridable, InlineEditConditionToggle))
-	bool bWriteNestingDepth = false;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Asset", meta=(PCG_Overridable, DisplayName="Nesting Depth", EditCondition="bWriteNestingDepth"))
-	FName NestingDepthAttributeName = FName("NestingDepth");
-
-
+	
 	// Grammar outputs
 
 	/**
@@ -253,6 +270,49 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Grammar", meta=(PCG_Overridable, DisplayName="DebugColor", EditCondition="bWriteDebugColor"))
 	FName DebugColorAttributeName = FName("DebugColor");
+	
+	// Annotations
+	
+	/** Write the asset nesting depth (0 = top-level). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_NotOverridable, InlineEditConditionToggle))
+	bool bWriteNestingDepth = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_Overridable, DisplayName="Nesting Depth", EditCondition="bWriteNestingDepth"))
+	FName NestingDepthAttributeName = FName("NestingDepth");
+	
+	/** Write the index of the root collection (the one referenced from input / picked on the node) this row originated from. Counter increments per unique root in encounter order; sub-collection rows reached through recursion inherit their root's index. Shared across every output emitted by this node invocation. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_NotOverridable, InlineEditConditionToggle))
+	bool bWriteRootCollectionIndex = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_Overridable, DisplayName="Root Collection Index", EditCondition="bWriteRootCollectionIndex"))
+	FName RootCollectionIndexAttributeName = FName("RootCollectionIndex");
+
+	/** Write the index of the immediate host collection this row originated from. Counter increments per unique collection in discovery order -- roots AND sub-collections reached through recursion each get their own index. Shared across every output emitted by this node invocation. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_NotOverridable, InlineEditConditionToggle))
+	bool bWriteCollectionIndex = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_Overridable, DisplayName="Collection Index", EditCondition="bWriteCollectionIndex"))
+	FName CollectionIndexAttributeName = FName("CollectionIndex");
+	
+	/** Write a dense per-tuple hash combining RootCollectionIndex + CollectionIndex + NestingDepth. Each unique (Root, Collection, Depth) triplet is assigned a fresh sequential index (0, 1, 2, ...) the first time it's encountered. All rows sharing the same identity context get the same hash -- useful as a single short token for downstream substitution. Shared across every output emitted by this node invocation. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_NotOverridable, InlineEditConditionToggle))
+	bool bWriteCollectionHash = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_Overridable, DisplayName="Collection Hash", EditCondition="bWriteCollectionHash"))
+	FName CollectionHashAttributeName = FName("CollectionHash");
+
+	/** Properties read from each source's resolved collection schema (CollectionProperties), written
+	 *  as attributes on the annotated source. Schema-level values only -- per-entry overrides are
+	 *  NOT consulted (this path looks at the collection itself, not its entries).
+	 *
+	 *  Domain matches Fanout: PerInputData -> @Data (one value per input, taken from the input's
+	 *  resolved collection). PerEntry / Merged -> @Element (per row, with each row reading from
+	 *  its own resolved collection's schema). Rows whose slot resolved to a null collection get
+	 *  the attribute's declared default (= first-available schema default across the per-input
+	 *  collection set, established at writer init). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations",
+	          meta=(PCG_NotOverridable, DisplayName="Source Schema Properties"))
+	FPCGExPropertyOutputSettings SchemaPropertyAnnotations;
 
 
 	// Always-on outputs

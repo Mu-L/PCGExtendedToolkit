@@ -159,11 +159,11 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 	EnabledHandlePtr = PropertyHandle->GetChildHandle(TEXT("bEnabled"));
 	WeakPropertyUtilities = CustomizationUtils.GetPropertyUtilities();
 
-	// Capture the owning component + this entry's position in the Overrides array. The reset
-	// handler walks the BP class chain DYNAMICALLY per paint to resolve the effective parent
-	// value (CDO state can change while the detail panel is open). The ASSET-default tail
-	// of that chain is stable for the customization lifetime, so it's cached here once.
+	// The reset handler walks the BP class chain DYNAMICALLY per paint (CDO state can change while
+	// the detail panel is open). The asset-default tail of that chain is stable for the customization
+	// lifetime and is cached here once.
 	WeakLiveComponent.Reset();
+	WeakOwner.Reset();
 	CachedOverrideIndex = PropertyHandle->GetIndexInArray();
 	CachedAssetDefaultValue.Reset();
 
@@ -171,6 +171,16 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 	PropertyHandle->GetOuterObjects(OuterObjects);
 	for (UObject* Outer : OuterObjects)
 	{
+		if (!Outer || Outer->IsTemplate())
+		{
+			continue;
+		}
+
+		if (!WeakOwner.IsValid())
+		{
+			WeakOwner = Outer;
+		}
+
 		if (UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(Outer))
 		{
 			// Only BP-inherited instances get the chain-walk reset arrow; Instance-creation
@@ -179,12 +189,8 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeHeader(
 			{
 				WeakLiveComponent = Comp;
 
-				// Resolve the asset default once for the lifetime of this customization. The
-				// imports tree is stable for the detail session (an asset edit triggers a
-				// customization rebuild via OnSchemaAssetChanged), so caching here saves a
-				// full Resolve walk on every IsVisible Slate paint. An invalid CachedAssetDefaultValue
-				// after this means "no asset default exists for this entry" -- distinct from
-				// "not yet resolved," and load-bearing for TryGetResetSource.
+				// Invalid result after this means "no asset default for this entry" -- distinct
+				// from "not yet resolved" and load-bearing for TryGetResetSource.
 				bool _IgnoredEnabled = false;
 				PCGExPropertyOverrideEntryCustomization::TryResolveAssetDefault(
 					*Comp, CachedOverrideIndex, _IgnoredEnabled, CachedAssetDefaultValue);
@@ -530,17 +536,22 @@ void FPCGExPropertyOverrideEntryCustomization::CustomizeChildren(
 
 		IDetailPropertyRow* InnerRow = FPCGExInlineWidgetRegistry::AddCompactValueRow(
 			ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, NameContent, IsEnabledAttr);
-		if (InnerRow && WeakLiveComponent.IsValid())
+		if (InnerRow)
 		{
-			InnerRow->OverrideResetToDefault(MakeArchetypeResetOverride());
-
-			// Override Value edits need an explicit Modify() to dirty the actor; the
-			// external-structure row doesn't route through the owning UObject on its own.
-			PCGExEditorCustomizationUtils::HookModifyOnHandleChanged(InnerRow->GetPropertyHandle(), WeakLiveComponent);
+			// Reset-to-default arrow walks the BP class chain -- meaningful only for component owners.
+			if (WeakLiveComponent.IsValid())
+			{
+				InnerRow->OverrideResetToDefault(MakeArchetypeResetOverride());
+			}
+			if (WeakOwner.IsValid())
+			{
+				PCGExEditorCustomizationUtils::HookOwnerChangeOnHandleChanged(InnerRow->GetPropertyHandle(), WeakOwner);
+			}
 		}
 	}
 	else
 	{
-		FPCGExInlineWidgetRegistry::AddComplexValueRows(ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, IsEnabledAttr);
+		FPCGExInlineWidgetRegistry::AddComplexValueRows(
+			ChildBuilder, InnerScope.ToSharedRef(), InnerStruct, IsEnabledAttr, WeakOwner);
 	}
 }

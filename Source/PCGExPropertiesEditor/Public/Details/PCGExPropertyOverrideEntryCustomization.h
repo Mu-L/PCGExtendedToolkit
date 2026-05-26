@@ -60,6 +60,11 @@ private:
 	// the entry isn't owned by a UPCGExPropertyCollectionComponent or is Instance-created (no
 	// BP chain to walk); UE's default reset behavior applies in those cases.
 	TWeakObjectPtr<UPCGExPropertyCollectionComponent> WeakLiveComponent;
+
+	// First non-template outer captured at CustomizeHeader. Covers component AND asset-collection
+	// owners; drives the inline row's owner-change hook so external-struct edits dirty + signal PCG.
+	TWeakObjectPtr<UObject> WeakOwner;
+
 	int32 CachedOverrideIndex = INDEX_NONE;
 
 	// Asset-default resolved once at CustomizeHeader (imports tree is stable for the detail

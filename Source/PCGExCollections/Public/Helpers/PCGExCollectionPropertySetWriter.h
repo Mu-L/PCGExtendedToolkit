@@ -12,6 +12,7 @@ struct FPCGExAssetCollectionEntry;
 struct FPCGExContext;
 class FPCGMetadataAttributeBase;
 class UPCGMetadata;
+class UPCGData;
 
 namespace PCGExCollections
 {
@@ -32,6 +33,47 @@ namespace PCGExCollections
 		const FPCGExAssetCollectionEntry* Entry,
 		const UPCGExAssetCollection* Host,
 		FName PropertyName);
+
+	/**
+	 * @Data-domain counterpart to FPCGExCollectionPropertySetWriter: writes each configured
+	 * schema property as a single @Data value on InData, sourced from Host->CollectionProperties.
+	 * Entry overrides are NOT consulted (schema only) -- this is the annotation path, not the
+	 * per-entry write.
+	 *
+	 * Null Host -> per-property writes are skipped (no attribute is declared). Use the identity
+	 * attributes (RootCollectionIndex etc.) to detect null-resolved inputs downstream.
+	 *
+	 * Standalone helper rather than a method on FPCGExCollectionPropertySetWriter so callers can
+	 * use it without first calling Initialize -- @Data writes don't share machinery with the
+	 * per-row @Element write loop and don't need the prototype-cached Writers list.
+	 */
+	PCGEXCOLLECTIONS_API void WriteSchemaToDataDomain(
+		FPCGExContext* InContext,
+		const FPCGExPropertyOutputSettings& OutputSettings,
+		const UPCGExAssetCollection* Host,
+		UPCGData* InData);
+
+	/**
+	 * @Element-domain sibling: writes each configured schema property as a per-row attribute on
+	 * InData, where row r reads from PerRowHosts[r]->CollectionProperties.
+	 *
+	 * Heterogeneous-host friendly: rows can reference different collections; the prototype (and
+	 * thus the attribute type + null-host default value) is taken from the first collection in
+	 * PerRowHosts that declares the property. Rows whose host doesn't declare the property fall
+	 * back to that same prototype default.
+	 *
+	 * All-null PerRowHosts -> skips the property entirely (no prototype available, no schema to
+	 * read). Empty PerRowHosts -> no-op.
+	 *
+	 * Uses the same accessor-keys pattern as the identity-attr writes in AnnotateSources, so it
+	 * works uniformly for point data (keys = point indices) and attribute-set data (keys = entry
+	 * indices).
+	 */
+	PCGEXCOLLECTIONS_API void WriteSchemaToElementDomain(
+		FPCGExContext* InContext,
+		const FPCGExPropertyOutputSettings& OutputSettings,
+		UPCGData* InData,
+		TConstArrayView<const UPCGExAssetCollection*> PerRowHosts);
 
 	/**
 	 * Writes FPCGExPropertyOutputSettings-driven custom properties to an attribute set

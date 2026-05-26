@@ -16,7 +16,6 @@
 
 #if WITH_EDITOR
 #include "Editor.h"
-#include "PropertyEditorModule.h"
 #include "ScopedTransaction.h"
 #include "TimerManager.h"
 #include "AssetRegistry/AssetData.h"
@@ -1232,46 +1231,78 @@ bool UPCGExAssetCollection::SyncPropertySchemaAndRemapEntries()
 #if WITH_EDITOR
 void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	// Cheap recovery pass: the same FPCGExAssetGrammarDetails struct is reused across leaf and
-	// subcollection contexts, and the editor customization filters Size enum options per context.
-	// When the user flips bIsSubCollection (or SubGrammarMode to/from Override) the stored Size
-	// can leave the valid set -- snap it back to Fixed. Also enforce fixed contexts on the two
-	// collection-level grammar slots.
-	GlobalAssetGrammar.ValidateContext(/*bIsSubCollection=*/false);
-	SubCollectionGrammar.ValidateContext(/*bIsSubCollection=*/true);
-	ForEachEntry([](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
+	// Skip Interactive ticks: the sync + staging-rebuild chain below tears down the dragged
+	// widget (breaking undo) and floods PCG with per-tick re-cooks. Super still propagates
+	// the Interactive event for live preview.
+	const EPropertyChangeType::Type ChangeType = PropertyChangedEvent.ChangeType;
+	if (ChangeType == EPropertyChangeType::Interactive)
 	{
-		if (Entry) { Entry->AssetGrammar.ValidateContext(Entry->bIsSubCollection); }
-	});
+		Super::PostEditChangeProperty(PropertyChangedEvent);
+		return;
+	}
 
-	bool bNeedsSync = false;
-	bool bNeedsUIRefresh = false;
+	// Default-to-structural is the safe bias; only a positive "leaf is an FPCGExProperty value
+	// field" identification opts out, and array shape changes always force structural anyway.
+	bool bIsValueOnlyLeafEdit = false;
+	bool bIsStructuralSchemaChange = false;
 
 	if (PropertyChangedEvent.MemberProperty)
 	{
-		FName PropName = PropertyChangedEvent.MemberProperty->GetFName();
-		EPropertyChangeType::Type ChangeType = PropertyChangedEvent.ChangeType;
-
-		// Check for ANY changes in CollectionProperties
+		const FName PropName = PropertyChangedEvent.MemberProperty->GetFName();
 		if (PropName == GET_MEMBER_NAME_CHECKED(UPCGExAssetCollection, CollectionProperties))
 		{
-			bNeedsSync = true;
-			bNeedsUIRefresh = true;
+			const bool bArrayShapeChange =
+				ChangeType == EPropertyChangeType::ArrayAdd ||
+				ChangeType == EPropertyChangeType::ArrayRemove ||
+				ChangeType == EPropertyChangeType::ArrayClear ||
+				ChangeType == EPropertyChangeType::ArrayMove ||
+				ChangeType == EPropertyChangeType::Duplicate;
+
+			// IsChildOf, not equality: plugin-registered FPCGExProperty subtypes must classify
+			// the same way as built-in ones.
+			const FProperty* LeafProperty = PropertyChangedEvent.Property;
+			const UScriptStruct* LeafOwner = LeafProperty ? Cast<UScriptStruct>(LeafProperty->GetOwnerStruct()) : nullptr;
+			const bool bLeafIsFPCGExPropertyValue = LeafOwner && LeafOwner->IsChildOf(FPCGExProperty::StaticStruct());
+
+			bIsValueOnlyLeafEdit = !bArrayShapeChange && bLeafIsFPCGExPropertyValue;
+			bIsStructuralSchemaChange = !bIsValueOnlyLeafEdit;
 		}
-		// Also catch changes to schema array elements (add/remove/reorder/rename/type change)
-		else if (PropertyChangedEvent.MemberProperty->GetOwnerStruct() == FPCGExPropertySchema::StaticStruct() ||
-			PropertyChangedEvent.MemberProperty->GetOwnerStruct() == FPCGExPropertySchemaCollection::StaticStruct())
+		// Programmatic / reflection edits that bypass the outer CollectionProperties UPROPERTY.
+		else if (const UStruct* OwnerStruct = PropertyChangedEvent.MemberProperty->GetOwnerStruct();
+			OwnerStruct == FPCGExPropertySchema::StaticStruct() || OwnerStruct == FPCGExPropertySchemaCollection::StaticStruct())
 		{
-			bNeedsSync = true;
-			bNeedsUIRefresh = true;
+			bIsStructuralSchemaChange = true;
 		}
 	}
 
-	// Early return if no property-related changes needed
-	if (!bNeedsSync && !bNeedsUIRefresh)
+	// Heavy O(N) work -- grammar context recovery, structural rebuild, circular-dep walk -- is
+	// guarded on !bIsValueOnlyLeafEdit so a 1000-entry collection doesn't pay it for a single
+	// property tweak. Cache invalidation + optional staging rebuild always run so downstream
+	// consumers see fresh data regardless of which path we took.
+	if (!bIsValueOnlyLeafEdit)
 	{
-		Super::PostEditChangeProperty(PropertyChangedEvent);
+		// Grammar context recovery: FPCGExAssetGrammarDetails is shared across leaf/subcollection
+		// contexts; flipping bIsSubCollection can leave Size in the now-invalid enum subset -- snap back.
+		GlobalAssetGrammar.ValidateContext(/*bIsSubCollection=*/false);
+		SubCollectionGrammar.ValidateContext(/*bIsSubCollection=*/true);
+		ForEachEntry([](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
+		{
+			if (Entry) { Entry->AssetGrammar.ValidateContext(Entry->bIsSubCollection); }
+		});
+	}
 
+	if (bIsStructuralSchemaChange)
+	{
+		RebuildPropertyRegistry();
+		SyncPropertyOverridesToEntries();
+	}
+
+	(void)MarkPackageDirty();
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	if (!bIsValueOnlyLeafEdit)
+	{
+		// Sub-collection refs can only change on structural edits -- value-only edits can't create cycles.
 		ForEachEntry([this](FPCGExAssetCollectionEntry* InEntry, int32 i)
 		{
 			const UPCGExAssetCollection* Other = InEntry->GetSubCollectionPtr();
@@ -1279,51 +1310,9 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 			{
 				UE_LOG(LogTemp, Error, TEXT("Prevented circular dependency trying to nest \"%s\" inside \"%s\""), *GetNameSafe(Other), *GetNameSafe(this));
 				InEntry->ClearSubCollection();
-				(void)MarkPackageDirty();
 			}
 		});
-
-		EDITOR_SetDirty();
-
-		if (bAutoRebuildStaging)
-		{
-			EDITOR_RebuildStagingData();
-		}
-
-		return;
 	}
-
-	// Sync and rebuild if needed
-	if (bNeedsSync)
-	{
-		RebuildPropertyRegistry();
-		SyncPropertyOverridesToEntries();
-	}
-
-	(void)MarkPackageDirty();
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-#if WITH_EDITOR
-	// Force all details panels showing this object to rebuild
-	// This ensures nested PropertyOverrides customizations detect the schema changes
-	if (bNeedsSync)
-	{
-		FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
-		PropertyEditorModule.NotifyCustomizationModuleChanged();
-	}
-#endif
-
-	ForEachEntry([this](FPCGExAssetCollectionEntry* InEntry, int32 i)
-	{
-		const UPCGExAssetCollection* Other = InEntry->GetSubCollectionPtr();
-		if (Other && HasCircularDependency(Other))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Prevented circular dependency trying to nest \"%s\" inside \"%s\""), *GetNameSafe(Other), *GetNameSafe(this));
-			InEntry->ClearSubCollection();
-			(void)MarkPackageDirty();
-		}
-	});
 
 	EDITOR_SetDirty();
 

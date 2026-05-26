@@ -140,11 +140,8 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		FTabManager::NewPrimaryArea()
 		->SetOrientation(Orient_Horizontal);
 
-	// Bumped to _v7: Assets tab now defaults to left sidebar (vertical tab button)
-	// instead of being fully closed. Users who had a saved v6 layout will get the
-	// new default on first open; subsequent drag-to-reconfigure is preserved.
 	const TSharedRef<FTabManager::FLayout> Layout =
-		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v7")
+		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v8")
 		->AddArea(Area);
 
 	TSharedRef<FTabManager::FStack> MainStack = FTabManager::NewStack();
@@ -318,12 +315,13 @@ void FPCGExAssetCollectionEditor::CreateTabs(TArray<PCGExAssetCollectionEditor::
 
 	// Set the asset to display
 	DetailsView->SetObject(EditedCollection.Get());
-
+	
+	CreateEntriesTab(OutTabs);
+	CreateGridTab(OutTabs);
+	
 	PCGExAssetCollectionEditor::TabInfos& Infos = OutTabs.Emplace_GetRef(FName("Collection"), DetailsView, FName("Collection Settings"));
 	Infos.Icon = TEXT("Settings");
 
-	CreateEntriesTab(OutTabs);
-	CreateGridTab(OutTabs);
 }
 
 void FPCGExAssetCollectionEditor::CreateEntriesTab(TArray<PCGExAssetCollectionEditor::TabInfos>& OutTabs)

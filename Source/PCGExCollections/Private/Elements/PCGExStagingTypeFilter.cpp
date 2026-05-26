@@ -72,6 +72,17 @@ TArray<FPCGPinProperties> UPCGExStagedTypeFilterSettings::OutputPinProperties() 
 			PCGEX_PIN_POINTS(Label, "Points matching this collection type.", Normal)
 		}
 	}
+	else if (FilterMode == EPCGExStagedTypeFilterMode::EntryShape)
+	{
+		// Discarded pin first (index 0)
+		if (bOutputDiscarded)
+		{
+			PCGEX_PIN_POINTS(PCGExStagedTypeFilter::OutputFilteredOut, "Points whose entry could not be resolved (or invalid collections when discard is enabled).", Normal)
+		}
+
+		PCGEX_PIN_POINTS(PCGExStagedTypeFilter::OutputLeaf, "Points whose entry is a direct asset (not a subcollection).", Normal)
+		PCGEX_PIN_POINTS(PCGExStagedTypeFilter::OutputCollection, "Points whose entry is a subcollection.", Normal)
+	}
 	else
 	{
 		// Include/Exclude modes - default output from Super + optional Discarded
@@ -88,7 +99,7 @@ TArray<FPCGPinProperties> UPCGExStagedTypeFilterSettings::OutputPinProperties() 
 
 FName UPCGExStagedTypeFilterSettings::GetMainOutputPin() const
 {
-	if (FilterMode == EPCGExStagedTypeFilterMode::PinPerType)
+	if (IsBucketMode())
 	{
 		return PCGExStagedTypeFilter::OutputFilteredOut;
 	}
@@ -178,6 +189,22 @@ bool FPCGExStagedTypeFilterElement::Boot(FPCGExContext* InContext) const
 			Context->UnmatchedOutput->OutputPin = PCGExStagedTypeFilter::OutputFilteredOut;
 		}
 	}
+	else if (Settings->FilterMode == EPCGExStagedTypeFilterMode::EntryShape)
+	{
+		// Two fixed buckets: 0 = Leaf, 1 = Collection
+		Context->TypeOutputs.SetNum(2);
+		Context->TypeOutputs[0] = MakeShared<PCGExData::FPointIOCollection>(Context);
+		Context->TypeOutputs[0]->OutputPin = PCGExStagedTypeFilter::OutputLeaf;
+		Context->TypeOutputs[1] = MakeShared<PCGExData::FPointIOCollection>(Context);
+		Context->TypeOutputs[1]->OutputPin = PCGExStagedTypeFilter::OutputCollection;
+
+		// Create unmatched output
+		if (Settings->bOutputDiscarded)
+		{
+			Context->UnmatchedOutput = MakeShared<PCGExData::FPointIOCollection>(Context);
+			Context->UnmatchedOutput->OutputPin = PCGExStagedTypeFilter::OutputFilteredOut;
+		}
+	}
 	else
 	{
 		// Include/Exclude mode
@@ -198,13 +225,13 @@ bool FPCGExStagedTypeFilterElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_CONTEXT_AND_SETTINGS(StagedTypeFilter)
 	PCGEX_EXECUTION_CHECK
 
-	if (Settings->FilterMode == EPCGExStagedTypeFilterMode::PinPerType)
+	if (Settings->IsBucketMode())
 	{
 		PCGEX_ON_INITIAL_EXECUTION
 		{
 			Context->NumPairs = Context->MainPoints->Pairs.Num();
 
-			// Pre-size all per-type collections
+			// Pre-size all bucket collections
 			for (int32 i = 0; i < Context->TypeOutputs.Num(); i++)
 			{
 				Context->TypeOutputs[i]->Pairs.Init(nullptr, Context->NumPairs);
@@ -312,7 +339,7 @@ namespace PCGExStagedTypeFilter
 			return false;
 		}
 
-		if (Settings->FilterMode == EPCGExStagedTypeFilterMode::PinPerType)
+		if (Settings->IsBucketMode())
 		{
 			PCGEX_INIT_IO(PointDataFacade->Source, PCGExData::EIOInit::NoInit)
 		}
@@ -328,7 +355,7 @@ namespace PCGExStagedTypeFilter
 			return false;
 		}
 
-		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType)
+		if (!Settings->IsBucketMode())
 		{
 			// Initialize mask for Include/Exclude
 			Mask.Init(1, PointDataFacade->GetNum());
@@ -341,7 +368,7 @@ namespace PCGExStagedTypeFilter
 
 	void FProcessor::PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops)
 	{
-		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType)
+		if (!Settings->IsBucketMode())
 		{
 			return;
 		}
@@ -366,15 +393,16 @@ namespace PCGExStagedTypeFilter
 
 		PointDataFacade->Fetch(Scope);
 
-		if (Settings->FilterMode == EPCGExStagedTypeFilterMode::PinPerType)
+		if (Settings->IsBucketMode())
 		{
 			const int32 UnmatchedIdx = Context->TypeOutputs.Num();
+			const bool bIsEntryShape = Settings->FilterMode == EPCGExStagedTypeFilterMode::EntryShape;
+			const bool bDiscardInvalidCollections = Settings->bDiscardInvalidCollections;
 
 			PCGEX_SCOPE_LOOP(Index)
 			{
 				const uint64 Hash = EntryHashGetter->Read(Index);
-
-				PCGExAssetCollection::FTypeId TypeId = PCGExAssetCollection::TypeIds::None;
+				int32 Bucket = -1;
 
 				if (Hash != 0 && Hash != static_cast<uint64>(-1))
 				{
@@ -383,11 +411,24 @@ namespace PCGExStagedTypeFilter
 
 					if (Result.IsValid())
 					{
-						TypeId = Result.Entry->GetTypeId();
+						if (bIsEntryShape)
+						{
+							if (!Result.Entry->bIsSubCollection)
+							{
+								Bucket = 0; // Leaf
+							}
+							else if (!bDiscardInvalidCollections || Result.Entry->GetSubCollectionPtr())
+							{
+								Bucket = 1; // Collection
+							}
+							// else: invalid subcollection -- fall through to UnmatchedIdx
+						}
+						else
+						{
+							Bucket = Context->FindTypeBucket(Result.Entry->GetTypeId());
+						}
 					}
 				}
-
-				const int32 Bucket = Context->FindTypeBucket(TypeId);
 
 				if (Bucket >= 0)
 				{
@@ -459,7 +500,7 @@ namespace PCGExStagedTypeFilter
 
 	void FProcessor::OnPointsProcessingComplete()
 	{
-		if (Settings->FilterMode != EPCGExStagedTypeFilterMode::PinPerType)
+		if (!Settings->IsBucketMode())
 		{
 			return;
 		}
@@ -538,8 +579,8 @@ namespace PCGExStagedTypeFilter
 
 	void FProcessor::CompleteWork()
 	{
-		// PinPerType mode is handled entirely by OnPointsProcessingComplete
-		if (Settings->FilterMode == EPCGExStagedTypeFilterMode::PinPerType)
+		// Bucket modes (PinPerType, EntryShape) are handled entirely by OnPointsProcessingComplete
+		if (Settings->IsBucketMode())
 		{
 			return;
 		}

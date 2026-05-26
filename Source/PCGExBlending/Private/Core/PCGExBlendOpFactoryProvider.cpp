@@ -33,121 +33,6 @@ void UPCGExBlendOpFactoryProviderSettings::PostEditChangeProperty(FPropertyChang
 }
 #endif
 
-#pragma region Inline pins
-
-bool UPCGExBlendOpFactoryProviderSettings::IsPinDefaultValueEnabled(FName PinLabel) const
-{
-	return PinLabel == PCGExBlending::Labels::SourceConstantA || PinLabel == PCGExBlending::Labels::SourceConstantB;
-}
-
-bool UPCGExBlendOpFactoryProviderSettings::IsPinDefaultValueActivated(FName PinLabel) const
-{
-	if (!IsPinDefaultValueEnabled(PinLabel))
-	{
-		return false;
-	}
-	return DefaultValues.IsPropertyActivated(PinLabel);
-}
-
-EPCGMetadataTypes UPCGExBlendOpFactoryProviderSettings::GetPinDefaultValueType(FName PinLabel) const
-{
-	if (DefaultValues.FindProperty(PinLabel))
-	{
-		return DefaultValues.GetCurrentPropertyType(PinLabel);
-	}
-	return GetPinInitialDefaultValueType(PinLabel);
-}
-
-bool UPCGExBlendOpFactoryProviderSettings::IsPinDefaultValueMetadataTypeValid(FName PinLabel, EPCGMetadataTypes DataType) const
-{
-	// We support any value type so whatever
-	return true;
-}
-
-#if WITH_EDITOR
-void UPCGExBlendOpFactoryProviderSettings::SetPinDefaultValue(FName PinLabel, const FString& DefaultValue, bool bCreateIfNeeded)
-{
-	Modify();
-
-	if (!DefaultValues.FindProperty(PinLabel) && bCreateIfNeeded)
-	{
-		const EPCGMetadataTypes Type = GetPinInitialDefaultValueType(PinLabel);
-		DefaultValues.CreateNewProperty(PinLabel, Type);
-	}
-
-	if (DefaultValues.SetPropertyValueFromString(PinLabel, DefaultValue))
-	{
-		OnSettingsChangedDelegate.Broadcast(this, EPCGChangeType::Node | EPCGChangeType::Edge);
-	}
-}
-
-void UPCGExBlendOpFactoryProviderSettings::ConvertPinDefaultValueMetadataType(FName PinLabel, EPCGMetadataTypes DataType)
-{
-	if (ensure(IsPinDefaultValueActivated(PinLabel)))
-	{
-		if (IsPinDefaultValueMetadataTypeValid(PinLabel, DataType))
-		{
-			Modify();
-			DefaultValues.ConvertPropertyType(PinLabel, DataType);
-			OnSettingsChangedDelegate.Broadcast(this, EPCGChangeType::Node | EPCGChangeType::Edge);
-		}
-	}
-}
-
-void UPCGExBlendOpFactoryProviderSettings::SetPinDefaultValueIsActivated(FName PinLabel, bool bIsActivated, bool bDirtySettings)
-{
-	if (ensure(IsPinDefaultValueEnabled(PinLabel)))
-	{
-		if (bDirtySettings)
-		{
-			Modify();
-		}
-
-		const bool bPropertyChanged = DefaultValues.SetPropertyActivated(PinLabel, bIsActivated);
-		if (bPropertyChanged && bDirtySettings)
-		{
-			OnSettingsChangedDelegate.Broadcast(this, EPCGChangeType::Node | EPCGChangeType::Edge);
-		}
-	}
-}
-
-void UPCGExBlendOpFactoryProviderSettings::ResetDefaultValues()
-{
-	DefaultValues.Reset();
-	OnSettingsChangedDelegate.Broadcast(this, EPCGChangeType::Settings | EPCGChangeType::Edge);
-}
-
-FString UPCGExBlendOpFactoryProviderSettings::GetPinInitialDefaultValueString(FName PinLabel) const
-{
-	return LexToString(1.0f);
-}
-
-FString UPCGExBlendOpFactoryProviderSettings::GetPinDefaultValueAsString(FName PinLabel) const
-{
-	if (ensure(IsPinDefaultValueActivated(PinLabel)))
-	{
-		if (DefaultValues.FindProperty(PinLabel))
-		{
-			return DefaultValues.GetPropertyValueAsString(PinLabel);
-		}
-		return GetPinInitialDefaultValueString(PinLabel);
-	}
-
-	return FString();
-}
-
-void UPCGExBlendOpFactoryProviderSettings::ResetDefaultValue(FName PinLabel)
-{
-	if (DefaultValues.FindProperty(PinLabel))
-	{
-		Modify();
-		const EPCGMetadataTypes CurrentType = DefaultValues.GetCurrentPropertyType(PinLabel);
-		DefaultValues.RemoveProperty(PinLabel);
-		DefaultValues.CreateNewProperty(PinLabel, CurrentType);
-	}
-}
-#endif
-
 bool UPCGExBlendOpFactoryProviderSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
 	if (InPin->Properties.Label == PCGExBlending::Labels::SourceConstantA && Config.OperandASource == EPCGExOperandSource::Constant)
@@ -160,13 +45,6 @@ bool UPCGExBlendOpFactoryProviderSettings::IsPinUsedByNodeExecution(const UPCGPi
 	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
-
-EPCGMetadataTypes UPCGExBlendOpFactoryProviderSettings::GetPinInitialDefaultValueType(FName PinLabel) const
-{
-	return EPCGMetadataTypes::Float;
-}
-
-#pragma endregion
 
 #if WITH_EDITOR
 TArray<FPCGPreConfiguredSettingsInfo> UPCGExBlendOpFactoryProviderSettings::GetPreconfiguredInfo() const

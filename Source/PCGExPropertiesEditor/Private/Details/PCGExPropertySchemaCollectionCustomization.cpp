@@ -182,9 +182,12 @@ void FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged()
 	Collection->ReconcileImportOverrides();
 
 	CachedResolvedCount = -1;
+	// Deferred refresh: ForceRefresh from inside a property change notification tears down the
+	// widget tree mid-stack-unwind, killing the FInstancedStruct picker's in-flight transaction
+	// and breaking undo. Same trap FPCGExPropertyOverridesCustomization documents.
 	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 	{
-		PropertyUtilities->ForceRefresh();
+		PropertyUtilities->RequestRefresh();
 	}
 }
 
@@ -204,9 +207,10 @@ void FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged(
 	}
 
 	CachedResolvedCount = -1;
+	// Deferred refresh -- see OnSchemasArrayChanged.
 	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 	{
-		PropertyUtilities->ForceRefresh();
+		PropertyUtilities->RequestRefresh();
 	}
 }
 
@@ -458,10 +462,7 @@ bool FPCGExPropertySchemaCollectionCustomization::TryRenderFlatInline(
 	if (bIsInstanceMode)
 	{
 		ApplyLocalSchemaResetOverride(*Row, ElementHandle->GetIndexInArray());
-
-		// Instance-side local schema edits need an explicit Modify() to dirty the actor; the
-		// external-structure row doesn't route through the owning UObject on its own.
-		PCGExEditorCustomizationUtils::HookModifyOnHandleChanged(Row->GetPropertyHandle(), WeakLiveComponent);
+		PCGExEditorCustomizationUtils::HookOwnerChangeOnHandleChanged(Row->GetPropertyHandle(), WeakLiveComponent);
 	}
 	return true;
 }
@@ -513,9 +514,11 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 	}
 	else
 	{
-		// Normal mode: watch for array changes and trigger sync + refresh, then display as-is.
+		// Array-shape only -- per-element value edits are handled by inner customizations and
+		// the host object's PostEditChangeProperty. SetOnChildPropertyValueChanged is avoided:
+		// it propagates through inner FInstancedStruct value edits and would tear down the
+		// active widget mid-drag.
 		SchemasArrayHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged));
-		SchemasArrayHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged));
 
 		ChildBuilder.AddProperty(SchemasArrayHandle.ToSharedRef());
 	}
@@ -601,7 +604,6 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 		if (TSharedPtr<IPropertyHandle> ImportedSchemasHandle = PropertyHandle->GetChildHandle(TEXT("ImportedSchemas")))
 		{
 			ImportedSchemasHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged));
-			ImportedSchemasHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged));
 			ChildBuilder.AddProperty(ImportedSchemasHandle.ToSharedRef());
 		}
 	}
