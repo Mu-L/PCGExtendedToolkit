@@ -157,7 +157,13 @@ private:
 	// Tile callbacks
 	void OnTileClicked(int32 Index, const FPointerEvent& MouseEvent);
 	FReply OnTileDragDetected(int32 Index, const FPointerEvent& MouseEvent);
-	void OnTileCategoryChanged();
+
+	void OnTileEntryChanged(int32 SourceIndex, FName PropertyName);
+
+	/** Push the named property from SourceIndex to other selected entries. Struct members
+	 *  are pushed via PushStructGated (honors per-element bEnabled gates). No-op outside
+	 *  multi-selection or when SourceIndex isn't part of it. */
+	void PropagateTileProperty(int32 SourceIndex, FName PropertyName);
 
 	// Detail panel management
 	void UpdateDetailForSelection();

@@ -351,12 +351,12 @@ const FPCGExAssetGrammarDetails* FPCGExAssetCollectionEntry::GetEffectiveGrammar
 double FPCGExAssetCollectionEntry::GetGrammarSize(
 	const UPCGExAssetCollection* Host,
 	const EPCGExGrammarAxes Axis,
-	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+	FPCGExGrammarSizeCache* SizeCache) const
 {
-	// SizeCache is keyed by entry only -- valid because callers fix a single Axis per pass.
+	const FPCGExGrammarSizeCacheKey CacheKey{ this, Axis };
 	if (SizeCache)
 	{
-		if (const double* CachedSize = SizeCache->Find(this))
+		if (const double* CachedSize = SizeCache->Find(CacheKey))
 		{
 			return *CachedSize;
 		}
@@ -369,7 +369,7 @@ double FPCGExAssetCollectionEntry::GetGrammarSize(
 			? Resolved->GetSubCollectionSize(InternalSubCollection, Axis, SizeCache)
 			: Resolved->GetLeafSize(Staging.Bounds, Axis));
 
-	if (SizeCache) { SizeCache->Add(this, Size); }
+	if (SizeCache) { SizeCache->Add(CacheKey, Size); }
 	return Size;
 }
 
@@ -377,7 +377,7 @@ bool FPCGExAssetCollectionEntry::FixModuleInfos(
 	const UPCGExAssetCollection* Host,
 	FPCGSubdivisionSubmodule& OutModule,
 	const EPCGExGrammarAxes Axis,
-	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+	FPCGExGrammarSizeCache* SizeCache) const
 {
 	const FPCGExAssetGrammarDetails* Resolved = GetEffectiveGrammar(Host);
 	if (!Resolved) { return false; }

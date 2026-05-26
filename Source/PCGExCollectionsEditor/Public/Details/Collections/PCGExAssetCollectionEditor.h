@@ -7,6 +7,8 @@
 
 #include "Widgets/Docking/SDockTab.h"
 
+#include "Details/Collections/SPCGExCollectionGridTile.h"
+
 class UPCGExAssetCollection;
 class SVerticalBox;
 class FAssetThumbnailPool;
@@ -15,6 +17,10 @@ class SPCGExCollectionGridView;
 namespace PCGExAssetCollectionEditor
 {
 	const FName EntriesName = FName("Entries");
+
+	/** Typed sub-collection UPROPERTY name on derived entry structs (Mesh/Actor/Level/PCGDataAsset).
+	 *  EDITOR_Sanitize resyncs the base InternalSubCollection from this field on every PostEditChange. */
+	const FName SubCollectionName = FName("SubCollection");
 
 	struct PCGEXCOLLECTIONSEDITOR_API TabInfos
 	{
@@ -171,11 +177,20 @@ protected:
 		return NAME_None;
 	}
 
-	/** Build the picker widget for a single tile entry. Override for custom picker logic. */
+	/** Build the picker widget for a single tile entry. Override for custom picker logic.
+	 *  Invoke OnPropertyEdited with the FName of the entry-struct property that was written. */
 	virtual TSharedRef<SWidget> BuildTilePickerWidget(
 		TWeakObjectPtr<UPCGExAssetCollection> Collection,
 		int32 EntryIndex,
-		FSimpleDelegate OnAssetChanged);
+		FOnTilePropertyEdited OnPropertyEdited);
+
+	/** Standard SubCollection picker slot (visible only when bIsSubCollection is true).
+	 *  Writes the typed SubCollection UPROPERTY; falls back to base InternalSubCollection
+	 *  when no typed field exists. */
+	TSharedRef<SWidget> BuildSubCollectionPickerSlot(
+		TWeakObjectPtr<UPCGExAssetCollection> Collection,
+		int32 EntryIndex,
+		FOnTilePropertyEdited OnPropertyEdited) const;
 
 	/** Returns the allowed UClass for the type-specific asset picker. Override in subclasses. */
 	virtual const UClass* GetTilePickerAllowedClass() const

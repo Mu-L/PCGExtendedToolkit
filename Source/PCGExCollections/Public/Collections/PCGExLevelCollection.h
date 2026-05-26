@@ -77,11 +77,11 @@ public:
 	}
 
 	/** Actor content filter for bounds computation. If null, default infrastructure checks are used. */
-	UPROPERTY(EditAnywhere, Instanced, Category = "Bounds")
+	UPROPERTY(EditAnywhere, Instanced, Category = "Settings|Import")
 	TObjectPtr<UPCGExActorContentFilter> ContentFilter;
 
 	/** Bounds evaluator for bounds computation. If null, bounds default to empty. */
-	UPROPERTY(EditAnywhere, Instanced, Category = "Bounds")
+	UPROPERTY(EditAnywhere, Instanced, Category = "Settings|Import")
 	TObjectPtr<UPCGExBoundsEvaluator> BoundsEvaluator;
 
 	// Entries Array

@@ -8,7 +8,7 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
-#include "Helpers/PCGExPointArrayDataHelpers.h"
+#include "Helpers/PCGExBucketDispatchHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagedTypeFilterElement"
 #define PCGEX_NAMESPACE StagedTypeFilter
@@ -507,74 +507,16 @@ namespace PCGExStagedTypeFilter
 
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExStagedTypeFilter::OnPointsProcessingComplete);
 
-		const int32 NumBuckets = Context->TypeOutputs.Num();
-		const int32 UnmatchedIdx = NumBuckets;
-		const int32 NumPoints = PointDataFacade->GetNum();
-
-		// Check if all points went to a single bucket (can use Forward for zero-copy)
-		int32 SingleBucket = -1;
-		for (int32 i = 0; i <= UnmatchedIdx; i++)
-		{
-			if (BucketCounts[i] == NumPoints)
+		PCGExBucketDispatchHelpers::DispatchBuckets(
+			Context->TypeOutputs,
+			Context->UnmatchedOutput,
+			BucketCounts,
+			BucketIndices,
+			PointDataFacade->GetNum(),
+			[this](const TSharedRef<PCGExData::FPointIOCollection>& InCollection, PCGExData::EIOInit InitMode)
 			{
-				SingleBucket = i;
-				break;
-			}
-		}
-
-		if (SingleBucket >= 0)
-		{
-			// All points in one bucket -- Forward (zero-copy)
-			if (SingleBucket == UnmatchedIdx)
-			{
-				if (Context->UnmatchedOutput)
-				{
-					(void)CreateIO(Context->UnmatchedOutput.ToSharedRef(), PCGExData::EIOInit::Forward);
-				}
-			}
-			else
-			{
-				(void)CreateIO(Context->TypeOutputs[SingleBucket].ToSharedRef(), PCGExData::EIOInit::Forward);
-			}
-			return;
-		}
-
-		// Mixed distribution -- create new outputs per bucket
-		for (int32 i = 0; i < NumBuckets; i++)
-		{
-			if (BucketCounts[i] <= 0)
-			{
-				continue;
-			}
-
-			TArray<int32> ReadIndices;
-			BucketIndices[i]->Collapse(ReadIndices);
-
-			TSharedPtr<PCGExData::FPointIO> BucketIO = CreateIO(Context->TypeOutputs[i].ToSharedRef(), PCGExData::EIOInit::New);
-			if (!BucketIO)
-			{
-				continue;
-			}
-
-			PCGExPointArrayDataHelpers::SetNumPointsAllocated(BucketIO->GetOut(), ReadIndices.Num(), BucketIO->GetAllocations());
-			BucketIO->InheritProperties(ReadIndices, BucketIO->GetAllocations());
-		}
-
-		// Unmatched bucket
-		if (BucketCounts[UnmatchedIdx] > 0 && Context->UnmatchedOutput)
-		{
-			TArray<int32> ReadIndices;
-			BucketIndices[UnmatchedIdx]->Collapse(ReadIndices);
-
-			TSharedPtr<PCGExData::FPointIO> UnmatchedIO = CreateIO(Context->UnmatchedOutput.ToSharedRef(), PCGExData::EIOInit::New);
-			if (!UnmatchedIO)
-			{
-				return;
-			}
-
-			PCGExPointArrayDataHelpers::SetNumPointsAllocated(UnmatchedIO->GetOut(), ReadIndices.Num(), UnmatchedIO->GetAllocations());
-			UnmatchedIO->InheritProperties(ReadIndices, UnmatchedIO->GetAllocations());
-		}
+				return CreateIO(InCollection, InitMode);
+			});
 	}
 
 	void FProcessor::CompleteWork()

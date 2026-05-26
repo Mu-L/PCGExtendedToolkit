@@ -123,6 +123,10 @@ namespace PCGExGrammitExport
 			FString Color;
 			double Size = 0.0;
 			bool bScalable = false;
+			// Non-empty only when Name differs from the underlying grammar symbol (per-axis
+			// suffixed module). Encoded as the optional 5th tuple element so the grammar
+			// evaluator on the web side sees the bare symbol regardless of which axis-module ran.
+			FString ExportSymbol;
 		};
 
 		// Mirrors FPCGExCollectionToModuleInfosElement::FlattenCollection: walks the cache
@@ -210,11 +214,9 @@ namespace PCGExGrammitExport
 					: SourceColor;
 				const FString ColorHex = LinearColorToHex(DebugLC);
 
-				// Emit one atom per enabled axis. Single-axis entries get the bare Symbol; multi-axis
-				// entries get a _X/_Y/_Z suffix per axis so Grammit (which has no attribute concept)
-				// sees them as distinct modules with potentially different sizes / scalable flags.
-				// Dispatch through Grammar-> directly to skip Entry::FixModuleInfos's redundant
-				// GetEffectiveGrammar resolve (Grammar was just resolved above).
+				// Multi-axis entries emit a suffixed module per axis (Grammit has no attribute concept,
+				// so distinct modules are how we surface per-axis size differences); all axes share the
+				// same exportSymbol so the bare grammar symbol is what the evaluator emits.
 				const bool bSuffix = PCGExGrammarAxes::CountAxes(Grammar->Axes) > 1;
 				const bool bIsSub = Entry->bIsSubCollection;
 
@@ -229,10 +231,14 @@ namespace PCGExGrammitExport
 					const bool bFixed = bIsSub
 						? Grammar->FixSubCollection(Entry->InternalSubCollection, PCGExGrammarAxes::Bits[a], Submodule, /*SizeCache=*/nullptr)
 						: Grammar->FixLeaf(Entry->Staging.Bounds, PCGExGrammarAxes::Bits[a], Submodule);
-					if (!bFixed) { continue; }
+					if (!bFixed)
+					{
+						continue;
+					}
 
 					FAtomOut Atom;
 					Atom.Name = bSuffix ? (BaseSymbolStr + PCGExGrammarAxes::Suffixes[a]) : BaseSymbolStr;
+					Atom.ExportSymbol = bSuffix ? BaseSymbolStr : FString();
 					Atom.Color = ColorHex;
 					Atom.Size = Submodule.Size;
 					Atom.bScalable = Submodule.bScalable;
@@ -279,7 +285,7 @@ namespace PCGExGrammitExport
 		}
 
 		// Build v2 compact payload: {"v":2,"A":[...],"M":[...]}
-		// Atom tuple: [name, color, size, scalable]  (exportSymbol omitted - equals name)
+		// Atom tuple: [name, color, size, scalable, exportSymbol?]  (5th omitted when == name)
 		// Molecule tuple: [name, kindCode, color, children[]]
 		// M[0] is always MAIN (empty per design); subsequent are sequence-kind category groups.
 		// AtomRef inside a molecule: minimal form [0, atomIdx] (repCode=0, weight=1, alias="" all trimmed).
@@ -293,12 +299,25 @@ namespace PCGExGrammitExport
 				Json.AppendChar(',');
 			}
 			const FAtomOut& A = Atoms[i];
-			Json += FString::Printf(
-				TEXT("[\"%s\",\"%s\",%s,%d]"),
-				*EscapeJsonString(A.Name),
-				*A.Color,
-				*FormatNumber(A.Size),
-				A.bScalable ? 1 : 0);
+			if (!A.ExportSymbol.IsEmpty() && A.ExportSymbol != A.Name)
+			{
+				Json += FString::Printf(
+					TEXT("[\"%s\",\"%s\",%s,%d,\"%s\"]"),
+					*EscapeJsonString(A.Name),
+					*A.Color,
+					*FormatNumber(A.Size),
+					A.bScalable ? 1 : 0,
+					*EscapeJsonString(A.ExportSymbol));
+			}
+			else
+			{
+				Json += FString::Printf(
+					TEXT("[\"%s\",\"%s\",%s,%d]"),
+					*EscapeJsonString(A.Name),
+					*A.Color,
+					*FormatNumber(A.Size),
+					A.bScalable ? 1 : 0);
+			}
 		}
 		Json += TEXT("],\"M\":[");
 

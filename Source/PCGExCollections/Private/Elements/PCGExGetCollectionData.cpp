@@ -499,19 +499,10 @@ namespace PCGExGetCollectionData
 		FWeightNormSums WeightSums;
 		ComputeWeightNorms(Entries, P.WeightNorm, P.bWeightAsFloat, WeightSums);
 
-		// Per-axis SizeCache: subcollection aggregation queries within Grammar->FixSubCollection(Axis)
-		// only see child entries resolved at the same axis, so each axis gets its own map.
-		// Only allocate caches for axes that actually contribute output -- the others stay empty.
-		TMap<const FPCGExAssetCollectionEntry*, double> SizeCachePerAxis[3];
+		FPCGExGrammarSizeCache SizeCache;
 		if (Settings->bWriteSize)
 		{
-			for (int32 a = 0; a < 3; a++)
-			{
-				if (LocalUsedAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))
-				{
-					SizeCachePerAxis[a].Reserve(Entries.Num());
-				}
-			}
+			SizeCache.Reserve(Entries.Num() * PCGExGrammarAxes::CountAxes(LocalUsedAxes));
 		}
 
 		TSet<FName> UniqueSymbols;
@@ -633,7 +624,7 @@ namespace PCGExGetCollectionData
 
 					FPCGSubdivisionSubmodule Module;
 					const bool bFixed = bIsSub
-						? Grammar->FixSubCollection(E->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCachePerAxis[a] : nullptr)
+						? Grammar->FixSubCollection(E->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCache : nullptr)
 						: Grammar->FixLeaf(E->Staging.Bounds, PCGExGrammarAxes::Bits[a], Module);
 					if (!bFixed)
 					{

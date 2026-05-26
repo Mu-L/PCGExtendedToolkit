@@ -273,7 +273,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	double GetGrammarSize(
 		const UPCGExAssetCollection* Host,
 		EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X,
-		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+		FPCGExGrammarSizeCache* SizeCache = nullptr) const;
 
 	/**
 	 * Resolve and populate OutModule for the given axis. Returns true when the resolved grammar
@@ -284,7 +284,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 		const UPCGExAssetCollection* Host,
 		FPCGSubdivisionSubmodule& OutModule,
 		EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X,
-		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+		FPCGExGrammarSizeCache* SizeCache = nullptr) const;
 
 
 	// Lifecycle
@@ -869,16 +869,16 @@ public:
 	FDateTime LastRebuiltUtc = FDateTime::MinValue();
 #endif
 
-	UPROPERTY(EditAnywhere, Category = Settings)
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
 	EPCGExGlobalVariationRule GlobalVariationMode = EPCGExGlobalVariationRule::PerEntry;
 
-	UPROPERTY(EditAnywhere, Category = Settings)
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
 	FPCGExFittingVariations GlobalVariations;
 
-	UPROPERTY(EditAnywhere, Category = Settings)
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
 	EPCGExGlobalVariationRule GlobalGrammarMode = EPCGExGlobalVariationRule::PerEntry;
 
-	UPROPERTY(EditAnywhere, Category = Settings)
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
 	FPCGExAssetGrammarDetails GlobalAssetGrammar = FPCGExAssetGrammarDetails(FName("N/A"));
 
 	/**
@@ -890,22 +890,26 @@ public:
 	UPROPERTY(EditAnywhere, Category = Settings)
 	FPCGExAssetGrammarDetails SubCollectionGrammar;
 
+#pragma region DEPRECATED
+	
 	/** LEGACY (schema v0). Migrated into SubCollectionGrammar by PostLoad. */
 	UPROPERTY(meta=(DeprecatedProperty))
 	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
+	
+#pragma endregion
 
 	/** Versioned grammar schema. PostLoad migrates legacy data to the current version. 0 = pre-v1 layout. */
 	UPROPERTY()
 	int32 GrammarSchemaVersion = 0;
 
-	UPROPERTY(EditAnywhere, Category = Settings)
+	UPROPERTY(EditAnywhere, Category = "Settings|Utils")
 	bool bDoNotIgnoreInvalidEntries = false;
 
 	/**
 	 * How an entry that is itself a subcollection computes its aggregate Staging.Bounds
 	 * (extents, centered at origin). Consumed by selectors that reason about entry size.
 	 */
-	UPROPERTY(EditAnywhere, Category = "Settings|Subcollection")
+	UPROPERTY(EditAnywhere, Category = Settings)
 	EPCGExSubcollectionBoundsMode SubcollectionBoundsMode = EPCGExSubcollectionBoundsMode::UnionAABB;
 
 	/**

@@ -18,12 +18,15 @@ class SComboBox;
 
 using FThumbnailCacheMap = TMap<FSoftObjectPath, TSharedPtr<FAssetThumbnail>>;
 
+DECLARE_DELEGATE_OneParam(FOnTilePropertyEdited, FName /*PropertyName*/);
+
 DECLARE_DELEGATE_RetVal_ThreeParams(TSharedRef<SWidget>, FOnGetTilePickerWidget,
                                     TWeakObjectPtr<UPCGExAssetCollection> /*Collection*/,
                                     int32 /*EntryIndex*/,
-                                    FSimpleDelegate /*OnAssetChanged*/);
+                                    FOnTilePropertyEdited /*OnPropertyEdited*/);
 DECLARE_DELEGATE_TwoParams(FOnTileClicked, int32 /*EntryIndex*/, const FPointerEvent& /*MouseEvent*/);
 DECLARE_DELEGATE_RetVal_TwoParams(FReply, FOnTileDragDetected, int32 /*EntryIndex*/, const FPointerEvent& /*MouseEvent*/);
+DECLARE_DELEGATE_TwoParams(FOnTileEntryChanged, int32 /*EntryIndex*/, FName /*PropertyName*/);
 
 /**
  * Individual tile widget for the collection grid view.
@@ -56,7 +59,7 @@ public:
 		SLATE_ARGUMENT(bool*, BatchFlagPtr)
 		SLATE_EVENT(FOnTileClicked, OnTileClicked)
 		SLATE_EVENT(FOnTileDragDetected, OnTileDragDetected)
-		SLATE_EVENT(FSimpleDelegate, OnTileCategoryChanged)
+		SLATE_EVENT(FOnTileEntryChanged, OnTileEntryChanged)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -104,7 +107,7 @@ private:
 	// Delegates
 	FOnTileClicked OnTileClicked;
 	FOnTileDragDetected OnTileDragDetected;
-	FSimpleDelegate OnTileCategoryChanged;
+	FOnTileEntryChanged OnTileEntryChanged;
 
 	// Batch flag -- pointer to grid view's bIsBatchOperation (suppresses OnObjectModified during tile edits)
 	bool* BatchFlagPtr = nullptr;
@@ -117,4 +120,6 @@ private:
 
 	/** Build the thumbnail widget from the entry's Staging.Path */
 	TSharedRef<SWidget> BuildThumbnailWidget();
+
+	void HandlePickerPropertyEdited(FName PropertyName);
 };

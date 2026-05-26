@@ -9,6 +9,7 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Details/Collections/PCGExCollectionEditorSlateUtils.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -23,6 +24,48 @@
 namespace PCGExCollectionGrid
 {
 	static const FName NewCategorySentinel("__PCGEx_NewCategory__");
+
+	/** Opacity reflects whether the effective grammar enables this axis at paint time. */
+	TSharedRef<SWidget> MakeAxisHintLetter(
+		TWeakObjectPtr<UPCGExAssetCollection> WeakColl,
+		int32 Idx,
+		EPCGExGrammarAxes Axis,
+		const FText& Letter)
+	{
+		return SNew(STextBlock)
+			.Text(Letter)
+			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 6))
+			.ColorAndOpacity_Lambda([WeakColl, Idx, Axis]() -> FSlateColor
+			{
+				static constexpr float DisabledAlpha = 0.15f;
+				static constexpr float EnabledAlpha = 0.7f;
+				const UPCGExAssetCollection* Coll = WeakColl.Get();
+				if (!Coll) { return FSlateColor(FLinearColor(1, 1, 1, DisabledAlpha)); }
+				const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+				if (!Result.IsValid()) { return FSlateColor(FLinearColor(1, 1, 1, DisabledAlpha)); }
+				const FPCGExAssetGrammarDetails* G = Result.Entry->GetEffectiveGrammar(Coll);
+				const float A = (G && G->HasAxis(Axis)) ? EnabledAlpha : DisabledAlpha;
+				return FSlateColor(FLinearColor(1, 1, 1, A));
+			});
+	}
+
+	TSharedRef<SWidget> MakeAxisHintRow(TWeakObjectPtr<UPCGExAssetCollection> WeakColl, int32 Idx)
+	{
+		TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+		for (int32 a = 0; a < 3; ++a)
+		{
+			Row->AddSlot()
+			   .AutoWidth()
+			   .Padding(a < 2 ? FMargin(0, 0, 2, 0) : FMargin(0))
+			[
+				MakeAxisHintLetter(
+					WeakColl, Idx,
+					PCGExGrammarAxes::Bits[a],
+					FText::FromString(PCGExGrammarAxes::Letters[a]))
+			];
+		}
+		return Row;
+	}
 }
 
 #pragma region SPCGExCollectionGridTile
@@ -37,7 +80,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 	CategoryOptions = InArgs._CategoryOptions;
 	OnTileClicked = InArgs._OnTileClicked;
 	OnTileDragDetected = InArgs._OnTileDragDetected;
-	OnTileCategoryChanged = InArgs._OnTileCategoryChanged;
+	OnTileEntryChanged = InArgs._OnTileEntryChanged;
 	ThumbnailCachePtr = InArgs._ThumbnailCachePtr;
 	BatchFlagPtr = InArgs._BatchFlagPtr;
 
@@ -54,8 +97,8 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 	TSharedRef<SWidget> PickerWidget = SNullWidget::NullWidget;
 	if (InArgs._OnGetPickerWidget.IsBound())
 	{
-		FSimpleDelegate RefreshDelegate = FSimpleDelegate::CreateSP(this, &SPCGExCollectionGridTile::RefreshThumbnail);
-		PickerWidget = InArgs._OnGetPickerWidget.Execute(Collection, EntryIndex, RefreshDelegate);
+		FOnTilePropertyEdited PickerCallback = FOnTilePropertyEdited::CreateSP(this, &SPCGExCollectionGridTile::HandlePickerPropertyEdited);
+		PickerWidget = InArgs._OnGetPickerWidget.Execute(Collection, EntryIndex, PickerCallback);
 	}
 
 	// Build category widget -- combobox with "New..." option
@@ -105,15 +148,17 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 					{
 						*BatchFlagPtr = true;
 					}
-					FScopedTransaction Transaction(INVTEXT("Change Category"));
-					Coll->Modify();
-					Entry->Category = *Selected;
-					Coll->PostEditChange();
+					{
+						FScopedTransaction Transaction(INVTEXT("Change Category"));
+						Coll->Modify();
+						Entry->Category = *Selected;
+						Coll->PostEditChange();
+					}
+					OnTileEntryChanged.ExecuteIfBound(Idx, GET_MEMBER_NAME_CHECKED(FPCGExAssetCollectionEntry, Category));
 					if (BatchFlagPtr)
 					{
 						*BatchFlagPtr = false;
 					}
-					OnTileCategoryChanged.ExecuteIfBound();
 				})
 				.OnGenerateWidget_Lambda([](TSharedPtr<FName> Item) -> TSharedRef<SWidget>
 				{
@@ -176,15 +221,17 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 								{
 									*BatchFlagPtr = true;
 								}
-								FScopedTransaction Transaction(INVTEXT("New Category"));
-								Coll->Modify();
-								Entry->Category = NewCat;
-								Coll->PostEditChange();
+								{
+									FScopedTransaction Transaction(INVTEXT("New Category"));
+									Coll->Modify();
+									Entry->Category = NewCat;
+									Coll->PostEditChange();
+								}
+								OnTileEntryChanged.ExecuteIfBound(Idx, GET_MEMBER_NAME_CHECKED(FPCGExAssetCollectionEntry, Category));
 								if (BatchFlagPtr)
 								{
 									*BatchFlagPtr = false;
 								}
-								OnTileCategoryChanged.ExecuteIfBound();
 							}
 						}
 					}
@@ -294,10 +341,13 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									{
 										*BatchFlagPtr = true;
 									}
-									FScopedTransaction Transaction(INVTEXT("Toggle SubCollection"));
-									Coll->Modify();
-									Entry->bIsSubCollection = (NewState == ECheckBoxState::Checked);
-									Coll->PostEditChange();
+									{
+										FScopedTransaction Transaction(INVTEXT("Toggle SubCollection"));
+										Coll->Modify();
+										Entry->bIsSubCollection = (NewState == ECheckBoxState::Checked);
+										Coll->PostEditChange();
+									}
+									OnTileEntryChanged.ExecuteIfBound(Idx, GET_MEMBER_NAME_CHECKED(FPCGExAssetCollectionEntry, bIsSubCollection));
 									if (BatchFlagPtr)
 									{
 										*BatchFlagPtr = false;
@@ -367,7 +417,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 										Entry->Weight = NewVal;
 									}
 								})
-								.OnEndSliderMovement_Lambda([this, WeakColl](int32)
+								.OnEndSliderMovement_Lambda([this, WeakColl, Idx](int32)
 								{
 									if (UPCGExAssetCollection* Coll = WeakColl.Get())
 									{
@@ -377,6 +427,7 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									{
 										GEditor->EndTransaction();
 									}
+									OnTileEntryChanged.ExecuteIfBound(Idx, GET_MEMBER_NAME_CHECKED(FPCGExAssetCollectionEntry, Weight));
 									if (BatchFlagPtr)
 									{
 										*BatchFlagPtr = false;
@@ -398,10 +449,13 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 									{
 										*BatchFlagPtr = true;
 									}
-									FScopedTransaction Transaction(INVTEXT("Set Weight"));
-									Coll->Modify();
-									Entry->Weight = NewVal;
-									Coll->PostEditChange();
+									{
+										FScopedTransaction Transaction(INVTEXT("Set Weight"));
+										Coll->Modify();
+										Entry->Weight = NewVal;
+										Coll->PostEditChange();
+									}
+									OnTileEntryChanged.ExecuteIfBound(Idx, GET_MEMBER_NAME_CHECKED(FPCGExAssetCollectionEntry, Weight));
 									if (BatchFlagPtr)
 									{
 										*BatchFlagPtr = false;
@@ -616,94 +670,78 @@ void SPCGExCollectionGridTile::Construct(const FArguments& InArgs)
 							]
 						]
 
-						// Grammar symbol badge (bottom-left) -- background tinted by the entry's
-						// AssetGrammar.DebugColor so the symbol is visually identifiable at a glance.
-						// Reads AssetGrammar directly (not GetEffectiveGrammar): in Flatten/Inherit modes
-						// the effective grammar resolves to a different struct, but the user-authored
-						// symbol on this entry is still what they want to see on the tile.
-						// Extra bottom padding keeps the badge clear of Unreal's native asset-type
-						// color strip rendered along the thumbnail's bottom edge.
+						// Grammar column: resolves via GetEffectiveGrammar so SubCollection Inherit/Flatten
+						// and leaf Global/Overrule track what the export pipeline actually emits.
+						// Extra bottom padding clears UE's native asset-type color strip along the
+						// thumbnail edge.
 						+ SOverlay::Slot()
 						.HAlign(HAlign_Left)
 						.VAlign(VAlign_Bottom)
 						.Padding(FMargin(2.f, 2.f, 2.f, 6.f))
 						[
-							SNew(SBorder)
+							SNew(SVerticalBox)
 							.Visibility_Lambda([WeakColl, Idx]() -> EVisibility
 							{
 								const UPCGExAssetCollection* Coll = WeakColl.Get();
-								if (!Coll)
-								{
-									return EVisibility::Collapsed;
-								}
+								if (!Coll) { return EVisibility::Collapsed; }
 								const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-								if (!Result.IsValid())
-								{
-									return EVisibility::Collapsed;
-								}
-								const FPCGExAssetGrammarDetails& G = Result.Entry->AssetGrammar;
-								// Both gates required: a symbol with no enabled axes is dormant
-								// (export skips it), and an axis mask with no symbol has nothing to label.
-								return (G.Symbol.IsNone() || !G.IsValidModule()) ? EVisibility::Collapsed : EVisibility::HitTestInvisible;
+								if (!Result.IsValid()) { return EVisibility::Collapsed; }
+								const FPCGExAssetGrammarDetails* G = Result.Entry->GetEffectiveGrammar(Coll);
+								// nullptr = Flatten or unbound sub-collection (no module emitted).
+								// Empty Symbol or no axes = dormant module.
+								if (!G || G->Symbol.IsNone() || !G->IsValidModule()) { return EVisibility::Collapsed; }
+								return EVisibility::HitTestInvisible;
 							})
-							.BorderImage(&BadgeBrush)
-							.BorderBackgroundColor_Lambda([WeakColl, Idx]() -> FSlateColor
-							{
-								const UPCGExAssetCollection* Coll = WeakColl.Get();
-								if (!Coll)
-								{
-									return FSlateColor(FLinearColor(0, 0, 0, 0.85f));
-								}
-								const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-								if (!Result.IsValid())
-								{
-									return FSlateColor(FLinearColor(0, 0, 0, 0.85f));
-								}
-								FLinearColor C = Result.Entry->AssetGrammar.DebugColor;
-								C.A = 0.85f;
-								return FSlateColor(C);
-							})
-							.Padding(FMargin(3, 1))
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.HAlign(HAlign_Left)
+							.Padding(FMargin(1, 0, 0, 1))
 							[
-								SNew(STextBlock)
-								.Text_Lambda([WeakColl, Idx]() -> FText
+								PCGExCollectionGrid::MakeAxisHintRow(WeakColl, Idx)
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								SNew(SBorder)
+								.BorderImage(&BadgeBrush)
+								.BorderBackgroundColor_Lambda([WeakColl, Idx]() -> FSlateColor
 								{
 									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll)
-									{
-										return FText::GetEmpty();
-									}
+									if (!Coll) { return FSlateColor(FLinearColor(0, 0, 0, 0.85f)); }
 									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-									if (!Result.IsValid())
-									{
-										return FText::GetEmpty();
-									}
-									return FText::FromName(Result.Entry->AssetGrammar.Symbol);
+									if (!Result.IsValid()) { return FSlateColor(FLinearColor(0, 0, 0, 0.85f)); }
+									const FPCGExAssetGrammarDetails* G = Result.Entry->GetEffectiveGrammar(Coll);
+									if (!G) { return FSlateColor(FLinearColor(0, 0, 0, 0.85f)); }
+									FLinearColor C = G->DebugColor;
+									C.A = 0.85f;
+									return FSlateColor(C);
 								})
-								.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8))
-								.ColorAndOpacity_Lambda([WeakColl, Idx]() -> FSlateColor
-								{
-									// Pick black-on-light / white-on-dark from the background's
-									// perceived luminance. DebugColor is stored linear; sqrt is a
-									// cheap gamma~2 approximation of sRGB encoding, and Rec.601
-									// coefficients then map to perceived brightness.
-									const UPCGExAssetCollection* Coll = WeakColl.Get();
-									if (!Coll)
+								.Padding(FMargin(3, 1))
+								[
+									SNew(STextBlock)
+									.Text_Lambda([WeakColl, Idx]() -> FText
 									{
-										return FSlateColor(FLinearColor::White);
-									}
-									const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-									if (!Result.IsValid())
+										const UPCGExAssetCollection* Coll = WeakColl.Get();
+										if (!Coll) { return FText::GetEmpty(); }
+										const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+										if (!Result.IsValid()) { return FText::GetEmpty(); }
+										const FPCGExAssetGrammarDetails* G = Result.Entry->GetEffectiveGrammar(Coll);
+										return G ? FText::FromName(G->Symbol) : FText::GetEmpty();
+									})
+									.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8))
+									.ColorAndOpacity_Lambda([WeakColl, Idx]() -> FSlateColor
 									{
-										return FSlateColor(FLinearColor::White);
-									}
-									const FLinearColor& C = Result.Entry->AssetGrammar.DebugColor;
-									const float Perceived =
-										0.299f * FMath::Sqrt(FMath::Max(0.f, C.R)) +
-										0.587f * FMath::Sqrt(FMath::Max(0.f, C.G)) +
-										0.114f * FMath::Sqrt(FMath::Max(0.f, C.B));
-									return FSlateColor(Perceived > 0.6f ? FLinearColor::Black : FLinearColor::White);
-								})
+										const UPCGExAssetCollection* Coll = WeakColl.Get();
+										if (!Coll) { return FSlateColor(FLinearColor::White); }
+										const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
+										if (!Result.IsValid()) { return FSlateColor(FLinearColor::White); }
+										const FPCGExAssetGrammarDetails* G = Result.Entry->GetEffectiveGrammar(Coll);
+										if (!G) { return FSlateColor(FLinearColor::White); }
+										return PCGExCollectionEditorSlateUtils::PickReadableTextColor(G->DebugColor);
+									})
+								]
 							]
 						]
 					]
@@ -819,6 +857,12 @@ FReply SPCGExCollectionGridTile::OnDragDetected(const FGeometry& MyGeometry, con
 		return OnTileDragDetected.Execute(EntryIndex, MouseEvent);
 	}
 	return FReply::Unhandled();
+}
+
+void SPCGExCollectionGridTile::HandlePickerPropertyEdited(FName PropertyName)
+{
+	RefreshThumbnail();
+	OnTileEntryChanged.ExecuteIfBound(EntryIndex, PropertyName);
 }
 
 void SPCGExCollectionGridTile::RefreshThumbnail()

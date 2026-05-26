@@ -33,7 +33,6 @@ public:
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
-protected:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const;
 
 	virtual bool OnlyPassThroughOneEdgeWhenDisabled() const override

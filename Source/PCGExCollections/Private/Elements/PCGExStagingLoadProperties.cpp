@@ -374,18 +374,10 @@ namespace PCGExStagingLoadProperties
 			return;
 		}
 
-		// FixSubCollection's child-aggregation queries are axis-scoped -- each axis needs its
-		// own dedupe map.
-		TMap<const FPCGExAssetCollectionEntry*, double> SizeCachePerAxis[3];
+		FPCGExGrammarSizeCache SizeCache;
 		if (Settings->bWriteSize)
 		{
-			for (int32 a = 0; a < 3; a++)
-			{
-				if (LocalUsedAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))
-				{
-					SizeCachePerAxis[a].Reserve(Resolved.Num());
-				}
-			}
+			SizeCache.Reserve(Resolved.Num() * PCGExGrammarAxes::CountAxes(LocalUsedAxes));
 		}
 
 		for (const FResolved& R : Resolved)
@@ -415,7 +407,7 @@ namespace PCGExStagingLoadProperties
 				if (!(EntryAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))) { continue; }
 				FPCGSubdivisionSubmodule Module;
 				const bool bFixed = bIsSub
-					? Grammar->FixSubCollection(Entry->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCachePerAxis[a] : nullptr)
+					? Grammar->FixSubCollection(Entry->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCache : nullptr)
 					: Grammar->FixLeaf(Entry->Staging.Bounds, PCGExGrammarAxes::Bits[a], Module);
 				if (!bFixed) { continue; }
 
