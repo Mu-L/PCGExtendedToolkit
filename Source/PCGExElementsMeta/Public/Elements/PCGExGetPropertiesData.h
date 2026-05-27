@@ -193,15 +193,8 @@ struct FPCGExGetPropertiesDataContext final : FPCGExContext
 
 class FPCGExGetPropertiesDataElement final : public IPCGExElement
 {
-public:
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override;
-
 protected:
-	virtual FPCGContext* CreateContext() override
-	{
-		return new FPCGExGetPropertiesDataContext();
-	}
-
+	PCGEX_ELEMENT_CREATE_CONTEXT(GetPropertiesData)
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };

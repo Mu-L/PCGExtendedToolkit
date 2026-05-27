@@ -13,11 +13,13 @@
 #include "PCGContext.h"
 #include "PCGParamData.h"
 
+#include "PCGExCoreSettingsCache.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExMTCommon.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Helpers/PCGExBulkAttributeHelpers.h"
 #include "Helpers/PCGExMetaHelpers.h"
@@ -48,12 +50,6 @@ TArray<FPCGPinProperties> UPCGExGetPropertiesDataSettings::OutputPinProperties()
 }
 
 #pragma endregion
-
-bool FPCGExGetPropertiesDataElement::IsCacheable(const UPCGSettings* InSettings) const
-{
-	const UPCGExGetPropertiesDataSettings* Settings = static_cast<const UPCGExGetPropertiesDataSettings*>(InSettings);
-	PCGEX_GET_OPTION_STATE(Settings->CacheData, bDefaultCacheNodeOutput)
-}
 
 namespace PCGExGetPropertiesData
 {

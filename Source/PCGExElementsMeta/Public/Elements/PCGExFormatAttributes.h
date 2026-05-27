@@ -146,11 +146,7 @@ struct FPCGExFormatAttributesContext final : FPCGExContext
 class FPCGExFormatAttributesElement final : public IPCGExElement
 {
 protected:
-	virtual FPCGContext* CreateContext() override
-	{
-		return new FPCGExFormatAttributesContext();
-	}
-
+	PCGEX_ELEMENT_CREATE_CONTEXT(FormatAttributes)
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };

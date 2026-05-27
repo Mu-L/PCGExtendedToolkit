@@ -329,12 +329,6 @@ public:
 	FPCGExPropertyOutputSettings PropertyOutputSettings;
 };
 
-/**
- * Per-element context. Carries state across Boot → PostLoadAssetsDependencies → AdvanceWork.
- * Lets us register asset dependencies in Boot, resolve them in PostLoadAssetsDependencies (after
- * the framework's async load completes), and run the actual work in AdvanceWork without any
- * blocking loads on the hot path.
- */
 struct FPCGExGetCollectionDataContext final : FPCGExContext
 {
 	friend class FPCGExGetCollectionDataElement;
@@ -358,15 +352,8 @@ public:
 	virtual bool IsCacheable(const UPCGSettings* InSettings) const override;
 
 protected:
-	virtual FPCGContext* CreateContext() override
-	{
-		return new FPCGExGetCollectionDataContext();
-	}
+	PCGEX_ELEMENT_CREATE_CONTEXT(GetCollectionData)
 
-	/** Pin to main thread: lets LoadBlocking_AnyThread take the IsInGameThread() short-circuit
-	 *  instead of dispatching to game thread and waiting for the next tick, which removes the
-	 *  worker->main roundtrip latency from cold-load runs. The actual work the node does is
-	 *  minimal (orchestration + attribute writes), so we don't lose much by running on main. */
 	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override
 	{
 		return true;
