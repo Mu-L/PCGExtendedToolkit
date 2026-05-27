@@ -18,6 +18,7 @@
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGCustomAccessor.h"
 #include "Types/PCGExAttributeIdentity.h"
+#include "Types/PCGExTypeOpsImpl.h"
 #include "Types/PCGExTypes.h"
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"

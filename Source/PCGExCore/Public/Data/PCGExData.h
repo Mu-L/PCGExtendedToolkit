@@ -218,6 +218,8 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		T Min = T{};
 		T Max = T{};
 
+		bool bMinMaxCaptured = false;
+
 		TBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
 
 		virtual void ReadVoid(const int32 Index, PCGExTypes::FScopedTypedValue& OutValue) const override;

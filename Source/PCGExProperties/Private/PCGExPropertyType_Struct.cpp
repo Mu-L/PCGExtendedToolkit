@@ -71,22 +71,18 @@ void FPCGExProperty_Struct::CopyValueFrom(const FPCGExProperty* Source)
 	Value = Typed->Value;
 }
 
-void FPCGExProperty_Struct::SyncStructuralFromSchema(const FPCGExProperty& Schema)
+bool FPCGExProperty_Struct::SyncStructuralFromSchema(const FPCGExProperty& Schema)
 {
 	// Drops user-authored payload on type swap (matches Enum's documented policy).
 	const FPCGExProperty_Struct& Typed = static_cast<const FPCGExProperty_Struct&>(Schema);
 	const UScriptStruct* SchemaStruct = Typed.Value.GetScriptStruct();
+	const UScriptStruct* CurrentStruct = Value.GetScriptStruct();
 
-	if (!SchemaStruct)
-	{
-		Value.Reset();
-		return;
-	}
+	if (CurrentStruct == SchemaStruct) { return false; }
 
-	if (Value.GetScriptStruct() != SchemaStruct)
-	{
-		Value.InitializeAs(SchemaStruct);
-	}
+	if (!SchemaStruct) { Value.Reset(); }
+	else { Value.InitializeAs(SchemaStruct); }
+	return true;
 }
 
 FName FPCGExProperty_Struct::GetDisplayTypeName() const

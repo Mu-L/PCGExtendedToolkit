@@ -669,9 +669,18 @@ bool FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 		// per-property delta blanked the inner FInstancedStruct AND outer identity hadn't been
 		// migrated onto the CDO yet -- the same-index slot is the only signal left. Critical
 		// for preserving bEnabled toggles on instances of pre-fix authored data.
+		//
+		// Gated on the candidate ALSO being identity-less: an entry that still carries
+		// HeaderId/Name but didn't match any schema slot is a removed property, not a
+		// propagation casualty -- routing it here would misread "remove + add" as "rename"
+		// and silently preserve a stale value (and stale inner HeaderId) under the new name.
 		if (!Existing && OldOverrides.IsValidIndex(SchemaIndex))
 		{
-			Existing = &OldOverrides[SchemaIndex];
+			FPCGExPropertyOverrideEntry& Candidate = OldOverrides[SchemaIndex];
+			if (Candidate.HeaderId == 0 && Candidate.PropertyName.IsNone())
+			{
+				Existing = &Candidate;
+			}
 		}
 #endif
 

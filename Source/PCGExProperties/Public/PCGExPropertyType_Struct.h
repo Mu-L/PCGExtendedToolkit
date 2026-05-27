@@ -32,7 +32,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
