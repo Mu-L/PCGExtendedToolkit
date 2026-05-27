@@ -13,7 +13,9 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Colors/SColorBlock.h"
 #include "Widgets/Colors/SColorPicker.h"
+#include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
@@ -219,6 +221,135 @@ void FPCGExAssetGrammarCustomization::CustomizeHeader(
 
 namespace PCGExAssetGrammarCustomization
 {
+	/** Matrix-shaped popup picker for EPCGExGrammarAxisSize (Fixed row + 3 aggregators x 3 axes).
+	 *  Combo button shows the current selection's display name; clicking a cell commits and closes. */
+	static TSharedRef<SWidget> CreateSizeMatrixDropdown(TSharedPtr<IPropertyHandle> SizeHandle)
+	{
+		UEnum* Enum = FindFirstObjectSafe<UEnum>(TEXT("EPCGExGrammarAxisSize"));
+		if (!Enum || !SizeHandle.IsValid())
+		{
+			return SNullWidget::NullWidget;
+		}
+
+		// Shared holder so cell click handlers can close the popup after committing.
+		TSharedRef<TWeakPtr<SComboButton>> ComboHolder = MakeShared<TWeakPtr<SComboButton>>();
+
+		auto MakeCell = [SizeHandle, Enum, ComboHolder](EPCGExGrammarAxisSize CellVal, const FText& Label, float MinWidth) -> TSharedRef<SWidget>
+		{
+			const uint8 CellU8 = static_cast<uint8>(CellVal);
+			const int32 Idx = Enum->GetIndexByValue(CellU8);
+			const FText ToolTip = (Idx != INDEX_NONE) ? Enum->GetToolTipTextByIndex(Idx) : FText::GetEmpty();
+
+			auto IsSelected = [SizeHandle, CellU8]() -> bool
+			{
+				uint8 V = 0;
+				return SizeHandle->GetValue(V) == FPropertyAccess::Success && V == CellU8;
+			};
+
+			return SNew(SBox).MinDesiredWidth(MinWidth).MinDesiredHeight(22)
+			[
+				SNew(SButton)
+				.HAlign(HAlign_Center).VAlign(VAlign_Center)
+				.ContentPadding(FMargin(4, 1))
+				.ToolTipText(ToolTip)
+				.ButtonColorAndOpacity_Lambda([IsSelected]() -> FSlateColor
+				{
+					return IsSelected() ? FLinearColor(0.005f, 0.005f, 0.005f, 0.85f) : FLinearColor::Transparent;
+				})
+				.OnClicked_Lambda([SizeHandle, CellU8, ComboHolder]()
+				{
+					SizeHandle->SetValue(CellU8);
+					if (TSharedPtr<SComboButton> Pinned = ComboHolder->Pin())
+					{
+						Pinned->SetIsOpen(false);
+					}
+					return FReply::Handled();
+				})
+				[
+					SNew(STextBlock)
+					.Text(Label)
+					.Font(IDetailLayoutBuilder::GetDetailFontBold())
+					.ColorAndOpacity_Lambda([IsSelected]() -> FSlateColor
+					{
+						return IsSelected() ? FLinearColor::White : FLinearColor(0.6f, 0.6f, 0.6f);
+					})
+				]
+			];
+		};
+
+		auto MakeRowLabel = [](const FText& Text) -> TSharedRef<SWidget>
+		{
+			return SNew(SBox).MinDesiredWidth(70).VAlign(VAlign_Center).Padding(FMargin(4, 0))
+			[
+				SNew(STextBlock)
+				.Text(Text)
+				.Font(IDetailLayoutBuilder::GetDetailFont())
+				.ColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.75f, 0.75f)))
+			];
+		};
+
+		auto GetMenuContent = [MakeCell, MakeRowLabel]() -> TSharedRef<SWidget>
+		{
+			constexpr float AxisCellWidth = 28.f;
+			constexpr float LabelColWidth = 70.f;
+			// Fixed row matches label + 3 cells so the matrix stays rectangular.
+			constexpr float FixedRowWidth = LabelColWidth + AxisCellWidth * 3.f + 4.f;
+
+			return SNew(SBox).Padding(FMargin(4))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(2))
+				[
+					MakeCell(EPCGExGrammarAxisSize::Fixed, FText::FromString(TEXT("Fixed")), FixedRowWidth)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(2))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth()[ MakeRowLabel(FText::FromString(TEXT("Smallest"))) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Min_X, FText::FromString(TEXT("X")), AxisCellWidth) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Min_Y, FText::FromString(TEXT("Y")), AxisCellWidth) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Min_Z, FText::FromString(TEXT("Z")), AxisCellWidth) ]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(2))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth()[ MakeRowLabel(FText::FromString(TEXT("Largest"))) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Max_X, FText::FromString(TEXT("X")), AxisCellWidth) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Max_Y, FText::FromString(TEXT("Y")), AxisCellWidth) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Max_Z, FText::FromString(TEXT("Z")), AxisCellWidth) ]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(FMargin(2))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth()[ MakeRowLabel(FText::FromString(TEXT("Average"))) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Avg_X, FText::FromString(TEXT("X")), AxisCellWidth) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Avg_Y, FText::FromString(TEXT("Y")), AxisCellWidth) ]
+					+ SHorizontalBox::Slot().AutoWidth().Padding(1, 0)[ MakeCell(EPCGExGrammarAxisSize::Avg_Z, FText::FromString(TEXT("Z")), AxisCellWidth) ]
+				]
+			];
+		};
+
+		TSharedPtr<SComboButton> Combo;
+		SAssignNew(Combo, SComboButton)
+			.HasDownArrow(true)
+			.OnGetMenuContent_Lambda(GetMenuContent)
+			.ButtonContent()
+			[
+				SNew(STextBlock)
+				.Font(IDetailLayoutBuilder::GetDetailFont())
+				.Text_Lambda([SizeHandle, Enum]()
+				{
+					uint8 V = 0;
+					if (SizeHandle->GetValue(V) != FPropertyAccess::Success) { return FText::GetEmpty(); }
+					const int32 Idx = Enum->GetIndexByValue(V);
+					return Idx != INDEX_NONE ? Enum->GetDisplayNameTextByIndex(Idx) : FText::GetEmpty();
+				})
+			];
+
+		*ComboHolder = Combo;
+		return Combo.ToSharedRef();
+	}
+
 	/** Build one per-axis row. Hidden when the matching Axes bit is unset.
 	 *  Layout: NameContent = axis letter + Size radio + Scalable checkbox.
 	 *          ValueContent = SizeOp cycle button (when not Fixed) + FixedSize spinner (when Fixed or op-set). */
@@ -244,10 +375,10 @@ namespace PCGExAssetGrammarCustomization
 		TSharedPtr<IPropertyHandle> ScalableHandle  = SizingHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExGrammarAxisDetails, bScalable));
 
 		// Gate Size options by context: leaves can't aggregate (no children), subs have no own bounds.
-		// EPCGExGrammarAxisSize: 0=Bounds, 1=Fixed, 2=Min, 3=Max, 4=Average.
+		// EPCGExGrammarAxisSize: 0=Bounds, 1=Fixed, 2..4=Min_X/Y/Z, 5..7=Max_X/Y/Z, 8..10=Avg_X/Y/Z.
 		const TSet<int32> SkipSizeIndices = bIsSubContext
-			? TSet<int32>{0}              // hide Bounds for subcollections
-			: TSet<int32>{2, 3, 4};       // hide Min/Max/Average for leaves
+			? TSet<int32>{0}                              // hide Bounds for subcollections
+			: TSet<int32>{2, 3, 4, 5, 6, 7, 8, 9, 10};    // hide all Min_*/Max_*/Avg_* for leaves
 
 		const uint8 BitMask = static_cast<uint8>(AxisBit);
 
@@ -274,15 +405,13 @@ namespace PCGExAssetGrammarCustomization
 					.Font(IDetailLayoutBuilder::GetDetailFontBold())
 					.MinDesiredWidth(10)
 				]
-				// Size selector. Leaf has 2 visible options (Bounds/Fixed) -- inline icon radios are
-				// compact. Subcollection has 4 (Fixed/Min/Max/Average) -- icon row gets dense, so
-				// drop to a regular dropdown instead.
+				// Leaf: inline icon radios for Bounds/Fixed. Subcollection: matrix popup for the 10 entries.
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
 					SNew(SBox).IsEnabled_Lambda(IsLocalData)
 					[
 						bIsSubContext
-							? PCGExEnumCustomization::CreateDropdown(SizeHandle, TEXT("EPCGExGrammarAxisSize"), SkipSizeIndices)
+							? PCGExAssetGrammarCustomization::CreateSizeMatrixDropdown(SizeHandle)
 							: PCGExEnumCustomization::CreateRadioGroup(SizeHandle, TEXT("EPCGExGrammarAxisSize"), SkipSizeIndices)
 					]
 				]

@@ -12,6 +12,7 @@ struct FPCGExAssetCollectionEntry;
 struct FPCGExContext;
 class FPCGMetadataAttributeBase;
 class UPCGMetadata;
+class UPCGData;
 
 namespace PCGExCollections
 {
@@ -34,6 +35,47 @@ namespace PCGExCollections
 		FName PropertyName);
 
 	/**
+	 * @Data-domain counterpart to FPCGExCollectionPropertySetWriter: writes each configured
+	 * schema property as a single @Data value on InData, sourced from Host->CollectionProperties.
+	 * Entry overrides are NOT consulted (schema only) -- this is the annotation path, not the
+	 * per-entry write.
+	 *
+	 * Null Host -> per-property writes are skipped (no attribute is declared). Use the identity
+	 * attributes (RootCollectionIndex etc.) to detect null-resolved inputs downstream.
+	 *
+	 * Standalone helper rather than a method on FPCGExCollectionPropertySetWriter so callers can
+	 * use it without first calling Initialize -- @Data writes don't share machinery with the
+	 * per-row @Element write loop and don't need the prototype-cached Writers list.
+	 */
+	PCGEXCOLLECTIONS_API void WriteSchemaToDataDomain(
+		FPCGExContext* InContext,
+		const FPCGExPropertyOutputSettings& OutputSettings,
+		const UPCGExAssetCollection* Host,
+		UPCGData* InData);
+
+	/**
+	 * @Element-domain sibling: writes each configured schema property as a per-row attribute on
+	 * InData, where row r reads from PerRowHosts[r]->CollectionProperties.
+	 *
+	 * Heterogeneous-host friendly: rows can reference different collections; the prototype (and
+	 * thus the attribute type + null-host default value) is taken from the first collection in
+	 * PerRowHosts that declares the property. Rows whose host doesn't declare the property fall
+	 * back to that same prototype default.
+	 *
+	 * All-null PerRowHosts -> skips the property entirely (no prototype available, no schema to
+	 * read). Empty PerRowHosts -> no-op.
+	 *
+	 * Uses the same accessor-keys pattern as the identity-attr writes in AnnotateSources, so it
+	 * works uniformly for point data (keys = point indices) and attribute-set data (keys = entry
+	 * indices).
+	 */
+	PCGEXCOLLECTIONS_API void WriteSchemaToElementDomain(
+		FPCGExContext* InContext,
+		const FPCGExPropertyOutputSettings& OutputSettings,
+		UPCGData* InData,
+		TConstArrayView<const UPCGExAssetCollection*> PerRowHosts);
+
+	/**
 	 * Writes FPCGExPropertyOutputSettings-driven custom properties to an attribute set
 	 * (UPCGMetadata) for collection-backed generation nodes.
 	 *
@@ -53,6 +95,11 @@ namespace PCGExCollections
 	 * Per-entry source resolution: Entry->PropertyOverrides takes precedence, then
 	 * Host->CollectionProperties default. Type mismatches between source and writer are
 	 * skipped silently (leaves default value on the attribute).
+	 *
+	 * Thin wrapper over FPCGExPropertySetWriter -- this class is now collection-only glue
+	 * (turn UPCGExAssetCollection* / FPCGExAssetCollectionEntry* into the lookup callables the
+	 * generic writer expects). Anything that wants the same metadata-write machinery on a
+	 * non-collection schema source should use FPCGExPropertySetWriter directly.
 	 */
 	class PCGEXCOLLECTIONS_API FPCGExCollectionPropertySetWriter
 	{
@@ -85,17 +132,24 @@ namespace PCGExCollections
 
 		bool HasOutputs() const
 		{
-			return Writers.Num() > 0;
+			return Inner.HasOutputs();
 		}
 
 	protected:
-		struct FWriter
+		/** Lightweight IPCGExPropertyProvider used purely for prototype lookup during Initialize.
+		 *  Per-entry source resolution is handled by WriteEntry directly (via WriteAt + the existing
+		 *  ResolveEntrySourceProperty helper) -- the dynamic (Entry, Host) shape doesn't fit the
+		 *  per-source-index lookup that provider-based WriteEntry expects. */
+		struct FCollectionPrototypeProvider final : public IPCGExPropertyProvider
 		{
-			FName PropertyName;
-			FInstancedStruct WriterInstance;
-			FPCGMetadataAttributeBase* Attribute = nullptr;
+			TArray<const UPCGExAssetCollection*> SearchOrder;
+
+			virtual TConstArrayView<FInstancedStruct> GetProperties(int32 /*Index*/) const override { return {}; }
+			virtual TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const override { return {}; }
+			virtual const FInstancedStruct* FindPrototypeProperty(FName PropertyName) const override;
 		};
 
-		TArray<FWriter> Writers;
+		FCollectionPrototypeProvider Provider;
+		FPCGExPropertySetWriter Inner;
 	};
 }

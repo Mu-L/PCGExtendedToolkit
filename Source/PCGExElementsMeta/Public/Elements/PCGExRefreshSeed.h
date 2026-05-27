@@ -4,11 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-
-
+#include "PCGExFilterCommon.h"
 #include "Core/PCGExPointsProcessor.h"
-
-
+#include "Factories/PCGExFactories.h"
 #include "PCGExRefreshSeed.generated.h"
 
 /**
@@ -35,6 +33,15 @@ public:
 	}
 #endif
 
+	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourceFiltersLabel, "Filters", PCGExFactories::PointFilters, false)
+
+	virtual bool SupportsDataStealing() const override
+	{
+		return true;
+	}
+
+	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
+
 protected:
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
@@ -48,6 +55,9 @@ public:
 struct FPCGExRefreshSeedContext final : FPCGExPointsProcessorContext
 {
 	friend class FPCGExRefreshSeedElement;
+
+protected:
+	PCGEX_ELEMENT_BATCH_POINT_DECL
 };
 
 class FPCGExRefreshSeedElement final : public FPCGExPointsProcessorElement
@@ -55,6 +65,20 @@ class FPCGExRefreshSeedElement final : public FPCGExPointsProcessorElement
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(RefreshSeed)
 
-	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };
+
+namespace PCGExRefreshSeed
+{
+	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExRefreshSeedContext, UPCGExRefreshSeedSettings>
+	{
+	public:
+		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
+			: TProcessor(InPointDataFacade)
+		{
+		}
+
+		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
+		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
+	};
+}

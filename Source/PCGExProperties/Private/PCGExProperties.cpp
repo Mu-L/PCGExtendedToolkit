@@ -367,14 +367,14 @@ void FPCGExPropertySchemaCollection::ApplyToOverrides(TArray<FPCGExPropertyOverr
 	}
 }
 
-void FPCGExPropertySchemaCollection::ReconcileImportOverrides()
+bool FPCGExPropertySchemaCollection::ReconcileImportOverrides()
 {
 	TArray<FPCGExPropertyResolved> Resolved;
 	Resolve(Resolved);
-	ReconcileImportOverrides(Resolved);
+	return ReconcileImportOverrides(Resolved);
 }
 
-void FPCGExPropertySchemaCollection::ReconcileImportOverrides(const TArray<FPCGExPropertyResolved>& Resolved)
+bool FPCGExPropertySchemaCollection::ReconcileImportOverrides(const TArray<FPCGExPropertyResolved>& Resolved)
 {
 	check(IsInGameThread());
 
@@ -404,7 +404,7 @@ void FPCGExPropertySchemaCollection::ReconcileImportOverrides(const TArray<FPCGE
 		ImportedOnlySchema.Add(MoveTemp(Patched));
 	}
 
-	ImportOverrides.SyncToSchema(ImportedOnlySchema);
+	return ImportOverrides.SyncToSchema(ImportedOnlySchema);
 }
 
 void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchemaCollection& Archetype)
@@ -533,8 +533,56 @@ void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchem
 // At runtime (no WITH_EDITOR), the HeaderId path is skipped and all overrides
 // are rebuilt from schema defaults.
 
-void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schema)
+bool FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schema)
 {
+#if WITH_EDITOR
+	// Fast path: structure matches entry-for-entry. Refresh in place; the slow path below
+	// reallocates Overrides, dangling FStructOnScope aliases held by per-entry detail
+	// customizations (causes scrambled values, undo-time access violations). Reconcile
+	// usually arrives with no structural change, so this is the hot path.
+	if (Overrides.Num() == Schema.Num())
+	{
+		bool bStructureMatches = true;
+		for (int32 i = 0; i < Schema.Num(); ++i)
+		{
+			const FPCGExProperty* SchemaProp = Schema[i].GetPtr<FPCGExProperty>();
+			if (!SchemaProp ||
+				Overrides[i].Value.GetScriptStruct() != Schema[i].GetScriptStruct() ||
+				Overrides[i].HeaderId != SchemaProp->HeaderId)
+			{
+				bStructureMatches = false;
+				break;
+			}
+		}
+		if (bStructureMatches)
+		{
+			bool bChanged = false;
+			for (int32 i = 0; i < Schema.Num(); ++i)
+			{
+				const FPCGExProperty* SchemaProp = Schema[i].GetPtr<FPCGExProperty>();
+				if (Overrides[i].PropertyName != SchemaProp->PropertyName)
+				{
+					Overrides[i].PropertyName = SchemaProp->PropertyName;
+					bChanged = true;
+				}
+				if (FPCGExProperty* MyProp = Overrides[i].GetPropertyMutable())
+				{
+					if (MyProp->PropertyName != SchemaProp->PropertyName)
+					{
+						MyProp->PropertyName = SchemaProp->PropertyName;
+						bChanged = true;
+					}
+					if (MyProp->SyncStructuralFromSchema(*SchemaProp))
+					{
+						bChanged = true;
+					}
+				}
+			}
+			return bChanged;
+		}
+	}
+#endif
+
 	// Match existing entries to the new schema by OUTER identity (HeaderId primary, PropertyName
 	// fallback). Outer identity lives on FPCGExPropertyOverrideEntry directly, not inside Value's
 	// FInstancedStruct, so it survives UE's broken per-property delta propagation.
@@ -654,6 +702,10 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 			NewEntry.bEnabled = false;
 		}
 	}
+
+	// Slow path always rebuilds storage -- the relocated backing memory is itself an
+	// observable change regardless of bitwise content equality.
+	return true;
 }
 
 void FPCGExPropertyOverrides::ApplyHeaderIdRemap(TConstArrayView<FPCGExHeaderIdRemap> Remaps)

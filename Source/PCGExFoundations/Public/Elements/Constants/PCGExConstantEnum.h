@@ -186,8 +186,5 @@ protected:
 	// Stage bitflags
 	static void StageBitFlags(FPCGExContext* InContext, const UPCGExConstantEnumSettings* Settings, FPCGExBitmask& OutBitflags);
 
-	virtual FPCGContext* CreateContext() override
-	{
-		return new FPCGExContext();
-	}
+	PCGEX_ELEMENT_CREATE_DEFAULT_CONTEXT
 };
