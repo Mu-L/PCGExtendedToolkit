@@ -110,7 +110,7 @@ public:
 	}
 
 	/** Bounds evaluator for bounds computation. If null, basic GetActorBounds fallback is used. */
-	UPROPERTY(EditAnywhere, Instanced, Category = "Bounds")
+	UPROPERTY(EditAnywhere, Instanced, Category = "Settings|Import")
 	TObjectPtr<UPCGExBoundsEvaluator> BoundsEvaluator;
 
 	// Entries Array
@@ -125,7 +125,7 @@ public:
 	 * overwritten on each export to mirror the exporter's SchemaMergePolicy so manual
 	 * rebuilds of the embedded asset stay consistent with how it was generated.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Properties")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Import")
 	EPCGExSchemaMergePolicy SchemaMergePolicy = EPCGExSchemaMergePolicy::StrictTypeMatch;
 
 	/**

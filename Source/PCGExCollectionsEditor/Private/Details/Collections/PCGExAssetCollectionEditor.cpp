@@ -140,16 +140,14 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		FTabManager::NewPrimaryArea()
 		->SetOrientation(Orient_Horizontal);
 
-	// Bumped to _v7: Assets tab now defaults to left sidebar (vertical tab button)
-	// instead of being fully closed. Users who had a saved v6 layout will get the
-	// new default on first open; subsequent drag-to-reconfigure is preserved.
 	const TSharedRef<FTabManager::FLayout> Layout =
-		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v7")
+		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v9")
 		->AddArea(Area);
 
 	TSharedRef<FTabManager::FStack> MainStack = FTabManager::NewStack();
-	// Add tabs in reverse order so grid comes first; Assets tab is docked to the
-	// left sidebar as a collapsed vertical tab (clickable to expand as an overlay).
+	// Iterate Tabs in reverse: the LAST entry in Tabs (Grid, by CreateTabs ordering)
+	// is added FIRST to the stack and becomes the leftmost tab. Assets is docked to
+	// the left sidebar as a collapsed vertical tab (clickable to expand as overlay).
 	for (int i = Tabs.Num() - 1; i >= 0; i--)
 	{
 		if (Tabs[i].Id == FName("Assets"))
@@ -167,10 +165,7 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 	}
 	Area->Split(MainStack);
 
-	if (!Tabs.IsEmpty())
-	{
-		MainStack->SetForegroundTab(Tabs.Last().Id);
-	}
+	MainStack->SetForegroundTab(FName("Grid"));
 
 	InitAssetEditor(EToolkitMode::Standalone, InitToolkitHost, FName("PCGExAssetCollectionEditor"), Layout, bCreateDefaultStandaloneMenu, bCreateDefaultToolbar, ObjectsToEdit);
 
@@ -185,6 +180,18 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 
 	AddToolbarExtender(ToolbarExtender);
 	RegenerateMenusAndToolbars();
+
+	// Forcibly activate Grid as the initial tab on EVERY open. UE persists tab-manager
+	// state (including which tab was foreground at close) per layout name in
+	// GEditorLayoutIni; once that file contains a saved layout for our name, it fully
+	// replaces our StandaloneDefaultLayout (see FAssetEditorToolkit::InitAssetEditor +
+	// FLayoutSaveRestore::LoadFromConfig). That means SetForegroundTab(Grid) only takes
+	// effect on the very first open under a given layout version -- thereafter, persisted
+	// state wins. Invoking the tab post-init bypasses that entirely.
+	if (const TSharedPtr<FTabManager>& TabMgr = GetTabManager())
+	{
+		TabMgr->TryInvokeTab(FName("Grid"));
+	}
 }
 
 UPCGExAssetCollection* FPCGExAssetCollectionEditor::GetEditedCollection() const
@@ -318,11 +325,14 @@ void FPCGExAssetCollectionEditor::CreateTabs(TArray<PCGExAssetCollectionEditor::
 
 	// Set the asset to display
 	DetailsView->SetObject(EditedCollection.Get());
+	
+	CreateEntriesTab(OutTabs);
 
 	PCGExAssetCollectionEditor::TabInfos& Infos = OutTabs.Emplace_GetRef(FName("Collection"), DetailsView, FName("Collection Settings"));
 	Infos.Icon = TEXT("Settings");
 
-	CreateEntriesTab(OutTabs);
+	// Grid LAST so the reverse-iteration loop in InitEditor adds it FIRST to MainStack,
+	// making Grid the leftmost tab. Don't reorder without also updating that loop.
 	CreateGridTab(OutTabs);
 }
 
@@ -395,29 +405,22 @@ void FPCGExAssetCollectionEditor::CreateGridTab(TArray<PCGExAssetCollectionEdito
 	Infos.Footer = FooterToolbarBuilder.MakeWidget();
 }
 
-TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
+TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildSubCollectionPickerSlot(
 	TWeakObjectPtr<UPCGExAssetCollection> InCollection,
 	int32 EntryIndex,
-	FSimpleDelegate OnAssetChanged)
+	FOnTilePropertyEdited OnPropertyEdited) const
 {
 	TWeakObjectPtr<UPCGExAssetCollection> WeakColl = InCollection;
 	const int32 Idx = EntryIndex;
 
-	// Resolve property metadata once -- the struct type doesn't change at runtime
-	const FName PickerPropName = GetTilePickerPropertyName();
-	const UClass* AllowedClass = GetTilePickerAllowedClass();
-
-	// Resolve SubCollection property class from reflection
 	const UClass* SubCollectionClass = nullptr;
 	if (UPCGExAssetCollection* Coll = WeakColl.Get())
 	{
-		FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-		if (ArrayProp)
+		if (FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName)))
 		{
-			FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-			if (InnerProp && InnerProp->Struct)
+			if (FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner); InnerProp && InnerProp->Struct)
 			{
-				if (const FObjectPropertyBase* SubProp = CastField<FObjectPropertyBase>(InnerProp->Struct->FindPropertyByName(FName("SubCollection"))))
+				if (const FObjectPropertyBase* SubProp = CastField<FObjectPropertyBase>(InnerProp->Struct->FindPropertyByName(PCGExAssetCollectionEditor::SubCollectionName)))
 				{
 					SubCollectionClass = SubProp->PropertyClass;
 				}
@@ -425,20 +428,11 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 		}
 	}
 
-	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
-
-	// SubCollection picker (visible when bIsSubCollection is true)
-	Box->AddSlot()
-	   .AutoHeight()
-	[
-		SNew(SBox)
+	return SNew(SBox)
 		.Visibility_Lambda([WeakColl, Idx]()
 		{
 			const UPCGExAssetCollection* Coll = WeakColl.Get();
-			if (!Coll)
-			{
-				return EVisibility::Collapsed;
-			}
+			if (!Coll) { return EVisibility::Collapsed; }
 			const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
 			return (Result.IsValid() && Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
 		})
@@ -448,49 +442,76 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 			.ObjectPath_Lambda([WeakColl, Idx]() -> FString
 			{
 				const UPCGExAssetCollection* Coll = WeakColl.Get();
-				if (!Coll)
-				{
-					return FString();
-				}
+				if (!Coll) { return FString(); }
 				const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-				if (!Result.IsValid())
-				{
-					return FString();
-				}
+				if (!Result.IsValid()) { return FString(); }
 				const UPCGExAssetCollection* SubColl = Result.Entry->GetSubCollectionPtr();
 				return SubColl ? SubColl->GetPathName() : FString();
 			})
-			.OnObjectChanged_Lambda([WeakColl, Idx, OnAssetChanged](const FAssetData& AssetData)
+			.OnObjectChanged_Lambda([WeakColl, Idx, OnPropertyEdited](const FAssetData& AssetData)
 			{
 				UPCGExAssetCollection* Coll = WeakColl.Get();
-				if (!Coll)
-				{
-					return;
-				}
-				FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-				if (!Entry)
-				{
-					return;
-				}
+				if (!Coll) { return; }
+
+				FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
+				if (!ArrayProp) { return; }
+				FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
+				if (!InnerProp || !InnerProp->Struct) { return; }
+				void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
+				FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+				if (Idx < 0 || Idx >= ArrayHelper.Num()) { return; }
+				uint8* EntryPtr = ArrayHelper.GetRawPtr(Idx);
+
 				FScopedTransaction Transaction(INVTEXT("Set SubCollection"));
 				Coll->Modify();
-				// Write the InternalSubCollection via the base class pointer
-				Entry->InternalSubCollection = Cast<UPCGExAssetCollection>(AssetData.GetAsset());
+
+				// Write the typed SubCollection UPROPERTY -- the base InternalSubCollection field
+				// is resynced from this on every PostEditChange via EDITOR_Sanitize, so writes
+				// to it directly are silently reverted.
+				if (const FObjectPropertyBase* SubProp = CastField<FObjectPropertyBase>(InnerProp->Struct->FindPropertyByName(PCGExAssetCollectionEditor::SubCollectionName)))
+				{
+					SubProp->SetObjectPropertyValue_InContainer(EntryPtr, AssetData.GetAsset());
+				}
+				else
+				{
+					// Entry types without a typed SubCollection field: write the base storage directly.
+					FPCGExAssetCollectionEntry* BaseEntry = reinterpret_cast<FPCGExAssetCollectionEntry*>(EntryPtr);
+					BaseEntry->InternalSubCollection = Cast<UPCGExAssetCollection>(AssetData.GetAsset());
+				}
+
 				Coll->PostEditChange();
-				OnAssetChanged.ExecuteIfBound();
+				OnPropertyEdited.ExecuteIfBound(PCGExAssetCollectionEditor::SubCollectionName);
 			})
 			.DisplayThumbnail(false)
-		]
+		];
+}
+
+TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
+	TWeakObjectPtr<UPCGExAssetCollection> InCollection,
+	int32 EntryIndex,
+	FOnTilePropertyEdited OnPropertyEdited)
+{
+	TWeakObjectPtr<UPCGExAssetCollection> WeakColl = InCollection;
+	const int32 Idx = EntryIndex;
+
+	const FName PickerPropName = GetTilePickerPropertyName();
+	const UClass* AllowedClass = GetTilePickerAllowedClass();
+
+	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
+
+	Box->AddSlot()
+	   .AutoHeight()
+	[
+		BuildSubCollectionPickerSlot(WeakColl, Idx, OnPropertyEdited)
 	];
 
-	// Asset picker (visible when bIsSubCollection is false)
-	// Detect property type once at construction to choose the right widget
+	// Asset picker (visible when bIsSubCollection is false). Detect property type once at construction.
 	if (!PickerPropName.IsNone())
 	{
 		bool bIsClassProperty = false;
 		if (UPCGExAssetCollection* Coll = WeakColl.Get())
 		{
-			FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+			FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 			if (ArrayProp)
 			{
 				FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
@@ -528,7 +549,7 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 						{
 							return nullptr;
 						}
-						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 						if (!ArrayProp)
 						{
 							return nullptr;
@@ -553,14 +574,14 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 						const FSoftObjectPtr& SoftRef = *ClassProp->GetPropertyValuePtr_InContainer(EntryPtr);
 						return Cast<UClass>(SoftRef.Get());
 					})
-					.OnSetClass_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const UClass* NewClass)
+					.OnSetClass_Lambda([WeakColl, Idx, PickerPropName, OnPropertyEdited](const UClass* NewClass)
 					{
 						UPCGExAssetCollection* Coll = WeakColl.Get();
 						if (!Coll)
 						{
 							return;
 						}
-						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 						if (!ArrayProp)
 						{
 							return;
@@ -588,7 +609,7 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 						FSoftObjectPtr& SoftRef = *ClassProp->GetPropertyValuePtr_InContainer(EntryPtr);
 						SoftRef = NewClass ? FSoftObjectPath(NewClass) : FSoftObjectPath();
 						Coll->PostEditChange();
-						OnAssetChanged.ExecuteIfBound();
+						OnPropertyEdited.ExecuteIfBound(PickerPropName);
 					})
 				]
 			];
@@ -620,7 +641,7 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 						{
 							return FString();
 						}
-						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 						if (!ArrayProp)
 						{
 							return FString();
@@ -658,14 +679,14 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 						}
 						return FString();
 					})
-					.OnObjectChanged_Lambda([WeakColl, Idx, PickerPropName, OnAssetChanged](const FAssetData& AssetData)
+					.OnObjectChanged_Lambda([WeakColl, Idx, PickerPropName, OnPropertyEdited](const FAssetData& AssetData)
 					{
 						UPCGExAssetCollection* Coll = WeakColl.Get();
 						if (!Coll)
 						{
 							return;
 						}
-						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
+						FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
 						if (!ArrayProp)
 						{
 							return;
@@ -703,7 +724,7 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 						}
 
 						Coll->PostEditChange();
-						OnAssetChanged.ExecuteIfBound();
+						OnPropertyEdited.ExecuteIfBound(PickerPropName);
 					})
 					.DisplayThumbnail(false)
 				]
@@ -1166,10 +1187,7 @@ void FPCGExAssetCollectionEditor::RegisterTabSpawners(const TSharedRef<FTabManag
 		}
 	}
 
-	if (!Tabs.IsEmpty())
-	{
-		InTabManager->SetMainTab(Tabs[0].Id);
-	}
+	InTabManager->SetMainTab(FName("Grid"));
 
 	FAssetEditorToolkit::RegisterTabSpawners(InTabManager);
 }

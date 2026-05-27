@@ -227,13 +227,13 @@ public:
 
 	// Mesh-Specific Properties
 
-	UPROPERTY(EditAnywhere, Category = Settings)
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
 	EPCGExGlobalVariationRule GlobalDescriptorMode = EPCGExGlobalVariationRule::PerEntry;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" ├─ Global ISM Settings"))
+	UPROPERTY(EditAnywhere, Category = "Settings|Global", meta=(DisplayName=" ├─ Global ISM Settings"))
 	FSoftISMComponentDescriptor GlobalISMDescriptor;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Global SM Settings"))
+	UPROPERTY(EditAnywhere, Category = "Settings|Global", meta=(DisplayName=" └─ Global SM Settings"))
 	FPCGExStaticMeshComponentDescriptor GlobalSMDescriptor;
 
 	// Entries Array

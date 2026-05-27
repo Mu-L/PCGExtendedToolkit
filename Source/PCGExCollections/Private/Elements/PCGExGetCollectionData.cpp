@@ -17,6 +17,7 @@
 #include "Metadata/Accessors/PCGCustomAccessor.h"
 #include "Elements/Grammar/PCGSubdivisionBase.h"
 #include "Helpers/PCGExCollectionPropertySetWriter.h"
+#include "Helpers/PCGExGetCollectionDataFlatten.h"
 #include "Helpers/PCGExMetaHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGetCollectionData"
@@ -39,7 +40,16 @@
 	_(FVector, Extents,      ExtentsAttributeName,      bWriteExtents,      FVector::OneVector, E->Staging.Bounds.GetExtent()) \
 	_(FVector, BoundsMin,    BoundsMinAttributeName,    bWriteBoundsMin,    FVector::OneVector, E->Staging.Bounds.Min) \
 	_(FVector, BoundsMax,    BoundsMaxAttributeName,    bWriteBoundsMax,    FVector::OneVector, E->Staging.Bounds.Max) \
-	_(int32,   NestingDepth, NestingDepthAttributeName, bWriteNestingDepth, -1,                 -1)
+	_(int32,   NestingDepth, NestingDepthAttributeName, bWriteNestingDepth, -1,                 EH.NestingDepth)
+
+// Per-row attributes (written for EVERY row, including sub-collection placeholders and empty rows).
+//   _(Type, FieldName, AttrNameMember, ToggleMember, Default, PerEntryValueExpr)
+// PerEntryValueExpr references `EH` (the FFlattenedEntry), which always exists even when EH.Entry
+// is null -- that's why these live outside the leaf-only write block.
+#define PCGEX_GCD_ROW_ATTRS(_) \
+	_(int32, RootCollectionIndex, RootCollectionIndexAttributeName, bWriteRootCollectionIndex, -1, EH.RootCollectionIndex) \
+	_(int32, CollectionIndex,     CollectionIndexAttributeName,     bWriteCollectionIndex,     -1, EH.CollectionIndex) \
+	_(int32, CollectionHash,      CollectionHashAttributeName,      bWriteCollectionHash,      -1, EH.CollectionHash)
 
 // Per-axis grammar attributes. Each row maps to an array-of-3 in FUniqueOutput (one slot per
 // axis bit), with attribute names produced by appending _X/_Y/_Z to the user-configured base name.
@@ -59,276 +69,10 @@
 #define PCGEX_VALIDATE_TOGGLED(InContext, Settings, Toggle, AttrName) \
 	if ((Settings)->Toggle) { PCGEX_VALIDATE_NAME_C(InContext, (Settings)->AttrName) }
 
-namespace PCGExGetCollectionData
-{
-	const FName SourcesPin = TEXT("Sources");
-	const FName OutputCollectionDataPin = TEXT("Data");
-	const FName EmptyTag = TEXT("empty");
-
-	/** Collected entry along with the collection that directly owns it and the resolved category. */
-	struct FFlattenedEntry
-	{
-		const FPCGExAssetCollectionEntry* Entry = nullptr;
-		const UPCGExAssetCollection* Host = nullptr;
-		FName Category = NAME_None;
-	};
-
-	/** Invariants shared across the flatten recursion. */
-	struct FProcessEntryContext
-	{
-		FPCGExContext* Context = nullptr;
-		const FPCGExNameFiltersDetails* CategoryFilters = nullptr;
-		EPCGExSubCollectionToSet SubHandling = EPCGExSubCollectionToSet::Ignore;
-		EPCGExCategoryInheritance CategoryInheritance = EPCGExCategoryInheritance::None;
-		bool bOmitInvalidAndEmpty = true;
-		bool bNoDuplicates = true;
-	};
-
-	static void ProcessEntry(
-		const FProcessEntryContext& Ctx,
-		const FPCGExAssetCollectionEntry* InEntry,
-		const UPCGExAssetCollection* InHost,
-		TArray<FFlattenedEntry>& OutEntries,
-		const FName EffectiveParentCategory,
-		TSet<uint64>& GUIDS)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExGetCollectionData::ProcessEntry);
-
-		if (Ctx.bNoDuplicates)
-		{
-			for (const FFlattenedEntry& Existing : OutEntries)
-			{
-				if (Existing.Entry == InEntry)
-				{
-					return;
-				}
-			}
-		}
-
-		auto AddNone = [&]()
-		{
-			if (Ctx.bOmitInvalidAndEmpty)
-			{
-				return;
-			}
-			OutEntries.Add({nullptr, nullptr, NAME_None});
-		};
-
-		if (!InEntry)
-		{
-			AddNone();
-			return;
-		}
-
-		if (!Ctx.CategoryFilters->Test(InEntry->Category.ToString()))
-		{
-			return;
-		}
-
-		auto ResolveCategory = [&](const FName Authored) -> FName
-		{
-			switch (Ctx.CategoryInheritance)
-			{
-			case EPCGExCategoryInheritance::FillEmpty:
-				return Authored.IsNone() ? EffectiveParentCategory : Authored;
-			case EPCGExCategoryInheritance::Replace:
-				return EffectiveParentCategory.IsNone() ? Authored : EffectiveParentCategory;
-			default:
-				return Authored;
-			}
-		};
-
-		auto AddEmpty = [&](const FPCGExAssetCollectionEntry* S)
-		{
-			if (Ctx.bOmitInvalidAndEmpty)
-			{
-				return;
-			}
-			OutEntries.Add({S, InHost, NAME_None});
-		};
-
-		if (!InEntry->bIsSubCollection)
-		{
-			OutEntries.Add({InEntry, InHost, ResolveCategory(InEntry->Category)});
-			return;
-		}
-
-		if (Ctx.SubHandling == EPCGExSubCollectionToSet::Ignore)
-		{
-			return;
-		}
-
-		if (Ctx.SubHandling == EPCGExSubCollectionToSet::Grammar)
-		{
-			if (InEntry->SubGrammarMode != EPCGExGrammarSubCollectionMode::Flatten)
-			{
-				OutEntries.Add({InEntry, InHost, ResolveCategory(InEntry->Category)});
-				return;
-			}
-		}
-
-		UPCGExAssetCollection* SubCollection = InEntry->Staging.LoadSync<UPCGExAssetCollection>(Ctx.Context);
-		const PCGExAssetCollection::FCache* SubCache = SubCollection ? SubCollection->LoadCache() : nullptr;
-
-		if (!SubCache)
-		{
-			AddEmpty(InEntry);
-			return;
-		}
-
-		bool bVisited = false;
-		GUIDS.Add(SubCollection->GetUniqueID(), &bVisited);
-		if (bVisited)
-		{
-			return;
-		}
-
-		const FName NextParent = InEntry->Category.IsNone() ? EffectiveParentCategory : InEntry->Category;
-
-		FPCGExEntryAccessResult SubResult;
-		switch (Ctx.SubHandling)
-		{
-		default: ;
-		case EPCGExSubCollectionToSet::Grammar:
-		case EPCGExSubCollectionToSet::Expand:
-			for (int i = 0; i < SubCache->Main->Order.Num(); i++)
-			{
-				SubResult = SubCollection->GetEntryAt(i);
-				ProcessEntry(Ctx, SubResult.Entry, SubResult.Host, OutEntries, NextParent, GUIDS);
-			}
-			return;
-		case EPCGExSubCollectionToSet::PickRandom:
-			SubResult = SubCollection->GetEntryRandom(0);
-			break;
-		case EPCGExSubCollectionToSet::PickRandomWeighted:
-			SubResult = SubCollection->GetEntryWeightedRandom(0);
-			break;
-		case EPCGExSubCollectionToSet::PickFirstItem:
-			SubResult = SubCollection->GetEntryAt(0);
-			break;
-		case EPCGExSubCollectionToSet::PickLastItem:
-			SubResult = SubCollection->GetEntryAt(SubCache->Main->Indices.Num() - 1);
-			break;
-		}
-
-		ProcessEntry(Ctx, SubResult.Entry, SubResult.Host, OutEntries, NextParent, GUIDS);
-	}
-
-	static void FlattenCollection(
-		const FProcessEntryContext& Ctx,
-		UPCGExAssetCollection* Collection,
-		TArray<FFlattenedEntry>& OutEntries)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExGetCollectionData::FlattenCollection);
-
-		if (!Collection)
-		{
-			return;
-		}
-
-		const PCGExAssetCollection::FCache* MainCache = Collection->LoadCache();
-		if (!MainCache)
-		{
-			return;
-		}
-
-		TSet<uint64> GUIDS;
-		for (int i = 0; i < MainCache->Main->Order.Num(); i++)
-		{
-			GUIDS.Empty();
-			FPCGExEntryAccessResult Result = Collection->GetEntryAt(i);
-			ProcessEntry(Ctx, Result.Entry, Result.Host, OutEntries, NAME_None, GUIDS);
-		}
-	}
-
-	/** Read all rows of T from a single input. One CreateConstAccessor + one GetRange call --
-	 *  drops hundreds of read-locked GetValueFromItemKey hits down to a single locked bulk read,
-	 *  and AllowBroadcastAndConstructible handles FString->FSoftObjectPath / narrower-int->int64
-	 *  coercion for free.
-	 *
-	 *  We can't use TAttributeBroadcaster directly: its FAttributeProcessingInfos::Init gates
-	 *  attribute discovery on Cast<UPCGSpatialData>(InData), which rejects UPCGParamData (attribute
-	 *  sets) silently. We talk to PCGAttributeAccessorHelpers directly to support both Param and
-	 *  Point inputs uniformly. */
-	template <typename T>
-	static void BulkReadRows(const UPCGData* InData, const FName AttributeName, TArray<T>& OutValues)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExGetCollectionData::BulkReadRows);
-
-		if (!InData)
-		{
-			return;
-		}
-
-		FPCGAttributePropertyInputSelector Selector;
-		Selector.Update(AttributeName.ToString());
-		Selector = Selector.CopyAndFixLast(InData);
-
-		TUniquePtr<const IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreateConstAccessor(InData, Selector);
-		if (!Accessor)
-		{
-			return;
-		}
-
-		TSharedPtr<IPCGAttributeAccessorKeys> Keys;
-		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
-		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
-		}
-		else if (InData->ConstMetadata())
-		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(InData->ConstMetadata());
-		}
-		if (!Keys)
-		{
-			return;
-		}
-
-		const int32 NumValues = Keys->GetNum();
-		if (NumValues <= 0)
-		{
-			return;
-		}
-
-		OutValues.SetNumUninitialized(NumValues);
-		if (!Accessor->GetRange<T>(OutValues, 0, *Keys, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible))
-		{
-			OutValues.Reset();
-		}
-	}
-
-	/** Single-value @Data-domain read for the PerInputData fanout mode. Falls back from
-	 *  FSoftObjectPath to FString (authored-as-string paths) before giving up. */
-	static FSoftObjectPath ReadSinglePath(FPCGExContext* InContext, const UPCGData* InData, const FName AttributeName)
-	{
-		if (!InData)
-		{
-			return FSoftObjectPath();
-		}
-		FSoftObjectPath Path;
-		if (PCGExData::Helpers::TryReadDataValue<FSoftObjectPath>(InContext, InData, AttributeName, Path, /*bQuiet=*/true))
-		{
-			return Path;
-		}
-		FString PathStr;
-		if (PCGExData::Helpers::TryReadDataValue<FString>(InContext, InData, AttributeName, PathStr, /*bQuiet=*/false))
-		{
-			return FSoftObjectPath(PathStr);
-		}
-		return FSoftObjectPath();
-	}
-
-	static int64 ReadSingleHash(FPCGExContext* InContext, const UPCGData* InData, const FName AttributeName)
-	{
-		if (!InData)
-		{
-			return 0;
-		}
-		int64 Hash = 0;
-		PCGExData::Helpers::TryReadDataValue<int64>(InContext, InData, AttributeName, Hash, /*bQuiet=*/false);
-		return Hash;
-	}
-}
+// Pin labels (SourcesPin, OutputCollectionDataPin, AnnotatedSourcesPin) and EmptyTag now live in
+// Helpers/PCGExGetCollectionDataFlatten.h alongside the flatten code -- both translation units need
+// them, so they're `inline const FName` in the header. This main file owns the settings/element
+// glue and the write/annotate path.
 
 #pragma region UPCGSettings interface
 
@@ -358,6 +102,10 @@ TArray<FPCGPinProperties> UPCGExGetCollectionDataSettings::InputPinProperties() 
 TArray<FPCGPinProperties> UPCGExGetCollectionDataSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
+	if (SourceMode == EPCGExGetCollectionDataSourceMode::FromInputs && bAnnotateSources)
+	{
+		PCGEX_PIN_ANY(PCGExGetCollectionData::AnnotatedSourcesPin, TEXT("One forwarded copy of each Sources input, augmented with identity attributes (RootCollectionIndex / CollectionIndex / CollectionHash where their respective output toggles are on)."), Required)
+	}
 	PCGEX_PIN_PARAMS(PCGExGetCollectionData::OutputCollectionDataPin, TEXT("One attribute set per resolved source (see Fanout)."), Required)
 	PCGEX_PIN_PARAM(PCGExCollections::Labels::OutputCollectionMapLabel, TEXT("Collection map covering every host referenced by the emitted attribute sets."), Required)
 	return PinProperties;
@@ -367,6 +115,30 @@ FPCGElementPtr UPCGExGetCollectionDataSettings::CreateElement() const
 {
 	return MakeShared<FPCGExGetCollectionDataElement>();
 }
+
+#if PCGEX_ENGINE_VERSION < 507
+EPCGDataType UPCGExGetCollectionDataSettings::GetCurrentPinTypes(const UPCGPin* InPin) const
+{
+	// Input pins + the Annotated Sources output mirror their input shape (Any) -- fall through.
+	// Data + Map outputs are always Param-typed attribute sets and must not be auto-deduced.
+	if (!InPin->IsOutputPin() || InPin->Properties.Label == PCGExGetCollectionData::AnnotatedSourcesPin)
+	{
+		return Super::GetCurrentPinTypes(InPin);
+	}
+	return EPCGDataType::Param;
+}
+#else
+FPCGDataTypeIdentifier UPCGExGetCollectionDataSettings::GetCurrentPinTypesID(const UPCGPin* InPin) const
+{
+	// Input pins + the Annotated Sources output mirror their input shape (Any) -- fall through.
+	// Data + Map outputs are always Param-typed attribute sets and must not be auto-deduced.
+	if (!InPin->IsOutputPin() || InPin->Properties.Label == PCGExGetCollectionData::AnnotatedSourcesPin)
+	{
+		return Super::GetCurrentPinTypesID(InPin);
+	}
+	return FPCGDataTypeInfoParam::AsId();
+}
+#endif
 
 #pragma endregion
 
@@ -395,6 +167,7 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 #define PCGEX_GCD_VALIDATE(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
 	PCGEX_VALIDATE_TOGGLED(InContext, Settings, Toggle, AttrName)
 	PCGEX_GCD_LEAF_ATTRS(PCGEX_GCD_VALIDATE)
+	PCGEX_GCD_ROW_ATTRS(PCGEX_GCD_VALIDATE)
 	PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS(PCGEX_GCD_VALIDATE)
 	PCGEX_GCD_GRAMMAR_SHARED_ATTRS(PCGEX_GCD_VALIDATE)
 #undef PCGEX_GCD_VALIDATE
@@ -414,164 +187,8 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 		return true;
 	}
 
-	// FromInputs mode -- parse inputs, gather paths, register dependencies for async load.
-	PCGEX_VALIDATE_NAME(Settings->SourceAttribute)
-
-	TArray<FPCGTaggedData> Inputs = InContext->InputData.GetInputsByPin(PCGExGetCollectionData::SourcesPin);
-	if (Inputs.IsEmpty())
-	{
-		return true;
-	} // nothing to do
-
-	// EntryIdAndMap: resolve hashes to sub-collection paths via the unpacker.
-	TSharedPtr<PCGExCollections::FPickUnpacker> Unpacker;
-	if (Settings->SourceShape == EPCGExGetCollectionDataSourceShape::EntryIdAndMap)
-	{
-		Unpacker = MakeShared<PCGExCollections::FPickUnpacker>();
-		Unpacker->UnpackPin(InContext, PCGExCollections::Labels::SourceCollectionMapLabel);
-		if (!Unpacker->HasValidMapping())
-		{
-			PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("EntryIdAndMap mode requires a valid Collection Map on the Map pin."));
-			return false;
-		}
-	}
-
-	const bool bDataDomainOnly = Settings->Fanout == EPCGExGetCollectionDataFanout::PerInputData;
-	const bool bIsSoftPath = Settings->SourceShape == EPCGExGetCollectionDataSourceShape::SoftPath;
-	const FName SourceAttribute = Settings->SourceAttribute;
-
-	// Per-input scratch: paths (SoftPath mode) or hashes (EntryIdAndMap mode).
-	// We split path resolution into two passes so we can parallelize each independently.
-	struct FInputParse
-	{
-		TArray<FSoftObjectPath> Paths;
-		TArray<int64> Hashes;
-	};
-	TArray<FInputParse> PerInput;
-	PerInput.SetNum(Inputs.Num());
-
-	// Phase A: parallel per-input bulk read. Each iteration owns its own PerInput[i] slot.
-	// Bulk GetRange replaces hundreds of read-locked GetValueFromItemKey calls with one.
-	PCGExMT::ParallelOrSequential(Inputs.Num(), [&](const int32 i)
-	{
-		const FPCGTaggedData& TD = Inputs[i];
-		FInputParse& Out = PerInput[i];
-
-		if (bDataDomainOnly)
-		{
-			// One value per input (regardless of read success -> empty slot on failure).
-			if (bIsSoftPath)
-			{
-				Out.Paths.Add(PCGExGetCollectionData::ReadSinglePath(InContext, TD.Data, SourceAttribute));
-			}
-			else
-			{
-				Out.Hashes.Add(PCGExGetCollectionData::ReadSingleHash(InContext, TD.Data, SourceAttribute));
-			}
-		}
-		else
-		{
-			if (bIsSoftPath)
-			{
-				PCGExGetCollectionData::BulkReadRows<FSoftObjectPath>(TD.Data, SourceAttribute, Out.Paths);
-			}
-			else
-			{
-				PCGExGetCollectionData::BulkReadRows<int64>(TD.Data, SourceAttribute, Out.Hashes);
-			}
-		}
-	}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
-
-	// Phase B (single-threaded): pre-size Slots, write SourceInputIndex backrefs and -- for
-	// SoftPath -- the paths themselves. For EntryIdAndMap we leave Path empty and fill it in phase C.
-	int32 TotalRows = 0;
-	for (const FInputParse& P : PerInput)
-	{
-		TotalRows += bIsSoftPath ? P.Paths.Num() : P.Hashes.Num();
-	}
-	Context->Slots.SetNum(TotalRows);
-
-	TArray<int64> FlatHashes; // only used for EntryIdAndMap
-	if (!bIsSoftPath)
-	{
-		FlatHashes.SetNumUninitialized(TotalRows);
-	}
-
-	{
-		int32 Cursor = 0;
-		for (int32 i = 0; i < Inputs.Num(); i++)
-		{
-			const FInputParse& P = PerInput[i];
-			const int32 RowCount = bIsSoftPath ? P.Paths.Num() : P.Hashes.Num();
-			for (int32 r = 0; r < RowCount; r++)
-			{
-				FPCGExGetCollectionDataContext::FSlot& Slot = Context->Slots[Cursor];
-				Slot.SourceInputIndex = i;
-				if (bIsSoftPath)
-				{
-					Slot.Path = P.Paths[r];
-				}
-				else
-				{
-					FlatHashes[Cursor] = P.Hashes[r];
-				}
-				Cursor++;
-			}
-		}
-	}
-
-	// Phase C: parallel hash -> sub-collection path resolution (EntryIdAndMap only).
-	// FPickUnpacker::UnpackHash is read-only on CollectionMap after UnpackPin, safe for concurrent reads.
-	if (!bIsSoftPath)
-	{
-		PCGExMT::ParallelOrSequential(TotalRows, [&](const int32 i)
-		{
-			const int64 Hash = FlatHashes[i];
-			int16 OutPrimary = 0;
-			int16 OutSecondary = 0;
-			UPCGExAssetCollection* HostCollection = Unpacker->UnpackHash(static_cast<uint64>(Hash), OutPrimary, OutSecondary);
-			if (!HostCollection)
-			{
-				return;
-			}
-			FPCGExEntryAccessResult AccessResult = HostCollection->GetEntryRaw(OutPrimary);
-			const FPCGExAssetCollectionEntry* Entry = AccessResult.Entry;
-			if (!Entry || !Entry->bIsSubCollection)
-			{
-				return;
-			} // leaf -> empty slot (per design)
-			Context->Slots[i].Path = Entry->Staging.Path;
-		}, /*Threshold=*/64, EParallelForFlags::None);
-	}
-
-	// Batch-load all unique valid paths synchronously. The framework's async LoadAssets path
-	// (AddAssetDependency) defers AdvanceWork to the next tick, which on cold loads stacks a
-	// full frame of wall-clock latency on top of the load itself. LoadBlocking_AnyThread keeps
-	// everything in this frame: warm-cache resolves are instant, cold loads stall a worker
-	// thread briefly -- same total cost as the load itself, no extra frame.
-	{
-		TSharedRef<TSet<FSoftObjectPath>> UniquePaths = MakeShared<TSet<FSoftObjectPath>>();
-		UniquePaths->Reserve(Context->Slots.Num());
-		for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
-		{
-			if (Slot.Path.IsValid())
-			{
-				UniquePaths->Add(Slot.Path);
-			}
-		}
-		if (!UniquePaths->IsEmpty())
-		{
-			PCGExHelpers::LoadBlocking_AnyThread(TSharedPtr<TSet<FSoftObjectPath>>(UniquePaths), InContext);
-		}
-
-		// Resolve into ResolvedCollections now that everything's in memory.
-		for (const FSoftObjectPath& Path : *UniquePaths)
-		{
-			Context->ResolvedCollections.Add(Path, Cast<UPCGExAssetCollection>(Path.ResolveObject()));
-		}
-	}
-
-	return true;
+	// FromInputs mode -- delegate the slot parsing + async load orchestration to the helper.
+	return PCGExGetCollectionData::ParseSourceInputsIntoSlots(Context, Settings);
 }
 
 namespace PCGExGetCollectionData
@@ -586,6 +203,9 @@ namespace PCGExGetCollectionData
 		UPCGExAssetCollection* Collection = nullptr; // primary collection (root for PropertyWriter / FixModuleInfos host context)
 		UPCGParamData* OutputSet = nullptr;
 		TSharedPtr<TArray<FFlattenedEntry>> Entries;
+		// Pointer-identity set populated alongside Entries by ProcessEntry. Same scope as Entries so
+		// the dedup is correct in Merged fanout (multiple roots feeding one shared FUniqueOutput).
+		TSharedPtr<TSet<const FPCGExAssetCollectionEntry*>> SeenEntries;
 		bool bWantAssetPath = false;
 		bool bWantAssetClass = false;
 
@@ -599,6 +219,7 @@ namespace PCGExGetCollectionData
 #define PCGEX_GCD_DECL_FIELD(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
 		FPCGMetadataAttribute<Type>* FieldName##Attr = nullptr;
 		PCGEX_GCD_LEAF_ATTRS(PCGEX_GCD_DECL_FIELD)
+		PCGEX_GCD_ROW_ATTRS(PCGEX_GCD_DECL_FIELD)
 		PCGEX_GCD_GRAMMAR_SHARED_ATTRS(PCGEX_GCD_DECL_FIELD)
 #undef PCGEX_GCD_DECL_FIELD
 		// Per-axis grammar attributes: arrays indexed by axis (0=X, 1=Y, 2=Z). Each slot is
@@ -611,9 +232,9 @@ namespace PCGExGetCollectionData
 		PCGExCollections::FPCGExCollectionPropertySetWriter PropertyWriter;
 	};
 
-	/** Derived settings + ambient state passed to ProcessUniqueOutput. Bundled so both the
-	 *  Collection-mode fast path and the slot-based FromInputs path can share one helper
-	 *  without dragging a dozen positional params. */
+	/** Derived settings + ambient state passed to FlattenInto / WriteFromEntries. Bundled so the
+	 *  Collection-mode fast path, the Merged path, and the slot-based FromInputs path can all share
+	 *  the same helpers without dragging a dozen positional params. */
 	struct FOutputProcessParams
 	{
 		const UPCGExGetCollectionDataSettings* Settings = nullptr;
@@ -660,11 +281,131 @@ namespace PCGExGetCollectionData
 
 	/** Append flattened entries from `Collection` into U.Entries. Never clobbers, so it's safe
 	 *  to call multiple times on the same U (Merged fanout walks every unique collection into
-	 *  one shared FUniqueOutput). */
-	static void FlattenInto(FUniqueOutput& U, UPCGExAssetCollection* Collection, const FOutputProcessParams& P)
+	 *  one shared FUniqueOutput). Every appended entry is stamped with RootCollectionIndex, and
+	 *  its CollectionIndex is assigned from the shared map on FProcessEntryContext. */
+	static void FlattenInto(FUniqueOutput& U, UPCGExAssetCollection* Collection, const int32 RootCollectionIndex, const FOutputProcessParams& P)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_Flatten);
-		FlattenCollection(*P.FlattenCtx, Collection, *U.Entries);
+		// Per-call Ctx copy so the shared FlattenCtx isn't mutated -- SeenEntries is per-U, not global.
+		FProcessEntryContext Ctx = *P.FlattenCtx;
+		Ctx.SeenEntries = U.SeenEntries.Get();
+		FlattenCollection(Ctx, Collection, RootCollectionIndex, *U.Entries);
+	}
+
+	// =============================================================================================
+	// WriteFromEntries pre-passes
+	// =============================================================================================
+
+	/** Pre-pass: resolve each entry's effective grammar once and cache pointers for the write loop.
+	 *  Returns the union of per-entry Axes (intersected with the user-requested OutputAxes) -- this
+	 *  drives which per-axis attribute slots get declared. No-op when no grammar field is requested
+	 *  or OutputAxes is empty (saves the GetEffectiveGrammar call entirely). */
+	static uint8 ResolveGrammars(
+		const TArray<FFlattenedEntry>& Entries,
+		const UPCGExGetCollectionDataSettings* Settings,
+		const bool bAnyGrammarField,
+		TArray<const FPCGExAssetGrammarDetails*>& OutResolvedGrammars)
+	{
+		if (!bAnyGrammarField || Settings->OutputAxes == 0)
+		{
+			return 0;
+		}
+		OutResolvedGrammars.SetNumZeroed(Entries.Num());
+		uint8 UsedAxes = 0;
+		for (int32 i = 0; i < Entries.Num(); ++i)
+		{
+			const FFlattenedEntry& EH = Entries[i];
+			if (!EH.Entry)
+			{
+				continue;
+			}
+			const FPCGExAssetGrammarDetails* G = EH.Entry->GetEffectiveGrammar(EH.Host);
+			OutResolvedGrammars[i] = G;
+			if (G)
+			{
+				UsedAxes |= (G->Axes & Settings->OutputAxes);
+			}
+		}
+		return UsedAxes;
+	}
+
+	/** Bundle of weight-sum denominators for the three normalization scopes, used by the write loop
+	 *  to divide each entry's raw weight into a [0..1] float. Empty when Mode == None or bWeightAsFloat
+	 *  is false (the write loop emits raw int32 weights in those cases). */
+	struct FWeightNormSums
+	{
+		double Global = 0.0;
+		TMap<FName, double> PerCategory;
+		TMap<const UPCGExAssetCollection*, double> PerCollection;
+	};
+
+	/** Pre-pass: sum entry weights by the chosen normalization scope. Skips the walk when bWeightAsFloat
+	 *  is false -- raw int32 weights don't need a denominator. */
+	static void ComputeWeightNorms(
+		const TArray<FFlattenedEntry>& Entries,
+		const EPCGExWeightNormalization Mode,
+		const bool bWeightAsFloat,
+		FWeightNormSums& OutSums)
+	{
+		if (!bWeightAsFloat)
+		{
+			return;
+		}
+		for (const FFlattenedEntry& EH : Entries)
+		{
+			const FPCGExAssetCollectionEntry* E = EH.Entry;
+			if (!E || E->bIsSubCollection)
+			{
+				continue;
+			}
+			const double W = E->Weight;
+			switch (Mode)
+			{
+			case EPCGExWeightNormalization::Global:
+				OutSums.Global += W;
+				break;
+			case EPCGExWeightNormalization::PerCategory:
+				OutSums.PerCategory.FindOrAdd(EH.Category) += W;
+				break;
+			case EPCGExWeightNormalization::PerCollection:
+				OutSums.PerCollection.FindOrAdd(EH.Host) += W;
+				break;
+			default: ;
+			}
+		}
+	}
+
+	/** Initialize the U.PropertyWriter when properties are configured. Pulls "fallback hosts"
+	 *  (every distinct host that isn't the primary U.Collection) so per-entry property lookups can
+	 *  resolve against the sub-collection that actually owns the entry. Skipped when no property
+	 *  output is configured -- saves a non-trivial allocation per output. */
+	static void InitPropertyWriter(
+		FUniqueOutput& U,
+		const FOutputProcessParams& P,
+		const UPCGExGetCollectionDataSettings* Settings,
+		UPCGMetadata* Metadata)
+	{
+		if (!Settings->PropertyOutputSettings.HasOutputs())
+		{
+			return;
+		}
+		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_PropertyWriterInit);
+		TArray<const UPCGExAssetCollection*> FallbackHosts;
+		TSet<const UPCGExAssetCollection*> Seen;
+		for (const FFlattenedEntry& EH : *U.Entries)
+		{
+			if (!EH.Host || EH.Host == U.Collection)
+			{
+				continue;
+			}
+			bool bAlreadyIn = false;
+			Seen.Add(EH.Host, &bAlreadyIn);
+			if (!bAlreadyIn)
+			{
+				FallbackHosts.Add(EH.Host);
+			}
+		}
+		U.PropertyWriter.Initialize(P.InContext, Settings->PropertyOutputSettings, U.Collection, FallbackHosts, Metadata);
 	}
 
 	/** Declares attributes on U.OutputSet, initializes the property writer, computes weight sums,
@@ -683,31 +424,10 @@ namespace PCGExGetCollectionData
 		const bool bOutputAssetPath = Settings->bWriteAssetPath && U.bWantAssetPath;
 		const bool bOutputAssetClass = Settings->bWriteAssetPath && U.bWantAssetClass;
 
-		// Pre-pass: resolve each entry's effective grammar once and cache it for the write loop,
-		// accumulating the union of per-entry Axes (intersected with the user-requested OutputAxes)
-		// to drive which per-axis attribute slots get declared. Caching skips a per-row
-		// GetEffectiveGrammar in the write loop AND lets the per-axis Fix path call Grammar->Fix*
-		// directly instead of going through Entry::FixModuleInfos (which would re-resolve internally).
-		uint8 LocalUsedAxes = 0;
+		// Resolve grammars once, accumulate the union of axes used across all entries -- drives
+		// the per-axis attribute declarations below and the per-row Fix dispatch in the write loop.
 		TArray<const FPCGExAssetGrammarDetails*> ResolvedGrammars;
-		if (P.bAnyGrammarField && Settings->OutputAxes != 0)
-		{
-			ResolvedGrammars.SetNumZeroed(Entries.Num());
-			for (int32 i = 0; i < Entries.Num(); ++i)
-			{
-				const FFlattenedEntry& EH = Entries[i];
-				if (!EH.Entry)
-				{
-					continue;
-				}
-				const FPCGExAssetGrammarDetails* G = EH.Entry->GetEffectiveGrammar(EH.Host);
-				ResolvedGrammars[i] = G;
-				if (G)
-				{
-					LocalUsedAxes |= (G->Axes & Settings->OutputAxes);
-				}
-			}
-		}
+		const uint8 LocalUsedAxes = ResolveGrammars(Entries, Settings, P.bAnyGrammarField, ResolvedGrammars);
 
 		// Declare attributes. CreateAttribute (vs FindOrCreate) skips the find lookup -- safe
 		// because we just allocated a fresh empty Metadata.
@@ -743,6 +463,7 @@ namespace PCGExGetCollectionData
 				U.FieldName##Attr = Metadata->CreateAttribute<Type>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->AttrName, U.OutputSet), Default, false, true); \
 			}
 			PCGEX_GCD_LEAF_ATTRS(PCGEX_GCD_DECLARE)
+			PCGEX_GCD_ROW_ATTRS(PCGEX_GCD_DECLARE)
 			PCGEX_GCD_GRAMMAR_SHARED_ATTRS(PCGEX_GCD_DECLARE)
 #undef PCGEX_GCD_DECLARE
 
@@ -772,70 +493,16 @@ namespace PCGExGetCollectionData
 		} // end DeclareAttrs scope
 
 		// Property writer (gated -- skips an allocation per output when no properties configured).
-		if (Settings->PropertyOutputSettings.HasOutputs())
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_PropertyWriterInit);
-			TArray<const UPCGExAssetCollection*> FallbackHosts;
-			TSet<const UPCGExAssetCollection*> Seen;
-			for (const FFlattenedEntry& EH : Entries)
-			{
-				if (!EH.Host || EH.Host == U.Collection)
-				{
-					continue;
-				}
-				bool bAlreadyIn = false;
-				Seen.Add(EH.Host, &bAlreadyIn);
-				if (!bAlreadyIn)
-				{
-					FallbackHosts.Add(EH.Host);
-				}
-			}
-			U.PropertyWriter.Initialize(P.InContext, Settings->PropertyOutputSettings, U.Collection, FallbackHosts, Metadata);
-		}
+		InitPropertyWriter(U, P, Settings, Metadata);
 
 		// Weight normalization pre-pass (scoped to this output).
-		double GlobalWeightSum = 0.0;
-		TMap<FName, double> CategoryWeightSums;
-		TMap<const UPCGExAssetCollection*, double> CollectionWeightSums;
-		if (P.bWeightAsFloat)
-		{
-			for (const FFlattenedEntry& EH : Entries)
-			{
-				const FPCGExAssetCollectionEntry* E = EH.Entry;
-				if (!E || E->bIsSubCollection)
-				{
-					continue;
-				}
-				const double W = E->Weight;
-				switch (P.WeightNorm)
-				{
-				case EPCGExWeightNormalization::Global:
-					GlobalWeightSum += W;
-					break;
-				case EPCGExWeightNormalization::PerCategory:
-					CategoryWeightSums.FindOrAdd(EH.Category) += W;
-					break;
-				case EPCGExWeightNormalization::PerCollection:
-					CollectionWeightSums.FindOrAdd(EH.Host) += W;
-					break;
-				default: ;
-				}
-			}
-		}
+		FWeightNormSums WeightSums;
+		ComputeWeightNorms(Entries, P.WeightNorm, P.bWeightAsFloat, WeightSums);
 
-		// Per-axis SizeCache: subcollection aggregation queries within Grammar->FixSubCollection(Axis)
-		// only see child entries resolved at the same axis, so each axis gets its own map.
-		// Only allocate caches for axes that actually contribute output -- the others stay empty.
-		TMap<const FPCGExAssetCollectionEntry*, double> SizeCachePerAxis[3];
+		FPCGExGrammarSizeCache SizeCache;
 		if (Settings->bWriteSize)
 		{
-			for (int32 a = 0; a < 3; a++)
-			{
-				if (LocalUsedAxes & static_cast<uint8>(PCGExGrammarAxes::Bits[a]))
-				{
-					SizeCachePerAxis[a].Reserve(Entries.Num());
-				}
-			}
+			SizeCache.Reserve(Entries.Num() * PCGExGrammarAxes::CountAxes(LocalUsedAxes));
 		}
 
 		TSet<FName> UniqueSymbols;
@@ -888,6 +555,15 @@ namespace PCGExGetCollectionData
 			}
 
 			const int64 Key = Metadata->AddEntry();
+
+			// ROW_ATTRS (root + collection identity) are written for EVERY row -- including null/empty
+			// rows where E is nullptr -- so downstream consumers can always read "which root tried to
+			// resolve at this slot". Hence we write them before the !E early-out below.
+#define PCGEX_GCD_WRITE_ROW(Type, FieldName, AttrName, Toggle, Default, ValueExpr) \
+			SetIf(U.FieldName##Attr, Key, ValueExpr);
+			PCGEX_GCD_ROW_ATTRS(PCGEX_GCD_WRITE_ROW)
+#undef PCGEX_GCD_WRITE_ROW
+
 			if (!E)
 			{
 				continue;
@@ -913,13 +589,13 @@ namespace PCGExGetCollectionData
 					switch (P.WeightNorm)
 					{
 					case EPCGExWeightNormalization::Global:
-						Denom = GlobalWeightSum;
+						Denom = WeightSums.Global;
 						break;
 					case EPCGExWeightNormalization::PerCategory:
-						Denom = CategoryWeightSums.FindRef(EH.Category);
+						Denom = WeightSums.PerCategory.FindRef(EH.Category);
 						break;
 					case EPCGExWeightNormalization::PerCollection:
-						Denom = CollectionWeightSums.FindRef(EH.Host);
+						Denom = WeightSums.PerCollection.FindRef(EH.Host);
 						break;
 					default: ;
 					}
@@ -948,7 +624,7 @@ namespace PCGExGetCollectionData
 
 					FPCGSubdivisionSubmodule Module;
 					const bool bFixed = bIsSub
-						? Grammar->FixSubCollection(E->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCachePerAxis[a] : nullptr)
+						? Grammar->FixSubCollection(E->InternalSubCollection, PCGExGrammarAxes::Bits[a], Module, Settings->bWriteSize ? &SizeCache : nullptr)
 						: Grammar->FixLeaf(E->Staging.Bounds, PCGExGrammarAxes::Bits[a], Module);
 					if (!bFixed)
 					{
@@ -975,14 +651,534 @@ namespace PCGExGetCollectionData
 		}
 	}
 
-	/** Convenience wrapper used by the non-merged paths: flatten this output's single collection,
-	 *  then write all rows. Safe to call in parallel across distinct FUniqueOutput instances. */
-	static void ProcessUniqueOutput(FUniqueOutput& U, const FOutputProcessParams& P)
+	/** Per-slot precomputed identity for the AnnotateSources pass. Built once per node invocation
+	 *  from the flatten-time identity maps + the resolved collection ptr; read O(1) per row.
+	 *  Carries Collection* so collection-level reads (schema defaults, collection metadata) don't
+	 *  have to re-walk ResolvedCollections during annotation. */
+	struct FSlotIdentity
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_ProcessUniqueOutput_Body);
-		FlattenInto(U, U.Collection, P);
-		WriteFromEntries(U, P);
+		int32 Root = -1;
+		int32 Coll = -1;
+		int32 Hash = -1;
+		UPCGExAssetCollection* Collection = nullptr;
+	};
+
+	/** Forward each input from SourcesPin to AnnotatedSourcesPin with identity attributes added,
+	 *  based on whichever of bWriteRootCollectionIndex / bWriteCollectionIndex / bWriteCollectionHash
+	 *  are enabled. Domain matches Fanout (PerInputData -> @Data, else @Element).
+	 *
+	 *  When no identity toggle is on, falls back to a straight pass-through (no duplicate, no
+	 *  attribute writes) so the pin still emits its sources -- gives the user a useful default
+	 *  before they pick which identity field(s) to annotate with.
+	 *
+	 *  Must be called AFTER flatten so the per-collection identity maps on FlattenCtx are populated.
+	 *
+	 *  Per-slot identity (Root/Coll/Hash + resolved Collection*) is precomputed once into SlotIdentity
+	 *  so the per-row inner loop is a single array read instead of 3-4 map probes. The per-input
+	 *  duplicate + attribute write is dispatched via PCGExMT::ParallelOrSequential -- each task owns
+	 *  its DupData and writes into its disjoint slot in ParallelResults; a single-threaded compact
+	 *  appends the successes to TaggedData. SlotIdentity carries Collection* so future schema-output
+	 *  paths can read collection-level data without re-resolving. */
+	static void AnnotateSources(
+		FPCGExGetCollectionDataContext* Context,
+		const UPCGExGetCollectionDataSettings* Settings,
+		const FProcessEntryContext& FlattenCtx,
+		const TMap<UPCGExAssetCollection*, int32>& CollectionToRootIdx)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AnnotateSources);
+
+		TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(SourcesPin);
+		if (Inputs.IsEmpty())
+		{
+			return;
+		}
+
+		const bool bWantRoot = Settings->bWriteRootCollectionIndex;
+		const bool bWantColl = Settings->bWriteCollectionIndex;
+		const bool bWantHash = Settings->bWriteCollectionHash;
+		const bool bWantSchema = Settings->SchemaPropertyAnnotations.HasOutputs();
+
+		// Pass-through path: no annotation needed, just forward each input under the new pin name
+		// without duplicating. Same UPCGData pointer; downstream sees the original attribute set
+		// or point data, plus whatever tags were already on it.
+		if (!bWantRoot && !bWantColl && !bWantHash && !bWantSchema)
+		{
+			Context->OutputData.TaggedData.Reserve(Context->OutputData.TaggedData.Num() + Inputs.Num());
+			for (const FPCGTaggedData& InputTagged : Inputs)
+			{
+				if (!InputTagged.Data)
+				{
+					continue;
+				}
+				FPCGTaggedData& OutTagged = Context->OutputData.TaggedData.Emplace_GetRef();
+				OutTagged.Pin = AnnotatedSourcesPin;
+				OutTagged.Data = InputTagged.Data;
+				OutTagged.Tags = InputTagged.Tags;
+			}
+			return;
+		}
+
+		const bool bDataDomain = Settings->Fanout == EPCGExGetCollectionDataFanout::PerInputData;
+
+		// Precompute per-slot identity once. Single pass over Slots replaces 3-4 map probes per row
+		// inside the inner write loop. Carries the resolved Collection pointer so future schema-output
+		// code paths can read collection-level data without a second resolve.
+		TArray<FSlotIdentity> SlotIdentity;
+		SlotIdentity.SetNum(Context->Slots.Num());
+		for (int32 k = 0; k < Context->Slots.Num(); k++)
+		{
+			const FPCGExGetCollectionDataContext::FSlot& Slot = Context->Slots[k];
+			UPCGExAssetCollection* const* CollectionPtr = Context->ResolvedCollections.Find(Slot.Path);
+			if (!CollectionPtr || !*CollectionPtr)
+			{
+				continue;
+			}
+			UPCGExAssetCollection* Collection = *CollectionPtr;
+			FSlotIdentity& Id = SlotIdentity[k];
+			Id.Collection = Collection;
+			if (const int32* R = CollectionToRootIdx.Find(Collection)) { Id.Root = *R; }
+			if (FlattenCtx.CollectionIndexMap)
+			{
+				if (const int32* C = FlattenCtx.CollectionIndexMap->Find(Collection)) { Id.Coll = *C; }
+			}
+			// Input rows always reference a root collection -> Depth is 0 in the hash tuple.
+			if (FlattenCtx.CollectionHashMap && Id.Root != -1 && Id.Coll != -1)
+			{
+				const TTuple<int32, int32, int32> Key(Id.Root, Id.Coll, 0);
+				if (const int32* H = FlattenCtx.CollectionHashMap->Find(Key)) { Id.Hash = *H; }
+			}
+		}
+
+		// Bucket slots by input. Slots are stored input-major, row-minor today, but explicit
+		// bucketing makes the per-input iteration robust to that ordering and is O(NumSlots) anyway.
+		TArray<TArray<int32>> SlotsPerInput;
+		SlotsPerInput.SetNum(Inputs.Num());
+		for (int32 k = 0; k < Context->Slots.Num(); k++)
+		{
+			const int32 InputIdx = Context->Slots[k].SourceInputIndex;
+			if (Inputs.IsValidIndex(InputIdx))
+			{
+				SlotsPerInput[InputIdx].Add(k);
+			}
+		}
+
+		// Filter to valid inputs upfront so the parallel task list is dense (no skip-and-no-op tasks).
+		TArray<int32> ValidInputIndices;
+		ValidInputIndices.Reserve(Inputs.Num());
+		for (int32 i = 0; i < Inputs.Num(); i++)
+		{
+			if (Inputs[i].Data) { ValidInputIndices.Add(i); }
+		}
+		if (ValidInputIndices.IsEmpty())
+		{
+			return;
+		}
+
+		// Per-task scratch: each task writes its own disjoint slot. Sequential post-pass appends
+		// the successes into Context->OutputData.TaggedData (the latter isn't thread-safe to grow).
+		TArray<FPCGTaggedData> ParallelResults;
+		ParallelResults.SetNum(ValidInputIndices.Num());
+
+		PCGExMT::ParallelOrSequential(ValidInputIndices.Num(), [&](const int32 ValidIdx)
+		{
+			const int32 InputIdx = ValidInputIndices[ValidIdx];
+			const FPCGTaggedData& InputTagged = Inputs[InputIdx];
+
+			UPCGData* DupData = Context->ManagedObjects->DuplicateData<UPCGData>(InputTagged.Data);
+			if (!DupData)
+			{
+				return; // leaves ParallelResults[ValidIdx].Data == nullptr; compact pass drops it
+			}
+
+			const TArray<int32>& SlotIndices = SlotsPerInput[InputIdx];
+
+			if (bDataDomain)
+			{
+				// PerInputData: one slot per input. Read identity once and stamp as @Data.
+				const FSlotIdentity Id = SlotIndices.Num() > 0 ? SlotIdentity[SlotIndices[0]] : FSlotIdentity{};
+				if (bWantRoot) { PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->RootCollectionIndexAttributeName, Id.Root); }
+				if (bWantColl) { PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->CollectionIndexAttributeName, Id.Coll); }
+				if (bWantHash) { PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->CollectionHashAttributeName, Id.Hash); }
+
+				// Schema-property annotation (@Data): single value per input, taken from the slot's
+				// resolved collection schema. Null host -> no schema attribute (see helper docs).
+				if (bWantSchema)
+				{
+					PCGExCollections::WriteSchemaToDataDomain(
+						Context, Settings->SchemaPropertyAnnotations, Id.Collection, DupData);
+				}
+			}
+			else
+			{
+				// Element domain: build per-row value arrays in slot order (= row order in the
+				// source), then push them through a single SetRange per attribute. Same accessor
+				// pattern as the Boot-time read path; works uniformly for point and attribute-set inputs.
+				const int32 NumRows = SlotIndices.Num();
+				TArray<int32> RootValues, CollValues, HashValues;
+				if (bWantRoot) { RootValues.SetNumUninitialized(NumRows); }
+				if (bWantColl) { CollValues.SetNumUninitialized(NumRows); }
+				if (bWantHash) { HashValues.SetNumUninitialized(NumRows); }
+				for (int32 r = 0; r < NumRows; r++)
+				{
+					const FSlotIdentity& Id = SlotIdentity[SlotIndices[r]];
+					if (bWantRoot) { RootValues[r] = Id.Root; }
+					if (bWantColl) { CollValues[r] = Id.Coll; }
+					if (bWantHash) { HashValues[r] = Id.Hash; }
+				}
+
+				TSharedPtr<IPCGAttributeAccessorKeys> Keys;
+				if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(DupData))
+				{
+					Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
+				}
+				else if (UPCGMetadata* Metadata = DupData->MutableMetadata())
+				{
+					Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(Metadata);
+				}
+
+				auto WriteAttr = [&](const bool bWant, const FName AttrName, const TArray<int32>& Values)
+				{
+					if (!bWant) { return; }
+					UPCGMetadata* M = DupData->MutableMetadata();
+					if (!M) { return; }
+					// Always declare the attribute (so the column exists downstream) even when there's
+					// nothing to write -- keeps the schema stable for consumers that branch on presence.
+					M->FindOrCreateAttribute<int32>(PCGExMetaHelpers::GetAttributeIdentifier(AttrName, DupData), -1, false, true);
+					if (!Keys || Values.Num() == 0) { return; }
+					FPCGAttributePropertyInputSelector Selector;
+					Selector.Update(AttrName.ToString());
+					Selector = Selector.CopyAndFixLast(DupData);
+					TUniquePtr<IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreateAccessor(DupData, Selector);
+					if (Accessor)
+					{
+						Accessor->SetRange<int32>(Values, 0, *Keys, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible);
+					}
+				};
+
+				WriteAttr(bWantRoot, Settings->RootCollectionIndexAttributeName, RootValues);
+				WriteAttr(bWantColl, Settings->CollectionIndexAttributeName, CollValues);
+				WriteAttr(bWantHash, Settings->CollectionHashAttributeName, HashValues);
+
+				// Schema-property annotation (@Element): per-row schema values, one row per slot.
+				// PerRowHosts[r] = the collection that row r's slot resolved to (or null). The helper
+				// finds prototypes across the union and falls back to prototype default for null rows.
+				if (bWantSchema)
+				{
+					TArray<const UPCGExAssetCollection*> PerRowHosts;
+					PerRowHosts.SetNumUninitialized(NumRows);
+					for (int32 r = 0; r < NumRows; r++)
+					{
+						PerRowHosts[r] = SlotIdentity[SlotIndices[r]].Collection;
+					}
+					PCGExCollections::WriteSchemaToElementDomain(
+						Context, Settings->SchemaPropertyAnnotations, DupData, PerRowHosts);
+				}
+			}
+
+			FPCGTaggedData& OutTagged = ParallelResults[ValidIdx];
+			OutTagged.Pin = AnnotatedSourcesPin;
+			OutTagged.Data = DupData;
+			OutTagged.Tags = InputTagged.Tags;
+		}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
+
+		// Compact + append. Skips entries where DuplicateData returned nullptr (rare; only on
+		// node-wide handle-invalid). Worst-case Reserve overestimate is OK.
+		Context->OutputData.TaggedData.Reserve(Context->OutputData.TaggedData.Num() + ParallelResults.Num());
+		for (FPCGTaggedData& R : ParallelResults)
+		{
+			if (R.Data) { Context->OutputData.TaggedData.Emplace(MoveTemp(R)); }
+		}
 	}
+
+	// =============================================================================================
+	// Per-mode AdvanceWork bodies
+	// =============================================================================================
+	// Each helper handles its own flatten+write+emission. AdvanceWork shares only the upfront
+	// FProcessEntryContext / FOutputProcessParams setup, dispatches to one of these based on mode,
+	// then emits the shared Map output. Map emission stays in AdvanceWork because the Packer lifetime
+	// is owned there.
+
+	/** Collection-mode fast path. Skips Slots / UniqueOutputs / CollectionToIndex / ResolvedCollections
+	 *  / ParallelOrSequential dispatch entirely. Single FUniqueOutput, single flatten + write.
+	 *  Hard-ref TObjectPtr means the asset is already loaded -- no resolve, no map lookup. */
+	static void Run_CollectionFastPath(FPCGExGetCollectionDataContext* Context, const FOutputProcessParams& P)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AdvanceWork_CollectionFastPath);
+
+		FPCGExContext* InContext = P.InContext;
+		const UPCGExGetCollectionDataSettings* Settings = P.Settings;
+		UPCGExAssetCollection* MainCollection = Settings->AssetCollection;
+		InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + 2);
+
+		FUniqueOutput U;
+		U.Collection = MainCollection;
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AllocOutputSet);
+			U.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
+		}
+		U.Entries = MakeShared<TArray<FFlattenedEntry>>();
+		U.SeenEntries = MakeShared<TSet<const FPCGExAssetCollectionEntry*>>();
+		SetAssetHalves(U, MainCollection);
+
+		if (MainCollection)
+		{
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_RegisterTrackingKeys);
+				MainCollection->EDITOR_RegisterTrackingKeys(InContext);
+			}
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_RegisterPacker);
+				P.Packer->RegisterCollection(MainCollection);
+			}
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_Flatten);
+				FlattenInto(U, MainCollection, /*RootCollectionIndex=*/0, P);
+			}
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_Write);
+				WriteFromEntries(U, P);
+			}
+		}
+
+		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
+		OutData.Pin = OutputCollectionDataPin;
+		OutData.Data = U.OutputSet;
+		if (U.Entries->IsEmpty())
+		{
+			OutData.Tags.Add(EmptyTag.ToString());
+		}
+	}
+
+	/** FromInputs - Merged fanout. One shared FUniqueOutput receives entries from every unique
+	 *  collection (append in encounter order). One FPCGTaggedData emitted. AssetPath/AssetClass
+	 *  attributes are declared based on the union of contributing collection types so heterogeneous
+	 *  mixes get both halves. */
+	static void Run_MergedFanout(FPCGExGetCollectionDataContext* Context, const FOutputProcessParams& P)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AdvanceWork_Merged);
+
+		FPCGExContext* InContext = P.InContext;
+		const UPCGExGetCollectionDataSettings* Settings = P.Settings;
+
+		// Walk slots to discover unique collections (dedupe flatten work), build the Collection ->
+		// RootIdx map (used both by the flatten loop below and by AnnotateSources for per-row
+		// identity lookup), and pre-OR the asset-half flags.
+		TArray<UPCGExAssetCollection*> UniqueCollections;
+		TMap<UPCGExAssetCollection*, int32> CollectionToRootIdx;
+		bool bAnyActor = false;
+		bool bAnyNonActor = false;
+		for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
+		{
+			UPCGExAssetCollection* Collection = ResolveSlotCollection(Context, Slot);
+			if (!Collection)
+			{
+				continue;
+			}
+			int32& RootIdx = CollectionToRootIdx.FindOrAdd(Collection, INDEX_NONE);
+			if (RootIdx != INDEX_NONE)
+			{
+				continue;
+			}
+
+			RootIdx = UniqueCollections.Num();
+			UniqueCollections.Add(Collection);
+			Collection->EDITOR_RegisterTrackingKeys(InContext);
+			if (Cast<UPCGExActorCollection>(Collection))
+			{
+				bAnyActor = true;
+			}
+			else
+			{
+				bAnyNonActor = true;
+			}
+		}
+
+		// Allocate the single shared output. Packer registration covers every contributing host.
+		FUniqueOutput Merged;
+		Merged.Collection = UniqueCollections.IsEmpty() ? nullptr : UniqueCollections[0];
+		Merged.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
+		Merged.Entries = MakeShared<TArray<FFlattenedEntry>>();
+		Merged.SeenEntries = MakeShared<TSet<const FPCGExAssetCollectionEntry*>>();
+		Merged.bWantAssetPath = bAnyNonActor;
+		Merged.bWantAssetClass = bAnyActor;
+
+		for (int32 RootIdx = 0; RootIdx < UniqueCollections.Num(); ++RootIdx)
+		{
+			UPCGExAssetCollection* Collection = UniqueCollections[RootIdx];
+			P.Packer->RegisterCollection(Collection);
+			FlattenInto(Merged, Collection, /*RootCollectionIndex=*/RootIdx, P);
+		}
+
+		// Single-shot declare + write.
+		if (!Merged.Entries->IsEmpty())
+		{
+			WriteFromEntries(Merged, P);
+		}
+
+		// Emit one FPCGTaggedData. Tag forwarding (if on) unions tags from every contributing
+		// source input -- per-slot identity is lost in Merged mode by design.
+		InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + 2);
+
+		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
+		OutData.Pin = OutputCollectionDataPin;
+		OutData.Data = Merged.OutputSet;
+		if (Merged.Entries->IsEmpty())
+		{
+			OutData.Tags.Add(EmptyTag.ToString());
+		}
+		if (Settings->bForwardInputTags)
+		{
+			TArray<FPCGTaggedData> Inputs = InContext->InputData.GetInputsByPin(SourcesPin);
+			TSet<FString> TagUnion;
+			for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
+			{
+				if (Inputs.IsValidIndex(Slot.SourceInputIndex))
+				{
+					TagUnion.Append(Inputs[Slot.SourceInputIndex].Tags);
+				}
+			}
+			OutData.Tags.Append(TagUnion);
+		}
+
+		if (Settings->bAnnotateSources)
+		{
+			AnnotateSources(Context, Settings, *P.FlattenCtx, CollectionToRootIdx);
+		}
+	}
+
+	/** FromInputs slot-based path (PerEntry / PerInputData). One FPCGTaggedData per slot. Multiple
+	 *  slots pointing at the same collection share a single UPCGParamData (tags live on the
+	 *  per-slot wrapper, not the data). Flatten serial, write parallel. */
+	static void Run_SlotBasedFanout(FPCGExGetCollectionDataContext* Context, const FOutputProcessParams& P)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AdvanceWork_SlotBased);
+
+		FPCGExContext* InContext = P.InContext;
+		const UPCGExGetCollectionDataSettings* Settings = P.Settings;
+
+		// Phase 1 (single-threaded): pre-allocate one UPCGParamData per unique collection. Cache the
+		// per-slot resolved collection in SlotCollections so Phase 4 can skip the second resolve pass.
+		TArray<FUniqueOutput> UniqueOutputs;
+		TMap<UPCGExAssetCollection*, int32> CollectionToIndex;
+		TArray<UPCGExAssetCollection*> SlotCollections;
+		SlotCollections.Reserve(Context->Slots.Num());
+
+		for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
+		{
+			UPCGExAssetCollection* Collection = ResolveSlotCollection(Context, Slot);
+			SlotCollections.Add(Collection); // nullptr stays nullptr; Phase 4 reads by index
+			if (!Collection)
+			{
+				continue;
+			}
+			int32& Idx = CollectionToIndex.FindOrAdd(Collection, INDEX_NONE);
+			if (Idx != INDEX_NONE)
+			{
+				continue;
+			}
+			Idx = UniqueOutputs.Num();
+
+			FUniqueOutput& U = UniqueOutputs.AddDefaulted_GetRef();
+			U.Collection = Collection;
+			U.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
+			U.Entries = MakeShared<TArray<FFlattenedEntry>>();
+			U.SeenEntries = MakeShared<TSet<const FPCGExAssetCollectionEntry*>>();
+			SetAssetHalves(U, Collection);
+
+			Collection->EDITOR_RegisterTrackingKeys(InContext);
+		}
+
+		// Reserve TaggedData up-front (one entry per slot + one for the map) so the slot emission
+		// loop doesn't pay for TArray growth reallocations.
+		InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + Context->Slots.Num() + 1);
+
+		// Phase 2 (single-threaded): packer registration.
+		for (FUniqueOutput& U : UniqueOutputs)
+		{
+			P.Packer->RegisterCollection(U.Collection);
+		}
+
+		// Phase 3a (single-threaded flatten): assigns RootCollectionIndex (= position in UniqueOutputs)
+		// and CollectionIndex (= position in CollectionIndexMap, allocated lazily as new hosts are
+		// encountered, including recursed sub-collections). Must stay serial so the index space is
+		// deterministic across runs regardless of how Phase 3b parallelizes.
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_FlattenAll);
+			for (int32 i = 0; i < UniqueOutputs.Num(); ++i)
+			{
+				FlattenInto(UniqueOutputs[i], UniqueOutputs[i].Collection, /*RootCollectionIndex=*/i, P);
+			}
+		}
+
+		// Phase 3b (parallel over unique collections): attribute declaration + write of pre-flattened
+		// entries. Threshold=2 (default 512 would never trigger here); Unbalanced because per-iteration
+		// cost varies dramatically (small leaf-only collection vs deeply nested grammar tree).
+		PCGExMT::ParallelOrSequential(UniqueOutputs.Num(), [&](const int32 i)
+		{
+			WriteFromEntries(UniqueOutputs[i], P);
+		}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
+
+		// Phase 4 (single-threaded): emit one FPCGTaggedData per slot. Re-fetch input list only if
+		// we'll actually forward tags.
+		TArray<FPCGTaggedData> InputsForTags;
+		const bool bWillForwardTags = Settings->bForwardInputTags && Settings->SourceMode == EPCGExGetCollectionDataSourceMode::FromInputs;
+		if (bWillForwardTags)
+		{
+			InputsForTags = InContext->InputData.GetInputsByPin(SourcesPin);
+		}
+
+		UPCGParamData* EmptySentinel = nullptr;
+		auto GetOrCreateEmpty = [&]() -> UPCGParamData*
+		{
+			if (!EmptySentinel)
+			{
+				EmptySentinel = InContext->ManagedObjects->New<UPCGParamData>();
+			}
+			return EmptySentinel;
+		};
+
+		for (int32 SlotIdx = 0; SlotIdx < Context->Slots.Num(); SlotIdx++)
+		{
+			const FPCGExGetCollectionDataContext::FSlot& Slot = Context->Slots[SlotIdx];
+			UPCGExAssetCollection* Collection = SlotCollections[SlotIdx];
+
+			FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
+			OutData.Pin = OutputCollectionDataPin;
+
+			if (!Collection)
+			{
+				OutData.Data = GetOrCreateEmpty();
+				OutData.Tags.Add(EmptyTag.ToString());
+			}
+			else
+			{
+				const int32 Idx = CollectionToIndex.FindChecked(Collection);
+				const FUniqueOutput& U = UniqueOutputs[Idx];
+				if (U.Entries->IsEmpty())
+				{
+					OutData.Data = GetOrCreateEmpty();
+					OutData.Tags.Add(EmptyTag.ToString());
+				}
+				else
+				{
+					OutData.Data = U.OutputSet;
+				}
+			}
+
+			if (bWillForwardTags && InputsForTags.IsValidIndex(Slot.SourceInputIndex))
+			{
+				OutData.Tags.Append(InputsForTags[Slot.SourceInputIndex].Tags);
+			}
+		}
+
+		// Phase 5: optional annotated-source forwarding. Uses CollectionToIndex directly (it already
+		// maps Collection -> RootCollectionIndex), so no extra prep is needed in this path.
+		if (Settings->bAnnotateSources)
+		{
+			AnnotateSources(Context, Settings, *P.FlattenCtx, CollectionToIndex);
+		}
+	}
+
 }
 
 bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
@@ -1002,6 +1198,15 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 	FPCGExNameFiltersDetails CategoryFilters = Settings->CategoryFilters;
 	CategoryFilters.Init();
 
+	// Shared host -> CollectionIndex map + counter, and (Root, Coll, Depth) -> CollectionHash map
+	// + counter. Lifetime tied to this AdvanceWork call. Both are populated during the
+	// (single-threaded) flatten phase so the index space is deterministic regardless of how the
+	// write phase is parallelized.
+	TMap<const UPCGExAssetCollection*, int32> CollectionIndexMap;
+	int32 NextCollectionIndex = 0;
+	TMap<TTuple<int32, int32, int32>, int32> CollectionHashMap;
+	int32 NextCollectionHash = 0;
+
 	PCGExGetCollectionData::FProcessEntryContext Ctx;
 	Ctx.Context = InContext;
 	Ctx.CategoryFilters = &CategoryFilters;
@@ -1009,11 +1214,14 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 	Ctx.CategoryInheritance = CategoryInheritance;
 	Ctx.bOmitInvalidAndEmpty = Settings->bOmitInvalidAndEmpty;
 	Ctx.bNoDuplicates = (Settings->SkipFlags & static_cast<uint8>(EPCGExGetCollectionDataSkipFlags::Duplicates)) != 0;
+	Ctx.CollectionIndexMap = &CollectionIndexMap;
+	Ctx.NextCollectionIndex = &NextCollectionIndex;
+	Ctx.CollectionHashMap = &CollectionHashMap;
+	Ctx.NextCollectionHash = &NextCollectionHash;
 
-	// Shared FPickPacker (covers both fast path and slot path).
+	// Shared FPickPacker (covers every fanout path).
 	TSharedPtr<PCGExCollections::FPickPacker> Packer = MakeShared<PCGExCollections::FPickPacker>(InContext);
 
-	// Bundle derived settings for ProcessUniqueOutput.
 	PCGExGetCollectionData::FOutputProcessParams ProcessParams;
 	ProcessParams.Settings = Settings;
 	ProcessParams.InContext = InContext;
@@ -1025,275 +1233,37 @@ bool FPCGExGetCollectionDataElement::AdvanceWork(FPCGExContext* InContext, const
 	ProcessParams.bOutputCategory = bOutputCategory;
 	ProcessParams.bAnyGrammarField = bAnyGrammarField;
 
-	auto EmitMap = [&]()
+	// Dispatch to the per-mode helper. Each helper owns its own flatten+write+emission; the shared
+	// Map output is emitted here afterward so the Packer lifetime stays in this scope.
+	if (Settings->SourceMode == EPCGExGetCollectionDataSourceMode::Collection)
 	{
+		PCGExGetCollectionData::Run_CollectionFastPath(Context, ProcessParams);
+	}
+	else if (Settings->Fanout == EPCGExGetCollectionDataFanout::Merged)
+	{
+		PCGExGetCollectionData::Run_MergedFanout(Context, ProcessParams);
+	}
+	else
+	{
+		PCGExGetCollectionData::Run_SlotBasedFanout(Context, ProcessParams);
+	}
+
+	// Shared Map output -- packed from everything the Packer has accumulated across the helpers.
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_EmitMap);
 		UPCGParamData* OutputMap = InContext->ManagedObjects->New<UPCGParamData>();
 		Packer->PackToDataset(OutputMap);
 		FPCGTaggedData& MapData = InContext->OutputData.TaggedData.Emplace_GetRef();
 		MapData.Pin = PCGExCollections::Labels::OutputCollectionMapLabel;
 		MapData.Data = OutputMap;
-	};
-
-	// =========================================================================================
-	// Collection-mode fast path
-	// =========================================================================================
-	// Skips Slots / UniqueOutputs / CollectionToIndex / ResolvedCollections / ParallelOrSequential
-	// dispatch entirely. Single FUniqueOutput, single ProcessUniqueOutput call. Hard-ref
-	// TObjectPtr means the asset is already loaded -- no resolve, no map lookup.
-	if (Settings->SourceMode == EPCGExGetCollectionDataSourceMode::Collection)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AdvanceWork_CollectionFastPath);
-
-		UPCGExAssetCollection* MainCollection = Settings->AssetCollection;
-		InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + 2);
-
-		PCGExGetCollectionData::FUniqueOutput U;
-		U.Collection = MainCollection;
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AllocOutputSet);
-			U.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
-		}
-		U.Entries = MakeShared<TArray<PCGExGetCollectionData::FFlattenedEntry>>();
-		PCGExGetCollectionData::SetAssetHalves(U, MainCollection);
-
-		if (MainCollection)
-		{
-			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_RegisterTrackingKeys);
-				MainCollection->EDITOR_RegisterTrackingKeys(InContext);
-			}
-			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_RegisterPacker);
-				Packer->RegisterCollection(MainCollection);
-			}
-			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_ProcessUniqueOutput);
-				PCGExGetCollectionData::ProcessUniqueOutput(U, ProcessParams);
-			}
-		}
-
-		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
-		OutData.Pin = PCGExGetCollectionData::OutputCollectionDataPin;
-		OutData.Data = U.OutputSet;
-		if (!MainCollection || U.Entries->IsEmpty())
-		{
-			OutData.Tags.Add(PCGExGetCollectionData::EmptyTag.ToString());
-		}
-
-		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_EmitMap);
-			EmitMap();
-		}
-		InContext->Done();
-		return InContext->TryComplete();
 	}
-
-	// =========================================================================================
-	// FromInputs - Merged fanout
-	// =========================================================================================
-	// One shared FUniqueOutput receives entries from every unique collection (append in encounter
-	// order). One FPCGTaggedData emitted. AssetPath/AssetClass attributes are declared based on
-	// the union of contributing collection types so heterogeneous mixes get both halves.
-	if (Settings->Fanout == EPCGExGetCollectionDataFanout::Merged)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_AdvanceWork_Merged);
-
-		// Walk slots to discover unique collections (dedupe flatten work) and pre-OR the
-		// asset-half flags.
-		TArray<UPCGExAssetCollection*> UniqueCollections;
-		TSet<UPCGExAssetCollection*> SeenCollections;
-		bool bAnyActor = false;
-		bool bAnyNonActor = false;
-		for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
-		{
-			UPCGExAssetCollection* Collection = PCGExGetCollectionData::ResolveSlotCollection(Context, Slot);
-			if (!Collection)
-			{
-				continue;
-			}
-			bool bAlreadyIn = false;
-			SeenCollections.Add(Collection, &bAlreadyIn);
-			if (bAlreadyIn)
-			{
-				continue;
-			}
-
-			UniqueCollections.Add(Collection);
-			Collection->EDITOR_RegisterTrackingKeys(InContext);
-			if (Cast<UPCGExActorCollection>(Collection))
-			{
-				bAnyActor = true;
-			}
-			else
-			{
-				bAnyNonActor = true;
-			}
-		}
-
-		// Allocate the single shared output. Packer registration covers every contributing host.
-		PCGExGetCollectionData::FUniqueOutput Merged;
-		Merged.Collection = UniqueCollections.IsEmpty() ? nullptr : UniqueCollections[0];
-		Merged.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
-		Merged.Entries = MakeShared<TArray<PCGExGetCollectionData::FFlattenedEntry>>();
-		Merged.bWantAssetPath = bAnyNonActor;
-		Merged.bWantAssetClass = bAnyActor;
-
-		for (UPCGExAssetCollection* Collection : UniqueCollections)
-		{
-			Packer->RegisterCollection(Collection);
-			PCGExGetCollectionData::FlattenInto(Merged, Collection, ProcessParams);
-		}
-
-		// Single-shot declare + write.
-		if (!Merged.Entries->IsEmpty())
-		{
-			PCGExGetCollectionData::WriteFromEntries(Merged, ProcessParams);
-		}
-
-		// Emit one FPCGTaggedData. Tag forwarding (if on) unions tags from every contributing
-		// source input -- per-slot identity is lost in Merged mode by design.
-		InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + 2);
-
-		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
-		OutData.Pin = PCGExGetCollectionData::OutputCollectionDataPin;
-		OutData.Data = Merged.OutputSet;
-		if (Merged.Entries->IsEmpty())
-		{
-			OutData.Tags.Add(PCGExGetCollectionData::EmptyTag.ToString());
-		}
-		if (Settings->bForwardInputTags)
-		{
-			TArray<FPCGTaggedData> Inputs = InContext->InputData.GetInputsByPin(PCGExGetCollectionData::SourcesPin);
-			TSet<FString> TagUnion;
-			for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
-			{
-				if (Inputs.IsValidIndex(Slot.SourceInputIndex))
-				{
-					TagUnion.Append(Inputs[Slot.SourceInputIndex].Tags);
-				}
-			}
-			OutData.Tags.Append(TagUnion);
-		}
-
-		EmitMap();
-		InContext->Done();
-		return InContext->TryComplete();
-	}
-
-	// =========================================================================================
-	// FromInputs slot-based path (PerEntry / PerInputData)
-	// =========================================================================================
-
-	// Phase 1 (single-threaded): pre-allocate one UPCGParamData per unique collection.
-	// Multiple slots pointing at the same collection share the same output Data pointer
-	// (their FPCGTaggedData entries hold the per-slot tags).
-	TArray<PCGExGetCollectionData::FUniqueOutput> UniqueOutputs;
-	TMap<UPCGExAssetCollection*, int32> CollectionToIndex;
-
-	for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
-	{
-		UPCGExAssetCollection* Collection = PCGExGetCollectionData::ResolveSlotCollection(Context, Slot);
-		if (!Collection)
-		{
-			continue;
-		}
-		if (CollectionToIndex.Contains(Collection))
-		{
-			continue;
-		}
-
-		const int32 Idx = UniqueOutputs.Num();
-		CollectionToIndex.Add(Collection, Idx);
-
-		PCGExGetCollectionData::FUniqueOutput& U = UniqueOutputs.AddDefaulted_GetRef();
-		U.Collection = Collection;
-		U.OutputSet = InContext->ManagedObjects->New<UPCGParamData>();
-		U.Entries = MakeShared<TArray<PCGExGetCollectionData::FFlattenedEntry>>();
-		PCGExGetCollectionData::SetAssetHalves(U, Collection);
-
-		Collection->EDITOR_RegisterTrackingKeys(InContext);
-	}
-
-	// Reserve TaggedData up-front (one entry per slot + one for the map) so the slot emission
-	// loop doesn't pay for TArray growth reallocations.
-	InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + Context->Slots.Num() + 1);
-
-	// Phase 2 (single-threaded): packer registration.
-	for (PCGExGetCollectionData::FUniqueOutput& U : UniqueOutputs)
-	{
-		Packer->RegisterCollection(U.Collection);
-	}
-
-	// Phase 3 (parallel over unique collections): full per-output work via the shared helper.
-	// Threshold=2 (default 512 would never trigger here); Unbalanced because per-iteration cost
-	// varies dramatically (small leaf-only collection vs deeply nested grammar tree).
-	PCGExMT::ParallelOrSequential(UniqueOutputs.Num(), [&](const int32 i)
-	{
-		PCGExGetCollectionData::ProcessUniqueOutput(UniqueOutputs[i], ProcessParams);
-	}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
-
-	// Phase 4 (single-threaded): emit one FPCGTaggedData per slot. Multiple slots can share the
-	// same UPCGParamData pointer -- tags live on the tagged-data wrapper, not the data itself.
-	// Re-fetch input list only if we'll actually forward tags (slot.SourceInputIndex is stable
-	// across the lifetime of InContext, so re-querying gives the same order).
-	TArray<FPCGTaggedData> InputsForTags;
-	const bool bWillForwardTags = Settings->bForwardInputTags && Settings->SourceMode == EPCGExGetCollectionDataSourceMode::FromInputs;
-	if (bWillForwardTags)
-	{
-		InputsForTags = InContext->InputData.GetInputsByPin(PCGExGetCollectionData::SourcesPin);
-	}
-
-	UPCGParamData* EmptySentinel = nullptr;
-	auto GetOrCreateEmpty = [&]() -> UPCGParamData*
-	{
-		if (!EmptySentinel)
-		{
-			EmptySentinel = InContext->ManagedObjects->New<UPCGParamData>();
-		}
-		return EmptySentinel;
-	};
-
-	for (const FPCGExGetCollectionDataContext::FSlot& Slot : Context->Slots)
-	{
-		UPCGExAssetCollection* Collection = PCGExGetCollectionData::ResolveSlotCollection(Context, Slot);
-
-		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();
-		OutData.Pin = PCGExGetCollectionData::OutputCollectionDataPin;
-
-		if (!Collection)
-		{
-			OutData.Data = GetOrCreateEmpty();
-			OutData.Tags.Add(PCGExGetCollectionData::EmptyTag.ToString());
-		}
-		else
-		{
-			const int32 Idx = CollectionToIndex.FindChecked(Collection);
-			const PCGExGetCollectionData::FUniqueOutput& U = UniqueOutputs[Idx];
-			if (U.Entries->IsEmpty())
-			{
-				OutData.Data = GetOrCreateEmpty();
-				OutData.Tags.Add(PCGExGetCollectionData::EmptyTag.ToString());
-			}
-			else
-			{
-				OutData.Data = U.OutputSet;
-			}
-		}
-
-		if (bWillForwardTags && InputsForTags.IsValidIndex(Slot.SourceInputIndex))
-		{
-			OutData.Tags.Append(InputsForTags[Slot.SourceInputIndex].Tags);
-		}
-	}
-
-	// Phase 5: always emit the shared Map.
-	EmitMap();
 
 	InContext->Done();
 	return InContext->TryComplete();
 }
 
 #undef PCGEX_GCD_LEAF_ATTRS
+#undef PCGEX_GCD_ROW_ATTRS
 #undef PCGEX_GCD_GRAMMAR_PERAXIS_ATTRS
 #undef PCGEX_GCD_GRAMMAR_SHARED_ATTRS
 #undef PCGEX_VALIDATE_TOGGLED

@@ -9,35 +9,22 @@
 
 #include "PCGExPropertyWriter.generated.h"
 
-/**
- * Configuration for a single property output.
- * Associates a property (by name) with an output attribute name.
- *
- * This is the user-facing config for "which properties should become point attributes".
- * PropertyName must match a property defined in the source schema/provider.
- * OutputAttributeName lets the user rename the output attribute (defaults to PropertyName).
- */
 USTRUCT(BlueprintType)
 struct PCGEXPROPERTIES_API FPCGExPropertyOutputConfig
 {
 	GENERATED_BODY()
 
-	/** Whether this output config is enabled */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Output")
 	bool bEnabled = true;
 
-	/** Property name to output (must match a property in the source) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Output", meta=(EditCondition="bEnabled"))
 	FName PropertyName;
 
-	/** Attribute name for output (if empty, uses PropertyName) */
+	/** Defaults to PropertyName when empty. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Output", meta=(EditCondition="bEnabled"))
 	FName OutputAttributeName;
 
-	/**
-	 * Get effective output name, validated for PCG compatibility.
-	 * Returns NAME_None if the name is invalid.
-	 */
+	/** NAME_None when the resolved name fails PCG attribute-name validation. */
 	FName GetEffectiveOutputName() const;
 
 	bool IsValid() const
@@ -46,63 +33,31 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOutputConfig
 	}
 };
 
-/**
- * Reusable settings struct for property output configuration.
- * Can be embedded in any node that needs to output properties.
- */
 USTRUCT(BlueprintType)
 struct PCGEXPROPERTIES_API FPCGExPropertyOutputSettings
 {
 	GENERATED_BODY()
 
-	/**
-	 * Properties to output as point attributes.
-	 * Each config maps a property name to an output attribute name.
-	 *
-	 * Explicit entries here take precedence over schema-derived entries from IncludedSchemas:
-	 * if a name appears in both, the explicit Config wins (regardless of bEnabled). This lets
-	 * a disabled explicit entry suppress a schema-derived output for the same name.
-	 */
+	/** Explicit configs win over IncludedSchemas-derived entries on name conflict, regardless
+	 *  of bEnabled -- a disabled explicit entry suppresses the schema's same-named output. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName="Properties Mapping", TitleProperty="PropertyName"))
 	TArray<FPCGExPropertyOutputConfig> Configs;
 
-	/**
-	 * Schema assets whose properties should be output as-is.
-	 * Each referenced asset's Collection is resolved recursively (locals + ImportedSchemas, with
-	 * cycle detection) and every resolved entry contributes an enabled config using its Name as
-	 * both PropertyName and (defaulted) OutputAttributeName. Entries whose name already appears
-	 * in Configs are skipped.
-	 */
+	/** Each asset's Collection is resolved recursively (locals + ImportedSchemas, cycle-safe);
+	 *  every resolved entry contributes an enabled config keyed by its Name. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName="Included Schemas"))
 	TArray<TObjectPtr<UPCGExPropertySchemaAsset>> IncludedSchemas;
 
-	/**
-	 * Build the effective list of output configs:
-	 *   1. Every entry in Configs (preserved in order, including disabled ones).
-	 *   2. Followed by schema-derived entries from IncludedSchemas (recursively resolved),
-	 *      name-deduped against Configs and against each other (first-wins).
-	 *
-	 * @param OutConfigs Filled with the merged list. Reset before population.
-	 */
+	/** Configs first (in order, including disabled), then IncludedSchemas entries (first-wins,
+	 *  name-deduped against Configs). OutConfigs is Reset before population. */
 	void GetEffectiveConfigs(TArray<FPCGExPropertyOutputConfig>& OutConfigs) const;
 
-	/**
-	 * Check if any outputs are configured.
-	 * Returns true on the first valid explicit Config or, failing that, on the first
-	 * named entry produced by resolving IncludedSchemas.
-	 */
+	/** True on the first valid explicit Config, or failing that, on the first named IncludedSchemas entry. */
 	bool HasOutputs() const;
 
-	/**
-	 * Auto-populate configs from a property registry.
-	 * Adds configs for all properties that support output and aren't already configured.
-	 * Skips properties already configured (enabled configs only).
-	 * @param Registry The property registry to scan
-	 * @return Number of configs added
-	 */
+	/** Appends output-supporting Registry entries that aren't already present as enabled Configs. */
 	int32 AutoPopulateFromRegistry(TConstArrayView<FPCGExPropertyRegistryEntry> Registry)
 	{
-		// Collect existing enabled property names
 		TSet<FName> ExistingNames;
 		for (const FPCGExPropertyOutputConfig& Config : Configs)
 		{
@@ -112,7 +67,6 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOutputSettings
 			}
 		}
 
-		// Add new configs for each registry entry that supports output and isn't already configured
 		int32 AddedCount = 0;
 		for (const FPCGExPropertyRegistryEntry& Entry : Registry)
 		{
@@ -121,7 +75,6 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOutputSettings
 				FPCGExPropertyOutputConfig& NewConfig = Configs.AddDefaulted_GetRef();
 				NewConfig.bEnabled = true;
 				NewConfig.PropertyName = Entry.PropertyName;
-				// OutputAttributeName left empty - will use PropertyName as default
 				AddedCount++;
 			}
 		}
@@ -130,132 +83,118 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOutputSettings
 	}
 };
 
-/**
- * Interface for providing properties to the property writer.
- * Implement this to customize how properties are looked up per-point.
- *
- * IMPLEMENTING A CUSTOM PROVIDER:
- *
- * This is needed when you want to use FPCGExPropertyWriter in your own node.
- * The provider abstracts how properties are stored so the writer can work generically.
- *
- *   class FMyProvider : public IPCGExPropertyProvider
- *   {
- *       // Return properties for a given source index (e.g., collection entry, row)
- *       TConstArrayView<FInstancedStruct> GetProperties(int32 Index) const override;
- *
- *       // Return the registry (built once during init via PCGExProperties::BuildRegistry)
- *       TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const override;
- *
- *       // Find a prototype property by name (used to clone writer instances)
- *       const FInstancedStruct* FindPrototypeProperty(FName PropertyName) const override;
- *   };
- *
- * The "prototype" property is cloned by the writer during Initialize() to create
- * writer instances that own their output buffers. The actual per-point values
- * come from GetProperties(SourceIndex) during WriteProperties().
- */
+/** Abstraction over "where do properties come from" for the writer classes below. The prototype
+ *  (FindPrototypeProperty) is cloned during writer Initialize; per-source values come from
+ *  GetPropertyAt during the per-row write. */
 class PCGEXPROPERTIES_API IPCGExPropertyProvider
 {
 public:
 	virtual ~IPCGExPropertyProvider() = default;
 
-	/**
-	 * Get the properties for a specific index (e.g., module index, entry index).
-	 * @param Index The index to get properties for
-	 * @return Array view of property instanced structs
-	 */
 	virtual TConstArrayView<FInstancedStruct> GetProperties(int32 Index) const = 0;
-
-	/**
-	 * Get the property registry for this provider.
-	 * Used to find prototype properties for writer initialization.
-	 */
 	virtual TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const = 0;
-
-	/**
-	 * Find a prototype property by name from the provider.
-	 * @param PropertyName The name to search for
-	 * @return Pointer to FInstancedStruct if found, nullptr otherwise
-	 */
 	virtual const FInstancedStruct* FindPrototypeProperty(FName PropertyName) const = 0;
+
+	/** Override with an O(1) name-keyed lookup when the provider has one -- the writer hot path
+	 *  calls this per writer per row, so the default linear scan via GetProperties is
+	 *  O(P*SchemaSize) per row vs O(P) with an override. */
+	virtual const FInstancedStruct* GetPropertyAt(int32 SourceIndex, FName PropertyName) const
+	{
+		return PCGExProperties::GetPropertyByName(GetProperties(SourceIndex), PropertyName);
+	}
+};
+
+class FPCGMetadataAttributeBase;
+class UPCGMetadata;
+struct FPCGExContext;
+
+/**
+ * Metadata-attribute writer (single-threaded per instance). Pair with FPCGExPropertyWriter when
+ * the target is an FFacade-backed point buffer instead.
+ *
+ *   FPCGExPropertySetWriter W;
+ *   W.Initialize(Ctx, Provider, Settings, Metadata);
+ *   for (each row r) W.WriteEntry(EntryKey[r], SourceIndexFor(r));
+ *
+ * For sources that don't fit the SourceIndex shape, drive the per-writer loop yourself via
+ * Num() / GetPropertyName / WriteAt (see FPCGExCollectionPropertySetWriter).
+ */
+class PCGEXPROPERTIES_API FPCGExPropertySetWriter
+{
+public:
+	FPCGExPropertySetWriter() = default;
+
+	/** Provider must outlive WriteAt / WriteEntry calls. Writers whose prototype is missing or
+	 *  whose CreateMetadataAttribute returns null are silently dropped; true if any survive. */
+	bool Initialize(
+		FPCGExContext* InContext,
+		const IPCGExPropertyProvider* InProvider,
+		const FPCGExPropertyOutputSettings& OutputSettings,
+		UPCGMetadata* Metadata);
+
+	/** Skips GetEffectiveConfigs -- pass pre-assembled configs (e.g. from a discovered schema union). */
+	bool Initialize(
+		FPCGExContext* InContext,
+		const IPCGExPropertyProvider* InProvider,
+		TConstArrayView<FPCGExPropertyOutputConfig> EffectiveConfigs,
+		UPCGMetadata* Metadata);
+
+	int32 Num() const { return Writers.Num(); }
+	bool HasOutputs() const { return !Writers.IsEmpty(); }
+	FName GetPropertyName(int32 WriterIdx) const { return Writers[WriterIdx].PropertyName; }
+
+	/** Silent no-op on script-struct mismatch -- the type-erased FPCGExProperty interface can't
+	 *  transfer values between different concrete types. */
+	void WriteAt(int32 WriterIdx, int64 Key, const FInstancedStruct& Source);
+
+	/** Returns the count of successful writes (compare to Num() for partial-match detection).
+	 *  Returns 0 when no Provider was set during Initialize. */
+	int32 WriteEntry(int64 Key, int32 SourceIndex);
+
+protected:
+	struct FWriter
+	{
+		FName PropertyName;
+		FInstancedStruct WriterInstance;
+		FPCGMetadataAttributeBase* Attribute = nullptr;
+	};
+
+	const IPCGExPropertyProvider* Provider = nullptr;
+	TArray<FWriter> Writers;
 };
 
 /**
- * Generic helper for writing property data to point attributes.
- * Orchestrates property initialization and per-point writing using the
- * property-owned output interface.
+ * FFacade-backed point-attribute writer. Pair with FPCGExPropertySetWriter when the target is
+ * a UPCGMetadata instead.
  *
- * This is a general-purpose writer that works with any IPCGExPropertyProvider.
- * For Valency-specific needs, use FPCGExValencyPropertyWriter which adds
- * module tags support.
+ *   FPCGExPropertyWriter W;
+ *   W.Initialize(Provider, OutputFacade, Settings);   // single-threaded boot
+ *   W.WriteProperties(PointIdx, SourceIdx);            // per-point write
  *
- * LIFECYCLE:
- *
- *   // 1. Boot phase (single-threaded):
- *   FPCGExPropertyWriter Writer;
- *   Writer.Initialize(MyProvider, OutputFacade, OutputSettings);
- *   // Initialize() clones prototype properties, creates output buffers.
- *   // Returns false if no outputs were successfully initialized.
- *
- *   // 2. Processing phase (per-point, potentially parallel):
- *   Writer.WriteProperties(PointIndex, SourceIndex);
- *   // Looks up properties from provider at SourceIndex,
- *   // copies values into writer instances, writes to buffers.
- *
- * NOTE: WriteProperties() uses CopyValueFrom + WriteOutput internally,
- * which is NOT thread-safe. If you need parallel writes, access the
- * property's WriteOutputFrom() directly instead.
- *
- * Custom property types work transparently with this writer - no changes needed here.
+ * NOT thread-safe -- CopyValueFrom mutates the writer instance. For parallel writes go through
+ * FPCGExProperty::WriteOutputFrom directly.
  */
 class PCGEXPROPERTIES_API FPCGExPropertyWriter
 {
 public:
 	FPCGExPropertyWriter() = default;
 
-	/**
-	 * Initialize writers from a property provider using output settings.
-	 * Creates writer instances for each configured property.
-	 * Call during OnProcessingPreparationComplete or similar boot phase.
-	 *
-	 * @param InProvider The property provider to use
-	 * @param OutputFacade The facade to create writers on
-	 * @param OutputSettings The property output settings
-	 * @return true if at least one output was initialized
-	 */
 	bool Initialize(
 		const IPCGExPropertyProvider* InProvider,
 		const TSharedRef<PCGExData::FFacade>& OutputFacade,
 		const FPCGExPropertyOutputSettings& OutputSettings
 		);
 
-	/**
-	 * Write property values for a resolved index to a point.
-	 * Call during ProcessRange for each point.
-	 *
-	 * @param PointIndex The point index to write to
-	 * @param SourceIndex The source index to get properties from (e.g., module index, entry index)
-	 */
 	void WriteProperties(int32 PointIndex, int32 SourceIndex);
 
-	/** Check if this writer has any active outputs */
 	bool HasOutputs() const;
 
 protected:
-	/** Cached output settings */
 	FPCGExPropertyOutputSettings Settings;
-
-	/** Cached reference to property provider */
 	const IPCGExPropertyProvider* Provider = nullptr;
 
-	/**
-	 * Per-property writer instances.
-	 * Key = PropertyName, Value = cloned property (owns its OutputBuffer).
-	 *
-	 * Each writer instance is a deep copy of the prototype property from the provider.
-	 * The clone's InitializeOutput() is called during Initialize() to create the buffer.
-	 * During WriteProperties(), values are copied from source into the clone, then written.
-	 */
+	/** Cloned per-output prototypes that own their FFacade output buffer (allocated during
+	 *  Initialize via InitializeOutput). Per-row writes copy source values into these clones
+	 *  then flush via WriteOutput. */
 	TMap<FName, FInstancedStruct> WriterInstances;
 };

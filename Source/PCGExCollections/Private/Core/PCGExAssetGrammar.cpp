@@ -81,7 +81,7 @@ double FPCGExAssetGrammarDetails::GetLeafSize(const FBox& InBounds, const EPCGEx
 double FPCGExAssetGrammarDetails::GetSubCollectionSize(
 	const UPCGExAssetCollection* SubCollection,
 	const EPCGExGrammarAxes Axis,
-	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+	FPCGExGrammarSizeCache* SizeCache) const
 {
 	if (!HasAxis(Axis) || !SubCollection) { return 0.0; }
 
@@ -98,36 +98,34 @@ double FPCGExAssetGrammarDetails::GetSubCollectionSize(
 		return 0.0;
 	}
 
+	PCGExGrammarAxes::EAggregator Aggregator = PCGExGrammarAxes::EAggregator::None;
+	EPCGExGrammarAxes ChildSourceAxis = EPCGExGrammarAxes::None;
+	PCGExGrammarAxes::DecodeAggregation(A.Size, Aggregator, ChildSourceAxis);
+
+	if (Aggregator == PCGExGrammarAxes::EAggregator::None) { return 0.0; }
+
 	UPCGExAssetCollection* MutableSub = const_cast<UPCGExAssetCollection*>(SubCollection);
 	const PCGExAssetCollection::FCache* Cache = MutableSub->LoadCache();
 	if (!Cache || !Cache->Main) { return 0.0; }
 	const int32 NumEntries = Cache->Main->Order.Num();
 	if (NumEntries == 0) { return 0.0; }
 
-	double Aggregate = 0.0;
+	double Aggregate = (Aggregator == PCGExGrammarAxes::EAggregator::Min) ? TNumericLimits<double>::Max() : 0.0;
 	double Samples = 0.0;
-
-	if (A.Size == EPCGExGrammarAxisSize::Min) { Aggregate = TNumericLimits<double>::Max(); }
 
 	for (int32 i = 0; i < NumEntries; i++)
 	{
 		FPCGExEntryAccessResult Result = MutableSub->GetEntryAt(i);
 		if (!Result.IsValid()) { continue; }
 
-		const double ChildSize = Result.Entry->GetGrammarSize(Result.Host, Axis, SizeCache);
-		if (ChildSize <= 0.0) { continue; } // disabled-axis on this child -- skip the sample
+		const double ChildSize = Result.Entry->GetGrammarSize(Result.Host, ChildSourceAxis, SizeCache);
+		if (ChildSize <= 0.0) { continue; }
 
-		switch (A.Size)
+		switch (Aggregator)
 		{
-		case EPCGExGrammarAxisSize::Min:
-			Aggregate = FMath::Min(Aggregate, ChildSize);
-			break;
-		case EPCGExGrammarAxisSize::Max:
-			Aggregate = FMath::Max(Aggregate, ChildSize);
-			break;
-		case EPCGExGrammarAxisSize::Average:
-			Aggregate += ChildSize;
-			break;
+		case PCGExGrammarAxes::EAggregator::Min:     Aggregate = FMath::Min(Aggregate, ChildSize); break;
+		case PCGExGrammarAxes::EAggregator::Max:     Aggregate = FMath::Max(Aggregate, ChildSize); break;
+		case PCGExGrammarAxes::EAggregator::Average: Aggregate += ChildSize; break;
 		default: ;
 		}
 		Samples += 1.0;
@@ -135,7 +133,7 @@ double FPCGExAssetGrammarDetails::GetSubCollectionSize(
 
 	if (Samples == 0.0) { return 0.0; }
 
-	if (A.Size == EPCGExGrammarAxisSize::Average) { Aggregate /= Samples; }
+	if (Aggregator == PCGExGrammarAxes::EAggregator::Average) { Aggregate /= Samples; }
 
 	return FMath::Max(1.0, A.ApplyOp(Aggregate));
 }
@@ -156,7 +154,7 @@ bool FPCGExAssetGrammarDetails::FixSubCollection(
 	const UPCGExAssetCollection* SubCollection,
 	const EPCGExGrammarAxes Axis,
 	FPCGSubdivisionSubmodule& OutSubmodule,
-	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+	FPCGExGrammarSizeCache* SizeCache) const
 {
 	if (!HasAxis(Axis)) { return false; }
 
@@ -233,16 +231,16 @@ void FPCGExAssetGrammarDetails::MigrateFromLegacyCollectionGrammar(const FPCGExC
 		return;
 	}
 
-	// Legacy CollectionGrammar was single-axis (X-equivalent) with subcollection-aggregation mode.
+	// Legacy CollectionGrammar was single-axis (X-equivalent); map Min/Max/Avg to Min_X/Max_X/Avg_X.
 	Axes = static_cast<uint8>(EPCGExGrammarAxes::X);
 	FPCGExGrammarAxisDetails& Target = SizingX;
 
 	switch (Legacy.SizeMode)
 	{
 	case EPCGExCollectionGrammarSize::Fixed:   Target.Size = EPCGExGrammarAxisSize::Fixed; break;
-	case EPCGExCollectionGrammarSize::Min:     Target.Size = EPCGExGrammarAxisSize::Min; break;
-	case EPCGExCollectionGrammarSize::Max:     Target.Size = EPCGExGrammarAxisSize::Max; break;
-	case EPCGExCollectionGrammarSize::Average: Target.Size = EPCGExGrammarAxisSize::Average; break;
+	case EPCGExCollectionGrammarSize::Min:     Target.Size = EPCGExGrammarAxisSize::Min_X; break;
+	case EPCGExCollectionGrammarSize::Max:     Target.Size = EPCGExGrammarAxisSize::Max_X; break;
+	case EPCGExCollectionGrammarSize::Average: Target.Size = EPCGExGrammarAxisSize::Avg_X; break;
 	}
 	Target.SizeOp = EPCGExGrammarSizeOp::None;
 	Target.FixedSize = Legacy.Size;
@@ -266,10 +264,7 @@ bool FPCGExAssetGrammarDetails::ValidateContext(const bool bIsSubCollection)
 		}
 		else
 		{
-			// Min/Max/Average aggregate child entries; only meaningful for subcollections.
-			if (A->Size == EPCGExGrammarAxisSize::Min
-				|| A->Size == EPCGExGrammarAxisSize::Max
-				|| A->Size == EPCGExGrammarAxisSize::Average)
+			if (PCGExGrammarAxes::IsAggregation(A->Size))
 			{
 				A->Size = EPCGExGrammarAxisSize::Fixed;
 				bChanged = true;

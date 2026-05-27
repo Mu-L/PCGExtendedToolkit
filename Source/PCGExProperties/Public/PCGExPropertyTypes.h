@@ -82,6 +82,13 @@ struct PCGEXPROPERTIES_API FPCGExNumericRange
 
 	UPROPERTY(EditAnywhere, Category = "Range")
 	double Max = 1.0;
+
+	bool operator==(const FPCGExNumericRange& Other) const
+	{
+		return bClampMin == Other.bClampMin && Min == Other.Min
+			&& bClampMax == Other.bClampMax && Max == Other.Max;
+	}
+	bool operator!=(const FPCGExNumericRange& Other) const { return !(*this == Other); }
 #endif
 };
 
@@ -194,7 +201,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -241,7 +248,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -288,7 +295,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -335,7 +342,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -723,7 +730,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -780,7 +787,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{
@@ -833,7 +840,7 @@ public:
 	virtual void WriteOutput(int32 PointIndex) const override;
 	virtual void WriteOutputFrom(int32 PointIndex, const FPCGExProperty* Source) const override;
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema) override;
 
 	virtual bool SupportsOutput() const override
 	{

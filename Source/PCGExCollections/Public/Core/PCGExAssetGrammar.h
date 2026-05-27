@@ -69,10 +69,13 @@ ENUM_CLASS_FLAGS(EPCGExGrammarAxes)
 namespace PCGExGrammarAxes
 {
 	/** Iteration order for axis-indexed loops. */
-	static constexpr EPCGExGrammarAxes Bits[3] = { EPCGExGrammarAxes::X, EPCGExGrammarAxes::Y, EPCGExGrammarAxes::Z };
+	static constexpr EPCGExGrammarAxes Bits[3] = {EPCGExGrammarAxes::X, EPCGExGrammarAxes::Y, EPCGExGrammarAxes::Z};
 
 	/** Hardcoded attribute-name suffixes. */
-	static constexpr const TCHAR* Suffixes[3] = { TEXT("_X"), TEXT("_Y"), TEXT("_Z") };
+	static constexpr const TCHAR* Suffixes[3] = {TEXT("_X"), TEXT("_Y"), TEXT("_Z")};
+
+	/** Bare per-axis letters for UI labels. */
+	static constexpr const TCHAR* Letters[3] = {TEXT("X"), TEXT("Y"), TEXT("Z")};
 
 	/** Number of set bits in an axis mask. Constrained to the 3 valid axis bits. */
 	FORCEINLINE int32 CountAxes(const uint8 Mask)
@@ -86,26 +89,97 @@ namespace PCGExGrammarAxes
 	 *  (single-axis legacy shape); otherwise appends the matching _X/_Y/_Z suffix. */
 	FORCEINLINE FName MakeAxisAttributeName(const FName& Base, const int32 AxisIndex, const bool bSuppressSuffix)
 	{
-		if (bSuppressSuffix) { return Base; }
+		if (bSuppressSuffix)
+		{
+			return Base;
+		}
 		return FName(*FString::Printf(TEXT("%s%s"), *Base.ToString(), Suffixes[AxisIndex]));
 	}
 }
 
-/**
- * Per-axis size source.
- * Bounds/Fixed are valid for leaf entries; Min/Max/Average are valid for subcollection entries
- * (aggregating their child entries' per-axis grammar sizes). Customization hides the
- * non-applicable values based on the owning entry's bIsSubCollection.
- */
+/** Per-axis size source. Min_X/Y/Z, Max_X/Y/Z, Avg_X/Y/Z are subcollection-only and encode a child
+ *  source axis independent of the slot axis (Min_Z in SizingX = aggregate child Z for the X output). */
 UENUM()
 enum class EPCGExGrammarAxisSize : uint8
 {
-	Bounds  = 0 UMETA(DisplayName = "Bounds", Tooltip = "Use the entry's bounds extent on this axis.", ActionIcon = "From_Center"),
-	Fixed   = 1 UMETA(DisplayName = "Fixed", Tooltip = "Use FixedSize as the literal size on this axis.", ActionIcon = "Constant"),
-	Min     = 2 UMETA(DisplayName = "Smallest", Tooltip = "Subcollection only: smallest per-axis size across child entries.", ActionIcon = "Fit_Min"),
-	Max     = 3 UMETA(DisplayName = "Largest", Tooltip = "Subcollection only: largest per-axis size across child entries.", ActionIcon = "Fit_Max"),
-	Average = 4 UMETA(DisplayName = "Average", Tooltip = "Subcollection only: average per-axis size across child entries.", ActionIcon = "Fit_Average"),
+	Bounds = 0 UMETA(DisplayName = "Bounds", Tooltip = "Use the entry's bounds extent on this axis.", ActionIcon = "From_Center"),
+	Fixed  = 1 UMETA(DisplayName = "Fixed", Tooltip = "Use FixedSize as the literal size on this axis.", ActionIcon = "Constant"),
+	Min_X  = 2 UMETA(DisplayName = "Smallest (X)", Tooltip = "Subcollection only: smallest child X grammar size.", ActionIcon = "Fit_Min"),
+	Min_Y  = 3 UMETA(DisplayName = "Smallest (Y)", Tooltip = "Subcollection only: smallest child Y grammar size.", ActionIcon = "Fit_Min"),
+	Min_Z  = 4 UMETA(DisplayName = "Smallest (Z)", Tooltip = "Subcollection only: smallest child Z grammar size.", ActionIcon = "Fit_Min"),
+	Max_X  = 5 UMETA(DisplayName = "Largest (X)", Tooltip = "Subcollection only: largest child X grammar size.", ActionIcon = "Fit_Max"),
+	Max_Y  = 6 UMETA(DisplayName = "Largest (Y)", Tooltip = "Subcollection only: largest child Y grammar size.", ActionIcon = "Fit_Max"),
+	Max_Z  = 7 UMETA(DisplayName = "Largest (Z)", Tooltip = "Subcollection only: largest child Z grammar size.", ActionIcon = "Fit_Max"),
+	Avg_X  = 8 UMETA(DisplayName = "Average (X)", Tooltip = "Subcollection only: average of child X grammar sizes.", ActionIcon = "Fit_Average"),
+	Avg_Y  = 9 UMETA(DisplayName = "Average (Y)", Tooltip = "Subcollection only: average of child Y grammar sizes.", ActionIcon = "Fit_Average"),
+	Avg_Z  = 10 UMETA(DisplayName = "Average (Z)", Tooltip = "Subcollection only: average of child Z grammar sizes.", ActionIcon = "Fit_Average"),
 };
+
+namespace PCGExGrammarAxes
+{
+	enum class EAggregator : uint8
+	{
+		None,
+		Min,
+		Max,
+		Average
+	};
+
+	namespace Detail
+	{
+		struct FAggregationDecode
+		{
+			EAggregator Agg;
+			EPCGExGrammarAxes Axis;
+		};
+
+		static constexpr FAggregationDecode AggregationTable[11] = {
+			/* Bounds */ {EAggregator::None, EPCGExGrammarAxes::None},
+			             /* Fixed  */ {EAggregator::None, EPCGExGrammarAxes::None},
+			             /* Min_X  */ {EAggregator::Min, EPCGExGrammarAxes::X},
+			             /* Min_Y  */ {EAggregator::Min, EPCGExGrammarAxes::Y},
+			             /* Min_Z  */ {EAggregator::Min, EPCGExGrammarAxes::Z},
+			             /* Max_X  */ {EAggregator::Max, EPCGExGrammarAxes::X},
+			             /* Max_Y  */ {EAggregator::Max, EPCGExGrammarAxes::Y},
+			             /* Max_Z  */ {EAggregator::Max, EPCGExGrammarAxes::Z},
+			             /* Avg_X  */ {EAggregator::Average, EPCGExGrammarAxes::X},
+			             /* Avg_Y  */ {EAggregator::Average, EPCGExGrammarAxes::Y},
+			             /* Avg_Z  */ {EAggregator::Average, EPCGExGrammarAxes::Z},
+		};
+	}
+
+	FORCEINLINE void DecodeAggregation(EPCGExGrammarAxisSize Size, EAggregator& OutAgg, EPCGExGrammarAxes& OutSourceAxis)
+	{
+		const Detail::FAggregationDecode& E = Detail::AggregationTable[static_cast<uint8>(Size)];
+		OutAgg = E.Agg;
+		OutSourceAxis = E.Axis;
+	}
+
+	FORCEINLINE bool IsAggregation(EPCGExGrammarAxisSize Size)
+	{
+		return Size != EPCGExGrammarAxisSize::Bounds && Size != EPCGExGrammarAxisSize::Fixed;
+	}
+}
+
+/** Memoization key for recursive grammar size resolution. Keyed by (Entry, Axis) because
+ *  cross-axis aggregation recursion mixes axes within one top-level pass. */
+struct FPCGExGrammarSizeCacheKey
+{
+	const FPCGExAssetCollectionEntry* Entry = nullptr;
+	EPCGExGrammarAxes Axis = EPCGExGrammarAxes::None;
+
+	FORCEINLINE bool operator==(const FPCGExGrammarSizeCacheKey& Other) const
+	{
+		return Entry == Other.Entry && Axis == Other.Axis;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FPCGExGrammarSizeCacheKey& Key)
+{
+	return HashCombine(GetTypeHash(Key.Entry), GetTypeHash(static_cast<uint8>(Key.Axis)));
+}
+
+using FPCGExGrammarSizeCache = TMap<FPCGExGrammarSizeCacheKey, double>;
 
 /** Arithmetic op applied on top of the resolved per-axis size. */
 UENUM()
@@ -227,8 +301,15 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 
 	// Runtime API
 
-	FORCEINLINE bool IsValidModule() const { return Axes != 0; }
-	FORCEINLINE bool HasAxis(EPCGExGrammarAxes Axis) const { return (Axes & static_cast<uint8>(Axis)) != 0; }
+	FORCEINLINE bool IsValidModule() const
+	{
+		return Axes != 0;
+	}
+
+	FORCEINLINE bool HasAxis(EPCGExGrammarAxes Axis) const
+	{
+		return (Axes & static_cast<uint8>(Axis)) != 0;
+	}
 
 	const FPCGExGrammarAxisDetails& GetAxisDetails(EPCGExGrammarAxes Axis) const;
 	FPCGExGrammarAxisDetails& GetAxisDetailsMutable(EPCGExGrammarAxes Axis);
@@ -240,16 +321,11 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 	 */
 	double GetLeafSize(const FBox& InBounds, EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X) const;
 
-	/**
-	 * Subcollection-context size. Aggregates child entries of SubCollection when Min/Max/Average,
-	 * returns FixedSize (with op applied) when Fixed. Bounds isn't meaningful for a subcollection
-	 * (no own bounds) and returns 0 -- invalid combination, customization should prevent it.
-	 * SizeCache deduplicates per-entry queries across the recursion.
-	 */
+	/** Subcollection-context size. SizeCache deduplicates per-(entry,axis) queries across the recursion. */
 	double GetSubCollectionSize(
 		const UPCGExAssetCollection* SubCollection,
 		EPCGExGrammarAxes Axis = EPCGExGrammarAxes::X,
-		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+		FPCGExGrammarSizeCache* SizeCache = nullptr) const;
 
 	/**
 	 * Leaf-context Fix. Returns true and populates OutSubmodule (Symbol, DebugColor, Size, bScalable)
@@ -262,11 +338,11 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 		const UPCGExAssetCollection* SubCollection,
 		EPCGExGrammarAxes Axis,
 		FPCGSubdivisionSubmodule& OutSubmodule,
-		TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache = nullptr) const;
+		FPCGExGrammarSizeCache* SizeCache = nullptr) const;
 
 
 #if WITH_EDITOR
-	
+
 	// Migration (schema v0 -> v1)
 
 	/**
@@ -297,7 +373,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 	bool ValidateContext(bool bIsSubCollection);
 
 #endif
-	
+
 };
 
 

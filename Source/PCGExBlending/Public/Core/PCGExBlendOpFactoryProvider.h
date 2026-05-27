@@ -10,9 +10,7 @@
 #include "UObject/Object.h"
 
 #include "Factories/PCGExFactoryProvider.h"
-#include "Metadata/PCGDefaultValueInterface.h"
 #include "Utils/PCGExCurveLookup.h"
-#include "Utils/PCGExDefaultValueContainer.h"
 
 #include "PCGExBlendOpFactoryProvider.generated.h"
 
@@ -28,7 +26,7 @@ namespace PCGExBlending
 }
 
 UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Blending", meta=(PCGExNodeLibraryDoc="metadata/blending/blendop"))
-class PCGEXBLENDING_API UPCGExBlendOpFactoryProviderSettings : public UPCGExFactoryProviderSettings, public IPCGSettingsDefaultValueProvider
+class PCGEXBLENDING_API UPCGExBlendOpFactoryProviderSettings : public UPCGExFactoryProviderSettings
 {
 	GENERATED_BODY()
 
@@ -40,30 +38,7 @@ public:
 #endif
 	//~End UObject interface
 
-	//~Begin IPCGSettingsDefaultValueProvider interface
-	virtual bool DefaultValuesAreEnabled() const override
-	{
-		return true;
-	}
-
-	virtual bool IsPinDefaultValueEnabled(FName PinLabel) const override;
-	virtual bool IsPinDefaultValueActivated(FName PinLabel) const override;
-	virtual EPCGMetadataTypes GetPinDefaultValueType(FName PinLabel) const override;
-	virtual bool IsPinDefaultValueMetadataTypeValid(FName PinLabel, EPCGMetadataTypes DataType) const override;
-#if WITH_EDITOR
-	virtual void SetPinDefaultValue(FName PinLabel, const FString& DefaultValue, bool bCreateIfNeeded = false) override;
-	virtual void ConvertPinDefaultValueMetadataType(FName PinLabel, EPCGMetadataTypes DataType) override;
-	virtual void SetPinDefaultValueIsActivated(FName PinLabel, bool bIsActivated, bool bDirtySettings = true) override;
-	virtual void ResetDefaultValues() override;
-	virtual FString GetPinInitialDefaultValueString(FName PinLabel) const override;
-	virtual FString GetPinDefaultValueAsString(FName PinLabel) const override;
-	virtual void ResetDefaultValue(FName PinLabel) override;
-#endif // WITH_EDITOR
-
-protected:
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
-	virtual EPCGMetadataTypes GetPinInitialDefaultValueType(FName PinLabel) const override;
-	//~End IPCGSettingsDefaultValueProvider interface
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
@@ -111,9 +86,4 @@ public:
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override;
 #endif
-
-private:
-	/** Stores the default values for the pins to be used as inline constants. */
-	UPROPERTY()
-	FPCGExDefaultValueContainer DefaultValues;
 };

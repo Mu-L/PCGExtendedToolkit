@@ -118,5 +118,5 @@ protected:
 		const FPCGExNameFiltersDetails& CategoryFilters,
 		TArray<PCGExCollectionToGrammar::FModule>& OutModules,
 		TSet<FName>& OutSymbols,
-		TMap<const FPCGExAssetCollectionEntry*, double>& SizeCache) const;
+		FPCGExGrammarSizeCache& SizeCache) const;
 };
