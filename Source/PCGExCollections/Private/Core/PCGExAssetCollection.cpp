@@ -1011,7 +1011,7 @@ void UPCGExAssetCollection::PostLoad()
 	// corrupting the result for PCGDataAssetCollection from commandlet.
 	// Cooked output uses the committed, editor-rebuilt content; staleness should be an
 	// authoring concern, not a cook concern.
-	if (!GEditor || !GEditor->IsTimerManagerValid() || !bAutoRebuildStaging || IsRunningCookCommandlet())
+	if (!GEditor || !GEditor->IsTimerManagerValid() || bSuppressStagingRebuild || IsRunningCookCommandlet())
 	{
 		return;
 	}
@@ -1352,7 +1352,7 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 	EDITOR_SetDirty();
 
-	if (bAutoRebuildStaging)
+	if (!bSuppressStagingRebuild)
 	{
 		EDITOR_RebuildStagingData();
 	}
@@ -1402,7 +1402,7 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 
 int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 {
-	if (!bAutoRebuildStaging)
+	if (bSuppressStagingRebuild)
 	{
 		return 0;
 	}
@@ -1474,7 +1474,7 @@ int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 
 bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 {
-	if (!bAutoRebuildStaging)
+	if (bSuppressStagingRebuild)
 	{
 		return false;
 	}
