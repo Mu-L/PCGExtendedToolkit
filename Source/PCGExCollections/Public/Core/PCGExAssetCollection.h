@@ -856,8 +856,7 @@ public:
 	}
 
 #if WITH_EDITORONLY_DATA
-	UPROPERTY(EditAnywhere, Category = Settings, AdvancedDisplay)
-	bool bAutoRebuildStaging = true;
+	bool bSuppressStagingRebuild = false;
 
 	/** Set at the end of every full rebuild (EDITOR_RebuildStagingData / _Recursive) to UtcNow.
 	 *  Used by EDITOR_RebuildStaleEntries to detect entries whose referenced asset's file mtime

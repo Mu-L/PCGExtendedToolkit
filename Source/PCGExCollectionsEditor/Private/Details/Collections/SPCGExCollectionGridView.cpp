@@ -1120,15 +1120,14 @@ void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 		FScopedTransaction Transaction(INVTEXT("Add Entry to Category"));
 
 		// Suppress staging rebuild -- nothing to stage on an empty entry
-		const bool bWasAutoRebuild = Coll->bAutoRebuildStaging;
-		Coll->bAutoRebuildStaging = false;
+		Coll->bSuppressStagingRebuild = true;
 
 		Coll->Modify();
 
 		FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
 		const int32 NewIndex = ArrayHelper.AddValue();
 
-		Coll->bAutoRebuildStaging = bWasAutoRebuild;
+		Coll->bSuppressStagingRebuild = false;
 
 		// Set category on newly added entry
 		FPCGExAssetCollectionEntry* NewEntry = Coll->EDITOR_GetMutableEntry(NewIndex);
@@ -1995,15 +1994,14 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 		FScopedTransaction Transaction(INVTEXT("Add Collection Entry"));
 
 		// Suppress staging rebuild -- nothing to stage on an empty entry
-		const bool bWasAutoRebuild = Coll->bAutoRebuildStaging;
-		Coll->bAutoRebuildStaging = false;
+		Coll->bSuppressStagingRebuild = true;
 
 		Coll->Modify();
 
 		FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
 		const int32 NewIndex = ArrayHelper.AddValue();
 
-		Coll->bAutoRebuildStaging = bWasAutoRebuild;
+		Coll->bSuppressStagingRebuild = false;
 		Coll->PostEditChange();
 
 		// Sync PropertyOverrides for the new entry to match the collection schema
