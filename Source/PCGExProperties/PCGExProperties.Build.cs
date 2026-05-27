@@ -41,7 +41,6 @@ public class PCGExProperties : ModuleRules
 				"Engine",
 				"PCG",
 				"PCGExCore"
-				//"StructUtils",
 			}
 		);
 
