@@ -5,6 +5,7 @@
 
 #include "Engine/World.h"
 #include "Misc/PackageName.h"
+#include "Serialization/ArchiveCrc32.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
@@ -414,6 +415,22 @@ namespace PCGExSharedCompact
 		UPackage* TargetPackage = CreatePackage(*DesiredPackagePath);
 		check(TargetPackage);
 
+		// SavePackage refuses to overwrite a package that is only partially loaded -- doing so
+		// would clobber the unloaded on-disk exports (see SavePackage2.cpp IsFullyLoaded guard).
+		// When the destination already exists on disk but was never loaded this session,
+		// CreatePackage hands back an unloaded stub (IsFullyLoaded() == false). This is the
+		// common case during cook: per-entry ExportedDataAssets are reached only via soft refs
+		// (Staging.Path), so a project-wide rebuild that force-loads collections never pulls the
+		// data-asset packages in. Fully load the target first -- it both materializes the
+		// existing occupant for the eviction below and makes the resulting package saveable.
+		// Newly-created packages with no file on disk already report IsFullyLoaded() == true, so
+		// this is a no-op for them. (Shared collections don't hit this because CompactShared
+		// LoadSynchronous()'s their external package back before modifying it.)
+		if (!TargetPackage->IsFullyLoaded())
+		{
+			TargetPackage->FullyLoad();
+		}
+
 		// If something already owns the target name in the target package, evict it. Renaming
 		// onto a name conflict would otherwise assert; we expect this on subsequent rebuilds
 		// when an old externalized asset is still loaded in the editor.
@@ -595,9 +612,49 @@ namespace PCGExSharedCompact
 			return MeshContentEquals(A, B);
 		}
 
+		// Process-stable ordering key. MUST NOT derive from GetTypeHash(FName/FSoftObjectPath):
+		// those hash the per-process FName comparison index (FNameEntryId::ToUnstableInt), which
+		// is assigned in name-registration order and therefore differs between editor sessions and
+		// the cooker. Using such a hash as a sort key reshuffles the shared collection every run,
+		// which silently re-points every baked Tag_EntryIdx (a raw Entries index) at a different
+		// mesh. Every ingredient below is either a raw scalar or a string / FArchiveCrc32 hash
+		// (FArchiveCrc32 stringifies FName & UObject paths), so the key is identical in any process.
+		//
+		// The key must also fully discriminate everything MeshContentEquals compares, so two
+		// distinct entries can never collide to the same key (which would re-introduce an unstable
+		// tie-break): mesh path, material-variant mode, slot, descriptor source, property-component
+		// hash, both component descriptors (CRC), and the material-override variant lists.
 		static FString SortKey(const FPCGExMeshCollectionEntry& E)
 		{
-			return E.StaticMesh.ToSoftObjectPath().ToString();
+			FArchiveCrc32 DescriptorCrc;
+			FSoftISMComponentDescriptor::StaticStruct()->SerializeBin(
+				DescriptorCrc, const_cast<FSoftISMComponentDescriptor*>(&E.ISMDescriptor));
+			FPCGExStaticMeshComponentDescriptor::StaticStruct()->SerializeBin(
+				DescriptorCrc, const_cast<FPCGExStaticMeshComponentDescriptor*>(&E.SMDescriptor));
+
+			FString Key = E.StaticMesh.ToSoftObjectPath().ToString();
+			Key += FString::Printf(TEXT("|MV=%d|SI=%d|DS=%d|PCH=%u|DESC=%08X"),
+				static_cast<int32>(E.MaterialVariants),
+				E.SlotIndex,
+				static_cast<int32>(E.DescriptorSource),
+				E.PropertyComponentHash,
+				DescriptorCrc.GetCrc());
+
+			for (const FPCGExMaterialOverrideSingleEntry& S : E.MaterialOverrideVariants)
+			{
+				Key += FString::Printf(TEXT("|MOV=%d:%s"),
+					S.Weight, *S.Material.ToSoftObjectPath().ToString());
+			}
+			for (const FPCGExMaterialOverrideCollection& V : E.MaterialOverrideVariantsList)
+			{
+				Key += FString::Printf(TEXT("|MOL=%d"), V.Weight);
+				for (const FPCGExMaterialOverrideEntry& O : V.Overrides)
+				{
+					Key += FString::Printf(TEXT(",%d:%s"),
+						O.SlotIndex, *O.Material.ToSoftObjectPath().ToString());
+				}
+			}
+			return Key;
 		}
 
 		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
@@ -679,7 +736,8 @@ namespace PCGExSharedCompact
 	// (identity via TPolicy::Hash + TPolicy::Equals), then rewrite Tag_EntryIdx on the
 	// policy's pin against the resulting shared indices. Tags/Category/PropertyOverrides
 	// on existing shared entries are preserved across rebuilds when identity survives.
-	// Deterministic ordering: (hash, sort-key) ascending -- stable across cold cooks.
+	// Deterministic ordering: by content-derived SortKey ascending -- stable across cold cooks
+	// and editor restarts (does NOT depend on the per-process FName comparison-index hash).
 	template <typename TPolicy>
 	static void CompactShared(
 		UObject* Outer,
@@ -795,12 +853,14 @@ namespace PCGExSharedCompact
 				AllGroups.Add(MoveTemp(G));
 			}
 		}
+		// Order purely by the content-derived, process-stable SortKey. FGroup::Hash is NOT used
+		// here: it comes from TPolicy::Hash -> GetTypeHash(FSoftObjectPath) -> GetTypeHash(FName),
+		// which is the per-process FName comparison index and reshuffles across sessions/cooks.
+		// TPolicy::SortKey fully discriminates every distinct group (see FMeshPolicy::SortKey), so
+		// no two groups share a key and there is no tie-break to fall back on. Hash is retained
+		// only as an in-process bucket key for grouping/preservation above.
 		AllGroups.Sort([](const FGroup& A, const FGroup& B)
 		{
-			if (A.Hash != B.Hash)
-			{
-				return A.Hash < B.Hash;
-			}
 			return A.SortKey < B.SortKey;
 		});
 
@@ -1216,13 +1276,23 @@ void UPCGExPCGDataAssetCollection::PreSave(FObjectPreSaveContext ObjectSaveConte
 {
 	// Cook-time safety net for users who edited a source level and cooked without a manual
 	// rebuild (or recovered from a mid-edit editor crash). Idempotent.
+	//
+	// Only re-bake the IN-MEMORY state here. 
+	// We deliberately do NOT call SaveExternalPackages() during cook:
+	//  - SavePackage(Pkg, nullptr, ...) is an editor (uncooked) save that writes the SOURCE
+	//    .uasset under /Content/. A cook must be read-only w.r.t. source content; writing it
+	//    dirties the workspace and fails / forces a writable-flip on read-only (Perforce) files.
+	//  - It mutates packages the cooker may have already cooked (no effect) or not yet cooked
+	//    (changing the source mid-cook), making the output depend on cook scheduling.
+	//  - In concurrent / cook-by-the-book saving, GIsSavingPackage is held for the whole batch;
+	//    a nested non-concurrent SavePackage clears it on scope-exit, breaking that invariant.
+	// On most cases (except for potential multi-threaded cooks), external objects are
+	// cooked from the loaded in-memory ones which should be enough.
+	// Actually might want to consider just removing this as the levels aren't actually being re-harvested
+	// at all here so the safety net is not quite comprehensive in the first place.
 	if (ObjectSaveContext.IsCooking())
 	{
 		RebuildSharedCollections();
-		if (IsExternalActive())
-		{
-			SaveExternalPackages();
-		}
 	}
 	Super::PreSave(ObjectSaveContext);
 }
