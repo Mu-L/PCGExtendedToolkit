@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "Misc/PackageName.h"
 #include "Hash/Blake3.h"
+#include "Serialization/ArchiveUObject.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
@@ -598,7 +599,7 @@ namespace PCGExSharedCompact
 	// digest the component descriptor structs, replacing a previous 32-bit CRC whose
 	// collision footprint could leave the sort tie-break undefined between distinct
 	// descriptors.
-	class FArchiveBlake3 : public FArchive
+	class FArchiveBlake3 : public FArchiveUObject
 	{
 	public:
 		FArchiveBlake3()
@@ -634,6 +635,8 @@ namespace PCGExSharedCompact
 		{
 			return TEXT("FArchiveBlake3");
 		}
+
+		using FArchiveUObject::operator<<; // bring in FSoftObjectPtr / FObjectPtr / etc. overloads
 
 		FBlake3Hash Finalize() { return Hasher.Finalize(); }
 
