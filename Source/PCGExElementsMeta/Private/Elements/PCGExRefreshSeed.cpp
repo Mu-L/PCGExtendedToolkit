@@ -12,45 +12,13 @@
 #define LOCTEXT_NAMESPACE "PCGExRefreshSeedElement"
 #define PCGEX_NAMESPACE RefreshSeed
 
-PCGEX_INITIALIZE_ELEMENT(RefreshSeed)
-
-bool FPCGExRefreshSeedElement::Boot(FPCGExContext* InContext) const
+PCGExData::EIOInit UPCGExRefreshSeedSettings::GetMainDataInitializationPolicy() const
 {
-	if (!FPCGExPointsProcessorElement::Boot(InContext))
-	{
-		return false;
-	}
-
-	PCGEX_CONTEXT_AND_SETTINGS(RefreshSeed)
-
-	return true;
+	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
 
-class FPCGExRefreshSeedTask final : public PCGExMT::FPCGExIndexedTask
-{
-public:
-	explicit FPCGExRefreshSeedTask(const int32 InPointIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO)
-		: FPCGExIndexedTask(InPointIndex)
-		  , PointIO(InPointIO)
-	{
-	}
-
-	const TSharedPtr<PCGExData::FPointIO> PointIO;
-
-	virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
-	{
-		PCGEX_INIT_IO_VOID(PointIO, PCGExData::EIOInit::Duplicate)
-
-		TPCGValueRange<int32> Seeds = PointIO->GetOut()->GetSeedValueRange();
-		TConstPCGValueRange<FTransform> Transforms = PointIO->GetOut()->GetConstTransformValueRange();
-
-		const FVector BaseOffset = FVector(TaskIndex) * 0.001;
-		for (int i = 0; i < PointIO->GetNum(); i++)
-		{
-			Seeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(Transforms[i].GetLocation(), BaseOffset);
-		}
-	}
-};
+PCGEX_INITIALIZE_ELEMENT(RefreshSeed)
+PCGEX_ELEMENT_BATCH_POINT_IMPL(RefreshSeed)
 
 bool FPCGExRefreshSeedElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
@@ -58,26 +26,67 @@ bool FPCGExRefreshSeedElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 
 	PCGEX_CONTEXT_AND_SETTINGS(RefreshSeed)
 	PCGEX_EXECUTION_CHECK
-
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
-
-		const TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
-		PCGEX_ASYNC_SCHEDULING_SCOPE(Context->GetTaskManager(), false)
-		while (Context->AdvancePointsIO(false))
+		if (!Context->StartBatchProcessingPoints(
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				return true;
+			},
+			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
+			{
+				NewBatch->bSkipCompletion = true;
+			}))
 		{
-			PCGEX_LAUNCH(FPCGExRefreshSeedTask, Settings->Base + Context->CurrentIO->IOIndex, Context->CurrentIO)
+			return Context->CancelExecution(TEXT("Could not find any data to refresh seed on."));
 		}
 	}
 
-	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_WaitingOnAsyncWork)
-	{
-		Context->Done();
-		Context->MainPoints->StageOutputs();
-	}
+	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
+
+	Context->MainPoints->StageOutputs();
 
 	return Context->TryComplete();
+}
+
+namespace PCGExRefreshSeed
+{
+	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
+	{
+		PointDataFacade->bSupportsScopedGet = Context->bScopedAttributeGet;
+
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
+
+		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
+
+		(void)PointDataFacade->GetOut()->GetSeedValueRange(true);
+
+		StartParallelLoopForPoints();
+
+		return true;
+	}
+
+	void FProcessor::ProcessPoints(const PCGExMT::FScope& Scope)
+	{
+		PointDataFacade->Fetch(Scope);
+		FilterScope(Scope);
+
+		TPCGValueRange<int32> Seeds = PointDataFacade->GetOut()->GetSeedValueRange(false);
+		TConstPCGValueRange<FTransform> Transforms = PointDataFacade->GetOut()->GetConstTransformValueRange();
+
+		const FVector BaseOffset = FVector(Settings->Base);
+		PCGEX_SCOPE_LOOP(Index)
+		{
+			if (!PointFilterCache[Index])
+			{
+				continue;
+			}
+			Seeds[Index] = PCGExRandomHelpers::ComputeSpatialSeed(Transforms[Index].GetLocation(), BaseOffset);
+		}
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

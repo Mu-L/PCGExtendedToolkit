@@ -75,7 +75,7 @@ struct PCGEXFOUNDATIONS_API FPCGExGUIDDetails
 	EPCGExGUIDFormat Format = EPCGExGUIDFormat::Digits;
 
 	/** What components are used for Uniqueness. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, Bitmask, BitmaskEnum="/Script/PCGExtendedToolkit.EPCGExGUIDUniquenessFlags"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, Bitmask, BitmaskEnum="/Script/PCGExFoundations.EPCGExGUIDUniquenessFlags"))
 	uint8 Uniqueness = static_cast<uint8>(EPCGExGUIDUniquenessFlags::All);
 
 	/** Where the unique key base value comes from. */

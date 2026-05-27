@@ -25,12 +25,15 @@ FPCGExPCGDataAssetCollectionEditor::FPCGExPCGDataAssetCollectionEditor()
 TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 	TWeakObjectPtr<UPCGExAssetCollection> InCollection,
 	int32 EntryIndex,
-	FSimpleDelegate OnAssetChanged)
+	FOnTilePropertyEdited OnPropertyEdited)
 {
 	TWeakObjectPtr<UPCGExAssetCollection> WeakColl = InCollection;
 	const int32 Idx = EntryIndex;
 
-	// Helper: read the typed entry (for Source enum access)
+	static const FName SourcePropName = GET_MEMBER_NAME_CHECKED(FPCGExPCGDataAssetCollectionEntry, Source);
+	static const FName DataAssetPropName = GET_MEMBER_NAME_CHECKED(FPCGExPCGDataAssetCollectionEntry, DataAsset);
+	static const FName LevelPropName = GET_MEMBER_NAME_CHECKED(FPCGExPCGDataAssetCollectionEntry, Level);
+
 	auto GetTypedEntry = [WeakColl, Idx]() -> FPCGExPCGDataAssetCollectionEntry*
 	{
 		UPCGExAssetCollection* Coll = WeakColl.Get();
@@ -41,79 +44,12 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 		return static_cast<FPCGExPCGDataAssetCollectionEntry*>(Coll->EDITOR_GetMutableEntry(Idx));
 	};
 
-	// Resolve SubCollection property class from reflection
-	const UClass* SubCollectionClass = nullptr;
-	if (UPCGExAssetCollection* Coll = WeakColl.Get())
-	{
-		FArrayProperty* ArrayProp = CastField<FArrayProperty>(Coll->GetClass()->FindPropertyByName(FName("Entries")));
-		if (ArrayProp)
-		{
-			FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-			if (InnerProp && InnerProp->Struct)
-			{
-				if (const FObjectPropertyBase* SubProp = CastField<FObjectPropertyBase>(InnerProp->Struct->FindPropertyByName(FName("SubCollection"))))
-				{
-					SubCollectionClass = SubProp->PropertyClass;
-				}
-			}
-		}
-	}
-
 	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
 
-	// SubCollection picker (visible when bIsSubCollection is true)
 	Box->AddSlot()
 	   .AutoHeight()
 	[
-		SNew(SBox)
-		.Visibility_Lambda([WeakColl, Idx]()
-		{
-			const UPCGExAssetCollection* Coll = WeakColl.Get();
-			if (!Coll)
-			{
-				return EVisibility::Collapsed;
-			}
-			const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-			return (Result.IsValid() && Result.Entry->bIsSubCollection) ? EVisibility::Visible : EVisibility::Collapsed;
-		})
-		[
-			SNew(SObjectPropertyEntryBox)
-			.AllowedClass(SubCollectionClass)
-			.ObjectPath_Lambda([WeakColl, Idx]() -> FString
-			{
-				const UPCGExAssetCollection* Coll = WeakColl.Get();
-				if (!Coll)
-				{
-					return FString();
-				}
-				const FPCGExEntryAccessResult Result = Coll->GetEntryRaw(Idx);
-				if (!Result.IsValid())
-				{
-					return FString();
-				}
-				const UPCGExAssetCollection* SubColl = Result.Entry->GetSubCollectionPtr();
-				return SubColl ? SubColl->GetPathName() : FString();
-			})
-			.OnObjectChanged_Lambda([WeakColl, Idx, OnAssetChanged](const FAssetData& AssetData)
-			{
-				UPCGExAssetCollection* Coll = WeakColl.Get();
-				if (!Coll)
-				{
-					return;
-				}
-				FPCGExAssetCollectionEntry* Entry = Coll->EDITOR_GetMutableEntry(Idx);
-				if (!Entry)
-				{
-					return;
-				}
-				FScopedTransaction Transaction(INVTEXT("Set SubCollection"));
-				Coll->Modify();
-				Entry->InternalSubCollection = Cast<UPCGExAssetCollection>(AssetData.GetAsset());
-				Coll->PostEditChange();
-				OnAssetChanged.ExecuteIfBound();
-			})
-			.DisplayThumbnail(false)
-		]
+		BuildSubCollectionPickerSlot(WeakColl, Idx, OnPropertyEdited)
 	];
 
 	// Source enum combobox (visible when not subcollection)
@@ -142,7 +78,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 					.Text(Item.IsValid() ? FText::FromString(*Item) : FText::GetEmpty())
 					.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8));
 			})
-			.OnSelectionChanged_Lambda([GetTypedEntry, WeakColl, OnAssetChanged](TSharedPtr<FString> Selected, ESelectInfo::Type SelectType)
+			.OnSelectionChanged_Lambda([GetTypedEntry, WeakColl, OnPropertyEdited](TSharedPtr<FString> Selected, ESelectInfo::Type SelectType)
 			{
 				if (!Selected.IsValid() || SelectType == ESelectInfo::Direct)
 				{
@@ -172,7 +108,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 				Coll->Modify();
 				Entry->Source = NewSource;
 				Coll->PostEditChange();
-				OnAssetChanged.ExecuteIfBound();
+				OnPropertyEdited.ExecuteIfBound(SourcePropName);
 			})
 			[
 				SNew(STextBlock)
@@ -224,7 +160,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 				}
 				return Entry->DataAsset.ToSoftObjectPath().ToString();
 			})
-			.OnObjectChanged_Lambda([GetTypedEntry, WeakColl, OnAssetChanged](const FAssetData& AssetData)
+			.OnObjectChanged_Lambda([GetTypedEntry, WeakColl, OnPropertyEdited](const FAssetData& AssetData)
 			{
 				UPCGExAssetCollection* Coll = WeakColl.Get();
 				if (!Coll)
@@ -240,7 +176,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 				Coll->Modify();
 				Entry->DataAsset = TSoftObjectPtr<UPCGDataAsset>(AssetData.GetSoftObjectPath());
 				Coll->PostEditChange();
-				OnAssetChanged.ExecuteIfBound();
+				OnPropertyEdited.ExecuteIfBound(DataAssetPropName);
 			})
 			.DisplayThumbnail(false)
 		]
@@ -278,7 +214,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 				}
 				return Entry->Level.ToSoftObjectPath().ToString();
 			})
-			.OnObjectChanged_Lambda([GetTypedEntry, WeakColl, OnAssetChanged](const FAssetData& AssetData)
+			.OnObjectChanged_Lambda([GetTypedEntry, WeakColl, OnPropertyEdited](const FAssetData& AssetData)
 			{
 				UPCGExAssetCollection* Coll = WeakColl.Get();
 				if (!Coll)
@@ -294,7 +230,7 @@ TSharedRef<SWidget> FPCGExPCGDataAssetCollectionEditor::BuildTilePickerWidget(
 				Coll->Modify();
 				Entry->Level = TSoftObjectPtr<UWorld>(AssetData.GetSoftObjectPath());
 				Coll->PostEditChange();
-				OnAssetChanged.ExecuteIfBound();
+				OnPropertyEdited.ExecuteIfBound(LevelPropName);
 			})
 			.DisplayThumbnail(false)
 		]

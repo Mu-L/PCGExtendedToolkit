@@ -169,7 +169,7 @@ bool FPCGExAttributesToTagsElement::AdvanceWork(FPCGExContext* InContext, const 
 
 namespace PCGExAttributesToTags
 {
-	void FProcessor::Hoist(const FPCGExAttributeToTagDetails& InDetails, const int32 Index) const
+	void FProcessor::Promote(const FPCGExAttributeToTagDetails& InDetails, const int32 Index) const
 	{
 		const PCGExData::FConstPoint Point = PointDataFacade->GetInPoint(Index);
 		if (OutputSet)
@@ -241,13 +241,13 @@ namespace PCGExAttributesToTags
 			switch (Settings->Selection)
 			{
 			case EPCGExCollectionEntrySelection::FirstIndex:
-				Hoist(Details, 0);
+				Promote(Details, 0);
 				break;
 			case EPCGExCollectionEntrySelection::LastIndex:
-				Hoist(Details, PointDataFacade->GetNum() - 1);
+				Promote(Details, PointDataFacade->GetNum() - 1);
 				break;
 			case EPCGExCollectionEntrySelection::RandomIndex:
-				Hoist(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
+				Promote(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
 				break;
 			case EPCGExCollectionEntrySelection::Picker:
 			case EPCGExCollectionEntrySelection::PickerFirst:
@@ -263,13 +263,13 @@ namespace PCGExAttributesToTags
 			switch (Settings->Selection)
 			{
 			case EPCGExCollectionEntrySelection::FirstIndex:
-				Hoist(Details, 0);
+				Promote(Details, 0);
 				break;
 			case EPCGExCollectionEntrySelection::LastIndex:
-				Hoist(Details, PointDataFacade->GetNum() - 1);
+				Promote(Details, PointDataFacade->GetNum() - 1);
 				break;
 			case EPCGExCollectionEntrySelection::RandomIndex:
-				Hoist(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
+				Promote(Details, RandomSource.RandRange(0, PointDataFacade->GetNum() - 1));
 				break;
 			case EPCGExCollectionEntrySelection::Picker:
 			case EPCGExCollectionEntrySelection::PickerFirst:
@@ -308,7 +308,7 @@ namespace PCGExAttributesToTags
 			{
 				if (i != -1)
 				{
-					Hoist(InDetails, i);
+					Promote(InDetails, i);
 				}
 			}
 		}
@@ -318,7 +318,7 @@ namespace PCGExAttributesToTags
 			{
 				if (UniqueIndicesTemp[i] != -1)
 				{
-					Hoist(InDetails, UniqueIndicesTemp[i]);
+					Promote(InDetails, UniqueIndicesTemp[i]);
 					return;
 				}
 			}
@@ -329,7 +329,7 @@ namespace PCGExAttributesToTags
 			{
 				if (UniqueIndicesTemp[i] != -1)
 				{
-					Hoist(InDetails, UniqueIndicesTemp[i]);
+					Promote(InDetails, UniqueIndicesTemp[i]);
 					return;
 				}
 			}

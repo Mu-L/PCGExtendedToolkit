@@ -5,6 +5,7 @@
 
 #include "PCGExLog.h"
 #include "PCGExProperty.h"
+#include "PCGExPropertySchemaAsset.h"
 #include "StaticMeshResources.h"
 #include "Algo/RemoveIf.h"
 #include "Engine/StaticMesh.h"
@@ -16,7 +17,6 @@
 
 #if WITH_EDITOR
 #include "Editor.h"
-#include "PropertyEditorModule.h"
 #include "ScopedTransaction.h"
 #include "TimerManager.h"
 #include "AssetRegistry/AssetData.h"
@@ -352,12 +352,12 @@ const FPCGExAssetGrammarDetails* FPCGExAssetCollectionEntry::GetEffectiveGrammar
 double FPCGExAssetCollectionEntry::GetGrammarSize(
 	const UPCGExAssetCollection* Host,
 	const EPCGExGrammarAxes Axis,
-	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+	FPCGExGrammarSizeCache* SizeCache) const
 {
-	// SizeCache is keyed by entry only -- valid because callers fix a single Axis per pass.
+	const FPCGExGrammarSizeCacheKey CacheKey{ this, Axis };
 	if (SizeCache)
 	{
-		if (const double* CachedSize = SizeCache->Find(this))
+		if (const double* CachedSize = SizeCache->Find(CacheKey))
 		{
 			return *CachedSize;
 		}
@@ -370,7 +370,7 @@ double FPCGExAssetCollectionEntry::GetGrammarSize(
 			? Resolved->GetSubCollectionSize(InternalSubCollection, Axis, SizeCache)
 			: Resolved->GetLeafSize(Staging.Bounds, Axis));
 
-	if (SizeCache) { SizeCache->Add(this, Size); }
+	if (SizeCache) { SizeCache->Add(CacheKey, Size); }
 	return Size;
 }
 
@@ -378,7 +378,7 @@ bool FPCGExAssetCollectionEntry::FixModuleInfos(
 	const UPCGExAssetCollection* Host,
 	FPCGSubdivisionSubmodule& OutModule,
 	const EPCGExGrammarAxes Axis,
-	TMap<const FPCGExAssetCollectionEntry*, double>* SizeCache) const
+	FPCGExGrammarSizeCache* SizeCache) const
 {
 	const FPCGExAssetGrammarDetails* Resolved = GetEffectiveGrammar(Host);
 	if (!Resolved) { return false; }
@@ -876,6 +876,13 @@ void UPCGExAssetCollection::PostDuplicate(bool bDuplicateForPIE)
 	}
 
 #if WITH_EDITOR
+	// PostLoad doesn't fire on duplicates, so any stale ImportOverrides on the source would
+	// carry into the duplicate's first paint. PIE copies are transient -- skip the heal.
+	if (!bDuplicateForPIE)
+	{
+		CollectionProperties.ReconcileImportOverrides();
+	}
+
 	EDITOR_SetDirty();
 #endif
 }
@@ -975,12 +982,36 @@ void UPCGExAssetCollection::PostLoad()
 		(void)MarkPackageDirty();
 	}
 
+	// Heal stale CollectionProperties.ImportOverrides at load time so the customization's
+	// drift path doesn't have to fire mid-layout (which would leave the property tree's
+	// child count stale until a refresh). ConditionalPostLoad each import first -- UE
+	// doesn't guarantee referenced-asset PostLoad ordering, and the reconcile reads each
+	// asset's HeaderIds, which the asset's own PostLoad canonicalizes.
+	for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : CollectionProperties.ImportedSchemas)
+	{
+		if (UPCGExPropertySchemaAsset* Asset = AssetPtr.Get())
+		{
+			Asset->ConditionalPostLoad();
+		}
+	}
+	if (CollectionProperties.ReconcileImportOverrides())
+	{
+		(void)MarkPackageDirty();
+	}
+
 	// Defer to next tick: the rebuild cascades into UpdateStaging -> SpawnActor, which is
 	// unsafe during PostLoad (load chain may re-enter, GWorld mid-transition). Trade-off:
 	// a PCG graph that triggered THIS soft-load sees pre-rebuild state for its current
 	// run; subsequent runs see fresh data. Complements OnAssetUpdatedOnDisk which only
 	// fires for collections already loaded when a referenced asset is saved.
-	if (!GEditor || !GEditor->IsTimerManagerValid() || !bAutoRebuildStaging)
+	//
+	// Never during a cook: auto-rebuild is an interactive editor convenience. A cook shouldn't
+	// dirty source except for upgrade or fixup, moreover the deferred rebuild would re-harvest
+	// source levels from an uninitialized world (transforms will read back as Identity)
+	// corrupting the result for PCGDataAssetCollection from commandlet.
+	// Cooked output uses the committed, editor-rebuilt content; staleness should be an
+	// authoring concern, not a cook concern.
+	if (!GEditor || !GEditor->IsTimerManagerValid() || bSuppressStagingRebuild || IsRunningCookCommandlet())
 	{
 		return;
 	}
@@ -1046,14 +1077,17 @@ bool UPCGExAssetCollection::HasCircularDependency(const UPCGExAssetCollection* O
 
 bool UPCGExAssetCollection::HasCircularDependency(TSet<const UPCGExAssetCollection*>& InReferences) const
 {
-	bool bCircularDependency = false;
-	InReferences.Add(this, &bCircularDependency);
-
-	if (bCircularDependency)
+	// InReferences is the active recursion stack, not "ever visited." Pop on the way back
+	// up so DAG diamonds (two siblings pointing to the same descendant) don't false-positive
+	// as cycles -- caller's ClearSubCollection() on a false positive wipes valid entries.
+	bool bAlreadyOnStack = false;
+	InReferences.Add(this, &bAlreadyOnStack);
+	if (bAlreadyOnStack)
 	{
 		return true;
 	}
 
+	bool bCircularDependency = false;
 	ForEachEntry([&](const FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
 		if (bCircularDependency)
@@ -1066,6 +1100,7 @@ bool UPCGExAssetCollection::HasCircularDependency(TSet<const UPCGExAssetCollecti
 		}
 	});
 
+	InReferences.Remove(this);
 	return bCircularDependency;
 }
 
@@ -1232,46 +1267,78 @@ bool UPCGExAssetCollection::SyncPropertySchemaAndRemapEntries()
 #if WITH_EDITOR
 void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	// Cheap recovery pass: the same FPCGExAssetGrammarDetails struct is reused across leaf and
-	// subcollection contexts, and the editor customization filters Size enum options per context.
-	// When the user flips bIsSubCollection (or SubGrammarMode to/from Override) the stored Size
-	// can leave the valid set -- snap it back to Fixed. Also enforce fixed contexts on the two
-	// collection-level grammar slots.
-	GlobalAssetGrammar.ValidateContext(/*bIsSubCollection=*/false);
-	SubCollectionGrammar.ValidateContext(/*bIsSubCollection=*/true);
-	ForEachEntry([](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
+	// Skip Interactive ticks: the sync + staging-rebuild chain below tears down the dragged
+	// widget (breaking undo) and floods PCG with per-tick re-cooks. Super still propagates
+	// the Interactive event for live preview.
+	const EPropertyChangeType::Type ChangeType = PropertyChangedEvent.ChangeType;
+	if (ChangeType == EPropertyChangeType::Interactive)
 	{
-		if (Entry) { Entry->AssetGrammar.ValidateContext(Entry->bIsSubCollection); }
-	});
+		Super::PostEditChangeProperty(PropertyChangedEvent);
+		return;
+	}
 
-	bool bNeedsSync = false;
-	bool bNeedsUIRefresh = false;
+	// Default-to-structural is the safe bias; only a positive "leaf is an FPCGExProperty value
+	// field" identification opts out, and array shape changes always force structural anyway.
+	bool bIsValueOnlyLeafEdit = false;
+	bool bIsStructuralSchemaChange = false;
 
 	if (PropertyChangedEvent.MemberProperty)
 	{
-		FName PropName = PropertyChangedEvent.MemberProperty->GetFName();
-		EPropertyChangeType::Type ChangeType = PropertyChangedEvent.ChangeType;
-
-		// Check for ANY changes in CollectionProperties
+		const FName PropName = PropertyChangedEvent.MemberProperty->GetFName();
 		if (PropName == GET_MEMBER_NAME_CHECKED(UPCGExAssetCollection, CollectionProperties))
 		{
-			bNeedsSync = true;
-			bNeedsUIRefresh = true;
+			const bool bArrayShapeChange =
+				ChangeType == EPropertyChangeType::ArrayAdd ||
+				ChangeType == EPropertyChangeType::ArrayRemove ||
+				ChangeType == EPropertyChangeType::ArrayClear ||
+				ChangeType == EPropertyChangeType::ArrayMove ||
+				ChangeType == EPropertyChangeType::Duplicate;
+
+			// IsChildOf, not equality: plugin-registered FPCGExProperty subtypes must classify
+			// the same way as built-in ones.
+			const FProperty* LeafProperty = PropertyChangedEvent.Property;
+			const UScriptStruct* LeafOwner = LeafProperty ? Cast<UScriptStruct>(LeafProperty->GetOwnerStruct()) : nullptr;
+			const bool bLeafIsFPCGExPropertyValue = LeafOwner && LeafOwner->IsChildOf(FPCGExProperty::StaticStruct());
+
+			bIsValueOnlyLeafEdit = !bArrayShapeChange && bLeafIsFPCGExPropertyValue;
+			bIsStructuralSchemaChange = !bIsValueOnlyLeafEdit;
 		}
-		// Also catch changes to schema array elements (add/remove/reorder/rename/type change)
-		else if (PropertyChangedEvent.MemberProperty->GetOwnerStruct() == FPCGExPropertySchema::StaticStruct() ||
-			PropertyChangedEvent.MemberProperty->GetOwnerStruct() == FPCGExPropertySchemaCollection::StaticStruct())
+		// Programmatic / reflection edits that bypass the outer CollectionProperties UPROPERTY.
+		else if (const UStruct* OwnerStruct = PropertyChangedEvent.MemberProperty->GetOwnerStruct();
+			OwnerStruct == FPCGExPropertySchema::StaticStruct() || OwnerStruct == FPCGExPropertySchemaCollection::StaticStruct())
 		{
-			bNeedsSync = true;
-			bNeedsUIRefresh = true;
+			bIsStructuralSchemaChange = true;
 		}
 	}
 
-	// Early return if no property-related changes needed
-	if (!bNeedsSync && !bNeedsUIRefresh)
+	// Heavy O(N) work -- grammar context recovery, structural rebuild, circular-dep walk -- is
+	// guarded on !bIsValueOnlyLeafEdit so a 1000-entry collection doesn't pay it for a single
+	// property tweak. Cache invalidation + optional staging rebuild always run so downstream
+	// consumers see fresh data regardless of which path we took.
+	if (!bIsValueOnlyLeafEdit)
 	{
-		Super::PostEditChangeProperty(PropertyChangedEvent);
+		// Grammar context recovery: FPCGExAssetGrammarDetails is shared across leaf/subcollection
+		// contexts; flipping bIsSubCollection can leave Size in the now-invalid enum subset -- snap back.
+		GlobalAssetGrammar.ValidateContext(/*bIsSubCollection=*/false);
+		SubCollectionGrammar.ValidateContext(/*bIsSubCollection=*/true);
+		ForEachEntry([](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
+		{
+			if (Entry) { Entry->AssetGrammar.ValidateContext(Entry->bIsSubCollection); }
+		});
+	}
 
+	if (bIsStructuralSchemaChange)
+	{
+		RebuildPropertyRegistry();
+		SyncPropertyOverridesToEntries();
+	}
+
+	(void)MarkPackageDirty();
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	if (!bIsValueOnlyLeafEdit)
+	{
+		// Sub-collection refs can only change on structural edits -- value-only edits can't create cycles.
 		ForEachEntry([this](FPCGExAssetCollectionEntry* InEntry, int32 i)
 		{
 			const UPCGExAssetCollection* Other = InEntry->GetSubCollectionPtr();
@@ -1279,55 +1346,13 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 			{
 				UE_LOG(LogTemp, Error, TEXT("Prevented circular dependency trying to nest \"%s\" inside \"%s\""), *GetNameSafe(Other), *GetNameSafe(this));
 				InEntry->ClearSubCollection();
-				(void)MarkPackageDirty();
 			}
 		});
-
-		EDITOR_SetDirty();
-
-		if (bAutoRebuildStaging)
-		{
-			EDITOR_RebuildStagingData();
-		}
-
-		return;
 	}
-
-	// Sync and rebuild if needed
-	if (bNeedsSync)
-	{
-		RebuildPropertyRegistry();
-		SyncPropertyOverridesToEntries();
-	}
-
-	(void)MarkPackageDirty();
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-#if WITH_EDITOR
-	// Force all details panels showing this object to rebuild
-	// This ensures nested PropertyOverrides customizations detect the schema changes
-	if (bNeedsSync)
-	{
-		FPropertyEditorModule& PropertyEditorModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
-		PropertyEditorModule.NotifyCustomizationModuleChanged();
-	}
-#endif
-
-	ForEachEntry([this](FPCGExAssetCollectionEntry* InEntry, int32 i)
-	{
-		const UPCGExAssetCollection* Other = InEntry->GetSubCollectionPtr();
-		if (Other && HasCircularDependency(Other))
-		{
-			UE_LOG(LogTemp, Error, TEXT("Prevented circular dependency trying to nest \"%s\" inside \"%s\""), *GetNameSafe(Other), *GetNameSafe(this));
-			InEntry->ClearSubCollection();
-			(void)MarkPackageDirty();
-		}
-	});
 
 	EDITOR_SetDirty();
 
-	if (bAutoRebuildStaging)
+	if (!bSuppressStagingRebuild)
 	{
 		EDITOR_RebuildStagingData();
 	}
@@ -1377,7 +1402,7 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 
 int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 {
-	if (!bAutoRebuildStaging)
+	if (bSuppressStagingRebuild)
 	{
 		return 0;
 	}
@@ -1450,7 +1475,7 @@ int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 
 bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 {
-	if (!bAutoRebuildStaging)
+	if (bSuppressStagingRebuild)
 	{
 		return false;
 	}

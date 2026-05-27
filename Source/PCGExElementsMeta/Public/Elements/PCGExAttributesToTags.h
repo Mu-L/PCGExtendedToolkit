@@ -46,7 +46,7 @@ class UPCGExAttributesToTagsSettings : public UPCGExPointsProcessorSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS(AttributesToTags, "Hoist Attributes", "Hoist element values to tags or data domain");
+	PCGEX_NODE_INFOS(PromoteAttributes, "Promote Attributes", "Promote element values to tags or data domain");
 
 	virtual EPCGSettingsType GetType() const override
 	{
@@ -140,7 +140,7 @@ namespace PCGExAttributesToTags
 		{
 		}
 
-		void Hoist(const FPCGExAttributeToTagDetails& InDetails, const int32 Index) const;
+		void Promote(const FPCGExAttributeToTagDetails& InDetails, const int32 Index) const;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		void TagWithPickers(const FPCGExAttributeToTagDetails& InDetails);

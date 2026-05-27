@@ -290,9 +290,12 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 *
 	 * @param Schema The matching schema-side property to copy structural fields from.
 	 *               Same script struct as `this` is guaranteed by the caller.
+	 * @return       True if any field was changed. Lets SyncToSchema report whether the
+	 *               reconcile actually touched override state (drives PostLoad's dirty gate).
 	 */
-	virtual void SyncStructuralFromSchema(const FPCGExProperty& Schema)
+	virtual bool SyncStructuralFromSchema(const FPCGExProperty& Schema)
 	{
+		return false;
 	}
 
 	// --- Value Read Interface (type-erased) ---
@@ -553,8 +556,11 @@ struct PCGEXPROPERTIES_API FPCGExPropertyOverrides
 	 * At runtime (no editor data), overrides are rebuilt from schema defaults.
 	 *
 	 * @param Schema The schema to sync to (use FPCGExPropertySchemaCollection::BuildSchema())
+	 * @return       True if anything changed. Slow path (structural drift) returns true
+	 *               unconditionally; fast path returns true only if a PropertyName or
+	 *               structural field actually differed. Drives conditional MarkPackageDirty.
 	 */
-	void SyncToSchema(const TArray<FInstancedStruct>& Schema);
+	bool SyncToSchema(const TArray<FInstancedStruct>& Schema);
 
 	/**
 	 * Apply HeaderId remaps from a schema dedup pass. Matches entries by (OldId, Name) --
@@ -1009,11 +1015,14 @@ struct PCGEXPROPERTIES_API FPCGExPropertySchemaCollection
 	 *   ApplyToOverrides pipeline)
 	 * - ImportedSchemas array changes (add/remove an asset reference)
 	 * - A referenced UPCGExPropertySchemaAsset broadcasting OnSchemaAssetChanged
+	 *
+	 * @return True if ImportOverrides actually changed. Callers may use this to gate
+	 *         MarkPackageDirty; passing-through callers may safely discard.
 	 */
-	void ReconcileImportOverrides();
+	bool ReconcileImportOverrides();
 
 	/** Overload that accepts a precomputed Resolved view -- avoids re-walking the tree. */
-	void ReconcileImportOverrides(const TArray<FPCGExPropertyResolved>& Resolved);
+	bool ReconcileImportOverrides(const TArray<FPCGExPropertyResolved>& Resolved);
 
 	/**
 	 * Rebuild this collection's structure to match Archetype, preserving Value overrides for

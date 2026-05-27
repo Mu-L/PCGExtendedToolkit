@@ -90,10 +90,15 @@ public:
 	 * Adds all non-metadata properties of InnerStruct as child rows, skipping the internal fields
 	 * PropertyName, HeaderId, and OutputBuffer. Applies IsEnabled to each row.
 	 * Used for complex (non-PCGExInlineValue) property types shown in override or read-only-schema contexts.
+	 *
+	 * Pass WeakOwner to hook each emitted row's value-change through
+	 * PCGExEditorCustomizationUtils::HookOwnerChangeOnHandleChanged -- required when the owner
+	 * needs to dirty + signal PCG re-cook for these external-struct edits.
 	 */
 	static void AddComplexValueRows(
 		IDetailChildrenBuilder& ChildBuilder,
 		TSharedRef<FStructOnScope> Scope,
 		UScriptStruct* InnerStruct,
-		TAttribute<bool> IsEnabled = TAttribute<bool>(true));
+		TAttribute<bool> IsEnabled = TAttribute<bool>(true),
+		const TWeakObjectPtr<UObject>& WeakOwner = nullptr);
 };

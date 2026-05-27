@@ -15,6 +15,7 @@
 #include "PropertyHandle.h"
 #include "Details/PCGExEditorCustomizationUtils.h"
 #include "GameFramework/Actor.h"
+#include "Misc/TransactionObjectEvent.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -84,6 +85,11 @@ TSharedRef<IPropertyTypeCustomization> FPCGExPropertySchemaCollectionCustomizati
 FPCGExPropertySchemaCollectionCustomization::~FPCGExPropertySchemaCollectionCustomization()
 {
 	UnsubscribeImportedAssets();
+	if (ObjectTransactedHandle.IsValid())
+	{
+		FCoreUObjectDelegates::OnObjectTransacted.Remove(ObjectTransactedHandle);
+		ObjectTransactedHandle.Reset();
+	}
 }
 
 void FPCGExPropertySchemaCollectionCustomization::CustomizeHeader(
@@ -103,11 +109,21 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeHeader(
 	// etc.) won't cast to the component type, so they are unaffected.
 	bIsInstanceMode = false;
 	WeakLiveComponent.Reset();
+	WeakHostObject.Reset();
 	if (TSharedPtr<IPropertyUtilities> Utils = WeakPropertyUtilities.Pin())
 	{
 		for (const TWeakObjectPtr<UObject>& ObjPtr : Utils->GetSelectedObjects())
 		{
-			if (UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(ObjPtr.Get()))
+			UObject* Obj = ObjPtr.Get();
+			if (!Obj)
+			{
+				continue;
+			}
+			if (!WeakHostObject.IsValid())
+			{
+				WeakHostObject = Obj;
+			}
+			if (UPCGExPropertyCollectionComponent* Comp = Cast<UPCGExPropertyCollectionComponent>(Obj))
 			{
 				if (!Comp->IsTemplate() && Comp->CreationMethod != EComponentCreationMethod::Instance)
 				{
@@ -120,6 +136,15 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeHeader(
 				}
 			}
 		}
+	}
+
+	// Bind once. UE undo can reallocate inner FInstancedStruct memory in ImportOverrides.Overrides,
+	// dangling the FStructOnScope aliases held by per-entry customizations. ForceRefresh from
+	// the handler rebuilds them.
+	if (!ObjectTransactedHandle.IsValid())
+	{
+		ObjectTransactedHandle = FCoreUObjectDelegates::OnObjectTransacted.AddSP(
+			this, &FPCGExPropertySchemaCollectionCustomization::OnObjectTransacted);
 	}
 
 	HeaderRow
@@ -182,9 +207,12 @@ void FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged()
 	Collection->ReconcileImportOverrides();
 
 	CachedResolvedCount = -1;
+	// Deferred refresh: ForceRefresh from inside a property change notification tears down the
+	// widget tree mid-stack-unwind, killing the FInstancedStruct picker's in-flight transaction
+	// and breaking undo. Same trap FPCGExPropertyOverridesCustomization documents.
 	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 	{
-		PropertyUtilities->ForceRefresh();
+		PropertyUtilities->RequestRefresh();
 	}
 }
 
@@ -204,15 +232,30 @@ void FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged(
 	}
 
 	CachedResolvedCount = -1;
+	// Deferred refresh -- see OnSchemasArrayChanged.
 	if (TSharedPtr<IPropertyUtilities> PropertyUtilities = WeakPropertyUtilities.Pin())
 	{
-		PropertyUtilities->ForceRefresh();
+		PropertyUtilities->RequestRefresh();
 	}
 }
 
 void FPCGExPropertySchemaCollectionCustomization::OnImportedAssetChanged(UPCGExPropertySchemaAsset* /*ChangedAsset*/)
 {
 	ReconcileAndNotify();
+}
+
+void FPCGExPropertySchemaCollectionCustomization::OnObjectTransacted(UObject* Object, const FTransactionObjectEvent& Event)
+{
+	// Global delegate -- filter by host identity, and only act on undo/redo (the path that
+	// bypasses every other refresh hook).
+	if (Object != WeakHostObject.Get() || Event.GetEventType() != ETransactionObjectEventType::UndoRedo)
+	{
+		return;
+	}
+	if (TSharedPtr<IPropertyUtilities> Utils = WeakPropertyUtilities.Pin())
+	{
+		Utils->ForceRefresh();
+	}
 }
 
 void FPCGExPropertySchemaCollectionCustomization::ReconcileAndNotify()
@@ -313,24 +356,53 @@ void FPCGExPropertySchemaCollectionCustomization::EmitImportSections(IDetailChil
 	}
 }
 
-void FPCGExPropertySchemaCollectionCustomization::SubscribeToImportedAssets(const TArray<FPCGExPropertyResolved>& Resolved)
+void FPCGExPropertySchemaCollectionCustomization::SubscribeToImportedAssets()
 {
 	UnsubscribeImportedAssets();
 
-	TSet<UPCGExPropertySchemaAsset*> Unique;
-	for (const FPCGExPropertyResolved& Entry : Resolved)
+	// Walk the full ImportedSchemas tree (BFS, cycle-safe) and subscribe to every reachable
+	// asset -- including ones that don't contribute surviving entries to Resolved (empty
+	// imports, fully name-shadowed). Otherwise their later additions broadcast into the void.
+	TSharedPtr<IPropertyHandle> Handle = PropertyHandlePtr.Pin();
+	if (!Handle.IsValid())
 	{
-		if (Entry.OwningAsset)
+		return;
+	}
+	TArray<void*> RawData;
+	Handle->AccessRawData(RawData);
+	if (RawData.IsEmpty() || !RawData[0])
+	{
+		return;
+	}
+	const FPCGExPropertySchemaCollection* RootCollection = static_cast<const FPCGExPropertySchemaCollection*>(RawData[0]);
+
+	TSet<UPCGExPropertySchemaAsset*> Unique;
+	TArray<const FPCGExPropertySchemaCollection*> Frontier;
+	Frontier.Add(RootCollection);
+	while (!Frontier.IsEmpty())
+	{
+		const FPCGExPropertySchemaCollection* Current = Frontier.Pop(EAllowShrinking::No);
+		for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : Current->ImportedSchemas)
 		{
-			Unique.Add(Entry.OwningAsset);
+			UPCGExPropertySchemaAsset* Asset = AssetPtr.Get();
+			if (!Asset)
+			{
+				continue;
+			}
+			bool bAlreadySeen = false;
+			Unique.Add(Asset, &bAlreadySeen);
+			if (!bAlreadySeen)
+			{
+				Frontier.Add(&Asset->Collection);
+			}
 		}
 	}
 
 	for (UPCGExPropertySchemaAsset* Asset : Unique)
 	{
-		FDelegateHandle Handle = Asset->OnSchemaAssetChanged.AddSP(
+		FDelegateHandle DelHandle = Asset->OnSchemaAssetChanged.AddSP(
 			this, &FPCGExPropertySchemaCollectionCustomization::OnImportedAssetChanged);
-		AssetDelegateHandles.Emplace(TWeakObjectPtr<UPCGExPropertySchemaAsset>(Asset), Handle);
+		AssetDelegateHandles.Emplace(TWeakObjectPtr<UPCGExPropertySchemaAsset>(Asset), DelHandle);
 	}
 }
 
@@ -458,10 +530,7 @@ bool FPCGExPropertySchemaCollectionCustomization::TryRenderFlatInline(
 	if (bIsInstanceMode)
 	{
 		ApplyLocalSchemaResetOverride(*Row, ElementHandle->GetIndexInArray());
-
-		// Instance-side local schema edits need an explicit Modify() to dirty the actor; the
-		// external-structure row doesn't route through the owning UObject on its own.
-		PCGExEditorCustomizationUtils::HookModifyOnHandleChanged(Row->GetPropertyHandle(), WeakLiveComponent);
+		PCGExEditorCustomizationUtils::HookOwnerChangeOnHandleChanged(Row->GetPropertyHandle(), WeakLiveComponent);
 	}
 	return true;
 }
@@ -513,9 +582,11 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 	}
 	else
 	{
-		// Normal mode: watch for array changes and trigger sync + refresh, then display as-is.
+		// Array-shape only -- per-element value edits are handled by inner customizations and
+		// the host object's PostEditChangeProperty. SetOnChildPropertyValueChanged is avoided:
+		// it propagates through inner FInstancedStruct value edits and would tear down the
+		// active widget mid-drag.
 		SchemasArrayHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged));
-		SchemasArrayHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnSchemasArrayChanged));
 
 		ChildBuilder.AddProperty(SchemasArrayHandle.ToSharedRef());
 	}
@@ -589,6 +660,14 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 			// cached in Resolved entries are now stale -- rebuild Resolved against the new state.
 			Collection->ReconcileImportOverrides(Resolved);
 			Collection->Resolve(Resolved);
+
+			// Reconcile mutated Overrides via raw pointer; the property tree's child count
+			// is stale until refresh. Without this, EmitImportSections drops newly-added
+			// entries. Idempotent: next pass finds no drift.
+			if (TSharedPtr<IPropertyUtilities> Utils = WeakPropertyUtilities.Pin())
+			{
+				Utils->RequestRefresh();
+			}
 		}
 
 		EmitImportSections(ChildBuilder, PropertyHandle, Resolved);
@@ -601,14 +680,13 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 		if (TSharedPtr<IPropertyHandle> ImportedSchemasHandle = PropertyHandle->GetChildHandle(TEXT("ImportedSchemas")))
 		{
 			ImportedSchemasHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged));
-			ImportedSchemasHandle->SetOnChildPropertyValueChanged(FSimpleDelegate::CreateSP(this, &FPCGExPropertySchemaCollectionCustomization::OnImportedSchemasArrayChanged));
 			ChildBuilder.AddProperty(ImportedSchemasHandle.ToSharedRef());
 		}
 	}
 
 	if (Collection)
 	{
-		SubscribeToImportedAssets(Resolved);
+		SubscribeToImportedAssets();
 		CachedResolvedCount = Resolved.Num();
 	}
 }

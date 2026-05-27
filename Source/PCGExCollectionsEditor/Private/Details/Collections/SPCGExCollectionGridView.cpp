@@ -396,7 +396,7 @@ void SPCGExCollectionGridView::RebuildGroupedLayout()
 				.BatchFlagPtr(&bIsBatchOperation)
 				.OnTileClicked(FOnTileClicked::CreateSP(this, &SPCGExCollectionGridView::OnTileClicked))
 				.OnTileDragDetected(FOnTileDragDetected::CreateSP(this, &SPCGExCollectionGridView::OnTileDragDetected))
-				.OnTileCategoryChanged(FSimpleDelegate::CreateSP(this, &SPCGExCollectionGridView::OnTileCategoryChanged));
+				.OnTileEntryChanged(FOnTileEntryChanged::CreateSP(this, &SPCGExCollectionGridView::OnTileEntryChanged));
 
 			Group->AddTile(TileWidget);
 			ActiveTiles.Add(EntryIdx, Tile);
@@ -533,7 +533,7 @@ void SPCGExCollectionGridView::IncrementalCategoryRefresh()
 				.BatchFlagPtr(&bIsBatchOperation)
 				.OnTileClicked(FOnTileClicked::CreateSP(this, &SPCGExCollectionGridView::OnTileClicked))
 				.OnTileDragDetected(FOnTileDragDetected::CreateSP(this, &SPCGExCollectionGridView::OnTileDragDetected))
-				.OnTileCategoryChanged(FSimpleDelegate::CreateSP(this, &SPCGExCollectionGridView::OnTileCategoryChanged));
+				.OnTileEntryChanged(FOnTileEntryChanged::CreateSP(this, &SPCGExCollectionGridView::OnTileEntryChanged));
 
 			Group->AddTile(TileWidget);
 			ActiveTiles.Add(EntryIdx, Tile);
@@ -721,21 +721,91 @@ FReply SPCGExCollectionGridView::OnTileDragDetected(int32 Index, const FPointerE
 	return FReply::Handled().BeginDragDrop(DragOp);
 }
 
-void SPCGExCollectionGridView::OnTileCategoryChanged()
+void SPCGExCollectionGridView::OnTileEntryChanged(int32 SourceIndex, FName PropertyName)
 {
-	// Defer to next tick to avoid destroying the combobox widget during its own event handler
-	if (!bPendingCategoryRefresh)
+	PropagateTileProperty(SourceIndex, PropertyName);
+
+	// Category changes grouping; defer one tick so we don't destroy the combobox during its
+	// own selection-changed handler.
+	static const FName CategoryPropName = GET_MEMBER_NAME_CHECKED(FPCGExAssetCollectionEntry, Category);
+	if (PropertyName == CategoryPropName)
 	{
-		bPendingCategoryRefresh = true;
-		RegisterActiveTimer(0.f, FWidgetActiveTimerDelegate::CreateLambda(
-			                    [this](double, float) -> EActiveTimerReturnType
-			                    {
-				                    bPendingCategoryRefresh = false;
-				                    IncrementalCategoryRefresh();
-				                    UpdateDetailForSelection();
-				                    return EActiveTimerReturnType::Stop;
-			                    }));
+		if (!bPendingCategoryRefresh)
+		{
+			bPendingCategoryRefresh = true;
+			RegisterActiveTimer(0.f, FWidgetActiveTimerDelegate::CreateLambda(
+				                    [this](double, float) -> EActiveTimerReturnType
+				                    {
+					                    bPendingCategoryRefresh = false;
+					                    IncrementalCategoryRefresh();
+					                    UpdateDetailForSelection();
+					                    return EActiveTimerReturnType::Stop;
+				                    }));
+		}
+		return;
 	}
+
+	UpdateDetailForSelection();
+
+	if (SelectedIndices.Num() > 1 && SelectedIndices.Contains(SourceIndex))
+	{
+		for (int32 Idx : SelectedIndices)
+		{
+			if (Idx == SourceIndex) { continue; }
+			if (TSharedPtr<SPCGExCollectionGridTile> Tile = ActiveTiles.FindRef(Idx))
+			{
+				Tile->RefreshThumbnail();
+			}
+		}
+	}
+}
+
+void SPCGExCollectionGridView::PropagateTileProperty(int32 SourceIndex, FName PropertyName)
+{
+	if (SelectedIndices.Num() < 2 || !SelectedIndices.Contains(SourceIndex))
+	{
+		return;
+	}
+
+	UScriptStruct* EntryStruct = GetEntryScriptStruct();
+	if (!EntryStruct) { return; }
+
+	const FProperty* ChangedProp = EntryStruct->FindPropertyByName(PropertyName);
+	if (!ChangedProp) { return; }
+
+	const uint8* SrcPtr = GetEntryRawPtr(SourceIndex);
+	if (!SrcPtr) { return; }
+
+	UPCGExAssetCollection* Coll = Collection.Get();
+	if (!Coll) { return; }
+
+	const int32 Offset = ChangedProp->GetOffset_ForInternal();
+	const FStructProperty* StructProp = CastField<FStructProperty>(ChangedProp);
+
+	// Suppress the deferred OnObjectModified refresh that PostEditChange below would otherwise schedule.
+	TGuardValue<bool> SyncingGuard(bIsSyncing, true);
+
+	Coll->Modify();
+
+	for (int32 OtherIndex : SelectedIndices)
+	{
+		if (OtherIndex == SourceIndex) { continue; }
+		uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
+		if (!OtherPtr) { continue; }
+
+		// FInstancedStruct payload lives in an opaque heap buffer; descending via reflection finds no fields.
+		if (StructProp && StructProp->Struct != TBaseStructure<FInstancedStruct>::Get())
+		{
+			PushStructGated(StructProp->Struct, SrcPtr + Offset, OtherPtr + Offset);
+		}
+		else
+		{
+			ChangedProp->CopyCompleteValue(OtherPtr + Offset, SrcPtr + Offset);
+		}
+	}
+
+	// One PostEditChange sanitizes every modified entry -- EDITOR_RebuildStagingData iterates all of them.
+	Coll->PostEditChange();
 }
 
 // ── Category operations ─────────────────────────────────────────────────────
@@ -1050,15 +1120,14 @@ void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 		FScopedTransaction Transaction(INVTEXT("Add Entry to Category"));
 
 		// Suppress staging rebuild -- nothing to stage on an empty entry
-		const bool bWasAutoRebuild = Coll->bAutoRebuildStaging;
-		Coll->bAutoRebuildStaging = false;
+		Coll->bSuppressStagingRebuild = true;
 
 		Coll->Modify();
 
 		FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
 		const int32 NewIndex = ArrayHelper.AddValue();
 
-		Coll->bAutoRebuildStaging = bWasAutoRebuild;
+		Coll->bSuppressStagingRebuild = false;
 
 		// Set category on newly added entry
 		FPCGExAssetCollectionEntry* NewEntry = Coll->EDITOR_GetMutableEntry(NewIndex);
@@ -1219,7 +1288,7 @@ void SPCGExCollectionGridView::PopulateCategoryTiles(FName Category)
 			.BatchFlagPtr(&bIsBatchOperation)
 			.OnTileClicked(FOnTileClicked::CreateSP(this, &SPCGExCollectionGridView::OnTileClicked))
 			.OnTileDragDetected(FOnTileDragDetected::CreateSP(this, &SPCGExCollectionGridView::OnTileDragDetected))
-			.OnTileCategoryChanged(FSimpleDelegate::CreateSP(this, &SPCGExCollectionGridView::OnTileCategoryChanged));
+			.OnTileEntryChanged(FOnTileEntryChanged::CreateSP(this, &SPCGExCollectionGridView::OnTileEntryChanged));
 
 		Group->AddTile(TileWidget);
 		ActiveTiles.Add(EntryIdx, Tile);
@@ -1244,13 +1313,11 @@ void SPCGExCollectionGridView::UpdateDetailForSelection()
 	//       replaced FStructOnScope can hit dangling delegate instances during the
 	//       in-flight rebuild, manifesting as DEP crashes inside Slate widget Construct
 	//       (e.g. SNumericEntryBox lambda CreateCopy).
-	// ClearKeyboardFocus(Cleared) fires OnTextCommitted(OnUserMovedFocus) synchronously
-	// on the focused widget, which routes through the still-valid handle and lands the
-	// edit in CurrentStructScope -> OnDetailPropertyChanged -> SyncStructToCollection
-	// before we touch the struct pointer.
+	// Re-focus the grid (not ClearKeyboardFocus) so the previously focused widget commits
+	// any pending edit via OnFocusLost AND OnKeyDown (Delete, Ctrl+D) keeps working after.
 	if (FSlateApplication::IsInitialized())
 	{
-		FSlateApplication::Get().ClearKeyboardFocus(EFocusCause::Cleared);
+		FSlateApplication::Get().SetKeyboardFocus(SharedThis(this), EFocusCause::Cleared);
 	}
 
 	if (SelectedIndices.IsEmpty())
@@ -1927,15 +1994,14 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 		FScopedTransaction Transaction(INVTEXT("Add Collection Entry"));
 
 		// Suppress staging rebuild -- nothing to stage on an empty entry
-		const bool bWasAutoRebuild = Coll->bAutoRebuildStaging;
-		Coll->bAutoRebuildStaging = false;
+		Coll->bSuppressStagingRebuild = true;
 
 		Coll->Modify();
 
 		FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
 		const int32 NewIndex = ArrayHelper.AddValue();
 
-		Coll->bAutoRebuildStaging = bWasAutoRebuild;
+		Coll->bSuppressStagingRebuild = false;
 		Coll->PostEditChange();
 
 		// Sync PropertyOverrides for the new entry to match the collection schema

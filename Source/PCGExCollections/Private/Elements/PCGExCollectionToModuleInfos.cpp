@@ -89,7 +89,7 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 	TSet<FName> UniqueSymbols;
 	UniqueSymbols.Reserve(100);
 
-	TMap<const FPCGExAssetCollectionEntry*, double> SizeCache;
+	FPCGExGrammarSizeCache SizeCache;
 	SizeCache.Reserve(100);
 
 	TArray<PCGExCollectionToGrammar::FModule> Modules;
@@ -155,7 +155,7 @@ void FPCGExCollectionToModuleInfosElement::FlattenCollection(
 	const FPCGExNameFiltersDetails& CategoryFilters,
 	TArray<PCGExCollectionToGrammar::FModule>& OutModules,
 	TSet<FName>& UniqueSymbols,
-	TMap<const FPCGExAssetCollectionEntry*, double>& SizeCache) const
+	FPCGExGrammarSizeCache& SizeCache) const
 {
 	if (!Collection)
 	{

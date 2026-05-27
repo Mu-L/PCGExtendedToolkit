@@ -43,7 +43,7 @@ protected:
 	virtual TSharedRef<SWidget> BuildTilePickerWidget(
 		TWeakObjectPtr<UPCGExAssetCollection> Collection,
 		int32 EntryIndex,
-		FSimpleDelegate OnAssetChanged) override;
+		FOnTilePropertyEdited OnPropertyEdited) override;
 
 	// Kept alive for SComboBox::OptionsSource (raw pointer into this array).
 	TArray<TSharedPtr<FString>> SourceOptions;

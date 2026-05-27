@@ -4,7 +4,9 @@
 #include "PCGExPropertyWriter.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertySchemaAsset.h"
+#include "Core/PCGExContext.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Metadata/PCGMetadata.h"
 
 void FPCGExPropertyOutputSettings::GetEffectiveConfigs(TArray<FPCGExPropertyOutputConfig>& OutConfigs) const
 {
@@ -107,14 +109,119 @@ FName FPCGExPropertyOutputConfig::GetEffectiveOutputName() const
 	return OutputAttributeName;
 }
 
-// Initialize creates a writer instance for each configured property output.
-// For each output config:
-//   1. Find the prototype property from the provider (by PropertyName)
-//   2. Deep-copy it as a "writer instance" that will own the output buffer
-//   3. Call InitializeOutput() on the clone to create the buffer on the facade
-//   4. Store the clone in WriterInstances keyed by PropertyName
-//
-// After this, WriteProperties() can be called per-point to write values.
+bool FPCGExPropertySetWriter::Initialize(
+	FPCGExContext* InContext,
+	const IPCGExPropertyProvider* InProvider,
+	const FPCGExPropertyOutputSettings& OutputSettings,
+	UPCGMetadata* Metadata)
+{
+	TArray<FPCGExPropertyOutputConfig> EffectiveConfigs;
+	OutputSettings.GetEffectiveConfigs(EffectiveConfigs);
+	return Initialize(InContext, InProvider, EffectiveConfigs, Metadata);
+}
+
+bool FPCGExPropertySetWriter::Initialize(
+	FPCGExContext* InContext,
+	const IPCGExPropertyProvider* InProvider,
+	TConstArrayView<FPCGExPropertyOutputConfig> EffectiveConfigs,
+	UPCGMetadata* Metadata)
+{
+	Writers.Reset();
+	Provider = InProvider;
+
+	if (!Provider || !Metadata || EffectiveConfigs.IsEmpty())
+	{
+		return false;
+	}
+
+	Writers.Reserve(EffectiveConfigs.Num());
+
+	for (const FPCGExPropertyOutputConfig& Config : EffectiveConfigs)
+	{
+		if (!Config.IsValid())
+		{
+			continue;
+		}
+
+		const FName OutputName = Config.GetEffectiveOutputName();
+		if (OutputName.IsNone())
+		{
+			continue;
+		}
+
+		const FInstancedStruct* Prototype = Provider->FindPrototypeProperty(Config.PropertyName);
+		if (!Prototype)
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, InContext,
+			           FText::FromString(FString::Printf(TEXT("Property '%s' not found in any schema source."), *Config.PropertyName.ToString())));
+			continue;
+		}
+
+		const FPCGExProperty* PrototypeProp = Prototype->GetPtr<FPCGExProperty>();
+		if (!PrototypeProp || !PrototypeProp->SupportsOutput())
+		{
+			continue;
+		}
+
+		FWriter& Writer = Writers.Emplace_GetRef();
+		Writer.PropertyName = Config.PropertyName;
+		Writer.WriterInstance = *Prototype;
+
+		if (FPCGExProperty* MutableWriter = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>())
+		{
+			Writer.Attribute = MutableWriter->CreateMetadataAttribute(Metadata, OutputName);
+		}
+
+		if (!Writer.Attribute)
+		{
+			Writers.Pop(EAllowShrinking::No);
+		}
+	}
+
+	return !Writers.IsEmpty();
+}
+
+void FPCGExPropertySetWriter::WriteAt(int32 WriterIdx, int64 Key, const FInstancedStruct& Source)
+{
+	FWriter& Writer = Writers[WriterIdx];
+
+	// Script-struct equality is the cheapest way to confirm CopyValueFrom is safe -- different
+	// concrete types can't transfer values through the type-erased FPCGExProperty interface.
+	if (Source.GetScriptStruct() != Writer.WriterInstance.GetScriptStruct())
+	{
+		return;
+	}
+
+	const FPCGExProperty* SrcProp = Source.GetPtr<FPCGExProperty>();
+	FPCGExProperty* WriterProp = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>();
+	if (!SrcProp || !WriterProp)
+	{
+		return;
+	}
+
+	WriterProp->CopyValueFrom(SrcProp);
+	WriterProp->WriteMetadataValue(Writer.Attribute, Key);
+}
+
+int32 FPCGExPropertySetWriter::WriteEntry(int64 Key, int32 SourceIndex)
+{
+	if (!Provider)
+	{
+		return 0;
+	}
+
+	int32 NumWritten = 0;
+	for (int32 w = 0; w < Writers.Num(); w++)
+	{
+		if (const FInstancedStruct* Source = Provider->GetPropertyAt(SourceIndex, Writers[w].PropertyName))
+		{
+			WriteAt(w, Key, *Source);
+			++NumWritten;
+		}
+	}
+	return NumWritten;
+}
+
 bool FPCGExPropertyWriter::Initialize(
 	const IPCGExPropertyProvider* InProvider,
 	const TSharedRef<PCGExData::FFacade>& OutputFacade,
@@ -170,13 +277,9 @@ bool FPCGExPropertyWriter::Initialize(
 	return HasOutputs();
 }
 
-// WriteProperties copies values from the provider's source properties into the
-// writer instances, then writes those values to the output buffers.
-//
-// WARNING: This uses CopyValueFrom() which mutates the writer instance's Value field.
-// This is NOT safe for parallel processing. If you need parallel writes,
-// use the property's WriteOutputFrom() method directly, which reads from
-// source and writes to buffer without mutating any shared state.
+// WARNING: CopyValueFrom mutates the writer instance's Value field, so a single
+// FPCGExPropertyWriter cannot be driven from multiple threads. Parallel writers must use
+// FPCGExProperty::WriteOutputFrom directly (reads source, writes buffer, no shared mutation).
 void FPCGExPropertyWriter::WriteProperties(int32 PointIndex, int32 SourceIndex)
 {
 	if (!Provider || SourceIndex < 0)
@@ -184,33 +287,24 @@ void FPCGExPropertyWriter::WriteProperties(int32 PointIndex, int32 SourceIndex)
 		return;
 	}
 
-	// Write properties using property-owned output
-	if (WriterInstances.Num() > 0)
+	for (auto& KV : WriterInstances)
 	{
-		// Get the source property array for this index (e.g., collection entry, row)
-		TConstArrayView<FInstancedStruct> SourceProperties = Provider->GetProperties(SourceIndex);
-
-		for (auto& KV : WriterInstances)
+		const FName& PropName = KV.Key;
+		FPCGExProperty* Writer = KV.Value.GetMutablePtr<FPCGExProperty>();
+		if (!Writer)
 		{
-			const FName& PropName = KV.Key;
-			FPCGExProperty* Writer = KV.Value.GetMutablePtr<FPCGExProperty>();
-			if (!Writer)
-			{
-				continue;
-			}
-
-			// Find the source property by name and copy its value into the writer
-			if (const FInstancedStruct* SourceProp = PCGExProperties::GetPropertyByName(SourceProperties, PropName))
-			{
-				if (const FPCGExProperty* Source = SourceProp->GetPtr<FPCGExProperty>())
-				{
-					Writer->CopyValueFrom(Source);
-				}
-			}
-
-			// Write the (possibly updated) value to the output buffer
-			Writer->WriteOutput(PointIndex);
+			continue;
 		}
+
+		if (const FInstancedStruct* SourceProp = Provider->GetPropertyAt(SourceIndex, PropName))
+		{
+			if (const FPCGExProperty* Source = SourceProp->GetPtr<FPCGExProperty>())
+			{
+				Writer->CopyValueFrom(Source);
+			}
+		}
+
+		Writer->WriteOutput(PointIndex);
 	}
 }
 

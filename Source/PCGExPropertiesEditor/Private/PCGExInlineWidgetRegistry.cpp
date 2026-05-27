@@ -10,6 +10,7 @@
 #include "UObject/StructOnScope.h"
 #include "Widgets/SNullWidget.h"
 #include "Widgets/Layout/SBox.h"
+#include "Details/PCGExEditorCustomizationUtils.h"
 
 namespace PCGExInlineWidgetRegistry_Private
 {
@@ -123,7 +124,8 @@ void FPCGExInlineWidgetRegistry::AddComplexValueRows(
 	IDetailChildrenBuilder& ChildBuilder,
 	TSharedRef<FStructOnScope> Scope,
 	UScriptStruct* InnerStruct,
-	TAttribute<bool> IsEnabled)
+	TAttribute<bool> IsEnabled,
+	const TWeakObjectPtr<UObject>& WeakOwner)
 {
 	for (TFieldIterator<FProperty> It(InnerStruct); It; ++It)
 	{
@@ -141,5 +143,10 @@ void FPCGExInlineWidgetRegistry::AddComplexValueRows(
 
 		IDetailPropertyRow& PropRow = *ChildBuilder.AddExternalStructureProperty(Scope, PropName);
 		PropRow.IsEnabled(IsEnabled);
+
+		if (WeakOwner.IsValid())
+		{
+			PCGExEditorCustomizationUtils::HookOwnerChangeOnHandleChanged(PropRow.GetPropertyHandle(), WeakOwner);
+		}
 	}
 }
