@@ -65,17 +65,23 @@ namespace PCGExGetPropertiesData
 	{
 		const FPCGExGetPropertiesDataContext* Context = nullptr;
 
-		explicit FContextPropertyProvider(const FPCGExGetPropertiesDataContext* InContext) : Context(InContext) {}
+		explicit FContextPropertyProvider(const FPCGExGetPropertiesDataContext* InContext)
+			: Context(InContext)
+		{
+		}
 
 		virtual TConstArrayView<FInstancedStruct> GetProperties(int32 Index) const override
 		{
 			return Context->SchemaPerComponent.IsValidIndex(Index)
-				       ? TConstArrayView<FInstancedStruct>(Context->SchemaPerComponent[Index])
-				       : TConstArrayView<FInstancedStruct>();
+				? TConstArrayView<FInstancedStruct>(Context->SchemaPerComponent[Index])
+				: TConstArrayView<FInstancedStruct>();
 		}
 
 		// Empty -- nothing in this node needs the registry; AutoPopulateFromRegistry isn't on our path.
-		virtual TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const override { return {}; }
+		virtual TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const override
+		{
+			return {};
+		}
 
 		virtual const FInstancedStruct* FindPrototypeProperty(FName PropertyName) const override
 		{
@@ -674,7 +680,10 @@ namespace PCGExGetPropertiesData
 				(bWantOmitUnresolved && Outcome == ESlotOutcome::Unresolved) ||
 				(bWantOmitPartial && Outcome == ESlotOutcome::Partial);
 			KeepMask[r] = bDrop ? 0 : 1;
-			if (bDrop) { bAnyDropped = true; }
+			if (bDrop)
+			{
+				bAnyDropped = true;
+			}
 		}
 
 		if (!bAnyDropped)

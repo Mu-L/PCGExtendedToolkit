@@ -5,7 +5,7 @@
 
 #include "Engine/World.h"
 #include "Misc/PackageName.h"
-#include "Serialization/ArchiveCrc32.h"
+#include "Hash/Blake3.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
@@ -591,6 +591,56 @@ namespace PCGExSharedCompact
 	// Policies + CompactShared reference Editor* fields on FPCGExPCGDataAssetCollectionEntry
 	// which are themselves WITH_EDITORONLY_DATA. Their callers (CompactSharedMesh /
 	// CompactSharedLevel) are body-guarded the same way.
+
+	// Process-stable Blake3 archive: stringifies FName and UObject paths exactly like
+	// FArchiveCrc32 does, so the hashed bytes -- and therefore the digest -- are identical
+	// across editor sessions, cooker runs, and machines. Used by FMeshPolicy::SortKey to
+	// digest the component descriptor structs, replacing a previous 32-bit CRC whose
+	// collision footprint could leave the sort tie-break undefined between distinct
+	// descriptors.
+	class FArchiveBlake3 : public FArchive
+	{
+	public:
+		FArchiveBlake3()
+		{
+			this->SetIsSaving(true);
+			this->SetIsPersistent(false);
+		}
+
+		virtual void Serialize(void* Data, int64 Length) override
+		{
+			if (Length > 0)
+			{
+				Hasher.Update(Data, static_cast<uint64>(Length));
+			}
+		}
+
+		virtual FArchive& operator<<(FName& Name) override
+		{
+			FString NameAsString = Name.ToString();
+			NameAsString.ToLowerInline();
+			Serialize(GetData(NameAsString), sizeof(TCHAR) * NameAsString.Len());
+			return *this;
+		}
+
+		virtual FArchive& operator<<(UObject*& Object) override
+		{
+			FString Path = Object ? Object->GetPathName() : FString();
+			Serialize(GetData(Path), sizeof(TCHAR) * Path.Len());
+			return *this;
+		}
+
+		virtual FString GetArchiveName() const override
+		{
+			return TEXT("FArchiveBlake3");
+		}
+
+		FBlake3Hash Finalize() { return Hasher.Finalize(); }
+
+	private:
+		FBlake3 Hasher;
+	};
+
 	// --- Policy structs supplying entry-specific knowledge to CompactShared<>. ---
 	struct FMeshPolicy
 	{
@@ -617,44 +667,51 @@ namespace PCGExSharedCompact
 		// is assigned in name-registration order and therefore differs between editor sessions and
 		// the cooker. Using such a hash as a sort key reshuffles the shared collection every run,
 		// which silently re-points every baked Tag_EntryIdx (a raw Entries index) at a different
-		// mesh. Every ingredient below is either a raw scalar or a string / FArchiveCrc32 hash
-		// (FArchiveCrc32 stringifies FName & UObject paths), so the key is identical in any process.
+		// mesh. Every ingredient below is either a raw scalar or a string / FBlake3 digest
+		// (FArchiveBlake3 stringifies FName & UObject paths), so the key is identical in any process.
 		//
 		// The key must also fully discriminate everything MeshContentEquals compares, so two
 		// distinct entries can never collide to the same key (which would re-introduce an unstable
 		// tie-break): mesh path, material-variant mode, slot, descriptor source, property-component
-		// hash, both component descriptors (CRC), and the material-override variant lists.
+		// hash, both component descriptors (Blake3 256-bit digest), and the material-override
+		// variant lists.
+		//
+		// Mesh path is the leading lexicographic field by design: edits to non-leading fields
+		// (weights, overrides, descriptors) keep an entry within its mesh's sort cluster, so
+		// regenerated diffs stay minimal under typical content changes.
 		static FString SortKey(const FPCGExMeshCollectionEntry& E)
 		{
-			FArchiveCrc32 DescriptorCrc;
+			FArchiveBlake3 DescHasher;
 			FSoftISMComponentDescriptor::StaticStruct()->SerializeBin(
-				DescriptorCrc, const_cast<FSoftISMComponentDescriptor*>(&E.ISMDescriptor));
+				DescHasher, const_cast<FSoftISMComponentDescriptor*>(&E.ISMDescriptor));
 			FPCGExStaticMeshComponentDescriptor::StaticStruct()->SerializeBin(
-				DescriptorCrc, const_cast<FPCGExStaticMeshComponentDescriptor*>(&E.SMDescriptor));
+				DescHasher, const_cast<FPCGExStaticMeshComponentDescriptor*>(&E.SMDescriptor));
+			const FBlake3Hash DescHash = DescHasher.Finalize();
 
-			FString Key = E.StaticMesh.ToSoftObjectPath().ToString();
-			Key += FString::Printf(TEXT("|MV=%d|SI=%d|DS=%d|PCH=%u|DESC=%08X"),
+			TStringBuilder<512> Builder;
+			Builder.Append(E.StaticMesh.ToSoftObjectPath().ToString());
+			Builder.Appendf(TEXT("|MV=%d|SI=%d|DS=%d|PCH=%u|DESC="),
 				static_cast<int32>(E.MaterialVariants),
 				E.SlotIndex,
 				static_cast<int32>(E.DescriptorSource),
-				E.PropertyComponentHash,
-				DescriptorCrc.GetCrc());
+				E.PropertyComponentHash);
+			Builder.Append(LexToString(DescHash));
 
 			for (const FPCGExMaterialOverrideSingleEntry& S : E.MaterialOverrideVariants)
 			{
-				Key += FString::Printf(TEXT("|MOV=%d:%s"),
-					S.Weight, *S.Material.ToSoftObjectPath().ToString());
+				Builder.Appendf(TEXT("|MOV=%d:"), S.Weight);
+				Builder.Append(S.Material.ToSoftObjectPath().ToString());
 			}
 			for (const FPCGExMaterialOverrideCollection& V : E.MaterialOverrideVariantsList)
 			{
-				Key += FString::Printf(TEXT("|MOL=%d"), V.Weight);
+				Builder.Appendf(TEXT("|MOL=%d"), V.Weight);
 				for (const FPCGExMaterialOverrideEntry& O : V.Overrides)
 				{
-					Key += FString::Printf(TEXT(",%d:%s"),
-						O.SlotIndex, *O.Material.ToSoftObjectPath().ToString());
+					Builder.Appendf(TEXT(",%d:"), O.SlotIndex);
+					Builder.Append(O.Material.ToSoftObjectPath().ToString());
 				}
 			}
-			return Key;
+			return FString(Builder.ToString());
 		}
 
 		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
