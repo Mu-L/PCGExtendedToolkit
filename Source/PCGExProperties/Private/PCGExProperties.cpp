@@ -367,14 +367,14 @@ void FPCGExPropertySchemaCollection::ApplyToOverrides(TArray<FPCGExPropertyOverr
 	}
 }
 
-void FPCGExPropertySchemaCollection::ReconcileImportOverrides()
+bool FPCGExPropertySchemaCollection::ReconcileImportOverrides()
 {
 	TArray<FPCGExPropertyResolved> Resolved;
 	Resolve(Resolved);
-	ReconcileImportOverrides(Resolved);
+	return ReconcileImportOverrides(Resolved);
 }
 
-void FPCGExPropertySchemaCollection::ReconcileImportOverrides(const TArray<FPCGExPropertyResolved>& Resolved)
+bool FPCGExPropertySchemaCollection::ReconcileImportOverrides(const TArray<FPCGExPropertyResolved>& Resolved)
 {
 	check(IsInGameThread());
 
@@ -404,7 +404,7 @@ void FPCGExPropertySchemaCollection::ReconcileImportOverrides(const TArray<FPCGE
 		ImportedOnlySchema.Add(MoveTemp(Patched));
 	}
 
-	ImportOverrides.SyncToSchema(ImportedOnlySchema);
+	return ImportOverrides.SyncToSchema(ImportedOnlySchema);
 }
 
 void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchemaCollection& Archetype)
@@ -533,7 +533,7 @@ void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchem
 // At runtime (no WITH_EDITOR), the HeaderId path is skipped and all overrides
 // are rebuilt from schema defaults.
 
-void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schema)
+bool FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schema)
 {
 #if WITH_EDITOR
 	// Fast path: structure matches entry-for-entry. Refresh in place; the slow path below
@@ -556,17 +556,29 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 		}
 		if (bStructureMatches)
 		{
+			bool bChanged = false;
 			for (int32 i = 0; i < Schema.Num(); ++i)
 			{
 				const FPCGExProperty* SchemaProp = Schema[i].GetPtr<FPCGExProperty>();
-				Overrides[i].PropertyName = SchemaProp->PropertyName;
+				if (Overrides[i].PropertyName != SchemaProp->PropertyName)
+				{
+					Overrides[i].PropertyName = SchemaProp->PropertyName;
+					bChanged = true;
+				}
 				if (FPCGExProperty* MyProp = Overrides[i].GetPropertyMutable())
 				{
-					MyProp->PropertyName = SchemaProp->PropertyName;
-					MyProp->SyncStructuralFromSchema(*SchemaProp);
+					if (MyProp->PropertyName != SchemaProp->PropertyName)
+					{
+						MyProp->PropertyName = SchemaProp->PropertyName;
+						bChanged = true;
+					}
+					if (MyProp->SyncStructuralFromSchema(*SchemaProp))
+					{
+						bChanged = true;
+					}
 				}
 			}
-			return;
+			return bChanged;
 		}
 	}
 #endif
@@ -690,6 +702,10 @@ void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schem
 			NewEntry.bEnabled = false;
 		}
 	}
+
+	// Slow path always rebuilds storage -- the relocated backing memory is itself an
+	// observable change regardless of bitwise content equality.
+	return true;
 }
 
 void FPCGExPropertyOverrides::ApplyHeaderIdRemap(TConstArrayView<FPCGExHeaderIdRemap> Remaps)

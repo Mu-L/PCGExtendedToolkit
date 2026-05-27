@@ -994,9 +994,7 @@ void UPCGExAssetCollection::PostLoad()
 			Asset->ConditionalPostLoad();
 		}
 	}
-	const int32 ImportOverridesNumBefore = CollectionProperties.ImportOverrides.Overrides.Num();
-	CollectionProperties.ReconcileImportOverrides();
-	if (CollectionProperties.ImportOverrides.Overrides.Num() != ImportOverridesNumBefore)
+	if (CollectionProperties.ReconcileImportOverrides())
 	{
 		(void)MarkPackageDirty();
 	}

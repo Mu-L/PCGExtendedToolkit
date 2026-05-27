@@ -99,8 +99,13 @@ PCGEX_PROPERTY_IMPL(FSoftClassPath, SoftClassPath)
 // no-op stubs to preserve the vtable.
 #if WITH_EDITOR
 #define PCGEX_SYNC_STRUCTURAL(_TYPE, _FIELD) \
-	void FPCGExProperty_##_TYPE::SyncStructuralFromSchema(const FPCGExProperty& Schema) \
-	{ _FIELD = static_cast<const FPCGExProperty_##_TYPE&>(Schema)._FIELD; }
+	bool FPCGExProperty_##_TYPE::SyncStructuralFromSchema(const FPCGExProperty& Schema) \
+	{ \
+		const auto& SchemaField = static_cast<const FPCGExProperty_##_TYPE&>(Schema)._FIELD; \
+		if (_FIELD == SchemaField) { return false; } \
+		_FIELD = SchemaField; \
+		return true; \
+	}
 
 PCGEX_SYNC_STRUCTURAL(Int32, Range)
 PCGEX_SYNC_STRUCTURAL(Int64, Range)
@@ -130,23 +135,29 @@ PCGEX_GET_COOK_DEPS(SoftObjectPath)
 PCGEX_GET_COOK_DEPS(SoftClassPath)
 #undef PCGEX_GET_COOK_DEPS
 #else
-void FPCGExProperty_Int32::SyncStructuralFromSchema(const FPCGExProperty&)
+bool FPCGExProperty_Int32::SyncStructuralFromSchema(const FPCGExProperty&)
 {
+	return false;
 }
-void FPCGExProperty_Int64::SyncStructuralFromSchema(const FPCGExProperty&)
+bool FPCGExProperty_Int64::SyncStructuralFromSchema(const FPCGExProperty&)
 {
+	return false;
 }
-void FPCGExProperty_Float::SyncStructuralFromSchema(const FPCGExProperty&)
+bool FPCGExProperty_Float::SyncStructuralFromSchema(const FPCGExProperty&)
 {
+	return false;
 }
-void FPCGExProperty_Double::SyncStructuralFromSchema(const FPCGExProperty&)
+bool FPCGExProperty_Double::SyncStructuralFromSchema(const FPCGExProperty&)
 {
+	return false;
 }
-void FPCGExProperty_SoftObjectPath::SyncStructuralFromSchema(const FPCGExProperty&)
+bool FPCGExProperty_SoftObjectPath::SyncStructuralFromSchema(const FPCGExProperty&)
 {
+	return false;
 }
-void FPCGExProperty_SoftClassPath::SyncStructuralFromSchema(const FPCGExProperty&)
+bool FPCGExProperty_SoftClassPath::SyncStructuralFromSchema(const FPCGExProperty&)
 {
+	return false;
 }
 FName FPCGExProperty_SoftObjectPath::GetDisplayTypeName() const
 {
@@ -247,14 +258,16 @@ void FPCGExProperty_Enum::CopyValueFrom(const FPCGExProperty* Source)
 	Value = Typed->Value;
 }
 
-void FPCGExProperty_Enum::SyncStructuralFromSchema(const FPCGExProperty& Schema)
+bool FPCGExProperty_Enum::SyncStructuralFromSchema(const FPCGExProperty& Schema)
 {
 	// The enum class is structural -- the schema decides which UEnum the property targets,
 	// and overrides must follow it. The selected int64 value is intentionally preserved
 	// here; if it no longer corresponds to a member of the new class, the picker UI will
 	// surface the raw integer and the user can re-pick.
 	const FPCGExProperty_Enum& Typed = static_cast<const FPCGExProperty_Enum&>(Schema);
+	if (Value.Class == Typed.Value.Class) { return false; }
 	Value.Class = Typed.Value.Class;
+	return true;
 }
 
 FPCGMetadataAttributeBase* FPCGExProperty_Enum::CreateMetadataAttribute(UPCGMetadata* Metadata, FName AttributeName) const
