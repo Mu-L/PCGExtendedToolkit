@@ -5,8 +5,6 @@
 
 #include "Engine/World.h"
 #include "Misc/PackageName.h"
-#include "Hash/Blake3.h"
-#include "Serialization/ArchiveUObject.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
@@ -28,6 +26,7 @@
 #include "Data/PCGPointArrayData.h"
 #include "Data/PCGSpatialData.h"
 #include "Engine/Level.h"
+#include "Helpers/PCGExCollectionSortKeys.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExDefaultLevelDataExporter.h"
 #include "Helpers/PCGExLevelDataExporter.h"
@@ -592,57 +591,13 @@ namespace PCGExSharedCompact
 	// Policies + CompactShared reference Editor* fields on FPCGExPCGDataAssetCollectionEntry
 	// which are themselves WITH_EDITORONLY_DATA. Their callers (CompactSharedMesh /
 	// CompactSharedLevel) are body-guarded the same way.
-
-	// Process-stable Blake3 archive: stringifies FName and UObject paths exactly like
-	// FArchiveCrc32 does, so the hashed bytes -- and therefore the digest -- are identical
-	// across editor sessions, cooker runs, and machines. Used by FMeshPolicy::SortKey to
-	// digest the component descriptor structs, replacing a previous 32-bit CRC whose
-	// collision footprint could leave the sort tie-break undefined between distinct
-	// descriptors.
-	class FArchiveBlake3 : public FArchiveUObject
-	{
-	public:
-		FArchiveBlake3()
-		{
-			this->SetIsSaving(true);
-			this->SetIsPersistent(false);
-		}
-
-		virtual void Serialize(void* Data, int64 Length) override
-		{
-			if (Length > 0)
-			{
-				Hasher.Update(Data, static_cast<uint64>(Length));
-			}
-		}
-
-		virtual FArchive& operator<<(FName& Name) override
-		{
-			FString NameAsString = Name.ToString();
-			NameAsString.ToLowerInline();
-			Serialize(GetData(NameAsString), sizeof(TCHAR) * NameAsString.Len());
-			return *this;
-		}
-
-		virtual FArchive& operator<<(UObject*& Object) override
-		{
-			FString Path = Object ? Object->GetPathName() : FString();
-			Serialize(GetData(Path), sizeof(TCHAR) * Path.Len());
-			return *this;
-		}
-
-		virtual FString GetArchiveName() const override
-		{
-			return TEXT("FArchiveBlake3");
-		}
-
-		using FArchiveUObject::operator<<; // bring in FSoftObjectPtr / FObjectPtr / etc. overloads
-
-		FBlake3Hash Finalize() { return Hasher.Finalize(); }
-
-	private:
-		FBlake3 Hasher;
-	};
+	//
+	// SortKey implementations live in Helpers/PCGExCollectionSortKeys.{h,cpp} as free
+	// functions so they're directly testable from PCGExtendedToolkitTest. FArchiveBlake3
+	// (the process-stable Blake3 archive that backs the descriptor digest) is exposed in
+	// Helpers/PCGExArchiveBlake3.h. The full SortKey contract -- process-stable, fully
+	// discriminating, leading-field stable on mesh path -- is documented on the header
+	// declarations.
 
 	// --- Policy structs supplying entry-specific knowledge to CompactShared<>. ---
 	struct FMeshPolicy
@@ -665,56 +620,9 @@ namespace PCGExSharedCompact
 			return MeshContentEquals(A, B);
 		}
 
-		// Process-stable ordering key. MUST NOT derive from GetTypeHash(FName/FSoftObjectPath):
-		// those hash the per-process FName comparison index (FNameEntryId::ToUnstableInt), which
-		// is assigned in name-registration order and therefore differs between editor sessions and
-		// the cooker. Using such a hash as a sort key reshuffles the shared collection every run,
-		// which silently re-points every baked Tag_EntryIdx (a raw Entries index) at a different
-		// mesh. Every ingredient below is either a raw scalar or a string / FBlake3 digest
-		// (FArchiveBlake3 stringifies FName & UObject paths), so the key is identical in any process.
-		//
-		// The key must also fully discriminate everything MeshContentEquals compares, so two
-		// distinct entries can never collide to the same key (which would re-introduce an unstable
-		// tie-break): mesh path, material-variant mode, slot, descriptor source, property-component
-		// hash, both component descriptors (Blake3 256-bit digest), and the material-override
-		// variant lists.
-		//
-		// Mesh path is the leading lexicographic field by design: edits to non-leading fields
-		// (weights, overrides, descriptors) keep an entry within its mesh's sort cluster, so
-		// regenerated diffs stay minimal under typical content changes.
 		static FString SortKey(const FPCGExMeshCollectionEntry& E)
 		{
-			FArchiveBlake3 DescHasher;
-			FSoftISMComponentDescriptor::StaticStruct()->SerializeBin(
-				DescHasher, const_cast<FSoftISMComponentDescriptor*>(&E.ISMDescriptor));
-			FPCGExStaticMeshComponentDescriptor::StaticStruct()->SerializeBin(
-				DescHasher, const_cast<FPCGExStaticMeshComponentDescriptor*>(&E.SMDescriptor));
-			const FBlake3Hash DescHash = DescHasher.Finalize();
-
-			TStringBuilder<512> Builder;
-			Builder.Append(E.StaticMesh.ToSoftObjectPath().ToString());
-			Builder.Appendf(TEXT("|MV=%d|SI=%d|DS=%d|PCH=%u|DESC="),
-				static_cast<int32>(E.MaterialVariants),
-				E.SlotIndex,
-				static_cast<int32>(E.DescriptorSource),
-				E.PropertyComponentHash);
-			Builder.Append(LexToString(DescHash));
-
-			for (const FPCGExMaterialOverrideSingleEntry& S : E.MaterialOverrideVariants)
-			{
-				Builder.Appendf(TEXT("|MOV=%d:"), S.Weight);
-				Builder.Append(S.Material.ToSoftObjectPath().ToString());
-			}
-			for (const FPCGExMaterialOverrideCollection& V : E.MaterialOverrideVariantsList)
-			{
-				Builder.Appendf(TEXT("|MOL=%d"), V.Weight);
-				for (const FPCGExMaterialOverrideEntry& O : V.Overrides)
-				{
-					Builder.Appendf(TEXT(",%d:"), O.SlotIndex);
-					Builder.Append(O.Material.ToSoftObjectPath().ToString());
-				}
-			}
-			return FString(Builder.ToString());
+			return ::PCGExSharedCompact::MeshSortKey(E);
 		}
 
 		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
@@ -762,7 +670,7 @@ namespace PCGExSharedCompact
 
 		static FString SortKey(const FPCGExLevelCollectionEntry& E)
 		{
-			return E.Level.ToSoftObjectPath().ToString();
+			return ::PCGExSharedCompact::LevelSortKey(E);
 		}
 
 		static const TArray<FPCGExLevelCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)

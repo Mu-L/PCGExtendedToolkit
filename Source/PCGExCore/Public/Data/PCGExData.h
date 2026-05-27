@@ -187,6 +187,8 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		T Min = T{};
 		T Max = T{};
 
+		bool bMinMaxCaptured = false;
+
 		TBuffer(const TSharedRef<FPointIO>& InSource, const FPCGAttributeIdentifier& InIdentifier);
 
 		const FPCGMetadataAttribute<T>* GetTypedInAttribute() const;

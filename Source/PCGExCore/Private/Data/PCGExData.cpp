@@ -17,6 +17,7 @@
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGCustomAccessor.h"
 #include "Types/PCGExAttributeIdentity.h"
+#include "Types/PCGExTypeOpsImpl.h"
 #include "Types/PCGExTypes.h"
 
 namespace PCGExData
@@ -432,7 +433,24 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 				InternalBroadcaster->GrabAndDump(*InValues, bCaptureMinMax, this->Min, this->Max);
 				bReadComplete = true;
 				bSparseBuffer = false;
+				if (bCaptureMinMax) { this->bMinMaxCaptured = true; }
 				InternalBroadcaster.Reset();
+			}
+			else if (!bSparseBuffer && bCaptureMinMax && !this->bMinMaxCaptured)
+			{
+				// Buffer already fully read but Min/Max weren't captured on the prior init.
+				// Scan InValues in place rather than re-reading metadata -- same result,
+				// no broadcaster rebuild. Gated on !bSparseBuffer so we never scan a
+				// partially-populated scoped buffer.
+				using Traits = PCGExTypes::TTraits<T>;
+				this->Min = Traits::Max();
+				this->Max = Traits::Min();
+				for (const T& V : *InValues)
+				{
+					this->Min = PCGExTypeOps::FTypeOps<T>::Min(V, this->Min);
+					this->Max = PCGExTypeOps::FTypeOps<T>::Max(V, this->Max);
+				}
+				this->bMinMaxCaptured = true;
 			}
 
 			if (OutValues && InValues == OutValues)
@@ -460,6 +478,7 @@ template PCGEXCORE_API bool IBuffer::IsA<_TYPE>() const;
 		{
 			InternalBroadcaster->GrabAndDump(*InValues, bCaptureMinMax, this->Min, this->Max);
 			bReadComplete = true;
+			if (bCaptureMinMax) { this->bMinMaxCaptured = true; }
 			InternalBroadcaster.Reset();
 		}
 
