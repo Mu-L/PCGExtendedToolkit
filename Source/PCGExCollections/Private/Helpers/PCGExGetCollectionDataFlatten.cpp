@@ -10,6 +10,7 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Elements/PCGExGetCollectionData.h"
+#include "Helpers/PCGExBulkAttributeHelpers.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Helpers/PCGExStreamingHelpers.h"
@@ -287,11 +288,11 @@ namespace PCGExGetCollectionData
 			{
 				if (bIsSoftPath)
 				{
-					PCGExGetCollectionData::BulkReadRows<FSoftObjectPath>(TD.Data, SourceAttribute, Out.Paths);
+					PCGExData::Helpers::BulkReadRows<FSoftObjectPath>(TD.Data, SourceAttribute, Out.Paths);
 				}
 				else
 				{
-					PCGExGetCollectionData::BulkReadRows<int64>(TD.Data, SourceAttribute, Out.Hashes);
+					PCGExData::Helpers::BulkReadRows<int64>(TD.Data, SourceAttribute, Out.Hashes);
 				}
 			}
 		}, /*Threshold=*/2, EParallelForFlags::Unbalanced);

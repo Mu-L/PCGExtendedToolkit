@@ -95,6 +95,11 @@ namespace PCGExCollections
 	 * Per-entry source resolution: Entry->PropertyOverrides takes precedence, then
 	 * Host->CollectionProperties default. Type mismatches between source and writer are
 	 * skipped silently (leaves default value on the attribute).
+	 *
+	 * Thin wrapper over FPCGExPropertySetWriter -- this class is now collection-only glue
+	 * (turn UPCGExAssetCollection* / FPCGExAssetCollectionEntry* into the lookup callables the
+	 * generic writer expects). Anything that wants the same metadata-write machinery on a
+	 * non-collection schema source should use FPCGExPropertySetWriter directly.
 	 */
 	class PCGEXCOLLECTIONS_API FPCGExCollectionPropertySetWriter
 	{
@@ -127,17 +132,24 @@ namespace PCGExCollections
 
 		bool HasOutputs() const
 		{
-			return Writers.Num() > 0;
+			return Inner.HasOutputs();
 		}
 
 	protected:
-		struct FWriter
+		/** Lightweight IPCGExPropertyProvider used purely for prototype lookup during Initialize.
+		 *  Per-entry source resolution is handled by WriteEntry directly (via WriteAt + the existing
+		 *  ResolveEntrySourceProperty helper) -- the dynamic (Entry, Host) shape doesn't fit the
+		 *  per-source-index lookup that provider-based WriteEntry expects. */
+		struct FCollectionPrototypeProvider final : public IPCGExPropertyProvider
 		{
-			FName PropertyName;
-			FInstancedStruct WriterInstance;
-			FPCGMetadataAttributeBase* Attribute = nullptr;
+			TArray<const UPCGExAssetCollection*> SearchOrder;
+
+			virtual TConstArrayView<FInstancedStruct> GetProperties(int32 /*Index*/) const override { return {}; }
+			virtual TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const override { return {}; }
+			virtual const FInstancedStruct* FindPrototypeProperty(FName PropertyName) const override;
 		};
 
-		TArray<FWriter> Writers;
+		FCollectionPrototypeProvider Provider;
+		FPCGExPropertySetWriter Inner;
 	};
 }

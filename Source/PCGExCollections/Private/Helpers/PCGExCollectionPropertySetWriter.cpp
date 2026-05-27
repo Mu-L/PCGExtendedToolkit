@@ -54,6 +54,11 @@ namespace PCGExCollections
 		return nullptr;
 	}
 
+	const FInstancedStruct* FPCGExCollectionPropertySetWriter::FCollectionPrototypeProvider::FindPrototypeProperty(const FName PropertyName) const
+	{
+		return PCGExCollections::FindPrototypeProperty(PropertyName, SearchOrder);
+	}
+
 	bool FPCGExCollectionPropertySetWriter::Initialize(
 		FPCGExContext* InContext,
 		const FPCGExPropertyOutputSettings& OutputSettings,
@@ -61,78 +66,23 @@ namespace PCGExCollections
 		TConstArrayView<const UPCGExAssetCollection*> FallbackHosts,
 		UPCGMetadata* Metadata)
 	{
-		Writers.Reset();
-
-		if (!Metadata)
-		{
-			return false;
-		}
-
-		TArray<FPCGExPropertyOutputConfig> EffectiveConfigs;
-		OutputSettings.GetEffectiveConfigs(EffectiveConfigs);
-		if (EffectiveConfigs.IsEmpty())
-		{
-			return false;
-		}
-
-		// Build a flat search list: root + fallback hosts (skipping dupes of the root).
-		TArray<const UPCGExAssetCollection*> SearchOrder;
-		SearchOrder.Reserve(FallbackHosts.Num() + 1);
+		// Build the search list onto our member provider (Inner holds a const* to it during writes,
+		// so it has to outlive the call -- member storage is the right scope).
+		Provider.SearchOrder.Reset();
+		Provider.SearchOrder.Reserve(FallbackHosts.Num() + 1);
 		if (RootCollection)
 		{
-			SearchOrder.Add(RootCollection);
+			Provider.SearchOrder.Add(RootCollection);
 		}
 		for (const UPCGExAssetCollection* Host : FallbackHosts)
 		{
 			if (Host && Host != RootCollection)
 			{
-				SearchOrder.Add(Host);
+				Provider.SearchOrder.Add(Host);
 			}
 		}
 
-		for (const FPCGExPropertyOutputConfig& Config : EffectiveConfigs)
-		{
-			if (!Config.IsValid())
-			{
-				continue;
-			}
-
-			const FName OutputName = Config.GetEffectiveOutputName();
-			if (OutputName.IsNone())
-			{
-				continue;
-			}
-
-			const FInstancedStruct* Prototype = FindPrototypeProperty(Config.PropertyName, SearchOrder);
-			if (!Prototype)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, InContext,
-				           FText::FromString(FString::Printf(TEXT("Property '%s' not found in collection schema."), *Config.PropertyName.ToString())));
-				continue;
-			}
-
-			const FPCGExProperty* PrototypeProp = Prototype->GetPtr<FPCGExProperty>();
-			if (!PrototypeProp || !PrototypeProp->SupportsOutput())
-			{
-				continue;
-			}
-
-			FWriter& Writer = Writers.Emplace_GetRef();
-			Writer.PropertyName = Config.PropertyName;
-			Writer.WriterInstance = *Prototype;
-
-			if (FPCGExProperty* MutableWriter = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>())
-			{
-				Writer.Attribute = MutableWriter->CreateMetadataAttribute(Metadata, OutputName);
-			}
-
-			if (!Writer.Attribute)
-			{
-				Writers.Pop(EAllowShrinking::No);
-			}
-		}
-
-		return HasOutputs();
+		return Inner.Initialize(InContext, &Provider, OutputSettings, Metadata);
 	}
 
 	void WriteSchemaToDataDomain(
@@ -319,34 +269,17 @@ namespace PCGExCollections
 
 	void FPCGExCollectionPropertySetWriter::WriteEntry(const int64 Key, const FPCGExAssetCollectionEntry* Entry, const UPCGExAssetCollection* Host)
 	{
-		if (Writers.IsEmpty())
+		// Per-entry source resolution doesn't fit Inner's provider-based WriteEntry shape (the
+		// provider expects a SourceIndex into a fixed schema array, but ResolveEntrySourceProperty
+		// has to look at both the entry's overrides and the host's defaults each call). Drive the
+		// per-writer loop here and use the WriteAt primitive for the actual copy+write.
+		for (int32 w = 0; w < Inner.Num(); w++)
 		{
-			return;
-		}
-
-		for (FWriter& Writer : Writers)
-		{
-			const FInstancedStruct* Source = ResolveEntrySourceProperty(Entry, Host, Writer.PropertyName);
-			if (!Source)
+			const FName PropertyName = Inner.GetPropertyName(w);
+			if (const FInstancedStruct* Source = ResolveEntrySourceProperty(Entry, Host, PropertyName))
 			{
-				continue;
+				Inner.WriteAt(w, Key, *Source);
 			}
-
-			const FPCGExProperty* SourceProp = Source->GetPtr<FPCGExProperty>();
-			FPCGExProperty* WriterProp = Writer.WriterInstance.GetMutablePtr<FPCGExProperty>();
-			if (!SourceProp || !WriterProp)
-			{
-				continue;
-			}
-
-			// Only copy when source and writer have matching concrete types.
-			if (Source->GetScriptStruct() != Writer.WriterInstance.GetScriptStruct())
-			{
-				continue;
-			}
-
-			WriterProp->CopyValueFrom(SourceProp);
-			WriterProp->WriteMetadataValue(Writer.Attribute, Key);
 		}
 	}
 }

@@ -145,8 +145,9 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		->AddArea(Area);
 
 	TSharedRef<FTabManager::FStack> MainStack = FTabManager::NewStack();
-	// Add tabs in reverse order so grid comes first; Assets tab is docked to the
-	// left sidebar as a collapsed vertical tab (clickable to expand as an overlay).
+	// Iterate Tabs in reverse: the LAST entry in Tabs (Grid, by CreateTabs ordering)
+	// is added FIRST to the stack and becomes the leftmost tab. Assets is docked to
+	// the left sidebar as a collapsed vertical tab (clickable to expand as overlay).
 	for (int i = Tabs.Num() - 1; i >= 0; i--)
 	{
 		if (Tabs[i].Id == FName("Assets"))
@@ -179,6 +180,18 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 
 	AddToolbarExtender(ToolbarExtender);
 	RegenerateMenusAndToolbars();
+
+	// Forcibly activate Grid as the initial tab on EVERY open. UE persists tab-manager
+	// state (including which tab was foreground at close) per layout name in
+	// GEditorLayoutIni; once that file contains a saved layout for our name, it fully
+	// replaces our StandaloneDefaultLayout (see FAssetEditorToolkit::InitAssetEditor +
+	// FLayoutSaveRestore::LoadFromConfig). That means SetForegroundTab(Grid) only takes
+	// effect on the very first open under a given layout version -- thereafter, persisted
+	// state wins. Invoking the tab post-init bypasses that entirely.
+	if (const TSharedPtr<FTabManager>& TabMgr = GetTabManager())
+	{
+		TabMgr->TryInvokeTab(FName("Grid"));
+	}
 }
 
 UPCGExAssetCollection* FPCGExAssetCollectionEditor::GetEditedCollection() const
@@ -314,11 +327,13 @@ void FPCGExAssetCollectionEditor::CreateTabs(TArray<PCGExAssetCollectionEditor::
 	DetailsView->SetObject(EditedCollection.Get());
 	
 	CreateEntriesTab(OutTabs);
-	CreateGridTab(OutTabs);
-	
+
 	PCGExAssetCollectionEditor::TabInfos& Infos = OutTabs.Emplace_GetRef(FName("Collection"), DetailsView, FName("Collection Settings"));
 	Infos.Icon = TEXT("Settings");
 
+	// Grid LAST so the reverse-iteration loop in InitEditor adds it FIRST to MainStack,
+	// making Grid the leftmost tab. Don't reorder without also updating that loop.
+	CreateGridTab(OutTabs);
 }
 
 void FPCGExAssetCollectionEditor::CreateEntriesTab(TArray<PCGExAssetCollectionEditor::TabInfos>& OutTabs)

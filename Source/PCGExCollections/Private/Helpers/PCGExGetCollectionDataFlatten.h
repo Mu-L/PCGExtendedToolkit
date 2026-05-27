@@ -6,10 +6,6 @@
 #include "CoreMinimal.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Elements/PCGExAssetCollectionToSet.h"
-#include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
-#include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
-#include "Data/PCGBasePointData.h"
-#include "Metadata/Accessors/PCGCustomAccessor.h"
 
 struct FPCGExContext;
 class UPCGData;
@@ -122,62 +118,6 @@ namespace PCGExGetCollectionData
 		UPCGExAssetCollection* Collection,
 		const int32 RootCollectionIndex,
 		TArray<FFlattenedEntry>& OutEntries);
-
-	/** Read all rows of T from a single input. One CreateConstAccessor + one GetRange call --
-	 *  drops hundreds of read-locked GetValueFromItemKey hits down to a single locked bulk read,
-	 *  and AllowBroadcastAndConstructible handles FString->FSoftObjectPath / narrower-int->int64
-	 *  coercion for free.
-	 *
-	 *  We can't use TAttributeBroadcaster directly: its FAttributeProcessingInfos::Init gates
-	 *  attribute discovery on Cast<UPCGSpatialData>(InData), which rejects UPCGParamData (attribute
-	 *  sets) silently. We talk to PCGAttributeAccessorHelpers directly to support both Param and
-	 *  Point inputs uniformly. */
-	template <typename T>
-	void BulkReadRows(const UPCGData* InData, const FName AttributeName, TArray<T>& OutValues)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExGetCollectionData::BulkReadRows);
-
-		if (!InData)
-		{
-			return;
-		}
-
-		FPCGAttributePropertyInputSelector Selector;
-		Selector.Update(AttributeName.ToString());
-		Selector = Selector.CopyAndFixLast(InData);
-
-		TUniquePtr<const IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreateConstAccessor(InData, Selector);
-		if (!Accessor)
-		{
-			return;
-		}
-
-		TSharedPtr<IPCGAttributeAccessorKeys> Keys;
-		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
-		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
-		}
-		else if (InData->ConstMetadata())
-		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(InData->ConstMetadata());
-		}
-		if (!Keys)
-		{
-			return;
-		}
-
-		const int32 NumValues = Keys->GetNum();
-		if (NumValues <= 0)
-		{
-			return;
-		}
-
-		OutValues.SetNumUninitialized(NumValues);
-		if (!Accessor->GetRange<T>(OutValues, 0, *Keys, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible))
-		{
-			OutValues.Reset();
-		}
-	}
 
 	/** Single-value @Data-domain read for the PerInputData fanout mode. Falls back from
 	 *  FSoftObjectPath to FString (authored-as-string paths) before giving up. */
