@@ -7,6 +7,8 @@
 #include "Misc/Attribute.h"
 #include "Templates/Function.h"
 #include "Templates/SharedPointer.h"
+#include "UObject/WeakObjectPtr.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 class IDetailPropertyRow;
 class IDetailChildrenBuilder;
