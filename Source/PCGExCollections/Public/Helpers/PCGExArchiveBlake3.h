@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "Hash/Blake3.h"
 #include "Serialization/ArchiveUObject.h"
+#include "UObject/Object.h"
 
 /**
  * Process-stable Blake3 hash archive.
