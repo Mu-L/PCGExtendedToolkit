@@ -535,6 +535,42 @@ void FPCGExPropertySchemaCollection::SyncFromArchetype(const FPCGExPropertySchem
 
 void FPCGExPropertyOverrides::SyncToSchema(const TArray<FInstancedStruct>& Schema)
 {
+#if WITH_EDITOR
+	// Fast path: structure matches entry-for-entry. Refresh in place; the slow path below
+	// reallocates Overrides, dangling FStructOnScope aliases held by per-entry detail
+	// customizations (causes scrambled values, undo-time access violations). Reconcile
+	// usually arrives with no structural change, so this is the hot path.
+	if (Overrides.Num() == Schema.Num())
+	{
+		bool bStructureMatches = true;
+		for (int32 i = 0; i < Schema.Num(); ++i)
+		{
+			const FPCGExProperty* SchemaProp = Schema[i].GetPtr<FPCGExProperty>();
+			if (!SchemaProp ||
+				Overrides[i].Value.GetScriptStruct() != Schema[i].GetScriptStruct() ||
+				Overrides[i].HeaderId != SchemaProp->HeaderId)
+			{
+				bStructureMatches = false;
+				break;
+			}
+		}
+		if (bStructureMatches)
+		{
+			for (int32 i = 0; i < Schema.Num(); ++i)
+			{
+				const FPCGExProperty* SchemaProp = Schema[i].GetPtr<FPCGExProperty>();
+				Overrides[i].PropertyName = SchemaProp->PropertyName;
+				if (FPCGExProperty* MyProp = Overrides[i].GetPropertyMutable())
+				{
+					MyProp->PropertyName = SchemaProp->PropertyName;
+					MyProp->SyncStructuralFromSchema(*SchemaProp);
+				}
+			}
+			return;
+		}
+	}
+#endif
+
 	// Match existing entries to the new schema by OUTER identity (HeaderId primary, PropertyName
 	// fallback). Outer identity lives on FPCGExPropertyOverrideEntry directly, not inside Value's
 	// FInstancedStruct, so it survives UE's broken per-property delta propagation.

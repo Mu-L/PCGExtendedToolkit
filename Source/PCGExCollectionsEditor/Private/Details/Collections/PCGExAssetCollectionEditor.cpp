@@ -141,7 +141,7 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 		->SetOrientation(Orient_Horizontal);
 
 	const TSharedRef<FTabManager::FLayout> Layout =
-		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v8")
+		FTabManager::NewLayout("PCGExAssetCollectionEditor_Layout_v9")
 		->AddArea(Area);
 
 	TSharedRef<FTabManager::FStack> MainStack = FTabManager::NewStack();
@@ -164,10 +164,7 @@ void FPCGExAssetCollectionEditor::InitEditor(UPCGExAssetCollection* InCollection
 	}
 	Area->Split(MainStack);
 
-	if (!Tabs.IsEmpty())
-	{
-		MainStack->SetForegroundTab(Tabs.Last().Id);
-	}
+	MainStack->SetForegroundTab(FName("Grid"));
 
 	InitAssetEditor(EToolkitMode::Standalone, InitToolkitHost, FName("PCGExAssetCollectionEditor"), Layout, bCreateDefaultStandaloneMenu, bCreateDefaultToolbar, ObjectsToEdit);
 
@@ -1175,10 +1172,7 @@ void FPCGExAssetCollectionEditor::RegisterTabSpawners(const TSharedRef<FTabManag
 		}
 	}
 
-	if (!Tabs.IsEmpty())
-	{
-		InTabManager->SetMainTab(Tabs[0].Id);
-	}
+	InTabManager->SetMainTab(FName("Grid"));
 
 	FAssetEditorToolkit::RegisterTabSpawners(InTabManager);
 }

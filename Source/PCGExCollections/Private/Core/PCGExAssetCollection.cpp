@@ -5,6 +5,7 @@
 
 #include "PCGExLog.h"
 #include "PCGExProperty.h"
+#include "PCGExPropertySchemaAsset.h"
 #include "StaticMeshResources.h"
 #include "Algo/RemoveIf.h"
 #include "Engine/StaticMesh.h"
@@ -875,6 +876,13 @@ void UPCGExAssetCollection::PostDuplicate(bool bDuplicateForPIE)
 	}
 
 #if WITH_EDITOR
+	// PostLoad doesn't fire on duplicates, so any stale ImportOverrides on the source would
+	// carry into the duplicate's first paint. PIE copies are transient -- skip the heal.
+	if (!bDuplicateForPIE)
+	{
+		CollectionProperties.ReconcileImportOverrides();
+	}
+
 	EDITOR_SetDirty();
 #endif
 }
@@ -974,6 +982,25 @@ void UPCGExAssetCollection::PostLoad()
 		(void)MarkPackageDirty();
 	}
 
+	// Heal stale CollectionProperties.ImportOverrides at load time so the customization's
+	// drift path doesn't have to fire mid-layout (which would leave the property tree's
+	// child count stale until a refresh). ConditionalPostLoad each import first -- UE
+	// doesn't guarantee referenced-asset PostLoad ordering, and the reconcile reads each
+	// asset's HeaderIds, which the asset's own PostLoad canonicalizes.
+	for (const TObjectPtr<UPCGExPropertySchemaAsset>& AssetPtr : CollectionProperties.ImportedSchemas)
+	{
+		if (UPCGExPropertySchemaAsset* Asset = AssetPtr.Get())
+		{
+			Asset->ConditionalPostLoad();
+		}
+	}
+	const int32 ImportOverridesNumBefore = CollectionProperties.ImportOverrides.Overrides.Num();
+	CollectionProperties.ReconcileImportOverrides();
+	if (CollectionProperties.ImportOverrides.Overrides.Num() != ImportOverridesNumBefore)
+	{
+		(void)MarkPackageDirty();
+	}
+
 	// Defer to next tick: the rebuild cascades into UpdateStaging -> SpawnActor, which is
 	// unsafe during PostLoad (load chain may re-enter, GWorld mid-transition). Trade-off:
 	// a PCG graph that triggered THIS soft-load sees pre-rebuild state for its current
@@ -1045,14 +1072,17 @@ bool UPCGExAssetCollection::HasCircularDependency(const UPCGExAssetCollection* O
 
 bool UPCGExAssetCollection::HasCircularDependency(TSet<const UPCGExAssetCollection*>& InReferences) const
 {
-	bool bCircularDependency = false;
-	InReferences.Add(this, &bCircularDependency);
-
-	if (bCircularDependency)
+	// InReferences is the active recursion stack, not "ever visited." Pop on the way back
+	// up so DAG diamonds (two siblings pointing to the same descendant) don't false-positive
+	// as cycles -- caller's ClearSubCollection() on a false positive wipes valid entries.
+	bool bAlreadyOnStack = false;
+	InReferences.Add(this, &bAlreadyOnStack);
+	if (bAlreadyOnStack)
 	{
 		return true;
 	}
 
+	bool bCircularDependency = false;
 	ForEachEntry([&](const FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
 		if (bCircularDependency)
@@ -1065,6 +1095,7 @@ bool UPCGExAssetCollection::HasCircularDependency(TSet<const UPCGExAssetCollecti
 		}
 	});
 
+	InReferences.Remove(this);
 	return bCircularDependency;
 }
 

@@ -9,6 +9,7 @@
 class IDetailPropertyRow;
 class IPropertyUtilities;
 class FResetToDefaultOverride;
+class FTransactionObjectEvent;
 class UPCGExPropertySchemaAsset;
 struct FPCGExPropertyResolved;
 struct FPCGExPropertySchemaCollection;
@@ -53,6 +54,10 @@ private:
 	/** Called when a referenced UPCGExPropertySchemaAsset broadcasts OnSchemaAssetChanged */
 	void OnImportedAssetChanged(UPCGExPropertySchemaAsset* ChangedAsset);
 
+	/** ForceRefresh on undo/redo for our host -- UE transaction restore can reallocate
+	 *  FInstancedStruct memory in ImportOverrides.Overrides, dangling per-entry FStructOnScope aliases. */
+	void OnObjectTransacted(UObject* Object, const FTransactionObjectEvent& Event);
+
 	/**
 	 * Render a single schema element as a flat single-row inline value editor.
 	 * Returns false if the schema isn't a PCGExInlineValue type or any precondition fails,
@@ -76,8 +81,8 @@ private:
 	 */
 	void ReconcileAndNotify();
 
-	/** Subscribe to OnSchemaAssetChanged on every asset present in the precomputed Resolved set. */
-	void SubscribeToImportedAssets(const TArray<FPCGExPropertyResolved>& Resolved);
+	/** Subscribe to OnSchemaAssetChanged on every asset reachable through ImportedSchemas (BFS). */
+	void SubscribeToImportedAssets();
 
 	/** Remove all subscriptions registered through SubscribeToImportedAssets. Idempotent. */
 	void UnsubscribeImportedAssets();
@@ -98,6 +103,12 @@ private:
 	TWeakPtr<IPropertyUtilities> WeakPropertyUtilities;
 	TWeakPtr<IPropertyHandle> PropertyHandlePtr;
 	TWeakPtr<IPropertyHandle> SchemasArrayHandlePtr;
+
+	/** Outer host of the collection; used to filter OnObjectTransacted to events we own. */
+	TWeakObjectPtr<UObject> WeakHostObject;
+
+	/** Handle for the OnObjectTransacted binding -- removed in destructor. */
+	FDelegateHandle ObjectTransactedHandle;
 
 	/** True when the outer object is a non-template UPCGExPropertyCollectionComponent instance */
 	bool bIsInstanceMode = false;
