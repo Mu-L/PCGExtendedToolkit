@@ -55,6 +55,7 @@ public:
 
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins) override;
 	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS(PathSplineMesh, "Staging : Spline Mesh", "Create spline mesh components from paths using asset collections.");
@@ -103,13 +104,8 @@ public:
 	 * Legacy uses the inline settings below -- only set for legacy nodes.
 	 * External uses a factory on the Selector input pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
-	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::Legacy;
+	EPCGExSelectorMode SelectorMode = EPCGExSelectorMode::Unset;
 
-#if WITH_EDITORONLY_DATA
-	// TODO : remove in 0.76
-	UPROPERTY()
-	bool bSelectorModePreUpdated = false;
-#endif
 
 	/** Distribution details
 	 * Note : LEGACY Nodes only. */

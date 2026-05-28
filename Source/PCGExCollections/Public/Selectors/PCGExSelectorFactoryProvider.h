@@ -24,7 +24,7 @@ namespace PCGExCollections
 	class FSelectorSharedData;
 }
 
-USTRUCT(meta=(PCG_DataTypeDisplayName="PCGEx | Distribution"))
+USTRUCT(meta=(PCG_DataTypeDisplayName="PCGEx | Selector"))
 struct FPCGExDataTypeInfoSelector : public FPCGExFactoryDataTypeInfo
 {
 	GENERATED_BODY()
