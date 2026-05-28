@@ -117,7 +117,7 @@ public:
 protected:
 	/** Store version of the node, used for deprecation purposes */
 	UPROPERTY()
-	int64 PCGExDataVersion = -1;
+	int64 PCGExDataVersion = INDEX_NONE;
 
 	virtual bool SupportsDataStealing() const;
 	virtual bool ShouldCache() const;
