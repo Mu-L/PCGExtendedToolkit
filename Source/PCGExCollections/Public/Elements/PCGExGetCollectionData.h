@@ -301,17 +301,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_Overridable, DisplayName="Collection Hash", EditCondition="bWriteCollectionHash"))
 	FName CollectionHashAttributeName = FName("CollectionHash");
 
-	/** Properties read from each source's resolved collection schema (CollectionProperties), written
-	 *  as attributes on the annotated source. Schema-level values only -- per-entry overrides are
-	 *  NOT consulted (this path looks at the collection itself, not its entries).
-	 *
-	 *  Domain matches Fanout: PerInputData -> @Data (one value per input, taken from the input's
-	 *  resolved collection). PerEntry / Merged -> @Element (per row, with each row reading from
-	 *  its own resolved collection's schema). Rows whose slot resolved to a null collection get
-	 *  the attribute's declared default (= first-available schema default across the per-input
-	 *  collection set, established at writer init). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations",
-	          meta=(PCG_NotOverridable, DisplayName="Source Schema Properties"))
+	/** Schema-level properties (CollectionProperties) written as attributes; per-entry overrides
+	 *  ignored. Written to AnnotatedSources (FromInputs) or OutputCollectionData (Collection).
+	 *  Domain: @Data for PerInputData/Collection, @Element for PerEntry/Merged. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs|Annotations", meta=(PCG_NotOverridable, DisplayName="Source Schema Properties"))
 	FPCGExPropertyOutputSettings SchemaPropertyAnnotations;
 
 
