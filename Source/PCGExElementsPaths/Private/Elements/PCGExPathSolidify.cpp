@@ -254,12 +254,24 @@ namespace PCGExPathSolidify
 			{
 				return false;
 			}
+
+			TertiarySlide = Settings->TertiaryAxis.Slide.GetValueSetting();
+			if (!TertiarySlide->Init(PointDataFacade))
+			{
+				return false;
+			}
 		}
 
 		if (Settings->SecondaryAxis.RadiusInput != EPCGExInputValueToggle::Disabled)
 		{
 			SecondaryRadius = Settings->SecondaryAxis.GetValueSettingRadius();
 			if (!SecondaryRadius->Init(PointDataFacade))
+			{
+				return false;
+			}
+
+			SecondarySlide = Settings->SecondaryAxis.Slide.GetValueSetting();
+			if (!SecondarySlide->Init(PointDataFacade))
 			{
 				return false;
 			}
@@ -322,6 +334,11 @@ namespace PCGExPathSolidify
 
 		PointDataFacade->Fetch(Scope);
 
+		PCGEX_SV_VIEW(SecondaryRadius)
+		PCGEX_SV_VIEW(SecondarySlide)
+		PCGEX_SV_VIEW(TertiaryRadius)
+		PCGEX_SV_VIEW(TertiarySlide)
+
 		TPCGValueRange<FTransform> Transforms = PointDataFacade->GetOut()->GetTransformValueRange(false);
 		TPCGValueRange<FVector> BoundsMin = PointDataFacade->GetOut()->GetBoundsMinValueRange(false);
 		TPCGValueRange<FVector> BoundsMax = PointDataFacade->GetOut()->GetBoundsMaxValueRange(false);
@@ -336,6 +353,8 @@ namespace PCGExPathSolidify
 			{
 				continue;
 			}
+
+			const int32 i = Index - Scope.Start;
 
 			const PCGExPaths::FPathEdge& Edge = Path->Edges[Index];
 			const double Length = PathLength->Get(Index);
@@ -382,16 +401,18 @@ namespace PCGExPathSolidify
 
 			if (SecondaryRadius)
 			{
-				const double Rad = FMath::Abs(SecondaryRadius->Read(Index));
-				OutBoundsMin[B] = -Rad * InvScale[B];
-				OutBoundsMax[B] = Rad * InvScale[B];
+				const double Rad = FMath::Abs(PCGEX_SV_READ(SecondaryRadius, i));
+				const double Slide = FMath::Clamp(PCGEX_SV_READ(SecondarySlide, i), 0.0, 1.0);
+				OutBoundsMin[B] = 2.0 * (Slide - 1.0) * Rad * InvScale[B];
+				OutBoundsMax[B] = 2.0 * Slide * Rad * InvScale[B];
 			}
 
 			if (TertiaryRadius)
 			{
-				const double Rad = FMath::Abs(TertiaryRadius->Read(Index));
-				OutBoundsMin[C] = -Rad * InvScale[C];
-				OutBoundsMax[C] = Rad * InvScale[C];
+				const double Rad = FMath::Abs(PCGEX_SV_READ(TertiaryRadius, i));
+				const double Slide = FMath::Clamp(PCGEX_SV_READ(TertiarySlide, i), 0.0, 1.0);
+				OutBoundsMin[C] = 2.0 * (Slide - 1.0) * Rad * InvScale[C];
+				OutBoundsMax[C] = 2.0 * Slide * Rad * InvScale[C];
 			}
 		}
 	}
