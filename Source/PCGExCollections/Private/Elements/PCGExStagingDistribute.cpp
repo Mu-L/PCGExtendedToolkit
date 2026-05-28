@@ -543,6 +543,7 @@ namespace PCGExAssetStaging
 
 		const bool bLocalApplyFitting = bApplyFitting;
 		const bool bLocalOutputWeight = bOutputWeight;
+		const bool bFlattenSubCollections = Settings->bFlattenSubCollections;
 		UPCGBasePointData* OutPointData = PointDataFacade->GetOut();
 
 		const TPCGValueRange<FTransform> OutTransforms = OutPointData->GetTransformValueRange(false);
@@ -620,7 +621,7 @@ namespace PCGExAssetStaging
 
 			const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], Helper->Details.SeedComponents, Helper->Details.LocalSeed, Settings, Component);
 
-			FPCGExEntryAccessResult Result = Helper->GetEntry(Index, Seed);
+			FPCGExEntryAccessResult Result = Helper->GetEntry(Index, Seed, bFlattenSubCollections);
 
 			if (!Result.IsValid()
 				|| !Result.Entry->Staging.Bounds.IsValid

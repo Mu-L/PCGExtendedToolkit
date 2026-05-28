@@ -938,6 +938,14 @@ namespace PCGExGetCollectionData
 				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_Write);
 				WriteFromEntries(U, P);
 			}
+			// Schema-property annotation (@Data): mirrors the FromInputs PerInputData branch -- one
+			// value per attribute, stamped onto the output param data.
+			if (Settings->SchemaPropertyAnnotations.HasOutputs())
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(GetCollectionData_WriteSchemaToDataDomain);
+				PCGExCollections::WriteSchemaToDataDomain(
+					InContext, Settings->SchemaPropertyAnnotations, MainCollection, U.OutputSet);
+			}
 		}
 
 		FPCGTaggedData& OutData = InContext->OutputData.TaggedData.Emplace_GetRef();

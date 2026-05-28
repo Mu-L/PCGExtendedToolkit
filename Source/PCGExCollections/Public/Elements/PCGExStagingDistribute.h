@@ -120,6 +120,10 @@ public:
 	/** The name of the attribute to write asset path to.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode == EPCGExStagingOutputMode::Attributes"))
 	FName AssetPathAttributeName = "AssetPath";
+	
+	//** If enabled, doesn't go through collections recursively and assign top-level collections "as assets" */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	bool bFlattenSubCollections = false;
 
 	/** How distribution is configured for this node. 
 	 * Legacy uses the inline settings below -- only set for legacy nodes.

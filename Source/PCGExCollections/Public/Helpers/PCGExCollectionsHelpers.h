@@ -160,9 +160,10 @@ namespace PCGExCollections
 		 * Get an entry for a specific point
 		 * @param PointIndex Index of the point
 		 * @param Seed Random seed for this point
+		 * @param bFlattenSubCollections
 		 * @return Access result containing entry and host collection
 		 */
-		FPCGExEntryAccessResult GetEntry(int32 PointIndex, int32 Seed) const;
+		FPCGExEntryAccessResult GetEntry(int32 PointIndex, int32 Seed, const bool bFlattenSubCollections = false) const;
 
 		/**
 		 * Get an entry with tag inheritance
@@ -170,9 +171,10 @@ namespace PCGExCollections
 		 * @param Seed Random seed for this point
 		 * @param TagInheritance Bitmask of EPCGExAssetTagInheritance flags
 		 * @param OutTags Set to append inherited tags to
+		 * @param bFlattenSubCollections
 		 * @return Access result containing entry and host collection
 		 */
-		FPCGExEntryAccessResult GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const;
+		FPCGExEntryAccessResult GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags, const bool bFlattenSubCollections = false) const;
 
 		/** Get the underlying collection */
 		UPCGExAssetCollection* GetCollection() const
