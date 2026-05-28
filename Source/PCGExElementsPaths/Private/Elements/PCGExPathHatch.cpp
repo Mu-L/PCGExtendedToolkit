@@ -285,20 +285,31 @@ namespace PCGExPathHatch
 			const double PerpStep = (NumLines > 1) ? (PerpOffsets[1] - PerpOffsets[0]) : 1.0;
 			const double InvPerpStep = 1.0 / PerpStep;
 
-			// Wrap-aware: post-wrap the grid is still uniform on the cycle (Step is snapped for both
-			// Count and Distance+wrap), but fmod can introduce sub-epsilon drift -- fall back to binary
-			// search to stay robust against the closed-form rounding the wrong index at the seam.
+			// Half-open [Lo, Hi) so a vertex shared by two edges is claimed exactly once (by the edge
+			// where it's the lower-perp endpoint). Closed would double-count when a hatch offset falls
+			// exactly on an interior subdivision vertex, producing two zero-length pairs and dropping
+			// the real segment. Closed fallback at Hi == PerpMax keeps boundary lines on the top edge;
+			// PerpMin needs no fallback since [Lo, Hi) always includes Lo.
+			//
+			// Wrap-aware: fmod can introduce sub-epsilon drift, so binary-search the wrapped grid instead
+			// of trusting the closed-form index at the seam.
 			auto FindLineRange = [&](const double Lo, const double Hi, int32& OutFirst, int32& OutLast)
 			{
+				const bool bHiAtBoundary = FMath::IsNearlyEqual(Hi, PerpMax);
 				if (bPerpOffsetsWrapped)
 				{
 					OutFirst = Algo::LowerBound(PerpOffsets, Lo);
-					OutLast = Algo::UpperBound(PerpOffsets, Hi) - 1;
+					OutLast = bHiAtBoundary
+						? Algo::UpperBound(PerpOffsets, Hi) - 1
+						: Algo::LowerBound(PerpOffsets, Hi) - 1;
 				}
 				else
 				{
 					OutFirst = FMath::Max(0, FMath::CeilToInt((Lo - PerpOffset0) * InvPerpStep));
-					OutLast = FMath::Min(NumLines - 1, FMath::FloorToInt((Hi - PerpOffset0) * InvPerpStep));
+					const double UpperRatio = (Hi - PerpOffset0) * InvPerpStep;
+					OutLast = FMath::Min(NumLines - 1, bHiAtBoundary
+						? FMath::FloorToInt(UpperRatio)
+						: FMath::CeilToInt(UpperRatio) - 1);
 				}
 			};
 
