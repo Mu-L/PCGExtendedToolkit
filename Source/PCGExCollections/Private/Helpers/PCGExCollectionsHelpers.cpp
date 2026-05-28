@@ -216,7 +216,7 @@ namespace PCGExCollections
 	// Entry picking: resolve the active picker (category-aware) -> pick a raw entries index
 	// -> resolve entry -> handle subcollection recursion via the "fallback to WeightedRandom"
 	// policy (matches current behavior when the picked entry is a subcollection).
-	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed) const
+	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed, const bool bFlattenSubCollections) const
 	{
 		const FPCGExEntryPickerOperation* Op = ResolvePickerForPoint(PointIndex);
 		if (!Op)
@@ -226,14 +226,14 @@ namespace PCGExCollections
 
 		const int32 Raw = Op->Pick(PointIndex, Seed);
 		FPCGExEntryAccessResult Result = Collection->GetEntryRaw(Raw);
-		if (Result && Result.Entry->HasValidSubCollection())
+		if (Result && (!bFlattenSubCollections && Result.Entry->HasValidSubCollection()))
 		{
 			return Result.Entry->GetSubCollectionPtr()->GetEntryWeightedRandom(Seed);
 		}
 		return Result;
 	}
 
-	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags) const
+	FPCGExEntryAccessResult FSelectorHelper::GetEntry(int32 PointIndex, int32 Seed, uint8 TagInheritance, TSet<FName>& OutTags, const bool bFlattenSubCollections) const
 	{
 		if (TagInheritance == 0)
 		{
@@ -248,7 +248,7 @@ namespace PCGExCollections
 
 		const int32 Raw = Op->Pick(PointIndex, Seed);
 		FPCGExEntryAccessResult Result = Collection->GetEntryRaw(Raw, TagInheritance, OutTags);
-		if (Result && Result.Entry->HasValidSubCollection())
+		if (Result && (!bFlattenSubCollections && Result.Entry->HasValidSubCollection()))
 		{
 			return Result.Entry->GetSubCollectionPtr()->GetEntryWeightedRandom(Seed, TagInheritance, OutTags);
 		}

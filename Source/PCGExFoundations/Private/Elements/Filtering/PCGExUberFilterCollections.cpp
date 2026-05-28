@@ -69,8 +69,8 @@ bool FPCGExUberFilterCollectionsElement::Boot(FPCGExContext* InContext) const
 
 	PCGExFactories::GetInputFactories(Context, PCGExPickers::Labels::SourcePickersLabel, Context->PickerFactories, {PCGExFactories::EType::IndexPicker}, false);
 
-	Context->Inside = MakeShared<PCGExData::FPointIOCollection>(Context);
-	Context->Outside = MakeShared<PCGExData::FPointIOCollection>(Context);
+	Context->Inside = MakeShared<PCGExData::FPointIOCollection>(Context, true);
+	Context->Outside = MakeShared<PCGExData::FPointIOCollection>(Context, true);
 
 	Context->Inside->OutputPin = PCGExFilters::Labels::OutputInsideFiltersLabel;
 	Context->Outside->OutputPin = PCGExFilters::Labels::OutputOutsideFiltersLabel;
@@ -130,11 +130,11 @@ bool FPCGExUberFilterCollectionsElement::AdvanceWork(FPCGExContext* InContext, c
 			{
 				if (PrimaryFilters->Test(Context->CurrentIO, Context->MainPoints))
 				{
-					Context->Inside->Emplace_GetRef(Context->CurrentIO, PCGExData::EIOInit::Forward);
+					Context->Inside->Add_Unsafe(Context->CurrentIO);
 				}
 				else
 				{
-					Context->Outside->Emplace_GetRef(Context->CurrentIO, PCGExData::EIOInit::Forward);
+					Context->Outside->Add_Unsafe(Context->CurrentIO);
 				}
 			}
 
@@ -149,11 +149,11 @@ bool FPCGExUberFilterCollectionsElement::AdvanceWork(FPCGExContext* InContext, c
 	}
 
 	uint64& Mask = Context->OutputData.InactiveOutputPinBitmask;
-	if (!Context->Inside->StageOutputs())
+	if (!Context->Inside->StageAnyOutputs())
 	{
 		Mask |= 1ULL << (Settings->bSwap ? 1 : 0);
 	}
-	if (!Context->Outside->StageOutputs())
+	if (!Context->Outside->StageAnyOutputs())
 	{
 		Mask |= 1ULL << (Settings->bSwap ? 0 : 1);
 	}
@@ -189,7 +189,7 @@ namespace PCGExUberFilterCollections
 			if ((Settings->Comparison == EPCGExComparison::StrictlyGreater || Settings->Comparison == EPCGExComparison::EqualOrGreater) && NumPoints < Settings->IntThreshold)
 			{
 				// Not enough points to meet requirements.
-				Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				Context->Outside->Add(PointDataFacade->Source);
 				return true;
 			}
 		}
@@ -244,26 +244,28 @@ namespace PCGExUberFilterCollections
 	{
 		IProcessor::Output();
 
+		TSharedPtr<PCGExData::FPointIO> OutIO;
+		
 		switch (Settings->Mode)
 		{
 		default: case EPCGExUberFilterCollectionsMode::All:
 			if (NumInside == NumPoints)
 			{
-				Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				OutIO = Context->Inside->Add(PointDataFacade->Source);
 			}
 			else
 			{
-				Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				OutIO = Context->Outside->Add(PointDataFacade->Source);
 			}
 			break;
 		case EPCGExUberFilterCollectionsMode::Any:
 			if (NumInside != 0)
 			{
-				Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				OutIO = Context->Inside->Add(PointDataFacade->Source);
 			}
 			else
 			{
-				Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+				OutIO = Context->Outside->Add(PointDataFacade->Source);
 			}
 			break;
 		case EPCGExUberFilterCollectionsMode::Partial:
@@ -271,11 +273,11 @@ namespace PCGExUberFilterCollections
 			{
 				if (PCGExCompare::Compare(Settings->Comparison, NumInside, Settings->IntThreshold, 0))
 				{
-					Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+					OutIO = Context->Inside->Add(PointDataFacade->Source);
 				}
 				else
 				{
-					Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+					OutIO = Context->Outside->Add(PointDataFacade->Source);
 				}
 			}
 			else
@@ -283,11 +285,11 @@ namespace PCGExUberFilterCollections
 				const double Ratio = static_cast<double>(NumInside) / static_cast<double>(NumPoints);
 				if (PCGExCompare::Compare(Settings->Comparison, Ratio, Settings->DblThreshold, Settings->Tolerance))
 				{
-					Context->Inside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+					OutIO = Context->Inside->Add(PointDataFacade->Source);
 				}
 				else
 				{
-					Context->Outside->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Forward);
+					OutIO = Context->Outside->Add(PointDataFacade->Source);
 				}
 			}
 			break;
