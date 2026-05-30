@@ -43,6 +43,7 @@ enum class EPCGExSelectorMode : uint8
 {
 	Legacy   = 0 UMETA(DisplayName = "Legacy", ToolTip="Use the inline distribution settings configured on this node."),
 	External = 1 UMETA(DisplayName = "External (Factory)", ToolTip="Use a selector factory provided via the Selector input pin."),
+	Unset    = 8 UMETA(Hidden),
 };
 
 /** Behavior when a point's Category attribute does not match any named category in the collection. */

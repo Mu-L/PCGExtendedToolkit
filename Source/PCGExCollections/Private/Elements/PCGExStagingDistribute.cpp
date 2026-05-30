@@ -34,6 +34,22 @@
 #pragma region UPCGExAssetStagingSettings
 
 #if WITH_EDITOR
+void UPCGExAssetStagingSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	if (PCGExDataVersion == INDEX_NONE)
+	{
+		SelectorMode = EPCGExSelectorMode::External;
+	}
+
+	// TODO : Delete in 0.76
+	if (SelectorMode == EPCGExSelectorMode::Unset)
+	{
+		SelectorMode = EPCGExSelectorMode::Legacy;
+	}
+	
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
 void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	EntryTypeFilter.PostEditChangeProperty(PropertyChangedEvent);
@@ -43,7 +59,7 @@ void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedE
 
 bool UPCGExAssetStagingSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode != EPCGExSelectorMode::External)
+	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode == EPCGExSelectorMode::Legacy)
 	{
 		return false;
 	}
@@ -71,7 +87,7 @@ void UPCGExAssetStagingSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPinP
 		PCGEX_PIN_PARAM(PCGExCollections::Labels::SourceAssetCollection, "Attribute set to be used as collection.", Required)
 	}
 
-	if (SelectorMode == EPCGExSelectorMode::External)
+	if (SelectorMode != EPCGExSelectorMode::Legacy)
 	{
 		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Required, FPCGExDataTypeInfoSelector::AsId())
 	}

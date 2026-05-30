@@ -312,7 +312,8 @@ namespace PCGExMath
 
 	double GetRadiansBetweenVectors(const FVector& A, const FVector& B, const FVector& UpVector)
 	{
-		const double Radians = FMath::Acos(FVector::DotProduct(A, B));
+		// Clamp the dot: FP rounding on (near-)unit inputs can push it just outside [-1, 1], which makes Acos return NaN 
+		const double Radians = FMath::Acos(FMath::Clamp(FVector::DotProduct(A, B), -1.0, 1.0));
 		return FVector::CrossProduct(A, B).Z < 0 ? TWO_PI - Radians : Radians;
 	}
 
