@@ -73,27 +73,41 @@ bool FPCGExMetaCleanupElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	}
 	else
 	{
+
+		TArray<FPCGAttributeIdentifier> Identifiers;
+		Identifiers.Reserve(12);
+		
 		switch (Settings->GetMainDataInitializationPolicy())
 		{
-
-			break;
 		case PCGExData::EIOInit::NoInit:
 		case PCGExData::EIOInit::New:
 		case PCGExData::EIOInit::Duplicate:
 			for (int i = 0; i < NumInputs; i++)
 			{
 				const FPCGTaggedData& InData = Context->InputData.TaggedData[i];
-				UPCGData* NewOutData = InData.Data->DuplicateData(Context, true);
 
-				FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(NewOutData);
-				OutData.Pin = PCGPinConstants::DefaultOutputLabel;
-				OutData.Tags = InData.Tags;
-
-				if (UPCGMetadata* Metadata = NewOutData->MutableMetadata())
+				if (Context->Filters.GetPrunableIdentifiers(InData.Data->ConstMetadata(), Identifiers))
 				{
-					Context->Filters.Prune(Metadata);
+					UPCGData* NewOutData = InData.Data->DuplicateData(Context, true);
+					UPCGMetadata* Metadata = NewOutData->MutableMetadata();
+
+					for (const FPCGAttributeIdentifier& Identifier : Identifiers)
+					{
+						Metadata->DeleteAttribute(Identifier);
+					}
+
+					FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(NewOutData);
+					OutData.Pin = PCGPinConstants::DefaultOutputLabel;
+					OutData.Tags = InData.Tags;
+					Context->Filters.Prune(OutData.Tags);
 				}
-				Context->Filters.Prune(OutData.Tags);
+				else
+				{
+					FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(InData.Data);
+					OutData.Pin = PCGPinConstants::DefaultOutputLabel;
+					OutData.Tags = InData.Tags;
+					Context->Filters.Prune(OutData.Tags);
+				}
 			}
 			break;
 		case PCGExData::EIOInit::Forward:
@@ -103,14 +117,19 @@ bool FPCGExMetaCleanupElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 				UPCGData* NewOutData = const_cast<UPCGData*>(InData.Data.Get());
 
 				FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(NewOutData);
+
 				OutData.Pin = PCGPinConstants::DefaultOutputLabel;
 				OutData.Tags = InData.Tags;
-
-				if (UPCGMetadata* Metadata = NewOutData->MutableMetadata())
-				{
-					Context->Filters.Prune(Metadata);
-				}
 				Context->Filters.Prune(OutData.Tags);
+
+				if (Context->Filters.GetPrunableIdentifiers(NewOutData->MutableMetadata(), Identifiers))
+				{
+					for (const FPCGAttributeIdentifier& Identifier : Identifiers)
+					{
+						NewOutData->Metadata->DeleteAttribute(Identifier);
+					}
+				}
+
 			}
 			break;
 		}

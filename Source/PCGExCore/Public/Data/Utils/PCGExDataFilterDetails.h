@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "Utils/PCGExCompare.h"
+#include "Metadata/PCGMetadataCommon.h"
 
 #include "PCGExDataFilterDetails.generated.h"
 
@@ -32,6 +33,14 @@ enum class EPCGExAttributeFilter : uint8
 	Exclude = 1 UMETA(DisplayName = "Exclude", ToolTip="Discard listed elements, keep the others", ActionIcon="Exclude"),
 	Include = 2 UMETA(DisplayName = "Include", ToolTip="Keep listed elements, discard the others", ActionIcon="Include"),
 };
+
+namespace PCGExDataFilter
+{
+	namespace Helpers
+	{
+		void PCGEXCORE_API GetAttributes(const UPCGMetadata* InMetadata, EPCGExAttributeDomainScope InScope, TArray<FPCGAttributeIdentifier>& Identifiers);
+	}
+}
 
 USTRUCT(BlueprintType)
 struct PCGEXCORE_API FPCGExNameFiltersDetails
@@ -96,8 +105,18 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	{
 	}
 
+	explicit FPCGExCarryOverDetails(const bool InUsedForCleanup)
+		:bUsedForCleanup(InUsedForCleanup)
+	{
+	}
+	
+#if WITH_EDITORONLY_DATA
+	UPROPERTY()
+	bool bUsedForCleanup = false;
+#endif
+		
 	/** If enabled, will preserve the initial attribute default value. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, EditCondition="!bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
 	bool bPreserveAttributesDefaultValue = false;
 
 	/** Attributes to carry over. */
@@ -106,8 +125,12 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 
 	/** If enabled, will convert data domain attributes to elements domain ones.
 	 * Note : This is not used by all nodes. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Data domain to Elements"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" ├─ Data domain to Elements", EditCondition="!bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
 	bool bDataDomainToElements = true;
+
+	/** Scope */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Scope"))
+	EPCGExAttributeDomainScope Scope = EPCGExAttributeDomainScope::Any;
 
 	/** Tags to carry over. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
@@ -128,7 +151,9 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	bool Test(const PCGExData::FPointIO* PointIO) const;
 	bool Test(PCGExData::FTags* InTags) const;
 
+	bool GetPrunableIdentifiers(const UPCGMetadata* Metadata, TArray<FPCGAttributeIdentifier>& Identifiers) const;
 	void Prune(UPCGMetadata* Metadata) const;
+	
 
 	bool Test(const UPCGMetadata* Metadata) const;
 };

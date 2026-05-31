@@ -38,6 +38,14 @@ enum class EPCGExNumericOutput : uint8
 	Int64  = 3,
 };
 
+UENUM()
+enum class EPCGExAttributeDomainScope : uint8
+{
+	Any      = 0 UMETA(DisplayName = "Any", Tooltip="Any domain"),
+	Data     = 1 UMETA(DisplayName = "Data", Tooltip="Data domain only"),
+	Elements = 2 UMETA(DisplayName = "Elements", Tooltip="Elements domain only"),
+};
+
 namespace PCGExData
 {
 	enum class EIOInit : uint8
