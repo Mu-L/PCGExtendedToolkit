@@ -17,13 +17,16 @@ class UPCGExAssetCollection;
 namespace PCGExCollectionEditorHelpers
 {
 	/**
-	 * Create a new collection asset of CollectionClass in the same package path as the first
-	 * selected source asset, named DefaultAssetName, then append the source assets to it.
+	 * Create a new collection asset of CollectionClass and append the source assets to it.
+	 * When bOpenSaveDialog is true, the user picks the destination folder and asset name via a
+	 * modal save dialog; otherwise the asset is created as DefaultAssetName in the same package
+	 * path as the first selected source asset.
 	 */
 	PCGEXCOLLECTIONSEDITOR_API void CreateCollectionFromTyped(
 		const TArray<FAssetData>& SelectedAssets,
 		UClass* CollectionClass,
-		const TCHAR* DefaultAssetName);
+		const TCHAR* DefaultAssetName,
+		bool bOpenSaveDialog = true);
 
 	/** Append the given source assets to each selected collection. */
 	PCGEXCOLLECTIONSEDITOR_API void UpdateCollectionsFromTyped(

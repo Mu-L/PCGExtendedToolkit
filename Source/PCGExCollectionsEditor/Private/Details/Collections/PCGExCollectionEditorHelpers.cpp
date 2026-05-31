@@ -3,9 +3,12 @@
 
 #include "Details/Collections/PCGExCollectionEditorHelpers.h"
 
+#include "ContentBrowserModule.h"
 #include "FileHelpers.h"
+#include "IContentBrowserSingleton.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "UObject/Package.h"
 
@@ -14,16 +17,39 @@ namespace PCGExCollectionEditorHelpers
 	void CreateCollectionFromTyped(
 		const TArray<FAssetData>& SelectedAssets,
 		UClass* CollectionClass,
-		const TCHAR* DefaultAssetName)
+		const TCHAR* DefaultAssetName,
+		bool bOpenSaveDialog)
 	{
 		if (SelectedAssets.IsEmpty() || !CollectionClass)
 		{
 			return;
 		}
 
-		const FString CollectionAssetName = DefaultAssetName;
+		FString CollectionAssetName = DefaultAssetName;
 		const FString CollectionAssetPath = SelectedAssets[0].PackagePath.ToString();
-		const FString PackageName = FPaths::Combine(CollectionAssetPath, CollectionAssetName);
+		FString PackageName = FPaths::Combine(CollectionAssetPath, CollectionAssetName);
+
+		if (bOpenSaveDialog)
+		{
+			FSaveAssetDialogConfig SaveAssetDialogConfig;
+			SaveAssetDialogConfig.DefaultPath = CollectionAssetPath;
+			SaveAssetDialogConfig.DefaultAssetName = CollectionAssetName;
+			SaveAssetDialogConfig.AssetClassNames.Add(CollectionClass->GetClassPathName());
+			SaveAssetDialogConfig.ExistingAssetPolicy = ESaveAssetDialogExistingAssetPolicy::AllowButWarn;
+			SaveAssetDialogConfig.DialogTitleOverride = NSLOCTEXT("PCGExCollections", "SaveCollectionDialogTitle", "Create Asset Collection");
+
+			FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+			const FString SaveObjectPath = ContentBrowserModule.Get().CreateModalSaveAssetDialog(SaveAssetDialogConfig);
+
+			if (SaveObjectPath.IsEmpty())
+			{
+				// User cancelled the dialog -- create nothing.
+				return;
+			}
+
+			CollectionAssetName = FPackageName::ObjectPathToObjectName(SaveObjectPath);
+			PackageName = FPackageName::ObjectPathToPackageName(SaveObjectPath);
+		}
 
 		FText Reason;
 		if (!FPackageName::IsValidObjectPath(PackageName, &Reason))
