@@ -21,6 +21,13 @@ namespace PCGExGeoTask
 	class FLloydRelax2;
 }
 
+#if WITH_EDITOR
+TArray<FText> UPCGExBuildDelaunayGraph2DSettings::GetNodeTitleAliases() const
+{
+	return {FTEXT("PCGEx | Cluster : Triangulation")};
+}
+#endif
+
 TArray<FPCGPinProperties> UPCGExBuildDelaunayGraph2DSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();

@@ -14,6 +14,13 @@
 #define LOCTEXT_NAMESPACE "PCGExAttributesToTagsElement"
 #define PCGEX_NAMESPACE AttributesToTags
 
+#if WITH_EDITOR
+TArray<FText> UPCGExAttributesToTagsSettings::GetNodeTitleAliases() const
+{
+	return {FTEXT("PCGEx | Hoist Attributes")};
+}
+#endif
+
 bool UPCGExAttributesToTagsSettings::GetIsMainTransactional() const
 {
 	return true;
