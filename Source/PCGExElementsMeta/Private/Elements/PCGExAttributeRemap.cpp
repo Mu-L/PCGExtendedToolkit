@@ -56,6 +56,13 @@ void FPCGExAttributeRemapContext::RegisterAssetDependencies()
 	}
 }
 
+#if WITH_EDITOR
+TArray<FText> UPCGExAttributeRemapSettings::GetNodeTitleAliases() const
+{
+	return {FTEXT("PCGEx | Curve Remap")};
+}
+#endif
+
 PCGEX_INITIALIZE_ELEMENT(AttributeRemap)
 
 PCGExData::EIOInit UPCGExAttributeRemapSettings::GetMainDataInitializationPolicy() const

@@ -67,6 +67,8 @@ public:
 
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AttributeRemap, "Attribute Remap", "Remap a single property or attribute.", FName(GetDisplayName()));
 
+	virtual TArray<FText> GetNodeTitleAliases() const override;
+	
 	virtual EPCGSettingsType GetType() const override
 	{
 		return EPCGSettingsType::Metadata;
