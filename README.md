@@ -29,7 +29,7 @@ Vanilla PCG excels at scattering and rule-based placement. PCGEx adds what's mis
 
 Graph theory is just the headline. PCGEx is also a comprehensive data manipulation toolkit: spatial queries, sampling, blending, path operations, polygon booleans, asset management, filtering, sorting—the low-level primitives that vanilla PCG doesn't provide. Reusable sub-nodes (filters, heuristics, blenders) plug into operations to keep your graphs clean. 
 
-_It doesn't solve specific problems for you. _It gives you the tools to solve them yourself._
+_It doesn't solve specific problems for you. It gives you the tools to solve them yourself._
 
 ---
 
