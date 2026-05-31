@@ -46,10 +46,12 @@ void FPCGExMergeList::Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager
 	CompositeDataFacade->WriteFastest(TaskManager);
 }
 
+#if WITH_EDITOR
 TArray<FText> UPCGExMergePointsSettings::GetNodeTitleAliases() const
 {
 	return {FTEXT("PCGEx | Merge Points by Tag")};
 }
+#endif
 
 FPCGElementPtr UPCGExMergePointsSettings::CreateElement() const
 {
