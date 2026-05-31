@@ -53,7 +53,7 @@ public:
 
 	/** List of attributes to delete. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
-	FPCGExCarryOverDetails Filters;
+	FPCGExCarryOverDetails Filters = FPCGExCarryOverDetails(true);
 };
 
 struct FPCGExMetaCleanupContext final : FPCGExContext

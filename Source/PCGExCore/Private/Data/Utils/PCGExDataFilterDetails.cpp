@@ -9,6 +9,37 @@
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Types/PCGExAttributeIdentity.h"
 
+namespace PCGExDataFilter
+{
+	namespace Helpers
+	{
+		void GetAttributes(const UPCGMetadata* InMetadata, EPCGExAttributeDomainScope InScope, TArray<FPCGAttributeIdentifier>& Identifiers)
+		{
+			TArray<EPCGMetadataTypes> Types;
+			InMetadata->GetAllAttributes(Identifiers, Types);
+
+			switch (InScope)
+			{
+			case EPCGExAttributeDomainScope::Any:
+				return;
+			case EPCGExAttributeDomainScope::Data:
+				Identifiers.SetNum(Algo::RemoveIf(Identifiers, [](const FPCGAttributeIdentifier& Id)
+				{
+					return Id.MetadataDomain != PCGMetadataDomainID::Data;
+				}));
+				break;
+			case EPCGExAttributeDomainScope::Elements:
+				Identifiers.SetNum(Algo::RemoveIf(Identifiers, [](const FPCGAttributeIdentifier& Id)
+				{
+					return Id.MetadataDomain != PCGMetadataDomainID::Elements;
+				}));
+				break;
+			}
+
+		}
+	}
+}
+
 void FPCGExNameFiltersDetails::Init()
 {
 	for (const TArray<FString> Names = PCGExArrayHelpers::GetStringArrayFromCommaSeparatedList(CommaSeparatedNames);
@@ -283,6 +314,24 @@ bool FPCGExCarryOverDetails::Test(PCGExData::FTags* InTags) const
 	return true;
 }
 
+bool FPCGExCarryOverDetails::GetPrunableIdentifiers(const UPCGMetadata* Metadata, TArray<FPCGAttributeIdentifier>& Identifiers) const
+{
+	if (!Metadata || Attributes.FilterMode == EPCGExAttributeFilter::All)
+	{
+		return false;
+	}
+
+	PCGExDataFilter::Helpers::GetAttributes(Metadata, Scope, Identifiers);
+	Identifiers.SetNum(Algo::StableRemoveIf(
+		Identifiers,
+		[&](const FPCGAttributeIdentifier& Id)
+		{
+			return Attributes.Test(Id.Name.ToString());
+		}));
+
+	return !Identifiers.IsEmpty();
+}
+
 void FPCGExCarryOverDetails::Prune(UPCGMetadata* Metadata) const
 {
 	if (Attributes.FilterMode == EPCGExAttributeFilter::All)
@@ -291,11 +340,9 @@ void FPCGExCarryOverDetails::Prune(UPCGMetadata* Metadata) const
 	}
 
 	TArray<FPCGAttributeIdentifier> Identifiers;
-	TArray<EPCGMetadataTypes> Types;
-	Metadata->GetAllAttributes(Identifiers, Types);
-	for (const FPCGAttributeIdentifier& Identifier : Identifiers)
+	if (GetPrunableIdentifiers(Metadata, Identifiers))
 	{
-		if (!Attributes.Test(Identifier.Name.ToString()))
+		for (const FPCGAttributeIdentifier& Identifier : Identifiers)
 		{
 			Metadata->DeleteAttribute(Identifier);
 		}
@@ -310,8 +357,9 @@ bool FPCGExCarryOverDetails::Test(const UPCGMetadata* Metadata) const
 	}
 
 	TArray<FPCGAttributeIdentifier> Identifiers;
-	TArray<EPCGMetadataTypes> Types;
-	Metadata->GetAllAttributes(Identifiers, Types);
+
+	PCGExDataFilter::Helpers::GetAttributes(Metadata, Scope, Identifiers);
+
 	if (Attributes.FilterMode == EPCGExAttributeFilter::Exclude)
 	{
 		for (const FPCGAttributeIdentifier& Identifier : Identifiers)
