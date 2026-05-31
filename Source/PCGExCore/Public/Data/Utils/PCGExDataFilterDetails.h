@@ -110,10 +110,8 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	{
 	}
 	
-#if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	bool bUsedForCleanup = false;
-#endif
 		
 	/** If enabled, will preserve the initial attribute default value. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, EditCondition="!bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
