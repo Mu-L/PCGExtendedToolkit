@@ -41,6 +41,8 @@ public:
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(MergePoints, "Merge Points", "Merge point collections, optionally grouping them using matching rules.");
 
+	virtual TArray<FText> GetNodeTitleAliases() const override;
+	
 	virtual FLinearColor GetNodeTitleColor() const override
 	{
 		return PCGEX_NODE_COLOR_NAME(Misc);

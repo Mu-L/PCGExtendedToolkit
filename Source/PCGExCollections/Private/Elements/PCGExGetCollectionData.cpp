@@ -128,6 +128,14 @@ EPCGDataType UPCGExGetCollectionDataSettings::GetCurrentPinTypes(const UPCGPin* 
 	return EPCGDataType::Param;
 }
 #else
+
+#if WITH_EDITOR
+TArray<FText> UPCGExGetCollectionDataSettings::GetNodeTitleAliases() const
+{
+	return {FTEXT("PCGEx | Asset Collection to Set"), FTEXT("PCGEx | Collection to Module Infos")};
+}
+#endif
+
 FPCGDataTypeIdentifier UPCGExGetCollectionDataSettings::GetCurrentPinTypesID(const UPCGPin* InPin) const
 {
 	// Input pins + the Annotated Sources output mirror their input shape (Any) -- fall through.

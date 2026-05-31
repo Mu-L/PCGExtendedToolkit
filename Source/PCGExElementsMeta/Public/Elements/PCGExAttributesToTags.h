@@ -48,6 +48,8 @@ public:
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(PromoteAttributes, "Promote Attributes", "Promote element values to tags or data domain");
 
+	virtual TArray<FText> GetNodeTitleAliases() const override;
+	
 	virtual EPCGSettingsType GetType() const override
 	{
 		return EPCGSettingsType::Metadata;

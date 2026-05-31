@@ -68,6 +68,8 @@ public:
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(GetCollectionData, "Get Collection Data", "Unified read of asset collection contents into an attribute set. Supports static asset selection, soft-path-driven inputs, and recursive grammar via upstream Collection Maps.");
 
+	virtual TArray<FText> GetNodeTitleAliases() const override;
+	
 	virtual EPCGSettingsType GetType() const override
 	{
 		return EPCGSettingsType::Param;
