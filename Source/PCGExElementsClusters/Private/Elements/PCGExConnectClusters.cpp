@@ -11,6 +11,7 @@
 #include "Data/PCGExPointIO.h"
 #include "Math/Geo/PCGExDelaunay.h"
 #include "Utils/PCGExPointIOMerger.h"
+#include "Graphs/PCGExGraphPatcher.h"
 
 #define LOCTEXT_NAMESPACE "PCGExConnectClusters"
 #define PCGEX_NAMESPACE ConnectClusters
@@ -131,14 +132,7 @@ bool FPCGExConnectClustersElement::AdvanceWork(FPCGExContext* InContext, const U
 
 	PCGEX_CLUSTER_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
-	for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Context->Batches)
-	{
-		const TSharedPtr<PCGExConnectClusters::FBatch> BridgeBatch = StaticCastSharedPtr<PCGExConnectClusters::FBatch>(Batch);
-		PCGExDataId PairId;
-		PCGExClusters::Helpers::SetClusterVtx(BridgeBatch->VtxDataFacade->Source, PairId);
-		PCGExClusters::Helpers::MarkClusterEdges(BridgeBatch->CompoundedEdgesDataFacade->Source, PairId);
-	}
-
+	// The patcher already paired each component's edges with the vtx during processing.
 	Context->OutputPointsAndEdges();
 
 	return Context->TryComplete();
@@ -173,37 +167,6 @@ namespace PCGExConnectClusters
 		InVtx->InitializeOutput(PCGExData::EIOInit::Duplicate);
 	}
 
-	void FBatch::Process()
-	{
-		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ConnectClusters)
-
-		const TSharedPtr<PCGExData::FPointIO> ConsolidatedEdges = Context->MainEdges->Emplace_GetRef(PCGExData::EIOInit::New);
-		CompoundedEdgesDataFacade = MakeShared<PCGExData::FFacade>(ConsolidatedEdges.ToSharedRef());
-
-
-		// Start merging right away
-		Merger = MakeShared<FPCGExPointIOMerger>(CompoundedEdgesDataFacade.ToSharedRef());
-		Merger->Append(Edges);
-		Merger->MergeAsync(TaskManager, &Context->CarryOverDetails);
-
-		TBatch<FProcessor>::Process();
-
-
-	}
-
-	void FBatch::StartProcessing()
-	{
-		// Aggregate per-processor edge tags into the compounded facade.
-		// MUST stay sequential — Tags->Append mutates a shared container that was unsafe
-		// in PrepareSingle once candidate construction was parallelized.
-		for (const TSharedRef<PCGExClusterMT::IProcessor>& P : Processors)
-		{
-			CompoundedEdgesDataFacade->Source->Tags->Append(P->EdgeDataFacade->Source->Tags.ToSharedRef());
-		}
-
-		TBatch<FProcessor>::StartProcessing();
-	}
-
 	void FBatch::CompleteWork()
 	{
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ConnectClusters)
@@ -220,24 +183,28 @@ namespace PCGExConnectClusters
 			return;
 		} // Skip work completion entirely
 
-		CompoundedEdgesDataFacade->WriteFastest(TaskManager); // Write base attributes value while finding bridges
+		// Register every valid cluster's edge group with the patcher (group index == ValidClusters index).
+		Patcher = MakeShared<PCGExGraphs::FGraphPatcher>(VtxDataFacade);
+		for (const TSharedPtr<PCGExClusters::FCluster>& Cl : ValidClusters)
+		{
+			TArray<int32> VtxIndices;
+			VtxIndices.Reserve(Cl->Nodes->Num());
+			for (const PCGExClusters::FNode& Node : *Cl->Nodes) { VtxIndices.Add(Node.PointIndex); }
+			Patcher->AddEdgeGroup(Cl->EdgesIO.Pin(), VtxIndices);
+		}
 
 		const int32 NumBounds = ValidClusters.Num();
 		EPCGExBridgeClusterMethod SafeMethod = Settings->BridgeMethod;
 
-		if (NumBounds <= 4)
+		// Too few sites for a triangulation: fall back to MostEdges. These are independent checks --
+		// folding them into an if/else-if chain on NumBounds shadows the 2D case (every <=3 is also <=4).
+		if (NumBounds <= 4 && SafeMethod == EPCGExBridgeClusterMethod::Delaunay3D)
 		{
-			if (SafeMethod == EPCGExBridgeClusterMethod::Delaunay3D)
-			{
-				SafeMethod = EPCGExBridgeClusterMethod::MostEdges;
-			}
+			SafeMethod = EPCGExBridgeClusterMethod::MostEdges;
 		}
-		else if (NumBounds <= 3)
+		if (NumBounds <= 3 && SafeMethod == EPCGExBridgeClusterMethod::Delaunay2D)
 		{
-			if (SafeMethod == EPCGExBridgeClusterMethod::Delaunay2D)
-			{
-				SafeMethod = EPCGExBridgeClusterMethod::MostEdges;
-			}
+			SafeMethod = EPCGExBridgeClusterMethod::MostEdges;
 		}
 
 		// First find which cluster are connected
@@ -297,34 +264,54 @@ namespace PCGExConnectClusters
 		}
 		else if (SafeMethod == EPCGExBridgeClusterMethod::LeastEdges)
 		{
-			TSet<int32> VisitedEdges;
-			for (int i = 0; i < NumBounds; i++)
+			// Minimum spanning tree (Prim's, O(NumBounds^2)) so the clusters are connected with the
+			// globally-shortest set of bridges. Weight = distance between cluster bounds centers.
+			if (NumBounds > 1)
 			{
-				VisitedEdges.Add(i); // As to not connect to self or already connected
-				double Distance = TNumericLimits<double>::Max();
-				int32 ClosestIndex = -1;
+				TArray<bool> InTree;
+				InTree.Init(false, NumBounds);
+				TArray<double> BestDist;
+				BestDist.Init(TNumericLimits<double>::Max(), NumBounds);
+				TArray<int32> BestFrom;
+				BestFrom.Init(-1, NumBounds);
 
-				for (int j = 0; j < NumBounds; j++)
+				// Seed the tree with cluster 0, then grow it one nearest cluster at a time.
+				InTree[0] = true;
+				for (int j = 1; j < NumBounds; j++)
 				{
-					if (i == j || VisitedEdges.Contains(j))
-					{
-						continue;
-					}
-
-					if (const double Dist = FVector::DistSquared(Bounds[i].GetCenter(), Bounds[j].GetCenter());
-						Dist < Distance)
-					{
-						ClosestIndex = j;
-						Distance = Dist;
-					}
+					BestDist[j] = FVector::DistSquared(Bounds[0].GetCenter(), Bounds[j].GetCenter());
+					BestFrom[j] = 0;
 				}
 
-				if (ClosestIndex == -1)
+				for (int Added = 1; Added < NumBounds; Added++)
 				{
-					continue;
-				}
+					int32 Next = -1;
+					double NextDist = TNumericLimits<double>::Max();
+					for (int j = 0; j < NumBounds; j++)
+					{
+						if (!InTree[j] && BestDist[j] < NextDist)
+						{
+							NextDist = BestDist[j];
+							Next = j;
+						}
+					}
+					if (Next == -1) { break; } // disconnected guard (shouldn't happen with finite distances)
 
-				Bridges.Add(PCGEx::H64(i, ClosestIndex));
+					InTree[Next] = true;
+					Bridges.Add(PCGEx::H64(BestFrom[Next], Next));
+
+					// Relax remaining clusters against the one just added.
+					for (int j = 0; j < NumBounds; j++)
+					{
+						if (InTree[j]) { continue; }
+						if (const double Dist = FVector::DistSquared(Bounds[Next].GetCenter(), Bounds[j].GetCenter());
+							Dist < BestDist[j])
+						{
+							BestDist[j] = Dist;
+							BestFrom[j] = Next;
+						}
+					}
+				}
 			}
 		}
 		else if (SafeMethod == EPCGExBridgeClusterMethod::MostEdges)
@@ -345,115 +332,109 @@ namespace PCGExConnectClusters
 		{
 			// Let cluster processor handle it.
 		}
+
+		// Resolve each connected cluster pair to its closest vtx pair and stage a bridge edge.
+		BridgesList = Bridges.Array();
+		BridgeEdgeHandles.Reset(BridgesList.Num());
+		BridgeEndpoints.Reset(BridgesList.Num());
+		for (const uint64 BridgeHash : BridgesList)
+		{
+			int32 VtxA = -1;
+			int32 VtxB = -1;
+			if (!FindClosestVtxPair(PCGEx::H64A(BridgeHash), PCGEx::H64B(BridgeHash), VtxA, VtxB)) { continue; }
+			BridgeEdgeHandles.Add(Patcher->AddEdge(VtxA, VtxB));
+			BridgeEndpoints.Add(PCGEx::H64(VtxA, VtxB));
+		}
+
+		// Components -> merged edge IOs (async; ready by Write). ConnectClusters links existing vtx
+		// directly, so there are no new vtx -- only edges.
+		Patcher->ResolveAndMergeAsync(Context->MainEdges.ToSharedRef(), TaskManager, &Context->CarryOverDetails);
 	}
 
 	void FBatch::Write()
 	{
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ConnectClusters)
 
-		BridgesList = Bridges.Array();
-		NewEdges.SetNum(Bridges.Num());
+		if (!Patcher) { return; }
 
-		const int32 NumBridges = Bridges.Num();
-		UPCGBasePointData* EdgeData = CompoundedEdgesDataFacade->Source->GetOut();
-		EdgeData->SetNumPoints(EdgeData->GetNumPoints() + Bridges.Num());
+		// Append + patch the staged bridge edges into their component edge collections.
+		Patcher->Commit();
 
-		TPCGValueRange<int64> MetadataEntries = EdgeData->GetMetadataEntryValueRange();
-		for (int i = 0; i < NumBridges; i++)
+		// Optional connector flags (node-specific; the patcher handles topology only).
+		if (!Settings->bFlagVtxConnector && !Settings->bFlagEdgeConnector) { return; }
+
+		FPCGMetadataAttribute<int32>* VtxConnectorFlagAttribute = Settings->bFlagVtxConnector
+			                                                          ? VtxDataFacade->GetOut()->MutableMetadata()->FindOrCreateAttribute<int32>(Settings->VtxConnectorFlagName, 0)
+			                                                          : nullptr;
+
+		TConstPCGValueRange<int64> VtxMetadataEntries = VtxDataFacade->GetOut()->GetConstMetadataEntryValueRange();
+
+		for (int32 i = 0; i < BridgeEdgeHandles.Num(); ++i)
 		{
-			const int32 EdgeIndex = EdgeData->GetNumPoints() - (NumBridges - i);
-			NewEdges[i] = EdgeIndex;
-			EdgeData->Metadata->InitializeOnSet(MetadataEntries[EdgeIndex]);
-		}
+			if (Settings->bFlagEdgeConnector)
+			{
+				TSharedPtr<PCGExData::FPointIO> EdgesIO;
+				int32 EdgePointIndex = -1;
+				if (Patcher->GetEdgeOutput(BridgeEdgeHandles[i], EdgesIO, EdgePointIndex) && EdgesIO)
+				{
+					FPCGMetadataAttribute<bool>* EdgeConnectorFlagAttribute = EdgesIO->GetOut()->MutableMetadata()->FindOrCreateAttribute<bool>(Settings->EdgeConnectorFlagName, false);
+					const TConstPCGValueRange<int64> EdgeMetadataEntries = EdgesIO->GetOut()->GetConstMetadataEntryValueRange();
+					EdgeConnectorFlagAttribute->SetValue(EdgeMetadataEntries[EdgePointIndex], true);
+				}
+			}
 
-		UPCGMetadata* EdgeMetadata = CompoundedEdgesDataFacade->GetOut()->MutableMetadata();
-		UPCGMetadata* VtxMetadata = VtxDataFacade->GetOut()->MutableMetadata();
-
-		EdgeEndpointsAtt = EdgeMetadata->GetMutableTypedAttribute<int64>(PCGExClusters::Labels::Attr_PCGExEdgeIdx);
-		OutVtxEndpointAtt = VtxMetadata->GetMutableTypedAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
-		InVtxEndpointAtt = VtxDataFacade->GetIn()->Metadata->GetMutableTypedAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
-
-		if (Settings->bFlagVtxConnector)
-		{
-			VtxConnectorFlagAttribute = VtxMetadata->FindOrCreateAttribute<int32>(Settings->VtxConnectorFlagName, 0);
-		}
-
-		if (Settings->bFlagEdgeConnector)
-		{
-			EdgeConnectorFlagAttribute = EdgeMetadata->FindOrCreateAttribute<bool>(Settings->EdgeConnectorFlagName, false);
-		}
-
-		int32 BridgeIndex = 0;
-		for (const int64 BridgeHash : BridgesList)
-		{
-			CreateBridge(NewEdges[BridgeIndex++], PCGEx::H64A(BridgeHash), PCGEx::H64B(BridgeHash));
+			if (VtxConnectorFlagAttribute)
+			{
+				const int64 VtxKeyA = VtxMetadataEntries[PCGEx::H64A(BridgeEndpoints[i])];
+				const int64 VtxKeyB = VtxMetadataEntries[PCGEx::H64B(BridgeEndpoints[i])];
+				VtxConnectorFlagAttribute->SetValue(VtxKeyA, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyA) + 1);
+				VtxConnectorFlagAttribute->SetValue(VtxKeyB, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyB) + 1);
+			}
 		}
 	}
 
 
-	void FBatch::CreateBridge(const int32 EdgeIndex, const int32 FromClusterIndex, const int32 ToClusterIndex)
+	bool FBatch::FindClosestVtxPair(const int32 FromClusterIndex, const int32 ToClusterIndex, int32& OutVtxA, int32& OutVtxB) const
 	{
 		const TSharedPtr<PCGExClusters::FCluster> ClusterA = ValidClusters[FromClusterIndex];
 		const TSharedPtr<PCGExClusters::FCluster> ClusterB = ValidClusters[ToClusterIndex];
 
-		int32 IndexA = -1;
-		int32 IndexB = -1;
-
+		OutVtxA = -1;
+		OutVtxB = -1;
 		double Distance = TNumericLimits<double>::Max();
 
 		const TArray<PCGExClusters::FNode>& NodesRefA = *ClusterA->Nodes;
 		const TArray<PCGExClusters::FNode>& NodesRefB = *ClusterB->Nodes;
 
-		//Brute force find closest points
-		for (const PCGExClusters::FNode& Node : NodesRefA)
+		auto Consider = [&](const PCGExClusters::FNode& NodeA, const FVector& PosA, const PCGExClusters::FNode& NodeB)
 		{
-			FVector NodePos = ClusterA->GetPos(Node);
-			const PCGExClusters::FNode& OtherNode = NodesRefB[ClusterB->FindClosestNode(NodePos)];
-
-			if (const double Dist = FVector::DistSquared(NodePos, ClusterB->GetPos(OtherNode));
+			if (const double Dist = FVector::DistSquared(PosA, ClusterB->GetPos(NodeB));
 				Dist < Distance)
 			{
-				IndexA = Node.PointIndex;
-				IndexB = OtherNode.PointIndex;
+				OutVtxA = NodeA.PointIndex;
+				OutVtxB = NodeB.PointIndex;
 				Distance = Dist;
+			}
+		};
+
+		for (const PCGExClusters::FNode& NodeA : NodesRefA)
+		{
+			const FVector PosA = ClusterA->GetPos(NodeA);
+
+			// FindClosestNode is a bounded octree query: it returns INDEX_NONE when PosA lies outside B's
+			// populated cells (clusters far apart). On a miss, brute-force B -- never index with INDEX_NONE.
+			const int32 ClosestBIdx = ClusterB->FindClosestNode(PosA);
+			if (NodesRefB.IsValidIndex(ClosestBIdx))
+			{
+				Consider(NodeA, PosA, NodesRefB[ClosestBIdx]);
+			}
+			else
+			{
+				for (const PCGExClusters::FNode& NodeB : NodesRefB) { Consider(NodeA, PosA, NodeB); }
 			}
 		}
 
-		TConstPCGValueRange<int64> VtxMetadataEntries = VtxDataFacade->GetOut()->GetConstMetadataEntryValueRange();
-		TConstPCGValueRange<FTransform> VtxTransforms = VtxDataFacade->GetOut()->GetConstTransformValueRange();
-
-		TPCGValueRange<int64> EdgeMetadataEntries = CompoundedEdgesDataFacade->GetOut()->GetMetadataEntryValueRange(false);
-		TPCGValueRange<FTransform> EdgeTransforms = CompoundedEdgesDataFacade->GetOut()->GetTransformValueRange(false);
-
-		const int64 EdgeKey = EdgeMetadataEntries[EdgeIndex];
-		const int64 VtxKeyA = VtxMetadataEntries[IndexA];
-		const int64 VtxKeyB = VtxMetadataEntries[IndexB];
-
-		EdgeTransforms[EdgeIndex].SetLocation(FMath::Lerp(VtxTransforms[IndexA].GetLocation(), VtxTransforms[IndexB].GetLocation(), 0.5));
-
-		uint32 StartIdx;
-		uint32 StartNumEdges;
-
-		uint32 EndIdx;
-		uint32 EndNumEdges;
-
-		PCGEx::H64(OutVtxEndpointAtt->GetValueFromItemKey(VtxKeyA), StartIdx, StartNumEdges);
-		PCGEx::H64(OutVtxEndpointAtt->GetValueFromItemKey(VtxKeyB), EndIdx, EndNumEdges);
-
-		EdgeEndpointsAtt->SetValue(EdgeKey, PCGEx::H64(StartIdx, EndIdx));
-		OutVtxEndpointAtt->SetValue(VtxKeyA, PCGEx::H64(StartIdx, StartNumEdges + 1));
-		OutVtxEndpointAtt->SetValue(VtxKeyB, PCGEx::H64(EndIdx, EndNumEdges + 1));
-
-		if (VtxConnectorFlagAttribute)
-		{
-			VtxConnectorFlagAttribute->SetValue(VtxKeyA, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyA) + 1);
-			VtxConnectorFlagAttribute->SetValue(VtxKeyB, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyB) + 1);
-		}
-
-		if (EdgeConnectorFlagAttribute)
-		{
-			EdgeConnectorFlagAttribute->SetValue(EdgeKey, true);
-		}
+		return OutVtxA >= 0 && OutVtxB >= 0;
 	}
 }
 

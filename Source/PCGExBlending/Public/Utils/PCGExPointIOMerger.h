@@ -14,6 +14,7 @@
 
 #include "UObject/Object.h"
 
+class FPCGExIntTracker;
 struct FPCGExCarryOverDetails;
 
 namespace PCGExMT
@@ -57,7 +58,7 @@ public:
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData, const PCGExMT::FScope ReadScope);
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData);
 	void Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& InData);
-	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr);
+	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr, const bool bWriteUnion = false);
 
 	bool WantsDataToElements() const
 	{
@@ -69,7 +70,11 @@ public:
 		return bInitDefault;
 	}
 
+	TSharedPtr<FPCGExIntTracker> InternalTracker;
+	
 protected:
+
+	bool bWriteFacade = false;
 	void CopyProperties(const int32 Index);
 	PCGExPointIOMerger::FMergeScope NullScope;
 	bool bDataDomainToElements = false;

@@ -163,6 +163,32 @@ namespace PCGExBlending
 			}
 		}
 
+		// A composite property and its sub-components can't both be written in one stack: the result
+		// would be order-dependent and couldn't carry per-component blend modes.
+		{
+			TSet<FName> OutputNames;
+			OutputNames.Reserve(CachedOperations.Num());
+			for (const FPCGExBlendOperation* Op : CachedOperations)
+			{
+				OutputNames.Add(UPCGExBlendOpFactory::GetOutputTargetName(Op->Config));
+			}
+
+			auto RejectConflict = [&](const FName Composite, const TArray<FName>& Components) -> bool
+			{
+				if (!OutputNames.Contains(Composite)) { return false; }
+				for (const FName& Component : Components)
+				{
+					if (!OutputNames.Contains(Component)) { continue; }
+					PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("Blend output '{0}' conflicts with its sub-component '{1}'. Blend either the composite or its components, not both."), FText::FromName(Composite), FText::FromName(Component)));
+					return true;
+				}
+				return false;
+			};
+
+			if (RejectConflict(FName(TEXT("$Transform")), {FName(TEXT("$Position")), FName(TEXT("$Rotation")), FName(TEXT("$Scale"))})) { return false; }
+			if (RejectConflict(FName(TEXT("$Extents")), {FName(TEXT("$BoundsMin")), FName(TEXT("$BoundsMax"))})) { return false; }
+		}
+
 		return true;
 	}
 

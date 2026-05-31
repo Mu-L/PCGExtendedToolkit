@@ -5,14 +5,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Misc/ScopeRWLock.h"
+
+#include <atomic>
 
 class PCGEXCORE_API FPCGExIntTracker final : public TSharedFromThis<FPCGExIntTracker>
 {
-	FRWLock Lock;
-	bool bTriggered = false;
-	int32 PendingCount = 0;
-	int32 CompletedCount = 0;
+	// Net in-flight work (pending minus completed); reaching exactly 0 fires the threshold.
+	// bTriggered is a one-shot latch so it fires at most once per Reset cycle.
+	std::atomic<int32> Outstanding{0};
+	std::atomic<bool> bTriggered{false};
 
 	TFunction<void()> StartFn = nullptr;
 	TFunction<void()> ThresholdFn = nullptr;

@@ -12,6 +12,11 @@
 
 class FPCGExPointIOMerger;
 
+namespace PCGExGraphs
+{
+	class FGraphPatcher;
+}
+
 UENUM()
 enum class EPCGExBridgeClusterMethod : uint8
 {
@@ -131,28 +136,21 @@ namespace PCGExConnectClusters
 
 	class FBatch final : public PCGExClusterMT::TBatch<FProcessor>
 	{
-	protected:
-		const FPCGMetadataAttribute<int64>* InVtxEndpointAtt = nullptr;
-
-		FPCGMetadataAttribute<int64>* EdgeEndpointsAtt = nullptr;
-		FPCGMetadataAttribute<int64>* OutVtxEndpointAtt = nullptr;
-
-		FPCGMetadataAttribute<int32>* VtxConnectorFlagAttribute = nullptr;
-		FPCGMetadataAttribute<bool>* EdgeConnectorFlagAttribute = nullptr;
-
 	public:
-		TSharedPtr<PCGExData::FFacade> CompoundedEdgesDataFacade;
-		TSharedPtr<FPCGExPointIOMerger> Merger;
-		TSet<uint64> Bridges;
+		// Connectivity-aware patcher: owns the per-component edge merging + endpoint patching.
+		TSharedPtr<PCGExGraphs::FGraphPatcher> Patcher;
+		TSet<uint64> Bridges;               // connected cluster-index pairs (from the bridge method)
 		TArray<uint64> BridgesList;
-		TArray<int32> NewEdges;
+		TArray<int32> BridgeEdgeHandles;    // patcher AddEdge handles (parallel to BridgeEndpoints)
+		TArray<uint64> BridgeEndpoints;     // H64(VtxA, VtxB) per staged bridge, for the optional connector flags
 
 		FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges);
 
-		virtual void Process() override;
-		virtual void StartProcessing() override;
 		virtual void CompleteWork() override;
 		virtual void Write() override;
-		void CreateBridge(int32 EdgeIndex, int32 FromClusterIndex, int32 ToClusterIndex);
+
+	protected:
+		// Brute-force closest vtx pair between two valid clusters. Returns false if none found.
+		bool FindClosestVtxPair(int32 FromClusterIndex, int32 ToClusterIndex, int32& OutVtxA, int32& OutVtxB) const;
 	};
 }

@@ -8,6 +8,7 @@
 #include "Data/PCGExDataTags.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
 #include "Details/PCGExBlendingDetails.h"
+#include "Utils/PCGExIntTracker.h"
 
 namespace PCGExPointIOMerger
 {
@@ -17,8 +18,18 @@ namespace PCGExPointIOMerger
 	public:
 		PCGEX_ASYNC_TASK_NAME(FWriteAttributeScopeTask)
 
-		FWriteAttributeScopeTask(const TSharedPtr<PCGExData::FPointIO>& InPointIO, const FMergeScope& InScope, const PCGExData::FAttributeIdentity& InIdentity, const TSharedPtr<PCGExData::TBuffer<T>>& InOutBuffer)
-			: FTask(), PointIO(InPointIO), Scope(InScope), Identity(InIdentity), OutBuffer(InOutBuffer)
+		FWriteAttributeScopeTask(
+			const TSharedPtr<PCGExData::FPointIO>& InPointIO,
+			const FMergeScope& InScope,
+			const PCGExData::FAttributeIdentity& InIdentity,
+			const TSharedPtr<PCGExData::TBuffer<T>>& InOutBuffer,
+			const TSharedPtr<FPCGExIntTracker>& InTracker)
+			: FTask()
+			  , PointIO(InPointIO)
+			  , Scope(InScope)
+			  , Identity(InIdentity)
+			  , OutBuffer(InOutBuffer)
+			  , Tracker(InTracker)
 		{
 		}
 
@@ -26,10 +37,12 @@ namespace PCGExPointIOMerger
 		const FMergeScope Scope;
 		const PCGExData::FAttributeIdentity Identity;
 		const TSharedPtr<PCGExData::TBuffer<T>> OutBuffer;
+		TSharedPtr<FPCGExIntTracker> Tracker;
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
 			ScopeMerge<T>(Scope, Identity, PointIO, OutBuffer);
+			Tracker->IncrementCompleted();
 		}
 	};
 
@@ -51,8 +64,14 @@ namespace PCGExPointIOMerger
 			const TSharedPtr<PCGExData::FPointIO>& InPointIO,
 			const FMergeScope& InScope,
 			const PCGExData::FAttributeIdentity& InIdentity,
-			const TSharedRef<PCGExData::FPropertyArrayBuffer>& InOutBuffer)
-			: FTask(), PointIO(InPointIO), Scope(InScope), Identity(InIdentity), OutBuffer(InOutBuffer)
+			const TSharedRef<PCGExData::FPropertyArrayBuffer>& InOutBuffer,
+			const TSharedPtr<FPCGExIntTracker>& InTracker)
+			: FTask()
+			  , PointIO(InPointIO)
+			  , Scope(InScope)
+			  , Identity(InIdentity)
+			  , OutBuffer(InOutBuffer)
+			  , Tracker(InTracker)
 		{
 		}
 
@@ -60,18 +79,22 @@ namespace PCGExPointIOMerger
 		const FMergeScope Scope;
 		const PCGExData::FAttributeIdentity Identity;
 		const TSharedRef<PCGExData::FPropertyArrayBuffer> OutBuffer;
+		TSharedPtr<FPCGExIntTracker> Tracker;
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(FWriteAttributePropertyScopeTask::ExecuteTask);
 			PCGExData::Helpers::PropertyCopyAttributeRange(PointIO, Identity, OutBuffer, Scope.Read, Scope.Write, Scope.bReverse);
+			Tracker->IncrementCompleted();
 		}
 	};
 
 	class FCopyAttributeTask final : public PCGExMT::FPCGExIndexedTask
 	{
 	public:
-		FCopyAttributeTask(const int32 InTaskIndex, const TSharedPtr<FPCGExPointIOMerger>& InMerger)
+		FCopyAttributeTask(
+			const int32 InTaskIndex,
+			const TSharedPtr<FPCGExPointIOMerger>& InMerger)
 			: FPCGExIndexedTask(InTaskIndex)
 			  , Merger(InMerger)
 		{
@@ -120,8 +143,11 @@ namespace PCGExPointIOMerger
 							continue;
 						} // Type mismatch
 
-						PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer)
+						Merger->InternalTracker->IncrementPending();
+						PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer, Merger->InternalTracker)
 					}
+
+					Merger->InternalTracker->IncrementCompleted();
 				},
 				[&]()
 				{
@@ -145,8 +171,8 @@ namespace PCGExPointIOMerger
 							           FText::FromName(Identity.Name)));
 						return;
 					}
-					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(RawBuffer);
 
+					const TSharedPtr<PCGExData::FPropertyArrayBuffer> PropBuffer = StaticCastSharedPtr<PCGExData::FPropertyArrayBuffer>(RawBuffer);
 					const TSharedRef<PCGExData::FPropertyArrayBuffer> PropBufferRef = PropBuffer.ToSharedRef();
 					for (int i = 0; i < Merger->IOSources.Num(); i++)
 					{
@@ -162,9 +188,12 @@ namespace PCGExPointIOMerger
 							continue;
 						}
 
-						PCGEX_LAUNCH_INTERNAL(FWriteAttributePropertyScopeTask, SourceIO, Merger->Scopes[i], Identity, PropBufferRef)
+						Merger->InternalTracker->IncrementPending();
+						PCGEX_LAUNCH_INTERNAL(FWriteAttributePropertyScopeTask, SourceIO, Merger->Scopes[i], Identity, PropBufferRef, Merger->InternalTracker)
 					}
 				});
+
+			Merger->InternalTracker->IncrementCompleted();
 		}
 	};
 }
@@ -239,10 +268,11 @@ void FPCGExPointIOMerger::Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& 
 	}
 }
 
-void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes)
+void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes, const bool bWriteUnion)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExPointIOMerger::MergeAsync);
 
+	bWriteFacade = bWriteUnion;
 	bDataDomainToElements = InCarryOverDetails->bDataDomainToElements;
 	bInitDefault = InCarryOverDetails->bPreserveAttributesDefaultValue;
 
@@ -328,14 +358,36 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 
 	if (bHasAttributes)
 	{
+		InternalTracker = MakeShared<FPCGExIntTracker>(
+			[PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
+			{
+				PCGEX_ASYNC_THIS
+				if (This->bWriteFacade)
+				{
+					This->UnionDataFacade->WriteFastest(TaskManager);
+				}
+			});
+
 		CopyProperties->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
 		{
 			PCGEX_ASYNC_THIS
+			This->InternalTracker->IncrementPending(This->UniqueIdentities.Num());
 			TaskManager->Launch(This->UniqueIdentities.Num(), [&](int32 i)
 			{
 				PCGEX_MAKE_SHARED(Task, PCGExPointIOMerger::FCopyAttributeTask, i, This);
 				return Task;
 			});
+		};
+	}
+	else
+	{
+		CopyProperties->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
+		{
+			PCGEX_ASYNC_THIS
+			if (This->bWriteFacade)
+			{
+				This->UnionDataFacade->WriteFastest(TaskManager);
+			}
 		};
 	}
 
