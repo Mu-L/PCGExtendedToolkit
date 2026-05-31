@@ -693,7 +693,7 @@ namespace PCGExMT
 				// being destroyed while this task runs. Without this, the context could be
 				// garbage-collected mid-execution if the PCG graph is torn down.
 				FPCGContext::FSharedContext<FPCGExContext> SharedContext(Manager->ContextHandle);
-				if (!SharedContext.Get())
+				if (!SharedContext.Get() || SharedContext.Get()->IsWorkCancelled())
 				{
 					PCGEX_CANCEL_TASK_INTERNAL
 				}
