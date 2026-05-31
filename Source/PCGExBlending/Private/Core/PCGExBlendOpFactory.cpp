@@ -241,6 +241,13 @@ bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 	}
 	else // Point property
 	{
+		// Derived properties ($LocalCenter, $LocalSize, $ScaledLocalSize) resolve to NAME_None: PCG
+		// can't write them, so reject them here.
+		if (UPCGExBlendOpFactory::GetOutputTargetName(Config).IsNone())
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("This point property is not a supported blend output (PCG does not allow writing it). Blend its underlying components instead (e.g. $BoundsMin/$BoundsMax, $Scale)."));
+			return false;
+		}
 		RealTypeC = PCGExMetaHelpers::GetPropertyType(Config.OutputTo.GetPointProperty());
 	}
 
@@ -459,6 +466,10 @@ FName UPCGExBlendOpFactory::GetOutputTargetName(const FPCGExAttributeBlendConfig
 #define PCGEX_MAP_PP(_NAME, ...) case EPCGPointProperties::_NAME: return FName(TEXT("$" #_NAME));
 		PCGEX_FOREACH_BLEND_POINTPROPERTY(PCGEX_MAP_PP)
 #undef PCGEX_MAP_PP
+		// Composite outputs (not part of the blend macro). $LocalCenter/$LocalSize/$ScaledLocalSize are
+		// intentionally absent -- PCG can't write them, so they fall through to NAME_None.
+		case EPCGPointProperties::Transform: return FName(TEXT("$Transform"));
+		case EPCGPointProperties::Extents: return FName(TEXT("$Extents"));
 		default:
 			return NAME_None;
 		}

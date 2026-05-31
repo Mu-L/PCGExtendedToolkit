@@ -62,7 +62,16 @@ namespace PCGExBlending
 			for (const FPCGExBlendOperation* Op : Blender->GetCachedOperations())
 			{
 				const FName Name = UPCGExBlendOpFactory::GetOutputTargetName(Op->Config);
-				if (!Name.IsNone() && !SharedIndexMap.Contains(Name))
+
+				// Every op must resolve to an output name to map into the shared tracker slots; an
+				// unnamed op would keep its local OpIdx and index the tracker out of bounds in Blend().
+				if (Name.IsNone())
+				{
+					PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("A blend operation has no resolvable output target and cannot participate in union blending."));
+					return false;
+				}
+
+				if (!SharedIndexMap.Contains(Name))
 				{
 					SharedIndexMap.Add(Name, NextIdx++);
 				}

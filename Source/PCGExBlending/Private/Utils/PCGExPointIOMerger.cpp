@@ -6,6 +6,7 @@
 
 #include "Data/PCGExDataTags.h"
 #include "Details/PCGExBlendingDetails.h"
+#include "Utils/PCGExIntTracker.h"
 
 namespace PCGExPointIOMerger
 {
@@ -15,12 +16,18 @@ namespace PCGExPointIOMerger
 	public:
 		PCGEX_ASYNC_TASK_NAME(FWriteAttributeScopeTask)
 
-		FWriteAttributeScopeTask(const TSharedPtr<PCGExData::FPointIO>& InPointIO, const FMergeScope& InScope, const FIdentityRef& InIdentity, const TSharedPtr<PCGExData::TBuffer<T>>& InOutBuffer)
+		FWriteAttributeScopeTask(
+			const TSharedPtr<PCGExData::FPointIO>& InPointIO,
+			const FMergeScope& InScope,
+			const FIdentityRef& InIdentity,
+			const TSharedPtr<PCGExData::TBuffer<T>>& InOutBuffer,
+			const TSharedPtr<FPCGExIntTracker>& InTracker)
 			: FTask()
 			  , PointIO(InPointIO)
 			  , Scope(InScope)
 			  , Identity(InIdentity)
 			  , OutBuffer(InOutBuffer)
+			  , Tracker(InTracker)
 		{
 		}
 
@@ -28,10 +35,12 @@ namespace PCGExPointIOMerger
 		const FMergeScope Scope;
 		const FIdentityRef Identity;
 		const TSharedPtr<PCGExData::TBuffer<T>> OutBuffer;
+		TSharedPtr<FPCGExIntTracker> Tracker;
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
 			ScopeMerge<T>(Scope, Identity, PointIO, OutBuffer);
+			Tracker->IncrementCompleted();
 		}
 	};
 
@@ -44,7 +53,9 @@ namespace PCGExPointIOMerger
 	class FCopyAttributeTask final : public PCGExMT::FPCGExIndexedTask
 	{
 	public:
-		FCopyAttributeTask(const int32 InTaskIndex, const TSharedPtr<FPCGExPointIOMerger>& InMerger)
+		FCopyAttributeTask(
+			const int32 InTaskIndex,
+			const TSharedPtr<FPCGExPointIOMerger>& InMerger)
 			: FPCGExIndexedTask(InTaskIndex)
 			  , Merger(InMerger)
 		{
@@ -81,9 +92,12 @@ namespace PCGExPointIOMerger
 						continue;
 					} // Type mismatch
 
-					PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer)
+					Merger->InternalTracker->IncrementPending();
+					PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer, Merger->InternalTracker)
 				}
 			});
+
+			Merger->InternalTracker->IncrementCompleted();
 		}
 	};
 }
@@ -178,10 +192,11 @@ void FPCGExPointIOMerger::Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& 
 	}
 }
 
-void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes)
+void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes, const bool bWriteUnion)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExPointIOMerger::MergeAsync);
 
+	bWriteFacade = bWriteUnion;
 	bDataDomainToElements = InCarryOverDetails->bDataDomainToElements;
 
 	InCarryOverDetails->Prune(&UnionDataFacade->Source.Get());
@@ -210,41 +225,43 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 
 		// Discover attributes
 		UPCGMetadata* Metadata = Source->GetIn()->Metadata;
-		PCGExData::FAttributeIdentity::ForEach(Metadata, [&](const PCGExData::FAttributeIdentity& SourceIdentity, const int32)
-		{
-			if (InIgnoredAttributes && InIgnoredAttributes->Contains(SourceIdentity.Identifier.Name))
+		PCGExData::FAttributeIdentity::ForEach(
+			Metadata,
+			[&](const PCGExData::FAttributeIdentity& SourceIdentity, const int32)
 			{
-				return;
-			}
+				if (InIgnoredAttributes && InIgnoredAttributes->Contains(SourceIdentity.Identifier.Name))
+				{
+					return;
+				}
 
-			FString StrName = SourceIdentity.Identifier.Name.ToString();
-			if (!InCarryOverDetails->Attributes.Test(StrName))
-			{
-				return;
-			}
+				FString StrName = SourceIdentity.Identifier.Name.ToString();
+				if (!InCarryOverDetails->Attributes.Test(StrName))
+				{
+					return;
+				}
 
-			const int32* ExpectedType = ExpectedTypes.Find(SourceIdentity.Identifier);
-			if (!ExpectedType)
-			{
-				// No type expectations, we need to register a new attribute ref
-				PCGExPointIOMerger::FIdentityRef& SourceRef = UniqueIdentities.Emplace_GetRef(SourceIdentity);
-				SourceRef.Attribute = Metadata->GetConstAttribute(SourceIdentity.Identifier);
-				SourceRef.bInitDefault = InCarryOverDetails->bPreserveAttributesDefaultValue;
+				const int32* ExpectedType = ExpectedTypes.Find(SourceIdentity.Identifier);
+				if (!ExpectedType)
+				{
+					// No type expectations, we need to register a new attribute ref
+					PCGExPointIOMerger::FIdentityRef& SourceRef = UniqueIdentities.Emplace_GetRef(SourceIdentity);
+					SourceRef.Attribute = Metadata->GetConstAttribute(SourceIdentity.Identifier);
+					SourceRef.bInitDefault = InCarryOverDetails->bPreserveAttributesDefaultValue;
 
-				SourceRef.ElementsIdentifier.Name = SourceIdentity.Identifier.Name;
-				SourceRef.ElementsIdentifier.MetadataDomain = PCGMetadataDomainID::Elements;
+					SourceRef.ElementsIdentifier.Name = SourceIdentity.Identifier.Name;
+					SourceRef.ElementsIdentifier.MetadataDomain = PCGMetadataDomainID::Elements;
 
-				ExpectedTypes.Add(SourceRef.Identifier, UniqueIdentities.Num() - 1);
+					ExpectedTypes.Add(SourceRef.Identifier, UniqueIdentities.Num() - 1);
 
-				return;
-			}
+					return;
+				}
 
-			// Notify type/name mismatch if needed
-			if (UniqueIdentities[*ExpectedType].UnderlyingType != SourceIdentity.UnderlyingType)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(FTEXT("Mismatching attribute types for: {0}."), FText::FromName(SourceIdentity.Identifier.Name)));
-			}
-		});
+				// Notify type/name mismatch if needed
+				if (UniqueIdentities[*ExpectedType].UnderlyingType != SourceIdentity.UnderlyingType)
+				{
+					PCGE_LOG_C(Warning, GraphAndLog, TaskManager->GetContext(), FText::Format(FTEXT("Mismatching attribute types for: {0}."), FText::FromName(SourceIdentity.Identifier.Name)));
+				}
+			});
 	}
 
 	InCarryOverDetails->Prune(&UnionDataFacade->Source.Get());
@@ -272,9 +289,20 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 
 	if (bHasAttributes)
 	{
+		InternalTracker = MakeShared<FPCGExIntTracker>(
+		[PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
+		{
+			PCGEX_ASYNC_THIS
+			if (This->bWriteFacade)
+			{
+				This->UnionDataFacade->WriteFastest(TaskManager);
+			}
+		});
+		
 		CopyProperties->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
 		{
 			PCGEX_ASYNC_THIS
+			This->InternalTracker->IncrementPending(This->UniqueIdentities.Num());
 			TaskManager->Launch(This->UniqueIdentities.Num(), [&](int32 i)
 			{
 				PCGEX_MAKE_SHARED(Task, PCGExPointIOMerger::FCopyAttributeTask, i, This);
@@ -282,7 +310,18 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 			});
 		};
 	}
-
+	else
+	{
+		CopyProperties->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
+		{
+			PCGEX_ASYNC_THIS
+			if (This->bWriteFacade)
+			{
+				This->UnionDataFacade->WriteFastest(TaskManager);
+			}
+		};
+	}
+	
 	CopyProperties->StartIterations(NumSources, 1);
 }
 
