@@ -14,9 +14,9 @@ class UPCGExPickerFactoryData;
 UENUM()
 enum class EPCGExAttributeToTagsAction : uint8
 {
-	AddTags   = 0 UMETA(DisplayName = "Hoist to Tags", ToolTip="Hoist element attribute value as data tags"),
-	Attribute = 1 UMETA(DisplayName = "Hoist to Attribute Set", ToolTip="Output to a new attribute set"),
-	Data      = 2 UMETA(DisplayName = "Hoist to @Data", ToolTip="Hoist element attribute values to @Data domain"),
+	AddTags   = 0 UMETA(DisplayName = "Promote to Tags", ToolTip="Promote element attribute value as data tags"),
+	Attribute = 1 UMETA(DisplayName = "Promote to Attribute Set", ToolTip="Output to a new attribute set"),
+	Data      = 2 UMETA(DisplayName = "Promote to @Data", ToolTip="Promote element attribute values to @Data domain"),
 };
 
 UENUM()
