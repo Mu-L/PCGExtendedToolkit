@@ -4,15 +4,30 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Templates/SubclassOf.h"
 
 class UPCGExAssetCollection;
 class UPackage;
+struct FAssetData;
 
 /** Utility functions for collection editing. Operate on any UPCGExAssetCollection. */
 namespace PCGExCollectionEditorUtils
 {
 	/** Add Content Browser selection to this collection. */
 	PCGEXCOLLECTIONSEDITOR_API void AddBrowserSelection(UPCGExAssetCollection* InCollection);
+
+	/**
+	 * Create a new collection of InCollectionClass from a content-browser selection, then add that
+	 * selection to it. When bOpenSaveDialog is true, the user picks the destination folder and name
+	 * through the Save Asset dialog; otherwise the asset is created next to the first selected asset
+	 * using InDefaultAssetName. Returns the target collection, or nullptr if the user cancelled the
+	 * dialog or creation failed.
+	 */
+	PCGEXCOLLECTIONSEDITOR_API UPCGExAssetCollection* CreateCollectionFromSelection(
+		TSubclassOf<UPCGExAssetCollection> InCollectionClass,
+		const FString& InDefaultAssetName,
+		const TArray<FAssetData>& InSelectedAssets,
+		bool bOpenSaveDialog = true);
 
 #pragma region Tools
 
