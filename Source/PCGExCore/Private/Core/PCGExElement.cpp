@@ -35,8 +35,10 @@ bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 		InContext->PauseContext();
 
 		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetWeakSelfHandle();
-		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
+		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings, PinTracker = InContext->GetAsyncPinTracker()]()
 		{
+			// Count this drive as holding a context pin, incremented before the pin below.
+			PCGExMT::FAsyncContextPinScope PinScope(PinTracker);
 			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);
 			if (FPCGExContext* Ctx = Pinned.Get())
 			{
@@ -242,8 +244,10 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 		InContext->PauseContext();
 
 		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetWeakSelfHandle();
-		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
+		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings, PinTracker = InContext->GetAsyncPinTracker()]()
 		{
+			// Count this drive as holding a context pin, incremented before the pin below.
+			PCGExMT::FAsyncContextPinScope PinScope(PinTracker);
 			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);
 			if (FPCGExContext* Ctx = Pinned.Get())
 			{
