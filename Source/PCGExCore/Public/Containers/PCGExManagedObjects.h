@@ -47,7 +47,7 @@ namespace PCGEx
 			return bIsFlushing.load(std::memory_order_acquire);
 		}
 
-		explicit FManagedObjects(FPCGContext* InContext, const TWeakPtr<FWorkHandle>& InWorkHandle);
+		explicit FManagedObjects(const TWeakPtr<FPCGContextHandle>& InContextHandle, const TWeakPtr<FWorkHandle>& InWorkHandle);
 
 		~FManagedObjects();
 

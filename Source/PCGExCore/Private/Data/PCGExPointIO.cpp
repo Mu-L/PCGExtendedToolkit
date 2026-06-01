@@ -782,7 +782,7 @@ for (int i = 0; i < ReducedNum; i++){Range[i] = Range[InIndices[i]];}}
 #pragma region FPointIOCollection
 
 	FPointIOCollection::FPointIOCollection(FPCGExContext* InContext, const bool bIsTransactional)
-		: ContextHandle(InContext->GetOrCreateHandle())
+		: ContextHandle(InContext->GetWeakSelfHandle())
 		  , bTransactional(bIsTransactional)
 	{
 	}

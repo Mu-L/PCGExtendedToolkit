@@ -107,7 +107,7 @@ bool FPCGExBoundsPathIntersectionElement::Boot(FPCGExContext* InContext) const
 			Context->Collections.Add(Collection);
 
 			CollectionBuildingTasks.Execute(
-				[CtxHandle = Context->GetOrCreateHandle(), Collection, Facade, BoundsSource = Settings->OutputSettings.BoundsSource]()
+				[CtxHandle = Context->GetWeakSelfHandle(), Collection, Facade, BoundsSource = Settings->OutputSettings.BoundsSource]()
 				{
 					PCGEX_SHARED_CONTEXT_VOID(CtxHandle);
 					Collection->BuildFrom(Facade->Source, BoundsSource);
@@ -130,7 +130,7 @@ bool FPCGExBoundsPathIntersectionElement::AdvanceWork(FPCGExContext* InContext, 
 	{
 		Context->SetState(PCGExCommon::States::State_FacadePreloading);
 
-		TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetOrCreateHandle();
+		TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetWeakSelfHandle();
 		Context->TargetsHandler->TargetsPreloader->OnCompleteCallback = [Settings, Context, WeakHandle]()
 		{
 			PCGEX_SHARED_CONTEXT_VOID(WeakHandle)
