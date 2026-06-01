@@ -1048,7 +1048,7 @@ bool FPCGExClipper2ProcessorElement::AdvanceWork(FPCGExContext* InContext, const
 		Context->SetState(PCGExCommon::States::State_Processing);
 		PCGEX_ASYNC_GROUP_CHKD_RET(Context->GetTaskManager(), WorkTasks, true)
 
-		TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetOrCreateHandle();
+		TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetWeakSelfHandle();
 
 		for (int32 i = 0; i < Context->ProcessingGroups.Num(); i++)
 		{

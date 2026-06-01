@@ -48,7 +48,7 @@ PCGExFactories::EPreparationResult UPCGExNumericCompareNearestFilterFactory::Pre
 	OperandA = MakeShared<TArray<TSharedPtr<PCGExData::TBuffer<double>>>>();
 	OperandA->Reserve(TargetsHandler->Num());
 
-	TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetOrCreateHandle();
+	TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetWeakSelfHandle();
 	TargetsHandler->TargetsPreloader->OnCompleteCallback = [this, WeakHandle]()
 	{
 		PCGEX_SHARED_CONTEXT_VOID(WeakHandle)

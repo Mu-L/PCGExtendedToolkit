@@ -288,7 +288,7 @@ namespace PCGExDynMeshToCluster
 			}
 
 			// Mark vtx/edges on compilation end
-			TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetOrCreateHandle();
+			TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetWeakSelfHandle();
 			GraphBuilder->OnCompilationEndCallback = [WeakHandle, TIndex = TaskIndex](const TSharedRef<PCGExGraphs::FGraphBuilder>& InBuilder, const bool bSuccess)
 			{
 				if (!bSuccess)

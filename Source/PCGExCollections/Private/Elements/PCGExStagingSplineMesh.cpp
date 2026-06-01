@@ -378,7 +378,7 @@ bool FPCGExPathSplineMeshElement::AdvanceWork(FPCGExContext* InContext, const UP
 
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		if (!StartBatches(InContext->GetOrCreateHandle()))
+		if (!StartBatches(InContext->GetWeakSelfHandle()))
 		{
 			return true;
 		}

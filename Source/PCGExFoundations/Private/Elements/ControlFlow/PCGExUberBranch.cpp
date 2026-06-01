@@ -125,7 +125,7 @@ bool FPCGExUberBranchElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 	{
 		PCGEX_ON_INITIAL_EXECUTION
 		{
-			TWeakPtr<FPCGContextHandle> Handle = Context->GetOrCreateHandle();
+			TWeakPtr<FPCGContextHandle> Handle = Context->GetWeakSelfHandle();
 
 			Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);
 			PCGEX_ASYNC_GROUP_CHKD_RET(Context->GetTaskManager(), BranchTask, true)

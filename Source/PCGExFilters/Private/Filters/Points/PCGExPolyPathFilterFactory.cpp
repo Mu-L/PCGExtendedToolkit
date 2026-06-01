@@ -60,7 +60,7 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 	Datas = MakeShared<TArray<FPCGExTaggedData>>();
 	Datas->Reserve(TempTargets.Num());
 
-	TWeakPtr<FPCGContextHandle> CtxHandle = InContext->GetOrCreateHandle();
+	TWeakPtr<FPCGContextHandle> CtxHandle = InContext->GetWeakSelfHandle();
 
 	InitConfig_Internal();
 
