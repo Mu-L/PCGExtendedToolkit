@@ -124,7 +124,7 @@ TSharedPtr<PCGExMT::FTaskManager> FPCGExContext::GetTaskManager()
 	{
 		FWriteScopeLock WriteLock(AsyncLock);
 		TaskManager = MakeShared<PCGExMT::FTaskManager>(this);
-		TaskManager->OnEndCallback = [CtxHandle = GetOrCreateHandle()](const bool bWasCancelled)
+		TaskManager->OnEndCallback = [CtxHandle = GetWeakSelfHandle()](const bool bWasCancelled)
 		{
 			if (bWasCancelled)
 			{
@@ -167,8 +167,14 @@ bool FPCGExContext::IsRuntimeGen() const
 
 FPCGExContext::FPCGExContext()
 {
+	// Create the PCG handle once, up front, so it is the single source of truth for this
+	// context's lifetime. Every other PCGEx site reads it via GetWeakSelfHandle() and never
+	// calls GetOrCreateHandle() again -- that guarantees the handle is never resurrected after
+	// FPCGContext::Release(). Must run before ManagedObjects (which captures the handle).
+	SelfHandle = GetOrCreateHandle();
+
 	WorkHandle = MakeShared<PCGEx::FWorkHandle>();
-	ManagedObjects = MakeShared<PCGEx::FManagedObjects>(this, WorkHandle);
+	ManagedObjects = MakeShared<PCGEx::FManagedObjects>(SelfHandle, WorkHandle);
 	UniqueNameGenerator = MakeShared<FPCGExUniqueNameGenerator>();
 	BufferProxyPool = MakeShared<PCGExData::IBufferProxyPool>();
 }
@@ -330,7 +336,7 @@ bool FPCGExContext::TryComplete(const bool bForce)
 
 void FPCGExContext::OnAsyncWorkEnd(const bool bWasCancelled)
 {
-	PCGEX_SHARED_CONTEXT_VOID(GetOrCreateHandle());
+	PCGEX_SHARED_CONTEXT_VOID(GetWeakSelfHandle());
 
 	if (bWasCancelled || IsWorkCancelled())
 	{
@@ -416,11 +422,11 @@ bool FPCGExContext::LoadAssets()
 
 	PCGExHelpers::Load(
 		GetTaskManager(),
-		[CtxHandle = GetOrCreateHandle()]() -> TArray<FSoftObjectPath>
+		[CtxHandle = GetWeakSelfHandle()]() -> TArray<FSoftObjectPath>
 		{
 			PCGEX_SHARED_CONTEXT_RET(CtxHandle, {})
 			return SharedContext.Get()->RequiredAssets->Array();
-		}, [CtxHandle = GetOrCreateHandle()](const bool bSuccess, TSharedPtr<FStreamableHandle> StreamableHandle)
+		}, [CtxHandle = GetWeakSelfHandle()](const bool bSuccess, TSharedPtr<FStreamableHandle> StreamableHandle)
 		{
 			PCGEX_SHARED_CONTEXT_VOID(CtxHandle)
 			SharedContext.Get()->TrackAssetsHandle(StreamableHandle);
@@ -546,7 +552,7 @@ bool FPCGExContext::CancelExecution(const FString& InReason)
 	bool bExpected = false;
 	if (bWorkCancelled.compare_exchange_strong(bExpected, true, std::memory_order_acq_rel))
 	{
-		FSharedContext<FPCGExContext> SharedContext(GetOrCreateHandle());
+		FSharedContext<FPCGExContext> SharedContext(GetWeakSelfHandle());
 
 		if (!bQuietCancellationError && !InReason.IsEmpty())
 		{

@@ -489,7 +489,7 @@ namespace PCGExMT
 	FTaskManager::FTaskManager(FPCGExContext* InContext)
 		: IAsyncHandleGroup(FName("MANAGER"))
 		  , Context(InContext)
-		  , ContextHandle(InContext->GetOrCreateHandle())
+		  , ContextHandle(InContext->GetWeakSelfHandle())
 	{
 		WorkHandle = Context->GetWorkHandle();
 	}

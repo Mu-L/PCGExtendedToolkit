@@ -105,7 +105,7 @@ bool FPCGExSampleVtxByIDElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	{
 		Context->SetState(PCGExCommon::States::State_FacadePreloading);
 
-		TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetOrCreateHandle();
+		TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetWeakSelfHandle();
 		Context->TargetsPreloader->OnCompleteCallback = [Settings, Context, WeakHandle]()
 		{
 			// TODO : Need to revisit this, it's likely way too slow

@@ -16,7 +16,7 @@
 
 void FPCGExCollisionDetails::Init(FPCGExContext* InContext)
 {
-	PCGExMT::ExecuteOnMainThreadAndWait([CtxHandle = InContext->GetOrCreateHandle(), this]
+	PCGExMT::ExecuteOnMainThreadAndWait([CtxHandle = InContext->GetWeakSelfHandle(), this]
 	{
 		PCGEX_SHARED_CONTEXT_VOID(CtxHandle);
 		World = SharedContext.Get()->GetWorld();

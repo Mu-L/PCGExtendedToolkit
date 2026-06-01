@@ -438,14 +438,14 @@ namespace PCGExData
 
 	static TSharedPtr<FPointIO> NewPointIO(FPCGExContext* InContext, FName InOutputPin = NAME_None, int32 Index = -1)
 	{
-		PCGEX_MAKE_SHARED(NewIO, FPointIO, InContext->GetOrCreateHandle())
+		PCGEX_MAKE_SHARED(NewIO, FPointIO, InContext->GetWeakSelfHandle())
 		NewIO->SetInfos(Index, InOutputPin);
 		return NewIO;
 	}
 
 	static TSharedPtr<FPointIO> NewPointIO(FPCGExContext* InContext, const UPCGBasePointData* InData, FName InOutputPin = NAME_None, int32 Index = -1)
 	{
-		PCGEX_MAKE_SHARED(NewIO, FPointIO, InContext->GetOrCreateHandle(), InData)
+		PCGEX_MAKE_SHARED(NewIO, FPointIO, InContext->GetWeakSelfHandle(), InData)
 		NewIO->SetInfos(Index, InOutputPin);
 		return NewIO;
 	}

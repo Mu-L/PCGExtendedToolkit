@@ -57,6 +57,13 @@ protected:
 
 	TSharedPtr<PCGEx::FWorkHandle> WorkHandle;
 	const IPCGExElement* ElementHandle = nullptr;
+
+	// This context's own PCG handle, captured once at construction. Self-pinning async work
+	// MUST use GetWeakSelfHandle(), never GetOrCreateHandle(): once FPCGContext::Release() nulls
+	// the handle, GetOrCreateHandle() would resurrect a second handle bound to the already-released
+	// context, tripping ~FPCGContext's ensure(!Handle) when an in-flight task drops the last pin.
+	TWeakPtr<FPCGContextHandle> SelfHandle;
+
 	int32 LoopIndex = INDEX_NONE;
 	int32 TopLoopIndex = INDEX_NONE;
 	
@@ -68,6 +75,11 @@ public:
 	{
 		return WorkHandle;
 	}
+
+	// Non-creating accessor for this context's PCG handle. Returns an invalid weak ptr once the
+	// context has been released -- the intended "context is gone, bail out" signal for the
+	// PCGEX_SHARED_CONTEXT* guards. Use this for all self-pinning; see SelfHandle.
+	const TWeakPtr<FPCGContextHandle>& GetWeakSelfHandle() const { return SelfHandle; }
 
 	TSharedPtr<PCGEx::FManagedObjects> ManagedObjects;
 

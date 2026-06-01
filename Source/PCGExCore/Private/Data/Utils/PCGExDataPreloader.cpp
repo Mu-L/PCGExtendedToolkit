@@ -223,7 +223,7 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 
 	bool FFacadePreloader::StartLoading(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<PCGExMT::IAsyncHandleGroup>& InParentHandle)
 	{
-		ContextHandle = TaskManager->GetContext()->GetOrCreateHandle();
+		ContextHandle = TaskManager->GetContext()->GetWeakSelfHandle();
 
 		TSharedPtr<FFacade> SourceFacade = GetDataFacade();
 		if (!SourceFacade)

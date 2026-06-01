@@ -34,7 +34,7 @@ bool IPCGExElement::PrepareDataInternal(FPCGContext* Context) const
 		InContext->bPreparationDispatchedOffThread = true;
 		InContext->PauseContext();
 
-		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetOrCreateHandle();
+		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetWeakSelfHandle();
 		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
 		{
 			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);
@@ -241,7 +241,7 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 		InContext->bExecutionDispatchedOffThread = true;
 		InContext->PauseContext();
 
-		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetOrCreateHandle();
+		TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetWeakSelfHandle();
 		UE::Tasks::Launch(UE_SOURCE_LOCATION, [this, WeakHandle, InSettings]()
 		{
 			FPCGContext::FSharedContext<FPCGExContext> Pinned(WeakHandle);

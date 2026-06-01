@@ -150,7 +150,7 @@ namespace PCGExSelfPruning
 			TSharedPtr<PCGExSorting::FSorter> Sorter = MakeShared<PCGExSorting::FSorter>(Context, PointDataFacade, PCGExSorting::GetSortingRules(Context, PCGExSorting::Labels::SourceSortingRules));
 			Sorter->SortDirection = Settings->SortDirection;
 
-			PCGEX_SHARED_CONTEXT(Context->GetOrCreateHandle())
+			PCGEX_SHARED_CONTEXT(Context->GetWeakSelfHandle())
 			if (Sorter->Init(Context))
 			{
 				if (TSharedPtr<PCGExSorting::FSortCache> Cache = Sorter->BuildCache(NumPoints))
