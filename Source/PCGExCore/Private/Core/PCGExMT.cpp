@@ -489,7 +489,7 @@ namespace PCGExMT
 	FTaskManager::FTaskManager(FPCGExContext* InContext)
 		: IAsyncHandleGroup(FName("MANAGER"))
 		  , Context(InContext)
-		  , ContextHandle(InContext->GetOrCreateHandle())
+		  , ContextHandle(InContext->GetWeakSelfHandle())
 	{
 		WorkHandle = Context->GetWorkHandle();
 	}
@@ -678,7 +678,7 @@ namespace PCGExMT
 			InTask->SetGroup(ThisPtr);
 		}
 
-		UE::Tasks::Launch(*InTask->DEBUG_HandleId(), [WeakManager = TWeakPtr<FTaskManager>(SharedThis(this)), Task = InTask]()
+		UE::Tasks::Launch(*InTask->DEBUG_HandleId(), [WeakManager = TWeakPtr<FTaskManager>(SharedThis(this)), Task = InTask, PinTracker = Context->GetAsyncPinTracker()]()
 		{
 #define PCGEX_CANCEL_TASK_INTERNAL Task->Cancel(); Task->Complete(); return;
 
@@ -687,6 +687,11 @@ namespace PCGExMT
 			{
 				PCGEX_CANCEL_TASK_INTERNAL
 			}
+
+			// Count this task as holding a context pin for the pinned region below. Incremented
+			// BEFORE the FSharedContext pin so the cancel finalizer can never observe a zero count
+			// while this task still holds -- or is about to take -- a pin. See FAsyncContextPinTracker.
+			FAsyncContextPinScope PinScope(PinTracker);
 
 			{
 				// FSharedContext pins the PCG context via its handle, preventing it from

@@ -531,7 +531,7 @@ namespace PCGExGetPropertiesData
 
 		if (const UPCGBasePointData* PointDataIn = Cast<UPCGBasePointData>(InData))
 		{
-			OutPointIO = MakeShared<PCGExData::FPointIO>(Context->GetOrCreateHandle(), PointDataIn);
+			OutPointIO = MakeShared<PCGExData::FPointIO>(Context->GetWeakSelfHandle(), PointDataIn);
 			if (!OutPointIO->InitializeOutput<UPCGBasePointData>(PCGExData::EIOInit::Duplicate))
 			{
 				OutPointIO.Reset();

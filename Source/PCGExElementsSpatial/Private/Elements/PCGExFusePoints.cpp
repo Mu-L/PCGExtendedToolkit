@@ -312,7 +312,7 @@ namespace PCGExFusePoints
 
 		const bool bUpdateCenter = Settings->BlendingDetails.PropertiesOverrides.bOverridePosition && Settings->BlendingDetails.PropertiesOverrides.PositionBlending == EPCGExBlendingType::None;
 
-		PCGEX_SHARED_CONTEXT_VOID(Context->GetOrCreateHandle())
+		PCGEX_SHARED_CONTEXT_VOID(Context->GetWeakSelfHandle())
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
