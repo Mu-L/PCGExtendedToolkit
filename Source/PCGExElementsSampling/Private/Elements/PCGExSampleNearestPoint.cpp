@@ -56,6 +56,12 @@ void UPCGExSampleNearestPointSettings::PCGExApplyDeprecationBeforeUpdatePins(UPC
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
+void UPCGExSampleNearestPointSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	InOutNode->RenameInputPin(PCGPinConstants::DefaultInputLabel, PCGExSampling::Labels::SourceSourceLabel);
+	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
 void UPCGExSampleNearestPointSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
@@ -67,6 +73,11 @@ void UPCGExSampleNearestPointSettings::ApplyDeprecation(UPCGNode* InOutNode)
 	Super::ApplyDeprecation(InOutNode);
 }
 #endif
+
+FName UPCGExSampleNearestPointSettings::GetMainInputPin() const
+{
+	return PCGExSampling::Labels::SourceSourceLabel;
+}
 
 TArray<FPCGPinProperties> UPCGExSampleNearestPointSettings::InputPinProperties() const
 {

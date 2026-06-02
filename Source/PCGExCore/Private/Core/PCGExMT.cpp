@@ -682,16 +682,16 @@ namespace PCGExMT
 		{
 #define PCGEX_CANCEL_TASK_INTERNAL Task->Cancel(); Task->Complete(); return;
 
+			// Count this task BEFORE the gate below and the FSharedContext pin: a task that may pin is
+			// always counted first, while one starting post-cancel bails at the gate unpinned. This is
+			// the ordering FAsyncContextPinScope documents; the cancel finalizer relies on it.
+			FAsyncContextPinScope PinScope(PinTracker);
+
 			const TSharedPtr<FTaskManager> Manager = WeakManager.Pin();
 			if (!Manager || !Manager->IsAvailable())
 			{
 				PCGEX_CANCEL_TASK_INTERNAL
 			}
-
-			// Count this task as holding a context pin for the pinned region below. Incremented
-			// BEFORE the FSharedContext pin so the cancel finalizer can never observe a zero count
-			// while this task still holds -- or is about to take -- a pin. See FAsyncContextPinTracker.
-			FAsyncContextPinScope PinScope(PinTracker);
 
 			{
 				// FSharedContext pins the PCG context via its handle, preventing it from

@@ -47,10 +47,9 @@ namespace PCGExMT
 	class FTaskGroup;
 	class FTaskManager;
 
-	// Counts async tasks currently holding a pin on the owning context. Deliberately lives in
-	// its own shared object (not on the context) so the count is reachable WITHOUT pinning the
-	// context: the cancel-time game-thread finalizer polls it to know when every worker has let
-	// go of the context, so the final delete can be done on the game thread instead of off-thread.
+	// Counts async tasks currently pinning the owning context. Lives in its own shared object (not on
+	// the context) so the cancel finalizer can poll it WITHOUT pinning the context, and thus learn
+	// when every worker has let go -- so the final delete can run on the game thread, not off-thread.
 	class PCGEXCORE_API FAsyncContextPinTracker : public TSharedFromThis<FAsyncContextPinTracker>
 	{
 		std::atomic<int32> PinCount{0};
@@ -61,10 +60,12 @@ namespace PCGExMT
 		int32 Num() const { return PinCount.load(std::memory_order_acquire); }
 	};
 
-	// RAII bracket for the context-pinned region of an async task body. MUST be constructed
-	// BEFORE the FSharedContext pin (and so destructed after it is released): that ordering is
-	// what guarantees a zero count provably means no task holds -- or is about to acquire -- a
-	// context pin, which is the invariant the cancel finalizer relies on.
+	// RAII bracket for the context-pinned region of an async task body. MUST be the task body's FIRST
+	// action -- before any cancellation gate and before the FSharedContext pin (so it destructs after
+	// that pin releases). That ordering lets a zero tracker count mean "no task holds or can still
+	// acquire a pin": a task that may pin is already counted, and one starting after a cancel
+	// increments then bails at its gate without pinning. Every independently-scheduled off-thread task
+	// that pins MUST use this; sub-tasks pinning under a synchronous join are covered by the parent.
 	struct FAsyncContextPinScope
 	{
 		TSharedPtr<FAsyncContextPinTracker> Tracker;
