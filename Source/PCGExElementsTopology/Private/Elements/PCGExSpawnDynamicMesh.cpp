@@ -6,7 +6,7 @@
 #include "PCGComponent.h"
 #include "PCGExTopology.h"
 #include "PCGPin.h"
-#include "Components/PCGExDynamicMeshComponent.h"
+#include "Components/DynamicMeshComponent.h"
 #include "Data/PCGDynamicMeshData.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 
@@ -71,7 +71,7 @@ bool FPCGExSpawnDynamicMeshElement::AdvanceWork(FPCGExContext* InContext, const 
 
 		const FString ComponentName = TEXT("PCGDynamicMeshComponent");
 		const EObjectFlags ObjectFlags = (bIsPreviewMode ? RF_Transient : RF_NoFlags);
-		UPCGExDynamicMeshComponent* DynamicMeshComponent = NewObject<UPCGExDynamicMeshComponent>(TargetActor, MakeUniqueObjectName(TargetActor, UPCGExDynamicMeshComponent::StaticClass(), FName(ComponentName)), ObjectFlags);
+		UDynamicMeshComponent* DynamicMeshComponent = NewObject<UDynamicMeshComponent>(TargetActor, MakeUniqueObjectName(TargetActor, UDynamicMeshComponent::StaticClass(), FName(ComponentName)), ObjectFlags);
 
 		if (!DynamicMeshComponent)
 		{

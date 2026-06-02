@@ -14,6 +14,7 @@
 #include "Details/PCGExSettingsDetails.h"
 #include "Graphs/PCGExGraph.h"
 #include "Math/PCGExMathDistances.h"
+#include "Sampling/PCGExSamplingCommon.h"
 #include "Sampling/PCGExSamplingUnionData.h"
 
 #define LOCTEXT_NAMESPACE "PCGExSampleVtxByIDElement"
