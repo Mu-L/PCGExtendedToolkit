@@ -77,6 +77,7 @@ using EPCGExApplySampledComponentFlagsBitmask = TEnumAsByte<EPCGExApplySampledCo
 
 namespace PCGExSampling::Labels
 {
+	const FName SourceSourceLabel = TEXT("Sources");
 	const FName SourceIgnoreActorsLabel = TEXT("InIgnoreActors");
 	const FName SourceActorReferencesLabel = TEXT("ActorReferences");
 	const FName OutputSampledActorsLabel = TEXT("OutSampledActors");
