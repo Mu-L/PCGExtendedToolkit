@@ -5,8 +5,6 @@
 
 #include "CoreMinimal.h"
 #include "Factories/PCGExFactories.h"
-
-
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExFilterDetails.h"

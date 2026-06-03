@@ -4,7 +4,6 @@
 
 #include "Elements/Filtering/PCGExUberFilter.h"
 
-
 #include "PCGExPickersCommon.h"
 #include "PCGExVersion.h"
 #include "Containers/PCGExScopedContainers.h"
