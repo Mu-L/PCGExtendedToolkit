@@ -116,6 +116,13 @@ bool PCGExPointFilter::FNearestFilter::Init(FPCGExContext* InContext, const TSha
 	}
 	DistanceScale = Cfg.DistanceScale;
 
+	// Constant Max Distance -> resolve the scalar once and skip the per-point virtual Read.
+	bConstantMaxDistance = MaxDistance->IsConstant();
+	if (bConstantMaxDistance) { ConstantMaxDistance = MaxDistance->Read(0) * DistanceScale; }
+
+	// Only bounds-based source distance modes need the query box padded by the source extents.
+	bInflateQueryBounds = Cfg.DistanceDetails.Source != EPCGExDistance::Center;
+
 	if (Cfg.bIgnoreSelf)
 	{
 		IgnoreList.Add(InPointDataFacade->GetIn());
@@ -183,9 +190,9 @@ PCGExData::FConstPoint PCGExPointFilter::FNearestFilter::FindNearestInRange(cons
 	double BestDist = TNumericLimits<double>::Max();
 	if (bBounded)
 	{
-		// Inflate the AABB by the source's spatialized reach (bounds-based modes offset the measured center
-		// up to GetScaledExtents().Length()); the metric trim below still rejects out-of-range hits.
-		const double QueryExtent = MaxDist + SourcePt.GetScaledExtents().Length();
+		// Bounds-based source modes offset the measured center up to GetScaledExtents().Length(), so pad the
+		// query box by that reach (Center mode needs none); the metric trim below still rejects out-of-range hits.
+		const double QueryExtent = bInflateQueryBounds ? MaxDist + SourcePt.GetScaledExtents().Length() : MaxDist;
 		const FBoxCenterAndExtent QueryBounds(SourcePt.GetLocation(), FVector(QueryExtent));
 		TargetsHandler->FindClosestTarget(SourcePt, QueryBounds, TargetPt, BestDist, ExcludePtr);
 	}
