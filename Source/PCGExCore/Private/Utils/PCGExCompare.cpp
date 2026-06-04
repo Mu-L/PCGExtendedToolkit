@@ -132,6 +132,20 @@ namespace PCGExCompare
 		}
 	}
 
+	bool Compare(const EPCGExStringComparison Method, const FName& A, const FName& B)
+	{
+		switch (Method)
+		{
+		case EPCGExStringComparison::StrictlyEqual:
+			return A == B;
+		case EPCGExStringComparison::StrictlyNotEqual:
+			return A != B;
+		default:
+			// Non-equality comparisons need string content -- defer to the FString overload.
+			return Compare(Method, A.ToString(), B.ToString());
+		}
+	}
+
 	bool Compare(const EPCGExStringMatchMode Method, const FString& A, const FString& B)
 	{
 		switch (Method)

@@ -115,6 +115,24 @@ namespace PCGExCompare
 	PCGEXCORE_API
 	bool Compare(const EPCGExStringComparison Method, const FString& A, const FString& B);
 
+	/**
+	 * True for the equality string comparisons (StrictlyEqual / StrictlyNotEqual), which can be evaluated
+	 * directly on FName (cheaper than Stricmp). Matches FString case-insensitive equality for typical
+	 * values, but NOT for pathological inputs: FName truncates beyond NAME_SIZE, and FName("None")/("")
+	 * both fold to NAME_None. Used to decide whether to read operands as FName instead of FString.
+	 */
+	FORCEINLINE static bool IsStringEqualityComparison(const EPCGExStringComparison Method)
+	{
+		return Method == EPCGExStringComparison::StrictlyEqual || Method == EPCGExStringComparison::StrictlyNotEqual;
+	}
+
+	/**
+	 * FName comparison overload. Equality is evaluated on the FName (fast path); any other comparison
+	 * falls back to the FString overload via ToString(). Gate with IsStringEqualityComparison().
+	 */
+	PCGEXCORE_API
+	bool Compare(const EPCGExStringComparison Method, const FName& A, const FName& B);
+
 	PCGEXCORE_API
 	bool Compare(const EPCGExStringMatchMode Method, const FString& A, const FString& B);
 
