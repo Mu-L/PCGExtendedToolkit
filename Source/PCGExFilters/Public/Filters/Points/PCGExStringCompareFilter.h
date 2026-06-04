@@ -85,8 +85,18 @@ namespace PCGExPointFilter
 
 		const TObjectPtr<const UPCGExStringCompareFilterFactory> TypedFilterFactory;
 
+		// When the comparison is an equality check, operands are read as FName instead of
+		// FString (cheaper; matches FString equality for typical values -- see
+		// IsStringEqualityComparison for canonicalization caveats). Resolved once in Init from
+		// Config.Comparison. Only one of the FString / FName operand pairs is ever populated.
+		bool bUseNameComparison = false;
+
 		TSharedPtr<PCGExData::TAttributeBroadcaster<FString>> OperandA;
 		TSharedPtr<PCGExData::TAttributeBroadcaster<FString>> OperandB;
+
+		TSharedPtr<PCGExData::TAttributeBroadcaster<FName>> OperandAName;
+		TSharedPtr<PCGExData::TAttributeBroadcaster<FName>> OperandBName;
+		FName OperandBConstantName = NAME_None;
 
 		virtual bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade) override;
 

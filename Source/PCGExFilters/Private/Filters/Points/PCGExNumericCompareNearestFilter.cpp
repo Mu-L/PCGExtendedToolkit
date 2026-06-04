@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Filters/Points/PCGExNumericCompareNearestFilter.h"
@@ -7,7 +7,6 @@
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
-#include "Helpers/PCGExDataMatcher.h"
 #include "PCGExMatching/Public/Helpers/PCGExMatchingHelpers.h"
 #include "PCGExMatching/Public/Helpers/PCGExTargetsHandler.h"
 
@@ -15,60 +14,35 @@
 #define LOCTEXT_NAMESPACE "PCGExCompareFilterDefinition"
 #define PCGEX_NAMESPACE CompareFilterDefinition
 
-PCGEX_SETTING_VALUE_IMPL(FPCGExNumericCompareNearestFilterConfig, OperandB, double, CompareAgainst, OperandB, OperandBConstant)
-
 bool UPCGExNumericCompareNearestFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext))
-	{
-		return false;
-	}
-	if (Config.DataMatching.IsEnabled())
-	{
-		PCGExFactories::GetInputFactories(InContext, PCGExMatching::Labels::SourceMatchRulesLabel, MatchRuleFactories, {PCGExFactories::EType::MatchRule});
-	}
-	return true;
+	NearestConfig = &Config;
+	return Super::Init(InContext);
 }
 
-PCGExFactories::EPreparationResult UPCGExNumericCompareNearestFilterFactory::Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
+void UPCGExNumericCompareNearestFilterFactory::RegisterTargetDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
-	TargetsHandler = MakeShared<PCGExMatching::FTargetsHandler>();
-	if (!TargetsHandler->Init(InContext, PCGExCommon::Labels::SourceTargetsLabel))
-	{
-		return PCGExFactories::EPreparationResult::MissingData;
-	}
+	FacadePreloader.Register<double>(InContext, Config.OperandA);
+}
 
-	TargetsHandler->SetDistances(Config.DistanceDetails);
-	TargetsHandler->SetMatchingDetails(InContext, &Config.DataMatching);
-	TargetsHandler->ForEachPreloader([&](PCGExData::FFacadePreloader& Preloader)
-	{
-		Preloader.Register<double>(InContext, Config.OperandA);
-	});
-
+bool UPCGExNumericCompareNearestFilterFactory::BuildTargetCaches(FPCGExContext* InContext)
+{
 	OperandA = MakeShared<TArray<TSharedPtr<PCGExData::TBuffer<double>>>>();
 	OperandA->Reserve(TargetsHandler->Num());
 
-	TWeakPtr<FPCGContextHandle> WeakHandle = InContext->GetWeakSelfHandle();
-	TargetsHandler->TargetsPreloader->OnCompleteCallback = [this, WeakHandle]()
+	const bool bError = TargetsHandler->ForEachTarget([&](const TSharedRef<PCGExData::FFacade>& Target, const int32 TargetIndex, bool& bBreak)
 	{
-		PCGEX_SHARED_CONTEXT_VOID(WeakHandle)
-		const bool bError = TargetsHandler->ForEachTarget([&](const TSharedRef<PCGExData::FFacade>& Target, const int32 TargetIndex, bool& bBreak)
+		// Always add (even on failure) to keep index alignment with TargetPt.IO.
+		TSharedPtr<PCGExData::TBuffer<double>> LocalOperandA = Target->GetBroadcaster<double>(Config.OperandA, true);
+		OperandA->Add(LocalOperandA);
+		if (!LocalOperandA)
 		{
-			// Prep weights
-			TSharedPtr<PCGExData::TBuffer<double>> LocalOperandA = Target->GetBroadcaster<double>(Config.OperandA, true);
-			OperandA->Add(LocalOperandA);
-			if (!LocalOperandA)
-			{
-				bBreak = true;
-				PCGEX_LOG_INVALID_SELECTOR_C(SharedContext.Get(), Operand A, Config.OperandA)
-			}
-		});
+			bBreak = true;
+			PCGEX_LOG_INVALID_SELECTOR_C(InContext, Operand A, Config.OperandA)
+		}
+	});
 
-		PrepResult = bError ? PCGExFactories::EPreparationResult::Fail : PCGExFactories::EPreparationResult::Success;
-	};
-
-	TargetsHandler->StartLoading(TaskManager);
-	return Super::Prepare(InContext, TaskManager);
+	return !bError;
 }
 
 TSharedPtr<PCGExPointFilter::IFilter> UPCGExNumericCompareNearestFilterFactory::CreateFilter() const
@@ -79,10 +53,7 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExNumericCompareNearestFilterFactory::
 void UPCGExNumericCompareNearestFilterFactory::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
-	{
-		FacadePreloader.Register<double>(InContext, Config.OperandB);
-	}
+	Config.OperandBValue.RegisterBufferDependencies(InContext, FacadePreloader);
 }
 
 bool UPCGExNumericCompareNearestFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
@@ -93,63 +64,38 @@ bool UPCGExNumericCompareNearestFilterFactory::RegisterConsumableAttributesWithD
 	}
 
 	FName Consumable = NAME_None;
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.CompareAgainst == EPCGExInputValueType::Attribute, Config.OperandB, Consumable)
+	PCGEX_CONSUMABLE_CONDITIONAL(Config.OperandBValue.Input == EPCGExInputValueType::Attribute, Config.OperandBValue.Attribute, Consumable)
 
 	return true;
 }
 
-void UPCGExNumericCompareNearestFilterFactory::BeginDestroy()
+#if WITH_EDITOR
+void UPCGExNumericCompareNearestFilterProviderSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	TargetsHandler.Reset();
-	Super::BeginDestroy();
+	PCGEX_IF_VERSION_LOWER(1, 75, 20)
+	{
+		// Rewire the old Operand B override pins onto the new shorthand pins (ApplyDeprecation only migrates the inline value).
+		PCGEX_SHORTHAND_RENAME_PIN(OperandB, OperandBConstant, OperandBValue)
+	}
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-bool PCGExPointFilter::FNumericCompareNearestFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
+void UPCGExNumericCompareNearestFilterProviderSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
-	if (!IFilter::Init(InContext, InPointDataFacade))
+	PCGEX_IF_VERSION_LOWER(1, 75, 20)
 	{
-		return false;
+		Config.OperandBValue.Update(Config.CompareAgainst_DEPRECATED, Config.OperandB_DEPRECATED, Config.OperandBConstant_DEPRECATED);
 	}
+	Super::ApplyDeprecation(InOutNode);
+}
+#endif
 
-	if (!TargetsHandler || TargetsHandler->IsEmpty())
-	{
-		return false;
-	}
-
-	OperandB = TypedFilterFactory->Config.GetValueSettingOperandB(PCGEX_QUIET_HANDLING);
+bool PCGExPointFilter::FNumericCompareNearestFilter::InitNearest(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
+{
+	OperandB = TypedFilterFactory->Config.OperandBValue.GetValueSetting(PCGEX_QUIET_HANDLING);
 	if (!OperandB->Init(PointDataFacade, false))
 	{
 		return false;
-	}
-
-	if (TypedFilterFactory->Config.bIgnoreSelf)
-	{
-		IgnoreList.Add(InPointDataFacade->GetIn());
-	}
-
-	const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
-		&& !TypedFilterFactory->MatchRuleFactories.IsEmpty();
-
-	if (bMatchingEnabled)
-	{
-		// Always per-point (no bCheckAgainstDataBounds -- this filter doesn't support collection eval)
-		InverseMatcher = MakeShared<PCGExMatching::FDataMatcher>();
-		InverseMatcher->SetDetails(&TypedFilterFactory->Config.DataMatching);
-
-		TArray<TSharedPtr<PCGExData::FFacade>> SingleSource;
-		SingleSource.Add(InPointDataFacade);
-		if (InverseMatcher->Init(TypedFilterFactory->MatchRuleFactories, SingleSource, false))
-		{
-			TargetsHandler->ForEachTarget([&](const TSharedRef<PCGExData::FFacade>& Target, const int32 TargetIndex)
-			{
-				TargetCandidates.Add(Target->Source->GetTaggedData(PCGExData::EIOSide::In, TargetIndex));
-			});
-			bNoMatchResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
-		}
-		else
-		{
-			InverseMatcher.Reset();
-		}
 	}
 
 	return true;
@@ -157,38 +103,32 @@ bool PCGExPointFilter::FNumericCompareNearestFilter::Init(FPCGExContext* InConte
 
 bool PCGExPointFilter::FNumericCompareNearestFilter::Test(const int32 PointIndex) const
 {
-	if (bMatchingFailed)
+	TSet<const UPCGData*> Scratch;
+	bool bShortCircuit = false;
+	bool bShortCircuitResult = false;
+	const TSet<const UPCGData*>* ExcludePtr = ResolveExclude(PointIndex, Scratch, bShortCircuit, bShortCircuitResult);
+	if (bShortCircuit)
 	{
-		return bCollectionTestResult;
-	}
-
-	const TSet<const UPCGData*>* ExcludePtr = &IgnoreList;
-	TSet<const UPCGData*> PerPointExclude;
-
-	if (InverseMatcher)
-	{
-		PerPointExclude = IgnoreList;
-		if (!InverseMatcher->BuildPerPointExclude(PointDataFacade->Source->GetInPoint(PointIndex), TargetCandidates, PerPointExclude))
-		{
-			return bNoMatchResult;
-		}
-		ExcludePtr = &PerPointExclude;
+		return bShortCircuitResult;
 	}
 
 	const double B = OperandB->Read(PointIndex);
 	const PCGExData::FConstPoint SourcePt = PointDataFacade->GetInPoint(PointIndex);
-	PCGExData::FConstPoint TargetPt = PCGExData::FConstPoint();
 
-	double BestDist = TNumericLimits<double>::Max();
-	TargetsHandler->FindClosestTarget(SourcePt, TargetPt, BestDist, ExcludePtr);
-
+	const PCGExData::FConstPoint TargetPt = FindNearestInRange(SourcePt, GetMaxDistance(PointIndex), ExcludePtr);
 	if (!TargetPt.IsValid())
 	{
 		return false;
 	}
 
-	// Read OperandA from the closest target's pre-cached buffer: index into per-target-dataset array via TargetPt.IO, then read the point value at TargetPt.Index.
-	return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, (OperandA->GetData() + TargetPt.IO)->Get()->Read(TargetPt.Index), B, TypedFilterFactory->Config.Tolerance);
+	// OperandA: closest target's cached buffer via TargetPt.IO.
+	const PCGExData::TBuffer<double>* Buffer = (OperandA->GetData() + TargetPt.IO)->Get();
+	if (!Buffer)
+	{
+		return bNoMatchResult;
+	}
+
+	return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, Buffer->Read(TargetPt.Index), B, TypedFilterFactory->Config.Tolerance);
 }
 
 TArray<FPCGPinProperties> UPCGExNumericCompareNearestFilterProviderSettings::InputPinProperties() const
@@ -206,13 +146,13 @@ FString UPCGExNumericCompareNearestFilterProviderSettings::GetDisplayName() cons
 {
 	FString DisplayName = PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandA) + PCGExCompare::ToString(Config.Comparison);
 
-	if (Config.CompareAgainst == EPCGExInputValueType::Attribute)
+	if (Config.OperandBValue.Input == EPCGExInputValueType::Attribute)
 	{
-		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandB);
+		DisplayName += PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandBValue.Attribute);
 	}
 	else
 	{
-		DisplayName += FString::Printf(TEXT("%.3f"), (static_cast<int32>(1000 * Config.OperandBConstant) / 1000.0));
+		DisplayName += FString::Printf(TEXT("%.3f"), (static_cast<int32>(1000 * Config.OperandBValue.Constant) / 1000.0));
 	}
 
 	return DisplayName;
