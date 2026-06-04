@@ -131,6 +131,13 @@ namespace PCGExPointFilter
 		TSharedPtr<PCGExDetails::TSettingValue<double>> MaxDistance;
 		double DistanceScale = 1;
 
+		// Resolved once in Init: when MaxDistance is constant, GetMaxDistance returns the precomputed scalar
+		// instead of a per-point virtual Read. bInflateQueryBounds is set only for bounds-based source modes
+		// (Center needs no query-box padding).
+		double ConstantMaxDistance = 0;
+		bool bConstantMaxDistance = false;
+		bool bInflateQueryBounds = false;
+
 		virtual bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade) override;
 
 	protected:
@@ -143,7 +150,7 @@ namespace PCGExPointFilter
 		// Effective per-point search radius (<= 0 means unbounded).
 		FORCEINLINE double GetMaxDistance(const int32 PointIndex) const
 		{
-			return MaxDistance->Read(PointIndex) * DistanceScale;
+			return bConstantMaxDistance ? ConstantMaxDistance : MaxDistance->Read(PointIndex) * DistanceScale;
 		}
 
 		// Returns the per-point exclude set, or nullptr when the point short-circuits (then return

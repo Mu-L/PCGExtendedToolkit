@@ -111,9 +111,8 @@ bool PCGExPointFilter::FNearestPointCheckFilter::Test(const int32 PointIndex) co
 		}
 
 		const double MaxDistSquared = MaxDist * MaxDist;
-		// Inflate the AABB by the source's spatialized reach so bounds-based modes don't cull in-range
-		// targets; the GetDistSquared > MaxDistSquared trim below stays metric-correct.
-		const double QueryExtent = MaxDist + SourcePt.GetScaledExtents().Length();
+		// Pad the box for bounds-based source modes (Center needs none); the GetDistSquared trim stays exact.
+		const double QueryExtent = bInflateQueryBounds ? MaxDist + SourcePt.GetScaledExtents().Length() : MaxDist;
 		const FBoxCenterAndExtent QueryBounds(SourcePt.GetLocation(), FVector(QueryExtent));
 
 		TArray<TArray<int8>>& Cache = *TargetResultCache;
