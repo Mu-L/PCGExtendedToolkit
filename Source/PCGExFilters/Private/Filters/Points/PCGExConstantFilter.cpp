@@ -44,12 +44,28 @@ bool PCGExPointFilter::FConstantFilter::Test(const PCGExData::FProxyPoint& Point
 	return ConstantValue;
 }
 
+#if WITH_EDITOR
+TArray<FPCGPreConfiguredSettingsInfo> UPCGExConstantFilterProviderSettings::GetPreconfiguredInfo() const
+{
+	TArray<FPCGPreConfiguredSettingsInfo> Infos;
+	Infos.Emplace(0, FTEXT("Always fail"));
+	Infos.Emplace(1, FTEXT("Always pass"));
+	return Infos;
+}
+#endif
+
+void UPCGExConstantFilterProviderSettings::ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo)
+{
+	Super::ApplyPreconfiguredSettings(PreconfigureInfo);
+	Config.Value = PreconfigureInfo.PreconfiguredIndex == 1;
+}
+
 PCGEX_CREATE_FILTER_FACTORY(Constant)
 
 #if WITH_EDITOR
 FString UPCGExConstantFilterProviderSettings::GetDisplayName() const
 {
-	return Config.Value ? TEXT("Pass") : TEXT("Fail");
+	return Config.Value ? TEXT("Always pass") : TEXT("Always fail");
 }
 #endif
 

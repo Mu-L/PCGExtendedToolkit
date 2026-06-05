@@ -73,9 +73,18 @@ struct PCGEXFOUNDATIONS_API FPCGExRemapDetails
 
 	PCGExFloatLUT RemapLUT = nullptr;
 
+	// Resolved input remap target range, cached by Init(): [0,1] by default, or the
+	// curve's control-point x-range when bRemapToCurveRange is set.
+	double RemapRangeMin = 0;
+	double RemapRangeMax = 1;
+
 	/** Settings for how the curve is sampled (resolution, caching). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
 	FPCGExCurveLookupDetails RemapCurveLookup;
+
+	/** If enabled, the input is remapped into the curve's control-point x-range (min/max of the curve keys on the x-axis) instead of the normalized [0,1] range, so the full curve domain is sampled. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
+	bool bRemapToCurveRange = false;
 
 	/** Whether and how to truncate output value. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))

@@ -38,10 +38,14 @@ PCGEX_REGISTER_PIN_ICON(IN_##_NAME)
 
 #define PCGEX_START_PCG_REGISTRATION FPCGDataTypeRegistry& PCGDataTypeRegistry = FPCGModule::GetMutableDataTypeRegistry();
 
+// The icon lambda is stored in the global FPCGDataTypeRegistry and invoked LATER (on pin draw),
+// so it MUST capture InStyle BY VALUE (a TSharedPtr copy that keeps the style set alive). Capturing
+// by reference dangles whenever the caller's style pointer is a stack local -- e.g. addon modules in
+// a downstream plugin that register via IPCGExAddonModuleInterface::SelfRegisterToEditor().
 #define PCGEX_REGISTER_DATA_TYPE_INTERNAL(_MODULE, _NAME) \
 PCGEX_REGISTER_PIN_ICON_BASE(_NAME) \
 PCGDataTypeRegistry.RegisterPinIconsFunction(FPCGExDataTypeInfo##_NAME::AsId(),\
-	[&](const FPCGDataTypeIdentifier& InId, const FPCGPinProperties& InProperties, const bool bIsInput) -> TTuple<const FSlateBrush*, const FSlateBrush*>\
+	[InStyle](const FPCGDataTypeIdentifier& InId, const FPCGPinProperties& InProperties, const bool bIsInput) -> TTuple<const FSlateBrush*, const FSlateBrush*>\
 	{ \
 		if(bIsInput){ return {InStyle->GetBrush(FName("PCGEx.Pin.IN_"#_NAME)), InStyle->GetBrush(FName("PCGEx.Pin.IN_"#_NAME))};} \
 		else{ return {InStyle->GetBrush(FName("PCGEx.Pin.OUT_"#_NAME)), InStyle->GetBrush(FName("PCGEx.Pin.OUT_"#_NAME))};} \

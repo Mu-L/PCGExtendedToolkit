@@ -45,6 +45,35 @@ bool PCGExPointFilter::FStringCompareFilter::Init(FPCGExContext* InContext, cons
 		return false;
 	}
 
+	// Equality comparisons read operands as FName (cheaper; see IsStringEqualityComparison for caveats).
+	bUseNameComparison = PCGExCompare::IsStringEqualityComparison(TypedFilterFactory->Config.Comparison);
+
+	if (bUseNameComparison)
+	{
+		OperandAName = MakeShared<PCGExData::TAttributeBroadcaster<FName>>();
+		if (!OperandAName->Prepare(TypedFilterFactory->Config.OperandA, PointDataFacade->Source))
+		{
+			PCGEX_LOG_INVALID_ATTR_HANDLED_C(InContext, Operand A, TypedFilterFactory->Config.OperandA)
+			return false;
+		}
+
+		if (TypedFilterFactory->Config.CompareAgainst == EPCGExInputValueType::Attribute)
+		{
+			OperandBName = MakeShared<PCGExData::TAttributeBroadcaster<FName>>();
+			if (!OperandBName->Prepare(TypedFilterFactory->Config.OperandB, PointDataFacade->Source))
+			{
+				PCGEX_LOG_INVALID_ATTR_HANDLED_C(InContext, Operand B, TypedFilterFactory->Config.OperandB)
+				return false;
+			}
+		}
+		else
+		{
+			OperandBConstantName = FName(TypedFilterFactory->Config.OperandBConstant);
+		}
+
+		return true;
+	}
+
 	OperandA = MakeShared<PCGExData::TAttributeBroadcaster<FString>>();
 	if (!OperandA->Prepare(TypedFilterFactory->Config.OperandA, PointDataFacade->Source))
 	{
@@ -68,6 +97,15 @@ bool PCGExPointFilter::FStringCompareFilter::Init(FPCGExContext* InContext, cons
 bool PCGExPointFilter::FStringCompareFilter::Test(const int32 PointIndex) const
 {
 	const PCGExData::FConstPoint Point = PointDataFacade->Source->GetInPoint(PointIndex);
+
+	if (bUseNameComparison)
+	{
+		const FName A = OperandAName->FetchSingle(Point, NAME_None);
+		const FName B = TypedFilterFactory->Config.CompareAgainst == EPCGExInputValueType::Attribute ? OperandBName->FetchSingle(Point, NAME_None) : OperandBConstantName;
+		// Equality is symmetric, so bSwapOperands is a no-op here.
+		return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, A, B);
+	}
+
 	const FString A = OperandA->FetchSingle(Point, TEXT(""));
 	const FString B = TypedFilterFactory->Config.CompareAgainst == EPCGExInputValueType::Attribute ? OperandB->FetchSingle(Point, TEXT("")) : TypedFilterFactory->Config.OperandBConstant;
 	return TypedFilterFactory->Config.bSwapOperands ? PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, B, A) : PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, A, B);
@@ -86,6 +124,12 @@ bool PCGExPointFilter::FStringCompareFilter::Test(const TSharedPtr<PCGExData::FP
 	if (!PCGExData::Helpers::TryGetSettingDataValue(IO, TypedFilterFactory->Config.CompareAgainst, TypedFilterFactory->Config.OperandB, TypedFilterFactory->Config.OperandBConstant, B, PCGEX_QUIET_HANDLING))
 	{
 		PCGEX_QUIET_HANDLING_RET
+	}
+
+	// Mirror the per-point path: equality uses FName so both domains agree (see Test(int32)).
+	if (PCGExCompare::IsStringEqualityComparison(TypedFilterFactory->Config.Comparison))
+	{
+		return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, FName(A), FName(B));
 	}
 
 	return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, A, B);
