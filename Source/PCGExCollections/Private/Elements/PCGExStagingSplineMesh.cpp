@@ -157,7 +157,7 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 
 	if (!Settings->bUseStagedPoints)
 	{
-		if (Settings->SelectorMode == EPCGExSelectorMode::External)
+		if (Settings->SelectorMode != EPCGExSelectorMode::Legacy)
 		{
 			TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
 			if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))

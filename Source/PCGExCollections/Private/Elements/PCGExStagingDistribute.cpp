@@ -165,7 +165,7 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 		PCGEX_VALIDATE_NAME(Settings->EntryTypeAttributeName)
 	}
 
-	if (Settings->SelectorMode == EPCGExSelectorMode::External)
+	if (Settings->SelectorMode != EPCGExSelectorMode::Legacy)
 	{
 		TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
 		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {PCGExFactories::EType::Selector}))
