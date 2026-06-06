@@ -11,6 +11,7 @@
 #include "Data/PCGExTaggedData.h"
 #include "Details/PCGExDistancesDetails.h"
 #include "Details/PCGExInputShorthandsDetails.h"
+#include "Details/PCGExSettingsDetails.h"
 #include "PCGExMatching/Public/Core/PCGExMatchRuleFactoryProvider.h"
 #include "UObject/Object.h"
 

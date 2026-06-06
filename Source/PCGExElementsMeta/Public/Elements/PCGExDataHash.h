@@ -55,6 +55,11 @@ public:
 	{
 		return PCGEX_NODE_COLOR_NAME(Constant);
 	}
+	
+	virtual bool ShouldDrawNodeCompact() const override
+	{
+		return true;
+	}
 
 	FString GetEnumDisplayName() const;
 #endif
