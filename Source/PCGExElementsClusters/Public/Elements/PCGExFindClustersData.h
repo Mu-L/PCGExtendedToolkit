@@ -39,6 +39,13 @@ public:
 	{
 		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
 	}
+	
+	virtual bool ShouldDrawNodeCompact() const override
+	{
+		return true;
+	}
+	
+	virtual bool GetCompactNodeIcon(FName& OutCompactNodeIcon) const override;
 #endif
 
 protected:

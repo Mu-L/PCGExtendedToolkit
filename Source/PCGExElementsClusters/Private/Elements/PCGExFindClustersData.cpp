@@ -10,6 +10,14 @@
 #define LOCTEXT_NAMESPACE "PCGExFindClustersDataElement"
 #define PCGEX_NAMESPACE BuildCustomGraph
 
+#if WITH_EDITOR
+bool UPCGExFindClustersDataSettings::GetCompactNodeIcon(FName& OutCompactNodeIcon) const
+{
+	OutCompactNodeIcon = PCGNodeConstants::Icons::CompactNodeConvert;
+	return true;
+}
+#endif
+
 TArray<FPCGPinProperties> UPCGExFindClustersDataSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
