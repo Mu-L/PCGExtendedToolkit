@@ -27,18 +27,22 @@ public:
 	{
 		return EPCGSettingsType::Filter;
 	}
+
+	virtual bool ShouldDrawNodeCompact() const override
+	{
+		return bDrawAsCompactNode;
+	}
 #endif
 
 protected:
-	
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
-	
+
 	virtual bool HasDynamicPins() const override
 	{
 		return true;
 	}
-	
+
 	virtual bool SupportsDataStealing() const override
 	{
 		return true;
@@ -54,6 +58,10 @@ public:
 	/** List of attributes to delete. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
 	FPCGExCarryOverDetails Filters = FPCGExCarryOverDetails(true);
+
+	/** Whether to draw this node as a compact node */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
+	bool bDrawAsCompactNode = true;
 };
 
 struct FPCGExMetaCleanupContext final : FPCGExContext

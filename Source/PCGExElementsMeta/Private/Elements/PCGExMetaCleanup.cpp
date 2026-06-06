@@ -76,7 +76,7 @@ bool FPCGExMetaCleanupElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 
 		TArray<FPCGAttributeIdentifier> Identifiers;
 		Identifiers.Reserve(12);
-		
+
 		switch (Settings->GetMainDataInitializationPolicy())
 		{
 		case PCGExData::EIOInit::NoInit:
