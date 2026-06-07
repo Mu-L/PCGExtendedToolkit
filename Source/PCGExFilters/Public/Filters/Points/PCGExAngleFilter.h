@@ -120,7 +120,7 @@ class UPCGExAngleFilterProviderSettings : public UPCGExFilterProviderSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS(AngleFilterFactory, "Filter : Angle", "Creates a filter definition that compares dot value of the direction of a point toward its previous and next points.")
+	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(AngleFilterFactory, "Filter : Angle", "Creates a filter definition that compares dot value of the direction of a point toward its previous and next points.", PCGEX_FACTORY_NAME_PRIORITY)
 #endif
 	//~End UPCGSettings
 
