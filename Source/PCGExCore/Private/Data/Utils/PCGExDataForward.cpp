@@ -252,4 +252,38 @@ namespace PCGExData
 			});
 		}
 	}
+
+	void FDataForwardHandler::Forward(const int32 SourceIndex, UPCGMetadata* InTargetMetadata, const int64 TargetKey)
+	{
+		if (Identities.IsEmpty())
+		{
+			return;
+		}
+
+		const UPCGBasePointData* InSourceData = SourceDataFacade->GetIn();
+
+		for (const FAttributeIdentity& Identity : Identities)
+		{
+			PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
+			{
+				using T = decltype(DummyValue);
+
+				const FPCGMetadataAttribute<T>* SourceAtt = PCGExMetaHelpers::TryGetConstAttribute<T>(InSourceData, Identity.Identifier);
+				if (!SourceAtt)
+				{
+					return;
+				}
+
+				const T ForwardValue = Identity.InDataDomain() ? Helpers::ReadDataValue(SourceAtt) : SourceAtt->GetValueFromItemKey(InSourceData->GetMetadataEntry(SourceIndex));
+
+				// Land the forwarded value on a single target entry, on the element (per-row) domain.
+				const FPCGAttributeIdentifier TargetIdentifier(Identity.Identifier.Name);
+				FPCGMetadataAttribute<T>* TargetAtt = InTargetMetadata->FindOrCreateAttribute<T>(TargetIdentifier, T{}, SourceAtt->AllowsInterpolation());
+				if (TargetAtt)
+				{
+					TargetAtt->SetValue(TargetKey, ForwardValue);
+				}
+			});
+		}
+	}
 }

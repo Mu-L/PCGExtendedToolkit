@@ -3,9 +3,8 @@
 
 #include "Elements/PCGExClipper2Volume.h"
 
-#include "Algo/Reverse.h"
 #include "Clipper2Lib/clipper.h"
-#include "Clipper2Lib/clipper.triangulation.h"
+#include "Core/PCGExClipper2Decomposition.h"
 
 #include "Components/BrushComponent.h"
 #include "Engine/Polys.h"
@@ -18,13 +17,18 @@
 #include "PCGElement.h"
 #include "Helpers/PCGHelpers.h"
 #include "PCGManagedResource.h"
+#include "PCGParamData.h"
+#include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttributeTpl.h"
 
 #include "Core/PCGExMT.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/Utils/PCGExDataForward.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Engine/World.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "Math/PCGExProjectionDetails.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2VolumeElement"
@@ -37,116 +41,15 @@ struct FPCGExVolumeSpec
 	TArray<FPoly> BrushPolys;
 	FTransform ActorTransform = FTransform::Identity;
 	int32 GroupIndex = 0;
+	int32 SourceFacadeIndex = INDEX_NONE; // AllOpData index of the group's representative path (for @Data forwarding).
 };
 
 // File-local helpers in a named namespace (Unity-build safe -- see project build notes).
+// The shared projection -> triangulation -> Hertel-Mehlhorn decomposition now lives in
+// PCGExClipper2Decomposition (consumed by both Volume and Decompose); only the volume-specific
+// prism tessellation remains here.
 namespace PCGExClipper2Volume
 {
-	// 2D footprint vertex in projection space, plus per-vertex extrusion height and base (normal) Z.
-	struct FFootprintVertex
-	{
-		FVector2D Pos = FVector2D::ZeroVector;
-		double Height = 0;
-		double BaseZ = 0;
-		bool bHasSource = false;
-	};
-
-	FORCEINLINE double Cross2D(const FVector2D& O, const FVector2D& A, const FVector2D& B)
-	{
-		return (A.X - O.X) * (B.Y - O.Y) - (A.Y - O.Y) * (B.X - O.X);
-	}
-
-	double SignedArea(const TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
-	{
-		double Area = 0;
-		const int32 N = Loop.Num();
-		for (int32 i = 0; i < N; i++)
-		{
-			const FVector2D& A = Pool[Loop[i]].Pos;
-			const FVector2D& B = Pool[Loop[(i + 1) % N]].Pos;
-			Area += A.X * B.Y - B.X * A.Y;
-		}
-		return 0.5 * Area;
-	}
-
-	// Reorder a vertex-index loop to CCW (positive signed area) in projection X/Y.
-	void EnsureCCW(TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
-	{
-		if (SignedArea(Loop, Pool) < 0) { Algo::Reverse(Loop); }
-	}
-
-	// True if the loop is convex assuming CCW winding (reflex vertices -> false). Near-collinear is allowed.
-	bool IsConvexCCW(const TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
-	{
-		const int32 N = Loop.Num();
-		if (N < 3) { return false; }
-		for (int32 i = 0; i < N; i++)
-		{
-			const FVector2D& O = Pool[Loop[i]].Pos;
-			const FVector2D& A = Pool[Loop[(i + 1) % N]].Pos;
-			const FVector2D& B = Pool[Loop[(i + 2) % N]].Pos;
-			if (Cross2D(O, A, B) < -UE_KINDA_SMALL_NUMBER) { return false; }
-		}
-		return true;
-	}
-
-	// If A and B (both CCW loops) share an edge (u->v in A, v->u in B), merge along it.
-	// Returns true and fills OutMerged only when the merged polygon is convex.
-	bool TryMergeConvex(const TArray<int32>& A, const TArray<int32>& B, const TArray<FFootprintVertex>& Pool, TArray<int32>& OutMerged)
-	{
-		const int32 NA = A.Num();
-		const int32 NB = B.Num();
-
-		for (int32 ia = 0; ia < NA; ia++)
-		{
-			const int32 U = A[ia];
-			const int32 V = A[(ia + 1) % NA];
-
-			for (int32 ib = 0; ib < NB; ib++)
-			{
-				if (B[ib] != V || B[(ib + 1) % NB] != U) { continue; }
-
-				// Shared edge found (unique between two simple polygons). Build the merged loop:
-				// walk A from V around to U, then B's interior from after U to before V.
-				TArray<int32> Merged;
-				Merged.Reserve(NA + NB - 2);
-				for (int32 k = 0; k < NA; k++) { Merged.Add(A[(ia + 1 + k) % NA]); } // V ... U
-				for (int32 k = 0; k < NB - 2; k++) { Merged.Add(B[(ib + 2 + k) % NB]); } // interior of B
-
-				if (Merged.Num() >= 3 && IsConvexCCW(Merged, Pool))
-				{
-					OutMerged = MoveTemp(Merged);
-					return true;
-				}
-				return false; // single shared edge, not convex -> cannot merge these two
-			}
-		}
-		return false;
-	}
-
-	// Greedy Hertel-Mehlhorn-style convex merge of a triangulation into fewer convex pieces.
-	void MergeIntoConvexPieces(TArray<TArray<int32>>& Pieces, const TArray<FFootprintVertex>& Pool)
-	{
-		bool bMerged = true;
-		while (bMerged && Pieces.Num() > 1)
-		{
-			bMerged = false;
-			for (int32 i = 0; i < Pieces.Num() && !bMerged; i++)
-			{
-				for (int32 j = i + 1; j < Pieces.Num() && !bMerged; j++)
-				{
-					TArray<int32> Result;
-					if (TryMergeConvex(Pieces[i], Pieces[j], Pool, Result))
-					{
-						Pieces[i] = MoveTemp(Result);
-						Pieces.RemoveAt(j);
-						bMerged = true;
-					}
-				}
-			}
-		}
-	}
-
 	// Build the 6+ side/cap polys of a vertical prism (local space) for editor wireframe + bounds.
 	void AddPrismPolys(const TArray<FVector>& Bottoms, const TArray<FVector>& Tops, TArray<FPoly>& OutPolys)
 	{
@@ -195,6 +98,10 @@ UPCGExClipper2VolumeSettings::UPCGExClipper2VolumeSettings(const FObjectInitiali
 	// One volume per input path by default (more intuitive than the base's Consolidate, which would
 	// merge every input path into a single volume). Users can switch to Merged in the node settings.
 	MainInputGroupingPolicy = EPCGExGroupingPolicy::Split;
+
+	// Geometry node: hide the inherited path-output-only parameters (blending, carry-over, open-path
+	// output, simplify/arc-tolerance) that don't apply when the output is volumes rather than paths.
+	bExposePathOutputProperties = false;
 }
 
 FPCGExGeo2DProjectionDetails UPCGExClipper2VolumeSettings::GetProjectionDetails() const
@@ -204,8 +111,11 @@ FPCGExGeo2DProjectionDetails UPCGExClipper2VolumeSettings::GetProjectionDetails(
 
 TArray<FPCGPinProperties> UPCGExClipper2VolumeSettings::OutputPinProperties() const
 {
-	// This node produces actors via managed resources, not PCG data -- no output pins.
-	return TArray<FPCGPinProperties>();
+	// The volumes themselves are spawned actors (managed resources); this pin exposes a soft-object-path
+	// reference to each so downstream graphs can address them.
+	TArray<FPCGPinProperties> PinProperties;
+	PCGEX_PIN_PARAM(FName("Actor References"), TEXT("Attribute set with one soft-object-path entry per spawned volume actor."), Normal)
+	return PinProperties;
 }
 
 PCGEX_INITIALIZE_ELEMENT(Clipper2Volume)
@@ -245,6 +155,16 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 	{
 		return A->GroupIndex < B->GroupIndex;
 	});
+
+	// Build the actor-reference attribute set up front so each spawned volume fills one row.
+	const FName AttrName = Settings->ActorReferenceAttributeName.IsNone() ? FName("ActorReference") : Settings->ActorReferenceAttributeName;
+	UPCGParamData* RefData = NewObject<UPCGParamData>();
+	UPCGMetadata* RefMetadata = RefData->Metadata;
+	FPCGMetadataAttribute<FSoftObjectPath>* RefAttribute = RefMetadata->FindOrCreateAttribute<FSoftObjectPath>(
+		PCGExMetaHelpers::GetAttributeIdentifier(AttrName, RefData), FSoftObjectPath(), false, true);
+
+	// Force-forward every @Data-domain attribute from the source path onto its actor's row.
+	const FPCGExForwardDetails ForwardDetails(true);
 
 	for (const TSharedPtr<FPCGExVolumeSpec>& Spec : StagedVolumes)
 	{
@@ -301,127 +221,87 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		}
 
 		PCGExCollections::FinalizeSpawnedActor(Volume, ManagedActors, bTransientSpawn);
+
+		// One attribute-set row per spawned volume: the actor reference, plus the source path's
+		// @Data-domain attributes forwarded onto that row.
+		const int64 Key = RefMetadata->AddEntry();
+		if (RefAttribute) { RefAttribute->SetValue(Key, FSoftObjectPath(Volume)); }
+
+		if (AllOpData && AllOpData->Facades.IsValidIndex(Spec->SourceFacadeIndex))
+		{
+			if (const TSharedPtr<PCGExData::FDataForwardHandler> Handler = ForwardDetails.TryGetHandler(AllOpData->Facades[Spec->SourceFacadeIndex], false))
+			{
+				Handler->ValidateIdentities([](const PCGExData::FAttributeIdentity& Identity) { return Identity.InDataDomain(); });
+				Handler->Forward(0, RefMetadata, Key);
+			}
+		}
 	}
+
+	FPCGTaggedData& OutRef = OutputData.TaggedData.Emplace_GetRef();
+	OutRef.Pin = FName("Actor References");
+	OutRef.Data = RefData;
 }
 
 void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProcessingGroup>& Group)
 {
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
-	if (!Group->IsValid() || Group->SubjectPaths.empty() || Group->SubjectIndices.IsEmpty()) { return; }
+	// Triangulate + deduplicate vertex pool + Hertel-Mehlhorn merge (shared with Clipper2 : Decompose).
+	PCGExClipper2Decomposition::FDecomposeParams Params;
+	Params.Precision = Settings->Precision;
+	Params.FillRule = Settings->FillRule;
+	Params.bUseDelaunay = true;
+	Params.bMergeConvexPieces = Settings->bMergeConvexPieces;
+	Params.MaxConvexPieces = Settings->MaxConvexPieces;
 
-	const double InvScale = 1.0 / static_cast<double>(Settings->Precision);
+	PCGExClipper2Decomposition::FDecomposeResult Decomposition;
+	if (!PCGExClipper2Decomposition::TryDecomposeGroup(Group, AllOpData, Params, Decomposition))
+	{
+		if (!Settings->bQuietWarnings)
+		{
+			if (Decomposition.Status == PCGExClipper2Decomposition::EDecomposeResult::TriangulationFailed)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, this, FTEXT("A volume footprint could not be triangulated (degenerate or self-intersecting) and was skipped."));
+			}
+			else if (Decomposition.Status == PCGExClipper2Decomposition::EDecomposeResult::TooManyPieces)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, this, FText::Format(
+					LOCTEXT("TooManyPieces", "A volume needs {0} convex pieces (over the {1} cap) and was skipped. Raise Max Convex Pieces or simplify the path."),
+					FText::AsNumber(Decomposition.Pieces.Num()), FText::AsNumber(Settings->MaxConvexPieces)));
+			}
+		}
+		return;
+	}
 
 	// Use the first subject's projection as a consistent frame for the whole volume.
 	const int32 FrameSrcIdx = Group->SubjectIndices[0];
-	if (!AllOpData->Projections.IsValidIndex(FrameSrcIdx)) { return; }
 	const FPCGExGeo2DProjectionDetails& FrameProjection = AllOpData->Projections[FrameSrcIdx];
 
-	// --- Boundary-respecting triangulation (holes honored via fill rule) ---
-	PCGExClipper2Lib::Paths64 CombinedPaths;
-	CombinedPaths.reserve(Group->SubjectPaths.size());
-	for (const auto& Path : Group->SubjectPaths) { CombinedPaths.push_back(Path); }
+	const TArray<PCGExClipper2Decomposition::FFootprintVertex>& VertexPool = Decomposition.VertexPool;
+	const TArray<TArray<int32>>& Pieces = Decomposition.Pieces;
 
-	PCGExClipper2Lib::Paths64 TrianglePaths;
-	const PCGExClipper2Lib::TriangulateResult Result = PCGExClipper2Lib::TriangulateWithHoles(
-		CombinedPaths, TrianglePaths, PCGExClipper2::ConvertFillRule(Settings->FillRule), true, Group->CreateZCallback());
-
-	if (Result != PCGExClipper2Lib::TriangulateResult::success || TrianglePaths.empty())
+	// Per-vertex extrusion height. This is volume-specific (not part of the shared pool), so it is read
+	// here from the height reader using each vertex's mapped source point; non-source vertices contribute 0.
+	TArray<double> Heights;
+	Heights.SetNumUninitialized(VertexPool.Num());
+	for (int32 i = 0; i < VertexPool.Num(); i++)
 	{
-		if (!Settings->bQuietWarnings)
-		{
-			PCGE_LOG_C(Warning, GraphAndLog, this, FTEXT("A volume footprint could not be triangulated (degenerate or self-intersecting) and was skipped."));
-		}
-		return;
-	}
-
-	// --- Deduplicated 2D vertex pool with per-vertex height + base (normal) Z ---
-	const int32 EstimatedVerts = static_cast<int32>(TrianglePaths.size()) * 3;
-	TArray<PCGExClipper2Volume::FFootprintVertex> VertexPool;
-	TMap<uint64, int32> VertexMap;
-	VertexPool.Reserve(EstimatedVerts);
-	VertexMap.Reserve(EstimatedVerts);
-
-	auto FindOrAddVertex = [&](const PCGExClipper2Lib::Point64& Pt) -> int32
-	{
-		const uint64 Hash = PCGEx::H64(static_cast<uint32>(Pt.x & 0xFFFFFFFF), static_cast<uint32>(Pt.y & 0xFFFFFFFF));
-		if (const int32* Found = VertexMap.Find(Hash)) { return *Found; }
-
-		PCGExClipper2Volume::FFootprintVertex V;
-		V.Pos = FVector2D(static_cast<double>(Pt.x) * InvScale, static_cast<double>(Pt.y) * InvScale);
-
-		uint32 RawPointIdx, RawSourceIdx;
-		PCGEx::H64(static_cast<uint64>(Pt.z), RawPointIdx, RawSourceIdx);
-
-		if (RawPointIdx != PCGExClipper2::INTERSECTION_MARKER)
-		{
-			const int32 SrcIdx = static_cast<int32>(RawSourceIdx);
-			const int32 PtIdx = static_cast<int32>(RawPointIdx);
-
-			if (AllOpData->Facades.IsValidIndex(SrcIdx) && HeightValues.IsValidIndex(SrcIdx) && HeightValues[SrcIdx])
-			{
-				const int32 SrcNum = AllOpData->Facades[SrcIdx]->Source->GetNum(PCGExData::EIOSide::In);
-				if (PtIdx < SrcNum)
-				{
-					V.Height = HeightValues[SrcIdx]->Read(PtIdx);
-					if (AllOpData->ProjectedZValues.IsValidIndex(SrcIdx) && AllOpData->ProjectedZValues[SrcIdx].IsValidIndex(PtIdx))
-					{
-						V.BaseZ = AllOpData->ProjectedZValues[SrcIdx][PtIdx];
-					}
-					V.bHasSource = true;
-				}
-			}
-		}
-
-		const int32 Index = VertexPool.Num();
-		VertexMap.Add(Hash, Index);
-		VertexPool.Add(V);
-		return Index;
-	};
-
-	TArray<TArray<int32>> Pieces; // each is a CCW vertex-index loop
-	Pieces.Reserve(static_cast<int32>(TrianglePaths.size()));
-	for (const auto& Tri : TrianglePaths)
-	{
-		if (Tri.size() != 3) { continue; }
-		const int32 A = FindOrAddVertex(Tri[0]);
-		const int32 B = FindOrAddVertex(Tri[1]);
-		const int32 C = FindOrAddVertex(Tri[2]);
-		if (A == B || B == C || C == A) { continue; }
-
-		TArray<int32> Piece = {A, B, C};
-		PCGExClipper2Volume::EnsureCCW(Piece, VertexPool);
-		Pieces.Add(MoveTemp(Piece));
-	}
-
-	if (Pieces.IsEmpty() || VertexPool.IsEmpty()) { return; }
-
-	if (Settings->bMergeConvexPieces)
-	{
-		PCGExClipper2Volume::MergeIntoConvexPieces(Pieces, VertexPool);
-	}
-
-	if (Pieces.Num() > Settings->MaxConvexPieces)
-	{
-		if (!Settings->bQuietWarnings)
-		{
-			PCGE_LOG_C(Warning, GraphAndLog, this, FText::Format(
-				LOCTEXT("TooManyPieces", "A volume needs {0} convex pieces (over the {1} cap) and was skipped. Raise Max Convex Pieces or simplify the path."),
-				FText::AsNumber(Pieces.Num()), FText::AsNumber(Settings->MaxConvexPieces)));
-		}
-		return;
+		const PCGExClipper2Decomposition::FFootprintVertex& V = VertexPool[i];
+		Heights[i] = (V.bHasSource && HeightValues.IsValidIndex(V.SourceIdx) && HeightValues[V.SourceIdx])
+			? HeightValues[V.SourceIdx]->Read(V.SourcePointIdx)
+			: 0.0;
 	}
 
 	// --- Global lowest projected Z (actor-origin base) + a single footprint centroid for the actor origin ---
 	double MinBaseZ = 0;
 	bool bAnyBase = false;
 	FVector2D Centroid = FVector2D::ZeroVector;
-	for (const PCGExClipper2Volume::FFootprintVertex& V : VertexPool)
+	for (const PCGExClipper2Decomposition::FFootprintVertex& V : VertexPool)
 	{
 		Centroid += V.Pos;
 		if (V.bHasSource)
 		{
-			MinBaseZ = bAnyBase ? FMath::Min(MinBaseZ, V.BaseZ) : V.BaseZ;
+			MinBaseZ = bAnyBase ? FMath::Min(MinBaseZ, V.ProjectedZ) : V.ProjectedZ;
 			bAnyBase = true;
 		}
 	}
@@ -430,6 +310,7 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 	// --- Build one convex prism (+ wireframe polys) per convex piece, in actor-local space ---
 	TSharedPtr<FPCGExVolumeSpec> Spec = MakeShared<FPCGExVolumeSpec>();
 	Spec->GroupIndex = Group->GroupIndex;
+	Spec->SourceFacadeIndex = FrameSrcIdx;
 	Spec->ConvexElems.Reserve(Pieces.Num());
 
 	for (const TArray<int32>& Piece : Pieces)
@@ -448,12 +329,12 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			int32 SourceCount = 0;
 			for (const int32 Idx : Piece)
 			{
-				const PCGExClipper2Volume::FFootprintVertex& V = VertexPool[Idx];
-				TopHeight = FMath::Max(TopHeight, V.Height);
+				const PCGExClipper2Decomposition::FFootprintVertex& V = VertexPool[Idx];
+				TopHeight = FMath::Max(TopHeight, Heights[Idx]);
 				if (!V.bHasSource) { continue; }
-				MinZ = SourceCount == 0 ? V.BaseZ : FMath::Min(MinZ, V.BaseZ);
-				MaxZ = SourceCount == 0 ? V.BaseZ : FMath::Max(MaxZ, V.BaseZ);
-				SumZ += V.BaseZ;
+				MinZ = SourceCount == 0 ? V.ProjectedZ : FMath::Min(MinZ, V.ProjectedZ);
+				MaxZ = SourceCount == 0 ? V.ProjectedZ : FMath::Max(MaxZ, V.ProjectedZ);
+				SumZ += V.ProjectedZ;
 				++SourceCount;
 			}
 

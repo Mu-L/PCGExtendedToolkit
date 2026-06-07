@@ -118,6 +118,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Collision", meta = (PCG_Overridable, EditCondition = "bOverrideCollisionProfile"))
 	FName CollisionProfileName = FName("Trigger");
 
+	/** Name of the soft-object-path attribute written to the Actor References output (one entry per spawned volume). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable))
+	FName ActorReferenceAttributeName = FName("ActorReference");
+
 	/** Suppress per-group warnings about degenerate footprints / failed triangulation. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors", meta = (PCG_NotOverridable))
 	bool bQuietWarnings = false;

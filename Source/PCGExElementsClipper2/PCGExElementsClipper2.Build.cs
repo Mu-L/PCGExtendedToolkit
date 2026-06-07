@@ -26,6 +26,7 @@ public class PCGExElementsClipper2 : ModuleRules
 				"PCGExCore",
 				"PCGExBlending",
 				"PCGExFilters",
+				"PCGExGraphs",
 				"PCGExMatching",
 				"PCGExFoundations",
 				"PCGExCollections", // FinalizeSpawnedActor / managed-actor spawn helpers (Clipper2 : Volume)

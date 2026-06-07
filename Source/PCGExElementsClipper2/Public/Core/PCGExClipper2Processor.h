@@ -252,6 +252,13 @@ protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
+	/** True for path-output nodes (Boolean, RectClip, Offset, Triangulate); geometry nodes (Volume,
+	 *  Decompose) set this false in their constructor to hide the path-output-only parameters below
+	 *  (blending, carry-over, open-path output, simplify/arc-tolerance) that have no effect when the node
+	 *  emits geometry rather than paths. Not user-editable -- a per-class constant. */
+	UPROPERTY()
+	bool bExposePathOutputProperties = true;
+
 public:
 	/** If enabled, lets you to create sub-groups to operate on. If disabled, data is processed individually. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing")
@@ -268,7 +275,7 @@ public:
 	FPCGExMatchingDetails OperandsDataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** Skip paths that aren't closed */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
 	bool bSkipOpenPaths = false;
 
 	/** Decimal precision 
@@ -277,15 +284,15 @@ public:
 	int32 Precision = 100;
 
 	/** Cleanup */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
 	bool bSimplifyPaths = false;
 
 	/** Keep collinear points in the output instead of simplifying them. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
 	bool bPreserveCollinear = true;
 
 	/** Tolerance for arc approximation when generating curved offsets. Higher values = fewer points. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
 	double ArcTolerance = 5.0;
 
 	FORCEINLINE double GetArcTolerance() const
@@ -294,15 +301,15 @@ public:
 	}
 
 	/** Filter in/out which attributes get carried over from inputs to outputs. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
 	FPCGExCarryOverDetails CarryOverDetails;
 
-	/** Filter in/out which attributes get carried over from inputs to outputs. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))
+	/** Defines how source point properties and attributes are blended together for fused output points. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
 	FPCGExBlendingDetails BlendingDetails = FPCGExBlendingDetails(EPCGExBlendingType::Average, EPCGExBlendingType::None);
 
 	/** How to handle open paths in the output (ignore, output to main pin, or separate pin). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
 	EPCGExClipper2OpenPathOutput OpenPathsOutput = EPCGExClipper2OpenPathOutput::Output;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output|Tagging", meta=(InlineEditConditionToggle))

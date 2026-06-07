@@ -684,12 +684,50 @@ namespace PCGExMath::Geo
 		const bool bIncludeContour)
 	{
 		Clear();
+		if (Outer.Num() < 3) { return false; }
+
+		// Normalize to a unit box BEFORE solving. Real footprints sit at tens of thousands of world units,
+		// and at that magnitude float precision in the split-event predicates degrades badly while the
+		// absolute distance tolerance (TIME_EPS) stops being meaningful. Translating to bounds-min and
+		// scaling so the diagonal is ~1 makes every predicate scale-relative and the arithmetic
+		// well-conditioned regardless of where in the world (or at what size) the polygon lives. Node
+		// positions and times (offset distances) are denormalized back to world afterwards.
+		FVector2D Mn(TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
+		FVector2D Mx(-TNumericLimits<double>::Max(), -TNumericLimits<double>::Max());
+		auto Acc = [&](const FVector2D& P) { Mn.X = FMath::Min(Mn.X, P.X); Mn.Y = FMath::Min(Mn.Y, P.Y); Mx.X = FMath::Max(Mx.X, P.X); Mx.Y = FMath::Max(Mx.Y, P.Y); };
+		for (const FVector2D& P : Outer) { Acc(P); }
+		for (const TArray<FVector2D>& Hole : Holes) { for (const FVector2D& P : Hole) { Acc(P); } }
+
+		const FVector2D Ref = Mn;
+		const double Diag = FMath::Max((Mx - Mn).Size(), 1e-8);
+		const double Scale = 1.0 / Diag;
+		auto Norm = [&](const FVector2D& P) { return (P - Ref) * Scale; };
+
+		TArray<FVector2D> NOuter;
+		NOuter.Reserve(Outer.Num());
+		for (const FVector2D& P : Outer) { NOuter.Add(Norm(P)); }
+
+		TArray<TArray<FVector2D>> NHoles;
+		NHoles.Reserve(Holes.Num());
+		for (const TArray<FVector2D>& Hole : Holes)
+		{
+			TArray<FVector2D>& NH = NHoles.Emplace_GetRef();
+			NH.Reserve(Hole.Num());
+			for (const FVector2D& P : Hole) { NH.Add(Norm(P)); }
+		}
 
 		PCGExStraightSkeleton::FSolver Solver;
-		if (!Solver.Init(Outer, Holes)) { return false; }
+		if (!Solver.Init(NOuter, NHoles)) { return false; }
 
 		Solver.Run();
-		Solver.Build(MergeDistance, bIncludeContour, Nodes, Edges, NumContourNodes);
+		Solver.Build(MergeDistance * Scale, bIncludeContour, Nodes, Edges, NumContourNodes);
+
+		// Denormalize back to world.
+		for (FStraightSkeletonNode& Node : Nodes)
+		{
+			Node.Pos = Node.Pos * Diag + Ref;
+			Node.Time *= Diag;
+		}
 
 		IsValid = Edges.Num() > 0;
 		return IsValid;

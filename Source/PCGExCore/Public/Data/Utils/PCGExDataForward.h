@@ -46,5 +46,9 @@ namespace PCGExData
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade);
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade, const TArray<int32>& Indices);
 		void Forward(const int32 SourceIndex, UPCGMetadata* InTargetMetadata);
+
+		// Forwards the source attributes onto a single entry (per-row, element domain) of an arbitrary target
+		// metadata -- e.g. to attach a source path's @Data attributes to one row of an output attribute set.
+		void Forward(const int32 SourceIndex, UPCGMetadata* InTargetMetadata, const int64 TargetKey);
 	};
 }
