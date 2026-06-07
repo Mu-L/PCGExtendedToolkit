@@ -189,6 +189,11 @@ public:
 		return PCGEX_NODE_COLOR_OPTIN_NAME(FilterHub);
 	}
 
+	virtual bool ShouldDrawNodeCompact() const override
+	{
+		return bDrawAsCompactNode;
+	}
+	
 	virtual TArray<FPCGPreConfiguredSettingsInfo> GetPreconfiguredInfo() const override;
 #endif
 	//~End UPCGSettings
@@ -218,6 +223,10 @@ public:
 	/** Inverts the group output value. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayPriority=-1))
 	bool bInvert = false;
+	
+	/** Whether to draw this node as a compact node */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable), AdvancedDisplay)
+	bool bDrawAsCompactNode = true;
 };
 
 #pragma endregion
