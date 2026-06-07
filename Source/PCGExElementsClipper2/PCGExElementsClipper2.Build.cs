@@ -28,6 +28,7 @@ public class PCGExElementsClipper2 : ModuleRules
 				"PCGExFilters",
 				"PCGExMatching",
 				"PCGExFoundations",
+				"PCGExCollections", // FinalizeSpawnedActor / managed-actor spawn helpers (Clipper2 : Volume)
 			}
 		);
 

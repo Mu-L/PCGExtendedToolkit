@@ -254,6 +254,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output - Points", meta=(DisplayName="DistanceToNext", PCG_Overridable, EditCondition="bWriteDistanceToNext"))
 	FName DistanceToNextAttributeName = FName("DistanceToNext");
 
+	/** Output normalized distance to next. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output - Points", meta=(PCG_NotOverridable, EditCondition="bWriteDistanceToNext", EditConditionHides, HideEditConditionToggle))
+	bool bNormalizeDistanceToNext = false;
 
 	/** Output distance to prev. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output - Points", meta=(PCG_NotOverridable, InlineEditConditionToggle))
