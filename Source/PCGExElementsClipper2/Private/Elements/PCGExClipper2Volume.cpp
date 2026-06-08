@@ -235,6 +235,7 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		BodySetup->CreatePhysicsMeshes();
 		BrushComp->BrushBodySetup = BodySetup;
 
+#if WITH_EDITOR
 		// Brush model for editor wireframe + render/selection bounds (collision is independent of this).
 		UModel* Model = NewObject<UModel>(BrushComp);
 		Model->Initialize(nullptr, true);
@@ -242,7 +243,8 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		Model->Polys->Element = MoveTemp(Spec->BrushPolys);
 		Model->BuildBound();
 		BrushComp->Brush = Model;
-
+#endif
+		
 		if (Settings->bOverrideCollisionProfile)
 		{
 			BrushComp->SetCollisionProfileName(Settings->CollisionProfileName);
