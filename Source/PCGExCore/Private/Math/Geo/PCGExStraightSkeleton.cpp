@@ -250,6 +250,31 @@ namespace PCGExStraightSkeleton
 			return true;
 		}
 
+		// Reject "escaping" events -- split/edge events that resolve OUTSIDE the polygon (the dominant
+		// failure mode on thin necks and holed shapes: nodes ending up beyond the boundary). A real
+		// skeleton node is always strictly interior, so a point-in-solid (winding-number) test rejects
+		// escapers without ever false-rejecting a valid interior node -- and unlike an offset-vs-all-edges
+		// test it is not fooled by edges that have already collapsed. Outer is CCW (+1 inside), holes are
+		// CW (-1 inside the hole), so the solid region is exactly winding != 0. (LoopNodes index the
+		// contour nodes, whose positions never move during solving.)
+		bool IsInsidePolygon(const FVector2D& B) const
+		{
+			int32 Wn = 0;
+			for (const TArray<int32>& Loop : LoopNodes)
+			{
+				const int32 N = Loop.Num();
+				for (int32 i = 0; i < N; i++)
+				{
+					const FVector2D& Pa = NodePos[Loop[i]];
+					const FVector2D& Pb = NodePos[Loop[(i + 1) % N]];
+					const double IsLeft = (Pb.X - Pa.X) * (B.Y - Pa.Y) - (B.X - Pa.X) * (Pb.Y - Pa.Y);
+					if (Pa.Y <= B.Y) { if (Pb.Y > B.Y && IsLeft > 0.0) { Wn++; } }
+					else { if (Pb.Y <= B.Y && IsLeft < 0.0) { Wn--; } }
+				}
+			}
+			return Wn != 0;
+		}
+
 		bool ComputeEvent(const int32 Vi, FEvent& Out) const
 		{
 			const FVertex& V = Verts[Vi];
@@ -288,6 +313,7 @@ namespace PCGExStraightSkeleton
 				const double Dist = FVector2D::DotProduct(I - Ed.P, Ed.Normal);
 				if (Dist < -TIME_EPS) { return; }
 				if (Dist + TIME_EPS < FMath::Max(Verts[Ua].StartTime, Verts[Ub].StartTime)) { return; }
+				if (!IsInsidePolygon(I)) { return; } // reject escaping edge events
 				if (Dist < BestDist)
 				{
 					BestDist = Dist;
@@ -311,7 +337,7 @@ namespace PCGExStraightSkeleton
 					if (e == V.LeftEdge || e == V.RightEdge) { continue; }
 					FVector2D B;
 					double Dist;
-					if (ComputeSplitCandidate(Vi, e, B, Dist) && Dist < BestDist)
+					if (ComputeSplitCandidate(Vi, e, B, Dist) && IsInsidePolygon(B) && Dist < BestDist)
 					{
 						BestDist = Dist;
 						Best.Kind = EKind::Split;

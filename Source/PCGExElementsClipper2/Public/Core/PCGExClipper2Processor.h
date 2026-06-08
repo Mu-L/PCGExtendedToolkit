@@ -252,21 +252,44 @@ protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
+public:
 	/** True for path-output nodes (Boolean, RectClip, Offset, Triangulate); geometry nodes (Volume,
 	 *  Decompose) set this false in their constructor to hide the path-output-only parameters below
 	 *  (blending, carry-over, open-path output, simplify/arc-tolerance) that have no effect when the node
-	 *  emits geometry rather than paths. Not user-editable -- a per-class constant. */
+	 *  emits geometry rather than paths. Not user-editable -- a per-class constant.
+	 *
+	 *  This is deliberately an EditCondition gate rather than splitting the path-output properties into a
+	 *  separate base class: the cleaner inheritance split would change the serialized class layout and drop
+	 *  these UPROPERTYs from existing production graphs that already inherit them. Keep the gate until a
+	 *  migration path for that serialized data exists. (PCG_Overridable hidden props may still surface an
+	 *  override pin on geometry nodes; that pin is inert for them.) */
 	UPROPERTY()
 	bool bExposePathOutputProperties = true;
 
-public:
+	/** True for nodes that may operate on grouped/merged inputs (the path-output nodes); geometry nodes
+	 *  (Volume, Decompose) set this false in their constructor. They produce one output per source footprint,
+	 *  so grouping or matching several source paths into one operation would mix unrelated footprints (and a
+	 *  decomposed cluster could only carry attributes from one template source). When false, inputs are forced
+	 *  to Split (one source per group, see GetEffectiveGroupingPolicy) and the grouping + main-matching
+	 *  controls below are hidden. Not user-editable -- a per-class constant. */
+	UPROPERTY()
+	bool bExposeGroupingPolicy = true;
+
 	/** If enabled, lets you to create sub-groups to operate on. If disabled, data is processed individually. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (EditCondition="bExposeGroupingPolicy", EditConditionHides))
 	FPCGExMatchingDetails MainDataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** How should data be grouped when data matching is disabled */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching()"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching() && bExposeGroupingPolicy", EditConditionHides))
 	EPCGExGroupingPolicy MainInputGroupingPolicy = EPCGExGroupingPolicy::Consolidate;
+
+	/** Effective grouping policy. Geometry nodes (bExposeGroupingPolicy == false) always process inputs as
+	 *  Split -- one source per group -- regardless of the serialized MainInputGroupingPolicy (hidden for them)
+	 *  or any legacy value, so multi-source groups can never reach the geometry pipeline. */
+	EPCGExGroupingPolicy GetEffectiveGroupingPolicy() const
+	{
+		return bExposeGroupingPolicy ? MainInputGroupingPolicy : EPCGExGroupingPolicy::Split;
+	}
 
 	/** If enabled, lets you to pick which are matched with which main data.
 	 * Note that the match is done against every single data within a group and then consolidated;

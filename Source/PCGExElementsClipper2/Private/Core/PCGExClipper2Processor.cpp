@@ -1246,7 +1246,9 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 	TArray<TArray<int32>> MainPartitions;
 
 	bool bDoMainMatching = false;
-	if (Settings->MainDataMatching.IsEnabled() && Settings->MainDataMatching.Mode != EPCGExMapMatchMode::Disabled)
+	// Geometry nodes (bExposeGroupingPolicy == false) force one source per group, so main matching -- which
+	// can merge several sources into one partition -- is bypassed alongside the grouping policy below.
+	if (Settings->bExposeGroupingPolicy && Settings->MainDataMatching.IsEnabled() && Settings->MainDataMatching.Mode != EPCGExMapMatchMode::Disabled)
 	{
 		auto Matcher = MakeShared<PCGExMatching::FDataMatcher>();
 		Matcher->SetDetails(&Settings->MainDataMatching);
@@ -1261,8 +1263,8 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 
 	if (!bDoMainMatching)
 	{
-		// No matching - each main input is its own group
-		switch (Settings->MainInputGroupingPolicy)
+		// No matching - each main input is its own group (geometry nodes resolve to Split here)
+		switch (Settings->GetEffectiveGroupingPolicy())
 		{
 		case EPCGExGroupingPolicy::Split:
 			MainPartitions.Reserve(MainIndices.Num());

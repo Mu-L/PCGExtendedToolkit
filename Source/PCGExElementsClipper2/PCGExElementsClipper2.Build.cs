@@ -30,6 +30,7 @@ public class PCGExElementsClipper2 : ModuleRules
 				"PCGExMatching",
 				"PCGExFoundations",
 				"PCGExCollections", // FinalizeSpawnedActor / managed-actor spawn helpers (Clipper2 : Volume)
+				"PCGExElementsClusters", // UPCGExClusterNodesData / cluster labels (Clipper2 : Straight Skeleton)
 			}
 		);
 

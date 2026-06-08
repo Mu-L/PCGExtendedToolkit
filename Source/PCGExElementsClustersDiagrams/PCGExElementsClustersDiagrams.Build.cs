@@ -41,7 +41,7 @@ public class PCGExElementsClustersDiagrams : ModuleRules
 				"PCGExBlending",
 				"PCGExFoundations",
 				"PCGExGraphs",
-				"PCGExElementsClusters",
+				"PCGExElementsClusters"
 			}
 		);
 

@@ -95,9 +95,10 @@ UPCGExClipper2VolumeSettings::UPCGExClipper2VolumeSettings(const FObjectInitiali
 {
 	VolumeClass = ATriggerVolume::StaticClass();
 
-	// One volume per input path by default (more intuitive than the base's Consolidate, which would
-	// merge every input path into a single volume). Users can switch to Merged in the node settings.
-	MainInputGroupingPolicy = EPCGExGroupingPolicy::Split;
+	// Geometry node: extrude each input path as its own volume. Grouping/matching multiple source paths into
+	// one operation is disabled (bExposeGroupingPolicy=false, forcing Split) -- it would merge unrelated
+	// footprints into a single volume, the wrong model for an extruder.
+	bExposeGroupingPolicy = false;
 
 	// Geometry node: hide the inherited path-output-only parameters (blending, carry-over, open-path
 	// output, simplify/arc-tolerance) that don't apply when the output is volumes rather than paths.
@@ -134,11 +135,27 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 {
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
+	// Build the actor-reference attribute set up front. It is emitted unconditionally via EmitReferences --
+	// even on the early outs below, or with zero spawned volumes (empty set) -- so the "Actor References"
+	// output pin is always present, regardless of how spawning went.
+	const FName AttrName = Settings->ActorReferenceAttributeName.IsNone() ? FName("ActorReference") : Settings->ActorReferenceAttributeName;
+	UPCGParamData* RefData = NewObject<UPCGParamData>();
+	UPCGMetadata* RefMetadata = RefData->Metadata;
+	FPCGMetadataAttribute<FSoftObjectPath>* RefAttribute = RefMetadata->FindOrCreateAttribute<FSoftObjectPath>(
+		PCGExMetaHelpers::GetAttributeIdentifier(AttrName, RefData), FSoftObjectPath(), false, true);
+
+	auto EmitReferences = [&]()
+	{
+		FPCGTaggedData& OutRef = OutputData.TaggedData.Emplace_GetRef();
+		OutRef.Pin = FName("Actor References");
+		OutRef.Data = RefData;
+	};
+
 	UPCGComponent* MutableComponent = GetMutableComponent();
-	if (!MutableComponent) { return; }
+	if (!MutableComponent) { EmitReferences(); return; }
 
 	UWorld* World = MutableComponent->GetWorld();
-	if (!World) { return; }
+	if (!World) { EmitReferences(); return; }
 
 	const UPCGComponent* Comp = GetComponent();
 	const bool bIsPreview = Comp && Comp->IsInPreviewMode();
@@ -156,15 +173,11 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		return A->GroupIndex < B->GroupIndex;
 	});
 
-	// Build the actor-reference attribute set up front so each spawned volume fills one row.
-	const FName AttrName = Settings->ActorReferenceAttributeName.IsNone() ? FName("ActorReference") : Settings->ActorReferenceAttributeName;
-	UPCGParamData* RefData = NewObject<UPCGParamData>();
-	UPCGMetadata* RefMetadata = RefData->Metadata;
-	FPCGMetadataAttribute<FSoftObjectPath>* RefAttribute = RefMetadata->FindOrCreateAttribute<FSoftObjectPath>(
-		PCGExMetaHelpers::GetAttributeIdentifier(AttrName, RefData), FSoftObjectPath(), false, true);
-
-	// Force-forward every @Data-domain attribute from the source path onto its actor's row.
+	// Force-forward every @Data-domain attribute from the source path onto its actor's row. The per-source
+	// handler is built once and cached (a source can back more than one group); rebuilding it per row would
+	// re-scan the source's attribute identities needlessly.
 	const FPCGExForwardDetails ForwardDetails(true);
+	TMap<int32, TSharedPtr<PCGExData::FDataForwardHandler>> HandlersBySource;
 
 	for (const TSharedPtr<FPCGExVolumeSpec>& Spec : StagedVolumes)
 	{
@@ -229,17 +242,21 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 
 		if (AllOpData && AllOpData->Facades.IsValidIndex(Spec->SourceFacadeIndex))
 		{
-			if (const TSharedPtr<PCGExData::FDataForwardHandler> Handler = ForwardDetails.TryGetHandler(AllOpData->Facades[Spec->SourceFacadeIndex], false))
+			const int32 SrcIdx = Spec->SourceFacadeIndex;
+			if (!HandlersBySource.Contains(SrcIdx))
 			{
-				Handler->ValidateIdentities([](const PCGExData::FAttributeIdentity& Identity) { return Identity.InDataDomain(); });
+				TSharedPtr<PCGExData::FDataForwardHandler> NewHandler = ForwardDetails.TryGetHandler(AllOpData->Facades[SrcIdx], false);
+				if (NewHandler) { NewHandler->ValidateIdentities([](const PCGExData::FAttributeIdentity& Identity) { return Identity.InDataDomain(); }); }
+				HandlersBySource.Add(SrcIdx, NewHandler); // cache the result (incl. null) so each source resolves once
+			}
+			if (const TSharedPtr<PCGExData::FDataForwardHandler>& Handler = HandlersBySource.FindChecked(SrcIdx))
+			{
 				Handler->Forward(0, RefMetadata, Key);
 			}
 		}
 	}
 
-	FPCGTaggedData& OutRef = OutputData.TaggedData.Emplace_GetRef();
-	OutRef.Pin = FName("Actor References");
-	OutRef.Data = RefData;
+	EmitReferences();
 }
 
 void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProcessingGroup>& Group)
@@ -247,28 +264,16 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
 	// Triangulate + deduplicate vertex pool + Hertel-Mehlhorn merge (shared with Clipper2 : Decompose).
-	PCGExClipper2Decomposition::FDecomposeParams Params;
-	Params.Precision = Settings->Precision;
-	Params.FillRule = Settings->FillRule;
-	Params.bUseDelaunay = true;
-	Params.bMergeConvexPieces = Settings->bMergeConvexPieces;
-	Params.MaxConvexPieces = Settings->MaxConvexPieces;
+	const PCGExClipper2Decomposition::FDecomposeParams Params = PCGExClipper2Decomposition::MakeParams(Settings);
 
 	PCGExClipper2Decomposition::FDecomposeResult Decomposition;
 	if (!PCGExClipper2Decomposition::TryDecomposeGroup(Group, AllOpData, Params, Decomposition))
 	{
 		if (!Settings->bQuietWarnings)
 		{
-			if (Decomposition.Status == PCGExClipper2Decomposition::EDecomposeResult::TriangulationFailed)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, this, FTEXT("A volume footprint could not be triangulated (degenerate or self-intersecting) and was skipped."));
-			}
-			else if (Decomposition.Status == PCGExClipper2Decomposition::EDecomposeResult::TooManyPieces)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, this, FText::Format(
-					LOCTEXT("TooManyPieces", "A volume needs {0} convex pieces (over the {1} cap) and was skipped. Raise Max Convex Pieces or simplify the path."),
-					FText::AsNumber(Decomposition.Pieces.Num()), FText::AsNumber(Settings->MaxConvexPieces)));
-			}
+			const FText WarningText = PCGExClipper2Decomposition::DescribeDecomposeFailure(
+				Decomposition, LOCTEXT("VolumeSubject", "volume"), Settings->MaxConvexPieces);
+			if (!WarningText.IsEmpty()) { PCGE_LOG_C(Warning, GraphAndLog, this, WarningText); }
 		}
 		return;
 	}
@@ -420,11 +425,10 @@ void FPCGExClipper2VolumeElement::OutputWork(FPCGExContext* InContext, const UPC
 {
 	PCGEX_CONTEXT_AND_SETTINGS(Clipper2Volume)
 
-	if (Context->StagedVolumes.IsEmpty()) { return; }
-
 	// Actor spawning, physics cooking and managed-resource registration must run on the game thread.
 	// OutputWork can be invoked off the game thread by the async pipeline, so marshal explicitly
-	// (runs inline if already on the game thread -- no deadlock).
+	// (runs inline if already on the game thread -- no deadlock). Always marshal -- even with zero staged
+	// volumes -- so SpawnStagedVolumes emits the (empty) Actor References output set.
 	PCGExMT::ExecuteOnMainThreadAndWait([Context]() { Context->SpawnStagedVolumes(); });
 }
 

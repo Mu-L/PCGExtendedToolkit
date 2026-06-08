@@ -5,16 +5,22 @@
 
 #include "Algo/Reverse.h"
 #include "Clipper2Lib/clipper.triangulation.h"
+#include "Internationalization/Text.h" // FText / LOCTEXT used by DescribeDecomposeFailure
 
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Math/Geo/PCGExGeo.h"
+
+#define LOCTEXT_NAMESPACE "PCGExClipper2Decomposition"
 
 // File-local helpers live in the namespace matching this file (Unity-build safe -- see project build notes).
 namespace PCGExClipper2Decomposition
 {
+	// 2D cross of (A-O) and (B-O); positive when O->A->B turns left (CCW). Shares the plugin-wide 2D
+	// determinant primitive instead of carrying a private copy.
 	FORCEINLINE double Cross2D(const FVector2D& O, const FVector2D& A, const FVector2D& B)
 	{
-		return (A.X - O.X) * (B.Y - O.Y) - (A.Y - O.Y) * (B.X - O.X);
+		return PCGExMath::Geo::Det(A - O, B - O);
 	}
 
 	double SignedArea(const TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
@@ -25,7 +31,7 @@ namespace PCGExClipper2Decomposition
 		{
 			const FVector2D& A = Pool[Loop[i]].Pos;
 			const FVector2D& B = Pool[Loop[(i + 1) % N]].Pos;
-			Area += A.X * B.Y - B.X * A.Y;
+			Area += PCGExMath::Geo::Det(A, B); // shoelace term == 2D determinant of consecutive vertices
 		}
 		return 0.5 * Area;
 	}
@@ -53,6 +59,10 @@ namespace PCGExClipper2Decomposition
 
 	// If A and B (both CCW loops) share an edge (u->v in A, v->u in B), merge along it.
 	// Returns true and fills OutMerged only when the merged polygon is convex.
+	//
+	// Two convex polygons with disjoint interiors share AT MOST one edge (sharing two would force one of
+	// them concave around the shared corner), so the first matching half-edge is the only merge candidate:
+	// bailing on it -- rather than continuing to scan for another shared edge -- cannot miss a valid merge.
 	bool TryMergeConvex(const TArray<int32>& A, const TArray<int32>& B, const TArray<FFootprintVertex>& Pool, TArray<int32>& OutMerged)
 	{
 		const int32 NA = A.Num();
@@ -86,22 +96,31 @@ namespace PCGExClipper2Decomposition
 	}
 
 	// Greedy Hertel-Mehlhorn-style convex merge of a triangulation into fewer convex pieces.
+	//
+	// Full passes repeat until one merges nothing (fixpoint). Within a pass, piece i absorbs every piece it
+	// can before advancing, without restarting the outer scan; a later pass re-examines earlier pieces
+	// against any grown piece, so the converged decomposition matches the original (which restarted the whole
+	// i/j scan after every single merge -- O(n^3) in the piece count).
 	void MergeIntoConvexPieces(TArray<TArray<int32>>& Pieces, const TArray<FFootprintVertex>& Pool)
 	{
-		bool bMerged = true;
-		while (bMerged && Pieces.Num() > 1)
+		bool bAnyMerged = true;
+		while (bAnyMerged && Pieces.Num() > 1)
 		{
-			bMerged = false;
-			for (int32 i = 0; i < Pieces.Num() && !bMerged; i++)
+			bAnyMerged = false;
+			for (int32 i = 0; i < Pieces.Num(); i++)
 			{
-				for (int32 j = i + 1; j < Pieces.Num() && !bMerged; j++)
+				for (int32 j = i + 1; j < Pieces.Num();)
 				{
 					TArray<int32> Result;
 					if (TryMergeConvex(Pieces[i], Pieces[j], Pool, Result))
 					{
 						Pieces[i] = MoveTemp(Result);
-						Pieces.RemoveAt(j);
-						bMerged = true;
+						Pieces.RemoveAt(j); // keep order; the next piece shifts into slot j, so recheck it
+						bAnyMerged = true;
+					}
+					else
+					{
+						++j;
 					}
 				}
 			}
@@ -141,6 +160,12 @@ namespace PCGExClipper2Decomposition
 
 		auto FindOrAddVertex = [&](const PCGExClipper2Lib::Point64& Pt) -> int32
 		{
+			// Dedup key = low 32 bits of each int64 Clipper coordinate, packed. This is exact (injective) only
+			// while |Pt.x|,|Pt.y| < 2^31 SCALED units, i.e. ~+-21M / Precision in world cm (about +-215km at the
+			// default Precision=100, but only +-2km at Precision=10000). Beyond that the high bits are dropped and
+			// two genuinely distinct vertices can collide -> silently welded mesh (degenerate prisms / lost edges).
+			// If that ever bites in production (huge footprints or very high Precision), key on the full int64 pair
+			// (e.g. FIntVector2) or a properly-mixed 64-bit hash of both full coords instead of truncating.
 			const uint64 Hash = PCGEx::H64(static_cast<uint32>(Pt.x & 0xFFFFFFFF), static_cast<uint32>(Pt.y & 0xFFFFFFFF));
 			if (const int32* Found = VertexMap.Find(Hash)) { return *Found; }
 
@@ -231,4 +256,24 @@ namespace PCGExClipper2Decomposition
 		OutResult = Decompose(Group->SubjectPaths, AllOpData, Group->CreateZCallback(), Params);
 		return OutResult.Status == EDecomposeResult::Success;
 	}
+
+	FText DescribeDecomposeFailure(const FDecomposeResult& Result, const FText& Subject, const int32 MaxConvexPieces)
+	{
+		switch (Result.Status)
+		{
+		case EDecomposeResult::TriangulationFailed:
+			return FText::Format(
+				LOCTEXT("TriangulationFailed", "A {0} could not be triangulated (degenerate or self-intersecting) and was skipped."),
+				Subject);
+		case EDecomposeResult::TooManyPieces:
+			return FText::Format(
+				LOCTEXT("TooManyPieces", "A {0} needs {1} convex pieces (over the {2} cap) and was skipped. Raise Max Convex Pieces or simplify the path."),
+				Subject, FText::AsNumber(Result.Pieces.Num()), FText::AsNumber(MaxConvexPieces));
+		default:
+			// Success / Empty -- Empty is an intentional silent skip (degenerate/invalid group), nothing to report.
+			return FText::GetEmpty();
+		}
+	}
 }
+
+#undef LOCTEXT_NAMESPACE

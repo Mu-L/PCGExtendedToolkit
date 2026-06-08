@@ -26,9 +26,8 @@ namespace PCGExData
  * Straight Skeleton generator: takes closed paths (polygons) as input and produces one edge cluster
  * per polygon -- the inward mitered-offset / wavefront topology (roofs, mid-lines, inset partitioning).
  *
- * The skeleton is computed in 2D on a projection plane, then unprojected back to 3D. v1 handles a single
- * closed loop per input; polygons with holes are assembled from grouped inputs (see Path : Properties
- * grouping) in a later iteration.
+ * The skeleton is computed in 2D on a projection plane, then unprojected back to 3D. The solver is the
+ * robust iterative mitered-offset (Clipper2) implementation -- see FStraightSkeletonOffset.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters", meta=(Keywords = "skeleton medial roof miter inset offset", PCGExNodeLibraryDoc="clusters/generate/cluster-straight-skeleton"))
 class UPCGExBuildStraightSkeletonSettings : public UPCGExPathProcessorSettings

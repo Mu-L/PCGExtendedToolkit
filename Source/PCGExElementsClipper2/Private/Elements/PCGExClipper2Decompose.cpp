@@ -14,8 +14,6 @@
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Helpers/PCGExPointArrayDataHelpers.h"
 #include "Math/PCGExProjectionDetails.h"
-#include "PCGExGraphs/Public/Graphs/PCGExGraph.h"
-#include "PCGExGraphs/Public/Graphs/PCGExGraphBuilder.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2DecomposeElement"
 #define PCGEX_NAMESPACE Clipper2Decompose
@@ -33,9 +31,11 @@ namespace PCGExClipper2Decompose
 UPCGExClipper2DecomposeSettings::UPCGExClipper2DecomposeSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// One cluster per input path by default (matches Clipper2 : Volume's grouping). Switch to Merged to
-	// decompose a whole group of footprints into a single cluster.
-	MainInputGroupingPolicy = EPCGExGroupingPolicy::Split;
+	// Geometry node: decompose each input path as its own cluster. Grouping/matching multiple source paths
+	// into one operation is disabled (bExposeGroupingPolicy=false, forcing Split) -- merging unrelated
+	// footprints into one cluster would also break attribute carry, since cluster nodes can only inherit from
+	// a single template source.
+	bExposeGroupingPolicy = false;
 
 	// Geometry node: hide the inherited path-output-only parameters (blending, carry-over, hole/joint
 	// tagging, open-path output, simplify/arc-tolerance). See UPCGExClipper2ProcessorSettings.
@@ -104,28 +104,16 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 	const UPCGExClipper2DecomposeSettings* Settings = GetInputSettings<UPCGExClipper2DecomposeSettings>();
 
 	// Triangulate + deduplicate vertex pool + Hertel-Mehlhorn merge (shared with Clipper2 : Volume).
-	PCGExClipper2Decomposition::FDecomposeParams Params;
-	Params.Precision = Settings->Precision;
-	Params.FillRule = Settings->FillRule;
-	Params.bUseDelaunay = true;
-	Params.bMergeConvexPieces = Settings->bMergeConvexPieces;
-	Params.MaxConvexPieces = Settings->MaxConvexPieces;
+	const PCGExClipper2Decomposition::FDecomposeParams Params = PCGExClipper2Decomposition::MakeParams(Settings);
 
 	PCGExClipper2Decomposition::FDecomposeResult Decomposition;
 	if (!PCGExClipper2Decomposition::TryDecomposeGroup(Group, AllOpData, Params, Decomposition))
 	{
 		if (!Settings->bQuietWarnings)
 		{
-			if (Decomposition.Status == PCGExClipper2Decomposition::EDecomposeResult::TriangulationFailed)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, this, FTEXT("A footprint could not be triangulated (degenerate or self-intersecting) and was skipped."));
-			}
-			else if (Decomposition.Status == PCGExClipper2Decomposition::EDecomposeResult::TooManyPieces)
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, this, FText::Format(
-					LOCTEXT("TooManyPieces", "A footprint needs {0} convex pieces (over the {1} cap) and was skipped. Raise Max Convex Pieces or simplify the path."),
-					FText::AsNumber(Decomposition.Pieces.Num()), FText::AsNumber(Settings->MaxConvexPieces)));
-			}
+			const FText WarningText = PCGExClipper2Decomposition::DescribeDecomposeFailure(
+				Decomposition, LOCTEXT("DecomposeSubject", "footprint"), Settings->MaxConvexPieces);
+			if (!WarningText.IsEmpty()) { PCGE_LOG_C(Warning, GraphAndLog, this, WarningText); }
 		}
 		return;
 	}
@@ -169,26 +157,27 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 	const EPCGPointNativeProperties Allocations = TemplateFacade->GetAllocations();
 	PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutPoints, NumVerts, Allocations);
 
-	// Each node maps back to its decoded source point. Transforms are written explicitly here (so they are
-	// correct even when a group merges multiple sources); attributes are carried over via ConsumeIdxMapping,
-	// which resolves against the template source -- exact for the single-source (default Split) case.
+	// Each node maps back to its decoded source point. Transforms are written explicitly here; non-transform
+	// attributes are carried via ConsumeIdxMapping against the single frame source. Groups are always
+	// single-source (the geometry nodes force Split grouping), so this carry is exact.
 	TArray<int32>& IdxMapping = VtxIO->GetIdxMapping(NumVerts);
 	TPCGValueRange<FTransform> OutTransforms = OutPoints->GetTransformValueRange();
+
+	// Single-source group -> every source-backed vertex is the frame source; fetch its transform view once.
+	const TConstPCGValueRange<FTransform> FrameTransforms = TemplateFacade->Source->GetIn()->GetConstTransformValueRange();
 
 	for (int32 i = 0; i < NumVerts; i++)
 	{
 		const PCGExClipper2Decomposition::FFootprintVertex& V = VertexPool[i];
 
-		if (V.bHasSource && AllOpData->Facades.IsValidIndex(V.SourceIdx))
+		if (V.bHasSource && V.SourceIdx == FrameSrcIdx)
 		{
-			const TSharedPtr<PCGExData::FFacade>& SrcFacade = AllOpData->Facades[V.SourceIdx];
-			TConstPCGValueRange<FTransform> SrcTransforms = SrcFacade->Source->GetIn()->GetConstTransformValueRange();
-			OutTransforms[i] = SrcTransforms[V.SourcePointIdx];
-			IdxMapping[i] = (V.SourceIdx == FrameSrcIdx) ? V.SourcePointIdx : 0;
+			OutTransforms[i] = FrameTransforms[V.SourcePointIdx];
+			IdxMapping[i] = V.SourcePointIdx;
 		}
 		else
 		{
-			// Clipper-created intersection / Steiner vertex: no source -> position by unprojection.
+			// No source (Clipper-created intersection / Steiner vertex) -> position by unprojection.
 			const FVector UnprojectedPos = FrameProjection.Unproject(FVector(V.Pos.X, V.Pos.Y, V.ProjectedZ));
 			OutTransforms[i] = FTransform(UnprojectedPos);
 			IdxMapping[i] = 0;

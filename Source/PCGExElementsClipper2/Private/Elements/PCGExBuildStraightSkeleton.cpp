@@ -4,6 +4,7 @@
 #include "Elements/PCGExBuildStraightSkeleton.h"
 
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExStraightSkeletonOffset.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
@@ -11,7 +12,6 @@
 #include "Graphs/PCGExGraphBuilder.h"
 #include "Helpers/PCGExPointArrayDataHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
-#include "Math/Geo/PCGExStraightSkeleton.h"
 #include "Paths/PCGExPathsHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExGraphs"
@@ -124,34 +124,14 @@ namespace PCGExBuildStraightSkeleton
 		}
 		const double PlaneZ = NumIn > 0 ? SumZ / NumIn : 0;
 
-		// Solve (single loop, no holes in v1).
+		// Solve (single loop, no holes in v1) with the robust Clipper2 mitered-offset solver.
 		const TArray<TArray<FVector2D>> NoHoles;
-		PCGExMath::Geo::TStraightSkeleton2 Skeleton;
+		PCGExMath::Geo::FStraightSkeletonOffset Skeleton;
 		if (!Skeleton.Process(Outer, NoHoles, Settings->MergeDistance, Settings->bIncludeContour) || Skeleton.Nodes.IsEmpty())
 		{
 			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Failed to compute a straight skeleton for an input (degenerate or self-intersecting?)."));
 			return false;
 		}
-
-#if !UE_BUILD_SHIPPING
-		// TEMP DIAGNOSTIC (remove after dropped-edge debugging): log the ACTUAL in-editor input polygon
-		// (copy-pasteable) plus solver connectivity, so the real failing shape can be reproduced exactly.
-		{
-			const int32 NN = Skeleton.Nodes.Num();
-			TArray<int32> Parent;
-			Parent.SetNumUninitialized(NN);
-			for (int32 i = 0; i < NN; i++) { Parent[i] = i; }
-			auto Find = [&Parent](int32 X) -> int32 { while (Parent[X] != X) { Parent[X] = Parent[Parent[X]]; X = Parent[X]; } return X; };
-			for (const PCGExMath::Geo::FStraightSkeletonEdge& SE : Skeleton.Edges) { Parent[Find(SE.A)] = Find(SE.B); }
-			TSet<int32> Roots;
-			for (int32 i = 0; i < NN; i++) { Roots.Add(Find(i)); }
-
-			FString Pts;
-			for (const FVector2D& P : Outer) { Pts += FString::Printf(TEXT("FVector2D(%.2f, %.2f), "), P.X, P.Y); }
-			UE_LOG(LogTemp, Warning, TEXT("SSNODE closed=%d inPts=%d merge=%.3f solverNodes=%d solverEdges=%d comps=%d  OUTER={ %s }"),
-			       PCGExPaths::Helpers::GetClosedLoop(PointDataFacade->GetIn()) ? 1 : 0, Outer.Num(), Settings->MergeDistance, NN, Skeleton.Edges.Num(), Roots.Num(), *Pts);
-		}
-#endif
 
 		// Repurpose the source IO as the cluster vertex output with brand-new points.
 		if (!PointDataFacade->Source->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::New))

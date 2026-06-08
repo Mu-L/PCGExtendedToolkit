@@ -70,6 +70,23 @@ namespace PCGExClipper2Decomposition
 		int32 MaxConvexPieces = 256;
 	};
 
+	/**
+	 * Build decomposition params from any geometry-node settings exposing Precision / FillRule /
+	 * bMergeConvexPieces / MaxConvexPieces. Volume and Decompose share these fields without a common base,
+	 * so the helper is templated on the concrete settings type rather than taking a shared interface.
+	 */
+	template <typename TSettings>
+	FDecomposeParams MakeParams(const TSettings* Settings)
+	{
+		FDecomposeParams Params;
+		Params.Precision = Settings->Precision;
+		Params.FillRule = Settings->FillRule;
+		Params.bUseDelaunay = true;
+		Params.bMergeConvexPieces = Settings->bMergeConvexPieces;
+		Params.MaxConvexPieces = Settings->MaxConvexPieces;
+		return Params;
+	}
+
 	/** Result of a decomposition pass: the vertex pool, the convex piece loops, and a status. */
 	struct FDecomposeResult
 	{
@@ -115,4 +132,14 @@ namespace PCGExClipper2Decomposition
 		const TSharedPtr<PCGExClipper2::FOpData>& AllOpData,
 		const FDecomposeParams& Params,
 		FDecomposeResult& OutResult);
+
+	/**
+	 * Standard, user-facing warning text for a failed decomposition, parameterized by the node's subject
+	 * noun (e.g. "volume", "footprint") so both geometry nodes share one wording. Returns:
+	 *   - TriangulationFailed -> "A {Subject} could not be triangulated ... and was skipped."
+	 *   - TooManyPieces       -> "A {Subject} needs {N} convex pieces (over the {cap} cap) ..."
+	 *   - Success / Empty     -> empty FText (Empty is a silent skip; nothing to report).
+	 * The core deliberately does not log; callers test for non-empty text and emit it via their own context.
+	 */
+	PCGEXELEMENTSCLIPPER2_API FText DescribeDecomposeFailure(const FDecomposeResult& Result, const FText& Subject, int32 MaxConvexPieces);
 }
