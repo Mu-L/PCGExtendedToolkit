@@ -127,6 +127,7 @@ namespace PCGExBuildStraightSkeleton
 		// Solve (single loop, no holes in v1) with the robust Clipper2 mitered-offset solver.
 		const TArray<TArray<FVector2D>> NoHoles;
 		PCGExMath::Geo::FStraightSkeletonOffset Skeleton;
+		Skeleton.Resolution = Settings->Resolution;
 		if (!Skeleton.Process(Outer, NoHoles, Settings->MergeDistance, Settings->bIncludeContour) || Skeleton.Nodes.IsEmpty())
 		{
 			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Failed to compute a straight skeleton for an input (degenerate or self-intersecting?)."));

@@ -36,7 +36,16 @@ namespace PCGExMath::Geo
 		double Precision = 1000.0;
 		// Effectively-unlimited miter so corners reach the true bisector intersection (not beveled/squared).
 		double MiterLimit = 1.0e6;
-		// Offset marching step (world units). Smaller = more accurate event timing, slower. <=0 -> auto.
+
+		// The DEFAULT marching resolution -- and the single source of truth for the STABLE tolerance scale the
+		// weld/merge/edge-match gates key off, so those gates never move when Resolution is dialed.
+		static constexpr double DefaultResolution = 500.0;
+		// Marching resolution: the inward offset is sampled in steps of (bounds diagonal / Resolution). Higher =
+		// finer sampling = more accurate node positions and Time, but more offset evaluations (slower). The
+		// internal topology tolerances do NOT scale with this (they key off DefaultResolution), so raising it
+		// sharpens accuracy without destabilizing welding/merging. Overridden by Step when Step > 0.
+		double Resolution = DefaultResolution;
+		// Optional absolute override of the marching step in world units. <= 0 (default) uses Resolution instead.
 		double Step = 0.0;
 
 		FStraightSkeletonOffset() = default;

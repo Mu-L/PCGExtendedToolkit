@@ -5,6 +5,7 @@
 
 #include "Algo/Reverse.h"
 #include "PCGExH.h"
+#include "PCGExLog.h"
 #include "Clipper2Lib/clipper.h"
 
 // =====================================================================================================
@@ -272,9 +273,17 @@ namespace PCGExMath::Geo
 
 		const double Diag = BoundsMax.Size();
 		const double S = Precision;
-		const double Delta = Step > 0 ? Step : FMath::Max(Diag / 500.0, KINDA_SMALL_NUMBER);
-		const double DistTol = FMath::Max(2.0, Delta * 0.5);
-		const int32 MaxSteps = 8000;
+		// Stable tolerance scale: the step the DEFAULT resolution would use. The weld/merge/edge-match gates key
+		// off this (never the user's Resolution), so raising Resolution sharpens sampling without shrinking the
+		// gates that hold topology together (e.g. the Hexagon's near-degenerate weld cluster needs ~BaseDelta*5).
+		const double BaseDelta = FMath::Max(Diag / DefaultResolution, KINDA_SMALL_NUMBER);
+		// Marching step: how finely the inward offset is sampled. Step (world units) overrides Resolution when set.
+		const double Delta = Step > 0.0 ? Step : FMath::Max(Diag / FMath::Max(Resolution, 1.0), KINDA_SMALL_NUMBER);
+		const double DistTol = FMath::Max(2.0, BaseDelta * 0.5);
+		// Empty Rings (wavefront collapsed) is the real terminator (below). This cap only bounds a non-collapsing
+		// march and scales with the step so fine sampling is never truncated: T <= inradius <= Diag/2 => the real
+		// step count is <= Diag/(2*Delta); ~8x slack for numerical tail rings. Warned on hit, never silently cut.
+		const int32 MaxSteps = FMath::Max(256, static_cast<int32>(FMath::CeilToDouble(Diag / Delta)) * 4);
 
 		const PCGExClipper2Lib::Paths64 Subject = BuildSubject(Loops[0], TArrayView<const TArray<FVector2D>>(Loops.GetData() + 1, Loops.Num() - 1), S);
 
@@ -297,7 +306,8 @@ namespace PCGExMath::Geo
 		// ---- 3. March: per-step corner traces ---------------------------------------------------------
 		TArray<TArray<FVector2D>> Rings;
 		double LastT = 0.0;
-		for (int32 StepIdx = 0; StepIdx < MaxSteps; StepIdx++)
+		int32 StepIdx = 0;
+		for (; StepIdx < MaxSteps; StepIdx++)
 		{
 			const double T = Delta * (StepIdx + 1);
 			OffsetSubject(Subject, -T * S, MiterLimit, 1.0 / S, Rings);
@@ -352,9 +362,10 @@ namespace PCGExMath::Geo
 
 			// Dying corners merged into a surviving neighbour. The target is the survivor this corner became
 			// coincident with, so it must be GEOMETRICALLY LOCAL. Prefer the nearest survivor sharing an edge,
-			// but only within a few marching steps -- a far "shared edge" is a label coincidence that would draw
-			// a spurious diameter edge. Otherwise take the nearest survivor of any kind.
-			const double MergeGateSq = FMath::Square(FMath::Max(MergeDistance, Delta * 8.0));
+			// but only within a few default-resolution steps (stable BaseDelta, not the user's Resolution step) --
+			// a far "shared edge" is a label coincidence that would draw a spurious diameter edge. Otherwise take
+			// the nearest survivor of any kind.
+			const double MergeGateSq = FMath::Square(FMath::Max(MergeDistance, BaseDelta * 8.0));
 			for (FActiveCorner& AC : Active)
 			{
 				if (AC.bSeen) { continue; }
@@ -401,6 +412,16 @@ namespace PCGExMath::Geo
 				}
 			}
 			for (int32 ai = Active.Num() - 1; ai >= 0; ai--) { if (!Active[ai].bSeen) { Active.RemoveAtSwap(ai, 1, EAllowShrinking::No); } }
+		}
+		if (StepIdx >= MaxSteps)
+		{
+			// Warn-and-continue (no ensure: most users run without a debugger, where an ensure can surface as a
+			// crash). The wavefront should always empty first; reaching the cap means degenerate/self-intersecting
+			// input or a precision stall, and the skeleton may be truncated.
+			UE_LOG(LogPCGEx, Warning,
+				TEXT("FStraightSkeletonOffset: inward march hit the %d-step cap without the wavefront collapsing ")
+				TEXT("(Delta=%.4f, Diag=%.2f); the skeleton may be truncated -- check for degenerate / self-")
+				TEXT("intersecting input, or lower Resolution."), MaxSteps, Delta, Diag);
 		}
 
 		// ---- 4. Final collapse: ridge edges. For each ORIGINAL edge, connect the surviving corners lying
@@ -524,11 +545,12 @@ namespace PCGExMath::Geo
 		// Single-linkage (union-find) weld. A near-degenerate event spreads what should be ONE junction over
 		// several marching samples -- e.g. the Hexagon's slow reflex collapse emits 3 nodes ~15-30 apart over
 		// t=318..344. A single-rep weld leaves that as a tiny self-crossing cluster (the chain's far end never
-		// reaches the first rep); chaining collapses the whole run. Radius = max(user merge distance, a few
-		// steps) -- below the marching resolution. Contour nodes are the lowest indices and we root each set
-		// at its min index, so a cluster touching the boundary stays anchored there (spokes preserved).
+		// reaches the first rep); chaining collapses the whole run. Radius = max(user merge distance, ~5x the
+		// DEFAULT-resolution step) -- a fixed fraction of the shape, INDEPENDENT of the sampling Resolution so
+		// fine sampling cannot shrink it below an event's spread. Contour nodes are the lowest indices and we
+		// root each set at its min index, so a cluster touching the boundary stays anchored there (spokes preserved).
 		const int32 NumWork = NodePos.Num();
-		const double WeldR = FMath::Max(MergeDistance, Delta * 5.0);
+		const double WeldR = FMath::Max(MergeDistance, BaseDelta * 5.0);
 		const double WeldR2 = WeldR * WeldR;
 
 		// Only nodes referenced by a surviving arc (or contour) need to exist.
@@ -586,10 +608,15 @@ namespace PCGExMath::Geo
 
 		// ---- 6b. Planarity repair: a wavefront merge can attach an arc to the FAR end of a short junction
 		// ridge (the live hub) instead of the near BEND it actually meets, crossing a neighbouring spoke. Where
-		// two skeleton edges properly cross, slide the over-reaching edge's endpoint along an existing incident
-		// edge onto an endpoint of the other edge -- but ONLY when that SHORTENS it. The shortening test is what
-		// singles out the over-reaching edge and never disturbs a correctly-placed one; the slide preserves
-		// connectivity (the slid-from node keeps its remaining edges). Iterate to clear cascades.
+		// two skeleton edges properly cross, slide the over-reaching edge's endpoint onto an endpoint of the
+		// other edge -- but ONLY when that SHORTENS it. The shortening test singles out the over-reaching edge
+		// and never disturbs a correctly-placed one. Two slide modes, strict first: (a) the target is directly
+		// adjacent to the slid-from endpoint (trivially connectivity-safe); (b) FALLBACK, only when no strict move
+		// exists (e.g. a fine-sampled near-degenerate hub resolves into a 2-node ridge, so the correct target is
+		// 2+ hops away) -- reconnect across the gap, with a reachability check guaranteeing the slide never
+		// disconnects the skeleton (the over-reaching edge can be the SOLE bridge to a whole feature). The
+		// fallback is gated on the strict pass finding nothing, so every already-clean result is untouched.
+		// Iterate to clear cascades.
 		{
 			auto Orient = [](const FVector2D& P, const FVector2D& Q, const FVector2D& R) { return (Q.X - P.X) * (R.Y - P.Y) - (Q.Y - P.Y) * (R.X - P.X); };
 			auto Crosses = [&](const int32 a, const int32 b, const int32 cc, const int32 dd)
@@ -603,6 +630,32 @@ namespace PCGExMath::Geo
 				TArray<TSet<int32>> Adj;
 				Adj.SetNum(Nodes.Num());
 				for (const FStraightSkeletonEdge& E : Edges) { Adj[E.A].Add(E.B); Adj[E.B].Add(E.A); }
+
+				// Can Slide still reach New if the single edge (AvoidA,AvoidB) is deleted? The fallback slide below
+				// uses this to guarantee a reconnection never splits the skeleton -- essential because an over-
+				// reaching edge can be the SOLE bridge to a whole feature (a pinwheel arm, a hole's region).
+				auto Reachable = [&](const int32 Start, const int32 Target, const int32 AvoidA, const int32 AvoidB) -> bool
+				{
+					if (Start == Target) { return true; }
+					TBitArray<> Visited(false, Nodes.Num());
+					Visited[Start] = true;
+					TArray<int32> Stack;
+					Stack.Add(Start);
+					while (Stack.Num() > 0)
+					{
+						const int32 U = Stack.Pop(EAllowShrinking::No);
+						for (const int32 V : Adj[U])
+						{
+							if ((U == AvoidA && V == AvoidB) || (U == AvoidB && V == AvoidA)) { continue; }
+							if (Visited[V]) { continue; }
+							if (V == Target) { return true; }
+							Visited[V] = true;
+							Stack.Add(V);
+						}
+					}
+					return false;
+				};
+
 				bool bFixed = false;
 				for (int32 i = 0; i < Edges.Num() && !bFixed; i++)
 				{
@@ -613,16 +666,33 @@ namespace PCGExMath::Geo
 						if (!Crosses(A, B, X, Y)) { continue; }
 						int32 BestE = -1, BestKeep = -1, BestNew = -1;
 						double BestLen = TNumericLimits<double>::Max();
-						auto Try = [&](const int32 Ei, const int32 Keep, const int32 Slide, const int32 New)
+						// Slide edge Ei's far endpoint Slide -> New (New = an endpoint of the OTHER crossing edge, so
+						// the reconnected edge shares a node with it and can no longer cross it), keeping Keep, ONLY
+						// when that SHORTENS. bRelaxed=false: New must be directly adjacent to Slide (trivially
+						// connectivity-safe). bRelaxed=true: New need only stay reachable from Slide without the
+						// removed edge -- a 2+-hop reconnect that still cannot disconnect the graph.
+						auto Try = [&](const int32 Ei, const int32 Keep, const int32 Slide, const int32 New, const bool bRelaxed)
 						{
-							if (New == Keep || !Adj[Slide].Contains(New) || Adj[Keep].Contains(New)) { return; }
+							if (New == Keep || Adj[Keep].Contains(New)) { return; }
+							const bool bLinkOk = bRelaxed ? Reachable(Slide, New, Keep, Slide) : Adj[Slide].Contains(New);
+							if (!bLinkOk) { return; }
 							const double OldL = FVector2D::DistSquared(Nodes[Keep].Pos, Nodes[Slide].Pos);
 							const double NewL = FVector2D::DistSquared(Nodes[Keep].Pos, Nodes[New].Pos);
 							if (NewL >= OldL || NewL >= BestLen) { return; }
 							BestLen = NewL; BestE = Ei; BestKeep = Keep; BestNew = New;
 						};
-						Try(i, A, B, X); Try(i, A, B, Y); Try(i, B, A, X); Try(i, B, A, Y);
-						Try(j, X, Y, A); Try(j, X, Y, B); Try(j, Y, X, A); Try(j, Y, X, B);
+						// Primary: the strict adjacent slide (original behaviour). Every already-clean result is
+						// produced here, so gating the fallback on "primary found nothing" leaves them untouched.
+						Try(i, A, B, X, false); Try(i, A, B, Y, false); Try(i, B, A, X, false); Try(i, B, A, Y, false);
+						Try(j, X, Y, A, false); Try(j, X, Y, B, false); Try(j, Y, X, A, false); Try(j, Y, X, B, false);
+						if (BestE < 0)
+						{
+							// Fallback: the over-reaching edge has no adjacent endpoint to collapse onto -- its correct
+							// target is 2+ hops away (a fine-sampled near-degenerate hub resolved into a short ridge).
+							// Reconnect across the gap; Reachable keeps it connectivity-safe.
+							Try(i, A, B, X, true); Try(i, A, B, Y, true); Try(i, B, A, X, true); Try(i, B, A, Y, true);
+							Try(j, X, Y, A, true); Try(j, X, Y, B, true); Try(j, Y, X, A, true); Try(j, Y, X, B, true);
+						}
 						if (BestE >= 0)
 						{
 							Edges[BestE].A = BestKeep;

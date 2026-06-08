@@ -72,6 +72,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, ClampMin="0"))
 	double MergeDistance = 1.0;
 
+	/** Marching resolution: the inward offset is sampled in steps of (shape diagonal / Resolution). Higher =
+	 *  finer sampling = more accurate node positions and offset-distance values, but more offset evaluations
+	 *  (slower). The weld/merge tolerances are scale-stable and do NOT change with this, so raising it sharpens
+	 *  accuracy without altering the skeleton topology. The default reproduces the legacy auto step exactly
+	 *  (matches FStraightSkeletonOffset::DefaultResolution). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, ClampMin="16", ClampMax="10000", UIMin="100", UIMax="2000"))
+	double Resolution = 500.0;
+
 	/** Write each node's wavefront offset distance (inset depth / roof height) to a vertex attribute. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteOffsetDistance = false;
