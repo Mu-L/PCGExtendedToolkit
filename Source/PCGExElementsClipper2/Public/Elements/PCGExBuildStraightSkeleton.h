@@ -88,6 +88,15 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_Overridable, EditCondition="bWriteOffsetDistance"))
 	FName OffsetDistanceAttributeName = "OffsetDistance";
 
+	/** Write each skeleton edge's wavefront event classification to an int32 edge attribute. Values match
+	 *  ESkeletonEventType: 0=None (contour edges), 1=Initial, 2=EdgeEvent, 4=FeatureCollapse (3=SplitEvent unused). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_Overridable, InlineEditConditionToggle))
+	bool bWriteEventType = false;
+
+	/** Name of the 'int32' edge attribute to write the event classification to. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_Overridable, EditCondition="bWriteEventType"))
+	FName EventTypeAttributeName = "EventType";
+
 	/** Graph & Edges output properties */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Cluster Output Settings"))
 	FPCGExGraphBuilderDetails GraphBuilderDetails = FPCGExGraphBuilderDetails(EPCGExMinimalAxis::X);

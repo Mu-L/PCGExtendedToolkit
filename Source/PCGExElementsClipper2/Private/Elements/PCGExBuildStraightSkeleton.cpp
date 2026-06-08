@@ -41,6 +41,11 @@ bool FPCGExBuildStraightSkeletonElement::Boot(FPCGExContext* InContext) const
 		PCGEX_VALIDATE_NAME(Settings->OffsetDistanceAttributeName)
 	}
 
+	if (Settings->bWriteEventType)
+	{
+		PCGEX_VALIDATE_NAME(Settings->EventTypeAttributeName)
+	}
+
 	return true;
 }
 
@@ -180,6 +185,30 @@ namespace PCGExBuildStraightSkeleton
 			GraphEdges[i] = PCGExGraphs::FEdge(i, SE.A, SE.B);
 		}
 		GraphBuilder->Graph->InsertEdges(GraphEdges);
+
+		// Surface the per-edge event classification (see ESkeletonEventType) as an int32 edge attribute. The graph
+		// compile splits edges into subgraphs and reorders them, so we map back via the per-subgraph PreCompile
+		// callback: EdgeKeys[i].Index is the ORIGINAL edge index (== the index we built FEdge with == the solver
+		// edge index). Everything is captured BY VALUE -- the callback fires during async compile, after Process
+		// returns, so it must own its data (no dangling Skeleton / this).
+		if (Settings->bWriteEventType)
+		{
+			TArray<int32> EdgeEvents;
+			EdgeEvents.SetNumUninitialized(Skeleton.Edges.Num());
+			for (int32 i = 0; i < Skeleton.Edges.Num(); i++) { EdgeEvents[i] = static_cast<int32>(Skeleton.Edges[i].Event); }
+			const FName EventAttr = Settings->EventTypeAttributeName;
+
+			GraphBuilder->OnCreateContext = []() -> TSharedPtr<PCGExGraphs::FSubGraphUserContext> { return MakeShared<PCGExGraphs::FSubGraphUserContext>(); };
+			GraphBuilder->OnPreCompile = [EventAttr, EdgeEvents = MoveTemp(EdgeEvents)](PCGExGraphs::FSubGraphUserContext&, const PCGExGraphs::FSubGraphPreCompileData& Data)
+			{
+				const TSharedPtr<PCGExData::TBuffer<int32>> Writer = Data.EdgesDataFacade->GetWritable<int32>(EventAttr, 0, true, PCGExData::EBufferInit::New);
+				for (int32 i = 0; i < Data.NumEdges; i++)
+				{
+					const int32 SolverEdgeIdx = Data.EdgeKeys[i].Index;
+					Writer->SetValue(i, EdgeEvents.IsValidIndex(SolverEdgeIdx) ? EdgeEvents[SolverEdgeIdx] : 0);
+				}
+			};
+		}
 
 		GraphBuilder->CompileAsync(InTaskManager, false);
 
