@@ -280,6 +280,11 @@ namespace PCGExMath::Geo
 
 		struct FArcRec { int32 A; int32 B; };
 		TArray<FArcRec> Arcs;
+		// Parallel/feature-collapse medials (a pinched neck's centerline). Recorded here during the march and
+		// added after it ONLY where they bridge two otherwise-disconnected components -- so a genuine bridge
+		// (the neck) is restored, while a medial already implied by the surrounding skeleton (a hole's ring
+		// routes around the gap) is not duplicated into a crossing edge.
+		TArray<FArcRec> CollapseCandidates;
 
 		auto AddNode = [&](const FVector2D& P, const double T) -> int32
 		{
@@ -346,10 +351,9 @@ namespace PCGExMath::Geo
 			}
 
 			// Dying corners merged into a surviving neighbour. The target is the survivor this corner became
-			// coincident with, so it must be GEOMETRICALLY LOCAL. Prefer the nearest survivor sharing an
-			// edge, but only within a few marching steps -- a far "shared edge" is a label coincidence (e.g.
-			// across a collapsed neck) that would draw a spurious diameter edge. Otherwise take the nearest
-			// survivor of any kind.
+			// coincident with, so it must be GEOMETRICALLY LOCAL. Prefer the nearest survivor sharing an edge,
+			// but only within a few marching steps -- a far "shared edge" is a label coincidence that would draw
+			// a spurious diameter edge. Otherwise take the nearest survivor of any kind.
 			const double MergeGateSq = FMath::Square(FMath::Max(MergeDistance, Delta * 8.0));
 			for (FActiveCorner& AC : Active)
 			{
@@ -393,7 +397,7 @@ namespace PCGExMath::Geo
 					OnE.RemoveAll([&](const int32 ai) { const double Pj = FVector2D::DotProduct(Active[ai].Pos - EP, EDir); return Pj < -CollapseSlack || Pj > OrigEdges[Pair.Key].Len + CollapseSlack; });
 					if (OnE.Num() < 2) { continue; }
 					OnE.Sort([&](const int32 A, const int32 B) { return FVector2D::DotProduct(Active[A].Pos, EDir) < FVector2D::DotProduct(Active[B].Pos, EDir); });
-					for (int32 k = 0; k + 1 < OnE.Num(); k++) { if (Active[OnE[k]].Node != Active[OnE[k + 1]].Node) { Arcs.Add({Active[OnE[k]].Node, Active[OnE[k + 1]].Node}); } }
+					for (int32 k = 0; k + 1 < OnE.Num(); k++) { if (Active[OnE[k]].Node != Active[OnE[k + 1]].Node) { CollapseCandidates.Add({Active[OnE[k]].Node, Active[OnE[k + 1]].Node}); } }
 				}
 			}
 			for (int32 ai = Active.Num() - 1; ai >= 0; ai--) { if (!Active[ai].bSeen) { Active.RemoveAtSwap(ai, 1, EAllowShrinking::No); } }
@@ -429,6 +433,23 @@ namespace PCGExMath::Geo
 					if (NA != NB) { Arcs.Add({NA, NB}); }
 				}
 			}
+		}
+
+		// ---- 4b. Connectivity repair: add a recorded collapse-medial only where it joins two components -----
+		// A pinched feature (a thin neck) can be the ONLY link between two parts of the shape, and its medial is
+		// captured by none of the passes above. Restore exactly those bridges: union the arcs so far, then add
+		// each candidate whose endpoints are still in different components. A medial already implied by the
+		// surrounding skeleton (a hole's encircling ring) joins same-component nodes and is skipped, so it never
+		// becomes a crossing duplicate.
+		if (CollapseCandidates.Num() > 0)
+		{
+			TArray<int32> Parent;
+			Parent.SetNumUninitialized(NodePos.Num());
+			for (int32 i = 0; i < Parent.Num(); i++) { Parent[i] = i; }
+			auto Find = [&Parent](int32 X) { while (Parent[X] != X) { Parent[X] = Parent[Parent[X]]; X = Parent[X]; } return X; };
+			auto Union = [&](const int32 A, const int32 B) { const int32 RA = Find(A); const int32 RB = Find(B); if (RA != RB) { Parent[RA] = RB; } };
+			for (const FArcRec& Arc : Arcs) { Union(Arc.A, Arc.B); }
+			for (const FArcRec& C : CollapseCandidates) { if (Find(C.A) != Find(C.B)) { Arcs.Add(C); Union(C.A, C.B); } }
 		}
 
 		// ---- 5. Collinear-dissolve: collapse each straight trace run into one edge ---------------------
@@ -562,6 +583,70 @@ namespace PCGExMath::Geo
 		};
 
 		for (const FArcRec& Arc : Arcs) { AddEdge(Final(Arc.A), Final(Arc.B), ESkeletonEdgeType::Skeleton); }
+
+		// ---- 6b. Planarity repair: a wavefront merge can attach an arc to the FAR end of a short junction
+		// ridge (the live hub) instead of the near BEND it actually meets, crossing a neighbouring spoke. Where
+		// two skeleton edges properly cross, slide the over-reaching edge's endpoint along an existing incident
+		// edge onto an endpoint of the other edge -- but ONLY when that SHORTENS it. The shortening test is what
+		// singles out the over-reaching edge and never disturbs a correctly-placed one; the slide preserves
+		// connectivity (the slid-from node keeps its remaining edges). Iterate to clear cascades.
+		{
+			auto Orient = [](const FVector2D& P, const FVector2D& Q, const FVector2D& R) { return (Q.X - P.X) * (R.Y - P.Y) - (Q.Y - P.Y) * (R.X - P.X); };
+			auto Crosses = [&](const int32 a, const int32 b, const int32 cc, const int32 dd)
+			{
+				const double D1 = Orient(Nodes[cc].Pos, Nodes[dd].Pos, Nodes[a].Pos), D2 = Orient(Nodes[cc].Pos, Nodes[dd].Pos, Nodes[b].Pos);
+				const double D3 = Orient(Nodes[a].Pos, Nodes[b].Pos, Nodes[cc].Pos), D4 = Orient(Nodes[a].Pos, Nodes[b].Pos, Nodes[dd].Pos);
+				return ((D1 > 0 && D2 < 0) || (D1 < 0 && D2 > 0)) && ((D3 > 0 && D4 < 0) || (D3 < 0 && D4 > 0));
+			};
+			for (int32 Iter = 0; Iter < 16; Iter++)
+			{
+				TArray<TSet<int32>> Adj;
+				Adj.SetNum(Nodes.Num());
+				for (const FStraightSkeletonEdge& E : Edges) { Adj[E.A].Add(E.B); Adj[E.B].Add(E.A); }
+				bool bFixed = false;
+				for (int32 i = 0; i < Edges.Num() && !bFixed; i++)
+				{
+					for (int32 j = i + 1; j < Edges.Num() && !bFixed; j++)
+					{
+						const int32 A = Edges[i].A, B = Edges[i].B, X = Edges[j].A, Y = Edges[j].B;
+						if (A == X || A == Y || B == X || B == Y) { continue; }
+						if (!Crosses(A, B, X, Y)) { continue; }
+						int32 BestE = -1, BestKeep = -1, BestNew = -1;
+						double BestLen = TNumericLimits<double>::Max();
+						auto Try = [&](const int32 Ei, const int32 Keep, const int32 Slide, const int32 New)
+						{
+							if (New == Keep || !Adj[Slide].Contains(New) || Adj[Keep].Contains(New)) { return; }
+							const double OldL = FVector2D::DistSquared(Nodes[Keep].Pos, Nodes[Slide].Pos);
+							const double NewL = FVector2D::DistSquared(Nodes[Keep].Pos, Nodes[New].Pos);
+							if (NewL >= OldL || NewL >= BestLen) { return; }
+							BestLen = NewL; BestE = Ei; BestKeep = Keep; BestNew = New;
+						};
+						Try(i, A, B, X); Try(i, A, B, Y); Try(i, B, A, X); Try(i, B, A, Y);
+						Try(j, X, Y, A); Try(j, X, Y, B); Try(j, Y, X, A); Try(j, Y, X, B);
+						if (BestE >= 0)
+						{
+							Edges[BestE].A = BestKeep;
+							Edges[BestE].B = BestNew;
+							Edges[BestE].bPerimeterIncident = Nodes[BestKeep].bIsContour || Nodes[BestNew].bIsContour;
+							bFixed = true;
+						}
+					}
+				}
+				if (!bFixed) { break; }
+			}
+			TSet<uint64> Seen;
+			TArray<FStraightSkeletonEdge> Kept;
+			Kept.Reserve(Edges.Num());
+			for (const FStraightSkeletonEdge& E : Edges)
+			{
+				if (E.A == E.B) { continue; }
+				const uint64 K = PCGEx::H64U(static_cast<uint32>(E.A), static_cast<uint32>(E.B));
+				if (Seen.Contains(K)) { continue; }
+				Seen.Add(K);
+				Kept.Add(E);
+			}
+			Edges = MoveTemp(Kept);
+		}
 
 		if (bIncludeContour)
 		{

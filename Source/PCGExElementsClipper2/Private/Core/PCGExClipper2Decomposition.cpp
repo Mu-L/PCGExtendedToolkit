@@ -97,30 +97,30 @@ namespace PCGExClipper2Decomposition
 
 	// Greedy Hertel-Mehlhorn-style convex merge of a triangulation into fewer convex pieces.
 	//
-	// Full passes repeat until one merges nothing (fixpoint). Within a pass, piece i absorbs every piece it
-	// can before advancing, without restarting the outer scan; a later pass re-examines earlier pieces
-	// against any grown piece, so the converged decomposition matches the original (which restarted the whole
-	// i/j scan after every single merge -- O(n^3) in the piece count).
+	// IMPORTANT: every successful merge restarts the whole i/j scan from the start (that is what the
+	// `&& !bMerged` loop guards + the outer while do). The restart is INTENTIONAL and load-bearing for output
+	// QUALITY -- it is NOT a missed optimization. Greedy convex merging is order-sensitive: "merge the first
+	// available pair, then re-scan from the beginning" immediately re-pairs a freshly-grown piece against the
+	// earlier pieces, which yields markedly FEWER convex pieces than absorbing each piece's neighbours in one
+	// forward sweep. It is O(n^3) in the piece count (bounded by MaxConvexPieces), but the better
+	// decomposition is worth it -- do NOT replace the restart with a forward-sweep/fixpoint variant (measured
+	// to produce MORE pieces).
 	void MergeIntoConvexPieces(TArray<TArray<int32>>& Pieces, const TArray<FFootprintVertex>& Pool)
 	{
-		bool bAnyMerged = true;
-		while (bAnyMerged && Pieces.Num() > 1)
+		bool bMerged = true;
+		while (bMerged && Pieces.Num() > 1)
 		{
-			bAnyMerged = false;
-			for (int32 i = 0; i < Pieces.Num(); i++)
+			bMerged = false;
+			for (int32 i = 0; i < Pieces.Num() && !bMerged; i++)
 			{
-				for (int32 j = i + 1; j < Pieces.Num();)
+				for (int32 j = i + 1; j < Pieces.Num() && !bMerged; j++)
 				{
 					TArray<int32> Result;
 					if (TryMergeConvex(Pieces[i], Pieces[j], Pool, Result))
 					{
 						Pieces[i] = MoveTemp(Result);
-						Pieces.RemoveAt(j); // keep order; the next piece shifts into slot j, so recheck it
-						bAnyMerged = true;
-					}
-					else
-					{
-						++j;
+						Pieces.RemoveAt(j);
+						bMerged = true;
 					}
 				}
 			}
