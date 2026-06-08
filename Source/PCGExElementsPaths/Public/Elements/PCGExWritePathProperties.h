@@ -218,6 +218,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output - Path", meta=(DisplayName="Num Inside", PCG_Overridable, EditCondition="bWriteNumInside"))
 	FName NumInsideAttributeName = FName("@Data.NumInside");
 
+	/** Write a per-path 'Is Hole' flag attribute (true for odd inclusion-depth paths -- the standard even-odd hole rule). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output - Path", meta=(PCG_NotOverridable))
+	bool bWriteIsHole = false;
+
 #pragma endregion
 
 #pragma region Points attributes

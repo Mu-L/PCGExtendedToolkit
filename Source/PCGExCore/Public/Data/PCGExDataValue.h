@@ -9,6 +9,7 @@
 #include "UObject/Object.h"
 
 class UPCGData;
+struct FPCGTaggedData;
 struct FPCGAttributePropertyInputSelector;
 enum class EPCGMetadataTypes : uint8;
 
@@ -94,4 +95,8 @@ extern template class TDataValue<_TYPE>;
 	PCGEXCORE_API TSharedPtr<IDataValue> TryGetValueFromData(const UPCGData* InData, const FPCGAttributePropertyInputSelector& InSelector);
 
 	PCGEXCORE_API TSharedPtr<IDataValue> TryGetValueFromData(const UPCGData* InData, const FName& InName);
+
+	// Reads a data-level value for InSelector from a tagged data: matches the selector
+	// name against the "key:value" tags first, then falls back to a data-domain attribute.
+	PCGEXCORE_API TSharedPtr<IDataValue> TryGetValueFromData(const FPCGTaggedData& InTaggedData, const FPCGAttributePropertyInputSelector& InSelector);
 }

@@ -3,6 +3,7 @@
 
 #include "Data/PCGExDataValue.h"
 
+#include "PCGData.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExSubSelection.h"
 #include "Helpers/PCGExMetaHelpers.h"
@@ -238,5 +239,26 @@ template class PCGEXCORE_API TDataValue<_TYPE>;
 		Selector.Update(InName.ToString());
 
 		return TryGetValueFromData(InData, Selector);
+	}
+
+	TSharedPtr<IDataValue> TryGetValueFromData(const FPCGTaggedData& InTaggedData, const FPCGAttributePropertyInputSelector& InSelector)
+	{
+		// Tag-first: match the selector name against the "key:value" tags.
+		const FString TagName = InSelector.GetName().ToString();
+		if (!TagName.IsEmpty())
+		{
+			for (const FString& Tag : InTaggedData.Tags)
+			{
+				FString LeftSide;
+				if (TSharedPtr<IDataValue> TagValue = TryGetValueFromTag(Tag, LeftSide);
+					TagValue && LeftSide == TagName)
+				{
+					return TagValue;
+				}
+			}
+		}
+
+		// Fallback: data-domain attribute.
+		return TryGetValueFromData(InTaggedData.Data, InSelector);
 	}
 }

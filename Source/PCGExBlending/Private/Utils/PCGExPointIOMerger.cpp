@@ -4,8 +4,12 @@
 
 #include "Utils/PCGExPointIOMerger.h"
 
+#include "PCGExCommon.h"
 #include "Data/PCGExDataTags.h"
+#include "Data/PCGExDataValue.h"
+#include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Details/PCGExBlendingDetails.h"
+#include "Types/PCGExTypeTraits.h"
 #include "Utils/PCGExIntTracker.h"
 
 namespace PCGExPointIOMerger
@@ -50,6 +54,46 @@ namespace PCGExPointIOMerger
 
 #undef PCGEX_TPL
 
+	// Fills one source's disjoint output range with a single resolved value (the tag fallback used by
+	// FCopyAttributeTask: one source's tag value, broadcast across that source's points).
+	template <typename T>
+	class FWriteConvertedTagScopeTask final : public PCGExMT::FTask
+	{
+	public:
+		PCGEX_ASYNC_TASK_NAME(FWriteConvertedTagScopeTask)
+
+		FWriteConvertedTagScopeTask(
+			const FMergeScope& InScope,
+			const T& InValue,
+			const TSharedPtr<PCGExData::TBuffer<T>>& InOutBuffer,
+			const TSharedPtr<FPCGExIntTracker>& InTracker)
+			: FTask()
+			  , Scope(InScope)
+			  , Value(InValue)
+			  , OutBuffer(InOutBuffer)
+			  , Tracker(InTracker)
+		{
+		}
+
+		const FMergeScope Scope;
+		const T Value;
+		const TSharedPtr<PCGExData::TBuffer<T>> OutBuffer;
+		TSharedPtr<FPCGExIntTracker> Tracker;
+
+		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
+		{
+			for (int Index = Scope.Write.Start; Index < Scope.Write.End; Index++)
+			{
+				OutBuffer->SetValue(Index, Value);
+			}
+			Tracker->IncrementCompleted();
+		}
+	};
+
+	// Builds one output attribute. Each source that carries the real attribute is read normally; where
+	// a source lacks it (or for a tag-only synthetic identity), a same-named tag value composites in --
+	// converted to the output type via PCGExTypeOps (best-effort, no type gate). The real attribute
+	// always wins the type, and any point whose source actually has it.
 	class FCopyAttributeTask final : public PCGExMT::FPCGExIndexedTask
 	{
 	public:
@@ -69,6 +113,11 @@ namespace PCGExPointIOMerger
 
 			const FIdentityRef& Identity = Merger->UniqueIdentities[TaskIndex];
 
+			// Tag-only synthetic identities have no backing attribute; they are fed purely from tags and
+			// never consult source metadata (so a filtered-out same-named real attribute is ignored).
+			const bool bTagOnly = (Identity.Attribute == nullptr);
+			const TArray<TSharedPtr<PCGExData::IDataValue>>* TagValues = Merger->TagValuesByName.Find(Identity.Identifier.Name);
+
 			PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
@@ -78,22 +127,60 @@ namespace PCGExPointIOMerger
 					Identity.bInitDefault ? static_cast<const FPCGMetadataAttribute<T>*>(Identity.Attribute)->GetValue(PCGDefaultValueKey) : T{},
 					Identity.bAllowsInterpolation, PCGExData::EBufferInit::New);
 
+				if (!Buffer)
+				{
+					return;
+				}
+
 				for (int i = 0; i < Merger->IOSources.Num(); i++)
 				{
-					TSharedPtr<PCGExData::FPointIO> SourceIO = Merger->IOSources[i];
-					const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identity.Identifier);
+					const TSharedPtr<PCGExData::FPointIO>& SourceIO = Merger->IOSources[i];
 
-					if (!Attribute)
+					// A real attribute on this source wins (its type must match the resolved type).
+					if (!bTagOnly)
+					{
+						const FPCGMetadataAttributeBase* Attribute = SourceIO->GetIn()->Metadata->GetConstAttribute(Identity.Identifier);
+						if (Attribute && Identity.IsA(Attribute->GetTypeId()))
+						{
+							Merger->InternalTracker->IncrementPending();
+							PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer, Merger->InternalTracker)
+							continue;
+						}
+						// No usable attribute on this source -> fall through to its tag value, if any.
+					}
+
+					if (!TagValues)
 					{
 						continue;
-					} // Missing attribute
-					if (!Identity.IsA(Attribute->GetTypeId()))
+					}
+
+					const TSharedPtr<PCGExData::IDataValue>& TagValue = (*TagValues)[i];
+					if (!TagValue)
 					{
 						continue;
-					} // Type mismatch
+					} // This source doesn't carry the tag.
+
+					const FMergeScope& Scope = Merger->Scopes[i];
+					if (Scope.Write.Count <= 0)
+					{
+						continue;
+					}
+
+					// No type gate -- always convert. A same-type tag is taken verbatim (so e.g. an int64
+					// originator keeps full precision instead of round-tripping through double); a cross-type
+					// tag uses PCGExTypeOps' own best-effort conversion. No PCG broadcastability map involved.
+					T ConvertedValue{};
+					if (TagValue->GetTypeId() == PCGExTypes::TTraits<T>::Type)
+					{
+						ConvertedValue = static_cast<PCGExData::TDataValue<T>*>(TagValue.Get())->Value;
+					}
+					else
+					{
+						ConvertedValue = TagValue->GetValue<T>();
+					}
 
 					Merger->InternalTracker->IncrementPending();
-					PCGEX_LAUNCH_INTERNAL(FWriteAttributeScopeTask<T>, SourceIO, Merger->Scopes[i], Identity, Buffer, Merger->InternalTracker)
+					PCGEX_LAUNCH_INTERNAL(FWriteConvertedTagScopeTask<T>, Scope, ConvertedValue, Buffer, Merger->InternalTracker)
 				}
 			});
 
@@ -192,7 +279,7 @@ void FPCGExPointIOMerger::Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& 
 	}
 }
 
-void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes, const bool bWriteUnion)
+void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes, const bool bWriteUnion, const FPCGExNameFiltersDetails* InTagsToAttributes)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExPointIOMerger::MergeAsync);
 
@@ -264,6 +351,92 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 			});
 	}
 
+	// Build the tag-to-attribute plan (opt-in via InTagsToAttributes), now that carried attributes are
+	// known. A tag passing the filter is intent: it is consumed (stripped from the output tags) whatever
+	// the outcome. If its name is a carried real attribute it composites in -- filling points whose source
+	// lacks the attribute, when the tag's type broadcasts to the attribute's type (incompatible tags are
+	// dropped at write time). Otherwise it becomes a tag-only attribute of its own resolved type, ignoring
+	// any same-named attribute the Carry-Over filter excluded.
+	if (InTagsToAttributes)
+	{
+		// Names already owned by a carried real attribute (composite targets).
+		TSet<FName> CarriedNames;
+		CarriedNames.Reserve(UniqueIdentities.Num());
+		for (const PCGExPointIOMerger::FIdentityRef& Identity : UniqueIdentities)
+		{
+			CarriedNames.Add(Identity.Identifier.Name);
+		}
+
+		// Resolved output type for tag-only names (first typed value wins; presence-only stays Boolean).
+		TMap<FName, EPCGMetadataTypes> TagOnlyTypes;
+
+		for (int i = 0; i < NumSources; i++)
+		{
+			const TSharedPtr<PCGExData::FPointIO>& Source = IOSources[i];
+
+			for (const FName TagName : Source->Tags->FlattenToArrayOfNames(false))
+			{
+				const FString TagStr = TagName.ToString();
+
+				// Never convert reserved PCGEx data-recognition tags (cluster pairing, etc.).
+				if (TagStr.StartsWith(PCGExCommon::PCGExPrefix))
+				{
+					continue;
+				}
+				if (!InTagsToAttributes->Test(TagStr))
+				{
+					continue;
+				}
+
+				// Intent: this tag is consumed from the output regardless of how it resolves.
+				ConvertedTagNames.Add(TagName);
+
+				// This source's value: the typed tag value, or Boolean 'true' for a valueless (presence) tag.
+				TSharedPtr<PCGExData::IDataValue> Value = Source->Tags->GetValue(TagStr);
+				if (!Value)
+				{
+					Value = MakeShared<PCGExData::TDataValue<bool>>(true);
+				}
+
+				TArray<TSharedPtr<PCGExData::IDataValue>>& PerSource = TagValuesByName.FindOrAdd(TagName);
+				if (PerSource.IsEmpty())
+				{
+					PerSource.SetNum(NumSources);
+				}
+				PerSource[i] = Value;
+
+				// Track the tag-only output type (only used when the name isn't a carried attribute).
+				if (!CarriedNames.Contains(TagName))
+				{
+					EPCGMetadataTypes& TagOnlyType = TagOnlyTypes.FindOrAdd(TagName, EPCGMetadataTypes::Boolean);
+					if (TagOnlyType == EPCGMetadataTypes::Boolean && Value->GetTypeId() != EPCGMetadataTypes::Boolean)
+					{
+						TagOnlyType = Value->GetTypeId();
+					}
+				}
+			}
+		}
+
+		// One synthetic identity per tag-only name, so the unified FCopyAttributeTask path builds it.
+		for (const TPair<FName, EPCGMetadataTypes>& Pair : TagOnlyTypes)
+		{
+			// Integer tags originate as int64. An int64 tag may still be cast (with loss) into an
+			// existing narrower int32 attribute -- but when the tag is the originating type, it must
+			// not be silently narrowed to int32.
+			EPCGMetadataTypes EntryType = Pair.Value;
+			if (EntryType == EPCGMetadataTypes::Integer32)
+			{
+				EntryType = EPCGMetadataTypes::Integer64;
+			}
+
+			PCGExPointIOMerger::FIdentityRef& Entry = UniqueIdentities.Emplace_GetRef(Pair.Key, EntryType, true);
+			Entry.Attribute = nullptr; // tag-only marker (no backing metadata attribute)
+			Entry.bInitDefault = false;
+			Entry.Identifier = FPCGAttributeIdentifier(Pair.Key, PCGMetadataDomainID::Elements);
+			Entry.ElementsIdentifier = FPCGAttributeIdentifier(Pair.Key, PCGMetadataDomainID::Elements);
+		}
+	}
+
 	InCarryOverDetails->Prune(&UnionDataFacade->Source.Get());
 
 	UPCGBasePointData* OutPointData = UnionDataFacade->GetOut();
@@ -293,12 +466,20 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 		[PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
 		{
 			PCGEX_ASYNC_THIS
+
+			// Tags marked for conversion are consumed into attributes; drop them from the merged
+			// data-domain tags so they aren't duplicated (and flattened) on the output.
+			if (!This->ConvertedTagNames.IsEmpty())
+			{
+				This->UnionDataFacade->Source->Tags->Remove(This->ConvertedTagNames);
+			}
+
 			if (This->bWriteFacade)
 			{
 				This->UnionDataFacade->WriteFastest(TaskManager);
 			}
 		});
-		
+
 		CopyProperties->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
 		{
 			PCGEX_ASYNC_THIS

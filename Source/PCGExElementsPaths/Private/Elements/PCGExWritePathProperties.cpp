@@ -30,7 +30,7 @@ bool UPCGExWritePathPropertiesSettings::CanForwardData() const
 
 bool UPCGExWritePathPropertiesSettings::WantsInclusionHelper() const
 {
-	return bTagInner || bTagOuter || bTagOddInclusionDepth || bWriteNumInside || bWriteInclusionDepth || bUseInclusionPins;
+	return bTagInner || bTagOuter || bTagOddInclusionDepth || bWriteNumInside || bWriteInclusionDepth || bUseInclusionPins || bWriteIsHole;
 }
 
 bool UPCGExWritePathPropertiesSettings::WriteAnyPathData() const
@@ -373,6 +373,13 @@ namespace PCGExWritePathProperties
 		if (PathAttributeSet && !Context->PathAttributeSet)
 		{
 			Context->StageOutput(PathAttributeSet, OutputPathProperties, PCGExData::EStaging::None, FlattenedTags);
+		}
+
+		// A hole is a path at ODD inclusion depth (even-odd rule); depth 0 (outer) and even depths are not holes.
+		if (Settings->bWriteIsHole && Context->InclusionHelper)
+		{
+			PCGExPaths::FInclusionInfos HoleInfos;
+			PCGExPaths::Helpers::SetIsHole(PointDataFacade->Source, Context->InclusionHelper->Find(Path->Idx, HoleInfos) && HoleInfos.bOdd);
 		}
 
 		if (PCGExPaths::FInclusionInfos Infos;

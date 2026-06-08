@@ -127,7 +127,7 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	bool bDataDomainToElements = true;
 
 	/** Scope */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Scope"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Scope", EditCondition="bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
 	EPCGExAttributeDomainScope Scope = EPCGExAttributeDomainScope::Any;
 
 	/** Tags to carry over. */
@@ -135,7 +135,7 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	FPCGExNameFiltersDetails Tags = FPCGExNameFiltersDetails(false);
 
 	/** If enabled, will test full tag with its value ('Tag:Value'), otherwise only test the left part ignoring the right `:Value` ('Tag'). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Flatten tag value"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Flatten tag value", EditCondition="!bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
 	bool bTestTagsWithValues = false;
 
 	void Init();

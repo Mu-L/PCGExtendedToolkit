@@ -222,6 +222,31 @@ namespace PCGExSorting
 			const TSharedPtr<FRuleHandler>& RuleHandler = RuleHandlers[i];
 			RuleHandler->DataValues.SetNum(NumDatas);
 
+			if (RuleHandler->bUseDataTag)
+			{
+				// Tag-based: resolve each data's value tag-first, attribute-fallback.
+				// Lenient -- datas without a value are left null (skipped during
+				// comparison); the rule is kept as long as at least one data resolves.
+				bool bFoundAny = false;
+				for (int32 f = 0; f < NumDatas; f++)
+				{
+					const int32 DataIdx = IdxMap[InTaggedDatas[f].Data->GetUniqueID()];
+					if (TSharedPtr<PCGExData::IDataValue> DataValue = PCGExData::TryGetValueFromData(InTaggedDatas[f], RuleHandler->Selector))
+					{
+						RuleHandler->DataValues[DataIdx] = DataValue;
+						bFoundAny = true;
+					}
+				}
+
+				if (!bFoundAny)
+				{
+					PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(FTEXT("Sorting rule tag '{0}' not found on any data, rule will be skipped."), FText::FromString(RuleHandler->Selector.GetName().ToString())));
+					RuleHandlers.RemoveAt(i);
+					i--;
+				}
+				continue;
+			}
+
 			for (int32 f = 0; f < NumDatas; f++)
 			{
 				const UPCGData* Data = InTaggedDatas[f].Data;

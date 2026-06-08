@@ -52,6 +52,10 @@ bool FPCGExPathStitchElement::Boot(FPCGExContext* InContext) const
 	PCGEX_FWD(CarryOverDetails)
 	Context->CarryOverDetails.Init();
 
+	PCGEX_FWD(bTagToAttributes)
+	PCGEX_FWD(TagsToAttributes)
+	Context->TagsToAttributes.Init();
+
 	return true;
 }
 
@@ -258,7 +262,7 @@ namespace PCGExPathStitch
 			MergeScope.bReverse = Link.bReverse;
 		}
 
-		Merger->MergeAsync(TaskManager, &Context->CarryOverDetails);
+		Merger->MergeAsync(TaskManager, &Context->CarryOverDetails, nullptr, false, Settings->bTagToAttributes ? &Context->TagsToAttributes : nullptr);
 
 		PCGExPaths::Helpers::SetClosedLoop(PointDataFacade->GetOut(), bClosedLoop);
 	}
