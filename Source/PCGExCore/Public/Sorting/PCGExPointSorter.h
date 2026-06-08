@@ -54,7 +54,6 @@ namespace PCGExSorting
 	protected:
 		FPCGExContext* ExecutionContext = nullptr;
 		TArray<TSharedPtr<FRuleHandler>> RuleHandlers;
-		TMap<uint32, int32> IdxMap;
 
 		// Cached for hot path - updated by UpdateCachedState()
 		int32 NumRules = 0;

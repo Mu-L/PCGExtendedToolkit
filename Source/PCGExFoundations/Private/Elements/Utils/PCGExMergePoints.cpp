@@ -19,7 +19,7 @@ namespace PCGExMergePoints
 	PCGEX_CTX_STATE(State_MergingData);
 }
 
-void FPCGExMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails)
+void FPCGExMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const FPCGExNameFiltersDetails* InTagsToAttributes)
 {
 	if (IOs.IsEmpty())
 	{
@@ -38,7 +38,7 @@ void FPCGExMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager
 
 	Merger = MakeShared<FPCGExPointIOMerger>(CompositeDataFacade.ToSharedRef());
 	Merger->Append(IOs);
-	Merger->MergeAsync(TaskManager, InCarryOverDetails);
+	Merger->MergeAsync(TaskManager, InCarryOverDetails, nullptr, false, InTagsToAttributes);
 }
 
 void FPCGExMergeList::Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) const
@@ -118,6 +118,10 @@ bool FPCGExMergePointsElement::Boot(FPCGExContext* InContext) const
 
 	Context->CarryOverDetails = Settings->CarryOverDetails;
 	Context->CarryOverDetails.Init();
+
+	Context->bTagToAttributes = Settings->bTagToAttributes;
+	Context->TagsToAttributes = Settings->TagsToAttributes;
+	Context->TagsToAttributes.Init();
 
 	// Initialize the data matcher
 	Context->DataMatcher = MakeShared<PCGExMatching::FDataMatcher>();
@@ -229,9 +233,9 @@ bool FPCGExMergePointsElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 
 			for (const TSharedPtr<FPCGExMergeList>& List : Context->MergeLists)
 			{
-				MergeAsync->AddSimpleCallback([List, TaskManager, Det = Context->CarryOverDetails]
+				MergeAsync->AddSimpleCallback([List, TaskManager, Det = Context->CarryOverDetails, bT2A = Context->bTagToAttributes, TagDet = Context->TagsToAttributes]
 				{
-					List->Merge(TaskManager, &Det);
+					List->Merge(TaskManager, &Det, PCGExDataFilter::ResolveOptional(bT2A, TagDet));
 				});
 			}
 

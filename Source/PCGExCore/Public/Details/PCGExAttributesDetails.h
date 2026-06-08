@@ -21,8 +21,11 @@ struct PCGEXCORE_API FPCGExInputConfig
 
 	FPCGExInputConfig() = default;
 	explicit FPCGExInputConfig(const FPCGAttributePropertyInputSelector& InSelector);
-	explicit FPCGExInputConfig(const FPCGExInputConfig& Other);
 	explicit FPCGExInputConfig(const FName InName);
+
+	// Compiler-generated copy/move: Attribute/UnderlyingType are transient caches rebound by Validate(), so never read them before calling it.
+	FPCGExInputConfig(const FPCGExInputConfig&) = default;
+	FPCGExInputConfig& operator=(const FPCGExInputConfig&) = default;
 
 	virtual ~FPCGExInputConfig() = default;
 	UPROPERTY(VisibleAnywhere, Category=Settings, meta=(HideInDetailPanel, EditCondition="false", EditConditionHides))

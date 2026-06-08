@@ -42,7 +42,7 @@ namespace PCPGExMergePointsByTag
 		FMergeList();
 		~FMergeList() = default;
 
-		void Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails);
+		void Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const FPCGExNameFiltersDetails* InTagsToAttributes = nullptr);
 		void Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) const;
 	};
 
@@ -114,6 +114,14 @@ public:
 	/** Meta filter settings. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Carry Over Settings"))
 	FPCGExCarryOverDetails CarryOverDetails;
+
+	/** If enabled, will convert tags into per-point attributes so their semantics survive the merge. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, InlineEditConditionToggle))
+	bool bTagToAttributes = false;
+
+	/** Tags to convert to attributes: simple tags become boolean (presence), tag:value pairs become their typed value. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="bTagToAttributes"))
+	FPCGExNameFiltersDetails TagsToAttributes = FPCGExNameFiltersDetails(false);
 };
 
 struct FPCGExMergePointsByTagContext final : FPCGExPointsProcessorContext
@@ -122,6 +130,9 @@ struct FPCGExMergePointsByTagContext final : FPCGExPointsProcessorContext
 
 	FPCGExNameFiltersDetails TagFilters;
 	FPCGExCarryOverDetails CarryOverDetails;
+
+	bool bTagToAttributes = false;
+	FPCGExNameFiltersDetails TagsToAttributes;
 
 	TSharedPtr<PCPGExMergePointsByTag::FMergeList> FallbackMergeList;
 	TMap<uint32, TSharedPtr<PCPGExMergePointsByTag::FMergeList>> MergeMap;

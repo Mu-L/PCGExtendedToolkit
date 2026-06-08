@@ -14,13 +14,6 @@
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE
 
-FPCGExSortRuleConfig::FPCGExSortRuleConfig(const FPCGExSortRuleConfig& Other)
-	: FPCGExInputConfig(Other)
-	  , Tolerance(Other.Tolerance)
-	  , bInvertRule(Other.bInvertRule)
-{
-}
-
 namespace PCGExSorting
 {
 	void DeclareSortingRulesInputs(TArray<FPCGPinProperties>& PinProperties, const EPCGPinStatus InStatus)

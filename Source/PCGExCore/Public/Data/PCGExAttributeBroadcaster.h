@@ -175,6 +175,9 @@ namespace PCGExData
 
 	PCGEXCORE_API TSharedPtr<IAttributeBroadcaster> MakeBroadcaster(const FPCGAttributePropertyInputSelector& InSelector, const TSharedRef<FPointIO>& InPointIO, bool bSingleFetch = false);
 
+	// Raw-data variant: builds a broadcaster from a UPCGData (point data OR attribute set) without an FPointIO. Always single-fetch.
+	PCGEXCORE_API TSharedPtr<IAttributeBroadcaster> MakeBroadcaster(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData);
+
 	template <typename T>
 	TSharedPtr<TAttributeBroadcaster<T>> MakeTypedBroadcaster(const FName& InName, const TSharedRef<FPointIO>& InPointIO, bool bSingleFetch = false);
 

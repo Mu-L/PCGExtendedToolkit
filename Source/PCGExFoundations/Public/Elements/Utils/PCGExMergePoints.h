@@ -27,7 +27,7 @@ struct PCGEXFOUNDATIONS_API FPCGExMergeList
 
 	FPCGExMergeList() = default;
 
-	void Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails);
+	void Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const FPCGExNameFiltersDetails* InTagsToAttributes = nullptr);
 	void Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) const;
 };
 
@@ -61,7 +61,7 @@ public:
 	FPCGExMatchingDetails MatchingDetails = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** If enabled, each data can only belong to one group (first match). If disabled, data can appear in multiple groups. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="MatchingDetails.Mode != EPCGExMapMatchMode::Disabled", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable), AdvancedDisplay)
 	bool bExclusivePartitions = true;
 
 	/** Controls the order in which data will be sorted if sorting rules are used */
@@ -71,6 +71,14 @@ public:
 	/** Meta filter settings. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Carry Over Settings"))
 	FPCGExCarryOverDetails CarryOverDetails;
+
+	/** If enabled, will convert tags into per-point attributes so their semantics survive the merge. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, InlineEditConditionToggle))
+	bool bTagToAttributes = false;
+
+	/** Tags to convert to attributes: simple tags become boolean (presence), tag:value pairs become their typed value. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="bTagToAttributes"))
+	FPCGExNameFiltersDetails TagsToAttributes = FPCGExNameFiltersDetails(false);
 };
 
 struct FPCGExMergePointsContext final : FPCGExPointsProcessorContext
@@ -79,6 +87,9 @@ struct FPCGExMergePointsContext final : FPCGExPointsProcessorContext
 
 	FPCGExMatchingDetails MatchingDetails;
 	FPCGExCarryOverDetails CarryOverDetails;
+
+	bool bTagToAttributes = false;
+	FPCGExNameFiltersDetails TagsToAttributes;
 
 	TSharedPtr<PCGExMatching::FDataMatcher> DataMatcher;
 	TArray<TArray<int32>> Partitions;

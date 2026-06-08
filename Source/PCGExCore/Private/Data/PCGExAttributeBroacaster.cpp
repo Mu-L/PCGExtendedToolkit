@@ -57,9 +57,10 @@ namespace PCGExData
 			Attribute = nullptr;
 			bIsValid = false;
 
-			if (const UPCGSpatialData* AsSpatial = Cast<UPCGSpatialData>(InData))
+			// Read from metadata directly so this works for any UPCGData with metadata (point/spatial AND attribute sets), not just spatial.
+			if (const UPCGMetadata* MetadataPtr = InData->ConstMetadata())
 			{
-				Attribute = AsSpatial->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData));
+				Attribute = MetadataPtr->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData));
 				bIsDataDomain = Attribute ? Attribute->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data : false;
 				bIsValid = Attribute ? true : false;
 			}
@@ -158,6 +159,22 @@ namespace PCGExData
 	template <typename T>
 	bool TAttributeBroadcaster<T>::PrepareForSingleFetch(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData, const TSharedPtr<IPCGAttributeAccessorKeys> InKeys)
 	{
+		Min = Traits::Min();
+		Max = Traits::Max();
+
+		// Resolve the selector + accessor first; this also classifies the attribute domain.
+		if (!ApplySelector(InSelector, InData))
+		{
+			return false;
+		}
+
+		// @Data-domain values are read as a single constant -- no per-element keys are required.
+		if (ProcessingInfos.bIsDataDomain)
+		{
+			return true;
+		}
+
+		// Element-domain reads need keys aligned with the accessor.
 		if (InKeys)
 		{
 			Keys = InKeys;
@@ -166,19 +183,18 @@ namespace PCGExData
 		{
 			Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
 		}
-		else if (InData->Metadata)
+		else
 		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(InData->Metadata);
+			// Non-point data (e.g. attribute sets): let the engine build keys that match the accessor for any
+			// selector (attribute / property / $Index).
+			const FPCGAttributePropertyInputSelector Resolved = InSelector.CopyAndFixLast(InData);
+			if (TUniquePtr<const IPCGAttributeAccessorKeys> EngineKeys = PCGAttributeAccessorHelpers::CreateConstKeys(InData, Resolved))
+			{
+				Keys = MakeShareable(const_cast<IPCGAttributeAccessorKeys*>(EngineKeys.Release()));
+			}
 		}
 
-		if (!Keys)
-		{
-			return false;
-		}
-
-		Min = Traits::Min();
-		Max = Traits::Max();
-		return ApplySelector(InSelector, InData);
+		return Keys.IsValid();
 	}
 
 	template <typename T>
@@ -450,6 +466,29 @@ namespace PCGExData
 			using T = decltype(DummyValue);
 			TSharedPtr<TAttributeBroadcaster<T>> TypedBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
 			if (!(bSingleFetch ? TypedBroadcaster->PrepareForSingleFetch(InSelector, InData) : TypedBroadcaster->Prepare(InSelector, InPointIO)))
+			{
+				return;
+			}
+			Broadcaster = TypedBroadcaster;
+		});
+
+		return Broadcaster;
+	}
+
+	TSharedPtr<IAttributeBroadcaster> MakeBroadcaster(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData)
+	{
+		EPCGMetadataTypes Type = EPCGMetadataTypes::Unknown;
+		if (!TryGetType(InSelector, InData, Type))
+		{
+			return nullptr;
+		}
+
+		TSharedPtr<IAttributeBroadcaster> Broadcaster = nullptr;
+		PCGExMetaHelpers::ExecuteWithRightType(Type, [&](auto DummyValue)
+		{
+			using T = decltype(DummyValue);
+			TSharedPtr<TAttributeBroadcaster<T>> TypedBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
+			if (!TypedBroadcaster->PrepareForSingleFetch(InSelector, InData))
 			{
 				return;
 			}
