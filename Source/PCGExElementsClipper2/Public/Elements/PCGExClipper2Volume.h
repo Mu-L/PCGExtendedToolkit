@@ -130,6 +130,11 @@ public:
 	{
 		return false; // Volumes require closed footprints.
 	}
+
+	virtual bool SupportsAutoGrouping() const override
+	{
+		return true;
+	} // outer + nested holes -> one volume
 };
 
 struct FPCGExClipper2VolumeContext final : FPCGExClipper2ProcessorContext

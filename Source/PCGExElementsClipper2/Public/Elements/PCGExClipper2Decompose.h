@@ -59,7 +59,6 @@ public:
 
 	//~End UPCGExPointsProcessorSettings
 
-public:
 	/** Projection settings used to flatten the path into a 2D footprint before decomposition. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExGeo2DProjectionDetails ProjectionDetails;
@@ -91,6 +90,11 @@ public:
 	{
 		return false; // Decomposition requires closed footprints.
 	}
+
+	virtual bool SupportsAutoGrouping() const override
+	{
+		return true;
+	} // outer + nested holes -> one cluster
 };
 
 // Per-group build record (Process): the cluster's authored vtx IO + graph builder. Compiled later in OutputWork.

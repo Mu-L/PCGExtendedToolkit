@@ -57,9 +57,12 @@ namespace PCGExData
 			Attribute = nullptr;
 			bIsValid = false;
 
-			if (const UPCGSpatialData* AsSpatial = Cast<UPCGSpatialData>(InData))
+			// Resolve the attribute straight from the data's metadata so this works for any UPCGData that
+			// carries metadata -- point/spatial data AND attribute sets (UPCGParamData) -- not just spatial
+			// data. Single-fetch reads off raw attribute sets depend on this.
+			if (const UPCGMetadata* MetadataPtr = InData->ConstMetadata())
 			{
-				Attribute = AsSpatial->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData));
+				Attribute = MetadataPtr->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(Selector, InData));
 				bIsDataDomain = Attribute ? Attribute->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data : false;
 				bIsValid = Attribute ? true : false;
 			}
@@ -450,6 +453,29 @@ namespace PCGExData
 			using T = decltype(DummyValue);
 			TSharedPtr<TAttributeBroadcaster<T>> TypedBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
 			if (!(bSingleFetch ? TypedBroadcaster->PrepareForSingleFetch(InSelector, InData) : TypedBroadcaster->Prepare(InSelector, InPointIO)))
+			{
+				return;
+			}
+			Broadcaster = TypedBroadcaster;
+		});
+
+		return Broadcaster;
+	}
+
+	TSharedPtr<IAttributeBroadcaster> MakeBroadcaster(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData)
+	{
+		EPCGMetadataTypes Type = EPCGMetadataTypes::Unknown;
+		if (!TryGetType(InSelector, InData, Type))
+		{
+			return nullptr;
+		}
+
+		TSharedPtr<IAttributeBroadcaster> Broadcaster = nullptr;
+		PCGExMetaHelpers::ExecuteWithRightType(Type, [&](auto DummyValue)
+		{
+			using T = decltype(DummyValue);
+			TSharedPtr<TAttributeBroadcaster<T>> TypedBroadcaster = MakeShared<TAttributeBroadcaster<T>>();
+			if (!TypedBroadcaster->PrepareForSingleFetch(InSelector, InData))
 			{
 				return;
 			}

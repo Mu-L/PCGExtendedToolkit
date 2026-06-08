@@ -38,20 +38,29 @@ namespace PCGExClipper2Decomposition
 	// Reorder a vertex-index loop to CCW (positive signed area) in projection X/Y.
 	void EnsureCCW(TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
 	{
-		if (SignedArea(Loop, Pool) < 0) { Algo::Reverse(Loop); }
+		if (SignedArea(Loop, Pool) < 0)
+		{
+			Algo::Reverse(Loop);
+		}
 	}
 
 	// True if the loop is convex assuming CCW winding (reflex vertices -> false). Near-collinear is allowed.
 	bool IsConvexCCW(const TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
 	{
 		const int32 N = Loop.Num();
-		if (N < 3) { return false; }
+		if (N < 3)
+		{
+			return false;
+		}
 		for (int32 i = 0; i < N; i++)
 		{
 			const FVector2D& O = Pool[Loop[i]].Pos;
 			const FVector2D& A = Pool[Loop[(i + 1) % N]].Pos;
 			const FVector2D& B = Pool[Loop[(i + 2) % N]].Pos;
-			if (Cross2D(O, A, B) < -UE_KINDA_SMALL_NUMBER) { return false; }
+			if (Cross2D(O, A, B) < -UE_KINDA_SMALL_NUMBER)
+			{
+				return false;
+			}
 		}
 		return true;
 	}
@@ -71,13 +80,22 @@ namespace PCGExClipper2Decomposition
 
 			for (int32 ib = 0; ib < NB; ib++)
 			{
-				if (B[ib] != V || B[(ib + 1) % NB] != U) { continue; }
+				if (B[ib] != V || B[(ib + 1) % NB] != U)
+				{
+					continue;
+				}
 
 				// Shared edge: build the merged loop = A from V around to U, then B's interior (after U .. before V).
 				TArray<int32> Merged;
 				Merged.Reserve(NA + NB - 2);
-				for (int32 k = 0; k < NA; k++) { Merged.Add(A[(ia + 1 + k) % NA]); } // V ... U
-				for (int32 k = 0; k < NB - 2; k++) { Merged.Add(B[(ib + 2 + k) % NB]); } // interior of B
+				for (int32 k = 0; k < NA; k++)
+				{
+					Merged.Add(A[(ia + 1 + k) % NA]);
+				} // V ... U
+				for (int32 k = 0; k < NB - 2; k++)
+				{
+					Merged.Add(B[(ib + 2 + k) % NB]);
+				} // interior of B
 
 				if (Merged.Num() >= 3 && IsConvexCCW(Merged, Pool))
 				{
@@ -103,7 +121,10 @@ namespace PCGExClipper2Decomposition
 	void MergeIntoConvexPieces(TArray<TArray<int32>>& Pieces, const TArray<FFootprintVertex>& Pool)
 	{
 		// Tight 2D bounds of a piece (pieces always have >= 3 vertices, so Loop[0] is valid).
-		struct FBounds2D { double MinX, MinY, MaxX, MaxY; };
+		struct FBounds2D
+		{
+			double MinX, MinY, MaxX, MaxY;
+		};
 		auto ComputeBounds = [&Pool](const TArray<int32>& Loop) -> FBounds2D
 		{
 			const FVector2D& P0 = Pool[Loop[0]].Pos;
@@ -122,9 +143,12 @@ namespace PCGExClipper2Decomposition
 		// Bounds[k] tracks Pieces[k] in lockstep (recomputed on merge, RemoveAt'd alongside Pieces).
 		TArray<FBounds2D> Bounds;
 		Bounds.Reserve(Pieces.Num());
-		for (const TArray<int32>& Piece : Pieces) { Bounds.Add(ComputeBounds(Piece)); }
+		for (const TArray<int32>& Piece : Pieces)
+		{
+			Bounds.Add(ComputeBounds(Piece));
+		}
 
-		const double Eps = UE_KINDA_SMALL_NUMBER;
+		constexpr double Eps = UE_KINDA_SMALL_NUMBER;
 
 		bool bMerged = true;
 		while (bMerged && Pieces.Num() > 1)
@@ -149,7 +173,7 @@ namespace PCGExClipper2Decomposition
 						Pieces[i] = MoveTemp(Result);
 						Bounds[i] = ComputeBounds(Pieces[i]); // grown piece -> refresh its bounds
 						Pieces.RemoveAt(j);
-						Bounds.RemoveAt(j);                   // keep Bounds aligned with Pieces
+						Bounds.RemoveAt(j); // keep Bounds aligned with Pieces
 						bMerged = true;
 					}
 				}
@@ -170,7 +194,10 @@ namespace PCGExClipper2Decomposition
 		// --- Boundary-respecting triangulation (holes honored via fill rule) ---
 		PCGExClipper2Lib::Paths64 CombinedPaths;
 		CombinedPaths.reserve(SubjectPaths.size());
-		for (const auto& Path : SubjectPaths) { CombinedPaths.push_back(Path); }
+		for (const auto& Path : SubjectPaths)
+		{
+			CombinedPaths.push_back(Path);
+		}
 
 		PCGExClipper2Lib::Paths64 TrianglePaths;
 		const PCGExClipper2Lib::TriangulateResult Result = PCGExClipper2Lib::TriangulateWithHoles(
@@ -194,7 +221,10 @@ namespace PCGExClipper2Decomposition
 			// units (~+-21M / Precision world cm: +-215km at Precision=100, +-2km at 10000); beyond that, dropped
 			// high bits can collide distinct verts -> welded mesh. If it bites, key on the full int64 pair instead.
 			const uint64 Hash = PCGEx::H64(static_cast<uint32>(Pt.x & 0xFFFFFFFF), static_cast<uint32>(Pt.y & 0xFFFFFFFF));
-			if (const int32* Found = VertexMap.Find(Hash)) { return *Found; }
+			if (const int32* Found = VertexMap.Find(Hash))
+			{
+				return *Found;
+			}
 
 			FFootprintVertex V;
 			V.Pos = FVector2D(static_cast<double>(Pt.x) * InvScale, static_cast<double>(Pt.y) * InvScale);
@@ -233,11 +263,17 @@ namespace PCGExClipper2Decomposition
 		Out.Pieces.Reserve(static_cast<int32>(TrianglePaths.size()));
 		for (const auto& Tri : TrianglePaths)
 		{
-			if (Tri.size() != 3) { continue; }
+			if (Tri.size() != 3)
+			{
+				continue;
+			}
 			const int32 A = FindOrAddVertex(Tri[0]);
 			const int32 B = FindOrAddVertex(Tri[1]);
 			const int32 C = FindOrAddVertex(Tri[2]);
-			if (A == B || B == C || C == A) { continue; }
+			if (A == B || B == C || C == A)
+			{
+				continue;
+			}
 
 			TArray<int32> Piece = {A, B, C};
 			EnsureCCW(Piece, Out.VertexPool);
@@ -273,11 +309,17 @@ namespace PCGExClipper2Decomposition
 	{
 		OutResult = FDecomposeResult(); // Status == Empty (silent skip) by default
 
-		if (!Group->IsValid() || Group->SubjectPaths.empty() || Group->SubjectIndices.IsEmpty()) { return false; }
+		if (!Group->IsValid() || Group->SubjectPaths.empty() || Group->SubjectIndices.IsEmpty())
+		{
+			return false;
+		}
 
 		// SubjectIndices[0] indexes the parallel AllOpData arrays; one validity check covers all later lookups.
 		const int32 FrameSrcIdx = Group->SubjectIndices[0];
-		if (!AllOpData->Projections.IsValidIndex(FrameSrcIdx) || !AllOpData->Facades.IsValidIndex(FrameSrcIdx)) { return false; }
+		if (!AllOpData->Projections.IsValidIndex(FrameSrcIdx) || !AllOpData->Facades.IsValidIndex(FrameSrcIdx))
+		{
+			return false;
+		}
 
 		OutResult = Decompose(Group->SubjectPaths, AllOpData, Group->CreateZCallback(), Params);
 		return OutResult.Status == EDecomposeResult::Success;

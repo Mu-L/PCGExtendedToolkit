@@ -48,6 +48,9 @@ namespace PCGExMetaHelpers
 
 	PCGEXCORE_API bool TryGetAttributeName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData, FName& OutName);
 
+	/** Number of addressable items in a data object: point count for point data, metadata entry count otherwise. Returns 0 for null data or data without metadata. */
+	PCGEXCORE_API int32 GetElementsCount(const UPCGData* InData);
+
 	PCGEXCORE_API bool IsDataDomainAttribute(const FName& InName);
 	PCGEXCORE_API bool IsDataDomainAttribute(const FString& InName);
 	PCGEXCORE_API bool IsDataDomainAttribute(const FPCGAttributePropertyInputSelector& InputSelector);

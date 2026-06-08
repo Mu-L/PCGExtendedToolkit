@@ -321,6 +321,28 @@ TSharedPtr<PCGExData::FTags> FPCGExClipper2ProcessorContext::GatherTags(const TA
 	return OutTags;
 }
 
+// File-local helpers (named namespace matching the file -- Unity-build safe).
+namespace PCGExClipper2Processor
+{
+	// Deterministic plurality pick from a source-index -> count map, shared by OutputPaths64 (dominant template
+	// source) and the Auto grouping helpers (ModalSourceIndex). Highest count wins; ties broken by the smaller
+	// source index (TMap iteration order is not meaningful). Returns INDEX_NONE for an empty map.
+	int32 PickModalSource(const TMap<int32, int32>& Counts)
+	{
+		int32 BestIdx = INDEX_NONE;
+		int32 BestCount = 0;
+		for (const TPair<int32, int32>& Pair : Counts)
+		{
+			if (Pair.Value > BestCount || (Pair.Value == BestCount && Pair.Key < BestIdx))
+			{
+				BestCount = Pair.Value;
+				BestIdx = Pair.Key;
+			}
+		}
+		return BestIdx;
+	}
+}
+
 void FPCGExClipper2ProcessorContext::OutputPaths64(
 	PCGExClipper2Lib::Paths64& InPaths,
 	const TSharedPtr<PCGExClipper2::FProcessingGroup>& Group,
@@ -415,16 +437,12 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 			}
 		}
 
-		// Find dominant source (most points from same source)
-		int32 DominantSourceIdx = RelevantSourceIndices.Num() > 0 ? *RelevantSourceIndices.CreateConstIterator() : INDEX_NONE;
-		int32 MaxCount = 0;
-		for (const auto& Pair : SourceCounts)
+		// Dominant source (most points from one source) as the output template; fall back to the first relevant
+		// source when the path is all intersection points (SourceCounts empty).
+		int32 DominantSourceIdx = PCGExClipper2Processor::PickModalSource(SourceCounts);
+		if (DominantSourceIdx == INDEX_NONE)
 		{
-			if (Pair.Value > MaxCount)
-			{
-				MaxCount = Pair.Value;
-				DominantSourceIdx = Pair.Key;
-			}
+			DominantSourceIdx = RelevantSourceIndices.Num() > 0 ? *RelevantSourceIndices.CreateConstIterator() : INDEX_NONE;
 		}
 
 		// Create new output point data from template
@@ -1223,6 +1241,146 @@ int32 FPCGExClipper2ProcessorElement::BuildDataFromCollection(
 	return TotalDataNum;
 }
 
+// File-local helpers for EPCGExGroupingPolicy::Auto. Named namespace matching the file (Unity-build safe).
+namespace PCGExClipper2Processor
+{
+	// ZCallback for the grouping union: tag every newly-created intersection vertex with the intersection
+	// marker so the source scan below skips it. Pass-through vertices keep their original H64(PointIdx,
+	// SourceIdx) z -- that is what maps a PolyTree contour back to the source path it came from.
+	void MarkIntersectionZ(
+		const PCGExClipper2Lib::Point64& /*E1Bot*/, const PCGExClipper2Lib::Point64& /*E1Top*/,
+		const PCGExClipper2Lib::Point64& /*E2Bot*/, const PCGExClipper2Lib::Point64& /*E2Top*/,
+		PCGExClipper2Lib::Point64& Pt)
+	{
+		Pt.z = static_cast<int64_t>(PCGEx::H64(PCGExClipper2::INTERSECTION_MARKER, PCGExClipper2::INTERSECTION_MARKER));
+	}
+
+	// Most frequent source (AllOpData) index among a contour's vertices, skipping union-created intersection
+	// verts. Returns INDEX_NONE if the contour carries no source-backed vertex. For clean non-touching nested
+	// rings the union creates no intersections, so each contour maps bijectively to one source ring.
+	int32 ModalSourceIndex(const PCGExClipper2Lib::Path64& Contour)
+	{
+		TMap<int32, int32> Counts;
+		for (const PCGExClipper2Lib::Point64& Pt : Contour)
+		{
+			uint32 PointIdx, SourceIdx;
+			PCGEx::H64(static_cast<uint64>(Pt.z), PointIdx, SourceIdx);
+			if (PointIdx == PCGExClipper2::INTERSECTION_MARKER)
+			{
+				continue;
+			}
+			Counts.FindOrAdd(static_cast<int32>(SourceIdx))++;
+		}
+
+		return PickModalSource(Counts);
+	}
+
+	// Turn a PolyTree outer node + its direct hole children into one partition (outer source first, so it lands
+	// at SubjectIndices[0]); recurse into islands (solid contours nested inside a hole) as their own footprints.
+	void CollectFootprint(const PCGExClipper2Lib::PolyPath64* OuterNode, TArray<TArray<int32>>& OutPartitions, TSet<int32>& OutClaimed)
+	{
+		TArray<int32> Partition;
+
+		// Claim sources GLOBALLY (OutClaimed), not just within this partition: one source ring maps to exactly one
+		// footprint, so if the union split it across multiple contours (self-intersecting / touching input) the
+		// first claim wins and later occurrences are skipped -- otherwise the same ring would be triangulated into
+		// two groups, producing duplicate/overlapping output.
+		const int32 OuterSrc = ModalSourceIndex(OuterNode->Polygon());
+		if (OuterSrc != INDEX_NONE && !OutClaimed.Contains(OuterSrc))
+		{
+			Partition.Add(OuterSrc);
+			OutClaimed.Add(OuterSrc);
+		}
+
+		for (size_t h = 0; h < OuterNode->Count(); h++)
+		{
+			const PCGExClipper2Lib::PolyPath64* Hole = OuterNode->Child(h);
+
+			const int32 HoleSrc = ModalSourceIndex(Hole->Polygon());
+			if (HoleSrc != INDEX_NONE && !OutClaimed.Contains(HoleSrc))
+			{
+				Partition.Add(HoleSrc);
+				OutClaimed.Add(HoleSrc);
+			}
+
+			// Islands inside this hole are new, solid footprints.
+			for (size_t g = 0; g < Hole->Count(); g++)
+			{
+				CollectFootprint(Hole->Child(g), OutPartitions, OutClaimed);
+			}
+		}
+
+		if (!Partition.IsEmpty())
+		{
+			OutPartitions.Add(MoveTemp(Partition));
+		}
+	}
+
+	// Partition closed main paths by spatial nesting via a union -> PolyTree hierarchy. Each top-level outer
+	// contour plus the rings it directly contains becomes one footprint partition; islands restart a footprint.
+	// Open paths and any path the union drops become their own singleton partitions, so nothing is silently
+	// lost (a failed union degrades to Split). Partitions are sorted by representative index for determinism.
+	void BuildNestedPartitions(const TSharedPtr<PCGExClipper2::FOpData>& AllOpData, const TArray<int32>& MainIndices, TArray<TArray<int32>>& OutPartitions)
+	{
+		PCGExClipper2Lib::Paths64 ClosedSubjects;
+		ClosedSubjects.reserve(MainIndices.Num());
+		TArray<int32> OpenSingletons;
+
+		for (const int32 Idx : MainIndices)
+		{
+			if (AllOpData->IsClosedLoop.IsValidIndex(Idx) && AllOpData->IsClosedLoop[Idx])
+			{
+				ClosedSubjects.push_back(AllOpData->Paths[Idx]); // copy -- AllOpData->Paths is reused by Prepare
+			}
+			else
+			{
+				OpenSingletons.Add(Idx); // open paths can't nest
+			}
+		}
+
+		TSet<int32> Claimed;
+
+		if (!ClosedSubjects.empty())
+		{
+			PCGExClipper2Lib::Clipper64 Clipper;
+			Clipper.SetZCallback(&MarkIntersectionZ);
+			Clipper.AddSubject(ClosedSubjects);
+
+			// EvenOdd always exposes the full containment hierarchy as nested contours regardless of input
+			// winding -- exactly the nesting we want to discover. Per-group triangulation still honors the
+			// node's own FillRule later.
+			PCGExClipper2Lib::PolyTree64 Tree;
+			Clipper.Execute(PCGExClipper2Lib::ClipType::Union, PCGExClipper2Lib::FillRule::EvenOdd, Tree);
+
+			for (size_t i = 0; i < Tree.Count(); i++)
+			{
+				CollectFootprint(Tree.Child(i), OutPartitions, Claimed);
+			}
+		}
+
+		// Any closed path the union dropped (degenerate / fully coincident / union failure) -> its own group.
+		for (const int32 Idx : MainIndices)
+		{
+			if (AllOpData->IsClosedLoop.IsValidIndex(Idx) && AllOpData->IsClosedLoop[Idx] && !Claimed.Contains(Idx))
+			{
+				OutPartitions.Add({Idx});
+			}
+		}
+
+		// Open paths as singletons.
+		for (const int32 Idx : OpenSingletons)
+		{
+			OutPartitions.Add({Idx});
+		}
+
+		// Deterministic group ordering by the partition's representative (outer / first) index.
+		OutPartitions.Sort([](const TArray<int32>& A, const TArray<int32>& B)
+		{
+			return A[0] < B[0];
+		});
+	}
+}
+
 void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 	FPCGExClipper2ProcessorContext* Context,
 	const UPCGExClipper2ProcessorSettings* Settings,
@@ -1246,8 +1404,8 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 	TArray<TArray<int32>> MainPartitions;
 
 	bool bDoMainMatching = false;
-	// Geometry nodes (bExposeGroupingPolicy == false) force one source per group, so main matching -- which
-	// can merge several sources into one partition -- is bypassed alongside the grouping policy below.
+	// When main matching is enabled it builds the partitions directly; otherwise the grouping policy below
+	// (Split / Consolidate / Auto) decides. Matching requires bExposeGroupingPolicy (hidden -> no matching).
 	if (Settings->bExposeGroupingPolicy && Settings->MainDataMatching.IsEnabled() && Settings->MainDataMatching.Mode != EPCGExMapMatchMode::Disabled)
 	{
 		auto Matcher = MakeShared<PCGExMatching::FDataMatcher>();
@@ -1263,7 +1421,7 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 
 	if (!bDoMainMatching)
 	{
-		// No matching - each main input is its own group (geometry nodes resolve to Split here)
+		// No matching - the grouping policy decides how main inputs partition into groups.
 		switch (Settings->GetEffectiveGroupingPolicy())
 		{
 		case EPCGExGroupingPolicy::Split:
@@ -1279,6 +1437,11 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 			Consolidated.Append(MainIndices);
 		}
 		break;
+		case EPCGExGroupingPolicy::Auto:
+			// Partition by spatial nesting (union -> PolyTree): each outer + the rings it contains forms one
+			// group, so nested rings become holes while unrelated footprints stay separate.
+			PCGExClipper2Processor::BuildNestedPartitions(Context->AllOpData, MainIndices, MainPartitions);
+			break;
 		}
 	}
 	else

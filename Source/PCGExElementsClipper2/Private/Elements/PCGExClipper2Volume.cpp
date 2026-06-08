@@ -6,18 +6,18 @@
 #include "Clipper2Lib/clipper.h"
 #include "Core/PCGExClipper2Decomposition.h"
 
+#include "Model.h"
 #include "Components/BrushComponent.h"
 #include "Engine/Polys.h"
-#include "Model.h"
-#include "GameFramework/Volume.h"
 #include "Engine/TriggerVolume.h"
+#include "GameFramework/Volume.h"
 #include "PhysicsEngine/BodySetup.h"
 
 #include "PCGComponent.h"
 #include "PCGElement.h"
-#include "Helpers/PCGHelpers.h"
 #include "PCGManagedResource.h"
 #include "PCGParamData.h"
+#include "Helpers/PCGHelpers.h"
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttributeTpl.h"
 
@@ -52,23 +52,38 @@ namespace PCGExClipper2Volume
 	void AddPrismPolys(const TArray<FVector>& Bottoms, const TArray<FVector>& Tops, TArray<FPoly>& OutPolys)
 	{
 		const int32 N = Bottoms.Num();
-		if (N < 3) { return; }
+		if (N < 3)
+		{
+			return;
+		}
 
 		// Bottom cap (reversed so it faces down/outward).
 		{
 			FPoly Poly;
 			Poly.Init();
-			for (int32 i = N - 1; i >= 0; --i) { Poly.Vertices.Add(FVector3f(Bottoms[i])); }
+			for (int32 i = N - 1; i >= 0; --i)
+			{
+				Poly.Vertices.Add(FVector3f(Bottoms[i]));
+			}
 			Poly.Base = FVector3f(Bottoms[0]);
-			if (Poly.CalcNormal(true) == 0) { OutPolys.Add(Poly); }
+			if (Poly.CalcNormal(true) == 0)
+			{
+				OutPolys.Add(Poly);
+			}
 		}
 		// Top cap.
 		{
 			FPoly Poly;
 			Poly.Init();
-			for (int32 i = 0; i < N; ++i) { Poly.Vertices.Add(FVector3f(Tops[i])); }
+			for (int32 i = 0; i < N; ++i)
+			{
+				Poly.Vertices.Add(FVector3f(Tops[i]));
+			}
 			Poly.Base = FVector3f(Tops[0]);
-			if (Poly.CalcNormal(true) == 0) { OutPolys.Add(Poly); }
+			if (Poly.CalcNormal(true) == 0)
+			{
+				OutPolys.Add(Poly);
+			}
 		}
 		// Side quads.
 		for (int32 i = 0; i < N; ++i)
@@ -81,7 +96,10 @@ namespace PCGExClipper2Volume
 			Poly.Vertices.Add(FVector3f(Tops[J]));
 			Poly.Vertices.Add(FVector3f(Tops[i]));
 			Poly.Base = FVector3f(Bottoms[i]);
-			if (Poly.CalcNormal(true) == 0) { OutPolys.Add(Poly); }
+			if (Poly.CalcNormal(true) == 0)
+			{
+				OutPolys.Add(Poly);
+			}
 		}
 	}
 }
@@ -93,9 +111,11 @@ UPCGExClipper2VolumeSettings::UPCGExClipper2VolumeSettings(const FObjectInitiali
 {
 	VolumeClass = ATriggerVolume::StaticClass();
 
-	// Geometry node: one volume per input path. Multi-source grouping/matching is disabled (forces Split) --
-	// it would merge unrelated footprints into a single volume, the wrong model for an extruder.
-	bExposeGroupingPolicy = false;
+	// Geometry node: default to Auto grouping so an outer footprint and the rings nested inside it form one
+	// volume (the inner rings become holes), while unrelated footprints stay separate. The dropdown is exposed
+	// so users can switch to Separate (one volume per path) or Merged.
+	bExposeGroupingPolicy = true;
+	MainInputGroupingPolicy = EPCGExGroupingPolicy::Auto;
 
 	// Hide the inherited path-output-only parameters (blending, carry-over, open-path, simplify). See base.
 	bExposePathOutputProperties = false;
@@ -146,10 +166,18 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 	};
 
 	UPCGComponent* MutableComponent = GetMutableComponent();
-	if (!MutableComponent) { EmitReferences(); return; }
+	if (!MutableComponent)
+	{
+		EmitReferences();
+		return;
+	}
 
 	UWorld* World = MutableComponent->GetWorld();
-	if (!World) { EmitReferences(); return; }
+	if (!World)
+	{
+		EmitReferences();
+		return;
+	}
 
 	const UPCGComponent* Comp = GetComponent();
 	const bool bIsPreview = Comp && Comp->IsInPreviewMode();
@@ -174,14 +202,26 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 
 	for (const TSharedPtr<FPCGExVolumeSpec>& Spec : StagedVolumes)
 	{
-		if (!Spec || Spec->ConvexElems.IsEmpty()) { continue; }
+		if (!Spec || Spec->ConvexElems.IsEmpty())
+		{
+			continue;
+		}
 
 		FActorSpawnParameters SpawnParams;
-		if (TargetLevel) { SpawnParams.OverrideLevel = TargetLevel; }
-		if (bTransientSpawn) { SpawnParams.ObjectFlags |= RF_Transient | RF_NonPIEDuplicateTransient; }
+		if (TargetLevel)
+		{
+			SpawnParams.OverrideLevel = TargetLevel;
+		}
+		if (bTransientSpawn)
+		{
+			SpawnParams.ObjectFlags |= RF_Transient | RF_NonPIEDuplicateTransient;
+		}
 
 		AVolume* Volume = World->SpawnActor<AVolume>(Settings->VolumeClass, Spec->ActorTransform, SpawnParams);
-		if (!Volume) { continue; }
+		if (!Volume)
+		{
+			continue;
+		}
 
 		UBrushComponent* BrushComp = Volume->GetBrushComponent();
 		if (!BrushComp)
@@ -230,7 +270,10 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 
 		// One row per spawned volume: the actor reference + the source's @Data attributes.
 		const int64 Key = RefMetadata->AddEntry();
-		if (RefAttribute) { RefAttribute->SetValue(Key, FSoftObjectPath(Volume)); }
+		if (RefAttribute)
+		{
+			RefAttribute->SetValue(Key, FSoftObjectPath(Volume));
+		}
 
 		if (AllOpData && AllOpData->Facades.IsValidIndex(Spec->SourceFacadeIndex))
 		{
@@ -238,7 +281,13 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			if (!HandlersBySource.Contains(SrcIdx))
 			{
 				TSharedPtr<PCGExData::FDataForwardHandler> NewHandler = ForwardDetails.TryGetHandler(AllOpData->Facades[SrcIdx], false);
-				if (NewHandler) { NewHandler->ValidateIdentities([](const PCGExData::FAttributeIdentity& Identity) { return Identity.InDataDomain(); }); }
+				if (NewHandler)
+				{
+					NewHandler->ValidateIdentities([](const PCGExData::FAttributeIdentity& Identity)
+					{
+						return Identity.InDataDomain();
+					});
+				}
 				HandlersBySource.Add(SrcIdx, NewHandler); // cache the result (incl. null) so each source resolves once
 			}
 			if (const TSharedPtr<PCGExData::FDataForwardHandler>& Handler = HandlersBySource.FindChecked(SrcIdx))
@@ -265,7 +314,10 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 		{
 			const FText WarningText = PCGExClipper2Decomposition::DescribeDecomposeFailure(
 				Decomposition, LOCTEXT("VolumeSubject", "volume"), Settings->MaxConvexPieces);
-			if (!WarningText.IsEmpty()) { PCGE_LOG_C(Warning, GraphAndLog, this, WarningText); }
+			if (!WarningText.IsEmpty())
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, this, WarningText);
+			}
 		}
 		return;
 	}
@@ -302,7 +354,7 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			bAnyBase = true;
 		}
 	}
-	Centroid /= static_cast<double>(VertexPool.Num());
+	Centroid /= VertexPool.Num();
 
 	// --- Build one convex prism (+ wireframe polys) per convex piece, in actor-local space ---
 	TSharedPtr<FPCGExVolumeSpec> Spec = MakeShared<FPCGExVolumeSpec>();
@@ -313,7 +365,10 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 	for (const TArray<int32>& Piece : Pieces)
 	{
 		const int32 N = Piece.Num();
-		if (N < 3) { continue; }
+		if (N < 3)
+		{
+			continue;
+		}
 
 		// Extrusion height (max of the piece's point heights), and -- unless Flat -- the piece's own floor
 		// (min/max/average of its points' Z). A flat-floored prism stays convex at any base Z.
@@ -328,7 +383,10 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			{
 				const PCGExClipper2Decomposition::FFootprintVertex& V = VertexPool[Idx];
 				TopHeight = FMath::Max(TopHeight, Heights[Idx]);
-				if (!V.bHasSource) { continue; }
+				if (!V.bHasSource)
+				{
+					continue;
+				}
 				MinZ = SourceCount == 0 ? V.ProjectedZ : FMath::Min(MinZ, V.ProjectedZ);
 				MaxZ = SourceCount == 0 ? V.ProjectedZ : FMath::Max(MaxZ, V.ProjectedZ);
 				SumZ += V.ProjectedZ;
@@ -339,13 +397,17 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			{
 				switch (Settings->BaseMode)
 				{
-				case EPCGExVolumeBaseMode::Min: PieceBaseZ = MinZ;
+				case EPCGExVolumeBaseMode::Min:
+					PieceBaseZ = MinZ;
 					break;
-				case EPCGExVolumeBaseMode::Max: PieceBaseZ = MaxZ;
+				case EPCGExVolumeBaseMode::Max:
+					PieceBaseZ = MaxZ;
 					break;
-				case EPCGExVolumeBaseMode::Average: PieceBaseZ = SumZ / static_cast<double>(SourceCount);
+				case EPCGExVolumeBaseMode::Average:
+					PieceBaseZ = SumZ / static_cast<double>(SourceCount);
 					break;
-				default: break; // Flat -> keep the global base plane
+				default:
+					break; // Flat -> keep the global base plane
 				}
 			}
 		}
@@ -377,7 +439,10 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 		PCGExClipper2Volume::AddPrismPolys(Bottoms, Tops, Spec->BrushPolys);
 	}
 
-	if (Spec->ConvexElems.IsEmpty()) { return; }
+	if (Spec->ConvexElems.IsEmpty())
+	{
+		return;
+	}
 
 	// Actor frame: rotation = projection orientation, origin = footprint centroid on the base plane.
 	const FVector WorldOrigin = FrameProjection.Unproject(FVector(Centroid.X, Centroid.Y, MinBaseZ));
@@ -402,7 +467,10 @@ bool FPCGExClipper2VolumeElement::PostBoot(FPCGExContext* InContext) const
 	{
 		const TSharedPtr<PCGExData::FFacade>& Facade = Context->AllOpData->Facades[i];
 		TSharedPtr<PCGExDetails::TSettingValue<double>> HeightSetting = Settings->Height.GetValueSetting();
-		if (!HeightSetting->Init(Facade)) { return false; }
+		if (!HeightSetting->Init(Facade))
+		{
+			return false;
+		}
 		Context->HeightValues[i] = HeightSetting;
 	}
 
@@ -419,7 +487,10 @@ void FPCGExClipper2VolumeElement::OutputWork(FPCGExContext* InContext, const UPC
 	// Actor spawning, physics cooking and managed-resource registration must run on the game thread, so
 	// marshal explicitly (inline if already there -- no deadlock). Always marshal, even with zero staged
 	// volumes, so SpawnStagedVolumes still emits the (empty) Actor References set.
-	PCGExMT::ExecuteOnMainThreadAndWait([Context]() { Context->SpawnStagedVolumes(); });
+	PCGExMT::ExecuteOnMainThreadAndWait([Context]()
+	{
+		Context->SpawnStagedVolumes();
+	});
 }
 
 #pragma endregion

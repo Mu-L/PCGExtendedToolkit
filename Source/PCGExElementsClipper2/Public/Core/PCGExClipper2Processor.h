@@ -60,6 +60,7 @@ enum class EPCGExGroupingPolicy : uint8
 {
 	Split       = 0 UMETA(DisplayName = "Separate", ToolTip="Split inputs into separate groups"),
 	Consolidate = 1 UMETA(DisplayName = "Merged", ToolTip="Add all inputs into a single group"),
+	Auto        = 2 UMETA(DisplayName = "Auto", ToolTip="Group inputs by spatial nesting: each outer contour and the rings it contains form one footprint, so nested rings become holes, while unrelated footprints stay separate. Nodes that don't support nesting treat this as Separate."),
 };
 
 UENUM()
@@ -266,12 +267,11 @@ public:
 	UPROPERTY()
 	bool bExposePathOutputProperties = true;
 
-	/** True for nodes that may operate on grouped/merged inputs (the path-output nodes); geometry nodes
-	 *  (Volume, Decompose) set this false in their constructor. They produce one output per source footprint,
-	 *  so grouping or matching several source paths into one operation would mix unrelated footprints (and a
-	 *  decomposed cluster could only carry attributes from one template source). When false, inputs are forced
-	 *  to Split (one source per group, see GetEffectiveGroupingPolicy) and the grouping + main-matching
-	 *  controls below are hidden. Not user-editable -- a per-class constant. */
+	/** Whether the grouping policy + main-matching controls below are user-editable on this node. True for the
+	 *  path-output nodes and for the geometry nodes (Volume, Decompose) -- the latter expose the dropdown and
+	 *  default to Auto, so an outer footprint and the rings it contains are grouped together (holes) while
+	 *  unrelated footprints stay separate. When false, the controls are hidden and inputs fall back to Split
+	 *  (see GetEffectiveGroupingPolicy). Not user-editable -- a per-class constant. */
 	UPROPERTY()
 	bool bExposeGroupingPolicy = true;
 
@@ -283,12 +283,26 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching() && bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	EPCGExGroupingPolicy MainInputGroupingPolicy = EPCGExGroupingPolicy::Consolidate;
 
-	/** Effective grouping policy. Geometry nodes (bExposeGroupingPolicy == false) always process inputs as
-	 *  Split -- one source per group -- regardless of the serialized MainInputGroupingPolicy (hidden for them)
-	 *  or any legacy value, so multi-source groups can never reach the geometry pipeline. */
+	/** Whether this node's per-group code can consume nesting-aware (outer + holes) groups produced by
+	 *  EPCGExGroupingPolicy::Auto. Geometry nodes (Volume, Decompose) override this to true; for everyone else
+	 *  Auto falls back to Split in GetEffectiveGroupingPolicy. */
+	virtual bool SupportsAutoGrouping() const
+	{
+		return false;
+	}
+
+	/** Effective grouping policy. When the grouping controls are hidden (bExposeGroupingPolicy == false) inputs
+	 *  fall back to Split. Auto also falls back to Split on nodes that don't support nesting. */
 	EPCGExGroupingPolicy GetEffectiveGroupingPolicy() const
 	{
-		return bExposeGroupingPolicy ? MainInputGroupingPolicy : EPCGExGroupingPolicy::Split;
+		EPCGExGroupingPolicy Policy = bExposeGroupingPolicy ? MainInputGroupingPolicy : EPCGExGroupingPolicy::Split;
+		// Auto needs nesting-aware per-group code; nodes that don't support it fall back to Separate (each input
+		// its own group) -- the conservative, least-surprising choice, never silently merging unrelated inputs.
+		if (Policy == EPCGExGroupingPolicy::Auto && !SupportsAutoGrouping())
+		{
+			Policy = EPCGExGroupingPolicy::Split;
+		}
+		return Policy;
 	}
 
 	/** If enabled, lets you to pick which are matched with which main data.

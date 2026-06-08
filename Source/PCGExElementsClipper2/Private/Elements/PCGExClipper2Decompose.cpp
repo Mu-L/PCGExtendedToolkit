@@ -30,9 +30,11 @@ namespace PCGExClipper2Decompose
 UPCGExClipper2DecomposeSettings::UPCGExClipper2DecomposeSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// Geometry node: one cluster per input path. Multi-source grouping/matching is disabled (forces Split) --
-	// it would merge unrelated footprints and break attribute carry (cluster nodes inherit one template source).
-	bExposeGroupingPolicy = false;
+	// Geometry node: default to Auto grouping so an outer footprint and the rings nested inside it form one
+	// cluster (the inner rings become holes), while unrelated footprints stay separate. The dropdown is exposed
+	// so users can switch to Separate (one cluster per path) or Merged.
+	bExposeGroupingPolicy = true;
+	MainInputGroupingPolicy = EPCGExGroupingPolicy::Auto;
 
 	// Hide the inherited path-output-only parameters (blending, carry-over, open-path, simplify). See base.
 	bExposePathOutputProperties = false;
@@ -109,7 +111,10 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		{
 			const FText WarningText = PCGExClipper2Decomposition::DescribeDecomposeFailure(
 				Decomposition, LOCTEXT("DecomposeSubject", "footprint"), Settings->MaxConvexPieces);
-			if (!WarningText.IsEmpty()) { PCGE_LOG_C(Warning, GraphAndLog, this, WarningText); }
+			if (!WarningText.IsEmpty())
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, this, WarningText);
+			}
 		}
 		return;
 	}
@@ -133,17 +138,26 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		{
 			const int32 A = Piece[i];
 			const int32 B = Piece[(i + 1) % N];
-			if (A == B) { continue; }
+			if (A == B)
+			{
+				continue;
+			}
 			EdgeKeys.Add(PCGEx::H64U(static_cast<uint32>(A), static_cast<uint32>(B)));
 		}
 	}
 
-	if (EdgeKeys.IsEmpty()) { return; }
+	if (EdgeKeys.IsEmpty())
+	{
+		return;
+	}
 
 	// --- Author vtx data from the frame source as template (provides the attribute schema) ---
 	const TSharedPtr<PCGExData::FFacade>& TemplateFacade = AllOpData->Facades[FrameSrcIdx];
 	const TSharedPtr<PCGExData::FPointIO> VtxIO = MainPoints->Emplace_GetRef<UPCGExClusterNodesData>(TemplateFacade->Source, PCGExData::EIOInit::New);
-	if (!VtxIO) { return; }
+	if (!VtxIO)
+	{
+		return;
+	}
 
 	VtxIO->IOIndex = Group->GroupIndex; // deterministic vtx output ordering
 	VtxIO->OutputPin = PCGExClusters::Labels::OutputVerticesLabel;
@@ -152,12 +166,13 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 	const EPCGPointNativeProperties Allocations = TemplateFacade->GetAllocations();
 	PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutPoints, NumVerts, Allocations);
 
-	// Transforms written explicitly; non-transform attributes carried via ConsumeIdxMapping. Groups are always
-	// single-source (Split is forced), so the carry against the frame source is exact.
+	// Transforms written explicitly; non-transform attributes carried via ConsumeIdxMapping against the frame
+	// (template) source. Under Auto grouping a group can be multi-source (outer + hole rings); hole-ring nodes
+	// keep their own transform (below) but still carry template attributes -- exact only for frame-source nodes.
 	TArray<int32>& IdxMapping = VtxIO->GetIdxMapping(NumVerts);
 	TPCGValueRange<FTransform> OutTransforms = OutPoints->GetTransformValueRange();
 
-	// Single-source group: fetch the frame source's transform view once.
+	// Fetch the frame (template) source's transform view once. Attribute carry is always against this template.
 	const TConstPCGValueRange<FTransform> FrameTransforms = TemplateFacade->Source->GetIn()->GetConstTransformValueRange();
 
 	for (int32 i = 0; i < NumVerts; i++)
@@ -168,6 +183,20 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		{
 			OutTransforms[i] = FrameTransforms[V.SourcePointIdx];
 			IdxMapping[i] = V.SourcePointIdx;
+		}
+		else if (V.bHasSource && AllOpData->Facades.IsValidIndex(V.SourceIdx))
+		{
+			// Hole-ring vertex from a non-frame source (Auto nesting): keep its own transform so position and
+			// orientation stay faithful.
+			// TODO: attribute carry still uses the frame template (IdxMapping = 0), so hole-ring nodes inherit the
+			// TODO: template's point-0 attributes rather than their own source's. Real per-source carry needs the
+			// TODO: union-blender path.
+			// TODO: this multi-source vertex authoring is special-cased here; Volume positions all verts uniformly
+			// TODO: from Pos/ProjectedZ. Lift a single source-aware authoring path into the shared
+			// TODO: PCGExClipper2Decomposition core so both nodes handle nested/multi-source groups identically.
+			const TConstPCGValueRange<FTransform> SrcTransforms = AllOpData->Facades[V.SourceIdx]->Source->GetIn()->GetConstTransformValueRange();
+			OutTransforms[i] = SrcTransforms[V.SourcePointIdx];
+			IdxMapping[i] = 0;
 		}
 		else
 		{
@@ -217,7 +246,10 @@ bool FPCGExClipper2DecomposeElement::AdvanceWork(FPCGExContext* InContext, const
 			WorkTasks->AddSimpleCallback([Settings, WeakHandle, Index = i]
 			{
 				FPCGContext::FSharedContext<FPCGExClipper2DecomposeContext> SharedContext(WeakHandle);
-				if (!SharedContext.Get()) { return; }
+				if (!SharedContext.Get())
+				{
+					return;
+				}
 
 				const TSharedPtr<PCGExClipper2::FProcessingGroup> Group = SharedContext.Get()->ProcessingGroups[Index];
 				Group->PreProcess(Settings);
@@ -267,7 +299,10 @@ void FPCGExClipper2DecomposeElement::OutputWork(FPCGExContext* InContext, const 
 
 	for (const FPCGExDecomposeCluster& Staged : Context->StagedClusters)
 	{
-		if (!Staged.GraphBuilder) { continue; }
+		if (!Staged.GraphBuilder)
+		{
+			continue;
+		}
 		// true = flush the vtx facade (incl. cluster vtx-index attr) on compile completion.
 		Staged.GraphBuilder->CompileAsync(Context->GetTaskManager(), true);
 	}
