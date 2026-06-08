@@ -276,11 +276,11 @@ public:
 	bool bExposeGroupingPolicy = true;
 
 	/** If enabled, lets you to create sub-groups to operate on. If disabled, data is processed individually. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (EditCondition="bExposeGroupingPolicy", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (EditCondition="bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	FPCGExMatchingDetails MainDataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** How should data be grouped when data matching is disabled */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching() && bExposeGroupingPolicy", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching() && bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	EPCGExGroupingPolicy MainInputGroupingPolicy = EPCGExGroupingPolicy::Consolidate;
 
 	/** Effective grouping policy. Geometry nodes (bExposeGroupingPolicy == false) always process inputs as
@@ -298,7 +298,7 @@ public:
 	FPCGExMatchingDetails OperandsDataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** Skip paths that aren't closed */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	bool bSkipOpenPaths = false;
 
 	/** Decimal precision 
@@ -307,15 +307,15 @@ public:
 	int32 Precision = 100;
 
 	/** Cleanup */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	bool bSimplifyPaths = false;
 
 	/** Keep collinear points in the output instead of simplifying them. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	bool bPreserveCollinear = true;
 
 	/** Tolerance for arc approximation when generating curved offsets. Higher values = fewer points. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	double ArcTolerance = 5.0;
 
 	FORCEINLINE double GetArcTolerance() const
@@ -324,15 +324,15 @@ public:
 	}
 
 	/** Filter in/out which attributes get carried over from inputs to outputs. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	FPCGExCarryOverDetails CarryOverDetails;
 
 	/** Defines how source point properties and attributes are blended together for fused output points. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	FPCGExBlendingDetails BlendingDetails = FPCGExBlendingDetails(EPCGExBlendingType::Average, EPCGExBlendingType::None);
 
 	/** How to handle open paths in the output (ignore, output to main pin, or separate pin). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable, EditCondition="bExposePathOutputProperties", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	EPCGExClipper2OpenPathOutput OpenPathsOutput = EPCGExClipper2OpenPathOutput::Output;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output|Tagging", meta=(InlineEditConditionToggle))
