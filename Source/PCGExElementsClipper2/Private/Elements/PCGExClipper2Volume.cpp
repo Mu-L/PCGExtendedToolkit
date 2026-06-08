@@ -44,11 +44,11 @@ struct FPCGExVolumeSpec
 	int32 SourceFacadeIndex = INDEX_NONE; // AllOpData index of the group's representative path (for @Data forwarding).
 };
 
-// File-local helpers in a named namespace (Unity-build safe). The shared triangulation/decomposition lives
-// in PCGExClipper2Decomposition; only the volume-specific prism tessellation remains here.
+// File-local helpers in a named namespace (Unity-build safe). Shared triangulation/decomposition lives in
+// PCGExClipper2Decomposition; only the volume-specific prism tessellation is here.
 namespace PCGExClipper2Volume
 {
-	// Build the 6+ side/cap polys of a vertical prism (local space) for editor wireframe + bounds.
+	// Build the side/cap polys of a vertical prism (local space) for editor wireframe + bounds.
 	void AddPrismPolys(const TArray<FVector>& Bottoms, const TArray<FVector>& Tops, TArray<FPoly>& OutPolys)
 	{
 		const int32 N = Bottoms.Num();
@@ -57,7 +57,7 @@ namespace PCGExClipper2Volume
 			return;
 		}
 
-		// Bottom cap (reversed so it faces down/outward).
+		// Bottom cap (reversed winding so it faces down/outward).
 		{
 			FPoly Poly;
 			Poly.Init();
@@ -71,7 +71,6 @@ namespace PCGExClipper2Volume
 				OutPolys.Add(Poly);
 			}
 		}
-		// Top cap.
 		{
 			FPoly Poly;
 			Poly.Init();
@@ -85,7 +84,6 @@ namespace PCGExClipper2Volume
 				OutPolys.Add(Poly);
 			}
 		}
-		// Side quads.
 		for (int32 i = 0; i < N; ++i)
 		{
 			const int32 J = (i + 1) % N;
@@ -111,13 +109,12 @@ UPCGExClipper2VolumeSettings::UPCGExClipper2VolumeSettings(const FObjectInitiali
 {
 	VolumeClass = ATriggerVolume::StaticClass();
 
-	// Geometry node: default to Auto grouping so an outer footprint and the rings nested inside it form one
-	// volume (the inner rings become holes), while unrelated footprints stay separate. The dropdown is exposed
-	// so users can switch to Separate (one volume per path) or Merged.
+	// Default to Auto grouping: an outer footprint + its nested rings form one volume (rings become holes),
+	// unrelated footprints stay separate. Dropdown exposed so users can pick Separate or Merged.
 	bExposeGroupingPolicy = true;
 	MainInputGroupingPolicy = EPCGExGroupingPolicy::Auto;
 
-	// Hide the inherited path-output-only parameters (blending, carry-over, open-path, simplify). See base.
+	// Hide inherited path-output-only parameters (blending, carry-over, open-path, simplify).
 	bExposePathOutputProperties = false;
 }
 
@@ -150,8 +147,8 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 {
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
-	// Build the actor-reference set up front and emit it unconditionally (EmitReferences) -- even on the early
-	// outs or with zero spawned volumes (empty set) -- so the "Actor References" pin is always present.
+	// Build the actor-reference set up front and emit it unconditionally (even on early-outs / zero volumes) so
+	// the "Actor References" pin is always present.
 	const FName AttrName = Settings->ActorReferenceAttributeName.IsNone() ? FName("ActorReference") : Settings->ActorReferenceAttributeName;
 	UPCGParamData* RefData = NewObject<UPCGParamData>();
 	UPCGMetadata* RefMetadata = RefData->Metadata;
@@ -189,14 +186,13 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		TargetLevel = CompOwner->GetLevel();
 	}
 
-	// Deterministic output ordering.
 	StagedVolumes.Sort([](const TSharedPtr<FPCGExVolumeSpec>& A, const TSharedPtr<FPCGExVolumeSpec>& B)
 	{
 		return A->GroupIndex < B->GroupIndex;
 	});
 
-	// Forward every @Data-domain attribute from the source path onto its actor's row. The per-source handler
-	// is built once and cached (rebuilding per row would re-scan the source's identities needlessly).
+	// Forward every @Data-domain attribute from the source path onto its actor's row. Handler is built once
+	// per source and cached (rebuilding per row would re-scan the source's identities needlessly).
 	const FPCGExForwardDetails ForwardDetails(true);
 	TMap<int32, TSharedPtr<PCGExData::FDataForwardHandler>> HandlersBySource;
 
@@ -304,7 +300,7 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 {
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
-	// Triangulate + deduplicate vertex pool + Hertel-Mehlhorn merge (shared with Clipper2 : Decompose).
+	// Triangulate + dedup vertex pool + Hertel-Mehlhorn merge (shared with Clipper2 : Decompose).
 	const PCGExClipper2Decomposition::FDecomposeParams Params = PCGExClipper2Decomposition::MakeParams(Settings);
 
 	PCGExClipper2Decomposition::FDecomposeResult Decomposition;
@@ -322,15 +318,15 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 		return;
 	}
 
-	// Use the first subject's projection as a consistent frame for the whole volume.
+	// First subject's projection is the consistent frame for the whole volume.
 	const int32 FrameSrcIdx = Group->SubjectIndices[0];
 	const FPCGExGeo2DProjectionDetails& FrameProjection = AllOpData->Projections[FrameSrcIdx];
 
 	const TArray<PCGExClipper2Decomposition::FFootprintVertex>& VertexPool = Decomposition.VertexPool;
 	const TArray<TArray<int32>>& Pieces = Decomposition.Pieces;
 
-	// Per-vertex extrusion height (volume-specific, not in the shared pool): read from the height reader at
-	// each vertex's mapped source point; non-source vertices contribute 0.
+	// Per-vertex extrusion height (volume-specific, not in the shared pool): read at each vertex's mapped
+	// source point; non-source vertices contribute 0.
 	TArray<double> Heights;
 	Heights.SetNumUninitialized(VertexPool.Num());
 	for (int32 i = 0; i < VertexPool.Num(); i++)
@@ -370,8 +366,8 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			continue;
 		}
 
-		// Extrusion height (max of the piece's point heights), and -- unless Flat -- the piece's own floor
-		// (min/max/average of its points' Z). A flat-floored prism stays convex at any base Z.
+		// Extrusion height = max of the piece's point heights; floor = piece's own min/max/avg Z (unless Flat).
+		// A flat-floored prism stays convex at any base Z.
 		double TopHeight = 0;
 		double PieceBaseZ = MinBaseZ;
 		{
@@ -407,7 +403,7 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 					PieceBaseZ = SumZ / static_cast<double>(SourceCount);
 					break;
 				default:
-					break; // Flat -> keep the global base plane
+					break; // Flat -> keep global base plane
 				}
 			}
 		}
@@ -484,9 +480,9 @@ void FPCGExClipper2VolumeElement::OutputWork(FPCGExContext* InContext, const UPC
 {
 	PCGEX_CONTEXT_AND_SETTINGS(Clipper2Volume)
 
-	// Actor spawning, physics cooking and managed-resource registration must run on the game thread, so
-	// marshal explicitly (inline if already there -- no deadlock). Always marshal, even with zero staged
-	// volumes, so SpawnStagedVolumes still emits the (empty) Actor References set.
+	// Actor spawning, physics cooking and managed-resource registration must run on the game thread (inline if
+	// already there -- no deadlock). Always marshal, even with zero volumes, so SpawnStagedVolumes still emits
+	// the (empty) Actor References set.
 	PCGExMT::ExecuteOnMainThreadAndWait([Context]()
 	{
 		Context->SpawnStagedVolumes();

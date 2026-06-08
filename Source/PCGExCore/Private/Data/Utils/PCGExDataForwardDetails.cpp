@@ -44,9 +44,8 @@ TSharedPtr<PCGExData::FDataForwardHandler> FPCGExForwardDetails::TryGetHandler(c
 
 bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const TSet<FName>* IgnoreAttributes)
 {
-	// Single-fetch on the facade's input data is identical to the raw-data path
-	// (MakeBroadcaster(Source, /*bSingleFetch*/true) just forwards Source->GetIn()), so reuse it and
-	// only attach the facade afterwards for callers that read SourceDataFacade.
+	// Single-fetch on the facade's input is identical to the raw-data path (MakeBroadcaster just forwards
+	// Source->GetIn()), so reuse it and only attach the facade afterwards for SourceDataFacade readers.
 	if (!Init(InContext, InSourceFacade->Source->GetIn(), IgnoreAttributes))
 	{
 		return false;

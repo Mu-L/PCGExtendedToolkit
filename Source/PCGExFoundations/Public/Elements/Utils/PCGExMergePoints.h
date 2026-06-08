@@ -76,7 +76,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, InlineEditConditionToggle))
 	bool bTagToAttributes = false;
 
-	/** Tags that will be converted to attributes. Simple tags become boolean (presence) values; tag:value pairs become their typed value (int32, double, FString, FVector 2-3-4). */
+	/** Tags to convert to attributes: simple tags become boolean (presence), tag:value pairs become their typed value. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="bTagToAttributes"))
 	FPCGExNameFiltersDetails TagsToAttributes = FPCGExNameFiltersDetails(false);
 };

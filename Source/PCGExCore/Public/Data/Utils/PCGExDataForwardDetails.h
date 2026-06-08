@@ -81,9 +81,8 @@ struct PCGEXCORE_API FPCGExAttributeToTagDetails
 
 	bool Init(const FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const TSet<FName>* IgnoreAttributes = nullptr);
 
-	// Raw-data variant: resolves the attribute getters directly against a UPCGData (point data OR attribute set),
-	// skipping the FFacade/FPointIO machinery. SourceDataFacade is left null; callers needing the source row count
-	// derive it from the data. Tag(...) works unchanged since it only reads getters by row index.
+	// Raw-data variant: resolves getters directly against a UPCGData (point data OR attribute set), skipping
+	// FFacade/FPointIO. SourceDataFacade is left null; Tag(...) is unaffected as it reads getters by row index.
 	bool Init(const FPCGExContext* InContext, const UPCGData* InSourceData, const TSet<FName>* IgnoreAttributes = nullptr);
 
 	void Tag(const PCGExData::FConstPoint& TagSource, TSet<FString>& InTags) const;

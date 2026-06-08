@@ -88,9 +88,8 @@ struct PCGEXCORE_API FPCGExNameFiltersDetails
 
 namespace PCGExDataFilter
 {
-	// Resolves an opt-in name filter: returns &Filters when the toggle is on, else nullptr.
-	// Centralizes the 'bEnabled ? &Filters : nullptr' idiom repeated at every merge call site
-	// that forwards a TagsToAttributes filter to FPCGExPointIOMerger / FMergeList.
+	// Centralizes the 'bEnabled ? &Filters : nullptr' idiom for opt-in name filters, repeated at every
+	// merge call site that forwards a TagsToAttributes filter to FPCGExPointIOMerger / FMergeList.
 	FORCEINLINE const FPCGExNameFiltersDetails* ResolveOptional(const bool bEnabled, const FPCGExNameFiltersDetails& Filters)
 	{
 		return bEnabled ? &Filters : nullptr;

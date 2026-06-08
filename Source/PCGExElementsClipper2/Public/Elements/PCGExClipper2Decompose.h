@@ -20,13 +20,7 @@ namespace PCGExData
 	class FPointIO;
 }
 
-/**
- * Clipper2 : Decompose
- *
- * Same projection + triangulation + Hertel-Mehlhorn convex decomposition as Clipper2 : Volume, but outputs a
- * PCGEx cluster (Vtx + Edges) instead of volume actors. Cluster nodes are the deduplicated footprint vertices;
- * edges are the deduplicated union of every convex-piece edge (boundary + surviving Hertel-Mehlhorn diagonals).
- */
+/** Clipper2 : Decompose -- like Clipper2 : Volume but outputs a PCGEx cluster (deduped footprint vtx + deduped union of convex-piece edges) instead of volume actors. */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="clusters/interop/clipper2-decompose"))
 class UPCGExClipper2DecomposeSettings : public UPCGExClipper2ProcessorSettings
 {
@@ -67,8 +61,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	EPCGExClipper2FillRule FillRule = EPCGExClipper2FillRule::EvenOdd;
 
-	/** If enabled, greedily merge triangles into larger convex pieces (Hertel-Mehlhorn) so fewer internal
-	 *  diagonals remain. Disable to keep the raw Constrained-Delaunay triangulation (every triangle edge). */
+	/** Greedily merge triangles into larger convex pieces (Hertel-Mehlhorn); disable to keep the raw triangulation (every triangle edge). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Decomposition", meta = (PCG_NotOverridable))
 	bool bMergeConvexPieces = true;
 
@@ -97,7 +90,7 @@ public:
 	} // outer + nested holes -> one cluster
 };
 
-// Per-group build record (Process): the cluster's authored vtx IO + graph builder. Compiled later in OutputWork.
+// Per-group build record: authored vtx IO + graph builder, compiled later in OutputWork.
 struct FPCGExDecomposeCluster
 {
 	TSharedPtr<PCGExGraphs::FGraphBuilder> GraphBuilder;
@@ -109,7 +102,7 @@ struct FPCGExClipper2DecomposeContext final : FPCGExClipper2ProcessorContext
 {
 	friend class FPCGExClipper2DecomposeElement;
 
-	/** Per-group cluster build records produced off-thread in Process(Group). */
+	// Per-group cluster build records produced off-thread in Process(Group).
 	TArray<FPCGExDecomposeCluster> StagedClusters;
 	mutable FCriticalSection StagedClustersLock;
 

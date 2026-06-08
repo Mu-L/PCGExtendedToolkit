@@ -276,7 +276,7 @@ namespace PCGExData
 
 				const T ForwardValue = Identity.InDataDomain() ? Helpers::ReadDataValue(SourceAtt) : SourceAtt->GetValueFromItemKey(InSourceData->GetMetadataEntry(SourceIndex));
 
-				// Land the forwarded value on a single target entry, on the element (per-row) domain.
+				// Single target entry on the element (per-row) domain.
 				const FPCGAttributeIdentifier TargetIdentifier(Identity.Identifier.Name);
 				FPCGMetadataAttribute<T>* TargetAtt = InTargetMetadata->FindOrCreateAttribute<T>(TargetIdentifier, T{}, SourceAtt->AllowsInterpolation());
 				if (TargetAtt)

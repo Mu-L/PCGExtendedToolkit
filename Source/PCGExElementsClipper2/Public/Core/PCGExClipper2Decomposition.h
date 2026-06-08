@@ -11,24 +11,21 @@
 // projected closed paths -> triangulation -> deduplicated vertex pool -> Hertel-Mehlhorn convex pieces.
 namespace PCGExClipper2Decomposition
 {
-	/** A deduplicated 2D footprint vertex in projection space. Source-backed verts map to
-	 *  (SourceIdx, SourcePointIdx) in FOpData; Clipper-created intersection/Steiner verts have
-	 *  bHasSource == false and are positioned by unprojecting Pos with ProjectedZ. */
+	/** A deduplicated 2D footprint vertex. Source-backed verts map into FOpData; Clipper-created verts (bHasSource == false) are positioned by unprojecting Pos with ProjectedZ. */
 	struct FFootprintVertex
 	{
-		// 2D position in projection space (Clipper2 int coords scaled back by 1/Precision).
+		// Projection-space 2D position (Clipper2 ints / Precision).
 		FVector2D Pos = FVector2D::ZeroVector;
 
-		// Projection-space Z of the mapped source point (0 when there is no source).
+		// Projection-space Z of the source point (0 if none).
 		double ProjectedZ = 0;
 
-		// FOpData facade index of the mapped source, or INDEX_NONE.
+		// FOpData facade index of the source, or INDEX_NONE.
 		int32 SourceIdx = INDEX_NONE;
 
-		// Point index within the mapped source, or INDEX_NONE.
+		// Point index within the source, or INDEX_NONE.
 		int32 SourcePointIdx = INDEX_NONE;
 
-		// True only when this vertex maps back to a valid input point.
 		bool bHasSource = false;
 	};
 
@@ -57,15 +54,14 @@ namespace PCGExClipper2Decomposition
 		// Use Delaunay refinement during triangulation.
 		bool bUseDelaunay = true;
 
-		// Greedily merge triangles into larger convex pieces (Hertel-Mehlhorn). When false, pieces stay triangles.
+		// Hertel-Mehlhorn merge of triangles into convex pieces; false keeps triangles.
 		bool bMergeConvexPieces = true;
 
 		// Safety cap on convex pieces; exceeding it yields EDecomposeResult::TooManyPieces.
 		int32 MaxConvexPieces = 256;
 	};
 
-	/** Build params from any settings exposing Precision / FillRule / bMergeConvexPieces / MaxConvexPieces
-	 *  (templated since Volume and Decompose share these fields without a common base). */
+	/** Build params from any settings exposing the decompose fields (templated -- Volume and Decompose share no common base). */
 	template <typename TSettings>
 	FDecomposeParams MakeParams(const TSettings* Settings)
 	{
@@ -91,24 +87,20 @@ namespace PCGExClipper2Decomposition
 		EDecomposeResult Status = EDecomposeResult::Empty;
 	};
 
-	/** Decompose one group's projected closed paths. Paths must be in Clipper2 int space (as FOpData stores
-	 *  them) with each Point64.z = H64(PointIndex, SourceIndex). Does NOT log -- inspect the returned Status. */
+	/** Decompose one group's projected closed paths (Clipper2 int space, Point64.z = H64(PointIndex, SourceIndex)). Does NOT log -- inspect the Status. */
 	PCGEXELEMENTSCLIPPER2_API FDecomposeResult Decompose(
 		const PCGExClipper2Lib::Paths64& SubjectPaths,
 		const TSharedPtr<PCGExClipper2::FOpData>& AllOpData,
 		const PCGExClipper2Lib::ZCallback64& ZCallback,
 		const FDecomposeParams& Params);
 
-	/** Validate a group, resolve its frame subject (SubjectIndices[0], valid in AllOpData on success), and run
-	 *  Decompose(). Returns true only on Status == Success; otherwise OutResult.Status reports why. Does NOT
-	 *  log -- each node emits its own wording (see DescribeDecomposeFailure). */
+	/** Validate a group, resolve its frame subject (SubjectIndices[0]), and run Decompose(). True only on Success; otherwise OutResult.Status reports why. Does NOT log. */
 	PCGEXELEMENTSCLIPPER2_API bool TryDecomposeGroup(
 		const TSharedPtr<PCGExClipper2::FProcessingGroup>& Group,
 		const TSharedPtr<PCGExClipper2::FOpData>& AllOpData,
 		const FDecomposeParams& Params,
 		FDecomposeResult& OutResult);
 
-	/** Standard warning text for a failed decomposition, with the node's subject noun ("volume"/"footprint").
-	 *  Empty FText for Success/Empty (Empty is a silent skip); callers log non-empty text via their context. */
+	/** Warning text for a failed decomposition, keyed on the subject noun ("volume"/"footprint"). Empty for Success/Empty (silent skip). */
 	PCGEXELEMENTSCLIPPER2_API FText DescribeDecomposeFailure(const FDecomposeResult& Result, const FText& Subject, int32 MaxConvexPieces);
 }

@@ -54,8 +54,7 @@ namespace PCGExPointIOMerger
 
 #undef PCGEX_TPL
 
-	// Fills one source's disjoint output range with a single resolved value (the tag fallback used by
-	// FCopyAttributeTask: one source's tag value, broadcast across that source's points).
+	// Tag fallback for FCopyAttributeTask: broadcasts one source's resolved tag value across its disjoint output range.
 	template <typename T>
 	class FWriteConvertedTagScopeTask final : public PCGExMT::FTask
 	{
@@ -90,10 +89,8 @@ namespace PCGExPointIOMerger
 		}
 	};
 
-	// Builds one output attribute. Each source that carries the real attribute is read normally; where
-	// a source lacks it (or for a tag-only synthetic identity), a same-named tag value composites in --
-	// converted to the output type via PCGExTypeOps (best-effort, no type gate). The real attribute
-	// always wins the type, and any point whose source actually has it.
+	// Builds one output attribute: the real attribute wins (type and points), and a same-named tag
+	// composites in where a source lacks it -- best-effort converted via PCGExTypeOps, no type gate.
 	class FCopyAttributeTask final : public PCGExMT::FPCGExIndexedTask
 	{
 	public:
@@ -113,8 +110,7 @@ namespace PCGExPointIOMerger
 
 			const FIdentityRef& Identity = Merger->UniqueIdentities[TaskIndex];
 
-			// Tag-only synthetic identities have no backing attribute; they are fed purely from tags and
-			// never consult source metadata (so a filtered-out same-named real attribute is ignored).
+			// Tag-only synthetic identities never consult source metadata, so a filtered-out same-named real attribute is ignored.
 			const bool bTagOnly = Identity.bTagOnly;
 			const TArray<TSharedPtr<PCGExData::IDataValue>>* TagValues = Merger->TagValuesByName.Find(Identity.Identifier.Name);
 
@@ -166,9 +162,8 @@ namespace PCGExPointIOMerger
 						continue;
 					}
 
-					// No type gate -- always convert (best-effort QoL). GetValue<T> takes a same-type tag
-					// verbatim (preserving e.g. int64 precision) and otherwise applies PCGExTypeOps'
-					// best-effort conversion. No PCG broadcastability map involved.
+					// No type gate -- always convert: GetValue<T> takes a same-type tag verbatim (preserving
+					// e.g. int64 precision) and otherwise applies PCGExTypeOps' best-effort conversion.
 					const T ConvertedValue = TagValue->GetValue<T>();
 
 					Merger->InternalTracker->IncrementPending();
@@ -343,12 +338,9 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 			});
 	}
 
-	// Build the tag-to-attribute plan (opt-in via InTagsToAttributes), now that carried attributes are
-	// known. A tag passing the filter is intent: it is consumed (stripped from the output tags) whatever
-	// the outcome. If its name is a carried real attribute it composites in -- filling points whose source
-	// lacks the attribute, when the tag's type broadcasts to the attribute's type (incompatible tags are
-	// dropped at write time). Otherwise it becomes a tag-only attribute of its own resolved type, ignoring
-	// any same-named attribute the Carry-Over filter excluded.
+	// Tag-to-attribute plan (opt-in), built once carried attributes are known. A tag passing the filter is
+	// always consumed (stripped from output tags): it composites into a same-named carried attribute, else
+	// becomes a tag-only attribute of its own resolved type (ignoring any Carry-Over-excluded same-named attribute).
 	if (InTagsToAttributes)
 	{
 		// Names already owned by a carried real attribute (composite targets).
@@ -412,9 +404,8 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 		// One synthetic identity per tag-only name, so the unified FCopyAttributeTask path builds it.
 		for (const TPair<FName, EPCGMetadataTypes>& Pair : TagOnlyTypes)
 		{
-			// Integer tags originate as int64. An int64 tag may still be cast (with loss) into an
-			// existing narrower int32 attribute -- but when the tag is the originating type, it must
-			// not be silently narrowed to int32.
+			// Integer tags originate as int64; as the originating type it must not be silently narrowed to int32
+			// (it can still be cast with loss into an existing narrower int32 attribute via the composite path).
 			EPCGMetadataTypes EntryType = Pair.Value;
 			if (EntryType == EPCGMetadataTypes::Integer32)
 			{
@@ -460,8 +451,7 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 		{
 			PCGEX_ASYNC_THIS
 
-			// Tags marked for conversion are consumed into attributes; drop them from the merged
-			// data-domain tags so they aren't duplicated (and flattened) on the output.
+			// Drop converted tags from the merged data-domain tags so they aren't duplicated on the output.
 			if (!This->ConvertedTagNames.IsEmpty())
 			{
 				This->UnionDataFacade->Source->Tags->Remove(This->ConvertedTagNames);

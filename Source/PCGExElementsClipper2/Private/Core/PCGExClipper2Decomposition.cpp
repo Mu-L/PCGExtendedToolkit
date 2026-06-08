@@ -13,10 +13,10 @@
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2Decomposition"
 
-// File-local helpers live in the namespace matching this file (Unity-build safe -- see project build notes).
+// File-local helpers (named namespace -- Unity-build safe).
 namespace PCGExClipper2Decomposition
 {
-	// 2D cross of (A-O),(B-O); >0 when O->A->B turns left (CCW). Uses the shared Det primitive.
+	// 2D cross of (A-O),(B-O); >0 when O->A->B turns left (CCW).
 	FORCEINLINE double Cross2D(const FVector2D& O, const FVector2D& A, const FVector2D& B)
 	{
 		return PCGExMath::Geo::Det(A - O, B - O);
@@ -30,12 +30,12 @@ namespace PCGExClipper2Decomposition
 		{
 			const FVector2D& A = Pool[Loop[i]].Pos;
 			const FVector2D& B = Pool[Loop[(i + 1) % N]].Pos;
-			Area += PCGExMath::Geo::Det(A, B); // shoelace term == 2D determinant of consecutive vertices
+			Area += PCGExMath::Geo::Det(A, B); // shoelace term
 		}
 		return 0.5 * Area;
 	}
 
-	// Reorder a vertex-index loop to CCW (positive signed area) in projection X/Y.
+	// Reorder loop to CCW winding (positive signed area).
 	void EnsureCCW(TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
 	{
 		if (SignedArea(Loop, Pool) < 0)
@@ -44,7 +44,7 @@ namespace PCGExClipper2Decomposition
 		}
 	}
 
-	// True if the loop is convex assuming CCW winding (reflex vertices -> false). Near-collinear is allowed.
+	// Convex test assuming CCW winding; near-collinear allowed (reflex -> false).
 	bool IsConvexCCW(const TArray<int32>& Loop, const TArray<FFootprintVertex>& Pool)
 	{
 		const int32 N = Loop.Num();
@@ -65,9 +65,8 @@ namespace PCGExClipper2Decomposition
 		return true;
 	}
 
-	// If A and B (both CCW) share an edge (u->v in A, v->u in B), merge along it; returns true + fills
-	// OutMerged only if the union is convex. Two disjoint convex polygons share AT MOST one edge, so the
-	// first matching half-edge is the only candidate -- bailing on it cannot miss a valid merge.
+	// Merge A and B (both CCW) along their shared edge iff the union stays convex. Two disjoint convex
+	// polygons share at most one edge, so the first matching half-edge is the only candidate.
 	bool TryMergeConvex(const TArray<int32>& A, const TArray<int32>& B, const TArray<FFootprintVertex>& Pool, TArray<int32>& OutMerged)
 	{
 		const int32 NA = A.Num();
@@ -85,7 +84,7 @@ namespace PCGExClipper2Decomposition
 					continue;
 				}
 
-				// Shared edge: build the merged loop = A from V around to U, then B's interior (after U .. before V).
+				// Merged loop: A from V around to U, then B's interior.
 				TArray<int32> Merged;
 				Merged.Reserve(NA + NB - 2);
 				for (int32 k = 0; k < NA; k++)
@@ -102,25 +101,20 @@ namespace PCGExClipper2Decomposition
 					OutMerged = MoveTemp(Merged);
 					return true;
 				}
-				return false; // single shared edge, not convex -> cannot merge these two
+				return false; // only candidate edge, union not convex
 			}
 		}
 		return false;
 	}
 
 	// Greedy Hertel-Mehlhorn convex merge of a triangulation into fewer convex pieces.
-	//
-	// IMPORTANT: restarting the whole i/j scan after every merge (the `&& !bMerged` guards + outer while) is
-	// INTENTIONAL, not a missed optimization. Greedy merging is order-sensitive: re-pairing a freshly-grown
-	// piece against earlier ones yields FEWER pieces than a one-pass forward sweep (measured). O(n^3) in the
-	// piece count, but the tighter decomposition is worth it -- do NOT switch to a forward-sweep/fixpoint.
-	//
-	// The per-piece Bounds are a behavior-PRESERVING speedup: pieces sharing an edge share its 2 endpoints, so
-	// their bounds always overlap -- a non-overlap means no shared edge (what TryMergeConvex finds anyway), so
-	// skipping it is exact. The eps test only ever lets MORE pairs through, never skips a real adjacency.
+	// Restarting the i/j scan after every merge is intentional: greedy merging is order-sensitive, and
+	// re-pairing a freshly-grown piece yields fewer pieces than a forward sweep (measured). O(n^3) but worth it.
+	// The Bounds pre-filter is exact -- pieces sharing an edge share 2 endpoints, so non-overlapping bounds
+	// can only skip pairs TryMergeConvex would reject anyway.
 	void MergeIntoConvexPieces(TArray<TArray<int32>>& Pieces, const TArray<FFootprintVertex>& Pool)
 	{
-		// Tight 2D bounds of a piece (pieces always have >= 3 vertices, so Loop[0] is valid).
+		// Tight 2D bounds of a piece (always >= 3 vertices, so Loop[0] is valid).
 		struct FBounds2D
 		{
 			double MinX, MinY, MaxX, MaxY;
@@ -140,7 +134,7 @@ namespace PCGExClipper2Decomposition
 			return B;
 		};
 
-		// Bounds[k] tracks Pieces[k] in lockstep (recomputed on merge, RemoveAt'd alongside Pieces).
+		// Bounds[k] tracks Pieces[k] in lockstep.
 		TArray<FBounds2D> Bounds;
 		Bounds.Reserve(Pieces.Num());
 		for (const TArray<int32>& Piece : Pieces)
@@ -158,7 +152,7 @@ namespace PCGExClipper2Decomposition
 			{
 				for (int32 j = i + 1; j < Pieces.Num() && !bMerged; j++)
 				{
-					// Pre-filter: bounds separated on any axis -> no shared edge -> would not merge (exact).
+					// Separated bounds -> no shared edge -> can't merge (exact pre-filter).
 					const FBounds2D& Bi = Bounds[i];
 					const FBounds2D& Bj = Bounds[j];
 					if (Bi.MinX > Bj.MaxX + Eps || Bj.MinX > Bi.MaxX + Eps ||
@@ -217,9 +211,9 @@ namespace PCGExClipper2Decomposition
 
 		auto FindOrAddVertex = [&](const PCGExClipper2Lib::Point64& Pt) -> int32
 		{
-			// Dedup key = low 32 bits of each int64 Clipper coord, packed. Exact only while |x|,|y| < 2^31 scaled
-			// units (~+-21M / Precision world cm: +-215km at Precision=100, +-2km at 10000); beyond that, dropped
-			// high bits can collide distinct verts -> welded mesh. If it bites, key on the full int64 pair instead.
+			// Dedup key packs the low 32 bits of each int64 Clipper coord. Exact while |x|,|y| < 2^31 scaled
+			// units (~215km at Precision=100, ~2km at 10000); beyond that, dropped high bits can weld distinct
+			// verts. If it bites, key on the full int64 pair instead.
 			const uint64 Hash = PCGEx::H64(static_cast<uint32>(Pt.x & 0xFFFFFFFF), static_cast<uint32>(Pt.y & 0xFFFFFFFF));
 			if (const int32* Found = VertexMap.Find(Hash))
 			{
@@ -314,7 +308,7 @@ namespace PCGExClipper2Decomposition
 			return false;
 		}
 
-		// SubjectIndices[0] indexes the parallel AllOpData arrays; one validity check covers all later lookups.
+		// SubjectIndices[0] indexes the parallel AllOpData arrays; one check covers all later lookups.
 		const int32 FrameSrcIdx = Group->SubjectIndices[0];
 		if (!AllOpData->Projections.IsValidIndex(FrameSrcIdx) || !AllOpData->Facades.IsValidIndex(FrameSrcIdx))
 		{

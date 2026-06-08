@@ -219,9 +219,7 @@ namespace PCGExSorting
 
 			if (RuleHandler->bUseDataTag)
 			{
-				// Tag-based: resolve each data's value tag-first, attribute-fallback.
-				// Lenient -- datas without a value are left null (skipped during
-				// comparison); the rule is kept as long as at least one data resolves.
+				// Lenient: datas without a value are left null (skipped in comparison); rule survives if any data resolves.
 				bool bFoundAny = false;
 				for (int32 f = 0; f < NumDatas; f++)
 				{

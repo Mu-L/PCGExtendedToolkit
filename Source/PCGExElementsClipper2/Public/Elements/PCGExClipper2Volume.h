@@ -19,8 +19,7 @@ namespace PCGExDetails
 	class TSettingValue;
 }
 
-// Defined in the .cpp -- holds plain, game-thread-agnostic build data produced by Process(Group)
-// and consumed by OutputWork() when spawning the volume actor.
+// Defined in the .cpp -- plain build data produced by Process(Group), consumed by OutputWork() when spawning the volume.
 struct FPCGExVolumeSpec;
 
 /** How each convex piece's floor Z is derived from its own points. */
@@ -33,13 +32,7 @@ enum class EPCGExVolumeBaseMode : uint8
 	Average = 3 UMETA(DisplayName = "Average", ToolTip = "Each piece's floor sits at the average point Z within that piece."),
 };
 
-/**
- * Clipper2 : Volume
- *
- * Extrudes a (possibly concave) closed-path footprint into an AVolume trigger actor: triangulate, merge into
- * convex pieces (Hertel-Mehlhorn), and write each as a vertical convex prism into the brush body setup
- * (AggGeom.ConvexElems) -- no BSP, so it works in editor and cooked runtime alike.
- */
+/** Clipper2 : Volume -- extrudes a concave closed-path footprint into an AVolume, writing each Hertel-Mehlhorn convex piece as a vertical prism in AggGeom.ConvexElems (no BSP, so editor + cooked runtime both work). */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="paths/generate/clipper2-volume"))
 class UPCGExClipper2VolumeSettings : public UPCGExClipper2ProcessorSettings
 {
@@ -95,8 +88,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Volume", meta = (PCG_Overridable, ClampMin = 0.01))
 	double MinThickness = 1.0;
 
-	/** How each convex piece's floor Z is chosen from its points, so the volume can step to follow uneven input.
-	 *  Flat keeps a single shared floor at the footprint's lowest point. */
+	/** How each convex piece's floor Z is chosen from its points, so the volume steps to follow uneven input (Flat keeps one shared floor). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Volume", meta = (PCG_NotOverridable))
 	EPCGExVolumeBaseMode BaseMode = EPCGExVolumeBaseMode::Min;
 
@@ -141,17 +133,17 @@ struct FPCGExClipper2VolumeContext final : FPCGExClipper2ProcessorContext
 {
 	friend class FPCGExClipper2VolumeElement;
 
-	/** Per-source-path height reader (Facade->Idx indexes this array, matching AllOpData). */
+	// Per-source-path height reader (Facade->Idx indexes this array, matching AllOpData).
 	TArray<TSharedPtr<PCGExDetails::TSettingValue<double>>> HeightValues;
 
-	/** Volume build specs produced off-thread in Process(Group), consumed on the game thread in OutputWork. */
+	// Volume build specs produced off-thread in Process(Group), consumed on the game thread in OutputWork.
 	TArray<TSharedPtr<FPCGExVolumeSpec>> StagedVolumes;
 	mutable FCriticalSection StagedVolumesLock;
 
-	/** Managed resource that owns all spawned volumes for this generation (auto-cleanup on regen). */
+	// Managed resource owning all spawned volumes for this generation (auto-cleanup on regen).
 	UPCGManagedActors* ManagedActors = nullptr;
 
-	/** CRC of inputs + settings, stamped on the managed resource. */
+	// CRC of inputs + settings, stamped on the managed resource.
 	FPCGCrc DependenciesCrc;
 
 	void AddStagedVolume(const TSharedPtr<FPCGExVolumeSpec>& Spec);

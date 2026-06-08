@@ -114,11 +114,13 @@ struct FPCGExAttributesToTagsContext final : FPCGExContext
 
 	TArray<TObjectPtr<const UPCGExPickerFactoryData>> PickerFactories;
 
-	/** Settings->Attributes merged with the comma-separated selector overrides. Built once in Boot. */
+	/** Element-domain selectors (merged with the comma-separated overrides), read per-row via the broadcaster. Built in Boot. */
 	TArray<FPCGAttributePropertyInputSelector> Attributes;
 
-	/** Cross-collection resolutions (EntryToCollection / CollectionToCollection): the resolved "Tags Source"
-	 * data and their matching attribute readers, built once in Boot. Empty for the Self resolution. */
+	/** @Data-domain selectors, read as a single value via PCGExData::Helpers::TryReadDataValue (the broadcaster is point-centric and doesn't handle @Data off raw data). Built in Boot. */
+	TArray<FPCGAttributePropertyInputSelector> DataAttributes;
+
+	/** Cross-collection (EntryToCollection / CollectionToCollection): resolved "Tags Source" data + readers, built in Boot. Empty for Self. */
 	TArray<const UPCGData*> Sources;
 	TArray<FPCGExAttributeToTagDetails> Details;
 };

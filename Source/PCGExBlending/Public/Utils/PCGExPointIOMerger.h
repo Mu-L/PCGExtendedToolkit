@@ -66,9 +66,8 @@ public:
 	TArray<TSharedPtr<PCGExData::FPointIO>> IOSources;
 	TArray<PCGExPointIOMerger::FMergeScope> Scopes;
 
-	// Per-source tag values for names being converted to attributes (entry size == IOSources.Num();
-	// null where that source doesn't carry the tag). Consumed by FCopyAttributeTask as a per-source
-	// fallback when a source lacks the real attribute. See MergeAsync.
+	// Per-source tag values for names converted to attributes (entry size == IOSources.Num(), null where the
+	// source lacks the tag); FCopyAttributeTask uses it as the per-source fallback. See MergeAsync.
 	TMap<FName, TArray<TSharedPtr<PCGExData::IDataValue>>> TagValuesByName;
 
 	explicit FPCGExPointIOMerger(const TSharedRef<PCGExData::FFacade>& InUnionDataFacade);

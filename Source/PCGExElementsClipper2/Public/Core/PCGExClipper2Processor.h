@@ -254,24 +254,15 @@ protected:
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
 public:
-	/** True for path-output nodes (Boolean, RectClip, Offset, Triangulate); geometry nodes (Volume,
-	 *  Decompose) set this false in their constructor to hide the path-output-only parameters below
-	 *  (blending, carry-over, open-path output, simplify/arc-tolerance) that have no effect when the node
-	 *  emits geometry rather than paths. Not user-editable -- a per-class constant.
-	 *
-	 *  This is deliberately an EditCondition gate rather than splitting the path-output properties into a
-	 *  separate base class: the cleaner inheritance split would change the serialized class layout and drop
-	 *  these UPROPERTYs from existing production graphs that already inherit them. Keep the gate until a
-	 *  migration path for that serialized data exists. (PCG_Overridable hidden props may still surface an
-	 *  override pin on geometry nodes; that pin is inert for them.) */
+	/** Per-class constant: false on geometry nodes (Volume, Decompose) to hide path-output-only properties
+	 *  (blending, carry-over, open-path output, simplify/arc-tolerance) that have no effect on geometry output.
+	 *  Intentionally an EditCondition gate, not an inheritance split, which would change the serialized class
+	 *  layout and drop these UPROPERTYs from existing graphs -- keep the gate until a data migration exists. */
 	UPROPERTY()
 	bool bExposePathOutputProperties = true;
 
-	/** Whether the grouping policy + main-matching controls below are user-editable on this node. True for the
-	 *  path-output nodes and for the geometry nodes (Volume, Decompose) -- the latter expose the dropdown and
-	 *  default to Auto, so an outer footprint and the rings it contains are grouped together (holes) while
-	 *  unrelated footprints stay separate. When false, the controls are hidden and inputs fall back to Split
-	 *  (see GetEffectiveGroupingPolicy). Not user-editable -- a per-class constant. */
+	/** Per-class constant: whether the grouping-policy + main-matching controls are user-editable. When false the
+	 *  controls hide and inputs fall back to Split (see GetEffectiveGroupingPolicy). */
 	UPROPERTY()
 	bool bExposeGroupingPolicy = true;
 
@@ -283,21 +274,17 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching() && bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	EPCGExGroupingPolicy MainInputGroupingPolicy = EPCGExGroupingPolicy::Consolidate;
 
-	/** Whether this node's per-group code can consume nesting-aware (outer + holes) groups produced by
-	 *  EPCGExGroupingPolicy::Auto. Geometry nodes (Volume, Decompose) override this to true; for everyone else
-	 *  Auto falls back to Split in GetEffectiveGroupingPolicy. */
+	/** Whether per-group code can consume nesting-aware (outer + holes) Auto groups; else Auto falls back to Split. */
 	virtual bool SupportsAutoGrouping() const
 	{
 		return false;
 	}
 
-	/** Effective grouping policy. When the grouping controls are hidden (bExposeGroupingPolicy == false) inputs
-	 *  fall back to Split. Auto also falls back to Split on nodes that don't support nesting. */
+	/** Effective grouping policy: falls back to Split when controls are hidden, or for Auto on nodes that don't support nesting. */
 	EPCGExGroupingPolicy GetEffectiveGroupingPolicy() const
 	{
 		EPCGExGroupingPolicy Policy = bExposeGroupingPolicy ? MainInputGroupingPolicy : EPCGExGroupingPolicy::Split;
-		// Auto needs nesting-aware per-group code; nodes that don't support it fall back to Separate (each input
-		// its own group) -- the conservative, least-surprising choice, never silently merging unrelated inputs.
+		// Fall back to Split when Auto is unsupported -- the conservative choice, never silently merging inputs.
 		if (Policy == EPCGExGroupingPolicy::Auto && !SupportsAutoGrouping())
 		{
 			Policy = EPCGExGroupingPolicy::Split;

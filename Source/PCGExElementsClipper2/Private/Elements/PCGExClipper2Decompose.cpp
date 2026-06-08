@@ -20,8 +20,7 @@
 
 namespace PCGExClipper2Decompose
 {
-	// Compile-wait phase: after every cluster is authored + its graph compile launched. Stays pending (via
-	// IsWaitingForTasks) until the async subgraph compiles + vtx writes drain.
+	// Compile-wait phase: stays pending (via IsWaitingForTasks) until the async subgraph compiles + vtx writes drain.
 	PCGEX_CTX_STATE(State_CompilingClusters)
 }
 
@@ -30,13 +29,12 @@ namespace PCGExClipper2Decompose
 UPCGExClipper2DecomposeSettings::UPCGExClipper2DecomposeSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// Geometry node: default to Auto grouping so an outer footprint and the rings nested inside it form one
-	// cluster (the inner rings become holes), while unrelated footprints stay separate. The dropdown is exposed
-	// so users can switch to Separate (one cluster per path) or Merged.
+	// Default to Auto grouping: an outer footprint + its nested rings form one cluster (rings become holes),
+	// unrelated footprints stay separate. Dropdown exposed so users can pick Separate or Merged.
 	bExposeGroupingPolicy = true;
 	MainInputGroupingPolicy = EPCGExGroupingPolicy::Auto;
 
-	// Hide the inherited path-output-only parameters (blending, carry-over, open-path, simplify). See base.
+	// Hide inherited path-output-only parameters (blending, carry-over, open-path, simplify).
 	bExposePathOutputProperties = false;
 }
 
@@ -47,7 +45,7 @@ FPCGExGeo2DProjectionDetails UPCGExClipper2DecomposeSettings::GetProjectionDetai
 
 TArray<FPCGPinProperties> UPCGExClipper2DecomposeSettings::OutputPinProperties() const
 {
-	// Main pin (Vtx) is declared by the base via GetMainOutputPin(); add the paired Edges pin.
+	// Base declares the main Vtx pin via GetMainOutputPin(); add the paired Edges pin.
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
 	PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputEdgesLabel, "Point data representing edges.", Required)
 	return PinProperties;
@@ -70,7 +68,6 @@ void FPCGExClipper2DecomposeContext::AddStagedCluster(const TSharedPtr<PCGExGrap
 
 void FPCGExClipper2DecomposeContext::StageClusterOutputs()
 {
-	// Deterministic output ordering by group index.
 	StagedClusters.Sort([](const FPCGExDecomposeCluster& A, const FPCGExDecomposeCluster& B)
 	{
 		return A.GroupIndex < B.GroupIndex;
@@ -80,7 +77,7 @@ void FPCGExClipper2DecomposeContext::StageClusterOutputs()
 	{
 		if (!Staged.GraphBuilder || !Staged.GraphBuilder->bCompiledSuccessfully)
 		{
-			// Compilation produced no valid subgraph (e.g. every node pruned) -- drop the orphan vtx output.
+			// No valid subgraph (e.g. every node pruned) -- drop the orphan vtx output.
 			if (Staged.VtxIO)
 			{
 				Staged.VtxIO->InitializeOutput(PCGExData::EIOInit::NoInit);
@@ -92,8 +89,7 @@ void FPCGExClipper2DecomposeContext::StageClusterOutputs()
 		Staged.GraphBuilder->StageEdgesOutputs();
 	}
 
-	// Vtx outputs live in MainPoints (only the authored cluster-node IOs have OUT data; the source paths
-	// remain input-only and are skipped).
+	// Vtx outputs live in MainPoints: only authored cluster-node IOs have OUT data; source paths stay input-only.
 	MainPoints->StageOutputs();
 }
 
@@ -101,7 +97,7 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 {
 	const UPCGExClipper2DecomposeSettings* Settings = GetInputSettings<UPCGExClipper2DecomposeSettings>();
 
-	// Triangulate + deduplicate vertex pool + Hertel-Mehlhorn merge (shared with Clipper2 : Volume).
+	// Triangulate + dedup vertex pool + Hertel-Mehlhorn merge (shared with Clipper2 : Volume).
 	const PCGExClipper2Decomposition::FDecomposeParams Params = PCGExClipper2Decomposition::MakeParams(Settings);
 
 	PCGExClipper2Decomposition::FDecomposeResult Decomposition;
@@ -119,7 +115,7 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		return;
 	}
 
-	// Frame subject: projection frame (Steiner unprojection) + attribute template for the nodes.
+	// Frame subject: projection frame (Steiner unprojection) + attribute template for nodes.
 	const int32 FrameSrcIdx = Group->SubjectIndices[0];
 	const FPCGExGeo2DProjectionDetails& FrameProjection = AllOpData->Projections[FrameSrcIdx];
 
@@ -128,7 +124,7 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 	const int32 NumVerts = VertexPool.Num();
 
 	// --- Edge set: deduplicated union of every convex-piece edge (boundary + diagonals) ---
-	// H64U canonicalizes (a,b)==(b,a), so shared diagonals collapse to one key; InsertEdges decodes back to A!=B.
+	// H64U canonicalizes (a,b)==(b,a) so shared diagonals collapse to one key; InsertEdges decodes back to A!=B.
 	TSet<uint64> EdgeKeys;
 	EdgeKeys.Reserve(NumVerts * 3);
 	for (const TArray<int32>& Piece : Pieces)
@@ -151,7 +147,7 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		return;
 	}
 
-	// --- Author vtx data from the frame source as template (provides the attribute schema) ---
+	// --- Author vtx data using the frame source as attribute-schema template ---
 	const TSharedPtr<PCGExData::FFacade>& TemplateFacade = AllOpData->Facades[FrameSrcIdx];
 	const TSharedPtr<PCGExData::FPointIO> VtxIO = MainPoints->Emplace_GetRef<UPCGExClusterNodesData>(TemplateFacade->Source, PCGExData::EIOInit::New);
 	if (!VtxIO)
@@ -159,7 +155,7 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		return;
 	}
 
-	VtxIO->IOIndex = Group->GroupIndex; // deterministic vtx output ordering
+	VtxIO->IOIndex = Group->GroupIndex; // deterministic vtx ordering
 	VtxIO->OutputPin = PCGExClusters::Labels::OutputVerticesLabel;
 
 	UPCGBasePointData* OutPoints = VtxIO->GetOut();
@@ -167,12 +163,12 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 	PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutPoints, NumVerts, Allocations);
 
 	// Transforms written explicitly; non-transform attributes carried via ConsumeIdxMapping against the frame
-	// (template) source. Under Auto grouping a group can be multi-source (outer + hole rings); hole-ring nodes
-	// keep their own transform (below) but still carry template attributes -- exact only for frame-source nodes.
+	// (template) source. Under Auto grouping a group can be multi-source (outer + hole rings); attribute carry
+	// is exact only for frame-source nodes (hole-ring nodes keep their own transform but template attributes).
 	TArray<int32>& IdxMapping = VtxIO->GetIdxMapping(NumVerts);
 	TPCGValueRange<FTransform> OutTransforms = OutPoints->GetTransformValueRange();
 
-	// Fetch the frame (template) source's transform view once. Attribute carry is always against this template.
+	// Frame (template) source's transform view, fetched once.
 	const TConstPCGValueRange<FTransform> FrameTransforms = TemplateFacade->Source->GetIn()->GetConstTransformValueRange();
 
 	for (int32 i = 0; i < NumVerts; i++)
@@ -186,34 +182,31 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		}
 		else if (V.bHasSource && AllOpData->Facades.IsValidIndex(V.SourceIdx))
 		{
-			// Hole-ring vertex from a non-frame source (Auto nesting): keep its own transform so position and
-			// orientation stay faithful.
+			// Hole-ring vertex from a non-frame source (Auto nesting): keep its own transform.
 			// TODO: attribute carry still uses the frame template (IdxMapping = 0), so hole-ring nodes inherit the
-			// TODO: template's point-0 attributes rather than their own source's. Real per-source carry needs the
-			// TODO: union-blender path.
-			// TODO: this multi-source vertex authoring is special-cased here; Volume positions all verts uniformly
-			// TODO: from Pos/ProjectedZ. Lift a single source-aware authoring path into the shared
-			// TODO: PCGExClipper2Decomposition core so both nodes handle nested/multi-source groups identically.
+			// TODO: template's point-0 attributes, not their own source's. Real per-source carry needs the union-blender.
+			// TODO: this multi-source authoring is special-cased here; Volume positions all verts uniformly from
+			// TODO: Pos/ProjectedZ. Lift one source-aware authoring path into the shared PCGExClipper2Decomposition
+			// TODO: core so both nodes handle nested/multi-source groups identically.
 			const TConstPCGValueRange<FTransform> SrcTransforms = AllOpData->Facades[V.SourceIdx]->Source->GetIn()->GetConstTransformValueRange();
 			OutTransforms[i] = SrcTransforms[V.SourcePointIdx];
 			IdxMapping[i] = 0;
 		}
 		else
 		{
-			// No source (Clipper-created intersection / Steiner vertex) -> position by unprojection.
+			// No source (Clipper intersection / Steiner vertex) -> position by unprojection.
 			const FVector UnprojectedPos = FrameProjection.Unproject(FVector(V.Pos.X, V.Pos.Y, V.ProjectedZ));
 			OutTransforms[i] = FTransform(UnprojectedPos);
 			IdxMapping[i] = 0;
 		}
 	}
 
-	// Carry non-transform attributes (transforms authored above).
+	// Carry non-transform attributes (transforms already authored above).
 	EPCGPointNativeProperties CarryProperties = Allocations;
 	EnumRemoveFlags(CarryProperties, EPCGPointNativeProperties::Transform);
 	VtxIO->ConsumeIdxMapping(CarryProperties);
 
 	// Build the graph AFTER the vtx OUT buffer is sized/positioned (FGraphBuilder captures its transform range).
-	// bInheritNodeData=false -- nodes are authored from scratch.
 	const TSharedPtr<PCGExData::FFacade> VtxFacade = MakeShared<PCGExData::FFacade>(VtxIO.ToSharedRef());
 	const TSharedPtr<PCGExGraphs::FGraphBuilder> GraphBuilder = MakeShared<PCGExGraphs::FGraphBuilder>(VtxFacade.ToSharedRef(), &Settings->GraphBuilderDetails);
 	GraphBuilder->bInheritNodeData = false;
@@ -240,7 +233,7 @@ bool FPCGExClipper2DecomposeElement::AdvanceWork(FPCGExContext* InContext, const
 
 		TWeakPtr<FPCGContextHandle> WeakHandle = Context->GetWeakSelfHandle();
 
-		// Decompose each group + author its vtx IO and graph builder in parallel (one task per group).
+		// Decompose + author each group's vtx IO and graph builder in parallel (one task per group).
 		for (int32 i = 0; i < Context->ProcessingGroups.Num(); i++)
 		{
 			WorkTasks->AddSimpleCallback([Settings, WeakHandle, Index = i]
@@ -262,13 +255,13 @@ bool FPCGExClipper2DecomposeElement::AdvanceWork(FPCGExContext* InContext, const
 
 	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_Processing)
 	{
-		// Every group authored. Orchestrate the (async) graph compiles.
+		// Every group authored. Orchestrate the async graph compiles.
 		OutputWork(Context, Settings);
 	}
 
 	PCGEX_ON_ASYNC_STATE_READY(PCGExClipper2Decompose::State_CompilingClusters)
 	{
-		// All compiles drained -- stage vtx + edges deterministically.
+		// All compiles drained -- stage vtx + edges.
 		Context->StageClusterOutputs();
 		Context->Done();
 	}
@@ -288,8 +281,7 @@ void FPCGExClipper2DecomposeElement::OutputWork(FPCGExContext* InContext, const 
 
 	Context->SetState(PCGExClipper2Decompose::State_CompilingClusters);
 
-	// Keeps the context "waiting for tasks" until the compiles drain (State_CompilingClusters gates on
-	// IsWaitingForTasks).
+	// Keeps the context "waiting for tasks" until the compiles drain (State_CompilingClusters gates on IsWaitingForTasks).
 	PCGExMT::FSchedulingScope SchedulingScope(Context->GetTaskManager());
 	if (!SchedulingScope.Token.IsValid())
 	{
