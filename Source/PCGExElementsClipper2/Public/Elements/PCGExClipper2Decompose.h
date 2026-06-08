@@ -23,13 +23,9 @@ namespace PCGExData
 /**
  * Clipper2 : Decompose
  *
- * Runs the same projection + Clipper2 boundary-respecting triangulation + Hertel-Mehlhorn convex
- * decomposition as Clipper2 : Volume, but outputs a PCGEx cluster (Vtx + Edges) instead of volume actors.
- *
- * Cluster nodes are the deduplicated footprint vertices (each mapped back to its source point, or
- * positioned by unprojection for Clipper-created intersection vertices). Cluster edges are the
- * deduplicated union of every convex-piece edge: the original closed-path boundary plus the internal
- * Hertel-Mehlhorn split diagonals that survive the merge, each shared diagonal appearing exactly once.
+ * Same projection + triangulation + Hertel-Mehlhorn convex decomposition as Clipper2 : Volume, but outputs a
+ * PCGEx cluster (Vtx + Edges) instead of volume actors. Cluster nodes are the deduplicated footprint vertices;
+ * edges are the deduplicated union of every convex-piece edge (boundary + surviving Hertel-Mehlhorn diagonals).
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="clusters/interop/clipper2-decompose"))
 class UPCGExClipper2DecomposeSettings : public UPCGExClipper2ProcessorSettings
@@ -97,8 +93,7 @@ public:
 	}
 };
 
-// Plain build record produced in Process(Group): the per-group cluster's freshly-authored vtx IO and its
-// graph builder (edges already inserted). The async graph compile is orchestrated later, in OutputWork.
+// Per-group build record (Process): the cluster's authored vtx IO + graph builder. Compiled later in OutputWork.
 struct FPCGExDecomposeCluster
 {
 	TSharedPtr<PCGExGraphs::FGraphBuilder> GraphBuilder;

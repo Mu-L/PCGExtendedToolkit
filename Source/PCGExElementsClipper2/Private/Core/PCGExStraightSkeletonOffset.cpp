@@ -157,6 +157,36 @@ namespace PCGExStraightSkeletonOffset
 	{
 		return AEA == BEA || AEA == BEB || AEB == BEA || AEB == BEB;
 	}
+
+	// Which pass created a skeleton arc. Carried on FArcRec through dissolve/weld and mapped into
+	// FStraightSkeletonEdge.Event for downstream (M5) edge classification.
+	enum class EArcSrc : uint8 { Trace = 0, Merge = 1, Final = 2, Collapse = 3 };
+
+	// Trace is the spoke BODY; merge/final/collapse are terminating EVENTS and outrank it when a collinear
+	// dissolve absorbs one arc into another, so the merged edge keeps its terminal event. Collapse (a feature
+	// medial) is the most specific.
+	FORCEINLINE int32 ArcSrcPriority(const EArcSrc Src)
+	{
+		switch (Src)
+		{
+		case EArcSrc::Collapse: return 3;
+		case EArcSrc::Final: return 2;
+		case EArcSrc::Merge: return 1;
+		default: return 0; // Trace
+		}
+	}
+
+	FORCEINLINE PCGExMath::Geo::ESkeletonEventType ArcEvent(const EArcSrc Src)
+	{
+		using namespace PCGExMath::Geo;
+		switch (Src)
+		{
+		case EArcSrc::Merge: return ESkeletonEventType::EdgeEvent;
+		case EArcSrc::Final: return ESkeletonEventType::EdgeEvent;
+		case EArcSrc::Collapse: return ESkeletonEventType::FeatureCollapse;
+		default: return ESkeletonEventType::Initial; // Trace
+		}
+	}
 }
 
 namespace PCGExMath::Geo
@@ -287,7 +317,7 @@ namespace PCGExMath::Geo
 
 		const PCGExClipper2Lib::Paths64 Subject = BuildSubject(Loops[0], TArrayView<const TArray<FVector2D>>(Loops.GetData() + 1, Loops.Num() - 1), S);
 
-		struct FArcRec { int32 A; int32 B; };
+		struct FArcRec { int32 A; int32 B; EArcSrc Src; };
 		TArray<FArcRec> Arcs;
 		// Parallel/feature-collapse medials (a pinched neck's centerline). Recorded here during the march and
 		// added after it ONLY where they bridge two otherwise-disconnected components -- so a genuine bridge
@@ -348,7 +378,7 @@ namespace PCGExMath::Geo
 				const int32 NewNode = AddNode(RC.Pos, T);
 				if (Best >= 0)
 				{
-					Arcs.Add({Active[Best].Node, NewNode});
+					Arcs.Add({Active[Best].Node, NewNode, EArcSrc::Trace});
 					Active[Best].Node = NewNode;
 					Active[Best].Pos = RC.Pos;
 					Active[Best].bSeen = true;
@@ -380,7 +410,7 @@ namespace PCGExMath::Geo
 					if (D < ShareD && ShareEdge(AC.EA, AC.EB, SN.EA, SN.EB)) { ShareD = D; ShareNode = SN.Node; }
 				}
 				const int32 MergeNode = (ShareNode != INDEX_NONE && ShareD <= MergeGateSq) ? ShareNode : AnyNode;
-				if (MergeNode != INDEX_NONE && MergeNode != AC.Node) { Arcs.Add({AC.Node, MergeNode}); }
+				if (MergeNode != INDEX_NONE && MergeNode != AC.Node) { Arcs.Add({AC.Node, MergeNode, EArcSrc::Merge}); }
 			}
 
 			// Feature collapse: an original edge whose corners ALL die this step (none survive in StepNodes) has
@@ -408,7 +438,7 @@ namespace PCGExMath::Geo
 					OnE.RemoveAll([&](const int32 ai) { const double Pj = FVector2D::DotProduct(Active[ai].Pos - EP, EDir); return Pj < -CollapseSlack || Pj > OrigEdges[Pair.Key].Len + CollapseSlack; });
 					if (OnE.Num() < 2) { continue; }
 					OnE.Sort([&](const int32 A, const int32 B) { return FVector2D::DotProduct(Active[A].Pos, EDir) < FVector2D::DotProduct(Active[B].Pos, EDir); });
-					for (int32 k = 0; k + 1 < OnE.Num(); k++) { if (Active[OnE[k]].Node != Active[OnE[k + 1]].Node) { CollapseCandidates.Add({Active[OnE[k]].Node, Active[OnE[k + 1]].Node}); } }
+					for (int32 k = 0; k + 1 < OnE.Num(); k++) { if (Active[OnE[k]].Node != Active[OnE[k + 1]].Node) { CollapseCandidates.Add({Active[OnE[k]].Node, Active[OnE[k + 1]].Node, EArcSrc::Collapse}); } }
 				}
 			}
 			for (int32 ai = Active.Num() - 1; ai >= 0; ai--) { if (!Active[ai].bSeen) { Active.RemoveAtSwap(ai, 1, EAllowShrinking::No); } }
@@ -451,7 +481,7 @@ namespace PCGExMath::Geo
 				{
 					const int32 NA = Active[OnE[k]].Node;
 					const int32 NB = Active[OnE[k + 1]].Node;
-					if (NA != NB) { Arcs.Add({NA, NB}); }
+					if (NA != NB) { Arcs.Add({NA, NB, EArcSrc::Final}); }
 				}
 			}
 		}
@@ -502,6 +532,8 @@ namespace PCGExMath::Geo
 						if (FMath::Abs(D0.X * D1.Y - D0.Y * D1.X) > COLLINEAR_EPS) { continue; }
 						E[Live[0]].A = A;
 						E[Live[0]].B = B;
+						// Keep the terminal EVENT when a trace run absorbs an event segment (or vice-versa).
+						if (ArcSrcPriority(E[Live[1]].Src) > ArcSrcPriority(E[Live[0]].Src)) { E[Live[0]].Src = E[Live[1]].Src; }
 						Alive[Live[1]] = false;
 						Adj[B].Remove(Live[1]);
 						Adj[B].Add(Live[0]);
@@ -594,17 +626,17 @@ namespace PCGExMath::Geo
 		auto Final = [&](const int32 Old) { return RepToNew[OldToRep[Old]]; };
 
 		TMap<uint64, int32> EdgeMap;
-		auto AddEdge = [&](const int32 A, const int32 B, const ESkeletonEdgeType Type)
+		auto AddEdge = [&](const int32 A, const int32 B, const ESkeletonEdgeType Type, const ESkeletonEventType Event)
 		{
 			if (A < 0 || B < 0 || A == B) { return; }
 			const uint64 Key = PCGEx::H64U(static_cast<uint32>(A), static_cast<uint32>(B));
 			if (const int32* Existing = EdgeMap.Find(Key)) { if (Type == ESkeletonEdgeType::Contour) { Edges[*Existing].Type = ESkeletonEdgeType::Contour; } return; }
 			const bool bPerimeter = Nodes[A].bIsContour || Nodes[B].bIsContour;
 			EdgeMap.Add(Key, Edges.Num());
-			Edges.Add(FStraightSkeletonEdge(A, B, Type, Type == ESkeletonEdgeType::Contour ? ESkeletonEventType::None : ESkeletonEventType::Initial, bPerimeter));
+			Edges.Add(FStraightSkeletonEdge(A, B, Type, Event, bPerimeter));
 		};
 
-		for (const FArcRec& Arc : Arcs) { AddEdge(Final(Arc.A), Final(Arc.B), ESkeletonEdgeType::Skeleton); }
+		for (const FArcRec& Arc : Arcs) { AddEdge(Final(Arc.A), Final(Arc.B), ESkeletonEdgeType::Skeleton, ArcEvent(Arc.Src)); }
 
 		// ---- 6b. Planarity repair: a wavefront merge can attach an arc to the FAR end of a short junction
 		// ridge (the live hub) instead of the near BEND it actually meets, crossing a neighbouring spoke. Where
@@ -724,7 +756,7 @@ namespace PCGExMath::Geo
 			for (const TArray<FVector2D>& L : Loops)
 			{
 				const int32 N = L.Num();
-				for (int32 i = 0; i < N; i++) { AddEdge(Final(VOff + i), Final(VOff + (i + 1) % N), ESkeletonEdgeType::Contour); }
+				for (int32 i = 0; i < N; i++) { AddEdge(Final(VOff + i), Final(VOff + (i + 1) % N), ESkeletonEdgeType::Contour, ESkeletonEventType::None); }
 				VOff += N;
 			}
 		}

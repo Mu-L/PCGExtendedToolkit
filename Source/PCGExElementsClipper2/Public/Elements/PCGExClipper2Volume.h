@@ -36,10 +36,8 @@ enum class EPCGExVolumeBaseMode : uint8
 /**
  * Clipper2 : Volume
  *
- * Extrudes a (possibly concave) closed-path footprint into an AVolume trigger actor.
- * The path outline is triangulated with Clipper2 (boundary-respecting, holes supported),
- * the triangulation is merged into convex pieces (Hertel-Mehlhorn), and each piece becomes a
- * vertical convex prism written directly into the volume's brush-component body setup
+ * Extrudes a (possibly concave) closed-path footprint into an AVolume trigger actor: triangulate, merge into
+ * convex pieces (Hertel-Mehlhorn), and write each as a vertical convex prism into the brush body setup
  * (AggGeom.ConvexElems) -- no BSP, so it works in editor and cooked runtime alike.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="paths/generate/clipper2-volume"))

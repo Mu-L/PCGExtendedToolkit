@@ -17,10 +17,11 @@ namespace PCGExMath::Geo
 	/** The wavefront event that produced a skeleton arc's terminating node. */
 	enum class ESkeletonEventType : uint8
 	{
-		None       = 0, // Contour edges (no event).
-		Initial    = 1, // Arc emanating from an original vertex, ended by an unspecified/peak event.
-		EdgeEvent  = 2, // Ended by an edge event (a wavefront edge collapsed).
-		SplitEvent = 3, // Ended by a split event (a reflex vertex split a wavefront edge).
+		None            = 0, // Contour edges (no event).
+		Initial         = 1, // Arc emanating from an original vertex, ended by an unspecified/peak event.
+		EdgeEvent       = 2, // Ended by an edge event (a wavefront edge collapsed).
+		SplitEvent      = 3, // Ended by a split event (a reflex vertex split a wavefront edge).
+		FeatureCollapse = 4, // Medial of a pinched feature (thin neck / slot) collapsing to its centerline.
 	};
 
 	struct PCGEXCORE_API FStraightSkeletonNode

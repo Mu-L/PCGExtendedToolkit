@@ -44,10 +44,8 @@ struct FPCGExVolumeSpec
 	int32 SourceFacadeIndex = INDEX_NONE; // AllOpData index of the group's representative path (for @Data forwarding).
 };
 
-// File-local helpers in a named namespace (Unity-build safe -- see project build notes).
-// The shared projection -> triangulation -> Hertel-Mehlhorn decomposition now lives in
-// PCGExClipper2Decomposition (consumed by both Volume and Decompose); only the volume-specific
-// prism tessellation remains here.
+// File-local helpers in a named namespace (Unity-build safe). The shared triangulation/decomposition lives
+// in PCGExClipper2Decomposition; only the volume-specific prism tessellation remains here.
 namespace PCGExClipper2Volume
 {
 	// Build the 6+ side/cap polys of a vertical prism (local space) for editor wireframe + bounds.
@@ -95,13 +93,11 @@ UPCGExClipper2VolumeSettings::UPCGExClipper2VolumeSettings(const FObjectInitiali
 {
 	VolumeClass = ATriggerVolume::StaticClass();
 
-	// Geometry node: extrude each input path as its own volume. Grouping/matching multiple source paths into
-	// one operation is disabled (bExposeGroupingPolicy=false, forcing Split) -- it would merge unrelated
-	// footprints into a single volume, the wrong model for an extruder.
+	// Geometry node: one volume per input path. Multi-source grouping/matching is disabled (forces Split) --
+	// it would merge unrelated footprints into a single volume, the wrong model for an extruder.
 	bExposeGroupingPolicy = false;
 
-	// Geometry node: hide the inherited path-output-only parameters (blending, carry-over, open-path
-	// output, simplify/arc-tolerance) that don't apply when the output is volumes rather than paths.
+	// Hide the inherited path-output-only parameters (blending, carry-over, open-path, simplify). See base.
 	bExposePathOutputProperties = false;
 }
 
@@ -112,8 +108,7 @@ FPCGExGeo2DProjectionDetails UPCGExClipper2VolumeSettings::GetProjectionDetails(
 
 TArray<FPCGPinProperties> UPCGExClipper2VolumeSettings::OutputPinProperties() const
 {
-	// The volumes themselves are spawned actors (managed resources); this pin exposes a soft-object-path
-	// reference to each so downstream graphs can address them.
+	// One soft-object-path reference per spawned volume actor, so downstream graphs can address them.
 	TArray<FPCGPinProperties> PinProperties;
 	PCGEX_PIN_PARAM(FName("Actor References"), TEXT("Attribute set with one soft-object-path entry per spawned volume actor."), Normal)
 	return PinProperties;
@@ -135,9 +130,8 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 {
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
-	// Build the actor-reference attribute set up front. It is emitted unconditionally via EmitReferences --
-	// even on the early outs below, or with zero spawned volumes (empty set) -- so the "Actor References"
-	// output pin is always present, regardless of how spawning went.
+	// Build the actor-reference set up front and emit it unconditionally (EmitReferences) -- even on the early
+	// outs or with zero spawned volumes (empty set) -- so the "Actor References" pin is always present.
 	const FName AttrName = Settings->ActorReferenceAttributeName.IsNone() ? FName("ActorReference") : Settings->ActorReferenceAttributeName;
 	UPCGParamData* RefData = NewObject<UPCGParamData>();
 	UPCGMetadata* RefMetadata = RefData->Metadata;
@@ -173,9 +167,8 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		return A->GroupIndex < B->GroupIndex;
 	});
 
-	// Force-forward every @Data-domain attribute from the source path onto its actor's row. The per-source
-	// handler is built once and cached (a source can back more than one group); rebuilding it per row would
-	// re-scan the source's attribute identities needlessly.
+	// Forward every @Data-domain attribute from the source path onto its actor's row. The per-source handler
+	// is built once and cached (rebuilding per row would re-scan the source's identities needlessly).
 	const FPCGExForwardDetails ForwardDetails(true);
 	TMap<int32, TSharedPtr<PCGExData::FDataForwardHandler>> HandlersBySource;
 
@@ -235,8 +228,7 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 
 		PCGExCollections::FinalizeSpawnedActor(Volume, ManagedActors, bTransientSpawn);
 
-		// One attribute-set row per spawned volume: the actor reference, plus the source path's
-		// @Data-domain attributes forwarded onto that row.
+		// One row per spawned volume: the actor reference + the source's @Data attributes.
 		const int64 Key = RefMetadata->AddEntry();
 		if (RefAttribute) { RefAttribute->SetValue(Key, FSoftObjectPath(Volume)); }
 
@@ -285,8 +277,8 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 	const TArray<PCGExClipper2Decomposition::FFootprintVertex>& VertexPool = Decomposition.VertexPool;
 	const TArray<TArray<int32>>& Pieces = Decomposition.Pieces;
 
-	// Per-vertex extrusion height. This is volume-specific (not part of the shared pool), so it is read
-	// here from the height reader using each vertex's mapped source point; non-source vertices contribute 0.
+	// Per-vertex extrusion height (volume-specific, not in the shared pool): read from the height reader at
+	// each vertex's mapped source point; non-source vertices contribute 0.
 	TArray<double> Heights;
 	Heights.SetNumUninitialized(VertexPool.Num());
 	for (int32 i = 0; i < VertexPool.Num(); i++)
@@ -297,7 +289,7 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			: 0.0;
 	}
 
-	// --- Global lowest projected Z (actor-origin base) + a single footprint centroid for the actor origin ---
+	// --- Global lowest projected Z (actor base) + footprint centroid (actor origin) ---
 	double MinBaseZ = 0;
 	bool bAnyBase = false;
 	FVector2D Centroid = FVector2D::ZeroVector;
@@ -414,8 +406,7 @@ bool FPCGExClipper2VolumeElement::PostBoot(FPCGExContext* InContext) const
 		Context->HeightValues[i] = HeightSetting;
 	}
 
-	// CRC for the managed-resource record (no incremental reuse in this version -- resources are
-	// released and respawned each generation).
+	// CRC for the managed-resource record (no incremental reuse -- resources respawn each generation).
 	GetDependenciesCrc(FPCGGetDependenciesCrcParams(&InContext->InputData, Settings, nullptr), Context->DependenciesCrc);
 
 	return FPCGExClipper2ProcessorElement::PostBoot(InContext);
@@ -425,10 +416,9 @@ void FPCGExClipper2VolumeElement::OutputWork(FPCGExContext* InContext, const UPC
 {
 	PCGEX_CONTEXT_AND_SETTINGS(Clipper2Volume)
 
-	// Actor spawning, physics cooking and managed-resource registration must run on the game thread.
-	// OutputWork can be invoked off the game thread by the async pipeline, so marshal explicitly
-	// (runs inline if already on the game thread -- no deadlock). Always marshal -- even with zero staged
-	// volumes -- so SpawnStagedVolumes emits the (empty) Actor References output set.
+	// Actor spawning, physics cooking and managed-resource registration must run on the game thread, so
+	// marshal explicitly (inline if already there -- no deadlock). Always marshal, even with zero staged
+	// volumes, so SpawnStagedVolumes still emits the (empty) Actor References set.
 	PCGExMT::ExecuteOnMainThreadAndWait([Context]() { Context->SpawnStagedVolumes(); });
 }
 

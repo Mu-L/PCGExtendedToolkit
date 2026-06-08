@@ -20,9 +20,8 @@
 
 namespace PCGExClipper2Decompose
 {
-	// Compile-wait phase: entered once every group's cluster has been authored (in Process) and its graph
-	// compile launched (in OutputWork). PCGEX_ON_ASYNC_STATE_READY gates on IsWaitingForTasks(), so this
-	// state stays pending until the async subgraph compiles + vtx writes fully drain.
+	// Compile-wait phase: after every cluster is authored + its graph compile launched. Stays pending (via
+	// IsWaitingForTasks) until the async subgraph compiles + vtx writes drain.
 	PCGEX_CTX_STATE(State_CompilingClusters)
 }
 
@@ -31,14 +30,11 @@ namespace PCGExClipper2Decompose
 UPCGExClipper2DecomposeSettings::UPCGExClipper2DecomposeSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// Geometry node: decompose each input path as its own cluster. Grouping/matching multiple source paths
-	// into one operation is disabled (bExposeGroupingPolicy=false, forcing Split) -- merging unrelated
-	// footprints into one cluster would also break attribute carry, since cluster nodes can only inherit from
-	// a single template source.
+	// Geometry node: one cluster per input path. Multi-source grouping/matching is disabled (forces Split) --
+	// it would merge unrelated footprints and break attribute carry (cluster nodes inherit one template source).
 	bExposeGroupingPolicy = false;
 
-	// Geometry node: hide the inherited path-output-only parameters (blending, carry-over, hole/joint
-	// tagging, open-path output, simplify/arc-tolerance). See UPCGExClipper2ProcessorSettings.
+	// Hide the inherited path-output-only parameters (blending, carry-over, open-path, simplify). See base.
 	bExposePathOutputProperties = false;
 }
 
@@ -118,7 +114,7 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		return;
 	}
 
-	// Frame subject: projection frame for unprojecting Steiner vertices + attribute template for the nodes.
+	// Frame subject: projection frame (Steiner unprojection) + attribute template for the nodes.
 	const int32 FrameSrcIdx = Group->SubjectIndices[0];
 	const FPCGExGeo2DProjectionDetails& FrameProjection = AllOpData->Projections[FrameSrcIdx];
 
@@ -126,9 +122,8 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 	const TArray<TArray<int32>>& Pieces = Decomposition.Pieces;
 	const int32 NumVerts = VertexPool.Num();
 
-	// --- Edge set: the deduplicated union of every convex-piece edge (boundary + internal diagonals) ---
-	// H64U canonicalizes (a,b)==(b,a), so a shared diagonal between two pieces collapses to one key, and
-	// InsertEdges decodes the key back to a valid A!=B endpoint pair.
+	// --- Edge set: deduplicated union of every convex-piece edge (boundary + diagonals) ---
+	// H64U canonicalizes (a,b)==(b,a), so shared diagonals collapse to one key; InsertEdges decodes back to A!=B.
 	TSet<uint64> EdgeKeys;
 	EdgeKeys.Reserve(NumVerts * 3);
 	for (const TArray<int32>& Piece : Pieces)
@@ -145,7 +140,7 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 
 	if (EdgeKeys.IsEmpty()) { return; }
 
-	// --- Author the cluster-node (vtx) data from the frame source as template (provides the attribute schema) ---
+	// --- Author vtx data from the frame source as template (provides the attribute schema) ---
 	const TSharedPtr<PCGExData::FFacade>& TemplateFacade = AllOpData->Facades[FrameSrcIdx];
 	const TSharedPtr<PCGExData::FPointIO> VtxIO = MainPoints->Emplace_GetRef<UPCGExClusterNodesData>(TemplateFacade->Source, PCGExData::EIOInit::New);
 	if (!VtxIO) { return; }
@@ -157,13 +152,12 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 	const EPCGPointNativeProperties Allocations = TemplateFacade->GetAllocations();
 	PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutPoints, NumVerts, Allocations);
 
-	// Each node maps back to its decoded source point. Transforms are written explicitly here; non-transform
-	// attributes are carried via ConsumeIdxMapping against the single frame source. Groups are always
-	// single-source (the geometry nodes force Split grouping), so this carry is exact.
+	// Transforms written explicitly; non-transform attributes carried via ConsumeIdxMapping. Groups are always
+	// single-source (Split is forced), so the carry against the frame source is exact.
 	TArray<int32>& IdxMapping = VtxIO->GetIdxMapping(NumVerts);
 	TPCGValueRange<FTransform> OutTransforms = OutPoints->GetTransformValueRange();
 
-	// Single-source group -> every source-backed vertex is the frame source; fetch its transform view once.
+	// Single-source group: fetch the frame source's transform view once.
 	const TConstPCGValueRange<FTransform> FrameTransforms = TemplateFacade->Source->GetIn()->GetConstTransformValueRange();
 
 	for (int32 i = 0; i < NumVerts; i++)
@@ -184,13 +178,13 @@ void FPCGExClipper2DecomposeContext::Process(const TSharedPtr<PCGExClipper2::FPr
 		}
 	}
 
-	// Carry non-transform attributes from the template source (transforms were authored explicitly above).
+	// Carry non-transform attributes (transforms authored above).
 	EPCGPointNativeProperties CarryProperties = Allocations;
 	EnumRemoveFlags(CarryProperties, EPCGPointNativeProperties::Transform);
 	VtxIO->ConsumeIdxMapping(CarryProperties);
 
-	// Build the graph AFTER the vtx OUT buffer is allocated + positioned: FGraphBuilder captures the OUT
-	// transform range and sizes the graph from it. bInheritNodeData=false -- nodes are authored from scratch.
+	// Build the graph AFTER the vtx OUT buffer is sized/positioned (FGraphBuilder captures its transform range).
+	// bInheritNodeData=false -- nodes are authored from scratch.
 	const TSharedPtr<PCGExData::FFacade> VtxFacade = MakeShared<PCGExData::FFacade>(VtxIO.ToSharedRef());
 	const TSharedPtr<PCGExGraphs::FGraphBuilder> GraphBuilder = MakeShared<PCGExGraphs::FGraphBuilder>(VtxFacade.ToSharedRef(), &Settings->GraphBuilderDetails);
 	GraphBuilder->bInheritNodeData = false;
@@ -262,8 +256,8 @@ void FPCGExClipper2DecomposeElement::OutputWork(FPCGExContext* InContext, const 
 
 	Context->SetState(PCGExClipper2Decompose::State_CompilingClusters);
 
-	// Bracket the launches so the context reliably reports "waiting for tasks" until the compiles drain;
-	// the State_CompilingClusters ready-check (IsWaitingForTasks) then resumes only once they finish.
+	// Keeps the context "waiting for tasks" until the compiles drain (State_CompilingClusters gates on
+	// IsWaitingForTasks).
 	PCGExMT::FSchedulingScope SchedulingScope(Context->GetTaskManager());
 	if (!SchedulingScope.Token.IsValid())
 	{
@@ -274,8 +268,7 @@ void FPCGExClipper2DecomposeElement::OutputWork(FPCGExContext* InContext, const 
 	for (const FPCGExDecomposeCluster& Staged : Context->StagedClusters)
 	{
 		if (!Staged.GraphBuilder) { continue; }
-		// bWriteNodeFacade=true: the builder flushes the vtx facade (incl. the cluster vtx-index attribute)
-		// on compile completion.
+		// true = flush the vtx facade (incl. cluster vtx-index attr) on compile completion.
 		Staged.GraphBuilder->CompileAsync(Context->GetTaskManager(), true);
 	}
 }

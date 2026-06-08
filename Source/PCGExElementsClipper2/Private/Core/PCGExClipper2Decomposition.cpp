@@ -16,8 +16,7 @@
 // File-local helpers live in the namespace matching this file (Unity-build safe -- see project build notes).
 namespace PCGExClipper2Decomposition
 {
-	// 2D cross of (A-O) and (B-O); positive when O->A->B turns left (CCW). Shares the plugin-wide 2D
-	// determinant primitive instead of carrying a private copy.
+	// 2D cross of (A-O),(B-O); >0 when O->A->B turns left (CCW). Uses the shared Det primitive.
 	FORCEINLINE double Cross2D(const FVector2D& O, const FVector2D& A, const FVector2D& B)
 	{
 		return PCGExMath::Geo::Det(A - O, B - O);
@@ -57,12 +56,9 @@ namespace PCGExClipper2Decomposition
 		return true;
 	}
 
-	// If A and B (both CCW loops) share an edge (u->v in A, v->u in B), merge along it.
-	// Returns true and fills OutMerged only when the merged polygon is convex.
-	//
-	// Two convex polygons with disjoint interiors share AT MOST one edge (sharing two would force one of
-	// them concave around the shared corner), so the first matching half-edge is the only merge candidate:
-	// bailing on it -- rather than continuing to scan for another shared edge -- cannot miss a valid merge.
+	// If A and B (both CCW) share an edge (u->v in A, v->u in B), merge along it; returns true + fills
+	// OutMerged only if the union is convex. Two disjoint convex polygons share AT MOST one edge, so the
+	// first matching half-edge is the only candidate -- bailing on it cannot miss a valid merge.
 	bool TryMergeConvex(const TArray<int32>& A, const TArray<int32>& B, const TArray<FFootprintVertex>& Pool, TArray<int32>& OutMerged)
 	{
 		const int32 NA = A.Num();
@@ -77,8 +73,7 @@ namespace PCGExClipper2Decomposition
 			{
 				if (B[ib] != V || B[(ib + 1) % NB] != U) { continue; }
 
-				// Shared edge found (unique between two simple polygons). Build the merged loop:
-				// walk A from V around to U, then B's interior from after U to before V.
+				// Shared edge: build the merged loop = A from V around to U, then B's interior (after U .. before V).
 				TArray<int32> Merged;
 				Merged.Reserve(NA + NB - 2);
 				for (int32 k = 0; k < NA; k++) { Merged.Add(A[(ia + 1 + k) % NA]); } // V ... U
@@ -95,18 +90,42 @@ namespace PCGExClipper2Decomposition
 		return false;
 	}
 
-	// Greedy Hertel-Mehlhorn-style convex merge of a triangulation into fewer convex pieces.
+	// Greedy Hertel-Mehlhorn convex merge of a triangulation into fewer convex pieces.
 	//
-	// IMPORTANT: every successful merge restarts the whole i/j scan from the start (that is what the
-	// `&& !bMerged` loop guards + the outer while do). The restart is INTENTIONAL and load-bearing for output
-	// QUALITY -- it is NOT a missed optimization. Greedy convex merging is order-sensitive: "merge the first
-	// available pair, then re-scan from the beginning" immediately re-pairs a freshly-grown piece against the
-	// earlier pieces, which yields markedly FEWER convex pieces than absorbing each piece's neighbours in one
-	// forward sweep. It is O(n^3) in the piece count (bounded by MaxConvexPieces), but the better
-	// decomposition is worth it -- do NOT replace the restart with a forward-sweep/fixpoint variant (measured
-	// to produce MORE pieces).
+	// IMPORTANT: restarting the whole i/j scan after every merge (the `&& !bMerged` guards + outer while) is
+	// INTENTIONAL, not a missed optimization. Greedy merging is order-sensitive: re-pairing a freshly-grown
+	// piece against earlier ones yields FEWER pieces than a one-pass forward sweep (measured). O(n^3) in the
+	// piece count, but the tighter decomposition is worth it -- do NOT switch to a forward-sweep/fixpoint.
+	//
+	// The per-piece Bounds are a behavior-PRESERVING speedup: pieces sharing an edge share its 2 endpoints, so
+	// their bounds always overlap -- a non-overlap means no shared edge (what TryMergeConvex finds anyway), so
+	// skipping it is exact. The eps test only ever lets MORE pairs through, never skips a real adjacency.
 	void MergeIntoConvexPieces(TArray<TArray<int32>>& Pieces, const TArray<FFootprintVertex>& Pool)
 	{
+		// Tight 2D bounds of a piece (pieces always have >= 3 vertices, so Loop[0] is valid).
+		struct FBounds2D { double MinX, MinY, MaxX, MaxY; };
+		auto ComputeBounds = [&Pool](const TArray<int32>& Loop) -> FBounds2D
+		{
+			const FVector2D& P0 = Pool[Loop[0]].Pos;
+			FBounds2D B{P0.X, P0.Y, P0.X, P0.Y};
+			for (int32 k = 1; k < Loop.Num(); k++)
+			{
+				const FVector2D& P = Pool[Loop[k]].Pos;
+				B.MinX = FMath::Min(B.MinX, P.X);
+				B.MinY = FMath::Min(B.MinY, P.Y);
+				B.MaxX = FMath::Max(B.MaxX, P.X);
+				B.MaxY = FMath::Max(B.MaxY, P.Y);
+			}
+			return B;
+		};
+
+		// Bounds[k] tracks Pieces[k] in lockstep (recomputed on merge, RemoveAt'd alongside Pieces).
+		TArray<FBounds2D> Bounds;
+		Bounds.Reserve(Pieces.Num());
+		for (const TArray<int32>& Piece : Pieces) { Bounds.Add(ComputeBounds(Piece)); }
+
+		const double Eps = UE_KINDA_SMALL_NUMBER;
+
 		bool bMerged = true;
 		while (bMerged && Pieces.Num() > 1)
 		{
@@ -115,11 +134,22 @@ namespace PCGExClipper2Decomposition
 			{
 				for (int32 j = i + 1; j < Pieces.Num() && !bMerged; j++)
 				{
+					// Pre-filter: bounds separated on any axis -> no shared edge -> would not merge (exact).
+					const FBounds2D& Bi = Bounds[i];
+					const FBounds2D& Bj = Bounds[j];
+					if (Bi.MinX > Bj.MaxX + Eps || Bj.MinX > Bi.MaxX + Eps ||
+						Bi.MinY > Bj.MaxY + Eps || Bj.MinY > Bi.MaxY + Eps)
+					{
+						continue;
+					}
+
 					TArray<int32> Result;
 					if (TryMergeConvex(Pieces[i], Pieces[j], Pool, Result))
 					{
 						Pieces[i] = MoveTemp(Result);
+						Bounds[i] = ComputeBounds(Pieces[i]); // grown piece -> refresh its bounds
 						Pieces.RemoveAt(j);
+						Bounds.RemoveAt(j);                   // keep Bounds aligned with Pieces
 						bMerged = true;
 					}
 				}
@@ -160,12 +190,9 @@ namespace PCGExClipper2Decomposition
 
 		auto FindOrAddVertex = [&](const PCGExClipper2Lib::Point64& Pt) -> int32
 		{
-			// Dedup key = low 32 bits of each int64 Clipper coordinate, packed. This is exact (injective) only
-			// while |Pt.x|,|Pt.y| < 2^31 SCALED units, i.e. ~+-21M / Precision in world cm (about +-215km at the
-			// default Precision=100, but only +-2km at Precision=10000). Beyond that the high bits are dropped and
-			// two genuinely distinct vertices can collide -> silently welded mesh (degenerate prisms / lost edges).
-			// If that ever bites in production (huge footprints or very high Precision), key on the full int64 pair
-			// (e.g. FIntVector2) or a properly-mixed 64-bit hash of both full coords instead of truncating.
+			// Dedup key = low 32 bits of each int64 Clipper coord, packed. Exact only while |x|,|y| < 2^31 scaled
+			// units (~+-21M / Precision world cm: +-215km at Precision=100, +-2km at 10000); beyond that, dropped
+			// high bits can collide distinct verts -> welded mesh. If it bites, key on the full int64 pair instead.
 			const uint64 Hash = PCGEx::H64(static_cast<uint32>(Pt.x & 0xFFFFFFFF), static_cast<uint32>(Pt.y & 0xFFFFFFFF));
 			if (const int32* Found = VertexMap.Find(Hash)) { return *Found; }
 
@@ -248,8 +275,7 @@ namespace PCGExClipper2Decomposition
 
 		if (!Group->IsValid() || Group->SubjectPaths.empty() || Group->SubjectIndices.IsEmpty()) { return false; }
 
-		// Frame subject indexes the parallel AllOpData arrays (Projections / Facades / ProjectedZValues);
-		// validity is identical across them, so one check covers every later lookup the callers do.
+		// SubjectIndices[0] indexes the parallel AllOpData arrays; one validity check covers all later lookups.
 		const int32 FrameSrcIdx = Group->SubjectIndices[0];
 		if (!AllOpData->Projections.IsValidIndex(FrameSrcIdx) || !AllOpData->Facades.IsValidIndex(FrameSrcIdx)) { return false; }
 
@@ -270,8 +296,7 @@ namespace PCGExClipper2Decomposition
 				LOCTEXT("TooManyPieces", "A {0} needs {1} convex pieces (over the {2} cap) and was skipped. Raise Max Convex Pieces or simplify the path."),
 				Subject, FText::AsNumber(Result.Pieces.Num()), FText::AsNumber(MaxConvexPieces));
 		default:
-			// Success / Empty -- Empty is an intentional silent skip (degenerate/invalid group), nothing to report.
-			return FText::GetEmpty();
+			return FText::GetEmpty(); // Success/Empty: nothing to report (Empty is a silent skip)
 		}
 	}
 }

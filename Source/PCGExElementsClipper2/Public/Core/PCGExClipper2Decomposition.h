@@ -7,19 +7,13 @@
 #include "Clipper2Lib/clipper.h"
 #include "Core/PCGExClipper2Processor.h"
 
-// Shared geometry pipeline behind the Clipper2 *geometry* nodes (Clipper2 : Volume and
-// Clipper2 : Decompose). Both nodes need the identical "projected closed paths -> boundary-respecting
-// triangulation -> deduplicated vertex pool -> Hertel-Mehlhorn convex decomposition" sequence; this
-// header exposes it once so neither node duplicates the geometry code.
+// Shared geometry pipeline for the Clipper2 geometry nodes (Volume, Decompose):
+// projected closed paths -> triangulation -> deduplicated vertex pool -> Hertel-Mehlhorn convex pieces.
 namespace PCGExClipper2Decomposition
 {
-	/**
-	 * A single deduplicated 2D footprint vertex, in projection space.
-	 *
-	 * Source-backed vertices map back to a concrete input point via (SourceIdx, SourcePointIdx),
-	 * indexing PCGExClipper2::FOpData. Intersection / Steiner vertices created by Clipper2 carry no
-	 * source (bHasSource == false); consumers position those by unprojecting Pos with ProjectedZ.
-	 */
+	/** A deduplicated 2D footprint vertex in projection space. Source-backed verts map to
+	 *  (SourceIdx, SourcePointIdx) in FOpData; Clipper-created intersection/Steiner verts have
+	 *  bHasSource == false and are positioned by unprojecting Pos with ProjectedZ. */
 	struct FFootprintVertex
 	{
 		// 2D position in projection space (Clipper2 int coords scaled back by 1/Precision).
@@ -70,11 +64,8 @@ namespace PCGExClipper2Decomposition
 		int32 MaxConvexPieces = 256;
 	};
 
-	/**
-	 * Build decomposition params from any geometry-node settings exposing Precision / FillRule /
-	 * bMergeConvexPieces / MaxConvexPieces. Volume and Decompose share these fields without a common base,
-	 * so the helper is templated on the concrete settings type rather than taking a shared interface.
-	 */
+	/** Build params from any settings exposing Precision / FillRule / bMergeConvexPieces / MaxConvexPieces
+	 *  (templated since Volume and Decompose share these fields without a common base). */
 	template <typename TSettings>
 	FDecomposeParams MakeParams(const TSettings* Settings)
 	{
@@ -100,46 +91,24 @@ namespace PCGExClipper2Decomposition
 		EDecomposeResult Status = EDecomposeResult::Empty;
 	};
 
-	/**
-	 * Run the shared decomposition over one processing group's projected closed paths.
-	 *
-	 * The paths must already be projected into Clipper2 int space (as FOpData stores them) with each
-	 * Point64.z encoding (PointIndex, SourceIndex) via PCGEx::H64 -- exactly what BuildDataFromCollection
-	 * produces. This does NOT log; callers inspect FDecomposeResult::Status and emit their own warnings.
-	 *
-	 * @param SubjectPaths Closed, projected paths for the group (e.g. FProcessingGroup::SubjectPaths).
-	 * @param AllOpData    Source registry, used to validate source indices and read projected Z.
-	 * @param ZCallback    The group's Z-callback (preserves source encoding through Clipper2's internal union).
-	 * @param Params       Precision / fill rule / delaunay / merge / cap.
-	 */
+	/** Decompose one group's projected closed paths. Paths must be in Clipper2 int space (as FOpData stores
+	 *  them) with each Point64.z = H64(PointIndex, SourceIndex). Does NOT log -- inspect the returned Status. */
 	PCGEXELEMENTSCLIPPER2_API FDecomposeResult Decompose(
 		const PCGExClipper2Lib::Paths64& SubjectPaths,
 		const TSharedPtr<PCGExClipper2::FOpData>& AllOpData,
 		const PCGExClipper2Lib::ZCallback64& ZCallback,
 		const FDecomposeParams& Params);
 
-	/**
-	 * Per-group orchestration shared by the geometry nodes (Volume, Decompose): validate the group, resolve
-	 * its frame subject (SubjectIndices[0], guaranteed valid in AllOpData on success), and run Decompose().
-	 *
-	 * Returns true only when the group yielded usable convex pieces (OutResult.Status == Success, with
-	 * OutResult.VertexPool / .Pieces ready). On false, OutResult.Status reports why so the caller can emit
-	 * its own (node-specific) warning: Empty for an invalid/degenerate group, or TriangulationFailed /
-	 * TooManyPieces. Intentionally does NOT log -- warning wording is left to each node.
-	 */
+	/** Validate a group, resolve its frame subject (SubjectIndices[0], valid in AllOpData on success), and run
+	 *  Decompose(). Returns true only on Status == Success; otherwise OutResult.Status reports why. Does NOT
+	 *  log -- each node emits its own wording (see DescribeDecomposeFailure). */
 	PCGEXELEMENTSCLIPPER2_API bool TryDecomposeGroup(
 		const TSharedPtr<PCGExClipper2::FProcessingGroup>& Group,
 		const TSharedPtr<PCGExClipper2::FOpData>& AllOpData,
 		const FDecomposeParams& Params,
 		FDecomposeResult& OutResult);
 
-	/**
-	 * Standard, user-facing warning text for a failed decomposition, parameterized by the node's subject
-	 * noun (e.g. "volume", "footprint") so both geometry nodes share one wording. Returns:
-	 *   - TriangulationFailed -> "A {Subject} could not be triangulated ... and was skipped."
-	 *   - TooManyPieces       -> "A {Subject} needs {N} convex pieces (over the {cap} cap) ..."
-	 *   - Success / Empty     -> empty FText (Empty is a silent skip; nothing to report).
-	 * The core deliberately does not log; callers test for non-empty text and emit it via their own context.
-	 */
+	/** Standard warning text for a failed decomposition, with the node's subject noun ("volume"/"footprint").
+	 *  Empty FText for Success/Empty (Empty is a silent skip); callers log non-empty text via their context. */
 	PCGEXELEMENTSCLIPPER2_API FText DescribeDecomposeFailure(const FDecomposeResult& Result, const FText& Subject, int32 MaxConvexPieces);
 }
