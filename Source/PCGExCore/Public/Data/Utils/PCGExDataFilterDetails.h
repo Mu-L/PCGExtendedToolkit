@@ -86,6 +86,17 @@ struct PCGEXCORE_API FPCGExNameFiltersDetails
 	void Prune(PCGExData::FAttributesInfos& InAttributeInfos, const bool bInvert = false) const;
 };
 
+namespace PCGExDataFilter
+{
+	// Resolves an opt-in name filter: returns &Filters when the toggle is on, else nullptr.
+	// Centralizes the 'bEnabled ? &Filters : nullptr' idiom repeated at every merge call site
+	// that forwards a TagsToAttributes filter to FPCGExPointIOMerger / FMergeList.
+	FORCEINLINE const FPCGExNameFiltersDetails* ResolveOptional(const bool bEnabled, const FPCGExNameFiltersDetails& Filters)
+	{
+		return bEnabled ? &Filters : nullptr;
+	}
+}
+
 USTRUCT(BlueprintType)
 struct PCGEXCORE_API FPCGExAttributeGatherDetails : public FPCGExNameFiltersDetails
 {

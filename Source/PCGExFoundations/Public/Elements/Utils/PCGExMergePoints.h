@@ -61,7 +61,7 @@ public:
 	FPCGExMatchingDetails MatchingDetails = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** If enabled, each data can only belong to one group (first match). If disabled, data can appear in multiple groups. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="MatchingDetails.Mode != EPCGExMapMatchMode::Disabled", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable), AdvancedDisplay)
 	bool bExclusivePartitions = true;
 
 	/** Controls the order in which data will be sorted if sorting rules are used */

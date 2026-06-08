@@ -30,6 +30,10 @@ namespace PCGExData
 	template <typename T>
 	T IDataValue::GetValue()
 	{
+		if (GetTypeId() == PCGExTypes::TTraits<T>::Type)
+		{
+			return static_cast<TDataValue<T>*>(this)->Value;
+		}
 		if (IsNumeric())
 		{
 			return PCGExTypeOps::Convert<double, T>(AsDouble());

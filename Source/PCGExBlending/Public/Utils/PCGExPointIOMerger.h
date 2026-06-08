@@ -37,6 +37,7 @@ namespace PCGExPointIOMerger
 		const FPCGMetadataAttributeBase* Attribute = nullptr;
 		FPCGAttributeIdentifier ElementsIdentifier;
 		bool bInitDefault = false;
+		bool bTagOnly = false;
 
 		FIdentityRef();
 		FIdentityRef(const FIdentityRef& Other);

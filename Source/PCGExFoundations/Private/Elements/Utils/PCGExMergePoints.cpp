@@ -235,7 +235,7 @@ bool FPCGExMergePointsElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 			{
 				MergeAsync->AddSimpleCallback([List, TaskManager, Det = Context->CarryOverDetails, bT2A = Context->bTagToAttributes, TagDet = Context->TagsToAttributes]
 				{
-					List->Merge(TaskManager, &Det, bT2A ? &TagDet : nullptr);
+					List->Merge(TaskManager, &Det, PCGExDataFilter::ResolveOptional(bT2A, TagDet));
 				});
 			}
 

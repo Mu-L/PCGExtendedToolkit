@@ -364,7 +364,7 @@ bool FPCGExMergePointsByTagElement::AdvanceWork(FPCGExContext* InContext, const 
 			Context->SetState(PCPGExMergePointsByTag::State_MergingData);
 			PCGEX_ASYNC_GROUP_CHKD_RET(TaskManager, MergeAsync, true)
 
-			const FPCGExNameFiltersDetails* TagsToAttributesPtr = Context->bTagToAttributes ? &Context->TagsToAttributes : nullptr;
+			const FPCGExNameFiltersDetails* TagsToAttributesPtr = PCGExDataFilter::ResolveOptional(Context->bTagToAttributes, Context->TagsToAttributes);
 
 			if (Context->FallbackMergeList)
 			{
@@ -374,7 +374,7 @@ bool FPCGExMergePointsByTagElement::AdvanceWork(FPCGExContext* InContext, const 
 			{
 				MergeAsync->AddSimpleCallback([List, TaskManager, Det = Context->CarryOverDetails, bT2A = Context->bTagToAttributes, TagDet = Context->TagsToAttributes]
 				{
-					List->Merge(TaskManager, &Det, bT2A ? &TagDet : nullptr);
+					List->Merge(TaskManager, &Det, PCGExDataFilter::ResolveOptional(bT2A, TagDet));
 				});
 			}
 

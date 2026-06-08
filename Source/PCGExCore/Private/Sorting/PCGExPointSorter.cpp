@@ -211,11 +211,6 @@ namespace PCGExSorting
 	bool FSorter::Init(FPCGExContext* InContext, const TArray<FPCGTaggedData>& InTaggedDatas)
 	{
 		const int32 NumDatas = InTaggedDatas.Num();
-		IdxMap.Reserve(NumDatas);
-		for (int32 i = 0; i < NumDatas; i++)
-		{
-			IdxMap.Add(InTaggedDatas[i].Data->GetUniqueID(), i);
-		}
 
 		for (int32 i = 0; i < RuleHandlers.Num(); i++)
 		{
@@ -230,10 +225,9 @@ namespace PCGExSorting
 				bool bFoundAny = false;
 				for (int32 f = 0; f < NumDatas; f++)
 				{
-					const int32 DataIdx = IdxMap[InTaggedDatas[f].Data->GetUniqueID()];
 					if (TSharedPtr<PCGExData::IDataValue> DataValue = PCGExData::TryGetValueFromData(InTaggedDatas[f], RuleHandler->Selector))
 					{
-						RuleHandler->DataValues[DataIdx] = DataValue;
+						RuleHandler->DataValues[f] = DataValue;
 						bFoundAny = true;
 					}
 				}
@@ -250,7 +244,6 @@ namespace PCGExSorting
 			for (int32 f = 0; f < NumDatas; f++)
 			{
 				const UPCGData* Data = InTaggedDatas[f].Data;
-				const int32 DataIdx = IdxMap[Data->GetUniqueID()];
 
 				TSharedPtr<PCGExData::IDataValue> DataValue = PCGExData::TryGetValueFromData(Data, RuleHandler->Selector);
 				if (!DataValue)
@@ -261,7 +254,7 @@ namespace PCGExSorting
 					break;
 				}
 
-				RuleHandler->DataValues[DataIdx] = DataValue;
+				RuleHandler->DataValues[f] = DataValue;
 			}
 		}
 

@@ -115,7 +115,7 @@ namespace PCGExPointIOMerger
 
 			// Tag-only synthetic identities have no backing attribute; they are fed purely from tags and
 			// never consult source metadata (so a filtered-out same-named real attribute is ignored).
-			const bool bTagOnly = (Identity.Attribute == nullptr);
+			const bool bTagOnly = Identity.bTagOnly;
 			const TArray<TSharedPtr<PCGExData::IDataValue>>* TagValues = Merger->TagValuesByName.Find(Identity.Identifier.Name);
 
 			PCGExMetaHelpers::ExecuteWithRightType(Identity.UnderlyingType, [&](auto DummyValue)
@@ -166,18 +166,10 @@ namespace PCGExPointIOMerger
 						continue;
 					}
 
-					// No type gate -- always convert. A same-type tag is taken verbatim (so e.g. an int64
-					// originator keeps full precision instead of round-tripping through double); a cross-type
-					// tag uses PCGExTypeOps' own best-effort conversion. No PCG broadcastability map involved.
-					T ConvertedValue{};
-					if (TagValue->GetTypeId() == PCGExTypes::TTraits<T>::Type)
-					{
-						ConvertedValue = static_cast<PCGExData::TDataValue<T>*>(TagValue.Get())->Value;
-					}
-					else
-					{
-						ConvertedValue = TagValue->GetValue<T>();
-					}
+					// No type gate -- always convert (best-effort QoL). GetValue<T> takes a same-type tag
+					// verbatim (preserving e.g. int64 precision) and otherwise applies PCGExTypeOps'
+					// best-effort conversion. No PCG broadcastability map involved.
+					const T ConvertedValue = TagValue->GetValue<T>();
 
 					Merger->InternalTracker->IncrementPending();
 					PCGEX_LAUNCH_INTERNAL(FWriteConvertedTagScopeTask<T>, Scope, ConvertedValue, Buffer, Merger->InternalTracker)
@@ -430,7 +422,8 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 			}
 
 			PCGExPointIOMerger::FIdentityRef& Entry = UniqueIdentities.Emplace_GetRef(Pair.Key, EntryType, true);
-			Entry.Attribute = nullptr; // tag-only marker (no backing metadata attribute)
+			Entry.bTagOnly = true; // synthetic: no backing metadata attribute, fed purely from tags
+			Entry.Attribute = nullptr;
 			Entry.bInitDefault = false;
 			Entry.Identifier = FPCGAttributeIdentifier(Pair.Key, PCGMetadataDomainID::Elements);
 			Entry.ElementsIdentifier = FPCGAttributeIdentifier(Pair.Key, PCGMetadataDomainID::Elements);

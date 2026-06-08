@@ -262,7 +262,7 @@ namespace PCGExPathStitch
 			MergeScope.bReverse = Link.bReverse;
 		}
 
-		Merger->MergeAsync(TaskManager, &Context->CarryOverDetails, nullptr, false, Settings->bTagToAttributes ? &Context->TagsToAttributes : nullptr);
+		Merger->MergeAsync(TaskManager, &Context->CarryOverDetails, nullptr, false, PCGExDataFilter::ResolveOptional(Settings->bTagToAttributes, Context->TagsToAttributes));
 
 		PCGExPaths::Helpers::SetClosedLoop(PointDataFacade->GetOut(), bClosedLoop);
 	}
