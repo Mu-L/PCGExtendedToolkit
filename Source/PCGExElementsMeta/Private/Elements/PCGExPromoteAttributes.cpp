@@ -1,13 +1,14 @@
 ﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
-#include "Elements/PCGExAttributesToTags.h"
+#include "Elements/PCGExPromoteAttributes.h"
 
 #include <type_traits>
 
 #include "PCGContext.h"
 #include "PCGParamData.h"
 #include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExMTCommon.h"
 #include "Core/PCGExPickerFactoryProvider.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
@@ -64,17 +65,12 @@ TArray<FPCGPinProperties> UPCGExAttributesToTagsSettings::OutputPinProperties() 
 
 PCGEX_INITIALIZE_ELEMENT(AttributesToTags)
 
-namespace PCGExAttributesToTags
+namespace PCGExPromoteAttributes
 {
-	// A non-empty pin input: a pointer into the caller's stable TaggedData array plus its cached row count. The source TArray must outlive these entries.
-	struct FValidInput
-	{
-		FPCGTaggedData Tagged;
-		int32 NumRows = 0;
-	};
-
-	// Filter inputs to non-null, non-empty, preserving pin order. `Inputs` must outlive `OutValid` (holds pointers into it).
-	void GatherValidInputs(const TArray<FPCGTaggedData>& Inputs, TArray<FValidInput>& OutValid)
+	// Filter a pin's inputs to the non-null, non-empty ones, preserving pin order. Each entry copies the
+	// FPCGTaggedData by value, so the result is self-contained -- safe to outlive the temporary TArray that
+	// GetInputsByPin returns.
+	void GatherValidInputs(const TArray<FPCGTaggedData>& Inputs, TArray<FPCGExAttributesToTagsInput>& OutValid)
 	{
 		OutValid.Reserve(Inputs.Num());
 		for (const FPCGTaggedData& TaggedData : Inputs)
@@ -123,18 +119,8 @@ namespace PCGExAttributesToTags
 				T Value{};
 				if (!PCGExData::Helpers::TryReadDataValue<T>(InContext, SourceData, Selector, Value, /*bQuiet=*/true)) { return; }
 
-				const FString Prefix = PCGExMetaHelpers::GetAttributeIdentifier(Selector, SourceData).Name.ToString();
-				if constexpr (std::is_same_v<T, bool>)
-				{
-					// Booleans tag by presence.
-					if (Value) { OutTags.Add(Prefix); }
-				}
-				else
-				{
-					const FString StringValue = PCGExTypeOps::Convert<T, FString>(Value);
-					if (StringValue.IsEmpty()) { return; }
-					OutTags.Add(bPrefixWithAttributeName ? (Prefix + TEXT(":") + StringValue) : StringValue);
-				}
+				// Same formatting as the broadcaster (element) path, so @Data and element tags are identical.
+				FPCGExAttributeToTagDetails::AppendValueTag<T>(PCGExMetaHelpers::GetAttributeIdentifier(Selector, SourceData).Name, Value, bPrefixWithAttributeName, OutTags);
 			});
 		}
 	}
@@ -249,17 +235,18 @@ bool FPCGExAttributesToTagsElement::Boot(FPCGExContext* InContext) const
 		}
 	}
 
+	// Gather valid main inputs once (reused by AdvanceWork for every resolution; GetInputsByPin returns a
+	// temporary, but GatherValidInputs copies each entry by value).
+	PCGExPromoteAttributes::GatherValidInputs(Context->InputData.GetInputsByPin(PCGPinConstants::DefaultInputLabel), Context->ValidMains);
+
 	if (Settings->Resolution == EPCGExAttributeToTagsResolution::Self)
 	{
 		return true;
 	}
 
 	// Cross-collection: resolve the "Tags Source" inputs (non-null, non-empty), preserving pin order.
-	TArray<PCGExAttributesToTags::FValidInput> ValidSources;
-	{
-		const TArray<FPCGTaggedData> SourceInputs = Context->InputData.GetInputsByPin(FName("Tags Source"));
-		PCGExAttributesToTags::GatherValidInputs(SourceInputs, ValidSources);
-	}
+	TArray<FPCGExAttributesToTagsInput> ValidSources;
+	PCGExPromoteAttributes::GatherValidInputs(Context->InputData.GetInputsByPin(FName("Tags Source")), ValidSources);
 
 	if (ValidSources.IsEmpty())
 	{
@@ -271,13 +258,7 @@ bool FPCGExAttributesToTagsElement::Boot(FPCGExContext* InContext) const
 
 	if (Settings->Resolution == EPCGExAttributeToTagsResolution::CollectionToCollection)
 	{
-		TArray<PCGExAttributesToTags::FValidInput> ValidMains;
-		{
-			const TArray<FPCGTaggedData> MainInputs = Context->InputData.GetInputsByPin(PCGPinConstants::DefaultInputLabel);
-			PCGExAttributesToTags::GatherValidInputs(MainInputs, ValidMains);
-		}
-
-		if (ValidSources.Num() != ValidMains.Num())
+		if (ValidSources.Num() != Context->ValidMains.Num())
 		{
 			PCGE_LOG(Error, GraphAndLog, FTEXT("Number of input collections don't match the number of sources."));
 			return false;
@@ -295,15 +276,17 @@ bool FPCGExAttributesToTagsElement::Boot(FPCGExContext* InContext) const
 		NumIterations = 1;
 	}
 
+	// Store sources (data + cached row count) paired with their readers, indexed the same as ValidMains for
+	// CollectionToCollection.
 	Context->Sources.Reserve(NumIterations);
 	Context->Details.Reserve(NumIterations);
 	for (int i = 0; i < NumIterations; i++)
 	{
-		const UPCGData* SourceData = ValidSources[i].Tagged.Data;
-		Context->Sources.Add(SourceData);
+		const FPCGExAttributesToTagsInput& Source = ValidSources[i];
+		Context->Sources.Add(Source);
 
 		FPCGExAttributeToTagDetails& Details = Context->Details.Emplace_GetRef();
-		if (!PCGExAttributesToTags::InitDetails(Context, Settings->bPrefixWithAttributeName, Context->Attributes, SourceData, Details))
+		if (!PCGExPromoteAttributes::InitDetails(Context, Settings->bPrefixWithAttributeName, Context->Attributes, Source.Tagged.Data, Details))
 		{
 			return false;
 		}
@@ -319,103 +302,122 @@ bool FPCGExAttributesToTagsElement::AdvanceWork(FPCGExContext* InContext, const 
 	PCGEX_CONTEXT_AND_SETTINGS(AttributesToTags)
 	PCGEX_EXECUTION_CHECK
 
-	// Gather valid main inputs (non-null, non-empty), preserving pin order. Entries point into MainInputs, which outlives the loop.
-	const TArray<FPCGTaggedData> MainInputs = Context->InputData.GetInputsByPin(PCGPinConstants::DefaultInputLabel);
-	TArray<PCGExAttributesToTags::FValidInput> ValidMains;
-	PCGExAttributesToTags::GatherValidInputs(MainInputs, ValidMains);
-
+	// Valid main inputs were gathered once in Boot (with cached row counts).
+	const TArray<FPCGExAttributesToTagsInput>& ValidMains = Context->ValidMains;
 	if (ValidMains.IsEmpty())
 	{
 		return Context->CancelExecution(TEXT("Could not find any points to process."));
 	}
 
-	for (int32 i = 0; i < ValidMains.Num(); i++)
+	// Each input produces exactly one output. Build them in parallel (the per-input work is independent and
+	// ManagedObjects / accessor creation / TryReadDataValue are all thread-safe), into a pre-sized array, then
+	// stage in input order afterward so output order stays deterministic.
+	struct FPendingOutput
 	{
-		const FPCGTaggedData& MainTagged = ValidMains[i].Tagged;
-		const UPCGData* MainData = MainTagged.Data;
+		UPCGData* Data = nullptr;
+		FName Pin = NAME_None;
+		TSet<FString> Tags;
+	};
+	TArray<FPendingOutput> Outputs;
+	Outputs.SetNum(ValidMains.Num());
 
-		// Resolve the source data, its reader, and its row count for this input.
-		const UPCGData* SourceData = nullptr;
-		const FPCGExAttributeToTagDetails* Details = nullptr;
-		FPCGExAttributeToTagDetails SelfDetails;
-		int32 SourceNum = 0;
-
-		switch (Settings->Resolution)
+	PCGExMT::ParallelOrSequential(
+		ValidMains.Num(), [&](const int32 i)
 		{
-		case EPCGExAttributeToTagsResolution::Self:
-			// Self reads each input from itself (per-input reader); source == main, so reuse the gathered row count.
-			SourceData = MainData;
-			if (!PCGExAttributesToTags::InitDetails(Context, Settings->bPrefixWithAttributeName, Context->Attributes, MainData, SelfDetails))
+			const FPCGTaggedData& MainTagged = ValidMains[i].Tagged;
+			const UPCGData* MainData = MainTagged.Data;
+
+			// Resolve the source data, its reader, and its (cached) row count for this input.
+			const UPCGData* SourceData = nullptr;
+			const FPCGExAttributeToTagDetails* Details = nullptr;
+			FPCGExAttributeToTagDetails SelfDetails;
+			int32 SourceNum = 0;
+
+			switch (Settings->Resolution)
 			{
-				return false;
+			case EPCGExAttributeToTagsResolution::Self:
+				// Self reads each input from itself, so the reader is per-input; source == main.
+				SourceData = MainData;
+				if (!PCGExPromoteAttributes::InitDetails(Context, Settings->bPrefixWithAttributeName, Context->Attributes, MainData, SelfDetails)) { return; }
+				Details = &SelfDetails;
+				SourceNum = ValidMains[i].NumRows;
+				break;
+			case EPCGExAttributeToTagsResolution::CollectionToCollection:
+				SourceData = Context->Sources[i].Tagged.Data;
+				Details = &Context->Details[i];
+				SourceNum = Context->Sources[i].NumRows;
+				break;
+			case EPCGExAttributeToTagsResolution::EntryToCollection:
+				SourceData = Context->Sources[0].Tagged.Data;
+				Details = &Context->Details[0];
+				SourceNum = Context->Sources[0].NumRows;
+				break;
 			}
-			Details = &SelfDetails;
-			SourceNum = ValidMains[i].NumRows;
-			break;
-		case EPCGExAttributeToTagsResolution::CollectionToCollection:
-			SourceData = Context->Sources[i];
-			Details = &Context->Details[i];
-			SourceNum = PCGExMetaHelpers::GetElementsCount(SourceData);
-			break;
-		case EPCGExAttributeToTagsResolution::EntryToCollection:
-			SourceData = Context->Sources[0];
-			Details = &Context->Details[0];
-			SourceNum = PCGExMetaHelpers::GetElementsCount(SourceData);
-			break;
-		}
 
-		TArray<int32> PickedIndices;
-		PCGExAttributesToTags::ResolveIndices(Settings->Selection, SourceNum, i, Context->PickerFactories, PickedIndices);
+			TArray<int32> PickedIndices;
+			PCGExPromoteAttributes::ResolveIndices(Settings->Selection, SourceNum, i, Context->PickerFactories, PickedIndices);
 
-		switch (Settings->Action)
+			FPendingOutput& Out = Outputs[i];
+
+			switch (Settings->Action)
+			{
+			case EPCGExAttributeToTagsAction::AddTags:
+				{
+					// Forward the original data untouched; promoted tags merge with the input's own (round-tripped through FTags).
+					PCGExData::FTags OutTags;
+					OutTags.Append(MainTagged.Tags);
+
+					TSet<FString> Promoted;
+					PCGExPromoteAttributes::PromoteAll(*Details, PickedIndices, Promoted);
+					PCGExPromoteAttributes::PromoteDataDomainToTags(Context, SourceData, Context->DataAttributes, Settings->bPrefixWithAttributeName, Promoted);
+					OutTags.Append(Promoted);
+
+					Out.Data = const_cast<UPCGData*>(MainData);
+					Out.Pin = PCGPinConstants::DefaultOutputLabel;
+					Out.Tags = OutTags.Flatten();
+				}
+				break;
+			case EPCGExAttributeToTagsAction::Data:
+				{
+					// Duplicate the input and write the promoted values as @Data attributes on the copy.
+					UPCGData* DupData = Context->ManagedObjects->DuplicateData<UPCGData>(MainData);
+					if (!DupData) { return; }
+
+					if (UPCGMetadata* Metadata = DupData->MutableMetadata())
+					{
+						PCGExPromoteAttributes::PromoteAll(*Details, PickedIndices, Metadata);
+						PCGExPromoteAttributes::PromoteDataDomainToMetadata(Context, SourceData, Context->DataAttributes, Metadata);
+					}
+
+					PCGExData::FTags OutTags;
+					OutTags.Append(MainTagged.Tags);
+
+					Out.Data = DupData;
+					Out.Pin = PCGPinConstants::DefaultOutputLabel;
+					Out.Tags = OutTags.Flatten();
+				}
+				break;
+			case EPCGExAttributeToTagsAction::Attribute:
+				{
+					// Emit one attribute set per input, carrying the promoted values as @Data attributes.
+					UPCGParamData* OutputSet = Context->ManagedObjects->New<UPCGParamData>();
+					OutputSet->Metadata->AddEntry();
+
+					PCGExPromoteAttributes::PromoteAll(*Details, PickedIndices, OutputSet->Metadata);
+					PCGExPromoteAttributes::PromoteDataDomainToMetadata(Context, SourceData, Context->DataAttributes, OutputSet->Metadata);
+
+					Out.Data = OutputSet;
+					Out.Pin = FName("Tags");
+				}
+				break;
+			}
+		}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
+
+	for (FPendingOutput& Out : Outputs)
+	{
+		if (Out.Data)
 		{
-		case EPCGExAttributeToTagsAction::AddTags:
-			{
-				// Forward the original data untouched; promoted tags merge with the input's own (round-tripped through FTags).
-				PCGExData::FTags OutTags;
-				OutTags.Append(MainTagged.Tags);
-
-				TSet<FString> Promoted;
-				PCGExAttributesToTags::PromoteAll(*Details, PickedIndices, Promoted);
-				PCGExAttributesToTags::PromoteDataDomainToTags(Context, SourceData, Context->DataAttributes, Settings->bPrefixWithAttributeName, Promoted);
-				OutTags.Append(Promoted);
-
-				Context->StageOutput(const_cast<UPCGData*>(MainData), PCGPinConstants::DefaultOutputLabel, PCGExData::EStaging::None, OutTags.Flatten());
-			}
-			break;
-		case EPCGExAttributeToTagsAction::Data:
-			{
-				// Duplicate the input and write the promoted values as @Data attributes on the copy.
-				UPCGData* DupData = Context->ManagedObjects->DuplicateData<UPCGData>(MainData);
-				if (!DupData)
-				{
-					return false;
-				}
-
-				if (UPCGMetadata* Metadata = DupData->MutableMetadata())
-				{
-					PCGExAttributesToTags::PromoteAll(*Details, PickedIndices, Metadata);
-					PCGExAttributesToTags::PromoteDataDomainToMetadata(Context, SourceData, Context->DataAttributes, Metadata);
-				}
-
-				PCGExData::FTags OutTags;
-				OutTags.Append(MainTagged.Tags);
-
-				Context->StageOutput(DupData, PCGPinConstants::DefaultOutputLabel, PCGExData::EStaging::None, OutTags.Flatten());
-			}
-			break;
-		case EPCGExAttributeToTagsAction::Attribute:
-			{
-				// Emit one attribute set per input, carrying the promoted values as @Data attributes.
-				UPCGParamData* OutputSet = Context->ManagedObjects->New<UPCGParamData>();
-				OutputSet->Metadata->AddEntry();
-
-				PCGExAttributesToTags::PromoteAll(*Details, PickedIndices, OutputSet->Metadata);
-				PCGExAttributesToTags::PromoteDataDomainToMetadata(Context, SourceData, Context->DataAttributes, OutputSet->Metadata);
-
-				Context->StageOutput(OutputSet, FName("Tags"), PCGExData::EStaging::None);
-			}
-			break;
+			Context->StageOutput(Out.Data, Out.Pin, PCGExData::EStaging::None, Out.Tags);
 		}
 	}
 

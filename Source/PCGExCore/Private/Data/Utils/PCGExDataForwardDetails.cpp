@@ -104,32 +104,13 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, T
 					return;
 				}
 
-				const FString Prefix = TypedGetter->GetName().ToString();
-
 				T TypedValue = T{};
 				if (!TypedGetter->TryFetchSingle(TagSource, TypedValue))
 				{
 					return;
 				}
 
-				if constexpr (std::is_same_v<T, bool>)
-				{
-					// Booleans tag by presence: add the attribute name when true, omit when false.
-					if (TypedValue)
-					{
-						InTags.Add(Prefix);
-					}
-				}
-				else
-				{
-					FString StringValue = PCGExTypeOps::Convert<T, FString>(TypedValue);
-					if (StringValue.IsEmpty())
-					{
-						return;
-					}
-
-					InTags.Add(bPrefixWithAttributeName ? (Prefix + TEXT(":") + StringValue) : StringValue);
-				}
+				AppendValueTag<T>(TypedGetter->GetName(), TypedValue, bPrefixWithAttributeName, InTags);
 			});
 		}
 	}

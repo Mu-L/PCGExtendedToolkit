@@ -4,7 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include <type_traits>
+
 #include "PCGExDataFilterDetails.h"
+#include "Types/PCGExTypeOps.h"
 
 #include "PCGExDataForwardDetails.generated.h"
 
@@ -88,4 +91,22 @@ struct PCGEXCORE_API FPCGExAttributeToTagDetails
 	void Tag(const PCGExData::FConstPoint& TagSource, TSet<FString>& InTags) const;
 	void Tag(const PCGExData::FConstPoint& TagSource, const TSharedPtr<PCGExData::FPointIO>& PointIO) const;
 	void Tag(const PCGExData::FConstPoint& TagSource, UPCGMetadata* InMetadata) const;
+
+	// Format one promoted value as a data tag, matching Tag()'s per-getter rule: bools tag by presence;
+	// everything else becomes "Name:Value" (or just "Value" when not prefixed); empty strings are skipped.
+	// Shared so the broadcaster path and any raw @Data path (TryReadDataValue) produce identical tags.
+	template <typename T>
+	static void AppendValueTag(const FName InName, const T& InValue, const bool bPrefixWithAttributeName, TSet<FString>& OutTags)
+	{
+		if constexpr (std::is_same_v<T, bool>)
+		{
+			if (InValue) { OutTags.Add(InName.ToString()); }
+		}
+		else
+		{
+			const FString StringValue = PCGExTypeOps::Convert<T, FString>(InValue);
+			if (StringValue.IsEmpty()) { return; }
+			OutTags.Add(bPrefixWithAttributeName ? (InName.ToString() + TEXT(":") + StringValue) : StringValue);
+		}
+	}
 };
