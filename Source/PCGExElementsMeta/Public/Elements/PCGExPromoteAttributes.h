@@ -4,11 +4,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/PCGExPointsProcessor.h"
+
+#include "PCGExCoreMacros.h"
+#include "PCGExCoreSettingsCache.h"
+#include "Core/PCGExContext.h"
+#include "Core/PCGExElement.h"
+#include "Core/PCGExSettings.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 
-#include "PCGExAttributesToTags.generated.h"
+#include "PCGExPromoteAttributes.generated.h"
 
+class UPCGData;
 class UPCGExPickerFactoryData;
 
 UENUM()
@@ -39,7 +45,7 @@ enum class EPCGExCollectionEntrySelection : uint8
 };
 
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="metadata/keys/hoist-attributes"))
-class UPCGExAttributesToTagsSettings : public UPCGExPointsProcessorSettings
+class UPCGExAttributesToTagsSettings : public UPCGExSettings
 {
 	GENERATED_BODY()
 
@@ -49,7 +55,7 @@ public:
 	PCGEX_NODE_INFOS(PromoteAttributes, "Promote Attributes", "Promote element values to tags or data domain");
 
 	virtual TArray<FText> GetNodeTitleAliases() const override;
-	
+
 	virtual EPCGSettingsType GetType() const override
 	{
 		return EPCGSettingsType::Metadata;
@@ -65,8 +71,6 @@ public:
 		return Action != EPCGExAttributeToTagsAction::Attribute;
 	}
 #endif
-
-	virtual bool GetIsMainTransactional() const override;
 
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
@@ -104,19 +108,35 @@ public:
 	bool bQuietTooManyCollectionsWarning = false;
 };
 
-struct FPCGExAttributesToTagsContext final : FPCGExPointsProcessorContext
+/** A non-empty input on a pin: the tagged data (copied by value -- self-contained, no lifetime ties to the
+ * temporary GetInputsByPin array) plus its cached row count. */
+struct FPCGExAttributesToTagsInput
 {
-	friend class FPCGExAttributesToTagsElement;
-	TArray<TObjectPtr<const UPCGExPickerFactoryData>> PickerFactories;
-	TArray<FPCGAttributePropertyInputSelector> Attributes;
-	TArray<TSharedPtr<PCGExData::FFacade>> SourceDataFacades;
-	TArray<FPCGExAttributeToTagDetails> Details;
-
-protected:
-	PCGEX_ELEMENT_BATCH_POINT_DECL
+	FPCGTaggedData Tagged;
+	int32 NumRows = 0;
 };
 
-class FPCGExAttributesToTagsElement final : public FPCGExPointsProcessorElement
+struct FPCGExAttributesToTagsContext final : FPCGExContext
+{
+	friend class FPCGExAttributesToTagsElement;
+
+	TArray<TObjectPtr<const UPCGExPickerFactoryData>> PickerFactories;
+
+	/** Element-domain selectors (merged with the comma-separated overrides), read per-row via the broadcaster. Built in Boot. */
+	TArray<FPCGAttributePropertyInputSelector> Attributes;
+
+	/** @Data-domain selectors, read as a single value via PCGExData::Helpers::TryReadDataValue (the broadcaster is point-centric and doesn't handle @Data off raw data). Built in Boot. */
+	TArray<FPCGAttributePropertyInputSelector> DataAttributes;
+
+	/** All non-empty main inputs (with cached row counts), gathered once in Boot and reused in AdvanceWork. */
+	TArray<FPCGExAttributesToTagsInput> ValidMains;
+
+	/** Cross-collection (EntryToCollection / CollectionToCollection): resolved "Tags Source" data (with cached row counts) + matching readers, built in Boot. Empty for Self. */
+	TArray<FPCGExAttributesToTagsInput> Sources;
+	TArray<FPCGExAttributeToTagDetails> Details;
+};
+
+class FPCGExAttributesToTagsElement final : public IPCGExElement
 {
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(AttributesToTags)
@@ -124,28 +144,3 @@ protected:
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };
-
-namespace PCGExAttributesToTags
-{
-	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExAttributesToTagsContext, UPCGExAttributesToTagsSettings>
-	{
-		UPCGParamData* OutputSet = nullptr;
-		TArray<int32> PickedIndices;
-
-	public:
-		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
-			: TProcessor(InPointDataFacade)
-		{
-		}
-
-		virtual ~FProcessor() override
-		{
-		}
-
-		void Promote(const FPCGExAttributeToTagDetails& InDetails, const int32 Index) const;
-
-		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-		void TagWithPickers(const FPCGExAttributeToTagDetails& InDetails);
-		virtual void Output() override;
-	};
-}

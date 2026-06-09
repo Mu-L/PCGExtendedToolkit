@@ -68,7 +68,7 @@ struct FPCGExFormatTokenRule
 	FString FallbackValue;
 };
 
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="metadata/keys/format-attributes"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="metadata/modify/format-attributes"))
 class UPCGExFormatAttributesSettings : public UPCGExSettings
 {
 	GENERATED_BODY()

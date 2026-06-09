@@ -16,6 +16,7 @@
 
 class FPCGExIntTracker;
 struct FPCGExCarryOverDetails;
+struct FPCGExNameFiltersDetails;
 
 namespace PCGExMT
 {
@@ -26,6 +27,7 @@ namespace PCGExData
 {
 	class FPointIO;
 	class FFacade;
+	class IDataValue;
 }
 
 namespace PCGExPointIOMerger
@@ -51,6 +53,10 @@ public:
 	TArray<TSharedPtr<PCGExData::FPointIO>> IOSources;
 	TArray<PCGExPointIOMerger::FMergeScope> Scopes;
 
+	// Per-source tag values for names converted to attributes (entry size == IOSources.Num(), null where the
+	// source lacks the tag); FCopyAttributeTask uses it as the per-source fallback. See MergeAsync.
+	TMap<FName, TArray<TSharedPtr<PCGExData::IDataValue>>> TagValuesByName;
+
 	explicit FPCGExPointIOMerger(const TSharedRef<PCGExData::FFacade>& InUnionDataFacade);
 	~FPCGExPointIOMerger();
 
@@ -58,7 +64,7 @@ public:
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData, const PCGExMT::FScope ReadScope);
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData);
 	void Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& InData);
-	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr, const bool bWriteUnion = false);
+	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr, const bool bWriteUnion = false, const FPCGExNameFiltersDetails* InTagsToAttributes = nullptr);
 
 	bool WantsDataToElements() const
 	{
@@ -81,6 +87,9 @@ protected:
 	// Merger-wide: whether output buffers should be initialized from each attribute's default value
 	// (vs. a zero-init T{}). Sourced from FPCGExCarryOverDetails::bPreserveAttributesDefaultValue.
 	bool bInitDefault = false;
+
+	// Tag keys converted to attributes this merge; stripped from the merged data-domain tags before write.
+	TSet<FName> ConvertedTagNames;
 	int32 NumCompositePoints = 0;
 	EPCGPointNativeProperties AllocateProperties = EPCGPointNativeProperties::None;
 

@@ -211,21 +211,37 @@ namespace PCGExSorting
 	bool FSorter::Init(FPCGExContext* InContext, const TArray<FPCGTaggedData>& InTaggedDatas)
 	{
 		const int32 NumDatas = InTaggedDatas.Num();
-		IdxMap.Reserve(NumDatas);
-		for (int32 i = 0; i < NumDatas; i++)
-		{
-			IdxMap.Add(InTaggedDatas[i].Data->GetUniqueID(), i);
-		}
 
 		for (int32 i = 0; i < RuleHandlers.Num(); i++)
 		{
 			const TSharedPtr<FRuleHandler>& RuleHandler = RuleHandlers[i];
 			RuleHandler->DataValues.SetNum(NumDatas);
 
+			if (RuleHandler->bUseDataTag)
+			{
+				// Lenient: datas without a value are left null (skipped in comparison); rule survives if any data resolves.
+				bool bFoundAny = false;
+				for (int32 f = 0; f < NumDatas; f++)
+				{
+					if (TSharedPtr<PCGExData::IDataValue> DataValue = PCGExData::TryGetValueFromData(InTaggedDatas[f], RuleHandler->Selector))
+					{
+						RuleHandler->DataValues[f] = DataValue;
+						bFoundAny = true;
+					}
+				}
+
+				if (!bFoundAny)
+				{
+					PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(FTEXT("Sorting rule tag '{0}' not found on any data, rule will be skipped."), FText::FromString(RuleHandler->Selector.GetName().ToString())));
+					RuleHandlers.RemoveAt(i);
+					i--;
+				}
+				continue;
+			}
+
 			for (int32 f = 0; f < NumDatas; f++)
 			{
 				const UPCGData* Data = InTaggedDatas[f].Data;
-				const int32 DataIdx = IdxMap[Data->GetUniqueID()];
 
 				TSharedPtr<PCGExData::IDataValue> DataValue = PCGExData::TryGetValueFromData(Data, RuleHandler->Selector);
 				if (!DataValue)
@@ -236,7 +252,7 @@ namespace PCGExSorting
 					break;
 				}
 
-				RuleHandler->DataValues[DataIdx] = DataValue;
+				RuleHandler->DataValues[f] = DataValue;
 			}
 		}
 

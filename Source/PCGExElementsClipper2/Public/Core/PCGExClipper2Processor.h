@@ -60,6 +60,7 @@ enum class EPCGExGroupingPolicy : uint8
 {
 	Split       = 0 UMETA(DisplayName = "Separate", ToolTip="Split inputs into separate groups"),
 	Consolidate = 1 UMETA(DisplayName = "Merged", ToolTip="Add all inputs into a single group"),
+	Auto        = 2 UMETA(DisplayName = "Auto", ToolTip="Group inputs by spatial nesting: each outer contour and the rings it contains form one footprint, so nested rings become holes, while unrelated footprints stay separate. Nodes that don't support nesting treat this as Separate."),
 };
 
 UENUM()
@@ -253,13 +254,43 @@ protected:
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
 public:
+	/** Per-class constant: false on geometry nodes (Volume, Decompose) to hide path-output-only properties
+	 *  (blending, carry-over, open-path output, simplify/arc-tolerance) that have no effect on geometry output.
+	 *  Intentionally an EditCondition gate, not an inheritance split, which would change the serialized class
+	 *  layout and drop these UPROPERTYs from existing graphs -- keep the gate until a data migration exists. */
+	UPROPERTY()
+	bool bExposePathOutputProperties = true;
+
+	/** Per-class constant: whether the grouping-policy + main-matching controls are user-editable. When false the
+	 *  controls hide and inputs fall back to Split (see GetEffectiveGroupingPolicy). */
+	UPROPERTY()
+	bool bExposeGroupingPolicy = true;
+
 	/** If enabled, lets you to create sub-groups to operate on. If disabled, data is processed individually. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (EditCondition="bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	FPCGExMatchingDetails MainDataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** How should data be grouped when data matching is disabled */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching()"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching() && bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	EPCGExGroupingPolicy MainInputGroupingPolicy = EPCGExGroupingPolicy::Consolidate;
+
+	/** Whether per-group code can consume nesting-aware (outer + holes) Auto groups; else Auto falls back to Split. */
+	virtual bool SupportsAutoGrouping() const
+	{
+		return false;
+	}
+
+	/** Effective grouping policy: falls back to Split when controls are hidden, or for Auto on nodes that don't support nesting. */
+	EPCGExGroupingPolicy GetEffectiveGroupingPolicy() const
+	{
+		EPCGExGroupingPolicy Policy = bExposeGroupingPolicy ? MainInputGroupingPolicy : EPCGExGroupingPolicy::Split;
+		// Fall back to Split when Auto is unsupported -- the conservative choice, never silently merging inputs.
+		if (Policy == EPCGExGroupingPolicy::Auto && !SupportsAutoGrouping())
+		{
+			Policy = EPCGExGroupingPolicy::Split;
+		}
+		return Policy;
+	}
 
 	/** If enabled, lets you to pick which are matched with which main data.
 	 * Note that the match is done against every single data within a group and then consolidated;
@@ -268,7 +299,7 @@ public:
 	FPCGExMatchingDetails OperandsDataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
 	/** Skip paths that aren't closed */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	bool bSkipOpenPaths = false;
 
 	/** Decimal precision 
@@ -277,15 +308,15 @@ public:
 	int32 Precision = 100;
 
 	/** Cleanup */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	bool bSimplifyPaths = false;
 
 	/** Keep collinear points in the output instead of simplifying them. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	bool bPreserveCollinear = true;
 
 	/** Tolerance for arc approximation when generating curved offsets. Higher values = fewer points. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tweaks", meta = (PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	double ArcTolerance = 5.0;
 
 	FORCEINLINE double GetArcTolerance() const
@@ -294,15 +325,15 @@ public:
 	}
 
 	/** Filter in/out which attributes get carried over from inputs to outputs. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	FPCGExCarryOverDetails CarryOverDetails;
 
-	/** Filter in/out which attributes get carried over from inputs to outputs. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))
+	/** Defines how source point properties and attributes are blended together for fused output points. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	FPCGExBlendingDetails BlendingDetails = FPCGExBlendingDetails(EPCGExBlendingType::Average, EPCGExBlendingType::None);
 
 	/** How to handle open paths in the output (ignore, output to main pin, or separate pin). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable, EditCondition="bExposePathOutputProperties", EditConditionHides, HideEditConditionToggle))
 	EPCGExClipper2OpenPathOutput OpenPathsOutput = EPCGExClipper2OpenPathOutput::Output;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output|Tagging", meta=(InlineEditConditionToggle))

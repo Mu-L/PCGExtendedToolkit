@@ -415,4 +415,64 @@ namespace PCGExData
 				});
 		}
 	}
+
+	void FDataForwardHandler::Forward(const int32 SourceIndex, UPCGMetadata* InTargetMetadata, const int64 TargetKey)
+	{
+		if (Identities.IsEmpty())
+		{
+			return;
+		}
+
+		const UPCGBasePointData* InSourceData = SourceDataFacade->GetIn();
+
+		for (const FAttributeIdentity& Identity : Identities)
+		{
+			PCGExMetaHelpers::ExecuteWithRightType(
+				Identity,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+
+					const FPCGMetadataAttributeBase* SourceAtt = PCGExMetaHelpers::TryGetConstAttribute<T>(InSourceData, Identity.GetIdentifier());
+					if (!SourceAtt)
+					{
+						return;
+					}
+
+					const T ForwardValue = Identity.InDataDomain() ? Helpers::ReadDataValue<T>(SourceAtt) : SourceAtt->GetValueFromItemKey<T>(InSourceData->GetMetadataEntry(SourceIndex));
+
+					// Single target entry on the element (per-row) domain. Find-or-create (not delete+create):
+					// successive calls forward distinct rows into the same target metadata.
+					const FPCGAttributeIdentifier TargetIdentifier(Identity.Name);
+					FPCGMetadataAttribute<T>* TargetAtt = InTargetMetadata->FindOrCreateAttribute<T>(TargetIdentifier, T{}, SourceAtt->AllowsInterpolation());
+					if (TargetAtt)
+					{
+						TargetAtt->SetValue(TargetKey, ForwardValue);
+					}
+				},
+				[&]()
+				{
+					// Property-backed (Struct/Enum/Object/container) source -> deep-copy the single source value onto TargetKey.
+					const FPCGMetadataAttributeBase* SourceAtt = Identity.Attribute;
+					if (!SourceAtt || !InTargetMetadata)
+					{
+						return;
+					}
+
+					const FPCGAttributeIdentifier TargetIdentifier(Identity.Name);
+					FPCGMetadataAttributeBase* TargetAtt = InTargetMetadata->GetMutableAttribute(TargetIdentifier);
+					if (!TargetAtt)
+					{
+						TargetAtt = InTargetMetadata->CreateAttribute(TargetIdentifier, SourceAtt->GetAttributeDesc(), SourceAtt->AllowsInterpolation(), /*bOverrideParent=*/true);
+					}
+					if (!TargetAtt)
+					{
+						return;
+					}
+
+					const PCGMetadataEntryKey SourceKey = Identity.InDataDomain() ? PCGDefaultValueKey : InSourceData->GetMetadataEntry(SourceIndex);
+					Helpers::PropertyCopyAttribute(SourceAtt, SourceKey, TargetAtt, TargetKey);
+				});
+		}
+	}
 }

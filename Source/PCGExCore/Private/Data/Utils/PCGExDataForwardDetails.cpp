@@ -44,6 +44,19 @@ TSharedPtr<PCGExData::FDataForwardHandler> FPCGExForwardDetails::TryGetHandler(c
 
 bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const TSet<FName>* IgnoreAttributes)
 {
+	// Single-fetch on the facade's input is identical to the raw-data path (MakeBroadcaster just forwards
+	// Source->GetIn()), so reuse it and only attach the facade afterwards for SourceDataFacade readers.
+	if (!Init(InContext, InSourceFacade->Source->GetIn(), IgnoreAttributes))
+	{
+		return false;
+	}
+
+	SourceDataFacade = InSourceFacade;
+	return true;
+}
+
+bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const UPCGData* InSourceData, const TSet<FName>* IgnoreAttributes)
+{
 	PCGExMetaHelpers::AppendUniqueSelectorsFromCommaSeparatedList(CommaSeparatedAttributeSelectors, Attributes);
 
 	Getters.Reserve(Attributes.Num());
@@ -57,7 +70,7 @@ bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSh
 			}
 		}
 
-		const TSharedPtr<PCGExData::IAttributeBroadcaster>& Getter = PCGExData::MakeBroadcaster(Selector, InSourceFacade->Source, true);
+		const TSharedPtr<PCGExData::IAttributeBroadcaster> Getter = PCGExData::MakeBroadcaster(Selector, InSourceData);
 		if (!Getter)
 		{
 			PCGEX_LOG_INVALID_SELECTOR_C(InContext, Tag, Selector)
@@ -67,7 +80,7 @@ bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSh
 		Getters.Add(Getter);
 	}
 
-	SourceDataFacade = InSourceFacade;
+	// Raw-data path: no facade is involved, so SourceDataFacade stays null.
 	return true;
 }
 
@@ -91,32 +104,13 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, T
 					return;
 				}
 
-				const FString Prefix = TypedGetter->GetName().ToString();
-
 				T TypedValue = T{};
 				if (!TypedGetter->TryFetchSingle(TagSource, TypedValue))
 				{
 					return;
 				}
 
-				if constexpr (std::is_same_v<T, bool>)
-				{
-					// Booleans tag by presence: add the attribute name when true, omit when false.
-					if (TypedValue)
-					{
-						InTags.Add(Prefix);
-					}
-				}
-				else
-				{
-					FString StringValue = PCGExTypeOps::Convert<T, FString>(TypedValue);
-					if (StringValue.IsEmpty())
-					{
-						return;
-					}
-
-					InTags.Add(bPrefixWithAttributeName ? (Prefix + TEXT(":") + StringValue) : StringValue);
-				}
+				AppendValueTag<T>(TypedGetter->GetName(), TypedValue, bPrefixWithAttributeName, InTags);
 			});
 		}
 	}

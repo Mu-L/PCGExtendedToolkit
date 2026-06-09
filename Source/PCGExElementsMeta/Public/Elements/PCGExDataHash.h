@@ -34,7 +34,7 @@ namespace PCGExDataHash
 	const FName OutputValueLabel = FName("Value");
 }
 
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), meta=(PCGExNodeLibraryDoc="metadata/keys/data-hash"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), meta=(PCGExNodeLibraryDoc="metadata/analyze/data-hash"))
 class UPCGExDataHashSettings : public UPCGExSettings
 {
 	GENERATED_BODY()

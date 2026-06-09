@@ -100,14 +100,6 @@ namespace PCGExFormatAttributes
 		TArray<bool> RuleOK;
 	};
 
-	FORCEINLINE int32 GetNumRows(const UPCGData* InData)
-	{
-		if (!InData) { return 0; }
-		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData)) { return PointData->GetNumPoints(); }
-		if (const UPCGMetadata* Metadata = InData->ConstMetadata()) { return static_cast<int32>(Metadata->GetLocalItemCount()); }
-		return 0;
-	}
-
 	FORCEINLINE TSharedPtr<IPCGAttributeAccessorKeys> MakeKeys(UPCGData* InData)
 	{
 		if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData)) { return MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData); }
@@ -485,7 +477,7 @@ bool FPCGExFormatAttributesElement::AdvanceWork(FPCGExContext* InContext, const 
 		UPCGData* DupData = InContext->ManagedObjects->DuplicateData<UPCGData>(InputTagged.Data);
 		if (!DupData) { return; }
 
-		const int32 NumRows = PCGExFormatAttributes::GetNumRows(DupData);
+		const int32 NumRows = PCGExMetaHelpers::GetElementsCount(DupData);
 		if (NumRows > 0 && !Settings->Rules.IsEmpty() && !Context->TargetSelectors.IsEmpty())
 		{
 			TSharedPtr<IPCGAttributeAccessorKeys> WriteKeys = PCGExFormatAttributes::MakeKeys(DupData);

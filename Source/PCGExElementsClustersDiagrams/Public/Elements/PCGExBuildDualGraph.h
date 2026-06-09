@@ -49,7 +49,7 @@ class UPCGExBuildDualGraphSettings : public UPCGExClustersProcessorSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS(BuildDualGraph, "Cluster : Dual Graph", "Build the edge dual graph: edges become vertices that connect to sequential edges around shared endpoints.");
+	PCGEX_NODE_INFOS(BuildDualGraph, "Cluster : Edge Dual Graph", "Build the edge dual graph: edges become vertices that connect to sequential edges around shared endpoints.");
 
 	virtual FLinearColor GetNodeTitleColor() const override
 	{

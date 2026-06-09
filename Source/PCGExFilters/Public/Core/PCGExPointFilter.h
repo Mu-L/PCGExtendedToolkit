@@ -101,7 +101,6 @@ public:
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const;
 
-	int32 Priority = 0;
 	EPCGExFilterNoDataFallback InitializationFailurePolicy = EPCGExFilterNoDataFallback::Error;
 	EPCGExFilterNoDataFallback MissingDataPolicy = EPCGExFilterNoDataFallback::Fail;
 

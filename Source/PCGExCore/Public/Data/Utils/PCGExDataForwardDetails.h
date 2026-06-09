@@ -4,9 +4,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include <type_traits>
+
 #include "PCGExDataFilterDetails.h"
+#include "Types/PCGExTypeOps.h"
 
 #include "PCGExDataForwardDetails.generated.h"
+
+class UPCGData;
 
 namespace PCGExData
 {
@@ -78,7 +83,30 @@ struct PCGEXCORE_API FPCGExAttributeToTagDetails
 	TArray<TSharedPtr<PCGExData::IAttributeBroadcaster>> Getters;
 
 	bool Init(const FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const TSet<FName>* IgnoreAttributes = nullptr);
+
+	// Raw-data variant: resolves getters directly against a UPCGData (point data OR attribute set), skipping
+	// FFacade/FPointIO. SourceDataFacade is left null; Tag(...) is unaffected as it reads getters by row index.
+	bool Init(const FPCGExContext* InContext, const UPCGData* InSourceData, const TSet<FName>* IgnoreAttributes = nullptr);
+
 	void Tag(const PCGExData::FConstPoint& TagSource, TSet<FString>& InTags) const;
 	void Tag(const PCGExData::FConstPoint& TagSource, const TSharedPtr<PCGExData::FPointIO>& PointIO) const;
 	void Tag(const PCGExData::FConstPoint& TagSource, UPCGMetadata* InMetadata) const;
+
+	// Format one promoted value as a data tag, matching Tag()'s per-getter rule: bools tag by presence;
+	// everything else becomes "Name:Value" (or just "Value" when not prefixed); empty strings are skipped.
+	// Shared so the broadcaster path and any raw @Data path (TryReadDataValue) produce identical tags.
+	template <typename T>
+	static void AppendValueTag(const FName InName, const T& InValue, const bool bPrefixWithAttributeName, TSet<FString>& OutTags)
+	{
+		if constexpr (std::is_same_v<T, bool>)
+		{
+			if (InValue) { OutTags.Add(InName.ToString()); }
+		}
+		else
+		{
+			const FString StringValue = PCGExTypeOps::Convert<T, FString>(InValue);
+			if (StringValue.IsEmpty()) { return; }
+			OutTags.Add(bPrefixWithAttributeName ? (InName.ToString() + TEXT(":") + StringValue) : StringValue);
+		}
+	}
 };

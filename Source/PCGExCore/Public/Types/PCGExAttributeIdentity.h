@@ -48,6 +48,10 @@ namespace PCGExData
 		// nullptr for synthesized identities (e.g. placeholders before an attribute exists).
 		const FPCGMetadataAttributeBase* Attribute = nullptr;
 
+		// True for synthesized identities fed purely from tag values, with no backing metadata attribute
+		// (Attribute == nullptr). Set by FPCGExPointIOMerger's tags-to-attributes path; ignored elsewhere.
+		bool bTagOnly = false;
+
 		FAttributeIdentity() = default;
 
 		// Canonical construction: from a live attribute. Copies the attribute's desc, domain and caches the pointer.

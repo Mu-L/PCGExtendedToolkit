@@ -24,7 +24,6 @@ struct PCGEXCORE_API FPCGExSortRuleConfig : public FPCGExInputConfig
 	GENERATED_BODY()
 
 	FPCGExSortRuleConfig() = default;
-	FPCGExSortRuleConfig(const FPCGExSortRuleConfig& Other);
 
 	/** If enabled, reads the sort value from a data tag (tag:value format) instead of a point attribute.
 	 * Tag values are per-data, so all points in the same data will share the same sort value.

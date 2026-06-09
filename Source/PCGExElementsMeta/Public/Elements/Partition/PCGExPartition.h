@@ -29,28 +29,6 @@ struct FPCGExPartitonRuleConfig : public FPCGExInputConfig
 	{
 	}
 
-	FPCGExPartitonRuleConfig(const FPCGExPartitonRuleConfig& Other)
-		: FPCGExInputConfig(Other)
-		  , bEnabled(Other.bEnabled)
-		  , FilterSize(Other.FilterSize)
-		  , Upscale(Other.Upscale)
-		  , Offset(Other.Offset)
-		  , FilterMode(Other.FilterMode)
-		  , ModuloValue(Other.ModuloValue)
-		  , bClampKey(Other.bClampKey)
-		  , KeyClampMin(Other.KeyClampMin)
-		  , KeyClampMax(Other.KeyClampMax)
-		  , bInvertKey(Other.bInvertKey)
-		  , bAbsoluteKey(Other.bAbsoluteKey)
-		  , bWriteKey(Other.bWriteKey)
-		  , KeyAttributeName(Other.KeyAttributeName)
-		  , bUsePartitionIndexAsKey(Other.bUsePartitionIndexAsKey)
-		  , bWriteTag(Other.bWriteTag)
-		  , TagPrefixName(Other.TagPrefixName)
-		  , bTagUsePartitionIndexAsKey(Other.bTagUsePartitionIndexAsKey)
-	{
-	}
-
 #if WITH_EDITOR
 	virtual FString GetDisplayName() const override
 	{

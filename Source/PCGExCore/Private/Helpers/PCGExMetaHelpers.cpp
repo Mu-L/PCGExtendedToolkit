@@ -3,10 +3,20 @@
 
 #include "Helpers/PCGExMetaHelpers.h"
 #include "CoreMinimal.h"
+#include "PCGData.h"
 #include "PCGExCommon.h"
+#include "Data/PCGBasePointData.h"
 
 namespace PCGExMetaHelpers
 {
+	int32 GetElementsCount(const UPCGData* InData)
+	{
+		if (!InData) { return 0; }
+		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData)) { return PointData->GetNumPoints(); }
+		if (const UPCGMetadata* Metadata = InData->ConstMetadata()) { return static_cast<int32>(Metadata->GetLocalItemCount()); }
+		return 0;
+	}
+
 	bool IsPCGExAttribute(const FString& InStr)
 	{
 		return InStr.Contains(PCGExCommon::PCGExPrefix);

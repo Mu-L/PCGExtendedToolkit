@@ -86,6 +86,16 @@ struct PCGEXCORE_API FPCGExNameFiltersDetails
 	void Prune(PCGExData::FAttributesInfos& InAttributeInfos, const bool bInvert = false) const;
 };
 
+namespace PCGExDataFilter
+{
+	// Centralizes the 'bEnabled ? &Filters : nullptr' idiom for opt-in name filters, repeated at every
+	// merge call site that forwards a TagsToAttributes filter to FPCGExPointIOMerger / FMergeList.
+	FORCEINLINE const FPCGExNameFiltersDetails* ResolveOptional(const bool bEnabled, const FPCGExNameFiltersDetails& Filters)
+	{
+		return bEnabled ? &Filters : nullptr;
+	}
+}
+
 USTRUCT(BlueprintType)
 struct PCGEXCORE_API FPCGExAttributeGatherDetails : public FPCGExNameFiltersDetails
 {
@@ -127,7 +137,7 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	bool bDataDomainToElements = true;
 
 	/** Scope */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Scope"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Scope", EditCondition="bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
 	EPCGExAttributeDomainScope Scope = EPCGExAttributeDomainScope::Any;
 
 	/** Tags to carry over. */
@@ -135,7 +145,7 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	FPCGExNameFiltersDetails Tags = FPCGExNameFiltersDetails(false);
 
 	/** If enabled, will test full tag with its value ('Tag:Value'), otherwise only test the left part ignoring the right `:Value` ('Tag'). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Flatten tag value"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Flatten tag value", EditCondition="!bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
 	bool bTestTagsWithValues = false;
 
 	void Init();
