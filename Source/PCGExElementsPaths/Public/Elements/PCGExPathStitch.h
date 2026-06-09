@@ -128,6 +128,14 @@ public:
 	/** Meta filter settings. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Carry Over Settings"))
 	FPCGExCarryOverDetails CarryOverDetails;
+
+	/** If enabled, will convert tags into per-point attributes so their semantics survive the merge. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, InlineEditConditionToggle))
+	bool bTagToAttributes = false;
+
+	/** Tags to convert to attributes: simple tags become boolean (presence), tag:value pairs become their typed value. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="bTagToAttributes"))
+	FPCGExNameFiltersDetails TagsToAttributes = FPCGExNameFiltersDetails(false);
 };
 
 struct FPCGExPathStitchContext final : FPCGExPathProcessorContext
@@ -139,6 +147,9 @@ struct FPCGExPathStitchContext final : FPCGExPathProcessorContext
 	FPCGExMatchingDetails MatchingDetails;
 
 	FPCGExCarryOverDetails CarryOverDetails;
+
+	bool bTagToAttributes = false;
+	FPCGExNameFiltersDetails TagsToAttributes;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL

@@ -18,12 +18,6 @@ FPCGExInputConfig::FPCGExInputConfig(const FPCGAttributePropertyInputSelector& I
 	Selector.ImportFromOtherSelector(InSelector);
 }
 
-FPCGExInputConfig::FPCGExInputConfig(const FPCGExInputConfig& Other)
-	: Attribute(Other.Attribute)
-{
-	Selector.ImportFromOtherSelector(Other.Selector);
-}
-
 FPCGExInputConfig::FPCGExInputConfig(const FName InName)
 {
 	Selector.Update(InName.ToString());

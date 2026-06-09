@@ -16,7 +16,7 @@ namespace PCPGExMergePointsByTag
 	{
 	}
 
-	void FMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails)
+	void FMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const FPCGExNameFiltersDetails* InTagsToAttributes)
 	{
 		if (IOs.IsEmpty())
 		{
@@ -30,7 +30,7 @@ namespace PCPGExMergePointsByTag
 
 		Merger = MakeShared<FPCGExPointIOMerger>(CompositeDataFacade.ToSharedRef());
 		Merger->Append(IOs);
-		Merger->MergeAsync(TaskManager, InCarryOverDetails);
+		Merger->MergeAsync(TaskManager, InCarryOverDetails, nullptr, false, InTagsToAttributes);
 	}
 
 	void FMergeList::Write(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) const
@@ -284,6 +284,10 @@ bool FPCGExMergePointsByTagElement::Boot(FPCGExContext* InContext) const
 	PCGEX_FWD(CarryOverDetails)
 	Context->CarryOverDetails.Init();
 
+	PCGEX_FWD(bTagToAttributes)
+	PCGEX_FWD(TagsToAttributes)
+	Context->TagsToAttributes.Init();
+
 	return true;
 }
 
@@ -360,15 +364,17 @@ bool FPCGExMergePointsByTagElement::AdvanceWork(FPCGExContext* InContext, const 
 			Context->SetState(PCPGExMergePointsByTag::State_MergingData);
 			PCGEX_ASYNC_GROUP_CHKD_RET(TaskManager, MergeAsync, true)
 
+			const FPCGExNameFiltersDetails* TagsToAttributesPtr = PCGExDataFilter::ResolveOptional(Context->bTagToAttributes, Context->TagsToAttributes);
+
 			if (Context->FallbackMergeList)
 			{
-				Context->FallbackMergeList->Merge(TaskManager, &Context->CarryOverDetails);
+				Context->FallbackMergeList->Merge(TaskManager, &Context->CarryOverDetails, TagsToAttributesPtr);
 			}
 			for (const TSharedPtr<PCPGExMergePointsByTag::FMergeList>& List : Context->MergeLists)
 			{
-				MergeAsync->AddSimpleCallback([List, TaskManager, Det = Context->CarryOverDetails]
+				MergeAsync->AddSimpleCallback([List, TaskManager, Det = Context->CarryOverDetails, bT2A = Context->bTagToAttributes, TagDet = Context->TagsToAttributes]
 				{
-					List->Merge(TaskManager, &Det);
+					List->Merge(TaskManager, &Det, PCGExDataFilter::ResolveOptional(bT2A, TagDet));
 				});
 			}
 

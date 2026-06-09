@@ -39,7 +39,6 @@ public:
 		return PCGExFactories::EType::RuleSort;
 	}
 
-	int32 Priority;
 	FPCGExSortRuleConfig Config;
 
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
