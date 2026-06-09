@@ -73,9 +73,11 @@ namespace PCGExComponentFixups
 
 				if (bCurvesDiverged && !bSplineDiverged)
 				{
-					// SplineCurves edited, Spline at default. SynchronizeSplines() calls
-					// SetSpline(FSplineCurves) which updates both sides from the curves.
-					Spline->SynchronizeSplines();
+					// SplineCurves edited, Spline at default. SetSpline(FSplineCurves)
+					// updates both sides from the curves. (Was SynchronizeSplines()
+					// pre-5.8, which did exactly this internally; it's now a deprecated
+					// no-op, so calling it would silently skip the sync.)
+					Spline->SetSpline(Spline->GetSplineCurves());
 				}
 				else if (bSplineDiverged && !bCurvesDiverged)
 				{

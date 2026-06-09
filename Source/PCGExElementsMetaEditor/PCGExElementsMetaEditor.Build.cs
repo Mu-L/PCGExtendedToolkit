@@ -22,6 +22,7 @@ public class PCGExElementsMetaEditor : ModuleRules
 				"CoreUObject",
 				"UnrealEd",
 				"Engine",
+				"PCG",
 				"PCGExCore",
 				"PCGExCoreEditor",
 				"PCGExElementsMeta",
@@ -32,6 +33,7 @@ public class PCGExElementsMetaEditor : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"PCG",
 				"Slate",
 				"SlateCore",
 				"PropertyEditor"
