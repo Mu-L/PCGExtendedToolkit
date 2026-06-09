@@ -13,6 +13,29 @@
 
 #define LOCTEXT_NAMESPACE "CullOnEmptyElement"
 
+#if WITH_EDITOR
+TArray<FPCGPreConfiguredSettingsInfo> UPCGExCullOnEmptySettings::GetPreconfiguredInfo() const
+{
+	TArray<FPCGPreConfiguredSettingsInfo> Configs;
+	Configs.Emplace(0, GetDefaultNodeTitle());
+	Configs.Emplace(1, FTEXT("PCGEx | Is Data Empty"));
+	return Configs;
+}
+
+bool UPCGExCullOnEmptySettings::ShouldDrawNodeCompact() const
+{
+	return bCheckOnly;
+}
+#endif
+
+void UPCGExCullOnEmptySettings::ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo)
+{
+	if (PreconfigureInfo.PreconfiguredIndex == 1)
+	{
+		bCheckOnly = true;
+	}
+}
+
 FPCGDataTypeIdentifier UPCGExCullOnEmptySettings::GetCurrentPinTypesID(const UPCGPin* InPin) const
 {
 	if (!InPin->IsOutputPin() || InPin->Properties.Label == PCGPinConstants::DefaultOutputLabel)
