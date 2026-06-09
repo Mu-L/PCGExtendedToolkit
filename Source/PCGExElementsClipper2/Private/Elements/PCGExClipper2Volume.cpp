@@ -16,14 +16,16 @@
 #include "PCGComponent.h"
 #include "PCGElement.h"
 #include "PCGManagedResource.h"
-#include "PCGParamData.h"
 #include "Helpers/PCGHelpers.h"
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttributeTpl.h"
 
 #include "Core/PCGExMT.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataHelpers.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGVolumeData.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Engine/World.h"
@@ -125,9 +127,10 @@ FPCGExGeo2DProjectionDetails UPCGExClipper2VolumeSettings::GetProjectionDetails(
 
 TArray<FPCGPinProperties> UPCGExClipper2VolumeSettings::OutputPinProperties() const
 {
-	// One soft-object-path reference per spawned volume actor, so downstream graphs can address them.
+	// One volume data per spawned actor. The actor reference and the source path's @Data attributes ride along in
+	// the volume's @Data domain, so downstream graphs can address/filter the volumes like the source paths.
 	TArray<FPCGPinProperties> PinProperties;
-	PCGEX_PIN_PARAM(FName("Actor References"), TEXT("Attribute set with one soft-object-path entry per spawned volume actor."), Normal)
+	PCGEX_PIN_VOLUMES(FName("Volumes"), TEXT("Volume data created from spawned actors, one per spawned volume."), Normal)
 	return PinProperties;
 }
 
@@ -147,32 +150,18 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 {
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
-	// Build the actor-reference set up front and emit it unconditionally (even on early-outs / zero volumes) so
-	// the "Actor References" pin is always present.
+	// Each spawned volume's actor reference is written into the output volume data's @Data domain under this name.
 	const FName AttrName = Settings->ActorReferenceAttributeName.IsNone() ? FName("ActorReference") : Settings->ActorReferenceAttributeName;
-	UPCGParamData* RefData = NewObject<UPCGParamData>();
-	UPCGMetadata* RefMetadata = RefData->Metadata;
-	FPCGMetadataAttribute<FSoftObjectPath>* RefAttribute = RefMetadata->FindOrCreateAttribute<FSoftObjectPath>(
-		PCGExMetaHelpers::GetAttributeIdentifier(AttrName, RefData), FSoftObjectPath(), false, true);
-
-	auto EmitReferences = [&]()
-	{
-		FPCGTaggedData& OutRef = OutputData.TaggedData.Emplace_GetRef();
-		OutRef.Pin = FName("Actor References");
-		OutRef.Data = RefData;
-	};
 
 	UPCGComponent* MutableComponent = GetMutableComponent();
 	if (!MutableComponent)
 	{
-		EmitReferences();
 		return;
 	}
 
 	UWorld* World = MutableComponent->GetWorld();
 	if (!World)
 	{
-		EmitReferences();
 		return;
 	}
 
@@ -191,8 +180,8 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		return A->GroupIndex < B->GroupIndex;
 	});
 
-	// Forward every @Data-domain attribute from the source path onto its actor's row. Handler is built once
-	// per source and cached (rebuilding per row would re-scan the source's identities needlessly).
+	// Forward every @Data-domain attribute from the source path onto its volume's @Data domain. Handler is built
+	// once per source and cached (rebuilding per volume would re-scan the source's identities needlessly).
 	const FPCGExForwardDetails ForwardDetails(true);
 	TMap<int32, TSharedPtr<PCGExData::FDataForwardHandler>> HandlersBySource;
 
@@ -244,7 +233,7 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		Model->BuildBound();
 		BrushComp->Brush = Model;
 #endif
-		
+
 		if (Settings->bOverrideCollisionProfile)
 		{
 			BrushComp->SetCollisionProfileName(Settings->CollisionProfileName);
@@ -266,16 +255,21 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 
 		PCGExCollections::FinalizeSpawnedActor(Volume, ManagedActors, bTransientSpawn);
 
-		// One row per spawned volume: the actor reference + the source's @Data attributes.
-		const int64 Key = RefMetadata->AddEntry();
-		if (RefAttribute)
-		{
-			RefAttribute->SetValue(Key, FSoftObjectPath(Volume));
-		}
+		// One UPCGVolumeData per spawned actor, emitted on the "Volumes" pin.
+		UPCGVolumeData* VolumeData = ManagedObjects->New<UPCGVolumeData>();
+		VolumeData->Initialize(Volume);
 
-		if (AllOpData && AllOpData->Facades.IsValidIndex(Spec->SourceFacadeIndex))
+		FPCGTaggedData& OutVolume = OutputData.TaggedData.Emplace_GetRef();
+		OutVolume.Pin = FName("Volumes");
+		OutVolume.Data = VolumeData;
+
+		// Carry the source path's tags + @Data attributes onto the volume so downstream graphs can address/filter
+		// the volumes the same way they would the originating paths.
+		const int32 SrcIdx = Spec->SourceFacadeIndex;
+		if (AllOpData && AllOpData->Facades.IsValidIndex(SrcIdx))
 		{
-			const int32 SrcIdx = Spec->SourceFacadeIndex;
+			AllOpData->Facades[SrcIdx]->Source->Tags->DumpTo(OutVolume.Tags);
+
 			if (!HandlersBySource.Contains(SrcIdx))
 			{
 				TSharedPtr<PCGExData::FDataForwardHandler> NewHandler = ForwardDetails.TryGetHandler(AllOpData->Facades[SrcIdx], false);
@@ -290,12 +284,13 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			}
 			if (const TSharedPtr<PCGExData::FDataForwardHandler>& Handler = HandlersBySource.FindChecked(SrcIdx))
 			{
-				Handler->Forward(0, RefMetadata, Key);
+				Handler->Forward(0, VolumeData->Metadata);
 			}
 		}
-	}
 
-	EmitReferences();
+		// Written last so the node's own actor reference wins any @Data name collision with a forwarded attribute.
+		PCGExData::Helpers::SetDataValue<FSoftObjectPath>(VolumeData, AttrName, FSoftObjectPath(Volume));
+	}
 }
 
 void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProcessingGroup>& Group)
@@ -308,7 +303,7 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 	PCGExClipper2Decomposition::FDecomposeResult Decomposition;
 	if (!PCGExClipper2Decomposition::TryDecomposeGroup(Group, AllOpData, Params, Decomposition))
 	{
-		if (!Settings->bQuietWarnings)
+		if (!Settings->bQuietTriangulationWarnings)
 		{
 			const FText WarningText = PCGExClipper2Decomposition::DescribeDecomposeFailure(
 				Decomposition, LOCTEXT("VolumeSubject", "volume"), Settings->MaxConvexPieces);
@@ -483,8 +478,7 @@ void FPCGExClipper2VolumeElement::OutputWork(FPCGExContext* InContext, const UPC
 	PCGEX_CONTEXT_AND_SETTINGS(Clipper2Volume)
 
 	// Actor spawning, physics cooking and managed-resource registration must run on the game thread (inline if
-	// already there -- no deadlock). Always marshal, even with zero volumes, so SpawnStagedVolumes still emits
-	// the (empty) Actor References set.
+	// already there -- no deadlock).
 	PCGExMT::ExecuteOnMainThreadAndWait([Context]()
 	{
 		Context->SpawnStagedVolumes();
