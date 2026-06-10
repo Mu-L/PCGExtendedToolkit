@@ -34,6 +34,16 @@ public:
 	virtual bool ChecksCandidate() const;
 	virtual bool IsValidCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, const PCGExFloodFill::FCandidate& Candidate);
 
+	// Capture notification - opt in via WantsCaptureNotify() to react to a committed capture
+	// (e.g. per-node child counts). OnCaptured fires once per captured node, on its diffusion's thread.
+	virtual bool WantsCaptureNotify() const;
+	virtual void OnCaptured(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate);
+
+	// Probe fan-out limiting - opt in via LimitsProbeFanout() to cap how many children a node
+	// spreads to. The probe keeps the best 'limit' neighbors and leaves the rest for other nodes.
+	virtual bool LimitsProbeFanout() const;
+	virtual int32 GetProbeFanoutLimit(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From);
+
 	int32 GetSettingsIndex(const PCGExFloodFill::FDiffusion* Diffusion) const;
 
 protected:

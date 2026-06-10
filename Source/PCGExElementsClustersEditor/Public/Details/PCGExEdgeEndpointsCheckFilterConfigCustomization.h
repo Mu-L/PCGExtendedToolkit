@@ -27,8 +27,11 @@ public:
 		IPropertyTypeCustomizationUtils& CustomizationUtils) override;
 
 private:
+	TSharedPtr<IPropertyHandle> UseTwoFilterSetsHandle;
 	TSharedPtr<IPropertyHandle> ModeHandle;
+	TSharedPtr<IPropertyHandle> RespectEdgeDirectionHandle;
 	TSharedPtr<IPropertyHandle> ExpectsHandle;
+	TSharedPtr<IPropertyHandle> ExpectsBHandle;
 	TSharedPtr<IPropertyHandle> InvertHandle;
 
 	TSharedPtr<SPCGExEdgeEndpointsCheckPreview> PreviewWidget;
