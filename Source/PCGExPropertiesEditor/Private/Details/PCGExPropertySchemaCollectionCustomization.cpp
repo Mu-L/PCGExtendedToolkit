@@ -661,12 +661,14 @@ void FPCGExPropertySchemaCollectionCustomization::CustomizeChildren(
 			Collection->ReconcileImportOverrides(Resolved);
 			Collection->Resolve(Resolved);
 
-			// Reconcile mutated Overrides via raw pointer; the property tree's child count
-			// is stale until refresh. Without this, EmitImportSections drops newly-added
-			// entries. Idempotent: next pass finds no drift.
+			// Reconcile grew Overrides via raw pointer, so the new entries have no child handles in
+			// this already-built node tree and EmitImportSections drops them this pass. RequestRefresh
+			// is unreliable mid layout-build (see ReconcileAndNotify); a deferred ForceRefresh rebuilds
+			// after this build unwinds and re-emits every row. Converges: the rebuilt pass finds no drift.
 			if (TSharedPtr<IPropertyUtilities> Utils = WeakPropertyUtilities.Pin())
 			{
-				Utils->RequestRefresh();
+				// Bound to Utils itself: drained by Utils after the build unwinds, no-ops if it's gone.
+				Utils->EnqueueDeferredAction(FSimpleDelegate::CreateSP(Utils.ToSharedRef(), &IPropertyUtilities::ForceRefresh));
 			}
 		}
 

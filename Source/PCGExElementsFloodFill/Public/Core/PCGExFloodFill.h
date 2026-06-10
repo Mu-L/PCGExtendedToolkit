@@ -259,9 +259,16 @@ namespace PCGExFloodFill
 		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsProbe;
 		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsCandidate;
 		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsCapture;
+		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsCaptureNotify;
+		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsProbeFanout;
 
 	public:
 		mutable FRWLock HandlerLock;
+
+		// Set in BuildFrom -- whether any control opts into capture-notify / probe fan-out
+		// limiting, so hot paths can skip the dispatch.
+		bool bHasCaptureNotify = false;
+		bool bHasProbeFanout = false;
 
 		TSharedPtr<PCGExClusters::FCluster> Cluster;
 		TSharedPtr<PCGExData::FFacade> VtxDataFacade;
@@ -308,6 +315,9 @@ namespace PCGExFloodFill
 		bool TryCapture(const FDiffusion* Diffusion, const FCandidate& Candidate);
 		bool IsValidProbe(const FDiffusion* Diffusion, const FCandidate& Candidate);
 		bool IsValidCandidate(const FDiffusion* Diffusion, const FCandidate& From, const FCandidate& Candidate);
+
+		// Aggregate probe-time fan-out limit across probe-limiting controls (MAX_int32 if none).
+		int32 GetProbeFanoutLimit(const FDiffusion* Diffusion, const FCandidate& From);
 	};
 
 	/**

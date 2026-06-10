@@ -7,6 +7,7 @@
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Graphs/PCGExGraph.h"
+#include "HAL/PlatformAtomics.h"
 
 #define LOCTEXT_NAMESPACE "PCGExEdgeEndpointsCheckFilter"
 #define PCGEX_NAMESPACE EdgeEndpointsCheckFilter
@@ -15,9 +16,12 @@ void UPCGExEdgeEndpointsCheckFilterFactory::RegisterBuffersDependencies(FPCGExCo
 {
 	Super::RegisterBuffersDependencies(InContext, FacadePreloader);
 
-	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : FilterFactories)
+	for (const TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* FactorySet : {&FilterFactories, &FilterFactoriesB})
 	{
-		Factory->RegisterBuffersDependencies(InContext, FacadePreloader);
+		for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : *FactorySet)
+		{
+			Factory->RegisterBuffersDependencies(InContext, FacadePreloader);
+		}
 	}
 }
 
@@ -28,11 +32,14 @@ bool UPCGExEdgeEndpointsCheckFilterFactory::RegisterConsumableAttributes(FPCGExC
 		return false;
 	}
 
-	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : FilterFactories)
+	for (const TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* FactorySet : {&FilterFactories, &FilterFactoriesB})
 	{
-		if (!Factory->RegisterConsumableAttributes(InContext))
+		for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : *FactorySet)
 		{
-			return false;
+			if (!Factory->RegisterConsumableAttributes(InContext))
+			{
+				return false;
+			}
 		}
 	}
 
@@ -46,11 +53,14 @@ bool UPCGExEdgeEndpointsCheckFilterFactory::RegisterConsumableAttributesWithData
 		return false;
 	}
 
-	for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : FilterFactories)
+	for (const TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>* FactorySet : {&FilterFactories, &FilterFactoriesB})
 	{
-		if (!Factory->RegisterConsumableAttributesWithData(InContext, InData))
+		for (const TObjectPtr<const UPCGExPointFilterFactoryData>& Factory : *FactorySet)
 		{
-			return false;
+			if (!Factory->RegisterConsumableAttributesWithData(InContext, InData))
+			{
+				return false;
+			}
 		}
 	}
 
@@ -64,6 +74,18 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExEdgeEndpointsCheckFilterFactory::Cre
 
 namespace PCGExEdgeEndpointsCheck
 {
+	// Resolves a node's filter result against the given manager, lazily caching it (-1 == not yet computed).
+	FORCEINLINE int8 ResolveCachedResult(const TSharedPtr<PCGExClusterFilter::FManager>& Manager, TArray<int8>& Cache, const PCGExClusters::FNode* Node)
+	{
+		int8 Result = Cache[Node->Index]; // TODO Atomic read?
+		if (Result == -1)
+		{
+			Result = Manager->Test(*Node);
+			FPlatformAtomics::AtomicStore(&Cache[Node->Index], Result);
+		}
+		return Result;
+	}
+
 	bool FFilter::Init(FPCGExContext* InContext, const TSharedRef<PCGExClusters::FCluster>& InCluster, const TSharedRef<PCGExData::FFacade>& InPointDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 	{
 		if (!IFilter::Init(InContext, InCluster, InPointDataFacade, InEdgeDataFacade))
@@ -81,32 +103,61 @@ namespace PCGExEdgeEndpointsCheck
 		ResultCache.Init(-1, Cluster->Nodes->Num());
 
 		Expected = TypedFilterFactory->Config.Expects == EPCGExFilterResult::Fail ? 0 : 1;
+
+		if (TypedFilterFactory->Config.bUseTwoFilterSets)
+		{
+			VtxFiltersManagerB = MakeShared<PCGExClusterFilter::FManager>(Cluster.ToSharedRef(), InPointDataFacade, InEdgeDataFacade);
+			VtxFiltersManagerB->SetSupportedTypes(&PCGExFactories::ClusterNodeFilters);
+			if (!VtxFiltersManagerB->Init(InContext, TypedFilterFactory->FilterFactoriesB))
+			{
+				return false;
+			}
+
+			ResultCacheB.Init(-1, Cluster->Nodes->Num());
+
+			ExpectedB = TypedFilterFactory->Config.ExpectsB == EPCGExFilterResult::Fail ? 0 : 1;
+		}
+
 		return true;
 	}
 
 	bool FFilter::Test(const PCGExGraphs::FEdge& Edge) const
 	{
-		TArray<int8>& MutableResultCache = const_cast<TArray<int8>&>(ResultCache);
-
 		const PCGExClusters::FNode* Start = Cluster->GetEdgeStart(Edge);
-		int8 StartResult = ResultCache[Start->Index]; // TODO Atomic read?
-
 		const PCGExClusters::FNode* End = Cluster->GetEdgeEnd(Edge);
-		int8 EndResult = ResultCache[End->Index];
 
-		if (StartResult == -1)
-		{
-			StartResult = VtxFiltersManager->Test(*Start);
-			FPlatformAtomics::AtomicStore(&MutableResultCache[Start->Index], StartResult);
-		}
-
-		if (EndResult == -1)
-		{
-			EndResult = VtxFiltersManager->Test(*End);
-			FPlatformAtomics::AtomicStore(&MutableResultCache[End->Index], EndResult);
-		}
+		TArray<int8>& MutableResultCache = const_cast<TArray<int8>&>(ResultCache);
+		const int8 StartResult = ResolveCachedResult(VtxFiltersManager, MutableResultCache, Start);
+		const int8 EndResult = ResolveCachedResult(VtxFiltersManager, MutableResultCache, End);
 
 		bool bPass = true;
+
+		if (TypedFilterFactory->Config.bUseTwoFilterSets)
+		{
+			TArray<int8>& MutableResultCacheB = const_cast<TArray<int8>&>(ResultCacheB);
+			const int8 StartResultB = ResolveCachedResult(VtxFiltersManagerB, MutableResultCacheB, Start);
+			const int8 EndResultB = ResolveCachedResult(VtxFiltersManagerB, MutableResultCacheB, End);
+
+			// "Matches A" = first-set result equals Expected; "matches B" = second-set result equals ExpectedB.
+			const bool bStartMatchesA = StartResult == Expected;
+			const bool bEndMatchesA = EndResult == Expected;
+			const bool bStartMatchesB = StartResultB == ExpectedB;
+			const bool bEndMatchesB = EndResultB == ExpectedB;
+
+			if (TypedFilterFactory->Config.bRespectEdgeDirection)
+			{
+				// A is bound to Start, B to End.
+				bPass = bStartMatchesA && bEndMatchesB;
+			}
+			else
+			{
+				// One endpoint matches A and the other matches B, in either orientation.
+				bPass = (bStartMatchesA && bEndMatchesB) || (bEndMatchesA && bStartMatchesB);
+			}
+
+			return TypedFilterFactory->Config.bInvert ? !bPass : bPass;
+		}
+
 		switch (TypedFilterFactory->Config.Mode)
 		{
 		case EPCGExEdgeEndpointsCheckMode::None:
@@ -135,6 +186,7 @@ namespace PCGExEdgeEndpointsCheck
 	FFilter::~FFilter()
 	{
 		VtxFiltersManager.Reset();
+		VtxFiltersManagerB.Reset();
 		TypedFilterFactory = nullptr;
 	}
 }
@@ -142,7 +194,11 @@ namespace PCGExEdgeEndpointsCheck
 TArray<FPCGPinProperties> UPCGExEdgeEndpointsCheckFilterProviderSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
-	PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceVtxFiltersLabel, TEXT("Filters used on endpoints."), Required)
+	PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceVtxFiltersLabel, TEXT("Filters used on endpoints. In two-input mode, this is the first set (A)."), Required)
+	if (Config.bUseTwoFilterSets)
+	{
+		PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceVtxFiltersLabelB, TEXT("Second filter set (B), matched against the other endpoint."), Required)
+	}
 	return PinProperties;
 }
 
@@ -158,6 +214,15 @@ UPCGExFactoryData* UPCGExEdgeEndpointsCheckFilterProviderSettings::CreateFactory
 	{
 		InContext->ManagedObjects->Destroy(NewFactory);
 		return nullptr;
+	}
+
+	if (Config.bUseTwoFilterSets)
+	{
+		if (!GetInputFactories(InContext, PCGExFilters::Labels::SourceVtxFiltersLabelB, NewFactory->FilterFactoriesB, PCGExFactories::ClusterNodeFilters))
+		{
+			InContext->ManagedObjects->Destroy(NewFactory);
+			return nullptr;
+		}
 	}
 
 	if (!NewFactory->Init(InContext))

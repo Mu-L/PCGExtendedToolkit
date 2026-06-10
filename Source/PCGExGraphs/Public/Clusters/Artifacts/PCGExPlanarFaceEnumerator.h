@@ -62,6 +62,18 @@ namespace PCGExClusters
 	};
 
 	/**
+	 * An interior boundary segment shared by two faces (one undirected half-edge pair).
+	 * OriginNode/TargetNode are the segment's endpoint node indices; FaceA/FaceB are the two bounded faces.
+	 */
+	struct PCGEXGRAPHS_API FSharedSegment
+	{
+		int32 OriginNode = -1;
+		int32 TargetNode = -1;
+		int32 FaceA = -1;
+		int32 FaceB = -1;
+	};
+
+	/**
 	 * DCEL-based planar face enumerator.
 	 * Builds a proper half-edge structure and enumerates all faces by following next pointers.
 	 */
@@ -265,6 +277,14 @@ namespace PCGExClusters
 		 * @param OutHalfEdgeIndices Output array of half-edge indices belonging to this face
 		 */
 		void GetFaceHalfEdges(int32 FaceIndex, TArray<int32>& OutHalfEdgeIndices) const;
+
+		/**
+		 * Enumerate every interior shared segment (each undirected boundary half-edge bounded by two distinct faces),
+		 * visiting each segment once. Use this instead of re-walking half-edges/twins by hand.
+		 * @param OutSegments Output list of shared segments (endpoints + the two faces)
+		 * @param WrapperFaceIndex Optional face index to exclude (typically the unbounded exterior face)
+		 */
+		void GetSharedSegments(TArray<FSharedSegment>& OutSegments, int32 WrapperFaceIndex = -1) const;
 
 	protected:
 		/** Build a cell from a face (list of node indices) - internal use */

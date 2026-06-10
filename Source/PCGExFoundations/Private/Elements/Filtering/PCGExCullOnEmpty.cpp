@@ -152,7 +152,7 @@ bool FPCGExCullOnEmptyElement::ExecuteInternal(FPCGContext* Context) const
 		{
 			UPCGParamData* ParamData = Context->NewObject_AnyThread<UPCGParamData>(Context);
 			FPCGMetadataAttribute<bool>* Attr = ParamData->Metadata->CreateAttribute<bool>(Settings->OutputIsEmpty, !bHasValidData, true, true);
-			Attr->AddValue(!bHasValidData);
+			Attr->SetValue(ParamData->Metadata->AddEntry(), !bHasValidData);
 
 			FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef();
 			OutData.Data = ParamData;

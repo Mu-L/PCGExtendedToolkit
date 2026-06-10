@@ -54,6 +54,26 @@ bool FPCGExFillControlOperation::IsValidCandidate(const PCGExFloodFill::FDiffusi
 	return true;
 }
 
+bool FPCGExFillControlOperation::WantsCaptureNotify() const
+{
+	return false;
+}
+
+void FPCGExFillControlOperation::OnCaptured(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate)
+{
+	// No-op; override in controls that track capture state.
+}
+
+bool FPCGExFillControlOperation::LimitsProbeFanout() const
+{
+	return false;
+}
+
+int32 FPCGExFillControlOperation::GetProbeFanoutLimit(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From)
+{
+	return MAX_int32;
+}
+
 int32 FPCGExFillControlOperation::GetSettingsIndex(const PCGExFloodFill::FDiffusion* Diffusion) const
 {
 	return *(SettingsIndex->GetData() + Diffusion->Index);

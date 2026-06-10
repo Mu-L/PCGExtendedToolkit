@@ -14,6 +14,7 @@
 #include "Data/PCGPointArrayData.h"
 #include "Graphs/PCGExGraph.h"
 #include "Graphs/PCGExGraphBuilder.h"
+#include "Graphs/PCGExSubGraph.h"
 #include "Helpers/PCGExMetaHelpers.h"
 #include "Math/PCGExMathDistances.h"
 #include "Sampling/PCGExSamplingUnionData.h"
@@ -62,6 +63,14 @@ bool FPCGExBuildCellDiagramElement::Boot(FPCGExContext* InContext) const
 	if (Settings->bWriteNumNodes)
 	{
 		PCGEX_VALIDATE_NAME_C(Context, Settings->NumNodesAttributeName);
+	}
+	if (Settings->bWriteVtxType)
+	{
+		PCGEX_VALIDATE_NAME_C(Context, Settings->VtxTypeAttributeName);
+	}
+	if (Settings->bWriteEdgeType)
+	{
+		PCGEX_VALIDATE_NAME_C(Context, Settings->EdgeTypeAttributeName);
 	}
 
 	Context->HolesFacade = PCGExData::TryGetSingleFacade(Context, PCGExClusters::Labels::SourceHolesLabel, false, false);
@@ -142,7 +151,7 @@ namespace PCGExBuildCellDiagram
 		// Enumerate all cells (wrapper is omitted by default for graph)
 		Enumerator->EnumerateAllFaces(ValidCells, CellsConstraints.ToSharedRef(), nullptr, true);
 
-		const int32 NumCells = ValidCells.Num();
+		NumCells = ValidCells.Num();
 		if (NumCells < 2)
 		{
 			// Need at least 2 cells to form a graph
@@ -163,13 +172,27 @@ namespace PCGExBuildCellDiagram
 			}
 		}
 
-		// Create output vertex data (cell centroids)
+		// Resolve the additional vertex blocks (corners, then midpoints) appended after the centroids.
+		if (Settings->SpokeMode != EPCGExCellSpokeMode::None)
+		{
+			SetupCornerBlock();
+		}
+		if (Settings->bSplitCellEdgesAtSharedMidpoint)
+		{
+			SetupMidpointBlock();
+		}
+
+		CornerBlockStart = NumCells;
+		MidpointBlockStart = NumCells + CornerNodes.Num();
+		TotalVtxCount = MidpointBlockStart + MidpointNodePairs.Num();
+
+		// Create output vertex data (cell centroids + optional corners/midpoints)
 		TSharedPtr<PCGExData::FPointIO> CentroidIO = Context->MainPoints->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
 		CentroidIO->Tags->Reset();
 		CentroidIO->IOIndex = BatchIndex;
 		PCGExClusters::Helpers::CleanupClusterData(CentroidIO);
 
-		PCGExPointArrayDataHelpers::SetNumPointsAllocated(CentroidIO->GetOut(), NumCells);
+		PCGExPointArrayDataHelpers::SetNumPointsAllocated(CentroidIO->GetOut(), TotalVtxCount);
 
 		CentroidFacade = MakeShared<PCGExData::FFacade>(CentroidIO.ToSharedRef());
 
@@ -204,9 +227,164 @@ namespace PCGExBuildCellDiagram
 			NumNodesWriter = CentroidFacade->GetWritable<int32>(Settings->NumNodesAttributeName, 0, true, PCGExData::EBufferInit::New);
 		}
 
-		StartParallelLoopForRange(NumCells);
+		if (Settings->bWriteVtxType)
+		{
+			VtxTypeWriter = CentroidFacade->GetWritable<int32>(Settings->VtxTypeAttributeName, 0, true, PCGExData::EBufferInit::New);
+		}
+
+		StartParallelLoopForRange(TotalVtxCount);
 
 		return true;
+	}
+
+	void FProcessor::SetupCornerBlock()
+	{
+		const EPCGExCellSpokeMode Mode = Settings->SpokeMode;
+		const bool bAllCorners = Mode == EPCGExCellSpokeMode::AllCorners;
+		const bool bSingleMode = Mode == EPCGExCellSpokeMode::LongestSpoke || Mode == EPCGExCellSpokeMode::ShortestSpoke;
+		const bool bLongest = Mode == EPCGExCellSpokeMode::LongestSpoke;
+
+		// Per-cell elected corners are only consumed by the non-spread single-spoke edge pass; in All/spread
+		// modes spokes come from CornerNodeToCells, so we don't allocate or fill them there.
+		const bool bNeedPicks = bSingleMode && !Settings->bConnectSharedSelectedCorners;
+		if (bNeedPicks)
+		{
+			CellPickedCornerNode.Init(INDEX_NONE, NumCells);
+		}
+
+		// Materialize an activated corner as a shared vertex slot : one slot per unique cluster node.
+		auto ActivateCorner = [&](const int32 NodeIdx)
+		{
+			if (!CornerNodeToSlot.Contains(NodeIdx))
+			{
+				CornerNodeToSlot.Add(NodeIdx, CornerNodes.Num());
+				CornerNodes.Add(NodeIdx);
+			}
+		};
+
+		// Single pass : map each corner node to the cells that use it (drives the shared-corner spread),
+		// activate corners (every corner in All mode, the elected one in a single mode), and in a single
+		// mode elect this cell's longest/shortest corner by centroid distance. Cells excluded from output
+		// connectivity (FaceIndex < 0, i.e. absent from FaceIndexToOutputIndex) are skipped so spokes stay
+		// consistent with the cell-to-cell edges.
+		for (int32 CellIdx = 0; CellIdx < NumCells; ++CellIdx)
+		{
+			const TSharedPtr<PCGExClusters::FCell>& Cell = ValidCells[CellIdx];
+			if (!Cell || Cell->Nodes.IsEmpty() || Cell->FaceIndex < 0)
+			{
+				continue;
+			}
+
+			for (const int32 NodeIdx : Cell->Nodes)
+			{
+				CornerNodeToCells.FindOrAdd(NodeIdx).AddUnique(CellIdx);
+				if (bAllCorners)
+				{
+					ActivateCorner(NodeIdx);
+				}
+			}
+
+			if (bSingleMode)
+			{
+				const FVector Centroid = Cell->Data.Centroid;
+				int32 BestNode = INDEX_NONE;
+				double BestDistSq = bLongest ? -1.0 : TNumericLimits<double>::Max();
+				for (const int32 NodeIdx : Cell->Nodes)
+				{
+					const double DistSq = FVector::DistSquared(Centroid, Cluster->GetPos(NodeIdx));
+					if (bLongest ? DistSq > BestDistSq : DistSq < BestDistSq)
+					{
+						BestDistSq = DistSq;
+						BestNode = NodeIdx;
+					}
+				}
+				if (bNeedPicks)
+				{
+					CellPickedCornerNode[CellIdx] = BestNode;
+				}
+				if (BestNode != INDEX_NONE)
+				{
+					ActivateCorner(BestNode);
+				}
+			}
+		}
+	}
+
+	void FProcessor::SetupMidpointBlock()
+	{
+		const TSharedPtr<PCGExClusters::FPlanarFaceEnumerator>& Enumerator = CellsConstraints->Enumerator;
+		if (!Enumerator)
+		{
+			return;
+		}
+
+		TArray<PCGExClusters::FSharedSegment> Segments;
+		Enumerator->GetSharedSegments(Segments);
+
+		// One midpoint per shared segment between two valid output cells. Segments whose faces were
+		// constraint-filtered (or the wrapper) are absent from FaceIndexToOutputIndex and produce no midpoint.
+		for (const PCGExClusters::FSharedSegment& Seg : Segments)
+		{
+			const int32* OutAPtr = FaceIndexToOutputIndex.Find(Seg.FaceA);
+			const int32* OutBPtr = FaceIndexToOutputIndex.Find(Seg.FaceB);
+			if (!OutAPtr || !OutBPtr)
+			{
+				continue;
+			}
+
+			MidpointNodePairs.Emplace(Seg.OriginNode, Seg.TargetNode);
+			MidpointCentroids.Emplace(*OutAPtr, *OutBPtr);
+		}
+	}
+
+	void FProcessor::SetupEdgeTypeTagging()
+	{
+		// Classify each edge by the vertex blocks of its endpoints. This runs on the graph's edges -- whose
+		// Start/End are still our original [centroids | corners | midpoints] point indices -- BEFORE compilation
+		// Morton-sorts and renumbers the points. The result is keyed by the stable parent edge index so
+		// OnPreCompile can recover it per output edge via EdgeKeys. (FlattenedEdges endpoints are post-sort
+		// point indices, so range-classifying them directly would misclassify every edge.)
+		const int32 CornerStart = CornerBlockStart;
+		const int32 MidStart = MidpointBlockStart;
+
+		const TArray<PCGExGraphs::FEdge>& Edges = GraphBuilder->Graph->Edges;
+		const TSharedPtr<TArray<int8>> EdgeTypeByIndex = MakeShared<TArray<int8>>();
+		EdgeTypeByIndex->SetNumZeroed(Edges.Num());
+		for (const PCGExGraphs::FEdge& E : Edges)
+		{
+			const int32 A = static_cast<int32>(E.Start);
+			const int32 B = static_cast<int32>(E.End);
+
+			int8 Type = 0;                                               // cell adjacency (centroid <-> centroid)
+			if (A >= MidStart || B >= MidStart) { Type = 1; }            // split-half (touches a midpoint)
+			else if (A >= CornerStart || B >= CornerStart) { Type = 2; } // corner spoke (touches a corner)
+			(*EdgeTypeByIndex)[E.Index] = Type;
+		}
+
+		const FName TypeName = Settings->EdgeTypeAttributeName;
+
+		// A non-null user context is required for OnPreCompile to fire.
+		GraphBuilder->OnCreateContext = []() -> TSharedPtr<PCGExGraphs::FSubGraphUserContext>
+		{
+			return MakeShared<PCGExGraphs::FSubGraphUserContext>();
+		};
+
+		GraphBuilder->OnPreCompile = [TypeName, EdgeTypeByIndex](PCGExGraphs::FSubGraphUserContext&, const PCGExGraphs::FSubGraphPreCompileData& Data)
+		{
+			const TSharedPtr<PCGExData::TBuffer<int32>> TypeBuffer = Data.EdgesDataFacade->GetWritable<int32>(TypeName, 0, true, PCGExData::EBufferInit::New);
+			if (!TypeBuffer)
+			{
+				return;
+			}
+
+			const int32 NumEdges = Data.FlattenedEdges.Num();
+			for (int32 i = 0; i < NumEdges; ++i)
+			{
+				// EdgeKeys[i].Index is the edge's index in the parent graph -- stable across point/edge renumbering.
+				const int32 ParentEdgeIndex = Data.EdgeKeys[i].Index;
+				TypeBuffer->SetValue(i, EdgeTypeByIndex->IsValidIndex(ParentEdgeIndex) ? (*EdgeTypeByIndex)[ParentEdgeIndex] : 0);
+			}
+		};
 	}
 
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
@@ -218,7 +396,7 @@ namespace PCGExBuildCellDiagram
 		TPCGValueRange<FVector> OutBoundsMin = CentroidIO->GetBoundsMinValueRange();
 		TPCGValueRange<FVector> OutBoundsMax = CentroidIO->GetBoundsMaxValueRange();
 
-		// Write cell centroids and blend attributes using reset-able union data
+		// Per-task (per-scope) blend scratch -- never shared across scopes.
 		TArray<PCGExData::FWeightedPoint> WeightedPoints;
 		TArray<PCGEx::FOpStats> Trackers;
 		UnionBlender->InitTrackers(Trackers);
@@ -226,85 +404,145 @@ namespace PCGExBuildCellDiagram
 		const TSharedPtr<PCGExSampling::FSampingUnionData> Union = MakeShared<PCGExSampling::FSampingUnionData>();
 		const int32 SourceIOIndex = VtxDataFacade->Source->IOIndex;
 
-		PCGEX_SCOPE_LOOP(Index)
+		// Place one output vertex : write its transform/bounds, blend the source cluster nodes (equal weight)
+		// into its row, and tag its type. Each Index owns a disjoint row, so writes are race-free across scopes.
+		auto WriteBlendedVertex = [&](const int32 Index, const FVector& Position, const FVector& HalfExtent, const TArrayView<const int32>& SourceNodes, const int32 VtxType)
 		{
-			const TSharedPtr<PCGExClusters::FCell>& Cell = ValidCells[Index];
-			if (!Cell)
-			{
-				continue;
-			}
-
-			// Set transform at centroid
 			FTransform Transform = FTransform::Identity;
-			Transform.SetLocation(Cell->Data.Centroid);
+			Transform.SetLocation(Position);
 			OutTransforms[Index] = Transform;
-
-			// Set bounds
-			const FVector HalfExtent = Cell->Data.Bounds.GetExtent();
 			OutBoundsMin[Index] = -HalfExtent;
 			OutBoundsMax[Index] = HalfExtent;
 
-			// Blend attributes from cell vertices using reset-able union data
 			Union->Reset();
-			Union->Reserve(1, Cell->Nodes.Num());
-			for (const int32 NodeIdx : Cell->Nodes)
+			Union->Reserve(1, SourceNodes.Num());
+			for (const int32 NodeIdx : SourceNodes)
 			{
-				const int32 PointIdx = Cluster->GetNodePointIndex(NodeIdx);
-				// Use equal weight (1.0) for all vertices in the cell
-				Union->AddWeighted_Unsafe(PCGExData::FElement(PointIdx, SourceIOIndex), 1.0);
+				Union->AddWeighted_Unsafe(PCGExData::FElement(Cluster->GetNodePointIndex(NodeIdx), SourceIOIndex), 1.0);
 			}
 
 			UnionBlender->ComputeWeights(Index, Union, WeightedPoints);
 			UnionBlender->Blend(Index, WeightedPoints, Trackers);
 
-			// Write cell-specific attributes
-			if (AreaWriter)
+			if (VtxTypeWriter) { VtxTypeWriter->SetValue(Index, VtxType); }
+		};
+
+		PCGEX_SCOPE_LOOP(Index)
+		{
+			if (Index < CornerBlockStart)
 			{
-				AreaWriter->SetValue(Index, Cell->Data.Area);
+				// ===== Centroid ===== (blend all cell vertices, keep the cell bounds and cell metrics)
+				const TSharedPtr<PCGExClusters::FCell>& Cell = ValidCells[Index];
+				if (!Cell)
+				{
+					continue;
+				}
+
+				WriteBlendedVertex(Index, Cell->Data.Centroid, Cell->Data.Bounds.GetExtent(), Cell->Nodes, 0);
+
+				if (AreaWriter) { AreaWriter->SetValue(Index, Cell->Data.Area); }
+				if (CompactnessWriter) { CompactnessWriter->SetValue(Index, Cell->Data.Compactness); }
+				if (NumNodesWriter) { NumNodesWriter->SetValue(Index, Cell->Nodes.Num()); }
 			}
-			if (CompactnessWriter)
+			else if (Index < MidpointBlockStart)
 			{
-				CompactnessWriter->SetValue(Index, Cell->Data.Compactness);
+				// ===== Corner ===== (a corner IS a cluster node : copy it, single source)
+				const int32 NodeIdx = CornerNodes[Index - CornerBlockStart];
+				WriteBlendedVertex(Index, Cluster->GetPos(NodeIdx), FVector::ZeroVector, MakeArrayView(&NodeIdx, 1), 1);
 			}
-			if (NumNodesWriter)
+			else
 			{
-				NumNodesWriter->SetValue(Index, Cell->Nodes.Num());
+				// ===== Shared-segment midpoint ===== (blend the two segment endpoints, equal weight)
+				const TPair<int32, int32>& Pair = MidpointNodePairs[Index - MidpointBlockStart];
+				const int32 SourceNodes[2] = {Pair.Key, Pair.Value};
+				WriteBlendedVertex(Index, (Cluster->GetPos(Pair.Key) + Cluster->GetPos(Pair.Value)) * 0.5, FVector::ZeroVector, MakeArrayView(SourceNodes, 2), 2);
 			}
 		}
 	}
 
 	void FProcessor::OnRangeProcessingComplete()
 	{
-		// Build edges from adjacency
 		TSet<uint64> UniqueEdges;
-		for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
+
+		// ---- Cell-to-cell connectivity ----
+		if (Settings->bSplitCellEdgesAtSharedMidpoint)
 		{
-			if (!Cell || Cell->FaceIndex < 0)
+			// Route each adjacency through its shared-segment midpoint vertex : centroid -> midpoint -> centroid
+			for (int32 Slot = 0; Slot < MidpointNodePairs.Num(); ++Slot)
 			{
-				continue;
+				const int32 MidOut = MidpointBlockStart + Slot;
+				const TPair<int32, int32>& Centroids = MidpointCentroids[Slot];
+				UniqueEdges.Add(PCGEx::H64U(Centroids.Key, MidOut));
+				UniqueEdges.Add(PCGEx::H64U(MidOut, Centroids.Value));
 			}
-
-			const int32* PointAPtr = FaceIndexToOutputIndex.Find(Cell->FaceIndex);
-			if (!PointAPtr)
+		}
+		else
+		{
+			// Direct centroid-to-centroid adjacency
+			for (const TSharedPtr<PCGExClusters::FCell>& Cell : ValidCells)
 			{
-				continue;
-			}
-			const int32 PointA = *PointAPtr;
-
-			if (const TSet<int32>* Adjacent = CellAdjacencyMap.Find(Cell->FaceIndex))
-			{
-				for (int32 AdjFace : *Adjacent)
+				if (!Cell || Cell->FaceIndex < 0)
 				{
-					const int32* PointBPtr = FaceIndexToOutputIndex.Find(AdjFace);
-					if (!PointBPtr)
+					continue;
+				}
+
+				const int32* PointAPtr = FaceIndexToOutputIndex.Find(Cell->FaceIndex);
+				if (!PointAPtr)
+				{
+					continue;
+				}
+				const int32 PointA = *PointAPtr;
+
+				if (const TSet<int32>* Adjacent = CellAdjacencyMap.Find(Cell->FaceIndex))
+				{
+					for (int32 AdjFace : *Adjacent)
+					{
+						const int32* PointBPtr = FaceIndexToOutputIndex.Find(AdjFace);
+						if (!PointBPtr)
+						{
+							continue;
+						}
+						// Use H64U to ensure unique edges (A,B) == (B,A)
+						UniqueEdges.Add(PCGEx::H64U(PointA, *PointBPtr));
+					}
+				}
+			}
+		}
+
+		// ---- Corner spokes ----
+		if (Settings->SpokeMode != EPCGExCellSpokeMode::None)
+		{
+			// In All mode (or when the spread toggle is on) every cell touching an activated corner spokes to it.
+			// In a single-spoke mode without spread, each cell connects only to its own elected corner.
+			const bool bSpread = Settings->SpokeMode == EPCGExCellSpokeMode::AllCorners || Settings->bConnectSharedSelectedCorners;
+
+			if (bSpread)
+			{
+				for (int32 Slot = 0; Slot < CornerNodes.Num(); ++Slot)
+				{
+					const int32 CornerOut = CornerBlockStart + Slot;
+					if (const TArray<int32>* Cells = CornerNodeToCells.Find(CornerNodes[Slot]))
+					{
+						for (const int32 CellIdx : *Cells)
+						{
+							UniqueEdges.Add(PCGEx::H64U(CellIdx, CornerOut));
+						}
+					}
+				}
+			}
+			else
+			{
+				for (int32 CellIdx = 0; CellIdx < NumCells; ++CellIdx)
+				{
+					const int32 NodeIdx = CellPickedCornerNode[CellIdx];
+					if (NodeIdx == INDEX_NONE)
 					{
 						continue;
 					}
-					const int32 PointB = *PointBPtr;
-
-					// Use H64U to ensure unique edges (A,B) == (B,A)
-					uint64 Hash = PCGEx::H64U(PointA, PointB);
-					UniqueEdges.Add(Hash);
+					if (const int32* SlotPtr = CornerNodeToSlot.Find(NodeIdx))
+					{
+						UniqueEdges.Add(PCGEx::H64U(CellIdx, CornerBlockStart + *SlotPtr));
+					}
 				}
 			}
 		}
@@ -325,6 +563,11 @@ namespace PCGExBuildCellDiagram
 		// Set up edge output
 		GraphBuilder->EdgesIO = Context->MainEdges;
 		GraphBuilder->NodePointsTransforms = CentroidFacade->GetOut()->GetConstTransformValueRange();
+
+		if (Settings->bWriteEdgeType)
+		{
+			SetupEdgeTypeTagging();
+		}
 
 		// Compile graph
 		GraphBuilder->CompileAsync(TaskManager, true, nullptr);
