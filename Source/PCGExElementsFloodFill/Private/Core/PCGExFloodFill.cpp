@@ -68,43 +68,85 @@ namespace PCGExFloodFill
 			return;
 		}
 
-		// Gather all neighbors, add to candidates for the first time only
 		const PCGExClusters::FNode& FromNode = *From.Node;
-		FVector FromPosition = Cluster->GetPos(FromNode);
+		const FVector FromPosition = Cluster->GetPos(FromNode);
 
-		for (const PCGExGraphs::FLink& Lk : FromNode.Links)
+		// Builds a scored candidate for a neighbor, without claiming (marking visited) it.
+		const auto MakeCandidate = [&](PCGExClusters::FNode* OtherNode, const PCGExGraphs::FLink& Lk) -> FCandidate
 		{
-			PCGExClusters::FNode* OtherNode = Cluster->GetNode(Lk);
-			const int32 OtherIndex = OtherNode->Index;
-
-			// Fast array lookup instead of TSet hash lookup
-			if (Visited[OtherIndex])
-			{
-				continue;
-			}
-			Visited[OtherIndex] = true;
-
-			FVector OtherPosition = Cluster->GetPos(OtherNode);
-			double Dist = FVector::Dist(FromPosition, OtherPosition);
+			const FVector OtherPosition = Cluster->GetPos(OtherNode);
+			const double Dist = FVector::Dist(FromPosition, OtherPosition);
 
 			FCandidate Candidate = FCandidate{};
 			Candidate.CaptureIndex = From.CaptureIndex;
-
 			Candidate.Link = PCGExGraphs::FLink(FromNode.Index, Lk.Edge);
 			Candidate.Node = OtherNode;
-
 			Candidate.Depth = From.Depth + 1;
 			Candidate.Distance = Dist;
 			Candidate.PathDistance = From.PathDistance + Dist;
 
 			// Scoring via fill controls (use 'Heuristics Score' fill control for heuristics-based scoring)
 			FillControlsHandler->ScoreCandidate(this, From, Candidate);
+			return Candidate;
+		};
 
+		// Fan-out budget for this parent. MAX_int32 (the default when no Vtx+Reroute control is
+		// active) means "unlimited" -- the claim-up-front path. bHasProbeFanout gates the handler call.
+		const int32 FanoutLimit = FillControlsHandler->bHasProbeFanout ? FillControlsHandler->GetProbeFanoutLimit(this, From) : MAX_int32;
+
+		if (FanoutLimit == MAX_int32)
+		{
+			// Unlimited: claim every first-seen neighbor up front (rejected ones stay visited -- legacy behavior).
+			for (const PCGExGraphs::FLink& Lk : FromNode.Links)
+			{
+				PCGExClusters::FNode* OtherNode = Cluster->GetNode(Lk);
+				const int32 OtherIndex = OtherNode->Index;
+
+				// Fast array lookup instead of TSet hash lookup
+				if (Visited[OtherIndex])
+				{
+					continue;
+				}
+				Visited[OtherIndex] = true;
+
+				FCandidate Candidate = MakeCandidate(OtherNode, Lk);
+				if (FillControlsHandler->IsValidCandidate(this, From, Candidate))
+				{
+					// O(log n) heap insertion instead of O(1) array add + O(n log n) sort later
+					Candidates.HeapPush(Candidate, HeapComparator);
+				}
+			}
+			return;
+		}
+
+		// Fan-out-limited (Vtx+Reroute): score all valid unvisited neighbors, claim only the best
+		// 'FanoutLimit' by heap priority. Unclaimed ones stay unvisited for other nodes to adopt.
+		TArray<FCandidate, TInlineAllocator<8>> Pending;
+		for (const PCGExGraphs::FLink& Lk : FromNode.Links)
+		{
+			PCGExClusters::FNode* OtherNode = Cluster->GetNode(Lk);
+			if (Visited[OtherNode->Index])
+			{
+				continue;
+			}
+
+			FCandidate Candidate = MakeCandidate(OtherNode, Lk);
 			if (FillControlsHandler->IsValidCandidate(this, From, Candidate))
 			{
-				// O(log n) heap insertion instead of O(1) array add + O(n log n) sort later
-				Candidates.HeapPush(Candidate, HeapComparator);
+				Pending.Add(Candidate);
 			}
+		}
+
+		if (Pending.Num() > FanoutLimit)
+		{
+			Pending.Sort(HeapComparator);
+			Pending.SetNum(FanoutLimit, EAllowShrinking::No);
+		}
+
+		for (const FCandidate& Candidate : Pending)
+		{
+			Visited[Candidate.Node->Index] = true;
+			Candidates.HeapPush(Candidate, HeapComparator);
 		}
 	}
 
@@ -227,8 +269,19 @@ namespace PCGExFloodFill
 				{
 					SubOpsCapture.Add(Op);
 				}
+				if (Op->WantsCaptureNotify())
+				{
+					SubOpsCaptureNotify.Add(Op);
+				}
+				if (Op->LimitsProbeFanout())
+				{
+					SubOpsProbeFanout.Add(Op);
+				}
 			}
 		}
+
+		bHasCaptureNotify = !SubOpsCaptureNotify.IsEmpty();
+		bHasProbeFanout = !SubOpsProbeFanout.IsEmpty();
 
 		return true;
 	}
@@ -292,6 +345,17 @@ namespace PCGExFloodFill
 		{
 			return false;
 		}
+
+		// Capture committed: notify opt-in controls so they can track per-capture state
+		// (e.g. branch child counts). Runs on this diffusion's thread; one capturer per node.
+		if (bHasCaptureNotify)
+		{
+			for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsCaptureNotify)
+			{
+				Op->OnCaptured(Diffusion, Candidate);
+			}
+		}
+
 		return true;
 	}
 
@@ -317,6 +381,16 @@ namespace PCGExFloodFill
 			}
 		}
 		return true;
+	}
+
+	int32 FFillControlsHandler::GetProbeFanoutLimit(const FDiffusion* Diffusion, const FCandidate& From)
+	{
+		int32 Limit = MAX_int32;
+		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsProbeFanout)
+		{
+			Limit = FMath::Min(Limit, Op->GetProbeFanoutLimit(Diffusion, From));
+		}
+		return Limit;
 	}
 
 #pragma region FDiffusionPathWriter
