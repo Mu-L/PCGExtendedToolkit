@@ -16,6 +16,7 @@
 
 class UPCGData;
 class UPCGExPickerFactoryData;
+class UPCGExPropertySchemaAsset;
 
 UENUM()
 enum class EPCGExAttributeToTagsAction : uint8
@@ -102,6 +103,10 @@ public:
 	/** A list of selectors separated by a comma, for easy overrides. Will be appended to the existing array.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FString CommaSeparatedAttributeSelectors;
+
+	/** Schema assets whose property names are appended to the selectors above. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	TArray<TObjectPtr<UPCGExPropertySchemaAsset>> IncludedSchemas;
 
 	/** Suppress warning when source has more collections than target. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors")
