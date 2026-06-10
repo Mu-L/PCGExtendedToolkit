@@ -90,7 +90,7 @@ struct FPCGExTimeFilterConfig
 	bool bIgnoreSelf = true;
 
 	/** Data matching settings. When enabled, only paths whose data matches the input being tested will be considered. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExFilterMatchingDetails DataMatching;
 };
 

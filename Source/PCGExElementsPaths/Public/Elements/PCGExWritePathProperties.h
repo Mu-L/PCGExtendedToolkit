@@ -383,6 +383,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable, EditCondition="bTagOddInclusionDepth"))
 	FString OddInclusionDepthTag = TEXT("OddDepth");
 
+	/** . */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_NotOverridable, InlineEditConditionToggle))
+	bool bTagPairing = false;
+
+	/** Pairs each outer path with the holes directly inside it: an outer (even inclusion depth) and the holes it immediately encloses share a unique integer id -- the outer's collection index -- written as a "Prefix:Id" value tag. Nested odd/even stacks (outer/hole/outer/hole) split into separate groups. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging", meta=(PCG_Overridable, EditCondition="bTagPairing"))
+	FString PairingTag = TEXT("PairingTag");
+
 	/** If enabled, will output data to additional pins. Note that all outputs are added to the default Path pin; extra pins contain a filtered list of the same data. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
 	bool bUseInclusionPins = false;

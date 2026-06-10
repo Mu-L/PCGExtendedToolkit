@@ -82,16 +82,20 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExGraphBuilderDetails GraphBuilderDetails;
 
-	/** How to emit additional edges connecting each cell centroid to its corner vertices. Corners are shared between adjacent cells. */
+	/** Extract a topological "cell skeleton": a cell with exactly two neighbors drops its centroid and bridges its two shared-side midpoints with a single edge, while one-neighbor (leaf) and three-or-more-neighbor (junction) cells keep their centroid. Forces shared-midpoint routing internally and re-scopes Spoke Mode to leaf cells' unshared corners. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable))
+	bool bExtractSkeleton = false;
+
+	/** How to emit additional edges connecting each cell centroid to its corner vertices. Corners are shared between adjacent cells. When Extract Skeleton is on, this is re-scoped to leaf (single-neighbor) cells and their unshared corners only: None = no spokes, All Corners = every unshared corner, Longest/Shortest = the single farthest/nearest unshared corner. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable))
 	EPCGExCellSpokeMode SpokeMode = EPCGExCellSpokeMode::None;
 
 	/** In a single-spoke mode, also connect every other cell that shares an elected corner to that corner (in addition to its own spoke), turning the corner into a shared hub. A cell may then emit multiple spokes. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable, EditCondition = "SpokeMode == EPCGExCellSpokeMode::LongestSpoke || SpokeMode == EPCGExCellSpokeMode::ShortestSpoke", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable, EditCondition = "(SpokeMode == EPCGExCellSpokeMode::LongestSpoke || SpokeMode == EPCGExCellSpokeMode::ShortestSpoke) && !bExtractSkeleton", EditConditionHides))
 	bool bConnectSharedSelectedCorners = false;
 
-	/** Replace each centroid-to-centroid adjacency edge with two edges routed through a new vertex at the midpoint of the shared cell segment (centroid -> midpoint -> centroid). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable))
+	/** Replace each centroid-to-centroid adjacency edge with two edges routed through a new vertex at the midpoint of the shared cell segment (centroid -> midpoint -> centroid). Forced on internally when Extract Skeleton is enabled. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable, EditCondition = "!bExtractSkeleton", EditConditionHides))
 	bool bSplitCellEdgesAtSharedMidpoint = false;
 
 	/** Write cell area to centroid points */
@@ -126,7 +130,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, EditCondition="bWriteVtxType"))
 	FName VtxTypeAttributeName = FName("VtxType");
 
-	/** Write a per-edge type tag : 0 = cell adjacency, 1 = split-half (centroid<->midpoint), 2 = corner spoke. */
+	/** Write a per-edge type tag : 0 = cell adjacency, 1 = split-half (centroid<->midpoint), 2 = corner spoke, 3 = skeleton bridge (midpoint<->midpoint). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteEdgeType = false;
 
@@ -206,8 +210,17 @@ namespace PCGExBuildCellDiagram
 		TArray<TPair<int32, int32>> MidpointNodePairs; // midpoint slot -> (origin node, target node) of shared segment
 		TArray<TPair<int32, int32>> MidpointCentroids; // midpoint slot -> (centroid A, centroid B) output indices
 
+		// Skeleton mode (bExtractSkeleton), centroid-indexed. NeighborCount = number of incident shared-side
+		// midpoints : 2 -> collapse (drop centroid, bridge the two midpoints), 1 -> leaf, 3+ -> junction, 0 -> island.
+		TArray<int32> CellNeighborCount;   // centroid index -> incident midpoint count
+		TArray<int32> CellMidSlot0;        // centroid index -> first incident midpoint slot (INDEX_NONE if none)
+		TArray<int32> CellMidSlot1;        // centroid index -> second incident midpoint slot (INDEX_NONE if < 2)
+		TArray<int32> CornerSlotOwnerCell; // corner slot -> owning leaf centroid index (skeleton leaf-tip spokes)
+
 		void SetupCornerBlock();
+		void SetupSkeletonCornerBlock();
 		void SetupMidpointBlock();
+		void ClassifySkeletonCells();
 		void SetupEdgeTypeTagging();
 
 	public:

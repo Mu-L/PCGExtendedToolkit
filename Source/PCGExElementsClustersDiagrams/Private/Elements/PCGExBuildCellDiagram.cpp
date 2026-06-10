@@ -172,14 +172,28 @@ namespace PCGExBuildCellDiagram
 			}
 		}
 
-		// Resolve the additional vertex blocks (corners, then midpoints) appended after the centroids.
-		if (Settings->SpokeMode != EPCGExCellSpokeMode::None)
-		{
-			SetupCornerBlock();
-		}
-		if (Settings->bSplitCellEdgesAtSharedMidpoint)
+		// Resolve the additional vertex blocks appended after the centroids. Skeleton mode forces shared-midpoint
+		// routing and re-scopes spokes to leaf cells' unshared corners, so it needs the midpoint block built and
+		// the cells classified before the corner block is resolved.
+		const bool bSkeleton = Settings->bExtractSkeleton;
+		const bool bUseMidpoints = bSkeleton || Settings->bSplitCellEdgesAtSharedMidpoint;
+
+		if (bUseMidpoints)
 		{
 			SetupMidpointBlock();
+		}
+
+		if (bSkeleton)
+		{
+			ClassifySkeletonCells();
+			if (Settings->SpokeMode != EPCGExCellSpokeMode::None)
+			{
+				SetupSkeletonCornerBlock();
+			}
+		}
+		else if (Settings->SpokeMode != EPCGExCellSpokeMode::None)
+		{
+			SetupCornerBlock();
 		}
 
 		CornerBlockStart = NumCells;
@@ -337,6 +351,114 @@ namespace PCGExBuildCellDiagram
 		}
 	}
 
+	void FProcessor::ClassifySkeletonCells()
+	{
+		// Count incident shared-side midpoints per centroid and remember up to the first two slots. A centroid
+		// with exactly two incident midpoints collapses (its two side-midpoints are bridged directly and the
+		// centroid is dropped); one-neighbor (leaf) and 3+-neighbor (junction) centroids are kept. Centroids
+		// with no incident midpoint contribute nothing and are pruned as isolated points at compile time.
+		CellNeighborCount.Init(0, NumCells);
+		CellMidSlot0.Init(INDEX_NONE, NumCells);
+		CellMidSlot1.Init(INDEX_NONE, NumCells);
+
+		const int32 NumMidpoints = MidpointCentroids.Num();
+		for (int32 Slot = 0; Slot < NumMidpoints; ++Slot)
+		{
+			const TPair<int32, int32>& Centroids = MidpointCentroids[Slot];
+			const int32 Cells[2] = {Centroids.Key, Centroids.Value};
+			for (const int32 CellIdx : Cells)
+			{
+				const int32 Count = CellNeighborCount[CellIdx]++;
+				if (Count == 0) { CellMidSlot0[CellIdx] = Slot; }
+				else if (Count == 1) { CellMidSlot1[CellIdx] = Slot; }
+			}
+		}
+	}
+
+	void FProcessor::SetupSkeletonCornerBlock()
+	{
+		// Leaf-tip spokes : only leaf cells (exactly one neighbor, which keep their centroid) spoke out, and only
+		// to their unshared corners -- cluster nodes that belong to no other valid cell. Spoke Mode selects how
+		// many : All Corners -> every unshared corner, Longest/Shortest -> the single farthest/nearest one.
+		const EPCGExCellSpokeMode Mode = Settings->SpokeMode;
+		const bool bAll = Mode == EPCGExCellSpokeMode::AllCorners;
+		const bool bLongest = Mode == EPCGExCellSpokeMode::LongestSpoke;
+
+		// Count how many valid cells each cluster node belongs to; a node used by exactly one cell is "unshared".
+		TMap<int32, int32> NodeCellCount;
+		for (int32 CellIdx = 0; CellIdx < NumCells; ++CellIdx)
+		{
+			const TSharedPtr<PCGExClusters::FCell>& Cell = ValidCells[CellIdx];
+			if (!Cell || Cell->Nodes.IsEmpty() || Cell->FaceIndex < 0)
+			{
+				continue;
+			}
+			for (const int32 NodeIdx : Cell->Nodes)
+			{
+				NodeCellCount.FindOrAdd(NodeIdx)++;
+			}
+		}
+
+		// One corner slot per activated unshared corner. Each unshared corner belongs to exactly one cell, so
+		// there is no sharing : record its single owning leaf centroid alongside the slot for edge emission.
+		auto AddSpokeCorner = [&](const int32 CellIdx, const int32 NodeIdx)
+		{
+			CornerNodeToSlot.Add(NodeIdx, CornerNodes.Num());
+			CornerNodes.Add(NodeIdx);
+			CornerSlotOwnerCell.Add(CellIdx);
+		};
+
+		for (int32 CellIdx = 0; CellIdx < NumCells; ++CellIdx)
+		{
+			if (CellNeighborCount[CellIdx] != 1) // leaf cells only
+			{
+				continue;
+			}
+
+			const TSharedPtr<PCGExClusters::FCell>& Cell = ValidCells[CellIdx];
+			if (!Cell || Cell->Nodes.IsEmpty() || Cell->FaceIndex < 0)
+			{
+				continue;
+			}
+
+			if (bAll)
+			{
+				for (const int32 NodeIdx : Cell->Nodes)
+				{
+					const int32* CountPtr = NodeCellCount.Find(NodeIdx);
+					if (CountPtr && *CountPtr == 1)
+					{
+						AddSpokeCorner(CellIdx, NodeIdx);
+					}
+				}
+			}
+			else // single longest/shortest among the unshared corners
+			{
+				const FVector Centroid = Cell->Data.Centroid;
+				int32 BestNode = INDEX_NONE;
+				double BestDistSq = bLongest ? -1.0 : TNumericLimits<double>::Max();
+				for (const int32 NodeIdx : Cell->Nodes)
+				{
+					const int32* CountPtr = NodeCellCount.Find(NodeIdx);
+					if (!CountPtr || *CountPtr != 1)
+					{
+						continue;
+					}
+					const double DistSq = FVector::DistSquared(Centroid, Cluster->GetPos(NodeIdx));
+					if (bLongest ? DistSq > BestDistSq : DistSq < BestDistSq)
+					{
+						BestDistSq = DistSq;
+						BestNode = NodeIdx;
+					}
+				}
+				if (BestNode != INDEX_NONE)
+				{
+					AddSpokeCorner(CellIdx, BestNode);
+				}
+			}
+		}
+	}
+
 	void FProcessor::SetupEdgeTypeTagging()
 	{
 		// Classify each edge by the vertex blocks of its endpoints. This runs on the graph's edges -- whose
@@ -354,9 +476,12 @@ namespace PCGExBuildCellDiagram
 		{
 			const int32 A = static_cast<int32>(E.Start);
 			const int32 B = static_cast<int32>(E.End);
+			const bool bAMid = A >= MidStart;
+			const bool bBMid = B >= MidStart;
 
 			int8 Type = 0;                                               // cell adjacency (centroid <-> centroid)
-			if (A >= MidStart || B >= MidStart) { Type = 1; }            // split-half (touches a midpoint)
+			if (bAMid && bBMid) { Type = 3; }                            // skeleton bridge (midpoint <-> midpoint)
+			else if (bAMid || bBMid) { Type = 1; }                       // split-half (centroid <-> midpoint)
 			else if (A >= CornerStart || B >= CornerStart) { Type = 2; } // corner spoke (touches a corner)
 			(*EdgeTypeByIndex)[E.Index] = Type;
 		}
@@ -465,15 +590,42 @@ namespace PCGExBuildCellDiagram
 		TSet<uint64> UniqueEdges;
 
 		// ---- Cell-to-cell connectivity ----
-		if (Settings->bSplitCellEdgesAtSharedMidpoint)
+		const bool bSkeleton = Settings->bExtractSkeleton;
+		const bool bUseMidpoints = bSkeleton || Settings->bSplitCellEdgesAtSharedMidpoint;
+
+		if (bUseMidpoints)
 		{
-			// Route each adjacency through its shared-segment midpoint vertex : centroid -> midpoint -> centroid
-			for (int32 Slot = 0; Slot < MidpointNodePairs.Num(); ++Slot)
+			if (bSkeleton)
 			{
-				const int32 MidOut = MidpointBlockStart + Slot;
-				const TPair<int32, int32>& Centroids = MidpointCentroids[Slot];
-				UniqueEdges.Add(PCGEx::H64U(Centroids.Key, MidOut));
-				UniqueEdges.Add(PCGEx::H64U(MidOut, Centroids.Value));
+				// Skeleton routing : a centroid with exactly two incident midpoints is collapsed -- its two
+				// side-midpoints are bridged directly and the centroid is dropped (left edgeless, so it gets
+				// pruned as an isolated point at compile time). Leaf (one) and junction (3+) centroids keep
+				// their centroid <-> midpoint edges.
+				for (int32 Slot = 0; Slot < MidpointNodePairs.Num(); ++Slot)
+				{
+					const int32 MidOut = MidpointBlockStart + Slot;
+					const TPair<int32, int32>& Centroids = MidpointCentroids[Slot];
+					if (CellNeighborCount[Centroids.Key] != 2) { UniqueEdges.Add(PCGEx::H64U(Centroids.Key, MidOut)); }
+					if (CellNeighborCount[Centroids.Value] != 2) { UniqueEdges.Add(PCGEx::H64U(MidOut, Centroids.Value)); }
+				}
+
+				// Bridge the two side-midpoints of each collapsed (two-neighbor) cell.
+				for (int32 CellIdx = 0; CellIdx < NumCells; ++CellIdx)
+				{
+					if (CellNeighborCount[CellIdx] != 2) { continue; }
+					UniqueEdges.Add(PCGEx::H64U(MidpointBlockStart + CellMidSlot0[CellIdx], MidpointBlockStart + CellMidSlot1[CellIdx]));
+				}
+			}
+			else
+			{
+				// Route each adjacency through its shared-segment midpoint vertex : centroid -> midpoint -> centroid
+				for (int32 Slot = 0; Slot < MidpointNodePairs.Num(); ++Slot)
+				{
+					const int32 MidOut = MidpointBlockStart + Slot;
+					const TPair<int32, int32>& Centroids = MidpointCentroids[Slot];
+					UniqueEdges.Add(PCGEx::H64U(Centroids.Key, MidOut));
+					UniqueEdges.Add(PCGEx::H64U(MidOut, Centroids.Value));
+				}
 			}
 		}
 		else
@@ -510,7 +662,15 @@ namespace PCGExBuildCellDiagram
 		}
 
 		// ---- Corner spokes ----
-		if (Settings->SpokeMode != EPCGExCellSpokeMode::None)
+		if (bSkeleton)
+		{
+			// Leaf-tip spokes : each activated unshared corner connects to its single owning leaf centroid.
+			for (int32 Slot = 0; Slot < CornerNodes.Num(); ++Slot)
+			{
+				UniqueEdges.Add(PCGEx::H64U(CornerSlotOwnerCell[Slot], CornerBlockStart + Slot));
+			}
+		}
+		else if (Settings->SpokeMode != EPCGExCellSpokeMode::None)
 		{
 			// In All mode (or when the spread toggle is on) every cell touching an activated corner spokes to it.
 			// In a single-spoke mode without spread, each cell connects only to its own elected corner.

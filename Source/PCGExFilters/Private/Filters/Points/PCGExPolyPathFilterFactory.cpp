@@ -20,15 +20,11 @@
 
 bool UPCGExPolyPathFilterFactory::Init(FPCGExContext* InContext)
 {
-	if (!Super::Init(InContext))
-	{
-		return false;
-	}
-	if (DataMatching.IsEnabled())
-	{
-		PCGExFactories::GetInputFactories(InContext, PCGExMatching::Labels::SourceMatchRulesLabel, MatchRuleFactories, {PCGExFactories::EType::MatchRule});
-	}
-	return true;
+	// Match-rule factories are loaded in Prepare(), not here. At Init() time the DataMatching member
+	// is still default-constructed (Mode=Disabled) because it is only populated from the derived Config
+	// by InitConfig_Internal(), which runs inside Prepare(). Gating the load on DataMatching here would
+	// therefore always skip it and silently disable data-matching.
+	return Super::Init(InContext);
 }
 
 bool UPCGExPolyPathFilterFactory::WantsPreparation(FPCGExContext* InContext)
@@ -57,14 +53,23 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 
 	TempTaggedData.Init(FPCGExTaggedData(), TempTargets.Num());
 	TempPolyPaths.Init(nullptr, TempTargets.Num());
+	TempTags.Init(nullptr, TempTargets.Num());
 	PolyPaths.Reserve(TempTargets.Num());
 
 	Datas = MakeShared<TArray<FPCGExTaggedData>>();
 	Datas->Reserve(TempTargets.Num());
+	OwnedTags.Reserve(TempTargets.Num());
 
 	TWeakPtr<FPCGContextHandle> CtxHandle = InContext->GetWeakSelfHandle();
 
 	InitConfig_Internal();
+
+	// DataMatching is now populated from the derived Config, so the match-rule factories can be loaded.
+	// They are consumed later (when filter instances are created), which always happens after Prepare().
+	if (DataMatching.IsEnabled())
+	{
+		PCGExFactories::GetInputFactories(InContext, PCGExMatching::Labels::SourceMatchRulesLabel, MatchRuleFactories, {PCGExFactories::EType::MatchRule});
+	}
 
 	PCGEX_ASYNC_GROUP_CHKD_RET(TaskManager, CreatePolyPaths, PCGExFactories::EPreparationResult::Fail)
 
@@ -109,6 +114,7 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 
 			PolyPaths.Add(Path);
 			Datas->Add(TempTaggedData[i]);
+			OwnedTags.Add(TempTags[i]); // strong owner -- keeps Datas[k].Tags (TWeakPtr) alive
 		}
 
 		if (PolyPaths.IsEmpty())
@@ -120,6 +126,7 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 
 		TempTaggedData.Empty();
 		TempPolyPaths.Empty();
+		TempTags.Empty();
 		TempTargets.Empty();
 
 		Octree = MakeShared<PCGExOctree::FItemOctree>(OctreeBounds.GetCenter(), OctreeBounds.GetExtent().Length());
@@ -201,6 +208,7 @@ PCGExFactories::EPreparationResult UPCGExPolyPathFilterFactory::Prepare(FPCGExCo
 			TempPolyPaths[Index] = Path;
 			TSharedPtr<PCGExData::FTags> Tags = MakeShared<PCGExData::FTags>(TempTargets[Index].Tags);
 			TempTaggedData[Index] = FPCGExTaggedData(Data, Index, Tags, nullptr);
+			TempTags[Index] = Tags; // retain a strong ref; FPCGExTaggedData only holds Tags weakly
 		}
 	};
 
@@ -247,6 +255,7 @@ bool UPCGExPolyPathFilterFactory::PopulateMatchIgnoreList(FPCGExContext* InConte
 void UPCGExPolyPathFilterFactory::BeginDestroy()
 {
 	PolyPaths.Reset();
+	OwnedTags.Reset();
 	Octree.Reset();
 	Super::BeginDestroy();
 }

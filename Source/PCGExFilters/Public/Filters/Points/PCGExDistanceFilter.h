@@ -61,7 +61,7 @@ struct FPCGExDistanceFilterConfig
 	bool bIgnoreSelf = false;
 
 	/** Data matching settings. When enabled, only targets whose data matches the input being tested will be considered. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExFilterMatchingDetails DataMatching;
 
 	PCGEX_SETTING_VALUE_DECL(DistanceThreshold, double)

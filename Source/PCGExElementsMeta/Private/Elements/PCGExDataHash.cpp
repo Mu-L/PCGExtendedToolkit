@@ -23,18 +23,30 @@ namespace PCGExDataHash
 	{
 		switch (InType)
 		{
-		case EPCGExDataHashType::Bool:       return EPCGMetadataTypes::Boolean;
-		case EPCGExDataHashType::Int32:      return EPCGMetadataTypes::Integer32;
-		case EPCGExDataHashType::Int64:      return EPCGMetadataTypes::Integer64;
-		case EPCGExDataHashType::Float:      return EPCGMetadataTypes::Float;
-		case EPCGExDataHashType::Double:     return EPCGMetadataTypes::Double;
-		case EPCGExDataHashType::Vector2:    return EPCGMetadataTypes::Vector2;
-		case EPCGExDataHashType::Vector:     return EPCGMetadataTypes::Vector;
-		case EPCGExDataHashType::Vector4:    return EPCGMetadataTypes::Vector4;
-		case EPCGExDataHashType::Quaternion: return EPCGMetadataTypes::Quaternion;
-		case EPCGExDataHashType::Rotator:    return EPCGMetadataTypes::Rotator;
-		case EPCGExDataHashType::Transform:  return EPCGMetadataTypes::Transform;
-		default:                             return EPCGMetadataTypes::Unknown;
+		case EPCGExDataHashType::Bool:
+			return EPCGMetadataTypes::Boolean;
+		case EPCGExDataHashType::Int32:
+			return EPCGMetadataTypes::Integer32;
+		case EPCGExDataHashType::Int64:
+			return EPCGMetadataTypes::Integer64;
+		case EPCGExDataHashType::Float:
+			return EPCGMetadataTypes::Float;
+		case EPCGExDataHashType::Double:
+			return EPCGMetadataTypes::Double;
+		case EPCGExDataHashType::Vector2:
+			return EPCGMetadataTypes::Vector2;
+		case EPCGExDataHashType::Vector:
+			return EPCGMetadataTypes::Vector;
+		case EPCGExDataHashType::Vector4:
+			return EPCGMetadataTypes::Vector4;
+		case EPCGExDataHashType::Quaternion:
+			return EPCGMetadataTypes::Quaternion;
+		case EPCGExDataHashType::Rotator:
+			return EPCGMetadataTypes::Rotator;
+		case EPCGExDataHashType::Transform:
+			return EPCGMetadataTypes::Transform;
+		default:
+			return EPCGMetadataTypes::Unknown;
 		}
 	}
 
@@ -53,7 +65,10 @@ namespace PCGExDataHash
 	// We use it instead of GetTypeHash(FName) which depends on FName pool insertion order.
 	uint32 StableClassHash(const UPCGData* Data)
 	{
-		if (!Data) { return 0u; }
+		if (!Data)
+		{
+			return 0u;
+		}
 		// GetClass()->GetName() returns the class's short name (e.g. "PCGBasePointData"),
 		// stable as long as the class isn't renamed at the C++ level.
 		return FCrc::StrCrc32(*Data->GetClass()->GetName());
@@ -61,7 +76,10 @@ namespace PCGExDataHash
 
 	uint32 HashInput(const UPCGData* Data)
 	{
-		if (!Data) { return 0u; }
+		if (!Data)
+		{
+			return 0u;
+		}
 
 		uint32 H = StableClassHash(Data);
 
@@ -162,7 +180,10 @@ namespace PCGExDataHash
 		{
 			return static_cast<int32>(Stream.GetUnsignedInt());
 		}
-		if (Max <= Min) { return Min; }
+		if (Max <= Min)
+		{
+			return Min;
+		}
 		return Stream.RandRange(Min, Max);
 	}
 
@@ -177,7 +198,10 @@ namespace PCGExDataHash
 			return static_cast<int64>(Raw);
 		}
 
-		if (Max <= Min) { return Min; }
+		if (Max <= Min)
+		{
+			return Min;
+		}
 
 		const uint64 Span = static_cast<uint64>(Max - Min) + 1ULL;
 		return Min + static_cast<int64>(Raw % Span);
@@ -188,7 +212,10 @@ namespace PCGExDataHash
 FString UPCGExDataHashSettings::GetEnumDisplayName() const
 {
 	const UEnum* EnumPtr = StaticEnum<EPCGExDataHashType>();
-	if (!EnumPtr) { return FString(); }
+	if (!EnumPtr)
+	{
+		return FString();
+	}
 	return EnumPtr->GetDisplayNameTextByValue(static_cast<int64>(OutputType)).ToString();
 }
 #endif
@@ -327,8 +354,8 @@ bool FPCGExDataHashElement::ExecuteInternal(FPCGContext* Context) const
 	case EPCGExDataHashType::Quaternion:
 	{
 		const FQuat Value = Settings->bUseRange
-			                    ? PCGExDataHash::RandomEulerQuat(Stream, RMin, RMax)
-			                    : PCGExDataHash::RandomUnitQuat(Stream);
+			? PCGExDataHash::RandomEulerQuat(Stream, RMin, RMax)
+			: PCGExDataHash::RandomUnitQuat(Stream);
 		FPCGMetadataAttribute<FQuat>* Attr = OutputData->Metadata->CreateAttribute<FQuat>(AttrName, Value, true, true);
 		Attr->SetValue(Entry, Value);
 		break;
@@ -344,8 +371,8 @@ bool FPCGExDataHashElement::ExecuteInternal(FPCGContext* Context) const
 	{
 		const FVector Location(Stream.FRandRange(RMin, RMax), Stream.FRandRange(RMin, RMax), Stream.FRandRange(RMin, RMax));
 		const FQuat Rotation = Settings->bUseRange
-			                       ? PCGExDataHash::RandomEulerQuat(Stream, RMin, RMax)
-			                       : PCGExDataHash::RandomUnitQuat(Stream);
+			? PCGExDataHash::RandomEulerQuat(Stream, RMin, RMax)
+			: PCGExDataHash::RandomUnitQuat(Stream);
 		// Scale: special case [0,1] when range is off, otherwise share the user's range.
 		const double ScaleMin = Settings->bUseRange ? RMin : 0.0;
 		const double ScaleMax = Settings->bUseRange ? RMax : 1.0;

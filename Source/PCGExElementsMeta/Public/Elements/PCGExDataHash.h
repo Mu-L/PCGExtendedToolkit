@@ -55,7 +55,7 @@ public:
 	{
 		return PCGEX_NODE_COLOR_NAME(Constant);
 	}
-	
+
 	virtual bool ShouldDrawNodeCompact() const override
 	{
 		return true;
@@ -69,7 +69,11 @@ public:
 #endif
 
 protected:
-	virtual bool HasDynamicPins() const override { return true; }
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
