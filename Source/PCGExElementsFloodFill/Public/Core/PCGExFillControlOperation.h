@@ -40,16 +40,11 @@ public:
 	virtual bool WantsCaptureNotify() const;
 	virtual void OnCaptured(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate);
 
-	// Probe fan-out limiting - opt in via LimitsProbeFanout() to cap how many children
-	// a node may spread to at probe time. A finite limit makes Probe claim-on-accept so
-	// unclaimed neighbors stay reachable by other nodes (coverage-preserving).
+	// Probe fan-out limiting - opt in via LimitsProbeFanout() to cap how many children a node
+	// may spread to at probe time. The probe claims only the best 'limit' valid neighbors and
+	// leaves the rest unvisited, so they stay reachable by other nodes (coverage-preserving).
 	virtual bool LimitsProbeFanout() const;
 	virtual int32 GetProbeFanoutLimit(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From);
-
-	// Called once after a fan-out-limited probe, with the number of children actually
-	// claimed. Lets a control reconcile a shared (per-diffusion) budget against what was
-	// spent. Only invoked on controls that limit probe fan-out.
-	virtual void OnProbeComplete(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, int32 NumClaimed);
 
 	int32 GetSettingsIndex(const PCGExFloodFill::FDiffusion* Diffusion) const;
 

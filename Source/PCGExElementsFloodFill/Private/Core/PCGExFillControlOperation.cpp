@@ -74,11 +74,6 @@ int32 FPCGExFillControlOperation::GetProbeFanoutLimit(const PCGExFloodFill::FDif
 	return MAX_int32;
 }
 
-void FPCGExFillControlOperation::OnProbeComplete(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, int32 NumClaimed)
-{
-	// Default implementation does nothing - override in probe-limiting controls with a shared budget
-}
-
 int32 FPCGExFillControlOperation::GetSettingsIndex(const PCGExFloodFill::FDiffusion* Diffusion) const
 {
 	return *(SettingsIndex->GetData() + Diffusion->Index);

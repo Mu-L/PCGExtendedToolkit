@@ -66,17 +66,17 @@ class FPCGExFillControlBranchLimit : public FPCGExFillControlOperation
 public:
 	virtual bool PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler) override;
 
-	// Prune mode: enforce the cap at capture time, tracking per-node child counts
-	// (plus a per-diffusion fork pool when Source = Seed).
+	// Capture-time enforcement (everything except Vtx + Reroute): Vtx tracks per-node child
+	// counts; Seed draws from one shared per-diffusion fork budget, spent best-first.
 	virtual bool ChecksCapture() const override;
 	virtual bool IsValidCapture(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate) override;
 	virtual bool WantsCaptureNotify() const override;
 	virtual void OnCaptured(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate) override;
 
-	// Reroute mode: enforce the cap at probe time (claim-on-accept).
+	// Probe-time enforcement (Vtx + Reroute only): cap a node's fan-out, keeping the best
+	// children by score and leaving the rest unvisited (adoptable by other nodes).
 	virtual bool LimitsProbeFanout() const override;
 	virtual int32 GetProbeFanoutLimit(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From) override;
-	virtual void OnProbeComplete(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, int32 NumClaimed) override;
 
 	virtual bool ChecksProbe() const override
 	{
@@ -89,12 +89,27 @@ public:
 	}
 
 protected:
-	TSharedPtr<PCGExDetails::TSettingValue<int32>> MaxBranchesValue;
+	// Vtx + Reroute is the only combination that limits fan-out at probe time; every other
+	// combination enforces its budget at capture time.
+	FORCEINLINE bool UsesProbeFanout() const { return Mode == EPCGExFloodFillBranchMode::Reroute && bSourceIsVtx; }
 
-	// Captured children per node index (Prune mode). A node is a parent in exactly
-	// one diffusion (single capturer), so a single shared array is safe: each element
-	// has exactly one writer, on that diffusion's own thread.
+	// Reads the per-parent branch budget for a settings index, clamped to a non-negative,
+	// overflow-safe range (so 1 + budget can neither overflow nor hit the MAX_int32 'unlimited'
+	// sentinel). Returns the cached value when the input is constant / data-domain.
+	int32 ReadBudget(int32 Index);
+
+	TSharedPtr<PCGExDetails::TSettingValue<int32>> MaxBranchesValue;
+	bool bConstantBudget = false;
+	int32 ConstantBudget = 0;
+
+	// Captured children per node index (Prune + Vtx source). A node is a parent in exactly
+	// one diffusion (single capturer), so a single shared array is safe: each element has
+	// exactly one writer, on that diffusion's own thread.
 	TArray<int32> ChildCounts;
+
+	// Whether a node already has a child (Prune + Seed source) -- only the 'has any child'
+	// bit is needed there; the global fork tally lives in DiffusionForks.
+	TBitArray<> ParentHasChild;
 
 	// Forks spent per diffusion (Seed source -- the global, shared budget). Indexed by
 	// diffusion index; each slot has a single writer (its diffusion's thread).
