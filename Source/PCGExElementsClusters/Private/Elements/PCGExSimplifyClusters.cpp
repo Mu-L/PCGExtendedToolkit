@@ -221,107 +221,160 @@ namespace PCGExSimplifyClusters
 			const double DotThreshold = PCGExMath::DegreesToDot(Settings->AngularThreshold);
 			const int32 IOIndex = EdgeDataFacade->Source->IOIndex;
 
-			PCGExGraphs::FEdge OutEdge = PCGExGraphs::FEdge{};
-
 			const TArray<PCGExGraphs::FLink>& Links = Chain->Links;
-
-			int32 LastIndex = Chain->Seed.Node;
-			int32 UnionCount = 0;
-
 			const int32 MaxIndex = Links.Num() - 1;
-			const int32 NumIterations = Links.Num();
 
-			TArray<int32> MergedEdges;
-			MergedEdges.Reserve(NumIterations);
+			TArray<int32> PendingEdges; // Original edges absorbed since the last kept node
+			PendingEdges.Reserve(Links.Num() + 1);
 
-			FVector LastPosition = Cluster->GetPos(LastIndex);
-
-			for (int i = 1; i < NumIterations; ++i)
+			// A node is collinear (mergeable) when the turn between its incoming and outgoing
+			// directions is within threshold -- a local property of the node's immediate chain
+			// neighbors, independent of which neighbors were previously kept. Coincident points
+			// produce a zero direction (GetSafeNormal) and are always mergeable, never spurious corners.
+			auto IsCollinear = [&](const int32 PrevNode, const int32 CurNode, const int32 NextNode) -> bool
 			{
-				UnionCount++;
+				const FVector A = Cluster->GetDir(PrevNode, CurNode);
+				const FVector B = Cluster->GetDir(CurNode, NextNode);
+				if (A.IsNearlyZero() || B.IsNearlyZero()) { return true; }
+				const double Dot = FVector::DotProduct(A, B);
+				return Settings->bInvertAngularThreshold ? (Dot < DotThreshold) : (Dot > DotThreshold);
+			};
 
-				const PCGExGraphs::FLink Lk = Links[i];
-				const FVector A = Cluster->GetDir(Links[i - 1].Node, Lk.Node);
-				const int32 IndexB = (i == MaxIndex && Chain->bIsClosedLoop) ? 0 : i + 1;
+			// Emits one simplified edge from FromNode to ToLink.Node, recording every original edge it
+			// absorbs (the accumulated PendingEdges plus ToLink.Edge). UnionSize is kept equal to that
+			// merged source-edge count. The graph holds no parallel edges, so if the pair already exists
+			// (InsertEdge returns false) the accounting is merged into the existing entry, never overwritten.
+			auto EmitEdge = [&](const int32 FromNode, const PCGExGraphs::FLink& ToLink)
+			{
+				PendingEdges.Add(ToLink.Edge);
 
-				if (!Links.IsValidIndex(IndexB))
+				PCGExGraphs::FEdge OutEdge = PCGExGraphs::FEdge{};
+				const bool bNewEdge = GraphBuilder->Graph->InsertEdge(Cluster->GetNodePointIndex(FromNode), Cluster->GetNodePointIndex(ToLink.Node), OutEdge, IOIndex);
+
+				PCGExGraphs::FGraphEdgeMetadata& EdgeMetadata = GraphBuilder->Graph->GetOrCreateEdgeMetadata(OutEdge.Index);
+
+				if (bNewEdge)
 				{
-					continue;
+					EdgeMetadata.UnionSize = PendingEdges.Num();
+					EdgesUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add_Unsafe(IOIndex, PendingEdges);
 				}
-
-
-				const FVector CurrentPosition = Cluster->GetPos(Lk);
-				const FVector B = Cluster->GetDir(Lk.Node, Links[IndexB].Node);
-				bool bSkip = false;
-
-				if (!Settings->bInvertAngularThreshold)
+				else if (const TSharedPtr<PCGExData::IUnionData> Existing = EdgesUnion->Get(OutEdge.Index))
 				{
-					if (FVector::DotProduct(A, B) > DotThreshold)
-					{
-						bSkip = true;
-					}
+					// Pair already exists (not expected for valid chains): merge so nothing is lost.
+					EdgeMetadata.UnionSize += PendingEdges.Num();
+					Existing->Add(IOIndex, PendingEdges);
 				}
 				else
 				{
-					if (FVector::DotProduct(A, B) < DotThreshold)
+					EdgeMetadata.UnionSize = PendingEdges.Num();
+					EdgesUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add(IOIndex, PendingEdges);
+				}
+
+				PendingEdges.Reset();
+			};
+
+			if (!Chain->bIsClosedLoop)
+			{
+				// Open chain: Seed and Links.Last() are fixed endpoints (junction/leaf) and are always
+				// kept. Every interior node Links[0..MaxIndex-1] is tested -- including Links[0], whose
+				// predecessor is the Seed (which lives outside the Links array).
+				int32 LastKeptNode = Chain->Seed.Node;
+				FVector LastKeptPos = Cluster->GetPos(LastKeptNode);
+
+				for (int32 i = 0; i < MaxIndex; ++i)
+				{
+					const PCGExGraphs::FLink Cur = Links[i];
+					const int32 PrevNode = (i == 0) ? Chain->Seed.Node : Links[i - 1].Node;
+					const FVector CurPos = Cluster->GetPos(Cur.Node);
+
+					bool bSkip = IsCollinear(PrevNode, Cur.Node, Links[i + 1].Node);
+					if (!bSkip && FuseDistance > 0)
 					{
-						bSkip = true;
+						bSkip = FVector::DistSquared(LastKeptPos, CurPos) <= FuseDistance;
+					}
+
+					if (bSkip)
+					{
+						PendingEdges.Add(Cur.Edge);
+						continue;
+					}
+
+					EmitEdge(LastKeptNode, Cur);
+					LastKeptNode = Cur.Node;
+					LastKeptPos = CurPos;
+				}
+
+				// Terminal endpoint is always kept.
+				EmitEdge(LastKeptNode, Links.Last());
+			}
+			else
+			{
+				// Closed loop: every node (including the Seed) is binary and eligible for collapse.
+				// Model the ring of Links.Num()+1 nodes; RingLinkAt(r).Edge is the edge arriving at
+				// node r from its ring predecessor (Seed.Edge is the closing edge).
+				const int32 RingSize = Links.Num() + 1;
+
+				auto RingNodeAt = [&](const int32 r) -> int32 { return r == 0 ? Chain->Seed.Node : Links[r - 1].Node; };
+				auto RingLinkAt = [&](const int32 r) -> PCGExGraphs::FLink { return r == 0 ? Chain->Seed : Links[r - 1]; };
+
+				// Flag every angular corner once (order-independent), reusing the verdict for both anchor
+				// selection and the walk; remember the first corner as a stable walk anchor.
+				TArray<bool> bCorner;
+				bCorner.SetNumUninitialized(RingSize);
+				int32 Anchor = 0;
+				bool bAnyCorner = false;
+				for (int32 r = 0; r < RingSize; ++r)
+				{
+					bCorner[r] = !IsCollinear(RingNodeAt((r - 1 + RingSize) % RingSize), RingNodeAt(r), RingNodeAt((r + 1) % RingSize));
+					if (bCorner[r] && !bAnyCorner) { Anchor = r; bAnyCorner = true; }
+				}
+
+				// Collect the kept ring indices: corners that survive the collocation (fuse) test,
+				// walking from the anchor so fuse measures from a stable starting point.
+				TArray<int32> Kept;
+				Kept.Reserve(RingSize);
+				if (bAnyCorner)
+				{
+					Kept.Add(Anchor);
+					FVector LastKeptPos = Cluster->GetPos(RingNodeAt(Anchor));
+					for (int32 k = 1; k < RingSize; ++k)
+					{
+						const int32 r = (Anchor + k) % RingSize;
+						if (!bCorner[r]) { continue; }
+						const FVector CurPos = Cluster->GetPos(RingNodeAt(r));
+						if (FuseDistance > 0 && FVector::DistSquared(LastKeptPos, CurPos) <= FuseDistance) { continue; }
+						Kept.Add(r);
+						LastKeptPos = CurPos;
+					}
+
+					// Apply fuse across the closing wrap too (the anchor was exempt above), but never below 3 nodes.
+					if (FuseDistance > 0 && Kept.Num() > 3 &&
+						FVector::DistSquared(Cluster->GetPos(RingNodeAt(Kept.Last())), Cluster->GetPos(RingNodeAt(Anchor))) <= FuseDistance)
+					{
+						Kept.Pop();
 					}
 				}
 
-				if (!bSkip && FuseDistance > 0)
+				// A simple graph cannot represent a cycle with fewer than 3 nodes; pad with spread-out
+				// ring nodes (RingSize >= 3 guarantees enough distinct nodes exist) so the loop stays valid.
+				if (Kept.Num() < 3)
 				{
-					bSkip = FVector::DistSquared(LastPosition, CurrentPosition) <= FuseDistance;
+					auto TryAdd = [&](const int32 r) { if (Kept.Num() < 3 && !Kept.Contains(r)) { Kept.Add(r); } };
+					TryAdd(0);
+					TryAdd(RingSize / 3);
+					TryAdd((2 * RingSize) / 3);
+					for (int32 r = 0; r < RingSize && Kept.Num() < 3; ++r) { TryAdd(r); }
 				}
 
-				if (bSkip)
+				// Emit one edge per consecutive kept pair (cyclic), absorbing the skipped edges in each gap.
+				Kept.Sort();
+				for (int32 i = 0; i < Kept.Num(); ++i)
 				{
-					MergedEdges.Add(Lk.Edge);
-					continue;
+					const int32 FromR = Kept[i];
+					const int32 ToR = Kept[(i + 1) % Kept.Num()];
+					for (int32 r = (FromR + 1) % RingSize; r != ToR; r = (r + 1) % RingSize) { PendingEdges.Add(RingLinkAt(r).Edge); }
+					EmitEdge(RingNodeAt(FromR), RingLinkAt(ToR));
 				}
-
-				LastPosition = CurrentPosition;
-
-				GraphBuilder->Graph->InsertEdge(Cluster->GetNodePointIndex(LastIndex), Cluster->GetNodePointIndex(Lk), OutEdge, IOIndex);
-
-				PCGExGraphs::FGraphEdgeMetadata& EdgeMetadata = GraphBuilder->Graph->GetOrCreateEdgeMetadata(OutEdge.Index);
-				EdgeMetadata.UnionSize = UnionCount;
-				EdgesUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add(IOIndex, MergedEdges);
-
-				UnionCount = 0;
-				MergedEdges.Reset();
-
-				LastIndex = Lk.Node;
-			}
-
-			auto MakeLastEdge = [&](const PCGExGraphs::FLink Link)
-			{
-				UnionCount++;
-
-				GraphBuilder->Graph->InsertEdge(Cluster->GetNodePointIndex(LastIndex), Cluster->GetNodePointIndex(Link.Node), OutEdge, IOIndex);
-
-				MergedEdges.Add(Link.Edge);
-
-				PCGExGraphs::FGraphEdgeMetadata& EdgeMetadata = GraphBuilder->Graph->GetOrCreateEdgeMetadata(OutEdge.Index);
-				EdgeMetadata.UnionSize = UnionCount;
-				EdgesUnion->NewEntryAt_Unsafe(OutEdge.Index)->Add(IOIndex, MergedEdges);
-
-				UnionCount = 0;
-				MergedEdges.Reset();
-			};
-
-			if (LastIndex != Chain->Links.Last().Node)
-			{
-				// Last processed point is not the last; likely skipped by angular threshold.
-				const int32 LastNode = Chain->Links.Last().Node;
-				MakeLastEdge(Chain->Links.Last());
-				LastIndex = LastNode; // Update last index
-			}
-
-			if (Chain->bIsClosedLoop)
-			{
-				// Wrap
-				MakeLastEdge(Chain->Seed);
 			}
 		}
 	}

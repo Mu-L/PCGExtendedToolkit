@@ -70,7 +70,16 @@ namespace PCGExFloodFill
 
 		// Gather all neighbors, add to candidates for the first time only
 		const PCGExClusters::FNode& FromNode = *From.Node;
-		FVector FromPosition = Cluster->GetPos(FromNode);
+		const FVector FromPosition = Cluster->GetPos(FromNode);
+
+		// Fan-out budget for this parent. MAX_int32 -- the default whenever no Reroute-mode
+		// branch control is active -- means "unlimited" and takes the legacy path below,
+		// byte-for-byte. A finite limit switches to claim-on-accept: a neighbor is only
+		// marked visited when actually taken as a child, so unclaimed neighbors stay
+		// reachable by other captured nodes (coverage-preserving de-branching).
+		const int32 FanoutLimit = FillControlsHandler->GetProbeFanoutLimit(this, From);
+		const bool bLimited = FanoutLimit != MAX_int32;
+		int32 Queued = 0;
 
 		for (const PCGExGraphs::FLink& Lk : FromNode.Links)
 		{
@@ -82,10 +91,23 @@ namespace PCGExFloodFill
 			{
 				continue;
 			}
-			Visited[OtherIndex] = true;
 
-			FVector OtherPosition = Cluster->GetPos(OtherNode);
-			double Dist = FVector::Dist(FromPosition, OtherPosition);
+			// Reroute: once the budget is spent, stop probing entirely so the remaining
+			// neighbors stay unvisited (and thus adoptable by other captured nodes).
+			if (bLimited && Queued >= FanoutLimit)
+			{
+				break;
+			}
+
+			// Legacy claims the node up-front, before validation, so a rejected candidate is
+			// permanently pruned from THIS diffusion. Preserve that behavior exactly.
+			if (!bLimited)
+			{
+				Visited[OtherIndex] = true;
+			}
+
+			const FVector OtherPosition = Cluster->GetPos(OtherNode);
+			const double Dist = FVector::Dist(FromPosition, OtherPosition);
 
 			FCandidate Candidate = FCandidate{};
 			Candidate.CaptureIndex = From.CaptureIndex;
@@ -100,11 +122,35 @@ namespace PCGExFloodFill
 			// Scoring via fill controls (use 'Heuristics Score' fill control for heuristics-based scoring)
 			FillControlsHandler->ScoreCandidate(this, From, Candidate);
 
-			if (FillControlsHandler->IsValidCandidate(this, From, Candidate))
+			const bool bValid = FillControlsHandler->IsValidCandidate(this, From, Candidate);
+
+			if (!bLimited)
 			{
-				// O(log n) heap insertion instead of O(1) array add + O(n log n) sort later
-				Candidates.HeapPush(Candidate, HeapComparator);
+				if (bValid)
+				{
+					// O(log n) heap insertion instead of O(1) array add + O(n log n) sort later
+					Candidates.HeapPush(Candidate, HeapComparator);
+				}
+				continue;
 			}
+
+			// Reroute path: only claim (mark visited) when we actually take the child, so a
+			// rejected neighbor stays unvisited and can still be reached via another node.
+			if (!bValid)
+			{
+				continue;
+			}
+
+			Visited[OtherIndex] = true;
+			Candidates.HeapPush(Candidate, HeapComparator);
+			++Queued;
+		}
+
+		// A fan-out-limited probe reports how many children it claimed, so controls with a
+		// shared (per-diffusion) budget can reconcile against what this probe actually spent.
+		if (bLimited)
+		{
+			FillControlsHandler->NotifyProbeComplete(this, From, Queued);
 		}
 	}
 
@@ -227,6 +273,14 @@ namespace PCGExFloodFill
 				{
 					SubOpsCapture.Add(Op);
 				}
+				if (Op->WantsCaptureNotify())
+				{
+					SubOpsCaptureNotify.Add(Op);
+				}
+				if (Op->LimitsProbeFanout())
+				{
+					SubOpsProbeFanout.Add(Op);
+				}
 			}
 		}
 
@@ -292,6 +346,15 @@ namespace PCGExFloodFill
 		{
 			return false;
 		}
+
+		// Capture is now committed (shared influence claimed). Notify opt-in controls so
+		// they can maintain per-capture state (e.g. branch child counts). Runs on this
+		// diffusion's thread; each node is captured by exactly one diffusion.
+		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsCaptureNotify)
+		{
+			Op->OnCaptured(Diffusion, Candidate);
+		}
+
 		return true;
 	}
 
@@ -317,6 +380,24 @@ namespace PCGExFloodFill
 			}
 		}
 		return true;
+	}
+
+	int32 FFillControlsHandler::GetProbeFanoutLimit(const FDiffusion* Diffusion, const FCandidate& From)
+	{
+		int32 Limit = MAX_int32;
+		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsProbeFanout)
+		{
+			Limit = FMath::Min(Limit, Op->GetProbeFanoutLimit(Diffusion, From));
+		}
+		return Limit;
+	}
+
+	void FFillControlsHandler::NotifyProbeComplete(const FDiffusion* Diffusion, const FCandidate& From, const int32 NumClaimed)
+	{
+		for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsProbeFanout)
+		{
+			Op->OnProbeComplete(Diffusion, From, NumClaimed);
+		}
 	}
 
 #pragma region FDiffusionPathWriter

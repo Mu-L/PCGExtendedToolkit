@@ -259,6 +259,8 @@ namespace PCGExFloodFill
 		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsProbe;
 		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsCandidate;
 		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsCapture;
+		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsCaptureNotify;
+		TArray<TSharedPtr<FPCGExFillControlOperation>> SubOpsProbeFanout;
 
 	public:
 		mutable FRWLock HandlerLock;
@@ -308,6 +310,13 @@ namespace PCGExFloodFill
 		bool TryCapture(const FDiffusion* Diffusion, const FCandidate& Candidate);
 		bool IsValidProbe(const FDiffusion* Diffusion, const FCandidate& Candidate);
 		bool IsValidCandidate(const FDiffusion* Diffusion, const FCandidate& From, const FCandidate& Candidate);
+
+		// Aggregate probe-time fan-out limit across Reroute-mode controls (MAX_int32 if none).
+		int32 GetProbeFanoutLimit(const FDiffusion* Diffusion, const FCandidate& From);
+
+		// Notify Reroute-mode controls how many children a probe actually claimed, so a
+		// shared (per-diffusion) budget can reconcile against what was spent.
+		void NotifyProbeComplete(const FDiffusion* Diffusion, const FCandidate& From, int32 NumClaimed);
 	};
 
 	/**

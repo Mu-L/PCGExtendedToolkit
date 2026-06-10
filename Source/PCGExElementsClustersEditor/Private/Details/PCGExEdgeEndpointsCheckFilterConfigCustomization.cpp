@@ -8,6 +8,7 @@
 #include "PropertyHandle.h"
 #include "Details/Widgets/SPCGExEdgeEndpointsCheckPreview.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExEdgeEndpointsCheckFilterConfigCustomization::MakeInstance()
 {
@@ -19,8 +20,11 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeHeader(
 	FDetailWidgetRow& HeaderRow,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
+	UseTwoFilterSetsHandle = PropertyHandle->GetChildHandle(TEXT("bUseTwoFilterSets"));
 	ModeHandle = PropertyHandle->GetChildHandle(TEXT("Mode"));
+	RespectEdgeDirectionHandle = PropertyHandle->GetChildHandle(TEXT("bRespectEdgeDirection"));
 	ExpectsHandle = PropertyHandle->GetChildHandle(TEXT("Expects"));
+	ExpectsBHandle = PropertyHandle->GetChildHandle(TEXT("ExpectsB"));
 	InvertHandle = PropertyHandle->GetChildHandle(TEXT("bInvert"));
 
 	HeaderRow.NameContent()
@@ -34,8 +38,25 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeChildren(
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// 1. Insert the preview widget as the first custom row
+	// The single-set truth-table preview and the dual-set note are mutually exclusive on
+	// bUseTwoFilterSets. One predicate, parameterized by which mode the row belongs to, so the
+	// two rows can never drift out of sync.
+	auto RowVisibility = [this](const bool bForTwoFilterSets) -> EVisibility
+	{
+		bool bTwoFilterSets = false;
+		if (UseTwoFilterSetsHandle.IsValid())
+		{
+			UseTwoFilterSetsHandle->GetValue(bTwoFilterSets);
+		}
+		return bTwoFilterSets == bForTwoFilterSets ? EVisibility::Visible : EVisibility::Collapsed;
+	};
+
+	// 1. Insert the preview widget as the first custom row (single-input mode only).
 	ChildBuilder.AddCustomRow(FText::FromString(TEXT("Preview")))
+	            .Visibility(TAttribute<EVisibility>::CreateLambda([RowVisibility]()
+	            {
+		            return RowVisibility(false);
+	            }))
 	            .WholeRowContent()
 	[
 		SNew(SBox)
@@ -72,6 +93,23 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeChildren(
 		]
 	];
 
+	// 1b. Two-input mode note (shown instead of the truth table, which does not model dual-set logic).
+	ChildBuilder.AddCustomRow(FText::FromString(TEXT("Two Filter Sets")))
+	            .Visibility(TAttribute<EVisibility>::CreateLambda([RowVisibility]()
+	            {
+		            return RowVisibility(true);
+	            }))
+	            .WholeRowContent()
+	[
+		SNew(SBox)
+		.Padding(8.0f)
+		[
+			SNew(STextBlock)
+			.AutoWrapText(true)
+			.Text(FText::FromString(TEXT("Two-filter-sets mode: the edge passes when one endpoint matches the 'Vtx Filters' set and the other matches 'Vtx Filters (B)'. Enable 'Respect Edge Direction' to bind the first set to Start and the second to End.")))
+		]
+	];
+
 	// 2. Add all child properties normally
 	uint32 NumChildren = 0;
 	PropertyHandle->GetNumChildren(NumChildren);
@@ -101,7 +139,10 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeChildren(
 		}
 	};
 
+	RegisterInvalidation(UseTwoFilterSetsHandle);
 	RegisterInvalidation(ModeHandle);
+	RegisterInvalidation(RespectEdgeDirectionHandle);
 	RegisterInvalidation(ExpectsHandle);
+	RegisterInvalidation(ExpectsBHandle);
 	RegisterInvalidation(InvertHandle);
 }

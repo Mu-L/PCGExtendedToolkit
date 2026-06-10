@@ -65,6 +65,7 @@ namespace PCGExFilters
 
 		const FName SourcePointFiltersLabel = FName("Point Filters");
 		const FName SourceVtxFiltersLabel = FName("Vtx Filters");
+		const FName SourceVtxFiltersLabelB = FName("Vtx Filters (B)");
 		const FName SourceEdgeFiltersLabel = FName("Edge Filters");
 
 		const FName OutputInsideFiltersLabel = FName("Inside");
