@@ -62,6 +62,10 @@ public:
 	FPCGAttributePropertyInputSelector SubdivisionAmount;
 
 	PCGEX_SETTING_VALUE_DECL(SubdivisionAmount, double)
+	
+	/** How to round count based on distance subdivision. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, EditCondition="SubdivideMethod == EPCGExSubdivideMode::Distance"))
+	EPCGExTruncateMode TruncateMethod = EPCGExTruncateMode::Floor;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="SubdivideMethod != EPCGExSubdivideMode::Manhattan && SubdivideMethod == EPCGExSubdivideMode::Distance", EditConditionHides))
 	bool bRedistributeEvenly = false;

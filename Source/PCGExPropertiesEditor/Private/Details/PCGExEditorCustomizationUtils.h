@@ -17,6 +17,12 @@ namespace PCGExEditorCustomizationUtils
 	// Uses SetOnPropertyValueChangedWithData (not SetOnPropertyValueChanged) so we can read
 	// ChangeType and skip Interactive ticks -- drag-in-progress events shouldn't tick-storm
 	// every listener of the global OnObjectPropertyChanged delegate.
+	//
+	// Registered on both the own- and child-changed delegates: multi-component widgets
+	// (Vector / Rotator) commit through their X/Y/Z child handles, which fire only the parent's
+	// child-changed delegate (FPropertyNode::BroadcastPropertyChangedDelegates), never its own --
+	// so without the child registration those rows never dirty the owner. No double-fire: one edit
+	// hits one node, and no call site hooks a node together with one of its ancestors.
 	inline void HookOwnerChangeOnHandleChanged(
 		const TSharedPtr<IPropertyHandle>& Handle,
 		const TWeakObjectPtr<UObject>& WeakOwner)
@@ -25,15 +31,21 @@ namespace PCGExEditorCustomizationUtils
 		{
 			return;
 		}
-		Handle->SetOnPropertyValueChangedWithData(TDelegate<void(const FPropertyChangedEvent&)>::CreateLambda(
-			[WeakOwner](const FPropertyChangedEvent& InEvent)
-			{
-				if (InEvent.ChangeType == EPropertyChangeType::Interactive) { return; }
-				UObject* Live = WeakOwner.Get();
-				if (!Live) { return; }
-				Live->Modify();
-				FPropertyChangedEvent Event(InEvent.Property, EPropertyChangeType::ValueSet);
-				FCoreUObjectDelegates::OnObjectPropertyChanged.Broadcast(Live, Event);
-			}));
+
+		// One handler registered on both delegates (the setters copy it).
+		const TDelegate<void(const FPropertyChangedEvent&)> OnChanged =
+			TDelegate<void(const FPropertyChangedEvent&)>::CreateLambda(
+				[WeakOwner](const FPropertyChangedEvent& InEvent)
+				{
+					if (InEvent.ChangeType == EPropertyChangeType::Interactive) { return; }
+					UObject* Live = WeakOwner.Get();
+					if (!Live) { return; }
+					Live->Modify();
+					FPropertyChangedEvent Event(InEvent.Property, EPropertyChangeType::ValueSet);
+					FCoreUObjectDelegates::OnObjectPropertyChanged.Broadcast(Live, Event);
+				});
+
+		Handle->SetOnPropertyValueChangedWithData(OnChanged);
+		Handle->SetOnChildPropertyValueChangedWithData(OnChanged);
 	}
 }

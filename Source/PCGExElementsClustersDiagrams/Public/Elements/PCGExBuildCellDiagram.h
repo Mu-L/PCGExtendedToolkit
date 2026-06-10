@@ -33,6 +33,15 @@ namespace PCGExBuildCellDiagram
 	class FProcessor;
 }
 
+UENUM()
+enum class EPCGExCellSpokeMode : uint8
+{
+	None          = 0 UMETA(DisplayName = "None", ToolTip="Do not emit any centroid-to-corner spokes."),
+	AllCorners    = 1 UMETA(DisplayName = "All Corners", ToolTip="Emit a spoke from each cell centroid to every one of its corners."),
+	LongestSpoke  = 2 UMETA(DisplayName = "Longest Spoke", ToolTip="Emit only the single longest centroid-to-corner spoke per cell."),
+	ShortestSpoke = 3 UMETA(DisplayName = "Shortest Spoke", ToolTip="Emit only the single shortest centroid-to-corner spoke per cell."),
+};
+
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters")
 class UPCGExBuildCellDiagramSettings : public UPCGExClustersProcessorSettings
 {
@@ -73,6 +82,18 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExGraphBuilderDetails GraphBuilderDetails;
 
+	/** How to emit additional edges connecting each cell centroid to its corner vertices. Corners are shared between adjacent cells. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable))
+	EPCGExCellSpokeMode SpokeMode = EPCGExCellSpokeMode::None;
+
+	/** In a single-spoke mode, also connect every other cell that shares an elected corner to that corner (in addition to its own spoke), turning the corner into a shared hub. A cell may then emit multiple spokes. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable, EditCondition = "SpokeMode == EPCGExCellSpokeMode::LongestSpoke || SpokeMode == EPCGExCellSpokeMode::ShortestSpoke", EditConditionHides))
+	bool bConnectSharedSelectedCorners = false;
+
+	/** Replace each centroid-to-centroid adjacency edge with two edges routed through a new vertex at the midpoint of the shared cell segment (centroid -> midpoint -> centroid). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivisions", meta = (PCG_Overridable))
+	bool bSplitCellEdgesAtSharedMidpoint = false;
+
 	/** Write cell area to centroid points */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteArea = false;
@@ -96,6 +117,22 @@ public:
 	/** Attribute name for node count */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, EditCondition="bWriteNumNodes"))
 	FName NumNodesAttributeName = FName("NumNodes");
+
+	/** Write a per-vertex type tag : 0 = centroid, 1 = corner, 2 = shared-segment midpoint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, InlineEditConditionToggle))
+	bool bWriteVtxType = false;
+
+	/** Attribute name for the vertex type tag */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, EditCondition="bWriteVtxType"))
+	FName VtxTypeAttributeName = FName("VtxType");
+
+	/** Write a per-edge type tag : 0 = cell adjacency, 1 = split-half (centroid<->midpoint), 2 = corner spoke. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, InlineEditConditionToggle))
+	bool bWriteEdgeType = false;
+
+	/** Attribute name for the edge type tag */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Attributes", meta = (PCG_Overridable, EditCondition="bWriteEdgeType"))
+	FName EdgeTypeAttributeName = FName("EdgeType");
 
 	/** Defines how cell vertex properties and attributes are blended to the centroid. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_Overridable))
@@ -150,6 +187,28 @@ namespace PCGExBuildCellDiagram
 		TSharedPtr<PCGExData::TBuffer<double>> AreaWriter = nullptr;
 		TSharedPtr<PCGExData::TBuffer<double>> CompactnessWriter = nullptr;
 		TSharedPtr<PCGExData::TBuffer<int32>> NumNodesWriter = nullptr;
+		TSharedPtr<PCGExData::TBuffer<int32>> VtxTypeWriter = nullptr;
+
+		// Output vertex layout as contiguous point-index blocks:
+		// [0, NumCells) centroids | [CornerBlockStart, MidpointBlockStart) corners | [MidpointBlockStart, TotalVtxCount) midpoints
+		int32 NumCells = 0;
+		int32 CornerBlockStart = 0;
+		int32 MidpointBlockStart = 0;
+		int32 TotalVtxCount = 0;
+
+		// Corner block (spokes). Corners are shared : one slot per unique activated cluster node.
+		TArray<int32> CornerNodes;                    // corner slot -> cluster node index
+		TMap<int32, int32> CornerNodeToSlot;          // cluster node index -> corner slot
+		TMap<int32, TArray<int32>> CornerNodeToCells; // cluster node index -> ValidCells indices containing it
+		TArray<int32> CellPickedCornerNode;           // ValidCells index -> elected corner node; populated only for the non-spread single-spoke pass
+
+		// Midpoint block (split). One slot per shared cell segment between two valid cells.
+		TArray<TPair<int32, int32>> MidpointNodePairs; // midpoint slot -> (origin node, target node) of shared segment
+		TArray<TPair<int32, int32>> MidpointCentroids; // midpoint slot -> (centroid A, centroid B) output indices
+
+		void SetupCornerBlock();
+		void SetupMidpointBlock();
+		void SetupEdgeTypeTagging();
 
 	public:
 		TSharedPtr<PCGExClusters::FCellConstraints> CellsConstraints;

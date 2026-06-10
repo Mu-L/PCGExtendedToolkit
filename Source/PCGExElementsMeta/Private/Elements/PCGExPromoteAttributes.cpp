@@ -5,6 +5,9 @@
 
 #include <type_traits>
 
+#include "PCGExProperty.h"
+#include "PCGExPropertySchemaAsset.h"
+
 #include "PCGContext.h"
 #include "PCGParamData.h"
 #include "Containers/PCGExManagedObjects.h"
@@ -220,6 +223,22 @@ bool FPCGExAttributesToTagsElement::Boot(FPCGExContext* InContext) const
 	// read a single value via TryReadDataValue, everything else (element attrs / properties / $Index) via the broadcaster.
 	TArray<FPCGAttributePropertyInputSelector> AllAttributes = Settings->Attributes;
 	PCGExMetaHelpers::AppendUniqueSelectorsFromCommaSeparatedList(Settings->CommaSeparatedAttributeSelectors, AllAttributes);
+
+	// Schema assets contribute their property names as selectors.
+	TArray<FPCGExPropertyResolved> Resolved;
+	for (const TObjectPtr<UPCGExPropertySchemaAsset>& SchemaAsset : Settings->IncludedSchemas)
+	{
+		if (!SchemaAsset) { continue; }
+		SchemaAsset->Collection.Resolve(Resolved);
+		for (const FPCGExPropertyResolved& Entry : Resolved)
+		{
+			if (!Entry.Source || Entry.Source->Name.IsNone()) { continue; }
+			FPCGAttributePropertyInputSelector Selector;
+			Selector.Update(Entry.Source->Name.ToString());
+			AllAttributes.AddUnique(Selector);
+		}
+	}
+
 	for (const FPCGAttributePropertyInputSelector& Selector : AllAttributes)
 	{
 		if (PCGExMetaHelpers::IsDataDomainAttribute(Selector)) { Context->DataAttributes.Add(Selector); }

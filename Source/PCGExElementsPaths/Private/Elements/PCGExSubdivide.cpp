@@ -164,6 +164,8 @@ namespace PCGExSubdivide
 
 		TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
 
+		const EPCGExTruncateMode TruncateMode = Settings->TruncateMethod;
+		
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
@@ -199,7 +201,7 @@ namespace PCGExSubdivide
 
 			if (!bRedistribute)
 			{
-				Sub.NumSubdivisions = FMath::Floor(Sub.Dist / Amount);
+				Sub.NumSubdivisions = PCGExMath::TruncateDbl(Sub.Dist / Amount, TruncateMode);
 				Sub.StepSize = Amount;
 
 				if (Settings->bRedistributeEvenly)
@@ -216,7 +218,7 @@ namespace PCGExSubdivide
 
 			if (bRedistribute)
 			{
-				Sub.NumSubdivisions = FMath::Floor(Amount);
+				Sub.NumSubdivisions = PCGExMath::TruncateDbl(Amount, TruncateMode);
 				Sub.StepSize = Sub.Dist / static_cast<double>(Sub.NumSubdivisions + 1);
 				Sub.StartOffset = Sub.StepSize;
 			}

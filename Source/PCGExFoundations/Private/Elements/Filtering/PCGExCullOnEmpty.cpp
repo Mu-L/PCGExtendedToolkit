@@ -13,6 +13,29 @@
 
 #define LOCTEXT_NAMESPACE "CullOnEmptyElement"
 
+#if WITH_EDITOR
+TArray<FPCGPreConfiguredSettingsInfo> UPCGExCullOnEmptySettings::GetPreconfiguredInfo() const
+{
+	TArray<FPCGPreConfiguredSettingsInfo> Configs;
+	Configs.Emplace(0, GetDefaultNodeTitle());
+	Configs.Emplace(1, FTEXT("PCGEx | Is Data Empty"));
+	return Configs;
+}
+
+bool UPCGExCullOnEmptySettings::ShouldDrawNodeCompact() const
+{
+	return bCheckOnly;
+}
+#endif
+
+void UPCGExCullOnEmptySettings::ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo)
+{
+	if (PreconfigureInfo.PreconfiguredIndex == 1)
+	{
+		bCheckOnly = true;
+	}
+}
+
 FPCGDataTypeIdentifier UPCGExCullOnEmptySettings::GetCurrentPinTypesID(const UPCGPin* InPin) const
 {
 	if (!InPin->IsOutputPin() || InPin->Properties.Label == PCGPinConstants::DefaultOutputLabel)
@@ -129,7 +152,7 @@ bool FPCGExCullOnEmptyElement::ExecuteInternal(FPCGContext* Context) const
 		{
 			UPCGParamData* ParamData = Context->NewObject_AnyThread<UPCGParamData>(Context);
 			FPCGMetadataAttribute<bool>* Attr = ParamData->Metadata->CreateAttribute<bool>(Settings->OutputIsEmpty, !bHasValidData, true, true);
-			Attr->AddValue(!bHasValidData);
+			Attr->SetValue(ParamData->Metadata->AddEntry(), !bHasValidData);
 
 			FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef();
 			OutData.Data = ParamData;
