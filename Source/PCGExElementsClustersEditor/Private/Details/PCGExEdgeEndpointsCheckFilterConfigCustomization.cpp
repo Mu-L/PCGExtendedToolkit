@@ -38,9 +38,8 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeChildren(
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// The single-set truth-table preview and the dual-set note are mutually exclusive on
-	// bUseTwoFilterSets. One predicate, parameterized by which mode the row belongs to, so the
-	// two rows can never drift out of sync.
+	// The single-set preview and the dual-set note are mutually exclusive on bUseTwoFilterSets.
+	// One predicate parameterized by mode keeps the two rows in sync.
 	auto RowVisibility = [this](const bool bForTwoFilterSets) -> EVisibility
 	{
 		bool bTwoFilterSets = false;
@@ -93,7 +92,7 @@ void FPCGExEdgeEndpointsCheckFilterConfigCustomization::CustomizeChildren(
 		]
 	];
 
-	// 1b. Two-input mode note (shown instead of the truth table, which does not model dual-set logic).
+	// 1b. Two-set note (shown instead of the truth table, which doesn't model dual-set logic).
 	ChildBuilder.AddCustomRow(FText::FromString(TEXT("Two Filter Sets")))
 	            .Visibility(TAttribute<EVisibility>::CreateLambda([RowVisibility]()
 	            {

@@ -138,8 +138,7 @@ namespace PCGExEdgeEndpointsCheck
 			const int8 StartResultB = ResolveCachedResult(VtxFiltersManagerB, MutableResultCacheB, Start);
 			const int8 EndResultB = ResolveCachedResult(VtxFiltersManagerB, MutableResultCacheB, End);
 
-			// An endpoint "matches A" when its first-set result equals Expected;
-			// it "matches B" when its second-set result equals ExpectedB.
+			// "Matches A" = first-set result equals Expected; "matches B" = second-set result equals ExpectedB.
 			const bool bStartMatchesA = StartResult == Expected;
 			const bool bEndMatchesA = EndResult == Expected;
 			const bool bStartMatchesB = StartResultB == ExpectedB;

@@ -87,10 +87,9 @@ namespace PCGExClusters::ChainHelpers
 		{
 			if (Chain->bIsClosedLoop)
 			{
-				// A closed loop has no endpoints to collapse toward, so there is no single edge to reduce
-				// it to. On this non-angular path there is no criterion for which nodes to drop, so removal
-				// would be arbitrary -- keep the loop intact. Angular loop reduction (with a >=3-node floor)
-				// lives in SimplifyClusters' merge path, FProcessor::ProcessRange.
+				// A closed loop has no endpoints to collapse toward, and this non-angular path has no
+				// criterion for which nodes to drop -- keep it intact. Angular loop reduction lives in
+				// SimplifyClusters' merge path (FProcessor::ProcessRange).
 				Dump(Chain, Cluster, Graph, bAddMetadata);
 				return;
 			}

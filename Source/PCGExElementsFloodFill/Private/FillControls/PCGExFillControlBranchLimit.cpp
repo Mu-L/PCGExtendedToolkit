@@ -18,8 +18,7 @@ bool FPCGExFillControlBranchLimit::PrepareForDiffusions(FPCGExContext* InContext
 		return false;
 	}
 
-	// Mode & bSourceIsVtx are cached on the operation in CreateOperation (so the capability
-	// predicates, which run during the handler's BuildFrom before this, share one source).
+	// Mode & bSourceIsVtx were cached on the operation in CreateOperation.
 	const UPCGExFillControlsFactoryBranchLimit* TypedFactory = Cast<UPCGExFillControlsFactoryBranchLimit>(Factory);
 
 	MaxBranchesValue = TypedFactory->Config.MaxBranches.GetValueSetting();
@@ -35,10 +34,8 @@ bool FPCGExFillControlBranchLimit::PrepareForDiffusions(FPCGExContext* InContext
 		ConstantBudget = MaxBranchesValue->Read(0);
 	}
 
-	// Branch state by enforcement strategy:
-	//  - Vtx + Reroute limits fan-out at probe time and needs no persistent state.
-	//  - Everything else enforces at capture: Vtx tracks per-node child counts, while Seed
-	//    shares one global fork budget per diffusion (spent best-first as the heap pops).
+	// Allocate state by enforcement strategy: Vtx+Reroute needs none (probe-time); Vtx+Prune
+	// tracks per-node child counts; Seed shares one fork budget per diffusion.
 	if (bSourceIsVtx)
 	{
 		if (Mode == EPCGExFloodFillBranchMode::Prune)
@@ -58,9 +55,7 @@ bool FPCGExFillControlBranchLimit::PrepareForDiffusions(FPCGExContext* InContext
 int32 FPCGExFillControlBranchLimit::ReadBudget(const int32 Index)
 {
 	const int32 Raw = bConstantBudget ? ConstantBudget : MaxBranchesValue->Read(Index);
-	// Clamp to a non-negative, overflow-safe range: a budget so large it is effectively
-	// unlimited still keeps (1 + budget) below the MAX_int32 sentinel, so the reroute
-	// fan-out math can neither overflow nor accidentally read as 'no limit'.
+	// Clamp so 1+budget can't overflow or hit the MAX_int32 'unlimited' sentinel.
 	return FMath::Clamp(Raw, 0, MAX_int32 - 2);
 }
 
@@ -86,8 +81,7 @@ bool FPCGExFillControlBranchLimit::IsValidCapture(const PCGExFloodFill::FDiffusi
 		return ChildCounts[ParentNode] <= ReadBudget(Cluster->GetNodePointIndex(ParentNode));
 	}
 
-	// Seed source (global): the first child is always free (it continues the lane); any
-	// additional child is a fork that draws from the diffusion's shared budget.
+	// Seed (global): first child is free; any beyond it is a fork drawing from the shared budget.
 	if (!ParentHasChild[ParentNode])
 	{
 		return true;
@@ -114,8 +108,7 @@ void FPCGExFillControlBranchLimit::OnCaptured(const PCGExFloodFill::FDiffusion* 
 		return;
 	}
 
-	// Seed source: the first child is free; every child beyond it is a fork that consumes
-	// the diffusion's shared budget.
+	// First child free; subsequent children spend a fork from the shared budget.
 	if (ParentHasChild[ParentNode]) { DiffusionForks[Diffusion->Index]++; }
 	else { ParentHasChild[ParentNode] = true; }
 }
@@ -131,8 +124,7 @@ bool FPCGExFillControlBranchLimit::LimitsProbeFanout() const
 
 int32 FPCGExFillControlBranchLimit::GetProbeFanoutLimit(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From)
 {
-	// Only Vtx + Reroute registers for probe fan-out limiting. A node may spread to up to
-	// (1 + budget) children; the probe keeps the best ones by score (see FDiffusion::Probe).
+	// A node may spread to up to (1 + budget) children; the probe keeps the best by score (see FDiffusion::Probe).
 	return 1 + ReadBudget(From.Node->PointIndex);
 }
 
@@ -142,8 +134,7 @@ TSharedPtr<FPCGExFillControlOperation> UPCGExFillControlsFactoryBranchLimit::Cre
 {
 	PCGEX_FACTORY_NEW_OPERATION(FillControlBranchLimit)
 	PCGEX_FORWARD_FILLCONTROL_OPERATION
-	// Cache mode & source on the operation so the capability predicates (run during the
-	// handler's BuildFrom, before PrepareForDiffusions) have a single source of truth.
+	// Cache mode & source here so the capability predicates (called during BuildFrom, before PrepareForDiffusions) have one source of truth.
 	NewOperation->Mode = Config.Mode;
 	NewOperation->bSourceIsVtx = Config.Source == EPCGExFloodFillSettingSource::Vtx;
 	return NewOperation;

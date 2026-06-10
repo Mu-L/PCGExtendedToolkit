@@ -227,10 +227,9 @@ namespace PCGExSimplifyClusters
 			TArray<int32> PendingEdges; // Original edges absorbed since the last kept node
 			PendingEdges.Reserve(Links.Num() + 1);
 
-			// A node is collinear (mergeable) when the turn between its incoming and outgoing
-			// directions is within threshold -- a local property of the node's immediate chain
-			// neighbors, independent of which neighbors were previously kept. Coincident points
-			// produce a zero direction (GetSafeNormal) and are always mergeable, never spurious corners.
+			// Collinear (mergeable) when the turn between incoming and outgoing directions is within
+			// threshold -- a local property of immediate neighbors. Coincident points give a zero
+			// direction and are always mergeable.
 			auto IsCollinear = [&](const int32 PrevNode, const int32 CurNode, const int32 NextNode) -> bool
 			{
 				const FVector A = Cluster->GetDir(PrevNode, CurNode);
@@ -240,10 +239,9 @@ namespace PCGExSimplifyClusters
 				return Settings->bInvertAngularThreshold ? (Dot < DotThreshold) : (Dot > DotThreshold);
 			};
 
-			// Emits one simplified edge from FromNode to ToLink.Node, recording every original edge it
-			// absorbs (the accumulated PendingEdges plus ToLink.Edge). UnionSize is kept equal to that
-			// merged source-edge count. The graph holds no parallel edges, so if the pair already exists
-			// (InsertEdge returns false) the accounting is merged into the existing entry, never overwritten.
+			// Emits one simplified edge FromNode -> ToLink.Node, recording the original edges it absorbs
+			// (PendingEdges + ToLink.Edge) as UnionSize. If the pair already exists (no parallel edges),
+			// the accounting is merged into the existing entry rather than overwritten.
 			auto EmitEdge = [&](const int32 FromNode, const PCGExGraphs::FLink& ToLink)
 			{
 				PendingEdges.Add(ToLink.Edge);
@@ -275,9 +273,8 @@ namespace PCGExSimplifyClusters
 
 			if (!Chain->bIsClosedLoop)
 			{
-				// Open chain: Seed and Links.Last() are fixed endpoints (junction/leaf) and are always
-				// kept. Every interior node Links[0..MaxIndex-1] is tested -- including Links[0], whose
-				// predecessor is the Seed (which lives outside the Links array).
+				// Open chain: Seed and Links.Last() are fixed endpoints, always kept. Every interior node
+				// Links[0..MaxIndex-1] is tested -- including Links[0], whose predecessor is the Seed.
 				int32 LastKeptNode = Chain->Seed.Node;
 				FVector LastKeptPos = Cluster->GetPos(LastKeptNode);
 
@@ -309,16 +306,15 @@ namespace PCGExSimplifyClusters
 			}
 			else
 			{
-				// Closed loop: every node (including the Seed) is binary and eligible for collapse.
-				// Model the ring of Links.Num()+1 nodes; RingLinkAt(r).Edge is the edge arriving at
-				// node r from its ring predecessor (Seed.Edge is the closing edge).
+				// Closed loop: every node (including Seed) is binary and collapsible. Model a ring of
+				// Links.Num()+1 nodes; RingLinkAt(r).Edge arrives at node r from its predecessor.
 				const int32 RingSize = Links.Num() + 1;
 
 				auto RingNodeAt = [&](const int32 r) -> int32 { return r == 0 ? Chain->Seed.Node : Links[r - 1].Node; };
 				auto RingLinkAt = [&](const int32 r) -> PCGExGraphs::FLink { return r == 0 ? Chain->Seed : Links[r - 1]; };
 
-				// Flag every angular corner once (order-independent), reusing the verdict for both anchor
-				// selection and the walk; remember the first corner as a stable walk anchor.
+				// Flag every angular corner once, reusing the verdict for anchor selection and the walk;
+				// the first corner is a stable anchor.
 				TArray<bool> bCorner;
 				bCorner.SetNumUninitialized(RingSize);
 				int32 Anchor = 0;
@@ -329,8 +325,7 @@ namespace PCGExSimplifyClusters
 					if (bCorner[r] && !bAnyCorner) { Anchor = r; bAnyCorner = true; }
 				}
 
-				// Collect the kept ring indices: corners that survive the collocation (fuse) test,
-				// walking from the anchor so fuse measures from a stable starting point.
+				// Collect kept ring indices: corners that survive the fuse test, walked from the anchor.
 				TArray<int32> Kept;
 				Kept.Reserve(RingSize);
 				if (bAnyCorner)
@@ -355,8 +350,8 @@ namespace PCGExSimplifyClusters
 					}
 				}
 
-				// A simple graph cannot represent a cycle with fewer than 3 nodes; pad with spread-out
-				// ring nodes (RingSize >= 3 guarantees enough distinct nodes exist) so the loop stays valid.
+				// A simple graph can't represent a cycle under 3 nodes; pad with spread-out ring nodes
+				// (RingSize >= 3 guarantees enough exist) to keep the loop valid.
 				if (Kept.Num() < 3)
 				{
 					auto TryAdd = [&](const int32 r) { if (Kept.Num() < 3 && !Kept.Contains(r)) { Kept.Add(r); } };

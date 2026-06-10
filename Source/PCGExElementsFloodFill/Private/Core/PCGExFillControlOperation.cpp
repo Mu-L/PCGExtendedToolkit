@@ -61,7 +61,7 @@ bool FPCGExFillControlOperation::WantsCaptureNotify() const
 
 void FPCGExFillControlOperation::OnCaptured(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate)
 {
-	// Default implementation does nothing - override in controls that track capture state
+	// No-op; override in controls that track capture state.
 }
 
 bool FPCGExFillControlOperation::LimitsProbeFanout() const

@@ -31,23 +31,23 @@ struct FPCGExEdgeEndpointsCheckFilterConfig
 	{
 	}
 
-	/** Use two separate filter sets -- one per endpoint -- instead of a single set applied to both endpoints. Enables testing mixed conditions on an edge (e.g. one endpoint matches set A while the other matches set B). */
+	/** Use two filter sets (one per endpoint) instead of one set on both -- lets each endpoint match a different condition. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Two Filter Sets"))
 	bool bUseTwoFilterSets = false;
 
-	/** Mode -- how the single filter set's two endpoint results are combined. Only used in single-input mode. */
+	/** How the single set's two endpoint results are combined. Single-set mode only. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="!bUseTwoFilterSets", EditConditionHides))
 	EPCGExEdgeEndpointsCheckMode Mode = EPCGExEdgeEndpointsCheckMode::Both;
 
-	/** If enabled, the first set ('Vtx Filters') is tested strictly against the edge's Start endpoint and the second set ('Vtx Filters (B)') against its End endpoint. If disabled, the two sets are matched to the two endpoints in either orientation (one endpoint matches A and the other matches B). */
+	/** Bind set A to the Start endpoint and set B to End. If disabled, the sets match either endpoint in any orientation. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bUseTwoFilterSets", EditConditionHides))
 	bool bRespectEdgeDirection = false;
 
-	/** The expected result for the (first) filter set. In single-input mode this is combined per 'Mode' (e.g. mode = "Both" and Comparison = "Pass" means both endpoints must pass). In two-input mode it is the expectation for the 'Vtx Filters' set. */
+	/** Expected result for the (first) filter set. Combined per 'Mode' in single-set mode. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Comparison", EditCondition="bUseTwoFilterSets || Mode != EPCGExEdgeEndpointsCheckMode::SeeSaw", EditConditionHides))
 	EPCGExFilterResult Expects = EPCGExFilterResult::Pass;
 
-	/** The expected result for the second filter set ('Vtx Filters (B)'). Only used in two-input mode. */
+	/** Expected result for the second filter set ('Vtx Filters (B)'). Two-set mode only. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Comparison (B)", EditCondition="bUseTwoFilterSets", EditConditionHides))
 	EPCGExFilterResult ExpectsB = EPCGExFilterResult::Pass;
 

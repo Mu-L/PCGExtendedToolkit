@@ -15,8 +15,8 @@
 UENUM()
 enum class EPCGExFloodFillBranchMode : uint8
 {
-	Prune   = 0 UMETA(DisplayName = "Prune", ToolTip="Hard-cap branching, enforced when a node is captured. Excess branches are dropped entirely -- fewer, longer, cleaner lanes, at the cost of coverage (some nodes may go uncaptured). No core overhead."),
-	Reroute = 1 UMETA(DisplayName = "Reroute", ToolTip="Cap branching when a node spreads, but leave the excess neighbors available for other nodes to pick up. Preserves coverage (the region stays filled) while de-bushing. Slightly more expensive."),
+	Prune   = 0 UMETA(DisplayName = "Prune", ToolTip="Hard-cap branching at capture time; excess branches are dropped (fewer, longer lanes, but some nodes may go uncaptured)."),
+	Reroute = 1 UMETA(DisplayName = "Reroute", ToolTip="Cap branching at probe time, leaving excess neighbors for other nodes to claim -- preserves coverage at a slight cost."),
 };
 
 USTRUCT(BlueprintType)
@@ -34,30 +34,17 @@ struct FPCGExFillControlConfigBranchLimit : public FPCGExFillControlConfigBase
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
 	EPCGExFloodFillBranchMode Mode = EPCGExFloodFillBranchMode::Prune;
 
-	/**
-	 * Maximum number of times the fill may branch (i.e. children beyond the first).
-	 * 0 = never branches (a single lane). The scope depends on Source:
-	 * - Source = Vtx: per-vtx -- each node may branch up to this many times.
-	 * - Source = Seed: GLOBAL -- the seed's whole diffusion may branch this many times total.
-	 */
+	/** Max times the fill may branch (children beyond the first); 0 = single lane. Scope follows Source: per-vtx, or global to the seed's whole diffusion. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Max Branches"))
 	FPCGExInputShorthandSelectorInteger32Abs MaxBranches = FPCGExInputShorthandSelectorInteger32Abs(FName("MaxBranches"), 0);
 };
 
 /**
- * Limits how many times the fill may branch during diffusion, suppressing heavy
- * branching.
- *
- * Prune mode caps branching at capture time: excess branches are dropped, which
- * trims the fill into fewer, longer lanes but can leave nodes uncaptured. Reroute
- * mode caps branching at probe time but leaves the excess neighbors unclaimed, so
- * other nodes can still adopt them -- the region stays filled while branching is reduced.
- *
- * The budget scope follows Source: Vtx is per-node, Seed is global to the whole
- * diffusion (a shared fork pool for the seed's lifetime). Either way the limit is
- * per-diffusion: a node skipped by one seed remains fully reachable by every other
- * seed (the shared influence claim only happens on an actual capture, which a
- * skipped node never reaches).
+ * Limits how many times the fill may branch during diffusion. Prune drops excess
+ * branches at capture time (may leave nodes uncaptured); Reroute caps fan-out at probe
+ * time but leaves excess neighbors for other nodes (preserves coverage). Budget scope
+ * follows Source: Vtx per-node, Seed global to the diffusion. Always per-diffusion --
+ * a node skipped by one seed stays reachable by others.
  */
 class FPCGExFillControlBranchLimit : public FPCGExFillControlOperation
 {
@@ -66,15 +53,13 @@ class FPCGExFillControlBranchLimit : public FPCGExFillControlOperation
 public:
 	virtual bool PrepareForDiffusions(FPCGExContext* InContext, const TSharedPtr<PCGExFloodFill::FFillControlsHandler>& InHandler) override;
 
-	// Capture-time enforcement (everything except Vtx + Reroute): Vtx tracks per-node child
-	// counts; Seed draws from one shared per-diffusion fork budget, spent best-first.
+	// Capture-time enforcement (all but Vtx+Reroute). Vtx: per-node child counts. Seed: shared per-diffusion fork budget.
 	virtual bool ChecksCapture() const override;
 	virtual bool IsValidCapture(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate) override;
 	virtual bool WantsCaptureNotify() const override;
 	virtual void OnCaptured(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& Candidate) override;
 
-	// Probe-time enforcement (Vtx + Reroute only): cap a node's fan-out, keeping the best
-	// children by score and leaving the rest unvisited (adoptable by other nodes).
+	// Probe-time enforcement (Vtx+Reroute only): cap fan-out, keep the best children by score, leave the rest for other nodes.
 	virtual bool LimitsProbeFanout() const override;
 	virtual int32 GetProbeFanoutLimit(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From) override;
 
@@ -89,30 +74,23 @@ public:
 	}
 
 protected:
-	// Vtx + Reroute is the only combination that limits fan-out at probe time; every other
-	// combination enforces its budget at capture time.
+	// Vtx+Reroute limits fan-out at probe time; every other combination enforces at capture time.
 	FORCEINLINE bool UsesProbeFanout() const { return Mode == EPCGExFloodFillBranchMode::Reroute && bSourceIsVtx; }
 
-	// Reads the per-parent branch budget for a settings index, clamped to a non-negative,
-	// overflow-safe range (so 1 + budget can neither overflow nor hit the MAX_int32 'unlimited'
-	// sentinel). Returns the cached value when the input is constant / data-domain.
+	// Per-parent branch budget, clamped to [0, MAX_int32-2] so 1+budget never overflows or hits the 'unlimited' sentinel. Cached when constant.
 	int32 ReadBudget(int32 Index);
 
 	TSharedPtr<PCGExDetails::TSettingValue<int32>> MaxBranchesValue;
 	bool bConstantBudget = false;
 	int32 ConstantBudget = 0;
 
-	// Captured children per node index (Prune + Vtx source). A node is a parent in exactly
-	// one diffusion (single capturer), so a single shared array is safe: each element has
-	// exactly one writer, on that diffusion's own thread.
+	// Captured children per node (Prune + Vtx). Safe shared array: each node is captured by one diffusion, so one writer per element.
 	TArray<int32> ChildCounts;
 
-	// Whether a node already has a child (Prune + Seed source) -- only the 'has any child'
-	// bit is needed there; the global fork tally lives in DiffusionForks.
+	// Whether a node already has a child (Prune + Seed); the global fork tally lives in DiffusionForks.
 	TBitArray<> ParentHasChild;
 
-	// Forks spent per diffusion (Seed source -- the global, shared budget). Indexed by
-	// diffusion index; each slot has a single writer (its diffusion's thread).
+	// Forks spent per diffusion (Seed, global budget). Indexed by diffusion; one writer per slot.
 	TArray<int32> DiffusionForks;
 
 	EPCGExFloodFillBranchMode Mode = EPCGExFloodFillBranchMode::Prune;

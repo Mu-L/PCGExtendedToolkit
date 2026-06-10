@@ -90,15 +90,13 @@ namespace PCGExFloodFill
 			return Candidate;
 		};
 
-		// Fan-out budget for this parent. MAX_int32 -- the default whenever no probe-limiting
-		// (Vtx Reroute) control is active -- means "unlimited" and takes the claim-up-front path.
-		// The bHasProbeFanout gate keeps the common no-control path free of the handler call.
+		// Fan-out budget for this parent. MAX_int32 (the default when no Vtx+Reroute control is
+		// active) means "unlimited" -- the claim-up-front path. bHasProbeFanout gates the handler call.
 		const int32 FanoutLimit = FillControlsHandler->bHasProbeFanout ? FillControlsHandler->GetProbeFanoutLimit(this, From) : MAX_int32;
 
 		if (FanoutLimit == MAX_int32)
 		{
-			// Unlimited: claim every first-seen neighbor up front. A rejected candidate is still
-			// marked visited, so it is permanently pruned from this diffusion (legacy behavior).
+			// Unlimited: claim every first-seen neighbor up front (rejected ones stay visited -- legacy behavior).
 			for (const PCGExGraphs::FLink& Lk : FromNode.Links)
 			{
 				PCGExClusters::FNode* OtherNode = Cluster->GetNode(Lk);
@@ -121,10 +119,8 @@ namespace PCGExFloodFill
 			return;
 		}
 
-		// Fan-out-limited (Vtx Reroute): score every valid unvisited neighbor, then claim only
-		// the best 'FanoutLimit' by the same priority the growth heap pops by -- so the surviving
-		// branches are heuristic-chosen, not link-order. Unclaimed neighbors stay unvisited so
-		// other captured nodes can still adopt them (coverage-preserving de-branching).
+		// Fan-out-limited (Vtx+Reroute): score all valid unvisited neighbors, claim only the best
+		// 'FanoutLimit' by heap priority. Unclaimed ones stay unvisited for other nodes to adopt.
 		TArray<FCandidate, TInlineAllocator<8>> Pending;
 		for (const PCGExGraphs::FLink& Lk : FromNode.Links)
 		{
@@ -350,9 +346,8 @@ namespace PCGExFloodFill
 			return false;
 		}
 
-		// Capture is now committed (shared influence claimed). Notify opt-in controls so
-		// they can maintain per-capture state (e.g. branch child counts). Runs on this
-		// diffusion's thread; each node is captured by exactly one diffusion.
+		// Capture committed: notify opt-in controls so they can track per-capture state
+		// (e.g. branch child counts). Runs on this diffusion's thread; one capturer per node.
 		if (bHasCaptureNotify)
 		{
 			for (const TSharedPtr<FPCGExFillControlOperation>& Op : SubOpsCaptureNotify)

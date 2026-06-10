@@ -265,8 +265,8 @@ namespace PCGExFloodFill
 	public:
 		mutable FRWLock HandlerLock;
 
-		// Fast-path flags set in BuildFrom: whether any registered control opts into
-		// capture-notify / probe fan-out limiting, so hot paths can skip the dispatch.
+		// Set in BuildFrom -- whether any control opts into capture-notify / probe fan-out
+		// limiting, so hot paths can skip the dispatch.
 		bool bHasCaptureNotify = false;
 		bool bHasProbeFanout = false;
 
