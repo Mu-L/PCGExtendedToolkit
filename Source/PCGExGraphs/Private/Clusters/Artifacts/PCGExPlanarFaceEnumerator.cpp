@@ -1041,6 +1041,39 @@ namespace PCGExClusters
 		}
 	}
 
+	void FPlanarFaceEnumerator::GetSharedSegments(TArray<FSharedSegment>& OutSegments, int32 WrapperFaceIndex) const
+	{
+		OutSegments.Reset();
+
+		if (!bRawFacesEnumerated || HalfEdges.IsEmpty())
+		{
+			return;
+		}
+
+		const int32 NumHalfEdges = HalfEdges.Num();
+
+		// Visit each undirected segment once (h < twin). Mirrors the twin walk in BuildCellAdjacencyMap,
+		// but keeps the segment endpoints so callers (e.g. midpoint vertices) don't re-walk the DCEL.
+		for (int32 h = 0; h < NumHalfEdges; ++h)
+		{
+			const FHalfEdge& HE = HalfEdges[h];
+			const int32 Twin = HE.TwinIndex;
+			if (Twin < 0 || Twin >= NumHalfEdges || h > Twin)
+			{
+				continue;
+			}
+
+			const int32 FaceA = HE.FaceIndex;
+			const int32 FaceB = HalfEdges[Twin].FaceIndex;
+			if (FaceA < 0 || FaceB < 0 || FaceA == FaceB || FaceA == WrapperFaceIndex || FaceB == WrapperFaceIndex)
+			{
+				continue;
+			}
+
+			OutSegments.Emplace(FSharedSegment{HE.OriginNode, HE.TargetNode, FaceA, FaceB});
+		}
+	}
+
 	int32 FPlanarFaceEnumerator::GetWrapperFaceIndex() const
 	{
 		// LocalTangent: closed manifolds have no unbounded exterior face
