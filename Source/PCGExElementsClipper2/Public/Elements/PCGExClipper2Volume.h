@@ -33,7 +33,7 @@ enum class EPCGExVolumeBaseMode : uint8
 };
 
 /** Clipper2 : Volume -- extrudes a concave closed-path footprint into an AVolume, writing each Hertel-Mehlhorn convex piece as a vertical prism in AggGeom.ConvexElems (no BSP, so editor + cooked runtime both work). */
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="paths/generate/clipper2-volume"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="utilities/clipper2-volume"))
 class UPCGExClipper2VolumeSettings : public UPCGExClipper2ProcessorSettings
 {
 	GENERATED_BODY()
