@@ -142,12 +142,15 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		}
 		ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
 
-		// Use collection's instanced exporter if available, otherwise create a transient default
+		// Use collection's instanced exporter if available, otherwise create a transient default.
+		// The instanced exporter is editor-only data; cooked builds always take the fallback path.
 		UPCGExLevelDataExporter* Exporter = nullptr;
+#if WITH_EDITORONLY_DATA
 		if (const UPCGExPCGDataAssetCollection* TypedCollection = Cast<UPCGExPCGDataAssetCollection>(OwningCollection))
 		{
 			Exporter = TypedCollection->LevelExporter;
 		}
+#endif
 
 		TObjectPtr<UPCGExLevelDataExporter> FallbackExporter;
 		if (!Exporter)

@@ -21,7 +21,7 @@ class UPCGExLevelCollection;
 class UWorld;
 class FObjectPreSaveContext;
 
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExDataAssetEntrySource : uint8
 {
 	DataAsset = 0 UMETA(DisplayName = "Data Asset", ToolTip="Reference an existing PCGDataAsset", ActionIcon="PCGDA_DataAsset"),
@@ -184,10 +184,13 @@ public:
 
 	// Settings
 
+#if WITH_EDITORONLY_DATA
 	/** Exporter used to convert level-sourced entries into embedded PCGDataAssets during staging.
-	 *  If unset, a default exporter is used. Instanced so custom exporters can expose their own settings. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Instanced, Category = Settings)
+	 *  If unset, a default exporter is used. Instanced so custom exporters can expose their own settings.
+	 *  Editor-only: level harvesting is an authoring operation; cooked data carries the baked result. */
+	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
 	TObjectPtr<UPCGExLevelDataExporter> LevelExporter;
+#endif
 
 	/** Externalize generated subobjects (ExportedDataAsset, EmbeddedActorCollection,
 	 *  SharedMeshCollection, SharedLevelCollection) as separate uassets so the collection's
