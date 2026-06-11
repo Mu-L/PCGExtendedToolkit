@@ -170,10 +170,15 @@ double PCGExPointFilter::FVolumeFilter::GetEffectiveRadius(const FBox& LocalBox,
 
 bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const double EffectiveRadius) const
 {
+	return TestPoint(Position, EffectiveRadius, *Octree, *CachedVolumes, CheckType, bInvert);
+}
+
+bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const double EffectiveRadius, const PCGExOctree::FItemOctree& InOctree, const TArray<FCachedVolume>& InVolumes, const EPCGExVolumeCheckType InCheckType, const bool bInInvert) const
+{
 	bool bFoundInside = false;
 	bool bMatched = false;
 
-	Octree->FindElementsWithBoundsTest(
+	InOctree.FindElementsWithBoundsTest(
 		FBoxCenterAndExtent(Position, FVector(EffectiveRadius)),
 		[&](const PCGExOctree::FItem& Item)
 		{
@@ -182,7 +187,7 @@ bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const d
 				return;
 			} // Already resolved for non-aggregate checks
 
-			const FCachedVolume& Volume = (*CachedVolumes)[Item.Index];
+			const FCachedVolume& Volume = InVolumes[Item.Index];
 			if (!Volume.VolumeActor.IsValid())
 			{
 				return;
@@ -192,7 +197,7 @@ bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const d
 			const bool bSphereOverlaps = Volume.VolumeActor->EncompassesPoint(Position, static_cast<float>(EffectiveRadius), &DistToSurface);
 			const bool bPointInside = DistToSurface < KINDA_SMALL_NUMBER;
 
-			switch (CheckType)
+			switch (InCheckType)
 			{
 			case EPCGExVolumeCheckType::IsInside:
 				if (bPointInside)
@@ -230,16 +235,16 @@ bool PCGExPointFilter::FVolumeFilter::TestPoint(const FVector& Position, const d
 
 	if (bMatched)
 	{
-		return !bInvert;
+		return !bInInvert;
 	}
 
 	// No volume matched
-	if (CheckType == EPCGExVolumeCheckType::IsOutsideOrIntersects)
+	if (InCheckType == EPCGExVolumeCheckType::IsOutsideOrIntersects)
 	{
-		return bFoundInside ? bInvert : !bInvert;
+		return bFoundInside ? bInInvert : !bInInvert;
 	}
 
-	return bInvert;
+	return bInInvert;
 }
 
 bool PCGExPointFilter::FVolumeFilter::Test(const PCGExData::FProxyPoint& Point) const
@@ -264,9 +269,40 @@ bool PCGExPointFilter::FVolumeFilter::Test(const int32 PointIndex) const
 
 bool PCGExPointFilter::FVolumeFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
 {
+	// Self-contained collection-level eval (see IFilter::Test(IO, ParentCollection) contract): the
+	// volume octree is factory data built in Prepare() -- independent of the per-point Init() -- and
+	// the radius shorthands are read per-IO, so each data is judged on its own @Data values rather
+	// than the seed facade's. Stays correct even when the per-point Init() failed.
+	const TArray<FCachedVolume>& Volumes = TypedFilterFactory->CachedVolumes;
+	const PCGExOctree::FItemOctree* VolumeOctree = TypedFilterFactory->Octree.Get();
+	if (Volumes.IsEmpty() || !VolumeOctree)
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
+
+	const FPCGExVolumeFilterConfig& Cfg = TypedFilterFactory->Config;
+
+	double ExtraR = 0;
+	if (!Cfg.ExtraRadius.TryReadDataValue(IO, ExtraR, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
+
+	double Threshold = 0;
+	if (Cfg.bUsePenetrationThreshold && !Cfg.PenetrationThreshold.TryReadDataValue(IO, Threshold, PCGEX_QUIET_HANDLING))
+	{
+		PCGEX_QUIET_HANDLING_RET
+	}
+
 	PCGExData::FProxyPoint ProxyPoint;
 	IO->GetDataAsProxyPoint(ProxyPoint);
-	return Test(ProxyPoint);
+
+	const FVector Position = ProxyPoint.GetTransform().GetLocation();
+	const FBox LocalBox = PCGExMath::GetLocalBounds(ProxyPoint, Cfg.BoundsSource);
+	const double Radius = ComputeRadius(LocalBox, Cfg.RadiusSource) + ExtraR;
+	const double EffRadius = ComputeEffectiveRadius(Radius, Cfg.bUsePenetrationThreshold, Cfg.PenetrationMode, Threshold);
+
+	return TestPoint(Position, EffRadius, *VolumeOctree, Volumes, Cfg.CheckType, Cfg.bInvert);
 }
 
 #pragma endregion

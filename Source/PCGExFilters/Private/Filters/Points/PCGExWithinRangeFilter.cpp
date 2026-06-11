@@ -67,6 +67,12 @@ bool PCGExPointFilter::FWithinRangeFilter::Init(FPCGExContext* InContext, const 
 		return false;
 	}
 
+	// Cache config flags up front so they survive a per-point Init failure: the collection-level
+	// Test(IO,...) path reads them and may run even when the broadcaster setup below fails against
+	// the seed facade (see IFilter::Test(IO, ParentCollection) contract).
+	bInclusive = TypedFilterFactory->Config.bInclusive;
+	bInvert = TypedFilterFactory->Config.bInvert;
+
 	OperandA = PointDataFacade->GetBroadcaster<double>(TypedFilterFactory->Config.OperandA, true, false, PCGEX_QUIET_HANDLING);
 
 	if (!OperandA)
@@ -74,9 +80,6 @@ bool PCGExPointFilter::FWithinRangeFilter::Init(FPCGExContext* InContext, const 
 		PCGEX_LOG_INVALID_SELECTOR_HANDLED_C(InContext, Operand A, TypedFilterFactory->Config.OperandA)
 		return false;
 	}
-
-	bInclusive = TypedFilterFactory->Config.bInclusive;
-	bInvert = TypedFilterFactory->Config.bInvert;
 
 	return true;
 }

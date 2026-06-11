@@ -834,15 +834,7 @@ namespace PCGExGetCollectionData
 					if (bWantHash) { HashValues[r] = Id.Hash; }
 				}
 
-				TSharedPtr<IPCGAttributeAccessorKeys> Keys;
-				if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(DupData))
-				{
-					Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
-				}
-				else if (UPCGMetadata* Metadata = DupData->MutableMetadata())
-				{
-					Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(Metadata);
-				}
+				TSharedPtr<IPCGAttributeAccessorKeys> Keys = PCGExMetaHelpers::MakeKeys(DupData);
 
 				auto WriteAttr = [&](const bool bWant, const FName AttrName, const TArray<int32>& Values)
 				{

@@ -72,6 +72,12 @@ public:
 	TArray<TSharedPtr<PCGExPaths::FPolyPath>> PolyPaths;
 	TSharedPtr<PCGExOctree::FItemOctree> Octree;
 
+	/** Strong owners for the synthesized per-path FTags, parallel to Datas. FPCGExTaggedData::Tags is a
+	 *  TWeakPtr, so without retaining the FTags here, Datas' tag references would dangle and tag-based data
+	 *  matching silently fails (every candidate's GetTags() returns null). The handler/filter keeps this
+	 *  factory alive for as long as matching runs (it also holds a raw pointer into PolyPaths). */
+	TArray<TSharedPtr<PCGExData::FTags>> OwnedTags;
+
 	virtual bool Init(FPCGExContext* InContext) override;
 	virtual bool WantsPreparation(FPCGExContext* InContext) override;
 	virtual PCGExFactories::EPreparationResult Prepare(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override;
@@ -128,6 +134,7 @@ protected:
 	TArray<FPCGTaggedData> TempTargets;
 	TArray<TSharedPtr<PCGExPaths::FPolyPath>> TempPolyPaths;
 	TArray<FPCGExTaggedData> TempTaggedData;
+	TArray<TSharedPtr<PCGExData::FTags>> TempTags;
 };
 
 namespace PCGExPathInclusion

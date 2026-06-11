@@ -56,6 +56,15 @@ bool PCGExPointFilter::FBitmaskFilter::Init(FPCGExContext* InContext, const TSha
 		return false;
 	}
 
+	// Cache config-derived compositions up front so they survive a per-point Init failure: the
+	// collection-level Test(IO,...) path relies on them and may run even when the broadcaster setup
+	// below fails against the seed facade (see IFilter::Test(IO, ParentCollection) contract).
+	Compositions.Reserve(TypedFilterFactory->Config.Compositions.Num());
+	for (const FPCGExBitmaskRef& Ref : TypedFilterFactory->Config.Compositions)
+	{
+		Compositions.Add(Ref.GetSimpleBitmask());
+	}
+
 	FlagsReader = PointDataFacade->GetReadable<int64>(TypedFilterFactory->Config.FlagsAttribute, PCGExData::EIOSide::In, true);
 
 	if (!FlagsReader)
@@ -68,12 +77,6 @@ bool PCGExPointFilter::FBitmaskFilter::Init(FPCGExContext* InContext, const TSha
 	if (!MaskReader->Init(PointDataFacade))
 	{
 		return false;
-	}
-
-	Compositions.Reserve(TypedFilterFactory->Config.Compositions.Num());
-	for (const FPCGExBitmaskRef& Ref : TypedFilterFactory->Config.Compositions)
-	{
-		Compositions.Add(Ref.GetSimpleBitmask());
 	}
 
 	return true;

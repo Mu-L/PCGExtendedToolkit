@@ -180,7 +180,12 @@ namespace PCGExPointFilter
 		virtual bool Test(const PCGExClusters::FNode& Node) const;
 		virtual bool Test(const PCGExGraphs::FEdge& Edge) const;
 
-		virtual bool Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const; // destined for collection only, is expected to test internal PointDataFacade directly.
+		// Collection-level evaluation. MUST be self-contained: read everything from IO (and the
+		// owning factory's config), never from per-point state built in Init(). In collection mode
+		// the manager keeps filters whose per-point Init() failed (the seed facade may lack the
+		// data), so this can be called even when Init() returned false -- it must not rely on any
+		// Init() side effects. Apply the data-missing fallback locally (see PCGEX_QUIET_HANDLING_RET).
+		virtual bool Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const;
 
 		virtual void SetSupportedTypes(const TSet<PCGExFactories::EType>* InTypes)
 		{

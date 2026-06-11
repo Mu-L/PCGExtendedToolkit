@@ -6,6 +6,7 @@
 #include "PCGData.h"
 #include "PCGExCommon.h"
 #include "Data/PCGBasePointData.h"
+#include "Metadata/Accessors/PCGCustomAccessor.h"
 
 namespace PCGExMetaHelpers
 {
@@ -15,6 +16,19 @@ namespace PCGExMetaHelpers
 		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData)) { return PointData->GetNumPoints(); }
 		if (const UPCGMetadata* Metadata = InData->ConstMetadata()) { return static_cast<int32>(Metadata->GetLocalItemCount()); }
 		return 0;
+	}
+
+	TSharedPtr<IPCGAttributeAccessorKeys> MakeKeys(const UPCGData* InData)
+	{
+		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
+		{
+			return MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
+		}
+		if (InData && InData->Metadata)
+		{
+			return MakeShared<FPCGAttributeAccessorKeysEntries>(InData->Metadata);
+		}
+		return nullptr;
 	}
 
 	bool IsPCGExAttribute(const FString& InStr)

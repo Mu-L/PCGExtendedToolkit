@@ -167,6 +167,23 @@ namespace PCGExPointFilter
 
 			if (!InitFilter(InContext, NewFilter))
 			{
+				// TODO: This failure-policy handling (and the surrounding create/configure/init +
+				// constant-injection loop) is duplicated in FFilterGroup::InitManaged. The proper fix is
+				// a shared FFilterStack base owning ManagedFilters/Stack/sort/PostInit, with virtual hooks
+				// for the init call, constant injection, and Test -- not a param-heavy free helper.
+				if (bWillBeUsedWithCollections)
+				{
+					// In collection mode the per-point machinery built by Init() is never used: the
+					// filter is only ever evaluated per-data through Test(IO, ParentCollection), which
+					// re-reads the data and applies InitializationFailurePolicy locally. A failure here
+					// only means the dummy seed facade (the first data) lacked what the filter needs --
+					// which says nothing about the other data in the collection. Keep the filter so each
+					// data is judged on its own merits, instead of collapsing the whole stack to a single
+					// constant based on the first data.
+					ManagedFilters.Add(NewFilter);
+					continue;
+				}
+
 				if (Factory->InitializationFailurePolicy == EPCGExFilterNoDataFallback::Error)
 				{
 					PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(FTEXT("A filter failed to initialize properly : {0}."), FText::FromString(GetNameSafe(Factory->GetClass()))));

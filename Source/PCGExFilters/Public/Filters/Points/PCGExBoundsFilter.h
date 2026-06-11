@@ -82,7 +82,7 @@ struct FPCGExBoundsFilterConfig
 	bool bIgnoreSelf = false;
 
 	/** Data matching settings. When enabled, only bounds data that matches the input being tested will be considered. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExFilterMatchingDetails DataMatching;
 
 	/** If enabled, uses collection bounds as a single proxy point instead of per-point testing. */
