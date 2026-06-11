@@ -13,6 +13,7 @@ from pathlib import Path
 PLUGIN_NAME = "PCGExtendedToolkit"
 MODULE_PREFIX = "PCGEx"
 EDITOR_SUFFIX = "Editor"
+UNCOOKED_SUFFIX = "Uncooked"
 
 PLATFORMS = {
     "runtime": ["Win64", "Mac", "IOS", "Android", "Linux", "LinuxArm64"],
@@ -168,11 +169,22 @@ def module_exists(module_name: str) -> bool:
     return module_path.is_dir()
 
 
+def is_umbrella_module(name: str) -> bool:
+    return name == PLUGIN_NAME or name == PLUGIN_NAME + EDITOR_SUFFIX
+
+
 def get_editor_companion(module_name: str) -> str | None:
     if module_name.endswith(EDITOR_SUFFIX):
         return None
     editor_name = module_name + EDITOR_SUFFIX
     return editor_name if module_exists(editor_name) else None
+
+
+def get_uncooked_companion(module_name: str) -> str | None:
+    if module_name.endswith(UNCOOKED_SUFFIX):
+        return None
+    uncooked_name = module_name + UNCOOKED_SUFFIX
+    return uncooked_name if module_exists(uncooked_name) else None
 
 
 def scan_build_cs_dependencies(module_name: str) -> list[str]:
@@ -240,6 +252,12 @@ def resolve_all_modules(requested_modules: list[str]) -> set[str]:
         if editor and editor not in resolved:
             queue.append(editor)
 
+        # Add uncooked companion if exists (K2 node hosts and the like - nothing
+        # Build.cs-depends on them, so name convention is the only discovery path)
+        uncooked = get_uncooked_companion(module_name)
+        if uncooked and uncooked not in resolved:
+            queue.append(uncooked)
+
         # Add PCGEx dependencies
         deps = scan_build_cs_dependencies(module_name)
         for dep in deps:
@@ -263,13 +281,28 @@ def load_existing_uplugin() -> str:
     return uplugin_path.read_text(encoding="utf-8")
 
 
+def infer_module_type(name: str) -> str:
+    # Name-based inference is only a DEFAULT for newly discovered modules.
+    # Modules already declared in the .uplugin keep their entry verbatim (see
+    # generate_uplugin), so deliberate deviations - e.g. PCGExPropertiesEditor
+    # being UncookedOnly because it hosts K2 nodes - survive regeneration.
+    if name.endswith(UNCOOKED_SUFFIX):
+        return "UncookedOnly"
+    if name.endswith(EDITOR_SUFFIX):
+        return "Editor"
+    return "Runtime"
+
+
 def build_module_entry(name: str) -> dict:
-    is_editor = name.endswith(EDITOR_SUFFIX)
+    module_type = infer_module_type(name)
+    # UncookedOnly modules only load in editor and uncooked -game runs, so they
+    # get the same desktop-only platform list as Editor modules.
+    platforms = PLATFORMS["runtime"] if module_type == "Runtime" else PLATFORMS["editor"]
     return {
         "Name": name,
-        "Type": "Editor" if is_editor else "Runtime",
+        "Type": module_type,
         "LoadingPhase": "Default",
-        "PlatformAllowList": list(PLATFORMS["editor"] if is_editor else PLATFORMS["runtime"]),
+        "PlatformAllowList": list(platforms),
     }
 
 
@@ -289,31 +322,40 @@ def resolve_required_plugins(modules: set[str], plugins_deps: dict[str, list[str
 
 
 def module_sort_key(name: str) -> tuple[int, int, str]:
-    is_umbrella = name == PLUGIN_NAME or name == PLUGIN_NAME + EDITOR_SUFFIX
-    if is_umbrella:
+    if is_umbrella_module(name):
         # Main umbrella first (0), then editor umbrella (1)
         return (0, 0 if name == PLUGIN_NAME else 1, name)
     return (1, 0, name)
 
 
 def generate_uplugin(existing_uplugin: dict, modules: set[str], plugins: set[str]) -> dict:
+    # Build new uplugin preserving all existing metadata
+    new_uplugin = dict(existing_uplugin)
+
+    # Preserve-first: a module already declared in the .uplugin keeps its entry
+    # verbatim (Type, LoadingPhase, PlatformAllowList, ...). The .uplugin is the
+    # source of truth for hand-tuned fields; name-based inference only provides
+    # defaults for NEWLY discovered modules (see build_module_entry). Entries whose
+    # module is no longer part of the resolved set are dropped.
+    existing_modules = {entry["Name"]: entry for entry in existing_uplugin.get("Modules", [])}
+    existing_plugins = {entry["Name"]: entry for entry in existing_uplugin.get("Plugins", [])}
+
     # Always include umbrella modules
     all_modules = set(modules)
     all_modules.add(PLUGIN_NAME)
     all_modules.add(PLUGIN_NAME + EDITOR_SUFFIX)
 
-    # Build new uplugin preserving all existing metadata
-    new_uplugin = dict(existing_uplugin)
-
     new_uplugin["Modules"] = [
-        build_module_entry(name) for name in sorted(all_modules, key=module_sort_key)
+        existing_modules.get(name) or build_module_entry(name)
+        for name in sorted(all_modules, key=module_sort_key)
     ]
 
     def plugin_sort_key(name: str) -> tuple[int, str]:
         return (0, name) if name == "PCG" else (1, name)
 
     new_uplugin["Plugins"] = [
-        build_plugin_entry(name) for name in sorted(plugins, key=plugin_sort_key)
+        existing_plugins.get(name) or build_plugin_entry(name)
+        for name in sorted(plugins, key=plugin_sort_key)
     ]
 
     return new_uplugin
@@ -397,17 +439,30 @@ def main():
     plugins_deps = parse_plugins_deps(PATHS["plugins_deps"])
     print(f"Plugin dependencies defined for: {len(plugins_deps)} modules")
 
-    # Resolve all modules (with deps and editor companions)
+    # Load existing uplugin content (as string for comparison)
+    existing_content = load_existing_uplugin()
+    existing_uplugin = json.loads(existing_content)
+
+    # Resolve all modules (with deps and editor/uncooked companions)
     all_modules = resolve_all_modules(valid)
     print(f"Resolved modules (with dependencies): {len(all_modules)}")
+
+    # The config is the source of truth for module INCLUSION: declared modules
+    # that are no longer reachable (removed from the config, or folder deleted)
+    # are pruned from the .uplugin. Always-on modules (e.g. PCGExSpatialDomains)
+    # must be listed in PCGExSubModulesConfig.ini. Log drops so a module
+    # accidentally missing from the config never disappears silently.
+    dropped = [
+        entry["Name"]
+        for entry in existing_uplugin.get("Modules", [])
+        if not is_umbrella_module(entry["Name"]) and entry["Name"] not in all_modules
+    ]
+    if dropped:
+        print(f"Dropped declared modules (removed from config or folder deleted): {', '.join(dropped)}")
 
     # Resolve required plugins
     required_plugins = resolve_required_plugins(all_modules, plugins_deps)
     print(f"Required plugins: {', '.join(sorted(required_plugins))}")
-
-    # Load existing uplugin content (as string for comparison)
-    existing_content = load_existing_uplugin()
-    existing_uplugin = json.loads(existing_content)
 
     # Generate new uplugin
     new_uplugin = generate_uplugin(existing_uplugin, all_modules, required_plugins)
@@ -420,8 +475,9 @@ def main():
         # Clean build artifacts before writing new uplugin
         # clean_build_artifacts()
 
-        # Write new uplugin
-        PATHS["uplugin"].write_text(new_content, encoding="utf-8")
+        # Write new uplugin (keep LF on every platform so the output is
+        # byte-identical to the js generator and stable in version control)
+        PATHS["uplugin"].write_text(new_content, encoding="utf-8", newline="\n")
         print(f"\nGenerated {PATHS['uplugin']}")
     else:
         print("\n.uplugin unchanged - skipping write.")

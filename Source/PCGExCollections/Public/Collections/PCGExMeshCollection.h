@@ -20,7 +20,7 @@ class UPCGExMeshCollection;
 
 // Material Override Structures
 
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExMaterialVariantsMode : uint8
 {
 	None   = 0 UMETA(DisplayName = "None", ToolTip="No variants.", ActionIcon="STF_None"),
@@ -147,7 +147,7 @@ struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionEntry : public FPCGExAssetCollec
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Variants", EditCondition="!bIsSubCollection && MaterialVariants == EPCGExMaterialVariantsMode::Multi", EditConditionHides))
 	TArray<FPCGExMaterialOverrideCollection> MaterialOverrideVariantsList;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides, DisplayAfter="Variations"))
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides, DisplayAfter="Variations", InvalidEnumValues="None"))
 	EPCGExEntryVariationMode DescriptorSource = EPCGExEntryVariationMode::Local;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" ├─ ISM Settings", EditCondition="!bIsSubCollection && DescriptorSource == EPCGExEntryVariationMode::Local", EditConditionHides, DisplayAfter="DescriptorSource"))

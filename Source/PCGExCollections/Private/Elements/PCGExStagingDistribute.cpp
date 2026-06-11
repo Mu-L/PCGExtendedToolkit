@@ -560,6 +560,8 @@ namespace PCGExAssetStaging
 		const bool bLocalApplyFitting = bApplyFitting;
 		const bool bLocalOutputWeight = bOutputWeight;
 		const bool bFlattenSubCollections = Settings->bFlattenSubCollections;
+		const bool bConsiderEntryScaleToFit = Settings->bConsiderEntryScaleToFit;
+		const bool bConsiderEntryJustification = Settings->bConsiderEntryJustification;
 		UPCGBasePointData* OutPointData = PointDataFacade->GetOut();
 
 		const TPCGValueRange<FTransform> OutTransforms = OutPointData->GetTransformValueRange(false);
@@ -714,6 +716,16 @@ namespace PCGExAssetStaging
 
 				const FPCGExFittingVariations& EntryVariations = Entry->GetVariations(EntryHost);
 
+				PCGExFitting::FOverridesView EntryOverrides;
+				if (bConsiderEntryScaleToFit)
+				{
+					EntryOverrides.ScaleToFit = Entry->GetScaleToFitOverride(EntryHost);
+				}
+				if (bConsiderEntryJustification)
+				{
+					EntryOverrides.Justification = Entry->GetJustificationOverride(EntryHost);
+				}
+
 				RandomSource.Initialize(PCGExRandomHelpers::GetSeed(Seed, Variations.Seed));
 
 				// "Before" variations modify asset bounds before fitting, affecting scale-to-fit calculation.
@@ -722,11 +734,11 @@ namespace PCGExAssetStaging
 				{
 					FTransform LocalXForm = FTransform::Identity;
 					Variations.Apply(RandomSource, LocalXForm, EntryVariations, EPCGExVariationMode::Before);
-					FittingHandler.ComputeLocalTransform(Index, LocalXForm, OutTransform, OutBounds, OutTranslation);
+					FittingHandler.ComputeLocalTransform(Index, LocalXForm, OutTransform, OutBounds, OutTranslation, EntryOverrides);
 				}
 				else
 				{
-					FittingHandler.ComputeTransform(Index, OutTransform, OutBounds, OutTranslation);
+					FittingHandler.ComputeTransform(Index, OutTransform, OutBounds, OutTranslation, true, EntryOverrides);
 				}
 
 				if (TranslationWriter)

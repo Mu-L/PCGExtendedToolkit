@@ -10,6 +10,7 @@ class SWidget;
 
 namespace PCGExEnumCustomization
 {
+	/** Radio group that honors the property's ValidEnumValues / InvalidEnumValues metadata (plus UMETA(Hidden)). */
 	PCGEXCOREEDITOR_API
 	TSharedRef<SWidget> CreateRadioGroup(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum);
 
