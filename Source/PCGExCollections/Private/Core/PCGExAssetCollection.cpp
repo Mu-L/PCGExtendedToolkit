@@ -1391,7 +1391,7 @@ void UPCGExAssetCollection::EDITOR_DispatchPipelinePreRebuild()
 	StagingPipeline->OnPreRebuild(this);
 }
 
-void UPCGExAssetCollection::EDITOR_DispatchPipelineEntry(int32 EntryIndex)
+void UPCGExAssetCollection::EDITOR_DispatchPipelineEntry(int32 EntryIndex, bool bIsSubCollection)
 {
 	if (!StagingPipeline || bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet())
 	{
@@ -1400,7 +1400,7 @@ void UPCGExAssetCollection::EDITOR_DispatchPipelineEntry(int32 EntryIndex)
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
 	FEditorScriptExecutionGuard ScriptGuard;
-	StagingPipeline->OnProcessEntry(this, EntryIndex);
+	StagingPipeline->OnProcessEntry(this, EntryIndex, bIsSubCollection);
 }
 
 void UPCGExAssetCollection::EDITOR_DispatchPipelinePostRebuild()
@@ -1549,6 +1549,13 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 		return false;
 	}
 
+	// Hook-initiated restages (e.g. Blueprint RestageEntry called from a StagingPipeline hook)
+	// must be finalize-quiet: the owning session fires EDITOR_FinalizeStagingRebuild once at
+	// its own tail. Standalone calls keep full session semantics (pre-dispatch + finalize).
+	TGuardValue<int32> HookSuppressGuard(
+		EDITOR_PostStagingRebuildSuppressDepth,
+		EDITOR_PostStagingRebuildSuppressDepth + (bEDITOR_PipelineDispatchGuard ? 1 : 0));
+
 	// Direct single-entry sessions fire the pre hook themselves; batch loops (stale entries)
 	// already fired it before suppressing.
 	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
@@ -1567,7 +1574,7 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 		InEntry->EDITOR_Sanitize();
 		InEntry->UpdateStaging(this, i, false);
 		InEntry->PostUpdateStaging();
-		EDITOR_DispatchPipelineEntry(i);
+		EDITOR_DispatchPipelineEntry(i, InEntry->bIsSubCollection);
 		bRebuilt = true;
 	});
 
@@ -1612,7 +1619,7 @@ void UPCGExAssetCollection::EDITOR_SanitizeAndRebuildStagingData(bool bRecursive
 		InEntry->EDITOR_Sanitize();
 		InEntry->UpdateStaging(this, i, bRecursive);
 		InEntry->PostUpdateStaging();
-		EDITOR_DispatchPipelineEntry(i);
+		EDITOR_DispatchPipelineEntry(i, InEntry->bIsSubCollection);
 	});
 }
 

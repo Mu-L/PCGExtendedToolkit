@@ -6,7 +6,9 @@
 #include "PCGExProperty.h"
 #include "PCGExPropertyPinMarshal.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Core/PCGExAssetCollectionTypes.h"
 #include "Helpers/PCGExCollectionPropertySetWriter.h"
+#include "Helpers/PCGExMemberPath.h"
 #include "UObject/Stack.h"
 
 namespace PCGExCollectionEntryBlueprintLibrary_Private
@@ -192,6 +194,223 @@ namespace PCGExCollectionEntryBlueprintLibrary_Private
 		Collection->Modify();
 		(void)Collection->MarkPackageDirty();
 		Collection->InvalidateCache();
+	}
+
+	// --- Generic reflected member access ---
+
+	// Entry-struct layout for the collection's registered type. Instance TypeId first (exact
+	// regardless of BP subclassing), class lookup second, base entry struct as final fallback
+	// so base members stay reachable for unregistered custom types.
+	const UStruct* ResolveEntryMemberRoot(const UPCGExAssetCollection* Collection)
+	{
+		const PCGExAssetCollection::FTypeRegistry& Registry = PCGExAssetCollection::FTypeRegistry::Get();
+
+		const PCGExAssetCollection::FTypeInfo* TypeInfo = Registry.Find(Collection->GetTypeId());
+		if (!TypeInfo || !TypeInfo->EntryStruct)
+		{
+			TypeInfo = Registry.FindByClass(Collection->GetClass());
+		}
+
+		if (TypeInfo && TypeInfo->EntryStruct)
+		{
+			return TypeInfo->EntryStruct;
+		}
+
+		return FPCGExAssetCollectionEntry::StaticStruct();
+	}
+
+	PCGExMemberPath::FResolvedMember ResolveEntryMember(UPCGExAssetCollection* Collection, int32 EntryIndex, FName MemberPath)
+	{
+		FPCGExAssetCollectionEntry* Entry = GetMutableEntry(Collection, EntryIndex);
+		if (!Entry)
+		{
+			return PCGExMemberPath::FResolvedMember();
+		}
+		return PCGExMemberPath::Resolve(ResolveEntryMemberRoot(Collection), Entry, MemberPath);
+	}
+
+	PCGExMemberPath::FResolvedMember ResolveEntryMemberConst(const UPCGExAssetCollection* Collection, int32 EntryIndex, FName MemberPath)
+	{
+		// Read-only resolution; the resolver wants a mutable container but the address is
+		// only ever read from on this path.
+		const FPCGExAssetCollectionEntry* Entry = GetEntry(Collection, EntryIndex);
+		if (!Entry)
+		{
+			return PCGExMemberPath::FResolvedMember();
+		}
+		return PCGExMemberPath::Resolve(ResolveEntryMemberRoot(Collection), const_cast<FPCGExAssetCollectionEntry*>(Entry), MemberPath);
+	}
+
+	PCGExMemberPath::FResolvedMember ResolveCollectionMember(UPCGExAssetCollection* Collection, FName MemberPath)
+	{
+		if (!Collection)
+		{
+			return PCGExMemberPath::FResolvedMember();
+		}
+		return PCGExMemberPath::Resolve(Collection->GetClass(), Collection, MemberPath);
+	}
+
+	PCGExMemberPath::FResolvedMember ResolveCollectionMemberConst(const UPCGExAssetCollection* Collection, FName MemberPath)
+	{
+		if (!Collection)
+		{
+			return PCGExMemberPath::FResolvedMember();
+		}
+		return PCGExMemberPath::Resolve(Collection->GetClass(), const_cast<UPCGExAssetCollection*>(Collection), MemberPath);
+	}
+
+	void MemberPathMissWarning(const UPCGExAssetCollection* Collection, FName MemberPath)
+	{
+		FFrame::KismetExecutionMessage(
+			*FString::Printf(
+				TEXT("Member path '%s' could not be resolved on collection '%s'."),
+				*MemberPath.ToString(), *GetNameSafe(Collection)),
+			ELogVerbosity::Warning);
+	}
+
+	// Generic member writes can touch anything the pick cache consumes (Weight, Category,
+	// material variants) -- blanket invalidate; the cache rebuilds lazily.
+	void CommitMemberWrite(UPCGExAssetCollection* Collection)
+	{
+		Collection->Modify();
+		(void)Collection->MarkPackageDirty();
+		Collection->InvalidateCache();
+	}
+
+	// Exact-type copy between a member property and a Blueprint pin (either direction).
+	// FBoolProperty pairs are special-cased: native bool vs bitfield bool pass SameType,
+	// but CopyCompleteValue is FieldMask-based and corrupts across differing layouts.
+	bool CopyMemberValue(
+		const FProperty* SrcProp, const void* SrcMem,
+		const FProperty* DstProp, void* DstMem,
+		const UPCGExAssetCollection* Collection, FName MemberPath)
+	{
+		if (!SrcProp || !SrcMem || !DstProp || !DstMem)
+		{
+			return false;
+		}
+
+		const FBoolProperty* SrcBool = CastField<FBoolProperty>(SrcProp);
+		const FBoolProperty* DstBool = CastField<FBoolProperty>(DstProp);
+		if (SrcBool && DstBool)
+		{
+			DstBool->SetPropertyValue(DstMem, SrcBool->GetPropertyValue(SrcMem));
+			return true;
+		}
+
+		if (!DstProp->SameType(SrcProp))
+		{
+			FFrame::KismetExecutionMessage(
+				*FString::Printf(
+					TEXT("Member '%s' on collection '%s' is of type '%s' but the connected pin is '%s'. Re-pick the member on the node to refresh the pin type."),
+					*MemberPath.ToString(), *GetNameSafe(Collection),
+					*SrcProp->GetCPPType(), *DstProp->GetCPPType()),
+				ELogVerbosity::Warning);
+			return false;
+		}
+
+		DstProp->CopyCompleteValue(DstMem, SrcMem);
+		return true;
+	}
+
+	bool ReadMemberInto(
+		const PCGExMemberPath::FResolvedMember& Member,
+		const UPCGExAssetCollection* Collection, FName MemberPath,
+		const FProperty* OutProp, void* OutMem)
+	{
+		if (!Member.IsValid())
+		{
+			MemberPathMissWarning(Collection, MemberPath);
+			return false;
+		}
+		return CopyMemberValue(Member.Property, Member.Address, OutProp, OutMem, Collection, MemberPath);
+	}
+
+	bool WriteMemberFrom(
+		const PCGExMemberPath::FResolvedMember& Member,
+		UPCGExAssetCollection* Collection, FName MemberPath,
+		const FProperty* InProp, const void* InMem)
+	{
+		if (!Member.IsValid())
+		{
+			MemberPathMissWarning(Collection, MemberPath);
+			return false;
+		}
+		if (!CopyMemberValue(InProp, InMem, Member.Property, Member.Address, Collection, MemberPath))
+		{
+			return false;
+		}
+		CommitMemberWrite(Collection);
+		return true;
+	}
+
+	// Soft-reference flavor helpers. FSoftClassProperty derives from FSoftObjectProperty, so
+	// the object flavor must explicitly reject class members and vice versa.
+	const FSoftObjectProperty* ResolveSoftFlavor(
+		const PCGExMemberPath::FResolvedMember& Member,
+		const UPCGExAssetCollection* Collection, FName MemberPath, bool bClassFlavor)
+	{
+		if (!Member.IsValid())
+		{
+			MemberPathMissWarning(Collection, MemberPath);
+			return nullptr;
+		}
+
+		const FSoftObjectProperty* SoftProp = CastField<FSoftObjectProperty>(Member.Property);
+		const bool bIsClassProp = Member.Property->IsA<FSoftClassProperty>();
+		if (!SoftProp || bIsClassProp != bClassFlavor)
+		{
+			FFrame::KismetExecutionMessage(
+				*FString::Printf(
+					TEXT("Member '%s' on collection '%s' is not a soft %s reference."),
+					*MemberPath.ToString(), *GetNameSafe(Collection),
+					bClassFlavor ? TEXT("class") : TEXT("object")),
+				ELogVerbosity::Warning);
+			return nullptr;
+		}
+
+		return SoftProp;
+	}
+
+	bool ReadMemberSoftPath(
+		const PCGExMemberPath::FResolvedMember& Member,
+		const UPCGExAssetCollection* Collection, FName MemberPath,
+		UClass* ExpectedClass, bool bClassFlavor, FSoftObjectPath& OutPath)
+	{
+		const FSoftObjectProperty* SoftProp = ResolveSoftFlavor(Member, Collection, MemberPath, bClassFlavor);
+		if (!SoftProp)
+		{
+			return false;
+		}
+
+		// Declared-class compatibility: the node stamps ExpectedClass from the member's own
+		// class, so this only rejects stale/mismatched graphs.
+		const UClass* DeclaredClass = bClassFlavor
+			? CastFieldChecked<FSoftClassProperty>(SoftProp)->MetaClass
+			: SoftProp->PropertyClass;
+		if (ExpectedClass && DeclaredClass && !DeclaredClass->IsChildOf(ExpectedClass))
+		{
+			return false;
+		}
+
+		OutPath = SoftProp->GetPropertyValue(Member.Address).ToSoftObjectPath();
+		return true;
+	}
+
+	bool WriteMemberSoftPath(
+		const PCGExMemberPath::FResolvedMember& Member,
+		UPCGExAssetCollection* Collection, FName MemberPath,
+		bool bClassFlavor, const FSoftObjectPath& InPath)
+	{
+		const FSoftObjectProperty* SoftProp = ResolveSoftFlavor(Member, Collection, MemberPath, bClassFlavor);
+		if (!SoftProp)
+		{
+			return false;
+		}
+
+		SoftProp->SetPropertyValue(Member.Address, FSoftObjectPtr(InPath));
+		CommitMemberWrite(Collection);
+		return true;
 	}
 }
 
@@ -484,4 +703,395 @@ FBox UPCGExCollectionEntryBlueprintLibrary::GetEntryStagingBounds(const UPCGExAs
 {
 	const FPCGExAssetCollectionEntry* Entry = PCGExCollectionEntryBlueprintLibrary_Private::GetEntry(Collection, EntryIndex);
 	return Entry ? Entry->Staging.Bounds : FBox(ForceInit);
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TryGetEntryMemberValue(
+	const UPCGExAssetCollection* Collection,
+	int32 EntryIndex,
+	FName MemberPath,
+	int32& OutValue)
+{
+	checkNoEntry();
+	return false;
+}
+
+DEFINE_FUNCTION(UPCGExCollectionEntryBlueprintLibrary::execTryGetEntryMemberValue)
+{
+	P_GET_OBJECT(UPCGExAssetCollection, Collection);
+	P_GET_PROPERTY(FIntProperty, EntryIndex);
+	P_GET_PROPERTY(FNameProperty, MemberPath);
+
+	Stack.MostRecentProperty = nullptr;
+	Stack.MostRecentPropertyAddress = nullptr;
+	Stack.StepCompiledIn<FProperty>(nullptr);
+	const FProperty* OutProp = Stack.MostRecentProperty;
+	void* OutMem = Stack.MostRecentPropertyAddress;
+
+	P_FINISH;
+
+	P_NATIVE_BEGIN;
+		*static_cast<bool*>(RESULT_PARAM) = PCGExCollectionEntryBlueprintLibrary_Private::ReadMemberInto(
+			PCGExCollectionEntryBlueprintLibrary_Private::ResolveEntryMemberConst(Collection, EntryIndex, MemberPath),
+			Collection, MemberPath, OutProp, OutMem);
+	P_NATIVE_END;
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TrySetEntryMemberValue(
+	UPCGExAssetCollection* Collection,
+	int32 EntryIndex,
+	FName MemberPath,
+	const int32& NewValue)
+{
+	checkNoEntry();
+	return false;
+}
+
+DEFINE_FUNCTION(UPCGExCollectionEntryBlueprintLibrary::execTrySetEntryMemberValue)
+{
+	P_GET_OBJECT(UPCGExAssetCollection, Collection);
+	P_GET_PROPERTY(FIntProperty, EntryIndex);
+	P_GET_PROPERTY(FNameProperty, MemberPath);
+
+	Stack.MostRecentProperty = nullptr;
+	Stack.MostRecentPropertyAddress = nullptr;
+	Stack.StepCompiledIn<FProperty>(nullptr);
+	const FProperty* InProp = Stack.MostRecentProperty;
+	const void* InMem = Stack.MostRecentPropertyAddress;
+
+	P_FINISH;
+
+	P_NATIVE_BEGIN;
+		*static_cast<bool*>(RESULT_PARAM) = PCGExCollectionEntryBlueprintLibrary_Private::WriteMemberFrom(
+			PCGExCollectionEntryBlueprintLibrary_Private::ResolveEntryMember(Collection, EntryIndex, MemberPath),
+			Collection, MemberPath, InProp, InMem);
+	P_NATIVE_END;
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TryGetCollectionMemberValue(
+	const UPCGExAssetCollection* Collection,
+	FName MemberPath,
+	int32& OutValue)
+{
+	checkNoEntry();
+	return false;
+}
+
+DEFINE_FUNCTION(UPCGExCollectionEntryBlueprintLibrary::execTryGetCollectionMemberValue)
+{
+	P_GET_OBJECT(UPCGExAssetCollection, Collection);
+	P_GET_PROPERTY(FNameProperty, MemberPath);
+
+	Stack.MostRecentProperty = nullptr;
+	Stack.MostRecentPropertyAddress = nullptr;
+	Stack.StepCompiledIn<FProperty>(nullptr);
+	const FProperty* OutProp = Stack.MostRecentProperty;
+	void* OutMem = Stack.MostRecentPropertyAddress;
+
+	P_FINISH;
+
+	P_NATIVE_BEGIN;
+		*static_cast<bool*>(RESULT_PARAM) = PCGExCollectionEntryBlueprintLibrary_Private::ReadMemberInto(
+			PCGExCollectionEntryBlueprintLibrary_Private::ResolveCollectionMemberConst(Collection, MemberPath),
+			Collection, MemberPath, OutProp, OutMem);
+	P_NATIVE_END;
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TrySetCollectionMemberValue(
+	UPCGExAssetCollection* Collection,
+	FName MemberPath,
+	const int32& NewValue)
+{
+	checkNoEntry();
+	return false;
+}
+
+DEFINE_FUNCTION(UPCGExCollectionEntryBlueprintLibrary::execTrySetCollectionMemberValue)
+{
+	P_GET_OBJECT(UPCGExAssetCollection, Collection);
+	P_GET_PROPERTY(FNameProperty, MemberPath);
+
+	Stack.MostRecentProperty = nullptr;
+	Stack.MostRecentPropertyAddress = nullptr;
+	Stack.StepCompiledIn<FProperty>(nullptr);
+	const FProperty* InProp = Stack.MostRecentProperty;
+	const void* InMem = Stack.MostRecentPropertyAddress;
+
+	P_FINISH;
+
+	P_NATIVE_BEGIN;
+		*static_cast<bool*>(RESULT_PARAM) = PCGExCollectionEntryBlueprintLibrary_Private::WriteMemberFrom(
+			PCGExCollectionEntryBlueprintLibrary_Private::ResolveCollectionMember(Collection, MemberPath),
+			Collection, MemberPath, InProp, InMem);
+	P_NATIVE_END;
+}
+
+TSoftObjectPtr<UObject> UPCGExCollectionEntryBlueprintLibrary::TryGetEntryMemberSoftObject(
+	const UPCGExAssetCollection* Collection,
+	int32 EntryIndex,
+	FName MemberPath,
+	TSubclassOf<UObject> ExpectedClass,
+	bool& bSuccess)
+{
+	FSoftObjectPath Path;
+	bSuccess = PCGExCollectionEntryBlueprintLibrary_Private::ReadMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveEntryMemberConst(Collection, EntryIndex, MemberPath),
+		Collection, MemberPath, *ExpectedClass, false, Path);
+	return TSoftObjectPtr<UObject>(Path);
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TrySetEntryMemberSoftObject(
+	UPCGExAssetCollection* Collection,
+	int32 EntryIndex,
+	FName MemberPath,
+	TSoftObjectPtr<UObject> NewValue)
+{
+	return PCGExCollectionEntryBlueprintLibrary_Private::WriteMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveEntryMember(Collection, EntryIndex, MemberPath),
+		Collection, MemberPath, false, NewValue.ToSoftObjectPath());
+}
+
+TSoftClassPtr<UObject> UPCGExCollectionEntryBlueprintLibrary::TryGetEntryMemberSoftClass(
+	const UPCGExAssetCollection* Collection,
+	int32 EntryIndex,
+	FName MemberPath,
+	TSubclassOf<UObject> ExpectedClass,
+	bool& bSuccess)
+{
+	FSoftObjectPath Path;
+	bSuccess = PCGExCollectionEntryBlueprintLibrary_Private::ReadMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveEntryMemberConst(Collection, EntryIndex, MemberPath),
+		Collection, MemberPath, *ExpectedClass, true, Path);
+	return TSoftClassPtr<UObject>(Path);
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TrySetEntryMemberSoftClass(
+	UPCGExAssetCollection* Collection,
+	int32 EntryIndex,
+	FName MemberPath,
+	TSoftClassPtr<UObject> NewValue)
+{
+	return PCGExCollectionEntryBlueprintLibrary_Private::WriteMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveEntryMember(Collection, EntryIndex, MemberPath),
+		Collection, MemberPath, true, NewValue.ToSoftObjectPath());
+}
+
+TSoftObjectPtr<UObject> UPCGExCollectionEntryBlueprintLibrary::TryGetCollectionMemberSoftObject(
+	const UPCGExAssetCollection* Collection,
+	FName MemberPath,
+	TSubclassOf<UObject> ExpectedClass,
+	bool& bSuccess)
+{
+	FSoftObjectPath Path;
+	bSuccess = PCGExCollectionEntryBlueprintLibrary_Private::ReadMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveCollectionMemberConst(Collection, MemberPath),
+		Collection, MemberPath, *ExpectedClass, false, Path);
+	return TSoftObjectPtr<UObject>(Path);
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TrySetCollectionMemberSoftObject(
+	UPCGExAssetCollection* Collection,
+	FName MemberPath,
+	TSoftObjectPtr<UObject> NewValue)
+{
+	return PCGExCollectionEntryBlueprintLibrary_Private::WriteMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveCollectionMember(Collection, MemberPath),
+		Collection, MemberPath, false, NewValue.ToSoftObjectPath());
+}
+
+TSoftClassPtr<UObject> UPCGExCollectionEntryBlueprintLibrary::TryGetCollectionMemberSoftClass(
+	const UPCGExAssetCollection* Collection,
+	FName MemberPath,
+	TSubclassOf<UObject> ExpectedClass,
+	bool& bSuccess)
+{
+	FSoftObjectPath Path;
+	bSuccess = PCGExCollectionEntryBlueprintLibrary_Private::ReadMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveCollectionMemberConst(Collection, MemberPath),
+		Collection, MemberPath, *ExpectedClass, true, Path);
+	return TSoftClassPtr<UObject>(Path);
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::TrySetCollectionMemberSoftClass(
+	UPCGExAssetCollection* Collection,
+	FName MemberPath,
+	TSoftClassPtr<UObject> NewValue)
+{
+	return PCGExCollectionEntryBlueprintLibrary_Private::WriteMemberSoftPath(
+		PCGExCollectionEntryBlueprintLibrary_Private::ResolveCollectionMember(Collection, MemberPath),
+		Collection, MemberPath, true, NewValue.ToSoftObjectPath());
+}
+
+FPCGExAssetGrammarDetails UPCGExCollectionEntryBlueprintLibrary::GetEntryGrammar(const UPCGExAssetCollection* Collection, int32 EntryIndex, bool& bSuccess)
+{
+	const FPCGExAssetCollectionEntry* Entry = PCGExCollectionEntryBlueprintLibrary_Private::GetEntry(Collection, EntryIndex);
+	bSuccess = Entry != nullptr;
+	return Entry ? Entry->AssetGrammar : FPCGExAssetGrammarDetails();
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::SetEntryGrammar(UPCGExAssetCollection* Collection, int32 EntryIndex, const FPCGExAssetGrammarDetails& NewGrammar)
+{
+	FPCGExAssetCollectionEntry* Entry = PCGExCollectionEntryBlueprintLibrary_Private::GetMutableEntry(Collection, EntryIndex);
+	if (!Entry)
+	{
+		return false;
+	}
+
+	Entry->AssetGrammar = NewGrammar;
+	// Grammar does not feed the pick cache -- undo snapshot + dirty only.
+	Collection->Modify();
+	(void)Collection->MarkPackageDirty();
+	return true;
+}
+
+FPCGExAssetGrammarDetails UPCGExCollectionEntryBlueprintLibrary::GetEntryEffectiveGrammar(const UPCGExAssetCollection* Collection, int32 EntryIndex, bool& bSuccess)
+{
+	bSuccess = false;
+	if (!Collection)
+	{
+		return FPCGExAssetGrammarDetails();
+	}
+
+	const FPCGExEntryAccessResult Result = Collection->GetEntryRaw(EntryIndex);
+	if (!Result)
+	{
+		return FPCGExAssetGrammarDetails();
+	}
+
+	const FPCGExAssetGrammarDetails* Effective = Result.Entry->GetEffectiveGrammar(Result.Host);
+	bSuccess = Effective != nullptr;
+	return Effective ? *Effective : FPCGExAssetGrammarDetails();
+}
+
+FPCGExFittingVariations UPCGExCollectionEntryBlueprintLibrary::GetEntryVariations(const UPCGExAssetCollection* Collection, int32 EntryIndex, bool& bSuccess)
+{
+	const FPCGExAssetCollectionEntry* Entry = PCGExCollectionEntryBlueprintLibrary_Private::GetEntry(Collection, EntryIndex);
+	bSuccess = Entry != nullptr;
+	return Entry ? Entry->Variations : FPCGExFittingVariations();
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::SetEntryVariations(UPCGExAssetCollection* Collection, int32 EntryIndex, const FPCGExFittingVariations& NewVariations)
+{
+	FPCGExAssetCollectionEntry* Entry = PCGExCollectionEntryBlueprintLibrary_Private::GetMutableEntry(Collection, EntryIndex);
+	if (!Entry)
+	{
+		return false;
+	}
+
+	Entry->Variations = NewVariations;
+	Collection->Modify();
+	(void)Collection->MarkPackageDirty();
+	return true;
+}
+
+FPCGExAssetGrammarDetails UPCGExCollectionEntryBlueprintLibrary::GetCollectionGlobalGrammar(const UPCGExAssetCollection* Collection, bool& bSuccess)
+{
+	bSuccess = Collection != nullptr;
+	return Collection ? Collection->GlobalAssetGrammar : FPCGExAssetGrammarDetails();
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::SetCollectionGlobalGrammar(UPCGExAssetCollection* Collection, const FPCGExAssetGrammarDetails& NewGrammar)
+{
+	if (!Collection)
+	{
+		return false;
+	}
+
+	Collection->GlobalAssetGrammar = NewGrammar;
+	Collection->Modify();
+	(void)Collection->MarkPackageDirty();
+	return true;
+}
+
+FPCGExAssetGrammarDetails UPCGExCollectionEntryBlueprintLibrary::GetCollectionSubCollectionGrammar(const UPCGExAssetCollection* Collection, bool& bSuccess)
+{
+	bSuccess = Collection != nullptr;
+	return Collection ? Collection->SubCollectionGrammar : FPCGExAssetGrammarDetails();
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::SetCollectionSubCollectionGrammar(UPCGExAssetCollection* Collection, const FPCGExAssetGrammarDetails& NewGrammar)
+{
+	if (!Collection)
+	{
+		return false;
+	}
+
+	Collection->SubCollectionGrammar = NewGrammar;
+	Collection->Modify();
+	(void)Collection->MarkPackageDirty();
+	return true;
+}
+
+FPCGExFittingVariations UPCGExCollectionEntryBlueprintLibrary::GetCollectionGlobalVariations(const UPCGExAssetCollection* Collection, bool& bSuccess)
+{
+	bSuccess = Collection != nullptr;
+	return Collection ? Collection->GlobalVariations : FPCGExFittingVariations();
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::SetCollectionGlobalVariations(UPCGExAssetCollection* Collection, const FPCGExFittingVariations& NewVariations)
+{
+	if (!Collection)
+	{
+		return false;
+	}
+
+	Collection->GlobalVariations = NewVariations;
+	Collection->Modify();
+	(void)Collection->MarkPackageDirty();
+	return true;
+}
+
+UPCGExAssetCollection* UPCGExCollectionEntryBlueprintLibrary::GetEntrySubCollection(UPCGExAssetCollection* Collection, int32 EntryIndex)
+{
+	FPCGExAssetCollectionEntry* Entry = PCGExCollectionEntryBlueprintLibrary_Private::GetMutableEntry(Collection, EntryIndex);
+	return Entry ? Entry->GetSubCollection<UPCGExAssetCollection>() : nullptr;
+}
+
+UObject* UPCGExCollectionEntryBlueprintLibrary::LoadEntryAsset(
+	const UPCGExAssetCollection* Collection,
+	int32 EntryIndex,
+	TSubclassOf<UObject> ExpectedClass,
+	bool& bSuccess)
+{
+	bSuccess = false;
+
+	const FPCGExAssetCollectionEntry* Entry = PCGExCollectionEntryBlueprintLibrary_Private::GetEntry(Collection, EntryIndex);
+	if (!Entry || !Entry->Staging.Path.IsValid())
+	{
+		return nullptr;
+	}
+
+	UObject* Resolved = Entry->Staging.Path.ResolveObject();
+	if (!Resolved)
+	{
+		Resolved = Entry->Staging.Path.TryLoad();
+	}
+	if (!Resolved)
+	{
+		return nullptr;
+	}
+	if (*ExpectedClass && !Resolved->IsA(ExpectedClass))
+	{
+		return nullptr;
+	}
+
+	bSuccess = true;
+	return Resolved;
+}
+
+bool UPCGExCollectionEntryBlueprintLibrary::RestageEntry(UPCGExAssetCollection* Collection, int32 EntryIndex)
+{
+#if WITH_EDITOR
+	if (!Collection)
+	{
+		return false;
+	}
+	return Collection->EDITOR_RebuildEntryStaging(EntryIndex);
+#else
+	return false;
+#endif
+}
+
+FName UPCGExCollectionEntryBlueprintLibrary::GetCollectionTypeId(const UPCGExAssetCollection* Collection)
+{
+	return Collection ? Collection->GetTypeId() : FName(NAME_None);
 }

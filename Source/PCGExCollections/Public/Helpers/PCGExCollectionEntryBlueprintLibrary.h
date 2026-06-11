@@ -7,6 +7,10 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Templates/SubclassOf.h"
 #include "UObject/SoftObjectPath.h"
+#include "UObject/SoftObjectPtr.h"
+
+#include "Core/PCGExAssetGrammar.h"
+#include "Fitting/PCGExFittingVariations.h"
 
 #include "PCGExCollectionEntryBlueprintLibrary.generated.h"
 
@@ -116,6 +120,135 @@ public:
 		FName PropertyName,
 		UClass* NewClass);
 
+	// Generic reflected member access -- BlueprintInternalUseOnly backing for the
+	// Get/Set Entry Member and Get/Set Collection Member K2 nodes. MemberPath is a
+	// dot-separated path into the entry struct (resolved via the collection type registry)
+	// or the collection object itself, e.g. "Weight", "AssetGrammar.SizingX.FixedSize",
+	// "ISMDescriptor.InstanceStartCullDistance". Exact-type semantics: the wildcard pin's
+	// type must match the member's reflected type (the K2 node stamps it from the picked
+	// member); mismatches and unknown paths fail with a Blueprint runtime warning.
+
+	UFUNCTION(BlueprintPure, CustomThunk, Category = "PCGEx|Collection",
+		meta = (CustomStructureParam = "OutValue", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get Entry Member Value"))
+	static bool TryGetEntryMemberValue(
+		const UPCGExAssetCollection* Collection,
+		int32 EntryIndex,
+		FName MemberPath,
+		int32& OutValue);
+
+	DECLARE_FUNCTION(execTryGetEntryMemberValue);
+
+	/** Writes an entry member. Commits Modify + dirty + cache invalidation on success. */
+	UFUNCTION(BlueprintCallable, CustomThunk, Category = "PCGEx|Collection",
+		meta = (CustomStructureParam = "NewValue", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set Entry Member Value"))
+	static bool TrySetEntryMemberValue(
+		UPCGExAssetCollection* Collection,
+		int32 EntryIndex,
+		FName MemberPath,
+		const int32& NewValue);
+
+	DECLARE_FUNCTION(execTrySetEntryMemberValue);
+
+	UFUNCTION(BlueprintPure, CustomThunk, Category = "PCGEx|Collection",
+		meta = (CustomStructureParam = "OutValue", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get Collection Member Value"))
+	static bool TryGetCollectionMemberValue(
+		const UPCGExAssetCollection* Collection,
+		FName MemberPath,
+		int32& OutValue);
+
+	DECLARE_FUNCTION(execTryGetCollectionMemberValue);
+
+	UFUNCTION(BlueprintCallable, CustomThunk, Category = "PCGEx|Collection",
+		meta = (CustomStructureParam = "NewValue", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set Collection Member Value"))
+	static bool TrySetCollectionMemberValue(
+		UPCGExAssetCollection* Collection,
+		FName MemberPath,
+		const int32& NewValue);
+
+	DECLARE_FUNCTION(execTrySetCollectionMemberValue);
+
+	// Typed soft-reference member accessors. Soft pins do not round-trip through the
+	// CustomStructureParam wildcard (same marshalling hazard as Object pins); the member
+	// K2 nodes dispatch PC_SoftObject / PC_SoftClass members here instead. bSuccess
+	// reflects member resolution + flavor/class compatibility -- the returned soft
+	// reference itself may legitimately be null.
+
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection",
+		meta = (DeterminesOutputType = "ExpectedClass", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get Entry Member (Soft Object)"))
+	static TSoftObjectPtr<UObject> TryGetEntryMemberSoftObject(
+		const UPCGExAssetCollection* Collection,
+		int32 EntryIndex,
+		FName MemberPath,
+		UPARAM(meta = (AllowAbstract = "true")) TSubclassOf<UObject> ExpectedClass,
+		bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection",
+		meta = (BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set Entry Member (Soft Object)"))
+	static bool TrySetEntryMemberSoftObject(
+		UPCGExAssetCollection* Collection,
+		int32 EntryIndex,
+		FName MemberPath,
+		TSoftObjectPtr<UObject> NewValue);
+
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection",
+		meta = (DeterminesOutputType = "ExpectedClass", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get Entry Member (Soft Class)"))
+	static TSoftClassPtr<UObject> TryGetEntryMemberSoftClass(
+		const UPCGExAssetCollection* Collection,
+		int32 EntryIndex,
+		FName MemberPath,
+		UPARAM(meta = (AllowAbstract = "true")) TSubclassOf<UObject> ExpectedClass,
+		bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection",
+		meta = (BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set Entry Member (Soft Class)"))
+	static bool TrySetEntryMemberSoftClass(
+		UPCGExAssetCollection* Collection,
+		int32 EntryIndex,
+		FName MemberPath,
+		TSoftClassPtr<UObject> NewValue);
+
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection",
+		meta = (DeterminesOutputType = "ExpectedClass", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get Collection Member (Soft Object)"))
+	static TSoftObjectPtr<UObject> TryGetCollectionMemberSoftObject(
+		const UPCGExAssetCollection* Collection,
+		FName MemberPath,
+		UPARAM(meta = (AllowAbstract = "true")) TSubclassOf<UObject> ExpectedClass,
+		bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection",
+		meta = (BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set Collection Member (Soft Object)"))
+	static bool TrySetCollectionMemberSoftObject(
+		UPCGExAssetCollection* Collection,
+		FName MemberPath,
+		TSoftObjectPtr<UObject> NewValue);
+
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection",
+		meta = (DeterminesOutputType = "ExpectedClass", BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Get Collection Member (Soft Class)"))
+	static TSoftClassPtr<UObject> TryGetCollectionMemberSoftClass(
+		const UPCGExAssetCollection* Collection,
+		FName MemberPath,
+		UPARAM(meta = (AllowAbstract = "true")) TSubclassOf<UObject> ExpectedClass,
+		bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection",
+		meta = (BlueprintInternalUseOnly = "true",
+			DisplayName = "Try Set Collection Member (Soft Class)"))
+	static bool TrySetCollectionMemberSoftClass(
+		UPCGExAssetCollection* Collection,
+		FName MemberPath,
+		TSoftClassPtr<UObject> NewValue);
+
 	// Plain entry helpers -- user-facing, usable anywhere a collection reference exists.
 
 	/** Number of entries in the collection's raw entries array (includes invalid entries). */
@@ -181,4 +314,81 @@ public:
 	/** The entry's staged local bounds (computed by the last staging rebuild). */
 	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
 	static FBox GetEntryStagingBounds(const UPCGExAssetCollection* Collection, int32 EntryIndex);
+
+	// Whole-struct pairs -- copy out, edit with standard struct nodes, write back.
+
+	/** The entry's AUTHORED grammar (AssetGrammar member, regardless of GrammarSource).
+	 *  Use GetEntryEffectiveGrammar for the grammar that staging/export actually resolves. */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static FPCGExAssetGrammarDetails GetEntryGrammar(const UPCGExAssetCollection* Collection, int32 EntryIndex, bool& bSuccess);
+
+	/** Write the entry's authored grammar wholesale. */
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection")
+	static bool SetEntryGrammar(UPCGExAssetCollection* Collection, int32 EntryIndex, const FPCGExAssetGrammarDetails& NewGrammar);
+
+	/** The grammar the entry actually resolves to (routes through GrammarSource / collection
+	 *  global / subcollection grammar) -- read-only by nature. */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static FPCGExAssetGrammarDetails GetEntryEffectiveGrammar(const UPCGExAssetCollection* Collection, int32 EntryIndex, bool& bSuccess);
+
+	/** The entry's authored fitting variations. */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static FPCGExFittingVariations GetEntryVariations(const UPCGExAssetCollection* Collection, int32 EntryIndex, bool& bSuccess);
+
+	/** Write the entry's fitting variations wholesale. */
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection")
+	static bool SetEntryVariations(UPCGExAssetCollection* Collection, int32 EntryIndex, const FPCGExFittingVariations& NewVariations);
+
+	/** The collection's shared Global grammar (used by entries with GrammarSource == Global). */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static FPCGExAssetGrammarDetails GetCollectionGlobalGrammar(const UPCGExAssetCollection* Collection, bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection")
+	static bool SetCollectionGlobalGrammar(UPCGExAssetCollection* Collection, const FPCGExAssetGrammarDetails& NewGrammar);
+
+	/** The grammar this collection exposes when nested as a subcollection entry. */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static FPCGExAssetGrammarDetails GetCollectionSubCollectionGrammar(const UPCGExAssetCollection* Collection, bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection")
+	static bool SetCollectionSubCollectionGrammar(UPCGExAssetCollection* Collection, const FPCGExAssetGrammarDetails& NewGrammar);
+
+	/** The collection's shared Global fitting variations. */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static FPCGExFittingVariations GetCollectionGlobalVariations(const UPCGExAssetCollection* Collection, bool& bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection")
+	static bool SetCollectionGlobalVariations(UPCGExAssetCollection* Collection, const FPCGExFittingVariations& NewVariations);
+
+	// Computed helpers.
+
+	/** The nested collection referenced by a subcollection entry (null for asset entries). */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static UPCGExAssetCollection* GetEntrySubCollection(UPCGExAssetCollection* Collection, int32 EntryIndex);
+
+	/**
+	 * Synchronously load the entry's staged asset (Staging.Path). Callable (not pure) so the
+	 * blocking load happens at an explicit point in the graph. Returns null and bSuccess=false
+	 * when the path is unset, fails to load, or doesn't match ExpectedClass.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection", meta = (DeterminesOutputType = "ExpectedClass"))
+	static UObject* LoadEntryAsset(
+		const UPCGExAssetCollection* Collection,
+		int32 EntryIndex,
+		UPARAM(meta = (AllowAbstract = "true")) TSubclassOf<UObject> ExpectedClass,
+		bool& bSuccess);
+
+	/**
+	 * Re-run staging for a single entry. Use after mutating staging-feeding members (e.g. a
+	 * mesh entry's StaticMesh) from OnProcessEntry / OnPostRebuild; prefer mutating such
+	 * members in OnPreRebuild instead, where the session stages them naturally. When called
+	 * from inside a pipeline hook the restage is finalize-quiet (the owning session fires the
+	 * post-rebuild work once at its own tail). Editor-only; returns false in cooked targets.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "PCGEx|Collection")
+	static bool RestageEntry(UPCGExAssetCollection* Collection, int32 EntryIndex);
+
+	/** The collection's registered type id (e.g. "Mesh", "Actor"); None when null/unregistered. */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection")
+	static FName GetCollectionTypeId(const UPCGExAssetCollection* Collection);
 };

@@ -55,7 +55,7 @@ enum class EPCGExCollectionGrammarSize : uint8
  * mask bits directly (1, 2, 4) rather than bit indices -- without it, the checkboxes are
  * off-by-one and toggling "X" sets the Y bit.
  */
-UENUM(meta=(Bitflags, UseEnumValuesAsMaskValuesInEditor="true"))
+UENUM(BlueprintType, meta=(Bitflags, UseEnumValuesAsMaskValuesInEditor="true"))
 enum class EPCGExGrammarAxes : uint8
 {
 	None = 0 UMETA(Hidden),
@@ -99,7 +99,7 @@ namespace PCGExGrammarAxes
 
 /** Per-axis size source. Min_X/Y/Z, Max_X/Y/Z, Avg_X/Y/Z are subcollection-only and encode a child
  *  source axis independent of the slot axis (Min_Z in SizingX = aggregate child Z for the X output). */
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExGrammarAxisSize : uint8
 {
 	Bounds = 0 UMETA(DisplayName = "Bounds", Tooltip = "Use the entry's bounds extent on this axis.", ActionIcon = "From_Center"),
@@ -182,7 +182,7 @@ FORCEINLINE uint32 GetTypeHash(const FPCGExGrammarSizeCacheKey& Key)
 using FPCGExGrammarSizeCache = TMap<FPCGExGrammarSizeCacheKey, double>;
 
 /** Arithmetic op applied on top of the resolved per-axis size. */
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExGrammarSizeOp : uint8
 {
 	None     = 0 UMETA(DisplayName = "=", Tooltip = "Use the resolved size as-is."),
@@ -190,7 +190,7 @@ enum class EPCGExGrammarSizeOp : uint8
 	Multiply = 2 UMETA(DisplayName = "×", Tooltip = "Multiply the resolved size by FixedSize."),
 };
 
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExGrammarSubCollectionMode : uint8
 {
 	Inherit  = 0 UMETA(DisplayName = "Inherit", Tooltip = "Use the subcollection's own SubCollectionGrammar."),

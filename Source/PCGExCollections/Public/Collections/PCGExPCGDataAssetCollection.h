@@ -21,7 +21,7 @@ class UPCGExLevelCollection;
 class UWorld;
 class FObjectPreSaveContext;
 
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExDataAssetEntrySource : uint8
 {
 	DataAsset = 0 UMETA(DisplayName = "Data Asset", ToolTip="Reference an existing PCGDataAsset", ActionIcon="PCGDA_DataAsset"),

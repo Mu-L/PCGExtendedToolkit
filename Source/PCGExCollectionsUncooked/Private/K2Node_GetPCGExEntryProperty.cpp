@@ -61,7 +61,7 @@ void UK2Node_GetPCGExEntryProperty::AllocateDefaultPins()
 
 FText UK2Node_GetPCGExEntryProperty::GetNodeTitle(ENodeTitleType::Type TitleType) const
 {
-	return LOCTEXT("NodeTitle", "PCGEx | Get Entry Property");
+	return LOCTEXT("NodeTitle", "Get Entry Property");
 }
 
 FText UK2Node_GetPCGExEntryProperty::GetTooltipText() const

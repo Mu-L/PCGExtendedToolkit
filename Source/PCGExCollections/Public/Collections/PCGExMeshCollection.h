@@ -20,7 +20,7 @@ class UPCGExMeshCollection;
 
 // Material Override Structures
 
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExMaterialVariantsMode : uint8
 {
 	None   = 0 UMETA(DisplayName = "None", ToolTip="No variants.", ActionIcon="STF_None"),

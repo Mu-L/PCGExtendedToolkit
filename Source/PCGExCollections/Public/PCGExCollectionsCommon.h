@@ -80,7 +80,7 @@ ENUM_CLASS_FLAGS(EPCGExAssetTagInheritance)
 using EPCGExAssetTagInheritanceBitmask = TEnumAsByte<EPCGExAssetTagInheritance>;
 
 /** Whether an entry uses its own settings (Local) or the collection's global settings. */
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExEntryVariationMode : uint8
 {
 	Local  = 0 UMETA(DisplayName = "Local", ToolTip="This entry defines its own settings. This can be overruled in the collection settings.", ActionIcon="EntryRule"),
@@ -88,7 +88,7 @@ enum class EPCGExEntryVariationMode : uint8
 };
 
 /** Collection-level override rule: let entries choose (PerEntry) or force global (Overrule). */
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExGlobalVariationRule : uint8
 {
 	PerEntry = 0 UMETA(DisplayName = "Per Entry", ToolTip="Let the entry choose whether it's using collection settings or its own", ActionIcon="EntryRule"),
@@ -100,7 +100,7 @@ enum class EPCGExGlobalVariationRule : uint8
  * Consumed by selectors that reason about entry extents (e.g. Best Fit).
  * Extents-only: aggregate bounds are centered at origin; center offsets are not aggregated.
  */
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExSubcollectionBoundsMode : uint8
 {
 	UnionAABB    = 0 UMETA(DisplayName = "Union AABB", ToolTip="Enclosing AABB over all child bounds. Preserves worst-case footprint."),

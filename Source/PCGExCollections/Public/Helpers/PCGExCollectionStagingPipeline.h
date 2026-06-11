@@ -51,11 +51,12 @@ public:
 	{
 	}
 
-	/** Fired for each re-staged entry, after its UpdateStaging + PostUpdateStaging. */
+	/** Fired for each re-staged entry, after its UpdateStaging + PostUpdateStaging.
+	 *  bIsSubCollection is true when the entry references a nested collection rather than an asset. */
 	UFUNCTION(BlueprintNativeEvent, Category = "PCGEx|Collection|Staging")
-	void OnProcessEntry(UPCGExAssetCollection* Collection, int32 EntryIndex);
+	void OnProcessEntry(UPCGExAssetCollection* Collection, int32 EntryIndex, bool bIsSubCollection);
 
-	virtual void OnProcessEntry_Implementation(UPCGExAssetCollection* Collection, int32 EntryIndex)
+	virtual void OnProcessEntry_Implementation(UPCGExAssetCollection* Collection, int32 EntryIndex, bool bIsSubCollection)
 	{
 	}
 

@@ -64,7 +64,8 @@ bool FPCGExMetaCleanupElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 		for (int i = 0; i < NumInputs; i++)
 		{
 			const FPCGTaggedData& InData = Context->InputData.TaggedData[i];
-			FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(InData.Data);
+			FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef();
+			OutData.Data = InData.Data;
 			OutData.Pin = PCGPinConstants::DefaultOutputLabel;
 			OutData.Tags = InData.Tags;
 
@@ -96,14 +97,16 @@ bool FPCGExMetaCleanupElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 						Metadata->DeleteAttribute(Identifier);
 					}
 
-					FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(NewOutData);
+					FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef();
+					OutData.Data = NewOutData;
 					OutData.Pin = PCGPinConstants::DefaultOutputLabel;
 					OutData.Tags = InData.Tags;
 					Context->Filters.Prune(OutData.Tags);
 				}
 				else
 				{
-					FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(InData.Data);
+					FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef();
+					OutData.Data = InData.Data;
 					OutData.Pin = PCGPinConstants::DefaultOutputLabel;
 					OutData.Tags = InData.Tags;
 					Context->Filters.Prune(OutData.Tags);
@@ -116,7 +119,8 @@ bool FPCGExMetaCleanupElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 				const FPCGTaggedData& InData = Context->InputData.TaggedData[i];
 				UPCGData* NewOutData = const_cast<UPCGData*>(InData.Data.Get());
 
-				FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef(NewOutData);
+				FPCGTaggedData& OutData = Context->OutputData.TaggedData.Emplace_GetRef();
+				OutData.Data = NewOutData;
 
 				OutData.Pin = PCGPinConstants::DefaultOutputLabel;
 				OutData.Tags = InData.Tags;

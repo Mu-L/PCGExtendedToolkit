@@ -843,7 +843,7 @@ protected:
 	/** StagingPipeline hook dispatchers. No-ops when no pipeline is assigned, when invoked
 	 *  re-entrantly from inside another hook, or while cooking. */
 	void EDITOR_DispatchPipelinePreRebuild();
-	void EDITOR_DispatchPipelineEntry(int32 EntryIndex);
+	void EDITOR_DispatchPipelineEntry(int32 EntryIndex, bool bIsSubCollection);
 	void EDITOR_DispatchPipelinePostRebuild();
 #endif
 

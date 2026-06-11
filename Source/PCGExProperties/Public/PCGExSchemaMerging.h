@@ -16,7 +16,7 @@
  * The first source is typically the canonical / user-authored schema, so most callers
  * want FirstWins or StrictTypeMatch (defaults that protect manual authoring).
  */
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExSchemaMergePolicy : uint8
 {
 	/** Earlier source wins; subsequent same-name entries are dropped and reported as conflicts. */
