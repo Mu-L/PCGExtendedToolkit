@@ -23,8 +23,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = MeshSelector, meta=(InlineEditConditionToggle))
 	bool bUseTemplateDescriptor = true;
 
-	/** If enabled, will ignore the collection descriptor details and only push mesh, materials & tags from the collection. */
-	UPROPERTY(EditAnywhere, Category = MeshSelector, meta=(EditCondition="bUseTemplateDescriptor"))
+	/** If enabled, will ignore the collection descriptor details and only push mesh, materials & tags from the collection. 
+	 * This is enabled by default for legacy reasons but if you set per-entry settings in your collections, turn this off!
+	 */
+	UPROPERTY(EditAnywhere, Category = MeshSelector, meta=(DisplayName="Descriptor Override", EditCondition="bUseTemplateDescriptor"))
 	FPCGSoftISMComponentDescriptor TemplateDescriptor;
 
 	UPROPERTY(EditAnywhere, Category = MeshSelector)

@@ -585,14 +585,7 @@ namespace PCGExMatching
 
 		if (!TaggedData.Keys)
 		{
-			if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(TaggedData.Data))
-			{
-				TaggedData.Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
-			}
-			else if (TaggedData.Data->Metadata)
-			{
-				TaggedData.Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(TaggedData.Data->Metadata);
-			}
+			TaggedData.Keys = PCGExMetaHelpers::MakeKeys(TaggedData.Data);
 		}
 
 		NumSources = MatchableSources->Num();

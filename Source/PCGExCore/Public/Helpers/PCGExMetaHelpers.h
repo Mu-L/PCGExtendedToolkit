@@ -13,6 +13,7 @@
 class UPCGManagedComponent;
 class UPCGData;
 class UPCGComponent;
+class IPCGAttributeAccessorKeys;
 
 #define PCGEX_VALIDATE_NAME(_NAME) if (!PCGExMetaHelpers::IsWritableAttributeName(_NAME)){	PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Invalid user-defined attribute name for " #_NAME)); return false;	}
 #define PCGEX_VALIDATE_NAME_CONDITIONAL(_IF, _NAME) if(_IF){ PCGEX_VALIDATE_NAME(_NAME) }
@@ -26,6 +27,8 @@ namespace PCGExMetaHelpers
 {
 	const FName InvalidName = "INVALID_DATA";
 
+	PCGEXCORE_API TSharedPtr<IPCGAttributeAccessorKeys> MakeKeys(const UPCGData* InData);
+	
 	PCGEXCORE_API bool IsPCGExAttribute(const FString& InStr);
 	PCGEXCORE_API bool IsPCGExAttribute(const FName InName);
 	PCGEXCORE_API bool IsPCGExAttribute(const FText& InText);
@@ -75,7 +78,7 @@ namespace PCGExMetaHelpers
 	PCGEXCORE_API FPCGAttributeIdentifier MakeElementIdentifier(const FName& BaseName);
 
 	PCGEXCORE_API bool HasAttribute(const UPCGMetadata* InMetadata, const FPCGAttributeIdentifier& Identifier);
-
+	
 	static bool HasAttribute(const UPCGData* InData, const FPCGAttributeIdentifier& Identifier)
 	{
 		if (!InData)

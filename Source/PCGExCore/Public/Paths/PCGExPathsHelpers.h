@@ -118,8 +118,9 @@ namespace PCGExPaths
 	struct PCGEXCORE_API FInclusionInfos
 	{
 		FInclusionInfos() = default;
-		int32 Depth = 0;    // Inclusion "depth"
-		int32 Children = 0; // Number of paths included in this one
+		int32 Depth = 0;       // Inclusion "depth"
+		int32 Children = 0;    // Number of paths included in this one
+		int32 ParentIdx = -1;  // Idx of the nearest enclosing path (direct parent); -1 when not enclosed (outer)
 		bool bOdd = false;
 	};
 
@@ -129,6 +130,13 @@ namespace PCGExPaths
 		TSet<int32> PathsSet;
 		TArray<TSharedPtr<FPath>> Paths;
 		TMap<int32, FInclusionInfos> IdxMap;
+
+		// Recorded (ContainerIdx, ContainedIdx) pairs, used to resolve each path's nearest
+		// enclosing parent once all depths are final (see ResolveParents).
+		TArray<TPair<int32, int32>> Containments;
+
+		// Resolves FInclusionInfos::ParentIdx for every path (nearest parent = deepest container).
+		void ResolveParents();
 
 	public:
 		FPathInclusionHelper() = default;

@@ -19,11 +19,14 @@ namespace PCGExRegex
 		{
 		}
 
-		/** Compiles the given pattern string. Returns false if the pattern is invalid. */
-		bool Compile(const FString& InPattern)
+		/**
+		 * Stores the pattern for matching. NOTE: UE's FRegexPattern exposes no way to detect an
+		 * invalid pattern (ICU compiles lazily and only logs internally), so this cannot report
+		 * syntax errors -- a malformed pattern simply matches nothing at Test() time.
+		 */
+		void Compile(const FString& InPattern)
 		{
 			CompiledPattern = MakeShared<FRegexPattern>(InPattern);
-			return CompiledPattern.IsValid();
 		}
 
 		/** Tests whether the subject string matches the compiled pattern. */

@@ -424,16 +424,39 @@ namespace PCGExPaths
 				NewInfos.Depth++;
 				NewInfos.bOdd = NewInfos.Depth % 2 != 0;
 				OtherInfos.Children++;
+				Containments.Emplace(OtherPath->Idx, InPath->Idx); // OtherPath encloses InPath
 			}
 			else if (InPath->Contains(OtherPath->GetPositions(), Tolerance))
 			{
 				OtherInfos.Depth++;
 				OtherInfos.bOdd = OtherInfos.Depth % 2 != 0;
 				NewInfos.Children++;
+				Containments.Emplace(InPath->Idx, OtherPath->Idx); // InPath encloses OtherPath
 			}
 		}
 
 		Paths.Add(InPath);
+	}
+
+	// Resolves the nearest enclosing parent (ParentIdx) for every path. The nearest parent is the
+	// deepest container; depths are final by the time this runs, so a single pass over the recorded
+	// containment pairs is independent of the order in which paths were added.
+	void FPathInclusionHelper::ResolveParents()
+	{
+		// Start fresh so repeat calls (multiple AddPaths) recompute correctly.
+		for (auto& It : IdxMap) { It.Value.ParentIdx = -1; }
+
+		for (const TPair<int32, int32>& Containment : Containments)
+		{
+			const int32 ContainerIdx = Containment.Key;
+			const int32 ContainedIdx = Containment.Value;
+
+			FInclusionInfos& ChildInfos = IdxMap[ContainedIdx];
+			if (ChildInfos.ParentIdx == -1 || IdxMap[ContainerIdx].Depth > IdxMap[ChildInfos.ParentIdx].Depth)
+			{
+				ChildInfos.ParentIdx = ContainerIdx;
+			}
+		}
 	}
 
 	void FPathInclusionHelper::AddPaths(const TArrayView<TSharedPtr<FPath>> InPaths, const double Tolerance)
@@ -442,11 +465,14 @@ namespace PCGExPaths
 		PathsSet.Reserve(Reserve);
 		Paths.Reserve(Reserve);
 		IdxMap.Reserve(Reserve);
+		Containments.Reserve(Reserve);
 
 		for (const TSharedPtr<FPath>& Path : InPaths)
 		{
 			AddPath(Path, Tolerance);
 		}
+
+		ResolveParents();
 	}
 
 	bool FPathInclusionHelper::Find(const int32 Idx, FInclusionInfos& OutInfos) const

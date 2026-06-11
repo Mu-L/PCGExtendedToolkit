@@ -172,7 +172,10 @@ namespace PCGExCollections
 				{
 					bool bAlreadySeen = false;
 					Seen.Add(H, &bAlreadySeen);
-					if (!bAlreadySeen) { UniqueHosts.Add(H); }
+					if (!bAlreadySeen)
+					{
+						UniqueHosts.Add(H);
+					}
 				}
 			}
 		}
@@ -182,15 +185,8 @@ namespace PCGExCollections
 		}
 
 		// Build accessor keys once -- same uniform pattern as the identity-attr write block.
-		TSharedPtr<IPCGAttributeAccessorKeys> Keys;
-		if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
-		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData);
-		}
-		else if (UPCGMetadata* Metadata = InData->MutableMetadata())
-		{
-			Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(Metadata);
-		}
+		TSharedPtr<IPCGAttributeAccessorKeys> Keys = PCGExMetaHelpers::MakeKeys(InData);
+		
 		if (!Keys)
 		{
 			return;
@@ -241,17 +237,32 @@ namespace PCGExCollections
 				for (int32 r = 0; r < PerRowHosts.Num(); r++)
 				{
 					const UPCGExAssetCollection* RowHost = PerRowHosts[r];
-					if (!RowHost) { continue; } // keep DefaultValue
+					if (!RowHost)
+					{
+						continue;
+					} // keep DefaultValue
 					const FInstancedStruct* Source = RowHost->CollectionProperties.GetPropertyByName(Config.PropertyName);
-					if (!Source || !Source->IsValid()) { continue; }
+					if (!Source || !Source->IsValid())
+					{
+						continue;
+					}
 					const FPCGExProperty* SrcProp = Source->GetPtr<FPCGExProperty>();
-					if (!SrcProp) { continue; }
+					if (!SrcProp)
+					{
+						continue;
+					}
 					T_VALUE V = T_VALUE{};
-					if (SrcProp->TryGetValue<T_VALUE>(V)) { Values[r] = V; }
+					if (SrcProp->TryGetValue<T_VALUE>(V))
+					{
+						Values[r] = V;
+					}
 				}
 
 				UPCGMetadata* M = InData->MutableMetadata();
-				if (!M) { return; }
+				if (!M)
+				{
+					return;
+				}
 				const FPCGAttributeIdentifier Id = PCGExMetaHelpers::GetAttributeIdentifier(OutputName, InData);
 				M->FindOrCreateAttribute<T_VALUE>(Id, DefaultValue, false, true);
 
