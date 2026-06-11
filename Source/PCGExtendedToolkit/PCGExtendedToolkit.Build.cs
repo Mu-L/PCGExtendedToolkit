@@ -16,6 +16,7 @@ public class PCGExtendedToolkit : ModuleRules
 	private const string PluginName = "PCGExtendedToolkit";
 	private const string ModulePrefix = "PCGEx";
 	private const string EditorSuffix = "Editor";
+	private const string UncookedSuffix = "Uncooked";
 
 	private static readonly string[] BaseDependencies = { "PCGExCore", "PCGExBlending" };
 	private static readonly string[] BaseEditorDependencies = { "PCGExCoreEditor" };
@@ -54,7 +55,7 @@ public class PCGExtendedToolkit : ModuleRules
 
 		foreach (ModuleDescriptor module in descriptor.Modules)
 		{
-			RegisterModule(module.Name, declaredModules);
+			RegisterModule(module, declaredModules);
 		}
 
 		ValidateConfiguration(declaredModules);
@@ -142,15 +143,24 @@ public class PCGExtendedToolkit : ModuleRules
 		}
 	}
 
-	private void RegisterModule(string moduleName, HashSet<string> declaredModules)
+	private void RegisterModule(ModuleDescriptor module, HashSet<string> declaredModules)
 	{
+		string moduleName = module.Name;
 		if (IsUmbrellaModule(moduleName)) return;
 		if (!IsPCGExModule(moduleName)) return;
 
-		bool isEditor = moduleName.EndsWith(EditorSuffix);
-		if (isEditor && !Target.bBuildEditor) return;
+		// Classify by the DECLARED module type, not the name suffix: a direct module
+		// dependency bypasses the .uplugin type gating, so referencing an Editor or
+		// UncookedOnly module (K2 node hosts) from a cooked game target would drag
+		// UnrealEd into UnrealGame builds.
+		bool isEditorOnlyHost =
+			module.Type == ModuleHostType.Editor ||
+			module.Type == ModuleHostType.EditorNoCommandlet ||
+			module.Type == ModuleHostType.UncookedOnly;
 
-		if (isEditor)
+		if (isEditorOnlyHost && !Target.bBuildEditor) return;
+
+		if (isEditorOnlyHost)
 		{
 			PrivateDependencyModuleNames.Add(moduleName);
 		}
@@ -196,7 +206,7 @@ public class PCGExtendedToolkit : ModuleRules
 	private void ValidateConfiguration(HashSet<string> declaredModules)
 	{
 		var missingDeps = new Dictionary<string, List<string>>();
-		var missingEditors = new List<string>();
+		var missingCompanions = new List<string>();
 
 		foreach (var (module, deps) in _moduleDependencies)
 		{
@@ -213,12 +223,19 @@ public class PCGExtendedToolkit : ModuleRules
 
 		foreach (string moduleName in declaredModules)
 		{
-			if (moduleName.EndsWith(EditorSuffix) || IsUmbrellaModule(moduleName)) continue;
+			if (IsUmbrellaModule(moduleName)) continue;
 
-			string editorName = moduleName + EditorSuffix;
-			if (Directory.Exists(Path.Combine(ModuleDirectory, "..", editorName)) && !declaredModules.Contains(editorName))
+			// Companion modules follow the name convention Foo -> FooEditor / FooUncooked;
+			// warn when one exists on disk but is not declared in the .uplugin.
+			foreach (string suffix in new[] { EditorSuffix, UncookedSuffix })
 			{
-				missingEditors.Add(editorName);
+				if (moduleName.EndsWith(suffix)) continue;
+
+				string companionName = moduleName + suffix;
+				if (Directory.Exists(Path.Combine(ModuleDirectory, "..", companionName)) && !declaredModules.Contains(companionName))
+				{
+					missingCompanions.Add(companionName);
+				}
 			}
 		}
 
@@ -230,11 +247,11 @@ public class PCGExtendedToolkit : ModuleRules
 			);
 		}
 
-		foreach (string editor in missingEditors.OrderBy(e => e))
+		foreach (string companion in missingCompanions.OrderBy(e => e))
 		{
 			Logger.LogWarning(
-				"[{Plugin}] Editor module '{Editor}' exists but is not declared in .uplugin. Add:\n{Entry}",
-				PluginName, editor, FormatModuleEntry(editor)
+				"[{Plugin}] Companion module '{Companion}' exists but is not declared in .uplugin. Add:\n{Entry}",
+				PluginName, companion, FormatModuleEntry(companion)
 			);
 		}
 	}
@@ -295,17 +312,26 @@ public class PCGExtendedToolkit : ModuleRules
 
 	private string FormatModuleEntry(string name)
 	{
-		bool isEditor = name.EndsWith(EditorSuffix);
-		string platforms = isEditor
-			? "\"Win64\", \"Mac\", \"Linux\""
-			: "\"Win64\", \"Mac\", \"IOS\", \"Android\", \"Linux\", \"LinuxArm64\"";
+		// Suggested entry only -- "Type" is inferred from the name suffix and may need
+		// manual adjustment (e.g. a K2-node-hosting module must be "UncookedOnly" even
+		// when named *Editor, like PCGExPropertiesEditor). Scripts/generate-uplugin.js/.py
+		// preserve already-declared entries verbatim, so a hand-corrected type sticks.
+		string type = name.EndsWith(UncookedSuffix) ? "UncookedOnly"
+			: name.EndsWith(EditorSuffix) ? "Editor"
+			: "Runtime";
+
+		// Editor and UncookedOnly modules never ship in cooked builds: desktop platforms only
+		string platforms = type == "Runtime"
+			? "\"Win64\", \"Mac\", \"IOS\", \"Android\", \"Linux\", \"LinuxArm64\""
+			: "\"Win64\", \"Mac\", \"Linux\"";
 
 		return $@"		{{
 			""Name"": ""{name}"",
-			""Type"": ""{(isEditor ? "Editor" : "Runtime")}"",
+			""Type"": ""{type}"",
 			""LoadingPhase"": ""Default"",
 			""PlatformAllowList"": [ {platforms} ]
-		}}";
+		}}
+		(""Type"" guessed from the name suffix -- adjust if needed, e.g. ""UncookedOnly"" for K2 node hosts.)";
 	}
 
 	private bool IsBaseDependency(string name) =>

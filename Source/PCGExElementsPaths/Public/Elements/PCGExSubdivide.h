@@ -10,6 +10,7 @@
 #include "Core/PCGExPathProcessor.h"
 #include "Details/PCGExSettingsMacros.h"
 #include "Details/PCGExSubdivisionDetails.h"
+#include "Math/PCGExMath.h"
 
 #include "PCGExSubdivide.generated.h"
 

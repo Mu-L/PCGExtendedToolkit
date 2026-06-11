@@ -13,6 +13,7 @@
 #include "Core/PCGExContext.h"
 #include "Details/PCGExSocket.h"
 #include "Details/PCGExStagingDetails.h"
+#include "Fitting/PCGExFittingOverrides.h"
 #include "Fitting/PCGExFittingVariations.h"
 #include "Helpers/PCGExCookDependencyProvider.h"
 #include "Helpers/PCGExStreamingHelpers.h"
@@ -24,6 +25,7 @@ struct FAssetData;
 #endif
 
 class UPCGExAssetCollection;
+class UPCGExCollectionStagingPipeline;
 
 namespace PCGExAssetCollection
 {
@@ -132,7 +134,8 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetStagingData
  * - Weight: pick probability (0 = excluded from cache)
  * - Category: named group for category-based picking
  * - Tags: arbitrary FName set, inheritable through subcollection hierarchy
- * - Variations: per-entry fitting transforms (scale/rotation randomization)
+ * - Variations: per-entry fitting transforms (scale/rotation randomization), opt-in via VariationMode
+ * - ScaleToFit / Justification: opt-in per-entry overrides of the staging nodes' fitting settings
  * - PropertyOverrides: per-entry override of collection-level custom properties
  * - Staging: pre-computed bounds, path, and sockets
  */
@@ -168,10 +171,30 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	bool bIsSubCollection = false;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
-	EPCGExEntryVariationMode VariationMode = EPCGExEntryVariationMode::Local;
+	EPCGExEntryVariationMode VariationMode = EPCGExEntryVariationMode::None;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Variations", EditCondition="!bIsSubCollection && VariationMode == EPCGExEntryVariationMode::Local", EditConditionHides, ShowOnlyInnerProperties))
 	FPCGExFittingVariations Variations;
+
+	/**
+	 * Where this entry's Scale to Fit comes from when a staging node considers entry overrides.
+	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	EPCGExEntryVariationMode ScaleToFitSource = EPCGExEntryVariationMode::None;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Scale to Fit", EditCondition="!bIsSubCollection && ScaleToFitSource == EPCGExEntryVariationMode::Local", EditConditionHides))
+	FPCGExLeanScaleToFitDetails ScaleToFit;
+
+	/**
+	 * Where this entry's Justification comes from when a staging node considers entry overrides.
+	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	EPCGExEntryVariationMode JustificationSource = EPCGExEntryVariationMode::None;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Justification", EditCondition="!bIsSubCollection && JustificationSource == EPCGExEntryVariationMode::Local", EditConditionHides))
+	FPCGExLeanJustificationDetails Justification;
 
 	UPROPERTY(EditAnywhere, Category = Settings)
 	TSet<FName> Tags;
@@ -184,7 +207,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	UPROPERTY(EditAnywhere, Category = Settings)
 	FPCGExPropertyOverrides PropertyOverrides;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides, InvalidEnumValues="None"))
 	EPCGExEntryVariationMode GrammarSource = EPCGExEntryVariationMode::Local;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName="Grammar Mode", EditCondition="bIsSubCollection", EditConditionHides))
@@ -254,6 +277,16 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	// Variations & Grammar
 
 	const FPCGExFittingVariations& GetVariations(const UPCGExAssetCollection* ParentCollection) const;
+
+	/**
+	 * Resolve this entry's Scale to Fit override. Collection-level Overrule wins first, then
+	 * ScaleToFitSource (Local/Global). Returns nullptr when the consuming node's settings
+	 * should be used (None).
+	 */
+	const FPCGExLeanScaleToFitDetails* GetScaleToFitOverride(const UPCGExAssetCollection* ParentCollection) const;
+
+	/** Same contract as GetScaleToFitOverride, for justification. */
+	const FPCGExLeanJustificationDetails* GetJustificationOverride(const UPCGExAssetCollection* ParentCollection) const;
 
 	/**
 	 * Return the grammar struct that applies to this entry given GrammarSource / SubGrammarMode /
@@ -602,6 +635,14 @@ public:
 	/** Get entry by raw Entries array index (bypasses cache). Use for indices from FCategory, packed hashes, etc. */
 	FPCGExEntryAccessResult GetEntryRaw(int32 RawIndex) const;
 
+	/** Mutable access to entry at raw array index (bypasses cache). For programmatic mutation
+	 *  (staging pipeline hooks, the entry Blueprint library). Caller owns Modify /
+	 *  MarkPackageDirty / InvalidateCache as appropriate for what it mutates. */
+	FPCGExAssetCollectionEntry* GetMutableEntryRaw(int32 RawIndex)
+	{
+		return GetMutableEntryAtRawIndex(RawIndex);
+	}
+
 #if WITH_EDITOR
 	/** Editor-only mutable access to entry at raw array index. For editor UI direct writes. */
 	FPCGExAssetCollectionEntry* EDITOR_GetMutableEntry(int32 Index)
@@ -824,6 +865,21 @@ protected:
 		bCacheNeedsRebuild = true;
 		InvalidateCache();
 	}
+
+	/** Tail of every user-triggered rebuild session (depth 0 only): runs the native
+	 *  EDITOR_OnPostStagingRebuild virtual first, then the staging pipelines' OnPostRebuild,
+	 *  so the pipelines see post-merge/post-compaction state. Must stay outside the virtual --
+	 *  overrides are not required to call Super. */
+	void EDITOR_FinalizeStagingRebuild();
+
+	/** Staging pipeline hook dispatchers. Run every valid pipeline in array order; no-op when
+	 *  none are assigned, when invoked re-entrantly from inside another hook, or while cooking. */
+	void EDITOR_DispatchPipelinePreRebuild();
+	void EDITOR_DispatchPipelineEntry(int32 EntryIndex, bool bIsSubCollection);
+	void EDITOR_DispatchPipelinePostRebuild();
+
+	/** True when at least one StagingPipelines slot holds a valid pipeline. */
+	bool EDITOR_HasAnyStagingPipeline() const;
 #endif
 
 	static uint32 GenerateNewGUID()
@@ -839,6 +895,19 @@ public:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayPriority=-1, MultiLine))
 	FString Notes;
+
+	/** Optional post-process pipelines invoked around editor staging rebuilds (once before the
+	 *  session, once per re-staged entry, once after the native post-rebuild work). Composable:
+	 *  pipelines run in array order at every hook point, so later pipelines see earlier ones'
+	 *  mutations; null entries are skipped. Use them to drive per-entry property overrides,
+	 *  tags, weights etc. from Blueprint or C++.
+	 *  Editor-only: never serialized into or executed by cooked targets. */
+	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
+	TArray<TObjectPtr<UPCGExCollectionStagingPipeline>> StagingPipelines;
+
+	/** LEGACY single-pipeline slot. Migrated into StagingPipelines by PostLoad. */
+	UPROPERTY(Instanced, meta=(DeprecatedProperty))
+	TObjectPtr<UPCGExCollectionStagingPipeline> StagingPipeline_DEPRECATED;
 #endif
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayPriority=-1))
@@ -880,6 +949,22 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Settings|Global")
 	FPCGExAssetGrammarDetails GlobalAssetGrammar = FPCGExAssetGrammarDetails(FName("N/A"));
 
+	/** Collection-level rule for entry Scale to Fit overrides: let entries choose (PerEntry) or force GlobalScaleToFit on all of them (Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	EPCGExGlobalVariationRule GlobalScaleToFitMode = EPCGExGlobalVariationRule::PerEntry;
+
+	/** Collection-level Scale to Fit, consumed by entries whose ScaleToFitSource is Global (or by all entries when Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	FPCGExLeanScaleToFitDetails GlobalScaleToFit;
+
+	/** Collection-level rule for entry Justification overrides: let entries choose (PerEntry) or force GlobalJustification on all of them (Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	EPCGExGlobalVariationRule GlobalJustificationMode = EPCGExGlobalVariationRule::PerEntry;
+
+	/** Collection-level Justification, consumed by entries whose JustificationSource is Global (or by all entries when Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	FPCGExLeanJustificationDetails GlobalJustification;
+
 	/**
 	 * This collection's identity as a grammar module when it is used as a subcollection entry
 	 * elsewhere (resolved when the parent entry has SubGrammarMode == Inherit). Per-axis like
@@ -900,6 +985,10 @@ public:
 	/** Versioned grammar schema. PostLoad migrates legacy data to the current version. 0 = pre-v1 layout. */
 	UPROPERTY()
 	int32 GrammarSchemaVersion = 0;
+
+	/** Versioned fitting/variations schema. PostLoad migrates legacy data to the current version. 0 = pre-opt-in entry variations. */
+	UPROPERTY()
+	int32 FittingSchemaVersion = 0;
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Utils")
 	bool bDoNotIgnoreInvalidEntries = false;
@@ -955,6 +1044,12 @@ protected:
 	 *  to zero. Kept as int32 rather than bool so future nested batch calls work without
 	 *  API changes. */
 	int32 EDITOR_PostStagingRebuildSuppressDepth = 0;
+
+	/** True while a staging pipeline hook executes (TGuardValue pattern). Rebuilds triggered
+	 *  from inside a hook (e.g. a scripted edit routing through PostEditChangeProperty ->
+	 *  EDITOR_RebuildStagingData) run normally but without re-firing pipeline hooks,
+	 *  preventing infinite recursion. Transient. */
+	bool bEDITOR_PipelineDispatchGuard = false;
 #endif
 };
 

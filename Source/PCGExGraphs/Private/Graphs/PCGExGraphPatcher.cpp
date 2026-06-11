@@ -14,6 +14,7 @@
 #include "Helpers/PCGExPointArrayDataHelpers.h"
 #include "Utils/PCGExIntTracker.h"
 #include "Utils/PCGExPointIOMerger.h"
+#include "Data/PCGExDataTags.h"
 
 namespace PCGExGraphs
 {

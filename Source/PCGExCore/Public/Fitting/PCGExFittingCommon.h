@@ -6,7 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGExFittingCommon.generated.h"
 
-UENUM()
+UENUM(BlueprintType)
 enum class EPCGExVariationSnapping : uint8
 {
 	None       = 0 UMETA(DisplayName = "No Snapping", ToolTip="No Snapping", ActionIcon="NoSnapping"),

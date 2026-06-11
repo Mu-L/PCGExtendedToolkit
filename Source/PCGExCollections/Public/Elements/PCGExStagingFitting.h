@@ -74,8 +74,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExScaleToFitDetails ScaleToFit;
 
+	/** When enabled, entries that define a Scale to Fit override (entry-local or collection-global) replace this node's Scale to Fit for their points. Collection Map source only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Entry Overrides", EditCondition="Source == EPCGExFittingSource::CollectionMap", EditConditionHides))
+	bool bConsiderEntryScaleToFit = true;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FPCGExJustificationDetails Justification;
+
+	/** When enabled, entries that define a Justification override (entry-local or collection-global) replace this node's Justification for their points. Collection Map source only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Entry Overrides", EditCondition="Source == EPCGExFittingSource::CollectionMap", EditConditionHides))
+	bool bConsiderEntryJustification = true;
 
 	/** Variations are only available in Collection Map mode (entries carry per-asset variation limits). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="Source == EPCGExFittingSource::CollectionMap", EditConditionHides))

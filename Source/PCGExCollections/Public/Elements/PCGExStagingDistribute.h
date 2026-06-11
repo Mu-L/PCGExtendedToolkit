@@ -152,8 +152,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bApplyFitting", EditConditionHides))
 	FPCGExScaleToFitDetails ScaleToFit;
 
+	/** When enabled, entries that define a Scale to Fit override (entry-local or collection-global) replace this node's Scale to Fit for their points. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Entry Overrides", EditCondition="bApplyFitting", EditConditionHides))
+	bool bConsiderEntryScaleToFit = true;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bApplyFitting", EditConditionHides))
 	FPCGExJustificationDetails Justification;
+
+	/** When enabled, entries that define a Justification override (entry-local or collection-global) replace this node's Justification for their points. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName=" └─ Entry Overrides", EditCondition="bApplyFitting", EditConditionHides))
+	bool bConsiderEntryJustification = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="bApplyFitting", EditConditionHides))
 	FPCGExFittingVariationsDetails Variations;

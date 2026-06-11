@@ -9,6 +9,7 @@ const path = require('path');
 const PLUGIN_NAME = 'PCGExtendedToolkit';
 const MODULE_PREFIX = 'PCGEx';
 const EDITOR_SUFFIX = 'Editor';
+const UNCOOKED_SUFFIX = 'Uncooked';
 
 const PLATFORMS = {
 	runtime: ['Win64', 'Mac', 'IOS', 'Android', 'Linux', 'LinuxArm64'],
@@ -173,10 +174,20 @@ function moduleExists(moduleName) {
 	return fs.existsSync(modulePath) && fs.statSync(modulePath).isDirectory();
 }
 
+function isUmbrellaModule(name) {
+	return name === PLUGIN_NAME || name === PLUGIN_NAME + EDITOR_SUFFIX;
+}
+
 function getEditorCompanion(moduleName) {
 	if (moduleName.endsWith(EDITOR_SUFFIX)) return null;
 	const editorName = moduleName + EDITOR_SUFFIX;
 	return moduleExists(editorName) ? editorName : null;
+}
+
+function getUncookedCompanion(moduleName) {
+	if (moduleName.endsWith(UNCOOKED_SUFFIX)) return null;
+	const uncookedName = moduleName + UNCOOKED_SUFFIX;
+	return moduleExists(uncookedName) ? uncookedName : null;
 }
 
 function scanBuildCsDependencies(moduleName) {
@@ -245,6 +256,13 @@ function resolveAllModules(requestedModules) {
 			queue.push(editor);
 		}
 
+		// Add uncooked companion if exists (K2 node hosts and the like - nothing
+		// Build.cs-depends on them, so name convention is the only discovery path)
+		const uncooked = getUncookedCompanion(moduleName);
+		if (uncooked && !resolved.has(uncooked)) {
+			queue.push(uncooked);
+		}
+
 		// Add PCGEx dependencies
 		const deps = scanBuildCsDependencies(moduleName);
 		for (const dep of deps) {
@@ -270,13 +288,26 @@ function loadExistingUplugin() {
 	return fs.readFileSync(PATHS.uplugin, 'utf8');
 }
 
+function inferModuleType(name) {
+	// Name-based inference is only a DEFAULT for newly discovered modules.
+	// Modules already declared in the .uplugin keep their entry verbatim (see
+	// generateUplugin), so deliberate deviations - e.g. PCGExPropertiesEditor
+	// being UncookedOnly because it hosts K2 nodes - survive regeneration.
+	if (name.endsWith(UNCOOKED_SUFFIX)) return 'UncookedOnly';
+	if (name.endsWith(EDITOR_SUFFIX)) return 'Editor';
+	return 'Runtime';
+}
+
 function buildModuleEntry(name) {
-	const isEditor = name.endsWith(EDITOR_SUFFIX);
+	const type = inferModuleType(name);
+	// UncookedOnly modules only load in editor and uncooked -game runs, so they
+	// get the same desktop-only platform list as Editor modules.
+	const platforms = type === 'Runtime' ? PLATFORMS.runtime : PLATFORMS.editor;
 	return {
 		Name: name,
-		Type: isEditor ? 'Editor' : 'Runtime',
+		Type: type,
 		LoadingPhase: 'Default',
-		PlatformAllowList: isEditor ? [...PLATFORMS.editor] : [...PLATFORMS.runtime]
+		PlatformAllowList: [...platforms]
 	};
 }
 
@@ -302,48 +333,57 @@ function resolveRequiredPlugins(modules, pluginsDeps) {
 	return plugins;
 }
 
+function compareNames(a, b) {
+	// Ordinal comparison - locale-independent, so output is byte-stable across
+	// machines and identical to the python generator's sort
+	if (a < b) return -1;
+	if (a > b) return 1;
+	return 0;
+}
+
+function compareModuleNames(a, b) {
+	// Umbrella modules first (main before editor), then alphabetically
+	const aIsUmbrella = isUmbrellaModule(a);
+	const bIsUmbrella = isUmbrellaModule(b);
+	if (aIsUmbrella && !bIsUmbrella) return -1;
+	if (!aIsUmbrella && bIsUmbrella) return 1;
+	if (aIsUmbrella && bIsUmbrella) return a === PLUGIN_NAME ? -1 : 1;
+	return compareNames(a, b);
+}
+
 function generateUplugin(existingUplugin, modules, plugins) {
-	// Sort modules: umbrella first, then alphabetically
-	const sortedModules = Array.from(modules).sort((a, b) => {
-		const aIsUmbrella = a === PLUGIN_NAME || a === PLUGIN_NAME + EDITOR_SUFFIX;
-		const bIsUmbrella = b === PLUGIN_NAME || b === PLUGIN_NAME + EDITOR_SUFFIX;
-
-		if (aIsUmbrella && !bIsUmbrella) return -1;
-		if (!aIsUmbrella && bIsUmbrella) return 1;
-		if (aIsUmbrella && bIsUmbrella) {
-			// Main umbrella before editor umbrella
-			return a === PLUGIN_NAME ? -1 : 1;
-		}
-		return a.localeCompare(b);
-	});
-
 	// Build new uplugin preserving all existing metadata
 	const newUplugin = { ...existingUplugin };
 
+	// Preserve-first: a module already declared in the .uplugin keeps its entry
+	// verbatim (Type, LoadingPhase, PlatformAllowList, ...). The .uplugin is the
+	// source of truth for hand-tuned fields; name-based inference only provides
+	// defaults for NEWLY discovered modules (see buildModuleEntry). Entries whose
+	// module is no longer part of the resolved set are dropped.
+	const existingModules = new Map(
+		(existingUplugin.Modules || []).map(entry => [entry.Name, entry])
+	);
+	const existingPlugins = new Map(
+		(existingUplugin.Plugins || []).map(entry => [entry.Name, entry])
+	);
+
 	// Always include umbrella modules
-	const allModules = new Set(sortedModules);
+	const allModules = new Set(modules);
 	allModules.add(PLUGIN_NAME);
 	allModules.add(PLUGIN_NAME + EDITOR_SUFFIX);
 
 	newUplugin.Modules = Array.from(allModules)
-		.sort((a, b) => {
-			const aIsUmbrella = a === PLUGIN_NAME || a === PLUGIN_NAME + EDITOR_SUFFIX;
-			const bIsUmbrella = b === PLUGIN_NAME || b === PLUGIN_NAME + EDITOR_SUFFIX;
-			if (aIsUmbrella && !bIsUmbrella) return -1;
-			if (!aIsUmbrella && bIsUmbrella) return 1;
-			if (aIsUmbrella && bIsUmbrella) return a === PLUGIN_NAME ? -1 : 1;
-			return a.localeCompare(b);
-		})
-		.map(buildModuleEntry);
+		.sort(compareModuleNames)
+		.map(name => existingModules.get(name) || buildModuleEntry(name));
 
 	newUplugin.Plugins = Array.from(plugins)
 		.sort((a, b) => {
 			// PCG first, then alphabetically
 			if (a === 'PCG') return -1;
 			if (b === 'PCG') return 1;
-			return a.localeCompare(b);
+			return compareNames(a, b);
 		})
-		.map(buildPluginEntry);
+		.map(name => existingPlugins.get(name) || buildPluginEntry(name));
 
 	return newUplugin;
 }
@@ -429,17 +469,29 @@ function main() {
 	const pluginsDeps = parsePluginsDeps(PATHS.pluginsDeps);
 	console.log(`Plugin dependencies defined for: ${pluginsDeps.size} modules`);
 
-	// Resolve all modules (with deps and editor companions)
+	// Load existing uplugin content (as string for comparison)
+	const existingContent = loadExistingUplugin();
+	const existingUplugin = JSON.parse(existingContent);
+
+	// Resolve all modules (with deps and editor/uncooked companions)
 	const allModules = resolveAllModules(valid);
 	console.log(`Resolved modules (with dependencies): ${allModules.size}`);
+
+	// The config is the source of truth for module INCLUSION: declared modules
+	// that are no longer reachable (removed from the config, or folder deleted)
+	// are pruned from the .uplugin. Always-on modules (e.g. PCGExSpatialDomains)
+	// must be listed in PCGExSubModulesConfig.ini. Log drops so a module
+	// accidentally missing from the config never disappears silently.
+	const dropped = (existingUplugin.Modules || [])
+		.map(entry => entry.Name)
+		.filter(name => !isUmbrellaModule(name) && !allModules.has(name));
+	if (dropped.length > 0) {
+		console.log(`Dropped declared modules (removed from config or folder deleted): ${dropped.join(', ')}`);
+	}
 
 	// Resolve required plugins
 	const requiredPlugins = resolveRequiredPlugins(allModules, pluginsDeps);
 	console.log(`Required plugins: ${Array.from(requiredPlugins).join(', ')}`);
-
-	// Load existing uplugin content (as string for comparison)
-	const existingContent = loadExistingUplugin();
-	const existingUplugin = JSON.parse(existingContent);
 
 	// Generate new uplugin
 	const newUplugin = generateUplugin(existingUplugin, allModules, requiredPlugins);
