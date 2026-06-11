@@ -21,7 +21,7 @@ namespace PCGExData
 }
 
 /** Clipper2 : Decompose -- like Clipper2 : Volume but outputs a PCGEx cluster (deduped footprint vtx + deduped union of convex-piece edges) instead of volume actors. */
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="clusters/interop/clipper2-decompose"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Path", meta=(PCGExNodeLibraryDoc="clusters/generate/clipper2-decompose"))
 class UPCGExClipper2DecomposeSettings : public UPCGExClipper2ProcessorSettings
 {
 	GENERATED_BODY()

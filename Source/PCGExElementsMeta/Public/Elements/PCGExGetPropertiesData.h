@@ -46,7 +46,7 @@ enum class EPCGExSchemaPresenceMode : uint8
  * Runs entirely off the game thread.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc",
-	meta=(Keywords = "property component schema actor attribute", PCGExNodeLibraryDoc="metadata/get-properties-data"))
+	meta=(Keywords = "property component schema actor attribute", PCGExNodeLibraryDoc="metadata/keys/get-properties-data"))
 class UPCGExGetPropertiesDataSettings : public UPCGExSettings
 {
 	GENERATED_BODY()
