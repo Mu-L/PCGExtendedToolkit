@@ -76,6 +76,16 @@
       ]
     },
     {
+      "Name": "PCGExCollectionsUncooked",
+      "Type": "UncookedOnly",
+      "LoadingPhase": "Default",
+      "PlatformAllowList": [
+        "Win64",
+        "Mac",
+        "Linux"
+      ]
+    },
+    {
       "Name": "PCGExCore",
       "Type": "Runtime",
       "LoadingPhase": "Default",

@@ -22,7 +22,9 @@
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "HAL/FileManager.h"
+#include "Helpers/PCGExCollectionStagingPipeline.h"
 #include "Misc/PackageName.h"
+#include "UObject/Script.h"
 #endif
 
 bool FPCGExEntryAccessResult::IsType(PCGExAssetCollection::FTypeId TypeId) const
@@ -1372,17 +1374,70 @@ void UPCGExAssetCollection::SyncPropertyOverridesToEntries()
 	});
 }
 
+void UPCGExAssetCollection::EDITOR_DispatchPipelinePreRebuild()
+{
+	if (!StagingPipeline || bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet())
+	{
+		return;
+	}
+
+	// Hooks may mutate entries before some session paths take their own snapshot (the
+	// stale-entry batch only Modifies per entry, inside EDITOR_RebuildEntryStaging) --
+	// snapshot for undo up front. Redundant Modify calls within one transaction are no-ops.
+	Modify(true);
+
+	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
+	FEditorScriptExecutionGuard ScriptGuard;
+	StagingPipeline->OnPreRebuild(this);
+}
+
+void UPCGExAssetCollection::EDITOR_DispatchPipelineEntry(int32 EntryIndex)
+{
+	if (!StagingPipeline || bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet())
+	{
+		return;
+	}
+
+	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
+	FEditorScriptExecutionGuard ScriptGuard;
+	StagingPipeline->OnProcessEntry(this, EntryIndex);
+}
+
+void UPCGExAssetCollection::EDITOR_DispatchPipelinePostRebuild()
+{
+	if (!StagingPipeline || bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet())
+	{
+		return;
+	}
+
+	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
+	FEditorScriptExecutionGuard ScriptGuard;
+	StagingPipeline->OnPostRebuild(this);
+}
+
+void UPCGExAssetCollection::EDITOR_FinalizeStagingRebuild()
+{
+	// Native extension point first (actor component schema merges, shared-collection
+	// compaction), then the pipeline so its OnPostRebuild operates on final state.
+	EDITOR_OnPostStagingRebuild();
+	EDITOR_DispatchPipelinePostRebuild();
+}
+
 void UPCGExAssetCollection::EDITOR_RebuildStagingData()
 {
 	Modify(true);
 	InvalidateCache();
+	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+	{
+		EDITOR_DispatchPipelinePreRebuild();
+	}
 	EDITOR_SanitizeAndRebuildStagingData(false);
 	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
 	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
 	{
-		EDITOR_OnPostStagingRebuild();
+		EDITOR_FinalizeStagingRebuild();
 	}
 }
 
@@ -1390,13 +1445,17 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingData_Recursive()
 {
 	Modify(true);
 	InvalidateCache();
+	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+	{
+		EDITOR_DispatchPipelinePreRebuild();
+	}
 	EDITOR_SanitizeAndRebuildStagingData(true);
 	LastRebuiltUtc = FDateTime::UtcNow();
 	(void)MarkPackageDirty();
 	PCGExEditor::NotifyObjectChanged(this);
 	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
 	{
-		EDITOR_OnPostStagingRebuild();
+		EDITOR_FinalizeStagingRebuild();
 	}
 }
 
@@ -1458,6 +1517,11 @@ int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 		}
 	});
 
+	if (!StaleIndices.IsEmpty())
+	{
+		EDITOR_DispatchPipelinePreRebuild();
+	}
+
 	{
 		// Suppress per-entry post-rebuild hook firings; emit one tail call after the batch.
 		TGuardValue<int32> SuppressGuard(EDITOR_PostStagingRebuildSuppressDepth, EDITOR_PostStagingRebuildSuppressDepth + 1);
@@ -1468,7 +1532,7 @@ int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 	}
 	if (!StaleIndices.IsEmpty())
 	{
-		EDITOR_OnPostStagingRebuild();
+		EDITOR_FinalizeStagingRebuild();
 	}
 	return StaleIndices.Num();
 }
@@ -1478,6 +1542,18 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 	if (bSuppressStagingRebuild)
 	{
 		return false;
+	}
+
+	if (!IsValidIndex(EntryIndex))
+	{
+		return false;
+	}
+
+	// Direct single-entry sessions fire the pre hook themselves; batch loops (stale entries)
+	// already fired it before suppressing.
+	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
+	{
+		EDITOR_DispatchPipelinePreRebuild();
 	}
 
 	bool bRebuilt = false;
@@ -1491,6 +1567,7 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 		InEntry->EDITOR_Sanitize();
 		InEntry->UpdateStaging(this, i, false);
 		InEntry->PostUpdateStaging();
+		EDITOR_DispatchPipelineEntry(i);
 		bRebuilt = true;
 	});
 
@@ -1501,7 +1578,7 @@ bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
 		PCGExEditor::NotifyObjectChanged(this);
 		if (EDITOR_PostStagingRebuildSuppressDepth == 0)
 		{
-			EDITOR_OnPostStagingRebuild();
+			EDITOR_FinalizeStagingRebuild();
 		}
 	}
 	return bRebuilt;
@@ -1535,6 +1612,7 @@ void UPCGExAssetCollection::EDITOR_SanitizeAndRebuildStagingData(bool bRecursive
 		InEntry->EDITOR_Sanitize();
 		InEntry->UpdateStaging(this, i, bRecursive);
 		InEntry->PostUpdateStaging();
+		EDITOR_DispatchPipelineEntry(i);
 	});
 }
 
