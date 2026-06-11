@@ -13,10 +13,12 @@ class UPCGExAssetCollection;
 /**
  * Editor-only post-process pipeline for asset-collection staging rebuilds.
  *
- * Subclass in C++ or Blueprint and assign to UPCGExAssetCollection::StagingPipeline to
+ * Subclass in C++ or Blueprint and add to UPCGExAssetCollection::StagingPipelines to
  * post-process entry data (property overrides, tags, weights, ...) whenever the collection's
  * staging data is rebuilt in the editor. Instanced via Instanced/EditInlineNew so derived
  * classes can expose their own UPROPERTYs directly in the collection's details panel.
+ * Pipelines compose: every assigned pipeline runs in array order at each hook point (null
+ * slots are skipped), so later pipelines observe earlier pipelines' mutations.
  *
  * Hook contract:
  *  - Fires for every editor rebuild session: toolbar Rebuild / Rebuild Recursive / Rebuild
@@ -34,8 +36,8 @@ class UPCGExAssetCollection;
  * entry array is being iterated live. Structural changes belong in OnPreRebuild/OnPostRebuild.
  *
  * Events are declared unconditionally so Blueprint subclasses stay cook-safe, but they are
- * only ever invoked from WITH_EDITOR rebuild paths (the collection-side StagingPipeline
- * pointer is editor-only data and never exists in cooked targets).
+ * only ever invoked from WITH_EDITOR rebuild paths (the collection-side StagingPipelines
+ * list is editor-only data and never exists in cooked targets).
  */
 UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew, DefaultToInstanced)
 class PCGEXCOLLECTIONS_API UPCGExCollectionStagingPipeline : public UObject

@@ -935,6 +935,16 @@ void UPCGExAssetCollection::PostLoad()
 {
 	Super::PostLoad();
 
+#if WITH_EDITORONLY_DATA
+	// Single-pipeline slot migration: the legacy StagingPipeline pointer becomes the first
+	// element of the composable StagingPipelines array. Runs once; subsequent loads no-op.
+	if (StagingPipeline_DEPRECATED)
+	{
+		StagingPipelines.Add(StagingPipeline_DEPRECATED);
+		StagingPipeline_DEPRECATED = nullptr;
+	}
+#endif
+
 #if WITH_EDITOR
 	// Grammar schema migration. Runs once per collection; subsequent loads no-op.
 	if (GrammarSchemaVersion < PCGExAssetCollectionMigration::CurrentGrammarSchemaVersion)
@@ -1374,9 +1384,21 @@ void UPCGExAssetCollection::SyncPropertyOverridesToEntries()
 	});
 }
 
+bool UPCGExAssetCollection::EDITOR_HasAnyStagingPipeline() const
+{
+	for (const TObjectPtr<UPCGExCollectionStagingPipeline>& Pipeline : StagingPipelines)
+	{
+		if (Pipeline)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void UPCGExAssetCollection::EDITOR_DispatchPipelinePreRebuild()
 {
-	if (!StagingPipeline || bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet())
+	if (bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet() || !EDITOR_HasAnyStagingPipeline())
 	{
 		return;
 	}
@@ -1387,38 +1409,62 @@ void UPCGExAssetCollection::EDITOR_DispatchPipelinePreRebuild()
 	Modify(true);
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
-	TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(StagingPipeline->TargetCollection, this);
-	TGuardValue<int32> TargetIndexGuard(StagingPipeline->TargetEntryIndex, INDEX_NONE);
 	FEditorScriptExecutionGuard ScriptGuard;
-	StagingPipeline->OnPreRebuild(this);
+
+	for (UPCGExCollectionStagingPipeline* Pipeline : StagingPipelines)
+	{
+		if (!Pipeline)
+		{
+			continue;
+		}
+		TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(Pipeline->TargetCollection, this);
+		TGuardValue<int32> TargetIndexGuard(Pipeline->TargetEntryIndex, INDEX_NONE);
+		Pipeline->OnPreRebuild(this);
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_DispatchPipelineEntry(int32 EntryIndex, bool bIsSubCollection)
 {
-	if (!StagingPipeline || bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet())
+	if (bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet() || !EDITOR_HasAnyStagingPipeline())
 	{
 		return;
 	}
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
-	TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(StagingPipeline->TargetCollection, this);
-	TGuardValue<int32> TargetIndexGuard(StagingPipeline->TargetEntryIndex, EntryIndex);
 	FEditorScriptExecutionGuard ScriptGuard;
-	StagingPipeline->OnProcessEntry(this, EntryIndex, bIsSubCollection);
+
+	for (UPCGExCollectionStagingPipeline* Pipeline : StagingPipelines)
+	{
+		if (!Pipeline)
+		{
+			continue;
+		}
+		TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(Pipeline->TargetCollection, this);
+		TGuardValue<int32> TargetIndexGuard(Pipeline->TargetEntryIndex, EntryIndex);
+		Pipeline->OnProcessEntry(this, EntryIndex, bIsSubCollection);
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_DispatchPipelinePostRebuild()
 {
-	if (!StagingPipeline || bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet())
+	if (bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet() || !EDITOR_HasAnyStagingPipeline())
 	{
 		return;
 	}
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
-	TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(StagingPipeline->TargetCollection, this);
-	TGuardValue<int32> TargetIndexGuard(StagingPipeline->TargetEntryIndex, INDEX_NONE);
 	FEditorScriptExecutionGuard ScriptGuard;
-	StagingPipeline->OnPostRebuild(this);
+
+	for (UPCGExCollectionStagingPipeline* Pipeline : StagingPipelines)
+	{
+		if (!Pipeline)
+		{
+			continue;
+		}
+		TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(Pipeline->TargetCollection, this);
+		TGuardValue<int32> TargetIndexGuard(Pipeline->TargetEntryIndex, INDEX_NONE);
+		Pipeline->OnPostRebuild(this);
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_FinalizeStagingRebuild()
