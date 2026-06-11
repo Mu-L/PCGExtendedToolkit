@@ -79,12 +79,14 @@ enum class EPCGExAssetTagInheritance : uint8
 ENUM_CLASS_FLAGS(EPCGExAssetTagInheritance)
 using EPCGExAssetTagInheritanceBitmask = TEnumAsByte<EPCGExAssetTagInheritance>;
 
-/** Whether an entry uses its own settings (Local) or the collection's global settings. */
+// None is declared first (with an explicit value) so it leads the details dropdown as the default.
+/** Whether an entry uses its own settings (Local), the collection's global settings (Global), or none at all (None). */
 UENUM(BlueprintType)
 enum class EPCGExEntryVariationMode : uint8
 {
 	Local  = 0 UMETA(DisplayName = "Local", ToolTip="This entry defines its own settings. This can be overruled in the collection settings.", ActionIcon="EntryRule"),
-	Global = 1 UMETA(DisplayName = "Global", ToolTip="Uses collections settings", ActionIcon="CollectionRule")
+	Global = 1 UMETA(DisplayName = "Global", ToolTip="Uses collections settings", ActionIcon="CollectionRule"),
+	None   = 2 UMETA(DisplayName = "None", ToolTip="No local data. Variations resolve to identity; fitting overrides resolve to the consuming node's settings.", ActionIcon="Disabled"),
 };
 
 /** Collection-level override rule: let entries choose (PerEntry) or force global (Overrule). */

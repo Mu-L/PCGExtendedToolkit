@@ -13,6 +13,7 @@
 #include "Core/PCGExContext.h"
 #include "Details/PCGExSocket.h"
 #include "Details/PCGExStagingDetails.h"
+#include "Fitting/PCGExFittingOverrides.h"
 #include "Fitting/PCGExFittingVariations.h"
 #include "Helpers/PCGExCookDependencyProvider.h"
 #include "Helpers/PCGExStreamingHelpers.h"
@@ -133,7 +134,8 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetStagingData
  * - Weight: pick probability (0 = excluded from cache)
  * - Category: named group for category-based picking
  * - Tags: arbitrary FName set, inheritable through subcollection hierarchy
- * - Variations: per-entry fitting transforms (scale/rotation randomization)
+ * - Variations: per-entry fitting transforms (scale/rotation randomization), opt-in via VariationMode
+ * - ScaleToFit / Justification: opt-in per-entry overrides of the staging nodes' fitting settings
  * - PropertyOverrides: per-entry override of collection-level custom properties
  * - Staging: pre-computed bounds, path, and sockets
  */
@@ -169,10 +171,30 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	bool bIsSubCollection = false;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
-	EPCGExEntryVariationMode VariationMode = EPCGExEntryVariationMode::Local;
+	EPCGExEntryVariationMode VariationMode = EPCGExEntryVariationMode::None;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Variations", EditCondition="!bIsSubCollection && VariationMode == EPCGExEntryVariationMode::Local", EditConditionHides, ShowOnlyInnerProperties))
 	FPCGExFittingVariations Variations;
+
+	/**
+	 * Where this entry's Scale to Fit comes from when a staging node considers entry overrides.
+	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	EPCGExEntryVariationMode ScaleToFitSource = EPCGExEntryVariationMode::None;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Scale to Fit", EditCondition="!bIsSubCollection && ScaleToFitSource == EPCGExEntryVariationMode::Local", EditConditionHides))
+	FPCGExLeanScaleToFitDetails ScaleToFit;
+
+	/**
+	 * Where this entry's Justification comes from when a staging node considers entry overrides.
+	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	EPCGExEntryVariationMode JustificationSource = EPCGExEntryVariationMode::None;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Justification", EditCondition="!bIsSubCollection && JustificationSource == EPCGExEntryVariationMode::Local", EditConditionHides))
+	FPCGExLeanJustificationDetails Justification;
 
 	UPROPERTY(EditAnywhere, Category = Settings)
 	TSet<FName> Tags;
@@ -185,7 +207,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	UPROPERTY(EditAnywhere, Category = Settings)
 	FPCGExPropertyOverrides PropertyOverrides;
 
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides, InvalidEnumValues="None"))
 	EPCGExEntryVariationMode GrammarSource = EPCGExEntryVariationMode::Local;
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName="Grammar Mode", EditCondition="bIsSubCollection", EditConditionHides))
@@ -255,6 +277,16 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	// Variations & Grammar
 
 	const FPCGExFittingVariations& GetVariations(const UPCGExAssetCollection* ParentCollection) const;
+
+	/**
+	 * Resolve this entry's Scale to Fit override. Collection-level Overrule wins first, then
+	 * ScaleToFitSource (Local/Global). Returns nullptr when the consuming node's settings
+	 * should be used (None).
+	 */
+	const FPCGExLeanScaleToFitDetails* GetScaleToFitOverride(const UPCGExAssetCollection* ParentCollection) const;
+
+	/** Same contract as GetScaleToFitOverride, for justification. */
+	const FPCGExLeanJustificationDetails* GetJustificationOverride(const UPCGExAssetCollection* ParentCollection) const;
 
 	/**
 	 * Return the grammar struct that applies to this entry given GrammarSource / SubGrammarMode /
@@ -917,6 +949,22 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Settings|Global")
 	FPCGExAssetGrammarDetails GlobalAssetGrammar = FPCGExAssetGrammarDetails(FName("N/A"));
 
+	/** Collection-level rule for entry Scale to Fit overrides: let entries choose (PerEntry) or force GlobalScaleToFit on all of them (Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	EPCGExGlobalVariationRule GlobalScaleToFitMode = EPCGExGlobalVariationRule::PerEntry;
+
+	/** Collection-level Scale to Fit, consumed by entries whose ScaleToFitSource is Global (or by all entries when Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	FPCGExLeanScaleToFitDetails GlobalScaleToFit;
+
+	/** Collection-level rule for entry Justification overrides: let entries choose (PerEntry) or force GlobalJustification on all of them (Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	EPCGExGlobalVariationRule GlobalJustificationMode = EPCGExGlobalVariationRule::PerEntry;
+
+	/** Collection-level Justification, consumed by entries whose JustificationSource is Global (or by all entries when Overrule). */
+	UPROPERTY(EditAnywhere, Category = "Settings|Global")
+	FPCGExLeanJustificationDetails GlobalJustification;
+
 	/**
 	 * This collection's identity as a grammar module when it is used as a subcollection entry
 	 * elsewhere (resolved when the parent entry has SubGrammarMode == Inherit). Per-axis like
@@ -937,6 +985,10 @@ public:
 	/** Versioned grammar schema. PostLoad migrates legacy data to the current version. 0 = pre-v1 layout. */
 	UPROPERTY()
 	int32 GrammarSchemaVersion = 0;
+
+	/** Versioned fitting/variations schema. PostLoad migrates legacy data to the current version. 0 = pre-opt-in entry variations. */
+	UPROPERTY()
+	int32 FittingSchemaVersion = 0;
 
 	UPROPERTY(EditAnywhere, Category = "Settings|Utils")
 	bool bDoNotIgnoreInvalidEntries = false;

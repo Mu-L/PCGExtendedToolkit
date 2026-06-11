@@ -324,7 +324,53 @@ const FPCGExFittingVariations& FPCGExAssetCollectionEntry::GetVariations(const U
 	{
 		return ParentCollection->GlobalVariations;
 	}
+
+	if (VariationMode == EPCGExEntryVariationMode::None)
+	{
+		// Identity ranges, NOT a skip: Apply() must keep drawing from the random stream exactly
+		// as a Local entry with default values would, so seed-dependent downstream results are
+		// unaffected by the None/Local distinction.
+		static const FPCGExFittingVariations IdentityVariations;
+		return IdentityVariations;
+	}
+
 	return Variations;
+}
+
+const FPCGExLeanScaleToFitDetails* FPCGExAssetCollectionEntry::GetScaleToFitOverride(const UPCGExAssetCollection* ParentCollection) const
+{
+	if (ParentCollection && ParentCollection->GlobalScaleToFitMode == EPCGExGlobalVariationRule::Overrule)
+	{
+		return &ParentCollection->GlobalScaleToFit;
+	}
+
+	switch (ScaleToFitSource)
+	{
+	case EPCGExEntryVariationMode::Local:
+		return &ScaleToFit;
+	case EPCGExEntryVariationMode::Global:
+		return ParentCollection ? &ParentCollection->GlobalScaleToFit : nullptr;
+	default:
+		return nullptr;
+	}
+}
+
+const FPCGExLeanJustificationDetails* FPCGExAssetCollectionEntry::GetJustificationOverride(const UPCGExAssetCollection* ParentCollection) const
+{
+	if (ParentCollection && ParentCollection->GlobalJustificationMode == EPCGExGlobalVariationRule::Overrule)
+	{
+		return &ParentCollection->GlobalJustification;
+	}
+
+	switch (JustificationSource)
+	{
+	case EPCGExEntryVariationMode::Local:
+		return &Justification;
+	case EPCGExEntryVariationMode::Global:
+		return ParentCollection ? &ParentCollection->GlobalJustification : nullptr;
+	default:
+		return nullptr;
+	}
 }
 
 const FPCGExAssetGrammarDetails* FPCGExAssetCollectionEntry::GetEffectiveGrammar(const UPCGExAssetCollection* Host) const
@@ -905,6 +951,48 @@ void UPCGExAssetCollection::PostEditImport()
 namespace PCGExAssetCollectionMigration
 {
 	static constexpr int32 CurrentGrammarSchemaVersion = 1;
+	static constexpr int32 CurrentFittingSchemaVersion = 1;
+
+	/**
+	 * Migrate one entry's variation mode from the always-on era (v0) to opt-in (v1).
+	 *
+	 * 'Local' was both the old default and the old delta-serialization baseline, so entries
+	 * authored as Local never wrote the byte to disk and now load as None (the new default).
+	 * Intent is recovered from the data itself: authored ranges mean Local, untouched ranges
+	 * mean None. Global entries always serialized their byte and are left alone (their parked
+	 * local values are kept too). Behaviorally lossless either way: GetVariations resolves
+	 * None to identity ranges, which is exactly what a Local entry with default values was.
+	 *
+	 * Returns true if the entry was modified.
+	 */
+	static bool MigrateEntryVariationsV0ToV1(FPCGExAssetCollectionEntry* Entry)
+	{
+		if (!Entry || Entry->VariationMode == EPCGExEntryVariationMode::Global) { return false; }
+
+		static const FPCGExFittingVariations Defaults;
+		const bool bIsDefault = FPCGExFittingVariations::StaticStruct()->CompareScriptStruct(&Entry->Variations, &Defaults, 0);
+
+		const EPCGExEntryVariationMode Desired = bIsDefault ? EPCGExEntryVariationMode::None : EPCGExEntryVariationMode::Local;
+		if (Entry->VariationMode == Desired) { return false; }
+
+		Entry->VariationMode = Desired;
+		return true;
+	}
+
+	// -- Future (option B): true sparse storage for entry variations ---------------------------
+	// v1 (above) makes variations semantically opt-in but keeps the FPCGExFittingVariations
+	// payload inline on every entry. If per-entry memory ever matters, the v2 pass is:
+	//   1. Add sparse storage (e.g. an FInstancedStruct payload populated only for Local
+	//      entries -- after v1 normalization that is exactly the entries with authored ranges).
+	//   2. Rename the inline member Variations -> Variations_DEPRECATED (UE matches the
+	//      serialized 'Variations' tag onto the _DEPRECATED member automatically) and add a
+	//      FittingSchemaVersion < 2 PostLoad pass that moves the payload, then bump to 2.
+	//   3. Fleet-resave production collections (ResavePackages commandlet) so disk data migrates.
+	//   4. Only then delete Variations_DEPRECATED in a later release: a deprecated UPROPERTY
+	//      still occupies its bytes in RAM, so the win only materializes at deletion -- which is
+	//      only safe once no un-resaved asset remains.
+	// GetVariations() is the single read funnel, so consumers won't notice the storage change.
+	// -------------------------------------------------------------------------------------------
 
 	/** Migrate one entry's grammar data from v0 to v1. Returns true if a downgrade warning
 	 *  should be emitted for this entry (legacy Min/Max/Average on a leaf). */
@@ -980,7 +1068,22 @@ void UPCGExAssetCollection::PostLoad()
 		}
 
 		GrammarSchemaVersion = PCGExAssetCollectionMigration::CurrentGrammarSchemaVersion;
-		
+
+		(void)MarkPackageDirty();
+	}
+
+	// Entry variations opt-in migration (v0 -> v1). VariationMode's default flipped from Local
+	// to None; this pass recovers authored intent from the serialized data (see
+	// MigrateEntryVariationsV0ToV1). Runs once per collection; subsequent loads no-op.
+	if (FittingSchemaVersion < PCGExAssetCollectionMigration::CurrentFittingSchemaVersion)
+	{
+		ForEachEntry([](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
+		{
+			PCGExAssetCollectionMigration::MigrateEntryVariationsV0ToV1(Entry);
+		});
+
+		FittingSchemaVersion = PCGExAssetCollectionMigration::CurrentFittingSchemaVersion;
+
 		(void)MarkPackageDirty();
 	}
 #endif

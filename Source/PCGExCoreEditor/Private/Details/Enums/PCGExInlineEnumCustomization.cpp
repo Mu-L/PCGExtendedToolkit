@@ -18,9 +18,63 @@
 
 namespace PCGExEnumCustomization
 {
+	/**
+	 * Build skip indices from the property's engine-standard ValidEnumValues / InvalidEnumValues
+	 * metadata, so per-property gating works through the inline customizations the same way it
+	 * does through the default enum combobox.
+	 */
+	static TSet<int32> GetMetaSkipIndices(const TSharedPtr<IPropertyHandle>& PropertyHandle, const UEnum* Enum)
+	{
+		TSet<int32> SkipIndices;
+		if (!PropertyHandle || !Enum)
+		{
+			return SkipIndices;
+		}
+
+		auto ParseIndices = [Enum](const FString& MetaString, TSet<int32>& OutIndices)
+		{
+			TArray<FString> Names;
+			MetaString.ParseIntoArray(Names, TEXT(","), true);
+			for (FString& Name : Names)
+			{
+				Name.TrimStartAndEndInline();
+				const int32 Idx = Enum->GetIndexByNameString(Name);
+				if (Idx != INDEX_NONE)
+				{
+					OutIndices.Add(Idx);
+				}
+			}
+		};
+
+		const FString& InvalidMeta = PropertyHandle->GetMetaData(TEXT("InvalidEnumValues"));
+		if (!InvalidMeta.IsEmpty())
+		{
+			ParseIndices(InvalidMeta, SkipIndices);
+		}
+
+		const FString& ValidMeta = PropertyHandle->GetMetaData(TEXT("ValidEnumValues"));
+		if (!ValidMeta.IsEmpty())
+		{
+			TSet<int32> ValidIndices;
+			ParseIndices(ValidMeta, ValidIndices);
+			if (!ValidIndices.IsEmpty())
+			{
+				for (int32 i = 0; i < Enum->NumEnums() - 1; ++i)
+				{
+					if (!ValidIndices.Contains(i))
+					{
+						SkipIndices.Add(i);
+					}
+				}
+			}
+		}
+
+		return SkipIndices;
+	}
+
 	TSharedRef<SWidget> CreateRadioGroup(TSharedPtr<IPropertyHandle> PropertyHandle, UEnum* Enum)
 	{
-		return CreateRadioGroup(PropertyHandle, Enum, /*SkipIndices=*/{});
+		return CreateRadioGroup(PropertyHandle, Enum, GetMetaSkipIndices(PropertyHandle, Enum));
 	}
 
 	TSharedRef<SWidget> CreateRadioGroup(const TSharedPtr<IPropertyHandle>& PropertyHandle, const FString& Enum)

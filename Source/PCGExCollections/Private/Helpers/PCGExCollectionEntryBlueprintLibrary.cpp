@@ -978,6 +978,12 @@ bool UPCGExCollectionEntryBlueprintLibrary::SetEntryVariations(UPCGExAssetCollec
 	}
 
 	Entry->Variations = NewVariations;
+	if (Entry->VariationMode == EPCGExEntryVariationMode::None)
+	{
+		// A write to an entry parked at None would otherwise be invisible -- promote to Local.
+		// Global is left alone: writing while Global is already "parked values" behavior.
+		Entry->VariationMode = EPCGExEntryVariationMode::Local;
+	}
 	Collection->Modify();
 	(void)Collection->MarkPackageDirty();
 	return true;
