@@ -41,16 +41,16 @@ bool PCGExPointFilter::FStringRegexFilter::Init(FPCGExContext* InContext, const 
 		return false;
 	}
 
+	// Compile the regex up front so the kept collection filter has a valid pattern even when the
+	// OperandA prep below fails against the seed facade (see IFilter::Test(IO, ParentCollection)
+	// contract). UE's FRegexPattern can't report invalid syntax, so there is nothing to check here
+	// -- a malformed pattern simply matches nothing at test time.
+	RegexMatcher.Compile(TypedFilterFactory->Config.RegexPattern);
+
 	OperandA = MakeShared<PCGExData::TAttributeBroadcaster<FString>>();
 	if (!OperandA->Prepare(TypedFilterFactory->Config.OperandA, PointDataFacade->Source))
 	{
 		PCGEX_LOG_INVALID_ATTR_HANDLED_C(InContext, Operand A, TypedFilterFactory->Config.OperandA)
-		return false;
-	}
-
-	if (!RegexMatcher.Compile(TypedFilterFactory->Config.RegexPattern))
-	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(LOCTEXT("InvalidRegex", "Invalid regex pattern: '{0}'"), FText::FromString(TypedFilterFactory->Config.RegexPattern)));
 		return false;
 	}
 

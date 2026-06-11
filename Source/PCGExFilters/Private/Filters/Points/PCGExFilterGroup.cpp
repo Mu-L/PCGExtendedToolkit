@@ -63,6 +63,16 @@ namespace PCGExFilterGroup
 
 			if (!InitManagedFilter(InContext, NewFilter, ManagedFactory->InitializationFailurePolicy != EPCGExFilterNoDataFallback::Error))
 			{
+				// TODO: duplicated with FManager::Init -- consolidate via a shared FFilterStack base (see note there).
+				if (bWillBeUsedWithCollections)
+				{
+					// See FManager::Init: in collection mode a per-point Init failure is expected (the
+					// dummy seed facade may lack the data). The filter is evaluated per-data through
+					// Test(IO, ParentCollection), so keep it rather than substituting a constant.
+					ManagedFilters.Add(NewFilter);
+					continue;
+				}
+
 				if (ManagedFactory->InitializationFailurePolicy == EPCGExFilterNoDataFallback::Error)
 				{
 					PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(FTEXT("A grouped filter failed to initialize properly : {0}."), FText::FromString(GetNameSafe(ManagedFactory->GetClass()))));

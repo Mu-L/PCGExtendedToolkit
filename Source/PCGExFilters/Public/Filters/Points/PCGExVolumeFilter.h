@@ -193,6 +193,9 @@ namespace PCGExPointFilter
 		TSharedPtr<PCGExDetails::TSettingValue<double>> PenetrationThresholdValue;
 
 		bool TestPoint(const FVector& Position, double EffectiveRadius) const;
+		// Explicit-data overload used by the collection path, where the per-point members (Octree,
+		// CachedVolumes, CheckType, bInvert) may be unset because Init() failed against the seed facade.
+		bool TestPoint(const FVector& Position, double EffectiveRadius, const PCGExOctree::FItemOctree& InOctree, const TArray<FCachedVolume>& InVolumes, EPCGExVolumeCheckType InCheckType, bool bInInvert) const;
 		double GetEffectiveRadius(const FBox& LocalBox, int32 PointIndex) const;
 	};
 }

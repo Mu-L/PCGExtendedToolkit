@@ -52,11 +52,9 @@ namespace PCGExEdgeEndpointsRegex
 			return false;
 		}
 
-		if (!RegexMatcher.Compile(TypedFilterFactory->Config.RegexPattern))
-		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(LOCTEXT("InvalidRegex", "Invalid regex pattern: '{0}'"), FText::FromString(TypedFilterFactory->Config.RegexPattern)));
-			return false;
-		}
+		// UE's FRegexPattern can't report invalid syntax (a malformed pattern just matches nothing),
+		// so there is nothing to validate here.
+		RegexMatcher.Compile(TypedFilterFactory->Config.RegexPattern);
 
 		return true;
 	}
