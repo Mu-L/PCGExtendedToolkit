@@ -1387,6 +1387,8 @@ void UPCGExAssetCollection::EDITOR_DispatchPipelinePreRebuild()
 	Modify(true);
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
+	TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(StagingPipeline->TargetCollection, this);
+	TGuardValue<int32> TargetIndexGuard(StagingPipeline->TargetEntryIndex, INDEX_NONE);
 	FEditorScriptExecutionGuard ScriptGuard;
 	StagingPipeline->OnPreRebuild(this);
 }
@@ -1399,6 +1401,8 @@ void UPCGExAssetCollection::EDITOR_DispatchPipelineEntry(int32 EntryIndex, bool 
 	}
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
+	TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(StagingPipeline->TargetCollection, this);
+	TGuardValue<int32> TargetIndexGuard(StagingPipeline->TargetEntryIndex, EntryIndex);
 	FEditorScriptExecutionGuard ScriptGuard;
 	StagingPipeline->OnProcessEntry(this, EntryIndex, bIsSubCollection);
 }
@@ -1411,6 +1415,8 @@ void UPCGExAssetCollection::EDITOR_DispatchPipelinePostRebuild()
 	}
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
+	TGuardValue<TObjectPtr<UPCGExAssetCollection>> TargetCollectionGuard(StagingPipeline->TargetCollection, this);
+	TGuardValue<int32> TargetIndexGuard(StagingPipeline->TargetEntryIndex, INDEX_NONE);
 	FEditorScriptExecutionGuard ScriptGuard;
 	StagingPipeline->OnPostRebuild(this);
 }

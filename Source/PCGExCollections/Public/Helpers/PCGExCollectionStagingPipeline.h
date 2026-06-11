@@ -42,7 +42,39 @@ class PCGEXCOLLECTIONS_API UPCGExCollectionStagingPipeline : public UObject
 {
 	GENERATED_BODY()
 
+	// The dispatcher stamps the hook-scoped target context (collection + entry index) around
+	// each event invocation.
+	friend class UPCGExAssetCollection;
+
 public:
+	/**
+	 * The collection currently dispatching hooks into this pipeline. Self-context: the self
+	 * pin is hidden and non-connectable (HideSelfPin), so the node renders as a tiny output
+	 * lozenge that can be dropped next to any library node instead of dragging the event's
+	 * Collection pin across the canvas. Only meaningful on the executing pipeline; null
+	 * outside hook execution (e.g. when called from an editor utility widget).
+	 */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection|Staging", meta = (CompactNodeTitle = "Collection", HideSelfPin = "true"))
+	UPCGExAssetCollection* GetTargetCollection() const
+	{
+		return TargetCollection;
+	}
+
+	/** The entry index currently being processed. Only valid inside OnProcessEntry; -1 in
+	 *  OnPreRebuild / OnPostRebuild and outside hook execution. */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection|Staging", meta = (CompactNodeTitle = "Entry", HideSelfPin = "true"))
+	int32 GetTargetEntryIndex() const
+	{
+		return TargetEntryIndex;
+	}
+
+	/** True while executing OnProcessEntry (i.e. GetTargetEntryIndex is a valid index). */
+	UFUNCTION(BlueprintPure, Category = "PCGEx|Collection|Staging", meta = (HideSelfPin = "true"))
+	bool IsProcessingEntry() const
+	{
+		return TargetEntryIndex >= 0;
+	}
+
 	/** Fired once per rebuild session, before any entry is re-staged. */
 	UFUNCTION(BlueprintNativeEvent, Category = "PCGEx|Collection|Staging")
 	void OnPreRebuild(UPCGExAssetCollection* Collection);
@@ -68,4 +100,13 @@ public:
 	virtual void OnPostRebuild_Implementation(UPCGExAssetCollection* Collection)
 	{
 	}
+
+protected:
+	/** Hook-scoped dispatch context. Stamped by the owning collection's dispatcher around each
+	 *  event (single-threaded, re-entrancy guarded), cleared on scope exit. Transient on
+	 *  purpose: never serialized, only meaningful mid-dispatch. */
+	UPROPERTY(Transient)
+	TObjectPtr<UPCGExAssetCollection> TargetCollection;
+
+	int32 TargetEntryIndex = -1;
 };
