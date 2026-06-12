@@ -21,7 +21,7 @@ double FPCGExHeuristicSteepness::GetGlobalScore(const PCGExClusters::FNode& From
 	return GetScoreInternal(GetDot(Cluster->GetPos(From), Cluster->GetPos(Goal)));
 }
 
-double FPCGExHeuristicSteepness::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
+double FPCGExHeuristicSteepness::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack) const
 {
 	if (bAccumulate && TravelStack)
 	{

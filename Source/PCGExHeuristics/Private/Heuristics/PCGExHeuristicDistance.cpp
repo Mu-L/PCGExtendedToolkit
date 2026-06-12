@@ -19,7 +19,7 @@ double FPCGExHeuristicDistance::GetGlobalScore(const PCGExClusters::FNode& From,
 	return GetScoreInternal(Cluster->GetDist(From, Goal) / BoundsSize);
 }
 
-double FPCGExHeuristicDistance::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
+double FPCGExHeuristicDistance::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack) const
 {
 	return GetScoreInternal((*Cluster->EdgeLengths)[Edge.Index]);
 }

@@ -33,6 +33,7 @@ public:
 	virtual TSharedPtr<FPCGExSearchOperation> CreateOperation() const override
 	{
 		PCGEX_FACTORY_NEW_OPERATION(SearchOperationDijkstra)
+		NewOperation->bEarlyExit = bEarlyExit;
 		return NewOperation;
 	}
 };

@@ -89,14 +89,16 @@ public:
 
 protected:
 	TSharedPtr<PCGExHeuristics::FHandler> HeuristicsHandler;
+	/** Resolved during PrepareForDiffusions -- candidate scoring runs in parallel and must not hit the lazy lookup */
+	const PCGExClusters::FNode* RoamingGoal = nullptr;
 	TSharedPtr<PCGExDetails::TSettingValue<double>> Threshold;
 	EPCGExFloodFillThresholdSource ThresholdSource = EPCGExFloodFillThresholdSource::EdgeScore;
 	EPCGExComparison Comparison = EPCGExComparison::StrictlySmaller;
 	double Tolerance = DBL_COMPARE_TOLERANCE;
 
-	// Cached score from ScoreCandidate for use in IsValidCandidate
-	mutable double LastComputedEdgeScore = 0;
-	mutable double LastComputedGlobalScore = 0;
+	/** Shared by ScoreCandidate & IsValidCandidate. This op instance is shared across diffusions
+	 * that run in parallel, so per-candidate results must never be cached on the op itself. */
+	double ComputeEdgeScore(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, const PCGExFloodFill::FCandidate& Candidate) const;
 };
 
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Data")

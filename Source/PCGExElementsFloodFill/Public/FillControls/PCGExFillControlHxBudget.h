@@ -80,6 +80,8 @@ public:
 
 protected:
 	TSharedPtr<PCGExHeuristics::FHandler> HeuristicsHandler;
+	/** Resolved during PrepareForDiffusions -- ScoreCandidate runs in parallel and must not hit the lazy lookup */
+	const PCGExClusters::FNode* RoamingGoal = nullptr;
 	TSharedPtr<PCGExDetails::TSettingValue<double>> MaxBudget;
 	EPCGExFloodFillBudgetSource BudgetSource = EPCGExFloodFillBudgetSource::PathScore;
 

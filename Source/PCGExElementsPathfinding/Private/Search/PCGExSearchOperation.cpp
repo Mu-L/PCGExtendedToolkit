@@ -26,6 +26,30 @@ TSharedPtr<PCGExPathfinding::FSearchAllocations> FPCGExSearchOperation::NewAlloc
 	return Allocations;
 }
 
+TSharedPtr<PCGExPathfinding::FSearchAllocations> FPCGExSearchOperation::AcquireAllocations()
+{
+	{
+		FScopeLock Lock(&AllocationsPoolLock);
+		if (!AllocationsPool.IsEmpty())
+		{
+			return AllocationsPool.Pop();
+		}
+	}
+
+	return NewAllocations();
+}
+
+void FPCGExSearchOperation::ReleaseAllocations(const TSharedPtr<PCGExPathfinding::FSearchAllocations>& InAllocations)
+{
+	if (!InAllocations)
+	{
+		return;
+	}
+
+	FScopeLock Lock(&AllocationsPoolLock);
+	AllocationsPool.Add(InAllocations);
+}
+
 
 void UPCGExSearchInstancedFactory::CopySettingsFrom(const UPCGExInstancedFactory* Other)
 {

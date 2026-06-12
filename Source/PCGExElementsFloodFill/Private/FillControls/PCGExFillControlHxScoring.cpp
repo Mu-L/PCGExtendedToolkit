@@ -38,6 +38,11 @@ bool FPCGExFillControlHeuristicsScoring::PrepareForDiffusions(FPCGExContext* InC
 
 	HeuristicsHandler->PrepareForCluster(InHandler->Cluster);
 	HeuristicsHandler->CompleteClusterPreparation();
+	// Diffusion re-scores candidates throughout the fill -- always worth baking static edge scores.
+	HeuristicsHandler->BakeStaticEdgeScores();
+	// Resolve the roaming goal once, single-threaded -- diffusions run in parallel and the lazy
+	// lookup both races and re-runs a full closest-edge scan per racing thread.
+	RoamingGoal = HeuristicsHandler->GetRoamingGoal();
 
 	return true;
 }
@@ -52,17 +57,14 @@ void FPCGExFillControlHeuristicsScoring::ScoreCandidate(const PCGExFloodFill::FD
 	const PCGExClusters::FNode& FromNode = *From.Node;
 	const PCGExClusters::FNode& ToNode = *OutCandidate.Node;
 	const PCGExClusters::FNode& SeedNode = *Diffusion->SeedNode;
-	const PCGExClusters::FNode& RoamingGoal = *HeuristicsHandler->GetRoamingGoal();
 
 	if (bUseLocalScore || bUsePreviousScore)
 	{
-		// Cast TravelStack to base class type for parameter compatibility
-		const TSharedPtr<PCGEx::FHashLookup> TravelStack = Diffusion->TravelStack;
 		const double LocalScore = HeuristicsHandler->GetEdgeScore(
 			FromNode, ToNode,
 			*Cluster->GetEdge(OutCandidate.Link),
-			SeedNode, RoamingGoal,
-			nullptr, TravelStack);
+			SeedNode, *RoamingGoal,
+			nullptr, Diffusion->TravelStack.Get());
 
 		if (bUsePreviousScore)
 		{

@@ -145,14 +145,15 @@ bool FPCGExPathfindingNavmeshElement::AdvanceWork(FPCGExContext* InContext, cons
 	PCGEX_ON_INITIAL_EXECUTION
 	{
 		const TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
-		auto NavClusterTask = [&](const int32 SeedIndex, const int32 GoalIndex)
+
+		// PathQueries is fully built in Boot and must not grow once tasks are in
+		// flight -- each task reads (*Queries)[TaskIndex], so a reallocation would
+		// pull the array out from under running tasks.
+		for (int32 i = 0; i < Context->PathQueries.Num(); i++)
 		{
-			const int32 PathIndex = Context->PathQueries.Emplace(SeedIndex, Context->SeedsDataFacade->Source->GetInPoint(SeedIndex).GetLocation(), GoalIndex, Context->GoalsDataFacade->Source->GetInPoint(GoalIndex).GetLocation());
+			PCGEX_LAUNCH(FSampleNavmeshTask, i, Context->SeedsDataFacade->Source, &Context->PathQueries)
+		}
 
-			PCGEX_LAUNCH(FSampleNavmeshTask, PathIndex, Context->SeedsDataFacade->Source, &Context->PathQueries)
-		};
-
-		PCGExPathfinding::ProcessGoals(Context->SeedsDataFacade, Context->GoalPicker, NavClusterTask);
 		Context->SetState(PCGExGraphs::States::State_Pathfinding);
 	}
 

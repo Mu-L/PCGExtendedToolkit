@@ -47,8 +47,22 @@ bool FPCGExFillControlHeuristicsThreshold::PrepareForDiffusions(FPCGExContext* I
 
 	HeuristicsHandler->PrepareForCluster(InHandler->Cluster);
 	HeuristicsHandler->CompleteClusterPreparation();
+	// Diffusion re-scores candidates throughout the fill -- always worth baking static edge scores.
+	HeuristicsHandler->BakeStaticEdgeScores();
+	// Resolve the roaming goal once, single-threaded -- diffusions run in parallel and the lazy
+	// lookup both races and re-runs a full closest-edge scan per racing thread.
+	RoamingGoal = HeuristicsHandler->GetRoamingGoal();
 
 	return true;
+}
+
+double FPCGExFillControlHeuristicsThreshold::ComputeEdgeScore(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, const PCGExFloodFill::FCandidate& Candidate) const
+{
+	return HeuristicsHandler->GetEdgeScore(
+		*From.Node, *Candidate.Node,
+		*Cluster->GetEdge(Candidate.Link),
+		*Diffusion->SeedNode, *RoamingGoal,
+		nullptr, Diffusion->TravelStack.Get());
 }
 
 void FPCGExFillControlHeuristicsThreshold::ScoreCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, PCGExFloodFill::FCandidate& OutCandidate)
@@ -58,30 +72,11 @@ void FPCGExFillControlHeuristicsThreshold::ScoreCandidate(const PCGExFloodFill::
 		return;
 	}
 
-	const PCGExClusters::FNode& FromNode = *From.Node;
-	const PCGExClusters::FNode& ToNode = *OutCandidate.Node;
-	const PCGExClusters::FNode& SeedNode = *Diffusion->SeedNode;
-	const PCGExClusters::FNode& RoamingGoal = *HeuristicsHandler->GetRoamingGoal();
-
-	// Cast TravelStack to base class type for parameter compatibility
-	const TSharedPtr<PCGEx::FHashLookup> TravelStack = Diffusion->TravelStack;
-
-	// Compute and cache edge score (always needed for threshold check)
-	LastComputedEdgeScore = HeuristicsHandler->GetEdgeScore(
-		FromNode, ToNode,
-		*Cluster->GetEdge(OutCandidate.Link),
-		SeedNode, RoamingGoal,
-		nullptr, TravelStack);
-
-	// Compute global score if needed
-	if (ThresholdSource == EPCGExFloodFillThresholdSource::GlobalScore)
-	{
-		LastComputedGlobalScore = HeuristicsHandler->GetGlobalScore(FromNode, SeedNode, ToNode);
-	}
+	const double EdgeScore = ComputeEdgeScore(Diffusion, From, OutCandidate);
 
 	// Accumulate scores for path tracking
-	OutCandidate.PathScore = From.PathScore + LastComputedEdgeScore;
-	OutCandidate.Score += LastComputedEdgeScore;
+	OutCandidate.PathScore = From.PathScore + EdgeScore;
+	OutCandidate.Score += EdgeScore;
 }
 
 bool FPCGExFillControlHeuristicsThreshold::IsValidCandidate(const PCGExFloodFill::FDiffusion* Diffusion, const PCGExFloodFill::FCandidate& From, const PCGExFloodFill::FCandidate& Candidate)
@@ -90,10 +85,18 @@ bool FPCGExFillControlHeuristicsThreshold::IsValidCandidate(const PCGExFloodFill
 	switch (ThresholdSource)
 	{
 	case EPCGExFloodFillThresholdSource::EdgeScore:
-		Value = LastComputedEdgeScore;
+		// Recomputed rather than cached: this op instance is shared by diffusions running in
+		// parallel, so a score stashed in ScoreCandidate could belong to another thread's candidate.
+		if (HeuristicsHandler)
+		{
+			Value = ComputeEdgeScore(Diffusion, From, Candidate);
+		}
 		break;
 	case EPCGExFloodFillThresholdSource::GlobalScore:
-		Value = LastComputedGlobalScore;
+		if (HeuristicsHandler)
+		{
+			Value = HeuristicsHandler->GetGlobalScore(*From.Node, *Diffusion->SeedNode, *Candidate.Node);
+		}
 		break;
 	case EPCGExFloodFillThresholdSource::ScoreDelta:
 		Value = Candidate.Score - From.Score;

@@ -324,6 +324,14 @@ namespace PCGExPathfindingEdges
 		}
 
 		const int32 NumQueries = Context->SeedGoalPairs.Num();
+
+		// A single early-exit query may explore only a fraction of the cluster; anything more
+		// re-evaluates edges enough times for the one-time bake sweep to pay for itself.
+		if (NumQueries > 1 || !SearchOperation->bEarlyExit)
+		{
+			HeuristicsHandler->BakeStaticEdgeScores();
+		}
+
 		PCGExArrayHelpers::InitArray(Queries, NumQueries);
 		QueriesIO.Init(nullptr, NumQueries);
 
@@ -344,6 +352,23 @@ namespace PCGExPathfindingEdges
 
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
 	{
+		// Single-threaded mode shares one allocation set across all scopes; otherwise lease
+		// pooled allocations for this scope instead of allocating fresh ones per query.
+		TSharedPtr<PCGExPathfinding::FSearchAllocations> ScopedAllocations = SearchAllocations;
+		const bool bPooled = !ScopedAllocations;
+		if (bPooled)
+		{
+			ScopedAllocations = SearchOperation->AcquireAllocations();
+		}
+
+		ON_SCOPE_EXIT
+		{
+			if (bPooled)
+			{
+				SearchOperation->ReleaseAllocations(ScopedAllocations);
+			}
+		};
+
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			TSharedPtr<PCGExPathfinding::FPathQuery> Query = Queries[Index];
@@ -360,7 +385,7 @@ namespace PCGExPathfindingEdges
 				continue;
 			}
 
-			Query->FindPath(SearchOperation, SearchAllocations, HeuristicsHandler, nullptr);
+			Query->FindPath(SearchOperation, ScopedAllocations, HeuristicsHandler, nullptr);
 
 			if (!Query->IsQuerySuccessful())
 			{
