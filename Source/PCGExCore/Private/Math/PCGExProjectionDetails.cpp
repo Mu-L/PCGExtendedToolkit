@@ -162,6 +162,17 @@ void FPCGExGeo2DProjectionDetails::Project(const TArray<FVector>& InPositions, T
 		)
 }
 
+void FPCGExGeo2DProjectionDetails::Project(const TArrayView<FVector>& InPositions, TArray<FVector>& OutPositions) const
+{
+	const int32 NumVectors = InPositions.Num();
+	PCGExArrayHelpers::InitArray(OutPositions, NumVectors);
+
+	PCGEX_PARALLEL_FOR(
+		NumVectors,
+		OutPositions[i] = ProjectionQuat.UnrotateVector(InPositions[i]);
+		)
+}
+
 void FPCGExGeo2DProjectionDetails::Project(const TArrayView<FVector>& InPositions, TArray<FVector2D>& OutPositions) const
 {
 	const int32 NumVectors = InPositions.Num();

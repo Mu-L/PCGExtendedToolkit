@@ -276,6 +276,26 @@ namespace PCGExMath::Geo
 	}
 
 	/**
+	 * Compute the single bend point of an L∞ metric edge between two Voronoi cell centers, if any.
+	 * L∞ edges are axis-aligned or 45° diagonal, with at most one bend.
+	 * @param Start Start position (2D)
+	 * @param End End position (2D)
+	 * @param OutBend Bend position (2D), only written when the path has a bend
+	 * @return true if the edge has a bend point, false if it is a straight segment
+	 */
+	PCGEXCORE_API bool ComputeLInfBend(const FVector2D& Start, const FVector2D& End, FVector2D& OutBend);
+
+	/**
+	 * Compute the single bend point of an L1 metric edge between two Voronoi cell centers, if any.
+	 * Uses coordinate transform to leverage L∞ computation.
+	 * @param Start Start position (2D)
+	 * @param End End position (2D)
+	 * @param OutBend Bend position (2D), only written when the path has a bend
+	 * @return true if the edge has a bend point, false if it is a straight segment
+	 */
+	PCGEXCORE_API bool ComputeL1Bend(const FVector2D& Start, const FVector2D& End, FVector2D& OutBend);
+
+	/**
 	 * Compute the edge path between two Voronoi cell centers for L∞ metric.
 	 * L∞ edges are axis-aligned or 45° diagonal, with at most one bend.
 	 * @param Start Start position (2D)

@@ -100,7 +100,7 @@ namespace PCGExGraphs
 		uint32 A;
 		uint32 B;
 
-		UniqueEdges.Reserve(UniqueEdges.Num() + UniqueEdges.Num());
+		UniqueEdges.Reserve(UniqueEdges.Num() + InEdges.Num());
 		Edges.Reserve(Edges.Num() + InEdges.Num());
 
 		for (const uint64 E : InEdges)

@@ -95,7 +95,8 @@ namespace PCGExLloydRelax2D
 			TArray<FVector>& Positions = Processor->ActivePositions;
 
 			const TArrayView<FVector> View = MakeArrayView(Positions);
-			if (!Delaunay->Process(View, Processor->ProjectionDetails))
+			// Only Sites are consumed below; skip the DelaunayEdges set and hull extraction.
+			if (!Delaunay->Process(View, Processor->ProjectionDetails, false, false))
 			{
 				return;
 			}
