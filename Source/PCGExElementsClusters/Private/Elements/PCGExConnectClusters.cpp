@@ -251,7 +251,8 @@ namespace PCGExConnectClusters
 				Positions[i] = Bounds[i].GetCenter();
 			}
 
-			if (Delaunay->Process(Positions, Context->ProjectionDetails))
+			// Only DelaunayEdges are consumed; skip hull extraction.
+			if (Delaunay->Process(Positions, Context->ProjectionDetails, true, false))
 			{
 				Bridges.Append(Delaunay->DelaunayEdges);
 			}

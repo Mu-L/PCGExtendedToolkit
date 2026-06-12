@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "CoreMinimal.h"
 #include "PCGExH.h"
 #include "CompGeom/Delaunay2.h"
@@ -61,8 +63,20 @@ namespace PCGExMath::Geo
 	protected:
 		void Clear();
 
+		bool ProcessDelaunator(const std::vector<double>& Coords, const bool bComputeDelaunayEdges, const bool bComputeHull);
+		bool ProcessFallback(const TArray<FVector2D>& ProjectedPositions, const bool bComputeDelaunayEdges, const bool bComputeHull);
+
 	public:
-		bool Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails);
+		/**
+		 * Triangulate the given positions, projected onto a working plane.
+		 * Sites (triangles + adjacency + per-site hull flag) are always built.
+		 * @param bComputeDelaunayEdges Populate the DelaunayEdges set (unique undirected vtx pairs). Skip when only Sites/adjacency are needed.
+		 * @param bComputeHull Populate the DelaunayHull vertex set.
+		 */
+		bool Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const bool bComputeDelaunayEdges = true, const bool bComputeHull = true);
+
+		/** Same as Process, but positions are already projected onto the working plane (X/Y planar, Z carried along) -- skips the internal projection pass. */
+		bool ProcessProjected(const TArrayView<FVector>& ProjectedPositions, const bool bComputeDelaunayEdges = true, const bool bComputeHull = true);
 
 		void RemoveLongestEdges(const TArrayView<FVector>& Positions);
 		void RemoveLongestEdges(const TArrayView<FVector>& Positions, TSet<uint64>& LongestEdges);

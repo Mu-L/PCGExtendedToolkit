@@ -524,68 +524,86 @@ namespace PCGExMath::Geo
 		}
 	}
 
-	void ComputeLInfEdgePath(const FVector2D& Start, const FVector2D& End, TArray<FVector2D>& OutPath)
+	bool ComputeLInfBend(const FVector2D& Start, const FVector2D& End, FVector2D& OutBend)
 	{
-		// Compute an L∞ (Chebyshev) metric edge path between two Voronoi cell centers.
-		// In L∞ geometry, Voronoi edges consist of axis-aligned and 45° diagonal segments.
-		// If |dx| ≈ |dy|, the path is a pure diagonal. Otherwise, we insert one bend point:
-		// an axis-aligned segment followed by a diagonal to reach the endpoint.
+		// Compute an L-inf (Chebyshev) metric edge path between two Voronoi cell centers.
+		// In L-inf geometry, Voronoi edges consist of axis-aligned and 45-degree diagonal
+		// segments. If |dx| ~= |dy|, the path is a pure diagonal (no bend). Otherwise there
+		// is exactly one bend point: an axis-aligned segment followed by a diagonal.
 		// This produces the characteristic "staircase" edges of Chebyshev Voronoi diagrams.
-		OutPath.Reset();
-		OutPath.Add(Start);
-
 		const double DX = End.X - Start.X;
 		const double DY = End.Y - Start.Y;
 		const double AbsDX = FMath::Abs(DX);
 		const double AbsDY = FMath::Abs(DY);
 
-		// For L∞, edges are axis-aligned or 45° diagonal
-		// If |dx| ≈ |dy|, it's diagonal (no bend needed)
-		// Otherwise, we need one bend point
 		constexpr double Tolerance = UE_DOUBLE_KINDA_SMALL_NUMBER;
 
 		if (FMath::IsNearlyEqual(AbsDX, AbsDY, Tolerance))
 		{
 			// Pure diagonal, no bend needed
-			OutPath.Add(End);
+			return false;
 		}
-		else if (AbsDX > AbsDY)
+
+		if (AbsDX > AbsDY)
 		{
 			// Horizontal dominant: go horizontal first, then diagonal
 			// Bend point: move horizontally until remaining dx equals dy
 			const double DiagDist = AbsDY;
 			const double HorizDist = AbsDX - DiagDist;
-			const double BendX = Start.X + FMath::Sign(DX) * HorizDist;
-			OutPath.Add(FVector2D(BendX, Start.Y));
-			OutPath.Add(End);
+			OutBend = FVector2D(Start.X + FMath::Sign(DX) * HorizDist, Start.Y);
 		}
 		else
 		{
 			// Vertical dominant: go vertical first, then diagonal
 			const double DiagDist = AbsDX;
 			const double VertDist = AbsDY - DiagDist;
-			const double BendY = Start.Y + FMath::Sign(DY) * VertDist;
-			OutPath.Add(FVector2D(Start.X, BendY));
-			OutPath.Add(End);
+			OutBend = FVector2D(Start.X, Start.Y + FMath::Sign(DY) * VertDist);
 		}
+
+		return true;
+	}
+
+	bool ComputeL1Bend(const FVector2D& Start, const FVector2D& End, FVector2D& OutBend)
+	{
+		// L1 (Manhattan) and L-inf (Chebyshev) metrics are related by a 45-degree rotation.
+		// Rather than implementing Manhattan edge paths from scratch, we transform the
+		// endpoints into L-inf space, compute the bend there, and transform back.
+		// This exploits the mathematical duality between the two distance metrics.
+		FVector2D TransformedBend;
+		if (!ComputeLInfBend(TransformToLInf(Start), TransformToLInf(End), TransformedBend))
+		{
+			return false;
+		}
+
+		OutBend = TransformFromLInf(TransformedBend);
+		return true;
+	}
+
+	void ComputeLInfEdgePath(const FVector2D& Start, const FVector2D& End, TArray<FVector2D>& OutPath)
+	{
+		OutPath.Reset();
+		OutPath.Add(Start);
+
+		FVector2D Bend;
+		if (ComputeLInfBend(Start, End, Bend))
+		{
+			OutPath.Add(Bend);
+		}
+
+		OutPath.Add(End);
 	}
 
 	void ComputeL1EdgePath(const FVector2D& Start, const FVector2D& End, TArray<FVector2D>& OutPath)
 	{
-		// L1 (Manhattan) and L∞ (Chebyshev) metrics are related by a 45° rotation.
-		// Rather than implementing Manhattan edge paths from scratch, we transform
-		// the endpoints into L∞ space, compute the path there, and transform back.
-		// This exploits the mathematical duality between the two distance metrics.
-		const FVector2D StartTransformed = TransformToLInf(Start);
-		const FVector2D EndTransformed = TransformToLInf(End);
-
-		TArray<FVector2D> TransformedPath;
-		ComputeLInfEdgePath(StartTransformed, EndTransformed, TransformedPath);
-
 		OutPath.Reset();
-		for (const FVector2D& P : TransformedPath)
+		OutPath.Add(Start);
+
+		FVector2D Bend;
+		if (ComputeL1Bend(Start, End, Bend))
 		{
-			OutPath.Add(TransformFromLInf(P));
+			OutPath.Add(Bend);
 		}
+
+		OutPath.Add(End);
 	}
 }
