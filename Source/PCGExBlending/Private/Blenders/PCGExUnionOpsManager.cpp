@@ -6,6 +6,7 @@
 #include "Containers/PCGExIndexLookup.h"
 #include "Core/PCGExBlendOpFactory.h"
 #include "Core/PCGExBlendOpsManager.h"
+#include "Core/PCGExBlendOpsSchema.h"
 #include "Core/PCGExOpStats.h"
 #include "Core/PCGExUnionData.h"
 #include "Data/PCGExData.h"
@@ -23,7 +24,7 @@ namespace PCGExBlending
 	{
 	}
 
-	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources)
+	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<const FBlendOpsSchema>& InSchema)
 	{
 		CurrentTargetData = TargetData;
 
@@ -44,7 +45,7 @@ namespace PCGExBlending
 			TSharedPtr<FBlendOpsManager> BlendOpsManager = MakeShared<FBlendOpsManager>(TargetData, true);
 			BlendOpsManager->SetSourceA(Src, PCGExData::EIOSide::In);
 
-			if (!BlendOpsManager->Init(InContext, *BlendingFactories))
+			if (InSchema ? !BlendOpsManager->Init(InContext, InSchema) : !BlendOpsManager->Init(InContext, *BlendingFactories))
 			{
 				return false;
 			}
@@ -99,10 +100,10 @@ namespace PCGExBlending
 		return true;
 	}
 
-	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata)
+	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, const TSharedPtr<const FBlendOpsSchema>& InSchema)
 	{
 		CurrentUnionMetadata = InUnionMetadata;
-		return Init(InContext, TargetData, InSources);
+		return Init(InContext, TargetData, InSources, InSchema);
 	}
 
 	void FUnionOpsManager::InitTrackers(TArray<PCGEx::FOpStats>& Trackers) const

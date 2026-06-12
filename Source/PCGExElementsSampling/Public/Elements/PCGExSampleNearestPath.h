@@ -51,6 +51,7 @@ namespace PCGExBlending
 {
 	class IUnionBlender;
 	class FUnionOpsManager;
+	class FBlendOpsSchema;
 }
 
 namespace PCGExMT
@@ -442,6 +443,10 @@ struct FPCGExSampleNearestPathContext final : FPCGExPointsProcessorContext
 	friend class FPCGExSampleNearestPathElement;
 
 	TArray<TObjectPtr<const UPCGExBlendOpFactory>> BlendingFactories;
+
+	// Blend configs resolved once in Boot and shared across processors -- per-processor
+	// blender init only instantiates ops instead of re-enumerating target metadata.
+	TSharedPtr<PCGExBlending::FBlendOpsSchema> BlendOpsSchema;
 
 	FPCGExApplySamplingDetails ApplySampling;
 

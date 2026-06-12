@@ -278,31 +278,6 @@ void UPCGExPropertyCollectionComponent::SyncBEnabledFromOverrideSet()
 	}
 }
 
-void UPCGExPropertyCollectionComponent::SyncOverrideSetFromBEnabled()
-{
-	// Templates never own a TSet. Older builds synced it here on CDO toggle edits; in-parity
-	// instances then inherited that set through archetype delta at load -- the root of the
-	// CDO->instance toggle bleed this guard (with PostLoad and Serialize) eliminates.
-	if (IsTemplate())
-	{
-		return;
-	}
-
-	EnabledOverrides.Reset();
-	for (const FPCGExPropertyOverrideEntry& Entry : Properties.ImportOverrides.Overrides)
-	{
-		if (!Entry.bEnabled)
-		{
-			continue;
-		}
-		const FName Name = Entry.GetPropertyName();
-		if (!Name.IsNone())
-		{
-			EnabledOverrides.Add(Name);
-		}
-	}
-}
-
 void UPCGExPropertyCollectionComponent::PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent)
 {
 	// Only chain edits whose leaf is FPCGExPropertyOverrideEntry::bEnabled are relevant.
@@ -312,14 +287,20 @@ void UPCGExPropertyCollectionComponent::PostEditChangeChainProperty(FPropertyCha
 		Leaf->GetFName() == GET_MEMBER_NAME_CHECKED(FPCGExPropertyOverrideEntry, bEnabled) &&
 		Leaf->GetOwnerStruct() == FPCGExPropertyOverrideEntry::StaticStruct();
 
-	// Sync TSet BEFORE Super: Super may synchronously RerunConstructionScripts, capturing
-	// InstanceData from this component pre-destroy. A stale TSet at capture would round-trip
-	// the just-toggled bEnabled back to its pre-edit value on apply. No-op on templates (the
-	// guard lives in the sync): a template TSet would leak into in-parity instances through
-	// archetype delta at load.
+	// CRITICAL -- bEnabled is a derived mirror and must NEVER be folded back into the TSet.
+	// UObject::PostEditChangeChainProperty (Obj.cpp:600-641, PropagatePostEditChange:827)
+	// forwards this exact chain event to every archetype instance when a template is edited,
+	// AFTER the details panel raw-imported the new bEnabled into in-parity instances. So this
+	// override runs both for genuine edits on this object and as propagation fallout on every
+	// instance of an edited template -- and a mirror->authority sync here converts the CDO's
+	// toggle into instance-authored state (the recurring "instance toggles follow the base
+	// class" bug). Re-derive the mirror from the authoritative TSet instead: propagated
+	// clobbers self-heal at notify time, before Super's RerunConstructionScripts can capture
+	// them into instance data. The TSet is written exclusively through SetOverrideEnabled.
+	// No-op on templates (guard in the sync): their bEnabled IS the authored layer.
 	if (bIsBEnabledEdit)
 	{
-		SyncOverrideSetFromBEnabled();
+		SyncBEnabledFromOverrideSet();
 	}
 
 	Super::PostEditChangeChainProperty(PropertyChangedEvent);

@@ -25,11 +25,10 @@ public:
 		return true;
 	}
 
-	virtual bool CreateOperations(
+	virtual bool ResolveConfigs(
 		FPCGExContext* InContext,
 		const TSharedPtr<PCGExData::FFacade>& InSourceAFacade,
-		const TSharedPtr<PCGExData::FFacade>& InTargetFacade,
-		TArray<TSharedPtr<FPCGExBlendOperation>>& OutOperations,
+		TArray<FPCGExAttributeBlendConfig>& OutConfigs,
 		const TSet<FName>* InSupersedeNames = nullptr) const override;
 
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;

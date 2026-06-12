@@ -25,6 +25,11 @@ namespace PCGExMath
 	class IDistances;
 }
 
+namespace PCGExBlending
+{
+	class FBlendOpsSchema;
+}
+
 UENUM()
 enum class EPCGExSampleInsidePathOutput : uint8
 {
@@ -230,6 +235,10 @@ struct FPCGExSampleInsidePathContext final : FPCGExPointsProcessorContext
 	friend class FPCGExSampleInsidePathElement;
 
 	TArray<TObjectPtr<const UPCGExBlendOpFactory>> BlendingFactories;
+
+	// Blend configs resolved once in Boot and shared across processors -- per-processor
+	// blender init only instantiates ops instead of re-enumerating target metadata.
+	TSharedPtr<PCGExBlending::FBlendOpsSchema> BlendOpsSchema;
 
 	TSharedPtr<PCGExMatching::FTargetsHandler> TargetsHandler;
 	int32 NumMaxTargets = 0;

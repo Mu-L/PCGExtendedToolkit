@@ -60,6 +60,7 @@ namespace PCGExBlending
 	class IUnionBlender;
 	class FUnionOpsManager;
 	class FUnionBlender;
+	class FBlendOpsSchema;
 }
 
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Sampling", meta=(PCGExNodeLibraryDoc="sampling/nearest/sample-nearest-point"))
@@ -356,6 +357,10 @@ struct FPCGExSampleNearestPointContext final : FPCGExPointsProcessorContext
 	friend class FPCGExSampleNearestPointElement;
 
 	TArray<TObjectPtr<const UPCGExBlendOpFactory>> BlendingFactories;
+
+	// Blend configs resolved once in Boot and shared across processors -- per-processor
+	// blender init only instantiates ops instead of re-enumerating target metadata.
+	TSharedPtr<PCGExBlending::FBlendOpsSchema> BlendOpsSchema;
 
 	TSharedPtr<PCGExMatching::FTargetsHandler> TargetsHandler;
 	int32 NumMaxTargets = 0;

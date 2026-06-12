@@ -5,6 +5,7 @@
 
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExBlendOpFactory.h"
+#include "Core/PCGExBlendOpsSchema.h"
 #include "Core/PCGExOpStats.h"
 #include "Data/PCGExData.h"
 #include "Elements/Metadata/PCGMetadataElementCommon.h"
@@ -134,60 +135,112 @@ namespace PCGExBlending
 
 			for (const TSharedPtr<FPCGExBlendOperation>& Op : NewOps)
 			{
-				Op->bUsedForMultiBlendOnly = bUsedForMultiBlendOnly;
-
-				// Assign blender facades
-				Op->WeightFacade = WeightFacade;
-
-				Op->Source_A_Facade = SourceAFacade;
-				Op->SideA = SideA;
-
-				Op->Source_B_Facade = SourceBFacade;
-				Op->SideB = SideB;
-
-				Op->TargetFacade = TargetFacade;
-
-				Op->OpIdx = Operations->Add(Op);
-				Op->SiblingOperations = Operations;
-
-				if (!Op->PrepareForData(InContext))
+				// Monolithic ops may fail preparation when a source lacks the attribute
+				if (!SetupOperation(InContext, Op, Factory->IsMonolithic()))
 				{
-					if (!Factory->IsMonolithic())
-					{
-						return false;
-					}
-					continue; // Monolithic ops may fail when a source lacks the attribute
+					return false;
 				}
-
-				CachedOperations.Add(Op.Get());
 			}
 		}
 
+		return ValidateOutputs(InContext);
+	}
+
+	bool FBlendOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<const FBlendOpsSchema>& InSchema)
+	{
+		check(SourceAFacade)
+		check(SourceBFacade)
+		check(TargetFacade)
+
+		if (!WeightFacade)
+		{
+			WeightFacade = SourceAFacade;
+		}
+		check(WeightFacade)
+
+		const TArray<FBlendOpsSchemaEntry>* Entries = InSchema ? InSchema->GetEntries(SourceAFacade->GetIn()) : nullptr;
+		if (!Entries)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Blend ops schema has no entries for the given source."));
+			return false;
+		}
+
+		Operations->Reserve(Entries->Num());
+		CachedOperations.Reserve(Entries->Num());
+
+		for (const FBlendOpsSchemaEntry& Entry : *Entries)
+		{
+			TSharedPtr<FPCGExBlendOperation> Op = Entry.Factory->CreateOperation(InContext);
+			if (!Op)
+			{
+				PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("An operation could not be created."));
+				return false;
+			}
+
+			Op->Config = Entry.Config;
+
+			if (!SetupOperation(InContext, Op, Entry.bSoftFail))
+			{
+				return false;
+			}
+		}
+
+		return ValidateOutputs(InContext);
+	}
+
+	bool FBlendOpsManager::SetupOperation(FPCGExContext* InContext, const TSharedPtr<FPCGExBlendOperation>& InOperation, const bool bTolerateFailure)
+	{
+		InOperation->bUsedForMultiBlendOnly = bUsedForMultiBlendOnly;
+
+		// Assign blender facades
+		InOperation->WeightFacade = WeightFacade;
+
+		InOperation->Source_A_Facade = SourceAFacade;
+		InOperation->SideA = SideA;
+
+		InOperation->Source_B_Facade = SourceBFacade;
+		InOperation->SideB = SideB;
+
+		InOperation->TargetFacade = TargetFacade;
+
+		InOperation->OpIdx = Operations->Add(InOperation);
+		InOperation->SiblingOperations = Operations;
+
+		if (!InOperation->PrepareForData(InContext))
+		{
+			// Failed ops stay in Operations (stable sibling indices) but are never cached/executed.
+			return bTolerateFailure;
+		}
+
+		CachedOperations.Add(InOperation.Get());
+		return true;
+	}
+
+	bool FBlendOpsManager::ValidateOutputs(FPCGExContext* InContext) const
+	{
 		// A composite property and its sub-components can't both be written in one stack: the result
 		// would be order-dependent and couldn't carry per-component blend modes.
+		TSet<FName> OutputNames;
+		OutputNames.Reserve(CachedOperations.Num());
+		for (const FPCGExBlendOperation* Op : CachedOperations)
 		{
-			TSet<FName> OutputNames;
-			OutputNames.Reserve(CachedOperations.Num());
-			for (const FPCGExBlendOperation* Op : CachedOperations)
-			{
-				OutputNames.Add(UPCGExBlendOpFactory::GetOutputTargetName(Op->Config));
-			}
-
-			auto RejectConflict = [&](const FName Composite, const TArray<FName>& Components) -> bool
-			{
-				if (!OutputNames.Contains(Composite)) { return false; }
-				for (const FName& Component : Components)
-				{
-					if (!OutputNames.Contains(Component)) { continue; }
-					PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("Blend output '{0}' conflicts with its sub-component '{1}'. Blend either the composite or its components, not both."), FText::FromName(Composite), FText::FromName(Component)));
-					return true;
-				}
-				return false;
-			};
-
-			if (RejectConflict(FName(TEXT("$Transform")), {FName(TEXT("$Position")), FName(TEXT("$Rotation")), FName(TEXT("$Scale"))})) { return false; }
-			if (RejectConflict(FName(TEXT("$Extents")), {FName(TEXT("$BoundsMin")), FName(TEXT("$BoundsMax"))})) { return false; }
+			OutputNames.Add(UPCGExBlendOpFactory::GetOutputTargetName(Op->Config));
 		}
+
+		auto RejectConflict = [&](const FName Composite, const TArray<FName>& Components) -> bool
+		{
+			if (!OutputNames.Contains(Composite)) { return false; }
+			for (const FName& Component : Components)
+			{
+				if (!OutputNames.Contains(Component)) { continue; }
+				PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("Blend output '{0}' conflicts with its sub-component '{1}'. Blend either the composite or its components, not both."), FText::FromName(Composite), FText::FromName(Component)));
+				return true;
+			}
+			return false;
+		};
+
+		if (RejectConflict(FName(TEXT("$Transform")), {FName(TEXT("$Position")), FName(TEXT("$Rotation")), FName(TEXT("$Scale"))})) { return false; }
+		if (RejectConflict(FName(TEXT("$Extents")), {FName(TEXT("$BoundsMin")), FName(TEXT("$BoundsMax"))})) { return false; }
 
 		return true;
 	}

@@ -192,11 +192,13 @@ public:
 	virtual void Serialize(FArchive& Ar) override;
 
 #if WITH_EDITOR
-	// Non-templates: mirror chain-leaf bEnabled edits into the TSet (the authoritative signal).
-	// On CDO/template edits, walk dependent instances after Super and restore bEnabled from each
-	// instance's own TSet -- UE's per-property propagation just clobbered bEnabled wherever it
-	// matched the old CDO; the TSet survives because UE's edit chain targets the nested bool,
-	// not the top-level TSet. Templates themselves never sync their TSet (see PostLoad).
+	// On chain-leaf bEnabled events, re-derive the bEnabled mirror from the authoritative TSet
+	// (never the inverse -- see SyncBEnabledFromOverrideSet). This both rejects UE's
+	// CDO->instance propagation fallout (UObject::PostEditChangeChainProperty forwards template
+	// chain edits to archetype instances after raw-importing the new value into in-parity ones)
+	// and normalizes any non-authoritative bEnabled write. On template edits, additionally walk
+	// dependent instances after Super and restore their bEnabled from each instance's own TSet
+	// as a backstop for raw-import paths that carry no notify.
 	virtual void PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent) override;
 #endif
 
@@ -220,10 +222,13 @@ public:
 	/**
 	 * Authoritative per-instance "which import overrides are enabled" set.
 	 *
-	 * The matching bEnabled on each FPCGExPropertyOverrideEntry is a UI-bound mirror that UE's
-	 * per-property propagation overwrites on CDO edits (and we can't reliably block that).
+	 * The matching bEnabled on each FPCGExPropertyOverrideEntry is a DERIVED mirror that UE's
+	 * propagation machinery overwrites on CDO edits (raw value import + forwarded
+	 * PostEditChangeChainProperty on every archetype instance -- neither can be blocked).
 	 * The TSet survives because UE's edit chain targets the nested bool, not this top-level
-	 * field. PostEditChangeChainProperty keeps the two sides in sync.
+	 * field. Data flows one way only: TSet -> bEnabled (SyncBEnabledFromOverrideSet); the TSet
+	 * itself is written exclusively through SetOverrideEnabled, the instance-data restore, and
+	 * the PostLoad legacy migration.
 	 *
 	 * Invariants (enforced by PostLoad, Serialize and the IsTemplate guards in the sync paths):
 	 * - Templates never own a TSet: theirs is always empty. Template bEnabled is the authored
@@ -247,11 +252,12 @@ public:
 	// Re-derive every entry's bEnabled from EnabledOverrides. Use after CDO->instance propagation
 	// may have clobbered bEnabled, or after restoring the TSet from instance data. No-op on
 	// templates: their bEnabled is authored data and must never be derived.
+	//
+	// There is intentionally NO inverse (bEnabled -> TSet): UObject::PostEditChangeChainProperty
+	// forwards template chain edits to archetype instances, so any mirror->authority fold runs
+	// on propagation fallout and bakes the CDO's toggle into instance-authored state. The TSet
+	// is written exclusively through SetOverrideEnabled (and the PostLoad legacy migration).
 	void SyncBEnabledFromOverrideSet();
-
-	// Inverse: rebuild the TSet from each entry's current bEnabled. Use after a checkbox toggle.
-	// No-op on templates: they never own a TSet (see PostLoad).
-	void SyncOverrideSetFromBEnabled();
 #endif
 
 	/**
