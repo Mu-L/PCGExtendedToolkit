@@ -53,6 +53,11 @@ namespace PCGExGraphs
 
 		bool bRefreshEdgeSeed = false;
 
+		// False when edges were adopted without building per-node Links (compile-only
+		// graphs). Adjacency queries (GetConnectedNodes, Node.Links) are unavailable;
+		// BuildSubGraphs derives connectivity from the edge list instead.
+		bool bHasNodeLinks = true;
+
 		explicit FGraph(const int32 InNumNodes);
 
 		void ReserveForEdges(const int32 UpcomingAdditionCount);
@@ -71,8 +76,13 @@ namespace PCGExGraphs
 		void InsertEdges(const TArray<uint64>& InEdges, int32 InIOIndex);
 		int32 InsertEdges(const TArray<FEdge>& InEdges);
 
-		/** Bulk-adopt pre-deduplicated edges without hash checking. Caller guarantees uniqueness. */
-		void AdoptEdges(TArray<FEdge>& InEdges);
+		/**
+		 * Bulk-adopt pre-deduplicated edges without hash checking. Caller guarantees uniqueness.
+		 * @param bBuildAdjacency When false, skips the UniqueEdges dedup map, per-node Links and
+		 * edge metadata sizing -- for graphs that go straight to compilation. Such graphs must not
+		 * receive further edge insertions, edge lookups or metadata writes.
+		 */
+		void AdoptEdges(TArray<FEdge>& InEdges, const bool bBuildAdjacency = true);
 
 		FEdge* FindEdge_Unsafe(const uint64 Hash);
 		FEdge* FindEdge_Unsafe(const int32 A, const int32 B);

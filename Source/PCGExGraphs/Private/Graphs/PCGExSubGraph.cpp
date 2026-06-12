@@ -174,7 +174,13 @@ namespace PCGExGraphs
 				)
 		}
 
-		PCGExSortingHelpers::RadixSort(Edges);
+		// Sorting establishes a deterministic output edge order; builders whose edge
+		// insertion order is already deterministic can opt out of the cost entirely.
+		if (InBuilder->bSortEdgeKeys || InBuilder->bRequiresEdgeResort)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(FWriteSubGraphEdges::SortEdges);
+			PCGExSortingHelpers::RadixSort(Edges);
+		}
 
 		FlattenedEdges.SetNumUninitialized(NumEdges);
 
@@ -210,8 +216,15 @@ namespace PCGExGraphs
 			const TPCGValueRange<int64> OutMetadataEntries = OutEdgeData->GetMetadataEntryValueRange(false);
 			UPCGMetadata* Metadata = OutEdgeData->MutableMetadata();
 
+			// Entry keys handed out by AddEntryPlaceholder are sequential from the current
+			// item count; this metadata is exclusively owned by this subgraph during
+			// compilation, so the keys are synthesized directly instead of paying one
+			// lock + shared atomic per edge. AddDelayedEntries sizes from the array we
+			// pass, which keeps it in sync.
+			const int64 EntryStart = Metadata->GetItemCountForChild();
+
 			TArray<TTuple<int64, int64>> DelayedEntries;
-			DelayedEntries.SetNum(NumEdges);
+			DelayedEntries.SetNumUninitialized(NumEdges);
 
 			if (InEdgeData)
 			{
@@ -248,8 +261,9 @@ namespace PCGExGraphs
 							WriteEdgeIndices[LocalWriteIndex] = i;
 						}
 
-						OutMetadataEntries[i] = Metadata->AddEntryPlaceholder();
-						DelayedEntries[i] = MakeTuple(OutMetadataEntries[i], ParentEntry);
+						const int64 Entry = EntryStart + i;
+						OutMetadataEntries[i] = Entry;
+						DelayedEntries[i] = MakeTuple(Entry, ParentEntry);
 					});
 
 				ReadEdgeIndices.SetNum(WriteIndex);
@@ -268,8 +282,9 @@ namespace PCGExGraphs
 						const FEdge& E = ParentGraphEdges[Edges[i].Index];
 						FlattenedEdges[i] = FEdge(i, ParentGraphNodes[E.Start].PointIndex, ParentGraphNodes[E.End].PointIndex, i, E.Index);
 
-						OutMetadataEntries[i] = Metadata->AddEntryPlaceholder();
-						DelayedEntries[i] = MakeTuple(OutMetadataEntries[i], PCGInvalidEntryKey);
+						const int64 Entry = EntryStart + i;
+						OutMetadataEntries[i] = Entry;
+						DelayedEntries[i] = MakeTuple(Entry, PCGInvalidEntryKey);
 					});
 			}
 
