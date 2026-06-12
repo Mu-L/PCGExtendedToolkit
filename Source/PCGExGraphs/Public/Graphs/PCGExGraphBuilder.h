@@ -85,6 +85,12 @@ namespace PCGExGraphs
 		// Required for union graphs where node indices are non-deterministic due to parallel insertion.
 		bool bRequiresEdgeResort = false;
 
+		// Subgraph edge keys are sorted before compilation so the output edge order is
+		// deterministic. Nodes whose edge insertion order is itself deterministic (e.g.
+		// sequential, single-threaded inserts) can disable this and keep insertion order,
+		// skipping the sort entirely. Ignored when bRequiresEdgeResort is set.
+		bool bSortEdgeKeys = true;
+
 		// When true, nodes have been pre-sorted spatially at Collapse() time.
 		// Skip the Morton sort in Compile() since spatial ordering is already established.
 		bool bNodesPreSorted = false;
