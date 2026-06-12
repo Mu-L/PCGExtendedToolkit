@@ -428,6 +428,9 @@ namespace PCGExBuildVoronoiGraph2D
 		Voronoi.Reset();
 
 		GraphBuilder->bInheritNodeData = false;
+		// Edges were inserted sequentially in deterministic order (ascending parent edge
+		// index); skip the per-subgraph edge key sort.
+		GraphBuilder->bSortEdgeKeys = false;
 		GraphBuilder->CompileAsync(TaskManager, false);
 
 		// Process site output asynchronously if needed
