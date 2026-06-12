@@ -278,109 +278,273 @@ namespace PCGExGraphs
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FGraph::BuildSubGraphs);
 
+		// Connected components via union-find over the flat edge list, replacing the
+		// previous sequential BFS: linear scans over contiguous arrays instead of
+		// pointer-chasing through per-node Links, exact component sizes known before
+		// any subgraph is allocated, and components that fail size limits are culled
+		// before being materialized.
+		// Nodes within a component are gathered in ascending index order (the BFS
+		// gathered them in traversal order); deterministic output ordering is
+		// re-established downstream (Morton/radix sorts in the graph compilation).
+
 		const int32 NumNodes = Nodes.Num();
 		const int32 NumEdges = Edges.Num();
 
-		TArray<bool> VisitedNodes;
-		VisitedNodes.Init(false, NumNodes);
-		TArray<bool> VisitedEdges;
-		VisitedEdges.Init(false, NumEdges);
-
-		int32 VisitedNodesNum = 0;
-		int32 VisitedEdgesNum = 0;
-
-		TArray<int32> Stack;
-		Stack.Reserve(NumNodes);
-		OutValidNodes.Reserve(NumNodes);
-
-		for (int32 i = 0; i < NumNodes; i++)
-		{
-			FNode& CurrentNode = Nodes[i];
-			if (VisitedNodes[i])
+		// Linkless nodes can never belong to a subgraph
+		PCGExMT::ParallelOrSequential(
+			NumNodes,
+			[&](const int32 i)
 			{
-				continue;
-			}
-
-			if (!CurrentNode.bValid || CurrentNode.IsEmpty())
-			{
-				CurrentNode.bValid = false;
-				continue;
-			}
-
-			Stack.Reset();
-			Stack.Add(i);
-			VisitedNodes[i] = true;
-			VisitedNodesNum++;
-
-			TSharedPtr<FSubGraph> SubGraph = MakeShared<FSubGraph>();
-			SubGraph->WeakParentGraph = SharedThis(this);
-			SubGraph->Nodes.Reserve(NumNodes - VisitedNodesNum);
-			SubGraph->Edges.Reserve(NumEdges - VisitedEdgesNum);
-
-			while (!Stack.IsEmpty())
-			{
-				const int32 NodeIndex = Stack.Pop(EAllowShrinking::No);
-				SubGraph->Nodes.Add(NodeIndex);
-				FNode& Node = Nodes[NodeIndex];
-				Node.NumExportedEdges = 0;
-
-				for (const FLink& Lk : Node.Links)
+				FNode& Node = Nodes[i];
+				if (!Node.bValid || Node.IsEmpty())
 				{
-					const int32 E = Lk.Edge;
-					if (VisitedEdges[E])
+					Node.bValid = false;
+				}
+			});
+
+		TArray<int32> Parent;
+		Parent.SetNumUninitialized(NumNodes);
+		PCGExMT::ParallelOrSequential(NumNodes, [&](const int32 i) { Parent[i] = i; });
+
+		// Per-root node count while unioning (union by size keeps trees shallow)
+		TArray<int32> ComponentSize;
+		ComponentSize.Init(1, NumNodes);
+
+		// Iterative find with path halving
+		auto Find = [&Parent](int32 X) -> int32
+		{
+			while (Parent[X] != X)
+			{
+				Parent[X] = Parent[Parent[X]];
+				X = Parent[X];
+			}
+			return X;
+		};
+
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(BuildSubGraphs::Union);
+
+			for (const FEdge& Edge : Edges)
+			{
+				if (!Edge.bValid)
+				{
+					continue;
+				}
+
+				const int32 Start = static_cast<int32>(Edge.Start);
+				const int32 End = static_cast<int32>(Edge.End);
+
+				if (!Nodes[Start].bValid || !Nodes[End].bValid)
+				{
+					continue;
+				}
+
+				int32 RootA = Find(Start);
+				int32 RootB = Find(End);
+
+				if (RootA == RootB)
+				{
+					continue;
+				}
+
+				if (ComponentSize[RootA] < ComponentSize[RootB])
+				{
+					Swap(RootA, RootB);
+				}
+
+				Parent[RootB] = RootA;
+				ComponentSize[RootA] += ComponentSize[RootB];
+			}
+		}
+
+		// Assign compact component ids ordered by minimum node index -- the same
+		// order in which the BFS used to discover components.
+		int32 NumComponents = 0;
+		int32 TotalExportedNodes = 0;
+
+		TArray<int32> NodeComponent;
+		NodeComponent.Init(-1, NumNodes);
+
+		TArray<int32> RootToComponent;
+		RootToComponent.Init(-1, NumNodes);
+
+		TArray<int32> ComponentNodeCounts;
+		TArray<int32> ComponentEdgeCounts;
+
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(BuildSubGraphs::Label);
+
+			for (int32 i = 0; i < NumNodes; i++)
+			{
+				if (!Nodes[i].bValid)
+				{
+					continue;
+				}
+
+				const int32 Root = Find(i);
+				int32& Component = RootToComponent[Root];
+				if (Component == -1)
+				{
+					Component = NumComponents++;
+					ComponentNodeCounts.Add(ComponentSize[Root]);
+				}
+				NodeComponent[i] = Component;
+			}
+
+			ComponentEdgeCounts.Init(0, NumComponents);
+
+			for (const FEdge& Edge : Edges)
+			{
+				if (!Edge.bValid)
+				{
+					continue;
+				}
+
+				// Both endpoints share the same component by construction; an edge
+				// with an invalid endpoint belongs to none (mirrors the BFS, which
+				// never collected such edges).
+				const int32 Component = NodeComponent[static_cast<int32>(Edge.Start)];
+				if (Component == -1 || NodeComponent[static_cast<int32>(Edge.End)] == -1)
+				{
+					continue;
+				}
+
+				ComponentEdgeCounts[Component]++;
+			}
+		}
+
+		// Evaluate size limits on counts alone - nothing has been allocated yet.
+		// Components that fail limits are invalidated; edgeless components are
+		// silently dropped (not invalidated, not exported), as before.
+		const int32 SubGraphsBase = SubGraphs.Num();
+		int32 NumNewSubGraphs = 0;
+
+		TArray<int8> ComponentCulled;
+		ComponentCulled.SetNumUninitialized(NumComponents);
+
+		TArray<int32> ComponentSubGraph;
+		ComponentSubGraph.SetNumUninitialized(NumComponents);
+
+		for (int32 c = 0; c < NumComponents; c++)
+		{
+			const bool bMeetsLimits = Limits.IsValid(ComponentNodeCounts[c], ComponentEdgeCounts[c]);
+			ComponentCulled[c] = bMeetsLimits ? 0 : 1;
+
+			if (bMeetsLimits && ComponentEdgeCounts[c] > 0)
+			{
+				ComponentSubGraph[c] = NumNewSubGraphs++;
+				TotalExportedNodes += ComponentNodeCounts[c];
+			}
+			else
+			{
+				ComponentSubGraph[c] = -1;
+			}
+		}
+
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(BuildSubGraphs::Cull);
+
+			PCGExMT::ParallelOrSequential(
+				NumNodes,
+				[&](const int32 i)
+				{
+					const int32 Component = NodeComponent[i];
+					if (Component != -1 && ComponentCulled[Component])
 					{
-						continue;
+						Nodes[i].bValid = false;
 					}
+				});
 
-					VisitedEdges[E] = true;
-					VisitedEdgesNum++;
-
-					FEdge& Edge = Edges[E];
+			PCGExMT::ParallelOrSequential(
+				NumEdges,
+				[&](const int32 i)
+				{
+					FEdge& Edge = Edges[i];
 					if (!Edge.bValid)
 					{
-						continue;
+						return;
 					}
 
-					const int32 OtherIndex = Edge.Other(NodeIndex);
-					if (!Nodes[OtherIndex].bValid)
+					const int32 Component = NodeComponent[static_cast<int32>(Edge.Start)];
+					if (Component == -1 || NodeComponent[static_cast<int32>(Edge.End)] == -1)
 					{
-						continue;
+						return;
 					}
 
-					SubGraph->Add(Edge);
-
-					if (!VisitedNodes[OtherIndex])
+					if (ComponentCulled[Component])
 					{
-						VisitedNodes[OtherIndex] = true;
-						VisitedNodesNum++;
-						Stack.Add(OtherIndex);
+						Edge.bValid = false;
 					}
-				}
-			}
+				});
+		}
 
-			if (!Limits.IsValid(SubGraph->Nodes.Num(), SubGraph->Edges.Num()))
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(BuildSubGraphs::Gather);
+
+			SubGraphs.Reserve(SubGraphsBase + NumNewSubGraphs);
+			for (int32 c = 0; c < NumComponents; c++)
 			{
-				for (const int32 j : SubGraph->Nodes)
+				if (ComponentSubGraph[c] == -1)
 				{
-					Nodes[j].bValid = false;
+					continue;
 				}
-				for (const PCGEx::FIndexKey j : SubGraph->Edges)
-				{
-					Edges[j.Index].bValid = false;
-				}
-			}
-			else if (!SubGraph->Edges.IsEmpty())
-			{
-				OutValidNodes.Append(SubGraph->Nodes);
-				SubGraph->Shrink();
+
+				TSharedPtr<FSubGraph> SubGraph = MakeShared<FSubGraph>();
+				SubGraph->WeakParentGraph = SharedThis(this);
+				SubGraph->Nodes.Reserve(ComponentNodeCounts[c]);
+				SubGraph->Edges.Reserve(ComponentEdgeCounts[c]);
 				SubGraphs.Add(SubGraph.ToSharedRef());
+			}
+
+			for (int32 i = 0; i < NumNodes; i++)
+			{
+				const int32 Component = NodeComponent[i];
+				if (Component == -1)
+				{
+					continue;
+				}
+
+				const int32 SubGraphIndex = ComponentSubGraph[Component];
+				if (SubGraphIndex == -1)
+				{
+					continue;
+				}
+
+				SubGraphs[SubGraphsBase + SubGraphIndex]->Nodes.Add(i);
+			}
+
+			for (const FEdge& Edge : Edges)
+			{
+				if (!Edge.bValid)
+				{
+					continue;
+				}
+
+				const int32 Component = NodeComponent[static_cast<int32>(Edge.Start)];
+				if (Component == -1 || NodeComponent[static_cast<int32>(Edge.End)] == -1)
+				{
+					continue;
+				}
+
+				const int32 SubGraphIndex = ComponentSubGraph[Component];
+				if (SubGraphIndex == -1)
+				{
+					continue;
+				}
+
+				SubGraphs[SubGraphsBase + SubGraphIndex]->Add(Edge);
+			}
+
+			OutValidNodes.Reserve(OutValidNodes.Num() + TotalExportedNodes);
+			for (int32 s = SubGraphsBase; s < SubGraphs.Num(); s++)
+			{
+				OutValidNodes.Append(SubGraphs[s]->Nodes);
 			}
 		}
 
 		// Recompute NumExportedEdges deterministically based on actual edge connections.
-		// The BFS traversal order affects which node "claims" each shared edge, making
-		// NumExportedEdges non-deterministic when Node.Links order varies (parallel insertion).
 		// Count valid edges per node directly from Links - parallelizable and cache-friendly.
+		// Nodes that are not exported keep their default of 0.
 		PCGExMT::ParallelOrSequential(
 			OutValidNodes.Num(),
 			[&](const int32 i)
