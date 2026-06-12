@@ -123,14 +123,14 @@ void FPCGExShapeFiblatBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> 
 }
 
 #if WITH_EDITOR
-void UPCGExCreateShapeFiblatSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExCreateShapeFiblatSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		Config.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

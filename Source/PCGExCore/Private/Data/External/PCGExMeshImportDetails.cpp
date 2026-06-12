@@ -59,5 +59,5 @@ bool FPCGExGeoMeshImportDetails::Validate(FPCGExContext* InContext)
 
 bool FPCGExGeoMeshImportDetails::WantsImport() const
 {
-	return bImportVertexColor || !UVChannels.IsEmpty();
+	return bImportVertexColor || bImportVertexNormals || !UVChannels.IsEmpty();
 }

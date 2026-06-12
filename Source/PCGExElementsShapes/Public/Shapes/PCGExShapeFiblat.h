@@ -121,7 +121,7 @@ class UPCGExCreateShapeFiblatSettings : public UPCGExShapeBuilderFactoryProvider
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
+	virtual void PCGExApplyDeprecation(UPCGNode* InOutNode) override;
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ShapeBuilderFiblat, "Shape : φ Sphere", "Create a Fibonacci Lattice sphere.", FName(TEXT("φ Sphere")))
 
 #endif

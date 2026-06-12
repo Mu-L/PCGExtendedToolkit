@@ -40,8 +40,9 @@ namespace PCGExMesh
 		void TriangulateMeshSynchronous();
 
 		/**
-		 * Get averaged vertex colors. For each dense vertex, averages all color overlay
-		 * elements from triangles referencing that vertex.
+		 * Get averaged vertex colors, one entry per output vertex of the current triangulation
+		 * (Dual/Hollow centroids get the average of their triangle's vertices).
+		 * Must be called after extraction (and MakeDual/MakeHollowDual, if any).
 		 * @return false if the mesh has no color overlay.
 		 */
 		bool GetAveragedVertexColors(TArray<FVector4f>& OutColors) const;
@@ -50,13 +51,35 @@ namespace PCGExMesh
 		int32 GetNumUVChannels() const;
 
 		/**
-		 * Get averaged vertex UVs for a specific channel.
+		 * Get averaged vertex UVs for a specific channel, one entry per output vertex of the
+		 * current triangulation (Dual/Hollow centroids get the average of their triangle's vertices).
+		 * Must be called after extraction (and MakeDual/MakeHollowDual, if any).
 		 * @return false if the channel doesn't exist.
 		 */
 		bool GetAveragedVertexUVs(int32 Channel, TArray<FVector2f>& OutUVs) const;
 
+		/**
+		 * Get averaged vertex normals, one entry per output vertex of the current triangulation
+		 * (Dual/Hollow centroids get the average of their triangle's vertices). Prefers the primary
+		 * normal overlay, falls back to per-vertex mesh normals. Values are not guaranteed normalized.
+		 * Must be called after extraction (and MakeDual/MakeHollowDual, if any).
+		 * @return false if the mesh has neither a normal overlay nor per-vertex normals.
+		 */
+		bool GetAveragedVertexNormals(TArray<FVector3f>& OutNormals) const;
+
 	private:
 		/** Maps sparse source vertex ID → dense output vertex index. Built during extraction. */
 		TMap<int32, int32> VertexIDToDenseIndex;
+
+		/** Dense vertex count at extraction time, before MakeDual/MakeHollowDual mutate the vertex array. */
+		int32 DenseVertexCount = 0;
+
+		/** Averages overlay elements per dense vertex (pre-dual index space). */
+		template <typename OverlayType, typename ValueType>
+		bool AverageOverlayPerVertex(const OverlayType* Overlay, TArray<ValueType>& OutValues) const;
+
+		/** Remaps per-dense-vertex values to the current triangulation's output vertices (Dual/Hollow centroids). */
+		template <typename ValueType>
+		void RemapToTriangulation(TArray<ValueType>& Values) const;
 	};
 }

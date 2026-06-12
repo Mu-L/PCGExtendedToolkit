@@ -38,7 +38,7 @@ void UPCGExSampleNearestSurfaceSettings::ApplyDeprecationBeforeUpdatePins(UPCGNo
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExSampleNearestSurfaceSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExSampleNearestSurfaceSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -46,7 +46,7 @@ void UPCGExSampleNearestSurfaceSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		Distance.Update(bUseLocalMaxDistance_DEPRECATED ? EPCGExInputValueType::Attribute : EPCGExInputValueType::Constant, LocalMaxDistance_DEPRECATED, MaxDistance_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 
@@ -549,4 +549,4 @@ namespace PCGExSampleNearestSurface
 }
 
 #undef LOCTEXT_NAMESPACE
-#undef PCGEX_NAMESPACE
+#undef PCGEX_NAMES

@@ -41,7 +41,7 @@ void UPCGExPathSolidifySettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode*
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExPathSolidifySettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExPathSolidifySettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
@@ -80,7 +80,7 @@ else{_TARGET##Axis.RadiusInput = EPCGExInputValueToggle::Disabled;}
 		SolidificationLerp.Update(SolidificationLerpInput_DEPRECATED, SolidificationLerpAttribute_DEPRECATED, SolidificationLerpConstant_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 
 #endif
