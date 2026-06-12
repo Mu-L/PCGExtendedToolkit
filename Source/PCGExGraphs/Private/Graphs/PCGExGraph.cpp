@@ -7,6 +7,7 @@
 #include "Clusters/PCGExEdge.h"
 #include "Core/PCGExMTCommon.h"
 #include "Graphs/PCGExSubGraph.h"
+#include "HAL/PlatformAtomics.h"
 
 namespace PCGExGraphs
 {
@@ -141,7 +142,7 @@ namespace PCGExGraphs
 		return StartIndex;
 	}
 
-	void FGraph::AdoptEdges(TArray<FEdge>& InEdges)
+	void FGraph::AdoptEdges(TArray<FEdge>& InEdges, const bool bBuildAdjacency)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FGraph::AdoptEdges);
 
@@ -149,6 +150,15 @@ namespace PCGExGraphs
 
 		Edges = MoveTemp(InEdges);
 		const int32 NumEdges = Edges.Num();
+
+		if (!bBuildAdjacency)
+		{
+			// Compile-only adoption: the graph goes straight to BuildSubGraphs and
+			// compilation, neither of which needs the dedup map or per-node links.
+			// Metadata arrays stay empty; Find*Metadata_Unsafe bounds-check against them.
+			bHasNodeLinks = false;
+			return;
+		}
 
 		UniqueEdges.Reserve(NumEdges);
 
@@ -290,71 +300,126 @@ namespace PCGExGraphs
 		const int32 NumNodes = Nodes.Num();
 		const int32 NumEdges = Edges.Num();
 
-		// Linkless nodes can never belong to a subgraph
+		// Edgeless nodes can never belong to a subgraph. When per-node links were
+		// not built (compile-only adoption), incidence is derived from the edge list.
+		TArray<int8> NodeHasEdges;
+		if (!bHasNodeLinks)
+		{
+			NodeHasEdges.Init(0, NumNodes);
+			for (const FEdge& Edge : Edges)
+			{
+				NodeHasEdges[static_cast<int32>(Edge.Start)] = 1;
+				NodeHasEdges[static_cast<int32>(Edge.End)] = 1;
+			}
+		}
+
+		// Validity is also snapshot into a compact array: the passes below hammer it
+		// with random reads, and one byte per node keeps that working set
+		// cache-resident instead of striding through the much larger FNode structs.
+		TArray<int8> NodeValid;
+		NodeValid.SetNumUninitialized(NumNodes);
+
 		PCGExMT::ParallelOrSequential(
 			NumNodes,
 			[&](const int32 i)
 			{
 				FNode& Node = Nodes[i];
-				if (!Node.bValid || Node.IsEmpty())
+				const bool bIsolated = bHasNodeLinks ? static_cast<bool>(Node.IsEmpty()) : !NodeHasEdges[i];
+				if (!Node.bValid || bIsolated)
 				{
 					Node.bValid = false;
 				}
+				NodeValid[i] = Node.bValid;
 			});
 
 		TArray<int32> Parent;
 		Parent.SetNumUninitialized(NumNodes);
-		PCGExMT::ParallelOrSequential(NumNodes, [&](const int32 i) { Parent[i] = i; });
+		int32* ParentData = Parent.GetData();
+		PCGExMT::ParallelOrSequential(NumNodes, [&](const int32 i) { ParentData[i] = i; });
 
-		// Per-root node count while unioning (union by size keeps trees shallow)
-		TArray<int32> ComponentSize;
-		ComponentSize.Init(1, NumNodes);
-
-		// Iterative find with path halving
-		auto Find = [&Parent](int32 X) -> int32
+		// Iterative find with opportunistic CAS path-halving. Links always attach the
+		// larger root under the smaller one, so parents only ever move toward smaller
+		// indices; a stale relaxed read is just a valid ancestor and the chase
+		// converges regardless of thread interleaving.
+		auto FindRoot = [ParentData](int32 X) -> int32
 		{
-			while (Parent[X] != X)
+			while (true)
 			{
-				Parent[X] = Parent[Parent[X]];
-				X = Parent[X];
+				const int32 P = FPlatformAtomics::AtomicRead_Relaxed(ParentData + X);
+				if (P == X)
+				{
+					return X;
+				}
+
+				const int32 GP = FPlatformAtomics::AtomicRead_Relaxed(ParentData + P);
+				if (GP == P)
+				{
+					return P;
+				}
+
+				// Halving is opportunistic; a failed exchange means another thread
+				// already moved this link further along.
+				FPlatformAtomics::InterlockedCompareExchange(ParentData + X, GP, P);
+				X = GP;
 			}
-			return X;
 		};
 
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(BuildSubGraphs::Union);
 
-			for (const FEdge& Edge : Edges)
-			{
-				if (!Edge.bValid)
+			// Lock-free union by minimum index: every component deterministically
+			// converges to its smallest node index as root, independent of thread
+			// scheduling, so the final state is identical to a sequential pass.
+			PCGExMT::ParallelOrSequential(
+				NumEdges,
+				[&](const int32 EdgeIndex)
 				{
-					continue;
-				}
+					const FEdge& Edge = Edges[EdgeIndex];
+					if (!Edge.bValid)
+					{
+						return;
+					}
 
-				const int32 Start = static_cast<int32>(Edge.Start);
-				const int32 End = static_cast<int32>(Edge.End);
+					int32 U = static_cast<int32>(Edge.Start);
+					int32 V = static_cast<int32>(Edge.End);
 
-				if (!Nodes[Start].bValid || !Nodes[End].bValid)
+					if (!NodeValid[U] || !NodeValid[V])
+					{
+						return;
+					}
+
+					while (true)
+					{
+						U = FindRoot(U);
+						V = FindRoot(V);
+
+						if (U == V)
+						{
+							break;
+						}
+
+						if (U > V)
+						{
+							Swap(U, V);
+						}
+
+						// Attach the larger root under the smaller one; only valid if
+						// V is still its own root, otherwise retry from the new roots.
+						if (FPlatformAtomics::InterlockedCompareExchange(ParentData + V, U, V) == V)
+						{
+							break;
+						}
+					}
+				});
+
+			// Flatten so every node points directly at its final root; later passes
+			// then resolve components with a single read.
+			PCGExMT::ParallelOrSequential(
+				NumNodes,
+				[&](const int32 i)
 				{
-					continue;
-				}
-
-				int32 RootA = Find(Start);
-				int32 RootB = Find(End);
-
-				if (RootA == RootB)
-				{
-					continue;
-				}
-
-				if (ComponentSize[RootA] < ComponentSize[RootB])
-				{
-					Swap(RootA, RootB);
-				}
-
-				Parent[RootB] = RootA;
-				ComponentSize[RootA] += ComponentSize[RootB];
-			}
+					FPlatformAtomics::InterlockedExchange(ParentData + i, FindRoot(i));
+				});
 		}
 
 		// Assign compact component ids ordered by minimum node index -- the same
@@ -376,19 +441,20 @@ namespace PCGExGraphs
 
 			for (int32 i = 0; i < NumNodes; i++)
 			{
-				if (!Nodes[i].bValid)
+				if (!NodeValid[i])
 				{
 					continue;
 				}
 
-				const int32 Root = Find(i);
+				const int32 Root = Parent[i];
 				int32& Component = RootToComponent[Root];
 				if (Component == -1)
 				{
 					Component = NumComponents++;
-					ComponentNodeCounts.Add(ComponentSize[Root]);
+					ComponentNodeCounts.Add(0);
 				}
 				NodeComponent[i] = Component;
+				ComponentNodeCounts[Component]++;
 			}
 
 			ComponentEdgeCounts.Init(0, NumComponents);
@@ -452,6 +518,7 @@ namespace PCGExGraphs
 					if (Component != -1 && ComponentCulled[Component])
 					{
 						Nodes[i].bValid = false;
+						NodeValid[i] = 0;
 					}
 				});
 
@@ -542,25 +609,37 @@ namespace PCGExGraphs
 			}
 		}
 
-		// Recompute NumExportedEdges deterministically based on actual edge connections.
-		// Count valid edges per node directly from Links - parallelizable and cache-friendly.
-		// Nodes that are not exported keep their default of 0.
-		PCGExMT::ParallelOrSequential(
-			OutValidNodes.Num(),
-			[&](const int32 i)
-			{
-				const int32 NodeIdx = OutValidNodes[i];
-				FNode& Node = Nodes[NodeIdx];
-				Node.NumExportedEdges = 0;
-				for (const FLink& Lk : Node.Links)
+		// Compute NumExportedEdges deterministically from the edge list: every edge
+		// that survived culling contributes to both endpoints. Atomic increments
+		// commute, so the counts are exact regardless of thread scheduling; nodes
+		// that are not exported are never incremented and keep their default of 0.
+		// (Also works without per-node Links, unlike the previous per-node recount.)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(BuildSubGraphs::ExportedEdgeCounts);
+
+			FNode* NodesData = Nodes.GetData();
+			PCGExMT::ParallelOrSequential(
+				NumEdges,
+				[&](const int32 i)
 				{
-					const FEdge& Edge = Edges[Lk.Edge];
-					if (Edge.bValid && Nodes[Edge.Other(NodeIdx)].bValid)
+					const FEdge& Edge = Edges[i];
+					if (!Edge.bValid)
 					{
-						Node.NumExportedEdges++;
+						return;
 					}
-				}
-			});
+
+					const int32 Start = static_cast<int32>(Edge.Start);
+					const int32 End = static_cast<int32>(Edge.End);
+
+					if (!NodeValid[Start] || !NodeValid[End])
+					{
+						return;
+					}
+
+					FPlatformAtomics::InterlockedIncrement(&NodesData[Start].NumExportedEdges);
+					FPlatformAtomics::InterlockedIncrement(&NodesData[End].NumExportedEdges);
+				});
+		}
 	}
 
 	void FGraph::GetConnectedNodes(const int32 FromIndex, TArray<int32>& OutIndices, const int32 SearchDepth) const

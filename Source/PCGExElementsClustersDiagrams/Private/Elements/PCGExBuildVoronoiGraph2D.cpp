@@ -409,7 +409,8 @@ namespace PCGExBuildVoronoiGraph2D
 				GraphEdges[i] = PCGExGraphs::FEdge(i, A, B, -1, -1);
 				)
 
-			GraphBuilder->Graph->AdoptEdges(GraphEdges);
+			// Compile-only graph: skip the dedup map, per-node links and metadata sizing
+			GraphBuilder->Graph->AdoptEdges(GraphEdges, false);
 		}
 
 		// Mark out-of-bounds cell centers as invalid - the builder will handle pruning
