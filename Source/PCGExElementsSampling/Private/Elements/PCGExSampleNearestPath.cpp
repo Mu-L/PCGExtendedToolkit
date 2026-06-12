@@ -6,6 +6,7 @@
 #include "Blenders/PCGExUnionOpsManager.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExBlendOpsManager.h"
+#include "Core/PCGExBlendOpsSchema.h"
 #include "Core/PCGExOpStats.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
@@ -201,9 +202,18 @@ bool FPCGExSampleNearestPathElement::Boot(FPCGExContext* InContext) const
 
 	if (!Context->BlendingFactories.IsEmpty())
 	{
+		// Resolve blend op configs once, here, single-threaded: per-processor blender init then
+		// only instantiates ops (no concurrent metadata enumeration on shared target facades),
+		// and the preloader warms exactly the attribute set the ops will read.
+		Context->BlendOpsSchema = MakeShared<PCGExBlending::FBlendOpsSchema>();
+		if (!Context->BlendOpsSchema->Init(Context, Context->BlendingFactories, Context->TargetsHandler->GetFacades()))
+		{
+			return false;
+		}
+
 		Context->TargetsHandler->ForEachPreloader([&](PCGExData::FFacadePreloader& Preloader)
 		{
-			PCGExBlending::RegisterBuffersDependencies_SourceA(Context, Preloader, Context->BlendingFactories);
+			Context->BlendOpsSchema->RegisterBuffersDependencies(Context, Preloader);
 		});
 	}
 
@@ -355,7 +365,7 @@ namespace PCGExSampleNearestPath
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(InitBlendingFactories)
 			UnionBlendOpsManager = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, Context->TargetsHandler->GetDistances());
-			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades()))
+			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades(), Context->BlendOpsSchema))
 			{
 				return false;
 			}

@@ -166,14 +166,39 @@ public:
 	// Fresh non-CDO instances start with every ImportOverride disabled regardless of what the
 	// CDO authored -- the toggle is purely instance state. Resolution falls back through the BP
 	// class chain so the CDO's authored override stays effective on un-toggled instances.
-	// Does NOT fire on load: saved/authored instances keep their serialized bEnabled.
+	// Does NOT fire on load: saved/authored instances are handled by PostLoad instead.
 	virtual void OnComponentCreated() override;
 
+	/**
+	 * Load-time invariant enforcement for override-toggle state:
+	 * - Templates: EnabledOverrides is cleared. Templates author overrides through bEnabled
+	 *   alone; a non-empty template TSet is legacy poison (older builds synced it on CDO toggle
+	 *   edits) and is what in-parity instances inherited through archetype delta at every
+	 *   package load -- the root of the CDO->instance toggle bleed.
+	 * - Instances (editor): packages older than InstanceOwnedOverrideToggles rebuild the TSet
+	 *   from the bEnabled-vs-archetype diff (the only ordering-stable authored signal in legacy
+	 *   data; template bEnabled is authored and never mutated at load). Then bEnabled is
+	 *   re-derived from the TSet so the mirror never carries archetype-inherited state.
+	 */
+	virtual void PostLoad() override;
+
+	/**
+	 * Serializes EnabledOverrides unconditionally into persistent packages (custom-version
+	 * gated) on top of the regular UPROPERTY pass. Tagged delta serialization omits the TSet
+	 * whenever it matches the archetype, and omitted state re-resolves to the archetype's
+	 * CURRENT value on the next load -- i.e. per-instance toggles silently follow CDO toggle
+	 * changes. The unconditional copy pins the authored per-instance state to the package.
+	 */
+	virtual void Serialize(FArchive& Ar) override;
+
 #if WITH_EDITOR
-	// Mirror chain-leaf bEnabled edits into the TSet (the authoritative signal). On CDO/template
-	// edits also walk dependent instances and restore bEnabled from each instance's own TSet --
-	// UE's per-property propagation just clobbered bEnabled wherever it matched the old CDO; the
-	// TSet survives because UE's edit chain targets the nested bool, not the top-level TSet.
+	// On chain-leaf bEnabled events, re-derive the bEnabled mirror from the authoritative TSet
+	// (never the inverse -- see SyncBEnabledFromOverrideSet). This both rejects UE's
+	// CDO->instance propagation fallout (UObject::PostEditChangeChainProperty forwards template
+	// chain edits to archetype instances after raw-importing the new value into in-parity ones)
+	// and normalizes any non-authoritative bEnabled write. On template edits, additionally walk
+	// dependent instances after Super and restore their bEnabled from each instance's own TSet
+	// as a backstop for raw-import paths that carry no notify.
 	virtual void PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent) override;
 #endif
 
@@ -197,10 +222,21 @@ public:
 	/**
 	 * Authoritative per-instance "which import overrides are enabled" set.
 	 *
-	 * The matching bEnabled on each FPCGExPropertyOverrideEntry is a UI-bound mirror that UE's
-	 * per-property propagation overwrites on CDO edits (and we can't reliably block that).
+	 * The matching bEnabled on each FPCGExPropertyOverrideEntry is a DERIVED mirror that UE's
+	 * propagation machinery overwrites on CDO edits (raw value import + forwarded
+	 * PostEditChangeChainProperty on every archetype instance -- neither can be blocked).
 	 * The TSet survives because UE's edit chain targets the nested bool, not this top-level
-	 * field. PostEditChangeChainProperty keeps the two sides in sync.
+	 * field. Data flows one way only: TSet -> bEnabled (SyncBEnabledFromOverrideSet); the TSet
+	 * itself is written exclusively through SetOverrideEnabled, the instance-data restore, and
+	 * the PostLoad legacy migration.
+	 *
+	 * Invariants (enforced by PostLoad, Serialize and the IsTemplate guards in the sync paths):
+	 * - Templates never own a TSet: theirs is always empty. Template bEnabled is the authored
+	 *   override layer that chain resolution reads directly; a template TSet would leak into
+	 *   in-parity instances through archetype delta at load.
+	 * - Instances never inherit the TSet through archetype delta: Serialize writes it into
+	 *   persistent packages unconditionally, so a saved-in-parity instance can no longer adopt
+	 *   the template's toggle state on its next load.
 	 *
 	 * Empty on fresh instances (OnComponentCreated); captured/restored across BP reinstancing
 	 * via FPCGExPropertyCollectionInstanceData.
@@ -209,16 +245,19 @@ public:
 	 * (Tuple node, level exporter) aren't subject to CDO->instance propagation and use bEnabled
 	 * directly.
 	 */
-	UPROPERTY(meta = (DisableCopyOnInstances))
+	UPROPERTY()
 	TSet<FName> EnabledOverrides;
 
 #if WITH_EDITOR
 	// Re-derive every entry's bEnabled from EnabledOverrides. Use after CDO->instance propagation
-	// may have clobbered bEnabled, or after restoring the TSet from instance data.
+	// may have clobbered bEnabled, or after restoring the TSet from instance data. No-op on
+	// templates: their bEnabled is authored data and must never be derived.
+	//
+	// There is intentionally NO inverse (bEnabled -> TSet): UObject::PostEditChangeChainProperty
+	// forwards template chain edits to archetype instances, so any mirror->authority fold runs
+	// on propagation fallout and bakes the CDO's toggle into instance-authored state. The TSet
+	// is written exclusively through SetOverrideEnabled (and the PostLoad legacy migration).
 	void SyncBEnabledFromOverrideSet();
-
-	// Inverse: rebuild the TSet from each entry's current bEnabled. Use after a checkbox toggle.
-	void SyncOverrideSetFromBEnabled();
 #endif
 
 	/**
@@ -226,6 +265,8 @@ public:
 	 * into the matching entry's bEnabled (UI). Single entry point for activation paths
 	 * (notably SetProperty K2 thunks auto-enabling on write). No-op for unknown / None names.
 	 * Local schemas have no toggle; this only affects ImportOverrides entries.
+	 * On templates only bEnabled is written: templates author through bEnabled and their TSet
+	 * stays empty (see PostLoad).
 	 */
 	void SetOverrideEnabled(FName PropertyName, bool bEnabled);
 

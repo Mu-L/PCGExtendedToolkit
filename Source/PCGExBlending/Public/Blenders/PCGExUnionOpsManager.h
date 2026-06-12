@@ -15,6 +15,7 @@ class FPCGExBlendOperation;
 namespace PCGExBlending
 {
 	class FBlendOpsManager;
+	class FBlendOpsSchema;
 	struct FPropertiesBlender;
 }
 
@@ -26,8 +27,10 @@ namespace PCGExBlending
 		FUnionOpsManager(const TArray<TObjectPtr<const UPCGExBlendOpFactory>>* InBlendingFactories, const PCGExMath::IDistances* InDistances);
 		virtual ~FUnionOpsManager() override;
 
-		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources);
-		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata);
+		/** When a pre-resolved schema is provided, per-source blenders skip factory config resolution
+		 * (and its concurrent metadata enumeration) -- see PCGExBlending::FBlendOpsSchema. */
+		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<const FBlendOpsSchema>& InSchema = nullptr);
+		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, const TSharedPtr<const FBlendOpsSchema>& InSchema = nullptr);
 
 		virtual void InitTrackers(TArray<PCGEx::FOpStats>& Trackers) const override;
 		virtual int32 ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const override;

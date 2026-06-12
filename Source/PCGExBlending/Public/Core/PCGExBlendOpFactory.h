@@ -228,7 +228,19 @@ public:
 
 	virtual TSharedPtr<FPCGExBlendOperation> CreateOperation(FPCGExContext* InContext) const;
 
-	/** Creates one or more operations from this factory. Default wraps CreateOperation(). Monolithic overrides enumerate all attributes. */
+	/**
+	 * Resolves the effective blend configs this factory contributes for a given source facade.
+	 * Default returns the single static Config; monolithic factories enumerate the source attributes.
+	 * Resolution is data-dependent but target-independent, so results can be computed once
+	 * (single-threaded) and shared across processors -- see PCGExBlending::FBlendOpsSchema.
+	 */
+	virtual bool ResolveConfigs(
+		FPCGExContext* InContext,
+		const TSharedPtr<PCGExData::FFacade>& InSourceAFacade,
+		TArray<FPCGExAttributeBlendConfig>& OutConfigs,
+		const TSet<FName>* InSupersedeNames = nullptr) const;
+
+	/** Creates one or more operations from this factory: ResolveConfigs + one CreateOperation() per resolved config. */
 	virtual bool CreateOperations(
 		FPCGExContext* InContext,
 		const TSharedPtr<PCGExData::FFacade>& InSourceAFacade,

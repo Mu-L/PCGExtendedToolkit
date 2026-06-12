@@ -545,8 +545,14 @@ namespace PCGExData
 
 	void FPointIO::ClearCachedKeys()
 	{
-		InKeys.Reset();
-		OutKeys.Reset();
+		{
+			FWriteScopeLock WriteScopeLock(InKeysLock);
+			InKeys.Reset();
+		}
+		{
+			FWriteScopeLock WriteScopeLock(OutKeysLock);
+			OutKeys.Reset();
+		}
 	}
 
 	FPointIO::~FPointIO()

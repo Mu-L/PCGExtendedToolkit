@@ -18,6 +18,9 @@ namespace PCGExMT
 
 namespace PCGExBlending
 {
+	class FBlendOpsSchema;
+	struct FBlendOpsSchemaEntry;
+
 	PCGEXBLENDING_API void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader, const TArray<TObjectPtr<const UPCGExBlendOpFactory>>& Factories);
 
 	PCGEXBLENDING_API void RegisterBuffersDependencies_SourceA(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader, const TArray<TObjectPtr<const UPCGExBlendOpFactory>>& Factories);
@@ -54,7 +57,15 @@ namespace PCGExBlending
 		void SetSources(const TSharedPtr<PCGExData::FFacade>& InDataFacade, PCGExData::EIOSide Side = PCGExData::EIOSide::In);
 		void SetTargetFacade(const TSharedPtr<PCGExData::FFacade>& InDataFacade);
 
+		/** Init from factories, resolving configs against SourceA on the spot. This is the right path
+		 * when the source is unique to this blender (e.g. a processor's own facade) -- resolution then
+		 * happens exactly once anyway. When many blenders share the same sources (multi-target sampling),
+		 * resolve once into a FBlendOpsSchema instead and use the schema overload. */
 		bool Init(FPCGExContext* InContext, const TArray<TObjectPtr<const UPCGExBlendOpFactory>>& InFactories);
+
+		/** Init from a pre-resolved schema: instantiates ops without re-resolving factory configs.
+		 * The schema must have been built from the same source facades (keyed by their In data). */
+		bool Init(FPCGExContext* InContext, const TSharedPtr<const FBlendOpsSchema>& InSchema);
 
 		int32 GetNumOperations() const
 		{
@@ -89,5 +100,12 @@ namespace PCGExBlending
 	protected:
 		int32 SharedOperationCount = -1;
 		TSharedPtr<PCGExMT::TScopedArray<PCGEx::FOpStats>> ScopedTrackers;
+
+		/** Wires facades/indices into a freshly created op and runs PrepareForData.
+		 * On preparation failure, returns bTolerateFailure (failed ops stay in Operations but aren't cached). */
+		bool SetupOperation(FPCGExContext* InContext, const TSharedPtr<FPCGExBlendOperation>& InOperation, bool bTolerateFailure);
+
+		/** Rejects composite/sub-component output conflicts (e.g. $Transform vs $Position). */
+		bool ValidateOutputs(FPCGExContext* InContext) const;
 	};
 }
