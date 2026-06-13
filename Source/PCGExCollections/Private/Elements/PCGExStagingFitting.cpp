@@ -264,7 +264,9 @@ namespace PCGExStagingFitting
 		const bool bUseMeshAttribute = Settings->Source == EPCGExFittingSource::MeshAttribute;
 		const bool bConsiderEntryScaleToFit = Settings->bConsiderEntryScaleToFit;
 		const bool bConsiderEntryJustification = Settings->bConsiderEntryJustification;
-		const TArray<PCGExValueHash>& KeysRef = MeshKeys ? *MeshKeys.Get() : TArray<PCGExValueHash>{};
+		// Null in CollectionMap mode (never assigned, never indexed); the MeshAttribute null
+		// case bails in Process(), so this is guaranteed valid wherever bUseMeshAttribute is set.
+		const TArray<PCGExValueHash>* MeshKeysPtr = MeshKeys.Get();
 
 		int16 MaterialPick = 0;
 		FRandomStream RandomSource;
@@ -282,7 +284,8 @@ namespace PCGExStagingFitting
 
 			if (bUseMeshAttribute)
 			{
-				const FBox* CachedBounds = BoundsCache.Find(KeysRef[Index]);
+				check(MeshKeysPtr);
+				const FBox* CachedBounds = BoundsCache.Find((*MeshKeysPtr)[Index]);
 				if (!CachedBounds || !CachedBounds->IsValid)
 				{
 					InvalidPoint(Index);
