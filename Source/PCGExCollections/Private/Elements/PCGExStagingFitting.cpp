@@ -54,7 +54,10 @@ TArray<FPCGPinProperties> UPCGExStagingFittingSettings::OutputPinProperties() co
 void FPCGExStagingFittingContext::RegisterAssetDependencies()
 {
 	FPCGExPointsProcessorContext::RegisterAssetDependencies();
-	if (StaticMeshLoader) { StaticMeshLoader->AddAssetDependencies(); }
+	if (StaticMeshLoader)
+	{
+		StaticMeshLoader->AddAssetDependencies();
+	}
 }
 
 bool FPCGExStagingFittingElement::Boot(FPCGExContext* InContext) const
@@ -105,7 +108,10 @@ void FPCGExStagingFittingElement::PostLoadAssetsDependencies(FPCGExContext* InCo
 
 bool FPCGExStagingFittingElement::PostBoot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPointsProcessorElement::PostBoot(InContext)) { return false; }
+	if (!FPCGExPointsProcessorElement::PostBoot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagingFitting)
 	if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
@@ -160,10 +166,11 @@ namespace PCGExStagingFitting
 			return false;
 		}
 
-		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
 		if (Settings->Source == EPCGExFittingSource::CollectionMap)
 		{
+			PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
+
 			EntryHashGetter = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
 			if (!EntryHashGetter)
 			{
@@ -176,6 +183,18 @@ namespace PCGExStagingFitting
 		else
 		{
 			MeshKeys = Context->StaticMeshLoader->GetKeys(PointDataFacade->Source->IOIndex);
+
+			// Missing attribute on processed source
+			if (Settings->Source == EPCGExFittingSource::MeshAttribute && !MeshKeys)
+			{
+				PCGEX_INIT_IO(PointDataFacade->Source, Settings->bPruneEmptyPoints ? PCGExData::EIOInit::NoInit : PCGExData::EIOInit::Forward)
+				return false;
+			}
+			else
+			{
+				PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
+			}
+
 
 			// Build bounds cache from loaded meshes
 			for (const auto& Pair : Context->StaticMeshLoader->AssetsMap)
@@ -245,7 +264,9 @@ namespace PCGExStagingFitting
 		const bool bUseMeshAttribute = Settings->Source == EPCGExFittingSource::MeshAttribute;
 		const bool bConsiderEntryScaleToFit = Settings->bConsiderEntryScaleToFit;
 		const bool bConsiderEntryJustification = Settings->bConsiderEntryJustification;
-		const TArray<PCGExValueHash>& KeysRef = MeshKeys ? *MeshKeys.Get() : TArray<PCGExValueHash>{};
+		// Null in CollectionMap mode (never assigned, never indexed); the MeshAttribute null
+		// case bails in Process(), so this is guaranteed valid wherever bUseMeshAttribute is set.
+		const TArray<PCGExValueHash>* MeshKeysPtr = MeshKeys.Get();
 
 		int16 MaterialPick = 0;
 		FRandomStream RandomSource;
@@ -263,7 +284,8 @@ namespace PCGExStagingFitting
 
 			if (bUseMeshAttribute)
 			{
-				const FBox* CachedBounds = BoundsCache.Find(KeysRef[Index]);
+				check(MeshKeysPtr);
+				const FBox* CachedBounds = BoundsCache.Find((*MeshKeysPtr)[Index]);
 				if (!CachedBounds || !CachedBounds->IsValid)
 				{
 					InvalidPoint(Index);

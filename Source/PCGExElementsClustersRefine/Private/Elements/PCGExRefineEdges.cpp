@@ -18,7 +18,7 @@
 #define PCGEX_NAMESPACE RefineEdges
 
 #if WITH_EDITOR
-void UPCGExRefineEdgesSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExRefineEdgesSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
@@ -34,7 +34,7 @@ void UPCGExRefineEdgesSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		ResultOutputEdges.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

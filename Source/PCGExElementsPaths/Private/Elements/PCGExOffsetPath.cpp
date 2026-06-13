@@ -28,14 +28,14 @@ void UPCGExOffsetPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* I
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExOffsetPathSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExOffsetPathSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 7)
 	{
 		Offset.Update(OffsetInput_DEPRECATED, OffsetAttribute_DEPRECATED, OffsetConstant_DEPRECATED);
 		Direction.Update(DirectionType_DEPRECATED, DirectionAttribute_DEPRECATED, FVector::UpVector);
 	}
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 
 #endif

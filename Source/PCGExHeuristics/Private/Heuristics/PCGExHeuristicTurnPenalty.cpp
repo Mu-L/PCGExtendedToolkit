@@ -12,7 +12,7 @@ double FPCGExHeuristicTurnPenalty::GetGlobalScore(const PCGExClusters::FNode& Fr
 	return GetScoreInternal(GlobalScore);
 }
 
-double FPCGExHeuristicTurnPenalty::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
+double FPCGExHeuristicTurnPenalty::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack) const
 {
 	if (!TravelStack)
 	{

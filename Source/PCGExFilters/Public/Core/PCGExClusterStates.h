@@ -115,7 +115,7 @@ protected:
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	virtual void ApplyDeprecation(UPCGNode* InOutNode) override;
+	virtual void PCGExApplyDeprecation(UPCGNode* InOutNode) override;
 
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(ClusterNodeFlag, "State : Cluster", "A single, filter-driven vtx state.", PCGEX_FACTORY_NAME_PRIORITY)
 

@@ -3,6 +3,7 @@
 
 #include "PCGExPropertyCollectionComponent.h"
 
+#include "PCGExPropertiesCustomVersion.h"
 #include "PCGExPropertySchemaAsset.h"
 
 #if WITH_EDITOR
@@ -72,6 +73,121 @@ void UPCGExPropertyCollectionComponent::OnComponentCreated()
 	EnabledOverrides.Empty();
 }
 
+void UPCGExPropertyCollectionComponent::PostLoad()
+{
+	Super::PostLoad();
+
+	if (IsTemplate())
+	{
+		// Templates author overrides through per-entry bEnabled alone; the TSet is per-instance
+		// state. Older builds synced the TSet on template toggle edits, and that baked set is
+		// what in-parity instances inherited through archetype delta on every package load (the
+		// CDO->instance toggle bleed). Clearing is deterministic, so no dirty flag is needed;
+		// the next blueprint save persists the empty set.
+		EnabledOverrides.Empty();
+		return;
+	}
+
+#if WITH_EDITOR
+	if (GetLinkerCustomVersion(FPCGExPropertiesCustomVersion::GUID) < FPCGExPropertiesCustomVersion::InstanceOwnedOverrideToggles)
+	{
+		// Legacy package: the TSet was delta-serialized against the archetype, so saved-in-parity
+		// state re-resolved to the archetype's CURRENT set at this load -- poisoned and authored
+		// entries are indistinguishable. Rebuild from the bEnabled-vs-archetype diff instead:
+		// template bEnabled is authored data (never mutated at load), making it the only
+		// ordering-stable signal regardless of template/instance PostLoad order; an instance bool
+		// that diverges from its archetype was tag-serialized and is therefore trustworthy.
+		// Known one-time loss: an instance toggle authored identical to the CDO's own toggle
+		// reads as parity and un-pins (falls back to chain resolution -- same resolved value
+		// today); re-toggling re-authors it under the always-serialized format.
+		EnabledOverrides.Reset();
+
+		const UPCGExPropertyCollectionComponent* Archetype = Cast<UPCGExPropertyCollectionComponent>(GetArchetype());
+		const bool bHasArchetype = Archetype && Archetype != this;
+
+		const TArray<FPCGExPropertyOverrideEntry>& OwnEntries = Properties.ImportOverrides.Overrides;
+		for (int32 Index = 0; Index < OwnEntries.Num(); ++Index)
+		{
+			const FPCGExPropertyOverrideEntry& Entry = OwnEntries[Index];
+			if (!Entry.bEnabled)
+			{
+				continue;
+			}
+
+			const FName Name = Entry.GetPropertyName();
+			if (Name.IsNone())
+			{
+				continue;
+			}
+
+			// Match by PropertyName first, same-index second -- Overrides arrays are kept
+			// parallel with the resolved imports schema by construction (same fallback policy
+			// as the instance-data capture path).
+			const FPCGExPropertyOverrideEntry* ArchEntry = nullptr;
+			if (bHasArchetype)
+			{
+				for (const FPCGExPropertyOverrideEntry& Candidate : Archetype->Properties.ImportOverrides.Overrides)
+				{
+					if (Candidate.GetPropertyName() == Name)
+					{
+						ArchEntry = &Candidate;
+						break;
+					}
+				}
+				if (!ArchEntry && Archetype->Properties.ImportOverrides.Overrides.IsValidIndex(Index))
+				{
+					ArchEntry = &Archetype->Properties.ImportOverrides.Overrides[Index];
+				}
+			}
+
+			if (!ArchEntry || !ArchEntry->bEnabled)
+			{
+				EnabledOverrides.Add(Name);
+			}
+		}
+	}
+
+	// Re-derive the UI mirror from the authoritative TSet. Tagged delta may have left bEnabled
+	// holding the template's current value wherever instance and template were in parity at save
+	// time -- without this, a CDO toggle flip would still read as enabled on untouched instances.
+	SyncBEnabledFromOverrideSet();
+#endif
+}
+
+void UPCGExPropertyCollectionComponent::Serialize(FArchive& Ar)
+{
+	Ar.UsingCustomVersion(FPCGExPropertiesCustomVersion::GUID);
+
+	Super::Serialize(Ar);
+
+	// Persistent binary packages only. Transactions and in-memory copies (duplication, CPFUO
+	// during BP reinstancing) round-trip the TSet correctly through the tagged UPROPERTY pass:
+	// with template TSets pinned empty (PostLoad), an instance set is either empty-matching-empty
+	// (reconstructs identically from the archetype) or divergent (tag-serialized), so false
+	// parity is impossible there. Text formats keep the tagged representation only.
+	if (!Ar.IsPersistent() || Ar.IsTransacting() || Ar.IsTextFormat())
+	{
+		return;
+	}
+
+	// Written unconditionally (templates included -- theirs is empty): the tagged pass omits the
+	// TSet whenever it matches the archetype, and omitted state re-resolves to the archetype's
+	// CURRENT value on the next load, silently following CDO toggle changes. This copy pins the
+	// authored per-instance state to the package. The UPROPERTY pass still runs for backward
+	// compat with pre-InstanceOwnedOverrideToggles packages.
+	if (Ar.IsLoading())
+	{
+		if (Ar.CustomVer(FPCGExPropertiesCustomVersion::GUID) >= FPCGExPropertiesCustomVersion::InstanceOwnedOverrideToggles)
+		{
+			Ar << EnabledOverrides;
+		}
+	}
+	else if (Ar.IsSaving())
+	{
+		Ar << EnabledOverrides;
+	}
+}
+
 void UPCGExPropertyCollectionComponent::SetOverrideEnabled(FName PropertyName, bool bEnabled)
 {
 	if (PropertyName.IsNone())
@@ -79,13 +195,19 @@ void UPCGExPropertyCollectionComponent::SetOverrideEnabled(FName PropertyName, b
 		return;
 	}
 
-	if (bEnabled)
+	// Templates author overrides through bEnabled alone; the TSet is per-instance state and
+	// stays empty on templates (see PostLoad). A template TSet would leak into in-parity
+	// instances through archetype delta at load.
+	if (!IsTemplate())
 	{
-		EnabledOverrides.Add(PropertyName);
-	}
-	else
-	{
-		EnabledOverrides.Remove(PropertyName);
+		if (bEnabled)
+		{
+			EnabledOverrides.Add(PropertyName);
+		}
+		else
+		{
+			EnabledOverrides.Remove(PropertyName);
+		}
 	}
 
 	if (FPCGExPropertyOverrideEntry* Entry = Properties.ImportOverrides.FindEntryMutableByName(PropertyName))
@@ -140,27 +262,19 @@ const UPCGExPropertyCollectionComponent* UPCGExPropertyCollectionComponent::Find
 
 void UPCGExPropertyCollectionComponent::SyncBEnabledFromOverrideSet()
 {
+	// Templates never derive bEnabled: theirs is the authored override layer that chain
+	// resolution reads directly, and their TSet is pinned empty (PostLoad) -- deriving here
+	// would wipe authored CDO toggles (e.g. when a CDO actor is passed through
+	// ExtractSchemaFromActor as a donor).
+	if (IsTemplate())
+	{
+		return;
+	}
+
 	for (FPCGExPropertyOverrideEntry& Entry : Properties.ImportOverrides.Overrides)
 	{
 		const FName Name = Entry.GetPropertyName();
 		Entry.bEnabled = !Name.IsNone() && EnabledOverrides.Contains(Name);
-	}
-}
-
-void UPCGExPropertyCollectionComponent::SyncOverrideSetFromBEnabled()
-{
-	EnabledOverrides.Reset();
-	for (const FPCGExPropertyOverrideEntry& Entry : Properties.ImportOverrides.Overrides)
-	{
-		if (!Entry.bEnabled)
-		{
-			continue;
-		}
-		const FName Name = Entry.GetPropertyName();
-		if (!Name.IsNone())
-		{
-			EnabledOverrides.Add(Name);
-		}
 	}
 }
 
@@ -173,12 +287,20 @@ void UPCGExPropertyCollectionComponent::PostEditChangeChainProperty(FPropertyCha
 		Leaf->GetFName() == GET_MEMBER_NAME_CHECKED(FPCGExPropertyOverrideEntry, bEnabled) &&
 		Leaf->GetOwnerStruct() == FPCGExPropertyOverrideEntry::StaticStruct();
 
-	// Sync TSet BEFORE Super: Super may synchronously RerunConstructionScripts, capturing
-	// InstanceData from this component pre-destroy. A stale TSet at capture would round-trip
-	// the just-toggled bEnabled back to its pre-edit value on apply.
+	// CRITICAL -- bEnabled is a derived mirror and must NEVER be folded back into the TSet.
+	// UObject::PostEditChangeChainProperty (Obj.cpp:600-641, PropagatePostEditChange:827)
+	// forwards this exact chain event to every archetype instance when a template is edited,
+	// AFTER the details panel raw-imported the new bEnabled into in-parity instances. So this
+	// override runs both for genuine edits on this object and as propagation fallout on every
+	// instance of an edited template -- and a mirror->authority sync here converts the CDO's
+	// toggle into instance-authored state (the recurring "instance toggles follow the base
+	// class" bug). Re-derive the mirror from the authoritative TSet instead: propagated
+	// clobbers self-heal at notify time, before Super's RerunConstructionScripts can capture
+	// them into instance data. The TSet is written exclusively through SetOverrideEnabled.
+	// No-op on templates (guard in the sync): their bEnabled IS the authored layer.
 	if (bIsBEnabledEdit)
 	{
-		SyncOverrideSetFromBEnabled();
+		SyncBEnabledFromOverrideSet();
 	}
 
 	Super::PostEditChangeChainProperty(PropertyChangedEvent);

@@ -7,6 +7,7 @@
 #include "Blenders/PCGExUnionOpsManager.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExBlendOpsManager.h"
+#include "Core/PCGExBlendOpsSchema.h"
 #include "Core/PCGExOpStats.h"
 #include "Core/PCGExPointFilter.h"
 #include "Data/PCGExData.h"
@@ -62,7 +63,7 @@ void UPCGExSampleNearestPointSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExSampleNearestPointSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExSampleNearestPointSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -70,7 +71,7 @@ void UPCGExSampleNearestPointSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 
@@ -160,13 +161,28 @@ bool FPCGExSampleNearestPointElement::Boot(FPCGExContext* InContext) const
 		Context->Sorter->SortDirection = Settings->SortDirection;
 	}
 
+	if (!Context->BlendingFactories.IsEmpty())
+	{
+		// Resolve blend op configs once, here, single-threaded: per-processor blender init then
+		// only instantiates ops (no concurrent metadata enumeration on shared target facades),
+		// and the preloader warms exactly the attribute set the ops will read.
+		Context->BlendOpsSchema = MakeShared<PCGExBlending::FBlendOpsSchema>();
+		if (!Context->BlendOpsSchema->Init(Context, Context->BlendingFactories, Context->TargetsHandler->GetFacades()))
+		{
+			return false;
+		}
+	}
+
 	Context->TargetsHandler->ForEachPreloader([&](PCGExData::FFacadePreloader& Preloader)
 	{
 		if (Settings->WeightMode != EPCGExSampleWeightMode::Distance)
 		{
 			Preloader.Register<double>(Context, Settings->WeightAttribute);
 		}
-		PCGExBlending::RegisterBuffersDependencies_SourceA(Context, Preloader, Context->BlendingFactories);
+		if (Context->BlendOpsSchema)
+		{
+			Context->BlendOpsSchema->RegisterBuffersDependencies(Context, Preloader);
+		}
 	});
 
 	Context->WeightCurve = Settings->WeightCurveLookup.MakeLookup(
@@ -334,7 +350,7 @@ namespace PCGExSampleNearestPoint
 		if (!Context->BlendingFactories.IsEmpty())
 		{
 			UnionBlendOpsManager = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, Context->TargetsHandler->GetDistances());
-			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades()))
+			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades(), Context->BlendOpsSchema))
 			{
 				return false;
 			}

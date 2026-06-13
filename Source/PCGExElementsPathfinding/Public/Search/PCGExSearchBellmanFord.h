@@ -5,12 +5,26 @@
 
 #include "CoreMinimal.h"
 #include "PCGExSearchOperation.h"
+#include "Core/PCGExSearchAllocations.h"
 #include "Factories/PCGExFactoryData.h"
 
 #include "UObject/Object.h"
 #include "PCGExSearchBellmanFord.generated.h"
 
 class FPCGExHeuristicOperation;
+
+namespace PCGExPathfinding
+{
+	/**
+	 * Allocations for Bellman-Ford. The search relaxes edges without going through the scored
+	 * queue, so the sparse reset has nothing to track -- restore everything densely instead.
+	 */
+	class PCGEXELEMENTSPATHFINDING_API FBellmanFordSearchAllocations : public FSearchAllocations
+	{
+	public:
+		virtual void Reset() override;
+	};
+}
 
 /**
  * Bellman-Ford Search operation.
@@ -53,6 +67,7 @@ public:
 	virtual TSharedPtr<FPCGExSearchOperation> CreateOperation() const override
 	{
 		PCGEX_FACTORY_NEW_OPERATION(SearchOperationBellmanFord)
+		NewOperation->bEarlyExit = bEarlyExit;
 		NewOperation->bDetectNegativeCycles = bDetectNegativeCycles;
 		return NewOperation;
 	}

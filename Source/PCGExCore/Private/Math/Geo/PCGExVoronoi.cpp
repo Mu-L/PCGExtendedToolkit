@@ -4,6 +4,7 @@
 #include "Math/Geo/PCGExVoronoi.h"
 
 #include "CoreMinimal.h"
+#include "Core/PCGExMTCommon.h"
 #include "Helpers/PCGExArrayHelpers.h"
 
 #include "Math/PCGExProjectionDetails.h"
@@ -12,6 +13,8 @@
 
 namespace PCGExMath::Geo
 {
+#pragma region TVoronoi2
+
 	TVoronoi2::~TVoronoi2()
 	{
 		Clear();
@@ -20,8 +23,6 @@ namespace PCGExMath::Geo
 	void TVoronoi2::Clear()
 	{
 		Delaunay.Reset();
-		Centroids.Empty();
-		Circumcenters.Empty();
 		VoronoiEdges.Empty();
 		OutputVertices.Empty();
 		OutputEdges.Empty();
@@ -30,335 +31,198 @@ namespace PCGExMath::Geo
 		IsValid = false;
 	}
 
-	bool TVoronoi2::Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails)
-	{
-		Clear();
-
-		Delaunay = MakeShared<TDelaunay2>();
-		if (!Delaunay->Process(Positions, ProjectionDetails))
-		{
-			Clear();
-			return IsValid;
-		}
-
-		const int32 NumSites = Delaunay->Sites.Num();
-		PCGExArrayHelpers::InitArray(Circumcenters, NumSites);
-		PCGExArrayHelpers::InitArray(Centroids, NumSites);
-
-		for (FDelaunaySite2& Site : Delaunay->Sites)
-		{
-			GetCircumcenter(Positions, Site.Vtx, Circumcenters[Site.Id]);
-			GetCentroid(Positions, Site.Vtx, Centroids[Site.Id]);
-
-			for (int i = 0; i < 3; i++)
-			{
-				const int32 AdjacentIdx = Site.Neighbors[i];
-
-				if (AdjacentIdx == -1)
-				{
-					continue;
-				}
-
-				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
-			}
-		}
-
-		IsValid = true;
-		return IsValid;
-	}
-
-	bool TVoronoi2::Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const FBox& Bounds, TBitArray<>& WithinBounds)
-	{
-		Clear();
-
-		Delaunay = MakeShared<TDelaunay2>();
-		if (!Delaunay->Process(Positions, ProjectionDetails))
-		{
-			Clear();
-			return IsValid;
-		}
-
-		const int32 NumSites = Delaunay->Sites.Num();
-		PCGExArrayHelpers::InitArray(Circumcenters, NumSites);
-		PCGExArrayHelpers::InitArray(Centroids, NumSites);
-		WithinBounds.Init(true, NumSites);
-
-		for (FDelaunaySite2& Site : Delaunay->Sites)
-		{
-			FVector CC = FVector::ZeroVector;
-
-			GetCircumcenter(Positions, Site.Vtx, CC);
-			Circumcenters[Site.Id] = CC;
-
-			WithinBounds[Site.Id] = Bounds.IsInside(CC);
-
-			GetCentroid(Positions, Site.Vtx, Centroids[Site.Id]);
-
-			for (int i = 0; i < 3; i++)
-			{
-				const int32 AdjacentIdx = Site.Neighbors[i];
-
-				if (AdjacentIdx == -1)
-				{
-					continue;
-				}
-
-				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
-			}
-		}
-
-		IsValid = true;
-		return IsValid;
-	}
-
 	bool TVoronoi2::Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExVoronoiMetric InMetric, EPCGExCellCenter CellCenterMethod)
 	{
 		Clear();
 		Metric = InMetric;
-
-		Delaunay = MakeShared<TDelaunay2>();
-		if (!Delaunay->Process(Positions, ProjectionDetails))
-		{
-			Clear();
-			return IsValid;
-		}
-
-		const int32 NumSites = Delaunay->Sites.Num();
-		PCGExArrayHelpers::InitArray(Circumcenters, NumSites);
-		PCGExArrayHelpers::InitArray(Centroids, NumSites);
-
-		for (FDelaunaySite2& Site : Delaunay->Sites)
-		{
-			// Store 3D versions for backwards compatibility
-			GetCircumcenter(Positions, Site.Vtx, Circumcenters[Site.Id]);
-			GetCentroid(Positions, Site.Vtx, Centroids[Site.Id]);
-
-			for (int i = 0; i < 3; i++)
-			{
-				const int32 AdjacentIdx = Site.Neighbors[i];
-				if (AdjacentIdx == -1)
-				{
-					continue;
-				}
-				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
-			}
-		}
-
-		IsValid = true;
-		BuildMetricOutput(Positions, ProjectionDetails, CellCenterMethod, nullptr, nullptr);
-		return IsValid;
+		return ProcessInternal(Positions, ProjectionDetails, CellCenterMethod, nullptr, nullptr);
 	}
 
-	bool TVoronoi2::Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const FBox& Bounds, TBitArray<>& WithinBounds, EPCGExVoronoiMetric InMetric, EPCGExCellCenter CellCenterMethod)
+	bool TVoronoi2::Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const FBox& Bounds, TArray<int8>& WithinBounds, EPCGExVoronoiMetric InMetric, EPCGExCellCenter CellCenterMethod)
 	{
 		Clear();
 		Metric = InMetric;
+		return ProcessInternal(Positions, ProjectionDetails, CellCenterMethod, &Bounds, &WithinBounds);
+	}
+
+	bool TVoronoi2::ProcessInternal(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExCellCenter CellCenterMethod, const FBox* Bounds, TArray<int8>* WithinBounds)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(TVoronoi2::Process);
+
+		// Project once; the same projected positions feed the triangulation and the
+		// cell center computation in BuildMetricOutput.
+		TArray<FVector> ProjectedPositions;
+		ProjectionDetails.Project(Positions, ProjectedPositions);
 
 		Delaunay = MakeShared<TDelaunay2>();
-		if (!Delaunay->Process(Positions, ProjectionDetails))
+
+		// Voronoi construction needs sites/adjacency + hull, never the Delaunay edge set
+		if (!Delaunay->ProcessProjected(ProjectedPositions, false, true))
 		{
 			Clear();
 			return IsValid;
 		}
 
-		const int32 NumSites = Delaunay->Sites.Num();
-		PCGExArrayHelpers::InitArray(Circumcenters, NumSites);
-		PCGExArrayHelpers::InitArray(Centroids, NumSites);
-		WithinBounds.Init(true, NumSites);
-
-		for (FDelaunaySite2& Site : Delaunay->Sites)
-		{
-			// Store 3D versions for backwards compatibility
-			GetCircumcenter(Positions, Site.Vtx, Circumcenters[Site.Id]);
-			GetCentroid(Positions, Site.Vtx, Centroids[Site.Id]);
-
-			for (int i = 0; i < 3; i++)
-			{
-				const int32 AdjacentIdx = Site.Neighbors[i];
-				if (AdjacentIdx == -1)
-				{
-					continue;
-				}
-				VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
-			}
-		}
+		BuildVoronoiEdges();
 
 		IsValid = true;
-		// BuildMetricOutput will compute final positions and check bounds after unprojection
-		BuildMetricOutput(Positions, ProjectionDetails, CellCenterMethod, &Bounds, &WithinBounds);
+		// BuildMetricOutput computes final positions and checks bounds after unprojection
+		BuildMetricOutput(ProjectedPositions, ProjectionDetails, CellCenterMethod, Bounds, WithinBounds);
 		return IsValid;
 	}
 
-	void TVoronoi2::BuildMetricOutput(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExCellCenter CellCenterMethod, const FBox* Bounds, TBitArray<>* WithinBounds)
+	void TVoronoi2::BuildVoronoiEdges()
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(TVoronoi2::BuildVoronoiEdges);
+
+		const TArray<FDelaunaySite2>& Sites = Delaunay->Sites;
+
+		// ~1.5 unique edges per site for a typical triangulation
+		VoronoiEdges.Reserve(Sites.Num() * 2);
+
+		for (const FDelaunaySite2& Site : Sites)
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				// Each unordered pair is claimed by its lower-id site, so every edge is
+				// appended exactly once - no dedup required. Also filters out -1.
+				const int32 AdjacentIdx = Site.Neighbors[i];
+				if (AdjacentIdx > Site.Id)
+				{
+					VoronoiEdges.Add(PCGEx::H64U(Site.Id, AdjacentIdx));
+				}
+			}
+		}
+	}
+
+	void TVoronoi2::BuildMetricOutput(const TArrayView<FVector>& ProjectedPositions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExCellCenter CellCenterMethod, const FBox* Bounds, TArray<int8>* WithinBounds)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(TVoronoi2::BuildMetricOutput);
 
 		const int32 NumSites = Delaunay->Sites.Num();
-		const int32 NumPositions = Positions.Num();
 		NumCellCenters = NumSites;
 
-		// Reserve space for cell centers + potential bend points
-		OutputVertices.Reserve(NumSites + VoronoiEdges.Num());
-		OutputEdges.Reserve(VoronoiEdges.Num() * 2);
+		const bool bEuclidean = Metric == EPCGExVoronoiMetric::Euclidean;
 
-		// Build cell centers
-		OutputVertices.SetNum(NumSites);
-
-		// Initialize WithinBounds if provided
 		if (WithinBounds)
 		{
-			WithinBounds->Init(true, NumSites);
+			WithinBounds->Init(1, NumSites);
 		}
 
-		// Project all positions to 2D space - used for all metrics
-		TArray<FVector> ProjectedPositions;
-		ProjectedPositions.SetNumUninitialized(NumPositions);
-		for (int32 i = 0; i < NumPositions; i++)
+		// Cell centers first; bend points are appended after them for L1/Linf
+		OutputVertices.Reserve(bEuclidean ? NumSites : NumSites + VoronoiEdges.Num());
+		OutputVertices.SetNumUninitialized(NumSites);
+
+		// Projected centers are cached for the L1/Linf bend pass below, so they are
+		// never recomputed per edge.
+		TArray<FVector> ProjectedCenters;
+		if (!bEuclidean)
 		{
-			ProjectedPositions[i] = ProjectionDetails.Project(Positions[i]);
+			ProjectedCenters.SetNumUninitialized(NumSites);
 		}
-		const TArrayView<FVector> ProjectedView(ProjectedPositions);
 
-		// Compute cell centers in projected space, then unproject
-		for (int32 i = 0; i < NumSites; i++)
 		{
-			const FDelaunaySite2& Site = Delaunay->Sites[i];
+			TRACE_CPUPROFILER_EVENT_SCOPE(TVoronoi2::CellCenters);
 
-			FVector ProjectedCenter;
-			if (CellCenterMethod == EPCGExCellCenter::Centroid)
-			{
-				GetCentroid(ProjectedView, Site.Vtx, ProjectedCenter);
-			}
-			else if (CellCenterMethod == EPCGExCellCenter::Circumcenter)
-			{
-				GetCircumcenter2D(ProjectedView, Site.Vtx, ProjectedCenter);
-			}
-			else // Balanced
-			{
-				GetCircumcenter2D(ProjectedView, Site.Vtx, ProjectedCenter);
-				if (Bounds)
+			const TArray<FDelaunaySite2>& Sites = Delaunay->Sites;
+
+			PCGEX_PARALLEL_FOR(
+				NumSites,
+				const FDelaunaySite2& Site = Sites[i];
+
+				FVector ProjectedCenter;
+				if (CellCenterMethod == EPCGExCellCenter::Centroid)
 				{
-					const FVector Unprojected = ProjectionDetails.Unproject(ProjectedCenter);
-					if (!Bounds->IsInside(Unprojected))
+					GetCentroid(ProjectedPositions, Site.Vtx, ProjectedCenter);
+				}
+				else if (CellCenterMethod == EPCGExCellCenter::Circumcenter)
+				{
+					GetCircumcenter2D(ProjectedPositions, Site.Vtx, ProjectedCenter);
+				}
+				else // Balanced
+				{
+					GetCircumcenter2D(ProjectedPositions, Site.Vtx, ProjectedCenter);
+					if (Bounds && !Bounds->IsInside(ProjectionDetails.Unproject(ProjectedCenter)))
 					{
-						GetCentroid(ProjectedView, Site.Vtx, ProjectedCenter);
+						GetCentroid(ProjectedPositions, Site.Vtx, ProjectedCenter);
 					}
 				}
-			}
 
-			OutputVertices[i] = ProjectionDetails.Unproject(ProjectedCenter);
+				const FVector Unprojected = ProjectionDetails.Unproject(ProjectedCenter);
+				OutputVertices[i] = Unprojected;
 
-			if (Bounds && WithinBounds)
-			{
-				(*WithinBounds)[i] = Bounds->IsInside(OutputVertices[i]);
-			}
+				if (!bEuclidean)
+				{
+					ProjectedCenters[i] = ProjectedCenter;
+				}
+
+				if (Bounds && WithinBounds)
+				{
+					(*WithinBounds)[i] = Bounds->IsInside(Unprojected) ? 1 : 0;
+				}
+				)
 		}
 
-		// Process edges - for Euclidean, just direct edges; for L1/L∞, potential bends
-		for (const uint64 EdgeHash : VoronoiEdges)
+		if (bEuclidean)
 		{
-			const int32 SiteA = PCGEx::H64A(EdgeHash);
-			const int32 SiteB = PCGEx::H64B(EdgeHash);
+			// Direct edges only. VoronoiEdges hashes already use the same (H64A, H64B)
+			// encoding OutputEdges expects, so this is a plain copy.
+			OutputEdges = VoronoiEdges;
+			return;
+		}
 
-			// For Euclidean, just create direct edges (no bends)
-			if (Metric == EPCGExVoronoiMetric::Euclidean)
-			{
-				OutputEdges.Add(PCGEx::H64(SiteA, SiteB));
-				continue;
-			}
+		// L1/Linf: subdivide each edge with at most one bend point
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(TVoronoi2::MetricEdges);
 
-			// For L1/L∞, compute 2D path with potential bends
-			const FDelaunaySite2& SiteDataA = Delaunay->Sites[SiteA];
-			const FDelaunaySite2& SiteDataB = Delaunay->Sites[SiteB];
+			const bool bManhattan = Metric == EPCGExVoronoiMetric::Manhattan;
 
-			// Get projected cell centers for 2D path computation
-			FVector ProjectedCenterA, ProjectedCenterB;
-			if (CellCenterMethod == EPCGExCellCenter::Centroid)
+			OutputEdges.Reserve(VoronoiEdges.Num() * 2);
+
+			for (const uint64 EdgeHash : VoronoiEdges)
 			{
-				GetCentroid(ProjectedView, SiteDataA.Vtx, ProjectedCenterA);
-				GetCentroid(ProjectedView, SiteDataB.Vtx, ProjectedCenterB);
-			}
-			else if (CellCenterMethod == EPCGExCellCenter::Circumcenter)
-			{
-				GetCircumcenter2D(ProjectedView, SiteDataA.Vtx, ProjectedCenterA);
-				GetCircumcenter2D(ProjectedView, SiteDataB.Vtx, ProjectedCenterB);
-			}
-			else // Balanced
-			{
-				const bool bInBoundsA = WithinBounds ? (*WithinBounds)[SiteA] : true;
-				const bool bInBoundsB = WithinBounds ? (*WithinBounds)[SiteB] : true;
-				if (bInBoundsA)
+				const int32 SiteA = PCGEx::H64A(EdgeHash);
+				const int32 SiteB = PCGEx::H64B(EdgeHash);
+
+				const FVector& ProjectedCenterA = ProjectedCenters[SiteA];
+				const FVector& ProjectedCenterB = ProjectedCenters[SiteB];
+
+				const FVector2D Start2D(ProjectedCenterA.X, ProjectedCenterA.Y);
+				const FVector2D End2D(ProjectedCenterB.X, ProjectedCenterB.Y);
+
+				FVector2D Bend2D;
+				const bool bHasBend = bManhattan ? ComputeL1Bend(Start2D, End2D, Bend2D) : ComputeLInfBend(Start2D, End2D, Bend2D);
+
+				if (!bHasBend)
 				{
-					GetCircumcenter2D(ProjectedView, SiteDataA.Vtx, ProjectedCenterA);
-				}
-				else
-				{
-					GetCentroid(ProjectedView, SiteDataA.Vtx, ProjectedCenterA);
-				}
-				if (bInBoundsB)
-				{
-					GetCircumcenter2D(ProjectedView, SiteDataB.Vtx, ProjectedCenterB);
-				}
-				else
-				{
-					GetCentroid(ProjectedView, SiteDataB.Vtx, ProjectedCenterB);
-				}
-			}
-
-			// Use projected X,Y for 2D path computation
-			const FVector2D Start2D(ProjectedCenterA.X, ProjectedCenterA.Y);
-			const FVector2D End2D(ProjectedCenterB.X, ProjectedCenterB.Y);
-
-			TArray<FVector2D> Path2D;
-			if (Metric == EPCGExVoronoiMetric::Manhattan)
-			{
-				ComputeL1EdgePath(Start2D, End2D, Path2D);
-			}
-			else // Chebyshev
-			{
-				ComputeLInfEdgePath(Start2D, End2D, Path2D);
-			}
-
-			if (Path2D.Num() == 2)
-			{
-				// No bend point, direct edge
-				OutputEdges.Add(PCGEx::H64(SiteA, SiteB));
-			}
-			else
-			{
-				// Has bend points - add intermediate vertices
-				int32 PrevIdx = SiteA;
-
-				for (int32 j = 1; j < Path2D.Num() - 1; j++)
-				{
-					// Interpolate Z in projected space based on position along path
-					const double Alpha = static_cast<double>(j) / (Path2D.Num() - 1);
-					const double ProjectedZ = FMath::Lerp(ProjectedCenterA.Z, ProjectedCenterB.Z, Alpha);
-
-					// Create projected bend point and unproject to get point on the plane
-					const FVector ProjectedBend(Path2D[j].X, Path2D[j].Y, ProjectedZ);
-					const FVector BendPoint3D = ProjectionDetails.Unproject(ProjectedBend);
-
-					const int32 BendIdx = OutputVertices.Num();
-					OutputVertices.Add(BendPoint3D);
-
-					// For non-Euclidean metrics, if bend point is out of bounds, mark connected sites as out of bounds
-					if (Bounds && WithinBounds && !Bounds->IsInside(BendPoint3D))
-					{
-						(*WithinBounds)[SiteA] = false;
-						(*WithinBounds)[SiteB] = false;
-					}
-
-					// Edge from previous to bend
-					OutputEdges.Add(PCGEx::H64(PrevIdx, BendIdx));
-					PrevIdx = BendIdx;
+					// No bend point, direct edge
+					OutputEdges.Add(PCGEx::H64(SiteA, SiteB));
+					continue;
 				}
 
-				// Final edge from last bend to end
-				OutputEdges.Add(PCGEx::H64(PrevIdx, SiteB));
+				// Interpolate Z halfway in projected space, then unproject to get the bend on the plane
+				const FVector ProjectedBend(Bend2D.X, Bend2D.Y, (ProjectedCenterA.Z + ProjectedCenterB.Z) * 0.5);
+				const FVector BendPoint3D = ProjectionDetails.Unproject(ProjectedBend);
+
+				const int32 BendIdx = OutputVertices.Add(BendPoint3D);
+
+				// If the bend point is out of bounds, mark both connected sites as out of bounds
+				if (Bounds && WithinBounds && !Bounds->IsInside(BendPoint3D))
+				{
+					(*WithinBounds)[SiteA] = 0;
+					(*WithinBounds)[SiteB] = 0;
+				}
+
+				// Previous-to-bend, then bend-to-end
+				OutputEdges.Add(PCGEx::H64(SiteA, BendIdx));
+				OutputEdges.Add(PCGEx::H64(BendIdx, SiteB));
 			}
 		}
 	}
+
+#pragma endregion
+
+#pragma region TVoronoi3
 
 	TVoronoi3::~TVoronoi3()
 	{
@@ -414,4 +278,6 @@ namespace PCGExMath::Geo
 		IsValid = true;
 		return IsValid;
 	}
+
+#pragma endregion
 }

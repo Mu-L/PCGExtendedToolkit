@@ -8,6 +8,7 @@
 
 #include "PCGExSettingsCacheBody.h"
 #include "Async/ParallelFor.h"
+#include "Core/PCGExMTCommon.h"
 #include "Math/PCGExProjectionDetails.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Math/Geo/PCGExPrimtives.h"
@@ -49,11 +50,13 @@ namespace PCGExMath::Geo
 
 	void FDelaunaySite2::PushAdjacency(const int32 SiteId)
 	{
-		for (int32& i : Neighbors)
+		for (int i = 0; i < 3; i++)
 		{
-			if (i == -1)
+			if (Neighbors[i] == -1)
 			{
-				i = SiteId;
+				Neighbors[i] = SiteId;
+				// A site is on the hull as long as it has fewer than 3 neighbors,
+				// i.e. until the last neighbor slot is filled.
 				bOnHull = i != 2;
 				break;
 			}
@@ -74,146 +77,251 @@ namespace PCGExMath::Geo
 		IsValid = false;
 	}
 
-	bool TDelaunay2::Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails)
+	bool TDelaunay2::Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const bool bComputeDelaunayEdges, const bool bComputeHull)
 	{
 		Clear();
 
-		if (const int32 NumPositions = Positions.Num();
-			Positions.IsEmpty() || NumPositions <= 2)
+		if (Positions.IsEmpty() || Positions.Num() <= 2)
 		{
 			return false;
 		}
 
-		TMap<uint64, int32> EdgeMap;
+		if (PCGEX_CORE_SETTINGS.bUseDelaunator)
+		{
+			std::vector<double> Coords(Positions.Num() * 2);
+			ProjectionDetails.Project(Positions, Coords);
+			return ProcessDelaunator(Coords, bComputeDelaunayEdges, bComputeHull);
+		}
+
+		TArray<FVector2D> Projected;
+		ProjectionDetails.Project(Positions, Projected);
+		return ProcessFallback(Projected, bComputeDelaunayEdges, bComputeHull);
+	}
+
+	bool TDelaunay2::ProcessProjected(const TArrayView<FVector>& ProjectedPositions, const bool bComputeDelaunayEdges, const bool bComputeHull)
+	{
+		Clear();
+
+		const int32 NumPositions = ProjectedPositions.Num();
+		if (NumPositions <= 2)
+		{
+			return false;
+		}
+
+		if (PCGEX_CORE_SETTINGS.bUseDelaunator)
+		{
+			std::vector<double> Coords(NumPositions * 2);
+			PCGEX_PARALLEL_FOR(
+				NumPositions,
+				const FVector& P = ProjectedPositions[i];
+				const int32 ii = i * 2;
+				Coords[ii] = P.X;
+				Coords[ii + 1] = P.Y;
+				)
+			return ProcessDelaunator(Coords, bComputeDelaunayEdges, bComputeHull);
+		}
+
+		TArray<FVector2D> Projected;
+		Projected.SetNumUninitialized(NumPositions);
+		PCGEX_PARALLEL_FOR(
+			NumPositions,
+			Projected[i] = FVector2D(ProjectedPositions[i].X, ProjectedPositions[i].Y);
+			)
+		return ProcessFallback(Projected, bComputeDelaunayEdges, bComputeHull);
+	}
+
+	bool TDelaunay2::ProcessDelaunator(const std::vector<double>& Coords, const bool bComputeDelaunayEdges, const bool bComputeHull)
+	{
+		// NOTE: delaunator keeps a reference to Coords; it must stay alive for the
+		// lifetime of the triangulation object.
+		TUniquePtr<delaunator::Delaunator> Triangulation;
 
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(Delaunator::Triangulate);
+			Triangulation = MakeUnique<delaunator::Delaunator>(Coords);
+		}
 
-			IsValid = true;
-			// Build adjacency by matching shared edges between triangles.
-			// First occurrence of an edge records the owning site in EdgeMap.
-			// Second occurrence means two triangles share that edge, so they become neighbors.
-			// Unmatched edges (still in EdgeMap after all sites) are convex hull edges.
-			auto PushEdge = [&](FDelaunaySite2& Site, const uint64 Edge)
-			{
-				bool bIsAlreadySet = false;
-				DelaunayEdges.Add(Edge, &bIsAlreadySet);
-				if (bIsAlreadySet)
+		const delaunator::Delaunator& D = *Triangulation;
+
+		if (D.runtime_error)
+		{
+			return false;
+		}
+
+		const std::size_t NumHalfedges = D.triangles.size();
+		if (!NumHalfedges)
+		{
+			return false;
+		}
+
+		const int32 NumSites = static_cast<int32>(NumHalfedges / 3);
+		const std::size_t* Triangles = D.triangles.data();
+		const std::size_t* Halfedges = D.halfedges.data();
+
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Delaunay2D::BuildSites);
+
+			// Adjacency comes for free from the half-edge structure: halfedge e belongs to
+			// triangle e/3, and Halfedges[e] is its twin in the adjacent triangle
+			// (INVALID_INDEX when the edge lies on the convex hull).
+			Sites.SetNumUninitialized(NumSites);
+
+			PCGEX_PARALLEL_FOR(
+				NumSites,
+				const int32 Base = i * 3;
+				FDelaunaySite2& Site = Sites[i];
+				Site.Id = i;
+				bool bTouchesHull = false;
+				for (int k = 0; k < 3; k++)
 				{
-					if (int32 Idx = -1;
-						EdgeMap.RemoveAndCopyValue(Edge, Idx))
+					Site.Vtx[k] = static_cast<int32>(Triangles[Base + k]);
+					const std::size_t Opposite = Halfedges[Base + k];
+					if (Opposite == delaunator::INVALID_INDEX)
 					{
-						FDelaunaySite2& OtherSite = Sites[Idx];
-						OtherSite.PushAdjacency(Site.Id);
-						Site.PushAdjacency(OtherSite.Id);
+						Site.Neighbors[k] = -1;
+						bTouchesHull = true;
+					}
+					else
+					{
+						Site.Neighbors[k] = static_cast<int32>(Opposite / 3);
 					}
 				}
-				else
-				{
-					EdgeMap.Add(Edge, Site.Id);
-				}
-			};
+				Site.bOnHull = bTouchesHull;
+				)
+		}
 
-			if (PCGEX_CORE_SETTINGS.bUseDelaunator)
+		if (bComputeDelaunayEdges || bComputeHull)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Delaunay2D::BuildEdgesAndHull);
+
+			std::size_t NumHullEdges = 0;
+			for (std::size_t e = 0; e < NumHalfedges; e++)
 			{
-				std::vector<double> OutVector(Positions.Num() * 2);
-				ProjectionDetails.Project(Positions, OutVector);
-
-				delaunator::Delaunator d(OutVector);
-
-				if (d.runtime_error)
+				if (Halfedges[e] == delaunator::INVALID_INDEX)
 				{
-					return false;
+					NumHullEdges++;
+				}
+			}
+
+			if (bComputeDelaunayEdges)
+			{
+				// Interior edges are shared by two halfedges, hull edges by one.
+				DelaunayEdges.Reserve(static_cast<int32>((NumHalfedges - NumHullEdges) / 2 + NumHullEdges));
+			}
+			if (bComputeHull)
+			{
+				DelaunayHull.Reserve(static_cast<int32>(NumHullEdges));
+			}
+
+			// Each undirected edge is visited exactly once: hull halfedges have no twin,
+			// interior pairs are claimed by the smaller halfedge index. No dedup required.
+			for (std::size_t e = 0; e < NumHalfedges; e++)
+			{
+				const std::size_t Opposite = Halfedges[e];
+				const bool bHullEdge = Opposite == delaunator::INVALID_INDEX;
+
+				if (!bHullEdge && Opposite < e)
+				{
+					continue;
 				}
 
-				const int32 NumTriangles = d.triangles.size();
+				const std::size_t Next = (e % 3 == 2) ? e - 2 : e + 1;
+				const int32 A = static_cast<int32>(Triangles[e]);
+				const int32 B = static_cast<int32>(Triangles[Next]);
 
-				if (!NumTriangles)
+				if (bComputeDelaunayEdges)
 				{
-					return false;
+					DelaunayEdges.Add(PCGEx::H64U(A, B));
 				}
 
-				const int32 NumSites = NumTriangles / 3;
-				DelaunayEdges.Reserve(NumSites);
-				Sites.Reserve(NumSites);
-				EdgeMap.Reserve(NumSites);
-
-				int32 s = 0;
-				for (std::size_t i = 0; i < NumTriangles; i += 3)
+				if (bHullEdge && bComputeHull)
 				{
-					FDelaunaySite2& Site = Sites.Emplace_GetRef(d.triangles[i], d.triangles[i + 1], d.triangles[i + 2], s++);
-					PushEdge(Site, Site.AB());
-					PushEdge(Site, Site.BC());
-					PushEdge(Site, Site.AC());
+					DelaunayHull.Add(A);
+					DelaunayHull.Add(B);
+				}
+			}
+		}
+
+		IsValid = true;
+		return IsValid;
+	}
+
+	bool TDelaunay2::ProcessFallback(const TArray<FVector2D>& ProjectedPositions, const bool bComputeDelaunayEdges, const bool bComputeHull)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(TDelaunay2::ProcessFallback);
+
+		UE::Geometry::FDelaunay2 Delaunay2;
+		if (!Delaunay2.Triangulate(ProjectedPositions))
+		{
+			return false;
+		}
+
+		TArray<UE::Geometry::FIndex3i> Triangles = Delaunay2.GetTriangles();
+		const int32 NumTriangles = Triangles.Num();
+
+		if (!NumTriangles)
+		{
+			return false;
+		}
+
+		// The engine triangulation does not expose adjacency, so it is rebuilt by matching
+		// shared edges between triangles. First occurrence of an edge records the owning
+		// site in EdgeMap; the second occurrence links the two owning sites as neighbors.
+		// Edges left unmatched once all sites are processed lie on the convex hull.
+		TMap<uint64, int32> EdgeMap;
+		TSet<uint64> SeenEdges;
+
+		const int32 NumSites = NumTriangles;
+		SeenEdges.Reserve(NumSites * 2);
+		Sites.Reserve(NumSites);
+		EdgeMap.Reserve(NumSites);
+
+		auto PushEdge = [&](FDelaunaySite2& Site, const uint64 Edge)
+		{
+			bool bIsAlreadySet = false;
+			SeenEdges.Add(Edge, &bIsAlreadySet);
+			if (bIsAlreadySet)
+			{
+				if (int32 Idx = -1;
+					EdgeMap.RemoveAndCopyValue(Edge, Idx))
+				{
+					FDelaunaySite2& OtherSite = Sites[Idx];
+					OtherSite.PushAdjacency(Site.Id);
+					Site.PushAdjacency(OtherSite.Id);
 				}
 			}
 			else
 			{
-				TArray<FVector2D> OutVector;
-				ProjectionDetails.Project(Positions, OutVector);
-
-				UE::Geometry::FDelaunay2 Delaunay2;
-				if (!Delaunay2.Triangulate(OutVector))
-				{
-					return false;
-				}
-
-				TArray<UE::Geometry::FIndex3i> Triangles = Delaunay2.GetTriangles();
-				const int32 NumTriangles = Triangles.Num();
-
-				if (!NumTriangles)
-				{
-					return false;
-				}
-
-				const int32 NumSites = NumTriangles / 3;
-				DelaunayEdges.Reserve(NumSites);
-				Sites.Reserve(NumSites);
-				EdgeMap.Reserve(NumSites);
-
-				int32 s = 0;
-				for (const UE::Geometry::FIndex3i& T : Triangles)
-				{
-					FDelaunaySite2& Site = Sites.Emplace_GetRef(T.A, T.B, T.C, s++);
-					PushEdge(Site, Site.AB());
-					PushEdge(Site, Site.BC());
-					PushEdge(Site, Site.AC());
-				}
+				EdgeMap.Add(Edge, Site.Id);
 			}
+		};
 
-			DelaunayEdges.Shrink();
-			DelaunayHull.Reserve(DelaunayEdges.Num() / 3);
-		}
-
+		int32 s = 0;
+		for (const UE::Geometry::FIndex3i& T : Triangles)
 		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(Delaunay2D::FillHullSites);
+			FDelaunaySite2& Site = Sites.Emplace_GetRef(T.A, T.B, T.C, s++);
+			PushEdge(Site, Site.AB());
+			PushEdge(Site, Site.BC());
+			PushEdge(Site, Site.AC());
+		}
 
-			for (const FDelaunaySite2& Site : Sites)
+		if (bComputeHull)
+		{
+			// Edges still in EdgeMap were never matched to a second triangle: hull edges.
+			DelaunayHull.Reserve(EdgeMap.Num());
+			for (const TPair<uint64, int32>& HullEdge : EdgeMap)
 			{
-				if (Site.bOnHull)
-				{
-					// Push edges that are still waiting to be matched
-					if (EdgeMap.Contains(Site.AB()))
-					{
-						DelaunayHull.Add(Site.Vtx[0]);
-						DelaunayHull.Add(Site.Vtx[1]);
-					}
-
-					if (EdgeMap.Contains(Site.BC()))
-					{
-						DelaunayHull.Add(Site.Vtx[1]);
-						DelaunayHull.Add(Site.Vtx[2]);
-					}
-
-					if (EdgeMap.Contains(Site.AC()))
-					{
-						DelaunayHull.Add(Site.Vtx[0]);
-						DelaunayHull.Add(Site.Vtx[2]);
-					}
-				}
+				DelaunayHull.Add(static_cast<int32>(PCGEx::H64A(HullEdge.Key)));
+				DelaunayHull.Add(static_cast<int32>(PCGEx::H64B(HullEdge.Key)));
 			}
 		}
 
+		if (bComputeDelaunayEdges)
+		{
+			DelaunayEdges = MoveTemp(SeenEdges);
+		}
+
+		IsValid = true;
 		return IsValid;
 	}
 

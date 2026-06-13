@@ -20,14 +20,14 @@ PCGEX_INITIALIZE_ELEMENT(ClusterCentrality)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ClusterCentrality)
 
 #if WITH_EDITOR
-void UPCGExClusterCentralitySettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExClusterCentralitySettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 73, 0)
 	{
 		RandomDownsampling.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

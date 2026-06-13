@@ -21,6 +21,10 @@ struct PCGEXCORE_API FPCGExGeoMeshImportDetails
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	bool bImportVertexColor = true;
 
+	/** Import per-vertex normals from the mesh, if available, by orienting each point so its Up axis (+Z) faces the vertex normal. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
+	bool bImportVertexNormals = false;
+
 	/** Import UV coordinates from mesh as point attributes. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	bool bImportUVs = false;

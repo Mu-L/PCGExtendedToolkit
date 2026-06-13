@@ -23,7 +23,7 @@ double FPCGExHeuristicFeedback::GetGlobalScore(const PCGExClusters::FNode& From,
 	return N ? GetScoreInternal(NodeScale * FMath::Loge(static_cast<double>(N) + 1.0)) : 0.0;
 }
 
-double FPCGExHeuristicFeedback::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
+double FPCGExHeuristicFeedback::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack) const
 {
 	const uint32 N = NodeFeedbackCounts[To.Index];
 	const uint32 E = EdgeFeedbackCounts[Edge.Index];

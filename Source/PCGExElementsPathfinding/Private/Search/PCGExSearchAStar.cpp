@@ -40,8 +40,8 @@ bool FPCGExSearchOperationAStar::ResolveQuery(
 
 	TBitArray<>& Visited = LocalAllocations->Visited;
 	TArray<double>& GScore = LocalAllocations->GScore;
-	const TSharedPtr<PCGEx::FHashLookup> TravelStack = LocalAllocations->TravelStack;
-	const TSharedPtr<PCGEx::FScoredQueue> ScoredQueue = LocalAllocations->ScoredQueue;
+	PCGEx::FHashLookup* TravelStack = LocalAllocations->TravelStack.Get();
+	PCGEx::FScoredQueue* ScoredQueue = LocalAllocations->ScoredQueue.Get();
 	ScoredQueue->Enqueue(SeedNode.Index, Heuristics->GetGlobalScore(SeedNode, SeedNode, GoalNode));
 
 	GScore[SeedNode.Index] = 0;
@@ -128,6 +128,6 @@ bool FPCGExSearchOperationAStar::ResolveQuery(
 TSharedPtr<PCGExPathfinding::FSearchAllocations> FPCGExSearchOperationAStar::NewAllocations() const
 {
 	TSharedPtr<PCGExPathfinding::FSearchAllocations> Allocations = FPCGExSearchOperation::NewAllocations();
-	Allocations->GScore.Init(-1, Cluster->Nodes->Num());
+	Allocations->InitGScore(-1);
 	return Allocations;
 }

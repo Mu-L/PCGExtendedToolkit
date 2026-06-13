@@ -335,10 +335,12 @@ namespace PCGExCopyClustersToPoints
 			VtxDupes[i] = VtxDupe;
 			VtxTag[i] = OutId;
 
-			PCGEX_LAUNCH(PCGExFitting::Tasks::FTransformPointIO, i, Context->TargetsDataFacade->Source, VtxDupe, &Context->TransformDetails)
-
+			// Fully initialize the dupe (tags, forwarded attributes) before publishing
+			// it to an async task, so the task never observes a half-built IO.
 			Context->TargetsAttributesToClusterTags.Tag(Context->TargetsDataFacade->GetInPoint(i), VtxDupe);
 			Context->TargetsForwardHandler->Forward(i, VtxDupe->GetOut()->Metadata);
+
+			PCGEX_LAUNCH(PCGExFitting::Tasks::FTransformPointIO, i, Context->TargetsDataFacade->Source, VtxDupe, &Context->TransformDetails)
 		}
 
 		TBatch<FProcessor>::Process();

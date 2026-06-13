@@ -46,6 +46,18 @@ public:
 		const TSharedPtr<PCGExHeuristics::FLocalFeedbackHandler>& LocalFeedback = nullptr) const;
 
 	virtual TSharedPtr<PCGExPathfinding::FSearchAllocations> NewAllocations() const;
+
+	/** Grabs allocations from the pool, or creates new ones if the pool is empty. Thread-safe.
+	 * ResolveQuery resets provided allocations on entry, so pooled ones come back dirty by design. */
+	TSharedPtr<PCGExPathfinding::FSearchAllocations> AcquireAllocations();
+
+	/** Returns allocations to the pool for reuse by other queries. Thread-safe. */
+	void ReleaseAllocations(const TSharedPtr<PCGExPathfinding::FSearchAllocations>& InAllocations);
+
+protected:
+	/** Pool of reusable per-query search allocations */
+	TArray<TSharedPtr<PCGExPathfinding::FSearchAllocations>> AllocationsPool;
+	FCriticalSection AllocationsPoolLock;
 };
 
 /**

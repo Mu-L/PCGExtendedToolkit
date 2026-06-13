@@ -179,14 +179,14 @@ void FPCGExShapeGridBuilder::BuildShape(const TSharedPtr<PCGExShapes::FShape> In
 }
 
 #if WITH_EDITOR
-void UPCGExCreateShapeGridSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExCreateShapeGridSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		Config.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

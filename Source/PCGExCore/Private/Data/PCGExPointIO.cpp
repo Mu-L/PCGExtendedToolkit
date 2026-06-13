@@ -256,15 +256,20 @@ namespace PCGExData
 			// Non-conservative: replace ALL metadata entries with fresh ones.
 			// Old keys are preserved as parent references in DelayedEntries so attribute
 			// values can still be inherited/interpolated from the original data.
+			// Placeholder keys are handed out sequentially from the current item count,
+			// so they are synthesized directly instead of paying one lock + shared
+			// atomic per point. AddDelayedEntries sizes from the array we pass.
 			const int32 NumEntries = MetadataEntries.Num();
+			const int64 EntryStart = Metadata->GetItemCountForChild();
+
 			TArray<TTuple<int64, int64>> DelayedEntries;
-			DelayedEntries.SetNum(NumEntries);
+			DelayedEntries.SetNumUninitialized(NumEntries);
 
 			for (int i = 0; i < NumEntries; i++)
 			{
-				int64 OldKey = MetadataEntries[i];
-				MetadataEntries[i] = Metadata->AddEntryPlaceholder();
-				DelayedEntries[i] = MakeTuple(MetadataEntries[i], OldKey);
+				const int64 Entry = EntryStart + i;
+				DelayedEntries[i] = MakeTuple(Entry, MetadataEntries[i]);
+				MetadataEntries[i] = Entry;
 			}
 
 			Metadata->AddDelayedEntries(DelayedEntries);
@@ -540,8 +545,14 @@ namespace PCGExData
 
 	void FPointIO::ClearCachedKeys()
 	{
-		InKeys.Reset();
-		OutKeys.Reset();
+		{
+			FWriteScopeLock WriteScopeLock(InKeysLock);
+			InKeys.Reset();
+		}
+		{
+			FWriteScopeLock WriteScopeLock(OutKeysLock);
+			OutKeys.Reset();
+		}
 	}
 
 	FPointIO::~FPointIO()

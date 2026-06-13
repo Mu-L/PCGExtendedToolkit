@@ -63,7 +63,7 @@ struct FPCGExVoronoiSitesOutputDetails
 	TArray<int32> Influences;
 
 	void Init(const TSharedPtr<PCGExData::FFacade>& InSiteFacade);
-	void AddInfluence(const int32 SiteIndex, const FVector& SitePosition);
+	void AddInfluence(const int32 SiteIndex, const FVector& SitePosition, const int32 Count = 1);
 	void Output(const int32 SiteIndex);
 
 protected:
@@ -194,10 +194,8 @@ namespace PCGExBuildVoronoiGraph2D
 	protected:
 		FPCGExGeo2DProjectionDetails ProjectionDetails;
 
-		TBitArray<> WithinBounds;
+		TArray<int8> WithinBounds;
 		TBitArray<> IsVtxValid;
-
-		TArray<FVector> SitesPositions;
 
 		TSharedPtr<TArray<int32>> OutputIndices;
 		TSharedPtr<PCGExMath::Geo::TVoronoi2> Voronoi;
@@ -225,7 +223,7 @@ namespace PCGExBuildVoronoiGraph2D
 		virtual void Output() override;
 
 	protected:
-		/** Process non-Euclidean (L1/L∞) Voronoi with extended vertex/edge output */
-		bool ProcessNonEuclidean(const TArray<FVector>& ActivePositions);
+		/** Build cluster vtx/edges and site outputs from the computed Voronoi diagram (all metrics) */
+		bool BuildOutputs();
 	};
 }

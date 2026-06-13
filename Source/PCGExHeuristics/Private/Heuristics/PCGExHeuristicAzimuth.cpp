@@ -33,7 +33,7 @@ double FPCGExHeuristicAzimuth::GetGlobalScore(const PCGExClusters::FNode& From, 
 	return GetScoreInternal(PCGExMath::Remap(Dot, -1, 1, 0, 1));
 }
 
-double FPCGExHeuristicAzimuth::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
+double FPCGExHeuristicAzimuth::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack) const
 {
 	// Use cached edge direction, but check if we're traversing in reverse
 	FVector EdgeDir = CachedEdgeDirections[Edge.Index];

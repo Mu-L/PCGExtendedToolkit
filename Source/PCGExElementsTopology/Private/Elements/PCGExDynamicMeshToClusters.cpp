@@ -8,6 +8,7 @@
 #include "UDynamicMesh.h"
 #include "Clusters/PCGExClusterCommon.h"
 #include "Clusters/PCGExClustersHelpers.h"
+#include "Core/PCGExMTCommon.h"
 #include "Data/PCGDynamicMeshData.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
@@ -87,27 +88,32 @@ namespace PCGExDynMeshToCluster
 			const FPCGExGeoMeshImportDetails& ImportDetails = Context->ImportDetails;
 
 			bool bWantsColor = false;
+			bool bWantsNormals = false;
 			TArray<FVector4f> AvgColors;
+			TArray<FVector3f> AvgNormals;
+			TArray<TArray<FVector2f>> AllUVs;
 			TArray<TSharedPtr<PCGExData::TBuffer<FVector2D>>> UVChannelsWriters;
-			TArray<int32> UVChannels;
 			TArray<FPCGAttributeIdentifier> UVIdentifiers;
 
 			EPCGPointNativeProperties Allocations = EPCGPointNativeProperties::Transform;
 
 			if (Context->bWantsImport)
 			{
-				// Check color availability (computed once, reused in vertex write loops below)
+				// Check color availability (computed once, reused in the write passes below)
 				if (ImportDetails.bImportVertexColor && Mesh->GetAveragedVertexColors(AvgColors))
 				{
 					Allocations |= EPCGPointNativeProperties::Color;
 					bWantsColor = true;
 				}
 
+				// Check normal availability
+				bWantsNormals = ImportDetails.bImportVertexNormals && Mesh->GetAveragedVertexNormals(AvgNormals);
+
 				// Check UV availability
 				const int32 NumMeshUVChannels = Mesh->GetNumUVChannels();
 				if (!ImportDetails.UVChannelIndex.IsEmpty() && NumMeshUVChannels > 0)
 				{
-					UVChannels.Reserve(ImportDetails.UVChannelIndex.Num());
+					AllUVs.Reserve(ImportDetails.UVChannelIndex.Num());
 					UVIdentifiers.Reserve(ImportDetails.UVChannelIndex.Num());
 
 					for (int i = 0; i < ImportDetails.UVChannelIndex.Num(); i++)
@@ -124,93 +130,45 @@ namespace PCGExDynMeshToCluster
 							continue;
 						}
 
-						UVChannels.Add(Channel);
+						// An empty array means the channel exists but has no usable overlay data;
+						// the attribute is still created and keeps its default value.
+						Mesh->GetAveragedVertexUVs(Channel, AllUVs.Emplace_GetRef());
 						UVIdentifiers.Add(Id);
 					}
 				}
 			}
 
-			const int32 NumUVChannels = UVChannels.Num();
+			const int32 NumUVChannels = UVIdentifiers.Num();
 
-			if (Mesh->DesiredTriangulationType == EPCGExTriangulationType::Boundaries)
+			const bool bBoundaries = Mesh->DesiredTriangulationType == EPCGExTriangulationType::Boundaries;
+			const int32 NumOutPoints = bBoundaries ? Mesh->HullIndices.Num() : Mesh->Vertices.Num();
+
+			(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(VtxPoints, NumOutPoints, Allocations);
+
+			// UV channels attributes need to be initialized once we have the final number of points
+			UVChannelsWriters.Reserve(NumUVChannels);
+			for (int32 i = 0; i < NumUVChannels; i++)
 			{
-				// Boundaries mode: only hull vertices
-				const int32 NumHullVertices = Mesh->HullIndices.Num();
-				(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(VtxPoints, NumHullVertices, Allocations);
+				UVChannelsWriters.Add(RootVtxFacade->GetWritable(UVIdentifiers[i], FVector2D::ZeroVector, true, PCGExData::EBufferInit::New));
+			}
 
-				// Init UV writers after point count is known
-				for (int32 i = 0; i < NumUVChannels; i++)
-				{
-					UVChannelsWriters.Add(RootVtxFacade->GetWritable(UVIdentifiers[i], FVector2D::ZeroVector, true, PCGExData::EBufferInit::New));
-				}
+			TPCGValueRange<FTransform> OutTransforms = VtxPoints->GetTransformValueRange(false);
 
-				TPCGValueRange<FTransform> OutTransforms = VtxPoints->GetTransformValueRange(false);
+			// Import values are indexed by dense vertex; in Boundaries mode output points are a remapped subset.
+			TArray<int32> BoundaryToDense;
+
+			if (bBoundaries)
+			{
+				TMap<int32, int32> IndicesRemap;
+				IndicesRemap.Reserve(NumOutPoints);
+				BoundaryToDense.Reserve(NumOutPoints);
 
 				int32 t = 0;
-				TMap<int32, int32> IndicesRemap;
-				IndicesRemap.Reserve(NumHullVertices);
-
-				if (bWantsColor)
+				for (const int32 i : Mesh->HullIndices)
 				{
-					TPCGValueRange<FVector4> OutColors = VtxPoints->GetColorValueRange(false);
-
-					if (NumUVChannels)
-					{
-						// Precompute UV data per channel
-						TArray<TArray<FVector2f>> AllUVs;
-						AllUVs.SetNum(NumUVChannels);
-						for (int u = 0; u < NumUVChannels; u++)
-						{
-							Mesh->GetAveragedVertexUVs(UVChannels[u], AllUVs[u]);
-						}
-
-						for (const int32 i : Mesh->HullIndices)
-						{
-							OutColors[t] = FVector4(AvgColors[i]);
-							for (int u = 0; u < NumUVChannels; u++)
-							{
-								UVChannelsWriters[u]->SetValue(t, FVector2D(AllUVs[u][i]));
-							}
-							IndicesRemap.Add(i, t);
-							OutTransforms[t++].SetLocation(Mesh->Vertices[i]);
-						}
-					}
-					else
-					{
-						for (const int32 i : Mesh->HullIndices)
-						{
-							OutColors[t] = FVector4(AvgColors[i]);
-							IndicesRemap.Add(i, t);
-							OutTransforms[t++].SetLocation(Mesh->Vertices[i]);
-						}
-					}
-				}
-				else if (NumUVChannels)
-				{
-					TArray<TArray<FVector2f>> AllUVs;
-					AllUVs.SetNum(NumUVChannels);
-					for (int u = 0; u < NumUVChannels; u++)
-					{
-						Mesh->GetAveragedVertexUVs(UVChannels[u], AllUVs[u]);
-					}
-
-					for (const int32 i : Mesh->HullIndices)
-					{
-						for (int u = 0; u < NumUVChannels; u++)
-						{
-							UVChannelsWriters[u]->SetValue(t, FVector2D(AllUVs[u][i]));
-						}
-						IndicesRemap.Add(i, t);
-						OutTransforms[t++].SetLocation(Mesh->Vertices[i]);
-					}
-				}
-				else
-				{
-					for (const int32 i : Mesh->HullIndices)
-					{
-						IndicesRemap.Add(i, t);
-						OutTransforms[t++].SetLocation(Mesh->Vertices[i]);
-					}
+					IndicesRemap.Add(i, t);
+					BoundaryToDense.Add(i);
+					OutTransforms[t++].SetLocation(Mesh->Vertices[i]);
 				}
 
 				// Remap hull edges to new dense indices
@@ -225,53 +183,56 @@ namespace PCGExDynMeshToCluster
 			}
 			else
 			{
-				// Raw, Dual, or Hollow: all vertices
-				(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(VtxPoints, Mesh->Vertices.Num(), Allocations);
+				const TArray<FVector>& MeshVertices = Mesh->Vertices;
+				PCGExMT::ParallelOrSequential(
+					NumOutPoints,
+					[&](const int32 i)
+					{
+						OutTransforms[i].SetLocation(MeshVertices[i]);
+					}, 1024);
+			}
 
-				// Init UV writers after point count is known
-				for (int32 i = 0; i < NumUVChannels; i++)
+			if (bWantsColor || bWantsNormals || NumUVChannels)
+			{
+				auto ValueIndex = [&](const int32 i) { return bBoundaries ? BoundaryToDense[i] : i; };
+
+				if (bWantsColor)
 				{
-					UVChannelsWriters.Add(RootVtxFacade->GetWritable(UVIdentifiers[i], FVector2D::ZeroVector, true, PCGExData::EBufferInit::New));
+					TPCGValueRange<FVector4> OutColors = VtxPoints->GetColorValueRange(false);
+					PCGExMT::ParallelOrSequential(
+						NumOutPoints,
+						[&](const int32 i)
+						{
+							OutColors[i] = FVector4(AvgColors[ValueIndex(i)]);
+						}, 1024);
 				}
 
-				TPCGValueRange<FTransform> OutTransforms = VtxPoints->GetTransformValueRange(false);
-				for (int i = 0; i < OutTransforms.Num(); i++)
+				for (int32 u = 0; u < NumUVChannels; u++)
 				{
-					OutTransforms[i].SetLocation(Mesh->Vertices[i]);
+					const TArray<FVector2f>& UVs = AllUVs[u];
+					if (UVs.IsEmpty())
+					{
+						continue;
+					}
+
+					PCGExData::TBuffer<FVector2D>* Writer = UVChannelsWriters[u].Get();
+					PCGExMT::ParallelOrSequential(
+						NumOutPoints,
+						[&](const int32 i)
+						{
+							Writer->SetValue(i, FVector2D(UVs[ValueIndex(i)]));
+						}, 1024);
 				}
 
-				if (bWantsColor || NumUVChannels)
+				if (bWantsNormals)
 				{
-					TArray<TArray<FVector2f>> AllUVs;
-					if (NumUVChannels)
-					{
-						AllUVs.SetNum(NumUVChannels);
-						for (int u = 0; u < NumUVChannels; u++)
+					PCGExMT::ParallelOrSequential(
+						NumOutPoints,
+						[&](const int32 i)
 						{
-							Mesh->GetAveragedVertexUVs(UVChannels[u], AllUVs[u]);
-						}
-					}
-
-					if (bWantsColor)
-					{
-						TPCGValueRange<FVector4> OutColors = VtxPoints->GetColorValueRange(false);
-						for (int i = 0; i < OutTransforms.Num(); i++)
-						{
-							if (i < AvgColors.Num())
-							{
-								OutColors[i] = FVector4(AvgColors[i]);
-							}
-						}
-					}
-
-					for (int u = 0; u < NumUVChannels; u++)
-					{
-						const TArray<FVector2f>& UVs = AllUVs[u];
-						for (int i = 0; i < OutTransforms.Num() && i < UVs.Num(); i++)
-						{
-							UVChannelsWriters[u]->SetValue(i, FVector2D(UVs[i]));
-						}
-					}
+							const FVector3f& Normal = AvgNormals[ValueIndex(i)];
+							PCGExMesh::AlignTransformUpToNormal(OutTransforms[i], FVector(Normal.X, Normal.Y, Normal.Z));
+						}, 1024);
 				}
 			}
 

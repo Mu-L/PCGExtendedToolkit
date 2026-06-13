@@ -17,16 +17,15 @@ namespace PCGExMath::Geo
 	{
 	public:
 		TSharedPtr<TDelaunay2> Delaunay;
-		TSet<uint64> VoronoiEdges;
-		TArray<FVector> Circumcenters;
-		TArray<FVector> Centroids;
+
+		// Unique Delaunay site pairs (H64U hashes), each adjacency listed exactly once
+		TArray<uint64> VoronoiEdges;
 
 		// Metric used for this Voronoi diagram
 		EPCGExVoronoiMetric Metric = EPCGExVoronoiMetric::Euclidean;
 
-		// Extended output for L1/L∞ metrics
-		// For Euclidean, these mirror Circumcenters/Centroids and VoronoiEdges
-		// For L1/L∞, OutputVertices contains [CellCenters..., BendPoints...] and OutputEdges contains subdivided edges
+		// For Euclidean, OutputVertices contains cell centers and OutputEdges mirrors VoronoiEdges
+		// For L1/Linf, OutputVertices contains [CellCenters..., BendPoints...] and OutputEdges contains subdivided edges
 		TArray<FVector> OutputVertices;
 		TArray<uint64> OutputEdges;
 		int32 NumCellCenters = 0; // Number of cell centers (first N entries in OutputVertices)
@@ -39,16 +38,17 @@ namespace PCGExMath::Geo
 	protected:
 		void Clear();
 
-		// Build extended output with projection support (projects to 2D, computes circumcenters, unprojects back)
-		void BuildMetricOutput(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExCellCenter CellCenterMethod, const FBox* Bounds = nullptr, TBitArray<>* WithinBounds = nullptr);
+		bool ProcessInternal(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExCellCenter CellCenterMethod, const FBox* Bounds, TArray<int8>* WithinBounds);
+
+		// Derive unique Voronoi edges (cell-to-cell adjacency) from Delaunay site neighbors
+		void BuildVoronoiEdges();
+
+		// Compute cell centers in projected space, unproject them, and build OutputVertices/OutputEdges (with bend subdivision for L1/Linf)
+		void BuildMetricOutput(const TArrayView<FVector>& ProjectedPositions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExCellCenter CellCenterMethod, const FBox* Bounds, TArray<int8>* WithinBounds);
 
 	public:
-		bool Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails);
-		bool Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const FBox& Bounds, TBitArray<>& WithinBounds);
-
-		// Process with metric support
 		bool Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, EPCGExVoronoiMetric InMetric, EPCGExCellCenter CellCenterMethod);
-		bool Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const FBox& Bounds, TBitArray<>& WithinBounds, EPCGExVoronoiMetric InMetric, EPCGExCellCenter CellCenterMethod);
+		bool Process(const TArrayView<FVector>& Positions, const FPCGExGeo2DProjectionDetails& ProjectionDetails, const FBox& Bounds, TArray<int8>& WithinBounds, EPCGExVoronoiMetric InMetric, EPCGExCellCenter CellCenterMethod);
 	};
 
 	class PCGEXCORE_API TVoronoi3

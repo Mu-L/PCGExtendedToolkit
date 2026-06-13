@@ -46,7 +46,7 @@ void UPCGExSampleSurfaceGuidedSettings::ApplyDeprecationBeforeUpdatePins(UPCGNod
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExSampleSurfaceGuidedSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExSampleSurfaceGuidedSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -54,7 +54,7 @@ void UPCGExSampleSurfaceGuidedSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		                LocalMaxDistance_DEPRECATED, MaxDistance_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

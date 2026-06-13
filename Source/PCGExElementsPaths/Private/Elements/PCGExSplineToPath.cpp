@@ -360,9 +360,12 @@ bool FPCGExSplineToPathElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 			}
 
 			PCGEX_MAKE_SHARED(PointDataFacade, PCGExData::FFacade, NewOutput.ToSharedRef())
-			PCGEX_LAUNCH(PCGExSplineToPath::FWriteTask, i, PointDataFacade)
 
+			// Tags must be fully appended before the task is published -- FWriteTask
+			// reads them off-thread (TagsToData), and FTags iteration is lock-free.
 			NewOutput->Tags->Append(Context->Tags[i]);
+
+			PCGEX_LAUNCH(PCGExSplineToPath::FWriteTask, i, PointDataFacade)
 		}
 
 		Context->SetState(PCGExCommon::States::State_WaitingOnAsyncWork);

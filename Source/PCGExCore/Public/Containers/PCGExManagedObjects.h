@@ -36,6 +36,7 @@ namespace PCGEx
 	protected:
 		mutable FRWLock ManagedObjectLock;
 		mutable FRWLock DuplicatedObjectLock;
+		mutable FRWLock DuplicationLock;
 
 	public:
 		TWeakPtr<FWorkHandle> WorkHandle;
@@ -109,9 +110,13 @@ namespace PCGEx
 
 			T* Object = nullptr;
 
+			// DuplicationLock serializes duplications only: the AsyncStateScope below toggles a
+			// context-wide flag, and the engine-side DuplicateData may block on the GC guard when
+			// off the game thread. Kept separate from ManagedObjectLock so Add/Remove/New don't
+			// convoy behind a GC-blocked duplication.
 			if (!IsInGameThread())
 			{
-				FWriteScopeLock WriteScopeLock(ManagedObjectLock);
+				FWriteScopeLock WriteScopeLock(DuplicationLock);
 				FPCGExAsyncStateScope ForceAsyncState(SharedContext.Get(), false);
 
 				// Do the duplicate (uses AnyThread that requires bIsRunningOnMainThread to be up-to-date)
@@ -125,7 +130,7 @@ namespace PCGEx
 			}
 			else
 			{
-				FWriteScopeLock WriteScopeLock(ManagedObjectLock);
+				FWriteScopeLock WriteScopeLock(DuplicationLock);
 				Object = Cast<T>(InData->DuplicateData(SharedContext.Get(), true));
 				check(Object);
 				{

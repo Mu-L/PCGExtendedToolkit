@@ -22,14 +22,14 @@ TSharedPtr<PCGExPointFilter::IFilter> UPCGExRandomRatioFilterFactory::CreateFilt
 }
 
 #if WITH_EDITOR
-void UPCGExRandomRatioFilterProviderSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExRandomRatioFilterProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 73, 0)
 	{
 		Config.Random.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 
