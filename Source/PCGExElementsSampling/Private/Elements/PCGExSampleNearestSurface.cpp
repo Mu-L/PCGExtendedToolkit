@@ -549,4 +549,4 @@ namespace PCGExSampleNearestSurface
 }
 
 #undef LOCTEXT_NAMESPACE
-#undef PCGEX_NAMES
+#undef PCGEX_NAMESPACE
