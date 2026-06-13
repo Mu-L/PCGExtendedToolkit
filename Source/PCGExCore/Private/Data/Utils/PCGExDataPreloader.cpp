@@ -9,6 +9,7 @@
 #include "Core/PCGExContext.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Types/PCGExTypeTraits.h"
 
 namespace PCGExData
