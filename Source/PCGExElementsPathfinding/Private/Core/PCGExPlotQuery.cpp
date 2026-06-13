@@ -60,14 +60,23 @@ namespace PCGExPathfinding
 		PlotTasks->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, SearchOperation, Allocations, HeuristicsHandler](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
+
+			// Lease pooled allocations for this scope when none are shared across the whole plot
 			TSharedPtr<FSearchAllocations> LocalAllocations = Allocations;
-			if (!Allocations)
+			const bool bPooled = !Allocations;
+			if (bPooled)
 			{
-				LocalAllocations = SearchOperation->NewAllocations();
+				LocalAllocations = SearchOperation->AcquireAllocations();
 			}
+
 			PCGEX_SCOPE_LOOP(Index)
 			{
 				This->SubQueries[Index]->FindPath(SearchOperation, LocalAllocations, HeuristicsHandler, This->LocalFeedbackHandler);
+			}
+
+			if (bPooled)
+			{
+				SearchOperation->ReleaseAllocations(LocalAllocations);
 			}
 		};
 

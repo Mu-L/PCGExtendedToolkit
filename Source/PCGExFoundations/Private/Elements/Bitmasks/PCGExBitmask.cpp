@@ -15,14 +15,14 @@
 #define PCGEX_NAMESPACE Bitmask
 
 #if WITH_EDITOR
-void UPCGExBitmaskSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExBitmaskSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 71, 2)
 	{
 		Bitmask.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 
 FName UPCGExBitmaskSettings::GetDisplayName() const

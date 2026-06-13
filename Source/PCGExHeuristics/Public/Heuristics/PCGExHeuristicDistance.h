@@ -28,9 +28,10 @@ struct FPCGExHeuristicConfigShortestDistance : public FPCGExHeuristicConfigBase
 class FPCGExHeuristicDistance : public FPCGExHeuristicOperation
 {
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override
+	// Edge score only reads the edge length; only the global score is goal-dependent.
+	virtual bool HasStaticEdgeScore() const override
 	{
-		return EPCGExHeuristicCategory::GoalDependent;
+		return true;
 	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
@@ -38,7 +39,7 @@ public:
 	virtual double GetGlobalScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal) const override;
 
 
-	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const override;
+	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack = nullptr) const override;
 
 protected:
 	double BoundsSize = 0;

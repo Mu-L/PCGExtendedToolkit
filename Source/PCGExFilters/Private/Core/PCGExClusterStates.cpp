@@ -26,14 +26,14 @@ void UPCGExClusterStateFactoryData::BeginDestroy()
 }
 
 #if WITH_EDITOR
-void UPCGExClusterStateFactoryProviderSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExClusterStateFactoryProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 71, 2)
 	{
 		Config.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

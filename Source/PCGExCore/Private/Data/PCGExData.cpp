@@ -1134,6 +1134,7 @@ template PCGEXCORE_API bool TryReadMark<_TYPE>(const TSharedRef<FPointIO>& Point
 			if (!TaskManager || !TaskManager->IsAvailable())
 			{
 				InBuffer->Write(InEnsureValidKeys);
+				return;
 			}
 			PCGEX_LAUNCH(FWriteBufferTask, InBuffer, InEnsureValidKeys)
 		}

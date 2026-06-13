@@ -63,14 +63,14 @@ struct FPCGExHeuristicAttributeConfig : public FPCGExHeuristicConfigBase
 class FPCGExHeuristicAttribute : public FPCGExHeuristicOperation
 {
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override
+	virtual bool HasStaticEdgeScore() const override
 	{
-		return EPCGExHeuristicCategory::FullyStatic;
+		return true;
 	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 
-	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const override;
+	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack = nullptr) const override;
 
 	EPCGExClusterElement Source = EPCGExClusterElement::Vtx;
 	FPCGAttributePropertyInputSelector Attribute;

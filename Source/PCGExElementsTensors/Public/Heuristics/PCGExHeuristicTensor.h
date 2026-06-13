@@ -38,12 +38,19 @@ class FPCGExHeuristicTensor : public FPCGExHeuristicOperation
 	friend class UPCGExHeuristicsFactoryTensor;
 
 public:
+	// Edge score samples the (immutable) tensor field at From/To only -- bakeable, and sampling
+	// is by far the most expensive edge score so baking it pays off quickly.
+	virtual bool HasStaticEdgeScore() const override
+	{
+		return true;
+	}
+
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 
 	virtual double GetGlobalScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal) const override;
 
 
-	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const override;
+	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack = nullptr) const override;
 
 protected:
 	TSharedPtr<PCGExTensor::FTensorsHandler> TensorsHandler;

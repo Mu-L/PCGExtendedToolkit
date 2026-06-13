@@ -3,15 +3,6 @@
 
 #pragma once
 
-#include <queue>
-#include <vector>
-#include "CoreMinimal.h"
-
-// Copyright 2026 Timothé Lapetite and contributors
-// Released under the MIT license https://opensource.org/license/MIT/
-
-#pragma once
-
 #include "CoreMinimal.h"
 
 namespace PCGEx
@@ -24,6 +15,10 @@ namespace PCGEx
 
 		// Maps node index -> position in heap (-1 if not in queue)
 		TArray<int32> HeapIndex;
+
+		// Indices touched since the last Reset, in first-enqueue order. Drives sparse resets:
+		// any entry whose Scores/HeapIndex deviates from its initial value is in this list.
+		TArray<int32> Touched;
 
 		int32 Size = 0;
 
@@ -109,12 +104,24 @@ namespace PCGEx
 			return Size;
 		}
 
+		/** Indices enqueued at least once since the last Reset. Consumers that mirror per-index
+		 * state alongside enqueues can use this to reset only what was actually dirtied. */
+		FORCEINLINE const TArray<int32>& GetTouched() const
+		{
+			return Touched;
+		}
+
 		bool Enqueue(const int32 Index, const double InScore)
 		{
 			double& RegisteredScore = Scores[Index];
 			if (RegisteredScore <= InScore)
 			{
 				return false;
+			}
+
+			if (RegisteredScore == TNumericLimits<double>::Max())
+			{
+				Touched.Add(Index);
 			}
 
 			RegisteredScore = InScore;
@@ -169,15 +176,30 @@ namespace PCGEx
 
 		void Reset()
 		{
-			for (int32 i = 0; i < Size; i++)
+			// Restore only touched entries unless most of the queue was visited, in which
+			// case a dense sweep is cheaper than scattered writes.
+			if (Touched.Num() < Scores.Num() / 4)
 			{
-				HeapIndex[Heap[i].Value] = -1;
+				for (const int32 Index : Touched)
+				{
+					Scores[Index] = TNumericLimits<double>::Max();
+					HeapIndex[Index] = -1;
+				}
 			}
+			else
+			{
+				for (double& Score : Scores)
+				{
+					Score = TNumericLimits<double>::Max();
+				}
+				for (int32 i = 0; i < Size; i++)
+				{
+					HeapIndex[Heap[i].Value] = -1;
+				}
+			}
+
 			Size = 0;
-			for (double& Score : Scores)
-			{
-				Score = TNumericLimits<double>::Max();
-			}
+			Touched.Reset();
 		}
 	};
 }

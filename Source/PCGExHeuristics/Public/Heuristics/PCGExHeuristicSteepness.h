@@ -45,16 +45,17 @@ class FPCGExHeuristicSteepness : public FPCGExHeuristicOperation
 	friend class UPCGExHeuristicsFactorySteepness;
 
 public:
-	virtual EPCGExHeuristicCategory GetCategory() const override
+	// Without accumulation the edge score only reads From/To positions; accumulation walks the travel stack.
+	virtual bool HasStaticEdgeScore() const override
 	{
-		return bAccumulate ? EPCGExHeuristicCategory::TravelDependent : EPCGExHeuristicCategory::GoalDependent;
+		return !bAccumulate;
 	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster) override;
 
 	virtual double GetGlobalScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal) const override;
 
-	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const override;
+	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack = nullptr) const override;
 
 protected:
 	bool bAccumulate = false;

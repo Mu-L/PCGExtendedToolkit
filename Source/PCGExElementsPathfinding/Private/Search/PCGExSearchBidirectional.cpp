@@ -17,7 +17,7 @@ namespace PCGExPathfinding
 	{
 		FSearchAllocations::Init(InCluster);
 
-		GScore.Init(-1, NumNodes);
+		InitGScore(-1);
 		VisitedBackward.Init(false, NumNodes);
 		GScoreBackward.Init(-1, NumNodes);
 		TravelStackBackward = PCGEx::NewHashLookup<PCGEx::FHashLookupArray>(PCGEx::NH64(-1, -1), NumNodes);
@@ -27,21 +27,7 @@ namespace PCGExPathfinding
 	void FBidirectionalSearchAllocations::Reset()
 	{
 		FSearchAllocations::Reset();
-
-		for (int i = 0; i < NumNodes; i++)
-		{
-			GScore[i] = -1;
-		}
-
-		const int32 NumVisitedNodes = Visited.Num();
-		for (int i = 0; i < NumVisitedNodes; i++)
-		{
-			VisitedBackward[i] = false;
-			GScoreBackward[i] = -1;
-		}
-
-		TravelStackBackward->Reset();
-		ScoredQueueBackward->Reset();
+		ResetSearchState(ScoredQueueBackward, VisitedBackward, GScoreBackward, -1, TravelStackBackward);
 	}
 }
 
@@ -75,14 +61,14 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 	// Forward search structures
 	TBitArray<>& VisitedForward = LocalAllocations->Visited;
 	TArray<double>& GScoreForward = LocalAllocations->GScore;
-	const TSharedPtr<PCGEx::FHashLookup> TravelStackForward = LocalAllocations->TravelStack;
-	const TSharedPtr<PCGEx::FScoredQueue> QueueForward = LocalAllocations->ScoredQueue;
+	PCGEx::FHashLookup* TravelStackForward = LocalAllocations->TravelStack.Get();
+	PCGEx::FScoredQueue* QueueForward = LocalAllocations->ScoredQueue.Get();
 
 	// Backward search structures
 	TBitArray<>& VisitedBackward = LocalAllocations->VisitedBackward;
 	TArray<double>& GScoreBackward = LocalAllocations->GScoreBackward;
-	const TSharedPtr<PCGEx::FHashLookup> TravelStackBackward = LocalAllocations->TravelStackBackward;
-	const TSharedPtr<PCGEx::FScoredQueue> QueueBackward = LocalAllocations->ScoredQueueBackward;
+	PCGEx::FHashLookup* TravelStackBackward = LocalAllocations->TravelStackBackward.Get();
+	PCGEx::FScoredQueue* QueueBackward = LocalAllocations->ScoredQueueBackward.Get();
 
 	// Initialize forward search from seed
 	QueueForward->Enqueue(SeedNode.Index, 0);
@@ -241,8 +227,8 @@ bool FPCGExSearchOperationBidirectional::ResolveQuery(
 void FPCGExSearchOperationBidirectional::ReconstructPath(
 	const TSharedPtr<PCGExPathfinding::FPathQuery>& InQuery,
 	int32 MeetingNode,
-	const TSharedPtr<PCGEx::FHashLookup>& ForwardStack,
-	const TSharedPtr<PCGEx::FHashLookup>& BackwardStack,
+	PCGEx::FHashLookup* ForwardStack,
+	PCGEx::FHashLookup* BackwardStack,
 	int32 SeedIndex,
 	int32 GoalIndex) const
 {

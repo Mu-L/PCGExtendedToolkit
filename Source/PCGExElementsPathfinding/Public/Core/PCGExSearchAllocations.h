@@ -25,13 +25,24 @@ namespace PCGExPathfinding
 
 	public:
 		FSearchAllocations() = default;
+		virtual ~FSearchAllocations() = default;
 
 		TBitArray<> Visited;
 		TArray<double> GScore;
+		double GScoreInit = -1;
 		TSharedPtr<PCGEx::FHashLookup> TravelStack;
 		TSharedPtr<PCGEx::FScoredQueue> ScoredQueue;
 
-		void Init(const PCGExClusters::FCluster* InCluster);
-		void Reset();
+		virtual void Init(const PCGExClusters::FCluster* InCluster);
+
+		/** Allocates GScore and registers the sentinel Reset() must restore it to. */
+		void InitGScore(const double InInitValue);
+
+		virtual void Reset();
+
+	protected:
+		/** Sparse-resets one set of search state, driven by the queue's touched list.
+		 * Valid as long as the search only dirties per-node state alongside queue enqueues. */
+		void ResetSearchState(const TSharedPtr<PCGEx::FScoredQueue>& InQueue, TBitArray<>& InVisited, TArray<double>& InGScore, const double InGScoreInit, const TSharedPtr<PCGEx::FHashLookup>& InTravelStack) const;
 	};
 }

@@ -27,7 +27,7 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExPathSplineMeshSimpleSettings, StartOffset, FVecto
 PCGEX_SETTING_VALUE_IMPL(UPCGExPathSplineMeshSimpleSettings, EndOffset, FVector2D, EndOffsetInput, EndOffsetAttribute, EndOffset)
 
 #if WITH_EDITOR
-void UPCGExPathSplineMeshSimpleSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExPathSplineMeshSimpleSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
@@ -35,7 +35,7 @@ void UPCGExPathSplineMeshSimpleSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		Tangents.ApplyDeprecation(bApplyCustomTangents_DEPRECATED, ArriveTangentAttribute_DEPRECATED, LeaveTangentAttribute_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 
 void UPCGExPathSplineMeshSimpleSettings::PostInitProperties()
@@ -72,8 +72,14 @@ UPCGExPathSplineMeshSimpleSettings::UPCGExPathSplineMeshSimpleSettings(const FOb
 void FPCGExPathSplineMeshSimpleContext::RegisterAssetDependencies()
 {
 	FPCGExPathProcessorContext::RegisterAssetDependencies();
-	if (StaticMeshLoader) { StaticMeshLoader->AddAssetDependencies(); }
-	if (MaterialLoader) { MaterialLoader->AddAssetDependencies(); }
+	if (StaticMeshLoader)
+	{
+		StaticMeshLoader->AddAssetDependencies();
+	}
+	if (MaterialLoader)
+	{
+		MaterialLoader->AddAssetDependencies();
+	}
 }
 
 bool FPCGExPathSplineMeshSimpleElement::Boot(FPCGExContext* InContext) const
@@ -142,7 +148,10 @@ void FPCGExPathSplineMeshSimpleElement::PostLoadAssetsDependencies(FPCGExContext
 
 bool FPCGExPathSplineMeshSimpleElement::PostBoot(FPCGExContext* InContext) const
 {
-	if (!FPCGExPathProcessorElement::PostBoot(InContext)) { return false; }
+	if (!FPCGExPathProcessorElement::PostBoot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathSplineMeshSimple)
 	if (Context->StaticMeshLoader && Context->StaticMeshLoader->IsEmpty())
@@ -490,4 +499,4 @@ namespace PCGExPathSplineMeshSimple
 }
 
 #undef LOCTEXT_NAMESPACE
-#undef PCGEX_NAMESPACE
+#undef PCGEX_NAMES

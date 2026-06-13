@@ -78,7 +78,7 @@ void UPCGExSampleNearestSplineSettings::ApplyDeprecationBeforeUpdatePins(UPCGNod
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExSampleNearestSplineSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExSampleNearestSplineSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -87,7 +87,7 @@ void UPCGExSampleNearestSplineSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 
@@ -777,4 +777,4 @@ namespace PCGExSampleNearestSpline
 }
 
 #undef LOCTEXT_NAMESPACE
-#undef PCGEX_NAMESPACE
+#undef PCGEX_NAMES

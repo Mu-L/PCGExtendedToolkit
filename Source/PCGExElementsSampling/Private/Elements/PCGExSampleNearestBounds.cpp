@@ -7,6 +7,7 @@
 #include "Blenders/PCGExUnionOpsManager.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExBlendOpsManager.h"
+#include "Core/PCGExBlendOpsSchema.h"
 #include "Core/PCGExOpStats.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGExData.h"
@@ -133,6 +134,18 @@ bool FPCGExSampleNearestBoundsElement::Boot(FPCGExContext* InContext) const
 		Context->Sorter->SortDirection = Settings->SortDirection;
 	}
 
+	if (!Context->BlendingFactories.IsEmpty())
+	{
+		// Resolve blend op configs once, here, single-threaded: per-processor blender init then
+		// only instantiates ops (no concurrent metadata enumeration on shared target facades),
+		// and the preloader warms exactly the attribute set the ops will read.
+		Context->BlendOpsSchema = MakeShared<PCGExBlending::FBlendOpsSchema>();
+		if (!Context->BlendOpsSchema->Init(Context, Context->BlendingFactories, Context->TargetsHandler->GetFacades()))
+		{
+			return false;
+		}
+	}
+
 	{
 		PCGExAsyncHelpers::FAsyncExecutionScope CollectionBuildingTasks(Context->NumMaxTargets);
 		Context->TargetsHandler->ForEachPreloader([&](PCGExData::FFacadePreloader& Preloader)
@@ -150,7 +163,10 @@ bool FPCGExSampleNearestBoundsElement::Boot(FPCGExContext* InContext) const
 					Collection->BuildFrom(Facade->Source, BoundsSource);
 				});
 
-			PCGExBlending::RegisterBuffersDependencies_SourceA(Context, Preloader, Context->BlendingFactories);
+			if (Context->BlendOpsSchema)
+			{
+				Context->BlendOpsSchema->RegisterBuffersDependencies(Context, Preloader);
+			}
 		});
 	}
 
@@ -307,7 +323,7 @@ namespace PCGExSampleNearestBounds
 		if (!Context->BlendingFactories.IsEmpty())
 		{
 			UnionBlendOpsManager = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, Distances);
-			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades()))
+			if (!UnionBlendOpsManager->Init(Context, PointDataFacade, Context->TargetsHandler->GetFacades(), Context->BlendOpsSchema))
 			{
 				return false;
 			}

@@ -215,7 +215,7 @@ namespace PCGExPathfindingGrowPaths
 
 	double FGrowth::GetGrowthScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge) const
 	{
-		return Processor->HeuristicsHandler->GetEdgeScore(From, To, Edge, *SeedNode, To, nullptr, TravelStack);
+		return Processor->HeuristicsHandler->GetEdgeScore(From, To, Edge, *SeedNode, To, nullptr, TravelStack.Get());
 	}
 }
 
@@ -349,6 +349,9 @@ namespace PCGExPathfindingGrowPaths
 
 		GrowthStop = Settings->bUseGrowthStop ? VtxDataFacade->GetBroadcaster<bool>(Settings->GrowthStopAttribute) : nullptr;
 		NoGrowth = Settings->bUseNoGrowth ? VtxDataFacade->GetBroadcaster<bool>(Settings->NoGrowthAttribute) : nullptr;
+
+		// Growth re-scores every neighbor on every iteration -- always worth baking static edge scores.
+		HeuristicsHandler->BakeStaticEdgeScores();
 
 		if (Settings->bUseOctreeSearch)
 		{

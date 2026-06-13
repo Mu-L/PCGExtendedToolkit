@@ -30,7 +30,7 @@ FString UPCGExAttributeRemapSettings::GetDisplayName() const
 	return TEXT("Remap : ") + Attributes.Source.ToString();
 }
 
-void UPCGExAttributeRemapSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExAttributeRemapSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
@@ -45,7 +45,7 @@ void UPCGExAttributeRemapSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		}
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

@@ -46,14 +46,14 @@ void UPCGExInclusionFilterFactory::InitConfig_Internal()
 }
 
 #if WITH_EDITOR
-void UPCGExInclusionFilterProviderSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExInclusionFilterProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 73, 4)
 	{
 		Config.ProjectionDetails.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

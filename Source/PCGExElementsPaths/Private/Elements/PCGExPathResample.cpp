@@ -20,14 +20,14 @@ void UPCGExResamplePathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode*
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExResamplePathSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExResamplePathSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 71, 3)
 	{
 		SampleLength.Constant = Resolution_DEPRECATED;
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

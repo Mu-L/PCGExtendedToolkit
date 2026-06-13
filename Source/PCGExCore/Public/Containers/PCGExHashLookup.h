@@ -27,6 +27,12 @@ namespace PCGEx
 			return InValue == InternalInitValue;
 		}
 
+		/** Restore a single entry to its initial value -- supports sparse resets. */
+		virtual void Unset(const int32 At)
+		{
+			Set(At, InternalInitValue);
+		}
+
 		virtual void Reset() = 0;
 	};
 
@@ -98,6 +104,11 @@ namespace PCGEx
 				return *Value;
 			}
 			return InternalInitValue;
+		}
+
+		virtual void Unset(const int32 At) override
+		{
+			Data.Remove(At);
 		}
 
 		virtual void Reset() override

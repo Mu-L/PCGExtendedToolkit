@@ -5,6 +5,7 @@
 
 #include "Clipper2Lib/clipper.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
@@ -156,6 +157,14 @@ void FPCGExClipper2OffsetContext::Process(const TSharedPtr<PCGExClipper2::FProce
 					for (const TSharedPtr<PCGExData::FPointIO>& Output : OutputPaths)
 					{
 						Output->Tags->Set<int32>(Settings->IterationTag, Iteration);
+					}
+				}
+				
+				if (Settings->bWriteIteration)
+				{
+					for (const TSharedPtr<PCGExData::FPointIO>& Output : OutputPaths)
+					{
+						PCGExData::Helpers::SetDataValue<int32>(Output->GetOut(), Settings->IterationAttributeName, Iteration);
 					}
 				}
 			}

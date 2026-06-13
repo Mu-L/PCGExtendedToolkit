@@ -14,7 +14,7 @@ double FPCGExHeuristicInertia::GetGlobalScore(const PCGExClusters::FNode& From, 
 	return GetScoreInternal(GlobalInertiaScore);
 }
 
-double FPCGExHeuristicInertia::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
+double FPCGExHeuristicInertia::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack) const
 {
 	if (TravelStack)
 	{

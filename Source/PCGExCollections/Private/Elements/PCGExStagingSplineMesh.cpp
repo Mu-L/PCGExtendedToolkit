@@ -48,7 +48,7 @@ void UPCGExPathSplineMeshSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* In
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExPathSplineMeshSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExPathSplineMeshSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
@@ -65,7 +65,7 @@ void UPCGExPathSplineMeshSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		}
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 
 void UPCGExPathSplineMeshSettings::PostInitProperties()

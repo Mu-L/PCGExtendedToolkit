@@ -446,8 +446,12 @@ FResetToDefaultOverride FPCGExPropertyOverrideEntryCustomization::MakeArchetypeR
 				return false;
 			}
 
+			// Authored = present in the TSet (the authoritative signal); bEnabled alone can hold
+			// transient propagation-clobber state and must not drive the arrow.
 			const FPCGExPropertyOverrideEntry& L = Live->Properties.ImportOverrides.Overrides[OverrideIndex];
-			return L.bEnabled != SrcEnabled || L.Value != SrcValue;
+			const FName EntryName = L.GetPropertyName();
+			const bool bInstanceAuthored = !EntryName.IsNone() && Live->EnabledOverrides.Contains(EntryName);
+			return bInstanceAuthored || L.Value != SrcValue;
 		});
 
 	auto Handler = FResetToDefaultHandler::CreateLambda(
@@ -468,7 +472,15 @@ FResetToDefaultOverride FPCGExPropertyOverrideEntryCustomization::MakeArchetypeR
 
 			Live->Modify();
 			FPCGExPropertyOverrideEntry& L = Live->Properties.ImportOverrides.Overrides[OverrideIndex];
-			L.bEnabled = SrcEnabled;
+
+			// Reset = defer to the chain: un-author the instance toggle (TSet is the
+			// authoritative signal) and land the stored value on the chain's effective value.
+			// Writing bEnabled = SrcEnabled directly would diverge the mirror from the TSet and
+			// read as instance-authored state to every TSet consumer (instance-data capture, the
+			// post-CDO-edit repair walk, the export-time sync) -- the chain already surfaces the
+			// parent's enabled override without the instance pinning it.
+			Live->SetOverrideEnabled(L.GetPropertyName(), false);
+			L.bEnabled = false; // Direct mirror write covers entries with broken identity (None name).
 
 			// Copy-assign (not move): same-type copy preserves the destination memory pointer
 			// that InnerScope aliases. Move-assign would Reset() first, invalidating the alias.

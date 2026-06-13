@@ -33,8 +33,18 @@ void UPCGExSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArra
 
 void UPCGExSettings::ApplyDeprecation(UPCGNode* InOutNode)
 {
+	if (PCGExDataVersion != INDEX_NONE)
+	{
+		// Only call deprecation path if we're not a fresh new node
+		PCGExApplyDeprecation(InOutNode);
+	}
+	
 	Super::ApplyDeprecation(InOutNode);
 	PCGEX_UPDATE_DATA_VERSION_TO_LATEST
+}
+
+void UPCGExSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
 }
 
 bool UPCGExSettings::GetPinExtraIcon(const UPCGPin* InPin, FName& OutExtraIcon, FText& OutTooltip) const

@@ -271,6 +271,14 @@ template PCGEXCORE_API void FFacadePreloader::Register<_TYPE>(FPCGExContext* InC
 			return false;
 		}
 
+		// Pre-warm InKeys while still single-threaded: GetInKeys lazily inits under a write lock,
+		// so the per-config tasks below would otherwise all pile up on the first init
+		// (same rationale as IAssetLoader::Discover).
+		if (SourceFacade->GetIn())
+		{
+			(void)SourceFacade->Source->GetInKeys();
+		}
+
 		PCGEX_ASYNC_SUBGROUP_CHKD_RET(TaskManager, InParentHandle, PrefetchAttributesTask, false)
 
 		PrefetchAttributesTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()

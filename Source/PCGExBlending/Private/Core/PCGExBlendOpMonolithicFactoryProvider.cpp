@@ -12,11 +12,10 @@
 
 #pragma region UPCGExBlendOpMonolithicFactory
 
-bool UPCGExBlendOpMonolithicFactory::CreateOperations(
+bool UPCGExBlendOpMonolithicFactory::ResolveConfigs(
 	FPCGExContext* InContext,
 	const TSharedPtr<PCGExData::FFacade>& InSourceAFacade,
-	const TSharedPtr<PCGExData::FFacade>& InTargetFacade,
-	TArray<TSharedPtr<FPCGExBlendOperation>>& OutOperations,
+	TArray<FPCGExAttributeBlendConfig>& OutConfigs,
 	const TSet<FName>* InSupersedeNames) const
 {
 	TArray<PCGExBlending::FBlendingParam> Params;
@@ -34,6 +33,8 @@ bool UPCGExBlendOpMonolithicFactory::CreateOperations(
 			true, // bSkipProperties - already handled above
 			InSupersedeNames);
 	}
+
+	OutConfigs.Reserve(OutConfigs.Num() + Params.Num());
 
 	for (const PCGExBlending::FBlendingParam& Param : Params)
 	{
@@ -56,9 +57,7 @@ bool UPCGExBlendOpMonolithicFactory::CreateOperations(
 		OpConfig.bResetValueBeforeMultiSourceBlend = true;
 		OpConfig.Init();
 
-		PCGEX_FACTORY_NEW_OPERATION(BlendOperation)
-		NewOperation->Config = OpConfig;
-		OutOperations.Add(NewOperation);
+		OutConfigs.Add(MoveTemp(OpConfig));
 	}
 
 	return true;

@@ -28,6 +28,15 @@ namespace PCGExMesh
 	PCGEXCORE_API
 	void DeclareGeoMeshImportInputs(const FPCGExGeoMeshImportDetails& InDetails, TArray<FPCGPinProperties>& PinProperties);
 
+	/** Orients a transform so its Up axis (+Z) points along the given normal. Degenerate normals leave the rotation untouched. */
+	FORCEINLINE void AlignTransformUpToNormal(FTransform& InTransform, FVector InNormal)
+	{
+		if (InNormal.Normalize())
+		{
+			InTransform.SetRotation(FRotationMatrix::MakeFromZ(InNormal).ToQuat());
+		}
+	}
+
 	struct PCGEXCORE_API FMeshData
 	{
 		FMeshData() = default;
@@ -39,6 +48,7 @@ namespace PCGExMesh
 		const FStaticMeshVertexBuffers* Buffers = nullptr;
 		const FPositionVertexBuffer* Positions = nullptr;
 		const FColorVertexBuffer* Colors = nullptr;
+		const FStaticMeshVertexBuffer* Tangents = nullptr;
 
 
 		FORCEINLINE int32 NumTriangles() const
@@ -54,6 +64,11 @@ namespace PCGExMesh
 		FORCEINLINE bool HasColor() const
 		{
 			return Colors != nullptr;
+		}
+
+		FORCEINLINE bool HasNormals() const
+		{
+			return Tangents != nullptr;
 		}
 	};
 

@@ -133,14 +133,14 @@ void UPCGExCreateShapeCircleSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCG
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExCreateShapeCircleSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExCreateShapeCircleSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		Config.ApplyDeprecation();
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

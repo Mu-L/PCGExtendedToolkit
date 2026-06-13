@@ -483,6 +483,16 @@ TSharedPtr<FPCGExBlendOperation> UPCGExBlendOpFactory::CreateOperation(FPCGExCon
 	return NewOperation;
 }
 
+bool UPCGExBlendOpFactory::ResolveConfigs(
+	FPCGExContext* InContext,
+	const TSharedPtr<PCGExData::FFacade>& InSourceAFacade,
+	TArray<FPCGExAttributeBlendConfig>& OutConfigs,
+	const TSet<FName>* InSupersedeNames) const
+{
+	OutConfigs.Add(Config);
+	return true;
+}
+
 bool UPCGExBlendOpFactory::CreateOperations(
 	FPCGExContext* InContext,
 	const TSharedPtr<PCGExData::FFacade>& InSourceAFacade,
@@ -490,12 +500,23 @@ bool UPCGExBlendOpFactory::CreateOperations(
 	TArray<TSharedPtr<FPCGExBlendOperation>>& OutOperations,
 	const TSet<FName>* InSupersedeNames) const
 {
-	TSharedPtr<FPCGExBlendOperation> Op = CreateOperation(InContext);
-	if (!Op)
+	TArray<FPCGExAttributeBlendConfig> Configs;
+	if (!ResolveConfigs(InContext, InSourceAFacade, Configs, InSupersedeNames))
 	{
 		return false;
 	}
-	OutOperations.Add(Op);
+
+	OutOperations.Reserve(OutOperations.Num() + Configs.Num());
+	for (FPCGExAttributeBlendConfig& ResolvedConfig : Configs)
+	{
+		TSharedPtr<FPCGExBlendOperation> Op = CreateOperation(InContext);
+		if (!Op)
+		{
+			return false;
+		}
+		Op->Config = MoveTemp(ResolvedConfig);
+		OutOperations.Add(Op);
+	}
 	return true;
 }
 

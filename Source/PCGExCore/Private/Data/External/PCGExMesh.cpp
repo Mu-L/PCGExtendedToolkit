@@ -245,6 +245,11 @@ namespace PCGExMesh
 			Colors = &Buffers->ColorVertexBuffer;
 		}
 
+		if (Buffers->StaticMeshVertexBuffer.GetNumVertices() > 0 && Buffers->StaticMeshVertexBuffer.GetTangentData() != nullptr)
+		{
+			Tangents = &Buffers->StaticMeshVertexBuffer;
+		}
+
 		Positions = &Buffers->PositionVertexBuffer;
 
 		bIsValid = true;
