@@ -26,19 +26,6 @@ namespace PCGExClusters
 	class FCluster;
 }
 
-/** Categories for heuristic operations to enable fast-path optimizations */
-enum class EPCGExHeuristicCategory : uint8
-{
-	/** Stateless, cluster-level pre-computable (e.g., Distance edge scores, Attribute) */
-	FullyStatic,
-	/** Goal-dependent but stateless within a query (e.g., Azimuth, Distance global scores) */
-	GoalDependent,
-	/** Requires TravelStack for path history (e.g., Inertia, Steepness with accumulation) */
-	TravelDependent,
-	/** Feedback tracking operations */
-	Feedback
-};
-
 /**
  *
  */
@@ -58,10 +45,11 @@ public:
 
 	bool bHasCustomLocalWeightMultiplier = false;
 
-	/** Returns the category of this heuristic for optimization purposes */
-	virtual EPCGExHeuristicCategory GetCategory() const
+	/** True when GetEdgeScore depends only on From/To/Edge -- no Seed/Goal/TravelStack, and no state
+	 * that mutates between queries -- so the handler can bake it once per directed edge. */
+	virtual bool HasStaticEdgeScore() const
 	{
-		return EPCGExHeuristicCategory::GoalDependent;
+		return false;
 	}
 
 	virtual void PrepareForCluster(const TSharedPtr<const PCGExClusters::FCluster>& InCluster);
@@ -69,7 +57,7 @@ public:
 	virtual double GetGlobalScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal) const;
 
 
-	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack = nullptr) const;
+	virtual double GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack = nullptr) const;
 
 
 	double GetCustomWeightMultiplier(const int32 PointIndex, const int32 EdgeIndex) const;

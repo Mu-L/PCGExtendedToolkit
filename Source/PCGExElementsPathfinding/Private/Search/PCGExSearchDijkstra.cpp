@@ -19,6 +19,8 @@ bool FPCGExSearchOperationDijkstra::ResolveQuery(
 	const TSharedPtr<PCGExHeuristics::FHandler>& Heuristics,
 	const TSharedPtr<PCGExHeuristics::FLocalFeedbackHandler>& LocalFeedback) const
 {
+	check(InQuery->PickResolution == PCGExPathfinding::EQueryPickResolution::Success)
+
 	TSharedPtr<PCGExPathfinding::FSearchAllocations> LocalAllocations = Allocations;
 	if (!LocalAllocations)
 	{
@@ -35,19 +37,13 @@ bool FPCGExSearchOperationDijkstra::ResolveQuery(
 	const PCGExClusters::FNode& SeedNode = *InQuery->Seed.Node;
 	const PCGExClusters::FNode& GoalNode = *InQuery->Goal.Node;
 
-	const int32 NumNodes = NodesRef.Num();
-
 	TRACE_CPUPROFILER_EVENT_SCOPE(UPCGExSearchDijkstra::FindPath);
 
 	// Basic Dijkstra implementation
 
-	TBitArray<> Visited;
-	Visited.Init(false, NumNodes);
-
-	// TODO : Use local allocations for the hash lookup
-	const TSharedPtr<PCGEx::FHashLookup> TravelStack = PCGEx::NewHashLookup<PCGEx::FHashLookupArray>(PCGEx::NH64(-1, -1), NumNodes);
-
-	const TUniquePtr<PCGEx::FScoredQueue> ScoredQueue = MakeUnique<PCGEx::FScoredQueue>(NumNodes);
+	TBitArray<>& Visited = LocalAllocations->Visited;
+	PCGEx::FHashLookup* TravelStack = LocalAllocations->TravelStack.Get();
+	PCGEx::FScoredQueue* ScoredQueue = LocalAllocations->ScoredQueue.Get();
 	ScoredQueue->Enqueue(SeedNode.Index, 0);
 
 	const PCGExHeuristics::FLocalFeedbackHandler* Feedback = LocalFeedback.Get();

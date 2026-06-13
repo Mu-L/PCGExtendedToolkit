@@ -80,13 +80,13 @@ void UPCGExNumericCompareNearestFilterProviderSettings::PCGExApplyDeprecationBef
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExNumericCompareNearestFilterProviderSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExNumericCompareNearestFilterProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 20)
 	{
 		Config.OperandBValue.Update(Config.CompareAgainst_DEPRECATED, Config.OperandB_DEPRECATED, Config.OperandBConstant_DEPRECATED);
 	}
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

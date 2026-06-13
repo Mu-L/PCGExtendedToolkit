@@ -76,7 +76,7 @@ double FPCGExHeuristicGradient::GetGlobalScore(const PCGExClusters::FNode& From,
 	}
 }
 
-double FPCGExHeuristicGradient::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, const TSharedPtr<PCGEx::FHashLookup> TravelStack) const
+double FPCGExHeuristicGradient::GetEdgeScore(const PCGExClusters::FNode& From, const PCGExClusters::FNode& To, const PCGExGraphs::FEdge& Edge, const PCGExClusters::FNode& Seed, const PCGExClusters::FNode& Goal, PCGEx::FHashLookup* TravelStack) const
 {
 	if (CachedValues.IsEmpty())
 	{

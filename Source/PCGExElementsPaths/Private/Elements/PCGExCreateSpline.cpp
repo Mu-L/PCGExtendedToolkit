@@ -17,14 +17,14 @@
 #define PCGEX_NAMESPACE CreateSpline
 
 #if WITH_EDITOR
-void UPCGExCreateSplineSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExCreateSplineSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 70, 11)
 	{
 		Tangents.ApplyDeprecation(bApplyCustomTangents_DEPRECATED, ArriveTangentAttribute_DEPRECATED, LeaveTangentAttribute_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

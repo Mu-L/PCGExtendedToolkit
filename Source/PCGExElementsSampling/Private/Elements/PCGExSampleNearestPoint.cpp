@@ -63,7 +63,7 @@ void UPCGExSampleNearestPointSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
-void UPCGExSampleNearestPointSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExSampleNearestPointSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
@@ -71,7 +71,7 @@ void UPCGExSampleNearestPointSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		MaxRange.Update(RangeMaxInput_DEPRECATED, RangeMaxAttribute_DEPRECATED, RangeMax_DEPRECATED);
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

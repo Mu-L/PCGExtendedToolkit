@@ -60,7 +60,7 @@ void UPCGExConstantEnumSettings::PostLoad()
 }
 
 #if WITH_EDITOR
-void UPCGExConstantEnumSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExConstantEnumSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 75, 15)
 	{
@@ -75,7 +75,7 @@ void UPCGExConstantEnumSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		Source_DEPRECATED = EPCGExEnumConstantSourceType::Selector;
 		PickerEnum_DEPRECATED = nullptr;
 	}
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 
 // Adapted from similar handling in PCGSwitch.cpp

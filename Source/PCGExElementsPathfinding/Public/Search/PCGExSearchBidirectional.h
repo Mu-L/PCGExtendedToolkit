@@ -34,8 +34,8 @@ namespace PCGExPathfinding
 		TSharedPtr<PCGEx::FHashLookup> TravelStackBackward;
 		TSharedPtr<PCGEx::FScoredQueue> ScoredQueueBackward;
 
-		void Init(const PCGExClusters::FCluster* InCluster);
-		void Reset();
+		virtual void Init(const PCGExClusters::FCluster* InCluster) override;
+		virtual void Reset() override;
 	};
 }
 
@@ -59,8 +59,8 @@ protected:
 	void ReconstructPath(
 		const TSharedPtr<PCGExPathfinding::FPathQuery>& InQuery,
 		int32 MeetingNode,
-		const TSharedPtr<PCGEx::FHashLookup>& ForwardStack,
-		const TSharedPtr<PCGEx::FHashLookup>& BackwardStack,
+		PCGEx::FHashLookup* ForwardStack,
+		PCGEx::FHashLookup* BackwardStack,
 		int32 SeedIndex,
 		int32 GoalIndex) const;
 };
@@ -80,6 +80,7 @@ public:
 	virtual TSharedPtr<FPCGExSearchOperation> CreateOperation() const override
 	{
 		PCGEX_FACTORY_NEW_OPERATION(SearchOperationBidirectional)
+		NewOperation->bEarlyExit = bEarlyExit;
 		return NewOperation;
 	}
 };

@@ -9,6 +9,7 @@
 #include "Details/PCGExSubdivisionDetails.h"
 #include "Factories/PCGExFactories.h"
 #include "Math/PCGExMathMean.h"
+#include "Utils/PCGValueRange.h"
 
 #include "PCGExBevelPath.generated.h"
 
@@ -16,8 +17,6 @@ namespace PCGExPaths
 {
 	class FPathEdgeLength;
 	class FPath;
-	template <typename T>
-	class TPathEdgeExtra;
 }
 
 namespace PCGExBevelPath
@@ -154,7 +153,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Subdivisions (Count)", EditCondition="bSubdivide && Type != EPCGExBevelProfileType::Custom && SubdivideMethod == EPCGExSubdivideMode::Count && SubdivisionAmountInput == EPCGExInputValueType::Constant", EditConditionHides, ClampMin=1))
 	int32 SubdivisionCount = 10;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Subdividions (Attr)", EditCondition="bSubdivide && Type != EPCGExBevelProfileType::Custom && SubdivideMethod != EPCGExSubdivideMode::Manhattan && SubdivisionAmountInput != EPCGExInputValueType::Constant", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Subdivisions (Attr)", EditCondition="bSubdivide && Type != EPCGExBevelProfileType::Custom && SubdivideMethod != EPCGExSubdivideMode::Manhattan && SubdivisionAmountInput != EPCGExInputValueType::Constant", EditConditionHides))
 	FPCGAttributePropertyInputSelector SubdivisionAmount;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Manhattan", EditCondition="bSubdivide && Type != EPCGExBevelProfileType::Custom && SubdivideMethod == EPCGExSubdivideMode::Manhattan", EditConditionHides))
@@ -205,7 +204,6 @@ struct FPCGExBevelPathContext final : FPCGExPathProcessorContext
 	TSharedPtr<PCGExData::FFacade> CustomProfileFacade;
 
 	TArray<FVector> CustomProfilePositions;
-	double CustomLength;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
@@ -235,12 +233,10 @@ namespace PCGExBevelPath
 
 		FVector Corner = FVector::ZeroVector;
 
-		FVector PrevLocation = FVector::ZeroVector;
 		FVector Arrive = FVector::ZeroVector;
 		FVector ArriveDir = FVector::ZeroVector;
 		double ArriveAlpha = 0;
 
-		FVector NextLocation = FVector::ZeroVector;
 		FVector Leave = FVector::ZeroVector;
 		FVector LeaveDir = FVector::ZeroVector;
 		double LeaveAlpha = 0;
@@ -263,28 +259,12 @@ namespace PCGExBevelPath
 		double Width = 0;
 		double InitialWidth = 0; // Store original width before limiting
 
-		double CustomMainAxisScale = 1;
-		double CustomCrossAxisScale = 1;
-
 		TArray<FVector> Subdivisions;
-
-		FPCGExManhattanDetails ManhattanDetails;
 
 		FBevel(const int32 InIndex, const FProcessor* InProcessor);
 
-		~FBevel()
-		{
-			Subdivisions.Empty();
-			ArrivePathPoints.Empty();
-			ArrivePathDistances.Empty();
-			ArrivePathIndices.Empty();
-			LeavePathPoints.Empty();
-			LeavePathDistances.Empty();
-			LeavePathIndices.Empty();
-		}
-
-		/** Compute sliding limits - how far can this bevel extend on each side */
-		void ComputeSlidingLimits(const FProcessor* InProcessor);
+		/** Compute sliding limits - how far can this bevel extend on each side. Only valid to call when sliding is enabled. */
+		void ComputeSlidingLimits(const FProcessor* InProcessor, const TConstPCGValueRange<FTransform>& InTransforms);
 
 		/** Balance against neighboring bevels (respects sliding if enabled) */
 		void Balance(const FProcessor* InProcessor);
@@ -298,9 +278,6 @@ namespace PCGExBevelPath
 		void SubdivideManhattan(const FProcessor* InProcessor);
 
 	private:
-		/** Helper to accumulate path distance across multiple edges */
-		double AccumulatePathDistance(const FProcessor* InProcessor, int32 StartIdx, int32 Direction, int32& OutBevelIdx) const;
-
 		/** Compute position along stored path at given distance */
 		FVector GetPositionAlongPath(const TArray<FVector>& PathPoints, const TArray<double>& PathDistances, double Distance) const;
 	};
@@ -328,7 +305,6 @@ namespace PCGExBevelPath
 
 		TSharedPtr<PCGExPaths::FPath> Path;
 		TSharedPtr<PCGExPaths::FPathEdgeLength> PathLength;
-		TSharedPtr<PCGExPaths::TPathEdgeExtra<FVector>> PathDirection;
 
 		TSharedPtr<PCGExData::TBuffer<bool>> EndpointsWriter;
 		TSharedPtr<PCGExData::TBuffer<bool>> StartPointWriter;
@@ -361,7 +337,6 @@ namespace PCGExBevelPath
 		void PrepareSinglePoint(const int32 Index);
 
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
-		virtual void OnPointsProcessingComplete() override;
 		
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
 		virtual void OnRangeProcessingComplete() override;

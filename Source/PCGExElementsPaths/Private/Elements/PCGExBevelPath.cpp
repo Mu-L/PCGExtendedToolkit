@@ -3,6 +3,7 @@
 
 #include "Elements/PCGExBevelPath.h"
 
+#include "Algo/BinarySearch.h"
 #include "Core/PCGExPointFilter.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
@@ -100,7 +101,15 @@ bool FPCGExBevelPathElement::Boot(FPCGExContext* InContext) const
 
 		const FVector Start = ProfileTransforms[0].GetLocation();
 		const FVector End = ProfileTransforms[ProfileTransforms.Num() - 1].GetLocation();
-		const double Factor = 1 / FVector::Dist(Start, End);
+
+		const double ProfileLength = FVector::Dist(Start, End);
+		if (ProfileLength <= KINDA_SMALL_NUMBER)
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Custom profile first and last points must not overlap."));
+			return false;
+		}
+
+		const double Factor = 1 / ProfileLength;
 
 		const FVector ProjectionNormal = (End - Start).GetSafeNormal(1E-08, FVector::ForwardVector);
 		const FQuat ProjectionQuat = FQuat::FindBetweenNormals(ProjectionNormal, FVector::ForwardVector);
@@ -140,7 +149,6 @@ bool FPCGExBevelPathElement::AdvanceWork(FPCGExContext* InContext, const UPCGExS
 				return true;
 			}, [&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
-				//NewBatch->bSkipCompletion = true;
 				NewBatch->bRequiresWriteStep = (Settings->bFlagPoles || Settings->bFlagSubdivision || Settings->bFlagEndPoint || Settings->bFlagStartPoint);
 			}))
 		{
@@ -178,10 +186,10 @@ namespace PCGExBevelPath
 		}
 
 		Corner = InTransforms[InIndex].GetLocation();
-		PrevLocation = InTransforms[ArriveIdx].GetLocation();
-		NextLocation = InTransforms[LeaveIdx].GetLocation();
 
-		// Use cached directions if available
+		const FVector PrevLocation = InTransforms[ArriveIdx].GetLocation();
+		const FVector NextLocation = InTransforms[LeaveIdx].GetLocation();
+
 		ArriveDir = (PrevLocation - Corner).GetSafeNormal();
 		LeaveDir = (NextLocation - Corner).GetSafeNormal();
 
@@ -228,66 +236,8 @@ namespace PCGExBevelPath
 		LeaveAlpha = (LeaveLen > KINDA_SMALL_NUMBER) ? Width / LeaveLen : 1.0;
 	}
 
-	double FBevel::AccumulatePathDistance(const FProcessor* InProcessor, int32 StartIdx, int32 Direction, int32& OutBevelIdx) const
+	void FBevel::ComputeSlidingLimits(const FProcessor* InProcessor, const TConstPCGValueRange<FTransform>& InTransforms)
 	{
-		double TotalDistance = 0.0;
-		OutBevelIdx = -1;
-
-		int32 CurrentIdx = StartIdx;
-		const int32 MaxIterations = InProcessor->NumPoints; // Prevent infinite loops
-
-		for (int32 Iteration = 0; Iteration < MaxIterations; ++Iteration)
-		{
-			// Get the edge length
-			const int32 EdgeIdx = (Direction > 0) ? CurrentIdx : InProcessor->WrapIndex(CurrentIdx - 1);
-			if (EdgeIdx < 0)
-			{
-				break;
-			} // Hit path end
-
-			TotalDistance += InProcessor->PathLength->Get(EdgeIdx);
-
-			// Move to next point
-			const int32 NextIdx = InProcessor->WrapIndex(CurrentIdx + Direction);
-			if (NextIdx < 0)
-			{
-				break;
-			} // Hit path end
-
-			// Check if next point has a bevel
-			if (InProcessor->Bevels[NextIdx])
-			{
-				OutBevelIdx = NextIdx;
-				break;
-			}
-
-			CurrentIdx = NextIdx;
-
-			// For closed loops, stop if we've come back around
-			if (CurrentIdx == Index)
-			{
-				break;
-			}
-		}
-
-		return TotalDistance;
-	}
-
-	void FBevel::ComputeSlidingLimits(const FProcessor* InProcessor)
-	{
-		const UPCGBasePointData* InPoints = InProcessor->PointDataFacade->GetIn();
-		TConstPCGValueRange<FTransform> InTransforms = InPoints->GetConstTransformValueRange();
-
-		if (!InProcessor->bSlideAlongPath)
-		{
-			// No sliding - limits are just the immediate neighbors
-			ArriveSlidingLimit = InProcessor->PathLength->Get(ArriveIdx);
-			LeaveSlidingLimit = InProcessor->PathLength->Get(Index);
-			ArriveBevelIdx = -1;
-			LeaveBevelIdx = -1;
-			return;
-		}
-
 		// Walk backwards to find limiting bevel or path end
 		ArriveSlidingLimit = 0.0;
 		ArriveBevelIdx = -1;
@@ -382,36 +332,30 @@ namespace PCGExBevelPath
 			return PathPoints.Num() > 0 ? PathPoints[0] : Corner;
 		}
 
-		// Find the segment containing our distance
-		for (int32 i = 1; i < PathDistances.Num(); ++i)
+		// Distance exceeds path length - return last point
+		if (Distance >= PathDistances.Last())
 		{
-			if (Distance <= PathDistances[i])
-			{
-				const double SegmentStart = PathDistances[i - 1];
-				const double SegmentEnd = PathDistances[i];
-				const double SegmentLength = SegmentEnd - SegmentStart;
-
-				if (SegmentLength <= KINDA_SMALL_NUMBER)
-				{
-					return PathPoints[i];
-				}
-
-				const double Alpha = (Distance - SegmentStart) / SegmentLength;
-				return FMath::Lerp(PathPoints[i - 1], PathPoints[i], Alpha);
-			}
+			return PathPoints.Last();
 		}
 
-		// Distance exceeds path length - return last point
-		return PathPoints.Last();
+		// Find the segment containing our distance. Distances are cumulative, hence sorted.
+		const int32 SegmentEndIdx = Algo::UpperBound(PathDistances, Distance);
+
+		const double SegmentStart = PathDistances[SegmentEndIdx - 1];
+		const double SegmentEnd = PathDistances[SegmentEndIdx];
+		const double SegmentLength = SegmentEnd - SegmentStart;
+
+		if (SegmentLength <= KINDA_SMALL_NUMBER)
+		{
+			return PathPoints[SegmentEndIdx];
+		}
+
+		const double Alpha = (Distance - SegmentStart) / SegmentLength;
+		return FMath::Lerp(PathPoints[SegmentEndIdx - 1], PathPoints[SegmentEndIdx], Alpha);
 	}
 
 	void FBevel::Balance(const FProcessor* InProcessor)
 	{
-		if (InProcessor->Settings->Limit != EPCGExBevelLimit::Balanced)
-		{
-			return;
-		}
-
 		double EffectiveArriveLimit = ArriveSlidingLimit;
 		double EffectiveLeaveLimit = LeaveSlidingLimit;
 
@@ -563,8 +507,9 @@ namespace PCGExBevelPath
 		}
 		else
 		{
+			// Attribute-driven amounts bypass the property clamp, guard against zero & negative values
 			StepSize = FMath::Min(Dist, Factor);
-			SubdivCount = FMath::Floor(Dist / Factor);
+			SubdivCount = Factor > KINDA_SMALL_NUMBER ? FMath::Floor(Dist / Factor) : 0;
 		}
 
 		SubdivCount = FMath::Max(0, SubdivCount);
@@ -617,7 +562,13 @@ namespace PCGExBevelPath
 			return;
 		}
 
-		const int32 SubdivCount = bIsCount ? static_cast<int32>(Factor) : FMath::Floor(Arc.GetLength() / Factor);
+		// Attribute-driven amounts bypass the property clamp, guard against zero & negative values
+		int32 SubdivCount = bIsCount ? static_cast<int32>(Factor) : 0;
+		if (!bIsCount && Factor > KINDA_SMALL_NUMBER)
+		{
+			SubdivCount = FMath::Floor(Arc.GetLength() / Factor);
+		}
+		SubdivCount = FMath::Max(0, SubdivCount);
 
 		const double StepSize = 1.0 / static_cast<double>(SubdivCount + 1);
 		PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount);
@@ -644,25 +595,27 @@ namespace PCGExBevelPath
 		const FVector ProjectionNormal = (Leave - Arrive).GetSafeNormal(1E-08, FVector::ForwardVector);
 		const FQuat ProjectionQuat = FRotationMatrix::MakeFromZX(PCGExMath::GetNormal(Arrive, Leave, Corner) * -1, ProjectionNormal).ToQuat();
 
+		const UPCGExBevelPathSettings* Settings = InProcessor->Settings;
+
 		double MainAxisSize = ProfileSize;
 		double CrossAxisSize = ProfileSize;
 
-		if (InProcessor->Settings->MainAxisScaling == EPCGExBevelCustomProfileScaling::Scale)
+		if (Settings->MainAxisScaling == EPCGExBevelCustomProfileScaling::Scale)
 		{
-			MainAxisSize = Length * CustomMainAxisScale;
+			MainAxisSize = Length * Settings->MainAxisScale;
 		}
-		else if (InProcessor->Settings->MainAxisScaling == EPCGExBevelCustomProfileScaling::Distance)
+		else if (Settings->MainAxisScaling == EPCGExBevelCustomProfileScaling::Distance)
 		{
-			MainAxisSize = CustomMainAxisScale;
+			MainAxisSize = Settings->MainAxisScale;
 		}
 
-		if (InProcessor->Settings->CrossAxisScaling == EPCGExBevelCustomProfileScaling::Scale)
+		if (Settings->CrossAxisScaling == EPCGExBevelCustomProfileScaling::Scale)
 		{
-			CrossAxisSize = Length * CustomCrossAxisScale;
+			CrossAxisSize = Length * Settings->CrossAxisScale;
 		}
-		else if (InProcessor->Settings->CrossAxisScaling == EPCGExBevelCustomProfileScaling::Distance)
+		else if (Settings->CrossAxisScaling == EPCGExBevelCustomProfileScaling::Distance)
 		{
-			CrossAxisSize = CustomCrossAxisScale;
+			CrossAxisSize = Settings->CrossAxisScale;
 		}
 
 		for (int i = 0; i < SubdivCount; i++)
@@ -693,12 +646,14 @@ namespace PCGExBevelPath
 
 	void FProcessor::ComputeSlidingLimits()
 	{
+		TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
+
 		// Compute sliding limits for all bevels
 		for (int32 i = 0; i < NumPoints; ++i)
 		{
 			if (const TSharedPtr<FBevel>& Bevel = Bevels[i])
 			{
-				Bevel->ComputeSlidingLimits(this);
+				Bevel->ComputeSlidingLimits(this, InTransforms);
 			}
 		}
 	}
@@ -795,8 +750,6 @@ namespace PCGExBevelPath
 
 		bIsClosedLoop = Path->IsClosedLoop();
 
-		bForceSingleThreadedProcessPoints = true;
-
 		Bevels.Init(nullptr, NumPoints);
 
 		WidthGetter = Settings->GetValueSettingWidth();
@@ -848,12 +801,6 @@ namespace PCGExBevelPath
 		Preparation->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 		{
 			PCGEX_ASYNC_THIS
-			if (!This->bIsClosedLoop)
-			{
-				// Ensure bevel is disabled on start/end points
-				This->PointFilterCache[0] = false;
-				This->PointFilterCache[This->PointFilterCache.Num() - 1] = false;
-			}
 
 			// Compute sliding limits after all bevels are created
 			if (This->bSlideAlongPath)
@@ -863,11 +810,14 @@ namespace PCGExBevelPath
 			}
 
 			// Now balance all bevels (requires sliding limits to be computed first)
-			for (int32 i = 0; i < This->NumPoints; ++i)
+			if (This->Settings->Limit == EPCGExBevelLimit::Balanced)
 			{
-				if (const TSharedPtr<FBevel>& Bevel = This->Bevels[i])
+				for (int32 i = 0; i < This->NumPoints; ++i)
 				{
-					Bevel->Balance(This.Get());
+					if (const TSharedPtr<FBevel>& Bevel = This->Bevels[i])
+					{
+						Bevel->Balance(This.Get());
+					}
 				}
 			}
 
@@ -886,9 +836,15 @@ namespace PCGExBevelPath
 
 			if (!This->bIsClosedLoop)
 			{
-				// Ensure bevel is disabled on start/end points
-				This->PointFilterCache[0] = false;
-				This->PointFilterCache[This->PointFilterCache.Num() - 1] = false;
+				// Bevel is not supported on open path endpoints
+				if (Scope.Start == 0)
+				{
+					This->PointFilterCache[0] = false;
+				}
+				if (Scope.End == This->NumPoints)
+				{
+					This->PointFilterCache[This->NumPoints - 1] = false;
+				}
 			}
 
 			PCGEX_SCOPE_LOOP(i)
@@ -897,7 +853,7 @@ namespace PCGExBevelPath
 			}
 		};
 
-		Preparation->StartSubLoops(NumPoints, PCGEX_CORE_SETTINGS.PointsDefaultBatchChunkSize);
+		Preparation->StartSubLoops(NumPoints, PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize());
 
 		return true;
 	}
@@ -910,8 +866,6 @@ namespace PCGExBevelPath
 		}
 
 		Bevels[Index] = MakeShared<FBevel>(Index, this);
-		Bevels[Index]->CustomMainAxisScale = Settings->MainAxisScale;
-		Bevels[Index]->CustomCrossAxisScale = Settings->CrossAxisScale;
 	}
 
 	void FProcessor::ProcessPoints(const PCGExMT::FScope& Scope)
@@ -930,11 +884,6 @@ namespace PCGExBevelPath
 		}
 	}
 
-	void FProcessor::OnPointsProcessingComplete()
-	{
-		//CompleteWork();
-	}
-
 	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
 	{
 		const UPCGBasePointData* InPointData = PointDataFacade->GetIn();
@@ -942,6 +891,7 @@ namespace PCGExBevelPath
 
 		// Only pin properties we will not be inheriting
 		TConstPCGValueRange<FTransform> InTransform = InPointData->GetConstTransformValueRange();
+		TConstPCGValueRange<int32> InSeeds = InPointData->GetConstSeedValueRange();
 
 		TPCGValueRange<FTransform> OutTransform = OutPointData->GetTransformValueRange(false);
 		TPCGValueRange<int32> OutSeeds = OutPointData->GetSeedValueRange(false);
@@ -964,6 +914,7 @@ namespace PCGExBevelPath
 			{
 				IdxMapping[StartIndex] = Index;
 				OutTransform[StartIndex] = InTransform[Index];
+				OutSeeds[StartIndex] = InSeeds[Index];
 				continue;
 			}
 
@@ -979,8 +930,8 @@ namespace PCGExBevelPath
 			OutTransform[A].SetLocation(Bevel->Arrive);
 			OutTransform[B].SetLocation(Bevel->Leave);
 
-			OutSeeds[A] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransform[A].GetLocation());
-			OutSeeds[B] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransform[B].GetLocation());
+			OutSeeds[A] = PCGExRandomHelpers::ComputeSpatialSeed(Bevel->Arrive);
+			OutSeeds[B] = PCGExRandomHelpers::ComputeSpatialSeed(Bevel->Leave);
 
 			if (Bevel->Subdivisions.IsEmpty())
 			{
@@ -991,14 +942,15 @@ namespace PCGExBevelPath
 			{
 				const int32 SubIndex = A + i + 1;
 				OutTransform[SubIndex].SetLocation(Bevel->Subdivisions[i]);
-				OutSeeds[SubIndex] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransform[SubIndex].GetLocation());
+				OutSeeds[SubIndex] = PCGExRandomHelpers::ComputeSpatialSeed(Bevel->Subdivisions[i]);
 			}
 		}
 	}
 
 	void FProcessor::OnRangeProcessingComplete()
 	{
-		constexpr EPCGPointNativeProperties CarryOverProperties = static_cast<EPCGPointNativeProperties>(static_cast<uint8>(EPCGPointNativeProperties::All) & ~static_cast<uint8>(EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::MetadataEntry));
+		// Seed is excluded from the carry-over: ProcessRange writes spatial seeds for bevel points and copies source seeds for pass-through points
+		constexpr EPCGPointNativeProperties CarryOverProperties = static_cast<EPCGPointNativeProperties>(static_cast<uint8>(EPCGPointNativeProperties::All) & ~static_cast<uint8>(EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed | EPCGPointNativeProperties::MetadataEntry));
 
 		PointDataFacade->Source->ConsumeIdxMapping(CarryOverProperties);
 	}
@@ -1045,9 +997,6 @@ namespace PCGExBevelPath
 		int32 NumBevels = 0;
 		int32 NumOutPoints = 0;
 
-		TArray<int32> ReadIndices;
-		ReadIndices.Reserve(NumOutPoints * 4);
-
 		const bool bHasConsumedPoints = ConsumedByBevel.Num() > 0;
 
 		for (int i = 0; i < StartIndices.Num(); i++)
@@ -1086,7 +1035,9 @@ namespace PCGExBevelPath
 		// Build output points
 
 		UPCGBasePointData* MutablePoints = PointDataFacade->GetOut();
-		PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumOutPoints, PointDataFacade->GetAllocations());
+
+		// Transform & Seed are written for every output point in ProcessRange, ensure they're allocated even when absent on the input
+		PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumOutPoints, PointDataFacade->GetAllocations() | EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed);
 
 		// Initialize metadata entries at once, too expensive on thread
 

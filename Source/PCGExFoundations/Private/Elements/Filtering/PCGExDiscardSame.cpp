@@ -12,7 +12,7 @@
 #define PCGEX_NAMESPACE DiscardSame
 
 #if WITH_EDITOR
-void UPCGExDiscardSameSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExDiscardSameSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 72, 0)
 	{
@@ -21,7 +21,7 @@ void UPCGExDiscardSameSettings::ApplyDeprecation(UPCGNode* InOutNode)
 			TestAttributesHash = EPCGExDiscardAttributeHashMode::Single;
 		}
 	}
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

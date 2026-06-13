@@ -151,6 +151,7 @@ namespace PCGExMesh
 			}
 		}
 
+		DenseVertexCount = Vertices.Num();
 		bIsLoaded = true;
 	}
 
@@ -292,36 +293,32 @@ namespace PCGExMesh
 			}
 		}
 
+		DenseVertexCount = Vertices.Num();
 		bIsLoaded = true;
 	}
 
-	bool FGeoDynMesh::GetAveragedVertexColors(TArray<FVector4f>& OutColors) const
+	template <typename OverlayType, typename ValueType>
+	bool FGeoDynMesh::AverageOverlayPerVertex(const OverlayType* Overlay, TArray<ValueType>& OutValues) const
 	{
-		if (!SourceMesh || !SourceMesh->HasAttributes())
+		if (!Overlay || Overlay->ElementCount() == 0)
 		{
 			return false;
 		}
 
-		const UE::Geometry::FDynamicMeshColorOverlay* ColorOverlay = SourceMesh->Attributes()->PrimaryColors();
-		if (!ColorOverlay || ColorOverlay->ElementCount() == 0)
-		{
-			return false;
-		}
+		OutValues.SetNumZeroed(DenseVertexCount);
 
-		const int32 NumVerts = Vertices.Num();
-		OutColors.SetNumZeroed(NumVerts);
 		TArray<int32> Counts;
-		Counts.SetNumZeroed(NumVerts);
+		Counts.SetNumZeroed(DenseVertexCount);
 
 		for (const int32 TriID : SourceMesh->TriangleIndicesItr())
 		{
-			if (!ColorOverlay->IsSetTriangle(TriID))
+			if (!Overlay->IsSetTriangle(TriID))
 			{
 				continue;
 			}
 
 			const UE::Geometry::FIndex3i SrcTri = SourceMesh->GetTriangle(TriID);
-			const UE::Geometry::FIndex3i ColorTri = ColorOverlay->GetTriangle(TriID);
+			const UE::Geometry::FIndex3i ElemTri = Overlay->GetTriangle(TriID);
 
 			for (int i = 0; i < 3; i++)
 			{
@@ -331,20 +328,65 @@ namespace PCGExMesh
 					continue;
 				}
 
-				const FVector4f Color = ColorOverlay->GetElement(ColorTri[i]);
-				OutColors[*DenseIdx] += Color;
+				OutValues[*DenseIdx] += Overlay->GetElement(ElemTri[i]);
 				Counts[*DenseIdx]++;
 			}
 		}
 
-		for (int i = 0; i < NumVerts; i++)
+		for (int i = 0; i < DenseVertexCount; i++)
 		{
-			if (Counts[i] > 0)
+			if (Counts[i] > 1)
 			{
-				OutColors[i] /= static_cast<float>(Counts[i]);
+				OutValues[i] /= static_cast<float>(Counts[i]);
 			}
 		}
 
+		return true;
+	}
+
+	template <typename ValueType>
+	void FGeoDynMesh::RemapToTriangulation(TArray<ValueType>& Values) const
+	{
+		if (DesiredTriangulationType == EPCGExTriangulationType::Dual)
+		{
+			// Output vertices are triangle centroids; after MakeDual, Triangles hold source vertex IDs.
+			TArray<ValueType> Centroids;
+			Centroids.SetNumZeroed(Triangles.Num());
+
+			for (int32 i = 0; i < Triangles.Num(); i++)
+			{
+				const FIntVector3& Triangle = Triangles[i];
+				Centroids[i] = (Values[VertexIDToDenseIndex.FindChecked(Triangle.X)] + Values[VertexIDToDenseIndex.FindChecked(Triangle.Y)] + Values[VertexIDToDenseIndex.FindChecked(Triangle.Z)]) / 3.f;
+			}
+
+			Values = MoveTemp(Centroids);
+		}
+		else if (DesiredTriangulationType == EPCGExTriangulationType::Hollow)
+		{
+			// Centroids are appended after the original dense vertices; Triangles hold dense indices.
+			Values.SetNumZeroed(DenseVertexCount + Triangles.Num());
+
+			for (int32 i = 0; i < Triangles.Num(); i++)
+			{
+				const FIntVector3& Triangle = Triangles[i];
+				Values[DenseVertexCount + i] = (Values[Triangle.X] + Values[Triangle.Y] + Values[Triangle.Z]) / 3.f;
+			}
+		}
+	}
+
+	bool FGeoDynMesh::GetAveragedVertexColors(TArray<FVector4f>& OutColors) const
+	{
+		if (!SourceMesh || !SourceMesh->HasAttributes())
+		{
+			return false;
+		}
+
+		if (!AverageOverlayPerVertex(SourceMesh->Attributes()->PrimaryColors(), OutColors))
+		{
+			return false;
+		}
+
+		RemapToTriangulation(OutColors);
 		return true;
 	}
 
@@ -368,49 +410,53 @@ namespace PCGExMesh
 			return false;
 		}
 
-		const UE::Geometry::FDynamicMeshUVOverlay* UVOverlay = SourceMesh->Attributes()->GetUVLayer(Channel);
-		if (!UVOverlay || UVOverlay->ElementCount() == 0)
+		if (!AverageOverlayPerVertex(SourceMesh->Attributes()->GetUVLayer(Channel), OutUVs))
 		{
 			return false;
 		}
 
-		const int32 NumVerts = Vertices.Num();
-		OutUVs.SetNumZeroed(NumVerts);
-		TArray<int32> Counts;
-		Counts.SetNumZeroed(NumVerts);
+		RemapToTriangulation(OutUVs);
+		return true;
+	}
 
-		for (const int32 TriID : SourceMesh->TriangleIndicesItr())
+	bool FGeoDynMesh::GetAveragedVertexNormals(TArray<FVector3f>& OutNormals) const
+	{
+		if (!SourceMesh)
 		{
-			if (!UVOverlay->IsSetTriangle(TriID))
-			{
-				continue;
-			}
-
-			const UE::Geometry::FIndex3i SrcTri = SourceMesh->GetTriangle(TriID);
-			const UE::Geometry::FIndex3i UVTri = UVOverlay->GetTriangle(TriID);
-
-			for (int i = 0; i < 3; i++)
-			{
-				const int32* DenseIdx = VertexIDToDenseIndex.Find(SrcTri[i]);
-				if (!DenseIdx)
-				{
-					continue;
-				}
-
-				const FVector2f UV = UVOverlay->GetElement(UVTri[i]);
-				OutUVs[*DenseIdx] += UV;
-				Counts[*DenseIdx]++;
-			}
+			return false;
 		}
 
-		for (int i = 0; i < NumVerts; i++)
+		bool bHasNormals = false;
+
+		if (SourceMesh->HasAttributes())
 		{
-			if (Counts[i] > 0)
-			{
-				OutUVs[i] /= static_cast<float>(Counts[i]);
-			}
+			bHasNormals = AverageOverlayPerVertex(SourceMesh->Attributes()->PrimaryNormals(), OutNormals);
 		}
 
+		if (!bHasNormals && SourceMesh->HasVertexNormals())
+		{
+			// Merged vertices accumulate; normalize so dual/hollow averaging weighs each dense vertex equally.
+			OutNormals.SetNumZeroed(DenseVertexCount);
+
+			for (const TPair<int32, int32>& Pair : VertexIDToDenseIndex)
+			{
+				OutNormals[Pair.Value] += SourceMesh->GetVertexNormal(Pair.Key);
+			}
+
+			for (FVector3f& Normal : OutNormals)
+			{
+				Normal.Normalize();
+			}
+
+			bHasNormals = true;
+		}
+
+		if (!bHasNormals)
+		{
+			return false;
+		}
+
+		RemapToTriangulation(OutNormals);
 		return true;
 	}
 

@@ -9,6 +9,22 @@
 #include "Core/PCGExPathQuery.h"
 #include "Core/PCGExPathfinding.h"
 #include "Core/PCGExSearchAllocations.h"
+#include "Utils/PCGExScoredQueue.h"
+
+namespace PCGExPathfinding
+{
+	void FBellmanFordSearchAllocations::Reset()
+	{
+		Visited.SetRange(0, Visited.Num(), false);
+		TravelStack->Reset();
+		ScoredQueue->Reset();
+
+		for (double& Value : GScore)
+		{
+			Value = GScoreInit;
+		}
+	}
+}
 
 bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 	const TSharedPtr<PCGExPathfinding::FPathQuery>& InQuery,
@@ -39,7 +55,7 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExSearchOperationBellmanFord::FindPath);
 
 	TArray<double>& Distance = LocalAllocations->GScore;
-	const TSharedPtr<PCGEx::FHashLookup> TravelStack = LocalAllocations->TravelStack;
+	PCGEx::FHashLookup* TravelStack = LocalAllocations->TravelStack.Get();
 
 	const PCGExHeuristics::FLocalFeedbackHandler* Feedback = LocalFeedback.Get();
 
@@ -84,12 +100,6 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 
 		// Early termination if no relaxation occurred
 		if (!bAnyRelaxation)
-		{
-			break;
-		}
-
-		// Early exit if goal is reachable and we want to exit early
-		if (bEarlyExit && Distance[GoalNode.Index] != TNumericLimits<double>::Max() && !bAnyRelaxation)
 		{
 			break;
 		}
@@ -158,9 +168,10 @@ bool FPCGExSearchOperationBellmanFord::ResolveQuery(
 
 TSharedPtr<PCGExPathfinding::FSearchAllocations> FPCGExSearchOperationBellmanFord::NewAllocations() const
 {
-	TSharedPtr<PCGExPathfinding::FSearchAllocations> NewAllocations = FPCGExSearchOperation::NewAllocations();
-	NewAllocations->GScore.Init(TNumericLimits<double>::Max(), Cluster->Nodes->Num()); // Use TNumericLimits<double>::Max() as infinity
-	return NewAllocations;
+	TSharedPtr<PCGExPathfinding::FBellmanFordSearchAllocations> Allocations = MakeShared<PCGExPathfinding::FBellmanFordSearchAllocations>();
+	Allocations->Init(Cluster);
+	Allocations->InitGScore(TNumericLimits<double>::Max()); // TNumericLimits<double>::Max() as infinity
+	return Allocations;
 }
 
 void UPCGExSearchBellmanFord::CopySettingsFrom(const UPCGExInstancedFactory* Other)

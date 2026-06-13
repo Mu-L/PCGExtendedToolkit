@@ -13,7 +13,7 @@
 #pragma region UPCGSettings interface
 
 #if WITH_EDITOR
-void UPCGExPointsProcessorSettings::ApplyDeprecation(UPCGNode* InOutNode)
+void UPCGExPointsProcessorSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 73, 4)
 	{
@@ -38,7 +38,7 @@ void UPCGExPointsProcessorSettings::ApplyDeprecation(UPCGNode* InOutNode)
 		}
 	}
 
-	Super::ApplyDeprecation(InOutNode);
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

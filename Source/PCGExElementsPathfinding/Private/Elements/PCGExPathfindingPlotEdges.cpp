@@ -455,9 +455,18 @@ namespace PCGExPathfindingPlotEdges
 		}
 
 		// Build all queries first
+		int32 NumSubQueries = 0;
 		for (int i = 0; i < NumPlots; i++)
 		{
 			Queries[i]->BuildPlotQuery(ValidPlots[i], Settings->SeedPicking, Settings->GoalPicking);
+			NumSubQueries += Queries[i]->SubQueries.Num();
+		}
+
+		// A single early-exit query may explore only a fraction of the cluster; anything more
+		// re-evaluates edges enough times for the one-time bake sweep to pay for itself.
+		if (NumSubQueries > 1 || !SearchOperation->bEarlyExit)
+		{
+			HeuristicsHandler->BakeStaticEdgeScores();
 		}
 
 		if (bForceSingleThreadedProcessRange)
