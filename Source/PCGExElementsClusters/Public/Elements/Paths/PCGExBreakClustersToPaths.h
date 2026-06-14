@@ -5,8 +5,10 @@
 
 #include "CoreMinimal.h"
 #include "Factories/PCGExFactories.h"
+#include "PCGExFilterCommon.h"
 
 #include "Core/PCGExClustersProcessor.h"
+#include "Core/PCGExPointFilter.h"
 #include "Math/PCGExWinding.h"
 
 #include "PCGExBreakClustersToPaths.generated.h"
@@ -48,6 +50,7 @@ public:
 #endif
 
 protected:
+	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
@@ -100,6 +103,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bOmitAbovePointCount", ClampMin=2))
 	int32 MaxPointCount = 500;
 
+	/** When edge filters are connected, how many of a chain's edges must pass for that chain to be output as a path. Inert if no edge filters are connected. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OperateOn == EPCGExBreakClusterOperationTarget::Paths", EditConditionHides))
+	EPCGExUberFilterCollectionsMode EdgeFilterMode = EPCGExUberFilterCollectionsMode::All;
+
+	/** Minimum ratio (0-1) of a chain's edges that must pass the edge filters when using Partial mode. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin=0, ClampMax=1, EditCondition="OperateOn == EPCGExBreakClusterOperationTarget::Paths && EdgeFilterMode == EPCGExUberFilterCollectionsMode::Partial", EditConditionHides))
+	double EdgeFilterPassRatio = 0.5;
+
 private:
 	friend class FPCGExBreakClustersToPathsElement;
 };
@@ -110,6 +121,8 @@ struct FPCGExBreakClustersToPathsContext final : FPCGExClustersProcessorContext
 
 	TSharedPtr<PCGExData::FPointIOCollection> OutputPaths;
 	TArray<TSharedPtr<PCGExClusters::FNodeChain>> Chains;
+
+	TArray<TObjectPtr<const UPCGExPointFilterFactoryData>> EdgeFilterFactories;
 
 protected:
 	PCGEX_ELEMENT_BATCH_EDGE_DECL
@@ -147,6 +160,7 @@ namespace PCGExBreakClustersToPaths
 		virtual void CompleteWork() override;
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
 		virtual void ProcessEdges(const PCGExMT::FScope& Scope) override;
+		virtual void OnEdgesProcessingComplete() override;
 
 		virtual void Cleanup() override;
 	};

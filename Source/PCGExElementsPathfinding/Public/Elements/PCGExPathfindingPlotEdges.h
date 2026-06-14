@@ -74,11 +74,18 @@ protected:
 
 	//~Begin UObject interface
 public:
+	
+	virtual bool SupportsDataStealing() const override;
+	
 #if WITH_EDITOR
 	virtual void PostInitProperties() override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 	//~End UObject interface
+
+	/** Whether to output paths, or to forward Vtx & Edges with a per-element visited count instead. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
+	EPCGExPathfindingOutputMode OutputMode = EPCGExPathfindingOutputMode::Paths;
 
 	/** Scoring mode for combining multiple heuristics */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
@@ -89,22 +96,22 @@ public:
 	FPCGExMatchingDetails DataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Cluster);
 
 	/** Add seed point at the beginning of the path */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode==EPCGExPathfindingOutputMode::Paths", EditConditionHides))
 	bool bAddSeedToPath = false;
 
 	/** Add goal point at the beginning of the path */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode==EPCGExPathfindingOutputMode::Paths", EditConditionHides))
 	bool bAddGoalToPath = false;
 
 	/** Insert plot points inside the path */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode==EPCGExPathfindingOutputMode::Paths", EditConditionHides))
 	bool bAddPlotPointsToPath = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bClosedLoop = false;
 
 	/** What are the paths made of. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="OutputMode==EPCGExPathfindingOutputMode::Paths", EditConditionHides))
 	EPCGExPathComposition PathComposition = EPCGExPathComposition::Vtx;
 
 	/** Drive how a seed selects a node. */
@@ -119,19 +126,19 @@ public:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = Settings, Instanced, meta = (PCG_Overridable, NoResetToDefault, ShowOnlyInnerProperties))
 	TObjectPtr<UPCGExSearchInstancedFactory> SearchAlgorithm;
 
-	/** Output various statistics. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	/** Per-element visited counts written onto the forwarded Vtx & Edges. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(DisplayName="Visited", EditCondition="OutputMode==EPCGExPathfindingOutputMode::Visited", EditConditionHides))
 	FPCGExPathStatistics Statistics;
 
 	/** Whether or not to search for closest node using an octree. Depending on your dataset, enabling this may be either much faster, or much slower. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, AdvancedDisplay))
 	bool bUseOctreeSearch = false;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(EditCondition="OutputMode==EPCGExPathfindingOutputMode::Paths", EditConditionHides))
 	bool bOmitCompletePathOnFailedPlot = false;
 
 	/** ... */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(DisplayName="Paths Output Settings"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(DisplayName="Paths Output Settings", EditCondition="OutputMode==EPCGExPathfindingOutputMode::Paths", EditConditionHides))
 	FPCGExPathOutputDetails PathOutputDetails;
 
 	/** Which data is forwarded from plots to paths */
@@ -207,6 +214,15 @@ namespace PCGExPathfindingPlotEdges
 
 		TSharedPtr<PCGExClusters::FClusterDataForwardHandler> ClusterDataForwardHandler;
 
+		// Visited mode: per-element counts written via atomic increments. The vtx buffer is owned
+		// by the batch (shared across the batch's clusters); the edge buffer is per-processor.
+		int32* VisitedVtxData = nullptr;
+		int32* VisitedEdgeData = nullptr;
+		TSharedPtr<PCGExData::TBuffer<int32>> VisitedEdgeWriter;
+
+		// Handles one finished plot: marks visited counts (Visited mode) or builds the path.
+		void OnPlotComplete(const TSharedPtr<PCGExPathfinding::FPlotQuery>& Plot);
+
 	public:
 		FProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
 			: TProcessor(InVtxDataFacade, InEdgeDataFacade)
@@ -219,6 +235,7 @@ namespace PCGExPathfindingPlotEdges
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
+		virtual void Write() override;
 		virtual void Cleanup() override;
 	};
 
@@ -231,6 +248,9 @@ namespace PCGExPathfindingPlotEdges
 		TSet<const UPCGData*> IgnoreList;
 		TSharedPtr<PCGExData::FDataForwardHandler> VtxDataForwardHandler;
 
+		// Visited mode: vtx counts live on the (batch-shared) vtx facade, allocated once here.
+		TSharedPtr<PCGExData::TBuffer<int32>> VisitedVtxWriter;
+
 	public:
 		FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, const TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges)
 			: TBatch(InContext, InVtx, InEdges)
@@ -238,6 +258,7 @@ namespace PCGExPathfindingPlotEdges
 		}
 
 		virtual void Process() override;
+		virtual void OnProcessingPreparationComplete() override;
 		virtual bool PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor) override;
 		virtual void CompleteWork() override;
 	};

@@ -17,6 +17,7 @@
 #include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExDataMatcher.h"
 #include "Helpers/PCGExMatchingHelpers.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "Helpers/PCGExTargetsHandler.h"
 #include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
@@ -46,11 +47,21 @@ void UPCGExPathfindingPlotEdgesSettings::PostEditChangeProperty(FPropertyChanged
 
 PCGExData::EIOInit UPCGExPathfindingPlotEdgesSettings::GetMainOutputInitMode() const
 {
+	if (OutputMode == EPCGExPathfindingOutputMode::Visited)
+	{
+		// Duplicate when we write counts onto the vtx, otherwise forward untouched.
+		return (Statistics.bWritePointUseCount && !WantsDataStealing()) ? PCGExData::EIOInit::Duplicate : PCGExData::EIOInit::Forward;
+	}
 	return PCGExData::EIOInit::NoInit;
 }
 
 PCGExData::EIOInit UPCGExPathfindingPlotEdgesSettings::GetEdgeOutputInitMode() const
 {
+	if (OutputMode == EPCGExPathfindingOutputMode::Visited)
+	{
+		// Duplicate when we write counts onto the edges, otherwise forward untouched.
+		return (Statistics.bWriteEdgeUseCount && !WantsDataStealing()) ? PCGExData::EIOInit::Duplicate : PCGExData::EIOInit::Forward;
+	}
 	return PCGExData::EIOInit::NoInit;
 }
 
@@ -76,7 +87,15 @@ TArray<FPCGPinProperties> UPCGExPathfindingPlotEdgesSettings::InputPinProperties
 TArray<FPCGPinProperties> UPCGExPathfindingPlotEdgesSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
-	PCGEX_PIN_POINTS(PCGExPaths::Labels::OutputPathsLabel, "Paths output.", Required)
+	if (OutputMode == EPCGExPathfindingOutputMode::Visited)
+	{
+		// Forward the cluster (Vtx + Edges) carrying the visited counts.
+		PinProperties = Super::OutputPinProperties();
+	}
+	else
+	{
+		PCGEX_PIN_POINTS(PCGExPaths::Labels::OutputPathsLabel, "Paths output.", Required)
+	}
 	PCGExMatching::Helpers::DeclareMatchingRulesOutputs(DataMatching, PinProperties);
 	return PinProperties;
 }
@@ -237,6 +256,11 @@ void FPCGExPathfindingPlotEdgesContext::BuildPath(const TSharedPtr<PCGExPathfind
 
 PCGEX_INITIALIZE_ELEMENT(PathfindingPlotEdges)
 
+bool UPCGExPathfindingPlotEdgesSettings::SupportsDataStealing() const
+{
+	return OutputMode == EPCGExPathfindingOutputMode::Visited;
+}
+
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(PathfindingPlotEdges)
 
 bool FPCGExPathfindingPlotEdgesElement::Boot(FPCGExContext* InContext) const
@@ -247,6 +271,12 @@ bool FPCGExPathfindingPlotEdgesElement::Boot(FPCGExContext* InContext) const
 	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(PathfindingPlotEdges)
+
+	if (Settings->OutputMode == EPCGExPathfindingOutputMode::Visited)
+	{
+		PCGEX_VALIDATE_NAME_CONDITIONAL(Settings->Statistics.bWritePointUseCount, Settings->Statistics.PointUseCountAttributeName)
+		PCGEX_VALIDATE_NAME_CONDITIONAL(Settings->Statistics.bWriteEdgeUseCount, Settings->Statistics.EdgeUseCountAttributeName)
+	}
 
 	PCGEX_FWD(VtxDataForwarding)
 	PCGEX_FWD(EdgesDataForwarding)
@@ -332,6 +362,7 @@ bool FPCGExPathfindingPlotEdgesElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
+		const bool bVisited = Settings->OutputMode == EPCGExPathfindingOutputMode::Visited;
 		if (!Context->StartProcessingClusters(
 			[](const TSharedPtr<PCGExData::FPointIOTaggedEntries>& Entries)
 			{
@@ -339,6 +370,11 @@ bool FPCGExPathfindingPlotEdgesElement::AdvanceWork(FPCGExContext* InContext, co
 			}, [&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
 			{
 				NewBatch->SetWantsHeuristics(true, Settings->HeuristicScoreMode);
+				if (bVisited)
+				{
+					NewBatch->bRequiresWriteStep = true;
+					NewBatch->bWriteVtxDataFacade = Settings->Statistics.bWritePointUseCount;
+				}
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
@@ -347,10 +383,17 @@ bool FPCGExPathfindingPlotEdgesElement::AdvanceWork(FPCGExContext* InContext, co
 
 	PCGEX_CLUSTER_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
-	Context->OutputPaths->StageOutputs();
-	if (Settings->DataMatching.WantsUnmatchedSplit())
+	if (Settings->OutputMode == EPCGExPathfindingOutputMode::Visited)
 	{
 		Context->OutputPointsAndEdges();
+	}
+	else
+	{
+		Context->OutputPaths->StageOutputs();
+		if (Settings->DataMatching.WantsUnmatchedSplit())
+		{
+			Context->OutputPointsAndEdges();
+		}
 	}
 
 	return Context->TryComplete();
@@ -370,6 +413,8 @@ namespace PCGExPathfindingPlotEdges
 		{
 			return false;
 		}
+
+		const bool bVisited = Settings->OutputMode == EPCGExPathfindingOutputMode::Visited;
 
 		if (Context->bMatchForEdges)
 		{
@@ -400,10 +445,21 @@ namespace PCGExPathfindingPlotEdges
 
 		if (ValidPlots.IsEmpty())
 		{
+			if (bVisited && Settings->Statistics.bWriteEdgeUseCount)
+			{
+				// No plot reaches this cluster: still forward its edges carrying a zeroed Visited
+				// attribute so output is uniform across clusters. Vtx counts come from the batch writer.
+				VisitedEdgeWriter = EdgeDataFacade->GetWritable<int32>(Settings->Statistics.EdgeUseCountAttributeName, 0, true, PCGExData::EBufferInit::New);
+				EdgeDataFacade->WriteFastest(TaskManager);
+			}
 			return false;
 		}
 
-		ClusterDataForwardHandler = MakeShared<PCGExClusters::FClusterDataForwardHandler>(Cluster, StaticCastSharedPtr<FBatch>(ParentBatch.Pin())->VtxDataForwardHandler, Context->EdgesDataForwarding.TryGetHandler(EdgeDataFacade, false));
+		// Path-data forwarding only applies when we actually output paths.
+		if (!bVisited)
+		{
+			ClusterDataForwardHandler = MakeShared<PCGExClusters::FClusterDataForwardHandler>(Cluster, StaticCastSharedPtr<FBatch>(ParentBatch.Pin())->VtxDataForwardHandler, Context->EdgesDataForwarding.TryGetHandler(EdgeDataFacade, false));
+		}
 
 		if (Settings->bUseOctreeSearch)
 		{
@@ -418,34 +474,53 @@ namespace PCGExPathfindingPlotEdges
 			}
 		}
 
-		TSharedPtr<PCGExData::FPointIO> ReferenceIO = nullptr;
-
-		if (Settings->PathComposition == EPCGExPathComposition::Vtx)
-		{
-			ReferenceIO = VtxDataFacade->Source;
-		}
-		else if (Settings->PathComposition == EPCGExPathComposition::Edges)
-		{
-			ReferenceIO = EdgeDataFacade->Source;
-		}
-		else if (Settings->PathComposition == EPCGExPathComposition::VtxAndEdges)
-		{
-			// TODO : Implement
-		}
-
 		SearchOperation = Context->SearchAlgorithm->CreateOperation(); // Create a local copy
 		SearchOperation->PrepareForCluster(Cluster.Get());
 		const int32 NumPlots = ValidPlots.Num();
 		PCGExArrayHelpers::InitArray(Queries, NumPlots);
-		QueriesIO.Init(nullptr, NumPlots);
 
-		Context->OutputPaths->IncreaseReserve(NumPlots);
-		for (int i = 0; i < NumPlots; i++)
+		if (bVisited)
 		{
-			PCGEX_MAKE_SHARED(Query, PCGExPathfinding::FPlotQuery, Cluster.ToSharedRef(), Settings->bClosedLoop, i)
-			Queries[i] = Query;
-			QueriesIO[i] = Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(ReferenceIO, PCGExData::EIOInit::New);
-			QueriesIO[i]->Disable();
+			// Per-edge visited buffer lives on this processor's (per-cluster) edge facade.
+			// The vtx buffer is batch-shared and wired in via FBatch::PrepareSingle.
+			if (Settings->Statistics.bWriteEdgeUseCount)
+			{
+				VisitedEdgeWriter = EdgeDataFacade->GetWritable<int32>(Settings->Statistics.EdgeUseCountAttributeName, 0, true, Settings->Statistics.bResetValues ? PCGExData::EBufferInit::New : PCGExData::EBufferInit::Inherit);
+				if (VisitedEdgeWriter) { VisitedEdgeData = StaticCastSharedPtr<PCGExData::TArrayBuffer<int32>>(VisitedEdgeWriter)->GetOutValues()->GetData(); }
+			}
+
+			for (int i = 0; i < NumPlots; i++)
+			{
+				Queries[i] = MakeShared<PCGExPathfinding::FPlotQuery>(Cluster.ToSharedRef(), Settings->bClosedLoop, i);
+			}
+		}
+		else
+		{
+			TSharedPtr<PCGExData::FPointIO> ReferenceIO = nullptr;
+
+			if (Settings->PathComposition == EPCGExPathComposition::Vtx)
+			{
+				ReferenceIO = VtxDataFacade->Source;
+			}
+			else if (Settings->PathComposition == EPCGExPathComposition::Edges)
+			{
+				ReferenceIO = EdgeDataFacade->Source;
+			}
+			else if (Settings->PathComposition == EPCGExPathComposition::VtxAndEdges)
+			{
+				// TODO : Implement
+			}
+
+			QueriesIO.Init(nullptr, NumPlots);
+
+			Context->OutputPaths->IncreaseReserve(NumPlots);
+			for (int i = 0; i < NumPlots; i++)
+			{
+				PCGEX_MAKE_SHARED(Query, PCGExPathfinding::FPlotQuery, Cluster.ToSharedRef(), Settings->bClosedLoop, i)
+				Queries[i] = Query;
+				QueriesIO[i] = Context->OutputPaths->Emplace_GetRef<UPCGPointArrayData>(ReferenceIO, PCGExData::EIOInit::New);
+				QueriesIO[i]->Disable();
+			}
 		}
 
 		bForceSingleThreadedProcessRange = HeuristicsHandler->HasGlobalFeedback() || !Settings->bGreedyQueries;
@@ -480,9 +555,7 @@ namespace PCGExPathfindingPlotEdges
 				Query->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE, NextIndex](const TSharedPtr<PCGExPathfinding::FPlotQuery>& Plot)
 				{
 					PCGEX_ASYNC_THIS
-					This->Context->BuildPath(Plot, This->QueriesIO[Plot->QueryIndex]);
-					This->QueriesIO[Plot->QueryIndex]->IOIndex = This->EdgeDataFacade->Source->IOIndex * 100000 + Plot->QueryIndex;
-					Plot->Cleanup();
+					This->OnPlotComplete(Plot);
 
 					// Start next query if there is one
 					if (NextIndex < This->Queries.Num())
@@ -512,11 +585,33 @@ namespace PCGExPathfindingPlotEdges
 			Query->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TSharedPtr<PCGExPathfinding::FPlotQuery>& Plot)
 			{
 				PCGEX_ASYNC_THIS
-				This->Context->BuildPath(Plot, This->QueriesIO[Plot->QueryIndex]);
-				This->QueriesIO[Plot->QueryIndex]->IOIndex = This->EdgeDataFacade->Source->IOIndex * 100000 + Plot->QueryIndex;
-				Plot->Cleanup();
+				This->OnPlotComplete(Plot);
 			};
 			Query->FindPaths(TaskManager, SearchOperation, SearchAllocations, HeuristicsHandler);
+		}
+	}
+
+	void FProcessor::OnPlotComplete(const TSharedPtr<PCGExPathfinding::FPlotQuery>& Plot)
+	{
+		if (Settings->OutputMode == EPCGExPathfindingOutputMode::Visited)
+		{
+			PCGExPathfinding::MarkPlotVisited(*Cluster, *Plot, VisitedVtxData, VisitedEdgeData);
+		}
+		else
+		{
+			Context->BuildPath(Plot, QueriesIO[Plot->QueryIndex]);
+			QueriesIO[Plot->QueryIndex]->IOIndex = EdgeDataFacade->Source->IOIndex * 100000 + Plot->QueryIndex;
+		}
+		Plot->Cleanup();
+	}
+
+	void FProcessor::Write()
+	{
+		// Visited mode only: flush this cluster's per-edge counts. The batch flushes the shared
+		// vtx facade (bWriteVtxDataFacade). In Paths mode the write step never runs.
+		if (VisitedEdgeData)
+		{
+			EdgeDataFacade->WriteFastest(TaskManager);
 		}
 	}
 
@@ -541,6 +636,18 @@ namespace PCGExPathfindingPlotEdges
 		TBatch<FProcessor>::Process();
 	}
 
+	void FBatch::OnProcessingPreparationComplete()
+	{
+		PCGEX_TYPED_CONTEXT_AND_SETTINGS(PathfindingPlotEdges)
+
+		if (Settings->OutputMode == EPCGExPathfindingOutputMode::Visited && Settings->Statistics.bWritePointUseCount)
+		{
+			VisitedVtxWriter = VtxDataFacade->GetWritable<int32>(Settings->Statistics.PointUseCountAttributeName, 0, true, Settings->Statistics.bResetValues ? PCGExData::EBufferInit::New : PCGExData::EBufferInit::Inherit);
+		}
+
+		TBatch<FProcessor>::OnProcessingPreparationComplete();
+	}
+
 	bool FBatch::PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor)
 	{
 		if (!TBatch<FProcessor>::PrepareSingle(InProcessor))
@@ -549,6 +656,10 @@ namespace PCGExPathfindingPlotEdges
 		}
 		PCGEX_TYPED_PROCESSOR
 		TypedProcessor->VtxIgnoreList = &IgnoreList;
+		if (VisitedVtxWriter)
+		{
+			TypedProcessor->VisitedVtxData = StaticCastSharedPtr<PCGExData::TArrayBuffer<int32>>(VisitedVtxWriter)->GetOutValues()->GetData();
+		}
 		return true;
 	}
 
@@ -558,6 +669,12 @@ namespace PCGExPathfindingPlotEdges
 
 		if (Settings->DataMatching.WantsUnmatchedSplit())
 		{
+			// In Visited mode the cluster outputs are already initialized (Duplicate/Forward) and hold
+			// the per-element visited counts, so unmatched data is only re-pinned. Re-initializing to
+			// Forward here would destroy that count-carrying output (and the buffer a writer is bound to).
+			// In Paths mode the outputs are NoInit, so the Forward init is required to emit anything.
+			const bool bReinitUnmatched = Settings->OutputMode != EPCGExPathfindingOutputMode::Visited;
+
 			int32 NumEdgesMatched = 0;
 			for (const TSharedRef<PCGExClusterMT::IProcessor>& InProcessor : Processors)
 			{
@@ -569,19 +686,20 @@ namespace PCGExPathfindingPlotEdges
 				else
 				{
 					P->EdgeDataFacade->Source->OutputPin = PCGExMatching::Labels::OutputUnmatchedEdgesLabel;
-					P->EdgeDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
+					if (bReinitUnmatched) { P->EdgeDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward); }
 				}
 			}
 
 			if (NumEdgesMatched != Processors.Num())
 			{
 				VtxDataFacade->Source->OutputPin = PCGExMatching::Labels::OutputUnmatchedVtxLabel;
-				VtxDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
+				if (bReinitUnmatched) { VtxDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward); }
 			}
 		}
 
 		TBatch<FProcessor>::CompleteWork();
 	}
+
 }
 
 #undef LOCTEXT_NAMESPACE

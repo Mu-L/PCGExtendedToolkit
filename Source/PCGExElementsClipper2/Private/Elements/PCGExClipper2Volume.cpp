@@ -8,14 +8,18 @@
 
 #include "Model.h"
 #include "Components/BrushComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/Polys.h"
 #include "Engine/TriggerVolume.h"
 #include "GameFramework/Volume.h"
+#include "Engine/StaticMesh.h"
 #include "PhysicsEngine/BodySetup.h"
+#include "PhysicsEngine/BodyInstance.h"
 
 #include "PCGComponent.h"
 #include "PCGElement.h"
 #include "PCGManagedResource.h"
+#include "PCGPin.h"
 #include "Helpers/PCGHelpers.h"
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttributeTpl.h"
@@ -25,6 +29,7 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGPrimitiveData.h"
 #include "Data/PCGVolumeData.h"
 #include "Data/Utils/PCGExDataForward.h"
 #include "Details/PCGExSettingsDetails.h"
@@ -41,6 +46,7 @@ struct FPCGExVolumeSpec
 {
 	TArray<FKConvexElem> ConvexElems;
 	TArray<FPoly> BrushPolys;
+	FBox LocalBounds = FBox(ForceInit); // actor-local AABB of the prism set; sets the static mesh bounds in Primitive mode (no render data to derive them from).
 	FTransform ActorTransform = FTransform::Identity;
 	int32 GroupIndex = 0;
 	int32 SourceFacadeIndex = INDEX_NONE; // AllOpData index of the group's representative path (for @Data forwarding).
@@ -110,6 +116,8 @@ UPCGExClipper2VolumeSettings::UPCGExClipper2VolumeSettings(const FObjectInitiali
 	: Super(ObjectInitializer)
 {
 	VolumeClass = ATriggerVolume::StaticClass();
+	PrimitiveActorClass = AActor::StaticClass();
+	CollisionBody.SetCollisionProfileName(FName("BlockAll"));
 
 	// Default to Auto grouping: an outer footprint + its nested rings form one volume (rings become holes),
 	// unrelated footprints stay separate. Dropdown exposed so users can pick Separate or Merged.
@@ -127,10 +135,17 @@ FPCGExGeo2DProjectionDetails UPCGExClipper2VolumeSettings::GetProjectionDetails(
 
 TArray<FPCGPinProperties> UPCGExClipper2VolumeSettings::OutputPinProperties() const
 {
-	// One volume data per spawned actor. The actor reference and the source path's @Data attributes ride along in
-	// the volume's @Data domain, so downstream graphs can address/filter the volumes like the source paths.
+	// One spatial data per spawned actor. The actor reference and the source path's @Data attributes ride along in
+	// the output's @Data domain, so downstream graphs can address/filter the outputs like the source paths.
 	TArray<FPCGPinProperties> PinProperties;
-	PCGEX_PIN_VOLUMES(FName("Volumes"), TEXT("Volume data created from spawned actors, one per spawned volume."), Normal)
+	if (OutputMode == EPCGExClipper2VolumeOutputMode::Primitive)
+	{
+		PCGEX_PIN_PRIMITIVES(PCGPinConstants::DefaultOutputLabel, TEXT("Simple static-mesh colliders, one per spawned actor."), Normal)
+	}
+	else
+	{
+		PCGEX_PIN_VOLUMES(PCGPinConstants::DefaultOutputLabel, TEXT("Volume data created from spawned actors, one per spawned volume."), Normal)
+	}
 	return PinProperties;
 }
 
@@ -202,45 +217,130 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			SpawnParams.ObjectFlags |= RF_Transient | RF_NonPIEDuplicateTransient;
 		}
 
-		AVolume* Volume = World->SpawnActor<AVolume>(Settings->VolumeClass, Spec->ActorTransform, SpawnParams);
-		if (!Volume)
-		{
-			continue;
-		}
+		// Host actor + the spatial data wrapping its collision; built per OutputMode below.
+		AActor* SpawnedActor = nullptr;
+		UPCGSpatialData* OutData = nullptr;
 
-		UBrushComponent* BrushComp = Volume->GetBrushComponent();
-		if (!BrushComp)
+		if (Settings->OutputMode == EPCGExClipper2VolumeOutputMode::Primitive)
 		{
-			Volume->Destroy();
-			continue;
-		}
+			TSubclassOf<AActor> ActorClass = Settings->PrimitiveActorClass;
+			if (!ActorClass)
+			{
+				ActorClass = AActor::StaticClass();
+			}
+			AActor* Actor = World->SpawnActor<AActor>(ActorClass, Spec->ActorTransform, SpawnParams);
+			if (!Actor)
+			{
+				continue;
+			}
+			
+			// Collision-only static mesh: our convex pieces as simple geometry. No complex mesh exists, so
+			// CTF_UseSimpleAsComplex makes the simple hulls answer every query (incl. line traces). With no render
+			// data, bounds are set explicitly so UPCGPrimitiveData (which caches the component bounds) and the
+			// voxel sampler have a valid extent.
+			UStaticMesh* Mesh = NewObject<UStaticMesh>(Actor, NAME_None, bTransientSpawn ? RF_Transient : RF_NoFlags);
+			Mesh->CreateBodySetup();
 
-		// Collision body from our convex pieces (the actual trigger geometry -- no BSP).
-		UBodySetup* BodySetup = NewObject<UBodySetup>(BrushComp);
-		BodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
-		BodySetup->bGenerateNonMirroredCollision = true;
-		BodySetup->bGenerateMirroredCollision = false;
-		BodySetup->AggGeom.ConvexElems = MoveTemp(Spec->ConvexElems);
-		BodySetup->CreatePhysicsMeshes();
-		BrushComp->BrushBodySetup = BodySetup;
+			UBodySetup* BodySetup = Mesh->GetBodySetup();
+			BodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
+			BodySetup->bGenerateNonMirroredCollision = true;
+			BodySetup->bGenerateMirroredCollision = false;
+			BodySetup->AggGeom.ConvexElems = MoveTemp(Spec->ConvexElems);
+			BodySetup->CreatePhysicsMeshes();
+
+			Mesh->SetExtendedBounds(FBoxSphereBounds(Spec->LocalBounds));
+
+			UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(Actor, NAME_None, bTransientSpawn ? RF_Transient : RF_NoFlags);
+			const bool bActorHadRoot = Actor->GetRootComponent() != nullptr;
+			if (bActorHadRoot)
+			{
+				MeshComp->SetupAttachment(Actor->GetRootComponent());
+			}
+			else
+			{
+				Actor->SetRootComponent(MeshComp);
+			}
+			MeshComp->SetStaticMesh(Mesh);
+
+			// Apply the user's collision setup. bUseDefaultCollision must be off or UpdateCollisionFromStaticMesh
+			// (run during registration) would overwrite it with the mesh asset's default profile.
+			MeshComp->bUseDefaultCollision = false;
+			MeshComp->BodyInstance.CopyBodyInstancePropertiesFrom(&Settings->CollisionBody);
+			MeshComp->RegisterComponent();
+			Actor->AddInstanceComponent(MeshComp);
+
+			// A class with no native root (the default plain AActor) can't be placed by SpawnActor -- there's no root
+			// to receive the transform -- so it lands at the origin. Position it now that our component is the root.
+			// A class that brought its own root was already placed by SpawnActor, so leave its transform alone.
+			if (!bActorHadRoot)
+			{
+				Actor->SetActorTransform(Spec->ActorTransform);
+			}
+			MeshComp->RecreatePhysicsState();
+
+			// UPCGPrimitiveData samples through OverlapComponent, so the body must already be registered + cooked
+			// (Initialize caches the component's current bounds).
+			UPCGPrimitiveData* PrimitiveData = ManagedObjects->New<UPCGPrimitiveData>();
+			PrimitiveData->Initialize(MeshComp);
+
+			SpawnedActor = Actor;
+			OutData = PrimitiveData;
+		}
+		else
+		{
+			AVolume* Volume = World->SpawnActor<AVolume>(Settings->VolumeClass, Spec->ActorTransform, SpawnParams);
+			if (!Volume)
+			{
+				continue;
+			}
+
+			UBrushComponent* BrushComp = Volume->GetBrushComponent();
+			if (!BrushComp)
+			{
+				Volume->Destroy();
+				continue;
+			}
+
+			// Collision body from our convex pieces (the actual trigger geometry -- no BSP).
+			UBodySetup* BodySetup = NewObject<UBodySetup>(BrushComp);
+			BodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
+			BodySetup->bGenerateNonMirroredCollision = true;
+			BodySetup->bGenerateMirroredCollision = false;
+			BodySetup->AggGeom.ConvexElems = MoveTemp(Spec->ConvexElems);
+			BodySetup->CreatePhysicsMeshes();
+			BrushComp->BrushBodySetup = BodySetup;
 
 #if WITH_EDITOR
-		// Brush model for editor wireframe + render/selection bounds (collision is independent of this).
-		UModel* Model = NewObject<UModel>(BrushComp);
-		Model->Initialize(nullptr, true);
-		Model->Polys = NewObject<UPolys>(Model);
-		Model->Polys->Element = MoveTemp(Spec->BrushPolys);
-		Model->BuildBound();
-		BrushComp->Brush = Model;
+			// Brush model for editor wireframe + render/selection bounds (collision is independent of this).
+			UModel* Model = NewObject<UModel>(BrushComp);
+			Model->Initialize(nullptr, true);
+			Model->Polys = NewObject<UPolys>(Model);
+			Model->Polys->Element = MoveTemp(Spec->BrushPolys);
+			Model->BuildBound();
+			BrushComp->Brush = Model;
 #endif
 
-		if (Settings->bOverrideCollisionProfile)
-		{
-			BrushComp->SetCollisionProfileName(Settings->CollisionProfileName);
+			if (Settings->bOverrideCollisionProfile)
+			{
+				BrushComp->SetCollisionProfileName(Settings->CollisionProfileName);
+			}
+
+			BrushComp->RecreatePhysicsState();
+			BrushComp->MarkRenderStateDirty();
+
+			UPCGVolumeData* VolumeData = ManagedObjects->New<UPCGVolumeData>();
+			VolumeData->Initialize(Volume);
+
+			SpawnedActor = Volume;
+			OutData = VolumeData;
 		}
 
-		BrushComp->RecreatePhysicsState();
-		BrushComp->MarkRenderStateDirty();
+		if (!SpawnedActor || !OutData)
+		{
+			continue;
+		}
+		
+		AddNotifyActor(SpawnedActor);
 
 		// Create + register the managed resource lazily on first spawn so partial work is still tracked.
 		if (!ManagedActors)
@@ -253,22 +353,19 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			MutableComponent->AddToManagedResources(ManagedActors);
 		}
 
-		PCGExCollections::FinalizeSpawnedActor(Volume, ManagedActors, bTransientSpawn);
+		PCGExCollections::FinalizeSpawnedActor(SpawnedActor, ManagedActors, bTransientSpawn);
 
-		// One UPCGVolumeData per spawned actor, emitted on the "Volumes" pin.
-		UPCGVolumeData* VolumeData = ManagedObjects->New<UPCGVolumeData>();
-		VolumeData->Initialize(Volume);
+		// One spatial data per spawned actor, emitted on the default output pin.
+		FPCGTaggedData& OutTagged = OutputData.TaggedData.Emplace_GetRef();
+		OutTagged.Pin = PCGPinConstants::DefaultOutputLabel;
+		OutTagged.Data = OutData;
 
-		FPCGTaggedData& OutVolume = OutputData.TaggedData.Emplace_GetRef();
-		OutVolume.Pin = FName("Volumes");
-		OutVolume.Data = VolumeData;
-
-		// Carry the source path's tags + @Data attributes onto the volume so downstream graphs can address/filter
-		// the volumes the same way they would the originating paths.
+		// Carry the source path's tags + @Data attributes onto the output so downstream graphs can address/filter
+		// the spawned actors the same way they would the originating paths.
 		const int32 SrcIdx = Spec->SourceFacadeIndex;
 		if (AllOpData && AllOpData->Facades.IsValidIndex(SrcIdx))
 		{
-			AllOpData->Facades[SrcIdx]->Source->Tags->DumpTo(OutVolume.Tags);
+			AllOpData->Facades[SrcIdx]->Source->Tags->DumpTo(OutTagged.Tags);
 
 			if (!HandlersBySource.Contains(SrcIdx))
 			{
@@ -284,13 +381,15 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			}
 			if (const TSharedPtr<PCGExData::FDataForwardHandler>& Handler = HandlersBySource.FindChecked(SrcIdx))
 			{
-				Handler->Forward(0, VolumeData->Metadata);
+				Handler->Forward(0, OutData->Metadata);
 			}
 		}
 
 		// Written last so the node's own actor reference wins any @Data name collision with a forwarded attribute.
-		PCGExData::Helpers::SetDataValue<FSoftObjectPath>(VolumeData, AttrName, FSoftObjectPath(Volume));
+		PCGExData::Helpers::SetDataValue<FSoftObjectPath>(OutData, AttrName, FSoftObjectPath(SpawnedActor));
 	}
+	
+	ExecuteOnNotifyActors(Settings->PostProcessFunctionNames);
 }
 
 void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProcessingGroup>& Group)
@@ -424,6 +523,8 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			Tops.Add(Top);
 			Elem.VertexData.Add(Bottom);
 			Elem.VertexData.Add(Top);
+			Spec->LocalBounds += Bottom;
+			Spec->LocalBounds += Top;
 		}
 
 		Elem.UpdateElemBox();
