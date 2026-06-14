@@ -65,6 +65,20 @@ struct FPCGExDecompOccupancyGrid
 		const FVector& CellSize,
 		const FTransform& CustomTransform = FTransform::Identity);
 
+	/**
+	 * Compute per-cell box sizes from a voxel -> CellID map, in the GRID-LOCAL frame (the grid's
+	 * own axes): each cell's size is its voxel-AABB span times VoxelSize, (Max - Min + 1) * VoxelSize.
+	 * For an oriented or scaled grid this is intentionally NOT a world-axis-aligned size, unlike the
+	 * world-space node-position AABB that node-grouping decompositions use.
+	 * VoxelCellIDs must hold one entry per voxel (Num() == TotalVoxels).
+	 * OutSizes is sized to NumCells. Cells with no voxels get ZeroVector.
+	 */
+	void ComputeCellSizes(
+		const TArray<int32>& VoxelCellIDs,
+		int32 NumCells,
+		const FVector& VoxelSize,
+		TArray<FVector>& OutSizes) const;
+
 	FORCEINLINE int32 FlatIndex(const int32 X, const int32 Y, const int32 Z) const
 	{
 		return X + Y * GridDimensions.X + Z * GridDimensions.X * GridDimensions.Y;

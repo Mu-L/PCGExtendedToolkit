@@ -74,6 +74,20 @@ bool FPCGExClusterDecompositionElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
+	// Output attribute names must be distinct; a same-name collision silently clobbers data when
+	// buffers flush (e.g. the FVector Cell Size over an int32 Cell ID / Cell Count of the same name).
+	{
+		const FName CellIDName = Settings->CellIDAttributeName;
+		const FName CellCountName = Settings->CellCountAttributeName;
+		const FName CellSizeName = Settings->CellSizeAttributeName;
+
+		if ((CellSizeName != NAME_None && (CellSizeName == CellIDName || CellSizeName == CellCountName)) ||
+			(CellCountName != NAME_None && CellCountName == CellIDName))
+		{
+			PCGE_LOG(Warning, GraphAndLog, FTEXT("Cluster Decomposition output attribute names (Cell ID / Cell Count / Cell Size) are not distinct; same-named outputs will overwrite each other."));
+		}
+	}
+
 	return true;
 }
 
@@ -135,10 +149,14 @@ namespace PCGExClusterDecomposition
 
 		FPCGExDecompositionResult Result;
 		Result.Init(Cluster->Nodes->Num());
+		Result.bWantsCellSizes = CellSizeBuffer != nullptr;
 
-		if (Operation->Decompose(Result))
+		if (Operation->DecomposeAndFinalize(Result))
 		{
 			const int32 Offset = EdgeDataFacade->Source->IOIndex * 1000000;
+			// DecomposeAndFinalize guarantees CellSizes is sized to NumCells when bWantsCellSizes.
+			const bool bWriteCellSize = Result.bWantsCellSizes;
+
 			for (int32 NodeIndex = 0; NodeIndex < Result.NodeCellIDs.Num(); NodeIndex++)
 			{
 				const int32 CellID = Result.NodeCellIDs[NodeIndex];
@@ -146,7 +164,14 @@ namespace PCGExClusterDecomposition
 				{
 					continue;
 				}
-				CellIDBuffer->SetValue(Cluster->GetNodePointIndex(NodeIndex), Offset + CellID);
+
+				const int32 PointIndex = Cluster->GetNodePointIndex(NodeIndex);
+				CellIDBuffer->SetValue(PointIndex, Offset + CellID);
+
+				if (bWriteCellSize)
+				{
+					CellSizeBuffer->SetValue(PointIndex, Result.CellSizes[CellID]);
+				}
 			}
 
 			if (CellCountBuffer)
@@ -217,6 +242,11 @@ namespace PCGExClusterDecomposition
 			CellCountBuffer = VtxDataFacade->GetWritable<int32>(Settings->CellCountAttributeName, 0, false, PCGExData::EBufferInit::New);
 		}
 
+		if (Settings->CellSizeAttributeName != NAME_None)
+		{
+			CellSizeBuffer = VtxDataFacade->GetWritable<FVector>(Settings->CellSizeAttributeName, FVector::ZeroVector, true, PCGExData::EBufferInit::New);
+		}
+
 		Context->Decomposition->PrepareVtxFacade(VtxDataFacade);
 		TBatch<FProcessor>::OnProcessingPreparationComplete();
 	}
@@ -231,6 +261,7 @@ namespace PCGExClusterDecomposition
 
 		TypedProcessor->CellIDBuffer = CellIDBuffer;
 		TypedProcessor->CellCountBuffer = CellCountBuffer;
+		TypedProcessor->CellSizeBuffer = CellSizeBuffer;
 
 		return true;
 	}
