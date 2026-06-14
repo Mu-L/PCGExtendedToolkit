@@ -58,11 +58,13 @@ public:
 #endif
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
+	virtual bool OutputPinsCanBeDeactivated() const override { return true; }
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourceFiltersLabel, "Filters which points can be processed as overlapping", PCGExFactories::PointFilters, false)
 
 protected:
 	virtual bool HasDynamicPins() const override;
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
+	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
@@ -94,6 +96,10 @@ public:
 	/** Whether to do a OneMinus on the normalized overlap count value */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="   └─ OneMinus", EditCondition="Mode == EPCGExSelfPruningMode::WriteResult && Units == EPCGExMeanMeasure::Relative", EditConditionHides))
 	bool bOutputOneMinusOverlap = false;
+
+	/** If enabled, output the pruned-away points to a separate 'Discarded' pin. Authoring-time only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Output Discarded", EditCondition="Mode == EPCGExSelfPruningMode::Prune", EditConditionHides))
+	bool bOutputDiscard = false;
 
 	/** If enabled, does very precise and EXPENSIVE spatial tests. Only supported for pruning. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Expansion", meta=(PCG_NotOverridable))
@@ -140,6 +146,8 @@ public:
 struct FPCGExSelfPruningContext final : FPCGExPointsProcessorContext
 {
 	friend class FPCGExSelfPruningElement;
+
+	TSharedPtr<PCGExData::FPointIOCollection> Discarded;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL

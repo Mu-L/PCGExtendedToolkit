@@ -194,6 +194,10 @@ void FPCGExContext::ExecuteOnNotifyActors(const TArray<FName>& FunctionNames)
 	{
 		if (IsInGameThread())
 		{
+			// FindUserFunctions does FindObject/StaticFindObjectFast -- illegal mid package-save or GC. This GT branch
+			// can be reached via the marshal below being pumped during SavePackage's render flush; bail rather than crash.
+			if (PCGExMT::IsObjectWorkBlocked()) { return; }
+
 			TArray<AActor*> NotifyActorsArray = NotifyActors.Array();
 			for (AActor* TargetActor : NotifyActorsArray)
 			{

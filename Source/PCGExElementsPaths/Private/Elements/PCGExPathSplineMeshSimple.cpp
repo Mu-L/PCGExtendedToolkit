@@ -7,6 +7,7 @@
 #include "Components/SplineMeshComponent.h"
 
 #include "PCGExVersion.h"
+#include "Core/PCGExMT.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -190,6 +191,9 @@ bool FPCGExPathSplineMeshSimpleElement::AdvanceWork(FPCGExContext* InContext, co
 		}
 	}
 
+	// Output spawns spline-mesh components and runs user functions -- illegal during a package save or GC (the batch's
+	// game-thread spawn loop and this block can be pumped mid-SavePackage). Defer the whole output phase.
+	PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
 	PCGEX_OUTPUT_VALID_PATHS(MainPoints)

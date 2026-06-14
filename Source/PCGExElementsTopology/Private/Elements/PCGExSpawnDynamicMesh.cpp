@@ -7,6 +7,7 @@
 #include "PCGExTopology.h"
 #include "PCGPin.h"
 #include "Components/DynamicMeshComponent.h"
+#include "Core/PCGExMT.h"
 #include "Data/PCGDynamicMeshData.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 
@@ -56,6 +57,9 @@ bool FPCGExSpawnDynamicMeshElement::AdvanceWork(FPCGExContext* InContext, const 
 	{
 		PCGExHelpers::LoadBlocking_AnyThread(TemplateResources, Context);
 	}
+
+	// Output creates UObjects (NewObject) and attaches components -- illegal during a package save / GC. Defer (re-tick) until clear.
+	PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED
 
 	int32 Index = -1;
 	for (const FPCGTaggedData& Input : InContext->InputData.GetInputsByPin(PCGExTopology::Labels::SourceMeshLabel))

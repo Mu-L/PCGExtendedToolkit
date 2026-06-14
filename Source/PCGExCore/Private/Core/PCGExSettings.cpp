@@ -39,7 +39,10 @@ void UPCGExSettings::ApplyDeprecation(UPCGNode* InOutNode)
 	}
 	
 	Super::ApplyDeprecation(InOutNode);
+	
 	PCGEX_UPDATE_DATA_VERSION_TO_LATEST
+	
+	ensure(PCGExDataVersion == PCGExVersion::Latest);
 }
 
 void UPCGExSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)

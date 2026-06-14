@@ -10,6 +10,7 @@
 #include "PCGParamData.h"
 #include "Components/SplineMeshComponent.h"
 #include "Containers/PCGExScopedContainers.h"
+#include "Core/PCGExMT.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -31,7 +32,6 @@
 
 #if WITH_EDITOR
 
-
 void UPCGExPathSplineMeshSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
 	if (PCGExDataVersion == INDEX_NONE)
@@ -44,7 +44,7 @@ void UPCGExPathSplineMeshSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* In
 	{
 		SelectorMode = EPCGExSelectorMode::Legacy;
 	}
-
+	
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -64,7 +64,7 @@ void UPCGExPathSplineMeshSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 			bUseStagedPoints = false;
 		}
 	}
-
+	
 	Super::PCGExApplyDeprecation(InOutNode);
 }
 
@@ -383,6 +383,10 @@ bool FPCGExPathSplineMeshElement::AdvanceWork(FPCGExContext* InContext, const UP
 			return true;
 		}
 	}
+
+	// Output drives a main-thread loop that spawns spline mesh components (NewObject / AttachManagedComponent) and
+	// calls ExecuteOnNotifyActors -- illegal during a package save or GC. Defer the whole output phase (re-tick).
+	PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 

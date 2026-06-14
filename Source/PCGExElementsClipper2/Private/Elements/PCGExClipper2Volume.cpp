@@ -56,6 +56,17 @@ struct FPCGExVolumeSpec
 // PCGExClipper2Decomposition; only the volume-specific prism tessellation is here.
 namespace PCGExClipper2Volume
 {
+	// Convex pieces as simple collision, shared by both output modes. CTF_UseSimpleAsComplex makes the hulls answer
+	// every query since there's no complex/per-tri mesh.
+	void ConfigureConvexBodySetup(UBodySetup* BodySetup, TArray<FKConvexElem>&& ConvexElems)
+	{
+		BodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
+		BodySetup->bGenerateNonMirroredCollision = true;
+		BodySetup->bGenerateMirroredCollision = false;
+		BodySetup->AggGeom.ConvexElems = MoveTemp(ConvexElems);
+		BodySetup->CreatePhysicsMeshes();
+	}
+
 	// Build the side/cap polys of a vertical prism (local space) for editor wireframe + bounds.
 	void AddPrismPolys(const TArray<FVector>& Bottoms, const TArray<FVector>& Tops, TArray<FPoly>& OutPolys)
 	{
@@ -170,6 +181,14 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		return;
 	}
 
+	// Backstop for the narrow race where a package save / GC begins after the output dispatch's check but before this
+	// marshaled task runs (it can be pumped from SavePackage's render flush). Creating/finding UObjects is illegal
+	// then; skip rather than crash. The common case is already deferred in FPCGExClipper2ProcessorElement::AdvanceWork.
+	if (PCGExMT::IsObjectWorkBlocked())
+	{
+		return;
+	}
+
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
 	// Each spawned volume's actor reference is written into the output volume data's @Data domain under this name.
@@ -253,14 +272,13 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			// voxel sampler have a valid extent.
 			UStaticMesh* Mesh = NewObject<UStaticMesh>(Actor, NAME_None, bTransientSpawn ? RF_Transient : RF_NoFlags);
 			Mesh->CreateBodySetup();
+			PCGExClipper2Volume::ConfigureConvexBodySetup(Mesh->GetBodySetup(), MoveTemp(Spec->ConvexElems));
 
-			UBodySetup* BodySetup = Mesh->GetBodySetup();
-			BodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
-			BodySetup->bGenerateNonMirroredCollision = true;
-			BodySetup->bGenerateMirroredCollision = false;
-			BodySetup->AggGeom.ConvexElems = MoveTemp(Spec->ConvexElems);
-			BodySetup->CreatePhysicsMeshes();
-
+			// Render-data-less mesh: set bounds explicitly (UPCGPrimitiveData caches them; the voxel sampler needs a
+			// valid extent). Also encode the AABB as bounds extensions so a later CalculateExtendedBounds -- which
+			// would otherwise zero a mesh with no render data -- reproduces it instead of collapsing to a point.
+			Mesh->SetNegativeBoundsExtension(-Spec->LocalBounds.Min);
+			Mesh->SetPositiveBoundsExtension(Spec->LocalBounds.Max);
 			Mesh->SetExtendedBounds(FBoxSphereBounds(Spec->LocalBounds));
 
 			UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(Actor, NAME_None, bTransientSpawn ? RF_Transient : RF_NoFlags);
@@ -291,6 +309,9 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			}
 			MeshComp->RecreatePhysicsState();
 
+			// A baked footprint collider must never simulate, regardless of what the user's CollisionBody copied.
+			MeshComp->SetSimulatePhysics(false);
+
 			// UPCGPrimitiveData samples through OverlapComponent, so the body must already be registered + cooked
 			// (Initialize caches the component's current bounds).
 			UPCGPrimitiveData* PrimitiveData = ManagedObjects->New<UPCGPrimitiveData>();
@@ -316,11 +337,7 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 
 			// Collision body from our convex pieces (the actual trigger geometry -- no BSP).
 			UBodySetup* BodySetup = NewObject<UBodySetup>(BrushComp);
-			BodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
-			BodySetup->bGenerateNonMirroredCollision = true;
-			BodySetup->bGenerateMirroredCollision = false;
-			BodySetup->AggGeom.ConvexElems = MoveTemp(Spec->ConvexElems);
-			BodySetup->CreatePhysicsMeshes();
+			PCGExClipper2Volume::ConfigureConvexBodySetup(BodySetup, MoveTemp(Spec->ConvexElems));
 			BrushComp->BrushBodySetup = BodySetup;
 
 #if WITH_EDITOR
@@ -519,10 +536,17 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 		TopHeight = FMath::Max(TopHeight, Settings->MinThickness);
 		const double BaseLocalZ = PieceBaseZ - MinBaseZ; // 0 in Flat mode
 
+		// Volume mode needs the prism caps/sides for the editor brush model; Primitive mode needs only the AABB.
+		// Build only what the active mode consumes.
+		const bool bPrimitive = Settings->OutputMode == EPCGExClipper2VolumeOutputMode::Primitive;
+
 		TArray<FVector> Bottoms;
 		TArray<FVector> Tops;
-		Bottoms.Reserve(N);
-		Tops.Reserve(N);
+		if (!bPrimitive)
+		{
+			Bottoms.Reserve(N);
+			Tops.Reserve(N);
+		}
 
 		FKConvexElem Elem;
 		Elem.VertexData.Reserve(N * 2);
@@ -532,18 +556,27 @@ void FPCGExClipper2VolumeContext::Process(const TSharedPtr<PCGExClipper2::FProce
 			const FVector2D& P = VertexPool[Idx].Pos;
 			const FVector Bottom(P.X - Centroid.X, P.Y - Centroid.Y, BaseLocalZ);
 			const FVector Top(P.X - Centroid.X, P.Y - Centroid.Y, BaseLocalZ + TopHeight);
-			Bottoms.Add(Bottom);
-			Tops.Add(Top);
 			Elem.VertexData.Add(Bottom);
 			Elem.VertexData.Add(Top);
-			Spec->LocalBounds += Bottom;
-			Spec->LocalBounds += Top;
+			if (bPrimitive)
+			{
+				Spec->LocalBounds += Bottom;
+				Spec->LocalBounds += Top;
+			}
+			else
+			{
+				Bottoms.Add(Bottom);
+				Tops.Add(Top);
+			}
 		}
 
 		Elem.UpdateElemBox();
 		Spec->ConvexElems.Add(MoveTemp(Elem));
 
-		PCGExClipper2Volume::AddPrismPolys(Bottoms, Tops, Spec->BrushPolys);
+		if (!bPrimitive)
+		{
+			PCGExClipper2Volume::AddPrismPolys(Bottoms, Tops, Spec->BrushPolys);
+		}
 	}
 
 	if (Spec->ConvexElems.IsEmpty())

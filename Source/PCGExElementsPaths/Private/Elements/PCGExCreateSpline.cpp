@@ -7,6 +7,7 @@
 #include "PCGComponent.h"
 
 #include "PCGExVersion.h"
+#include "Core/PCGExMT.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -101,10 +102,15 @@ bool FPCGExCreateSplineElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
+	// Output spawns spline components / creates UObjects -- illegal during a package save or GC (and the game-thread
+	// marshal below can be pumped mid-SavePackage). Defer the whole output phase until the save/GC finishes.
+	PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED
+
 	if (Settings->Mode != EPCGCreateSplineMode::CreateDataOnly)
 	{
 		PCGExMT::ExecuteOnMainThreadAndWait([&]()
 		{
+			if (PCGExMT::IsObjectWorkBlocked()) { return; }
 			Context->MainBatch->Output();
 			Context->ExecuteOnNotifyActors(Settings->PostProcessFunctionNames);
 		});
