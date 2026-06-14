@@ -447,9 +447,9 @@ namespace PCGExPathfindingPlotEdges
 		{
 			if (bVisited && Settings->Statistics.bWriteEdgeUseCount)
 			{
-				// No plot reaches this cluster: still forward its edges carrying a zeroed Visited
+				// No plot reaches this cluster: still forward its edges carrying a Visited
 				// attribute so output is uniform across clusters. Vtx counts come from the batch writer.
-				VisitedEdgeWriter = EdgeDataFacade->GetWritable<int32>(Settings->Statistics.EdgeUseCountAttributeName, 0, true, PCGExData::EBufferInit::New);
+				VisitedEdgeWriter = EdgeDataFacade->GetWritable<int32>(Settings->Statistics.EdgeUseCountAttributeName, 0, true, Settings->Statistics.bResetValues ? PCGExData::EBufferInit::New : PCGExData::EBufferInit::Inherit);
 				EdgeDataFacade->WriteFastest(TaskManager);
 			}
 			return false;

@@ -163,6 +163,13 @@ void FPCGExClipper2VolumeContext::AddStagedVolume(const TSharedPtr<FPCGExVolumeS
 
 void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 {
+	// Undo/redo can cancel the generation before this game-thread spawn runs. Bail rather than spawn actors into a
+	// torn-down context -- the cancelled generation's output is discarded and any partial actors are cleaned up by PCG.
+	if (IsWorkCancelled())
+	{
+		return;
+	}
+
 	const UPCGExClipper2VolumeSettings* Settings = GetInputSettings<UPCGExClipper2VolumeSettings>();
 
 	// Each spawned volume's actor reference is written into the output volume data's @Data domain under this name.
@@ -202,6 +209,12 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 
 	for (const TSharedPtr<FPCGExVolumeSpec>& Spec : StagedVolumes)
 	{
+		// Re-check each iteration: actor spawn / RegisterComponent can pump the game thread and let a fast undo
+		// cancel the generation mid-spawn. Stop touching context state the moment that happens.
+		if (IsWorkCancelled())
+		{
+			return;
+		}
 		if (!Spec || Spec->ConvexElems.IsEmpty())
 		{
 			continue;
@@ -577,6 +590,13 @@ bool FPCGExClipper2VolumeElement::PostBoot(FPCGExContext* InContext) const
 void FPCGExClipper2VolumeElement::OutputWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
 	PCGEX_CONTEXT_AND_SETTINGS(Clipper2Volume)
+
+	// Don't begin spawning for a generation that's already been cancelled (e.g. by undo/redo). SpawnStagedVolumes
+	// re-checks on the game thread, but skipping the marshal here avoids the round-trip entirely.
+	if (Context->IsWorkCancelled())
+	{
+		return;
+	}
 
 	// Actor spawning, physics cooking and managed-resource registration must run on the game thread (inline if
 	// already there -- no deadlock).
