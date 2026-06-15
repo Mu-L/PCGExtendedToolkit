@@ -16,6 +16,12 @@
 #include "PhysicsEngine/BodySetup.h"
 #include "PhysicsEngine/BodyInstance.h"
 
+#if WITH_EDITOR
+// Empty-MeshDescription cook fix for the persisted collision mesh (see SpawnStagedVolumes, Primitive mode).
+#include "MeshDescription.h"
+#include "StaticMeshAttributes.h"
+#endif
+
 #include "PCGComponent.h"
 #include "PCGElement.h"
 #include "PCGManagedResource.h"
@@ -284,6 +290,22 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 			Mesh->SetNegativeBoundsExtension(-Spec->LocalBounds.Min);
 			Mesh->SetPositiveBoundsExtension(Spec->LocalBounds.Max);
 			Mesh->SetExtendedBounds(FBoxSphereBounds(Spec->LocalBounds));
+
+#if WITH_EDITOR
+			// Persisted meshes get cooked, and a mesh with no MeshDescription fails the cook: the render-data build
+			// logs "Bad MeshDescription" and the cook commandlet turns that Error into a nonzero exit. Commit one
+			// empty MeshDescription so the cook builds valid (empty -> nothing to draw) render data; the convex
+			// BodySetup cooks on its own path and still answers every collision query. Transient/PIE is never cooked.
+			if (!bTransientSpawn)
+			{
+				Mesh->SetNumSourceModels(1);
+				if (FMeshDescription* EmptyMeshDesc = Mesh->CreateMeshDescription(0))
+				{
+					FStaticMeshAttributes(*EmptyMeshDesc).Register();
+					Mesh->CommitMeshDescription(0);
+				}
+			}
+#endif
 
 			UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(Actor, NAME_None, bTransientSpawn ? RF_Transient : RF_NoFlags);
 			const bool bActorHadRoot = Actor->GetRootComponent() != nullptr;
