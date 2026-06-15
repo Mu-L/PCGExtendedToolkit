@@ -80,6 +80,18 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 			}
 		}
 
+		// Many nodes cancel from their Boot() override by writing:
+		// {
+		//     return Context->CancelExecution(TEXT("..."));
+		// }
+		// and FPCGExContext::CancelExecution() returns true. 
+		// so Boot() returns true even though it just cancelled the context. 
+		// The `if (!Boot())` above does not catch that, so re-check here: 
+		// if Boot cancelled (or completed) execution, finalize now. Otherwise
+		// we would fall through to RegisterAssetDependencies/LoadAssets and re-pause an already-cancelled context,
+		// whose async completion (OnAsyncWorkEnd) refuses to resume it -> permanently wedged in PrepareData.
+		PCGEX_EXECUTION_CHECK_C(Context)
+
 		for (UPCGExInstancedFactory* Op : Context->InternalOperations)
 		{
 			Op->RegisterAssetDependencies(Context);
