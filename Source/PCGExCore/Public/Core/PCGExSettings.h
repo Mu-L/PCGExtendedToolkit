@@ -31,6 +31,8 @@ public:
 #endif
 
 	virtual void PostLoad() override;
+	virtual void Serialize(FArchive& Ar) override;
+	virtual FGuid GetUserCustomVersionGuid() override;
 
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
@@ -116,9 +118,19 @@ public:
 #endif
 
 protected:
-	/** Store version of the node, used for deprecation purposes */
+	/**
+	 * Legacy per-object deprecation version. No longer the serialized source of truth -- the package
+	 * custom version (FPCGExCustomVersion, surfaced by the engine as UserDataVersion) is. Kept as a
+	 * UPROPERTY for one release so ResolveDataVersion() can bridge assets saved before the custom
+	 * version existed; the PCGEX_IF_VERSION_LOWER gates still read this field.
+	 */
 	UPROPERTY()
 	int64 PCGExDataVersion = INDEX_NONE;
+
+#if WITH_EDITOR
+	/** Resolve PCGExDataVersion from the package custom version (UserDataVersion), bridging legacy assets. Called from Serialize on load. */
+	void ResolveDataVersion();
+#endif
 
 	virtual bool SupportsDataStealing() const;
 	virtual bool ShouldCache() const;

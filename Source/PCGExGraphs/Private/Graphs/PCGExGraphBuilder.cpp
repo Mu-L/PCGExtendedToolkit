@@ -286,10 +286,13 @@ namespace PCGExGraphs
 				NumValidNodes,
 				[&](const int32 i)
 				{
-					const FGraphNodeMetadata* NodeMeta = Graph->FindNodeMetadata_Unsafe(i);
+					// Index through ValidNodes (like VtxEndpoints above): metadata is keyed by original
+					// node index, and survivors are sparse/reordered once isolated nodes are pruned.
+					const int32 NodeIndex = ValidNodes[i];
+					const FGraphNodeMetadata* NodeMeta = Graph->FindNodeMetadata_Unsafe(NodeIndex);
 					if (NodeMeta)
 					{
-						const int32 PointIndex = Nodes[i].PointIndex;
+						const int32 PointIndex = Nodes[NodeIndex].PointIndex;
 						PCGEX_FOREACH_NODE_METADATA(PCGEX_NODE_METADATA_OUTPUT)
 					}
 				});

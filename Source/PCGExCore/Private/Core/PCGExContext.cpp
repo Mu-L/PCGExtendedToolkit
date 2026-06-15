@@ -17,6 +17,7 @@
 #include "Engine/AssetManager.h"
 #include "Engine/EngineTypes.h"
 #include "Factories/PCGExInstancedFactory.h"
+#include "GameFramework/Actor.h"
 #include "Helpers/PCGDynamicTrackingHelpers.h"
 #include "Helpers/PCGExFunctionPrototypes.h"
 #include "Helpers/PCGExStreamingHelpers.h"
@@ -194,6 +195,10 @@ void FPCGExContext::ExecuteOnNotifyActors(const TArray<FName>& FunctionNames)
 	{
 		if (IsInGameThread())
 		{
+			// FindUserFunctions does FindObject/StaticFindObjectFast -- illegal mid package-save or GC. This GT branch
+			// can be reached via the marshal below being pumped during SavePackage's render flush; bail rather than crash.
+			if (PCGExMT::IsObjectWorkBlocked()) { return; }
+
 			TArray<AActor*> NotifyActorsArray = NotifyActors.Array();
 			for (AActor* TargetActor : NotifyActorsArray)
 			{
@@ -341,6 +346,11 @@ void FPCGExContext::OnAsyncWorkEnd(const bool bWasCancelled)
 
 	if (bWasCancelled || IsWorkCancelled())
 	{
+		// A cancel can land while async work is still in flight and the context is paused. CancelExecution
+		// unpauses once, but a subsequent re-pause can consume that wake-up and strand the task in PCG's
+		// PausedTasks forever. Unpause again here so PCG re-ticks and finalizes the cancelled task cleanly
+		// (CanExecute() is false, so the re-tick just completes it - no double work).
+		UnpauseContext();
 		return;
 	}
 
@@ -540,6 +550,22 @@ void FPCGExContext::EDITOR_TrackClass(const TSubclassOf<UObject>& InSelectionCla
 {
 #if WITH_EDITOR
 	FPCGDynamicTrackingHelper::AddSingleDynamicTrackingKey(this, FPCGSelectionKey(InSelectionClass), false);
+#endif
+}
+
+void FPCGExContext::EDITOR_TrackPCGComponentData(const UPCGComponent* InComponent, const bool bIsCulled)
+{
+#if WITH_EDITOR
+	if (!InComponent) { return; }
+
+	const AActor* Owner = InComponent->GetOwner();
+	if (!Owner) { return; }
+
+	// The UPCGComponent extra dependency is mandatory: without it the actor/component mapping filters out
+	// the dirty when a change originates from a PCG component regen (PCGActorAndComponentMapping ClearCacheForKeys).
+	FPCGSelectionKey Key = FPCGSelectionKey::CreateFromObjectPtr(Owner);
+	Key.SetExtraDependency(UPCGComponent::StaticClass());
+	FPCGDynamicTrackingHelper::AddSingleDynamicTrackingKey(this, MoveTemp(Key), bIsCulled);
 #endif
 }
 

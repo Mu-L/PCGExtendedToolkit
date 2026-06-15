@@ -9,6 +9,7 @@
 #include "PCGElement.h"
 #include "PCGExSocketProvider.h"
 #include "PCGParamData.h"
+#include "Core/PCGExMT.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
@@ -276,6 +277,11 @@ bool FPCGExStagingLoadLevelElement::AdvanceWork(FPCGExContext* InContext, const 
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
 		}
 	}
+
+	// Output drives a main-thread loop that spawns level instances / loose actors (World->SpawnActor /
+	// LoadLevelInstance / NewObject / FinalizeSpawnedActor) -- illegal during a package save or GC. Defer the
+	// whole output phase (re-tick).
+	PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 

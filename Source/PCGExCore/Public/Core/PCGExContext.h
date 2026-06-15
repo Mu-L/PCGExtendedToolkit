@@ -255,6 +255,7 @@ public:
 
 	void EDITOR_TrackPath(const FSoftObjectPath& Path, bool bIsCulled = false);
 	void EDITOR_TrackClass(const TSubclassOf<UObject>& InSelectionClass, bool bIsCulled = false);
+	void EDITOR_TrackPCGComponentData(const UPCGComponent* InComponent, bool bIsCulled = false);
 
 	bool CanExecute() const;
 	bool bQuietInvalidInputWarning = false;

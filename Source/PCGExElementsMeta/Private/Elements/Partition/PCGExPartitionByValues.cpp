@@ -164,6 +164,12 @@ namespace PCGExPartitionByValuesBase
 			{
 				Context->AddConsumableAttributeName(Consumable);
 			}
+			
+			if (FMath::IsNearlyZero(Config.FilterSize))
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context, FTEXT("Filter size must not be nearly equal to zero, replaced with 1. This will not produce the expected result."));
+				Config.FilterSize = 1.0;
+			}
 
 			PCGExPartition::FRule& NewRule = Rules.Emplace_GetRef(Config);
 			NewRule.DataCache = DataCache;

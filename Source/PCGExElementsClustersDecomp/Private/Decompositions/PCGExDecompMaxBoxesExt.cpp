@@ -260,6 +260,11 @@ bool FPCGExDecompMaxBoxesExt::Decompose(FPCGExDecompositionResult& OutResult)
 		}
 	}
 
+	if (OutResult.bWantsCellSizes)
+	{
+		Grid.ComputeCellSizes(VoxelCellIDs, NextCellID, ResolvedVoxelSize, OutResult.CellSizes);
+	}
+
 	OutResult.NumCells = NextCellID;
 	return OutResult.NumCells > 0;
 }

@@ -3,6 +3,7 @@
 
 #include "Core/PCGExDecompOccupancyGrid.h"
 
+#include "Core/PCGExDecompositionUtils.h"
 #include "Math/PCGExBestFitPlane.h"
 
 FVector FPCGExDecompOccupancyGrid::ResolveVoxelSize(
@@ -171,4 +172,21 @@ bool FPCGExDecompOccupancyGrid::Build(
 	}
 
 	return OccupiedCount > 0;
+}
+
+void FPCGExDecompOccupancyGrid::ComputeCellSizes(
+	const TArray<int32>& VoxelCellIDs,
+	const int32 NumCells,
+	const FVector& VoxelSize,
+	TArray<FVector>& OutSizes) const
+{
+	// VoxelCellIDs is a full voxel -> CellID map; one entry per voxel.
+	check(VoxelCellIDs.Num() == TotalVoxels);
+
+	// Each voxel contributes its grid coordinate to its cell's AABB; size = span * VoxelSize.
+	PCGExDecomposition::AccumulateQuantizedCellSizes(
+		TotalVoxels, NumCells, VoxelSize,
+		[&VoxelCellIDs](const int32 Flat) { return VoxelCellIDs[Flat]; },
+		[this](const int32 Flat) { return UnflatIndex(Flat); },
+		OutSizes);
 }

@@ -25,6 +25,12 @@ struct FPCGExDecompositionResult
 	TArray<int32> NodeCellIDs;
 	int32 NumCells = 0;
 
+	/** Opt-in (set by the caller before Decompose): when true, operations populate CellSizes. */
+	bool bWantsCellSizes = false;
+
+	/** Per-cell bounds size (full extent), indexed by CellID, sized to NumCells. Empty unless requested. */
+	TArray<FVector> CellSizes;
+
 	void Init(const int32 NumNodes)
 	{
 		NodeCellIDs.SetNumUninitialized(NumNodes);
@@ -33,6 +39,8 @@ struct FPCGExDecompositionResult
 			ID = -1;
 		}
 		NumCells = 0;
+		bWantsCellSizes = false;
+		CellSizes.Reset();
 	}
 };
 
@@ -72,13 +80,74 @@ public:
 		}
 	}
 
-	/** Main decomposition entry point. Must populate OutResult.NodeCellIDs and set OutResult.NumCells. */
+	/**
+	 * Framework entry point. Runs the decomposition, then guarantees the cell-size contract:
+	 * when OutResult.bWantsCellSizes is set, CellSizes is always populated (sized to NumCells).
+	 * Box-like operations fill it themselves inside Decompose(); any operation that doesn't
+	 * falls back to the node-position AABB here -- so a decomposition can never silently emit
+	 * empty/zero cell sizes, and new operations need not remember to handle the flag.
+	 */
+	bool DecomposeAndFinalize(FPCGExDecompositionResult& OutResult)
+	{
+		if (!Decompose(OutResult))
+		{
+			return false;
+		}
+
+		if (OutResult.bWantsCellSizes && OutResult.CellSizes.Num() != OutResult.NumCells)
+		{
+			ComputeNodeAABBCellSizes(OutResult);
+		}
+
+		check(!OutResult.bWantsCellSizes || OutResult.CellSizes.Num() == OutResult.NumCells);
+		return true;
+	}
+
+protected:
+	/** Main decomposition. Each algorithm overrides this and must populate OutResult.NodeCellIDs
+	 *  and set OutResult.NumCells. Box-like operations should also fill OutResult.CellSizes (sized
+	 *  to NumCells) when OutResult.bWantsCellSizes is set; operations that leave it untouched get a
+	 *  node-position AABB default from DecomposeAndFinalize(). */
 	virtual bool Decompose(FPCGExDecompositionResult& OutResult)
 	{
 		return false;
 	}
 
-protected:
+	/**
+	 * Shared helper for "cloud" decompositions that have no intrinsic box:
+	 * fills OutResult.CellSizes with the full size of each cell's node-position AABB, in the
+	 * WORLD-space frame (from Cluster->GetPos). This intentionally differs from the grid-local
+	 * box sizes that voxel/grid decompositions report via FPCGExDecompOccupancyGrid::ComputeCellSizes.
+	 * Call after NodeCellIDs and NumCells are final.
+	 */
+	void ComputeNodeAABBCellSizes(FPCGExDecompositionResult& OutResult) const
+	{
+		if (OutResult.NumCells <= 0)
+		{
+			return;
+		}
+
+		TArray<FBox> CellBounds;
+		CellBounds.Init(FBox(ForceInit), OutResult.NumCells);
+
+		const int32 NumNodes = OutResult.NodeCellIDs.Num();
+		for (int32 i = 0; i < NumNodes; i++)
+		{
+			const int32 CellID = OutResult.NodeCellIDs[i];
+			if (CellID < 0 || CellID >= OutResult.NumCells)
+			{
+				continue;
+			}
+			CellBounds[CellID] += Cluster->GetPos(i);
+		}
+
+		OutResult.CellSizes.SetNumUninitialized(OutResult.NumCells);
+		for (int32 c = 0; c < OutResult.NumCells; c++)
+		{
+			OutResult.CellSizes[c] = CellBounds[c].IsValid ? CellBounds[c].GetSize() : FVector::ZeroVector;
+		}
+	}
+
 	TSharedPtr<PCGExClusters::FCluster> Cluster;
 	TSharedPtr<PCGExHeuristics::FHandler> Heuristics;
 };

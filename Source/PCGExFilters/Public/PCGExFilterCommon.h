@@ -36,6 +36,14 @@ enum class EPCGExFilterGroupMode : uint8
 	OR  = 1 UMETA(DisplayName = "Or", ToolTip="Only a single connected filter must pass.", ActionIcon="PCGEx.Pin.OUT_Filter", SearchHints = "Or Combine")
 };
 
+UENUM(BlueprintType)
+enum class EPCGExUberFilterCollectionsMode : uint8
+{
+	All     = 0 UMETA(DisplayName = "All", ToolTip="All points must pass the filters."),
+	Any     = 1 UMETA(DisplayName = "Any", ToolTip="At least one point must pass the filter."),
+	Partial = 2 UMETA(DisplayName = "Partial", ToolTip="A given amount of points must pass the filter."),
+};
+
 namespace PCGExFilters
 {
 	enum class EType : uint8

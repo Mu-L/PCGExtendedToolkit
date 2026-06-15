@@ -42,6 +42,16 @@ TArray<FPCGPinProperties> UPCGExSelfPruningSettings::InputPinProperties() const
 	return PinProperties;
 }
 
+TArray<FPCGPinProperties> UPCGExSelfPruningSettings::OutputPinProperties() const
+{
+	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
+	if (bOutputDiscard && Mode == EPCGExSelfPruningMode::Prune)
+	{
+		PCGEX_PIN_POINTS(PCGExCommon::Labels::OutputDiscardedLabel, "Points that were pruned away.", Normal)
+	}
+	return PinProperties;
+}
+
 PCGEX_INITIALIZE_ELEMENT(SelfPruning)
 PCGEX_ELEMENT_BATCH_POINT_IMPL(SelfPruning)
 
@@ -55,6 +65,12 @@ bool FPCGExSelfPruningElement::Boot(FPCGExContext* InContext) const
 	PCGEX_CONTEXT_AND_SETTINGS(SelfPruning)
 
 	PCGEX_VALIDATE_NAME_CONDITIONAL(Settings->Mode == EPCGExSelfPruningMode::WriteResult, Settings->NumOverlapAttributeName)
+
+	if (Settings->bOutputDiscard && Settings->Mode == EPCGExSelfPruningMode::Prune)
+	{
+		Context->Discarded = MakeShared<PCGExData::FPointIOCollection>(InContext);
+		Context->Discarded->OutputPin = PCGExCommon::Labels::OutputDiscardedLabel;
+	}
 
 	return true;
 }
@@ -84,8 +100,17 @@ bool FPCGExSelfPruningElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 
 	Context->MainPoints->StageOutputs();
-	Context->Done();
 
+	if (Context->Discarded)
+	{
+		// Bit 1 == the 'Discarded' pin (bit 0 is the main output). Deactivate it when no points were pruned.
+		if (!Context->Discarded->StageOutputs())
+		{
+			Context->OutputData.InactiveOutputPinBitmask |= 1ULL << 1;
+		}
+	}
+
+	Context->Done();
 
 	return Context->TryComplete();
 }
@@ -551,6 +576,17 @@ namespace PCGExSelfPruning
 		}
 
 		PCGEX_INIT_IO_VOID(PointDataFacade->Source, PCGExData::EIOInit::Duplicate)
+
+		// Mask is the keep-set; the pruned-away points are its inverse. Built from In before
+		// Gather compacts Out (Gather only touches Out, so ordering is irrelevant).
+		if (Context->Discarded)
+		{
+			if (const TSharedPtr<PCGExData::FPointIO> Discarded = Context->Discarded->Emplace_GetRef(PointDataFacade->GetIn(), PCGExData::EIOInit::New))
+			{
+				(void)Discarded->InheritPoints(Mask, true);
+			}
+		}
+
 		(void)PointDataFacade->Source->Gather(Mask);
 	}
 }

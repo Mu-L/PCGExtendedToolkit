@@ -7,6 +7,7 @@
 #include "Core/PCGExClusterMT.h"
 #include "Core/PCGExClustersProcessor.h"
 #include "Details/PCGExBlendingDetails.h"
+#include "Details/PCGExInputShorthandsDetails.h"
 #include "Details/PCGExSettingsMacros.h"
 #include "Sampling/PCGExSamplingCommon.h"
 
@@ -169,6 +170,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta = (PCG_Overridable, DisplayName="Radius X", EditCondition="bWriteRadiusX && SolidificationAxis != EPCGExMinimalAxis::X && SolidificationAxis != EPCGExMinimalAxis::None && RadiusXInput == EPCGExInputValueType::Constant", EditConditionHides))
 	double RadiusXConstant = 1;
 
+	/** Slide factor that shifts the X bounds along the axis while preserving their size (2*Radius). 0.5 = centered, 0 = fully negative, 1 = fully positive. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta = (PCG_Overridable, DisplayName="Radius X Slide", EditCondition="bWriteRadiusX && SolidificationAxis != EPCGExMinimalAxis::X && SolidificationAxis != EPCGExMinimalAxis::None", EditConditionHides))
+	FPCGExInputShorthandSelectorDouble01 RadiusXSlide = FPCGExInputShorthandSelectorDouble01(NAME_None, 0.5, false);
+
 
 	/** Whether or not to write the edge extents over the local Y axis. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta=(PCG_Overridable, EditCondition="SolidificationAxis != EPCGExMinimalAxis::Y && SolidificationAxis != EPCGExMinimalAxis::None", EditConditionHides))
@@ -190,6 +195,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta = (PCG_Overridable, DisplayName="Radius Y", EditCondition="bWriteRadiusY && SolidificationAxis != EPCGExMinimalAxis::Y && SolidificationAxis != EPCGExMinimalAxis::None && RadiusYInput == EPCGExInputValueType::Constant", EditConditionHides))
 	double RadiusYConstant = 1;
 
+	/** Slide factor that shifts the Y bounds along the axis while preserving their size (2*Radius). 0.5 = centered, 0 = fully negative, 1 = fully positive. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta = (PCG_Overridable, DisplayName="Radius Y Slide", EditCondition="bWriteRadiusY && SolidificationAxis != EPCGExMinimalAxis::Y && SolidificationAxis != EPCGExMinimalAxis::None", EditConditionHides))
+	FPCGExInputShorthandSelectorDouble01 RadiusYSlide = FPCGExInputShorthandSelectorDouble01(NAME_None, 0.5, false);
+
 
 	/** Whether or not to write the edge extents over the local Z axis. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta=(PCG_Overridable, EditCondition="SolidificationAxis != EPCGExMinimalAxis::Z && SolidificationAxis != EPCGExMinimalAxis::None", EditConditionHides))
@@ -210,6 +219,10 @@ public:
 	/** Radius Z Constant */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta = (PCG_Overridable, DisplayName="Radius Z", EditCondition="bWriteRadiusZ && SolidificationAxis != EPCGExMinimalAxis::Z && SolidificationAxis != EPCGExMinimalAxis::None && RadiusZInput == EPCGExInputValueType::Constant", EditConditionHides))
 	double RadiusZConstant = 1;
+
+	/** Slide factor that shifts the Z bounds along the axis while preserving their size (2*Radius). 0.5 = centered, 0 = fully negative, 1 = fully positive. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Solidification|Radiuses", meta = (PCG_Overridable, DisplayName="Radius Z Slide", EditCondition="bWriteRadiusZ && SolidificationAxis != EPCGExMinimalAxis::Z && SolidificationAxis != EPCGExMinimalAxis::None", EditConditionHides))
+	FPCGExInputShorthandSelectorDouble01 RadiusZSlide = FPCGExInputShorthandSelectorDouble01(NAME_None, 0.5, false);
 
 private:
 	friend class FPCGExWriteEdgePropertiesElement;
@@ -255,6 +268,10 @@ namespace PCGExWriteEdgeProperties
 #define PCGEX_LOCAL_EDGE_GETTER_DECL(_AXIS) TSharedPtr<PCGExDetails::TSettingValue<double>> SolidificationRad##_AXIS;
 		PCGEX_FOREACH_XYZ(PCGEX_LOCAL_EDGE_GETTER_DECL)
 #undef PCGEX_LOCAL_EDGE_GETTER_DECL
+
+#define PCGEX_LOCAL_SLIDE_GETTER_DECL(_AXIS) TSharedPtr<PCGExDetails::TSettingValue<double>> SolidificationSlide##_AXIS;
+		PCGEX_FOREACH_XYZ(PCGEX_LOCAL_SLIDE_GETTER_DECL)
+#undef PCGEX_LOCAL_SLIDE_GETTER_DECL
 
 	public:
 		FProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)

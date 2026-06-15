@@ -57,6 +57,8 @@ namespace PCGExWaitForPCGData
 	/** Generation trigger action configuration -- alias to shared type in PCGExPCGInterop */
 	struct FGenerationConfig : PCGExPCGInterop::FGenerationConfig
 	{
+		bool bTrackSourceComponents = false;
+
 		void InitFrom(const UPCGExWaitForPCGDataSettings* Settings);
 	};
 
@@ -198,6 +200,10 @@ public:
 	/** How to deal with found components that have the trigger condition 'GenerateAtRuntime'*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Gen & Wait Settings", meta = (PCG_Overridable, DisplayName="Grab GenerateAtRuntime"))
 	EPCGExRuntimeGenerationTriggerAction GenerateAtRuntime = EPCGExRuntimeGenerationTriggerAction::AsIs;
+
+	/** If enabled, registers an editor-only dependency on each fetched component's owning actor, so this node re-runs when that source component regenerates. Off by default. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Gen & Wait Settings")
+	bool bTrackSourceComponents = false;
 
 	/** If enabled, available data will be output even if some required pins have no data. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_Overridable))

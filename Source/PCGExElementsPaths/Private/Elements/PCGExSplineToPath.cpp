@@ -53,8 +53,9 @@ namespace PCGExSplineToPath
 
 			UPCGBasePointData* MutablePoints = PointDataFacade->Source->GetOut();
 			const int32 LastIndex = Spline.bClosedLoop ? NumSegments - 1 : NumSegments;
-			PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumPoints, EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed);
-
+			PCGExPointArrayDataHelpers::SetNumPointsAllocated(MutablePoints, NumPoints, EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed | EPCGPointNativeProperties::MetadataEntry);
+			(void)PointDataFacade->Source->GetOutKeys(true);
+			
 			// Detect winding and determine if we need to reverse the output order
 			bool bReverse = false;
 			if (Spline.bClosedLoop && Settings->Winding != EPCGExWindingMutation::Unchanged)
@@ -195,10 +196,12 @@ namespace PCGExSplineToPath
 			{
 				TPCGValueRange<int64> OutMeta = MutablePoints->GetMetadataEntryValueRange();
 
+				/*
 				for (int64& Key : OutMeta)
 				{
 					MutablePoints->Metadata->InitializeOnSet(Key);
 				}
+				*/
 
 				const TSharedPtr<FPCGAttributeAccessorKeysEntries> Keys = MakeShared<FPCGAttributeAccessorKeysEntries>(SplineData->Metadata);
 

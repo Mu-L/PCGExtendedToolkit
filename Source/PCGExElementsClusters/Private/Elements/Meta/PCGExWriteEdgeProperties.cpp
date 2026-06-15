@@ -151,7 +151,9 @@ namespace PCGExWriteEdgeProperties
 		{
 #define PCGEX_CREATE_LOCAL_AXIS_SET_CONST(_AXIS) if (Settings->bWriteRadius##_AXIS){\
 			SolidificationRad##_AXIS = PCGExDetails::MakeSettingValue(Settings->Radius##_AXIS##Input, Settings->Radius##_AXIS##SourceAttribute, Settings->Radius##_AXIS##Constant);\
-			if(!SolidificationRad##_AXIS->Init(Settings->Radius##_AXIS##Source == EPCGExClusterElement::Edge ? EdgeDataFacade : VtxDataFacade, false)){ return false; } }
+			if(!SolidificationRad##_AXIS->Init(Settings->Radius##_AXIS##Source == EPCGExClusterElement::Edge ? EdgeDataFacade : VtxDataFacade, false)){ return false; }\
+			SolidificationSlide##_AXIS = Settings->Radius##_AXIS##Slide.GetValueSetting();\
+			if(!SolidificationSlide##_AXIS->Init(EdgeDataFacade, false)){ return false; } }
 			PCGEX_FOREACH_XYZ(PCGEX_CREATE_LOCAL_AXIS_SET_CONST)
 #undef PCGEX_CREATE_LOCAL_AXIS_SET_CONST
 
@@ -269,8 +271,10 @@ TargetBoundsMax._AXIS = (EdgeLength * BlendWeightStart) * InvScale._AXIS;\
 double Rad = 0;\
 if (Settings->Radius##_AXIS##Source == EPCGExClusterElement::Vtx) { Rad = FMath::Lerp(SolidificationRad##_AXIS->Read(Edge.Start), SolidificationRad##_AXIS->Read(Edge.End), BlendWeightStart); }\
 else { Rad = SolidificationRad##_AXIS->Read(EdgeIndex); }\
-TargetBoundsMin._AXIS = -Rad * InvScale._AXIS;\
-TargetBoundsMax._AXIS = Rad * InvScale._AXIS;\
+Rad = FMath::Abs(Rad);\
+const double Slide = FMath::Clamp(SolidificationSlide##_AXIS->Read(EdgeIndex), 0.0, 1.0);\
+TargetBoundsMin._AXIS = (2.0 * (Slide - 1.0) * Rad) * InvScale._AXIS;\
+TargetBoundsMax._AXIS = (2.0 * Slide * Rad) * InvScale._AXIS;\
 }
 
 				PCGEX_FOREACH_XYZ(PCGEX_SOLIDIFY_DIMENSION)

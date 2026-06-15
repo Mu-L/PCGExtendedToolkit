@@ -71,6 +71,7 @@ bool FPCGExPathToClustersElement::Boot(FPCGExContext* InContext) const
 		Context->bUseOctreeMode = (Context->FuseDetails.GetEffectiveMethod() == EPCGExFuseMethod::Octree);
 
 		Context->NodeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
+		Context->NodeBuilder->bDedupeElementsBySource = true; // node table: collapse shared-point duplicates
 		Context->EdgeBuilder = MakeShared<PCGExData::FUnionTableBuilder>(1);
 		if (Context->bUseOctreeMode)
 		{
