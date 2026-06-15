@@ -17,6 +17,7 @@
 #include "Engine/AssetManager.h"
 #include "Engine/EngineTypes.h"
 #include "Factories/PCGExInstancedFactory.h"
+#include "GameFramework/Actor.h"
 #include "Helpers/PCGDynamicTrackingHelpers.h"
 #include "Helpers/PCGExFunctionPrototypes.h"
 #include "Helpers/PCGExStreamingHelpers.h"
@@ -544,6 +545,22 @@ void FPCGExContext::EDITOR_TrackClass(const TSubclassOf<UObject>& InSelectionCla
 {
 #if WITH_EDITOR
 	FPCGDynamicTrackingHelper::AddSingleDynamicTrackingKey(this, FPCGSelectionKey(InSelectionClass), false);
+#endif
+}
+
+void FPCGExContext::EDITOR_TrackPCGComponentData(const UPCGComponent* InComponent, const bool bIsCulled)
+{
+#if WITH_EDITOR
+	if (!InComponent) { return; }
+
+	const AActor* Owner = InComponent->GetOwner();
+	if (!Owner) { return; }
+
+	// The UPCGComponent extra dependency is mandatory: without it the actor/component mapping filters out
+	// the dirty when a change originates from a PCG component regen (PCGActorAndComponentMapping ClearCacheForKeys).
+	FPCGSelectionKey Key = FPCGSelectionKey::CreateFromObjectPtr(Owner);
+	Key.SetExtraDependency(UPCGComponent::StaticClass());
+	FPCGDynamicTrackingHelper::AddSingleDynamicTrackingKey(this, MoveTemp(Key), bIsCulled);
 #endif
 }
 
