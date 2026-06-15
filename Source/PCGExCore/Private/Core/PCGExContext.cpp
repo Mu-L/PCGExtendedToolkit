@@ -346,6 +346,11 @@ void FPCGExContext::OnAsyncWorkEnd(const bool bWasCancelled)
 
 	if (bWasCancelled || IsWorkCancelled())
 	{
+		// A cancel can land while async work is still in flight and the context is paused. CancelExecution
+		// unpauses once, but a subsequent re-pause can consume that wake-up and strand the task in PCG's
+		// PausedTasks forever. Unpause again here so PCG re-ticks and finalizes the cancelled task cleanly
+		// (CanExecute() is false, so the re-tick just completes it - no double work).
+		UnpauseContext();
 		return;
 	}
 
