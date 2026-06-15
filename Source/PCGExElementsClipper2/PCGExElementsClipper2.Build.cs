@@ -40,5 +40,18 @@ public class PCGExElementsClipper2 : ModuleRules
 			{
 			}
 		);
+
+		if (Target.bBuildEditor)
+		{
+			// Editor-only: build a box render mesh on the persisted collision static mesh (Clipper2 : Volume,
+			// Primitive mode) so it cooks without a "Bad MeshDescription" error.
+			PrivateDependencyModuleNames.AddRange(
+				new string[]
+				{
+					"MeshDescription",
+					"StaticMeshDescription"
+				}
+			);
+		}
 	}
 }

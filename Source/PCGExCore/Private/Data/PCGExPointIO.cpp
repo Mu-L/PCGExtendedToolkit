@@ -3,6 +3,7 @@
 
 #include "Data/PCGExPointIO.h"
 
+#include "PCGExLog.h"
 #include "PCGParamData.h"
 #include "Core/PCGExContext.h"
 #include "Data/PCGExDataTags.h"
@@ -230,17 +231,26 @@ namespace PCGExData
 
 		if (bConservative)
 		{
-			// Conservative: only allocate new metadata entries for points that don't
-			// already have valid keys (invalid or stale parent references). This preserves
-			// existing metadata entries, which is important when the output was duplicated
-			// from input and some points already carry valid attribute data.
+			// Conservative: re-initialize only keys that don't reference a real LOCAL entry
+			// of this metadata -- i.e. anything outside [ItemKeyOffset, ItemCount). This
+			// preserves genuine local entries (the Duplicate case, where points already
+			// carry valid attribute data) while healing three corruptions:
+			//   Key == PCGInvalidEntryKey -> never set
+			//   Key <  ItemKeyOffset      -> stale parent reference
+			//   Key >= ItemCount          -> dangling: a positive-but-unbacked key (e.g.
+			//                                inherited from an upstream node whose metadata
+			//                                schema doesn't back it). Such keys look valid to
+			//                                every later conservative pass, so they slip
+			//                                through unrepaired and surface as "Output ... does
+			//                                not have valid point metadata" on the graph output.
 			TArray<int64*> KeysNeedingInit;
 			KeysNeedingInit.Reserve(MetadataEntries.Num());
 			const int64 ItemKeyOffset = Metadata->GetItemKeyCountForParent();
+			const int64 ItemCount = Metadata->GetItemCountForChild();
 
 			for (int64& Key : MetadataEntries)
 			{
-				if (Key == PCGInvalidEntryKey || Key < ItemKeyOffset)
+				if (Key == PCGInvalidEntryKey || Key < ItemKeyOffset || Key >= ItemCount)
 				{
 					KeysNeedingInit.Add(&Key);
 				}

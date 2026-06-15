@@ -16,6 +16,12 @@
 #include "PhysicsEngine/BodySetup.h"
 #include "PhysicsEngine/BodyInstance.h"
 
+#if WITH_EDITOR
+// Box render mesh for the persisted Primitive-mode collider (see BuildBoxRenderMesh / SpawnStagedVolumes).
+#include "MeshDescription.h"
+#include "StaticMeshAttributes.h"
+#endif
+
 #include "PCGComponent.h"
 #include "PCGElement.h"
 #include "PCGManagedResource.h"
@@ -46,7 +52,7 @@ struct FPCGExVolumeSpec
 {
 	TArray<FKConvexElem> ConvexElems;
 	TArray<FPoly> BrushPolys;
-	FBox LocalBounds = FBox(ForceInit); // actor-local AABB of the prism set; sets the static mesh bounds in Primitive mode (no render data to derive them from).
+	FBox LocalBounds = FBox(ForceInit); // actor-local AABB of the prism set; sizes the Primitive-mode collider's bounds + its (hidden) placeholder box render mesh.
 	FTransform ActorTransform = FTransform::Identity;
 	int32 GroupIndex = 0;
 	int32 SourceFacadeIndex = INDEX_NONE; // AllOpData index of the group's representative path (for @Data forwarding).
@@ -66,6 +72,79 @@ namespace PCGExClipper2Volume
 		BodySetup->AggGeom.ConvexElems = MoveTemp(ConvexElems);
 		BodySetup->CreatePhysicsMeshes();
 	}
+
+#if WITH_EDITOR
+	// A persisted Primitive-mode collider gets cooked, and a UStaticMesh with no MeshDescription fails the cook
+	// ("Bad MeshDescription"). An EMPTY MeshDescription won't do either: FMeshDescriptionBulkData::SaveMeshDescription
+	// drops empty descriptions, so it reads back invalid at cook. Give the mesh a real box matching the AABB -- the
+	// component hides it (the convex BodySetup is the real collision), and it yields correct mesh bounds for free.
+	void BuildBoxRenderMesh(UStaticMesh* Mesh, const FBox& Bounds)
+	{
+		Mesh->SetNumSourceModels(1);
+		FMeshDescription* MeshDesc = Mesh->CreateMeshDescription(0);
+		if (!MeshDesc)
+		{
+			return;
+		}
+
+		// Hidden placeholder: no lightmap UVs needed (and it avoids a degenerate-UV warning from the zero UVs).
+		Mesh->GetSourceModel(0).BuildSettings.bGenerateLightmapUVs = false;
+
+		MeshDesc->SetNumUVChannels(1);
+		FStaticMeshAttributes Attributes(*MeshDesc);
+		Attributes.Register();
+
+		// One material slot so the single section maps to a valid material index (no missing-slot build warning).
+		const FName SlotName(TEXT("Collision"));
+		Mesh->GetStaticMaterials().Add(FStaticMaterial(nullptr, SlotName));
+
+		TVertexAttributesRef<FVector3f> Positions = Attributes.GetVertexPositions();
+		TPolygonGroupAttributesRef<FName> PolyGroupSlots = Attributes.GetPolygonGroupMaterialSlotNames();
+
+		const FPolygonGroupID PolyGroup = MeshDesc->CreatePolygonGroup();
+		PolyGroupSlots[PolyGroup] = SlotName;
+
+		const FVector Min = Bounds.Min;
+		const FVector Max = Bounds.Max;
+		const FVector Corners[8] = {
+			FVector(Min.X, Min.Y, Min.Z), FVector(Max.X, Min.Y, Min.Z),
+			FVector(Max.X, Max.Y, Min.Z), FVector(Min.X, Max.Y, Min.Z),
+			FVector(Min.X, Min.Y, Max.Z), FVector(Max.X, Min.Y, Max.Z),
+			FVector(Max.X, Max.Y, Max.Z), FVector(Min.X, Max.Y, Max.Z)
+		};
+
+		FVertexID Vertices[8];
+		for (int32 i = 0; i < 8; ++i)
+		{
+			Vertices[i] = MeshDesc->CreateVertex();
+			Positions[Vertices[i]] = FVector3f(Corners[i]);
+		}
+
+		// 6 quads -> 12 triangles. Winding/normals are irrelevant (the component hides this mesh): it exists only
+		// to give the cook valid render data + correct bounds; the build recomputes normals.
+		const int32 Quads[6][4] = {
+			{0, 1, 2, 3}, {7, 6, 5, 4}, {4, 5, 1, 0}, {5, 6, 2, 1}, {6, 7, 3, 2}, {7, 4, 0, 3}
+		};
+		for (int32 q = 0; q < 6; ++q)
+		{
+			const FVertexInstanceID I0 = MeshDesc->CreateVertexInstance(Vertices[Quads[q][0]]);
+			const FVertexInstanceID I1 = MeshDesc->CreateVertexInstance(Vertices[Quads[q][1]]);
+			const FVertexInstanceID I2 = MeshDesc->CreateVertexInstance(Vertices[Quads[q][2]]);
+			const FVertexInstanceID I3 = MeshDesc->CreateVertexInstance(Vertices[Quads[q][3]]);
+			const FVertexInstanceID TriA[3] = {I0, I1, I2};
+			const FVertexInstanceID TriB[3] = {I0, I2, I3};
+			MeshDesc->CreateTriangle(PolyGroup, TriA);
+			MeshDesc->CreateTriangle(PolyGroup, TriB);
+		}
+
+		Mesh->CommitMeshDescription(0);
+
+		// Build render data now: a runtime-created mesh doesn't build until asked, so without this the asset (and
+		// the spawned component) reads 0 tris/verts until the cook builds it. Silent to avoid message-log spam.
+		// Build() leaves the convex BodySetup untouched (only BuildFromMeshDescriptions mutates AggGeom).
+		Mesh->Build(true);
+	}
+#endif
 
 	// Build the side/cap polys of a vertical prism (local space) for editor wireframe + bounds.
 	void AddPrismPolys(const TArray<FVector>& Bottoms, const TArray<FVector>& Tops, TArray<FPoly>& OutPolys)
@@ -270,20 +349,36 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 				continue;
 			}
 			
-			// Collision-only static mesh: our convex pieces as simple geometry. No complex mesh exists, so
-			// CTF_UseSimpleAsComplex makes the simple hulls answer every query (incl. line traces). With no render
-			// data, bounds are set explicitly so UPCGPrimitiveData (which caches the component bounds) and the
-			// voxel sampler have a valid extent.
+			// Simple-collision static mesh: our convex pieces as simple geometry. With no complex/per-tri mesh,
+			// CTF_UseSimpleAsComplex makes the hulls answer every query (incl. line traces). The component hides the
+			// mesh (below), so its only render data is the placeholder box the cook needs -- the BodySetup is the
+			// real collision.
 			UStaticMesh* Mesh = NewObject<UStaticMesh>(Actor, NAME_None, bTransientSpawn ? RF_Transient : RF_NoFlags);
 			Mesh->CreateBodySetup();
 			PCGExClipper2Volume::ConfigureConvexBodySetup(Mesh->GetBodySetup(), MoveTemp(Spec->ConvexElems));
 
-			// Render-data-less mesh: set bounds explicitly (UPCGPrimitiveData caches them; the voxel sampler needs a
-			// valid extent). Also encode the AABB as bounds extensions so a later CalculateExtendedBounds -- which
-			// would otherwise zero a mesh with no render data -- reproduces it instead of collapsing to a point.
-			Mesh->SetNegativeBoundsExtension(-Spec->LocalBounds.Min);
-			Mesh->SetPositiveBoundsExtension(Spec->LocalBounds.Max);
+			// Bounds for UPCGPrimitiveData (cached at Initialize) + the voxel sampler. Valid at spawn time before any
+			// render build; on the persisted path the cook's CalculateExtendedBounds recomputes the same AABB from the
+			// box render mesh below.
 			Mesh->SetExtendedBounds(FBoxSphereBounds(Spec->LocalBounds));
+
+			bool bHasRenderMesh = false;
+#if WITH_EDITOR
+			if (!bTransientSpawn)
+			{
+				// Persisted mesh gets cooked: give it a real (hidden) box so the cook builds valid render data
+				// instead of failing with "Bad MeshDescription". See PCGExClipper2Volume::BuildBoxRenderMesh.
+				PCGExClipper2Volume::BuildBoxRenderMesh(Mesh, Spec->LocalBounds);
+				bHasRenderMesh = true;
+			}
+#endif
+			if (!bHasRenderMesh)
+			{
+				// Render-data-less mesh (transient/runtime, never cooked): encode the AABB as bounds extensions so a
+				// later CalculateExtendedBounds reproduces it instead of collapsing to a point.
+				Mesh->SetNegativeBoundsExtension(-Spec->LocalBounds.Min);
+				Mesh->SetPositiveBoundsExtension(Spec->LocalBounds.Max);
+			}
 
 			UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(Actor, NAME_None, bTransientSpawn ? RF_Transient : RF_NoFlags);
 			const bool bActorHadRoot = Actor->GetRootComponent() != nullptr;
@@ -296,6 +391,10 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 				Actor->SetRootComponent(MeshComp);
 			}
 			MeshComp->SetStaticMesh(Mesh);
+
+			// Collision-only volume: the placeholder render mesh must never draw. Set before registration so no
+			// visible scene proxy is ever created; visibility doesn't affect collision.
+			MeshComp->SetVisibility(false);
 
 			// Apply the user's collision setup. bUseDefaultCollision must be off or UpdateCollisionFromStaticMesh
 			// (run during registration) would overwrite it with the mesh asset's default profile.

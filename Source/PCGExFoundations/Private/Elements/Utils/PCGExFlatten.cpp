@@ -44,41 +44,47 @@ bool FPCGExFlattenElement::ExecuteInternal(FPCGContext* Context) const
 	for (int32 i = 0; i < Inputs.Num(); ++i)
 	{
 		const UPCGData* InData = Inputs[i].Data;
-		if (!InData) { continue; }
+		if (!InData)
+		{
+			continue;
+		}
 
 		UPCGData* Copy = InData->DuplicateData(Context, /*bInitializeMetadata=*/true);
-		if (!Copy) { continue; }
+		if (!Copy)
+		{
+			continue;
+		}
 
 		Copies.Add(Copy);
 		Sources.Add(i);
 	}
 
 	PCGExMT::ParallelOrSequential(Copies.Num(), [&](int32 i)
-    	{
-    		UPCGData* Copy = Copies[i];
-    		UPCGMetadata* Metadata = Copy->MutableMetadata();
-    		if (Metadata)
-    		{
-    			if (FPCGMetadataDomain* Domain = Metadata->GetDefaultMetadataDomain())
-    			{
-    				// Engine Flatten no-ops on a domain with 0 *local* attributes (FlattenAndCompress
-    				// bails on Attributes.IsEmpty()), leaving it parented and unsafe to duplicate from
-    				// another component. Giving it one owned attribute is the only thing that flips that.
-    				Domain->FindOrCreateAttribute<double>(FName("___DUMMY___"), 0.0, /*bAllowsInterpolation=*/true, /*bOverrideParent=*/false);
-    				if (Domain->GetItemCountForChild() == 0)
-    				{
-    					Domain->AddEntry();
-    				}
-    			}
-    		}
-    
-    		Copy->Flatten();
-    
-    		if (Metadata)
-    		{
-    			Metadata->DeleteAttribute(FName("___DUMMY___"));
-    		}
-    	}, 1);
+	{
+		UPCGData* Copy = Copies[i];
+		UPCGMetadata* Metadata = Copy->MutableMetadata();
+		if (Metadata)
+		{
+			if (FPCGMetadataDomain* Domain = Metadata->GetDefaultMetadataDomain())
+			{
+				// Engine Flatten no-ops on a domain with 0 *local* attributes (FlattenAndCompress
+				// bails on Attributes.IsEmpty()), leaving it parented and unsafe to duplicate from
+				// another component. Giving it one owned attribute is the only thing that flips that.
+				Domain->FindOrCreateAttribute<double>(FName("____FIXUP____"), 0.0, /*bAllowsInterpolation=*/true, /*bOverrideParent=*/false);
+				if (Domain->GetItemCountForChild() == 0)
+				{
+					Domain->AddEntry();
+				}
+			}
+		}
+
+		Copy->Flatten();
+
+		if (Metadata)
+		{
+			Metadata->DeleteAttribute(FName("____FIXUP____"));
+		}
+	}, 1);
 
 	Context->OutputData.TaggedData.Reserve(Copies.Num());
 	for (int32 i = 0; i < Copies.Num(); ++i)
