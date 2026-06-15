@@ -673,6 +673,11 @@ namespace PCGExFindContours
 			{
 				return;
 			}
+			
+			for (const TSharedPtr<PCGExData::FPointIO>& IO : CellsIOIndices)
+			{
+				PCGExClusters::Helpers::CleanupClusterData(IO);
+			}
 
 			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ProcessCellsTask)
 

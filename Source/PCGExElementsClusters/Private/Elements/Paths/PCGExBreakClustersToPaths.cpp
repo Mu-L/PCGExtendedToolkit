@@ -4,6 +4,7 @@
 #include "Elements/Paths/PCGExBreakClustersToPaths.h"
 
 #include "Clusters/PCGExCluster.h"
+#include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCachedChain.h"
 #include "Clusters/Artifacts/PCGExChain.h"
 #include "Curve/CurveUtil.h"
@@ -17,6 +18,16 @@
 
 #define LOCTEXT_NAMESPACE "PCGExBreakClustersToPaths"
 #define PCGEX_NAMESPACE BreakClustersToPaths
+
+TArray<FPCGPinProperties> UPCGExBreakClustersToPathsSettings::InputPinProperties() const
+{
+	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
+	if (OperateOn == EPCGExBreakClusterOperationTarget::Paths)
+	{
+		PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceEdgeFiltersLabel, "Optional edge filters. Chains are kept based on how many of their edges pass these filters (see Edge Filter Mode).", Normal)
+	}
+	return PinProperties;
+}
 
 TArray<FPCGPinProperties> UPCGExBreakClustersToPathsSettings::OutputPinProperties() const
 {
@@ -49,6 +60,11 @@ bool FPCGExBreakClustersToPathsElement::Boot(FPCGExContext* InContext) const
 
 	Context->OutputPaths = MakeShared<PCGExData::FPointIOCollection>(Context);
 	Context->OutputPaths->OutputPin = PCGExPaths::Labels::OutputPathsLabel;
+
+	if (Settings->OperateOn == EPCGExBreakClusterOperationTarget::Paths)
+	{
+		GetInputFactories(Context, PCGExClusters::Labels::SourceEdgeFiltersLabel, Context->EdgeFilterFactories, PCGExFactories::ClusterEdgeFilters, false);
+	}
 
 	return true;
 }
@@ -97,6 +113,11 @@ namespace PCGExBreakClustersToPaths
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExBreakClustersToPaths::Process);
 
+		if (!Context->EdgeFilterFactories.IsEmpty())
+		{
+			EdgeFilterFactories = &Context->EdgeFilterFactories;
+		}
+
 		if (!IProcessor::Process(InTaskManager))
 		{
 			return false;
@@ -112,8 +133,15 @@ namespace PCGExBreakClustersToPaths
 			if (VtxFiltersManager)
 			{
 				FilterVtxScope(PCGExMT::FScope(0, NumNodes), true);
-				return BuildChains();
 			}
+
+			if (EdgesFiltersManager)
+			{
+				//StartParallelLoopForEdges(); // return true
+				EdgeDataFacade->Fetch(PCGExMT::FScope(0, NumEdges));
+				FilterEdgeScope(PCGExMT::FScope(0, NumEdges), true);
+			}
+
 			return BuildChains();
 		}
 
@@ -121,6 +149,11 @@ namespace PCGExBreakClustersToPaths
 		if (!Context->OutputPaths->EmplaceBatch<UPCGPointArrayData>(ChainsIO, VtxDataFacade->Source, PCGExData::EIOInit::New))
 		{
 			return false;
+		}
+		
+		for (const TSharedPtr<PCGExData::FPointIO>& IO : ChainsIO)
+		{
+			PCGExClusters::Helpers::CleanupClusterData(IO);
 		}
 
 		StartParallelLoopForEdges();
@@ -156,6 +189,11 @@ namespace PCGExBreakClustersToPaths
 			return;
 		}
 
+		for (const TSharedPtr<PCGExData::FPointIO>& IO : ChainsIO)
+		{
+			PCGExClusters::Helpers::CleanupClusterData(IO);
+		}
+		
 		StartParallelLoopForRange(NumChains);
 	}
 
@@ -191,6 +229,43 @@ namespace PCGExBreakClustersToPaths
 			if (Settings->bOmitAbovePointCount && ChainSize > Settings->MaxPointCount)
 			{
 				PCGEX_IGNORE_CHAIN
+			}
+
+			if (EdgesFiltersManager)
+			{
+				// EdgeFilterCache is indexed by cluster edge index, same space as FLink::Edge.
+				// A chain's edges are every Links[i].Edge, plus the closing Seed.Edge for closed loops.
+				int32 EdgePassCount = 0;
+				int32 EdgeTotalCount = Chain->Links.Num();
+				for (const PCGExGraphs::FLink& Link : Chain->Links)
+				{
+					EdgePassCount += EdgeFilterCache[Link.Edge];
+				}
+				if (Chain->bIsClosedLoop)
+				{
+					EdgeTotalCount++;
+					EdgePassCount += EdgeFilterCache[Chain->Seed.Edge];
+				}
+
+				bool bChainPasses = true;
+				switch (Settings->EdgeFilterMode)
+				{
+				default:
+				case EPCGExUberFilterCollectionsMode::All:
+					bChainPasses = (EdgePassCount == EdgeTotalCount);
+					break;
+				case EPCGExUberFilterCollectionsMode::Any:
+					bChainPasses = (EdgePassCount > 0);
+					break;
+				case EPCGExUberFilterCollectionsMode::Partial:
+					bChainPasses = (static_cast<double>(EdgePassCount) / static_cast<double>(EdgeTotalCount)) >= Settings->EdgeFilterPassRatio;
+					break;
+				}
+
+				if (!bChainPasses)
+				{
+					PCGEX_IGNORE_CHAIN
+				}
 			}
 
 			const bool bReverse = DirectionSettings.SortExtrapolation(Cluster.Get(), Chain->Seed.Edge, Chain->Seed.Node, Chain->Links.Last().Node);
@@ -245,6 +320,16 @@ namespace PCGExBreakClustersToPaths
 
 	void FProcessor::ProcessEdges(const PCGExMT::FScope& Scope)
 	{
+		/*
+		if (Settings->OperateOn == EPCGExBreakClusterOperationTarget::Paths)
+		{
+			// We only call process edge in path mode if there's filters
+			EdgeDataFacade->Fetch(PCGExMT::FScope(0, NumEdges));
+			FilterEdgeScope(PCGExMT::FScope(0, NumEdges), true);
+			return;
+		}
+		*/
+
 		TArray<PCGExGraphs::FEdge>& ClusterEdges = *Cluster->Edges;
 
 		PCGEX_SCOPE_LOOP(Index)
@@ -269,6 +354,18 @@ namespace PCGExBreakClustersToPaths
 			PathIO->ConsumeIdxMapping(EPCGPointNativeProperties::All);
 			PCGExPaths::Helpers::SetClosedLoop(PathIO->GetOut(), false);
 		}
+	}
+
+	void FProcessor::OnEdgesProcessingComplete()
+	{
+		/*
+		if (Settings->OperateOn == EPCGExBreakClusterOperationTarget::Paths)
+		{
+			// We only call process edge in path mode if there's filters
+			// Once filters have been processed, build chains
+			BuildChains();
+		}
+		*/
 	}
 
 	void FProcessor::Cleanup()

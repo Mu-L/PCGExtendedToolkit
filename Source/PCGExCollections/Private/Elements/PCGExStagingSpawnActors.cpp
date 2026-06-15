@@ -7,6 +7,7 @@
 #include "PCGElement.h"
 #include "PCGManagedResource.h"
 #include "PCGParamData.h"
+#include "Core/PCGExMT.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataMacros.h"
 #include "Data/PCGExPointIO.h"
@@ -101,6 +102,10 @@ bool FPCGExStagingSpawnActorsElement::AdvanceWork(FPCGExContext* InContext, cons
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
 		}
 	}
+
+	// Output drives a main-thread loop that spawns actors (World->SpawnActor / NewObject<UPCGManagedActors> /
+	// FinalizeSpawnedActor) -- illegal during a package save or GC. Defer the whole output phase (re-tick).
+	PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 

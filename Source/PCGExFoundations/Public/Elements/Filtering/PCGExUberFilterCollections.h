@@ -15,14 +15,6 @@
 
 class UPCGExPickerFactoryData;
 
-UENUM(BlueprintType)
-enum class EPCGExUberFilterCollectionsMode : uint8
-{
-	All     = 0 UMETA(DisplayName = "All", ToolTip="All points must pass the filters."),
-	Any     = 1 UMETA(DisplayName = "Any", ToolTip="At least one point must pass the filter."),
-	Partial = 2 UMETA(DisplayName = "Partial", ToolTip="A given amount of points must pass the filter."),
-};
-
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="filters/uber-filter-data"))
 class UPCGExUberFilterCollectionsSettings : public UPCGExPointsProcessorSettings
 {

@@ -118,6 +118,12 @@ namespace PCGExData
 
 		~FUnionTableBuilder() = default;
 
+		// When set, Compile() collapses records sharing an (IO, Index) within a key group, so Size()
+		// counts distinct merged points instead of raw records. Enable for NODE tables (a shared vtx is
+		// emitted once per incident edge); leave false for EDGE tables, whose record count is the number
+		// of contributing segments.
+		bool bDedupeElementsBySource = false;
+
 		void Init(const int32 NumScopes)
 		{
 			ScopedRecords.SetNum(NumScopes);

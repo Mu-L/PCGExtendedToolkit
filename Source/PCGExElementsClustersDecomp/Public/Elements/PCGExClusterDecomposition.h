@@ -68,6 +68,21 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))
 	FName CellCountAttributeName = NAME_None;
 
+	/** Optional attribute name for per-node cell bounds size (FVector, full extent). Empty = disabled.
+	 *
+	 *  The meaning is algorithm-specific:
+	 *  - Box-like algorithms (Grid, Max Boxes, BSP Occupancy) report their quantized cell box, measured
+	 *    along the grid's LOCAL axes. With a Best Fit or Custom transform space the size is in that
+	 *    rotated (and, for a scaled Custom transform, scaled) frame -- it is NOT a world-axis-aligned
+	 *    size. The value is the enclosing box: a non-cuboid cell (an L-shaped BSP Occupancy region, or a
+	 *    Grid cell merged from non-adjacent cells) reports the AABB that contains it, which can exceed
+	 *    its filled volume.
+	 *  - Node-grouping algorithms (Convex BSP, Spectral, Threshold) report the world-space AABB of the
+	 *    member node positions, so a single-node cell reports a zero-size vector.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta=(PCG_Overridable))
+	FName CellSizeAttributeName = NAME_None;
+
 private:
 	friend class FPCGExClusterDecompositionElement;
 };
@@ -101,6 +116,7 @@ namespace PCGExClusterDecomposition
 
 		TSharedPtr<PCGExData::TBuffer<int32>> CellIDBuffer;
 		TSharedPtr<PCGExData::TBuffer<int32>> CellCountBuffer;
+		TSharedPtr<PCGExData::TBuffer<FVector>> CellSizeBuffer;
 
 	public:
 		FProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
@@ -120,6 +136,7 @@ namespace PCGExClusterDecomposition
 	{
 		TSharedPtr<PCGExData::TBuffer<int32>> CellIDBuffer;
 		TSharedPtr<PCGExData::TBuffer<int32>> CellCountBuffer;
+		TSharedPtr<PCGExData::TBuffer<FVector>> CellSizeBuffer;
 
 	public:
 		FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges);

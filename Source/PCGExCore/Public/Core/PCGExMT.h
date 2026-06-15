@@ -378,6 +378,18 @@ namespace PCGExMT
 	PCGEXCORE_API
 	void ExecuteOnMainThreadAndWait(FExecuteCallback&& Callback);
 
+	// True when UObject work (spawning actors, NewObject, FindFunction) is currently illegal -- a package save or GC
+	// is in progress. Game-thread output phases that marshal object work must defer (re-tick) until this is false.
+	// See the PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED macro.
+	PCGEXCORE_API
+	bool IsObjectWorkBlocked();
+
+// Defer the current bool-returning AdvanceWork (return false = "not complete, re-tick") when UObject work is illegal
+// -- a package save / GC is in progress. USE ONLY in a main-thread-only element (PCGEX_CAN_ONLY_EXECUTE_ON_MAIN_THREAD):
+// on an off-thread/paused context this return-false is never re-driven and would hang. The game-thread UObject work
+// itself (spawn / marshal / FindFunction) must still carry its own PCGExMT::IsObjectWorkBlocked() backstop.
+#define PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED if (PCGExMT::IsObjectWorkBlocked()) { return false; }
+
 	// Base task class
 	class PCGEXCORE_API FTask : public IAsyncHandle
 	{

@@ -3,6 +3,8 @@
 
 #include "Decompositions/PCGExDecompGridPartition.h"
 
+#include "Core/PCGExDecompositionUtils.h"
+
 #pragma region FPCGExDecompGridPartition
 
 bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
@@ -33,6 +35,16 @@ bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
 
 	const FVector BoundsMin = Bounds.Min;
 
+	// Cache per-node grid coords when cell sizes are requested, so the size pass
+	// below reuses them instead of recomputing the quantization.
+	TArray<FIntVector> GridCoords;
+	if (OutResult.bWantsCellSizes)
+	{
+		// Zeroed, not Uninitialized: invalid nodes never write their slot; a defined value
+		// removes the latent uninitialized-read hazard even though the size pass skips them.
+		GridCoords.SetNumZeroed(NumNodes);
+	}
+
 	// Quantize each node position to a grid cell
 	TMap<FIntVector, int32> CellMap;      // GridCoord -> CellID
 	TMap<int32, TArray<int32>> CellNodes; // CellID -> NodeIndices
@@ -52,6 +64,11 @@ bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
 			FMath::FloorToInt((Pos.X - BoundsMin.X) / SafeCellSize.X),
 			FMath::FloorToInt((Pos.Y - BoundsMin.Y) / SafeCellSize.Y),
 			FMath::FloorToInt((Pos.Z - BoundsMin.Z) / SafeCellSize.Z));
+
+		if (OutResult.bWantsCellSizes)
+		{
+			GridCoords[i] = GridCoord;
+		}
 
 		int32* ExistingID = CellMap.Find(GridCoord);
 		int32 CellID;
@@ -166,6 +183,16 @@ bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
 		}
 
 		NextCellID = CompactID;
+	}
+
+	if (OutResult.bWantsCellSizes)
+	{
+		// Box-like: each cell's size is its grid-coord AABB span times the cell size.
+		PCGExDecomposition::AccumulateQuantizedCellSizes(
+			NumNodes, NextCellID, SafeCellSize,
+			[&OutResult](const int32 i) { return OutResult.NodeCellIDs[i]; },
+			[&GridCoords](const int32 i) { return GridCoords[i]; },
+			OutResult.CellSizes);
 	}
 
 	OutResult.NumCells = NextCellID;

@@ -6,6 +6,7 @@
 #include "PCGComponent.h"
 
 #include "PCGParamData.h"
+#include "Core/PCGExMT.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Data/PCGExPointIO.h"
 #include "Elements/PCGExecuteBlueprint.h"
@@ -271,6 +272,11 @@ bool FPCGExPackActorDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 			return Context->CancelExecution(TEXT("Could not find any points."));
 		}
 	}
+
+	// When bExecuteOnMainThread, the batch drives a main-thread loop whose ProcessEntry can create components/actors
+	// (AddComponent -> ManagedObjects->New / AttachManagedComponent) -- illegal during a package save or GC. Defer the
+	// whole output phase (re-tick) until it finishes.
+	PCGEX_DEFER_IF_OBJECT_WORK_BLOCKED
 
 	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
 

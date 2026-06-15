@@ -34,20 +34,18 @@
 #pragma region UPCGExAssetStagingSettings
 
 #if WITH_EDITOR
-void UPCGExAssetStagingSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+void UPCGExAssetStagingSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
-	if (PCGExDataVersion == INDEX_NONE)
-	{
-		SelectorMode = EPCGExSelectorMode::External;
-	}
-
-	// TODO : Delete in 0.76
+	// Resolve the deferred selector default ONCE, and only while still Unset so explicit user choices
+	// are never overwritten. Nodes predating the Unset default (< 1.75.19) keep the legacy inline
+	// behavior; newer nodes adopt the external-factory default. PCGExDataVersion is resolved in Serialize.
 	if (SelectorMode == EPCGExSelectorMode::Unset)
 	{
-		SelectorMode = EPCGExSelectorMode::Legacy;
+		SelectorMode = EPCGExSelectorMode::External;
+		PCGEX_IF_VERSION_LOWER(1, 75, 19) { SelectorMode = EPCGExSelectorMode::Legacy; }
 	}
 	
-	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
 void UPCGExAssetStagingSettings::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)

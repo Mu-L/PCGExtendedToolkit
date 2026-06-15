@@ -141,28 +141,49 @@ namespace PCGExData
 		OutTable.Keys.Reserve(TotalRecords);
 		OutRecordToEntry.SetNumUninitialized(TotalRecords);
 
+		const bool bDedupe = bDedupeElementsBySource;
+
+		// Reused scratch set (one alloc for the whole compile), cleared per key group.
+		TSet<FElement> SeenInGroup;
+		if (bDedupe) { SeenInGroup.Reserve(8); }
+
 		OutTable.Offsets.Add(0);
 		uint64 CurrentKey = SortKeys[0].Key;
 		OutTable.Keys.Add(CurrentKey);
 		int32 EntryIndex = 0;
+		int32 WriteCount = 0; // == i without dedup; lags by collapsed duplicates with it
 
 		for (int32 i = 0; i < TotalRecords; i++)
 		{
 			const PCGEx::FIndexKey& Sorted = SortKeys[i];
 			if (Sorted.Key != CurrentKey)
 			{
-				OutTable.Offsets.Add(i);
+				OutTable.Offsets.Add(WriteCount);
 				CurrentKey = Sorted.Key;
 				OutTable.Keys.Add(CurrentKey);
 				EntryIndex++;
+				if (bDedupe) { SeenInGroup.Reset(); }
 			}
 
 			const FUnionStreamRecord& Rec = AllRecords[Sorted.Index];
-			OutTable.Elements[i] = FElement(Rec.Index, Rec.IO);
 			OutRecordToEntry[Sorted.Index] = EntryIndex;
+
+			const FElement Element(Rec.Index, Rec.IO);
+			if (bDedupe)
+			{
+				bool bAlreadyInGroup = false;
+				SeenInGroup.Add(Element, &bAlreadyInGroup);
+				if (bAlreadyInGroup)
+				{
+					continue; // duplicate of a point already in this entry; still mapped above
+				}
+			}
+
+			OutTable.Elements[WriteCount++] = Element;
 		}
 
-		OutTable.Offsets.Add(TotalRecords);
+		OutTable.Offsets.Add(WriteCount);
+		OutTable.Elements.SetNum(WriteCount, EAllowShrinking::No); // trim slack from collapsed dups
 	}
 
 #pragma endregion

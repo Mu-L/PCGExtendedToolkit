@@ -85,6 +85,7 @@ void PCGExWaitForPCGData::FGenerationConfig::InitFrom(const UPCGExWaitForPCGData
 	GenerateOnLoadAction = Settings->GenerateOnLoadAction;
 	GenerateOnDemandAction = Settings->GenerateOnDemandAction;
 	GenerateAtRuntimeAction = Settings->GenerateAtRuntime;
+	bTrackSourceComponents = Settings->bTrackSourceComponents;
 }
 
 void PCGExWaitForPCGData::FOutputConfig::InitFrom(const UPCGExWaitForPCGDataSettings* Settings)
@@ -622,7 +623,10 @@ namespace PCGExWaitForPCGData
 		// Notify about found components
 		for (UPCGComponent* PCGComponent : FoundComponents)
 		{
-			Context->EDITOR_TrackPath(PCGComponent);
+			if (Context->GenerationConfig.bTrackSourceComponents)
+			{
+				Context->EDITOR_TrackPCGComponentData(PCGComponent);
+			}
 			if (OnComponentFound)
 			{
 				OnComponentFound(PCGComponent);

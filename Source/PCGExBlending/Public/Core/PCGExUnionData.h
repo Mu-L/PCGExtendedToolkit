@@ -57,6 +57,12 @@ namespace PCGExData
 
 		for (const FElement& Element : InElements)
 		{
+			// Abstract elements (IO < 0) have no source; skip before the unchecked Get(-1) reads OOB.
+			if (Element.IO < 0)
+			{
+				continue;
+			}
+
 			const int32 IOIdx = IdxLookup->Get(Element.IO);
 			if (IOIdx == -1)
 			{
