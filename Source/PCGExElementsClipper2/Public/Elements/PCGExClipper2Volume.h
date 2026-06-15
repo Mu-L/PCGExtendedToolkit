@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGCommon.h"
 #include "PCGCrc.h"
 #include "Core/PCGExClipper2Processor.h"
 #include "Details/PCGExInputShorthandsDetails.h"
@@ -129,6 +130,11 @@ public:
 	/** Full collision setup (preset/object type/responses) applied to the spawned static-mesh collider (Primitive mode). Defaults to a blocking profile. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Collision", meta = (PCG_NotOverridable, EditCondition = "OutputMode == EPCGExClipper2VolumeOutputMode::Primitive", EditConditionHides))
 	FBodyInstance CollisionBody;
+
+	/** Controls where each spawned volume/primitive actor lands in the Outliner: in a folder named after the target
+	 *  actor (default), attached to it, or loose at the root. The anchor is the PCG component's target actor. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Spawning", meta = (PCG_NotOverridable))
+	EPCGAttachOptions AttachOptions = EPCGAttachOptions::InFolder;
 
 	/** Name of the soft-object-path attribute written into each output volume's @Data domain (points at the spawned actor). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable))

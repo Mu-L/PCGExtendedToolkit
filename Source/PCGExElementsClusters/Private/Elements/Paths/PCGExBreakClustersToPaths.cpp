@@ -4,6 +4,7 @@
 #include "Elements/Paths/PCGExBreakClustersToPaths.h"
 
 #include "Clusters/PCGExCluster.h"
+#include "Clusters/PCGExClustersHelpers.h"
 #include "Clusters/Artifacts/PCGExCachedChain.h"
 #include "Clusters/Artifacts/PCGExChain.h"
 #include "Curve/CurveUtil.h"
@@ -149,6 +150,11 @@ namespace PCGExBreakClustersToPaths
 		{
 			return false;
 		}
+		
+		for (const TSharedPtr<PCGExData::FPointIO>& IO : ChainsIO)
+		{
+			PCGExClusters::Helpers::CleanupClusterData(IO);
+		}
 
 		StartParallelLoopForEdges();
 
@@ -183,6 +189,11 @@ namespace PCGExBreakClustersToPaths
 			return;
 		}
 
+		for (const TSharedPtr<PCGExData::FPointIO>& IO : ChainsIO)
+		{
+			PCGExClusters::Helpers::CleanupClusterData(IO);
+		}
+		
 		StartParallelLoopForRange(NumChains);
 	}
 

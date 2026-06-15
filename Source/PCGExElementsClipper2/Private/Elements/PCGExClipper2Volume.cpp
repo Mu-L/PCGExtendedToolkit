@@ -216,6 +216,10 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		TargetLevel = CompOwner->GetLevel();
 	}
 
+	// Outliner grouping anchor: the component's target actor. AttachToParent names the folder after it (InFolder)
+	// or attaches to it (Attached); a null anchor makes the call a safe no-op.
+	AActor* const TargetActor = GetTargetActor(nullptr);
+
 	StagedVolumes.Sort([](const TSharedPtr<FPCGExVolumeSpec>& A, const TSharedPtr<FPCGExVolumeSpec>& B)
 	{
 		return A->GroupIndex < B->GroupIndex;
@@ -371,6 +375,9 @@ void FPCGExClipper2VolumeContext::SpawnStagedVolumes()
 		}
 		
 		AddNotifyActor(SpawnedActor);
+
+		// Group the spawned actor under its Outliner folder (or attach it) instead of leaving it loose at the root.
+		PCGHelpers::AttachToParent(SpawnedActor, TargetActor, Settings->AttachOptions, this);
 
 		// Create + register the managed resource lazily on first spawn so partial work is still tracked.
 		if (!ManagedActors)

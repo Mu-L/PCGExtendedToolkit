@@ -395,6 +395,11 @@ namespace PCGExPathfindingEdges
 			{
 				return false;
 			}
+			
+			for (const TSharedPtr<PCGExData::FPointIO>& IO : QueriesIO)
+			{
+				PCGExClusters::Helpers::CleanupClusterData(IO);
+			}
 		}
 
 		for (int i = 0; i < NumQueries; i++)
