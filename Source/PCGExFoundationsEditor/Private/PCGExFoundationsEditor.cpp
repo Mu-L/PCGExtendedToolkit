@@ -15,6 +15,7 @@
 #include "Details/InputSettings/PCGExClampDetailsCustomization.h"
 #include "Details/InputSettings/PCGExCompareShorthandsCustomization.h"
 #include "Details/InputSettings/PCGExInputShorthandsCustomization.h"
+#include "Details/PCGExPartitionGridCustomization.h"
 
 void FPCGExFoundationsEditorModule::StartupModule()
 {
@@ -23,6 +24,8 @@ void FPCGExFoundationsEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO_START
 
 	PCGEX_REGISTER_CUSTO("PCGExApplySamplingDetails", FPCGExApplySamplingCustomization)
+
+	PCGEX_REGISTER_CUSTO("PCGExPartitionGrid", FPCGExPartitionGridCustomization)
 
 	PCGEX_REGISTER_CUSTO("PCGExBitmask", FPCGExBitmaskCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExBitmaskWithOperation", FPCGExBitmaskWithOperationCustomization)

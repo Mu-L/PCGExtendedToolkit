@@ -164,7 +164,7 @@ namespace PCGExStagingSpawnActors
 			GenConfig.GenerateOnDemandAction = Settings->GenerateOnDemandAction;
 			GenConfig.GenerateAtRuntimeAction = Settings->GenerateAtRuntimeAction;
 
-			GenerationWatcher = MakeShared<PCGExPCGInterop::FGenerationWatcher>(TaskManager, GenConfig);
+			GenerationWatcher = MakeShared<PCGExPCGInterop::FGenerationWatcher>(TaskManager, GenConfig, Context->GetMutableComponent());
 			GenerationWatcher->Initialize();
 		}
 
