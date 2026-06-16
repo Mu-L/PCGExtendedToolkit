@@ -8,10 +8,8 @@
 #include "PropertyHandle.h"
 #include "Details/PCGExCustomizationMacros.h"
 #include "Details/Enums/PCGExInlineEnumCustomization.h"
-#include "Metadata/PCGAttributePropertySelector.h"
 #include "UObject/TextProperty.h"
 #include "Widgets/Input/SCheckBox.h"
-#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -125,54 +123,12 @@ TSharedRef<SWidget> FPCGExCompareShorthandCustomization::CreateAttributeWidget(T
 		return AttributeHandle->CreatePropertyValueWidget();
 	}
 
+	// Reuse PCG's selector widget (falls back to the default widget if the type has no customization).
 	return SNew(SBox)
 		.VAlign(VAlign_Center)
 		.MaxDesiredHeight(22.0f)
 		[
-			SNew(SEditableTextBox)
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-			.Text_Lambda(
-				[AttributeHandle]()
-				{
-					TArray<void*> RawData;
-					AttributeHandle->AccessRawData(RawData);
-
-					if (RawData.Num() > 0)
-					{
-						FPCGAttributePropertyInputSelector* Selector = static_cast<FPCGAttributePropertyInputSelector*>(RawData[0]);
-						if (Selector)
-						{
-							return FText::FromString(Selector->ToString());
-						}
-					}
-					return FText::GetEmpty();
-				})
-			.OnTextCommitted_Lambda(
-				[AttributeHandle](const FText& NewText, ETextCommit::Type CommitType)
-				{
-					// Only handle commits from Enter or losing focus
-					if (CommitType == ETextCommit::OnEnter || CommitType == ETextCommit::OnUserMovedFocus)
-					{
-						TArray<void*> RawData;
-						AttributeHandle->AccessRawData(RawData);
-
-						bool bUpdated = false;
-						for (void* Ptr : RawData)
-						{
-							FPCGAttributePropertyInputSelector* Selector = static_cast<FPCGAttributePropertyInputSelector*>(Ptr);
-							if (Selector)
-							{
-								Selector->Update(NewText.ToString());
-								bUpdated = true;
-							}
-						}
-
-						if (bUpdated)
-						{
-							AttributeHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
-						}
-					}
-				})
+			AttributeHandle->CreatePropertyValueWidgetWithCustomization(nullptr)
 		];
 }
 

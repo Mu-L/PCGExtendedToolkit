@@ -3,17 +3,14 @@
 
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
 
-#include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
 #include "PCGExPropertyWriter.h"
 #include "PropertyHandle.h"
 #include "Helpers/PCGExMetaHelpers.h"
-#include "Styling/SlateColor.h"
 #include "Widgets/SBoxPanel.h"
-#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/Text/STextBlock.h"
+#include "Details/PCGExDetailRowWidgets.h"
 
 TSharedRef<IPropertyTypeCustomization> FPCGExPropertyOutputConfigCustomization::MakeInstance()
 {
@@ -109,28 +106,11 @@ void FPCGExPropertyOutputConfigCustomization::CustomizeHeader(
 	HeaderRow.ValueContent()
 	         .MinDesiredWidth(220)
 	[
-		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(2, 0, 4, 0)
-		[
-			SNew(STextBlock)
-			.Text(FText::FromString(TEXT("→")))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-			.ColorAndOpacity(FSlateColor(FLinearColor::Gray))
-		]
-		+ SHorizontalBox::Slot().Padding(1).FillWidth(1)
-		[
-			SNew(SBox)
-			.IsEnabled_Lambda(IsEnabled)
-			[
-				SNew(SEditableTextBox)
-				.Text_Lambda(GetOutputText)
-				.HintText_Lambda(GetHintText)
-				.OnTextCommitted_Lambda(OnOutputCommitted)
-				.SelectAllTextWhenFocused(true)
-				.ClearKeyboardFocusOnCommit(true)
-				.Font(IDetailLayoutBuilder::GetDetailFont())
-			]
-		]
+		PCGExDetailRowWidgets::MakeArrowedHintTextBox(
+			TAttribute<FText>::CreateLambda(GetOutputText),
+			TAttribute<FText>::CreateLambda(GetHintText),
+			FOnTextCommitted::CreateLambda(OnOutputCommitted),
+			TAttribute<bool>::CreateLambda(IsEnabled))
 	];
 }
 
