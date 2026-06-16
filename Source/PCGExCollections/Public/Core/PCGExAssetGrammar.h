@@ -285,16 +285,16 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetGrammarDetails
 	// UPCGExAssetCollection::PostLoad reads these when GrammarSchemaVersion < 1 and writes
 	// the canonical fields above. Do not read directly outside migration code.
 
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	EPCGExGrammarScaleMode ScaleMode_DEPRECATED = EPCGExGrammarScaleMode::Fixed;
 
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	EPCGExGrammarSizeReference Size_DEPRECATED = EPCGExGrammarSizeReference::X;
 
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	EPCGExGrammarSizeOp SizeOp_DEPRECATED = EPCGExGrammarSizeOp::None;
 
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	double FixedSize_DEPRECATED = 100;
 
 #pragma endregion

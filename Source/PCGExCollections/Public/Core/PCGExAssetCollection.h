@@ -225,7 +225,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 #pragma region DEPRECATED
 	
 	/** LEGACY (schema v0). Migrated into AssetGrammar by PostLoad when SubGrammarMode==Override. */
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
 	
 #pragma endregion
@@ -906,7 +906,7 @@ public:
 	TArray<TObjectPtr<UPCGExCollectionStagingPipeline>> StagingPipelines;
 
 	/** LEGACY single-pipeline slot. Migrated into StagingPipelines by PostLoad. */
-	UPROPERTY(Instanced, meta=(DeprecatedProperty))
+	UPROPERTY(Instanced, meta=(DeprecatedProperty, ScriptNoExport))
 	TObjectPtr<UPCGExCollectionStagingPipeline> StagingPipeline_DEPRECATED;
 #endif
 
@@ -977,7 +977,7 @@ public:
 #pragma region DEPRECATED
 	
 	/** LEGACY (schema v0). Migrated into SubCollectionGrammar by PostLoad. */
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
 	
 #pragma endregion

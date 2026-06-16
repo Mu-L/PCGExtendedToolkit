@@ -86,7 +86,7 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	FName ResultAttributeName_DEPRECATED = NAME_None;
 
 #pragma endregion

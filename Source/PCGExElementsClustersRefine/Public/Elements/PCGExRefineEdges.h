@@ -90,7 +90,7 @@ public:
 
 #pragma region DEPRECATED
 
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	bool bOutputEdgesOnly_DEPRECATED = false;
 
 #pragma endregion
