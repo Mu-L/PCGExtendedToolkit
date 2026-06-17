@@ -5,6 +5,7 @@
 
 #include "PCGContext.h"
 #include "PCGPin.h"
+#include "PCGModule.h"
 #include "PCGExCommon.h"
 #include "PCGExMatchingCommon.h"
 #include "Clusters/PCGExClusterCommon.h"
