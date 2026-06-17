@@ -585,7 +585,7 @@ namespace PCGExMatching
 
 		if (!TaggedData.Keys)
 		{
-			TaggedData.Keys = PCGExMetaHelpers::MakeKeys(TaggedData.Data);
+			TaggedData.Keys = PCGExMetaHelpers::MakeConstKeys(TaggedData.Data);
 		}
 
 		NumSources = MatchableSources->Num();

@@ -473,7 +473,7 @@ bool FPCGExFormatAttributesElement::AdvanceWork(FPCGExContext* InContext, const 
 		const int32 NumRows = PCGExMetaHelpers::GetElementsCount(DupData);
 		if (NumRows > 0 && !Settings->Rules.IsEmpty() && !Context->TargetSelectors.IsEmpty())
 		{
-			if (TSharedPtr<IPCGAttributeAccessorKeys> WriteKeys = PCGExMetaHelpers::MakeKeys(DupData))
+			if (TSharedPtr<IPCGAttributeAccessorKeys> WriteKeys = PCGExMetaHelpers::MakeMutableKeys(DupData))
 			{
 				PCGExFormatAttributes::FFormatInputState State;
 				State.DupData = DupData;

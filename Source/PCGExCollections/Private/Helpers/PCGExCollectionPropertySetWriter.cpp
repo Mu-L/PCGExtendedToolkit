@@ -185,7 +185,7 @@ namespace PCGExCollections
 		}
 
 		// Build accessor keys once -- same uniform pattern as the identity-attr write block.
-		TSharedPtr<IPCGAttributeAccessorKeys> Keys = PCGExMetaHelpers::MakeKeys(InData);
+		TSharedPtr<IPCGAttributeAccessorKeys> Keys = PCGExMetaHelpers::MakeMutableKeys(InData);
 		
 		if (!Keys)
 		{
