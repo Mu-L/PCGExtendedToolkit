@@ -109,7 +109,7 @@ namespace PCGExReversePointOrder
 			{
 				continue;
 			}
-			if (FirstIdentity->UnderlyingType != SecondIdentity->UnderlyingType)
+			if (!FirstIdentity->IsSameType(*SecondIdentity))
 			{
 				continue;
 			}
@@ -206,12 +206,22 @@ namespace PCGExReversePointOrder
 			PCGEX_ASYNC_THIS
 			FPCGExSwapAttributePairDetails& WorkingPair = This->SwapPairs[Scope.Start];
 
-			PCGExMetaHelpers::ExecuteWithRightType(WorkingPair.FirstIdentity->UnderlyingType, [&](auto DummyValue)
-			{
-				using T_REAL = decltype(DummyValue);
-				WorkingPair.FirstWriter = This->PointDataFacade->GetWritable<T_REAL>(WorkingPair.FirstAttributeName, PCGExData::EBufferInit::Inherit);
-				WorkingPair.SecondWriter = This->PointDataFacade->GetWritable<T_REAL>(WorkingPair.SecondAttributeName, PCGExData::EBufferInit::Inherit);
-			});
+			PCGExMetaHelpers::ExecuteWithRightType(
+				*WorkingPair.FirstIdentity,
+				[&](auto DummyValue)
+				{
+					using T_REAL = decltype(DummyValue);
+					WorkingPair.FirstWriter = This->PointDataFacade->GetWritable<T_REAL>(WorkingPair.FirstAttributeName, PCGExData::EBufferInit::Inherit);
+					WorkingPair.SecondWriter = This->PointDataFacade->GetWritable<T_REAL>(WorkingPair.SecondAttributeName, PCGExData::EBufferInit::Inherit);
+				},
+				[&]()
+				{
+					// Swap pair on container/extended-typed attribute would need property-aware
+					// per-element swap with a scratch slot. Not wired yet -- drop the pair with a log.
+					PCGEX_LOG_UNSUPPORTED_TYPE(This->Context, *WorkingPair.FirstIdentity, FTEXT("Reverse Point Order swap"));
+					WorkingPair.FirstWriter.Reset();
+					WorkingPair.SecondWriter.Reset();
+				});
 		};
 
 		FetchWritersTask->StartSubLoops(SwapPairs.Num(), 1);
@@ -225,7 +235,13 @@ namespace PCGExReversePointOrder
 
 		for (const FPCGExSwapAttributePairDetails& WorkingPair : SwapPairs)
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(WorkingPair.FirstIdentity->UnderlyingType, [&](auto DummyValue)
+			// Container/extended pairs were nulled at writer-fetch time -- skip them here too.
+			if (!WorkingPair.FirstWriter || !WorkingPair.SecondWriter)
+			{
+				continue;
+			}
+
+			PCGExMetaHelpers::ExecuteWithRightType(*WorkingPair.FirstIdentity, [&](auto DummyValue)
 			{
 				using T_REAL = decltype(DummyValue);
 				TSharedPtr<PCGExData::TBuffer<T_REAL>> FirstWriter = StaticCastSharedPtr<PCGExData::TBuffer<T_REAL>>(WorkingPair.FirstWriter);

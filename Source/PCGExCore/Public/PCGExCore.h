@@ -13,6 +13,8 @@ class FPCGExCoreModule final : public IPCGExLegacyModuleInterface
 	PCGEX_MODULE_BODY
 
 public:
+	virtual void StartupModule() override;
+
 #if WITH_EDITOR
 	virtual void RegisterToEditor(const TSharedPtr<FSlateStyleSet>& InStyle) override;
 #endif

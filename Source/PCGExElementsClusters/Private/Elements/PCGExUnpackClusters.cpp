@@ -67,7 +67,7 @@ public:
 		PCGEX_SETTINGS(UnpackClusters)
 
 		FPCGAttributeIdentifier EdgeCountIdentifier = PCGExMetaHelpers::GetAttributeIdentifier(PCGExClusters::Labels::Tag_PackedClusterEdgeCount, PointIO->GetIn());
-		const FPCGMetadataAttribute<int32>* EdgeCount = PCGExMetaHelpers::TryGetConstAttribute<int32>(PointIO->GetIn(), EdgeCountIdentifier);
+		const FPCGMetadataAttributeBase* EdgeCount = PCGExMetaHelpers::TryGetConstAttribute<int32>(PointIO->GetIn(), EdgeCountIdentifier);
 		int32 NumEdges = -1;
 
 		if (!EdgeCount)
@@ -77,12 +77,12 @@ public:
 			EdgeCount = PCGExMetaHelpers::TryGetConstAttribute<int32>(PointIO->GetIn(), EdgeCountIdentifier);
 			if (EdgeCount)
 			{
-				NumEdges = PCGExData::Helpers::ReadDataValue(EdgeCount);
+				NumEdges = PCGExData::Helpers::ReadDataValue<int32>(EdgeCount);
 			}
 		}
 		else
 		{
-			NumEdges = PCGExData::Helpers::ReadDataValue(EdgeCount);
+			NumEdges = PCGExData::Helpers::ReadDataValue<int32>(EdgeCount);
 		}
 
 		if (NumEdges == -1)

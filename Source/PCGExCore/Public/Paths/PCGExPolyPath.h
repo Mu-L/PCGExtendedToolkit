@@ -56,12 +56,10 @@ namespace PCGExPaths
 			const double Expansion = 0, const double ExpansionZ = -1,
 			const EPCGExWindingMutation WindingMutation = EPCGExWindingMutation::Unchanged);
 
-#if PCGEX_ENGINE_VERSION > 506
 		FPolyPath(
 			const UPCGPolygon2DData* PolygonData, const FPCGExGeo2DProjectionDetails& InProjection,
 			const double Expansion = 0, const double ExpansionZ = -1,
 			const EPCGExWindingMutation WindingMutation = EPCGExWindingMutation::Unchanged);
-#endif
 
 		FORCEINLINE const FPCGSplineStruct* GetSpline() const
 		{

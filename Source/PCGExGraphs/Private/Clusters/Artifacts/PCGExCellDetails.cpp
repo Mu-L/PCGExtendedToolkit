@@ -224,7 +224,7 @@ void FPCGExCellArtifactsDetails::Process(const TSharedPtr<PCGExClusters::FCluste
 	if (VtxIDBuffer)
 	{
 		TSharedPtr<PCGExData::FPointIO> VtxIO = InCluster->VtxIO.Pin();
-		const FPCGMetadataAttribute<int64>* VtxIDAttr = VtxIO ? VtxIO->FindConstAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx) : nullptr;
+		const FPCGMetadataAttributeBase* VtxIDAttr = VtxIO ? VtxIO->FindConstAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx) : nullptr;
 
 		if (VtxIO && VtxIDAttr)
 		{
@@ -232,7 +232,7 @@ void FPCGExCellArtifactsDetails::Process(const TSharedPtr<PCGExClusters::FCluste
 			for (int i = 0; i < NumNodes; i++)
 			{
 				const int32 PointIndex = InCluster->GetNodePointIndex(InCell->Nodes[i]);
-				VtxIDBuffer->SetValue(i, PCGEx::H64A(VtxIDAttr->GetValueFromItemKey(MetadataEntries[PointIndex])));
+				VtxIDBuffer->SetValue(i, PCGEx::H64A(VtxIDAttr->GetValueFromItemKey<int64>(MetadataEntries[PointIndex])));
 			}
 		}
 	}

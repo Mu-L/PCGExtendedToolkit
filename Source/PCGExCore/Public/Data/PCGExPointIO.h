@@ -382,9 +382,9 @@ namespace PCGExData
 		void GetDataAsProxyPoint(FProxyPoint& OutPoint, const EIOSide Side = EIOSide::In) const;
 
 		template <typename T>
-		FPCGMetadataAttribute<T>* CreateAttribute(const FPCGAttributeIdentifier& Identifier, const T& DefaultValue = T{}, bool bAllowsInterpolation = true, bool bOverrideParent = true)
+		FPCGMetadataAttributeBase* CreateAttribute(const FPCGAttributeIdentifier& Identifier, const T& DefaultValue = T{}, bool bAllowsInterpolation = true, bool bOverrideParent = true)
 		{
-			FPCGMetadataAttribute<T>* OutAttribute = nullptr;
+			FPCGMetadataAttributeBase* OutAttribute = nullptr;
 			if (!Out)
 			{
 				return OutAttribute;
@@ -401,9 +401,9 @@ namespace PCGExData
 		}
 
 		template <typename T>
-		FPCGMetadataAttribute<T>* FindOrCreateAttribute(const FPCGAttributeIdentifier& Identifier, const T& DefaultValue = T{}, bool bAllowsInterpolation = true, bool bOverrideParent = true, bool bOverwriteIfTypeMismatch = true)
+		FPCGMetadataAttributeBase* FindOrCreateAttribute(const FPCGAttributeIdentifier& Identifier, const T& DefaultValue = T{}, bool bAllowsInterpolation = true, bool bOverrideParent = true, bool bOverwriteIfTypeMismatch = true)
 		{
-			FPCGMetadataAttribute<T>* OutAttribute = nullptr;
+			FPCGMetadataAttributeBase* OutAttribute = nullptr;
 			if (!Out)
 			{
 				return OutAttribute;
@@ -422,7 +422,7 @@ namespace PCGExData
 		const FPCGMetadataAttributeBase* FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const;
 
 		template <typename T>
-		FPCGMetadataAttribute<T>* FindMutableAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const
+		FPCGMetadataAttributeBase* FindMutableAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const
 		{
 			return PCGExMetaHelpers::TryGetMutableAttribute<T>(GetMutableData(InSide), InIdentifier);
 		}
@@ -430,7 +430,7 @@ namespace PCGExData
 		FPCGMetadataAttributeBase* FindMutableAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const;
 
 		template <typename T>
-		const FPCGMetadataAttribute<T>* FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const
+		const FPCGMetadataAttributeBase* FindConstAttribute(const FPCGAttributeIdentifier& InIdentifier, const EIOSide InSide = EIOSide::In) const
 		{
 			return PCGExMetaHelpers::TryGetConstAttribute<T>(GetData(InSide), InIdentifier);
 		}

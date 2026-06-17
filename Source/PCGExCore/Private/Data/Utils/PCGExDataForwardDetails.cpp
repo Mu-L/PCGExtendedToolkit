@@ -14,7 +14,7 @@ void FPCGExForwardDetails::Filter(TArray<PCGExData::FAttributeIdentity>& Identit
 {
 	for (int i = 0; i < Identities.Num(); i++)
 	{
-		if (!Test(Identities[i].Identifier.Name.ToString()))
+		if (!Test(Identities[i].Name.ToString()))
 		{
 			Identities.RemoveAt(i);
 			i--;
@@ -143,6 +143,7 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, U
 			{
 				using T = decltype(DummyValue);
 				TSharedPtr<PCGExData::TAttributeBroadcaster<T>> TypedGetter = StaticCastSharedPtr<PCGExData::TAttributeBroadcaster<T>>(Getter);
+
 				if (!TypedGetter)
 				{
 					return;

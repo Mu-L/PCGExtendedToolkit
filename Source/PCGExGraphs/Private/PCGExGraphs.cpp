@@ -8,12 +8,8 @@
 #include "Clusters/Artifacts/PCGExCachedFaceEnumerator.h"
 
 #if WITH_EDITOR
-
-#if PCGEX_ENGINE_VERSION > 506
-#include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
-#endif
-
 #include "Core/PCGExPointStates.h"
+#include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExGraphsModule"

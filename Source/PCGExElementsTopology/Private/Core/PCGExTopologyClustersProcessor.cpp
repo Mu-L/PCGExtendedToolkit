@@ -21,22 +21,6 @@
 #define LOCTEXT_NAMESPACE "TopologyProcessor"
 #define PCGEX_NAMESPACE TopologyProcessor
 
-#if WITH_EDITOR
-void UPCGExTopologyClustersProcessorSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
-{
-	for (TObjectPtr<UPCGPin>& OutPin : OutputPins)
-	{
-		// If vtx/edge pins are connected, set Legacy output mode and log warning
-		if ((OutPin->Properties.Label == PCGExClusters::Labels::OutputVerticesLabel || OutPin->Properties.Label == PCGExClusters::Labels::OutputEdgesLabel) && OutPin->EdgeCount() > 0)
-		{
-			OutputMode = EPCGExTopologyOutputMode::Legacy;
-			UE_LOG(LogPCGEx, Warning, TEXT("Legacy output mode is deprecated. Please reconnect to use PCG Dynamic Mesh output."));
-		}
-	}
-	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
-}
-#endif
-
 PCGExData::EIOInit UPCGExTopologyClustersProcessorSettings::GetMainOutputInitMode() const
 {
 	return PCGExData::EIOInit::NoInit;
@@ -85,12 +69,6 @@ bool FPCGExTopologyClustersProcessorElement::Boot(FPCGExContext* InContext) cons
 	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(TopologyClustersProcessor)
-
-	if (Settings->OutputMode == EPCGExTopologyOutputMode::Legacy)
-	{
-		PCGE_LOG(Error, GraphAndLog, FTEXT("Legacy output mode is deprecated and no longer supported. Please use PCG Dynamic Mesh output mode."));
-		return false;
-	}
 
 	Context->HolesFacade = PCGExData::TryGetSingleFacade(Context, PCGExClusters::Labels::SourceHolesLabel, false, false);
 	if (Context->HolesFacade && Settings->ProjectionDetails.Method == EPCGExProjectionMethod::Normal)

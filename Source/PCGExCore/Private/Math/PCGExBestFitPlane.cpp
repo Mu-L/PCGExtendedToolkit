@@ -162,7 +162,7 @@ namespace PCGExMath
 
 			// Compute extents by projecting all points onto axes
 			FVector MinProj(TNumericLimits<double>::Max(), TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
-			FVector MaxProj(TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), -TNumericLimits<double>::Max());
+			FVector MaxProj(TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest(), TNumericLimits<double>::Lowest());
 
 			for (int32 i = 0; i < NumPoints; i++)
 			{

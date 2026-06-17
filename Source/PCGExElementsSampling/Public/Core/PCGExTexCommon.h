@@ -5,16 +5,11 @@
 
 #include "CoreMinimal.h"
 #include "PCGExVersion.h"
+#include "Factories/PCGExFactoryProvider.h"
+#include "Materials/MaterialParameters.h"
 #include "UObject/Object.h"
 
-#if PCGEX_ENGINE_VERSION < 507
-#include "MaterialTypes.h"
-#else
-#include "Materials/MaterialParameters.h"
-#endif
-#include "Factories/PCGExFactoryProvider.h"
-
-class UPCGBaseTextureData;
+class UPCGTexture2DSingleBaseData;
 class UMaterialInterface;
 class UPCGExTexParamFactoryData;
 
@@ -56,7 +51,7 @@ namespace PCGExTexture
 
 	class FLookup : public TSharedFromThis<FLookup>
 	{
-		TMap<FString, const UPCGBaseTextureData*> TextureDataMap;
+		TMap<FString, const UPCGTexture2DSingleBaseData*> TextureDataMap;
 
 	public:
 		FLookup()
@@ -75,6 +70,6 @@ namespace PCGExTexture
 		void ExtractParamsAndReferences(const int32 PointIndex, const UMaterialInterface* InMaterial, TSet<FReference>& References) const;
 
 		void BuildMapFrom(FPCGExContext* InContext, const FName InPin);
-		const UPCGBaseTextureData* TryGetTextureData(const FString& InPath) const;
+		const UPCGTexture2DSingleBaseData* TryGetTextureData(const FString& InPath) const;
 	};
 }

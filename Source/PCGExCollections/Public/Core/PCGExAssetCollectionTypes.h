@@ -44,6 +44,7 @@ namespace PCGExAssetCollection
 		inline const FTypeId None = NAME_None;
 		inline const FTypeId Base = FName(TEXT("Base"));
 		inline const FTypeId Mesh = FName(TEXT("Mesh"));
+		inline const FTypeId SkinnedMesh = FName(TEXT("SkinnedMesh"));
 		inline const FTypeId Actor = FName(TEXT("Actor"));
 		inline const FTypeId PCGDataAsset = FName(TEXT("PCGDataAsset"));
 		inline const FTypeId Level = FName(TEXT("Level"));

@@ -3,20 +3,23 @@
 
 #include "PCGExCore.h"
 
+#include "Data/PCGExSubAccessor.h"
 
 #if WITH_EDITOR
-
-#if PCGEX_ENGINE_VERSION > 506
-#include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
-#endif
-
 #include "AssetTypeActions_Base.h"
 #include "Data/Bitmasks/PCGExBitmaskCollection.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "PCGExCoreEditor/Public/PCGExAssetTypesMacros.h"
 #include "Sorting/PCGExSortingRuleProvider.h"
 #endif
 
 PCGEX_IMPLEMENT_MODULE(FPCGExCoreModule, PCGExCore)
+
+void FPCGExCoreModule::StartupModule()
+{
+	IPCGExLegacyModuleInterface::StartupModule();
+	PCGExData::FSubAccessorRegistry::Initialize();
+}
 
 #if WITH_EDITOR
 void FPCGExCoreModule::RegisterToEditor(const TSharedPtr<FSlateStyleSet>& InStyle)

@@ -8,15 +8,8 @@
 #include "Data/PCGExProxyData.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 
-#if PCGEX_ENGINE_VERSION > 506
 #include "PCGPointPropertiesTraits.h"
-#else
-namespace PCGExMT
-{
-	struct FScope;
-}
-#include "PCGCommon.h"
-#endif
+#include "Data/PCGExData.h"
 
 struct FPCGExContext;
 class UPCGBasePointData;
@@ -281,20 +274,61 @@ namespace PCGExBlending
 		//void Set(const int32 TargetIndex, const T& Value) const { if (C) { C->Set(TargetIndex, Value); } }
 
 	protected:
+		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(EPCGMetadataTypes, EPCGExABBlendingType, bool, const UObject*);
+		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(EPCGMetadataTypes, EPCGExABBlendingType, bool, const FProperty*);
+		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(FPCGExContext*, EPCGExABBlendingType, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, bool);
+		friend PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(FPCGExContext*, EPCGExABBlendingType, const PCGExData::FProxyDescriptor&, const PCGExData::FProxyDescriptor&, bool);
+
 		// Cached type info
 		bool bNeedsLifecycleManagement = false;
+
+		// Cached value size/alignment for working buffers (from Operation)
+		int32 ValueSize = 0;
+		int32 ValueAlignment = 1;
+
+		// Build a FScopedTypedValue sized for the underlying type. Delegates to the source
+		// buffer when available (property buffers return FProperty-aware values, correct for
+		// containers and heap-owning structs); falls back to descriptor sizing for proxies
+		// without a buffer (TConstantProxy, point-property proxies).
+		FORCEINLINE PCGExTypes::FScopedTypedValue MakeScopedValue() const
+		{
+			if (A)
+			{
+				if (TSharedPtr<PCGExData::IBuffer> Buf = A->GetBuffer())
+				{
+					return Buf->MakeScopedValue();
+				}
+			}
+			if (ValueSize > 0 && PCGExTypes::FScopedTypedValue::GetTypeSize(UnderlyingType) == 0)
+			{
+				return PCGExTypes::FScopedTypedValue(UnderlyingType, ValueSize, ValueAlignment);
+			}
+			return PCGExTypes::FScopedTypedValue(UnderlyingType);
+		}
 	};
 
 	//
-	// Factory functions for creating proxy blenders
+	// Factory functions for creating prMetoxy blenders
 	//
 
 	// Create blender with just type and mode - caller sets A, B, C proxies manually
 	// This replaces the old CreateProxyBlender<T>(BlendMode, bReset) template
+	// ValueTypeObject: UStruct/UEnum/UClass for extended types (Struct, Enum, etc.); nullptr for basic types.
+	// Required for non-basic types so FBlendOperationFactory can compute correct ValueSize.
 	PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(
 		EPCGMetadataTypes WorkingType,
 		EPCGExABBlendingType BlendMode,
-		bool bResetValueForMultiBlend = true);
+		bool bResetValueForMultiBlend = true,
+		const UObject* InValueTypeObject = nullptr);
+
+	// Property-aware variant. Required for container types (TArray/TSet/TMap) and for any
+	// non-trivially-copyable scalar where memcpy semantics would corrupt allocators.
+	// InProperty must outlive the returned blender (typically owned by an FPropertyBuffer).
+	PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(
+		EPCGMetadataTypes WorkingType,
+		EPCGExABBlendingType BlendMode,
+		bool bResetValueForMultiBlend,
+		const FProperty* InProperty);
 
 	// Create blender with A, B, and C descriptors
 	PCGEXBLENDING_API TSharedPtr<FProxyDataBlender> CreateProxyBlender(

@@ -303,20 +303,12 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			return 0;
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-		}
-
 		// Categorical: 0 when equal, 1 otherwise -- used by closest-match scoring for non-ordered types.
 		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
 		{
 			return A.Equals(B) ? 0.0 : 1.0;
 		}
+
 	};
 
 	// Name Type Operations - FName
@@ -609,19 +601,11 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			return 0;
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-		}
-
 		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
 		{
 			return A == B ? 0.0 : 1.0;
 		}
+
 	};
 
 	// Path Type Operations - FSoftObjectPath
@@ -898,15 +882,6 @@ namespace PCGExTypeOps
 		static FORCEINLINE Type Factor(const Type& A, const double Factor)
 		{
 			return A;
-		}
-
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			return 0;
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
 		}
 
 		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
@@ -1191,18 +1166,14 @@ namespace PCGExTypeOps
 			return A;
 		}
 
-		static FORCEINLINE double ExtractField(const void* Value, ESingleField Field)
-		{
-			return 0;
-		}
-
-		static FORCEINLINE void InjectField(void* Target, double Value, ESingleField Field)
-		{
-		}
-
 		static FORCEINLINE double MatchScore(const Type& A, const Type& B)
 		{
 			return A == B ? 0.0 : 1.0;
 		}
 	};
+
+	// Text Type Operations - FText -- DELETED (Byte/Text cleanup).
+	// FText is not in PCGEX_FOREACH_SUPPORTEDTYPES. If encountered at
+	// runtime, the Tier 3 FPropertyCopyBlendOperation fallback handles it.
+	// FScopedTypedValue and FPropertyBuffer still handle FText lifecycle.
 }

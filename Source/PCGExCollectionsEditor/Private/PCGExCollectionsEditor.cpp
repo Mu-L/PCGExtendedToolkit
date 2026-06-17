@@ -18,6 +18,7 @@
 #include "Details/Collections/PCGExActorCollectionActions.h"
 #include "Details/Collections/PCGExAssetEntryCustomization.h"
 #include "Details/Collections/PCGExAssetGrammarCustomization.h"
+#include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
 #include "Details/Collections/PCGExFittingVariationsCustomization.h"
 #include "Details/Collections/PCGExLevelCollectionActions.h"
 #include "Details/Collections/PCGExMaterialPicksCustomization.h"
@@ -25,6 +26,7 @@
 #include "Details/Collections/PCGExPCGDataAssetCollectionActions.h"
 #include "Details/Collections/PCGExSelectorClosestMatchAxisCustomization.h"
 #include "Details/Collections/PCGExSelectorRangeAxisCustomization.h"
+#include "Details/Collections/PCGExSkinnedMeshCollectionActions.h"
 #include "UObject/UObjectGlobals.h"
 
 #define LOCTEXT_NAMESPACE "FPCGExCollectionsEditorModule"
@@ -34,6 +36,10 @@
 void FPCGExCollectionsEditorModule::StartupModule()
 {
 	IPCGExEditorModuleInterface::StartupModule();
+
+	// Flush queued PCGEX_REGISTER_COLLECTION_EDITOR_TYPE registrations and any
+	// per-type Customize() callbacks from each PCGEx*CollectionActions.cpp.
+	FCollectionEditorTypeRegistry::ProcessPendingRegistrations();
 
 	PCGEX_REGISTER_CUSTO_START
 

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "Data/PCGExSubAccessor.h"
 #include "Math/PCGExMathAxis.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 #include "Types/PCGExTypeOps.h"
@@ -20,79 +21,17 @@ namespace PCGExData
 
 namespace PCGExData
 {
-	// Forward declarations
-	class ISubSelectorOps;
-
-
-#pragma region Field helpers
-
-	using FInputSelectorComponentData = TTuple<PCGExTypeOps::ETransformPart, EPCGMetadataTypes>;
-	static const TMap<FString, FInputSelectorComponentData> STRMAP_TRANSFORM_FIELD = {
-		{TEXT("POSITION"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Position, EPCGMetadataTypes::Vector}},
-		{TEXT("POS"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Position, EPCGMetadataTypes::Vector}},
-		{TEXT("ROTATION"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-		{TEXT("ROT"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-		{TEXT("ORIENT"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion}},
-		{TEXT("SCALE"), FInputSelectorComponentData{PCGExTypeOps::ETransformPart::Scale, EPCGMetadataTypes::Vector}},
-	};
-
-	using FInputSelectorFieldData = TTuple<PCGExTypeOps::ESingleField, EPCGMetadataTypes, int32>;
-	static const TMap<FString, FInputSelectorFieldData> STRMAP_SINGLE_FIELD = {
-		{TEXT("X"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("R"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
-		{TEXT("ROLL"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
-		{TEXT("RX"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Quaternion, 0}},
-		{TEXT("Y"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Vector, 1}},
-		{TEXT("G"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Vector4, 1}},
-		{TEXT("YAW"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Quaternion, 1}},
-		{TEXT("RY"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Y, EPCGMetadataTypes::Quaternion, 1}},
-		{TEXT("Z"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Vector, 2}},
-		{TEXT("B"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Vector4, 2}},
-		{TEXT("P"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
-		{TEXT("PITCH"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
-		{TEXT("RZ"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Z, EPCGMetadataTypes::Quaternion, 2}},
-		{TEXT("W"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::W, EPCGMetadataTypes::Vector4, 3}},
-		{TEXT("A"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::W, EPCGMetadataTypes::Vector4, 3}},
-		{TEXT("L"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("LEN"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("LENGTH"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Length, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("SQUAREDLENGTH"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("LENSQR"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::SquaredLength, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("VOL"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Volume, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("VOLUME"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Volume, EPCGMetadataTypes::Vector, 0}},
-		{TEXT("SUM"), FInputSelectorFieldData{PCGExTypeOps::ESingleField::Sum, EPCGMetadataTypes::Vector, 0}},
-	};
-
-	using FInputSelectorAxisData = TTuple<EPCGExAxis, EPCGMetadataTypes>;
-	static const TMap<FString, FInputSelectorAxisData> STRMAP_AXIS = {
-		{TEXT("FORWARD"), FInputSelectorAxisData{EPCGExAxis::Forward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("FRONT"), FInputSelectorAxisData{EPCGExAxis::Forward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("BACKWARD"), FInputSelectorAxisData{EPCGExAxis::Backward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("BACK"), FInputSelectorAxisData{EPCGExAxis::Backward, EPCGMetadataTypes::Quaternion}},
-		{TEXT("RIGHT"), FInputSelectorAxisData{EPCGExAxis::Right, EPCGMetadataTypes::Quaternion}},
-		{TEXT("LEFT"), FInputSelectorAxisData{EPCGExAxis::Left, EPCGMetadataTypes::Quaternion}},
-		{TEXT("UP"), FInputSelectorAxisData{EPCGExAxis::Up, EPCGMetadataTypes::Quaternion}},
-		{TEXT("TOP"), FInputSelectorAxisData{EPCGExAxis::Up, EPCGMetadataTypes::Quaternion}},
-		{TEXT("DOWN"), FInputSelectorAxisData{EPCGExAxis::Down, EPCGMetadataTypes::Quaternion}},
-		{TEXT("BOTTOM"), FInputSelectorAxisData{EPCGExAxis::Down, EPCGMetadataTypes::Quaternion}},
-	};
-
-	bool GetComponentSelection(const TArray<FString>& Names, FInputSelectorComponentData& OutSelection);
-	bool GetFieldSelection(const TArray<FString>& Names, FInputSelectorFieldData& OutSelection);
-	bool GetAxisSelection(const TArray<FString>& Names, FInputSelectorAxisData& OutSelection);
-
-#pragma endregion
-
 	/**
 	 * FSubSelection - Sub-selection configuration and type-erased operations
-	 * 
+	 *
 	 * This struct stores the configuration for selecting sub-components of values
 	 * (like extracting .X from a vector, or Position from a Transform) and provides
 	 * type-erased methods for applying the selection.
-	 * 
-	 * The actual operations are delegated to ISubSelectorOps instances via
-	 * FSubSelectorRegistry
-	 * 
+	 *
+	 * Dispatch routes through FSubAccessorRegistry accessors (axis,
+	 * transform-part, single-field) driven by the parsed chain's projection
+	 * onto the legacy flag layout.
+	 *
 	 * Usage:
 	 *   FSubSelection Sub(Selector);  // Parse selection from attribute path
 	 *   
@@ -107,17 +46,26 @@ namespace PCGExData
 	 */
 	struct PCGEXCORE_API FSubSelection
 	{
-		// Configuration flags
-		bool bIsValid = false;
-		bool bIsAxisSet = false;
-		bool bIsFieldSet = false;
-		bool bIsComponentSet = false;
-
-		// Selection parameters
+		// Selection parameters. Populated by Init from the parsed chain. External
+		// callers read these via the classifier methods below, not directly.
 		PCGExTypeOps::ETransformPart Component = PCGExTypeOps::ETransformPart::Position;
 		EPCGExAxis Axis = EPCGExAxis::Forward;
 		PCGExTypeOps::ESingleField Field = PCGExTypeOps::ESingleField::X;
 		EPCGMetadataTypes PossibleSourceType = EPCGMetadataTypes::Unknown;
+
+		// Classifier bitmask. Cached at Init time so HasSelection /
+		// IsFieldSelection / etc. are O(1) bit tests instead of chain walks.
+		enum EClassifierBits : uint8
+		{
+			Bit_HasSelection   = 1 << 0,
+			Bit_Field          = 1 << 1,
+			Bit_Axis           = 1 << 2,
+			Bit_Component      = 1 << 3,
+			Bit_ContainerIndex = 1 << 4,
+			Bit_ContainerCount = 1 << 5,
+		};
+
+		uint8 ClassifierMask = 0;
 
 		// Constructors
 		FSubSelection() = default;
@@ -126,11 +74,82 @@ namespace PCGExData
 		explicit FSubSelection(const FString& Path, const UPCGData* InData = nullptr);
 
 		/**
-		 * Get the resulting type when this sub-selection is applied
-		 * 
+		 * Read-only access to the chain produced by Init. Empty when Init
+		 * was given empty ExtraNames or when the FSubSelection was
+		 * default-constructed and never re-Init'd.
+		 *
+		 * FCachedSubSelection's hot path uses the compiled chain (via
+		 * CompileChainForSource); FSubSelection's type-erased path also
+		 * walks the chain via accessor virtual calls.
+		 */
+		FORCEINLINE const FSubSelectionChain& GetChain() const
+		{
+			return ParsedChain;
+		}
+
+		//
+		// Public classifier methods (chain-backed).
+		//
+		// These compute directly from ParsedChain via a classifier bitmask.
+		// Malformed inputs like {Garbage} produce an empty chain and
+		// HasSelection() returns false.
+		//
+
+		/** True if the parsed chain has at least one step. */
+		FORCEINLINE bool HasSelection() const
+		{
+			return (ClassifierMask & Bit_HasSelection) != 0;
+		}
+
+		/** True if the chain contains a SingleField step (resolves to Double). */
+		FORCEINLINE bool IsFieldSelection() const
+		{
+			return (ClassifierMask & Bit_Field) != 0;
+		}
+
+		/** True if the chain contains an Axis step. */
+		FORCEINLINE bool IsAxisSelection() const
+		{
+			return (ClassifierMask & Bit_Axis) != 0;
+		}
+
+		/** True if the chain contains a TransformPart step. */
+		FORCEINLINE bool IsComponentSelection() const
+		{
+			return (ClassifierMask & Bit_Component) != 0;
+		}
+
+		/** True if the chain contains an FContainerIndexAccessor step. */
+		FORCEINLINE bool IsContainerIndexSelection() const
+		{
+			return (ClassifierMask & Bit_ContainerIndex) != 0;
+		}
+
+		/** True if the chain contains an FContainerCountAccessor step. */
+		FORCEINLINE bool IsContainerCountSelection() const
+		{
+			return (ClassifierMask & Bit_ContainerCount) != 0;
+		}
+
+		/**
+		 * Best-guess hint for the source-side type this selection assumes.
+		 * E.g., ".R" hints Quaternion, ".X" hints Vector. Returns Unknown
+		 * when the parser couldn't infer a hint (empty or unmatched tokens).
+		 */
+		FORCEINLINE EPCGMetadataTypes GetHintedSourceType() const
+		{
+			return PossibleSourceType;
+		}
+
+		/**
+		 * Get the resulting type when this sub-selection is applied.
+		 *
 		 * - Field selection → Double
-		 * - Axis selection → Vector  
+		 * - Axis selection → Vector
 		 * - Component selection → Vector (Position/Scale) or Quaternion (Rotation)
+		 * - ContainerCount selection → Double (the count)
+		 * - ContainerIndex selection → Fallback (a container element is the
+		 *   same type as the element type PCG reports via RealType)
 		 * - No selection → Fallback (original type)
 		 */
 		EPCGMetadataTypes GetSubType(EPCGMetadataTypes Fallback = EPCGMetadataTypes::Unknown) const;
@@ -140,28 +159,50 @@ namespace PCGExData
 
 		friend FORCEINLINE uint32 GetTypeHash(const FSubSelection& S)
 		{
+			// Hash derives from the four selection-parameter fields plus the
+			// chain shape (step count + each step's accessor kind). The old
+			// booleans are gone so the hash recipe is slimmer; identical
+			// inputs still produce identical hashes.
 			uint32 Hash = 0;
-
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsValid));
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsAxisSet));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.Axis));
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsFieldSet));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.Field));
-			Hash = HashCombineFast(Hash, static_cast<uint32>(S.bIsComponentSet));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.Component));
 			Hash = HashCombineFast(Hash, static_cast<uint32>(S.PossibleSourceType));
-
+			Hash = HashCombineFast(Hash, static_cast<uint32>(S.ParsedChain.Steps.Num()));
+			for (const FSubSelectionStep& Step : S.ParsedChain.Steps)
+			{
+				// Accessor pointer is stable for the process lifetime.
+				Hash = HashCombineFast(Hash, PointerHash(Step.Accessor));
+			}
 			return Hash;
 		}
 
 	protected:
 		void Init(const TArray<FString>& ExtraNames);
 
+		/**
+		 * Parsed chain. Populated by Init via FSubAccessorRegistry::ParseChain.
+		 * Empty for default-constructed instances or empty ExtraNames.
+		 */
+		FSubSelectionChain ParsedChain;
+
+		/**
+		 * 1-entry compile cache for ApplyGet/ApplySet. The type-erased
+		 * dispatch compiles the chain on-the-fly against SourceType; since
+		 * the same FSubSelection is typically applied to many elements of
+		 * the same type, caching the last compilation avoids re-running
+		 * CompileChainForSource per element. Thread-safe via mutable
+		 * (each FSubSelection is owned by a single proxy descriptor, not
+		 * shared across threads).
+		 */
+		mutable FSubSelectionChain CachedCompiled;
+		mutable EPCGMetadataTypes CachedCompiledSourceType = EPCGMetadataTypes::Unknown;
+
 	public:
 		//
 		// Type-Erased Interface (Primary API)
 		//
-		// These methods delegate to ISubSelectorOps via FSubSelectorRegistry.
+		// These methods dispatch through the sub-accessor system.
 		// No template instantiation required at call sites.
 		//
 

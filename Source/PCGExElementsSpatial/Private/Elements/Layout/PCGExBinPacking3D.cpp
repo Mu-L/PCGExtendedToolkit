@@ -286,7 +286,7 @@ namespace PCGExBinPacking3D
 		const FQuat Quat = Rotation.Quaternion();
 		const FVector HalfSize = Size * 0.5;
 		FVector Min = FVector(TNumericLimits<double>::Max());
-		FVector Max = FVector(-TNumericLimits<double>::Max());
+		FVector Max = FVector(TNumericLimits<double>::Lowest());
 
 		for (int32 i = 0; i < 8; i++)
 		{

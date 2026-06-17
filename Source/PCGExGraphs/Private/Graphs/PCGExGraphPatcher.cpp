@@ -8,6 +8,7 @@
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGPointArrayData.h"
 #include "Helpers/PCGExPointArrayDataHelpers.h"
@@ -189,7 +190,7 @@ namespace PCGExGraphs
 		bCommitted = true;
 
 		UPCGBasePointData* VtxData = VtxFacade->GetOut();
-		FPCGMetadataAttribute<int64>* VtxIdxAttr = VtxData->MutableMetadata()->GetMutableTypedAttribute_Unsafe<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
+		FPCGMetadataAttribute<int64>* VtxIdxAttr = VtxData->MutableMetadata()->FindOrCreateAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
 		if (!VtxIdxAttr)
 		{
 			return;
@@ -250,7 +251,7 @@ namespace PCGExGraphs
 			}
 
 			UPCGBasePointData* EdgeData = ComponentEdgeFacades[c]->GetOut();
-			FPCGMetadataAttribute<int64>* EdgeIdxAttr = EdgeData->MutableMetadata()->GetMutableTypedAttribute_Unsafe<int64>(PCGExClusters::Labels::Attr_PCGExEdgeIdx);
+			FPCGMetadataAttribute<int64>* EdgeIdxAttr = EdgeData->MutableMetadata()->FindOrCreateAttribute<int64>(PCGExClusters::Labels::Attr_PCGExEdgeIdx);
 			if (!EdgeIdxAttr)
 			{
 				continue;

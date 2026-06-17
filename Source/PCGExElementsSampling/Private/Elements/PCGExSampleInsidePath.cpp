@@ -548,9 +548,13 @@ namespace PCGExSampleInsidePath
 			return;
 		}
 
+		// bResetWithFirstValue collapses an array buffer to its first element as the attribute's
+		// default value (TArrayBuffer<T>::Write special path). It's a no-op on Data-domain buffers
+		// (single-value), so gate by domain to keep intent explicit and avoid setting a flag that
+		// never fires for half the buffers it touches.
 		for (const TSharedPtr<PCGExData::IBuffer>& Buffer : PointDataFacade->Buffers)
 		{
-			if (Buffer->IsWritable())
+			if (Buffer->IsWritable() && Buffer->GetUnderlyingDomain() == PCGExData::EDomainType::Elements)
 			{
 				Buffer->bResetWithFirstValue = true;
 			}

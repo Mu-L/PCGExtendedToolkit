@@ -31,27 +31,6 @@ TArray<FPCGPinProperties> UPCGExIterationsSettings::OutputPinProperties() const
 	FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(FName("Iterations"));
 	Pin.SetRequiredPin();
 
-#if PCGEX_ENGINE_VERSION < 507
-	switch (Type)
-	{
-	default:
-	case EPCGExIterationDataType::Any:
-		Pin.AllowedTypes = EPCGDataType::Any;
-		break;
-	case EPCGExIterationDataType::Params:
-		Pin.AllowedTypes = EPCGDataType::Param;
-		break;
-	case EPCGExIterationDataType::Points:
-		Pin.AllowedTypes = EPCGDataType::Point;
-		break;
-	case EPCGExIterationDataType::Spline:
-		Pin.AllowedTypes = EPCGDataType::Spline;
-		break;
-	case EPCGExIterationDataType::Texture:
-		Pin.AllowedTypes = EPCGDataType::BaseTexture;
-		break;
-	}
-#else
 	switch (Type)
 	{
 	default: case EPCGExIterationDataType::Any:
@@ -67,10 +46,9 @@ TArray<FPCGPinProperties> UPCGExIterationsSettings::OutputPinProperties() const
 		Pin.AllowedTypes = FPCGDataTypeInfoSpline::AsId();
 		break;
 	case EPCGExIterationDataType::Texture:
-		Pin.AllowedTypes = FPCGDataTypeInfoBaseTexture2D::AsId();
+		Pin.AllowedTypes = FPCGDataTypeInfoTexture2D::AsId();
 		break;
 	}
-#endif
 
 	return PinProperties;
 }

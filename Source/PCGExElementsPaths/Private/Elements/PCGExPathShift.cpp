@@ -314,6 +314,10 @@ namespace PCGExShiftPath
 						return;
 					}
 
+					// Container/extended-typed buffers report GetTypeId()=Unknown (FPropertyBuffer fallback),
+					// so the typed dispatch below safely no-ops for them -- those buffers retain their
+					// pre-shift order. Property-aware reorder (scratch byte array + per-element CopyCompleteValue)
+					// is a future addition if path-shift on container attributes becomes a real use case.
 					PCGExMetaHelpers::ExecuteWithRightType(Buffer->GetTypeId(), [&](auto DummyValue)
 					{
 						using T = decltype(DummyValue);

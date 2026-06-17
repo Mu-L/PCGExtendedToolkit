@@ -62,8 +62,8 @@ namespace PCGExComponentFixups
 				// Without this guard, two empty/disabled splines would be reported as
 				// diverged and the fixup would try to rebuild SplineCurves from the empty
 				// Spline via SetSpline(GetSpline()), wiping the archetype's SplineCurves data.
-				const int32 CurSplinePts = Spline->GetSpline().GetNumControlPoints();
-				const int32 ArchSplinePts = ArchSpline->GetSpline().GetNumControlPoints();
+				const int32 CurSplinePts = Spline->GetSpline().GetNumberOfSegments();
+				const int32 ArchSplinePts = ArchSpline->GetSpline().GetNumberOfSegments();
 				const bool bBothSplinesEmpty = (CurSplinePts == 0 && ArchSplinePts == 0);
 
 
@@ -73,9 +73,11 @@ namespace PCGExComponentFixups
 
 				if (bCurvesDiverged && !bSplineDiverged)
 				{
-					// SplineCurves edited, Spline at default. SynchronizeSplines() calls
-					// SetSpline(FSplineCurves) which updates both sides from the curves.
-					Spline->SynchronizeSplines();
+					// SplineCurves edited, Spline at default. SetSpline(FSplineCurves)
+					// updates both sides from the curves. (Was SynchronizeSplines()
+					// pre-5.8, which did exactly this internally; it's now a deprecated
+					// no-op, so calling it would silently skip the sync.)
+					Spline->SetSpline(Spline->GetSplineCurves());
 				}
 				else if (bSplineDiverged && !bCurvesDiverged)
 				{

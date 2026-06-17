@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExData.h"
 #include "PCGExDataCommon.h"
 #include "PCGExProxyData.h"
 #include "Data/PCGExCachedSubSelection.h"
@@ -171,8 +172,8 @@ namespace PCGExData
 	class TDirectAttributeProxy : public IBufferProxy
 	{
 	public:
-		const FPCGMetadataAttribute<T_REAL>* InAttribute = nullptr;
-		FPCGMetadataAttribute<T_REAL>* OutAttribute = nullptr;
+		const FPCGMetadataAttributeBase* InAttribute = nullptr;
+		FPCGMetadataAttributeBase* OutAttribute = nullptr;
 
 		explicit TDirectAttributeProxy(EPCGMetadataTypes InWorkingType);
 
@@ -191,14 +192,46 @@ namespace PCGExData
 #pragma endregion
 
 	//
+	// FPropertyBufferProxy - Non-template proxy for generic/unknown attribute types (Tier 3).
+	//
+	// Wraps an IBuffer (typically FPropertyArrayBuffer or FPropertySingleValueBuffer) and
+	// delegates all access through the void* API (ReadVoid/SetVoid/GetVoid). No type
+	// conversion is performed -- RealType and WorkingType are both EPCGMetadataTypes::Unknown.
+	//
+	// This enables blending/data-forwarding code to carry generic attribute data even when
+	// the underlying type isn't in PCGEX_FOREACH_SUPPORTEDTYPES. The blend system's
+	// FCopyOnlyBlendOperation handles the actual memcpy-based accumulation.
+	//
+	class PCGEXCORE_API FPropertyBufferProxy : public IBufferProxy
+	{
+	public:
+		const TSharedPtr<IBuffer> Buffer;
+
+		FPropertyBufferProxy(const TSharedPtr<IBuffer>& InBuffer, EPCGMetadataTypes InRealType, EPCGMetadataTypes InWorkingType);
+
+		virtual void GetVoid(const int32 Index, void* OutValue) const override;
+		virtual void SetVoid(const int32 Index, const void* Value) const override;
+		virtual void GetCurrentVoid(const int32 Index, void* OutValue) const override;
+
+		virtual TSharedPtr<IBuffer> GetBuffer() const override;
+		virtual bool EnsureReadable() const override;
+
+		virtual PCGExValueHash ReadValueHash(const int32 Index) const override;
+
+		// Forward size/alignment to the underlying buffer -- single source of truth.
+		virtual int32 GetValueSize() const override { return Buffer ? Buffer->GetValueSize() : 0; }
+		virtual int32 GetValueAlignment() const override { return Buffer ? Buffer->GetValueAlignment() : 1; }
+	};
+
+	//
 	// TDirectDataAttributeProxy - Direct data-domain attribute access
 	//
 	template <typename T_REAL>
 	class TDirectDataAttributeProxy : public IBufferProxy
 	{
 	public:
-		const FPCGMetadataAttribute<T_REAL>* InAttribute = nullptr;
-		FPCGMetadataAttribute<T_REAL>* OutAttribute = nullptr;
+		const FPCGMetadataAttributeBase* InAttribute = nullptr;
+		FPCGMetadataAttributeBase* OutAttribute = nullptr;
 
 		explicit TDirectDataAttributeProxy(EPCGMetadataTypes InWorkingType);
 

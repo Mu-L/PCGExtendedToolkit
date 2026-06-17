@@ -377,6 +377,22 @@ namespace PCGExMetaHelpers
 		return FPCGAttributeIdentifier(Selector.GetAttributeName(), StrName.StartsWith(TEXT("@Data.")) ? PCGMetadataDomainID::Data : PCGMetadataDomainID::Elements);
 	}
 
+	EPCGMetadataTypes GetAttributeType(const FPCGMetadataAttributeBase* InAttribute)
+	{
+		if (!InAttribute)
+		{
+			return EPCGMetadataTypes::Unknown;
+		}
+
+		const EPCGMetadataTypes LegacyType = static_cast<EPCGMetadataTypes>(InAttribute->GetTypeId());
+		if (LegacyType != EPCGMetadataTypes::Unknown)
+		{
+			return LegacyType;
+		}
+
+		return InAttribute->GetAttributeDesc().ValueType;
+	}
+
 	FPCGAttributePropertyInputSelector GetSelectorFromIdentifier(const FPCGAttributeIdentifier& InIdentifier)
 	{
 		FPCGAttributePropertyInputSelector Selector;

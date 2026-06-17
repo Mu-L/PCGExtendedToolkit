@@ -118,8 +118,7 @@ bool PCGExPCGInterop::FGenerationConfig::TriggerGeneration(UPCGComponent* Compon
 		case EPCGExRuntimeGenerationTriggerAction::RefreshFirst:
 			if (UPCGSubsystem* PCGSubsystem = UPCGSubsystem::GetSubsystemForCurrentWorld())
 			{
-				BeginIgnore();
-				PCGSubsystem->RefreshRuntimeGenComponent(Component, EPCGChangeType::GenerationGrid);
+				PCGSubsystem->RefreshRuntimeGenExecutionSource(Component, EPCGChangeType::GenerationGrid);
 				bOutShouldWatch = true;
 				return true;
 			}

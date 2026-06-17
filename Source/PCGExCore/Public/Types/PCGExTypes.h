@@ -18,13 +18,17 @@
 // Type-erased buffers
 //#include "PCGExTypeErasedBuffer.h"
 
+class FPCGMetadataAttributeBase;
+class FProperty;
+
 namespace PCGExTypes
 {
 	//
-	// FScopedTypedValue - RAII wrapper for type-erased stack values
+	// FScopedTypedValue - RAII wrapper for type-erased values
 	//
-	// Provides safe lifecycle management for both POD and complex types (FString, FName, etc.)
-	// when stored in stack buffers.
+	// Provides safe lifecycle management for both POD and complex types (FString, FName, etc.).
+	// Uses an inline stack buffer for known types (up to 96 bytes), and heap-allocates for
+	// generic/unknown types whose size is only known at runtime.
 	//
 	class PCGEXCORE_API FScopedTypedValue
 	{
@@ -42,14 +46,25 @@ namespace PCGExTypes
 
 	private:
 		alignas(BufferAlignment) uint8 Storage[BufferSize];
+		void* ActiveStorage = Storage; // Points to Storage (inline) or heap allocation
 		EPCGMetadataTypes Type;
+		int32 ValueSize = 0;                 // Actual size of stored value (0 = computed from Type)
+		const FProperty* Property = nullptr; // If set, lifecycle routes through FProperty
 		bool bConstructed;
+		bool bHeapAllocated = false;
 
 	public:
-		// Construct with type - initializes complex types via placement new
+		// Construct with known type - uses inline stack buffer
 		explicit FScopedTypedValue(EPCGMetadataTypes InType);
 
-		// Destructor - calls destructor for complex types
+		// Construct with explicit size - heap-allocates if size > BufferSize
+		FScopedTypedValue(EPCGMetadataTypes InType, int32 InSize, int32 InAlignment = 1);
+
+		// Construct from an FProperty - uses FProperty reflection for size, alignment, and lifecycle.
+		// Supports arbitrary UStruct/UEnum/UObject types. Heap-allocates if size > BufferSize.
+		explicit FScopedTypedValue(const FProperty* InProperty);
+
+		// Destructor - calls destructor for complex types, frees heap if allocated
 		~FScopedTypedValue();
 
 		// Non-copyable to prevent double-destruction
@@ -60,28 +75,28 @@ namespace PCGExTypes
 		FScopedTypedValue(FScopedTypedValue&& Other) noexcept;
 		FScopedTypedValue& operator=(FScopedTypedValue&&) = delete;
 
-		// Raw access
+		// Raw access - returns active storage pointer (inline or heap)
 		FORCEINLINE void* GetRaw()
 		{
-			return Storage;
+			return ActiveStorage;
 		}
 
 		FORCEINLINE const void* GetRaw() const
 		{
-			return Storage;
+			return ActiveStorage;
 		}
 
 		// Typed access
 		template <typename T>
 		FORCEINLINE T& As()
 		{
-			return *reinterpret_cast<T*>(Storage);
+			return *reinterpret_cast<T*>(ActiveStorage);
 		}
 
 		template <typename T>
 		FORCEINLINE const T& As() const
 		{
-			return *reinterpret_cast<const T*>(Storage);
+			return *reinterpret_cast<const T*>(ActiveStorage);
 		}
 
 		// Type info
@@ -95,15 +110,53 @@ namespace PCGExTypes
 			return bConstructed;
 		}
 
+		FORCEINLINE int32 GetValueSize() const
+		{
+			return ValueSize;
+		}
+
+		FORCEINLINE bool IsHeapAllocated() const
+		{
+			return bHeapAllocated;
+		}
+
+		// Get the underlying FProperty if the value was constructed from one
+		FORCEINLINE const FProperty* GetProperty() const
+		{
+			return Property;
+		}
+
 		// Manual lifecycle control (for reuse scenarios)
 		void Destruct();
 		void Initialize(EPCGMetadataTypes NewType);
+		void Initialize(EPCGMetadataTypes NewType, int32 InSize, int32 InAlignment = 1);
+		void Initialize(const FProperty* InProperty);
 
 		// Type traits helpers
 		static bool NeedsLifecycleManagement(EPCGMetadataTypes InType);
 		static int32 GetTypeSize(EPCGMetadataTypes InType);
+
+	private:
+		void AllocateStorage(int32 InSize, int32 InAlignment);
+		void FreeHeapStorage();
+		void InitializeValue();
 	};
 
+
+	// Get element size for generic/unknown attribute types from their descriptor.
+	// Returns 0 if the size cannot be determined (e.g., container types).
+	PCGEXCORE_API int32 GetElementSizeFromType(EPCGMetadataTypes InType, const UObject* ValueTypeObject = nullptr);
+
+	// Get element alignment for generic/unknown attribute types.
+	PCGEXCORE_API int32 GetElementAlignmentFromType(EPCGMetadataTypes InType, const UObject* ValueTypeObject = nullptr);
+
+	// Get element size from an attribute base pointer. Handles typed scalars, extended scalars
+	// (Struct/Enum/Object/etc.) AND containers (TArray/TSet/TMap) -- for the last category it
+	// routes through FPropertyBuffer::GetElementSizeFromDesc which constructs a transient property.
+	PCGEXCORE_API int32 GetElementSizeFromAttribute(const FPCGMetadataAttributeBase* InAttribute);
+
+	// Companion to GetElementSizeFromAttribute. Returns 1 if no useful alignment can be derived.
+	PCGEXCORE_API int32 GetElementAlignmentFromAttribute(const FPCGMetadataAttributeBase* InAttribute);
 
 	/**
 	 * Convenience functions for common operations

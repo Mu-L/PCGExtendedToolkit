@@ -6,63 +6,10 @@
 #include "CoreMinimal.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Data/PCGExSubSelectionOpsImpl.h"
+#include "Types/PCGExTypeOps.h"
 
 namespace PCGExData
 {
-	//
-	// Helper function implementations
-	//
-
-	bool GetComponentSelection(const TArray<FString>& Names, FInputSelectorComponentData& OutSelection)
-	{
-		if (Names.IsEmpty())
-		{
-			return false;
-		}
-		for (const FString& Name : Names)
-		{
-			if (const FInputSelectorComponentData* Selection = STRMAP_TRANSFORM_FIELD.Find(Name.ToUpper()))
-			{
-				OutSelection = *Selection;
-				return true;
-			}
-		}
-		return false;
-	}
-
-	bool GetFieldSelection(const TArray<FString>& Names, FInputSelectorFieldData& OutSelection)
-	{
-		if (Names.IsEmpty())
-		{
-			return false;
-		}
-		const FString& STR = Names.Num() > 1 ? Names[1].ToUpper() : Names[0].ToUpper();
-		if (const FInputSelectorFieldData* Selection = STRMAP_SINGLE_FIELD.Find(STR))
-		{
-			OutSelection = *Selection;
-			return true;
-		}
-		return false;
-	}
-
-	bool GetAxisSelection(const TArray<FString>& Names, FInputSelectorAxisData& OutSelection)
-	{
-		if (Names.IsEmpty())
-		{
-			return false;
-		}
-		for (const FString& Name : Names)
-		{
-			if (const FInputSelectorAxisData* Selection = STRMAP_AXIS.Find(Name.ToUpper()))
-			{
-				OutSelection = *Selection;
-				return true;
-			}
-		}
-		return false;
-	}
-
 	//
 	// FSubSelection constructors
 	//
@@ -88,21 +35,42 @@ namespace PCGExData
 		Init(ProxySelector.GetExtraNames());
 	}
 
+	//
+	// Classifier bitmask is populated at Init time (see Init below).
+	// The classifier methods are now inline bit-tests in the header.
+	//
+
 	EPCGMetadataTypes FSubSelection::GetSubType(const EPCGMetadataTypes Fallback) const
 	{
-		if (!bIsValid)
+		if (!HasSelection())
 		{
 			return Fallback;
 		}
-		if (bIsFieldSet)
+		if (IsFieldSelection())
 		{
 			return EPCGMetadataTypes::Double;
 		}
-		if (bIsAxisSet)
+		if (IsAxisSelection())
 		{
 			return EPCGMetadataTypes::Vector;
 		}
 
+		// ContainerCount always yields Double (the count). Checked
+		// after field/axis so a chain like `.1.X` (ContainerIndex + Field)
+		// still reports Double via the field path.
+		if (IsContainerCountSelection())
+		{
+			return EPCGMetadataTypes::Double;
+		}
+
+		// Component selection: Vector (Pos/Scale) or Quaternion (Rotation).
+		// NOTE: intentionally ungated -- even chains without an explicit
+		// component step may have Component populated from Init's default
+		// (Position). Gating on IsComponentSelection() changes WorkingType
+		// for chains that don't have a component step (Swizzle-only, etc.),
+		// which can cause downstream buffer sizing mismatches. The default
+		// Component=Position → Vector is a safe fallback for non-component
+		// chains (most produce Vector-compatible output).
 		switch (Component)
 		{
 		case PCGExTypeOps::ETransformPart::Position:
@@ -112,91 +80,189 @@ namespace PCGExData
 			return EPCGMetadataTypes::Quaternion;
 		}
 
+		// ContainerIndex-only (and any other non-type-changing chain) falls
+		// through to Fallback: the element type of a container equals the
+		// attribute's reported RealType.
 		return Fallback;
 	}
 
 	void FSubSelection::SetComponent(const PCGExTypeOps::ETransformPart InComponent)
 	{
-		bIsValid = true;
-		bIsComponentSet = true;
+		// Rebuild the chain with a single TransformPart step so classifier
+		// methods and dispatch both see a valid component-selection state.
+		// The chain is the source of truth; pure flag mutations are gone.
+		const ISubAccessor* Accessor = FSubAccessorRegistry::GetTransformPartAccessor();
+
+		FSubSelectionStep Step;
+		Step.Accessor = Accessor;
+		Step.Parsed.Component = InComponent;
+		Step.Parsed.SourceTypeHint = (InComponent == PCGExTypeOps::ETransformPart::Rotation)
+			? EPCGMetadataTypes::Quaternion
+			: EPCGMetadataTypes::Vector;
+		Step.InType = EPCGMetadataTypes::Transform;
+		Accessor->ResolveOutputType(Step.InType, Step.Parsed, Step.OutType);
+		Step.StepGetFn = Accessor->GetStepGetFn(Step.InType);
+		Step.StepSetFn = Accessor->GetStepSetFn(Step.InType);
+
+		ParsedChain.Reset();
+		ParsedChain.Steps.Add(MoveTemp(Step));
+		ParsedChain.bIsValid = true;
+		ParsedChain.FinalType = ParsedChain.Steps.Last().OutType;
+
 		Component = InComponent;
+		PossibleSourceType = ParsedChain.Steps.Last().Parsed.SourceTypeHint;
+		ClassifierMask = Bit_HasSelection | Bit_Component;
+		CachedCompiledSourceType = EPCGMetadataTypes::Unknown; // invalidate compile cache
 	}
 
 	bool FSubSelection::SetFieldIndex(const int32 InFieldIndex)
 	{
 		if (InFieldIndex < 0 || InFieldIndex > 3)
 		{
-			bIsFieldSet = false;
+			ParsedChain.Reset();
+			ClassifierMask = 0;
+			CachedCompiledSourceType = EPCGMetadataTypes::Unknown;
 			return false;
 		}
 
-		bIsValid = true;
-		bIsFieldSet = true;
-
-		if (InFieldIndex == 0)
+		PCGExTypeOps::ESingleField NewField = PCGExTypeOps::ESingleField::X;
+		switch (InFieldIndex)
 		{
-			Field = PCGExTypeOps::ESingleField::X;
-		}
-		else if (InFieldIndex == 1)
-		{
-			Field = PCGExTypeOps::ESingleField::Y;
-		}
-		else if (InFieldIndex == 2)
-		{
-			Field = PCGExTypeOps::ESingleField::Z;
-		}
-		else if (InFieldIndex == 3)
-		{
-			Field = PCGExTypeOps::ESingleField::W;
+		case 0:
+			NewField = PCGExTypeOps::ESingleField::X;
+			break;
+		case 1:
+			NewField = PCGExTypeOps::ESingleField::Y;
+			break;
+		case 2:
+			NewField = PCGExTypeOps::ESingleField::Z;
+			break;
+		case 3:
+			NewField = PCGExTypeOps::ESingleField::W;
+			break;
 		}
 
+		const ISubAccessor* Accessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+
+		FSubSelectionStep Step;
+		Step.Accessor = Accessor;
+		Step.Parsed.Field = NewField;
+		Step.Parsed.FieldIndex = InFieldIndex;
+		Step.Parsed.SourceTypeHint = EPCGMetadataTypes::Vector; // default -- real hint comes from parsing aliases
+		Step.InType = EPCGMetadataTypes::Unknown;
+		Accessor->ResolveOutputType(Step.InType, Step.Parsed, Step.OutType);
+		Step.StepGetFn = nullptr;
+		Step.StepSetFn = nullptr;
+
+		ParsedChain.Reset();
+		ParsedChain.Steps.Add(MoveTemp(Step));
+		ParsedChain.bIsValid = true;
+		ParsedChain.FinalType = EPCGMetadataTypes::Double;
+
+		Field = NewField;
+		ClassifierMask = Bit_HasSelection | Bit_Field;
+		CachedCompiledSourceType = EPCGMetadataTypes::Unknown; // invalidate compile cache
 		return true;
 	}
 
 	void FSubSelection::Init(const TArray<FString>& ExtraNames)
 	{
-		// Parse extra selector names (e.g. "$Position.X" → component=Position, field=X)
-		// to determine what part of a compound attribute type to read/write.
-		// Priority: axis (Forward/Right/Up) > component (Position/Rotation/Scale) > field (X/Y/Z/W).
-		// Multiple can be combined (e.g. "$Rotation.Forward" = axis from rotation component).
+		// Chain-backed parser. Builds a step sequence via FSubAccessorRegistry,
+		// then populates Field/Axis/Component/PossibleSourceType for
+		// dispatch-time reads.
+		//
+		// HasSelection() is true iff the parser actually matched at least one
+		// token. Malformed inputs like {Garbage} produce an empty chain.
+		ParsedChain.Reset();
+
 		if (ExtraNames.IsEmpty())
 		{
-			bIsValid = false;
 			return;
 		}
 
-		FInputSelectorAxisData AxisIDMapping = FInputSelectorAxisData{EPCGExAxis::Forward, EPCGMetadataTypes::Unknown};
-		FInputSelectorComponentData ComponentIDMapping = {PCGExTypeOps::ETransformPart::Rotation, EPCGMetadataTypes::Quaternion};
-		FInputSelectorFieldData FieldIDMapping = {PCGExTypeOps::ESingleField::X, EPCGMetadataTypes::Unknown, 0};
+		FSubAccessorRegistry::ParseChain(ExtraNames, EPCGMetadataTypes::Unknown, ParsedChain);
 
-		bIsAxisSet = GetAxisSelection(ExtraNames, AxisIDMapping);
-		Axis = AxisIDMapping.Get<0>();
+		// Locate steps for populating the legacy dispatch fields.
+		const ISubAccessor* AxisAccessor = FSubAccessorRegistry::GetAxisAccessor();
+		const ISubAccessor* TransformAccessor = FSubAccessorRegistry::GetTransformPartAccessor();
+		const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
 
-		bIsComponentSet = GetComponentSelection(ExtraNames, ComponentIDMapping);
-
-		if (bIsAxisSet)
+		const FSubSelectionStep* AxisStep = nullptr;
+		const FSubSelectionStep* CompStep = nullptr;
+		const FSubSelectionStep* FieldStep = nullptr;
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
 		{
-			bIsValid = true;
-			bIsComponentSet = GetComponentSelection(ExtraNames, ComponentIDMapping);
+			if (Step.Accessor == AxisAccessor)
+			{
+				AxisStep = &Step;
+			}
+			else if (Step.Accessor == TransformAccessor)
+			{
+				CompStep = &Step;
+			}
+			else if (Step.Accessor == FieldAccessor)
+			{
+				FieldStep = &Step;
+			}
+		}
+
+		Axis = AxisStep ? AxisStep->Parsed.Axis : EPCGExAxis::Forward;
+		Field = FieldStep ? FieldStep->Parsed.Field : PCGExTypeOps::ESingleField::X;
+		// Component default stays Rotation for parity with legacy dispatch --
+		// some ApplyGet branches read Component when bIsComponentSet was true,
+		// but the chain-based classifier methods gate that read now.
+		Component = CompStep ? CompStep->Parsed.Component : PCGExTypeOps::ETransformPart::Rotation;
+
+		// PossibleSourceType: component hint wins, else field hint, else axis hint, else Unknown.
+		// Axis tokens are parsed with a Quaternion hint -- an axis alone strongly
+		// suggests the source is rotational (FQuat/FRotator/FTransform).
+		if (CompStep)
+		{
+			PossibleSourceType = CompStep->Parsed.SourceTypeHint;
+		}
+		else if (FieldStep)
+		{
+			PossibleSourceType = FieldStep->Parsed.SourceTypeHint;
+		}
+		else if (AxisStep)
+		{
+			PossibleSourceType = AxisStep->Parsed.SourceTypeHint;
 		}
 		else
 		{
-			bIsValid = bIsComponentSet;
+			PossibleSourceType = EPCGMetadataTypes::Unknown;
 		}
 
-		Component = ComponentIDMapping.Get<0>();
-		PossibleSourceType = ComponentIDMapping.Get<1>();
+		// Build classifier bitmask from the chain's step accessor identities.
+		ClassifierMask = 0;
+		const ISubAccessor* ContainerIndexAccessor = FSubAccessorRegistry::GetContainerIndexAccessor();
+		const ISubAccessor* ContainerCountAccessor = FSubAccessorRegistry::GetContainerCountAccessor();
 
-		bIsFieldSet = GetFieldSelection(ExtraNames, FieldIDMapping);
-		Field = FieldIDMapping.Get<0>();
-		SetFieldIndex(FieldIDMapping.Get<2>());
-
-		if (bIsFieldSet)
+		if (!ParsedChain.Steps.IsEmpty())
 		{
-			bIsValid = true;
-			if (!bIsComponentSet)
+			ClassifierMask |= Bit_HasSelection;
+		}
+		for (const FSubSelectionStep& Step : ParsedChain.Steps)
+		{
+			if (Step.Accessor == FieldAccessor)
 			{
-				PossibleSourceType = FieldIDMapping.Get<1>();
+				ClassifierMask |= Bit_Field;
+			}
+			else if (Step.Accessor == AxisAccessor)
+			{
+				ClassifierMask |= Bit_Axis;
+			}
+			else if (Step.Accessor == TransformAccessor)
+			{
+				ClassifierMask |= Bit_Component;
+			}
+			else if (Step.Accessor == ContainerIndexAccessor)
+			{
+				ClassifierMask |= Bit_ContainerIndex;
+			}
+			else if (Step.Accessor == ContainerCountAccessor)
+			{
+				ClassifierMask |= Bit_ContainerCount;
 			}
 		}
 	}
@@ -204,80 +270,200 @@ namespace PCGExData
 	//
 	// Type-Erased Interface Implementation
 	//
+	// ApplyGet/ApplySet walk ParsedChain.Steps directly via accessor
+	// virtual calls. This is a non-hot fallback path;
+	// FCachedSubSelection is the performance-critical surface.
+	//
+	// NOTE: Container steps require compile-time ContainerElementSize
+	// (populated by PostClassifyFinalize at FCachedSubSelection::Initialize
+	// time). FSubSelection doesn't have a SourceDesc, so container steps
+	// in the parsed chain won't have ElementSize populated -- they produce
+	// zero-filled output (graceful degradation). For container-aware
+	// dispatch, callers should use FCachedSubSelection.
+	//
 
 	void FSubSelection::ApplyGet(EPCGMetadataTypes SourceType, const void* Source,
 	                             void* OutValue, EPCGMetadataTypes& OutType) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(SourceType);
-		if (!Ops)
+		if (!HasSelection())
+		{
+			const PCGExTypeOps::ITypeOpsBase* Ops = PCGExTypeOps::FTypeOpsRegistry::Get(SourceType);
+			if (Ops)
+			{
+				Ops->Copy(Source, OutValue);
+				OutType = SourceType;
+			}
+			else
+			{
+				OutType = EPCGMetadataTypes::Unknown;
+			}
+			return;
+		}
+
+		// 1-entry compile cache: avoid re-running CompileChainForSource
+		// when the same FSubSelection is applied to many elements of the
+		// same SourceType (the common case).
+		if (CachedCompiledSourceType != SourceType)
+		{
+			CachedCompiled = ParsedChain;
+			CompileChainForSource(CachedCompiled, SourceType);
+			CachedCompiledSourceType = SourceType;
+		}
+
+		const FSubSelectionChain& Compiled = CachedCompiled;
+
+		if (Compiled.Steps.IsEmpty())
 		{
 			OutType = EPCGMetadataTypes::Unknown;
 			return;
 		}
 
-		Ops->ApplyGetSelection(Source, *this, OutValue, OutType);
+		// Walk the compiled chain with double-buffered intermediates.
+		alignas(16) uint8 BufA[96];
+		alignas(16) uint8 BufB[96];
+		void* Bufs[2] = {BufA, BufB};
+
+		const void* CurrentIn = Source;
+		int32 BufIdx = 0;
+		const int32 LastIdx = Compiled.Steps.Num() - 1;
+
+		for (int32 i = 0; i < LastIdx; ++i)
+		{
+			const FSubSelectionStep& Step = Compiled.Steps[i];
+			check(Step.StepGetFn);
+			void* StepOut = Bufs[BufIdx];
+			Step.StepGetFn(CurrentIn, StepOut, Step.Parsed);
+			CurrentIn = StepOut;
+			BufIdx = 1 - BufIdx;
+		}
+
+		// Last step writes directly to OutValue.
+		const FSubSelectionStep& Last = Compiled.Steps[LastIdx];
+		check(Last.StepGetFn);
+		Last.StepGetFn(CurrentIn, OutValue, Last.Parsed);
+
+		OutType = Compiled.FinalType;
 	}
 
 	void FSubSelection::ApplySet(EPCGMetadataTypes TargetType, void* Target,
 	                             EPCGMetadataTypes SourceType, const void* Source) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(TargetType);
-		if (!Ops)
+		if (!HasSelection())
 		{
+			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
 			return;
 		}
 
-		Ops->ApplySetSelection(Target, *this, Source, SourceType);
+		// Reuse the 1-entry compile cache (ApplySet compiles against TargetType).
+		if (CachedCompiledSourceType != TargetType)
+		{
+			CachedCompiled = ParsedChain;
+			CompileChainForSource(CachedCompiled, TargetType);
+			CachedCompiledSourceType = TargetType;
+		}
+
+		const FSubSelectionChain& Compiled = CachedCompiled;
+
+		if (Compiled.Steps.IsEmpty())
+		{
+			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
+			return;
+		}
+
+		const int32 LastIdx = Compiled.Steps.Num() - 1;
+
+		// All steps must have a SetFn for inject to work.
+		for (const FSubSelectionStep& Step : Compiled.Steps)
+		{
+			if (!Step.StepSetFn)
+			{
+				PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
+				return;
+			}
+		}
+
+		// Extract phase: walk forward to populate intermediates.
+		constexpr int32 MaxSteps = 4;
+		checkf(Compiled.Steps.Num() <= MaxSteps,
+		       TEXT("FSubSelection chain exceeded MaxSteps (%d > %d)"),
+		       Compiled.Steps.Num(), MaxSteps);
+
+		alignas(16) uint8 Buffers[MaxSteps][96];
+
+		{
+			const void* CurrentIn = Target;
+			for (int32 i = 0; i < LastIdx; ++i)
+			{
+				const FSubSelectionStep& Step = Compiled.Steps[i];
+				check(Step.StepGetFn);
+				Step.StepGetFn(CurrentIn, Buffers[i], Step.Parsed);
+				CurrentIn = Buffers[i];
+			}
+		}
+
+		// Convert source to the chain's final type if needed, then inject.
+		alignas(16) uint8 NewChildBuf[96];
+		const void* NewChild = Source;
+		if (SourceType != Compiled.FinalType)
+		{
+			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, Compiled.FinalType, NewChildBuf);
+			NewChild = NewChildBuf;
+		}
+
+		// Inject at last step.
+		void* LastParent = (LastIdx == 0) ? Target : Buffers[LastIdx - 1];
+		Compiled.Steps[LastIdx].StepSetFn(LastParent, NewChild, Compiled.Steps[LastIdx].Parsed);
+
+		// Walk backward, propagating mutations up.
+		for (int32 i = LastIdx - 1; i >= 0; --i)
+		{
+			void* Parent = (i == 0) ? Target : Buffers[i - 1];
+			Compiled.Steps[i].StepSetFn(Parent, Buffers[i], Compiled.Steps[i].Parsed);
+		}
 	}
 
 	double FSubSelection::ExtractFieldToDouble(EPCGMetadataTypes SourceType, const void* Source) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(SourceType);
-		if (!Ops)
-		{
-			return 0.0;
-		}
+		const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+		FAccessorParseResult Parsed;
+		Parsed.Field = Field;
 
-		return Ops->ExtractField(Source, Field);
+		double Out = 0.0;
+		FieldAccessor->ApplyGet(SourceType, Source, EPCGMetadataTypes::Double, &Out, Parsed);
+		return Out;
 	}
 
 	void FSubSelection::InjectFieldFromDouble(EPCGMetadataTypes TargetType, void* Target, double Value) const
 	{
-		const ISubSelectorOps* Ops = FSubSelectorRegistry::Get(TargetType);
-		if (!Ops)
-		{
-			return;
-		}
+		const ISubAccessor* FieldAccessor = FSubAccessorRegistry::GetSingleFieldAccessor();
+		FAccessorParseResult Parsed;
+		Parsed.Field = Field;
 
-		Ops->InjectField(Target, Value, Field);
+		FieldAccessor->ApplySet(TargetType, Target, EPCGMetadataTypes::Double, &Value, Parsed);
 	}
 
 	//
 	// Legacy Type-Erased Interface (GetVoid/SetVoid)
 	//
-	// These implement the original signature but use the new type-erased system internally.
-	// NOTE: For performance, prefer using FCachedSubSelection in IBufferProxy instead.
+	// Delegates to ApplyGet/ApplySet (the chain walker) with intermediate
+	// type conversion. For performance, prefer FCachedSubSelection.
 	//
 
 	void FSubSelection::GetVoid(EPCGMetadataTypes SourceType, const void* Source, EPCGMetadataTypes WorkingType, void* Target) const
 	{
-		if (!bIsValid)
+		if (!HasSelection())
 		{
-			// No sub-selection - just convert
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, WorkingType, Target);
 			return;
 		}
 
-		// Apply the sub-selection to get an intermediate value
 		alignas(16) uint8 IntermediateBuffer[96];
 		EPCGMetadataTypes IntermediateType = EPCGMetadataTypes::Unknown;
 
 		ApplyGet(SourceType, Source, IntermediateBuffer, IntermediateType);
 
-		// Convert from intermediate to working type if needed
 		if (IntermediateType == WorkingType)
 		{
-			// Direct copy using type ops (handles strings, etc.)
 			const PCGExTypeOps::ITypeOpsBase* TypeOps = PCGExTypeOps::FTypeOpsRegistry::Get(IntermediateType);
 			if (TypeOps)
 			{
@@ -286,12 +472,10 @@ namespace PCGExData
 		}
 		else if (IntermediateType != EPCGMetadataTypes::Unknown)
 		{
-			// Need conversion
 			PCGExTypeOps::FConversionTable::Convert(IntermediateType, IntermediateBuffer, WorkingType, Target);
 		}
 		else
 		{
-			// ApplyGet didn't produce valid output, fallback to direct conversion
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, WorkingType, Target);
 		}
 	}
@@ -299,14 +483,12 @@ namespace PCGExData
 	void FSubSelection::SetVoid(EPCGMetadataTypes TargetType, void* Target,
 	                            EPCGMetadataTypes SourceType, const void* Source) const
 	{
-		if (!bIsValid)
+		if (!HasSelection())
 		{
-			// No sub-selection - just convert
 			PCGExTypeOps::FConversionTable::Convert(SourceType, Source, TargetType, Target);
 			return;
 		}
 
-		// Use the sub-selector ops to apply the set
 		ApplySet(TargetType, Target, SourceType, Source);
 	}
 
@@ -337,7 +519,7 @@ namespace PCGExData
 			}
 			if (const FPCGMetadataAttributeBase* AttributeBase = InData->Metadata->GetConstAttribute(PCGExMetaHelpers::GetAttributeIdentifier(FixedSelector, InData)))
 			{
-				OutType = static_cast<EPCGMetadataTypes>(AttributeBase->GetTypeId());
+				OutType = PCGExMetaHelpers::GetAttributeType(AttributeBase);
 			}
 		}
 		else if (FixedSelector.GetSelection() == EPCGAttributePropertySelection::ExtraProperty)

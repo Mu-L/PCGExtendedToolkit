@@ -6,13 +6,9 @@
 #include "Core/PCGExFillControlsFactoryProvider.h"
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
-
-#if PCGEX_ENGINE_VERSION > 506
-#include "Data/Registry/PCGDataTypeRegistry.h"
-#endif
-
 #include "Core/PCGExFillControlsFactoryProvider.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
+#include "Styling/AppStyle.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExElementsFloodFill"

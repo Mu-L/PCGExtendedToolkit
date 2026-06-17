@@ -5,12 +5,12 @@
 
 #include "CoreMinimal.h"
 #include "PCGExCommon.h"
-#include "Metadata/PCGMetadataAttributeTraits.h"
+#include "Helpers/PCGExMetaHelpers.h" // FText shims + MetadataTraits<FText> specialization
 #include "UObject/SoftObjectPath.h"
 
 namespace PCGExTypes
 {
-	constexpr int TypesAllocations = 15;
+	constexpr int TypesAllocations = 256; // Full uint8 range for EPCGMetadataTypes
 
 	// Type Traits - Compile time type classification
 
@@ -482,4 +482,5 @@ namespace PCGExTypes
 			return FSoftClassPath();
 		}
 	};
+
 }

@@ -4,7 +4,6 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
-
 #include "PCGExConstantsDefinitions.generated.h"
 
 // An enum used to identify the constants in the namespace below. This is perhaps a slightly messy way of doing things,

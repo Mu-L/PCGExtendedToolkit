@@ -41,27 +41,3 @@ class UPCGExNeighborSamplerFactoryAttribute : public UPCGExNeighborSamplerFactor
 public:
 	virtual TSharedPtr<FPCGExNeighborSampleOperation> CreateOperation(FPCGExContext* InContext) const override;
 };
-
-UCLASS(Hidden, MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|NeighborSample")
-class UPCGExNeighborSampleAttributeSettings : public UPCGExNeighborSampleProviderSettings
-{
-	GENERATED_BODY()
-
-public:
-	//~Begin UPCGSettings
-#if WITH_EDITOR
-	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(NeighborSamplerAttribute, "Sampler : Vtx Attributes", "Create a single neighbor attribute sampler, to be used by a Sample Neighbors node.", PCGEX_FACTORY_NAME_PRIORITY)
-
-#endif
-	//~End UPCGSettings
-
-	virtual UPCGExFactoryData* CreateFactory(FPCGExContext* InContext, UPCGExFactoryData* InFactory) const override;
-
-#if WITH_EDITOR
-	virtual FString GetDisplayName() const override;
-#endif
-
-	/** Sampler Settings. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ShowOnlyInnerProperties))
-	FPCGExAttributeSamplerConfigBase Config;
-};

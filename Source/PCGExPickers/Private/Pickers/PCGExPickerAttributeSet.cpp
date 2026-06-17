@@ -99,13 +99,13 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 			if (Config.Attributes.IsEmpty())
 			{
 				const TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(Facade->Source->GetIn()->Metadata);
-				if (Infos->Attributes.IsEmpty())
+				if (Infos->Identities.IsEmpty())
 				{
 					PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Some input have no attributes."));
 					continue;
 				}
 
-				const TSharedPtr<PCGExData::TAttributeBroadcaster<double>> Values = PCGExData::MakeTypedBroadcaster<double>(Infos->Attributes[0]->Name, Facade->Source);
+				const TSharedPtr<PCGExData::TAttributeBroadcaster<double>> Values = PCGExData::MakeTypedBroadcaster<double>(Infos->Identities[0].Name, Facade->Source);
 				if (!Values)
 				{
 					continue;
@@ -136,13 +136,13 @@ PCGExFactories::EPreparationResult UPCGExPickerAttributeSetFactory::InitInternal
 			if (Config.Attributes.IsEmpty())
 			{
 				const TSharedPtr<PCGExData::FAttributesInfos> Infos = PCGExData::FAttributesInfos::Get(Facade->Source->GetIn()->Metadata);
-				if (Infos->Attributes.IsEmpty())
+				if (Infos->Identities.IsEmpty())
 				{
 					PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Some input have no attributes."));
 					continue;
 				}
 
-				const TSharedPtr<PCGExData::TAttributeBroadcaster<int32>> Values = PCGExData::MakeTypedBroadcaster<int32>(Infos->Attributes[0]->Name, Facade->Source);
+				const TSharedPtr<PCGExData::TAttributeBroadcaster<int32>> Values = PCGExData::MakeTypedBroadcaster<int32>(Infos->Identities[0].Name, Facade->Source);
 				if (!Values)
 				{
 					continue;

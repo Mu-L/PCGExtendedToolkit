@@ -8,7 +8,7 @@
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExProxyData.h"
 #include "Data/PCGExProxyDataImpl.h"
-#include "Data/PCGExSubSelectionOps.h"
+#include "Data/PCGExSubAccessor.h"
 
 namespace PCGExData
 {
@@ -16,8 +16,8 @@ namespace PCGExData
 	void TryGetInOutAttr(
 		const FProxyDescriptor& InDescriptor,
 		const TSharedPtr<FFacade>& InDataFacade,
-		const FPCGMetadataAttribute<T_REAL>*& OutInAttribute,
-		FPCGMetadataAttribute<T_REAL>*& OutOutAttribute)
+		const FPCGMetadataAttributeBase*& OutInAttribute,
+		FPCGMetadataAttributeBase*& OutOutAttribute)
 	{
 		OutInAttribute = nullptr;
 		OutOutAttribute = nullptr;
@@ -39,7 +39,7 @@ namespace PCGExData
 
 			if (OutInAttribute)
 			{
-				OutOutAttribute = const_cast<FPCGMetadataAttribute<T_REAL>*>(OutInAttribute);
+				OutOutAttribute = const_cast<FPCGMetadataAttributeBase*>(OutInAttribute);
 			}
 
 			check(OutInAttribute);
@@ -144,8 +144,8 @@ namespace PCGExData
 	template PCGEXCORE_API void TryGetInOutAttr<_TYPE>( \
 		const FProxyDescriptor& InDescriptor, \
 		const TSharedPtr<FFacade>& InDataFacade, \
-		const FPCGMetadataAttribute<_TYPE>*& OutInAttribute, \
-		FPCGMetadataAttribute<_TYPE>*& OutOutAttribute); \
+		const FPCGMetadataAttributeBase*& OutInAttribute, \
+		FPCGMetadataAttributeBase*& OutOutAttribute); \
 	template PCGEXCORE_API TSharedPtr<TBuffer<_TYPE>> TryGetBuffer<_TYPE>( \
 		FPCGExContext* InContext, \
 		const FProxyDescriptor& InDescriptor, \
@@ -207,8 +207,8 @@ namespace PCGExData
 			const TSharedPtr<FFacade>& InDataFacade,
 			bool bIsDataDomain)
 		{
-			const FPCGMetadataAttribute<T_REAL>* InAttribute = nullptr;
-			FPCGMetadataAttribute<T_REAL>* OutAttribute = nullptr;
+			const FPCGMetadataAttributeBase* InAttribute = nullptr;
+			FPCGMetadataAttributeBase* OutAttribute = nullptr;
 
 			TryGetInOutAttr<T_REAL>(InDescriptor, InDataFacade, InAttribute, OutAttribute);
 
@@ -361,7 +361,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 				if (OutProxy)
 				{
-					OutProxy->SetSubSelection(InDescriptor.SubSelection);
+					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.SourceDesc.IsValid() ? &InDescriptor.SourceDesc : nullptr);
 				}
 				return OutProxy;
 			}
@@ -380,9 +380,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 					if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 					{
-						if (const FPCGMetadataAttribute<T>* Attr = PCGExMetaHelpers::TryGetConstAttribute<T>(InDataFacade->GetIn(), PCGExMetaHelpers::GetAttributeIdentifier(InDescriptor.Selector, InDataFacade->GetIn())))
+						if (const FPCGMetadataAttributeBase* Attr = PCGExMetaHelpers::TryGetConstAttribute<T>(InDataFacade->GetIn(), PCGExMetaHelpers::GetAttributeIdentifier(InDescriptor.Selector, InDataFacade->GetIn())))
 						{
-							OutProxy = GetConstantProxyBuffer<T>(Attr->GetValueFromItemKey(Key), InDescriptor.WorkingType);
+							OutProxy = GetConstantProxyBuffer<T>(Attr->GetValueFromItemKey<T>(Key), InDescriptor.WorkingType);
 						}
 					}
 					else if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Property)
@@ -393,7 +393,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 				if (OutProxy)
 				{
-					OutProxy->SetSubSelection(InDescriptor.SubSelection);
+					OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.SourceDesc.IsValid() ? &InDescriptor.SourceDesc : nullptr);
 				}
 				return OutProxy;
 			}
@@ -401,9 +401,18 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			// Handle attribute proxy
 			if (InDescriptor.Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 			{
-				if (InDescriptor.HasFlag(EProxyFlags::Direct))
+				// Container attributes (TArray/TSet/TMap) must route
+				// through FPropertyBuffer, not TBuffer<T>. The Desc-based
+				// RealType is the inner element type (e.g. Vector for
+				// TArray<FVector>), so the normal ExecuteWithRightType path
+				// would instantiate TBuffer<FVector> -- wrong for container
+				// storage (which is FScriptArray layout). Skip straight to
+				// the Tier 3 FPropertyBuffer fallback for containers.
+				const bool bIsContainer = InDescriptor.SourceDesc.IsValid() && !InDescriptor.SourceDesc.IsSingleValue();
+
+				if (!bIsContainer && InDescriptor.HasFlag(EProxyFlags::Direct))
 				{
-					// Direct attribute access
+					// Direct attribute access (scalar only)
 					const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(InDescriptor.Selector, InDataFacade->GetIn());
 					const FPCGMetadataAttributeBase* BaseAttr = InDataFacade->FindConstAttribute(Identifier, InDescriptor.Side);
 					const bool bIsDataDomain = BaseAttr && BaseAttr->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data;
@@ -414,14 +423,67 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 						OutProxy = Internal::CreateDirectProxy<T>(InDescriptor, InDataFacade, bIsDataDomain);
 					});
 				}
-				else
+				else if (!bIsContainer)
 				{
-					// Buffered attribute access
+					// Buffered attribute access (scalar only)
 					PCGExMetaHelpers::ExecuteWithRightType(InDescriptor.RealType, [&](auto DummyValue)
 					{
 						using T = decltype(DummyValue);
 						OutProxy = Internal::CreateAttributeProxy<T>(InContext, InDescriptor, InDataFacade);
 					});
+				}
+
+				// Tier 3 fallback: wrap FPropertyBuffer via void* R/W for types not in
+				// PCGEX_FOREACH_SUPPORTEDTYPES. FFacade::GetWritable/GetDefaultReadable gate on
+				// InitProperty internally -- a failed size derivation returns nullptr.
+				if (!OutProxy)
+				{
+					const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(
+						InDescriptor.Selector,
+						InDescriptor.Side == EIOSide::In ? InDataFacade->GetIn() : InDataFacade->GetOut());
+
+					TSharedPtr<IBuffer> PropertyBuf;
+
+					if (InDescriptor.Role == EProxyRole::Read)
+					{
+						PropertyBuf = InDataFacade->GetDefaultReadable(Identifier, InDescriptor.Side);
+					}
+					else
+					{
+						// For writes, find the source attribute and use the type-erased writable path
+						const FPCGMetadataAttributeBase* SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::In);
+						if (!SrcAttr)
+						{
+							SrcAttr = InDataFacade->FindConstAttribute(Identifier, EIOSide::Out);
+						}
+
+						// Output Mode: New -- create the attribute from the template Desc
+						// the factory propagated (mirrors FPCGExProperty_Struct::InitializeOutput).
+						if (!SrcAttr && InDescriptor.SourceDesc.IsValid())
+						{
+							if (UPCGBasePointData* OutData = InDataFacade->GetOut();
+								OutData && OutData->Metadata)
+							{
+								FPCGMetadataAttributeDesc OutDesc = InDescriptor.SourceDesc;
+								OutDesc.Name = Identifier.Name;
+								SrcAttr = OutData->Metadata->CreateAttribute(
+									Identifier, OutDesc,
+									/*bAllowsInterp=*/true, /*bOverrideParent=*/true);
+							}
+						}
+
+						if (SrcAttr)
+						{
+							PropertyBuf = InDataFacade->GetWritable(
+								PCGExMetaHelpers::GetAttributeType(SrcAttr),
+								SrcAttr, EBufferInit::Inherit);
+						}
+					}
+
+					if (PropertyBuf)
+					{
+						OutProxy = MakeShared<FPropertyBufferProxy>(PropertyBuf, InDescriptor.RealType, InDescriptor.WorkingType);
+					}
 				}
 			}
 			// Handle point property proxy
@@ -439,7 +501,7 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 			if (OutProxy)
 			{
 				OutProxy->Data = PointData;
-				OutProxy->SetSubSelection(InDescriptor.SubSelection);
+				OutProxy->SetSubSelection(InDescriptor.SubSelection, InDescriptor.SourceDesc.IsValid() ? &InDescriptor.SourceDesc : nullptr);
 				OutProxy->InitForRole(InDescriptor.Role);
 
 				if (!OutProxy->Validate(InDescriptor))
@@ -468,10 +530,10 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 		TArray<TSharedPtr<IBufferProxy>>& OutProxies)
 	{
 		OutProxies.Reset(NumDesiredFields);
-		const int32 Dimensions = FMath::Min(4, FSubSelectorRegistry::Get(InBaseDescriptor.RealType)->GetNumFields());
+		const int32 Dimensions = FMath::Min(4, GetNumFieldsForType(InBaseDescriptor.RealType));
 
 		if (Dimensions == -1 &&
-			(!InBaseDescriptor.SubSelection.bIsValid || !InBaseDescriptor.SubSelection.bIsComponentSet))
+			(!InBaseDescriptor.SubSelection.HasSelection() || !InBaseDescriptor.SubSelection.IsComponentSelection()))
 		{
 			PCGE_LOG_C(Error, GraphAndLog, InContext,
 			           FTEXT("Can't automatically break complex type into sub-components. "
@@ -481,9 +543,9 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 		const int32 MaxIndex = Dimensions == -1 ? 2 : Dimensions - 1;
 
-		if (InBaseDescriptor.SubSelection.bIsValid)
+		if (InBaseDescriptor.SubSelection.HasSelection())
 		{
-			if (InBaseDescriptor.SubSelection.bIsFieldSet)
+			if (InBaseDescriptor.SubSelection.IsFieldSelection())
 			{
 				// Single specific field - use same proxy for all
 				const TSharedPtr<IBufferProxy> Proxy = GetProxyBuffer(InContext, InBaseDescriptor);

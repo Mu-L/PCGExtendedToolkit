@@ -1635,7 +1635,6 @@ int32 UPCGExAssetCollection::EDITOR_RebuildStaleEntries()
 		{
 			return;
 		}
-
 		// Use EDITOR_GetSourceAssetPaths so entry types that bake into an embedded asset
 		// (e.g. PCGDataAsset collection entries with Source==Level) check the real source
 		// file rather than Staging.Path, which resolves to the collection's own package.

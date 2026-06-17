@@ -119,7 +119,7 @@ public:
 	 * The value is clamped to be no less than a small positive value to prevent division by zero errors.
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
-	float VertexMergeHashTolerance = PCGExMesh::DefaultVertexMergeHashTolerance;
+	float VertexMergeHashTolerance = static_cast<float>(PCGExMesh::DefaultVertexMergeHashTolerance);
 
 	/**
 	 * Use two overlapping spatial hashes to detect vertex proximity. True (default) is more accurate but

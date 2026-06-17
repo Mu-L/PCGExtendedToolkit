@@ -3,6 +3,7 @@
 
 #include "Helpers/PCGExBlendingHelpers.h"
 
+#include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
 #include "Metadata/PCGMetadata.h"
 #include "Types/PCGExAttributeIdentity.h"
@@ -32,24 +33,48 @@ namespace PCGExBlending::Helpers
 
 			for (const PCGExData::FAttributeIdentity& Identity : InAttributesInfos.Identities)
 			{
-				PCGExMetaHelpers::ExecuteWithRightType(Identity.GetTypeId(), [&](auto DummyValue)
-				{
-					using T = decltype(DummyValue);
-					const FPCGMetadataAttribute<T>* InAttribute = InMetadata->GetConstTypedAttribute<T>(Identity.Identifier);
-					FPCGMetadataAttribute<T>* OutAttribute = PCGExMetaHelpers::TryGetMutableAttribute<T>(OutMetadata, Identity.Identifier);
-
-					if (!OutAttribute)
+				const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
+				PCGExMetaHelpers::ExecuteWithRightType(
+					Identity,
+					[&](auto DummyValue)
 					{
-						OutAttribute = Target->FindOrCreateAttribute<T>(Identity.Identifier, InAttribute->GetValueFromItemKey(PCGDefaultValueKey), InAttribute->AllowsInterpolation());
-					}
+						using T = decltype(DummyValue);
+						const FPCGMetadataAttribute<T>* InAttribute = InMetadata->GetConstTypedAttribute<T>(Identifier);
+						FPCGMetadataAttributeBase* OutAttribute = PCGExMetaHelpers::TryGetMutableAttribute<T>(OutMetadata, Identifier);
 
-					if (!OutAttribute)
+						if (!OutAttribute)
+						{
+							OutAttribute = Target->FindOrCreateAttribute<T>(Identifier, InAttribute->GetValueFromItemKey(PCGDefaultValueKey), InAttribute->AllowsInterpolation());
+						}
+
+						if (!OutAttribute)
+						{
+							return;
+						}
+
+						OutAttribute->SetValue(OutKey, InAttribute->GetValueFromItemKey(InKey));
+					},
+					[&]()
 					{
-						return;
-					}
+						// Property-backed: copy single value from source attribute → target attribute via FProperty.
+						const FPCGMetadataAttributeBase* InAttribute = InMetadata->GetConstAttribute(Identifier);
+						if (!InAttribute)
+						{
+							return;
+						}
 
-					OutAttribute->SetValue(OutKey, InAttribute->GetValueFromItemKey(InKey));
-				});
+						FPCGMetadataAttributeBase* OutAttribute = OutMetadata->GetMutableAttribute(Identifier);
+						if (!OutAttribute)
+						{
+							OutAttribute = OutMetadata->CreateAttribute(Identifier, InAttribute->GetAttributeDesc(), InAttribute->AllowsInterpolation(), /*bOverrideParent=*/true);
+						}
+						if (!OutAttribute)
+						{
+							return;
+						}
+
+						PCGExData::Helpers::PropertyCopyAttribute(InAttribute, InKey, OutAttribute, OutKey);
+					});
 			}
 		}
 	}

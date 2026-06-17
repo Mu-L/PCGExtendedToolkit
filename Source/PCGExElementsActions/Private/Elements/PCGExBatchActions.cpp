@@ -142,14 +142,25 @@ namespace PCGExBatchActions
 		}
 
 		// Initialize writers with provided default value
-		for (FPCGMetadataAttributeBase* AttributeBase : Context->DefaultAttributes->Attributes)
+		for (const PCGExData::FAttributeIdentity& Identity : Context->DefaultAttributes->Identities)
 		{
-			PCGExMetaHelpers::ExecuteWithRightType(AttributeBase->GetTypeId(), [&](auto DummyValue)
+			const FPCGMetadataAttributeBase* AttributeBase = Identity.Attribute;
+			if (!AttributeBase)
 			{
-				using T = decltype(DummyValue);
-				const FPCGMetadataAttribute<T>* TypedAttribute = static_cast<FPCGMetadataAttribute<T>*>(AttributeBase);
-				PointDataFacade->GetWritable<T>(TypedAttribute, PCGExData::EBufferInit::Inherit);
-			});
+				continue;
+			}
+			PCGExMetaHelpers::ExecuteWithRightType(
+				AttributeBase,
+				[&](auto DummyValue)
+				{
+					using T = decltype(DummyValue);
+					PointDataFacade->GetWritable<T>(AttributeBase, PCGExData::EBufferInit::Inherit);
+				},
+				[&]()
+				{
+					// Property-backed: route through the generic GetWritableFromAttribute fallback.
+					PointDataFacade->GetWritableFromAttribute(AttributeBase, PCGExData::EBufferInit::Inherit);
+				});
 		}
 
 		for (const UPCGExActionFactoryData* Factory : Context->ActionsFactories)

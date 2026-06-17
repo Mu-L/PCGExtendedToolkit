@@ -209,7 +209,7 @@ namespace PCGEx
 					return;
 				}
 				SubObject->ClearInternalFlags(EInternalObjectFlags::Async);
-			}, true);
+			}, EGetObjectsFlags::IncludeNestedObjects);
 		}
 	}
 }

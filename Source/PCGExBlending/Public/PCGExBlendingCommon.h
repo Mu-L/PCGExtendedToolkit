@@ -5,6 +5,7 @@
 
 #include "Metadata/PCGAttributePropertySelector.h"
 #include "Metadata/PCGMetadataCommon.h"
+#include "PCGExBlendingCommon.generated.h"
 
 UENUM(BlueprintType)
 enum class EPCGExBlendingType : uint8

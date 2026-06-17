@@ -9,6 +9,7 @@
 #include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGPointData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Engine/Level.h"
 #if WITH_EDITOR
@@ -16,6 +17,7 @@
 #endif
 #include "Helpers/PCGHelpers.h"
 #include "MeshSelectors/PCGMeshSelectorBase.h"
+#include "MeshSelectors/PCGSkinnedMeshSelector.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
@@ -462,9 +464,51 @@ namespace PCGExCollections
 	// Groups points by their entry hash into FPCGMeshInstanceList partitions.
 	// Each unique hash gets one instance list; points sharing the same hash share the list.
 	// Used by the PCG mesh spawner pipeline to batch-instantiate identical meshes.
-	bool FPickUnpacker::BuildPartitions(const UPCGBasePointData* InPointData, TArray<FPCGMeshInstanceList>& InstanceLists)
+	// Instance-list traits.
+	// Absorb the per-list-type differences between FPCGMeshInstanceList and FPCGSkinnedMeshInstanceList:
+	//   - InstancesIndices vs InstancePointIndices
+	//   - PointData type (UPCGBasePointData vs UPCGPointData -- UPCGPointData is a UPCGBasePointData
+	//     subclass, so a Cast<> resolves at runtime to the same object; the cast survives the
+	//     hierarchy change painlessly when the engine consolidates these later).
+	// Adding a new instance-list type is a matter of providing one specialization below and adding
+	// an explicit instantiation pair at the bottom of this file.
+	template <typename T>
+	struct TInstanceListTraits;
+
+	template <>
+	struct TInstanceListTraits<FPCGMeshInstanceList>
+	{
+		static TArray<int32>& GetIndices(FPCGMeshInstanceList& InList)
+		{
+			return InList.InstancesIndices;
+		}
+
+		static void SetPointData(FPCGMeshInstanceList& InList, const UPCGBasePointData* InPointData)
+		{
+			InList.PointData = InPointData;
+		}
+	};
+
+	template <>
+	struct TInstanceListTraits<FPCGSkinnedMeshInstanceList>
+	{
+		static TArray<int32>& GetIndices(FPCGSkinnedMeshInstanceList& InList)
+		{
+			return InList.InstancePointIndices;
+		}
+
+		static void SetPointData(FPCGSkinnedMeshInstanceList& InList, const UPCGBasePointData* InPointData)
+		{
+			InList.PointData = Cast<UPCGPointData>(InPointData);
+		}
+	};
+
+	template <typename T>
+	bool FPickUnpacker::BuildPartitions(const UPCGBasePointData* InPointData, TArray<T>& InstanceLists)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FPickUnpacker::BuildPartitions);
+
+		using FTraits = TInstanceListTraits<T>;
 
 		FPCGAttributePropertyInputSelector HashSelector;
 		HashSelector.Update(Labels::Tag_EntryIdx.ToString());
@@ -495,41 +539,53 @@ namespace PCGExCollections
 			if (const int32* Index = IndexedPartitions.Find(EntryHash);
 				!Index)
 			{
-				FPCGMeshInstanceList& NewInstanceList = InstanceLists.Emplace_GetRef();
+				T& NewInstanceList = InstanceLists.Emplace_GetRef();
 				NewInstanceList.AttributePartitionIndex = EntryHash;
-				NewInstanceList.PointData = InPointData;
-				NewInstanceList.InstancesIndices.Reserve(SafeReserve);
-				NewInstanceList.InstancesIndices.Emplace(i);
+				FTraits::SetPointData(NewInstanceList, InPointData);
+				TArray<int32>& Indices = FTraits::GetIndices(NewInstanceList);
+				Indices.Reserve(SafeReserve);
+				Indices.Emplace(i);
 
 				IndexedPartitions.Add(EntryHash, InstanceLists.Num() - 1);
 			}
 			else
 			{
-				InstanceLists[*Index].InstancesIndices.Emplace(i);
+				FTraits::GetIndices(InstanceLists[*Index]).Emplace(i);
 			}
 		}
 
 		return !IndexedPartitions.IsEmpty();
 	}
 
-	void FPickUnpacker::InsertEntry(const uint64 EntryHash, const int32 EntryIndex, TArray<FPCGMeshInstanceList>& InstanceLists)
+	template <typename T>
+	void FPickUnpacker::InsertEntry(const uint64 EntryHash, const int32 EntryIndex, TArray<T>& InstanceLists)
 	{
+		using FTraits = TInstanceListTraits<T>;
+
 		if (const int32* Index = IndexedPartitions.Find(EntryHash);
 			!Index)
 		{
-			FPCGMeshInstanceList& NewInstanceList = InstanceLists.Emplace_GetRef();
+			T& NewInstanceList = InstanceLists.Emplace_GetRef();
 			NewInstanceList.AttributePartitionIndex = EntryHash;
-			NewInstanceList.PointData = PointData;
-			NewInstanceList.InstancesIndices.Reserve(PointData->GetNumPoints() / (NumUniqueEntries * 2));
-			NewInstanceList.InstancesIndices.Emplace(EntryIndex);
+			FTraits::SetPointData(NewInstanceList, PointData);
+			TArray<int32>& Indices = FTraits::GetIndices(NewInstanceList);
+			Indices.Reserve(PointData->GetNumPoints() / (NumUniqueEntries * 2));
+			Indices.Emplace(EntryIndex);
 
 			IndexedPartitions.Add(EntryHash, InstanceLists.Num() - 1);
 		}
 		else
 		{
-			InstanceLists[*Index].InstancesIndices.Emplace(EntryIndex);
+			FTraits::GetIndices(InstanceLists[*Index]).Emplace(EntryIndex);
 		}
 	}
+
+	// Explicit instantiations. Add a new pair here when introducing a new instance-list type
+	// alongside its TInstanceListTraits specialization above.
+	template bool FPickUnpacker::BuildPartitions<FPCGMeshInstanceList>(const UPCGBasePointData*, TArray<FPCGMeshInstanceList>&);
+	template bool FPickUnpacker::BuildPartitions<FPCGSkinnedMeshInstanceList>(const UPCGBasePointData*, TArray<FPCGSkinnedMeshInstanceList>&);
+	template void FPickUnpacker::InsertEntry<FPCGMeshInstanceList>(const uint64, const int32, TArray<FPCGMeshInstanceList>&);
+	template void FPickUnpacker::InsertEntry<FPCGSkinnedMeshInstanceList>(const uint64, const int32, TArray<FPCGSkinnedMeshInstanceList>&);
 
 	UPCGExAssetCollection* FPickUnpacker::UnpackHash(uint64 EntryHash, int16& OutPrimaryIndex, int16& OutSecondaryIndex)
 	{

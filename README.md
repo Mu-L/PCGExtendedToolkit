@@ -1,4 +1,4 @@
-![UE 5.7](https://img.shields.io/badge/UE-5.7-darkgreen) ![5.6](https://img.shields.io/badge/5.6-darkgreen) ![5.5](https://img.shields.io/badge/5.5-gray) ![5.4](https://img.shields.io/badge/5.4-gray) ![5.3](https://img.shields.io/badge/5.3-gray) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Nebukam/PCGExtendedToolkit)
+![UE 5.8](https://img.shields.io/badge/UE-5.8-darkgreen)  ![5.7](https://img.shields.io/badge/5.7-darkgreen)  ![5.6](https://img.shields.io/badge/5.6-darkgreen) ![5.5](https://img.shields.io/badge/5.5-gray) ![5.4](https://img.shields.io/badge/5.4-gray) ![5.3](https://img.shields.io/badge/5.3-gray) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Nebukam/PCGExtendedToolkit)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/Nebukam/PCGExtendedToolkit/refs/heads/docs/_sources/smol-logo.png" alt="PCGEx Logo">
@@ -29,7 +29,7 @@ Vanilla PCG excels at scattering and rule-based placement. PCGEx adds what's mis
 
 Graph theory is just the headline. PCGEx is also a comprehensive data manipulation toolkit: spatial queries, sampling, blending, path operations, polygon booleans, asset management, filtering, sorting—the low-level primitives that vanilla PCG doesn't provide. Reusable sub-nodes (filters, heuristics, blenders) plug into operations to keep your graphs clean. 
 
-_It doesn't solve specific problems for you. _It gives you the tools to solve them yourself._
+_It doesn't solve specific problems for you. It gives you the tools to solve them yourself._
 
 ---
 

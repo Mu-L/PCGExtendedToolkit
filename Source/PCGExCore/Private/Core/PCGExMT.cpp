@@ -993,7 +993,7 @@ namespace PCGExMT
 		// save or GC is in progress. GIsSavingPackage is game-thread-owned and non-atomic, so only consult it on the
 		// game thread -- off-thread callers are advisory (the actual UObject work is game-thread-marshaled and re-checks
 		// there). IsGarbageCollecting() reads an atomic and is safe from any thread.
-		return (IsInGameThread() && GIsSavingPackage) || IsGarbageCollecting();
+		return (IsInGameThread() && UE::IsSavingPackage()) || IsGarbageCollecting();
 	}
 
 	void ExecuteOnMainThreadAndWait(FExecuteCallback&& Callback)

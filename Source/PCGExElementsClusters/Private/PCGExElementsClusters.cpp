@@ -5,15 +5,11 @@
 
 
 #if WITH_EDITOR
-#include "Styling/AppStyle.h"
-
-#if PCGEX_ENGINE_VERSION > 506
-#include "Data/Registry/PCGDataTypeRegistry.h" // PCGEX_PCG_DATA_REGISTRY
-#endif
-
 #include "Core/PCGExClusterStates.h"
+#include "Data/Registry/PCGDataTypeRegistry.h"
 #include "Elements/Meta/NeighborSamplers/PCGExNeighborSampleFactoryProvider.h"
 #include "Elements/Meta/VtxProperties/PCGExVtxPropertyFactoryProvider.h"
+#include "Styling/AppStyle.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "FPCGExElementsClustersModule"

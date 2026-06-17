@@ -14,7 +14,6 @@
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
 
-#include "InstancedStruct.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Details/Collections/FPCGExCollectionTileDragDropOp.h"
 #include "Details/Collections/PCGExAssetCollectionEditor.h"
@@ -23,6 +22,7 @@
 #include "DragAndDrop/AssetDragDropOp.h"
 #include "Misc/TransactionObjectEvent.h"
 #include "Modules/ModuleManager.h"
+#include "StructUtils/InstancedStruct.h"
 #include "UObject/StructOnScope.h"
 #include "UObject/UnrealType.h"
 #include "Widgets/SBoxPanel.h"

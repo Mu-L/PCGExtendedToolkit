@@ -10,6 +10,7 @@
 
 struct FPCGExContext;
 class UPCGBasePointData;
+class FPCGMetadataAttributeBase;
 
 template <typename T>
 class FPCGMetadataAttribute;
@@ -38,8 +39,8 @@ namespace PCGExData
 	void TryGetInOutAttr(
 		const FProxyDescriptor& InDescriptor,
 		const TSharedPtr<FFacade>& InDataFacade,
-		const FPCGMetadataAttribute<T_REAL>*& OutInAttribute,
-		FPCGMetadataAttribute<T_REAL>*& OutOutAttribute);
+		const FPCGMetadataAttributeBase*& OutInAttribute,
+		FPCGMetadataAttributeBase*& OutOutAttribute);
 
 #pragma region externalization TryGetInOutAttr / TryGetBuffer
 
@@ -47,8 +48,8 @@ namespace PCGExData
 	extern template void TryGetInOutAttr<_TYPE>( \
 		const FProxyDescriptor& InDescriptor, \
 		const TSharedPtr<FFacade>& InDataFacade, \
-		const FPCGMetadataAttribute<_TYPE>*& OutInAttribute, \
-		FPCGMetadataAttribute<_TYPE>*& OutOutAttribute); \
+		const FPCGMetadataAttributeBase*& OutInAttribute, \
+		FPCGMetadataAttributeBase*& OutOutAttribute); \
 	extern template TSharedPtr<TBuffer<_TYPE>> TryGetBuffer<_TYPE>( \
 		FPCGExContext* InContext, \
 		const FProxyDescriptor& InDescriptor, \

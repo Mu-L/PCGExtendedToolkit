@@ -23,6 +23,7 @@ namespace PCGExDetails
 
 struct FPCGContext;
 struct FPCGMeshInstanceList;
+struct FPCGSkinnedMeshInstanceList;
 class UPCGBasePointData;
 class UPCGExSelectorFactoryData;
 class UPCGManagedActors;
@@ -346,10 +347,19 @@ namespace PCGExCollections
 		/** Unpack from a specific input pin */
 		void UnpackPin(FPCGContext* InContext, FName InPinLabel = NAME_None);
 
-		/** Build point partitions from point data */
-		bool BuildPartitions(const UPCGBasePointData* InPointData, TArray<FPCGMeshInstanceList>& InstanceLists);
+		/**
+		 * Build point partitions from point data.
+		 *
+		 * Templated on the instance-list type so the same partitioning logic works for both
+		 * static (FPCGMeshInstanceList) and skinned (FPCGSkinnedMeshInstanceList) selectors.
+		 * Field-name and PointData-type differences are absorbed by TInstanceListTraits<T>.
+		 * Explicit instantiations live in the .cpp for both built-in list types.
+		 */
+		template <typename T>
+		bool BuildPartitions(const UPCGBasePointData* InPointData, TArray<T>& InstanceLists);
 
-		void InsertEntry(const uint64 EntryHash, const int32 EntryIndex, TArray<FPCGMeshInstanceList>& InstanceLists);
+		template <typename T>
+		void InsertEntry(const uint64 EntryHash, const int32 EntryIndex, TArray<T>& InstanceLists);
 
 		/**
 		 * Resolve a packed hash to an entry

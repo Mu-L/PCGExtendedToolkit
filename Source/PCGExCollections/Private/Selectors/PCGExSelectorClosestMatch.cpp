@@ -181,7 +181,7 @@ bool FPCGExEntryClosestMatchPickerOp::OnInitForData(FPCGExContext* InContext, co
 		if (!Eval.IsValid())
 		{
 			PCGE_LOG_C(Warning, GraphAndLog, InContext,
-			           FText::Format(FTEXT("Selector : Closest Match — axis {0} could not bind attribute '{1}' as the expected type; this axis will be skipped."),
+			           FText::Format(FTEXT("Selector : Closest Match -- axis {0} could not bind attribute '{1}' as the expected type; this axis will be skipped."),
 				           FText::AsNumber(A), FText::FromName(Axes[A].AttributeName)));
 			continue;
 		}
@@ -191,7 +191,7 @@ bool FPCGExEntryClosestMatchPickerOp::OnInitForData(FPCGExContext* InContext, co
 
 	if (ActiveEvaluators.IsEmpty())
 	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match — no axes could bind their query attribute; nothing to pick from."));
+		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Closest Match -- no axes could bind their query attribute; nothing to pick from."));
 		return false;
 	}
 
@@ -212,7 +212,7 @@ int32 FPCGExEntryClosestMatchPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGEx
 	int32 BestIdx = -1;
 
 	// TODO: when the scratch contract is wired through FSelectorHelper, hoist the per-axis
-	// Broadcaster->Read(PointIndex) out of the inner virtual Distance() — one read per axis
+	// Broadcaster->Read(PointIndex) out of the inner virtual Distance() -- one read per axis
 	// per pick instead of per axis per entry. Currently safe to leave because Pick runs
 	// concurrently on the same op across points, so mutating evaluator state would race.
 	for (const int32 i : ValidEntryIndices)
@@ -223,7 +223,7 @@ int32 FPCGExEntryClosestMatchPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGEx
 			D += Eval->Distance(PointIndex, i);
 			if (D >= BestDist)
 			{
-				break; // Already worse than current best — no point summing remaining axes.
+				break; // Already worse than current best -- no point summing remaining axes.
 			}
 		}
 		if (D < BestDist)

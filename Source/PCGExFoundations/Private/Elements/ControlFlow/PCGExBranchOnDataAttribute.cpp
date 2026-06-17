@@ -136,12 +136,13 @@ bool FPCGExBranchOnDataAttributeElement::AdvanceWork(FPCGExContext* InContext, c
 			}
 			else
 			{
-				PCGExMetaHelpers::ExecuteWithRightType(Attr->GetTypeId(), [&](auto ValueType)
+				// Container/extended attributes have no defined Numeric/String conversion -- silently skip;
+				// caller falls into the "no branch matched" default path below.
+				PCGExMetaHelpers::ExecuteWithRightType(Attr, [&](auto ValueType)
 				{
 					using T_ATTR = decltype(ValueType);
-					const FPCGMetadataAttribute<T_ATTR>* TypedAtt = static_cast<const FPCGMetadataAttribute<T_ATTR>*>(Attr);
 
-					T_ATTR Value = PCGExData::Helpers::ReadDataValue(TypedAtt);
+					T_ATTR Value = PCGExData::Helpers::ReadDataValue<T_ATTR>(Attr);
 
 					const double AsNumeric = PCGExTypeOps::Convert<T_ATTR, double>(Value);
 					const FString AsString = PCGExTypeOps::Convert<T_ATTR, FString>(Value);

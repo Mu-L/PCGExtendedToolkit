@@ -28,7 +28,7 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 	{
 		for (const PCGExData::FAttributeIdentity& Identity : Infos->Identities)
 		{
-			const FString Str = Identity.Identifier.Name.ToString();
+			const FString Str = Identity.Name.ToString();
 			bool bMatches = false;
 
 			if (TypedFilterFactory->Config.Domain != EPCGExAttribtueDomainCheck::Any)
@@ -41,7 +41,7 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 				{
 					continue;
 				}
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.Identifier.MetadataDomain != Identifier.MetadataDomain)
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain)
 				{
 					continue;
 				}
@@ -52,7 +52,7 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 				bMatches = true;
 			}
 
-			if (bMatches && Identity.UnderlyingType == TypedFilterFactory->Config.Type)
+			if (bMatches && Identity.ValueType == TypedFilterFactory->Config.Type)
 			{
 				bResult = true;
 				break;
@@ -66,7 +66,7 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 		// This means the "no type check" branch skips Data-domain attributes when Domain==Data.
 		for (const PCGExData::FAttributeIdentity& Identity : Infos->Identities)
 		{
-			const FString Str = Identity.Identifier.Name.ToString();
+			const FString Str = Identity.Name.ToString();
 			bool bMatches = false;
 
 			if (TypedFilterFactory->Config.Domain != EPCGExAttribtueDomainCheck::Any)
@@ -79,7 +79,7 @@ bool PCGExPointFilter::FAttributeCheckFilter::Test(const TSharedPtr<PCGExData::F
 				{
 					continue;
 				}
-				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.Identifier.MetadataDomain != Identifier.MetadataDomain)
+				if (TypedFilterFactory->Config.Domain == EPCGExAttribtueDomainCheck::Match && Identity.MetadataDomain != Identifier.MetadataDomain)
 				{
 					continue;
 				}

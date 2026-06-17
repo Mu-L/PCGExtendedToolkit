@@ -52,10 +52,9 @@ namespace PCGExBlending
 			return;
 		}
 
-		// Use FScopedTypedValue for safe working buffers
-		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValB(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValC(UnderlyingType);
+		PCGExTypes::FScopedTypedValue ValA = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValB = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValC = MakeScopedValue();
 
 		A->GetVoid(SourceIndexA, ValA.GetRaw());
 		B->GetVoid(SourceIndexB, ValB.GetRaw());
@@ -71,10 +70,9 @@ namespace PCGExBlending
 			return;
 		}
 
-		// Use FScopedTypedValue for safe working buffers
-		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValB(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValC(UnderlyingType);
+		PCGExTypes::FScopedTypedValue ValA = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValB = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValC = MakeScopedValue();
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
@@ -93,10 +91,9 @@ namespace PCGExBlending
 			return;
 		}
 
-		// Use FScopedTypedValue for safe working buffers
-		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValB(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValC(UnderlyingType);
+		PCGExTypes::FScopedTypedValue ValA = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValB = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValC = MakeScopedValue();
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
@@ -115,10 +112,9 @@ namespace PCGExBlending
 			return;
 		}
 
-		// Use FScopedTypedValue for safe working buffers
-		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValB(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValC(UnderlyingType);
+		PCGExTypes::FScopedTypedValue ValA = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValB = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValC = MakeScopedValue();
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
@@ -142,10 +138,9 @@ namespace PCGExBlending
 			return;
 		}
 
-		// Use FScopedTypedValue for safe working buffers
-		PCGExTypes::FScopedTypedValue ValA(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValB(UnderlyingType);
-		PCGExTypes::FScopedTypedValue ValC(UnderlyingType);
+		PCGExTypes::FScopedTypedValue ValA = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValB = MakeScopedValue();
+		PCGExTypes::FScopedTypedValue ValC = MakeScopedValue();
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
@@ -170,7 +165,7 @@ namespace PCGExBlending
 		check(Operation)
 		check(C)
 
-		PCGExTypes::FScopedTypedValue Current(UnderlyingType);
+		PCGExTypes::FScopedTypedValue Current = MakeScopedValue();
 		C->GetVoid(TargetIndex, Current.GetRaw());
 		Operation->BeginMulti(Current.GetRaw(), nullptr, Tracker);
 		C->SetVoid(TargetIndex, Current.GetRaw());
@@ -185,7 +180,7 @@ namespace PCGExBlending
 		check(B)
 		check(C)
 
-		PCGExTypes::FScopedTypedValue Source(UnderlyingType);
+		PCGExTypes::FScopedTypedValue Source = MakeScopedValue();
 
 		// Read source value
 		A->GetVoid(SourceIndex, Source.GetRaw());
@@ -197,10 +192,10 @@ namespace PCGExBlending
 		}
 		else
 		{
-			PCGExTypes::FScopedTypedValue Current(UnderlyingType);
+			PCGExTypes::FScopedTypedValue Current = MakeScopedValue();
 
-			C->GetCurrentVoid(TargetIndex, Current.GetRaw());                 // Read current accumulated value			
-			Operation->Accumulate(Source.GetRaw(), Current.GetRaw(), Weight); // Accumulate			
+			C->GetCurrentVoid(TargetIndex, Current.GetRaw());                 // Read current accumulated value
+			Operation->Accumulate(Source.GetRaw(), Current.GetRaw(), Weight); // Accumulate
 			C->SetVoid(TargetIndex, Current.GetRaw());                        // Write back
 		}
 
@@ -218,11 +213,10 @@ namespace PCGExBlending
 			return;
 		}
 
-		PCGExTypes::FScopedTypedValue Current(UnderlyingType);
+		PCGExTypes::FScopedTypedValue Current = MakeScopedValue();
 
-
-		C->GetCurrentVoid(TargetIndex, Current.GetRaw());                          // Read accumulated value		
-		Operation->EndMulti(Current.GetRaw(), Tracker.TotalWeight, Tracker.Count); // Finalize (e.g., divide by count for average)		
+		C->GetCurrentVoid(TargetIndex, Current.GetRaw());                          // Read accumulated value
+		Operation->EndMulti(Current.GetRaw(), Tracker.TotalWeight, Tracker.Count); // Finalize (e.g., divide by count for average)
 		C->SetVoid(TargetIndex, Current.GetRaw());                                 // Write final result
 	}
 
@@ -233,7 +227,7 @@ namespace PCGExBlending
 			return;
 		}
 
-		PCGExTypes::FScopedTypedValue Value(UnderlyingType);
+		PCGExTypes::FScopedTypedValue Value = MakeScopedValue();
 
 		C->GetVoid(TargetIndex, Value.GetRaw()); // Read current value
 		Operation->Div(Value.GetRaw(), Divider); // Divide
@@ -319,19 +313,106 @@ namespace PCGExBlending
 	TSharedPtr<FProxyDataBlender> CreateProxyBlender(
 		EPCGMetadataTypes WorkingType,
 		EPCGExABBlendingType BlendMode,
-		bool bResetValueForMultiBlend)
+		bool bResetValueForMultiBlend,
+		const UObject* InValueTypeObject)
 	{
 		TSharedPtr<FProxyDataBlender> Blender = MakeShared<FProxyDataBlender>();
 
 		Blender->UnderlyingType = WorkingType;
-		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend);
+
+		// For extended types (Struct/Enum/etc.), InValueTypeObject must be non-null so size can be computed.
+		// For basic types, size comes from the enum alone and VTO is ignored.
+		// NOTE: container types CANNOT be sized via this VTO-only overload -- callers with container
+		// attributes must use the FProperty-based overload (next).
+		const int32 DerivedSize = PCGExTypes::GetElementSizeFromType(WorkingType, InValueTypeObject);
+		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize);
 
 		if (!Blender->Operation)
 		{
 			return nullptr;
 		}
 
+		Blender->ValueSize = Blender->Operation->GetValueSize();
+		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
+
 		return Blender;
+	}
+
+	TSharedPtr<FProxyDataBlender> CreateProxyBlender(
+		EPCGMetadataTypes WorkingType,
+		EPCGExABBlendingType BlendMode,
+		bool bResetValueForMultiBlend,
+		const FProperty* InProperty)
+	{
+		// Property-aware factory: required for containers (TArray/TSet/TMap) and
+		// non-trivially-copyable scalars where memcpy semantics would corrupt allocators.
+		// InProperty must outlive the returned blender (typically owned by an FPropertyBuffer).
+		TSharedPtr<FProxyDataBlender> Blender = MakeShared<FProxyDataBlender>();
+		Blender->UnderlyingType = WorkingType;
+		Blender->Operation = FBlendOperationFactory::Create(WorkingType, BlendMode, bResetValueForMultiBlend, InProperty);
+		if (!Blender->Operation)
+		{
+			return nullptr;
+		}
+		Blender->ValueSize = Blender->Operation->GetValueSize();
+		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
+		return Blender;
+	}
+
+	namespace
+	{
+		// Resolve the FProperty backing a proxy. Returns nullptr for typed TBuffer<T> proxies,
+		// constants, and point-property proxies. Non-owning -- the FProperty's lifetime is tied
+		// to the buffer, which the blender holds via TSharedPtr through the proxy.
+		const FProperty* ResolveBackingProperty(const TSharedPtr<PCGExData::IBufferProxy>& Proxy)
+		{
+			if (!Proxy)
+			{
+				return nullptr;
+			}
+			const TSharedPtr<PCGExData::IBuffer> Buf = Proxy->GetBuffer();
+			return Buf ? Buf->GetSourceProperty() : nullptr;
+		}
+
+		// Prefer the FProperty-aware path when any proxy is property-backed: routes through
+		// FPropertyCopyBlendOperation (CopyCompleteValue) -- correct for containers and structs
+		// with heap-owning members where memcpy would shallow-copy.
+		//
+		// WorkingType forced to Unknown so the factory's switch falls through to the default
+		// FProperty branch even when the descriptor's inner type happens to be legacy (e.g.
+		// TArray<float> reports RealType=Float; dispatching to TBlendOperationImpl<float>
+		// would memcpy FScriptArray bytes -- wrong).
+		TSharedPtr<IBlendOperation> CreateOperationForProxies(
+			const PCGExData::FProxyDescriptor& A,
+			const TSharedPtr<PCGExData::IBufferProxy>& AProxy,
+			const TSharedPtr<PCGExData::IBufferProxy>& BProxy,
+			const TSharedPtr<PCGExData::IBufferProxy>& CProxy,
+			EPCGExABBlendingType BlendMode,
+			bool bResetValueForMultiBlend)
+		{
+			const FProperty* Prop = ResolveBackingProperty(AProxy);
+			if (!Prop)
+			{
+				Prop = ResolveBackingProperty(BProxy);
+			}
+			if (!Prop)
+			{
+				Prop = ResolveBackingProperty(CProxy);
+			}
+
+			if (Prop)
+			{
+				return FBlendOperationFactory::Create(EPCGMetadataTypes::Unknown, BlendMode, bResetValueForMultiBlend, Prop);
+			}
+
+			// Legacy/typed path: read sizes from the proxy's underlying buffer (typed TBuffer<T>
+			// reports sizeof(T)/alignof(T)). For proxies without a backing buffer (TConstantProxy,
+			// point-property proxies), fall back to type-only derivation from WorkingType.
+			const TSharedPtr<PCGExData::IBuffer> ABuf = AProxy ? AProxy->GetBuffer() : nullptr;
+			const int32 DerivedSize = ABuf ? ABuf->GetValueSize() : PCGExTypes::GetElementSizeFromType(A.WorkingType);
+			const int32 DerivedAlign = ABuf ? ABuf->GetValueAlignment() : PCGExTypes::GetElementAlignmentFromType(A.WorkingType);
+			return FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend, DerivedSize, DerivedAlign);
+		}
 	}
 
 	TSharedPtr<FProxyDataBlender> CreateProxyBlender(
@@ -353,15 +434,8 @@ namespace PCGExBlending
 		// Set type info
 		Blender->UnderlyingType = A.WorkingType;
 
-		// Create blend operation
-		Blender->Operation = FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend);
-		if (!Blender->Operation)
-		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
-			return nullptr;
-		}
-
-		// Create output first so we may read from it
+		// Create proxies first -- the operation now depends on whether any proxy is
+		// property-backed, which we can only know after they're built.
 		Blender->C = PCGExData::GetProxyBuffer(InContext, C);
 		Blender->A = PCGExData::GetProxyBuffer(InContext, A);
 		Blender->B = PCGExData::GetProxyBuffer(InContext, B);
@@ -383,6 +457,16 @@ namespace PCGExBlending
 			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to generate buffer for Output."));
 			return nullptr;
 		}
+
+		Blender->Operation = CreateOperationForProxies(A, Blender->A, Blender->B, Blender->C, BlendMode, bResetValueForMultiBlend);
+		if (!Blender->Operation)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
+			return nullptr;
+		}
+
+		Blender->ValueSize = Blender->Operation->GetValueSize();
+		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
 
 		// Ensure C is readable for MultiBlend, as those will use GetCurrent
 		if (!Blender->C->EnsureReadable())
@@ -412,15 +496,7 @@ namespace PCGExBlending
 		// Set type info
 		Blender->UnderlyingType = A.WorkingType;
 
-		// Create blend operation
-		Blender->Operation = FBlendOperationFactory::Create(A.WorkingType, BlendMode, bResetValueForMultiBlend);
-		if (!Blender->Operation)
-		{
-			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
-			return nullptr;
-		}
-
-		// Create output first so we may read from it
+		// Create proxies first (see 3-source overload for rationale).
 		Blender->C = PCGExData::GetProxyBuffer(InContext, C);
 		Blender->A = PCGExData::GetProxyBuffer(InContext, A);
 		Blender->B = Blender->A; // Use B as fallback -- important for intrinsic properties such as $Index
@@ -436,6 +512,16 @@ namespace PCGExBlending
 			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to generate buffer for Output."));
 			return nullptr;
 		}
+
+		Blender->Operation = CreateOperationForProxies(A, Blender->A, Blender->B, Blender->C, BlendMode, bResetValueForMultiBlend);
+		if (!Blender->Operation)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("ProxyBlender: Failed to create blend operation."));
+			return nullptr;
+		}
+
+		Blender->ValueSize = Blender->Operation->GetValueSize();
+		Blender->ValueAlignment = Blender->Operation->GetValueAlignment();
 
 		// Ensure C is readable for MultiBlend, as those will use GetCurrent
 		if (!Blender->C->EnsureReadable())
