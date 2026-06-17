@@ -34,7 +34,7 @@ namespace PCGExMatching
  * Pairing is driven by the data matching rules; with matching disabled, every
  * Source pairs with every Target.
  */
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="metadata/copy-tags"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="utilities/copy-tags"))
 class UPCGExCopyTagsSettings : public UPCGExSettings
 {
 	GENERATED_BODY()

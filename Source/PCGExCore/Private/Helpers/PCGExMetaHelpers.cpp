@@ -18,7 +18,20 @@ namespace PCGExMetaHelpers
 		return 0;
 	}
 
-	TSharedPtr<IPCGAttributeAccessorKeys> MakeKeys(const UPCGData* InData)
+	TSharedPtr<IPCGAttributeAccessorKeys> MakeMutableKeys(UPCGData* InData)
+	{
+		if (UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
+		{
+			return MakeShared<FPCGAttributeAccessorKeysPointIndices>(PointData, true);
+		}
+		if (InData && InData->MutableMetadata())
+		{
+			return MakeShared<FPCGAttributeAccessorKeysEntries>(InData->MutableMetadata());
+		}
+		return nullptr;
+	}
+	
+	TSharedPtr<IPCGAttributeAccessorKeys> MakeConstKeys(const UPCGData* InData)
 	{
 		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
 		{
@@ -29,6 +42,67 @@ namespace PCGExMetaHelpers
 			return MakeShared<FPCGAttributeAccessorKeysEntries>(InData->Metadata);
 		}
 		return nullptr;
+	}
+
+	void InitializeMetadataEntries(UPCGMetadata* Metadata, const TPCGValueRange<int64>& MetadataEntries, const bool bConservative)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FPointIO::InitializeMetadataEntries);
+
+		if (bConservative)
+		{
+			// Conservative: re-initialize only keys that don't reference a real LOCAL entry
+			// of this metadata -- i.e. anything outside [ItemKeyOffset, ItemCount). This
+			// preserves genuine local entries (the Duplicate case, where points already
+			// carry valid attribute data) while healing three corruptions:
+			//   Key == PCGInvalidEntryKey -> never set
+			//   Key <  ItemKeyOffset      -> stale parent reference
+			//   Key >= ItemCount          -> dangling: a positive-but-unbacked key (e.g.
+			//                                inherited from an upstream node whose metadata
+			//                                schema doesn't back it). Such keys look valid to
+			//                                every later conservative pass, so they slip
+			//                                through unrepaired and surface as "Output ... does
+			//                                not have valid point metadata" on the graph output.
+			TArray<int64*> KeysNeedingInit;
+			KeysNeedingInit.Reserve(MetadataEntries.Num());
+			const int64 ItemKeyOffset = Metadata->GetItemKeyCountForParent();
+			const int64 ItemCount = Metadata->GetItemCountForChild();
+
+			for (int64& Key : MetadataEntries)
+			{
+				if (Key == PCGInvalidEntryKey || Key < ItemKeyOffset || Key >= ItemCount)
+				{
+					KeysNeedingInit.Add(&Key);
+				}
+			}
+
+			if (KeysNeedingInit.Num() > 0)
+			{
+				Metadata->AddEntriesInPlace(KeysNeedingInit);
+			}
+		}
+		else
+		{
+			// Non-conservative: replace ALL metadata entries with fresh ones.
+			// Old keys are preserved as parent references in DelayedEntries so attribute
+			// values can still be inherited/interpolated from the original data.
+			// Placeholder keys are handed out sequentially from the current item count,
+			// so they are synthesized directly instead of paying one lock + shared
+			// atomic per point. AddDelayedEntries sizes from the array we pass.
+			const int32 NumEntries = MetadataEntries.Num();
+			const int64 EntryStart = Metadata->GetItemCountForChild();
+
+			TArray<TTuple<int64, int64>> DelayedEntries;
+			DelayedEntries.SetNumUninitialized(NumEntries);
+
+			for (int i = 0; i < NumEntries; i++)
+			{
+				const int64 Entry = EntryStart + i;
+				DelayedEntries[i] = MakeTuple(Entry, MetadataEntries[i]);
+				MetadataEntries[i] = Entry;
+			}
+
+			Metadata->AddDelayedEntries(DelayedEntries);
+		}
 	}
 
 	bool IsPCGExAttribute(const FString& InStr)

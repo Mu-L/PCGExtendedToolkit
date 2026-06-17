@@ -15,6 +15,10 @@
 #include "Metadata/PCGMetadataAttributeTpl.h"
 #include "Metadata/PCGMetadataAttributeTraits.h"
 
+template <typename ValueType, typename ViewType>
+class TPCGValueRange;
+
+class UPCGMetadata;
 class UPCGManagedComponent;
 class UPCGData;
 class UPCGComponent;
@@ -32,7 +36,10 @@ namespace PCGExMetaHelpers
 {
 	const FName InvalidName = "INVALID_DATA";
 
-	PCGEXCORE_API TSharedPtr<IPCGAttributeAccessorKeys> MakeKeys(const UPCGData* InData);
+	PCGEXCORE_API TSharedPtr<IPCGAttributeAccessorKeys> MakeMutableKeys(UPCGData* InData);
+	PCGEXCORE_API TSharedPtr<IPCGAttributeAccessorKeys> MakeConstKeys(const UPCGData* InData);
+	
+	PCGEXCORE_API void InitializeMetadataEntries(UPCGMetadata* Metadata, const TPCGValueRange<int64>& MetadataEntries, const bool bConservative);
 	
 	PCGEXCORE_API bool IsPCGExAttribute(const FString& InStr);
 	PCGEXCORE_API bool IsPCGExAttribute(const FName InName);
