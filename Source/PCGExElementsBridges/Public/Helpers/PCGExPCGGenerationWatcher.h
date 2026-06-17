@@ -43,7 +43,12 @@ namespace PCGExPCGInterop
 		EPCGExRuntimeGenerationTriggerAction GenerateAtRuntimeAction = EPCGExRuntimeGenerationTriggerAction::AsIs;
 
 		bool ShouldIgnore(EPCGComponentGenerationTrigger Trigger) const;
-		bool TriggerGeneration(UPCGComponent* Component, bool& bOutShouldWatch) const;
+
+		// InSelf is the executing component; when we trigger a generation we bracket it with
+		// UPCGComponent::StartIgnoringChangeOriginDuringGeneration so the source's completion
+		// notification can't re-enter and cancel our in-flight execution (hang/torn-read crash).
+		// On success, OutIgnoredOwner is the source owner actor we started ignoring (null if none).
+		bool TriggerGeneration(UPCGComponent* Component, bool& bOutShouldWatch, UPCGComponent* InSelf, AActor*& OutIgnoredOwner) const;
 	};
 
 	/**
@@ -57,7 +62,8 @@ namespace PCGExPCGInterop
 
 		FGenerationWatcher(
 			const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
-			const FGenerationConfig& InGenerationConfig);
+			const FGenerationConfig& InGenerationConfig,
+			const TWeakObjectPtr<UPCGComponent>& InSelf);
 
 		~FGenerationWatcher();
 
@@ -80,6 +86,24 @@ namespace PCGExPCGInterop
 		void ProcessComponent(UPCGComponent* InComponent);
 		void WatchComponentGeneration(UPCGComponent* InComponent);
 		void OnComponentReady(UPCGComponent* InComponent, bool bSuccess);
+
+#if WITH_EDITOR
+		// Releases the ignore brackets opened in ProcessComponent. ForSource==null sweeps all
+		// outstanding entries (destructor / cancellation), keeping the engine's ignore counter balanced.
+		void ReleaseIgnoredOrigins(UPCGComponent* ForSource);
+
+		struct FIgnoredOrigin
+		{
+			TWeakObjectPtr<UPCGComponent> Self;
+			TWeakObjectPtr<AActor> Owner;
+			TWeakObjectPtr<UPCGComponent> Source;
+		};
+
+		TArray<FIgnoredOrigin> IgnoredOrigins;
+#endif
+
+		// Executing component, used to open the ignore brackets. Read in all configs (passed to TriggerGeneration).
+		TWeakObjectPtr<UPCGComponent> SelfWeak;
 
 		TWeakPtr<PCGExMT::FTaskManager> TaskManagerWeak;
 		FGenerationConfig GenerationConfig;

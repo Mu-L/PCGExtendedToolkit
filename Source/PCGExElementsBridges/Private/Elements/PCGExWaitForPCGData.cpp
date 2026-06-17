@@ -939,7 +939,8 @@ namespace PCGExWaitForPCGData
 
 		Watcher = MakeShared<FGenerationWatcher>(
 			TaskManager,
-			Context->GenerationConfig);
+			Context->GenerationConfig,
+			Context->GetMutableComponent());
 		Watcher->Initialize();
 
 		Stager = MakeShared<FDataStager>(

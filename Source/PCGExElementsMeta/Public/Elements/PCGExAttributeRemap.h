@@ -95,10 +95,10 @@ public:
 #pragma region DEPRECATED
 
 	// Deprecated, old source/target
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	FName SourceAttributeName_DEPRECATED = NAME_None;
 
-	UPROPERTY(meta=(DeprecatedProperty))
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	FName TargetAttributeName_DEPRECATED = NAME_None;
 
 #pragma endregion

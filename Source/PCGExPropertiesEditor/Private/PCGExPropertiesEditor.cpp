@@ -11,8 +11,10 @@
 #include "PCGExPropertyTypes.h"
 #include "PCGExPropertyWriter.h"
 #include "PropertyEditorModule.h"
+#include "Metadata/PCGObjectPropertyOverride.h"
 #include "Details/PCGExEnumSelectorCustomization.h"
 #include "Details/PCGExNumericRangeCustomization.h"
+#include "Details/PCGExObjectPropertyOverrideDescriptionCustomization.h"
 #include "Details/PCGExPropertyCompiledCustomization.h"
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
 #include "Details/PCGExPropertyOverrideEntryCustomization.h"
@@ -73,6 +75,12 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGExPropertyOutputConfig::StaticStruct()->GetFName(),
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOutputConfigCustomization::MakeInstance)
+		);
+
+	// FPCGObjectPropertyOverrideDescription (engine struct) -> compact inline [source] -> [target]. Global by FName.
+	PropertyModule.RegisterCustomPropertyTypeLayout(
+		FPCGObjectPropertyOverrideDescription::StaticStruct()->GetFName(),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExObjectPropertyOverrideDescriptionCustomization::MakeInstance)
 		);
 
 	// Register FPCGExWeightedPropertyOverrides customization - weight in header + flattened overrides

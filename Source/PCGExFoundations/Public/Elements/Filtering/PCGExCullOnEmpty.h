@@ -47,7 +47,7 @@ public:
 	bool bCheckOnly = false;
 	
 	/** */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(InlineEditConditionToggle))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(InlineEditConditionToggle, ScriptName="output_is_empty_enabled"))
 	bool bOutputIsEmpty = false;
 	
 	/**  */
