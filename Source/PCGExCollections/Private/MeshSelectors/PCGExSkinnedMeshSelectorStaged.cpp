@@ -16,9 +16,6 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(PCGExSkinnedMeshSelectorStaged)
 
-#pragma region WAITING FOR API
-/*
- 
 #define LOCTEXT_NAMESPACE "PCGExSkinnedMeshSelectorStaged"
 
 bool UPCGExSkinnedMeshSelectorStaged::SelectInstances(FPCGSkinnedMeshSpawnerContext& Context, const UPCGSkinnedMeshSpawnerSettings* Settings, const UPCGPointData* InPointData, TArray<FPCGSkinnedMeshInstanceList>& OutMeshInstances, UPCGPointData* OutPointData) const
@@ -171,6 +168,3 @@ bool UPCGExSkinnedMeshSelectorStaged::SelectInstances(FPCGSkinnedMeshSpawnerCont
 }
 
 #undef LOCTEXT_NAMESPACE
-
-*/
-#pragma endregion

@@ -3,11 +3,6 @@
 
 #pragma once
 
-#pragma region WAITING FOR API
-/*
-// Overriding selectors need UE_API export on PostLoad and SelectInstances of the base class
-//
-
 #include "MeshSelectors/PCGSkinnedMeshSelector.h"
 #include "PCGExSkinnedMeshSelectorStaged.generated.h"
 
@@ -39,5 +34,3 @@ public:
 	UPROPERTY(EditAnywhere, Category = MeshSelector)
 	bool bQuietMissingStagingDataWarning = false;
 };
-*/
-#pragma endregion
