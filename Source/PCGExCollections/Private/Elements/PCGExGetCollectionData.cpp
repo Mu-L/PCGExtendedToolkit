@@ -744,16 +744,25 @@ namespace PCGExGetCollectionData
 			UPCGExAssetCollection* Collection = *CollectionPtr;
 			FSlotIdentity& Id = SlotIdentity[k];
 			Id.Collection = Collection;
-			if (const int32* R = CollectionToRootIdx.Find(Collection)) { Id.Root = *R; }
+			if (const int32* R = CollectionToRootIdx.Find(Collection))
+			{
+				Id.Root = *R;
+			}
 			if (FlattenCtx.CollectionIndexMap)
 			{
-				if (const int32* C = FlattenCtx.CollectionIndexMap->Find(Collection)) { Id.Coll = *C; }
+				if (const int32* C = FlattenCtx.CollectionIndexMap->Find(Collection))
+				{
+					Id.Coll = *C;
+				}
 			}
 			// Input rows always reference a root collection -> Depth is 0 in the hash tuple.
 			if (FlattenCtx.CollectionHashMap && Id.Root != -1 && Id.Coll != -1)
 			{
 				const TTuple<int32, int32, int32> Key(Id.Root, Id.Coll, 0);
-				if (const int32* H = FlattenCtx.CollectionHashMap->Find(Key)) { Id.Hash = *H; }
+				if (const int32* H = FlattenCtx.CollectionHashMap->Find(Key))
+				{
+					Id.Hash = *H;
+				}
 			}
 		}
 
@@ -775,7 +784,10 @@ namespace PCGExGetCollectionData
 		ValidInputIndices.Reserve(Inputs.Num());
 		for (int32 i = 0; i < Inputs.Num(); i++)
 		{
-			if (Inputs[i].Data) { ValidInputIndices.Add(i); }
+			if (Inputs[i].Data)
+			{
+				ValidInputIndices.Add(i);
+			}
 		}
 		if (ValidInputIndices.IsEmpty())
 		{
@@ -804,9 +816,18 @@ namespace PCGExGetCollectionData
 			{
 				// PerInputData: one slot per input. Read identity once and stamp as @Data.
 				const FSlotIdentity Id = SlotIndices.Num() > 0 ? SlotIdentity[SlotIndices[0]] : FSlotIdentity{};
-				if (bWantRoot) { PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->RootCollectionIndexAttributeName, Id.Root); }
-				if (bWantColl) { PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->CollectionIndexAttributeName, Id.Coll); }
-				if (bWantHash) { PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->CollectionHashAttributeName, Id.Hash); }
+				if (bWantRoot)
+				{
+					PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->RootCollectionIndexAttributeName, Id.Root);
+				}
+				if (bWantColl)
+				{
+					PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->CollectionIndexAttributeName, Id.Coll);
+				}
+				if (bWantHash)
+				{
+					PCGExData::Helpers::SetDataValue<int32>(DupData, Settings->CollectionHashAttributeName, Id.Hash);
+				}
 
 				// Schema-property annotation (@Data): single value per input, taken from the slot's
 				// resolved collection schema. Null host -> no schema attribute (see helper docs).
@@ -823,28 +844,56 @@ namespace PCGExGetCollectionData
 				// pattern as the Boot-time read path; works uniformly for point and attribute-set inputs.
 				const int32 NumRows = SlotIndices.Num();
 				TArray<int32> RootValues, CollValues, HashValues;
-				if (bWantRoot) { RootValues.SetNumUninitialized(NumRows); }
-				if (bWantColl) { CollValues.SetNumUninitialized(NumRows); }
-				if (bWantHash) { HashValues.SetNumUninitialized(NumRows); }
+				if (bWantRoot)
+				{
+					RootValues.SetNumUninitialized(NumRows);
+				}
+				if (bWantColl)
+				{
+					CollValues.SetNumUninitialized(NumRows);
+				}
+				if (bWantHash)
+				{
+					HashValues.SetNumUninitialized(NumRows);
+				}
 				for (int32 r = 0; r < NumRows; r++)
 				{
 					const FSlotIdentity& Id = SlotIdentity[SlotIndices[r]];
-					if (bWantRoot) { RootValues[r] = Id.Root; }
-					if (bWantColl) { CollValues[r] = Id.Coll; }
-					if (bWantHash) { HashValues[r] = Id.Hash; }
+					if (bWantRoot)
+					{
+						RootValues[r] = Id.Root;
+					}
+					if (bWantColl)
+					{
+						CollValues[r] = Id.Coll;
+					}
+					if (bWantHash)
+					{
+						HashValues[r] = Id.Hash;
+					}
 				}
 
-				TSharedPtr<IPCGAttributeAccessorKeys> Keys = PCGExMetaHelpers::MakeKeys(DupData);
+				UPCGMetadata* M = DupData->MutableMetadata();
+				if (!M)
+				{
+					return;
+				}
+				
+				TSharedPtr<IPCGAttributeAccessorKeys> Keys = PCGExMetaHelpers::MakeMutableKeys(DupData);
 
 				auto WriteAttr = [&](const bool bWant, const FName AttrName, const TArray<int32>& Values)
 				{
-					if (!bWant) { return; }
-					UPCGMetadata* M = DupData->MutableMetadata();
-					if (!M) { return; }
+					if (!bWant)
+					{
+						return;
+					}
 					// Always declare the attribute (so the column exists downstream) even when there's
 					// nothing to write -- keeps the schema stable for consumers that branch on presence.
 					M->FindOrCreateAttribute<int32>(PCGExMetaHelpers::GetAttributeIdentifier(AttrName, DupData), -1, false, true);
-					if (!Keys || Values.Num() == 0) { return; }
+					if (!Keys || Values.Num() == 0)
+					{
+						return;
+					}
 					FPCGAttributePropertyInputSelector Selector;
 					Selector.Update(AttrName.ToString());
 					Selector = Selector.CopyAndFixLast(DupData);
@@ -886,7 +935,10 @@ namespace PCGExGetCollectionData
 		Context->OutputData.TaggedData.Reserve(Context->OutputData.TaggedData.Num() + ParallelResults.Num());
 		for (FPCGTaggedData& R : ParallelResults)
 		{
-			if (R.Data) { Context->OutputData.TaggedData.Emplace(MoveTemp(R)); }
+			if (R.Data)
+			{
+				Context->OutputData.TaggedData.Emplace(MoveTemp(R));
+			}
 		}
 	}
 
