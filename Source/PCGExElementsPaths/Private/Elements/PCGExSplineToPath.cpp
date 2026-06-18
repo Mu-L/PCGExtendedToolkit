@@ -95,46 +95,8 @@ namespace PCGExSplineToPath
 
 			auto ApplyTransform = [&](const int32 Index, const FTransform& Transform)
 			{
-				if (Settings->TransformDetails.bInheritRotation && Settings->TransformDetails.bInheritScale)
-				{
-					OutTransforms[Index] = Transform;
-				}
-				else if (Settings->TransformDetails.bInheritRotation)
-				{
-					OutTransforms[Index].SetLocation(Transform.GetLocation());
-					OutTransforms[Index].SetRotation(Transform.GetRotation());
-				}
-				else if (Settings->TransformDetails.bInheritScale)
-				{
-					OutTransforms[Index].SetLocation(Transform.GetLocation());
-					OutTransforms[Index].SetScale3D(Transform.GetScale3D());
-				}
-				else
-				{
-					OutTransforms[Index].SetLocation(Transform.GetLocation());
-				}
-
+				Settings->TransformDetails.ApplyTo(OutTransforms[Index], Transform);
 				OutSeeds[Index] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[Index].GetLocation());
-			};
-
-			auto GetPointType = [](EInterpCurveMode Mode)-> int32
-			{
-				switch (Mode)
-				{
-				case CIM_Linear:
-					return 0;
-				case CIM_CurveAuto:
-					return 1;
-				case CIM_Constant:
-					return 2;
-				case CIM_CurveUser:
-					return 4;
-				case CIM_CurveAutoClamped:
-					return 3;
-				default: case CIM_Unknown:
-				case CIM_CurveBreak:
-					return -1;
-				}
 			};
 
 			const FTransform SplineTransform = Spline.GetTransform();
@@ -160,7 +122,7 @@ namespace PCGExSplineToPath
 					PCGEX_OUTPUT_VALUE(LeaveTangent, i, SplineTransform.TransformVector(SplinePositions.Points[ReadIndex].LeaveTangent));
 				}
 
-				PCGEX_OUTPUT_VALUE(PointType, i, GetPointType(SplinePositions.Points[ReadIndex].InterpMode));
+				PCGEX_OUTPUT_VALUE(PointType, i, PCGExPaths::Helpers::SplinePointTypeToInt(SplinePositions.Points[ReadIndex].InterpMode));
 			}
 
 			PCGExPaths::Helpers::SetClosedLoop(PointDataFacade->GetOut(), Spline.bClosedLoop);
@@ -183,7 +145,7 @@ namespace PCGExSplineToPath
 					PCGEX_OUTPUT_VALUE(LeaveTangent, LastIndex, SplineTransform.TransformVector(SplinePositions.Points[NumSegments].LeaveTangent));
 				}
 
-				PCGEX_OUTPUT_VALUE(PointType, LastIndex, GetPointType(SplinePositions.Points[NumSegments].InterpMode));
+				PCGEX_OUTPUT_VALUE(PointType, LastIndex, PCGExPaths::Helpers::SplinePointTypeToInt(SplinePositions.Points[NumSegments].InterpMode));
 			}
 
 			// Copy attributes
