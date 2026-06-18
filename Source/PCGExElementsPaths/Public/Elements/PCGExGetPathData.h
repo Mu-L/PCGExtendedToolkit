@@ -16,13 +16,14 @@
  *
  * Engine-style getter -- inherits UPCGDataFromActorSettings (NOT UPCGExSettings), so it runs on the
  * game thread and can read spline components directly off the selected actors, before they become PCG
- * data. Each spline is emitted as a PCGEx path (point data, closed-loop marked). Because we read raw
- * USplineComponents, the only convertible features are geometry-derived (transform, tangents, length,
- * alpha, point type) -- there is no per-control-point metadata to carry over. In exchange, each path
- * is stamped with the source actor reference (@Data), which the GetSplineData -> SplineToPath flow loses.
+ * data. Handles both USplineComponent and ULandscapeSplinesComponent via the shared UPCGPolyLineData
+ * interface. Each spline is emitted as a PCGEx path (point data, closed-loop marked) and/or as the
+ * source spline data, on separate pins. Convertible features are geometry-derived (transform, tangents,
+ * length, alpha); point type is regular-spline-only (landscape splines have no CIM interp modes). In
+ * exchange, every output is stamped with the source actor reference (@Data), which GetSplineData loses.
  *
- * Replaces that two-node flow for the common "spline on an actor -> path that remembers its actor" case
- * (e.g. feeding Get Properties Data).
+ * Replaces the GetSplineData -> SplineToPath flow for the common "spline on an actor -> path/spline that
+ * remembers its actor" case (e.g. feeding Get Properties Data).
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category = "PCGEx|Path",
 	meta = (Keywords = "pcgex spline path actor reference getter", PCGExNodeLibraryDoc = "paths/generate/get-path-data"))

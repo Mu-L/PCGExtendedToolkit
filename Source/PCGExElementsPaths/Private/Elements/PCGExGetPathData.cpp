@@ -109,37 +109,48 @@ namespace PCGExGetPathData
 
 		const FSoftObjectPath ActorPath(Actor);
 
-		TInlineComponentArray<USplineComponent*, 4> SplineComponents;
-		Actor->GetComponents(SplineComponents);
+		TInlineComponentArray<UActorComponent*> Components;
+		Actor->GetComponents(Components);
 
-		const bool bWriteAnyAttr =
-			Settings->bWriteArriveTangent || Settings->bWriteLeaveTangent ||
-			Settings->bWriteLengthAtPoint || Settings->bWriteAlpha || Settings->bWritePointType;
-
-		for (USplineComponent* SplineComp : SplineComponents)
+		for (UActorComponent* Component : Components)
 		{
-			if (!SplineComp) { continue; }
-			if (!Context->ComponentSelector.FilterComponent(SplineComp)) { continue; }
+			if (!Component) { continue; }
+			if (!Context->ComponentSelector.FilterComponent(Component)) { continue; }
 			// Mirror the engine getter: skip components PCG spawned (tagged DefaultPCGTag).
-			if (Settings->bIgnorePCGGeneratedComponents && SplineComp->ComponentTags.Contains(PCGHelpers::DefaultPCGTag)) { continue; }
+			if (Settings->bIgnorePCGGeneratedComponents && Component->ComponentTags.Contains(PCGHelpers::DefaultPCGTag)) { continue; }
 
-			// Build engine spline data from the raw component; this bakes the component world transform.
-			UPCGSplineData* SplineData = FPCGContext::NewObject_AnyThread<UPCGSplineData>(Context);
-			SplineData->Initialize(SplineComp);
+			// Read the raw component as poly-line data (bakes its world transform). Regular splines also
+			// expose CIM point types via SplineData; landscape splines share only the polyline interface.
+			UPCGPolyLineData* PolyData = nullptr;
+			const UPCGSplineData* SplineData = nullptr;
+			if (USplineComponent* SplineComp = Cast<USplineComponent>(Component))
+			{
+				UPCGSplineData* TypedData = FPCGContext::NewObject_AnyThread<UPCGSplineData>(Context);
+				TypedData->Initialize(SplineComp);
+				PolyData = TypedData;
+				SplineData = TypedData;
+			}
+			else if (ULandscapeSplinesComponent* LandscapeComp = Cast<ULandscapeSplinesComponent>(Component))
+			{
+				UPCGLandscapeSplineData* TypedData = FPCGContext::NewObject_AnyThread<UPCGLandscapeSplineData>(Context);
+				TypedData->Initialize(LandscapeComp);
+				PolyData = TypedData;
+			}
+			else { continue; }
 
-			const FPCGSplineStruct& Spline = SplineData->SplineStruct;
-			const int32 NumSegments = Spline.GetNumberOfSplineSegments();
+			const int32 NumSegments = PolyData->GetNumSegments();
 			if (NumSegments <= 0) { continue; }
 
-			if (Settings->SampleInputs == EPCGExSplineSamplingIncludeMode::ClosedLoopOnly && !Spline.bClosedLoop) { continue; }
-			if (Settings->SampleInputs == EPCGExSplineSamplingIncludeMode::OpenSplineOnly && Spline.bClosedLoop) { continue; }
+			const bool bClosedLoop = PolyData->IsClosed();
+			if (Settings->SampleInputs == EPCGExSplineSamplingIncludeMode::ClosedLoopOnly && !bClosedLoop) { continue; }
+			if (Settings->SampleInputs == EPCGExSplineSamplingIncludeMode::OpenSplineOnly && bClosedLoop) { continue; }
 
 			// Actor ref + tags are shared by both outputs; compute once and stamp whichever are enabled.
 			TSet<FString> GatheredTags;
 			if (Settings->bForwardSourceTags)
 			{
 				for (const FName& Tag : Actor->Tags) { GatheredTags.Add(Tag.ToString()); }
-				for (const FName& Tag : SplineComp->ComponentTags) { GatheredTags.Add(Tag.ToString()); }
+				for (const FName& Tag : Component->ComponentTags) { GatheredTags.Add(Tag.ToString()); }
 			}
 			const TSharedPtr<PCGExData::FTags> Tags = MakeShared<PCGExData::FTags>(GatheredTags);
 
@@ -161,12 +172,18 @@ namespace PCGExGetPathData
 				Tags->DumpTo(Output.Tags);
 			};
 
-			// Spline data is complete after Initialize; emit it directly when requested (no fill needed).
-			if (Settings->bOutputSplines) { StampAndEmit(SplineData, OutputSplinesLabel); }
+			// Poly-line data is complete after Initialize; emit it directly when requested (no fill needed).
+			if (Settings->bOutputSplines) { StampAndEmit(PolyData, OutputSplinesLabel); }
 
 			if (!Settings->bOutputPaths) { continue; }
 
-			const int32 NumPoints = Spline.bClosedLoop ? NumSegments : NumSegments + 1;
+			// Point type only applies to regular splines (landscape splines have no interp modes).
+			const bool bWritePointType = Settings->bWritePointType && SplineData != nullptr;
+			const bool bWriteAnyAttr =
+				Settings->bWriteArriveTangent || Settings->bWriteLeaveTangent ||
+				Settings->bWriteLengthAtPoint || Settings->bWriteAlpha || bWritePointType;
+
+			const int32 NumPoints = bClosedLoop ? NumSegments : NumSegments + 1;
 
 			UPCGBasePointData* PathData = FPCGContext::NewPointData_AnyThread(Context);
 			PCGExPointArrayDataHelpers::SetNumPointsAllocated(
@@ -174,6 +191,7 @@ namespace PCGExGetPathData
 				EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed | EPCGPointNativeProperties::MetadataEntry);
 
 			FPathWork Work;
+			Work.PolyData = PolyData;
 			Work.SplineData = SplineData;
 			Work.PathData = PathData;
 
@@ -187,12 +205,12 @@ namespace PCGExGetPathData
 				if (Settings->bWriteLeaveTangent) { Work.LeaveAttr = PathData->Metadata->FindOrCreateAttribute<FVector>(Settings->LeaveTangentAttributeName, FVector::ZeroVector, false, false, true); }
 				if (Settings->bWriteLengthAtPoint) { Work.LengthAttr = PathData->Metadata->FindOrCreateAttribute<double>(Settings->LengthAtPointAttributeName, 0, false, false, true); }
 				if (Settings->bWriteAlpha) { Work.AlphaAttr = PathData->Metadata->FindOrCreateAttribute<double>(Settings->AlphaAttributeName, 0, false, false, true); }
-				if (Settings->bWritePointType) { Work.PointTypeAttr = PathData->Metadata->FindOrCreateAttribute<int32>(Settings->PointTypeAttributeName, 0, false, false, true); }
+				if (bWritePointType) { Work.PointTypeAttr = PathData->Metadata->FindOrCreateAttribute<int32>(Settings->PointTypeAttributeName, 0, false, false, true); }
 			}
 
 			// Closed-loop marker + actor ref + tags are metadata structure -> set single-threaded now.
 			// Emitting here is fine: Phase 2 fills PathData's value ranges in place (no realloc).
-			PCGExPaths::Helpers::SetClosedLoop(PathData, Spline.bClosedLoop);
+			PCGExPaths::Helpers::SetClosedLoop(PathData, bClosedLoop);
 			StampAndEmit(PathData, OutputPathsLabel);
 
 			OutPathWork.Add(Work);
@@ -205,7 +223,7 @@ namespace PCGExGetPathData
 #if WITH_EDITOR
 FText UPCGExGetPathDataSettings::GetNodeTooltipText() const
 {
-	return LOCTEXT("NodeTooltip", "Reads spline components directly off the selected actors and outputs each as a path, stamped with the source actor reference. Replaces the GetSplineData -> SplineToPath flow when the actor reference matters.");
+	return LOCTEXT("NodeTooltip", "Reads spline (and landscape spline) components directly off the selected actors and outputs each as a path and/or spline data, stamped with the source actor reference. Replaces the GetSplineData -> SplineToPath flow when the actor reference matters.");
 }
 #endif
 
