@@ -53,6 +53,7 @@ public class PCGExElementsPaths : ModuleRules
 				"GeometryCore",
 				"GeometryFramework",
 				"GeometryAlgorithms",
+				"Landscape", // ULandscapeSplinesComponent (Get Path Data)
 			}
 		);
 

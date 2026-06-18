@@ -4,6 +4,7 @@
 #include "Elements/PCGExGetPathData.h"
 
 #include "Components/SplineComponent.h"
+#include "LandscapeSplinesComponent.h"
 #include "GameFramework/Actor.h"
 
 #include "PCGCommon.h"
@@ -11,6 +12,8 @@
 #include "PCGData.h"
 #include "PCGPin.h"
 #include "Data/PCGBasePointData.h"
+#include "Data/PCGPolyLineData.h"
+#include "Data/PCGLandscapeSplineData.h"
 PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
 #include "Data/PCGSplineData.h"
 PRAGMA_ENABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
@@ -38,87 +41,63 @@ namespace PCGExGetPathData
 	// buffers, so concurrent work items never touch shared state.
 	struct FPathWork
 	{
-		const UPCGSplineData* SplineData = nullptr;
+		const UPCGPolyLineData* PolyData = nullptr; // source: UPCGSplineData or UPCGLandscapeSplineData
+		const UPCGSplineData* SplineData = nullptr; // non-null only for regular splines (point-type source)
 		UPCGBasePointData* PathData = nullptr;
 		FPCGMetadataAttribute<FVector>* ArriveAttr = nullptr;
 		FPCGMetadataAttribute<FVector>* LeaveAttr = nullptr;
 		FPCGMetadataAttribute<double>* LengthAttr = nullptr;
 		FPCGMetadataAttribute<double>* AlphaAttr = nullptr;
-		FPCGMetadataAttribute<int32>* PointTypeAttr = nullptr;
+		FPCGMetadataAttribute<int32>* PointTypeAttr = nullptr; // non-null only for regular splines
 	};
 
-	int32 SplinePointTypeToInt(const EInterpCurveMode Mode)
-	{
-		switch (Mode)
-		{
-		case CIM_Linear: return 0;
-		case CIM_CurveAuto: return 1;
-		case CIM_Constant: return 2;
-		case CIM_CurveAutoClamped: return 3;
-		case CIM_CurveUser: return 4;
-		default: case CIM_Unknown: case CIM_CurveBreak: return -1;
-		}
-	}
-
 	// Phase 2 -- runs on a worker thread. Writes only into Work's own pre-allocated buffers/attributes.
+	// Samples through the UPCGPolyLineData interface so regular and landscape splines share one path.
 	void FillPath(const FPathWork& Work, const UPCGExGetPathDataSettings* Settings)
 	{
-		const FPCGSplineStruct& Spline = Work.SplineData->SplineStruct;
-		const FInterpCurveVector& SplinePositions = Spline.GetSplinePointsPosition();
-		const FTransform SplineTransform = Spline.GetTransform();
-		const double TotalLength = Spline.GetSplineLength();
-		const int32 NumSegments = Spline.GetNumberOfSplineSegments();
+		const UPCGPolyLineData* Poly = Work.PolyData;
+		const int32 NumSegments = Poly->GetNumSegments();
+		const bool bClosedLoop = Poly->IsClosed();
+		const double TotalLength = Poly->GetLength();
+		const FTransform LineTransform = Poly->GetTransform();
 
 		UPCGBasePointData* OutData = Work.PathData;
 		TPCGValueRange<FTransform> OutTransforms = OutData->GetTransformValueRange(false);
 		TPCGValueRange<int32> OutSeeds = OutData->GetSeedValueRange(false);
 		TPCGValueRange<int64> OutMeta = OutData->GetMetadataEntryValueRange();
 
-		auto ApplyTransform = [&](const int32 Index, const FTransform& Transform)
-		{
-			if (Settings->TransformDetails.bInheritRotation && Settings->TransformDetails.bInheritScale)
-			{
-				OutTransforms[Index] = Transform;
-			}
-			else if (Settings->TransformDetails.bInheritRotation)
-			{
-				OutTransforms[Index].SetLocation(Transform.GetLocation());
-				OutTransforms[Index].SetRotation(Transform.GetRotation());
-			}
-			else if (Settings->TransformDetails.bInheritScale)
-			{
-				OutTransforms[Index].SetLocation(Transform.GetLocation());
-				OutTransforms[Index].SetScale3D(Transform.GetScale3D());
-			}
-			else
-			{
-				OutTransforms[Index].SetLocation(Transform.GetLocation());
-			}
+		// Point type only exists for regular splines (CIM interp modes); landscape splines have none.
+		const FInterpCurveVector* SplinePositions = (Work.PointTypeAttr && Work.SplineData) ? &Work.SplineData->SplineStruct.GetSplinePointsPosition() : nullptr;
 
-			OutSeeds[Index] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[Index].GetLocation());
-		};
-
-		auto WriteAttributes = [&](const int32 PointIndex, const int32 SplinePointIndex, const double LengthAtPoint)
+		auto WritePoint = [&](const int32 PointIndex, const int32 SegmentIndex, const FTransform& Transform, const double LengthAtPoint)
 		{
+			Settings->TransformDetails.ApplyTo(OutTransforms[PointIndex], Transform);
+			OutSeeds[PointIndex] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[PointIndex].GetLocation());
+
 			const PCGMetadataEntryKey Key = OutMeta[PointIndex];
-			if (Work.ArriveAttr) { Work.ArriveAttr->SetValue(Key, SplineTransform.TransformVector(SplinePositions.Points[SplinePointIndex].ArriveTangent)); }
-			if (Work.LeaveAttr) { Work.LeaveAttr->SetValue(Key, SplineTransform.TransformVector(SplinePositions.Points[SplinePointIndex].LeaveTangent)); }
+			if (Work.ArriveAttr || Work.LeaveAttr)
+			{
+				// GetTangentsAtSegmentStart returns spline-local tangents; bring them to world via the line transform.
+				FVector ArriveTangent = FVector::ZeroVector;
+				FVector LeaveTangent = FVector::ZeroVector;
+				Poly->GetTangentsAtSegmentStart(SegmentIndex, ArriveTangent, LeaveTangent);
+				if (Work.ArriveAttr) { Work.ArriveAttr->SetValue(Key, LineTransform.TransformVector(ArriveTangent)); }
+				if (Work.LeaveAttr) { Work.LeaveAttr->SetValue(Key, LineTransform.TransformVector(LeaveTangent)); }
+			}
 			if (Work.LengthAttr) { Work.LengthAttr->SetValue(Key, LengthAtPoint); }
 			if (Work.AlphaAttr) { Work.AlphaAttr->SetValue(Key, TotalLength > 0 ? LengthAtPoint / TotalLength : 0); }
-			if (Work.PointTypeAttr) { Work.PointTypeAttr->SetValue(Key, SplinePointTypeToInt(SplinePositions.Points[SplinePointIndex].InterpMode)); }
+			if (SplinePositions) { Work.PointTypeAttr->SetValue(Key, PCGExPaths::Helpers::SplinePointTypeToInt(SplinePositions->Points[SegmentIndex].InterpMode)); }
 		};
 
 		for (int32 i = 0; i < NumSegments; i++)
 		{
-			const double LengthAtPoint = Spline.GetDistanceAlongSplineAtSplinePoint(i);
-			ApplyTransform(i, Spline.GetTransformAtDistanceAlongSpline(LengthAtPoint, ESplineCoordinateSpace::World, true));
-			WriteAttributes(i, i, LengthAtPoint);
+			WritePoint(i, i, Poly->GetTransformAtDistance(i, 0.0, /*bWorldSpace=*/true), Poly->GetDistanceAtSegmentStart(i));
 		}
 
-		if (!Spline.bClosedLoop)
+		if (!bClosedLoop)
 		{
-			ApplyTransform(NumSegments, Spline.GetTransformAtDistanceAlongSpline(TotalLength, ESplineCoordinateSpace::World, true));
-			WriteAttributes(NumSegments, NumSegments, TotalLength);
+			// Last vertex of an open line is the end of the final segment.
+			WritePoint(NumSegments, NumSegments, Poly->GetTransformAtDistance(NumSegments - 1, Poly->GetSegmentLength(NumSegments - 1), true), TotalLength);
 		}
 	}
 
@@ -166,12 +145,15 @@ namespace PCGExGetPathData
 
 			auto StampAndEmit = [&](UPCGData* Data, const FName Pin)
 			{
+				// TagsToData first, then the actor reference -- so a source tag literally named
+				// "ActorReference" can't clobber the node's own actor-reference stamp.
+				PCGEx::TagsToData(Data, Tags, Settings->TagsToData);
+
 				if (Settings->bWriteActorReference)
 				{
 					const FName ActorRefName = Settings->ActorReferenceAttributeName.IsNone() ? PCGPointDataConstants::ActorReferenceAttribute : Settings->ActorReferenceAttributeName;
 					PCGExData::Helpers::SetDataValue<FSoftObjectPath>(Data, ActorRefName, ActorPath);
 				}
-				PCGEx::TagsToData(Data, Tags, Settings->TagsToData);
 
 				FPCGTaggedData& Output = Context->OutputData.TaggedData.Emplace_GetRef();
 				Output.Data = Data;
@@ -231,7 +213,7 @@ TArray<FPCGPinProperties> UPCGExGetPathDataSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
 	PinProperties.Emplace(PCGExGetPathData::OutputPathsLabel, EPCGDataType::Point, true, true, LOCTEXT("PathsPinTooltip", "One point path per spline component."));
-	PinProperties.Emplace(PCGExGetPathData::OutputSplinesLabel, EPCGDataType::PolyLine, true, true, LOCTEXT("SplinesPinTooltip", "The source spline data, stamped with the actor reference."));
+	PinProperties.Emplace(PCGExGetPathData::OutputSplinesLabel, EPCGDataType::PolyLine, true, true, LOCTEXT("SplinesPinTooltip", "The source spline data (stamped with the actor reference when Write Actor Reference is enabled)."));
 	return PinProperties;
 }
 
@@ -284,10 +266,13 @@ void FPCGExGetPathDataElement::ProcessActors(FPCGContext* InContext, const UPCGD
 	}
 
 	// Phase 2 (parallel): fill per-point values into the pre-allocated path buffers. Each work item owns
-	// its output exclusively, so writes never collide; runs sequentially below the internal threshold.
+	// its output exclusively, so writes never collide. Threshold 1: each item is a full spline conversion
+	// (heavy), so parallelize at any count -- the default 512 cheap-iteration threshold would keep typical
+	// selections (far fewer than 512 splines) sequential.
 	PCGExMT::ParallelOrSequential(
 		PathWork.Num(),
-		[&](const int32 i) { PCGExGetPathData::FillPath(PathWork[i], Settings); });
+		[&](const int32 i) { PCGExGetPathData::FillPath(PathWork[i], Settings); },
+		/*Threshold=*/1);
 }
 
 #pragma endregion

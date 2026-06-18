@@ -325,4 +325,28 @@ struct PCGEXCORE_API FPCGExLeanTransformDetails
 	/** Rotate result by the parent's rotation. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bInheritRotation = true;
+
+	/** Write Source's location into OutTransform, plus rotation/scale per the inherit flags. Components that
+	 *  aren't inherited are left untouched (callers pass an identity-initialized transform). */
+	void ApplyTo(FTransform& OutTransform, const FTransform& Source) const
+	{
+		if (bInheritRotation && bInheritScale)
+		{
+			OutTransform = Source;
+		}
+		else if (bInheritRotation)
+		{
+			OutTransform.SetLocation(Source.GetLocation());
+			OutTransform.SetRotation(Source.GetRotation());
+		}
+		else if (bInheritScale)
+		{
+			OutTransform.SetLocation(Source.GetLocation());
+			OutTransform.SetScale3D(Source.GetScale3D());
+		}
+		else
+		{
+			OutTransform.SetLocation(Source.GetLocation());
+		}
+	}
 };

@@ -21,6 +21,19 @@ namespace PCGExPaths
 {
 	namespace Helpers
 	{
+		int32 SplinePointTypeToInt(const EInterpCurveMode Mode)
+		{
+			switch (Mode)
+			{
+			case CIM_Linear: return 0;
+			case CIM_CurveAuto: return 1;
+			case CIM_Constant: return 2;
+			case CIM_CurveAutoClamped: return 3;
+			case CIM_CurveUser: return 4;
+			default: case CIM_Unknown: case CIM_CurveBreak: return -1;
+			}
+		}
+
 		void SetClosedLoop(UPCGData* InData, const bool bIsClosedLoop)
 		{
 			PCGExData::Helpers::SetDataValue(InData, Labels::ClosedLoopIdentifier, bIsClosedLoop);

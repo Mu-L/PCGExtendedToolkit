@@ -66,8 +66,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable))
 	bool bOutputPaths = true;
 
-	/** Output the source spline data per spline, stamped with the actor reference (on the Splines pin) --
-	 *  i.e. "GetSplineData that remembers its actor". Built from the same component, so nearly free. */
+	/** Output the source spline data per spline on the Splines pin -- "GetSplineData that remembers its
+	 *  actor" when Write Actor Reference is enabled. Built from the same component, so nearly free. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output", meta = (PCG_NotOverridable))
 	bool bOutputSplines = false;
 
