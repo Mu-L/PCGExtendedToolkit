@@ -3,47 +3,33 @@
 
 #include "Elements/Utils/PCGExDestroyActor.h"
 
+#include "GameFramework/Actor.h"
 #include "PCGComponent.h"
-
-
-#include "PCGExSubSystem.h"
 #include "PCGManagedResource.h"
-#include "Data/PCGExAttributeBroadcaster.h"
+#include "PCGModule.h"
+#include "PCGPin.h"
+
 #include "Data/PCGExData.h"
-#include "Data/PCGExPointIO.h"
+#include "Helpers/PCGExBulkAttributeHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExDestroyActorElement"
 #define PCGEX_NAMESPACE DestroyActor
 
-UPCGExDestroyActorSettings::UPCGExDestroyActorSettings(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+TArray<FPCGPinProperties> UPCGExDestroyActorSettings::InputPinProperties() const
 {
+	TArray<FPCGPinProperties> PinProperties;
+	PCGEX_PIN_ANY(PCGExCommon::Labels::SourceTargetsLabel, "Data carrying the actor references to destroy.", Required)
+	return PinProperties;
 }
 
-PCGExData::EIOInit UPCGExDestroyActorSettings::GetMainOutputInitMode() const
+TArray<FPCGPinProperties> UPCGExDestroyActorSettings::OutputPinProperties() const
 {
-	return PCGExData::EIOInit::Forward;
+	TArray<FPCGPinProperties> PinProperties;
+	PCGEX_PIN_ANY(PCGPinConstants::DefaultOutputLabel, "Input data, forwarded untouched.", Required)
+	return PinProperties;
 }
 
 PCGEX_INITIALIZE_ELEMENT(DestroyActor)
-PCGEX_ELEMENT_BATCH_POINT_IMPL(DestroyActor)
-
-FName UPCGExDestroyActorSettings::GetMainInputPin() const
-{
-	return PCGExCommon::Labels::SourceTargetsLabel;
-}
-
-bool FPCGExDestroyActorElement::Boot(FPCGExContext* InContext) const
-{
-	if (!FPCGExPointsProcessorElement::Boot(InContext))
-	{
-		return false;
-	}
-
-	PCGEX_CONTEXT_AND_SETTINGS(DestroyActor)
-
-	return true;
-}
 
 bool FPCGExDestroyActorElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
@@ -51,104 +37,84 @@ bool FPCGExDestroyActorElement::AdvanceWork(FPCGExContext* InContext, const UPCG
 
 	PCGEX_CONTEXT_AND_SETTINGS(DestroyActor)
 	PCGEX_EXECUTION_CHECK
-	PCGEX_ON_INITIAL_EXECUTION
+
+	const TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(PCGExCommon::Labels::SourceTargetsLabel);
+	Context->IncreaseStagedOutputReserve(Inputs.Num());
+
+	// Forward every input untouched, harvesting actor references from any input that carries the attribute.
+	TSet<FSoftObjectPath> UniqueActorReferences;
+	for (const FPCGTaggedData& Input : Inputs)
 	{
-		if (!Context->StartBatchProcessingPoints(
-			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
-			{
-				return true;
-			},
-			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
-			{
-			}))
+		if (!Input.Data)
 		{
-			return Context->CancelExecution(TEXT("Could not find any points."));
+			continue;
 		}
+
+		TArray<FSoftObjectPath> Paths;
+		PCGExData::Helpers::BulkReadSoftPaths(Input.Data, Settings->ActorReferenceAttribute, Paths);
+		for (const FSoftObjectPath& Path : Paths)
+		{
+			if (Path.IsValid())
+			{
+				UniqueActorReferences.Add(Path);
+			}
+		}
+
+		Context->StageOutput(const_cast<UPCGData*>(Input.Data.Get()), PCGPinConstants::DefaultOutputLabel, PCGExData::EStaging::None, Input.Tags);
 	}
 
-	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
-
-	Context->MainPoints->StageOutputs();
-
-	return Context->TryComplete();
-}
-
-namespace PCGExDestroyActor
-{
-	FProcessor::~FProcessor()
+	// Runs on the game thread (CanExecuteOnlyOnMainThread), so matched actors are destroyed inline.
+	if (!UniqueActorReferences.IsEmpty())
 	{
-	}
-
-	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExDestroyActor::Process);
-
-		if (!IProcessor::Process(InTaskManager))
+		// Null when the execution source isn't a UPCGComponent -- then there's nothing this node spawned.
+		if (UPCGComponent* Component = Context->GetMutableComponent())
 		{
-			return false;
-		}
+			TArray<AActor*> ActorsToDestroy;
 
-		TSharedPtr<PCGExData::TAttributeBroadcaster<FSoftObjectPath>> ActorReferences = MakeShared<PCGExData::TAttributeBroadcaster<FSoftObjectPath>>();
-		if (!ActorReferences->Prepare(Settings->ActorReferenceAttribute, PointDataFacade->Source))
-		{
-			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("Some inputs don't have the specified Actor Reference attribute."));
-			return false;
-		}
-
-		TSet<FSoftObjectPath> UniqueActorReferences;
-		ActorReferences->GrabUniqueValues(UniqueActorReferences);
-
-		MainThreadToken = TaskManager->TryCreateToken(FName("DestroyActors"));
-		if (!MainThreadToken.IsValid())
-		{
-			return false;
-		}
-
-		Context->GetMutableComponent()->ForEachManagedResource([&](UPCGManagedResource* InResource)
-		{
-			UPCGManagedActors* ManagedActors = Cast<UPCGManagedActors>(InResource);
-
-			if (!ManagedActors)
+			Component->ForEachManagedResource([&](UPCGManagedResource* InResource)
 			{
-				return;
-			}
-
-			TArray<TSoftObjectPtr<AActor>> GeneratedActors = ManagedActors->GetConstGeneratedActors();
-
-			if (!ManagedActors || GeneratedActors.IsEmpty())
-			{
-				return;
-			}
-
-			for (const TSoftObjectPtr<AActor>& Actor : GeneratedActors)
-			{
-				if (UniqueActorReferences.Contains(Actor->GetPathName()))
+				UPCGManagedActors* ManagedActors = Cast<UPCGManagedActors>(InResource);
+				if (!ManagedActors)
 				{
-					ManagedActors->Release(false, ActorsToDelete);
 					return;
 				}
-			}
-		});
 
-		PCGEX_SUBSYSTEM
-		PCGExSubsystem->RegisterBeginTickAction([PCGEX_ASYNC_THIS_CAPTURE]()
-		{
-			PCGEX_ASYNC_THIS
-			for (const TSoftObjectPtr<AActor>& ActorRef : This->ActorsToDelete)
-			{
-				if (ActorRef.IsValid())
+				// Pull out ONLY the referenced actors -- never the whole spawn batch. Match on the stored
+				// soft path (no deref, so unloaded actors don't crash) and walk backwards so RemoveAtSwap
+				// stays valid (mirrors UPCGManagedActors::MoveResourceToNewActor).
+				TArray<TSoftObjectPtr<AActor>>& GeneratedActors = ManagedActors->GetMutableGeneratedActors();
+				for (int32 i = GeneratedActors.Num() - 1; i >= 0; --i)
 				{
-					ActorRef->Destroy();
+					if (!UniqueActorReferences.Contains(GeneratedActors[i].ToSoftObjectPath()))
+					{
+						continue;
+					}
+
+					// Unresolved (e.g. streamed-out) matches stay tracked -- can't destroy what isn't loaded.
+					if (AActor* Actor = GeneratedActors[i].Get())
+					{
+						ActorsToDestroy.Add(Actor);
+						GeneratedActors.RemoveAtSwap(i);
+					}
 				}
+			});
+
+			// Destroy outside the iteration -- ForEachManagedResource holds the component's resource lock.
+			for (AActor* Actor : ActorsToDestroy)
+			{
+				Actor->Destroy();
 			}
-
-			PCGEX_ASYNC_RELEASE_TOKEN(This->MainThreadToken)
-		});
-
-		return true;
+		}
 	}
-}
+	else
+	{
+		// Warn-but-continue: data still forwards; an empty set usually means a mis-wired attribute name.
+		PCGE_LOG_C(Warning, GraphAndLog, Context, FTEXT("No actor references found under the specified attribute; nothing to destroy."));
+	}
 
+	Context->Done();
+	return Context->TryComplete();
+}
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

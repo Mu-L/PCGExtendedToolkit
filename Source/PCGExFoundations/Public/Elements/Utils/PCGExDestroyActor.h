@@ -5,22 +5,20 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/PCGExPointsProcessor.h"
+#include "PCGExCoreMacros.h"
+#include "PCGExCoreSettingsCache.h"
+#include "Core/PCGExContext.h"
+#include "Core/PCGExElement.h"
+#include "Core/PCGExSettings.h"
+
 #include "PCGExDestroyActor.generated.h"
 
-namespace PCGExMT
-{
-	class FAsyncToken;
-}
-
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Sampling", meta=(PCGExNodeLibraryDoc="utilities/discarding/destroy-actor"))
-class UPCGExDestroyActorSettings : public UPCGExPointsProcessorSettings
+class UPCGExDestroyActorSettings : public UPCGExSettings
 {
 	GENERATED_BODY()
 
 public:
-	UPCGExDestroyActorSettings(const FObjectInitializer& ObjectInitializer);
-
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(DestroyActor, "Destroy Actor", "Destroy target actor references that have been previously spawned by the PCG component this note is currently executing on.");
@@ -29,57 +27,43 @@ public:
 	{
 		return PCGEX_NODE_COLOR_NAME(MiscRemove);
 	}
+
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::Sampler;
+	}
 #endif
 
+	// Output pin mirrors the input shape, so e.g. points-in stays points-out.
+	virtual bool HasDynamicPins() const override
+	{
+		return true;
+	}
+
 protected:
+	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
+	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
-	//~Begin UPCGExPointsProcessorSettings
-
 public:
-	virtual FName GetMainInputPin() const override;
-	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
-	//~End UPCGExPointsProcessorSettings
-
-	/** Actor reference */
+	/** Attribute holding the actor references to destroy. FString-typed attributes are parsed as soft object paths. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FName ActorReferenceAttribute = FName(TEXT("ActorReference"));
 };
 
-struct FPCGExDestroyActorContext final : FPCGExPointsProcessorContext
+struct FPCGExDestroyActorContext final : FPCGExContext
 {
-	friend class FPCGExDestroyActorElement;
-
-protected:
-	PCGEX_ELEMENT_BATCH_POINT_DECL
 };
 
-class FPCGExDestroyActorElement final : public FPCGExPointsProcessorElement
+class FPCGExDestroyActorElement final : public IPCGExElement
 {
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(DestroyActor)
 
-	virtual bool Boot(FPCGExContext* InContext) const override;
+	// Actor destruction is game-thread only; run the whole (lightweight) node there and do it
+	// synchronously in a single pass -- no async, no deferral.
+	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return true; }
+
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };
-
-namespace PCGExDestroyActor
-{
-	const FName SourceOverridesPacker = TEXT("Overrides : Packer");
-
-	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExDestroyActorContext, UPCGExDestroyActorSettings>
-	{
-		TSet<TSoftObjectPtr<AActor>> ActorsToDelete;
-		TWeakPtr<PCGExMT::FAsyncToken> MainThreadToken;
-
-	public:
-		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
-			: TProcessor(InPointDataFacade)
-		{
-		}
-
-		virtual ~FProcessor() override;
-		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-	};
-}
