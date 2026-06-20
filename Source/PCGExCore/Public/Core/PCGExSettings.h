@@ -10,6 +10,7 @@
 #include "PCGExSettings.generated.h"
 
 class UPCGExInstancedFactory;
+struct FPCGExContext;
 
 UCLASS(Abstract, BlueprintType, ClassGroup = (Procedural))
 class PCGEXCORE_API UPCGExSettings : public UPCGSettings
