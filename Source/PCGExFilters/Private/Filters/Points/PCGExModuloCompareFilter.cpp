@@ -86,16 +86,41 @@ bool PCGExPointFilter::FModuloComparisonFilter::Init(FPCGExContext* InContext, c
 	return true;
 }
 
+namespace PCGExModuloCompareFilter
+{
+	// For ~= / ~!= with cyclic remainder on, the modulo result is a residue on a ring
+	// of circumference |B|: a remainder near 0 OR near |B| both count as "near a multiple",
+	// which catches values landing just below a multiple (179.996 % 90 -> 89.996 ~= 0 cyclically).
+	bool Evaluate(const FPCGExModuloCompareFilterConfig& Config, const double A, const double B, const double C)
+	{
+		if (A == 0 || B == 0) { return Config.ZeroResult; }
+
+		const double M = FMath::Fmod(A, B);
+
+		if (Config.bCyclicRemainder &&
+			(Config.Comparison == EPCGExComparison::NearlyEqual || Config.Comparison == EPCGExComparison::NearlyNotEqual))
+		{
+			const double AbsB = FMath::Abs(B);
+			const double Rm = M < 0 ? M + AbsB : M;
+			double Rc = FMath::Fmod(C, AbsB);
+			if (Rc < 0) { Rc += AbsB; }
+			double D = FMath::Abs(Rm - Rc);
+			D = FMath::Min(D, AbsB - D);
+			const bool bIsNear = D <= Config.Tolerance;
+			return Config.Comparison == EPCGExComparison::NearlyEqual ? bIsNear : !bIsNear;
+		}
+
+		return PCGExCompare::Compare(Config.Comparison, M, C, Config.Tolerance);
+	}
+}
+
 bool PCGExPointFilter::FModuloComparisonFilter::Test(const int32 PointIndex) const
 {
-	const double A = OperandA->Read(PointIndex);
-	const double B = OperandB->Read(PointIndex);
-	const double C = OperandC->Read(PointIndex);
-	if (A == 0 || B == 0)
-	{
-		return TypedFilterFactory->Config.ZeroResult;
-	}
-	return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, FMath::Fmod(A, B), C, TypedFilterFactory->Config.Tolerance);
+	return PCGExModuloCompareFilter::Evaluate(
+		TypedFilterFactory->Config,
+		OperandA->Read(PointIndex),
+		OperandB->Read(PointIndex),
+		OperandC->Read(PointIndex));
 }
 
 bool PCGExPointFilter::FModuloComparisonFilter::Test(const TSharedPtr<PCGExData::FPointIO>& IO, const TSharedPtr<PCGExData::FPointIOCollection>& ParentCollection) const
@@ -117,11 +142,7 @@ bool PCGExPointFilter::FModuloComparisonFilter::Test(const TSharedPtr<PCGExData:
 		PCGEX_QUIET_HANDLING_RET
 	}
 
-	if (A == 0 || B == 0)
-	{
-		return TypedFilterFactory->Config.ZeroResult;
-	}
-	return PCGExCompare::Compare(TypedFilterFactory->Config.Comparison, FMath::Fmod(A, B), C, TypedFilterFactory->Config.Tolerance);
+	return PCGExModuloCompareFilter::Evaluate(TypedFilterFactory->Config, A, B, C);
 }
 
 PCGEX_CREATE_FILTER_FACTORY(ModuloCompare)
