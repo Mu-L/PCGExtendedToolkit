@@ -155,13 +155,13 @@ namespace PCGExDetailsCustomization
 		FSlateBrush Brush = FAppStyle::Get().GetWidgetStyle<FButtonStyle>("SimpleButton").Pressed;
 		Brush.Margin = FMargin(2, 2);
 
-		Brush.TintColor = FLinearColor(0.1, 0.1, 0.1, 0.5f);
+		Brush.TintColor = FLinearColor(0.1f, 0.1f, 0.1f, 0.5f);
 		ActionIconButton.SetNormal(Brush);
 
-		Brush.TintColor = FLinearColor(0.1, 0.1, 0.1, 0.5f);
+		Brush.TintColor = FLinearColor(0.1f, 0.1f, 0.1f, 0.5f);
 		ActionIconButton.SetHovered(Brush);
 
-		Brush.TintColor = FLinearColor(0.1, 0.1, 0.1, 0.8f);
+		Brush.TintColor = FLinearColor(0.1f, 0.1f, 0.1f, 0.8f);
 		ActionIconButton.SetPressed(Brush);
 
 		AppStyle.Set("PCGEx.ActionIcon", ActionIconButton);
