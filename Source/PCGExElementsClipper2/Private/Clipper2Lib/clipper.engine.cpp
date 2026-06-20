@@ -1188,7 +1188,6 @@ namespace PCGExClipper2Lib
 			default:
 				return (e.wind_cnt2 != 0);
 			}
-			break;
 
 		case ClipType::Union:
 			switch (fillrule_)
@@ -1200,7 +1199,6 @@ namespace PCGExClipper2Lib
 			default:
 				return (e.wind_cnt2 == 0);
 			}
-			break;
 
 		case ClipType::Difference:
 			bool result;
@@ -1220,11 +1218,9 @@ namespace PCGExClipper2Lib
 				return result;
 			}
 			return !result;
-			break;
 
 		case ClipType::Xor:
 			return true;
-			break;
 		// Should never happen, but adding this to stop a compiler warning
 		default:
 			break;

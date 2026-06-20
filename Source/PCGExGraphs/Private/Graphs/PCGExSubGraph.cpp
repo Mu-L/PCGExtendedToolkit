@@ -137,11 +137,8 @@ namespace PCGExGraphs
 
 	int32 FSubGraph::GetFirstInIOIndex()
 	{
-		for (const int32 InIOIndex : EdgesInIOIndices)
-		{
-			return InIOIndex;
-		}
-		return -1;
+		const TSet<int32>::TConstIterator It = EdgesInIOIndices.CreateConstIterator();
+		return It ? *It : -1;
 	}
 
 	void FSubGraph::Compile(const TWeakPtr<PCGExMT::IAsyncHandleGroup>& InParentHandle, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<FGraphBuilder>& InBuilder)
