@@ -4,7 +4,9 @@
 #include "Elements/PCGExBFSDepth.h"
 
 #include "Clusters/PCGExCluster.h"
+#include "Core/PCGExClusterFilter.h"
 #include "Data/PCGExData.h"
+#include "Factories/PCGExFactories.h"
 
 #define LOCTEXT_NAMESPACE "PCGExBFSDepth"
 #define PCGEX_NAMESPACE BFSDepth
@@ -18,13 +20,17 @@ PCGExData::EIOInit UPCGExBFSDepthSettings::GetMainOutputInitMode() const
 
 PCGExData::EIOInit UPCGExBFSDepthSettings::GetEdgeOutputInitMode() const
 {
-	return PCGExData::EIOInit::Forward;
+	return EdgeDirectionOutput.ResolveEdgeInitMode(WantsDataStealing());
 }
 
 TArray<FPCGPinProperties> UPCGExBFSDepthSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
 	PCGEX_PIN_POINT(PCGExCommon::Labels::SourceSeedsLabel, "Seed points used as BFS starting positions.", Required)
+	if (TriggerCount.bOutputTriggerCount)
+	{
+		PCGEX_PIN_FILTERS(PCGExBFSDepth::Labels::SourceTriggerFiltersLabel, "Vtx filters defining which vtx are 'triggers' that increment the trigger count.", Required)
+	}
 	return PinProperties;
 }
 
@@ -44,6 +50,21 @@ bool FPCGExBFSDepthElement::Boot(FPCGExContext* InContext) const
 
 	PCGEX_CONTEXT_AND_SETTINGS(BFSDepth)
 	PCGEX_FOREACH_FIELD_BFS_DEPTH(PCGEX_OUTPUT_VALIDATE_NAME)
+
+	Context->EdgeDirectionOutput = Settings->EdgeDirectionOutput;
+	Context->EdgeDirectionOutput.ValidateNames(Context);
+
+	Context->TriggerCount = Settings->TriggerCount;
+	Context->TriggerCount.ValidateNames(Context);
+
+	if (Settings->TriggerCount.bOutputTriggerCount)
+	{
+		// Required: trigger count is meaningless without filters defining what a trigger is.
+		if (!PCGExFactories::GetInputFactories(Context, PCGExBFSDepth::Labels::SourceTriggerFiltersLabel, Context->VtxFilterFactories, PCGExFactories::ClusterNodeFilters))
+		{
+			return false;
+		}
+	}
 
 	Context->SeedsDataFacade = PCGExData::TryGetSingleFacade(Context, PCGExCommon::Labels::SourceSeedsLabel, false, true);
 	if (!Context->SeedsDataFacade)
@@ -70,6 +91,10 @@ bool FPCGExBFSDepthElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSe
 			[&](const TSharedPtr<PCGExClusterMT::IBatch>& NewBatch)
 			{
 				NewBatch->bRequiresWriteStep = true;
+				if (!Context->VtxFilterFactories.IsEmpty())
+				{
+					NewBatch->VtxFilterFactories = &Context->VtxFilterFactories;
+				}
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not build any clusters."));
@@ -103,8 +128,19 @@ namespace PCGExBFSDepth
 			return false;
 		}
 
+		EdgeDirectionDetails = Context->EdgeDirectionOutput;
+		if (EdgeDirectionDetails.WantsDirection() && !EdgeDirectionDetails.InitForProcessor(Context, GetParentBatch<FBatch>()->EdgeDirectionOutput, EdgeDataFacade))
+		{
+			return false;
+		}
+
 		Depths.Init(-1, NumNodes);
 		Seeded.Init(0, NumNodes);
+
+		if (TriggerCountPtr && TriggerCountPtr->IsActive())
+		{
+			TriggerCounts.Init(0, NumNodes);
+		}
 
 		if (NormalizedDepthData)
 		{
@@ -188,6 +224,15 @@ namespace PCGExBFSDepth
 		const bool bComputeDistance = DistanceData != nullptr;
 		const bool bTrackSeedOwner = SeedIndexData != nullptr;
 		const bool bTrackParents = !Parents.IsEmpty();
+		const bool bWriteTriggers = TriggerCountPtr && TriggerCountPtr->IsActive();
+		const bool bTriggerCountsSelf = bWriteTriggers && TriggerCountPtr->CountsTriggerItself();
+
+		// Resolve every vtx's trigger flag up-front (parallel) into the shared filter cache so the
+		// per-node lookups below are O(1) array reads via IsNodePassingFilters().
+		if (bWriteTriggers)
+		{
+			FilterVtxScope(PCGExMT::FScope(0, NumNodes, 0), true);
+		}
 
 		if (bComputeDistance)
 		{
@@ -224,6 +269,14 @@ namespace PCGExBFSDepth
 			{
 				SeedOwners[NodeIdx] = SeedPtIdx;
 				SeedIndexData[PointIdx] = SeedPtIdx;
+			}
+
+			if (bWriteTriggers)
+			{
+				const int32 SeedFlag = bTriggerCountsSelf && IsNodePassingFilters(Nodes[NodeIdx]) ? 1 : 0;
+				const int32 SeedValue = TriggerCountPtr->GetInitialValue(SeedPtIdx) + SeedFlag;
+				TriggerCounts[NodeIdx] = SeedValue;
+				TriggerCountPtr->Set(PointIdx, SeedValue);
 			}
 
 			Queue.Add(NodeIdx);
@@ -272,6 +325,14 @@ namespace PCGExBFSDepth
 						SeedIndexData[NeighborPointIdx] = SeedOwners[CurrentIdx];
 					}
 
+					if (bWriteTriggers)
+					{
+						const int32 Flag = (bTriggerCountsSelf ? IsNodePassingFilters(Nodes[Lk.Node]) : IsNodePassingFilters(Nodes[CurrentIdx])) ? 1 : 0;
+						const int32 ChildValue = TriggerCounts[CurrentIdx] + Flag;
+						TriggerCounts[Lk.Node] = ChildValue;
+						TriggerCountPtr->Set(NeighborPointIdx, ChildValue);
+					}
+
 					Queue.Add(Lk.Node);
 				}
 			}
@@ -308,6 +369,14 @@ namespace PCGExBFSDepth
 						SeedIndexData[Nodes[Lk.Node].PointIndex] = SeedOwners[CurrentIdx];
 					}
 
+					if (bWriteTriggers)
+					{
+						const int32 Flag = (bTriggerCountsSelf ? IsNodePassingFilters(Nodes[Lk.Node]) : IsNodePassingFilters(Nodes[CurrentIdx])) ? 1 : 0;
+						const int32 ChildValue = TriggerCounts[CurrentIdx] + Flag;
+						TriggerCounts[Lk.Node] = ChildValue;
+						TriggerCountPtr->Set(Nodes[Lk.Node].PointIndex, ChildValue);
+					}
+
 					Queue.Add(Lk.Node);
 				}
 			}
@@ -316,6 +385,12 @@ namespace PCGExBFSDepth
 		if (NormalizedDepthData)
 		{
 			ComputeNormalizedDepth();
+		}
+
+		// Cross/back edges aren't seen during discovery, so write every visited-visited edge in one pass.
+		if (EdgeDirectionDetails.IsActive())
+		{
+			EdgeDirectionDetails.WriteFromNodeDepths(Cluster.Get(), Depths);
 		}
 	}
 
@@ -433,6 +508,12 @@ namespace PCGExBFSDepth
 			);
 	}
 
+	void FProcessor::CompleteWork()
+	{
+		// Edge directions are written synchronously in RunBFS, so the facade is ready to flush here.
+		if (EdgeDirectionDetails.IsActive()) { EdgeDataFacade->WriteFastest(TaskManager); }
+	}
+
 #pragma endregion
 
 #pragma region PCGExBFSDepth::FBatch
@@ -440,6 +521,12 @@ namespace PCGExBFSDepth
 	FBatch::FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges)
 		: TBatch(InContext, InVtx, InEdges)
 	{
+	}
+
+	void FBatch::RegisterBuffersDependencies(PCGExData::FFacadePreloader& FacadePreloader)
+	{
+		TBatch<FProcessor>::RegisterBuffersDependencies(FacadePreloader);
+		EdgeDirectionOutput.RegisterBuffersDependencies(ExecutionContext, FacadePreloader);
 	}
 
 	void FBatch::OnProcessingPreparationComplete()
@@ -454,6 +541,22 @@ namespace PCGExBFSDepth
 			{
 				NormalizedDepthWriter = OutputFacade->GetWritable<double>(Settings->NormalizedDepthAttributeName, 0.0, true, PCGExData::EBufferInit::New);
 			}
+		}
+
+		// Trigger count: writer on the shared vtx facade, initial-value reader on the seeds facade.
+		TriggerCount = Context->TriggerCount;
+		if (!TriggerCount.InitForBatch(Context, VtxDataFacade, Context->SeedsDataFacade.ToSharedRef()))
+		{
+			bIsBatchValid = false;
+			return;
+		}
+
+		// Build the shared edge-direction sorter before the base triggers RegisterBuffersDependencies.
+		EdgeDirectionOutput = Context->EdgeDirectionOutput;
+		if (!EdgeDirectionOutput.InitForBatch(Context, VtxDataFacade, Context->GetEdgeSortingRules()))
+		{
+			bIsBatchValid = false;
+			return;
 		}
 
 		TBatch<FProcessor>::OnProcessingPreparationComplete();
@@ -484,6 +587,8 @@ namespace PCGExBFSDepth
 		{
 			TypedProcessor->NormalizedDepthData = StaticCastSharedPtr<PCGExData::TArrayBuffer<double>>(NormalizedDepthWriter)->GetOutValues()->GetData();
 		}
+
+		TypedProcessor->TriggerCountPtr = &TriggerCount;
 
 		return true;
 	}

@@ -76,9 +76,6 @@ void FPCGExtendedToolkitModule::StartupModule()
 				// Soft refs into /Game won't drag the provider asset into the cook on their own.
 				InOutPackageCookRules.Emplace(Asset.PackageName, ProviderInstigator, UE::Cook::EPackageCookRule::AddToCook);
 
-				// GetAsset() loads from inside ModifyCook (no cook referencer in scope) -> cooker logs
-				// UnexpectedLoad. Tag the load EditorOnly so it's treated as expected; the AddToCook rule
-				// above is what forces the cook, so EditorOnly here doesn't drop the asset.
 				UObject* Obj;
 				{
 					FCookLoadScope CookLoadScope(ECookLoadType::EditorOnly);

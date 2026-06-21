@@ -129,6 +129,8 @@ void FPCGExAssetEntryCustomization::CustomizeChildren(
 	uint32 NumElements = 0;
 	PropertyHandle->GetNumChildren(NumElements);
 
+	const UPCGExCollectionsEditorSettings* EditorSettings = GetDefault<UPCGExCollectionsEditorSettings>();
+
 	for (uint32 i = 0; i < NumElements; ++i)
 	{
 		TSharedPtr<IPropertyHandle> ElementHandle = PropertyHandle->GetChildHandle(i);
@@ -138,14 +140,17 @@ void FPCGExAssetEntryCustomization::CustomizeChildren(
 			continue;
 		}
 
-		IDetailPropertyRow& PropertyRow = ChildBuilder.AddProperty(ElementHandle.ToSharedRef());
-		// Bind visibility dynamically
-		PropertyRow.Visibility(
-			MakeAttributeLambda(
-				[ElementName]()
-				{
-					return GetDefault<UPCGExCollectionsEditorSettings>()->GetPropertyVisibility(ElementName);
-				}));
+		// Build-time filter instead of a per-row dynamic Visibility attribute: that attribute
+		// breaks change-notification/write-back for default-expanded nested structs in the grid's
+		// FStructOnScope panel (Scale to Fit / Justification never reached OnFinishedChangingProperties).
+		// ForceRefreshTabs re-runs this customization whenever the filter toggles
+		// (OnHiddenAssetPropertyNamesChanged), so show/hide stays live without it.
+		if (EditorSettings->GetPropertyVisibility(ElementName) != EVisibility::Visible)
+		{
+			continue;
+		}
+
+		ChildBuilder.AddProperty(ElementHandle.ToSharedRef());
 	}
 
 	// Add PropertyOverrides WITHOUT any visibility filter or customization

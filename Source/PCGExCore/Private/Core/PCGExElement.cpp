@@ -173,7 +173,7 @@ FPCGContext* IPCGExElement::Initialize(const FPCGInitializeElementParams& InPara
 bool IPCGExElement::IsCacheable(const UPCGSettings* InSettings) const
 {
 	const UPCGExSettings* Settings = static_cast<const UPCGExSettings*>(InSettings);
-	return Settings->ShouldCache();
+	return !Settings->WantsDataStealing() && Settings->ShouldCache();
 }
 
 FPCGContext* IPCGExElement::CreateContext()

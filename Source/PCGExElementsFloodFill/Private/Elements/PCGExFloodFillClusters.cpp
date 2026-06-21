@@ -34,7 +34,7 @@ PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetMainOutputInitMode() const
 
 PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetEdgeOutputInitMode() const
 {
-	return PCGExData::EIOInit::Forward;
+	return EdgeDirectionOutput.ResolveEdgeInitMode(WantsDataStealing());
 }
 
 TArray<FPCGPinProperties> UPCGExClusterDiffusionSettings::InputPinProperties() const
@@ -73,6 +73,9 @@ bool FPCGExClusterDiffusionElement::Boot(FPCGExContext* InContext) const
 
 	PCGEX_CONTEXT_AND_SETTINGS(ClusterDiffusion)
 	PCGEX_FOREACH_FIELD_CLUSTER_DIFF(PCGEX_OUTPUT_VALIDATE_NAME)
+
+	Context->EdgeDirectionOutput = Settings->EdgeDirectionOutput;
+	Context->EdgeDirectionOutput.ValidateNames(Context);
 
 	PCGExFactories::GetInputFactories<UPCGExBlendOpFactory>(Context, PCGExBlending::Labels::SourceBlendingLabel, Context->BlendingFactories, {PCGExFactories::EType::Blending}, false);
 
@@ -156,6 +159,12 @@ namespace PCGExClusterDiffusion
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExClusterDiffusion::Process);
 
 		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
+
+		EdgeDirectionDetails = Context->EdgeDirectionOutput;
+		if (EdgeDirectionDetails.WantsDirection() && !EdgeDirectionDetails.InitForProcessor(Context, GetParentBatch<FBatch>()->EdgeDirectionOutput, EdgeDataFacade))
 		{
 			return false;
 		}
@@ -605,6 +614,29 @@ namespace PCGExClusterDiffusion
 		PathsTaskGroup->StartIterations(Diffusions.Num(), 1);
 	}
 
+	void FProcessor::Write()
+	{
+		if (!EdgeDirectionDetails.IsActive())
+		{
+			return;
+		}
+
+		// Captured candidates persist until Cleanup(), so build the node-index -> depth lookup here
+		// (rather than mirroring it during the parallel Diffuse pass) and resolve edge directions.
+		TArray<int32> NodeDepths;
+		NodeDepths.Init(-1, Cluster->Nodes->Num());
+		for (const TSharedPtr<PCGExFloodFill::FDiffusion>& Diffusion : Diffusions)
+		{
+			for (const PCGExFloodFill::FCandidate& Candidate : Diffusion->Captured)
+			{
+				NodeDepths[Candidate.Node->Index] = Candidate.Depth;
+			}
+		}
+
+		EdgeDirectionDetails.WriteFromNodeDepths(Cluster.Get(), NodeDepths);
+		EdgeDataFacade->WriteFastest(TaskManager);
+	}
+
 	void FProcessor::Cleanup()
 	{
 		TProcessor<FPCGExClusterDiffusionContext, UPCGExClusterDiffusionSettings>::Cleanup();
@@ -650,6 +682,23 @@ namespace PCGExClusterDiffusion
 			Factory->RegisterBuffersDependencies(Context, FacadePreloader);
 			// TODO : Might need to fill-in facade here as well
 		}
+
+		EdgeDirectionOutput.RegisterBuffersDependencies(Context, FacadePreloader);
+	}
+
+	void FBatch::OnProcessingPreparationComplete()
+	{
+		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ClusterDiffusion)
+
+		// Build the shared edge-direction sorter before the base triggers RegisterBuffersDependencies.
+		EdgeDirectionOutput = Context->EdgeDirectionOutput;
+		if (!EdgeDirectionOutput.InitForBatch(Context, VtxDataFacade, Context->GetEdgeSortingRules()))
+		{
+			bIsBatchValid = false;
+			return;
+		}
+
+		TBatch<FProcessor>::OnProcessingPreparationComplete();
 	}
 
 	void FBatch::Process()

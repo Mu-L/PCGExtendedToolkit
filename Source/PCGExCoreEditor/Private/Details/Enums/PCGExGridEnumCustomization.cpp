@@ -90,7 +90,7 @@ TSharedRef<SWidget> FPCGExGridEnumCustomization::GenerateEnumButtons(UEnum* Enum
 					{
 						FString CurrentValue;
 						EnumHandle->GetValueAsFormattedString(CurrentValue);
-						return CurrentValue == KeyName ? FLinearColor(0.005, 0.005, 0.005, 0.8) : FLinearColor::Transparent;
+						return CurrentValue == KeyName ? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f) : FLinearColor::Transparent;
 					})
 				.OnClicked_Lambda(
 					[this, KeyName]()
@@ -113,7 +113,7 @@ TSharedRef<SWidget> FPCGExGridEnumCustomization::GenerateEnumButtons(UEnum* Enum
 					{
 						FString CurrentValue;
 						EnumHandle->GetValueAsFormattedString(CurrentValue);
-						return CurrentValue == KeyName ? FLinearColor(0.005, 0.005, 0.005, 0.8f) : FLinearColor::Transparent;
+						return CurrentValue == KeyName ? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f) : FLinearColor::Transparent;
 					})
 				.OnClicked_Lambda(
 					[this, KeyName]()

@@ -8,6 +8,7 @@
 
 #include "Core/PCGExClustersProcessor.h"
 #include "Core/PCGExFloodFill.h"
+#include "Core/PCGExFloodFillEdgeDirection.h"
 #include "Data/Utils/PCGExDataForwardDetails.h"
 #include "Sampling/PCGExSamplingCommon.h"
 #include "PCGExFloodFillClusters.generated.h"
@@ -98,6 +99,11 @@ protected:
 		return true;
 	}
 
+	virtual bool SupportsEdgeSorting() const override
+	{
+		return EdgeDirectionOutput.RequiresSortingRules();
+	}
+
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
@@ -158,6 +164,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(DisplayName="Diffusion Ending", PCG_Overridable, EditCondition="bWriteDiffusionEnding"))
 	FName DiffusionEndingAttributeName = FName("DiffusionEnding");
 
+	/** Output the diffusion traversal direction onto each edge, in propagation order (away from the seed). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable))
+	FPCGExFloodFillEdgeDirectionDetails EdgeDirectionOutput;
+
 #pragma endregion
 
 	/** Which Seed attributes to forward on the vtx they diffused to. */
@@ -217,6 +227,8 @@ struct FPCGExClusterDiffusionContext final : FPCGExClustersProcessorContext
 
 	PCGEX_FOREACH_FIELD_CLUSTER_DIFF(PCGEX_OUTPUT_DECL_TOGGLE)
 
+	FPCGExFloodFillEdgeDirectionDetails EdgeDirectionOutput;
+
 	int32 ExpectedPathCount = 0;
 
 protected:
@@ -260,6 +272,8 @@ namespace PCGExClusterDiffusion
 
 		TSharedPtr<PCGExMT::TScopedNumericValue<double>> MaxDistanceValue;
 
+		FPCGExFloodFillEdgeDirectionDetails EdgeDirectionDetails;
+
 		int32 ExpectedPathCount = 0;
 
 	public:
@@ -286,6 +300,7 @@ namespace PCGExClusterDiffusion
 
 		void OnDiffusionComplete();
 
+		virtual void Write() override;
 		virtual void Cleanup() override;
 	};
 
@@ -300,10 +315,13 @@ namespace PCGExClusterDiffusion
 		TSharedPtr<PCGExDetails::TSettingValue<int32>> FillRate;
 
 	public:
+		FPCGExFloodFillEdgeDirectionDetails EdgeDirectionOutput;
+
 		FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges);
 		virtual ~FBatch() override;
 
 		virtual void RegisterBuffersDependencies(PCGExData::FFacadePreloader& FacadePreloader) override;
+		virtual void OnProcessingPreparationComplete() override;
 		virtual void Process() override;
 		virtual bool PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor) override;
 		virtual void Write() override;

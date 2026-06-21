@@ -107,7 +107,7 @@ namespace PCGExEnumCustomization
 						{
 							FString CurrentValue;
 							PropertyHandle->GetValueAsFormattedString(CurrentValue);
-							return CurrentValue == KeyName ? FLinearColor(0.005, 0.005, 0.005, 0.8) : FLinearColor::Transparent;
+							return CurrentValue == KeyName ? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f) : FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(
 						[PropertyHandle, KeyName]()
@@ -130,7 +130,7 @@ namespace PCGExEnumCustomization
 						{
 							FString CurrentValue;
 							PropertyHandle->GetValueAsFormattedString(CurrentValue);
-							return CurrentValue == KeyName ? FLinearColor(0.005, 0.005, 0.005, 0.8) : FLinearColor::Transparent;
+							return CurrentValue == KeyName ? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f) : FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(
 						[PropertyHandle, KeyName]()
@@ -187,7 +187,7 @@ namespace PCGExEnumCustomization
 					.ButtonColorAndOpacity_Lambda(
 						[GetValue, EnumValue]
 						{
-							return GetValue() == EnumValue ? FLinearColor(0.005, 0.005, 0.005, 0.8) : FLinearColor::Transparent;
+							return GetValue() == EnumValue ? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f) : FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(
 						[SetValue, EnumValue]()
@@ -208,7 +208,7 @@ namespace PCGExEnumCustomization
 					.ButtonColorAndOpacity_Lambda(
 						[GetValue, EnumValue]
 						{
-							return GetValue() == EnumValue ? FLinearColor(0.005, 0.005, 0.005, 0.8) : FLinearColor::Transparent;
+							return GetValue() == EnumValue ? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f) : FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(
 						[SetValue, EnumValue]()
@@ -343,7 +343,7 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f)
 								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)
@@ -362,7 +362,7 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f)
 								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)
@@ -667,7 +667,7 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f)
 								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)
@@ -686,7 +686,7 @@ namespace PCGExEnumCustomization
 						[IsActive]
 						{
 							return IsActive()
-								? FLinearColor(0.005, 0.005, 0.005, 0.8)
+								? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f)
 								: FLinearColor::Transparent;
 						})
 					.OnClicked_Lambda(Toggle)

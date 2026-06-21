@@ -6,7 +6,9 @@
 #include "CoreMinimal.h"
 #include "Containers/PCGExScopedContainers.h"
 
+#include "Core/PCGExBFSTriggerCount.h"
 #include "Core/PCGExClustersProcessor.h"
+#include "Core/PCGExFloodFillEdgeDirection.h"
 #include "Sampling/PCGExSamplingCommon.h"
 #include "PCGExBFSDepth.generated.h"
 
@@ -14,6 +16,14 @@
 MACRO(Depth, int32, -1)\
 MACRO(Distance, double, -1)\
 MACRO(SeedIndex, int32, -1)
+
+namespace PCGExBFSDepth
+{
+	namespace Labels
+	{
+		const FName SourceTriggerFiltersLabel = FName("TriggerFilters");
+	}
+}
 
 UENUM()
 enum class EPCGExBFSNormalizedDepthMode : uint8
@@ -40,6 +50,11 @@ protected:
 	virtual bool SupportsDataStealing() const override
 	{
 		return true;
+	}
+
+	virtual bool SupportsEdgeSorting() const override
+	{
+		return EdgeDirectionOutput.RequiresSortingRules();
 	}
 
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
@@ -87,6 +102,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_NotOverridable, EditCondition="bWriteNormalizedDepth", EditCondtionHides, HideEditConditionToggle))
 	EPCGExBFSNormalizedDepthMode NormalizedDepthMode = EPCGExBFSNormalizedDepthMode::Global;
 
+	/** Output the BFS traversal direction onto each edge, in propagation order (away from the seed). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable))
+	FPCGExFloodFillEdgeDirectionDetails EdgeDirectionOutput;
+
+	/** Output a running count of "trigger" vtx (those passing the Vtx Filters) crossed along the BFS path. Adds a required Vtx Filters input. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable))
+	FPCGExBFSTriggerCountDetails TriggerCount;
+
 	/** Whether to use an octree for closest node search. Depending on your dataset, this may be faster or slower. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, AdvancedDisplay))
 	bool bUseOctreeSearch = false;
@@ -102,6 +125,11 @@ struct FPCGExBFSDepthContext final : FPCGExClustersProcessorContext
 	TSharedPtr<PCGExData::FFacade> SeedsDataFacade;
 
 	PCGEX_FOREACH_FIELD_BFS_DEPTH(PCGEX_OUTPUT_DECL_TOGGLE)
+
+	FPCGExFloodFillEdgeDirectionDetails EdgeDirectionOutput;
+
+	FPCGExBFSTriggerCountDetails TriggerCount;
+	TArray<TObjectPtr<const UPCGExPointFilterFactoryData>> VtxFilterFactories;
 
 protected:
 	PCGEX_ELEMENT_BATCH_EDGE_DECL
@@ -136,6 +164,11 @@ namespace PCGExBFSDepth
 		TSharedPtr<PCGExMT::TScopedArray<FIntPoint>> SeedNodeIndices;
 		TArray<FIntPoint> CollectedSeeds;
 
+		FPCGExFloodFillEdgeDirectionDetails EdgeDirectionDetails;
+
+		const FPCGExBFSTriggerCountDetails* TriggerCountPtr = nullptr; // Points at the batch's instance (shared vtx writer)
+		TArray<int32> TriggerCounts;                                   // BFS-path trigger count per node
+
 		void ComputeNormalizedDepth();
 
 	public:
@@ -150,6 +183,7 @@ namespace PCGExBFSDepth
 		double* NormalizedDepthData = nullptr;
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
+		virtual void CompleteWork() override;
 
 		void RunBFS();
 	};
@@ -160,8 +194,12 @@ namespace PCGExBFSDepth
 		TSharedPtr<PCGExData::TBuffer<double>> NormalizedDepthWriter;
 
 	public:
+		FPCGExFloodFillEdgeDirectionDetails EdgeDirectionOutput;
+		FPCGExBFSTriggerCountDetails TriggerCount;
+
 		FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges);
 
+		virtual void RegisterBuffersDependencies(PCGExData::FFacadePreloader& FacadePreloader) override;
 		virtual void OnProcessingPreparationComplete() override;
 		virtual bool PrepareSingle(const TSharedPtr<PCGExClusterMT::IProcessor>& InProcessor) override;
 		virtual void Write() override;

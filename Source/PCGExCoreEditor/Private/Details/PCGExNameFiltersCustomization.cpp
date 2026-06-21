@@ -178,7 +178,7 @@ TSharedRef<SWidget> FPCGExNameFiltersDetailsCustomization::MakeBoolToggleButton(
 		.ButtonColorAndOpacity_Lambda(
 			[Bind]
 			{
-				return Bind.Get() ? FLinearColor(0.005, 0.005, 0.005, 0.8) : FLinearColor::Transparent;
+				return Bind.Get() ? FLinearColor(0.005f, 0.005f, 0.005f, 0.8f) : FLinearColor::Transparent;
 			})
 		.OnClicked_Lambda(
 			[Bind]()
