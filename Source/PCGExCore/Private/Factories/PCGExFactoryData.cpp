@@ -4,6 +4,7 @@
 #include "Factories/PCGExFactoryData.h"
 
 #include "Data/PCGExPointIO.h"
+#include "Helpers/PCGExStreamingHelpers.h"
 #include "Tasks/Task.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFactoryProvider"
@@ -25,7 +26,7 @@ bool UPCGExFactoryData::RegisterConsumableAttributesWithData(FPCGExContext* InCo
 	return bCleanupConsumableAttributes;
 }
 
-void UPCGExFactoryData::RegisterAssetDependencies(FPCGExContext* InContext) const
+void UPCGExFactoryData::RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const
 {
 }
 
@@ -46,6 +47,7 @@ void UPCGExFactoryData::BeginDestroy()
 {
 	// UPROPERTY Should be enough, Rooting is overkill
 	//for (UPCGData* DataDependency : DataDependencies) { DataDependency->RemoveFromRoot(); }
+	PCGExHelpers::SafeReleaseHandle(AssetsDependencies);
 	Super::BeginDestroy();
 }
 

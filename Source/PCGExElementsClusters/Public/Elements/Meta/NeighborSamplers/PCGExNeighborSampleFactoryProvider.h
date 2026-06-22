@@ -177,7 +177,7 @@ public:
 
 	virtual void RegisterVtxBuffersDependencies(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, PCGExData::FFacadePreloader& FacadePreloader) const;
 
-	virtual void RegisterAssetDependencies(FPCGExContext* InContext) const override;
+	virtual void RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const override;
 };
 
 UCLASS(Abstract, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|NeighborSample")

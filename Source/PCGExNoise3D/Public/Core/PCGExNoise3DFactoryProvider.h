@@ -16,11 +16,11 @@
 #include "PCGExNoise3DFactoryProvider.generated.h"
 
 #define PCGEX_NOISE3D_FACTORY_BOILERPLATE \
-virtual void RegisterAssetDependencies(FPCGExContext* InContext) const override;
+virtual void RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const override;
 
 #define PCGEX_NOISE3D_FACTORY_BOILERPLATE_IMPL(_TYPE, _REGISTER_ASSET_BODY)\
-void UPCGExNoise3DFactory##_TYPE::RegisterAssetDependencies(FPCGExContext* InContext) const{\
-	Super::RegisterAssetDependencies(InContext); }
+void UPCGExNoise3DFactory##_TYPE::RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const{\
+	Super::RegisterAssetDependencies(InDependencies); }
 
 #define PCGEX_FORWARD_NOISE3D_FACTORY \
 	NewFactory->Priority = Priority; \

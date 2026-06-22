@@ -7,6 +7,7 @@
 #include "Core/PCGExContext.h"
 #include "Data/PCGExPointIO.h"
 #include "Factories/PCGExFactoryData.h"
+#include "Helpers/PCGExStreamingHelpers.h"
 #include "Tasks/Task.h"
 
 #define LOCTEXT_NAMESPACE "PCGExFactoryProvider"
@@ -73,6 +74,15 @@ bool FPCGExFactoryProviderElement::AdvanceWork(FPCGExContext* InContext, const U
 		}
 
 		Context->OutFactory->OutputConfigToMetadata();
+
+		{
+			PCGEX_MAKE_SHARED(AssetDeps, TSet<FSoftObjectPath>)			
+			Context->OutFactory->RegisterAssetDependencies(*AssetDeps.Get());
+			if (!AssetDeps->IsEmpty())
+			{
+				Context->OutFactory->AssetsDependencies = PCGExHelpers::LoadBlocking_AnyThread(AssetDeps);
+			}
+		}
 
 		if (Context->OutFactory->WantsPreparation(Context))
 		{

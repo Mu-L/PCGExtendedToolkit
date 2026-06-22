@@ -45,10 +45,10 @@ void UPCGExRandomFilterFactory::RegisterBuffersDependencies(FPCGExContext* InCon
 	}
 }
 
-void UPCGExRandomFilterFactory::RegisterAssetDependencies(FPCGExContext* InContext) const
+void UPCGExRandomFilterFactory::RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const
 {
-	Super::RegisterAssetDependencies(InContext);
-	InContext->AddAssetDependency(Config.WeightCurve.ToSoftObjectPath());
+	Super::RegisterAssetDependencies(InDependencies);
+	InDependencies.Add(Config.WeightCurve.ToSoftObjectPath());
 }
 
 bool UPCGExRandomFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const

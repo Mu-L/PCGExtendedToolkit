@@ -103,7 +103,7 @@ public:
 	virtual bool SupportsProxyEvaluation() const override;
 
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const override;
-	virtual void RegisterAssetDependencies(FPCGExContext* InContext) const override;
+	virtual void RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const override;
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;

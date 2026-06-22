@@ -55,6 +55,7 @@ bool FPCGExBlendAttributesElement::AdvanceWork(FPCGExContext* InContext, const U
 			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
+				NewBatch->bSkipCompletion = true;
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
@@ -92,14 +93,11 @@ namespace PCGExBlendAttributes
 			return false;
 		}
 
-		NumPoints = PointDataFacade->GetNum();
-
-		StartParallelLoopForRange(NumPoints);
-
+		StartParallelLoopForPoints();
 		return true;
 	}
 
-	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
+	void FProcessor::ProcessPoints(const PCGExMT::FScope& Scope)
 	{
 		PointDataFacade->Fetch(Scope);
 		FilterScope(Scope);
@@ -107,7 +105,7 @@ namespace PCGExBlendAttributes
 		BlendOpsManager->BlendAutoWeight(Scope, Scope.GetConstView(PointFilterCache));
 	}
 
-	void FProcessor::CompleteWork()
+	void FProcessor::OnPointsProcessingComplete()
 	{
 		BlendOpsManager->Cleanup(Context);
 		PointDataFacade->WriteFastest(TaskManager);

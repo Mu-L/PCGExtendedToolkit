@@ -343,12 +343,12 @@ bool UPCGExFilterGroupFactoryData::RegisterConsumableAttributesWithData(FPCGExCo
 	return true;
 }
 
-void UPCGExFilterGroupFactoryData::RegisterAssetDependencies(FPCGExContext* InContext) const
+void UPCGExFilterGroupFactoryData::RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const
 {
-	Super::RegisterAssetDependencies(InContext);
+	Super::RegisterAssetDependencies(InDependencies);
 
 	// Ensure we grab dependencies from plugged-in factories recursively
-	PCGEX_FILTERGROUP_FOREACH(SubFilter->RegisterAssetDependencies(InContext);)
+	PCGEX_FILTERGROUP_FOREACH(SubFilter->RegisterAssetDependencies(InDependencies);)
 }
 
 void UPCGExFilterGroupFactoryData::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const

@@ -16,11 +16,11 @@
 #include "PCGExHeuristicsFactoryProvider.generated.h"
 
 #define PCGEX_HEURISTIC_FACTORY_BOILERPLATE \
-virtual void RegisterAssetDependencies(FPCGExContext* InContext) const override;
+virtual void RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const override;
 
 #define PCGEX_HEURISTIC_FACTORY_BOILERPLATE_IMPL(_TYPE, _REGISTER_ASSET_BODY)\
-void UPCGExHeuristicsFactory##_TYPE::RegisterAssetDependencies(FPCGExContext* InContext) const{\
-	Super::RegisterAssetDependencies(InContext); }
+void UPCGExHeuristicsFactory##_TYPE::RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const{\
+	Super::RegisterAssetDependencies(InDependencies); }
 //	InContext->AddAssetDependency(Config.ScoreCurve.ToSoftObjectPath()); _REGISTER_ASSET_BODY }
 
 #define PCGEX_FORWARD_HEURISTIC_FACTORY \

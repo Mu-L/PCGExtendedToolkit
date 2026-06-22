@@ -17,6 +17,8 @@
 
 ///
 
+struct FStreamableHandle;
+
 namespace PCGExMT
 {
 	class FTaskManager;
@@ -62,6 +64,8 @@ class PCGEXCORE_API UPCGExFactoryData : public UPCGExParamDataBase
 {
 	GENERATED_BODY()
 
+	friend class FPCGExFactoryProviderElement;
+	
 public:
 	PCG_ASSIGN_TYPE_INFO(FPCGExFactoryDataTypeInfo)
 
@@ -80,7 +84,7 @@ public:
 
 	virtual bool RegisterConsumableAttributes(FPCGExContext* InContext) const;
 	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const;
-	virtual void RegisterAssetDependencies(FPCGExContext* InContext) const;
+	virtual void RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const;
 	virtual void RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const;
 
 	virtual bool WantsPreparation(FPCGExContext* InContext)
@@ -98,5 +102,7 @@ public:
 
 protected:
 	UPROPERTY()
-	TSet<TObjectPtr<UPCGData>> DataDependencies;
+	TSet<TObjectPtr<UPCGData>> DataDependencies;	
+	
+	TSharedPtr<FStreamableHandle> AssetsDependencies;
 };

@@ -600,12 +600,12 @@ PCGExFactories::EPreparationResult UPCGExBlendOpFactory::Prepare(FPCGExContext* 
 	return Result;
 }
 
-void UPCGExBlendOpFactory::RegisterAssetDependencies(FPCGExContext* InContext) const
+void UPCGExBlendOpFactory::RegisterAssetDependencies(TSet<FSoftObjectPath>& InDependencies) const
 {
-	Super::RegisterAssetDependencies(InContext);
+	Super::RegisterAssetDependencies(InDependencies);
 	if (!Config.Weighting.bUseLocalCurve)
 	{
-		InContext->AddAssetDependency(Config.Weighting.WeightCurve.ToSoftObjectPath());
+		InDependencies.Add(Config.Weighting.WeightCurve.ToSoftObjectPath());
 	}
 }
 

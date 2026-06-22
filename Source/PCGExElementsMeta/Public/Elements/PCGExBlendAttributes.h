@@ -76,7 +76,6 @@ namespace PCGExBlendAttributes
 {
 	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExBlendAttributesContext, UPCGExBlendAttributesSettings>
 	{
-		double NumPoints = 0;
 		TSharedPtr<PCGExBlending::FBlendOpsManager> BlendOpsManager;
 
 	public:
@@ -90,8 +89,8 @@ namespace PCGExBlendAttributes
 		}
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
-		virtual void CompleteWork() override;
+		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
+		virtual void OnPointsProcessingComplete() override;
 		virtual void Cleanup() override;
 	};
 }

@@ -735,6 +735,17 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 				FWriteScopeLock WriteScopeLock(BufferLock);
 				PCGEX_ASYNC_SCHEDULING_SCOPE(TaskManager)
 
+				PCGExMT::ParallelOrSequential(Buffers.Num(),[&](int32 i)
+				{
+					const TSharedPtr<IBuffer> Buffer = Buffers[i];
+					if (!Buffer.IsValid() || !Buffer->IsWritable() || !Buffer->IsEnabled())
+					{
+						return;
+					}
+					WriteBuffer(nullptr, Buffer, false);
+				}, 1);
+				
+				/*
 				for (int i = 0; i < Buffers.Num(); i++)
 				{
 					const TSharedPtr<IBuffer> Buffer = Buffers[i];
@@ -744,6 +755,7 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 					}
 					WriteBuffer(TaskManager, Buffer, false);
 				}
+				*/
 			}
 		}
 
