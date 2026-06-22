@@ -287,7 +287,7 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorBestFitFactoryDa
 
 		if (Entry && Entry->Staging.Bounds.IsValid)
 		{
-			Ext = Entry->Staging.Bounds.GetExtent();
+			Ext = Entry->Staging.AlteredBounds.GetExtent();
 			Vol = Ext.X * Ext.Y * Ext.Z;
 		}
 

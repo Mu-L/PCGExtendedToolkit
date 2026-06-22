@@ -319,7 +319,7 @@ namespace PCGExStagingFitting
 				const FPCGExAssetCollectionEntry* Entry = Result.Entry;
 				const UPCGExAssetCollection* EntryHost = Result.Host;
 
-				FBox OutBounds = Entry->Staging.Bounds;
+				FBox OutBounds = Entry->Staging.AlteredBounds;
 				const FPCGExFittingVariations& EntryVariations = Entry->GetVariations(EntryHost);
 
 				PCGExFitting::FOverridesView EntryOverrides;

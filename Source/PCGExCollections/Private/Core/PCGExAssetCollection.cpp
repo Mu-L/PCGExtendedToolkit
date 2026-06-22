@@ -270,6 +270,19 @@ namespace PCGExAssetCollection
 	// index in CategoryNameToIndex). Subsequent entries on the same name reuse that slot.
 	void FCache::RegisterEntry(int32 Index, const FPCGExAssetCollectionEntry* InEntry)
 	{
+		if (InEntry)
+		{
+			FPCGExAssetCollectionEntry* MutableEntry = const_cast<FPCGExAssetCollectionEntry*>(InEntry);
+			MutableEntry->Staging.AlteredBounds = FBox(
+				MutableEntry->Staging.Bounds.Min + MutableEntry->Staging.BoundsStagingOffsetMin,
+				MutableEntry->Staging.Bounds.Max + MutableEntry->Staging.BoundsStagingOffsetMax);
+			
+			if (!MutableEntry->Staging.AlteredBounds.IsValid)
+			{
+				MutableEntry->Staging.AlteredBounds = MutableEntry->Staging.Bounds;
+			}
+		}
+
 		Main->RegisterEntry(Index, InEntry);
 		if (const int32* IdxPtr = CategoryNameToIndex.Find(InEntry->Category))
 		{
@@ -385,7 +398,10 @@ const FPCGExAssetGrammarDetails* FPCGExAssetCollectionEntry::GetEffectiveGrammar
 	}
 
 	// Subcollection: Inherit / Override / Flatten.
-	if (!InternalSubCollection) { return nullptr; }
+	if (!InternalSubCollection)
+	{
+		return nullptr;
+	}
 	switch (SubGrammarMode)
 	{
 	case EPCGExGrammarSubCollectionMode::Inherit:
@@ -402,7 +418,7 @@ double FPCGExAssetCollectionEntry::GetGrammarSize(
 	const EPCGExGrammarAxes Axis,
 	FPCGExGrammarSizeCache* SizeCache) const
 {
-	const FPCGExGrammarSizeCacheKey CacheKey{ this, Axis };
+	const FPCGExGrammarSizeCacheKey CacheKey{this, Axis};
 	if (SizeCache)
 	{
 		if (const double* CachedSize = SizeCache->Find(CacheKey))
@@ -418,7 +434,10 @@ double FPCGExAssetCollectionEntry::GetGrammarSize(
 			? Resolved->GetSubCollectionSize(InternalSubCollection, Axis, SizeCache)
 			: Resolved->GetLeafSize(Staging.Bounds, Axis));
 
-	if (SizeCache) { SizeCache->Add(CacheKey, Size); }
+	if (SizeCache)
+	{
+		SizeCache->Add(CacheKey, Size);
+	}
 	return Size;
 }
 
@@ -429,7 +448,10 @@ bool FPCGExAssetCollectionEntry::FixModuleInfos(
 	FPCGExGrammarSizeCache* SizeCache) const
 {
 	const FPCGExAssetGrammarDetails* Resolved = GetEffectiveGrammar(Host);
-	if (!Resolved) { return false; }
+	if (!Resolved)
+	{
+		return false;
+	}
 	return bIsSubCollection
 		? Resolved->FixSubCollection(InternalSubCollection, Axis, OutModule, SizeCache)
 		: Resolved->FixLeaf(Staging.Bounds, Axis, OutModule);
@@ -967,13 +989,19 @@ namespace PCGExAssetCollectionMigration
 	 */
 	static bool MigrateEntryVariationsV0ToV1(FPCGExAssetCollectionEntry* Entry)
 	{
-		if (!Entry || Entry->VariationMode == EPCGExEntryVariationMode::Global) { return false; }
+		if (!Entry || Entry->VariationMode == EPCGExEntryVariationMode::Global)
+		{
+			return false;
+		}
 
 		static const FPCGExFittingVariations Defaults;
 		const bool bIsDefault = FPCGExFittingVariations::StaticStruct()->CompareScriptStruct(&Entry->Variations, &Defaults, 0);
 
 		const EPCGExEntryVariationMode Desired = bIsDefault ? EPCGExEntryVariationMode::None : EPCGExEntryVariationMode::Local;
-		if (Entry->VariationMode == Desired) { return false; }
+		if (Entry->VariationMode == Desired)
+		{
+			return false;
+		}
 
 		Entry->VariationMode = Desired;
 		return true;
@@ -998,7 +1026,10 @@ namespace PCGExAssetCollectionMigration
 	 *  should be emitted for this entry (legacy Min/Max/Average on a leaf). */
 	static bool MigrateEntryGrammarV0ToV1(FPCGExAssetCollectionEntry* Entry)
 	{
-		if (!Entry) { return false; }
+		if (!Entry)
+		{
+			return false;
+		}
 
 		bool bWarn = false;
 		if (Entry->bIsSubCollection && Entry->SubGrammarMode == EPCGExGrammarSubCollectionMode::Override)
@@ -1040,14 +1071,20 @@ void UPCGExAssetCollection::PostLoad()
 		int32 DowngradedEntries = 0;
 		int32 DisabledEntries = 0;
 
-		if (GlobalAssetGrammar.MigrateFromV0Internal()) { DowngradedEntries++; }
+		if (GlobalAssetGrammar.MigrateFromV0Internal())
+		{
+			DowngradedEntries++;
+		}
 
 		// SubCollectionGrammar is a new v1 field; its source data lives on the legacy CollectionGrammar slot.
 		SubCollectionGrammar.MigrateFromLegacyCollectionGrammar(CollectionGrammar_DEPRECATED);
 
 		ForEachEntry([&DowngradedEntries, &DisabledEntries](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
 		{
-			if (PCGExAssetCollectionMigration::MigrateEntryGrammarV0ToV1(Entry)) { DowngradedEntries++; }
+			if (PCGExAssetCollectionMigration::MigrateEntryGrammarV0ToV1(Entry))
+			{
+				DowngradedEntries++;
+			}
 			if (Entry && !Entry->bIsSubCollection && Entry->AssetGrammar.Axes == static_cast<uint8>(EPCGExGrammarAxes::None))
 			{
 				DisabledEntries++;
@@ -1057,14 +1094,14 @@ void UPCGExAssetCollection::PostLoad()
 		if (DowngradedEntries > 0)
 		{
 			UE_LOG(LogTemp, Warning,
-				TEXT("[PCGEx] Grammar migration: %d entr%s in '%s' had legacy Min/Max/Average size mode -- downgraded to X-bounds. Review and reconfigure axes if needed."),
-				DowngradedEntries, DowngradedEntries == 1 ? TEXT("y") : TEXT("ies"), *GetName());
+			       TEXT("[PCGEx] Grammar migration: %d entr%s in '%s' had legacy Min/Max/Average size mode -- downgraded to X-bounds. Review and reconfigure axes if needed."),
+			       DowngradedEntries, DowngradedEntries == 1 ? TEXT("y") : TEXT("ies"), *GetName());
 		}
 		if (DisabledEntries > 0)
 		{
 			UE_LOG(LogTemp, Log,
-				TEXT("[PCGEx] Grammar migration: %d entr%s in '%s' had empty Symbol -- grammar disabled (Axes=None)."),
-				DisabledEntries, DisabledEntries == 1 ? TEXT("y") : TEXT("ies"), *GetName());
+			       TEXT("[PCGEx] Grammar migration: %d entr%s in '%s' had empty Symbol -- grammar disabled (Axes=None)."),
+			       DisabledEntries, DisabledEntries == 1 ? TEXT("y") : TEXT("ies"), *GetName());
 		}
 
 		GrammarSchemaVersion = PCGExAssetCollectionMigration::CurrentGrammarSchemaVersion;
@@ -1339,28 +1376,28 @@ void UPCGExAssetCollection::RefreshCollectionPropertiesFromEntries(
 
 	ForEachEntry([&CanonicalSchema
 #if WITH_EDITOR
-				, &CanonicalHeaderIdsByName
+			, &CanonicalHeaderIdsByName
 #endif
-			](FPCGExAssetCollectionEntry* InEntry, int32 /*Idx*/)
-	{
-		if (!InEntry)
+		](FPCGExAssetCollectionEntry* InEntry, int32 /*Idx*/)
 		{
-			return;
-		}
-#if WITH_EDITOR
-		for (FPCGExPropertyOverrideEntry& Slot : InEntry->PropertyOverrides.Overrides)
-		{
-			if (FPCGExProperty* P = Slot.GetPropertyMutable())
+			if (!InEntry)
 			{
-				if (const int32* CanonicalId = CanonicalHeaderIdsByName.Find(P->PropertyName))
+				return;
+			}
+#if WITH_EDITOR
+			for (FPCGExPropertyOverrideEntry& Slot : InEntry->PropertyOverrides.Overrides)
+			{
+				if (FPCGExProperty* P = Slot.GetPropertyMutable())
 				{
-					P->HeaderId = *CanonicalId;
+					if (const int32* CanonicalId = CanonicalHeaderIdsByName.Find(P->PropertyName))
+					{
+						P->HeaderId = *CanonicalId;
+					}
 				}
 			}
-		}
 #endif
-		InEntry->PropertyOverrides.SyncToSchema(CanonicalSchema);
-	});
+			InEntry->PropertyOverrides.SyncToSchema(CanonicalSchema);
+		});
 
 	RebuildPropertyRegistry();
 }
@@ -1438,7 +1475,10 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 		SubCollectionGrammar.ValidateContext(/*bIsSubCollection=*/true);
 		ForEachEntry([](FPCGExAssetCollectionEntry* Entry, int32 /*Index*/)
 		{
-			if (Entry) { Entry->AssetGrammar.ValidateContext(Entry->bIsSubCollection); }
+			if (Entry)
+			{
+				Entry->AssetGrammar.ValidateContext(Entry->bIsSubCollection);
+			}
 		});
 	}
 

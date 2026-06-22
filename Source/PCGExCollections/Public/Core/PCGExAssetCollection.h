@@ -98,6 +98,16 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetStagingData
 	UPROPERTY(VisibleAnywhere, Category = Settings)
 	FBox Bounds = FBox(ForceInit);
 
+	/** Offset applied to Bounds.Min to compute fitting. Bounds applied to the mesh remain the original ones. */
+	UPROPERTY(VisibleAnywhere, Category = Settings)
+	FVector BoundsStagingOffsetMin = FVector::ZeroVector;
+	
+	/** Offset applied to Bounds.Max to compute fitting. Bounds applied to the mesh remain the original ones. */
+	UPROPERTY(VisibleAnywhere, Category = Settings)
+	FVector BoundsStagingOffsetMax = FVector::ZeroVector;
+	
+	FBox AlteredBounds = FBox(ForceInit);
+	
 	template <typename T>
 	T* LoadSync(FPCGExContext* InContext = nullptr) const
 	{
