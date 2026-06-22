@@ -31,15 +31,20 @@ bool FPCGExVtxPropertySortedNeighbor::PrepareForCluster(FPCGExContext* InContext
 		return false;
 	}
 
-	// The sorter is shared across all clusters of this vtx facade (built once, see GetOrBuildSorter).
+	bSortByEdge = Config.SortSource == EPCGExClusterElement::Edge;
+
+	// Vtx sorts over the shared vtx facade (one sorter reused across the batch's clusters); Edge sorts over
+	// this cluster's own edge facade. Either way the sorter compares point values directly.
 	check(Factory);
-	Sorter = Factory->GetOrBuildSorter(InContext, InVtxDataFacade.ToSharedRef());
+	const TSharedRef<PCGExData::FFacade> SortFacade = bSortByEdge ? InEdgeDataFacade.ToSharedRef() : InVtxDataFacade.ToSharedRef();
+	Sorter = Factory->GetOrBuildSorter(InContext, SortFacade);
 	if (!Sorter)
 	{
 		bIsValidOperation = false;
 		return false;
 	}
 
+	// Output is always written to the evaluated vtx, regardless of what we sorted by.
 	Config.SortedNeighbor.Init(InVtxDataFacade.ToSharedRef());
 
 	return bIsValidOperation;
@@ -53,13 +58,18 @@ void FPCGExVtxPropertySortedNeighbor::ProcessNode(PCGExClusters::FNode& Node, co
 		return;
 	}
 
-	// Keep the single most extreme neighbor; Sort(A, B) is true when A ranks before B under the chosen direction.
+	// Keep the single most extreme neighbor; Sort(A, B) is true when A ranks before B under the chosen
+	// direction. The sort key is the neighbor vtx point, or the connecting edge point when sorting over edges.
 	int32 IBest = 0;
+	int32 BestSortIndex = bSortByEdge ? Cluster->GetEdge(Adjacency[0].EdgeIndex)->PointIndex : Adjacency[0].NodePointIndex;
+
 	for (int i = 1; i < Adjacency.Num(); i++)
 	{
-		if (Sorter->Sort(Adjacency[i].NodePointIndex, Adjacency[IBest].NodePointIndex))
+		const int32 CandSortIndex = bSortByEdge ? Cluster->GetEdge(Adjacency[i].EdgeIndex)->PointIndex : Adjacency[i].NodePointIndex;
+		if (Sorter->Sort(CandSortIndex, BestSortIndex))
 		{
 			IBest = i;
+			BestSortIndex = CandSortIndex;
 		}
 	}
 
@@ -78,34 +88,36 @@ TSharedPtr<FPCGExVtxPropertyOperation> UPCGExVtxPropertySortedNeighborFactory::C
 	return NewOperation;
 }
 
-TSharedPtr<PCGExSorting::FSorter> UPCGExVtxPropertySortedNeighborFactory::GetOrBuildSorter(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InVtxDataFacade) const
+TSharedPtr<PCGExSorting::FSorter> UPCGExVtxPropertySortedNeighborFactory::GetOrBuildSorter(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InSortFacade) const
 {
-	PCGExData::FFacade* Key = &InVtxDataFacade.Get();
+	PCGExData::FFacade* Key = &InSortFacade.Get();
 
 	FScopeLock Lock(&SorterLock);
 
-	if (const TSharedPtr<PCGExSorting::FSorter>* Existing = SortersByFacade.Find(Key))
+	// Reuse the sorter while any cluster of this facade still holds it (vtx clusters share one facade). The
+	// entry is weak, so once the batch's operations are gone the sorter -- and its strong ref to the facade --
+	// is released instead of being pinned for the whole execution; a dead/reused-address entry just rebuilds.
+	if (const TWeakPtr<PCGExSorting::FSorter>* Existing = SortersByFacade.Find(Key))
 	{
-		return *Existing;
+		if (TSharedPtr<PCGExSorting::FSorter> Pinned = Existing->Pin())
+		{
+			return Pinned;
+		}
 	}
-
-	TSharedPtr<PCGExSorting::FSorter> NewSorter;
 
 	if (SortingRules.IsEmpty())
 	{
 		PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Vtx : Sorted Neighbor -- no sorting rules provided."));
-	}
-	else
-	{
-		NewSorter = MakeShared<PCGExSorting::FSorter>(InContext, InVtxDataFacade, SortingRules);
-		NewSorter->SortDirection = Config.SortDirection;
-		if (!NewSorter->Init(InContext))
-		{
-			NewSorter = nullptr;
-		}
+		return nullptr;
 	}
 
-	// Cache the result (even a null failure) so we don't retry the build for every cluster.
+	TSharedPtr<PCGExSorting::FSorter> NewSorter = MakeShared<PCGExSorting::FSorter>(InContext, InSortFacade, SortingRules);
+	NewSorter->SortDirection = Config.SortDirection;
+	if (!NewSorter->Init(InContext))
+	{
+		return nullptr;
+	}
+
 	SortersByFacade.Add(Key, NewSorter);
 	return NewSorter;
 }

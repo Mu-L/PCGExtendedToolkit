@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Clusters/PCGExClusterCommon.h"
 #include "HAL/CriticalSection.h"
 #include "PCGExVtxPropertyFactoryProvider.h"
 #include "Factories/PCGExFactoryProvider.h"
@@ -39,6 +40,11 @@ struct FPCGExSortedNeighborConfig
 		SortedNeighbor.bInvertDirection = true;
 	}
 
+	/** Whether the sorting rules read their values from the neighbor vtx (Point) or from the edge
+	 *  connecting the evaluated vtx to that neighbor (Edge). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	EPCGExClusterElement SortSource = EPCGExClusterElement::Vtx;
+
 	/** Which extreme to point toward, as ranked by the plugged sorting rules.
 	 *  Descending points toward the highest-ranked neighbor, Ascending toward the lowest-ranked. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -63,6 +69,10 @@ public:
 	virtual void ProcessNode(PCGExClusters::FNode& Node, const TArray<PCGExClusters::FAdjacencyData>& Adjacency, const PCGExMath::FBestFitPlane& BFP) override;
 
 protected:
+	bool bSortByEdge = false;
+
+	// Sorter over the chosen source facade: shared across a batch's clusters for the Vtx source (one shared
+	// vtx facade), or effectively per-cluster for the Edge source (each cluster has its own edge facade).
 	TSharedPtr<PCGExSorting::FSorter> Sorter;
 };
 
@@ -79,14 +89,18 @@ public:
 
 	virtual TSharedPtr<FPCGExVtxPropertyOperation> CreateOperation(FPCGExContext* InContext) const override;
 
-	/** Builds the sorter once per vtx facade and shares it across every cluster that references the
-	 *  same facade (clusters in a batch are processed in parallel). Thread-safe. Returns null when
-	 *  there are no usable sorting rules. */
-	TSharedPtr<PCGExSorting::FSorter> GetOrBuildSorter(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InVtxDataFacade) const;
+	/** Builds (or reuses) a sorter for the given source facade. Reuse is held via weak references, so a
+	 *  completed batch's facade is released rather than pinned alive for the whole execution. All clusters
+	 *  of a batch share one vtx facade (and thus one sorter); each cluster has its own edge facade.
+	 *  Thread-safe. Returns null when there are no usable sorting rules. */
+	TSharedPtr<PCGExSorting::FSorter> GetOrBuildSorter(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InSortFacade) const;
 
 private:
 	mutable FCriticalSection SorterLock;
-	mutable TMap<PCGExData::FFacade*, TSharedPtr<PCGExSorting::FSorter>> SortersByFacade;
+
+	// Weak so a sorter (and the facade it strong-refs) lives only as long as some cluster's operation holds
+	// it; otherwise this factory-level map would pin every batch's facade alive until end of execution.
+	mutable TMap<PCGExData::FFacade*, TWeakPtr<PCGExSorting::FSorter>> SortersByFacade;
 };
 
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|VtxProperty", meta=(PCGExNodeLibraryDoc="clusters/analyze/cluster-vtx-properties/vtx-sorted-neighbor"))
