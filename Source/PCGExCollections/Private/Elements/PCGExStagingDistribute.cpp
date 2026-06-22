@@ -713,7 +713,7 @@ namespace PCGExAssetStaging
 
 				FTransform& OutTransform = OutTransforms[Index];
 				FVector OutTranslation = FVector::ZeroVector;
-				FBox OutBounds = Entry->Staging.Bounds;
+				FBox OutBounds = Entry->Staging.AlteredBounds;
 
 				const FPCGExFittingVariations& EntryVariations = Entry->GetVariations(EntryHost);
 
