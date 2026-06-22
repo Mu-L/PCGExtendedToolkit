@@ -8,12 +8,15 @@
 #include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
+#include "Misc/ScopeLock.h"
 #include "Sorting/PCGExPointSorter.h"
 #include "Sorting/PCGExSortingDetails.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExVtxPropertySortedNeighbor"
 #define PCGEX_NAMESPACE PCGExVtxPropertySortedNeighbor
+
+#pragma region FPCGExVtxPropertySortedNeighbor
 
 bool FPCGExVtxPropertySortedNeighbor::PrepareForCluster(FPCGExContext* InContext, TSharedPtr<PCGExClusters::FCluster> InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataFacade, const TSharedPtr<PCGExData::FFacade>& InEdgeDataFacade)
 {
@@ -28,17 +31,10 @@ bool FPCGExVtxPropertySortedNeighbor::PrepareForCluster(FPCGExContext* InContext
 		return false;
 	}
 
-	if (SortingRules.IsEmpty())
-	{
-		PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Vtx : Sorted Neighbor -- no sorting rules provided."));
-		bIsValidOperation = false;
-		return false;
-	}
-
-	// Sorter reads the vtx attributes through Direct proxies (immutable input, random-access safe).
-	Sorter = MakeShared<PCGExSorting::FSorter>(InContext, InVtxDataFacade.ToSharedRef(), SortingRules);
-	Sorter->SortDirection = Config.SortDirection;
-	if (!Sorter->Init(InContext))
+	// The sorter is shared across all clusters of this vtx facade (built once, see GetOrBuildSorter).
+	check(Factory);
+	Sorter = Factory->GetOrBuildSorter(InContext, InVtxDataFacade.ToSharedRef());
+	if (!Sorter)
 	{
 		bIsValidOperation = false;
 		return false;
@@ -70,20 +66,60 @@ void FPCGExVtxPropertySortedNeighbor::ProcessNode(PCGExClusters::FNode& Node, co
 	Config.SortedNeighbor.Set(Node.PointIndex, Adjacency[IBest], Cluster->GetNode(Adjacency[IBest].NodeIndex)->Num());
 }
 
+#pragma endregion
+
+#pragma region UPCGExVtxPropertySortedNeighborFactory
+
+TSharedPtr<FPCGExVtxPropertyOperation> UPCGExVtxPropertySortedNeighborFactory::CreateOperation(FPCGExContext* InContext) const
+{
+	PCGEX_FACTORY_NEW_OPERATION(VtxPropertySortedNeighbor)
+	PCGEX_VTX_EXTRA_CREATE
+	NewOperation->Factory = this;
+	return NewOperation;
+}
+
+TSharedPtr<PCGExSorting::FSorter> UPCGExVtxPropertySortedNeighborFactory::GetOrBuildSorter(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InVtxDataFacade) const
+{
+	PCGExData::FFacade* Key = &InVtxDataFacade.Get();
+
+	FScopeLock Lock(&SorterLock);
+
+	if (const TSharedPtr<PCGExSorting::FSorter>* Existing = SortersByFacade.Find(Key))
+	{
+		return *Existing;
+	}
+
+	TSharedPtr<PCGExSorting::FSorter> NewSorter;
+
+	if (SortingRules.IsEmpty())
+	{
+		PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Vtx : Sorted Neighbor -- no sorting rules provided."));
+	}
+	else
+	{
+		NewSorter = MakeShared<PCGExSorting::FSorter>(InContext, InVtxDataFacade, SortingRules);
+		NewSorter->SortDirection = Config.SortDirection;
+		if (!NewSorter->Init(InContext))
+		{
+			NewSorter = nullptr;
+		}
+	}
+
+	// Cache the result (even a null failure) so we don't retry the build for every cluster.
+	SortersByFacade.Add(Key, NewSorter);
+	return NewSorter;
+}
+
+#pragma endregion
+
+#pragma region UPCGExVtxPropertySortedNeighborSettings
+
 #if WITH_EDITOR
 FString UPCGExVtxPropertySortedNeighborSettings::GetDisplayName() const
 {
 	return TEXT("");
 }
 #endif
-
-TSharedPtr<FPCGExVtxPropertyOperation> UPCGExVtxPropertySortedNeighborFactory::CreateOperation(FPCGExContext* InContext) const
-{
-	PCGEX_FACTORY_NEW_OPERATION(VtxPropertySortedNeighbor)
-	PCGEX_VTX_EXTRA_CREATE
-	NewOperation->SortingRules = SortingRules;
-	return NewOperation;
-}
 
 TArray<FPCGPinProperties> UPCGExVtxPropertySortedNeighborSettings::InputPinProperties() const
 {
@@ -99,6 +135,8 @@ UPCGExFactoryData* UPCGExVtxPropertySortedNeighborSettings::CreateFactory(FPCGEx
 	NewFactory->SortingRules = PCGExSorting::GetSortingRules(InContext, PCGExSorting::Labels::SourceSortingRules);
 	return Super::CreateFactory(InContext, NewFactory);
 }
+
+#pragma endregion
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

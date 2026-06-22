@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "HAL/CriticalSection.h"
 #include "PCGExVtxPropertyFactoryProvider.h"
 #include "Factories/PCGExFactoryProvider.h"
 #include "Sorting/PCGExSortingCommon.h"
@@ -13,6 +14,13 @@
 #include "PCGExVtxPropertySortedNeighbor.generated.h"
 
 ///
+
+class UPCGExVtxPropertySortedNeighborFactory;
+
+namespace PCGExData
+{
+	class FFacade;
+}
 
 namespace PCGExSorting
 {
@@ -49,7 +57,7 @@ class FPCGExVtxPropertySortedNeighbor : public FPCGExVtxPropertyOperation
 public:
 	FPCGExSortedNeighborConfig Config;
 
-	TArray<FPCGExSortRuleConfig> SortingRules;
+	const UPCGExVtxPropertySortedNeighborFactory* Factory = nullptr;
 
 	virtual bool PrepareForCluster(FPCGExContext* InContext, TSharedPtr<PCGExClusters::FCluster> InCluster, const TSharedPtr<PCGExData::FFacade>& InVtxDataFacade, const TSharedPtr<PCGExData::FFacade>& InEdgeDataFacade) override;
 	virtual void ProcessNode(PCGExClusters::FNode& Node, const TArray<PCGExClusters::FAdjacencyData>& Adjacency, const PCGExMath::FBestFitPlane& BFP) override;
@@ -70,6 +78,15 @@ public:
 	TArray<FPCGExSortRuleConfig> SortingRules;
 
 	virtual TSharedPtr<FPCGExVtxPropertyOperation> CreateOperation(FPCGExContext* InContext) const override;
+
+	/** Builds the sorter once per vtx facade and shares it across every cluster that references the
+	 *  same facade (clusters in a batch are processed in parallel). Thread-safe. Returns null when
+	 *  there are no usable sorting rules. */
+	TSharedPtr<PCGExSorting::FSorter> GetOrBuildSorter(FPCGExContext* InContext, const TSharedRef<PCGExData::FFacade>& InVtxDataFacade) const;
+
+private:
+	mutable FCriticalSection SorterLock;
+	mutable TMap<PCGExData::FFacade*, TSharedPtr<PCGExSorting::FSorter>> SortersByFacade;
 };
 
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|VtxProperty", meta=(PCGExNodeLibraryDoc="clusters/analyze/cluster-vtx-properties/vtx-sorted-neighbor"))

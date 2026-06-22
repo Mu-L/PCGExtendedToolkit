@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "StructUtils/InstancedStruct.h"
 
 #include "PCGExAssetCollectionTypes.h"
 #include "PCGExAssetGrammar.h"
@@ -98,13 +99,13 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetStagingData
 	UPROPERTY(VisibleAnywhere, Category = Settings)
 	FBox Bounds = FBox(ForceInit);
 
-	/** Offset applied to Bounds.Min to compute fitting. Bounds applied to the mesh remain the original ones. */
-	UPROPERTY(VisibleAnywhere, Category = Settings)
-	FVector BoundsStagingOffsetMin = FVector::ZeroVector;
-	
-	/** Offset applied to Bounds.Max to compute fitting. Bounds applied to the mesh remain the original ones. */
-	UPROPERTY(VisibleAnywhere, Category = Settings)
-	FVector BoundsStagingOffsetMax = FVector::ZeroVector;
+	/**
+	 * Optional modifier that derives AlteredBounds (the bounds used for fitting, spacing and
+	 * best-fit selection) from the original asset-derived Bounds. Null = AlteredBounds mirrors
+	 * Bounds. The bounds applied to the mesh itself always remain the original ones.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(BaseStruct="/Script/PCGExCollections.PCGExStagingBoundsModifier", ExcludeBaseStruct))
+	FInstancedStruct BoundsStagingModifier;
 	
 	FBox AlteredBounds = FBox(ForceInit);
 	

@@ -2,6 +2,7 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Core/PCGExAssetCollection.h"
+#include "Core/PCGExStagingBoundsModifier.h"
 
 #include "PCGExLog.h"
 #include "PCGExProperty.h"
@@ -270,17 +271,18 @@ namespace PCGExAssetCollection
 	// index in CategoryNameToIndex). Subsequent entries on the same name reuse that slot.
 	void FCache::RegisterEntry(int32 Index, const FPCGExAssetCollectionEntry* InEntry)
 	{
-		if (InEntry)
+		check(InEntry);
+
+		FPCGExAssetCollectionEntry* MutableEntry = const_cast<FPCGExAssetCollectionEntry*>(InEntry);
+		FPCGExAssetStagingData& Staging = MutableEntry->Staging;
+
+		if (const FPCGExStagingBoundsModifier* Modifier = Staging.BoundsStagingModifier.GetPtr<FPCGExStagingBoundsModifier>())
 		{
-			FPCGExAssetCollectionEntry* MutableEntry = const_cast<FPCGExAssetCollectionEntry*>(InEntry);
-			MutableEntry->Staging.AlteredBounds = FBox(
-				MutableEntry->Staging.Bounds.Min + MutableEntry->Staging.BoundsStagingOffsetMin,
-				MutableEntry->Staging.Bounds.Max + MutableEntry->Staging.BoundsStagingOffsetMax);
-			
-			if (!MutableEntry->Staging.AlteredBounds.IsValid)
-			{
-				MutableEntry->Staging.AlteredBounds = MutableEntry->Staging.Bounds;
-			}
+			Staging.AlteredBounds = Modifier->ComputeAlteredBounds(Staging.Bounds);
+		}
+		else
+		{
+			Staging.AlteredBounds = Staging.Bounds;
 		}
 
 		Main->RegisterEntry(Index, InEntry);
