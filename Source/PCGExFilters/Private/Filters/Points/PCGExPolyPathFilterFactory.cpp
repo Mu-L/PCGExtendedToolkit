@@ -278,16 +278,32 @@ namespace PCGExPathInclusion
 		bIgnoreSelf = InFactory->bIgnoreSelf;
 	}
 
-	void FHandler::Init(const EPCGExSplineCheckType InCheckType)
+	void FHandler::Init(const EPCGExSplineCheckType InCheckType, const EPCGExDistance InPrecision)
 	{
 		Check = InCheckType;
+
+		// Failsafe: only Sphere/Box enable precision. Center, the hidden None sentinel, and any out-of-range
+		// value (e.g. forced through an override pin) all fall back to Center, so precision is never half-enabled.
+		switch (InPrecision)
+		{
+		case EPCGExDistance::SphereBounds:
+		case EPCGExDistance::BoxBounds:
+			Precision = InPrecision;
+			break;
+		default:
+			Precision = EPCGExDistance::Center;
+			break;
+		}
+
+		const bool bUsePrecision = Precision != EPCGExDistance::Center;
 
 		switch (Check)
 		{
 		case EPCGExSplineCheckType::IsInside:
 			GoodFlags = Inside;
 
-			if (Tolerance <= 0)
+			// Precision needs the distance path (the fast path is center-only and can't see the bound).
+			if (!bUsePrecision && Tolerance <= 0)
 			{
 				bFastCheck = true;
 			}
@@ -310,7 +326,8 @@ namespace PCGExPathInclusion
 		case EPCGExSplineCheckType::IsOutside:
 			GoodFlags = Outside;
 
-			if (Tolerance <= 0)
+			// Precision needs the distance path (the fast path is center-only and can't see the bound).
+			if (!bUsePrecision && Tolerance <= 0)
 			{
 				bFastCheck = true;
 			}
@@ -343,139 +360,123 @@ namespace PCGExPathInclusion
 		}
 	}
 
-	EFlags FHandler::GetInclusionFlags(const FVector& WorldPosition, int32& InclusionCount, const bool bClosestOnly, const UPCGData* InParentData, const TSet<const UPCGData*>* InAdditionalExclude) const
+	EFlags FHandler::GetInclusionFlags(const FTransform& InTransform, const FVector& InBoundsMin, const FVector& InBoundsMax, int32& InclusionCount, const bool bClosestOnly, const UPCGData* InParentData, const TSet<const UPCGData*>* InAdditionalExclude) const
 	{
+		const FVector WorldPosition = InTransform.GetLocation();
+		const bool bUsePrecision = Precision != EPCGExDistance::Center;
+
 		uint8 OutFlags = None;
 		bool bIsOn = false;
+		bool bAnyShapeAllGood = false; // All-scope (AndOn): a single shape must satisfy every good flag
+
+		// Bounding-sphere (corner) radius of the tested bound. It upper-bounds any box reach too, so it both sizes
+		// the octree broad-phase query (below) and serves as the reach for SphereBounds. Only paid under precision.
+		const double SphereReach = bUsePrecision ? (((InBoundsMax - InBoundsMin) * 0.5) * InTransform.GetScale3D()).Length() : 0.0;
 
 		const auto* DataArray = Datas->GetData();
 		const auto* PathArray = Paths->GetData();
 
+		// The candidate query must cover the bound's reach, or far paths the bound touches are never visited and
+		// can't contribute the 'On' flag. Center keeps the cheap 1-unit query (its reach is 0).
+		const FVector QueryExtent = bUsePrecision ? FVector(SphereReach + Tolerance) : FVector::OneVector;
+
+		auto ShouldSkip = [&](const PCGExOctree::FItem& Item) -> bool
+		{
+			if (bIgnoreSelf && DataArray[Item.Index].Data == InParentData) { return true; }
+			if (!MatchIgnoreList.IsEmpty() && MatchIgnoreList.Contains(DataArray[Item.Index].Data)) { return true; }
+			if (InAdditionalExclude && InAdditionalExclude->Contains(DataArray[Item.Index].Data)) { return true; }
+			return false;
+		};
+
 		if (bFastCheck)
 		{
-			if (bClosestOnly)
+			Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, QueryExtent), [&](const PCGExOctree::FItem& Item)
 			{
-				Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, FVector::OneVector), [&](const PCGExOctree::FItem& Item)
-				{
-					if (bIgnoreSelf && DataArray[Item.Index].Data == InParentData)
-					{
-						return;
-					}
-					if (!MatchIgnoreList.IsEmpty() && MatchIgnoreList.Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
-					if (InAdditionalExclude && InAdditionalExclude->Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
+				if (ShouldSkip(Item)) { return; }
 
-					const bool bInside = PathArray[Item.Index]->IsInsideProjection(WorldPosition);
-					InclusionCount += bInside;
-					OutFlags = bInside ? Inside : Outside;
-				});
-			}
-			else
-			{
-				Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, FVector::OneVector), [&](const PCGExOctree::FItem& Item)
-				{
-					if (bIgnoreSelf && DataArray[Item.Index].Data == InParentData)
-					{
-						return;
-					}
-					if (!MatchIgnoreList.IsEmpty() && MatchIgnoreList.Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
-					if (InAdditionalExclude && InAdditionalExclude->Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
-
-					const bool bInside = PathArray[Item.Index]->IsInsideProjection(WorldPosition);
-					InclusionCount += bInside;
-					OutFlags |= bInside ? Inside : Outside;
-				});
-			}
+				const bool bInside = PathArray[Item.Index]->IsInsideProjection(WorldPosition);
+				InclusionCount += bInside;
+				if (bClosestOnly) { OutFlags = bInside ? Inside : Outside; }
+				else { OutFlags |= bInside ? Inside : Outside; }
+			});
 		}
 		else
 		{
-			if (bClosestOnly)
+			// 'On' band: the nearest boundary lies within the bound's reach toward it plus the tolerance band.
+			// Center -> reach 0, measured as 3D squared distance (unchanged legacy behaviour). Precision -> reach is
+			// the sphere radius / oriented-box silhouette, and the distance is measured IN-PLANE (projected) so it
+			// matches the 2D inside test; out-of-plane extent is left to the octree / ExpandZAxis broad-phase.
+			auto ComputeIsOn = [&](const PCGExPaths::FPath& Path, const FTransform& Closest, const double DistSquared3D) -> bool
 			{
-				double BestDist = TNumericLimits<double>::Max();
-
-				if (Check == EPCGExSplineCheckType::IsOn)
+				if (!bUsePrecision)
 				{
+					const double Tol = bScaleTolerance ? FMath::Square(Tolerance * (Closest.GetScale3D() * ToleranceScaleFactor).Length()) : ToleranceSquared;
+					return DistSquared3D < Tol;
 				}
 
-				Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, FVector::OneVector), [&](const PCGExOctree::FItem& Item)
+				const FPCGExGeo2DProjectionDetails& Projection = Path.GetProjection();
+				const FVector ClosestLoc = Closest.GetLocation();
+				const FVector FlatPos = Projection.ProjectFlat(WorldPosition);
+				const double InPlaneDistSq = FVector::DistSquared(FlatPos, Projection.ProjectFlat(ClosestLoc));
+
+				double Reach = SphereReach;
+				if (Precision == EPCGExDistance::BoxBounds)
 				{
-					if (bIgnoreSelf && DataArray[Item.Index].Data == InParentData)
-					{
-						return;
-					}
-					if (!MatchIgnoreList.IsEmpty() && MatchIgnoreList.Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
-					if (InAdditionalExclude && InAdditionalExclude->Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
+					// Closest point on the oriented box toward the boundary (same clamp as GetSpatializedCenter<BoxBounds>),
+					// projected so the reach is measured in the same plane as InPlaneDistSq.
+					const FVector LocalClosest = InTransform.InverseTransformPosition(ClosestLoc).ComponentMax(InBoundsMin).ComponentMin(InBoundsMax);
+					Reach = FVector::Dist(FlatPos, Projection.ProjectFlat(InTransform.TransformPosition(LocalClosest)));
+				}
 
-					bool bLocalIsInside = false;
-					const FTransform Closest = PathArray[Item.Index]->GetClosestTransform(WorldPosition, bLocalIsInside, bScaleTolerance);
-					InclusionCount += bLocalIsInside;
-					OutFlags |= bLocalIsInside ? Inside : Outside;
+				const double LinearTol = bScaleTolerance ? Tolerance * (Closest.GetScale3D() * ToleranceScaleFactor).Length() : Tolerance;
+				const double Band = Reach + LinearTol;
+				return InPlaneDistSq < Band * Band; // squared compare -- no sqrt of the per-path distance
+			};
 
-					if (const double Dist = FVector::DistSquared(WorldPosition, Closest.GetLocation());
-						Dist < BestDist)
-					{
-						BestDist = Dist;
-						const double Tol = bScaleTolerance ? FMath::Square(Tolerance * (Closest.GetScale3D() * ToleranceScaleFactor).Length()) : ToleranceSquared;
-						bIsOn = Dist < Tol;
-					}
-				});
-			}
-			else
+			double BestDist = TNumericLimits<double>::Max();
+
+			Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, QueryExtent), [&](const PCGExOctree::FItem& Item)
 			{
-				Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(WorldPosition, FVector::OneVector), [&](const PCGExOctree::FItem& Item)
+				if (ShouldSkip(Item)) { return; }
+
+				const PCGExPaths::FPath& Path = *PathArray[Item.Index];
+				bool bLocalIsInside = false;
+				const FTransform Closest = Path.GetClosestTransform(WorldPosition, bLocalIsInside, bScaleTolerance);
+				InclusionCount += bLocalIsInside;
+				OutFlags |= bLocalIsInside ? Inside : Outside;
+
+				const double DistSquared3D = FVector::DistSquared(WorldPosition, Closest.GetLocation());
+				const bool bLocalOn = ComputeIsOn(Path, Closest, DistSquared3D);
+
+				if (FlagScope == All)
 				{
-					if (bIgnoreSelf && DataArray[Item.Index].Data == InParentData)
-					{
-						return;
-					}
-					if (!MatchIgnoreList.IsEmpty() && MatchIgnoreList.Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
-					if (InAdditionalExclude && InAdditionalExclude->Contains(DataArray[Item.Index].Data))
-					{
-						return;
-					}
-
-					bool bLocalIsInside = false;
-					const FTransform Closest = PathArray[Item.Index]->GetClosestTransform(WorldPosition, bLocalIsInside, bScaleTolerance);
-					InclusionCount += bLocalIsInside;
-					OutFlags |= bLocalIsInside ? Inside : Outside;
-
-					const double Tol = bScaleTolerance ? FMath::Square(Tolerance * (Closest.GetScale3D() * ToleranceScaleFactor).Length()) : ToleranceSquared;
-					if (FVector::DistSquared(WorldPosition, Closest.GetLocation()) < Tol)
-					{
-						bIsOn = true;
-					}
-				});
-			}
+					// Require the SAME shape to satisfy every good flag (e.g. inside AND on its own boundary),
+					// instead of letting Inside come from one shape and On from another.
+					const uint8 ShapeFlags = (bLocalIsInside ? Inside : Outside) | (bLocalOn ? On : None);
+					if (EnumHasAllFlags(static_cast<EFlags>(ShapeFlags), GoodFlags)) { bAnyShapeAllGood = true; }
+				}
+				else if (bClosestOnly && !bUsePrecision)
+				{
+					// Center 'closest' pick: On reflects the nearest-by-distance shape only.
+					if (DistSquared3D < BestDist) { BestDist = DistSquared3D; bIsOn = bLocalOn; }
+				}
+				else if (bLocalOn)
+				{
+					// All pick, and every precision pick: On if the bound is on any shape. Precision can't take the
+					// nearest-by-center shortcut because the oriented-box reach is direction-dependent.
+					bIsOn = true;
+				}
+			});
 		}
 
-		if (OutFlags == None)
+		if (FlagScope == All)
 		{
-			OutFlags = Outside;
+			// AndOn passes iff a single shape satisfied every good flag; BadFlags is None for these checks.
+			return bAnyShapeAllGood ? GoodFlags : Outside;
 		}
-		if (bIsOn)
-		{
-			OutFlags |= On;
-		}
+
+		if (OutFlags == None) { OutFlags = Outside; }
+		if (bIsOn) { OutFlags |= On; }
 
 		return static_cast<EFlags>(OutFlags);
 	}

@@ -606,7 +606,7 @@ namespace PCGExData
 	{
 		InData->GetTransformValueRange(false)[Index] = Transform;
 		InData->GetBoundsMinValueRange(false)[Index] = BoundsMin;
-		InData->GetBoundsMinValueRange(false)[Index] = BoundsMax;
+		InData->GetBoundsMaxValueRange(false)[Index] = BoundsMax;
 		InData->GetColorValueRange(false)[Index] = Color;
 	}
 

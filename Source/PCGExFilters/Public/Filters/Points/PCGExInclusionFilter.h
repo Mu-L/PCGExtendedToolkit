@@ -40,6 +40,14 @@ struct FPCGExInclusionFilterConfig
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	EPCGExSplineCheckType CheckType = EPCGExSplineCheckType::IsInside;
 
+	/** How the tested point's bounds factor into the check. Center (default) tests the point location only and is
+	 *  fastest. Sphere/Box widen the on-boundary band by the bound's reach so the check applies to the whole bound,
+	 *  but the meaning depends on the check: "Is Inside" requires the *entire* bound inside, "Is Outside" entirely
+	 *  outside, while the On family ("Is On", "...Or On", "...And On") treat the bound as On when it touches/crosses
+	 *  a boundary. More expensive (forces the distance path). The hidden "None" value falls back to Center. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	EPCGExDistance BoundsCheck = EPCGExDistance::Center;
+
 	/** If a point is both inside and outside a spline (if there are multiple ones), decide what value to favor. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	EPCGExSplineFilterPick Pick = EPCGExSplineFilterPick::All;
@@ -131,7 +139,7 @@ namespace PCGExPointFilter
 			  , TypedFilterFactory(InFactory)
 		{
 			Handler = TypedFilterFactory->CreateHandler();
-			Handler->Init(TypedFilterFactory->Config.CheckType);
+			Handler->Init(TypedFilterFactory->Config.CheckType, TypedFilterFactory->Config.BoundsCheck);
 			Handler->ToleranceScaleFactor = FVector(0, 1, 1);
 		}
 
@@ -144,7 +152,12 @@ namespace PCGExPointFilter
 		bool bNoMatchResult = false;
 
 		bool bCheckAgainstDataBounds = false;
+
+		// Cached input value ranges for the per-point hot path (Test(int32)) -- read directly, no FPoint virtual
+		// dispatch. BoundsMin/Max are only consumed by the handler when BoundsCheck != Center.
 		TConstPCGValueRange<FTransform> InTransforms;
+		TConstPCGValueRange<FVector> InBoundsMin;
+		TConstPCGValueRange<FVector> InBoundsMax;
 
 		virtual bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade) override;
 

@@ -100,7 +100,10 @@ namespace PCGExPointFilter
 		}
 
 		bCheckAgainstDataBounds = TypedFilterFactory->Config.bCheckAgainstDataBounds;
+
 		InTransforms = InPointDataFacade->GetIn()->GetConstTransformValueRange();
+		InBoundsMin = InPointDataFacade->GetIn()->GetConstBoundsMinValueRange();
+		InBoundsMax = InPointDataFacade->GetIn()->GetConstBoundsMaxValueRange();
 
 		if (bCheckAgainstDataBounds)
 		{
@@ -118,7 +121,7 @@ namespace PCGExPointFilter
 	bool FInclusionFilter::Test(const PCGExData::FProxyPoint& Point) const
 	{
 		int32 InclusionsCount = 0;
-		PCGExPathInclusion::EFlags Flags = Handler->GetInclusionFlags(Point.GetLocation(), InclusionsCount, TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest);
+		PCGExPathInclusion::EFlags Flags = Handler->GetInclusionFlags(Point.GetTransform(), Point.GetBoundsMin(), Point.GetBoundsMax(), InclusionsCount, TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest);
 
 		PCGEX_CHECK_MAX
 		PCGEX_CHECK_MIN
@@ -147,7 +150,7 @@ namespace PCGExPointFilter
 		}
 
 		int32 InclusionsCount = 0;
-		PCGExPathInclusion::EFlags Flags = Handler->GetInclusionFlags(InTransforms[PointIndex].GetLocation(), InclusionsCount, TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest, PointDataFacade->Source->GetIn(), AdditionalExclude);
+		PCGExPathInclusion::EFlags Flags = Handler->GetInclusionFlags(InTransforms[PointIndex], InBoundsMin[PointIndex], InBoundsMax[PointIndex], InclusionsCount, TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest, PointDataFacade->Source->GetIn(), AdditionalExclude);
 
 		PCGEX_CHECK_MAX
 		PCGEX_CHECK_MIN
@@ -162,7 +165,7 @@ namespace PCGExPointFilter
 		IO->GetDataAsProxyPoint(ProxyPoint);
 
 		int32 InclusionsCount = 0;
-		PCGExPathInclusion::EFlags Flags = Handler->GetInclusionFlags(ProxyPoint.GetLocation(), InclusionsCount, TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest, IO->GetInOut());
+		PCGExPathInclusion::EFlags Flags = Handler->GetInclusionFlags(ProxyPoint.GetTransform(), ProxyPoint.GetBoundsMin(), ProxyPoint.GetBoundsMax(), InclusionsCount, TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest, IO->GetInOut());
 
 		PCGEX_CHECK_MAX
 		PCGEX_CHECK_MIN

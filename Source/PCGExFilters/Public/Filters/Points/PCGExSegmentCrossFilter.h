@@ -99,7 +99,7 @@ namespace PCGExPointFilter
 			  , TypedFilterFactory(InFactory)
 		{
 			Handler = TypedFilterFactory->CreateHandler();
-			Handler->Init(EPCGExSplineCheckType::IsOn);
+			Handler->Init(EPCGExSplineCheckType::IsOn, EPCGExDistance::Center);
 			Handler->ToleranceScaleFactor = FVector(0, 1, 1);
 		}
 

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExCommon.h"
 #include "PCGExFilterCommon.h"
 #include "PCGExVersion.h"
 #include "Core/PCGExPointFilter.h"
@@ -168,7 +169,7 @@ namespace PCGExPathInclusion
 		case EPCGExSplineCheckType::IsInsideOrOn:
 			return TEXT("Is Inside or On");
 		case EPCGExSplineCheckType::IsInsideAndOn:
-			return TEXT("Is Outside and On");
+			return TEXT("Is Inside and On");
 		case EPCGExSplineCheckType::IsOutside:
 			return TEXT("Is Outside");
 		case EPCGExSplineCheckType::IsOutsideOrOn:
@@ -194,6 +195,11 @@ namespace PCGExPathInclusion
 		bool bDistanceCheckOnly = false;
 		bool bIgnoreSelf = true;
 
+		// Precision mode: when not Center, the tested bounds (sphere/box) must satisfy the check, not just the
+		// center. Implemented by inflating the 'On' band by the bound's in-plane reach toward the nearest boundary
+		// (see GetInclusionFlags). Set in Init; forces the distance path (disables bFastCheck for inside/outside).
+		EPCGExDistance Precision = EPCGExDistance::Center;
+
 		EFlags GoodFlags = None;
 		EFlags BadFlags = None;
 		ESplineMatch FlagScope = Any;
@@ -207,7 +213,9 @@ namespace PCGExPathInclusion
 
 		explicit FHandler(const UPCGExPolyPathFilterFactory* InFactory);
 
-		void Init(const EPCGExSplineCheckType InCheckType);
+		// InPrecision is intentionally non-defaulted: every caller must state its bounds mode explicitly so the
+		// shared handler (also used by Time/SegmentCross filters) can never silently inherit a precision setting.
+		void Init(const EPCGExSplineCheckType InCheckType, const EPCGExDistance InPrecision);
 
 		FORCEINLINE bool TestFlags(const EFlags InFlags) const
 		{
@@ -222,7 +230,9 @@ namespace PCGExPathInclusion
 			return bPass;
 		}
 
-		EFlags GetInclusionFlags(const FVector& WorldPosition, int32& InclusionCount, const bool bClosestOnly, const UPCGData* InParentData = nullptr, const TSet<const UPCGData*>* InAdditionalExclude = nullptr) const;
+		// Tested bounds are passed as the point's transform + local bounds (read from value ranges by the caller),
+		// avoiding any FPoint virtual dispatch on the per-point hot path. Center mode only reads the location.
+		EFlags GetInclusionFlags(const FTransform& InTransform, const FVector& InBoundsMin, const FVector& InBoundsMax, int32& InclusionCount, const bool bClosestOnly, const UPCGData* InParentData = nullptr, const TSet<const UPCGData*>* InAdditionalExclude = nullptr) const;
 		PCGExMath::FClosestPosition FindClosestIntersection(const PCGExMath::FSegment& Segment, const FPCGExPathIntersectionDetails& InDetails, const UPCGData* InParentData = nullptr, const TSet<const UPCGData*>* InAdditionalExclude = nullptr) const;
 	};
 }
