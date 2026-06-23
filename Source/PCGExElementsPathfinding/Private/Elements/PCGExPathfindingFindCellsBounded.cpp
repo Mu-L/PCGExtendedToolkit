@@ -655,7 +655,6 @@ namespace PCGExFindContoursBounded
 				return;
 			}
 
-			OBBPointIO->Tags->Reset();
 			if (!TriageTag.IsEmpty())
 			{
 				OBBPointIO->Tags->AddRaw(TriageTag);
@@ -943,7 +942,6 @@ namespace PCGExFindContoursBounded
 				return;
 			}
 
-			OBBPointIO->Tags->Reset();
 			if (!TriageTag.IsEmpty())
 			{
 				OBBPointIO->Tags->AddRaw(TriageTag);

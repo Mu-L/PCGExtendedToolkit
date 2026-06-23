@@ -281,7 +281,6 @@ namespace PCGExFindAllCells
 						return false;
 					}
 
-					OBBPointIO->Tags->Reset();
 					OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 					PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
 
@@ -305,7 +304,6 @@ namespace PCGExFindAllCells
 				return false;
 			}
 
-			OBBPointIO->Tags->Reset();
 			OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 			PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
 

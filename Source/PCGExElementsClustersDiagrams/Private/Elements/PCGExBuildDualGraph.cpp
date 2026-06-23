@@ -186,7 +186,7 @@ namespace PCGExBuildDualGraph
 			return true;
 		}
 
-		DualVtxIO->Tags->Reset();
+		Context->VtxCarryOverDetails.Prune(DualVtxIO->Tags.Get());
 		DualVtxIO->IOIndex = BatchIndex;
 		PCGExClusters::Helpers::CleanupClusterData(DualVtxIO);
 

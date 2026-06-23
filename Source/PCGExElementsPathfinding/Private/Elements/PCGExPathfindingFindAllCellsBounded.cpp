@@ -496,7 +496,6 @@ namespace PCGExFindAllCellsBounded
 				return;
 			}
 
-			OBBPointIO->Tags->Reset();
 			if (!TriageTag.IsEmpty())
 			{
 				OBBPointIO->Tags->AddRaw(TriageTag);

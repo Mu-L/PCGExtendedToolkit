@@ -426,7 +426,6 @@ namespace PCGExFindContours
 					return;
 				}
 
-				OBBPointIO->Tags->Reset();
 				OBBPointIO->IOIndex = BatchIndex;
 				PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
 
@@ -656,7 +655,6 @@ namespace PCGExFindContours
 				return;
 			}
 
-			OBBPointIO->Tags->Reset();
 			OBBPointIO->IOIndex = BatchIndex;
 			PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
 

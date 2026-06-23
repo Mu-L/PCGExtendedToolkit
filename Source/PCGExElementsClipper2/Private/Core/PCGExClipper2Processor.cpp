@@ -251,11 +251,6 @@ TArray<FPCGPinProperties> UPCGExClipper2ProcessorSettings::OutputPinProperties()
 	return PinProperties;
 }
 
-bool UPCGExClipper2ProcessorSettings::WantsDataMatching() const
-{
-	return MainDataMatching.IsEnabled();
-}
-
 bool UPCGExClipper2ProcessorSettings::WantsOperands() const
 {
 	return false;
@@ -1314,7 +1309,7 @@ namespace PCGExClipper2Processor
 
 	// Partition closed main paths by spatial nesting (union -> PolyTree): each outer + rings it contains is one
 	// footprint, islands restart one. Open/dropped paths become singletons so nothing is lost (failed union
-	// degrades to Split). Sorted by representative index for determinism.
+	// degrades to Split). Appends one block sorted by representative index, so it is safe to call once per pre-group.
 	void BuildNestedPartitions(const TSharedPtr<PCGExClipper2::FOpData>& AllOpData, const TArray<int32>& MainIndices, TArray<TArray<int32>>& OutPartitions)
 	{
 		PCGExClipper2Lib::Paths64 ClosedSubjects;
@@ -1333,6 +1328,10 @@ namespace PCGExClipper2Processor
 			}
 		}
 
+		// Build this call's partitions in a local array so we sort (and own the ordering of) only the footprints
+		// produced from THIS index set, then append them as one contiguous block. This keeps the helper safe to
+		// call once per pre-group (matching + Auto) without re-sorting partitions contributed by earlier calls.
+		TArray<TArray<int32>> Partitions;
 		TSet<int32> Claimed;
 
 		if (!ClosedSubjects.empty())
@@ -1348,7 +1347,7 @@ namespace PCGExClipper2Processor
 
 			for (size_t i = 0; i < Tree.Count(); i++)
 			{
-				CollectFootprint(Tree.Child(i), OutPartitions, Claimed);
+				CollectFootprint(Tree.Child(i), Partitions, Claimed);
 			}
 		}
 
@@ -1357,21 +1356,23 @@ namespace PCGExClipper2Processor
 		{
 			if (AllOpData->IsClosedLoop.IsValidIndex(Idx) && AllOpData->IsClosedLoop[Idx] && !Claimed.Contains(Idx))
 			{
-				OutPartitions.Add({Idx});
+				Partitions.Add({Idx});
 			}
 		}
 
 		// Open paths as singletons.
 		for (const int32 Idx : OpenSingletons)
 		{
-			OutPartitions.Add({Idx});
+			Partitions.Add({Idx});
 		}
 
-		// Deterministic group ordering by the partition's representative (outer / first) index.
-		OutPartitions.Sort([](const TArray<int32>& A, const TArray<int32>& B)
+		// Deterministic ordering within this call's block, by each partition's representative (outer / first) index.
+		Partitions.Sort([](const TArray<int32>& A, const TArray<int32>& B)
 		{
 			return A[0] < B[0];
 		});
+
+		OutPartitions.Append(MoveTemp(Partitions));
 	}
 }
 
@@ -1394,11 +1395,19 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 		}
 	}
 
-	// Determine main data partitions
-	TArray<TArray<int32>> MainPartitions;
+	// Main partitioning runs in two passes so data matching and the grouping policy COMPOSE instead of being
+	// mutually exclusive:
+	//   1. Matching (optional) splits the main inputs into pre-groups.
+	//   2. The grouping policy is applied WITHIN each pre-group.
+	// With matching disabled there is a single pre-group holding every main input, so the policy behaves exactly
+	// as before. With the policy at its default (Consolidate) each pre-group also stays whole, so "matching ->
+	// one group per match" is unchanged too; only Auto/Split now refine inside a matched pre-group.
+
+	// Pass 1 -- pre-groups, in AllOpData index space.
+	TArray<TArray<int32>> PreGroups;
 
 	bool bDoMainMatching = false;
-	// Matching builds the partitions directly; it requires bExposeGroupingPolicy (hidden -> no matching).
+	// Matching requires bExposeGroupingPolicy (the control is hidden otherwise -> no matching).
 	if (Settings->bExposeGroupingPolicy && Settings->MainDataMatching.IsEnabled() && Settings->MainDataMatching.Mode != EPCGExMapMatchMode::Disabled)
 	{
 		auto Matcher = MakeShared<PCGExMatching::FDataMatcher>();
@@ -1408,48 +1417,59 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 
 		if (bDoMainMatching)
 		{
-			PCGExMatching::Helpers::GetMatchingSourcePartitions(Matcher, MainFacades, MainPartitions, true);
+			PCGExMatching::Helpers::GetMatchingSourcePartitions(Matcher, MainFacades, PreGroups, true);
+
+			// GetMatchingSourcePartitions works in MainFacades index space; convert to AllOpData indices
+			// (Facade->Idx == ArrayIndex) so the policy pass + group building can index AllOpData directly.
+			for (TArray<int32>& PreGroup : PreGroups)
+			{
+				for (int32& Idx : PreGroup)
+				{
+					if (Idx < MainFacades.Num())
+					{
+						Idx = MainFacades[Idx]->Idx;
+					}
+				}
+			}
 		}
 	}
 
 	if (!bDoMainMatching)
 	{
-		// No matching - the grouping policy decides how main inputs partition into groups.
-		switch (Settings->GetEffectiveGroupingPolicy())
+		// No matching -> a single pre-group containing every main input.
+		PreGroups.Emplace(MainIndices);
+	}
+
+	// Pass 2 -- apply the grouping policy within each pre-group (one policy per node, shared by every pre-group).
+	const EPCGExGroupingPolicy GroupingPolicy = Settings->GetEffectiveGroupingPolicy();
+
+	TArray<TArray<int32>> MainPartitions;
+	MainPartitions.Reserve(MainIndices.Num());
+
+	for (TArray<int32>& PreGroup : PreGroups)
+	{
+		if (PreGroup.IsEmpty())
+		{
+			continue;
+		}
+
+		switch (GroupingPolicy)
 		{
 		case EPCGExGroupingPolicy::Split:
-			MainPartitions.Reserve(MainIndices.Num());
-			for (const int32 Index : MainIndices)
+			// Each input in the pre-group becomes its own group.
+			for (const int32 Index : PreGroup)
 			{
 				MainPartitions.Add({Index});
 			}
 			break;
 		case EPCGExGroupingPolicy::Consolidate:
-		{
-			TArray<int32>& Consolidated = MainPartitions.Emplace_GetRef();
-			Consolidated.Append(MainIndices);
-		}
-		break;
-		case EPCGExGroupingPolicy::Auto:
-			// Partition by spatial nesting so nested rings become holes; unrelated footprints stay separate.
-			PCGExClipper2Processor::BuildNestedPartitions(Context->AllOpData, MainIndices, MainPartitions);
+			// The whole pre-group is one group.
+			MainPartitions.Add(MoveTemp(PreGroup));
 			break;
-		}
-	}
-	else
-	{
-		// Convert facade indices to AllOpData indices
-		for (TArray<int32>& Partition : MainPartitions)
-		{
-			for (int32& Idx : Partition)
-			{
-				if (Idx < MainFacades.Num())
-				{
-					// Now that Facade->Idx == ArrayIndex, we can use it directly
-					const TSharedPtr<PCGExData::FFacade>& Facade = MainFacades[Idx];
-					Idx = Facade->Idx;
-				}
-			}
+		case EPCGExGroupingPolicy::Auto:
+			// Partition the pre-group by spatial nesting so nested rings become holes; unrelated footprints stay separate.
+			PCGExClipper2Processor::BuildNestedPartitions(Context->AllOpData, PreGroup, MainPartitions);
+			break;
 		}
 	}
 

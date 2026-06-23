@@ -202,7 +202,7 @@ namespace PCGExBuildCellDiagram
 
 		// Create output vertex data (cell centroids + optional corners/midpoints)
 		TSharedPtr<PCGExData::FPointIO> CentroidIO = Context->MainPoints->Emplace_GetRef(VtxDataFacade->Source, PCGExData::EIOInit::New);
-		CentroidIO->Tags->Reset();
+		Context->CarryOverDetails.Prune(CentroidIO->Tags.Get());
 		CentroidIO->IOIndex = BatchIndex;
 		PCGExClusters::Helpers::CleanupClusterData(CentroidIO);
 

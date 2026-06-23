@@ -63,7 +63,6 @@ namespace PCGExClusters
 		PCGExPointArrayDataHelpers::SetNumPointsAllocated(InPathIO->GetOut(), NumCellPoints);
 
 		// Setup tags
-		InPathIO->Tags->Reset();
 		if (!InTriageTag.IsEmpty())
 		{
 			InPathIO->Tags->AddRaw(InTriageTag);

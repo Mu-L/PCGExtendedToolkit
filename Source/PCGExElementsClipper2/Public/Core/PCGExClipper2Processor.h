@@ -266,12 +266,14 @@ public:
 	UPROPERTY()
 	bool bExposeGroupingPolicy = true;
 
-	/** If enabled, lets you to create sub-groups to operate on. If disabled, data is processed individually. */
+	/** If enabled, matches main inputs into pre-groups (by tags / @Data) before the grouping policy below is
+	 * applied within each. If disabled, the grouping policy alone partitions the inputs. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (EditCondition="bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	FPCGExMatchingDetails MainDataMatching = FPCGExMatchingDetails(EPCGExMatchingDetailsUsage::Default);
 
-	/** How should data be grouped when data matching is disabled */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="!WantsDataMatching() && bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
+	/** How main inputs are grouped. With data matching enabled this applies *within* each matched pre-group;
+	 * otherwise it applies across all main inputs. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Processing", meta = (PCG_Overridable, EditCondition="bExposeGroupingPolicy", EditConditionHides, HideEditConditionToggle))
 	EPCGExGroupingPolicy MainInputGroupingPolicy = EPCGExGroupingPolicy::Consolidate;
 
 	/** Whether per-group code can consume nesting-aware (outer + holes) Auto groups; else Auto falls back to Split. */
@@ -370,9 +372,6 @@ public:
 	/** (DEBUG) If enabled, performs a union of all paths in the operand group before proceeding to the operation */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable), AdvancedDisplay)
 	bool bUnionOperandsBeforeOperation = false;
-
-	UFUNCTION()
-	virtual bool WantsDataMatching() const;
 
 	UFUNCTION()
 	virtual bool WantsOperands() const;

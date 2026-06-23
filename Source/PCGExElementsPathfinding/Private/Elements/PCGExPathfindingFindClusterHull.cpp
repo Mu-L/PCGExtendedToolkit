@@ -150,7 +150,6 @@ namespace PCGExFindClusterHull
 				return false;
 			}
 
-			OBBPointIO->Tags->Reset();
 			OBBPointIO->IOIndex = EdgeDataFacade->Source->IOIndex;
 			PCGExClusters::Helpers::CleanupClusterData(OBBPointIO);
 
