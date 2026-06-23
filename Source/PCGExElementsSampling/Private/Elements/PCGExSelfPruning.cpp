@@ -22,7 +22,7 @@ PCGEX_SETTING_VALUE_IMPL(UPCGExSelfPruningSettings, SecondaryExpansion, double, 
 
 bool UPCGExSelfPruningSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if ((Mode != EPCGExSelfPruningMode::Prune || bRandomize) && InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules)
+	if (Mode != EPCGExSelfPruningMode::Prune && InPin->Properties.Label == PCGExSorting::Labels::SourceSortingRules)
 	{
 		return false;
 	}
@@ -38,7 +38,7 @@ bool UPCGExSelfPruningSettings::HasDynamicPins() const
 TArray<FPCGPinProperties> UPCGExSelfPruningSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	PCGExSorting::DeclareSortingRulesInputs(PinProperties, bRandomize ? EPCGPinStatus::Advanced : EPCGPinStatus::Normal);
+	PCGExSorting::DeclareSortingRulesInputs(PinProperties, EPCGPinStatus::Normal);
 	return PinProperties;
 }
 
@@ -176,7 +176,12 @@ namespace PCGExSelfPruning
 			Sorter->SortDirection = Settings->SortDirection;
 
 			PCGEX_SHARED_CONTEXT(Context->GetWeakSelfHandle())
-			if (Sorter->Init(Context))
+
+			// When the sorting rules produce an ordering, SortDirection is already baked into Order;
+			// the randomize pass below must then NOT re-apply it. With no rules, Order stays identity
+			// and the randomize pass owns the SortDirection semantics.
+			const bool bHasRuleOrder = Sorter->Init(Context);
+			if (bHasRuleOrder)
 			{
 				if (TSharedPtr<PCGExSorting::FSortCache> Cache = Sorter->BuildCache(NumPoints))
 				{
@@ -199,12 +204,19 @@ namespace PCGExSelfPruning
 				TConstPCGValueRange<int32> Seeds = PointDataFacade->GetIn()->GetConstSeedValueRange();
 				const int32 MaxRange = NumPoints * Settings->RandomRange;
 				const int32 MinRange = -MaxRange;
-				for (int i = 0; i < NumPoints; i++)
+
+				// Perturb each point's rank (its position in Order) by a per-point random offset.
+				// Priority is keyed by point index so the comparator below reads consistent values,
+				// and the noise draws from that point's own seed (Order[i] is the point at rank i).
+				for (int32 i = 0; i < NumPoints; i++)
 				{
-					Priority[i] = Order[i] + PCGExRandomHelpers::GetRandomStreamFromPoint(Seeds[i], 0, Settings).RandRange(MinRange, MaxRange);
+					const int32 PointIndex = Order[i];
+					Priority[PointIndex] = i + PCGExRandomHelpers::GetRandomStreamFromPoint(Seeds[PointIndex], 0, Settings).RandRange(MinRange, MaxRange);
 				}
-				if (Settings->SortDirection == EPCGExSortDirection::Descending)
+
+				if (!bHasRuleOrder && Settings->SortDirection == EPCGExSortDirection::Descending)
 				{
+					// No rule ordering to honor: SortDirection flips the (otherwise identity) rank order.
 					Order.Sort([&](const int32 A, const int32 B)
 					{
 						return Priority[A] > Priority[B];

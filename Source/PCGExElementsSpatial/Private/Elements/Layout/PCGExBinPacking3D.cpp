@@ -1072,7 +1072,8 @@ namespace PCGExBinPacking3D
 			return false;
 		}
 
-		if (Settings->bEnableWeightConstraint)
+		// Item weight feeds both the weight constraint and load bearing; init the buffer if either needs it.
+		if (Settings->bEnableWeightConstraint || Settings->bEnableLoadBearing)
 		{
 			ItemWeightBuffer = Settings->ItemWeight.GetValueSetting();
 			if (!ItemWeightBuffer->Init(PointDataFacade))

@@ -207,8 +207,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight Constraint", meta = (PCG_Overridable))
 	bool bEnableWeightConstraint = false;
 
-	/** Per-item weight value. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight Constraint", meta = (PCG_Overridable, EditCondition="bEnableWeightConstraint", EditConditionHides))
+	/** Per-item weight/mass value. Shared by the weight constraint (Paper Eq. 23) and load bearing (Paper Eq. 26, mass comparison). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weight Constraint", meta = (PCG_Overridable, EditCondition="bEnableWeightConstraint || bEnableLoadBearing", EditConditionHides))
 	FPCGExInputShorthandSelectorDoubleAbs ItemWeight = FPCGExInputShorthandSelectorDoubleAbs(FName("Weight"), 1.0);
 
 	/** Per-bin maximum weight (read from bin points). */

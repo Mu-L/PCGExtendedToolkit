@@ -6,6 +6,7 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailChildrenBuilder.h"
+#include "IPropertyUtilities.h"
 #include "PropertyHandle.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Widgets/Input/SCheckBox.h"
@@ -203,6 +204,14 @@ void FPCGExMaterialOverrideCollectionCustomization::CustomizeChildren(
 {
 	TSharedPtr<IPropertyHandle> OverridesHandle =
 		PropertyHandle->GetChildHandle(GET_MEMBER_NAME_CHECKED(FPCGExMaterialOverrideCollection, Overrides));
+
+	// Rebuild the entry rows when the inner array gains/loses elements -- otherwise the
+	// header counter ticks up while these child rows stay a stale build-time snapshot.
+	const TWeakPtr<IPropertyUtilities> WeakUtils = CustomizationUtils.GetPropertyUtilities();
+	OverridesHandle->SetOnPropertyValueChanged(FSimpleDelegate::CreateLambda([WeakUtils]()
+	{
+		if (const TSharedPtr<IPropertyUtilities> Utils = WeakUtils.Pin()) { Utils->ForceRefresh(); }
+	}));
 
 	uint32 NumChildren = 0;
 	OverridesHandle->GetNumChildren(NumChildren);
