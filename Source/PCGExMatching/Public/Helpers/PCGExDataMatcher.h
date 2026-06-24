@@ -62,6 +62,7 @@ namespace PCGExMatching
 		int32 NumSources = 0;
 		bool bWantsRecursion = false;
 		int32 MaxRecursionDepth = -1; // -1 = unlimited
+		bool bWantsPoints = false;
 
 		TSharedPtr<TArray<FPCGExTaggedData>> MatchableSources;
 		TSharedPtr<TArray<PCGExData::FConstPoint>> MatchableSourceFirstElements;
@@ -75,6 +76,11 @@ namespace PCGExMatching
 		EPCGExMapMatchMode MatchMode = EPCGExMapMatchMode::Disabled;
 
 		FDataMatcher();
+
+		FORCEINLINE bool WantsPoints() const
+		{
+			return bWantsPoints;
+		}
 
 		FORCEINLINE int32 GetNumSources() const
 		{

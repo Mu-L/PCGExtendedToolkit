@@ -416,14 +416,42 @@ namespace PCGExPackActorData
 				}
 
 				FPCGPoint& Point = PointsForProcessing[Index];
-				Packer->ProcessEntry(ActorRef, Point, Index, Point);
+
+				if (Settings->bTrackActors)
+				{
+					Context->GetMutableComponent()->IgnoreChangeOriginDuringGenerationWithScope(ActorRef, [&]()
+					{
+						Packer->ProcessEntry(ActorRef, Point, Index, Point);
+					});
+				}
+				else
+				{
+					Packer->ProcessEntry(ActorRef, Point, Index, Point);
+				}
 			};
 
 			PCGEX_ASYNC_HANDLE_CHKD_VOID(TaskManager, MainThreadLoop)
 		}
 		else
 		{
-			StartParallelLoopForPoints();
+			if (Settings->bTrackActors)
+			{
+				TArray<const UObject*> ActorRefsArray;
+				ActorRefsArray.Init(nullptr, UniqueActors.Num());
+				for (AActor* ActorRef : UniqueActors)
+				{
+					ActorRefsArray.Add(ActorRef);
+				}
+
+				Context->GetMutableComponent()->IgnoreChangeOriginsDuringGenerationWithScope(ActorRefsArray, [&]()
+				{
+					StartParallelLoopForPoints();
+				});
+			}
+			else
+			{
+				StartParallelLoopForPoints();
+			}
 		}
 	}
 

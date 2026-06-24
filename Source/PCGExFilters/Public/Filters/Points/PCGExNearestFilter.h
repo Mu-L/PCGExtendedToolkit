@@ -21,7 +21,6 @@
 namespace PCGExMatching
 {
 	class FTargetsHandler;
-	class FDataMatcher;
 }
 
 namespace PCGExData
@@ -120,12 +119,11 @@ namespace PCGExPointFilter
 		const TObjectPtr<const UPCGExNearestFilterFactoryData> NearestFactory;
 
 		TSharedPtr<PCGExMatching::FTargetsHandler> TargetsHandler;
-		TSet<const UPCGData*> IgnoreList; // Self-ignore only (this family has no static matching path)
+		TSet<const UPCGData*> IgnoreList; // Self-ignore + collection-level non-matching targets, built once in Init()
 		bool bMatchingFailed = false;
 
-		// Per-point matching: built in Init(), used by each Test to build a point-specific exclude set.
-		TSharedPtr<PCGExMatching::FDataMatcher> InverseMatcher;
-		TArray<FPCGExTaggedData> TargetCandidates;
+		// Fallback result (NoMatchFallback == Pass) returned when a result can't be determined -- collection match
+		// failure (via bCollectionTestResult) and, in derived filters, a missing target buffer.
 		bool bNoMatchResult = false;
 
 		// Per-point distance threshold = MaxDistance (read on the tested point) * DistanceScale.

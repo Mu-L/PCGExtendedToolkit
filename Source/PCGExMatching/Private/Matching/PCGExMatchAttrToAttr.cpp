@@ -104,7 +104,7 @@ bool FPCGExMatchAttrToAttr::Test(const PCGExData::FConstPoint& InTargetElement, 
 	return Config.bInvert ? !bResult : bResult;
 }
 
-bool UPCGExMatchAttrToAttrFactory::WantsPoints()
+bool UPCGExMatchAttrToAttrFactory::WantsPoints() const
 {
 	return !PCGExMetaHelpers::IsDataDomainAttribute(Config.TargetAttributeName);
 }

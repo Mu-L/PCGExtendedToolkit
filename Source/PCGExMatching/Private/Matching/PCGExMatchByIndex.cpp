@@ -88,7 +88,7 @@ bool FPCGExMatchByIndex::Test(const PCGExData::FConstPoint& InTargetElement, con
 	return Config.bInvert ? !bResult : bResult;
 }
 
-bool UPCGExMatchByIndexFactory::WantsPoints()
+bool UPCGExMatchByIndexFactory::WantsPoints() const
 {
 	return !PCGExMetaHelpers::IsDataDomainAttribute(Config.IndexAttribute);
 }

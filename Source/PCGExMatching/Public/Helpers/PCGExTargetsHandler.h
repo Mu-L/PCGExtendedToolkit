@@ -95,9 +95,10 @@ namespace PCGExMatching
 
 		void SetMatchingDetails(FPCGExContext* InContext, const FPCGExMatchingDetails* InDetails);
 		bool PopulateIgnoreList(const TSharedPtr<PCGExData::FPointIO>& InDataCandidate, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const;
-		/** Static matching: uses Test(UPCGData*, ...) which reads the first point only. For per-point attribute
-		 *  matching, create an FDataMatcher directly and call Test(FConstPoint, ...) per-point instead. */
-		bool PopulateIgnoreListInverse(const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& InMatchRuleFactories, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const FPCGExMatchingDetails* InDetails, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const;
+		/** Collection-level matching: builds the ignore list once (data-vs-data, first element only); always built.
+		 *  Sets bOutWantsPoints=true if a rule reads a per-point attribute -- per-point callers should reject it (see
+		 *  PCGExPointFilter::RejectPerPointMatchRule); collection/proxy callers can still use the list. */
+		bool PopulateIgnoreListInverse(const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& InMatchRuleFactories, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const FPCGExMatchingDetails* InDetails, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList, bool& bOutWantsPoints) const;
 		bool HandleUnmatchedOutput(const TSharedPtr<PCGExData::FFacade>& InFacade, const bool bForward = true) const;
 
 		void ForEachPreloader(PCGExData::FMultiFacadePreloader::FPreloaderItCallback&& It) const;

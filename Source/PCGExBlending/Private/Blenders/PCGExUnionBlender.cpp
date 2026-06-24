@@ -107,7 +107,7 @@ namespace PCGExBlending
 						{
 							bSubBlendersInitOk.store(false, std::memory_order_relaxed);
 						}
-					}, 32);
+					}, 8);
 
 				if (!bSubBlendersInitOk.load(std::memory_order_relaxed))
 				{

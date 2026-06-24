@@ -130,25 +130,24 @@ bool PCGExPointFilter::FNearestFilter::Init(FPCGExContext* InContext, const TSha
 
 	const bool bMatchingEnabled = Cfg.DataMatching.IsEnabled() && !NearestFactory->MatchRuleFactories.IsEmpty();
 
+	// This family only supports collection-level (data/tag) matching: the ignore list is identical for every point,
+	// so it is built once here (PopulateIgnoreListInverse, data-vs-data) instead of per-point in Test(). It is never
+	// collection-evaluated, so a rule that reads a per-point attribute is always rejected.
 	if (bMatchingEnabled)
 	{
-		// Always per-point (this family doesn't support collection eval).
-		InverseMatcher = MakeShared<PCGExMatching::FDataMatcher>();
-		InverseMatcher->SetDetails(&Cfg.DataMatching);
+		bNoMatchResult = (Cfg.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
 
-		TArray<TSharedPtr<PCGExData::FFacade>> SingleSource;
-		SingleSource.Add(InPointDataFacade);
-		if (InverseMatcher->Init(NearestFactory->MatchRuleFactories, SingleSource, false))
+		bool bWantsPoints = false;
+		PCGExMatching::FScope MatchingScope(TargetsHandler->Num(), true);
+		const bool bMatched = TargetsHandler->PopulateIgnoreListInverse(NearestFactory->MatchRuleFactories, InPointDataFacade, &Cfg.DataMatching, MatchingScope, IgnoreList, bWantsPoints);
+		if (PCGExPointFilter::RejectPerPointMatchRule(InContext, TEXT("Nearest"), bWantsPoints, false))
 		{
-			TargetsHandler->ForEachTarget([&](const TSharedRef<PCGExData::FFacade>& Target, const int32 TargetIndex)
-			{
-				TargetCandidates.Add(Target->Source->GetTaggedData(PCGExData::EIOSide::In, TargetIndex));
-			});
-			bNoMatchResult = (Cfg.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
+			return false;
 		}
-		else
+		if (!bMatched)
 		{
-			InverseMatcher.Reset();
+			bMatchingFailed = true;
+			bCollectionTestResult = bNoMatchResult;
 		}
 	}
 
@@ -160,6 +159,7 @@ const TSet<const UPCGData*>* PCGExPointFilter::FNearestFilter::ResolveExclude(co
 	bShortCircuit = false;
 	bShortCircuitResult = false;
 
+	// Matching failed for the whole collection (no candidate matched) -> every point takes the fallback result.
 	if (bMatchingFailed)
 	{
 		bShortCircuit = true;
@@ -167,18 +167,8 @@ const TSet<const UPCGData*>* PCGExPointFilter::FNearestFilter::ResolveExclude(co
 		return nullptr;
 	}
 
-	if (InverseMatcher)
-	{
-		Scratch = IgnoreList;
-		if (!InverseMatcher->BuildPerPointExclude(PointDataFacade->Source->GetInPoint(PointIndex), TargetCandidates, Scratch))
-		{
-			bShortCircuit = true;
-			bShortCircuitResult = bNoMatchResult;
-			return nullptr;
-		}
-		return &Scratch;
-	}
-
+	// Collection-level ignore list (self-ignore + non-matching targets), built once in Init(). Scratch is unused
+	// now that there is no per-point exclude set; it is kept in the signature for call-site stability.
 	return &IgnoreList;
 }
 

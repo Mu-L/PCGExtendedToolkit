@@ -62,6 +62,7 @@ namespace PCGExPaths
 		: FPath(SplineData->IsClosed())
 	{
 		Spline = &SplineData->SplineStruct; // MakeSplineCopy(SplineData->SplineStruct);
+		bIsSplineBacked = true;
 
 		TArray<FVector> TempPolyline;
 		Spline->ConvertSplineToPolyLine(ESplineCoordinateSpace::World, FMath::Square(Fidelity), TempPolyline);
@@ -151,15 +152,63 @@ namespace PCGExPaths
 			}
 		}
 
-		if (!Spline)
+		// Point/polygon-built paths keep no FPCGSplineStruct: the closest-point/eval overloads use the polyline
+		// helpers (ClosestEdgeLerp / LerpEdgeTransform) instead. Only spline-built paths retain the real Spline.
+	}
+
+	int32 FPolyPath::ClosestEdgeLerp(const FVector& WorldPosition, float& OutLerp) const
+	{
+		OutLerp = 0;
+		if (Edges.IsEmpty()) { return 0; }
+
+		double BestDistSq = TNumericLimits<double>::Max();
+		int32 BestEdge = 0;
+
+		for (int32 i = 0; i < NumEdges; i++)
 		{
-			LocalSpline = Helpers::MakeSplineFromPoints(Positions, EPCGExSplinePointTypeRedux::Linear, bClosedLoop, false);
-			Spline = LocalSpline.Get();
+			const FPathEdge& Edge = Edges[i];
+			const FVector Start = Positions[Edge.Start].GetLocation();
+			const FVector Closest = FMath::ClosestPointOnSegment(WorldPosition, Start, Positions[Edge.End].GetLocation());
+			if (const double DistSq = FVector::DistSquared(WorldPosition, Closest); DistSq < BestDistSq)
+			{
+				BestDistSq = DistSq;
+				BestEdge = i;
+				// Alpha along the edge from the cached unit direction / length (Edge.Dir is zero for a degenerate edge).
+				OutLerp = Edge.Length > SMALL_NUMBER ? static_cast<float>(FVector::DotProduct(Closest - Start, Edge.Dir) / Edge.Length) : 0.0f;
+			}
 		}
+
+		return BestEdge;
+	}
+
+	FTransform FPolyPath::LerpEdgeTransform(const int32 EdgeIndex, const float Lerp, const bool bUseScale) const
+	{
+		if (Edges.IsEmpty())
+		{
+			if (NumPoints <= 0) { return FTransform::Identity; }
+			const FTransform Single = Positions[0];
+			return FTransform(Single.GetRotation(), Single.GetLocation(), bUseScale ? Single.GetScale3D() : FVector::OneVector);
+		}
+
+		const FPathEdge& Edge = Edges[FMath::Clamp(EdgeIndex, 0, LastEdge)];
+		const FTransform A = Positions[Edge.Start];
+		const FTransform B = Positions[Edge.End];
+
+		const FVector Location = FMath::Lerp(A.GetLocation(), B.GetLocation(), Lerp);
+		const FQuat Rotation = FQuat::Slerp(A.GetRotation(), B.GetRotation(), Lerp).GetNormalized();
+		const FVector Scale = bUseScale ? FMath::Lerp(A.GetScale3D(), B.GetScale3D(), Lerp) : FVector::OneVector;
+
+		return FTransform(Rotation, Location, Scale);
 	}
 
 	FTransform FPolyPath::GetClosestTransform(const FVector& WorldPosition, int32& OutEdgeIndex, float& OutLerp, const bool bUseScale) const
 	{
+		if (!bIsSplineBacked)
+		{
+			OutEdgeIndex = ClosestEdgeLerp(WorldPosition, OutLerp);
+			return LerpEdgeTransform(OutEdgeIndex, OutLerp, bUseScale);
+		}
+
 		const float ClosestKey = Spline->FindInputKeyClosestToWorldLocation(WorldPosition);
 		OutEdgeIndex = FMath::Min(FMath::FloorToInt32(ClosestKey), this->LastEdge);
 		OutLerp = ClosestKey - OutEdgeIndex;
@@ -168,6 +217,14 @@ namespace PCGExPaths
 
 	FTransform FPolyPath::GetClosestTransform(const FVector& WorldPosition, float& OutAlpha, const bool bUseScale) const
 	{
+		if (!bIsSplineBacked)
+		{
+			float Lerp = 0;
+			const int32 EdgeIndex = ClosestEdgeLerp(WorldPosition, Lerp);
+			OutAlpha = NumEdges > 0 ? (EdgeIndex + Lerp) / NumEdges : 0.0f;
+			return LerpEdgeTransform(EdgeIndex, Lerp, bUseScale);
+		}
+
 		const float ClosestKey = Spline->FindInputKeyClosestToWorldLocation(WorldPosition);
 		OutAlpha = ClosestKey / Spline->GetNumberOfSplineSegments();
 		return Spline->GetTransformAtSplineInputKey(ClosestKey, ESplineCoordinateSpace::World, bUseScale);
@@ -176,11 +233,23 @@ namespace PCGExPaths
 	FTransform FPolyPath::GetClosestTransform(const FVector& WorldPosition, bool& bIsInside, const bool bUseScale) const
 	{
 		bIsInside = IsInsideProjection(WorldPosition);
+		if (!bIsSplineBacked)
+		{
+			float Lerp = 0;
+			const int32 EdgeIndex = ClosestEdgeLerp(WorldPosition, Lerp);
+			return LerpEdgeTransform(EdgeIndex, Lerp, bUseScale);
+		}
 		return Spline->GetTransformAtSplineInputKey(Spline->FindInputKeyClosestToWorldLocation(WorldPosition), ESplineCoordinateSpace::World, bUseScale);
 	}
 
 	FTransform FPolyPath::GetClosestTransform(const FVector& WorldPosition, const bool bUseScale) const
 	{
+		if (!bIsSplineBacked)
+		{
+			float Lerp = 0;
+			const int32 EdgeIndex = ClosestEdgeLerp(WorldPosition, Lerp);
+			return LerpEdgeTransform(EdgeIndex, Lerp, bUseScale);
+		}
 		return Spline->GetTransformAtSplineInputKey(Spline->FindInputKeyClosestToWorldLocation(WorldPosition), ESplineCoordinateSpace::World, bUseScale);
 	}
 
@@ -200,6 +269,8 @@ namespace PCGExPaths
 
 	int32 FPolyPath::GetClosestEdge(const FVector& WorldPosition, float& OutLerp) const
 	{
+		if (!bIsSplineBacked) { return ClosestEdgeLerp(WorldPosition, OutLerp); }
+
 		const float ClosestKey = Spline->FindInputKeyClosestToWorldLocation(WorldPosition);
 		const int32 OutEdgeIndex = FMath::FloorToInt32(ClosestKey);
 		OutLerp = ClosestKey - OutEdgeIndex;
@@ -216,6 +287,11 @@ namespace PCGExPaths
 
 	FTransform FPolyPath::GetTransformAtInputKey(const float InKey, const bool bUseScale) const
 	{
+		if (!bIsSplineBacked)
+		{
+			const int32 EdgeIndex = FMath::FloorToInt32(InKey);
+			return LerpEdgeTransform(EdgeIndex, InKey - EdgeIndex, bUseScale);
+		}
 		return Spline->GetTransformAtSplineInputKey(InKey, ESplineCoordinateSpace::World, bUseScale);
 	}
 

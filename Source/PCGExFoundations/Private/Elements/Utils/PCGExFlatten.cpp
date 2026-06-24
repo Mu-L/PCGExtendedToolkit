@@ -84,7 +84,7 @@ bool FPCGExFlattenElement::ExecuteInternal(FPCGContext* Context) const
 		{
 			Metadata->DeleteAttribute(FName("____FIXUP____"));
 		}
-	}, 1);
+	}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 
 	Context->OutputData.TaggedData.Reserve(Copies.Num());
 	for (int32 i = 0; i < Copies.Num(); ++i)

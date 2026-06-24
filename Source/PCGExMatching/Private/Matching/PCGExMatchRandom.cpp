@@ -54,7 +54,7 @@ bool FPCGExMatchRandom::Test(const PCGExData::FConstPoint& InTargetElement, cons
 	return Config.bInvert ? !bResult : bResult;
 }
 
-bool UPCGExMatchRandomFactory::WantsPoints()
+bool UPCGExMatchRandomFactory::WantsPoints() const
 {
 	return !PCGExMetaHelpers::IsDataDomainAttribute(Config.ThresholdAttribute);
 }

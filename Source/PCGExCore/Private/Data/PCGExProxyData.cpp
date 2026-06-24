@@ -258,6 +258,8 @@ namespace PCGExData
 		const FProxyDescriptor& Descriptor,
 		TFunctionRef<TSharedPtr<IBufferProxy>()> Factory)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(IBufferProxyPool::GetOrCreate);
+		
 		const uint64 Key = GetTypeHash(Descriptor);
 
 		// Read-locked fast path: cache hits proceed in parallel across threads.

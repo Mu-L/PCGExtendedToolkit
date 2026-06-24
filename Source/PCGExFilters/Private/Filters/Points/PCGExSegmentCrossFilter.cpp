@@ -55,30 +55,18 @@ namespace PCGExPointFilter
 		const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
 			&& TypedFilterFactory->HasMatchRuleFactories();
 
-		// See FDistanceFilter::Init for the full per-point vs static matching explanation.
-		// Always per-point when matching is enabled (no bCheckAgainstDataBounds on this filter).
-
+		// Segment Cross only supports collection-level (data/tag) matching: the ignore list is identical for every
+		// point, so it is built once here instead of per-point in Test(). It is never collection-evaluated, so a rule
+		// that reads a per-point attribute is always rejected.
 		if (bMatchingEnabled)
 		{
-			InverseMatcher = MakeShared<PCGExMatching::FDataMatcher>();
-			InverseMatcher->SetDetails(&TypedFilterFactory->Config.DataMatching);
-
-			TArray<TSharedPtr<PCGExData::FFacade>> SingleSource;
-			SingleSource.Add(InPointDataFacade);
-			if (InverseMatcher->Init(TypedFilterFactory->GetMatchRuleFactories(), SingleSource, false))
+			bool bWantsPoints = false;
+			const bool bMatched = TypedFilterFactory->PopulateMatchIgnoreList(InContext, InPointDataFacade, Handler->MatchIgnoreList, bWantsPoints);
+			if (PCGExPointFilter::RejectPerPointMatchRule(InContext, TEXT("Segment Cross"), bWantsPoints, false))
 			{
-				bNoMatchResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
+				return false;
 			}
-			else
-			{
-				InverseMatcher.Reset();
-			}
-		}
-
-		if (!InverseMatcher)
-		{
-			// Static matching or no matching
-			if (!TypedFilterFactory->PopulateMatchIgnoreList(InContext, InPointDataFacade, Handler->MatchIgnoreList))
+			if (!bMatched)
 			{
 				bMatchingFailed = true;
 				bCollectionTestResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
@@ -129,20 +117,8 @@ namespace PCGExPointFilter
 			}
 		}
 
-		const TSet<const UPCGData*>* AdditionalExclude = nullptr;
-		TSet<const UPCGData*> PerPointExclude;
-
-		if (InverseMatcher)
-		{
-			if (!InverseMatcher->BuildPerPointExclude(PointDataFacade->Source->GetInPoint(PointIndex), *TypedFilterFactory->Datas, PerPointExclude))
-			{
-				return bNoMatchResult;
-			}
-			AdditionalExclude = &PerPointExclude;
-		}
-
 		const PCGExMath::FSegment Segment(InTransforms[PointIndex].GetLocation(), InTransforms[NextIndex].GetLocation(), Handler->Tolerance);
-		const PCGExMath::FClosestPosition ClosestPosition = Handler->FindClosestIntersection(Segment, TypedFilterFactory->Config.IntersectionSettings, PointDataFacade->Source->GetIn(), AdditionalExclude);
+		const PCGExMath::FClosestPosition ClosestPosition = Handler->FindClosestIntersection(Segment, TypedFilterFactory->Config.IntersectionSettings, PointDataFacade->Source->GetIn());
 		return TypedFilterFactory->Config.bInvert ? !ClosestPosition.bValid : ClosestPosition.bValid;
 	}
 }

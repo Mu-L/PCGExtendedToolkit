@@ -290,7 +290,7 @@ void FPCGExGetPathDataElement::ProcessActors(FPCGContext* InContext, const UPCGD
 	PCGExMT::ParallelOrSequential(
 		PathWork.Num(),
 		[&](const int32 i) { PCGExGetPathData::FillPath(PathWork[i], Settings); },
-		/*Threshold=*/1);
+		/*Threshold=*/2);
 }
 
 #pragma endregion

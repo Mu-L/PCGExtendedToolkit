@@ -317,6 +317,14 @@ namespace PCGExPointFilter
 
 	PCGEXFILTERS_API
 	void PruneForDirectEvaluation(FPCGExContext* InContext, TArray<TObjectPtr<const UPCGExPointFilterFactoryData>>& InFactories);
+
+	/** Per-point match-rule policy for filters that only support collection-level data matching. Returns true (and
+	 *  logs an error) when there IS a per-point rule (bWantsPoints) AND the filter will be evaluated per-point
+	 *  (bSupportsCollectionFallback == false) -- the caller should then fail Init. Returns false (proceed) when there
+	 *  is no per-point rule, or when the filter falls back to collection/proxy evaluation, where the rule degrades to
+	 *  the representative element rather than being unsupported. */
+	PCGEXFILTERS_API
+	bool RejectPerPointMatchRule(FPCGExContext* InContext, const TCHAR* InFilterLabel, const bool bWantsPoints, const bool bSupportsCollectionFallback);
 }
 
 USTRUCT(meta=(PCG_DataTypeDisplayName="PCGEx | Filter (Data)"))

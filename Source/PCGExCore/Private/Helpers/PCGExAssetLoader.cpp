@@ -48,22 +48,31 @@ namespace PCGEx
 			[&](const int32 i)
 			{
 				(void)IOCollection->Pairs[i]->GetInKeys();
-			}, 1);
+			}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 
 		for (const TSharedPtr<PCGExData::FPointIO>& PointIO : IOCollection->Pairs)
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(IAssetLoader::Discover::Iteration);
 
-			if (!PointIO) { continue; }
+			if (!PointIO)
+			{
+				continue;
+			}
 
 			TSharedRef<PCGExData::FPointIO> PointIORef = PointIO.ToSharedRef();
 			const int32 NumPoints = PointIORef->GetNum();
-			if (NumPoints <= 0) { continue; }
+			if (NumPoints <= 0)
+			{
+				continue;
+			}
 
 			for (const FName& AssetAttributeName : AttributeNames)
 			{
 				TSharedPtr<PCGExData::TAttributeBroadcaster<FSoftObjectPath>> Broadcaster = MakeShared<PCGExData::TAttributeBroadcaster<FSoftObjectPath>>();
-				if (!Broadcaster->Prepare(AssetAttributeName, PointIORef)) { continue; }
+				if (!Broadcaster->Prepare(AssetAttributeName, PointIORef))
+				{
+					continue;
+				}
 
 				TSharedPtr<TArray<PCGExValueHash>> KeysPtr = MakeShared<TArray<PCGExValueHash>>();
 				KeysPtr->Init(0, NumPoints);
@@ -96,14 +105,15 @@ namespace PCGEx
 						for (int32 i = 0; i < Scope.Count; ++i)
 						{
 							const FSoftObjectPath& Path = SliceDump[i];
-							if (!Path.IsAsset()) { continue; }
+							if (!Path.IsAsset())
+							{
+								continue;
+							}
 
 							KeysRef[Scope.Start + i] = PCGExTypes::ComputeHash(Path);
 							LocalUnique.Add(Path);
 						}
-					},
-					2,
-					EParallelForFlags::Unbalanced);
+					}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 
 				ScopedUnique.Collapse(UniquePaths);
 			}
@@ -114,7 +124,10 @@ namespace PCGEx
 
 	void IAssetLoader::AddAssetDependencies()
 	{
-		if (UniquePaths.IsEmpty() || !Context) { return; }
+		if (UniquePaths.IsEmpty() || !Context)
+		{
+			return;
+		}
 
 		TSet<FSoftObjectPath>& Required = Context->GetRequiredAssets();
 		Required.Append(UniquePaths);
@@ -122,7 +135,10 @@ namespace PCGEx
 
 	bool IAssetLoader::Load()
 	{
-		if (UniquePaths.IsEmpty()) { return false; }
+		if (UniquePaths.IsEmpty())
+		{
+			return false;
+		}
 
 		// LoadBlocking_AnyThread marshals to the game thread internally and registers the handle
 		// against the context's TrackedAssets. We also hold our own ref so the assets stay
@@ -136,7 +152,10 @@ namespace PCGEx
 
 	bool IAssetLoader::Load(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 	{
-		if (UniquePaths.IsEmpty()) { return false; }
+		if (UniquePaths.IsEmpty())
+		{
+			return false;
+		}
 
 		PCGExHelpers::Load(
 			TaskManager,
@@ -149,7 +168,10 @@ namespace PCGEx
 			{
 				PCGEX_ASYNC_THIS
 				This->LoadHandle = StreamableHandle;
-				if (bSuccess) { This->Finalize(); }
+				if (bSuccess)
+				{
+					This->Finalize();
+				}
 			});
 
 		return true;
@@ -159,7 +181,10 @@ namespace PCGEx
 	{
 		// Single-CAS gate: if multiple threads race here (e.g. an async Load() completion
 		// callback and a manual Finalize() from the element), exactly one wins.
-		if (FPlatformAtomics::InterlockedCompareExchange(&bFinalized, 1, 0) != 0) { return; }
+		if (FPlatformAtomics::InterlockedCompareExchange(&bFinalized, 1, 0) != 0)
+		{
+			return;
+		}
 
 		PrepareFinalize();
 		BuildAssetsMap();

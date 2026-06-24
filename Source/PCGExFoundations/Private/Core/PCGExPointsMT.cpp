@@ -174,7 +174,7 @@ namespace PCGExPointsMT
 					}
 					ProcessPoints(Loops[i]);
 				},
-				2, EParallelForFlags::Unbalanced);
+				/*Threshold=*/2, EParallelForFlags::Unbalanced);
 		}
 
 		OnPointsProcessingComplete();
@@ -241,7 +241,7 @@ namespace PCGExPointsMT
 					}
 					ProcessRange(Loops[i]);
 				},
-				2, EParallelForFlags::Unbalanced);
+				/*Threshold=*/2, EParallelForFlags::Unbalanced);
 		}
 
 		OnRangeProcessingComplete();
@@ -378,7 +378,7 @@ namespace PCGExPointsMT
 				NewProcessor->bIsTrivial = IO->GetNum() < PCGEX_CORE_SETTINGS.SmallPointsSize;
 				Candidates[i] = NewProcessor;
 
-			}, 1, EParallelForFlags::Unbalanced);
+			}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 
 		{
 			Processors.Reserve(Candidates.Num());
@@ -470,7 +470,7 @@ namespace PCGExPointsMT
 					{
 						Processor->CompleteWork();
 					}
-				}, 1);
+				}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 		}
 	}
 
@@ -499,7 +499,7 @@ namespace PCGExPointsMT
 					{
 						Processor->Write();
 					}
-				}, 1);
+				}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 		}
 	}
 
@@ -546,7 +546,7 @@ namespace PCGExPointsMT
 				{
 					const TSharedRef<IProcessor>& Processor = Processors[i];
 					Processor->bIsProcessorValid = Processor->Process(TaskManager);
-				}, 1);
+				}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 		}
 
 		OnInitialPostProcess();

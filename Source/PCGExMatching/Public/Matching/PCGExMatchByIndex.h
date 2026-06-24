@@ -73,7 +73,7 @@ public:
 	UPROPERTY()
 	FPCGExMatchByIndexConfig Config;
 
-	virtual bool WantsPoints() override;
+	virtual bool WantsPoints() const override;
 
 	virtual TSharedPtr<FPCGExMatchRuleOperation> CreateOperation(FPCGExContext* InContext) const override;
 };

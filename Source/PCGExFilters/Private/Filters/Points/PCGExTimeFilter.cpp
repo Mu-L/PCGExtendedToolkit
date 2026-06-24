@@ -86,28 +86,18 @@ namespace PCGExPointFilter
 		const bool bMatchingEnabled = TypedFilterFactory->Config.DataMatching.IsEnabled()
 			&& TypedFilterFactory->HasMatchRuleFactories();
 
-		// See FDistanceFilter::Init for the full per-point vs static matching explanation.
-
-		if (bMatchingEnabled && !TypedFilterFactory->Config.bCheckAgainstDataBounds)
+		// Time only supports collection-level (data/tag) matching: the ignore list is identical for every point,
+		// so it is built once here instead of per-point in Test(). A rule that reads a per-point attribute is rejected
+		// under per-point evaluation; under collection/proxy mode (bCheckAgainstDataBounds) it degrades gracefully.
+		if (bMatchingEnabled)
 		{
-			InverseMatcher = MakeShared<PCGExMatching::FDataMatcher>();
-			InverseMatcher->SetDetails(&TypedFilterFactory->Config.DataMatching);
-
-			TArray<TSharedPtr<PCGExData::FFacade>> SingleSource;
-			SingleSource.Add(InPointDataFacade);
-			if (InverseMatcher->Init(TypedFilterFactory->GetMatchRuleFactories(), SingleSource, false))
+			bool bWantsPoints = false;
+			const bool bMatched = TypedFilterFactory->PopulateMatchIgnoreList(InContext, InPointDataFacade, Handler->MatchIgnoreList, bWantsPoints);
+			if (PCGExPointFilter::RejectPerPointMatchRule(InContext, TEXT("Time"), bWantsPoints, TypedFilterFactory->Config.bCheckAgainstDataBounds))
 			{
-				bNoMatchResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
+				return false;
 			}
-			else
-			{
-				InverseMatcher.Reset();
-			}
-		}
-		else
-		{
-			// Static matching or no matching
-			if (!TypedFilterFactory->PopulateMatchIgnoreList(InContext, InPointDataFacade, Handler->MatchIgnoreList))
+			if (!bMatched)
 			{
 				bCheckAgainstDataBounds = true;
 				bCollectionTestResult = (TypedFilterFactory->Config.DataMatching.NoMatchFallback == EPCGExFilterFallback::Pass);
@@ -202,6 +192,9 @@ namespace PCGExPointFilter
 	// When multiple splines exist, TimeConsolidation controls how alphas are combined (min/max/avg).
 	bool FTimeFilter::Test(const int32 PointIndex) const
 	{
+		// Matching failed for the whole collection (no candidate matched) -> every point takes the fallback result.
+		if (bCheckAgainstDataBounds) { return bCollectionTestResult; }
+
 		const FVector WorldPosition = InTransforms[PointIndex].GetLocation();
 		float Alpha = 0;
 
@@ -212,16 +205,6 @@ namespace PCGExPointFilter
 		}
 
 		const TSet<const UPCGData*>* MatchExclude = &Handler->MatchIgnoreList;
-		TSet<const UPCGData*> PerPointExclude;
-
-		if (InverseMatcher)
-		{
-			if (!InverseMatcher->BuildPerPointExclude(PointDataFacade->Source->GetInPoint(PointIndex), *TypedFilterFactory->Datas, PerPointExclude))
-			{
-				return bNoMatchResult;
-			}
-			MatchExclude = &PerPointExclude;
-		}
 
 		if (TypedFilterFactory->Config.Pick == EPCGExSplineFilterPick::Closest)
 		{

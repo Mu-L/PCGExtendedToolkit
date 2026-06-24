@@ -118,8 +118,9 @@ namespace PCGExMatching
 		return true;
 	}
 
-	bool FTargetsHandler::PopulateIgnoreListInverse(const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& InMatchRuleFactories, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const FPCGExMatchingDetails* InDetails, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList) const
+	bool FTargetsHandler::PopulateIgnoreListInverse(const TArray<TObjectPtr<const UPCGExMatchRuleFactoryData>>& InMatchRuleFactories, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const FPCGExMatchingDetails* InDetails, FScope& InMatchingScope, TSet<const UPCGData*>& OutIgnoreList, bool& bOutWantsPoints) const
 	{
+		bOutWantsPoints = false;
 		if (!InDetails || !InDetails->IsEnabled())
 		{
 			return true;
@@ -139,6 +140,10 @@ namespace PCGExMatching
 		{
 			return true;
 		}
+
+		// A per-point rule still yields a usable collection-level list (built from the first element); we flag it so
+		// per-point callers can reject it, but we always build the list so collection/proxy callers keep matching.
+		bOutWantsPoints = InverseMatcher->WantsPoints();
 
 		// Build FPCGExTaggedData array from targets (candidates in inverse context)
 		TArray<FPCGExTaggedData> TargetCandidates;

@@ -558,4 +558,14 @@ namespace PCGExPointFilter
 			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(FTEXT("Some filters don't support direct evaluation and will be ignored: \"{0}\"."), FText::FromString(FString::Join(UnsupportedFilters, TEXT(", ")))));
 		}
 	}
+
+	bool RejectPerPointMatchRule(FPCGExContext* InContext, const TCHAR* InFilterLabel, const bool bWantsPoints, const bool bSupportsCollectionFallback)
+	{
+		// Per-point rules are only unsupported under genuine per-point evaluation. Under collection/proxy evaluation
+		// the filter tests a single representative element, so the rule degrades to that element's value -- allowed.
+		if (!bWantsPoints || bSupportsCollectionFallback) { return false; }
+
+		PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("{0} filter does not support per-point match rules (a rule reads a per-point attribute). Use @Data / tag-based rules."), FText::FromString(InFilterLabel)));
+		return true;
+	}
 }

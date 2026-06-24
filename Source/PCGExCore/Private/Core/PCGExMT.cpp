@@ -883,9 +883,7 @@ namespace PCGExMT
 								return;
 							}
 							ExecScopeIteration(Loops[i], bPreparationOnly);
-						},
-						2,                                  // Threshold=2: redundant given the NumScopes==1 branch above, but harmless.
-						EParallelForFlags::Unbalanced);     // Scope cost commonly varies (filtered points, data-dependent inner loops, cluster connectivity).
+						}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 				}
 
 				CompletedCount.fetch_add(NumScopes, std::memory_order_acq_rel);

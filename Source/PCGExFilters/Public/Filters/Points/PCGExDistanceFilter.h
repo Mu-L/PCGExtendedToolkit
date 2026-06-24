@@ -20,7 +20,6 @@
 namespace PCGExMatching
 {
 	class FTargetsHandler;
-	class FDataMatcher;
 }
 
 USTRUCT(BlueprintType)
@@ -127,16 +126,9 @@ namespace PCGExPointFilter
 		const TObjectPtr<const UPCGExDistanceFilterFactory> TypedFilterFactory;
 		TSharedPtr<PCGExMatching::FTargetsHandler> TargetsHandler;
 
-		// Static matching: IgnoreList is built once in Init() using PopulateIgnoreListInverse (data-vs-data, uses first point only).
-		// Used when bCheckAgainstDataBounds=true (collection-level proxy) or when matching is disabled (self-ignore only).
+		// Collection-level matching: IgnoreList is built once in Init() using PopulateIgnoreListInverse (data-vs-data,
+		// first point only), plus the self-ignore. Consulted as-is by every Test(); no per-point matching.
 		TSet<const UPCGData*> IgnoreList;
-
-		// Per-point matching: InverseMatcher + TargetCandidates are stored in Init(), then each Test(PointIndex)
-		// builds a point-specific exclude set by testing that point's attributes against each candidate.
-		// This is the correct path for per-point evaluation with attribute-based match rules (e.g. MatchTagToAttr).
-		TSharedPtr<PCGExMatching::FDataMatcher> InverseMatcher;
-		TArray<FPCGExTaggedData> TargetCandidates;
-		bool bNoMatchResult = false;
 
 		bool bCheckAgainstDataBounds = false;
 

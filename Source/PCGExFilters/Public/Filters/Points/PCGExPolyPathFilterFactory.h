@@ -85,11 +85,11 @@ public:
 
 	TSharedPtr<PCGExPathInclusion::FHandler> CreateHandler() const;
 
-	/** Static matching: builds an ignore list using the first point only (data-vs-data).
-	 *  Use for collection-level proxy evaluation (bCheckAgainstDataBounds) or when no per-point matching is needed.
-	 *  For per-point evaluation, filters should create their own FDataMatcher and call Test(FConstPoint, ...) instead.
-	 *  Returns true if matching passed (or no matcher). Returns false if no targets matched. */
-	bool PopulateMatchIgnoreList(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InFacade, TSet<const UPCGData*>& OutIgnoreList) const;
+	/** Collection-level matching: builds the ignore list once (data-vs-data, first element only); the list is always
+	 *  built. Returns true if matching passed (or no matcher); returns false if no targets matched.
+	 *  Sets bOutWantsPoints=true if a rule reads a per-point attribute on the tested data -- per-point callers should
+	 *  reject it (see PCGExPointFilter::RejectPerPointMatchRule); collection/proxy callers can still use the list. */
+	bool PopulateMatchIgnoreList(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InFacade, TSet<const UPCGData*>& OutIgnoreList, bool& bOutWantsPoints) const;
 
 	/** Whether match rule factories were provided (matching pin connected). */
 	bool HasMatchRuleFactories() const

@@ -32,10 +32,14 @@ namespace PCGExPaths
 {
 	class PCGEXCORE_API FPolyPath : public FPath
 	{
-		TSharedPtr<FPCGSplineStruct> LocalSpline;
 		TArray<FTransform> LocalTransforms;
 
 		const FPCGSplineStruct* Spline = nullptr;
+
+		// True only when constructed from an actual spline (UPCGSplineData). For point/polygon-built paths the
+		// geometry is a polyline, so the closest-point/eval helpers operate directly on Edges/Positions and no
+		// FPCGSplineStruct is synthesized.
+		bool bIsSplineBacked = false;
 
 	public:
 		FPolyPath(
@@ -61,13 +65,13 @@ namespace PCGExPaths
 			const double Expansion = 0, const double ExpansionZ = -1,
 			const EPCGExWindingMutation WindingMutation = EPCGExWindingMutation::Unchanged);
 
-		FORCEINLINE const FPCGSplineStruct* GetSpline() const
-		{
-			return Spline;
-		}
-
 	protected:
 		void InitFromTransforms(const EPCGExWindingMutation WindingMutation = EPCGExWindingMutation::Unchanged);
+
+		// Polyline closest-point + interpolation used when !bIsSplineBacked. Reproduces the linear spline they replace,
+		// straight off the precomputed FPathEdge Dir/Length and the source point transforms.
+		int32 ClosestEdgeLerp(const FVector& WorldPosition, float& OutLerp) const;
+		FTransform LerpEdgeTransform(const int32 EdgeIndex, const float Lerp, const bool bUseScale) const;
 
 	public:
 		virtual FTransform GetClosestTransform(const FVector& WorldPosition, int32& OutEdgeIndex, float& OutLerp, const bool bUseScale = false) const override;

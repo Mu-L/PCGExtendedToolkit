@@ -130,7 +130,7 @@ bool FPCGExMatchTagToAttr::Test(const PCGExData::FConstPoint& InTargetElement, c
 	return !Config.bInvert;
 }
 
-bool UPCGExMatchTagToAttrFactory::WantsPoints()
+bool UPCGExMatchTagToAttrFactory::WantsPoints() const
 {
 	if (Config.TagNameInput == EPCGExInputValueType::Attribute && !PCGExMetaHelpers::IsDataDomainAttribute(Config.TagNameAttribute))
 	{

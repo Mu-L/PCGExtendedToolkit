@@ -15,11 +15,6 @@
 
 #include "PCGExSegmentCrossFilter.generated.h"
 
-namespace PCGExMatching
-{
-	class FDataMatcher;
-}
-
 UENUM()
 enum class EPCGExSegmentCrossWinding : uint8
 {
@@ -109,10 +104,6 @@ namespace PCGExPointFilter
 
 		const TObjectPtr<const UPCGExSegmentCrossFilterFactory> TypedFilterFactory;
 		TSharedPtr<PCGExPathInclusion::FHandler> Handler;
-
-		// Per-point matching -- see FDistanceFilter for full explanation.
-		TSharedPtr<PCGExMatching::FDataMatcher> InverseMatcher;
-		bool bNoMatchResult = false;
 
 		TConstPCGValueRange<FTransform> InTransforms;
 

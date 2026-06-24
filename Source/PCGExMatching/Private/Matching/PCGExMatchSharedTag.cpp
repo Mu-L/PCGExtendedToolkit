@@ -231,7 +231,7 @@ bool FPCGExMatchSharedTag::Test(const PCGExData::FConstPoint& InTargetElement, c
 	return Config.bInvert ? !bResult : bResult;
 }
 
-bool UPCGExMatchSharedTagFactory::WantsPoints()
+bool UPCGExMatchSharedTagFactory::WantsPoints() const
 {
 	return Config.Mode == EPCGExTagMatchMode::Specific &&
 		Config.TagNameInput == EPCGExInputValueType::Attribute &&

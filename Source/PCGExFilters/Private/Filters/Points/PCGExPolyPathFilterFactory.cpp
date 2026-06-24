@@ -219,12 +219,13 @@ TSharedPtr<PCGExPathInclusion::FHandler> UPCGExPolyPathFilterFactory::CreateHand
 	return Handler;
 }
 
-// Static matching path: uses Test(UPCGData*, ...) which reads MatchableSourceFirstElements[0] -- always the
-// first point of the input. Suitable for collection-level proxy evaluation (bCheckAgainstDataBounds) or when
-// no matching is configured. For per-point evaluation with attribute-based rules, filters create their own
-// FDataMatcher and call Test(FConstPoint, ...) per-point instead of using this method.
-bool UPCGExPolyPathFilterFactory::PopulateMatchIgnoreList(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InFacade, TSet<const UPCGData*>& OutIgnoreList) const
+// Collection-level matching path: uses Test(UPCGData*, ...) which reads MatchableSourceFirstElements[0] -- always
+// the first point of the input. These path filters only support collection-level rules, so the ignore list is the
+// same for every point and is built a single time here. If a rule wants per-point evaluation, bOutWantsPoints is
+// set and the caller fails init (we never build a per-point list in the hot path).
+bool UPCGExPolyPathFilterFactory::PopulateMatchIgnoreList(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InFacade, TSet<const UPCGData*>& OutIgnoreList, bool& bOutWantsPoints) const
 {
+	bOutWantsPoints = false;
 	if (!DataMatching.IsEnabled())
 	{
 		return true;
@@ -243,6 +244,10 @@ bool UPCGExPolyPathFilterFactory::PopulateMatchIgnoreList(FPCGExContext* InConte
 	{
 		return true;
 	}
+
+	// A per-point rule still yields a usable collection-level list (built from the first element); we flag it so
+	// per-point callers can reject it, but we always build the list so collection/proxy callers keep matching.
+	bOutWantsPoints = InverseMatcher->WantsPoints();
 
 	PCGExMatching::FScope Scope(1, true);
 	return InverseMatcher->PopulateIgnoreListFromCandidates(*Datas, Scope, OutIgnoreList);

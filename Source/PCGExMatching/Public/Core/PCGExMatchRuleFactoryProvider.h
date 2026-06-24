@@ -107,7 +107,7 @@ public:
 
 	FPCGExMatchRuleConfigBase BaseConfig;
 
-	virtual bool WantsPoints()
+	virtual bool WantsPoints() const
 	{
 		return false;
 	}

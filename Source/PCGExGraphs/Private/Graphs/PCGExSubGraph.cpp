@@ -143,7 +143,7 @@ namespace PCGExGraphs
 
 	void FSubGraph::Compile(const TWeakPtr<PCGExMT::IAsyncHandleGroup>& InParentHandle, const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const TSharedPtr<FGraphBuilder>& InBuilder)
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(FWriteSubGraphEdges::ExecuteTask);
+		TRACE_CPUPROFILER_EVENT_SCOPE(FSubGraph::Compile);
 
 		const TSharedPtr<FGraph> ParentGraph = WeakParentGraph.Pin();
 		const TArray<FNode>& ParentGraphNodes = ParentGraph->Nodes;
@@ -175,7 +175,7 @@ namespace PCGExGraphs
 		// insertion order is already deterministic can opt out of the cost entirely.
 		if (InBuilder->bSortEdgeKeys || InBuilder->bRequiresEdgeResort)
 		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(FWriteSubGraphEdges::SortEdges);
+			TRACE_CPUPROFILER_EVENT_SCOPE(FSubGraph::Compile::SortEdges);
 			PCGExSortingHelpers::RadixSort(Edges);
 		}
 
@@ -208,7 +208,7 @@ namespace PCGExGraphs
 		EnumRemoveFlags(AllocateProperties, EPCGPointNativeProperties::MetadataEntry);
 
 		{
-			TRACE_CPUPROFILER_EVENT_SCOPE(FWriteSubGraphEdges::BuildEdgesEntries);
+			TRACE_CPUPROFILER_EVENT_SCOPE(FSubGraph::Compile::BuildEdgesEntries);
 
 			const TPCGValueRange<int64> OutMetadataEntries = OutEdgeData->GetMetadataEntryValueRange(false);
 			UPCGMetadata* Metadata = OutEdgeData->MutableMetadata();
@@ -226,7 +226,7 @@ namespace PCGExGraphs
 			if (InEdgeData)
 			{
 				// We'll cherry pick existing edges
-				TRACE_CPUPROFILER_EVENT_SCOPE(FWriteSubGraphEdges::CherryPickInheritedEdges);
+				TRACE_CPUPROFILER_EVENT_SCOPE(FSubGraph::Compile::CherryPickInheritedEdges);
 
 				TArray<int32> ReadEdgeIndices;
 				TArray<int32> WriteEdgeIndices;
@@ -270,7 +270,7 @@ namespace PCGExGraphs
 			}
 			else
 			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(FWriteSubGraphEdges::CreatePoints);
+				TRACE_CPUPROFILER_EVENT_SCOPE(FSubGraph::Compile::CreatePoints);
 
 				PCGExMT::ParallelOrSequential(
 					NumEdges,

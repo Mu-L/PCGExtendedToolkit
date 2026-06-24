@@ -186,7 +186,7 @@ bool FPCGExMatchOverlap::Test(const PCGExData::FConstPoint& InTargetElement, con
 	return !Config.bInvert;
 }
 
-bool UPCGExMatchOverlapFactory::WantsPoints()
+bool UPCGExMatchOverlapFactory::WantsPoints() const
 {
 	return !PCGExMetaHelpers::IsDataDomainAttribute(Config.Expansion.Attribute) ||
 		(Config.bUseMinOverlapRatio && !PCGExMetaHelpers::IsDataDomainAttribute(Config.MinOverlapRatio.Attribute));

@@ -392,7 +392,7 @@ bool FPCGExClustersProcessorContext::StartProcessingClusters(FBatchProcessingVal
 		PCGExMT::ParallelOrSequential(Batches.Num(), [&](const int32 i)
 		{
 			Batches[i]->PrepareProcessing(GetTaskManager(), bScopedIndexLookupBuild);
-		}, 1, EParallelForFlags::Unbalanced);
+		}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 	}
 
 	return true;

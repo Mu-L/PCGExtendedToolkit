@@ -229,7 +229,7 @@ namespace PCGExTensorsTransform
 				PCGExMT::ParallelOrSequential(
 					NumScopes,
 					[this, &Loops](const int32 i) { ProcessPoints(Loops[i]); },
-					2, EParallelForFlags::Unbalanced);
+					/*Threshold=*/2, EParallelForFlags::Unbalanced);
 			}
 		}
 

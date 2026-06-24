@@ -535,7 +535,7 @@ namespace PCGExExtrudeTensors
 				PCGExMT::ParallelOrSequential(
 					NumScopes,
 					[this, &Loops](const int32 i) { ProcessRange(Loops[i]); },
-					2, EParallelForFlags::Unbalanced);
+					/*Threshold=*/2, EParallelForFlags::Unbalanced);
 			}
 
 			RemainingIterations--;
