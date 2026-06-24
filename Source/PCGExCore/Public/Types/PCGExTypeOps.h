@@ -55,6 +55,26 @@ namespace PCGExTypeOps
 	template <typename T>
 	struct FTypeOps;
 
+	/**
+	 * TIsCategoricalBlend<T> -- true for "string-like" types (FName, FString, soft paths) that have
+	 * no additive or averaging structure. Accumulating blend modes (Average, Mult, WeightedAdd, ...)
+	 * must select a representative value for these rather than combine them: concatenation grows
+	 * unbounded and trips FName's hard 1023-character assert once enough values are folded together.
+	 *
+	 * Deliberately NARROWER than TTraits<T>::bSupportsArithmetic, which is also false for Quat/Transform/bool
+	 * -- those have genuine (slerp/composition) blend math that must NOT degrade to selection.
+	 */
+	template <typename T>
+	struct TIsCategoricalBlend
+	{
+		static constexpr bool Value = false;
+	};
+
+	template <> struct TIsCategoricalBlend<FName> { static constexpr bool Value = true; };
+	template <> struct TIsCategoricalBlend<FString> { static constexpr bool Value = true; };
+	template <> struct TIsCategoricalBlend<FSoftObjectPath> { static constexpr bool Value = true; };
+	template <> struct TIsCategoricalBlend<FSoftClassPath> { static constexpr bool Value = true; };
+
 	// Type-Erased Operation Interface
 
 	/**

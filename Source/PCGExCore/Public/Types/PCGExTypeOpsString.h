@@ -180,7 +180,8 @@ namespace PCGExTypeOps
 			}
 		}
 
-		// String blend operations - mostly concatenation-based
+		// String blend operations. Add concatenates (empty string is its natural identity); accumulating
+		// modes with no meaningful "sum" (Average/Mult/WeightedAdd) degrade to selection instead.
 		static FORCEINLINE Type Add(const Type& A, const Type& B)
 		{
 			return A + B;
@@ -191,9 +192,10 @@ namespace PCGExTypeOps
 			return A.Replace(*B, TEXT(""));
 		}
 
+		// Categorical: degrade to selection (keep first non-empty). No additive structure to multiply.
 		static FORCEINLINE Type Mult(const Type& A, const Type& B)
 		{
-			return A + B;
+			return A.IsEmpty() ? B : A;
 		}
 
 		static FORCEINLINE Type Div(const Type& A, double D)
@@ -216,14 +218,18 @@ namespace PCGExTypeOps
 			return A.Len() >= B.Len() ? A : B;
 		}
 
+		// Categorical: degrade to selection (keep first non-empty) rather than concatenating.
 		static FORCEINLINE Type Average(const Type& A, const Type& B)
 		{
-			return A + TEXT("|") + B;
+			return A.IsEmpty() ? B : A;
 		}
 
+		// Pick the heavier-weighted operand; a tie (W == 0.5) keeps the existing accumulator (A).
+		// A valid A is never dropped for an empty B, even when B is the heavier-weighted operand.
 		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
 		{
-			return W > 0.5 ? A + B : A;
+			if (A.IsEmpty()) { return B; }
+			return W > 0.5 && !B.IsEmpty() ? B : A;
 		}
 
 		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
@@ -478,10 +484,18 @@ namespace PCGExTypeOps
 			}
 		}
 
-		// Name blend operations
+		// Name blend operations.
+		// FName has no additive identity (FName() == None), so None is treated as the concatenation
+		// identity -- this mirrors FString's empty-string behaviour and avoids a leading "None" when the
+		// multi-blend accumulator seed is folded in. The result is clamped to FName's hard limit so that
+		// accumulation across a large union can never trip the engine's 1023-character assert.
 		static FORCEINLINE Type Add(const Type& A, const Type& B)
 		{
-			return FName(*(A.ToString() + B.ToString()));
+			if (A.IsNone()) { return B; }
+			if (B.IsNone()) { return A; }
+			FString Combined = A.ToString() + B.ToString();
+			constexpr int32 MaxLen = NAME_SIZE - 1;
+			return Combined.Len() <= MaxLen ? FName(*Combined) : FName(*Combined.Left(MaxLen));
 		}
 
 		static FORCEINLINE Type Sub(const Type& A, const Type& B)
@@ -489,9 +503,10 @@ namespace PCGExTypeOps
 			return FName(*A.ToString().Replace(*B.ToString(), TEXT("")));
 		}
 
+		// Categorical: degrade to selection (keep first non-None). No additive structure to multiply.
 		static FORCEINLINE Type Mult(const Type& A, const Type& B)
 		{
-			return Add(A, B);
+			return A.IsNone() ? B : A;
 		}
 
 		static FORCEINLINE Type Div(const Type& A, double D)
@@ -514,14 +529,18 @@ namespace PCGExTypeOps
 			return A.ToString().Len() >= B.ToString().Len() ? A : B;
 		}
 
+		// Categorical: degrade to selection (keep first non-None) rather than concatenating.
 		static FORCEINLINE Type Average(const Type& A, const Type& B)
 		{
-			return FName(*(A.ToString() + TEXT("_") + B.ToString()));
+			return A.IsNone() ? B : A;
 		}
 
+		// Pick the heavier-weighted operand; a tie (W == 0.5) keeps the existing accumulator (A).
+		// A valid A is never dropped for a None B, even when B is the heavier-weighted operand.
 		static FORCEINLINE Type WeightedAdd(const Type& A, const Type& B, double W)
 		{
-			return W > 0.5 ? Add(A, B) : A;
+			if (A.IsNone()) { return B; }
+			return W > 0.5 && !B.IsNone() ? B : A;
 		}
 
 		static FORCEINLINE Type WeightedSub(const Type& A, const Type& B, double W)
@@ -774,9 +793,10 @@ namespace PCGExTypeOps
 			return A;
 		}
 
+		// Categorical: degrade to selection (keep first valid). Never drops a valid A for an invalid B.
 		static FORCEINLINE Type Mult(const Type& A, const Type& B)
 		{
-			return A.IsValid() && B.IsValid() ? A : Type();
+			return A.IsValid() ? A : B;
 		}
 
 		static FORCEINLINE Type Div(const Type& A, double D)
@@ -1056,9 +1076,10 @@ namespace PCGExTypeOps
 			return A;
 		}
 
+		// Categorical: degrade to selection (keep first valid). Never drops a valid A for an invalid B.
 		static FORCEINLINE Type Mult(const Type& A, const Type& B)
 		{
-			return A.IsValid() && B.IsValid() ? A : Type();
+			return A.IsValid() ? A : B;
 		}
 
 		static FORCEINLINE Type Div(const Type& A, double D)

@@ -335,7 +335,16 @@ namespace PCGExBlending
 			switch (Mode)
 			{
 			case EPCGExABBlendingType::Average:
-				return &Add<T>; // Average does /2 internally, we don't want to accumulate that
+				if constexpr (PCGExTypeOps::TIsCategoricalBlend<T>::Value)
+				{
+					// Categorical types have no additive identity: accumulating via Add would
+					// concatenate unboundedly. Average degrades to a representative selection instead.
+					return &Average<T>;
+				}
+				else
+				{
+					return &Add<T>; // Average does /2 internally, we don't want to accumulate that
+				}
 			default:
 				return GetBlendFunction<T>(Mode);
 			}
@@ -380,16 +389,25 @@ namespace PCGExBlending
 		template <typename T>
 		FFinalizeFn GetFinalizeFunction(const EPCGExABBlendingType Mode)
 		{
-			switch (Mode)
+			if constexpr (PCGExTypeOps::TIsCategoricalBlend<T>::Value)
 			{
-			case EPCGExABBlendingType::Average:
-				return &FinalizeAverage<T>;
-			case EPCGExABBlendingType::Weight:
-				return &FinalizeWeight<T>;
-			case EPCGExABBlendingType::WeightNormalize:
-				return &FinalizeWeightNormalize<T>;
-			default:
+				// Selection-based blends produce a single representative value -- there is nothing
+				// to divide or normalize, so every mode finalizes as a no-op.
 				return &FinalizeNoop<T>;
+			}
+			else
+			{
+				switch (Mode)
+				{
+				case EPCGExABBlendingType::Average:
+					return &FinalizeAverage<T>;
+				case EPCGExABBlendingType::Weight:
+					return &FinalizeWeight<T>;
+				case EPCGExABBlendingType::WeightNormalize:
+					return &FinalizeWeightNormalize<T>;
+				default:
+					return &FinalizeNoop<T>;
+				}
 			}
 		}
 

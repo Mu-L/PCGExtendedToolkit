@@ -378,7 +378,7 @@ namespace PCGExPointsMT
 				NewProcessor->bIsTrivial = IO->GetNum() < PCGEX_CORE_SETTINGS.SmallPointsSize;
 				Candidates[i] = NewProcessor;
 
-			}, 1);
+			}, 1, EParallelForFlags::Unbalanced);
 
 		{
 			Processors.Reserve(Candidates.Num());

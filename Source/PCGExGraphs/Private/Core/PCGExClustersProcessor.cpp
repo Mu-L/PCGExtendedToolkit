@@ -389,10 +389,10 @@ bool FPCGExClustersProcessorContext::StartProcessingClusters(FBatchProcessingVal
 		SetState(PCGExClusterMT::MTState_ClusterProcessing);
 		PCGEX_ASYNC_SCHEDULING_SCOPE(GetTaskManager(), true)
 
-		for (const TSharedPtr<PCGExClusterMT::IBatch>& Batch : Batches)
+		PCGExMT::ParallelOrSequential(Batches.Num(), [&](const int32 i)
 		{
-			Batch->PrepareProcessing(GetTaskManager(), bScopedIndexLookupBuild);
-		}
+			Batches[i]->PrepareProcessing(GetTaskManager(), bScopedIndexLookupBuild);
+		}, 1, EParallelForFlags::Unbalanced);
 	}
 
 	return true;
