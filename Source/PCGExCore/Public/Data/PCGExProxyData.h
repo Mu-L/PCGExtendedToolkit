@@ -128,6 +128,18 @@ namespace PCGExData
 		bool CaptureStrict(FPCGExContext* InContext, const FString& Path, const EIOSide InSide = EIOSide::Out, const bool bRequired = true);
 		bool CaptureStrict(FPCGExContext* InContext, const FPCGAttributePropertyInputSelector& InSelector, const EIOSide InSide = EIOSide::Out, const bool bRequired = true);
 
+		// Validation-skipping fast paths for callers that ALREADY know the attribute's real type
+		// (e.g. blend init, where the type comes from FAttributeIdentity). They trust the caller's
+		// InKnownRealType and InSide -- no TryGetTypeAndSource probe, no SourceDesc metadata lookup --
+		// so they MUST only be used where type and side are known-correct. Selector fixup,
+		// SubSelection and WorkingType are still resolved exactly as Capture() does. Pass a null
+		// InKnownSourceDesc for non-attribute selectors (mirrors Capture leaving SourceDesc default).
+		// CaptureStrict_Unsafe is provided for call-site symmetry; since the side is trusted (never
+		// flipped), the strict side-match it guarantees is the caller's assertion and it simply
+		// forwards to Capture_Unsafe.
+		bool Capture_Unsafe(FPCGExContext* InContext, const FPCGAttributePropertyInputSelector& InSelector, const EIOSide InSide, const EPCGMetadataTypes InKnownRealType, const FPCGMetadataAttributeDesc* InKnownSourceDesc = nullptr);
+		bool CaptureStrict_Unsafe(FPCGExContext* InContext, const FPCGAttributePropertyInputSelector& InSelector, const EIOSide InSide, const EPCGMetadataTypes InKnownRealType, const FPCGMetadataAttributeDesc* InKnownSourceDesc = nullptr);
+
 		friend uint32 GetTypeHash(const FProxyDescriptor& D);
 	};
 
@@ -340,14 +352,32 @@ namespace PCGExData
 		}
 	};
 
+	// One pool slot. Weak is always set and drives the liveness check; Strong is set only
+	// for retained (In-side) entries so a shared input proxy survives for the owning pool's
+	// lifetime and is reused across every consumer instead of being rebuilt per consumer.
+	struct FProxyPoolEntry
+	{
+		TWeakPtr<IBufferProxy> Weak;
+		TSharedPtr<IBufferProxy> Strong;
+	};
+
+	// Get-or-create cache for buffer proxies, keyed by FProxyDescriptor hash.
+	//
+	// Instances live in two places (see GetProxyBuffer routing): one per FFacade (the primary
+	// home -- a target facade's pool is touched only by its own compiling thread, a source
+	// facade's pool is shared across consumers of that input) and one on FPCGExContext as the
+	// fallback for the rare descriptor that has no pinnable facade. Per-facade pools eliminate
+	// the cross-instance lock contention and unbounded growth of the prior single context-wide
+	// map, and free their entries when the facade dies.
+	//
+	// 8-way sharded map: descriptors route to one of 8 (shard, lock) pairs by hash, so two
+	// threads requesting different descriptors only contend on a hash collision. Per-facade
+	// contention is low, so 8 shards keep the per-facade footprint small while still letting
+	// concurrent consumers of a shared source facade (clusters compiling in parallel) proceed
+	// without serializing on a single lock.
 	class PCGEXCORE_API IBufferProxyPool : public TSharedFromThis<IBufferProxyPool>
 	{
-		// 32-way sharded map: descriptors are routed to one of 32 (shard, lock) pairs
-		// by hash, so two threads requesting different descriptors only contend when
-		// their hashes collide on the same shard (~3% probability). Replaces the prior
-		// single-lock design that serialized every proxy creation across the entire
-		// process -- a major bottleneck once Factory had to run under the lock.
-		PCGExMT::TH64MapShards<TWeakPtr<IBufferProxy>, 32> ProxyMap;
+		PCGExMT::TH64MapShards<FProxyPoolEntry, 8> ProxyMap;
 
 	public:
 		IBufferProxyPool() = default;
@@ -359,6 +389,10 @@ namespace PCGExData
 		// point data) are serialized per descriptor, so two threads racing for the
 		// same descriptor never double-construct or double-initialize. Unrelated
 		// descriptors in different shards proceed in parallel.
+		//
+		// Retention: In-side descriptors (shared, stable upstream input) are held strongly so
+		// they outlive any single consumer and are reused; Out-side descriptors (this data's own
+		// transient output) are held weakly and die with the consumer that created them.
 		//
 		// Constraint: Factory must NOT call back into the pool with a descriptor that
 		// hashes to the same shard (would deadlock on the shard's write lock). Current

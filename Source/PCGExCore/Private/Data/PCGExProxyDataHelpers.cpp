@@ -516,7 +516,12 @@ template PCGEXCORE_API TSharedPtr<IBufferProxy> GetConstantProxyBuffer<_TYPE>(co
 
 		if (InDescriptor.HasFlag(EProxyFlags::Shared))
 		{
-			return InContext->BufferProxyPool->GetOrCreate(InDescriptor, Factory);
+			// Route to the descriptor's facade-local pool so creation no longer funnels through a
+			// single context-wide chokepoint: a per-cluster target facade's pool is uncontended,
+			// and shared source facades distribute contention while retaining their read proxies.
+			// Descriptors with no pinnable facade fall back to the context pool.
+			IBufferProxyPool& Pool = InDataFacade ? InDataFacade->GetProxyPool() : *InContext->BufferProxyPool;
+			return Pool.GetOrCreate(InDescriptor, Factory);
 		}
 		return Factory();
 	}

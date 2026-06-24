@@ -260,14 +260,20 @@ namespace PCGExBlending
 		// Get output buffer
 		TSharedPtr<PCGExData::IBuffer> GetOutputBuffer() const;
 
-		// Initialize from blending param (helper for common setup pattern)
+		// Initialize from blending param (helper for common setup pattern).
+		// When InKnownRealType is set (!= Unknown), descriptor capture uses the validation-skipping
+		// FProxyDescriptor::*_Unsafe paths -- the caller asserts the attribute's real type and side.
+		// Pass InKnownSourceDesc for attribute selectors (e.g. &FAttributeIdentity), null otherwise.
+		// Leaving InKnownRealType Unknown falls back to the fully-probing safe capture.
 		bool InitFromParam(
 			FPCGExContext* InContext,
 			const FBlendingParam& InParam,
 			const TSharedPtr<PCGExData::FFacade> InTargetFacade,
 			const TSharedPtr<PCGExData::FFacade> InSourceFacade,
 			PCGExData::EIOSide InSide,
-			PCGExData::EProxyFlags InProxyFlags = PCGExData::EProxyFlags::None);
+			PCGExData::EProxyFlags InProxyFlags = PCGExData::EProxyFlags::None,
+			EPCGMetadataTypes InKnownRealType = EPCGMetadataTypes::Unknown,
+			const FPCGMetadataAttributeDesc* InKnownSourceDesc = nullptr);
 
 		// Type-safe set (converts to working type)
 		//template <typename T>

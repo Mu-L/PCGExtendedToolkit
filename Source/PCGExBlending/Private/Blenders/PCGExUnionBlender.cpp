@@ -90,32 +90,26 @@ namespace PCGExBlending
 
 			{
 				TArray<int32> SupportedList(SupportedSources.Array());
-				std::atomic<bool> bSubBlendersInitOk{true};
-				PCGExMT::ParallelOrSequential(
-					SupportedList.Num(),
-					[&](const int32 i)
-					{
+				for (int32 i = 0; i < SupportedList.Num(); i++)
+				{
 					const int32 SourceIdx = SupportedList[i];
 
 					TSharedPtr<FProxyDataBlender> SubBlender = InitProperty
-					? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
-					: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
+						? CreateProxyBlender(WorkingType, Param.Blending, true, InitProperty)
+						: CreateProxyBlender(WorkingType, Param.Blending, true, Identity.ValueTypeObject);
 
-						SubBlenders[SourceIdx] = SubBlender;
+					SubBlenders[SourceIdx] = SubBlender;
 
-						if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
-						{
-							bSubBlendersInitOk.store(false, std::memory_order_relaxed);
-						}
-					}, 8);
+					// Type is known from Identity -- use the validation-skipping capture path.
+					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags, WorkingType, &Identity))
+					{
+						return false;
+					}
+				};
 
-				if (!bSubBlendersInitOk.load(std::memory_order_relaxed))
-				{
-					return false;
-				}
 			}
 
-			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags))
+			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags, WorkingType, &Identity))
 			{
 				return false;
 			}
@@ -142,29 +136,23 @@ namespace PCGExBlending
 				{
 					SupportedList = SupportedSources.Array();
 				}
-				std::atomic<bool> bSubBlendersInitOk{true};
-				PCGExMT::ParallelOrSequential(
-					SupportedList.Num(),
-					[&](const int32 i)
-					{
-						const int32 SourceIdx = SupportedList[i];
-						TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
 
-						SubBlenders[SourceIdx] = SubBlender;
-
-						if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags))
-						{
-							bSubBlendersInitOk.store(false, std::memory_order_relaxed);
-						}
-					}, 32);
-
-				if (!bSubBlendersInitOk.load(std::memory_order_relaxed))
+				for (int32 i = 0; i < SupportedList.Num(); i++)
 				{
-					return false;
-				}
+					const int32 SourceIdx = SupportedList[i];
+					TSharedPtr<FProxyDataBlender> SubBlender = CreateProxyBlender(WorkingType, Param.Blending);
+
+					SubBlenders[SourceIdx] = SubBlender;
+
+					// Property type is known -- use the validation-skipping capture path (no attribute desc).
+					if (!SubBlender->InitFromParam(InContext, Param, InTargetData, Sources[SourceIdx], PCGExData::EIOSide::In, InProxyFlags, WorkingType))
+					{
+						return false;
+					}
+				};
 			}
 
-			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags))
+			if (!MainBlender->InitFromParam(InContext, Param, InTargetData, InTargetData, PCGExData::EIOSide::Out, InProxyFlags, WorkingType))
 			{
 				return false;
 			}

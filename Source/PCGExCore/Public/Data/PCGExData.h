@@ -64,6 +64,7 @@ namespace PCGExData
 #pragma region Buffers
 
 	class FFacade;
+	class IBufferProxyPool;
 
 	PCGEXCORE_API uint64 BufferUID(const FPCGAttributeIdentifier& Identifier, const EPCGMetadataTypes Type);
 
@@ -304,6 +305,11 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 	{
 		mutable FRWLock BufferLock;
 
+		// Lazily-created proxy cache, scoped to this facade's lifetime. Only facades that take
+		// part in proxy-based blending ever allocate it. See IBufferProxyPool / GetProxyPool.
+		mutable FRWLock ProxyPoolLock;
+		TSharedPtr<IBufferProxyPool> ProxyPool;
+
 	public:
 		TSharedRef<FPointIO> Source;
 		int32 Idx = -1;
@@ -325,6 +331,11 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 		EPCGPointNativeProperties GetAllocations() const;
 
 		FPCGExContext* GetContext() const;
+
+		// Facade-local proxy cache (lazily created, thread-safe). Used by GetProxyBuffer when a
+		// Shared descriptor resolves to this facade, so proxy creation no longer funnels through
+		// a single context-wide pool.
+		IBufferProxyPool& GetProxyPool();
 
 		explicit FFacade(const TSharedRef<FPointIO>& InSource);
 		~FFacade() = default;

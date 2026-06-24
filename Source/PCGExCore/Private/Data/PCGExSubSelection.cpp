@@ -498,6 +498,8 @@ namespace PCGExData
 
 	bool TryGetType(const FPCGAttributePropertyInputSelector& InputSelector, const UPCGData* InData, EPCGMetadataTypes& OutType)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(TryGetType)
+		
 		OutType = EPCGMetadataTypes::Unknown;
 
 		if (!IsValid(InData))
@@ -536,6 +538,8 @@ namespace PCGExData
 
 	bool TryGetTypeAndSource(const FPCGAttributePropertyInputSelector& InputSelector, const TSharedPtr<FFacade>& InDataFacade, EPCGMetadataTypes& OutType, EIOSide& InOutSide)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(TryGetTypeAndSource)
+		
 		OutType = EPCGMetadataTypes::Unknown;
 		if (InOutSide == EIOSide::In)
 		{

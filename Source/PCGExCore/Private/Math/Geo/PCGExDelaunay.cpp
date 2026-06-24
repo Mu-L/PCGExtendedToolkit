@@ -12,6 +12,7 @@
 #include "Math/PCGExProjectionDetails.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Math/Geo/PCGExPrimtives.h"
+#include "CompGeom/ExactPredicates.h"
 #include "ThirdParty/Delaunator/include/delaunator.hpp"
 
 namespace PCGExMath::Geo
@@ -132,6 +133,17 @@ namespace PCGExMath::Geo
 
 	bool TDelaunay2::ProcessDelaunator(const std::vector<double>& Coords, const bool bComputeDelaunayEdges, const bool bComputeHull)
 	{
+		// delaunator now routes its predicates through UE's exact predicates (see delaunator.hpp),
+		// which require a one-time GlobalInit() before use. GeometryAlgorithms' module startup already
+		// calls it; this guarded call makes the dependency explicit and is a thread-safe no-op after
+		// the first invocation (C++ guarantees once-only init of a function-local static).
+		static const bool bExactPredicatesReady = []()
+		{
+			UE::Geometry::ExactPredicates::GlobalInit();
+			return true;
+		}();
+		(void)bExactPredicatesReady;
+
 		// NOTE: delaunator keeps a reference to Coords; it must stay alive for the
 		// lifetime of the triangulation object.
 		TUniquePtr<delaunator::Delaunator> Triangulation;

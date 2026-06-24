@@ -12,6 +12,7 @@
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "Data/PCGExProxyData.h"
 #include "Data/PCGPointData.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Metadata/PCGMetadataDomain.h"
@@ -236,6 +237,19 @@ template class PCGEXCORE_API TBuffer<_TYPE>;
 	{
 		const FPCGContext::FSharedContext<FPCGExContext> SharedContext(Source->GetContextHandle());
 		return SharedContext.Get();
+	}
+
+	IBufferProxyPool& FFacade::GetProxyPool()
+	{
+		// Double-checked lazy init: the common case (already created) takes only a read lock.
+		{
+			FReadScopeLock ReadLock(ProxyPoolLock);
+			if (ProxyPool) { return *ProxyPool; }
+		}
+
+		FWriteScopeLock WriteLock(ProxyPoolLock);
+		if (!ProxyPool) { ProxyPool = MakeShared<IBufferProxyPool>(); }
+		return *ProxyPool;
 	}
 
 	FFacade::FFacade(const TSharedRef<FPointIO>& InSource)

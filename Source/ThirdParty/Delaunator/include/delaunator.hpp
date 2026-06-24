@@ -9,6 +9,15 @@
 #include <utility>
 #include <vector>
 
+// PCGEx patch: route delaunator's geometric predicates through UE's adaptive *exact* predicates.
+// Stock orient()/in_circle() use non-robust double arithmetic; the sign of a near-zero determinant
+// then depends on compiler FP codegen (FMA/AVX/`/fp`), which differs across toolchains (e.g. UE 5.7
+// vs 5.8). On near-coincident / near-collinear input that inconsistency corrupts the advancing-hull
+// linked list, and the hull-walk loops below stop terminating -> the editor hard-hangs. Exact
+// predicates make every sign test consistent, restoring guaranteed termination, while keeping all
+// distinct input points (unlike a merge/snap pass), so fine detail is preserved.
+#include "CompGeom/ExactPredicates.h"
+
 namespace delaunator {
 
 //@see https://stackoverflow.com/questions/33333363/built-in-mod-vs-custom-mod-function-improve-the-performance-of-modulus-op/33333636#33333636
@@ -66,6 +75,17 @@ inline double circumradius(
     }
 }
 
+// PCGEx: static error bounds for the inline predicate filters below (Shewchuk's exactinit() values
+// for IEEE double, epsilon = 2^-53). The filter reproduces the *fast* first stage of UE's exact
+// predicates so non-degenerate calls resolve inline with no cross-module call; only determinants too
+// close to zero to trust fall through to the exact predicate. The bound is a provable upper bound on
+// the float rounding error, so a filtered result is *identical* to the exact predicate's - never an
+// approximation. Assumes round-to-nearest and no /fp:fast (UE's default); FMA contraction is safe
+// since it only reduces error. The constructor's iteration caps remain a hard backstop regardless.
+constexpr double PCGEX_PRED_EPSILON      = 1.1102230246251565e-16;                             // 2^-53
+constexpr double PCGEX_ORIENT2D_ERRBOUND = (3.0 + 16.0 * PCGEX_PRED_EPSILON) * PCGEX_PRED_EPSILON;
+constexpr double PCGEX_INCIRCLE_ERRBOUND = (10.0 + 96.0 * PCGEX_PRED_EPSILON) * PCGEX_PRED_EPSILON;
+
 inline bool orient(
     const double px,
     const double py,
@@ -73,7 +93,33 @@ inline bool orient(
     const double qy,
     const double rx,
     const double ry) {
-    return (qy - py) * (rx - qx) - (qx - px) * (ry - qy) < 0.0;
+    // PCGEx patch: robust orientation with an inline static filter. Computes Shewchuk's orient2d
+    // determinant (sign matches UE's Orient2D and the stock "true iff P,Q,R counterclockwise"
+    // boolean: >0 == CCW, ==0 == collinear -> false). When |det| provably clears the rounding-error
+    // bound the sign is trusted inline; otherwise we fall back to the exact predicate. Identical result.
+    const double detleft = (px - rx) * (qy - ry);
+    const double detright = (py - ry) * (qx - rx);
+    const double det = detleft - detright;
+
+    double detsum = 0.0; // always overwritten below before use; initialized to satisfy -Wmaybe-uninitialized
+    if (detleft > 0.0) {
+        if (detright <= 0.0) { return det > 0.0; }
+        detsum = detleft + detright;
+    } else if (detleft < 0.0) {
+        if (detright >= 0.0) { return det > 0.0; }
+        detsum = -detleft - detright;
+    } else {
+        return det > 0.0;
+    }
+
+    const double errbound = PCGEX_ORIENT2D_ERRBOUND * detsum;
+    if (det >= errbound || -det >= errbound) { return det > 0.0; }
+
+    // Too close to zero to trust the float sign: exact.
+    const double PA[2]{px, py};
+    const double PB[2]{qx, qy};
+    const double PC[2]{rx, ry};
+    return UE::Geometry::ExactPredicates::Orient2D(PA, PB, PC) > 0.0;
 }
 
 inline std::pair<double, double> circumcenter(
@@ -130,20 +176,46 @@ inline bool in_circle(
     const double cy,
     const double px,
     const double py) {
-    const double dx = ax - px;
-    const double dy = ay - py;
-    const double ex = bx - px;
-    const double ey = by - py;
-    const double fx = cx - px;
-    const double fy = cy - py;
+    // PCGEx patch: robust in-circle with an inline static filter. Computes Shewchuk's incircle
+    // determinant (same matrix and sign as UE's InCircle and as the stock body's det; stock returned
+    // det < 0, so do we). When |det| provably clears the rounding-error bound the sign is trusted
+    // inline; otherwise we fall back to the exact predicate. Identical result either way.
+    const double adx = ax - px;
+    const double ady = ay - py;
+    const double bdx = bx - px;
+    const double bdy = by - py;
+    const double cdx = cx - px;
+    const double cdy = cy - py;
 
-    const double ap = dx * dx + dy * dy;
-    const double bp = ex * ex + ey * ey;
-    const double cp = fx * fx + fy * fy;
+    const double bdxcdy = bdx * cdy;
+    const double cdxbdy = cdx * bdy;
+    const double alift = adx * adx + ady * ady;
 
-    return (dx * (ey * cp - bp * fy) -
-            dy * (ex * cp - bp * fx) +
-            ap * (ex * fy - ey * fx)) < 0.0;
+    const double cdxady = cdx * ady;
+    const double adxcdy = adx * cdy;
+    const double blift = bdx * bdx + bdy * bdy;
+
+    const double adxbdy = adx * bdy;
+    const double bdxady = bdx * ady;
+    const double clift = cdx * cdx + cdy * cdy;
+
+    const double det = alift * (bdxcdy - cdxbdy)
+                     + blift * (cdxady - adxcdy)
+                     + clift * (adxbdy - bdxady);
+
+    const double permanent = (std::fabs(bdxcdy) + std::fabs(cdxbdy)) * alift
+                           + (std::fabs(cdxady) + std::fabs(adxcdy)) * blift
+                           + (std::fabs(adxbdy) + std::fabs(bdxady)) * clift;
+    const double errbound = PCGEX_INCIRCLE_ERRBOUND * permanent;
+
+    if (det > errbound || -det > errbound) { return det < 0.0; }
+
+    // Too close to cocircular to trust the float sign: exact.
+    const double PA[2]{ax, ay};
+    const double PB[2]{bx, by};
+    const double PC[2]{cx, cy};
+    const double PD[2]{px, py};
+    return UE::Geometry::ExactPredicates::InCircle(PA, PB, PC, PD) < 0.0;
 }
 
 constexpr double EPSILON = std::numeric_limits<double>::epsilon();
@@ -398,6 +470,10 @@ Delaunator::Delaunator(std::vector<double> const& in_coords)
 
         // walk forward through the hull, adding more triangles and flipping recursively
         std::size_t next = hull_next[e];
+        // PCGEx backstop: each iteration consumes a hull edge, so a valid hull bounds this by the
+        // hull size; the cap only trips on a corrupted hull and converts a spin into a graceful fail.
+        const std::size_t walk_max = coords.size();
+        std::size_t fwd_guard = 0;
         while (
             q = hull_next[next],
             orient(x, y, coords[2 * next], coords[2 * next + 1], coords[2 * q], coords[2 * q + 1])) {
@@ -407,10 +483,12 @@ Delaunator::Delaunator(std::vector<double> const& in_coords)
             hull_next[next] = next; // mark as removed
             hull_size--;
             next = q;
+            if (++fwd_guard > walk_max) { runtime_error = true; return; }
         }
 
         // walk backward from the other side, adding more triangles and flipping
         if (e == start) {
+            std::size_t bwd_guard = 0;
             while (
                 q = hull_prev[e],
                 orient(x, y, coords[2 * q], coords[2 * q + 1], coords[2 * e], coords[2 * e + 1])) {
@@ -421,6 +499,7 @@ Delaunator::Delaunator(std::vector<double> const& in_coords)
                 hull_next[e] = e; // mark as removed
                 hull_size--;
                 e = q;
+                if (++bwd_guard > walk_max) { runtime_error = true; return; } // PCGEx backstop (walk_max from forward walk)
             }
         }
 
@@ -439,9 +518,14 @@ Delaunator::Delaunator(std::vector<double> const& in_coords)
 double Delaunator::get_hull_area() {
     std::vector<double> hull_area;
     size_t e = hull_start;
+    // PCGEx backstop: bound the hull walk so a corrupted hull_next cycle can't hang. Not on the
+    // Voronoi build path (ProcessDelaunator never calls this), guarded purely for safety parity.
+    std::size_t guard = 0;
+    const std::size_t guard_max = coords.size();
     do {
         hull_area.push_back((coords[2 * e] - coords[2 * hull_prev[e]]) * (coords[2 * e + 1] + coords[2 * hull_prev[e] + 1]));
         e = hull_next[e];
+        if (++guard > guard_max) { break; }
     } while (e != hull_start);
     return sum(hull_area);
 }
@@ -511,13 +595,23 @@ std::size_t Delaunator::legalize(std::size_t a) {
 
             // edge swapped on the other side of the hull (rare); fix the halfedge reference
             if (hbl == INVALID_INDEX) {
+                // PCGEx backstop: this scans the hull for hull_tri[e] == bl and relies on the
+                // hull_next cycle returning to hull_start. Exact predicates should keep that cycle
+                // intact, but a cap guarantees termination regardless; on overrun we raise
+                // runtime_error so ProcessDelaunator fails gracefully instead of hanging the editor.
                 std::size_t e = hull_start;
+                std::size_t guard = 0;
+                const std::size_t guard_max = coords.size();
                 do {
                     if (hull_tri[e] == bl) {
                         hull_tri[e] = a;
                         break;
                     }
                     e = hull_next[e];
+                    if (++guard > guard_max) {
+                        runtime_error = true;
+                        break;
+                    }
                 } while (e != hull_start);
             }
             link(a, hbl);

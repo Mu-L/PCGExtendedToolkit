@@ -245,15 +245,25 @@ namespace PCGExBlending
 		const TSharedPtr<PCGExData::FFacade> InTargetFacade,
 		const TSharedPtr<PCGExData::FFacade> InSourceFacade,
 		const PCGExData::EIOSide InSide,
-		const PCGExData::EProxyFlags InProxyFlags)
+		const PCGExData::EProxyFlags InProxyFlags,
+		const EPCGMetadataTypes InKnownRealType,
+		const FPCGMetadataAttributeDesc* InKnownSourceDesc)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FProxyDataBlender::InitFromParam)
+
+		// When the caller knows the attribute's real type (e.g. from FAttributeIdentity), skip the
+		// expensive TryGetTypeAndSource probe via the *_Unsafe capture paths. Otherwise fall back to
+		// the fully-probing safe capture.
+		const bool bKnownType = InKnownRealType != EPCGMetadataTypes::Unknown;
 
 		// Setup proxy descriptors
 		PCGExData::FProxyDescriptor Desc_A = PCGExData::FProxyDescriptor(InSourceFacade, PCGExData::EProxyRole::Read);
 		PCGExData::FProxyDescriptor Desc_B = PCGExData::FProxyDescriptor(InTargetFacade, PCGExData::EProxyRole::Read);
 
-		if (!Desc_A.Capture(InContext, InParam.Selector, InSide))
+		const bool bDescACaptured = bKnownType
+			                            ? Desc_A.Capture_Unsafe(InContext, InParam.Selector, InSide, InKnownRealType, InKnownSourceDesc)
+			                            : Desc_A.Capture(InContext, InParam.Selector, InSide);
+		if (!bDescACaptured)
 		{
 			return false;
 		}
@@ -271,7 +281,10 @@ namespace PCGExBlending
 		else
 		{
 			// Strict capture may fail here, TBD
-			if (!Desc_B.CaptureStrict(InContext, InParam.Selector, PCGExData::EIOSide::Out))
+			const bool bDescBCaptured = bKnownType
+				                            ? Desc_B.CaptureStrict_Unsafe(InContext, InParam.Selector, PCGExData::EIOSide::Out, InKnownRealType, InKnownSourceDesc)
+				                            : Desc_B.CaptureStrict(InContext, InParam.Selector, PCGExData::EIOSide::Out);
+			if (!bDescBCaptured)
 			{
 				return false;
 			}
