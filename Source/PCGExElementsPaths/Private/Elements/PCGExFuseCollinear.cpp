@@ -272,6 +272,8 @@ namespace PCGExFuseCollinear
 			ProtectedAttributes.Add(Settings->UnionDetails.UnionSizeAttributeName);
 		}
 
+		// Single-source: @Data is carried by the output init, not blended.
+		DataBlender->bBlendDataDomain = false;
 		DataBlender->AddSources(UnionSources, &ProtectedAttributes);
 
 		if (!DataBlender->Init(Context, PointDataFacade))

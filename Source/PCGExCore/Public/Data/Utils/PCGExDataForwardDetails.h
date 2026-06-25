@@ -7,6 +7,7 @@
 #include <type_traits>
 
 #include "PCGExDataFilterDetails.h"
+#include "Details/PCGExAttributesDetails.h"
 #include "Types/PCGExTypeOps.h"
 
 #include "PCGExDataForwardDetails.generated.h"
@@ -71,9 +72,16 @@ struct PCGEXCORE_API FPCGExAttributeToTagDetails
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	bool bPrefixWithAttributeName = true;
 
-	/** Attributes which value will be used as tags. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
-	TArray<FPCGAttributePropertyInputSelector> Attributes;
+#pragma region DEPRECATED
+	// Pre-remapping selector list. Migrated to AttributeMappings in PostSerialize (see PCGExDataForwardDetails.cpp).
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
+	TArray<FPCGAttributePropertyInputSelector> Attributes_DEPRECATED;
+#pragma endregion
+
+	/** Attributes whose value is promoted to tags, each with an optional source->target output-name remap.
+	 *  Leave the target empty to keep the source's resolved name (the pre-remapping behavior). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(TitleProperty="Source"))
+	TArray<FPCGExAttributeSourceToTargetDetails> AttributeMappings;
 
 	/** A list of selectors separated by a comma, for easy overrides. Will be appended to the existing array. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -81,6 +89,12 @@ struct PCGEXCORE_API FPCGExAttributeToTagDetails
 
 	TSharedPtr<PCGExData::FFacade> SourceDataFacade;
 	TArray<TSharedPtr<PCGExData::IAttributeBroadcaster>> Getters;
+
+	/** Per-getter output-name override, index-aligned with Getters. NAME_None falls back to Getter->GetName()
+	 *  (the resolved source name). Populated in Init from AttributeMappings' remapped entries. */
+	TArray<FName> GetterNames;
+
+	void PostSerialize(const FArchive& Ar);
 
 	bool Init(const FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const TSet<FName>* IgnoreAttributes = nullptr);
 
@@ -109,4 +123,13 @@ struct PCGEXCORE_API FPCGExAttributeToTagDetails
 			OutTags.Add(bPrefixWithAttributeName ? (InName.ToString() + TEXT(":") + StringValue) : StringValue);
 		}
 	}
+};
+
+template <>
+struct TStructOpsTypeTraits<FPCGExAttributeToTagDetails> : public TStructOpsTypeTraitsBase2<FPCGExAttributeToTagDetails>
+{
+	enum
+	{
+		WithPostSerialize = true,
+	};
 };

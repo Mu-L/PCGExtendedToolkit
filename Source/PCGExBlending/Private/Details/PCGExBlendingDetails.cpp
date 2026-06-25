@@ -368,9 +368,16 @@ namespace PCGExBlending
 		}
 	}
 
-	void GetFilteredIdentities(const UPCGMetadata* InMetadata, TArray<PCGExData::FAttributeIdentity>& OutIdentities, const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* IgnoreAttributeSet)
+	void GetFilteredIdentities(const UPCGMetadata* InMetadata, TArray<PCGExData::FAttributeIdentity>& OutIdentities, const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* IgnoreAttributeSet, bool bIncludeDataDomain)
 	{
 		PCGExData::FAttributeIdentity::Get(InMetadata, OutIdentities, IgnoreAttributeSet);
+
+		// Drop @Data unless opted in -- it can't go through the element-domain blend path (see FUnionBlender::bBlendDataDomain).
+		if (!bIncludeDataDomain)
+		{
+			OutIdentities.RemoveAll([](const PCGExData::FAttributeIdentity& Identity) { return Identity.InDataDomain(); });
+		}
+
 		if (InCarryOverDetails)
 		{
 			InCarryOverDetails->Prune(OutIdentities);

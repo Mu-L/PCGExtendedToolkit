@@ -226,7 +226,7 @@ namespace PCGExBlending
 			UniqueTags.Append(Facade->Source->Tags->RawTags);
 
 			TArray<PCGExData::FAttributeIdentity> SourceAttributes;
-			GetFilteredIdentities(Facade->GetIn()->Metadata, SourceAttributes, BlendingDetails, CarryOverDetails, IgnoreAttributeSet);
+			GetFilteredIdentities(Facade->GetIn()->Metadata, SourceAttributes, BlendingDetails, CarryOverDetails, IgnoreAttributeSet, bBlendDataDomain);
 
 			// Check of this new source' attributes
 			// See if it adds any new, non-conflicting one

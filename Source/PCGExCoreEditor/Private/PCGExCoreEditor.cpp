@@ -6,6 +6,7 @@
 #include "PCGExAssetTypesMacros.h"
 #include "PropertyEditorDelegates.h"
 #include "PropertyEditorModule.h"
+#include "Details/PCGExAttributeSourceToTargetCustomization.h"
 #include "Details/PCGExDotComparisonCustomization.h"
 #include "Details/PCGExNameFiltersCustomization.h"
 
@@ -25,6 +26,7 @@ void FPCGExCoreEditorModule::StartupModule()
 	PCGEX_REGISTER_CUSTO("PCGExNameFiltersDetails", FPCGExNameFiltersDetailsCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExAttributeGatherDetails", FPCGExNameFiltersDetailsCustomization)
 	PCGEX_REGISTER_CUSTO("PCGExForwardDetails", FPCGExForwardDetailsCustomization)
+	PCGEX_REGISTER_CUSTO("PCGExAttributeSourceToTargetDetails", FPCGExAttributeSourceToTargetCustomization)
 }
 
 void FPCGExCoreEditorModule::ShutdownModule()

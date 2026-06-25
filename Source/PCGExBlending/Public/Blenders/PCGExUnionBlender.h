@@ -40,6 +40,11 @@ namespace PCGExBlending
 	public:
 		const FPCGExCarryOverDetails* CarryOverDetails = nullptr;
 
+		// @Data attributes are per-data singletons; the element-domain blend path indexes contributors by point index
+		// and would corrupt a one-slot @Data buffer. Single-source nodes set this false (before AddSources) to leave
+		// @Data to the output init.
+		bool bBlendDataDomain = true;
+
 		FUnionBlender(const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const PCGExMath::IDistances* InDistanceDetails);
 		virtual ~FUnionBlender() override;
 

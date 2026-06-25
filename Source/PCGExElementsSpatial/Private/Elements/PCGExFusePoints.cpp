@@ -212,9 +212,9 @@ namespace PCGExFusePoints
 
 		UnionTable = MakeShared<PCGExData::FUnionTable>();
 
-		// Register fetch-able buffers for chunked reads
+		// Register fetch-able buffers for chunked reads (@Data excluded: not blended for this single-source node).
 		TArray<PCGExData::FAttributeIdentity> SourceAttributes;
-		PCGExBlending::GetFilteredIdentities(PointDataFacade->GetIn()->Metadata, SourceAttributes, &Settings->BlendingDetails, &Context->CarryOverDetails);
+		PCGExBlending::GetFilteredIdentities(PointDataFacade->GetIn()->Metadata, SourceAttributes, &Settings->BlendingDetails, &Context->CarryOverDetails, nullptr, false);
 
 		PointDataFacade->CreateReadables(SourceAttributes);
 
@@ -530,6 +530,9 @@ namespace PCGExFusePoints
 		const TSharedPtr<PCGExBlending::FUnionBlender> TypedBlender = MakeShared<PCGExBlending::FUnionBlender>(
 			&Settings->BlendingDetails, &Context->CarryOverDetails, Context->Distances);
 		UnionBlender = TypedBlender;
+
+		// Single-source duplicate of the output: @Data is carried by the New init, not blended.
+		TypedBlender->bBlendDataDomain = false;
 
 		TArray<TSharedRef<PCGExData::FFacade>> UnionSources;
 		UnionSources.Add(PointDataFacade);
