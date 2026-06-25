@@ -40,11 +40,6 @@ namespace PCGExBlending
 	public:
 		const FPCGExCarryOverDetails* CarryOverDetails = nullptr;
 
-		// @Data attributes are per-data singletons; the element-domain blend path indexes contributors by point index
-		// and would corrupt a one-slot @Data buffer. Single-source nodes set this false (before AddSources) to leave
-		// @Data to the output init.
-		bool bBlendDataDomain = true;
-
 		FUnionBlender(const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const PCGExMath::IDistances* InDistanceDetails);
 		virtual ~FUnionBlender() override;
 
@@ -57,7 +52,16 @@ namespace PCGExBlending
 			PCGExData::FAttributeIdentity Identity;
 			const FPCGMetadataAttributeBase* DefaultValue = nullptr;
 
-			TSharedPtr<FProxyDataBlender> MainBlender; // Finisher, only used to initialize tracker & complete the multiblend 
+			TSharedPtr<FProxyDataBlender> MainBlender; // Finisher, only used to initialize tracker & complete the multiblend
+
+			// Data-domain (@Data) attribute in KEEP mode: reduced once across sources into slot 0 (FUnionBlender::Init),
+			// never run through the per-entry element blend -- that would collapse the single slot to last-wins.
+			bool bDataDomain = false;
+
+			// Data-domain (@Data) attribute in PROMOTE mode (bDataDomainToElements): the output is an Elements
+			// attribute and each element is blended from its contributors' @Data value via cross-domain proxies
+			// (source captured @Data, output captured Elements). Runs through the normal per-entry Blend.
+			bool bPromoteToElements = false;
 
 			FMultiSourceBlender(const PCGExData::FAttributeIdentity& InIdentity, const TArray<TSharedPtr<PCGExData::FFacade>>& InSources);
 			explicit FMultiSourceBlender(const TArray<TSharedPtr<PCGExData::FFacade>>& InSources);

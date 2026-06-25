@@ -19,6 +19,13 @@ namespace PCGExMergePoints
 	PCGEX_CTX_STATE(State_MergingData);
 }
 
+UPCGExMergePointsSettings::UPCGExMergePointsSettings()
+{
+	// Merge Points is the one node that promotes @Data attributes to the elements domain by default;
+	// bDataDomainToElements is off everywhere else.
+	CarryOverDetails.bDataDomainToElements = true;
+}
+
 void FPCGExMergeList::Merge(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const FPCGExNameFiltersDetails* InTagsToAttributes)
 {
 	if (IOs.IsEmpty())

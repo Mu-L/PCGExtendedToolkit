@@ -368,15 +368,11 @@ namespace PCGExBlending
 		}
 	}
 
-	void GetFilteredIdentities(const UPCGMetadata* InMetadata, TArray<PCGExData::FAttributeIdentity>& OutIdentities, const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* IgnoreAttributeSet, bool bIncludeDataDomain)
+	void GetFilteredIdentities(const UPCGMetadata* InMetadata, TArray<PCGExData::FAttributeIdentity>& OutIdentities, const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* IgnoreAttributeSet)
 	{
+		// @Data attributes are included: the union/metadata blenders handle them domain-aware (reduce once / carry over),
+		// so they no longer need to be filtered out here.
 		PCGExData::FAttributeIdentity::Get(InMetadata, OutIdentities, IgnoreAttributeSet);
-
-		// Drop @Data unless opted in -- it can't go through the element-domain blend path (see FUnionBlender::bBlendDataDomain).
-		if (!bIncludeDataDomain)
-		{
-			OutIdentities.RemoveAll([](const PCGExData::FAttributeIdentity& Identity) { return Identity.InDataDomain(); });
-		}
 
 		if (InCarryOverDetails)
 		{

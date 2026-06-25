@@ -531,8 +531,6 @@ namespace PCGExPathHatch
 
 			TArray<TSharedRef<PCGExData::FFacade>> UnionSources;
 			UnionSources.Add(PointDataFacade);
-			// Single-source: @Data is carried by the output init, not blended.
-			Blender->bBlendDataDomain = false;
 			Blender->AddSources(UnionSources, &ProtectedAttributes);
 
 			if (!Blender->Init(Context, TargetFacade, PCGExData::EProxyFlags::Direct)) { return nullptr; }

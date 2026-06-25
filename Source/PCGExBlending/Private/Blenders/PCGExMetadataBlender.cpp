@@ -38,6 +38,10 @@ namespace PCGExBlending
 		Blenders.Reserve(BlendingParams.Num());
 		for (const FBlendingParam& Param : BlendingParams)
 		{
+			// @Data attributes are per-data singletons; a per-element source->target blend would index a one-slot
+			// buffer by element and corrupt it. Leave them to the target's output init rather than blend here.
+			if (Param.Identifier.MetadataDomain == PCGMetadataDomainID::Data) { continue; }
+
 			// Setup a single blender per A/B pair
 
 			PCGExData::FProxyDescriptor A = PCGExData::FProxyDescriptor(SourceFacade, PCGExData::EProxyRole::Read);

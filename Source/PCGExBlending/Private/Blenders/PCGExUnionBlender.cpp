@@ -18,7 +18,9 @@
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGExPointIO.h"
+#include "PCGData.h"
 #include "Data/Buffers/PCGExBufferProperty.h"
+#include "Data/PCGExProxyData.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Data/Utils/PCGExDataFilterDetails.h"
 #include "Details/PCGExBlendingDetails.h"
@@ -42,7 +44,7 @@ namespace PCGExBlending
 	{
 		check(InTargetData);
 
-		TRACE_CPUPROFILER_EVENT_SCOPE(FUnionBlender::FMultiSourceBlender::Init)
+		TRACE_CPUPROFILER_EVENT_SCOPE(FMultiSourceBlender::Init)
 
 		if (Param.Selector.GetSelection() == EPCGAttributePropertySelection::Attribute)
 		{
@@ -55,6 +57,56 @@ namespace PCGExBlending
 				return false;
 			}
 
+			if (bPromoteToElements)
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(PromoteToElements)
+
+				// Promote @Data -> Elements: the output is a fresh Elements attribute. We MUST force the Elements
+				// domain explicitly (MakeElementIdentifier) -- a by-name GetWritable sanitizes the domain against the
+				// output's existing attributes and would resolve the same-named single-slot @Data attribute instead.
+				// Each output element is then blended from its contributors' @Data value: source proxies capture @Data
+				// (the singleton reads for any index), the output proxy captures Elements (written per entry). The
+				// resulting blenders run through the normal per-entry FUnionBlender::Blend path.
+				if (!InTargetData->GetWritable(WorkingType, PCGExMetaHelpers::MakeElementIdentifier(Identity.Name), PCGExData::EBufferInit::New))
+				{
+					PCGE_LOG_C(Error, GraphAndLog, InContext, FText::Format(FTEXT("FMultiSourceBlender : Cannot create elements output for : \"{0}\""), FText::FromName(Identity.Name)));
+					return false;
+				}
+
+				FPCGAttributePropertyInputSelector OutSelector = Param.Selector;
+				OutSelector.SetDomainName(PCGDataConstants::DefaultDomainName);
+
+				auto MakeCrossDomainBlender = [&](const TSharedPtr<PCGExData::FFacade>& InSourceFacade, const FPCGAttributePropertyInputSelector& InSourceSelector, const PCGExData::EIOSide InSourceSide) -> TSharedPtr<FProxyDataBlender>
+				{
+					PCGExData::FProxyDescriptor DescA(InSourceFacade, PCGExData::EProxyRole::Read);
+					if (!DescA.Capture(InContext, InSourceSelector, InSourceSide)) { return nullptr; }
+
+					PCGExData::FProxyDescriptor DescC(InTargetData, PCGExData::EProxyRole::Write);
+					if (!DescC.Capture(InContext, OutSelector, PCGExData::EIOSide::Out)) { return nullptr; }
+
+					DescA.AddFlags(InProxyFlags | PCGExData::EProxyFlags::Shared);
+					PCGExData::EProxyFlags WriteFlags = InProxyFlags;
+					EnumRemoveFlags(WriteFlags, PCGExData::EProxyFlags::Direct);
+					DescC.AddFlags(WriteFlags | PCGExData::EProxyFlags::Shared);
+
+					return CreateProxyBlender(InContext, Param.Blending, DescA, DescC);
+				};
+
+				// Main blender: finisher over the Elements output (Begin/EndMultiBlend operate on C).
+				MainBlender = MakeCrossDomainBlender(InTargetData, OutSelector, PCGExData::EIOSide::Out);
+				if (!MainBlender) { return false; }
+
+				// One sub-blender per contributing source: reads that source's @Data singleton, writes the Elements output.
+				const TArray<int32> SupportedList = SupportedSources.Array();
+				for (const int32 SourceIdx : SupportedList)
+				{
+					SubBlenders[SourceIdx] = MakeCrossDomainBlender(Sources[SourceIdx], Param.Selector, PCGExData::EIOSide::In);
+					if (!SubBlenders[SourceIdx]) { return false; }
+				}
+
+				return true;
+			}
+
 			const FPCGAttributeIdentifier Identifier = Identity.GetIdentifier();
 			TSharedPtr<PCGExData::IBuffer> InitializationBuffer = nullptr;
 
@@ -65,11 +117,13 @@ namespace PCGExBlending
 			if (const FPCGMetadataAttributeBase* ExistingAttribute = InTargetData->FindConstAttribute(Identifier);
 				ExistingAttribute && ExistingAttribute->GetAttributeDesc().IsSameType(Identity))
 			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(Inherit)
 				// This attribute exists on target already
 				InitializationBuffer = InTargetData->GetWritable(WorkingType, ExistingAttribute, PCGExData::EBufferInit::Inherit);
 			}
 			else
 			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(New)
 				// This attribute needs to be initialized
 				InitializationBuffer = InTargetData->GetWritable(WorkingType, DefaultValue, PCGExData::EBufferInit::New);
 			}
@@ -199,6 +253,10 @@ namespace PCGExBlending
 		}
 		IOLookup = MakeShared<PCGEx::FIndexLookup>(MaxIndex + 1);
 
+		// When the carry-over opts into Data->Elements, @Data attributes are PROMOTED to per-element outputs (blended
+		// per entry); otherwise they're KEPT and reduced once into slot 0. Default is keep.
+		const bool bWantsDataToElements = CarryOverDetails && CarryOverDetails->bDataDomainToElements;
+
 		const int32 NumSources = InSources.Num();
 		Sources.Reserve(NumSources);
 		SourcesData.SetNumUninitialized(NumSources);
@@ -226,7 +284,7 @@ namespace PCGExBlending
 			UniqueTags.Append(Facade->Source->Tags->RawTags);
 
 			TArray<PCGExData::FAttributeIdentity> SourceAttributes;
-			GetFilteredIdentities(Facade->GetIn()->Metadata, SourceAttributes, BlendingDetails, CarryOverDetails, IgnoreAttributeSet, bBlendDataDomain);
+			GetFilteredIdentities(Facade->GetIn()->Metadata, SourceAttributes, BlendingDetails, CarryOverDetails, IgnoreAttributeSet);
 
 			// Check of this new source' attributes
 			// See if it adds any new, non-conflicting one
@@ -268,6 +326,9 @@ namespace PCGExBlending
 					MultiAttribute = Blenders.Add_GetRef(MakeShared<FMultiSourceBlender>(Identity, Sources));
 					MultiAttribute->Param = Param;
 					MultiAttribute->DefaultValue = SourceAttribute;
+					const bool bIsDataDomain = Identity.InDataDomain();
+					MultiAttribute->bDataDomain = bIsDataDomain && !bWantsDataToElements;
+					MultiAttribute->bPromoteToElements = bIsDataDomain && bWantsDataToElements;
 					MultiAttribute->SetNum(NumSources);
 					BlenderLookup.Add(Identifier, MultiAttribute);
 				}
@@ -319,6 +380,34 @@ namespace PCGExBlending
 			}
 		}
 
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(BlendDataDomain)
+
+			// @Data attributes are per-data singletons: blending them per entry would collapse every write onto
+			// slot 0 (last-wins). Reduce each across its contributing sources exactly once here, into slot 0.
+			// Sources are visited in ascending index order for determinism; N==1 degenerates to a carry-over.
+			for (const TSharedPtr<FMultiSourceBlender>& MultiAttribute : Blenders)
+			{
+				if (!MultiAttribute->bDataDomain || !MultiAttribute->MainBlender) { continue; }
+
+				TArray<int32> SupportedList = MultiAttribute->SupportedSources.Array();
+				if (SupportedList.IsEmpty()) { continue; }
+				SupportedList.Sort();
+
+				// Uniform weighting (1 per source): EndMultiBlend normalizes by count/total weight, so this yields
+				// the 1/N mean for Average and the mode-appropriate result for Min/Max/etc.
+				PCGEx::FOpStats Tracker = MultiAttribute->MainBlender->BeginMultiBlend(0);
+				for (const int32 SourceIdx : SupportedList)
+				{
+					if (const TSharedPtr<FProxyDataBlender>& SubBlender = MultiAttribute->SubBlenders[SourceIdx])
+					{
+						SubBlender->MultiBlend(0, 0, 1.0, Tracker);
+					}
+				}
+				MultiAttribute->MainBlender->EndMultiBlend(0, Tracker);
+			}
+		}
+
 		return true;
 	}
 
@@ -364,6 +453,7 @@ namespace PCGExBlending
 		// For each attribute/property we want to blend
 		for (const TSharedPtr<FMultiSourceBlender>& MultiAttribute : Blenders)
 		{
+			if (MultiAttribute->bDataDomain) { continue; } // Reduced once in Init, not per entry.
 			PCGEx::FOpStats Tracking = MultiAttribute->MainBlender->BeginMultiBlend(WriteIndex);
 
 			// For each point in the union, check if there is an attribute blender for that source; and if so, add it to the blend
