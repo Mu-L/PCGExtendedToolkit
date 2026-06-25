@@ -370,7 +370,10 @@ namespace PCGExBlending
 
 	void GetFilteredIdentities(const UPCGMetadata* InMetadata, TArray<PCGExData::FAttributeIdentity>& OutIdentities, const FPCGExBlendingDetails* InBlendingDetails, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* IgnoreAttributeSet)
 	{
+		// @Data attributes are included: the union/metadata blenders handle them domain-aware (reduce once / carry over),
+		// so they no longer need to be filtered out here.
 		PCGExData::FAttributeIdentity::Get(InMetadata, OutIdentities, IgnoreAttributeSet);
+
 		if (InCarryOverDetails)
 		{
 			InCarryOverDetails->Prune(OutIdentities);

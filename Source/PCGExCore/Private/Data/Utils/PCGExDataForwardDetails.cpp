@@ -57,31 +57,50 @@ bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const TSh
 
 bool FPCGExAttributeToTagDetails::Init(const FPCGExContext* InContext, const UPCGData* InSourceData, const TSet<FName>* IgnoreAttributes)
 {
-	PCGExMetaHelpers::AppendUniqueSelectorsFromCommaSeparatedList(CommaSeparatedAttributeSelectors, Attributes);
+	Getters.Reserve(AttributeMappings.Num());
+	GetterNames.Reserve(AttributeMappings.Num());
 
-	Getters.Reserve(Attributes.Num());
-	for (FPCGAttributePropertyInputSelector& Selector : Attributes)
+	// GetterNames stays index-aligned with Getters; NAME_None => Tag() uses Getter->GetName().
+	auto AddGetter = [&](const FPCGAttributePropertyInputSelector& Selector, const FName OutputNameOverride)
 	{
-		if (IgnoreAttributes)
-		{
-			if (IgnoreAttributes->Contains(Selector.GetAttributeName()))
-			{
-				continue;
-			}
-		}
+		if (IgnoreAttributes && IgnoreAttributes->Contains(Selector.GetAttributeName())) { return; }
 
 		const TSharedPtr<PCGExData::IAttributeBroadcaster> Getter = PCGExData::MakeBroadcaster(Selector, InSourceData);
 		if (!Getter)
 		{
 			PCGEX_LOG_INVALID_SELECTOR_C(InContext, Tag, Selector)
-			continue;
+			return;
 		}
 
 		Getters.Add(Getter);
+		GetterNames.Add(OutputNameOverride);
+	};
+
+	for (const FPCGExAttributeSourceToTargetDetails& Mapping : AttributeMappings)
+	{
+		AddGetter(Mapping.GetSourceSelector(), Mapping.WantsRemappedOutput() ? Mapping.GetOutputName() : NAME_None);
 	}
+
+	// Comma-separated additions are never remapped (output keeps the resolved source name).
+	TArray<FPCGAttributePropertyInputSelector> ExtraSelectors;
+	PCGExMetaHelpers::AppendUniqueSelectorsFromCommaSeparatedList(CommaSeparatedAttributeSelectors, ExtraSelectors);
+	for (const FPCGAttributePropertyInputSelector& Selector : ExtraSelectors) { AddGetter(Selector, NAME_None); }
 
 	// Raw-data path: no facade is involved, so SourceDataFacade stays null.
 	return true;
+}
+
+void FPCGExAttributeToTagDetails::PostSerialize(const FArchive& Ar)
+{
+#if WITH_EDITOR
+	// One-shot migration for every embedder. The (new-empty AND deprecated-non-empty) guard avoids clobbering
+	// post-migration edits; clearing the source stops an emptied AttributeMappings from resurrecting old entries.
+	if (Ar.IsLoading() && AttributeMappings.IsEmpty() && !Attributes_DEPRECATED.IsEmpty())
+	{
+		PCGExAttributeMigration::AppendMappingsFromSelectors(Attributes_DEPRECATED, AttributeMappings);
+		Attributes_DEPRECATED.Empty();
+	}
+#endif
 }
 
 void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, TSet<FString>& InTags) const
@@ -93,8 +112,11 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, T
 
 	if (!Getters.IsEmpty())
 	{
-		for (const TSharedPtr<PCGExData::IAttributeBroadcaster>& Getter : Getters)
+		for (int32 i = 0; i < Getters.Num(); i++)
 		{
+			const TSharedPtr<PCGExData::IAttributeBroadcaster>& Getter = Getters[i];
+			const FName OutputName = !GetterNames[i].IsNone() ? GetterNames[i] : Getter->GetName();
+
 			PCGExMetaHelpers::ExecuteWithRightType(Getter->GetMetadataType(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
@@ -110,7 +132,7 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, T
 					return;
 				}
 
-				AppendValueTag<T>(TypedGetter->GetName(), TypedValue, bPrefixWithAttributeName, InTags);
+				AppendValueTag<T>(OutputName, TypedValue, bPrefixWithAttributeName, InTags);
 			});
 		}
 	}
@@ -137,8 +159,11 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, U
 
 	if (!Getters.IsEmpty())
 	{
-		for (const TSharedPtr<PCGExData::IAttributeBroadcaster>& Getter : Getters)
+		for (int32 i = 0; i < Getters.Num(); i++)
 		{
+			const TSharedPtr<PCGExData::IAttributeBroadcaster>& Getter = Getters[i];
+			const FName OutputName = !GetterNames[i].IsNone() ? GetterNames[i] : Getter->GetName();
+
 			PCGExMetaHelpers::ExecuteWithRightType(Getter->GetMetadataType(), [&](auto DummyValue)
 			{
 				using T = decltype(DummyValue);
@@ -149,7 +174,7 @@ void FPCGExAttributeToTagDetails::Tag(const PCGExData::FConstPoint& TagSource, U
 					return;
 				}
 
-				const FPCGAttributeIdentifier Identifier = FPCGAttributeIdentifier(Getter->GetName(), PCGMetadataDomainID::Data);
+				const FPCGAttributeIdentifier Identifier = FPCGAttributeIdentifier(OutputName, PCGMetadataDomainID::Data);
 				InMetadata->DeleteAttribute(Identifier);
 				InMetadata->FindOrCreateAttribute<T>(Identifier, TypedGetter->FetchSingle(TagSource, T{}));
 			});

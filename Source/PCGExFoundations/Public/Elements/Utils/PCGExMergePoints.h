@@ -37,6 +37,8 @@ class UPCGExMergePointsSettings : public UPCGExPointsProcessorSettings
 	GENERATED_BODY()
 
 public:
+	UPCGExMergePointsSettings();
+
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(MergePoints, "Merge Points", "Merge point collections, optionally grouping them using matching rules.");

@@ -11,6 +11,7 @@
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Types/PCGExAttributeIdentity.h"
+#include "Utils/PCGExAttributeCopy.h"
 
 #include "UObject/Object.h"
 
@@ -105,85 +106,15 @@ namespace PCGExPointIOMerger
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExPointIOMerger::ScopeMerge);
 
-		UPCGMetadata* InMetadata = SourceIO->GetIn()->Metadata;
-
-		const FPCGMetadataAttributeBase* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(InMetadata, Identity.GetIdentifier());
+		const FPCGMetadataAttributeBase* TypedInAttribute = PCGExMetaHelpers::TryGetConstAttribute<T>(SourceIO->GetIn()->Metadata, Identity.GetIdentifier());
 		if (!TypedInAttribute)
 		{
 			return;
 		}
 
-		if (!OutBuffer) { return; }
-
-		if (OutBuffer->GetUnderlyingDomain() == PCGExData::EDomainType::Elements)
-		{
-			// We are writing to elements domain
-			const TSharedPtr<PCGExData::TArrayBuffer<T>> OutElementsBuffer = StaticCastSharedPtr<PCGExData::TArrayBuffer<T>>(OutBuffer);
-
-			if (TypedInAttribute->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data)
-			{
-				// From a data domain
-				const T Value = PCGExData::Helpers::ReadDataValue<T>(TypedInAttribute);
-				for (int Index = Scope.Write.Start; Index < Scope.Write.End; Index++)
-				{
-					OutElementsBuffer->SetValue(Index, Value);
-				}
-			}
-			else
-			{
-				check(Scope.Read.Count == Scope.Write.Count)
-
-				// From elements domain
-				TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, TypedInAttribute->GetMetadataDomain());
-
-				if (!InAccessor.IsValid())
-				{
-					return;
-				}
-
-				TArrayView<T> InRange = MakeArrayView(OutElementsBuffer->GetOutValues()->GetData() + Scope.Write.Start, Scope.Write.Count);
-
-				if (Scope.bReverse)
-				{
-					TArray<T> ReadData;
-					PCGExArrayHelpers::InitArray(ReadData, Scope.Write.Count);
-
-					InAccessor->GetRange<T>(ReadData, Scope.Read.Start, *SourceIO->GetInKeys());
-					for (int i = 0; i < Scope.Read.Count; i++)
-					{
-						InRange[i] = ReadData.Last(i);
-					}
-				}
-				else
-				{
-					InAccessor->GetRange<T>(InRange, Scope.Read.Start, *SourceIO->GetInKeys());
-				}
-			}
-		}
-		else if (OutBuffer->GetUnderlyingDomain() == PCGExData::EDomainType::Data)
-		{
-			// We are writing to data domain
-			const TSharedPtr<PCGExData::TSingleValueBuffer<T>> OutDataBuffer = StaticCastSharedPtr<PCGExData::TSingleValueBuffer<T>>(OutBuffer);
-
-			if (TypedInAttribute->GetMetadataDomain()->GetDomainID().Flag == EPCGMetadataDomainFlag::Data)
-			{
-				// From data domain
-				OutDataBuffer->SetValue(0, PCGExData::Helpers::ReadDataValue<T>(TypedInAttribute));
-			}
-			else
-			{
-				// From elements domain
-				TUniquePtr<const IPCGAttributeAccessor> InAccessor = PCGAttributeAccessorHelpers::CreateConstAccessor(TypedInAttribute, TypedInAttribute->GetMetadataDomain());
-				if (!InAccessor.IsValid())
-				{
-					return;
-				}
-				if (T Value = T{};
-					InAccessor->Get(Value, Scope.Read.Start, *SourceIO->GetInKeys()))
-				{
-					OutDataBuffer->SetValue(0, Value);
-				}
-			}
-		}
+		// The source-domain x output-domain matrix lives in CopyAttributeScoped, shared with the blenders.
+		PCGExBlending::CopyAttributeScoped<T>(
+			PCGExBlending::FAttributeCopyScope{Scope.Read, Scope.Write, Scope.bReverse, Scope.ReadIndices},
+			TypedInAttribute, SourceIO, OutBuffer);
 	}
 }

@@ -212,7 +212,7 @@ namespace PCGExFusePoints
 
 		UnionTable = MakeShared<PCGExData::FUnionTable>();
 
-		// Register fetch-able buffers for chunked reads
+		// Register fetch-able buffers for chunked reads.
 		TArray<PCGExData::FAttributeIdentity> SourceAttributes;
 		PCGExBlending::GetFilteredIdentities(PointDataFacade->GetIn()->Metadata, SourceAttributes, &Settings->BlendingDetails, &Context->CarryOverDetails);
 

@@ -69,7 +69,7 @@ struct PCGEXCORE_API FPCGExNameFiltersDetails
 	FString CommaSeparatedNames;
 
 	/** Unique filter mode applied to comma separated names */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="FilterMode != EPCGExAttributeFilter::All", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, EditCondition="FilterMode != EPCGExAttributeFilter::All", EditConditionHides))
 	EPCGExStringMatchMode CommaSeparatedNameFilter = EPCGExStringMatchMode::Equals;
 
 	/** If enabled, PCGEx attributes & tags won't be affected.  Cluster-related nodes rely on these to work! */
@@ -131,10 +131,10 @@ struct PCGEXCORE_API FPCGExCarryOverDetails
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExNameFiltersDetails Attributes = FPCGExNameFiltersDetails(false);
 
-	/** If enabled, will convert data domain attributes to elements domain ones.
-	 * Note : This is not used by all nodes. */
+	/** If enabled, data domain attributes are promoted to the elements domain (the single @Data value is
+	 * broadcast to every point). Off by default; Merge Points is the node that enables it. Not used by all nodes. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" ├─ Data domain to Elements", EditCondition="!bUsedForCleanup", EditConditionHides, HideEditConditionToggle))
-	bool bDataDomainToElements = true;
+	bool bDataDomainToElements = false;
 
 	/** Scope */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, DisplayName=" └─ Scope", EditCondition="bUsedForCleanup", EditConditionHides, HideEditConditionToggle))

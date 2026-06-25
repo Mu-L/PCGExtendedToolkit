@@ -160,7 +160,7 @@ public:
 
 	/** Optionally include/exclude entries by category name. Tested against both leaf entries and
 	 *  sub-collection containers; excluding a sub-collection skips its descendants entirely. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_NotOverridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Recursion", meta=(PCG_Overridable))
 	FPCGExNameFiltersDetails CategoryFilters;
 
 

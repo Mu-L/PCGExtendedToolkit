@@ -366,6 +366,9 @@ extern template bool IBuffer::IsA<_TYPE>() const;
 
 		TSharedPtr<IBuffer> GetWritable(EPCGMetadataTypes Type, const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init);
 		TSharedPtr<IBuffer> GetWritable(EPCGMetadataTypes Type, const FName InName, EBufferInit Init);
+		// Identifier-driven: preserves an explicit MetadataDomain (e.g. forcing Elements). Unlike the FName overload,
+		// it does NOT sanitize the domain against existing attributes -- so it won't resolve a same-named @Data attribute.
+		TSharedPtr<IBuffer> GetWritable(EPCGMetadataTypes Type, const FPCGAttributeIdentifier& InIdentifier, EBufferInit Init);
 
 		// Attribute-driven writable lookup -- callers don't need to extract EPCGMetadataTypes.
 		// Internally delegates to GetWritable(EPCGMetadataTypes, FPCGMetadataAttributeBase*, EBufferInit).

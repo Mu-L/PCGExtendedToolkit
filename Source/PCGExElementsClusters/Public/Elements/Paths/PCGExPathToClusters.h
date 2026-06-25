@@ -72,47 +72,47 @@ public:
 	bool bFusePaths = true;
 
 	/** Fuse Settings */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Point/Point Settings", EditCondition="bFusePaths"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing", meta=(PCG_Overridable, DisplayName="Point/Point Settings"))
 	FPCGExPointPointIntersectionDetails PointPointIntersectionDetails;
 
 	/** Find Point-Edge intersection (points on edges)*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bFusePaths"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing", meta=(PCG_Overridable))
 	bool bFindPointEdgeIntersections;
 
 	/** Point-Edge intersection settings */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Point/Edge Settings", EditCondition="bFusePaths && bFindPointEdgeIntersections"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing", meta=(PCG_Overridable, DisplayName="Point/Edge Settings", EditCondition="bFindPointEdgeIntersections"))
 	FPCGExPointEdgeIntersectionDetails PointEdgeIntersectionDetails;
 
 	/** Find Edge-Edge intersection (edge crossings)*/
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="bFusePaths"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bFindEdgeEdgeIntersections;
 
 	/** Edge-Edge intersection settings */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, DisplayName="Edge/Edge Settings", EditCondition="bFusePaths && bFindEdgeEdgeIntersections"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing", meta=(PCG_Overridable, DisplayName="Edge/Edge Settings", EditCondition="bFindEdgeEdgeIntersections"))
 	FPCGExEdgeEdgeIntersectionDetails EdgeEdgeIntersectionDetails;
 
 	/** Defines how fused point properties and attributes are merged together for fused points. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Data Blending", meta=(EditCondition="bFusePaths"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing|Data Blending")
 	FPCGExBlendingDetails DefaultPointsBlendingDetails;
 
 	/** Defines how fused point properties and attributes are merged together for fused edges. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Data Blending", meta=(EditCondition="bFusePaths"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing|Data Blending")
 	FPCGExBlendingDetails DefaultEdgesBlendingDetails;
 
 	/** Use custom blending settings for Point/Edge intersections instead of the default. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Data Blending", meta=(PCG_Overridable, EditCondition="bFusePaths"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing|Data Blending", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bUseCustomPointEdgeBlending = false;
 
 	/** Defines how fused point properties and attributes are merged together for Point/Edge intersections. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Data Blending", meta=(PCG_Overridable, EditCondition="bFusePaths && bUseCustomPointEdgeBlending"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing|Data Blending", meta=(PCG_Overridable, EditCondition="bUseCustomPointEdgeBlending"))
 	FPCGExBlendingDetails CustomPointEdgeBlendingDetails;
 
 	/** Use custom blending settings for Edge/Edge intersections (crossings) instead of the default. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Data Blending", meta=(PCG_Overridable, EditCondition="bFusePaths"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing|Data Blending", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bUseCustomEdgeEdgeBlending = false;
 
 	/** Defines how fused point properties and attributes are merged together for Edge/Edge intersections (Crossings). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Data Blending", meta=(PCG_Overridable, EditCondition="bFusePaths && bUseCustomEdgeEdgeBlending"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Fusing|Data Blending", meta=(PCG_Overridable, EditCondition="bUseCustomEdgeEdgeBlending"))
 	FPCGExBlendingDetails CustomEdgeEdgeBlendingDetails;
 
 	/** Meta filter settings. */

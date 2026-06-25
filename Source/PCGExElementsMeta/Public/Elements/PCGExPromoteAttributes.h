@@ -53,6 +53,8 @@ class UPCGExAttributesToTagsSettings : public UPCGExSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
+	virtual void PCGExApplyDeprecation(UPCGNode* InOutNode) override;
+
 	PCGEX_NODE_INFOS(PromoteAttributes, "Promote Attributes", "Promote element values to tags or data domain");
 
 	virtual TArray<FText> GetNodeTitleAliases() const override;
@@ -96,9 +98,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
 	bool bPrefixWithAttributeName = true;
 
-	/** Attributes which value will be used as tags. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
-	TArray<FPCGAttributePropertyInputSelector> Attributes;
+#pragma region DEPRECATED
+	// Pre-remapping selector list. Migrated to AttributeMappings in PCGExApplyDeprecation.
+	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
+	TArray<FPCGAttributePropertyInputSelector> Attributes_DEPRECATED;
+#pragma endregion
+
+	/** Attributes whose value is promoted, each with an optional source->target output-name remap.
+	 *  Leave the target empty to keep the source's resolved name (the pre-remapping behavior). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(TitleProperty="Source"))
+	TArray<FPCGExAttributeSourceToTargetDetails> AttributeMappings;
 
 	/** A list of selectors separated by a comma, for easy overrides. Will be appended to the existing array.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -127,11 +136,11 @@ struct FPCGExAttributesToTagsContext final : FPCGExContext
 
 	TArray<TObjectPtr<const UPCGExPickerFactoryData>> PickerFactories;
 
-	/** Element-domain selectors (merged with the comma-separated overrides), read per-row via the broadcaster. Built in Boot. */
-	TArray<FPCGAttributePropertyInputSelector> Attributes;
+	/** Element-domain mappings (merged with the comma-separated overrides), read per-row via the broadcaster. Built in Boot. */
+	TArray<FPCGExAttributeSourceToTargetDetails> ElementMappings;
 
-	/** @Data-domain selectors, read as a single value via PCGExData::Helpers::TryReadDataValue (the broadcaster is point-centric and doesn't handle @Data off raw data). Built in Boot. */
-	TArray<FPCGAttributePropertyInputSelector> DataAttributes;
+	/** @Data-domain mappings, read as a single value via PCGExData::Helpers::TryReadDataValue (the broadcaster is point-centric and doesn't handle @Data off raw data). Built in Boot. */
+	TArray<FPCGExAttributeSourceToTargetDetails> DataMappings;
 
 	/** All non-empty main inputs (with cached row counts), gathered once in Boot and reused in AdvanceWork. */
 	TArray<FPCGExAttributesToTagsInput> ValidMains;

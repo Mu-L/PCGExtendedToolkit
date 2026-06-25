@@ -562,6 +562,26 @@ template PCGEXCORE_API const FPCGMetadataAttributeBase* FFacade::FindConstAttrib
 #undef PCGEX_TYPED_WRITABLE
 	}
 
+	TSharedPtr<IBuffer> FFacade::GetWritable(const EPCGMetadataTypes Type, const FPCGAttributeIdentifier& InIdentifier, EBufferInit Init)
+	{
+#define PCGEX_TYPED_WRITABLE(_TYPE, _ID, ...) case EPCGMetadataTypes::_ID: return GetWritable<_TYPE>(InIdentifier, Init);
+		switch (Type)
+		{
+		PCGEX_FOREACH_SUPPORTEDTYPES(PCGEX_TYPED_WRITABLE)
+		default:
+		{
+			// Generic/property types: resolve an existing attribute (by the identifier's domain) for size info, then
+			// route through the attribute overload. Promotion of a non-legacy @Data attribute to a NEW Elements one
+			// isn't supported here (no existing Elements attribute to size from) and returns null.
+			const FPCGMetadataAttributeBase* RawAttribute = Source->FindConstAttribute(InIdentifier, EIOSide::In);
+			if (!RawAttribute) { RawAttribute = Source->FindConstAttribute(InIdentifier, EIOSide::Out); }
+			if (!RawAttribute) { return nullptr; }
+			return GetWritable(Type, RawAttribute, Init);
+		}
+		}
+#undef PCGEX_TYPED_WRITABLE
+	}
+
 	TSharedPtr<IBuffer> FFacade::GetWritableFromAttribute(const FPCGMetadataAttributeBase* InAttribute, EBufferInit Init)
 	{
 		if (!InAttribute)
