@@ -295,6 +295,9 @@ switch (_OPTION){ \
 // Pin for operation property overrides
 #define PCGEX_PIN_OPERATION_OVERRIDES(_LABEL) PCGEX_PIN_PARAMS(_LABEL, "Property overrides to be forwarded & processed by the module. Name must match the property you're targeting 1:1, type mismatch will be broadcasted at your own risk.", Advanced)
 
+// Execution-dependency-only pin: carries no data, only orders execution. Multi-connection/data.
+#define PCGEX_PIN_DEPENDENCY(_LABEL) { FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(_LABEL, EPCGDataType::Any, /*bInAllowMultipleConnections=*/true, /*bAllowMultipleData=*/true); Pin.Usage = EPCGPinUsage::DependencyOnly; }
+
 
 /// GEOMETRY UTILITIES
 /// Macros for creating bounding boxes with tolerance
