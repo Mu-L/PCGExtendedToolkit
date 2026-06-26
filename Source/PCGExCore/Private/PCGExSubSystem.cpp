@@ -229,6 +229,10 @@ void UPCGExSubSystem::PeekCachedResources(const TSet<FSoftObjectPath>& InPaths, 
 {
 	const double Now = FPlatformTime::Seconds();
 
+	// Many requested paths map to the same batch wrapper; dedup hits by wrapper identity in O(1) each
+	// rather than OutHits.AddUnique's linear scan (assumes OutHits starts empty, as all callers pass it).
+	TSet<const PCGExHelpers::FPCGExSharedAssetHandle*> Seen;
+
 	// Resolve hits against the per-path index; everything else is a miss for the caller to load.
 	FReadScopeLock ReadLock(ResourceCacheLock);
 	for (const FSoftObjectPath& Path : InPaths)
@@ -238,7 +242,9 @@ void UPCGExSubSystem::PeekCachedResources(const TSet<FSoftObjectPath>& InPaths, 
 			if (PCGExHelpers::FPCGExSharedAssetHandlePtr Pinned = Found->Pin())
 			{
 				Pinned->LastAccess.store(Now, std::memory_order_relaxed);
-				OutHits.AddUnique(Pinned);
+				bool bAlreadySeen = false;
+				Seen.Add(Pinned.Get(), &bAlreadySeen);
+				if (!bAlreadySeen) { OutHits.Add(Pinned); }
 				continue;
 			}
 		}
@@ -248,10 +254,14 @@ void UPCGExSubSystem::PeekCachedResources(const TSet<FSoftObjectPath>& InPaths, 
 
 PCGExHelpers::FPCGExSharedAssetHandlePtr UPCGExSubSystem::TrackLoadedBatch(const TSharedPtr<FStreamableHandle>& InHandle, const bool bInsert)
 {
+	// Never wrap a failed load: a dead wrapper would only be handed back and discarded, and if cached it
+	// would keep returning an invalid handle. All callers null-check the result.
+	if (!InHandle.IsValid()) { return nullptr; }
+
 	const PCGExHelpers::FPCGExSharedAssetHandlePtr Wrapper = MakeShared<PCGExHelpers::FPCGExSharedAssetHandle>(InHandle, FPlatformTime::Seconds());
 
-	// Read-only callers skip insertion; never cache a failed load (it would keep returning a dead wrapper).
-	if (!bInsert || !InHandle.IsValid()) { return Wrapper; }
+	// Read-only callers skip insertion -- reuse the wrapper without caching it.
+	if (!bInsert) { return Wrapper; }
 
 	// Index from the handle's authoritative path list (single source of truth, post null/dup strip).
 	TArray<FSoftObjectPath> Covered;
@@ -262,14 +272,18 @@ PCGExHelpers::FPCGExSharedAssetHandlePtr UPCGExSubSystem::TrackLoadedBatch(const
 		ResourceCacheWarm.Add(Wrapper);
 		for (const FSoftObjectPath& Path : Covered)
 		{
-			// Keep the first wrapper indexed for a path. The game-thread sync path never collides (every
-			// missed path was absent from the index); for concurrent async inserts a later wrapper stays in
-			// the warm set covering the path harmlessly and self-prunes on eviction.
-			if (!ResourceCacheIndex.Contains(Path)) { ResourceCacheIndex.Add(Path, Wrapper); }
+			// Keep the first wrapper indexed for a path. A later wrapper that also covers Path stays in the
+			// warm set (still reachable: the eviction sweep re-points the index to it if the first wrapper is
+			// dropped). Flag the duplicate so the sweep knows it must run that re-point pass.
+			if (ResourceCacheIndex.Contains(Path)) { bResourceIndexHasDuplicates = true; }
+			else { ResourceCacheIndex.Add(Path, Wrapper); }
 		}
+
+		// Count mutated under the same lock as the warm set, so the two never disagree across a concurrent
+		// ClearResourceCache or eviction sweep.
+		CachedHandleCount.fetch_add(1, std::memory_order_acq_rel);
 	}
 
-	CachedHandleCount.fetch_add(1, std::memory_order_acq_rel);
 	return Wrapper;
 }
 
@@ -300,9 +314,14 @@ void UPCGExSubSystem::SweepResourceCache(const double Now)
 	// Collect evicted wrappers and let them release OUTSIDE the lock -- their destructor releases the
 	// streamable handle, which we keep off the cache critical section.
 	TArray<PCGExHelpers::FPCGExSharedAssetHandlePtr> Evicted;
+	int32 RemainingWarm = 0;
 
 	{
 		FWriteScopeLock WriteLock(ResourceCacheLock);
+
+		// Paths whose index entry pointed at an evicted wrapper. Only collected when duplicate coverage
+		// exists; otherwise an evicted wrapper's paths have no other warm owner and are simply removed.
+		TSet<FSoftObjectPath> OrphanedPaths;
 
 		for (int32 i = ResourceCacheWarm.Num() - 1; i >= 0; --i)
 		{
@@ -317,15 +336,19 @@ void UPCGExSubSystem::SweepResourceCache(const double Now)
 
 			if (Handle.IsValid())
 			{
-				// Prune the index, but only entries still pointing at THIS wrapper. Paths come straight from
-				// the streamable handle (no stored copy) -- the same list we indexed at load.
+				// Drop the index entries still pointing at THIS wrapper. Paths come straight from the
+				// streamable handle (no stored copy) -- the same list we indexed at load.
 				TArray<FSoftObjectPath> Covered;
 				Handle->GetCoveredPaths(Covered);
 				for (const FSoftObjectPath& Path : Covered)
 				{
 					if (const TWeakPtr<PCGExHelpers::FPCGExSharedAssetHandle>* Found = ResourceCacheIndex.Find(Path))
 					{
-						if (Found->Pin() == Handle) { ResourceCacheIndex.Remove(Path); }
+						if (Found->Pin() == Handle)
+						{
+							ResourceCacheIndex.Remove(Path);
+							if (bResourceIndexHasDuplicates) { OrphanedPaths.Add(Path); }
+						}
 					}
 				}
 			}
@@ -333,12 +356,38 @@ void UPCGExSubSystem::SweepResourceCache(const double Now)
 			Evicted.Add(MoveTemp(ResourceCacheWarm[i]));
 			ResourceCacheWarm.RemoveAtSwap(i);
 		}
+
+		// Re-point any orphaned path that a surviving warm wrapper still covers: a multi-loaded path must
+		// stay discoverable as long as ANY warm wrapper backs it. OrphanedPaths is empty unless a duplicate
+		// was ever indexed, so the common single-owner sweep skips this survivor scan entirely.
+		if (!OrphanedPaths.IsEmpty())
+		{
+			for (const PCGExHelpers::FPCGExSharedAssetHandlePtr& Survivor : ResourceCacheWarm)
+			{
+				if (!Survivor.IsValid()) { continue; }
+				TArray<FSoftObjectPath> Covered;
+				Survivor->GetCoveredPaths(Covered);
+				for (const FSoftObjectPath& Path : Covered)
+				{
+					if (OrphanedPaths.Contains(Path) && !ResourceCacheIndex.Contains(Path))
+					{
+						ResourceCacheIndex.Add(Path, Survivor);
+					}
+				}
+			}
+		}
+
+		// Count mutated under the same lock as the warm set so the two never disagree.
+		if (!Evicted.IsEmpty())
+		{
+			CachedHandleCount.fetch_sub(Evicted.Num(), std::memory_order_acq_rel);
+		}
+		RemainingWarm = ResourceCacheWarm.Num();
 	}
 
 	if (!Evicted.IsEmpty())
 	{
-		const int32 Remaining = CachedHandleCount.fetch_sub(Evicted.Num(), std::memory_order_acq_rel) - Evicted.Num();
-		UE_LOG(LogPCGEx, Log, TEXT("PCGEx resource cache: swept %d handle(s) (%d still warm)."), Evicted.Num(), Remaining);
+		UE_LOG(LogPCGEx, Log, TEXT("PCGEx resource cache: swept %d handle(s) (%d still warm)."), Evicted.Num(), RemainingWarm);
 	}
 
 	// Evicted wrappers release here -- on the game thread, outside the lock.
@@ -354,9 +403,11 @@ void UPCGExSubSystem::ClearResourceCache()
 		ResourceCacheIndex.Empty();
 		Evicted = MoveTemp(ResourceCacheWarm);
 		ResourceCacheWarm.Reset();
-	}
+		bResourceIndexHasDuplicates = false;
 
-	CachedHandleCount.store(0, std::memory_order_release);
+		// Count zeroed under the same lock as the warm set.
+		CachedHandleCount.store(0, std::memory_order_release);
+	}
 
 	// Release outside the lock. Wrappers still referenced by a live context survive until it drops them.
 	Evicted.Reset();

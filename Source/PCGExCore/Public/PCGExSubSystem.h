@@ -186,5 +186,10 @@ protected:
 	std::atomic<int32> ActiveGenerationCount{0};
 	double LastCacheSweepTime = 0.0;
 
+	// Set once any path ends up covered by more than one warm wrapper (concurrent multi-source loads).
+	// Gates the eviction sweep's index re-point pass so the common single-owner case stays cheap.
+	// Only ever read/written under ResourceCacheLock.
+	bool bResourceIndexHasDuplicates = false;
+
 #pragma endregion
 };

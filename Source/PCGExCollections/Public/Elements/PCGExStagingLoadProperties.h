@@ -184,7 +184,7 @@ class FPCGExStagingLoadPropertiesElement final : public FPCGExPointsProcessorEle
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(StagingLoadProperties)
 
-	virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override;
+	PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE()
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };

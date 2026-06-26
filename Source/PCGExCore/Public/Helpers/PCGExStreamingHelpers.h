@@ -98,6 +98,10 @@ namespace PCGExHelpers
 	// Keep-alive is guaranteed by registration on the context -- the caller never receives a handle, so it
 	// can never release one out from under the cache. This is the ergonomic front door for the many call
 	// sites that just need assets resident for the duration of the node.
+	// CALLER RESPONSIBILITY: a cache miss marshals the load to the game thread and blocks until it returns,
+	// so the calling code must be game-thread-affine when a miss is possible (e.g. the element overrides
+	// CanExecuteOnlyOnMainThread for the loading phase). Calling this from a worker thread while the game
+	// thread is joined on it can deadlock under PCG cancellation.
 	PCGEXCORE_API
 	void LoadBlockingTracked_AnyThread(const FSoftObjectPath& Path, FPCGExContext* InContext);
 

@@ -41,7 +41,7 @@ class PCGEXCORE_API UPCGExFactoryProviderSettings : public UPCGExSettings
 
 public:
 	
-	UPCGExFactoryProviderSettings();
+	UPCGExFactoryProviderSettings(const FObjectInitializer& ObjectInitializer);
 	
 	//~Begin UObject interface
 #if WITH_EDITOR

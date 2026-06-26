@@ -28,11 +28,6 @@ TArray<FPCGPinProperties> UPCGExSocketStagingSettings::OutputPinProperties() con
 	return PinProperties;
 }
 
-bool FPCGExSocketStagingElement::CanExecuteOnlyOnMainThread(FPCGContext* Context) const
-{
-	return Context && Context->CurrentPhase == EPCGExecutionPhase::PrepareData;
-}
-
 bool FPCGExSocketStagingElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))

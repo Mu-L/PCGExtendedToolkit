@@ -437,11 +437,6 @@ TArray<FPCGPinProperties> UPCGExPCGDataAssetLoaderSettings::OutputPinProperties(
 PCGEX_INITIALIZE_ELEMENT(PCGDataAssetLoader)
 PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(PCGDataAssetLoader)
 
-bool FPCGExPCGDataAssetLoaderElement::CanExecuteOnlyOnMainThread(FPCGContext* Context) const
-{
-	return Context && Context->CurrentPhase == EPCGExecutionPhase::PrepareData;
-}
-
 bool FPCGExPCGDataAssetLoaderElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))

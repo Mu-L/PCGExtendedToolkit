@@ -423,8 +423,10 @@ void FPCGExContext::AddAssetDependency(const FSoftObjectPath& Dependency)
 	RequiredAssets->Add(Dependency);
 }
 
-bool FPCGExContext::LoadAssets(bool& bIsAlreadyLoaded)
+bool FPCGExContext::LoadAssets()
 {
+	bWarmDependencies = false;
+
 	if (!RequiredAssets || RequiredAssets->IsEmpty())
 	{
 		return false;
@@ -432,7 +434,11 @@ bool FPCGExContext::LoadAssets(bool& bIsAlreadyLoaded)
 
 	SetState(PCGExCommon::States::State_LoadingAssetDependencies);
 
-	bIsAlreadyLoaded = PCGExHelpers::LoadTracked(
+	// LoadTracked returns true when every dependency was already resident (warm cache) and the load
+	// therefore completed synchronously in this call. Record that so AdvancePreparation can skip the
+	// async yield, and so downstream PostLoadAssetsDependencies overrides can tell a warm re-run from
+	// a cold load via bWarmDependencies.
+	bWarmDependencies = PCGExHelpers::LoadTracked(
 		GetTaskManager(),
 		[CtxHandle = GetWeakSelfHandle()]() -> TArray<FSoftObjectPath>
 		{

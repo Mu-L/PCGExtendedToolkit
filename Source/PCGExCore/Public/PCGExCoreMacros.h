@@ -30,6 +30,11 @@
 // Override to control whether a node can only execute on the main thread
 #define PCGEX_ELEMENT_MAIN_THREAD_ONLY(_BOOL) virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return _BOOL; }
 
+// Force a node onto the main thread for the PrepareData phase only (e.g. nodes that load/cache
+// resources during preparation and must stay game-thread-affine to avoid the marshal-and-wait
+// deadlock under PCG cancellation). Off-thread for every other phase.
+#define PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE() virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return Context && Context->CurrentPhase == EPCGExecutionPhase::PrepareData; }
+
 // Override to control whether a node supports base point data inputs
 #define PCGEX_SUPPORT_BASE_POINT_DATA(_BOOL) virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override { return _BOOL; }
 

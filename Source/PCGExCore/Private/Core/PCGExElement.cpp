@@ -98,16 +98,23 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 		}
 
 		Context->RegisterAssetDependencies();
-		bool bAlreadyLoaded = false;
-		if (Context->HasAssetRequirements() && Context->LoadAssets(bAlreadyLoaded))
+		if (Context->HasAssetRequirements() && Context->LoadAssets())
 		{
-			if (!bAlreadyLoaded)
+			// Cold cache: an async load was dispatched -- yield now. The State_LoadingAssetDependencies
+			// gate below fires PostLoadAssetsDependencies exactly once when the load completes. A warm-cache
+			// hit (bWarmDependencies) completed synchronously and falls through to that same gate in this
+			// tick, so the hook still runs exactly once -- never twice.
+			if (!Context->bWarmDependencies)
 			{
 				return false;
 			}
 		}
-
-		PostLoadAssetsDependencies(Context);
+		else
+		{
+			// No async dependency load was scheduled (no requirements), so the
+			// State_LoadingAssetDependencies gate will not fire -- run the post-load hook directly, once.
+			PostLoadAssetsDependencies(Context);
+		}
 	}
 
 	PCGEX_ON_ASYNC_STATE_READY(PCGExCommon::States::State_LoadingAssetDependencies)

@@ -12,6 +12,65 @@
 #include "Engine/StreamableManager.h"
 #include "UObject/SoftObjectPath.h"
 
+namespace PCGExStreamingHelpers
+{
+	// File-local helpers for the cached load path. Named (not anonymous / not static) so the Unity build
+	// cannot collide them with same-named helpers in sibling translation units.
+
+	// Wrap a freshly-loaded streamable handle for cache tracking: routes through the subsystem when one is
+	// present (which optionally inserts it into the warm set), otherwise builds a standalone wrapper.
+	// Returns null for an invalid handle so callers never track a dead load.
+	PCGExHelpers::FPCGExSharedAssetHandlePtr WrapLoadedBatch(UPCGExSubSystem* Subsystem, const TSharedPtr<FStreamableHandle>& Handle, const bool bCacheMisses)
+	{
+		if (Subsystem) { return Subsystem->TrackLoadedBatch(Handle, bCacheMisses); }
+		if (Handle.IsValid()) { return MakeShared<PCGExHelpers::FPCGExSharedAssetHandle>(Handle, FPlatformTime::Seconds()); }
+		return nullptr;
+	}
+
+	// Cache-resolve the requested paths, synchronously load only the misses (marshaled to the game thread
+	// when called off it), and register every resulting wrapper on the context for keep-alive. Shared by
+	// both LoadAndCacheBlocking_AnyThread overloads.
+	TArray<PCGExHelpers::FPCGExSharedAssetHandlePtr> LoadAndCacheBlockingSet(const TSet<FSoftObjectPath>& Paths, FPCGExContext* InContext, const bool bCacheMisses)
+	{
+		TArray<PCGExHelpers::FPCGExSharedAssetHandlePtr> Result;
+
+		// Interrogate the cache FIRST, off the game thread -- it's a lock-only read. Already-resident
+		// resources are reused with no marshal at all: the entire point of the cache, and what keeps a warm
+		// load deadlock-free under PCG cancellation. Only an actual miss needs the game thread.
+		UPCGExSubSystem* Subsystem = UPCGExSubSystem::GetSubsystemForCurrentWorld();
+
+		TArray<FSoftObjectPath> Misses;
+		if (Subsystem) { Subsystem->PeekCachedResources(Paths, Result, Misses); }
+		else { Misses = Paths.Array(); }
+
+		if (!Misses.IsEmpty())
+		{
+			// RequestSyncLoad is the only game-thread-bound step; the peek above already ran off-thread.
+			// CALLER RESPONSIBILITY: when a miss is possible this marshals-and-waits on the game thread, so
+			// the calling node must be game-thread-affine for the loading phase (e.g. via
+			// PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE) or it can deadlock under PCG cancellation.
+			auto LoadMisses = [&Subsystem, &Misses, bCacheMisses]() -> PCGExHelpers::FPCGExSharedAssetHandlePtr
+			{
+				const TSharedPtr<FStreamableHandle> Handle = UAssetManager::GetStreamableManager().RequestSyncLoad(MoveTemp(Misses));
+				return WrapLoadedBatch(Subsystem, Handle, bCacheMisses);
+			};
+
+			PCGExHelpers::FPCGExSharedAssetHandlePtr MissWrapper;
+			if (IsInGameThread()) { MissWrapper = LoadMisses(); }
+			else { PCGExMT::ExecuteOnMainThreadAndWait([&]() { MissWrapper = LoadMisses(); }); }
+
+			if (MissWrapper) { Result.Add(MissWrapper); }
+		}
+
+		if (InContext)
+		{
+			for (const PCGExHelpers::FPCGExSharedAssetHandlePtr& Handle : Result) { InContext->TrackCachedAsset(Handle); }
+		}
+
+		return Result;
+	}
+}
+
 namespace PCGExHelpers
 {
 	TSharedPtr<FStreamableHandle> LoadBlocking_AnyThread(const FSoftObjectPath& Path, FPCGExContext* InContext)
@@ -87,76 +146,20 @@ namespace PCGExHelpers
 
 	TArray<FPCGExSharedAssetHandlePtr> LoadAndCacheBlocking_AnyThread(const TSharedPtr<TSet<FSoftObjectPath>>& Paths, FPCGExContext* InContext, const bool bCacheMisses)
 	{
-		TArray<FPCGExSharedAssetHandlePtr> Result;
-
 		if (!Paths || Paths->IsEmpty())
 		{
-			return Result;
+			return {};
 		}
-
-		// Interrogate the cache FIRST, off the game thread -- it's a lock-only read. Already-resident
-		// resources are reused with no marshal at all: the entire point of the cache, and what keeps a warm
-		// load deadlock-free under PCG cancellation. Only an actual miss needs the game thread (RequestSyncLoad),
-		// and only the misses are loaded there.
-		UPCGExSubSystem* Subsystem = UPCGExSubSystem::GetSubsystemForCurrentWorld();
-
-		TArray<FSoftObjectPath> Misses;
-		if (Subsystem)
-		{
-			Subsystem->PeekCachedResources(*Paths, Result, Misses);
-		}
-		else
-		{
-			Misses = Paths->Array();
-		}
-
-		if (!Misses.IsEmpty())
-		{
-			// RequestSyncLoad is the only game-thread-bound step; the peek above already ran off-thread.
-			auto LoadMisses = [&Subsystem, &Misses, bCacheMisses]() -> FPCGExSharedAssetHandlePtr
-			{
-				const TSharedPtr<FStreamableHandle> Handle = UAssetManager::GetStreamableManager().RequestSyncLoad(MoveTemp(Misses));
-				return Subsystem
-					? Subsystem->TrackLoadedBatch(Handle, bCacheMisses)
-					: MakeShared<FPCGExSharedAssetHandle>(Handle, FPlatformTime::Seconds());
-			};
-
-			FPCGExSharedAssetHandlePtr MissWrapper;
-			if (IsInGameThread())
-			{
-				MissWrapper = LoadMisses();
-			}
-			else
-			{
-				PCGExMT::ExecuteOnMainThreadAndWait([&]()
-				{
-					MissWrapper = LoadMisses();
-				});
-			}
-
-			if (MissWrapper)
-			{
-				Result.Add(MissWrapper);
-			}
-		}
-
-		if (InContext)
-		{
-			for (const FPCGExSharedAssetHandlePtr& Handle : Result)
-			{
-				InContext->TrackCachedAsset(Handle);
-			}
-		}
-
-		return Result;
+		return PCGExStreamingHelpers::LoadAndCacheBlockingSet(*Paths, InContext, bCacheMisses);
 	}
 
 	FPCGExSharedAssetHandlePtr LoadAndCacheBlocking_AnyThread(const FSoftObjectPath& Path, FPCGExContext* InContext, const bool bCacheMisses)
 	{
-		const TSharedPtr<TSet<FSoftObjectPath>> Paths = MakeShared<TSet<FSoftObjectPath>>();
-		Paths->Add(Path);
+		// Single path: a stack set avoids the heap TSet the TSharedPtr<TSet> overload would allocate.
+		TSet<FSoftObjectPath> Paths;
+		Paths.Add(Path);
 
-		const TArray<FPCGExSharedAssetHandlePtr> Handles = LoadAndCacheBlocking_AnyThread(Paths, InContext, bCacheMisses);
+		const TArray<FPCGExSharedAssetHandlePtr> Handles = PCGExStreamingHelpers::LoadAndCacheBlockingSet(Paths, InContext, bCacheMisses);
 		return Handles.IsEmpty() ? nullptr : Handles[0];
 	}
 
@@ -235,6 +238,10 @@ namespace PCGExHelpers
 		TArray<FSoftObjectPath> Paths = GetPathsFunc();
 		if (Paths.IsEmpty())
 		{
+			// Empty dependency set -> report not-loaded. This matches the legacy Load() contract, which also
+			// signals OnLoadEnd(false) on empty paths (so this is NOT a behavioral change). Callers that
+			// cancel on !bSuccess (e.g. FPCGExContext::LoadAssets) only reach LoadTracked after their own
+			// HasAssetRequirements() guard, so an empty set never reaches them here.
 			OnLoadEnd(false);
 			return true;
 		}
@@ -275,30 +282,24 @@ namespace PCGExHelpers
 			return true;
 		}
 
-		// Misses remain: marshal ONLY the async load to the game thread.
-		PCGExMT::ExecuteOnMainThread(TaskManager, [Misses = MoveTemp(Misses), OnLoadEnd, TaskManager, CtxHandle, Subsystem, bCacheMisses]() mutable
+		// Misses remain: marshal ONLY the async load to the game thread. Capture the subsystem WEAKLY -- the
+		// async completion can fire many frames later, by which point the world (and its subsystem) may be
+		// gone. WrapLoadedBatch tolerates a null subsystem (it builds a standalone wrapper).
+		const TWeakObjectPtr<UPCGExSubSystem> WeakSubsystem = Subsystem;
+		PCGExMT::ExecuteOnMainThread(TaskManager, [Misses = MoveTemp(Misses), OnLoadEnd, TaskManager, CtxHandle, WeakSubsystem, bCacheMisses]() mutable
 		{
 			TWeakPtr<PCGExMT::FAsyncToken> LoadToken = TaskManager->TryCreateToken(FName("LoadToken"));
 
 			// Wrap + (optionally) cache the freshly-loaded batch, register it on the context, report success.
-			// Touches the cache + context only while the context (hence its world subsystem) is alive. Shared
-			// by the async-completion and synchronously-completed paths below; the two are mutually exclusive.
-			auto RegisterAndComplete = [OnLoadEnd, CtxHandle, Subsystem, bCacheMisses](const TSharedPtr<FStreamableHandle>& InHandle)
+			// Re-resolves the subsystem at completion (it may have been torn down) and registers on the
+			// context only while it is alive. Shared by the async-completion and synchronously-completed
+			// paths below; the two are mutually exclusive.
+			auto RegisterAndComplete = [OnLoadEnd, CtxHandle, WeakSubsystem, bCacheMisses](const TSharedPtr<FStreamableHandle>& InHandle)
 			{
 				FPCGContext::FSharedContext<FPCGExContext> SharedContext(CtxHandle);
 				if (FPCGExContext* Ctx = SharedContext.Get())
 				{
-					FPCGExSharedAssetHandlePtr Wrapper;
-					if (Subsystem)
-					{
-						Wrapper = Subsystem->TrackLoadedBatch(InHandle, bCacheMisses);
-					}
-					else
-						if (InHandle.IsValid())
-						{
-							Wrapper = MakeShared<FPCGExSharedAssetHandle>(InHandle, FPlatformTime::Seconds());
-						}
-					if (Wrapper)
+					if (const FPCGExSharedAssetHandlePtr Wrapper = PCGExStreamingHelpers::WrapLoadedBatch(WeakSubsystem.Get(), InHandle, bCacheMisses))
 					{
 						Ctx->TrackCachedAsset(Wrapper);
 					}

@@ -140,11 +140,6 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(StagedTypeFilter)
 
 #pragma region FPCGExStagedTypeFilterElement
 
-bool FPCGExStagedTypeFilterElement::CanExecuteOnlyOnMainThread(FPCGContext* Context) const
-{	
-	return Context && Context->CurrentPhase == EPCGExecutionPhase::PrepareData;
-}
-
 bool FPCGExStagedTypeFilterElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))

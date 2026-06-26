@@ -76,7 +76,7 @@ bool FPCGExFactoryProviderElement::AdvanceWork(FPCGExContext* InContext, const U
 		Context->OutFactory->OutputConfigToMetadata();
 
 		{
-			PCGEX_MAKE_SHARED(AssetDeps, TSet<FSoftObjectPath>)			
+			PCGEX_MAKE_SHARED(AssetDeps, TSet<FSoftObjectPath>)
 			Context->OutFactory->RegisterAssetDependencies(*AssetDeps.Get());
 			if (!AssetDeps->IsEmpty())
 			{
@@ -127,7 +127,8 @@ bool FPCGExFactoryProviderElement::AdvanceWork(FPCGExContext* InContext, const U
 	return Context->TryComplete();
 }
 
-UPCGExFactoryProviderSettings::UPCGExFactoryProviderSettings()
+UPCGExFactoryProviderSettings::UPCGExFactoryProviderSettings(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	CacheLoadedResources = EPCGExOptionState::Enabled;
 }
@@ -142,8 +143,6 @@ const FPCGDataTypeBaseId& UPCGExFactoryProviderSettings::GetFactoryTypeId() cons
 {
 	return FPCGExFactoryDataTypeInfo::AsId();
 }
-
-
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

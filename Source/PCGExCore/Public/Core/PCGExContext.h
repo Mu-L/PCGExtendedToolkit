@@ -116,6 +116,11 @@ public:
 	bool bScopedAttributeGet = false;
 	bool bPropagateAbortedExecution = false;
 
+	// True when the most recent LoadAssets() completed synchronously because every dependency was
+	// already resident (a warm resource-cache hit) rather than dispatching an async load. Lets
+	// PostLoadAssetsDependencies overrides distinguish a warm re-run from a cold load.
+	bool bWarmDependencies = false;
+
 	FPCGExContext();
 
 	// Non-copyable / non-movable: SelfHandle and the base Handle both bind to THIS instance (the
@@ -234,7 +239,10 @@ public:
 
 	virtual void RegisterAssetDependencies();
 	void AddAssetDependency(const FSoftObjectPath& Dependency);
-	bool LoadAssets(bool& bIsAlreadyLoaded);
+	// Returns true when an asset-dependency load was initiated (state advanced to
+	// State_LoadingAssetDependencies), false when there was nothing to load. On return, bWarmDependencies
+	// reflects whether the load completed synchronously from the resource cache (no async yield needed).
+	bool LoadAssets();
 
 	void TrackAssetsHandle(const TSharedPtr<FStreamableHandle>& InHandle);
 
