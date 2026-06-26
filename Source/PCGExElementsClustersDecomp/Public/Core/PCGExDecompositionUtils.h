@@ -4,9 +4,55 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Map.h"
 
 namespace PCGExDecomposition
 {
+	/**
+	 * Relabel CellIDs in-place to a contiguous 0..K-1 range, assigning new IDs in ascending order of
+	 * the original CellID. Entries < 0 (invalid/unassigned) are left untouched. Returns K, the number
+	 * of distinct cells used. Deterministic and order-preserving (so value/coordinate-ordered sources
+	 * keep their ordering), and it allocates against the entry count, never the raw CellID magnitude --
+	 * shared by decompositions whose CellID space can contain gaps (grid partition, threshold bins).
+	 */
+	inline int32 CompactCellIDs(TArray<int32>& InOutCellIDs)
+	{
+		TArray<int32> Used;
+		Used.Reserve(InOutCellIDs.Num());
+		for (const int32 ID : InOutCellIDs)
+		{
+			if (ID >= 0)
+			{
+				Used.Add(ID);
+			}
+		}
+		if (Used.Num() == 0)
+		{
+			return 0;
+		}
+		Used.Sort();
+
+		TMap<int32, int32> Remap;
+		Remap.Reserve(Used.Num());
+		int32 Next = 0;
+		for (int32 i = 0; i < Used.Num(); i++)
+		{
+			if (i == 0 || Used[i] != Used[i - 1])
+			{
+				Remap.Add(Used[i], Next++);
+			}
+		}
+
+		for (int32& ID : InOutCellIDs)
+		{
+			if (ID >= 0)
+			{
+				ID = Remap[ID];
+			}
+		}
+		return Next;
+	}
+
 	/**
 	 * Accumulate a per-cell integer-coordinate AABB and convert it to world-space box sizes.
 	 * For each cell, size = (CoordMax - CoordMin + 1) * CellSize (inclusive integer span).

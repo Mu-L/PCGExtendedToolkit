@@ -36,6 +36,48 @@ bool FPCGExDecompSpectral::Decompose(FPCGExDecompositionResult& OutResult)
 	TArray<TArray<int32>> Partitions;
 	BisectRecursive(ValidNodes, SafePartitions, Partitions);
 
+	// Exact mode: split the largest partition until the count is met, falling back to an arbitrary
+	// even split when no spectral cut exists (those extra cuts carry no spectral meaning).
+	if (PartitionMode == EPCGExDecompSpectralPartitionMode::Exact)
+	{
+		while (Partitions.Num() < SafePartitions)
+		{
+			int32 LargestIdx = -1;
+			int32 LargestSize = 1;
+			for (int32 p = 0; p < Partitions.Num(); p++)
+			{
+				if (Partitions[p].Num() > LargestSize)
+				{
+					LargestSize = Partitions[p].Num();
+					LargestIdx = p;
+				}
+			}
+
+			if (LargestIdx < 0)
+			{
+				break;
+			} // Every partition is a single node -- can't reach the target
+
+			TArray<int32> A, B;
+			if (!BisectOnce(Partitions[LargestIdx], A, B))
+			{
+				// No spectral cut available -- split by arrival order purely to honor the count.
+				const TArray<int32>& Src = Partitions[LargestIdx];
+				const int32 Half = Src.Num() / 2;
+				A.Reset();
+				B.Reset();
+				for (int32 i = 0; i < Src.Num(); i++)
+				{
+					if (i < Half) { A.Add(Src[i]); }
+					else { B.Add(Src[i]); }
+				}
+			}
+
+			Partitions[LargestIdx] = MoveTemp(A);
+			Partitions.Add(MoveTemp(B));
+		}
+	}
+
 	if (Partitions.Num() == 0)
 	{
 		return false;
@@ -233,6 +275,62 @@ bool FPCGExDecompSpectral::ComputeFiedlerVector(
 	return true;
 }
 
+bool FPCGExDecompSpectral::BisectOnce(
+	const TArray<int32>& NodeIndices,
+	TArray<int32>& OutA,
+	TArray<int32>& OutB) const
+{
+	OutA.Reset();
+	OutB.Reset();
+
+	const int32 N = NodeIndices.Num();
+	if (N < 2)
+	{
+		return false;
+	}
+
+	TArray<double> Fiedler;
+	if (!ComputeFiedlerVector(NodeIndices, Fiedler))
+	{
+		return false;
+	}
+
+	if (PartitionMode == EPCGExDecompSpectralPartitionMode::Natural)
+	{
+		// Natural: cut at the Fiedler sign -- the graph's intrinsic bottleneck.
+		for (int32 i = 0; i < N; i++)
+		{
+			if (Fiedler[i] >= 0) { OutA.Add(NodeIndices[i]); }
+			else { OutB.Add(NodeIndices[i]); }
+		}
+		return OutA.Num() > 0 && OutB.Num() > 0;
+	}
+
+	// Balanced / Exact: median cut by Fiedler rank. Always yields two non-empty halves for N >= 2,
+	// avoiding the degenerate all-one-sign failure the plain sign cut can hit.
+	TArray<int32> Order;
+	Order.SetNumUninitialized(N);
+	for (int32 i = 0; i < N; i++)
+	{
+		Order[i] = i;
+	}
+	// Tie-break by node index so equal-Fiedler nodes split deterministically across toolchains
+	// (TArray::Sort is an unstable introsort).
+	Order.Sort([&Fiedler](const int32 A, const int32 B)
+	{
+		return Fiedler[A] != Fiedler[B] ? Fiedler[A] < Fiedler[B] : A < B;
+	});
+
+	const int32 Half = N / 2;
+	for (int32 r = 0; r < N; r++)
+	{
+		if (r < Half) { OutA.Add(NodeIndices[Order[r]]); }
+		else { OutB.Add(NodeIndices[Order[r]]); }
+	}
+
+	return OutA.Num() > 0 && OutB.Num() > 0;
+}
+
 void FPCGExDecompSpectral::BisectRecursive(
 	const TArray<int32>& NodeIndices,
 	int32 TargetPartitions,
@@ -244,41 +342,24 @@ void FPCGExDecompSpectral::BisectRecursive(
 		return;
 	}
 
-	TArray<double> Fiedler;
-	if (!ComputeFiedlerVector(NodeIndices, Fiedler))
+	TArray<int32> A, B;
+	if (!BisectOnce(NodeIndices, A, B))
 	{
-		// Fallback: can't bisect, return as single partition
+		// Can't bisect (degenerate spectrum, or an all-one-sign Fiedler vector in Natural mode).
 		OutPartitions.Add(NodeIndices);
 		return;
 	}
 
-	// Bisect by sign of Fiedler vector
-	TArray<int32> Positive, Negative;
-	for (int32 i = 0; i < NodeIndices.Num(); i++)
-	{
-		if (Fiedler[i] >= 0)
-		{
-			Positive.Add(NodeIndices[i]);
-		}
-		else
-		{
-			Negative.Add(NodeIndices[i]);
-		}
-	}
-
-	// Handle degenerate case where all values have same sign
-	if (Positive.Num() == 0 || Negative.Num() == 0)
-	{
-		OutPartitions.Add(NodeIndices);
-		return;
-	}
-
-	// Recurse on each half
 	const int32 HalfTarget = FMath::Max(TargetPartitions / 2, 1);
-	const int32 RemainingTarget = TargetPartitions - HalfTarget;
 
-	BisectRecursive(Positive, HalfTarget, OutPartitions);
-	BisectRecursive(Negative, FMath::Max(RemainingTarget, 1), OutPartitions);
+	// Recurse the first half, then hand the second half whatever budget the first didn't use, so a
+	// branch that bottoms out early doesn't silently cost the cluster partitions it asked for.
+	const int32 Before = OutPartitions.Num();
+	BisectRecursive(A, HalfTarget, OutPartitions);
+	const int32 ProducedA = OutPartitions.Num() - Before;
+
+	const int32 RemainingTarget = FMath::Max(TargetPartitions - ProducedA, 1);
+	BisectRecursive(B, RemainingTarget, OutPartitions);
 }
 
 #pragma endregion
@@ -293,6 +374,7 @@ void UPCGExDecompSpectral::CopySettingsFrom(const UPCGExInstancedFactory* Other)
 		NumPartitions = TypedOther->NumPartitions;
 		MaxIterations = TypedOther->MaxIterations;
 		ConvergenceTolerance = TypedOther->ConvergenceTolerance;
+		PartitionMode = TypedOther->PartitionMode;
 	}
 }
 

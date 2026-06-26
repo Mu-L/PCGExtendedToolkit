@@ -183,7 +183,10 @@ namespace PCGExDecompConvexBSPInternal
 		OutHullIndices = HullSet.Array();
 	}
 
-	static double ComputeConvexityRatio(const TArray<FVector>& Positions)
+	// Returns CONCAVITY: the fraction of points interior to the hull (0 = fully convex, ->1 = mostly
+	// interior). Terminate when it drops to/below MaxConcavityRatio -- the name matches the value, so
+	// don't flip the comparison.
+	static double ComputeConcavityRatio(const TArray<FVector>& Positions)
 	{
 		if (Positions.Num() <= 4)
 		{
@@ -268,6 +271,7 @@ namespace PCGExDecompConvexBSPInternal
 		const int32 InMaxDepth,
 		const double InMaxConcavityRatio,
 		TArray<FConvexCell3D>& OutCells,
+		int32& NumOpenCells,
 		int32 Depth)
 	{
 		TArray<FVector> Positions;
@@ -283,8 +287,10 @@ namespace PCGExDecompConvexBSPInternal
 		{
 			bShouldTerminate = true;
 		}
-		else if (OutCells.Num() >= MaxCells)
+		else if (NumOpenCells >= MaxCells)
 		{
+			// NumOpenCells is the leaf count if every open region stopped now (root 1, +1 per split),
+			// so stopping at MaxCells makes the cap hard.
 			bShouldTerminate = true;
 		}
 		else if (NodeIndices.Num() <= MinNodesPerCell)
@@ -293,8 +299,8 @@ namespace PCGExDecompConvexBSPInternal
 		}
 		else
 		{
-			const double ConvexityRatio = ComputeConvexityRatio(Positions);
-			if (ConvexityRatio <= InMaxConcavityRatio)
+			const double ConcavityRatio = ComputeConcavityRatio(Positions);
+			if (ConcavityRatio <= InMaxConcavityRatio)
 			{
 				bShouldTerminate = true;
 			}
@@ -380,8 +386,11 @@ namespace PCGExDecompConvexBSPInternal
 			}
 		}
 
-		DecomposeRecursive(InCluster, FrontNodes, MinNodesPerCell, MaxCells, InMaxDepth, InMaxConcavityRatio, OutCells, Depth + 1);
-		DecomposeRecursive(InCluster, BackNodes, MinNodesPerCell, MaxCells, InMaxDepth, InMaxConcavityRatio, OutCells, Depth + 1);
+		// A split turns one open region into two; charge it against the MaxCells budget before
+		// descending so the cap stays hard.
+		NumOpenCells++;
+		DecomposeRecursive(InCluster, FrontNodes, MinNodesPerCell, MaxCells, InMaxDepth, InMaxConcavityRatio, OutCells, NumOpenCells, Depth + 1);
+		DecomposeRecursive(InCluster, BackNodes, MinNodesPerCell, MaxCells, InMaxDepth, InMaxConcavityRatio, OutCells, NumOpenCells, Depth + 1);
 	}
 }
 
@@ -404,14 +413,22 @@ bool FPCGExDecompConvexBSP::Decompose(FPCGExDecompositionResult& OutResult)
 		}
 	}
 
-	if (AllNodes.Num() < MinNodesPerCell)
+	// ClampMin/Max only guards the editor; PCG_Overridable values arrive from attributes unclamped,
+	// and out-of-range values cause degenerate recursion or collapse the cluster to a single cell.
+	const int32 SafeMinNodesPerCell = FMath::Max(MinNodesPerCell, 1);
+	const int32 SafeMaxCells = FMath::Max(MaxCells, 1);
+	const int32 SafeMaxDepth = FMath::Max(MaxDepth, 1);
+	const double SafeMaxConcavityRatio = FMath::Clamp(MaxConcavityRatio, 0.0, 1.0);
+
+	if (AllNodes.Num() < SafeMinNodesPerCell)
 	{
 		return false;
 	}
 
 	TArray<PCGExDecompConvexBSPInternal::FConvexCell3D> Cells;
+	int32 NumOpenCells = 1; // Root region; each split adds one, capped at SafeMaxCells (hard limit).
 	PCGExDecompConvexBSPInternal::DecomposeRecursive(
-		Cluster.Get(), AllNodes, MinNodesPerCell, MaxCells, MaxDepth, MaxConcavityRatio, Cells, 0);
+		Cluster.Get(), AllNodes, SafeMinNodesPerCell, SafeMaxCells, SafeMaxDepth, SafeMaxConcavityRatio, Cells, NumOpenCells, 0);
 
 	if (Cells.Num() == 0)
 	{

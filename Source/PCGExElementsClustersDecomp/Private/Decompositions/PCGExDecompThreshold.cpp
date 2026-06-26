@@ -3,6 +3,7 @@
 
 #include "Decompositions/PCGExDecompThreshold.h"
 
+#include "Core/PCGExDecompositionUtils.h"
 #include "Data/PCGExData.h"
 #include "Data/Utils/PCGExDataPreloader.h"
 
@@ -79,6 +80,8 @@ bool FPCGExDecompThreshold::Decompose(FPCGExDecompositionResult& OutResult)
 		}
 
 		const double BinWidth = Range / SafeNumBins;
+
+		// Assign each node to its equal-width bin (raw id in [0, SafeNumBins)).
 		for (const FNodeValue& NV : NodeValues)
 		{
 			int32 Bin = FMath::FloorToInt((NV.Value - MinVal) / BinWidth);
@@ -86,7 +89,9 @@ bool FPCGExDecompThreshold::Decompose(FPCGExDecompositionResult& OutResult)
 			OutResult.NodeCellIDs[NV.NodeIndex] = Bin;
 		}
 
-		OutResult.NumCells = SafeNumBins;
+		// Bins can be sparse; compact to contiguous CellIDs. The helper allocates against the node
+		// count, not the (PCG_Overridable, unbounded) bin count -- so a huge NumBins can't OOM here.
+		OutResult.NumCells = PCGExDecomposition::CompactCellIDs(OutResult.NodeCellIDs);
 	}
 	else // Quantile
 	{

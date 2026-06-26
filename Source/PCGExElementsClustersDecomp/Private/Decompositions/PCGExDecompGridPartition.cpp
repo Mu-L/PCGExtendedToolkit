@@ -86,103 +86,198 @@ bool FPCGExDecompGridPartition::Decompose(FPCGExDecompositionResult& OutResult)
 		CellNodes.FindOrAdd(CellID).Add(i);
 	}
 
-	// Merge underpopulated cells into nearest neighbor
-	if (MinNodesPerCell > 1)
+	// Merge under-populated cells (fewer than MinNodesPerCell nodes) into a neighbour so the
+	// threshold is respected; MergeMode picks the target (see EPCGExDecompGridMergeMode).
+	bool bAnyMerged = false;
+	if (MinNodesPerCell > 1 && CellNodes.Num() > 1)
 	{
-		bool bMergedAny = true;
-		while (bMergedAny)
+		if (MergeMode == EPCGExDecompGridMergeMode::Adjacent)
 		{
-			bMergedAny = false;
+			// Targets come from each cell's grid-coord neighbours (26-conn), not a full-cell scan, so
+			// the pass is O(N). A spatially isolated cell (no occupied neighbour) stays its own cell.
+			TArray<FIntVector> Offsets;
+			Offsets.Reserve(26);
+			for (int32 Dz = -1; Dz <= 1; Dz++)
+			{
+				for (int32 Dy = -1; Dy <= 1; Dy++)
+				{
+					for (int32 Dx = -1; Dx <= 1; Dx++)
+					{
+						if (Dx != 0 || Dy != 0 || Dz != 0)
+						{
+							Offsets.Add(FIntVector(Dx, Dy, Dz));
+						}
+					}
+				}
+			}
 
-			TArray<int32> SmallCells;
+			// Cell -> its grid coords (CellMap is the inverse coord -> cell lookup, mutated on merge).
+			TMap<int32, TArray<FIntVector>> CellCoords;
+			CellCoords.Reserve(CellNodes.Num());
+			for (const TPair<FIntVector, int32>& Pair : CellMap)
+			{
+				CellCoords.FindOrAdd(Pair.Value).Add(Pair.Key);
+			}
+
+			TArray<int32> Queue;
 			for (const auto& Pair : CellNodes)
 			{
 				if (Pair.Value.Num() < MinNodesPerCell)
 				{
-					SmallCells.Add(Pair.Key);
+					Queue.Add(Pair.Key);
 				}
 			}
+			Queue.Sort(); // Deterministic processing order (CellNodes/CellMap iteration is unstable).
 
-			if (SmallCells.Num() == 0 || SmallCells.Num() == CellNodes.Num())
+			int32 Head = 0;
+			while (Head < Queue.Num())
 			{
-				break;
-			} // All small or none small -- stop
-
-			for (const int32 SmallCellID : SmallCells)
-			{
-				const TArray<int32>* NodesPtr = CellNodes.Find(SmallCellID);
-				if (!NodesPtr || NodesPtr->Num() == 0)
+				const int32 SmallID = Queue[Head++];
+				const TArray<int32>* SmallNodes = CellNodes.Find(SmallID);
+				if (!SmallNodes || SmallNodes->Num() >= MinNodesPerCell)
 				{
 					continue;
-				} // Already merged away
+				} // Merged away, or grew past the threshold via incoming merges
 
-				FVector SmallCentroid = FVector::ZeroVector;
-				for (const int32 NodeIdx : *NodesPtr)
-				{
-					SmallCentroid += Cluster->GetPos(NodeIdx);
-				}
-				SmallCentroid /= NodesPtr->Num();
-
+				// Largest grid-adjacent cell; tie-break by lowest CellID for determinism.
 				int32 BestTargetID = -1;
-				double BestDistSq = TNumericLimits<double>::Max();
+				int32 BestTargetCount = -1;
+				for (const FIntVector& Coord : CellCoords[SmallID])
+				{
+					for (const FIntVector& Off : Offsets)
+					{
+						const int32* Neighbor = CellMap.Find(Coord + Off);
+						if (!Neighbor || *Neighbor == SmallID)
+						{
+							continue;
+						}
+						const int32 NeighborCount = CellNodes[*Neighbor].Num();
+						if (BestTargetID < 0 || NeighborCount > BestTargetCount ||
+							(NeighborCount == BestTargetCount && *Neighbor < BestTargetID))
+						{
+							BestTargetCount = NeighborCount;
+							BestTargetID = *Neighbor;
+						}
+					}
+				}
 
+				if (BestTargetID < 0)
+				{
+					continue;
+				} // Spatially isolated -- leave as its own cell
+
+				// Absorb the small cell into the target and reassign its coords.
+				const TArray<int32> NodesToMove = *SmallNodes; // Copy before mutation
+				for (const int32 NodeIdx : NodesToMove)
+				{
+					OutResult.NodeCellIDs[NodeIdx] = BestTargetID;
+				}
+				CellNodes[BestTargetID].Append(NodesToMove);
+
+				const TArray<FIntVector> CoordsToMove = CellCoords[SmallID]; // Copy before mutation
+				for (const FIntVector& Coord : CoordsToMove)
+				{
+					CellMap[Coord] = BestTargetID;
+				}
+				CellCoords[BestTargetID].Append(CoordsToMove);
+
+				CellNodes.Remove(SmallID);
+				CellCoords.Remove(SmallID);
+				bAnyMerged = true;
+
+				if (CellNodes[BestTargetID].Num() < MinNodesPerCell)
+				{
+					Queue.Add(BestTargetID);
+				}
+			}
+		}
+		else
+		{
+			// Nearest merge. Running per-cell position sums keep centroids O(1) to query/update.
+			// O(cells^2) overall -- fine for moderate cell counts; use Adjacent for very fine grids.
+			TMap<int32, FVector> CellPosSum;
+			CellPosSum.Reserve(CellNodes.Num());
+			for (const auto& Pair : CellNodes)
+			{
+				FVector Sum = FVector::ZeroVector;
+				for (const int32 NodeIdx : Pair.Value)
+				{
+					Sum += Cluster->GetPos(NodeIdx);
+				}
+				CellPosSum.Add(Pair.Key, Sum);
+			}
+
+			while (CellNodes.Num() > 1)
+			{
+				// Most under-populated cell; tie-break by lowest CellID for determinism.
+				int32 SmallestID = -1;
+				int32 SmallestCount = 0;
 				for (const auto& Pair : CellNodes)
 				{
-					if (Pair.Key == SmallCellID)
+					const int32 Count = Pair.Value.Num();
+					if (Count >= MinNodesPerCell)
 					{
 						continue;
 					}
-
-					FVector TargetCentroid = FVector::ZeroVector;
-					for (const int32 NodeIdx : Pair.Value)
+					if (SmallestID < 0 || Count < SmallestCount ||
+						(Count == SmallestCount && Pair.Key < SmallestID))
 					{
-						TargetCentroid += Cluster->GetPos(NodeIdx);
+						SmallestCount = Count;
+						SmallestID = Pair.Key;
 					}
-					TargetCentroid /= Pair.Value.Num();
+				}
 
+				if (SmallestID < 0)
+				{
+					break;
+				} // Every cell meets the threshold
+
+				const FVector SmallCentroid = CellPosSum[SmallestID] / SmallestCount;
+
+				// Nearest other cell by centroid distance; tie-break by lowest CellID.
+				int32 BestTargetID = -1;
+				double BestDistSq = TNumericLimits<double>::Max();
+				for (const auto& Pair : CellNodes)
+				{
+					if (Pair.Key == SmallestID)
+					{
+						continue;
+					}
+					const FVector TargetCentroid = CellPosSum[Pair.Key] / Pair.Value.Num();
 					const double DistSq = FVector::DistSquared(SmallCentroid, TargetCentroid);
-					if (DistSq < BestDistSq)
+					if (BestTargetID < 0 || DistSq < BestDistSq ||
+						(DistSq == BestDistSq && Pair.Key < BestTargetID))
 					{
 						BestDistSq = DistSq;
 						BestTargetID = Pair.Key;
 					}
 				}
 
-				if (BestTargetID >= 0)
+				if (BestTargetID < 0)
 				{
-					const TArray<int32> NodesToMove = *NodesPtr; // Copy before mutation
-					for (const int32 NodeIdx : NodesToMove)
-					{
-						OutResult.NodeCellIDs[NodeIdx] = BestTargetID;
-					}
-					CellNodes[BestTargetID].Append(NodesToMove);
-					CellNodes.Remove(SmallCellID);
-					bMergedAny = true;
+					break;
+				} // No target available (only reachable with a single cell)
+
+				// Absorb the small cell into the target, then drop it.
+				const TArray<int32> NodesToMove = CellNodes[SmallestID]; // Copy before mutation
+				for (const int32 NodeIdx : NodesToMove)
+				{
+					OutResult.NodeCellIDs[NodeIdx] = BestTargetID;
 				}
+				CellNodes[BestTargetID].Append(NodesToMove);
+				CellPosSum[BestTargetID] += CellPosSum[SmallestID];
+
+				CellNodes.Remove(SmallestID);
+				CellPosSum.Remove(SmallestID);
+				bAnyMerged = true;
 			}
 		}
+	}
 
-		// Re-compact CellIDs to be sequential
-		TMap<int32, int32> Remap;
-		int32 CompactID = 0;
-		for (const auto& Pair : CellNodes)
-		{
-			Remap.Add(Pair.Key, CompactID++);
-		}
-
-		for (int32& ID : OutResult.NodeCellIDs)
-		{
-			if (ID < 0)
-			{
-				continue;
-			}
-			if (const int32* Remapped = Remap.Find(ID))
-			{
-				ID = *Remapped;
-			}
-		}
-
-		NextCellID = CompactID;
+	if (bAnyMerged)
+	{
+		// Merging left gaps in the CellID space; close them. Skipped otherwise -- IDs stay dense.
+		NextCellID = PCGExDecomposition::CompactCellIDs(OutResult.NodeCellIDs);
 	}
 
 	if (OutResult.bWantsCellSizes)
@@ -210,6 +305,7 @@ void UPCGExDecompGridPartition::CopySettingsFrom(const UPCGExInstancedFactory* O
 	{
 		CellSize = TypedOther->CellSize;
 		MinNodesPerCell = TypedOther->MinNodesPerCell;
+		MergeMode = TypedOther->MergeMode;
 	}
 }
 

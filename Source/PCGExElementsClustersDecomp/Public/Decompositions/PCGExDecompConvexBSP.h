@@ -33,19 +33,19 @@ class UPCGExDecompConvexBSP : public UPCGExDecompositionInstancedFactory
 
 public:
 	/** Maximum allowed concavity ratio. 0 = all must be on hull. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin="0", ClampMax="1"))
 	double MaxConcavityRatio = 0.01;
 
 	/** Minimum nodes per cell. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin="1"))
 	int32 MinNodesPerCell = 4;
 
 	/** Maximum cells to produce. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin="1"))
 	int32 MaxCells = 32;
 
 	/** Maximum recursion depth. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, ClampMin="1"))
 	int32 MaxDepth = 100;
 
 	virtual void CopySettingsFrom(const UPCGExInstancedFactory* Other) override;
