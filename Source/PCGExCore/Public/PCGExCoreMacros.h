@@ -28,7 +28,7 @@
 
 
 // Override to control whether a node can only execute on the main thread
-#define PCGEX_CAN_ONLY_EXECUTE_ON_MAIN_THREAD(_BOOL) virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return _BOOL; }
+#define PCGEX_ELEMENT_MAIN_THREAD_ONLY(_BOOL) virtual bool CanExecuteOnlyOnMainThread(FPCGContext* Context) const override { return _BOOL; }
 
 // Override to control whether a node supports base point data inputs
 #define PCGEX_SUPPORT_BASE_POINT_DATA(_BOOL) virtual bool SupportsBasePointDataInputs(FPCGContext* InContext) const override { return _BOOL; }

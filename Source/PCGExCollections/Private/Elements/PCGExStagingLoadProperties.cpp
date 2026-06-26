@@ -29,6 +29,11 @@ PCGExData::EIOInit UPCGExStagingLoadPropertiesSettings::GetMainDataInitializatio
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(StagingLoadProperties)
 
+bool FPCGExStagingLoadPropertiesElement::CanExecuteOnlyOnMainThread(FPCGContext* Context) const
+{
+	return Context && Context->CurrentPhase == EPCGExecutionPhase::PrepareData;
+}
+
 bool FPCGExStagingLoadPropertiesElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))

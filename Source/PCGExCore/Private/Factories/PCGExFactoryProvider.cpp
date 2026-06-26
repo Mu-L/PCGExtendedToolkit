@@ -127,6 +127,11 @@ bool FPCGExFactoryProviderElement::AdvanceWork(FPCGExContext* InContext, const U
 	return Context->TryComplete();
 }
 
+UPCGExFactoryProviderSettings::UPCGExFactoryProviderSettings()
+{
+	CacheLoadedResources = EPCGExOptionState::Enabled;
+}
+
 void FPCGExFactoryProviderElement::DisabledPassThroughData(FPCGContext* Context) const
 {
 	// Disabled factories should not output anything when disabled
@@ -137,6 +142,8 @@ const FPCGDataTypeBaseId& UPCGExFactoryProviderSettings::GetFactoryTypeId() cons
 {
 	return FPCGExFactoryDataTypeInfo::AsId();
 }
+
+
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

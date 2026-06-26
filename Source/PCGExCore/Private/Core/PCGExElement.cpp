@@ -98,9 +98,13 @@ bool IPCGExElement::AdvancePreparation(FPCGExContext* Context, const UPCGExSetti
 		}
 
 		Context->RegisterAssetDependencies();
-		if (Context->HasAssetRequirements() && Context->LoadAssets())
+		bool bAlreadyLoaded = false;
+		if (Context->HasAssetRequirements() && Context->LoadAssets(bAlreadyLoaded))
 		{
-			return false;
+			if (!bAlreadyLoaded)
+			{
+				return false;
+			}
 		}
 
 		PostLoadAssetsDependencies(Context);
@@ -148,6 +152,7 @@ FPCGContext* IPCGExElement::Initialize(const FPCGInitializeElementParams& InPara
 	Context->bCleanupConsumableAttributes = Settings->bCleanupConsumableAttributes;
 
 	Context->bWantsDataStealing = Settings->WantsDataStealing();
+	Context->bWantsResourcesCached = Settings->WantsResourcesCached();
 
 	Context->ElementHandle = this;
 

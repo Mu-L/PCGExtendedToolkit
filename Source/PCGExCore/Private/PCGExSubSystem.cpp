@@ -3,6 +3,11 @@
 
 #include "PCGExSubSystem.h"
 
+#include "PCGExLog.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
+#include "HAL/IConsoleManager.h"
+
 #if WITH_EDITOR
 #include "Editor.h"
 #include "ObjectTools.h"
@@ -10,6 +15,27 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #endif
+
+namespace PCGExResourceCacheCVars
+{
+	TAutoConsoleVariable<float> CVarSweepInterval(
+		TEXT("pcgex.ResourceCache.SweepInterval"),
+		5.0f,
+		TEXT("Seconds between PCGEx streamable-resource cache eviction sweeps."),
+		ECVF_Default);
+
+	TAutoConsoleVariable<float> CVarTTL(
+		TEXT("pcgex.ResourceCache.TTL"),
+		45.0f,
+		TEXT("Seconds an idle (unreferenced) cached PCGEx resource survives before it is evicted."),
+		ECVF_Default);
+
+	TAutoConsoleVariable<bool> CVarSuspendEvictionWhileGenerating(
+		TEXT("pcgex.ResourceCache.SuspendEvictionWhileGenerating"),
+		false,
+		TEXT("When enabled, suppresses resource-cache eviction while any PCG generation is in flight."),
+		ECVF_Default);
+}
 
 UPCGExSubSystem::UPCGExSubSystem()
 	: Super()
@@ -23,6 +49,7 @@ void UPCGExSubSystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UPCGExSubSystem::Deinitialize()
 {
+	ClearResourceCache();
 	Super::Deinitialize();
 }
 
@@ -57,6 +84,7 @@ void UPCGExSubSystem::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	ExecuteBeginTickActions();
+	TickResourceCache();
 }
 
 ETickableTickType UPCGExSubSystem::GetTickableTickType() const
@@ -66,7 +94,7 @@ ETickableTickType UPCGExSubSystem::GetTickableTickType() const
 
 bool UPCGExSubSystem::IsTickable() const
 {
-	return bWantsTick;
+	return bWantsTick || CachedHandleCount.load(std::memory_order_relaxed) > 0;
 }
 
 TStatId UPCGExSubSystem::GetStatId() const
@@ -194,3 +222,144 @@ void UPCGExSubSystem::ExecuteBeginTickActions()
 		Action();
 	}
 }
+
+#pragma region Resource cache
+
+void UPCGExSubSystem::PeekCachedResources(const TSet<FSoftObjectPath>& InPaths, TArray<PCGExHelpers::FPCGExSharedAssetHandlePtr>& OutHits, TArray<FSoftObjectPath>& OutMisses)
+{
+	const double Now = FPlatformTime::Seconds();
+
+	// Resolve hits against the per-path index; everything else is a miss for the caller to load.
+	FReadScopeLock ReadLock(ResourceCacheLock);
+	for (const FSoftObjectPath& Path : InPaths)
+	{
+		if (const TWeakPtr<PCGExHelpers::FPCGExSharedAssetHandle>* Found = ResourceCacheIndex.Find(Path))
+		{
+			if (PCGExHelpers::FPCGExSharedAssetHandlePtr Pinned = Found->Pin())
+			{
+				Pinned->LastAccess.store(Now, std::memory_order_relaxed);
+				OutHits.AddUnique(Pinned);
+				continue;
+			}
+		}
+		OutMisses.Add(Path);
+	}
+}
+
+PCGExHelpers::FPCGExSharedAssetHandlePtr UPCGExSubSystem::TrackLoadedBatch(const TSharedPtr<FStreamableHandle>& InHandle, const bool bInsert)
+{
+	const PCGExHelpers::FPCGExSharedAssetHandlePtr Wrapper = MakeShared<PCGExHelpers::FPCGExSharedAssetHandle>(InHandle, FPlatformTime::Seconds());
+
+	// Read-only callers skip insertion; never cache a failed load (it would keep returning a dead wrapper).
+	if (!bInsert || !InHandle.IsValid()) { return Wrapper; }
+
+	// Index from the handle's authoritative path list (single source of truth, post null/dup strip).
+	TArray<FSoftObjectPath> Covered;
+	Wrapper->GetCoveredPaths(Covered);
+
+	{
+		FWriteScopeLock WriteLock(ResourceCacheLock);
+		ResourceCacheWarm.Add(Wrapper);
+		for (const FSoftObjectPath& Path : Covered)
+		{
+			// Keep the first wrapper indexed for a path. The game-thread sync path never collides (every
+			// missed path was absent from the index); for concurrent async inserts a later wrapper stays in
+			// the warm set covering the path harmlessly and self-prunes on eviction.
+			if (!ResourceCacheIndex.Contains(Path)) { ResourceCacheIndex.Add(Path, Wrapper); }
+		}
+	}
+
+	CachedHandleCount.fetch_add(1, std::memory_order_acq_rel);
+	return Wrapper;
+}
+
+void UPCGExSubSystem::TickResourceCache()
+{
+	if (CachedHandleCount.load(std::memory_order_acquire) <= 0) { return; }
+
+	const double Now = FPlatformTime::Seconds();
+	const double Interval = FMath::Max(0.1, static_cast<double>(PCGExResourceCacheCVars::CVarSweepInterval.GetValueOnGameThread()));
+
+	if ((Now - LastCacheSweepTime) < Interval) { return; }
+
+	LastCacheSweepTime = Now;
+	SweepResourceCache(Now);
+}
+
+void UPCGExSubSystem::SweepResourceCache(const double Now)
+{
+	// Optional guard: keep everything warm while a generation is running, regardless of TTL.
+	if (PCGExResourceCacheCVars::CVarSuspendEvictionWhileGenerating.GetValueOnGameThread()
+		&& ActiveGenerationCount.load(std::memory_order_acquire) > 0)
+	{
+		return;
+	}
+
+	const double TTL = FMath::Max(0.0, static_cast<double>(PCGExResourceCacheCVars::CVarTTL.GetValueOnGameThread()));
+
+	// Collect evicted wrappers and let them release OUTSIDE the lock -- their destructor releases the
+	// streamable handle, which we keep off the cache critical section.
+	TArray<PCGExHelpers::FPCGExSharedAssetHandlePtr> Evicted;
+
+	{
+		FWriteScopeLock WriteLock(ResourceCacheLock);
+
+		for (int32 i = ResourceCacheWarm.Num() - 1; i >= 0; --i)
+		{
+			const PCGExHelpers::FPCGExSharedAssetHandlePtr& Handle = ResourceCacheWarm[i];
+
+			// Refcount 1 == only the warm array holds it (no live context). Reading the count through a
+			// reference (not a copy) avoids adding a transient reference of our own.
+			const bool bUnused = !Handle.IsValid() || Handle.GetSharedReferenceCount() <= 1;
+			const bool bIdle = !Handle.IsValid() || (Now - Handle->LastAccess.load(std::memory_order_relaxed)) > TTL;
+
+			if (!bUnused || !bIdle) { continue; }
+
+			if (Handle.IsValid())
+			{
+				// Prune the index, but only entries still pointing at THIS wrapper. Paths come straight from
+				// the streamable handle (no stored copy) -- the same list we indexed at load.
+				TArray<FSoftObjectPath> Covered;
+				Handle->GetCoveredPaths(Covered);
+				for (const FSoftObjectPath& Path : Covered)
+				{
+					if (const TWeakPtr<PCGExHelpers::FPCGExSharedAssetHandle>* Found = ResourceCacheIndex.Find(Path))
+					{
+						if (Found->Pin() == Handle) { ResourceCacheIndex.Remove(Path); }
+					}
+				}
+			}
+
+			Evicted.Add(MoveTemp(ResourceCacheWarm[i]));
+			ResourceCacheWarm.RemoveAtSwap(i);
+		}
+	}
+
+	if (!Evicted.IsEmpty())
+	{
+		const int32 Remaining = CachedHandleCount.fetch_sub(Evicted.Num(), std::memory_order_acq_rel) - Evicted.Num();
+		UE_LOG(LogPCGEx, Log, TEXT("PCGEx resource cache: swept %d handle(s) (%d still warm)."), Evicted.Num(), Remaining);
+	}
+
+	// Evicted wrappers release here -- on the game thread, outside the lock.
+	Evicted.Reset();
+}
+
+void UPCGExSubSystem::ClearResourceCache()
+{
+	TArray<PCGExHelpers::FPCGExSharedAssetHandlePtr> Evicted;
+
+	{
+		FWriteScopeLock WriteLock(ResourceCacheLock);
+		ResourceCacheIndex.Empty();
+		Evicted = MoveTemp(ResourceCacheWarm);
+		ResourceCacheWarm.Reset();
+	}
+
+	CachedHandleCount.store(0, std::memory_order_release);
+
+	// Release outside the lock. Wrappers still referenced by a live context survive until it drops them.
+	Evicted.Reset();
+}
+
+#pragma endregion

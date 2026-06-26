@@ -186,6 +186,7 @@ FPCGExContext::~FPCGExContext()
 	//WorkHandle.Reset();
 	ManagedObjects->Flush(); // So cleanups can be recursively triggered while manager is still alive
 	PCGExHelpers::SafeReleaseHandles(TrackedAssets);
+	TrackedCachedAssets.Empty(); // wrappers self-release on drop (RAII); the subsystem cache may keep the asset warm
 }
 
 void FPCGExContext::ExecuteOnNotifyActors(const TArray<FName>& FunctionNames)
@@ -422,7 +423,7 @@ void FPCGExContext::AddAssetDependency(const FSoftObjectPath& Dependency)
 	RequiredAssets->Add(Dependency);
 }
 
-bool FPCGExContext::LoadAssets()
+bool FPCGExContext::LoadAssets(bool& bIsAlreadyLoaded)
 {
 	if (!RequiredAssets || RequiredAssets->IsEmpty())
 	{
@@ -431,16 +432,15 @@ bool FPCGExContext::LoadAssets()
 
 	SetState(PCGExCommon::States::State_LoadingAssetDependencies);
 
-	PCGExHelpers::Load(
+	bIsAlreadyLoaded = PCGExHelpers::LoadTracked(
 		GetTaskManager(),
 		[CtxHandle = GetWeakSelfHandle()]() -> TArray<FSoftObjectPath>
 		{
 			PCGEX_SHARED_CONTEXT_RET(CtxHandle, {})
 			return SharedContext.Get()->RequiredAssets->Array();
-		}, [CtxHandle = GetWeakSelfHandle()](const bool bSuccess, TSharedPtr<FStreamableHandle> StreamableHandle)
+		}, [CtxHandle = GetWeakSelfHandle()](const bool bSuccess)
 		{
 			PCGEX_SHARED_CONTEXT_VOID(CtxHandle)
-			SharedContext.Get()->TrackAssetsHandle(StreamableHandle);
 			if (!bSuccess)
 			{
 				SharedContext.Get()->CancelExecution("Error loading assets.");
@@ -461,6 +461,18 @@ void FPCGExContext::TrackAssetsHandle(const TSharedPtr<FStreamableHandle>& InHan
 	{
 		FWriteScopeLock WriteScopeLock(AssetsLock);
 		TrackedAssets.Add(InHandle);
+	}
+}
+
+void FPCGExContext::TrackCachedAsset(const TSharedPtr<PCGExHelpers::FPCGExSharedAssetHandle>& InHandle)
+{
+	if (!InHandle.IsValid())
+	{
+		return;
+	}
+	{
+		FWriteScopeLock WriteScopeLock(AssetsLock);
+		TrackedCachedAssets.Add(InHandle);
 	}
 }
 
