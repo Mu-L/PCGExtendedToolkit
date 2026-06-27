@@ -4,16 +4,28 @@
 #include "Elements/PCGExPreloadResources.h"
 
 #include "PCGComponent.h"
+#include "PCGExLog.h"
+#include "PCGGraph.h"
 #include "PCGManagedResource.h"
 #include "PCGModule.h"
 #include "PCGPin.h"
 
 #include "Core/PCGExAssetCollection.h"
+#include "Core/PCGExMTCommon.h"
+#include "Data/PCGExData.h"
+#include "Helpers/PCGExBulkAttributeHelpers.h"
 #include "Helpers/PCGExManagedResourceHelpers.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "Helpers/PCGExStreamingHelpers.h"
+#include "Metadata/PCGMetadata.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPreloadResourcesElement"
 #define PCGEX_NAMESPACE PreloadResources
+
+namespace PCGExPreloadResources
+{
+	const FName SourcesLabel = FName(TEXT("Sources"));
+}
 
 #pragma region UPCGExManagedPreloadedResources
 
@@ -73,6 +85,20 @@ void UPCGExPreloadResourcesSettings::ApplyPreconfiguredSettings(const FPCGPreCon
 	}
 }
 
+TArray<FPCGPinProperties> UPCGExPreloadResourcesSettings::InputPinProperties() const
+{
+	TArray<FPCGPinProperties> PinProperties;
+
+	// Opt-in input: PCG forces the first input pin to be Required, so we only add it while the user has
+	// asked to load from inputs (and only in Preload mode) -- otherwise the node has no input pins.
+	if (Mode == EPCGExPreloadResourcesMode::Preload && bLoadFromInputs)
+	{
+		PCGEX_PIN_ANY(PCGExPreloadResources::SourcesLabel, "Points or attribute sets carrying FSoftObjectPath (or string-path) attributes to preload.", Required)
+	}
+
+	return PinProperties;
+}
+
 TArray<FPCGPinProperties> UPCGExPreloadResourcesSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
@@ -128,6 +154,42 @@ namespace PCGExPreloadResources
 			Hash = HashCombine(Hash, GetTypeHash(Path));
 		}
 		return FPCGCrc(Hash);
+	}
+
+	// First FSoftObjectPath attribute on the metadata. NAME_None if there's none / no metadata.
+	FName FindFirstSoftObjectPathAttribute(const UPCGMetadata* Metadata)
+	{
+		if (!Metadata)
+		{
+			return NAME_None;
+		}
+
+		TArray<FName> Names;
+		TArray<EPCGMetadataTypes> Types;
+		Metadata->GetAttributes(Names, Types);
+		for (int32 i = 0; i < Names.Num(); ++i)
+		{
+			if (Types[i] == EPCGMetadataTypes::SoftObjectPath)
+			{
+				return Names[i];
+			}
+		}
+		return NAME_None;
+	}
+
+	// Which attribute to read soft paths from on a given input: the configured selector (resolved to a
+	// concrete attribute name via the shared helper, which fixes @Last); when that doesn't name a
+	// present attribute, the first FSoftObjectPath attribute on the data.
+	FName ResolveAssetAttribute(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData)
+	{
+		const UPCGMetadata* Metadata = InData ? InData->ConstMetadata() : nullptr;
+
+		FName Name = NAME_None;
+		if (PCGExMetaHelpers::TryGetAttributeName(InSelector, InData, Name) && !Name.IsNone() && Metadata && Metadata->HasAttribute(Name))
+		{
+			return Name;
+		}
+		return FindFirstSoftObjectPathAttribute(Metadata);
 	}
 }
 
@@ -238,6 +300,52 @@ bool FPCGExPreloadResourcesElement::AdvanceWork(FPCGExContext* InContext, const 
 		}
 	}
 
+	// 3) Soft object paths read from connected input data (opt-in). The input pin only exists when
+	//    bLoadFromInputs is set (see InputPinProperties), so there is nothing to read otherwise.
+	if (Settings->bLoadFromInputs)
+	{
+		const TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(PCGExPreloadResources::SourcesLabel);
+		if (!Inputs.IsEmpty())
+		{
+			// Reads are independent and read-only, so fan out across inputs; merge into the (non-thread-safe)
+			// PathSet sequentially afterwards.
+			TArray<TArray<FSoftObjectPath>> PerInput;
+			PerInput.SetNum(Inputs.Num());
+			PCGExMT::ParallelOrSequential(
+				Inputs.Num(),
+				[&](const int32 i)
+				{
+					const UPCGData* Data = Inputs[i].Data;
+					if (!Data)
+					{
+						return;
+					}
+
+					// Resolve which attribute holds the asset reference (selector / @Last, else the first
+					// FSoftObjectPath attribute), then bulk-read it (with an FString-path fallback).
+					const FName AttributeName = PCGExPreloadResources::ResolveAssetAttribute(Settings->AssetAttribute, Data);
+					if (AttributeName.IsNone())
+					{
+						return;
+					}
+
+					PCGExData::Helpers::BulkReadSoftPaths(Data, AttributeName, PerInput[i]);
+				},
+				/*Threshold=*/2, EParallelForFlags::Unbalanced);
+
+			for (const TArray<FSoftObjectPath>& InputPaths : PerInput)
+			{
+				for (const FSoftObjectPath& Path : InputPaths)
+				{
+					if (Path.IsValid())
+					{
+						PathSet.Add(Path);
+					}
+				}
+			}
+		}
+	}
+
 	if (PathSet.IsEmpty())
 	{
 		PCGE_LOG_C(Warning, GraphAndLog, Context, FTEXT("Preload Resources resolved no assets to load; check the configured collections / assets and load flags."));
@@ -259,6 +367,15 @@ bool FPCGExPreloadResourcesElement::AdvanceWork(FPCGExContext* InContext, const 
 		for (const FSoftObjectPath& Path : Paths)
 		{
 			Context->EDITOR_TrackPath(Path);
+		}
+	}
+
+	if (Settings->bLogLoadedResources)
+	{
+		UE_LOG(LogPCGEx, Log, TEXT("================== Preloading from %s | %s"), *GetNameSafe(Context->GetComponent()->GetOwner()), *Context->Node->GetGraph()->GetFName().ToString())
+		for (const FSoftObjectPath& Path : Paths)
+		{
+			UE_LOG(LogPCGEx, Log, TEXT("+ %s"), *Path.ToString())
 		}
 	}
 #endif

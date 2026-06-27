@@ -12,6 +12,7 @@
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
 #include "Helpers/PCGExStreamingHelpers.h"
+#include "Metadata/PCGAttributePropertySelector.h"
 
 #include "PCGExPreloadResources.generated.h"
 
@@ -113,11 +114,7 @@ public:
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 
 protected:
-	virtual TArray<FPCGPinProperties> InputPinProperties() const override
-	{
-		return {};
-	}
-
+	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
@@ -139,9 +136,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (EditCondition = "Mode == EPCGExPreloadResourcesMode::Preload", EditConditionHides))
 	TArray<TSoftObjectPtr<UObject>> Assets;
 
+	/** Also read assets to preload from a connected input (points or attribute set). Opt-in: PCG forces the first input pin to be Required, so the input pin only exists while this is enabled. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (EditCondition = "Mode == EPCGExPreloadResourcesMode::Preload", EditConditionHides))
+	bool bLoadFromInputs = false;
+
+	/** Attribute on each input row holding the asset to preload (FSoftObjectPath, or an FString path). Defaults to @Last; clear it to None to use the first FSoftObjectPath attribute found. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (EditCondition = "Mode == EPCGExPreloadResourcesMode::Preload && bLoadFromInputs", EditConditionHides))
+	FPCGAttributePropertyInputSelector AssetAttribute;
+
 	/** Register the preloaded assets for change-tracking so editing a referenced collection/asset forces a graph refresh. Editor-only effect. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (EditCondition = "Mode == EPCGExPreloadResourcesMode::Preload", EditConditionHides))
 	bool bTrackResources = false;
+	
+	/** Print out the list of loaded assets */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (EditCondition = "Mode == EPCGExPreloadResourcesMode::Preload", EditConditionHides))
+	bool bLogLoadedResources = false;
 };
 
 struct FPCGExPreloadResourcesContext final : FPCGExContext
