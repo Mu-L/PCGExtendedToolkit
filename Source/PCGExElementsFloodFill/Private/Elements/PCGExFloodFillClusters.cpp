@@ -77,10 +77,10 @@ bool FPCGExClusterDiffusionElement::Boot(FPCGExContext* InContext) const
 	Context->EdgeDirectionOutput = Settings->EdgeDirectionOutput;
 	Context->EdgeDirectionOutput.ValidateNames(Context);
 
-	PCGExFactories::GetInputFactories<UPCGExBlendOpFactory>(Context, PCGExBlending::Labels::SourceBlendingLabel, Context->BlendingFactories, {PCGExFactories::EType::Blending}, false);
+	PCGExFactories::GetInputFactories<UPCGExBlendOpFactory>(Context, PCGExBlending::Labels::SourceBlendingLabel, Context->BlendingFactories, {FPCGExDataTypeInfoBlendOp::AsId()}, false);
 
 	// Fill controls are optional
-	PCGExFactories::GetInputFactories<UPCGExFillControlsFactoryData>(Context, PCGExFloodFill::SourceFillControlsLabel, Context->FillControlFactories, {PCGExFactories::EType::FillControls}, false);
+	PCGExFactories::GetInputFactories<UPCGExFillControlsFactoryData>(Context, PCGExFloodFill::SourceFillControlsLabel, Context->FillControlFactories, {FPCGExDataTypeInfoFillControl::AsId()}, false);
 
 	// Check for deprecated Heuristics pin usage
 	if (Context->bHasValidHeuristics)
