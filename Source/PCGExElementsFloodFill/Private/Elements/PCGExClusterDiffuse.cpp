@@ -3,11 +3,15 @@
 
 #include "Elements/PCGExClusterDiffuse.h"
 
+#include "PCGExVersion.h"
+#include "Blenders/PCGExUnionOpsManager.h"
 #include "Clusters/PCGExCluster.h"
 #include "Core/PCGExBlendOpsManager.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
 #include "Core/PCGExFloodFill.h"
+#include "Core/PCGExOpStats.h"
 #include "Data/PCGExData.h"
+#include "Data/PCGExPointElements.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExBlendingDetails.h"
 #include "Details/PCGExSettingsDetails.h"
@@ -36,6 +40,19 @@ TArray<FPCGPinProperties> UPCGExClusterDiffuseSettings::InputPinProperties() con
 
 	return PinProperties;
 }
+
+#if WITH_EDITOR
+void UPCGExClusterDiffuseSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 3)
+	{
+		// FillRate migrated from the Input/Attribute/Constant triple to FPCGExInputShorthandSelectorInteger32Abs.
+		Diffusion.ApplyDeprecation();
+	}
+
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+#endif
 
 PCGEX_INITIALIZE_ELEMENT(ClusterDiffuse)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ClusterDiffuse)
@@ -97,13 +114,6 @@ namespace PCGExClusterDiffuse
 	{
 	}
 
-	TSharedPtr<TArray<int8>> FProcessor::GetInfluencesCount() const
-	{
-		// WIP: claiming on for now (each vtx captured once -> safe in-place blend). Returning null
-		// here is all it takes to make diffusions overlap; the union-blend output lands next.
-		return InfluencesCount;
-	}
-
 	void FProcessor::CompleteWork()
 	{
 		if (Diffusions.IsEmpty())
@@ -113,29 +123,176 @@ namespace PCGExClusterDiffuse
 			return;
 		}
 
-		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, DiffuseDiffusions)
+		// Nothing to blend without blend operations -- the vtx pass through unchanged.
+		if (Context->BlendingFactories.IsEmpty())
+		{
+			return;
+		}
 
-		DiffuseDiffusions->OnIterationCallback = [PCGEX_ASYNC_THIS_CAPTURE](const int32 Index, const PCGExMT::FScope& Scope)
+		const int32 NumVtx = VtxDataFacade->GetNum();
+
+		// Per-vtx "does the original value participate" toggle (constant or attribute).
+		// Non-scoped (full) read: the grouping below reads participation at arbitrary vtx indices.
+		const TSharedPtr<PCGExDetails::TSettingValue<bool>> ParticipatesValue = Settings->VtxParticipates.GetValueSetting();
+		const bool bHasParticipates = ParticipatesValue && ParticipatesValue->Init(VtxDataFacade, false);
+
+		// Collect, per reached vtx, every seed that touched it (with the depth it reached at). Built
+		// single-threaded -- the parallel growth passes have finished. Distinct seeds have distinct vtx
+		// indices, so no dedup is needed except for the self-participation case handled below.
+		VtxContributors.Empty();
+		VtxContributors.SetNum(NumVtx);
+
+		for (const TSharedPtr<PCGExFloodFill::FDiffusion>& Diffusion : Diffusions)
+		{
+			const int32 SeedVtx = Diffusion->SeedNode->PointIndex;
+			const int32 SeedPoint = Diffusion->SeedIndex;
+			for (const PCGExFloodFill::FCandidate& Candidate : Diffusion->Captured)
+			{
+				VtxContributors[Candidate.Node->PointIndex].Add(FContribution{SeedVtx, SeedPoint, Candidate.Depth});
+			}
+		}
+
+		// Optionally add each reached vtx's own value as a contributor (depth 0), unless it is already
+		// present (the vtx is its own seed) -- avoid double-counting that value.
+		if (bHasParticipates)
+		{
+			for (int32 VtxIndex = 0; VtxIndex < NumVtx; VtxIndex++)
+			{
+				TArray<FContribution>& Contributors = VtxContributors[VtxIndex];
+				if (Contributors.IsEmpty() || !ParticipatesValue->Read(VtxIndex)) { continue; }
+
+				bool bSelfPresent = false;
+				for (const FContribution& C : Contributors) { if (C.SeedVtxIndex == VtxIndex) { bSelfPresent = true; break; } }
+				if (!bSelfPresent) { Contributors.Add(FContribution{VtxIndex, -1, 0}); }
+			}
+		}
+
+		// Single source & target: the vtx facade. Distances is unused -- we feed weights directly to
+		// Blend() rather than computing them spatially via ComputeWeights().
+		UnionBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, nullptr);
+
+		TArray<TSharedRef<PCGExData::FFacade>> Sources;
+		Sources.Add(VtxDataFacade);
+
+		if (!UnionBlender->Init(Context, VtxDataFacade, Sources))
+		{
+			bIsProcessorValid = false;
+			return;
+		}
+
+		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, BlendDiffusions)
+
+		BlendDiffusions->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 		{
 			PCGEX_ASYNC_THIS
-			This->Diffuse(This->Diffusions[Index]);
+			if (This->UnionBlender)
+			{
+				This->UnionBlender->Cleanup(This->Context);
+			}
 		};
 
-		DiffuseDiffusions->StartIterations(Diffusions.Num(), 1);
-	}
+		BlendDiffusions->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, WeightMode = Settings->Weighting](const PCGExMT::FScope& Scope)
+		{
+			PCGEX_ASYNC_THIS
 
-	void FProcessor::Diffuse(const TSharedPtr<PCGExFloodFill::FDiffusion>& Diffusion)
-	{
-		TArray<int32> Indices;
-		PCGExFloodFill::DiffuseAndBlend(*Diffusion, VtxDataFacade, BlendOpsManager, Indices);
-		Diffusion->Candidates.Empty();
+			TArray<PCGExData::FWeightedPoint> WeightedPoints;
+			TArray<PCGEx::FOpStats> Trackers;
+			This->UnionBlender->InitTrackers(Trackers);
+
+			// Distance weighting reads vtx positions (source & target share the vtx facade).
+			const TConstPCGValueRange<FTransform> VtxTransforms = This->VtxDataFacade->GetIn()->GetConstTransformValueRange();
+
+			PCGEX_SCOPE_LOOP(Index)
+			{
+				const TArray<FContribution>& Contributors = This->VtxContributors[Index];
+				const int32 Count = Contributors.Num();
+				if (Count == 0) { continue; }
+
+				WeightedPoints.Reset(Count);
+
+				// A lone contributor is always weight 1 (mode-agnostic): a blend of one is a copy.
+				if (Count == 1)
+				{
+					WeightedPoints.Emplace(Contributors[0].SeedVtxIndex, 1.0, 0);
+					This->UnionBlender->Blend(Index, WeightedPoints, Trackers);
+					continue;
+				}
+
+				switch (WeightMode)
+				{
+				case EPCGExClusterDiffuseWeightMode::Distance:
+					{
+						// Inverse-distance: w = 1 / (distSq + 1). Closer seeds weigh more; the multi-blend
+						// normalizes the proportions (scale-relative for distSq >> 1). Where two diffusions
+						// meet, both contributors are far so their weights converge -> smooth blend.
+						const FVector TargetPos = VtxTransforms[Index].GetLocation();
+						for (const FContribution& C : Contributors)
+						{
+							const double DistSq = FVector::DistSquared(VtxTransforms[C.SeedVtxIndex].GetLocation(), TargetPos);
+							WeightedPoints.Emplace(C.SeedVtxIndex, 1.0 / (DistSq + 1.0), 0);
+						}
+					}
+					break;
+
+				case EPCGExClusterDiffuseWeightMode::Depth:
+					{
+						// Inverse-depth: w = 1 / (depth + 1). Shallower contributors weigh more; contributors
+						// at similar depth (where two diffusions meet) converge to a smooth blend.
+						for (const FContribution& C : Contributors)
+						{
+							WeightedPoints.Emplace(C.SeedVtxIndex, 1.0 / (static_cast<double>(C.Depth) + 1.0), 0);
+						}
+					}
+					break;
+
+				case EPCGExClusterDiffuseWeightMode::CountAndDepth:
+					{
+						// Half equal + half inverse-depth (each normalized within the contributor set), so
+						// depth biases the result without shallow contributors dominating as in pure Depth.
+						double SumInvDepth = 0;
+						for (const FContribution& C : Contributors) { SumInvDepth += 1.0 / (static_cast<double>(C.Depth) + 1.0); }
+
+						const double EqualShare = 0.5 / static_cast<double>(Count);
+						const double DepthScale = SumInvDepth > 0 ? 0.5 / SumInvDepth : 0.0;
+						for (const FContribution& C : Contributors)
+						{
+							const double InvDepth = 1.0 / (static_cast<double>(C.Depth) + 1.0);
+							WeightedPoints.Emplace(C.SeedVtxIndex, EqualShare + InvDepth * DepthScale, 0);
+						}
+					}
+					break;
+
+				default: // Count
+					for (const FContribution& C : Contributors) { WeightedPoints.Emplace(C.SeedVtxIndex, 1.0, 0); }
+					break;
+				}
+
+				// Put the weights in the form the multi-blend expects: dominant contributor at weight 1,
+				// and ordered first. The blender copies the first contributor as the base (ignoring its
+				// weight) and only re-normalizes once the summed weight passes 1 -- so without this an
+				// un-normalized low weight landing first would be applied at full strength.
+				double MaxWeight = 0;
+				for (const PCGExData::FWeightedPoint& P : WeightedPoints) { MaxWeight = FMath::Max(MaxWeight, P.Weight); }
+				if (MaxWeight > 0)
+				{
+					const double InvMax = 1.0 / MaxWeight;
+					for (PCGExData::FWeightedPoint& P : WeightedPoints) { P.Weight *= InvMax; }
+				}
+				WeightedPoints.Sort([](const PCGExData::FWeightedPoint& A, const PCGExData::FWeightedPoint& B) { return A.Weight > B.Weight; });
+
+				This->UnionBlender->Blend(Index, WeightedPoints, Trackers);
+			}
+		};
+
+		BlendDiffusions->StartSubLoops(NumVtx, PCGEX_CORE_SETTINGS.ClusterDefaultBatchChunkSize);
 	}
 
 	void FProcessor::Cleanup()
 	{
 		// Base resets the growth state (diffusions + fill controls handler).
 		TDiffusionGrowthProcessor<FPCGExClusterDiffuseContext, UPCGExClusterDiffuseSettings>::Cleanup();
-		BlendOpsManager.Reset();
+		UnionBlender.Reset();
+		VtxContributors.Empty();
 	}
 
 	FBatch::FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges)
@@ -155,6 +312,9 @@ namespace PCGExClusterDiffuse
 
 		PCGExBlending::RegisterBuffersDependencies(Context, FacadePreloader, Context->BlendingFactories);
 
+		// Vtx-participation toggle may read from a vtx attribute -- preload it.
+		Settings->VtxParticipates.RegisterBufferDependencies(Context, FacadePreloader);
+
 		for (const TObjectPtr<const UPCGExFillControlsFactoryData>& Factory : Context->FillControlFactories)
 		{
 			Factory->RegisterBuffersDependencies(Context, FacadePreloader);
@@ -165,17 +325,7 @@ namespace PCGExClusterDiffuse
 	{
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ClusterDiffuse)
 
-		BlendOpsManager = MakeShared<PCGExBlending::FBlendOpsManager>(VtxDataFacade);
-		if (!BlendOpsManager->Init(Context, Context->BlendingFactories))
-		{
-			bIsBatchValid = false;
-			return;
-		}
-
-		InfluencesCount = MakeShared<TArray<int8>>();
-		InfluencesCount->Init(0, VtxDataFacade->GetNum());
-
-		FillRate = PCGExDetails::MakeSettingValue<int32>(Settings->Diffusion.FillRateInput, Settings->Diffusion.FillRateAttribute, Settings->Diffusion.FillRateConstant);
+		FillRate = Settings->Diffusion.FillRate.GetValueSetting();
 		bIsBatchValid = FillRate->Init(Settings->Diffusion.FillRateSource == EPCGExFloodFillSettingSource::Seed ? Context->SeedsDataFacade : VtxDataFacade);
 
 		if (!bIsBatchValid)
@@ -195,8 +345,6 @@ namespace PCGExClusterDiffuse
 
 		PCGEX_TYPED_PROCESSOR
 
-		TypedProcessor->BlendOpsManager = BlendOpsManager;
-		TypedProcessor->InfluencesCount = InfluencesCount;
 		TypedProcessor->FillRate = FillRate;
 
 		return true;
@@ -207,7 +355,6 @@ namespace PCGExClusterDiffuse
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ClusterDiffuse)
 
 		TBatch<FProcessor>::Write();
-		BlendOpsManager->Cleanup(Context);
 		VtxDataFacade->WriteFastest(TaskManager);
 	}
 }

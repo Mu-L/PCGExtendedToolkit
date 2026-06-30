@@ -20,6 +20,13 @@
 #define LOCTEXT_NAMESPACE "PCGExFloodFill"
 #define PCGEX_NAMESPACE FloodFill
 
+#if WITH_EDITOR
+void FPCGExFloodFillFlowDetails::ApplyDeprecation()
+{
+	FillRate.Update(FillRateInput_DEPRECATED, FillRateAttribute_DEPRECATED, FillRateConstant_DEPRECATED);
+}
+#endif
+
 namespace PCGExFloodFill
 {
 	FDiffusion::FDiffusion(const TSharedPtr<FFillControlsHandler>& InFillControlsHandler, const TSharedPtr<PCGExClusters::FCluster>& InCluster, const PCGExClusters::FNode* InSeedNode)

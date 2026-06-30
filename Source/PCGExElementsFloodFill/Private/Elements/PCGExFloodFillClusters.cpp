@@ -4,6 +4,7 @@
 #include "Elements/PCGExFloodFillClusters.h"
 
 
+#include "PCGExVersion.h"
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExHashLookup.h"
 #include "Core/PCGExBlendOpsManager.h"
@@ -26,6 +27,19 @@ UPCGExClusterDiffusionSettings::UPCGExClusterDiffusionSettings(const FObjectInit
 {
 	SeedForwarding.bPreservePCGExData = true;
 }
+
+#if WITH_EDITOR
+void UPCGExClusterDiffusionSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 3)
+	{
+		// FillRate migrated from the Input/Attribute/Constant triple to FPCGExInputShorthandSelectorInteger32Abs.
+		Diffusion.ApplyDeprecation();
+	}
+
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+#endif
 
 PCGExData::EIOInit UPCGExClusterDiffusionSettings::GetMainOutputInitMode() const
 {
@@ -550,7 +564,7 @@ namespace PCGExClusterDiffusion
 
 		// Diffusion rate
 
-		FillRate = PCGExDetails::MakeSettingValue<int32>(Settings->Diffusion.FillRateInput, Settings->Diffusion.FillRateAttribute, Settings->Diffusion.FillRateConstant);
+		FillRate = Settings->Diffusion.FillRate.GetValueSetting();
 		bIsBatchValid = FillRate->Init(Settings->Diffusion.FillRateSource == EPCGExFloodFillSettingSource::Seed ? Context->SeedsDataFacade : VtxDataFacade);
 
 		if (!bIsBatchValid)

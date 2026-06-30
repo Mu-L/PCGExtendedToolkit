@@ -58,6 +58,10 @@ public:
 	virtual PCGExData::EIOInit GetMainOutputInitMode() const override;
 	virtual PCGExData::EIOInit GetEdgeOutputInitMode() const override;
 
+#if WITH_EDITOR
+	virtual void PCGExApplyDeprecation(UPCGNode* InOutNode) override;
+#endif
+
 protected:
 	virtual bool SupportsDataStealing() const override
 	{
