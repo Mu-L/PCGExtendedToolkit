@@ -5,6 +5,8 @@
 
 #include "CoreMinimal.h"
 #include "Core/PCGExClustersProcessor.h"
+#include "Clusters/PCGExClusterCommon.h"
+#include "Sorting/PCGExSortingCommon.h"
 #include "PCGExFloodFill.generated.h"
 
 namespace PCGEx
@@ -42,6 +44,42 @@ enum class EPCGExFloodFillPrioritization : uint8
 {
 	Heuristics = 0 UMETA(DisplayName = "Heuristics", ToolTip="Prioritize expansion based on heuristics first, then depth."),
 	Depth      = 1 UMETA(DisplayName = "Depth", ToolTip="Prioritize expansion based on depth, then FillControls."),
+};
+
+UENUM()
+enum class EPCGExFloodFillOrder : uint8
+{
+	Index   = 0 UMETA(DisplayName = "Index", ToolTip="Uses point index to drive diffusion order."),
+	Sorting = 1 UMETA(DisplayName = "Sorting", ToolTip="Use sorting rules to drive diffusion order."),
+};
+
+UENUM()
+enum class EPCGExFloodFillProcessing : uint8
+{
+	Parallel = 0 UMETA(DisplayName = "Parallel", ToolTip="Diffuse each vtx once before moving to the next iteration."),
+	Sequence = 1 UMETA(DisplayName = "Sequential", ToolTip="Diffuse each vtx until it stops before moving to the next one, and so on."),
+};
+
+USTRUCT(BlueprintType)
+struct PCGEXELEMENTSFLOODFILL_API FPCGExFloodFillSeedPickingDetails
+{
+	GENERATED_BODY()
+
+	FPCGExFloodFillSeedPickingDetails()
+	{
+	}
+
+	/** Drive how a seed point selects a node. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	FPCGExNodeSelectionDetails SeedPicking = FPCGExNodeSelectionDetails(200);
+
+	/** Defines the sorting used for the vtx */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
+	EPCGExFloodFillOrder Ordering = EPCGExFloodFillOrder::Index;
+
+	/** Sort direction */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
+	EPCGExSortDirection SortDirection = EPCGExSortDirection::Ascending;
 };
 
 UENUM(meta=(Bitflags, UseEnumValuesAsMaskValuesInEditor="true", DisplayName="[PCGEx] Flood Fill Control Step Flags"))
