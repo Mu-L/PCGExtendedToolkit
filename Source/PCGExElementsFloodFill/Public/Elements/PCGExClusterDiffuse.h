@@ -15,6 +15,7 @@ class UPCGExBlendOpFactory;
 namespace PCGExBlending
 {
 	class FUnionOpsManager;
+	class FBlendOpsSchema;
 }
 
 UENUM()
@@ -91,9 +92,13 @@ struct FPCGExClusterDiffuseContext final : FPCGExClustersProcessorContext
 	friend class FPCGExClusterDiffuseElement;
 
 	TArray<TObjectPtr<const UPCGExBlendOpFactory>> BlendingFactories;
+	TArray<TObjectPtr<const UPCGExBlendOpFactory>> SeedBlendingFactories;
 	TArray<TObjectPtr<const UPCGExFillControlsFactoryData>> FillControlFactories;
 
 	TSharedPtr<PCGExData::FFacade> SeedsDataFacade;
+	// Pre-resolved (Boot, single-threaded) blend-op configs for the seeds-cloud source layer, so
+	// per-processor blender init is thread-safe against the shared seeds facade.
+	TSharedPtr<PCGExBlending::FBlendOpsSchema> SeedBlendOpsSchema;
 
 protected:
 	PCGEX_ELEMENT_BATCH_EDGE_DECL
@@ -110,6 +115,8 @@ protected:
 
 namespace PCGExClusterDiffuse
 {
+	const FName SourceSeedBlendingLabel = FName(TEXT("Seed Blend Ops"));
+
 	class FBatch;
 
 	// One seed's contribution to a reached vtx (collected after growth, consumed by the blend pass).
@@ -127,8 +134,10 @@ namespace PCGExClusterDiffuse
 	protected:
 		// Per reached vtx (indexed by vtx point index), the seeds that touched it. Built after growth.
 		TArray<TArray<FContribution>> VtxContributors;
-		// Weighted multi-source blender driven by the Blend Ops pin (source & target are the vtx facade).
-		TSharedPtr<PCGExBlending::FUnionOpsManager> UnionBlender;
+		// Layer 1: blends seed VTX values onto reached vtx (source & target = vtx facade).
+		TSharedPtr<PCGExBlending::FUnionOpsManager> VtxBlender;
+		// Layer 2: blends seeds-cloud values onto reached vtx (source = seeds facade, target = vtx facade).
+		TSharedPtr<PCGExBlending::FUnionOpsManager> SeedBlender;
 
 		// NOTE: GetInfluencesCount() is intentionally left to the base default (null) -> claiming is
 		// disabled, so diffusions overlap. The union blend below reconciles multi-influence vtx.

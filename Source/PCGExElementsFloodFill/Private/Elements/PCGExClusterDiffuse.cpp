@@ -7,6 +7,7 @@
 #include "Blenders/PCGExUnionOpsManager.h"
 #include "Clusters/PCGExCluster.h"
 #include "Core/PCGExBlendOpsManager.h"
+#include "Core/PCGExBlendOpsSchema.h"
 #include "Core/PCGExFillControlsFactoryProvider.h"
 #include "Core/PCGExFloodFill.h"
 #include "Core/PCGExOpStats.h"
@@ -37,6 +38,7 @@ TArray<FPCGPinProperties> UPCGExClusterDiffuseSettings::InputPinProperties() con
 	PCGEX_PIN_POINT(PCGExCommon::Labels::SourceSeedsLabel, "Seed points.", Required)
 	PCGEX_PIN_FACTORIES(PCGExFloodFill::SourceFillControlsLabel, "Fill controls, used to constraint & limit diffusion", Normal, FPCGExDataTypeInfoFillControl::AsId())
 	PCGExBlending::DeclareBlendOpsInputs(PinProperties, EPCGPinStatus::Normal);
+	PCGEX_PIN_FACTORIES(PCGExClusterDiffuse::SourceSeedBlendingLabel, "Blend operations that blend seed attributes (read from the seeds point cloud) onto reached vtx.", Normal, FPCGExDataTypeInfoBlendOp::AsId())
 
 	return PinProperties;
 }
@@ -68,6 +70,9 @@ bool FPCGExClusterDiffuseElement::Boot(FPCGExContext* InContext) const
 
 	PCGExFactories::GetInputFactories<UPCGExBlendOpFactory>(Context, PCGExBlending::Labels::SourceBlendingLabel, Context->BlendingFactories, {FPCGExDataTypeInfoBlendOp::AsId()}, false);
 
+	// Seed Blend Ops (Layer 2) are optional -- they blend attributes from the seeds point cloud.
+	PCGExFactories::GetInputFactories<UPCGExBlendOpFactory>(Context, PCGExClusterDiffuse::SourceSeedBlendingLabel, Context->SeedBlendingFactories, {FPCGExDataTypeInfoBlendOp::AsId()}, false);
+
 	// Fill controls are optional
 	PCGExFactories::GetInputFactories<UPCGExFillControlsFactoryData>(Context, PCGExFloodFill::SourceFillControlsLabel, Context->FillControlFactories, {FPCGExDataTypeInfoFillControl::AsId()}, false);
 
@@ -75,6 +80,22 @@ bool FPCGExClusterDiffuseElement::Boot(FPCGExContext* InContext) const
 	if (!Context->SeedsDataFacade)
 	{
 		return false;
+	}
+
+	if (!Context->SeedBlendingFactories.IsEmpty())
+	{
+		// Warm the seeds-cloud attributes (full, non-scoped reads) and resolve the seed blend configs
+		// once -- single-threaded here -- so per-processor seed blending never enumerates metadata or
+		// creates cold reads concurrently on the shared seeds facade.
+		TArray<PCGExData::FAttributeIdentity> SeedIdentities;
+		PCGExBlending::GetFilteredIdentities(Context->SeedsDataFacade->GetIn()->Metadata, SeedIdentities);
+		Context->SeedsDataFacade->CreateReadables(SeedIdentities, false);
+
+		Context->SeedBlendOpsSchema = MakeShared<PCGExBlending::FBlendOpsSchema>();
+		if (!Context->SeedBlendOpsSchema->Init(Context, Context->SeedBlendingFactories, {Context->SeedsDataFacade.ToSharedRef()}))
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -123,8 +144,8 @@ namespace PCGExClusterDiffuse
 			return;
 		}
 
-		// Nothing to blend without blend operations -- the vtx pass through unchanged.
-		if (Context->BlendingFactories.IsEmpty())
+		// Nothing to blend without any blend operations -- the vtx pass through unchanged.
+		if (Context->BlendingFactories.IsEmpty() && Context->SeedBlendingFactories.IsEmpty())
 		{
 			return;
 		}
@@ -167,17 +188,33 @@ namespace PCGExClusterDiffuse
 			}
 		}
 
-		// Single source & target: the vtx facade. Distances is unused -- we feed weights directly to
-		// Blend() rather than computing them spatially via ComputeWeights().
-		UnionBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, nullptr);
-
-		TArray<TSharedRef<PCGExData::FFacade>> Sources;
-		Sources.Add(VtxDataFacade);
-
-		if (!UnionBlender->Init(Context, VtxDataFacade, Sources))
+		// Layer 1 (Vtx Blend Ops): source & target are the vtx facade. Layer 2 (Seed Blend Ops): source
+		// is the shared seeds facade (thread-safe via the Boot-resolved schema), target is the vtx
+		// facade. Distances is unused -- weights are fed to Blend() directly. Either layer is optional.
+		if (!Context->BlendingFactories.IsEmpty())
 		{
-			bIsProcessorValid = false;
-			return;
+			TArray<TSharedRef<PCGExData::FFacade>> VtxSources;
+			VtxSources.Add(VtxDataFacade);
+
+			VtxBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, nullptr);
+			if (!VtxBlender->Init(Context, VtxDataFacade, VtxSources))
+			{
+				bIsProcessorValid = false;
+				return;
+			}
+		}
+
+		if (!Context->SeedBlendingFactories.IsEmpty())
+		{
+			TArray<TSharedRef<PCGExData::FFacade>> SeedSources;
+			SeedSources.Add(Context->SeedsDataFacade.ToSharedRef());
+
+			SeedBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->SeedBlendingFactories, nullptr);
+			if (!SeedBlender->Init(Context, VtxDataFacade, SeedSources, Context->SeedBlendOpsSchema))
+			{
+				bIsProcessorValid = false;
+				return;
+			}
 		}
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, BlendDiffusions)
@@ -185,21 +222,23 @@ namespace PCGExClusterDiffuse
 		BlendDiffusions->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 		{
 			PCGEX_ASYNC_THIS
-			if (This->UnionBlender)
-			{
-				This->UnionBlender->Cleanup(This->Context);
-			}
+			if (This->VtxBlender) { This->VtxBlender->Cleanup(This->Context); }
+			if (This->SeedBlender) { This->SeedBlender->Cleanup(This->Context); }
 		};
 
 		BlendDiffusions->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, WeightMode = Settings->Weighting](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
 
+			TArray<double> Weights;
+			TArray<int32> Order;
 			TArray<PCGExData::FWeightedPoint> WeightedPoints;
-			TArray<PCGEx::FOpStats> Trackers;
-			This->UnionBlender->InitTrackers(Trackers);
+			TArray<PCGEx::FOpStats> VtxTrackers;
+			TArray<PCGEx::FOpStats> SeedTrackers;
+			if (This->VtxBlender) { This->VtxBlender->InitTrackers(VtxTrackers); }
+			if (This->SeedBlender) { This->SeedBlender->InitTrackers(SeedTrackers); }
 
-			// Distance weighting reads vtx positions (source & target share the vtx facade).
+			// Distance weighting reads vtx positions.
 			const TConstPCGValueRange<FTransform> VtxTransforms = This->VtxDataFacade->GetIn()->GetConstTransformValueRange();
 
 			PCGEX_SCOPE_LOOP(Index)
@@ -208,79 +247,84 @@ namespace PCGExClusterDiffuse
 				const int32 Count = Contributors.Num();
 				if (Count == 0) { continue; }
 
-				WeightedPoints.Reset(Count);
-
-				// A lone contributor is always weight 1 (mode-agnostic): a blend of one is a copy.
+				// 1. Per-contributor weight, aligned with Contributors. Shared by both layers.
+				Weights.Reset(Count);
 				if (Count == 1)
 				{
-					WeightedPoints.Emplace(Contributors[0].SeedVtxIndex, 1.0, 0);
-					This->UnionBlender->Blend(Index, WeightedPoints, Trackers);
-					continue;
+					// A lone contributor is always weight 1 (mode-agnostic): a blend of one is a copy.
+					Weights.Add(1.0);
 				}
-
-				switch (WeightMode)
+				else
 				{
-				case EPCGExClusterDiffuseWeightMode::Distance:
+					switch (WeightMode)
 					{
-						// Inverse-distance: w = 1 / (distSq + 1). Closer seeds weigh more; the multi-blend
-						// normalizes the proportions (scale-relative for distSq >> 1). Where two diffusions
-						// meet, both contributors are far so their weights converge -> smooth blend.
-						const FVector TargetPos = VtxTransforms[Index].GetLocation();
-						for (const FContribution& C : Contributors)
+					case EPCGExClusterDiffuseWeightMode::Distance:
 						{
-							const double DistSq = FVector::DistSquared(VtxTransforms[C.SeedVtxIndex].GetLocation(), TargetPos);
-							WeightedPoints.Emplace(C.SeedVtxIndex, 1.0 / (DistSq + 1.0), 0);
+							// Inverse-distance: closer seeds weigh more; where two diffusions meet both are
+							// far, so weights converge -> smooth blend.
+							const FVector TargetPos = VtxTransforms[Index].GetLocation();
+							for (const FContribution& C : Contributors)
+							{
+								const double DistSq = FVector::DistSquared(VtxTransforms[C.SeedVtxIndex].GetLocation(), TargetPos);
+								Weights.Add(1.0 / (DistSq + 1.0));
+							}
 						}
-					}
-					break;
-
-				case EPCGExClusterDiffuseWeightMode::Depth:
-					{
-						// Inverse-depth: w = 1 / (depth + 1). Shallower contributors weigh more; contributors
-						// at similar depth (where two diffusions meet) converge to a smooth blend.
-						for (const FContribution& C : Contributors)
+						break;
+					case EPCGExClusterDiffuseWeightMode::Depth:
+						// Inverse-depth: shallower contributors weigh more; similar depths converge.
+						for (const FContribution& C : Contributors) { Weights.Add(1.0 / (static_cast<double>(C.Depth) + 1.0)); }
+						break;
+					case EPCGExClusterDiffuseWeightMode::CountAndDepth:
 						{
-							WeightedPoints.Emplace(C.SeedVtxIndex, 1.0 / (static_cast<double>(C.Depth) + 1.0), 0);
+							// Half equal + half inverse-depth (each normalized within the contributor set).
+							double SumInvDepth = 0;
+							for (const FContribution& C : Contributors) { SumInvDepth += 1.0 / (static_cast<double>(C.Depth) + 1.0); }
+							const double EqualShare = 0.5 / static_cast<double>(Count);
+							const double DepthScale = SumInvDepth > 0 ? 0.5 / SumInvDepth : 0.0;
+							for (const FContribution& C : Contributors) { Weights.Add(EqualShare + (1.0 / (static_cast<double>(C.Depth) + 1.0)) * DepthScale); }
 						}
+						break;
+					default: // Count
+						for (int32 i = 0; i < Count; i++) { Weights.Add(1.0); }
+						break;
 					}
-					break;
-
-				case EPCGExClusterDiffuseWeightMode::CountAndDepth:
-					{
-						// Half equal + half inverse-depth (each normalized within the contributor set), so
-						// depth biases the result without shallow contributors dominating as in pure Depth.
-						double SumInvDepth = 0;
-						for (const FContribution& C : Contributors) { SumInvDepth += 1.0 / (static_cast<double>(C.Depth) + 1.0); }
-
-						const double EqualShare = 0.5 / static_cast<double>(Count);
-						const double DepthScale = SumInvDepth > 0 ? 0.5 / SumInvDepth : 0.0;
-						for (const FContribution& C : Contributors)
-						{
-							const double InvDepth = 1.0 / (static_cast<double>(C.Depth) + 1.0);
-							WeightedPoints.Emplace(C.SeedVtxIndex, EqualShare + InvDepth * DepthScale, 0);
-						}
-					}
-					break;
-
-				default: // Count
-					for (const FContribution& C : Contributors) { WeightedPoints.Emplace(C.SeedVtxIndex, 1.0, 0); }
-					break;
 				}
 
-				// Put the weights in the form the multi-blend expects: dominant contributor at weight 1,
-				// and ordered first. The blender copies the first contributor as the base (ignoring its
-				// weight) and only re-normalizes once the summed weight passes 1 -- so without this an
-				// un-normalized low weight landing first would be applied at full strength.
+				// 2. Normalize to max = 1 -- the form the multi-blend expects (dominant copied as base,
+				//    and only re-normalized once the summed weight passes 1).
 				double MaxWeight = 0;
-				for (const PCGExData::FWeightedPoint& P : WeightedPoints) { MaxWeight = FMath::Max(MaxWeight, P.Weight); }
+				for (const double W : Weights) { MaxWeight = FMath::Max(MaxWeight, W); }
 				if (MaxWeight > 0)
 				{
 					const double InvMax = 1.0 / MaxWeight;
-					for (PCGExData::FWeightedPoint& P : WeightedPoints) { P.Weight *= InvMax; }
+					for (double& W : Weights) { W *= InvMax; }
 				}
-				WeightedPoints.Sort([](const PCGExData::FWeightedPoint& A, const PCGExData::FWeightedPoint& B) { return A.Weight > B.Weight; });
 
-				This->UnionBlender->Blend(Index, WeightedPoints, Trackers);
+				// 3. Order contributors by weight descending so the dominant one is copied as the base.
+				Order.Reset(Count);
+				for (int32 i = 0; i < Count; i++) { Order.Add(i); }
+				Order.Sort([&Weights](const int32 A, const int32 B) { return Weights[A] > Weights[B]; });
+
+				// 4. Layer 1: blend seed VTX values onto this vtx.
+				if (This->VtxBlender)
+				{
+					WeightedPoints.Reset(Count);
+					for (const int32 O : Order) { WeightedPoints.Emplace(Contributors[O].SeedVtxIndex, Weights[O], 0); }
+					This->VtxBlender->Blend(Index, WeightedPoints, VtxTrackers);
+				}
+
+				// 5. Layer 2: blend seeds-cloud values onto this vtx (the participation self-entry has no
+				//    seeds-cloud point, so it's skipped here).
+				if (This->SeedBlender)
+				{
+					WeightedPoints.Reset(Count);
+					for (const int32 O : Order)
+					{
+						if (Contributors[O].SeedPointIndex < 0) { continue; }
+						WeightedPoints.Emplace(Contributors[O].SeedPointIndex, Weights[O], 0);
+					}
+					if (!WeightedPoints.IsEmpty()) { This->SeedBlender->Blend(Index, WeightedPoints, SeedTrackers); }
+				}
 			}
 		};
 
@@ -291,7 +335,8 @@ namespace PCGExClusterDiffuse
 	{
 		// Base resets the growth state (diffusions + fill controls handler).
 		TDiffusionGrowthProcessor<FPCGExClusterDiffuseContext, UPCGExClusterDiffuseSettings>::Cleanup();
-		UnionBlender.Reset();
+		VtxBlender.Reset();
+		SeedBlender.Reset();
 		VtxContributors.Empty();
 	}
 
