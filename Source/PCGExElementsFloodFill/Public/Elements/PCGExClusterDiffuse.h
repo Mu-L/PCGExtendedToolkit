@@ -23,8 +23,15 @@ enum class EPCGExClusterDiffuseWeightMode : uint8
 {
 	Count         = 0 UMETA(DisplayName = "Count", ToolTip="Every contributor weighs equally; the vtx becomes the mean of the seeds that reached it."),
 	Distance      = 1 UMETA(DisplayName = "Distance", ToolTip="Closer seeds (by distance to the vtx) weigh more, farther seeds less."),
-	Depth         = 2 UMETA(DisplayName = "Depth", ToolTip="Inverse-depth: seeds that reached the vtx in fewer diffusion steps weigh more; contributions blend smoothly where two diffusions meet."),
-	CountAndDepth = 3 UMETA(DisplayName = "Count + Depth", ToolTip="Half equal weighting, half depth weighting -- depth biases the blend without shallow seeds dominating as strongly as pure Depth."),
+	Depth         = 2 UMETA(DisplayName = "Depth", ToolTip="Weight by diffusion depth (graph steps from the seed)."),
+	CountAndDepth = 3 UMETA(DisplayName = "Count + Depth", ToolTip="A blend of equal weighting and depth weighting."),
+};
+
+UENUM()
+enum class EPCGExClusterDiffuseWeightSpace : uint8
+{
+	Relative = 0 UMETA(DisplayName = "Relative", ToolTip="Each vtx is normalized so its strongest contributor reaches full intensity -- a territorial / Voronoi-style blend. Distance/Depth only bias overlaps; a vtx reached by a single seed always gets that seed at full strength."),
+	Falloff  = 1 UMETA(DisplayName = "Falloff", ToolTip="Absolute intensity: each seed is full at its origin and fades to 0 at that diffusion's furthest reach. Distance/Depth become real gradients out from each seed, and Seed Factor is an absolute multiplier. Where intensity is low the vtx fades to its original value (if it participates) or to 0."),
 };
 
 /**
@@ -71,13 +78,21 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	FPCGExFloodFillFlowDetails Diffusion;
 
-	/** How overlapping seed contributions are weighted when blended onto a vtx. */
+	/** What drives each seed's contribution weight when blended onto a vtx. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_NotOverridable))
 	EPCGExClusterDiffuseWeightMode Weighting = EPCGExClusterDiffuseWeightMode::Count;
+
+	/** How the weights are interpreted. Relative = normalized/territorial (single seed always full). Falloff = absolute intensity that fades from each seed to its furthest reach. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_NotOverridable))
+	EPCGExClusterDiffuseWeightSpace WeightSpace = EPCGExClusterDiffuseWeightSpace::Relative;
 
 	/** Whether the vtx's own (pre-diffusion) value participates in the blend, alongside the seeds that reached it. When off, reached vtx are fully replaced by the seed blend. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_Overridable))
 	FPCGExInputShorthandSelectorBoolean VtxParticipates = FPCGExInputShorthandSelectorBoolean(FName("VtxParticipates"), false, false);
+
+	/** Per-seed multiplier on each seed's contribution, read from the seeds point cloud. Scales how strongly each seed competes where diffusions overlap (1 = neutral). Has no effect on a vtx reached by a single seed. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_Overridable))
+	FPCGExInputShorthandSelectorDouble SeedFactor = FPCGExInputShorthandSelectorDouble(FName("SeedFactor"), 1.0, false);
 
 	/** Whether or not to search for closest node using an octree. Depending on your dataset, enabling this may be either much faster, or much slower. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, AdvancedDisplay))
@@ -96,6 +111,9 @@ struct FPCGExClusterDiffuseContext final : FPCGExClustersProcessorContext
 	TArray<TObjectPtr<const UPCGExFillControlsFactoryData>> FillControlFactories;
 
 	TSharedPtr<PCGExData::FFacade> SeedsDataFacade;
+	// Per-seed contribution factor, read from the seeds facade. Init'd single-threaded in Boot (warming
+	// the attribute), then read-only off-thread by every processor.
+	TSharedPtr<PCGExDetails::TSettingValue<double>> SeedFactorValue;
 	// Pre-resolved (Boot, single-threaded) blend-op configs for the seeds-cloud source layer, so
 	// per-processor blender init is thread-safe against the shared seeds facade.
 	TSharedPtr<PCGExBlending::FBlendOpsSchema> SeedBlendOpsSchema;
@@ -123,8 +141,10 @@ namespace PCGExClusterDiffuse
 	struct FContribution
 	{
 		int32 SeedVtxIndex = -1;   // seed's vtx point index -- the Layer 1 blend source
-		int32 SeedPointIndex = -1; // seed's seeds-cloud point index -- reserved for the seed blend layer
-		int32 Depth = 0;           // diffusion depth at which the seed reached this vtx
+		int32 SeedPointIndex = -1; // seed's seeds-cloud point index (Layer 2 source); <0 marks the participation self-entry
+		int32 Depth = 0;           // diffusion depth at which the seed reached this vtx (for Relative weighting)
+		double NormDepth = 0.0;    // depth / diffusion max depth, [0,1] (0 at seed, 1 at furthest) -- for Falloff
+		double NormDist = 0.0;     // path distance / diffusion max distance, [0,1] -- for Falloff
 	};
 
 	class FProcessor final : public PCGExFloodFill::TDiffusionGrowthProcessor<FPCGExClusterDiffuseContext, UPCGExClusterDiffuseSettings>

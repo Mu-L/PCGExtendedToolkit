@@ -27,10 +27,16 @@ namespace PCGExBlending
 		FUnionOpsManager(const TArray<TObjectPtr<const UPCGExBlendOpFactory>>* InBlendingFactories, const PCGExMath::IDistances* InDistances);
 		virtual ~FUnionOpsManager() override;
 
-		/** When a pre-resolved schema is provided, per-source blenders skip factory config resolution
-		 * (and its concurrent metadata enumeration) -- see PCGExBlending::FBlendOpsSchema. */
-		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<const FBlendOpsSchema>& InSchema = nullptr);
-		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, const TSharedPtr<const FBlendOpsSchema>& InSchema = nullptr);
+		/** When a pre-resolved schema is provided, per-source (primary) blenders skip factory config
+		 * resolution (and its concurrent metadata enumeration) -- see PCGExBlending::FBlendOpsSchema.
+		 *
+		 * NumTrailingBackgroundSources: the last N sources are treated as best-effort "background" sources.
+		 * They always resolve from factories on the spot (never the schema -- they're typically per-caller,
+		 * e.g. a processor's own target facade used as a fade-to-original source) and tolerate operand
+		 * attributes they don't carry (those ops are simply dropped for that source). Primary sources keep
+		 * the strict behaviour: schema if provided, factories otherwise. */
+		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<const FBlendOpsSchema>& InSchema = nullptr, const int32 NumTrailingBackgroundSources = 0);
+		bool Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, const TSharedPtr<const FBlendOpsSchema>& InSchema = nullptr, const int32 NumTrailingBackgroundSources = 0);
 
 		virtual void InitTrackers(TArray<PCGEx::FOpStats>& Trackers) const override;
 		virtual int32 ComputeWeights(const int32 WriteIndex, const TSharedPtr<PCGExData::IUnionData>& InUnionData, TArray<PCGExData::FWeightedPoint>& OutWeightedPoints) const override;
