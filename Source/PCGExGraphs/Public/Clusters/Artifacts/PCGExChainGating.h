@@ -47,41 +47,53 @@ struct PCGEXGRAPHS_API FPCGExChainGatingDetails
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	EPCGExChainGatingLogic Logic = EPCGExChainGatingLogic::All;
 
-	/** Gate on the number of vertices (nodes) in the chain. */
+	/** Gate on a lower bound for the vertex (node) count. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(InlineEditConditionToggle))
-	bool bCheckVtxCount = false;
+	bool bCheckMinVtxCount = false;
 
 	/** Inclusive lower bound for the vertex count. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" ├─ Min Vtx Count", EditCondition="bCheckVtxCount", ClampMin=0))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" ┌─ Min Vtx Count", EditCondition="bCheckMinVtxCount", ClampMin=0))
 	int32 MinVtxCount = 0;
 
-	/** Inclusive upper bound for the vertex count. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" └─ Max Vtx Count", EditCondition="bCheckVtxCount", ClampMin=0))
-	int32 MaxVtxCount = MAX_int32;
-
-	/** Gate on the number of edges in the chain. */
+	/** Gate on an upper bound for the vertex (node) count. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(InlineEditConditionToggle))
-	bool bCheckEdgeCount = false;
+	bool bCheckMaxVtxCount = false;
+
+	/** Inclusive upper bound for the vertex count. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" └─ Max Vtx Count", EditCondition="bCheckMaxVtxCount", ClampMin=0))
+	int32 MaxVtxCount = 100;
+
+	/** Gate on a lower bound for the edge count. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(InlineEditConditionToggle))
+	bool bCheckMinEdgeCount = false;
 
 	/** Inclusive lower bound for the edge count. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" ├─ Min Edge Count", EditCondition="bCheckEdgeCount", ClampMin=0))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" ┌─ Min Edge Count", EditCondition="bCheckMinEdgeCount", ClampMin=0))
 	int32 MinEdgeCount = 0;
 
-	/** Inclusive upper bound for the edge count. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" └─ Max Edge Count", EditCondition="bCheckEdgeCount", ClampMin=0))
-	int32 MaxEdgeCount = MAX_int32;
-
-	/** Gate on the total length of the chain. */
+	/** Gate on an upper bound for the edge count. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(InlineEditConditionToggle))
-	bool bCheckLength = false;
+	bool bCheckMaxEdgeCount = false;
+
+	/** Inclusive upper bound for the edge count. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" └─ Max Edge Count", EditCondition="bCheckMaxEdgeCount", ClampMin=0))
+	int32 MaxEdgeCount = 100;
+
+	/** Gate on a lower bound for the total chain length. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(InlineEditConditionToggle))
+	bool bCheckMinLength = false;
 
 	/** Inclusive lower bound for the chain length. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" ├─ Min Length", EditCondition="bCheckLength", ClampMin=0))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" ┌─ Min Length", EditCondition="bCheckMinLength", ClampMin=0))
 	double MinLength = 0;
 
+	/** Gate on an upper bound for the total chain length. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(InlineEditConditionToggle))
+	bool bCheckMaxLength = false;
+
 	/** Inclusive upper bound for the chain length. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" └─ Max Length", EditCondition="bCheckLength", ClampMin=0))
-	double MaxLength = MAX_flt;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta=(DisplayName=" └─ Max Length", EditCondition="bCheckMaxLength", ClampMin=0))
+	double MaxLength = 1000;
 
 	/** Whether any criterion is enabled at all. */
 	bool IsEnabled() const;

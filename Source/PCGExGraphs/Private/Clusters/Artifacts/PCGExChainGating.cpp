@@ -33,7 +33,9 @@ namespace PCGExClusters
 
 bool FPCGExChainGatingDetails::IsEnabled() const
 {
-	return bCheckVtxCount || bCheckEdgeCount || bCheckLength;
+	return bCheckMinVtxCount || bCheckMaxVtxCount ||
+		bCheckMinEdgeCount || bCheckMaxEdgeCount ||
+		bCheckMinLength || bCheckMaxLength;
 }
 
 bool FPCGExChainGatingDetails::Test(const PCGExClusters::FNodeChain& Chain, const PCGExClusters::FCluster& Cluster) const
@@ -57,9 +59,12 @@ bool FPCGExChainGatingDetails::Test(const PCGExClusters::FNodeChain& Chain, cons
 		else { bResult |= bPass; }
 	};
 
-	if (bCheckVtxCount) { Apply(VtxCount >= MinVtxCount && VtxCount <= MaxVtxCount); }
-	if (bCheckEdgeCount) { Apply(EdgeCount >= MinEdgeCount && EdgeCount <= MaxEdgeCount); }
-	if (bCheckLength) { Apply(Length >= MinLength && Length <= MaxLength); }
+	if (bCheckMinVtxCount) { Apply(VtxCount >= MinVtxCount); }
+	if (bCheckMaxVtxCount) { Apply(VtxCount <= MaxVtxCount); }
+	if (bCheckMinEdgeCount) { Apply(EdgeCount >= MinEdgeCount); }
+	if (bCheckMaxEdgeCount) { Apply(EdgeCount <= MaxEdgeCount); }
+	if (bCheckMinLength) { Apply(Length >= MinLength); }
+	if (bCheckMaxLength) { Apply(Length <= MaxLength); }
 
 	return bResult;
 }
