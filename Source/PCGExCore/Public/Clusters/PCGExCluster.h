@@ -468,6 +468,5 @@ namespace PCGExClusters
 
 	protected:
 		int32 GetOrCreateNode_Unsafe(const int32 PointIndex);
-		int32 GetOrCreateNode_Unsafe(TSparseArray<int32>& InLookup, const int32 PointIndex);
 	};
 }

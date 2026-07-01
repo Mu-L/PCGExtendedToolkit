@@ -68,6 +68,14 @@ namespace PCGExGraphs
 			Links.AddUnique(FLink(NodeIndex, EdgeIndex));
 		}
 
+		// Skips AddUnique's linear scan. Only valid when the caller guarantees each
+		// (node, edge) pair is inserted at most once -- true for cluster builds, where
+		// every edge index is visited exactly once per endpoint.
+		FORCEINLINE void Link_Unsafe(const int32 NodeIndex, const int32 EdgeIndex)
+		{
+			Links.Add(FLink(NodeIndex, EdgeIndex));
+		}
+
 		bool IsAdjacentTo(const int32 OtherNodeIndex) const;
 
 		int32 GetEdgeIndex(const int32 AdjacentNodeIndex) const;

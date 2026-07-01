@@ -5,9 +5,11 @@
 #include "Clusters/PCGExClusterCache.h"
 
 #include "Clusters/PCGExClusterCommon.h"
+#include "Core/PCGExMTCommon.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
+#include "HAL/PlatformAtomics.h"
 #include "Math/PCGExMathAxis.h"
 
 namespace PCGExClusters
@@ -216,8 +218,8 @@ namespace PCGExClusters
 			const int32 StartNode = GetOrCreateNode_Unsafe(*StartPointIndexPtr);
 			const int32 EndNode = GetOrCreateNode_Unsafe(*EndPointIndexPtr);
 
-			(Nodes->GetData() + StartNode)->Link(EndNode, i);
-			(Nodes->GetData() + EndNode)->Link(StartNode, i);
+			(Nodes->GetData() + StartNode)->Link_Unsafe(EndNode, i);
+			(Nodes->GetData() + EndNode)->Link_Unsafe(StartNode, i);
 
 			*(Edges->GetData() + i) = FEdge(i, *StartPointIndexPtr, *EndPointIndexPtr, i, EdgeIOIndex);
 		}
@@ -258,31 +260,131 @@ namespace PCGExClusters
 		const UPCGBasePointData* SubVtxPoints = InVtxFacade->Source->GetOutIn();
 		VtxTransforms = SubVtxPoints->GetConstTransformValueRange();
 
-		Nodes->Reserve(InNumNodes);
-
 		Edges->Reserve(NumRawEdges);
 		Edges->Append(InEdges);
 
-		TSparseArray<int32> TempLookup;
-		TempLookup.Reserve(InNumNodes);
+		// The shared, -1-initialized lookup (created fresh per graph compile) doubles as
+		// the point->node scratch: subgraphs partition vtx points (union-find components),
+		// so concurrent cluster builds each claim a disjoint set of indices, and the values
+		// written during creation ARE the lookup's final content. This replaces a per-cluster
+		// TSparseArray whose expansion cost scaled with the highest point index touched.
+		check(NodeIndexLookup)
 
-		for (const TArray<FEdge>& SubgraphEdges = *Edges.Get();
-		     const FEdge& E : SubgraphEdges)
+		const int32 NumEdges = InEdges.Num();
+
+		// Below this, the parallel build's extra passes cost more than they save;
+		// the sequential path also keeps many-small-clusters batches contention-free.
+		constexpr int32 ParallelBuildThreshold = 4096;
+
+		if (NumEdges < ParallelBuildThreshold)
 		{
-			const int32 StartNode = GetOrCreateNode_Unsafe(TempLookup, E.Start);
-			const int32 EndNode = GetOrCreateNode_Unsafe(TempLookup, E.End);
+			Nodes->Reserve(InNumNodes);
 
-			(Nodes->GetData() + StartNode)->Link(EndNode, E.Index);
-			(Nodes->GetData() + EndNode)->Link(StartNode, E.Index);
-		}
-
-		// Populate NodeIndexLookup from created nodes
-		if (NodeIndexLookup)
-		{
-			for (const FNode& Node : *Nodes)
+			for (const FEdge& E : InEdges)
 			{
-				NodeIndexLookup->GetMutable(Node.PointIndex) = Node.Index;
+				const int32 StartNode = GetOrCreateNode_Unsafe(E.Start);
+				const int32 EndNode = GetOrCreateNode_Unsafe(E.End);
+
+				(Nodes->GetData() + StartNode)->Link_Unsafe(EndNode, E.Index);
+				(Nodes->GetData() + EndNode)->Link_Unsafe(StartNode, E.Index);
 			}
+		}
+		else
+		{
+			TArray<FNode>& NodesRef = *Nodes;
+			NodesRef.SetNum(InNumNodes);
+
+			const FEdge* EdgesData = InEdges.GetData();
+			PCGEx::FIndexLookup* Lookup = NodeIndexLookup.Get();
+
+			// Sequential index assignment in first-appearance order -- matches the
+			// sequential path's node ordering exactly, and is only two lookup probes
+			// per edge. Everything heavy below runs parallel.
+			int32 NumCreated = 0;
+			for (int32 i = 0; i < NumEdges; i++)
+			{
+				const FEdge& E = EdgesData[i];
+
+				int32& StartNode = Lookup->GetMutable(E.Start);
+				if (StartNode == -1)
+				{
+					check(NumCreated < InNumNodes)
+					FNode& Node = NodesRef[NumCreated];
+					Node.Index = NumCreated;
+					Node.PointIndex = E.Start;
+					StartNode = NumCreated++;
+				}
+
+				int32& EndNode = Lookup->GetMutable(E.End);
+				if (EndNode == -1)
+				{
+					check(NumCreated < InNumNodes)
+					FNode& Node = NodesRef[NumCreated];
+					Node.Index = NumCreated;
+					Node.PointIndex = E.End;
+					EndNode = NumCreated++;
+				}
+			}
+
+			if (NumCreated < InNumNodes)
+			{
+				NodesRef.SetNum(NumCreated, EAllowShrinking::No);
+			}
+
+			// Per-node degree count; reused as fill cursors below.
+			TArray<int32> LinkCursors;
+			LinkCursors.SetNumZeroed(NumCreated);
+			int32* Cursors = LinkCursors.GetData();
+
+			PCGExMT::ParallelOrSequential(
+				NumEdges,
+				[&](const int32 i)
+				{
+					const FEdge& E = EdgesData[i];
+					FPlatformAtomics::InterlockedIncrement(Cursors + Lookup->Get(E.Start));
+					FPlatformAtomics::InterlockedIncrement(Cursors + Lookup->Get(E.End));
+				});
+
+			// Size each node's links to its exact degree and gather bounds.
+			FRWLock BoundsLock;
+			PCGExMT::ParallelOrSequentialScoped(
+				NumCreated,
+				[&](const PCGExMT::FScope& Scope)
+				{
+					FBox ScopedBounds(ForceInit);
+					PCGEX_SCOPE_LOOP(i)
+					{
+						FNode& Node = NodesRef[i];
+						Node.Links.SetNum(Cursors[i]);
+						ScopedBounds += VtxTransforms[Node.PointIndex].GetLocation();
+					}
+
+					FWriteScopeLock WriteLock(BoundsLock);
+					Bounds += ScopedBounds;
+				});
+
+			// Scatter links; each atomic decrement claims a unique slot, so concurrent
+			// writes into a node's link array never alias.
+			PCGExMT::ParallelOrSequential(
+				NumEdges,
+				[&](const int32 i)
+				{
+					const FEdge& E = EdgesData[i];
+					const int32 StartNode = Lookup->Get(E.Start);
+					const int32 EndNode = Lookup->Get(E.End);
+
+					NodesRef[StartNode].Links[FPlatformAtomics::InterlockedDecrement(Cursors + StartNode)] = FLink(EndNode, E.Index);
+					NodesRef[EndNode].Links[FPlatformAtomics::InterlockedDecrement(Cursors + EndNode)] = FLink(StartNode, E.Index);
+				});
+
+			// Slot claim order is scheduling-dependent; sorting by edge index restores
+			// the deterministic ascending order the sequential path produces.
+			PCGExMT::ParallelOrSequential(
+				NumCreated,
+				[&](const int32 i)
+				{
+					NodesRef[i].Links.Sort([](const FLink& A, const FLink& B) { return A.Edge < B.Edge; });
+				});
 		}
 
 		Bounds = Bounds.ExpandBy(10);
@@ -1104,21 +1206,6 @@ namespace PCGExClusters
 
 		NodeIndex = Nodes->Add(FNode(Nodes->Num(), PointIndex));
 		NodeIndexLookup->GetMutable(PointIndex) = NodeIndex;
-		Bounds += VtxTransforms[PointIndex].GetLocation();
-
-		return NodeIndex;
-	}
-
-	int32 FCluster::GetOrCreateNode_Unsafe(TSparseArray<int32>& InLookup, const int32 PointIndex)
-	{
-		if (InLookup.IsValidIndex(PointIndex))
-		{
-			return InLookup[PointIndex];
-		}
-
-		const int32 NodeIndex = Nodes->Add(FNode(Nodes->Num(), PointIndex));
-		InLookup.Insert(PointIndex, NodeIndex);
-
 		Bounds += VtxTransforms[PointIndex].GetLocation();
 
 		return NodeIndex;
