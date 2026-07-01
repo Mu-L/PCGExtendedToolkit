@@ -31,7 +31,7 @@ UPCGExClusterDiffusionSettings::UPCGExClusterDiffusionSettings(const FObjectInit
 #if WITH_EDITOR
 void UPCGExClusterDiffusionSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
-	PCGEX_IF_VERSION_LOWER(1, 76, 3)
+	PCGEX_IF_VERSION_LOWER(1, 76, 2)
 	{
 		// FillRate migrated from the Input/Attribute/Constant triple to FPCGExInputShorthandSelectorInteger32Abs.
 		Diffusion.ApplyDeprecation();
