@@ -1,0 +1,449 @@
+// Copyright 2026 Timothé Lapetite and contributors
+// Released under the MIT license https://opensource.org/license/MIT/
+
+#include "Elements/PCGExExtrudePath.h"
+
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
+#include "Details/PCGExSettingsDetails.h"
+#include "Helpers/PCGExArrayHelpers.h"
+#include "Helpers/PCGExPointArrayDataHelpers.h"
+#include "Helpers/PCGExRandomHelpers.h"
+#include "Math/Geo/PCGExGeo.h"
+#include "Paths/PCGExPathProfile.h"
+#include "Paths/PCGExPathsHelpers.h"
+
+#define LOCTEXT_NAMESPACE "PCGExExtrudePathElement"
+#define PCGEX_NAMESPACE ExtrudePath
+
+PCGEX_SETTING_VALUE_IMPL(UPCGExExtrudePathSettings, Subdivisions, double, SubdivisionAmountInput, SubdivisionAmount, SubdivideMethod == EPCGExSubdivideMode::Count ? SubdivisionCount : SubdivisionDistance)
+
+UPCGExExtrudePathSettings::UPCGExExtrudePathSettings(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	bSupportClosedLoops = false;
+}
+
+TArray<FPCGPinProperties> UPCGExExtrudePathSettings::InputPinProperties() const
+{
+	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
+	if (Type == EPCGExExtrudeProfileType::Custom)
+	{
+		PCGEX_PIN_POINT(PCGExExtrudePath::SourceCustomProfile, "Single path used as the extrusion profile", Required)
+	}
+	return PinProperties;
+}
+
+PCGEX_INITIALIZE_ELEMENT(ExtrudePath)
+
+PCGExData::EIOInit UPCGExExtrudePathSettings::GetMainDataInitializationPolicy() const
+{
+	// Output is (re)initialized per-path in CompleteWork (New when extruding, Duplicate otherwise)
+	return PCGExData::EIOInit::NoInit;
+}
+
+PCGEX_ELEMENT_BATCH_POINT_IMPL(ExtrudePath)
+
+bool FPCGExExtrudePathElement::Boot(FPCGExContext* InContext) const
+{
+	if (!FPCGExPathProcessorElement::Boot(InContext))
+	{
+		return false;
+	}
+
+	PCGEX_CONTEXT_AND_SETTINGS(ExtrudePath)
+
+	if (Settings->bFlagSubdivision)
+	{
+		PCGEX_VALIDATE_NAME(Settings->SubdivisionFlagName)
+	}
+
+	// Arc & Custom profiles curve the segment away from the path tangent, which needs the extrusion direction to
+	// differ from the path. Path Direction is always collinear, so warn once here rather than per-path at runtime.
+	const bool bWantsCurvedProfile = Settings->Type == EPCGExExtrudeProfileType::Custom || (Settings->Type == EPCGExExtrudeProfileType::Arc && Settings->bSubdivide);
+	if (bWantsCurvedProfile && Settings->DirectionMode == EPCGExExtrudeDirection::PathDirection && !Settings->bQuietDegenerateProfileWarning)
+	{
+		PCGE_LOG(Warning, GraphAndLog, FTEXT("Arc/Custom profiles need a Custom extrusion direction angled from the path; with Path Direction the new segment stays straight."));
+	}
+
+	if (Settings->Type == EPCGExExtrudeProfileType::Custom)
+	{
+		const TSharedPtr<PCGExData::FPointIO> CustomProfileIO = PCGExData::TryGetSingleInput(Context, PCGExExtrudePath::SourceCustomProfile, false, true);
+		if (!CustomProfileIO)
+		{
+			return false;
+		}
+
+		if (CustomProfileIO->GetNum() < 2)
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Custom profile must have at least two points."));
+			return false;
+		}
+
+		Context->CustomProfileFacade = MakeShared<PCGExData::FFacade>(CustomProfileIO.ToSharedRef());
+
+		TConstPCGValueRange<FTransform> ProfileTransforms = CustomProfileIO->GetIn()->GetConstTransformValueRange();
+		PCGExArrayHelpers::InitArray(Context->CustomProfilePositions, ProfileTransforms.Num());
+
+		const FVector Start = ProfileTransforms[0].GetLocation();
+		const FVector End = ProfileTransforms[ProfileTransforms.Num() - 1].GetLocation();
+
+		const double ProfileLength = FVector::Dist(Start, End);
+		if (ProfileLength <= KINDA_SMALL_NUMBER)
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Custom profile first and last points must not overlap."));
+			return false;
+		}
+
+		const double Factor = 1 / ProfileLength;
+
+		const FVector ProjectionNormal = (End - Start).GetSafeNormal(1E-08, FVector::ForwardVector);
+		const FQuat ProjectionQuat = FQuat::FindBetweenNormals(ProjectionNormal, FVector::ForwardVector);
+
+		for (int i = 0; i < ProfileTransforms.Num(); i++)
+		{
+			Context->CustomProfilePositions[i] = ProjectionQuat.RotateVector((ProfileTransforms[i].GetLocation() - Start) * Factor);
+		}
+	}
+
+	return true;
+}
+
+bool FPCGExExtrudePathElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExExtrudePathElement::Execute);
+
+	PCGEX_CONTEXT_AND_SETTINGS(ExtrudePath)
+	PCGEX_EXECUTION_CHECK
+	PCGEX_ON_INITIAL_EXECUTION
+	{
+		PCGEX_ON_INVALILD_INPUTS(FTEXT("Some inputs have less than 2 points and won't be processed."))
+
+		if (!Context->StartBatchProcessingPoints(
+			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
+			{
+				if (PCGExPaths::Helpers::GetClosedLoop(Entry))
+				{
+					if (!Settings->bQuietClosedLoopWarning)
+					{
+						PCGE_LOG(Warning, GraphAndLog, FTEXT("Some inputs are closed loops and have no endpoints to extrude; they are forwarded as-is."));
+					}
+					PCGEX_INIT_IO(Entry, PCGExData::EIOInit::Forward)
+					return false;
+				}
+
+				PCGEX_SKIP_INVALID_PATH_ENTRY
+				return true;
+			}, [&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
+			{
+				NewBatch->bRequiresWriteStep = Settings->bFlagSubdivision;
+			}))
+		{
+			return Context->CancelExecution(TEXT("Could not find any paths to extrude."));
+		}
+	}
+
+	PCGEX_POINTS_BATCH_PROCESSING(PCGExCommon::States::State_Done)
+
+	PCGEX_OUTPUT_VALID_PATHS(MainPoints)
+
+	return Context->TryComplete();
+}
+
+namespace PCGExExtrudePath
+{
+	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExExtrudePath::Process);
+
+		// Endpoint values are read at arbitrary indices (0 and Last), so scoped get is unsafe here
+		PointDataFacade->bSupportsScopedGet = false;
+
+		if (!IProcessor::Process(InTaskManager))
+		{
+			return false;
+		}
+
+		NumPoints = PointDataFacade->GetNum();
+		LastPointIndex = NumPoints - 1;
+
+		bProfileActive = Settings->Type == EPCGExExtrudeProfileType::Custom || Settings->bSubdivide;
+		bSubdivideCount = Settings->SubdivideMethod != EPCGExSubdivideMode::Distance;
+
+		LengthGetter = Settings->Length.GetValueSetting();
+		if (!LengthGetter->Init(PointDataFacade))
+		{
+			return false;
+		}
+
+		if (Settings->DirectionMode == EPCGExExtrudeDirection::Custom)
+		{
+			DirectionGetter = Settings->Direction.GetValueSetting();
+			if (!DirectionGetter->Init(PointDataFacade))
+			{
+				return false;
+			}
+		}
+
+		if (bProfileActive && Settings->Type != EPCGExExtrudeProfileType::Custom)
+		{
+			if (Settings->SubdivideMethod == EPCGExSubdivideMode::Manhattan)
+			{
+				bIsManhattan = true;
+				ManhattanDetails = Settings->ManhattanDetails;
+				if (!ManhattanDetails.Init(Context, PointDataFacade))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				SubdivAmountGetter = Settings->GetValueSettingSubdivisions();
+				if (!SubdivAmountGetter->Init(PointDataFacade))
+				{
+					return false;
+				}
+			}
+		}
+
+		// Full fetch so endpoint getter reads and filters have their data ready
+		PointDataFacade->Fetch(PointDataFacade->GetInFullScope());
+		FilterAll();
+
+		const bool bAllowStart = Settings->Endpoint != EPCGExExtrudeEndpoint::End;
+		const bool bAllowEnd = Settings->Endpoint != EPCGExExtrudeEndpoint::Start;
+
+		bExtrudeStart = bAllowStart && PointFilterCache[0];
+		bExtrudeEnd = bAllowEnd && PointFilterCache[LastPointIndex];
+
+		const TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
+
+		if (bExtrudeStart)
+		{
+			StartExtra = ComputeExtrusion(true, InTransforms, StartPositions);
+			bExtrudeStart = StartExtra > 0;
+		}
+
+		if (bExtrudeEnd)
+		{
+			EndExtra = ComputeExtrusion(false, InTransforms, EndPositions);
+			bExtrudeEnd = EndExtra > 0;
+		}
+
+		NumOutPoints = StartExtra + NumPoints + EndExtra;
+
+		return true;
+	}
+
+	int32 FProcessor::ComputeExtrusion(const bool bIsStart, const TConstPCGValueRange<FTransform>& InTransforms, TArray<FVector>& OutPositions)
+	{
+		const int32 EndpointIdx = bIsStart ? 0 : LastPointIndex;
+		const int32 NeighborIdx = bIsStart ? 1 : LastPointIndex - 1;
+
+		const FVector EndpointPos = InTransforms[EndpointIdx].GetLocation();
+
+		// Outward terminal-segment direction (inverted prev/next), i.e. what Shrink extends along
+		const FVector T = (EndpointPos - InTransforms[NeighborIdx].GetLocation()).GetSafeNormal();
+
+		const double Length = LengthGetter->Read(EndpointIdx);
+		if (FMath::Abs(Length) <= UE_KINDA_SMALL_NUMBER)
+		{
+			return 0;
+		}
+
+		FVector Dir;
+		if (Settings->DirectionMode == EPCGExExtrudeDirection::PathDirection)
+		{
+			Dir = T;
+		}
+		else
+		{
+			Dir = DirectionGetter->Read(EndpointIdx);
+			if (Settings->Direction.bFlip) { Dir *= -1; }
+			if (Settings->bTransformDirection) { Dir = InTransforms[EndpointIdx].GetRotation().RotateVector(Dir); }
+			Dir = Dir.GetSafeNormal();
+		}
+
+		if (Dir.IsNearlyZero())
+		{
+			return 0;
+		}
+
+		const FVector Tip = EndpointPos + Dir * Length;
+
+		// Subdivisions along the new segment [EndpointPos -> Tip], in EndpointPos->Tip order
+		TArray<FVector> Subs;
+		if (bProfileActive)
+		{
+			if (Settings->Type == EPCGExExtrudeProfileType::Custom)
+			{
+				// Same frame as the arc: plane spanned by the extrusion and the path tangent.
+				// A custom profile can't be projected without a valid plane, so skip it (straight tip) when degenerate.
+				const FVector PlaneNormal = FVector::CrossProduct(Tip - EndpointPos, T).GetSafeNormal() * -1;
+				if (!PlaneNormal.IsNearlyZero())
+				{
+					const double ExtrudeLength = FVector::Dist(EndpointPos, Tip);
+
+					double MainAxisSize = ExtrudeLength;
+					double CrossAxisSize = ExtrudeLength;
+
+					if (Settings->MainAxisScaling == EPCGExExtrudeProfileScaling::Scale) { MainAxisSize = ExtrudeLength * Settings->MainAxisScale; }
+					else if (Settings->MainAxisScaling == EPCGExExtrudeProfileScaling::Distance) { MainAxisSize = Settings->MainAxisScale; }
+
+					if (Settings->CrossAxisScaling == EPCGExExtrudeProfileScaling::Scale) { CrossAxisSize = ExtrudeLength * Settings->CrossAxisScale; }
+					else if (Settings->CrossAxisScaling == EPCGExExtrudeProfileScaling::Distance) { CrossAxisSize = Settings->CrossAxisScale; }
+
+					PCGExPaths::Profile::SubdivideCustom(Subs, Context->CustomProfilePositions, EndpointPos, Tip, PlaneNormal, MainAxisSize, CrossAxisSize);
+				}
+			}
+			else if (bIsManhattan)
+			{
+				PCGExPaths::Profile::SubdivideManhattan(Subs, ManhattanDetails, EndpointIdx, EndpointPos, Tip, nullptr);
+			}
+			else
+			{
+				const double Amount = SubdivAmountGetter->Read(EndpointIdx);
+
+				if (Settings->Type == EPCGExExtrudeProfileType::Arc)
+				{
+					// SubdivideArc degrades to a straight line when the arc is degenerate (extrusion collinear with
+					// the path, e.g. Path Direction mode), so Arc keeps its subdivision points instead of dropping them.
+					const PCGExMath::Geo::FExCenterArc Arc = PCGExMath::Geo::FExCenterArc::MakeTangent(EndpointPos, T, Tip);
+					PCGExPaths::Profile::SubdivideArc(Subs, Arc, EndpointPos, Tip, Amount, bSubdivideCount);
+				}
+				else
+				{
+					PCGExPaths::Profile::SubdivideLine(Subs, EndpointPos, Tip, Amount, bSubdivideCount);
+				}
+			}
+		}
+
+		OutPositions.Reset(Subs.Num() + 1);
+		if (bIsStart)
+		{
+			// Output runs tip -> ... -> kept endpoint, so the tip leads and subdivisions are reversed
+			OutPositions.Add(Tip);
+			for (int32 i = Subs.Num() - 1; i >= 0; i--) { OutPositions.Add(Subs[i]); }
+		}
+		else
+		{
+			// Output runs kept endpoint -> ... -> tip
+			OutPositions.Append(Subs);
+			OutPositions.Add(Tip);
+		}
+
+		return OutPositions.Num();
+	}
+
+	void FProcessor::CompleteWork()
+	{
+		const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
+
+		if (!bExtrudeStart && !bExtrudeEnd)
+		{
+			// Nothing to extrude — forward the path unchanged
+			PCGEX_INIT_IO_VOID(PointIO, PCGExData::EIOInit::Duplicate)
+			if (Settings->bFlagSubdivision)
+			{
+				WriteMark(PointIO, Settings->SubdivisionFlagName, false);
+			}
+			return;
+		}
+
+		PCGEX_INIT_IO_VOID(PointIO, PCGExData::EIOInit::New)
+
+		const UPCGBasePointData* InPointData = PointDataFacade->GetIn();
+		UPCGBasePointData* OutPointData = PointDataFacade->GetOut();
+		UPCGMetadata* Metadata = OutPointData->Metadata;
+
+		// Transform & Seed are written for every output point in ProcessRange, ensure they're allocated even when absent on the input
+		PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutPointData, NumOutPoints, PointDataFacade->GetAllocations() | EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed);
+
+		// Metadata entries must be initialized single-threaded (shared metadata), before the parallel range fills transforms
+		TConstPCGValueRange<int64> InMetadataEntry = InPointData->GetConstMetadataEntryValueRange();
+		TPCGValueRange<int64> OutMetadataEntry = OutPointData->GetMetadataEntryValueRange();
+
+		for (int32 Out = 0; Out < NumOutPoints; Out++)
+		{
+			const int32 Src = SourceIndex(Out);
+			OutMetadataEntry[Out] = InMetadataEntry[Src];
+			Metadata->InitializeOnSet(OutMetadataEntry[Out]);
+		}
+
+		if (Settings->bFlagSubdivision)
+		{
+			SubdivisionWriter = PointDataFacade->GetWritable<bool>(Settings->SubdivisionFlagName, false, true, PCGExData::EBufferInit::New);
+		}
+
+		StartParallelLoopForRange(NumOutPoints);
+	}
+
+	void FProcessor::ProcessRange(const PCGExMT::FScope& Scope)
+	{
+		const UPCGBasePointData* InPointData = PointDataFacade->GetIn();
+		UPCGBasePointData* OutPointData = PointDataFacade->GetOut();
+
+		const TConstPCGValueRange<FTransform> InTransform = InPointData->GetConstTransformValueRange();
+		const TConstPCGValueRange<int32> InSeed = InPointData->GetConstSeedValueRange();
+
+		TPCGValueRange<FTransform> OutTransform = OutPointData->GetTransformValueRange(false);
+		TPCGValueRange<int32> OutSeed = OutPointData->GetSeedValueRange(false);
+
+		TArray<int32>& IdxMapping = PointDataFacade->Source->GetIdxMapping();
+
+		const int32 OriginalsEnd = StartExtra + NumPoints;
+
+		PCGEX_SCOPE_LOOP(Out)
+		{
+			const int32 Src = SourceIndex(Out);
+			IdxMapping[Out] = Src;
+
+			// Inherit the source transform (rotation/scale); location is overwritten for new points below
+			OutTransform[Out] = InTransform[Src];
+
+			bool bIsSubdivision = false;
+
+			if (Out < StartExtra)
+			{
+				const FVector Pos = StartPositions[Out];
+				OutTransform[Out].SetLocation(Pos);
+				OutSeed[Out] = PCGExRandomHelpers::ComputeSpatialSeed(Pos);
+				bIsSubdivision = Out > 0; // Out == 0 is the new tip
+			}
+			else if (Out < OriginalsEnd)
+			{
+				// Original point, kept verbatim
+				OutSeed[Out] = InSeed[Src];
+			}
+			else
+			{
+				const int32 j = Out - OriginalsEnd;
+				const FVector Pos = EndPositions[j];
+				OutTransform[Out].SetLocation(Pos);
+				OutSeed[Out] = PCGExRandomHelpers::ComputeSpatialSeed(Pos);
+				bIsSubdivision = j < (EndExtra - 1); // last end point is the new tip
+			}
+
+			if (SubdivisionWriter)
+			{
+				SubdivisionWriter->SetValue(Out, bIsSubdivision);
+			}
+		}
+	}
+
+	void FProcessor::OnRangeProcessingComplete()
+	{
+		// Transform, Seed and MetadataEntry are written explicitly; carry the remaining native properties from source
+		constexpr EPCGPointNativeProperties CarryOverProperties = static_cast<EPCGPointNativeProperties>(static_cast<uint8>(EPCGPointNativeProperties::All) & ~static_cast<uint8>(EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::Seed | EPCGPointNativeProperties::MetadataEntry));
+
+		PointDataFacade->Source->ConsumeIdxMapping(CarryOverProperties);
+	}
+
+	void FProcessor::Write()
+	{
+		PointDataFacade->WriteFastest(TaskManager);
+	}
+}
+
+#undef LOCTEXT_NAMESPACE
+#undef PCGEX_NAMESPACE

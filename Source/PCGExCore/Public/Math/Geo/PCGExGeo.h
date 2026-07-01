@@ -154,6 +154,16 @@ namespace PCGExMath::Geo
 			 */
 		FExCenterArc(const FVector& A1, const FVector& B1, const FVector& A2, const FVector& B2, const double MaxLength = 100000);
 
+		/**
+		 * Arc tangent to TangentDir at A, passing through C.
+		 * Produces the unique seamless arc that leaves A along TangentDir and reaches C; both A and C lie exactly on it.
+		 * Robust for any C off the tangent line (no synthetic corner needed); sets bIsLine when C is near-collinear with TangentDir.
+		 * @param A Start point, lies on the arc (Alpha 0)
+		 * @param TangentDir Direction the arc is tangent to at A (sign-agnostic, need not be normalized)
+		 * @param C End point, lies on the arc (Alpha 1)
+		 */
+		static FExCenterArc MakeTangent(const FVector& A, const FVector& TangentDir, const FVector& C);
+
 		FORCEINLINE double GetLength() const
 		{
 			return Radius * Theta;

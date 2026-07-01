@@ -271,6 +271,54 @@ namespace PCGExMath::Geo
 		SinTheta = FMath::Sin(Theta);
 	}
 
+	FExCenterArc FExCenterArc::MakeTangent(const FVector& A, const FVector& TangentDir, const FVector& C)
+	{
+		// Seamless arc: tangent to TangentDir at A, passing through C.
+		// The center sits on the ray from A perpendicular to TangentDir (which guarantees tangency at A),
+		// at radius R = |AC|^2 / (2b), where b is AC's magnitude along that perpendicular.
+		// This lands both A (Alpha 0) and C (Alpha 1) exactly on the circle, for any C off the tangent line.
+		FExCenterArc Arc;
+
+		const FVector D = C - A;
+		const FVector Tangent = TangentDir.GetSafeNormal();
+
+		// Component of AC perpendicular to the tangent, pointing from the tangent line toward C
+		FVector Perp = D - FVector::DotProduct(D, Tangent) * Tangent;
+		const double B = Perp.Length();
+
+		if (B <= UE_KINDA_SMALL_NUMBER)
+		{
+			// C is (near) collinear with the tangent: no curvature, degenerate to a line
+			Arc.bIsLine = true;
+			Arc.Center = FMath::Lerp(A, C, 0.5);
+			Arc.Radius = FVector::Dist(A, C) * 0.5;
+			Arc.Hand = (A - Arc.Center).GetSafeNormal();
+			Arc.OtherHand = (C - Arc.Center).GetSafeNormal();
+			Arc.Normal = FVector::CrossProduct(Arc.Hand, Arc.OtherHand).GetSafeNormal();
+			return Arc;
+		}
+
+		Perp /= B;
+
+		Arc.Radius = D.SizeSquared() / (2.0 * B);
+		Arc.Center = A + Perp * Arc.Radius;
+
+		Arc.Hand = (A - Arc.Center).GetSafeNormal();
+		Arc.OtherHand = (C - Arc.Center).GetSafeNormal();
+
+		const double Dot = FVector::DotProduct(Arc.Hand, Arc.OtherHand);
+
+		// |Dot| ~ 1 means Theta ~ 0 (point) or Theta ~ pi (semicircle); either way SinTheta -> 0 makes the
+		// slerp in GetLocationOnArc unstable, so treat it as a line (matches the 3-point constructor's convention).
+		Arc.bIsLine = FMath::IsNearlyEqual(FMath::Abs(Dot), 1.0);
+
+		Arc.Normal = FVector::CrossProduct(Arc.Hand, Arc.OtherHand).GetSafeNormal();
+		Arc.Theta = FMath::Acos(FMath::Clamp(Dot, -1.0, 1.0));
+		Arc.SinTheta = FMath::Sin(Arc.Theta);
+
+		return Arc;
+	}
+
 	FVector FExCenterArc::GetLocationOnArc(const double Alpha) const
 	{
 		// Spherical linear interpolation (slerp) between Hand and OtherHand directions,

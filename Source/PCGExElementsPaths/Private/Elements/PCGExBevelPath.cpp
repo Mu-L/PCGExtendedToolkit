@@ -13,6 +13,7 @@
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Paths/PCGExPath.h"
+#include "Paths/PCGExPathProfile.h"
 
 
 #define LOCTEXT_NAMESPACE "PCGExBevelPathElement"
@@ -496,109 +497,29 @@ namespace PCGExBevelPath
 
 	void FBevel::SubdivideLine(const double Factor, const bool bIsCount, const bool bKeepCorner)
 	{
-		const double Dist = FVector::Dist(Arrive, bKeepCorner ? Corner : Leave);
-
-		int32 SubdivCount = static_cast<int32>(Factor);
-		double StepSize = 0;
-
-		if (bIsCount)
-		{
-			StepSize = Dist / static_cast<double>(SubdivCount + 1);
-		}
-		else
-		{
-			// Attribute-driven amounts bypass the property clamp, guard against zero & negative values
-			StepSize = FMath::Min(Dist, Factor);
-			SubdivCount = Factor > KINDA_SMALL_NUMBER ? FMath::Floor(Dist / Factor) : 0;
-		}
-
-		SubdivCount = FMath::Max(0, SubdivCount);
-
 		if (bKeepCorner)
 		{
-			PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount * 2 + 1);
-
-			if (SubdivCount == 0)
-			{
-				Subdivisions[0] = Corner;
-			}
-			else
-			{
-				int32 WriteIndex = 0;
-				FVector Dir = (Corner - Arrive).GetSafeNormal();
-				for (int i = 0; i < SubdivCount; i++)
-				{
-					Subdivisions[WriteIndex++] = Arrive + Dir * (StepSize + i * StepSize);
-				}
-
-				Subdivisions[WriteIndex++] = Corner;
-
-				Dir = (Leave - Corner).GetSafeNormal();
-				for (int i = 0; i < SubdivCount; i++)
-				{
-					Subdivisions[WriteIndex++] = Corner + Dir * (StepSize + i * StepSize);
-				}
-			}
+			PCGExPaths::Profile::SubdivideLineKeepCorner(Subdivisions, Arrive, Corner, Leave, Factor, bIsCount);
 		}
 		else
 		{
-			PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount);
-			const FVector Dir = (Leave - Arrive).GetSafeNormal();
-			for (int i = 0; i < SubdivCount; i++)
-			{
-				Subdivisions[i] = Arrive + Dir * (StepSize + i * StepSize);
-			}
+			PCGExPaths::Profile::SubdivideLine(Subdivisions, Arrive, Leave, Factor, bIsCount);
 		}
 	}
 
 	void FBevel::SubdivideArc(const double Factor, const bool bIsCount)
 	{
 		const PCGExMath::Geo::FExCenterArc Arc = PCGExMath::Geo::FExCenterArc(Arrive, Corner, Leave);
-
-		if (Arc.bIsLine)
-		{
-			// Fallback to line since we can't infer a proper radius
-			SubdivideLine(Factor, bIsCount, false);
-			return;
-		}
-
-		// Attribute-driven amounts bypass the property clamp, guard against zero & negative values
-		int32 SubdivCount = bIsCount ? static_cast<int32>(Factor) : 0;
-		if (!bIsCount && Factor > KINDA_SMALL_NUMBER)
-		{
-			SubdivCount = FMath::Floor(Arc.GetLength() / Factor);
-		}
-		SubdivCount = FMath::Max(0, SubdivCount);
-
-		const double StepSize = 1.0 / static_cast<double>(SubdivCount + 1);
-		PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount);
-
-		for (int i = 0; i < SubdivCount; i++)
-		{
-			Subdivisions[i] = Arc.GetLocationOnArc(StepSize + i * StepSize);
-		}
+		PCGExPaths::Profile::SubdivideArc(Subdivisions, Arc, Arrive, Leave, Factor, bIsCount);
 	}
 
 	void FBevel::SubdivideCustom(const FProcessor* InProcessor)
 	{
-		const TArray<FVector>& SourcePos = InProcessor->Context->CustomProfilePositions;
-		const int32 SubdivCount = SourcePos.Num() - 2;
-
-		PCGExArrayHelpers::InitArray(Subdivisions, SubdivCount);
-
-		if (SubdivCount == 0)
-		{
-			return;
-		}
-
-		const double ProfileSize = FVector::Dist(Leave, Arrive);
-		const FVector ProjectionNormal = (Leave - Arrive).GetSafeNormal(1E-08, FVector::ForwardVector);
-		const FQuat ProjectionQuat = FRotationMatrix::MakeFromZX(PCGExMath::GetNormal(Arrive, Leave, Corner) * -1, ProjectionNormal).ToQuat();
-
 		const UPCGExBevelPathSettings* Settings = InProcessor->Settings;
 
-		double MainAxisSize = ProfileSize;
-		double CrossAxisSize = ProfileSize;
+		// Uniform scaling defaults to the projected profile span (matches the original SubdivideCustom defaults)
+		double MainAxisSize = FVector::Dist(Leave, Arrive);
+		double CrossAxisSize = MainAxisSize;
 
 		if (Settings->MainAxisScaling == EPCGExBevelCustomProfileScaling::Scale)
 		{
@@ -618,30 +539,17 @@ namespace PCGExBevelPath
 			CrossAxisSize = Settings->CrossAxisScale;
 		}
 
-		for (int i = 0; i < SubdivCount; i++)
-		{
-			FVector Pos = SourcePos[i + 1];
-			Pos.X *= ProfileSize;
-			Pos.Y *= MainAxisSize;
-			Pos.Z *= CrossAxisSize;
-			Subdivisions[i] = Arrive + ProjectionQuat.RotateVector(Pos);
-		}
+		PCGExPaths::Profile::SubdivideCustom(
+			Subdivisions, InProcessor->Context->CustomProfilePositions,
+			Arrive, Leave, PCGExMath::GetNormal(Arrive, Leave, Corner) * -1,
+			MainAxisSize, CrossAxisSize);
 	}
 
 	void FBevel::SubdivideManhattan(const FProcessor* InProcessor)
 	{
-		double OutDist = 0;
-
-		if (InProcessor->bKeepCorner)
-		{
-			InProcessor->ManhattanDetails.ComputeSubdivisions(Arrive, Corner, Index, Subdivisions, OutDist);
-			Subdivisions.Emplace(Corner);
-			InProcessor->ManhattanDetails.ComputeSubdivisions(Corner, Leave, Index, Subdivisions, OutDist);
-		}
-		else
-		{
-			InProcessor->ManhattanDetails.ComputeSubdivisions(Arrive, Leave, Index, Subdivisions, OutDist);
-		}
+		PCGExPaths::Profile::SubdivideManhattan(
+			Subdivisions, InProcessor->ManhattanDetails, Index,
+			Arrive, Leave, InProcessor->bKeepCorner ? &Corner : nullptr);
 	}
 
 	void FProcessor::ComputeSlidingLimits()
