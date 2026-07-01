@@ -24,7 +24,7 @@ namespace PCGExBlending
 	{
 	}
 
-	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<const FBlendOpsSchema>& InSchema, const int32 NumTrailingBackgroundSources)
+	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<const FBlendOpsSchema>& InSchema, const TConstArrayView<bool> InBackgroundSources)
 	{
 		CurrentTargetData = TargetData;
 
@@ -38,9 +38,8 @@ namespace PCGExBlending
 		}
 		IOLookup = MakeShared<PCGEx::FIndexLookup>(MaxIndex + 1);
 
-		// The last NumTrailingBackgroundSources sources are best-effort: factories on the spot, missing
-		// attributes tolerated. Everything before is a primary source (strict; schema if one was provided).
-		const int32 FirstBackgroundPos = InSources.Num() - FMath::Clamp(NumTrailingBackgroundSources, 0, InSources.Num());
+		// A source flagged in InBackgroundSources is best-effort: factories on the spot, missing attributes
+		// tolerated. Every other source is primary (strict; schema if one was provided).
 		int32 SrcPos = 0;
 
 		for (const TSharedRef<PCGExData::FFacade>& Src : InSources)
@@ -50,7 +49,7 @@ namespace PCGExBlending
 			TSharedPtr<FBlendOpsManager> BlendOpsManager = MakeShared<FBlendOpsManager>(TargetData, true);
 			BlendOpsManager->SetSourceA(Src, PCGExData::EIOSide::In);
 
-			const bool bIsBackground = SrcPos >= FirstBackgroundPos;
+			const bool bIsBackground = InBackgroundSources.IsValidIndex(SrcPos) && InBackgroundSources[SrcPos];
 			const bool bInitOk = bIsBackground
 				                     ? BlendOpsManager->Init(InContext, *BlendingFactories, /*bTolerateMissingAttributes=*/true)
 				                     : (InSchema ? BlendOpsManager->Init(InContext, InSchema) : BlendOpsManager->Init(InContext, *BlendingFactories));
@@ -110,10 +109,10 @@ namespace PCGExBlending
 		return true;
 	}
 
-	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, const TSharedPtr<const FBlendOpsSchema>& InSchema, const int32 NumTrailingBackgroundSources)
+	bool FUnionOpsManager::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& TargetData, const TArray<TSharedRef<PCGExData::FFacade>>& InSources, const TSharedPtr<PCGExData::FUnionMetadata>& InUnionMetadata, const TSharedPtr<const FBlendOpsSchema>& InSchema, const TConstArrayView<bool> InBackgroundSources)
 	{
 		CurrentUnionMetadata = InUnionMetadata;
-		return Init(InContext, TargetData, InSources, InSchema, NumTrailingBackgroundSources);
+		return Init(InContext, TargetData, InSources, InSchema, InBackgroundSources);
 	}
 
 	void FUnionOpsManager::InitTrackers(TArray<PCGEx::FOpStats>& Trackers) const

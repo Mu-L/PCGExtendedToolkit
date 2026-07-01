@@ -8,6 +8,8 @@
 #include "Core/PCGExClustersProcessor.h"
 #include "Core/PCGExFloodFill.h"
 #include "Core/PCGExDiffusionGrowthProcessor.h"
+#include "Curves/CurveFloat.h"
+#include "Utils/PCGExCurveLookup.h"
 #include "PCGExClusterDiffuse.generated.h"
 
 class UPCGExBlendOpFactory;
@@ -94,6 +96,22 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_Overridable))
 	FPCGExInputShorthandSelectorDouble SeedFactor = FPCGExInputShorthandSelectorDouble(FName("SeedFactor"), 1.0, false);
 
+	/** Whether to shape the Falloff intensity with an in-editor curve or an external asset. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_NotOverridable, EditCondition="WeightSpace == EPCGExClusterDiffuseWeightSpace::Falloff", EditConditionHides))
+	bool bUseLocalFalloffCurve = false;
+
+	/** Curve that shapes the Falloff intensity (input: 1 at the seed, fading to 0 at the diffusion's furthest reach). Linear = no shaping. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_NotOverridable, DisplayName="Falloff Curve", EditCondition="WeightSpace == EPCGExClusterDiffuseWeightSpace::Falloff && bUseLocalFalloffCurve", EditConditionHides))
+	FRuntimeFloatCurve LocalFalloffCurve;
+
+	/** Curve that shapes the Falloff intensity (input: 1 at the seed, fading to 0 at the diffusion's furthest reach). Linear = no shaping. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_Overridable, DisplayName="Falloff Curve", EditCondition="WeightSpace == EPCGExClusterDiffuseWeightSpace::Falloff && !bUseLocalFalloffCurve", EditConditionHides))
+	TSoftObjectPtr<UCurveFloat> FalloffCurve;
+
+	/** Falloff curve lookup mode / resolution. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Blending", meta = (PCG_NotOverridable, EditCondition="WeightSpace == EPCGExClusterDiffuseWeightSpace::Falloff", EditConditionHides))
+	FPCGExCurveLookupDetails FalloffCurveLookup;
+
 	/** Whether or not to search for closest node using an octree. Depending on your dataset, enabling this may be either much faster, or much slower. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance, meta=(PCG_NotOverridable, AdvancedDisplay))
 	bool bUseOctreeSearch = false;
@@ -117,6 +135,8 @@ struct FPCGExClusterDiffuseContext final : FPCGExClustersProcessorContext
 	// Pre-resolved (Boot, single-threaded) blend-op configs for the seeds-cloud source layer, so
 	// per-processor blender init is thread-safe against the shared seeds facade.
 	TSharedPtr<PCGExBlending::FBlendOpsSchema> SeedBlendOpsSchema;
+	// Falloff shaping curve, built once in Boot; applied to the [0,1] falloff intensity (Falloff space only).
+	PCGExFloatLUT FalloffLUT;
 
 protected:
 	PCGEX_ELEMENT_BATCH_EDGE_DECL
@@ -143,8 +163,9 @@ namespace PCGExClusterDiffuse
 		int32 SeedVtxIndex = -1;   // seed's vtx point index -- the Layer 1 blend source
 		int32 SeedPointIndex = -1; // seed's seeds-cloud point index (Layer 2 source); <0 marks the participation self-entry
 		int32 Depth = 0;           // diffusion depth at which the seed reached this vtx (for Relative weighting)
-		double NormDepth = 0.0;    // depth / diffusion max depth, [0,1] (0 at seed, 1 at furthest) -- for Falloff
-		double NormDist = 0.0;     // path distance / diffusion max distance, [0,1] -- for Falloff
+		double NormDepth = 0.0;    // depth / diffusion max depth, [0,1] (0 at seed, 1 at furthest) -- Falloff Depth
+		double NormDist = 0.0;     // path distance / diffusion max distance, [0,1] -- Falloff Distance
+		double PathDistance = 0.0; // raw diffusion path length from the seed -- Relative Distance (comparable across diffusions)
 	};
 
 	class FProcessor final : public PCGExFloodFill::TDiffusionGrowthProcessor<FPCGExClusterDiffuseContext, UPCGExClusterDiffuseSettings>
@@ -179,6 +200,10 @@ namespace PCGExClusterDiffuse
 	{
 	protected:
 		TSharedPtr<PCGExDetails::TSettingValue<int32>> FillRate;
+		// Blenders target the shared, batch-owned vtx facade -- built once (single-threaded) in Process() and
+		// shared with every processor via PrepareSingle, never created inside the parallel CompleteWork.
+		TSharedPtr<PCGExBlending::FUnionOpsManager> VtxBlender;
+		TSharedPtr<PCGExBlending::FUnionOpsManager> SeedBlender;
 
 	public:
 		FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges);

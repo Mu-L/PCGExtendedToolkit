@@ -20,6 +20,8 @@
 #define LOCTEXT_NAMESPACE "PCGExClusterDiffuse"
 #define PCGEX_NAMESPACE ClusterDiffuse
 
+#pragma region UPCGExClusterDiffuseSettings
+
 PCGExData::EIOInit UPCGExClusterDiffuseSettings::GetMainOutputInitMode() const
 {
 	return PCGExData::EIOInit::Duplicate;
@@ -55,6 +57,10 @@ void UPCGExClusterDiffuseSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
+
+#pragma endregion
+
+#pragma region FPCGExClusterDiffuseElement
 
 PCGEX_INITIALIZE_ELEMENT(ClusterDiffuse)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ClusterDiffuse)
@@ -107,6 +113,16 @@ bool FPCGExClusterDiffuseElement::Boot(FPCGExContext* InContext) const
 		}
 	}
 
+	// Build the Falloff shaping curve once (Boot). Default linear = identity (no shaping); applied only in
+	// Falloff space to the [0,1] intensity.
+	Context->FalloffLUT = Settings->FalloffCurveLookup.MakeLookup(
+		Settings->bUseLocalFalloffCurve, Settings->LocalFalloffCurve, Settings->FalloffCurve,
+		[](FRichCurve& CurveData)
+		{
+			CurveData.AddKey(0, 0);
+			CurveData.AddKey(1, 1);
+		});
+
 	return true;
 }
 
@@ -138,8 +154,12 @@ bool FPCGExClusterDiffuseElement::AdvanceWork(FPCGExContext* InContext, const UP
 	return Context->TryComplete();
 }
 
+#pragma endregion
+
 namespace PCGExClusterDiffuse
 {
+#pragma region FProcessor
+
 	FProcessor::~FProcessor()
 	{
 	}
@@ -172,6 +192,21 @@ namespace PCGExClusterDiffuse
 		VtxContributors.Empty();
 		VtxContributors.SetNum(NumVtx);
 
+		// Count contributors per vtx first so each inner array is reserved to its exact size -- avoids the
+		// per-vtx geometric regrowth an append-only fill pays on dense diffusions. MaxContributors also sizes
+		// the per-thread scratch buffers in the blend pass below.
+		int32 MaxContributors = 0;
+		{
+			TArray<int32> Counts;
+			Counts.Init(0, NumVtx);
+			for (const TSharedPtr<PCGExFloodFill::FDiffusion>& Diffusion : Diffusions)
+			{
+				for (const PCGExFloodFill::FCandidate& Candidate : Diffusion->Captured) { Counts[Candidate.Node->PointIndex]++; }
+			}
+			for (int32 i = 0; i < NumVtx; i++) { VtxContributors[i].Reserve(Counts[i]); MaxContributors = FMath::Max(MaxContributors, Counts[i]); }
+			MaxContributors += bHasParticipates ? 1 : 0;
+		}
+
 		for (const TSharedPtr<PCGExFloodFill::FDiffusion>& Diffusion : Diffusions)
 		{
 			const int32 SeedVtx = Diffusion->SeedNode->PointIndex;
@@ -185,7 +220,7 @@ namespace PCGExClusterDiffuse
 			{
 				const double NormDepth = static_cast<double>(Candidate.Depth) * InvMaxDepth;
 				const double NormDist = Candidate.PathDistance * InvMaxDist;
-				VtxContributors[Candidate.Node->PointIndex].Add(FContribution{SeedVtx, SeedPoint, Candidate.Depth, NormDepth, NormDist});
+				VtxContributors[Candidate.Node->PointIndex].Add(FContribution{SeedVtx, SeedPoint, Candidate.Depth, NormDepth, NormDist, Candidate.PathDistance});
 			}
 		}
 
@@ -200,68 +235,33 @@ namespace PCGExClusterDiffuse
 
 				bool bSelfPresent = false;
 				for (const FContribution& C : Contributors) { if (C.SeedVtxIndex == VtxIndex) { bSelfPresent = true; break; } }
-				if (!bSelfPresent) { Contributors.Add(FContribution{VtxIndex, -1, 0, 0.0, 0.0}); }
+				if (!bSelfPresent) { Contributors.Add(FContribution{VtxIndex, -1, 0, 0.0, 0.0, 0.0}); }
 			}
 		}
 
-		// Layer 1 (Vtx Blend Ops): source & target are the vtx facade. Layer 2 (Seed Blend Ops): source 0
-		// (primary) is the shared seeds facade (thread-safe via the Boot-resolved schema); source 1
-		// (background) is this processor's own vtx facade, so the participation self-entry can fade reached
-		// vtx back toward their original value -- exactly as Layer 1 does. Both target the vtx facade.
-		// Distances is unused -- weights are fed to Blend() directly. Either layer is optional.
-		if (!Context->BlendingFactories.IsEmpty())
-		{
-			TArray<TSharedRef<PCGExData::FFacade>> VtxSources;
-			VtxSources.Add(VtxDataFacade);
-
-			VtxBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, nullptr);
-			if (!VtxBlender->Init(Context, VtxDataFacade, VtxSources))
-			{
-				bIsProcessorValid = false;
-				return;
-			}
-		}
-
-		if (!Context->SeedBlendingFactories.IsEmpty())
-		{
-			// Background source (vtx) is resolved on the spot (per-processor, unique -> thread-safe) and
-			// tolerates attributes the vtx doesn't carry: seed-only attributes simply have no original to
-			// fade to and fall back toward 0, while attributes the vtx already holds fade to their original.
-			TArray<TSharedRef<PCGExData::FFacade>> SeedSources;
-			SeedSources.Add(Context->SeedsDataFacade.ToSharedRef());
-			SeedSources.Add(VtxDataFacade);
-
-			SeedBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->SeedBlendingFactories, nullptr);
-			if (!SeedBlender->Init(Context, VtxDataFacade, SeedSources, Context->SeedBlendOpsSchema, /*NumTrailingBackgroundSources=*/1))
-			{
-				bIsProcessorValid = false;
-				return;
-			}
-		}
+		// The blenders are built once at batch scope (FBatch::Process) and shared via PrepareSingle, so this
+		// parallel pass only *writes* into their already-allocated vtx output buffers -- it never allocates on
+		// the shared, batch-owned vtx facade. Either layer is null when its pin carries no ops.
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, BlendDiffusions)
 
-		BlendDiffusions->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
-		{
-			PCGEX_ASYNC_THIS
-			if (This->VtxBlender) { This->VtxBlender->Cleanup(This->Context); }
-			if (This->SeedBlender) { This->SeedBlender->Cleanup(This->Context); }
-		};
-
-		BlendDiffusions->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, WeightMode = Settings->Weighting, WeightSpace = Settings->WeightSpace](const PCGExMT::FScope& Scope)
+		BlendDiffusions->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE, WeightMode = Settings->Weighting, WeightSpace = Settings->WeightSpace, MaxContributors](const PCGExMT::FScope& Scope)
 		{
 			PCGEX_ASYNC_THIS
 
 			TArray<double> Weights;
 			TArray<int32> Order;
-			TArray<PCGExData::FWeightedPoint> WeightedPoints;
+			TArray<PCGExData::FWeightedPoint> VtxWeightedPoints;
+			TArray<PCGExData::FWeightedPoint> SeedWeightedPoints;
 			TArray<PCGEx::FOpStats> VtxTrackers;
 			TArray<PCGEx::FOpStats> SeedTrackers;
-			if (This->VtxBlender) { This->VtxBlender->InitTrackers(VtxTrackers); }
-			if (This->SeedBlender) { This->SeedBlender->InitTrackers(SeedTrackers); }
 
-			// Relative distance weighting reads vtx positions.
-			const TConstPCGValueRange<FTransform> VtxTransforms = This->VtxDataFacade->GetIn()->GetConstTransformValueRange();
+			// Reserve once (buffers are reused via Reset across the chunk) so no vtx pays reallocation growth.
+			Weights.Reserve(MaxContributors);
+			Order.Reserve(MaxContributors);
+			if (This->VtxBlender) { This->VtxBlender->InitTrackers(VtxTrackers); VtxWeightedPoints.Reserve(MaxContributors); }
+			if (This->SeedBlender) { This->SeedBlender->InitTrackers(SeedTrackers); SeedWeightedPoints.Reserve(MaxContributors); }
+
 			const TSharedPtr<PCGExDetails::TSettingValue<double>>& SeedFactor = This->Context->SeedFactorValue;
 
 			PCGEX_SCOPE_LOOP(Index)
@@ -271,8 +271,6 @@ namespace PCGExClusterDiffuse
 				if (Count == 0) { continue; }
 
 				Weights.Reset(Count);
-				Order.Reset(Count);
-				for (int32 i = 0; i < Count; i++) { Order.Add(i); }
 
 				if (WeightSpace == EPCGExClusterDiffuseWeightSpace::Falloff)
 				{
@@ -283,6 +281,7 @@ namespace PCGExClusterDiffuse
 					// it, the vtx fades toward 0.
 					double SumSeed = 0;
 					int32 SelfIndex = -1;
+					const PCGExFloatLUT& FalloffLUT = This->Context->FalloffLUT;
 					for (int32 i = 0; i < Count; i++)
 					{
 						const FContribution& C = Contributors[i];
@@ -297,6 +296,7 @@ namespace PCGExClusterDiffuse
 						default:                                            Intensity = 1.0; break; // Count: flat full
 						}
 						Intensity = FMath::Clamp(Intensity, 0.0, 1.0);
+						if (FalloffLUT) { Intensity = FalloffLUT->Eval(Intensity); } // shape the falloff (linear = identity)
 						if (SeedFactor) { Intensity *= FMath::Max(0.0, SeedFactor->Read(C.SeedPointIndex)); }
 
 						Weights.Add(Intensity);
@@ -327,17 +327,10 @@ namespace PCGExClusterDiffuse
 						switch (WeightMode)
 						{
 						case EPCGExClusterDiffuseWeightMode::Distance:
-							{
-								// Inverse-distance: closer seeds weigh more; where two diffusions meet both are
-								// far, so weights converge -> smooth blend.
-								const FVector TargetPos = VtxTransforms[Index].GetLocation();
-								for (const FContribution& C : Contributors)
-								{
-									if (C.SeedPointIndex < 0) { Weights.Add(0.0); continue; }
-									const double DistSq = FVector::DistSquared(VtxTransforms[C.SeedVtxIndex].GetLocation(), TargetPos);
-									Weights.Add(1.0 / (DistSq + 1.0));
-								}
-							}
+							// Inverse path length: the seed with the shorter diffusion path to this vtx weighs more;
+							// where two diffusions meet both are far, so weights converge -> smooth blend. Path length
+							// (not straight-line) matches Falloff and the diffusion's own traversal metric.
+							for (const FContribution& C : Contributors) { Weights.Add(C.SeedPointIndex < 0 ? 0.0 : 1.0 / (C.PathDistance + 1.0)); }
 							break;
 						case EPCGExClusterDiffuseWeightMode::Depth:
 							for (const FContribution& C : Contributors) { Weights.Add(C.SeedPointIndex < 0 ? 0.0 : 1.0 / (static_cast<double>(C.Depth) + 1.0)); }
@@ -389,32 +382,43 @@ namespace PCGExClusterDiffuse
 						const double InvMax = 1.0 / MaxWeight;
 						for (double& W : Weights) { W *= InvMax; }
 					}
+					// Dominant-first ordering (Relative only; Falloff walks contributors in natural order).
+					Order.Reset(Count);
+					for (int32 i = 0; i < Count; i++) { Order.Add(i); }
 					Order.Sort([&Weights](const int32 A, const int32 B) { return Weights[A] > Weights[B]; });
 				}
 
-				// Layer 1: blend seed VTX values onto this vtx.
-				if (This->VtxBlender)
+				// Skip if no seed meaningfully reached this vtx (all weights ~0 -- e.g. Seed Factor 0, or a vtx
+				// grazed at a diffusion edge): leave it at its original value rather than letting the reset-mode
+				// multi-blend wipe it to 0. The intended Falloff gradient still applies for any real weight, and
+				// the participation self-entry (weight ~1) keeps participating vtx above this threshold.
+				double TotalWeight = 0;
+				for (const double W : Weights) { TotalWeight += W; }
+				if (TotalWeight < UE_KINDA_SMALL_NUMBER) { continue; }
+
+				// Emit both layers in a single walk. Relative goes dominant-first (sorted Order); Falloff goes in
+				// natural order. Layer 1 blends each seed vtx value (source 0); Layer 2 blends each seed cloud value
+				// (source 0), routing the participation self-entry to the vtx background source (source 1).
+				const bool bReorder = WeightSpace == EPCGExClusterDiffuseWeightSpace::Relative;
+				if (This->VtxBlender) { VtxWeightedPoints.Reset(Count); }
+				if (This->SeedBlender) { SeedWeightedPoints.Reset(Count); }
+
+				for (int32 k = 0; k < Count; k++)
 				{
-					WeightedPoints.Reset(Count);
-					for (const int32 O : Order) { WeightedPoints.Emplace(Contributors[O].SeedVtxIndex, Weights[O], 0); }
-					This->VtxBlender->Blend(Index, WeightedPoints, VtxTrackers);
+					const int32 O = bReorder ? Order[k] : k;
+					const FContribution& C = Contributors[O];
+					const double W = Weights[O];
+
+					if (This->VtxBlender) { VtxWeightedPoints.Emplace(C.SeedVtxIndex, W, 0); }
+					if (This->SeedBlender)
+					{
+						if (C.SeedPointIndex < 0) { SeedWeightedPoints.Emplace(C.SeedVtxIndex, W, 1); }
+						else { SeedWeightedPoints.Emplace(C.SeedPointIndex, W, 0); }
+					}
 				}
 
-				// Layer 2: blend seeds-cloud values onto this vtx. Seed contributors read from the seeds
-				// cloud (source 0); the participation self-entry (no seeds-cloud point) reads this vtx's own
-				// original value from the background source (source 1), so reached vtx fade back toward their
-				// original where the seeds leave intensity -- mirroring Layer 1.
-				if (This->SeedBlender)
-				{
-					WeightedPoints.Reset(Count);
-					for (const int32 O : Order)
-					{
-						const FContribution& C = Contributors[O];
-						if (C.SeedPointIndex < 0) { WeightedPoints.Emplace(C.SeedVtxIndex, Weights[O], 1); }
-						else { WeightedPoints.Emplace(C.SeedPointIndex, Weights[O], 0); }
-					}
-					if (!WeightedPoints.IsEmpty()) { This->SeedBlender->Blend(Index, WeightedPoints, SeedTrackers); }
-				}
+				if (This->VtxBlender) { This->VtxBlender->Blend(Index, VtxWeightedPoints, VtxTrackers); }
+				if (This->SeedBlender && !SeedWeightedPoints.IsEmpty()) { This->SeedBlender->Blend(Index, SeedWeightedPoints, SeedTrackers); }
 			}
 		};
 
@@ -429,6 +433,10 @@ namespace PCGExClusterDiffuse
 		SeedBlender.Reset();
 		VtxContributors.Empty();
 	}
+
+#pragma endregion
+
+#pragma region FBatch
 
 	FBatch::FBatch(FPCGExContext* InContext, const TSharedRef<PCGExData::FPointIO>& InVtx, TArrayView<TSharedRef<PCGExData::FPointIO>> InEdges)
 		: TBatch(InContext, InVtx, InEdges)
@@ -468,6 +476,40 @@ namespace PCGExClusterDiffuse
 			return;
 		}
 
+		// Build the blenders once here, single-threaded: they target the shared, batch-owned vtx facade, so
+		// creating them inside the parallel per-processor CompleteWork would allocate output buffers on that
+		// shared facade from multiple threads. Layer 1 = vtx->vtx; Layer 2 = seeds (+ vtx background) -> vtx.
+		if (!Context->BlendingFactories.IsEmpty())
+		{
+			TArray<TSharedRef<PCGExData::FFacade>> VtxSources;
+			VtxSources.Add(VtxDataFacade);
+
+			VtxBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->BlendingFactories, nullptr);
+			if (!VtxBlender->Init(Context, VtxDataFacade, VtxSources))
+			{
+				bIsBatchValid = false;
+				return;
+			}
+		}
+
+		if (!Context->SeedBlendingFactories.IsEmpty())
+		{
+			// Source 1 (vtx background) tolerates attributes the vtx lacks: seed-only attributes have no
+			// original to fade to and fall toward 0, while attributes the vtx holds fade to their original.
+			TArray<TSharedRef<PCGExData::FFacade>> SeedSources;
+			SeedSources.Add(Context->SeedsDataFacade.ToSharedRef());
+			SeedSources.Add(VtxDataFacade);
+
+			SeedBlender = MakeShared<PCGExBlending::FUnionOpsManager>(&Context->SeedBlendingFactories, nullptr);
+			// Source 0 = seeds (primary, schema-resolved); source 1 = vtx (background: factories + tolerate-missing).
+			static constexpr bool BackgroundFlags[] = {false, true};
+			if (!SeedBlender->Init(Context, VtxDataFacade, SeedSources, Context->SeedBlendOpsSchema, BackgroundFlags))
+			{
+				bIsBatchValid = false;
+				return;
+			}
+		}
+
 		TBatch<FProcessor>::Process();
 	}
 
@@ -481,6 +523,8 @@ namespace PCGExClusterDiffuse
 		PCGEX_TYPED_PROCESSOR
 
 		TypedProcessor->FillRate = FillRate;
+		TypedProcessor->VtxBlender = VtxBlender;
+		TypedProcessor->SeedBlender = SeedBlender;
 
 		return true;
 	}
@@ -490,8 +534,16 @@ namespace PCGExClusterDiffuse
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ClusterDiffuse)
 
 		TBatch<FProcessor>::Write();
+
+		// Batch-scoped blender teardown (mirrors the batch-scoped creation), after every processor's blend
+		// pass has completed and before the vtx facade is flushed.
+		if (VtxBlender) { VtxBlender->Cleanup(Context); }
+		if (SeedBlender) { SeedBlender->Cleanup(Context); }
+
 		VtxDataFacade->WriteFastest(TaskManager);
 	}
+
+#pragma endregion
 }
 
 #undef LOCTEXT_NAMESPACE
