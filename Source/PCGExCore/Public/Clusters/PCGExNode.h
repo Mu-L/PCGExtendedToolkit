@@ -63,15 +63,11 @@ namespace PCGExGraphs
 			Links.AddUnique(FLink(0, EdgeIndex));
 		}
 
+		// Plain append: builders visit each edge index exactly once per endpoint, so
+		// (node, edge) pairs are unique by construction. FLink equality includes the
+		// edge index, so a dedup scan could never reject anything a caller produces;
+		// degenerate edges are rejected at graph insertion, not at link level.
 		FORCEINLINE void Link(const int32 NodeIndex, const int32 EdgeIndex)
-		{
-			Links.AddUnique(FLink(NodeIndex, EdgeIndex));
-		}
-
-		// Skips AddUnique's linear scan. Only valid when the caller guarantees each
-		// (node, edge) pair is inserted at most once -- true for cluster builds, where
-		// every edge index is visited exactly once per endpoint.
-		FORCEINLINE void Link_Unsafe(const int32 NodeIndex, const int32 EdgeIndex)
 		{
 			Links.Add(FLink(NodeIndex, EdgeIndex));
 		}
