@@ -195,9 +195,16 @@ namespace PCGExClusterDiffuse
 			Counts.Init(0, NumVtx);
 			for (const TSharedPtr<PCGExFloodFill::FDiffusion>& Diffusion : Diffusions)
 			{
-				for (const PCGExFloodFill::FCandidate& Candidate : Diffusion->Captured) { Counts[Candidate.Node->PointIndex]++; }
+				for (const PCGExFloodFill::FCandidate& Candidate : Diffusion->Captured)
+				{
+					Counts[Candidate.Node->PointIndex]++;
+				}
 			}
-			for (int32 i = 0; i < NumVtx; i++) { VtxContributors[i].Reserve(Counts[i]); MaxContributors = FMath::Max(MaxContributors, Counts[i]); }
+			for (int32 i = 0; i < NumVtx; i++)
+			{
+				VtxContributors[i].Reserve(Counts[i]);
+				MaxContributors = FMath::Max(MaxContributors, Counts[i]);
+			}
 			MaxContributors += bHasParticipates ? 1 : 0;
 		}
 
@@ -224,11 +231,24 @@ namespace PCGExClusterDiffuse
 			for (int32 VtxIndex = 0; VtxIndex < NumVtx; VtxIndex++)
 			{
 				TArray<FContribution>& Contributors = VtxContributors[VtxIndex];
-				if (Contributors.IsEmpty() || !ParticipatesValue->Read(VtxIndex)) { continue; }
+				if (Contributors.IsEmpty() || !ParticipatesValue->Read(VtxIndex))
+				{
+					continue;
+				}
 
 				bool bSelfPresent = false;
-				for (const FContribution& C : Contributors) { if (C.SeedVtxIndex == VtxIndex) { bSelfPresent = true; break; } }
-				if (!bSelfPresent) { Contributors.Add(FContribution{VtxIndex, -1, 0, 0.0, 0.0, 0.0}); }
+				for (const FContribution& C : Contributors)
+				{
+					if (C.SeedVtxIndex == VtxIndex)
+					{
+						bSelfPresent = true;
+						break;
+					}
+				}
+				if (!bSelfPresent)
+				{
+					Contributors.Add(FContribution{VtxIndex, -1, 0, 0.0, 0.0, 0.0});
+				}
 			}
 		}
 
@@ -251,8 +271,16 @@ namespace PCGExClusterDiffuse
 			// Reserve once (buffers are reused via Reset across the chunk) so no vtx pays reallocation growth.
 			Weights.Reserve(MaxContributors);
 			Order.Reserve(MaxContributors);
-			if (This->VtxBlender) { This->VtxBlender->InitTrackers(VtxTrackers); VtxWeightedPoints.Reserve(MaxContributors); }
-			if (This->SeedBlender) { This->SeedBlender->InitTrackers(SeedTrackers); SeedWeightedPoints.Reserve(MaxContributors); }
+			if (This->VtxBlender)
+			{
+				This->VtxBlender->InitTrackers(VtxTrackers);
+				VtxWeightedPoints.Reserve(MaxContributors);
+			}
+			if (This->SeedBlender)
+			{
+				This->SeedBlender->InitTrackers(SeedTrackers);
+				SeedWeightedPoints.Reserve(MaxContributors);
+			}
 
 			const TSharedPtr<PCGExDetails::TSettingValue<double>>& SeedFactor = This->Context->SeedFactorValue;
 
@@ -260,7 +288,10 @@ namespace PCGExClusterDiffuse
 			{
 				const TArray<FContribution>& Contributors = This->VtxContributors[Index];
 				const int32 Count = Contributors.Num();
-				if (Count == 0) { continue; }
+				if (Count == 0)
+				{
+					continue;
+				}
 
 				Weights.Reset(Count);
 
@@ -275,26 +306,48 @@ namespace PCGExClusterDiffuse
 					for (int32 i = 0; i < Count; i++)
 					{
 						const FContribution& C = Contributors[i];
-						if (C.SeedPointIndex < 0) { SelfIndex = i; Weights.Add(0.0); continue; }
+						if (C.SeedPointIndex < 0)
+						{
+							SelfIndex = i;
+							Weights.Add(0.0);
+							continue;
+						}
 
 						double Intensity;
 						switch (WeightMode)
 						{
-						case EPCGExClusterDiffuseWeightMode::Distance:      Intensity = 1.0 - C.NormDist; break;
-						case EPCGExClusterDiffuseWeightMode::Depth:         Intensity = 1.0 - C.NormDepth; break;
-						case EPCGExClusterDiffuseWeightMode::CountAndDepth: Intensity = 0.5 + 0.5 * (1.0 - C.NormDepth); break;
-						default:                                            Intensity = 1.0; break; // Count: flat full
+						case EPCGExClusterDiffuseWeightMode::Distance:
+							Intensity = 1.0 - C.NormDist;
+							break;
+						case EPCGExClusterDiffuseWeightMode::Depth:
+							Intensity = 1.0 - C.NormDepth;
+							break;
+						case EPCGExClusterDiffuseWeightMode::CountAndDepth:
+							Intensity = 0.5 + 0.5 * (1.0 - C.NormDepth);
+							break;
+						default:
+							Intensity = 1.0;
+							break; // Count: flat full
 						}
 						Intensity = FMath::Clamp(Intensity, 0.0, 1.0);
-						if (FalloffLUT) { Intensity = FalloffLUT->Eval(Intensity); } // shape the falloff (linear = identity)
-						if (SeedFactor) { Intensity *= FMath::Max(0.0, SeedFactor->Read(C.SeedPointIndex)); }
+						if (FalloffLUT)
+						{
+							Intensity = FalloffLUT->Eval(Intensity);
+						} // shape the falloff (linear = identity)
+						if (SeedFactor)
+						{
+							Intensity *= FMath::Max(0.0, SeedFactor->Read(C.SeedPointIndex));
+						}
 
 						Weights.Add(Intensity);
 						SumSeed += Intensity;
 					}
 
 					// Background fill: the vtx's own value takes whatever intensity the seeds leave.
-					if (SelfIndex >= 0) { Weights[SelfIndex] = FMath::Max(0.0, 1.0 - SumSeed); }
+					if (SelfIndex >= 0)
+					{
+						Weights[SelfIndex] = FMath::Max(0.0, 1.0 - SumSeed);
+					}
 
 					// No normalization, no reorder -- absolute weights fed as-is (fine for accumulate-from-zero blends).
 				}
@@ -317,33 +370,65 @@ namespace PCGExClusterDiffuse
 						case EPCGExClusterDiffuseWeightMode::Distance:
 							// Inverse path length: the seed with the shorter path weighs more; where two diffusions meet both
 							// are far, so weights converge (smooth blend). Path length (not straight-line) matches the traversal metric.
-							for (const FContribution& C : Contributors) { Weights.Add(C.SeedPointIndex < 0 ? 0.0 : 1.0 / (C.PathDistance + 1.0)); }
-							break;
-						case EPCGExClusterDiffuseWeightMode::Depth:
-							for (const FContribution& C : Contributors) { Weights.Add(C.SeedPointIndex < 0 ? 0.0 : 1.0 / (static_cast<double>(C.Depth) + 1.0)); }
-							break;
-						case EPCGExClusterDiffuseWeightMode::CountAndDepth:
+							for (const FContribution& C : Contributors)
 							{
-								double SumInvDepth = 0;
-								int32 NumSeeds = 0;
-								for (const FContribution& C : Contributors) { if (C.SeedPointIndex < 0) { continue; } SumInvDepth += 1.0 / (static_cast<double>(C.Depth) + 1.0); ++NumSeeds; }
-								const double EqualShare = NumSeeds > 0 ? 0.5 / static_cast<double>(NumSeeds) : 0.0;
-								const double DepthScale = SumInvDepth > 0 ? 0.5 / SumInvDepth : 0.0;
-								for (const FContribution& C : Contributors) { Weights.Add(C.SeedPointIndex < 0 ? 0.0 : EqualShare + (1.0 / (static_cast<double>(C.Depth) + 1.0)) * DepthScale); }
+								Weights.Add(C.SeedPointIndex < 0 ? 0.0 : 1.0 / (C.PathDistance + 1.0));
 							}
 							break;
+						case EPCGExClusterDiffuseWeightMode::Depth:
+							for (const FContribution& C : Contributors)
+							{
+								Weights.Add(C.SeedPointIndex < 0 ? 0.0 : 1.0 / (static_cast<double>(C.Depth) + 1.0));
+							}
+							break;
+						case EPCGExClusterDiffuseWeightMode::CountAndDepth:
+						{
+							double SumInvDepth = 0;
+							int32 NumSeeds = 0;
+							for (const FContribution& C : Contributors)
+							{
+								if (C.SeedPointIndex < 0)
+								{
+									continue;
+								}
+								SumInvDepth += 1.0 / (static_cast<double>(C.Depth) + 1.0);
+								++NumSeeds;
+							}
+							const double EqualShare = NumSeeds > 0 ? 0.5 / static_cast<double>(NumSeeds) : 0.0;
+							const double DepthScale = SumInvDepth > 0 ? 0.5 / SumInvDepth : 0.0;
+							for (const FContribution& C : Contributors)
+							{
+								Weights.Add(C.SeedPointIndex < 0 ? 0.0 : EqualShare + (1.0 / (static_cast<double>(C.Depth) + 1.0)) * DepthScale);
+							}
+						}
+						break;
 						default: // Count
-							for (int32 i = 0; i < Count; i++) { Weights.Add(Contributors[i].SeedPointIndex < 0 ? 0.0 : 1.0); }
+							for (int32 i = 0; i < Count; i++)
+							{
+								Weights.Add(Contributors[i].SeedPointIndex < 0 ? 0.0 : 1.0);
+							}
 							break;
 						}
 
 						// 2. Normalize so the strongest SEED reaches full intensity (territorial among seeds; self-entry excluded).
 						double MaxSeed = 0;
-						for (int32 i = 0; i < Count; i++) { if (Contributors[i].SeedPointIndex >= 0) { MaxSeed = FMath::Max(MaxSeed, Weights[i]); } }
+						for (int32 i = 0; i < Count; i++)
+						{
+							if (Contributors[i].SeedPointIndex >= 0)
+							{
+								MaxSeed = FMath::Max(MaxSeed, Weights[i]);
+							}
+						}
 						if (MaxSeed > 0)
 						{
 							const double InvMaxSeed = 1.0 / MaxSeed;
-							for (int32 i = 0; i < Count; i++) { if (Contributors[i].SeedPointIndex >= 0) { Weights[i] *= InvMaxSeed; } }
+							for (int32 i = 0; i < Count; i++)
+							{
+								if (Contributors[i].SeedPointIndex >= 0)
+								{
+									Weights[i] *= InvMaxSeed;
+								}
+							}
 						}
 					}
 
@@ -353,40 +438,73 @@ namespace PCGExClusterDiffuse
 						for (int32 i = 0; i < Count; i++)
 						{
 							const int32 SeedPt = Contributors[i].SeedPointIndex;
-							if (SeedPt >= 0) { Weights[i] *= FMath::Max(0.0, SeedFactor->Read(SeedPt)); }
+							if (SeedPt >= 0)
+							{
+								Weights[i] *= FMath::Max(0.0, SeedFactor->Read(SeedPt));
+							}
 						}
 					}
 
 					// 4. The original participates as a peer to the strongest seed (equal at Seed Factor 1).
-					for (int32 i = 0; i < Count; i++) { if (Contributors[i].SeedPointIndex < 0) { Weights[i] = 1.0; } }
+					for (int32 i = 0; i < Count; i++)
+					{
+						if (Contributors[i].SeedPointIndex < 0)
+						{
+							Weights[i] = 1.0;
+						}
+					}
 
 					// 5. Renormalize to max = 1 (preserves the seed/original ratio; orders dominant-first, as the multi-blend
 					// copies the first as its base and only re-normalizes once the summed weight passes 1).
 					double MaxWeight = 0;
-					for (const double W : Weights) { MaxWeight = FMath::Max(MaxWeight, W); }
+					for (const double W : Weights)
+					{
+						MaxWeight = FMath::Max(MaxWeight, W);
+					}
 					if (MaxWeight > 0)
 					{
 						const double InvMax = 1.0 / MaxWeight;
-						for (double& W : Weights) { W *= InvMax; }
+						for (double& W : Weights)
+						{
+							W *= InvMax;
+						}
 					}
 					// Dominant-first ordering (Relative only; Falloff walks contributors in natural order).
 					Order.Reset(Count);
-					for (int32 i = 0; i < Count; i++) { Order.Add(i); }
-					Order.Sort([&Weights](const int32 A, const int32 B) { return Weights[A] > Weights[B]; });
+					for (int32 i = 0; i < Count; i++)
+					{
+						Order.Add(i);
+					}
+					Order.Sort([&Weights](const int32 A, const int32 B)
+					{
+						return Weights[A] > Weights[B];
+					});
 				}
 
 				// Skip if no seed meaningfully reached this vtx (all weights ~0 -- e.g. Seed Factor 0, or grazed at a
 				// diffusion edge): leave the original rather than let the reset-mode multi-blend wipe it to 0. Real weights
 				// still apply the Falloff gradient, and the participation self-entry (weight ~1) stays above this threshold.
 				double TotalWeight = 0;
-				for (const double W : Weights) { TotalWeight += W; }
-				if (TotalWeight < UE_KINDA_SMALL_NUMBER) { continue; }
+				for (const double W : Weights)
+				{
+					TotalWeight += W;
+				}
+				if (TotalWeight < UE_KINDA_SMALL_NUMBER)
+				{
+					continue;
+				}
 
 				// Emit both layers in one walk (Relative: dominant-first via Order; Falloff: natural order). Layer 1 = seed vtx
 				// value (source 0); Layer 2 = seed cloud value (source 0), routing the self-entry to the vtx background (source 1).
 				const bool bReorder = WeightSpace == EPCGExClusterDiffuseWeightSpace::Relative;
-				if (This->VtxBlender) { VtxWeightedPoints.Reset(Count); }
-				if (This->SeedBlender) { SeedWeightedPoints.Reset(Count); }
+				if (This->VtxBlender)
+				{
+					VtxWeightedPoints.Reset(Count);
+				}
+				if (This->SeedBlender)
+				{
+					SeedWeightedPoints.Reset(Count);
+				}
 
 				for (int32 k = 0; k < Count; k++)
 				{
@@ -394,16 +512,31 @@ namespace PCGExClusterDiffuse
 					const FContribution& C = Contributors[O];
 					const double W = Weights[O];
 
-					if (This->VtxBlender) { VtxWeightedPoints.Emplace(C.SeedVtxIndex, W, 0); }
+					if (This->VtxBlender)
+					{
+						VtxWeightedPoints.Emplace(C.SeedVtxIndex, W, 0);
+					}
 					if (This->SeedBlender)
 					{
-						if (C.SeedPointIndex < 0) { SeedWeightedPoints.Emplace(C.SeedVtxIndex, W, 1); }
-						else { SeedWeightedPoints.Emplace(C.SeedPointIndex, W, 0); }
+						if (C.SeedPointIndex < 0)
+						{
+							SeedWeightedPoints.Emplace(C.SeedVtxIndex, W, 1);
+						}
+						else
+						{
+							SeedWeightedPoints.Emplace(C.SeedPointIndex, W, 0);
+						}
 					}
 				}
 
-				if (This->VtxBlender) { This->VtxBlender->Blend(Index, VtxWeightedPoints, VtxTrackers); }
-				if (This->SeedBlender && !SeedWeightedPoints.IsEmpty()) { This->SeedBlender->Blend(Index, SeedWeightedPoints, SeedTrackers); }
+				if (This->VtxBlender)
+				{
+					This->VtxBlender->Blend(Index, VtxWeightedPoints, VtxTrackers);
+				}
+				if (This->SeedBlender && !SeedWeightedPoints.IsEmpty())
+				{
+					This->SeedBlender->Blend(Index, SeedWeightedPoints, SeedTrackers);
+				}
 			}
 		};
 
@@ -521,8 +654,14 @@ namespace PCGExClusterDiffuse
 
 		// Batch-scoped blender teardown (mirrors the batch-scoped creation), after every processor's blend
 		// pass has completed and before the vtx facade is flushed.
-		if (VtxBlender) { VtxBlender->Cleanup(Context); }
-		if (SeedBlender) { SeedBlender->Cleanup(Context); }
+		if (VtxBlender)
+		{
+			VtxBlender->Cleanup(Context);
+		}
+		if (SeedBlender)
+		{
+			SeedBlender->Cleanup(Context);
+		}
 
 		VtxDataFacade->WriteFastest(TaskManager);
 	}

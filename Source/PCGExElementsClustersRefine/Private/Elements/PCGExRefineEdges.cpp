@@ -350,6 +350,7 @@ namespace PCGExRefineEdges
 
 		Refinement->VtxFilterCache = VtxFilterCache.Get();
 		Refinement->EdgeFilterCache = &EdgeFilterCache;
+		Refinement->bHasEdgeFilters = !Context->EdgeFilterFactories.IsEmpty();
 
 		const int32 PLI = PCGEX_CORE_SETTINGS.GetClusterBatchChunkSize();
 
