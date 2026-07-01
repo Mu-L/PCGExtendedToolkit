@@ -6,6 +6,7 @@
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/Artifacts/PCGExChain.h"
 #include "Clusters/Artifacts/PCGExCachedChain.h"
+#include "Core/PCGExMTCommon.h"
 
 #pragma region FPCGExEdgeRefineChainFilter
 
@@ -18,49 +19,62 @@ void FPCGExEdgeRefineChainFilter::Process()
 		return;
 	}
 
-	// The edge filter cache defaults to all-true when the (optional) filter pin is disconnected,
-	// so the override must only kick in when filters are actually present.
 	const bool bUseFilters = bHasEdgeFilters && EdgeFilterCache;
 
-	for (const TSharedPtr<PCGExClusters::FNodeChain>& Chain : Chains)
-	{
-		if (!Chain)
+	PCGExMT::ParallelOrSequential(
+		Chains.Num(),
+		[&](const int32 Index)
 		{
-			continue;
-		}
-
-		// bInvert only flips an actual gating verdict; with no criteria enabled the node stays inert
-		// (the optional filter override below can still act).
-		const bool bMatch = Gating.Test(*Chain, *Cluster);
-		bool bRemove = Gating.IsEnabled() ? (bInvert ? !bMatch : bMatch) : false;
-
-		if (bUseFilters)
-		{
-			bool bAnyPass = false;
-			bool bAllPass = true;
-
-			auto AccumulateFilter = [&](const int32 EdgeIndex)
+			const TSharedPtr<PCGExClusters::FNodeChain>& Chain = Chains[Index];
+			if (!Chain)
 			{
-				const bool bPass = static_cast<bool>((*EdgeFilterCache)[EdgeIndex]);
-				bAnyPass |= bPass;
-				bAllPass &= bPass;
-			};
-
-			for (const PCGExGraphs::FLink& Lk : Chain->Links) { AccumulateFilter(Lk.Edge); }
-			if (Chain->bIsClosedLoop) { AccumulateFilter(Chain->Seed.Edge); }
-
-			if (bRequireAllEdgesPass ? bAllPass : bAnyPass)
-			{
-				bRemove = (FilterOverride == EPCGExChainFilterOverride::ForceRemove);
+				return;
 			}
-		}
 
-		// Process() runs single-threaded per cluster (invoked from the edge-loop completion callback),
-		// so a plain write is sufficient here.
-		const int8 Validity = bRemove ? 0 : 1;
-		for (const PCGExGraphs::FLink& Lk : Chain->Links) { Cluster->GetEdge(Lk.Edge)->bValid = Validity; }
-		if (Chain->bIsClosedLoop) { Cluster->GetEdge(Chain->Seed.Edge)->bValid = Validity; }
-	}
+			// bInvert only flips an actual gating verdict; with no criteria enabled the node stays inert
+			// (the optional filter override below can still act).
+			const bool bMatch = Gating.Test(*Chain, *Cluster);
+			bool bRemove = Gating.IsEnabled() ? (bInvert ? !bMatch : bMatch) : false;
+
+			if (bUseFilters)
+			{
+				bool bAnyPass = false;
+				bool bAllPass = true;
+
+				auto AccumulateFilter = [&](const int32 EdgeIndex)
+				{
+					const bool bPass = static_cast<bool>((*EdgeFilterCache)[EdgeIndex]);
+					bAnyPass |= bPass;
+					bAllPass &= bPass;
+				};
+
+				for (const PCGExGraphs::FLink& Lk : Chain->Links)
+				{
+					AccumulateFilter(Lk.Edge);
+				}
+				if (Chain->bIsClosedLoop)
+				{
+					AccumulateFilter(Chain->Seed.Edge);
+				}
+
+				if (bRequireAllEdgesPass ? bAllPass : bAnyPass)
+				{
+					bRemove = (FilterOverride == EPCGExChainFilterOverride::ForceRemove);
+				}
+			}
+
+			// Chains own disjoint edges, so these writes never race across parallel iterations.
+			const int8 Validity = bRemove ? 0 : 1;
+			for (const PCGExGraphs::FLink& Lk : Chain->Links)
+			{
+				Cluster->GetEdge(Lk.Edge)->bValid = Validity;
+			}
+			if (Chain->bIsClosedLoop)
+			{
+				Cluster->GetEdge(Chain->Seed.Edge)->bValid = Validity;
+			}
+		},
+		32, EParallelForFlags::Unbalanced);
 }
 
 #pragma endregion

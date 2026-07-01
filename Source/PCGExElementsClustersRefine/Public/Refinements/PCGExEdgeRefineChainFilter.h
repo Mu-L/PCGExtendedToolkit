@@ -68,9 +68,9 @@ public:
 	bool bRequireAllEdgesPass = false;
 
 	PCGEX_CREATE_REFINE_OPERATION(EdgeRefineChainFilter, {
-		Operation->Gating = Gating;
-		Operation->bInvert = bInvert;
-		Operation->FilterOverride = FilterOverride;
-		Operation->bRequireAllEdgesPass = bRequireAllEdgesPass;
-		})
+	                              Operation->Gating = Gating;
+	                              Operation->bInvert = bInvert;
+	                              Operation->FilterOverride = FilterOverride;
+	                              Operation->bRequireAllEdgesPass = bRequireAllEdgesPass;
+	                              })
 };
