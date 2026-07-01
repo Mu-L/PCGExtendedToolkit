@@ -41,8 +41,7 @@ enum class EPCGExClusterDiffuseWeightSpace : uint8
  * operations. Sibling to Cluster : Flood Fill, but with no path output and no per-vtx scalar outputs.
  *
  * Unlike Flood Fill, diffusions do NOT claim vtx -- they overlap freely. Each reached vtx is the
- * union of every seed that touched it, reconciled by a single weighted blend pass (equal weight per
- * contributor for now; a count/distance weighting choice and a seed-sourced second layer come next).
+ * union of every seed that touched it, reconciled by a single weighted blend pass.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters")
 class UPCGExClusterDiffuseSettings : public UPCGExClustersProcessorSettings
@@ -129,11 +128,9 @@ struct FPCGExClusterDiffuseContext final : FPCGExClustersProcessorContext
 	TArray<TObjectPtr<const UPCGExFillControlsFactoryData>> FillControlFactories;
 
 	TSharedPtr<PCGExData::FFacade> SeedsDataFacade;
-	// Per-seed contribution factor, read from the seeds facade. Init'd single-threaded in Boot (warming
-	// the attribute), then read-only off-thread by every processor.
+	// Per-seed contribution factor. Warmed single-threaded in Boot, then read-only off-thread by every processor.
 	TSharedPtr<PCGExDetails::TSettingValue<double>> SeedFactorValue;
-	// Pre-resolved (Boot, single-threaded) blend-op configs for the seeds-cloud source layer, so
-	// per-processor blender init is thread-safe against the shared seeds facade.
+	// Pre-resolved (Boot, single-threaded) blend-op configs for the seeds layer, so per-processor blender init is thread-safe.
 	TSharedPtr<PCGExBlending::FBlendOpsSchema> SeedBlendOpsSchema;
 	// Falloff shaping curve, built once in Boot; applied to the [0,1] falloff intensity (Falloff space only).
 	PCGExFloatLUT FalloffLUT;
@@ -180,8 +177,8 @@ namespace PCGExClusterDiffuse
 		// Layer 2: blends seeds-cloud values onto reached vtx (source = seeds facade, target = vtx facade).
 		TSharedPtr<PCGExBlending::FUnionOpsManager> SeedBlender;
 
-		// NOTE: GetInfluencesCount() is intentionally left to the base default (null) -> claiming is
-		// disabled, so diffusions overlap. The union blend below reconciles multi-influence vtx.
+		// GetInfluencesCount() intentionally left at the base default (null): claiming is disabled, so diffusions
+		// overlap and the union blend reconciles multi-influence vtx.
 
 	public:
 		FProcessor(const TSharedRef<PCGExData::FFacade>& InVtxDataFacade, const TSharedRef<PCGExData::FFacade>& InEdgeDataFacade)
@@ -200,8 +197,7 @@ namespace PCGExClusterDiffuse
 	{
 	protected:
 		TSharedPtr<PCGExDetails::TSettingValue<int32>> FillRate;
-		// Blenders target the shared, batch-owned vtx facade -- built once (single-threaded) in Process() and
-		// shared with every processor via PrepareSingle, never created inside the parallel CompleteWork.
+		// Built once (single-threaded) in Process() and shared via PrepareSingle; never created in the parallel CompleteWork.
 		TSharedPtr<PCGExBlending::FUnionOpsManager> VtxBlender;
 		TSharedPtr<PCGExBlending::FUnionOpsManager> SeedBlender;
 

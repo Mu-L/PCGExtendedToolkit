@@ -45,7 +45,7 @@ namespace PCGExFloodFill
 		TSharedPtr<FFillControlsHandler> FillControlsHandler;
 
 		TSharedPtr<PCGExMT::TScopedArray<TSharedPtr<FDiffusion>>> InitialDiffusions;
-		TArray<TSharedPtr<FDiffusion>> OngoingDiffusions; // Ongoing diffusions
+		TArray<TSharedPtr<FDiffusion>> OngoingDiffusions;
 		TArray<TSharedPtr<FDiffusion>> Diffusions;        // Stopped diffusions, as to not iterate over them needlessly
 
 		/** Node-specific Process()-time setup, run before diffusion initialization. Return false to abort. */

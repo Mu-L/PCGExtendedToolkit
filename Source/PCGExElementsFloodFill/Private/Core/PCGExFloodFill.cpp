@@ -58,8 +58,7 @@ namespace PCGExFloodFill
 		HeapComparator = FCandidateHeapComparator(Config.Sorting);
 
 		Visited[SeedNode->Index] = true;
-		// Claiming is optional: when no InfluencesCount array is provided, diffusions overlap freely
-		// and never pre-claim their seed node (see FFillControlsHandler::TryCapture).
+		// Claiming is optional: with no InfluencesCount, diffusions overlap and never pre-claim their seed node (see FFillControlsHandler::TryCapture).
 		if (FillControlsHandler->InfluencesCount)
 		{
 			*(FillControlsHandler->InfluencesCount->GetData() + SeedNode->PointIndex) = 1;
@@ -353,8 +352,8 @@ namespace PCGExFloodFill
 				return false;
 			}
 		}
-		// When claiming is disabled (no InfluencesCount), capture is never gated on exclusivity --
-		// multiple diffusions may capture the same node. The && short-circuits past the atomic.
+		// When claiming is disabled (no InfluencesCount), the && skips the atomic and capture is never gated on
+		// exclusivity -- multiple diffusions may capture the same node.
 		if (InfluencesCount && FPlatformAtomics::InterlockedCompareExchange((InfluencesCount->GetData() + Candidate.Node->PointIndex), 1, 0) == 1)
 		{
 			return false;
