@@ -210,51 +210,28 @@ namespace PCGExData::Helpers
 	T ReadDataValue(const FPCGMetadataAttributeBase* Attribute)
 	{
 		// Read a single value from a @Data domain attribute (one value per dataset, not per-point).
-		// If the attribute has no local entries, the value lives on an ancestor in the metadata
-		// inheritance chain.
-		
+		// The default-value slot is the canonical @Data store, mirroring the engine: accessor keys
+		// resolve to the default slot when the data domain has no items (bAddDefaultValueIfEmpty in
+		// the accessor factory), and attribute copies across node boundaries never carry entries
+		// (CopyInternal: bCopyEntries=false) -- only the default, which is copied eagerly at copy
+		// time and is therefore also GC-proof. Entry reads apply only when the domain actually has
+		// items, exactly like engine accessors; GetValueFromItemKey then resolves inherited entries
+		// through the attribute parent chain the same way the engine would.
+
 		if (!ensure(Attribute))
 		{
 			// Should not happen, callsite need to gate against reading nothing
 			return T();
 		}
-		
-		if (Attribute->GetNumberOfEntries())
+
+		const FPCGMetadataDomain* Domain = Attribute->GetMetadataDomain();
+		if (Domain && Domain->GetItemCountForChild() > 0)
 		{
 			return Attribute->GetValueFromItemKey<T>(PCGFirstEntryKey);
 		}
 
-		const FPCGMetadataDomain* Domain = Attribute->GetMetadataDomain();
-		const FPCGAttributeIdentifier Identifier(Attribute->Name, Domain->GetDomainID());
-
-		TWeakObjectPtr<const UPCGMetadata> ParentMeta = Domain->GetTopMetadata()->GetParentPtr();
-		while (const UPCGMetadata* Meta = ParentMeta.Get())
-		{
-			const FPCGMetadataAttributeBase* Ancestor = Meta->GetConstAttribute(Identifier);
-			if (!Ancestor || !Ancestor->GetAttributeDesc().IsSameType(Attribute->GetAttributeDesc()))
-			{
-				// Chain broken by an upstream filter/recreation -- nothing further to inherit.
-				break;
-			}
-
-			if (Ancestor->GetNumberOfEntries())
-			{
-				return Ancestor->GetValueFromItemKey<T>(PCGFirstEntryKey);
-			}
-
-			ParentMeta = Meta->GetParentPtr();
-		}
-
-		if (Attribute->GetParent())
-		{
-			// A raw parent exists but the live weak chain carried no value: the value-holding
-			// ancestor was garbage collected (or dropped the attribute). The value is lost.
-			UE_LOG(LogPCGEx, Warning,
-			       TEXT("PCGEx: @Data attribute '%s' could not be resolved -- its ancestor metadata was garbage collected or the attribute was removed upstream. Falling back to the attribute's default value."),
-			       *Attribute->Name.ToString());
-		}
-
-		return Attribute->GetValueFromItemKey<T>(Attribute->GetValueKey(PCGDefaultValueKey));
+		// PCGDefaultValueKey == PCGInvalidEntryKey routes GetValueFromItemKey to the default slot.
+		return Attribute->GetValueFromItemKey<T>(PCGDefaultValueKey);
 	}
 
 	template <typename T>
@@ -273,7 +250,13 @@ namespace PCGExData::Helpers
 	template <typename T>
 	void SetDataValue(FPCGMetadataAttributeBase* Attribute, const T Value)
 	{
-		Attribute->SetValue(PCGFirstEntryKey, Value);
+		// The default-value slot is the canonical @Data store (see ReadDataValue). Do NOT materialize
+		// an entry here: entries are invisible to the engine while the data domain has no items, but
+		// they survive full data copies -- a later engine-side rewrite of the attribute (which goes to
+		// the default slot) would leave the copied entry stale, and item-keyed reads prefer entries.
+		// CRITICAL -- this must be SetDefaultValue, not SetValue<T>(PCGDefaultValueKey, ...):
+		// PCGDefaultValueKey == -1 == PCGInvalidEntryKey and the engine's SetValueFromValueKey_Unsafe
+		// silently drops writes for invalid entry keys.
 		Attribute->SetDefaultValue(Value);
 	}
 
@@ -297,92 +280,6 @@ namespace PCGExData::Helpers
 	void SetDataValue(UPCGData* InData, FPCGAttributeIdentifier Identifier, const T Value)
 	{
 		SetDataValue<T>(InData, Identifier.Name, Value);
-	}
-
-	void LocalizeDataValues(UPCGData* InData)
-	{
-		if (!InData || !InData->Metadata)
-		{
-			return;
-		}
-
-		UPCGMetadata* Metadata = InData->MutableMetadata();
-		const FPCGMetadataDomain* DataDomain = Metadata->GetConstMetadataDomain(PCGMetadataDomainID::Data);
-		if (!DataDomain)
-		{
-			return;
-		}
-
-		TArray<FName> AttributeNames;
-		TArray<EPCGMetadataTypes> AttributeTypes;
-		DataDomain->GetAttributes(AttributeNames, AttributeTypes);
-
-		for (int32 i = 0; i < AttributeNames.Num(); i++)
-		{
-			const FPCGAttributeIdentifier Identifier(AttributeNames[i], PCGMetadataDomainID::Data);
-
-			// Fast typed path for plain scalar types. bTypedHandled stays false when the type isn't
-			// in the supported set OR the typed lookup fails (property-backed attribute reporting a
-			// scalar type) -- both fall through to the type-erased carry below.
-			bool bTypedHandled = false;
-			PCGExMetaHelpers::ExecuteWithRightType(AttributeTypes[i], [&](auto DummyValue)
-			{
-				using T = decltype(DummyValue);
-				FPCGMetadataAttributeBase* Attribute = PCGExMetaHelpers::TryGetMutableAttribute<T>(Metadata, Identifier);
-				if (!Attribute)
-				{
-					return;
-				}
-
-				bTypedHandled = true;
-				if (Attribute->GetNumberOfEntries())
-				{
-					return;
-				}
-				SetDataValue<T>(Attribute, ReadDataValue<T>(Attribute));
-			});
-
-			if (bTypedHandled)
-			{
-				continue;
-			}
-
-			// Container/extended (property-backed) types: type-erased single-value carry from the
-			// nearest live, value-carrying ancestor -- same GC-safe weak-chain walk as ReadDataValue.
-			FPCGMetadataAttributeBase* Attribute = Metadata->GetMutableAttribute(Identifier);
-			if (!Attribute || Attribute->GetNumberOfEntries())
-			{
-				continue;
-			}
-
-			const FPCGMetadataAttributeBase* ValueAncestor = nullptr;
-			TWeakObjectPtr<const UPCGMetadata> ParentMeta = Metadata->GetParentPtr();
-			while (const UPCGMetadata* Meta = ParentMeta.Get())
-			{
-				const FPCGMetadataAttributeBase* Ancestor = Meta->GetConstAttribute(Identifier);
-				if (!Ancestor || !Ancestor->GetAttributeDesc().IsSameType(Attribute->GetAttributeDesc()))
-				{
-					break;
-				}
-
-				if (Ancestor->GetNumberOfEntries())
-				{
-					ValueAncestor = Ancestor;
-					break;
-				}
-
-				ParentMeta = Meta->GetParentPtr();
-			}
-
-			if (!ValueAncestor)
-			{
-				continue;
-			}
-
-			// Mirror SetDataValue semantics: materialize the local entry AND align the default value.
-			PropertyCopyAttribute(ValueAncestor, PCGFirstEntryKey, Attribute, PCGFirstEntryKey);
-			PropertyCopyAttribute(ValueAncestor, PCGFirstEntryKey, Attribute, PCGDefaultValueKey);
-		}
 	}
 
 #define PCGEX_TPL(_TYPE, _NAME, ...) \
@@ -409,7 +306,8 @@ template PCGEXCORE_API void SetDataValue<_TYPE>(UPCGData* InData, FPCGAttributeI
 		FPCGAttributeIdentifier SanitizedIdentifier = PCGExMetaHelpers::GetAttributeIdentifier(InSelector, InData);
 		SanitizedIdentifier.MetadataDomain = EPCGMetadataDomainFlag::Data; // Force data domain
 
-		if (const FPCGMetadataAttributeBase* SourceAttribute = InMetadata->GetConstAttribute(SanitizedIdentifier))
+		// Domain-safe lookup: the data may have never instantiated its @Data domain.
+		if (const FPCGMetadataAttributeBase* SourceAttribute = PCGExMetaHelpers::TryGetConstAttribute(InMetadata, SanitizedIdentifier))
 		{
 			// Container/extended source types: TryReadDataValue<T> can't represent them; falls through to bSuccess=false.
 			PCGExMetaHelpers::ExecuteWithRightType(SourceAttribute, [&](auto DummyValue)
