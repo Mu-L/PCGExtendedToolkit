@@ -250,7 +250,10 @@ namespace PCGExData
 
 					FPCGMetadataAttributeBase* TargetAtt = InTargetDataFacade->Source->FindOrCreateAttribute<T>(Identifier, ForwardValue, SourceAtt->AllowsInterpolation());
 
-					if (bElementDomainToDataDomain)
+					// Data-domain targets get a materialized local entry, not just a default value:
+					// default-only attributes read correctly but keep GetNumberOfEntries() == 0, which
+					// re-triggers ancestor-chain resolution in every downstream consumer.
+					if (TargetAtt && (bElementDomainToDataDomain || Identity.InDataDomain()))
 					{
 						Helpers::SetDataValue(TargetAtt, ForwardValue);
 					}
@@ -384,7 +387,9 @@ namespace PCGExData
 
 					InTargetMetadata->DeleteAttribute(Identifier);
 					FPCGMetadataAttributeBase* TargetAtt = InTargetMetadata->FindOrCreateAttribute<T>(Identifier, ForwardValue, SourceAtt->AllowsInterpolation(), true, true);
-					if (bElementDomainToDataDomain)
+
+					// Same rationale as the facade overload above: data-domain targets get a real entry.
+					if (TargetAtt && (bElementDomainToDataDomain || Identity.InDataDomain()))
 					{
 						Helpers::SetDataValue(TargetAtt, ForwardValue);
 					}
@@ -412,6 +417,14 @@ namespace PCGExData
 
 					const PCGMetadataEntryKey SourceKey = Identity.InDataDomain() ? PCGDefaultValueKey : InSourceData->GetMetadataEntry(SourceIndex);
 					Helpers::PropertyCopyAttribute(SourceAtt, SourceKey, TargetAtt, PCGDefaultValueKey);
+
+					// Same rationale as the typed branch: data-domain targets get a materialized local
+					// entry on top of the default, so downstream consumers never re-trigger
+					// ancestor-chain resolution.
+					if (bElementDomainToDataDomain || Identity.InDataDomain())
+					{
+						Helpers::PropertyCopyAttribute(SourceAtt, SourceKey, TargetAtt, PCGFirstEntryKey);
+					}
 				});
 		}
 	}
