@@ -18,6 +18,7 @@
 #include "Math/PCGExBestFitPlane.h"
 #include "Math/PCGExMathDistances.h"
 #include "Paths/PCGExPath.h"
+#include "Paths/PCGExPathsCommon.h"
 #include "Paths/PCGExPathsHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExClipper2ProcessorElement"
@@ -315,6 +316,13 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 
 	const double InvScale = 1.0 / static_cast<double>(Settings->Precision);
 
+	// Internal path-state markers are authored on outputs by this node alone (SetClosedLoop below, hole tagging),
+	// and must NOT ride the blender's @Data carry-over: the reduce writes entry 0, which shadows the default slot
+	// SetClosedLoop writes to -- a closed source's IsClosed=true would clobber the explicit "false" on paths that
+	// get cut open (e.g. RectClip as-lines). Name-based exclusion, so user attributes with these reserved names
+	// are skipped too.
+	const TSet<FName> NodeAuthoredAttributes = {PCGExPaths::Labels::ClosedLoopIdentifier.Name, PCGExPaths::Labels::HoleIdentifier.Name};
+
 	// Bounds-guarded source resolution helpers, shared by every path below.
 	auto GetProjectedZ = [this](const int32 SrcIdx, const uint32 PtIdx) -> double
 	{
@@ -506,7 +514,7 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		const TSharedPtr<PCGExData::FFacade> OutputFacade = MakeShared<PCGExData::FFacade>(NewPointIO.ToSharedRef());
 
 		const TSharedPtr<PCGExBlending::FUnionBlender> Blender = MakeShared<PCGExBlending::FUnionBlender>(&BlendingDetails, &CarryOverDetails, PCGExMath::GetDistances());
-		Blender->AddSources(BlendSources, nullptr, [](const TSharedRef<PCGExData::FFacade>& InFacade)
+		Blender->AddSources(BlendSources, &NodeAuthoredAttributes, [](const TSharedRef<PCGExData::FFacade>& InFacade)
 		{
 			return InFacade->Idx;
 		});
