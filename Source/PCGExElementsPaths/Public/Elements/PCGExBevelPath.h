@@ -49,6 +49,8 @@ enum class EPCGExBevelLimit : uint8
 	Balanced        = 2 UMETA(DisplayName = "Balanced", ToolTip="Weighted balance against opposite bevel position, falling back to closest neighbor"),
 };
 
+// Predates the shared EPCGExPathProfileScaling (PCGExPathProfile.h) and is kept for serialization
+// compatibility; layouts must stay in sync (enforced by a static_assert in PCGExBevelPath.cpp).
 UENUM()
 enum class EPCGExBevelCustomProfileScaling : uint8
 {
@@ -86,7 +88,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	EPCGExBevelMode Mode = EPCGExBevelMode::Radius;
 
-	
 	/** Bevel width value interpretation.*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable))
 	EPCGExMeanMeasure WidthMeasure = EPCGExMeanMeasure::Relative;
@@ -112,11 +113,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="Limit != EPCGExBevelLimit::None", EditConditionHides))
 	bool bSlideAlongPath = false;
 
-	
 	/** Type of Bevel profile */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_NotOverridable))
 	EPCGExBevelProfileType Type = EPCGExBevelProfileType::Line;
-	
+
 	/** Whether to keep the corner point or not. If enabled, subdivision is ignored. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExBevelProfileType::Line", EditConditionHides))
 	bool bKeepCornerPoint = false;
@@ -137,7 +137,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExBevelProfileType::Custom && (CrossAxisScaling == EPCGExBevelCustomProfileScaling::Scale || CrossAxisScaling == EPCGExBevelCustomProfileScaling::Distance)", EditConditionHides))
 	double CrossAxisScale = 1;
 
-	
 	/** Whether to subdivide the profile */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta = (PCG_Overridable, EditCondition="Type != EPCGExBevelProfileType::Custom", EditConditionHides))
 	bool bSubdivide = false;

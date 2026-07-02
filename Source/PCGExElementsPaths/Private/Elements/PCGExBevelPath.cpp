@@ -81,44 +81,10 @@ bool FPCGExBevelPathElement::Boot(FPCGExContext* InContext) const
 		PCGEX_VALIDATE_NAME(Settings->SubdivisionFlagName)
 	}
 
-	if (Settings->Type == EPCGExBevelProfileType::Custom)
+	if (Settings->Type == EPCGExBevelProfileType::Custom &&
+		!PCGExPaths::Profile::TryBuildCustomProfile(Context, PCGExBevelPath::SourceCustomProfile, Context->CustomProfileFacade, Context->CustomProfilePositions))
 	{
-		const TSharedPtr<PCGExData::FPointIO> CustomProfileIO = PCGExData::TryGetSingleInput(Context, PCGExBevelPath::SourceCustomProfile, false, true);
-		if (!CustomProfileIO)
-		{
-			return false;
-		}
-
-		if (CustomProfileIO->GetNum() < 2)
-		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("Custom profile must have at least two points."));
-			return false;
-		}
-
-		Context->CustomProfileFacade = MakeShared<PCGExData::FFacade>(CustomProfileIO.ToSharedRef());
-
-		TConstPCGValueRange<FTransform> ProfileTransforms = CustomProfileIO->GetIn()->GetConstTransformValueRange();
-		PCGExArrayHelpers::InitArray(Context->CustomProfilePositions, ProfileTransforms.Num());
-
-		const FVector Start = ProfileTransforms[0].GetLocation();
-		const FVector End = ProfileTransforms[ProfileTransforms.Num() - 1].GetLocation();
-
-		const double ProfileLength = FVector::Dist(Start, End);
-		if (ProfileLength <= KINDA_SMALL_NUMBER)
-		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("Custom profile first and last points must not overlap."));
-			return false;
-		}
-
-		const double Factor = 1 / ProfileLength;
-
-		const FVector ProjectionNormal = (End - Start).GetSafeNormal(1E-08, FVector::ForwardVector);
-		const FQuat ProjectionQuat = FQuat::FindBetweenNormals(ProjectionNormal, FVector::ForwardVector);
-
-		for (int i = 0; i < ProfileTransforms.Num(); i++)
-		{
-			Context->CustomProfilePositions[i] = ProjectionQuat.RotateVector((ProfileTransforms[i].GetLocation() - Start) * Factor);
-		}
+		return false;
 	}
 
 	return true;
@@ -517,27 +483,21 @@ namespace PCGExBevelPath
 	{
 		const UPCGExBevelPathSettings* Settings = InProcessor->Settings;
 
-		// Uniform scaling defaults to the projected profile span (matches the original SubdivideCustom defaults)
-		double MainAxisSize = FVector::Dist(Leave, Arrive);
-		double CrossAxisSize = MainAxisSize;
+		// EPCGExBevelCustomProfileScaling predates the shared profile enum and is kept for serialization
+		// compatibility; their layouts must stay in sync for the casts below.
+		static_assert(
+			static_cast<uint8>(EPCGExBevelCustomProfileScaling::Uniform) == static_cast<uint8>(EPCGExPathProfileScaling::Uniform) &&
+			static_cast<uint8>(EPCGExBevelCustomProfileScaling::Scale) == static_cast<uint8>(EPCGExPathProfileScaling::Scale) &&
+			static_cast<uint8>(EPCGExBevelCustomProfileScaling::Distance) == static_cast<uint8>(EPCGExPathProfileScaling::Distance),
+			"EPCGExBevelCustomProfileScaling must mirror EPCGExPathProfileScaling");
 
-		if (Settings->MainAxisScaling == EPCGExBevelCustomProfileScaling::Scale)
-		{
-			MainAxisSize = Length * Settings->MainAxisScale;
-		}
-		else if (Settings->MainAxisScaling == EPCGExBevelCustomProfileScaling::Distance)
-		{
-			MainAxisSize = Settings->MainAxisScale;
-		}
+		// Uniform scaling defaults to the projected profile span; Scale is relative to the bevel depth (Length)
+		const double Span = FVector::Dist(Leave, Arrive);
 
-		if (Settings->CrossAxisScaling == EPCGExBevelCustomProfileScaling::Scale)
-		{
-			CrossAxisSize = Length * Settings->CrossAxisScale;
-		}
-		else if (Settings->CrossAxisScaling == EPCGExBevelCustomProfileScaling::Distance)
-		{
-			CrossAxisSize = Settings->CrossAxisScale;
-		}
+		const double MainAxisSize = PCGExPaths::Profile::ResolveAxisSize(
+			static_cast<EPCGExPathProfileScaling>(Settings->MainAxisScaling), Settings->MainAxisScale, Span, Length);
+		const double CrossAxisSize = PCGExPaths::Profile::ResolveAxisSize(
+			static_cast<EPCGExPathProfileScaling>(Settings->CrossAxisScaling), Settings->CrossAxisScale, Span, Length);
 
 		PCGExPaths::Profile::SubdivideCustom(
 			Subdivisions, InProcessor->Context->CustomProfilePositions,

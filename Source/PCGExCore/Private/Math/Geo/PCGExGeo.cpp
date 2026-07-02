@@ -238,7 +238,6 @@ namespace PCGExMath::Geo
 
 		Normal = FVector::CrossProduct(Hand, OtherHand).GetSafeNormal();
 		Theta = FMath::Acos(FVector::DotProduct(Hand, OtherHand));
-		SinTheta = FMath::Sin(Theta);
 	}
 
 	FExCenterArc::FExCenterArc(const FVector& A1, const FVector& B1, const FVector& A2, const FVector& B2, const double MaxLength)
@@ -268,7 +267,6 @@ namespace PCGExMath::Geo
 
 		Normal = FVector::CrossProduct(Hand, OtherHand).GetSafeNormal();
 		Theta = FMath::Acos(FVector::DotProduct(Hand, OtherHand));
-		SinTheta = FMath::Sin(Theta);
 	}
 
 	FExCenterArc FExCenterArc::MakeTangent(const FVector& A, const FVector& TangentDir, const FVector& C)
@@ -286,9 +284,10 @@ namespace PCGExMath::Geo
 		FVector Perp = D - FVector::DotProduct(D, Tangent) * Tangent;
 		const double B = Perp.Length();
 
-		if (B <= UE_KINDA_SMALL_NUMBER)
+		if (B <= UE_KINDA_SMALL_NUMBER || Tangent.IsNearlyZero())
 		{
-			// C is (near) collinear with the tangent: no curvature, degenerate to a line
+			// C is (near) collinear with the tangent, or the tangent itself is degenerate (zero-length,
+			// e.g. a duplicated terminal point upstream): no curvature, degenerate to a line
 			Arc.bIsLine = true;
 			Arc.Center = FMath::Lerp(A, C, 0.5);
 			Arc.Radius = FVector::Dist(A, C) * 0.5;
@@ -315,7 +314,6 @@ namespace PCGExMath::Geo
 		// represent. Only the b<=eps early-out above (extrusion collinear with the path) is a real degeneracy.
 		const double CosChordAngle = FMath::Clamp(FVector::DotProduct(D.GetSafeNormal(), Tangent), -1.0, 1.0);
 		Arc.Theta = 2.0 * FMath::Acos(CosChordAngle);
-		Arc.SinTheta = FMath::Sin(Arc.Theta);
 
 		return Arc;
 	}

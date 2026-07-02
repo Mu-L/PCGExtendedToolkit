@@ -10,6 +10,7 @@
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Factories/PCGExFactories.h"
 #include "Core/PCGExFilterTypeSets.h"
+#include "Paths/PCGExPathProfile.h"
 #include "Utils/PCGValueRange.h"
 
 #include "PCGExExtrudePath.generated.h"
@@ -41,14 +42,6 @@ enum class EPCGExExtrudeProfileType : uint8
 	Line   = 0 UMETA(DisplayName = "Line", ToolTip="Straight extrusion, subdivided evenly."),
 	Arc    = 1 UMETA(DisplayName = "Arc", ToolTip="Seamless arc, tangent to the path at the endpoint (a perpendicular Custom direction gives a half-circle). Needs a Custom direction not parallel to the path, else it stays a straight line."),
 	Custom = 2 UMETA(DisplayName = "Custom", ToolTip="Custom profile applied to the new segment. Needs a Custom direction angled from the path, else it falls back to no profile."),
-};
-
-UENUM()
-enum class EPCGExExtrudeProfileScaling : uint8
-{
-	Uniform  = 0 UMETA(DisplayName = "Uniform", ToolTip="Keep the profile ratio uniform (relative to the extrusion length)."),
-	Scale    = 1 UMETA(DisplayName = "Scale", ToolTip="Use a scale factor relative to the extrusion length."),
-	Distance = 2 UMETA(DisplayName = "Distance", ToolTip="Use a fixed distance."),
 };
 
 /**
@@ -106,18 +99,18 @@ public:
 
 	/** Define how the custom profile is scaled on the main axis. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom", EditConditionHides))
-	EPCGExExtrudeProfileScaling MainAxisScaling = EPCGExExtrudeProfileScaling::Uniform;
+	EPCGExPathProfileScaling MainAxisScaling = EPCGExPathProfileScaling::Uniform;
 
 	/** Scale or Distance value for the main axis. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (MainAxisScaling == EPCGExExtrudeProfileScaling::Scale || MainAxisScaling == EPCGExExtrudeProfileScaling::Distance)", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (MainAxisScaling == EPCGExPathProfileScaling::Scale || MainAxisScaling == EPCGExPathProfileScaling::Distance)", EditConditionHides))
 	double MainAxisScale = 1;
 
 	/** Define how the custom profile is scaled on the cross axis. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom", EditConditionHides))
-	EPCGExExtrudeProfileScaling CrossAxisScaling = EPCGExExtrudeProfileScaling::Uniform;
+	EPCGExPathProfileScaling CrossAxisScaling = EPCGExPathProfileScaling::Uniform;
 
 	/** Scale or Distance value for the cross axis. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (CrossAxisScaling == EPCGExExtrudeProfileScaling::Scale || CrossAxisScaling == EPCGExExtrudeProfileScaling::Distance)", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (CrossAxisScaling == EPCGExPathProfileScaling::Scale || CrossAxisScaling == EPCGExPathProfileScaling::Distance)", EditConditionHides))
 	double CrossAxisScale = 1;
 
 
@@ -202,8 +195,6 @@ namespace PCGExExtrudePath
 		TSharedPtr<PCGExDetails::TSettingValue<double>> LengthGetter;
 		TSharedPtr<PCGExDetails::TSettingValue<FVector>> DirectionGetter;
 		TSharedPtr<PCGExDetails::TSettingValue<double>> SubdivAmountGetter;
-
-		TSharedPtr<PCGExData::TBuffer<bool>> SubdivisionWriter;
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)

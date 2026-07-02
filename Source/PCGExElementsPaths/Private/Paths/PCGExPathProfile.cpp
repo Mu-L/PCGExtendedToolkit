@@ -3,32 +3,51 @@
 
 #include "Paths/PCGExPathProfile.h"
 
+#include "PCGElement.h"
+#include "PCGExCoreMacros.h"
+#include "Core/PCGExContext.h"
+#include "Data/PCGExData.h"
+#include "Data/PCGExPointIO.h"
 #include "Details/PCGExSubdivisionDetails.h"
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Math/Geo/PCGExGeo.h"
 #include "Math/RotationMatrix.h"
+#include "Utils/PCGValueRange.h"
 
 namespace PCGExPaths::Profile
 {
-	void SubdivideLine(TArray<FVector>& Out, const FVector& A, const FVector& B, const double Factor, const bool bIsCount)
+	// Resolves how many subdivision points fit in Dist, and how far apart they sit.
+	// Attribute-driven factors bypass property clamps, so both modes are hardened here:
+	// counts are clamped into int32 range before the cast (out-of-range double->int32 is UB),
+	// and distance factors get a min segment length of 1 so degenerate spacing can't explode
+	// the count on huge spans (e.g. wide reflex arcs).
+	int32 ResolveSubdivisions(const double Dist, const double Factor, const bool bIsCount, double& OutStepSize)
 	{
-		const double Dist = FVector::Dist(A, B);
-
-		int32 SubdivCount = static_cast<int32>(Factor);
-		double StepSize = 0;
+		int32 SubdivCount = 0;
 
 		if (bIsCount)
 		{
-			StepSize = Dist / static_cast<double>(SubdivCount + 1);
+			SubdivCount = static_cast<int32>(FMath::Clamp(Factor, 0.0, static_cast<double>(MAX_int32)));
+			OutStepSize = Dist / (static_cast<double>(SubdivCount) + 1.0);
+		}
+		else if (Factor > KINDA_SMALL_NUMBER)
+		{
+			const double StepDist = FMath::Max(Factor, 1.0);
+			SubdivCount = static_cast<int32>(FMath::Clamp(FMath::Floor(Dist / StepDist), 0.0, static_cast<double>(MAX_int32)));
+			OutStepSize = FMath::Min(Dist, StepDist);
 		}
 		else
 		{
-			// Attribute-driven amounts bypass the property clamp, guard against zero & negative values
-			StepSize = FMath::Min(Dist, Factor);
-			SubdivCount = Factor > KINDA_SMALL_NUMBER ? FMath::Floor(Dist / Factor) : 0;
+			OutStepSize = Dist;
 		}
 
-		SubdivCount = FMath::Max(0, SubdivCount);
+		return SubdivCount;
+	}
+
+	void SubdivideLine(TArray<FVector>& Out, const FVector& A, const FVector& B, const double Factor, const bool bIsCount)
+	{
+		double StepSize = 0;
+		const int32 SubdivCount = ResolveSubdivisions(FVector::Dist(A, B), Factor, bIsCount, StepSize);
 
 		PCGExArrayHelpers::InitArray(Out, SubdivCount);
 		const FVector Dir = (B - A).GetSafeNormal();
@@ -40,23 +59,9 @@ namespace PCGExPaths::Profile
 
 	void SubdivideLineKeepCorner(TArray<FVector>& Out, const FVector& A, const FVector& Corner, const FVector& B, const double Factor, const bool bIsCount)
 	{
-		const double Dist = FVector::Dist(A, Corner);
-
-		int32 SubdivCount = static_cast<int32>(Factor);
 		double StepSize = 0;
-
-		if (bIsCount)
-		{
-			StepSize = Dist / static_cast<double>(SubdivCount + 1);
-		}
-		else
-		{
-			// Attribute-driven amounts bypass the property clamp, guard against zero & negative values
-			StepSize = FMath::Min(Dist, Factor);
-			SubdivCount = Factor > KINDA_SMALL_NUMBER ? FMath::Floor(Dist / Factor) : 0;
-		}
-
-		SubdivCount = FMath::Max(0, SubdivCount);
+		// Two mirrored legs plus the corner; keep the doubled count inside int32 range
+		const int32 SubdivCount = FMath::Min(ResolveSubdivisions(FVector::Dist(A, Corner), Factor, bIsCount, StepSize), (MAX_int32 - 1) / 2);
 
 		PCGExArrayHelpers::InitArray(Out, SubdivCount * 2 + 1);
 
@@ -92,15 +97,10 @@ namespace PCGExPaths::Profile
 			return;
 		}
 
-		// Attribute-driven amounts bypass the property clamp, guard against zero & negative values
-		int32 SubdivCount = bIsCount ? static_cast<int32>(Factor) : 0;
-		if (!bIsCount && Factor > KINDA_SMALL_NUMBER)
-		{
-			SubdivCount = FMath::Floor(Arc.GetLength() / Factor);
-		}
-		SubdivCount = FMath::Max(0, SubdivCount);
+		double DistStepSize = 0;
+		const int32 SubdivCount = ResolveSubdivisions(Arc.GetLength(), Factor, bIsCount, DistStepSize);
 
-		const double StepSize = 1.0 / static_cast<double>(SubdivCount + 1);
+		const double StepSize = 1.0 / (static_cast<double>(SubdivCount) + 1.0);
 		PCGExArrayHelpers::InitArray(Out, SubdivCount);
 
 		for (int i = 0; i < SubdivCount; i++)
@@ -149,5 +149,57 @@ namespace PCGExPaths::Profile
 		{
 			Details.ComputeSubdivisions(A, B, Index, Out, OutDist);
 		}
+	}
+
+	double ResolveAxisSize(const EPCGExPathProfileScaling Scaling, const double Scale, const double UniformSize, const double ScaleReference)
+	{
+		switch (Scaling)
+		{
+		case EPCGExPathProfileScaling::Scale: return ScaleReference * Scale;
+		case EPCGExPathProfileScaling::Distance: return Scale;
+		default: return UniformSize;
+		}
+	}
+
+	bool TryBuildCustomProfile(FPCGExContext* InContext, const FName InPinLabel, TSharedPtr<PCGExData::FFacade>& OutFacade, TArray<FVector>& OutPositions)
+	{
+		const TSharedPtr<PCGExData::FPointIO> ProfileIO = PCGExData::TryGetSingleInput(InContext, InPinLabel, false, true);
+		if (!ProfileIO)
+		{
+			return false;
+		}
+
+		if (ProfileIO->GetNum() < 2)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Custom profile must have at least two points."));
+			return false;
+		}
+
+		OutFacade = MakeShared<PCGExData::FFacade>(ProfileIO.ToSharedRef());
+
+		TConstPCGValueRange<FTransform> ProfileTransforms = ProfileIO->GetIn()->GetConstTransformValueRange();
+		PCGExArrayHelpers::InitArray(OutPositions, ProfileTransforms.Num());
+
+		const FVector Start = ProfileTransforms[0].GetLocation();
+		const FVector End = ProfileTransforms[ProfileTransforms.Num() - 1].GetLocation();
+
+		const double ProfileLength = FVector::Dist(Start, End);
+		if (ProfileLength <= KINDA_SMALL_NUMBER)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Custom profile first and last points must not overlap."));
+			return false;
+		}
+
+		const double Factor = 1 / ProfileLength;
+
+		const FVector ProjectionNormal = (End - Start).GetSafeNormal(1E-08, FVector::ForwardVector);
+		const FQuat ProjectionQuat = FQuat::FindBetweenNormals(ProjectionNormal, FVector::ForwardVector);
+
+		for (int i = 0; i < ProfileTransforms.Num(); i++)
+		{
+			OutPositions[i] = ProjectionQuat.RotateVector((ProfileTransforms[i].GetLocation() - Start) * Factor);
+		}
+
+		return true;
 	}
 }

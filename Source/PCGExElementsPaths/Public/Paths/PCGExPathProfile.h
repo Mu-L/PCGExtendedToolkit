@@ -5,12 +5,28 @@
 
 #include "CoreMinimal.h"
 
+#include "PCGExPathProfile.generated.h"
+
+struct FPCGExContext;
 struct FPCGExManhattanDetails;
+
+namespace PCGExData
+{
+	class FFacade;
+}
 
 namespace PCGExMath::Geo
 {
 	struct FExCenterArc;
 }
+
+UENUM()
+enum class EPCGExPathProfileScaling : uint8
+{
+	Uniform  = 0 UMETA(DisplayName = "Uniform", ToolTip="Keep the profile ratio uniform (relative to the reference length)."),
+	Scale    = 1 UMETA(DisplayName = "Scale", ToolTip="Use a scale factor relative to the reference length."),
+	Distance = 2 UMETA(DisplayName = "Distance", ToolTip="Use a fixed distance."),
+};
 
 /**
  * Shared profile-subdivision routines used by path nodes that carve a segment into a
@@ -62,4 +78,22 @@ namespace PCGExPaths::Profile
 	PCGEXELEMENTSPATHS_API void SubdivideManhattan(
 		TArray<FVector>& Out, const FPCGExManhattanDetails& Details, const int32 Index,
 		const FVector& A, const FVector& B, const FVector* Corner = nullptr);
+
+	/**
+	 * Resolves a profile axis size from its scaling mode.
+	 * @param UniformSize    Size used as-is for Uniform.
+	 * @param ScaleReference Length the Scale mode multiplies (may differ from UniformSize, e.g. bevel depth vs span).
+	 */
+	PCGEXELEMENTSPATHS_API double ResolveAxisSize(
+		const EPCGExPathProfileScaling Scaling, const double Scale,
+		const double UniformSize, const double ScaleReference);
+
+	/**
+	 * Fetches the single-path custom profile input from InPinLabel, validates it (at least two points,
+	 * non-overlapping endpoints) and normalizes its positions into OutPositions: first point at origin,
+	 * X running 0..1 along the profile span. Logs errors on the context and returns false when invalid.
+	 */
+	PCGEXELEMENTSPATHS_API bool TryBuildCustomProfile(
+		FPCGExContext* InContext, const FName InPinLabel,
+		TSharedPtr<PCGExData::FFacade>& OutFacade, TArray<FVector>& OutPositions);
 }
