@@ -126,7 +126,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Orient", meta = (PCG_Overridable))
 	bool bRemoveLastPoint = true;
 
-	/** Axis order. First axis will use the segment direction, second is the path normal. These are Primary > Secondary > Tertiary. */
+	/** Axis order, as Primary > Secondary > Tertiary. The primary axis aligns to the segment direction, the secondary to (Direction x Normal), and the tertiary to the path normal itself. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Orient", meta = (PCG_Overridable, InlineEnum))
 	EPCGExAxisOrder SolidificationOrder = EPCGExAxisOrder::XYZ;
 
@@ -325,6 +325,9 @@ namespace PCGExPathSolidify
 
 		EPCGExAxisOrder GetOrder(const int32 Index) const;
 		EPCGExMakeRotAxis GetConstruction(const EPCGExAxisOrder Order, const int32 Index) const;
+
+		/** Nearest edge with a usable direction, preferring upstream; -1 if the path has none. */
+		int32 FindReferenceEdge(const int32 Index) const;
 
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
 	};
