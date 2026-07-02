@@ -64,6 +64,8 @@ namespace PCGExData
 
 	bool FPointIO::InitializeOutput(const EIOInit InitOut)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FPointIO::InitializeOutput);
+		
 		PCGEX_SHARED_CONTEXT(ContextHandle)
 
 		if (LastInit == InitOut)
@@ -136,6 +138,12 @@ namespace PCGExData
 				FPCGInitializeFromDataParams InitializeFromDataParams(In);
 				InitializeFromDataParams.bInheritSpatialData = false;
 				Out->InitializeFromDataWithParams(InitializeFromDataParams);
+
+				// Inherited @Data values must be materialized locally while the input chain is
+				// still alive; ancestor metadata is only weakly referenced by the engine and
+				// may be GC'd before this data is read.
+				// Not the best workaround but preserves data and avoid crashes downstream.
+				Helpers::LocalizeDataValues(Out);
 			}
 			else
 			{
@@ -154,6 +162,12 @@ namespace PCGExData
 		{
 			check(In)
 			Out = SharedContext.Get()->ManagedObjects->DuplicateData<UPCGBasePointData>(In);
+
+			// Same rationale as the New branch above: cap @Data inheritance at this boundary.
+			if (Out)
+			{
+				Helpers::LocalizeDataValues(Out);
+			}
 		}
 
 		return Out != nullptr;
