@@ -39,7 +39,7 @@ UENUM()
 enum class EPCGExExtrudeProfileType : uint8
 {
 	Line   = 0 UMETA(DisplayName = "Line", ToolTip="Straight extrusion, subdivided evenly."),
-	Arc    = 1 UMETA(DisplayName = "Arc", ToolTip="Seamless arc, tangent to the path at the endpoint. Needs a Custom direction angled from the path, else it falls back to no profile."),
+	Arc    = 1 UMETA(DisplayName = "Arc", ToolTip="Seamless arc, tangent to the path at the endpoint (a perpendicular Custom direction gives a half-circle). Needs a Custom direction not parallel to the path, else it stays a straight line."),
 	Custom = 2 UMETA(DisplayName = "Custom", ToolTip="Custom profile applied to the new segment. Needs a Custom direction angled from the path, else it falls back to no profile."),
 };
 
@@ -96,7 +96,7 @@ public:
 	FPCGExInputShorthandSelectorDirection Direction = FPCGExInputShorthandSelectorDirection(FName("$Transform.Up"), FVector::UpVector, false);
 
 	/** If enabled, the direction read above is rotated by the endpoint's transform. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="DirectionMode == EPCGExExtrudeDirection::Custom", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName=" └─ Transform Direction", EditCondition="DirectionMode == EPCGExExtrudeDirection::Custom", EditConditionHides))
 	bool bTransformDirection = false;
 
 
@@ -105,19 +105,19 @@ public:
 	EPCGExExtrudeProfileType Type = EPCGExExtrudeProfileType::Line;
 
 	/** Define how the custom profile is scaled on the main axis. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile Scaling", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom", EditConditionHides))
 	EPCGExExtrudeProfileScaling MainAxisScaling = EPCGExExtrudeProfileScaling::Uniform;
 
 	/** Scale or Distance value for the main axis. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile Scaling", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (MainAxisScaling == EPCGExExtrudeProfileScaling::Scale || MainAxisScaling == EPCGExExtrudeProfileScaling::Distance)", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (MainAxisScaling == EPCGExExtrudeProfileScaling::Scale || MainAxisScaling == EPCGExExtrudeProfileScaling::Distance)", EditConditionHides))
 	double MainAxisScale = 1;
 
 	/** Define how the custom profile is scaled on the cross axis. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile Scaling", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom", EditConditionHides))
 	EPCGExExtrudeProfileScaling CrossAxisScaling = EPCGExExtrudeProfileScaling::Uniform;
 
 	/** Scale or Distance value for the cross axis. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile Scaling", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (CrossAxisScaling == EPCGExExtrudeProfileScaling::Scale || CrossAxisScaling == EPCGExExtrudeProfileScaling::Distance)", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Profile", meta = (PCG_Overridable, EditCondition="Type == EPCGExExtrudeProfileType::Custom && (CrossAxisScaling == EPCGExExtrudeProfileScaling::Scale || CrossAxisScaling == EPCGExExtrudeProfileScaling::Distance)", EditConditionHides))
 	double CrossAxisScale = 1;
 
 
@@ -126,22 +126,13 @@ public:
 	bool bSubdivide = false;
 
 	/** Subdivision method. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta = (PCG_Overridable, EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta = (PCG_Overridable, DisplayName=" ├─ Method", EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom", EditConditionHides))
 	EPCGExSubdivideMode SubdivideMethod = EPCGExSubdivideMode::Count;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta = (PCG_Overridable, EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom && SubdivideMethod != EPCGExSubdivideMode::Manhattan", EditConditionHides))
-	EPCGExInputValueType SubdivisionAmountInput = EPCGExInputValueType::Constant;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName=" └─ Subdivisions Amount", EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom && SubdivideMethod != EPCGExSubdivideMode::Manhattan", EditConditionHides, ClampMin=0.1))
+	FPCGExInputShorthandSelectorDouble SubdivisionAmount = FPCGExInputShorthandSelectorDouble(FName("Count"), 10.0, false);
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Subdivisions (Distance)", EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom && SubdivideMethod == EPCGExSubdivideMode::Distance && SubdivisionAmountInput == EPCGExInputValueType::Constant", EditConditionHides, ClampMin=0.1))
-	double SubdivisionDistance = 10;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Subdivisions (Count)", EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom && SubdivideMethod == EPCGExSubdivideMode::Count && SubdivisionAmountInput == EPCGExInputValueType::Constant", EditConditionHides, ClampMin=0))
-	int32 SubdivisionCount = 4;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Subdivisions (Attr)", EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom && SubdivideMethod != EPCGExSubdivideMode::Manhattan && SubdivisionAmountInput != EPCGExInputValueType::Constant", EditConditionHides))
-	FPCGAttributePropertyInputSelector SubdivisionAmount;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName="Manhattan", EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom && SubdivideMethod == EPCGExSubdivideMode::Manhattan", EditConditionHides))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Subdivision", meta=(PCG_Overridable, DisplayName=" └─ Manhattan", EditCondition="bSubdivide && Type != EPCGExExtrudeProfileType::Custom && SubdivideMethod == EPCGExSubdivideMode::Manhattan", EditConditionHides))
 	FPCGExManhattanDetails ManhattanDetails;
 
 
@@ -162,7 +153,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors")
 	bool bQuietClosedLoopWarning = false;
 
-	PCGEX_SETTING_VALUE_DECL(Subdivisions, double)
 };
 
 struct FPCGExExtrudePathContext final : FPCGExPathProcessorContext
@@ -237,8 +227,14 @@ namespace PCGExExtrudePath
 		// Source input index each output point inherits from (start-new -> 0, originals -> self, end-new -> Last)
 		FORCEINLINE int32 SourceIndex(const int32 OutIndex) const
 		{
-			if (OutIndex < StartExtra) { return 0; }
-			if (OutIndex < StartExtra + NumPoints) { return OutIndex - StartExtra; }
+			if (OutIndex < StartExtra)
+			{
+				return 0;
+			}
+			if (OutIndex < StartExtra + NumPoints)
+			{
+				return OutIndex - StartExtra;
+			}
 			return LastPointIndex;
 		}
 	};

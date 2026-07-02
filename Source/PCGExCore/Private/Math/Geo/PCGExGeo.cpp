@@ -303,17 +303,18 @@ namespace PCGExMath::Geo
 		Arc.Radius = D.SizeSquared() / (2.0 * B);
 		Arc.Center = A + Perp * Arc.Radius;
 
-		Arc.Hand = (A - Arc.Center).GetSafeNormal();
+		Arc.Hand = (A - Arc.Center).GetSafeNormal();     // == -Perp
 		Arc.OtherHand = (C - Arc.Center).GetSafeNormal();
 
-		const double Dot = FVector::DotProduct(Arc.Hand, Arc.OtherHand);
+		// Forward (seamless) rotation axis: sweeping Hand around it leaves A along +Tangent.
+		Arc.Normal = FVector::CrossProduct(Tangent, Perp).GetSafeNormal();
 
-		// |Dot| ~ 1 means Theta ~ 0 (point) or Theta ~ pi (semicircle); either way SinTheta -> 0 makes the
-		// slerp in GetLocationOnArc unstable, so treat it as a line (matches the 3-point constructor's convention).
-		Arc.bIsLine = FMath::IsNearlyEqual(FMath::Abs(Dot), 1.0);
-
-		Arc.Normal = FVector::CrossProduct(Arc.Hand, Arc.OtherHand).GetSafeNormal();
-		Arc.Theta = FMath::Acos(FMath::Clamp(Dot, -1.0, 1.0));
+		// Central angle = twice the angle between the chord (AC) and the tangent, taken as the forward sweep in
+		// (0, 2PI). This spans the semicircle case (extrusion perpendicular to the path -> radius = half the
+		// segment) and the reflex case (extrusion leaning back), which the shorter-arc slerp form could not
+		// represent. Only the b<=eps early-out above (extrusion collinear with the path) is a real degeneracy.
+		const double CosChordAngle = FMath::Clamp(FVector::DotProduct(D.GetSafeNormal(), Tangent), -1.0, 1.0);
+		Arc.Theta = 2.0 * FMath::Acos(CosChordAngle);
 		Arc.SinTheta = FMath::Sin(Arc.Theta);
 
 		return Arc;
@@ -321,12 +322,9 @@ namespace PCGExMath::Geo
 
 	FVector FExCenterArc::GetLocationOnArc(const double Alpha) const
 	{
-		// Spherical linear interpolation (slerp) between Hand and OtherHand directions,
-		// then project outward from Center by Radius to get the point on the arc.
-		const double W1 = FMath::Sin((1.0 - Alpha) * Theta) / SinTheta;
-		const double W2 = FMath::Sin(Alpha * Theta) / SinTheta;
-
-		const FVector Dir = Hand * W1 + OtherHand * W2;
+		// Sweep Hand around Normal by Alpha*Theta. Robust for any sweep angle (including the Theta = PI semicircle
+		// and reflex arcs), unlike the sin-based slerp which divides by SinTheta and blows up at Theta = PI.
+		const FVector Dir = FQuat(Normal, Alpha * Theta).RotateVector(Hand);
 		return Center + (Dir * Radius);
 	}
 

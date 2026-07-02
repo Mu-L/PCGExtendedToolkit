@@ -16,8 +16,6 @@
 #define LOCTEXT_NAMESPACE "PCGExExtrudePathElement"
 #define PCGEX_NAMESPACE ExtrudePath
 
-PCGEX_SETTING_VALUE_IMPL(UPCGExExtrudePathSettings, Subdivisions, double, SubdivisionAmountInput, SubdivisionAmount, SubdivideMethod == EPCGExSubdivideMode::Count ? SubdivisionCount : SubdivisionDistance)
-
 UPCGExExtrudePathSettings::UPCGExExtrudePathSettings(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -198,7 +196,7 @@ namespace PCGExExtrudePath
 			}
 			else
 			{
-				SubdivAmountGetter = Settings->GetValueSettingSubdivisions();
+				SubdivAmountGetter = Settings->SubdivisionAmount.GetValueSetting();
 				if (!SubdivAmountGetter->Init(PointDataFacade))
 				{
 					return false;
@@ -259,8 +257,14 @@ namespace PCGExExtrudePath
 		else
 		{
 			Dir = DirectionGetter->Read(EndpointIdx);
-			if (Settings->Direction.bFlip) { Dir *= -1; }
-			if (Settings->bTransformDirection) { Dir = InTransforms[EndpointIdx].GetRotation().RotateVector(Dir); }
+			if (Settings->Direction.bFlip)
+			{
+				Dir *= -1;
+			}
+			if (Settings->bTransformDirection)
+			{
+				Dir = InTransforms[EndpointIdx].GetRotation().RotateVector(Dir);
+			}
 			Dir = Dir.GetSafeNormal();
 		}
 
@@ -287,11 +291,25 @@ namespace PCGExExtrudePath
 					double MainAxisSize = ExtrudeLength;
 					double CrossAxisSize = ExtrudeLength;
 
-					if (Settings->MainAxisScaling == EPCGExExtrudeProfileScaling::Scale) { MainAxisSize = ExtrudeLength * Settings->MainAxisScale; }
-					else if (Settings->MainAxisScaling == EPCGExExtrudeProfileScaling::Distance) { MainAxisSize = Settings->MainAxisScale; }
+					if (Settings->MainAxisScaling == EPCGExExtrudeProfileScaling::Scale)
+					{
+						MainAxisSize = ExtrudeLength * Settings->MainAxisScale;
+					}
+					else
+						if (Settings->MainAxisScaling == EPCGExExtrudeProfileScaling::Distance)
+						{
+							MainAxisSize = Settings->MainAxisScale;
+						}
 
-					if (Settings->CrossAxisScaling == EPCGExExtrudeProfileScaling::Scale) { CrossAxisSize = ExtrudeLength * Settings->CrossAxisScale; }
-					else if (Settings->CrossAxisScaling == EPCGExExtrudeProfileScaling::Distance) { CrossAxisSize = Settings->CrossAxisScale; }
+					if (Settings->CrossAxisScaling == EPCGExExtrudeProfileScaling::Scale)
+					{
+						CrossAxisSize = ExtrudeLength * Settings->CrossAxisScale;
+					}
+					else
+						if (Settings->CrossAxisScaling == EPCGExExtrudeProfileScaling::Distance)
+						{
+							CrossAxisSize = Settings->CrossAxisScale;
+						}
 
 					PCGExPaths::Profile::SubdivideCustom(Subs, Context->CustomProfilePositions, EndpointPos, Tip, PlaneNormal, MainAxisSize, CrossAxisSize);
 				}
@@ -323,7 +341,10 @@ namespace PCGExExtrudePath
 		{
 			// Output runs tip -> ... -> kept endpoint, so the tip leads and subdivisions are reversed
 			OutPositions.Add(Tip);
-			for (int32 i = Subs.Num() - 1; i >= 0; i--) { OutPositions.Add(Subs[i]); }
+			for (int32 i = Subs.Num() - 1; i >= 0; i--)
+			{
+				OutPositions.Add(Subs[i]);
+			}
 		}
 		else
 		{
