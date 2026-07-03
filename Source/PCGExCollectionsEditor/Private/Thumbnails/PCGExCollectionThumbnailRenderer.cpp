@@ -20,8 +20,11 @@ namespace PCGExCollectionThumbnail
 {
 	constexpr float BaseThumbnailSize = 256.f;
 
-	const FLinearColor BackgroundColor = FLinearColor(0.011f, 0.011f, 0.012f);
-	const FLinearColor EmptyCellColor = FLinearColor(0.035f, 0.035f, 0.04f);
+	// Unified dark gray shown behind the mosaic: fills the tile, the inter-cell gaps, empty
+	// slots, and the overflow-count backdrop. EmptyCellColor is lifted a hair so an empty
+	// slot still reads as a distinct slot rather than dissolving into the gap.
+	const FLinearColor BackgroundColor = FLinearColor(0.016f, 0.016f, 0.018f);
+	const FLinearColor EmptyCellColor = FLinearColor(0.024f, 0.024f, 0.027f);
 	const FLinearColor DeepCollectionCellColor = FLinearColor(0.06f, 0.05f, 0.09f);
 
 	// Resolve the FAssetData for a path without loading. Falls back to stripping the
@@ -88,7 +91,7 @@ void UPCGExCollectionThumbnailRenderer::DrawCollection(const UPCGExAssetCollecti
 	const bool bOverflow = NumEntries > MaxCells;
 	const int32 NumEntryCells = bOverflow ? MaxCells - 1 : NumEntries;
 
-	const float Pad = Side == 1 ? 0.f : FMath::Max(1.f, Width / 128.f);
+	const float Pad = Side == 1 ? 0.f : FMath::Max(2.f, Width / 64.f);
 	const float CellWidth = (Width - Pad * (Side + 1)) / Side;
 	const float CellHeight = (Height - Pad * (Side + 1)) / Side;
 
