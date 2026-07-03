@@ -896,6 +896,11 @@ protected:
 	 *  overrides are not required to call Super. */
 	void EDITOR_FinalizeStagingRebuild();
 
+	/** Render the entry mosaic and cache it into the package thumbnail map so it survives editor
+	 *  restarts -- the pool's live render is session-only and data assets get no engine save-time
+	 *  bake. No-op outside the editor, mid asset-registry scan, or for empty/transient collections. */
+	void EDITOR_BakeThumbnailToPackage();
+
 	/** Staging pipeline hook dispatchers. Run every valid pipeline in array order; no-op when
 	 *  none are assigned, when invoked re-entrantly from inside another hook, or while cooking. */
 	void EDITOR_DispatchPipelinePreRebuild();

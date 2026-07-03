@@ -18,10 +18,12 @@
 
 #if WITH_EDITOR
 #include "Editor.h"
+#include "ObjectTools.h"
 #include "ScopedTransaction.h"
 #include "TimerManager.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
 #include "HAL/FileManager.h"
 #include "Helpers/PCGExCollectionStagingPipeline.h"
 #include "Misc/PackageName.h"
@@ -1647,6 +1649,47 @@ void UPCGExAssetCollection::EDITOR_FinalizeStagingRebuild()
 	// compaction), then the pipeline so its OnPostRebuild operates on final state.
 	EDITOR_OnPostStagingRebuild();
 	EDITOR_DispatchPipelinePostRebuild();
+
+	// Content is final here -- persist the mosaic so it survives editor restarts.
+	EDITOR_BakeThumbnailToPackage();
+}
+
+void UPCGExAssetCollection::EDITOR_BakeThumbnailToPackage()
+{
+	// Needs the editor engine + thumbnail manager, so no-op in commandlets/cooks; never render mid-GC.
+	if (!GEditor || IsRunningCommandlet() || IsGarbageCollecting())
+	{
+		return;
+	}
+
+	// Empty collections render nothing (CanVisualizeAsset == false) -- leave the class icon.
+	if (NumEntries() <= 0)
+	{
+		return;
+	}
+
+	// Cells resolve child paths through the asset registry; skip while its initial scan is in flight
+	// so a load-time rebuild doesn't bake a half-resolved mosaic.
+	const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	if (AssetRegistryModule.Get().IsLoadingAssets())
+	{
+		return;
+	}
+
+	UPackage* Package = GetOutermost();
+	if (!Package || Package == GetTransientPackage())
+	{
+		return;
+	}
+
+	// Render via our renderer + CacheThumbnail into the package's (in-memory) thumbnail map.
+	// This alone does NOT dirty the package, so without the MarkPackageDirty below a normal Save
+	// never serializes the map (SaveThumbnails only runs for packages that actually get saved) --
+	// the thumbnail would stay session-only. Only dirty when a thumbnail was actually produced.
+	if (ThumbnailTools::GenerateThumbnailForObjectToSaveToDisk(this))
+	{
+		(void)MarkPackageDirty();
+	}
 }
 
 void UPCGExAssetCollection::EDITOR_RebuildStagingData()
