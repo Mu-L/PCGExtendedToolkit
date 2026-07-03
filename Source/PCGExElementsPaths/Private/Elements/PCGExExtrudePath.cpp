@@ -211,12 +211,31 @@ namespace PCGExExtrudePath
 	int32 FProcessor::ComputeExtrusion(const bool bIsStart, const TConstPCGValueRange<FTransform>& InTransforms, TArray<FVector>& OutPositions)
 	{
 		const int32 EndpointIdx = bIsStart ? 0 : LastPointIndex;
-		const int32 NeighborIdx = bIsStart ? 1 : LastPointIndex - 1;
 
 		const FVector EndpointPos = InTransforms[EndpointIdx].GetLocation();
 
-		// Outward terminal-segment direction (inverted prev/next), i.e. what Shrink extends along
-		const FVector T = (EndpointPos - InTransforms[NeighborIdx].GetLocation()).GetSafeNormal();
+		// Outward terminal-segment direction (inverted prev/next), i.e. what Shrink extends along.
+		// Walks inward past coincident points (e.g. a duplicated terminal point) so a degenerate terminal
+		// segment doesn't zero the tangent — which would kill Path Direction extrusions and flatten arcs.
+		FVector T = FVector::ZeroVector;
+		const int32 Step = bIsStart ? 1 : -1;
+		for (int32 i = EndpointIdx + Step; i >= 0 && i < NumPoints; i += Step)
+		{
+			const FVector ToEndpoint = EndpointPos - InTransforms[i].GetLocation();
+			if (ToEndpoint.SizeSquared() > UE_DOUBLE_SMALL_NUMBER)
+			{
+				T = ToEndpoint.GetSafeNormal();
+				break;
+			}
+		}
+
+		if (T.IsNearlyZero())
+		{
+			// The walk exhausted the path without finding a distinct point (e.g. a 2-point path with both
+			// points collocated): no direction can be inferred, so the extrusion is meaningless.
+			PCGE_LOG_C(Warning, GraphAndLog, Context, FTEXT("A path has all its points collocated; endpoint extrusion was skipped."));
+			return 0;
+		}
 
 		const double Length = LengthGetter->Read(EndpointIdx);
 		if (FMath::Abs(Length) <= UE_KINDA_SMALL_NUMBER)
