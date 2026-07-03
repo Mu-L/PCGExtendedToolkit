@@ -7,9 +7,9 @@
 #include "CanvasTypes.h"
 #include "ObjectTools.h"
 #include "TextureResource.h"
-#include "AssetRegistry/AssetRegistryModule.h"
-#include "AssetRegistry/IAssetRegistry.h"
+#include "AssetRegistry/AssetData.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Details/Collections/PCGExCollectionEditorUtils.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
@@ -20,33 +20,10 @@ namespace PCGExCollectionThumbnail
 {
 	constexpr float BaseThumbnailSize = 256.f;
 
-	// Unified dark gray shown behind the mosaic: fills the tile, the inter-cell gaps, empty
-	// slots, and the overflow-count backdrop. EmptyCellColor is lifted a hair so an empty
-	// slot still reads as a distinct slot rather than dissolving into the gap.
+	// Backdrop grays; EmptyCellColor sits just above BackgroundColor so empty slots read against the gaps.
 	const FLinearColor BackgroundColor = FLinearColor(0.016f, 0.016f, 0.018f);
 	const FLinearColor EmptyCellColor = FLinearColor(0.024f, 0.024f, 0.027f);
 	const FLinearColor DeepCollectionCellColor = FLinearColor(0.06f, 0.05f, 0.09f);
-
-	// Resolve the FAssetData for a path without loading. Falls back to stripping the
-	// "_C" suffix so actor entries (generated class paths) resolve to their Blueprint,
-	// mirroring SPCGExCollectionGridTile's thumbnail lookup.
-	FAssetData ResolveAssetData(const FSoftObjectPath& AssetPath)
-	{
-		const IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
-		FAssetData AssetData = AssetRegistry.GetAssetByObjectPath(AssetPath);
-
-		if (!AssetData.IsValid())
-		{
-			FString PathString = AssetPath.ToString();
-			if (PathString.EndsWith(TEXT("_C")))
-			{
-				PathString.LeftChopInline(2);
-				AssetData = AssetRegistry.GetAssetByObjectPath(FSoftObjectPath(PathString));
-			}
-		}
-
-		return AssetData;
-	}
 }
 
 bool UPCGExCollectionThumbnailRenderer::CanVisualizeAsset(UObject* Object)
@@ -85,7 +62,7 @@ void UPCGExCollectionThumbnailRenderer::DrawCollection(const UPCGExAssetCollecti
 		return;
 	}
 
-	// Adaptive grid: a single entry fills the tile, small collections use 2x2, larger 3x3.
+	// Adaptive grid: 1 / 2x2 / 3x3.
 	const int32 Side = NumEntries <= 1 ? 1 : NumEntries <= 4 ? 2 : 3;
 	const int32 MaxCells = Side * Side;
 	const bool bOverflow = NumEntries > MaxCells;
@@ -109,8 +86,7 @@ void UPCGExCollectionThumbnailRenderer::DrawCollection(const UPCGExAssetCollecti
 
 		if (CellIndex < NumEntryCells)
 		{
-			// Raw authored order; entries with no asset assigned keep their slot as a
-			// placeholder so cell order stays truthful to the Entries array.
+			// Authored order; empty entry slots stay as placeholders so cell order matches Entries.
 			const FPCGExEntryAccessResult Result = Collection->GetEntryRaw(CellIndex);
 			const FSoftObjectPath CellPath = Result.IsValid() ? Result.Entry->EDITOR_GetThumbnailAssetPath() : FSoftObjectPath();
 			DrawCell(CellPath, CellX, CellY, CellWidth, CellHeight, Viewport, Canvas, Depth);
@@ -121,7 +97,6 @@ void UPCGExCollectionThumbnailRenderer::DrawCollection(const UPCGExAssetCollecti
 		}
 		else
 		{
-			// 2x2 grid with 2-3 entries: keep unused slots as faint cells.
 			DrawPlaceholder(CellX, CellY, CellWidth, CellHeight, Canvas, EmptyCellColor);
 		}
 	}
@@ -139,8 +114,7 @@ void UPCGExCollectionThumbnailRenderer::DrawCell(const FSoftObjectPath& AssetPat
 
 	UObject* LoadedObject = AssetPath.ResolveObject();
 
-	// Nested subcollection -> recursive mosaic. Handled explicitly (never through renderer
-	// delegation below) both for the depth cap and to avoid unbounded recursion on cycles.
+	// Nested subcollection: recurse (depth cap also bounds cycles) rather than delegate.
 	if (const UPCGExAssetCollection* SubCollection = Cast<UPCGExAssetCollection>(LoadedObject))
 	{
 		if (Depth < MaxRecursionDepth && SubCollection->NumEntries() > 0)
@@ -154,8 +128,7 @@ void UPCGExCollectionThumbnailRenderer::DrawCell(const FSoftObjectPath& AssetPat
 		return;
 	}
 
-	// Cached package thumbnail -- cheap, no asset load, matches what the content browser
-	// shows for unloaded assets.
+	// Cached package thumbnail: no asset load, matches the browser's unloaded-asset view.
 	if (UTexture2D* CellTexture = GetOrBuildCachedThumbnailTexture(AssetPath))
 	{
 		FCanvasTileItem Tile(FVector2D(X, Y), CellTexture->GetResource(), FVector2D(Width, Height), FLinearColor::White);
@@ -164,8 +137,7 @@ void UPCGExCollectionThumbnailRenderer::DrawCell(const FSoftObjectPath& AssetPat
 		return;
 	}
 
-	// No cached thumbnail (e.g. freshly created, never-saved asset): delegate to the
-	// child's own renderer when the asset is loaded and supports one.
+	// No cached thumbnail: delegate to the loaded child's own renderer if it has one.
 	if (LoadedObject)
 	{
 		if (FThumbnailRenderingInfo* RenderInfo = UThumbnailManager::Get().GetRenderingInfo(LoadedObject);
@@ -216,50 +188,48 @@ void UPCGExCollectionThumbnailRenderer::DrawOverflowCell(int32 OverflowCount, fl
 
 UTexture2D* UPCGExCollectionThumbnailRenderer::GetOrBuildCachedThumbnailTexture(const FSoftObjectPath& AssetPath)
 {
-	const FAssetData AssetData = PCGExCollectionThumbnail::ResolveAssetData(AssetPath);
+	const FAssetData AssetData = PCGExCollectionEditorUtils::ResolveEntryAssetData(AssetPath);
 	if (!AssetData.IsValid())
 	{
 		return nullptr;
 	}
 
-	// ConditionallyLoadThumbnailsForObjects checks in-memory package thumbnail maps first
-	// and only falls back to a package-header read for unloaded content. OnPropertyChange
-	// render frequency keeps this off any per-frame path.
+	const FSoftObjectPath ResolvedPath = AssetData.GetSoftObjectPath();
+
+	// Cache-first: a present key is authoritative (invalidated via OnThumbnailDirtied), so hits skip all I/O.
+	// A null value negative-caches "no usable thumbnail" so thumbnail-less assets aren't re-read each render.
+	if (const TObjectPtr<UTexture2D>* Existing = CellTextureCache.Find(ResolvedPath))
+	{
+		return Existing->Get();
+	}
+
+	EnsureThumbnailDirtyListener();
+
+	// Miss: load the package thumbnail (in-memory first, package-header read for unloaded). Runs once per asset until dirtied.
 	const FName ObjectFullName = FName(*AssetData.GetFullName());
 	FThumbnailMap ThumbnailMap;
-	if (!ThumbnailTools::ConditionallyLoadThumbnailsForObjects({ObjectFullName}, ThumbnailMap))
+
+	const FObjectThumbnail* ObjectThumbnail = nullptr;
+	if (ThumbnailTools::ConditionallyLoadThumbnailsForObjects({ObjectFullName}, ThumbnailMap))
 	{
+		ObjectThumbnail = ThumbnailMap.Find(ObjectFullName);
+	}
+
+	const int32 ImageWidth = ObjectThumbnail ? ObjectThumbnail->GetImageWidth() : 0;
+	const int32 ImageHeight = ObjectThumbnail ? ObjectThumbnail->GetImageHeight() : 0;
+
+	// Negative-cache the unusable cases so the caller delegates without re-reading every render.
+	if (!ObjectThumbnail || ObjectThumbnail->IsEmpty() || ImageWidth <= 0 || ImageHeight <= 0)
+	{
+		StoreCellTexture(ResolvedPath, nullptr);
 		return nullptr;
 	}
 
-	const FObjectThumbnail* ObjectThumbnail = ThumbnailMap.Find(ObjectFullName);
-	if (!ObjectThumbnail || ObjectThumbnail->IsEmpty())
-	{
-		return nullptr;
-	}
-
-	const int32 ImageWidth = ObjectThumbnail->GetImageWidth();
-	const int32 ImageHeight = ObjectThumbnail->GetImageHeight();
 	const TArray<uint8>& ImageData = ObjectThumbnail->GetUncompressedImageData();
-
-	if (ImageWidth <= 0 || ImageHeight <= 0 || ImageData.Num() != ImageWidth * ImageHeight * 4)
+	if (ImageData.Num() != ImageWidth * ImageHeight * 4)
 	{
+		StoreCellTexture(ResolvedPath, nullptr);
 		return nullptr;
-	}
-
-	const FString CacheKey = AssetData.GetSoftObjectPath().ToString();
-
-	// Reuse the cached texture unless the source thumbnail changed (byte-count heuristic:
-	// re-captured thumbnails virtually never keep the exact same uncompressed size AND
-	// dimensions, and a false negative only costs a texture rebuild).
-	if (const TObjectPtr<UTexture2D>* Existing = CellTextureCache.Find(CacheKey))
-	{
-		const int64* SourceBytes = CellTextureSourceBytes.Find(CacheKey);
-		if (*Existing && SourceBytes && *SourceBytes == ImageData.Num()
-			&& (*Existing)->GetSizeX() == ImageWidth && (*Existing)->GetSizeY() == ImageHeight)
-		{
-			return *Existing;
-		}
 	}
 
 	UTexture2D* Texture = UTexture2D::CreateTransient(ImageWidth, ImageHeight, PF_B8G8R8A8);
@@ -276,8 +246,35 @@ UTexture2D* UPCGExCollectionThumbnailRenderer::GetOrBuildCachedThumbnailTexture(
 	Texture->NeverStream = true;
 	Texture->UpdateResource();
 
-	CellTextureCache.Add(CacheKey, Texture);
-	CellTextureSourceBytes.Add(CacheKey, ImageData.Num());
+	StoreCellTexture(ResolvedPath, Texture);
 
 	return Texture;
+}
+
+void UPCGExCollectionThumbnailRenderer::StoreCellTexture(const FSoftObjectPath& ResolvedPath, UTexture2D* Texture)
+{
+	// Cells are cheap to rebuild, so bound growth by dropping the whole cache when full (no per-entry LRU).
+	if (CellTextureCache.Num() >= MaxCacheEntries)
+	{
+		CellTextureCache.Empty(MaxCacheEntries);
+	}
+	CellTextureCache.Add(ResolvedPath, Texture);
+}
+
+void UPCGExCollectionThumbnailRenderer::EnsureThumbnailDirtyListener()
+{
+	if (bThumbnailDirtiedBound)
+	{
+		return;
+	}
+
+	// Weak binding: auto-removed when this renderer is destroyed, so no explicit teardown.
+	UThumbnailManager::Get().GetOnThumbnailDirtied().AddUObject(this, &UPCGExCollectionThumbnailRenderer::OnThumbnailDirtied);
+	bThumbnailDirtiedBound = true;
+}
+
+void UPCGExCollectionThumbnailRenderer::OnThumbnailDirtied(const FSoftObjectPath& AssetPath)
+{
+	// Evict the dirtied asset's cell; next render rebuilds it. (A collection's own path is never a cell key.)
+	CellTextureCache.Remove(AssetPath);
 }

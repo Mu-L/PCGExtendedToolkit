@@ -61,9 +61,8 @@ void FPCGExCollectionsEditorModule::StartupModule()
 
 #undef PCGEX_REGISTER_ENTRY_CUSTOMIZATION
 
-	// Mosaic thumbnail renderer for all collection types (registered on the base class).
-	// GEngine non-null means engine init is done and UThumbnailManager is safe to touch;
-	// otherwise defer to PostEngineInit.
+	// Mosaic thumbnail renderer for all collection types. GEngine != null means engine init is
+	// done and UThumbnailManager is safe to touch; otherwise defer to PostEngineInit.
 	if (GEngine)
 	{
 		RegisterThumbnailRenderer();

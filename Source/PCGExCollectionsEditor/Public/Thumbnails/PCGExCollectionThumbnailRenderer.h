@@ -14,21 +14,16 @@ class UPCGExAssetCollection;
 class UTexture2D;
 
 /**
- * Thumbnail renderer for all UPCGExAssetCollection types (registered on the base class by
- * the module). Draws an adaptive mosaic of the collection's entries in authored order:
- * 1 entry fills the tile, 2-4 entries use a 2x2 grid, 5+ a 3x3 grid. When the collection
- * holds more than 9 entries, the last cell shows the "+N" overflow count instead of a
- * thumbnail (10 entries -> "+2").
+ * Thumbnail renderer for all UPCGExAssetCollection types (registered on the base class by the
+ * module). Draws an adaptive mosaic of the entries in authored order (1 / 2x2 / 3x3 by count);
+ * past 9 entries the last cell shows a "+N" overflow count.
  *
- * Per-cell content resolution, cheapest-first:
- *   1. Nested subcollection (loaded) -> recursive mosaic, depth-capped at one level.
- *   2. Cached package thumbnail (ThumbnailTools) -> drawn without loading the child asset.
- *   3. Loaded child with its own thumbnail renderer -> delegated sub-rect draw.
- *   4. Placeholder tile.
+ * Per-cell resolution, cheapest-first: nested subcollection -> recursive mosaic (depth-capped);
+ * cached package thumbnail (no asset load); loaded child's own renderer (delegated sub-rect);
+ * placeholder.
  *
- * OnPropertyChange render frequency: the thumbnail pool re-renders whenever the collection
- * is edited, and the editor bakes the result into the package thumbnail on save -- so the
- * content browser shows the mosaic for unloaded assets too.
+ * OnPropertyChange frequency: the pool re-renders on edit and the editor bakes the result into the
+ * package thumbnail on save, so unloaded assets show the mosaic in the content browser too.
  */
 UCLASS()
 class PCGEXCOLLECTIONSEDITOR_API UPCGExCollectionThumbnailRenderer : public UThumbnailRenderer
@@ -58,16 +53,29 @@ protected:
 	void DrawOverflowCell(int32 OverflowCount, float X, float Y, float Width, float Height, FCanvas* Canvas) const;
 
 	/**
-	 * Transient texture built from an asset's cached package thumbnail (no asset load).
-	 * Returns nullptr when no non-empty cached thumbnail exists. Cached per object path,
-	 * invalidated when the source thumbnail's byte count changes.
+	 * Transient texture from an asset's cached package thumbnail (no asset load), or nullptr if none.
+	 * Cache-first (consulted before any load); entries invalidated via OnThumbnailDirtied.
 	 */
 	UTexture2D* GetOrBuildCachedThumbnailTexture(const FSoftObjectPath& AssetPath);
 
-private:
-	UPROPERTY(Transient)
-	TMap<FString, TObjectPtr<UTexture2D>> CellTextureCache;
+	/** Insert (or negative-cache with nullptr), dropping the whole cache first if it is full. */
+	void StoreCellTexture(const FSoftObjectPath& ResolvedPath, UTexture2D* Texture);
 
-	/** Uncompressed byte count of the source thumbnail each cache entry was built from. */
-	TMap<FString, int64> CellTextureSourceBytes;
+	/** Evict the cached cell texture for a dirtied asset so the next render rebuilds it. */
+	void OnThumbnailDirtied(const FSoftObjectPath& AssetPath);
+
+private:
+	/** Subscribe to UThumbnailManager::OnThumbnailDirtied exactly once (lazy, on first build). */
+	void EnsureThumbnailDirtyListener();
+
+	/** Soft cap on cached cell textures; when exceeded the cache is dropped wholesale (cells
+	 *  are cheap to rebuild on demand), bounding editor-session memory growth. */
+	static constexpr int32 MaxCacheEntries = 256;
+
+	/** Cell textures keyed by resolved asset path. A null value is a negative-cache marker
+	 *  ("this asset has no usable cached thumbnail") so repeat renders skip the package read. */
+	UPROPERTY(Transient)
+	TMap<FSoftObjectPath, TObjectPtr<UTexture2D>> CellTextureCache;
+
+	bool bThumbnailDirtiedBound = false;
 };

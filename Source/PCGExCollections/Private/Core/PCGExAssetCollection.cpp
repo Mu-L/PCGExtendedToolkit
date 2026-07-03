@@ -625,9 +625,7 @@ void FPCGExAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath
 
 FSoftObjectPath FPCGExAssetCollectionEntry::EDITOR_GetThumbnailAssetPath() const
 {
-	// Sub entries surface the live SubCollection pointer rather than Staging.Path --
-	// staging may not have run yet right after an assignment, and the thumbnail should
-	// track the authored reference, not the staged snapshot.
+	// Live SubCollection ref, not Staging.Path: staging can lag a just-assigned reference.
 	if (bIsSubCollection)
 	{
 		return SubCollection ? FSoftObjectPath(SubCollection.GetPathName()) : FSoftObjectPath();
@@ -1260,8 +1258,7 @@ bool UPCGExAssetCollection::HasCircularDependency(TSet<const UPCGExAssetCollecti
 		{
 			return;
 		}
-		// Active subcollection entries only: leaf entries may hold a parked SubCollection
-		// reference that never participates in recursion and must not count as a cycle edge.
+		// Skip leaf entries: a parked SubCollection ref is not a cycle edge.
 		if (!InEntry->bIsSubCollection)
 		{
 			return;
@@ -1523,9 +1520,7 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 	if (!bIsValueOnlyLeafEdit)
 	{
 		// Sub-collection refs can only change on structural edits -- value-only edits can't create cycles.
-		// Only active subcollection entries are checked: a leaf entry may keep a parked SubCollection
-		// reference (preserved across bIsSubCollection toggles), which never participates in recursion
-		// and must not be cleared here.
+		// Skip leaf entries: a parked ref (survives bIsSubCollection toggles) must not be cleared here.
 		ForEachEntry([this](FPCGExAssetCollectionEntry* InEntry, int32 i)
 		{
 			if (!InEntry->bIsSubCollection)
@@ -1858,11 +1853,9 @@ void UPCGExAssetCollection::EDITOR_AddBrowserSelectionTyped(const TArray<FAssetD
 	FScopedTransaction Transaction(INVTEXT("Add Browser Selection to Collection"));
 	Modify(true);
 
-	// Partition: assets that are themselves a collection (of any type -- subcollections are not
-	// restricted to the host's own class) become subcollection entries; everything else falls
-	// through to the type-specific EDITOR_AddBrowserSelectionInternal. Resolving GetAsset()
-	// loads the package -- fine here since this only runs from user-driven editor actions
-	// (drag-drop / browser selection).
+	// Partition: any collection asset (any type, not just the host's class) becomes a subcollection
+	// entry; everything else goes to the type-specific EDITOR_AddBrowserSelectionInternal. GetAsset()
+	// loads the package, fine for a user-driven editor action.
 	TArray<FAssetData> RegularAssets;
 	TArray<UPCGExAssetCollection*> SubCollectionAssets;
 	RegularAssets.Reserve(InAssetData.Num());
@@ -1907,10 +1900,8 @@ void UPCGExAssetCollection::EDITOR_AddSubCollectionEntries(const TArray<UPCGExAs
 		return;
 	}
 
-	// Reflection is only needed to grow the per-class `Entries` array; the members being
-	// written (bIsSubCollection, SubCollection) live on FPCGExAssetCollectionEntry, so the
-	// raw element pointer is written through the base struct directly. Any collection type
-	// is accepted as a subcollection.
+	// Reflection only grows the per-class Entries array; bIsSubCollection/SubCollection live on the
+	// base struct, so the new element is written through a base pointer. Any collection type is accepted.
 	FArrayProperty* ArrayProp = CastField<FArrayProperty>(GetClass()->FindPropertyByName(FName("Entries")));
 	if (!ArrayProp)
 	{

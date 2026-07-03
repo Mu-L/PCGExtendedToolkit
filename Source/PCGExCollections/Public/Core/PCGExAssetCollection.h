@@ -246,12 +246,11 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	FPCGExAssetStagingData Staging;
 
 	/**
-	 * Subcollection to draw picks from when bIsSubCollection is enabled. Accepts any collection
-	 * type -- consuming nodes type-check resolved entries and skip the ones they can't handle,
-	 * so mixed-type nesting is expected to be routed through type filters downstream.
-	 * Kept populated when bIsSubCollection is toggled off so the reference survives iteration.
-	 * (Serialization note: legacy per-type entry members were also named "SubCollection", so
-	 * their on-disk tags deserialize directly into this property -- do not rename.)
+	 * Subcollection to draw picks from when bIsSubCollection is enabled. Accepts any collection type;
+	 * consuming nodes type-check resolved entries, so mixed-type nesting must be routed through type
+	 * filters downstream. Kept populated when bIsSubCollection is toggled off so the ref survives iteration.
+	 * Do not rename: legacy per-type entry members were also named "SubCollection", so their on-disk
+	 * tags deserialize straight into this property.
 	 */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="bIsSubCollection", EditConditionHides, DisplayAfter="bIsSubCollection"))
 	TObjectPtr<UPCGExAssetCollection> SubCollection;
@@ -259,13 +258,11 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 	// Subcollection Access
 
-	/** Get subcollection as base type. */
 	virtual const UPCGExAssetCollection* GetSubCollectionPtr() const
 	{
 		return SubCollection;
 	}
 
-	/** Clear subcollection reference. */
 	virtual void ClearSubCollection()
 	{
 		SubCollection = nullptr;
