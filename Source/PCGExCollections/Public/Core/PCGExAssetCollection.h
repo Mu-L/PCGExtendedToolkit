@@ -360,7 +360,8 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 	/**
 	 * Editor-only: the asset path the collection grid should use for this entry's
-	 * thumbnail and for double-click "open asset" actions. Defaults to Staging.Path.
+	 * thumbnail and for double-click "open asset" actions. Defaults to Staging.Path
+	 * for leaves and to the live SubCollection reference for subcollection entries.
 	 * Override when the user-facing source asset differs from Staging.Path -- e.g.
 	 * level-sourced PCGDataAsset entries whose Staging.Path points at the embedded
 	 * exported data asset rather than the authored UWorld.

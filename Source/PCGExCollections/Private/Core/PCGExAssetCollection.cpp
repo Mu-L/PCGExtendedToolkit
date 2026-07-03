@@ -625,6 +625,13 @@ void FPCGExAssetCollectionEntry::EDITOR_GetSourceAssetPaths(TSet<FSoftObjectPath
 
 FSoftObjectPath FPCGExAssetCollectionEntry::EDITOR_GetThumbnailAssetPath() const
 {
+	// Sub entries surface the live SubCollection pointer rather than Staging.Path --
+	// staging may not have run yet right after an assignment, and the thumbnail should
+	// track the authored reference, not the staged snapshot.
+	if (bIsSubCollection)
+	{
+		return SubCollection ? FSoftObjectPath(SubCollection.GetPathName()) : FSoftObjectPath();
+	}
 	return Staging.Path;
 }
 #endif

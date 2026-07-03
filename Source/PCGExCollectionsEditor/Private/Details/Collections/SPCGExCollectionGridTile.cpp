@@ -942,18 +942,9 @@ TSharedRef<SWidget> SPCGExCollectionGridTile::BuildThumbnailWidget()
 	bCachedIsSubCollection = Result.Entry->bIsSubCollection;
 	CachedThumbnailPath = Result.Entry->EDITOR_GetThumbnailAssetPath();
 
-	// Subcollection -- show collection icon
-	if (Result.Entry->bIsSubCollection)
-	{
-		return SNew(SBox)
-			.HAlign(HAlign_Center)
-			.VAlign(VAlign_Center)
-			[
-				SNew(SImage)
-				.Image(FAppStyle::GetBrush("ClassIcon.DataAsset"))
-				.DesiredSizeOverride(FVector2D(48, 48))
-			];
-	}
+	// Subcollection entries fall through to the standard FAssetThumbnail path below:
+	// their thumbnail path is the subcollection asset, whose registered
+	// UPCGExCollectionThumbnailRenderer draws the content mosaic.
 
 	// Get asset path -- entry-specific source (may differ from Staging.Path for
 	// entry types that bake into an embedded asset, e.g. level-sourced PCGDataAsset).
