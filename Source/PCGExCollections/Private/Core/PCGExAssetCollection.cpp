@@ -1324,7 +1324,10 @@ void UPCGExAssetCollection::SyncEntryIds()
 		}
 		if (InEntry->EntryId == 0 || bAlreadySeen)
 		{
-			do { InEntry->EntryId = GetTypeHash(FGuid::NewGuid()); }
+			do
+			{
+				InEntry->EntryId = GetTypeHash(FGuid::NewGuid());
+			}
 			while (InEntry->EntryId == 0 || SeenIds.Contains(InEntry->EntryId));
 			SeenIds.Add(InEntry->EntryId);
 		}
@@ -2027,7 +2030,7 @@ void UPCGExAssetCollection::EDITOR_AddBrowserSelectionTyped(const TArray<FAssetD
 	for (const FAssetData& AssetData : InAssetData)
 	{
 		UClass* AssetClass = AssetData.GetClass();
-		if (!AssetClass || !AssetClass->IsChildOf(UPCGExAssetCollection::StaticClass()))
+		if (!AssetClass || !AssetClass->IsChildOf(StaticClass()))
 		{
 			RegularAssets.Add(AssetData);
 			continue;

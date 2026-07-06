@@ -18,6 +18,7 @@
 #include "PCGDataAsset.h"
 #include "PCGExCollectionsSettingsCache.h"
 #include "PCGExLog.h"
+#include "PCGExSchemaMerging.h"
 #include "PCGExSocketProvider.h"
 #include "PCGParamData.h"
 #include "Collections/PCGExActorCollection.h"
@@ -30,7 +31,6 @@
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExDefaultLevelDataExporter.h"
 #include "Helpers/PCGExLevelDataExporter.h"
-#include "PCGExSchemaMerging.h"
 
 
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
@@ -605,7 +605,7 @@ namespace PCGExSharedCompact
 
 		static FString SortKey(const FPCGExMeshCollectionEntry& E)
 		{
-			return ::PCGExSharedCompact::MeshSortKey(E);
+			return MeshSortKey(E);
 		}
 
 		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
@@ -653,7 +653,7 @@ namespace PCGExSharedCompact
 
 		static FString SortKey(const FPCGExLevelCollectionEntry& E)
 		{
-			return ::PCGExSharedCompact::LevelSortKey(E);
+			return LevelSortKey(E);
 		}
 
 		static const TArray<FPCGExLevelCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)

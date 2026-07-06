@@ -4,9 +4,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Collections/PCGExVariantCollection.h"
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointsProcessor.h"
-#include "Collections/PCGExVariantCollection.h"
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 

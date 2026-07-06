@@ -40,9 +40,12 @@ void UPCGExPathSplineMeshSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* In
 	if (SelectorMode == EPCGExSelectorMode::Unset)
 	{
 		SelectorMode = EPCGExSelectorMode::External;
-		PCGEX_IF_VERSION_LOWER(1, 75, 19) { SelectorMode = EPCGExSelectorMode::Legacy; }
+		PCGEX_IF_VERSION_LOWER(1, 75, 19)
+		{
+			SelectorMode = EPCGExSelectorMode::Legacy;
+		}
 	}
-	
+
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -62,7 +65,7 @@ void UPCGExPathSplineMeshSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 			bUseStagedPoints = false;
 		}
 	}
-	
+
 	Super::PCGExApplyDeprecation(InOutNode);
 }
 

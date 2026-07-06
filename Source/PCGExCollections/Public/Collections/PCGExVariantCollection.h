@@ -108,7 +108,10 @@ class PCGEXCOLLECTIONS_API UPCGExVariantCollection : public UPCGExAssetCollectio
 	GENERATED_BODY()
 
 public:
-	virtual PCGExAssetCollection::FTypeId GetTypeId() const override { return PCGExAssetCollection::TypeIds::Variant; }
+	virtual PCGExAssetCollection::FTypeId GetTypeId() const override
+	{
+		return PCGExAssetCollection::TypeIds::Variant;
+	}
 
 	/** Source collections this variant themes; overrides are grouped per source. */
 	UPROPERTY(EditAnywhere, Category = Settings)

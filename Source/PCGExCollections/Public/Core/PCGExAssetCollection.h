@@ -106,9 +106,9 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetStagingData
 	 */
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(BaseStruct="/Script/PCGExCollections.PCGExStagingBoundsModifier", ExcludeBaseStruct))
 	FInstancedStruct BoundsStagingModifier;
-	
+
 	FBox AlteredBounds = FBox(ForceInit);
-	
+
 	template <typename T>
 	T* LoadSync(FPCGExContext* InContext = nullptr) const
 	{
@@ -245,7 +245,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName="Grammar Mode", EditCondition="bIsSubCollection", EditConditionHides))
 	EPCGExGrammarSubCollectionMode SubGrammarMode = EPCGExGrammarSubCollectionMode::Inherit;
-	
+
 	/**
 	 * Per-entry grammar configuration. Shared between leaf and subcollection entries; for
 	 * subcollections this slot is populated only when SubGrammarMode == Override (it then
@@ -256,11 +256,11 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	FPCGExAssetGrammarDetails AssetGrammar;
 
 #pragma region DEPRECATED
-	
+
 	/** LEGACY (schema v0). Migrated into AssetGrammar by PostLoad when SubGrammarMode==Override. */
 	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
-	
+
 #pragma endregion
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
@@ -1033,11 +1033,11 @@ public:
 	FPCGExAssetGrammarDetails SubCollectionGrammar;
 
 #pragma region DEPRECATED
-	
+
 	/** LEGACY (schema v0). Migrated into SubCollectionGrammar by PostLoad. */
 	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
-	
+
 #pragma endregion
 
 	/** Versioned grammar schema. PostLoad migrates legacy data to the current version. 0 = pre-v1 layout. */
