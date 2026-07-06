@@ -69,8 +69,7 @@ bool FPCGExStagingSpawnActorsElement::Boot(FPCGExContext* InContext) const
 		PCGE_LOG(Error, GraphAndLog, FTEXT("Could not rebuild a valid asset mapping from the provided map."));
 		return false;
 	}
-	
-	
+
 
 	return true;
 }

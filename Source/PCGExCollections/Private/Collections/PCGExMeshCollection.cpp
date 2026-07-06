@@ -410,7 +410,10 @@ void UPCGExMeshCollection::EDITOR_DisableCollisions()
 void UPCGExMeshCollection::EDITOR_SetDescriptorSourceAll(EPCGExEntryVariationMode DescriptorSource)
 {
 	// None is a variations/fitting-source concept; descriptors always carry data. Clamp to Local.
-	if (DescriptorSource == EPCGExEntryVariationMode::None) { DescriptorSource = EPCGExEntryVariationMode::Local; }
+	if (DescriptorSource == EPCGExEntryVariationMode::None)
+	{
+		DescriptorSource = EPCGExEntryVariationMode::Local;
+	}
 
 	Modify(true);
 

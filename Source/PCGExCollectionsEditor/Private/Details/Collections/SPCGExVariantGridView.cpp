@@ -707,11 +707,14 @@ void SPCGExVariantGridView::DeclareSwap(const int32 ItemIndex)
 	}
 
 	// The replacement starts as a full copy of the source entry — swap-the-asset becomes a
-	// one-field edit and weights/variations/tags carry over. Struct type resolved through
-	// the runtime type registry (source collections are homogeneous by construction).
-	const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().FindByClass(Src->GetClass());
-	const UScriptStruct* EntryStruct = TypeInfo ? TypeInfo->EntryStruct : nullptr;
+	// one-field edit and weights/variations/tags carry over. Struct type resolved from the
+	// ENTRY's own type id (not the host class): hosts may be heterogeneous — notably another
+	// variant collection, which is a legal source for daisy-chained swap nodes.
 	const FPCGExEntryAccessResult SourceEntry = Src->GetEntryRaw(Item.SourceRawIndex);
+	const PCGExAssetCollection::FTypeInfo* TypeInfo = SourceEntry.IsValid()
+		                                                  ? PCGExAssetCollection::FTypeRegistry::Get().Find(SourceEntry.Entry->GetTypeId())
+		                                                  : nullptr;
+	const UScriptStruct* EntryStruct = TypeInfo ? TypeInfo->EntryStruct : nullptr;
 
 	if (!EntryStruct || !SourceEntry.IsValid())
 	{

@@ -120,11 +120,10 @@ TSharedRef<SWidget> FPCGExVariantCollectionEditor::MakeAddSourceMenu()
 	PickerConfig.OnShouldFilterAsset = FOnShouldFilterAsset::CreateLambda(
 		[WeakEdited = EditedCollection](const FAssetData& Asset)
 		{
-			// Variants can't source other variants (no chaining, by design), nor themselves.
-			if (Asset.IsInstanceOf<UPCGExVariantCollection>())
-			{
-				return true;
-			}
+			// Other variants ARE legal sources: their payload entries carry stable EntryIds,
+			// so theming a variant enables daisy-chained Swap nodes (X→A, then A→B). Only
+			// self-reference is excluded. Bakes never recurse into a source's own mappings,
+			// so even accidental A↔B setups are inert rather than cyclic.
 			if (const UPCGExAssetCollection* Edited = WeakEdited.Get();
 				Edited && Asset.GetSoftObjectPath() == FSoftObjectPath(Edited))
 			{
@@ -221,12 +220,6 @@ void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetDat
 			continue;
 		}
 
-		const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().FindByClass(Src->GetClass());
-		if (!TypeInfo || !TypeInfo->EntryStruct)
-		{
-			continue;
-		}
-
 		Src->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, int32)
 		{
 			if (!SeedEntry && !Entry->bIsSubCollection && Entry->Staging.Path == MatchPath)
@@ -237,8 +230,16 @@ void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetDat
 
 		if (SeedEntry)
 		{
-			SeedStruct = TypeInfo->EntryStruct;
+			// Struct resolved from the ENTRY's type id — hosts may be heterogeneous
+			// (variant sources), where the host class only maps to the base entry struct.
+			const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(SeedEntry->GetTypeId());
+			SeedStruct = TypeInfo ? TypeInfo->EntryStruct : nullptr;
 			SeedCollection = Src;
+			if (!SeedStruct)
+			{
+				SeedEntry = nullptr;
+				continue;
+			}
 			break;
 		}
 	}
