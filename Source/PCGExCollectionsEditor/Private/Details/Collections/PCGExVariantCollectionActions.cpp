@@ -10,7 +10,7 @@
 // Variant collections are registered by hand rather than via PCGEX_REGISTER_COLLECTION_EDITOR_TYPE:
 // the macro wires CreateCollection/DetectSourceAsset for the content-browser "Create from
 // selection" flow, which variants (asset-only) opt out of entirely.
-namespace
+namespace PCGExVariantCollectionActions
 {
 	struct FRegisterVariantEditorTypeInfo
 	{

@@ -172,6 +172,17 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	}
 
 	/**
+	 * Bake collection-level ("Global") inheritance channels into local values, reading the
+	 * globals from the given source collection. Call when an entry is copied OUT of its
+	 * collection (e.g. into a variant collection payload) — the new host cannot provide the
+	 * typed globals, so they must be resolved into the entry or they are silently lost.
+	 * Base is a no-op; typed entries override for their descriptor channels.
+	 */
+	virtual void ResolveGlobalsToLocal(const UPCGExAssetCollection* InSourceCollection)
+	{
+	}
+
+	/**
 	 * Stable identity for external entry references (e.g. variant collections) across source
 	 * edits -- reorder, rename, duplicate. 0 = unassigned. NEVER assign in the ctor: it would
 	 * defeat UE's CDO->instance propagation for arrays-of-structs (see FPCGExProperty::HeaderId).

@@ -19,6 +19,27 @@
 
 #define LOCTEXT_NAMESPACE "PCGExVariantCollectionEditor"
 
+namespace PCGExVariantCollectionEditor
+{
+	// Shared shell for the toolbar asset-picker dropdowns — one place owns the sizing and
+	// selection behavior contract; callers only provide filters and the selected-callback.
+	TSharedRef<SWidget> MakeAssetPickerMenu(FAssetPickerConfig&& PickerConfig)
+	{
+		PickerConfig.SelectionMode = ESelectionMode::Single;
+		PickerConfig.InitialAssetViewType = EAssetViewType::List;
+		PickerConfig.bAllowNullSelection = false;
+
+		FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+
+		return SNew(SBox)
+			.WidthOverride(380.f)
+			.HeightOverride(420.f)
+			[
+				ContentBrowserModule.Get().CreateAssetPicker(PickerConfig)
+			];
+	}
+}
+
 FPCGExVariantCollectionEditor::FPCGExVariantCollectionEditor()
 	: FPCGExAssetCollectionEditor()
 {
@@ -92,12 +113,7 @@ void FPCGExVariantCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Too
 
 TSharedRef<SWidget> FPCGExVariantCollectionEditor::MakeAddSourceMenu()
 {
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-
 	FAssetPickerConfig PickerConfig;
-	PickerConfig.SelectionMode = ESelectionMode::Single;
-	PickerConfig.InitialAssetViewType = EAssetViewType::List;
-	PickerConfig.bAllowNullSelection = false;
 	PickerConfig.Filter.bRecursiveClasses = true;
 	PickerConfig.Filter.ClassPaths.Add(UPCGExAssetCollection::StaticClass()->GetClassPathName());
 	PickerConfig.OnAssetSelected = FOnAssetSelected::CreateSP(this, &FPCGExVariantCollectionEditor::OnSourceAssetPicked);
@@ -117,12 +133,7 @@ TSharedRef<SWidget> FPCGExVariantCollectionEditor::MakeAddSourceMenu()
 			return false;
 		});
 
-	return SNew(SBox)
-		.WidthOverride(380.f)
-		.HeightOverride(420.f)
-		[
-			ContentBrowserModule.Get().CreateAssetPicker(PickerConfig)
-		];
+	return PCGExVariantCollectionEditor::MakeAssetPickerMenu(MoveTemp(PickerConfig));
 }
 
 void FPCGExVariantCollectionEditor::OnSourceAssetPicked(const FAssetData& AssetData)
@@ -165,21 +176,11 @@ void FPCGExVariantCollectionEditor::OnSourceAssetPicked(const FAssetData& AssetD
 
 TSharedRef<SWidget> FPCGExVariantCollectionEditor::MakeAddAssetSwapMenu()
 {
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-
 	// No class filter: rules match any staged asset path (meshes, actors, levels, ...).
 	FAssetPickerConfig PickerConfig;
-	PickerConfig.SelectionMode = ESelectionMode::Single;
-	PickerConfig.InitialAssetViewType = EAssetViewType::List;
-	PickerConfig.bAllowNullSelection = false;
 	PickerConfig.OnAssetSelected = FOnAssetSelected::CreateSP(this, &FPCGExVariantCollectionEditor::OnSwapAssetPicked);
 
-	return SNew(SBox)
-		.WidthOverride(380.f)
-		.HeightOverride(420.f)
-		[
-			ContentBrowserModule.Get().CreateAssetPicker(PickerConfig)
-		];
+	return PCGExVariantCollectionEditor::MakeAssetPickerMenu(MoveTemp(PickerConfig));
 }
 
 void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetData)
@@ -210,6 +211,7 @@ void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetDat
 	// the Collection Settings tab) when nothing matches yet.
 	const UScriptStruct* SeedStruct = nullptr;
 	const FPCGExAssetCollectionEntry* SeedEntry = nullptr;
+	const UPCGExAssetCollection* SeedCollection = nullptr;
 
 	for (const FPCGExVariantSource& Group : Variant->Sources)
 	{
@@ -236,6 +238,7 @@ void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetDat
 		if (SeedEntry)
 		{
 			SeedStruct = TypeInfo->EntryStruct;
+			SeedCollection = Src;
 			break;
 		}
 	}
@@ -253,6 +256,9 @@ void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetDat
 			if (FPCGExAssetCollectionEntry* Payload = NewRule.Entry.GetMutablePtr<FPCGExAssetCollectionEntry>())
 			{
 				Payload->EntryId = 0;
+				// Bake the seed collection's Global channels into the payload — the variant
+				// host cannot provide typed globals (ISM/skinned descriptors).
+				Payload->ResolveGlobalsToLocal(SeedCollection);
 			}
 		}
 		else

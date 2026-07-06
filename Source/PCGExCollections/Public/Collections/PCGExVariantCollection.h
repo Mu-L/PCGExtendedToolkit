@@ -153,12 +153,32 @@ public:
 	const FPCGExVariantSource* FindSourceGroup(const FSoftObjectPath& InSourcePath) const;
 
 	virtual void PreSave(FObjectPreSaveContext SaveContext) override;
+	virtual void PostLoad() override;
+
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 
 protected:
 	virtual const FPCGExAssetCollectionEntry* GetEntryAtRawIndex(int32 Index) const override;
 	virtual FPCGExAssetCollectionEntry* GetMutableEntryAtRawIndex(int32 Index) override;
 
-	/** Flat raw index -> row payload. Linear over Sources (group count is expected tiny). */
+	/** Flat raw index -> row payload. O(log groups) via the cached offsets when built. */
 	FPCGExAssetCollectionEntry* ResolveRawIndex(int32 Index);
 	const FPCGExAssetCollectionEntry* ResolveRawIndex(int32 Index) const;
+
+	/**
+	 * Cached flat-view structure: FlatGroupOffsets[g] = flat start index of Sources[g]'s rows,
+	 * with one trailing element = start of the PathOverrides payload tail. FlatTotalEntries < 0
+	 * means "not built yet" (fresh object) and lookups fall back to a linear walk.
+	 *
+	 * CONTRACT: rebuilt on PostLoad / PostEditChangeProperty / SyncVariantMappings — any code
+	 * that mutates Sources or PathOverrides structurally OUTSIDE those notification paths must
+	 * call RebuildFlatView() itself. Assets are structurally immutable during PCG execution,
+	 * which is what makes the unguarded hot-path read safe.
+	 */
+	TArray<int32> FlatGroupOffsets;
+	int32 FlatTotalEntries = INDEX_NONE;
+
+	void RebuildFlatView();
 };

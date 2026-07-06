@@ -4,6 +4,7 @@
 #include "Collections/PCGExVariantCollection.h"
 
 #include "PCGExLog.h"
+#include "Algo/BinarySearch.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 #include "UObject/ObjectSaveContext.h"
 
@@ -31,6 +32,11 @@ bool UPCGExVariantCollection::IsValidIndex(const int32 InIndex) const
 
 int32 UPCGExVariantCollection::NumEntries() const
 {
+	if (FlatTotalEntries >= 0)
+	{
+		return FlatTotalEntries;
+	}
+
 	int32 Total = PathOverrides.Num();
 	for (const FPCGExVariantSource& Group : Sources)
 	{
@@ -123,6 +129,15 @@ void UPCGExVariantCollection::SyncVariantMappings()
 	for (const FPCGExVariantSource& Group : Sources)
 	{
 		PathPayloadBase += Group.Overrides.Num();
+	}
+
+	// Pick hashes carry raw entry indices in 16 bits by design (see PCGExCollections::PickHash).
+	// A flattened view beyond that ceiling would truncate silently — near impossible in real
+	// projects, so just say it loudly if it ever happens.
+	if (PathPayloadBase + PathOverrides.Num() > MAX_uint16)
+	{
+		UE_LOG(LogPCGEx, Error, TEXT("[%s] Variant flat entry count (%d) exceeds the 16-bit pick-index ceiling (%d) — picks swapped to entries beyond it will resolve to the WRONG entry."),
+		       *GetName(), PathPayloadBase + PathOverrides.Num(), MAX_uint16);
 	}
 
 	TMap<FSoftObjectPath, int32> PathToRule;
@@ -234,6 +249,11 @@ void UPCGExVariantCollection::SyncVariantMappings()
 
 		FlatOffset += GroupCount;
 	}
+
+	// Sync is a guaranteed pre-consumption checkpoint (PreSave/cook + editor Sync button) —
+	// refresh the flat-view cache here too, covering programmatic mutations that bypassed
+	// the PostEditChange notification path.
+	RebuildFlatView();
 }
 
 bool UPCGExVariantCollection::IsMappingStale(const FPCGExVariantSource& InSourceGroup) const
@@ -268,6 +288,35 @@ void UPCGExVariantCollection::PreSave(FObjectPreSaveContext SaveContext)
 	Super::PreSave(SaveContext);
 }
 
+void UPCGExVariantCollection::PostLoad()
+{
+	Super::PostLoad();
+	RebuildFlatView();
+}
+
+#if WITH_EDITOR
+void UPCGExVariantCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	RebuildFlatView();
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+#endif
+
+void UPCGExVariantCollection::RebuildFlatView()
+{
+	FlatGroupOffsets.Reset(Sources.Num() + 1);
+
+	int32 Offset = 0;
+	for (const FPCGExVariantSource& Group : Sources)
+	{
+		FlatGroupOffsets.Add(Offset);
+		Offset += Group.Overrides.Num();
+	}
+	FlatGroupOffsets.Add(Offset); // start of the PathOverrides payload tail
+
+	FlatTotalEntries = Offset + PathOverrides.Num();
+}
+
 const FPCGExAssetCollectionEntry* UPCGExVariantCollection::GetEntryAtRawIndex(const int32 Index) const
 {
 	return ResolveRawIndex(Index);
@@ -290,6 +339,26 @@ const FPCGExAssetCollectionEntry* UPCGExVariantCollection::ResolveRawIndex(const
 		return nullptr;
 	}
 
+	if (FlatTotalEntries >= 0)
+	{
+		if (Index >= FlatTotalEntries)
+		{
+			return nullptr;
+		}
+
+		const int32 PathBase = FlatGroupOffsets.Last();
+		if (Index >= PathBase)
+		{
+			return PathOverrides[Index - PathBase].Entry.GetPtr<FPCGExAssetCollectionEntry>();
+		}
+
+		// Offsets are ascending (empty groups collapse onto the next start); UpperBound lands
+		// past every start <= Index, so -1 is the last group actually containing the index.
+		const int32 GroupIdx = Algo::UpperBound(FlatGroupOffsets, Index) - 1;
+		return Sources[GroupIdx].Overrides[Index - FlatGroupOffsets[GroupIdx]].Entry.GetPtr<FPCGExAssetCollectionEntry>();
+	}
+
+	// Fallback: flat view not built yet (fresh object before any load/edit notification).
 	int32 Offset = 0;
 	for (const FPCGExVariantSource& Group : Sources)
 	{

@@ -124,7 +124,7 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 				// entry's micro-cache and is meaningless against the replacement entry.
 				Context->SwapMap.Add(
 					PCGEx::H64(Group.SourceGUIDAtBake, Pair.X),
-					PCGEx::H64(VariantGUID, PCGEx::H32(Pair.Y, 0)));
+					PCGExCollections::PickHash::Pack(VariantGUID, static_cast<uint16>(Pair.Y)));
 			}
 
 			bVariantContributes = true;
@@ -230,9 +230,8 @@ namespace PCGExStagingSwap
 				continue;
 			}
 
-			// Pick layout: H64(CollectionGUID, H32(RawEntryIndex, SecondaryIndex + 1))
-			const uint32 CollectionGUID = PCGEx::H64A(Hash);
-			const uint32 RawEntryIndex = PCGEx::H32A(PCGEx::H64B(Hash));
+			const uint32 CollectionGUID = PCGExCollections::PickHash::GetCollectionGUID(Hash);
+			const uint32 RawEntryIndex = PCGExCollections::PickHash::GetRawEntryIndex(Hash);
 
 			if (const uint64* NewHash = Context->SwapMap.Find(PCGEx::H64(CollectionGUID, RawEntryIndex)))
 			{

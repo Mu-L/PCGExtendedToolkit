@@ -728,10 +728,13 @@ void SPCGExVariantGridView::DeclareSwap(const int32 ItemIndex)
 		NewRow.Entry.InitializeAs(EntryStruct, reinterpret_cast<const uint8*>(SourceEntry.Entry));
 
 		// The copy carried the SOURCE entry's identity; zero it so the variant's own
-		// SyncEntryIds assigns a fresh one on the next staging rebuild.
+		// SyncEntryIds assigns a fresh one on the next staging rebuild. Also bake the
+		// source collection's Global channels into the payload — the variant host cannot
+		// provide typed globals (ISM/skinned descriptors), they'd be silently lost.
 		if (FPCGExAssetCollectionEntry* Payload = NewRow.Entry.GetMutablePtr<FPCGExAssetCollectionEntry>())
 		{
 			Payload->EntryId = 0;
+			Payload->ResolveGlobalsToLocal(Src);
 		}
 
 		Variant->PostEditChange();
