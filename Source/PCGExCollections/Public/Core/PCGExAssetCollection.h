@@ -1080,6 +1080,13 @@ protected:
 	template <typename T>
 	bool BuildCacheFromEntries(TArray<T>& InEntries);
 
+	/**
+	 * Non-template cache build over base-entry pointers — the shared core the typed template
+	 * delegates to. Null pointers are tolerated and skipped while still consuming their raw
+	 * index (heterogeneous collections may carry unset rows).
+	 */
+	bool BuildCacheFromEntryPtrs(TConstArrayView<FPCGExAssetCollectionEntry*> InEntries);
+
 	UPROPERTY()
 	bool bCacheNeedsRebuild = true;
 
@@ -1102,98 +1109,18 @@ protected:
 
 // Validates each entry, registers valid ones to the cache (Main + named categories),
 // triggers MicroCache builds, and compiles weight-sorted indices.
+// Thin typed adapter — the actual build lives in BuildCacheFromEntryPtrs (all per-entry
+// calls it makes are virtual on the base entry, so the pointer view loses nothing).
 template <typename T>
 bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
 {
-	FWriteScopeLock WriteScopeLock(CacheLock);
-
-	if (Cache)
+	TArray<FPCGExAssetCollectionEntry*> EntryPtrs;
+	EntryPtrs.Reserve(InEntries.Num());
+	for (T& Entry : InEntries)
 	{
-		return true;
+		EntryPtrs.Add(&Entry);
 	}
-
-	// Rebuild property registry from collection properties
-	RebuildPropertyRegistry();
-
-	Cache = MakeShared<PCGExAssetCollection::FCache>();
-	bCacheNeedsRebuild = false;
-
-	const int32 NumEntriesCount = InEntries.Num();
-	Cache->Main->Reserve(NumEntriesCount);
-
-	// Collect direct subcollection children while iterating entries. Recursion into their
-	// FlatHosts is deferred to after the loop because LoadCache() on a sub-collection takes
-	// its own CacheLock and we want to release the write path here before that happens.
-	TSet<UPCGExAssetCollection*> DirectSubs;
-
-	for (int32 i = 0; i < NumEntriesCount; i++)
-	{
-		T& Entry = InEntries[i];
-		if (!Entry.Validate(this))
-		{
-			continue;
-		}
-
-		Cache->RegisterEntry(i, static_cast<const FPCGExAssetCollectionEntry*>(&Entry));
-
-		if (Entry.HasValidSubCollection())
-		{
-			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(Entry.GetSubCollectionPtr()))
-			{
-				if (Sub != this)
-				{
-					DirectSubs.Add(Sub);
-				}
-			}
-		}
-	}
-
-	Cache->Compile();
-
-	// Materialize FlatHosts: self + every transitively reachable subcollection, deduplicated.
-	// Walks sub-collections via ForEachEntry (direct Entries array read -- no lock on the
-	// sub-collection's cache). This avoids calling LoadCache() on sub-collections, which
-	// could re-enter BuildCacheFromEntries on a cycle (A→B→A) and deadlock on our own
-	// CacheLock. Cycles are handled by the Visited set.
-	TSet<UPCGExAssetCollection*> Visited;
-	Visited.Add(this);
-	Cache->FlatHosts.Add(this);
-
-	TArray<UPCGExAssetCollection*> Stack;
-	for (UPCGExAssetCollection* Sub : DirectSubs)
-	{
-		bool bAlreadyVisited = false;
-		Visited.Add(Sub, &bAlreadyVisited);
-		if (!bAlreadyVisited)
-		{
-			Stack.Add(Sub);
-		}
-	}
-
-	while (!Stack.IsEmpty())
-	{
-		UPCGExAssetCollection* Current = Stack.Pop(EAllowShrinking::No);
-		Cache->FlatHosts.Add(Current);
-
-		Current->ForEachEntry([&Visited, &Stack](const FPCGExAssetCollectionEntry* E, int32 /*Idx*/)
-		{
-			if (!E || !E->HasValidSubCollection())
-			{
-				return;
-			}
-			if (UPCGExAssetCollection* Sub = const_cast<UPCGExAssetCollection*>(E->GetSubCollectionPtr()))
-			{
-				bool bAlreadyVisited = false;
-				Visited.Add(Sub, &bAlreadyVisited);
-				if (!bAlreadyVisited)
-				{
-					Stack.Add(Sub);
-				}
-			}
-		});
-	}
-
-	return true;
+	return BuildCacheFromEntryPtrs(EntryPtrs);
 }
 
 // Boilerplate Macro
