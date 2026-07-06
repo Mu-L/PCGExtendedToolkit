@@ -624,8 +624,8 @@ namespace PCGExPathSplineMesh
 				Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, Segment.MaterialPick);
 			}
 
-			// Subcollections may nest any collection type; only mesh-hosted entries are usable here.
-			if (!Result.IsValid() || !Result.Host->IsType(PCGExAssetCollection::TypeIds::Mesh))
+			// Subcollections/hosts may mix collection types; only mesh entries are usable here.
+			if (!Result.IsValid() || !Result.Entry->IsType(PCGExAssetCollection::TypeIds::Mesh))
 			{
 				HandleInvalidPoint(Index);
 				continue;
