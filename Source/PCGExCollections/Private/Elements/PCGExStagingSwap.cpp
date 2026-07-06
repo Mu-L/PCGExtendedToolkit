@@ -65,28 +65,34 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 		}
 	}
 
-	for (const TSoftObjectPtr<UPCGExVariantCollection>& VariantRef : Settings->VariantCollections)
+	// Variants can be @Data-driven per input, so contribution maps are built per distinct
+	// variant path (once), then assigned/merged per input IO.
+	TMap<FSoftObjectPath, TSharedPtr<TMap<uint64, uint64>>> ContributionByPath;
+
+	auto GetContribution = [&](const FSoftObjectPath& VariantPath) -> TSharedPtr<TMap<uint64, uint64>>
 	{
-		if (VariantRef.IsNull())
+		if (const TSharedPtr<TMap<uint64, uint64>>* Cached = ContributionByPath.Find(VariantPath))
 		{
-			continue;
+			return *Cached;
 		}
 
-		PCGExHelpers::LoadBlocking_AnyThreadTpl(VariantRef);
-		UPCGExVariantCollection* Variant = VariantRef.Get();
+		TSharedPtr<TMap<uint64, uint64>>& Contribution = ContributionByPath.Add(VariantPath); // null until proven loadable
+
+		PCGExHelpers::LoadAndCacheBlocking_AnyThread(VariantPath, Context);
+		UPCGExVariantCollection* Variant = Cast<UPCGExVariantCollection>(VariantPath.ResolveObject());
 
 		if (!Variant)
 		{
-			PCGE_LOG(Warning, GraphAndLog, FTEXT("A variant collection could not be loaded and was skipped."));
-			continue;
+			PCGE_LOG(Warning, GraphAndLog, FTEXT("A variant collection could not be loaded (or isn't a Variant Collection) and was skipped."));
+			return nullptr;
 		}
 
-		// Track every listed variant (not just contributing ones): an edit may make a
+		// Track every resolved variant (not just contributing ones): an edit may make a
 		// currently-inert variant contribute, and that edit must retrigger generation.
 		Variant->EDITOR_RegisterTrackingKeys(Context);
 
+		Contribution = MakeShared<TMap<uint64, uint64>>();
 		const uint32 VariantGUID = Variant->GetCollectionGUID();
-		bool bVariantContributes = false;
 
 		for (const FPCGExVariantSource& Group : Variant->Sources)
 		{
@@ -122,21 +128,61 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 			{
 				// Secondary pick (e.g. material variant) is reset: it indexed the SOURCE
 				// entry's micro-cache and is meaningless against the replacement entry.
-				Context->SwapMap.Add(
+				Contribution->Add(
 					PCGEx::H64(Group.SourceGUIDAtBake, Pair.X),
 					PCGExCollections::PickHash::Pack(VariantGUID, static_cast<uint16>(Pair.Y)));
 			}
-
-			bVariantContributes = true;
 		}
 
-		if (bVariantContributes)
+		if (!Contribution->IsEmpty())
 		{
 			Context->CollectionPickDatasetPacker->RegisterCollection(Variant);
 		}
+
+		return Contribution;
+	};
+
+	for (const TSharedPtr<PCGExData::FPointIO>& IO : Context->MainPoints->Pairs)
+	{
+		TSharedPtr<TMap<uint64, uint64>> Merged;
+
+		for (const FPCGExInputShorthandNameSoftObjectPath& VariantInput : Settings->VariantCollections)
+		{
+			FSoftObjectPath VariantPath;
+			if (!VariantInput.TryReadDataValue(IO, VariantPath) || VariantPath.IsNull())
+			{
+				continue;
+			}
+
+			const TSharedPtr<TMap<uint64, uint64>> Contribution = GetContribution(VariantPath);
+			if (!Contribution || Contribution->IsEmpty())
+			{
+				continue;
+			}
+
+			if (!Merged)
+			{
+				// Single-variant case shares the contribution map directly (common path).
+				Merged = Contribution;
+			}
+			else
+			{
+				// Clone-on-second-contribution so a shared per-path map is never mutated.
+				if (ContributionByPath.FindKey(Merged))
+				{
+					Merged = MakeShared<TMap<uint64, uint64>>(*Merged);
+				}
+				Merged->Append(*Contribution); // later slots win on conflicts
+			}
+		}
+
+		if (Merged && !Merged->IsEmpty())
+		{
+			Context->SwapMapsPerIO.Add(IO->IOIndex, Merged);
+		}
 	}
 
-	if (Context->SwapMap.IsEmpty())
+	if (Context->SwapMapsPerIO.IsEmpty())
 	{
 		PCGE_LOG(Warning, GraphAndLog, FTEXT("No applicable variant mappings — points and map are forwarded unchanged."));
 	}
@@ -194,6 +240,18 @@ namespace PCGExStagingSwap
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
+		// Variants are resolved per input IO (constant or @Data) — no map means this input
+		// passes through untouched; the init policy already forwards/duplicates the data.
+		if (const TSharedPtr<TMap<uint64, uint64>>* Found = Context->SwapMapsPerIO.Find(PointDataFacade->Source->IOIndex))
+		{
+			SwapMap = *Found;
+		}
+
+		if (!SwapMap || SwapMap->IsEmpty())
+		{
+			return true;
+		}
+
 		HashReader = PointDataFacade->GetReadable<int64>(PCGExCollections::Labels::Tag_EntryIdx, PCGExData::EIOSide::In, true);
 		if (!HashReader)
 		{
@@ -233,7 +291,7 @@ namespace PCGExStagingSwap
 			const uint32 CollectionGUID = PCGExCollections::PickHash::GetCollectionGUID(Hash);
 			const uint32 RawEntryIndex = PCGExCollections::PickHash::GetRawEntryIndex(Hash);
 
-			if (const uint64* NewHash = Context->SwapMap.Find(PCGEx::H64(CollectionGUID, RawEntryIndex)))
+			if (const uint64* NewHash = SwapMap->Find(PCGEx::H64(CollectionGUID, RawEntryIndex)))
 			{
 				HashWriter->SetValue(Index, static_cast<int64>(*NewHash));
 			}

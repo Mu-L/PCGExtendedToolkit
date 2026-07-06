@@ -7,6 +7,7 @@
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Collections/PCGExVariantCollection.h"
+#include "Details/PCGExInputShorthandsDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 
 #include "PCGExStagingSwap.generated.h"
@@ -58,12 +59,13 @@ public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
 
 	/**
-	 * Variant collections to apply. Each variant's source groups are matched against the
-	 * collections present in the input Collection Map; groups whose source isn't in the map
-	 * are ignored. Later variants win on conflicting (source, entry) mappings.
+	 * Variant collections to apply — each slot is a constant path or a `@Data` attribute read
+	 * per input data, so different inputs can resolve different variants. Each variant's source
+	 * groups are matched against the collections present in the input Collection Map; groups
+	 * whose source isn't in the map are ignored. Later slots win on conflicting mappings.
 	 */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	TArray<TSoftObjectPtr<UPCGExVariantCollection>> VariantCollections;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, AllowedClasses="/Script/PCGExCollections.PCGExVariantCollection"))
+	TArray<FPCGExInputShorthandNameSoftObjectPath> VariantCollections;
 
 	/**
 	 * Skip source groups whose baked mapping is stale against the live source collection
@@ -81,8 +83,12 @@ struct FPCGExStagingSwapContext final : FPCGExPointsProcessorContext
 	TSharedPtr<PCGExCollections::FPickUnpacker> CollectionPickUnpacker;
 	TSharedPtr<PCGExCollections::FPickPacker> CollectionPickDatasetPacker;
 
-	/** H64(SourceCollectionGUID, SourceRawIndex) -> full replacement pick hash (secondary pick reset). */
-	TMap<uint64, uint64> SwapMap;
+	/**
+	 * Per-input-IO swap map (keyed by IOIndex): H64(SourceCollectionGUID, SourceRawIndex) ->
+	 * full replacement pick hash (secondary pick reset). Per-IO because variants can be
+	 * @Data-driven; single-variant IOs share one contribution map, multi-variant IOs merge.
+	 */
+	TMap<int32, TSharedPtr<TMap<uint64, uint64>>> SwapMapsPerIO;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
@@ -105,6 +111,7 @@ namespace PCGExStagingSwap
 	protected:
 		TSharedPtr<PCGExData::TBuffer<int64>> HashReader;
 		TSharedPtr<PCGExData::TBuffer<int64>> HashWriter;
+		TSharedPtr<TMap<uint64, uint64>> SwapMap;
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
