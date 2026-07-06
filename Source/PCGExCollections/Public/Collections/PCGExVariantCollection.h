@@ -70,6 +70,25 @@ struct PCGEXCOLLECTIONS_API FPCGExVariantSource
 };
 
 /**
+ * Authoring shorthand: "any source entry staging this asset swaps to this payload."
+ * Resolves at bake time against the DECLARED sources only — a rule with no match in any
+ * source simply bakes nothing. Explicit per-entry rows always take precedence over rules.
+ */
+USTRUCT(BlueprintType)
+struct PCGEXCOLLECTIONS_API FPCGExVariantPathOverride
+{
+	GENERATED_BODY()
+
+	/** Source entries whose staged asset path (Staging.Path) equals this swap to Entry. */
+	UPROPERTY(EditAnywhere, Category = Settings)
+	FSoftObjectPath MatchAsset;
+
+	/** Replacement entry. Any concrete FPCGExAssetCollectionEntry type. Unset = rule inert. */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(BaseStruct="/Script/PCGExCollections.PCGExAssetCollectionEntry", ExcludeBaseStruct))
+	FInstancedStruct Entry;
+};
+
+/**
  * A collection that themes other collections: per source collection, a set of override rows
  * keyed by stable EntryId, each carrying a full replacement entry of any concrete type
  * (heterogeneous by design — mesh and actor entries can coexist).
@@ -94,6 +113,16 @@ public:
 	/** Source collections this variant themes; overrides are grouped per source. */
 	UPROPERTY(EditAnywhere, Category = Settings)
 	TArray<FPCGExVariantSource> Sources;
+
+	/**
+	 * Asset-path swap rules — shorthand over the per-entry rows. Resolved into baked pairs
+	 * by SyncVariantMappings against the declared sources; entries already claimed by an
+	 * explicit row are untouched (specific beats general). First matching rule wins;
+	 * duplicate MatchAsset values warn at bake. Rule payloads occupy the tail of the
+	 * flattened raw-index view, after all source-group rows.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings)
+	TArray<FPCGExVariantPathOverride> PathOverrides;
 
 	//~ UPCGExAssetCollection interface — flattened view over Sources[*].Overrides[*].Entry.
 	// InitNumEntries / Sort intentionally keep their base behavior (not-implemented / no-op):

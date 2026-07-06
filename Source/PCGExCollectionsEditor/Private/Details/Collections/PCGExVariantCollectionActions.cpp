@@ -5,14 +5,11 @@
 
 #include "Collections/PCGExVariantCollection.h"
 #include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
-#include "Toolkits/SimpleAssetEditor.h"
+#include "Details/Collections/PCGExVariantCollectionEditor.h"
 
 // Variant collections are registered by hand rather than via PCGEX_REGISTER_COLLECTION_EDITOR_TYPE:
-// the macro wires OpenEditor to a grid-view toolkit whose tile picker assumes homogeneous entries
-// with one known asset property — meaningless for heterogeneous override rows. Until the dedicated
-// mirror-against-source editor exists, the plain details panel (FSimpleAssetEditor) is the correct
-// authoring surface: FInstancedStruct rows are fully editable there. Variants are also asset-only —
-// they never participate in the content-browser "Create from selection" flow.
+// the macro wires CreateCollection/DetectSourceAsset for the content-browser "Create from
+// selection" flow, which variants (asset-only) opt out of entirely.
 namespace
 {
 	struct FRegisterVariantEditorTypeInfo
@@ -34,7 +31,8 @@ namespace
 				Info.DetectCollectionAsset = [](const FAssetData& Asset) { return Asset.IsInstanceOf<UPCGExVariantCollection>(); };
 				Info.OpenEditor = [](UPCGExAssetCollection* Collection, const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& Host)
 				{
-					FSimpleAssetEditor::CreateEditor(Mode, Host, Collection);
+					const TSharedRef<FPCGExVariantCollectionEditor> Editor = MakeShared<FPCGExVariantCollectionEditor>();
+					Editor->InitEditor(Collection, Mode, Host);
 				};
 				Info.CreateCollection = [](const TArray<FAssetData>&) {};
 				Info.UpdateCollections = [](const TArray<TObjectPtr<UPCGExAssetCollection>>&, const TArray<FAssetData>&) {};

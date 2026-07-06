@@ -81,6 +81,10 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 			continue;
 		}
 
+		// Track every listed variant (not just contributing ones): an edit may make a
+		// currently-inert variant contribute, and that edit must retrigger generation.
+		Variant->EDITOR_RegisterTrackingKeys(Context);
+
 		const uint32 VariantGUID = Variant->GetCollectionGUID();
 		bool bVariantContributes = false;
 

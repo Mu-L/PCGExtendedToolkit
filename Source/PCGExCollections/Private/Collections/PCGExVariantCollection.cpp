@@ -31,7 +31,7 @@ bool UPCGExVariantCollection::IsValidIndex(const int32 InIndex) const
 
 int32 UPCGExVariantCollection::NumEntries() const
 {
-	int32 Total = 0;
+	int32 Total = PathOverrides.Num();
 	for (const FPCGExVariantSource& Group : Sources)
 	{
 		Total += Group.Overrides.Num();
@@ -54,6 +54,11 @@ void UPCGExVariantCollection::BuildCache()
 		}
 	}
 
+	for (FPCGExVariantPathOverride& Rule : PathOverrides)
+	{
+		EntryPtrs.Add(Rule.Entry.GetMutablePtr<FPCGExAssetCollectionEntry>());
+	}
+
 	BuildCacheFromEntryPtrs(EntryPtrs);
 }
 
@@ -73,6 +78,14 @@ void UPCGExVariantCollection::ForEachEntry(FForEachConstEntryFunc Iterator) cons
 			FlatIndex++;
 		}
 	}
+	for (const FPCGExVariantPathOverride& Rule : PathOverrides)
+	{
+		if (const FPCGExAssetCollectionEntry* Entry = Rule.Entry.GetPtr<FPCGExAssetCollectionEntry>())
+		{
+			Iterator(Entry, FlatIndex);
+		}
+		FlatIndex++;
+	}
 }
 
 void UPCGExVariantCollection::ForEachEntry(FForEachEntryFunc Iterator)
@@ -89,11 +102,46 @@ void UPCGExVariantCollection::ForEachEntry(FForEachEntryFunc Iterator)
 			FlatIndex++;
 		}
 	}
+	for (FPCGExVariantPathOverride& Rule : PathOverrides)
+	{
+		if (FPCGExAssetCollectionEntry* Entry = Rule.Entry.GetMutablePtr<FPCGExAssetCollectionEntry>())
+		{
+			Iterator(Entry, FlatIndex);
+		}
+		FlatIndex++;
+	}
 }
 
 void UPCGExVariantCollection::SyncVariantMappings()
 {
 	int32 FlatOffset = 0;
+
+	// Path rules resolve here, against the declared sources only — pure authoring shorthand
+	// over the explicit rows: the baked output has the same shape. Rule payloads occupy the
+	// flat raw-index view after all source-group rows.
+	int32 PathPayloadBase = 0;
+	for (const FPCGExVariantSource& Group : Sources)
+	{
+		PathPayloadBase += Group.Overrides.Num();
+	}
+
+	TMap<FSoftObjectPath, int32> PathToRule;
+	PathToRule.Reserve(PathOverrides.Num());
+	for (int32 r = 0; r < PathOverrides.Num(); r++)
+	{
+		const FPCGExVariantPathOverride& Rule = PathOverrides[r];
+		if (Rule.MatchAsset.IsNull() || !Rule.Entry.IsValid())
+		{
+			continue;
+		}
+		if (PathToRule.Contains(Rule.MatchAsset))
+		{
+			UE_LOG(LogPCGEx, Warning, TEXT("[%s] Duplicate asset swap rule for '%s' — first rule wins."),
+			       *GetName(), *Rule.MatchAsset.ToString());
+			continue;
+		}
+		PathToRule.Add(Rule.MatchAsset, r);
+	}
 
 	for (FPCGExVariantSource& Group : Sources)
 	{
@@ -155,6 +203,29 @@ void UPCGExVariantCollection::SyncVariantMappings()
 				UE_LOG(LogPCGEx, Warning, TEXT("[%s] Variant row %d for source '%s' references EntryId %d which no longer exists — orphaned row skipped."),
 				       *GetName(), o, *Src->GetName(), Row.SourceEntryId);
 			}
+		}
+
+		// Path rules fill entries not claimed by an explicit row (specific beats general).
+		if (!PathToRule.IsEmpty())
+		{
+			TSet<int32> ClaimedRawIndices;
+			ClaimedRawIndices.Reserve(Group.BakedPairs.Num());
+			for (const FIntPoint& Pair : Group.BakedPairs)
+			{
+				ClaimedRawIndices.Add(Pair.X);
+			}
+
+			Src->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, const int32 RawIndex)
+			{
+				if (Entry->bIsSubCollection || ClaimedRawIndices.Contains(RawIndex))
+				{
+					return;
+				}
+				if (const int32* Rule = PathToRule.Find(Entry->Staging.Path))
+				{
+					Group.BakedPairs.Emplace(RawIndex, PathPayloadBase + *Rule);
+				}
+			});
 		}
 
 		Group.SourceNumEntriesAtBake = Src->NumEntries();
@@ -228,6 +299,10 @@ const FPCGExAssetCollectionEntry* UPCGExVariantCollection::ResolveRawIndex(const
 			return Group.Overrides[Index - Offset].Entry.GetPtr<FPCGExAssetCollectionEntry>();
 		}
 		Offset += Count;
+	}
+	if (PathOverrides.IsValidIndex(Index - Offset))
+	{
+		return PathOverrides[Index - Offset].Entry.GetPtr<FPCGExAssetCollectionEntry>();
 	}
 	return nullptr;
 }
