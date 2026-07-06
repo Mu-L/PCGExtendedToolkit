@@ -171,6 +171,16 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 		return PCGExAssetCollection::FTypeRegistry::Get().IsA(GetTypeId(), TypeId);
 	}
 
+	/**
+	 * Stable identity for external entry references (e.g. variant collections) across source
+	 * edits -- reorder, rename, duplicate. 0 = unassigned. NEVER assign in the ctor: it would
+	 * defeat UE's CDO->instance propagation for arrays-of-structs (see FPCGExProperty::HeaderId).
+	 * Assigned and deduplicated by UPCGExAssetCollection::SyncEntryIds (RebuildStagingData).
+	 * Cooked deliberately (not editor-only) so packaged builds can match entries by identity.
+	 */
+	UPROPERTY()
+	int32 EntryId = 0;
+
 	// Core Properties
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayPriority=-1, ClampMin=0, UIMin=0))
@@ -829,6 +839,14 @@ public:
 
 	bool HasCircularDependency(const UPCGExAssetCollection* OtherCollection) const;
 	bool HasCircularDependency(TSet<const UPCGExAssetCollection*>& InReferences) const;
+
+	/**
+	 * Assigns a unique non-zero EntryId to every entry that has none, and re-assigns
+	 * copy-paste-introduced duplicates (first-seen entry keeps its id, so external
+	 * references keep resolving to the original). Runs at the top of RebuildStagingData
+	 * so identity is settled before any derived data (e.g. variant bakes) reads it.
+	 */
+	void SyncEntryIds();
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;

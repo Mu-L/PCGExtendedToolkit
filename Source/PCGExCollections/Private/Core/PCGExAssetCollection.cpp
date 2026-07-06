@@ -1202,12 +1202,37 @@ void UPCGExAssetCollection::BeginDestroy()
 
 void UPCGExAssetCollection::RebuildStagingData(bool bRecursive)
 {
+	SyncEntryIds();
+
 	ForEachEntry([this, bRecursive](FPCGExAssetCollectionEntry* InEntry, int32 i)
 	{
 		InEntry->UpdateStaging(this, i, bRecursive);
 		InEntry->PostUpdateStaging();
 	});
 	InvalidateCache();
+}
+
+void UPCGExAssetCollection::SyncEntryIds()
+{
+	TSet<int32> SeenIds;
+	SeenIds.Reserve(NumEntries());
+
+	ForEachEntry([&SeenIds](FPCGExAssetCollectionEntry* InEntry, int32 i)
+	{
+		// Copy-paste preserves the source's EntryId; without this catch, external references
+		// (variant collections) would alias the duplicates. First-seen keeps its id.
+		bool bAlreadySeen = false;
+		if (InEntry->EntryId != 0)
+		{
+			SeenIds.Add(InEntry->EntryId, &bAlreadySeen);
+		}
+		if (InEntry->EntryId == 0 || bAlreadySeen)
+		{
+			do { InEntry->EntryId = GetTypeHash(FGuid::NewGuid()); }
+			while (InEntry->EntryId == 0 || SeenIds.Contains(InEntry->EntryId));
+			SeenIds.Add(InEntry->EntryId);
+		}
+	});
 }
 
 void UPCGExAssetCollection::EDITOR_RegisterTrackingKeys(FPCGExContext* Context) const
