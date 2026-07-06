@@ -41,6 +41,11 @@ public:
 	{
 		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
 	}
+	
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 #endif
 
 protected:
