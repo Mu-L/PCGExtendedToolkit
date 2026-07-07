@@ -259,7 +259,7 @@ namespace PCGExCollections
 	 *   Packer->PackToDataset(OutputSet);
 	 */
 	/**
-	 * Canonical pick-hash layout — the ONE definition shared by FPickPacker, FPickUnpacker
+	 * Canonical pick-hash layout -- the ONE definition shared by FPickPacker, FPickUnpacker
 	 * and any node that rewrites picks (e.g. Staging : Swap):
 	 *
 	 *   uint64 = H64(CollectionGUID, H32(RawEntryIndex, SecondaryIndex + 1))

@@ -47,8 +47,8 @@ int32 UPCGExVariantCollection::NumEntries() const
 
 void UPCGExVariantCollection::BuildCache()
 {
-	// Flatten to base pointers in declaration order. Unset rows contribute a null — tolerated
-	// by BuildCacheFromEntryPtrs — so raw indices stay stable under partial authoring.
+	// Flatten to base pointers in declaration order. Unset rows contribute a null -- tolerated
+	// by BuildCacheFromEntryPtrs -- so raw indices stay stable under partial authoring.
 	TArray<FPCGExAssetCollectionEntry*> EntryPtrs;
 	EntryPtrs.Reserve(NumEntries());
 
@@ -75,7 +75,7 @@ void UPCGExVariantCollection::ForEachEntry(FForEachConstEntryFunc Iterator) cons
 	{
 		for (const FPCGExVariantEntryOverride& Row : Group.Overrides)
 		{
-			// Unset rows are skipped but still consume their flat index — iterator
+			// Unset rows are skipped but still consume their flat index -- iterator
 			// consumers rely on the index being the raw entry index.
 			if (const FPCGExAssetCollectionEntry* Entry = Row.Entry.GetPtr<FPCGExAssetCollectionEntry>())
 			{
@@ -122,7 +122,7 @@ void UPCGExVariantCollection::SyncVariantMappings()
 {
 	int32 FlatOffset = 0;
 
-	// Path rules resolve here, against the declared sources only — pure authoring shorthand
+	// Path rules resolve here, against the declared sources only -- pure authoring shorthand
 	// over the explicit rows: the baked output has the same shape. Rule payloads occupy the
 	// flat raw-index view after all source-group rows.
 	int32 PathPayloadBase = 0;
@@ -132,11 +132,11 @@ void UPCGExVariantCollection::SyncVariantMappings()
 	}
 
 	// Pick hashes carry raw entry indices in 16 bits by design (see PCGExCollections::PickHash).
-	// A flattened view beyond that ceiling would truncate silently — near impossible in real
+	// A flattened view beyond that ceiling would truncate silently -- near impossible in real
 	// projects, so just say it loudly if it ever happens.
 	if (PathPayloadBase + PathOverrides.Num() > MAX_uint16)
 	{
-		UE_LOG(LogPCGEx, Error, TEXT("[%s] Variant flat entry count (%d) exceeds the 16-bit pick-index ceiling (%d) — picks swapped to entries beyond it will resolve to the WRONG entry."),
+		UE_LOG(LogPCGEx, Error, TEXT("[%s] Variant flat entry count (%d) exceeds the 16-bit pick-index ceiling (%d) -- picks swapped to entries beyond it will resolve to the WRONG entry."),
 		       *GetName(), PathPayloadBase + PathOverrides.Num(), MAX_uint16);
 	}
 
@@ -151,7 +151,7 @@ void UPCGExVariantCollection::SyncVariantMappings()
 		}
 		if (PathToRule.Contains(Rule.MatchAsset))
 		{
-			UE_LOG(LogPCGEx, Warning, TEXT("[%s] Duplicate asset swap rule for '%s' — first rule wins."),
+			UE_LOG(LogPCGEx, Warning, TEXT("[%s] Duplicate asset swap rule for '%s' -- first rule wins."),
 			       *GetName(), *Rule.MatchAsset.ToString());
 			continue;
 		}
@@ -178,7 +178,7 @@ void UPCGExVariantCollection::SyncVariantMappings()
 
 		if (!Src)
 		{
-			UE_LOG(LogPCGEx, Warning, TEXT("[%s] Variant source '%s' could not be loaded — group mapping not baked."),
+			UE_LOG(LogPCGEx, Warning, TEXT("[%s] Variant source '%s' could not be loaded -- group mapping not baked."),
 			       *GetName(), *Group.Source.ToSoftObjectPath().ToString());
 			FlatOffset += GroupCount;
 			continue;
@@ -197,7 +197,7 @@ void UPCGExVariantCollection::SyncVariantMappings()
 
 		if (IdToRawIndex.IsEmpty() && Src->NumEntries() > 0)
 		{
-			UE_LOG(LogPCGEx, Warning, TEXT("[%s] Variant source '%s' has no EntryIds — it was never staging-rebuilt since EntryId support landed. Rebuild & save the source, then re-save this variant."),
+			UE_LOG(LogPCGEx, Warning, TEXT("[%s] Variant source '%s' has no EntryIds -- it was never staging-rebuilt since EntryId support landed. Rebuild & save the source, then re-save this variant."),
 			       *GetName(), *Src->GetName());
 		}
 
@@ -215,7 +215,7 @@ void UPCGExVariantCollection::SyncVariantMappings()
 			}
 			else
 			{
-				UE_LOG(LogPCGEx, Warning, TEXT("[%s] Variant row %d for source '%s' references EntryId %d which no longer exists — orphaned row skipped."),
+				UE_LOG(LogPCGEx, Warning, TEXT("[%s] Variant row %d for source '%s' references EntryId %d which no longer exists -- orphaned row skipped."),
 				       *GetName(), o, *Src->GetName(), Row.SourceEntryId);
 			}
 		}
@@ -250,7 +250,7 @@ void UPCGExVariantCollection::SyncVariantMappings()
 		FlatOffset += GroupCount;
 	}
 
-	// Sync is a guaranteed pre-consumption checkpoint (PreSave/cook + editor Sync button) —
+	// Sync is a guaranteed pre-consumption checkpoint (PreSave/cook + editor Sync button) --
 	// refresh the flat-view cache here too, covering programmatic mutations that bypassed
 	// the PostEditChange notification path.
 	RebuildFlatView();
@@ -261,7 +261,7 @@ bool UPCGExVariantCollection::IsMappingStale(const FPCGExVariantSource& InSource
 	const UPCGExAssetCollection* Src = InSourceGroup.Source.Get();
 	if (!Src)
 	{
-		// Unloaded source — cannot verify, report not-stale rather than blocking consumers.
+		// Unloaded source -- cannot verify, report not-stale rather than blocking consumers.
 		return false;
 	}
 

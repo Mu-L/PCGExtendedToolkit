@@ -19,7 +19,7 @@
  * variant collections. Points whose entry has no override pass through untouched.
  *
  * Place after a staging node (picks must exist) and before consumers (spawn/load/selector
- * nodes). Fitting transforms were computed against the SOURCE entry's bounds — re-adapt with
+ * nodes). Fitting transforms were computed against the SOURCE entry's bounds -- re-adapt with
  * the dedicated Staging : Fitting node downstream if the variant assets differ in footprint.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(Keywords = "stage swap variant biome theme skin collection", PCGExNodeLibraryDoc="staging/staging-swap"))
@@ -64,7 +64,7 @@ public:
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;
 
 	/**
-	 * Variant collections to apply — each slot is a constant path or a `@Data` attribute read
+	 * Variant collections to apply -- each slot is a constant path or a `@Data` attribute read
 	 * per input data, so different inputs can resolve different variants. Each variant's source
 	 * groups are matched against the collections present in the input Collection Map; groups
 	 * whose source isn't in the map are ignored. Later slots win on conflicting mappings.
@@ -79,6 +79,10 @@ public:
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bSkipStaleMappings = true;
+	
+	/** Suppress no applicable variant warnings. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors", meta=(PCG_NotOverridable))
+	bool bQuietNoApplicableVariantsWarning = false;
 };
 
 struct FPCGExStagingSwapContext final : FPCGExPointsProcessorContext

@@ -105,13 +105,13 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 			if (!MappedCollections.Contains(Group.SourceGUIDAtBake))
 			{
 				// The source may be present under a different GUID (re-imported/duplicated since
-				// the variant was baked) — that's a stale bake, not a missing source. Say so
+				// the variant was baked) -- that's a stale bake, not a missing source. Say so
 				// instead of silently not swapping.
 				for (const TPair<uint32, UPCGExAssetCollection*>& Pair : MappedCollections)
 				{
 					if (Pair.Value && FSoftObjectPath(Pair.Value) == Group.Source.ToSoftObjectPath())
 					{
-						PCGE_LOG(Warning, GraphAndLog, FTEXT("A variant source is present in the map but its GUID changed since the variant was baked — mapping skipped. Re-save the variant asset to refresh it."));
+						PCGE_LOG(Warning, GraphAndLog, FTEXT("A variant source is present in the map but its GUID changed since the variant was baked -- mapping skipped. Re-save the variant asset to refresh it."));
 						break;
 					}
 				}
@@ -182,9 +182,9 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 		}
 	}
 
-	if (Context->SwapMapsPerIO.IsEmpty())
+	if (Context->SwapMapsPerIO.IsEmpty() && !Settings->bQuietNoApplicableVariantsWarning)
 	{
-		PCGE_LOG(Warning, GraphAndLog, FTEXT("No applicable variant mappings — points and map are forwarded unchanged."));
+		PCGE_LOG(Warning, GraphAndLog, FTEXT("No applicable variant mappings -- points and map are forwarded unchanged."));
 	}
 
 	return true;
@@ -240,7 +240,7 @@ namespace PCGExStagingSwap
 
 		PCGEX_INIT_IO(PointDataFacade->Source, Settings->GetMainDataInitializationPolicy())
 
-		// Variants are resolved per input IO (constant or @Data) — no map means this input
+		// Variants are resolved per input IO (constant or @Data) -- no map means this input
 		// passes through untouched; the init policy already forwards/duplicates the data.
 		if (const TSharedPtr<TMap<uint64, uint64>>* Found = Context->SwapMapsPerIO.Find(PointDataFacade->Source->IOIndex))
 		{

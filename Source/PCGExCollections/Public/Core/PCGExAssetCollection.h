@@ -174,7 +174,7 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	/**
 	 * Bake collection-level ("Global") inheritance channels into local values, reading the
 	 * globals from the given source collection. Call when an entry is copied OUT of its
-	 * collection (e.g. into a variant collection payload) — the new host cannot provide the
+	 * collection (e.g. into a variant collection payload) -- the new host cannot provide the
 	 * typed globals, so they must be resolved into the entry or they are silently lost.
 	 * Base is a no-op; typed entries override for their descriptor channels.
 	 */
@@ -1092,7 +1092,7 @@ protected:
 	bool BuildCacheFromEntries(TArray<T>& InEntries);
 
 	/**
-	 * Non-template cache build over base-entry pointers — the shared core the typed template
+	 * Non-template cache build over base-entry pointers -- the shared core the typed template
 	 * delegates to. Null pointers are tolerated and skipped while still consuming their raw
 	 * index (heterogeneous collections may carry unset rows).
 	 */
@@ -1120,7 +1120,7 @@ protected:
 
 // Validates each entry, registers valid ones to the cache (Main + named categories),
 // triggers MicroCache builds, and compiles weight-sorted indices.
-// Thin typed adapter — the actual build lives in BuildCacheFromEntryPtrs (all per-entry
+// Thin typed adapter -- the actual build lives in BuildCacheFromEntryPtrs (all per-entry
 // calls it makes are virtual on the base entry, so the pointer view loses nothing).
 template <typename T>
 bool UPCGExAssetCollection::BuildCacheFromEntries(TArray<T>& InEntries)
