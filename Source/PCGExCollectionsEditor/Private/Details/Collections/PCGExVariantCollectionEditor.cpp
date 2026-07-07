@@ -16,6 +16,7 @@
 
 #include "Collections/PCGExVariantCollection.h"
 #include "Details/Collections/SPCGExVariantGridView.h"
+#include "Helpers/PCGExObjectNotifyHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExVariantCollectionEditor"
 
@@ -139,37 +140,10 @@ void FPCGExVariantCollectionEditor::OnSourceAssetPicked(const FAssetData& AssetD
 {
 	FSlateApplication::Get().DismissAllMenus();
 
-	UPCGExVariantCollection* Variant = Cast<UPCGExVariantCollection>(EditedCollection.Get());
-	UPCGExAssetCollection* Source = Cast<UPCGExAssetCollection>(AssetData.GetAsset());
-
-	if (!Variant || !Source)
-	{
-		return;
-	}
-
-	const FSoftObjectPath SourcePath(Source);
-	for (const FPCGExVariantSource& Group : Variant->Sources)
-	{
-		if (Group.Source.ToSoftObjectPath() == SourcePath)
-		{
-			FNotificationInfo Info(LOCTEXT("SourceAlreadyAdded", "This collection is already a source of the variant."));
-			Info.ExpireDuration = 3.f;
-			FSlateNotificationManager::Get().AddNotification(Info);
-			return;
-		}
-	}
-
-	{
-		FScopedTransaction Transaction(LOCTEXT("AddSourceTransaction", "Add Variant Source"));
-		Variant->Modify();
-		FPCGExVariantSource& NewGroup = Variant->Sources.AddDefaulted_GetRef();
-		NewGroup.Source = Source;
-		Variant->PostEditChange();
-	}
-
+	// The grid owns the single add-source path (filtering, transaction, toasts, refresh).
 	if (VariantGrid.IsValid())
 	{
-		VariantGrid->RefreshGrid();
+		VariantGrid->AddSourcesFromAssets({AssetData});
 	}
 }
 
@@ -291,6 +265,9 @@ FReply FPCGExVariantCollectionEditor::OnSyncMappings()
 		Variant->Modify();
 		Variant->SyncVariantMappings();
 	}
+
+	// Mutation happened outside any PostEditChangeProperty path -- notify PCG trackers manually.
+	PCGExEditor::NotifyObjectChanged(Variant);
 
 	if (VariantGrid.IsValid())
 	{

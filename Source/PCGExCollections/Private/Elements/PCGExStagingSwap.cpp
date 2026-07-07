@@ -7,10 +7,11 @@
 #include "Core/PCGExAssetCollection.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
-#include "Helpers/PCGExStreamingHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagingSwapElement"
 #define PCGEX_NAMESPACE StagingSwap
+
+#pragma region UPCGExStagingSwapSettings
 
 void UPCGExStagingSwapSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const
 {
@@ -29,6 +30,26 @@ PCGExData::EIOInit UPCGExStagingSwapSettings::GetMainDataInitializationPolicy() 
 {
 	return WantsDataStealing() ? PCGExData::EIOInit::Forward : PCGExData::EIOInit::Duplicate;
 }
+
+#pragma endregion
+
+#pragma region FPCGExStagingSwapContext
+
+void FPCGExStagingSwapContext::RegisterAssetDependencies()
+{
+	FPCGExPointsProcessorContext::RegisterAssetDependencies();
+
+	// Unique variant paths across IOs; batch-loaded before PostLoadAssetsDependencies runs.
+	TSet<FSoftObjectPath>& Required = GetRequiredAssets();
+	for (const TPair<int32, TArray<FSoftObjectPath>>& Pair : VariantPathsPerIO)
+	{
+		Required.Append(Pair.Value);
+	}
+}
+
+#pragma endregion
+
+#pragma region FPCGExStagingSwapElement
 
 PCGEX_INITIALIZE_ELEMENT(StagingSwap)
 
@@ -52,18 +73,49 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
-	const TMap<uint32, UPCGExAssetCollection*>& MappedCollections = Context->CollectionPickUnpacker->GetCollections();
-
 	// The output map is a superset of the input map: every original collection plus the
 	// variants that actually contribute mappings. Register originals up-front.
 	Context->CollectionPickDatasetPacker = MakeShared<PCGExCollections::FPickPacker>(Context);
-	for (const TPair<uint32, UPCGExAssetCollection*>& Pair : MappedCollections)
+	for (const TPair<uint32, UPCGExAssetCollection*>& Pair : Context->CollectionPickUnpacker->GetCollections())
 	{
 		if (Pair.Value)
 		{
 			Context->CollectionPickDatasetPacker->RegisterCollection(Pair.Value);
 		}
 	}
+
+	// Resolve which variant paths apply to each input IO (constant or @Data) -- attribute
+	// reads only; loading happens through the asset-dependency pipeline.
+	for (const TSharedPtr<PCGExData::FPointIO>& IO : Context->MainPoints->Pairs)
+	{
+		TArray<FSoftObjectPath> Paths;
+
+		for (const FPCGExInputShorthandNameSoftObjectPath& VariantInput : Settings->VariantCollections)
+		{
+			FSoftObjectPath VariantPath;
+			if (!VariantInput.TryReadDataValue(IO, VariantPath) || VariantPath.IsNull())
+			{
+				continue;
+			}
+			Paths.Add(MoveTemp(VariantPath));
+		}
+
+		if (!Paths.IsEmpty())
+		{
+			Context->VariantPathsPerIO.Add(IO->IOIndex, MoveTemp(Paths));
+		}
+	}
+
+	return true;
+}
+
+void FPCGExStagingSwapElement::PostLoadAssetsDependencies(FPCGExContext* InContext) const
+{
+	FPCGExPointsProcessorElement::PostLoadAssetsDependencies(InContext);
+
+	PCGEX_CONTEXT_AND_SETTINGS(StagingSwap)
+
+	const TMap<uint32, UPCGExAssetCollection*>& MappedCollections = Context->CollectionPickUnpacker->GetCollections();
 
 	// Variants can be @Data-driven per input, so contribution maps are built per distinct
 	// variant path (once), then assigned/merged per input IO.
@@ -78,7 +130,7 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 
 		TSharedPtr<TMap<uint64, uint64>>& Contribution = ContributionByPath.Add(VariantPath); // null until proven loadable
 
-		PCGExHelpers::LoadAndCacheBlocking_AnyThread(VariantPath, Context);
+		// Batch-loaded between RegisterAssetDependencies and this hook -- resolve only.
 		UPCGExVariantCollection* Variant = Cast<UPCGExVariantCollection>(VariantPath.ResolveObject());
 
 		if (!Variant)
@@ -142,18 +194,12 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 		return Contribution;
 	};
 
-	for (const TSharedPtr<PCGExData::FPointIO>& IO : Context->MainPoints->Pairs)
+	for (const TPair<int32, TArray<FSoftObjectPath>>& PerIO : Context->VariantPathsPerIO)
 	{
 		TSharedPtr<TMap<uint64, uint64>> Merged;
 
-		for (const FPCGExInputShorthandNameSoftObjectPath& VariantInput : Settings->VariantCollections)
+		for (const FSoftObjectPath& VariantPath : PerIO.Value)
 		{
-			FSoftObjectPath VariantPath;
-			if (!VariantInput.TryReadDataValue(IO, VariantPath) || VariantPath.IsNull())
-			{
-				continue;
-			}
-
 			const TSharedPtr<TMap<uint64, uint64>> Contribution = GetContribution(VariantPath);
 			if (!Contribution || Contribution->IsEmpty())
 			{
@@ -178,7 +224,7 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 
 		if (Merged && !Merged->IsEmpty())
 		{
-			Context->SwapMapsPerIO.Add(IO->IOIndex, Merged);
+			Context->SwapMapsPerIO.Add(PerIO.Key, Merged);
 		}
 	}
 
@@ -186,8 +232,6 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 	{
 		PCGE_LOG(Warning, GraphAndLog, FTEXT("No applicable variant mappings -- points and map are forwarded unchanged."));
 	}
-
-	return true;
 }
 
 bool FPCGExStagingSwapElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
@@ -226,6 +270,10 @@ bool FPCGExStagingSwapElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 
 	return Context->TryComplete();
 }
+
+#pragma endregion
+
+#pragma region PCGExStagingSwap::FProcessor
 
 namespace PCGExStagingSwap
 {
@@ -303,6 +351,8 @@ namespace PCGExStagingSwap
 		PointDataFacade->WriteFastest(TaskManager);
 	}
 }
+
+#pragma endregion
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

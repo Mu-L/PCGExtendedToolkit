@@ -93,11 +93,21 @@ struct FPCGExStagingSwapContext final : FPCGExPointsProcessorContext
 	TSharedPtr<PCGExCollections::FPickPacker> CollectionPickDatasetPacker;
 
 	/**
+	 * Per-input-IO variant paths (keyed by IOIndex) resolved during Boot, in slot order
+	 * (later slots win on conflicting mappings). Batch-loaded via RegisterAssetDependencies;
+	 * consumed by PostLoadAssetsDependencies to build SwapMapsPerIO.
+	 */
+	TMap<int32, TArray<FSoftObjectPath>> VariantPathsPerIO;
+
+	/**
 	 * Per-input-IO swap map (keyed by IOIndex): H64(SourceCollectionGUID, SourceRawIndex) ->
 	 * full replacement pick hash (secondary pick reset). Per-IO because variants can be
 	 * @Data-driven; single-variant IOs share one contribution map, multi-variant IOs merge.
 	 */
 	TMap<int32, TSharedPtr<TMap<uint64, uint64>>> SwapMapsPerIO;
+
+	/** Registers every resolved variant path for batch pre-loading. */
+	virtual void RegisterAssetDependencies() override;
 
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
@@ -110,6 +120,7 @@ protected:
 
 	PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE()
 	virtual bool Boot(FPCGExContext* InContext) const override;
+	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 };
 

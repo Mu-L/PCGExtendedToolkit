@@ -297,7 +297,20 @@ void UPCGExVariantCollection::PostLoad()
 #if WITH_EDITOR
 void UPCGExVariantCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	RebuildFlatView();
+	if (PropertyChangedEvent.ChangeType == EPropertyChangeType::Interactive)
+	{
+		// Value drags can't change the mapping shape.
+		RebuildFlatView();
+		Super::PostEditChangeProperty(PropertyChangedEvent);
+		return;
+	}
+
+	// Bake BEFORE Super: its notification chain re-triggers PCG components tracking this
+	// asset, and those regenerations read BakedPairs. Ends with RebuildFlatView.
+	// KNOWN COST: every non-interactive edit block-loads each source group and walks its
+	// entries twice (order hash + id map), on top of the staging rebuild Super triggers.
+	// If "editor stutters while editing variants" ever comes up, look here first.
+	SyncVariantMappings();
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif

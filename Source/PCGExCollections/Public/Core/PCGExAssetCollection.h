@@ -452,6 +452,47 @@ protected:
 namespace PCGExAssetCollection
 {
 	/**
+	 * Claim-once bank of persistent EntryIds for GENERATED collections that rebuild their
+	 * Entries from scratch. External references (variant collections) bind entries by
+	 * EntryId; a rebuild that mints all-new ids silently unbinds them.
+	 *
+	 * Deposit every previous entry's id under caller-defined identity keys before
+	 * regenerating, then claim while writing the new entries. Two tiers: exact (full
+	 * content/definition identity -- claim FIRST, for every entry) and loose (coarser
+	 * identity, e.g. primary asset path, so a binding survives a content tweak -- claim only
+	 * for entries the exact pass left at 0; ordering ensure-enforced). Pass 0 for either key
+	 * to skip that tier. Each deposited id is handed out at most once, in deposit order per
+	 * key. Unclaimed entries keep EntryId 0 and receive fresh ids from the post-rebuild
+	 * SyncEntryIds pass. Keys only need to be stable within the rebuild call.
+	 */
+	class PCGEXCOLLECTIONS_API FEntryIdBank
+	{
+		struct FDeposit
+		{
+			int32 EntryId = 0;
+			bool bClaimed = false;
+		};
+
+		TArray<FDeposit> Deposits;
+		TMap<uint32, TArray<int32>> ExactToDeposits;
+		TMap<uint32, TArray<int32>> LooseToDeposits;
+		bool bLooseClaimStarted = false;
+
+	public:
+		/** Deposit one id under the two identity tiers. Zero id is ignored; a zero key skips that tier. */
+		void Deposit(uint32 InExactKey, uint32 InLooseKey, int32 InEntryId);
+
+		/** Deposit every non-zero EntryId of InCollection; InKeyFunc returns the exact key per entry (0 = skip). No loose tier. */
+		void Deposit(const UPCGExAssetCollection* InCollection, TFunctionRef<uint32(const FPCGExAssetCollectionEntry&, int32 Index)> InKeyFunc);
+
+		/** Pop the oldest unclaimed id deposited under the exact key. 0 when exhausted or unknown. */
+		int32 ClaimExact(uint32 InExactKey);
+
+		/** Pop the oldest unclaimed id deposited under the loose key. 0 when exhausted or unknown. */
+		int32 ClaimLoose(uint32 InLooseKey);
+	};
+
+	/**
 	 * Per-entry cache for weighted sub-selections within a single entry.
 	 * Used when an entry has multiple variants (e.g. material overrides on a mesh,
 	 * point weights on a data asset). Provides the same pick modes as FCategory

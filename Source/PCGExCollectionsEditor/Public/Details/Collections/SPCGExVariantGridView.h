@@ -9,6 +9,7 @@
 
 #include "Details/Collections/SPCGExCollectionGridTile.h" // FThumbnailCacheMap
 
+struct FAssetData;
 class FAssetThumbnail;
 class FAssetThumbnailPool;
 class FStructOnScope;
@@ -145,6 +146,18 @@ public:
 	 * @param bRefreshDetailPanel Pass false when the edit originated from the details pane itself.
 	 */
 	void RefreshGrid(bool bRefreshDetailPanel = true);
+
+	/**
+	 * Declare the collection assets among InAssets as new sources. The variant itself and
+	 * already-declared sources are skipped (with a toast); other asset types are ignored.
+	 * Shared by the toolbar picker and the drag-drop paths.
+	 * @return The number of candidate collections handled (declared + skipped duplicates).
+	 */
+	int32 AddSourcesFromAssets(const TArray<FAssetData>& InAssets);
+
+	//~ Drop target: collection assets dropped anywhere on the grid become sources.
+	virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& InDragDropEvent) override;
+	virtual FReply OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& InDragDropEvent) override;
 
 private:
 	TWeakObjectPtr<UPCGExVariantCollection> Collection;

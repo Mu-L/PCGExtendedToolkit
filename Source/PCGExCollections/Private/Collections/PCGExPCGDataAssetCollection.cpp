@@ -176,9 +176,18 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		ExportContext.LevelContributions = &EditorLevelContributions;
 		ExportContext.LevelLocalPicks = &EditorLevelLocalPicks;
 #endif
+		// The previous actor collection is the exporter's working buffer -- its CollectionGUID
+		// and EntryIds are bound by external references (variants). Cold external sessions load
+		// the externalized asset back. The entry ref stays assigned during export so the object
+		// stays GC-reachable.
+		if (!EmbeddedActorCollection && !ExternalActorCollection.IsNull())
+		{
+			PCGExHelpers::LoadBlocking_AnyThreadTpl(ExternalActorCollection);
+			EmbeddedActorCollection = ExternalActorCollection.Get();
+		}
+		ExportContext.PreviousActorCollection = EmbeddedActorCollection;
 		ExportContext.ActorCollectionOut = &EmbeddedActorCollection;
 
-		EmbeddedActorCollection = nullptr;
 		const bool bSuccess = Exporter->ExportLevelData(LoadedWorld, ExportedDataAsset, ExportContext);
 
 		if (bSuccess)
@@ -207,6 +216,10 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		{
 			Staging.Path = FSoftObjectPath();
 			Staging.Bounds = FBox(ForceInit);
+
+			// Failed exports return before ActorCollectionOut is assigned; the previous
+			// collection's outer chain was just retired -- never serialize it.
+			EmbeddedActorCollection = nullptr;
 #if WITH_EDITORONLY_DATA
 			EditorMeshContributions.Reset();
 			EditorMeshInheritedDefaults.Reset();
@@ -608,6 +621,12 @@ namespace PCGExSharedCompact
 			return MeshSortKey(E);
 		}
 
+		// Loose identity for EntryId preservation -- the binding survives variant/descriptor tweaks.
+		static FSoftObjectPath PrimaryPath(const FPCGExMeshCollectionEntry& E)
+		{
+			return E.StaticMesh.ToSoftObjectPath();
+		}
+
 		static const TArray<FPCGExMeshCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
 		{
 			return E.EditorMeshContributions;
@@ -654,6 +673,12 @@ namespace PCGExSharedCompact
 		static FString SortKey(const FPCGExLevelCollectionEntry& E)
 		{
 			return LevelSortKey(E);
+		}
+
+		// Path IS the level identity; present to keep the templated preservation body uniform.
+		static FSoftObjectPath PrimaryPath(const FPCGExLevelCollectionEntry& E)
+		{
+			return E.Level.ToSoftObjectPath();
 		}
 
 		static const TArray<FPCGExLevelCollectionEntry>& Contributions(const FPCGExPCGDataAssetCollectionEntry& E)
@@ -743,6 +768,7 @@ namespace PCGExSharedCompact
 			TSet<FName> Tags;
 			FName Category = NAME_None;
 			FPCGExPropertyOverrides PropertyOverrides;
+			bool bEntryIdConsumed = false; // exact-matched by a merged group; keeps its id out of the loose-fallback bank
 		};
 		TMap<uint32, TArray<FPreserved>> PreservedByHash;
 		for (const TEntry& E : SharedCollectionRef->Entries)
@@ -832,9 +858,13 @@ namespace PCGExSharedCompact
 			TEntry Merged = *G.Representative;
 			Merged.Weight = FMath::Max(1, G.WeightSum);
 
-			if (const TArray<FPreserved>* Bucket = PreservedByHash.Find(G.Hash))
+			// Contribution snapshots carry their SOURCE's id, not this collection's; zero is
+			// also the "not preserved" marker for the loose pass below.
+			Merged.EntryId = 0;
+
+			if (TArray<FPreserved>* Bucket = PreservedByHash.Find(G.Hash))
 			{
-				for (const FPreserved& P : *Bucket)
+				for (FPreserved& P : *Bucket)
 				{
 					if (TPolicy::Equals(P.Identity, *G.Representative))
 					{
@@ -844,6 +874,10 @@ namespace PCGExSharedCompact
 						// per-export actor contributions, not user-authored on the shared
 						// collection. Preserving it perpetuates stale values across re-exports.
 						// Tags/Category ARE user-authored and have no per-export contributor.
+
+						// EntryId IS preserved: external references bind by id.
+						Merged.EntryId = P.Identity.EntryId;
+						P.bEntryIdConsumed = true;
 						break;
 					}
 				}
@@ -854,6 +888,31 @@ namespace PCGExSharedCompact
 			for (const TPair<int32, int32>& C : G.Contributors)
 			{
 				LocalToSharedByEntry[C.Key][C.Value] = SharedIdx;
+			}
+		}
+
+		// Loose EntryId fallback: content-changed entries re-claim the previous id bound to
+		// the same primary asset. Claim-once in SortKey order (deterministic); anything still
+		// 0 gets a fresh id from the SyncEntryIds pass below.
+		{
+			PCGExAssetCollection::FEntryIdBank FallbackIds;
+			for (TPair<uint32, TArray<FPreserved>>& Pair : PreservedByHash)
+			{
+				for (const FPreserved& P : Pair.Value)
+				{
+					if (!P.bEntryIdConsumed)
+					{
+						FallbackIds.Deposit(0, GetTypeHash(TPolicy::PrimaryPath(P.Identity)), P.Identity.EntryId);
+					}
+				}
+			}
+
+			for (TEntry& Merged : MergedEntries)
+			{
+				if (Merged.EntryId == 0)
+				{
+					Merged.EntryId = FallbackIds.ClaimLoose(GetTypeHash(TPolicy::PrimaryPath(Merged)));
+				}
 			}
 		}
 

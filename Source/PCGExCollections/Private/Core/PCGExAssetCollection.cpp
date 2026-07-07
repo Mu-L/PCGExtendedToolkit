@@ -91,6 +91,88 @@ namespace PCGExAssetCollection
 		return WeightSum;
 	}
 
+#pragma region FEntryIdBank
+
+	void FEntryIdBank::Deposit(const uint32 InExactKey, const uint32 InLooseKey, const int32 InEntryId)
+	{
+		if (InEntryId == 0 || (InExactKey == 0 && InLooseKey == 0))
+		{
+			return;
+		}
+
+		const int32 DepositIndex = Deposits.Add(FDeposit{InEntryId, false});
+		if (InExactKey != 0)
+		{
+			ExactToDeposits.FindOrAdd(InExactKey).Add(DepositIndex);
+		}
+		if (InLooseKey != 0)
+		{
+			LooseToDeposits.FindOrAdd(InLooseKey).Add(DepositIndex);
+		}
+	}
+
+	void FEntryIdBank::Deposit(const UPCGExAssetCollection* InCollection, TFunctionRef<uint32(const FPCGExAssetCollectionEntry&, int32)> InKeyFunc)
+	{
+		if (!InCollection)
+		{
+			return;
+		}
+		InCollection->ForEachEntry([this, &InKeyFunc](const FPCGExAssetCollectionEntry* Entry, const int32 Index)
+		{
+			Deposit(InKeyFunc(*Entry, Index), 0, Entry->EntryId);
+		});
+	}
+
+	int32 FEntryIdBank::ClaimExact(const uint32 InExactKey)
+	{
+		ensureMsgf(!bLooseClaimStarted, TEXT("FEntryIdBank: exact claims must all happen before the first loose claim."));
+
+		if (InExactKey == 0)
+		{
+			return 0;
+		}
+
+		if (const TArray<int32>* Bucket = ExactToDeposits.Find(InExactKey))
+		{
+			for (const int32 DepositIndex : *Bucket)
+			{
+				FDeposit& D = Deposits[DepositIndex];
+				if (!D.bClaimed)
+				{
+					D.bClaimed = true;
+					return D.EntryId;
+				}
+			}
+		}
+		return 0;
+	}
+
+	int32 FEntryIdBank::ClaimLoose(const uint32 InLooseKey)
+	{
+		bLooseClaimStarted = true;
+
+		if (InLooseKey == 0)
+		{
+			return 0;
+		}
+
+		if (const TArray<int32>* Bucket = LooseToDeposits.Find(InLooseKey))
+		{
+			for (const int32 DepositIndex : *Bucket)
+			{
+				FDeposit& D = Deposits[DepositIndex];
+				if (!D.bClaimed)
+				{
+					D.bClaimed = true;
+					return D.EntryId;
+				}
+			}
+		}
+		return 0;
+	}
+
+#pragma endregion
+
 #pragma region FMicroCache
 
 	int32 FMicroCache::GetPick(int32 Index, EPCGExIndexPickMode PickMode) const

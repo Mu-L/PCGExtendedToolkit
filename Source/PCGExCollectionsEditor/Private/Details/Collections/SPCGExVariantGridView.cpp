@@ -3,13 +3,17 @@
 
 #include "Details/Collections/SPCGExVariantGridView.h"
 
+#include "AssetRegistry/AssetData.h"
 #include "AssetThumbnail.h"
+#include "DragAndDrop/AssetDragDropOp.h"
+#include "Framework/Notifications/NotificationManager.h"
 #include "IStructureDetailsView.h"
 #include "Misc/ITransaction.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 #include "ScopedTransaction.h"
 #include "UObject/StructOnScope.h"
+#include "Widgets/Notifications/SNotificationList.h"
 
 #include "Collections/PCGExVariantCollection.h"
 #include "Core/PCGExAssetCollection.h"
@@ -43,6 +47,15 @@ namespace PCGExVariantGrid
 
 	// Synthetic group hosting the asset-path swap rules.
 	inline const FName AssetSwapsGroupName = FName(TEXT("Asset Swaps"));
+
+	// Any collection subtype except the variant itself (other variants ARE legal --
+	// daisy-chained swap nodes). Registry-only class check, no asset load.
+	inline bool CanBeSource(const FAssetData& InAsset, const UPCGExVariantCollection* InVariant)
+	{
+		return InVariant
+			&& InAsset.IsInstanceOf(UPCGExAssetCollection::StaticClass())
+			&& InAsset.GetSoftObjectPath() != FSoftObjectPath(InVariant);
+	}
 }
 
 #pragma region SPCGExVariantGridTile
@@ -614,6 +627,11 @@ void SPCGExVariantGridView::RebuildLayout()
 			.EntryCount(Count)
 			.bIsCollapsed(bCollapsed)
 			.bAllowRename(false) // group names mirror source asset names — never editable here
+			// Group widgets swallow asset drops (Handled); route them to the shared add-source path.
+			.OnAssetDropOnCategory_Lambda([this](const FName, const TArray<FAssetData>& InAssets)
+			{
+				AddSourcesFromAssets(InAssets);
+			})
 			.OnExpansionChanged_Lambda([this](const FName InGroup, const bool bIsExpanded)
 			{
 				if (bIsExpanded)
@@ -936,6 +954,97 @@ void SPCGExVariantGridView::OnObjectTransacted(UObject* Object, const FTransacti
 		return;
 	}
 	RefreshGrid();
+}
+
+int32 SPCGExVariantGridView::AddSourcesFromAssets(const TArray<FAssetData>& InAssets)
+{
+	UPCGExVariantCollection* Variant = Collection.Get();
+	if (!Variant)
+	{
+		return 0;
+	}
+
+	int32 NumAlreadyDeclared = 0;
+	TArray<UPCGExAssetCollection*> ToAdd;
+
+	for (const FAssetData& Asset : InAssets)
+	{
+		if (!PCGExVariantGrid::CanBeSource(Asset, Variant))
+		{
+			continue;
+		}
+
+		UPCGExAssetCollection* Source = Cast<UPCGExAssetCollection>(Asset.GetAsset());
+		if (!Source)
+		{
+			continue;
+		}
+
+		if (Variant->FindSourceGroup(FSoftObjectPath(Source)) || ToAdd.Contains(Source))
+		{
+			NumAlreadyDeclared++;
+			continue;
+		}
+
+		ToAdd.Add(Source);
+	}
+
+	if (!ToAdd.IsEmpty())
+	{
+		{
+			FScopedTransaction Transaction(LOCTEXT("AddSources", "Add Variant Sources"));
+			bIsSyncing = true;
+			Variant->Modify();
+			for (UPCGExAssetCollection* Source : ToAdd)
+			{
+				Variant->Sources.AddDefaulted_GetRef().Source = Source;
+			}
+			Variant->PostEditChange();
+			bIsSyncing = false;
+		}
+
+		RefreshGrid();
+	}
+
+	if (NumAlreadyDeclared > 0)
+	{
+		FNotificationInfo Info(FText::Format(
+			LOCTEXT("SourcesAlreadyDeclaredFmt", "{0} {0}|plural(one=collection is,other=collections are) already declared as a source of this variant."),
+			NumAlreadyDeclared));
+		Info.ExpireDuration = 3.f;
+		FSlateNotificationManager::Get().AddNotification(Info);
+	}
+
+	return ToAdd.Num() + NumAlreadyDeclared;
+}
+
+FReply SPCGExVariantGridView::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& InDragDropEvent)
+{
+	if (const TSharedPtr<FAssetDragDropOp> AssetOp = InDragDropEvent.GetOperationAs<FAssetDragDropOp>())
+	{
+		for (const FAssetData& Asset : AssetOp->GetAssets())
+		{
+			if (PCGExVariantGrid::CanBeSource(Asset, Collection.Get()))
+			{
+				return FReply::Handled();
+			}
+		}
+	}
+	return FReply::Unhandled();
+}
+
+FReply SPCGExVariantGridView::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& InDragDropEvent)
+{
+	if (const TSharedPtr<FAssetDragDropOp> AssetOp = InDragDropEvent.GetOperationAs<FAssetDragDropOp>())
+	{
+		// Handled whenever the op carried candidate collections -- even all-duplicates
+		// (the skip toast is the drop's outcome).
+		if (AddSourcesFromAssets(AssetOp->GetAssets()) > 0)
+		{
+			return FReply::Handled();
+		}
+	}
+	return FReply::Unhandled();
 }
 
 #pragma endregion
