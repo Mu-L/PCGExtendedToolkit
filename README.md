@@ -133,7 +133,7 @@ PCGEx has companion plugins for specialized integrations:
 | Plugin | Description |
 |--------|-------------|
 | **[PCGEx + ZoneGraph](https://github.com/Nebukam/PCGExtendedToolkitZoneGraph)** | Generate ZoneGraph data for AI navigation from PCGEx clusters |
-| **[PCGEx + Watabou](https://github.com/Nebukam/PCGExtendedToolkitWatabou)** | Import procedural maps from Watabou's generators |
+| **[PCGEx + Watabou](https://pcgex.gitbook.io/pcgex/essentials/importers/watabou-bridge)** | Import procedural maps from Watabou's generators |
 
 ---
 
