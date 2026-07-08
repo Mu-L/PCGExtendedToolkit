@@ -11,6 +11,7 @@
 #include "PCGParamData.h"
 #include "PCGPin.h"
 
+#include "Collections/PCGExMeshCollection.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Core/PCGExCollectionHelpers.h"
@@ -45,6 +46,13 @@ bool UPCGExManagedAssetCollection::Release(bool bHardRelease, TSet<TSoftObjectPt
 
 #pragma region UPCGExBuildAssetCollectionSettings
 
+UPCGExBuildAssetCollectionSettings::UPCGExBuildAssetCollectionSettings()
+{
+	// Default to Mesh Collection: it's the most common source and, unlike most other collection types, can
+	// rebuild its staging data outside the editor (this node bakes staging at execute time). Still user-changeable.
+	AttributeSetDetails.AssetCollectionType = UPCGExMeshCollection::StaticClass();
+}
+
 TArray<FPCGPinProperties> UPCGExBuildAssetCollectionSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
@@ -57,6 +65,21 @@ TArray<FPCGPinProperties> UPCGExBuildAssetCollectionSettings::OutputPinPropertie
 	TArray<FPCGPinProperties> PinProperties;
 	PCGEX_PIN_PARAM(PCGPinConstants::DefaultOutputLabel, "Attribute set carrying the built collection's soft path under OutputAttributeName. Wire into Staging : Distribute's SourceCollection (Constant) override pin.", Normal)
 	return PinProperties;
+}
+
+FPCGDataTypeIdentifier UPCGExBuildAssetCollectionSettings::GetCurrentPinTypesID(const UPCGPin* InPin) const
+{
+	if (InPin && InPin->IsOutputPin())
+	{
+		// The output pin carries the built collection's soft object path -- tag the subtype so it type-matches
+		// soft-path override pins (e.g. Distribute's SourceCollection/Constant).
+		FPCGDataTypeIdentifier Id = FPCGDataTypeInfoParam::AsId();
+		Id.CustomSubtype = static_cast<int32>(EPCGMetadataTypes::SoftObjectPath);
+		return Id;
+	}
+
+	// Input carries an arbitrary attribute set -- no single subtype to pin it to, leave it a generic Param.
+	return FPCGDataTypeInfoParam::AsId();
 }
 
 PCGEX_INITIALIZE_ELEMENT(BuildAssetCollection)

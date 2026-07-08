@@ -62,6 +62,8 @@ class UPCGExBuildAssetCollectionSettings : public UPCGExSettings
 	GENERATED_BODY()
 
 public:
+	UPCGExBuildAssetCollectionSettings();
+
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(BuildAssetCollection, "Build Asset Collection", "Builds a transient asset collection from an input attribute set and outputs its soft path for a Staging : Distribute SourceCollection (Constant) override.")
@@ -74,6 +76,10 @@ public:
 	// Non-cacheable so the managed-resource reuse/mark-used pass runs every generation (drives the PCGEx
 	// element's IsCacheable via ShouldCache).
 	virtual bool IsCacheable() const override { return false; }
+
+	// Type the output pin's payload as a soft object path so it connects cleanly to soft-path override pins
+	// (e.g. Staging : Distribute's SourceCollection/Constant).
+	virtual FPCGDataTypeIdentifier GetCurrentPinTypesID(const UPCGPin* InPin) const override;
 	//~End UPCGSettings
 
 protected:
