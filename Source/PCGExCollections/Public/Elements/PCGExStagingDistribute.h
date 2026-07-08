@@ -111,6 +111,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="CollectionSource == EPCGExCollectionSource::Asset", EditConditionHides))
 	TSoftObjectPtr<UPCGExAssetCollection> AssetCollection;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="CollectionSource == EPCGExCollectionSource::Asset", AllowedClasses="/Script/PCGExCollections.PCGExAssetCollection", EditConditionHides))
+	FPCGExInputShorthandNameSoftObjectPath SourceCollection;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, EditCondition="CollectionSource == EPCGExCollectionSource::AttributeSet", EditConditionHides))
 	FPCGExRoamingAssetCollectionDetails AttributeSetDetails;
