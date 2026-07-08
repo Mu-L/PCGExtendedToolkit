@@ -29,11 +29,8 @@
 
 bool UPCGExManagedAssetCollection::Release(bool bHardRelease, TSet<TSoftObjectPtr<AActor>>& OutActorsToDelete)
 {
-	// Honor the soft/hard release contract so the collection survives a regeneration and can be reused.
-	// PCG's start-of-generation cleanup calls Release(bHardRelease=false); a reusable resource must KEEP its
-	// state and return false there (the base marks it unused so the node can MarkAsReused it). Only a hard
-	// release -- the end-of-gen sweep of an un-reused resource via ReleaseIfUnused, or teardown -- drops the
-	// collection. No actors to delete either way.
+	// Honor the soft/hard contract: keep state on soft cleanup (so the node can MarkAsReused it), drop only on
+	// hard release. Returning bHardRelease unconditionally would destroy the collection every generation.
 	if (bHardRelease)
 	{
 		Collection = nullptr;
@@ -48,8 +45,8 @@ bool UPCGExManagedAssetCollection::Release(bool bHardRelease, TSet<TSoftObjectPt
 
 UPCGExBuildAssetCollectionSettings::UPCGExBuildAssetCollectionSettings()
 {
-	// Default to Mesh Collection: it's the most common source and, unlike most other collection types, can
-	// rebuild its staging data outside the editor (this node bakes staging at execute time). Still user-changeable.
+	// Mesh is the sensible default: the common case, and the only type that can rebuild staging outside the
+	// editor. bSupportCustomType stays true, so it's user-changeable.
 	AttributeSetDetails.AssetCollectionType = UPCGExMeshCollection::StaticClass();
 }
 
@@ -71,14 +68,13 @@ FPCGDataTypeIdentifier UPCGExBuildAssetCollectionSettings::GetCurrentPinTypesID(
 {
 	if (InPin && InPin->IsOutputPin())
 	{
-		// The output pin carries the built collection's soft object path -- tag the subtype so it type-matches
-		// soft-path override pins (e.g. Distribute's SourceCollection/Constant).
+		// Tag the subtype so the output type-matches soft-path override pins (Distribute's SourceCollection/Constant).
 		FPCGDataTypeIdentifier Id = FPCGDataTypeInfoParam::AsId();
 		Id.CustomSubtype = static_cast<int32>(EPCGMetadataTypes::SoftObjectPath);
 		return Id;
 	}
 
-	// Input carries an arbitrary attribute set -- no single subtype to pin it to, leave it a generic Param.
+	// Arbitrary attribute set -- no single subtype, leave it generic.
 	return FPCGDataTypeInfoParam::AsId();
 }
 
@@ -90,9 +86,7 @@ PCGEX_INITIALIZE_ELEMENT(BuildAssetCollection)
 
 namespace PCGExBuildAssetCollection
 {
-	// Config-axis identity: the roaming details fully determine how the input rows map to entries. Combined
-	// with the input attribute set's own data CRC (content axis), this keys managed-resource reuse across
-	// regenerations. GetPathNameSafe gives a stable identity for the collection class.
+	// Config-axis half of the reuse key (folded with the input's data CRC in AdvanceWork).
 	FString BuildConfigId(const FPCGExRoamingAssetCollectionDetails& Details)
 	{
 		return FString::Printf(
@@ -111,11 +105,9 @@ bool FPCGExBuildAssetCollectionElement::AdvanceWork(FPCGExContext* InContext, co
 	PCGEX_CONTEXT_AND_SETTINGS(BuildAssetCollection)
 	PCGEX_EXECUTION_CHECK
 
-	// Guaranteed by CanExecuteOnlyOnMainThread; NewObject, managed-resource registration and the blocking
-	// staging load below all require the game thread.
-	check(IsInGameThread());
+	check(IsInGameThread()); // guaranteed by CanExecuteOnlyOnMainThread
 
-	// One output entry carrying the resolved collection path (empty path when the build can't happen).
+	// Emit the resolved path (empty when the build can't happen).
 	auto OutputPath = [&](const FSoftObjectPath& InPath)
 	{
 		UPCGParamData* OutData = Context->ManagedObjects->New<UPCGParamData>();
@@ -139,13 +131,12 @@ bool FPCGExBuildAssetCollectionElement::AdvanceWork(FPCGExContext* InContext, co
 		return Context->TryComplete();
 	};
 
-	// Validate the collection type up front -- without it there's nothing to build.
+	// No collection type -> nothing to build.
 	if (!Settings->AttributeSetDetails.Validate(Context))
 	{
 		return CompleteWith(FSoftObjectPath());
 	}
 
-	// Pure consumer: first param on the attribute-set input pin.
 	const UPCGParamData* InParam = nullptr;
 	for (const FPCGTaggedData& Tagged : Context->InputData.GetInputsByPin(PCGExCollections::Labels::SourceAssetCollection))
 	{
@@ -159,7 +150,7 @@ bool FPCGExBuildAssetCollectionElement::AdvanceWork(FPCGExContext* InContext, co
 		return CompleteWith(FSoftObjectPath());
 	}
 
-	// No component = nowhere to anchor the collection's lifetime, so the soft path would dangle.
+	// No component -> nowhere to anchor lifetime; the soft path would dangle.
 	UPCGComponent* Component = Context->GetMutableComponent();
 	if (!Component)
 	{
@@ -167,9 +158,8 @@ bool FPCGExBuildAssetCollectionElement::AdvanceWork(FPCGExContext* InContext, co
 		return CompleteWith(FSoftObjectPath());
 	}
 
-	// Reuse identity: the roaming config string (exact, collision-proof on the config axis) folded with the
-	// input attribute set's full data CRC (content axis). A 32-bit collision at worst reuses a stale
-	// collection until the next real input change -- never a crash.
+	// Reuse key = config string + the input's full data CRC. A 32-bit collision only risks reusing a stale
+	// collection until the next input change, never a crash.
 	const FString ConfigId = PCGExBuildAssetCollection::BuildConfigId(Settings->AttributeSetDetails);
 	uint32 Hash = GetTypeHash(ConfigId);
 	if (const FPCGCrc DataCrc = InParam->GetOrComputeCrc(/*bFullDataCrc=*/true); DataCrc.IsValid())
@@ -178,7 +168,7 @@ bool FPCGExBuildAssetCollectionElement::AdvanceWork(FPCGExContext* InContext, co
 	}
 	const FPCGCrc Crc(Hash);
 
-	// Reuse an identical collection already materialized on this component (dedup + no rebuild churn).
+	// Reuse an identical collection already on this component.
 	if (const UPCGExManagedAssetCollection* Existing = PCGExManagedHelpers::TryReuseManagedResource<UPCGExManagedAssetCollection>(
 		Component, Crc,
 		[&ConfigId](const UPCGExManagedAssetCollection* Candidate) { return Candidate->Collection && Candidate->Config == ConfigId; }))
@@ -186,9 +176,8 @@ bool FPCGExBuildAssetCollectionElement::AdvanceWork(FPCGExContext* InContext, co
 		return CompleteWith(FSoftObjectPath(Existing->Collection));
 	}
 
-	// Fresh build. Outer the resource to the component (persists across regenerations); outer the collection
-	// to the resource so its lifetime is unambiguous and its object path is unique + resolvable across the
-	// node boundary.
+	// Outer resource->component (persists across gens) and collection->resource, so the collection's soft path
+	// is unique + resolvable across the node boundary.
 	UPCGExManagedAssetCollection* Managed = NewObject<UPCGExManagedAssetCollection>(Component);
 	Managed->SetCrc(Crc);
 	Managed->Config = ConfigId;
@@ -196,17 +185,15 @@ bool FPCGExBuildAssetCollectionElement::AdvanceWork(FPCGExContext* InContext, co
 	UPCGExAssetCollection* Collection = NewObject<UPCGExAssetCollection>(
 		Managed, Settings->AttributeSetDetails.AssetCollectionType.Get(), NAME_None, RF_Transient);
 
-	// bBuildStaging=true bakes staging (bounds/paths) now -- RebuildStagingData self-loads each entry's asset
-	// on this (game) thread -- so downstream Distribute consumes the resolved collection exactly like a saved
-	// asset (its Asset/Constant path never rebuilds staging).
+	// Bake staging now (RebuildStagingData self-loads each asset on the GT) so downstream consumes the
+	// collection exactly like a saved asset.
 	if (!Collection || !PCGExCollectionHelpers::BuildFromAttributeSet(Collection, Context, InParam, Settings->AttributeSetDetails, /*bBuildStaging=*/true))
 	{
 		PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Failed to build collection from the input attribute set."));
 		return CompleteWith(FSoftObjectPath());
 	}
 
-	// Warm the lookup cache so the collection is fully ready for downstream consumers.
-	Collection->LoadCache();
+	Collection->LoadCache(); // warm the cache for consumers
 
 	Managed->Collection = Collection;
 	Component->AddToManagedResources(Managed);

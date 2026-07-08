@@ -56,8 +56,7 @@ void UPCGExAssetStagingSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOu
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 4)
 	{
-		// Rewire the old Asset (constant ref) and Path (attribute) override pins onto the new SourceCollection
-		// shorthand pins. PCGExApplyDeprecation migrates the inline value; this migrates the pin connections.
+		// Rewire the old override pins onto the shorthand's sub-pins (the value migrates in PCGExApplyDeprecation).
 		PCGEX_SHORTHAND_RENAME_PIN(CollectionPathAttributeName, AssetCollection, SourceCollection)
 	}
 
@@ -68,10 +67,8 @@ void UPCGExAssetStagingSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 {
 	PCGEX_IF_VERSION_LOWER(1, 76, 4)
 	{
-		// Collapse the old 3-way collection source onto the SourceCollection shorthand:
-		//   Asset -> Constant (the collection reference), Path Attribute -> Attribute (the path attribute).
-		// AttributeSet has no equivalent -- it lands as an empty Constant, so Boot errors and points users at
-		// the Build Asset Collection node.
+		// Collapse the old 3-way source: Asset -> Constant, Path Attribute -> Attribute. AttributeSet has no
+		// equivalent -> empty Constant -> Boot errors with guidance.
 		const EPCGExInputValueType NewInput = CollectionSource_DEPRECATED == EPCGExCollectionSource::Attribute
 			                                      ? EPCGExInputValueType::Attribute
 			                                      : EPCGExInputValueType::Constant;
@@ -152,8 +149,8 @@ void FPCGExAssetStagingContext::RegisterAssetDependencies()
 
 	if (Settings->SourceCollection.Input == EPCGExInputValueType::Attribute && CollectionsLoader)
 	{
-		// Per-point: register the unique collection paths discovered in Boot so PCG loads them before
-		// PostLoadAssetsDependencies. Inner assets are not needed for Distribute -- it just emits paths/refs.
+		// Register the discovered collection paths for PCG to preload. Inner assets aren't needed -- Distribute
+		// only emits paths/refs.
 		CollectionsLoader->AddAssetDependencies();
 	}
 }
@@ -212,8 +209,8 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 
 	if (Settings->SourceCollection.Input == EPCGExInputValueType::Attribute)
 	{
-		// Per-point / @Data mode: discover synchronously now (the loader is @Data/per-point aware); the
-		// framework loads the collection assets between RegisterAssetDependencies and PostLoadAssetsDependencies.
+		// Per-point / @Data mode: discover now (the loader is @Data/per-point aware); the framework loads the
+		// collections before processing.
 		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->SourceCollection.Attribute)
 
 		TArray<FName> Names = {Settings->SourceCollection.Attribute};
@@ -239,15 +236,14 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	}
 	else
 	{
-		// Constant mode: a single collection reference. Also resolves the live transient collection produced
-		// by a Build Asset Collection node when its output soft path is wired into this pin's Constant override.
+		// Constant mode: a single collection ref -- also resolves a Build Asset Collection node's transient
+		// collection wired into the Constant override.
 		const TSoftObjectPtr<UPCGExAssetCollection> CollectionRef(Settings->SourceCollection.Constant);
 		PCGExHelpers::LoadBlocking_AnyThreadTpl(CollectionRef, Context);
 		Context->MainCollection = CollectionRef.Get();
 		if (!Context->MainCollection)
 		{
-			// Nodes that used the removed 'Attribute Set' source migrate to an empty Constant -- point users at
-			// the replacement rather than the generic missing-collection error.
+			// Ex-AttributeSet nodes migrate to an empty Constant -- give targeted guidance.
 			if (Settings->CollectionSource_DEPRECATED == EPCGExCollectionSource::AttributeSet)
 			{
 				PCGE_LOG(Error, GraphAndLog, FTEXT("The 'Attribute Set' collection source was removed from Staging : Distribute. Use a 'Build Asset Collection' node to convert your attribute set into a collection, then connect its output to this node's Source Collection (Constant) input."));

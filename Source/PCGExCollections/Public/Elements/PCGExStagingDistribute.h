@@ -122,9 +122,6 @@ public:
 	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
 	TSoftObjectPtr<UPCGExAssetCollection> AssetCollection_DEPRECATED;
 
-	UPROPERTY(meta=(DeprecatedProperty, ScriptNoExport))
-	FPCGExRoamingAssetCollectionDetails AttributeSetDetails_DEPRECATED;
-
 #pragma endregion
 	
 	UPROPERTY()
