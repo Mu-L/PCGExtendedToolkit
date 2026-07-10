@@ -108,6 +108,20 @@ public:
 };
 
 /**
+ * Per-scope scratch for Best Fit picks: reusable score/pool buffers so per-pick work stops
+ * heap-allocating once the scope is warmed up (relevant for categories beyond the inline
+ * capacity). Ops fall back to per-pick local buffers when no scratch is provided.
+ */
+class FPCGExBestFitScratch : public FPCGExPickerScratchBase
+{
+public:
+	TArray<TPair<double, int32>, TInlineAllocator<32>> Scored;
+	TArray<double, TInlineAllocator<32>> KHeap;
+	TArray<int32, TInlineAllocator<32>> Pool;
+	TArray<double, TInlineAllocator<32>> Cumulative;
+};
+
+/**
  * Shared base for Best Fit picker operations. Caches the per-point extent source at Init,
  * scores all valid entries per point, and produces a pool for the concrete subclass to weighted-pick from.
  *
@@ -132,6 +146,8 @@ public:
 
 	// Per-point pool size driver.
 	TSharedPtr<PCGExDetails::TSettingValue<double>> PoolSizeGetter;
+
+	virtual TSharedPtr<FPCGExPickerScratchBase> CreateScratchForScope(int32 MaxPointsInScope) const override;
 
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override = 0;
 

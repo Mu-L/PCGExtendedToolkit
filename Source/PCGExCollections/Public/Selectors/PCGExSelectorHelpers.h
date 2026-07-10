@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Algo/BinarySearch.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Math/RandomStream.h"
 #include "Selectors/PCGExEntryPickerOperation.h"
@@ -61,15 +62,10 @@ namespace PCGExCollections::Selectors
 			return INDEX_NONE;
 		}
 		const double Roll = FRandomStream(Seed).FRandRange(0.0, Total);
-		for (int32 k = 0; k < Cumulative.Num(); ++k)
-		{
-			if (Roll <= Cumulative[k])
-			{
-				return k;
-			}
-		}
-		// Numerical drift fallback -- last bucket wins.
-		return Cumulative.Num() - 1;
+		// Cumulative is monotone non-decreasing by construction (weights >= 0), so the first
+		// bucket with Cumulative[k] >= Roll is a lower-bound binary search. Clamp covers
+		// numerical drift (Roll just past Cumulative.Last()) -- last bucket wins.
+		return FMath::Min(Algo::LowerBound(Cumulative, Roll), Cumulative.Num() - 1);
 	}
 
 	/**

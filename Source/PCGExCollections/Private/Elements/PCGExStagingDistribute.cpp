@@ -622,6 +622,10 @@ namespace PCGExAssetStaging
 		const bool bFilterEntryType = Settings->bDoFilterEntryType;
 		const FPCGExStagedTypeFilterDetails& EntryTypeFilter = Settings->EntryTypeFilter;
 
+		// Per-scope pick scratches -- this scope runs on a single thread, so ops can mutate
+		// their scratch freely. Null when no active selector op uses scratch.
+		const TSharedPtr<PCGExCollections::FSourceScratches> PickScratches = Source->CreateScratches(Scope.Count);
+
 		PCGEX_SCOPE_LOOP(Index)
 		{
 			PCGExCollections::FSelectorHelper* Helper = nullptr;
@@ -635,7 +639,7 @@ namespace PCGExAssetStaging
 
 			const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], Helper->Details.SeedComponents, Helper->Details.LocalSeed, Settings, Component);
 
-			FPCGExEntryAccessResult Result = Helper->GetEntry(Index, Seed, bFlattenSubCollections);
+			FPCGExEntryAccessResult Result = Helper->GetEntry(Index, Seed, bFlattenSubCollections, PickScratches ? PickScratches->GetFor(Helper) : nullptr);
 
 			if (!Result.IsValid()
 				|| !Result.Entry->Staging.Bounds.IsValid

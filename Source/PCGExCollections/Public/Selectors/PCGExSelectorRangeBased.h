@@ -131,6 +131,20 @@ public:
 };
 
 /**
+ * Per-scope scratch for Range-Based picks: reusable per-axis value + match buffers so per-pick
+ * work stops heap-allocating once the scope is warmed up. Ops fall back to per-pick local
+ * buffers when no scratch is provided.
+ */
+class FPCGExRangeBasedScratch : public FPCGExPickerScratchBase
+{
+public:
+	TArray<double, TInlineAllocator<8>> PointValues;
+	TArray<int32, TInlineAllocator<32>> Matches;
+	TArray<double, TInlineAllocator<32>> Cumulative;
+	TArray<int32, TInlineAllocator<8>> TieBucket;
+};
+
+/**
  * Shared base for Range-Based picker operations. Holds per-axis value getters and a typed
  * pointer to shared collection-derived state. Concrete subclasses implement Pick() according
  * to their overlap policy.
@@ -144,6 +158,8 @@ public:
 
 	// One getter per axis, parallel to Axes. Resolved in OnInitForData.
 	TArray<TSharedPtr<PCGExDetails::TSettingValue<double>>> ValueGetters;
+
+	virtual TSharedPtr<FPCGExPickerScratchBase> CreateScratchForScope(int32 MaxPointsInScope) const override;
 
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override = 0;
 
