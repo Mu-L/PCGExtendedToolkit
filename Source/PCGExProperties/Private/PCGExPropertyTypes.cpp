@@ -268,6 +268,14 @@ void FPCGExProperty_FloatCurve::CopyValueFrom(const FPCGExProperty* Source)
 	Value = Typed->Value;
 }
 
+double FPCGExProperty_FloatCurve::SampleAt(const double InTime) const
+{
+	// GetRichCurveConst never returns null (falls back to EditorCurveData when no external
+	// curve is assigned), and FRichCurve::Eval is a pure read (binary key search) -- safe to
+	// call from parallel point loops on a shared, immutable property instance.
+	return Value.GetRichCurveConst()->Eval(static_cast<float>(InTime));
+}
+
 bool FPCGExProperty_Enum::SyncStructuralFromSchema(const FPCGExProperty& Schema)
 {
 	// The enum class is structural -- the schema decides which UEnum the property targets,

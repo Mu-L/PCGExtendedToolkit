@@ -78,6 +78,14 @@ void FPCGExPropertiesEditorModule::StartupModule()
 		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOutputConfigCustomization::MakeInstance)
 		);
 
+	// FPCGExPropertySampledOutputConfig reuses the output-config customization: same header row,
+	// extra fields (Time) fall through CustomizeChildren. Type-layout registration is per struct
+	// name, so the derived struct needs its own explicit registration.
+	PropertyModule.RegisterCustomPropertyTypeLayout(
+		FPCGExPropertySampledOutputConfig::StaticStruct()->GetFName(),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyOutputConfigCustomization::MakeInstance)
+		);
+
 	// FPCGObjectPropertyOverrideDescription (engine struct) -> compact inline [source] -> [target]. Global by FName.
 	PropertyModule.RegisterCustomPropertyTypeLayout(
 		FPCGObjectPropertyOverrideDescription::StaticStruct()->GetFName(),

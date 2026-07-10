@@ -868,6 +868,10 @@ public:
  * value reads (SupportsOutput=false, GetOutputType=Unknown, TryWriteValue=false). Consumers
  * read it typed via GetResolvedProperty<FPCGExProperty_FloatCurve> -- e.g. the
  * Curve-Remapped Weight selector bakes each entry's curve into a LUT.
+ *
+ * It DOES support the sampling interface (SupportsSampling/SampleAt): generic consumers
+ * such as Staging : Load Properties evaluate the curve at a per-point time and write the
+ * result as a double attribute.
  */
 // NOT PCGExInlineValue: the curve editor needs a full-width row, not the value-column slot of
 // an inline row (whose width tracks the widget's desired size and jitters while typing).
@@ -888,6 +892,13 @@ struct PCGEXPROPERTIES_API FPCGExProperty_FloatCurve : public FPCGExProperty
 	FRuntimeFloatCurve Value;
 
 	virtual void CopyValueFrom(const FPCGExProperty* Source) override;
+
+	virtual bool SupportsSampling() const override
+	{
+		return true;
+	}
+
+	virtual double SampleAt(const double InTime) const override;
 
 	virtual FName GetTypeName() const override
 	{
