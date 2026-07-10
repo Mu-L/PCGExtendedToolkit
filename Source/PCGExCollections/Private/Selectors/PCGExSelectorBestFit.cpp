@@ -206,6 +206,79 @@ int32 FPCGExEntryBestFitTopKPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExP
 	return k == INDEX_NONE ? -1 : Target->Indices[S.Pool[k]];
 }
 
+int32 FPCGExEntryBestFitTopKPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+
+	const FVector P = GetPointExtents(PointIndex);
+
+	FPCGExBestFitScratch LocalScratch;
+	FPCGExBestFitScratch& S = Scratch ? *static_cast<FPCGExBestFitScratch*>(Scratch) : LocalScratch;
+	S.Scored.Reset();
+	S.KHeap.Reset();
+	S.Pool.Reset();
+	S.Cumulative.Reset();
+
+	// Quota-only path: unavailable entries are excluded before scoring, then the TopK logic
+	// runs unchanged over the surviving candidates. K clamps to the filtered count.
+	for (const int32 i : ValidEntryIndices)
+	{
+		if (!InAvailability.IsAvailable(i))
+		{
+			continue;
+		}
+		S.Scored.Emplace(ComputeScore(P, i), i);
+	}
+
+	const int32 N = S.Scored.Num();
+	if (N == 0)
+	{
+		return -1;
+	}
+	const int32 K = FMath::Clamp(FMath::RoundToInt(PoolSizeGetter->Read(PointIndex)), 1, N);
+
+	for (const TPair<double, int32>& Sc : S.Scored)
+	{
+		if (S.KHeap.Num() < K)
+		{
+			S.KHeap.HeapPush(Sc.Key, TGreater<double>());
+		}
+		else if (Sc.Key < S.KHeap.HeapTop())
+		{
+			S.KHeap.HeapPopDiscard(TGreater<double>(), EAllowShrinking::No);
+			S.KHeap.HeapPush(Sc.Key, TGreater<double>());
+		}
+	}
+
+	const double Cutoff = S.KHeap.HeapTop() + UE_DOUBLE_KINDA_SMALL_NUMBER;
+	int32 Write = 0;
+	for (int32 r = 0; r < S.Scored.Num(); ++r)
+	{
+		if (S.Scored[r].Key <= Cutoff)
+		{
+			S.Scored[Write++] = S.Scored[r];
+		}
+	}
+	S.Scored.SetNum(Write, EAllowShrinking::No);
+	S.Scored.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B)
+	{
+		return A.Key < B.Key;
+	});
+
+	double TotalWeight = 0.0;
+	for (const TPair<double, int32>& Sc : S.Scored)
+	{
+		S.Pool.Add(Sc.Value);
+		TotalWeight += EntryWeights[Sc.Value];
+		S.Cumulative.Add(TotalWeight);
+	}
+
+	const int32 k = PCGExCollections::Selectors::RollCumulativeWeighted(MakeArrayView(S.Cumulative), TotalWeight, Seed);
+	return k == INDEX_NONE ? -1 : Target->Indices[S.Pool[k]];
+}
+
 #pragma endregion
 
 #pragma region FPCGExEntryBestFitTolerancePickerOp
@@ -245,6 +318,60 @@ int32 FPCGExEntryBestFitTolerancePickerOp::Pick(int32 PointIndex, int32 Seed, FP
 
 	// Pool = entries within Tolerance * BestScore of the best score.
 	// When BestScore is ~0 (perfect fit), the cutoff also ~0 → only perfect-tie entries pool together.
+	const double Cutoff = BestScore * (1.0 + Tolerance) + UE_DOUBLE_KINDA_SMALL_NUMBER;
+
+	double TotalWeight = 0.0;
+	for (const TPair<double, int32>& Sc : S.Scored)
+	{
+		if (Sc.Key > Cutoff)
+		{
+			continue;
+		}
+		S.Pool.Add(Sc.Value);
+		TotalWeight += EntryWeights[Sc.Value];
+		S.Cumulative.Add(TotalWeight);
+	}
+
+	const int32 k = PCGExCollections::Selectors::RollCumulativeWeighted(MakeArrayView(S.Cumulative), TotalWeight, Seed);
+	return k == INDEX_NONE ? -1 : Target->Indices[S.Pool[k]];
+}
+
+int32 FPCGExEntryBestFitTolerancePickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+
+	const FVector P = GetPointExtents(PointIndex);
+	const double Tolerance = FMath::Max(0.0, PoolSizeGetter->Read(PointIndex));
+
+	FPCGExBestFitScratch LocalScratch;
+	FPCGExBestFitScratch& S = Scratch ? *static_cast<FPCGExBestFitScratch*>(Scratch) : LocalScratch;
+	S.Scored.Reset();
+	S.Pool.Reset();
+	S.Cumulative.Reset();
+
+	// Quota-only path: unavailable entries are excluded before scoring; the best score (and
+	// therefore the tolerance window) is computed over the surviving candidates only.
+	double BestScore = TNumericLimits<double>::Max();
+	for (const int32 i : ValidEntryIndices)
+	{
+		if (!InAvailability.IsAvailable(i))
+		{
+			continue;
+		}
+		const double Score = ComputeScore(P, i);
+		S.Scored.Emplace(Score, i);
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+		}
+	}
+	if (S.Scored.IsEmpty())
+	{
+		return -1;
+	}
+
 	const double Cutoff = BestScore * (1.0 + Tolerance) + UE_DOUBLE_KINDA_SMALL_NUMBER;
 
 	double TotalWeight = 0.0;

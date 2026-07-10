@@ -16,6 +16,7 @@
 #include "Details/PCGExNumericRangeCustomization.h"
 #include "Details/PCGExObjectPropertyOverrideDescriptionCustomization.h"
 #include "Details/PCGExPropertyCompiledCustomization.h"
+#include "Details/PCGExPropertyFloatCurveCustomization.h"
 #include "Details/PCGExPropertyOutputConfigCustomization.h"
 #include "Details/PCGExPropertyOverrideEntryCustomization.h"
 #include "Details/PCGExPropertyOverridesCustomization.h"
@@ -118,6 +119,13 @@ void FPCGExPropertiesEditorModule::StartupModule()
 	REGISTER_PROPERTY_COMPILED_CUSTOMIZATION(Struct)
 
 #undef REGISTER_PROPERTY_COMPILED_CUSTOMIZATION
+
+	// FPCGExProperty_FloatCurve gets the inline curve editor instead of the generic compiled
+	// layout -- it renders the whole value surface itself (and hides PropertyName the same way).
+	PropertyModule.RegisterCustomPropertyTypeLayout(
+		FPCGExProperty_FloatCurve::StaticStruct()->GetFName(),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FPCGExPropertyFloatCurveCustomization::MakeInstance)
+		);
 
 	// Register built-in compact inline widgets for Vector / Vector2D / Rotator property types
 	PCGExBuiltInInlineWidgets::RegisterAll();

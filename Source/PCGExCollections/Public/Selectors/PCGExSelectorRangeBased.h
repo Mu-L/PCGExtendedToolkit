@@ -221,6 +221,7 @@ class FPCGExEntryRangeWeightedRandomPickerOp : public FPCGExEntryRangeBasedPicke
 {
 public:
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+	virtual int32 PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 /** First (in category order) entry whose range contains the value. */
@@ -228,6 +229,7 @@ class FPCGExEntryRangeFirstMatchPickerOp : public FPCGExEntryRangeBasedPickerOpB
 {
 public:
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+	virtual int32 PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 /** Narrowest (smallest Max - Min) entry whose range contains the value; weighted-random on width ties. */
@@ -235,6 +237,7 @@ class FPCGExEntryRangeNarrowestPickerOp : public FPCGExEntryRangeBasedPickerOpBa
 {
 public:
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+	virtual int32 PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 /**

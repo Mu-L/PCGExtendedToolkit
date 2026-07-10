@@ -192,6 +192,75 @@ int32 FPCGExEntryDensityWeightedPickerOp::Pick(int32 PointIndex, int32 Seed, FPC
 	}
 }
 
+int32 FPCGExEntryDensityWeightedPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+	check(DensityGetter);
+
+	// Quota-only path: the constant-density precomputed cumulative can't be used (availability
+	// varies per pick), so both modes stream with the availability guard. Reading the getter is
+	// valid for constant sources too.
+	if (bSkipAllPoints)
+	{
+		return -1;
+	}
+
+	double Density = DensityGetter->Read(PointIndex);
+	if (Density < 0.0 || Density > 1.0)
+	{
+		if (OutOfRangePolicy == EPCGExDensityOutOfRangePolicy::SkipPoint)
+		{
+			return -1;
+		}
+		Density = FMath::Clamp(Density, 0.0, 1.0);
+	}
+
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+	const TArray<double>& EntryLogWeights = Shared->EntryLogWeights;
+	const int32 N = EntryWeights.Num();
+
+	const double Exponent = FMath::Lerp(1.0, Density * 2.0, DensityInfluence);
+	const double EffectiveDensity = (1.0 - DensityInfluence) + DensityInfluence * Density;
+
+	auto WeightOf = [&](const int32 i) -> double
+	{
+		return Mode == EPCGExDensityWeightMode::WeightModulation
+			? FMath::Exp(EntryLogWeights[i] * Exponent)
+			: FMath::Lerp(1.0, EntryWeights[i], EffectiveDensity);
+	};
+
+	double TotalWeight = 0.0;
+	for (int32 i = 0; i < N; ++i)
+	{
+		if (InAvailability.IsAvailable(i))
+		{
+			TotalWeight += WeightOf(i);
+		}
+	}
+	if (TotalWeight <= 0.0)
+	{
+		return -1;
+	}
+
+	const double Roll = FRandomStream(Seed).FRandRange(0.0, TotalWeight);
+	double Acc = 0.0;
+	int32 LastAvailable = -1;
+	for (int32 i = 0; i < N; ++i)
+	{
+		if (!InAvailability.IsAvailable(i))
+		{
+			continue;
+		}
+		LastAvailable = i;
+		Acc += WeightOf(i);
+		if (Roll <= Acc)
+		{
+			return Target->Indices[i];
+		}
+	}
+	return LastAvailable == -1 ? -1 : Target->Indices[LastAvailable];
+}
+
 #pragma endregion
 
 #pragma region UPCGExSelectorDensityWeightedFactoryData

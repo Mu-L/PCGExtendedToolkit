@@ -167,6 +167,7 @@ class FPCGExEntryBestFitTopKPickerOp : public FPCGExEntryBestFitPickerOpBase
 {
 public:
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+	virtual int32 PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 /** Pool = entries within tolerance * best_score of the best score; weighted random among the pool. */
@@ -174,6 +175,7 @@ class FPCGExEntryBestFitTolerancePickerOp : public FPCGExEntryBestFitPickerOpBas
 {
 public:
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+	virtual int32 PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 };
 
 /**

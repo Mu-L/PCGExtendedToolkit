@@ -262,6 +262,12 @@ void FPCGExProperty_Enum::CopyValueFrom(const FPCGExProperty* Source)
 	Value = Typed->Value;
 }
 
+void FPCGExProperty_FloatCurve::CopyValueFrom(const FPCGExProperty* Source)
+{
+	const FPCGExProperty_FloatCurve* Typed = static_cast<const FPCGExProperty_FloatCurve*>(Source);
+	Value = Typed->Value;
+}
+
 bool FPCGExProperty_Enum::SyncStructuralFromSchema(const FPCGExProperty& Schema)
 {
 	// The enum class is structural -- the schema decides which UEnum the property targets,

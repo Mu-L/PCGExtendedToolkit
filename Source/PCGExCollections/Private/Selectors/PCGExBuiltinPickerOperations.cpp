@@ -6,6 +6,7 @@
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Math/PCGExMath.h"
+#include "Selectors/PCGExSelectorHelpers.h"
 
 #pragma region FPCGExEntryWeightedRandomPickerOp
 
@@ -13,6 +14,12 @@ int32 FPCGExEntryWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed, FPCG
 {
 	checkSlow(Target && !Target->IsEmpty());
 	return Target->GetPickRandomWeighted(Seed);
+}
+
+int32 FPCGExEntryWeightedRandomPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+	return PCGExCollections::Selectors::FilteredWeightedPick(Target, InAvailability, Seed);
 }
 
 #pragma endregion
@@ -23,6 +30,35 @@ int32 FPCGExEntryRandomPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPicker
 {
 	checkSlow(Target && !Target->IsEmpty());
 	return Target->GetPickRandom(Seed);
+}
+
+int32 FPCGExEntryRandomPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+
+	const int32 N = Target->Entries.Num();
+	int32 NumAvailable = 0;
+	for (int32 i = 0; i < N; ++i)
+	{
+		if (InAvailability.IsAvailable(i))
+		{
+			++NumAvailable;
+		}
+	}
+	if (NumAvailable == 0)
+	{
+		return -1;
+	}
+
+	int32 Roll = FRandomStream(Seed).RandRange(0, NumAvailable - 1);
+	for (int32 i = 0; i < N; ++i)
+	{
+		if (InAvailability.IsAvailable(i) && Roll-- == 0)
+		{
+			return Target->Indices[i];
+		}
+	}
+	return -1;
 }
 
 #pragma endregion

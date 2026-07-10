@@ -253,6 +253,46 @@ int32 FPCGExEntryClosestMatchPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGEx
 	return BestLocal == -1 ? -1 : Target->Indices[ValidEntryIndices[BestLocal]];
 }
 
+int32 FPCGExEntryClosestMatchPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
+	if (ValidEntryIndices.IsEmpty())
+	{
+		return -1;
+	}
+
+	// Quota-only path: distances are accumulated for the full valid set (the batched evaluators
+	// are cheaper unsegmented), then availability filters the argmin.
+	FPCGExClosestMatchScratch LocalScratch;
+	FPCGExClosestMatchScratch& S = Scratch ? *static_cast<FPCGExClosestMatchScratch*>(Scratch) : LocalScratch;
+	S.Distances.Reset();
+	S.Distances.SetNumZeroed(ValidEntryIndices.Num());
+
+	for (const TSharedPtr<FPCGExClosestMatchAxisEvaluator>& Eval : ActiveEvaluators)
+	{
+		Eval->Accumulate(PointIndex, ValidEntryIndices, S.Distances);
+	}
+
+	double BestDist = TNumericLimits<double>::Max();
+	int32 BestLocal = -1;
+	for (int32 j = 0; j < S.Distances.Num(); ++j)
+	{
+		if (!InAvailability.IsAvailable(ValidEntryIndices[j]))
+		{
+			continue;
+		}
+		if (S.Distances[j] < BestDist)
+		{
+			BestDist = S.Distances[j];
+			BestLocal = j;
+		}
+	}
+
+	return BestLocal == -1 ? -1 : Target->Indices[ValidEntryIndices[BestLocal]];
+}
+
 #pragma endregion
 
 #pragma region UPCGExSelectorClosestMatchFactoryData

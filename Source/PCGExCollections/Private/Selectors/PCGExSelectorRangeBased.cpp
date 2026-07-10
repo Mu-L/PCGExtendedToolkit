@@ -149,6 +149,36 @@ int32 FPCGExEntryRangeWeightedRandomPickerOp::Pick(int32 PointIndex, int32 Seed,
 	return k == INDEX_NONE ? -1 : Target->Indices[S.Matches[k]];
 }
 
+int32 FPCGExEntryRangeWeightedRandomPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+
+	FPCGExRangeBasedScratch LocalScratch;
+	FPCGExRangeBasedScratch& S = Scratch ? *static_cast<FPCGExRangeBasedScratch*>(Scratch) : LocalScratch;
+	S.Matches.Reset();
+	S.Cumulative.Reset();
+
+	ReadPointValues(PointIndex, S.PointValues);
+
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+
+	double TotalWeight = 0.0;
+	for (const int32 i : ValidEntryIndices)
+	{
+		if (!InAvailability.IsAvailable(i) || !MatchesAllAxes(i, S.PointValues.GetData()))
+		{
+			continue;
+		}
+		TotalWeight += EntryWeights[i];
+		S.Matches.Add(i);
+		S.Cumulative.Add(TotalWeight);
+	}
+
+	const int32 k = PCGExCollections::Selectors::RollCumulativeWeighted(MakeArrayView(S.Cumulative), TotalWeight, Seed);
+	return k == INDEX_NONE ? -1 : Target->Indices[S.Matches[k]];
+}
+
 #pragma endregion
 
 #pragma region FPCGExEntryRangeFirstMatchPickerOp
@@ -167,6 +197,27 @@ int32 FPCGExEntryRangeFirstMatchPickerOp::Pick(int32 PointIndex, int32 Seed, FPC
 	for (const int32 i : Shared->ValidEntryIndices)
 	{
 		if (MatchesAllAxes(i, S.PointValues.GetData()))
+		{
+			return Target->Indices[i];
+		}
+	}
+
+	return -1;
+}
+
+int32 FPCGExEntryRangeFirstMatchPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+
+	FPCGExRangeBasedScratch LocalScratch;
+	FPCGExRangeBasedScratch& S = Scratch ? *static_cast<FPCGExRangeBasedScratch*>(Scratch) : LocalScratch;
+
+	ReadPointValues(PointIndex, S.PointValues);
+
+	// First available match in entry order -- an exhausted first match falls through to the next.
+	for (const int32 i : Shared->ValidEntryIndices)
+	{
+		if (InAvailability.IsAvailable(i) && MatchesAllAxes(i, S.PointValues.GetData()))
 		{
 			return Target->Indices[i];
 		}
@@ -239,6 +290,84 @@ int32 FPCGExEntryRangeNarrowestPickerOp::Pick(int32 PointIndex, int32 Seed, FPCG
 	}
 
 	// Tie-break by weight via streaming roll (no need to materialize a cumulative array).
+	double TotalWeight = 0.0;
+	for (const int32 i : S.TieBucket)
+	{
+		TotalWeight += EntryWeights[i];
+	}
+	if (TotalWeight <= 0.0)
+	{
+		return Target->Indices[S.TieBucket[0]];
+	}
+
+	const int32 k = PCGExCollections::Selectors::RollWeightedStreaming(
+		S.TieBucket.Num(),
+		[&](int32 LocalIdx)
+		{
+			return EntryWeights[S.TieBucket[LocalIdx]];
+		},
+		TotalWeight, Seed);
+	return Target->Indices[S.TieBucket[k]];
+}
+
+int32 FPCGExEntryRangeNarrowestPickerOp::PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch) const
+{
+	checkSlow(Target && !Target->IsEmpty());
+
+	const int32 AxisCount = Shared->AxisCount;
+
+	FPCGExRangeBasedScratch LocalScratch;
+	FPCGExRangeBasedScratch& S = Scratch ? *static_cast<FPCGExRangeBasedScratch*>(Scratch) : LocalScratch;
+	S.TieBucket.Reset();
+
+	ReadPointValues(PointIndex, S.PointValues);
+
+	const TArray<int32>& ValidEntryIndices = Shared->ValidEntryIndices;
+	const TArray<double>& EntryMins = Shared->EntryMins;
+	const TArray<double>& EntryMaxs = Shared->EntryMaxs;
+	const TArray<double>& EntryWeights = Shared->EntryWeights;
+
+	// Same narrowest-wins scan as Pick with unavailable entries excluded up front -- an
+	// exhausted narrowest falls through to the next-narrowest available.
+	double MinHypervolume = TNumericLimits<double>::Max();
+	double TieTolerance = 0.0;
+
+	for (const int32 i : ValidEntryIndices)
+	{
+		if (!InAvailability.IsAvailable(i) || !MatchesAllAxes(i, S.PointValues.GetData()))
+		{
+			continue;
+		}
+
+		const int32 Base = i * AxisCount;
+		double Hypervolume = 1.0;
+		for (int32 A = 0; A < AxisCount; ++A)
+		{
+			Hypervolume *= (EntryMaxs[Base + A] - EntryMins[Base + A]);
+		}
+
+		if (Hypervolume < MinHypervolume - TieTolerance)
+		{
+			MinHypervolume = Hypervolume;
+			TieTolerance = PCGExSelectorRangeBased::RangeTieTolerance(MinHypervolume);
+			S.TieBucket.Reset();
+			S.TieBucket.Add(i);
+		}
+		else if (FMath::Abs(Hypervolume - MinHypervolume) <= TieTolerance)
+		{
+			S.TieBucket.Add(i);
+		}
+	}
+
+	if (S.TieBucket.IsEmpty())
+	{
+		return -1;
+	}
+	if (S.TieBucket.Num() == 1)
+	{
+		return Target->Indices[S.TieBucket[0]];
+	}
+
 	double TotalWeight = 0.0;
 	for (const int32 i : S.TieBucket)
 	{
