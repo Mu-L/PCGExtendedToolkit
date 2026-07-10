@@ -6,6 +6,7 @@
 #include "PCGExBuiltInInlineWidgets.h"
 #include "PCGExEnumSelector.h"
 #include "PCGExInlineWidgetRegistry.h"
+#include "PCGExPropertiesEditorStyle.h"
 #include "PCGExProperty.h"
 #include "PCGExPropertyType_Struct.h"
 #include "PCGExPropertyTypes.h"
@@ -29,6 +30,9 @@
 void FPCGExPropertiesEditorModule::StartupModule()
 {
 	IPCGExEditorModuleInterface::StartupModule();
+
+	// Style first: the curve editor widgets look its brushes up by style name at paint time.
+	Style = MakeShared<FPCGExPropertiesEditorStyle>();
 
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 
@@ -142,6 +146,9 @@ void FPCGExPropertiesEditorModule::StartupModule()
 void FPCGExPropertiesEditorModule::ShutdownModule()
 {
 	FPCGExInlineWidgetRegistry::Clear();
+
+	// Destroying the style unregisters it from the Slate style registry.
+	Style.Reset();
 
 	IPCGExEditorModuleInterface::ShutdownModule();
 }

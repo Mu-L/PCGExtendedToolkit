@@ -4,6 +4,7 @@
 
 #include "SPCGExPropertyCurveKeyStrip.h"
 
+#include "PCGExPropertiesEditorStyle.h"
 #include "PCGExPropertyCurveEditController.h"
 
 #include "Rendering/DrawElements.h"
@@ -84,7 +85,7 @@ int32 SPCGExPropertyCurveKeyStrip::OnPaint(
 	}
 
 	// Gems. White SVG when supplied (tinted per selection below), else the built-in rectangle.
-	const FSlateBrush* SliderBrush = nullptr /* no style set -- drawn fallback */;
+	const FSlateBrush* SliderBrush = FPCGExPropertiesEditorStyle::GetSliderBrush();
 	const FSlateBrush* GemDrawBrush = SliderBrush ? SliderBrush : WhiteBrush;
 	const int32 GemLayer = LayerId + 2;
 	const float GemHeight = FMath::Max(Size.Y - 6.0f, 4.0f);
