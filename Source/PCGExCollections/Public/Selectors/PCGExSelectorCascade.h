@@ -21,6 +21,19 @@ class FPCGExCascadeSharedData : public PCGExCollections::FSelectorSharedData
 {
 public:
 	TArray<TSharedPtr<PCGExCollections::FSelectorSharedData>> PerChild;
+
+	// Children built through a parent's BuildSharedData never see the cache -- forward so
+	// batch-dependent child state (e.g. a nested Quota budget) still finalizes under the lock.
+	virtual void OnCached(const PCGExCollections::FSelectorSharedDataCache& InCache) override
+	{
+		for (const TSharedPtr<PCGExCollections::FSelectorSharedData>& Child : PerChild)
+		{
+			if (Child)
+			{
+				Child->OnCached(InCache);
+			}
+		}
+	}
 };
 
 /**
@@ -78,7 +91,7 @@ public:
 };
 
 /**
- * Palette node: "Selector : Cascade". Consumes an ordered set of selectors on the
+ * Palette node: "Selector Modifier : Cascade". Consumes an ordered set of selectors on the
  * "Selectors" pin; the first child returning a valid pick wins.
  */
 UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-cascade"))
@@ -90,7 +103,7 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(
-		SelectorCascade, "Selector : Cascade",
+		SelectorCascade, "Selector Modifier : Cascade",
 		"Fallback chain: tries each connected selector in Priority order, first valid pick wins. Children's seed/category/micro settings are ignored -- this node's Base Config drives those.",
 		FName(GetDisplayName()))
 #endif

@@ -293,6 +293,12 @@ namespace PCGExStagingLoadProperties
 
 		SampledPropertyCaches.Reserve(Context->SampledPropertyOutputs.Num());
 
+		// Sampled configs may legitimately repeat a property (different times), so effective
+		// output names can collide -- and colliding caches would share one facade buffer
+		// (GetWritable is identifier-keyed) and silently clobber each other. First wins.
+		TSet<FName> SeenOutputNames;
+		SeenOutputNames.Reserve(Context->SampledPropertyOutputs.Num());
+
 		for (const FPCGExPropertySampledOutputConfig& Config : Context->SampledPropertyOutputs)
 		{
 			if (!Config.IsValid())
@@ -302,6 +308,16 @@ namespace PCGExStagingLoadProperties
 
 			const FName OutputName = Config.GetEffectiveOutputName();
 			const FName PropName = Config.PropertyName;
+
+			bool bNameAlreadyUsed = false;
+			SeenOutputNames.Add(OutputName, &bNameAlreadyUsed);
+			if (bNameAlreadyUsed)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context, FText::Format(
+					           FTEXT("Sampled output '{0}' (property '{1}') collides with a previous sampled output attribute name, skipping. Set distinct Output Attribute Names when sampling the same property several times."),
+					           FText::FromName(OutputName), FText::FromName(PropName)));
+				continue;
+			}
 
 			const FInstancedStruct* Prototype = PCGExCollections::FindPrototypeProperty(PropName, SearchOrder);
 			const FPCGExProperty* PrototypeProp = Prototype ? Prototype->GetPtr<FPCGExProperty>() : nullptr;

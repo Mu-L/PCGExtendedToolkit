@@ -21,12 +21,12 @@ enum class EPCGExQuotaMode : uint8
 	Proportion = 1 UMETA(DisplayName = "Proportion", ToolTip="Property values in [0, 1] are shares of the processed point count."),
 };
 
-/** Which point population the caps apply to. */
+/** Which point population the caps apply to. Values are stable; declaration order drives the dropdown (default first). */
 UENUM()
 enum class EPCGExQuotaScope : uint8
 {
-	AllInputs    = 0 UMETA(DisplayName = "All Inputs", ToolTip="Caps are shared across every input data processed by the consuming node. Requires the consumer to wire a selector shared-data cache (Staging Distribute and Spline Mesh do); falls back to per-input otherwise."),
 	PerInputData = 1 UMETA(DisplayName = "Per Input Data", ToolTip="Each input data gets its own independent caps."),
+	AllInputs    = 0 UMETA(DisplayName = "All Inputs", ToolTip="Caps are shared across every input data processed by the consuming node. Requires the consumer to wire a selector shared-data cache (Staging Distribute and Spline Mesh do); falls back to per-input otherwise."),
 };
 
 /** What to do when every available entry is exhausted. */
@@ -68,7 +68,7 @@ struct PCGEXCOLLECTIONS_API FPCGExSelectorQuotaConfig
 
 	/** Which point population the MAX caps apply to. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
-	EPCGExQuotaScope Scope = EPCGExQuotaScope::AllInputs;
+	EPCGExQuotaScope Scope = EPCGExQuotaScope::PerInputData;
 
 	/** Behavior once every available entry is exhausted. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
@@ -89,11 +89,20 @@ public:
 	TArray<double> MinValues;    // raw property values; <= 0 (or unresolved) = no minimum
 
 	// AllInputs scope only. Count mode: initialized from MaxValues at build. Proportion mode:
-	// initialized empty-capped (0) and grown per facade at op init.
+	// finalized against the batch total in OnCached; starts empty-capped (0) with a per-facade
+	// grow fallback when no total was provided (see bBudgetFinalized).
 	TUniquePtr<std::atomic<int32>[]> SharedRemaining;
+
+	// bProportionBudget: counters are proportion-mode (set at build). bBudgetFinalized: OnCached
+	// filled them from the batch total -- ops skip the per-facade fallback. Plain bools: written
+	// under the cache lock, before publication.
+	bool bProportionBudget = false;
+	bool bBudgetFinalized = false;
 
 	// Inner selector's shared data (single-slot FPCGExCascadeSharedData, mirrors Anti-Repeat).
 	TSharedPtr<PCGExCollections::FSelectorSharedData> ChildSharedData;
+
+	virtual void OnCached(const PCGExCollections::FSelectorSharedDataCache& InCache) override;
 };
 
 /**
@@ -123,7 +132,7 @@ class PCGEXCOLLECTIONS_API FPCGExEntryQuotaPickerOp : public PCGExCollections::S
 public:
 	// Copied from factory before PrepareForData.
 	EPCGExQuotaMode Mode = EPCGExQuotaMode::Count;
-	EPCGExQuotaScope Scope = EPCGExQuotaScope::AllInputs;
+	EPCGExQuotaScope Scope = EPCGExQuotaScope::PerInputData;
 	EPCGExQuotaExhaustedBehavior ExhaustedBehavior = EPCGExQuotaExhaustedBehavior::Skip;
 	double ReservationPhase = 0.0;
 	const UPCGExSelectorFactoryData* ChildFactory = nullptr; // null -> weighted-random inner pick
@@ -181,7 +190,7 @@ public:
 };
 
 /**
- * Palette node: "Selector : Quota".
+ * Palette node: "Selector Modifier : Quota".
  */
 UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-quota"))
 class PCGEXCOLLECTIONS_API UPCGExSelectorQuotaFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
@@ -192,7 +201,7 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(
-		SelectorQuota, "Selector : Quota",
+		SelectorQuota, "Selector Modifier : Quota",
 		"Wraps any selector with exact per-entry max caps and near-exact (±1) min guarantees sourced from numeric collection properties. Max counts are exact; WHICH points receive capped entries depends on thread scheduling.",
 		FName(GetDisplayName()))
 #endif

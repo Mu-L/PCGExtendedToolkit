@@ -38,7 +38,7 @@ public:
 
 /**
  * Per-entry availability view for quota-constrained picking. A thin, inlineable window over
- * an atomic remaining-capacity block owned by a quota decorator (see Selector : Quota).
+ * an atomic remaining-capacity block owned by a quota decorator (see Selector Modifier : Quota).
  *
  * INDEXING IS CATEGORY-LOCAL: EntryIndex is a position in Target->Entries, NOT a raw
  * collection index -- selector candidate loops already iterate that space.
@@ -118,7 +118,7 @@ public:
 	 * Quota-aware pick: like Pick, but entries reported unavailable by InAvailability must not
 	 * be returned. Returns -1 when nothing available satisfies the selector's criteria.
 	 *
-	 * ONLY invoked by quota decorators (Selector : Quota) -- consumers and selectors that don't
+	 * ONLY invoked by quota decorators (Selector Modifier : Quota) -- consumers and selectors that don't
 	 * opt in never execute this path, so it costs nothing when unused. Same thread-safety
 	 * contract as Pick.
 	 *

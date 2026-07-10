@@ -186,6 +186,8 @@ bool FPCGExPathSplineMeshElement::Boot(FPCGExContext* InContext) const
 	}
 
 	Context->SelectorSharedDataCache = MakeShared<PCGExCollections::FSelectorSharedDataCache>();
+	// Batch total for AllInputs-scoped selector state; must precede any GetOrBuild (see OnCached).
+	Context->SelectorSharedDataCache->AllInputsPointCount = Context->MainPoints->GetTotalNum(PCGExData::EIOSide::In);
 
 	if (Settings->bUseStagedPoints)
 	{

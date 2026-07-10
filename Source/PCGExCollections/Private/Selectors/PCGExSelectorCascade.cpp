@@ -23,7 +23,7 @@ bool FPCGExEntryCascadePickerOp::PrepareForData(FPCGExContext* InContext, const 
 	const TSharedPtr<FPCGExCascadeSharedData> Composite = StaticCastSharedPtr<FPCGExCascadeSharedData>(SharedData);
 	if (!Composite || Composite->PerChild.Num() != ChildFactories.Num())
 	{
-		PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Cascade -- no child selectors to dispatch to."))
+		PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector Modifier : Cascade -- no child selectors to dispatch to."))
 		return false;
 	}
 
@@ -50,7 +50,7 @@ bool FPCGExEntryCascadePickerOp::PrepareForData(FPCGExContext* InContext, const 
 			// Child couldn't bind (missing attribute, no valid entries for its criteria...).
 			// Skip it -- the cascade semantic is precisely "fall through to the next".
 			PCGE_LOG_C(Warning, GraphAndLog, InContext,
-			           FText::Format(FTEXT("Selector : Cascade -- child selector {0} failed to initialize and will be skipped."), FText::AsNumber(i)));
+			           FText::Format(FTEXT("Selector Modifier : Cascade -- child selector {0} failed to initialize and will be skipped."), FText::AsNumber(i)));
 			continue;
 		}
 
@@ -60,7 +60,7 @@ bool FPCGExEntryCascadePickerOp::PrepareForData(FPCGExContext* InContext, const 
 
 	if (ChildOps.IsEmpty())
 	{
-		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector : Cascade -- no child selector could initialize; nothing to pick from."));
+		PCGE_LOG_C(Error, GraphAndLog, InContext, FTEXT("Selector Modifier : Cascade -- no child selector could initialize; nothing to pick from."));
 		return false;
 	}
 
@@ -195,7 +195,7 @@ UPCGExFactoryData* UPCGExSelectorCascadeFactoryProviderSettings::CreateFactory(F
 #if WITH_EDITOR
 FString UPCGExSelectorCascadeFactoryProviderSettings::GetDisplayName() const
 {
-	return TEXT("Select : Cascade");
+	return TEXT("Modify : Cascade");
 }
 #endif
 

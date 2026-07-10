@@ -38,6 +38,10 @@ class FPCGExAntiRepeatScratch : public FPCGExPickerScratchBase
 public:
 	TArray<int32, TInlineAllocator<8>> Ring; // most recent raw picks, cyclic
 	int32 Head = 0;
+	// Same-point re-invocation guard (e.g. Quota CAS-loss retries): RecordPick replaces the last
+	// written slot when the point repeats, so one point never consumes more than one ring slot.
+	int32 LastPointIndex = INDEX_NONE;
+	int32 LastSlot = INDEX_NONE;
 	TSharedPtr<FPCGExPickerScratchBase> ChildScratch;
 };
 
@@ -64,6 +68,14 @@ public:
 	virtual TSharedPtr<FPCGExPickerScratchBase> CreateScratchForScope(int32 MaxPointsInScope) const override;
 	virtual int32 Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch = nullptr) const override;
 	virtual int32 PickFiltered(int32 PointIndex, int32 Seed, const FPCGExPickAvailability& InAvailability, FPCGExPickerScratchBase* Scratch = nullptr) const override;
+
+private:
+	/**
+	 * Record the final pick for PointIndex. Same-point re-invocations (wrapper retries, e.g.
+	 * Quota CAS-loss) replace the previous record instead of appending, keeping the look-back
+	 * measured in points.
+	 */
+	void RecordPick(FPCGExAntiRepeatScratch& S, int32 PointIndex, int32 Raw) const;
 };
 
 /**
@@ -90,7 +102,7 @@ public:
 };
 
 /**
- * Palette node: "Selector : Anti-Repeat".
+ * Palette node: "Selector Modifier : Anti-Repeat".
  */
 UCLASS(BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Collections|Distribution", meta=(PCGExNodeLibraryDoc="staging/staging-distribute/selector-anti-repeat"))
 class PCGEXCOLLECTIONS_API UPCGExSelectorAntiRepeatFactoryProviderSettings : public UPCGExSelectorFactoryProviderSettings
@@ -101,7 +113,7 @@ public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS_CUSTOM_SUBTITLE(
-		SelectorAntiRepeat, "Selector : Anti-Repeat",
+		SelectorAntiRepeat, "Selector Modifier : Anti-Repeat",
 		"Re-rolls the inner selector (weighted random when none is connected) while the pick matches one of the last K picks in the processing scope. Breaks visible repetition along paths and grids.",
 		FName(GetDisplayName()))
 #endif

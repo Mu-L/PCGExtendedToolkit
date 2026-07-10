@@ -16,11 +16,40 @@ namespace PCGExSelectorQuota
 	constexpr double GoldenRatioConjugate = 0.6180339887498948482;
 }
 
+#pragma region FPCGExQuotaSharedData
+
+void FPCGExQuotaSharedData::OnCached(const PCGExCollections::FSelectorSharedDataCache& InCache)
+{
+	// Finalize the AllInputs Proportion budget against the batch total: per-facade accumulation
+	// let early facades pick against a partial cap. Runs under the cache lock, before any op
+	// can observe this instance.
+	if (bProportionBudget && SharedRemaining && InCache.AllInputsPointCount >= 0)
+	{
+		const double TotalD = static_cast<double>(InCache.AllInputsPointCount);
+		const int32 N = MaxValues.Num();
+		for (int32 i = 0; i < N; ++i)
+		{
+			if (MaxValues[i] >= 0.0)
+			{
+				SharedRemaining[i].store(FMath::CeilToInt32(FMath::Clamp(MaxValues[i], 0.0, 1.0) * TotalD), std::memory_order_relaxed);
+			}
+		}
+		bBudgetFinalized = true;
+	}
+
+	if (ChildSharedData)
+	{
+		ChildSharedData->OnCached(InCache);
+	}
+}
+
+#pragma endregion
+
 #pragma region FPCGExEntryQuotaPickerOp
 
 void FPCGExEntryQuotaPickerOp::OnSharedDataMissing(FPCGExContext* InContext) const
 {
-	PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector : Quota -- failed to build shared quota tables. Check the quota property names and that the target category has valid entries."))
+	PCGEX_LOG_MISSING_INPUT(InContext, FTEXT("Selector Modifier : Quota -- failed to build shared quota tables. Check the quota property names and that the target category has valid entries."))
 }
 
 int32 FPCGExEntryQuotaPickerOp::ResolveCount(const double RawValue) const
@@ -57,10 +86,11 @@ bool FPCGExEntryQuotaPickerOp::OnInitForData(FPCGExContext* InContext, const TSh
 	if (Scope == EPCGExQuotaScope::AllInputs && Shared->SharedRemaining)
 	{
 		Remaining = Shared->SharedRemaining.Get();
-		if (Mode == EPCGExQuotaMode::Proportion)
+		if (Mode == EPCGExQuotaMode::Proportion && !Shared->bBudgetFinalized)
 		{
-			// Proportion budgets accumulate per facade: each input data contributes its share.
-			// (Count-mode counters were fully initialized at BuildSharedData.)
+			// Fallback when OnCached didn't finalize (cache bypassed / no batch total): accumulate
+			// per facade. Early facades may transiently see a partial cap -- wired consumers
+			// (Distribute, Spline Mesh) avoid this by setting AllInputsPointCount on the cache.
 			for (int32 i = 0; i < NumEntries; ++i)
 			{
 				if (Shared->MaxValues[i] >= 0.0)
@@ -116,7 +146,7 @@ bool FPCGExEntryQuotaPickerOp::OnInitForData(FPCGExContext* InContext, const TSh
 			}
 			if (!ChildOp->PrepareForData(InContext, InDataFacade, Target, OwningCollection))
 			{
-				PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector : Quota -- inner selector failed to initialize; falling back to weighted random."));
+				PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector Modifier : Quota -- inner selector failed to initialize; falling back to weighted random."));
 				ChildOp = nullptr;
 			}
 		}
@@ -272,10 +302,11 @@ TSharedPtr<PCGExCollections::FSelectorSharedData> UPCGExSelectorQuotaFactoryData
 	}
 
 	// AllInputs scope: the counter block lives here so every facade shares it. Count mode is
-	// fully initialized now (BuildSharedData runs once per (factory, category) via the cache);
-	// Proportion mode starts at 0 and accumulates each facade's share at op init.
+	// fully initialized now; Proportion mode starts at 0 and is finalized in OnCached (with a
+	// per-facade fallback at op init when no batch total was provided).
 	if (Config.Scope == EPCGExQuotaScope::AllInputs)
 	{
+		NewShared->bProportionBudget = Config.Mode == EPCGExQuotaMode::Proportion;
 		NewShared->SharedRemaining = MakeUnique<std::atomic<int32>[]>(N);
 		for (int32 i = 0; i < N; ++i)
 		{
@@ -324,7 +355,7 @@ UPCGExFactoryData* UPCGExSelectorQuotaFactoryProviderSettings::CreateFactory(FPC
 	{
 		if (Children.Num() > 1)
 		{
-			PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector : Quota -- multiple inner selectors connected; using the lowest Priority. Use Selector : Cascade to combine several."));
+			PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector Modifier : Quota -- multiple inner selectors connected; using the lowest Priority. Use Selector Modifier : Cascade to combine several."));
 		}
 		NewFactory->Child = Children[0];
 	}
@@ -334,7 +365,7 @@ UPCGExFactoryData* UPCGExSelectorQuotaFactoryProviderSettings::CreateFactory(FPC
 #if WITH_EDITOR
 FString UPCGExSelectorQuotaFactoryProviderSettings::GetDisplayName() const
 {
-	return TEXT("Select : Quota");
+	return TEXT("Modify : Quota");
 }
 #endif
 

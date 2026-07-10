@@ -33,7 +33,7 @@ bool FPCGExEntryAntiRepeatPickerOp::PrepareForData(FPCGExContext* InContext, con
 			}
 			if (!ChildOp->PrepareForData(InContext, InDataFacade, InTarget, InOwningCollection))
 			{
-				PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector : Anti-Repeat -- inner selector failed to initialize; falling back to weighted random."));
+				PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector Modifier : Anti-Repeat -- inner selector failed to initialize; falling back to weighted random."));
 				ChildOp = nullptr;
 			}
 		}
@@ -52,6 +52,28 @@ TSharedPtr<FPCGExPickerScratchBase> FPCGExEntryAntiRepeatPickerOp::CreateScratch
 		Scratch->ChildScratch = ChildOp->CreateScratchForScope(MaxPointsInScope);
 	}
 	return Scratch;
+}
+
+void FPCGExEntryAntiRepeatPickerOp::RecordPick(FPCGExAntiRepeatScratch& S, const int32 PointIndex, const int32 Raw) const
+{
+	if (S.LastPointIndex == PointIndex && S.LastSlot != INDEX_NONE)
+	{
+		// Same point re-invoked by a wrapper retry -- replace its record, don't consume a new slot.
+		S.Ring[S.LastSlot] = Raw;
+		return;
+	}
+
+	S.LastPointIndex = PointIndex;
+	if (S.Ring.Num() < HistoryLength)
+	{
+		S.LastSlot = S.Ring.Add(Raw);
+	}
+	else
+	{
+		S.Ring[S.Head] = Raw;
+		S.LastSlot = S.Head;
+		S.Head = (S.Head + 1) % HistoryLength;
+	}
 }
 
 int32 FPCGExEntryAntiRepeatPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPickerScratchBase* Scratch) const
@@ -84,15 +106,7 @@ int32 FPCGExEntryAntiRepeatPickerOp::Pick(int32 PointIndex, int32 Seed, FPCGExPi
 		}
 
 		// Record the final pick (repeat or not) so runs of forced repeats still age out.
-		if (S->Ring.Num() < HistoryLength)
-		{
-			S->Ring.Add(Raw);
-		}
-		else
-		{
-			S->Ring[S->Head] = Raw;
-			S->Head = (S->Head + 1) % HistoryLength;
-		}
+		RecordPick(*S, PointIndex, Raw);
 	}
 
 	return Raw;
@@ -126,15 +140,7 @@ int32 FPCGExEntryAntiRepeatPickerOp::PickFiltered(int32 PointIndex, int32 Seed, 
 			Raw = Retry;
 		}
 
-		if (S->Ring.Num() < HistoryLength)
-		{
-			S->Ring.Add(Raw);
-		}
-		else
-		{
-			S->Ring[S->Head] = Raw;
-			S->Head = (S->Head + 1) % HistoryLength;
-		}
+		RecordPick(*S, PointIndex, Raw);
 	}
 
 	return Raw;
@@ -192,7 +198,7 @@ UPCGExFactoryData* UPCGExSelectorAntiRepeatFactoryProviderSettings::CreateFactor
 	{
 		if (Children.Num() > 1)
 		{
-			PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector : Anti-Repeat -- multiple inner selectors connected; using the lowest Priority. Use Selector : Cascade to combine several."));
+			PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Selector Modifier : Anti-Repeat -- multiple inner selectors connected; using the lowest Priority. Use Selector Modifier : Cascade to combine several."));
 		}
 		NewFactory->Child = Children[0];
 	}
@@ -202,7 +208,7 @@ UPCGExFactoryData* UPCGExSelectorAntiRepeatFactoryProviderSettings::CreateFactor
 #if WITH_EDITOR
 FString UPCGExSelectorAntiRepeatFactoryProviderSettings::GetDisplayName() const
 {
-	return FString::Printf(TEXT("Select : Anti-Repeat (%d)"), Config.HistoryLength);
+	return FString::Printf(TEXT("Modify : Anti-Repeat (%d)"), Config.HistoryLength);
 }
 #endif
 
