@@ -342,6 +342,12 @@ namespace PCGExProbing
 
 	void FProbingEngine::CollapseScopedEdges()
 	{
+		// Global-only runs never prepare scopes; there is nothing to collapse.
+		if (!ScopedEdges)
+		{
+			return;
+		}
+
 		{
 			FWriteScopeLock WriteScopeLock(UniqueEdgesLock);
 			if (RequiresEdgePostFilter())

@@ -366,6 +366,11 @@ bool FPCGExConnectVtxElement::LaunchPatching(FPCGExConnectVtxContext* Context, c
 		uint32 B;
 		PCGEx::H64(E, A, B);
 
+		if (A == B)
+		{
+			continue;
+		}
+
 		Context->ConnectorEdgeHandles.Add(Context->Patcher->AddEdge(A, B));
 		Context->ConnectorEndpoints.Add(E);
 	}
@@ -741,6 +746,11 @@ namespace PCGExConnectVtx
 			uint32 A;
 			uint32 B;
 			PCGEx::H64(E, A, B);
+
+			if (A == B)
+			{
+				continue;
+			}
 
 			ConnectorEdgeHandles.Add(Patcher->AddEdge(A, B));
 			ConnectorEndpoints.Add(E);
