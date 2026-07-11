@@ -4,8 +4,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PCGExMTCommon.h"
 
 class FPCGExIntTracker;
+struct FPCGExContext;
 struct FPCGExCarryOverDetails;
 class FPCGExPointIOMerger;
 
@@ -24,6 +26,53 @@ namespace PCGExData
 namespace PCGExGraphs
 {
 	/**
+	 * Assembles a single working vtx dataset from multiple cluster vtx sources, for use with
+	 * FGraphPatcher's merged-sources mode. Two-phase, because the attribute merge is async:
+	 *
+	 *   FVtxMerger Merger;
+	 *   for (VtxGroup) Merger.AddSource(VtxIO);              // records point-index offsets
+	 *   Merger.MergeAsync(Context, TaskManager, CarryOver);  // phase 1 (async)
+	 *   ... let the merge finish ...
+	 *   Facade = Merger.Finalize(Context, OutputPin);        // phase 2
+	 *
+	 * The finalized facade reads the merged data In-side (broadcaster/buffer friendly) and owns a
+	 * mutable duplicate as Out - the shape FGraphPatcher expects. The merged In data is kept alive
+	 * by this object; keep it around for as long as the facade is in use.
+	 */
+	class PCGEXGRAPHS_API FVtxMerger : public TSharedFromThis<FVtxMerger>
+	{
+	public:
+		/** Register a vtx source; returns its source index. Sources are laid out sequentially. */
+		int32 AddSource(const TSharedPtr<PCGExData::FPointIO>& InVtxIO);
+
+		int32 NumSources() const { return Sources.Num(); }
+		int32 GetTotalNum() const { return TotalNum; }
+		int32 GetOffset(const int32 SourceIndex) const { return Sources[SourceIndex].Offset; }
+		const TSharedPtr<PCGExData::FPointIO>& GetSourceIO(const int32 SourceIndex) const { return Sources[SourceIndex].VtxIO; }
+
+		/** Phase 1: merge all sources' points, attributes & tags into an internal scratch data (async). */
+		void MergeAsync(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, const FPCGExCarryOverDetails* InCarryOver);
+
+		/** Phase 2 (after the async merge completes): working facade with merged In + duplicated mutable Out. */
+		TSharedPtr<PCGExData::FFacade> Finalize(FPCGExContext* InContext, const FName InOutputPin);
+
+	protected:
+		struct FSource
+		{
+			TSharedPtr<PCGExData::FPointIO> VtxIO;
+			int32 Offset = 0;
+		};
+
+		TArray<FSource> Sources;
+		int32 TotalNum = 0;
+
+		TSharedPtr<PCGExData::FPointIO> ScratchIO;
+		TSharedPtr<PCGExData::FFacade> ScratchFacade;
+		TSharedPtr<FPCGExPointIOMerger> Merger;
+		TSharedPtr<PCGExData::FPointIO> WorkingIO;
+	};
+
+	/**
 	 * Merges input edge groups by CONNECTIVITY: groups linked (via AddEdge, or through an appended
 	 * bridge vtx) share one output edge collection; unlinked groups stay separate. Yields one output
 	 * cluster per connected component, all sharing the single vtx, by patching the PCGEx endpoint
@@ -41,14 +90,32 @@ namespace PCGExGraphs
 	 *
 	 * Both phases are single-threaded. New-vtx domain data beyond the transform is the caller's to
 	 * fill after Commit, via the index returned by AddVtx.
+	 *
+	 * Merged-sources mode: when the shared vtx is a merge of several vtx datasets (see FVtxMerger),
+	 * endpoint ids collide across sources - each dataset numbered its own ids from 0 at compile time.
+	 * Register each source with AddVtxSource and tag every edge group with its owning source index;
+	 * Commit then renumbers Attr_PCGExVtxIdx to the merged point indices and rewrites each merged
+	 * edge group's Attr_PCGExEdgeIdx accordingly (which the edge carry-over must preserve).
+	 * With no registered vtx source, ids are trusted as-is (single-dataset behavior, unchanged).
 	 */
 	class PCGEXGRAPHS_API FGraphPatcher : public TSharedFromThis<FGraphPatcher>
 	{
 	public:
 		explicit FGraphPatcher(const TSharedRef<PCGExData::FFacade>& InVtxFacade);
 
-		/** Register an input edge group with the vtx point indices it owns. Returns the group index. */
-		int32 AddEdgeGroup(const TSharedPtr<PCGExData::FPointIO>& InEdgesIO, const TArray<int32>& InVtxPointIndices);
+		/**
+		 * Merged-sources mode: declare a vtx dataset occupying [InOffset, InOffset + count) in the
+		 * shared vtx. Its In-side Attr_PCGExVtxIdx provides the old endpoint ids. Returns the source
+		 * index to pass to AddEdgeGroup.
+		 */
+		int32 AddVtxSource(const TSharedPtr<PCGExData::FPointIO>& InVtxIO, const int32 InOffset);
+
+		/**
+		 * Register an input edge group with the vtx point indices it owns. Returns the group index.
+		 * In merged-sources mode, InVtxSourceIndex must identify the source the group's endpoints
+		 * (and InVtxPointIndices) belong to; indices are in merged (offset) space.
+		 */
+		int32 AddEdgeGroup(const TSharedPtr<PCGExData::FPointIO>& InEdgesIO, const TArray<int32>& InVtxPointIndices, const int32 InVtxSourceIndex = INDEX_NONE);
 
 		/** Stage a new vtx at InTransform; returns the index it will occupy in the shared vtx. */
 		int32 AddVtx(const FTransform& InTransform);
@@ -83,7 +150,18 @@ namespace PCGExGraphs
 		{
 			TSharedPtr<PCGExData::FPointIO> EdgesIO;
 			TArray<int32> VtxPointIndices;
+			int32 VtxSourceIndex = INDEX_NONE;      // merged-sources mode: owning vtx source
+			int32 ComponentIndex = INDEX_NONE;      // filled during ResolveAndMergeAsync
+			PCGExMT::FScope OutWriteScope;          // this group's range in its component's merged edges
 		};
+
+		struct FVtxSource
+		{
+			TSharedPtr<PCGExData::FPointIO> VtxIO;
+			int32 Offset = 0;
+		};
+
+		TArray<FVtxSource> VtxSources;
 
 		struct FPendingEdge
 		{

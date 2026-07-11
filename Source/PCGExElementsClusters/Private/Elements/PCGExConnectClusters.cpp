@@ -5,8 +5,6 @@
 
 #include "Clusters/PCGExCluster.h"
 #include "Clusters/PCGExClustersHelpers.h"
-#include "Core/PCGExFilterTypeSets.h"
-#include "Core/PCGExPointFilter.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
@@ -30,19 +28,6 @@ PCGExData::EIOInit UPCGExConnectClustersSettings::GetEdgeOutputInitMode() const
 PCGEX_INITIALIZE_ELEMENT(ConnectClusters)
 PCGEX_ELEMENT_BATCH_EDGE_IMPL_ADV(ConnectClusters)
 
-TArray<FPCGPinProperties> UPCGExConnectClustersSettings::InputPinProperties() const
-{
-	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-
-	if (BridgeMethod == EPCGExBridgeClusterMethod::Filters)
-	{
-		PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceFilterGenerators, "Nodes that don't meet requirements won't generate connections", Required)
-		PCGEX_PIN_FILTERS(PCGExClusters::Labels::SourceFilterConnectables, "Nodes that don't meet requirements can't receive connections", Required)
-	}
-
-	return PinProperties;
-}
-
 bool FPCGExConnectClustersElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExClustersProcessorElement::Boot(InContext))
@@ -56,23 +41,6 @@ bool FPCGExConnectClustersElement::Boot(FPCGExContext* InContext) const
 	Context->CarryOverDetails.Init();
 
 	PCGEX_FWD(ProjectionDetails)
-	PCGEX_FWD(GraphBuilderDetails)
-
-	if (Settings->BridgeMethod == EPCGExBridgeClusterMethod::Filters)
-	{
-		PCGE_LOG(Error, GraphAndLog, FTEXT("Bridge through filter is not implemented yet!"));
-		return false;
-
-		/*
-		if (!GetInputFactories(
-			Context, PCGExClusters::Labels::SourceFilterGenerators, Context->GeneratorsFiltersFactories,
-			PCGExFactories::ClusterNodeFilters(), true)) { return false; }
-
-		if (!GetInputFactories(
-			Context, PCGExClusters::Labels::SourceFilterConnectables, Context->ConnectablesFiltersFactories,
-			PCGExFactories::ClusterNodeFilters(), true)) { return false; }
-		*/
-	}
 
 	if (Settings->bFlagVtxConnector)
 	{
@@ -157,7 +125,6 @@ namespace PCGExConnectClusters
 
 	void FProcessor::CompleteWork()
 	{
-		// if mode == filter, loop through generators and find all suitable connectables
 	}
 
 	//////// BATCH
@@ -329,10 +296,6 @@ namespace PCGExConnectClusters
 					Bridges.Add(PCGEx::H64U(i, j));
 				}
 			}
-		}
-		else if (SafeMethod == EPCGExBridgeClusterMethod::Filters)
-		{
-			// Let cluster processor handle it.
 		}
 
 		// Resolve each connected cluster pair to its closest vtx pair and stage a bridge edge.

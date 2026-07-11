@@ -4,6 +4,7 @@
 #include "Graphs/PCGExGraphPatcher.h"
 
 #include "PCGExH.h"
+#include "PCGExLog.h"
 #include "Clusters/PCGExClusterCommon.h"
 #include "Clusters/PCGExClustersHelpers.h"
 #include "Data/PCGExClusterData.h"
@@ -11,25 +12,98 @@
 #include "Data/PCGExDataTags.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/PCGPointArrayData.h"
+#include "Data/Buffers/PCGExBuffer.h"
 #include "Helpers/PCGExPointArrayDataHelpers.h"
 #include "Utils/PCGExIntTracker.h"
 #include "Utils/PCGExPointIOMerger.h"
-#include "Data/PCGExDataTags.h"
 
 namespace PCGExGraphs
 {
+#pragma region FVtxMerger
+
+	int32 FVtxMerger::AddSource(const TSharedPtr<PCGExData::FPointIO>& InVtxIO)
+	{
+		const int32 SourceIndex = Sources.Num();
+		FSource& Source = Sources.Emplace_GetRef();
+		Source.VtxIO = InVtxIO;
+		Source.Offset = TotalNum;
+		TotalNum += InVtxIO->GetNum();
+		return SourceIndex;
+	}
+
+	void FVtxMerger::MergeAsync(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, const FPCGExCarryOverDetails* InCarryOver)
+	{
+		ScratchIO = PCGExData::NewPointIO(InContext);
+		if (!ScratchIO->InitializeOutput<UPCGExClusterNodesData>(PCGExData::EIOInit::New))
+		{
+			ScratchIO.Reset();
+			return;
+		}
+
+		ScratchFacade = MakeShared<PCGExData::FFacade>(ScratchIO.ToSharedRef());
+
+		Merger = MakeShared<FPCGExPointIOMerger>(ScratchFacade.ToSharedRef());
+		for (const FSource& Source : Sources)
+		{
+			// Sequential full-range appends keep the merger's write offsets aligned with Source.Offset.
+			Merger->Append(Source.VtxIO);
+		}
+
+		Merger->MergeAsync(InTaskManager, InCarryOver, nullptr, true);
+	}
+
+	TSharedPtr<PCGExData::FFacade> FVtxMerger::Finalize(FPCGExContext* InContext, const FName InOutputPin)
+	{
+		if (!ScratchIO)
+		{
+			return nullptr;
+		}
+
+		const UPCGBasePointData* Merged = ScratchIO->GetOut();
+		if (!Merged || Merged->IsEmpty())
+		{
+			return nullptr;
+		}
+
+		// The merged data becomes the working In (broadcaster-readable); Out is a mutable duplicate.
+		// ScratchIO stays alive on this object so the managed In data survives until execution ends.
+		WorkingIO = PCGExData::NewPointIO(InContext, Merged, InOutputPin);
+		WorkingIO->Tags->Append(ScratchIO->Tags.ToSharedRef());
+
+		if (!WorkingIO->InitializeOutput(PCGExData::EIOInit::Duplicate))
+		{
+			return nullptr;
+		}
+
+		return MakeShared<PCGExData::FFacade>(WorkingIO.ToSharedRef());
+	}
+
+#pragma endregion
+
+#pragma region FGraphPatcher
+
 	FGraphPatcher::FGraphPatcher(const TSharedRef<PCGExData::FFacade>& InVtxFacade)
 		: VtxFacade(InVtxFacade)
 	{
 		NumInitialVtx = VtxFacade->GetOut()->GetNumPoints();
 	}
 
-	int32 FGraphPatcher::AddEdgeGroup(const TSharedPtr<PCGExData::FPointIO>& InEdgesIO, const TArray<int32>& InVtxPointIndices)
+	int32 FGraphPatcher::AddVtxSource(const TSharedPtr<PCGExData::FPointIO>& InVtxIO, const int32 InOffset)
+	{
+		const int32 SourceIndex = VtxSources.Num();
+		FVtxSource& Source = VtxSources.Emplace_GetRef();
+		Source.VtxIO = InVtxIO;
+		Source.Offset = InOffset;
+		return SourceIndex;
+	}
+
+	int32 FGraphPatcher::AddEdgeGroup(const TSharedPtr<PCGExData::FPointIO>& InEdgesIO, const TArray<int32>& InVtxPointIndices, const int32 InVtxSourceIndex)
 	{
 		const int32 GroupIndex = Groups.Num();
 		FEdgeGroup& Group = Groups.Emplace_GetRef();
 		Group.EdgesIO = InEdgesIO;
 		Group.VtxPointIndices = InVtxPointIndices;
+		Group.VtxSourceIndex = InVtxSourceIndex;
 		return GroupIndex;
 	}
 
@@ -159,8 +233,12 @@ namespace PCGExGraphs
 		// route each input group's edges to its component's merger (merger carries the source tags over)
 		for (int32 g = 0; g < G; ++g)
 		{
+			// Merged-sources mode: a group without a source association would keep stale endpoint ids.
+			check(VtxSources.IsEmpty() || Groups[g].VtxSourceIndex != INDEX_NONE);
+
 			const int32 CompIdx = GetComponent(g);
-			Mergers[CompIdx]->Append(Groups[g].EdgesIO);
+			Groups[g].ComponentIndex = CompIdx;
+			Groups[g].OutWriteScope = Mergers[CompIdx]->Append(Groups[g].EdgesIO).Write;
 		}
 
 		// route each staged edge to its component
@@ -220,6 +298,90 @@ namespace PCGExGraphs
 
 		TConstPCGValueRange<int64> VtxEntries = VtxData->GetConstMetadataEntryValueRange();
 		TConstPCGValueRange<FTransform> VtxTransforms = VtxData->GetConstTransformValueRange();
+
+		// ---- Merged-sources endpoint renumbering ----
+		// Per-source endpoint ids collide once datasets are merged; renumber every initial vtx to
+		// H64(PointIndex, Adjacency) and rewrite the merged edge groups' endpoint refs to match.
+		// Runs before anything below reads VtxIdxAttr, so staged edges & count bumps see final ids.
+		if (!VtxSources.IsEmpty())
+		{
+			const int32 NumVtxSources = VtxSources.Num();
+
+			// Old endpoint id -> merged point index, per source (ids are only unique per source).
+			TArray<TMap<uint32, uint32>> OldToNew;
+			OldToNew.SetNum(NumVtxSources);
+
+			bool bReadFailure = false;
+
+			for (int32 s = 0; s < NumVtxSources; ++s)
+			{
+				const FVtxSource& Source = VtxSources[s];
+
+				const TUniquePtr<PCGExData::TArrayBuffer<int64>> IdBuffer = MakeUnique<PCGExData::TArrayBuffer<int64>>(Source.VtxIO.ToSharedRef(), PCGExClusters::Labels::Attr_PCGExVtxIdx);
+				if (!IdBuffer->InitForRead())
+				{
+					bReadFailure = true;
+					continue;
+				}
+
+				const TArray<int64>& OldValues = *IdBuffer->GetInValues().Get();
+
+				TMap<uint32, uint32>& Map = OldToNew[s];
+				Map.Reserve(OldValues.Num());
+
+				for (int32 i = 0; i < OldValues.Num(); ++i)
+				{
+					const int32 P = Source.Offset + i;
+
+					uint32 OldId;
+					uint32 Adjacency;
+					PCGEx::H64(static_cast<uint64>(OldValues[i]), OldId, Adjacency);
+
+					Map.Add(OldId, static_cast<uint32>(P));
+					VtxIdxAttr->SetValue(VtxEntries[P], static_cast<int64>(PCGEx::H64(static_cast<uint32>(P), Adjacency)));
+				}
+			}
+
+			bool bUnresolvedEndpoints = bReadFailure;
+
+			for (const FEdgeGroup& Group : Groups)
+			{
+				if (Group.VtxSourceIndex == INDEX_NONE || Group.ComponentIndex == INDEX_NONE || Group.OutWriteScope.Count <= 0)
+				{
+					continue;
+				}
+
+				const TMap<uint32, uint32>& Map = OldToNew[Group.VtxSourceIndex];
+
+				UPCGBasePointData* GroupEdgeData = ComponentEdgeFacades[Group.ComponentIndex]->GetOut();
+				FPCGMetadataAttribute<int64>* GroupEdgeIdxAttr = GroupEdgeData->MutableMetadata()->FindOrCreateAttribute<int64>(PCGExClusters::Labels::Attr_PCGExEdgeIdx);
+				if (!GroupEdgeIdxAttr)
+				{
+					continue;
+				}
+
+				const TConstPCGValueRange<int64> GroupEdgeEntries = GroupEdgeData->GetConstMetadataEntryValueRange();
+
+				for (int32 p = Group.OutWriteScope.Start; p < Group.OutWriteScope.End; ++p)
+				{
+					uint32 OldA;
+					uint32 OldB;
+					PCGEx::H64(static_cast<uint64>(GroupEdgeIdxAttr->GetValueFromItemKey(GroupEdgeEntries[p])), OldA, OldB);
+
+					const uint32* NewA = Map.Find(OldA);
+					const uint32* NewB = Map.Find(OldB);
+					if (!NewA || !NewB)
+					{
+						bUnresolvedEndpoints = true;
+						continue;
+					}
+
+					GroupEdgeIdxAttr->SetValue(GroupEdgeEntries[p], static_cast<int64>(PCGEx::H64(*NewA, *NewB)));
+				}
+			}
+
+			UE_CLOG(bUnresolvedEndpoints, LogPCGEx, Warning, TEXT("Graph patcher: some merged endpoints could not be resolved; input vtx/edges pairing is likely corrupt."));
+		}
 
 		// Existing vtx keep their stored endpoint id; staged vtx use their own point index.
 		auto VtxEndpointId = [&](const int32 V) -> uint32
@@ -317,4 +479,6 @@ namespace PCGExGraphs
 		OutEdgePointIndex = E.EdgePointIndex;
 		return true;
 	}
+
+#pragma endregion
 }
