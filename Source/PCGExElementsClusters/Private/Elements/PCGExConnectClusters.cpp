@@ -328,8 +328,7 @@ namespace PCGExConnectClusters
 		// Optional connector flags (node-specific; the patcher handles topology only).
 		PCGExGraphs::WriteConnectorFlags(
 			*Patcher, VtxDataFacade,
-			Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName,
-			Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName,
+			{Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName, Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName},
 			BridgeEdgeHandles, BridgeEndpoints);
 	}
 

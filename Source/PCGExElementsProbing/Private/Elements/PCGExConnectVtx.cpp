@@ -311,8 +311,7 @@ bool FPCGExConnectVtxElement::CommitAndOutput(FPCGExConnectVtxContext* Context, 
 
 	PCGExGraphs::WriteConnectorFlags(
 		*Context->Patcher, Context->MergedFacade.ToSharedRef(),
-		Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName,
-		Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName,
+		{Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName, Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName},
 		Context->ConnectorEdgeHandles, Context->ConnectorEndpoints);
 
 	(void)Context->MergedFacade->Source->StageOutput(Context);
@@ -625,8 +624,7 @@ namespace PCGExConnectVtx
 
 		PCGExGraphs::WriteConnectorFlags(
 			*Patcher, VtxDataFacade,
-			Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName,
-			Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName,
+			{Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName, Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName},
 			ConnectorEdgeHandles, ConnectorEndpoints);
 	}
 

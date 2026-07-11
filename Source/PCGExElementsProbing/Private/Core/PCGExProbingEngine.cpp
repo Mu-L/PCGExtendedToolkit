@@ -134,7 +134,9 @@ namespace PCGExProbing
 
 		PrepareWorkingData();
 
-		// One decrement per launched phase; the finishing worker collapses & fires the callback.
+		// One pending decrement per phase; whichever finishes last collapses & fires the callback.
+		// A phase that fails to launch (manager torn down mid-sequence) still decrements via AdvanceRun,
+		// so the completion contract - OnCompleteFn fires exactly once - holds even on partial launch.
 		RunCountdown = (HasLocalWork() ? 1 : 0) + (HasGlobalWork() ? 1 : 0);
 
 		if (RunCountdown == 0)
@@ -147,54 +149,66 @@ namespace PCGExProbing
 
 		if (HasLocalWork())
 		{
-			PCGEX_ASYNC_GROUP_CHKD_VOID(InTaskManager, LocalTask)
-
-			LocalTask->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops)
+			const TSharedPtr<PCGExMT::FTaskGroup> LocalTask = InTaskManager ? InTaskManager->TryCreateTaskGroup(FName(TEXT("ProbingLocal"))) : nullptr;
+			if (LocalTask)
 			{
-				PCGEX_ASYNC_THIS
-				This->PrepareScopes(Loops);
-			};
+				LocalTask->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops)
+				{
+					PCGEX_ASYNC_THIS
+					This->PrepareScopes(Loops);
+				};
 
-			LocalTask->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
+				LocalTask->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
+				{
+					PCGEX_ASYNC_THIS
+					This->ProcessScope(Scope);
+				};
+
+				LocalTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
+				{
+					PCGEX_ASYNC_THIS
+					This->AdvanceRun();
+				};
+
+				LocalTask->StartSubLoops(NumPoints, PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize());
+			}
+			else
 			{
-				PCGEX_ASYNC_THIS
-				This->ProcessScope(Scope);
-			};
-
-			LocalTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
-			{
-				PCGEX_ASYNC_THIS
-				This->AdvanceRun();
-			};
-
-			LocalTask->StartSubLoops(NumPoints, PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize());
+				AdvanceRun();
+			}
 		}
 
 		if (HasGlobalWork())
 		{
-			PCGEX_ASYNC_GROUP_CHKD_VOID(InTaskManager, GlobalTask)
-
-			GlobalTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
+			const TSharedPtr<PCGExMT::FTaskGroup> GlobalTask = InTaskManager ? InTaskManager->TryCreateTaskGroup(FName(TEXT("ProbingGlobal"))) : nullptr;
+			if (GlobalTask)
 			{
-				PCGEX_ASYNC_THIS
-				This->AdvanceRun();
-			};
-
-			for (FPCGExProbeOperation* Operation : GlobalOperations)
-			{
-				GlobalTask->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE, Op = Operation]()
+				GlobalTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
 				{
 					PCGEX_ASYNC_THIS
-					TSet<uint64> LocalEdges;
-					Op->ProcessAll(LocalEdges);
-					if (!LocalEdges.IsEmpty())
-					{
-						This->AppendEdges(LocalEdges);
-					}
-				});
-			}
+					This->AdvanceRun();
+				};
 
-			GlobalTask->StartSimpleCallbacks();
+				for (FPCGExProbeOperation* Operation : GlobalOperations)
+				{
+					GlobalTask->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE, Op = Operation]()
+					{
+						PCGEX_ASYNC_THIS
+						TSet<uint64> LocalEdges;
+						Op->ProcessAll(LocalEdges);
+						if (!LocalEdges.IsEmpty())
+						{
+							This->AppendEdges(LocalEdges);
+						}
+					});
+				}
+
+				GlobalTask->StartSimpleCallbacks();
+			}
+			else
+			{
+				AdvanceRun();
+			}
 		}
 	}
 

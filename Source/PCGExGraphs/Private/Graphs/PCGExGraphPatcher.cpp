@@ -15,7 +15,6 @@
 #include "Data/Buffers/PCGExBuffer.h"
 #include "Graphs/PCGExGraphHelpers.h"
 #include "Helpers/PCGExPointArrayDataHelpers.h"
-#include "Utils/PCGExIntTracker.h"
 #include "Utils/PCGExPointIOMerger.h"
 
 namespace PCGExGraphs
@@ -503,18 +502,17 @@ namespace PCGExGraphs
 	void WriteConnectorFlags(
 		FGraphPatcher& InPatcher,
 		const TSharedRef<PCGExData::FFacade>& InVtxFacade,
-		const bool bFlagVtx, const FName VtxFlagName,
-		const bool bFlagEdge, const FName EdgeFlagName,
+		const FConnectorFlagsConfig& InConfig,
 		const TArray<int32>& InEdgeHandles,
 		const TArray<uint64>& InEndpoints)
 	{
-		if (!bFlagVtx && !bFlagEdge)
+		if (!InConfig.IsEnabled())
 		{
 			return;
 		}
 
 		// Per-edge bool flag: resolve the attribute + entry range once per distinct output edge IO.
-		if (bFlagEdge)
+		if (InConfig.bFlagEdge)
 		{
 			struct FEdgeTarget
 			{
@@ -537,7 +535,7 @@ namespace PCGExGraphs
 				{
 					UPCGBasePointData* Out = EdgesIO->GetOut();
 					Target = &EdgeTargets.Add(EdgesIO.Get());
-					Target->Attr = Out->MutableMetadata()->FindOrCreateAttribute<bool>(EdgeFlagName, false);
+					Target->Attr = Out->MutableMetadata()->FindOrCreateAttribute<bool>(InConfig.EdgeFlagName, false);
 					Target->Entries = Out->GetConstMetadataEntryValueRange();
 				}
 
@@ -549,7 +547,7 @@ namespace PCGExGraphs
 		}
 
 		// Per-vtx int32 count: accumulate across all endpoints, then apply one read-modify-write per vtx.
-		if (bFlagVtx)
+		if (InConfig.bFlagVtx)
 		{
 			TMap<int32, int32> Counts;
 			Counts.Reserve(InEndpoints.Num() * 2);
@@ -562,7 +560,7 @@ namespace PCGExGraphs
 			if (!Counts.IsEmpty())
 			{
 				UPCGBasePointData* VtxOut = InVtxFacade->GetOut();
-				FPCGMetadataAttribute<int32>* VtxAttr = VtxOut->MutableMetadata()->FindOrCreateAttribute<int32>(VtxFlagName, 0);
+				FPCGMetadataAttribute<int32>* VtxAttr = VtxOut->MutableMetadata()->FindOrCreateAttribute<int32>(InConfig.VtxFlagName, 0);
 				const TConstPCGValueRange<int64> VtxEntries = VtxOut->GetConstMetadataEntryValueRange();
 
 				for (const TPair<int32, int32>& It : Counts)

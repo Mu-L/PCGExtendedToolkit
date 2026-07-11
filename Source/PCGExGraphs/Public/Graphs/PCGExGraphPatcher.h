@@ -6,7 +6,6 @@
 #include "CoreMinimal.h"
 #include "Core/PCGExMTCommon.h"
 
-class FPCGExIntTracker;
 struct FPCGExContext;
 struct FPCGExCarryOverDetails;
 class FPCGExPointIOMerger;
@@ -140,7 +139,6 @@ namespace PCGExGraphs
 		bool GetEdgeOutput(const int32 EdgeHandle, TSharedPtr<PCGExData::FPointIO>& OutEdgesIO, int32& OutEdgePointIndex) const;
 
 	protected:
-		TSharedPtr<FPCGExIntTracker> InternalTracker;
 		TSharedRef<PCGExData::FFacade> VtxFacade;
 		int32 NumInitialVtx = 0;
 
@@ -189,6 +187,18 @@ namespace PCGExGraphs
 		bool bCommitted = false;
 	};
 
+	/** Which connector flags to write, and under what attribute names. Named fields so the vtx/edge
+	 *  pair can't be transposed at a call site (a positional-arg swap would compile silently). */
+	struct FConnectorFlagsConfig
+	{
+		bool bFlagVtx = false;
+		FName VtxFlagName = NAME_None;
+		bool bFlagEdge = false;
+		FName EdgeFlagName = NAME_None;
+
+		bool IsEnabled() const { return bFlagVtx || bFlagEdge; }
+	};
+
 	/**
 	 * Optional connector-flag output shared by the bridge/probe cluster nodes: stamps a per-edge bool
 	 * on each staged edge's output data and/or bumps a per-vtx int32 count on the shared vtx. Resolves
@@ -198,8 +208,7 @@ namespace PCGExGraphs
 	PCGEXGRAPHS_API void WriteConnectorFlags(
 		FGraphPatcher& InPatcher,
 		const TSharedRef<PCGExData::FFacade>& InVtxFacade,
-		const bool bFlagVtx, const FName VtxFlagName,
-		const bool bFlagEdge, const FName EdgeFlagName,
+		const FConnectorFlagsConfig& InConfig,
 		const TArray<int32>& InEdgeHandles,
 		const TArray<uint64>& InEndpoints);
 }
