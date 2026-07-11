@@ -326,36 +326,11 @@ namespace PCGExConnectClusters
 		Patcher->Commit();
 
 		// Optional connector flags (node-specific; the patcher handles topology only).
-		if (!Settings->bFlagVtxConnector && !Settings->bFlagEdgeConnector) { return; }
-
-		FPCGMetadataAttribute<int32>* VtxConnectorFlagAttribute = Settings->bFlagVtxConnector
-			                                                          ? VtxDataFacade->GetOut()->MutableMetadata()->FindOrCreateAttribute<int32>(Settings->VtxConnectorFlagName, 0)
-			                                                          : nullptr;
-
-		TConstPCGValueRange<int64> VtxMetadataEntries = VtxDataFacade->GetOut()->GetConstMetadataEntryValueRange();
-
-		for (int32 i = 0; i < BridgeEdgeHandles.Num(); ++i)
-		{
-			if (Settings->bFlagEdgeConnector)
-			{
-				TSharedPtr<PCGExData::FPointIO> EdgesIO;
-				int32 EdgePointIndex = -1;
-				if (Patcher->GetEdgeOutput(BridgeEdgeHandles[i], EdgesIO, EdgePointIndex) && EdgesIO)
-				{
-					FPCGMetadataAttribute<bool>* EdgeConnectorFlagAttribute = EdgesIO->GetOut()->MutableMetadata()->FindOrCreateAttribute<bool>(Settings->EdgeConnectorFlagName, false);
-					const TConstPCGValueRange<int64> EdgeMetadataEntries = EdgesIO->GetOut()->GetConstMetadataEntryValueRange();
-					EdgeConnectorFlagAttribute->SetValue(EdgeMetadataEntries[EdgePointIndex], true);
-				}
-			}
-
-			if (VtxConnectorFlagAttribute)
-			{
-				const int64 VtxKeyA = VtxMetadataEntries[PCGEx::H64A(BridgeEndpoints[i])];
-				const int64 VtxKeyB = VtxMetadataEntries[PCGEx::H64B(BridgeEndpoints[i])];
-				VtxConnectorFlagAttribute->SetValue(VtxKeyA, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyA) + 1);
-				VtxConnectorFlagAttribute->SetValue(VtxKeyB, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyB) + 1);
-			}
-		}
+		PCGExGraphs::WriteConnectorFlags(
+			*Patcher, VtxDataFacade,
+			Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName,
+			Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName,
+			BridgeEdgeHandles, BridgeEndpoints);
 	}
 
 

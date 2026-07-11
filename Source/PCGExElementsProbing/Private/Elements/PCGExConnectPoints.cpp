@@ -178,72 +178,17 @@ namespace PCGExConnectPoints
 
 	void FProcessor::OnPreparationComplete()
 	{
-		Engine->PrepareWorkingData();
-
 		GeneratorsFilter.Reset();
 		ConnectableFilter.Reset();
 
-		NumCompletions = Engine->HasGlobalWork() ? 1 : 0;
-		if (Engine->HasLocalWork())
-		{
-			NumCompletions++;
-			StartParallelLoopForPoints(PCGExData::EIOSide::In);
-		}
-
-		if (Engine->HasGlobalWork())
-		{
-			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, GlobalOpsTasks)
-			GlobalOpsTasks->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
+		Engine->RunAsync(
+			TaskManager,
+			[PCGEX_ASYNC_THIS_CAPTURE]()
 			{
 				PCGEX_ASYNC_THIS
-				This->AdvanceCompletion();
-			};
-
-			for (FPCGExProbeOperation* Operation : Engine->GetGlobalOperations())
-			{
-				GlobalOpsTasks->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE, Op = Operation]()
-				{
-					PCGEX_ASYNC_THIS
-					TSet<uint64> LocalEdges;
-					Op->ProcessAll(LocalEdges);
-					if (!LocalEdges.IsEmpty())
-					{
-						This->Engine->AppendEdges(LocalEdges);
-					}
-				});
-			}
-
-			GlobalOpsTasks->StartSimpleCallbacks();
-		}
-	}
-
-	void FProcessor::PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops)
-	{
-		IProcessor::PrepareLoopScopesForPoints(Loops);
-		Engine->PrepareScopes(Loops);
-	}
-
-	void FProcessor::ProcessPoints(const PCGExMT::FScope& Scope)
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGEx::ConnectPoints::ProcessPoints);
-		Engine->ProcessScope(Scope);
-	}
-
-	void FProcessor::OnPointsProcessingComplete()
-	{
-		Engine->CollapseScopedEdges();
-		AdvanceCompletion();
-	}
-
-	void FProcessor::AdvanceCompletion()
-	{
-		if (FPlatformAtomics::InterlockedDecrement(&NumCompletions))
-		{
-			return;
-		}
-
-		GraphBuilder->Graph->InsertEdges_Unsafe(Engine->GetUniqueEdges(), -1);
-		GraphBuilder->CompileAsync(TaskManager, true);
+				This->GraphBuilder->Graph->InsertEdges_Unsafe(This->Engine->GetUniqueEdges(), -1);
+				This->GraphBuilder->CompileAsync(This->TaskManager, true);
+			});
 	}
 
 	void FProcessor::CompleteWork()

@@ -110,8 +110,6 @@ namespace PCGExConnectPoints
 
 		TSharedPtr<PCGExProbing::FProbingEngine> Engine;
 
-		int8 NumCompletions = 2;
-
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
 			: TProcessor(InPointDataFacade)
@@ -122,11 +120,6 @@ namespace PCGExConnectPoints
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		void OnPreparationComplete();
-		virtual void PrepareLoopScopesForPoints(const TArray<PCGExMT::FScope>& Loops) override;
-		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
-		virtual void OnPointsProcessingComplete() override;
-
-		void AdvanceCompletion();
 
 		virtual void CompleteWork() override;
 		virtual void Output() override;

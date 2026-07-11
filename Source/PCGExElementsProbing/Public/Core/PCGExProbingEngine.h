@@ -20,6 +20,7 @@ namespace PCGExData
 namespace PCGExMT
 {
 	struct FScope;
+	class FTaskManager;
 	template <typename T>
 	class TScopedSet;
 }
@@ -39,14 +40,17 @@ namespace PCGExProbing
 	 * coincidence handling and edge accumulation. Extracted from Connect Points so cluster-aware
 	 * nodes can run the same probing over any point facade (e.g. cluster vtx).
 	 *
-	 * Call sequence:
-	 *   1. Configure (SetCoincidence / SetProjection / optional constraints), then Init().
-	 *   2. Fill the CanGenerate & AcceptConnections masks (sized by Init, uninitialized).
-	 *   3. PrepareWorkingData() - builds working transforms/positions & octree, binds operations.
-	 *   4. Local ops (HasLocalWork): PrepareScopes() once, ProcessScope() per scope (parallel-safe),
-	 *      CollapseScopedEdges() once all scopes are done.
-	 *      Global ops (HasGlobalWork): per operation, ProcessAll() into a local set -> AppendEdges().
-	 *   5. Read the result from GetUniqueEdges().
+	 * Usage:
+	 *   Engine = MakeShared<FProbingEngine>(Facade);
+	 *   Engine->SetCoincidence(...); Engine->SetProjection(...);   // optional, before Init
+	 *   if (!Engine->Init(Context, Factories)) { ... no work ... }
+	 *   // fill Engine->CanGenerate / Engine->AcceptConnections (sized by Init)
+	 *   Engine->RunAsync(TaskManager, [Engine]{ read Engine->GetUniqueEdges() });
+	 *
+	 * RunAsync owns the whole schedule: it builds working data, runs the local (radius/direct) scoped
+	 * loop and the global-probe passes concurrently, collapses the scoped edge sets, then fires the
+	 * completion callback exactly once on the worker that finishes last. Callers never touch the
+	 * per-phase steps directly - keeping the completion/ordering contract in one place.
 	 *
 	 * With a group constraint (EEdgeRelation != Any), radius-based probes exclude non-matching
 	 * candidates at gathering time (so "closest"-style probes re-pick), while direct & global probe
@@ -63,13 +67,6 @@ namespace PCGExProbing
 		void SetCoincidence(const bool bInPreventCoincidence, const FVector& InTolerance);
 		void SetProjection(const FPCGExGeo2DProjectionDetails& InDetails);
 
-		/** Optional: reuse working data computed elsewhere (must match the facade size & projection). */
-		void SetExternalWorkingData(const TArray<FTransform>* InTransforms, const TArray<FVector>* InPositions);
-
-		/** Optional: iterate generators through this list instead of [0, NumPoints).
-		 * ProcessScope scopes must then span [0, GeneratorIndices->Num()). */
-		const TArray<int32>* GeneratorIndices = nullptr;
-
 		/** Optional: per-point group ids consumed by EdgeRelation. */
 		const TArray<int32>* PointGroupIds = nullptr;
 		EEdgeRelation EdgeRelation = EEdgeRelation::Any;
@@ -77,30 +74,21 @@ namespace PCGExProbing
 		/** Creates & buckets operations. Returns false if no operation can produce edges. */
 		bool Init(FPCGExContext* InContext, const TArray<TObjectPtr<const UPCGExProbeFactoryData>>& InFactories);
 
-		//~ Participation masks - sized by Init (uninitialized), fill before PrepareWorkingData()
+		//~ Participation masks - sized by Init (uninitialized), fill before RunAsync()
 
 		TArray<int8> CanGenerate;
 		TArray<int8> AcceptConnections;
 
-		void PrepareWorkingData();
-
-		bool HasLocalWork() const { return !bOnlyGlobalOps; }
-		bool HasGlobalWork() const { return !GlobalOperations.IsEmpty(); }
-		const TArray<FPCGExProbeOperation*>& GetGlobalOperations() const { return GlobalOperations; }
-
-		/** Loop domain size for local probing (generator list size, or point count). */
-		int32 GetNumIterations() const;
-
-		void PrepareScopes(const TArray<PCGExMT::FScope>& Loops);
-		void ProcessScope(const PCGExMT::FScope& Scope);
-		void CollapseScopedEdges();
-
-		/** Thread-safe accumulation of global-probe outputs (relation post-filter applies). */
-		void AppendEdges(const TSet<uint64>& InUniqueEdges);
+		/**
+		 * Build working data, run all probing (local + global) on InTaskManager, collapse the results,
+		 * then call InOnComplete once from the finishing worker. No-op-safe: if no operation produces
+		 * work the callback still fires. GetUniqueEdges() is valid from inside the callback onward.
+		 */
+		void RunAsync(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, TFunction<void()>&& InOnComplete);
 
 		TSet<uint64>& GetUniqueEdges() { return UniqueEdges; }
-		const TArray<FVector>& GetWorkingPositions() const { return *WorkingPositionsPtr; }
-		const TArray<FTransform>& GetWorkingTransforms() const { return *WorkingTransformsPtr; }
+		const TArray<FVector>& GetWorkingPositions() const { return WorkingPositions; }
+		const TArray<FTransform>& GetWorkingTransforms() const { return WorkingTransforms; }
 
 	protected:
 		TSharedRef<PCGExData::FFacade> DataFacade;
@@ -118,7 +106,6 @@ namespace PCGExProbing
 		int32 NumDirectOps = 0;
 		int32 NumChainedOps = 0;
 		int32 NumSharedOps = 0;
-		int32 NumGlobalOps = 0;
 
 		bool bOnlyGlobalOps = false;
 		bool bWantsOctree = false;
@@ -128,12 +115,8 @@ namespace PCGExProbing
 
 		TUniquePtr<PCGExOctree::FItemOctree> Octree;
 
-		// Owned storage; the pointers alias external arrays when SetExternalWorkingData was used.
 		TArray<FTransform> WorkingTransforms;
 		TArray<FVector> WorkingPositions;
-		const TArray<FTransform>* WorkingTransformsPtr = nullptr;
-		const TArray<FVector>* WorkingPositionsPtr = nullptr;
-		bool bExternalWorkingData = false;
 
 		mutable FRWLock UniqueEdgesLock;
 		TSharedPtr<PCGExMT::TScopedSet<uint64>> ScopedEdges;
@@ -144,6 +127,25 @@ namespace PCGExProbing
 
 		bool bPreventCoincidence = false;
 		FVector CWCoincidenceTolerance = FVector::OneVector;
+
+		//~ RunAsync internals
+
+		TFunction<void()> OnCompleteFn;
+		int8 RunCountdown = 0;
+
+		bool HasLocalWork() const { return !bOnlyGlobalOps; }
+		bool HasGlobalWork() const { return !GlobalOperations.IsEmpty(); }
+
+		void PrepareWorkingData();
+		void PrepareScopes(const TArray<PCGExMT::FScope>& Loops);
+		void ProcessScope(const PCGExMT::FScope& Scope);
+		void CollapseScopedEdges();
+
+		/** Thread-safe accumulation of global-probe outputs (relation post-filter applies). */
+		void AppendEdges(const TSet<uint64>& InUniqueEdges);
+
+		/** Decrement the phase countdown; the worker that reaches zero collapses + fires OnComplete. */
+		void AdvanceRun();
 
 		bool RequiresEdgePostFilter() const { return EdgeRelation != EEdgeRelation::Any && PointGroupIds; }
 		void AppendEdgesFiltered_Unsafe(const TSet<uint64>& InEdges);

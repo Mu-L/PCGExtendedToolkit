@@ -26,6 +26,11 @@ namespace PCGExClusterFilter
 	class FManager;
 }
 
+namespace PCGExClusters
+{
+	class FCluster;
+}
+
 class UPCGExProbeFactoryData;
 class FPCGExProbeOperation;
 
@@ -137,6 +142,14 @@ namespace PCGExConnectVtx
 	PCGEX_CTX_STATE(State_MergingVtx)
 	PCGEX_CTX_STATE(State_Probing)
 	PCGEX_CTX_STATE(State_Patching)
+
+	// Shared staging (used by both the per-batch and All-Inputs pipelines). Offset shifts a cluster's
+	// vtx point indices into the merged/context domain (0 for a single-source batch); source index tags
+	// the owning vtx source for merged-sources endpoint renumbering (INDEX_NONE for single-source).
+	void RegisterClusterGroups(PCGExGraphs::FGraphPatcher& InPatcher, const TArray<TSharedPtr<PCGExClusters::FCluster>>& InClusters, const int32 InOffset, const int32 InSourceIndex);
+
+	// Stage probe-produced edges into the patcher, skipping edges that already exist and self-edges.
+	void StageProbeEdges(PCGExGraphs::FGraphPatcher& InPatcher, const TSet<uint64>& InNewEdges, const TSet<uint64>& InExistingEdges, TArray<int32>& OutHandles, TArray<uint64>& OutEndpoints);
 }
 
 struct FPCGExConnectVtxContext final : FPCGExClustersProcessorContext
@@ -198,7 +211,11 @@ namespace PCGExConnectVtx
 		}
 
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
-		virtual void ProcessNodes(const PCGExMT::FScope& Scope) override;
+
+		// Writes this cluster's participation masks (point-index space) into the batch caches.
+		// Called sequentially from FBatch::CompleteWork so shared-vtx writes are deterministic.
+		void ContributeMasks(const TSharedPtr<TArray<int8>>& InCanGenerate, const TSharedPtr<TArray<int8>>& InAcceptConnections) const;
+
 		virtual void Cleanup() override;
 	};
 
@@ -234,12 +251,12 @@ namespace PCGExConnectVtx
 		virtual void Write() override;
 
 	protected:
-		int8 NumCompletions = 0;
+		// Fills ClusterIds, ExistingEdges & the participation masks from ValidClusters (all scopes).
+		void BuildTopologyAndMasks();
 
-		// Fills ClusterIds & ExistingEdges from ValidClusters (all scopes).
-		void BuildTopologyData();
+		// Forward vtx + all paired edges untouched (batch has no usable clusters to connect).
+		void ForwardUntouched();
 
-		void AdvanceCompletion();
 		void StageAndResolve();
 	};
 }

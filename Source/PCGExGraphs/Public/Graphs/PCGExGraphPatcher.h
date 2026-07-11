@@ -30,10 +30,11 @@ namespace PCGExGraphs
 	 * FGraphPatcher's merged-sources mode. Two-phase, because the attribute merge is async:
 	 *
 	 *   FVtxMerger Merger;
-	 *   for (VtxGroup) Merger.AddSource(VtxIO);              // records point-index offsets
-	 *   Merger.MergeAsync(Context, TaskManager, CarryOver);  // phase 1 (async)
+	 *   for (VtxGroup) Merger.AddSource(VtxIO);              // registers a source
+	 *   Merger.MergeAsync(Context, TaskManager, CarryOver);  // phase 1 (async); fixes source offsets
 	 *   ... let the merge finish ...
 	 *   Facade = Merger.Finalize(Context, OutputPin);        // phase 2
+	 *   const int32 Off = Merger.GetOffset(SourceIndex);     // valid after MergeAsync
 	 *
 	 * The finalized facade reads the merged data In-side (broadcaster/buffer friendly) and owns a
 	 * mutable duplicate as Out - the shape FGraphPatcher expects. The merged In data is kept alive
@@ -42,13 +43,11 @@ namespace PCGExGraphs
 	class PCGEXGRAPHS_API FVtxMerger : public TSharedFromThis<FVtxMerger>
 	{
 	public:
-		/** Register a vtx source; returns its source index. Sources are laid out sequentially. */
+		/** Register a vtx source; returns its source index. */
 		int32 AddSource(const TSharedPtr<PCGExData::FPointIO>& InVtxIO);
 
-		int32 NumSources() const { return Sources.Num(); }
-		int32 GetTotalNum() const { return TotalNum; }
+		/** This source's first point index in the merged output. Authoritative only after MergeAsync. */
 		int32 GetOffset(const int32 SourceIndex) const { return Sources[SourceIndex].Offset; }
-		const TSharedPtr<PCGExData::FPointIO>& GetSourceIO(const int32 SourceIndex) const { return Sources[SourceIndex].VtxIO; }
 
 		/** Phase 1: merge all sources' points, attributes & tags into an internal scratch data (async). */
 		void MergeAsync(FPCGExContext* InContext, const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, const FPCGExCarryOverDetails* InCarryOver);
@@ -60,11 +59,10 @@ namespace PCGExGraphs
 		struct FSource
 		{
 			TSharedPtr<PCGExData::FPointIO> VtxIO;
-			int32 Offset = 0;
+			int32 Offset = 0; // filled from the merger's authoritative write scope in MergeAsync
 		};
 
 		TArray<FSource> Sources;
-		int32 TotalNum = 0;
 
 		TSharedPtr<PCGExData::FPointIO> ScratchIO;
 		TSharedPtr<PCGExData::FFacade> ScratchFacade;
@@ -190,4 +188,18 @@ namespace PCGExGraphs
 		bool bResolved = false;
 		bool bCommitted = false;
 	};
+
+	/**
+	 * Optional connector-flag output shared by the bridge/probe cluster nodes: stamps a per-edge bool
+	 * on each staged edge's output data and/or bumps a per-vtx int32 count on the shared vtx. Resolves
+	 * each edge output's attribute + entry range once per distinct IO and accumulates vtx counts before
+	 * flushing. No-op when both flags are off. Call after Patcher.Commit().
+	 */
+	PCGEXGRAPHS_API void WriteConnectorFlags(
+		FGraphPatcher& InPatcher,
+		const TSharedRef<PCGExData::FFacade>& InVtxFacade,
+		const bool bFlagVtx, const FName VtxFlagName,
+		const bool bFlagEdge, const FName EdgeFlagName,
+		const TArray<int32>& InEdgeHandles,
+		const TArray<uint64>& InEndpoints);
 }

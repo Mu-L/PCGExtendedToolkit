@@ -4,7 +4,9 @@
 #include "Core/PCGExProbingEngine.h"
 
 #include "PCGExH.h"
+#include "PCGExCoreSettingsCache.h"
 #include "Containers/PCGExScopedContainers.h"
+#include "Core/PCGExMT.h"
 #include "Core/PCGExMTCommon.h"
 #include "Core/PCGExProbeFactoryProvider.h"
 #include "Core/PCGExProbeOperation.h"
@@ -18,8 +20,6 @@ namespace PCGExProbing
 	FProbingEngine::FProbingEngine(const TSharedRef<PCGExData::FFacade>& InDataFacade)
 		: DataFacade(InDataFacade)
 	{
-		WorkingTransformsPtr = &WorkingTransforms;
-		WorkingPositionsPtr = &WorkingPositions;
 	}
 
 	FProbingEngine::~FProbingEngine()
@@ -38,14 +38,6 @@ namespace PCGExProbing
 		bUseProjection = true;
 	}
 
-	void FProbingEngine::SetExternalWorkingData(const TArray<FTransform>* InTransforms, const TArray<FVector>* InPositions)
-	{
-		check(InTransforms && InPositions)
-		WorkingTransformsPtr = InTransforms;
-		WorkingPositionsPtr = InPositions;
-		bExternalWorkingData = true;
-	}
-
 	bool FProbingEngine::Init(FPCGExContext* InContext, const TArray<TObjectPtr<const UPCGExProbeFactoryData>>& InFactories)
 	{
 		NumPoints = DataFacade->GetNum();
@@ -58,11 +50,8 @@ namespace PCGExProbing
 		CanGenerate.SetNumUninitialized(NumPoints);
 		AcceptConnections.SetNumUninitialized(NumPoints);
 
-		if (!bExternalWorkingData)
-		{
-			PCGExArrayHelpers::InitArray(WorkingTransforms, NumPoints);
-			PCGExArrayHelpers::InitArray(WorkingPositions, NumPoints);
-		}
+		PCGExArrayHelpers::InitArray(WorkingTransforms, NumPoints);
+		PCGExArrayHelpers::InitArray(WorkingPositions, NumPoints);
 
 		AllOperations.Reserve(InFactories.Num());
 
@@ -72,8 +61,8 @@ namespace PCGExProbing
 			NewOperation->BindContext(InContext);
 			NewOperation->PrimaryDataFacade = DataFacade;
 
-			NewOperation->WorkingTransforms = WorkingTransformsPtr;
-			NewOperation->WorkingPositions = WorkingPositionsPtr;
+			NewOperation->WorkingTransforms = &WorkingTransforms;
+			NewOperation->WorkingPositions = &WorkingPositions;
 			NewOperation->CanGenerate = &CanGenerate;
 			NewOperation->AcceptConnections = &AcceptConnections;
 
@@ -123,7 +112,6 @@ namespace PCGExProbing
 		NumChainedOps = ChainedOperations.Num();
 		NumSharedOps = SharedOperations.Num();
 		NumDirectOps = DirectOperations.Num();
-		NumGlobalOps = GlobalOperations.Num();
 
 		if (!RadiusSources.IsEmpty())
 		{
@@ -140,32 +128,110 @@ namespace PCGExProbing
 		return true;
 	}
 
+	void FProbingEngine::RunAsync(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager, TFunction<void()>&& InOnComplete)
+	{
+		OnCompleteFn = MoveTemp(InOnComplete);
+
+		PrepareWorkingData();
+
+		// One decrement per launched phase; the finishing worker collapses & fires the callback.
+		RunCountdown = (HasLocalWork() ? 1 : 0) + (HasGlobalWork() ? 1 : 0);
+
+		if (RunCountdown == 0)
+		{
+			// Init rejects the fully-empty case, so this is only defensive.
+			CollapseScopedEdges();
+			OnCompleteFn();
+			return;
+		}
+
+		if (HasLocalWork())
+		{
+			PCGEX_ASYNC_GROUP_CHKD_VOID(InTaskManager, LocalTask)
+
+			LocalTask->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops)
+			{
+				PCGEX_ASYNC_THIS
+				This->PrepareScopes(Loops);
+			};
+
+			LocalTask->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
+			{
+				PCGEX_ASYNC_THIS
+				This->ProcessScope(Scope);
+			};
+
+			LocalTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
+			{
+				PCGEX_ASYNC_THIS
+				This->AdvanceRun();
+			};
+
+			LocalTask->StartSubLoops(NumPoints, PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize());
+		}
+
+		if (HasGlobalWork())
+		{
+			PCGEX_ASYNC_GROUP_CHKD_VOID(InTaskManager, GlobalTask)
+
+			GlobalTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
+			{
+				PCGEX_ASYNC_THIS
+				This->AdvanceRun();
+			};
+
+			for (FPCGExProbeOperation* Operation : GlobalOperations)
+			{
+				GlobalTask->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE, Op = Operation]()
+				{
+					PCGEX_ASYNC_THIS
+					TSet<uint64> LocalEdges;
+					Op->ProcessAll(LocalEdges);
+					if (!LocalEdges.IsEmpty())
+					{
+						This->AppendEdges(LocalEdges);
+					}
+				});
+			}
+
+			GlobalTask->StartSimpleCallbacks();
+		}
+	}
+
+	void FProbingEngine::AdvanceRun()
+	{
+		if (FPlatformAtomics::InterlockedDecrement(&RunCountdown) != 0)
+		{
+			return;
+		}
+
+		CollapseScopedEdges();
+		OnCompleteFn();
+	}
+
 	void FProbingEngine::PrepareWorkingData()
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExProbing::FProbingEngine::PrepareWorkingData);
 
 		const UPCGBasePointData* PointData = DataFacade->Source->GetInOut();
 
-		if (!bExternalWorkingData)
-		{
-			const TConstPCGValueRange<FTransform> OriginalTransforms = PointData->GetConstTransformValueRange();
+		const TConstPCGValueRange<FTransform> OriginalTransforms = PointData->GetConstTransformValueRange();
 
-			PCGExMT::ParallelOrSequential(
-				NumPoints,
-				[&](const int32 i)
+		PCGExMT::ParallelOrSequential(
+			NumPoints,
+			[&](const int32 i)
+			{
+				if (bUseProjection)
 				{
-					if (bUseProjection)
-					{
-						WorkingTransforms[i] = ProjectionDetails.ProjectFlat(OriginalTransforms[i]);
-						WorkingPositions[i] = WorkingTransforms[i].GetLocation();
-					}
-					else
-					{
-						WorkingTransforms[i] = OriginalTransforms[i];
-						WorkingPositions[i] = OriginalTransforms[i].GetLocation();
-					}
-				});
-		}
+					WorkingTransforms[i] = ProjectionDetails.ProjectFlat(OriginalTransforms[i]);
+					WorkingPositions[i] = WorkingTransforms[i].GetLocation();
+				}
+				else
+				{
+					WorkingTransforms[i] = OriginalTransforms[i];
+					WorkingPositions[i] = OriginalTransforms[i].GetLocation();
+				}
+			});
 
 		if (bWantsOctree)
 		{
@@ -174,7 +240,6 @@ namespace PCGExProbing
 
 			constexpr double PPRefRadius = 0.05;
 			const FVector PPRefExtents = FVector(PPRefRadius);
-			const TArray<FVector>& Positions = *WorkingPositionsPtr;
 
 			for (int i = 0; i < NumPoints; i++)
 			{
@@ -182,7 +247,7 @@ namespace PCGExProbing
 				{
 					continue;
 				}
-				Octree->AddElement(PCGExOctree::FItem(i, FBoxSphereBounds(Positions[i], PPRefExtents, PPRefRadius)));
+				Octree->AddElement(PCGExOctree::FItem(i, FBoxSphereBounds(WorkingPositions[i], PPRefExtents, PPRefRadius)));
 			}
 
 			for (const TSharedPtr<FPCGExProbeOperation>& Operation : AllOperations)
@@ -190,11 +255,6 @@ namespace PCGExProbing
 				Operation->Octree = Octree.Get();
 			}
 		}
-	}
-
-	int32 FProbingEngine::GetNumIterations() const
-	{
-		return GeneratorIndices ? GeneratorIndices->Num() : NumPoints;
 	}
 
 	void FProbingEngine::PrepareScopes(const TArray<PCGExMT::FScope>& Loops)
@@ -227,7 +287,6 @@ namespace PCGExProbing
 		TArray<FCandidate> Candidates;
 		TArray<FBestCandidate> BestCandidates;
 
-		const TArray<FVector>& Positions = *WorkingPositionsPtr;
 		const TArray<int32>* GroupIds = RequiresEdgePostFilter() ? PointGroupIds : nullptr;
 		const bool bWantsSameGroup = EdgeRelation == EEdgeRelation::SameGroup;
 
@@ -247,7 +306,7 @@ namespace PCGExProbing
 				return;
 			}
 
-			const FVector Position = Positions[OtherPointIndex];
+			const FVector Position = WorkingPositions[OtherPointIndex];
 			const FVector Dir = (Origin - Position).GetSafeNormal();
 			const int32 EmplaceIndex = Candidates.Emplace(OtherPointIndex, Dir, FVector::DistSquared(Position, Origin), bPreventCoincidence ? PCGEx::SH3(Dir, CWCoincidenceTolerance) : 0);
 
@@ -260,10 +319,8 @@ namespace PCGExProbing
 			}
 		};
 
-		for (int It = Scope.Start; It < Scope.End; It++)
+		for (int Index = Scope.Start; Index < Scope.End; Index++)
 		{
-			const int32 Index = GeneratorIndices ? (*GeneratorIndices)[It] : It;
-
 			if (!CanGenerate[Index])
 			{
 				continue;
@@ -313,7 +370,7 @@ namespace PCGExProbing
 					}
 				}
 
-				Origin = Positions[Index];
+				Origin = WorkingPositions[Index];
 
 				// Find candidates within radius
 				Octree->FindElementsWithBoundsTest(FBoxCenterAndExtent(Origin, FVector(MaxRadius)), ProcessPoint);

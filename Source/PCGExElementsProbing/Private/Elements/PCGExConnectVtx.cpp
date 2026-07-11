@@ -9,11 +9,11 @@
 #include "Core/PCGExFilterTypeSets.h"
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExProbeFactoryProvider.h"
-#include "Core/PCGExProbeOperation.h"
 #include "Core/PCGExProbingEngine.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
+#include "Factories/PCGExFactories.h"
 #include "Graphs/PCGExGraphPatcher.h"
 
 #define LOCTEXT_NAMESPACE "PCGExConnectVtx"
@@ -47,6 +47,8 @@ FPCGExConnectVtxContext::~FPCGExConnectVtxContext()
 {
 }
 
+#pragma region UPCGExConnectVtxSettings / FPCGExConnectVtxElement
+
 bool FPCGExConnectVtxElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExClustersProcessorElement::Boot(InContext))
@@ -72,10 +74,10 @@ bool FPCGExConnectVtxElement::Boot(FPCGExContext* InContext) const
 	PCGEX_FWD(VtxCarryOverDetails)
 	Context->VtxCarryOverDetails.Init();
 
-	// The relation dropdown is hidden under Cluster scope (same-cluster is enforced there), so a
-	// stale value is ignored rather than rejected. Cross-Data is selectable under Vtx Group scope
-	// but unsatisfiable (a group is a single vtx dataset) - reject it.
-	if (Settings->EdgeRelation == EPCGExConnectVtxEdgeRelation::CrossData && Settings->Scope != EPCGExConnectVtxScope::All)
+	// The relation dropdown is only meaningful (and visible) under Vtx Group scope: Cluster scope forces
+	// same-cluster and hides it, All scope satisfies every relation. Reject the one unsatisfiable case -
+	// Cross-Data while the property is visible (Vtx Group) - and ignore any stale value otherwise.
+	if (Settings->EdgeRelation == EPCGExConnectVtxEdgeRelation::CrossData && Settings->Scope == EPCGExConnectVtxScope::VtxGroup)
 	{
 		PCGE_LOG(Error, GraphAndLog, FTEXT("Cross-Data edge relation requires the All Inputs scope."));
 		return false;
@@ -121,34 +123,22 @@ bool FPCGExConnectVtxElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 
 		PCGEX_ON_STATE(PCGExConnectVtx::State_LaunchingMerge)
 		{
-			if (!LaunchVtxMerge(Context, Settings))
-			{
-				return true;
-			}
+			if (!LaunchVtxMerge(Context, Settings)) { return true; }
 		}
 
 		PCGEX_ON_ASYNC_STATE_READY(PCGExConnectVtx::State_MergingVtx)
 		{
-			if (!LaunchProbing(Context, Settings))
-			{
-				return true;
-			}
+			if (!LaunchProbing(Context, Settings)) { return true; }
 		}
 
 		PCGEX_ON_ASYNC_STATE_READY(PCGExConnectVtx::State_Probing)
 		{
-			if (!LaunchPatching(Context, Settings))
-			{
-				return true;
-			}
+			if (!LaunchPatching(Context, Settings)) { return true; }
 		}
 
 		PCGEX_ON_ASYNC_STATE_READY(PCGExConnectVtx::State_Patching)
 		{
-			if (!CommitAndOutput(Context, Settings))
-			{
-				return true;
-			}
+			if (!CommitAndOutput(Context, Settings)) { return true; }
 		}
 
 		return Context->TryComplete();
@@ -160,6 +150,10 @@ bool FPCGExConnectVtxElement::AdvanceWork(FPCGExContext* InContext, const UPCGEx
 
 	return Context->TryComplete();
 }
+
+#pragma endregion
+
+#pragma region All-Inputs pipeline (context-level)
 
 bool FPCGExConnectVtxElement::LaunchVtxMerge(FPCGExConnectVtxContext* Context, const UPCGExConnectVtxSettings* Settings) const
 {
@@ -173,22 +167,16 @@ bool FPCGExConnectVtxElement::LaunchVtxMerge(FPCGExConnectVtxContext* Context, c
 	{
 		const TSharedPtr<FBatch> TypedBatch = StaticCastSharedPtr<FBatch>(Batch);
 
+		// Batches with no usable clusters already forwarded themselves (FBatch::CompleteWork).
 		if (!TypedBatch->bIsBatchValid || TypedBatch->ValidClusters.IsEmpty())
 		{
-			// No usable clusters: this group can't join the merge, forward it untouched.
-			TypedBatch->VtxDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
-			for (const TSharedPtr<PCGExData::FPointIO>& EdgesIO : TypedBatch->Edges)
-			{
-				EdgesIO->InitializeOutput(PCGExData::EIOInit::Forward);
-			}
 			continue;
 		}
 
-		const int32 SourceIndex = Context->VtxMerger->AddSource(TypedBatch->VtxDataFacade->Source);
-		TypedBatch->MergeOffset = Context->VtxMerger->GetOffset(SourceIndex);
 		TypedBatch->GroupIdOffset = ClusterIdOffset;
 		ClusterIdOffset += TypedBatch->ValidClusters.Num();
 
+		Context->VtxMerger->AddSource(TypedBatch->VtxDataFacade->Source);
 		Context->ValidBatches.Add(TypedBatch);
 	}
 
@@ -243,6 +231,9 @@ bool FPCGExConnectVtxElement::LaunchProbing(FPCGExConnectVtxContext* Context, co
 	for (int32 b = 0; b < Context->ValidBatches.Num(); ++b)
 	{
 		const TSharedPtr<FBatch>& Batch = Context->ValidBatches[b];
+
+		// Offsets are authoritative only after MergeAsync; ValidBatches[b] is source b by construction.
+		Batch->MergeOffset = Context->VtxMerger->GetOffset(b);
 		const int32 Offset = Batch->MergeOffset;
 		const int32 Num = Batch->VtxDataFacade->GetNum();
 
@@ -281,47 +272,9 @@ bool FPCGExConnectVtxElement::LaunchProbing(FPCGExConnectVtxContext* Context, co
 		Context->Engine->EdgeRelation = PCGExProbing::EEdgeRelation::DifferentGroup;
 	}
 
-	Context->Engine->PrepareWorkingData();
-
-	const TSharedPtr<PCGExMT::FTaskManager> TaskManager = Context->GetTaskManager();
-
-	if (Context->Engine->HasLocalWork())
-	{
-		PCGEX_ASYNC_GROUP_CHKD(TaskManager, ProbingLoopTask)
-
-		ProbingLoopTask->OnPrepareSubLoopsCallback = [Ctx = Context](const TArray<PCGExMT::FScope>& Loops)
-		{
-			Ctx->Engine->PrepareScopes(Loops);
-		};
-
-		ProbingLoopTask->OnSubLoopStartCallback = [Ctx = Context](const PCGExMT::FScope& Scope)
-		{
-			Ctx->Engine->ProcessScope(Scope);
-		};
-
-		ProbingLoopTask->StartSubLoops(Context->Engine->GetNumIterations(), PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize());
-	}
-
-	if (Context->Engine->HasGlobalWork())
-	{
-		PCGEX_ASYNC_GROUP_CHKD(TaskManager, GlobalOpsTasks)
-
-		for (FPCGExProbeOperation* Operation : Context->Engine->GetGlobalOperations())
-		{
-			GlobalOpsTasks->AddSimpleCallback([Ctx = Context, Op = Operation]()
-			{
-				TSet<uint64> LocalEdges;
-				Op->ProcessAll(LocalEdges);
-				if (!LocalEdges.IsEmpty())
-				{
-					Ctx->Engine->AppendEdges(LocalEdges);
-				}
-			});
-		}
-
-		GlobalOpsTasks->StartSimpleCallbacks();
-	}
-
+	// The engine owns the whole schedule; it collapses the scoped edges before the state machine
+	// advances (poll on IsWaitingForTasks), so LaunchPatching sees a finished GetUniqueEdges().
+	Context->Engine->RunAsync(Context->GetTaskManager(), []() {});
 	Context->SetState(State_Probing);
 
 	return true;
@@ -331,49 +284,15 @@ bool FPCGExConnectVtxElement::LaunchPatching(FPCGExConnectVtxContext* Context, c
 {
 	using namespace PCGExConnectVtx;
 
-	Context->Engine->CollapseScopedEdges();
-
 	Context->Patcher = MakeShared<PCGExGraphs::FGraphPatcher>(Context->MergedFacade.ToSharedRef());
 
 	for (const TSharedPtr<FBatch>& Batch : Context->ValidBatches)
 	{
 		const int32 SourceIndex = Context->Patcher->AddVtxSource(Batch->VtxDataFacade->Source, Batch->MergeOffset);
-
-		for (const TSharedPtr<PCGExClusters::FCluster>& Cl : Batch->ValidClusters)
-		{
-			TArray<int32> VtxIndices;
-			VtxIndices.Reserve(Cl->Nodes->Num());
-			for (const PCGExClusters::FNode& Node : *Cl->Nodes)
-			{
-				VtxIndices.Add(Batch->MergeOffset + Node.PointIndex);
-			}
-			Context->Patcher->AddEdgeGroup(Cl->EdgesIO.Pin(), VtxIndices, SourceIndex);
-		}
+		RegisterClusterGroups(*Context->Patcher, Batch->ValidClusters, Batch->MergeOffset, SourceIndex);
 	}
 
-	const TSet<uint64>& NewEdges = Context->Engine->GetUniqueEdges();
-	Context->ConnectorEdgeHandles.Reserve(NewEdges.Num());
-	Context->ConnectorEndpoints.Reserve(NewEdges.Num());
-
-	for (const uint64 E : NewEdges)
-	{
-		if (Context->ExistingEdges.Contains(E))
-		{
-			continue;
-		}
-
-		uint32 A;
-		uint32 B;
-		PCGEx::H64(E, A, B);
-
-		if (A == B)
-		{
-			continue;
-		}
-
-		Context->ConnectorEdgeHandles.Add(Context->Patcher->AddEdge(A, B));
-		Context->ConnectorEndpoints.Add(E);
-	}
+	StageProbeEdges(*Context->Patcher, Context->Engine->GetUniqueEdges(), Context->ExistingEdges, Context->ConnectorEdgeHandles, Context->ConnectorEndpoints);
 
 	if (Context->ConnectorEdgeHandles.IsEmpty() && !Settings->bQuietNoConnectionWarning)
 	{
@@ -386,56 +305,15 @@ bool FPCGExConnectVtxElement::LaunchPatching(FPCGExConnectVtxContext* Context, c
 	return true;
 }
 
-namespace PCGExConnectVtx
-{
-	void WriteConnectorFlags(
-		const UPCGExConnectVtxSettings* Settings,
-		PCGExGraphs::FGraphPatcher* Patcher,
-		const TSharedPtr<PCGExData::FFacade>& VtxFacade,
-		const TArray<int32>& EdgeHandles,
-		const TArray<uint64>& Endpoints)
-	{
-		if (!Settings->bFlagVtxConnector && !Settings->bFlagEdgeConnector)
-		{
-			return;
-		}
-
-		FPCGMetadataAttribute<int32>* VtxConnectorFlagAttribute = Settings->bFlagVtxConnector
-			                                                          ? VtxFacade->GetOut()->MutableMetadata()->FindOrCreateAttribute<int32>(Settings->VtxConnectorFlagName, 0)
-			                                                          : nullptr;
-
-		TConstPCGValueRange<int64> VtxMetadataEntries = VtxFacade->GetOut()->GetConstMetadataEntryValueRange();
-
-		for (int32 i = 0; i < EdgeHandles.Num(); ++i)
-		{
-			if (Settings->bFlagEdgeConnector)
-			{
-				TSharedPtr<PCGExData::FPointIO> EdgesIO;
-				int32 EdgePointIndex = -1;
-				if (Patcher->GetEdgeOutput(EdgeHandles[i], EdgesIO, EdgePointIndex) && EdgesIO)
-				{
-					FPCGMetadataAttribute<bool>* EdgeConnectorFlagAttribute = EdgesIO->GetOut()->MutableMetadata()->FindOrCreateAttribute<bool>(Settings->EdgeConnectorFlagName, false);
-					const TConstPCGValueRange<int64> EdgeMetadataEntries = EdgesIO->GetOut()->GetConstMetadataEntryValueRange();
-					EdgeConnectorFlagAttribute->SetValue(EdgeMetadataEntries[EdgePointIndex], true);
-				}
-			}
-
-			if (VtxConnectorFlagAttribute)
-			{
-				const int64 VtxKeyA = VtxMetadataEntries[PCGEx::H64A(Endpoints[i])];
-				const int64 VtxKeyB = VtxMetadataEntries[PCGEx::H64B(Endpoints[i])];
-				VtxConnectorFlagAttribute->SetValue(VtxKeyA, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyA) + 1);
-				VtxConnectorFlagAttribute->SetValue(VtxKeyB, VtxConnectorFlagAttribute->GetValueFromItemKey(VtxKeyB) + 1);
-			}
-		}
-	}
-}
-
 bool FPCGExConnectVtxElement::CommitAndOutput(FPCGExConnectVtxContext* Context, const UPCGExConnectVtxSettings* Settings) const
 {
 	Context->Patcher->Commit();
 
-	PCGExConnectVtx::WriteConnectorFlags(Settings, Context->Patcher.Get(), Context->MergedFacade, Context->ConnectorEdgeHandles, Context->ConnectorEndpoints);
+	PCGExGraphs::WriteConnectorFlags(
+		*Context->Patcher, Context->MergedFacade.ToSharedRef(),
+		Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName,
+		Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName,
+		Context->ConnectorEdgeHandles, Context->ConnectorEndpoints);
 
 	(void)Context->MergedFacade->Source->StageOutput(Context);
 	Context->OutputPointsAndEdges();
@@ -444,8 +322,53 @@ bool FPCGExConnectVtxElement::CommitAndOutput(FPCGExConnectVtxContext* Context, 
 	return true;
 }
 
+#pragma endregion
+
 namespace PCGExConnectVtx
 {
+#pragma region Shared staging helpers
+
+	void RegisterClusterGroups(PCGExGraphs::FGraphPatcher& InPatcher, const TArray<TSharedPtr<PCGExClusters::FCluster>>& InClusters, const int32 InOffset, const int32 InSourceIndex)
+	{
+		for (const TSharedPtr<PCGExClusters::FCluster>& Cl : InClusters)
+		{
+			TArray<int32> VtxIndices;
+			VtxIndices.Reserve(Cl->Nodes->Num());
+			for (const PCGExClusters::FNode& Node : *Cl->Nodes)
+			{
+				VtxIndices.Add(InOffset + Node.PointIndex);
+			}
+			InPatcher.AddEdgeGroup(Cl->EdgesIO.Pin(), VtxIndices, InSourceIndex);
+		}
+	}
+
+	void StageProbeEdges(PCGExGraphs::FGraphPatcher& InPatcher, const TSet<uint64>& InNewEdges, const TSet<uint64>& InExistingEdges, TArray<int32>& OutHandles, TArray<uint64>& OutEndpoints)
+	{
+		OutHandles.Reserve(InNewEdges.Num());
+		OutEndpoints.Reserve(InNewEdges.Num());
+
+		for (const uint64 E : InNewEdges)
+		{
+			if (InExistingEdges.Contains(E))
+			{
+				continue;
+			}
+
+			uint32 A;
+			uint32 B;
+			PCGEx::H64(E, A, B);
+			if (A == B)
+			{
+				continue;
+			}
+
+			OutHandles.Add(InPatcher.AddEdge(A, B));
+			OutEndpoints.Add(E);
+		}
+	}
+
+#pragma endregion
+
 #pragma region FProcessor
 
 	bool FProcessor::Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager)
@@ -457,6 +380,9 @@ namespace PCGExConnectVtx
 			return false;
 		}
 
+		// Filter managers are per-cluster (bound to this processor's Cluster + edge facade). Building them
+		// here is parallel-safe (no shared writes); mask evaluation is deferred to the sequential
+		// FBatch::CompleteWork pass so shared-vtx results are deterministic.
 		if (!Context->GeneratorsFiltersFactories.IsEmpty())
 		{
 			GeneratorsFilter = MakeShared<PCGExClusterFilter::FManager>(Cluster.ToSharedRef(), VtxDataFacade, EdgeDataFacade);
@@ -477,28 +403,20 @@ namespace PCGExConnectVtx
 			}
 		}
 
-		StartParallelLoopForNodes();
-
 		return true;
 	}
 
-	void FProcessor::ProcessNodes(const PCGExMT::FScope& Scope)
+	void FProcessor::ContributeMasks(const TSharedPtr<TArray<int8>>& InCanGenerate, const TSharedPtr<TArray<int8>>& InAcceptConnections) const
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExConnectVtx::ProcessNodes);
-
-		FBatch* Parent = GetParentBatch<FBatch>();
-		const TArrayView<PCGExClusters::FNode> NodesView = Scope.GetView(*Cluster->Nodes.Get());
-
-		// Fill the batch-level participation masks (point-index space) for this cluster's members.
-		// Vtx shared by several clusters in one group (degenerate input) take the last-tested result.
+		const TArrayView<PCGExClusters::FNode> NodesView = MakeArrayView(*Cluster->Nodes);
 
 		if (GeneratorsFilter)
 		{
-			GeneratorsFilter->Test(NodesView, Parent->CanGenerateCache, false);
+			GeneratorsFilter->Test(NodesView, InCanGenerate, false);
 		}
 		else
 		{
-			TArray<int8>& CanGenerate = *Parent->CanGenerateCache;
+			TArray<int8>& CanGenerate = *InCanGenerate;
 			for (const PCGExClusters::FNode& Node : NodesView)
 			{
 				CanGenerate[Node.PointIndex] = 1;
@@ -507,11 +425,11 @@ namespace PCGExConnectVtx
 
 		if (ConnectablesFilter)
 		{
-			ConnectablesFilter->Test(NodesView, Parent->AcceptConnectionsCache, false);
+			ConnectablesFilter->Test(NodesView, InAcceptConnections, false);
 		}
 		else
 		{
-			TArray<int8>& AcceptConnections = *Parent->AcceptConnectionsCache;
+			TArray<int8>& AcceptConnections = *InAcceptConnections;
 			for (const PCGExClusters::FNode& Node : NodesView)
 			{
 				AcceptConnections[Node.PointIndex] = 1;
@@ -535,6 +453,7 @@ namespace PCGExConnectVtx
 	{
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ConnectVtx)
 
+		// Per-batch scopes patch the vtx in place; All scope merges into a fresh dataset instead.
 		if (Settings->Scope != EPCGExConnectVtxScope::All)
 		{
 			InVtx->InitializeOutput(PCGExData::EIOInit::Duplicate);
@@ -553,6 +472,13 @@ namespace PCGExConnectVtx
 
 	void FBatch::Process()
 	{
+		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ConnectVtx)
+
+		// Flag the filter-input attributes consumable so they're cleaned from the mutable vtx output
+		// (the stock IBatch vtx-filter path does this; our per-node filter pins bypass it).
+		PCGExFactories::RegisterConsumableAttributesWithFacade(Context->GeneratorsFiltersFactories, VtxDataFacade);
+		PCGExFactories::RegisterConsumableAttributesWithFacade(Context->ConnectablesFiltersFactories, VtxDataFacade);
+
 		const int32 NumVtx = VtxDataFacade->GetNum();
 
 		CanGenerateCache = MakeShared<TArray<int8>>();
@@ -564,7 +490,16 @@ namespace PCGExConnectVtx
 		TBatch<FProcessor>::Process();
 	}
 
-	void FBatch::BuildTopologyData()
+	void FBatch::ForwardUntouched()
+	{
+		VtxDataFacade->Source->InitializeOutput(PCGExData::EIOInit::Forward);
+		for (const TSharedPtr<PCGExData::FPointIO>& EdgesIO : Edges)
+		{
+			EdgesIO->InitializeOutput(PCGExData::EIOInit::Forward);
+		}
+	}
+
+	void FBatch::BuildTopologyAndMasks()
 	{
 		const int32 NumVtx = VtxDataFacade->GetNum();
 		ClusterIds.Init(INDEX_NONE, NumVtx);
@@ -584,13 +519,22 @@ namespace PCGExConnectVtx
 				ExistingEdges.Add(PCGEx::H64U(E.Start, E.End));
 			}
 		}
+
+		// Deterministic sequential fill: processors run in a stable order, so a vtx shared by two clusters
+		// (degenerate input) resolves to a fixed last-writer instead of a data race on the shared caches.
+		for (const TSharedRef<PCGExClusterMT::IProcessor>& P : Processors)
+		{
+			if (!P->Cluster)
+			{
+				continue;
+			}
+			StaticCastSharedRef<FProcessor>(P)->ContributeMasks(CanGenerateCache, AcceptConnectionsCache);
+		}
 	}
 
 	void FBatch::CompleteWork()
 	{
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ConnectVtx)
-
-		TBatch<FProcessor>::CompleteWork();
 
 		const int32 NumValidClusters = GatherValidClusters();
 
@@ -601,10 +545,12 @@ namespace PCGExConnectVtx
 
 		if (ValidClusters.IsEmpty())
 		{
+			// Nothing to connect: pass the group through untouched (both scopes).
+			ForwardUntouched();
 			return;
 		}
 
-		BuildTopologyData();
+		BuildTopologyAndMasks();
 
 		if (Settings->Scope == EPCGExConnectVtxScope::All)
 		{
@@ -621,20 +567,14 @@ namespace PCGExConnectVtx
 
 		if (!Engine->Init(ExecutionContext, Context->ProbeFactories))
 		{
-			PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FTEXT("No probe could be initialized; clusters are forwarded untouched."));
+			// No probe can produce edges: pass the group through untouched.
 			Engine.Reset();
-			for (const TSharedPtr<PCGExClusters::FCluster>& Cl : ValidClusters)
-			{
-				if (const TSharedPtr<PCGExData::FPointIO> EdgesIO = Cl->EdgesIO.Pin())
-				{
-					EdgesIO->InitializeOutput(PCGExData::EIOInit::Forward);
-				}
-			}
+			ForwardUntouched();
 			return;
 		}
 
-		Engine->CanGenerate = *CanGenerateCache;
-		Engine->AcceptConnections = *AcceptConnectionsCache;
+		Engine->CanGenerate = MoveTemp(*CanGenerateCache);
+		Engine->AcceptConnections = MoveTemp(*AcceptConnectionsCache);
 
 		if (Settings->Scope == EPCGExConnectVtxScope::Cluster)
 		{
@@ -647,72 +587,13 @@ namespace PCGExConnectVtx
 			Engine->EdgeRelation = PCGExProbing::EEdgeRelation::DifferentGroup;
 		}
 
-		Engine->PrepareWorkingData();
-
-		NumCompletions = (Engine->HasLocalWork() ? 1 : 0) + (Engine->HasGlobalWork() ? 1 : 0);
-
-		if (Engine->HasLocalWork())
-		{
-			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ProbingLoopTask)
-
-			ProbingLoopTask->OnPrepareSubLoopsCallback = [PCGEX_ASYNC_THIS_CAPTURE](const TArray<PCGExMT::FScope>& Loops)
+		Engine->RunAsync(
+			TaskManager,
+			[PCGEX_ASYNC_THIS_CAPTURE]()
 			{
 				PCGEX_ASYNC_THIS
-				This->Engine->PrepareScopes(Loops);
-			};
-
-			ProbingLoopTask->OnSubLoopStartCallback = [PCGEX_ASYNC_THIS_CAPTURE](const PCGExMT::FScope& Scope)
-			{
-				PCGEX_ASYNC_THIS
-				This->Engine->ProcessScope(Scope);
-			};
-
-			ProbingLoopTask->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
-			{
-				PCGEX_ASYNC_THIS
-				This->Engine->CollapseScopedEdges();
-				This->AdvanceCompletion();
-			};
-
-			ProbingLoopTask->StartSubLoops(Engine->GetNumIterations(), PCGEX_CORE_SETTINGS.GetPointsBatchChunkSize());
-		}
-
-		if (Engine->HasGlobalWork())
-		{
-			PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, GlobalOpsTasks)
-
-			GlobalOpsTasks->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE]()
-			{
-				PCGEX_ASYNC_THIS
-				This->AdvanceCompletion();
-			};
-
-			for (FPCGExProbeOperation* Operation : Engine->GetGlobalOperations())
-			{
-				GlobalOpsTasks->AddSimpleCallback([PCGEX_ASYNC_THIS_CAPTURE, Op = Operation]()
-				{
-					PCGEX_ASYNC_THIS
-					TSet<uint64> LocalEdges;
-					Op->ProcessAll(LocalEdges);
-					if (!LocalEdges.IsEmpty())
-					{
-						This->Engine->AppendEdges(LocalEdges);
-					}
-				});
-			}
-
-			GlobalOpsTasks->StartSimpleCallbacks();
-		}
-	}
-
-	void FBatch::AdvanceCompletion()
-	{
-		if (FPlatformAtomics::InterlockedDecrement(&NumCompletions))
-		{
-			return;
-		}
-
-		StageAndResolve();
+				This->StageAndResolve();
+			});
 	}
 
 	void FBatch::StageAndResolve()
@@ -720,41 +601,8 @@ namespace PCGExConnectVtx
 		PCGEX_TYPED_CONTEXT_AND_SETTINGS(ConnectVtx)
 
 		Patcher = MakeShared<PCGExGraphs::FGraphPatcher>(VtxDataFacade);
-
-		for (const TSharedPtr<PCGExClusters::FCluster>& Cl : ValidClusters)
-		{
-			TArray<int32> VtxIndices;
-			VtxIndices.Reserve(Cl->Nodes->Num());
-			for (const PCGExClusters::FNode& Node : *Cl->Nodes)
-			{
-				VtxIndices.Add(Node.PointIndex);
-			}
-			Patcher->AddEdgeGroup(Cl->EdgesIO.Pin(), VtxIndices);
-		}
-
-		const TSet<uint64>& NewEdges = Engine->GetUniqueEdges();
-		ConnectorEdgeHandles.Reserve(NewEdges.Num());
-		ConnectorEndpoints.Reserve(NewEdges.Num());
-
-		for (const uint64 E : NewEdges)
-		{
-			if (ExistingEdges.Contains(E))
-			{
-				continue;
-			}
-
-			uint32 A;
-			uint32 B;
-			PCGEx::H64(E, A, B);
-
-			if (A == B)
-			{
-				continue;
-			}
-
-			ConnectorEdgeHandles.Add(Patcher->AddEdge(A, B));
-			ConnectorEndpoints.Add(E);
-		}
+		RegisterClusterGroups(*Patcher, ValidClusters, 0, INDEX_NONE);
+		StageProbeEdges(*Patcher, Engine->GetUniqueEdges(), ExistingEdges, ConnectorEdgeHandles, ConnectorEndpoints);
 
 		if (ConnectorEdgeHandles.IsEmpty() && !Settings->bQuietNoConnectionWarning)
 		{
@@ -775,7 +623,11 @@ namespace PCGExConnectVtx
 
 		Patcher->Commit();
 
-		WriteConnectorFlags(Settings, Patcher.Get(), VtxDataFacade, ConnectorEdgeHandles, ConnectorEndpoints);
+		PCGExGraphs::WriteConnectorFlags(
+			*Patcher, VtxDataFacade,
+			Settings->bFlagVtxConnector, Settings->VtxConnectorFlagName,
+			Settings->bFlagEdgeConnector, Settings->EdgeConnectorFlagName,
+			ConnectorEdgeHandles, ConnectorEndpoints);
 	}
 
 #pragma endregion
