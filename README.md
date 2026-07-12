@@ -23,7 +23,7 @@
 
 ## What is PCGEx?
 
-### PCGEx is a **low-level, use-case agnostic toolkit** extending Unreal Engine's PCG framework with **200+ nodes**.
+### PCGEx is a **low-level, use-case agnostic toolkit** extending Unreal Engine's PCG framework with **200+ nodes and new paradigms**.
 
 Vanilla PCG excels at scattering and rule-based placement. PCGEx adds what's missing: **structure**. Build graphs from points, find paths through them, analyze topology, and work with explicit connections, not just proximity. Delaunay, Voronoi, MST, convex hulls, A* pathfinding, and more.
 
