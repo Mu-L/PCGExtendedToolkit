@@ -11,6 +11,7 @@
 #include "Containers/PCGExManagedObjects.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExMT.h"
+#include "Core/PCGExMTCommon.h"
 #include "Core/PCGExSettings.h"
 #include "Data/PCGExDataCommon.h"
 #include "Data/PCGExProxyData.h"
@@ -78,65 +79,135 @@ void FPCGExContext::StageOutput(UPCGData* InData, const FName& InPin, const PCGE
 		ManagedObjects->Add(InData);
 	}
 
-	// Mutable: this is data we own and can modify. Consumable attributes are cleaned in a single
-	// flush-time pass (see CleanupConsumableAttributes); staging only records ownership so
-	// registrations that happen after staging still apply.
+	// Mutable: this is data we own and can modify. All mutation (consumable deletion, flattening)
+	// happens in a single flush-time pass (see FinalizeMutableOutputs); staging only records
+	// ownership, so registrations that happen after staging still apply and cancelled executions
+	// never mutate forwarded inputs.
 	if (EnumHasAnyFlags(Staging, PCGExData::EStaging::Mutable))
 	{
-		AddCleanableOutput(InData);
-
-		if (bFlattenOutput)
-		{
-			InData->Flatten();
-		}
+		AddMutableOutput(InData);
 	}
 }
 
-void FPCGExContext::AddCleanableOutput(const UPCGData* InData)
+void FPCGExContext::AddMutableOutput(const UPCGData* InData)
 {
-	if (!bCleanupConsumableAttributes || !InData)
+	if (!InData || (!bCleanupConsumableAttributes && !bFlattenOutput))
 	{
 		return;
 	}
 
-	FWriteScopeLock WriteScopeLock(CleanableOutputsLock);
-	CleanableOutputs.Add(InData);
+	FWriteScopeLock WriteScopeLock(MutableOutputsLock);
+	MutableOutputs.Add(InData);
 }
 
-void FPCGExContext::CleanupConsumableAttributes()
+void FPCGExContext::FinalizeMutableOutputs()
 {
-	// Runs single-threaded from OnComplete, after async work terminated -- sets are read unlocked.
-	if (!bCleanupConsumableAttributes || ConsumableAttributesSet.IsEmpty() || CleanableOutputs.IsEmpty())
+	// Runs from OnComplete after PCGEX_TERMINATE_ASYNC; locks are taken anyway so a straggling
+	// worker mid-registration can never race the pass.
+	FReadScopeLock MutableScopeLock(MutableOutputsLock);
+
+	if (MutableOutputs.IsEmpty())
 	{
 		return;
 	}
 
-	for (const UPCGData* Data : CleanableOutputs)
-	{
-		UPCGMetadata* Metadata = const_cast<UPCGData*>(Data)->MutableMetadata();
-		if (!Metadata)
-		{
-			continue;
-		}
+	const bool bDeleteConsumables = bCleanupConsumableAttributes && !ConsumableAttributesSet.IsEmpty();
 
+	// Consumable names are parsed once here, not per (name x data). A name whose selector carries
+	// extra accessors ("Color.R") is skipped entirely: a consumed component never licenses deleting
+	// the base attribute.
+	struct FConsumableEntry
+	{
+		FPCGAttributePropertyInputSelector Selector;
+	};
+
+	TArray<FConsumableEntry> Consumables;
+
+	if (bDeleteConsumables)
+	{
+		FReadScopeLock ConsumableScopeLock(ConsumableAttributesLock);
+		FReadScopeLock ProtectedScopeLock(ProtectedAttributesLock);
+
+		Consumables.Reserve(ConsumableAttributesSet.Num());
 		for (const FName ConsumableName : ConsumableAttributesSet)
 		{
-			// Protected names are registered domain-less (raw attribute names from writers), so a
-			// protected name shields that attribute name in every domain.
+			FPCGAttributePropertyInputSelector Selector;
+			Selector.Update(ConsumableName.ToString());
+
+			if (Selector.GetSelection() != EPCGAttributePropertySelection::Attribute || !Selector.GetExtraNames().IsEmpty())
+			{
+				continue;
+			}
+
+			// Name-based protection is domain-less (raw attribute names from writers) and shields
+			// the name in every domain; identifier-based protection is matched per-data below.
 			if (ProtectedAttributesSet.Contains(ConsumableName)
-				|| ProtectedAttributesSet.Contains(PCGExMetaHelpers::StripDomainFromName(ConsumableName)))
+				|| ProtectedAttributesSet.Contains(Selector.GetAttributeName()))
 			{
 				continue;
 			}
 
-			const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(ConsumableName, Data);
-			if (!PCGExMetaHelpers::HasAttribute(Metadata, Identifier))
-			{
-				continue;
-			}
-
-			Metadata->DeleteAttribute(Identifier);
+			Consumables.Add({MoveTemp(Selector)});
 		}
+	}
+
+	if (Consumables.IsEmpty() && !bFlattenOutput)
+	{
+		return;
+	}
+
+	// Snapshot for indexed parallel access. Each output is a distinct data object, so per-data
+	// mutation is embarrassingly parallel.
+	TArray<const UPCGData*> Outputs = MutableOutputs.Array();
+
+	if (!Consumables.IsEmpty())
+	{
+		FReadScopeLock ProtectedScopeLock(ProtectedAttributesLock);
+
+		// Per-data work is a handful of lookups + deletes; only worth dispatching on large output counts.
+		PCGExMT::ParallelOrSequential(Outputs.Num(), [&](const int32 Index)
+		{
+			const UPCGData* Data = Outputs[Index];
+			UPCGMetadata* Metadata = const_cast<UPCGData*>(Data)->MutableMetadata();
+			if (!Metadata)
+			{
+				return;
+			}
+
+			for (const FConsumableEntry& Entry : Consumables)
+			{
+				// Normalized so "Foo" and "@Elements.Foo" address the same domain on this data.
+				const FPCGMetadataDomainID DomainID = PCGExMetaHelpers::GetNormalizedDomainID(Data, Entry.Selector);
+				if (!DomainID.IsValid())
+				{
+					continue;
+				}
+
+				const FPCGAttributeIdentifier Identifier(Entry.Selector.GetAttributeName(), DomainID);
+				if (ProtectedAttributeIdentifiers.Contains(Identifier))
+				{
+					continue;
+				}
+
+				if (!PCGExMetaHelpers::HasAttribute(Metadata, Identifier))
+				{
+					continue;
+				}
+
+				Metadata->DeleteAttribute(Identifier);
+			}
+		}, /*Threshold=*/16, EParallelForFlags::Unbalanced);
+	}
+
+	// Deliberately a second pass, after ALL deletion: flatten must never materialize attributes
+	// that were scheduled for removal. Flatten compacts full value ranges -- expensive enough to
+	// parallelize from two outputs up.
+	if (bFlattenOutput)
+	{
+		PCGExMT::ParallelOrSequential(Outputs.Num(), [&](const int32 Index)
+		{
+			const_cast<UPCGData*>(Outputs[Index])->Flatten();
+		}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 	}
 }
 
@@ -428,7 +499,7 @@ void FPCGExContext::OnComplete()
 		StagedData.Empty();
 	}
 
-	CleanupConsumableAttributes();
+	FinalizeMutableOutputs();
 
 	// Unpause allows the PCG scheduler to collect our outputs and mark the node complete.
 	UnpauseContext();
@@ -594,6 +665,12 @@ void FPCGExContext::AddProtectedAttributeName(const FName InName)
 		FWriteScopeLock WriteScopeLock(ProtectedAttributesLock);
 		ProtectedAttributesSet.Add(InName);
 	}
+}
+
+void FPCGExContext::AddProtectedAttribute(const FPCGAttributeIdentifier& InIdentifier)
+{
+	FWriteScopeLock WriteScopeLock(ProtectedAttributesLock);
+	ProtectedAttributeIdentifiers.AddUnique(InIdentifier);
 }
 
 void FPCGExContext::EDITOR_TrackPath(const FSoftObjectPath& Path, const bool bIsCulled)

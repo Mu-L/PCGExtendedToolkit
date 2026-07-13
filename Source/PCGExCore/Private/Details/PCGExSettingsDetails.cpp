@@ -86,11 +86,12 @@ namespace PCGExDetails
 			return false;
 		}
 
-		// Register as consumable if it's an attribute
+		// Register as consumable if it's an attribute (domain-qualified so cleanup targets the right domain)
 		FName AttributeName = NAME_None;
-		if (PCGExMetaHelpers::TryGetAttributeName(Selector, InDataFacade->GetIn(), AttributeName))
+		FName QualifiedName = NAME_None;
+		if (PCGExMetaHelpers::TryGetQualifiedAttributeName(Selector, InDataFacade->GetIn(), AttributeName, QualifiedName))
 		{
-			Context->AddConsumableAttributeName(AttributeName);
+			Context->AddConsumableAttributeName(QualifiedName);
 		}
 
 		return true;
@@ -132,11 +133,13 @@ namespace PCGExDetails
 			return false;
 		}
 
-		// Register as consumable if it's an attribute
+		// Register as consumable if it's an attribute. This path reads @Data selectors, so the
+		// registration must be domain-qualified or cleanup would target the default domain instead.
 		FName AttributeName = NAME_None;
-		if (PCGExMetaHelpers::TryGetAttributeName(Selector, InDataFacade->GetIn(), AttributeName))
+		FName QualifiedName = NAME_None;
+		if (PCGExMetaHelpers::TryGetQualifiedAttributeName(Selector, InDataFacade->GetIn(), AttributeName, QualifiedName))
 		{
-			Context->AddConsumableAttributeName(AttributeName);
+			Context->AddConsumableAttributeName(QualifiedName);
 		}
 
 		return true;

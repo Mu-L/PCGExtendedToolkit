@@ -266,19 +266,54 @@ namespace PCGExMetaHelpers
 
 	FName GetDomainQualifiedName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData)
 	{
-		const FPCGAttributePropertyInputSelector FixedSelector = InSelector.CopyAndFixLast(InData);
-		if (FixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute)
+		return GetDomainQualifiedName(InSelector.CopyAndFixLast(InData));
+	}
+
+	FName GetDomainQualifiedName(const FPCGAttributePropertySelector& InFixedSelector)
+	{
+		if (InFixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute)
 		{
 			return NAME_None;
 		}
 
-		const FName DomainName = FixedSelector.GetDomainName();
+		const FName DomainName = InFixedSelector.GetDomainName();
 		if (DomainName.IsNone())
 		{
-			return FixedSelector.GetAttributeName();
+			return InFixedSelector.GetAttributeName();
 		}
 
-		return FName(TEXT("@") + DomainName.ToString() + TEXT(".") + FixedSelector.GetAttributeName().ToString());
+		return FName(TEXT("@") + DomainName.ToString() + TEXT(".") + InFixedSelector.GetAttributeName().ToString());
+	}
+
+	bool TryGetQualifiedAttributeName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData, FName& OutName, FName& OutQualifiedName)
+	{
+		const FPCGAttributePropertyInputSelector FixedSelector = InSelector.CopyAndFixLast(InData);
+		if (!FixedSelector.IsValid() || FixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute)
+		{
+			return false;
+		}
+
+		OutName = FixedSelector.GetName();
+		OutQualifiedName = GetDomainQualifiedName(FixedSelector);
+		return !OutQualifiedName.IsNone();
+	}
+
+	FPCGMetadataDomainID GetNormalizedDomainID(const UPCGData* InData, const FPCGAttributePropertySelector& InSelector)
+	{
+		if (!InData)
+		{
+			return FPCGMetadataDomainID(EPCGMetadataDomainFlag::Invalid);
+		}
+
+		const FPCGMetadataDomainID Resolved = InData->GetMetadataDomainIDFromSelector(InSelector);
+		if (!Resolved.IsDefault())
+		{
+			return Resolved;
+		}
+
+		const UPCGMetadata* Metadata = InData->ConstMetadata();
+		const FPCGMetadataDomain* DefaultDomain = Metadata ? Metadata->GetConstDefaultMetadataDomain() : nullptr;
+		return DefaultDomain ? DefaultDomain->GetDomainID() : Resolved;
 	}
 
 	bool IsDataDomainAttribute(const FName& InName)

@@ -4,6 +4,8 @@
 #include "Elements/PCGExCopyAttributes.h"
 
 #include "PCGContext.h"
+#include "Containers/PCGExManagedObjects.h"
+#include "Core/PCGExMTCommon.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Elements/PCGCopyPoints.h"
 #include "Helpers/PCGHelpers.h"
@@ -116,10 +118,15 @@ namespace PCGExCopyAttributes
 			return false;
 		}
 
-		// Canonical single-value read slot (mirrors PCGExData::Helpers::ReadDataValue): first entry
-		// when the domain carries items, default-value slot otherwise.
-		const FPCGMetadataDomain* SourceDomain = SourceAttribute->GetMetadataDomain();
-		const PCGMetadataEntryKey SourceKey = (SourceDomain && SourceDomain->GetItemCountForChild() > 0) ? PCGFirstEntryKey : PCGDefaultValueKey;
+		const PCGMetadataEntryKey SourceKey = PCGExData::Helpers::GetDataValueKey(SourceAttribute);
+
+		// Read-side validation happens before any target mutation: under data stealing the target is
+		// the original input, and a destroy-then-fail sequence would be unrecoverable.
+		if (!PCGExData::Helpers::HasPropertyCopyableValue(SourceAttribute, SourceKey))
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(LOCTEXT("SourceValueUnreadable", "Source attribute '{0}' has no readable value."), InputSource.GetDisplayText()));
+			return false;
+		}
 
 		UPCGMetadata* TargetMetadata = TargetData->MutableMetadata();
 		FPCGMetadataDomain* TargetDomain = TargetMetadata ? TargetMetadata->GetMetadataDomainFromSelector(OutputTarget) : nullptr;
@@ -127,6 +134,25 @@ namespace PCGExCopyAttributes
 		{
 			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(LOCTEXT("InvalidTargetDomain", "Invalid target domain for '{0}'."), OutputTarget.GetDisplayText()));
 			return false;
+		}
+
+		// Materialization keys are gathered before the destructive step too, so a key failure
+		// degrades to a default-only copy without having touched the existing attribute.
+		TArray<PCGMetadataEntryKey*> EntryKeyPtrs;
+		if (bMaterialize)
+		{
+			const TUniquePtr<IPCGAttributeAccessorKeys> TargetKeys = PCGAttributeAccessorHelpers::CreateKeys(TargetData, OutputTarget);
+			const int32 NumTargetKeys = TargetKeys ? TargetKeys->GetNum() : 0;
+
+			if (NumTargetKeys > 0)
+			{
+				EntryKeyPtrs.SetNumUninitialized(NumTargetKeys);
+				if (!TargetKeys->GetKeys<PCGMetadataEntryKey>(0, EntryKeyPtrs))
+				{
+					EntryKeyPtrs.Reset();
+					PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(LOCTEXT("MaterializeKeysFailed", "Could not gather element entries for '{0}' -- the value is written as default only, without materialized entries."), OutputTarget.GetDisplayText()));
+				}
+			}
 		}
 
 		// Same semantics as the engine helper: an existing target attribute is deleted and recreated,
@@ -147,36 +173,21 @@ namespace PCGExCopyAttributes
 			return false;
 		}
 
-		if (!PCGExData::Helpers::PropertyCopyAttribute(SourceAttribute, SourceKey, TargetAttribute, PCGDefaultValueKey))
+		if (EntryKeyPtrs.IsEmpty())
 		{
-			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(LOCTEXT("FailedCopyDefaultValue", "Failed to copy the value of '{0}' onto '{1}'."), InputSource.GetDisplayText(), FText::FromName(TargetName)));
-			return false;
-		}
+			if (!PCGExData::Helpers::PropertyCopyAttribute(SourceAttribute, SourceKey, TargetAttribute, PCGDefaultValueKey))
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(LOCTEXT("FailedCopyDefaultValue", "Failed to copy the value of '{0}' onto '{1}'."), InputSource.GetDisplayText(), FText::FromName(TargetName)));
+				return false;
+			}
 
-		if (!bMaterialize)
-		{
 			return true;
 		}
 
-		const TUniquePtr<IPCGAttributeAccessorKeys> TargetKeys = PCGAttributeAccessorHelpers::CreateKeys(TargetData, OutputTarget);
-		const int32 NumTargetKeys = TargetKeys ? TargetKeys->GetNum() : 0;
-		if (NumTargetKeys <= 0)
-		{
-			// No elements to materialize onto; the default value is already set.
-			return true;
-		}
-
-		TArray<PCGMetadataEntryKey*> EntryKeyPtrs;
-		EntryKeyPtrs.SetNumUninitialized(NumTargetKeys);
-		if (!TargetKeys->GetKeys<PCGMetadataEntryKey>(0, EntryKeyPtrs))
-		{
-			return true;
-		}
-
-		// Stripped-down InitializeOnSet, same shape as the engine helper: elements without a concrete
-		// entry get one so a value can be attached per element.
+		// Elements without a concrete entry get one so a value can be attached per element
+		// (stripped-down InitializeOnSet, same shape as the engine helper).
 		TArray<PCGMetadataEntryKey*> EntriesToAdd;
-		EntriesToAdd.Reserve(NumTargetKeys);
+		EntriesToAdd.Reserve(EntryKeyPtrs.Num());
 		for (PCGMetadataEntryKey* EntryKey : EntryKeyPtrs)
 		{
 			if (*EntryKey == PCGInvalidEntryKey || *EntryKey < TargetDomain->GetItemKeyCountForParent())
@@ -190,25 +201,61 @@ namespace PCGExCopyAttributes
 			TargetDomain->AddEntriesInPlace(EntriesToAdd);
 		}
 
-		// Store the value once through the first entry, then share its value key across all entries.
-		if (!PCGExData::Helpers::PropertyCopyAttribute(SourceAttribute, SourceKey, TargetAttribute, *EntryKeyPtrs[0]))
+		// One transient property writes both the default slot and the first entry.
+		const PCGMetadataEntryKey MaterializeKeys[2] = {PCGDefaultValueKey, *EntryKeyPtrs[0]};
+		if (!PCGExData::Helpers::PropertyCopyAttribute(SourceAttribute, SourceKey, TargetAttribute, MakeArrayView(MaterializeKeys, 2)))
 		{
-			// Default value is set; elements simply stay non-materialized.
-			return true;
+			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(LOCTEXT("FailedCopyMaterialized", "Failed to copy the value of '{0}' onto '{1}'."), InputSource.GetDisplayText(), FText::FromName(TargetName)));
+			return false;
 		}
 
+		// The remaining entries share the first entry's value key -- one stored value regardless of
+		// element count.
 		const PCGMetadataEntryKey FirstEntryKey = *EntryKeyPtrs[0];
 		TArray<PCGMetadataValueKey> ValueKeys;
 		TargetAttribute->GetValueKeys(MakeArrayView(&FirstEntryKey, 1), ValueKeys);
 
 		if (ValueKeys.Num() == 1)
 		{
-			TArray<PCGMetadataValueKey> AllValueKeys;
-			AllValueKeys.Init(ValueKeys[0], NumTargetKeys);
-			TargetAttribute->SetValuesFromValueKeys(EntryKeyPtrs, AllValueKeys, /*bResetValueOnDefaultValueKey=*/true);
+			if (EntryKeyPtrs.Num() > 1)
+			{
+				TArray<PCGMetadataValueKey> AllValueKeys;
+				AllValueKeys.Init(ValueKeys[0], EntryKeyPtrs.Num());
+				TargetAttribute->SetValuesFromValueKeys(EntryKeyPtrs, AllValueKeys, /*bResetValueOnDefaultValueKey=*/true);
+			}
+		}
+		else
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(LOCTEXT("MaterializeValueKeyFailed", "Could not resolve the stored value key for '{0}' -- entries beyond the first are not materialized."), FText::FromName(TargetName)));
 		}
 
 		return true;
+	}
+
+	// Post-copy consumable/protection registration for cache-and-restore workflows: the source
+	// attribute becomes a consumable (deleted from this node's outputs by the cleanup toggle) while
+	// the written attribute is protected domain-precisely, so a same-named write from any pair can
+	// never be deleted by another pair's registration. Only successful copies register -- a failed
+	// copy must not delete a same-named pre-existing attribute.
+	void RegisterConsumable(
+		FPCGExContext* InContext,
+		const UPCGData* TargetData,
+		const FPCGAttributePropertyInputSelector& InputSource, const FPCGAttributePropertyOutputSelector& OutputTarget)
+	{
+		const FName QualifiedSourceName = PCGExMetaHelpers::GetDomainQualifiedName(InputSource);
+		if (!QualifiedSourceName.IsNone())
+		{
+			InContext->AddConsumableAttributeName(QualifiedSourceName);
+		}
+
+		if (OutputTarget.GetSelection() == EPCGAttributePropertySelection::Attribute && OutputTarget.GetExtraNames().IsEmpty())
+		{
+			const FPCGMetadataDomainID WrittenDomain = PCGExMetaHelpers::GetNormalizedDomainID(TargetData, OutputTarget);
+			if (WrittenDomain.IsValid())
+			{
+				InContext->AddProtectedAttribute(FPCGAttributeIdentifier(OutputTarget.GetAttributeName(), WrittenDomain));
+			}
+		}
 	}
 
 	bool CopyPair(
@@ -220,43 +267,30 @@ namespace PCGExCopyAttributes
 		const FPCGAttributePropertyInputSelector InputSource = InInputSource.CopyAndFixLast(SourceData);
 		const FPCGAttributePropertyOutputSelector OutputTarget = InOutputTarget.CopyAndFixSource(&InputSource, SourceData);
 
-		// Cache-and-restore workflows: the source attribute is registered as consumable so enabling
-		// the cleanup toggle deletes the temp attribute from the output -- unless deletion would
-		// target the very attribute this copy writes.
-		if (bRegisterConsumable)
-		{
-			const FName QualifiedSourceName = PCGExMetaHelpers::GetDomainQualifiedName(InputSource, SourceData);
-			if (!QualifiedSourceName.IsNone())
-			{
-				bool bCollidesWithWritten = false;
-				if (OutputTarget.GetSelection() == EPCGAttributePropertySelection::Attribute)
-				{
-					const FPCGAttributeIdentifier DeleteId = PCGExMetaHelpers::GetAttributeIdentifier(QualifiedSourceName, TargetData);
-					const FPCGAttributeIdentifier WrittenId(OutputTarget.GetAttributeName(), TargetData->GetMetadataDomainIDFromSelector(OutputTarget));
-					bCollidesWithWritten = DeleteId == WrittenId;
-				}
-
-				if (!bCollidesWithWritten)
-				{
-					InContext->AddConsumableAttributeName(QualifiedSourceName);
-				}
-			}
-		}
-
+		bool bCopied;
 		if (IsSingleToMultiPromotion(SourceData, TargetData, InputSource, OutputTarget))
 		{
-			return CopySingleValueToElements(InContext, SourceData, TargetData, InputSource, OutputTarget, bMaterialize);
+			bCopied = CopySingleValueToElements(InContext, SourceData, TargetData, InputSource, OutputTarget, bMaterialize);
+		}
+		else
+		{
+			PCGMetadataHelpers::FPCGCopyAttributeParams Params{};
+			Params.SourceData = SourceData;
+			Params.TargetData = TargetData;
+			Params.InputSource = InputSource;
+			Params.OutputTarget = OutputTarget;
+			Params.OptionalContext = InContext;
+			Params.bSameOrigin = bSameOrigin;
+
+			bCopied = PCGMetadataHelpers::CopyAttribute(Params);
 		}
 
-		PCGMetadataHelpers::FPCGCopyAttributeParams Params{};
-		Params.SourceData = SourceData;
-		Params.TargetData = TargetData;
-		Params.InputSource = InputSource;
-		Params.OutputTarget = OutputTarget;
-		Params.OptionalContext = InContext;
-		Params.bSameOrigin = bSameOrigin;
+		if (bCopied && bRegisterConsumable && InContext->bCleanupConsumableAttributes)
+		{
+			RegisterConsumable(InContext, TargetData, InputSource, OutputTarget);
+		}
 
-		return PCGMetadataHelpers::CopyAttribute(Params);
+		return bCopied;
 	}
 
 	bool CopyAllAttributes(
@@ -264,7 +298,8 @@ namespace PCGExCopyAttributes
 		const UPCGData* SourceData, UPCGData* TargetData)
 	{
 		const UPCGMetadata* SourceMetadata = SourceData->ConstMetadata();
-		if (!SourceMetadata)
+		const UPCGMetadata* TargetMetadata = TargetData->ConstMetadata();
+		if (!SourceMetadata || !TargetMetadata)
 		{
 			return false;
 		}
@@ -290,8 +325,29 @@ namespace PCGExCopyAttributes
 			return false;
 		}
 
-		// Mirror of the engine's CopyAllAttributes selector expansion, except each pair routes through
-		// CopyPair so the single-value -> multi-entry promotion applies here too.
+		// Promotion (single-value -> multi-entry) depends only on the (source domain, target domain)
+		// pair, so it's resolved once per encountered domain instead of per attribute.
+		TMap<FPCGMetadataDomainID, bool> SourceSingleValue;
+		TMap<FPCGMetadataDomainID, bool> TargetMultiEntries;
+		auto IsPromotion = [&](const FPCGMetadataDomainID& SourceDomain, const FPCGMetadataDomainID& TargetDomain) -> bool
+		{
+			bool* bSourceSingle = SourceSingleValue.Find(SourceDomain);
+			if (!bSourceSingle)
+			{
+				bSourceSingle = &SourceSingleValue.Add(SourceDomain, !SourceMetadata->MetadataDomainSupportsMultiEntries(SourceDomain));
+			}
+
+			bool* bTargetMulti = TargetMultiEntries.Find(TargetDomain);
+			if (!bTargetMulti)
+			{
+				bTargetMulti = &TargetMultiEntries.Add(TargetDomain, TargetMetadata->MetadataDomainSupportsMultiEntries(TargetDomain));
+			}
+
+			return *bSourceSingle && *bTargetMulti;
+		};
+
+		// Mirror of the engine's CopyAllAttributes selector expansion, except promoted pairs route
+		// through CopySingleValueToElements so @Data values reach every element.
 		TArray<FPCGAttributeIdentifier> AttributeIDs;
 		TArray<EPCGMetadataTypes> AttributeTypes;
 		SourceMetadata->GetAllAttributes(AttributeIDs, AttributeTypes);
@@ -326,7 +382,22 @@ namespace PCGExCopyAttributes
 			TargetData->SetDomainFromDomainID(*TargetDomainId, OutputTarget);
 
 			// No consumable registration in copy-all: source names match the just-copied attributes.
-			bSuccess |= CopyPair(InContext, SourceData, TargetData, InputSource, OutputTarget, /*bSameOrigin=*/false, Settings->bMaterializeDataValues, /*bRegisterConsumable=*/false);
+			if (IsPromotion(AttributeID.MetadataDomain, *TargetDomainId))
+			{
+				bSuccess |= CopySingleValueToElements(InContext, SourceData, TargetData, InputSource, OutputTarget, Settings->bMaterializeDataValues);
+			}
+			else
+			{
+				PCGMetadataHelpers::FPCGCopyAttributeParams CopyParams{};
+				CopyParams.SourceData = SourceData;
+				CopyParams.TargetData = TargetData;
+				CopyParams.InputSource = InputSource;
+				CopyParams.OutputTarget = OutputTarget;
+				CopyParams.OptionalContext = InContext;
+				CopyParams.bSameOrigin = false;
+
+				bSuccess |= PCGMetadataHelpers::CopyAttribute(CopyParams);
+			}
 		}
 
 		return bSuccess;
@@ -343,10 +414,8 @@ bool FPCGExCopyAttributesElement::AdvanceWork(FPCGExContext* InContext, const UP
 
 	PCGEX_CONTEXT_AND_SETTINGS(CopyAttributes)
 
-	TArray<FPCGTaggedData> Sources = Context->InputData.GetInputsByPin(PCGCopyPointsConstants::SourcePointsLabel);
-	TArray<FPCGTaggedData> Targets = Context->InputData.GetInputsByPin(PCGCopyPointsConstants::TargetPointsLabel);
-
-	TArray<FPCGTaggedData>& Outputs = Context->OutputData.TaggedData;
+	const TArray<FPCGTaggedData> Sources = Context->InputData.GetInputsByPin(PCGCopyPointsConstants::SourcePointsLabel);
+	const TArray<FPCGTaggedData> Targets = Context->InputData.GetInputsByPin(PCGCopyPointsConstants::TargetPointsLabel);
 
 	const int32 NumSources = Sources.Num();
 	const int32 NumTargets = Targets.Num();
@@ -373,8 +442,7 @@ bool FPCGExCopyAttributesElement::AdvanceWork(FPCGExContext* InContext, const UP
 			PCGE_LOG_C(Error, GraphAndLog, Context, FText::Format(LOCTEXT("MismatchNum", "Num Sources ({0}) mismatches with Num Targets ({1}). Only supports N:N, 1:N and N:1 operation."), NumSources, NumTargets));
 			for (const FPCGTaggedData& Target : Targets)
 			{
-				FPCGTaggedData& Output = Outputs.Add_GetRef(Target);
-				Output.Pin = PCGPinConstants::DefaultOutputLabel;
+				Context->StageOutput(const_cast<UPCGData*>(Target.Data.Get()), PCGPinConstants::DefaultOutputLabel, PCGExData::EStaging::None, Target.Tags);
 			}
 			Context->Done();
 			return Context->TryComplete();
@@ -385,21 +453,97 @@ bool FPCGExCopyAttributesElement::AdvanceWork(FPCGExContext* InContext, const UP
 		break;
 	}
 
-	const bool bStealData = Context->bWantsDataStealing;
-
-	for (int32 i = 0; i < NumIterations; ++i)
+	// Iteration -> source index mapping (Merge visits every source per iteration).
+	const EPCGCopyAttributesOperation Operation = Settings->Operation;
+	auto SourceIndexForIteration = [Operation, NumSources, NumTargets](const int32 Iteration) -> int32
 	{
-		const int32 TargetIndex = i % NumTargets;
-		const FPCGTaggedData& Target = Targets[TargetIndex];
+		switch (Operation)
+		{
+		case EPCGCopyAttributesOperation::CopyEachSourceOnEveryTarget:
+			return Iteration / NumTargets;
+		case EPCGCopyAttributesOperation::CopyEachSourceToEachTargetRespectively:
+		default:
+			return FMath::Min(Iteration, NumSources - 1);
+		}
+	};
 
-		FPCGTaggedData& Output = Outputs.Add_GetRef(Target);
-		Output.Pin = PCGPinConstants::DefaultOutputLabel;
+	// Pointer-level steal analysis: iterations run in parallel, so an input may only be mutated in
+	// place when no other iteration can observe it -- targeted exactly once, and read as a source
+	// only by that same iteration through a single-source copy (the engine handles same-data copies).
+	const bool bStealData = Context->bWantsDataStealing;
+	TSet<const UPCGData*> StealTargets;
 
+	if (bStealData)
+	{
+		TMap<const UPCGData*, TPair<int32, int32>> TargetUse; // {UseCount, LastIteration}
+		for (int32 i = 0; i < NumIterations; i++)
+		{
+			TPair<int32, int32>& Use = TargetUse.FindOrAdd(Targets[i % NumTargets].Data.Get(), TPair<int32, int32>(0, -1));
+			Use.Key++;
+			Use.Value = i;
+		}
+
+		TMap<const UPCGData*, TPair<int32, int32>> SourceUse; // {UseCount, LastIteration}
+		auto RecordSourceUse = [&SourceUse](const UPCGData* InData, const int32 Iteration)
+		{
+			TPair<int32, int32>& Use = SourceUse.FindOrAdd(InData, TPair<int32, int32>(0, -1));
+			Use.Key++;
+			Use.Value = Iteration;
+		};
+
+		if (Operation == EPCGCopyAttributesOperation::MergeSourcesAndCopyToAllTargets)
+		{
+			for (int32 i = 0; i < NumIterations; i++)
+			{
+				for (int32 j = 0; j < NumSources; j++)
+				{
+					RecordSourceUse(Sources[j].Data.Get(), i);
+				}
+			}
+		}
+		else
+		{
+			for (int32 i = 0; i < NumIterations; i++)
+			{
+				RecordSourceUse(Sources[SourceIndexForIteration(i)].Data.Get(), i);
+			}
+		}
+
+		for (const TPair<const UPCGData*, TPair<int32, int32>>& Target : TargetUse)
+		{
+			if (!Target.Key || Target.Value.Key != 1)
+			{
+				continue;
+			}
+
+			const TPair<int32, int32>* Source = SourceUse.Find(Target.Key);
+			if (!Source || (Source->Key == 1 && Source->Value == Target.Value.Value))
+			{
+				StealTargets.Add(Target.Key);
+			}
+		}
+	}
+
+	// Iterations are independent by construction (distinct duplicates, or steal-safe pointers per
+	// the analysis above); sources are only ever read.
+	struct FIterationResult
+	{
+		const UPCGData* Data = nullptr;
+		PCGExData::EStaging Staging = PCGExData::EStaging::None;
+	};
+
+	TArray<FIterationResult> Results;
+	Results.SetNum(NumIterations);
+
+	PCGExMT::ParallelOrSequential(NumIterations, [&](const int32 i)
+	{
+		const FPCGTaggedData& Target = Targets[i % NumTargets];
 		const UPCGData* TargetData = Target.Data;
 
-		// Stealing may only mutate a given input once; each target's last iteration is the only one
-		// with no later reader, so earlier occurrences fall back to duplication.
-		const bool bStealThisTarget = bStealData && (i + NumTargets >= NumIterations);
+		FIterationResult& Result = Results[i];
+		Result.Data = TargetData;
+
+		const bool bStealThisTarget = TargetData && StealTargets.Contains(TargetData);
 
 		bool bSuccess = false;
 		UPCGData* OutputData = nullptr;
@@ -437,7 +581,11 @@ bool FPCGExCopyAttributesElement::AdvanceWork(FPCGExContext* InContext, const UP
 
 			if (!OutputData)
 			{
-				OutputData = bStealThisTarget ? const_cast<UPCGData*>(TargetData) : TargetData->DuplicateData(Context);
+				OutputData = bStealThisTarget ? const_cast<UPCGData*>(TargetData) : Context->ManagedObjects->DuplicateData<UPCGData>(TargetData);
+				if (!OutputData)
+				{
+					return;
+				}
 			}
 
 			if (Settings->bCopyAllAttributes)
@@ -450,28 +598,36 @@ bool FPCGExCopyAttributesElement::AdvanceWork(FPCGExContext* InContext, const UP
 			}
 		};
 
-		switch (Settings->Operation)
+		if (Operation == EPCGCopyAttributesOperation::MergeSourcesAndCopyToAllTargets)
 		{
-		case EPCGCopyAttributesOperation::CopyEachSourceOnEveryTarget:
-			DoCopy(i / NumTargets);
-			break;
-		case EPCGCopyAttributesOperation::MergeSourcesAndCopyToAllTargets:
 			for (int32 j = 0; j < NumSources; ++j)
 			{
 				DoCopy(j);
 			}
-			break;
-		case EPCGCopyAttributesOperation::CopyEachSourceToEachTargetRespectively:
-		default:
-			DoCopy(FMath::Min(i, NumSources - 1));
-			break;
+		}
+		else
+		{
+			DoCopy(SourceIndexForIteration(i));
 		}
 
 		if (bSuccess && OutputData)
 		{
-			Output.Data = OutputData;
-			Context->AddCleanableOutput(OutputData);
+			Result.Data = OutputData;
+			Result.Staging = bStealThisTarget
+				                 ? PCGExData::EStaging::Mutable
+				                 : PCGExData::EStaging::Managed | PCGExData::EStaging::Mutable;
 		}
+	}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
+
+	for (int32 i = 0; i < NumIterations; i++)
+	{
+		const FIterationResult& Result = Results[i];
+		if (!Result.Data)
+		{
+			continue;
+		}
+
+		Context->StageOutput(const_cast<UPCGData*>(Result.Data), PCGPinConstants::DefaultOutputLabel, Result.Staging, Targets[i % NumTargets].Tags);
 	}
 
 	Context->Done();
