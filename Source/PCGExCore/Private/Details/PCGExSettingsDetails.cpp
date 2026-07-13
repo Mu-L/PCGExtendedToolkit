@@ -5,15 +5,41 @@
 #include "Details/PCGExSettingsDetails.h"
 
 #include "PCGExCoreMacros.h"
+#include "Core/PCGExContext.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "Types/PCGExTypes.h"
 
 namespace PCGExDetails
 {
 	template <typename T>
-	bool TSettingValueBuffer<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
+	bool TSettingValue<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
+	{
+		if (!InitInternal(InDataFacade, bSupportScoped, bCaptureMinMax))
+		{
+			return false;
+		}
+
+		// Single registration site for the whole hierarchy: whatever attribute this value consumes
+		// is registered here, after a successful init, and only when the node can act on it.
+		// A null facade is a legal input -- constant values are routinely initialized without one
+		FPCGExContext* Context = InDataFacade ? InDataFacade->GetContext() : nullptr;
+		if (Context && Context->bCleanupConsumableAttributes)
+		{
+			const FName ConsumableName = GetConsumableName(InDataFacade->GetIn());
+			if (!ConsumableName.IsNone())
+			{
+				Context->AddConsumableAttributeName(ConsumableName);
+			}
+		}
+
+		return true;
+	}
+
+	template <typename T>
+	bool TSettingValueBuffer<T>::InitInternal(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
 		if (!Context)
@@ -34,9 +60,6 @@ namespace PCGExDetails
 			}
 			return false;
 		}
-
-		// Register as consumable
-		Context->AddConsumableAttributeName(Name);
 
 		return true;
 	}
@@ -72,7 +95,7 @@ namespace PCGExDetails
 	}
 
 	template <typename T>
-	bool TSettingValueSelector<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
+	bool TSettingValueSelector<T>::InitInternal(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
 		if (!Context)
@@ -81,24 +104,18 @@ namespace PCGExDetails
 		}
 
 		Buffer = InDataFacade->GetBroadcaster<T>(Selector, bSupportScoped && !bCaptureMinMax, bCaptureMinMax, this->bQuiet);
-		if (!Buffer)
-		{
-			return false;
-		}
-
-		// Register as consumable if it's an attribute (domain-qualified so cleanup targets the right domain)
-		FName AttributeName = NAME_None;
-		FName QualifiedName = NAME_None;
-		if (PCGExMetaHelpers::TryGetQualifiedAttributeName(Selector, InDataFacade->GetIn(), AttributeName, QualifiedName))
-		{
-			Context->AddConsumableAttributeName(QualifiedName);
-		}
-
-		return true;
+		return Buffer != nullptr;
 	}
 
 	template <typename T>
-	bool TSettingValueConstant<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
+	FName TSettingValueSelector<T>::GetConsumableName(const UPCGData* InData) const
+	{
+		// Domain-qualified so cleanup targets the right domain; NAME_None for non-attribute selections.
+		return PCGExMetaHelpers::GetDomainQualifiedName(Selector, InData);
+	}
+
+	template <typename T>
+	bool TSettingValueConstant<T>::InitInternal(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		return true;
 	}
@@ -120,7 +137,7 @@ namespace PCGExDetails
 	}
 
 	template <typename T>
-	bool TSettingValueSelectorConstant<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
+	bool TSettingValueSelectorConstant<T>::InitInternal(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
 		if (!Context)
@@ -128,25 +145,19 @@ namespace PCGExDetails
 			return false;
 		}
 
-		if (!PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Selector, this->Constant, this->bQuiet))
-		{
-			return false;
-		}
-
-		// Register as consumable if it's an attribute. This path reads @Data selectors, so the
-		// registration must be domain-qualified or cleanup would target the default domain instead.
-		FName AttributeName = NAME_None;
-		FName QualifiedName = NAME_None;
-		if (PCGExMetaHelpers::TryGetQualifiedAttributeName(Selector, InDataFacade->GetIn(), AttributeName, QualifiedName))
-		{
-			Context->AddConsumableAttributeName(QualifiedName);
-		}
-
-		return true;
+		return PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Selector, this->Constant, this->bQuiet);
 	}
 
 	template <typename T>
-	bool TSettingValueBufferConstant<T>::Init(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
+	FName TSettingValueSelectorConstant<T>::GetConsumableName(const UPCGData* InData) const
+	{
+		// This path reads @Data selectors: the registration must be domain-qualified or cleanup
+		// would target the default domain instead.
+		return PCGExMetaHelpers::GetDomainQualifiedName(Selector, InData);
+	}
+
+	template <typename T>
+	bool TSettingValueBufferConstant<T>::InitInternal(const TSharedPtr<PCGExData::FFacade>& InDataFacade, const bool bSupportScoped, const bool bCaptureMinMax)
 	{
 		FPCGExContext* Context = InDataFacade->GetContext();
 		if (!Context)
@@ -156,15 +167,7 @@ namespace PCGExDetails
 
 		PCGEX_VALIDATE_NAME_C(Context, Name)
 
-		if (!PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Name, this->Constant, this->bQuiet))
-		{
-			return false;
-		}
-
-		// Register as consumable
-		Context->AddConsumableAttributeName(Name);
-
-		return true;
+		return PCGExData::Helpers::TryReadDataValue(Context, InDataFacade->GetIn(), Name, this->Constant, this->bQuiet);
 	}
 
 	template <typename T>
@@ -239,6 +242,7 @@ namespace PCGExDetails
 #pragma region externalization
 
 #define PCGEX_TPL(_TYPE, _NAME, ...)\
+template class PCGEXCORE_API TSettingValue<_TYPE>;\
 template class PCGEXCORE_API TSettingValueBuffer<_TYPE>;\
 template class PCGEXCORE_API TSettingValueSelector<_TYPE>;\
 template class PCGEXCORE_API TSettingValueConstant<_TYPE>;\

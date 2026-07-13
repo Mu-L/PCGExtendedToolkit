@@ -266,6 +266,11 @@ namespace PCGExMetaHelpers
 
 	FName GetDomainQualifiedName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData)
 	{
+		if (!InData)
+		{
+			return NAME_None;
+		}
+
 		return GetDomainQualifiedName(InSelector.CopyAndFixLast(InData));
 	}
 
