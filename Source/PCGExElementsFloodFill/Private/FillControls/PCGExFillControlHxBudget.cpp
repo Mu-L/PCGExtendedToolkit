@@ -23,6 +23,7 @@ bool FPCGExFillControlHeuristicsBudget::PrepareForDiffusions(FPCGExContext* InCo
 
 	// Initialize budget setting value
 	MaxBudget = TypedFactory->Config.GetValueSettingMaxBudget();
+	MaxBudget->bRegisterConsumable &= TypedFactory->bCleanupConsumableAttributes;
 	if (!MaxBudget->Init(GetSourceFacade()))
 	{
 		return false;

@@ -26,6 +26,7 @@ bool FPCGExFillControlAttributeAccumulation::PrepareForDiffusions(FPCGExContext*
 
 	// Initialize max accumulation setting value
 	MaxAccumulation = TypedFactory->Config.GetValueSettingMaxAccumulation();
+	MaxAccumulation->bRegisterConsumable &= TypedFactory->bCleanupConsumableAttributes;
 	if (!MaxAccumulation->Init(GetSourceFacade()))
 	{
 		return false;

@@ -3,7 +3,6 @@
 
 #include "Filters/Edges/PCGExEdgeNeighborsCountFilter.h"
 
-
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Graphs/PCGExGraph.h"
@@ -13,19 +12,6 @@
 #define PCGEX_NAMESPACE EdgeNeighborsCountFilter
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExEdgeNeighborsCountFilterConfig, Threshold, int32, ThresholdInput, ThresholdAttribute, ThresholdConstant)
-
-bool UPCGExEdgeNeighborsCountFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
-{
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
-	{
-		return false;
-	}
-
-	FName Consumable = NAME_None;
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.ThresholdInput == EPCGExInputValueType::Attribute, Config.ThresholdAttribute, Consumable)
-
-	return true;
-}
 
 TSharedPtr<PCGExPointFilter::IFilter> UPCGExEdgeNeighborsCountFilterFactory::CreateFilter() const
 {
@@ -42,6 +28,7 @@ namespace PCGExEdgeNeighborsCount
 		}
 
 		ThresholdBuffer = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
+		ThresholdBuffer->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 		if (!ThresholdBuffer->Init(PointDataFacade))
 		{
 			return false;

@@ -51,6 +51,16 @@ namespace PCGExDetails
 
 		bool bQuiet = false;
 
+		/**
+		 * Whether Init auto-registers the consumed attribute with the context. A veto chain:
+		 * shorthand getters seed this from their per-operand bCleanupAttribute toggle, factory-driven
+		 * consumers (filters, fill controls, blend ops...) AND-in their factory's own toggle
+		 * (bRegisterConsumable &= Factory->bCleanupConsumableAttributes), and Init checks the node's
+		 * context toggle last. Factory Register* overrides remain only for operands read through raw
+		 * FNames/broadcasters that never flow through a TSettingValue.
+		 */
+		bool bRegisterConsumable = true;
+
 		FORCEINLINE virtual bool IsConstant()
 		{
 			return false;

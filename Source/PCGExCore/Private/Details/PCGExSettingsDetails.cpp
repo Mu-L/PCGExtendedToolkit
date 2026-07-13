@@ -25,7 +25,7 @@ namespace PCGExDetails
 		// Single registration site for the whole hierarchy: whatever attribute this value consumes
 		// is registered here, after a successful init, and only when the node can act on it.
 		// A null facade is a legal input -- constant values are routinely initialized without one
-		FPCGExContext* Context = InDataFacade ? InDataFacade->GetContext() : nullptr;
+		FPCGExContext* Context = (bRegisterConsumable && InDataFacade) ? InDataFacade->GetContext() : nullptr;
 		if (Context && Context->bCleanupConsumableAttributes)
 		{
 			const FName ConsumableName = GetConsumableName(InDataFacade->GetIn());

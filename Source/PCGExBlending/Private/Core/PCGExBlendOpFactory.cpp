@@ -45,6 +45,7 @@ void FPCGExAttributeBlendConfig::Init()
 bool FPCGExBlendOperation::PrepareForData(FPCGExContext* InContext)
 {
 	Weight = Config.Weighting.GetValueSettingWeight();
+	Weight->bRegisterConsumable &= bCleanupConsumableAttributes;
 	if (!Weight->Init(WeightFacade))
 	{
 		return false;
@@ -480,6 +481,7 @@ TSharedPtr<FPCGExBlendOperation> UPCGExBlendOpFactory::CreateOperation(FPCGExCon
 	NewOperation->Config = Config;
 	NewOperation->ConstantA = ConstantA;
 	NewOperation->ConstantB = ConstantB;
+	NewOperation->bCleanupConsumableAttributes = bCleanupConsumableAttributes;
 	return NewOperation;
 }
 

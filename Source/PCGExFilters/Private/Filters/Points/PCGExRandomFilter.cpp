@@ -9,7 +9,6 @@
 #include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExRandomHelpers.h"
 
-
 #define LOCTEXT_NAMESPACE "PCGExCompareFilterDefinition"
 #define PCGEX_NAMESPACE CompareFilterDefinition
 
@@ -51,20 +50,6 @@ void UPCGExRandomFilterFactory::RegisterAssetDependencies(TSet<FSoftObjectPath>&
 	InDependencies.Add(Config.WeightCurve.ToSoftObjectPath());
 }
 
-bool UPCGExRandomFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
-{
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
-	{
-		return false;
-	}
-
-	FName Consumable = NAME_None;
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.bPerPointWeight, Config.Weight, Consumable)
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.ThresholdInput == EPCGExInputValueType::Attribute, Config.ThresholdAttribute, Consumable)
-
-	return true;
-}
-
 TSharedPtr<PCGExPointFilter::IFilter> UPCGExRandomFilterFactory::CreateFilter() const
 {
 	PCGEX_MAKE_SHARED(Filter, PCGExPointFilter::FRandomFilter, this)
@@ -84,6 +69,7 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 	// When remapping internally, track min/max to normalize weight values to [0..WeightRange].
 	// If min is negative, WeightOffset shifts values so the effective range starts at zero.
 	WeightBuffer = TypedFilterFactory->Config.GetValueSettingWeight(PCGEX_QUIET_HANDLING);
+	WeightBuffer->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 	if (!WeightBuffer->IsConstant())
 	{
 		if (TypedFilterFactory->Config.bRemapWeightInternally)
@@ -110,6 +96,7 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 	}
 
 	ThresholdBuffer = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
+	ThresholdBuffer->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 	if (!ThresholdBuffer->IsConstant())
 	{
 		if (TypedFilterFactory->Config.bRemapThresholdInternally)
@@ -172,7 +159,6 @@ FString UPCGExRandomFilterProviderSettings::GetDisplayName() const
 	return TEXT("Random");
 }
 #endif
-
 
 #undef LOCTEXT_NAMESPACE
 #undef PCGEX_NAMESPACE

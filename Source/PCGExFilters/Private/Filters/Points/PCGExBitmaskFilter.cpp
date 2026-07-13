@@ -3,7 +3,6 @@
 
 #include "Filters/Points/PCGExBitmaskFilter.h"
 
-
 #include "Data/PCGExData.h"
 #include "Data/PCGExDataHelpers.h"
 #include "Data/PCGExPointIO.h"
@@ -44,7 +43,6 @@ bool UPCGExBitmaskFilterFactory::RegisterConsumableAttributes(FPCGExContext* InC
 	}
 
 	InContext->AddConsumableAttributeName(Config.FlagsAttribute);
-	InContext->AddConsumableAttributeName(Config.BitmaskAttribute);
 
 	return true;
 }
@@ -74,6 +72,7 @@ bool PCGExPointFilter::FBitmaskFilter::Init(FPCGExContext* InContext, const TSha
 	}
 
 	MaskReader = TypedFilterFactory->Config.GetValueSettingBitmask(PCGEX_QUIET_HANDLING);
+	MaskReader->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 	if (!MaskReader->Init(PointDataFacade))
 	{
 		return false;

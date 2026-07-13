@@ -3,7 +3,6 @@
 
 #include "Filters/Points/PCGExSegmentLengthFilter.h"
 
-
 #include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExData.h"
 #include "Data/Utils/PCGExDataPreloader.h"
@@ -51,20 +50,6 @@ void UPCGExSegmentLengthFilterFactory::RegisterBuffersDependencies(FPCGExContext
 	}
 }
 
-bool UPCGExSegmentLengthFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
-{
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
-	{
-		return false;
-	}
-
-	FName Consumable = NAME_None;
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.ThresholdInput == EPCGExInputValueType::Attribute, Config.ThresholdAttribute, Consumable)
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.CompareAgainst == EPCGExInputValueType::Attribute, Config.IndexAttribute, Consumable)
-
-	return true;
-}
-
 bool PCGExPointFilter::FSegmentLengthFilter::Init(FPCGExContext* InContext, const TSharedPtr<PCGExData::FFacade>& InPointDataFacade)
 {
 	if (!IFilter::Init(InContext, InPointDataFacade))
@@ -87,12 +72,14 @@ bool PCGExPointFilter::FSegmentLengthFilter::Init(FPCGExContext* InContext, cons
 	}
 
 	Threshold = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
+	Threshold->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 	if (!Threshold->Init(PointDataFacade))
 	{
 		return false;
 	}
 
 	Index = TypedFilterFactory->Config.GetValueSettingIndex(PCGEX_QUIET_HANDLING);
+	Index->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 	if (!Index->Init(PointDataFacade))
 	{
 		return false;

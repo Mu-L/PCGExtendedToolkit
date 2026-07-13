@@ -3,7 +3,6 @@
 
 #include "Filters/Edges/PCGExEdgeLengthFilter.h"
 
-
 #include "Clusters/PCGExCluster.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExData.h"
@@ -16,19 +15,6 @@
 #define PCGEX_NAMESPACE EdgeLengthFilter
 
 PCGEX_SETTING_VALUE_IMPL(FPCGExEdgeLengthFilterConfig, Threshold, double, ThresholdInput, ThresholdAttribute, ThresholdConstant)
-
-bool UPCGExEdgeLengthFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
-{
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
-	{
-		return false;
-	}
-
-	FName Consumable = NAME_None;
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.ThresholdInput == EPCGExInputValueType::Attribute, Config.ThresholdAttribute, Consumable)
-
-	return true;
-}
 
 TSharedPtr<PCGExPointFilter::IFilter> UPCGExEdgeLengthFilterFactory::CreateFilter() const
 {
@@ -47,6 +33,7 @@ namespace PCGExEdgeLength
 		TConstPCGValueRange<FTransform> VtxTransforms = InPointDataFacade->Source->GetIn()->GetConstTransformValueRange();
 
 		Threshold = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
+		Threshold->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 		if (!Threshold->Init(PointDataFacade))
 		{
 			return false;

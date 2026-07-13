@@ -32,6 +32,10 @@ struct PCGEXCORE_API FPCGExInputShorthandBase
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
 	EPCGExInputValueType Input = EPCGExInputValueType::Constant;
 
+	/** Allow this attribute to be registered as consumable, i.e. deleted from the consuming node's outputs when its 'Cleanup Consumable Attributes' toggle is enabled. Disable to always preserve the attribute. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable, EditCondition="Input == EPCGExInputValueType::Attribute"))
+	bool bCleanupAttribute = true;
+
 	void RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
 	{
 	}

@@ -3,7 +3,6 @@
 
 #include "Filters/Points/PCGExTimeFilter.h"
 
-
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataPreloader.h"
@@ -56,19 +55,6 @@ void UPCGExTimeFilterFactory::RegisterBuffersDependencies(FPCGExContext* InConte
 	}
 }
 
-bool UPCGExTimeFilterFactory::RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const
-{
-	if (!Super::RegisterConsumableAttributesWithData(InContext, InData))
-	{
-		return false;
-	}
-
-	FName Consumable = NAME_None;
-	PCGEX_CONSUMABLE_CONDITIONAL(Config.CompareAgainst == EPCGExInputValueType::Attribute, Config.OperandB, Consumable)
-
-	return true;
-}
-
 FName UPCGExTimeFilterFactory::GetInputLabel() const
 {
 	return PCGExCommon::Labels::SourceTargetsLabel;
@@ -106,6 +92,7 @@ namespace PCGExPointFilter
 		}
 
 		OperandB = TypedFilterFactory->Config.GetValueSettingOperandB();
+		OperandB->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 		if (!OperandB->Init(PointDataFacade))
 		{
 			return false;

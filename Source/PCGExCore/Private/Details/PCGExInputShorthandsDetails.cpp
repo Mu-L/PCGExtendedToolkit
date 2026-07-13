@@ -38,14 +38,14 @@ void FPCGExInputShorthandSelector##_NAME::Update(EPCGExInputValueType InInputTyp
 bool FPCGExInputShorthandSelector##_NAME::CanSupportDataOnly() const { return Input == EPCGExInputValueType::Constant ? true : PCGExMetaHelpers::IsDataDomainAttribute(Attribute); }
 
 #define PCGEX_TPL_SHORTHAND_NAME(_TYPE, _NAME, ...)\
-PCGEX_SETTING_VALUE_IMPL(FPCGExInputShorthandName##_NAME, , _TYPE, Input, Attribute, Constant)\
+PCGEX_SETTING_VALUE_IMPL_SHORTHAND(FPCGExInputShorthandName##_NAME, , _TYPE, Input, Attribute, Constant)\
 bool FPCGExInputShorthandName##_NAME::TryReadDataValue(const TSharedPtr<PCGExData::FPointIO>& IO, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(IO, Input, Attribute, Constant, OutValue, bQuiet);}\
 bool FPCGExInputShorthandName##_NAME::TryReadDataValue(FPCGExContext* InContext, const UPCGData* InData, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(InContext, InData, Input, Attribute, Constant, OutValue, bQuiet);}\
 void FPCGExInputShorthandName##_NAME::RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const { if (Input == EPCGExInputValueType::Attribute) { FacadePreloader.Register<_TYPE>(InContext, Attribute); } }\
 PCGEX_SHORTHAND_UPDATE__NAME_IMPL(_TYPE, _NAME)
 
 #define PCGEX_TPL_SHORTHAND_SELECTOR(_TYPE, _NAME, ...)\
-PCGEX_SETTING_VALUE_IMPL(FPCGExInputShorthandSelector##_NAME, , _TYPE, Input, Attribute, Constant)\
+PCGEX_SETTING_VALUE_IMPL_SHORTHAND(FPCGExInputShorthandSelector##_NAME, , _TYPE, Input, Attribute, Constant)\
 bool FPCGExInputShorthandSelector##_NAME::TryReadDataValue(const TSharedPtr<PCGExData::FPointIO>& IO, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(IO, Input, Attribute, Constant, OutValue, bQuiet);}\
 bool FPCGExInputShorthandSelector##_NAME::TryReadDataValue(FPCGExContext* InContext, const UPCGData* InData, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(InContext, InData, Input, Attribute, Constant, OutValue, bQuiet);}\
 void FPCGExInputShorthandSelector##_NAME::RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const { if (Input == EPCGExInputValueType::Attribute) { FacadePreloader.Register<_TYPE>(InContext, Attribute); } }\

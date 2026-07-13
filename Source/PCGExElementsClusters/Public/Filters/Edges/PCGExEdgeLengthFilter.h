@@ -59,7 +59,6 @@ public:
 	UPROPERTY()
 	FPCGExEdgeLengthFilterConfig Config;
 
-	virtual bool RegisterConsumableAttributesWithData(FPCGExContext* InContext, const UPCGData* InData) const override;
 
 	virtual TSharedPtr<PCGExPointFilter::IFilter> CreateFilter() const override;
 };

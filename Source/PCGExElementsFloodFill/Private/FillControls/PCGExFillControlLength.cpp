@@ -23,6 +23,7 @@ bool FPCGExFillControlLength::PrepareForDiffusions(FPCGExContext* InContext, con
 	bUsePathLength = TypedFactory->Config.bUsePathLength;
 
 	DistanceLimit = TypedFactory->Config.GetValueSettingMaxLength();
+	DistanceLimit->bRegisterConsumable &= TypedFactory->bCleanupConsumableAttributes;
 	if (!DistanceLimit->Init(GetSourceFacade()))
 	{
 		return false;

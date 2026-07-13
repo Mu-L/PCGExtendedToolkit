@@ -26,6 +26,7 @@ bool FPCGExFillControlHeuristicsThreshold::PrepareForDiffusions(FPCGExContext* I
 
 	// Initialize threshold setting value
 	Threshold = TypedFactory->Config.GetValueSettingThreshold();
+	Threshold->bRegisterConsumable &= TypedFactory->bCleanupConsumableAttributes;
 	if (!Threshold->Init(GetSourceFacade()))
 	{
 		return false;
