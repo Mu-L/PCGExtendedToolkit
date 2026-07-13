@@ -277,10 +277,22 @@ protected:
 	mutable FRWLock ConsumableAttributesLock;
 	mutable FRWLock ProtectedAttributesLock;
 
+	// Output data this node owns (duplicated, created, or stolen under the StealData contract) and
+	// may therefore mutate during the flush-time consumable cleanup. Populated by StageOutput for
+	// Mutable-staged data; elements that write OutputData.TaggedData directly must register their
+	// owned outputs through AddCleanableOutput themselves.
+	TSet<const UPCGData*> CleanableOutputs;
+	mutable FRWLock CleanableOutputsLock;
+
+	// Flush-time consumable cleanup, called once from OnComplete when all consumable/protected
+	// registrations are final. Names may be domain-qualified ("@Data.Foo") and are resolved per-data.
+	void CleanupConsumableAttributes();
+
 public:
 	bool bCleanupConsumableAttributes = false;
 	void AddConsumableAttributeName(FName InName);
 	void AddProtectedAttributeName(FName InName);
+	void AddCleanableOutput(const UPCGData* InData);
 
 	TSharedPtr<FPCGExUniqueNameGenerator> UniqueNameGenerator;
 

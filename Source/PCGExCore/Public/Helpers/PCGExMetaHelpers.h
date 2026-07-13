@@ -63,6 +63,14 @@ namespace PCGExMetaHelpers
 
 	PCGEXCORE_API bool TryGetAttributeName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData, FName& OutName);
 
+	/**
+	 * Domain-qualified name for a resolved attribute selector ("@Data.Foo" when the selector targets
+	 * a named domain, bare attribute name otherwise). Round-trips through
+	 * GetAttributeIdentifier(FName, InData) so consumers can resolve the domain per-data later.
+	 * Returns NAME_None if the selector doesn't resolve to an attribute.
+	 */
+	PCGEXCORE_API FName GetDomainQualifiedName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData);
+
 	/** Number of addressable items in a data object: point count for point data, metadata entry count otherwise. Returns 0 for null data or data without metadata. */
 	PCGEXCORE_API int32 GetElementsCount(const UPCGData* InData);
 

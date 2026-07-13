@@ -121,14 +121,15 @@ if(!SharedContext.Get()){ return _RET; }
 /// Macros for registering attributes that can be consumed/cleaned up
 
 
-// Register a selector as consumable if it resolves to a valid attribute
-#define PCGEX_CONSUMABLE_SELECTOR(_SELECTOR, _NAME) if (PCGExMetaHelpers::TryGetAttributeName(_SELECTOR, InData, _NAME)) { InContext->AddConsumableAttributeName(_NAME); }
+// Register a selector as consumable if it resolves to a valid attribute.
+// The registered name is domain-qualified ("@Data.Foo") so cleanup can resolve the right domain per-data.
+#define PCGEX_CONSUMABLE_SELECTOR(_SELECTOR, _NAME) if (PCGExMetaHelpers::TryGetAttributeName(_SELECTOR, InData, _NAME)) { InContext->AddConsumableAttributeName(PCGExMetaHelpers::GetDomainQualifiedName(_SELECTOR, InData)); }
 
 // Same as above but with explicit context parameter
-#define PCGEX_CONSUMABLE_SELECTOR_C(_CONTEXT, _SELECTOR, _NAME) if (PCGExMetaHelpers::TryGetAttributeName(_SELECTOR, InData, _NAME)) { _CONTEXT->AddConsumableAttributeName(_NAME); }
+#define PCGEX_CONSUMABLE_SELECTOR_C(_CONTEXT, _SELECTOR, _NAME) if (PCGExMetaHelpers::TryGetAttributeName(_SELECTOR, InData, _NAME)) { _CONTEXT->AddConsumableAttributeName(PCGExMetaHelpers::GetDomainQualifiedName(_SELECTOR, InData)); }
 
 // Conditional consumable registration based on a boolean condition
-#define PCGEX_CONSUMABLE_CONDITIONAL(_CONDITION, _SELECTOR, _NAME) if (_CONDITION && PCGExMetaHelpers::TryGetAttributeName(_SELECTOR, InData, _NAME)) { InContext->AddConsumableAttributeName(_NAME); }
+#define PCGEX_CONSUMABLE_CONDITIONAL(_CONDITION, _SELECTOR, _NAME) if (_CONDITION && PCGExMetaHelpers::TryGetAttributeName(_SELECTOR, InData, _NAME)) { InContext->AddConsumableAttributeName(PCGExMetaHelpers::GetDomainQualifiedName(_SELECTOR, InData)); }
 
 
 /// NODE METADATA & INFO
@@ -139,7 +140,7 @@ if(!SharedContext.Get()){ return _RET; }
 #define PCGEX_NODE_INFOS(_SHORTNAME, _NAME, _TOOLTIP)\
 virtual FName GetDefaultNodeName() const override { return FName(TEXT("PCGEx"#_SHORTNAME)); } \
 virtual FName AdditionalTaskName() const override{ FString A = TEXT(""); return FName(A + GetDefaultNodeTitle().ToString()); }\
-virtual FText GetDefaultNodeTitle() const override { FString A = TEXT(""); A += TEXT("PCGEx | "); A += (bCleanupConsumableAttributes ? TEXT("🗑️ ") : TEXT("")); A += TEXT(_NAME); return FTEXT(A);} \
+virtual FText GetDefaultNodeTitle() const override { FString A = TEXT(""); A += TEXT("PCGEx | "); A += (bCleanupConsumableAttributes ? TEXT("❌ ") : TEXT("")); A += TEXT(_NAME); return FTEXT(A);} \
 virtual FText GetNodeTooltipText() const override{ return FTEXT(_TOOLTIP); }
 
 // Extended node info with custom subtitle support
@@ -148,7 +149,7 @@ virtual FName GetDefaultNodeName() const override { return FName(TEXT(#_SHORTNAM
 virtual FName AdditionalTaskName() const override{ FString A = TEXT(""); return FName(A + GetDefaultNodeTitle().ToString()); }\
 virtual FString GetAdditionalTitleInformation() const override{ FName N = _TASK_NAME; return N.IsNone() ? FString() : N.ToString(); }\
 virtual bool HasFlippedTitleLines() const { FName N = _TASK_NAME; return !N.IsNone(); }\
-virtual FText GetDefaultNodeTitle() const override { FString A = TEXT(""); A += TEXT("PCGEx | ");  A += (bCleanupConsumableAttributes ? TEXT("🗑️ ") : TEXT("")); A += TEXT(_NAME); return FTEXT(A);} \
+virtual FText GetDefaultNodeTitle() const override { FString A = TEXT(""); A += TEXT("PCGEx | ");  A += (bCleanupConsumableAttributes ? TEXT("❌ ") : TEXT("")); A += TEXT(_NAME); return FTEXT(A);} \
 virtual FText GetNodeTooltipText() const override{ return FTEXT(_TOOLTIP); }
 
 #else

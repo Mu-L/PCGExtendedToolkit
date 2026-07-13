@@ -493,6 +493,8 @@ bool FPCGExFormatAttributesElement::AdvanceWork(FPCGExContext* InContext, const 
 		OutTagged.Pin = PCGPinConstants::DefaultOutputLabel;
 		OutTagged.Data = DupData;
 		OutTagged.Tags = InputTagged.Tags;
+
+		InContext->AddCleanableOutput(DupData);
 	}, /*Threshold=*/2, EParallelForFlags::Unbalanced);
 
 	InContext->OutputData.TaggedData.Reserve(InContext->OutputData.TaggedData.Num() + ParallelResults.Num());

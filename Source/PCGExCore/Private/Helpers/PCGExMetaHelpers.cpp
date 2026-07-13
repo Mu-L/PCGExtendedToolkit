@@ -264,6 +264,23 @@ namespace PCGExMetaHelpers
 		return true;
 	}
 
+	FName GetDomainQualifiedName(const FPCGAttributePropertyInputSelector& InSelector, const UPCGData* InData)
+	{
+		const FPCGAttributePropertyInputSelector FixedSelector = InSelector.CopyAndFixLast(InData);
+		if (FixedSelector.GetSelection() != EPCGAttributePropertySelection::Attribute)
+		{
+			return NAME_None;
+		}
+
+		const FName DomainName = FixedSelector.GetDomainName();
+		if (DomainName.IsNone())
+		{
+			return FixedSelector.GetAttributeName();
+		}
+
+		return FName(TEXT("@") + DomainName.ToString() + TEXT(".") + FixedSelector.GetAttributeName().ToString());
+	}
+
 	bool IsDataDomainAttribute(const FName& InName)
 	{
 		return InName.ToString().TrimStartAndEnd().StartsWith("@Data.");

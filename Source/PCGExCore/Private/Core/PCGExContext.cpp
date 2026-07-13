@@ -20,6 +20,7 @@
 #include "GameFramework/Actor.h"
 #include "Helpers/PCGDynamicTrackingHelpers.h"
 #include "Helpers/PCGExFunctionPrototypes.h"
+#include "Helpers/PCGExMetaHelpers.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 #include "Helpers/PCGHelpers.h"
 #include "Metadata/PCGMetadata.h"
@@ -77,28 +78,64 @@ void FPCGExContext::StageOutput(UPCGData* InData, const FName& InPin, const PCGE
 		ManagedObjects->Add(InData);
 	}
 
-	// Mutable: this is data we own and can modify. Clean up consumable attributes
-	// (internal PCGEx attributes not meant for downstream nodes) unless they're protected.
+	// Mutable: this is data we own and can modify. Consumable attributes are cleaned in a single
+	// flush-time pass (see CleanupConsumableAttributes); staging only records ownership so
+	// registrations that happen after staging still apply.
 	if (EnumHasAnyFlags(Staging, PCGExData::EStaging::Mutable))
 	{
-		if (bCleanupConsumableAttributes)
-		{
-			if (UPCGMetadata* Metadata = InData->MutableMetadata())
-			{
-				for (const FName ConsumableName : ConsumableAttributesSet)
-				{
-					if (Metadata->HasAttribute(ConsumableName)
-						&& !ProtectedAttributesSet.Contains(ConsumableName))
-					{
-						Metadata->DeleteAttribute(ConsumableName);
-					}
-				}
-			}
-		}
+		AddCleanableOutput(InData);
 
 		if (bFlattenOutput)
 		{
 			InData->Flatten();
+		}
+	}
+}
+
+void FPCGExContext::AddCleanableOutput(const UPCGData* InData)
+{
+	if (!bCleanupConsumableAttributes || !InData)
+	{
+		return;
+	}
+
+	FWriteScopeLock WriteScopeLock(CleanableOutputsLock);
+	CleanableOutputs.Add(InData);
+}
+
+void FPCGExContext::CleanupConsumableAttributes()
+{
+	// Runs single-threaded from OnComplete, after async work terminated -- sets are read unlocked.
+	if (!bCleanupConsumableAttributes || ConsumableAttributesSet.IsEmpty() || CleanableOutputs.IsEmpty())
+	{
+		return;
+	}
+
+	for (const UPCGData* Data : CleanableOutputs)
+	{
+		UPCGMetadata* Metadata = const_cast<UPCGData*>(Data)->MutableMetadata();
+		if (!Metadata)
+		{
+			continue;
+		}
+
+		for (const FName ConsumableName : ConsumableAttributesSet)
+		{
+			// Protected names are registered domain-less (raw attribute names from writers), so a
+			// protected name shields that attribute name in every domain.
+			if (ProtectedAttributesSet.Contains(ConsumableName)
+				|| ProtectedAttributesSet.Contains(PCGExMetaHelpers::StripDomainFromName(ConsumableName)))
+			{
+				continue;
+			}
+
+			const FPCGAttributeIdentifier Identifier = PCGExMetaHelpers::GetAttributeIdentifier(ConsumableName, Data);
+			if (!PCGExMetaHelpers::HasAttribute(Metadata, Identifier))
+			{
+				continue;
+			}
+
+			Metadata->DeleteAttribute(Identifier);
 		}
 	}
 }
@@ -390,6 +427,8 @@ void FPCGExContext::OnComplete()
 		ManagedObjects->Remove(StagedData);
 		StagedData.Empty();
 	}
+
+	CleanupConsumableAttributes();
 
 	// Unpause allows the PCG scheduler to collect our outputs and mark the node complete.
 	UnpauseContext();
