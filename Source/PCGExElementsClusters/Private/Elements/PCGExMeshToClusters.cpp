@@ -504,16 +504,14 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 		{
 			if (!Settings->StaticMesh.Constant.IsValid())
 			{
-				PCGE_LOG(Error, GraphAndLog, FTEXT("Invalid static mesh constant"));
-				return false;
+				return Context->CancelExecution(TEXT("Invalid static mesh constant"));
 			}
 
 			const int32 Idx = Context->StaticMeshMap->FindOrAdd(Settings->StaticMesh.Constant);
 
 			if (Idx == -1)
 			{
-				PCGE_LOG(Error, GraphAndLog, FTEXT("Static mesh constant could not be loaded."));
-				return false;
+				return Context->CancelExecution(TEXT("Static mesh constant could not be loaded."));
 			}
 
 			Context->EDITOR_TrackPath(Settings->StaticMesh.Constant);
@@ -530,8 +528,7 @@ bool FPCGExMeshToClustersElement::AdvanceWork(FPCGExContext* InContext, const UP
 			const TUniquePtr<PCGExData::TAttributeBroadcaster<FSoftObjectPath>> PathGetter = MakeUnique<PCGExData::TAttributeBroadcaster<FSoftObjectPath>>();
 			if (!PathGetter->Prepare(Selector, Context->MainPoints->Pairs[0].ToSharedRef()))
 			{
-				PCGE_LOG(Error, GraphAndLog, FTEXT("Static mesh attribute does not exists on targets."));
-				return false;
+				return Context->CancelExecution(TEXT("Static mesh attribute does not exists on targets."));
 			}
 
 			const UPCGBasePointData* TargetPoints = Context->CurrentIO->GetIn();

@@ -124,10 +124,10 @@ void UPCGExCreateShapeCircleSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCG
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		// Rewire Start Angle
-		PCGEX_SHORTHAND_RENAME_PIN(StartAngleAttribute, StartAngleConstant, StartAngle)
+		PCGEX_SHORTHAND_RENAME_PIN_EX(StartAngleAttribute, TEXT("Start Angle (Attr)"), StartAngleConstant, TEXT("Start Angle"), StartAngle)
 
 		// Rewire End Angle
-		PCGEX_SHORTHAND_RENAME_PIN(EndAngleAttribute, EndAngleConstant, EndAngle)
+		PCGEX_SHORTHAND_RENAME_PIN_EX(EndAngleAttribute, TEXT("End Angle (Attr)"), EndAngleConstant, TEXT("End Angle"), EndAngle)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

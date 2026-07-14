@@ -34,7 +34,7 @@ void UPCGExSampleSurfaceGuidedSettings::PCGExApplyDeprecationBeforeUpdatePins(UP
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
 		// Rewire Distance
-		PCGEX_SHORTHAND_RENAME_PIN(LocalMaxDistance, MaxDistance, Distance)
+		PCGEX_SHORTHAND_RENAME_PIN_EX(LocalMaxDistance, TEXT(""), MaxDistance, TEXT("Distance"), Distance)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

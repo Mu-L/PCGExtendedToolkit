@@ -299,10 +299,10 @@ void UPCGExCreateShapePolygonSettings::PCGExApplyDeprecationBeforeUpdatePins(UPC
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		// Rewire NumVertices
-		PCGEX_SHORTHAND_RENAME_PIN(NumVerticesAttribute, NumVerticesConstant, NumVertices)
+		PCGEX_SHORTHAND_RENAME_PIN_EX(NumVerticesAttribute, TEXT("Number of Vertices (Attr)"), NumVerticesConstant, TEXT("Number of Vertices"), NumVertices)
 
-		// Rewire Add Skeleton — old bool constant was `bAddSkeleton`, its pin label carries the prefix
-		PCGEX_SHORTHAND_RENAME_PIN(AddSkeletonAttribute, bAddSkeleton, AddSkeleton)
+		// Rewire Add Skeleton — old bool constant was `bAddSkeleton` (derived display "Add Skeleton")
+		PCGEX_SHORTHAND_RENAME_PIN_EX(AddSkeletonAttribute, TEXT("Add Skeleton (Attr)"), bAddSkeleton, TEXT("Add Skeleton"), AddSkeleton)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

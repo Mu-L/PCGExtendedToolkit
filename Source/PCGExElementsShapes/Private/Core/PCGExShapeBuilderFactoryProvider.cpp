@@ -20,10 +20,10 @@ void UPCGExShapeBuilderFactoryProviderSettings::PCGExApplyDeprecationBeforeUpdat
 	PCGEX_IF_VERSION_LOWER(1, 75, 11)
 	{
 		// Rewire Resolution
-		PCGEX_SHORTHAND_RENAME_PIN(ResolutionAttribute, ResolutionConstant, Resolution)
+		PCGEX_SHORTHAND_RENAME_PIN_EX(ResolutionAttribute, TEXT("Resolution (Attr)"), ResolutionConstant, TEXT("Resolution"), Resolution)
 
 		// Rewire Resolution Vector
-		PCGEX_SHORTHAND_RENAME_PIN(ResolutionAttribute, ResolutionConstantVector, ResolutionVector)
+		PCGEX_SHORTHAND_RENAME_PIN_EX(ResolutionAttribute, TEXT("Resolution (Attr)"), ResolutionConstantVector, TEXT("Resolution (Vector)"), ResolutionVector)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

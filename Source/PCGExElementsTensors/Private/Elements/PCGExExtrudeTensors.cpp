@@ -3,6 +3,7 @@
 
 #include "Elements/PCGExExtrudeTensors.h"
 
+#include "PCGExVersion.h"
 #include "Containers/PCGExScopedContainers.h"
 #include "Core/PCGExFilterTypeSets.h"
 #include "Core/PCGExPointFilter.h"
@@ -17,9 +18,34 @@
 #define LOCTEXT_NAMESPACE "PCGExExtrudeTensorsElement"
 #define PCGEX_NAMESPACE ExtrudeTensors
 
-PCGEX_SETTING_VALUE_IMPL(UPCGExExtrudeTensorsSettings, MaxLength, double, MaxLengthInput, MaxLengthAttribute, MaxLength)
-PCGEX_SETTING_VALUE_IMPL(UPCGExExtrudeTensorsSettings, MaxPointsCount, int32, MaxPointsCountInput, MaxPointsCountAttribute, MaxPointsCount)
 PCGEX_SETTING_VALUE_IMPL_BOOL(UPCGExExtrudeTensorsSettings, Iterations, int32, bUsePerPointMaxIterations, IterationsAttribute, Iterations)
+
+#if WITH_EDITOR
+void UPCGExExtrudeTensorsSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 8)
+	{
+		// Rewire Max Length
+		PCGEX_SHORTHAND_RENAME_PIN_EX(MaxLengthAttribute, TEXT("Max Length (Attr)"), MaxLength, TEXT("Max Length"), MaxLengthValue)
+
+		// Rewire Max Points Count
+		PCGEX_SHORTHAND_RENAME_PIN_EX(MaxPointsCountAttribute, TEXT("Max Points Count (Attr)"), MaxPointsCount, TEXT("Max Points Count"), MaxPointsCountValue)
+	}
+
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExExtrudeTensorsSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 8)
+	{
+		MaxLengthValue.Update(MaxLengthInput_DEPRECATED, MaxLengthAttribute_DEPRECATED, MaxLength_DEPRECATED);
+		MaxPointsCountValue.Update(MaxPointsCountInput_DEPRECATED, MaxPointsCountAttribute_DEPRECATED, MaxPointsCount_DEPRECATED);
+	}
+
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+#endif
 
 //
 // Node-specific config initialization
@@ -261,7 +287,7 @@ namespace PCGExExtrudeTensors
 
 		if (Settings->bUseMaxLength)
 		{
-			MaxLength = Settings->GetValueSettingMaxLength();
+			MaxLength = Settings->MaxLengthValue.GetValueSetting();
 			if (!MaxLength->Init(PointDataFacade, false))
 			{
 				return false;
@@ -270,7 +296,7 @@ namespace PCGExExtrudeTensors
 
 		if (Settings->bUseMaxPointsCount)
 		{
-			MaxPointsCount = Settings->GetValueSettingMaxPointsCount();
+			MaxPointsCount = Settings->MaxPointsCountValue.GetValueSetting();
 			if (!MaxPointsCount->Init(PointDataFacade, false))
 			{
 				return false;
