@@ -8,6 +8,13 @@
 #include "Data/Utils/PCGExDataPreloader.h"
 #include "Details/PCGExSettingsDetails.h"
 
+#if WITH_EDITOR
+#include "PCGExLog.h"
+#include "PCGNode.h"
+#include "PCGPin.h"
+#include "PCGSettings.h"
+#endif
+
 #define PCGEX_FOREACH_INPUT_SHORTHAND(MACRO, ...) \
 MACRO(bool, Boolean, __VA_ARGS__)       \
 MACRO(int32, Integer32, __VA_ARGS__)      \
@@ -17,6 +24,7 @@ MACRO(float, Float, __VA_ARGS__)      \
 MACRO(double, Double, __VA_ARGS__)     \
 MACRO(double, DoubleAbs, __VA_ARGS__)     \
 MACRO(double, Double01, __VA_ARGS__)     \
+MACRO(double, Double11, __VA_ARGS__)     \
 MACRO(FVector2D, Vector2, __VA_ARGS__)  \
 MACRO(FVector, Vector, __VA_ARGS__)    \
 MACRO(FVector, Direction, __VA_ARGS__)    \
@@ -57,3 +65,85 @@ PCGEX_FOREACH_INPUT_SHORTHAND(PCGEX_TPL_SHORTHAND_SELECTOR)
 #undef PCGEX_TPL_SHORTHAND_NAME
 #undef PCGEX_TPL_SHORTHAND_SELECTOR
 #undef PCGEX_FOREACH_INPUT_SHORTHAND
+
+#if WITH_EDITOR
+
+#pragma region PCGExDeprecation
+
+namespace PCGExDeprecation
+{
+	void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, const FName InOldName, const FName InMemberName, const FName InLeafName)
+	{
+		const FName PathSuffix[] = {InMemberName, InLeafName};
+		RenameShorthandOverridePin(InSettings, InOutNode, InOldName, PathSuffix);
+	}
+
+	void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, const FName InOldName, const TArrayView<const FName> InNewPathSuffix)
+	{
+		if (!InSettings || !InOutNode || InOldName.IsNone() || InNewPathSuffix.IsEmpty()) { return; }
+
+		// Resolve the new label from the freshly gathered params — the exact source UpdatePins
+		// builds pins from. Labels can be bare, member-qualified or root-path-qualified depending
+		// on clash disambiguation, so they must never be predicted statically.
+		const FPCGSettingsOverridableParam* NewParam = nullptr;
+		for (const FPCGSettingsOverridableParam& Param : InSettings->OverridableParams())
+		{
+			const int32 Offset = Param.PropertiesNames.Num() - InNewPathSuffix.Num();
+			if (Offset < 0) { continue; }
+
+			bool bMatchesSuffix = true;
+			for (int32 i = 0; i < InNewPathSuffix.Num(); i++)
+			{
+				if (Param.PropertiesNames[Offset + i] != InNewPathSuffix[i])
+				{
+					bMatchesSuffix = false;
+					break;
+				}
+			}
+
+			if (!bMatchesSuffix) { continue; }
+
+			if (NewParam)
+			{
+				UE_LOG(LogPCGEx, Warning, TEXT("[%s] Ambiguous override param suffix '%s/%s' while deprecating pin '%s' — pass a longer path suffix."),
+				       *InSettings->GetName(), *InNewPathSuffix[0].ToString(), *InNewPathSuffix.Last().ToString(), *InOldName.ToString());
+				return;
+			}
+
+			NewParam = &Param;
+		}
+
+		// Param absent (not overridable / renamed since), or the target pin already exists.
+		if (!NewParam || InOutNode->GetInputPin(NewParam->Label)) { return; }
+
+		// Resolve the old serialized pin: exact label first, else the unique segment-qualified
+		// ".../OldName" (the old property itself may have been clash-disambiguated).
+		FName OldLabel = NAME_None;
+		if (InOutNode->GetInputPin(InOldName)) { OldLabel = InOldName; }
+		else
+		{
+			const FString OldNameSuffix = FString::Printf(TEXT("/%s"), *InOldName.ToString());
+			for (const UPCGPin* Pin : InOutNode->GetInputPins())
+			{
+				if (!Pin || !Pin->Properties.Label.ToString().EndsWith(OldNameSuffix)) { continue; }
+
+				if (!OldLabel.IsNone())
+				{
+					UE_LOG(LogPCGEx, Warning, TEXT("[%s] Ambiguous old override pin '%s' during deprecation — pins '%s' and '%s' both match."),
+					       *InSettings->GetName(), *InOldName.ToString(), *OldLabel.ToString(), *Pin->Properties.Label.ToString());
+					return;
+				}
+
+				OldLabel = Pin->Properties.Label;
+			}
+		}
+
+		if (OldLabel.IsNone()) { return; }
+
+		InOutNode->RenameInputPin(OldLabel, NewParam->Label);
+	}
+}
+
+#pragma endregion
+
+#endif
