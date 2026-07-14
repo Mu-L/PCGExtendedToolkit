@@ -12,7 +12,27 @@
 #define LOCTEXT_NAMESPACE "PCGExBestMatchAxisElement"
 #define PCGEX_NAMESPACE BestMatchAxis
 
-PCGEX_SETTING_VALUE_IMPL(UPCGExBestMatchAxisSettings, Match, FVector, MatchInput, MatchSource, MatchConstant)
+#if WITH_EDITOR
+void UPCGExBestMatchAxisSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 7)
+	{
+		// Rewire Match
+		PCGEX_SHORTHAND_RENAME_PIN_EX(MatchSource, TEXT(" └─ Match (Attr)"), MatchConstant, TEXT(" └─ Match"), Match)
+	}
+
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExBestMatchAxisSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 7)
+	{
+		Match.Update(MatchInput_DEPRECATED, MatchSource_DEPRECATED, MatchConstant_DEPRECATED);
+	}
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+#endif
 
 TArray<FPCGPinProperties> UPCGExBestMatchAxisSettings::InputPinProperties() const
 {
@@ -120,7 +140,7 @@ namespace PCGExBestMatchAxis
 		}
 		else
 		{
-			MatchGetter = Settings->GetValueSettingMatch();
+			MatchGetter = Settings->Match.GetValueSetting();
 			if (!MatchGetter->Init(PointDataFacade))
 			{
 				return false;

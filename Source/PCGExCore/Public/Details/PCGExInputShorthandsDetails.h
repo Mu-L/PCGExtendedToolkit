@@ -28,13 +28,15 @@ namespace PCGExDeprecation
 	 * PropertiesNames end with [InMemberName, InLeafName]. New labels are resolved from the settings'
 	 * freshly gathered OverridableParams — the exact source UpdatePins builds pins from — so this stays
 	 * correct across bare/member-path/Config-path label variants (see .claude/Shorthand_Migration_Plan.md).
-	 * The old pin is matched by exact label, else by unique segment-qualified ".../InOldName".
+	 * The old pin is matched by exact label, else by unique segment-qualified ".../InOldName", else by
+	 * legacy display-name labels (explicit InOldDisplayName, then the engine-default prettified name) —
+	 * very old assets carry pins labeled by GetDisplayNameText from before PCG switched to authored names.
 	 * Call from PCGExApplyDeprecationBeforeUpdatePins; safely no-ops when either side is absent.
 	 */
-	PCGEXCORE_API void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, FName InOldName, FName InMemberName, FName InLeafName);
+	PCGEXCORE_API void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, FName InOldName, FName InMemberName, FName InLeafName, FName InOldDisplayName = NAME_None);
 
 	/** Suffix-explicit variant for ambiguous embeddings (same member/leaf tail reachable through two paths). */
-	PCGEXCORE_API void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, FName InOldName, TArrayView<const FName> InNewPathSuffix);
+	PCGEXCORE_API void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, FName InOldName, TArrayView<const FName> InNewPathSuffix, FName InOldDisplayName = NAME_None);
 }
 #endif
 
@@ -81,6 +83,13 @@ bool CanSupportDataOnly() const;
 PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_ATTR)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Attribute")));\
 PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_CONST)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Constant")));
 
+// Variant carrying the old properties' explicit DisplayName metas (pass string literals, e.g. TEXT("Static Mesh (Attr)")).
+// Needed to catch pins from the display-name labeling era when the old property had a custom DisplayName —
+// the default macro only covers the engine-derived prettified name.
+#define PCGEX_SHORTHAND_RENAME_PIN_EX(_OLD_ATTR, _OLD_ATTR_DISPLAY, _OLD_CONST, _OLD_CONST_DISPLAY, _NEW_MEMBER)\
+PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_ATTR)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Attribute")), FName(_OLD_ATTR_DISPLAY));\
+PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_CONST)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Constant")), FName(_OLD_CONST_DISPLAY));
+
 #pragma region Name
 
 #define PCGEX_SHORTHAND_NAME_CTR(_NAME, _TYPE) \
@@ -90,6 +99,7 @@ FPCGExInputShorthandName##_NAME(const FName DefaultName, const _TYPE DefaultValu
 bool TryReadDataValue(const TSharedPtr<PCGExData::FPointIO>& IO, _TYPE& OutValue, const bool bQuiet = false) const;\
 bool TryReadDataValue(FPCGExContext* InContext, const UPCGData* InData, _TYPE& OutValue, const bool bQuiet = false) const;\
 PCGEX_SETTING_VALUE_DECL(, _TYPE)\
+PCGEX_SETTING_DATA_VALUE_DECL(, _TYPE)\
 void RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const;\
 PCGEX_SHORTHAND_UPDATE_DECL(_NAME, _TYPE)
 
@@ -208,6 +218,17 @@ struct PCGEXCORE_API FPCGExInputShorthandNameInteger3201 : public FPCGExInputSho
 };
 
 USTRUCT(BlueprintType)
+struct PCGEXCORE_API FPCGExInputShorthandNameInteger64 : public FPCGExInputShorthandNameBase
+{
+	GENERATED_BODY()
+
+	PCGEX_SHORTHAND_NAME_CTR(Integer64, int64)
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	int64 Constant = 0;
+};
+
+USTRUCT(BlueprintType)
 struct PCGEXCORE_API FPCGExInputShorthandNameVector2 : public FPCGExInputShorthandNameBase
 {
 	GENERATED_BODY()
@@ -321,6 +342,7 @@ FPCGExInputShorthandSelector##_NAME(const FName& DefaultSelection, const _TYPE D
 bool TryReadDataValue(const TSharedPtr<PCGExData::FPointIO>& IO, _TYPE& OutValue, const bool bQuiet = false) const;\
 bool TryReadDataValue(FPCGExContext* InContext, const UPCGData* InData, _TYPE& OutValue, const bool bQuiet = false) const;\
 PCGEX_SETTING_VALUE_DECL(, _TYPE)\
+PCGEX_SETTING_DATA_VALUE_DECL(, _TYPE)\
 void RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const;\
 PCGEX_SHORTHAND_UPDATE_DECL(_NAME, _TYPE)
 
@@ -436,6 +458,17 @@ struct PCGEXCORE_API FPCGExInputShorthandSelectorInteger3201 : public FPCGExInpu
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, ClampMin=0, UIMin=0, ClampMax=1, UIMax=1))
 	int32 Constant = 0;
+};
+
+USTRUCT(BlueprintType)
+struct PCGEXCORE_API FPCGExInputShorthandSelectorInteger64 : public FPCGExInputShorthandSelectorBase
+{
+	GENERATED_BODY()
+
+	PCGEX_SHORTHAND_SELECTOR_CTR(Integer64, int64)
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	int64 Constant = 0;
 };
 
 USTRUCT(BlueprintType)

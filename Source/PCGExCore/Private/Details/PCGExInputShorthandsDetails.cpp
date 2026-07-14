@@ -20,6 +20,7 @@ MACRO(bool, Boolean, __VA_ARGS__)       \
 MACRO(int32, Integer32, __VA_ARGS__)      \
 MACRO(int32, Integer32Abs, __VA_ARGS__)      \
 MACRO(int32, Integer3201, __VA_ARGS__)      \
+MACRO(int64, Integer64, __VA_ARGS__)      \
 MACRO(float, Float, __VA_ARGS__)      \
 MACRO(double, Double, __VA_ARGS__)     \
 MACRO(double, DoubleAbs, __VA_ARGS__)     \
@@ -47,6 +48,7 @@ bool FPCGExInputShorthandSelector##_NAME::CanSupportDataOnly() const { return In
 
 #define PCGEX_TPL_SHORTHAND_NAME(_TYPE, _NAME, ...)\
 PCGEX_SETTING_VALUE_IMPL_SHORTHAND(FPCGExInputShorthandName##_NAME, , _TYPE, Input, Attribute, Constant)\
+PCGEX_SETTING_DATA_VALUE_IMPL_SHORTHAND(FPCGExInputShorthandName##_NAME, , _TYPE, Input, Attribute, Constant)\
 bool FPCGExInputShorthandName##_NAME::TryReadDataValue(const TSharedPtr<PCGExData::FPointIO>& IO, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(IO, Input, Attribute, Constant, OutValue, bQuiet);}\
 bool FPCGExInputShorthandName##_NAME::TryReadDataValue(FPCGExContext* InContext, const UPCGData* InData, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(InContext, InData, Input, Attribute, Constant, OutValue, bQuiet);}\
 void FPCGExInputShorthandName##_NAME::RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const { if (Input == EPCGExInputValueType::Attribute) { FacadePreloader.Register<_TYPE>(InContext, Attribute); } }\
@@ -54,6 +56,7 @@ PCGEX_SHORTHAND_UPDATE__NAME_IMPL(_TYPE, _NAME)
 
 #define PCGEX_TPL_SHORTHAND_SELECTOR(_TYPE, _NAME, ...)\
 PCGEX_SETTING_VALUE_IMPL_SHORTHAND(FPCGExInputShorthandSelector##_NAME, , _TYPE, Input, Attribute, Constant)\
+PCGEX_SETTING_DATA_VALUE_IMPL_SHORTHAND(FPCGExInputShorthandSelector##_NAME, , _TYPE, Input, Attribute, Constant)\
 bool FPCGExInputShorthandSelector##_NAME::TryReadDataValue(const TSharedPtr<PCGExData::FPointIO>& IO, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(IO, Input, Attribute, Constant, OutValue, bQuiet);}\
 bool FPCGExInputShorthandSelector##_NAME::TryReadDataValue(FPCGExContext* InContext, const UPCGData* InData, _TYPE& OutValue, const bool bQuiet) const{return PCGExData::Helpers::TryGetSettingDataValue(InContext, InData, Input, Attribute, Constant, OutValue, bQuiet);}\
 void FPCGExInputShorthandSelector##_NAME::RegisterBufferDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const { if (Input == EPCGExInputValueType::Attribute) { FacadePreloader.Register<_TYPE>(InContext, Attribute); } }\
@@ -72,13 +75,13 @@ PCGEX_FOREACH_INPUT_SHORTHAND(PCGEX_TPL_SHORTHAND_SELECTOR)
 
 namespace PCGExDeprecation
 {
-	void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, const FName InOldName, const FName InMemberName, const FName InLeafName)
+	void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, const FName InOldName, const FName InMemberName, const FName InLeafName, const FName InOldDisplayName)
 	{
 		const FName PathSuffix[] = {InMemberName, InLeafName};
-		RenameShorthandOverridePin(InSettings, InOutNode, InOldName, PathSuffix);
+		RenameShorthandOverridePin(InSettings, InOutNode, InOldName, PathSuffix, InOldDisplayName);
 	}
 
-	void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, const FName InOldName, const TArrayView<const FName> InNewPathSuffix)
+	void RenameShorthandOverridePin(const UPCGSettings* InSettings, UPCGNode* InOutNode, const FName InOldName, const TArrayView<const FName> InNewPathSuffix, const FName InOldDisplayName)
 	{
 		if (!InSettings || !InOutNode || InOldName.IsNone() || InNewPathSuffix.IsEmpty()) { return; }
 
@@ -136,6 +139,22 @@ namespace PCGExDeprecation
 
 				OldLabel = Pin->Properties.Label;
 			}
+		}
+
+		// Display-name safety net: very old assets carry pins labeled from GetDisplayNameText (pre-authored-name
+		// engine labeling). Only consulted when no authored-name pin matched; one-time deprecation cost, and
+		// preserving user connections outweighs the (label-unique-per-node) collision risk.
+		if (OldLabel.IsNone() && !InOldDisplayName.IsNone() && InOutNode->GetInputPin(InOldDisplayName))
+		{
+			OldLabel = InOldDisplayName;
+		}
+
+		if (OldLabel.IsNone())
+		{
+			const FString OldNameStr = InOldName.ToString();
+			const bool bLooksLikeBool = OldNameStr.Len() > 1 && OldNameStr[0] == TEXT('b') && FChar::IsUpper(OldNameStr[1]);
+			const FName DefaultDisplayLabel = FName(FName::NameToDisplayString(OldNameStr, bLooksLikeBool));
+			if (InOutNode->GetInputPin(DefaultDisplayLabel)) { OldLabel = DefaultDisplayLabel; }
 		}
 
 		if (OldLabel.IsNone()) { return; }

@@ -19,7 +19,7 @@ void UPCGExBlendPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* In
 	PCGEX_IF_VERSION_LOWER(1, 76, 6)
 	{
 		// Rewire Lerp
-		PCGEX_SHORTHAND_RENAME_PIN(LerpAttribute, LerpConstant, Lerp)
+		PCGEX_SHORTHAND_RENAME_PIN_EX(LerpAttribute, TEXT("Lerp (Attr)"), LerpConstant, TEXT("Lerp"), Lerp)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
