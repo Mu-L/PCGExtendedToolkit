@@ -337,6 +337,7 @@ struct PCGEXCORE_API FPCGExInputShorthandNameSoftObjectPath : public FPCGExInput
 FPCGExInputShorthandSelector##_NAME() = default;\
 explicit FPCGExInputShorthandSelector##_NAME(const FString& DefaultSelection, PCGEX_ATTRIBUTE_TOGGLE_DECL) { Attribute.Update(DefaultSelection); PCGEX_ATTRIBUTE_TOGGLE } \
 explicit FPCGExInputShorthandSelector##_NAME(const FName& DefaultSelection, PCGEX_ATTRIBUTE_TOGGLE_DECL) { Attribute.SetAttributeName(DefaultSelection); PCGEX_ATTRIBUTE_TOGGLE } \
+explicit FPCGExInputShorthandSelector##_NAME(const FPCGAttributePropertyInputSelector& DefaultSelector, const _TYPE DefaultValue, PCGEX_ATTRIBUTE_TOGGLE_DECL) { Attribute = DefaultSelector; Constant = DefaultValue; PCGEX_ATTRIBUTE_TOGGLE } \
 FPCGExInputShorthandSelector##_NAME(const FString& DefaultSelection, const _TYPE DefaultValue, PCGEX_ATTRIBUTE_TOGGLE_DECL){ Attribute.Update(DefaultSelection);	Constant = DefaultValue; PCGEX_ATTRIBUTE_TOGGLE } \
 FPCGExInputShorthandSelector##_NAME(const FName& DefaultSelection, const _TYPE DefaultValue, PCGEX_ATTRIBUTE_TOGGLE_DECL){ Attribute.Update(DefaultSelection.ToString()); Constant = DefaultValue; PCGEX_ATTRIBUTE_TOGGLE  } \
 bool TryReadDataValue(const TSharedPtr<PCGExData::FPointIO>& IO, _TYPE& OutValue, const bool bQuiet = false) const;\

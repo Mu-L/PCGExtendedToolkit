@@ -36,6 +36,11 @@ void UPCGExPathSplineMeshSimpleSettings::PCGExApplyDeprecationBeforeUpdatePins(U
 		PCGEX_SHORTHAND_RENAME_PIN_EX(EndOffsetAttribute, TEXT("End Offset (Attr)"), EndOffset, TEXT("End Offset"), EndOffsetValue)
 	}
 
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		MutationDetails.RenamePins(this, InOutNode);
+	}
+
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -51,6 +56,11 @@ void UPCGExPathSplineMeshSimpleSettings::PCGExApplyDeprecation(UPCGNode* InOutNo
 	{
 		StartOffsetValue.Update(StartOffsetInput_DEPRECATED, StartOffsetAttribute_DEPRECATED, StartOffset_DEPRECATED);
 		EndOffsetValue.Update(EndOffsetInput_DEPRECATED, EndOffsetAttribute_DEPRECATED, EndOffset_DEPRECATED);
+	}
+
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		MutationDetails.ApplyDeprecation();
 	}
 
 	Super::PCGExApplyDeprecation(InOutNode);

@@ -63,6 +63,12 @@ void UPCGExNumericCompareNearestFilterProviderSettings::PCGExApplyDeprecationBef
 		// Rewire the old Operand B override pins onto the new shorthand pins (ApplyDeprecation only migrates the inline value).
 		PCGEX_SHORTHAND_RENAME_PIN(OperandB, OperandBConstant, OperandBValue)
 	}
+
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.RenamePins(this, InOutNode);
+	}
+
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -72,6 +78,12 @@ void UPCGExNumericCompareNearestFilterProviderSettings::PCGExApplyDeprecation(UP
 	{
 		Config.OperandBValue.Update(Config.CompareAgainst_DEPRECATED, Config.OperandB_DEPRECATED, Config.OperandBConstant_DEPRECATED);
 	}
+
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.ApplyDeprecation();
+	}
+
 	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif

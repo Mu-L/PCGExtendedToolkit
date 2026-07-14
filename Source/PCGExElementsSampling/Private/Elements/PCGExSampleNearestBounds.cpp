@@ -3,6 +3,7 @@
 
 #include "Elements/PCGExSampleNearestBounds.h"
 
+#include "PCGExVersion.h"
 #include "Blenders/PCGExUnionBlender.h"
 #include "Blenders/PCGExUnionOpsManager.h"
 #include "Containers/PCGExScopedContainers.h"
@@ -51,6 +52,24 @@ void UPCGExSampleNearestBoundsSettings::ApplyDeprecationBeforeUpdatePins(UPCGNod
 {
 	InOutNode->RenameInputPin(PCGPinConstants::DefaultInputLabel, PCGExSampling::Labels::SourceSourceLabel);
 	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExSampleNearestBoundsSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		DataMatching.RenamePins(this, InOutNode);
+	}
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExSampleNearestBoundsSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		DataMatching.ApplyDeprecation();
+	}
+	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif
 

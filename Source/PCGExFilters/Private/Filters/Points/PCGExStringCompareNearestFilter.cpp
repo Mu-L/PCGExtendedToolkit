@@ -3,6 +3,7 @@
 
 #include "Filters/Points/PCGExStringCompareNearestFilter.h"
 
+#include "PCGExVersion.h"
 #include "Containers/PCGExManagedObjects.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
@@ -156,6 +157,24 @@ TArray<FPCGPinProperties> UPCGExStringCompareNearestFilterProviderSettings::Inpu
 PCGEX_CREATE_FILTER_FACTORY(StringCompareNearest)
 
 #if WITH_EDITOR
+void UPCGExStringCompareNearestFilterProviderSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.RenamePins(this, InOutNode);
+	}
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExStringCompareNearestFilterProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.ApplyDeprecation();
+	}
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+
 FString UPCGExStringCompareNearestFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = PCGExMetaHelpers::GetSelectorDisplayName(Config.OperandA) + PCGExCompare::ToString(Config.Comparison);

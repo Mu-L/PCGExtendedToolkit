@@ -21,6 +21,11 @@ void UPCGExBestMatchAxisSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode
 		PCGEX_SHORTHAND_RENAME_PIN_EX(MatchSource, TEXT(" └─ Match (Attr)"), MatchConstant, TEXT(" └─ Match"), Match)
 	}
 
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		DataMatching.RenamePins(this, InOutNode);
+	}
+
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -30,6 +35,12 @@ void UPCGExBestMatchAxisSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 	{
 		Match.Update(MatchInput_DEPRECATED, MatchSource_DEPRECATED, MatchConstant_DEPRECATED);
 	}
+
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		DataMatching.ApplyDeprecation();
+	}
+
 	Super::PCGExApplyDeprecation(InOutNode);
 }
 #endif

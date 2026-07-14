@@ -32,6 +32,11 @@ void UPCGExExtrudeTensorsSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNod
 		PCGEX_SHORTHAND_RENAME_PIN_EX(MaxPointsCountAttribute, TEXT("Max Points Count (Attr)"), MaxPointsCount, TEXT("Max Points Count"), MaxPointsCountValue)
 	}
 
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		TensorHandlerDetails.RenamePins(this, InOutNode);
+	}
+
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -41,6 +46,11 @@ void UPCGExExtrudeTensorsSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 	{
 		MaxLengthValue.Update(MaxLengthInput_DEPRECATED, MaxLengthAttribute_DEPRECATED, MaxLength_DEPRECATED);
 		MaxPointsCountValue.Update(MaxPointsCountInput_DEPRECATED, MaxPointsCountAttribute_DEPRECATED, MaxPointsCount_DEPRECATED);
+	}
+
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		TensorHandlerDetails.ApplyDeprecation();
 	}
 
 	Super::PCGExApplyDeprecation(InOutNode);

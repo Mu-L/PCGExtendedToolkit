@@ -30,6 +30,11 @@ void UPCGExBevelPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* In
 		PCGEX_SHORTHAND_RENAME_PIN_EX(WidthAttribute, TEXT("Width (Attr)"), WidthConstant, TEXT("Width"), Width)
 	}
 
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		ManhattanDetails.RenamePins(this, InOutNode);
+	}
+
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -38,6 +43,11 @@ void UPCGExBevelPathSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 	PCGEX_IF_VERSION_LOWER(1, 76, 8)
 	{
 		Width.Update(WidthInput_DEPRECATED, WidthAttribute_DEPRECATED, WidthConstant_DEPRECATED);
+	}
+
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		ManhattanDetails.ApplyDeprecation();
 	}
 	Super::PCGExApplyDeprecation(InOutNode);
 }
