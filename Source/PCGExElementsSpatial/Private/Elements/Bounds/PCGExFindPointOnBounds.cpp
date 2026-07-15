@@ -19,7 +19,7 @@ void UPCGExFindPointOnBoundsSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCG
 	PCGEX_IF_VERSION_LOWER(1, 76, 7)
 	{
 		// Rewire UVW
-		PCGEX_SHORTHAND_RENAME_PIN_EX(LocalUVW, TEXT("UVW (Attr)"), UVW, TEXT("UVW"), UVWValue)
+		PCGEX_SHORTHAND_RENAME_PIN(LocalUVW, UVW, UVWValue)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

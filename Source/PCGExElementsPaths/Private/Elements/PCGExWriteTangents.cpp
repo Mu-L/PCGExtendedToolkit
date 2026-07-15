@@ -21,10 +21,10 @@ void UPCGExWriteTangentsSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode
 	PCGEX_IF_VERSION_LOWER(1, 76, 8)
 	{
 		// Rewire Arrive Scale
-		PCGEX_SHORTHAND_RENAME_PIN_EX(ArriveScaleAttribute, TEXT("Arrive Scale (Attr)"), ArriveScaleConstant, TEXT("Arrive Scale"), ArriveScale)
+		PCGEX_SHORTHAND_RENAME_PIN(ArriveScaleAttribute, ArriveScaleConstant, ArriveScale)
 
 		// Rewire Leave Scale
-		PCGEX_SHORTHAND_RENAME_PIN_EX(LeaveScaleAttribute, TEXT("Leave Scale (Attr)"), LeaveScaleConstant, TEXT("Leave Scale"), LeaveScale)
+		PCGEX_SHORTHAND_RENAME_PIN(LeaveScaleAttribute, LeaveScaleConstant, LeaveScale)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

@@ -23,7 +23,7 @@ void UPCGExNormalizeSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* In
 	PCGEX_IF_VERSION_LOWER(1, 76, 7)
 	{
 		// Rewire Transform
-		PCGEX_SHORTHAND_RENAME_PIN_EX(TransformAttribute, TEXT("Transform (Attr)"), TransformConstant, TEXT("Transform"), Transform)
+		PCGEX_SHORTHAND_RENAME_PIN(TransformAttribute, TransformConstant, Transform)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

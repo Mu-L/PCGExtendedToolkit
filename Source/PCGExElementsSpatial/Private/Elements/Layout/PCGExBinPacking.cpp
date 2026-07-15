@@ -25,7 +25,7 @@ void UPCGExBinPackingSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* I
 	// is intentionally not rescued per project decision.
 	PCGEX_IF_VERSION_LOWER(1, 76, 9)
 	{
-		PCGEX_SHORTHAND_RENAME_PIN_EX(OccupationPaddingAttribute, TEXT("Occupation Padding (Attr)"), OccupationPadding, TEXT("Occupation Padding"), OccupationPadding)
+		PCGEX_SHORTHAND_RENAME_PIN(OccupationPaddingAttribute, OccupationPadding, OccupationPadding)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

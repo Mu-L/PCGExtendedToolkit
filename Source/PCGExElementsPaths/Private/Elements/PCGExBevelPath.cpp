@@ -27,7 +27,7 @@ void UPCGExBevelPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* In
 	PCGEX_IF_VERSION_LOWER(1, 76, 8)
 	{
 		// Rewire Width
-		PCGEX_SHORTHAND_RENAME_PIN_EX(WidthAttribute, TEXT("Width (Attr)"), WidthConstant, TEXT("Width"), Width)
+		PCGEX_SHORTHAND_RENAME_PIN(WidthAttribute, WidthConstant, Width)
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 10)

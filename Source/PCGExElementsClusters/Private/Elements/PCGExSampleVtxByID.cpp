@@ -27,18 +27,14 @@ UPCGExSampleVtxByIDSettings::UPCGExSampleVtxByIDSettings(const FObjectInitialize
 }
 
 #if WITH_EDITOR
-void UPCGExSampleVtxByIDSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
-{
-	InOutNode->RenameInputPin(PCGPinConstants::DefaultInputLabel, PCGExSampling::Labels::SourceSourceLabel);
-	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
-}
-
 void UPCGExSampleVtxByIDSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
+	InOutNode->RenameInputPin(PCGPinConstants::DefaultInputLabel, PCGExSampling::Labels::SourceSourceLabel);
+	
 	PCGEX_IF_VERSION_LOWER(1, 76, 7)
 	{
 		// Rewire LookAtUp
-		PCGEX_SHORTHAND_RENAME_PIN_EX(LookAtUpSource, TEXT(" └─ Up Vector (Attr)"), LookAtUpConstant, TEXT(" └─ Up Vector"), LookAtUp)
+		PCGEX_SHORTHAND_RENAME_PIN(LookAtUpSource, LookAtUpConstant, LookAtUp)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

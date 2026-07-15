@@ -34,7 +34,7 @@ void UPCGExWriteEdgePropertiesSettings::PCGExApplyDeprecationBeforeUpdatePins(UP
 	PCGEX_IF_VERSION_LOWER(1, 76, 8)
 	{
 		// Rewire Solidification Lerp
-		PCGEX_SHORTHAND_RENAME_PIN_EX(SolidificationLerpAttribute, TEXT("Solidification Lerp (Attr)"), SolidificationLerpConstant, TEXT("Solidification Lerp"), SolidificationLerp)
+		PCGEX_SHORTHAND_RENAME_PIN(SolidificationLerpAttribute, SolidificationLerpConstant, SolidificationLerp)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

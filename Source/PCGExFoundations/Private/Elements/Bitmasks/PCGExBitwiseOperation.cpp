@@ -16,7 +16,7 @@ void UPCGExBitwiseOperationSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGN
 	PCGEX_IF_VERSION_LOWER(1, 76, 7)
 	{
 		// Rewire Mask
-		PCGEX_SHORTHAND_RENAME_PIN_EX(MaskAttribute, TEXT("Bitmask (Attr)"), Bitmask, TEXT("Bitmask"), Mask)
+		PCGEX_SHORTHAND_RENAME_PIN(MaskAttribute, Bitmask, Mask)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

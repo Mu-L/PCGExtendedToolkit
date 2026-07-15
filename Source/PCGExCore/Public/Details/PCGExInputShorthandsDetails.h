@@ -83,13 +83,6 @@ bool CanSupportDataOnly() const;
 PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_ATTR)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Attribute")));\
 PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_CONST)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Constant")));
 
-// Variant carrying the old properties' explicit DisplayName metas (pass string literals, e.g. TEXT("Static Mesh (Attr)")).
-// Needed to catch pins from the display-name labeling era when the old property had a custom DisplayName —
-// the default macro only covers the engine-derived prettified name.
-#define PCGEX_SHORTHAND_RENAME_PIN_EX(_OLD_ATTR, _OLD_ATTR_DISPLAY, _OLD_CONST, _OLD_CONST_DISPLAY, _NEW_MEMBER)\
-PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_ATTR)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Attribute")), FName(_OLD_ATTR_DISPLAY));\
-PCGExDeprecation::RenameShorthandOverridePin(this, InOutNode, FName(TEXT(#_OLD_CONST)), FName(TEXT(#_NEW_MEMBER)), FName(TEXT("Constant")), FName(_OLD_CONST_DISPLAY));
-
 #pragma region Name
 
 #define PCGEX_SHORTHAND_NAME_CTR(_NAME, _TYPE) \

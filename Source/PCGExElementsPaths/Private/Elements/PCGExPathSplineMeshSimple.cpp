@@ -30,10 +30,10 @@ void UPCGExPathSplineMeshSimpleSettings::PCGExApplyDeprecationBeforeUpdatePins(U
 	PCGEX_IF_VERSION_LOWER(1, 76, 8)
 	{
 		// Rewire Start Offset
-		PCGEX_SHORTHAND_RENAME_PIN_EX(StartOffsetAttribute, TEXT("Start Offset (Attr)"), StartOffset, TEXT("Start Offset"), StartOffsetValue)
+		PCGEX_SHORTHAND_RENAME_PIN(StartOffsetAttribute, StartOffset, StartOffsetValue)
 
 		// Rewire End Offset
-		PCGEX_SHORTHAND_RENAME_PIN_EX(EndOffsetAttribute, TEXT("End Offset (Attr)"), EndOffset, TEXT("End Offset"), EndOffsetValue)
+		PCGEX_SHORTHAND_RENAME_PIN(EndOffsetAttribute, EndOffset, EndOffsetValue)
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 10)

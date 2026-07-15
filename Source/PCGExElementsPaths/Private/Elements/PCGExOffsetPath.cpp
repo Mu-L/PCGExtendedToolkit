@@ -19,10 +19,10 @@ void UPCGExOffsetPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* I
 	PCGEX_IF_VERSION_LOWER(1, 75, 7)
 	{
 		// Rewire Offset
-		PCGEX_SHORTHAND_RENAME_PIN_EX(OffsetAttribute, TEXT("Offset (Attr)"), OffsetConstant, TEXT("Offset"), Offset)
+		PCGEX_SHORTHAND_RENAME_PIN(OffsetAttribute, OffsetConstant, Offset)
 
 		// Rewire Direction
-		PCGEX_SHORTHAND_RENAME_PIN_EX(DirectionAttribute, TEXT("Direction (Attr)"), UNDEFINED, TEXT(""), Direction)
+		PCGEX_SHORTHAND_RENAME_PIN(DirectionAttribute, UNDEFINED, Direction)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

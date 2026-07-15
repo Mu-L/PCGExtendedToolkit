@@ -23,10 +23,10 @@ void UPCGExSmoothSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOut
 	PCGEX_IF_VERSION_LOWER(1, 76, 6)
 	{
 		// Rewire Influence
-		PCGEX_SHORTHAND_RENAME_PIN_EX(InfluenceAttribute, TEXT("Influence (Attr)"), InfluenceConstant, TEXT("Influence"), Influence)
+		PCGEX_SHORTHAND_RENAME_PIN(InfluenceAttribute, InfluenceConstant, Influence)
 
 		// Rewire Smoothing Amount
-		PCGEX_SHORTHAND_RENAME_PIN_EX(SmoothingAmountAttribute, TEXT("Smoothing (Attr)"), SmoothingAmountConstant, TEXT("Smoothing"), SmoothingAmount)
+		PCGEX_SHORTHAND_RENAME_PIN(SmoothingAmountAttribute, SmoothingAmountConstant, SmoothingAmount)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

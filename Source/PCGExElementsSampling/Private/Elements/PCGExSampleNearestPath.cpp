@@ -49,16 +49,19 @@ UPCGExSampleNearestPathSettings::UPCGExSampleNearestPathSettings(const FObjectIn
 #if WITH_EDITOR
 void UPCGExSampleNearestPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
 {
+	
+	InOutNode->RenameInputPin(PCGPinConstants::DefaultInputLabel, PCGExSampling::Labels::SourceSourceLabel);
+	
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
 		// Rewire alpha
-		PCGEX_SHORTHAND_RENAME_PIN_EX(SampleAlphaAttribute, TEXT(" └─ Sample Alpha (Attr)"), SampleAlphaConstant, TEXT(" └─ Sample Alpha"), SampleAlpha)
+		PCGEX_SHORTHAND_RENAME_PIN(SampleAlphaAttribute, SampleAlphaConstant, SampleAlpha)
 
 		// Rewire Range Min
-		PCGEX_SHORTHAND_RENAME_PIN_EX(RangeMinAttribute, TEXT("Range Min (Attr)"), RangeMin, TEXT(""), MinRange)
+		PCGEX_SHORTHAND_RENAME_PIN(RangeMinAttribute, RangeMin, MinRange)
 
 		// Rewire Range Max
-		PCGEX_SHORTHAND_RENAME_PIN_EX(RangeMaxAttribute, TEXT("Range Max (Attr)"), RangeMax, TEXT(""), MaxRange)
+		PCGEX_SHORTHAND_RENAME_PIN(RangeMaxAttribute, RangeMax, MaxRange)
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 10)
@@ -67,12 +70,6 @@ void UPCGExSampleNearestPathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCG
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
-}
-
-void UPCGExSampleNearestPathSettings::ApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
-{
-	InOutNode->RenameInputPin(PCGPinConstants::DefaultInputLabel, PCGExSampling::Labels::SourceSourceLabel);
-	Super::ApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
 void UPCGExSampleNearestPathSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)

@@ -44,10 +44,10 @@ void UPCGExSampleInsidePathSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGN
 	PCGEX_IF_VERSION_LOWER(1, 74, 3)
 	{
 		// Rewire Range Min
-		PCGEX_SHORTHAND_RENAME_PIN_EX(RangeMinAttribute, TEXT("Range Min (Attr)"), RangeMin, TEXT(""), MinRange)
+		PCGEX_SHORTHAND_RENAME_PIN(RangeMinAttribute, RangeMin, MinRange)
 
 		// Rewire Range Max
-		PCGEX_SHORTHAND_RENAME_PIN_EX(RangeMaxAttribute, TEXT("Range Max (Attr)"), RangeMax, TEXT(""), MaxRange)
+		PCGEX_SHORTHAND_RENAME_PIN(RangeMaxAttribute, RangeMax, MaxRange)
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 10)

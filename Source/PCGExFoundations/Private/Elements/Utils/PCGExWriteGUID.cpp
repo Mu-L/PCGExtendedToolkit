@@ -20,7 +20,7 @@ void UPCGExWriteGUIDSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* In
 	PCGEX_IF_VERSION_LOWER(1, 76, 7)
 	{
 		// Rewire Unique Key
-		PCGEX_SHORTHAND_RENAME_PIN_EX(UniqueKeyAttribute, TEXT("Unique Key (Attr)"), UniqueKeyConstant, TEXT("Unique Key"), UniqueKey)
+		PCGEX_SHORTHAND_RENAME_PIN(UniqueKeyAttribute, UniqueKeyConstant, UniqueKey)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);

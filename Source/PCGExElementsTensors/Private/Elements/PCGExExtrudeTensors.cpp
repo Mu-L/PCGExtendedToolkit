@@ -26,10 +26,10 @@ void UPCGExExtrudeTensorsSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNod
 	PCGEX_IF_VERSION_LOWER(1, 76, 8)
 	{
 		// Rewire Max Length
-		PCGEX_SHORTHAND_RENAME_PIN_EX(MaxLengthAttribute, TEXT("Max Length (Attr)"), MaxLength, TEXT("Max Length"), MaxLengthValue)
+		PCGEX_SHORTHAND_RENAME_PIN(MaxLengthAttribute, MaxLength, MaxLengthValue)
 
 		// Rewire Max Points Count
-		PCGEX_SHORTHAND_RENAME_PIN_EX(MaxPointsCountAttribute, TEXT("Max Points Count (Attr)"), MaxPointsCount, TEXT("Max Points Count"), MaxPointsCountValue)
+		PCGEX_SHORTHAND_RENAME_PIN(MaxPointsCountAttribute, MaxPointsCount, MaxPointsCountValue)
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 10)

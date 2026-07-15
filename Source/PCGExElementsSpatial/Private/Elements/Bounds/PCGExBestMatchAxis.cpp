@@ -18,7 +18,7 @@ void UPCGExBestMatchAxisSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode
 	PCGEX_IF_VERSION_LOWER(1, 76, 7)
 	{
 		// Rewire Match
-		PCGEX_SHORTHAND_RENAME_PIN_EX(MatchSource, TEXT(" └─ Match (Attr)"), MatchConstant, TEXT(" └─ Match"), Match)
+		PCGEX_SHORTHAND_RENAME_PIN(MatchSource, MatchConstant, Match)
 	}
 
 	PCGEX_IF_VERSION_LOWER(1, 76, 10)

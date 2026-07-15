@@ -31,11 +31,11 @@ void UPCGExPathSolidifySettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode*
 	PCGEX_IF_VERSION_LOWER(1, 75, 7)
 	{
 		// Rewire Normal
-		PCGEX_SHORTHAND_RENAME_PIN_EX(NormalAttribute, TEXT("Normal (Attr)"), UNDEFINED, TEXT(""), NormalValue)
+		PCGEX_SHORTHAND_RENAME_PIN(NormalAttribute, UNDEFINED, NormalValue)
 		InOutNode->RenameInputPin(FName(TEXT("InvertDirection")), FName(TEXT("NormalValue/Flip")));
 
 		// Rewire Solidification lerp
-		PCGEX_SHORTHAND_RENAME_PIN_EX(SolidificationLerpAttribute, TEXT("Solidification Lerp (Attr)"), SolidificationLerpConstant, TEXT("Solidification Lerp"), SolidificationLerp)
+		PCGEX_SHORTHAND_RENAME_PIN(SolidificationLerpAttribute, SolidificationLerpConstant, SolidificationLerp)
 	}
 
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
