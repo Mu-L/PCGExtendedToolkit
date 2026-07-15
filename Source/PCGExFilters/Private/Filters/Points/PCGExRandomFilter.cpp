@@ -3,6 +3,7 @@
 
 #include "Filters/Points/PCGExRandomFilter.h"
 
+#include "PCGExVersion.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataPreloader.h"
@@ -12,8 +13,20 @@
 #define LOCTEXT_NAMESPACE "PCGExCompareFilterDefinition"
 #define PCGEX_NAMESPACE CompareFilterDefinition
 
-PCGEX_SETTING_VALUE_IMPL(FPCGExRandomFilterConfig, Threshold, double, ThresholdInput, ThresholdAttribute, Threshold)
 PCGEX_SETTING_VALUE_IMPL(FPCGExRandomFilterConfig, Weight, double, bPerPointWeight ? EPCGExInputValueType::Attribute : EPCGExInputValueType::Constant, Weight, 1)
+
+#if WITH_EDITOR
+void FPCGExRandomFilterConfig::ApplyDeprecation()
+{
+	ThresholdValue.Update(ThresholdInput_DEPRECATED, ThresholdAttribute_DEPRECATED, Threshold_DEPRECATED);
+}
+
+void FPCGExRandomFilterConfig::RenamePins(const UPCGSettings* InSettings, UPCGNode* InOutNode) const
+{
+	PCGExDeprecation::RenameShorthandOverridePin(InSettings, InOutNode, FName(TEXT("Threshold")), FName(TEXT("ThresholdValue")), FName(TEXT("Constant")), FName(TEXT("Threshold")));
+	PCGExDeprecation::RenameShorthandOverridePin(InSettings, InOutNode, FName(TEXT("ThresholdAttribute")), FName(TEXT("ThresholdValue")), FName(TEXT("Attribute")), FName(TEXT("Threshold (Attr)")));
+}
+#endif
 
 bool UPCGExRandomFilterFactory::Init(FPCGExContext* InContext)
 {
@@ -23,12 +36,12 @@ bool UPCGExRandomFilterFactory::Init(FPCGExContext* InContext)
 
 bool UPCGExRandomFilterFactory::SupportsCollectionEvaluation() const
 {
-	return (!Config.bPerPointWeight && Config.ThresholdInput == EPCGExInputValueType::Constant) || bOnlyUseDataDomain;
+	return (!Config.bPerPointWeight && Config.ThresholdValue.Input == EPCGExInputValueType::Constant) || bOnlyUseDataDomain;
 }
 
 bool UPCGExRandomFilterFactory::SupportsProxyEvaluation() const
 {
-	return !Config.bPerPointWeight && Config.ThresholdInput == EPCGExInputValueType::Constant;
+	return !Config.bPerPointWeight && Config.ThresholdValue.Input == EPCGExInputValueType::Constant;
 }
 
 void UPCGExRandomFilterFactory::RegisterBuffersDependencies(FPCGExContext* InContext, PCGExData::FFacadePreloader& FacadePreloader) const
@@ -38,9 +51,9 @@ void UPCGExRandomFilterFactory::RegisterBuffersDependencies(FPCGExContext* InCon
 	{
 		FacadePreloader.Register<double>(InContext, Config.Weight);
 	}
-	if (Config.ThresholdInput != EPCGExInputValueType::Constant && Config.bRemapThresholdInternally)
+	if (Config.ThresholdValue.Input != EPCGExInputValueType::Constant && Config.bRemapThresholdInternally)
 	{
-		FacadePreloader.Register<double>(InContext, Config.ThresholdAttribute);
+		FacadePreloader.Register<double>(InContext, Config.ThresholdValue.Attribute);
 	}
 }
 
@@ -64,7 +77,7 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 		return false;
 	}
 
-	Threshold = TypedFilterFactory->Config.Threshold;
+	Threshold = TypedFilterFactory->Config.ThresholdValue.Constant;
 
 	// When remapping internally, track min/max to normalize weight values to [0..WeightRange].
 	// If min is negative, WeightOffset shifts values so the effective range starts at zero.
@@ -95,7 +108,7 @@ bool PCGExPointFilter::FRandomFilter::Init(FPCGExContext* InContext, const TShar
 		}
 	}
 
-	ThresholdBuffer = TypedFilterFactory->Config.GetValueSettingThreshold(PCGEX_QUIET_HANDLING);
+	ThresholdBuffer = TypedFilterFactory->Config.ThresholdValue.GetValueSetting(PCGEX_QUIET_HANDLING);
 	ThresholdBuffer->bRegisterConsumable &= TypedFilterFactory->bCleanupConsumableAttributes;
 	if (!ThresholdBuffer->IsConstant())
 	{
@@ -154,6 +167,26 @@ bool PCGExPointFilter::FRandomFilter::Test(const TSharedPtr<PCGExData::FPointIO>
 PCGEX_CREATE_FILTER_FACTORY(Random)
 
 #if WITH_EDITOR
+void UPCGExRandomFilterProviderSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.RenamePins(this, InOutNode);
+	}
+
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExRandomFilterProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.ApplyDeprecation();
+	}
+
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+
 FString UPCGExRandomFilterProviderSettings::GetDisplayName() const
 {
 	return TEXT("Random");

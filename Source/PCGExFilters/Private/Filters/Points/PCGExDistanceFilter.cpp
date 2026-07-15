@@ -3,6 +3,7 @@
 
 #include "Filters/Points/PCGExDistanceFilter.h"
 
+#include "PCGExVersion.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Details/PCGExSettingsDetails.h"
@@ -191,6 +192,24 @@ TArray<FPCGPinProperties> UPCGExDistanceFilterProviderSettings::InputPinProperti
 PCGEX_CREATE_FILTER_FACTORY(Distance)
 
 #if WITH_EDITOR
+void UPCGExDistanceFilterProviderSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.RenamePins(this, InOutNode);
+	}
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExDistanceFilterProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.ApplyDeprecation();
+	}
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+
 FString UPCGExDistanceFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = TEXT("Distance ") + PCGExCompare::ToString(Config.Comparison);

@@ -3,6 +3,7 @@
 
 #include "Filters/Points/PCGExTimeFilter.h"
 
+#include "PCGExVersion.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataPreloader.h"
@@ -273,6 +274,24 @@ TArray<FPCGPinProperties> UPCGExTimeFilterProviderSettings::InputPinProperties()
 PCGEX_CREATE_FILTER_FACTORY(Time)
 
 #if WITH_EDITOR
+void UPCGExTimeFilterProviderSettings::PCGExApplyDeprecationBeforeUpdatePins(UPCGNode* InOutNode, TArray<TObjectPtr<UPCGPin>>& InputPins, TArray<TObjectPtr<UPCGPin>>& OutputPins)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.RenamePins(this, InOutNode);
+	}
+	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
+}
+
+void UPCGExTimeFilterProviderSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 10)
+	{
+		Config.DataMatching.ApplyDeprecation();
+	}
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+
 FString UPCGExTimeFilterProviderSettings::GetDisplayName() const
 {
 	FString DisplayName = TEXT("Time ") + PCGExCompare::ToString(Config.Comparison);
