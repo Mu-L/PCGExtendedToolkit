@@ -15,7 +15,7 @@
 
 #include "PCGExCopyAttributes.generated.h"
 
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="metadata/copy-attributes"))
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Misc", meta=(PCGExNodeLibraryDoc="metadata/modify/copy-attributes"))
 class UPCGExCopyAttributesSettings : public UPCGExSettings
 {
 	GENERATED_BODY()
