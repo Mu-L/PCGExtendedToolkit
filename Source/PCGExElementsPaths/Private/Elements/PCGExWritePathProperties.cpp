@@ -178,8 +178,6 @@ namespace PCGExWritePathProperties
 			return false;
 		}
 
-		const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
-
 		Path = MakeShared<PCGExPaths::FPath>(PointDataFacade->GetIn(), 0);
 		Path->BuildProjection(ProjectionDetails);
 
@@ -215,20 +213,15 @@ namespace PCGExWritePathProperties
 			PathAvgNormal = Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, ProjectionDetails.Normal);
 		}
 
+		// Open paths: the last two points both map onto LastEdge; compute it once here so the parallel loop doesn't double-compute it concurrently
+		if (!bClosedLoop)
+		{
+			Path->ComputeEdgeExtra(Path->LastEdge);
+		}
+
 		{
 			const TSharedRef<PCGExData::FFacade>& OutputFacade = PointDataFacade;
 			PCGEX_FOREACH_FIELD_PATH_POINT(PCGEX_OUTPUT_INIT)
-		}
-
-		///
-
-		const int32 NumPoints = PointIO->GetIn()->GetNumPoints();
-
-		PCGExArrayHelpers::InitArray(Details, NumPoints);
-
-		for (int i = 0; i < NumPoints; i++)
-		{
-			Details[i] = {i, FVector::ZeroVector, FVector::ZeroVector, FVector::ZeroVector, FVector::ZeroVector};
 		}
 
 		StartParallelLoopForPoints();
@@ -244,32 +237,39 @@ namespace PCGExWritePathProperties
 
 		PCGEX_SCOPE_LOOP(Index)
 		{
-			FPointDetails& Current = Details[Index];
+			const FVector ToPrev = Path->DirToPrevPoint(Index);
+			const FVector ToNext = Path->DirToNextPoint(Index);
 
-			Current.ToPrev = Path->DirToPrevPoint(Index);
-			Current.ToNext = Path->DirToNextPoint(Index);
-
-			int32 ExtraIndex = !bClosedLoop && Index == Path->LastIndex ? Path->LastEdge : Index;
-			Path->ComputeEdgeExtra(ExtraIndex);
+			// LastEdge is precomputed in Process for open paths -- two points map onto it, skip both to avoid a concurrent duplicate compute
+			const int32 ExtraIndex = !bClosedLoop && Index == Path->LastIndex ? Path->LastEdge : Index;
+			if (bClosedLoop || ExtraIndex != Path->LastEdge)
+			{
+				Path->ComputeEdgeExtra(ExtraIndex);
+			}
 
 			PCGEX_OUTPUT_VALUE(PointNormal, Index, PathBinormal->Normals[ExtraIndex]);
 			PCGEX_OUTPUT_VALUE(PointBinormal, Index, PathBinormal->Get(ExtraIndex));
 			PCGEX_OUTPUT_VALUE(PointAvgNormal, Index, PathAvgNormal->Get(ExtraIndex));
 
-			PCGEX_OUTPUT_VALUE(DirectionToNext, Index, Current.ToNext);
-			PCGEX_OUTPUT_VALUE(DirectionToPrev, Index, Current.ToPrev);
+			PCGEX_OUTPUT_VALUE(DirectionToNext, Index, ToNext);
+			PCGEX_OUTPUT_VALUE(DirectionToPrev, Index, ToPrev);
 
 			PCGEX_OUTPUT_VALUE(DistanceToNext, Index, !Path->IsClosedLoop() && Index == Path->LastIndex ? 0 : PathLength->Get(Index))
 			PCGEX_OUTPUT_VALUE(DistanceToPrev, Index, Index == 0 ? Path->IsClosedLoop() ? PathLength->Get(Path->LastEdge) : 0 : PathLength->Get(Index-1))
 
-			PCGEX_OUTPUT_VALUE(Dot, Index, FVector::DotProduct(Current.ToPrev*-1, Current.ToNext));
-			PCGEX_OUTPUT_VALUE(Angle, Index, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, Current.ToPrev, Current.ToNext, ProjectionDetails.Normal));
+			// Edge dirs are unit length; a single dot/cross pair feeds Dot, Angle and the right-angle test
+			const double MainDot = ToPrev.Dot(ToNext);
+			const FVector Cross = FVector::CrossProduct(ToPrev, ToNext);
+			const double CornerRadians = FMath::Atan2(Cross.Size(), MainDot);
+
+			PCGEX_OUTPUT_VALUE(Dot, Index, -MainDot);
+			PCGEX_OUTPUT_VALUE(Angle, Index, PCGExSampling::Helpers::MapAngle(Settings->AngleRange, CornerRadians, Cross.Dot(ProjectionDetails.Normal) < 0));
 
 			if (ConcavityWriter)
 			{
 				int32 Concavity = ConcavitySigns[Index];
 				if (Concavity != 0 && Settings->bFlagRightAngles &&
-					FMath::Abs(PCGExSampling::Helpers::GetAngle(EPCGExAngleRange::UDegrees, Current.ToPrev, Current.ToNext) - 90) <= Settings->RightAngleTolerance)
+					FMath::Abs(FMath::RadiansToDegrees(CornerRadians) - 90) <= Settings->RightAngleTolerance)
 				{
 					Concavity = 0;
 				}
@@ -290,36 +290,36 @@ namespace PCGExWritePathProperties
 		const TSharedRef<PCGExData::FPointIO>& PointIO = PointDataFacade->Source;
 
 		FVector PathCentroid = FVector::ZeroVector;
-		FVector PathDir = Details[0].ToNext;
+		FVector PathDir = FVector::ZeroVector;
 
-		// Compute path-wide data (DistanceToStart/DistanceToEnd/PointTime are now computed in parallel in ProcessPoints)
-		for (int i = 0; i < Path->NumPoints; i++)
+		// Path-wide accumulation, skipped entirely when nothing consumes it
+		const bool bUpdateConvexity = Settings->bTagConcave || Settings->bTagConvex;
+		if (bUpdateConvexity || Context->bWritePathDirection || Context->bWritePathCentroid)
 		{
-			if (Settings->bTagConcave || Settings->bTagConvex)
+			for (int i = 0; i < Path->NumPoints; i++)
 			{
-				Path->UpdateConvexity(i);
-			}
+				if (bUpdateConvexity)
+				{
+					Path->UpdateConvexity(i);
+				}
 
-			PathDir += Details[i].ToNext;
-			PathCentroid += Path->GetPos_Unsafe(i);
+				PathDir += Path->DirToNextPoint(i);
+				PathCentroid += Path->GetPos_Unsafe(i);
+			}
 		}
 
 		if (!bClosedLoop)
 		{
-			const FPointDetails& First = Details[0];
-			const FPointDetails& Last = Details[Path->LastIndex];
-
+			// Open path endpoints have no corner: prev/next dirs are anti-parallel, a flat PI angle
 			PCGEX_OUTPUT_VALUE(Dot, 0, -1);
-			PCGEX_OUTPUT_VALUE(Angle, 0, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, First.ToNext *-1, First.ToNext, ProjectionDetails.Normal));
+			PCGEX_OUTPUT_VALUE(Angle, 0, PCGExSampling::Helpers::MapAngle(Settings->AngleRange, UE_DOUBLE_PI, false));
 
 			PCGEX_OUTPUT_VALUE(Dot, Path->LastIndex, -1);
-			PCGEX_OUTPUT_VALUE(Angle, Path->LastIndex, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, Last.ToPrev *-1, Last.ToPrev, ProjectionDetails.Normal));
+			PCGEX_OUTPUT_VALUE(Angle, Path->LastIndex, PCGExSampling::Helpers::MapAngle(Settings->AngleRange, UE_DOUBLE_PI, false));
 		}
 
 		if (Settings->WriteAnyPathData())
 		{
-			const PCGExMath::FPolygonInfos PolyInfos = PCGExMath::FPolygonInfos(Path->GetProjectedPoints());
-
 			PathAttributeSet = Context->PathAttributeSet ? Context->PathAttributeSet.Get() : Context->ManagedObjects->New<UPCGParamData>();
 			const int64 Key = Context->PathAttributeSet ? Context->MergedAttributeSetKeys[PointDataFacade->Source->IOIndex] : PathAttributeSet->Metadata->AddEntry();
 
@@ -330,10 +330,15 @@ namespace PCGExWritePathProperties
 			PCGEX_OUTPUT_PATH_VALUE(PathLength, double, PathLength->TotalLength)
 			PCGEX_OUTPUT_PATH_VALUE(PathDirection, FVector, (PathDir / Path->NumPoints).GetSafeNormal())
 			PCGEX_OUTPUT_PATH_VALUE(PathCentroid, FVector, (PathCentroid / Path->NumPoints))
-			PCGEX_OUTPUT_PATH_VALUE(IsClockwise, bool, PolyInfos.bIsClockwise)
-			PCGEX_OUTPUT_PATH_VALUE(Area, double, PolyInfos.Area * 0.01)
-			PCGEX_OUTPUT_PATH_VALUE(Perimeter, double, PolyInfos.Perimeter)
-			PCGEX_OUTPUT_PATH_VALUE(Compactness, double, PolyInfos.Compactness)
+
+			if (Context->bWriteIsClockwise || Context->bWriteArea || Context->bWritePerimeter || Context->bWriteCompactness)
+			{
+				const PCGExMath::FPolygonInfos PolyInfos = PCGExMath::FPolygonInfos(Path->GetProjectedPoints());
+				PCGEX_OUTPUT_PATH_VALUE(IsClockwise, bool, PolyInfos.bIsClockwise)
+				PCGEX_OUTPUT_PATH_VALUE(Area, double, PolyInfos.Area * 0.01)
+				PCGEX_OUTPUT_PATH_VALUE(Perimeter, double, PolyInfos.Perimeter)
+				PCGEX_OUTPUT_PATH_VALUE(Compactness, double, PolyInfos.Compactness)
+			}
 
 			bool bIsOdd = false;
 			bool bInner = false;

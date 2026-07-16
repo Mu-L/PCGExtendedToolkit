@@ -462,15 +462,6 @@ namespace PCGExWritePathProperties
 	const FName OutputPathInner = TEXT("Inner");
 	const FName OutputPathMedian = TEXT("Odd");
 
-	struct PCGEXELEMENTSPATHS_API FPointDetails
-	{
-		int32 Index;
-		FVector Normal;
-		FVector Binormal;
-		FVector ToPrev;
-		FVector ToNext;
-	};
-
 	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExWritePathPropertiesContext, UPCGExWritePathPropertiesSettings>
 	{
 		friend class FBatch;
@@ -487,8 +478,6 @@ namespace PCGExWritePathProperties
 		TSharedPtr<PCGExPaths::FPathEdgeLength> PathLength;
 		TSharedPtr<PCGExPaths::FPathEdgeBinormal> PathBinormal;
 		TSharedPtr<PCGExPaths::FPathEdgeAvgNormal> PathAvgNormal;
-
-		TArray<FPointDetails> Details;
 
 		// Per-point turn sign vs projected winding (-1 concave, +1 convex, 0 straight); must be computed from the pre-offset projection
 		TArray<int8> ConcavitySigns;

@@ -14,17 +14,8 @@
 
 namespace PCGExSampling::Helpers
 {
-	double GetAngle(const EPCGExAngleRange Mode, const FVector& A, const FVector& B, const FVector& Up)
+	double MapAngle(const EPCGExAngleRange Mode, const double Radians, const bool bFlipWinding)
 	{
-		const FVector N1 = A.GetSafeNormal();
-		const FVector N2 = B.GetSafeNormal();
-
-		const double MainDot = N1.Dot(N2);
-		const FVector C = FVector::CrossProduct(N1, N2);
-		const bool bFlipWinding = C.Dot(Up) < 0;
-
-		// Atan2 form is immune to FP rounding pushing an Acos input outside [-1, 1]
-		const double Radians = FMath::Atan2(C.Size(), MainDot); // 0 .. PI
 		const double Degrees = FMath::RadiansToDegrees(Radians); // 0 .. 180
 
 		switch (Mode)
@@ -51,6 +42,16 @@ namespace PCGExSampling::Helpers
 		case EPCGExAngleRange::InvertedNormalized: // 0 .. 360 -> 1 .. 0
 			return 1 - ((bFlipWinding ? 360 - Degrees : Degrees) / 360);
 		}
+	}
+
+	double GetAngle(const EPCGExAngleRange Mode, const FVector& A, const FVector& B, const FVector& Up)
+	{
+		const FVector N1 = A.GetSafeNormal();
+		const FVector N2 = B.GetSafeNormal();
+		const FVector C = FVector::CrossProduct(N1, N2);
+
+		// Atan2 form is immune to FP rounding pushing an Acos input outside [-1, 1]
+		return MapAngle(Mode, FMath::Atan2(C.Size(), N1.Dot(N2)), C.Dot(Up) < 0);
 	}
 
 	bool GetIncludedActors(const FPCGContext* InContext, const TSharedRef<PCGExData::FFacade>& InFacade, const FName ActorReferenceName, TMap<AActor*, int32>& OutActorSet)
