@@ -78,8 +78,8 @@ namespace PCGExDispatchSubgraph
 			}
 
 			// Object-typed targets: only assign already-resident assets. Candidate paths are preloaded in
-			// PostLoadAssetsDependencies (game thread); loading here would be a synchronous load off the
-			// game thread, as both write routes below TryLoad.
+			// PostLoadAssetsDependencies (game thread); a preload miss below would fall through to
+			// LoadBlocking_AnyThread and stall dispatch on a per-value game-thread marshal.
 			if (Property->IsA<FObjectPropertyBase>())
 			{
 				T Value = Values[EntryIndex];

@@ -145,7 +145,7 @@ void UPCGExInstancedFactory::ApplyOverrides()
 		PCGExMetaHelpers::ExecuteWithRightType(PossibleOverride.Value, [&](auto DummyValue)
 		{
 			using T = decltype(DummyValue);
-			PCGExPropertyHelpers::TrySetFPropertyValue<T>(Container, Property, PossibleOverride.Value->GetValueFromItemKey<T>(0));
+			PCGExPropertyHelpers::TrySetFPropertyValueCoerced<T>(Container, Property, PossibleOverride.Value->GetValueFromItemKey<T>(0));
 		});
 	}
 }

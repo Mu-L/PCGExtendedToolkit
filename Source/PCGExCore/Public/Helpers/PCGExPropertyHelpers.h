@@ -8,6 +8,7 @@
 #include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
 #include "Types/PCGExTypes.h"
+#include "UObject/SoftObjectPath.h"
 
 namespace PCGExPropertyHelpers
 {
@@ -28,27 +29,26 @@ MACRO(FStructProperty, FQuat) \
 MACRO(FStructProperty, FRotator) \
 MACRO(FStructProperty, FTransform)
 
+	/** Resolves InPath (worker-safe: off the game thread the load marshals to it and blocks, via
+	 *  PCGExHelpers::LoadBlocking_AnyThread) and writes the loaded object to the property if
+	 *  class-compatible. Never call raw FSoftObjectPath::TryLoad() here -- it is game-thread-only. */
+	PCGEXCORE_API bool TrySetObjectPropertyFromPath(void* InContainer, FObjectPropertyBase* InProperty, const FSoftObjectPath& InPath);
+
 	template <typename T>
 	static bool TrySetFPropertyValue(void* InContainer, FProperty* InProperty, T InValue)
 	{
 		const PCGExTypeOps::ITypeOpsBase* TypeOps = PCGExTypeOps::FTypeOpsRegistry::Get<T>();
 
-		if (InProperty->IsA<FObjectPropertyBase>())
+		if (FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(InProperty))
 		{
 			// If input type is a soft object path, check if the target property is an object type
 			// and resolve the object path
 			FSoftObjectPath Path;
 			TypeOps->ConvertTo(&InValue, PCGExTypes::TTraits<FSoftObjectPath>::Type, &Path);
 
-			if (UObject* ResolvedObject = Path.TryLoad())
+			if (TrySetObjectPropertyFromPath(InContainer, ObjectProperty, Path))
 			{
-				FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(InProperty);
-				if (ResolvedObject->IsA(ObjectProperty->PropertyClass))
-				{
-					void* PropertyContainer = ObjectProperty->ContainerPtrToValuePtr<void>(InContainer);
-					ObjectProperty->SetObjectPropertyValue(PropertyContainer, ResolvedObject);
-					return true;
-				}
+				return true;
 			}
 		}
 
@@ -94,19 +94,22 @@ MACRO(FStructProperty, FTransform)
 	/** Coerced single-value property write: the engine property accessor first (broadcast + construct
 	 *  covers targets TrySetFPropertyValue does not -- FLinearColor, FColor, ... -- plus every standard
 	 *  numeric/vector conversion), TrySetFPropertyValue as fallback for targets the accessor doesn't
-	 *  support (e.g. object properties driven by a soft path).
-	 *  WARNING: object-typed targets synchronously load the referenced asset on both routes -- resolve
-	 *  or preload beforehand when calling off the game thread. */
+	 *  support. Hard object/class targets skip the accessor: FPCGPropertyObjectPtrAccessor::Set does a
+	 *  raw TryLoad(), unsafe off the game thread -- the fallback resolves them through
+	 *  TrySetObjectPropertyFromPath instead. Soft object/class targets keep the accessor (never loads). */
 	template <typename T>
 	static bool TrySetFPropertyValueCoerced(void* InContainer, const FProperty* InProperty, const T& InValue)
 	{
-		if (const TUniquePtr<IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreatePropertyAccessor(InProperty))
+		if (!InProperty->IsA<FObjectProperty>())
 		{
-			void* Containers[1] = {InContainer};
-			FPCGAttributeAccessorKeysGenericPtrs Keys(Containers);
-			if (Accessor->Set<T>(InValue, Keys, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible))
+			if (const TUniquePtr<IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreatePropertyAccessor(InProperty))
 			{
-				return true;
+				void* Containers[1] = {InContainer};
+				FPCGAttributeAccessorKeysGenericPtrs Keys(Containers);
+				if (Accessor->Set<T>(InValue, Keys, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible))
+				{
+					return true;
+				}
 			}
 		}
 
