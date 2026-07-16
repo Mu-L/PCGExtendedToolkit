@@ -2,6 +2,7 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Elements/PCGExWritePathProperties.h"
+#include "Curve/CurveUtil.h"
 #include "MinVolumeBox3.h"
 #include "OrientedBoxTypes.h"
 #include "PCGParamData.h"
@@ -17,6 +18,23 @@
 
 #define LOCTEXT_NAMESPACE "PCGExWritePathPropertiesElement"
 #define PCGEX_NAMESPACE WritePathProperties
+
+#if WITH_EDITOR
+void UPCGExWritePathPropertiesSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
+{
+	PCGEX_IF_VERSION_LOWER(1, 76, 11)
+	{
+		// UpVector was merged into the projection normal; carry customized values over.
+		// Method is left untouched: BestFit graphs keep their projection (and thus Area/winding/inclusion) intact.
+		if (ProjectionDetails.Method == EPCGExProjectionMethod::Normal && !UpVector_DEPRECATED.Equals(FVector::UpVector))
+		{
+			ProjectionDetails.ProjectionVector.Input = EPCGExInputValueType::Constant;
+			ProjectionDetails.ProjectionVector.Constant = UpVector_DEPRECATED;
+		}
+	}
+	Super::PCGExApplyDeprecation(InOutNode);
+}
+#endif
 
 bool UPCGExWritePathPropertiesSettings::CanForwardData() const
 {
@@ -164,6 +182,23 @@ namespace PCGExWritePathProperties
 
 		Path = MakeShared<PCGExPaths::FPath>(PointDataFacade->GetIn(), 0);
 		Path->BuildProjection(ProjectionDetails);
+
+		if (Settings->bWriteConcavity)
+		{
+			// Must run before OffsetProjection: the inclusion offset distorts projected points
+			const TArray<FVector2D>& Projected = Path->GetProjectedPoints();
+			const double WindingSign = UE::Geometry::CurveUtil::SignedArea2<double, FVector2D>(Projected) < 0 ? -1 : 1;
+
+			PCGExArrayHelpers::InitArray(ConcavitySigns, Projected.Num());
+			for (int i = 0; i < Projected.Num(); i++)
+			{
+				const FVector2D DirIn = (Projected[i] - Projected[Path->PrevPointIndex(i)]).GetSafeNormal();
+				const FVector2D DirOut = (Projected[Path->NextPointIndex(i)] - Projected[i]).GetSafeNormal();
+				const double Turn = FVector2D::CrossProduct(DirIn, DirOut) * WindingSign;
+				ConcavitySigns[i] = FMath::IsNearlyZero(Turn) ? 0 : Turn > 0 ? 1 : -1;
+			}
+		}
+
 		Path->OffsetProjection(Settings->InclusionDetails.InclusionOffset);
 		Path->Idx = PointDataFacade->Source->IOIndex;
 
@@ -173,11 +208,11 @@ namespace PCGExWritePathProperties
 		PathLength = Path->AddExtra<PCGExPaths::FPathEdgeLength>(true); // Force compute length
 		if (Settings->bWritePointNormal || Settings->bWritePointBinormal)
 		{
-			PathBinormal = Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, Settings->UpVector);
+			PathBinormal = Path->AddExtra<PCGExPaths::FPathEdgeBinormal>(false, ProjectionDetails.Normal);
 		}
 		if (Settings->bWritePointAvgNormal)
 		{
-			PathAvgNormal = Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, Settings->UpVector);
+			PathAvgNormal = Path->AddExtra<PCGExPaths::FPathEdgeAvgNormal>(false, ProjectionDetails.Normal);
 		}
 
 		{
@@ -228,7 +263,18 @@ namespace PCGExWritePathProperties
 			PCGEX_OUTPUT_VALUE(DistanceToPrev, Index, Index == 0 ? Path->IsClosedLoop() ? PathLength->Get(Path->LastEdge) : 0 : PathLength->Get(Index-1))
 
 			PCGEX_OUTPUT_VALUE(Dot, Index, FVector::DotProduct(Current.ToPrev*-1, Current.ToNext));
-			PCGEX_OUTPUT_VALUE(Angle, Index, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, Current.ToPrev, Current.ToNext));
+			PCGEX_OUTPUT_VALUE(Angle, Index, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, Current.ToPrev, Current.ToNext, ProjectionDetails.Normal));
+
+			if (ConcavityWriter)
+			{
+				int32 Concavity = ConcavitySigns[Index];
+				if (Concavity != 0 && Settings->bFlagRightAngles &&
+					FMath::Abs(PCGExSampling::Helpers::GetAngle(EPCGExAngleRange::UDegrees, Current.ToPrev, Current.ToNext) - 90) <= Settings->RightAngleTolerance)
+				{
+					Concavity = 0;
+				}
+				ConcavityWriter->SetValue(Index, Concavity);
+			}
 
 			// Compute distance from start using pre-computed cumulative length prefix sum
 			// CumulativeLength[i] = sum of edge lengths 0..i, so DistanceToStart[i] = CumulativeLength[i-1] for i > 0
@@ -264,10 +310,10 @@ namespace PCGExWritePathProperties
 			const FPointDetails& Last = Details[Path->LastIndex];
 
 			PCGEX_OUTPUT_VALUE(Dot, 0, -1);
-			PCGEX_OUTPUT_VALUE(Angle, 0, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, First.ToNext *-1, First.ToNext));
+			PCGEX_OUTPUT_VALUE(Angle, 0, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, First.ToNext *-1, First.ToNext, ProjectionDetails.Normal));
 
 			PCGEX_OUTPUT_VALUE(Dot, Path->LastIndex, -1);
-			PCGEX_OUTPUT_VALUE(Angle, Path->LastIndex, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, Last.ToPrev *-1, Last.ToPrev));
+			PCGEX_OUTPUT_VALUE(Angle, Path->LastIndex, PCGExSampling::Helpers::GetAngle(Settings->AngleRange, Last.ToPrev *-1, Last.ToPrev, ProjectionDetails.Normal));
 		}
 
 		if (Settings->WriteAnyPathData())
