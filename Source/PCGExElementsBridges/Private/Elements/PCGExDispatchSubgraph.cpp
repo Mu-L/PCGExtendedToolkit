@@ -131,7 +131,40 @@ namespace PCGExDispatchSubgraph
 	// the generic accessor path (per-driver-data dedup -- see FGenericOverrideReader).
 	TSharedPtr<IOverrideReader> MakeOverrideReader(const UPCGData* InData, const FName InSourceAttr, const int32 InDriverIndex)
 	{
-		const UPCGMetadata* Metadata = InData ? InData->ConstMetadata() : nullptr;
+		if (!InData)
+		{
+			return nullptr;
+		}
+
+		FPCGAttributePropertyInputSelector Selector;
+		Selector.Update(InSourceAttr.ToString());
+		Selector = Selector.CopyAndFixLast(InData);
+
+		// Point / extra property source ($Transform, $Density, $Index, ...). The value is read into a
+		// concrete type resolved from the accessor (robust for sub-selectors like $Transform.X) and hashed
+		// by content, so property-valued dedup is cross-data. Properties only exist on point data; on data
+		// that lacks the property (e.g. param) no accessor is built and the override is skipped.
+		if (Selector.GetSelection() != EPCGAttributePropertySelection::Attribute)
+		{
+			const TUniquePtr<const IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreateConstAccessor(InData, Selector);
+			if (!Accessor)
+			{
+				return nullptr;
+			}
+
+			TSharedPtr<IOverrideReader> Result;
+			PCGExMetaHelpers::ExecuteWithRightType(Accessor->GetUnderlyingType(), [&](auto Dummy)
+			{
+				using T = decltype(Dummy);
+				TSharedPtr<TOverrideReader<T>> Reader = MakeShared<TOverrideReader<T>>();
+				PCGExData::Helpers::BulkReadRows<T>(InData, InSourceAttr, Reader->Values);
+				if (!Reader->Values.IsEmpty()) { Result = Reader; }
+			});
+			return Result;
+		}
+
+		// Attribute source.
+		const UPCGMetadata* Metadata = InData->ConstMetadata();
 		if (!Metadata)
 		{
 			return nullptr;
@@ -158,6 +191,20 @@ namespace PCGExDispatchSubgraph
 
 		// Non-basic (Struct / extended) attribute -> generic accessor path.
 		return MakeGenericOverrideReader(InData, InSourceAttr, Attr, InDriverIndex);
+	}
+
+	// True if Graph declares a Required input pin whose label is not among DeclaredInputLabels -- i.e. the
+	// dispatcher (Model C forwards only the declared custom input pins) would leave a required input unfed.
+	bool GraphHasUndeclaredRequiredInput(const UPCGGraph* Graph, const TSet<FName>& DeclaredInputLabels)
+	{
+		const UPCGNode* InputNode = Graph ? Graph->GetInputNode() : nullptr;
+		if (!InputNode) { return false; }
+
+		for (const FPCGPinProperties& Pin : InputNode->InputPinProperties())
+		{
+			if (Pin.IsRequiredPin() && !DeclaredInputLabels.Contains(Pin.Label)) { return true; }
+		}
+		return false;
 	}
 }
 
@@ -321,8 +368,14 @@ bool FPCGExDispatchSubgraphElement::ScheduleDispatches(FPCGExDispatchSubgraphCon
 	const FPCGStack* Stack = Context->GetStack();
 	const UPCGGraph* CurrentGraph = Stack ? Stack->GetGraphForCurrentFrame() : nullptr;
 
-	TSet<UPCGGraph*> RecursiveGraphs; // warned + skipped once
-	TSet<uint32> DispatchedKeys;      // (graph + overrides) groups already scheduled
+	// Custom input pin labels the user declared. A graph whose Required inputs aren't all covered is skipped.
+	TSet<FName> DeclaredInputLabels;
+	DeclaredInputLabels.Reserve(Settings->CustomInputPins.Num());
+	for (const FPCGPinProperties& Pin : Settings->CustomInputPins) { DeclaredInputLabels.Add(Pin.Label); }
+
+	TSet<UPCGGraph*> RecursiveGraphs;            // warned + skipped once
+	TSet<UPCGGraph*> MissingRequiredInputGraphs; // warned + skipped once
+	TSet<uint32> DispatchedKeys;                 // (graph + overrides) groups already scheduled
 	int32 LoopIndex = 0;
 
 	for (int32 DriverIndex = 0; DriverIndex < Drivers.Num(); ++DriverIndex)
@@ -365,7 +418,7 @@ bool FPCGExDispatchSubgraphElement::ScheduleDispatches(FPCGExDispatchSubgraphCon
 			}
 
 			UPCGGraph* Graph = Context->ResolvedGraphs.FindRef(Path);
-			if (!Graph || RecursiveGraphs.Contains(Graph))
+			if (!Graph || RecursiveGraphs.Contains(Graph) || MissingRequiredInputGraphs.Contains(Graph))
 			{
 				continue;
 			}
@@ -375,6 +428,15 @@ bool FPCGExDispatchSubgraphElement::ScheduleDispatches(FPCGExDispatchSubgraphCon
 			{
 				RecursiveGraphs.Add(Graph);
 				PCGE_LOG_C(Warning, GraphAndLog, Context, FText::FromString(TEXT("Skipped a recursive subgraph reference : ") + Graph->GetName()));
+				continue;
+			}
+
+			// Required-input guard (warn once per graph): a graph with a Required input pin not declared in
+			// Custom Input Pins would run with that input unfed, so skip it rather than execute it starved.
+			if (PCGExDispatchSubgraph::GraphHasUndeclaredRequiredInput(Graph, DeclaredInputLabels))
+			{
+				MissingRequiredInputGraphs.Add(Graph);
+				PCGE_LOG_C(Warning, GraphAndLog, Context, FText::FromString(TEXT("Skipped subgraph with an undeclared required input pin : ") + Graph->GetName()));
 				continue;
 			}
 

@@ -56,8 +56,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Overrides")
 	bool bAutoMatchByName = true;
 
-	/** Explicit source-attribute -> target-parameter remaps, for when the driver attribute name differs from the parameter name.
-	 *  Takes precedence over auto-match. (Point-property sources such as $Transform are not supported yet.) */
+	/** Explicit source -> target-parameter remaps, for when the driver source name differs from the parameter name.
+	 *  Takes precedence over auto-match. The source may be an attribute name or a point-property selector
+	 *  ($Transform, $Density, $Position, ...); point-property sources apply only to point drivers. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Overrides")
 	TMap<FName, FName> OverrideRemap;
 
