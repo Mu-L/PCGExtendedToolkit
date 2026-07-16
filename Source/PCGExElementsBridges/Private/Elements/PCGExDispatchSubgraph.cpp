@@ -9,8 +9,15 @@
 #include "PCGSubgraph.h"
 #include "Data/PCGUserParametersData.h"
 #include "Graph/PCGStackContext.h"
+#include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttribute.h"
+#include "Metadata/Accessors/IPCGAttributeAccessor.h"
+#include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
 #include "Helpers/PCGExBulkAttributeHelpers.h"
 #include "Helpers/PCGExMetaHelpers.h"
+#include "Helpers/PCGExPropertyHelpers.h"
+#include "Types/PCGExTypes.h"
+#include "StructUtils/PropertyBag.h"
 
 #define LOCTEXT_NAMESPACE "PCGExDispatchSubgraphElement"
 #define PCGEX_NAMESPACE DispatchSubgraph
@@ -18,6 +25,70 @@
 namespace PCGExDispatchSubgraph
 {
 	const FName SourceDriversLabel = FName("Drivers");
+
+	// Type-erased per-entry reader for one source attribute on one driver data. Values are read once in
+	// their natural type (BulkReadRows); Hash() feeds the group key, WriteTo() coerces into a param bag.
+	struct IOverrideReader
+	{
+		virtual ~IOverrideReader() = default;
+		virtual uint32 Hash(int32 EntryIndex) const = 0;
+		virtual bool WriteTo(int32 EntryIndex, void* BagMemory, const FProperty* Property) const = 0;
+	};
+
+	template <typename T>
+	struct TOverrideReader final : IOverrideReader
+	{
+		TArray<T> Values;
+
+		virtual uint32 Hash(const int32 EntryIndex) const override
+		{
+			return Values.IsValidIndex(EntryIndex) ? PCGExTypes::ComputeHash(Values[EntryIndex]) : 0;
+		}
+
+		virtual bool WriteTo(const int32 EntryIndex, void* BagMemory, const FProperty* Property) const override
+		{
+			if (!Values.IsValidIndex(EntryIndex))
+			{
+				return false;
+			}
+
+			// Primary: the engine property accessor with broadcast+construct handles targets PCGEx's own
+			// TrySetFPropertyValue does not (FLinearColor, FColor, ...) plus every standard numeric/vector conversion.
+			if (const TUniquePtr<IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreatePropertyAccessor(Property))
+			{
+				void* Containers[1] = {BagMemory};
+				FPCGAttributeAccessorKeysGenericPtrs Keys(Containers);
+				if (Accessor->Set<T>(Values[EntryIndex], Keys, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible))
+				{
+					return true;
+				}
+			}
+
+			// Fallback: targets the accessor doesn't support (e.g. object properties driven by a soft path).
+			return PCGExPropertyHelpers::TrySetFPropertyValue<T>(BagMemory, const_cast<FProperty*>(Property), Values[EntryIndex]);
+		}
+	};
+
+	// Builds a reader for InSourceAttr on InData, or null if the attribute is missing or an unsupported
+	// (container / extended) type. Point-property sources ($Transform, ...) are not handled yet.
+	TSharedPtr<IOverrideReader> MakeOverrideReader(const UPCGData* InData, const FName InSourceAttr)
+	{
+		const UPCGMetadata* Metadata = InData ? InData->ConstMetadata() : nullptr;
+		if (!Metadata)
+		{
+			return nullptr;
+		}
+
+		TSharedPtr<IOverrideReader> Result;
+		PCGExMetaHelpers::ExecuteWithRightType(Metadata->GetConstAttribute(InSourceAttr), [&](auto Dummy)
+		{
+			using T = decltype(Dummy);
+			TSharedPtr<TOverrideReader<T>> Reader = MakeShared<TOverrideReader<T>>();
+			PCGExData::Helpers::BulkReadRows<T>(InData, InSourceAttr, Reader->Values);
+			Result = Reader;
+		});
+		return Result;
+	}
 }
 
 #pragma region Settings
@@ -65,17 +136,26 @@ void FPCGExDispatchSubgraphContext::RegisterAssetDependencies()
 	for (const FPCGTaggedData& TaggedData : Drivers)
 	{
 		TArray<FSoftObjectPath>& Paths = DriverPaths.Emplace_GetRef();
-		if (!TaggedData.Data) { continue; }
+		if (!TaggedData.Data)
+		{
+			continue;
+		}
 
 		PCGExData::Helpers::BulkReadSoftPaths(TaggedData.Data, Settings->GraphPathAttribute, Paths);
 
 		for (const FSoftObjectPath& Path : Paths)
 		{
-			if (Path.IsNull()) { continue; } // empty reference -> ignored, no warning
+			if (Path.IsNull())
+			{
+				continue;
+			} // empty reference -> ignored, no warning
 
 			bool bAlreadyRegistered = false;
 			UniqueGraphPaths.Add(Path, &bAlreadyRegistered);
-			if (!bAlreadyRegistered) { AddAssetDependency(Path); }
+			if (!bAlreadyRegistered)
+			{
+				AddAssetDependency(Path);
+			}
 		}
 	}
 
@@ -86,7 +166,10 @@ void FPCGExDispatchSubgraphContext::AddToReferencedObjects(const FPCGDataCollect
 {
 	for (const FPCGTaggedData& TaggedData : InCollection.TaggedData)
 	{
-		if (TaggedData.Data) { ReferencedObjects.Add(TaggedData.Data); }
+		if (TaggedData.Data)
+		{
+			ReferencedObjects.Add(TaggedData.Data);
+		}
 	}
 }
 
@@ -98,7 +181,10 @@ void FPCGExDispatchSubgraphContext::AddExtraStructReferencedObjects(FReferenceCo
 
 bool FPCGExDispatchSubgraphElement::Boot(FPCGExContext* InContext) const
 {
-	if (!IPCGExElement::Boot(InContext)) { return false; }
+	if (!IPCGExElement::Boot(InContext))
+	{
+		return false;
+	}
 
 	PCGEX_CONTEXT_AND_SETTINGS(DispatchSubgraph)
 	PCGEX_VALIDATE_NAME(Settings->GraphPathAttribute)
@@ -160,60 +246,187 @@ bool FPCGExDispatchSubgraphElement::ScheduleDispatches(FPCGExDispatchSubgraphCon
 		return false;
 	}
 
-	// Unique resolved graphs (deduped by pointer; grouping by overrides comes next).
-	TSet<UPCGGraph*> UniqueGraphs;
-	UniqueGraphs.Reserve(Context->ResolvedGraphs.Num());
-	for (const TPair<FSoftObjectPath, UPCGGraph*>& Pair : Context->ResolvedGraphs)
-	{
-		if (Pair.Value) { UniqueGraphs.Add(Pair.Value); }
-	}
-
-	if (UniqueGraphs.IsEmpty()) { return false; }
+	const TArray<FPCGTaggedData> Drivers = Context->InputData.GetInputsByPin(PCGExDispatchSubgraph::SourceDriversLabel);
 
 	const FPCGStack* Stack = Context->GetStack();
 	const UPCGGraph* CurrentGraph = Stack ? Stack->GetGraphForCurrentFrame() : nullptr;
 
+	TSet<UPCGGraph*> RecursiveGraphs; // warned + skipped once
+	TSet<uint32> DispatchedKeys;      // (graph + overrides) groups already scheduled
 	int32 LoopIndex = 0;
-	for (UPCGGraph* Graph : UniqueGraphs)
-	{
-		const int32 DispatchIndex = LoopIndex++;
 
-		// Recursion guard: never dispatch a graph that is, or contains, the graph currently executing.
-		if ((Stack && Stack->HasObject(Graph)) || (CurrentGraph && Graph->Contains(CurrentGraph)))
+	for (int32 DriverIndex = 0; DriverIndex < Drivers.Num(); ++DriverIndex)
+	{
+		const UPCGData* Data = Drivers[DriverIndex].Data;
+		if (!Data || !Context->DriverPaths.IsValidIndex(DriverIndex))
 		{
-			PCGE_LOG_C(Warning, GraphAndLog, Context, FText::FromString(TEXT("Skipped a recursive subgraph reference : ") + Graph->GetName()));
 			continue;
 		}
 
-		FPCGDataCollection PreGraphData;
-		BuildUserParameters(Context, Graph, PreGraphData);
-		Context->AddToReferencedObjects(PreGraphData);
+		const TArray<FSoftObjectPath>& Paths = Context->DriverPaths[DriverIndex];
 
-		FPCGDataCollection InputData;
-		BuildDispatchInput(Context, Settings, Graph, InputData);
-		Context->AddToReferencedObjects(InputData);
+		// Driver attribute names, for auto-match-by-name.
+		TArray<FName> DriverAttrNames;
+		if (Settings->bAutoMatchByName && Data->ConstMetadata())
+		{
+			TArray<EPCGMetadataTypes> DriverAttrTypes;
+			Data->ConstMetadata()->GetAttributes(DriverAttrNames, DriverAttrTypes);
+		}
 
-		// Distinct invocation stack per dispatch (this node + a not-a-loop index), so the executor
-		// keeps each scheduled subgraph's tasks/outputs distinct.
-		FPCGStack InvocationStack = Stack ? *Stack : FPCGStack();
-		InvocationStack.GetStackFramesMutable().Emplace(Context->Node);
-		InvocationStack.GetStackFramesMutable().Emplace(DispatchIndex);
+		// Lazily built, cached per-attribute readers on this driver data.
+		TMap<FName, TSharedPtr<PCGExDispatchSubgraph::IOverrideReader>> Readers;
+		auto GetReader = [&](const FName Attr) -> TSharedPtr<PCGExDispatchSubgraph::IOverrideReader>
+		{
+			if (const TSharedPtr<PCGExDispatchSubgraph::IOverrideReader>* Found = Readers.Find(Attr))
+			{
+				return *Found;
+			}
+			TSharedPtr<PCGExDispatchSubgraph::IOverrideReader> Reader = PCGExDispatchSubgraph::MakeOverrideReader(Data, Attr);
+			Readers.Add(Attr, Reader);
+			return Reader;
+		};
 
-		const FPCGTaskId TaskId = Context->ScheduleGraph(FPCGScheduleGraphParams(
-			Graph,
-			Context->ExecutionSource.Get(),
-			MakeShared<FPCGInputForwardingElement>(PreGraphData),
-			MakeShared<FPCGInputForwardingElement>(InputData),
-			/*Dependencies=*/{},
-			&InvocationStack,
-			/*bAllowHierarchicalGeneration=*/false));
+		for (int32 EntryIndex = 0; EntryIndex < Paths.Num(); ++EntryIndex)
+		{
+			const FSoftObjectPath& Path = Paths[EntryIndex];
+			if (Path.IsNull())
+			{
+				continue;
+			}
 
-		if (TaskId == InvalidPCGTaskId) { continue; }
+			UPCGGraph* Graph = Context->ResolvedGraphs.FindRef(Path);
+			if (!Graph || RecursiveGraphs.Contains(Graph))
+			{
+				continue;
+			}
 
-		FPCGExDispatchSubgraphContext::FDispatch& Dispatch = Context->Dispatches.Emplace_GetRef();
-		Dispatch.Graph = Graph;
-		Dispatch.TaskId = TaskId;
-		Context->DynamicDependencies.Add(TaskId);
+			// Recursion guard (warn once per graph): never dispatch a graph that is, or contains, the graph currently executing.
+			if ((Stack && Stack->HasObject(Graph)) || (CurrentGraph && Graph->Contains(CurrentGraph)))
+			{
+				RecursiveGraphs.Add(Graph);
+				PCGE_LOG_C(Warning, GraphAndLog, Context, FText::FromString(TEXT("Skipped a recursive subgraph reference : ") + Graph->GetName()));
+				continue;
+			}
+
+			const FInstancedPropertyBag* GraphBag = Graph->GetUserParametersStruct();
+
+			// Resolve the overrides that apply to this (graph, driver-data, entry): a target param that exists
+			// on the graph, fed by a source attribute that exists on the driver data. Remap wins over auto-match.
+			struct FApplied
+			{
+				FName Param;
+				FName Src;
+				const FPropertyBagPropertyDesc* Desc;
+			};
+			TArray<FApplied> Applied;
+			auto TryAddOverride = [&](const FName Param, const FName Src)
+			{
+				if (!GraphBag)
+				{
+					return;
+				}
+				if (Applied.ContainsByPredicate([Param](const FApplied& A)
+				{
+					return A.Param == Param;
+				}))
+				{
+					return;
+				}
+				const FPropertyBagPropertyDesc* Desc = GraphBag->FindPropertyDescByName(Param);
+				if (!Desc || !Desc->CachedProperty)
+				{
+					return;
+				}
+				if (!GetReader(Src).IsValid())
+				{
+					return;
+				}
+				Applied.Add({Param, Src, Desc});
+			};
+
+			for (const TPair<FName, FName>& Remap : Settings->OverrideRemap)
+			{
+				TryAddOverride(Remap.Value, Remap.Key);
+			}
+			if (Settings->bAutoMatchByName)
+			{
+				for (const FName Attr : DriverAttrNames)
+				{
+					TryAddOverride(Attr, Attr);
+				}
+			}
+
+			Applied.Sort([](const FApplied& A, const FApplied& B)
+			{
+				return A.Param.LexicalLess(B.Param);
+			});
+
+			// Group key = graph identity + each applied (param name, per-entry source value).
+			uint32 Key = GetTypeHash(Graph);
+			for (const FApplied& A : Applied)
+			{
+				Key = HashCombineFast(Key, GetTypeHash(A.Param));
+				Key = HashCombineFast(Key, GetReader(A.Src)->Hash(EntryIndex));
+			}
+
+			bool bAlreadyDispatched = false;
+			DispatchedKeys.Add(Key, &bAlreadyDispatched);
+			if (bAlreadyDispatched)
+			{
+				continue;
+			} // identical (graph + overrides) already scheduled
+
+			// Pre-graph user parameters: graph defaults with this entry's overrides written in.
+			FPCGDataCollection PreGraphData;
+			{
+				UPCGUserParametersData* UserParamData = FPCGContext::NewObject_AnyThread<UPCGUserParametersData>(Context);
+				if (GraphBag)
+				{
+					FInstancedPropertyBag Bag = *GraphBag; // copy the defaults
+					void* BagMemory = Bag.GetMutableValue().GetMemory();
+					for (const FApplied& A : Applied)
+					{
+						GetReader(A.Src)->WriteTo(EntryIndex, BagMemory, A.Desc->CachedProperty);
+					}
+					UserParamData->UserParameters = Bag.GetValue();
+				}
+
+				FPCGTaggedData& Tagged = PreGraphData.TaggedData.Emplace_GetRef();
+				Tagged.Data = UserParamData;
+				Tagged.Tags.Add(PCG::Private::UserParameterTagData);
+				Tagged.bPinlessData = true;
+			}
+			Context->AddToReferencedObjects(PreGraphData);
+
+			FPCGDataCollection DispatchInput;
+			BuildDispatchInput(Context, Settings, Graph, DispatchInput);
+			Context->AddToReferencedObjects(DispatchInput);
+
+			// Distinct invocation stack per dispatch (this node + a not-a-loop index), so the executor
+			// keeps each scheduled subgraph's tasks/outputs distinct.
+			FPCGStack InvocationStack = Stack ? *Stack : FPCGStack();
+			InvocationStack.GetStackFramesMutable().Emplace(Context->Node);
+			InvocationStack.GetStackFramesMutable().Emplace(LoopIndex++);
+
+			const FPCGTaskId TaskId = Context->ScheduleGraph(FPCGScheduleGraphParams(
+				Graph,
+				Context->ExecutionSource.Get(),
+				MakeShared<FPCGInputForwardingElement>(PreGraphData),
+				MakeShared<FPCGInputForwardingElement>(DispatchInput),
+				/*Dependencies=*/{},
+				&InvocationStack,
+				/*bAllowHierarchicalGeneration=*/false));
+
+			if (TaskId == InvalidPCGTaskId)
+			{
+				continue;
+			}
+
+			FPCGExDispatchSubgraphContext::FDispatch& Dispatch = Context->Dispatches.Emplace_GetRef();
+			Dispatch.Graph = Graph;
+			Dispatch.TaskId = TaskId;
+			Context->DynamicDependencies.Add(TaskId);
+		}
 	}
 
 	return !Context->Dispatches.IsEmpty();
@@ -223,14 +436,23 @@ void FPCGExDispatchSubgraphElement::GatherDispatchOutputs(FPCGExDispatchSubgraph
 {
 	TSet<FName> CustomOutputLabels;
 	CustomOutputLabels.Reserve(Settings->CustomOutputPins.Num());
-	for (const FPCGPinProperties& Pin : Settings->CustomOutputPins) { CustomOutputLabels.Add(Pin.Label); }
+	for (const FPCGPinProperties& Pin : Settings->CustomOutputPins)
+	{
+		CustomOutputLabels.Add(Pin.Label);
+	}
 
 	for (const FPCGExDispatchSubgraphContext::FDispatch& Dispatch : Context->Dispatches)
 	{
-		if (Dispatch.TaskId == InvalidPCGTaskId) { continue; }
+		if (Dispatch.TaskId == InvalidPCGTaskId)
+		{
+			continue;
+		}
 
 		FPCGDataCollection SubgraphOutput;
-		if (!Context->GetOutputData(Dispatch.TaskId, SubgraphOutput)) { continue; }
+		if (!Context->GetOutputData(Dispatch.TaskId, SubgraphOutput))
+		{
+			continue;
+		}
 
 		// Root the gathered data before clearing the executor's copy: StageOutput(None) records it for
 		// the OnComplete flush but does not GC-root it, and ClearOutputData releases the executor's hold.
@@ -239,7 +461,10 @@ void FPCGExDispatchSubgraphElement::GatherDispatchOutputs(FPCGExDispatchSubgraph
 
 		for (const FPCGTaggedData& TaggedData : SubgraphOutput.TaggedData)
 		{
-			if (!TaggedData.Data) { continue; }
+			if (!TaggedData.Data)
+			{
+				continue;
+			}
 			const FName Pin = CustomOutputLabels.Contains(TaggedData.Pin) ? TaggedData.Pin : PCGPinConstants::DefaultOutputLabel;
 			Context->StageOutput(const_cast<UPCGData*>(TaggedData.Data.Get()), Pin, PCGExData::EStaging::None, TaggedData.Tags);
 		}
@@ -248,35 +473,28 @@ void FPCGExDispatchSubgraphElement::GatherDispatchOutputs(FPCGExDispatchSubgraph
 	}
 }
 
-void FPCGExDispatchSubgraphElement::BuildUserParameters(FPCGExDispatchSubgraphContext* Context, const UPCGGraph* Graph, FPCGDataCollection& OutData) const
-{
-	// Mirrors FPCGSubgraphElement::PrepareSubgraphUserParameters: the internal, pinless data the
-	// subgraph's User Parameter Get nodes read from. Defaults for now; per-dispatch overrides land next.
-	UPCGUserParametersData* UserParamData = FPCGContext::NewObject_AnyThread<UPCGUserParametersData>(Context);
-	if (const FInstancedPropertyBag* Bag = Graph->GetUserParametersStruct())
-	{
-		UserParamData->UserParameters = Bag->GetValue();
-	}
-
-	FPCGTaggedData& Tagged = OutData.TaggedData.Emplace_GetRef();
-	Tagged.Data = UserParamData;
-	Tagged.Tags.Add(PCG::Private::UserParameterTagData);
-	Tagged.bPinlessData = true;
-}
-
 void FPCGExDispatchSubgraphElement::BuildDispatchInput(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings, const UPCGGraph* Graph, FPCGDataCollection& OutData) const
 {
 	// Model C: forward each declared custom input pin whose label matches one of the graph's input pins.
 	// The Drivers pin is never forwarded.
 	const UPCGNode* InputNode = Graph->GetInputNode();
-	if (!InputNode) { return; }
+	if (!InputNode)
+	{
+		return;
+	}
 
 	TSet<FName> GraphInputLabels;
-	for (const FPCGPinProperties& Pin : InputNode->InputPinProperties()) { GraphInputLabels.Add(Pin.Label); }
+	for (const FPCGPinProperties& Pin : InputNode->InputPinProperties())
+	{
+		GraphInputLabels.Add(Pin.Label);
+	}
 
 	for (const FPCGPinProperties& CustomPin : Settings->CustomInputPins)
 	{
-		if (!GraphInputLabels.Contains(CustomPin.Label)) { continue; }
+		if (!GraphInputLabels.Contains(CustomPin.Label))
+		{
+			continue;
+		}
 		OutData.TaggedData.Append(Context->InputData.GetInputsByPin(CustomPin.Label));
 	}
 }

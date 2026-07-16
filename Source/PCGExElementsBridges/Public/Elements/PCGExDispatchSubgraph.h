@@ -16,7 +16,7 @@
 class UPCGGraph;
 
 /**
- * Dispatch Subgraph.
+ * Dispatch Subgraphs.
  * Resolves a PCG subgraph per driver entry (point or attribute-set row) from a soft-path attribute,
  * then executes each unique (graph + overrides) combination once as a dynamic subgraph.
  *
@@ -31,9 +31,13 @@ class UPCGExDispatchSubgraphSettings : public UPCGExSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS(DispatchSubgraph, "Dispatch Subgraph", "Executes a per-entry-resolved PCG subgraph, deduplicated by (graph + overrides).");
+	PCGEX_NODE_INFOS(DispatchSubgraph, "Dispatch Subgraphs", "Executes a per-entry-resolved PCG subgraph, deduplicated by (graph + overrides).");
 
-	virtual EPCGSettingsType GetType() const override { return EPCGSettingsType::ControlFlow; }
+	virtual EPCGSettingsType GetType() const override
+	{
+		return EPCGSettingsType::ControlFlow;
+	}
+
 	virtual FLinearColor GetNodeTitleColor() const override;
 #endif
 
@@ -47,6 +51,15 @@ public:
 	/** Attribute on the Drivers input holding the subgraph reference as a soft object path. Empty values are ignored (no warning). */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FName GraphPathAttribute = FName("AssetPath");
+
+	/** If enabled, any driver attribute whose name exactly matches a subgraph user-parameter is applied as an override. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Overrides")
+	bool bAutoMatchByName = true;
+
+	/** Explicit source-attribute -> target-parameter remaps, for when the driver attribute name differs from the parameter name.
+	 *  Takes precedence over auto-match. (Point-property sources such as $Transform are not supported yet.) */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Overrides")
+	TMap<FName, FName> OverrideRemap;
 
 	/** User-declared input pins, forwarded identically to every dispatched subgraph and matched to the subgraph's inputs by name. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Pins", meta = (TitleProperty = "{Label}"))
@@ -101,21 +114,22 @@ protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(DispatchSubgraph)
 	PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE()
 
-	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+	virtual bool IsCacheable(const UPCGSettings* InSettings) const override
+	{
+		return false;
+	}
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
 
 private:
-	/** Schedules one dynamic subgraph per unique resolved graph. Returns true if at least one was scheduled (and DynamicDependencies were populated). */
+	/** Groups driver entries by (graph + override values) and schedules one dynamic subgraph per unique group.
+	 *  Returns true if at least one was scheduled (and DynamicDependencies were populated). */
 	bool ScheduleDispatches(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings) const;
 
 	/** Gathers each dispatched subgraph's output and routes it to the matching output pin (unmatched -> default Out). */
 	void GatherDispatchOutputs(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings) const;
-
-	/** Builds the pre-graph user-parameters data for a dispatch (graph defaults for now; overrides land next). */
-	void BuildUserParameters(FPCGExDispatchSubgraphContext* Context, const UPCGGraph* Graph, FPCGDataCollection& OutData) const;
 
 	/** Builds the Model-C input for a dispatch: the custom input pins whose labels match the graph's input pins. */
 	void BuildDispatchInput(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings, const UPCGGraph* Graph, FPCGDataCollection& OutData) const;
