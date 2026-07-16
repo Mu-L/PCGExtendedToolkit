@@ -72,6 +72,27 @@ struct FPCGExDispatchSubgraphContext final : FPCGExContext
 
 	/** Loaded subgraphs by path, populated once the async load completes (null value == failed load). */
 	TMap<FSoftObjectPath, UPCGGraph*> ResolvedGraphs;
+
+	/** One scheduled dynamic subgraph execution. */
+	struct FDispatch
+	{
+		UPCGGraph* Graph = nullptr;
+		FPCGTaskId TaskId = InvalidPCGTaskId;
+	};
+
+	/** Scheduled dispatches -- one per unique subgraph (per unique graph + overrides once overrides land). */
+	TArray<FDispatch> Dispatches;
+
+	/** Set once the subgraphs are scheduled; distinguishes the schedule pass from the post-wake gather pass. */
+	bool bDispatched = false;
+
+	/** Forwarded-input and gathered-output data held alive for the context lifetime.
+	 *  FPCGInputForwardingElement does not own its data, and StageOutput(None) does not GC-root it. */
+	TSet<TObjectPtr<const UPCGData>> ReferencedObjects;
+	void AddToReferencedObjects(const FPCGDataCollection& InCollection);
+
+protected:
+	virtual void AddExtraStructReferencedObjects(FReferenceCollector& Collector) override;
 };
 
 class FPCGExDispatchSubgraphElement final : public IPCGExElement
@@ -85,4 +106,17 @@ protected:
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
+
+private:
+	/** Schedules one dynamic subgraph per unique resolved graph. Returns true if at least one was scheduled (and DynamicDependencies were populated). */
+	bool ScheduleDispatches(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings) const;
+
+	/** Gathers each dispatched subgraph's output and routes it to the matching output pin (unmatched -> default Out). */
+	void GatherDispatchOutputs(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings) const;
+
+	/** Builds the pre-graph user-parameters data for a dispatch (graph defaults for now; overrides land next). */
+	void BuildUserParameters(FPCGExDispatchSubgraphContext* Context, const UPCGGraph* Graph, FPCGDataCollection& OutData) const;
+
+	/** Builds the Model-C input for a dispatch: the custom input pins whose labels match the graph's input pins. */
+	void BuildDispatchInput(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings, const UPCGGraph* Graph, FPCGDataCollection& OutData) const;
 };
