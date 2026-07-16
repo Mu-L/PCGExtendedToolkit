@@ -10,18 +10,18 @@
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
 #include "Core/PCGExSettings.h"
+#include "Data/Utils/PCGExDataForwardDetails.h"
 
 #include "PCGExDispatchSubgraph.generated.h"
 
 class UPCGGraph;
+class UPCGGraphInterface;
 
 /**
  * Dispatch Subgraphs.
- * Resolves a PCG subgraph per driver entry (point or attribute-set row) from a soft-path attribute,
- * then executes each unique (graph + overrides) combination once as a dynamic subgraph.
- *
- * Scaffold stage (steps 1-2): resolves and async-loads the driver-referenced subgraphs. The
- * grouping / ScheduleGraph dispatch / DynamicDependencies wait / output-gather is wired next.
+ * Resolves a PCG subgraph (or graph instance) per driver entry (point or attribute-set row) from a
+ * soft-path attribute, then executes each unique (graph + overrides) combination once as a dynamic
+ * subgraph and routes the gathered outputs to matching output pins.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category = "PCGEx|Misc", meta=(Keywords = "subgraph dispatch execute graph dynamic"))
 class UPCGExDispatchSubgraphSettings : public UPCGExSettings
@@ -40,6 +40,13 @@ public:
 
 	virtual FLinearColor GetNodeTitleColor() const override;
 #endif
+
+	// Dispatched graphs are resolved from attribute values at execution time; without this the
+	// dynamic-tracking registrations are dropped by FPCGDynamicTrackingHelper.
+	virtual bool CanDynamicallyTrackKeys() const override
+	{
+		return true;
+	}
 
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
@@ -62,6 +69,18 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Overrides")
 	TMap<FName, FName> OverrideRemap;
 
+	/** Label of the required Drivers input pin. Rename it if a dispatched subgraph declares an input pin
+	 *  with the same label (custom pins colliding with this label are never forwarded). Renaming breaks
+	 *  existing edges on that pin. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Pins", AdvancedDisplay)
+	FName DriversPinLabel = FName("Drivers");
+
+	/** Label of the default output pin (receives subgraph outputs that match no custom output pin).
+	 *  Rename it if it collides with a subgraph output you want routed to a custom pin. Renaming breaks
+	 *  existing edges on that pin. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Pins", AdvancedDisplay)
+	FName OutputPinLabel = FName("Out");
+
 	/** User-declared input pins, forwarded identically to every dispatched subgraph and matched to the subgraph's inputs by name. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Pins", meta = (TitleProperty = "{Label}"))
 	TArray<FPCGPinProperties> CustomInputPins;
@@ -69,12 +88,16 @@ public:
 	/** User-declared output pins. Subgraph outputs are routed here by exact name; anything unmatched goes to the default Out pin. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Pins", meta = (TitleProperty = "{Label}"))
 	TArray<FPCGPinProperties> CustomOutputPins;
+
+	/** Driver attributes promoted to tags on every output of the dispatched subgraph, tying outputs back
+	 *  to their source entry. Entries deduplicated into a shared dispatch tag with the FIRST entry's
+	 *  values (the index tag uses that entry's row index within its driver data). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings)
+	FPCGExAttributeToTagDetails AttributesToTags;
 };
 
 struct FPCGExDispatchSubgraphContext final : FPCGExContext
 {
-	friend class FPCGExDispatchSubgraphElement;
-
 	/** Reads the driver soft-path attribute and registers each unique subgraph as an async asset dependency. */
 	virtual void RegisterAssetDependencies() override;
 
@@ -84,17 +107,20 @@ struct FPCGExDispatchSubgraphContext final : FPCGExContext
 	/** Unique non-null subgraph paths across all drivers -- the set registered for async loading. */
 	TSet<FSoftObjectPath> UniqueGraphPaths;
 
-	/** Loaded subgraphs by path, populated once the async load completes (null value == failed load). */
-	TMap<FSoftObjectPath, UPCGGraph*> ResolvedGraphs;
+	/** Loaded subgraphs (or graph instances) by path, populated once the async load completes
+	 *  (null value == failed load or unusable asset). */
+	TMap<FSoftObjectPath, UPCGGraphInterface*> ResolvedGraphs;
 
 	/** One scheduled dynamic subgraph execution. */
 	struct FDispatch
 	{
-		UPCGGraph* Graph = nullptr;
 		FPCGTaskId TaskId = InvalidPCGTaskId;
+
+		/** Driver tags appended to every output of this dispatch (first deduped entry wins). */
+		TSet<FString> Tags;
 	};
 
-	/** Scheduled dispatches -- one per unique subgraph (per unique graph + overrides once overrides land). */
+	/** Scheduled dispatches -- one per unique (graph + overrides) group. */
 	TArray<FDispatch> Dispatches;
 
 	/** Set once the subgraphs are scheduled; distinguishes the schedule pass from the post-wake gather pass. */
@@ -120,6 +146,14 @@ protected:
 		return false;
 	}
 
+	/** This element populates DynamicDependencies and pauses -- the executor only registers paused-task
+	 *  successors from dependencies visible when ExecuteInternal returns, so a detached AdvanceWork
+	 *  would fill them too late and the node would never be woken (see IPCGExElement). */
+	virtual bool SupportsDetachedExecute() const override
+	{
+		return false;
+	}
+
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
@@ -132,6 +166,8 @@ private:
 	/** Gathers each dispatched subgraph's output and routes it to the matching output pin (unmatched -> default Out). */
 	void GatherDispatchOutputs(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings) const;
 
-	/** Builds the Model-C input for a dispatch: the custom input pins whose labels match the graph's input pins. */
-	void BuildDispatchInput(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings, const UPCGGraph* Graph, FPCGDataCollection& OutData) const;
+	/** Builds the Model-C input for a dispatch: the custom input pins whose labels match the graph's input pins.
+	 *  bMarkUsedMultipleTimes flags the forwarded data as shared (required when 2+ dispatches receive it,
+	 *  or in-subgraph steal paths would mutate data another dispatch still references). */
+	void BuildDispatchInput(FPCGExDispatchSubgraphContext* Context, const UPCGExDispatchSubgraphSettings* Settings, const UPCGGraph* Graph, FPCGDataCollection& OutData, bool bMarkUsedMultipleTimes) const;
 };

@@ -4,6 +4,9 @@
 #pragma once
 
 #include "Metadata/PCGAttributePropertySelector.h"
+#include "Metadata/Accessors/IPCGAttributeAccessor.h"
+#include "Metadata/Accessors/PCGAttributeAccessorHelpers.h"
+#include "Metadata/Accessors/PCGAttributeAccessorKeys.h"
 #include "Types/PCGExTypes.h"
 
 namespace PCGExPropertyHelpers
@@ -86,6 +89,28 @@ MACRO(FStructProperty, FTransform)
 		}
 
 		return false;
+	}
+
+	/** Coerced single-value property write: the engine property accessor first (broadcast + construct
+	 *  covers targets TrySetFPropertyValue does not -- FLinearColor, FColor, ... -- plus every standard
+	 *  numeric/vector conversion), TrySetFPropertyValue as fallback for targets the accessor doesn't
+	 *  support (e.g. object properties driven by a soft path).
+	 *  WARNING: object-typed targets synchronously load the referenced asset on both routes -- resolve
+	 *  or preload beforehand when calling off the game thread. */
+	template <typename T>
+	static bool TrySetFPropertyValueCoerced(void* InContainer, const FProperty* InProperty, const T& InValue)
+	{
+		if (const TUniquePtr<IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreatePropertyAccessor(InProperty))
+		{
+			void* Containers[1] = {InContainer};
+			FPCGAttributeAccessorKeysGenericPtrs Keys(Containers);
+			if (Accessor->Set<T>(InValue, Keys, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible))
+			{
+				return true;
+			}
+		}
+
+		return TrySetFPropertyValue<T>(InContainer, const_cast<FProperty*>(InProperty), InValue);
 	}
 
 	PCGEXCORE_API void CopyStructProperties(const void* SourceStruct, void* TargetStruct, const UStruct* SourceStructType, const UStruct* TargetStructType);

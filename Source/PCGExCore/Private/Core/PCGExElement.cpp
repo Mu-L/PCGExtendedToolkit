@@ -269,7 +269,8 @@ bool IPCGExElement::ExecuteInternal(FPCGContext* Context) const
 	if (IsInGameThread()
 		&& (InSettings->GetForceOffThreadExecute(InContext))
 		&& !InContext->bExecutionDispatchedOffThread
-		&& !CanExecuteOnlyOnMainThread(InContext))
+		&& !CanExecuteOnlyOnMainThread(InContext)
+		&& SupportsDetachedExecute())
 	{
 		InContext->bExecutionDispatchedOffThread = true;
 		InContext->PauseContext();
