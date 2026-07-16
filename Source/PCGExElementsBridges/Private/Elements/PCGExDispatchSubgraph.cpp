@@ -69,9 +69,67 @@ namespace PCGExDispatchSubgraph
 		}
 	};
 
-	// Builds a reader for InSourceAttr on InData, or null if the attribute is missing or an unsupported
-	// (container / extended) type. Point-property sources ($Transform, ...) are not handled yet.
-	TSharedPtr<IOverrideReader> MakeOverrideReader(const UPCGData* InData, const FName InSourceAttr)
+	// Reader for Struct / extended attribute types (e.g. the Struct attributes emitted by the Tuple
+	// node, on points OR param). Reads and writes through the engine's generic accessor: the write is a
+	// same-struct copy into the target parameter; the group hash uses PCG's per-value key.
+	struct FGenericOverrideReader final : IOverrideReader
+	{
+		TUniquePtr<const IPCGAttributeAccessor> SrcAccessor;
+		TSharedPtr<IPCGAttributeAccessorKeys> SrcKeys;
+		const FPCGMetadataAttributeBase* Attr = nullptr;
+		const UPCGBasePointData* PointData = nullptr; // non-null when the driver is point data
+		int32 DriverIndex = 0;
+
+		virtual uint32 Hash(const int32 EntryIndex) const override
+		{
+			// PCG value keys are unique per distinct value but only WITHIN one attribute instance, so we
+			// fold the driver index in. Consequence: Struct/extended-valued dedup is PER DRIVER DATA --
+			// identical values arriving on two separate driver inputs dispatch separately (an
+			// over-dispatch, never a wrong result). [DOC: surface this in the user-facing docs.]
+			const PCGMetadataEntryKey EntryKey = PointData ? PointData->GetMetadataEntry(EntryIndex) : static_cast<PCGMetadataEntryKey>(EntryIndex);
+			return HashCombineFast(static_cast<uint32>(DriverIndex), static_cast<uint32>(Attr->GetValueKey(EntryKey)));
+		}
+
+		virtual bool WriteTo(const int32 EntryIndex, void* BagMemory, const FProperty* Property) const override
+		{
+			if (!SrcAccessor.IsValid() || !SrcKeys.IsValid()) { return false; }
+
+			// bUseGenericAccessor=true builds an FPCGPropertyGenericAccessor, which handles arbitrary
+			// structs (and other extended types) that the typed accessor / TrySetFPropertyValue can't.
+			const TUniquePtr<IPCGAttributeAccessor> TargetAccessor = PCGAttributeAccessorHelpers::CreatePropertyAccessor(Property, /*bUseGenericAccessor=*/true);
+			if (!TargetAccessor) { return false; }
+
+			void* Containers[1] = {BagMemory};
+			FPCGAttributeAccessorKeysGenericPtrs TargetKeys(Containers);
+			return SrcAccessor->CopyTo(*SrcKeys, *TargetAccessor, TargetKeys, /*InputIndex=*/EntryIndex, /*OutputIndex=*/0, /*Count=*/1, EPCGAttributeAccessorFlags::AllowBroadcastAndConstructible);
+		}
+	};
+
+	// Builds a generic reader for a Struct/extended attribute, or null if the engine cannot build a
+	// const accessor for it.
+	TSharedPtr<IOverrideReader> MakeGenericOverrideReader(const UPCGData* InData, const FName InSourceAttr, const FPCGMetadataAttributeBase* InAttr, const int32 InDriverIndex)
+	{
+		FPCGAttributePropertyInputSelector Selector;
+		Selector.Update(InSourceAttr.ToString());
+		Selector = Selector.CopyAndFixLast(InData);
+
+		TUniquePtr<const IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreateConstAccessor(InData, Selector);
+		TSharedPtr<IPCGAttributeAccessorKeys> Keys = PCGExData::Helpers::GetKeys(InData);
+		if (!Accessor || !Keys) { return nullptr; }
+
+		TSharedPtr<FGenericOverrideReader> Reader = MakeShared<FGenericOverrideReader>();
+		Reader->SrcAccessor = MoveTemp(Accessor);
+		Reader->SrcKeys = Keys;
+		Reader->Attr = InAttr;
+		Reader->PointData = Cast<UPCGBasePointData>(InData);
+		Reader->DriverIndex = InDriverIndex;
+		return Reader;
+	}
+
+	// Builds a reader for InSourceAttr on InData, or null if the attribute is missing. Basic single-value
+	// types use the fast typed path (content hash, cross-data dedup); Struct/extended types fall back to
+	// the generic accessor path (per-driver-data dedup -- see FGenericOverrideReader).
+	TSharedPtr<IOverrideReader> MakeOverrideReader(const UPCGData* InData, const FName InSourceAttr, const int32 InDriverIndex)
 	{
 		const UPCGMetadata* Metadata = InData ? InData->ConstMetadata() : nullptr;
 		if (!Metadata)
@@ -79,15 +137,27 @@ namespace PCGExDispatchSubgraph
 			return nullptr;
 		}
 
+		const FPCGMetadataAttributeBase* Attr = Metadata->GetConstAttribute(InSourceAttr);
+		if (!Attr)
+		{
+			return nullptr;
+		}
+
 		TSharedPtr<IOverrideReader> Result;
-		PCGExMetaHelpers::ExecuteWithRightType(Metadata->GetConstAttribute(InSourceAttr), [&](auto Dummy)
+		PCGExMetaHelpers::ExecuteWithRightType(Attr, [&](auto Dummy)
 		{
 			using T = decltype(Dummy);
 			TSharedPtr<TOverrideReader<T>> Reader = MakeShared<TOverrideReader<T>>();
 			PCGExData::Helpers::BulkReadRows<T>(InData, InSourceAttr, Reader->Values);
 			Result = Reader;
 		});
-		return Result;
+		if (Result)
+		{
+			return Result;
+		}
+
+		// Non-basic (Struct / extended) attribute -> generic accessor path.
+		return MakeGenericOverrideReader(InData, InSourceAttr, Attr, InDriverIndex);
 	}
 }
 
@@ -281,7 +351,7 @@ bool FPCGExDispatchSubgraphElement::ScheduleDispatches(FPCGExDispatchSubgraphCon
 			{
 				return *Found;
 			}
-			TSharedPtr<PCGExDispatchSubgraph::IOverrideReader> Reader = PCGExDispatchSubgraph::MakeOverrideReader(Data, Attr);
+			TSharedPtr<PCGExDispatchSubgraph::IOverrideReader> Reader = PCGExDispatchSubgraph::MakeOverrideReader(Data, Attr, DriverIndex);
 			Readers.Add(Attr, Reader);
 			return Reader;
 		};
