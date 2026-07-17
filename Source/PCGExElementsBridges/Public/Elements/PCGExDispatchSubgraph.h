@@ -39,7 +39,6 @@ public:
 	}
 
 	virtual FLinearColor GetNodeTitleColor() const override;
-#endif
 
 	// Dispatched graphs are resolved from attribute values at execution time; without this the
 	// dynamic-tracking registrations are dropped by FPCGDynamicTrackingHelper.
@@ -47,6 +46,7 @@ public:
 	{
 		return true;
 	}
+#endif
 
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
