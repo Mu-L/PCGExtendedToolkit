@@ -7,20 +7,32 @@
 
 using namespace PCGExNoise3D::Math;
 
+void FPCGExNoiseCaustic::PostInit()
+{
+	FPCGExNoise3DOperation::PostInit();
+
+	Layers.SetNum(WaveLayers);
+	for (int32 LayerIndex = 0; LayerIndex < WaveLayers; ++LayerIndex)
+	{
+		// Each layer has a different angle and phase
+		const double AngleOffset = LayerIndex * PI * 2.0 / WaveLayers;
+		const double PhaseOffset = LayerIndex * 1.7;
+
+		FWaveLayer& Layer = Layers[LayerIndex];
+		Layer.CosA = FMath::Cos(AngleOffset);
+		Layer.SinA = FMath::Sin(AngleOffset);
+		Layer.TimeOffset = Time * AnimationSpeed + PhaseOffset;
+	}
+}
+
 double FPCGExNoiseCaustic::GenerateWaveLayer(const FVector& Position, const int32 LayerIndex) const
 {
-	// Each layer has a different angle and phase
-	const double AngleOffset = LayerIndex * PI * 2.0 / WaveLayers;
-	const double PhaseOffset = LayerIndex * 1.7;
-	const double TimeOffset = Time * AnimationSpeed + PhaseOffset;
-
-	// Create wave direction from angle
-	const double CosA = FMath::Cos(AngleOffset);
-	const double SinA = FMath::Sin(AngleOffset);
+	const FWaveLayer& Layer = Layers[LayerIndex];
+	const double TimeOffset = Layer.TimeOffset;
 
 	// Project position onto wave direction
-	const double ProjXY = Position.X * CosA + Position.Y * SinA;
-	const double ProjXZ = Position.X * SinA + Position.Z * CosA;
+	const double ProjXY = Position.X * Layer.CosA + Position.Y * Layer.SinA;
+	const double ProjXZ = Position.X * Layer.SinA + Position.Z * Layer.CosA;
 
 	// Multiple overlapping sine waves for complexity
 	const double Wave1 = FMath::Sin((ProjXY / Wavelength + TimeOffset) * PI * 2.0);

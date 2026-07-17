@@ -16,38 +16,61 @@ double FPCGExNoiseVoronoi::GenerateRaw(const FVector& Position) const
 	double VF1 = TNumericLimits<double>::Max();
 	double VF2 = TNumericLimits<double>::Max();
 	double CellVal = 0.0;
-	FVector ClosestPoint = FVector::ZeroVector;
 
-	// Search 3x3x3 neighborhood
-	for (int32 DZ = -1; DZ <= 1; ++DZ)
+	if (Smoothness > 0.0)
 	{
-		for (int32 DY = -1; DY <= 1; ++DY)
+		// Smooth blend only tracks VF1; VF2/CellVal keep their defaults (matches historical behavior)
+		for (int32 DZ = -1; DZ <= 1; ++DZ)
 		{
-			for (int32 DX = -1; DX <= 1; ++DX)
+			for (int32 DY = -1; DY <= 1; ++DY)
 			{
-				const int32 NX = CellX + DX;
-				const int32 NY = CellY + DY;
-				const int32 NZ = CellZ + DZ;
-
-				const FVector FeaturePoint = GetCellPoint(NX, NY, NZ, Jitter, Seed);
-				const double Dist = FVector::Dist(Position, FeaturePoint);
-
-				if (Smoothness > 0.0)
+				for (int32 DX = -1; DX <= 1; ++DX)
 				{
-					VF1 = SmoothMin(VF1, Dist, Smoothness);
-				}
-				else if (Dist < VF1)
-				{
-					VF2 = VF1;
-					VF1 = Dist;
-					ClosestPoint = FeaturePoint;
-					CellVal = Hash32ToDouble01(Hash32(NX + Seed, NY, NZ));
-				}
-				else if (Dist < VF2)
-				{
-					VF2 = Dist;
+					const FVector FeaturePoint = GetCellPoint(CellX + DX, CellY + DY, CellZ + DZ, Jitter, Seed);
+					VF1 = SmoothMin(VF1, FVector::Dist(Position, FeaturePoint), Smoothness);
 				}
 			}
+		}
+	}
+	else
+	{
+		int32 WinnerX = CellX;
+		int32 WinnerY = CellY;
+		int32 WinnerZ = CellZ;
+
+		// Search 3x3x3 neighborhood
+		for (int32 DZ = -1; DZ <= 1; ++DZ)
+		{
+			for (int32 DY = -1; DY <= 1; ++DY)
+			{
+				for (int32 DX = -1; DX <= 1; ++DX)
+				{
+					const int32 NX = CellX + DX;
+					const int32 NY = CellY + DY;
+					const int32 NZ = CellZ + DZ;
+
+					const FVector FeaturePoint = GetCellPoint(NX, NY, NZ, Jitter, Seed);
+					const double Dist = FVector::Dist(Position, FeaturePoint);
+
+					if (Dist < VF1)
+					{
+						VF2 = VF1;
+						VF1 = Dist;
+						WinnerX = NX;
+						WinnerY = NY;
+						WinnerZ = NZ;
+					}
+					else if (Dist < VF2)
+					{
+						VF2 = Dist;
+					}
+				}
+			}
+		}
+
+		if (OutputMode == EPCGExVoronoiOutput::CellValue)
+		{
+			return Hash32ToDouble01(Hash32(WinnerX + Seed, WinnerY, WinnerZ));
 		}
 	}
 

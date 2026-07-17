@@ -67,9 +67,6 @@ public:
 	// Override GetDouble to use custom fractal implementation
 	virtual double GetDouble(const FVector& Position) const override;
 
-protected:
-	virtual double GenerateRaw(const FVector& Position) const override;
-
 private:
 	double BaseNoise(const FVector& Position) const;
 	double GenerateStandard(const FVector& Position) const;

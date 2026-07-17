@@ -66,10 +66,15 @@ public:
 
 	virtual ~FPCGExNoiseWorley() override = default;
 
+	virtual void PostInit() override;
+
 protected:
 	virtual double GenerateRaw(const FVector& Position) const override;
 
 private:
+	/** Approximate distance normalization for the configured distance function, precomputed in PostInit */
+	double MaxDist = 1.0;
+
 	FORCEINLINE double CalcDistance(const FVector& A, const FVector& B) const
 	{
 		switch (DistanceFunction)

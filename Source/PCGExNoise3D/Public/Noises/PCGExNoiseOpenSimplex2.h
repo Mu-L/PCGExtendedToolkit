@@ -27,6 +27,24 @@ namespace PCGExOpenSimplex2
 		-11, -4, -4, -4, -11, -4, -4, -4, -11,
 		11, -4, -4, 4, -11, -4, 4, -4, -11,
 	};
+
+	/** hash byte -> (hash % 24) * 3, precomputed to keep integer modulo out of the per-corner path */
+	struct FGradIndexTable
+	{
+		uint16 V[256] = {};
+	};
+
+	constexpr FGradIndexTable MakeGradIndexTable()
+	{
+		FGradIndexTable Table{};
+		for (int32 i = 0; i < 256; ++i)
+		{
+			Table.V[i] = static_cast<uint16>(i % 24 * 3);
+		}
+		return Table;
+	}
+
+	inline constexpr FGradIndexTable GradIndexTable = MakeGradIndexTable();
 }
 
 USTRUCT(BlueprintType)
@@ -70,7 +88,7 @@ private:
 			return 0;
 		}
 
-		const int32 GI = PCGExNoise3D::Math::Hash3DSeed(XSV, YSV, ZSV, Seed) % 24 * 3;
+		const int32 GI = PCGExOpenSimplex2::GradIndexTable.V[PCGExNoise3D::Math::Hash3DSeed(XSV, YSV, ZSV, Seed)];
 		const double GX = PCGExOpenSimplex2::Gradients3D[GI];
 		const double GY = PCGExOpenSimplex2::Gradients3D[GI + 1];
 		const double GZ = PCGExOpenSimplex2::Gradients3D[GI + 2];

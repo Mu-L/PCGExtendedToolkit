@@ -35,6 +35,8 @@ namespace PCGExNoise3D
 				continue;
 			}
 
+			Operation->PostInit();
+
 			const double Weight = FMath::Max(SMALL_NUMBER, Factory->ConfigBase.WeightFactor);
 			TotalWeight += Weight;
 
@@ -402,6 +404,57 @@ namespace PCGExNoise3D
 	// Batch generation
 	//
 
+	template <typename ValueType>
+	void FNoiseGenerator::GenerateImpl(const TArrayView<const FVector> Positions, TArrayView<ValueType> OutResults, TArrayView<ValueType> Scratch) const
+	{
+		const int32 Count = Positions.Num();
+
+		// First operation writes directly to output
+		OperationsPtr[0]->Generate(Positions, OutResults);
+
+		// Blend subsequent operations - switch is outside inner loop
+		for (int32 OpIdx = 1; OpIdx < OperationsPtr.Num(); ++OpIdx)
+		{
+			OperationsPtr[OpIdx]->Generate(Positions, Scratch);
+			BlendBatch(BlendModes[OpIdx], OutResults.GetData(), Scratch.GetData(), Count, BlendFactors[OpIdx]);
+		}
+	}
+
+	template <typename ValueType>
+	void FNoiseGenerator::GenerateParallelImpl(const TArrayView<const FVector> Positions, TArrayView<ValueType> OutResults, const int32 MinBatchSize) const
+	{
+		check(Positions.Num() == OutResults.Num());
+
+		const int32 Count = Positions.Num();
+		if (Count < MinBatchSize * 2 || Operations.IsEmpty())
+		{
+			Generate(Positions, OutResults);
+			return;
+		}
+
+		// Chunked so each task runs the batch path; single scratch allocation sliced per chunk
+		const int32 ChunkSize = FMath::Max(1, MinBatchSize);
+		const int32 NumChunks = FMath::DivideAndRoundUp(Count, ChunkSize);
+
+		TArray<ValueType> Scratch;
+		ValueType* ScratchData = nullptr;
+		if (Operations.Num() > 1)
+		{
+			Scratch.SetNumUninitialized(Count);
+			ScratchData = Scratch.GetData();
+		}
+
+		ParallelFor(NumChunks, [&](const int32 ChunkIndex)
+		{
+			const int32 Start = ChunkIndex * ChunkSize;
+			const int32 Num = FMath::Min(ChunkSize, Count - Start);
+			GenerateImpl(
+				Positions.Slice(Start, Num),
+				OutResults.Slice(Start, Num),
+				ScratchData ? TArrayView<ValueType>(ScratchData + Start, Num) : TArrayView<ValueType>());
+		});
+	}
+
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<double> OutResults) const
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FNoiseGenerator::GenerateDouble);
@@ -414,28 +467,13 @@ namespace PCGExNoise3D
 			return;
 		}
 
-		const int32 Count = Positions.Num();
-
-		// Fast path for single operation
-		if (Operations.Num() == 1)
+		TArray<double> Scratch;
+		if (Operations.Num() > 1)
 		{
-			OperationsPtr[0]->Generate(Positions, OutResults);
-			return;
+			Scratch.SetNumUninitialized(Positions.Num());
 		}
 
-		// Multiple operations - need temp storage
-		TArray<double> TempBuffer;
-		TempBuffer.SetNumUninitialized(Count);
-
-		// First operation
-		OperationsPtr[0]->Generate(Positions, OutResults);
-
-		// Blend subsequent operations - switch is outside inner loop
-		for (int32 OpIdx = 1; OpIdx < Operations.Num(); ++OpIdx)
-		{
-			OperationsPtr[OpIdx]->Generate(Positions, TempBuffer);
-			BlendBatch(BlendModes[OpIdx], OutResults.GetData(), TempBuffer.GetData(), Count, BlendFactors[OpIdx]);
-		}
+		GenerateImpl<double>(Positions, OutResults, Scratch);
 	}
 
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<FVector2D> OutResults) const
@@ -450,24 +488,13 @@ namespace PCGExNoise3D
 			return;
 		}
 
-		const int32 Count = Positions.Num();
-
-		if (Operations.Num() == 1)
+		TArray<FVector2D> Scratch;
+		if (Operations.Num() > 1)
 		{
-			OperationsPtr[0]->Generate(Positions, OutResults);
-			return;
+			Scratch.SetNumUninitialized(Positions.Num());
 		}
 
-		TArray<FVector2D> TempBuffer;
-		TempBuffer.SetNumUninitialized(Count);
-
-		OperationsPtr[0]->Generate(Positions, OutResults);
-
-		for (int32 OpIdx = 1; OpIdx < Operations.Num(); ++OpIdx)
-		{
-			OperationsPtr[OpIdx]->Generate(Positions, TempBuffer);
-			BlendBatch(BlendModes[OpIdx], OutResults.GetData(), TempBuffer.GetData(), Count, BlendFactors[OpIdx]);
-		}
+		GenerateImpl<FVector2D>(Positions, OutResults, Scratch);
 	}
 
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<FVector> OutResults) const
@@ -482,24 +509,13 @@ namespace PCGExNoise3D
 			return;
 		}
 
-		const int32 Count = Positions.Num();
-
-		if (Operations.Num() == 1)
+		TArray<FVector> Scratch;
+		if (Operations.Num() > 1)
 		{
-			OperationsPtr[0]->Generate(Positions, OutResults);
-			return;
+			Scratch.SetNumUninitialized(Positions.Num());
 		}
 
-		TArray<FVector> TempBuffer;
-		TempBuffer.SetNumUninitialized(Count);
-
-		OperationsPtr[0]->Generate(Positions, OutResults);
-
-		for (int32 OpIdx = 1; OpIdx < Operations.Num(); ++OpIdx)
-		{
-			OperationsPtr[OpIdx]->Generate(Positions, TempBuffer);
-			BlendBatch(BlendModes[OpIdx], OutResults.GetData(), TempBuffer.GetData(), Count, BlendFactors[OpIdx]);
-		}
+		GenerateImpl<FVector>(Positions, OutResults, Scratch);
 	}
 
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<FVector4> OutResults) const
@@ -514,24 +530,13 @@ namespace PCGExNoise3D
 			return;
 		}
 
-		const int32 Count = Positions.Num();
-
-		if (Operations.Num() == 1)
+		TArray<FVector4> Scratch;
+		if (Operations.Num() > 1)
 		{
-			OperationsPtr[0]->Generate(Positions, OutResults);
-			return;
+			Scratch.SetNumUninitialized(Positions.Num());
 		}
 
-		TArray<FVector4> TempBuffer;
-		TempBuffer.SetNumUninitialized(Count);
-
-		OperationsPtr[0]->Generate(Positions, OutResults);
-
-		for (int32 OpIdx = 1; OpIdx < Operations.Num(); ++OpIdx)
-		{
-			OperationsPtr[OpIdx]->Generate(Positions, TempBuffer);
-			BlendBatch(BlendModes[OpIdx], OutResults.GetData(), TempBuffer.GetData(), Count, BlendFactors[OpIdx]);
-		}
+		GenerateImpl<FVector4>(Positions, OutResults, Scratch);
 	}
 
 	//
@@ -540,70 +545,22 @@ namespace PCGExNoise3D
 
 	void FNoiseGenerator::GenerateParallel(const TArrayView<const FVector> Positions, TArrayView<double> OutResults, const int32 MinBatchSize) const
 	{
-		check(Positions.Num() == OutResults.Num());
-
-		const int32 Count = Positions.Num();
-		if (Count < MinBatchSize * 2 || Operations.IsEmpty())
-		{
-			Generate(Positions, OutResults);
-			return;
-		}
-
-		ParallelFor(Count, [&](const int32 Index)
-		{
-			OutResults[Index] = GetDouble(Positions[Index]);
-		}, Count < MinBatchSize);
+		GenerateParallelImpl<double>(Positions, OutResults, MinBatchSize);
 	}
 
 	void FNoiseGenerator::GenerateParallel(const TArrayView<const FVector> Positions, TArrayView<FVector2D> OutResults, const int32 MinBatchSize) const
 	{
-		check(Positions.Num() == OutResults.Num());
-
-		const int32 Count = Positions.Num();
-		if (Count < MinBatchSize * 2 || Operations.IsEmpty())
-		{
-			Generate(Positions, OutResults);
-			return;
-		}
-
-		ParallelFor(Count, [&](const int32 Index)
-		{
-			OutResults[Index] = GetVector2D(Positions[Index]);
-		}, Count < MinBatchSize);
+		GenerateParallelImpl<FVector2D>(Positions, OutResults, MinBatchSize);
 	}
 
 	void FNoiseGenerator::GenerateParallel(const TArrayView<const FVector> Positions, TArrayView<FVector> OutResults, const int32 MinBatchSize) const
 	{
-		check(Positions.Num() == OutResults.Num());
-
-		const int32 Count = Positions.Num();
-		if (Count < MinBatchSize * 2 || Operations.IsEmpty())
-		{
-			Generate(Positions, OutResults);
-			return;
-		}
-
-		ParallelFor(Count, [&](const int32 Index)
-		{
-			OutResults[Index] = GetVector(Positions[Index]);
-		}, Count < MinBatchSize);
+		GenerateParallelImpl<FVector>(Positions, OutResults, MinBatchSize);
 	}
 
 	void FNoiseGenerator::GenerateParallel(const TArrayView<const FVector> Positions, TArrayView<FVector4> OutResults, const int32 MinBatchSize) const
 	{
-		check(Positions.Num() == OutResults.Num());
-
-		const int32 Count = Positions.Num();
-		if (Count < MinBatchSize * 2 || Operations.IsEmpty())
-		{
-			Generate(Positions, OutResults);
-			return;
-		}
-
-		ParallelFor(Count, [&](const int32 Index)
-		{
-			OutResults[Index] = GetVector4(Positions[Index]);
-		}, Count < MinBatchSize);
+		GenerateParallelImpl<FVector4>(Positions, OutResults, MinBatchSize);
 	}
 }
 

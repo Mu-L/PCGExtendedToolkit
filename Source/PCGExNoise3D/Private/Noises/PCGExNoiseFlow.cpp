@@ -7,6 +7,29 @@
 
 using namespace PCGExNoise3D::Math;
 
+void FPCGExNoiseFlow::PostInit()
+{
+	FPCGExNoise3DOperation::PostInit();
+
+	for (int32 Hash = 0; Hash < 256; ++Hash)
+	{
+		const FVector BaseGrad = GetGrad3(Hash);
+
+		// Unique rotation rate for this cell, rotated in XY plane
+		const double Rate = HashToDouble(Hash) * RotationSpeed;
+		const double Angle = Time * Rate * 2.0 * PI;
+
+		const double CosA = FMath::Cos(Angle);
+		const double SinA = FMath::Sin(Angle);
+
+		RotatedGradients[Hash] = FVector(
+			BaseGrad.X * CosA - BaseGrad.Y * SinA,
+			BaseGrad.X * SinA + BaseGrad.Y * CosA,
+			BaseGrad.Z
+			);
+	}
+}
+
 double FPCGExNoiseFlow::GenerateRaw(const FVector& Position) const
 {
 	const int32 X0 = FastFloor(Position.X);
@@ -33,15 +56,15 @@ double FPCGExNoiseFlow::GenerateRaw(const FVector& Position) const
 	const int32 BAB = Hash3D(X0S + 1, Y0, Z0 + 1);
 	const int32 BBB = Hash3D(X0S + 1, Y0 + 1, Z0 + 1);
 
-	// Get rotated gradients
-	const FVector G_AAA = GetRotatedGradient(AAA, Time);
-	const FVector G_BAA = GetRotatedGradient(BAA, Time);
-	const FVector G_ABA = GetRotatedGradient(ABA, Time);
-	const FVector G_BBA = GetRotatedGradient(BBA, Time);
-	const FVector G_AAB = GetRotatedGradient(AAB, Time);
-	const FVector G_BAB = GetRotatedGradient(BAB, Time);
-	const FVector G_ABB = GetRotatedGradient(ABB, Time);
-	const FVector G_BBB = GetRotatedGradient(BBB, Time);
+	// Precomputed rotated gradients (see PostInit)
+	const FVector& G_AAA = RotatedGradients[AAA];
+	const FVector& G_BAA = RotatedGradients[BAA];
+	const FVector& G_ABA = RotatedGradients[ABA];
+	const FVector& G_BBA = RotatedGradients[BBA];
+	const FVector& G_AAB = RotatedGradients[AAB];
+	const FVector& G_BAB = RotatedGradients[BAB];
+	const FVector& G_ABB = RotatedGradients[ABB];
+	const FVector& G_BBB = RotatedGradients[BBB];
 
 	// Dot products with rotated gradients
 	const double D_AAA = FVector::DotProduct(G_AAA, FVector(Xf, Yf, Zf));

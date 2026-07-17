@@ -61,6 +61,13 @@ public:
 
 	virtual ~FPCGExNoise3DOperation() override = default;
 
+	/**
+	 * Precompute derived state once all config members are set.
+	 * Called by FNoiseGenerator::Init after the factory's CreateOperation;
+	 * hot paths assume this ran (no lazy computation on sampling threads).
+	 */
+	virtual void PostInit();
+
 	//
 	// Single-point generation (override in derived classes)
 	//
@@ -140,7 +147,7 @@ protected:
 		{
 			Value = RemapLUT->Eval(Value);
 		}
-		if (!FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER))
+		if (bApplyContrast)
 		{
 			Value = PCGExMath::Contrast::ApplyContrast(Value, Contrast, static_cast<int32>(ContrastCurve));
 		}
@@ -152,9 +159,7 @@ protected:
 	 */
 	double GenerateFractal(const FVector& Position) const;
 
-	/** Precomputed fractal normalization factor */
-	mutable double FractalBounding = 1.0;
-	mutable bool bFractalBoundingComputed = false;
-
-	void ComputeFractalBounding() const;
+	/** Precomputed by PostInit */
+	double FractalBounding = 1.0;
+	bool bApplyContrast = false;
 };

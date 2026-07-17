@@ -61,11 +61,23 @@ public:
 
 	virtual ~FPCGExNoiseCaustic() override = default;
 
+	virtual void PostInit() override;
+
 protected:
 	virtual double GenerateRaw(const FVector& Position) const override;
 
 private:
 	double GenerateWaveLayer(const FVector& Position, int32 LayerIndex) const;
+
+	/** Per-layer constants precomputed in PostInit */
+	struct FWaveLayer
+	{
+		double CosA = 1.0;
+		double SinA = 0.0;
+		double TimeOffset = 0.0;
+	};
+
+	TArray<FWaveLayer> Layers;
 };
 
 ////

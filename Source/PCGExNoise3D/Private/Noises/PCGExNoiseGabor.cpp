@@ -7,6 +7,19 @@
 
 using namespace PCGExNoise3D::Math;
 
+void FPCGExNoiseGabor::PostInit()
+{
+	FPCGExNoise3DOperation::PostInit();
+
+	SearchRadius = static_cast<int32>(FMath::CeilToInt(KernelRadius));
+	KernelRadiusSq = KernelRadius * KernelRadius;
+
+	// Impulse count is deterministic: every cell in the search cube contributes ImpulsesPerCell
+	const int32 CellsPerAxis = 2 * SearchRadius + 1;
+	const int32 TotalImpulses = ImpulsesPerCell * CellsPerAxis * CellsPerAxis * CellsPerAxis;
+	Normalization = FMath::Sqrt(1.0 / FMath::Max(TotalImpulses, 1));
+}
+
 double FPCGExNoiseGabor::GenerateRaw(const FVector& Position) const
 {
 	const int32 CellX = FastFloor(Position.X);
@@ -17,10 +30,6 @@ double FPCGExNoiseGabor::GenerateRaw(const FVector& Position) const
 	const double A = Bandwidth;
 
 	double Sum = 0.0;
-	int32 Count = 0;
-
-	// Search cells within kernel radius
-	const int32 SearchRadius = static_cast<int32>(FMath::CeilToInt(KernelRadius));
 
 	for (int32 DZ = -SearchRadius; DZ <= SearchRadius; ++DZ)
 	{
@@ -35,23 +44,18 @@ double FPCGExNoiseGabor::GenerateRaw(const FVector& Position) const
 				// Process impulses in this cell
 				for (int32 i = 0; i < ImpulsesPerCell; ++i)
 				{
-					const FVector ImpulseOffset = RandomImpulse(NX, NY, NZ, i);
+					double Weight = 0.0;
+					const FVector ImpulseOffset = RandomImpulse(NX, NY, NZ, i, Weight);
 					const FVector ImpulsePos = FVector(NX, NY, NZ) + ImpulseOffset;
 					const FVector Delta = Position - ImpulsePos;
 
-					// Random weight for this impulse
-					const uint32 HW = Hash32(NX + i, NY + i, NZ + Seed);
-					const double Weight = Hash32ToDouble01(HW) * 2.0 - 1.0;
-
 					Sum += Weight * GaborKernel(Delta, K, A);
-					Count++;
 				}
 			}
 		}
 	}
 
-	// Normalize
-	return Sum * FMath::Sqrt(1.0 / FMath::Max(Count, 1)) * 0.5 + 0.5;
+	return Sum * Normalization * 0.5 + 0.5;
 }
 
 TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryGabor::CreateOperation(FPCGExContext* InContext) const

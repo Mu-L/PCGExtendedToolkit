@@ -56,13 +56,14 @@ public:
 	virtual FVector GetVector(const FVector& Position) const override;
 	virtual FVector4 GetVector4(const FVector& Position) const override;
 
-protected:
-	virtual double GenerateRaw(const FVector& Position) const override;
-
 private:
 	double BaseNoise(const FVector& Position) const;
 	FVector GetPotentialField(const FVector& Position) const;
 	FVector ComputeCurl(const FVector& Position) const;
+
+	/** Single-component curl paths; must produce the exact same values as the matching ComputeCurl component */
+	double ComputeCurlX(const FVector& Position) const;
+	double ComputeCurlY(const FVector& Position) const;
 };
 
 ////

@@ -7,49 +7,16 @@
 
 using namespace PCGExNoise3D::Math;
 
+namespace PCGExNoiseCurl
+{
+	// Noise-space offsets decorrelating the three potential-field channels
+	const FVector OffsetFy = FVector(31.416, 47.853, 12.793);
+	const FVector OffsetFz = FVector(93.139, 25.186, 71.524);
+}
+
 double FPCGExNoiseCurl::BaseNoise(const FVector& Position) const
 {
-	const int32 X0 = FastFloor(Position.X);
-	const int32 Y0 = FastFloor(Position.Y);
-	const int32 Z0 = FastFloor(Position.Z);
-
-	const double Xf = Position.X - X0;
-	const double Yf = Position.Y - Y0;
-	const double Zf = Position.Z - Z0;
-
-	const double U = SmoothStep(Xf);
-	const double V = SmoothStep(Yf);
-	const double W = SmoothStep(Zf);
-
-	const int32 X0S = (X0 + Seed) & 255;
-
-	const int32 AAA = Hash3D(X0S, Y0, Z0);
-	const int32 ABA = Hash3D(X0S, Y0 + 1, Z0);
-	const int32 AAB = Hash3D(X0S, Y0, Z0 + 1);
-	const int32 ABB = Hash3D(X0S, Y0 + 1, Z0 + 1);
-	const int32 BAA = Hash3D(X0S + 1, Y0, Z0);
-	const int32 BBA = Hash3D(X0S + 1, Y0 + 1, Z0);
-	const int32 BAB = Hash3D(X0S + 1, Y0, Z0 + 1);
-	const int32 BBB = Hash3D(X0S + 1, Y0 + 1, Z0 + 1);
-
-	const double G_AAA = GradDot3(AAA, Xf, Yf, Zf);
-	const double G_BAA = GradDot3(BAA, Xf - 1.0, Yf, Zf);
-	const double G_ABA = GradDot3(ABA, Xf, Yf - 1.0, Zf);
-	const double G_BBA = GradDot3(BBA, Xf - 1.0, Yf - 1.0, Zf);
-	const double G_AAB = GradDot3(AAB, Xf, Yf, Zf - 1.0);
-	const double G_BAB = GradDot3(BAB, Xf - 1.0, Yf, Zf - 1.0);
-	const double G_ABB = GradDot3(ABB, Xf, Yf - 1.0, Zf - 1.0);
-	const double G_BBB = GradDot3(BBB, Xf - 1.0, Yf - 1.0, Zf - 1.0);
-
-	const double X00 = Lerp(G_AAA, G_BAA, U);
-	const double X10 = Lerp(G_ABA, G_BBA, U);
-	const double X01 = Lerp(G_AAB, G_BAB, U);
-	const double X11 = Lerp(G_ABB, G_BBB, U);
-
-	const double XY0 = Lerp(X00, X10, V);
-	const double XY1 = Lerp(X01, X11, V);
-
-	return Lerp(XY0, XY1, W);
+	return Perlin3D(Position, Seed);
 }
 
 FVector FPCGExNoiseCurl::GetPotentialField(const FVector& Position) const
@@ -57,8 +24,8 @@ FVector FPCGExNoiseCurl::GetPotentialField(const FVector& Position) const
 	// Three independent noise channels for potential field
 	const FVector ScaledPos = Position * Frequency;
 	const double Fx = BaseNoise(ScaledPos);
-	const double Fy = BaseNoise(ScaledPos + FVector(31.416, 47.853, 12.793));
-	const double Fz = BaseNoise(ScaledPos + FVector(93.139, 25.186, 71.524));
+	const double Fy = BaseNoise(ScaledPos + PCGExNoiseCurl::OffsetFy);
+	const double Fz = BaseNoise(ScaledPos + PCGExNoiseCurl::OffsetFz);
 	return FVector(Fx, Fy, Fz);
 }
 
@@ -91,47 +58,89 @@ FVector FPCGExNoiseCurl::ComputeCurl(const FVector& Position) const
 		) * CurlScale;
 }
 
-double FPCGExNoiseCurl::GenerateRaw(const FVector& Position) const
+double FPCGExNoiseCurl::ComputeCurlX(const FVector& Position) const
 {
-	// For scalar output, return magnitude of curl
-	const FVector ScaledPos = Position * Frequency;
-
-	// Need a non-const way to compute curl
+	// X component only (dFz/dy - dFy/dz): 4 base samples instead of ComputeCurl's 18
 	const double E = Epsilon;
 	const double InvE2 = 1.0 / (2.0 * E);
 
-	const FVector PxP = GetPotentialField(ScaledPos + FVector(E, 0, 0));
-	const FVector PxN = GetPotentialField(ScaledPos - FVector(E, 0, 0));
-	const FVector PyP = GetPotentialField(ScaledPos + FVector(0, E, 0));
-	const FVector PyN = GetPotentialField(ScaledPos - FVector(0, E, 0));
-	const FVector PzP = GetPotentialField(ScaledPos + FVector(0, 0, E));
-	const FVector PzN = GetPotentialField(ScaledPos - FVector(0, 0, E));
+	const double FzYP = BaseNoise((Position + FVector(0, E, 0)) * Frequency + PCGExNoiseCurl::OffsetFz);
+	const double FzYN = BaseNoise((Position - FVector(0, E, 0)) * Frequency + PCGExNoiseCurl::OffsetFz);
+	const double FyZP = BaseNoise((Position + FVector(0, 0, E)) * Frequency + PCGExNoiseCurl::OffsetFy);
+	const double FyZN = BaseNoise((Position - FVector(0, 0, E)) * Frequency + PCGExNoiseCurl::OffsetFy);
 
-	const double dFz_dy = (PyP.Z - PyN.Z) * InvE2;
-	const double dFy_dz = (PzP.Y - PzN.Y) * InvE2;
-	const double dFx_dz = (PzP.X - PzN.X) * InvE2;
-	const double dFz_dx = (PxP.Z - PxN.Z) * InvE2;
-	const double dFy_dx = (PxP.Y - PxN.Y) * InvE2;
-	const double dFx_dy = (PyP.X - PyN.X) * InvE2;
+	const double dFz_dy = (FzYP - FzYN) * InvE2;
+	const double dFy_dz = (FyZP - FyZN) * InvE2;
 
-	const FVector Curl(
-		dFz_dy - dFy_dz,
-		dFx_dz - dFz_dx,
-		dFy_dx - dFx_dy
-		);
+	return (dFz_dy - dFy_dz) * CurlScale;
+}
 
-	return Curl.Size() * CurlScale;
+double FPCGExNoiseCurl::ComputeCurlY(const FVector& Position) const
+{
+	// Y component only (dFx/dz - dFz/dx)
+	const double E = Epsilon;
+	const double InvE2 = 1.0 / (2.0 * E);
+
+	const double FxZP = BaseNoise((Position + FVector(0, 0, E)) * Frequency);
+	const double FxZN = BaseNoise((Position - FVector(0, 0, E)) * Frequency);
+	const double FzXP = BaseNoise((Position + FVector(E, 0, 0)) * Frequency + PCGExNoiseCurl::OffsetFz);
+	const double FzXN = BaseNoise((Position - FVector(E, 0, 0)) * Frequency + PCGExNoiseCurl::OffsetFz);
+
+	const double dFx_dz = (FxZP - FxZN) * InvE2;
+	const double dFz_dx = (FzXP - FzXN) * InvE2;
+
+	return (dFx_dz - dFz_dx) * CurlScale;
 }
 
 double FPCGExNoiseCurl::GetDouble(const FVector& Position) const
 {
-	return GetVector(Position).X;
+	double CurlX = ComputeCurlX(TransformPosition(Position));
+
+	if (Octaves > 1)
+	{
+		double Amp = 1.0;
+		double Freq = 1.0;
+
+		for (int32 i = 1; i < Octaves; ++i)
+		{
+			Amp *= Persistence;
+			Freq *= Lacunarity;
+			CurlX += ComputeCurlX(Position * Freq) * Amp;
+		}
+
+		CurlX *= FractalBounding;
+	}
+
+	return ApplyRemap(CurlX * 0.5 + 0.5);
 }
 
 FVector2D FPCGExNoiseCurl::GetVector2D(const FVector& Position) const
 {
-	const FVector Curl = GetVector(Position);
-	return FVector2D(Curl);
+	const FVector Transformed = TransformPosition(Position);
+	double CurlX = ComputeCurlX(Transformed);
+	double CurlY = ComputeCurlY(Transformed);
+
+	if (Octaves > 1)
+	{
+		double Amp = 1.0;
+		double Freq = 1.0;
+
+		for (int32 i = 1; i < Octaves; ++i)
+		{
+			Amp *= Persistence;
+			Freq *= Lacunarity;
+			CurlX += ComputeCurlX(Position * Freq) * Amp;
+			CurlY += ComputeCurlY(Position * Freq) * Amp;
+		}
+
+		CurlX *= FractalBounding;
+		CurlY *= FractalBounding;
+	}
+
+	return FVector2D(
+		ApplyRemap(CurlX * 0.5 + 0.5),
+		ApplyRemap(CurlY * 0.5 + 0.5)
+		);
 }
 
 FVector FPCGExNoiseCurl::GetVector(const FVector& Position) const
@@ -143,9 +152,6 @@ FVector FPCGExNoiseCurl::GetVector(const FVector& Position) const
 	{
 		double Amp = 1.0;
 		double Freq = 1.0;
-		const double Bounding = CalcFractalBounding(Octaves, Persistence);
-
-		Curl *= Amp;
 
 		for (int32 i = 1; i < Octaves; ++i)
 		{
@@ -154,7 +160,7 @@ FVector FPCGExNoiseCurl::GetVector(const FVector& Position) const
 			Curl += ComputeCurl(Position * Freq) * Amp;
 		}
 
-		Curl *= Bounding;
+		Curl *= FractalBounding;
 	}
 
 	for (int i = 0; i < 3; i++)

@@ -75,9 +75,10 @@ protected:
 	virtual double GenerateRaw(const FVector& Position) const override;
 
 private:
-	FVector GetSpotCenter(int32 CellX, int32 CellY, int32 CellZ) const;
-	double GetSpotRadius(int32 CellX, int32 CellY, int32 CellZ) const;
-	double GetSpotValue(int32 CellX, int32 CellY, int32 CellZ) const;
+	// All per-cell randomness derives from one hash: bit lanes for the center, remix channels for radius/value
+	FVector GetSpotCenter(int32 CellX, int32 CellY, int32 CellZ, uint32 CellHash) const;
+	double GetSpotRadius(uint32 CellHash) const;
+	double GetSpotValue(uint32 CellHash) const;
 	double ComputeShapeDistance(const FVector& Offset, double Radius) const;
 };
 

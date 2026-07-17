@@ -51,30 +51,14 @@ public:
 
 	virtual ~FPCGExNoiseFlow() override = default;
 
+	virtual void PostInit() override;
+
 protected:
 	virtual double GenerateRaw(const FVector& Position) const override;
 
 private:
-	/** Get rotated gradient based on time */
-	FORCEINLINE FVector GetRotatedGradient(int32 Hash, double T) const
-	{
-		// Get base gradient
-		const FVector BaseGrad = PCGExNoise3D::Math::GetGrad3(Hash);
-
-		// Get unique rotation rate for this cell
-		const double Rate = PCGExNoise3D::Math::HashToDouble(Hash) * RotationSpeed;
-		const double Angle = T * Rate * 2.0 * PI;
-
-		// Rotate in XY plane (could extend to full 3D rotation)
-		const double CosA = FMath::Cos(Angle);
-		const double SinA = FMath::Sin(Angle);
-
-		return FVector(
-			BaseGrad.X * CosA - BaseGrad.Y * SinA,
-			BaseGrad.X * SinA + BaseGrad.Y * CosA,
-			BaseGrad.Z
-			);
-	}
+	/** Time-rotated gradient per hash byte; Time/RotationSpeed are constant per operation so this is exhaustive */
+	FVector RotatedGradients[256];
 };
 
 ////

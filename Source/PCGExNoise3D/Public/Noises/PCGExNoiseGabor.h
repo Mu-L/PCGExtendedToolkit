@@ -51,14 +51,21 @@ public:
 
 	virtual ~FPCGExNoiseGabor() override = default;
 
+	virtual void PostInit() override;
+
 protected:
 	virtual double GenerateRaw(const FVector& Position) const override;
 
 private:
+	/** Precomputed in PostInit */
+	int32 SearchRadius = 2;
+	double KernelRadiusSq = 2.25;
+	double Normalization = 1.0;
+
 	FORCEINLINE double GaborKernel(const FVector& Offset, double K, double A) const
 	{
 		const double R2 = Offset.SizeSquared();
-		if (R2 > KernelRadius * KernelRadius)
+		if (R2 > KernelRadiusSq)
 		{
 			return 0.0;
 		}
@@ -72,17 +79,12 @@ private:
 		return Gaussian * FMath::Cos(Phase);
 	}
 
-	FORCEINLINE FVector RandomImpulse(int32 CellX, int32 CellY, int32 CellZ, int32 Idx) const
+	/** Offset within the cell + signed weight, both derived from a single hash */
+	FORCEINLINE FVector RandomImpulse(int32 CellX, int32 CellY, int32 CellZ, int32 Idx, double& OutWeight) const
 	{
-		const uint32 H1 = PCGExNoise3D::Math::Hash32(CellX + Seed, CellY + Idx, CellZ);
-		const uint32 H2 = PCGExNoise3D::Math::Hash32(CellX + Idx, CellY + Seed, CellZ);
-		const uint32 H3 = PCGExNoise3D::Math::Hash32(CellX, CellY, CellZ + Seed + Idx);
-
-		return FVector(
-			PCGExNoise3D::Math::Hash32ToDouble01(H1),
-			PCGExNoise3D::Math::Hash32ToDouble01(H2),
-			PCGExNoise3D::Math::Hash32ToDouble01(H3)
-			);
+		const uint32 H = PCGExNoise3D::Math::Hash32(CellX + Seed, CellY + Idx, CellZ);
+		OutWeight = PCGExNoise3D::Math::Hash32ToDouble01(PCGExNoise3D::Math::Hash32Remix(H)) * 2.0 - 1.0;
+		return PCGExNoise3D::Math::Hash32ToVector01(H);
 	}
 };
 

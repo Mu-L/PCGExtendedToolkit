@@ -108,8 +108,6 @@ double FPCGExNoiseSwiss::GetDouble(const FVector& Position) const
 	double Freq = Frequency;
 	FVector DerivSum = FVector::ZeroVector;
 
-	const double Bounding = CalcFractalBounding(Octaves, Persistence);
-
 	for (int32 i = 0; i < Octaves; ++i)
 	{
 		// Warp position based on accumulated derivatives
@@ -130,7 +128,7 @@ double FPCGExNoiseSwiss::GetDouble(const FVector& Position) const
 		Freq *= Lacunarity;
 	}
 
-	return ApplyRemap(Sum * Bounding * 0.5 + 0.5);
+	return ApplyRemap(Sum * FractalBounding * 0.5 + 0.5);
 }
 
 TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactorySwiss::CreateOperation(FPCGExContext* InContext) const
