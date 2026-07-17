@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseMarble.h"
@@ -7,9 +7,19 @@
 
 using namespace PCGExNoise3D::Math;
 
-double FPCGExNoiseMarble::BaseNoise(const FVector& Position) const
+void FPCGExNoiseMarble::PostInitDerived()
 {
-	return Perlin3D(Position, Seed);
+	// Property clamps don't apply to override-pin values; <= 0 octaves would divide by zero below
+	TurbulenceOctaves = FMath::Clamp(TurbulenceOctaves, 1, 16);
+
+	double Amp = 1.0;
+	double MaxVal = 0.0;
+	for (int32 i = 0; i < TurbulenceOctaves; ++i)
+	{
+		MaxVal += Amp;
+		Amp *= 0.5;
+	}
+	InvTurbulenceNorm = 1.0 / MaxVal;
 }
 
 double FPCGExNoiseMarble::GenerateTurbulence(const FVector& Position) const
@@ -17,17 +27,15 @@ double FPCGExNoiseMarble::GenerateTurbulence(const FVector& Position) const
 	double Sum = 0.0;
 	double Amp = 1.0;
 	double Freq = 1.0;
-	double MaxVal = 0.0;
 
 	for (int32 i = 0; i < TurbulenceOctaves; ++i)
 	{
-		Sum += FMath::Abs(BaseNoise(Position * Freq)) * Amp;
-		MaxVal += Amp;
+		Sum += FMath::Abs(Perlin3D(Position * Freq, Seed)) * Amp;
 		Amp *= 0.5;
 		Freq *= 2.0;
 	}
 
-	return Sum / MaxVal;
+	return Sum * InvTurbulenceNorm;
 }
 
 double FPCGExNoiseMarble::GenerateRaw(const FVector& Position) const
@@ -68,7 +76,7 @@ double FPCGExNoiseMarble::GenerateRaw(const FVector& Position) const
 	return Result * 0.5 + 0.5;
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryMarble::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryMarble::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoiseMarble)
 	PCGEX_FORWARD_NOISE3D_CONFIG

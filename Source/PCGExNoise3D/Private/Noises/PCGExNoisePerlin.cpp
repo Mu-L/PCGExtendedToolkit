@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoisePerlin.h"
@@ -12,7 +12,7 @@ double FPCGExNoisePerlin::GenerateRaw(const FVector& Position) const
 	return Perlin3D(Position, Seed) * 0.5 + 0.5;
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryPerlin::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryPerlin::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoisePerlin)
 	PCGEX_FORWARD_NOISE3D_CONFIG

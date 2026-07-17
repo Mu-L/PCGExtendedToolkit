@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseFlow.h"
@@ -7,10 +7,8 @@
 
 using namespace PCGExNoise3D::Math;
 
-void FPCGExNoiseFlow::PostInit()
+void FPCGExNoiseFlow::PostInitDerived()
 {
-	FPCGExNoise3DOperation::PostInit();
-
 	for (int32 Hash = 0; Hash < 256; ++Hash)
 	{
 		const FVector BaseGrad = GetGrad3(Hash);
@@ -56,7 +54,6 @@ double FPCGExNoiseFlow::GenerateRaw(const FVector& Position) const
 	const int32 BAB = Hash3D(X0S + 1, Y0, Z0 + 1);
 	const int32 BBB = Hash3D(X0S + 1, Y0 + 1, Z0 + 1);
 
-	// Precomputed rotated gradients (see PostInit)
 	const FVector& G_AAA = RotatedGradients[AAA];
 	const FVector& G_BAA = RotatedGradients[BAA];
 	const FVector& G_ABA = RotatedGradients[ABA];
@@ -88,7 +85,7 @@ double FPCGExNoiseFlow::GenerateRaw(const FVector& Position) const
 	return Lerp(XY0, XY1, W) * 0.5 + 0.5;
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryFlow::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryFlow::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoiseFlow)
 	PCGEX_FORWARD_NOISE3D_CONFIG

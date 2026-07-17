@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseVoronoi.h"
@@ -15,11 +15,10 @@ double FPCGExNoiseVoronoi::GenerateRaw(const FVector& Position) const
 
 	double VF1 = TNumericLimits<double>::Max();
 	double VF2 = TNumericLimits<double>::Max();
-	double CellVal = 0.0;
 
 	if (Smoothness > 0.0)
 	{
-		// Smooth blend only tracks VF1; VF2/CellVal keep their defaults (matches historical behavior)
+		// Smooth blend only tracks VF1; VF2 keeps its default (matches historical behavior)
 		for (int32 DZ = -1; DZ <= 1; ++DZ)
 		{
 			for (int32 DY = -1; DY <= 1; ++DY)
@@ -81,9 +80,6 @@ double FPCGExNoiseVoronoi::GenerateRaw(const FVector& Position) const
 	double Result;
 	switch (OutputMode)
 	{
-	case EPCGExVoronoiOutput::CellValue:
-		Result = CellVal;
-		break;
 	case EPCGExVoronoiOutput::Distance:
 		Result = VF1;
 		break;
@@ -98,13 +94,14 @@ double FPCGExNoiseVoronoi::GenerateRaw(const FVector& Position) const
 		Result = VF2 - VF1;
 		break;
 	default:
-		Result = CellVal;
+		// CellValue in smooth mode has no winner to hash (historical behavior)
+		Result = 0.0;
 	}
 
 	return Result;
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryVoronoi::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryVoronoi::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoiseVoronoi)
 	PCGEX_FORWARD_NOISE3D_CONFIG

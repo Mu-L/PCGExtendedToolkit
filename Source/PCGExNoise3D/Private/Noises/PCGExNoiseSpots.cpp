@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseSpots.h"
@@ -91,7 +91,6 @@ double FPCGExNoiseSpots::GenerateRaw(const FVector& Position) const
 
 	double MinDist = 1.0;
 	uint32 WinnerHash = 0;
-	bool bHasWinner = false;
 
 	// Check 3x3x3 neighborhood for overlapping spots
 	for (int32 DZ = -1; DZ <= 1; ++DZ)
@@ -115,13 +114,13 @@ double FPCGExNoiseSpots::GenerateRaw(const FVector& Position) const
 				{
 					MinDist = Dist;
 					WinnerHash = CellHash;
-					bHasWinner = true;
 				}
 			}
 		}
 	}
 
-	const double SpotVal = bHasWinner ? GetSpotValue(WinnerHash) : 0.0;
+	// MinDist below its 1.0 sentinel means a spot claimed this position
+	const double SpotVal = MinDist < 1.0 ? GetSpotValue(WinnerHash) : 0.0;
 
 	// Convert distance to value
 	double Result;
@@ -144,7 +143,7 @@ double FPCGExNoiseSpots::GenerateRaw(const FVector& Position) const
 	return Result;
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactorySpots::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactorySpots::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoiseSpots)
 	PCGEX_FORWARD_NOISE3D_CONFIG

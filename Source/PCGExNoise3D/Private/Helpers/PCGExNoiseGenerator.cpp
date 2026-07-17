@@ -2,7 +2,7 @@
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Helpers/PCGExNoiseGenerator.h"
-#include "Async/ParallelFor.h"
+#include "Core/PCGExMTCommon.h"
 #include "Core/PCGExNoise3DFactoryProvider.h"
 #include "Core/PCGExNoise3DOperation.h"
 
@@ -34,8 +34,6 @@ namespace PCGExNoise3D
 			{
 				continue;
 			}
-
-			Operation->PostInit();
 
 			const double Weight = FMath::Max(SMALL_NUMBER, Factory->ConfigBase.WeightFactor);
 			TotalWeight += Weight;
@@ -409,15 +407,34 @@ namespace PCGExNoise3D
 	{
 		const int32 Count = Positions.Num();
 
-		// First operation writes directly to output
 		OperationsPtr[0]->Generate(Positions, OutResults);
 
-		// Blend subsequent operations - switch is outside inner loop
+		// BlendBatch keeps the mode switch outside the per-element loop
 		for (int32 OpIdx = 1; OpIdx < OperationsPtr.Num(); ++OpIdx)
 		{
 			OperationsPtr[OpIdx]->Generate(Positions, Scratch);
 			BlendBatch(BlendModes[OpIdx], OutResults.GetData(), Scratch.GetData(), Count, BlendFactors[OpIdx]);
 		}
+	}
+
+	template <typename ValueType>
+	void FNoiseGenerator::GenerateTyped(const TArrayView<const FVector> Positions, TArrayView<ValueType> OutResults) const
+	{
+		check(Positions.Num() == OutResults.Num());
+
+		if (Operations.IsEmpty())
+		{
+			FMemory::Memzero(OutResults.GetData(), OutResults.Num() * sizeof(ValueType));
+			return;
+		}
+
+		TArray<ValueType> Scratch;
+		if (Operations.Num() > 1)
+		{
+			Scratch.SetNumUninitialized(Positions.Num());
+		}
+
+		GenerateImpl<ValueType>(Positions, OutResults, Scratch);
 	}
 
 	template <typename ValueType>
@@ -428,14 +445,11 @@ namespace PCGExNoise3D
 		const int32 Count = Positions.Num();
 		if (Count < MinBatchSize * 2 || Operations.IsEmpty())
 		{
-			Generate(Positions, OutResults);
+			GenerateTyped(Positions, OutResults);
 			return;
 		}
 
-		// Chunked so each task runs the batch path; single scratch allocation sliced per chunk
-		const int32 ChunkSize = FMath::Max(1, MinBatchSize);
-		const int32 NumChunks = FMath::DivideAndRoundUp(Count, ChunkSize);
-
+		// Single scratch allocation sliced per scope so every worker runs the batch path
 		TArray<ValueType> Scratch;
 		ValueType* ScratchData = nullptr;
 		if (Operations.Num() > 1)
@@ -444,99 +458,37 @@ namespace PCGExNoise3D
 			ScratchData = Scratch.GetData();
 		}
 
-		ParallelFor(NumChunks, [&](const int32 ChunkIndex)
+		PCGExMT::ParallelOrSequentialScoped(Count, [&](const PCGExMT::FScope& Scope)
 		{
-			const int32 Start = ChunkIndex * ChunkSize;
-			const int32 Num = FMath::Min(ChunkSize, Count - Start);
 			GenerateImpl(
-				Positions.Slice(Start, Num),
-				OutResults.Slice(Start, Num),
-				ScratchData ? TArrayView<ValueType>(ScratchData + Start, Num) : TArrayView<ValueType>());
-		});
+				Positions.Slice(Scope.Start, Scope.Count),
+				OutResults.Slice(Scope.Start, Scope.Count),
+				ScratchData ? TArrayView<ValueType>(ScratchData + Scope.Start, Scope.Count) : TArrayView<ValueType>());
+		}, MinBatchSize * 2);
 	}
 
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<double> OutResults) const
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FNoiseGenerator::GenerateDouble);
-
-		check(Positions.Num() == OutResults.Num());
-
-		if (Operations.IsEmpty())
-		{
-			FMemory::Memzero(OutResults.GetData(), OutResults.Num() * sizeof(double));
-			return;
-		}
-
-		TArray<double> Scratch;
-		if (Operations.Num() > 1)
-		{
-			Scratch.SetNumUninitialized(Positions.Num());
-		}
-
-		GenerateImpl<double>(Positions, OutResults, Scratch);
+		GenerateTyped<double>(Positions, OutResults);
 	}
 
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<FVector2D> OutResults) const
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FNoiseGenerator::GenerateVector2);
-
-		check(Positions.Num() == OutResults.Num());
-
-		if (Operations.IsEmpty())
-		{
-			FMemory::Memzero(OutResults.GetData(), OutResults.Num() * sizeof(FVector2D));
-			return;
-		}
-
-		TArray<FVector2D> Scratch;
-		if (Operations.Num() > 1)
-		{
-			Scratch.SetNumUninitialized(Positions.Num());
-		}
-
-		GenerateImpl<FVector2D>(Positions, OutResults, Scratch);
+		GenerateTyped<FVector2D>(Positions, OutResults);
 	}
 
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<FVector> OutResults) const
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FNoiseGenerator::GenerateVector);
-
-		check(Positions.Num() == OutResults.Num());
-
-		if (Operations.IsEmpty())
-		{
-			FMemory::Memzero(OutResults.GetData(), OutResults.Num() * sizeof(FVector));
-			return;
-		}
-
-		TArray<FVector> Scratch;
-		if (Operations.Num() > 1)
-		{
-			Scratch.SetNumUninitialized(Positions.Num());
-		}
-
-		GenerateImpl<FVector>(Positions, OutResults, Scratch);
+		GenerateTyped<FVector>(Positions, OutResults);
 	}
 
 	void FNoiseGenerator::Generate(const TArrayView<const FVector> Positions, TArrayView<FVector4> OutResults) const
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FNoiseGenerator::GenerateVector4);
-
-		check(Positions.Num() == OutResults.Num());
-
-		if (Operations.IsEmpty())
-		{
-			FMemory::Memzero(OutResults.GetData(), OutResults.Num() * sizeof(FVector4));
-			return;
-		}
-
-		TArray<FVector4> Scratch;
-		if (Operations.Num() > 1)
-		{
-			Scratch.SetNumUninitialized(Positions.Num());
-		}
-
-		GenerateImpl<FVector4>(Positions, OutResults, Scratch);
+		GenerateTyped<FVector4>(Positions, OutResults);
 	}
 
 	//

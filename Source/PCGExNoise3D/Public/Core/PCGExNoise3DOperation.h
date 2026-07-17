@@ -62,11 +62,11 @@ public:
 	virtual ~FPCGExNoise3DOperation() override = default;
 
 	/**
-	 * Precompute derived state once all config members are set.
-	 * Called by FNoiseGenerator::Init after the factory's CreateOperation;
-	 * hot paths assume this ran (no lazy computation on sampling threads).
+	 * Finalizes derived state once all config members are set.
+	 * Called by UPCGExNoise3DFactoryData::CreateOperation; hot paths assume it ran
+	 * (no lazy computation on sampling threads).
 	 */
-	virtual void PostInit();
+	void PostInit();
 
 	//
 	// Single-point generation (override in derived classes)
@@ -117,6 +117,11 @@ protected:
 	//
 	// Internal helpers
 	//
+
+	/** Per-noise precompute hook; base state (FractalBounding, bApplyContrast) is already computed when this runs */
+	virtual void PostInitDerived()
+	{
+	}
 
 	/** Transform world position to noise space */
 	FORCEINLINE FVector TransformPosition(const FVector& Position) const

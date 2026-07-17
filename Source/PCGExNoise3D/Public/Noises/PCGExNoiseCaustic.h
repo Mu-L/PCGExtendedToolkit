@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -61,7 +61,7 @@ public:
 
 	virtual ~FPCGExNoiseCaustic() override = default;
 
-	virtual void PostInit() override;
+	virtual void PostInitDerived() override;
 
 protected:
 	virtual double GenerateRaw(const FVector& Position) const override;
@@ -69,7 +69,7 @@ protected:
 private:
 	double GenerateWaveLayer(const FVector& Position, int32 LayerIndex) const;
 
-	/** Per-layer constants precomputed in PostInit */
+	/** Per-layer constants precomputed in PostInitDerived */
 	struct FWaveLayer
 	{
 		double CosA = 1.0;
@@ -78,6 +78,8 @@ private:
 	};
 
 	TArray<FWaveLayer> Layers;
+	double InvWavelength = 1.0;
+	double InvWaveLayers = 1.0;
 };
 
 ////
@@ -91,7 +93,7 @@ public:
 	UPROPERTY()
 	FPCGExNoiseConfigCaustic Config;
 
-	virtual TSharedPtr<FPCGExNoise3DOperation> CreateOperation(FPCGExContext* InContext) const override;
+	virtual TSharedPtr<FPCGExNoise3DOperation> CreateOperationInternal(FPCGExContext* InContext) const override;
 	PCGEX_NOISE3D_FACTORY_BOILERPLATE
 };
 

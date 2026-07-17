@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -51,18 +51,20 @@ public:
 
 	virtual ~FPCGExNoiseGabor() override = default;
 
-	virtual void PostInit() override;
+	virtual void PostInitDerived() override;
 
 protected:
 	virtual double GenerateRaw(const FVector& Position) const override;
 
 private:
-	/** Precomputed in PostInit */
+	/** Precomputed in PostInitDerived */
 	int32 SearchRadius = 2;
 	double KernelRadiusSq = 2.25;
 	double Normalization = 1.0;
+	double GaussCoeff = -PI;
+	double PhaseCoeff = 2.0 * PI;
 
-	FORCEINLINE double GaborKernel(const FVector& Offset, double K, double A) const
+	FORCEINLINE double GaborKernel(const FVector& Offset) const
 	{
 		const double R2 = Offset.SizeSquared();
 		if (R2 > KernelRadiusSq)
@@ -71,10 +73,10 @@ private:
 		}
 
 		// Gaussian envelope
-		const double Gaussian = FMath::Exp(-PI * A * A * R2);
+		const double Gaussian = FMath::Exp(GaussCoeff * R2);
 
 		// Sinusoidal carrier
-		const double Phase = 2.0 * PI * K * FVector::DotProduct(Direction, Offset);
+		const double Phase = PhaseCoeff * FVector::DotProduct(Direction, Offset);
 
 		return Gaussian * FMath::Cos(Phase);
 	}
@@ -99,7 +101,7 @@ public:
 	UPROPERTY()
 	FPCGExNoiseConfigGabor Config;
 
-	virtual TSharedPtr<FPCGExNoise3DOperation> CreateOperation(FPCGExContext* InContext) const override;
+	virtual TSharedPtr<FPCGExNoise3DOperation> CreateOperationInternal(FPCGExContext* InContext) const override;
 	PCGEX_NOISE3D_FACTORY_BOILERPLATE
 };
 

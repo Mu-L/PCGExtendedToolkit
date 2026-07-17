@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseTiling.h"
@@ -83,7 +83,7 @@ double FPCGExNoiseTiling::GetDouble(const FVector& Position) const
 	return ApplyRemap(Sum * FractalBounding * 0.5 + 0.5);
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryTiling::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryTiling::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoiseTiling)
 	PCGEX_FORWARD_NOISE3D_CONFIG

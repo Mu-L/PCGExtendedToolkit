@@ -8,6 +8,7 @@ void FPCGExNoise3DOperation::PostInit()
 {
 	FractalBounding = PCGExNoise3D::Math::CalcFractalBounding(Octaves, Persistence);
 	bApplyContrast = !FMath::IsNearlyEqual(Contrast, 1.0, SMALL_NUMBER);
+	PostInitDerived();
 }
 
 double FPCGExNoise3DOperation::GenerateFractal(const FVector& Position) const

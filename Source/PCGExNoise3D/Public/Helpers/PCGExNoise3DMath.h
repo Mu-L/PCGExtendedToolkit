@@ -67,18 +67,6 @@ namespace PCGExNoise3D
 			return X < Xi ? Xi - 1 : Xi;
 		}
 
-		/** Fast 1D hash */
-		FORCEINLINE uint8 Hash(const int32 X)
-		{
-			return Perm[(X & 255)];
-		}
-
-		/** Fast 2D hash */
-		FORCEINLINE uint8 Hash2D(const int32 X, const int32 Y)
-		{
-			return Perm[(Perm[(X & 255)] + Y) & 255];
-		}
-
 		/** Fast 3D hash */
 		FORCEINLINE uint8 Hash3D(const int32 X, const int32 Y, const int32 Z)
 		{
@@ -157,12 +145,6 @@ namespace PCGExNoise3D
 		FORCEINLINE double Hash32ToDouble01(const uint32 H)
 		{
 			return static_cast<double>(H) / 4294967295.0;
-		}
-
-		/** Convert 32-bit hash to normalized value [0, 1] */
-		FORCEINLINE double Hash32ToDouble(const uint32 H)
-		{
-			return Hash32ToDouble01(H);
 		}
 
 		/**
@@ -247,17 +229,11 @@ namespace PCGExNoise3D
 		// Remapping
 		//
 
-		/** Remap from [-1,1] to [0,1] */
-		FORCEINLINE double RemapTo01(const double Value)
-		{
-			return Value * 0.5 + 0.5;
-		}
-
 		//
 		// Noise Cores
 		//
 
-		/** Classic Perlin gradient noise, output in [-1, 1]. Shared by Perlin/FBM/Curl/Marble. */
+		/** Classic Perlin gradient noise core, output in [-1, 1] */
 		FORCEINLINE double Perlin3D(const FVector& Position, const int32 Seed)
 		{
 			// Find unit cube containing point

@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseWorley.h"
@@ -7,10 +7,8 @@
 
 using namespace PCGExNoise3D::Math;
 
-void FPCGExNoiseWorley::PostInit()
+void FPCGExNoiseWorley::PostInitDerived()
 {
-	FPCGExNoise3DOperation::PostInit();
-
 	// Approximate normalization per distance function
 	MaxDist = 1.0;
 	if (DistanceFunction == EPCGExWorleyDistanceFunc::EuclideanSq ||
@@ -96,7 +94,7 @@ double FPCGExNoiseWorley::GenerateRaw(const FVector& Position) const
 	return Result;
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryWorley::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryWorley::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoiseWorley)
 	PCGEX_FORWARD_NOISE3D_CONFIG

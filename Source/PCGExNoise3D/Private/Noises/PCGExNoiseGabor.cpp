@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Noises/PCGExNoiseGabor.h"
@@ -7,12 +7,12 @@
 
 using namespace PCGExNoise3D::Math;
 
-void FPCGExNoiseGabor::PostInit()
+void FPCGExNoiseGabor::PostInitDerived()
 {
-	FPCGExNoise3DOperation::PostInit();
-
 	SearchRadius = static_cast<int32>(FMath::CeilToInt(KernelRadius));
 	KernelRadiusSq = KernelRadius * KernelRadius;
+	GaussCoeff = -PI * Bandwidth * Bandwidth;
+	PhaseCoeff = 2.0 * PI * (Frequency * Bandwidth);
 
 	// Impulse count is deterministic: every cell in the search cube contributes ImpulsesPerCell
 	const int32 CellsPerAxis = 2 * SearchRadius + 1;
@@ -25,9 +25,6 @@ double FPCGExNoiseGabor::GenerateRaw(const FVector& Position) const
 	const int32 CellX = FastFloor(Position.X);
 	const int32 CellY = FastFloor(Position.Y);
 	const int32 CellZ = FastFloor(Position.Z);
-
-	const double K = Frequency * Bandwidth;
-	const double A = Bandwidth;
 
 	double Sum = 0.0;
 
@@ -49,7 +46,7 @@ double FPCGExNoiseGabor::GenerateRaw(const FVector& Position) const
 					const FVector ImpulsePos = FVector(NX, NY, NZ) + ImpulseOffset;
 					const FVector Delta = Position - ImpulsePos;
 
-					Sum += Weight * GaborKernel(Delta, K, A);
+					Sum += Weight * GaborKernel(Delta);
 				}
 			}
 		}
@@ -58,7 +55,7 @@ double FPCGExNoiseGabor::GenerateRaw(const FVector& Position) const
 	return Sum * Normalization * 0.5 + 0.5;
 }
 
-TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryGabor::CreateOperation(FPCGExContext* InContext) const
+TSharedPtr<FPCGExNoise3DOperation> UPCGExNoise3DFactoryGabor::CreateOperationInternal(FPCGExContext* InContext) const
 {
 	PCGEX_FACTORY_NEW_OPERATION(NoiseGabor)
 	PCGEX_FORWARD_NOISE3D_CONFIG

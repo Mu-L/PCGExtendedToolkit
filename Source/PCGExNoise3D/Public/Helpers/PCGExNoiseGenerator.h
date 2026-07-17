@@ -124,6 +124,9 @@ namespace PCGExNoise3D
 		void GenerateImpl(TArrayView<const FVector> Positions, TArrayView<ValueType> OutResults, TArrayView<ValueType> Scratch) const;
 
 		template <typename ValueType>
+		void GenerateTyped(TArrayView<const FVector> Positions, TArrayView<ValueType> OutResults) const;
+
+		template <typename ValueType>
 		void GenerateParallelImpl(TArrayView<const FVector> Positions, TArrayView<ValueType> OutResults, int32 MinBatchSize) const;
 		//
 		// Single-value blend (used for single-point generation)

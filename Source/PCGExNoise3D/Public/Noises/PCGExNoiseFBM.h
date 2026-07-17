@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Timothé Lapetite and contributors
+// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -68,7 +68,6 @@ public:
 	virtual double GetDouble(const FVector& Position) const override;
 
 private:
-	double BaseNoise(const FVector& Position) const;
 	double GenerateStandard(const FVector& Position) const;
 	double GenerateRidged(const FVector& Position) const;
 	double GenerateBillow(const FVector& Position) const;
@@ -87,7 +86,7 @@ public:
 	UPROPERTY()
 	FPCGExNoiseConfigFBM Config;
 
-	virtual TSharedPtr<FPCGExNoise3DOperation> CreateOperation(FPCGExContext* InContext) const override;
+	virtual TSharedPtr<FPCGExNoise3DOperation> CreateOperationInternal(FPCGExContext* InContext) const override;
 	PCGEX_NOISE3D_FACTORY_BOILERPLATE
 };
 
