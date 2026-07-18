@@ -1,8 +1,10 @@
-![UE 5.8](https://img.shields.io/badge/UE-5.8%20·%205.7-darkgreen)
+<p align="center">
+<img src="https://img.shields.io/badge/UE-5.8%20·%205.7-darkgreen" alt="Supports 5.8 5.7 and earlier versions down to 5.3" />
 <a href="https://github.com/PCGEx/PCGExtendedToolkit/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
 <a href="https://github.com/PCGEx/PCGExtendedToolkit/stargazers"><img src="https://img.shields.io/github/stars/PCGEx/PCGExtendedToolkit?style=social" alt="Stars" /></a>
 <a href="https://github.com/PCGEx/PCGExtendedToolkit/network/members"><img src="https://img.shields.io/github/forks/PCGEx/PCGExtendedToolkit?style=social" alt="Forks" /></a>
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Nebukam/PCGExtendedToolkit)
+<a href="https://deepwiki.com/Nebukam/PCGExtendedToolkit"><img src="https://deepwiki.com/badge.svg" alt="Deep Wiki" /></a>
+</p>
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/Nebukam/PCGExtendedToolkit/refs/heads/docs/_sources/smol-logo.png" alt="PCGEx Logo">
