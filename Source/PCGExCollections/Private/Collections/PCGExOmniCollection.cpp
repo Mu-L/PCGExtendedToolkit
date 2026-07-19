@@ -692,6 +692,99 @@ void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruc
 	});
 }
 
+int32 UPCGExOmniCollection::EDITOR_CleanupUnusedTypeSetup()
+{
+	// Present leaf types -- mirror of EDITOR_EnsureTypeSetup's collection pass.
+	TSet<const PCGExAssetCollection::FTypeInfo*> PresentTypes;
+	ForEachEntry([&PresentTypes](const FPCGExAssetCollectionEntry* Entry, int32)
+	{
+		if (Entry->bIsSubCollection)
+		{
+			return;
+		}
+		if (const PCGExAssetCollection::FTypeInfo* Info = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId()))
+		{
+			PresentTypes.Add(Info);
+		}
+	});
+
+	// Removable = owned by a REGISTERED type that has no present entry. Setup the registry
+	// doesn't know about (unloaded third-party plugin, hand-authored oddity) is kept --
+	// deleting what we can't identify is how user data gets lost.
+	auto FindBlockOwner = [](const UScriptStruct* BlockStruct) -> const PCGExAssetCollection::FTypeInfo*
+	{
+		const PCGExAssetCollection::FTypeInfo* Owner = nullptr;
+		PCGExAssetCollection::FTypeRegistry::Get().ForEach([&Owner, BlockStruct](const PCGExAssetCollection::FTypeInfo& Info)
+		{
+			if (!Owner && Info.GlobalsStruct && BlockStruct->IsChildOf(Info.GlobalsStruct))
+			{
+				Owner = &Info;
+			}
+		});
+		return Owner;
+	};
+
+	auto FindStateOwner = [](const UClass* StateClass) -> const PCGExAssetCollection::FTypeInfo*
+	{
+		const PCGExAssetCollection::FTypeInfo* Owner = nullptr;
+		PCGExAssetCollection::FTypeRegistry::Get().ForEach([&Owner, StateClass](const PCGExAssetCollection::FTypeInfo& Info)
+		{
+			if (!Owner && Info.StateClass.IsValid() && StateClass->IsChildOf(Info.StateClass.Get()))
+			{
+				Owner = &Info;
+			}
+		});
+		return Owner;
+	};
+
+	int32 Removed = 0;
+	bool bModified = false;
+
+	auto EnsureModify = [this, &bModified]()
+	{
+		if (!bModified)
+		{
+			Modify();
+			bModified = true;
+		}
+	};
+
+	for (int32 i = TypeGlobals.Num() - 1; i >= 0; --i)
+	{
+		const UScriptStruct* BlockStruct = TypeGlobals[i].GetScriptStruct();
+		const PCGExAssetCollection::FTypeInfo* Owner = BlockStruct ? FindBlockOwner(BlockStruct) : nullptr;
+
+		// Empty blocks are debris; owned blocks go when their type has no entries left.
+		if (!BlockStruct || (Owner && !PresentTypes.Contains(Owner)))
+		{
+			EnsureModify();
+			TypeGlobals.RemoveAt(i);
+			Removed++;
+		}
+	}
+
+	for (int32 i = TypeStates.Num() - 1; i >= 0; --i)
+	{
+		const UPCGExCollectionTypeState* State = TypeStates[i];
+		const PCGExAssetCollection::FTypeInfo* Owner = State ? FindStateOwner(State->GetClass()) : nullptr;
+
+		if (!State || (Owner && !PresentTypes.Contains(Owner)))
+		{
+			EnsureModify();
+			TypeStates.RemoveAt(i);
+			Removed++;
+		}
+	}
+
+	if (Removed > 0)
+	{
+		// Staging reads globals through the seam -- removing blocks changes effective config.
+		PostEditChange();
+	}
+
+	return Removed;
+}
+
 FPCGExAssetCollectionEntry* UPCGExOmniCollection::EDITOR_AddEntry(const UScriptStruct* EntryStruct)
 {
 	// Untyped adds are meaningless on a heterogeneous host -- the caller must pick a type.

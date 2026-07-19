@@ -153,6 +153,16 @@ public:
 	 */
 	bool EDITOR_EnsureTypeSetup();
 
+	/**
+	 * Counterpart affordance (user-triggered, never automatic -- blocks/states may carry
+	 * user edits): remove TypeGlobals blocks and TypeStates whose type has no leaf entry
+	 * left in the collection. Conservative: only setup owned by a REGISTERED type is ever
+	 * removed (unknown/third-party leftovers are kept); empty blocks and null state slots
+	 * count as debris. Fires PostEditChange when anything was removed (staging depends on
+	 * globals). Returns the number of removed items.
+	 */
+	int32 EDITOR_CleanupUnusedTypeSetup();
+
 	virtual void GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
 
 protected:
