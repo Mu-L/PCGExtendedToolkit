@@ -104,6 +104,10 @@ public:
 #if WITH_EDITOR
 	virtual void EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections) override;
 
+	virtual const UScriptStruct* EDITOR_GetEntryScriptStruct(int32 RawIndex) const override;
+	virtual void EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const override;
+	virtual FPCGExAssetCollectionEntry* EDITOR_AddEntry(const UScriptStruct* EntryStruct = nullptr) override;
+
 protected:
 	/**
 	 * Routes each dropped asset to the highest-priority registered type whose

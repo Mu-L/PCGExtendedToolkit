@@ -184,6 +184,8 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	{
 	}
 
+#pragma region Core
+	
 	/**
 	 * Stable identity for external entry references (e.g. variant collections) across source
 	 * edits -- reorder, rename, duplicate. 0 = unassigned. NEVER assign in the ctor: it would
@@ -204,36 +206,11 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 	UPROPERTY(EditAnywhere, Category = Settings)
 	bool bIsSubCollection = false;
-
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
-	EPCGExEntryVariationMode VariationMode = EPCGExEntryVariationMode::None;
-
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Variations", EditCondition="!bIsSubCollection && VariationMode == EPCGExEntryVariationMode::Local", EditConditionHides, ShowOnlyInnerProperties))
-	FPCGExFittingVariations Variations;
-
-	/**
-	 * Where this entry's Scale to Fit comes from when a staging node considers entry overrides.
-	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
-	 */
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
-	EPCGExEntryVariationMode ScaleToFitSource = EPCGExEntryVariationMode::None;
-
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Scale to Fit", EditCondition="!bIsSubCollection && ScaleToFitSource == EPCGExEntryVariationMode::Local", EditConditionHides))
-	FPCGExLeanScaleToFitDetails ScaleToFit;
-
-	/**
-	 * Where this entry's Justification comes from when a staging node considers entry overrides.
-	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
-	 */
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
-	EPCGExEntryVariationMode JustificationSource = EPCGExEntryVariationMode::None;
-
-	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Justification", EditCondition="!bIsSubCollection && JustificationSource == EPCGExEntryVariationMode::Local", EditConditionHides))
-	FPCGExLeanJustificationDetails Justification;
-
-	UPROPERTY(EditAnywhere, Category = Settings)
-	TSet<FName> Tags;
-
+	
+#pragma endregion
+	
+#pragma region Grammar
+	
 	/**
 	 * Property overrides for this entry.
 	 * Values here take precedence over collection-level defaults.
@@ -264,10 +241,46 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 	FPCGExCollectionGrammarDetails CollectionGrammar_DEPRECATED;
 
 #pragma endregion
+	
+#pragma endregion
+
+#pragma region Fitting
+	
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	EPCGExEntryVariationMode VariationMode = EPCGExEntryVariationMode::None;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Variations", EditCondition="!bIsSubCollection && VariationMode == EPCGExEntryVariationMode::Local", EditConditionHides, ShowOnlyInnerProperties))
+	FPCGExFittingVariations Variations;
+
+	/**
+	 * Where this entry's Scale to Fit comes from when a staging node considers entry overrides.
+	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	EPCGExEntryVariationMode ScaleToFitSource = EPCGExEntryVariationMode::None;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Scale to Fit", EditCondition="!bIsSubCollection && ScaleToFitSource == EPCGExEntryVariationMode::Local", EditConditionHides))
+	FPCGExLeanScaleToFitDetails ScaleToFit;
+
+	/**
+	 * Where this entry's Justification comes from when a staging node considers entry overrides.
+	 * None = the node's settings apply; Local = this entry's; Global = the collection's.
+	 */
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
+	EPCGExEntryVariationMode JustificationSource = EPCGExEntryVariationMode::None;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Justification", EditCondition="!bIsSubCollection && JustificationSource == EPCGExEntryVariationMode::Local", EditConditionHides))
+	FPCGExLeanJustificationDetails Justification;
+
+	UPROPERTY(EditAnywhere, Category = Settings)
+	TSet<FName> Tags;
+
 
 	UPROPERTY(EditAnywhere, Category = Settings, meta=(EditCondition="!bIsSubCollection", EditConditionHides))
 	FPCGExAssetStagingData Staging;
 
+#pragma endregion
+	
 	/**
 	 * Subcollection to draw picks from when bIsSubCollection is enabled. Accepts any collection type;
 	 * consuming nodes type-check resolved entries, so mixed-type nesting must be routed through type
@@ -768,6 +781,35 @@ public:
 	{
 		return GetMutableEntryAtRawIndex(Index);
 	}
+
+	/**
+	 * Concrete script struct of the entry payload at the given raw index. Base resolves the
+	 * homogeneous `Entries` array's inner struct (index-independent); heterogeneous
+	 * collections (Omni) resolve per row. Null when the row has no payload or the storage
+	 * isn't a reflected entry array. Editor UI must use this instead of reflecting the
+	 * Entries array inner type directly.
+	 */
+	virtual const UScriptStruct* EDITOR_GetEntryScriptStruct(int32 RawIndex) const;
+
+	/**
+	 * Payload types a grid "+ Add" affordance should offer. Base leaves the array empty,
+	 * meaning entries are added untyped (the collection's single entry struct); heterogeneous
+	 * collections fill it so the UI presents an explicit type choice.
+	 */
+	virtual void EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const
+	{
+	}
+
+	/**
+	 * Append one default-initialized entry. EntryStruct null = the collection's native entry
+	 * type; a non-null EntryStruct must be a type the storage can hold -- base: the Entries
+	 * inner struct or any base of it (the created element is the NATIVE type; callers copy
+	 * the requested-struct portion); Omni: any FPCGExAssetCollectionEntry-derived payload
+	 * (created as exactly that type). Returns the new entry (payload) or null on rejection.
+	 * Doubles as the compatibility arbiter for cross-collection entry transfers.
+	 * Caller owns transaction/Modify/PostEditChange.
+	 */
+	virtual FPCGExAssetCollectionEntry* EDITOR_AddEntry(const UScriptStruct* EntryStruct = nullptr);
 #endif
 
 	/** Get entry by index with pick mode */

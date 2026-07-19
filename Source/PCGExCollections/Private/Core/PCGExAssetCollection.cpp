@@ -2201,4 +2201,41 @@ void UPCGExAssetCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAss
 {
 	// Override in derived classes
 }
+
+const UScriptStruct* UPCGExAssetCollection::EDITOR_GetEntryScriptStruct(int32 RawIndex) const
+{
+	const FArrayProperty* ArrayProp = CastField<FArrayProperty>(GetClass()->FindPropertyByName(FName("Entries")));
+	const FStructProperty* InnerProp = ArrayProp ? CastField<FStructProperty>(ArrayProp->Inner) : nullptr;
+
+	if (InnerProp && InnerProp->Struct && InnerProp->Struct->IsChildOf(FPCGExAssetCollectionEntry::StaticStruct()))
+	{
+		return InnerProp->Struct;
+	}
+
+	return nullptr;
+}
+
+FPCGExAssetCollectionEntry* UPCGExAssetCollection::EDITOR_AddEntry(const UScriptStruct* EntryStruct)
+{
+	FArrayProperty* ArrayProp = CastField<FArrayProperty>(GetClass()->FindPropertyByName(FName("Entries")));
+	const FStructProperty* InnerProp = ArrayProp ? CastField<FStructProperty>(ArrayProp->Inner) : nullptr;
+
+	if (!InnerProp || !InnerProp->Struct || !InnerProp->Struct->IsChildOf(FPCGExAssetCollectionEntry::StaticStruct()))
+	{
+		return nullptr;
+	}
+
+	// Homogeneous storage holds exactly its own entry type; requests for a BASE of it are
+	// also honored (the created element is the native type and the caller copies the base
+	// portion) -- that's how base-typed subcollection rows transfer into typed collections.
+	if (EntryStruct && !InnerProp->Struct->IsChildOf(EntryStruct))
+	{
+		return nullptr;
+	}
+
+	void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(this);
+	FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
+	const int32 NewIndex = ArrayHelper.AddValue();
+	return reinterpret_cast<FPCGExAssetCollectionEntry*>(ArrayHelper.GetRawPtr(NewIndex));
+}
 #endif

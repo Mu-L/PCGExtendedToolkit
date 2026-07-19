@@ -21,6 +21,24 @@ PCGEX_REGISTER_COLLECTION_EDITOR_TYPE(
 
 namespace PCGExSkinnedMeshCollectionActions
 {
+	// Tile-picker contribution, resolved per-row by heterogeneous grid editors (Omni) and
+	// used as the typed editor's default (this also fixes the skinned editor previously
+	// missing a GetTilePickerPropertyName override).
+	struct FRegisterTilePicker
+	{
+		FRegisterTilePicker()
+		{
+			FCollectionEditorTypeRegistry::AddPendingRegistration([]()
+			{
+				FCollectionEditorTypeRegistry::Get().Customize(PCGExAssetCollection::TypeIds::SkinnedMesh, [](FCollectionEditorTypeInfo& Info)
+				{
+					Info.TilePickerPropertyName = FName("SkinnedAsset");
+					Info.TilePickerAllowedClass = USkinnedAsset::StaticClass();
+				});
+			});
+		}
+	} GRegisterSkinnedMeshTilePicker;
+
 	void CreateCollectionFrom(const TArray<FAssetData>& SelectedAssets)
 	{
 		PCGExCollectionEditorHelpers::CreateCollectionFromTyped(SelectedAssets, UPCGExSkinnedMeshCollection::StaticClass(), TEXT("SMC_NewSkinnedMeshCollection"));

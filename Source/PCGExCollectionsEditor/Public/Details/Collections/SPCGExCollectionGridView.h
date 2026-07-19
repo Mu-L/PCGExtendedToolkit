@@ -140,8 +140,11 @@ private:
 
 	/**
 	 * Cross-collection drop: move-or-copy entries from a different collection into this one.
-	 * Validates that the source and target share the same entry struct type; on mismatch,
-	 * shows a notification and aborts. When !bIsCopy, originals are removed from the source.
+	 * Works at PAYLOAD level -- a dropped entry is just an entry: heterogeneous targets
+	 * (Omni) wrap any payload, typed targets accept payloads of their own entry type (and
+	 * base-typed subcollection rows are valid anywhere). Per-row compatibility is arbitrated
+	 * by EDITOR_AddEntry; incompatible rows are skipped with a notification (full-failure
+	 * drops abort). When !bIsCopy, only transferred originals are removed from the source.
 	 * Both collections are wrapped in a single transaction.
 	 */
 	void HandleCrossCollectionDrop(
@@ -184,9 +187,21 @@ private:
 	bool bIsBatchOperation = false;
 	bool bPendingCategoryRefresh = false;
 
-	// Entry struct reflection helpers
-	UScriptStruct* GetEntryScriptStruct() const;
+	// Entry payload access helpers. Both resolve PER ROW through collection virtuals so
+	// heterogeneous hosts (Omni) work: the struct is the row's payload struct and the
+	// pointer is the payload base pointer (identical to the raw element for homogeneous
+	// collections). Element-level array ops (add/duplicate/reorder) keep using
+	// GetEntriesAccess -- element struct and payload struct differ on wrapper-row hosts.
+	UScriptStruct* GetEntryScriptStruct(int32 Index) const;
 	uint8* GetEntryRawPtr(int32 Index) const;
+
+	/** Resolve the destination-side property for cross-entry copies: same struct reuses
+	 *  SrcProp; different structs (mixed selection on heterogeneous hosts) match by name +
+	 *  SameType. Null when the destination has no compatible property. */
+	static const FProperty* ResolveMatchingProperty(const FProperty* SrcProp, const UScriptStruct* SrcStruct, const UScriptStruct* DstStruct);
+
+	/** Shared add-entry body (transaction, selection, refresh). EntryStruct null = untyped. */
+	void AddEntryOfStruct(const UScriptStruct* EntryStruct);
 
 	// Encapsulates reflection boilerplate for Entries array access
 	struct FEntriesArrayAccess

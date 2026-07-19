@@ -11,6 +11,7 @@
 #include "InputCoreTypes.h"
 #include "ScopedTransaction.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
 
@@ -779,7 +780,7 @@ void SPCGExCollectionGridView::PropagateTileProperty(int32 SourceIndex, FName Pr
 		return;
 	}
 
-	UScriptStruct* EntryStruct = GetEntryScriptStruct();
+	UScriptStruct* EntryStruct = GetEntryScriptStruct(SourceIndex);
 	if (!EntryStruct) { return; }
 
 	const FProperty* ChangedProp = EntryStruct->FindPropertyByName(PropertyName);
@@ -805,14 +806,19 @@ void SPCGExCollectionGridView::PropagateTileProperty(int32 SourceIndex, FName Pr
 		uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
 		if (!OtherPtr) { continue; }
 
+		// Mixed-type selections resolve the property on the target's own struct by name+type.
+		const FProperty* DstProp = ResolveMatchingProperty(ChangedProp, EntryStruct, GetEntryScriptStruct(OtherIndex));
+		if (!DstProp) { continue; }
+		const int32 DstOffset = DstProp->GetOffset_ForInternal();
+
 		// FInstancedStruct payload lives in an opaque heap buffer; descending via reflection finds no fields.
 		if (StructProp && StructProp->Struct != TBaseStructure<FInstancedStruct>::Get())
 		{
-			PushStructGated(StructProp->Struct, SrcPtr + Offset, OtherPtr + Offset);
+			PushStructGated(StructProp->Struct, SrcPtr + Offset, OtherPtr + DstOffset);
 		}
 		else
 		{
-			ChangedProp->CopyCompleteValue(OtherPtr + Offset, SrcPtr + Offset);
+			ChangedProp->CopyCompleteValue(OtherPtr + DstOffset, SrcPtr + Offset);
 		}
 	}
 
@@ -917,21 +923,9 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 		return;
 	}
 
-	UScriptStruct* SourceStruct = SourceAccess.InnerProp ? SourceAccess.InnerProp->Struct : nullptr;
-	UScriptStruct* TargetStruct = TargetAccess.InnerProp ? TargetAccess.InnerProp->Struct : nullptr;
-
-	// Different collection types use different entry structs (e.g. UPCGExMeshCollection vs
-	// UPCGExActorCollection); copying raw memory across would corrupt the destination.
-	if (!SourceStruct || !TargetStruct || SourceStruct != TargetStruct)
+	UScriptStruct* TargetElementStruct = TargetAccess.InnerProp ? TargetAccess.InnerProp->Struct : nullptr;
+	if (!TargetElementStruct)
 	{
-		FNotificationInfo Info(INVTEXT("Cannot drop entries: incompatible collection types."));
-		Info.ExpireDuration = 4.0f;
-		Info.bUseSuccessFailIcons = true;
-		Info.bFireAndForget = true;
-		if (TSharedPtr<SNotificationItem> Item = FSlateNotificationManager::Get().AddNotification(Info))
-		{
-			Item->SetCompletionState(SNotificationItem::CS_Fail);
-		}
 		return;
 	}
 
@@ -953,20 +947,39 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 	}
 	CleanIndices.Sort();
 
-	// Snapshot source payloads before the MOVE deletes originals; SourceHelper pointers would
-	// otherwise be invalidated mid-copy.
-	const int32 StructSize = TargetStruct->GetStructureSize();
-	TArray<uint8> Snapshots;
-	Snapshots.SetNumUninitialized(CleanIndices.Num() * StructSize);
-	for (int32 i = 0; i < CleanIndices.Num(); ++i)
+	// Snapshot source PAYLOADS (not raw elements): a dropped entry is just an entry --
+	// heterogeneous targets (Omni) wrap any payload, typed targets take payloads of their
+	// own entry type (and base-typed subcollection rows are valid anywhere). Compatibility
+	// is arbitrated per row by EDITOR_AddEntry below; nothing is converted. Snapshots are
+	// taken before any mutation (a MOVE deletes source rows) and own their lifetime.
+	TArray<FInstancedStruct> Snapshots;
+	TArray<int32> SnapshotSourceIndices;
+	Snapshots.Reserve(CleanIndices.Num());
+	SnapshotSourceIndices.Reserve(CleanIndices.Num());
+
+	for (int32 Idx : CleanIndices)
 	{
-		uint8* Dst = Snapshots.GetData() + i * StructSize;
-		TargetStruct->InitializeStruct(Dst);
-		TargetStruct->CopyScriptStruct(Dst, SourceHelper.GetRawPtr(CleanIndices[i]));
+		const UScriptStruct* PayloadStruct = SourceColl->EDITOR_GetEntryScriptStruct(Idx);
+		const FPCGExEntryAccessResult Row = SourceColl->GetEntryRaw(Idx);
+		if (!PayloadStruct || !Row.IsValid())
+		{
+			continue; // Unset rows (heterogeneous hosts) carry nothing to transfer.
+		}
+
+		FInstancedStruct& Snapshot = Snapshots.Emplace_GetRef();
+		Snapshot.InitializeAs(PayloadStruct, reinterpret_cast<const uint8*>(Row.Entry));
+		SnapshotSourceIndices.Add(Idx);
+	}
+
+	if (Snapshots.IsEmpty())
+	{
+		return;
 	}
 
 	TArray<int32> InsertedIndices;
+	TArray<int32> TransferredSourceIndices;
 	TArray<int32> FinalDraggedPositions;
+	int32 SkippedCount = 0;
 
 	bIsBatchOperation = true;
 	{
@@ -980,39 +993,49 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 			const_cast<UPCGExAssetCollection*>(SourceColl)->Modify();
 		}
 
-		FScriptArrayHelper TargetHelper(TargetAccess.ArrayProp, TargetAccess.ArrayData);
+		InsertedIndices.Reserve(Snapshots.Num());
+		TransferredSourceIndices.Reserve(Snapshots.Num());
 
-		InsertedIndices.Reserve(CleanIndices.Num());
-		for (int32 i = 0; i < CleanIndices.Num(); ++i)
+		for (int32 i = 0; i < Snapshots.Num(); ++i)
 		{
-			const int32 NewIdx = TargetHelper.AddValue();
-			TargetStruct->CopyScriptStruct(TargetHelper.GetRawPtr(NewIdx), Snapshots.GetData() + i * StructSize);
+			const UScriptStruct* PayloadStruct = Snapshots[i].GetScriptStruct();
 
-			if (FPCGExAssetCollectionEntry* NewEntry = TargetColl->EDITOR_GetMutableEntry(NewIdx))
+			FPCGExAssetCollectionEntry* NewEntry = TargetColl->EDITOR_AddEntry(PayloadStruct);
+			if (!NewEntry)
 			{
-				NewEntry->Category = TargetCategory;
-				// Copied/moved entries are NEW identities in the target collection: zero the
-				// carried-over EntryId so SyncEntryIds assigns a fresh one instead of aliasing
-				// (or colliding with) ids that external references may be bound to.
-				NewEntry->EntryId = 0;
+				SkippedCount++;
+				continue;
 			}
 
-			InsertedIndices.Add(NewIdx);
+			// Copies the snapshot-struct portion: a full copy when the target payload is the
+			// same type; the base portion onto a default-constructed native element when a
+			// base-typed row lands in a typed collection.
+			PayloadStruct->CopyScriptStruct(NewEntry, Snapshots[i].GetMemory());
+
+			NewEntry->Category = TargetCategory;
+			// Copied/moved entries are NEW identities in the target collection: zero the
+			// carried-over EntryId so SyncEntryIds assigns a fresh one instead of aliasing
+			// (or colliding with) ids that external references may be bound to.
+			NewEntry->EntryId = 0;
+
+			InsertedIndices.Add(TargetColl->NumEntries() - 1);
+			TransferredSourceIndices.Add(SnapshotSourceIndices[i]);
 		}
 
-		// Reverse iteration preserves earlier indices as later ones are removed.
-		if (!bIsCopy)
+		// Reverse iteration preserves earlier indices as later ones are removed. Only rows
+		// that actually transferred leave the source.
+		if (!bIsCopy && !TransferredSourceIndices.IsEmpty())
 		{
-			for (int32 i = CleanIndices.Num() - 1; i >= 0; --i)
+			for (int32 i = TransferredSourceIndices.Num() - 1; i >= 0; --i)
 			{
-				SourceHelper.RemoveValues(CleanIndices[i], 1);
+				SourceHelper.RemoveValues(TransferredSourceIndices[i], 1);
 			}
 			const_cast<UPCGExAssetCollection*>(SourceColl)->PostEditChange();
 		}
 
 		FinalDraggedPositions = InsertedIndices;
 
-		if (InsertBeforeLocalIndex != INDEX_NONE)
+		if (InsertBeforeLocalIndex != INDEX_NONE && !InsertedIndices.IsEmpty())
 		{
 			RebuildCategoryCache();
 			if (const TArray<int32>* CatIndices = CategoryToEntryIndices.Find(TargetCategory))
@@ -1021,7 +1044,10 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 				TArray<int32> DesiredOrder = ComputeCategoryDesiredOrder(*CatIndices, DraggedSet, InsertBeforeLocalIndex, /*bAdjustForDraggedBefore=*/false);
 				if (!DesiredOrder.IsEmpty())
 				{
-					TArray<int32> Reordered = ApplyCategoryPermutation(TargetHelper, TargetStruct, *CatIndices, DesiredOrder, DraggedSet);
+					// Fresh helper AFTER the adds; permutation swaps whole ELEMENTS, which is
+					// payload-type-agnostic (wrapper rows deep-copy via FInstancedStruct).
+					FScriptArrayHelper TargetHelper(TargetAccess.ArrayProp, TargetAccess.ArrayData);
+					TArray<int32> Reordered = ApplyCategoryPermutation(TargetHelper, TargetElementStruct, *CatIndices, DesiredOrder, DraggedSet);
 					if (!Reordered.IsEmpty()) { FinalDraggedPositions = MoveTemp(Reordered); }
 				}
 			}
@@ -1035,9 +1061,23 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 	}
 	bIsBatchOperation = false;
 
-	for (int32 i = 0; i < CleanIndices.Num(); ++i)
+	if (SkippedCount > 0)
 	{
-		TargetStruct->DestroyStruct(Snapshots.GetData() + i * StructSize);
+		FNotificationInfo Info(InsertedIndices.IsEmpty()
+			                       ? FText(INVTEXT("Cannot drop entries: no entry is compatible with the target collection."))
+			                       : FText::Format(INVTEXT("{0} incompatible entries were skipped."), SkippedCount));
+		Info.ExpireDuration = 4.0f;
+		Info.bUseSuccessFailIcons = true;
+		Info.bFireAndForget = true;
+		if (TSharedPtr<SNotificationItem> Item = FSlateNotificationManager::Get().AddNotification(Info))
+		{
+			Item->SetCompletionState(InsertedIndices.IsEmpty() ? SNotificationItem::CS_Fail : SNotificationItem::CS_Success);
+		}
+
+		if (InsertedIndices.IsEmpty())
+		{
+			return;
+		}
 	}
 
 	// Populate Staging.Path on new rows so thumbnails resolve immediately.
@@ -1361,7 +1401,7 @@ void SPCGExCollectionGridView::UpdateDetailForSelection()
 		Index = Sorted[0];
 	}
 
-	UScriptStruct* EntryStruct = GetEntryScriptStruct();
+	UScriptStruct* EntryStruct = GetEntryScriptStruct(Index);
 	uint8* EntryPtr = GetEntryRawPtr(Index);
 
 	if (!EntryStruct || !EntryPtr)
@@ -1393,7 +1433,7 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 		return;
 	}
 
-	UScriptStruct* EntryStruct = GetEntryScriptStruct();
+	UScriptStruct* EntryStruct = GetEntryScriptStruct(CurrentDetailIndex);
 	if (!EntryStruct)
 	{
 		return;
@@ -1465,6 +1505,8 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 	EntryStruct->CopyScriptStruct(PrimaryPtr, SrcData);
 
 	// ── Step 4: Propagate to other selected entries ──────────────────────
+	// Mixed-type selections (heterogeneous hosts): each target resolves the member on its
+	// OWN struct by name + type; targets without a compatible member are skipped.
 	if (PropToPropagate && SelectedIndices.Num() > 1)
 	{
 		const int32 MemberOffset = PropToPropagate->GetOffset_ForInternal();
@@ -1480,12 +1522,13 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 					continue;
 				}
 				uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
-				if (OtherPtr)
+				const FProperty* DstProp = ResolveMatchingProperty(PropToPropagate, EntryStruct, GetEntryScriptStruct(OtherIndex));
+				if (OtherPtr && DstProp)
 				{
 					PropagateChangedProperties(
 						MemberSnapshot.GetData(),
 						SrcData + MemberOffset,
-						OtherPtr + MemberOffset,
+						OtherPtr + DstProp->GetOffset_ForInternal(),
 						StructMember->Struct);
 				}
 			}
@@ -1503,9 +1546,10 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 					continue;
 				}
 				uint8* OtherPtr = GetEntryRawPtr(OtherIndex);
-				if (OtherPtr)
+				const FProperty* DstProp = ResolveMatchingProperty(PropToPropagate, EntryStruct, GetEntryScriptStruct(OtherIndex));
+				if (OtherPtr && DstProp)
 				{
-					PropToPropagate->CopyCompleteValue(OtherPtr + MemberOffset, SrcData + MemberOffset);
+					PropToPropagate->CopyCompleteValue(OtherPtr + DstProp->GetOffset_ForInternal(), SrcData + MemberOffset);
 				}
 			}
 		}
@@ -1694,7 +1738,7 @@ void SPCGExCollectionGridView::ExecutePush(const PCGExAssetCollectionEditor::FPu
 		return;
 	}
 
-	UScriptStruct* EntryStruct = GetEntryScriptStruct();
+	UScriptStruct* EntryStruct = GetEntryScriptStruct(CurrentDetailIndex);
 	if (!EntryStruct)
 	{
 		return;
@@ -1744,9 +1788,21 @@ void SPCGExCollectionGridView::ExecutePush(const PCGExAssetCollectionEditor::FPu
 				continue;
 			}
 
+			// Mixed-type selections (heterogeneous hosts): resolve each property on the
+			// target's own struct by name+type; incompatible targets skip that property --
+			// the same "missing names no-op gracefully" contract as cross-collection options.
+			const UScriptStruct* TargetStruct = GetEntryScriptStruct(TargetIdx);
+
 			for (const FProperty* Prop : ResolvedProps)
 			{
+				const FProperty* DstProp = ResolveMatchingProperty(Prop, EntryStruct, TargetStruct);
+				if (!DstProp)
+				{
+					continue;
+				}
+
 				const int32 Offset = Prop->GetOffset_ForInternal();
+				const int32 DstOffset = DstProp->GetOffset_ForInternal();
 
 				// Gated path only descends into reflected structs. Everything else
 				// (non-struct members, FInstancedStruct opaque buffers) falls back to a
@@ -1757,11 +1813,11 @@ void SPCGExCollectionGridView::ExecutePush(const PCGExAssetCollectionEditor::FPu
 
 				if (StructProp && StructProp->Struct != TBaseStructure<FInstancedStruct>::Get())
 				{
-					PushStructGated(StructProp->Struct, SrcPtr + Offset, TgtPtr + Offset);
+					PushStructGated(StructProp->Struct, SrcPtr + Offset, TgtPtr + DstOffset);
 				}
 				else
 				{
-					Prop->CopyCompleteValue(TgtPtr + Offset, SrcPtr + Offset);
+					Prop->CopyCompleteValue(TgtPtr + DstOffset, SrcPtr + Offset);
 				}
 			}
 		}
@@ -1826,50 +1882,37 @@ void SPCGExCollectionGridView::OnDetailPropertyChanged(const FPropertyChangedEve
 	}
 }
 
-// ── Entry struct reflection helpers ─────────────────────────────────────────
+// ── Entry payload access helpers ────────────────────────────────────────────
 
-UScriptStruct* SPCGExCollectionGridView::GetEntryScriptStruct() const
+UScriptStruct* SPCGExCollectionGridView::GetEntryScriptStruct(int32 Index) const
 {
 	const UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll)
-	{
-		return nullptr;
-	}
-
-	FArrayProperty* ArrayProp = CastField<FArrayProperty>(
-		Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
-	if (!ArrayProp)
-	{
-		return nullptr;
-	}
-
-	FStructProperty* InnerProp = CastField<FStructProperty>(ArrayProp->Inner);
-	return InnerProp ? InnerProp->Struct : nullptr;
+	return Coll ? const_cast<UScriptStruct*>(Coll->EDITOR_GetEntryScriptStruct(Index)) : nullptr;
 }
 
 uint8* SPCGExCollectionGridView::GetEntryRawPtr(int32 Index) const
 {
+	// Payload base pointer through the collection virtuals -- for homogeneous collections
+	// this is the same address as the raw array element; for wrapper-row hosts (Omni) it is
+	// the payload (null when the row's payload is unset).
 	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll || Index < 0)
+	return Coll ? reinterpret_cast<uint8*>(Coll->GetMutableEntryRaw(Index)) : nullptr;
+}
+
+const FProperty* SPCGExCollectionGridView::ResolveMatchingProperty(const FProperty* SrcProp, const UScriptStruct* SrcStruct, const UScriptStruct* DstStruct)
+{
+	if (!SrcProp || !DstStruct)
 	{
 		return nullptr;
 	}
 
-	FArrayProperty* ArrayProp = CastField<FArrayProperty>(
-		Coll->GetClass()->FindPropertyByName(PCGExAssetCollectionEditor::EntriesName));
-	if (!ArrayProp)
+	if (DstStruct == SrcStruct)
 	{
-		return nullptr;
+		return SrcProp;
 	}
 
-	void* ArrayData = ArrayProp->ContainerPtrToValuePtr<void>(Coll);
-	FScriptArrayHelper ArrayHelper(ArrayProp, ArrayData);
-
-	if (Index >= ArrayHelper.Num())
-	{
-		return nullptr;
-	}
-	return ArrayHelper.GetRawPtr(Index);
+	const FProperty* DstProp = DstStruct->FindPropertyByName(SrcProp->GetFName());
+	return (DstProp && DstProp->SameType(SrcProp)) ? DstProp : nullptr;
 }
 
 TArray<int32> SPCGExCollectionGridView::ComputeCategoryDesiredOrder(
@@ -1999,10 +2042,48 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 		return FReply::Handled();
 	}
 
-	FEntriesArrayAccess Access = GetEntriesAccess();
-	if (!Access.IsValid())
+	// Heterogeneous hosts (Omni) require an explicit payload type choice; homogeneous
+	// collections report no addable types and take the direct untyped add.
+	TArray<const UScriptStruct*> AddableTypes;
+	Coll->EDITOR_GetAddableEntryTypes(AddableTypes);
+
+	if (AddableTypes.IsEmpty())
 	{
+		AddEntryOfStruct(nullptr);
 		return FReply::Handled();
+	}
+
+	FMenuBuilder MenuBuilder(/*bInShouldCloseWindowAfterMenuSelection=*/true, nullptr);
+	MenuBuilder.BeginSection(NAME_None, INVTEXT("Add Entry"));
+	for (const UScriptStruct* EntryStruct : AddableTypes)
+	{
+		MenuBuilder.AddMenuEntry(
+			EntryStruct->GetDisplayNameText(),
+			FText::Format(INVTEXT("Add a new {0} to the collection."), EntryStruct->GetDisplayNameText()),
+			FSlateIcon(),
+			FUIAction(FExecuteAction::CreateSPLambda(this, [this, EntryStruct]()
+			{
+				AddEntryOfStruct(EntryStruct);
+			})));
+	}
+	MenuBuilder.EndSection();
+
+	FSlateApplication::Get().PushMenu(
+		AsShared(),
+		FWidgetPath(),
+		MenuBuilder.MakeWidget(),
+		FSlateApplication::Get().GetCursorPos(),
+		FPopupTransitionEffect(FPopupTransitionEffect::ContextMenu));
+
+	return FReply::Handled();
+}
+
+void SPCGExCollectionGridView::AddEntryOfStruct(const UScriptStruct* EntryStruct)
+{
+	UPCGExAssetCollection* Coll = Collection.Get();
+	if (!Coll)
+	{
+		return;
 	}
 
 	bIsBatchOperation = true;
@@ -2014,8 +2095,8 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 
 		Coll->Modify();
 
-		FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
-		const int32 NewIndex = ArrayHelper.AddValue();
+		FPCGExAssetCollectionEntry* NewEntry = Coll->EDITOR_AddEntry(EntryStruct);
+		const int32 NewIndex = Coll->NumEntries() - 1;
 
 		Coll->bSuppressStagingRebuild = false;
 		Coll->PostEditChange();
@@ -2024,9 +2105,12 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 		Coll->SyncPropertyOverridesToEntries();
 
 		// Select the new entry
-		SelectedIndices.Reset();
-		SelectedIndices.Add(NewIndex);
-		LastClickedIndex = NewIndex;
+		if (NewEntry)
+		{
+			SelectedIndices.Reset();
+			SelectedIndices.Add(NewIndex);
+			LastClickedIndex = NewIndex;
+		}
 	}
 	bIsBatchOperation = false;
 
@@ -2036,8 +2120,6 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 	{
 		GroupScrollBox->ScrollToEnd();
 	}
-
-	return FReply::Handled();
 }
 
 FReply SPCGExCollectionGridView::OnDuplicateSelected()
@@ -2089,8 +2171,13 @@ FReply SPCGExCollectionGridView::OnDuplicateSelected()
 
 			// A duplicate is a NEW identity: zero the copied EntryId so SyncEntryIds assigns
 			// a fresh one and the ORIGINAL unambiguously keeps its id — external references
-			// (variant collections) must never re-bind to the copy.
-			reinterpret_cast<FPCGExAssetCollectionEntry*>(DstPtr)->EntryId = 0;
+			// (variant collections) must never re-bind to the copy. Resolved through the
+			// collection virtuals: DstPtr is the raw ELEMENT, which on wrapper-row hosts
+			// (Omni) is not the entry payload — casting it would corrupt the wrapper.
+			if (FPCGExAssetCollectionEntry* DuplicatePayload = Coll->GetMutableEntryRaw(InsertAt))
+			{
+				DuplicatePayload->EntryId = 0;
+			}
 		}
 
 		Coll->PostEditChange();

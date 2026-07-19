@@ -189,11 +189,17 @@ protected:
 	}
 
 	/** Returns the property name of the type-specific asset picker (e.g., "StaticMesh", "Actor").
-	 *  Override in derived editors. Used by the grid view to build tile picker widgets. */
-	virtual FName GetTilePickerPropertyName() const
-	{
-		return NAME_None;
-	}
+	 *  Base resolves the edited collection's registered TilePickerPropertyName; override for
+	 *  editor-specific behavior. Used by the grid view to build tile picker widgets. */
+	virtual FName GetTilePickerPropertyName() const;
+
+	/**
+	 * Per-row picker resolution: for heterogeneous hosts (Omni) the row's entry type decides
+	 * the picker; typed rows resolve to the same values as the editor-wide virtuals. Falls
+	 * back to GetTilePickerPropertyName/GetTilePickerAllowedClass when the row's type has no
+	 * registered picker info.
+	 */
+	void ResolveTilePickerForRow(int32 EntryIndex, FName& OutPropertyName, const UClass*& OutAllowedClass) const;
 
 	/** Build the picker widget for a single tile entry. Override for custom picker logic.
 	 *  Invoke OnPropertyEdited with the FName of the entry-struct property that was written. */
@@ -210,11 +216,9 @@ protected:
 		int32 EntryIndex,
 		FOnTilePropertyEdited OnPropertyEdited) const;
 
-	/** Returns the allowed UClass for the type-specific asset picker. Override in subclasses. */
-	virtual const UClass* GetTilePickerAllowedClass() const
-	{
-		return nullptr;
-	}
+	/** Returns the allowed UClass for the type-specific asset picker. Base resolves the
+	 *  edited collection's registered TilePickerAllowedClass; override in subclasses. */
+	virtual const UClass* GetTilePickerAllowedClass() const;
 
 	TArray<PCGExAssetCollectionEditor::TabInfos> Tabs;
 	FDelegateHandle OnHiddenAssetPropertyNamesChanged;

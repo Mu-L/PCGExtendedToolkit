@@ -21,6 +21,24 @@ PCGEX_REGISTER_COLLECTION_EDITOR_TYPE(
 
 namespace PCGExMeshCollectionActions
 {
+	// Tile-picker contribution, resolved per-row by heterogeneous grid editors (Omni) and
+	// used as the typed editor's default. Registered as a pending customization AFTER the
+	// macro registration above (same TU, sequential static init).
+	struct FRegisterTilePicker
+	{
+		FRegisterTilePicker()
+		{
+			FCollectionEditorTypeRegistry::AddPendingRegistration([]()
+			{
+				FCollectionEditorTypeRegistry::Get().Customize(PCGExAssetCollection::TypeIds::Mesh, [](FCollectionEditorTypeInfo& Info)
+				{
+					Info.TilePickerPropertyName = FName("StaticMesh");
+					Info.TilePickerAllowedClass = UStaticMesh::StaticClass();
+				});
+			});
+		}
+	} GRegisterMeshTilePicker;
+
 	void CreateCollectionFrom(const TArray<FAssetData>& SelectedAssets)
 	{
 		PCGExCollectionEditorHelpers::CreateCollectionFromTyped(SelectedAssets, UPCGExMeshCollection::StaticClass(), TEXT("SMC_NewMeshCollection"));
