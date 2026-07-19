@@ -29,6 +29,25 @@ enum class EPCGExDataAssetEntrySource : uint8
 };
 
 /**
+ * PCGDataAsset collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
+ * UPCGExPCGDataAssetCollection's exporter member 1:1. The exporter is editor-only data
+ * (level harvesting is an authoring operation); in cooked targets this block is empty
+ * and querying it is harmless.
+ */
+USTRUCT(BlueprintType, DisplayName="[PCGEx] PCGDataAsset Collection Globals")
+struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionGlobals : public FPCGExCollectionTypeGlobals
+{
+	GENERATED_BODY()
+
+#if WITH_EDITORONLY_DATA
+	/** Exporter used to convert level-sourced entries into embedded PCGDataAssets during staging.
+	 *  If unset, a default exporter is used. */
+	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
+	TObjectPtr<UPCGExLevelDataExporter> LevelExporter;
+#endif
+};
+
+/**
  * PCG data asset collection entry. References a UPCGDataAsset or a subcollection.
  * UpdateStaging() computes combined bounds from all spatial data in the asset.
  *
@@ -182,6 +201,11 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
 	TObjectPtr<UPCGExLevelDataExporter> LevelExporter;
 #endif
+
+protected:
+	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const override;
+
+public:
 
 	/** Externalize generated subobjects (ExportedDataAsset, EmbeddedActorCollection,
 	 *  SharedMeshCollection, SharedLevelCollection) as separate uassets so the collection's

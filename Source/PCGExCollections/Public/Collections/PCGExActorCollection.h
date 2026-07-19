@@ -17,6 +17,21 @@
 class UPCGExActorCollection;
 
 /**
+ * Actor collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
+ * UPCGExActorCollection's import members 1:1 -- keep names in sync so conversion
+ * between the two stays a straight per-property copy.
+ */
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Actor Collection Globals")
+struct PCGEXCOLLECTIONS_API FPCGExActorCollectionGlobals : public FPCGExCollectionTypeGlobals
+{
+	GENERATED_BODY()
+
+	/** Bounds evaluator for bounds computation. If null, basic GetActorBounds fallback is used. */
+	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
+	TObjectPtr<UPCGExBoundsEvaluator> BoundsEvaluator;
+};
+
+/**
  * Actor collection entry. References an actor class (TSoftClassPtr<AActor>) or, via the
  * base SubCollection property, any collection type as a subcollection. Simpler than
  * FPCGExMeshCollectionEntry -- no MicroCache, no descriptors. UpdateStaging() spawns a
@@ -120,6 +135,11 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Import")
 	EPCGExSchemaMergePolicy SchemaMergePolicy = EPCGExSchemaMergePolicy::StrictTypeMatch;
+
+protected:
+	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const override;
+
+public:
 
 	/**
 	 * Scan each entry's source actor for a UPCGExPropertyCollectionComponent, merge its

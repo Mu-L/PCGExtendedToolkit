@@ -162,8 +162,9 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 			}
 			else
 			{
-				// Host may not be a mesh collection (heterogeneous hosts); null parent falls back to the entry's local descriptor.
-				Entry->InitPCGSoftISMDescriptor(Cast<UPCGExMeshCollection>(Result.Host), OutDescriptor);
+				// Globals resolve through the host's type-globals seam; heterogeneous hosts
+				// without a mesh globals block fall back to the entry's local descriptor.
+				Entry->InitPCGSoftISMDescriptor(Result.Host, OutDescriptor);
 			}
 
 			if (bForceDisableCollisions)

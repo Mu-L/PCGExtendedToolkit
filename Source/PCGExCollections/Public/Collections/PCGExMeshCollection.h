@@ -102,6 +102,26 @@ namespace PCGExMeshCollection
 }
 
 /**
+ * Mesh collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
+ * UPCGExMeshCollection's Settings|Global members 1:1 -- keep names in sync so conversion
+ * between the two stays a straight per-property copy.
+ */
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Mesh Collection Globals")
+struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionGlobals : public FPCGExCollectionTypeGlobals
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = Settings)
+	EPCGExGlobalVariationRule GlobalDescriptorMode = EPCGExGlobalVariationRule::PerEntry;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" ├─ Global ISM Settings"))
+	FSoftISMComponentDescriptor GlobalISMDescriptor;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Global SM Settings"))
+	FPCGExStaticMeshComponentDescriptor GlobalSMDescriptor;
+};
+
+/**
  * Mesh collection entry. References a UStaticMesh (or, via the base SubCollection property,
  * any collection type as a subcollection). Adds mesh-specific features on top of the base entry:
  * - Material variants: weighted material override sets (single-slot or multi-slot)
@@ -179,7 +199,13 @@ struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionEntry : public FPCGExAssetCollec
 	virtual void SetAssetPath(const FSoftObjectPath& InPath) override;
 	virtual void ResolveGlobalsToLocal(const UPCGExAssetCollection* InSourceCollection) override;
 
-	void InitPCGSoftISMDescriptor(const UPCGExMeshCollection* ParentCollection, FPCGSoftISMComponentDescriptor& TargetDescriptor) const;
+	/**
+	 * Resolve descriptor inheritance into TargetDescriptor. Accepts any host collection --
+	 * globals are read through the type-globals seam, so Variant/Omni hosts that carry a
+	 * mesh globals block behave like a native mesh collection; hosts without one (or null)
+	 * fall back to the entry's local descriptor.
+	 */
+	void InitPCGSoftISMDescriptor(const UPCGExAssetCollection* ParentCollection, FPCGSoftISMComponentDescriptor& TargetDescriptor) const;
 
 #if WITH_EDITOR
 	virtual void EDITOR_Sanitize() override;
@@ -230,7 +256,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExMeshCollectionEntry> Entries;
 
+protected:
+	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const override;
 
+public:
 #if WITH_EDITOR
 	// Editor Functions
 

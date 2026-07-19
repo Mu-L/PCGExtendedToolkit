@@ -104,12 +104,15 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 			return;
 		}
 
-		// Compute bounds via evaluator or fallback
-		const UPCGExActorCollection* ActorCollection = CastChecked<UPCGExActorCollection>(OwningCollection);
-		if (ActorCollection->BoundsEvaluator)
+		// Compute bounds via evaluator or fallback. Globals come through the type-globals
+		// seam so any host (native, Variant, Omni) can provide the evaluator; hosts without
+		// an actor globals block take the plain GetActorBounds fallback.
+		FPCGExActorCollectionGlobals Globals;
+		const bool bHasGlobals = OwningCollection && OwningCollection->GetTypeGlobals(Globals);
+		if (bHasGlobals && Globals.BoundsEvaluator)
 		{
-			const FBox WorldBounds = ActorCollection->BoundsEvaluator->EvaluateActorBounds(
-				TempActor, const_cast<UPCGExActorCollection*>(ActorCollection), InInternalIndex);
+			const FBox WorldBounds = Globals.BoundsEvaluator->EvaluateActorBounds(
+				TempActor, const_cast<UPCGExAssetCollection*>(OwningCollection), InInternalIndex);
 			Staging.Bounds = WorldBounds.IsValid ? WorldBounds : FBox(ForceInit);
 		}
 		else
@@ -295,6 +298,18 @@ namespace PCGExActorCollectionInternal
 
 		return nullptr;
 	}
+}
+
+bool UPCGExActorCollection::GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const
+{
+	if (!StructType || !StructType->IsChildOf(FPCGExActorCollectionGlobals::StaticStruct()))
+	{
+		return Super::GetTypeGlobalsInternal(StructType, OutGlobals);
+	}
+
+	FPCGExActorCollectionGlobals& Out = static_cast<FPCGExActorCollectionGlobals&>(OutGlobals);
+	Out.BoundsEvaluator = BoundsEvaluator;
+	return true;
 }
 
 void UPCGExActorCollection::RebuildPropertiesFromActorComponents(

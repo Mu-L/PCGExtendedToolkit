@@ -9,6 +9,7 @@
 
 #include "PCGExAssetCollectionTypes.h"
 #include "PCGExAssetGrammar.h"
+#include "PCGExCollectionGlobals.h"
 #include "PCGExProperty.h"
 #include "PCGExSchemaMerging.h"
 #include "Core/PCGExContext.h"
@@ -173,10 +174,11 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 	/**
 	 * Bake collection-level ("Global") inheritance channels into local values, reading the
-	 * globals from the given source collection. Call when an entry is copied OUT of its
-	 * collection (e.g. into a variant collection payload) -- the new host cannot provide the
-	 * typed globals, so they must be resolved into the entry or they are silently lost.
-	 * Base is a no-op; typed entries override for their descriptor channels.
+	 * globals from the given source collection (via GetTypeGlobals -- any host that carries
+	 * the matching globals block works as a source). Call when an entry is copied OUT of its
+	 * collection (e.g. into a variant collection payload) and the destination host won't
+	 * carry an equivalent globals block -- otherwise the global-sourced values are silently
+	 * lost. Base is a no-op; typed entries override for their descriptor channels.
 	 */
 	virtual void ResolveGlobalsToLocal(const UPCGExAssetCollection* InSourceCollection)
 	{
@@ -690,6 +692,44 @@ public:
 		return PCGExAssetCollection::FTypeRegistry::Get().IsA(GetTypeId(), TypeId);
 	}
 
+#pragma endregion
+
+#pragma region Type Globals
+
+	/**
+	 * Copy this host's collection-level globals block matching T into OutGlobals. Returns
+	 * false when this host doesn't provide such a block -- callers must then behave as if
+	 * the collection-level settings don't exist (entry-local fallbacks).
+	 *
+	 * This is how entries read collection-level configuration (global descriptors, bounds
+	 * evaluators, content filters...) without knowing their host's concrete class -- which is
+	 * what allows entries of any type to be hosted by heterogeneous collections (Variant,
+	 * Omni). NEVER cast a host collection to a concrete class to reach such settings.
+	 *
+	 * Copy-out by design: no lifetime coupling to the host, and safe to call from any thread
+	 * under the usual "assets are structurally immutable during PCG execution" contract.
+	 * Called per resolved entry (not per point) -- copy cost is acceptable there; do not
+	 * introduce per-point calls.
+	 */
+	template <typename T>
+	bool GetTypeGlobals(T& OutGlobals) const
+	{
+		static_assert(std::is_base_of_v<FPCGExCollectionTypeGlobals, T>, "T must derive from FPCGExCollectionTypeGlobals");
+		return GetTypeGlobalsInternal(T::StaticStruct(), OutGlobals);
+	}
+
+protected:
+	/**
+	 * Fill OutGlobals if this collection provides a globals block whose type StructType
+	 * matches or derives from (a derived StructType only gets its known base part written).
+	 * Unhandled types must route to Super so provider chains compose. Base provides none.
+	 */
+	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const
+	{
+		return false;
+	}
+
+public:
 #pragma endregion
 
 #pragma region Cache

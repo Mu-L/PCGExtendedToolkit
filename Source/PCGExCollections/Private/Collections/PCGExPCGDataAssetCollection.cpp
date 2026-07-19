@@ -132,13 +132,19 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		}
 		ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
 
-		// Use collection's instanced exporter if available, otherwise create a transient default.
-		// The instanced exporter is editor-only data; cooked builds always take the fallback path.
+		// Use the host's instanced exporter if available, otherwise create a transient default.
+		// The exporter comes through the type-globals seam (any host that carries a PCGDataAsset
+		// globals block can provide it); it is editor-only data, so cooked builds always take
+		// the fallback path.
 		UPCGExLevelDataExporter* Exporter = nullptr;
 #if WITH_EDITORONLY_DATA
-		if (const UPCGExPCGDataAssetCollection* TypedCollection = Cast<UPCGExPCGDataAssetCollection>(OwningCollection))
+		if (OwningCollection)
 		{
-			Exporter = TypedCollection->LevelExporter;
+			FPCGExPCGDataAssetCollectionGlobals Globals;
+			if (OwningCollection->GetTypeGlobals(Globals))
+			{
+				Exporter = Globals.LevelExporter;
+			}
 		}
 #endif
 
@@ -926,6 +932,20 @@ namespace PCGExSharedCompact
 #pragma endregion
 
 #pragma region UPCGExPCGDataAssetCollection
+
+bool UPCGExPCGDataAssetCollection::GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const
+{
+	if (!StructType || !StructType->IsChildOf(FPCGExPCGDataAssetCollectionGlobals::StaticStruct()))
+	{
+		return Super::GetTypeGlobalsInternal(StructType, OutGlobals);
+	}
+
+#if WITH_EDITORONLY_DATA
+	FPCGExPCGDataAssetCollectionGlobals& Out = static_cast<FPCGExPCGDataAssetCollectionGlobals&>(OutGlobals);
+	Out.LevelExporter = LevelExporter;
+#endif
+	return true;
+}
 
 void UPCGExPCGDataAssetCollection::CompactSharedMesh()
 {

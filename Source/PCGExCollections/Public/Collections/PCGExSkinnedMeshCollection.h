@@ -46,6 +46,23 @@ namespace PCGExSkinnedMeshCollection
 }
 
 /**
+ * Skinned mesh collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
+ * UPCGExSkinnedMeshCollection's global members 1:1 -- keep names in sync so conversion
+ * between the two stays a straight per-property copy.
+ */
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Skinned Mesh Collection Globals")
+struct PCGEXCOLLECTIONS_API FPCGExSkinnedMeshCollectionGlobals : public FPCGExCollectionTypeGlobals
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = Settings)
+	EPCGExGlobalVariationRule GlobalDescriptorMode = EPCGExGlobalVariationRule::PerEntry;
+
+	UPROPERTY(EditAnywhere, Category = Settings, meta=(DisplayName=" └─ Global Skinned Mesh Settings"))
+	FPCGSoftSkinnedMeshComponentDescriptor GlobalDescriptor;
+};
+
+/**
  * Skinned mesh collection entry. References a USkinnedAsset (or, via the base SubCollection
  * property, any collection type as a subcollection). Mirrors FPCGExMeshCollectionEntry
  * feature-for-feature, but with a single skinned-mesh component descriptor
@@ -103,7 +120,12 @@ struct PCGEXCOLLECTIONS_API FPCGExSkinnedMeshCollectionEntry : public FPCGExAsse
 	virtual void SetAssetPath(const FSoftObjectPath& InPath) override;
 	virtual void ResolveGlobalsToLocal(const UPCGExAssetCollection* InSourceCollection) override;
 
-	void InitPCGSoftSkinnedDescriptor(const UPCGExSkinnedMeshCollection* ParentCollection, FPCGSoftSkinnedMeshComponentDescriptor& TargetDescriptor) const;
+	/**
+	 * Resolve descriptor inheritance into TargetDescriptor. Accepts any host collection --
+	 * globals are read through the type-globals seam; hosts without a skinned-mesh globals
+	 * block (or null) fall back to the entry's local descriptor.
+	 */
+	void InitPCGSoftSkinnedDescriptor(const UPCGExAssetCollection* ParentCollection, FPCGSoftSkinnedMeshComponentDescriptor& TargetDescriptor) const;
 
 #if WITH_EDITOR
 	virtual void EDITOR_Sanitize() override;
@@ -148,7 +170,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExSkinnedMeshCollectionEntry> Entries;
 
+protected:
+	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const override;
 
+public:
 #if WITH_EDITOR
 	// Editor Functions
 
