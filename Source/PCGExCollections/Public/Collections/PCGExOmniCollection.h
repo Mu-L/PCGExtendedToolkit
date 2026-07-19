@@ -7,6 +7,7 @@
 #include "StructUtils/InstancedStruct.h"
 
 #include "Core/PCGExAssetCollection.h"
+#include "Core/PCGExCollectionTypeState.h"
 #include "Helpers/PCGExArrayHelpers.h"
 
 #include "PCGExOmniCollection.generated.h"
@@ -69,6 +70,33 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Settings|Global", meta=(BaseStruct="/Script/PCGExCollections.PCGExCollectionTypeGlobals", ExcludeBaseStruct))
 	TArray<FInstancedStruct> TypeGlobals;
 
+	/**
+	 * Per-type machinery state/processor blocks (see UPCGExCollectionTypeState). One instance
+	 * per present entry type whose registry entry declares a StateClass -- ensured
+	 * automatically at the start of every editor staging rebuild session. Owns the mutable
+	 * cross-entry state (e.g. the PCGDataAsset shared collections) and receives the host
+	 * lifecycle dispatches. Serialized (cooked too -- state may carry runtime subobjects).
+	 */
+	UPROPERTY(EditAnywhere, Instanced, Category = "Settings|Global", meta=(DisplayName="Type Machinery"))
+	TArray<TObjectPtr<UPCGExCollectionTypeState>> TypeStates;
+
+	/** First state instance of (or derived from) StateClass; null when absent. */
+	UPCGExCollectionTypeState* FindTypeState(const UClass* StateClass) const;
+
+	template <typename T>
+	T* FindTypeState() const
+	{
+		return static_cast<T*>(FindTypeState(T::StaticClass()));
+	}
+
+	/** True for any type with a registered StateClass (this host can run its machinery). */
+	virtual bool SupportsTypeMachinery(PCGExAssetCollection::FTypeId TypeId) const override;
+
+	//~ Lifecycle dispatch into type states
+	virtual void Serialize(FArchive& Ar) override;
+	virtual void PreSave(FObjectPreSaveContext ObjectSaveContext) override;
+	virtual void PostDuplicate(bool bDuplicateForPIE) override;
+
 	//~ UPCGExAssetCollection storage interface -- rows wrap payloads, so the
 	// PCGEX_ASSET_COLLECTION_BODY macro doesn't apply; virtuals resolve through the wrapper.
 	virtual bool IsValidIndex(int32 InIndex) const override;
@@ -109,9 +137,23 @@ public:
 	virtual void EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const override;
 	virtual FPCGExAssetCollectionEntry* EDITOR_AddEntry(const UScriptStruct* EntryStruct = nullptr) override;
 
-	/** Runs the actor-component property scan over actor-typed entries, matching what a
-	 *  native actor collection does (merge policy from the actor globals block, if any). */
+	/** Ensures type states for present entry types, runs the actor-component property scan
+	 *  over actor-typed entries (matching a native actor collection), then dispatches the
+	 *  post-rebuild hook into every type state. */
 	virtual void EDITOR_OnPostStagingRebuild() override;
+
+	/**
+	 * Ensure the per-type setup for every present LEAF entry type: a TypeGlobals block
+	 * (seeded from the registered typed collection's CDO through the globals seam, so
+	 * defaults -- including settings-driven instanced subobjects like the actor bounds
+	 * evaluator -- match a freshly created typed collection) and a TypeStates instance
+	 * (class defaults mirror the typed collection's members). Runs eagerly on every
+	 * entry-add path and as a safety net at the start of each post-rebuild session.
+	 * Idempotent; calls Modify() only when adding. Returns true when anything was added.
+	 */
+	bool EDITOR_EnsureTypeSetup();
+
+	virtual void GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const override;
 
 protected:
 	/**

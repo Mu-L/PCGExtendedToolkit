@@ -703,6 +703,18 @@ public:
 		return PCGExAssetCollection::FTypeRegistry::Get().IsA(GetTypeId(), TypeId);
 	}
 
+	/**
+	 * True when this host runs TypeId's cross-entry collection machinery (post-rebuild
+	 * passes, save-time lifecycle -- e.g. the PCGDataAsset shared-collection compaction).
+	 * Entry code gating on machinery must use this, never a concrete host cast.
+	 * Base: only the native type lineage runs its own machinery. Heterogeneous hosts
+	 * override to answer for every type with a registered state class.
+	 */
+	virtual bool SupportsTypeMachinery(PCGExAssetCollection::FTypeId TypeId) const
+	{
+		return IsType(TypeId);
+	}
+
 #pragma endregion
 
 #pragma region Type Globals

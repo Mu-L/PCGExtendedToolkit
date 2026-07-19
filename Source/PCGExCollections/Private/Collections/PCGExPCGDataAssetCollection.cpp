@@ -1012,7 +1012,9 @@ FPCGExPCGDataAssetMachinery UPCGExPCGDataAssetCollection::MakeMachinery()
 
 bool UPCGExPCGDataAssetCollection::HostSupportsDataAssetMachinery(const UPCGExAssetCollection* Host)
 {
-	return Host && Host->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset);
+	// Native lineage runs its own machinery; heterogeneous hosts answer through their
+	// registered type-state capability (per-type processor seam, Phase B).
+	return Host && Host->SupportsTypeMachinery(PCGExAssetCollection::TypeIds::PCGDataAsset);
 }
 
 void UPCGExPCGDataAssetCollection::CompactSharedMeshFor(FPCGExPCGDataAssetMachinery& State)
@@ -1534,6 +1536,184 @@ void UPCGExPCGDataAssetCollection::GetCookDependencyAssetPaths(TSet<FSoftObjectP
 		}
 	}
 }
+#endif
+
+#pragma endregion
+
+#pragma region UPCGExPCGDataTypeState
+
+FPCGExPCGDataAssetMachinery UPCGExPCGDataTypeState::MakeMachinery(UPCGExAssetCollection* Host)
+{
+	FPCGExPCGDataAssetMachinery State;
+	State.Host = Host;
+
+	if (Host)
+	{
+		Host->ForEachEntry([&State](FPCGExAssetCollectionEntry* Entry, int32)
+		{
+			if (Entry->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset))
+			{
+				State.Entries.Add(static_cast<FPCGExPCGDataAssetCollectionEntry*>(Entry));
+			}
+		});
+	}
+
+	State.SharedMeshCollection = &SharedMeshCollection;
+	State.SharedLevelCollection = &SharedLevelCollection;
+	State.ExternalSharedMeshCollection = &ExternalSharedMeshCollection;
+	State.ExternalSharedLevelCollection = &ExternalSharedLevelCollection;
+
+	State.bExternalActive = IsExternalActive();
+	State.ExportFolderPath = ExportFolder.Path;
+	// Same format as UPCGExPCGDataAssetCollection::GetExternalAssetPrefix -- keyed to the
+	// HOST's GUID so filenames are host-unique and rebuild-stable.
+	State.ExternalAssetPrefix = Host ? FString::Printf(TEXT("G_%08X"), Host->GetCollectionGUID()) : FString(TEXT("G_00000000"));
+
+	return State;
+}
+
+void UPCGExPCGDataTypeState::OnHostPreSave(UPCGExAssetCollection* Host, FObjectPreSaveContext SaveContext)
+{
+	// Cook-time safety net -- mirrors UPCGExPCGDataAssetCollection::PreSave (see there for
+	// why SaveExternalPackages is deliberately NOT called during cook).
+	if (SaveContext.IsCooking())
+	{
+		FPCGExPCGDataAssetMachinery State = MakeMachinery(Host);
+		UPCGExPCGDataAssetCollection::RebuildSharedCollectionsFor(State);
+	}
+}
+
+void UPCGExPCGDataTypeState::OnHostPostDuplicate(UPCGExAssetCollection* Host, bool bDuplicateForPIE)
+{
+	// Mirrors UPCGExPCGDataAssetCollection::PostDuplicate: the duplicate's collections carry
+	// fresh GUIDs while per-entry ExportedDataAssets still hold hashes keyed to the originals.
+	if (!bDuplicateForPIE)
+	{
+		FPCGExPCGDataAssetMachinery State = MakeMachinery(Host);
+		UPCGExPCGDataAssetCollection::RebuildSharedCollectionsFor(State);
+	}
+}
+
+void UPCGExPCGDataTypeState::OnHostSerializeSave_Begin(UPCGExAssetCollection* Host)
+{
+	// Entry-level instanced refs live in HOST data (payload rows) -- null them around the
+	// host's save so no hard references to session buffers / externalized assets are baked.
+	// Mirrors the typed collection's Serialize scrub; state-OWNED members are scrubbed in
+	// this object's own Serialize instead (separate package export).
+	if (!IsExternalActive() || !Host)
+	{
+		return;
+	}
+
+	ScrubbedEntries.Reset();
+	ScrubKeepData.Reset();
+	ScrubKeepActors.Reset();
+
+	Host->ForEachEntry([this](FPCGExAssetCollectionEntry* Entry, int32)
+	{
+		if (!Entry->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset))
+		{
+			return;
+		}
+
+		FPCGExPCGDataAssetCollectionEntry* Typed = static_cast<FPCGExPCGDataAssetCollectionEntry*>(Entry);
+		ScrubbedEntries.Add(Typed);
+		ScrubKeepData.Add(Typed->ExportedDataAsset);
+		ScrubKeepActors.Add(Typed->EmbeddedActorCollection);
+		Typed->ExportedDataAsset = nullptr;
+		Typed->EmbeddedActorCollection = nullptr;
+	});
+}
+
+void UPCGExPCGDataTypeState::OnHostSerializeSave_End(UPCGExAssetCollection* Host)
+{
+	// Restores exactly what Begin scrubbed; no-op when Begin's gate skipped.
+	for (int32 i = 0; i < ScrubbedEntries.Num(); i++)
+	{
+		ScrubbedEntries[i]->ExportedDataAsset = ScrubKeepData[i];
+		ScrubbedEntries[i]->EmbeddedActorCollection = ScrubKeepActors[i];
+	}
+
+	ScrubbedEntries.Reset();
+	ScrubKeepData.Reset();
+	ScrubKeepActors.Reset();
+}
+
+void UPCGExPCGDataTypeState::Serialize(FArchive& Ar)
+{
+	// Own-member mirror of the typed collection's external-mode scrub: shared collections
+	// are session working buffers whose targets live in external packages -- keep their
+	// instanced refs out of the saved data. Transacting round-trips in-memory state.
+	if (IsExternalActive() && Ar.IsSaving() && !Ar.IsTransacting())
+	{
+		const TObjectPtr<UPCGExMeshCollection> KeepMesh = SharedMeshCollection;
+		const TObjectPtr<UPCGExLevelCollection> KeepLevel = SharedLevelCollection;
+		SharedMeshCollection = nullptr;
+		SharedLevelCollection = nullptr;
+
+		Super::Serialize(Ar);
+
+		SharedMeshCollection = KeepMesh;
+		SharedLevelCollection = KeepLevel;
+	}
+	else
+	{
+		Super::Serialize(Ar);
+	}
+}
+
+#if WITH_EDITOR
+
+void UPCGExPCGDataTypeState::EDITOR_OnHostPostStagingRebuild(UPCGExAssetCollection* Host)
+{
+	FPCGExPCGDataAssetMachinery State = MakeMachinery(Host);
+	UPCGExPCGDataAssetCollection::RebuildSharedCollectionsFor(State);
+}
+
+void UPCGExPCGDataTypeState::AppendCookDependencyAssetPaths(const UPCGExAssetCollection* Host, TSet<FSoftObjectPath>& OutPaths) const
+{
+	// Mirrors UPCGExPCGDataAssetCollection::GetCookDependencyAssetPaths -- see there for the
+	// embedded-vs-external rationale per block.
+	if (SharedMeshCollection)
+	{
+		SharedMeshCollection->GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+	}
+	if (SharedLevelCollection)
+	{
+		SharedLevelCollection->GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+	}
+
+	if (!ExternalSharedMeshCollection.IsNull())
+	{
+		OutPaths.Add(ExternalSharedMeshCollection.ToSoftObjectPath());
+	}
+	if (!ExternalSharedLevelCollection.IsNull())
+	{
+		OutPaths.Add(ExternalSharedLevelCollection.ToSoftObjectPath());
+	}
+
+	if (Host)
+	{
+		Host->ForEachEntry([&OutPaths](const FPCGExAssetCollectionEntry* Entry, int32)
+		{
+			if (!Entry->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset))
+			{
+				return;
+			}
+
+			const FPCGExPCGDataAssetCollectionEntry* Typed = static_cast<const FPCGExPCGDataAssetCollectionEntry*>(Entry);
+			if (Typed->EmbeddedActorCollection)
+			{
+				Typed->EmbeddedActorCollection->GetAssetPaths(OutPaths, PCGExAssetCollection::ELoadingFlags::Recursive);
+			}
+			if (!Typed->ExternalActorCollection.IsNull())
+			{
+				OutPaths.Add(Typed->ExternalActorCollection.ToSoftObjectPath());
+			}
+		});
+	}
+}
+
 #endif
 
 #pragma endregion

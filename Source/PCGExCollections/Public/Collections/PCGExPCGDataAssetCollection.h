@@ -8,6 +8,7 @@
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Core/PCGExCollectionTypeState.h"
 #include "Helpers/PCGExArrayHelpers.h"
 
 #include "PCGExPCGDataAssetCollection.generated.h"
@@ -206,6 +207,75 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetMachinery
 		return Host && SharedMeshCollection && SharedLevelCollection
 			&& ExternalSharedMeshCollection && ExternalSharedLevelCollection;
 	}
+};
+
+/**
+ * Machinery state/processor for PCGDataAsset-typed entries hosted OUTSIDE a native
+ * PCGDataAsset collection (per-type processor seam, Phase B). Owns the same shared/external
+ * storage the typed collection keeps as members -- names mirror 1:1 -- and dispatches the
+ * host-agnostic machinery cores against it from the host lifecycle hooks. With this state
+ * present, level-sourced entries in an Omni behave like they do in a native collection
+ * (export, compaction, collection maps, externalization).
+ */
+UCLASS(DisplayName="PCG Data Asset Machinery")
+class PCGEXCOLLECTIONS_API UPCGExPCGDataTypeState : public UPCGExCollectionTypeState
+{
+	GENERATED_BODY()
+
+public:
+	/** Mirrors UPCGExPCGDataAssetCollection::bUseExternalAssets. */
+	UPROPERTY(EditAnywhere, Category = "External Storage")
+	bool bUseExternalAssets = false;
+
+	/** Mirrors UPCGExPCGDataAssetCollection::ExportFolder. */
+	UPROPERTY(EditAnywhere, Category = "External Storage", meta=(EditCondition="bUseExternalAssets", ContentDir, LongPackageName))
+	FDirectoryPath ExportFolder;
+
+	UPROPERTY(Instanced)
+	TObjectPtr<UPCGExMeshCollection> SharedMeshCollection;
+
+	UPROPERTY(Instanced)
+	TObjectPtr<UPCGExLevelCollection> SharedLevelCollection;
+
+	UPROPERTY()
+	TSoftObjectPtr<UPCGExMeshCollection> ExternalSharedMeshCollection;
+
+	UPROPERTY()
+	TSoftObjectPtr<UPCGExLevelCollection> ExternalSharedLevelCollection;
+
+	bool IsExternalActive() const
+	{
+		return bUseExternalAssets && !ExportFolder.Path.IsEmpty();
+	}
+
+	/**
+	 * Compose the machinery view: HOST identity (outer/GUID) + THIS state's storage + the
+	 * host's PCGDataAsset-typed entry payloads in host order. External-asset naming uses the
+	 * view index -- stable as long as row order is, same contract as the typed collection.
+	 */
+	FPCGExPCGDataAssetMachinery MakeMachinery(UPCGExAssetCollection* Host);
+
+	//~ UPCGExCollectionTypeState
+	virtual void OnHostPreSave(UPCGExAssetCollection* Host, FObjectPreSaveContext SaveContext) override;
+	virtual void OnHostPostDuplicate(UPCGExAssetCollection* Host, bool bDuplicateForPIE) override;
+	virtual void OnHostSerializeSave_Begin(UPCGExAssetCollection* Host) override;
+	virtual void OnHostSerializeSave_End(UPCGExAssetCollection* Host) override;
+#if WITH_EDITOR
+	virtual void EDITOR_OnHostPostStagingRebuild(UPCGExAssetCollection* Host) override;
+	virtual void AppendCookDependencyAssetPaths(const UPCGExAssetCollection* Host, TSet<FSoftObjectPath>& OutPaths) const override;
+#endif
+
+	/** Own-member scrub: in external mode the shared collections are session working buffers;
+	 *  their instanced refs must not bake hard references into the saved package. Entry-level
+	 *  refs live in HOST data and are scrubbed by the OnHostSerializeSave pair instead. */
+	virtual void Serialize(FArchive& Ar) override;
+
+private:
+	// OnHostSerializeSave_Begin/End restore buffers. Plain members: the pair brackets one
+	// host Serialize call on one thread, no GC window in between.
+	TArray<TObjectPtr<UPCGDataAsset>> ScrubKeepData;
+	TArray<TObjectPtr<UPCGExActorCollection>> ScrubKeepActors;
+	TArray<FPCGExPCGDataAssetCollectionEntry*> ScrubbedEntries;
 };
 
 UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | PCGDataAsset", meta=(ToolTip = "A weighted collection of PCG Data Assets."))

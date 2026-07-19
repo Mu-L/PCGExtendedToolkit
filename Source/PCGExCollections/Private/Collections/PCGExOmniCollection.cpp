@@ -52,7 +52,13 @@ namespace PCGExOmniCollection
 				FTypeRegistry::AddPendingCustomization(TypeIds::SkinnedMesh, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExSkinnedMeshCollectionGlobals::StaticStruct(); });
 				FTypeRegistry::AddPendingCustomization(TypeIds::Actor, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExActorCollectionGlobals::StaticStruct(); });
 				FTypeRegistry::AddPendingCustomization(TypeIds::Level, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExLevelCollectionGlobals::StaticStruct(); });
-				FTypeRegistry::AddPendingCustomization(TypeIds::PCGDataAsset, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExPCGDataAssetCollectionGlobals::StaticStruct(); });
+				FTypeRegistry::AddPendingCustomization(TypeIds::PCGDataAsset, [](FTypeInfo& Info)
+				{
+					Info.GlobalsStruct = FPCGExPCGDataAssetCollectionGlobals::StaticStruct();
+					// Machinery state/processor: hosts carrying this run the PCGData shared
+					// compaction / collection maps / externalization for their PCGData entries.
+					Info.StateClass = UPCGExPCGDataTypeState::StaticClass();
+				});
 			}
 
 #if WITH_EDITOR
@@ -249,6 +255,98 @@ void UPCGExOmniCollection::GetTypeGlobalsStructs(TArray<const UScriptStruct*>& O
 		if (const UScriptStruct* BlockStruct = Block.GetScriptStruct())
 		{
 			OutStructs.AddUnique(BlockStruct);
+		}
+	}
+}
+
+UPCGExCollectionTypeState* UPCGExOmniCollection::FindTypeState(const UClass* StateClass) const
+{
+	if (!StateClass)
+	{
+		return nullptr;
+	}
+
+	for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+	{
+		if (State && State->GetClass()->IsChildOf(StateClass))
+		{
+			return State;
+		}
+	}
+
+	return nullptr;
+}
+
+bool UPCGExOmniCollection::SupportsTypeMachinery(const PCGExAssetCollection::FTypeId TypeId) const
+{
+	// A registered StateClass means this host can instantiate and drive the type's
+	// machinery -- answered from the registry (not live state presence) so entry staging
+	// guards pass BEFORE the state is first ensured by the rebuild session.
+	const PCGExAssetCollection::FTypeInfo* Info = PCGExAssetCollection::FTypeRegistry::Get().Find(TypeId);
+	if (Info && Info->StateClass.IsValid())
+	{
+		return true;
+	}
+
+	return Super::SupportsTypeMachinery(TypeId);
+}
+
+void UPCGExOmniCollection::Serialize(FArchive& Ar)
+{
+	// Save-scrub pair: type states null host-side instanced refs (entry payload subobjects)
+	// around the save so session buffers / externalized assets don't bake hard references.
+	// State-OWNED members scrub in each state's own Serialize.
+	const bool bScrub = Ar.IsSaving() && !Ar.IsTransacting();
+
+	if (bScrub)
+	{
+		for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+		{
+			if (State)
+			{
+				State->OnHostSerializeSave_Begin(this);
+			}
+		}
+	}
+
+	Super::Serialize(Ar);
+
+	if (bScrub)
+	{
+		for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+		{
+			if (State)
+			{
+				State->OnHostSerializeSave_End(this);
+			}
+		}
+	}
+}
+
+void UPCGExOmniCollection::PreSave(FObjectPreSaveContext ObjectSaveContext)
+{
+	for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+	{
+		if (State)
+		{
+			State->OnHostPreSave(this, ObjectSaveContext);
+		}
+	}
+
+	Super::PreSave(ObjectSaveContext);
+}
+
+void UPCGExOmniCollection::PostDuplicate(const bool bDuplicateForPIE)
+{
+	// Super first: the duplicate's CollectionGUID must be regenerated before states re-stamp
+	// anything keyed to it (mirrors the typed PCGData collection's ordering).
+	Super::PostDuplicate(bDuplicateForPIE);
+
+	for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+	{
+		if (State)
+		{
+			State->OnHostPostDuplicate(this, bDuplicateForPIE);
 		}
 	}
 }
@@ -478,16 +576,101 @@ void UPCGExOmniCollection::EDITOR_OnPostStagingRebuild()
 		bAnyActorEntry |= !Entry->bIsSubCollection && Entry->IsType(PCGExAssetCollection::TypeIds::Actor);
 	});
 
-	if (!bAnyActorEntry)
+	if (bAnyActorEntry)
 	{
-		return;
+		// Merge policy from the actor globals block when one is present; struct default otherwise.
+		FPCGExActorCollectionGlobals ActorGlobals;
+		GetTypeGlobals(ActorGlobals);
+
+		UPCGExActorCollection::RebuildActorPropertiesFromComponents(this, ActorGlobals.SchemaMergePolicy);
 	}
 
-	// Merge policy from the actor globals block when one is present; struct default otherwise.
-	FPCGExActorCollectionGlobals ActorGlobals;
-	GetTypeGlobals(ActorGlobals);
+	// Per-type setup safety net (entry-add paths ensure eagerly), then dispatch -- newly
+	// needed machinery (e.g. the first level-sourced PCGData entry) runs within the session.
+	EDITOR_EnsureTypeSetup();
+	for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+	{
+		if (State)
+		{
+			State->EDITOR_OnHostPostStagingRebuild(this);
+		}
+	}
+}
 
-	UPCGExActorCollection::RebuildActorPropertiesFromComponents(this, ActorGlobals.SchemaMergePolicy);
+bool UPCGExOmniCollection::EDITOR_EnsureTypeSetup()
+{
+	// Leaf entries only: subcollection rows' content is configured on the referenced
+	// collection itself. Registry FTypeInfo pointers are stable (registrations only mutate
+	// at module init / plugin load).
+	TSet<const PCGExAssetCollection::FTypeInfo*> PresentTypes;
+	ForEachEntry([&PresentTypes](const FPCGExAssetCollectionEntry* Entry, int32)
+	{
+		if (Entry->bIsSubCollection)
+		{
+			return;
+		}
+		if (const PCGExAssetCollection::FTypeInfo* Info = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId()))
+		{
+			PresentTypes.Add(Info);
+		}
+	});
+
+	bool bAdded = false;
+
+	for (const PCGExAssetCollection::FTypeInfo* Info : PresentTypes)
+	{
+		// Globals block, seeded from the typed collection's CDO through the globals seam so
+		// defaults -- including settings-driven instanced subobjects like the actor bounds
+		// evaluator -- match a freshly created typed collection of that type.
+		if (Info->GlobalsStruct)
+		{
+			const bool bBlockExists = TypeGlobals.ContainsByPredicate([Info](const FInstancedStruct& Block)
+			{
+				return Block.GetScriptStruct() && Block.GetScriptStruct()->IsChildOf(Info->GlobalsStruct);
+			});
+
+			if (!bBlockExists)
+			{
+				Modify();
+				FInstancedStruct& Block = TypeGlobals.Emplace_GetRef();
+				Block.InitializeAs(Info->GlobalsStruct);
+
+				const UPCGExAssetCollection* TypedCDO = Info->CollectionClass.IsValid()
+					? Cast<UPCGExAssetCollection>(Info->CollectionClass->GetDefaultObject())
+					: nullptr;
+				if (TypedCDO && TypedCDO->GetTypeGlobals(Info->GlobalsStruct, *Block.GetMutablePtr<FPCGExCollectionTypeGlobals>()))
+				{
+					// CDO-owned subobjects must never be referenced by an asset.
+					PCGExCollectionHelpers::DuplicateInstancedSubobjects(Info->GlobalsStruct, Block.GetMutableMemory(), this);
+				}
+
+				bAdded = true;
+			}
+		}
+
+		// Machinery state; class defaults mirror the typed collection's members.
+		if (Info->StateClass.IsValid() && !FindTypeState(Info->StateClass.Get()))
+		{
+			Modify();
+			TypeStates.Add(NewObject<UPCGExCollectionTypeState>(this, Info->StateClass.Get(), NAME_None, RF_Transactional));
+			bAdded = true;
+		}
+	}
+
+	return bAdded;
+}
+
+void UPCGExOmniCollection::GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
+{
+	Super::GetCookDependencyAssetPaths(OutPaths);
+
+	for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+	{
+		if (State)
+		{
+			State->AppendCookDependencyAssetPaths(this, OutPaths);
+		}
+	}
 }
 
 void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const
@@ -512,7 +695,16 @@ void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruc
 FPCGExAssetCollectionEntry* UPCGExOmniCollection::EDITOR_AddEntry(const UScriptStruct* EntryStruct)
 {
 	// Untyped adds are meaningless on a heterogeneous host -- the caller must pick a type.
-	return EntryStruct ? AddEntryOfType(EntryStruct) : nullptr;
+	FPCGExAssetCollectionEntry* NewEntry = EntryStruct ? AddEntryOfType(EntryStruct) : nullptr;
+
+	if (NewEntry)
+	{
+		// A matching entry type arrives with its per-type setup (globals block + machinery
+		// state) already in place, typed-collection defaults included.
+		EDITOR_EnsureTypeSetup();
+	}
+
+	return NewEntry;
 }
 
 void UPCGExOmniCollection::EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections)
@@ -647,6 +839,10 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 			break; // Asset claimed by this type.
 		}
 	}
+
+	// Newly ingested entry types arrive with their per-type setup (globals block + machinery
+	// state) in place, typed-collection defaults included. Idempotent.
+	EDITOR_EnsureTypeSetup();
 }
 
 #endif

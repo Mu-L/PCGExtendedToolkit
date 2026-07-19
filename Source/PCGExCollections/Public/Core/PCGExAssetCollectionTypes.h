@@ -72,6 +72,12 @@ namespace PCGExAssetCollection
 		// and config-block UI. Registered via AddPendingCustomization.
 		UScriptStruct* GlobalsStruct = nullptr;
 
+		// The type's machinery state/processor class (UPCGExCollectionTypeState derivative),
+		// when the type has cross-entry collection machinery. Heterogeneous hosts instantiate
+		// one per present entry type and dispatch their lifecycle into it; a registered class
+		// is also what makes such hosts answer SupportsTypeMachinery for the type.
+		TWeakObjectPtr<UClass> StateClass = nullptr;
+
 		FText DisplayName;
 		FTypeId ParentType = NAME_None; // For inheritance checking
 
