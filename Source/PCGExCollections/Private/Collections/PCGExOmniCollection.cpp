@@ -379,6 +379,30 @@ const UScriptStruct* UPCGExOmniCollection::EDITOR_GetEntryScriptStruct(const int
 	return Entries.IsValidIndex(RawIndex) ? Entries[RawIndex].Entry.GetScriptStruct() : nullptr;
 }
 
+void UPCGExOmniCollection::EDITOR_OnPostStagingRebuild()
+{
+	Super::EDITOR_OnPostStagingRebuild();
+
+	// Actor-typed entries get the same property-component schema scan a native actor
+	// collection runs in its own post-rebuild hook.
+	bool bAnyActorEntry = false;
+	ForEachEntry([&bAnyActorEntry](const FPCGExAssetCollectionEntry* Entry, int32)
+	{
+		bAnyActorEntry |= !Entry->bIsSubCollection && Entry->IsType(PCGExAssetCollection::TypeIds::Actor);
+	});
+
+	if (!bAnyActorEntry)
+	{
+		return;
+	}
+
+	// Merge policy from the actor globals block when one is present; struct default otherwise.
+	FPCGExActorCollectionGlobals ActorGlobals;
+	GetTypeGlobals(ActorGlobals);
+
+	UPCGExActorCollection::RebuildActorPropertiesFromComponents(this, ActorGlobals.SchemaMergePolicy);
+}
+
 void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const
 {
 	// Every registered concrete entry type. Registered order isn't user-facing; sort by

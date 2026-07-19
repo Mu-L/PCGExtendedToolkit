@@ -309,6 +309,7 @@ bool UPCGExActorCollection::GetTypeGlobalsInternal(const UScriptStruct* StructTy
 
 	FPCGExActorCollectionGlobals& Out = static_cast<FPCGExActorCollectionGlobals&>(OutGlobals);
 	Out.BoundsEvaluator = BoundsEvaluator;
+	Out.SchemaMergePolicy = SchemaMergePolicy;
 	return true;
 }
 
@@ -316,10 +317,23 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 	EPCGExSchemaMergePolicy Policy,
 	TArrayView<AActor*> RepresentativeInstances)
 {
+	RebuildActorPropertiesFromComponents(this, Policy, RepresentativeInstances);
+}
+
+void UPCGExActorCollection::RebuildActorPropertiesFromComponents(
+	UPCGExAssetCollection* Host,
+	EPCGExSchemaMergePolicy Policy,
+	TArrayView<AActor*> RepresentativeInstances)
+{
+	if (!Host)
+	{
+		return;
+	}
+
 	// Remap entries before the downstream per-entry SyncToSchema -- otherwise SyncToSchema's
 	// HeaderId index aliases collided entries and per-entry authored values silently fall
 	// through to the schema default during the canonical rebuild below.
-	SyncPropertySchemaAndRemapEntries();
+	Host->SyncPropertySchemaAndRemapEntries();
 
 	// Source ordering under FirstWins / StrictTypeMatch:
 	//   1. Inherited-defaults aggregate (per-BP-class CDO views; asset-default fallback when
@@ -332,22 +346,28 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 	TMap<UClass*, TArray<FInstancedStruct>> InheritedByClass;
 	TMap<UClass*, TArray<FInstancedStruct>> AssetDefaultsByClass;
 
-	// Per-entry effective schemas, parallel to Entries (empty for entries with no donor).
+	const int32 NumEntriesTotal = Host->NumEntries();
+
+	// Per-entry effective schemas, parallel to the raw entry indices (empty for entries with
+	// no donor).
 	TArray<TArray<FInstancedStruct>> EntryCompSchemas;
-	EntryCompSchemas.SetNum(Entries.Num());
+	EntryCompSchemas.SetNum(NumEntriesTotal);
 
 	// Loaded-level handle holders, kept alive across the merge call so donor pointers stay
 	// valid. One handle per entry that needed a level load.
 	TArray<TSharedPtr<FStreamableHandle>> LevelHandles;
-	LevelHandles.Reserve(Entries.Num());
+	LevelHandles.Reserve(NumEntriesTotal);
 
-	for (int32 i = 0; i < Entries.Num(); ++i)
+	// Only actor-typed leaf entries contribute donors; other types (heterogeneous hosts)
+	// are skipped here but still re-sync against the merged schema below.
+	Host->ForEachEntry([&](const FPCGExAssetCollectionEntry* BaseEntry, const int32 i)
 	{
-		const FPCGExActorCollectionEntry& Entry = Entries[i];
-		if (Entry.bIsSubCollection)
+		if (BaseEntry->bIsSubCollection || !BaseEntry->IsType(PCGExAssetCollection::TypeIds::Actor))
 		{
-			continue;
+			return;
 		}
+
+		const FPCGExActorCollectionEntry& Entry = *static_cast<const FPCGExActorCollectionEntry*>(BaseEntry);
 
 		AActor* Instance = RepresentativeInstances.IsValidIndex(i) ? RepresentativeInstances[i] : nullptr;
 		TSharedPtr<FStreamableHandle> Handle;
@@ -359,13 +379,13 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 
 		if (!Donor)
 		{
-			continue;
+			return;
 		}
 
 		TArray<FInstancedStruct> CompSchema = UPCGExPropertyCollectionComponent::ExtractSchemaFromActor(Donor);
 		if (CompSchema.IsEmpty())
 		{
-			continue;
+			return;
 		}
 
 		// First donor of each class wins; subsequent donors share the same CDO so re-extracting
@@ -381,7 +401,7 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 		}
 
 		EntryCompSchemas[i] = MoveTemp(CompSchema);
-	}
+	});
 
 	TArray<TConstArrayView<FInstancedStruct>> InheritedViews;
 	InheritedViews.Reserve(InheritedByClass.Num());
@@ -398,21 +418,21 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 	TArray<FInstancedStruct> InheritedAggregate = PCGExProperties::AggregateAgreedValuesByName(InheritedViews, AssetDefaultViews);
 
 	TArray<TArray<FInstancedStruct>> Sources;
-	Sources.Reserve(2 + Entries.Num());
+	Sources.Reserve(2 + NumEntriesTotal);
 
-	// Parallel to Entries; INDEX_NONE means "this entry contributed no source".
+	// Parallel to the raw entry indices; INDEX_NONE means "this entry contributed no source".
 	TArray<int32> EntrySourceIdx;
-	EntrySourceIdx.Init(INDEX_NONE, Entries.Num());
+	EntrySourceIdx.Init(INDEX_NONE, NumEntriesTotal);
 
 	Sources.Add(MoveTemp(InheritedAggregate));
-	for (int32 i = 0; i < Entries.Num(); ++i)
+	for (int32 i = 0; i < NumEntriesTotal; ++i)
 	{
 		if (!EntryCompSchemas[i].IsEmpty())
 		{
 			EntrySourceIdx[i] = Sources.Add(MoveTemp(EntryCompSchemas[i]));
 		}
 	}
-	Sources.Add(CollectionProperties.BuildSchema());
+	Sources.Add(Host->CollectionProperties.BuildSchema());
 
 	// Nothing authored anywhere: leave existing state untouched (avoids no-op churn).
 	bool bAnySource = false;
@@ -434,22 +454,22 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 	}
 
 	const PCGExProperties::FSchemaMergeResult MergeResult = PCGExProperties::MergeSchemas(Sources, Policy);
-	PCGExProperties::LogSchemaConflicts(MergeResult, this);
-	PCGExProperties::ApplyMergeResultToSchemas(CollectionProperties, MergeResult.Merged);
+	PCGExProperties::LogSchemaConflicts(MergeResult, Host);
+	PCGExProperties::ApplyMergeResultToSchemas(Host->CollectionProperties, MergeResult.Merged);
 
-	TArray<FInstancedStruct> CanonicalSchema = CollectionProperties.BuildSchema();
+	TArray<FInstancedStruct> CanonicalSchema = Host->CollectionProperties.BuildSchema();
 
-	// SyncToSchema preserves overrides via HeaderId match; then per-source contributors get
-	// their authored values written into the matching slot and flipped enabled.
-	for (int32 i = 0; i < Entries.Num(); ++i)
+	// SyncToSchema preserves overrides via HeaderId match (ALL entries -- the collection
+	// schema is shared regardless of entry type); then per-source contributors get their
+	// authored values written into the matching slot and flipped enabled.
+	Host->ForEachEntry([&](FPCGExAssetCollectionEntry* BaseEntry, const int32 i)
 	{
-		FPCGExActorCollectionEntry& Entry = Entries[i];
-		Entry.PropertyOverrides.SyncToSchema(CanonicalSchema);
+		BaseEntry->PropertyOverrides.SyncToSchema(CanonicalSchema);
 
 		const int32 SourceIdx = EntrySourceIdx[i];
 		if (SourceIdx == INDEX_NONE)
 		{
-			continue;
+			return;
 		}
 
 		const TArray<int32>& LocalToMerged = MergeResult.SourceToMergedIdx[SourceIdx];
@@ -458,12 +478,12 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 		for (int32 LocalIdx = 0; LocalIdx < SourceProps.Num(); ++LocalIdx)
 		{
 			const int32 MergedIdx = LocalToMerged[LocalIdx];
-			if (MergedIdx == INDEX_NONE || !Entry.PropertyOverrides.Overrides.IsValidIndex(MergedIdx))
+			if (MergedIdx == INDEX_NONE || !BaseEntry->PropertyOverrides.Overrides.IsValidIndex(MergedIdx))
 			{
 				continue;
 			}
 
-			FPCGExPropertyOverrideEntry& Slot = Entry.PropertyOverrides.Overrides[MergedIdx];
+			FPCGExPropertyOverrideEntry& Slot = BaseEntry->PropertyOverrides.Overrides[MergedIdx];
 			Slot.Value = SourceProps[LocalIdx];
 			Slot.bEnabled = true;
 
@@ -481,9 +501,9 @@ void UPCGExActorCollection::RebuildPropertiesFromActorComponents(
 				}
 			}
 		}
-	}
+	});
 
-	RebuildPropertyRegistry();
+	Host->RebuildPropertyRegistry();
 
 	for (TSharedPtr<FStreamableHandle>& H : LevelHandles)
 	{

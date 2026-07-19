@@ -130,6 +130,10 @@ public:
 	virtual void EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const override;
 	virtual FPCGExAssetCollectionEntry* EDITOR_AddEntry(const UScriptStruct* EntryStruct = nullptr) override;
 
+	/** Runs the actor-component property scan over actor-typed entries, matching what a
+	 *  native actor collection does (merge policy from the actor globals block, if any). */
+	virtual void EDITOR_OnPostStagingRebuild() override;
+
 protected:
 	/**
 	 * Routes each dropped asset to the highest-priority registered type whose

@@ -29,6 +29,11 @@ struct PCGEXCOLLECTIONS_API FPCGExActorCollectionGlobals : public FPCGExCollecti
 	/** Bounds evaluator for bounds computation. If null, basic GetActorBounds fallback is used. */
 	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
 	TObjectPtr<UPCGExBoundsEvaluator> BoundsEvaluator;
+
+	/** Policy used when merging actor-component schemas into the host's CollectionProperties
+	 *  on staging rebuild (see RebuildActorPropertiesFromComponents). */
+	UPROPERTY(EditAnywhere, Category = Settings)
+	EPCGExSchemaMergePolicy SchemaMergePolicy = EPCGExSchemaMergePolicy::StrictTypeMatch;
 };
 
 /**
@@ -167,6 +172,18 @@ public:
 	 *                          through to DeltaSourceLevel resolution. May be empty.
 	 */
 	void RebuildPropertiesFromActorComponents(
+		EPCGExSchemaMergePolicy Policy = EPCGExSchemaMergePolicy::StrictTypeMatch,
+		TArrayView<AActor*> RepresentativeInstances = {});
+
+	/**
+	 * Host-agnostic core of RebuildPropertiesFromActorComponents: runs the actor-component
+	 * scan/merge over the ACTOR-typed leaf entries of ANY collection -- heterogeneous hosts
+	 * (Omni) included. Non-actor entries contribute nothing but still get their
+	 * PropertyOverrides re-synced against the merged canonical schema (the collection-level
+	 * schema is shared by every entry). RepresentativeInstances is indexed by raw entry index.
+	 */
+	static void RebuildActorPropertiesFromComponents(
+		UPCGExAssetCollection* Host,
 		EPCGExSchemaMergePolicy Policy = EPCGExSchemaMergePolicy::StrictTypeMatch,
 		TArrayView<AActor*> RepresentativeInstances = {});
 

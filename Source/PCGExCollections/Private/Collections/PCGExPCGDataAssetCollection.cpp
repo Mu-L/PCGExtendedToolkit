@@ -102,6 +102,29 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 
 	if (Source == EPCGExDataAssetEntrySource::Level)
 	{
+		// Level-sourced entries depend on collection-level machinery only PCGDataAsset
+		// collections run (shared-collection compaction, collection maps, externalization).
+		// In any other host the export would be half-functional -- stage nothing and point
+		// the user at the composition path instead of shipping a silently broken setup.
+		if (!OwningCollection || !OwningCollection->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset))
+		{
+			UE_LOG(LogPCGEx, Warning,
+			       TEXT("Level-sourced PCGDataAsset entry ('%s') is hosted by a collection without the level-export machinery -- entry skipped. Author it in a PCGDataAsset collection and reference that collection as a subcollection entry instead."),
+			       *Level.ToSoftObjectPath().ToString());
+
+			Staging.Bounds = FBox(ForceInit);
+			Staging.Path = FSoftObjectPath();
+#if WITH_EDITORONLY_DATA
+			EditorMeshContributions.Reset();
+			EditorMeshInheritedDefaults.Reset();
+			EditorLocalPicks.Reset();
+			EditorLevelContributions.Reset();
+			EditorLevelLocalPicks.Reset();
+#endif
+			FPCGExAssetCollectionEntry::UpdateStaging(OwningCollection, InInternalIndex, bRecursive);
+			return;
+		}
+
 		// Level source: load world, export to embedded data asset
 		TSharedPtr<FStreamableHandle> Handle = PCGExHelpers::LoadBlocking_AnyThread(Level.ToSoftObjectPath());
 		UWorld* LoadedWorld = Level.Get();
