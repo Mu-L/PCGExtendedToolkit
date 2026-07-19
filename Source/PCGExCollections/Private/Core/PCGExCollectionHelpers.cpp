@@ -344,4 +344,38 @@ namespace PCGExCollectionHelpers
 
 		return WriteIndex > 0;
 	}
+
+	void GetEntryAssetHalves(const UPCGExAssetCollection* Collection, bool& bOutAnyActor, bool& bOutAnyNonActor)
+	{
+		bOutAnyActor = false;
+		bOutAnyNonActor = false;
+
+		if (!Collection)
+		{
+			return;
+		}
+
+		// Typed Actor collections keep their legacy classification even when empty.
+		if (Collection->IsType(PCGExAssetCollection::TypeIds::Actor))
+		{
+			bOutAnyActor = true;
+		}
+
+		Collection->ForEachEntry([&bOutAnyActor, &bOutAnyNonActor](const FPCGExAssetCollectionEntry* Entry, int32)
+		{
+			if (Entry->bIsSubCollection)
+			{
+				return;
+			}
+
+			if (Entry->IsType(PCGExAssetCollection::TypeIds::Actor))
+			{
+				bOutAnyActor = true;
+			}
+			else
+			{
+				bOutAnyNonActor = true;
+			}
+		});
+	}
 }

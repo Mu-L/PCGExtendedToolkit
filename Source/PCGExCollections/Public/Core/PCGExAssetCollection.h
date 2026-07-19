@@ -962,8 +962,10 @@ public:
 	 * are already referenced by an existing subcollection entry.
 	 * Does NOT open a transaction or mark dirty -- caller is responsible (matches the
 	 * EDITOR_AddBrowserSelectionTyped contract).
+	 * Base implementation reflects over a homogeneous `Entries` array of entry structs;
+	 * collections whose rows wrap payloads (Omni) override it.
 	 */
-	void EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections);
+	virtual void EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections);
 
 	/**
 	 * Post-rebuild extension point. Called once at the tail of any user-triggered editor

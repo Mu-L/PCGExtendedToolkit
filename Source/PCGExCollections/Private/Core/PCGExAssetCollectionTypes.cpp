@@ -44,6 +44,20 @@ namespace PCGExAssetCollection
 	}
 
 
+	void FTypeRegistry::Customize(FTypeId Id, TFunctionRef<void(FTypeInfo&)> Mutator)
+	{
+		FWriteScopeLock Lock(RegistryLock);
+
+		FTypeInfo* Info = Types.Find(Id);
+		if (!Info)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PCGExAssetCollection: Cannot customize unregistered type '%s'"), *Id.ToString());
+			return;
+		}
+
+		Mutator(*Info);
+	}
+
 	// Two-phase registration: before module startup, registrations are queued.
 	// ProcessPendingRegistrations() flushes the queue during module init.
 	// Late registrations (e.g. hot-reload or plugins loaded after init) execute immediately.
@@ -56,6 +70,18 @@ namespace PCGExAssetCollection
 		else
 		{
 			GetPendingRegistrations().Add(MoveTemp(Func));
+		}
+	}
+
+	void FTypeRegistry::AddPendingCustomization(FTypeId Id, TFunction<void(FTypeInfo&)>&& Mutator)
+	{
+		if (IsProcessed())
+		{
+			Get().Customize(Id, Mutator);
+		}
+		else
+		{
+			GetPendingCustomizations().Emplace(Id, MoveTemp(Mutator));
 		}
 	}
 
@@ -73,11 +99,26 @@ namespace PCGExAssetCollection
 		}
 		GetPendingRegistrations().Empty();
 		GetPendingRegistrations().Shrink();
+
+		// Customizations run strictly after every registration so cross-TU static-init
+		// ordering between a type's registration and its customizers never matters.
+		for (auto& Pair : GetPendingCustomizations())
+		{
+			Get().Customize(Pair.Key, Pair.Value);
+		}
+		GetPendingCustomizations().Empty();
+		GetPendingCustomizations().Shrink();
 	}
 
 	TArray<TFunction<void()>>& FTypeRegistry::GetPendingRegistrations()
 	{
 		static TArray<TFunction<void()>> Pending;
+		return Pending;
+	}
+
+	TArray<TPair<FTypeId, TFunction<void(FTypeInfo&)>>>& FTypeRegistry::GetPendingCustomizations()
+	{
+		static TArray<TPair<FTypeId, TFunction<void(FTypeInfo&)>>> Pending;
 		return Pending;
 	}
 

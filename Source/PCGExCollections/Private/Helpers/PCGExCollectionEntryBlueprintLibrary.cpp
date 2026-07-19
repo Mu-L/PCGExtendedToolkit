@@ -219,6 +219,23 @@ namespace PCGExCollectionEntryBlueprintLibrary_Private
 		return FPCGExAssetCollectionEntry::StaticStruct();
 	}
 
+	// Per-entry refinement of ResolveEntryMemberRoot: heterogeneous hosts (Variant, Omni)
+	// have no single entry struct, but a live entry knows its own type. Same result as the
+	// collection root on typed collections; subcollection rows (TypeId Base) fall through
+	// to the collection root, matching legacy behavior.
+	const UStruct* ResolveEntryMemberRootForEntry(const UPCGExAssetCollection* Collection, const FPCGExAssetCollectionEntry* Entry)
+	{
+		if (Entry)
+		{
+			const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId());
+			if (TypeInfo && TypeInfo->EntryStruct)
+			{
+				return TypeInfo->EntryStruct;
+			}
+		}
+		return ResolveEntryMemberRoot(Collection);
+	}
+
 	PCGExMemberPath::FResolvedMember ResolveEntryMember(UPCGExAssetCollection* Collection, int32 EntryIndex, FName MemberPath)
 	{
 		FPCGExAssetCollectionEntry* Entry = GetMutableEntry(Collection, EntryIndex);
@@ -226,7 +243,7 @@ namespace PCGExCollectionEntryBlueprintLibrary_Private
 		{
 			return PCGExMemberPath::FResolvedMember();
 		}
-		return PCGExMemberPath::Resolve(ResolveEntryMemberRoot(Collection), Entry, MemberPath);
+		return PCGExMemberPath::Resolve(ResolveEntryMemberRootForEntry(Collection, Entry), Entry, MemberPath);
 	}
 
 	PCGExMemberPath::FResolvedMember ResolveEntryMemberConst(const UPCGExAssetCollection* Collection, int32 EntryIndex, FName MemberPath)
@@ -238,7 +255,7 @@ namespace PCGExCollectionEntryBlueprintLibrary_Private
 		{
 			return PCGExMemberPath::FResolvedMember();
 		}
-		return PCGExMemberPath::Resolve(ResolveEntryMemberRoot(Collection), const_cast<FPCGExAssetCollectionEntry*>(Entry), MemberPath);
+		return PCGExMemberPath::Resolve(ResolveEntryMemberRootForEntry(Collection, Entry), const_cast<FPCGExAssetCollectionEntry*>(Entry), MemberPath);
 	}
 
 	PCGExMemberPath::FResolvedMember ResolveCollectionMember(UPCGExAssetCollection* Collection, FName MemberPath)

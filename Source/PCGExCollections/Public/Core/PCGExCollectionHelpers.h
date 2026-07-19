@@ -101,4 +101,15 @@ namespace PCGExCollectionHelpers
 	bool FlattenCollection(
 		const UPCGExAssetCollection* Source,
 		UPCGExAssetCollection* Target);
+
+	/**
+	 * Classify a collection's LEAF entries for actor-vs-asset output declaration: actor
+	 * entries emit an asset CLASS, everything else emits an asset PATH. Heterogeneous hosts
+	 * (Variant, Omni) may hold both kinds, so consumers must not classify by collection
+	 * class. Subcollection entries are skipped (their content is classified wherever that
+	 * collection itself is consumed). A typed Actor collection reports bOutAnyActor even
+	 * when empty, preserving legacy declaration behavior.
+	 */
+	PCGEXCOLLECTIONS_API
+	void GetEntryAssetHalves(const UPCGExAssetCollection* Collection, bool& bOutAnyActor, bool& bOutAnyNonActor);
 }
