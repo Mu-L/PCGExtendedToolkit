@@ -112,6 +112,28 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 			       TEXT("Level-sourced PCGDataAsset entry ('%s') is hosted by a collection without the level-export machinery -- entry skipped. Author it in a PCGDataAsset collection and reference that collection as a subcollection entry instead."),
 			       *Level.ToSoftObjectPath().ToString());
 
+			// Discard any embedded export the entry carried in (e.g. copied along from a
+			// PCGDataAsset collection): a foreign host never consumes it, and a reference to
+			// ANOTHER asset's private subobject must not survive into a save. Subobjects this
+			// host owns get the usual transient-rename so no orphaned export lingers in the
+			// package (mirrors the recreate path below); foreign-owned pointers are only
+			// nulled -- the owning asset is not ours to mutate.
+			auto DiscardEmbedded = [OwningCollection](auto& Embedded)
+			{
+				if (!Embedded)
+				{
+					return;
+				}
+				if (Embedded->GetOuter() == OwningCollection)
+				{
+					Embedded->Rename(nullptr, GetTransientPackage(),
+					                 REN_DontCreateRedirectors | REN_NonTransactional);
+				}
+				Embedded = nullptr;
+			};
+			DiscardEmbedded(ExportedDataAsset);
+			DiscardEmbedded(EmbeddedActorCollection);
+
 			Staging.Bounds = FBox(ForceInit);
 			Staging.Path = FSoftObjectPath();
 #if WITH_EDITORONLY_DATA

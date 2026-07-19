@@ -9,9 +9,12 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Collections/PCGExOmniCollection.h"
 #include "Core/PCGExAssetCollection.h"
+#include "Framework/Notifications/NotificationManager.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopedSlowTask.h"
 #include "UObject/Package.h"
+#include "Widgets/Notifications/SNotificationList.h"
 
 namespace PCGExCollectionEditorHelpers
 {
@@ -158,9 +161,36 @@ namespace PCGExCollectionEditorHelpers
 			return;
 		}
 
-		Target->EDITOR_AppendCollections(Sources);
+		int32 AppendedCount = 0;
+		{
+			// After the modal save dialog, so the progress dialog doesn't fight it.
+			FScopedSlowTask SlowTask(1.0f, NSLOCTEXT("PCGEx", "MergingIntoOmni", "Merging collection(s) into Omni collection..."));
+			SlowTask.MakeDialog();
+			SlowTask.EnterProgressFrame(1.0f);
+			AppendedCount = Target->EDITOR_AppendCollections(Sources);
+		}
 
-		FEditorFileUtils::PromptForCheckoutAndSave({Target->GetOutermost()}, /*bCheckDirty=*/false, /*bPromptToSave=*/false);
+		// Sources whose storage can't be merged (e.g. Variant collections) contribute nothing
+		// and are detailed in the log by EDITOR_AppendCollections -- surface the outcome here
+		// so a partial or empty merge is never silent.
+		{
+			FNotificationInfo Info(AppendedCount > 0
+				                       ? FText::Format(NSLOCTEXT("PCGEx", "MergedIntoOmni", "Appended {0} {0}|plural(one=entry,other=entries) from {1} {1}|plural(one=collection,other=collections) into '{2}'."),
+				                                       AppendedCount, Sources.Num(), FText::FromString(Target->GetName()))
+				                       : NSLOCTEXT("PCGEx", "MergedIntoOmniNothing", "No entries could be appended from the selected collections (see log)."));
+			Info.ExpireDuration = 5.0f;
+			Info.bUseSuccessFailIcons = true;
+			Info.bFireAndForget = true;
+			if (const TSharedPtr<SNotificationItem> Item = FSlateNotificationManager::Get().AddNotification(Info))
+			{
+				Item->SetCompletionState(AppendedCount > 0 ? SNotificationItem::CS_Success : SNotificationItem::CS_Fail);
+			}
+		}
+
+		if (AppendedCount > 0)
+		{
+			FEditorFileUtils::PromptForCheckoutAndSave({Target->GetOutermost()}, /*bCheckDirty=*/false, /*bPromptToSave=*/false);
+		}
 	}
 
 	void UpdateCollectionsFromTyped(

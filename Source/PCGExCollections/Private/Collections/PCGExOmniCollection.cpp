@@ -3,11 +3,13 @@
 
 #include "Collections/PCGExOmniCollection.h"
 
+#include "PCGExLog.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExPCGDataAssetCollection.h"
 #include "Collections/PCGExSkinnedMeshCollection.h"
+#include "Core/PCGExCollectionHelpers.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetData.h"
@@ -82,7 +84,9 @@ namespace PCGExOmniCollection
 				// inspect GeneratedClass (mirrors UPCGExActorCollection's browser ingestion).
 				Info.DetectSourceAsset = [](const FAssetData& Asset)
 				{
-					if (Asset.AssetClassPath != UBlueprint::StaticClass()->GetClassPathName())
+					// IsInstanceOf (not an exact class-path compare) so UBlueprint SUBCLASS
+					// assets wrapping actors are claimed too.
+					if (!Asset.IsInstanceOf<UBlueprint>())
 					{
 						return false;
 					}
@@ -249,6 +253,21 @@ bool UPCGExOmniCollection::GetTypeGlobalsInternal(const UScriptStruct* StructTyp
 	return Super::GetTypeGlobalsInternal(StructType, OutGlobals);
 }
 
+void UPCGExOmniCollection::GetTypeGlobalsStructs(TArray<const UScriptStruct*>& OutStructs) const
+{
+	Super::GetTypeGlobalsStructs(OutStructs);
+
+	// Report each stored block's concrete struct -- unlike typed collections, what an Omni
+	// can answer is defined by its authored blocks, not by its own collection type.
+	for (const FInstancedStruct& Block : TypeGlobals)
+	{
+		if (const UScriptStruct* BlockStruct = Block.GetScriptStruct())
+		{
+			OutStructs.AddUnique(BlockStruct);
+		}
+	}
+}
+
 const FPCGExAssetCollectionEntry* UPCGExOmniCollection::GetEntryAtRawIndex(const int32 Index) const
 {
 	return Entries.IsValidIndex(Index) ? Entries[Index].GetPayload() : nullptr;
@@ -261,37 +280,40 @@ FPCGExAssetCollectionEntry* UPCGExOmniCollection::GetMutableEntryAtRawIndex(cons
 
 #if WITH_EDITOR
 
-namespace PCGExOmniCollection
-{
-	// Deep-copy Instanced subobjects referenced by a struct into a new owner. Raw struct
-	// copies are SHALLOW for object refs (the instancing graph cannot see into FInstancedStruct
-	// payloads), and sharing EditInlineNew subobjects across assets is illegal -- this is the
-	// StateTree-style manual pass the InstancedStruct spike mandated. Top-level properties
-	// only: the built-in globals blocks are flat; extend if a block ever nests instanced refs.
-	void DuplicateInstancedSubobjects(const UScriptStruct* Struct, void* Memory, UObject* NewOuter)
-	{
-		for (TFieldIterator<FObjectPropertyBase> It(Struct); It; ++It)
-		{
-			const FObjectPropertyBase* ObjProp = *It;
-			if (!ObjProp->HasAnyPropertyFlags(CPF_InstancedReference))
-			{
-				continue;
-			}
-
-			UObject* Current = ObjProp->GetObjectPropertyValue_InContainer(Memory);
-			if (Current && Current->GetOuter() != NewOuter)
-			{
-				ObjProp->SetObjectPropertyValue_InContainer(Memory, DuplicateObject(Current, NewOuter));
-			}
-		}
-	}
-}
-
 int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAssetCollection*> InSources)
 {
 	int32 AppendedCount = 0;
 
 	Modify(true);
+
+	// Conflict bookkeeping. One block per type slot at most: when a source provides a block
+	// type that already exists with DIFFERENT values, a single block cannot serve both --
+	// behavior wins over the block. If THIS call installed the existing block, it is dropped
+	// and the installer's copied entries retro-bake; either way the slot joins Conflicted so
+	// every later contributor bakes too. Blocks that pre-existed on this asset are the user's
+	// and are never dropped -- incoming entries bake and a warning flags the precedence gap.
+	struct FInstalledBlock
+	{
+		const UScriptStruct* Struct = nullptr;
+		UPCGExAssetCollection* Source = nullptr;
+		int32 RowStart = INDEX_NONE;
+		int32 RowEnd = INDEX_NONE;
+	};
+	TArray<FInstalledBlock> InstalledThisCall;
+	TArray<const UScriptStruct*> Conflicted;
+
+	// Base and derived globals blocks answer the same queries, so they share one type slot.
+	auto MatchesSlot = [](const UScriptStruct* A, const UScriptStruct* B)
+	{
+		return A && B && (A->IsChildOf(B) || B->IsChildOf(A));
+	};
+
+	// Would an entry of this type read the block struct S through the seam?
+	auto CoversEntry = [&MatchesSlot](const UScriptStruct* S, const FPCGExAssetCollectionEntry* Entry)
+	{
+		const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId());
+		return TypeInfo && MatchesSlot(TypeInfo->GlobalsStruct, S);
+	};
 
 	for (UPCGExAssetCollection* Source : InSources)
 	{
@@ -300,45 +322,109 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 			continue;
 		}
 
-		// Source globals: first source of a type contributes the TypeGlobals block; later
-		// same-type sources bake their globals into their copied entries instead.
-		bool bBakeGlobalsIntoEntries = false;
-		const PCGExAssetCollection::FTypeInfo* SourceTypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(Source->GetTypeId());
-		const UScriptStruct* GlobalsStruct = SourceTypeInfo ? SourceTypeInfo->GlobalsStruct : nullptr;
+		// Globals blocks: typed sources provide their own type's block, heterogeneous
+		// sources (Omni) every stored block -- both through the same seam.
+		TArray<const UScriptStruct*> ProvidedStructs;
+		Source->GetTypeGlobalsStructs(ProvidedStructs);
 
-		if (GlobalsStruct)
+		// Slots this source must bake into its entries instead of relying on a block.
+		TArray<const UScriptStruct*> BakeStructs;
+
+		for (const UScriptStruct* Provided : ProvidedStructs)
 		{
-			const bool bBlockExists = TypeGlobals.ContainsByPredicate([GlobalsStruct](const FInstancedStruct& Block)
+			if (!Provided)
 			{
-				return Block.GetScriptStruct() && Block.GetScriptStruct()->IsChildOf(GlobalsStruct);
+				continue;
+			}
+
+			FInstancedStruct Incoming;
+			Incoming.InitializeAs(Provided);
+			if (!Source->GetTypeGlobals(Provided, *Incoming.GetMutablePtr<FPCGExCollectionTypeGlobals>()))
+			{
+				continue;
+			}
+
+			// A slot that already conflicted stays block-less: bake.
+			if (Conflicted.ContainsByPredicate([&](const UScriptStruct* C) { return MatchesSlot(C, Provided); }))
+			{
+				BakeStructs.Add(Provided);
+				continue;
+			}
+
+			const int32 ExistingIdx = TypeGlobals.IndexOfByPredicate([&](const FInstancedStruct& Block)
+			{
+				return MatchesSlot(Block.GetScriptStruct(), Provided);
 			});
 
-			if (bBlockExists)
+			if (ExistingIdx == INDEX_NONE)
 			{
-				bBakeGlobalsIntoEntries = true;
+				// Install. The copy-out is SHALLOW for Instanced subobjects -- duplicate them
+				// into this asset (sharing EditInlineNew subobjects across assets is illegal).
+				FInstancedStruct& Block = TypeGlobals.Add_GetRef(MoveTemp(Incoming));
+				PCGExCollectionHelpers::DuplicateInstancedSubobjects(Provided, Block.GetMutableMemory(), this);
+
+				FInstalledBlock& Installed = InstalledThisCall.AddDefaulted_GetRef();
+				Installed.Struct = Provided;
+				Installed.Source = Source;
+				continue;
+			}
+
+			// Value-identical blocks are not conflicts: the installed block serves this source
+			// as-is. Deep comparison so equal instanced subobjects compare by value, not pointer.
+			const FInstancedStruct& Existing = TypeGlobals[ExistingIdx];
+			if (Existing.GetScriptStruct() == Provided &&
+				Provided->CompareScriptStruct(Existing.GetMemory(), Incoming.GetMemory(), PPF_DeepComparison))
+			{
+				continue;
+			}
+
+			Conflicted.AddUnique(Provided);
+			BakeStructs.Add(Provided);
+
+			const int32 InstalledIdx = InstalledThisCall.IndexOfByPredicate([&](const FInstalledBlock& I) { return MatchesSlot(I.Struct, Provided); });
+			if (InstalledIdx != INDEX_NONE)
+			{
+				// This call installed the block: drop it and retro-bake the installer's rows so
+				// BOTH contributors keep their exact behavior -- a retained block whose rules
+				// are collection-wide (e.g. Overrule descriptor mode) would silently restyle
+				// entries that were baked against different globals.
+				const FInstalledBlock Installed = InstalledThisCall[InstalledIdx];
+				InstalledThisCall.RemoveAt(InstalledIdx);
+				TypeGlobals.RemoveAt(ExistingIdx);
+				Conflicted.AddUnique(Installed.Struct);
+
+				for (int32 Row = FMath::Max(Installed.RowStart, 0); Row < Installed.RowEnd && Entries.IsValidIndex(Row); Row++)
+				{
+					FPCGExAssetCollectionEntry* Payload = Entries[Row].GetPayload();
+					if (Payload && !Payload->bIsSubCollection && CoversEntry(Installed.Struct, Payload))
+					{
+						Payload->ResolveGlobalsToLocal(Installed.Source);
+					}
+				}
 			}
 			else
 			{
-				FInstancedStruct& Block = TypeGlobals.Emplace_GetRef();
-				Block.InitializeAs(GlobalsStruct);
-				if (Source->GetTypeGlobals(GlobalsStruct, *Block.GetMutablePtr<FPCGExCollectionTypeGlobals>()))
-				{
-					PCGExOmniCollection::DuplicateInstancedSubobjects(GlobalsStruct, Block.GetMutableMemory(), this);
-				}
-				else
-				{
-					TypeGlobals.RemoveAt(TypeGlobals.Num() - 1);
-				}
+				// The block pre-existed on this asset -- it is the user's and stays. Baked
+				// incoming entries keep their values, but a block enforcing collection-wide
+				// rules still takes precedence over them.
+				UE_LOG(LogPCGEx, Warning,
+				       TEXT("Merging '%s': this Omni collection already has a '%s' globals block with different settings. The source's globals were baked into its copied entries, but the existing block's own rules (e.g. a collection-wide overrule) still take precedence over them."),
+				       *Source->GetName(), *Existing.GetScriptStruct()->GetName());
 			}
 		}
 
 		// Entries: exact-typed payload copies. Per-row struct resolution handles typed and
 		// heterogeneous sources alike.
-		Source->ForEachEntry([this, Source, bBakeGlobalsIntoEntries, &AppendedCount](const FPCGExAssetCollectionEntry* Entry, const int32 Index)
+		const int32 RowStart = Entries.Num();
+		int32 SourceAppended = 0;
+		int32 SourceSkipped = 0;
+
+		Source->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, const int32 Index)
 		{
 			const UScriptStruct* PayloadStruct = Source->EDITOR_GetEntryScriptStruct(Index);
 			if (!PayloadStruct)
 			{
+				SourceSkipped++;
 				return;
 			}
 
@@ -347,6 +433,11 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 			FPCGExAssetCollectionEntry* Payload = Row.GetPayload();
 
+			// The raw payload copy is SHALLOW for Instanced subobjects (e.g. a PCGDataAsset
+			// entry's embedded level export, outer'd to the SOURCE asset) -- duplicate them
+			// into this asset, or saving would reference another package's private objects.
+			PCGExCollectionHelpers::DuplicateInstancedSubobjects(PayloadStruct, Payload, this);
+
 			// New identity in this collection: fresh EntryId on the next SyncEntryIds pass.
 			Payload->EntryId = 0;
 
@@ -354,13 +445,42 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 			// the source as host); matches FlattenCollection semantics.
 			Payload->Tags.Append(Source->CollectionTags);
 
-			if (bBakeGlobalsIntoEntries && !Payload->bIsSubCollection)
+			if (!Payload->bIsSubCollection)
 			{
-				Payload->ResolveGlobalsToLocal(Source);
+				for (const UScriptStruct* Bake : BakeStructs)
+				{
+					if (CoversEntry(Bake, Payload))
+					{
+						Payload->ResolveGlobalsToLocal(Source);
+						break;
+					}
+				}
 			}
 
-			AppendedCount++;
+			SourceAppended++;
 		});
+
+		// Row ranges for blocks this source installed -- retro-bake targets on later conflicts.
+		for (FInstalledBlock& Installed : InstalledThisCall)
+		{
+			if (Installed.Source == Source)
+			{
+				Installed.RowStart = RowStart;
+				Installed.RowEnd = Entries.Num();
+			}
+		}
+
+		if (SourceAppended == 0 && SourceSkipped > 0)
+		{
+			// Storage without per-row payload structs (e.g. Variant collections, which theme
+			// other collections rather than owning entries) cannot be merged -- say so instead
+			// of silently producing nothing.
+			UE_LOG(LogPCGEx, Warning,
+			       TEXT("Merging '%s': no entries could be appended -- its storage does not expose per-entry payloads (Variant collections cannot be merged; merge their source collections instead)."),
+			       *Source->GetName());
+		}
+
+		AppendedCount += SourceAppended;
 	}
 
 	if (AppendedCount > 0)
@@ -409,7 +529,11 @@ void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruc
 	// display name so the add menu is stable.
 	PCGExAssetCollection::FTypeRegistry::Get().ForEach([&OutTypes](const PCGExAssetCollection::FTypeInfo& Info)
 	{
-		if (Info.EntryStruct)
+		// Skip the base entry struct (Variant registers it as its nominal EntryStruct): a
+		// base-typed row has no asset to reference, so offering it in the add menu only
+		// strands users on a pickerless tile -- subcollection rows are created by dropping
+		// collection assets instead.
+		if (Info.EntryStruct && Info.EntryStruct != FPCGExAssetCollectionEntry::StaticStruct())
 		{
 			OutTypes.Add(Info.EntryStruct);
 		}
@@ -504,9 +628,23 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 	TSet<uint64> ExistingKeys;
 	ForEachEntry([&ExistingKeys, &MakeKey](const FPCGExAssetCollectionEntry* Entry, int32)
 	{
-		if (!Entry->bIsSubCollection && Entry->Staging.Path.IsValid())
+		if (Entry->bIsSubCollection)
+		{
+			return;
+		}
+
+		// Staging.Path covers staged rows; source-asset paths cover rows added but not yet
+		// staged -- both spaces match what SetAssetPath seeds on a freshly dropped row.
+		if (Entry->Staging.Path.IsValid())
 		{
 			ExistingKeys.Add(MakeKey(Entry->GetTypeId(), Entry->Staging.Path));
+		}
+
+		TSet<FSoftObjectPath> SourcePaths;
+		Entry->EDITOR_GetSourceAssetPaths(SourcePaths);
+		for (const FSoftObjectPath& Path : SourcePaths)
+		{
+			ExistingKeys.Add(MakeKey(Entry->GetTypeId(), Path));
 		}
 	});
 
@@ -522,9 +660,11 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 			FInstancedStruct Payload;
 			if (Info->MakeEntryFromSourceAsset)
 			{
+				// A detector may claim an asset its factory then rejects on closer inspection;
+				// fall through to lower-priority detectors instead of dropping the asset.
 				if (!Info->MakeEntryFromSourceAsset(Asset, Payload))
 				{
-					break;
+					continue;
 				}
 			}
 			else
@@ -536,7 +676,7 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 			const FPCGExAssetCollectionEntry* NewEntry = Payload.GetPtr<FPCGExAssetCollectionEntry>();
 			if (!NewEntry)
 			{
-				break;
+				continue;
 			}
 
 			const uint64 Key = MakeKey(NewEntry->GetTypeId(), NewEntry->Staging.Path);

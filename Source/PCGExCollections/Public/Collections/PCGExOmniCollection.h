@@ -110,13 +110,19 @@ public:
 	 * - Entries are copied as payload rows of their exact type (works for typed AND
 	 *   heterogeneous sources). Copies are new identities (EntryId re-minted on rebuild);
 	 *   the source's CollectionTags are baked into each copied entry's Tags (matching
-	 *   FlattenCollection semantics). Subcollection rows keep referencing their collection
-	 *   asset (shared reference, not duplicated).
-	 * - The source's globals become a TypeGlobals block (Instanced subobjects are
-	 *   DuplicateObject'd into this asset -- raw copies would illegally share them). When a
-	 *   block of that type already exists (multi-merge conflicts), the source's globals are
-	 *   baked into its copied entries via ResolveGlobalsToLocal instead, so behavior is
-	 *   preserved either way.
+	 *   FlattenCollection semantics). Instanced subobjects inside copied payloads (e.g. a
+	 *   PCGDataAsset entry's embedded export) are DuplicateObject'd into this asset -- raw
+	 *   copies would illegally share them. Subcollection rows keep referencing their
+	 *   collection asset (shared reference, not duplicated).
+	 * - Each globals block a source provides (GetTypeGlobalsStructs -- typed sources answer
+	 *   their own type, heterogeneous sources every stored block) becomes a TypeGlobals block
+	 *   here, subobjects duplicated. Conflicts (a block of that type already exists with
+	 *   DIFFERENT values) cannot be represented by one block, so behavior wins over the block:
+	 *   if this call installed the existing block, it is REMOVED and both contributors bake
+	 *   their globals into their copied entries via ResolveGlobalsToLocal; if the block
+	 *   pre-existed on this asset, incoming entries bake and a warning flags that the
+	 *   existing block's own rules (e.g. Overrule) still take precedence. Value-identical
+	 *   blocks are not conflicts.
 	 * - Entry property overrides ride along; the collection-level property schema is
 	 *   re-derived from the merged entries afterwards.
 	 *
@@ -145,6 +151,8 @@ protected:
 
 public:
 #endif
+
+	virtual void GetTypeGlobalsStructs(TArray<const UScriptStruct*>& OutStructs) const override;
 
 protected:
 	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const override;

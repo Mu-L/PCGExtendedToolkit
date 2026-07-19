@@ -740,6 +740,15 @@ public:
 		return GetTypeGlobalsInternal(StructType, OutGlobals);
 	}
 
+	/**
+	 * Enumerate the globals-block struct types this host can answer GetTypeGlobals for.
+	 * Base resolves the collection's own registered GlobalsStruct (typed collections answer
+	 * exactly their type's block); heterogeneous hosts (Omni) report each stored block's
+	 * concrete struct. Consumed by conversion/merge to transfer collection-level settings
+	 * without knowing the source's concrete class.
+	 */
+	virtual void GetTypeGlobalsStructs(TArray<const UScriptStruct*>& OutStructs) const;
+
 protected:
 	/**
 	 * Fill OutGlobals if this collection provides a globals block whose type StructType

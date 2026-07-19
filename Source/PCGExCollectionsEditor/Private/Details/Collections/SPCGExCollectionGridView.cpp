@@ -16,6 +16,7 @@
 #include "Widgets/Notifications/SNotificationList.h"
 
 #include "Core/PCGExAssetCollection.h"
+#include "Core/PCGExCollectionHelpers.h"
 #include "Details/Collections/FPCGExCollectionTileDragDropOp.h"
 #include "Details/Collections/PCGExAssetCollectionEditor.h"
 #include "Details/Collections/SPCGExCollectionCategoryGroup.h"
@@ -1012,6 +1013,11 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 			// base-typed row lands in a typed collection.
 			PayloadStruct->CopyScriptStruct(NewEntry, Snapshots[i].GetMemory());
 
+			// The copy is SHALLOW for Instanced subobjects (e.g. a PCGDataAsset entry's
+			// embedded level export, outer'd to the SOURCE asset) -- duplicate them into the
+			// target, or saving it would reference another package's private objects.
+			PCGExCollectionHelpers::DuplicateInstancedSubobjects(PayloadStruct, NewEntry, TargetColl);
+
 			NewEntry->Category = TargetCategory;
 			// Copied/moved entries are NEW identities in the target collection: zero the
 			// carried-over EntryId so SyncEntryIds assigns a fresh one instead of aliasing
@@ -1035,29 +1041,38 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 
 		FinalDraggedPositions = InsertedIndices;
 
-		if (InsertBeforeLocalIndex != INDEX_NONE && !InsertedIndices.IsEmpty())
+		if (InsertedIndices.IsEmpty())
 		{
-			RebuildCategoryCache();
-			if (const TArray<int32>* CatIndices = CategoryToEntryIndices.Find(TargetCategory))
+			// Every row was rejected: nothing changed (removal only runs for transferred
+			// rows), so drop the transaction instead of leaving an empty undo step.
+			Transaction.Cancel();
+		}
+		else
+		{
+			if (InsertBeforeLocalIndex != INDEX_NONE)
 			{
-				const TSet<int32> DraggedSet(InsertedIndices);
-				TArray<int32> DesiredOrder = ComputeCategoryDesiredOrder(*CatIndices, DraggedSet, InsertBeforeLocalIndex, /*bAdjustForDraggedBefore=*/false);
-				if (!DesiredOrder.IsEmpty())
+				RebuildCategoryCache();
+				if (const TArray<int32>* CatIndices = CategoryToEntryIndices.Find(TargetCategory))
 				{
-					// Fresh helper AFTER the adds; permutation swaps whole ELEMENTS, which is
-					// payload-type-agnostic (wrapper rows deep-copy via FInstancedStruct).
-					FScriptArrayHelper TargetHelper(TargetAccess.ArrayProp, TargetAccess.ArrayData);
-					TArray<int32> Reordered = ApplyCategoryPermutation(TargetHelper, TargetElementStruct, *CatIndices, DesiredOrder, DraggedSet);
-					if (!Reordered.IsEmpty()) { FinalDraggedPositions = MoveTemp(Reordered); }
+					const TSet<int32> DraggedSet(InsertedIndices);
+					TArray<int32> DesiredOrder = ComputeCategoryDesiredOrder(*CatIndices, DraggedSet, InsertBeforeLocalIndex, /*bAdjustForDraggedBefore=*/false);
+					if (!DesiredOrder.IsEmpty())
+					{
+						// Fresh helper AFTER the adds; permutation swaps whole ELEMENTS, which is
+						// payload-type-agnostic (wrapper rows deep-copy via FInstancedStruct).
+						FScriptArrayHelper TargetHelper(TargetAccess.ArrayProp, TargetAccess.ArrayData);
+						TArray<int32> Reordered = ApplyCategoryPermutation(TargetHelper, TargetElementStruct, *CatIndices, DesiredOrder, DraggedSet);
+						if (!Reordered.IsEmpty()) { FinalDraggedPositions = MoveTemp(Reordered); }
+					}
 				}
 			}
+
+			TargetColl->PostEditChange();
+
+			SelectedIndices.Reset();
+			for (int32 Idx : FinalDraggedPositions) { SelectedIndices.Add(Idx); }
+			LastClickedIndex = FinalDraggedPositions.Num() > 0 ? FinalDraggedPositions[0] : INDEX_NONE;
 		}
-
-		TargetColl->PostEditChange();
-
-		SelectedIndices.Reset();
-		for (int32 Idx : FinalDraggedPositions) { SelectedIndices.Add(Idx); }
-		LastClickedIndex = FinalDraggedPositions.Num() > 0 ? FinalDraggedPositions[0] : INDEX_NONE;
 	}
 	bIsBatchOperation = false;
 
@@ -1403,6 +1418,15 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 
 	UScriptStruct* EntryStruct = GetEntryScriptStruct(CurrentDetailIndex);
 	if (!EntryStruct)
+	{
+		return;
+	}
+
+	// Heterogeneous hosts: the row under CurrentDetailIndex may have changed payload type
+	// since the details scope was built (stale index across remove/reorder/undo). Copying
+	// across mismatched layouts corrupts memory -- bail and let the next selection refresh
+	// rebuild the scope.
+	if (CurrentStructScope->GetStruct() != EntryStruct)
 	{
 		return;
 	}

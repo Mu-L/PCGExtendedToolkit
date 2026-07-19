@@ -3,6 +3,8 @@
 
 #include "Core/PCGExAssetCollectionTypes.h"
 
+#include "PCGExLog.h"
+
 namespace PCGExAssetCollection
 {
 	FTypeRegistry& FTypeRegistry::Get()
@@ -51,7 +53,7 @@ namespace PCGExAssetCollection
 		FTypeInfo* Info = Types.Find(Id);
 		if (!Info)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("PCGExAssetCollection: Cannot customize unregistered type '%s'"), *Id.ToString());
+			UE_LOG(LogPCGEx, Warning, TEXT("PCGExAssetCollection: Cannot customize unregistered type '%s'"), *Id.ToString());
 			return;
 		}
 

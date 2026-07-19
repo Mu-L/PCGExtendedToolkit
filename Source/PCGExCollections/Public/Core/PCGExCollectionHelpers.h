@@ -112,4 +112,18 @@ namespace PCGExCollectionHelpers
 	 */
 	PCGEXCOLLECTIONS_API
 	void GetEntryAssetHalves(const UPCGExAssetCollection* Collection, bool& bOutAnyActor, bool& bOutAnyNonActor);
+
+#if WITH_EDITOR
+	/**
+	 * Deep-copy Instanced subobjects referenced by a struct into a new owner. Raw struct
+	 * copies are SHALLOW for object refs (the instancing graph cannot see into FInstancedStruct
+	 * payloads), and sharing EditInlineNew subobjects across assets is illegal -- this is the
+	 * StateTree-style manual pass the InstancedStruct spike mandated. Applies to any struct
+	 * copied across assets: TypeGlobals blocks AND entry payloads (e.g. a PCGDataAsset entry's
+	 * embedded ExportedDataAsset). Top-level properties only: the built-in structs keep their
+	 * instanced refs flat; extend if one ever nests them.
+	 */
+	PCGEXCOLLECTIONS_API
+	void DuplicateInstancedSubobjects(const UScriptStruct* Struct, void* StructMemory, UObject* NewOuter);
+#endif
 }

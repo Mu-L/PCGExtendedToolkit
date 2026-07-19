@@ -758,6 +758,15 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryRaw(int32 RawIndex) const
 	return Result;
 }
 
+void UPCGExAssetCollection::GetTypeGlobalsStructs(TArray<const UScriptStruct*>& OutStructs) const
+{
+	const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(GetTypeId());
+	if (TypeInfo && TypeInfo->GlobalsStruct)
+	{
+		OutStructs.AddUnique(TypeInfo->GlobalsStruct);
+	}
+}
+
 FPCGExEntryAccessResult UPCGExAssetCollection::GetEntry(int32 Index, int32 Seed, EPCGExIndexPickMode PickMode) const
 {
 	FPCGExEntryAccessResult Result;

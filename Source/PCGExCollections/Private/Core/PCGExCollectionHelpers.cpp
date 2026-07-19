@@ -7,6 +7,7 @@
 #include "Core/PCGExAssetCollection.h"
 #include "Data/PCGExAttributeBroadcaster.h"
 #include "Details/PCGExStagingDetails.h"
+#include "UObject/UnrealType.h"
 
 namespace PCGExCollectionHelpers
 {
@@ -378,4 +379,29 @@ namespace PCGExCollectionHelpers
 			}
 		});
 	}
+
+#if WITH_EDITOR
+	void DuplicateInstancedSubobjects(const UScriptStruct* Struct, void* StructMemory, UObject* NewOuter)
+	{
+		if (!Struct || !StructMemory || !NewOuter)
+		{
+			return;
+		}
+
+		for (TFieldIterator<FObjectPropertyBase> It(Struct); It; ++It)
+		{
+			const FObjectPropertyBase* ObjProp = *It;
+			if (!ObjProp->HasAnyPropertyFlags(CPF_InstancedReference))
+			{
+				continue;
+			}
+
+			UObject* Current = ObjProp->GetObjectPropertyValue_InContainer(StructMemory);
+			if (Current && Current->GetOuter() != NewOuter)
+			{
+				ObjProp->SetObjectPropertyValue_InContainer(StructMemory, DuplicateObject(Current, NewOuter));
+			}
+		}
+	}
+#endif
 }

@@ -48,7 +48,8 @@ namespace PCGExCollectionsEditorMenuUtils
 				MergeAction.ExecuteAction.BindLambda(
 					[SelectedCollectionAssets = MoveTemp(SelectedCollectionAssets)](const FToolMenuContext&)
 					{
-						FScopedSlowTask SlowTask(0.0f, LOCTEXT("MergeIntoOmniCollection", "Merging collection(s) into Omni collection..."));
+						// Progress/result feedback is handled inside MergeCollectionsIntoOmni
+						// (a slow-task dialog here would fight the modal save dialog it opens).
 						PCGExCollectionEditorHelpers::MergeCollectionsIntoOmni(SelectedCollectionAssets);
 					});
 
