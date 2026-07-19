@@ -176,6 +176,38 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
  *
  *  Actor classes are kept per-entry on Entry.EmbeddedActorCollection (no cross-entry merge).
  */
+
+/**
+ * Host-agnostic view over the state the PCGDataAsset collection machinery operates on
+ * (shared-collection compaction, collection maps, externalization). Phase A of the per-type
+ * processor seam: the typed collection composes this from its own members (MakeMachinery);
+ * heterogeneous hosts will compose it from per-type state blocks in a later phase.
+ *
+ * Storage members are POINTERS TO the host's storage so the cores mutate the real refs.
+ * Entries is the PCGData-typed LEAF payload view in host order -- external-asset naming uses
+ * the view index, which matches the raw entry index on typed collections.
+ */
+struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetMachinery
+{
+	UPCGExAssetCollection* Host = nullptr; // Outer for generated subobjects; GUID / package identity
+	TArray<FPCGExPCGDataAssetCollectionEntry*> Entries;
+
+	TObjectPtr<UPCGExMeshCollection>* SharedMeshCollection = nullptr;
+	TObjectPtr<UPCGExLevelCollection>* SharedLevelCollection = nullptr;
+	TSoftObjectPtr<UPCGExMeshCollection>* ExternalSharedMeshCollection = nullptr;
+	TSoftObjectPtr<UPCGExLevelCollection>* ExternalSharedLevelCollection = nullptr;
+
+	bool bExternalActive = false;
+	FString ExportFolderPath;
+	FString ExternalAssetPrefix;
+
+	bool IsValid() const
+	{
+		return Host && SharedMeshCollection && SharedLevelCollection
+			&& ExternalSharedMeshCollection && ExternalSharedLevelCollection;
+	}
+};
+
 UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | PCGDataAsset", meta=(ToolTip = "A weighted collection of PCG Data Assets."))
 class PCGEXCOLLECTIONS_API UPCGExPCGDataAssetCollection : public UPCGExAssetCollection
 {
@@ -266,6 +298,29 @@ public:
 	 */
 	void RebuildSharedCollections();
 
+	// Host-agnostic machinery cores. Each operates purely on the given state view, so any
+	// host that can compose a FPCGExPCGDataAssetMachinery can run them (per-type processor
+	// seam, Phase A). The private instance methods below are thin wrappers over these.
+	// All editor-only in effect: bodies guard on WITH_EDITOR(_DATA) like their predecessors.
+	static void CompactSharedMeshFor(FPCGExPCGDataAssetMachinery& State);
+	static void CompactSharedLevelFor(FPCGExPCGDataAssetMachinery& State);
+	static void RebuildCollectionMapsFor(FPCGExPCGDataAssetMachinery& State);
+	static void ExternalizeSharedAndActorCollectionsFor(FPCGExPCGDataAssetMachinery& State);
+	static void ExternalizeExportedDataAssetsFor(FPCGExPCGDataAssetMachinery& State);
+	static void InternalizeSubobjectsFor(FPCGExPCGDataAssetMachinery& State);
+	static void SaveExternalPackagesFor(FPCGExPCGDataAssetMachinery& State);
+
+	/** Orchestrator: compaction -> shared/actor externalization -> collection maps -> data
+	 *  asset externalization, in the order the soft-path baking requires. */
+	static void RebuildSharedCollectionsFor(FPCGExPCGDataAssetMachinery& State);
+
+	/**
+	 * True when Host runs the PCGDataAsset collection machinery (compaction, collection maps,
+	 * externalization). Level-sourced entries stage nothing in hosts that don't -- this is
+	 * the capability query behind that guard, so future host kinds only change THIS.
+	 */
+	static bool HostSupportsDataAssetMachinery(const UPCGExAssetCollection* Host);
+
 	// Lifecycle
 
 	virtual void Serialize(FArchive& Ar) override;
@@ -291,6 +346,9 @@ public:
 #endif
 
 private:
+	/** Compose the machinery state view from this collection's own members. */
+	FPCGExPCGDataAssetMachinery MakeMachinery();
+
 	void CompactSharedMesh();
 	void CompactSharedLevel();
 	void RebuildCollectionMaps();
