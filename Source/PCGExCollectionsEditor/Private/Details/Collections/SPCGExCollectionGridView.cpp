@@ -1159,50 +1159,10 @@ void SPCGExCollectionGridView::OnCategoryRenamed(FName OldName, FName NewName)
 
 void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 {
-	UPCGExAssetCollection* Coll = Collection.Get();
-	if (!Coll)
-	{
-		return;
-	}
-
-	FEntriesArrayAccess Access = GetEntriesAccess();
-	if (!Access.IsValid())
-	{
-		return;
-	}
-
-	bIsBatchOperation = true;
-	{
-		FScopedTransaction Transaction(INVTEXT("Add Entry to Category"));
-
-		// Suppress staging rebuild -- nothing to stage on an empty entry
-		Coll->bSuppressStagingRebuild = true;
-
-		Coll->Modify();
-
-		FScriptArrayHelper ArrayHelper(Access.ArrayProp, Access.ArrayData);
-		const int32 NewIndex = ArrayHelper.AddValue();
-
-		Coll->bSuppressStagingRebuild = false;
-
-		// Set category on newly added entry
-		FPCGExAssetCollectionEntry* NewEntry = Coll->EDITOR_GetMutableEntry(NewIndex);
-		if (NewEntry)
-		{
-			NewEntry->Category = Category;
-		}
-
-		Coll->PostEditChange();
-
-		// Select the new entry
-		SelectedIndices.Reset();
-		SelectedIndices.Add(NewIndex);
-		LastClickedIndex = NewIndex;
-	}
-	bIsBatchOperation = false;
-
-	IncrementalCategoryRefresh();
-	UpdateDetailForSelection();
+	// Same type-aware entry point as the main [+]: heterogeneous hosts (Omni) get the
+	// payload-type dropdown, homogeneous collections add directly. A raw element add here
+	// would create unset (blank) rows on wrapper-row hosts.
+	RequestAddEntry(Category);
 }
 
 void SPCGExCollectionGridView::OnCategoryExpansionChanged(FName Category, bool bIsExpanded)
@@ -1406,6 +1366,14 @@ void SPCGExCollectionGridView::UpdateDetailForSelection()
 
 	if (!EntryStruct || !EntryPtr)
 	{
+		// Unresolvable row (e.g. unset payload on a heterogeneous host): clear the panel
+		// instead of leaving the previous selection's data on display.
+		CurrentStructScope.Reset();
+		CurrentDetailIndex = INDEX_NONE;
+		if (StructDetailView.IsValid())
+		{
+			StructDetailView->SetStructureData(nullptr);
+		}
 		return;
 	}
 
@@ -2036,10 +2004,16 @@ SPCGExCollectionGridView::FEntriesArrayAccess SPCGExCollectionGridView::GetEntri
 
 FReply SPCGExCollectionGridView::OnAddEntry()
 {
+	RequestAddEntry(NAME_None);
+	return FReply::Handled();
+}
+
+void SPCGExCollectionGridView::RequestAddEntry(FName Category)
+{
 	UPCGExAssetCollection* Coll = Collection.Get();
 	if (!Coll)
 	{
-		return FReply::Handled();
+		return;
 	}
 
 	// Heterogeneous hosts (Omni) require an explicit payload type choice; homogeneous
@@ -2049,21 +2023,36 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 
 	if (AddableTypes.IsEmpty())
 	{
-		AddEntryOfStruct(nullptr);
-		return FReply::Handled();
+		AddEntryOfStruct(nullptr, Category);
+		return;
 	}
+
+	// Menu labels prefer the entry struct's ShortName meta ("Actor") over its full display
+	// name ("[PCGEx] Actor Collection Entry"); structs without one fall back to the latter.
+	auto GetEntryTypeLabel = [](const UScriptStruct* EntryStruct) -> FText
+	{
+		static const FName ShortNameMeta = FName("ShortName");
+		const FString ShortName = EntryStruct->GetMetaData(ShortNameMeta);
+		return ShortName.IsEmpty() ? EntryStruct->GetDisplayNameText() : FText::FromString(ShortName);
+	};
+
+	AddableTypes.Sort([&GetEntryTypeLabel](const UScriptStruct& A, const UScriptStruct& B)
+	{
+		return GetEntryTypeLabel(&A).CompareTo(GetEntryTypeLabel(&B)) < 0;
+	});
 
 	FMenuBuilder MenuBuilder(/*bInShouldCloseWindowAfterMenuSelection=*/true, nullptr);
 	MenuBuilder.BeginSection(NAME_None, INVTEXT("Add Entry"));
 	for (const UScriptStruct* EntryStruct : AddableTypes)
 	{
+		const FText Label = GetEntryTypeLabel(EntryStruct);
 		MenuBuilder.AddMenuEntry(
-			EntryStruct->GetDisplayNameText(),
-			FText::Format(INVTEXT("Add a new {0} to the collection."), EntryStruct->GetDisplayNameText()),
+			Label,
+			FText::Format(INVTEXT("Add a new {0} entry to the collection."), Label),
 			FSlateIcon(),
-			FUIAction(FExecuteAction::CreateSPLambda(this, [this, EntryStruct]()
+			FUIAction(FExecuteAction::CreateSPLambda(this, [this, EntryStruct, Category]()
 			{
-				AddEntryOfStruct(EntryStruct);
+				AddEntryOfStruct(EntryStruct, Category);
 			})));
 	}
 	MenuBuilder.EndSection();
@@ -2074,17 +2063,17 @@ FReply SPCGExCollectionGridView::OnAddEntry()
 		MenuBuilder.MakeWidget(),
 		FSlateApplication::Get().GetCursorPos(),
 		FPopupTransitionEffect(FPopupTransitionEffect::ContextMenu));
-
-	return FReply::Handled();
 }
 
-void SPCGExCollectionGridView::AddEntryOfStruct(const UScriptStruct* EntryStruct)
+void SPCGExCollectionGridView::AddEntryOfStruct(const UScriptStruct* EntryStruct, FName Category)
 {
 	UPCGExAssetCollection* Coll = Collection.Get();
 	if (!Coll)
 	{
 		return;
 	}
+
+	bool bAdded = false;
 
 	bIsBatchOperation = true;
 	{
@@ -2099,6 +2088,12 @@ void SPCGExCollectionGridView::AddEntryOfStruct(const UScriptStruct* EntryStruct
 		const int32 NewIndex = Coll->NumEntries() - 1;
 
 		Coll->bSuppressStagingRebuild = false;
+
+		if (NewEntry && !Category.IsNone())
+		{
+			NewEntry->Category = Category;
+		}
+
 		Coll->PostEditChange();
 
 		// Sync PropertyOverrides for the new entry to match the collection schema
@@ -2107,6 +2102,7 @@ void SPCGExCollectionGridView::AddEntryOfStruct(const UScriptStruct* EntryStruct
 		// Select the new entry
 		if (NewEntry)
 		{
+			bAdded = true;
 			SelectedIndices.Reset();
 			SelectedIndices.Add(NewIndex);
 			LastClickedIndex = NewIndex;
@@ -2116,7 +2112,9 @@ void SPCGExCollectionGridView::AddEntryOfStruct(const UScriptStruct* EntryStruct
 
 	IncrementalCategoryRefresh();
 	UpdateDetailForSelection();
-	if (GroupScrollBox.IsValid())
+
+	// Uncategorized adds land at the array tail; category adds land inside their group.
+	if (bAdded && Category.IsNone() && GroupScrollBox.IsValid())
 	{
 		GroupScrollBox->ScrollToEnd();
 	}

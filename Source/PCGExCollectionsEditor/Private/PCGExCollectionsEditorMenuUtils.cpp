@@ -4,6 +4,7 @@
 #include "PCGExCollectionsEditorMenuUtils.h"
 
 #include "Core/PCGExAssetCollection.h"
+#include "Details/Collections/PCGExCollectionEditorHelpers.h"
 #include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
 #include "Engine/Blueprint.h"
 #include "GameFramework/Actor.h"
@@ -27,6 +28,39 @@ namespace PCGExCollectionsEditorMenuUtils
 
 	void CreateOrUpdatePCGExAssetCollectionsFromMenu(UToolMenu* Menu, TArray<FAssetData>& Assets)
 	{
+		// Selections containing PCGEx collections (any mix of types) can be merged into an
+		// Omni collection -- entry copies + globals transfer, sources untouched.
+		{
+			TArray<FAssetData> SelectedCollectionAssets;
+			for (const FAssetData& Asset : Assets)
+			{
+				if (Asset.IsInstanceOf<UPCGExAssetCollection>())
+				{
+					SelectedCollectionAssets.Add(Asset);
+				}
+			}
+
+			if (!SelectedCollectionAssets.IsEmpty())
+			{
+				FToolMenuSection& Section = CreatePCGExSection(Menu);
+
+				FToolUIAction MergeAction;
+				MergeAction.ExecuteAction.BindLambda(
+					[SelectedCollectionAssets = MoveTemp(SelectedCollectionAssets)](const FToolMenuContext&)
+					{
+						FScopedSlowTask SlowTask(0.0f, LOCTEXT("MergeIntoOmniCollection", "Merging collection(s) into Omni collection..."));
+						PCGExCollectionEditorHelpers::MergeCollectionsIntoOmni(SelectedCollectionAssets);
+					});
+
+				Section.AddMenuEntry(
+					"MergePCGExCollectionsIntoOmni",
+					TAttribute<FText>(FText::FromString(TEXT("Merge Collection(s) into Omni Collection"))),
+					TAttribute<FText>(FText::FromString(TEXT("Create (or pick) an Omni collection and append a copy of every entry from the selected collections. Collection-level globals carry over; sources are untouched."))),
+					FSlateIcon(FName("PCGExStyleSet"), "ClassIcon.PCGExAssetCollection"),
+					MergeAction);
+			}
+		}
+
 		TArray<const FCollectionEditorTypeInfo*> AllInfos;
 		FCollectionEditorTypeRegistry::Get().GetAll(AllInfos);
 

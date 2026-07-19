@@ -132,7 +132,7 @@ struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionGlobals : public FPCGExCollectio
  * - BuildMicroCache() creates a mesh-specific FMicroCache for material variant picking
  * - UpdateStaging() loads the mesh to extract bounds and sockets
  */
-USTRUCT(BlueprintType, DisplayName="[PCGEx] Mesh Collection Entry")
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Mesh Collection Entry", meta=(ShortName="Mesh"))
 struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionEntry : public FPCGExAssetCollectionEntry
 {
 	GENERATED_BODY()

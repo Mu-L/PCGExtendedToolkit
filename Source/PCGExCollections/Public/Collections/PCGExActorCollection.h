@@ -37,7 +37,7 @@ struct PCGEXCOLLECTIONS_API FPCGExActorCollectionGlobals : public FPCGExCollecti
  * FPCGExMeshCollectionEntry -- no MicroCache, no descriptors. UpdateStaging() spawns a
  * temporary actor in-editor to compute bounds (with configurable collision/child-actor inclusion).
  */
-USTRUCT(BlueprintType, DisplayName="[PCGEx] Actor Collection Entry")
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Actor Collection Entry", meta=(ShortName="Actor"))
 struct PCGEXCOLLECTIONS_API FPCGExActorCollectionEntry : public FPCGExAssetCollectionEntry
 {
 	GENERATED_BODY()

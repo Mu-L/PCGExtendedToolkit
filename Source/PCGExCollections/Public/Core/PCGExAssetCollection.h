@@ -731,6 +731,15 @@ public:
 		return GetTypeGlobalsInternal(T::StaticStruct(), OutGlobals);
 	}
 
+	/**
+	 * Type-erased flavor for callers holding only a struct type (conversion, config-block
+	 * UI). OutGlobals' concrete type must match or derive from StructType.
+	 */
+	bool GetTypeGlobals(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const
+	{
+		return GetTypeGlobalsInternal(StructType, OutGlobals);
+	}
+
 protected:
 	/**
 	 * Fill OutGlobals if this collection provides a globals block whose type StructType

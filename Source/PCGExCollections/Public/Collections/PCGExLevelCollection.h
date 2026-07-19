@@ -40,7 +40,7 @@ struct PCGEXCOLLECTIONS_API FPCGExLevelCollectionGlobals : public FPCGExCollecti
  * property, any collection type as a subcollection. UpdateStaging() loads the level
  * package in-editor to compute combined bounds from spatial actors.
  */
-USTRUCT(BlueprintType, DisplayName="[PCGEx] Level Collection Entry")
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Level Collection Entry", meta=(ShortName="Level"))
 struct PCGEXCOLLECTIONS_API FPCGExLevelCollectionEntry : public FPCGExAssetCollectionEntry
 {
 	GENERATED_BODY()

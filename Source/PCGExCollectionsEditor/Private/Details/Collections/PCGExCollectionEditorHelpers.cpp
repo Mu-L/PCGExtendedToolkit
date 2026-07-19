@@ -7,6 +7,7 @@
 #include "FileHelpers.h"
 #include "IContentBrowserSingleton.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Collections/PCGExOmniCollection.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
@@ -14,25 +15,24 @@
 
 namespace PCGExCollectionEditorHelpers
 {
-	void CreateCollectionFromTyped(
-		const TArray<FAssetData>& SelectedAssets,
+	UPCGExAssetCollection* CreateCollectionAsset(
+		const FString& AnchorPackagePath,
 		UClass* CollectionClass,
 		const TCHAR* DefaultAssetName,
 		bool bOpenSaveDialog)
 	{
-		if (SelectedAssets.IsEmpty() || !CollectionClass)
+		if (!CollectionClass)
 		{
-			return;
+			return nullptr;
 		}
 
 		FString CollectionAssetName = DefaultAssetName;
-		const FString CollectionAssetPath = SelectedAssets[0].PackagePath.ToString();
-		FString PackageName = FPaths::Combine(CollectionAssetPath, CollectionAssetName);
+		FString PackageName = FPaths::Combine(AnchorPackagePath, CollectionAssetName);
 
 		if (bOpenSaveDialog)
 		{
 			FSaveAssetDialogConfig SaveAssetDialogConfig;
-			SaveAssetDialogConfig.DefaultPath = CollectionAssetPath;
+			SaveAssetDialogConfig.DefaultPath = AnchorPackagePath;
 			SaveAssetDialogConfig.DefaultAssetName = CollectionAssetName;
 			SaveAssetDialogConfig.AssetClassNames.Add(CollectionClass->GetClassPathName());
 			SaveAssetDialogConfig.ExistingAssetPolicy = ESaveAssetDialogExistingAssetPolicy::AllowButWarn;
@@ -44,7 +44,7 @@ namespace PCGExCollectionEditorHelpers
 			if (SaveObjectPath.IsEmpty())
 			{
 				// User cancelled the dialog -- create nothing.
-				return;
+				return nullptr;
 			}
 
 			CollectionAssetName = FPackageName::ObjectPathToObjectName(SaveObjectPath);
@@ -55,7 +55,7 @@ namespace PCGExCollectionEditorHelpers
 		if (!FPackageName::IsValidObjectPath(PackageName, &Reason))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Invalid package path '%s': %s."), *PackageName, *Reason.ToString());
-			return;
+			return nullptr;
 		}
 
 		UPackage* Package = FPackageName::DoesPackageExist(PackageName) ? LoadPackage(nullptr, *PackageName, LOAD_None) : nullptr;
@@ -84,7 +84,7 @@ namespace PCGExCollectionEditorHelpers
 			if (!Package)
 			{
 				UE_LOG(LogTemp, Error, TEXT("Unable to create package with name '%s'."), *PackageName);
-				return;
+				return nullptr;
 			}
 			bIsNewCollection = true;
 		}
@@ -95,19 +95,72 @@ namespace PCGExCollectionEditorHelpers
 			TargetCollection = NewObject<UPCGExAssetCollection>(Package, CollectionClass, FName(*CollectionAssetName), Flags);
 		}
 
-		if (TargetCollection)
+		if (TargetCollection && bIsNewCollection)
 		{
-			if (bIsNewCollection)
-			{
-				FAssetRegistryModule::AssetCreated(TargetCollection);
-			}
-
-			TArray<TObjectPtr<UPCGExAssetCollection>> Collections;
-			Collections.Add(TargetCollection);
-			UpdateCollectionsFromTyped(Collections, SelectedAssets);
+			FAssetRegistryModule::AssetCreated(TargetCollection);
 		}
 
-		FEditorFileUtils::PromptForCheckoutAndSave({Package}, /*bCheckDirty=*/false, /*bPromptToSave=*/false);
+		return TargetCollection;
+	}
+
+	void CreateCollectionFromTyped(
+		const TArray<FAssetData>& SelectedAssets,
+		UClass* CollectionClass,
+		const TCHAR* DefaultAssetName,
+		bool bOpenSaveDialog)
+	{
+		if (SelectedAssets.IsEmpty() || !CollectionClass)
+		{
+			return;
+		}
+
+		UPCGExAssetCollection* TargetCollection = CreateCollectionAsset(
+			SelectedAssets[0].PackagePath.ToString(), CollectionClass, DefaultAssetName, bOpenSaveDialog);
+		if (!TargetCollection)
+		{
+			return;
+		}
+
+		TArray<TObjectPtr<UPCGExAssetCollection>> Collections;
+		Collections.Add(TargetCollection);
+		UpdateCollectionsFromTyped(Collections, SelectedAssets);
+
+		FEditorFileUtils::PromptForCheckoutAndSave({TargetCollection->GetOutermost()}, /*bCheckDirty=*/false, /*bPromptToSave=*/false);
+	}
+
+	void MergeCollectionsIntoOmni(const TArray<FAssetData>& SelectedCollections)
+	{
+		TArray<UPCGExAssetCollection*> Sources;
+		FString AnchorPath;
+		Sources.Reserve(SelectedCollections.Num());
+
+		for (const FAssetData& Asset : SelectedCollections)
+		{
+			if (UPCGExAssetCollection* Collection = Cast<UPCGExAssetCollection>(Asset.GetAsset()))
+			{
+				if (AnchorPath.IsEmpty())
+				{
+					AnchorPath = Asset.PackagePath.ToString();
+				}
+				Sources.Add(Collection);
+			}
+		}
+
+		if (Sources.IsEmpty())
+		{
+			return;
+		}
+
+		UPCGExOmniCollection* Target = Cast<UPCGExOmniCollection>(
+			CreateCollectionAsset(AnchorPath, UPCGExOmniCollection::StaticClass(), TEXT("SMC_NewOmniCollection")));
+		if (!Target)
+		{
+			return;
+		}
+
+		Target->EDITOR_AppendCollections(Sources);
+
+		FEditorFileUtils::PromptForCheckoutAndSave({Target->GetOutermost()}, /*bCheckDirty=*/false, /*bPromptToSave=*/false);
 	}
 
 	void UpdateCollectionsFromTyped(

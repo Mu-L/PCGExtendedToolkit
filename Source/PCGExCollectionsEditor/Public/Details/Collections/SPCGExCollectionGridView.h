@@ -200,8 +200,13 @@ private:
 	 *  SameType. Null when the destination has no compatible property. */
 	static const FProperty* ResolveMatchingProperty(const FProperty* SrcProp, const UScriptStruct* SrcStruct, const UScriptStruct* DstStruct);
 
-	/** Shared add-entry body (transaction, selection, refresh). EntryStruct null = untyped. */
-	void AddEntryOfStruct(const UScriptStruct* EntryStruct);
+	/** Single entry point for every add affordance (main [+], per-category [+]): untyped
+	 *  direct add on homogeneous collections, payload-type dropdown at the cursor on
+	 *  heterogeneous hosts (EDITOR_GetAddableEntryTypes drives the menu). */
+	void RequestAddEntry(FName Category);
+
+	/** Shared add-entry body (transaction, category, selection, refresh). EntryStruct null = untyped. */
+	void AddEntryOfStruct(const UScriptStruct* EntryStruct, FName Category);
 
 	// Encapsulates reflection boilerplate for Entries array access
 	struct FEntriesArrayAccess

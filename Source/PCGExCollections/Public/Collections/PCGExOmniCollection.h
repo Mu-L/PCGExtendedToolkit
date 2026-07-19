@@ -102,6 +102,28 @@ public:
 	FPCGExAssetCollectionEntry* AddEntryOfType(const UScriptStruct* EntryStruct);
 
 #if WITH_EDITOR
+	/**
+	 * Append every entry of the given source collections into this Omni (conversion when
+	 * called on a fresh asset with one source; merge with several). Sources are untouched.
+	 *
+	 * Per source:
+	 * - Entries are copied as payload rows of their exact type (works for typed AND
+	 *   heterogeneous sources). Copies are new identities (EntryId re-minted on rebuild);
+	 *   the source's CollectionTags are baked into each copied entry's Tags (matching
+	 *   FlattenCollection semantics). Subcollection rows keep referencing their collection
+	 *   asset (shared reference, not duplicated).
+	 * - The source's globals become a TypeGlobals block (Instanced subobjects are
+	 *   DuplicateObject'd into this asset -- raw copies would illegally share them). When a
+	 *   block of that type already exists (multi-merge conflicts), the source's globals are
+	 *   baked into its copied entries via ResolveGlobalsToLocal instead, so behavior is
+	 *   preserved either way.
+	 * - Entry property overrides ride along; the collection-level property schema is
+	 *   re-derived from the merged entries afterwards.
+	 *
+	 * Wraps everything in Modify + staging rebuild. Returns the number of entries appended.
+	 */
+	int32 EDITOR_AppendCollections(TConstArrayView<UPCGExAssetCollection*> InSources);
+
 	virtual void EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections) override;
 
 	virtual const UScriptStruct* EDITOR_GetEntryScriptStruct(int32 RawIndex) const override;

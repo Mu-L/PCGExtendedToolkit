@@ -3,14 +3,16 @@
 
 #include "Collections/PCGExOmniCollection.h"
 
-#if WITH_EDITOR
-#include "AssetRegistry/AssetData.h"
 #include "Collections/PCGExActorCollection.h"
 #include "Collections/PCGExLevelCollection.h"
 #include "Collections/PCGExMeshCollection.h"
 #include "Collections/PCGExPCGDataAssetCollection.h"
 #include "Collections/PCGExSkinnedMeshCollection.h"
+
+#if WITH_EDITOR
+#include "AssetRegistry/AssetData.h"
 #include "PCGDataAsset.h"
+#include "UObject/UnrealType.h"
 #include "Engine/Blueprint.h"
 #include "Engine/SkinnedAsset.h"
 #include "Engine/StaticMesh.h"
@@ -36,6 +38,22 @@ namespace PCGExOmniCollection
 				Info.ParentType = PCGExAssetCollection::TypeIds::Base;
 				PCGExAssetCollection::FTypeRegistry::Get().Register(Info);
 			});
+
+			// TypeId -> globals-block struct associations for the built-in types. Consumed by
+			// conversion/merge (build the matching TypeGlobals block per source) and by
+			// config-block UI. Registered here rather than per-collection-cpp so the macro
+			// signature stays untouched for third parties (they use the same customization API).
+			{
+				using FTypeRegistry = PCGExAssetCollection::FTypeRegistry;
+				using FTypeInfo = PCGExAssetCollection::FTypeInfo;
+				namespace TypeIds = PCGExAssetCollection::TypeIds;
+
+				FTypeRegistry::AddPendingCustomization(TypeIds::Mesh, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExMeshCollectionGlobals::StaticStruct(); });
+				FTypeRegistry::AddPendingCustomization(TypeIds::SkinnedMesh, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExSkinnedMeshCollectionGlobals::StaticStruct(); });
+				FTypeRegistry::AddPendingCustomization(TypeIds::Actor, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExActorCollectionGlobals::StaticStruct(); });
+				FTypeRegistry::AddPendingCustomization(TypeIds::Level, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExLevelCollectionGlobals::StaticStruct(); });
+				FTypeRegistry::AddPendingCustomization(TypeIds::PCGDataAsset, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExPCGDataAssetCollectionGlobals::StaticStruct(); });
+			}
 
 #if WITH_EDITOR
 			// Source-asset detection for the built-in types, consumed by Omni drag-drop
@@ -242,6 +260,119 @@ FPCGExAssetCollectionEntry* UPCGExOmniCollection::GetMutableEntryAtRawIndex(cons
 }
 
 #if WITH_EDITOR
+
+namespace PCGExOmniCollection
+{
+	// Deep-copy Instanced subobjects referenced by a struct into a new owner. Raw struct
+	// copies are SHALLOW for object refs (the instancing graph cannot see into FInstancedStruct
+	// payloads), and sharing EditInlineNew subobjects across assets is illegal -- this is the
+	// StateTree-style manual pass the InstancedStruct spike mandated. Top-level properties
+	// only: the built-in globals blocks are flat; extend if a block ever nests instanced refs.
+	void DuplicateInstancedSubobjects(const UScriptStruct* Struct, void* Memory, UObject* NewOuter)
+	{
+		for (TFieldIterator<FObjectPropertyBase> It(Struct); It; ++It)
+		{
+			const FObjectPropertyBase* ObjProp = *It;
+			if (!ObjProp->HasAnyPropertyFlags(CPF_InstancedReference))
+			{
+				continue;
+			}
+
+			UObject* Current = ObjProp->GetObjectPropertyValue_InContainer(Memory);
+			if (Current && Current->GetOuter() != NewOuter)
+			{
+				ObjProp->SetObjectPropertyValue_InContainer(Memory, DuplicateObject(Current, NewOuter));
+			}
+		}
+	}
+}
+
+int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAssetCollection*> InSources)
+{
+	int32 AppendedCount = 0;
+
+	Modify(true);
+
+	for (UPCGExAssetCollection* Source : InSources)
+	{
+		if (!Source || Source == this)
+		{
+			continue;
+		}
+
+		// Source globals: first source of a type contributes the TypeGlobals block; later
+		// same-type sources bake their globals into their copied entries instead.
+		bool bBakeGlobalsIntoEntries = false;
+		const PCGExAssetCollection::FTypeInfo* SourceTypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(Source->GetTypeId());
+		const UScriptStruct* GlobalsStruct = SourceTypeInfo ? SourceTypeInfo->GlobalsStruct : nullptr;
+
+		if (GlobalsStruct)
+		{
+			const bool bBlockExists = TypeGlobals.ContainsByPredicate([GlobalsStruct](const FInstancedStruct& Block)
+			{
+				return Block.GetScriptStruct() && Block.GetScriptStruct()->IsChildOf(GlobalsStruct);
+			});
+
+			if (bBlockExists)
+			{
+				bBakeGlobalsIntoEntries = true;
+			}
+			else
+			{
+				FInstancedStruct& Block = TypeGlobals.Emplace_GetRef();
+				Block.InitializeAs(GlobalsStruct);
+				if (Source->GetTypeGlobals(GlobalsStruct, *Block.GetMutablePtr<FPCGExCollectionTypeGlobals>()))
+				{
+					PCGExOmniCollection::DuplicateInstancedSubobjects(GlobalsStruct, Block.GetMutableMemory(), this);
+				}
+				else
+				{
+					TypeGlobals.RemoveAt(TypeGlobals.Num() - 1);
+				}
+			}
+		}
+
+		// Entries: exact-typed payload copies. Per-row struct resolution handles typed and
+		// heterogeneous sources alike.
+		Source->ForEachEntry([this, Source, bBakeGlobalsIntoEntries, &AppendedCount](const FPCGExAssetCollectionEntry* Entry, const int32 Index)
+		{
+			const UScriptStruct* PayloadStruct = Source->EDITOR_GetEntryScriptStruct(Index);
+			if (!PayloadStruct)
+			{
+				return;
+			}
+
+			FPCGExOmniCollectionEntry& Row = Entries.Emplace_GetRef();
+			Row.Entry.InitializeAs(PayloadStruct, reinterpret_cast<const uint8*>(Entry));
+
+			FPCGExAssetCollectionEntry* Payload = Row.GetPayload();
+
+			// New identity in this collection: fresh EntryId on the next SyncEntryIds pass.
+			Payload->EntryId = 0;
+
+			// Bake the source's collection tags into the copied entry (they no longer have
+			// the source as host); matches FlattenCollection semantics.
+			Payload->Tags.Append(Source->CollectionTags);
+
+			if (bBakeGlobalsIntoEntries && !Payload->bIsSubCollection)
+			{
+				Payload->ResolveGlobalsToLocal(Source);
+			}
+
+			AppendedCount++;
+		});
+	}
+
+	if (AppendedCount > 0)
+	{
+		// Re-derive the collection-level property schema from the merged entries' overrides,
+		// then rebuild staging (also re-mints EntryIds via SyncEntryIds).
+		RefreshCollectionPropertiesFromEntries();
+		EDITOR_RebuildStagingData();
+	}
+
+	return AppendedCount;
+}
 
 const UScriptStruct* UPCGExOmniCollection::EDITOR_GetEntryScriptStruct(const int32 RawIndex) const
 {

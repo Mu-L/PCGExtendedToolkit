@@ -68,6 +68,12 @@ namespace PCGExAssetCollection
 		// resolve per entry via Entry->GetTypeId() -> Find(TypeId)->EntryStruct instead.
 		UScriptStruct* EntryStruct = nullptr;
 
+		// The type's collection-level globals block struct (FPCGExCollectionTypeGlobals
+		// derivative), when it has one. Consumed by conversion/merge (build the matching
+		// block on a heterogeneous target) and by config-block UI. Registered via
+		// AddPendingCustomization alongside the type's registration.
+		UScriptStruct* GlobalsStruct = nullptr;
+
 		FText DisplayName;
 		FTypeId ParentType = NAME_None; // For inheritance checking
 

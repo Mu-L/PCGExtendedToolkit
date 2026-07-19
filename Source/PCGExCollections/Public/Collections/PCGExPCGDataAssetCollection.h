@@ -60,7 +60,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionGlobals : public FPCGExC
  * against the deduplicated shared indices. The CollectionMap pin is rebuilt afterward
  * by RebuildCollectionMaps() with all shared + per-entry collections registered.
  */
-USTRUCT(BlueprintType, DisplayName="[PCGEx] PCGDataAsset Collection Entry")
+USTRUCT(BlueprintType, DisplayName="[PCGEx] PCGDataAsset Collection Entry", meta=(ShortName="PCG Data Asset"))
 struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAssetCollectionEntry
 {
 	GENERATED_BODY()

@@ -71,7 +71,7 @@ struct PCGEXCOLLECTIONS_API FPCGExSkinnedMeshCollectionGlobals : public FPCGExCo
  * AnimationIndex on each spawned FPCGSkinnedMeshInstance is a per-instance selector-scoped
  * concern handled by the staged selector, not by the collection entry.
  */
-USTRUCT(BlueprintType, DisplayName="[PCGEx] Skinned Mesh Collection Entry")
+USTRUCT(BlueprintType, DisplayName="[PCGEx] Skinned Mesh Collection Entry", meta=(ShortName="Skinned Mesh"))
 struct PCGEXCOLLECTIONS_API FPCGExSkinnedMeshCollectionEntry : public FPCGExAssetCollectionEntry
 {
 	GENERATED_BODY()
