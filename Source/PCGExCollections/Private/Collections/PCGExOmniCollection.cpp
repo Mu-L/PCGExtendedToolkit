@@ -41,10 +41,8 @@ namespace PCGExOmniCollection
 				PCGExAssetCollection::FTypeRegistry::Get().Register(Info);
 			});
 
-			// TypeId -> globals-block struct associations for the built-in types. Consumed by
-			// conversion/merge (build the matching TypeGlobals block per source) and by
-			// config-block UI. Registered here rather than per-collection-cpp so the macro
-			// signature stays untouched for third parties (they use the same customization API).
+			// TypeId -> globals-block struct for the built-in types; registered here so the
+			// per-collection macro signature stays untouched.
 			{
 				using FTypeRegistry = PCGExAssetCollection::FTypeRegistry;
 				using FTypeInfo = PCGExAssetCollection::FTypeInfo;
@@ -58,9 +56,8 @@ namespace PCGExOmniCollection
 			}
 
 #if WITH_EDITOR
-			// Source-asset detection for the built-in types, consumed by Omni drag-drop
-			// ingestion. Pending customizations run after ALL registrations, so ordering
-			// against each type's own registration TU is irrelevant.
+			// Source-asset detection for the built-in types (Omni drag-drop ingestion).
+			// Pending customizations run after ALL registrations -- order-safe.
 			using FTypeRegistry = PCGExAssetCollection::FTypeRegistry;
 			using FTypeInfo = PCGExAssetCollection::FTypeInfo;
 			namespace TypeIds = PCGExAssetCollection::TypeIds;
@@ -80,12 +77,10 @@ namespace PCGExOmniCollection
 			FTypeRegistry::AddPendingCustomization(TypeIds::Actor, [](FTypeInfo& Info)
 			{
 				Info.SourceDetectPriority = 20;
-				// Loads the asset -- acceptable for a user-driven editor drop, and required to
-				// inspect GeneratedClass (mirrors UPCGExActorCollection's browser ingestion).
+				// Loads the asset to inspect GeneratedClass -- acceptable for a user-driven drop.
 				Info.DetectSourceAsset = [](const FAssetData& Asset)
 				{
-					// IsInstanceOf (not an exact class-path compare) so UBlueprint SUBCLASS
-					// assets wrapping actors are claimed too.
+					// IsInstanceOf so UBlueprint subclass assets are claimed too.
 					if (!Asset.IsInstanceOf<UBlueprint>())
 					{
 						return false;
@@ -93,8 +88,7 @@ namespace PCGExOmniCollection
 					const UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
 					return Blueprint && Blueprint->GeneratedClass && Blueprint->GeneratedClass->IsChildOf(AActor::StaticClass());
 				};
-				// The row must reference the GENERATED CLASS, not the blueprint asset --
-				// the generic SetAssetPath(asset path) would bind the wrong object.
+				// The row must reference the GENERATED CLASS, not the blueprint asset.
 				Info.MakeEntryFromSourceAsset = [](const FAssetData& Asset, FInstancedStruct& OutPayload)
 				{
 					const UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
@@ -108,9 +102,7 @@ namespace PCGExOmniCollection
 				};
 			});
 
-			// Levels resolve before PCGDataAsset so a dropped UWorld becomes a Level entry,
-			// not a level-sourced data asset export (that flow stays a deliberate authoring
-			// choice on PCGDataAsset collections).
+			// Levels resolve before PCGDataAsset: a dropped UWorld becomes a Level entry.
 			FTypeRegistry::AddPendingCustomization(TypeIds::Level, [](FTypeInfo& Info)
 			{
 				Info.SourceDetectPriority = 30;
@@ -121,9 +113,7 @@ namespace PCGExOmniCollection
 			{
 				Info.SourceDetectPriority = 40;
 				Info.DetectSourceAsset = [](const FAssetData& Asset) { return Asset.IsInstanceOf<UPCGDataAsset>(); };
-				// The entry struct default-constructs in Level source mode (level-exporter
-				// flow); a browser-dropped UPCGDataAsset must be flipped to DataAsset mode
-				// BEFORE SetAssetPath, which routes the path by Source.
+				// Flip to DataAsset mode BEFORE SetAssetPath -- it routes the path by Source.
 				Info.MakeEntryFromSourceAsset = [](const FAssetData& Asset, FInstancedStruct& OutPayload)
 				{
 					OutPayload.InitializeAs(FPCGExPCGDataAssetCollectionEntry::StaticStruct());
@@ -159,8 +149,7 @@ void UPCGExOmniCollection::InitNumEntries(const int32 InNum)
 
 void UPCGExOmniCollection::BuildCache()
 {
-	// Flatten to base pointers in row order. Unset payloads contribute a null -- tolerated
-	// by BuildCacheFromEntryPtrs -- so raw indices stay stable under partial authoring.
+	// Unset payloads contribute a null (tolerated) so raw indices stay stable.
 	TArray<FPCGExAssetCollectionEntry*> EntryPtrs;
 	EntryPtrs.Reserve(Entries.Num());
 
@@ -176,8 +165,7 @@ void UPCGExOmniCollection::ForEachEntry(FForEachConstEntryFunc Iterator) const
 {
 	for (int32 i = 0; i < Entries.Num(); i++)
 	{
-		// Unset payloads are skipped but still consume their index -- iterator consumers
-		// rely on the index being the raw entry index.
+		// Unset payloads skip but still consume their raw index.
 		if (const FPCGExAssetCollectionEntry* Payload = Entries[i].GetPayload())
 		{
 			Iterator(Payload, i);
@@ -241,10 +229,8 @@ bool UPCGExOmniCollection::GetTypeGlobalsInternal(const UScriptStruct* StructTyp
 				continue;
 			}
 
-			// Copy the requested portion out of the stored block. Base properties keep their
-			// offsets in derived structs, so copying through StructType is valid even when
-			// the block is a derived type. Shallow for subobject pointers -- intended: the
-			// query is a transient read, not an ownership transfer.
+			// Copy the StructType portion out (valid for derived blocks: base offsets are
+			// shared). Shallow for subobjects -- transient read, not ownership transfer.
 			StructType->CopyScriptStruct(&OutGlobals, Block.GetMemory());
 			return true;
 		}
@@ -257,8 +243,7 @@ void UPCGExOmniCollection::GetTypeGlobalsStructs(TArray<const UScriptStruct*>& O
 {
 	Super::GetTypeGlobalsStructs(OutStructs);
 
-	// Report each stored block's concrete struct -- unlike typed collections, what an Omni
-	// can answer is defined by its authored blocks, not by its own collection type.
+	// What an Omni answers is defined by its authored blocks, not its collection type.
 	for (const FInstancedStruct& Block : TypeGlobals)
 	{
 		if (const UScriptStruct* BlockStruct = Block.GetScriptStruct())
@@ -286,12 +271,9 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 	Modify(true);
 
-	// Conflict bookkeeping. One block per type slot at most: when a source provides a block
-	// type that already exists with DIFFERENT values, a single block cannot serve both --
-	// behavior wins over the block. If THIS call installed the existing block, it is dropped
-	// and the installer's copied entries retro-bake; either way the slot joins Conflicted so
-	// every later contributor bakes too. Blocks that pre-existed on this asset are the user's
-	// and are never dropped -- incoming entries bake and a warning flags the precedence gap.
+	// One block per type slot: on a value conflict behavior wins over the block -- a block
+	// THIS call installed is dropped (installer rows retro-bake) and the slot stays
+	// block-less; a pre-existing block is the user's and stays (incoming bakes + warning).
 	struct FInstalledBlock
 	{
 		const UScriptStruct* Struct = nullptr;
@@ -322,8 +304,7 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 			continue;
 		}
 
-		// Globals blocks: typed sources provide their own type's block, heterogeneous
-		// sources (Omni) every stored block -- both through the same seam.
+		// Typed sources provide their own block; heterogeneous sources every stored block.
 		TArray<const UScriptStruct*> ProvidedStructs;
 		Source->GetTypeGlobalsStructs(ProvidedStructs);
 
@@ -358,8 +339,7 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 			if (ExistingIdx == INDEX_NONE)
 			{
-				// Install. The copy-out is SHALLOW for Instanced subobjects -- duplicate them
-				// into this asset (sharing EditInlineNew subobjects across assets is illegal).
+				// Install; copy-out is SHALLOW for Instanced subobjects -- duplicate into this asset.
 				FInstancedStruct& Block = TypeGlobals.Add_GetRef(MoveTemp(Incoming));
 				PCGExCollectionHelpers::DuplicateInstancedSubobjects(Provided, Block.GetMutableMemory(), this);
 
@@ -369,8 +349,7 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 				continue;
 			}
 
-			// Value-identical blocks are not conflicts: the installed block serves this source
-			// as-is. Deep comparison so equal instanced subobjects compare by value, not pointer.
+			// Value-identical (deep-compared) blocks are not conflicts.
 			const FInstancedStruct& Existing = TypeGlobals[ExistingIdx];
 			if (Existing.GetScriptStruct() == Provided &&
 				Provided->CompareScriptStruct(Existing.GetMemory(), Incoming.GetMemory(), PPF_DeepComparison))
@@ -384,10 +363,8 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 			const int32 InstalledIdx = InstalledThisCall.IndexOfByPredicate([&](const FInstalledBlock& I) { return MatchesSlot(I.Struct, Provided); });
 			if (InstalledIdx != INDEX_NONE)
 			{
-				// This call installed the block: drop it and retro-bake the installer's rows so
-				// BOTH contributors keep their exact behavior -- a retained block whose rules
-				// are collection-wide (e.g. Overrule descriptor mode) would silently restyle
-				// entries that were baked against different globals.
+				// This call installed the block: drop it and retro-bake the installer's rows
+				// so BOTH contributors keep their exact behavior.
 				const FInstalledBlock Installed = InstalledThisCall[InstalledIdx];
 				InstalledThisCall.RemoveAt(InstalledIdx);
 				TypeGlobals.RemoveAt(ExistingIdx);
@@ -404,17 +381,14 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 			}
 			else
 			{
-				// The block pre-existed on this asset -- it is the user's and stays. Baked
-				// incoming entries keep their values, but a block enforcing collection-wide
-				// rules still takes precedence over them.
+				// Pre-existing block is the user's -- keep it, bake incoming, warn.
 				UE_LOG(LogPCGEx, Warning,
 				       TEXT("Merging '%s': this Omni collection already has a '%s' globals block with different settings. The source's globals were baked into its copied entries, but the existing block's own rules (e.g. a collection-wide overrule) still take precedence over them."),
 				       *Source->GetName(), *Existing.GetScriptStruct()->GetName());
 			}
 		}
 
-		// Entries: exact-typed payload copies. Per-row struct resolution handles typed and
-		// heterogeneous sources alike.
+		// Entries: exact-typed payload copies.
 		const int32 RowStart = Entries.Num();
 		int32 SourceAppended = 0;
 		int32 SourceSkipped = 0;
@@ -433,16 +407,13 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 			FPCGExAssetCollectionEntry* Payload = Row.GetPayload();
 
-			// The raw payload copy is SHALLOW for Instanced subobjects (e.g. a PCGDataAsset
-			// entry's embedded level export, outer'd to the SOURCE asset) -- duplicate them
-			// into this asset, or saving would reference another package's private objects.
+			// Payload copy is SHALLOW for Instanced subobjects -- duplicate into this asset.
 			PCGExCollectionHelpers::DuplicateInstancedSubobjects(PayloadStruct, Payload, this);
 
-			// New identity in this collection: fresh EntryId on the next SyncEntryIds pass.
+			// New identity: fresh EntryId on the next SyncEntryIds pass.
 			Payload->EntryId = 0;
 
-			// Bake the source's collection tags into the copied entry (they no longer have
-			// the source as host); matches FlattenCollection semantics.
+			// Bake source CollectionTags into the copy (FlattenCollection semantics).
 			Payload->Tags.Append(Source->CollectionTags);
 
 			if (!Payload->bIsSubCollection)
@@ -472,9 +443,7 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 		if (SourceAppended == 0 && SourceSkipped > 0)
 		{
-			// Storage without per-row payload structs (e.g. Variant collections, which theme
-			// other collections rather than owning entries) cannot be merged -- say so instead
-			// of silently producing nothing.
+			// Storage without per-row payload structs (Variant) cannot be merged -- say so.
 			UE_LOG(LogPCGEx, Warning,
 			       TEXT("Merging '%s': no entries could be appended -- its storage does not expose per-entry payloads (Variant collections cannot be merged; merge their source collections instead)."),
 			       *Source->GetName());
@@ -485,8 +454,7 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 	if (AppendedCount > 0)
 	{
-		// Re-derive the collection-level property schema from the merged entries' overrides,
-		// then rebuild staging (also re-mints EntryIds via SyncEntryIds).
+		// Re-derive the property schema, rebuild staging (re-mints EntryIds).
 		RefreshCollectionPropertiesFromEntries();
 		EDITOR_RebuildStagingData();
 	}
@@ -503,8 +471,7 @@ void UPCGExOmniCollection::EDITOR_OnPostStagingRebuild()
 {
 	Super::EDITOR_OnPostStagingRebuild();
 
-	// Actor-typed entries get the same property-component schema scan a native actor
-	// collection runs in its own post-rebuild hook.
+	// Actor-typed entries get the same schema scan a native actor collection runs.
 	bool bAnyActorEntry = false;
 	ForEachEntry([&bAnyActorEntry](const FPCGExAssetCollectionEntry* Entry, int32)
 	{
@@ -525,14 +492,11 @@ void UPCGExOmniCollection::EDITOR_OnPostStagingRebuild()
 
 void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const
 {
-	// Every registered concrete entry type. Registered order isn't user-facing; sort by
-	// display name so the add menu is stable.
+	// Every registered concrete entry type, sorted for a stable menu.
 	PCGExAssetCollection::FTypeRegistry::Get().ForEach([&OutTypes](const PCGExAssetCollection::FTypeInfo& Info)
 	{
-		// Skip the base entry struct (Variant registers it as its nominal EntryStruct): a
-		// base-typed row has no asset to reference, so offering it in the add menu only
-		// strands users on a pickerless tile -- subcollection rows are created by dropping
-		// collection assets instead.
+		// Skip the base entry struct (Variant's nominal EntryStruct): a base row has no
+		// asset picker; subcollection rows come from dropping collection assets instead.
 		if (Info.EntryStruct && Info.EntryStruct != FPCGExAssetCollectionEntry::StaticStruct())
 		{
 			OutTypes.Add(Info.EntryStruct);
@@ -547,15 +511,13 @@ void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruc
 
 FPCGExAssetCollectionEntry* UPCGExOmniCollection::EDITOR_AddEntry(const UScriptStruct* EntryStruct)
 {
-	// Untyped adds are meaningless on a heterogeneous host -- the caller must pick a type
-	// (EDITOR_GetAddableEntryTypes drives the UI affordance).
+	// Untyped adds are meaningless on a heterogeneous host -- the caller must pick a type.
 	return EntryStruct ? AddEntryOfType(EntryStruct) : nullptr;
 }
 
 void UPCGExOmniCollection::EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections)
 {
-	// Base implementation reflects over a homogeneous Entries array of entry structs; Omni
-	// rows wrap payloads, so append rows directly.
+	// Base reflects over a homogeneous Entries array; wrapper rows append directly.
 	TSet<const UPCGExAssetCollection*> AlreadyReferenced;
 	ForEachEntry([&AlreadyReferenced](const FPCGExAssetCollectionEntry* Entry, int32)
 	{
@@ -572,12 +534,9 @@ void UPCGExOmniCollection::EDITOR_AddSubCollectionEntries(const TArray<UPCGExAss
 			continue;
 		}
 
-		// Subcollection rows adopt the referenced collection's own entry type when it has
-		// one -- matching typed collections, whose subcollection entries are their native
-		// struct. That way, unticking bIsSubCollection reveals the right asset picker
-		// instead of stranding a base-typed row with nothing to reference. Heterogeneous
-		// sources (Omni, Variant) have no single entry type and fall back to the base
-		// struct, where the toggle has nothing to reveal by construction.
+		// Subcollection rows adopt the referenced collection's entry type when it has one
+		// (unticking bIsSubCollection then reveals the right picker); heterogeneous sources
+		// have no single type and fall back to the base struct.
 		const UScriptStruct* PayloadStruct = FPCGExAssetCollectionEntry::StaticStruct();
 		if (const PCGExAssetCollection::FTypeInfo* SubTypeInfo = PCGExAssetCollection::FTypeRegistry::Get().FindByClass(Sub->GetClass()))
 		{
@@ -603,9 +562,8 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 {
 	UPCGExAssetCollection::EDITOR_AddBrowserSelectionInternal(InAssetData);
 
-	// Gather registered detectors, lowest priority value first. Pointers into the registry
-	// map are stable here: registration mutations only happen at module init / plugin load,
-	// never during a user-driven editor drop.
+	// Detectors by ascending priority. Registry pointers are stable here (mutations only
+	// happen at module init / plugin load).
 	TArray<const PCGExAssetCollection::FTypeInfo*> Detectors;
 	PCGExAssetCollection::FTypeRegistry::Get().ForEach([&Detectors](const PCGExAssetCollection::FTypeInfo& Info)
 	{
@@ -633,8 +591,7 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 			return;
 		}
 
-		// Staging.Path covers staged rows; source-asset paths cover rows added but not yet
-		// staged -- both spaces match what SetAssetPath seeds on a freshly dropped row.
+		// Staging.Path covers staged rows; source paths cover not-yet-staged rows.
 		if (Entry->Staging.Path.IsValid())
 		{
 			ExistingKeys.Add(MakeKey(Entry->GetTypeId(), Entry->Staging.Path));
@@ -660,8 +617,7 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 			FInstancedStruct Payload;
 			if (Info->MakeEntryFromSourceAsset)
 			{
-				// A detector may claim an asset its factory then rejects on closer inspection;
-				// fall through to lower-priority detectors instead of dropping the asset.
+				// Factory rejected on closer inspection: fall through to lower-priority detectors.
 				if (!Info->MakeEntryFromSourceAsset(Asset, Payload))
 				{
 					continue;

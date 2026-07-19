@@ -488,8 +488,7 @@ void FPCGExAssetCollectionEditor::ResolveTilePickerForRow(int32 EntryIndex, FNam
 	OutPropertyName = GetTilePickerPropertyName();
 	OutAllowedClass = GetTilePickerAllowedClass();
 
-	// ...then the row's own entry type refines them so heterogeneous hosts (Omni) get the
-	// right picker per row. Typed rows resolve to the same values, so this is a no-op there.
+	// ...then the row's entry type refines them (no-op on typed rows).
 	const UPCGExAssetCollection* Coll = EditedCollection.Get();
 	if (!Coll)
 	{
@@ -527,9 +526,8 @@ TSharedRef<SWidget> FPCGExAssetCollectionEditor::BuildTilePickerWidget(
 		BuildSubCollectionPickerSlot(WeakColl, Idx, OnPropertyEdited)
 	];
 
-	// Asset picker (visible when bIsSubCollection is false). Detect property type once at
-	// construction, from the ROW's payload struct -- heterogeneous hosts (Omni) have per-row
-	// entry types, and the payload pointer/struct resolve through the collection virtuals.
+	// Asset picker (visible when bIsSubCollection is false). Property type detected once at
+	// construction, from the ROW's payload struct (per-row on heterogeneous hosts).
 	if (!PickerPropName.IsNone())
 	{
 		bool bIsClassProperty = false;

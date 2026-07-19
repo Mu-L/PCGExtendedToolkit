@@ -102,8 +102,7 @@ namespace PCGExAssetCollection
 		GetPendingRegistrations().Empty();
 		GetPendingRegistrations().Shrink();
 
-		// Customizations run strictly after every registration so cross-TU static-init
-		// ordering between a type's registration and its customizers never matters.
+		// Customizations run after every registration -- cross-TU static-init order never matters.
 		for (auto& Pair : GetPendingCustomizations())
 		{
 			Get().Customize(Pair.Key, Pair.Value);

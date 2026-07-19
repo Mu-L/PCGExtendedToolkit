@@ -219,10 +219,8 @@ namespace PCGExCollectionEntryBlueprintLibrary_Private
 		return FPCGExAssetCollectionEntry::StaticStruct();
 	}
 
-	// Per-entry refinement of ResolveEntryMemberRoot: heterogeneous hosts (Variant, Omni)
-	// have no single entry struct, but a live entry knows its own type. Same result as the
-	// collection root on typed collections; subcollection rows (TypeId Base) fall through
-	// to the collection root, matching legacy behavior.
+	// Per-entry refinement of ResolveEntryMemberRoot (heterogeneous hosts have no single
+	// entry struct). Subcollection rows fall through to the collection root (legacy behavior).
 	const UStruct* ResolveEntryMemberRootForEntry(const UPCGExAssetCollection* Collection, const FPCGExAssetCollectionEntry* Entry)
 	{
 		if (Entry)

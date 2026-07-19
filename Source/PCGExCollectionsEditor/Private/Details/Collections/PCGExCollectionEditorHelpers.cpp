@@ -170,9 +170,8 @@ namespace PCGExCollectionEditorHelpers
 			AppendedCount = Target->EDITOR_AppendCollections(Sources);
 		}
 
-		// Sources whose storage can't be merged (e.g. Variant collections) contribute nothing
-		// and are detailed in the log by EDITOR_AppendCollections -- surface the outcome here
-		// so a partial or empty merge is never silent.
+		// Surface the outcome (per-source detail is in the log) -- a partial or empty merge
+		// must never be silent.
 		{
 			FNotificationInfo Info(AppendedCount > 0
 				                       ? FText::Format(NSLOCTEXT("PCGEx", "MergedIntoOmni", "Appended {0} {0}|plural(one=entry,other=entries) from {1} {1}|plural(one=collection,other=collections) into '{2}'."),

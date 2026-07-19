@@ -69,9 +69,7 @@ void FPCGExLevelCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 #if WITH_EDITOR
 	if (const UWorld* World = Level.Get())
 	{
-		// Globals come through the type-globals seam so any host (native, Variant, Omni) can
-		// provide them; hosts without a level globals block behave like null filter/evaluator
-		// (infrastructure-only filtering, empty bounds).
+		// Globals via the seam; hosts without a block behave like null filter/evaluator.
 		FPCGExLevelCollectionGlobals Globals;
 		if (OwningCollection)
 		{

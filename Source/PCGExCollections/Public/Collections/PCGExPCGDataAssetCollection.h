@@ -29,10 +29,8 @@ enum class EPCGExDataAssetEntrySource : uint8
 };
 
 /**
- * PCGDataAsset collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
- * UPCGExPCGDataAssetCollection's exporter member 1:1. The exporter is editor-only data
- * (level harvesting is an authoring operation); in cooked targets this block is empty
- * and querying it is harmless.
+ * PCGDataAsset collection-level globals. Mirrors UPCGExPCGDataAssetCollection's exporter
+ * member 1:1. Editor-only data: in cooked targets the block is empty, querying it is harmless.
  */
 USTRUCT(BlueprintType, DisplayName="[PCGEx] PCGDataAsset Collection Globals")
 struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionGlobals : public FPCGExCollectionTypeGlobals

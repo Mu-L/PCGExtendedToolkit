@@ -307,10 +307,8 @@ void FPCGExMeshCollectionEntry::ResolveGlobalsToLocal(const UPCGExAssetCollectio
 	}
 }
 
-// Resolves descriptor inheritance: Global/Overrule → use collection-level descriptor,
-// Local → use entry-level ISMDescriptor. Always appends entry tags to component tags.
-// Globals come through the type-globals seam; hosts without a mesh globals block behave
-// like a null parent (entry-local descriptor).
+// Resolves descriptor inheritance: Global/Overrule → collection-level descriptor (via the
+// seam), Local → entry-level ISMDescriptor. Always appends entry tags to component tags.
 void FPCGExMeshCollectionEntry::InitPCGSoftISMDescriptor(const UPCGExAssetCollection* ParentCollection, FPCGSoftISMComponentDescriptor& TargetDescriptor) const
 {
 	FPCGExMeshCollectionGlobals Globals;

@@ -102,22 +102,18 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 
 	if (Source == EPCGExDataAssetEntrySource::Level)
 	{
-		// Level-sourced entries depend on collection-level machinery only PCGDataAsset
-		// collections run (shared-collection compaction, collection maps, externalization).
-		// In any other host the export would be half-functional -- stage nothing and point
-		// the user at the composition path instead of shipping a silently broken setup.
+		// Level export depends on machinery only PCGDataAsset collections run -- in any
+		// other host, stage nothing and point at the composition path.
 		if (!OwningCollection || !OwningCollection->IsType(PCGExAssetCollection::TypeIds::PCGDataAsset))
 		{
 			UE_LOG(LogPCGEx, Warning,
 			       TEXT("Level-sourced PCGDataAsset entry ('%s') is hosted by a collection without the level-export machinery -- entry skipped. Author it in a PCGDataAsset collection and reference that collection as a subcollection entry instead."),
 			       *Level.ToSoftObjectPath().ToString());
 
-			// Discard any embedded export the entry carried in (e.g. copied along from a
-			// PCGDataAsset collection): a foreign host never consumes it, and a reference to
-			// ANOTHER asset's private subobject must not survive into a save. Subobjects this
-			// host owns get the usual transient-rename so no orphaned export lingers in the
-			// package (mirrors the recreate path below); foreign-owned pointers are only
-			// nulled -- the owning asset is not ours to mutate.
+			// Discard any embedded export carried in via a cross-asset copy: foreign hosts
+			// never consume it, and a pointer to another asset's private subobject must not
+			// survive a save. Own subobjects get the transient-rename (mirrors the recreate
+			// path below); foreign-owned pointers are only nulled.
 			auto DiscardEmbedded = [OwningCollection](auto& Embedded)
 			{
 				if (!Embedded)
@@ -177,10 +173,8 @@ void FPCGExPCGDataAssetCollectionEntry::UpdateStaging(const UPCGExAssetCollectio
 		}
 		ExportedDataAsset = NewObject<UPCGDataAsset>(const_cast<UPCGExAssetCollection*>(OwningCollection));
 
-		// Use the host's instanced exporter if available, otherwise create a transient default.
-		// The exporter comes through the type-globals seam (any host that carries a PCGDataAsset
-		// globals block can provide it); it is editor-only data, so cooked builds always take
-		// the fallback path.
+		// Exporter via the type-globals seam, else a transient default. Editor-only data:
+		// cooked builds always take the fallback.
 		UPCGExLevelDataExporter* Exporter = nullptr;
 #if WITH_EDITORONLY_DATA
 		if (OwningCollection)

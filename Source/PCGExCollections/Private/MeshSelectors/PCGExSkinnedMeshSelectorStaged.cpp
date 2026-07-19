@@ -138,8 +138,7 @@ bool UPCGExSkinnedMeshSelectorStaged::SelectInstances(FPCGSkinnedMeshSpawnerCont
 			}
 			else
 			{
-				// Globals resolve through the host's type-globals seam; heterogeneous hosts
-				// without a skinned-mesh globals block fall back to the entry's local descriptor.
+				// Globals via the host's seam; hosts without a block fall back to the local descriptor.
 				Entry->InitPCGSoftSkinnedDescriptor(Result.Host, OutDescriptor);
 			}
 

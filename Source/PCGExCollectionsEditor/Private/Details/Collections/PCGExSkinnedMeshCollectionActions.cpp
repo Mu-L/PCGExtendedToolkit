@@ -21,9 +21,8 @@ PCGEX_REGISTER_COLLECTION_EDITOR_TYPE(
 
 namespace PCGExSkinnedMeshCollectionActions
 {
-	// Tile-picker contribution, resolved per-row by heterogeneous grid editors (Omni) and
-	// used as the typed editor's default (this also fixes the skinned editor previously
-	// missing a GetTilePickerPropertyName override).
+	// Tile-picker contribution (per-row resolution + typed editor default; also fixes the
+	// skinned editor's previously missing picker).
 	struct FRegisterTilePicker
 	{
 		FRegisterTilePicker()

@@ -174,11 +174,9 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 	/**
 	 * Bake collection-level ("Global") inheritance channels into local values, reading the
-	 * globals from the given source collection (via GetTypeGlobals -- any host that carries
-	 * the matching globals block works as a source). Call when an entry is copied OUT of its
-	 * collection (e.g. into a variant collection payload) and the destination host won't
-	 * carry an equivalent globals block -- otherwise the global-sourced values are silently
-	 * lost. Base is a no-op; typed entries override for their descriptor channels.
+	 * source's globals through GetTypeGlobals. Call when an entry is copied OUT of its
+	 * collection and the destination won't carry an equivalent globals block -- otherwise
+	 * global-sourced values are silently lost. Base is a no-op.
 	 */
 	virtual void ResolveGlobalsToLocal(const UPCGExAssetCollection* InSourceCollection)
 	{
@@ -710,19 +708,11 @@ public:
 #pragma region Type Globals
 
 	/**
-	 * Copy this host's collection-level globals block matching T into OutGlobals. Returns
-	 * false when this host doesn't provide such a block -- callers must then behave as if
-	 * the collection-level settings don't exist (entry-local fallbacks).
-	 *
-	 * This is how entries read collection-level configuration (global descriptors, bounds
-	 * evaluators, content filters...) without knowing their host's concrete class -- which is
-	 * what allows entries of any type to be hosted by heterogeneous collections (Variant,
-	 * Omni). NEVER cast a host collection to a concrete class to reach such settings.
-	 *
-	 * Copy-out by design: no lifetime coupling to the host, and safe to call from any thread
-	 * under the usual "assets are structurally immutable during PCG execution" contract.
-	 * Called per resolved entry (not per point) -- copy cost is acceptable there; do not
-	 * introduce per-point calls.
+	 * Copy this host's globals block matching T into OutGlobals; false when the host has no
+	 * such block (callers fall back to entry-local values). This is how entries read
+	 * collection-level settings -- NEVER cast a host collection to a concrete class for them.
+	 * Copy-out by design: no lifetime coupling, any-thread safe. Called per resolved entry;
+	 * do not introduce per-point calls.
 	 */
 	template <typename T>
 	bool GetTypeGlobals(T& OutGlobals) const
@@ -731,28 +721,22 @@ public:
 		return GetTypeGlobalsInternal(T::StaticStruct(), OutGlobals);
 	}
 
-	/**
-	 * Type-erased flavor for callers holding only a struct type (conversion, config-block
-	 * UI). OutGlobals' concrete type must match or derive from StructType.
-	 */
+	/** Type-erased flavor. OutGlobals' concrete type must match or derive from StructType. */
 	bool GetTypeGlobals(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const
 	{
 		return GetTypeGlobalsInternal(StructType, OutGlobals);
 	}
 
 	/**
-	 * Enumerate the globals-block struct types this host can answer GetTypeGlobals for.
-	 * Base resolves the collection's own registered GlobalsStruct (typed collections answer
-	 * exactly their type's block); heterogeneous hosts (Omni) report each stored block's
-	 * concrete struct. Consumed by conversion/merge to transfer collection-level settings
-	 * without knowing the source's concrete class.
+	 * Globals-block struct types this host can answer GetTypeGlobals for. Base: the
+	 * collection's registered GlobalsStruct; heterogeneous hosts: each stored block's
+	 * concrete struct. Consumed by conversion/merge.
 	 */
 	virtual void GetTypeGlobalsStructs(TArray<const UScriptStruct*>& OutStructs) const;
 
 protected:
 	/**
-	 * Fill OutGlobals if this collection provides a globals block whose type StructType
-	 * matches or derives from (a derived StructType only gets its known base part written).
+	 * Fill OutGlobals if this collection provides a block StructType matches or derives from.
 	 * Unhandled types must route to Super so provider chains compose. Base provides none.
 	 */
 	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const
@@ -801,30 +785,25 @@ public:
 	}
 
 	/**
-	 * Concrete script struct of the entry payload at the given raw index. Base resolves the
-	 * homogeneous `Entries` array's inner struct (index-independent); heterogeneous
-	 * collections (Omni) resolve per row. Null when the row has no payload or the storage
-	 * isn't a reflected entry array. Editor UI must use this instead of reflecting the
-	 * Entries array inner type directly.
+	 * Concrete script struct of the entry payload at the given raw index (base: the Entries
+	 * inner struct; heterogeneous collections: per row). Null when the row has no payload.
+	 * Editor UI must use this instead of reflecting the Entries array inner type.
 	 */
 	virtual const UScriptStruct* EDITOR_GetEntryScriptStruct(int32 RawIndex) const;
 
 	/**
-	 * Payload types a grid "+ Add" affordance should offer. Base leaves the array empty,
-	 * meaning entries are added untyped (the collection's single entry struct); heterogeneous
-	 * collections fill it so the UI presents an explicit type choice.
+	 * Payload types a grid "+ Add" affordance should offer. Base leaves it empty (untyped
+	 * adds); heterogeneous collections fill it so the UI presents a type choice.
 	 */
 	virtual void EDITOR_GetAddableEntryTypes(TArray<const UScriptStruct*>& OutTypes) const
 	{
 	}
 
 	/**
-	 * Append one default-initialized entry. EntryStruct null = the collection's native entry
-	 * type; a non-null EntryStruct must be a type the storage can hold -- base: the Entries
-	 * inner struct or any base of it (the created element is the NATIVE type; callers copy
-	 * the requested-struct portion); Omni: any FPCGExAssetCollectionEntry-derived payload
-	 * (created as exactly that type). Returns the new entry (payload) or null on rejection.
-	 * Doubles as the compatibility arbiter for cross-collection entry transfers.
+	 * Append one default-initialized entry; null EntryStruct = the native entry type. Base
+	 * accepts the Entries inner struct or a base of it (element is created NATIVE, caller
+	 * copies the requested portion); Omni accepts any entry-derived payload. Null on
+	 * rejection -- doubles as the compatibility arbiter for cross-collection transfers.
 	 * Caller owns transaction/Modify/PostEditChange.
 	 */
 	virtual FPCGExAssetCollectionEntry* EDITOR_AddEntry(const UScriptStruct* EntryStruct = nullptr);
@@ -1021,9 +1000,8 @@ public:
 	 * type is accepted. Skips inputs that would create a cycle, that point at self, or that
 	 * are already referenced by an existing subcollection entry.
 	 * Does NOT open a transaction or mark dirty -- caller is responsible (matches the
-	 * EDITOR_AddBrowserSelectionTyped contract).
-	 * Base implementation reflects over a homogeneous `Entries` array of entry structs;
-	 * collections whose rows wrap payloads (Omni) override it.
+	 * EDITOR_AddBrowserSelectionTyped contract). Base reflects over a homogeneous `Entries`
+	 * array; wrapper-row collections (Omni) override.
 	 */
 	virtual void EDITOR_AddSubCollectionEntries(const TArray<UPCGExAssetCollection*>& InSubCollections);
 

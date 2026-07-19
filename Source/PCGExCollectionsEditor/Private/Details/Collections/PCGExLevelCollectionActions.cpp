@@ -21,8 +21,7 @@ PCGEX_REGISTER_COLLECTION_EDITOR_TYPE(
 
 namespace PCGExLevelCollectionActions
 {
-	// Tile-picker contribution, resolved per-row by heterogeneous grid editors (Omni) and
-	// used as the typed editor's default.
+	// Tile-picker contribution (per-row resolution + typed editor default).
 	struct FRegisterTilePicker
 	{
 		FRegisterTilePicker()

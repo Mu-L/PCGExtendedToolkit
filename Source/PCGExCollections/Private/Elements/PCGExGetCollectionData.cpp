@@ -284,10 +284,8 @@ namespace PCGExGetCollectionData
 		return (ResolvedPtr && *ResolvedPtr) ? *ResolvedPtr : nullptr;
 	}
 
-	/** Set the AssetPath / AssetClass declaration flags on U based on a single collection's
-	 *  entry content. Heterogeneous hosts (Variant, Omni) may hold both actor and asset
-	 *  entries, so classification is per-entry union, not collection class.
-	 *  Used by the non-merged paths where each output is tied to exactly one collection. */
+	/** Set AssetPath / AssetClass declaration flags from the collection's entry content --
+	 *  per-entry union, not collection class (heterogeneous hosts may hold both). */
 	FORCEINLINE static void SetAssetHalves(FUniqueOutput& U, const UPCGExAssetCollection* Collection)
 	{
 		bool bAnyActor = false;
@@ -1054,7 +1052,7 @@ namespace PCGExGetCollectionData
 			UniqueCollections.Add(Collection);
 			Collection->EDITOR_RegisterTrackingKeys(InContext);
 
-			// Per-entry union so heterogeneous hosts (Variant, Omni) declare both halves.
+			// Per-entry union so heterogeneous hosts declare both halves.
 			bool bCollectionAnyActor = false;
 			bool bCollectionAnyNonActor = false;
 			PCGExCollectionHelpers::GetEntryAssetHalves(Collection, bCollectionAnyActor, bCollectionAnyNonActor);

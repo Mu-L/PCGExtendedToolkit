@@ -101,11 +101,7 @@ namespace PCGExMeshCollection
 	};
 }
 
-/**
- * Mesh collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
- * UPCGExMeshCollection's Settings|Global members 1:1 -- keep names in sync so conversion
- * between the two stays a straight per-property copy.
- */
+/** Mesh collection-level globals. Mirrors UPCGExMeshCollection's Settings|Global members 1:1 -- keep names in sync. */
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Mesh Collection Globals")
 struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionGlobals : public FPCGExCollectionTypeGlobals
 {
@@ -200,10 +196,8 @@ struct PCGEXCOLLECTIONS_API FPCGExMeshCollectionEntry : public FPCGExAssetCollec
 	virtual void ResolveGlobalsToLocal(const UPCGExAssetCollection* InSourceCollection) override;
 
 	/**
-	 * Resolve descriptor inheritance into TargetDescriptor. Accepts any host collection --
-	 * globals are read through the type-globals seam, so Variant/Omni hosts that carry a
-	 * mesh globals block behave like a native mesh collection; hosts without one (or null)
-	 * fall back to the entry's local descriptor.
+	 * Resolve descriptor inheritance into TargetDescriptor. Accepts any host -- globals read
+	 * through the seam; hosts without a mesh block (or null) fall back to the local descriptor.
 	 */
 	void InitPCGSoftISMDescriptor(const UPCGExAssetCollection* ParentCollection, FPCGSoftISMComponentDescriptor& TargetDescriptor) const;
 

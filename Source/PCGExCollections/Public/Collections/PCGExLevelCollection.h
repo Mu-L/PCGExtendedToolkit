@@ -16,11 +16,7 @@
 
 class UPCGExLevelCollection;
 
-/**
- * Level collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
- * UPCGExLevelCollection's import members 1:1 -- keep names in sync so conversion
- * between the two stays a straight per-property copy.
- */
+/** Level collection-level globals. Mirrors UPCGExLevelCollection's import members 1:1 -- keep names in sync. */
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Level Collection Globals")
 struct PCGEXCOLLECTIONS_API FPCGExLevelCollectionGlobals : public FPCGExCollectionTypeGlobals
 {

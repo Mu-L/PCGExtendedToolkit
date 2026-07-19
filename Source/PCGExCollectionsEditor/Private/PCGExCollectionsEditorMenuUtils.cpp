@@ -28,8 +28,7 @@ namespace PCGExCollectionsEditorMenuUtils
 
 	void CreateOrUpdatePCGExAssetCollectionsFromMenu(UToolMenu* Menu, TArray<FAssetData>& Assets)
 	{
-		// Selections containing PCGEx collections (any mix of types) can be merged into an
-		// Omni collection -- entry copies + globals transfer, sources untouched.
+		// Selections containing PCGEx collections can be merged into an Omni collection.
 		{
 			TArray<FAssetData> SelectedCollectionAssets;
 			for (const FAssetData& Asset : Assets)

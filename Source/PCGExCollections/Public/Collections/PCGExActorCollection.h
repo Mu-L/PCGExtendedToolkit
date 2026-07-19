@@ -16,11 +16,7 @@
 
 class UPCGExActorCollection;
 
-/**
- * Actor collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
- * UPCGExActorCollection's import members 1:1 -- keep names in sync so conversion
- * between the two stays a straight per-property copy.
- */
+/** Actor collection-level globals. Mirrors UPCGExActorCollection's import members 1:1 -- keep names in sync. */
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Actor Collection Globals")
 struct PCGEXCOLLECTIONS_API FPCGExActorCollectionGlobals : public FPCGExCollectionTypeGlobals
 {
@@ -176,11 +172,9 @@ public:
 		TArrayView<AActor*> RepresentativeInstances = {});
 
 	/**
-	 * Host-agnostic core of RebuildPropertiesFromActorComponents: runs the actor-component
-	 * scan/merge over the ACTOR-typed leaf entries of ANY collection -- heterogeneous hosts
-	 * (Omni) included. Non-actor entries contribute nothing but still get their
-	 * PropertyOverrides re-synced against the merged canonical schema (the collection-level
-	 * schema is shared by every entry). RepresentativeInstances is indexed by raw entry index.
+	 * Host-agnostic core of RebuildPropertiesFromActorComponents: scans ACTOR-typed leaf
+	 * entries of ANY collection; non-actor entries contribute nothing but still re-sync
+	 * against the merged schema. RepresentativeInstances is indexed by raw entry index.
 	 */
 	static void RebuildActorPropertiesFromComponents(
 		UPCGExAssetCollection* Host,

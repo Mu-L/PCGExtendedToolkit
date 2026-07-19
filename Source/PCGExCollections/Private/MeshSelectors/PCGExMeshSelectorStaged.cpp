@@ -162,8 +162,7 @@ bool UPCGExMeshSelectorStaged::SelectMeshInstances(FPCGStaticMeshSpawnerContext&
 			}
 			else
 			{
-				// Globals resolve through the host's type-globals seam; heterogeneous hosts
-				// without a mesh globals block fall back to the entry's local descriptor.
+				// Globals via the host's seam; hosts without a block fall back to the local descriptor.
 				Entry->InitPCGSoftISMDescriptor(Result.Host, OutDescriptor);
 			}
 

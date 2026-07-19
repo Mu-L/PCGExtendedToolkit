@@ -12,13 +12,10 @@
 #include "PCGExOmniCollection.generated.h"
 
 /**
- * One row of an Omni collection: a thin wrapper around a type-erased entry payload.
- * Wrapped (rather than a raw TArray<FInstancedStruct>) so future row-level metadata can be
- * added without a serialization break.
- *
- * An unset payload is a tolerated authoring state: the row still consumes its raw index
- * (skipped by iteration and cache build) so indices stay stable under partial authoring --
- * same contract as Variant collection rows.
+ * One row of an Omni collection: a thin wrapper around a type-erased entry payload
+ * (wrapped so future row metadata stays serialization-compatible). An unset payload is a
+ * tolerated authoring state -- the row still consumes its raw index (skipped by iteration
+ * and cache build), same contract as Variant rows.
  */
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Omni Collection Entry")
 struct PCGEXCOLLECTIONS_API FPCGExOmniCollectionEntry
@@ -41,18 +38,11 @@ struct PCGEXCOLLECTIONS_API FPCGExOmniCollectionEntry
 };
 
 /**
- * Type-erased asset collection: entries of ANY registered type coexist in one authored list
- * (mesh + actor + level + data asset + custom third-party types).
- *
- * It is a first-class UPCGExAssetCollection -- pick transport is type-blind and staged
- * consumers dispatch per entry, so everything downstream (staging, fitting, selectors,
- * spawning) works off the payloads directly. Consumers that need a specific type simply
- * skip foreign entries (or route per type through Staging Type Filter).
- *
- * Collection-level settings that typed collections expose (global descriptors, bounds
- * evaluators, content filters, level exporter) are provided through TypeGlobals blocks:
- * entries query them via the type-globals seam (UPCGExAssetCollection::GetTypeGlobals),
- * so an Omni host with a matching block behaves exactly like the native typed collection.
+ * Type-erased asset collection: entries of ANY registered type coexist in one authored
+ * list. Pick transport is type-blind and staged consumers dispatch per entry, so the whole
+ * downstream pipeline works off the payloads directly. Collection-level settings are
+ * provided through TypeGlobals blocks answering the type-globals seam -- an Omni host with
+ * a matching block behaves exactly like the native typed collection.
  */
 UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | Omni", meta=(ToolTip = "A weighted collection of mixed entry types -- meshes, actors, levels, data assets and custom types in a single list."))
 class PCGEXCOLLECTIONS_API UPCGExOmniCollection : public UPCGExAssetCollection
@@ -71,14 +61,10 @@ public:
 	TArray<FPCGExOmniCollectionEntry> Entries;
 
 	/**
-	 * Per-type collection-level globals blocks (see FPCGExCollectionTypeGlobals). One block
-	 * per entry type at most -- the first block whose struct matches a query wins. Entries
-	 * whose type has no block here fall back to their entry-local settings, exactly as if
-	 * the matching typed collection had default globals.
-	 *
-	 * NOTE: blocks may carry Instanced subobjects (bounds evaluators, content filters).
-	 * Raw FInstancedStruct copies are SHALLOW for those -- cross-asset copies must
-	 * DuplicateObject the subobjects into the destination asset.
+	 * Per-type collection-level globals blocks. One block per entry type at most (first
+	 * struct match wins); entries whose type has no block fall back to entry-local settings.
+	 * NOTE: raw FInstancedStruct copies are SHALLOW for Instanced subobjects -- cross-asset
+	 * copies must DuplicateObject them into the destination asset.
 	 */
 	UPROPERTY(EditAnywhere, Category = "Settings|Global", meta=(BaseStruct="/Script/PCGExCollections.PCGExCollectionTypeGlobals", ExcludeBaseStruct))
 	TArray<FInstancedStruct> TypeGlobals;
@@ -94,39 +80,26 @@ public:
 	virtual void Sort(FSortEntriesFunc Predicate) override;
 
 	/**
-	 * Append a row whose payload is default-initialized as EntryStruct (must derive from
-	 * FPCGExAssetCollectionEntry; the base struct itself is allowed -- that's what
-	 * subcollection rows use). Returns the new payload, or null if EntryStruct is invalid.
-	 * Caller owns Modify / MarkPackageDirty / staging rebuild.
+	 * Append a row default-initialized as EntryStruct (any entry-derived struct, base
+	 * included -- what subcollection rows use); null if invalid. Caller owns Modify /
+	 * MarkPackageDirty / staging rebuild.
 	 */
 	FPCGExAssetCollectionEntry* AddEntryOfType(const UScriptStruct* EntryStruct);
 
 #if WITH_EDITOR
 	/**
-	 * Append every entry of the given source collections into this Omni (conversion when
-	 * called on a fresh asset with one source; merge with several). Sources are untouched.
+	 * Append every entry of the given source collections into this Omni (conversion with
+	 * one source, merge with several). Sources are untouched; returns the appended count.
 	 *
-	 * Per source:
-	 * - Entries are copied as payload rows of their exact type (works for typed AND
-	 *   heterogeneous sources). Copies are new identities (EntryId re-minted on rebuild);
-	 *   the source's CollectionTags are baked into each copied entry's Tags (matching
-	 *   FlattenCollection semantics). Instanced subobjects inside copied payloads (e.g. a
-	 *   PCGDataAsset entry's embedded export) are DuplicateObject'd into this asset -- raw
-	 *   copies would illegally share them. Subcollection rows keep referencing their
-	 *   collection asset (shared reference, not duplicated).
-	 * - Each globals block a source provides (GetTypeGlobalsStructs -- typed sources answer
-	 *   their own type, heterogeneous sources every stored block) becomes a TypeGlobals block
-	 *   here, subobjects duplicated. Conflicts (a block of that type already exists with
-	 *   DIFFERENT values) cannot be represented by one block, so behavior wins over the block:
-	 *   if this call installed the existing block, it is REMOVED and both contributors bake
-	 *   their globals into their copied entries via ResolveGlobalsToLocal; if the block
-	 *   pre-existed on this asset, incoming entries bake and a warning flags that the
-	 *   existing block's own rules (e.g. Overrule) still take precedence. Value-identical
-	 *   blocks are not conflicts.
-	 * - Entry property overrides ride along; the collection-level property schema is
-	 *   re-derived from the merged entries afterwards.
-	 *
-	 * Wraps everything in Modify + staging rebuild. Returns the number of entries appended.
+	 * - Entries copy as payload rows of their exact type, as NEW identities (EntryId
+	 *   re-minted); source CollectionTags bake into entry Tags; Instanced subobjects inside
+	 *   payloads are DuplicateObject'd into this asset. Subcollection rows keep their
+	 *   shared collection reference.
+	 * - Each globals block a source provides (GetTypeGlobalsStructs) becomes a TypeGlobals
+	 *   block, subobjects duplicated. On a value conflict, behavior wins over the block:
+	 *   a block THIS call installed is removed and both contributors bake via
+	 *   ResolveGlobalsToLocal; a pre-existing block stays (incoming bakes + warning).
+	 * - The collection-level property schema is re-derived afterwards.
 	 */
 	int32 EDITOR_AppendCollections(TConstArrayView<UPCGExAssetCollection*> InSources);
 
@@ -142,10 +115,8 @@ public:
 
 protected:
 	/**
-	 * Routes each dropped asset to the highest-priority registered type whose
-	 * DetectSourceAsset claims it (see FTypeInfo), then seeds a row via
-	 * MakeEntryFromSourceAsset or the generic InitializeAs + SetAssetPath path.
-	 * Assets already referenced by a row of the same entry type are skipped.
+	 * Routes each dropped asset to the highest-priority type whose DetectSourceAsset claims
+	 * it. Assets already referenced by a row of the same entry type are skipped.
 	 */
 	virtual void EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData) override;
 

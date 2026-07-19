@@ -64,14 +64,12 @@ namespace PCGExAssetCollection
 		FTypeId Id = NAME_None;
 		TWeakObjectPtr<UClass> CollectionClass = nullptr;
 
-		// Null for heterogeneous collection types (Omni) that have no single entry struct --
+		// Null for heterogeneous collection types (Omni) with no single entry struct --
 		// resolve per entry via Entry->GetTypeId() -> Find(TypeId)->EntryStruct instead.
 		UScriptStruct* EntryStruct = nullptr;
 
-		// The type's collection-level globals block struct (FPCGExCollectionTypeGlobals
-		// derivative), when it has one. Consumed by conversion/merge (build the matching
-		// block on a heterogeneous target) and by config-block UI. Registered via
-		// AddPendingCustomization alongside the type's registration.
+		// The type's globals-block struct, when it has one. Consumed by conversion/merge
+		// and config-block UI. Registered via AddPendingCustomization.
 		UScriptStruct* GlobalsStruct = nullptr;
 
 		FText DisplayName;
@@ -79,19 +77,15 @@ namespace PCGExAssetCollection
 
 #if WITH_EDITOR
 		/**
-		 * Editor-only: return true when the given content-browser asset can seed an entry of
-		 * this type. Consumed by heterogeneous collections (Omni) to route dropped assets to
-		 * an entry type. Register via FTypeRegistry::AddPendingCustomization so ordering vs
-		 * the type's own registration never matters. Null = type doesn't participate.
+		 * True when the given content-browser asset can seed an entry of this type (drives
+		 * Omni drop routing). Register via AddPendingCustomization; null = doesn't participate.
 		 */
 		TFunction<bool(const FAssetData&)> DetectSourceAsset;
 
 		/**
-		 * Editor-only, optional: build a fully-initialized entry payload from a detected
-		 * source asset (payload struct must derive FPCGExAssetCollectionEntry). Only needed
-		 * when the generic path (InitializeAs(EntryStruct) + SetAssetPath(asset path)) is
-		 * insufficient -- e.g. Actor entries resolve a Blueprint's GeneratedClass first.
-		 * Return false to reject the asset after all.
+		 * Optional: build a fully-initialized entry payload from a detected asset, when the
+		 * generic InitializeAs + SetAssetPath path isn't enough (e.g. Actor resolves the
+		 * Blueprint's GeneratedClass). Return false to reject the asset after all.
 		 */
 		TFunction<bool(const FAssetData&, FInstancedStruct&)> MakeEntryFromSourceAsset;
 
@@ -129,10 +123,8 @@ namespace PCGExAssetCollection
 		const FTypeInfo* FindByEntryStruct(const UScriptStruct* Struct) const;
 
 		/**
-		 * Apply a mutator to a registered entry (e.g. to attach editor-only source-asset
-		 * detection). Mutator must NOT re-enter the registry -- FRWLock is non-recursive.
-		 * Logs a warning if Id isn't registered; prefer AddPendingCustomization when the
-		 * registration order is not guaranteed.
+		 * Apply a mutator to a registered entry. Must NOT re-enter the registry (FRWLock is
+		 * non-recursive). Prefer AddPendingCustomization when registration order isn't guaranteed.
 		 */
 		void Customize(FTypeId Id, TFunctionRef<void(FTypeInfo&)> Mutator);
 
@@ -156,10 +148,8 @@ namespace PCGExAssetCollection
 		static void AddPendingRegistration(TFunction<void()>&& Func);
 
 		/**
-		 * Queue a customization applied AFTER every pending registration has run (or
-		 * immediately if registration already happened) -- static-init ordering between the
-		 * type's registration TU and the customizing TU never matters. Use this to attach
-		 * DetectSourceAsset / MakeEntryFromSourceAsset to types registered elsewhere.
+		 * Queue a customization applied AFTER every pending registration (or immediately if
+		 * registration already ran) -- cross-TU static-init ordering never matters.
 		 */
 		static void AddPendingCustomization(FTypeId Id, TFunction<void(FTypeInfo&)>&& Mutator);
 

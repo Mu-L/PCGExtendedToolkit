@@ -17,9 +17,8 @@ class UPCGExAssetCollection;
 namespace PCGExCollectionEditorHelpers
 {
 	/**
-	 * Create a collection asset of CollectionClass (or return the existing one when the user
-	 * targets it through the save dialog). AnchorPackagePath seeds the dialog/default location.
-	 * Returns null on cancel or failure. Caller owns populating and saving the package.
+	 * Create a collection asset of CollectionClass (or return the existing one the user
+	 * targets via the save dialog). Null on cancel/failure. Caller populates and saves.
 	 */
 	PCGEXCOLLECTIONSEDITOR_API UPCGExAssetCollection* CreateCollectionAsset(
 		const FString& AnchorPackagePath,
@@ -40,10 +39,8 @@ namespace PCGExCollectionEditorHelpers
 		bool bOpenSaveDialog = true);
 
 	/**
-	 * Merge the selected PCGEx collection assets (any mix of types) into an Omni collection
-	 * picked via the save dialog (new, or an existing Omni to merge into). Entry copies,
-	 * globals-block transfer and conflict baking are handled by
-	 * UPCGExOmniCollection::EDITOR_AppendCollections; sources are untouched.
+	 * Merge the selected collection assets into an Omni picked via the save dialog (new or
+	 * existing). Copy/transfer semantics live in EDITOR_AppendCollections; sources untouched.
 	 */
 	PCGEXCOLLECTIONSEDITOR_API void MergeCollectionsIntoOmni(const TArray<FAssetData>& SelectedCollections);
 

@@ -948,11 +948,8 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 	}
 	CleanIndices.Sort();
 
-	// Snapshot source PAYLOADS (not raw elements): a dropped entry is just an entry --
-	// heterogeneous targets (Omni) wrap any payload, typed targets take payloads of their
-	// own entry type (and base-typed subcollection rows are valid anywhere). Compatibility
-	// is arbitrated per row by EDITOR_AddEntry below; nothing is converted. Snapshots are
-	// taken before any mutation (a MOVE deletes source rows) and own their lifetime.
+	// Snapshot source PAYLOADS (not raw elements) before any mutation -- a MOVE deletes
+	// source rows. Per-row compatibility is arbitrated by EDITOR_AddEntry below.
 	TArray<FInstancedStruct> Snapshots;
 	TArray<int32> SnapshotSourceIndices;
 	Snapshots.Reserve(CleanIndices.Num());
@@ -1008,20 +1005,15 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 				continue;
 			}
 
-			// Copies the snapshot-struct portion: a full copy when the target payload is the
-			// same type; the base portion onto a default-constructed native element when a
-			// base-typed row lands in a typed collection.
+			// Full copy when the target payload is the same type; base portion onto a native
+			// element when a base-typed row lands in a typed collection.
 			PayloadStruct->CopyScriptStruct(NewEntry, Snapshots[i].GetMemory());
 
-			// The copy is SHALLOW for Instanced subobjects (e.g. a PCGDataAsset entry's
-			// embedded level export, outer'd to the SOURCE asset) -- duplicate them into the
-			// target, or saving it would reference another package's private objects.
+			// The copy is SHALLOW for Instanced subobjects -- duplicate into the target.
 			PCGExCollectionHelpers::DuplicateInstancedSubobjects(PayloadStruct, NewEntry, TargetColl);
 
 			NewEntry->Category = TargetCategory;
-			// Copied/moved entries are NEW identities in the target collection: zero the
-			// carried-over EntryId so SyncEntryIds assigns a fresh one instead of aliasing
-			// (or colliding with) ids that external references may be bound to.
+			// NEW identity in the target: zero EntryId so SyncEntryIds re-mints it.
 			NewEntry->EntryId = 0;
 
 			InsertedIndices.Add(TargetColl->NumEntries() - 1);
@@ -1058,8 +1050,7 @@ void SPCGExCollectionGridView::HandleCrossCollectionDrop(
 					TArray<int32> DesiredOrder = ComputeCategoryDesiredOrder(*CatIndices, DraggedSet, InsertBeforeLocalIndex, /*bAdjustForDraggedBefore=*/false);
 					if (!DesiredOrder.IsEmpty())
 					{
-						// Fresh helper AFTER the adds; permutation swaps whole ELEMENTS, which is
-						// payload-type-agnostic (wrapper rows deep-copy via FInstancedStruct).
+						// Fresh helper AFTER the adds; permutation swaps whole ELEMENTS (payload-agnostic).
 						FScriptArrayHelper TargetHelper(TargetAccess.ArrayProp, TargetAccess.ArrayData);
 						TArray<int32> Reordered = ApplyCategoryPermutation(TargetHelper, TargetElementStruct, *CatIndices, DesiredOrder, DraggedSet);
 						if (!Reordered.IsEmpty()) { FinalDraggedPositions = MoveTemp(Reordered); }
@@ -1174,9 +1165,8 @@ void SPCGExCollectionGridView::OnCategoryRenamed(FName OldName, FName NewName)
 
 void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 {
-	// Same type-aware entry point as the main [+]: heterogeneous hosts (Omni) get the
-	// payload-type dropdown, homogeneous collections add directly. A raw element add here
-	// would create unset (blank) rows on wrapper-row hosts.
+	// Same type-aware entry point as the main [+] -- a raw element add would create unset
+	// (blank) rows on wrapper-row hosts.
 	RequestAddEntry(Category);
 }
 
@@ -1381,8 +1371,7 @@ void SPCGExCollectionGridView::UpdateDetailForSelection()
 
 	if (!EntryStruct || !EntryPtr)
 	{
-		// Unresolvable row (e.g. unset payload on a heterogeneous host): clear the panel
-		// instead of leaving the previous selection's data on display.
+		// Unresolvable row (e.g. unset payload): clear the panel.
 		CurrentStructScope.Reset();
 		CurrentDetailIndex = INDEX_NONE;
 		if (StructDetailView.IsValid())
@@ -1422,10 +1411,8 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 		return;
 	}
 
-	// Heterogeneous hosts: the row under CurrentDetailIndex may have changed payload type
-	// since the details scope was built (stale index across remove/reorder/undo). Copying
-	// across mismatched layouts corrupts memory -- bail and let the next selection refresh
-	// rebuild the scope.
+	// The row's payload type may have changed since the scope was built (stale index across
+	// remove/reorder/undo) -- copying across mismatched layouts corrupts memory.
 	if (CurrentStructScope->GetStruct() != EntryStruct)
 	{
 		return;
@@ -1497,8 +1484,7 @@ void SPCGExCollectionGridView::SyncStructToCollection(const FProperty* ChangedMe
 	EntryStruct->CopyScriptStruct(PrimaryPtr, SrcData);
 
 	// ── Step 4: Propagate to other selected entries ──────────────────────
-	// Mixed-type selections (heterogeneous hosts): each target resolves the member on its
-	// OWN struct by name + type; targets without a compatible member are skipped.
+	// Mixed-type selections: targets resolve the member by name + type; incompatible skip.
 	if (PropToPropagate && SelectedIndices.Num() > 1)
 	{
 		const int32 MemberOffset = PropToPropagate->GetOffset_ForInternal();
@@ -1780,9 +1766,7 @@ void SPCGExCollectionGridView::ExecutePush(const PCGExAssetCollectionEditor::FPu
 				continue;
 			}
 
-			// Mixed-type selections (heterogeneous hosts): resolve each property on the
-			// target's own struct by name+type; incompatible targets skip that property --
-			// the same "missing names no-op gracefully" contract as cross-collection options.
+			// Mixed-type selections: resolve per property by name + type; incompatible skip.
 			const UScriptStruct* TargetStruct = GetEntryScriptStruct(TargetIdx);
 
 			for (const FProperty* Prop : ResolvedProps)
@@ -1884,9 +1868,8 @@ UScriptStruct* SPCGExCollectionGridView::GetEntryScriptStruct(int32 Index) const
 
 uint8* SPCGExCollectionGridView::GetEntryRawPtr(int32 Index) const
 {
-	// Payload base pointer through the collection virtuals -- for homogeneous collections
-	// this is the same address as the raw array element; for wrapper-row hosts (Omni) it is
-	// the payload (null when the row's payload is unset).
+	// Payload base pointer via collection virtuals (== raw element on homogeneous hosts;
+	// null when a wrapper row's payload is unset).
 	UPCGExAssetCollection* Coll = Collection.Get();
 	return Coll ? reinterpret_cast<uint8*>(Coll->GetMutableEntryRaw(Index)) : nullptr;
 }
@@ -2040,8 +2023,7 @@ void SPCGExCollectionGridView::RequestAddEntry(FName Category)
 		return;
 	}
 
-	// Heterogeneous hosts (Omni) require an explicit payload type choice; homogeneous
-	// collections report no addable types and take the direct untyped add.
+	// Heterogeneous hosts require an explicit type choice; homogeneous take the untyped add.
 	TArray<const UScriptStruct*> AddableTypes;
 	Coll->EDITOR_GetAddableEntryTypes(AddableTypes);
 
@@ -2051,8 +2033,7 @@ void SPCGExCollectionGridView::RequestAddEntry(FName Category)
 		return;
 	}
 
-	// Menu labels prefer the entry struct's ShortName meta ("Actor") over its full display
-	// name ("[PCGEx] Actor Collection Entry"); structs without one fall back to the latter.
+	// Labels prefer the ShortName meta ("Actor") over the full display name.
 	auto GetEntryTypeLabel = [](const UScriptStruct* EntryStruct) -> FText
 	{
 		static const FName ShortNameMeta = FName("ShortName");
@@ -2191,11 +2172,9 @@ FReply SPCGExCollectionGridView::OnDuplicateSelected()
 			uint8* DstPtr = ArrayHelper.GetRawPtr(InsertAt);
 			EntryStruct->CopyScriptStruct(DstPtr, SrcPtr);
 
-			// A duplicate is a NEW identity: zero the copied EntryId so SyncEntryIds assigns
-			// a fresh one and the ORIGINAL unambiguously keeps its id — external references
-			// (variant collections) must never re-bind to the copy. Resolved through the
-			// collection virtuals: DstPtr is the raw ELEMENT, which on wrapper-row hosts
-			// (Omni) is not the entry payload — casting it would corrupt the wrapper.
+			// A duplicate is a NEW identity: zero EntryId so the ORIGINAL keeps its id. Via
+			// collection virtuals -- DstPtr is the raw ELEMENT; casting it would corrupt
+			// wrapper rows.
 			if (FPCGExAssetCollectionEntry* DuplicatePayload = Coll->GetMutableEntryRaw(InsertAt))
 			{
 				DuplicatePayload->EntryId = 0;

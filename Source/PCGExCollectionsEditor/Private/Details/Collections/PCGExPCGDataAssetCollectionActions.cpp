@@ -34,9 +34,8 @@ namespace
 					{
 						Info.bSupportsMenuCreation = false;
 
-						// Tile-picker contribution, resolved per-row by heterogeneous grid
-						// editors (Omni). Covers the direct DataAsset source mode; rows using
-						// the Level source mode are edited through the entry details.
+						// Tile-picker contribution. Covers the DataAsset source mode; Level-mode
+						// rows are edited through the entry details.
 						Info.TilePickerPropertyName = FName("DataAsset");
 						Info.TilePickerAllowedClass = UPCGDataAsset::StaticClass();
 					});

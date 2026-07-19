@@ -8,10 +8,8 @@
 #include "Details/Collections/PCGExCollectionEditorHelpers.h"
 #include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
 
-// Omni collections are registered by hand rather than via PCGEX_REGISTER_COLLECTION_EDITOR_TYPE:
-// there is no single source asset class -- "Create from selection" claims any asset that any
-// OTHER registered type's detector claims, and the collection opens in the base editor (the
-// grid resolves tile pickers per row through the registries, so no bespoke toolkit is needed).
+// Registered by hand (no single source asset class): "Create from selection" claims any
+// asset another type's detector claims, and the collection opens in the base editor.
 namespace PCGExOmniCollectionActions
 {
 	struct FRegisterOmniEditorTypeInfo
@@ -30,8 +28,7 @@ namespace PCGExOmniCollectionActions
 				Info.AssetDescription = INVTEXT("A weighted collection of mixed entry types -- meshes, actors, levels, data assets and custom types in a single list.");
 				Info.DetectSourceAsset = [](const FAssetData& Asset)
 				{
-					// Any asset claimable by any OTHER registered type can seed an Omni entry.
-					// Skip Omni itself (recursion) and detector-less entries (Variant).
+					// Anything another registered type claims can seed an Omni entry.
 					bool bClaimed = false;
 					FCollectionEditorTypeRegistry::Get().ForEach([&bClaimed, &Asset](const FCollectionEditorTypeInfo& Other)
 					{

@@ -139,13 +139,10 @@ private:
 	void OnTileReorderInCategory(FName Category, TSharedRef<FPCGExCollectionTileDragDropOp> DragOp, int32 InsertBeforeLocalIndex);
 
 	/**
-	 * Cross-collection drop: move-or-copy entries from a different collection into this one.
-	 * Works at PAYLOAD level -- a dropped entry is just an entry: heterogeneous targets
-	 * (Omni) wrap any payload, typed targets accept payloads of their own entry type (and
-	 * base-typed subcollection rows are valid anywhere). Per-row compatibility is arbitrated
-	 * by EDITOR_AddEntry; incompatible rows are skipped with a notification (full-failure
-	 * drops abort). When !bIsCopy, only transferred originals are removed from the source.
-	 * Both collections are wrapped in a single transaction.
+	 * Cross-collection drop: move-or-copy entries into this collection at PAYLOAD level.
+	 * Per-row compatibility is arbitrated by EDITOR_AddEntry; incompatible rows skip with a
+	 * notification. When !bIsCopy, only transferred originals leave the source. Single
+	 * transaction for both collections.
 	 */
 	void HandleCrossCollectionDrop(
 		const UPCGExAssetCollection* SourceColl,
@@ -187,22 +184,18 @@ private:
 	bool bIsBatchOperation = false;
 	bool bPendingCategoryRefresh = false;
 
-	// Entry payload access helpers. Both resolve PER ROW through collection virtuals so
-	// heterogeneous hosts (Omni) work: the struct is the row's payload struct and the
-	// pointer is the payload base pointer (identical to the raw element for homogeneous
-	// collections). Element-level array ops (add/duplicate/reorder) keep using
-	// GetEntriesAccess -- element struct and payload struct differ on wrapper-row hosts.
+	// Per-row payload access via collection virtuals (payload struct + payload base pointer).
+	// Element-level array ops (add/duplicate/reorder) keep using GetEntriesAccess -- element
+	// and payload struct differ on wrapper-row hosts.
 	UScriptStruct* GetEntryScriptStruct(int32 Index) const;
 	uint8* GetEntryRawPtr(int32 Index) const;
 
-	/** Resolve the destination-side property for cross-entry copies: same struct reuses
-	 *  SrcProp; different structs (mixed selection on heterogeneous hosts) match by name +
-	 *  SameType. Null when the destination has no compatible property. */
+	/** Destination-side property for cross-entry copies: same struct reuses SrcProp;
+	 *  different structs match by name + SameType. Null when incompatible. */
 	static const FProperty* ResolveMatchingProperty(const FProperty* SrcProp, const UScriptStruct* SrcStruct, const UScriptStruct* DstStruct);
 
-	/** Single entry point for every add affordance (main [+], per-category [+]): untyped
-	 *  direct add on homogeneous collections, payload-type dropdown at the cursor on
-	 *  heterogeneous hosts (EDITOR_GetAddableEntryTypes drives the menu). */
+	/** Single entry point for every add affordance: untyped direct add on homogeneous
+	 *  collections, payload-type dropdown on heterogeneous hosts. */
 	void RequestAddEntry(FName Category);
 
 	/** Shared add-entry body (transaction, category, selection, refresh). EntryStruct null = untyped. */

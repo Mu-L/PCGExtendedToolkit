@@ -39,8 +39,7 @@ namespace
 							return PCGExCollectionsEditorMenuUtils::DoesAssetInheritFromAActor(Asset);
 						};
 
-						// Tile-picker contribution, resolved per-row by heterogeneous grid
-						// editors (Omni) and used as the typed editor's default.
+						// Tile-picker contribution (per-row resolution + typed editor default).
 						Info.TilePickerPropertyName = FName("Actor");
 						Info.TilePickerAllowedClass = AActor::StaticClass();
 					});

@@ -2234,9 +2234,8 @@ FPCGExAssetCollectionEntry* UPCGExAssetCollection::EDITOR_AddEntry(const UScript
 		return nullptr;
 	}
 
-	// Homogeneous storage holds exactly its own entry type; requests for a BASE of it are
-	// also honored (the created element is the native type and the caller copies the base
-	// portion) -- that's how base-typed subcollection rows transfer into typed collections.
+	// Requests for a BASE of the native type are honored: the element is created native and
+	// the caller copies the base portion (how subcollection rows transfer in).
 	if (EntryStruct && !InnerProp->Struct->IsChildOf(EntryStruct))
 	{
 		return nullptr;

@@ -103,12 +103,10 @@ namespace PCGExCollectionHelpers
 		UPCGExAssetCollection* Target);
 
 	/**
-	 * Classify a collection's LEAF entries for actor-vs-asset output declaration: actor
-	 * entries emit an asset CLASS, everything else emits an asset PATH. Heterogeneous hosts
-	 * (Variant, Omni) may hold both kinds, so consumers must not classify by collection
-	 * class. Subcollection entries are skipped (their content is classified wherever that
-	 * collection itself is consumed). A typed Actor collection reports bOutAnyActor even
-	 * when empty, preserving legacy declaration behavior.
+	 * Classify a collection's LEAF entries for actor-vs-asset output declaration (actor =
+	 * asset CLASS, everything else = asset PATH); heterogeneous hosts may hold both.
+	 * Subcollection entries are skipped. A typed Actor collection reports bOutAnyActor even
+	 * when empty (legacy declaration behavior).
 	 */
 	PCGEXCOLLECTIONS_API
 	void GetEntryAssetHalves(const UPCGExAssetCollection* Collection, bool& bOutAnyActor, bool& bOutAnyNonActor);
@@ -116,12 +114,9 @@ namespace PCGExCollectionHelpers
 #if WITH_EDITOR
 	/**
 	 * Deep-copy Instanced subobjects referenced by a struct into a new owner. Raw struct
-	 * copies are SHALLOW for object refs (the instancing graph cannot see into FInstancedStruct
-	 * payloads), and sharing EditInlineNew subobjects across assets is illegal -- this is the
-	 * StateTree-style manual pass the InstancedStruct spike mandated. Applies to any struct
-	 * copied across assets: TypeGlobals blocks AND entry payloads (e.g. a PCGDataAsset entry's
-	 * embedded ExportedDataAsset). Top-level properties only: the built-in structs keep their
-	 * instanced refs flat; extend if one ever nests them.
+	 * copies are SHALLOW for object refs and sharing EditInlineNew subobjects across assets
+	 * is illegal -- run this on every cross-asset copy of a globals block or entry payload.
+	 * Top-level properties only (built-in structs keep instanced refs flat).
 	 */
 	PCGEXCOLLECTIONS_API
 	void DuplicateInstancedSubobjects(const UScriptStruct* Struct, void* StructMemory, UObject* NewOuter);

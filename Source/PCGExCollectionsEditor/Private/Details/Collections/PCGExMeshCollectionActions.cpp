@@ -21,9 +21,8 @@ PCGEX_REGISTER_COLLECTION_EDITOR_TYPE(
 
 namespace PCGExMeshCollectionActions
 {
-	// Tile-picker contribution, resolved per-row by heterogeneous grid editors (Omni) and
-	// used as the typed editor's default. Registered as a pending customization AFTER the
-	// macro registration above (same TU, sequential static init).
+	// Tile-picker contribution (per-row resolution + typed editor default). Same TU as the
+	// macro registration above -- sequential static init keeps the order safe.
 	struct FRegisterTilePicker
 	{
 		FRegisterTilePicker()

@@ -123,8 +123,8 @@ bool FPCGExAssetCollectionToSetElement::AdvanceWork(FPCGExContext* InContext, co
 	const bool bOutputCategory = Settings->bWriteCategory;
 	const EPCGExCategoryInheritance CategoryInheritance = bOutputCategory ? Settings->CategoryInheritance : EPCGExCategoryInheritance::None;
 
-	// Actor entries output FSoftClassPath, everything else a soft object path. Classified
-	// per-entry so heterogeneous hosts (Variant, Omni) can declare both halves at once.
+	// Actor entries output FSoftClassPath, everything else a soft object path -- classified
+	// per entry so heterogeneous hosts can declare both halves.
 	{
 		bool bAnyActor = false;
 		bool bAnyNonActor = false;

@@ -104,9 +104,7 @@ void FPCGExActorCollectionEntry::UpdateStaging(const UPCGExAssetCollection* Owni
 			return;
 		}
 
-		// Compute bounds via evaluator or fallback. Globals come through the type-globals
-		// seam so any host (native, Variant, Omni) can provide the evaluator; hosts without
-		// an actor globals block take the plain GetActorBounds fallback.
+		// Evaluator via the type-globals seam; hosts without a block take the GetActorBounds fallback.
 		FPCGExActorCollectionGlobals Globals;
 		const bool bHasGlobals = OwningCollection && OwningCollection->GetTypeGlobals(Globals);
 		if (bHasGlobals && Globals.BoundsEvaluator)
@@ -348,8 +346,7 @@ void UPCGExActorCollection::RebuildActorPropertiesFromComponents(
 
 	const int32 NumEntriesTotal = Host->NumEntries();
 
-	// Per-entry effective schemas, parallel to the raw entry indices (empty for entries with
-	// no donor).
+	// Per-entry effective schemas, parallel to raw entry indices (empty = no donor).
 	TArray<TArray<FInstancedStruct>> EntryCompSchemas;
 	EntryCompSchemas.SetNum(NumEntriesTotal);
 
@@ -358,8 +355,7 @@ void UPCGExActorCollection::RebuildActorPropertiesFromComponents(
 	TArray<TSharedPtr<FStreamableHandle>> LevelHandles;
 	LevelHandles.Reserve(NumEntriesTotal);
 
-	// Only actor-typed leaf entries contribute donors; other types (heterogeneous hosts)
-	// are skipped here but still re-sync against the merged schema below.
+	// Only actor-typed leaf entries contribute donors; all entries re-sync below.
 	Host->ForEachEntry([&](const FPCGExAssetCollectionEntry* BaseEntry, const int32 i)
 	{
 		if (BaseEntry->bIsSubCollection || !BaseEntry->IsType(PCGExAssetCollection::TypeIds::Actor))
@@ -459,9 +455,8 @@ void UPCGExActorCollection::RebuildActorPropertiesFromComponents(
 
 	TArray<FInstancedStruct> CanonicalSchema = Host->CollectionProperties.BuildSchema();
 
-	// SyncToSchema preserves overrides via HeaderId match (ALL entries -- the collection
-	// schema is shared regardless of entry type); then per-source contributors get their
-	// authored values written into the matching slot and flipped enabled.
+	// SyncToSchema preserves overrides via HeaderId match (ALL entries share the collection
+	// schema); per-source contributors then get authored values written + enabled.
 	Host->ForEachEntry([&](FPCGExAssetCollectionEntry* BaseEntry, const int32 i)
 	{
 		BaseEntry->PropertyOverrides.SyncToSchema(CanonicalSchema);

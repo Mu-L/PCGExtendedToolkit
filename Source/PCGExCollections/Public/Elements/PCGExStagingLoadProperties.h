@@ -116,19 +116,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Data", meta=(PCG_Overridable, EditCondition="bWriteBoundsMax"))
 	FName BoundsMaxAttributeName = FName("BoundsMax");
 
-	/** Write the host collection's type id (e.g. Mesh, Actor, Level, PCGDataAsset, Niagara).
-	 *  NOTE: this is the CONTAINER's type -- for heterogeneous hosts (Variant, Omni) every row
-	 *  reports the host type regardless of what the entry itself is. Use Entry Type for the
-	 *  per-entry id. */
+	/** Write the host collection's type id. NOTE: the CONTAINER's type -- rows in
+	 *  heterogeneous hosts all report the host type; use Entry Type for the per-entry id. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Data", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteCollectionType = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Data", meta=(PCG_Overridable, EditCondition="bWriteCollectionType"))
 	FName CollectionTypeAttributeName = FName("CollectionType");
 
-	/** Write the resolved entry's own type id. Unlike Collection Type (the host container's
-	 *  type), this is per-entry -- it differentiates rows inside heterogeneous hosts
-	 *  (Variant, Omni) and matches what Staging Type Filter dispatches on. */
+	/** Write the resolved entry's own type id -- differentiates rows inside heterogeneous
+	 *  hosts and matches what Staging Type Filter dispatches on. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Entry Data", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteEntryType = false;
 

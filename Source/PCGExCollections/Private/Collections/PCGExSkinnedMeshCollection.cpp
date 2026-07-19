@@ -212,10 +212,8 @@ void FPCGExSkinnedMeshCollectionEntry::ResolveGlobalsToLocal(const UPCGExAssetCo
 	}
 }
 
-// Resolves descriptor inheritance: Global/Overrule → use collection-level descriptor,
-// Local → use entry-level Descriptor. Always appends entry tags to component tags.
-// Globals come through the type-globals seam; hosts without a skinned-mesh globals block
-// behave like a null parent (entry-local descriptor).
+// Resolves descriptor inheritance: Global/Overrule → collection-level descriptor (via the
+// seam), Local → entry-level Descriptor. Always appends entry tags to component tags.
 void FPCGExSkinnedMeshCollectionEntry::InitPCGSoftSkinnedDescriptor(const UPCGExAssetCollection* ParentCollection, FPCGSoftSkinnedMeshComponentDescriptor& TargetDescriptor) const
 {
 	FPCGExSkinnedMeshCollectionGlobals Globals;

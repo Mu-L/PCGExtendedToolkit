@@ -45,11 +45,7 @@ namespace PCGExSkinnedMeshCollection
 	};
 }
 
-/**
- * Skinned mesh collection-level globals (see FPCGExCollectionTypeGlobals). Mirrors
- * UPCGExSkinnedMeshCollection's global members 1:1 -- keep names in sync so conversion
- * between the two stays a straight per-property copy.
- */
+/** Skinned mesh collection-level globals. Mirrors UPCGExSkinnedMeshCollection's global members 1:1 -- keep names in sync. */
 USTRUCT(BlueprintType, DisplayName="[PCGEx] Skinned Mesh Collection Globals")
 struct PCGEXCOLLECTIONS_API FPCGExSkinnedMeshCollectionGlobals : public FPCGExCollectionTypeGlobals
 {
@@ -121,9 +117,8 @@ struct PCGEXCOLLECTIONS_API FPCGExSkinnedMeshCollectionEntry : public FPCGExAsse
 	virtual void ResolveGlobalsToLocal(const UPCGExAssetCollection* InSourceCollection) override;
 
 	/**
-	 * Resolve descriptor inheritance into TargetDescriptor. Accepts any host collection --
-	 * globals are read through the type-globals seam; hosts without a skinned-mesh globals
-	 * block (or null) fall back to the entry's local descriptor.
+	 * Resolve descriptor inheritance into TargetDescriptor. Accepts any host -- globals read
+	 * through the seam; hosts without a block (or null) fall back to the local descriptor.
 	 */
 	void InitPCGSoftSkinnedDescriptor(const UPCGExAssetCollection* ParentCollection, FPCGSoftSkinnedMeshComponentDescriptor& TargetDescriptor) const;
 
