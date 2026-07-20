@@ -86,8 +86,8 @@ void UPCGExAssetStagingSettings::PCGExApplyDeprecation(UPCGNode* InOutNode)
 		// Collapse the old 3-way source: Asset -> Constant, Path Attribute -> Attribute. AttributeSet has no
 		// equivalent -> empty Constant -> Boot errors with guidance.
 		const EPCGExInputValueType NewInput = CollectionSource_DEPRECATED == EPCGExCollectionSource::Attribute
-			                                      ? EPCGExInputValueType::Attribute
-			                                      : EPCGExInputValueType::Constant;
+			? EPCGExInputValueType::Attribute
+			: EPCGExInputValueType::Constant;
 		SourceCollection.Update(NewInput, CollectionPathAttributeName_DEPRECATED, AssetCollection_DEPRECATED.ToSoftObjectPath());
 	}
 
@@ -192,6 +192,21 @@ void FPCGExAssetStagingContext::RegisterAssetDependencies()
 #pragma endregion
 
 #pragma region FPCGExAssetStagingElement
+
+void FPCGExAssetStagingElement::DisabledPassThroughData(FPCGContext* Context) const
+{
+	FPCGExPointsProcessorElement::DisabledPassThroughData(Context);
+
+	//Forward collection map data
+	TArray<FPCGTaggedData> MapSources = Context->InputData.GetInputsByPin(PCGExCollections::Labels::SourceCollectionMapLabel);
+	for (const FPCGTaggedData& TaggedData : MapSources)
+	{
+		FPCGTaggedData& TaggedDataCopy = Context->OutputData.TaggedData.Emplace_GetRef();
+		TaggedDataCopy.Data = TaggedData.Data;
+		TaggedDataCopy.Tags.Append(TaggedData.Tags);
+		TaggedDataCopy.Pin = PCGExCollections::Labels::SourceCollectionMapLabel;
+	}
+}
 
 bool FPCGExAssetStagingElement::CanExecuteOnlyOnMainThread(FPCGContext* Context) const
 {

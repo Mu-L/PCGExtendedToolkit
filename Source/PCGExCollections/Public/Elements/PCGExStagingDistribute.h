@@ -122,7 +122,7 @@ protected:
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	PCGEX_NODE_POINT_FILTER(PCGExFilters::Labels::SourcePointFiltersLabel, "Filters which points get staged.", PCGExFactories::PointFilters(), false)
 	//~End UPCGSettings
-
+	
 public:
 	/** Where the collection(s) to distribute from come from.
 	 * Default reads SourceCollection (asset reference or per-point path attribute).
@@ -323,6 +323,8 @@ class FPCGExAssetStagingElement final : public FPCGExPointsProcessorElement
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(AssetStaging)
 
+	virtual void DisabledPassThroughData(FPCGContext* Context) const override;
+	
 	// CollectionMap source mode unpacks (and blocking-loads) the upstream map in Boot; the loader's
 	// miss path marshals to the game thread and requires game-thread affinity during PrepareData
 	// (see LoadAndCacheBlockingSet in PCGExStreamingHelpers.cpp). Gated on the mode so Default-mode
@@ -331,6 +333,7 @@ protected:
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool PostBoot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
+	
 };
 
 namespace PCGExAssetStaging
