@@ -15,6 +15,7 @@
 #include "Widgets/Notifications/SNotificationList.h"
 
 #include "Collections/PCGExVariantCollection.h"
+#include "Core/PCGExCollectionHelpers.h"
 #include "Details/Collections/SPCGExVariantGridView.h"
 #include "Helpers/PCGExObjectNotifyHelpers.h"
 
@@ -227,6 +228,12 @@ void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetDat
 		if (SeedStruct && SeedEntry)
 		{
 			NewRule.Entry.InitializeAs(SeedStruct, reinterpret_cast<const uint8*>(SeedEntry));
+
+			// Cross-ASSET copy: duplicate any Instanced subobject refs the seed carried
+			// (e.g. a PCGData entry's ExportedDataAsset) into the variant, per the standing
+			// rule for every cross-asset copy of an entry payload.
+			PCGExCollectionHelpers::DuplicateInstancedSubobjects(SeedStruct, NewRule.Entry.GetMutableMemory(), Variant);
+
 			if (FPCGExAssetCollectionEntry* Payload = NewRule.Entry.GetMutablePtr<FPCGExAssetCollectionEntry>())
 			{
 				Payload->EntryId = 0;

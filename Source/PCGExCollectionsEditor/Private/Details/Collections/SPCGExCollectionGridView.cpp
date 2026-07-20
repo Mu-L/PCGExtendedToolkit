@@ -19,6 +19,7 @@
 #include "Core/PCGExCollectionHelpers.h"
 #include "Details/Collections/FPCGExCollectionTileDragDropOp.h"
 #include "Details/Collections/PCGExAssetCollectionEditor.h"
+#include "Details/Collections/PCGExCollectionEditorUtils.h"
 #include "Details/Collections/SPCGExCollectionCategoryGroup.h"
 #include "Details/Collections/SPCGExCollectionGridTile.h"
 #include "DragAndDrop/AssetDragDropOp.h"
@@ -2034,23 +2035,16 @@ void SPCGExCollectionGridView::RequestAddEntry(FName Category)
 	}
 
 	// Labels prefer the ShortName meta ("Actor") over the full display name.
-	auto GetEntryTypeLabel = [](const UScriptStruct* EntryStruct) -> FText
+	AddableTypes.Sort([](const UScriptStruct& A, const UScriptStruct& B)
 	{
-		static const FName ShortNameMeta = FName("ShortName");
-		const FString ShortName = EntryStruct->GetMetaData(ShortNameMeta);
-		return ShortName.IsEmpty() ? EntryStruct->GetDisplayNameText() : FText::FromString(ShortName);
-	};
-
-	AddableTypes.Sort([&GetEntryTypeLabel](const UScriptStruct& A, const UScriptStruct& B)
-	{
-		return GetEntryTypeLabel(&A).CompareTo(GetEntryTypeLabel(&B)) < 0;
+		return PCGExCollectionEditorUtils::GetEntryTypeLabel(&A).CompareTo(PCGExCollectionEditorUtils::GetEntryTypeLabel(&B)) < 0;
 	});
 
 	FMenuBuilder MenuBuilder(/*bInShouldCloseWindowAfterMenuSelection=*/true, nullptr);
 	MenuBuilder.BeginSection(NAME_None, INVTEXT("Add Entry"));
 	for (const UScriptStruct* EntryStruct : AddableTypes)
 	{
-		const FText Label = GetEntryTypeLabel(EntryStruct);
+		const FText Label = PCGExCollectionEditorUtils::GetEntryTypeLabel(EntryStruct);
 		MenuBuilder.AddMenuEntry(
 			Label,
 			FText::Format(INVTEXT("Add a new {0} entry to the collection."), Label),
