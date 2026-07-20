@@ -20,6 +20,23 @@
 namespace PCGExCollectionHelpers
 {
 	/**
+	 * Per-type slot identity: base and derived globals blocks / machinery state classes
+	 * answer the same queries, so they share ONE slot. Both directions on purpose -- see
+	 * UPCGExOmniCollection::EDITOR_AppendCollections' conflict handling, which set the
+	 * precedent. Every block/state ownership or existence check must use this (one-directional
+	 * IsChildOf makes the answer depend on registry iteration order).
+	 */
+	inline bool MatchesTypeSlot(const UScriptStruct* A, const UScriptStruct* B)
+	{
+		return A && B && (A->IsChildOf(B) || B->IsChildOf(A));
+	}
+
+	inline bool MatchesTypeSlot(const UClass* A, const UClass* B)
+	{
+		return A && B && (A->IsChildOf(B) || B->IsChildOf(A));
+	}
+
+	/**
 	 * Build a collection from an attribute set
 	 * @param InCollection Target collection to populate
 	 * @param InContext PCG context

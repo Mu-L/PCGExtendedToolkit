@@ -80,7 +80,9 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, Category = "Settings|Global", meta=(DisplayName="Type Machinery"))
 	TArray<TObjectPtr<UPCGExCollectionTypeState>> TypeStates;
 
-	/** First state instance of (or derived from) StateClass; null when absent. */
+	/** First state instance of (or derived from) StateClass; null when absent. Accessor
+	 *  semantics (one-directional on purpose): the result IS-A StateClass, so typed access
+	 *  through the template below stays cast-safe. */
 	UPCGExCollectionTypeState* FindTypeState(const UClass* StateClass) const;
 
 	template <typename T>
@@ -88,6 +90,11 @@ public:
 	{
 		return static_cast<T*>(FindTypeState(T::StaticClass()));
 	}
+
+	/** First state instance sharing StateClass's type SLOT (base and derived state classes
+	 *  answer the same machinery -- PCGExCollectionHelpers::MatchesTypeSlot, both directions).
+	 *  Occupancy check for ensure/cleanup; NOT cast-safe, use FindTypeState for access. */
+	UPCGExCollectionTypeState* FindTypeStateForSlot(const UClass* StateClass) const;
 
 	/** True for any type with a registered StateClass (this host can run its machinery). */
 	virtual bool SupportsTypeMachinery(PCGExAssetCollection::FTypeId TypeId) const override;
@@ -147,11 +154,17 @@ public:
 	 * (seeded from the registered typed collection's CDO through the globals seam, so
 	 * defaults -- including settings-driven instanced subobjects like the actor bounds
 	 * evaluator -- match a freshly created typed collection) and a TypeStates instance
-	 * (class defaults mirror the typed collection's members). Runs eagerly on every
-	 * entry-add path and as a safety net at the start of each post-rebuild session.
+	 * (class defaults mirror the typed collection's members). Type resolution is
+	 * lineage-aware (FTypeRegistry::GetInfoResolved) and existence checks are slot-based,
+	 * matching the staging capability guard. Runs eagerly on every entry-add path (per
+	 * added type) and as a safety net at the start of each post-rebuild session.
 	 * Idempotent; calls Modify() only when adding. Returns true when anything was added.
 	 */
 	bool EDITOR_EnsureTypeSetup();
+
+	/** Single-type slice of EDITOR_EnsureTypeSetup -- what entry-add paths call so a K-row
+	 *  ingestion doesn't rescan the whole collection per row. */
+	bool EDITOR_EnsureTypeSetupForType(PCGExAssetCollection::FTypeId TypeId);
 
 	/**
 	 * Counterpart affordance (user-triggered, never automatic -- blocks/states may carry
@@ -171,6 +184,10 @@ protected:
 	 * it. Assets already referenced by a row of the same entry type are skipped.
 	 */
 	virtual void EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData) override;
+
+	/** Distinct type ids of leaf (non-subcollection) entries. Shared presence definition for
+	 *  ensure/cleanup -- the pair must always agree on what "present" means. */
+	TSet<PCGExAssetCollection::FTypeId> EDITOR_CollectPresentLeafTypeIds() const;
 
 public:
 #endif

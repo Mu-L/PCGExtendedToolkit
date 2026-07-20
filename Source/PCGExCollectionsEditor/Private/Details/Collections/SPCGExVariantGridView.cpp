@@ -848,10 +848,9 @@ void SPCGExVariantGridView::DeclareSwap(const int32 ItemIndex)
 	// ENTRY's own type id (not the host class): hosts may be heterogeneous — notably another
 	// variant collection, which is a legal source for daisy-chained swap nodes.
 	const FPCGExEntryAccessResult SourceEntry = Src->GetEntryRaw(Item.SourceRawIndex);
-	const PCGExAssetCollection::FTypeInfo* TypeInfo = SourceEntry.IsValid()
-		                                                  ? PCGExAssetCollection::FTypeRegistry::Get().Find(SourceEntry.Entry->GetTypeId())
-		                                                  : nullptr;
-	const UScriptStruct* EntryStruct = TypeInfo ? TypeInfo->EntryStruct : nullptr;
+	const UScriptStruct* EntryStruct = SourceEntry.IsValid()
+		                                   ? PCGExAssetCollection::FTypeRegistry::Get().GetEntryStruct(SourceEntry.Entry->GetTypeId())
+		                                   : nullptr;
 
 	if (!EntryStruct || !SourceEntry.IsValid())
 	{
@@ -965,11 +964,12 @@ void SPCGExVariantGridView::UpdateDetailForSelection()
 			{
 				if (UPCGExAssetCollection* Src = Variant->Sources[Item.GroupIdx].Source.Get())
 				{
-					const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().FindByClass(Src->GetClass());
+					PCGExAssetCollection::FTypeInfo TypeInfo;
+					const bool bFound = PCGExAssetCollection::FTypeRegistry::Get().GetInfoByClass(Src->GetClass(), TypeInfo);
 					const FPCGExEntryAccessResult SourceEntry = Src->GetEntryRaw(Item.SourceRawIndex);
-					if (TypeInfo && TypeInfo->EntryStruct && SourceEntry.IsValid())
+					if (bFound && TypeInfo.EntryStruct && SourceEntry.IsValid())
 					{
-						PayloadStruct = TypeInfo->EntryStruct;
+						PayloadStruct = TypeInfo.EntryStruct;
 						PayloadMemory = const_cast<uint8*>(reinterpret_cast<const uint8*>(SourceEntry.Entry));
 					}
 				}

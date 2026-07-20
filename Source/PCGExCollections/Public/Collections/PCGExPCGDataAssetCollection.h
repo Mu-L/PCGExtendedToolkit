@@ -54,10 +54,10 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionGlobals : public FPCGExC
  * SharedLevelCollection by capturing editor-only snapshots (EditorMeshContributions +
  * EditorLocalPicks, EditorLevelContributions + EditorLevelLocalPicks) during export.
  * The captured snapshots are merged into the shared collections by
- * UPCGExPCGDataAssetCollection::CompactSharedMesh / CompactSharedLevel, which then
+ * UPCGExPCGDataAssetCollection::CompactSharedMeshFor / CompactSharedLevelFor, which then
  * rewrite each ExportedDataAsset's Tag_EntryIdx attribute on the corresponding pin
  * against the deduplicated shared indices. The CollectionMap pin is rebuilt afterward
- * by RebuildCollectionMaps() with all shared + per-entry collections registered.
+ * by RebuildCollectionMapsFor() with all shared + per-entry collections registered.
  */
 USTRUCT(BlueprintType, DisplayName="[PCGEx] PCGDataAsset Collection Entry", meta=(ShortName="PCG Data Asset"))
 struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAssetCollectionEntry
@@ -97,8 +97,8 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	TObjectPtr<UPCGExActorCollection> EmbeddedActorCollection;
 
 	/** External-mode mirrors of ExportedDataAsset / EmbeddedActorCollection. Populated by the
-	 *  externalization step (UPCGExPCGDataAssetCollection::ExternalizeExportedDataAssets /
-	 *  ExternalizeSharedAndActorCollections). Soft refs so loading the parent collection does
+	 *  externalization step (UPCGExPCGDataAssetCollection::ExternalizeExportedDataAssetsFor /
+	 *  ExternalizeSharedAndActorCollectionsFor). Soft refs so loading the parent collection does
 	 *  not pull these on-disk assets; LoadPCGData soft-loads via Staging.Path / CollectionMap. */
 	UPROPERTY()
 	TSoftObjectPtr<UPCGDataAsset> ExternalExportedDataAsset;
@@ -108,7 +108,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 
 #if WITH_EDITORONLY_DATA
 	/** Snapshot of mesh entries captured from this entry's source level. Editor-only,
-	 *  stripped at cook. Consumed by UPCGExPCGDataAssetCollection::CompactSharedMesh
+	 *  stripped at cook. Consumed by UPCGExPCGDataAssetCollection::CompactSharedMeshFor
 	 *  as one input to the cross-entry shared-mesh merge. */
 	UPROPERTY()
 	TArray<FPCGExMeshCollectionEntry> EditorMeshContributions;
@@ -117,7 +117,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 	 *  actors -- i.e., per property, the value the actors would resolve if they had no per-instance
 	 *  override. When all unique BP classes agree at the CDO level, that's the CDO value; when
 	 *  they disagree, the asset's authored default fills in. Transient -- recomputed on every
-	 *  export from the actors in this entry's source level. Consumed by CompactSharedMesh to
+	 *  export from the actors in this entry's source level. Consumed by CompactSharedMeshFor to
 	 *  derive the shared MeshCollection's CollectionProperties as a per-property union across all
 	 *  contributing entries' aggregates. */
 	UPROPERTY(Transient)
@@ -137,7 +137,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 
 	/** Snapshot of level entries (nested level instances) captured from this entry's source
 	 *  level. Editor-only, stripped at cook. Consumed by
-	 *  UPCGExPCGDataAssetCollection::CompactSharedLevel as one input to the cross-entry
+	 *  UPCGExPCGDataAssetCollection::CompactSharedLevelFor as one input to the cross-entry
 	 *  shared-level merge. */
 	UPROPERTY()
 	TArray<FPCGExLevelCollectionEntry> EditorLevelContributions;
@@ -171,7 +171,7 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
  *  Mutualizes mesh + nested-level storage across level-sourced entries via SharedMeshCollection
  *  and SharedLevelCollection: each entry's per-level snapshots (EditorMeshContributions,
  *  EditorLevelContributions) are captured during export, then merged into the two shared
- *  collections (CompactSharedMesh, CompactSharedLevel). Per-entry ExportedDataAsset point
+ *  collections (CompactSharedMeshFor, CompactSharedLevelFor). Per-entry ExportedDataAsset point
  *  hashes resolve through the shared collections' CollectionGUIDs at runtime, eliminating
  *  duplicated storage when entries reuse the same meshes or the same nested levels.
  *
@@ -206,6 +206,34 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetMachinery
 	{
 		return Host && SharedMeshCollection && SharedLevelCollection
 			&& ExternalSharedMeshCollection && ExternalSharedLevelCollection;
+	}
+};
+
+/**
+ * Keep-buffers for the external-mode save scrub (UPCGExPCGDataAssetCollection::Scrub*ForSave /
+ * Restore*AfterSave). A scrub/restore pair brackets ONE Serialize call on one thread, so the
+ * raw slot/entry pointers never see a GC window or an array mutation in between. The scrubbed
+ * ref SETS live in the cores -- typed collection and type state share them by construction.
+ */
+struct PCGEXCOLLECTIONS_API FPCGExPCGDataSharedScrubKeep
+{
+	TObjectPtr<UPCGExMeshCollection>* MeshSlot = nullptr;
+	TObjectPtr<UPCGExLevelCollection>* LevelSlot = nullptr;
+	TObjectPtr<UPCGExMeshCollection> KeptMesh;
+	TObjectPtr<UPCGExLevelCollection> KeptLevel;
+};
+
+struct PCGEXCOLLECTIONS_API FPCGExPCGDataEntryScrubKeep
+{
+	TArray<FPCGExPCGDataAssetCollectionEntry*> Entries;
+	TArray<TObjectPtr<UPCGDataAsset>> Data;
+	TArray<TObjectPtr<UPCGExActorCollection>> Actors;
+
+	void Reset()
+	{
+		Entries.Reset();
+		Data.Reset();
+		Actors.Reset();
 	}
 };
 
@@ -263,6 +291,12 @@ public:
 #if WITH_EDITOR
 	virtual void EDITOR_OnHostPostStagingRebuild(UPCGExAssetCollection* Host) override;
 	virtual void AppendCookDependencyAssetPaths(const UPCGExAssetCollection* Host, TSet<FSoftObjectPath>& OutPaths) const override;
+
+	/** Ports UPCGExPCGDataAssetCollection::PostEditChangeProperty's external-storage toggle
+	 *  reactions -- the engine delivers property edits to the instanced state FIRST, then walks
+	 *  up to the host (whose base PostEditChangeProperty triggers the staging rebuild). Without
+	 *  this, External -> Embedded on an Omni would never internalize the externalized assets. */
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 	/** Own-member scrub: in external mode the shared collections are session working buffers;
@@ -271,11 +305,8 @@ public:
 	virtual void Serialize(FArchive& Ar) override;
 
 private:
-	// OnHostSerializeSave_Begin/End restore buffers. Plain members: the pair brackets one
-	// host Serialize call on one thread, no GC window in between.
-	TArray<TObjectPtr<UPCGDataAsset>> ScrubKeepData;
-	TArray<TObjectPtr<UPCGExActorCollection>> ScrubKeepActors;
-	TArray<FPCGExPCGDataAssetCollectionEntry*> ScrubbedEntries;
+	/** OnHostSerializeSave_Begin/End restore buffer -- see FPCGExPCGDataEntryScrubKeep. */
+	FPCGExPCGDataEntryScrubKeep ScrubKeep;
 };
 
 UCLASS(BlueprintType, DisplayName="[PCGEx] Collection | PCGDataAsset", meta=(ToolTip = "A weighted collection of PCG Data Assets."))
@@ -328,7 +359,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExPCGDataAssetCollectionEntry> Entries;
 
-	/** Shared mesh collection. Built by CompactSharedMesh() as the deduplicated union of all
+	/** Shared mesh collection. Built by CompactSharedMeshFor() as the deduplicated union of all
 	 *  level-sourced entries' EditorMeshContributions. Outered to the collection in embedded
 	 *  mode, persists for the lifetime of the asset, and carries the stable CollectionGUID
 	 *  that gets baked into every per-entry ExportedDataAsset's "Meshes"-pin Tag_EntryIdx
@@ -336,13 +367,13 @@ public:
 	UPROPERTY(Instanced)
 	TObjectPtr<UPCGExMeshCollection> SharedMeshCollection;
 
-	/** Shared level collection. Built by CompactSharedLevel() as the deduplicated union of all
+	/** Shared level collection. Built by CompactSharedLevelFor() as the deduplicated union of all
 	 *  level-sourced entries' EditorLevelContributions (nested level instances). Same lifetime
 	 *  + GUID-stability guarantee as SharedMeshCollection. Null in external mode. */
 	UPROPERTY(Instanced)
 	TObjectPtr<UPCGExLevelCollection> SharedLevelCollection;
 
-	/** External-mode mirrors. Populated by ExternalizeSharedAndActorCollections; consumed at
+	/** External-mode mirrors. Populated by ExternalizeSharedAndActorCollectionsFor; consumed at
 	 *  runtime indirectly via the CollectionMap pin's soft paths. Loading the parent collection
 	 *  does not pull these. */
 	UPROPERTY()
@@ -384,6 +415,36 @@ public:
 	 *  asset externalization, in the order the soft-path baking requires. */
 	static void RebuildSharedCollectionsFor(FPCGExPCGDataAssetMachinery& State);
 
+	/** Per-host prefix used to derive external asset names. The host's GUID makes it stable
+	 *  across rebuilds (P4-friendly overwrites) and unique across collections sharing an
+	 *  ExportFolder. SINGLE source of the format -- typed collection and type state both
+	 *  compose their machinery through this. */
+	static FString MakeExternalAssetPrefixFor(const UPCGExAssetCollection* Host);
+
+	/** External-mode save-scrub cores (see Serialize). Scrub* records the slots and current
+	 *  values into the keep-buffer and nulls the live refs; Restore* writes them back and
+	 *  resets the buffer. The pair must bracket exactly one Serialize call on one thread.
+	 *  Shared refs = the two shared collections; entry refs = each entry's ExportedDataAsset +
+	 *  EmbeddedActorCollection. Any future externalizable ref is added HERE, for every host. */
+	static void ScrubSharedRefsForSave(TObjectPtr<UPCGExMeshCollection>& MeshSlot, TObjectPtr<UPCGExLevelCollection>& LevelSlot, FPCGExPCGDataSharedScrubKeep& OutKeep);
+	static void RestoreSharedRefsAfterSave(FPCGExPCGDataSharedScrubKeep& Keep);
+	static void ScrubEntryRefsForSave(const TArray<FPCGExPCGDataAssetCollectionEntry*>& InEntries, FPCGExPCGDataEntryScrubKeep& OutKeep);
+	static void RestoreEntryRefsAfterSave(FPCGExPCGDataEntryScrubKeep& Keep);
+
+#if WITH_EDITOR
+	/** Shared cook-dependency walk over the machinery storage (typed host and type state
+	 *  drive this with their own members / entry views). Parameters are explicit because the
+	 *  callers are const contexts and the machinery view is a mutation view. See
+	 *  GetCookDependencyAssetPaths for the embedded-vs-external rationale per block. */
+	static void AppendCookDependencyAssetPathsFor(
+		const UPCGExMeshCollection* InSharedMesh,
+		const UPCGExLevelCollection* InSharedLevel,
+		const TSoftObjectPtr<UPCGExMeshCollection>& InExternalSharedMesh,
+		const TSoftObjectPtr<UPCGExLevelCollection>& InExternalSharedLevel,
+		const TArray<const FPCGExPCGDataAssetCollectionEntry*>& InEntries,
+		TSet<FSoftObjectPath>& OutPaths);
+#endif
+
 	/**
 	 * True when Host runs the PCGDataAsset collection machinery (compaction, collection maps,
 	 * externalization). Level-sourced entries stage nothing in hosts that don't -- this is
@@ -419,10 +480,6 @@ private:
 	/** Compose the machinery state view from this collection's own members. */
 	FPCGExPCGDataAssetMachinery MakeMachinery();
 
-	void CompactSharedMesh();
-	void CompactSharedLevel();
-	void RebuildCollectionMaps();
-
 	/** True when external storage is both requested and configurable. ExportFolder is required
 	 *  in external mode; an empty folder silently falls back to embedded for that rebuild. */
 	bool IsExternalActive() const
@@ -430,19 +487,11 @@ private:
 		return bUseExternalAssets && !ExportFolder.Path.IsEmpty();
 	}
 
-	/** Per-collection prefix used to derive external asset names. The collection's GUID makes
-	 *  it stable across rebuilds (P4-friendly overwrites) and unique across collections that
-	 *  share an ExportFolder. */
-	FString GetExternalAssetPrefix() const
-	{
-		return FString::Printf(TEXT("G_%08X"), GetCollectionGUID());
-	}
-
-	/** External-storage helpers. Each is a no-op unless IsExternalActive(). Externalize* must
-	 *  run in the right order around RebuildCollectionMaps so the baked CollectionMap soft
-	 *  paths reflect the final external locations -- see RebuildSharedCollections. */
-	void ExternalizeSharedAndActorCollections();
-	void ExternalizeExportedDataAssets();
+	/** Pull every externalized subobject back into this package and null the soft refs.
+	 *  Used on the External -> Embedded toggle (PostEditChangeProperty). */
 	void InternalizeSubobjects();
+
+	/** Manual utility: editor-save every external package this collection produced.
+	 *  Deliberately NOT called from PreSave -- see the cook rationale there. */
 	void SaveExternalPackages();
 };

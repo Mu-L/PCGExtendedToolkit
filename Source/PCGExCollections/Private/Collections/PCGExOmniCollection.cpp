@@ -277,13 +277,33 @@ UPCGExCollectionTypeState* UPCGExOmniCollection::FindTypeState(const UClass* Sta
 	return nullptr;
 }
 
+UPCGExCollectionTypeState* UPCGExOmniCollection::FindTypeStateForSlot(const UClass* StateClass) const
+{
+	if (!StateClass)
+	{
+		return nullptr;
+	}
+
+	for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+	{
+		if (State && PCGExCollectionHelpers::MatchesTypeSlot(State->GetClass(), StateClass))
+		{
+			return State;
+		}
+	}
+
+	return nullptr;
+}
+
 bool UPCGExOmniCollection::SupportsTypeMachinery(const PCGExAssetCollection::FTypeId TypeId) const
 {
 	// A registered StateClass means this host can instantiate and drive the type's
 	// machinery -- answered from the registry (not live state presence) so entry staging
-	// guards pass BEFORE the state is first ensured by the rebuild session.
-	const PCGExAssetCollection::FTypeInfo* Info = PCGExAssetCollection::FTypeRegistry::Get().Find(TypeId);
-	if (Info && Info->StateClass.IsValid())
+	// guards pass BEFORE the state is first ensured by the rebuild session. Lineage-resolved
+	// so a type derived from a machinery type answers like its ancestor (matching the
+	// inheritance-aware entry checks the machinery itself uses).
+	PCGExAssetCollection::FTypeInfo Info;
+	if (PCGExAssetCollection::FTypeRegistry::Get().GetInfoResolved(TypeId, Info) && Info.StateClass.IsValid())
 	{
 		return true;
 	}
@@ -313,11 +333,15 @@ void UPCGExOmniCollection::Serialize(FArchive& Ar)
 
 	if (bScrub)
 	{
-		for (const TObjectPtr<UPCGExCollectionTypeState>& State : TypeStates)
+		// REVERSE order: Begin/End pairs must nest. With two states scrubbing overlapping
+		// host fields (e.g. a user-duplicated Type Machinery element), forward-order restore
+		// would let the later state's captured nulls overwrite the earlier state's real
+		// values -- silent, self-perpetuating entry-ref loss on every save.
+		for (int32 i = TypeStates.Num() - 1; i >= 0; --i)
 		{
-			if (State)
+			if (TypeStates[i])
 			{
-				State->OnHostSerializeSave_End(this);
+				TypeStates[i]->OnHostSerializeSave_End(this);
 			}
 		}
 	}
@@ -385,14 +409,24 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 	// Base and derived globals blocks answer the same queries, so they share one type slot.
 	auto MatchesSlot = [](const UScriptStruct* A, const UScriptStruct* B)
 	{
-		return A && B && (A->IsChildOf(B) || B->IsChildOf(A));
+		return PCGExCollectionHelpers::MatchesTypeSlot(A, B);
 	};
 
-	// Would an entry of this type read the block struct S through the seam?
-	auto CoversEntry = [&MatchesSlot](const UScriptStruct* S, const FPCGExAssetCollectionEntry* Entry)
+	// Would an entry of this type read the block struct S through the seam? Lineage-resolved
+	// (a derived type reads its ancestor's block); cached per type id -- this runs per row
+	// in the bake loops.
+	TMap<PCGExAssetCollection::FTypeId, const UScriptStruct*> GlobalsStructByType;
+	auto CoversEntry = [&MatchesSlot, &GlobalsStructByType](const UScriptStruct* S, const FPCGExAssetCollectionEntry* Entry)
 	{
-		const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId());
-		return TypeInfo && MatchesSlot(TypeInfo->GlobalsStruct, S);
+		const PCGExAssetCollection::FTypeId TypeId = Entry->GetTypeId();
+		const UScriptStruct** Cached = GlobalsStructByType.Find(TypeId);
+		if (!Cached)
+		{
+			PCGExAssetCollection::FTypeInfo TypeInfo;
+			PCGExAssetCollection::FTypeRegistry::Get().GetInfoResolved(TypeId, TypeInfo);
+			Cached = &GlobalsStructByType.Add(TypeId, TypeInfo.GlobalsStruct);
+		}
+		return MatchesSlot(*Cached, S);
 	};
 
 	for (UPCGExAssetCollection* Source : InSources)
@@ -597,64 +631,104 @@ void UPCGExOmniCollection::EDITOR_OnPostStagingRebuild()
 	}
 }
 
-bool UPCGExOmniCollection::EDITOR_EnsureTypeSetup()
+TSet<PCGExAssetCollection::FTypeId> UPCGExOmniCollection::EDITOR_CollectPresentLeafTypeIds() const
 {
 	// Leaf entries only: subcollection rows' content is configured on the referenced
-	// collection itself. Registry FTypeInfo pointers are stable (registrations only mutate
-	// at module init / plugin load).
-	TSet<const PCGExAssetCollection::FTypeInfo*> PresentTypes;
-	ForEachEntry([&PresentTypes](const FPCGExAssetCollectionEntry* Entry, int32)
+	// collection itself. No registry access here -- call sites resolve each unique id to a
+	// COPIED info (interior registry pointers must never be retained; see FTypeRegistry).
+	TSet<PCGExAssetCollection::FTypeId> PresentIds;
+	ForEachEntry([&PresentIds](const FPCGExAssetCollectionEntry* Entry, int32)
 	{
-		if (Entry->bIsSubCollection)
+		if (!Entry->bIsSubCollection)
 		{
-			return;
-		}
-		if (const PCGExAssetCollection::FTypeInfo* Info = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId()))
-		{
-			PresentTypes.Add(Info);
+			PresentIds.Add(Entry->GetTypeId());
 		}
 	});
+	return PresentIds;
+}
+
+bool UPCGExOmniCollection::EDITOR_EnsureTypeSetup()
+{
+	bool bAdded = false;
+
+	for (const PCGExAssetCollection::FTypeId TypeId : EDITOR_CollectPresentLeafTypeIds())
+	{
+		bAdded |= EDITOR_EnsureTypeSetupForType(TypeId);
+	}
+
+	// Surface duplicate same-slot states (user-added or duplicated "Type Machinery" array
+	// elements): each runs the same machinery against the same entries and scrubs the same
+	// host fields. The reverse-order restore in Serialize keeps the scrub safe, but the
+	// setup itself is a misconfiguration the user should resolve.
+	for (int32 i = 0; i < TypeStates.Num(); i++)
+	{
+		for (int32 j = i + 1; j < TypeStates.Num(); j++)
+		{
+			if (TypeStates[i] && TypeStates[j]
+				&& PCGExCollectionHelpers::MatchesTypeSlot(TypeStates[i]->GetClass(), TypeStates[j]->GetClass()))
+			{
+				UE_LOG(LogPCGEx, Warning,
+				       TEXT("'%s' carries multiple type-machinery states for the '%s' slot -- remove the duplicate array elements (each one runs the same machinery over the same entries)."),
+				       *GetName(), *TypeStates[i]->GetClass()->GetName());
+			}
+		}
+	}
+
+	return bAdded;
+}
+
+bool UPCGExOmniCollection::EDITOR_EnsureTypeSetupForType(const PCGExAssetCollection::FTypeId TypeId)
+{
+	// Lineage-resolved: a type registering no GlobalsStruct/StateClass of its own inherits
+	// its nearest ancestor's -- consistent with the staging capability guard
+	// (SupportsTypeMachinery) and with the machinery's inheritance-aware entry collection,
+	// so an entry type derived from PCGDataAsset gets the PCGData state ensured too.
+	PCGExAssetCollection::FTypeInfo Info;
+	if (!PCGExAssetCollection::FTypeRegistry::Get().GetInfoResolved(TypeId, Info))
+	{
+		return false;
+	}
 
 	bool bAdded = false;
 
-	for (const PCGExAssetCollection::FTypeInfo* Info : PresentTypes)
+	// Globals block, seeded from the typed collection's CDO through the globals seam so
+	// defaults -- including settings-driven instanced subobjects like the actor bounds
+	// evaluator -- match a freshly created typed collection of that type.
+	if (Info.GlobalsStruct)
 	{
-		// Globals block, seeded from the typed collection's CDO through the globals seam so
-		// defaults -- including settings-driven instanced subobjects like the actor bounds
-		// evaluator -- match a freshly created typed collection of that type.
-		if (Info->GlobalsStruct)
+		const bool bBlockExists = TypeGlobals.ContainsByPredicate([&Info](const FInstancedStruct& Block)
 		{
-			const bool bBlockExists = TypeGlobals.ContainsByPredicate([Info](const FInstancedStruct& Block)
-			{
-				return Block.GetScriptStruct() && Block.GetScriptStruct()->IsChildOf(Info->GlobalsStruct);
-			});
+			// Slot identity (both directions): base and derived blocks answer the same
+			// queries, so one block per slot -- same rule as the merge conflict handling.
+			return PCGExCollectionHelpers::MatchesTypeSlot(Block.GetScriptStruct(), Info.GlobalsStruct);
+		});
 
-			if (!bBlockExists)
-			{
-				Modify();
-				FInstancedStruct& Block = TypeGlobals.Emplace_GetRef();
-				Block.InitializeAs(Info->GlobalsStruct);
-
-				const UPCGExAssetCollection* TypedCDO = Info->CollectionClass.IsValid()
-					? Cast<UPCGExAssetCollection>(Info->CollectionClass->GetDefaultObject())
-					: nullptr;
-				if (TypedCDO && TypedCDO->GetTypeGlobals(Info->GlobalsStruct, *Block.GetMutablePtr<FPCGExCollectionTypeGlobals>()))
-				{
-					// CDO-owned subobjects must never be referenced by an asset.
-					PCGExCollectionHelpers::DuplicateInstancedSubobjects(Info->GlobalsStruct, Block.GetMutableMemory(), this);
-				}
-
-				bAdded = true;
-			}
-		}
-
-		// Machinery state; class defaults mirror the typed collection's members.
-		if (Info->StateClass.IsValid() && !FindTypeState(Info->StateClass.Get()))
+		if (!bBlockExists)
 		{
 			Modify();
-			TypeStates.Add(NewObject<UPCGExCollectionTypeState>(this, Info->StateClass.Get(), NAME_None, RF_Transactional));
+			FInstancedStruct& Block = TypeGlobals.Emplace_GetRef();
+			Block.InitializeAs(Info.GlobalsStruct);
+
+			const UPCGExAssetCollection* TypedCDO = Info.CollectionClass.IsValid()
+				? Cast<UPCGExAssetCollection>(Info.CollectionClass->GetDefaultObject())
+				: nullptr;
+			if (TypedCDO && TypedCDO->GetTypeGlobals(Info.GlobalsStruct, *Block.GetMutablePtr<FPCGExCollectionTypeGlobals>()))
+			{
+				// CDO-owned subobjects must never be referenced by an asset.
+				PCGExCollectionHelpers::DuplicateInstancedSubobjects(Info.GlobalsStruct, Block.GetMutableMemory(), this);
+			}
+
 			bAdded = true;
 		}
+	}
+
+	// Machinery state; class defaults mirror the typed collection's members. Slot-based
+	// existence check so an occupied slot (e.g. a derived state) is never doubled up.
+	if (Info.StateClass.IsValid() && !FindTypeStateForSlot(Info.StateClass.Get()))
+	{
+		Modify();
+		TypeStates.Add(NewObject<UPCGExCollectionTypeState>(this, Info.StateClass.Get(), NAME_None, RF_Transactional));
+		bAdded = true;
 	}
 
 	return bAdded;
@@ -694,47 +768,58 @@ void UPCGExOmniCollection::EDITOR_GetAddableEntryTypes(TArray<const UScriptStruc
 
 int32 UPCGExOmniCollection::EDITOR_CleanupUnusedTypeSetup()
 {
-	// Present leaf types -- mirror of EDITOR_EnsureTypeSetup's collection pass.
-	TSet<const PCGExAssetCollection::FTypeInfo*> PresentTypes;
-	ForEachEntry([&PresentTypes](const FPCGExAssetCollectionEntry* Entry, int32)
+	// Slots the present leaf entries need -- same presence definition and same lineage
+	// resolution as EDITOR_EnsureTypeSetup, so cleanup removes exactly what ensure would
+	// not (re-)create.
+	TArray<const UScriptStruct*> NeededGlobals;
+	TArray<const UClass*> NeededStates;
+	for (const PCGExAssetCollection::FTypeId TypeId : EDITOR_CollectPresentLeafTypeIds())
 	{
-		if (Entry->bIsSubCollection)
+		PCGExAssetCollection::FTypeInfo Info;
+		if (PCGExAssetCollection::FTypeRegistry::Get().GetInfoResolved(TypeId, Info))
 		{
-			return;
+			if (Info.GlobalsStruct)
+			{
+				NeededGlobals.AddUnique(Info.GlobalsStruct);
+			}
+			if (Info.StateClass.IsValid())
+			{
+				NeededStates.AddUnique(Info.StateClass.Get());
+			}
 		}
-		if (const PCGExAssetCollection::FTypeInfo* Info = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId()))
+	}
+
+	// Every slot ANY registration provides. Struct/class pointer VALUES are stable objects,
+	// safe to keep outside the registry lock (the visited infos themselves are not).
+	TArray<const UScriptStruct*> RegisteredGlobals;
+	TArray<const UClass*> RegisteredStates;
+	PCGExAssetCollection::FTypeRegistry::Get().ForEach([&RegisteredGlobals, &RegisteredStates](const PCGExAssetCollection::FTypeInfo& Info)
+	{
+		if (Info.GlobalsStruct)
 		{
-			PresentTypes.Add(Info);
+			RegisteredGlobals.AddUnique(Info.GlobalsStruct);
+		}
+		if (Info.StateClass.IsValid())
+		{
+			RegisteredStates.AddUnique(Info.StateClass.Get());
 		}
 	});
 
-	// Removable = owned by a REGISTERED type that has no present entry. Setup the registry
-	// doesn't know about (unloaded third-party plugin, hand-authored oddity) is kept --
-	// deleting what we can't identify is how user data gets lost.
-	auto FindBlockOwner = [](const UScriptStruct* BlockStruct) -> const PCGExAssetCollection::FTypeInfo*
+	// Removable = the slot is registry-KNOWN and no present entry needs it. Setup the
+	// registry doesn't know about (unloaded third-party plugin, hand-authored oddity) is
+	// kept -- deleting what we can't identify is how user data gets lost. Slot matching is
+	// both-directions (MatchesTypeSlot), so the answer cannot depend on registry iteration
+	// order the way first-match owner attribution would.
+	auto AnySlotMatch = [](const auto& Slots, const auto* Type)
 	{
-		const PCGExAssetCollection::FTypeInfo* Owner = nullptr;
-		PCGExAssetCollection::FTypeRegistry::Get().ForEach([&Owner, BlockStruct](const PCGExAssetCollection::FTypeInfo& Info)
+		for (const auto* Slot : Slots)
 		{
-			if (!Owner && Info.GlobalsStruct && BlockStruct->IsChildOf(Info.GlobalsStruct))
+			if (PCGExCollectionHelpers::MatchesTypeSlot(Slot, Type))
 			{
-				Owner = &Info;
+				return true;
 			}
-		});
-		return Owner;
-	};
-
-	auto FindStateOwner = [](const UClass* StateClass) -> const PCGExAssetCollection::FTypeInfo*
-	{
-		const PCGExAssetCollection::FTypeInfo* Owner = nullptr;
-		PCGExAssetCollection::FTypeRegistry::Get().ForEach([&Owner, StateClass](const PCGExAssetCollection::FTypeInfo& Info)
-		{
-			if (!Owner && Info.StateClass.IsValid() && StateClass->IsChildOf(Info.StateClass.Get()))
-			{
-				Owner = &Info;
-			}
-		});
-		return Owner;
+		}
+		return false;
 	};
 
 	int32 Removed = 0;
@@ -752,10 +837,9 @@ int32 UPCGExOmniCollection::EDITOR_CleanupUnusedTypeSetup()
 	for (int32 i = TypeGlobals.Num() - 1; i >= 0; --i)
 	{
 		const UScriptStruct* BlockStruct = TypeGlobals[i].GetScriptStruct();
-		const PCGExAssetCollection::FTypeInfo* Owner = BlockStruct ? FindBlockOwner(BlockStruct) : nullptr;
 
-		// Empty blocks are debris; owned blocks go when their type has no entries left.
-		if (!BlockStruct || (Owner && !PresentTypes.Contains(Owner)))
+		// Empty blocks are debris; known blocks go when no present type needs their slot.
+		if (!BlockStruct || (AnySlotMatch(RegisteredGlobals, BlockStruct) && !AnySlotMatch(NeededGlobals, BlockStruct)))
 		{
 			EnsureModify();
 			TypeGlobals.RemoveAt(i);
@@ -766,9 +850,9 @@ int32 UPCGExOmniCollection::EDITOR_CleanupUnusedTypeSetup()
 	for (int32 i = TypeStates.Num() - 1; i >= 0; --i)
 	{
 		const UPCGExCollectionTypeState* State = TypeStates[i];
-		const PCGExAssetCollection::FTypeInfo* Owner = State ? FindStateOwner(State->GetClass()) : nullptr;
+		const UClass* StateClass = State ? State->GetClass() : nullptr;
 
-		if (!State || (Owner && !PresentTypes.Contains(Owner)))
+		if (!State || (AnySlotMatch(RegisteredStates, StateClass) && !AnySlotMatch(NeededStates, StateClass)))
 		{
 			EnsureModify();
 			TypeStates.RemoveAt(i);
@@ -793,8 +877,10 @@ FPCGExAssetCollectionEntry* UPCGExOmniCollection::EDITOR_AddEntry(const UScriptS
 	if (NewEntry)
 	{
 		// A matching entry type arrives with its per-type setup (globals block + machinery
-		// state) already in place, typed-collection defaults included.
-		EDITOR_EnsureTypeSetup();
+		// state) already in place, typed-collection defaults included. Per-type slice on
+		// purpose: multi-row callers (grid drag-drop) invoke this once per row, and a
+		// full-collection rescan here made a K-row drop O(K * N).
+		EDITOR_EnsureTypeSetupForType(NewEntry->GetTypeId());
 	}
 
 	return NewEntry;
@@ -823,12 +909,10 @@ void UPCGExOmniCollection::EDITOR_AddSubCollectionEntries(const TArray<UPCGExAss
 		// (unticking bIsSubCollection then reveals the right picker); heterogeneous sources
 		// have no single type and fall back to the base struct.
 		const UScriptStruct* PayloadStruct = FPCGExAssetCollectionEntry::StaticStruct();
-		if (const PCGExAssetCollection::FTypeInfo* SubTypeInfo = PCGExAssetCollection::FTypeRegistry::Get().FindByClass(Sub->GetClass()))
+		if (PCGExAssetCollection::FTypeInfo SubTypeInfo;
+			PCGExAssetCollection::FTypeRegistry::Get().GetInfoByClass(Sub->GetClass(), SubTypeInfo) && SubTypeInfo.EntryStruct)
 		{
-			if (SubTypeInfo->EntryStruct)
-			{
-				PayloadStruct = SubTypeInfo->EntryStruct;
-			}
+			PayloadStruct = SubTypeInfo.EntryStruct;
 		}
 
 		FPCGExAssetCollectionEntry* Payload = AddEntryOfType(PayloadStruct);
@@ -847,14 +931,14 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 {
 	UPCGExAssetCollection::EDITOR_AddBrowserSelectionInternal(InAssetData);
 
-	// Detectors by ascending priority. Registry pointers are stable here (mutations only
-	// happen at module init / plugin load).
-	TArray<const PCGExAssetCollection::FTypeInfo*> Detectors;
+	// Detectors by ascending priority -- copied OUT of the registry: interior pointers must
+	// never outlive the lock (registrations can relocate storage; see FTypeRegistry).
+	TArray<PCGExAssetCollection::FTypeInfo> Detectors;
 	PCGExAssetCollection::FTypeRegistry::Get().ForEach([&Detectors](const PCGExAssetCollection::FTypeInfo& Info)
 	{
 		if (Info.DetectSourceAsset && Info.EntryStruct)
 		{
-			Detectors.Add(&Info);
+			Detectors.Add(Info);
 		}
 	});
 	Detectors.Sort([](const PCGExAssetCollection::FTypeInfo& A, const PCGExAssetCollection::FTypeInfo& B)
@@ -892,25 +976,25 @@ void UPCGExOmniCollection::EDITOR_AddBrowserSelectionInternal(const TArray<FAsse
 
 	for (const FAssetData& Asset : InAssetData)
 	{
-		for (const PCGExAssetCollection::FTypeInfo* Info : Detectors)
+		for (const PCGExAssetCollection::FTypeInfo& Info : Detectors)
 		{
-			if (!Info->DetectSourceAsset(Asset))
+			if (!Info.DetectSourceAsset(Asset))
 			{
 				continue;
 			}
 
 			FInstancedStruct Payload;
-			if (Info->MakeEntryFromSourceAsset)
+			if (Info.MakeEntryFromSourceAsset)
 			{
 				// Factory rejected on closer inspection: fall through to lower-priority detectors.
-				if (!Info->MakeEntryFromSourceAsset(Asset, Payload))
+				if (!Info.MakeEntryFromSourceAsset(Asset, Payload))
 				{
 					continue;
 				}
 			}
 			else
 			{
-				Payload.InitializeAs(Info->EntryStruct);
+				Payload.InitializeAs(Info.EntryStruct);
 				Payload.GetMutablePtr<FPCGExAssetCollectionEntry>()->SetAssetPath(Asset.ToSoftObjectPath());
 			}
 

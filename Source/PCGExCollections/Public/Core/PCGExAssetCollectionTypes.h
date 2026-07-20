@@ -31,10 +31,16 @@ struct FAssetData;
  *   3. Your collection's GetTypeId() should return your FTypeId.
  *
  * Querying:
- *   FTypeRegistry::Get().Find(TypeIds::Mesh)       -- get FTypeInfo by ID
- *   FTypeRegistry::Get().FindByClass(UClass*)       -- reverse lookup from UClass
- *   FTypeRegistry::Get().IsA(Mesh, Base)            -- inheritance check
- *   Entry->IsType(TypeIds::Mesh)                    -- check entry type
+ *   FTypeRegistry::Get().GetInfo(TypeIds::Mesh, Out)   -- copy FTypeInfo out by ID
+ *   FTypeRegistry::Get().GetInfoByClass(UClass*, Out)  -- reverse lookup from UClass
+ *   FTypeRegistry::Get().IsA(Mesh, Base)               -- inheritance check
+ *   Entry->IsType(TypeIds::Mesh)                       -- check entry type
+ *
+ * Thread safety: storage is a value TMap guarded by an FRWLock, and late registrations
+ * (hot-reload, late-loaded plugins) can relocate every stored FTypeInfo. Interior pointers
+ * must therefore NEVER escape the lock -- which is why every lookup is copy-out. Pointer
+ * VALUES copied out of an info (EntryStruct, GlobalsStruct, CollectionClass/StateClass
+ * targets) are stable UObjects and safe to keep.
  */
 
 namespace PCGExAssetCollection
@@ -119,14 +125,29 @@ namespace PCGExAssetCollection
 		 */
 		FTypeId Register(const FTypeInfo& Info);
 
-		/** Find type info by ID */
-		const FTypeInfo* Find(FTypeId Id) const;
+		/** Copy type info out by ID. Returns false when the id is unregistered. */
+		bool GetInfo(FTypeId Id, FTypeInfo& OutInfo) const;
 
-		/** Find type info by collection class */
-		const FTypeInfo* FindByClass(const UClass* Class) const;
+		/** Copy type info out by collection class (walks super classes). */
+		bool GetInfoByClass(const UClass* Class, FTypeInfo& OutInfo) const;
 
-		/** Find type info by entry struct */
-		const FTypeInfo* FindByEntryStruct(const UScriptStruct* Struct) const;
+		/** Copy type info out by entry struct (walks super structs). */
+		bool GetInfoByEntryStruct(const UScriptStruct* Struct, FTypeInfo& OutInfo) const;
+
+		/**
+		 * Copy type info out by ID, resolving machinery inheritance: when the type itself
+		 * registers no GlobalsStruct / StateClass, the nearest ancestor's (ParentType chain)
+		 * fills them in. Everything else in the copy is the LEAF registration. This is how
+		 * capability queries and per-type setup stay consistent with the lineage-aware entry
+		 * checks (IsA/IsType) -- a type derived from PCGDataAsset runs the base machinery.
+		 */
+		bool GetInfoResolved(FTypeId Id, FTypeInfo& OutInfo) const;
+
+		/** The registered parent type id, or None when unregistered / root. */
+		FTypeId GetParentType(FTypeId Id) const;
+
+		/** The registered entry struct, or null. (UScriptStruct values are stable objects.) */
+		const UScriptStruct* GetEntryStruct(FTypeId Id) const;
 
 		/**
 		 * Apply a mutator to a registered entry. Must NOT re-enter the registry (FRWLock is
@@ -140,7 +161,11 @@ namespace PCGExAssetCollection
 		/** Get all registered type IDs */
 		void GetAllTypeIds(TArray<FTypeId>& OutIds) const;
 
-		/** Iterate over all registered types */
+		/**
+		 * Iterate over all registered types under the read lock. The callback must NOT
+		 * re-enter the registry (FRWLock is non-recursive) and must NOT retain references or
+		 * pointers to the visited infos -- copy values out instead (see class doc).
+		 */
 		template <typename Func>
 		void ForEach(Func&& Callback) const
 		{
@@ -163,6 +188,13 @@ namespace PCGExAssetCollection
 
 	private:
 		FTypeRegistry() = default;
+
+		/** Interior lookup -- caller must hold RegistryLock. The returned pointer is only
+		 *  valid while the lock is held (storage relocates on later registrations). */
+		const FTypeInfo* FindUnsafe(FTypeId Id) const
+		{
+			return Types.Find(Id);
+		}
 
 		static TArray<TFunction<void()>>& GetPendingRegistrations();
 		static TArray<TPair<FTypeId, TFunction<void(FTypeInfo&)>>>& GetPendingCustomizations();
