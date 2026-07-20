@@ -119,7 +119,7 @@ public:
 	 * secondary pick reset instead (it indexed the source entry's micro cache and is meaningless
 	 * against the replacement entry). Points that aren't swapped are never touched.
 	 */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bRedistributeMicroCache = false;
 
 	/** Distribution details for the micro cache re-pick -- same semantics as Distribute's Distribution (Entry). */
@@ -192,6 +192,8 @@ class FPCGExStagingSwapElement final : public FPCGExPointsProcessorElement
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(StagingSwap)
 
+	virtual void DisabledPassThroughData(FPCGContext* Context) const override;
+	
 	PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE()
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;

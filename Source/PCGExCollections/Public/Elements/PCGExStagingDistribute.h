@@ -179,10 +179,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
 	FPCGExAssetDistributionDetails DistributionSettings;
 
-	/** Distribution details that are specific to the picked entry -- what it picks depends on the type of collection being staged. 
-	 * For Mesh Collections, this let you control how materials are picked. 
-	 * Note : LEGACY Nodes only. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution (Entry)", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy", EditConditionHides))
+	/** Distribution details that are specific to the picked entry -- what it picks depends on the type of collection being staged.
+	 * For Mesh Collections, this let you control how materials are picked.
+	 * Drives Micro Cache redistribution when no Selector is connected; otherwise LEGACY Nodes only. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName="Distribution (Micro-cache)", EditCondition="SelectorMode == EPCGExSelectorMode::Legacy || (SourceMode == EPCGExDistributeSourceMode::CollectionMap && RedistributionMode == EPCGExRedistributionMode::MicroCache)", EditConditionHides))
 	FPCGExMicroCacheDistributionDetails EntryDistributionSettings;
 
 

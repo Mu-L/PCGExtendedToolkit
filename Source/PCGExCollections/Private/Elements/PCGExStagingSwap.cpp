@@ -74,6 +74,21 @@ PCGEX_INITIALIZE_ELEMENT(StagingSwap)
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(StagingSwap)
 
+void FPCGExStagingSwapElement::DisabledPassThroughData(FPCGContext* Context) const
+{
+	FPCGExPointsProcessorElement::DisabledPassThroughData(Context);
+	
+	//Forward collection map data
+	TArray<FPCGTaggedData> MapSources = Context->InputData.GetInputsByPin(PCGExCollections::Labels::SourceCollectionMapLabel);
+	for (const FPCGTaggedData& TaggedData : MapSources)
+	{
+		FPCGTaggedData& TaggedDataCopy = Context->OutputData.TaggedData.Emplace_GetRef();
+		TaggedDataCopy.Data = TaggedData.Data;
+		TaggedDataCopy.Tags.Append(TaggedData.Tags);
+		TaggedDataCopy.Pin = PCGExCollections::Labels::OutputCollectionMapLabel;
+	}
+}
+
 bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))

@@ -127,13 +127,13 @@ void UPCGExAssetStagingSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPinP
 		PCGEX_PIN_PARAMS(PCGExCollections::Labels::SourceCollectionMapLabel, "Collection map information from, or merged from, Staging nodes.", Required)
 	}
 
-	if (SelectorMode != EPCGExSelectorMode::Legacy)
+	if (SelectorMode != EPCGExSelectorMode::Legacy && !IsMicroRedistribution())
 	{
 		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Required, FPCGExDataTypeInfoSelector::AsId())
 	}
 	else
 	{
-		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks.", Advanced, FPCGExDataTypeInfoSelector::AsId())
+		PCGEX_PIN_FACTORY(PCGExCollections::Labels::SourceSelectorLabel, "External selector factory driving entry picks. Unused by Legacy nodes; optional in Micro Cache redistribution (drives the re-pick when connected, inline Distribution (Entry) settings otherwise).", Advanced, FPCGExDataTypeInfoSelector::AsId())
 	}
 
 	Super::InputPinPropertiesBeforeFilters(PinProperties);
@@ -188,7 +188,7 @@ void FPCGExAssetStagingElement::DisabledPassThroughData(FPCGContext* Context) co
 		FPCGTaggedData& TaggedDataCopy = Context->OutputData.TaggedData.Emplace_GetRef();
 		TaggedDataCopy.Data = TaggedData.Data;
 		TaggedDataCopy.Tags.Append(TaggedData.Tags);
-		TaggedDataCopy.Pin = PCGExCollections::Labels::SourceCollectionMapLabel;
+		TaggedDataCopy.Pin = PCGExCollections::Labels::OutputCollectionMapLabel;
 	}
 }
 
@@ -230,18 +230,27 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 
 	if (Settings->SelectorMode != EPCGExSelectorMode::Legacy)
 	{
+		// Micro-cache redistribution never picks entries, so the Selector is optional there:
+		// it drives the micro re-pick when connected, the inline Distribution (Entry) settings
+		// take over when absent.
 		TArray<TObjectPtr<const UPCGExSelectorFactoryData>> Factories;
-		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {FPCGExDataTypeInfoSelector::AsId()}))
+		if (!PCGExFactories::GetInputFactories<UPCGExSelectorFactoryData>(Context, PCGExCollections::Labels::SourceSelectorLabel, Factories, {FPCGExDataTypeInfoSelector::AsId()}, !bMicroRedistribute))
 		{
-			PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
-			return false;
+			if (!bMicroRedistribute)
+			{
+				PCGE_LOG(Error, GraphAndLog, FTEXT("External distribution mode requires a Selector factory on the Selector input pin."));
+				return false;
+			}
 		}
-		if (Factories.Num() != 1)
+		else if (Factories.Num() != 1)
 		{
 			PCGE_LOG(Error, GraphAndLog, FTEXT("Exactly one Selector factory is expected on the Selector input pin."));
 			return false;
 		}
-		Context->SelectorFactory = Factories[0];
+		else
+		{
+			Context->SelectorFactory = Factories[0];
+		}
 	}
 	else
 	{
@@ -249,7 +258,7 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 		Context->SelectorFactory = PCGExCollections::BuildLegacyFactory(Context, Settings->DistributionSettings, Settings->EntryDistributionSettings);
 	}
 
-	if (!Context->SelectorFactory)
+	if (!Context->SelectorFactory && !bMicroRedistribute)
 	{
 		return Context->CancelExecution("Invalid Asset Selector");
 	}
@@ -1197,10 +1206,11 @@ namespace PCGExAssetStaging
 		const TConstPCGValueRange<int32> Seeds = PointDataFacade->GetIn()->GetConstSeedValueRange();
 		const UPCGComponent* Component = Context->GetComponent();
 
-		// Seed config comes from the connected Selector -- the same source FSelectorHelper::Init
-		// syncs from for the main loop.
-		const uint8 SeedComponents = Context->SelectorFactory->BaseConfig.SeedComponents;
-		const int32 LocalSeed = Context->SelectorFactory->BaseConfig.LocalSeed;
+		// Seed config comes from the connected Selector when present (the same source
+		// FSelectorHelper::Init syncs from for the main loop), else from the inline
+		// Distribution (Entry) settings -- mirroring what drives the micro pick itself.
+		const uint8 SeedComponents = Context->SelectorFactory ? Context->SelectorFactory->BaseConfig.SeedComponents : Settings->EntryDistributionSettings.SeedComponents;
+		const int32 LocalSeed = Context->SelectorFactory ? Context->SelectorFactory->BaseConfig.LocalSeed : Settings->EntryDistributionSettings.LocalSeed;
 
 		const bool bLocalPickMaterials = Context->bPickMaterials;
 		const FMicroRefreshTarget* Targets = MicroTargets.GetData();
