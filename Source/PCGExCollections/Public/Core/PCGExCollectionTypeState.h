@@ -67,5 +67,36 @@ public:
 	virtual void AppendCookDependencyAssetPaths(const UPCGExAssetCollection* Host, TSet<FSoftObjectPath>& OutPaths) const
 	{
 	}
+
+	/**
+	 * Called once, right after a host creates this state (EnsureTypeSetup, or an explicit
+	 * ensure during merge/convert). SeedSource is the collection whose entries prompted the
+	 * creation when there is one (merge/conversion source; null for plain entry adds) --
+	 * states may adopt its settings here. NEVER called on states that already exist: an
+	 * existing state is the user's and always wins (same behavior-wins policy as
+	 * globals-block merging).
+	 */
+	virtual void OnAddedToHost(UPCGExAssetCollection* Host, const UPCGExAssetCollection* SeedSource)
+	{
+	}
+
+	/**
+	 * Called instead of OnAddedToHost when an ensure-with-seed found this state already
+	 * present (merge/conversion offered SeedSource, the existing state won). Implementations
+	 * should surface meaningful conflicts -- e.g. warn when the ignored source carried
+	 * different external-storage settings -- so the first-creator-wins policy is visible.
+	 */
+	virtual void OnSeedSourceIgnored(UPCGExAssetCollection* Host, const UPCGExAssetCollection* SeedSource)
+	{
+	}
+
+	/**
+	 * Called right before a host removes this state (EDITOR_CleanupUnusedTypeSetup) --
+	 * last chance to release or surface owned resources (e.g. warn about externalized
+	 * packages that will orphan). Removal proceeds regardless.
+	 */
+	virtual void OnRemovedFromHost(UPCGExAssetCollection* Host)
+	{
+	}
 #endif
 };
