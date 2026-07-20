@@ -496,8 +496,9 @@ void FPCGExAssetCollectionEditor::ResolveTilePickerForRow(int32 EntryIndex, FNam
 	}
 
 	const UScriptStruct* RowStruct = Coll->EDITOR_GetEntryScriptStruct(EntryIndex);
-	const PCGExAssetCollection::FTypeInfo* RuntimeInfo = RowStruct ? PCGExAssetCollection::FTypeRegistry::Get().FindByEntryStruct(RowStruct) : nullptr;
-	const FCollectionEditorTypeInfo* EditorInfo = RuntimeInfo ? FCollectionEditorTypeRegistry::Get().Find(RuntimeInfo->Id) : nullptr;
+	PCGExAssetCollection::FTypeInfo RuntimeInfo;
+	const bool bRuntimeInfoFound = RowStruct && PCGExAssetCollection::FTypeRegistry::Get().GetInfoByEntryStruct(RowStruct, RuntimeInfo);
+	const FCollectionEditorTypeInfo* EditorInfo = bRuntimeInfoFound ? FCollectionEditorTypeRegistry::Get().Find(RuntimeInfo.Id) : nullptr;
 
 	if (EditorInfo && !EditorInfo->TilePickerPropertyName.IsNone())
 	{

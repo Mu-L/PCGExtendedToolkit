@@ -206,8 +206,7 @@ void FPCGExVariantCollectionEditor::OnSwapAssetPicked(const FAssetData& AssetDat
 		{
 			// Struct resolved from the ENTRY's type id — hosts may be heterogeneous
 			// (variant sources), where the host class only maps to the base entry struct.
-			const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(SeedEntry->GetTypeId());
-			SeedStruct = TypeInfo ? TypeInfo->EntryStruct : nullptr;
+			SeedStruct = PCGExAssetCollection::FTypeRegistry::Get().GetEntryStruct(SeedEntry->GetTypeId());
 			SeedCollection = Src;
 			if (!SeedStruct)
 			{

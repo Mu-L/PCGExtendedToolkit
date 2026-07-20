@@ -4,12 +4,13 @@
 #include "Details/Collections/PCGExOmniCollectionActions.h"
 
 #include "Collections/PCGExOmniCollection.h"
-#include "Details/Collections/PCGExAssetCollectionEditor.h"
 #include "Details/Collections/PCGExCollectionEditorHelpers.h"
 #include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
+#include "Details/Collections/PCGExOmniCollectionEditor.h"
 
 // Registered by hand (no single source asset class): "Create from selection" claims any
-// asset another type's detector claims, and the collection opens in the base editor.
+// asset another type's detector claims. Opens in FPCGExOmniCollectionEditor -- a thin
+// subclass of the (already heterogeneous) base editor adding Omni-only toolbar affordances.
 namespace PCGExOmniCollectionActions
 {
 	struct FRegisterOmniEditorTypeInfo
@@ -43,7 +44,7 @@ namespace PCGExOmniCollectionActions
 				Info.DetectCollectionAsset = [](const FAssetData& Asset) { return Asset.IsInstanceOf<UPCGExOmniCollection>(); };
 				Info.OpenEditor = [](UPCGExAssetCollection* Collection, const EToolkitMode::Type Mode, const TSharedPtr<IToolkitHost>& Host)
 				{
-					const TSharedRef<FPCGExAssetCollectionEditor> Editor = MakeShared<FPCGExAssetCollectionEditor>();
+					const TSharedRef<FPCGExOmniCollectionEditor> Editor = MakeShared<FPCGExOmniCollectionEditor>();
 					Editor->InitEditor(Collection, Mode, Host);
 				};
 				Info.CreateCollection = [](const TArray<FAssetData>& Assets)

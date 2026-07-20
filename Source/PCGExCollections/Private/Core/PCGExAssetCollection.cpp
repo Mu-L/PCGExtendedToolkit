@@ -760,10 +760,13 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryRaw(int32 RawIndex) const
 
 void UPCGExAssetCollection::GetTypeGlobalsStructs(TArray<const UScriptStruct*>& OutStructs) const
 {
-	const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(GetTypeId());
-	if (TypeInfo && TypeInfo->GlobalsStruct)
+	// Lineage-resolved: a derived type without its own registered block still answers its
+	// ancestor's struct through the seam (GetTypeGlobalsInternal chains to Super), so that
+	// is the block it provides.
+	PCGExAssetCollection::FTypeInfo TypeInfo;
+	if (PCGExAssetCollection::FTypeRegistry::Get().GetInfoResolved(GetTypeId(), TypeInfo) && TypeInfo.GlobalsStruct)
 	{
-		OutStructs.AddUnique(TypeInfo->GlobalsStruct);
+		OutStructs.AddUnique(TypeInfo.GlobalsStruct);
 	}
 }
 

@@ -205,15 +205,16 @@ namespace PCGExCollectionEntryBlueprintLibrary_Private
 	{
 		const PCGExAssetCollection::FTypeRegistry& Registry = PCGExAssetCollection::FTypeRegistry::Get();
 
-		const PCGExAssetCollection::FTypeInfo* TypeInfo = Registry.Find(Collection->GetTypeId());
-		if (!TypeInfo || !TypeInfo->EntryStruct)
+		PCGExAssetCollection::FTypeInfo TypeInfo;
+		bool bFound = Registry.GetInfo(Collection->GetTypeId(), TypeInfo);
+		if (!bFound || !TypeInfo.EntryStruct)
 		{
-			TypeInfo = Registry.FindByClass(Collection->GetClass());
+			bFound = Registry.GetInfoByClass(Collection->GetClass(), TypeInfo);
 		}
 
-		if (TypeInfo && TypeInfo->EntryStruct)
+		if (bFound && TypeInfo.EntryStruct)
 		{
-			return TypeInfo->EntryStruct;
+			return TypeInfo.EntryStruct;
 		}
 
 		return FPCGExAssetCollectionEntry::StaticStruct();
@@ -225,10 +226,9 @@ namespace PCGExCollectionEntryBlueprintLibrary_Private
 	{
 		if (Entry)
 		{
-			const PCGExAssetCollection::FTypeInfo* TypeInfo = PCGExAssetCollection::FTypeRegistry::Get().Find(Entry->GetTypeId());
-			if (TypeInfo && TypeInfo->EntryStruct)
+			if (const UScriptStruct* EntryStruct = PCGExAssetCollection::FTypeRegistry::Get().GetEntryStruct(Entry->GetTypeId()))
 			{
-				return TypeInfo->EntryStruct;
+				return EntryStruct;
 			}
 		}
 		return ResolveEntryMemberRoot(Collection);
