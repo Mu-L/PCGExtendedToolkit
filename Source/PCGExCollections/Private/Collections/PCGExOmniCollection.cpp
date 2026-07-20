@@ -42,7 +42,9 @@ namespace PCGExOmniCollection
 			});
 
 			// TypeId -> globals-block struct for the built-in types; registered here so the
-			// per-collection macro signature stays untouched.
+			// per-collection macro signature stays untouched. PCGDataAsset registers its own
+			// globals + machinery StateClass in PCGExPCGDataAssetCollection.cpp (Phase C1 --
+			// colocated with the machinery it describes).
 			{
 				using FTypeRegistry = PCGExAssetCollection::FTypeRegistry;
 				using FTypeInfo = PCGExAssetCollection::FTypeInfo;
@@ -52,13 +54,6 @@ namespace PCGExOmniCollection
 				FTypeRegistry::AddPendingCustomization(TypeIds::SkinnedMesh, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExSkinnedMeshCollectionGlobals::StaticStruct(); });
 				FTypeRegistry::AddPendingCustomization(TypeIds::Actor, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExActorCollectionGlobals::StaticStruct(); });
 				FTypeRegistry::AddPendingCustomization(TypeIds::Level, [](FTypeInfo& Info) { Info.GlobalsStruct = FPCGExLevelCollectionGlobals::StaticStruct(); });
-				FTypeRegistry::AddPendingCustomization(TypeIds::PCGDataAsset, [](FTypeInfo& Info)
-				{
-					Info.GlobalsStruct = FPCGExPCGDataAssetCollectionGlobals::StaticStruct();
-					// Machinery state/processor: hosts carrying this run the PCGData shared
-					// compaction / collection maps / externalization for their PCGData entries.
-					Info.StateClass = UPCGExPCGDataTypeState::StaticClass();
-				});
 			}
 
 #if WITH_EDITOR
@@ -524,6 +519,7 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 		const int32 RowStart = Entries.Num();
 		int32 SourceAppended = 0;
 		int32 SourceSkipped = 0;
+		TSet<PCGExAssetCollection::FTypeId> SourceLeafTypeIds;
 
 		Source->ForEachEntry([&](const FPCGExAssetCollectionEntry* Entry, const int32 Index)
 		{
@@ -550,6 +546,8 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 			if (!Payload->bIsSubCollection)
 			{
+				SourceLeafTypeIds.Add(Payload->GetTypeId());
+
 				for (const UScriptStruct* Bake : BakeStructs)
 				{
 					if (CoversEntry(Bake, Payload))
@@ -562,6 +560,18 @@ int32 UPCGExOmniCollection::EDITOR_AppendCollections(TConstArrayView<UPCGExAsset
 
 			SourceAppended++;
 		});
+
+		// Ensure per-type STATES for what THIS source contributed, seeding newly created
+		// ones from it (adopts external-storage settings -- closes the gap where merged
+		// PCGData machinery silently fell back to embedded). Must run per source, before the
+		// tail rebuild's seedless safety net would create the states with bare defaults.
+		// Deliberately states-only: installing globals BLOCKS mid-call would corrupt the
+		// block conflict resolution for later sources (see EDITOR_EnsureTypeStateForType);
+		// blocks arrive with the tail rebuild's full ensure.
+		for (const PCGExAssetCollection::FTypeId LeafTypeId : SourceLeafTypeIds)
+		{
+			EDITOR_EnsureTypeStateForType(LeafTypeId, Source);
+		}
 
 		// Row ranges for blocks this source installed -- retro-bake targets on later conflicts.
 		for (FInstalledBlock& Installed : InstalledThisCall)
@@ -677,7 +687,7 @@ bool UPCGExOmniCollection::EDITOR_EnsureTypeSetup()
 	return bAdded;
 }
 
-bool UPCGExOmniCollection::EDITOR_EnsureTypeSetupForType(const PCGExAssetCollection::FTypeId TypeId)
+bool UPCGExOmniCollection::EDITOR_EnsureTypeSetupForType(const PCGExAssetCollection::FTypeId TypeId, const UPCGExAssetCollection* SeedSource)
 {
 	// Lineage-resolved: a type registering no GlobalsStruct/StateClass of its own inherits
 	// its nearest ancestor's -- consistent with the staging capability guard
@@ -722,16 +732,37 @@ bool UPCGExOmniCollection::EDITOR_EnsureTypeSetupForType(const PCGExAssetCollect
 		}
 	}
 
-	// Machinery state; class defaults mirror the typed collection's members. Slot-based
-	// existence check so an occupied slot (e.g. a derived state) is never doubled up.
-	if (Info.StateClass.IsValid() && !FindTypeStateForSlot(Info.StateClass.Get()))
-	{
-		Modify();
-		TypeStates.Add(NewObject<UPCGExCollectionTypeState>(this, Info.StateClass.Get(), NAME_None, RF_Transactional));
-		bAdded = true;
-	}
+	bAdded |= EDITOR_EnsureTypeStateForType(TypeId, SeedSource);
 
 	return bAdded;
+}
+
+bool UPCGExOmniCollection::EDITOR_EnsureTypeStateForType(const PCGExAssetCollection::FTypeId TypeId, const UPCGExAssetCollection* SeedSource)
+{
+	PCGExAssetCollection::FTypeInfo Info;
+	if (!PCGExAssetCollection::FTypeRegistry::Get().GetInfoResolved(TypeId, Info) || !Info.StateClass.IsValid())
+	{
+		return false;
+	}
+
+	// Slot-based existence check so an occupied slot (e.g. a derived state) is never
+	// doubled up. An existing state is the user's and always wins -- but it gets to SEE a
+	// skipped seed so real conflicts (e.g. differing external-storage settings) surface.
+	if (UPCGExCollectionTypeState* Existing = FindTypeStateForSlot(Info.StateClass.Get()))
+	{
+		if (SeedSource)
+		{
+			Existing->OnSeedSourceIgnored(this, SeedSource);
+		}
+		return false;
+	}
+
+	// Machinery state; class defaults mirror the typed collection's members. Fresh states
+	// may adopt the seed source's settings (merge/conversion).
+	Modify();
+	UPCGExCollectionTypeState* NewState = TypeStates.Add_GetRef(NewObject<UPCGExCollectionTypeState>(this, Info.StateClass.Get(), NAME_None, RF_Transactional));
+	NewState->OnAddedToHost(this, SeedSource);
+	return true;
 }
 
 void UPCGExOmniCollection::GetCookDependencyAssetPaths(TSet<FSoftObjectPath>& OutPaths) const
@@ -849,12 +880,17 @@ int32 UPCGExOmniCollection::EDITOR_CleanupUnusedTypeSetup()
 
 	for (int32 i = TypeStates.Num() - 1; i >= 0; --i)
 	{
-		const UPCGExCollectionTypeState* State = TypeStates[i];
+		UPCGExCollectionTypeState* State = TypeStates[i];
 		const UClass* StateClass = State ? State->GetClass() : nullptr;
 
 		if (!State || (AnySlotMatch(RegisteredStates, StateClass) && !AnySlotMatch(NeededStates, StateClass)))
 		{
 			EnsureModify();
+			if (State)
+			{
+				// Teardown surface (e.g. warn about externalized packages that will orphan).
+				State->OnRemovedFromHost(this);
+			}
 			TypeStates.RemoveAt(i);
 			Removed++;
 		}

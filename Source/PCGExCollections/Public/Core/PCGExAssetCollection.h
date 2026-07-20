@@ -28,6 +28,7 @@ struct FAssetData;
 
 class UPCGExAssetCollection;
 class UPCGExCollectionStagingPipeline;
+class UPCGExCollectionTypeState;
 
 namespace PCGExAssetCollection
 {
@@ -713,6 +714,24 @@ public:
 	virtual bool SupportsTypeMachinery(PCGExAssetCollection::FTypeId TypeId) const
 	{
 		return IsType(TypeId);
+	}
+
+	/**
+	 * First machinery state of (or derived from) StateClass this host owns; null when it
+	 * has none. Accessor semantics (one-directional IsChildOf on purpose): the result IS-A
+	 * StateClass, so the typed template below stays cast-safe. Hosts with per-type
+	 * machinery override this (Omni: TypeStates array; typed collections: their owned
+	 * state) -- the generic way to reach a host's machinery state without concrete casts.
+	 */
+	virtual UPCGExCollectionTypeState* FindTypeState(const UClass* StateClass) const
+	{
+		return nullptr;
+	}
+
+	template <typename T>
+	T* FindTypeState() const
+	{
+		return static_cast<T*>(FindTypeState(T::StaticClass()));
 	}
 
 #pragma endregion

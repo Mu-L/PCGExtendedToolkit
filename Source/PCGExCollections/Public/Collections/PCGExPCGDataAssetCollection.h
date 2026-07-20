@@ -168,12 +168,19 @@ struct PCGEXCOLLECTIONS_API FPCGExPCGDataAssetCollectionEntry : public FPCGExAss
 
 /** Concrete collection for UPCGDataAsset references with optional level-sourced entries.
  *
- *  Mutualizes mesh + nested-level storage across level-sourced entries via SharedMeshCollection
- *  and SharedLevelCollection: each entry's per-level snapshots (EditorMeshContributions,
- *  EditorLevelContributions) are captured during export, then merged into the two shared
- *  collections (CompactSharedMeshFor, CompactSharedLevelFor). Per-entry ExportedDataAsset point
- *  hashes resolve through the shared collections' CollectionGUIDs at runtime, eliminating
- *  duplicated storage when entries reuse the same meshes or the same nested levels.
+ *  Mutualizes mesh + nested-level storage across level-sourced entries via the machinery
+ *  state's SharedMeshCollection and SharedLevelCollection: each entry's per-level snapshots
+ *  (EditorMeshContributions, EditorLevelContributions) are captured during export, then
+ *  merged into the two shared collections (CompactSharedMeshFor, CompactSharedLevelFor).
+ *  Per-entry ExportedDataAsset point hashes resolve through the shared collections'
+ *  CollectionGUIDs at runtime, eliminating duplicated storage when entries reuse the same
+ *  meshes or the same nested levels.
+ *
+ *  Phase C1 (per-type processor seam): the machinery storage + external-storage settings
+ *  live on an owned UPCGExPCGDataTypeState (always present, default subobject) and every
+ *  lifecycle override is a dispatch into it -- the typed collection is simply a host whose
+ *  state is guaranteed, running the exact same code path as an Omni host. Legacy members
+ *  migrate into the state on PostLoad (deprecated slots below).
  *
  *  Actor classes are kept per-entry on Entry.EmbeddedActorCollection (no cross-entry merge).
  */
@@ -292,11 +299,24 @@ public:
 	virtual void EDITOR_OnHostPostStagingRebuild(UPCGExAssetCollection* Host) override;
 	virtual void AppendCookDependencyAssetPaths(const UPCGExAssetCollection* Host, TSet<FSoftObjectPath>& OutPaths) const override;
 
-	/** Ports UPCGExPCGDataAssetCollection::PostEditChangeProperty's external-storage toggle
-	 *  reactions -- the engine delivers property edits to the instanced state FIRST, then walks
-	 *  up to the host (whose base PostEditChangeProperty triggers the staging rebuild). Without
-	 *  this, External -> Embedded on an Omni would never internalize the externalized assets. */
+	/** External-storage toggle reactions -- the engine delivers property edits to the
+	 *  instanced state FIRST, then walks up to the host (whose base PostEditChangeProperty
+	 *  triggers the staging rebuild). Without this, External -> Embedded would never
+	 *  internalize the externalized assets. */
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
+	/** Fresh states adopt the seed source's external-storage SETTINGS (closes the merge
+	 *  gap: converting a PCGData source into an Omni used to silently fall back to
+	 *  embedded). Shared collections / External* soft refs are NOT copied -- session
+	 *  buffers and the source's own external packages respectively. */
+	virtual void OnAddedToHost(UPCGExAssetCollection* Host, const UPCGExAssetCollection* SeedSource) override;
+
+	/** Warns when the ignored source's external-storage settings differ from this state's
+	 *  (first-creator-wins is otherwise invisible). */
+	virtual void OnSeedSourceIgnored(UPCGExAssetCollection* Host, const UPCGExAssetCollection* SeedSource) override;
+
+	/** Warns when removal orphans externalized packages (never deletes them). */
+	virtual void OnRemovedFromHost(UPCGExAssetCollection* Host) override;
 #endif
 
 	/** Own-member scrub: in external mode the shared collections are session working buffers;
@@ -337,65 +357,73 @@ protected:
 	virtual bool GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const override;
 
 public:
+	UPCGExPCGDataAssetCollection();
 
-	/** Externalize generated subobjects (ExportedDataAsset, EmbeddedActorCollection,
-	 *  SharedMeshCollection, SharedLevelCollection) as separate uassets so the collection's
-	 *  load footprint is small and per-asset loads are demand-driven by LoadPCGData. The
-	 *  externalized uassets are managed by the rebuild pipeline; overwritten on every rebuild;
-	 *  not meant to be hand-edited. */
-	UPROPERTY(EditAnywhere, Category = "External Storage")
-	bool bUseExternalAssets = false;
-
-	/** Content folder where externalized assets are written. Must be set when bUseExternalAssets
-	 *  is on; if empty, externalization is skipped with a warning and the collection falls back
-	 *  to embedded mode for that rebuild. Names are derived from the collection's asset name
-	 *  and entry index, so files are reused across rebuilds (P4-friendly overwrites). */
-	UPROPERTY(EditAnywhere, Category = "External Storage",
-		meta=(EditCondition="bUseExternalAssets", ContentDir, LongPackageName))
-	FDirectoryPath ExportFolder;
+	/**
+	 * Owned machinery state (per-type processor seam, Phase C1): external-storage settings
+	 * (bUseExternalAssets / ExportFolder) plus the shared/external collection storage the
+	 * PCGDataAsset machinery operates on. Always present (default subobject); the same
+	 * state class an Omni host instantiates per present PCGData entry type. Shared
+	 * subobjects it references stay outered to THIS collection (host package), exactly like
+	 * on an Omni host.
+	 */
+	UPROPERTY(EditAnywhere, Instanced, NoClear, Category = "External Storage", meta=(DisplayName="External Storage"))
+	TObjectPtr<UPCGExPCGDataTypeState> MachineryState;
 
 	// Entries Array
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExPCGDataAssetCollectionEntry> Entries;
 
-	/** Shared mesh collection. Built by CompactSharedMeshFor() as the deduplicated union of all
-	 *  level-sourced entries' EditorMeshContributions. Outered to the collection in embedded
-	 *  mode, persists for the lifetime of the asset, and carries the stable CollectionGUID
-	 *  that gets baked into every per-entry ExportedDataAsset's "Meshes"-pin Tag_EntryIdx
-	 *  hashes. Null in external mode -- see ExternalSharedMeshCollection. */
-	UPROPERTY(Instanced)
-	TObjectPtr<UPCGExMeshCollection> SharedMeshCollection;
-
-	/** Shared level collection. Built by CompactSharedLevelFor() as the deduplicated union of all
-	 *  level-sourced entries' EditorLevelContributions (nested level instances). Same lifetime
-	 *  + GUID-stability guarantee as SharedMeshCollection. Null in external mode. */
-	UPROPERTY(Instanced)
-	TObjectPtr<UPCGExLevelCollection> SharedLevelCollection;
-
-	/** External-mode mirrors. Populated by ExternalizeSharedAndActorCollectionsFor; consumed at
-	 *  runtime indirectly via the CollectionMap pin's soft paths. Loading the parent collection
-	 *  does not pull these. */
-	UPROPERTY()
-	TSoftObjectPtr<UPCGExMeshCollection> ExternalSharedMeshCollection;
-
-	UPROPERTY()
-	TSoftObjectPtr<UPCGExLevelCollection> ExternalSharedLevelCollection;
-
 	PCGEX_ASSET_COLLECTION_BODY(FPCGExPCGDataAssetCollectionEntry)
 
 public:
+	UPCGExPCGDataTypeState* GetMachineryState() const
+	{
+		return MachineryState;
+	}
+
+	/** Machinery-state accessor through the generic host seam (see base). */
+	using UPCGExAssetCollection::FindTypeState; // keep the base template visible
+	virtual UPCGExCollectionTypeState* FindTypeState(const UClass* StateClass) const override
+	{
+		return (MachineryState && StateClass && MachineryState->GetClass()->IsChildOf(StateClass))
+			       ? MachineryState.Get()
+			       : nullptr;
+	}
+
+private:
+	// ----- Phase C1 deprecated slots (2026-07-19) -----
+	// UHT registers these under their unsuffixed names with CPF_Deprecated: legacy assets
+	// LOAD into them (tagged-property name match), saves always skip them. PostLoad moves
+	// the values into MachineryState and clears them. Remove after a deprecation cycle.
+
+	UPROPERTY()
+	bool bUseExternalAssets_DEPRECATED = false;
+
+	UPROPERTY()
+	FDirectoryPath ExportFolder_DEPRECATED;
+
+	UPROPERTY(Instanced)
+	TObjectPtr<UPCGExMeshCollection> SharedMeshCollection_DEPRECATED;
+
+	UPROPERTY(Instanced)
+	TObjectPtr<UPCGExLevelCollection> SharedLevelCollection_DEPRECATED;
+
+	UPROPERTY()
+	TSoftObjectPtr<UPCGExMeshCollection> ExternalSharedMeshCollection_DEPRECATED;
+
+	UPROPERTY()
+	TSoftObjectPtr<UPCGExLevelCollection> ExternalSharedLevelCollection_DEPRECATED;
+
+public:
 	/**
-	 * Recompact both shared collections (mesh + level) from each entry's captured editor-only
-	 * contributions, rewrite per-entry Tag_EntryIdx on the Meshes and Levels pins against the
-	 * resulting shared indices, and rebuild every entry's CollectionMap pin with the two
-	 * shared collections + the entry's EmbeddedActorCollection registered.
-	 *
-	 * Idempotent. Triggered automatically:
-	 *   - After every editor-driven staging rebuild via EDITOR_OnPostStagingRebuild.
-	 *   - At cook time via PreSave as a safety net.
-	 *   - After PostDuplicate to re-stamp hashes against the duplicate's freshly-generated
-	 *     shared-collection CollectionGUIDs.
+	 * Manual convenience: recompact both shared collections (mesh + level) from each entry's
+	 * captured editor-only contributions, rewrite per-entry Tag_EntryIdx against the
+	 * resulting shared indices, and rebuild every entry's CollectionMap pin. Idempotent.
+	 * The automatic paths (post-staging rebuild, cook-time PreSave net, PostDuplicate
+	 * re-stamp) do NOT route through this -- they dispatch through MachineryState's
+	 * lifecycle hooks directly; this exists for explicit tooling-driven recompaction.
 	 */
 	void RebuildSharedCollections();
 
@@ -452,8 +480,10 @@ public:
 	 */
 	static bool HostSupportsDataAssetMachinery(const UPCGExAssetCollection* Host);
 
-	// Lifecycle
+	// Lifecycle -- every override below is a dispatch into MachineryState (the state runs
+	// the same host-agnostic cores an Omni host drives; see UPCGExPCGDataTypeState).
 
+	virtual void PostLoad() override;
 	virtual void Serialize(FArchive& Ar) override;
 	virtual void PostDuplicate(bool bDuplicateForPIE) override;
 	virtual void PreSave(FObjectPreSaveContext ObjectSaveContext) override;
@@ -461,7 +491,6 @@ public:
 #if WITH_EDITOR
 	virtual void EDITOR_OnPostStagingRebuild() override;
 	virtual void EDITOR_AddBrowserSelectionInternal(const TArray<FAssetData>& InAssetData) override;
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
 	/**
 	 * Cook-path override -- adds the references that GetAssetPaths intentionally omits
@@ -477,21 +506,8 @@ public:
 #endif
 
 private:
-	/** Compose the machinery state view from this collection's own members. */
-	FPCGExPCGDataAssetMachinery MakeMachinery();
-
-	/** True when external storage is both requested and configurable. ExportFolder is required
-	 *  in external mode; an empty folder silently falls back to embedded for that rebuild. */
-	bool IsExternalActive() const
-	{
-		return bUseExternalAssets && !ExportFolder.Path.IsEmpty();
-	}
-
-	/** Pull every externalized subobject back into this package and null the soft refs.
-	 *  Used on the External -> Embedded toggle (PostEditChangeProperty). */
-	void InternalizeSubobjects();
-
 	/** Manual utility: editor-save every external package this collection produced.
-	 *  Deliberately NOT called from PreSave -- see the cook rationale there. */
+	 *  Deliberately NOT called from PreSave -- see the cook rationale in
+	 *  UPCGExPCGDataTypeState::OnHostPreSave. */
 	void SaveExternalPackages();
 };

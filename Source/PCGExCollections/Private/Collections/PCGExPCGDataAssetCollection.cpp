@@ -37,6 +37,31 @@
 // Static-init type registration: TypeId=PCGDataAsset, parent=Base
 PCGEX_REGISTER_COLLECTION_TYPE(PCGDataAsset, UPCGExPCGDataAssetCollection, FPCGExPCGDataAssetCollectionEntry, "PCG Data Asset Collection", Base)
 
+// Machinery registration: TypeId -> globals block + state class. Colocated with the type
+// (moved here from PCGExOmniCollection.cpp in Phase C1 -- the typed collection owns a
+// UPCGExPCGDataTypeState itself now, so the capability data lives where the machinery does;
+// third-party types with machinery register theirs the same way, in their own module).
+namespace PCGExPCGDataAssetCollection
+{
+	struct FMachineryRegistration
+	{
+		FMachineryRegistration()
+		{
+			PCGExAssetCollection::FTypeRegistry::AddPendingCustomization(
+				PCGExAssetCollection::TypeIds::PCGDataAsset,
+				[](PCGExAssetCollection::FTypeInfo& Info)
+				{
+					Info.GlobalsStruct = FPCGExPCGDataAssetCollectionGlobals::StaticStruct();
+					// Hosts carrying this state run the PCGData shared compaction /
+					// collection maps / externalization for their PCGData entries.
+					Info.StateClass = UPCGExPCGDataTypeState::StaticClass();
+				});
+		}
+	};
+
+	FMachineryRegistration GMachineryRegistration;
+}
+
 #pragma region FPCGExPCGDataAssetCollectionEntry
 
 bool FPCGExPCGDataAssetCollectionEntry::Validate(const UPCGExAssetCollection* ParentCollection)
@@ -973,6 +998,58 @@ namespace PCGExSharedCompact
 
 #pragma region UPCGExPCGDataAssetCollection
 
+UPCGExPCGDataAssetCollection::UPCGExPCGDataAssetCollection()
+{
+	// Always-present machinery state (Phase C1). Default subobject: delta-serializes against
+	// the CDO's, inherits RF_Transactional from the asset (RF_PropagateToSubObjects), and
+	// guarantees the nested "External Storage" details block is never None.
+	MachineryState = CreateDefaultSubobject<UPCGExPCGDataTypeState>(TEXT("MachineryState"));
+}
+
+void UPCGExPCGDataAssetCollection::PostLoad()
+{
+	Super::PostLoad();
+
+	// Phase C1 migration (2026-07-19): the machinery members moved into MachineryState.
+	// The deprecated slots still LOAD legacy data (UHT registers them under their unsuffixed
+	// names with CPF_Deprecated: tagged properties match, saves always skip) -- move the
+	// values over once and clear. Referenced subobjects keep their outer (this collection),
+	// the state only holds the refs -- same shape as an Omni host.
+	if (MachineryState)
+	{
+		if (bUseExternalAssets_DEPRECATED)
+		{
+			MachineryState->bUseExternalAssets = true;
+			bUseExternalAssets_DEPRECATED = false;
+		}
+		if (!ExportFolder_DEPRECATED.Path.IsEmpty())
+		{
+			MachineryState->ExportFolder = ExportFolder_DEPRECATED;
+			ExportFolder_DEPRECATED.Path.Reset();
+		}
+		if (SharedMeshCollection_DEPRECATED)
+		{
+			MachineryState->SharedMeshCollection = SharedMeshCollection_DEPRECATED;
+			SharedMeshCollection_DEPRECATED = nullptr;
+		}
+		if (SharedLevelCollection_DEPRECATED)
+		{
+			MachineryState->SharedLevelCollection = SharedLevelCollection_DEPRECATED;
+			SharedLevelCollection_DEPRECATED = nullptr;
+		}
+		if (!ExternalSharedMeshCollection_DEPRECATED.IsNull())
+		{
+			MachineryState->ExternalSharedMeshCollection = ExternalSharedMeshCollection_DEPRECATED;
+			ExternalSharedMeshCollection_DEPRECATED.Reset();
+		}
+		if (!ExternalSharedLevelCollection_DEPRECATED.IsNull())
+		{
+			MachineryState->ExternalSharedLevelCollection = ExternalSharedLevelCollection_DEPRECATED;
+			ExternalSharedLevelCollection_DEPRECATED.Reset();
+		}
+	}
+}
+
 bool UPCGExPCGDataAssetCollection::GetTypeGlobalsInternal(const UScriptStruct* StructType, FPCGExCollectionTypeGlobals& OutGlobals) const
 {
 	if (!StructType || !StructType->IsChildOf(FPCGExPCGDataAssetCollectionGlobals::StaticStruct()))
@@ -985,29 +1062,6 @@ bool UPCGExPCGDataAssetCollection::GetTypeGlobalsInternal(const UScriptStruct* S
 	Out.LevelExporter = LevelExporter;
 #endif
 	return true;
-}
-
-FPCGExPCGDataAssetMachinery UPCGExPCGDataAssetCollection::MakeMachinery()
-{
-	FPCGExPCGDataAssetMachinery State;
-	State.Host = this;
-
-	State.Entries.Reserve(Entries.Num());
-	for (FPCGExPCGDataAssetCollectionEntry& Entry : Entries)
-	{
-		State.Entries.Add(&Entry);
-	}
-
-	State.SharedMeshCollection = &SharedMeshCollection;
-	State.SharedLevelCollection = &SharedLevelCollection;
-	State.ExternalSharedMeshCollection = &ExternalSharedMeshCollection;
-	State.ExternalSharedLevelCollection = &ExternalSharedLevelCollection;
-
-	State.bExternalActive = IsExternalActive();
-	State.ExportFolderPath = ExportFolder.Path;
-	State.ExternalAssetPrefix = MakeExternalAssetPrefixFor(this);
-
-	return State;
 }
 
 bool UPCGExPCGDataAssetCollection::HostSupportsDataAssetMachinery(const UPCGExAssetCollection* Host)
@@ -1261,26 +1315,24 @@ void UPCGExPCGDataAssetCollection::RebuildSharedCollectionsFor(FPCGExPCGDataAsse
 	ExternalizeExportedDataAssetsFor(State);
 }
 
-void UPCGExPCGDataAssetCollection::InternalizeSubobjects()
-{
-#if WITH_EDITOR
-	FPCGExPCGDataAssetMachinery State = MakeMachinery();
-	InternalizeSubobjectsFor(State);
-#endif
-}
-
 void UPCGExPCGDataAssetCollection::SaveExternalPackages()
 {
 #if WITH_EDITOR
-	FPCGExPCGDataAssetMachinery State = MakeMachinery();
-	SaveExternalPackagesFor(State);
+	if (MachineryState)
+	{
+		FPCGExPCGDataAssetMachinery State = MachineryState->MakeMachinery(this);
+		SaveExternalPackagesFor(State);
+	}
 #endif
 }
 
 void UPCGExPCGDataAssetCollection::RebuildSharedCollections()
 {
-	FPCGExPCGDataAssetMachinery State = MakeMachinery();
-	RebuildSharedCollectionsFor(State);
+	if (MachineryState)
+	{
+		FPCGExPCGDataAssetMachinery State = MachineryState->MakeMachinery(this);
+		RebuildSharedCollectionsFor(State);
+	}
 }
 
 void UPCGExPCGDataAssetCollection::ScrubSharedRefsForSave(TObjectPtr<UPCGExMeshCollection>& MeshSlot, TObjectPtr<UPCGExLevelCollection>& LevelSlot, FPCGExPCGDataSharedScrubKeep& OutKeep)
@@ -1335,67 +1387,47 @@ void UPCGExPCGDataAssetCollection::RestoreEntryRefsAfterSave(FPCGExPCGDataEntryS
 
 void UPCGExPCGDataAssetCollection::Serialize(FArchive& Ar)
 {
-	// External mode: the Instanced fields are working buffers during the editor session -- their
-	// targets live in separate external packages once externalization has run. Without this
-	// scrub, UE's Instanced-property serializer would chase those pointers and bake hard
-	// references into our saved package, eagerly loading every external asset alongside us
-	// and defeating the lazy-load goal. Soft refs + Staging.Path remain the on-disk addresses.
-	// Skipped for transacting (undo/redo) so the transaction buffer can round-trip the in-memory
-	// state without loss.
-	if (IsExternalActive() && Ar.IsSaving() && !Ar.IsTransacting())
+	// Host-side entry-ref scrub around the save, dispatched to the machinery state -- the
+	// exact code path an Omni host runs. Begin gates on external-active internally; the
+	// state scrubs its OWN shared members in its own Serialize (it is a separate package
+	// export, serialized by SavePackage outside this pair -- under the same save, so its
+	// own gate holds).
+	const bool bScrub = Ar.IsSaving() && !Ar.IsTransacting() && MachineryState;
+
+	if (bScrub)
 	{
-		FPCGExPCGDataSharedScrubKeep SharedKeep;
-		FPCGExPCGDataEntryScrubKeep EntryKeep;
-
-		ScrubSharedRefsForSave(SharedMeshCollection, SharedLevelCollection, SharedKeep);
-		ScrubEntryRefsForSave(MakeMachinery().Entries, EntryKeep);
-
-		Super::Serialize(Ar);
-
-		RestoreSharedRefsAfterSave(SharedKeep);
-		RestoreEntryRefsAfterSave(EntryKeep);
-		return;
+		MachineryState->OnHostSerializeSave_Begin(this);
 	}
 
 	Super::Serialize(Ar);
+
+	if (bScrub)
+	{
+		MachineryState->OnHostSerializeSave_End(this);
+	}
 }
 
 void UPCGExPCGDataAssetCollection::PostDuplicate(bool bDuplicateForPIE)
 {
+	// Super first: the duplicate's CollectionGUID must be regenerated before the state
+	// re-stamps anything keyed to it.
 	Super::PostDuplicate(bDuplicateForPIE);
 
-	// On a real duplicate (not PIE), both this collection AND its outered shared collections
-	// receive new CollectionGUIDs while per-entry ExportedDataAssets still carry hashes keyed
-	// to the ORIGINAL shared GUIDs. Re-stamp them so the duplicate is consistent without a
-	// manual rebuild.
-	if (!bDuplicateForPIE)
+	if (MachineryState)
 	{
-		RebuildSharedCollections();
+		MachineryState->OnHostPostDuplicate(this, bDuplicateForPIE);
 	}
 }
 
 void UPCGExPCGDataAssetCollection::PreSave(FObjectPreSaveContext ObjectSaveContext)
 {
-	// Cook-time safety net for users who edited a source level and cooked without a manual
-	// rebuild (or recovered from a mid-edit editor crash). Idempotent.
-	//
-	// Only re-bake the IN-MEMORY state here. 
-	// We deliberately do NOT call SaveExternalPackages() during cook:
-	//  - SavePackage(Pkg, nullptr, ...) is an editor (uncooked) save that writes the SOURCE
-	//    .uasset under /Content/. A cook must be read-only w.r.t. source content; writing it
-	//    dirties the workspace and fails / forces a writable-flip on read-only (Perforce) files.
-	//  - It mutates packages the cooker may have already cooked (no effect) or not yet cooked
-	//    (changing the source mid-cook), making the output depend on cook scheduling.
-	//  - In concurrent / cook-by-the-book saving, GIsSavingPackage is held for the whole batch;
-	//    a nested non-concurrent SavePackage clears it on scope-exit, breaking that invariant.
-	// On most cases (except for potential multi-threaded cooks), external objects are
-	// cooked from the loaded in-memory ones which should be enough.
-	// Actually might want to consider just removing this as the levels aren't actually being re-harvested
-	// at all here so the safety net is not quite comprehensive in the first place.
-	if (ObjectSaveContext.IsCooking())
+	// Cook-time safety net -- gated and explained in UPCGExPCGDataTypeState::OnHostPreSave
+	// (including why SaveExternalPackages is deliberately NOT called during cook).
+	if (MachineryState)
 	{
-		RebuildSharedCollections();
+		MachineryState->OnHostPreSave(this, ObjectSaveContext);
 	}
+
 	Super::PreSave(ObjectSaveContext);
 }
 
@@ -1403,29 +1435,9 @@ void UPCGExPCGDataAssetCollection::PreSave(FObjectPreSaveContext ObjectSaveConte
 
 void UPCGExPCGDataAssetCollection::EDITOR_OnPostStagingRebuild()
 {
-	RebuildSharedCollections();
-}
-
-void UPCGExPCGDataAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	const FName PropName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
-	const bool bToggledExternal = (PropName == GET_MEMBER_NAME_CHECKED(UPCGExPCGDataAssetCollection, bUseExternalAssets));
-	const bool bChangedFolder = (PropName == GET_MEMBER_NAME_CHECKED(UPCGExPCGDataAssetCollection, ExportFolder));
-
-	if (bToggledExternal && !bUseExternalAssets)
+	if (MachineryState)
 	{
-		// External -> Embedded: pull subobjects back into the collection package, null soft
-		// refs, then re-bake the CollectionMap with the now-inner paths.
-		InternalizeSubobjects();
-		RebuildSharedCollections();
-	}
-	else if (bToggledExternal || bChangedFolder)
-	{
-		// Embedded -> External, or External folder moved: re-externalize using the
-		// (new) settings. CompactShared's load-back rehydrates the working buffers.
-		RebuildSharedCollections();
+		MachineryState->EDITOR_OnHostPostStagingRebuild(this);
 	}
 }
 
@@ -1543,20 +1555,14 @@ void UPCGExPCGDataAssetCollection::GetCookDependencyAssetPaths(TSet<FSoftObjectP
 {
 	// Base = each entry's Staging.Path. For Level-sourced entries that path is the embedded
 	// (or repointed external) ExportedDataAsset; for DataAsset-sourced entries it's the
-	// user-referenced UPCGDataAsset.
+	// user-referenced UPCGDataAsset. The machinery refs (shared collections, externals,
+	// per-entry actor collections) come from the state dispatch.
 	Super::GetCookDependencyAssetPaths(OutPaths);
 
-	TArray<const FPCGExPCGDataAssetCollectionEntry*> EntryPtrs;
-	EntryPtrs.Reserve(Entries.Num());
-	for (const FPCGExPCGDataAssetCollectionEntry& Entry : Entries)
+	if (MachineryState)
 	{
-		EntryPtrs.Add(&Entry);
+		MachineryState->AppendCookDependencyAssetPaths(this, OutPaths);
 	}
-
-	AppendCookDependencyAssetPathsFor(
-		SharedMeshCollection, SharedLevelCollection,
-		ExternalSharedMeshCollection, ExternalSharedLevelCollection,
-		EntryPtrs, OutPaths);
 }
 #endif
 
@@ -1595,8 +1601,21 @@ FPCGExPCGDataAssetMachinery UPCGExPCGDataTypeState::MakeMachinery(UPCGExAssetCol
 
 void UPCGExPCGDataTypeState::OnHostPreSave(UPCGExAssetCollection* Host, FObjectPreSaveContext SaveContext)
 {
-	// Cook-time safety net -- mirrors UPCGExPCGDataAssetCollection::PreSave (see there for
-	// why SaveExternalPackages is deliberately NOT called during cook).
+	// Cook-time safety net for users who edited a source level and cooked without a manual
+	// rebuild (or recovered from a mid-edit editor crash). Idempotent.
+	//
+	// Only re-bake the IN-MEMORY state here.
+	// We deliberately do NOT call SaveExternalPackages during cook:
+	//  - SavePackage(Pkg, nullptr, ...) is an editor (uncooked) save that writes the SOURCE
+	//    .uasset under /Content/. A cook must be read-only w.r.t. source content; writing it
+	//    dirties the workspace and fails / forces a writable-flip on read-only (Perforce) files.
+	//  - It mutates packages the cooker may have already cooked (no effect) or not yet cooked
+	//    (changing the source mid-cook), making the output depend on cook scheduling.
+	//  - In concurrent / cook-by-the-book saving, GIsSavingPackage is held for the whole batch;
+	//    a nested non-concurrent SavePackage clears it on scope-exit, breaking that invariant.
+	// In most cases (except potential multi-threaded cooks), external objects are cooked from
+	// the loaded in-memory ones, which should be enough. NOTE: levels are not re-harvested
+	// here, so this net is not comprehensive -- kept as a best-effort re-bake.
 	if (SaveContext.IsCooking())
 	{
 		FPCGExPCGDataAssetMachinery State = MakeMachinery(Host);
@@ -1709,6 +1728,70 @@ void UPCGExPCGDataTypeState::PostEditChangeProperty(FPropertyChangedEvent& Prope
 			FPCGExPCGDataAssetMachinery State = MakeMachinery(Host);
 			UPCGExPCGDataAssetCollection::InternalizeSubobjectsFor(State);
 		}
+	}
+}
+
+void UPCGExPCGDataTypeState::OnAddedToHost(UPCGExAssetCollection* Host, const UPCGExAssetCollection* SeedSource)
+{
+	// Adopt the seed source's external-storage SETTINGS on creation (closes the merge gap:
+	// converting/merging a PCGData source into an Omni used to silently fall back to
+	// embedded). Only fires on FRESH states -- an existing state is the user's and always
+	// wins (behavior-wins, like globals-block merging). Only settings transfer: shared
+	// collections are session buffers, and External* soft refs address the SOURCE's own
+	// external packages -- adopting them would alias another asset's storage. Sharing the
+	// source's ExportFolder is safe: external names are host-GUID-prefixed.
+	if (!SeedSource)
+	{
+		return;
+	}
+
+	const UPCGExPCGDataTypeState* SourceState = SeedSource->FindTypeState<UPCGExPCGDataTypeState>();
+	if (!SourceState || !SourceState->bUseExternalAssets)
+	{
+		return;
+	}
+
+	bUseExternalAssets = SourceState->bUseExternalAssets;
+	ExportFolder = SourceState->ExportFolder;
+
+	UE_LOG(LogPCGEx, Log,
+	       TEXT("'%s': ensured PCG Data Asset machinery adopted external-storage settings (folder '%s') from source '%s'."),
+	       Host ? *Host->GetName() : TEXT("<null>"), *ExportFolder.Path, *SeedSource->GetName());
+}
+
+void UPCGExPCGDataTypeState::OnSeedSourceIgnored(UPCGExAssetCollection* Host, const UPCGExAssetCollection* SeedSource)
+{
+	// First-creator-wins must not be silent when it drops real configuration: if the ignored
+	// source ran external storage and this state's settings differ, the merged entries will
+	// compact/externalize under THIS state's rules -- say so, so the author can re-apply the
+	// source's settings deliberately.
+	const UPCGExPCGDataTypeState* SourceState = SeedSource ? SeedSource->FindTypeState<UPCGExPCGDataTypeState>() : nullptr;
+	if (!SourceState || !SourceState->bUseExternalAssets)
+	{
+		return;
+	}
+
+	if (bUseExternalAssets != SourceState->bUseExternalAssets || ExportFolder.Path != SourceState->ExportFolder.Path)
+	{
+		UE_LOG(LogPCGEx, Warning,
+		       TEXT("'%s': merged source '%s' used external storage (folder '%s'), but this collection's existing PCG Data Asset machinery settings win (%s). Re-apply the source's settings manually if that was intended."),
+		       Host ? *Host->GetName() : TEXT("<null>"), *SeedSource->GetName(), *SourceState->ExportFolder.Path,
+		       bUseExternalAssets ? *FString::Printf(TEXT("external, folder '%s'"), *ExportFolder.Path) : TEXT("embedded"));
+	}
+}
+
+void UPCGExPCGDataTypeState::OnRemovedFromHost(UPCGExAssetCollection* Host)
+{
+	// Teardown surface: external packages this machinery produced stay on disk (deleting
+	// user-visible assets here would be data loss) -- but with the state gone nothing
+	// references them anymore. Say so instead of orphaning silently.
+	if (!ExternalSharedMeshCollection.IsNull() || !ExternalSharedLevelCollection.IsNull())
+	{
+		UE_LOG(LogPCGEx, Warning,
+		       TEXT("'%s': the removed PCG Data Asset machinery state still pointed at externalized packages ('%s', '%s'). They remain on disk, now orphaned -- delete them manually, or undo, re-add PCGData entries and disable external storage first to internalize them."),
+		       Host ? *Host->GetName() : TEXT("<null>"),
+		       *ExternalSharedMeshCollection.ToSoftObjectPath().ToString(),
+		       *ExternalSharedLevelCollection.ToSoftObjectPath().ToString());
 	}
 }
 

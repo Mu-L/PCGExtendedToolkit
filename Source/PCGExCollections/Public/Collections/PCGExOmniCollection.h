@@ -80,16 +80,10 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, Category = "Settings|Global", meta=(DisplayName="Type Machinery"))
 	TArray<TObjectPtr<UPCGExCollectionTypeState>> TypeStates;
 
-	/** First state instance of (or derived from) StateClass; null when absent. Accessor
-	 *  semantics (one-directional on purpose): the result IS-A StateClass, so typed access
-	 *  through the template below stays cast-safe. */
-	UPCGExCollectionTypeState* FindTypeState(const UClass* StateClass) const;
-
-	template <typename T>
-	T* FindTypeState() const
-	{
-		return static_cast<T*>(FindTypeState(T::StaticClass()));
-	}
+	/** First state instance of (or derived from) StateClass; null when absent (see base --
+	 *  accessor semantics keep the typed FindTypeState<T>() template cast-safe). */
+	using UPCGExAssetCollection::FindTypeState; // keep the base template visible
+	virtual UPCGExCollectionTypeState* FindTypeState(const UClass* StateClass) const override;
 
 	/** First state instance sharing StateClass's type SLOT (base and derived state classes
 	 *  answer the same machinery -- PCGExCollectionHelpers::MatchesTypeSlot, both directions).
@@ -163,8 +157,20 @@ public:
 	bool EDITOR_EnsureTypeSetup();
 
 	/** Single-type slice of EDITOR_EnsureTypeSetup -- what entry-add paths call so a K-row
-	 *  ingestion doesn't rescan the whole collection per row. */
-	bool EDITOR_EnsureTypeSetupForType(PCGExAssetCollection::FTypeId TypeId);
+	 *  ingestion doesn't rescan the whole collection per row. SeedSource, when given (merge /
+	 *  conversion), is offered to NEWLY created states via OnAddedToHost so they can adopt
+	 *  its settings; existing states are never touched (they get OnSeedSourceIgnored). */
+	bool EDITOR_EnsureTypeSetupForType(PCGExAssetCollection::FTypeId TypeId, const UPCGExAssetCollection* SeedSource = nullptr);
+
+	/**
+	 * State-only half of the per-type ensure. EDITOR_AppendCollections uses this MID-CALL:
+	 * states must exist early to receive the per-source seed, but installing a missing
+	 * GLOBALS block between sources would corrupt the intra-call block conflict resolution
+	 * (a later source's authored block would mistake an auto-installed CDO block for a
+	 * user-authored one and bake itself away) -- blocks are left to the tail rebuild's full
+	 * ensure, which runs after every source has had its say.
+	 */
+	bool EDITOR_EnsureTypeStateForType(PCGExAssetCollection::FTypeId TypeId, const UPCGExAssetCollection* SeedSource);
 
 	/**
 	 * Counterpart affordance (user-triggered, never automatic -- blocks/states may carry
