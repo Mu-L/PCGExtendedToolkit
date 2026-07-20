@@ -77,16 +77,7 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(StagingSwap)
 void FPCGExStagingSwapElement::DisabledPassThroughData(FPCGContext* Context) const
 {
 	FPCGExPointsProcessorElement::DisabledPassThroughData(Context);
-	
-	//Forward collection map data
-	TArray<FPCGTaggedData> MapSources = Context->InputData.GetInputsByPin(PCGExCollections::Labels::SourceCollectionMapLabel);
-	for (const FPCGTaggedData& TaggedData : MapSources)
-	{
-		FPCGTaggedData& TaggedDataCopy = Context->OutputData.TaggedData.Emplace_GetRef();
-		TaggedDataCopy.Data = TaggedData.Data;
-		TaggedDataCopy.Tags.Append(TaggedData.Tags);
-		TaggedDataCopy.Pin = PCGExCollections::Labels::OutputCollectionMapLabel;
-	}
+	PCGExCollections::ForwardCollectionMap(Context);
 }
 
 bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
@@ -223,6 +214,13 @@ void FPCGExStagingSwapElement::PostLoadAssetsDependencies(FPCGExContext* InConte
 		// currently-inert variant contribute, and that edit must retrigger generation.
 		Variant->EDITOR_RegisterTrackingKeys(Context);
 
+		// Entry micro caches only exist once the collection cache is built, and nothing upstream
+		// guarantees that for variants (map-pin collections get theirs from UnpackPin).
+		if (Settings->bRedistributeMicroCache)
+		{
+			Variant->LoadCache();
+		}
+
 		Contribution = MakeShared<TMap<uint64, uint64>>();
 		const uint32 VariantGUID = Variant->GetCollectionGUID();
 
@@ -260,7 +258,6 @@ void FPCGExStagingSwapElement::PostLoadAssetsDependencies(FPCGExContext* InConte
 			{
 				// Secondary pick (e.g. material variant) is reset: it indexed the SOURCE
 				// entry's micro-cache and is meaningless against the replacement entry.
-				// Micro redistribution (below) re-picks it per point against the variant entry.
 				Contribution->Add(
 					PCGEx::H64(Group.SourceGUIDAtBake, Pair.X),
 					PCGExCollections::PickHash::Pack(VariantGUID, static_cast<uint16>(Pair.Y)));
@@ -268,12 +265,9 @@ void FPCGExStagingSwapElement::PostLoadAssetsDependencies(FPCGExContext* InConte
 				if (Settings->bRedistributeMicroCache)
 				{
 					const FPCGExEntryAccessResult Target = Variant->GetEntryRaw(Pair.Y);
-					if (Target.IsValid())
+					if (Target.IsValid() && PCGExCollections::GetRefreshableMicroCache(Target.Entry))
 					{
-						if (const PCGExAssetCollection::FMicroCache* Refreshable = PCGExCollections::GetRefreshableMicroCache(Target.Entry))
-						{
-							Context->MicroCacheByEntryKey.Add(PCGExCollections::PickHash::MakeEntryKey(VariantGUID, static_cast<uint16>(Pair.Y)), Refreshable);
-						}
+						Context->MicroCacheByEntryKey.Add(PCGExCollections::PickHash::MakeEntryKey(VariantGUID, static_cast<uint16>(Pair.Y)), Target.Entry->MicroCache);
 					}
 				}
 			}
@@ -432,10 +426,9 @@ bool FPCGExStagingSwapElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		// Runs after PostLoad built the swap mappings, so the emptiness check is meaningful. Gated
-		// on mappings existing -- with none at all, the no-applicable-variants warning already fired.
-		if (Settings->bRedistributeMicroCache && Context->MicroCacheByEntryKey.IsEmpty()
-			&& !(Context->SwapMapsPerIO.IsEmpty() && Context->LayersPerIO.IsEmpty()))
+		// Without mappings the no-applicable-variants warning already fired.
+		const bool bAnySwapMappings = !Context->SwapMapsPerIO.IsEmpty() || !Context->LayersPerIO.IsEmpty();
+		if (Settings->bRedistributeMicroCache && bAnySwapMappings && Context->MicroCacheByEntryKey.IsEmpty())
 		{
 			PCGE_LOG(Warning, GraphAndLog, FTEXT("Micro cache redistribution is enabled but no swapped-to variant entry has a refreshable (mesh) micro cache -- secondary picks are reset instead."));
 		}
@@ -524,11 +517,30 @@ namespace PCGExStagingSwap
 
 		if (Settings->bRedistributeMicroCache && !Context->MicroCacheByEntryKey.IsEmpty())
 		{
-			MicroHelper = MakeShared<PCGExCollections::FMicroSelectorHelper>(Settings->EntryDistributionSettings);
-			if (!MicroHelper->Init(PointDataFacade))
+			// The fast path knows this IO's full target set up front -- skip the helper (and its
+			// transient factory) when no target has a micro cache. Layered targets are per-point,
+			// so that path keeps the global gate.
+			bool bAnyMicroTarget = !SwapMap;
+			if (SwapMap)
 			{
-				PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Could not initialize the micro (entry) distribution."));
-				return false;
+				for (const TPair<uint64, uint64>& Pair : *SwapMap)
+				{
+					if (Context->MicroCacheByEntryKey.Contains(PCGExCollections::PickHash::GetEntryKey(Pair.Value)))
+					{
+						bAnyMicroTarget = true;
+						break;
+					}
+				}
+			}
+
+			if (bAnyMicroTarget)
+			{
+				MicroHelper = MakeShared<PCGExCollections::FMicroSelectorHelper>(Settings->EntryDistributionSettings);
+				if (!MicroHelper->Init(PointDataFacade))
+				{
+					PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Could not initialize the micro (entry) distribution."));
+					return false;
+				}
 			}
 		}
 
@@ -543,24 +555,22 @@ namespace PCGExStagingSwap
 		PointDataFacade->Fetch(Scope);
 		FilterScope(Scope);
 
-		// Micro redistribution state, hoisted out of the loops. Seed folding mirrors Distribute's
-		// micro-redistribution path -- the node's Seed is the refresh knob.
 		PCGExCollections::FMicroSelectorHelper* LocalMicroHelper = MicroHelper.Get();
-		const TConstPCGValueRange<int32> Seeds = PointDataFacade->GetIn()->GetConstSeedValueRange();
-		const UPCGComponent* Component = Context->GetComponent();
+		const TConstPCGValueRange<int32> Seeds = LocalMicroHelper ? PointDataFacade->GetIn()->GetConstSeedValueRange() : TConstPCGValueRange<int32>();
+		const UPCGComponent* Component = LocalMicroHelper ? Context->GetComponent() : nullptr;
 		const uint8 SeedComponents = Settings->EntryDistributionSettings.SeedComponents;
 		const int32 LocalSeed = Settings->EntryDistributionSettings.LocalSeed;
 
-		// Commits a remapped pick, re-picking the secondary index from the variant entry's micro
-		// cache when micro redistribution applies to it (otherwise the reset secondary stands).
+		// Remapped picks get a fresh secondary index when the variant entry has a micro cache;
+		// the node's Seed decorrelates the re-pick (same folding as Distribute's micro path).
 		auto WriteSwapped = [&](const int32 Index, const uint64 NewHash)
 		{
 			if (LocalMicroHelper)
 			{
-				if (const PCGExAssetCollection::FMicroCache* const* MicroCache = Context->MicroCacheByEntryKey.Find(PCGExCollections::PickHash::GetEntryKey(NewHash)))
+				if (const TSharedPtr<const PCGExAssetCollection::FMicroCache>* MicroCache = Context->MicroCacheByEntryKey.Find(PCGExCollections::PickHash::GetEntryKey(NewHash)))
 				{
 					const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], SeedComponents, LocalSeed, Settings, Component);
-					const int32 Pick = LocalMicroHelper->GetPick(*MicroCache, Index, PCGExRandomHelpers::GetSeed(Seed, Index, Settings));
+					const int32 Pick = LocalMicroHelper->GetPick(MicroCache->Get(), Index, PCGExRandomHelpers::GetSeed(Seed, Index, Settings));
 					if (Pick >= 0)
 					{
 						HashWriter->SetValue(

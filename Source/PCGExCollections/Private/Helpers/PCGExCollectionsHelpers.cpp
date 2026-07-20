@@ -59,6 +59,18 @@ namespace PCGExCollections
 		return static_cast<const PCGExMeshCollection::FMicroCache*>(MicroCache);
 	}
 
+	void ForwardCollectionMap(FPCGContext* InContext)
+	{
+		TArray<FPCGTaggedData> MapSources = InContext->InputData.GetInputsByPin(Labels::SourceCollectionMapLabel);
+		for (const FPCGTaggedData& TaggedData : MapSources)
+		{
+			FPCGTaggedData& TaggedDataCopy = InContext->OutputData.TaggedData.Emplace_GetRef();
+			TaggedDataCopy.Data = TaggedData.Data;
+			TaggedDataCopy.Tags.Append(TaggedData.Tags);
+			TaggedDataCopy.Pin = Labels::OutputCollectionMapLabel;
+		}
+	}
+
 	void FinalizeSpawnedActor(AActor* InActor, UPCGManagedActors* InManagedActors, bool bIsPreview)
 	{
 		if (!InActor)

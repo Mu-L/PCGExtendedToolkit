@@ -78,11 +78,13 @@ namespace PCGExCollections
 	/**
 	 * Entry's micro cache if it can be refreshed (secondary index re-picked), null otherwise.
 	 * Mesh-only: only mesh-type micro caches produce secondary indices during distribution.
-	 * Shared by every micro-redistribution gate (Distribute's detection scan and resolve
-	 * pre-pass, Swap's contribution build) so the predicates cannot drift.
 	 */
 	PCGEXCOLLECTIONS_API
 	const PCGExMeshCollection::FMicroCache* GetRefreshableMicroCache(const FPCGExAssetCollectionEntry* InEntry);
+
+	/** Copies Collection Map inputs to the output map pin -- for DisabledPassThroughData overrides. */
+	PCGEXCOLLECTIONS_API
+	void ForwardCollectionMap(FPCGContext* InContext);
 
 	/**
 	 * Resolves a soft-path-referenced root actor with a per-batch cache, falling back to the
