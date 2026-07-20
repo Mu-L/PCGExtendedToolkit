@@ -194,6 +194,10 @@ void FPCGExStagingSwapElement::PostLoadAssetsDependencies(FPCGExContext* InConte
 
 	auto GetContribution = [&](const FSoftObjectPath& VariantPath) -> TSharedPtr<TMap<uint64, uint64>>
 	{
+		// The closure hides the enclosing scope's null-state from the analyzer, and PCGE_LOG's
+		// internal null-test then marks the captured Context as nullable (C6011)
+		check(Context);
+
 		if (const TSharedPtr<TMap<uint64, uint64>>* Cached = ContributionByPath.Find(VariantPath))
 		{
 			return *Cached;
