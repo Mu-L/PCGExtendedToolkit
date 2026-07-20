@@ -32,22 +32,6 @@
 #define LOCTEXT_NAMESPACE "PCGExAssetStagingElement"
 #define PCGEX_NAMESPACE AssetStaging
 
-namespace PCGExAssetStaging
-{
-	// Shared by Boot's detection scan and the processor's resolve pre-pass so the warning
-	// predicate and the runtime gate cannot drift. Mesh-only: only mesh-type micro caches
-	// produce secondary indices during distribution.
-	const PCGExMeshCollection::FMicroCache* GetRefreshableMicroCache(const FPCGExAssetCollectionEntry* InEntry)
-	{
-		const PCGExAssetCollection::FMicroCache* MicroCache = InEntry->MicroCache.Get();
-		if (!MicroCache || MicroCache->GetTypeId() != PCGExAssetCollection::TypeIds::Mesh || MicroCache->IsEmpty())
-		{
-			return nullptr;
-		}
-		return static_cast<const PCGExMeshCollection::FMicroCache*>(MicroCache);
-	}
-}
-
 #pragma region UPCGExAssetStagingSettings
 
 UPCGExAssetStagingSettings::UPCGExAssetStagingSettings()
@@ -332,7 +316,7 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 					Host->ForEachEntry(
 						[&](FPCGExAssetCollectionEntry* Entry, const int32)
 						{
-							if (PCGExAssetStaging::GetRefreshableMicroCache(Entry))
+							if (PCGExCollections::GetRefreshableMicroCache(Entry))
 							{
 								bAnyMicroCache = true;
 							}
@@ -668,7 +652,7 @@ namespace PCGExAssetStaging
 					const FPCGExEntryAccessResult Result = Context->CollectionPickUnpacker->ResolveEntry(Hash, StagedSecondaryIndex);
 					if (Result.IsValid() && (!bFilterEntryType || EntryTypeFilter.Matches(Result.Entry->GetTypeId())))
 					{
-						if (const PCGExMeshCollection::FMicroCache* Refreshable = GetRefreshableMicroCache(Result.Entry))
+						if (const PCGExMeshCollection::FMicroCache* Refreshable = PCGExCollections::GetRefreshableMicroCache(Result.Entry))
 						{
 							FMicroRefreshTarget& Target = MicroTargets.Emplace_GetRef();
 							Target.Entry = Result.Entry;

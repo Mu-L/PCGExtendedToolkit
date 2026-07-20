@@ -4,10 +4,12 @@
 #include "Elements/PCGExStagingSwap.h"
 
 #include "PCGParamData.h"
+#include "Collections/PCGExMeshCollection.h"
 #include "Core/PCGExAssetCollection.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Helpers/PCGExAssetLoader.h"
+#include "Helpers/PCGExRandomHelpers.h"
 
 #define LOCTEXT_NAMESPACE "PCGExStagingSwapElement"
 #define PCGEX_NAMESPACE StagingSwap
@@ -243,9 +245,22 @@ void FPCGExStagingSwapElement::PostLoadAssetsDependencies(FPCGExContext* InConte
 			{
 				// Secondary pick (e.g. material variant) is reset: it indexed the SOURCE
 				// entry's micro-cache and is meaningless against the replacement entry.
+				// Micro redistribution (below) re-picks it per point against the variant entry.
 				Contribution->Add(
 					PCGEx::H64(Group.SourceGUIDAtBake, Pair.X),
 					PCGExCollections::PickHash::Pack(VariantGUID, static_cast<uint16>(Pair.Y)));
+
+				if (Settings->bRedistributeMicroCache)
+				{
+					const FPCGExEntryAccessResult Target = Variant->GetEntryRaw(Pair.Y);
+					if (Target.IsValid())
+					{
+						if (const PCGExAssetCollection::FMicroCache* Refreshable = PCGExCollections::GetRefreshableMicroCache(Target.Entry))
+						{
+							Context->MicroCacheByEntryKey.Add(PCGExCollections::PickHash::MakeEntryKey(VariantGUID, static_cast<uint16>(Pair.Y)), Refreshable);
+						}
+					}
+				}
 			}
 		}
 
@@ -402,6 +417,14 @@ bool FPCGExStagingSwapElement::AdvanceWork(FPCGExContext* InContext, const UPCGE
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
+		// Runs after PostLoad built the swap mappings, so the emptiness check is meaningful. Gated
+		// on mappings existing -- with none at all, the no-applicable-variants warning already fired.
+		if (Settings->bRedistributeMicroCache && Context->MicroCacheByEntryKey.IsEmpty()
+			&& !(Context->SwapMapsPerIO.IsEmpty() && Context->LayersPerIO.IsEmpty()))
+		{
+			PCGE_LOG(Warning, GraphAndLog, FTEXT("Micro cache redistribution is enabled but no swapped-to variant entry has a refreshable (mesh) micro cache -- secondary picks are reset instead."));
+		}
+
 		if (!Context->StartBatchProcessingPoints(
 			[&](const TSharedPtr<PCGExData::FPointIO>& Entry)
 			{
@@ -484,6 +507,16 @@ namespace PCGExStagingSwap
 			return false;
 		}
 
+		if (Settings->bRedistributeMicroCache && !Context->MicroCacheByEntryKey.IsEmpty())
+		{
+			MicroHelper = MakeShared<PCGExCollections::FMicroSelectorHelper>(Settings->EntryDistributionSettings);
+			if (!MicroHelper->Init(PointDataFacade))
+			{
+				PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Could not initialize the micro (entry) distribution."));
+				return false;
+			}
+		}
+
 		StartParallelLoopForPoints(PCGExData::EIOSide::In);
 		return true;
 	}
@@ -494,6 +527,40 @@ namespace PCGExStagingSwap
 
 		PointDataFacade->Fetch(Scope);
 		FilterScope(Scope);
+
+		// Micro redistribution state, hoisted out of the loops. Seed folding mirrors Distribute's
+		// micro-redistribution path -- the node's Seed is the refresh knob.
+		PCGExCollections::FMicroSelectorHelper* LocalMicroHelper = MicroHelper.Get();
+		const TConstPCGValueRange<int32> Seeds = PointDataFacade->GetIn()->GetConstSeedValueRange();
+		const UPCGComponent* Component = Context->GetComponent();
+		const uint8 SeedComponents = Settings->EntryDistributionSettings.SeedComponents;
+		const int32 LocalSeed = Settings->EntryDistributionSettings.LocalSeed;
+
+		// Commits a remapped pick, re-picking the secondary index from the variant entry's micro
+		// cache when micro redistribution applies to it (otherwise the reset secondary stands).
+		auto WriteSwapped = [&](const int32 Index, const uint64 NewHash)
+		{
+			if (LocalMicroHelper)
+			{
+				if (const PCGExAssetCollection::FMicroCache* const* MicroCache = Context->MicroCacheByEntryKey.Find(PCGExCollections::PickHash::GetEntryKey(NewHash)))
+				{
+					const int32 Seed = PCGExRandomHelpers::GetSeed(Seeds[Index], SeedComponents, LocalSeed, Settings, Component);
+					const int32 Pick = LocalMicroHelper->GetPick(*MicroCache, Index, PCGExRandomHelpers::GetSeed(Seed, Index, Settings));
+					if (Pick >= 0)
+					{
+						HashWriter->SetValue(
+							Index, static_cast<int64>(
+								PCGExCollections::PickHash::Pack(
+									PCGExCollections::PickHash::GetCollectionGUID(NewHash),
+									PCGExCollections::PickHash::GetRawEntryIndex(NewHash),
+									static_cast<int16>(Pick))));
+						return;
+					}
+				}
+			}
+
+			HashWriter->SetValue(Index, static_cast<int64>(NewHash));
+		};
 
 		if (SwapMap)
 		{
@@ -513,7 +580,7 @@ namespace PCGExStagingSwap
 
 				if (const uint64* NewHash = SwapMap->Find(PCGExCollections::PickHash::GetEntryKey(Hash)))
 				{
-					HashWriter->SetValue(Index, static_cast<int64>(*NewHash));
+					WriteSwapped(Index, *NewHash);
 				}
 			}
 
@@ -553,7 +620,7 @@ namespace PCGExStagingSwap
 
 			if (NewHash)
 			{
-				HashWriter->SetValue(Index, static_cast<int64>(*NewHash));
+				WriteSwapped(Index, *NewHash);
 			}
 		}
 	}

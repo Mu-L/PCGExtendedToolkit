@@ -8,6 +8,7 @@
 #include "Core/PCGExPointFilter.h"
 #include "Core/PCGExPointsProcessor.h"
 #include "Details/PCGExInputShorthandsDetails.h"
+#include "Details/PCGExStagingDetails.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 
 #include "PCGExStagingSwap.generated.h"
@@ -111,7 +112,20 @@ public:
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	bool bSkipStaleMappings = true;
-	
+
+	/**
+	 * Re-pick the micro cache selection (secondary index, e.g. mesh material variants) of swapped
+	 * points from the VARIANT entry's micro cache. When disabled, swapped points get their
+	 * secondary pick reset instead (it indexed the source entry's micro cache and is meaningless
+	 * against the replacement entry). Points that aren't swapped are never touched.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
+	bool bRedistributeMicroCache = false;
+
+	/** Distribution details for the micro cache re-pick -- same semantics as Distribute's Distribution (Entry). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_NotOverridable, DisplayName=" └─ Distribution (Entry)", EditCondition="bRedistributeMicroCache"))
+	FPCGExMicroCacheDistributionDetails EntryDistributionSettings;
+
 	/** Suppress no applicable variant warnings. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors", meta=(PCG_NotOverridable))
 	bool bQuietNoApplicableVariantsWarning = false;
@@ -158,6 +172,14 @@ struct FPCGExStagingSwapContext final : FPCGExPointsProcessorContext
 	/** Per-IO ordered variant layers (keyed by IOIndex), built in PostLoad, consumed per point (later wins). */
 	TMap<int32, TArray<FPCGExStagingSwapVariantLayer>> LayersPerIO;
 
+	/**
+	 * Micro redistribution: refreshable micro caches of swapped-to entries, keyed by swapped entry
+	 * key (H64(VariantGUID, RawIndex)). Built in PostLoad alongside contributions; entries without
+	 * a refreshable (mesh) micro cache are absent. Caches are owned by the variant collections,
+	 * kept alive by the context's loaded-asset handles.
+	 */
+	TMap<uint64, const PCGExAssetCollection::FMicroCache*> MicroCacheByEntryKey;
+
 	/** Registers every resolved variant path for batch pre-loading. */
 	virtual void RegisterAssetDependencies() override;
 
@@ -189,6 +211,10 @@ namespace PCGExStagingSwap
 
 		// Per-point path: this IO's ordered layers (points into context; later wins). Null on the fast path.
 		const TArray<FPCGExStagingSwapVariantLayer>* Layers = nullptr;
+
+		// Micro redistribution: re-picks the swapped entry's secondary index. Null when disabled
+		// or when no swapped-to entry has a refreshable micro cache.
+		TSharedPtr<PCGExCollections::FMicroSelectorHelper> MicroHelper;
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
