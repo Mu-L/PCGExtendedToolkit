@@ -72,6 +72,13 @@ void FPCGExCollectionsEditorModule::StartupModule()
 		OnPostEngineInitHandle = FCoreDelegates::GetOnPostEngineInit().AddRaw(this, &FPCGExCollectionsEditorModule::RegisterThumbnailRenderer);
 	}
 
+	// PostLoad can't read editor preferences itself -- PCGExCollections can't depend on us.
+	UPCGExAssetCollection::EDITOR_ShouldRefreshStaleEntriesOnLoad.BindLambda(
+		[]()
+		{
+			return GetDefault<UPCGExCollectionsEditorSettings>()->bRebuildStaleEntriesOnOpen;
+		});
+
 	// Defer subscription until the AssetRegistry's initial scan completes -- it fires
 	// OnAssetUpdatedOnDisk for every asset it discovers at startup, when referenced data
 	// isn't yet ready. Acting then would clobber saved staging.
@@ -106,6 +113,8 @@ void FPCGExCollectionsEditorModule::ShutdownModule()
 	}
 	FCoreUObjectDelegates::OnObjectsReinstanced.Remove(OnObjectsReinstancedHandle);
 	FCoreDelegates::GetOnPostEngineInit().Remove(OnPostEngineInitHandle);
+
+	UPCGExAssetCollection::EDITOR_ShouldRefreshStaleEntriesOnLoad.Unbind();
 
 	if (bThumbnailRendererRegistered && UObjectInitialized())
 	{
