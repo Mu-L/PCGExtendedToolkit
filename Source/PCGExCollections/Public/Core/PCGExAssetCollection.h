@@ -1091,10 +1091,6 @@ public:
 	 *  in flight); never read it as "changed". */
 	static uint64 EDITOR_ComputeEntrySourceFingerprint(const FPCGExAssetCollectionEntry* InEntry);
 
-	/** Policy gate for the load-time refresh PostLoad schedules -- a delegate so this runtime
-	 *  module never reaches into editor preferences. Unbound means no automatic refresh. */
-	static TDelegate<bool()> EDITOR_ShouldRefreshStaleEntriesOnLoad;
-
 	/** Sync PropertyOverrides in all entries to match CollectionProperties schema */
 	void SyncPropertyOverridesToEntries();
 
@@ -1135,6 +1131,10 @@ protected:
 
 	/** Shared body of EDITOR_RebuildStagingData / _Recursive. */
 	void EDITOR_RebuildStagingDataInternal(bool bRecursive);
+
+	/** Whole-object state as bytes for before/after comparison -- catches collection-level
+	 *  mutations by pipeline hooks. Refs written as paths so pointer churn doesn't count. */
+	void EDITOR_SnapshotForComparison(TArray<uint8>& OutBytes);
 #endif
 
 	static uint32 GenerateNewGUID()

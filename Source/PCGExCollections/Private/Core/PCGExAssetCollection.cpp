@@ -15,24 +15,23 @@
 #include "Helpers/PCGExArrayHelpers.h"
 #include "Helpers/PCGExObjectNotifyHelpers.h"
 #include "UObject/Package.h"
+#include "UObject/UnrealType.h"
 #include "UObject/UObjectGlobals.h"
 
 #if WITH_EDITOR
 #include "Editor.h"
 #include "ObjectTools.h"
 #include "ScopedTransaction.h"
-#include "TimerManager.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
+#include "HAL/IConsoleManager.h"
 #include "Hash/Blake3.h"
 #include "Helpers/PCGExCollectionStagingPipeline.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "UObject/Script.h"
 #include "UObject/StructOnScope.h"
-#endif
-
-#if WITH_EDITOR
-TDelegate<bool()> UPCGExAssetCollection::EDITOR_ShouldRefreshStaleEntriesOnLoad;
 #endif
 
 bool FPCGExEntryAccessResult::IsType(PCGExAssetCollection::FTypeId TypeId) const
@@ -1261,38 +1260,8 @@ void UPCGExAssetCollection::PostLoad()
 		(void)MarkPackageDirty();
 	}
 
-	// Defer to next tick: the rebuild cascades into UpdateStaging -> SpawnActor, which is
-	// unsafe during PostLoad (load chain may re-enter, GWorld mid-transition). Trade-off:
-	// a PCG graph that triggered THIS soft-load sees pre-rebuild state for its current
-	// run; subsequent runs see fresh data. Complements OnAssetUpdatedOnDisk which only
-	// fires for collections already loaded when a referenced asset is saved.
-	//
-	// Never during a cook: auto-rebuild is an interactive editor convenience. A cook shouldn't
-	// dirty source except for upgrade or fixup, moreover the deferred rebuild would re-harvest
-	// source levels from an uninitialized world (transforms will read back as Identity)
-	// corrupting the result for PCGDataAssetCollection from commandlet.
-	// Cooked output uses the committed, editor-rebuilt content; staleness should be an
-	// authoring concern, not a cook concern.
-	if (!GEditor || !GEditor->IsTimerManagerValid() || bSuppressStagingRebuild || IsRunningCookCommandlet())
-	{
-		return;
-	}
-
-	// Unbound = editor module absent = no automatic refresh.
-	if (!EDITOR_ShouldRefreshStaleEntriesOnLoad.IsBound() || !EDITOR_ShouldRefreshStaleEntriesOnLoad.Execute())
-	{
-		return;
-	}
-
-	TWeakObjectPtr<UPCGExAssetCollection> WeakThis(this);
-	GEditor->GetTimerManager()->SetTimerForNextTick(
-		[WeakThis]()
-		{
-			if (UPCGExAssetCollection* This = WeakThis.Get())
-			{
-				This->EDITOR_RebuildStaleEntries();
-			}
-		});
+	// Load-time staleness refresh lives in FPCGExCollectionsEditorModule::OnAssetLoaded, with its
+	// sibling triggers -- PostLoad stays pure data migration.
 #endif
 }
 
@@ -1798,6 +1767,29 @@ bool UPCGExAssetCollection::EDITOR_HasAnyStagingPipeline() const
 	return false;
 }
 
+namespace PCGExAssetCollectionDiag
+{
+	/** Turns "the rebuild dirties my collection and I changed nothing" into a named field. */
+	bool bLogStagingChanges = false;
+	FAutoConsoleVariableRef CVarLogStagingChanges(
+		TEXT("pcgex.LogStagingChanges"),
+		bLogStagingChanges,
+		TEXT("Log which entry/property caused a collection staging rebuild to mark the package dirty."));
+
+	/** Placeholder result means the difference lives in a nested or non-reflected member. */
+	FString FindFirstDifferingProperty(const UScriptStruct* Struct, const void* A, const void* B)
+	{
+		for (TFieldIterator<FProperty> It(Struct); It; ++It)
+		{
+			if (const FProperty* Prop = *It; !Prop->Identical_InContainer(A, B, 0))
+			{
+				return Prop->GetName();
+			}
+		}
+		return TEXT("<none reflected>");
+	}
+}
+
 void UPCGExAssetCollection::EDITOR_DispatchPipelinePreRebuild()
 {
 	if (bEDITOR_PipelineDispatchGuard || IsRunningCookCommandlet() || !EDITOR_HasAnyStagingPipeline())
@@ -1808,7 +1800,10 @@ void UPCGExAssetCollection::EDITOR_DispatchPipelinePreRebuild()
 	// Hooks may mutate entries before some session paths take their own snapshot (the
 	// stale-entry batch only Modifies per entry, inside EDITOR_RebuildEntryStaging) --
 	// snapshot for undo up front. Redundant Modify calls within one transaction are no-ops.
-	Modify(true);
+	//
+	// Modify(false), not (true): dirtying up front churns every pipeline-bearing collection on
+	// every rebuild. EDITOR_RebuildStagingDataInternal diffs whole-object state instead.
+	Modify(false);
 
 	TGuardValue<bool> DispatchGuard(bEDITOR_PipelineDispatchGuard, true);
 	FEditorScriptExecutionGuard ScriptGuard;
@@ -1918,9 +1913,33 @@ void UPCGExAssetCollection::EDITOR_BakeThumbnailToPackage()
 	}
 }
 
+void UPCGExAssetCollection::EDITOR_SnapshotForComparison(TArray<uint8>& OutBytes)
+{
+	OutBytes.Reset();
+
+	FMemoryWriter Writer(OutBytes, /*bIsPersistent=*/true);
+
+	// Refs as path strings: a reallocated pointer must not read as a content change. ArNoDelta
+	// forces absolute state -- delta-vs-defaults elides the fields a hook is likeliest to reset.
+	FObjectAndNameAsStringProxyArchive Ar(Writer, /*bInLoadIfFindFails=*/false);
+	Ar.ArNoDelta = true;
+
+	Serialize(Ar);
+}
+
 void UPCGExAssetCollection::EDITOR_RebuildStagingDataInternal(bool bRecursive)
 {
 	InvalidateCache();
+
+	// Pipeline hooks can mutate collection-level state the per-entry diff can't see. Snapshot and
+	// diff instead of assuming -- gated on having a pipeline, so the common case pays nothing.
+	const bool bDiffWholeObject = EDITOR_HasAnyStagingPipeline();
+	TArray<uint8> PreState;
+	if (bDiffWholeObject)
+	{
+		EDITOR_SnapshotForComparison(PreState);
+	}
+
 	if (EDITOR_PostStagingRebuildSuppressDepth == 0)
 	{
 		EDITOR_DispatchPipelinePreRebuild();
@@ -1928,7 +1947,19 @@ void UPCGExAssetCollection::EDITOR_RebuildStagingDataInternal(bool bRecursive)
 
 	// Dirty on actual change, not on "a rebuild ran" -- else every project-wide rebuild rewrites
 	// every collection on disk. Undo snapshots happen per entry, so bailing here is safe.
-	if (EDITOR_SanitizeAndRebuildStagingData(bRecursive) == 0)
+	int32 NumChanged = EDITOR_SanitizeAndRebuildStagingData(bRecursive);
+
+	if (NumChanged == 0 && bDiffWholeObject)
+	{
+		TArray<uint8> PostState;
+		EDITOR_SnapshotForComparison(PostState);
+		if (PreState != PostState)
+		{
+			NumChanged = 1;
+		}
+	}
+
+	if (NumChanged == 0)
 	{
 		return;
 	}
@@ -2002,8 +2033,9 @@ uint64 UPCGExAssetCollection::EDITOR_ComputeEntrySourceFingerprint(const FPCGExA
 		NumResolved++;
 	}
 
-	// 0 = "cannot determine", never "unchanged".
-	if (NumResolved == 0)
+	// All-or-nothing: a digest over a partially resolved set is indistinguishable from a real
+	// change once the registry catches up. 0 = "cannot determine", never "unchanged".
+	if (NumResolved != PackageNames.Num())
 	{
 		return 0;
 	}
@@ -2108,13 +2140,34 @@ bool UPCGExAssetCollection::EDITOR_RestageEntryIfChanged(FPCGExAssetCollectionEn
 	InEntry->UpdateStaging(this, EntryIndex, bRecursive);
 	InEntry->PostUpdateStaging();
 
-	// Refresh even when staging is identical, or the entry re-reports stale on every load.
-	InEntry->StagingSourceFingerprint = EDITOR_ComputeEntrySourceFingerprint(InEntry);
+	// Refresh even when staging is identical, or the entry re-reports stale on every load -- but
+	// never clobber a good baseline with 0. The registry answers differently at different moments,
+	// so 0 now and a real digest next pass makes the entry oscillate and dirty every rebuild.
+	if (const uint64 Fingerprint = EDITOR_ComputeEntrySourceFingerprint(InEntry); Fingerprint != 0)
+	{
+		InEntry->StagingSourceFingerprint = Fingerprint;
+	}
 
 	EDITOR_DispatchPipelineEntry(EntryIndex, InEntry->bIsSubCollection);
 
+	// Undiffable row: can't prove it unchanged, so report changed.
+	if (!EntryStruct)
+	{
+		return true;
+	}
+
 	// PortFlags 0: exact comparison.
-	return !EntryStruct || !EntryStruct->CompareScriptStruct(InEntry, PreState.GetStructMemory(), 0);
+	if (EntryStruct->CompareScriptStruct(InEntry, PreState.GetStructMemory(), 0))
+	{
+		return false;
+	}
+
+	UE_CLOG(PCGExAssetCollectionDiag::bLogStagingChanges, LogPCGEx, Warning,
+	        TEXT("[PCGEx] Rebuild changed '%s' entry %d -- first differing property: '%s'."),
+	        *GetName(), EntryIndex,
+	        *PCGExAssetCollectionDiag::FindFirstDifferingProperty(EntryStruct, InEntry, PreState.GetStructMemory()));
+
+	return true;
 }
 
 bool UPCGExAssetCollection::EDITOR_RebuildEntryStaging(int32 EntryIndex)
