@@ -108,10 +108,34 @@ namespace PCGExGraphs
 
 	int32 FGraphPatcher::AddVtx(const FTransform& InTransform, const int32 InInheritFromVtxPointIndex)
 	{
+		// Staging after ResolveAndMergeAsync yields a vtx with no union-find element, so no component.
+		check(!bResolved);
+
 		const int32 Index = NumInitialVtx + NewVtxTransforms.Num();
 		NewVtxTransforms.Add(InTransform);
-		NewVtxInheritFrom.Add(InInheritFromVtxPointIndex);
+
+		checkf(
+			InInheritFromVtxPointIndex == INDEX_NONE || (InInheritFromVtxPointIndex >= 0 && InInheritFromVtxPointIndex < Index),
+			TEXT("Graph patcher: vtx %d inherits from %d - expected INDEX_NONE or a vtx point index below %d."),
+			Index, InInheritFromVtxPointIndex, Index);
+
+		// Resolve to an initial vtx now, while the array still ends at the previous staged vtx: a staged
+		// source is necessarily earlier and already resolved, so one hop suffices and a forward or self
+		// reference fails IsValidIndex here rather than forming a cycle Commit would have to defend against.
+		int32 Source = InInheritFromVtxPointIndex;
+		if (Source >= NumInitialVtx)
+		{
+			const int32 StagedIndex = Source - NumInitialVtx;
+			Source = NewVtxInheritFrom.IsValidIndex(StagedIndex) ? NewVtxInheritFrom[StagedIndex] : INDEX_NONE;
+		}
+		NewVtxInheritFrom.Add(Source);
+
 		return Index;
+	}
+
+	void FGraphPatcher::SetInheritExclusions(const TSet<FName>& InAttributeNames)
+	{
+		InheritExclusions = InAttributeNames;
 	}
 
 	void FGraphPatcher::SetInheritedProperties(const EPCGPointNativeProperties InProperties)
@@ -276,11 +300,11 @@ namespace PCGExGraphs
 		}
 	}
 
-	void FGraphPatcher::Commit()
+	bool FGraphPatcher::Commit()
 	{
 		if (bCommitted)
 		{
-			return;
+			return bCommitOk;
 		}
 		bCommitted = true;
 
@@ -288,18 +312,20 @@ namespace PCGExGraphs
 		FPCGMetadataAttribute<int64>* VtxIdxAttr = VtxData->MutableMetadata()->FindOrCreateAttribute<int64>(PCGExClusters::Labels::Attr_PCGExVtxIdx);
 		if (!VtxIdxAttr)
 		{
-			return;
-		} // not compiled cluster vtx
+			return false;
+		} // no usable metadata domain; nothing is appended, so staged indices never come to exist
 
 		const int32 NumNewVtx = NewVtxTransforms.Num();
 
 		// ---- Grow + fill staged vtx (shared, once) ----
 		if (NumNewVtx > 0)
 		{
+			// InheritedProperties joins the grow: the self-copy in InheritStagedVtxData captures its read
+			// ranges before allocating, so everything it touches has to be allocated by the time it runs.
 			PCGExPointArrayDataHelpers::SetNumPointsAllocated(
 				VtxData, NumInitialVtx + NumNewVtx,
 				EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::BoundsMin |
-				EPCGPointNativeProperties::BoundsMax | EPCGPointNativeProperties::Seed);
+				EPCGPointNativeProperties::BoundsMax | EPCGPointNativeProperties::Seed | InheritedProperties);
 
 			TPCGValueRange<int64> NewEntries = VtxData->GetMetadataEntryValueRange();
 			TPCGValueRange<FTransform> NewTransforms = VtxData->GetTransformValueRange(false);
@@ -495,81 +521,71 @@ namespace PCGExGraphs
 		{
 			PCGExClusters::Helpers::MarkClusterEdges(IO, PairId);
 		}
+
+		bCommitOk = true;
+		return true;
 	}
 
 	void FGraphPatcher::InheritStagedVtxData(UPCGBasePointData* InVtxData) const
 	{
 		const int32 NumNewVtx = NewVtxTransforms.Num();
+		const TConstPCGValueRange<int64> Entries = InVtxData->GetConstMetadataEntryValueRange();
 
-		TArray<int32> SourceIndices;
-		TArray<int32> TargetIndices;
-		SourceIndices.Reserve(NumNewVtx);
-		TargetIndices.Reserve(NumNewVtx);
-
+		// AddVtx already resolved every source to an initial vtx, or to INDEX_NONE.
+		PCGExPointArrayDataHelpers::FReadWriteScope InheritScope(NumNewVtx, false);
+		TArray<PCGMetadataEntryKey> SourceKeys;
+		TArray<PCGMetadataEntryKey> TargetKeys;
+		SourceKeys.Reserve(NumNewVtx);
+		TargetKeys.Reserve(NumNewVtx);
 		for (int32 i = 0; i < NumNewVtx; ++i)
 		{
-			// Walk staged sources up to the initial vtx rooting the chain: a staged vtx owns no data of
-			// its own until this pass fills it, so only an initial vtx is a valid source. Step count is
-			// bounded by the staged count, so a caller-made cycle resolves to nothing instead of spinning.
-			int32 Source = NewVtxInheritFrom[i];
-			for (int32 Step = 0; Source >= NumInitialVtx; ++Step)
-			{
-				const int32 StagedIndex = Source - NumInitialVtx;
-				if (Step > NumNewVtx || !NewVtxInheritFrom.IsValidIndex(StagedIndex))
-				{
-					Source = INDEX_NONE;
-					break;
-				}
-				Source = NewVtxInheritFrom[StagedIndex];
-			}
-
+			const int32 Source = NewVtxInheritFrom[i];
 			if (Source < 0)
 			{
 				continue;
 			}
-
-			SourceIndices.Add(Source);
-			TargetIndices.Add(NumInitialVtx + i);
+			const int32 Target = NumInitialVtx + i;
+			InheritScope.Add(Source, Target);
+			SourceKeys.Add(Entries[Source]);
+			TargetKeys.Add(Entries[Target]);
 		}
 
-		if (SourceIndices.IsEmpty())
+		if (SourceKeys.IsEmpty())
 		{
 			return;
 		}
 
-		// Copying a point data onto itself is only safe once every touched property is allocated:
-		// CopyPropertiesTo captures its read ranges before allocating, so allocating inside it would
-		// leave those ranges dangling. Allocation is idempotent, so its own call becomes a no-op.
+		// Self-copy: safe because Commit allocated these up front, so nothing reallocates mid-copy.
 		if (InheritedProperties != EPCGPointNativeProperties::None)
 		{
-			InVtxData->AllocateProperties(InheritedProperties);
-			InVtxData->CopyPropertiesTo(InVtxData, SourceIndices, TargetIndices, InheritedProperties);
+			InheritScope.CopyProperties(InVtxData, InVtxData, InheritedProperties, /*bClean=*/false);
 		}
 
-		// Same-metadata attribute copy. Entry-key parenting is no help here - it only ever resolves into
-		// a PARENT metadata, never to a sibling entry, so a chained key reads back as the attribute
-		// default. SetAttributes takes the same-attribute path instead and shares the source's value
-		// keys. Target entries must already exist: it deduplicates on (source, target) pairs, so unset
-		// targets would collapse every vtx sharing a source onto one entry - and one endpoint id.
-		TPCGValueRange<int64> Entries = InVtxData->GetMetadataEntryValueRange();
+		// Per attribute rather than UPCGMetadata::SetAttributes, so exclusions can be honoured. Sharing
+		// the source's value keys is the only mechanism that works within one metadata: entry-key
+		// parenting resolves into a PARENT metadata, never to a sibling entry. Targets need entries first.
+		UPCGMetadata* Metadata = InVtxData->Metadata;
+		TArray<FName> AttributeNames;
+		TArray<EPCGMetadataTypes> AttributeTypes;
+		Metadata->GetAttributes(AttributeNames, AttributeTypes);
 
-		const int32 NumPairs = SourceIndices.Num();
-		TArray<PCGMetadataEntryKey> SourceKeys;
-		TArray<PCGMetadataEntryKey> TargetKeys;
-		SourceKeys.Reserve(NumPairs);
-		TargetKeys.Reserve(NumPairs);
-		for (int32 i = 0; i < NumPairs; ++i)
+		// Const views: GetValueKeys overloads on both TArrayView<const T> and TArrayView<T>, so a plain
+		// TArray argument is ambiguous.
+		const TConstArrayView<PCGMetadataEntryKey> SourceView(SourceKeys);
+		const TConstArrayView<PCGMetadataEntryKey> TargetView(TargetKeys);
+
+		TArray<PCGMetadataValueKey> ValueKeys;
+		for (const FName& AttributeName : AttributeNames)
 		{
-			SourceKeys.Add(Entries[SourceIndices[i]]);
-			TargetKeys.Add(Entries[TargetIndices[i]]);
-		}
-
-		InVtxData->Metadata->SetAttributes(SourceKeys, InVtxData->Metadata, MakeArrayView(TargetKeys));
-
-		// SetAttributes owns the target keys it was handed; take back whatever it resolved them to.
-		for (int32 i = 0; i < NumPairs; ++i)
-		{
-			Entries[TargetIndices[i]] = TargetKeys[i];
+			if (InheritExclusions.Contains(AttributeName))
+			{
+				continue;
+			}
+			if (FPCGMetadataAttributeBase* Attribute = Metadata->GetMutableAttribute(AttributeName))
+			{
+				Attribute->GetValueKeys(SourceView, ValueKeys);
+				Attribute->SetValuesFromValueKeys(TargetView, ValueKeys);
+			}
 		}
 	}
 

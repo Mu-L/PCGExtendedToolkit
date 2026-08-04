@@ -90,6 +90,9 @@ namespace PCGExGraphs
 	 * Both phases are single-threaded. New-vtx domain data beyond the transform and whatever it
 	 * inherits is the caller's to fill after Commit, via the index returned by AddVtx.
 	 *
+	 * Staged EDGES inherit nothing, by design: an appended edge has no single source edge to copy
+	 * from. Only staged vtx inherit, from the source AddVtx names.
+	 *
 	 * Merged-sources mode: when the shared vtx is a merge of several vtx datasets (see FVtxMerger),
 	 * endpoint ids collide across sources - each dataset numbered its own ids from 0 at compile time.
 	 * Register each source with AddVtxSource and tag every edge group with its owning source index;
@@ -118,17 +121,20 @@ namespace PCGExGraphs
 
 		/**
 		 * Stage a new vtx at InTransform; returns the index it will occupy in the shared vtx.
-		 * InInheritFromVtxPointIndex, when set, names the vtx whose metadata attributes (and whichever
-		 * native properties SetInheritedProperties opted in) the new vtx copies at Commit. A staged
-		 * source resolves to the initial vtx that roots its chain, so a whole staged tree inherits from
-		 * the one existing vtx it grew out of.
+		 * InInheritFromVtxPointIndex is a vtx POINT index (never a cluster node index) whose metadata
+		 * attributes the new vtx copies at Commit, minus SetInheritExclusions. Naming a staged vtx
+		 * resolves to ITS source, so callers must stage parents before their children.
 		 */
 		int32 AddVtx(const FTransform& InTransform, const int32 InInheritFromVtxPointIndex = INDEX_NONE);
 
+		/** Attributes a staged vtx must NOT inherit, because the caller writes them itself after Commit. */
+		void SetInheritExclusions(const TSet<FName>& InAttributeNames);
+
 		/**
-		 * Native point properties staged vtx copy from their inherit source, on top of the metadata
-		 * attributes they always copy. Transform and MetadataEntry are dropped from InProperties -
-		 * the patcher owns both. Default: none.
+		 * Native point properties a staged vtx copies from its inherit source, alongside the metadata
+		 * attributes (a separate system: this is the point struct, not the attribute table). Transform
+		 * and MetadataEntry are dropped - the patcher owns both. Must be set before Commit, which
+		 * allocates them as part of the grow. Default: none.
 		 */
 		void SetInheritedProperties(const EPCGPointNativeProperties InProperties);
 
@@ -144,8 +150,12 @@ namespace PCGExGraphs
 			const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
 			const FPCGExCarryOverDetails* InCarryOver);
 
-		/** Phase 2 (after the async merges complete): append + patch staged edges, grow the shared vtx. */
-		void Commit();
+		/**
+		 * Phase 2 (after the async merges complete): append + patch staged edges, grow the shared vtx.
+		 * False means nothing was appended (the shared vtx has no usable metadata domain), so the
+		 * indices AddVtx handed out do not exist and callers must not write at them.
+		 */
+		bool Commit();
 
 		/** The merged edge IOs, one per connected component (valid after ResolveAndMergeAsync). */
 		const TArray<TSharedPtr<PCGExData::FPointIO>>& GetOutputEdges() const { return ComponentEdgeIOs; }
@@ -184,12 +194,13 @@ namespace PCGExGraphs
 
 		TArray<FEdgeGroup> Groups;
 		TArray<FTransform> NewVtxTransforms;
-		TArray<int32> NewVtxInheritFrom; // parallel to NewVtxTransforms; vtx point index or INDEX_NONE
+		TArray<int32> NewVtxInheritFrom; // parallel to NewVtxTransforms; AddVtx-resolved initial vtx point index, or INDEX_NONE
 		TArray<FPendingEdge> PendingEdges;
 
+		TSet<FName> InheritExclusions;
 		EPCGPointNativeProperties InheritedProperties = EPCGPointNativeProperties::None;
 
-		/** Copy each staged vtx's inherited data from the initial vtx that roots its chain. */
+		/** Copy each staged vtx's inheritable attributes from the source AddVtx resolved for it. */
 		void InheritStagedVtxData(UPCGBasePointData* InVtxData) const;
 
 		// Union-find over elements [0, Groups.Num()) = groups, [Groups.Num(), +NewVtx) = staged vtx.
@@ -206,6 +217,7 @@ namespace PCGExGraphs
 
 		bool bResolved = false;
 		bool bCommitted = false;
+		bool bCommitOk = false;
 	};
 
 	/** Which connector flags to write, and under what attribute names. Named fields so the vtx/edge
