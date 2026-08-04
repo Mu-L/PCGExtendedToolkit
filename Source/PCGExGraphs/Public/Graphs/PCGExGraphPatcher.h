@@ -4,11 +4,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGPointPropertiesTraits.h"
 #include "Core/PCGExMTCommon.h"
 
 struct FPCGExContext;
 struct FPCGExCarryOverDetails;
 class FPCGExPointIOMerger;
+class UPCGBasePointData;
 
 namespace PCGExMT
 {
@@ -79,14 +81,14 @@ namespace PCGExGraphs
 	 *
 	 *   FGraphPatcher Patcher(VtxFacade);                       // vtx must be writable (e.g. Duplicate)
 	 *   for (Cluster) Patcher.AddEdgeGroup(Cluster.EdgesIO, Cluster.VtxPointIndices);
-	 *   const int32 M = Patcher.AddVtx(T);                      // optional new vtx
+	 *   const int32 M = Patcher.AddVtx(T, InheritFrom);         // optional new vtx
 	 *   Patcher.AddEdge(A, B);                                  // link two vtx (existing and/or new)
 	 *   Patcher.ResolveAndMergeAsync(OutEdges, TaskManager, CarryOver);   // phase 1 (async)
 	 *   ... let the merges finish (e.g. between a batch's CompleteWork and Write) ...
 	 *   Patcher.Commit();                                       // phase 2: patch staged edges + grow vtx
 	 *
-	 * Both phases are single-threaded. New-vtx domain data beyond the transform is the caller's to
-	 * fill after Commit, via the index returned by AddVtx.
+	 * Both phases are single-threaded. New-vtx domain data beyond the transform and whatever it
+	 * inherits is the caller's to fill after Commit, via the index returned by AddVtx.
 	 *
 	 * Merged-sources mode: when the shared vtx is a merge of several vtx datasets (see FVtxMerger),
 	 * endpoint ids collide across sources - each dataset numbered its own ids from 0 at compile time.
@@ -114,8 +116,21 @@ namespace PCGExGraphs
 		 */
 		int32 AddEdgeGroup(const TSharedPtr<PCGExData::FPointIO>& InEdgesIO, const TArray<int32>& InVtxPointIndices, const int32 InVtxSourceIndex = INDEX_NONE);
 
-		/** Stage a new vtx at InTransform; returns the index it will occupy in the shared vtx. */
-		int32 AddVtx(const FTransform& InTransform);
+		/**
+		 * Stage a new vtx at InTransform; returns the index it will occupy in the shared vtx.
+		 * InInheritFromVtxPointIndex, when set, names the vtx whose metadata attributes (and whichever
+		 * native properties SetInheritedProperties opted in) the new vtx copies at Commit. A staged
+		 * source resolves to the initial vtx that roots its chain, so a whole staged tree inherits from
+		 * the one existing vtx it grew out of.
+		 */
+		int32 AddVtx(const FTransform& InTransform, const int32 InInheritFromVtxPointIndex = INDEX_NONE);
+
+		/**
+		 * Native point properties staged vtx copy from their inherit source, on top of the metadata
+		 * attributes they always copy. Transform and MetadataEntry are dropped from InProperties -
+		 * the patcher owns both. Default: none.
+		 */
+		void SetInheritedProperties(const EPCGPointNativeProperties InProperties);
 
 		/** Stage an edge between two vtx point indices; returns a handle usable with GetEdgeOutput after Commit. */
 		int32 AddEdge(const int32 VtxPointIndexA, const int32 VtxPointIndexB);
@@ -169,7 +184,13 @@ namespace PCGExGraphs
 
 		TArray<FEdgeGroup> Groups;
 		TArray<FTransform> NewVtxTransforms;
+		TArray<int32> NewVtxInheritFrom; // parallel to NewVtxTransforms; vtx point index or INDEX_NONE
 		TArray<FPendingEdge> PendingEdges;
+
+		EPCGPointNativeProperties InheritedProperties = EPCGPointNativeProperties::None;
+
+		/** Copy each staged vtx's inherited data from the initial vtx that roots its chain. */
+		void InheritStagedVtxData(UPCGBasePointData* InVtxData) const;
 
 		// Union-find over elements [0, Groups.Num()) = groups, [Groups.Num(), +NewVtx) = staged vtx.
 		TArray<int32> DSU;

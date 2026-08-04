@@ -106,11 +106,18 @@ namespace PCGExGraphs
 		return GroupIndex;
 	}
 
-	int32 FGraphPatcher::AddVtx(const FTransform& InTransform)
+	int32 FGraphPatcher::AddVtx(const FTransform& InTransform, const int32 InInheritFromVtxPointIndex)
 	{
 		const int32 Index = NumInitialVtx + NewVtxTransforms.Num();
 		NewVtxTransforms.Add(InTransform);
+		NewVtxInheritFrom.Add(InInheritFromVtxPointIndex);
 		return Index;
+	}
+
+	void FGraphPatcher::SetInheritedProperties(const EPCGPointNativeProperties InProperties)
+	{
+		InheritedProperties = InProperties;
+		EnumRemoveFlags(InheritedProperties, EPCGPointNativeProperties::Transform | EPCGPointNativeProperties::MetadataEntry);
 	}
 
 	int32 FGraphPatcher::AddEdge(const int32 VtxPointIndexA, const int32 VtxPointIndexB)
@@ -301,6 +308,15 @@ namespace PCGExGraphs
 				const int32 P = NumInitialVtx + i;
 				VtxData->Metadata->InitializeOnSet(NewEntries[P]);
 				NewTransforms[P] = NewVtxTransforms[i];
+			}
+
+			// Before the endpoint-id stamp below: inheriting brings the source's Attr_PCGExVtxIdx along,
+			// and the id a staged vtx ships with is the patcher's to decide, not the source's.
+			InheritStagedVtxData(VtxData);
+
+			for (int32 i = 0; i < NumNewVtx; ++i)
+			{
+				const int32 P = NumInitialVtx + i;
 				// Endpoint id of a new vtx is its own point index; edge count is set in the bump pass below.
 				VtxIdxAttr->SetValue(NewEntries[P], static_cast<int64>(PCGEx::H64(static_cast<uint32>(P), 0)));
 			}
@@ -478,6 +494,82 @@ namespace PCGExGraphs
 		for (const TSharedPtr<PCGExData::FPointIO>& IO : ComponentEdgeIOs)
 		{
 			PCGExClusters::Helpers::MarkClusterEdges(IO, PairId);
+		}
+	}
+
+	void FGraphPatcher::InheritStagedVtxData(UPCGBasePointData* InVtxData) const
+	{
+		const int32 NumNewVtx = NewVtxTransforms.Num();
+
+		TArray<int32> SourceIndices;
+		TArray<int32> TargetIndices;
+		SourceIndices.Reserve(NumNewVtx);
+		TargetIndices.Reserve(NumNewVtx);
+
+		for (int32 i = 0; i < NumNewVtx; ++i)
+		{
+			// Walk staged sources up to the initial vtx rooting the chain: a staged vtx owns no data of
+			// its own until this pass fills it, so only an initial vtx is a valid source. Step count is
+			// bounded by the staged count, so a caller-made cycle resolves to nothing instead of spinning.
+			int32 Source = NewVtxInheritFrom[i];
+			for (int32 Step = 0; Source >= NumInitialVtx; ++Step)
+			{
+				const int32 StagedIndex = Source - NumInitialVtx;
+				if (Step > NumNewVtx || !NewVtxInheritFrom.IsValidIndex(StagedIndex))
+				{
+					Source = INDEX_NONE;
+					break;
+				}
+				Source = NewVtxInheritFrom[StagedIndex];
+			}
+
+			if (Source < 0)
+			{
+				continue;
+			}
+
+			SourceIndices.Add(Source);
+			TargetIndices.Add(NumInitialVtx + i);
+		}
+
+		if (SourceIndices.IsEmpty())
+		{
+			return;
+		}
+
+		// Copying a point data onto itself is only safe once every touched property is allocated:
+		// CopyPropertiesTo captures its read ranges before allocating, so allocating inside it would
+		// leave those ranges dangling. Allocation is idempotent, so its own call becomes a no-op.
+		if (InheritedProperties != EPCGPointNativeProperties::None)
+		{
+			InVtxData->AllocateProperties(InheritedProperties);
+			InVtxData->CopyPropertiesTo(InVtxData, SourceIndices, TargetIndices, InheritedProperties);
+		}
+
+		// Same-metadata attribute copy. Entry-key parenting is no help here - it only ever resolves into
+		// a PARENT metadata, never to a sibling entry, so a chained key reads back as the attribute
+		// default. SetAttributes takes the same-attribute path instead and shares the source's value
+		// keys. Target entries must already exist: it deduplicates on (source, target) pairs, so unset
+		// targets would collapse every vtx sharing a source onto one entry - and one endpoint id.
+		TPCGValueRange<int64> Entries = InVtxData->GetMetadataEntryValueRange();
+
+		const int32 NumPairs = SourceIndices.Num();
+		TArray<PCGMetadataEntryKey> SourceKeys;
+		TArray<PCGMetadataEntryKey> TargetKeys;
+		SourceKeys.Reserve(NumPairs);
+		TargetKeys.Reserve(NumPairs);
+		for (int32 i = 0; i < NumPairs; ++i)
+		{
+			SourceKeys.Add(Entries[SourceIndices[i]]);
+			TargetKeys.Add(Entries[TargetIndices[i]]);
+		}
+
+		InVtxData->Metadata->SetAttributes(SourceKeys, InVtxData->Metadata, MakeArrayView(TargetKeys));
+
+		// SetAttributes owns the target keys it was handed; take back whatever it resolved them to.
+		for (int32 i = 0; i < NumPairs; ++i)
+		{
+			Entries[TargetIndices[i]] = TargetKeys[i];
 		}
 	}
 
