@@ -189,6 +189,8 @@ namespace PCGExGraphs
 		const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
 		const FPCGExCarryOverDetails* InCarryOver)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FGraphPatcher::ResolveAndMergeAsync);
+		
 		if (bResolved)
 		{
 			return;
@@ -302,6 +304,8 @@ namespace PCGExGraphs
 
 	bool FGraphPatcher::Commit()
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FGraphPatcher::Commit);
+		
 		if (bCommitted)
 		{
 			return bCommitOk;
@@ -528,6 +532,8 @@ namespace PCGExGraphs
 
 	void FGraphPatcher::InheritStagedVtxData(UPCGBasePointData* InVtxData) const
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FGraphPatcher::InheritStagedVtxData);
+		
 		const int32 NumNewVtx = NewVtxTransforms.Num();
 		const TConstPCGValueRange<int64> Entries = InVtxData->GetConstMetadataEntryValueRange();
 
@@ -621,6 +627,8 @@ namespace PCGExGraphs
 		const TArray<int32>& InEdgeHandles,
 		const TArray<uint64>& InEndpoints)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(FGraphPatcher::WriteConnectorFlags);
+		
 		if (!InConfig.IsEnabled())
 		{
 			return;
