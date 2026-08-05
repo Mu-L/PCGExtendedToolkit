@@ -450,7 +450,9 @@ namespace PCGExMath::OBB
 
 		const FVector Center = WorldBounds.GetCenter();
 		const FVector Extent = WorldBounds.GetExtent();
-		const float MaxExtent = FMath::Max3(Extent.X, Extent.Y, Extent.Z) * 1.5f;
+		// Floored: a lone zero-extent entry (a point whose bounds are degenerate) collapses WorldBounds
+		// to a point, and a zero-extent root is not a subdividable octree.
+		const float MaxExtent = FMath::Max(FMath::Max3(Extent.X, Extent.Y, Extent.Z) * 1.5f, 1.0f);
 
 		Octree = MakeUnique<PCGExOctree::FItemOctree>(Center, MaxExtent);
 
