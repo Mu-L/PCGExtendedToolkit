@@ -311,12 +311,9 @@ struct PCGEXCOLLECTIONS_API FPCGExAssetCollectionEntry
 
 
 	/**
-	 * Level this entry sources its content from, or null when it has none.
-	 *
-	 * For consumers that read authoring data OUT of the source level rather than out of the entry's
-	 * staged asset -- Valency pulls a level's cage cache this way. An entry whose staged asset merely
-	 * derives from a level (an exported PCGDataAsset) still answers with that level; one referencing
-	 * a finished asset directly answers null.
+	 * Level this entry sources its content from, or null when it has none -- for consumers reading
+	 * authoring data OUT of the source level rather than out of the staged asset. An entry whose
+	 * staged asset merely derives from a level still answers with that level.
 	 */
 	virtual FSoftObjectPath GetSourceLevelPath() const
 	{
