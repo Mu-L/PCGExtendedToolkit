@@ -21,8 +21,8 @@ For new files:
 Modifying existing files
 ```
 // Copyright 2025 {Original Owner Name} and contributors
-// * {DD/MM/YY} {Your Name} {Short description of the contribtion}
 // Released under the MIT license https://opensource.org/license/MIT/
+// * {DD/MM/YY} {Your Name} {Short description of the contribtion}
 ```
 
 ### Enum
