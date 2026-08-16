@@ -1845,6 +1845,7 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 	// field" identification opts out, and array shape changes always force structural anyway.
 	bool bIsValueOnlyLeafEdit = false;
 	bool bIsStructuralSchemaChange = false;
+	bool bIsSchemaValueLeafEdit = false;
 
 	if (PropertyChangedEvent.MemberProperty)
 	{
@@ -1866,6 +1867,7 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 
 			bIsValueOnlyLeafEdit = !bArrayShapeChange && bLeafIsFPCGExPropertyValue;
 			bIsStructuralSchemaChange = !bIsValueOnlyLeafEdit;
+			bIsSchemaValueLeafEdit = bIsValueOnlyLeafEdit;
 		}
 		// Rows only refine already-declared names, so a value edit here can't alter the schema.
 		// Shape changes still have to re-sync: EditFixedSize suppresses add/insert/delete/duplicate
@@ -1912,6 +1914,14 @@ void UPCGExAssetCollection::PostEditChangeProperty(FPropertyChangedEvent& Proper
 	if (bIsStructuralSchemaChange)
 	{
 		RebuildPropertyRegistry();
+		SyncPropertyOverridesToEntries();
+	}
+	else if (bIsSchemaValueLeafEdit)
+	{
+		// Schema-authored structural meta (AllowedClass, Range) lives on FPCGExProperty leaf fields
+		// and reaches entry/category mirrors only through SyncToSchema's SyncStructuralFromSchema
+		// pass. Value-leaf edits take the fast path: no reallocation, override values preserved.
+		// Registry prototypes heal separately via the cache invalidation below.
 		SyncPropertyOverridesToEntries();
 	}
 
