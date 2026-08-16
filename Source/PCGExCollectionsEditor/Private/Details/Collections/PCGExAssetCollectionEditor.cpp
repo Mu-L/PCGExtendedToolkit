@@ -9,6 +9,7 @@
 #include "ToolMenus.h"
 #include "Engine/AssetManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Framework/MultiBox/SToolBarButtonBlock.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Styling/AppStyle.h"
 #include "Widgets/Input/SButton.h"
@@ -1033,7 +1034,7 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 
 	ToolbarBuilder.BeginSection("CategoriesSection");
 	{
-		ToolbarBuilder.AddToolBarButton(
+		const TSharedPtr<FToolBarButtonBlock> CleanupCategoriesButton = ToolbarBuilder.AddToolBarButton(
 			FUIAction(
 				FExecuteAction::CreateLambda([this]()
 				{
@@ -1073,6 +1074,14 @@ void FPCGExAssetCollectionEditor::BuildAssetHeaderToolbar(FToolBarBuilder& Toolb
 			FText::FromString(TEXT("Cleanup Categories")),
 			INVTEXT("Remove category override rows whose category no longer matches any entry. Rows with no enabled overrides are KEPT -- that is what in-progress authoring looks like."),
 			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Delete"));
+
+		// Icon-only in the bar, matching the combo buttons beside it. Per-block, not
+		// FToolBarBuilder::SetLabelVisibility, which is sticky and would swallow the label of
+		// anything a subclass appends afterwards. The label survives for the overflow menu.
+		if (CleanupCategoriesButton)
+		{
+			CleanupCategoriesButton->SetLabelVisibility(EVisibility::Collapsed);
+		}
 	}
 	ToolbarBuilder.EndSection();
 

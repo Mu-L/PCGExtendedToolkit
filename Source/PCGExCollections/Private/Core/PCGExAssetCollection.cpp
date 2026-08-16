@@ -1914,6 +1914,16 @@ void UPCGExAssetCollection::EDITOR_CollectUsedCategories(TSet<FName>& OutCategor
 	});
 }
 
+FPCGExCategoryOverrides* UPCGExAssetCollection::EDITOR_FindCategoryOverridesRow(const FName InCategory)
+{
+	if (InCategory.IsNone())
+	{
+		return nullptr;
+	}
+	return CategoryOverrides.FindByPredicate(
+		[InCategory](const FPCGExCategoryOverrides& Row) { return Row.Category == InCategory; });
+}
+
 FPCGExCategoryOverrides* UPCGExAssetCollection::EDITOR_FindOrAddCategoryOverrides(const FName InCategory)
 {
 	if (InCategory.IsNone())

@@ -1150,6 +1150,10 @@ public:
 	 */
 	FPCGExCategoryOverrides* EDITOR_FindOrAddCategoryOverrides(FName InCategory);
 
+	/** Row for InCategory, or null. Never mints -- a live editor panel must not resurrect a row the
+	 *  user just cleaned up. Use EDITOR_FindOrAddCategoryOverrides to create one. */
+	FPCGExCategoryOverrides* EDITOR_FindCategoryOverridesRow(FName InCategory);
+
 	/**
 	 * Re-key OldCategory's row to NewCategory. Move, not copy: leaving the original behind lets a
 	 * later category of the same name resurrect stale overrides. Destination wins on a real
