@@ -39,6 +39,23 @@ bool FPCGExEntryAccessResult::IsType(PCGExAssetCollection::FTypeId TypeId) const
 	return Entry ? Entry->IsType(TypeId) : false;
 }
 
+double FPCGExEntryAccessResult::GetWeightNormalizer() const
+{
+	if (Pool)
+	{
+		return Pool->RawWeightSum;
+	}
+
+	// No pick produced this entry, so the honest denominator is the pool its host owns in full.
+	if (!Host)
+	{
+		return 0;
+	}
+
+	const PCGExAssetCollection::FCache* Cache = const_cast<UPCGExAssetCollection*>(Host)->LoadCache();
+	return Cache && Cache->Main ? Cache->Main->RawWeightSum : 0;
+}
+
 #pragma region FPCGExAssetStagingData
 
 bool FPCGExAssetStagingData::FindSocket(FName InName, const FPCGExSocket*& OutSocket) const
@@ -331,6 +348,7 @@ namespace PCGExAssetCollection
 		const_cast<FPCGExAssetCollectionEntry*>(InEntry)->BuildMicroCache();
 		Indices.Add(Index);
 		Weights.Add(InEntry->Weight + 1);
+		RawWeightSum += InEntry->Weight;
 	}
 
 	void FCategory::Compile()
@@ -743,11 +761,13 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryAt(int32 Index) const
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 Pick = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPick(Index, EPCGExIndexPickMode::Ascending);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 Pick = ThisCache->Main->GetPick(Index, EPCGExIndexPickMode::Ascending);
 	if (const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(Pick))
 	{
 		Result.Entry = Entry;
 		Result.Host = this;
+		Result.Pool = ThisCache->Main.Get();
 	}
 	return Result;
 }
@@ -780,7 +800,8 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntry(int32 Index, int32 Seed,
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 PickedIndex = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPick(Index, PickMode);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 PickedIndex = ThisCache->Main->GetPick(Index, PickMode);
 	const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(PickedIndex);
 
 	if (!Entry)
@@ -795,6 +816,7 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntry(int32 Index, int32 Seed,
 
 	Result.Entry = Entry;
 	Result.Host = this;
+	Result.Pool = ThisCache->Main.Get();
 	return Result;
 }
 
@@ -802,7 +824,8 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryRandom(int32 Seed) const
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 PickedIndex = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPickRandom(Seed);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 PickedIndex = ThisCache->Main->GetPickRandom(Seed);
 	const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(PickedIndex);
 
 	if (!Entry)
@@ -817,6 +840,7 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryRandom(int32 Seed) const
 
 	Result.Entry = Entry;
 	Result.Host = this;
+	Result.Pool = ThisCache->Main.Get();
 	return Result;
 }
 
@@ -824,7 +848,8 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryWeightedRandom(int32 Seed
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 PickedIndex = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPickRandomWeighted(Seed);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 PickedIndex = ThisCache->Main->GetPickRandomWeighted(Seed);
 	const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(PickedIndex);
 
 	if (!Entry)
@@ -839,6 +864,7 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryWeightedRandom(int32 Seed
 
 	Result.Entry = Entry;
 	Result.Host = this;
+	Result.Pool = ThisCache->Main.Get();
 	return Result;
 }
 
@@ -848,7 +874,8 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryAt(int32 Index, uint8 Tag
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 PickedIndex = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPick(Index, EPCGExIndexPickMode::Ascending);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 PickedIndex = ThisCache->Main->GetPick(Index, EPCGExIndexPickMode::Ascending);
 	const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(PickedIndex);
 
 	if (!Entry)
@@ -870,6 +897,7 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryAt(int32 Index, uint8 Tag
 
 	Result.Entry = Entry;
 	Result.Host = this;
+	Result.Pool = ThisCache->Main.Get();
 	return Result;
 }
 
@@ -905,7 +933,8 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntry(int32 Index, int32 Seed,
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 PickedIndex = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPick(Index, PickMode);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 PickedIndex = ThisCache->Main->GetPick(Index, PickMode);
 	const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(PickedIndex);
 
 	if (!Entry)
@@ -933,6 +962,7 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntry(int32 Index, int32 Seed,
 
 	Result.Entry = Entry;
 	Result.Host = this;
+	Result.Pool = ThisCache->Main.Get();
 	return Result;
 }
 
@@ -940,7 +970,8 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryRandom(int32 Seed, uint8 
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 PickedIndex = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPickRandom(Seed);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 PickedIndex = ThisCache->Main->GetPickRandom(Seed);
 	const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(PickedIndex);
 
 	if (!Entry)
@@ -968,6 +999,7 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryRandom(int32 Seed, uint8 
 
 	Result.Entry = Entry;
 	Result.Host = this;
+	Result.Pool = ThisCache->Main.Get();
 	return Result;
 }
 
@@ -975,7 +1007,8 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryWeightedRandom(int32 Seed
 {
 	FPCGExEntryAccessResult Result;
 
-	const int32 PickedIndex = const_cast<UPCGExAssetCollection*>(this)->LoadCache()->Main->GetPickRandomWeighted(Seed);
+	const PCGExAssetCollection::FCache* ThisCache = const_cast<UPCGExAssetCollection*>(this)->LoadCache();
+	const int32 PickedIndex = ThisCache->Main->GetPickRandomWeighted(Seed);
 	const FPCGExAssetCollectionEntry* Entry = GetEntryAtRawIndex(PickedIndex);
 
 	if (!Entry)
@@ -1003,6 +1036,7 @@ FPCGExEntryAccessResult UPCGExAssetCollection::GetEntryWeightedRandom(int32 Seed
 
 	Result.Entry = Entry;
 	Result.Host = this;
+	Result.Pool = ThisCache->Main.Get();
 	return Result;
 }
 

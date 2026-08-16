@@ -57,6 +57,13 @@ struct PCGEXCOLLECTIONS_API FPCGExEntryAccessResult
 	const FPCGExAssetCollectionEntry* Entry = nullptr;
 	const UPCGExAssetCollection* Host = nullptr;
 
+	// Pool the pick drew this entry from. Null when no pick was involved -- direct index access,
+	// or a packed-hash lookup, where the pool that originally produced the entry isn't recoverable.
+	const PCGExAssetCollection::FCategory* Pool = nullptr;
+
+	/** Sum of raw entry weights to normalize Entry->Weight against. Falls back to Host's full pool when Pool is null; 0 when unresolvable. */
+	double GetWeightNormalizer() const;
+
 	FORCEINLINE operator bool() const
 	{
 		return Entry != nullptr;
@@ -598,7 +605,15 @@ namespace PCGExAssetCollection
 	{
 	public:
 		FName Name = NAME_None;
+
+		// Sum over Weights, which hold Weight+1 per entry -- i.e. Sum(Weight) + Num(). This is the
+		// domain GetPickRandomWeighted rolls in, NOT a sum of authored weights. For normalization
+		// (a value meant to sum to 1 across the pool) use RawWeightSum.
 		double WeightSum = 0;
+
+		/** Sum of authored entry weights. */
+		double RawWeightSum = 0;
+
 		TArray<int32> Indices;
 		TArray<int32> Weights;
 		TArray<int32> Order;
@@ -645,7 +660,6 @@ namespace PCGExAssetCollection
 	class PCGEXCOLLECTIONS_API FCache : public TSharedFromThis<FCache>
 	{
 	public:
-		int32 WeightSum = 0;
 		TSharedPtr<FCategory> Main;
 
 		// Dense array of named sub-categories, in registration order. Indexed by the value side

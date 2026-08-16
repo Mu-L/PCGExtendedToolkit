@@ -200,6 +200,9 @@ namespace PCGExCollections
 		 */
 		const FPCGExEntryPickerOperation* ResolvePickerForPoint(int32 PointIndex, int32& OutCategorySlot) const;
 
+		/** Pool behind a slot returned by ResolvePickerForPoint: Main for -1, else the named category. */
+		const PCGExAssetCollection::FCategory* GetPool(int32 CategorySlot) const;
+
 		/**
 		 * Shared pre-resolve routing: resolve the point's op (same category routing as GetEntry),
 		 * bail unless it opted in, and resolve its scratch slot. Returns null when the point has

@@ -241,6 +241,11 @@ namespace PCGExCollections
 			: nullptr;
 	}
 
+	const PCGExAssetCollection::FCategory* FSelectorHelper::GetPool(const int32 CategorySlot) const
+	{
+		return Cache->Categories.IsValidIndex(CategorySlot) ? Cache->Categories[CategorySlot].Get() : Cache->Main.Get();
+	}
+
 	// Scratch slots parallel the op layout (Main + CategoryPickerOpsByIndex). Ops that don't
 	// override CreateScratchForScope leave their slot null; a fully-null set collapses to
 	// nullptr so consumers can skip the routing entirely.
@@ -348,8 +353,10 @@ namespace PCGExCollections
 		FPCGExEntryAccessResult Result = Collection->GetEntryRaw(Raw);
 		if (Result && (!bFlattenSubCollections && Result.Entry->HasValidSubCollection()))
 		{
+			// The nested pick reports its own pool -- the root's slot didn't produce this entry.
 			return Result.Entry->GetSubCollectionPtr()->GetEntryWeightedRandom(Seed);
 		}
+		Result.Pool = GetPool(CategorySlot);
 		return Result;
 	}
 
@@ -373,8 +380,10 @@ namespace PCGExCollections
 		FPCGExEntryAccessResult Result = Collection->GetEntryRaw(Raw, TagInheritance, OutTags);
 		if (Result && (!bFlattenSubCollections && Result.Entry->HasValidSubCollection()))
 		{
+			// The nested pick reports its own pool -- the root's slot didn't produce this entry.
 			return Result.Entry->GetSubCollectionPtr()->GetEntryWeightedRandom(Seed, TagInheritance, OutTags);
 		}
+		Result.Pool = GetPool(CategorySlot);
 		return Result;
 	}
 
