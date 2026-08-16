@@ -12,6 +12,7 @@
 
 struct FAssetData;
 class FAssetThumbnailPool;
+class IMenu;
 class IStructureDetailsView;
 class UPCGExAssetCollection;
 class FStructOnScope;
@@ -135,6 +136,11 @@ private:
 	void OnAssetDropOnCategory(FName TargetCategory, const TArray<FAssetData>& Assets);
 	void OnCategoryRenamed(FName OldName, FName NewName);
 	void OnAddToCategory(FName Category);
+	void OnEditCategoryOverrides(FName Category);
+	void OnCategoryOverridesMenuDismissed(TSharedRef<IMenu> InMenu);
+
+	/** Visibility filter for the category-overrides popup: the CategoryOverrides subtree only. */
+	static bool IsPropertyUnderCategoryOverrides(const FPropertyAndParent& PropertyAndParent);
 	void OnCategoryExpansionChanged(FName Category, bool bIsExpanded);
 	void OnTileReorderInCategory(FName Category, TSharedRef<FPCGExCollectionTileDragDropOp> DragOp, int32 InsertBeforeLocalIndex);
 

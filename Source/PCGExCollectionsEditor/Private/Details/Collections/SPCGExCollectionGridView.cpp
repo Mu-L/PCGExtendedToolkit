@@ -8,8 +8,11 @@
 #include "IStructureDetailsView.h"
 #include "PropertyEditorModule.h"
 
+#include "PCGExProperty.h"
+
 #include "InputCoreTypes.h"
 #include "ScopedTransaction.h"
+#include "Framework/Application/IMenu.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Framework/Notifications/NotificationManager.h"
@@ -367,6 +370,7 @@ void SPCGExCollectionGridView::RebuildGroupedLayout()
 			.OnTileDropOnCategory(FOnTileDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileDropOnCategory))
 			.OnAssetDropOnCategory(FOnAssetDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnAssetDropOnCategory))
 			.OnAddToCategory(FOnAddToCategory::CreateSP(this, &SPCGExCollectionGridView::OnAddToCategory))
+			.OnEditCategoryOverrides(FOnEditCategoryOverrides::CreateSP(this, &SPCGExCollectionGridView::OnEditCategoryOverrides))
 			.OnExpansionChanged(FOnCategoryExpansionChanged::CreateSP(this, &SPCGExCollectionGridView::OnCategoryExpansionChanged))
 			.OnTileReorderInCategory(FOnTileReorderInCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileReorderInCategory))
 		];
@@ -495,6 +499,7 @@ void SPCGExCollectionGridView::IncrementalCategoryRefresh()
 			.OnTileDropOnCategory(FOnTileDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileDropOnCategory))
 			.OnAssetDropOnCategory(FOnAssetDropOnCategory::CreateSP(this, &SPCGExCollectionGridView::OnAssetDropOnCategory))
 			.OnAddToCategory(FOnAddToCategory::CreateSP(this, &SPCGExCollectionGridView::OnAddToCategory))
+			.OnEditCategoryOverrides(FOnEditCategoryOverrides::CreateSP(this, &SPCGExCollectionGridView::OnEditCategoryOverrides))
 			.OnExpansionChanged(FOnCategoryExpansionChanged::CreateSP(this, &SPCGExCollectionGridView::OnCategoryExpansionChanged))
 			.OnTileReorderInCategory(FOnTileReorderInCategory::CreateSP(this, &SPCGExCollectionGridView::OnTileReorderInCategory))
 		];
@@ -1157,6 +1162,10 @@ void SPCGExCollectionGridView::OnCategoryRenamed(FName OldName, FName NewName)
 			}
 		}
 
+		// Move the override row with the name. Leaving it behind would let a later category of the
+		// old name resurrect these values on unrelated entries.
+		Coll->EDITOR_RenameCategoryOverrides(OldName, NewName);
+
 		Coll->PostEditChange();
 	}
 	bIsBatchOperation = false;
@@ -1169,6 +1178,139 @@ void SPCGExCollectionGridView::OnAddToCategory(FName Category)
 	// Same type-aware entry point as the main [+] -- a raw element add would create unset
 	// (blank) rows on wrapper-row hosts.
 	RequestAddEntry(Category);
+}
+
+void SPCGExCollectionGridView::OnEditCategoryOverrides(FName Category)
+{
+	UPCGExAssetCollection* Coll = Collection.Get();
+	if (!Coll || Category.IsNone())
+	{
+		return;
+	}
+
+	// Hold the anchor by value: PostEditChange below can drive a layout rebuild, and that Resets
+	// CategoryGroupWidgets -- a pointer into the map would dangle before PushMenu uses it.
+	const TSharedPtr<SPCGExCollectionCategoryGroup> Anchor = CategoryGroupWidgets.FindRef(Category);
+	if (!Anchor.IsValid())
+	{
+		return;
+	}
+
+	// Only transact when a row must actually be created: merely opening the popup must not dirty
+	// the package, push an undo step, or trigger a rebuild.
+	if (!Coll->FindCategoryOverrides(Category))
+	{
+		bIsBatchOperation = true;
+		{
+			FScopedTransaction Transaction(INVTEXT("Add Category Overrides"));
+			Coll->Modify();
+			// Schema-synced on mint -- an unsynced FPCGExPropertyOverrides renders as an empty panel.
+			Coll->EDITOR_FindOrAddCategoryOverrides(Category);
+			Coll->PostEditChange();
+		}
+		bIsBatchOperation = false;
+	}
+
+	// Asset-backed details view on purpose: editing through the collection means a schema sync
+	// that rebuilds a row's slots can't leave a live FStructOnScope pointing at freed memory.
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+
+	FDetailsViewArgs DetailsArgs;
+	DetailsArgs.bUpdatesFromSelection = false;
+	DetailsArgs.bLockable = false;
+	DetailsArgs.bAllowSearch = false;
+	DetailsArgs.bHideSelectionTip = true;
+	DetailsArgs.bShowOptions = false;
+	DetailsArgs.NameAreaSettings = FDetailsViewArgs::HideNameArea;
+
+	const TSharedRef<IDetailsView> View = PropertyModule.CreateDetailView(DetailsArgs);
+	View->SetIsPropertyVisibleDelegate(FIsPropertyVisible::CreateStatic(&SPCGExCollectionGridView::IsPropertyUnderCategoryOverrides));
+	View->SetObject(Coll);
+
+	// The grid's external-modification refresh calls UpdateDetailForSelection, which force-steals
+	// keyboard focus; with focus inside the menu that dismisses it on the first committed edit.
+	// Suppress until the menu goes away, then refresh once.
+	bIsBatchOperation = true;
+
+	const TSharedPtr<IMenu> Menu = FSlateApplication::Get().PushMenu(
+		Anchor.ToSharedRef(),
+		FWidgetPath(),
+		SNew(SBox)
+		.WidthOverride(420.f)
+		.MaxDesiredHeight(520.f)
+		[
+			View
+		],
+		FSlateApplication::Get().GetCursorPos(),
+		FPopupTransitionEffect(FPopupTransitionEffect::ContextMenu));
+
+	if (Menu.IsValid())
+	{
+		Menu->GetOnMenuDismissed().AddSP(this, &SPCGExCollectionGridView::OnCategoryOverridesMenuDismissed);
+	}
+	else
+	{
+		bIsBatchOperation = false;
+	}
+}
+
+void SPCGExCollectionGridView::OnCategoryOverridesMenuDismissed(TSharedRef<IMenu> /*InMenu*/)
+{
+	bIsBatchOperation = false;
+	StructuralRefresh();
+}
+
+bool SPCGExCollectionGridView::IsPropertyUnderCategoryOverrides(const FPropertyAndParent& PropertyAndParent)
+{
+	// Reject CollectionProperties first: its value widgets are owned by the same FPCGExProperty
+	// subtypes the third test accepts, so it has to lose before that test runs.
+	const FName SchemaName = GET_MEMBER_NAME_CHECKED(UPCGExAssetCollection, CollectionProperties);
+	if (PropertyAndParent.Property.GetFName() == SchemaName)
+	{
+		return false;
+	}
+
+	const FName RootName = GET_MEMBER_NAME_CHECKED(UPCGExAssetCollection, CategoryOverrides);
+	if (PropertyAndParent.Property.GetFName() == RootName)
+	{
+		return true;
+	}
+
+	for (const FProperty* Parent : PropertyAndParent.ParentProperties)
+	{
+		if (!Parent)
+		{
+			continue;
+		}
+		const FName ParentName = Parent->GetFName();
+		if (ParentName == SchemaName)
+		{
+			return false;
+		}
+		if (ParentName == RootName)
+		{
+			return true;
+		}
+	}
+
+	// Override value widgets are synthesized via AddExternalStructureProperty and arrive with an
+	// incomplete parent chain, so the name tests above never see them. Same escape hatch the
+	// Assets-tab filter uses.
+	if (const UScriptStruct* Owner = Cast<UScriptStruct>(PropertyAndParent.Property.GetOwnerStruct());
+		Owner && Owner->IsChildOf(FPCGExProperty::StaticStruct()))
+	{
+		return true;
+	}
+	for (const FProperty* Parent : PropertyAndParent.ParentProperties)
+	{
+		if (const UScriptStruct* Owner = Cast<UScriptStruct>(Parent->GetOwnerStruct());
+			Owner && Owner->IsChildOf(FPCGExProperty::StaticStruct()))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void SPCGExCollectionGridView::OnCategoryExpansionChanged(FName Category, bool bIsExpanded)
