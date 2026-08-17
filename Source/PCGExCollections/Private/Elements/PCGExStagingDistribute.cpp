@@ -458,6 +458,7 @@ bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 	}
 
 	PCGEX_VALIDATE_NAME(Settings->AssetPathAttributeName)
+	PCGEX_VALIDATE_NAME(Settings->GetEntryIdxAttributeName())
 
 	if (!bMicroRedistribute && (Settings->WeightToAttribute == EPCGExWeightOutputMode::Raw || Settings->WeightToAttribute == EPCGExWeightOutputMode::Normalized))
 	{

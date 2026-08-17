@@ -106,6 +106,7 @@ bool FPCGExCollectionToModuleInfosElement::AdvanceWork(FPCGExContext* InContext,
 #undef PCGEX_DECLARE_ATT
 
 	const FName EntryIdxAttributeName = Settings->GetEntryIdxAttributeName();
+	PCGEX_VALIDATE_NAME(EntryIdxAttributeName)
 	FPCGMetadataAttribute<int64>* EntryAttribute = Metadata->FindOrCreateAttribute<int64>(PCGExMetaHelpers::GetAttributeIdentifier(EntryIdxAttributeName, OutputModules), 0, false, true);
 
 	TSet<FName> UniqueSymbols;

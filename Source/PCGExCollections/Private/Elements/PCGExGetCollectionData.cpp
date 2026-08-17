@@ -176,6 +176,7 @@ bool FPCGExGetCollectionDataElement::Boot(FPCGExContext* InContext) const
 	FPCGExGetCollectionDataContext* Context = static_cast<FPCGExGetCollectionDataContext*>(InContext);
 
 	// Validate attribute names up-front -- abort early on bad config.
+	PCGEX_VALIDATE_NAME_C(InContext, Settings->GetEntryIdxAttributeName())
 	PCGEX_VALIDATE_TOGGLED(InContext, Settings, bWriteAssetPath, AssetPathAttributeName)
 	PCGEX_VALIDATE_TOGGLED(InContext, Settings, bWriteWeight, WeightAttributeName)
 	PCGEX_VALIDATE_TOGGLED(InContext, Settings, bWriteCategory, CategoryAttributeName)

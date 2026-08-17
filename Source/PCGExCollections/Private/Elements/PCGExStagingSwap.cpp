@@ -89,6 +89,9 @@ bool FPCGExStagingSwapElement::Boot(FPCGExContext* InContext) const
 
 	PCGEX_CONTEXT_AND_SETTINGS(StagingSwap)
 
+	PCGEX_VALIDATE_NAME(Settings->GetEntryIdxAttributeName())
+	PCGEX_VALIDATE_NAME(Settings->GetOutputEntryIdxAttributeName())
+
 	Context->CollectionPickUnpacker = MakeShared<PCGExCollections::FPickUnpacker>();
 	Context->CollectionPickUnpacker->UnpackPin(InContext, PCGExCollections::Labels::SourceCollectionMapLabel);
 
