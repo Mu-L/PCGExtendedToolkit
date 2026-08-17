@@ -88,6 +88,7 @@ void UPCGExGetCollectionDataSettings::PostEditChangeProperty(FPropertyChangedEve
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 	bWriteAssetClass = bWriteAssetPath;
 	AssetClassAttributeName = AssetPathAttributeName;
+	EntryAttributeName = GetEntryIdxAttributeName();
 }
 #endif
 
@@ -505,7 +506,7 @@ namespace PCGExGetCollectionData
 #undef PCGEX_GCD_DECLARE_PERAXIS
 			}
 
-			U.EntryAttr = Metadata->CreateAttribute<int64>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->EntryAttributeName, U.OutputSet), 0, false, true);
+			U.EntryAttr = Metadata->CreateAttribute<int64>(PCGExMetaHelpers::GetAttributeIdentifier(Settings->GetEntryIdxAttributeName(), U.OutputSet), 0, false, true);
 		} // end DeclareAttrs scope
 
 		// Property writer (gated -- skips an allocation per output when no properties configured).
