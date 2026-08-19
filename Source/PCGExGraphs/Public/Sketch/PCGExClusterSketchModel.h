@@ -99,6 +99,9 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchValidation
 	int32 SelfLoops = 0;
 	int32 DuplicateEdges = 0;    // undirected duplicates beyond the first occurrence
 	int32 IsolatedVertices = 0;  // dropped by cluster compile (clusters cannot represent them)
+	/** Vertices sharing an earlier vertex's lattice coord (bound) or position (free) -- clusters cannot
+	 *  carry collocated vertices; the editor merges on drop, raw edits get warned at print. */
+	int32 CollocatedVertices = 0;
 	TArray<FName> MisalignedChannels;   // channel length != domain count
 	TArray<FName> InvalidChannelNames;  // None, duplicate, or reserved cluster attribute
 
@@ -147,6 +150,15 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 	/** Remove the undirected edge (A,B) and its channel entries. @return true if an edge was removed. */
 	bool Disconnect(int32 A, int32 B);
 
+	/**
+	 * Merge InAbsorbed into InSurvivor: every edge of the absorbed vertex retargets its endpoint onto
+	 * the survivor (edges that would become self-loops or duplicates are dropped, the survivor edge's
+	 * channel values winning), then the absorbed vertex and its channel entries are removed. The
+	 * editor's drop-on-vertex gesture and any raw cleanup both go through this.
+	 * @return the survivor's index AFTER the removal remap, or INDEX_NONE for an invalid pair.
+	 */
+	int32 MergeVertices(int32 InAbsorbed, int32 InSurvivor);
+
 	/** Index of the undirected edge (A,B), or INDEX_NONE. */
 	int32 FindEdge(int32 A, int32 B) const;
 
@@ -158,6 +170,28 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 	 *  re-snap coords from locations first when bResnapFromLocation (hand-edited transforms). */
 	void SyncBoundVertices(const FPCGExLatticeBasis& InBasis, bool bResnapFromLocation);
 
+	/**
+	 * Drop every structurally invalid edge -- out-of-range endpoints, self-loops, undirected duplicates
+	 * (first occurrence kept) -- with their channel entries. Out-of-range edges are DORMANT hazards:
+	 * invisible and unprintable today, they silently reactivate the moment the vertex array grows past
+	 * their indices, materializing as "random" edges onto new vertices. Never called automatically (a
+	 * details-panel edit passes through invalid states mid-typing); the editor surfaces them and the
+	 * sketch's cleanup button invokes this deliberately.
+	 * @return the number of edges removed.
+	 */
+	int32 RemoveInvalidEdges();
+
 	/** Aggregate integrity summary; cheap, never mutates. */
 	void Validate(FPCGExClusterSketchValidation& OutSummary) const;
 };
+
+namespace PCGExSketch
+{
+	/** Hash/compare key for "these vertices resolve to the same printed location" (0.01 tolerance) --
+	 *  the ONE collocation definition shared by the print warning, the editor highlight, and the
+	 *  Merge Collocated cleanup, so they can never disagree about what counts as overlapping. */
+	FORCEINLINE FVector QuantizedLocationKey(const FVector& Location)
+	{
+		return FVector(FMath::RoundToDouble(Location.X * 100.0), FMath::RoundToDouble(Location.Y * 100.0), FMath::RoundToDouble(Location.Z * 100.0));
+	}
+}

@@ -356,6 +356,24 @@ FIntVector FPCGExLatticeBasis::SnapWorldToCoord(const FVector& World) const
 	return Best;
 }
 
+FIntVector FPCGExLatticeBasis::SnapWorldToCoordPreserving(const FVector& World, const FIntVector& Previous) const
+{
+	FIntVector Coord = SnapWorldToCoord(World);
+	if (NumAxes <= 2)
+	{
+		Coord.Z = Previous.Z;
+	}
+	if (NumAxes <= 1)
+	{
+		Coord.Y = Previous.Y;
+	}
+	if (NumAxes <= 0)
+	{
+		Coord.X = Previous.X;
+	}
+	return Coord;
+}
+
 FVector FPCGExLatticeBasis::ContinuousCoord(const FVector& World) const
 {
 	double X[3];

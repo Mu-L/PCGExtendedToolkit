@@ -14,6 +14,7 @@ namespace PCGExSketchDrawHelper
 	const FLinearColor HoverColor = FLinearColor(1.0f, 1.0f, 1.0f);
 	const FLinearColor EdgeColor = FLinearColor(0.55f, 0.55f, 0.6f);
 	const FLinearColor PreviewColor = FLinearColor(0.3f, 1.0f, 0.4f);
+	const FLinearColor MergeColor = FLinearColor(1.0f, 0.35f, 0.15f);
 	const FLinearColor BasisColor = FLinearColor(0.35f, 0.5f, 0.9f, 0.6f);
 
 	constexpr float VertexSize = 10.0f;
@@ -49,6 +50,28 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		Locations[i] = LocalToWorld.TransformPosition(Local);
 	}
 
+	// Invalid-state highlight: vertices RESOLVING to the same printed location (duplicate coords,
+	// overlapping free verts, or a rank-collapsed basis stacking layers). Same key as the print
+	// warning and the Merge Collocated cleanup, so all three agree.
+	TSet<int32> Overlapping;
+	{
+		TMap<FVector, int32> FirstAtLocation;
+		FirstAtLocation.Reserve(Locations.Num());
+		for (int32 i = 0; i < Locations.Num(); ++i)
+		{
+			const FVector Key = PCGExSketch::QuantizedLocationKey(Locations[i]);
+			if (const int32* First = FirstAtLocation.Find(Key))
+			{
+				Overlapping.Add(i);
+				Overlapping.Add(*First);
+			}
+			else
+			{
+				FirstAtLocation.Add(Key, i);
+			}
+		}
+	}
+
 	// Basis tripod at the lattice origin -- a cheap "the snap model is live" cue.
 	if (bHasBasis)
 	{
@@ -60,16 +83,27 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 	}
 
 	// Edges under vertices.
+	const double StubLength = (bHasBasis && Basis.NumAxes > 0) ? Basis.AxisVecs[0].Size() * 0.35 : 35.0;
 	for (int32 e = 0; e < Model->Edges.Num(); ++e)
 	{
 		const FPCGExClusterSketchEdge& E = Model->Edges[e];
 		if (!Locations.IsValidIndex(E.A) || !Locations.IsValidIndex(E.B))
 		{
+			// A DORMANT edge (endpoint index not materialized yet) would otherwise be invisible until a
+			// new vertex silently activates it -- draw a warning stub from whichever endpoint exists.
+			const int32 ValidEnd = Locations.IsValidIndex(E.A) ? E.A : (Locations.IsValidIndex(E.B) ? E.B : INDEX_NONE);
+			if (ValidEnd != INDEX_NONE)
+			{
+				DrawDashedLine(PDI, Locations[ValidEnd], Locations[ValidEnd] + FVector(0, 0, StubLength), PCGExSketchDrawHelper::MergeColor, 5.0, SDPG_Foreground);
+			}
 			continue;
 		}
 		const bool bSelected = SelectedEdges.Contains(e);
 		const bool bHovered = Hover.Type == FPCGExSketchHit::EType::Edge && Hover.Index == e;
-		const FLinearColor Color = bHovered ? PCGExSketchDrawHelper::HoverColor : (bSelected ? PCGExSketchDrawHelper::SelectedColor : PCGExSketchDrawHelper::EdgeColor);
+		// While the host's delete modifier is held, the hovered edge reads as a delete target.
+		const FLinearColor Color = bHovered
+			                           ? (Controller.GetEdgeDeleteIntent() ? PCGExSketchDrawHelper::MergeColor : PCGExSketchDrawHelper::HoverColor)
+			                           : (bSelected ? PCGExSketchDrawHelper::SelectedColor : PCGExSketchDrawHelper::EdgeColor);
 		PDI->DrawLine(Locations[E.A], Locations[E.B], Color, SDPG_Foreground, (bSelected || bHovered) ? PCGExSketchDrawHelper::SelectedEdgeThickness : PCGExSketchDrawHelper::EdgeThickness);
 	}
 
@@ -81,6 +115,11 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		if (bSelected)
 		{
 			Color = PCGExSketchDrawHelper::SelectedColor;
+		}
+		if (Overlapping.Contains(i))
+		{
+			// Invalid state outranks selection; only hover (aiming) overrides it.
+			Color = PCGExSketchDrawHelper::MergeColor;
 		}
 		if (bHovered)
 		{
@@ -101,6 +140,17 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 	}
 	else if (Controller.GetDragMode() == FPCGExSketchEditController::EDragMode::Move)
 	{
-		PDI->DrawPoint(LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal()), PCGExSketchDrawHelper::PreviewColor, PCGExSketchDrawHelper::VertexSize, SDPG_Foreground);
+		const int32 MergeCandidate = Controller.GetMergeCandidate();
+		if (Locations.IsValidIndex(MergeCandidate))
+		{
+			// Release here MERGES the dragged vertex into this one -- loud, warm highlight.
+			const FVector MergePos = Locations[MergeCandidate];
+			PDI->DrawPoint(MergePos, PCGExSketchDrawHelper::MergeColor, PCGExSketchDrawHelper::SelectedVertexSize + 8.0f, SDPG_Foreground);
+			DrawDashedLine(PDI, LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal()), MergePos, PCGExSketchDrawHelper::MergeColor, 8.0, SDPG_Foreground);
+		}
+		else
+		{
+			PDI->DrawPoint(LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal()), PCGExSketchDrawHelper::PreviewColor, PCGExSketchDrawHelper::VertexSize, SDPG_Foreground);
+		}
 	}
 }

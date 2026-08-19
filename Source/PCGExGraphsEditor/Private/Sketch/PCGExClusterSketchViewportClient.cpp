@@ -30,14 +30,21 @@ FPCGExClusterSketchViewportClient::FPCGExClusterSketchViewportClient(FEditorMode
 
 	USingleClickOrDragInputBehavior* ClickOrDrag = NewObject<USingleClickOrDragInputBehavior>();
 	ClickOrDrag->Initialize(this, this);
+	// CRITICAL: default-true means a plain press on empty space falls through to the DRAG hit-test at
+	// the press ray -- depth-ambiguous, so casual empty-space drags silently grabbed (and merge-dropped)
+	// whatever vertex sat within screen radius at ANY depth. A drag may only ever grow out of a
+	// captured click.
+	ClickOrDrag->bBeginDragIfClickTargetNotHit = false;
 	ClickOrDrag->Modifiers.RegisterModifier(CtrlModifierID, FInputDeviceState::IsCtrlKeyDown);
 	ClickOrDrag->Modifiers.RegisterModifier(ShiftModifierID, FInputDeviceState::IsShiftKeyDown);
+	ClickOrDrag->Modifiers.RegisterModifier(AltModifierID, FInputDeviceState::IsAltKeyDown);
 	InputBehaviorSet->Add(ClickOrDrag);
 
 	UMouseHoverBehavior* HoverBehavior = NewObject<UMouseHoverBehavior>();
 	HoverBehavior->Initialize(this);
 	HoverBehavior->Modifiers.RegisterModifier(CtrlModifierID, FInputDeviceState::IsCtrlKeyDown);
 	HoverBehavior->Modifiers.RegisterModifier(ShiftModifierID, FInputDeviceState::IsShiftKeyDown);
+	HoverBehavior->Modifiers.RegisterModifier(AltModifierID, FInputDeviceState::IsAltKeyDown);
 	InputBehaviorSet->Add(HoverBehavior);
 
 	// The mode manager's tools context is constructed + activated with the manager itself, so the
@@ -68,6 +75,22 @@ void FPCGExClusterSketchViewportClient::Draw(const FSceneView* View, FPrimitiveD
 	{
 		FPCGExSketchDrawHelper::Draw(*Controller, PDI);
 	}
+}
+
+void FPCGExClusterSketchViewportClient::ProcessClick(FSceneView& View, HHitProxy* HitProxy, FKey Key, EInputEvent Event, uint32 HitX, uint32 HitY)
+{
+	// Alt+LMB starts camera tracking, which suppresses tools-context routing -- the ITF behaviors never
+	// see the press. A stationary Alt+click still lands here, so the edge-delete gesture lives on this
+	// path (the ITF-side Alt branch stays as a harmless mirror; the two are mutually exclusive).
+	if (Controller && Key == EKeys::LeftMouseButton && IsAltPressed())
+	{
+		const FViewportClick Click(&View, this, Key, Event, HitX, HitY);
+		if (Controller->DeleteEdgeAtRay(FRay(Click.GetOrigin(), Click.GetDirection())))
+		{
+			return;
+		}
+	}
+	FEditorViewportClient::ProcessClick(View, HitProxy, Key, Event, HitX, HitY);
 }
 
 bool FPCGExClusterSketchViewportClient::InputKey(const FInputKeyEventArgs& EventArgs)
@@ -105,6 +128,14 @@ void FPCGExClusterSketchViewportClient::AddReferencedObjects(FReferenceCollector
 FInputRayHit FPCGExClusterSketchViewportClient::IsHitByClick(const FInputDeviceRay& ClickPos)
 {
 	const FPCGExSketchHit Hit = Controller ? Controller->HitTest(ClickPos.WorldRay) : FPCGExSketchHit();
+
+	// Alt is the camera-orbit modifier: claim it ONLY for the edge-delete gesture (press exactly on an
+	// edge), everything else falls through to navigation.
+	if (bAltDown)
+	{
+		return Hit.Type == FPCGExSketchHit::EType::Edge ? FInputRayHit(Hit.RayT) : FInputRayHit();
+	}
+
 	if (Hit.IsHit())
 	{
 		return FInputRayHit(Hit.RayT);
@@ -120,14 +151,26 @@ FInputRayHit FPCGExClusterSketchViewportClient::IsHitByClick(const FInputDeviceR
 
 void FPCGExClusterSketchViewportClient::OnClicked(const FInputDeviceRay& ClickPos)
 {
-	if (Controller)
+	if (!Controller)
 	{
-		Controller->HandleClick(ClickPos.WorldRay, /*bAdditive*/ bCtrlDown, /*bAddOnEmpty*/ bCtrlDown);
+		return;
 	}
+	if (bAltDown)
+	{
+		Controller->DeleteEdgeAtRay(ClickPos.WorldRay);
+		return;
+	}
+	Controller->HandleClick(ClickPos.WorldRay, /*bAdditive*/ bCtrlDown, /*bAddOnEmpty*/ bCtrlDown);
 }
 
 FInputRayHit FPCGExClusterSketchViewportClient::CanBeginClickDragSequence(const FInputDeviceRay& PressPos)
 {
+	// Ctrl states add/toggle intent -- a wiggled Ctrl+click must stay a CLICK, never convert into a
+	// drag of some vertex that happened to sit near the cursor.
+	if (bCtrlDown)
+	{
+		return FInputRayHit();
+	}
 	const FPCGExSketchHit Hit = Controller ? Controller->HitTest(PressPos.WorldRay) : FPCGExSketchHit();
 	return Hit.IsVertex() ? FInputRayHit(Hit.RayT) : FInputRayHit();
 }
@@ -205,5 +248,14 @@ void FPCGExClusterSketchViewportClient::OnUpdateModifierState(const int Modifier
 	else if (ModifierID == ShiftModifierID)
 	{
 		bShiftDown = bIsOn;
+	}
+	else if (ModifierID == AltModifierID)
+	{
+		bAltDown = bIsOn;
+		if (Controller)
+		{
+			// The hovered edge renders as a delete target while Alt is held.
+			Controller->SetEdgeDeleteIntent(bIsOn);
+		}
 	}
 }

@@ -173,6 +173,11 @@ namespace PCGExSketch
 		UPCGBasePointData* OutData = InVtxIO->GetOut();
 		TPCGValueRange<FTransform> OutTransforms = OutData->GetTransformValueRange();
 		TPCGValueRange<int32> OutSeeds = OutData->GetSeedValueRange();
+		// Collocation is judged on RESOLVED output locations -- the only definition that also catches a
+		// rank-collapsed basis projecting distinct coords onto one spot.
+		TSet<FVector> SeenLocations;
+		SeenLocations.Reserve(NumVtx);
+		int32 CollocatedCount = 0;
 		for (int32 i = 0; i < NumVtx; ++i)
 		{
 			const FPCGExClusterSketchVertex& V = Model.Vertices[i];
@@ -182,6 +187,19 @@ namespace PCGExSketch
 			OutTransforms[i] = FTransform(V.Transform.GetRotation(), Location, V.Transform.GetScale3D());
 			// Seeds ride the compile reorder as a native property, so they can be written up front.
 			OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(Location);
+
+			bool bAlreadySeen = false;
+			SeenLocations.Add(PCGExSketch::QuantizedLocationKey(Location), &bAlreadySeen);
+			if (bAlreadySeen)
+			{
+				++CollocatedCount;
+			}
+		}
+		if (CollocatedCount > 0 && !InRequest.bQuiet)
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(
+				           FTEXT("{0} sketch vertex/vertices print at an already-occupied location (duplicate coords, overlapping positions, or a collapsed snap basis) -- clusters cannot carry collocated vertices; use Merge Collocated Vertices on the sketch."),
+				           FText::AsNumber(CollocatedCount)));
 		}
 
 		// --- Print context ---

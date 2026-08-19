@@ -3,6 +3,10 @@
 
 #include "Sketch/PCGExClusterSketch.h"
 
+#if WITH_EDITOR
+#include "ScopedTransaction.h"
+#endif
+
 bool UPCGExClusterSketch::BuildBasis(FPCGExLatticeBasis& OutBasis) const
 {
 	return SnapProvider ? SnapProvider->BuildBasis(OutBasis) : false;
@@ -71,5 +75,48 @@ void UPCGExClusterSketch::EDITOR_SyncBoundVertices(const bool bResnapFromLocatio
 		return;
 	}
 	Model.SyncBoundVertices(Basis, bResnapFromLocation);
+}
+
+void UPCGExClusterSketch::MergeCollocatedVertices()
+{
+	FPCGExLatticeBasis Basis;
+	const bool bHasBasis = BuildBasis(Basis);
+
+	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "MergeCollocated", "Merge Collocated Sketch Vertices"));
+	Modify();
+
+	// Every merge remaps indices, so rescan from scratch after each one; the guard bounds the loop by
+	// the only thing it can shrink.
+	bool bMergedAny = true;
+	int32 Guard = Model.Vertices.Num() + 1;
+	while (bMergedAny && Guard-- > 0)
+	{
+		bMergedAny = false;
+		TMap<FVector, int32> FirstAtLocation;
+		FirstAtLocation.Reserve(Model.Vertices.Num());
+		for (int32 i = 0; i < Model.Vertices.Num(); ++i)
+		{
+			const FPCGExClusterSketchVertex& V = Model.Vertices[i];
+			const FVector Location = (V.bLatticeBound && bHasBasis) ? Basis.CoordToWorld(V.LatticeCoord) : V.Transform.GetLocation();
+			const FVector Key = PCGExSketch::QuantizedLocationKey(Location);
+			if (const int32* First = FirstAtLocation.Find(Key))
+			{
+				Model.MergeVertices(i, *First);
+				bMergedAny = true;
+				break;
+			}
+			FirstAtLocation.Add(Key, i);
+		}
+	}
+
+	PostEditChange();
+}
+
+void UPCGExClusterSketch::RemoveInvalidEdges()
+{
+	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "RemoveInvalidEdges", "Remove Invalid Sketch Edges"));
+	Modify();
+	Model.RemoveInvalidEdges();
+	PostEditChange();
 }
 #endif

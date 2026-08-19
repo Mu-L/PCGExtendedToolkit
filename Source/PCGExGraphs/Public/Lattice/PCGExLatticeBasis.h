@@ -96,8 +96,18 @@ struct PCGEXGRAPHS_API FPCGExLatticeBasis
 
 	/** Snap a world position to its TRUE nearest integer lattice coordinate: Babai rounding corrected by a
 	 *  fixed local search, which matters on any skewed (hex / triangular) basis where the rounded
-	 *  coordinate is not the nearest node. Exact on an orthogonal basis, where rounding already is. */
+	 *  coordinate is not the nearest node. Exact on an orthogonal basis, where rounding already is.
+	 *  Components beyond NumAxes come back 0 -- callers re-snapping an EXISTING coord must use the
+	 *  preserving variant below, or a rank-collapsed basis wipes the stashed components. */
 	FIntVector SnapWorldToCoord(const FVector& World) const;
+
+	/**
+	 * SnapWorldToCoord, but unspanned components (>= NumAxes) keep Previous's values instead of 0.
+	 * A rank-deficient basis PROJECTS coords rather than truncating them -- CoordToWorld ignores the
+	 * unspanned components -- so a re-snap through this variant is idempotent at any rank and the
+	 * hidden components survive until their axis returns.
+	 */
+	FIntVector SnapWorldToCoordPreserving(const FVector& World, const FIntVector& Previous) const;
 
 	/** Continuous (un-rounded) lattice coordinate of a world position; useful for interpolation.
 	 *  Components beyond NumAxes are 0. */

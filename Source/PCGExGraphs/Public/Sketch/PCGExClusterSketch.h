@@ -58,5 +58,21 @@ public:
 
 	/** See PostEditChangeProperty. No-op without a usable basis. */
 	void EDITOR_SyncBoundVertices(bool bResnapFromLocation);
+
+	/**
+	 * Merge every vertex that RESOLVES to an already-occupied printed location (duplicate coords,
+	 * overlapping free positions, or a rank-collapsed snap basis projecting distinct coords together)
+	 * into the earliest vertex there. Explicit and undoable -- printing warns but never does this.
+	 */
+	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Merge Collocated Vertices")
+	void MergeCollocatedVertices();
+
+	/**
+	 * Drop structurally invalid edges: out-of-range endpoints (DORMANT edges -- invisible until the
+	 * vertex array grows past their indices, then they materialize as "random" edges), self-loops, and
+	 * duplicates. The editor draws dormant edges as warning stubs; this removes them, undoably.
+	 */
+	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Remove Invalid Edges")
+	void RemoveInvalidEdges();
 #endif
 };

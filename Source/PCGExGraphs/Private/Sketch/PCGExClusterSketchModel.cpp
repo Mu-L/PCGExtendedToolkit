@@ -180,6 +180,52 @@ bool FPCGExClusterSketchModel::Disconnect(const int32 A, const int32 B)
 	return true;
 }
 
+int32 FPCGExClusterSketchModel::MergeVertices(const int32 InAbsorbed, const int32 InSurvivor)
+{
+	if (InAbsorbed == InSurvivor || !Vertices.IsValidIndex(InAbsorbed) || !Vertices.IsValidIndex(InSurvivor))
+	{
+		return INDEX_NONE;
+	}
+
+	// Descending, in place: FindEdge sees already-retargeted edges, so two absorbed edges toward the
+	// same far vertex cannot both retarget and mint the duplicate this merge exists to prevent.
+	for (int32 e = Edges.Num() - 1; e >= 0; --e)
+	{
+		FPCGExClusterSketchEdge& E = Edges[e];
+		const bool bTouchA = E.A == InAbsorbed;
+		const bool bTouchB = E.B == InAbsorbed;
+		if (!bTouchA && !bTouchB)
+		{
+			continue;
+		}
+
+		bool bDrop = bTouchA && bTouchB; // self-loop remnant from a raw edit
+		if (!bDrop)
+		{
+			const int32 Other = bTouchA ? E.B : E.A;
+			if (Other == InSurvivor || FindEdge(Other, InSurvivor) != INDEX_NONE)
+			{
+				bDrop = true; // would become a self-loop / a duplicate of a surviving edge
+			}
+			else
+			{
+				(bTouchA ? E.A : E.B) = InSurvivor;
+				continue;
+			}
+		}
+
+		Edges.RemoveAt(e);
+		for (FPCGExClusterDataChannel& Channel : EdgeChannels)
+		{
+			Channel.RemoveAt(e);
+		}
+	}
+
+	const int32 SurvivorAfterRemoval = InSurvivor > InAbsorbed ? InSurvivor - 1 : InSurvivor;
+	RemoveVertex(InAbsorbed); // no edges touch it anymore -- pure vertex/channel removal + index remap
+	return SurvivorAfterRemoval;
+}
+
 int32 FPCGExClusterSketchModel::FindEdge(const int32 A, const int32 B) const
 {
 	for (int32 e = 0; e < Edges.Num(); ++e)
@@ -209,7 +255,8 @@ bool FPCGExClusterSketchModel::SetLatticeBound(const int32 Index, const bool bBo
 	V.bLatticeBound = bBound;
 	if (bBound)
 	{
-		V.LatticeCoord = InBasis.SnapWorldToCoord(V.Transform.GetLocation());
+		// Preserving: re-binding restores whatever unspanned components the coord still stashes.
+		V.LatticeCoord = InBasis.SnapWorldToCoordPreserving(V.Transform.GetLocation(), V.LatticeCoord);
 		V.Transform.SetLocation(InBasis.CoordToWorld(V.LatticeCoord));
 	}
 	// Unbinding keeps the current derived location as the free position -- nothing to do.
@@ -226,10 +273,50 @@ void FPCGExClusterSketchModel::SyncBoundVertices(const FPCGExLatticeBasis& InBas
 		}
 		if (bResnapFromLocation)
 		{
-			V.LatticeCoord = InBasis.SnapWorldToCoord(V.Transform.GetLocation());
+			// Preserving, or a rank-collapsed basis would wipe the stashed components on EVERY model
+			// edit (locations carry no information along unspanned directions to re-snap from).
+			V.LatticeCoord = InBasis.SnapWorldToCoordPreserving(V.Transform.GetLocation(), V.LatticeCoord);
 		}
 		V.Transform.SetLocation(InBasis.CoordToWorld(V.LatticeCoord));
 	}
+}
+
+int32 FPCGExClusterSketchModel::RemoveInvalidEdges()
+{
+	const int32 NumVtx = Vertices.Num();
+	int32 NumRemoved = 0;
+	TSet<uint64> Seen;
+	Seen.Reserve(Edges.Num());
+	// Ascending scan with in-place removal would skip; descending keeps earlier indices stable -- but
+	// duplicate detection must keep the FIRST occurrence, so collect keys ascending, remove descending.
+	TArray<bool> bRemove;
+	bRemove.SetNumZeroed(Edges.Num());
+	for (int32 e = 0; e < Edges.Num(); ++e)
+	{
+		const FPCGExClusterSketchEdge& E = Edges[e];
+		if (E.A < 0 || E.B < 0 || E.A >= NumVtx || E.B >= NumVtx || E.A == E.B)
+		{
+			bRemove[e] = true;
+			continue;
+		}
+		bool bAlreadySeen = false;
+		Seen.Add(PCGEx::H64U(static_cast<uint32>(E.A), static_cast<uint32>(E.B)), &bAlreadySeen);
+		bRemove[e] = bAlreadySeen;
+	}
+	for (int32 e = Edges.Num() - 1; e >= 0; --e)
+	{
+		if (!bRemove[e])
+		{
+			continue;
+		}
+		Edges.RemoveAt(e);
+		for (FPCGExClusterDataChannel& Channel : EdgeChannels)
+		{
+			Channel.RemoveAt(e);
+		}
+		++NumRemoved;
+	}
+	return NumRemoved;
 }
 
 void FPCGExClusterSketchModel::Validate(FPCGExClusterSketchValidation& OutSummary) const
@@ -269,6 +356,39 @@ void FPCGExClusterSketchModel::Validate(FPCGExClusterSketchValidation& OutSummar
 		if (Degree[i] == 0)
 		{
 			++OutSummary.IsolatedVertices;
+		}
+	}
+
+	// Collocation: bound-vs-bound by exact coord, free-vs-free by position. (Cross-kind collisions need
+	// a basis to resolve bound locations and are the editor's job to prevent, not this basis-less scan's.)
+	{
+		constexpr double PositionEpsilonSq = 0.01 * 0.01;
+		TSet<FIntVector> SeenCoords;
+		TArray<FVector> FreeLocations;
+		for (const FPCGExClusterSketchVertex& V : Vertices)
+		{
+			if (V.bLatticeBound)
+			{
+				bool bAlreadySeen = false;
+				SeenCoords.Add(V.LatticeCoord, &bAlreadySeen);
+				if (bAlreadySeen)
+				{
+					++OutSummary.CollocatedVertices;
+				}
+			}
+			else
+			{
+				const FVector Location = V.Transform.GetLocation();
+				for (const FVector& Earlier : FreeLocations)
+				{
+					if (FVector::DistSquared(Location, Earlier) <= PositionEpsilonSq)
+					{
+						++OutSummary.CollocatedVertices;
+						break;
+					}
+				}
+				FreeLocations.Add(Location);
+			}
 		}
 	}
 

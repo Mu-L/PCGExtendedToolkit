@@ -17,9 +17,10 @@ class FPCGExSketchEditController;
  * a level-viewport host can drive the same controller from its own behavior sources.
  *
  * Input map: LMB click = select (Ctrl toggles / adds a vertex on empty space); LMB drag on a vertex =
- * move; Shift+drag from a vertex = connect (release on empty extrudes); Delete = delete selection;
- * Escape = cancel drag / clear selection. Camera navigation stays fully stock -- empty-space plain
- * clicks/drags are deliberately NOT captured.
+ * move; Shift+drag from a vertex = connect (release on empty extrudes); Alt+click on an edge = delete
+ * it; Delete = delete selection; Escape = cancel drag / clear selection. Camera navigation stays fully
+ * stock -- empty-space plain clicks/drags are deliberately NOT captured, and the Alt claim is scoped to
+ * presses landing exactly on an edge (an Alt-orbit started there loses one gesture, deletes nothing).
  */
 class PCGEXGRAPHSEDITOR_API FPCGExClusterSketchViewportClient final
 	: public FEditorViewportClient,
@@ -36,6 +37,9 @@ public:
 	virtual void Draw(const FSceneView* View, FPrimitiveDrawInterface* PDI) override;
 	virtual bool InputKey(const FInputKeyEventArgs& EventArgs) override;
 	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
+	/** Alt+LMB never reaches the ITF router (camera tracking suppresses tools-context routing), so the
+	 *  Alt+click edge-delete rides the legacy click path instead. */
+	virtual void ProcessClick(FSceneView& View, HHitProxy* HitProxy, FKey Key, EInputEvent Event, uint32 HitX, uint32 HitY) override;
 
 	//~ IInputBehaviorSource
 	virtual const UInputBehaviorSet* GetInputBehaviors() const override { return InputBehaviorSet; }
@@ -63,6 +67,7 @@ public:
 private:
 	static constexpr int CtrlModifierID = 1;
 	static constexpr int ShiftModifierID = 2;
+	static constexpr int AltModifierID = 3;
 
 	TSharedPtr<FPCGExSketchEditController> Controller;
 	FEditorModeTools* OwnerModeTools = nullptr;
@@ -70,4 +75,5 @@ private:
 
 	bool bCtrlDown = false;
 	bool bShiftDown = false;
+	bool bAltDown = false;
 };

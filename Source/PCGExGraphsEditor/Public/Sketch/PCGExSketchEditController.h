@@ -109,10 +109,22 @@ public:
 	void SelectAll();
 	void ClearSelection();
 	int32 AddVertexAtRay(const FRay& WorldRay);
+	/** Delete the edge under the ray (the Alt+click gesture). @return true if one was removed. */
+	bool DeleteEdgeAtRay(const FRay& WorldRay);
 
 	//~ Snapping
 	bool IsSnapEnabled() const { return bSnapEnabled; }
 	void SetSnapEnabled(const bool bEnabled) { bSnapEnabled = bEnabled; }
+
+	//~ Gesture options
+	/** When true, a connect drag may also latch the vertex under the POINTER (tight radius) as its
+	 *  target; the snapped-release-point resolution is always on (the collocation guarantee). */
+	bool IsConnectToHoverEnabled() const { return bConnectToHover; }
+	void SetConnectToHoverEnabled(const bool bEnabled) { bConnectToHover = bEnabled; }
+
+	/** Host sets this while its delete modifier is held; the hovered edge draws as a delete target. */
+	void SetEdgeDeleteIntent(const bool bIntent) { bEdgeDeleteIntent = bIntent; }
+	bool GetEdgeDeleteIntent() const { return bEdgeDeleteIntent; }
 	/** Basis from the target's provider; false when there is none. Rebuilt on demand -- never cached. */
 	bool GetBasis(FPCGExLatticeBasis& OutBasis) const;
 
@@ -127,6 +139,9 @@ public:
 	int32 GetDragTargetVertex() const { return DragTargetVertexIndex; }
 	/** Current drag point in MODEL space (snap already applied) -- the move ghost / connect line end. */
 	const FVector& GetDragPreviewLocal() const { return DragPreviewLocal; }
+	/** Vertex the dragged one would MERGE into on release (clusters cannot hold collocated vertices);
+	 *  INDEX_NONE when the drop point is clear. Drawn as the merge highlight. */
+	int32 GetMergeCandidate() const { return MergeCandidateVertex; }
 
 	bool HasSelection() const { return !SelectedVertices.IsEmpty() || !SelectedEdges.IsEmpty(); }
 
@@ -139,6 +154,12 @@ private:
 	/** Ray point on the gesture plane: through InAnchor, lattice-plane normal for a 2-axis basis, else
 	 *  Z-up; falls back to a fixed distance along the ray when near-parallel. */
 	FVector RayPointOnWorkPlane(const FRay& LocalRay, const FVector& InAnchor, const FPCGExLatticeBasis* Basis) const;
+	/** Nearest vertex (excluding IgnoreVertex) whose resolved location sits within merge reach of
+	 *  LocalPoint -- pick radius, capped below half a cell so it can never bridge adjacent lattice
+	 *  nodes. Drives merge-on-drop and place-reuse. LayerRef breaks projection stacks: under a
+	 *  rank-collapsed basis many vertices resolve to one spot, and a candidate sharing LayerRef's
+	 *  UNSPANNED coord components (the gesture source's layer) wins over a merely-nearest one. */
+	int32 FindNearbyVertex(const FRay& LocalRay, const FVector& LocalPoint, int32 IgnoreVertex, const FPCGExLatticeBasis* Basis, const FIntVector* LayerRef = nullptr) const;
 	void DropInvalidIndices();
 	void EndTransaction();
 
@@ -151,6 +172,7 @@ private:
 	EDragMode DragMode = EDragMode::None;
 	int32 DragVertexIndex = INDEX_NONE;
 	int32 DragTargetVertexIndex = INDEX_NONE;
+	int32 MergeCandidateVertex = INDEX_NONE;
 	FVector DragPreviewLocal = FVector::ZeroVector;
 	FVector DragPlaneAnchor = FVector::ZeroVector;
 	FVector DragPlaneNormal = FVector::UpVector;
@@ -161,4 +183,6 @@ private:
 	TUniquePtr<FScopedTransaction> ActiveTransaction;
 
 	bool bSnapEnabled = true;
+	bool bConnectToHover = true;
+	bool bEdgeDeleteIntent = false;
 };
