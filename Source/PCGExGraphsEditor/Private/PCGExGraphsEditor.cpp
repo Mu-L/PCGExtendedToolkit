@@ -14,6 +14,19 @@
 #include "ThumbnailRendering/ThumbnailManager.h"
 #include "UObject/UObjectGlobals.h"
 
+namespace PCGExGraphsEditor
+{
+	/** FCoreDelegates::OnPostEngineInit became an accessor in 5.8, where the member itself is deprecated. */
+	FSimpleMulticastDelegate& OnPostEngineInit()
+	{
+#if PCGEX_ENGINE_VERSION >= 508
+		return FCoreDelegates::GetOnPostEngineInit();
+#else
+		return FCoreDelegates::OnPostEngineInit;
+#endif
+	}
+}
+
 void FPCGExGraphsEditorModule::StartupModule()
 {
 	IPCGExEditorModuleInterface::StartupModule();
@@ -27,7 +40,7 @@ void FPCGExGraphsEditorModule::StartupModule()
 	}
 	else
 	{
-		OnPostEngineInitHandle = FCoreDelegates::GetOnPostEngineInit().AddRaw(this, &FPCGExGraphsEditorModule::RegisterThumbnailRenderer);
+		OnPostEngineInitHandle = PCGExGraphsEditor::OnPostEngineInit().AddRaw(this, &FPCGExGraphsEditorModule::RegisterThumbnailRenderer);
 	}
 
 	// Cross-module bridge: the sketch HOSTS are runtime (asset, component), but creating an asset needs
@@ -77,7 +90,7 @@ void FPCGExGraphsEditorModule::ShutdownModule()
 {
 	PCGExSketch::GSaveSketchAsAssetFn = nullptr;
 
-	FCoreDelegates::GetOnPostEngineInit().Remove(OnPostEngineInitHandle);
+	PCGExGraphsEditor::OnPostEngineInit().Remove(OnPostEngineInitHandle);
 
 	if (bThumbnailRendererRegistered && UObjectInitialized())
 	{

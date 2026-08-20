@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PCGExVersion.h"
 #include "Tools/LegacyEdModeWidgetHelpers.h"
 
 #include "PCGExSketchEditorMode.generated.h"
@@ -51,8 +52,11 @@ public:
 	virtual bool HandleClick(FEditorViewportClient* InViewportClient, HHitProxy* HitProxy, const FViewportClick& Click) override;
 	virtual bool InputKey(FEditorViewportClient* ViewportClient, FViewport* Viewport, FKey Key, EInputEvent Event) override;
 
-	/** False, or the mode manager disables editor gizmos and moving the host actor becomes impossible. */
+#if PCGEX_ENGINE_VERSION >= 508
+	/** False, or the mode manager disables editor gizmos and moving the host actor becomes impossible.
+	 *  The hook only exists from 5.8; before it, nothing gated those interactions. */
 	virtual bool RequiresLegacyViewportInteractions() const override { return false; }
+#endif
 	//~ End UEdMode
 
 private:
