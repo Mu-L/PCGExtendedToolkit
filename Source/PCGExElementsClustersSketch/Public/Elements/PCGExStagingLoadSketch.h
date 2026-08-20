@@ -60,7 +60,7 @@ public:
 
 	virtual FLinearColor GetNodeTitleColor() const override
 	{
-		return PCGEX_NODE_COLOR_NAME(ClusterGenerator);
+		return PCGEX_NODE_COLOR_OPTIN_NAME(Sampling);
 	}
 
 	virtual bool CanDynamicallyTrackKeys() const override
