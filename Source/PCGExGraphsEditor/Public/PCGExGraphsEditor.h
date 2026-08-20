@@ -13,4 +13,11 @@ class FPCGExGraphsEditorModule final : public IPCGExEditorModuleInterface
 public:
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
+
+private:
+	/** UThumbnailManager is only safe to touch once the engine is up; see StartupModule. */
+	void RegisterThumbnailRenderer();
+
+	FDelegateHandle OnPostEngineInitHandle;
+	bool bThumbnailRendererRegistered = false;
 };

@@ -5,14 +5,30 @@
 
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
+#include "Engine/Engine.h"
 #include "Helpers/PCGExObjectNotifyHelpers.h"
+#include "Misc/CoreDelegates.h"
 #include "Sketch/PCGExClusterSketch.h"
 #include "Sketch/PCGExClusterSketchFactories.h"
+#include "Sketch/PCGExClusterSketchThumbnailRenderer.h"
+#include "ThumbnailRendering/ThumbnailManager.h"
+#include "UObject/UObjectGlobals.h"
 
 void FPCGExGraphsEditorModule::StartupModule()
 {
 	IPCGExEditorModuleInterface::StartupModule();
 	// Factories and asset definitions self-register through the AssetDefinition subsystem.
+
+	// Topology thumbnails for sketch assets. GEngine != null means engine init is done and
+	// UThumbnailManager is safe to touch; otherwise defer to PostEngineInit.
+	if (GEngine)
+	{
+		RegisterThumbnailRenderer();
+	}
+	else
+	{
+		OnPostEngineInitHandle = FCoreDelegates::GetOnPostEngineInit().AddRaw(this, &FPCGExGraphsEditorModule::RegisterThumbnailRenderer);
+	}
 
 	// Cross-module bridge: the sketch HOSTS are runtime (asset, component), but creating an asset needs
 	// the save dialog + package machinery, which only exists here.
@@ -51,9 +67,22 @@ void FPCGExGraphsEditorModule::StartupModule()
 	};
 }
 
+void FPCGExGraphsEditorModule::RegisterThumbnailRenderer()
+{
+	UThumbnailManager::Get().RegisterCustomRenderer(UPCGExClusterSketch::StaticClass(), UPCGExClusterSketchThumbnailRenderer::StaticClass());
+	bThumbnailRendererRegistered = true;
+}
+
 void FPCGExGraphsEditorModule::ShutdownModule()
 {
 	PCGExSketch::GSaveSketchAsAssetFn = nullptr;
+
+	FCoreDelegates::GetOnPostEngineInit().Remove(OnPostEngineInitHandle);
+
+	if (bThumbnailRendererRegistered && UObjectInitialized())
+	{
+		UThumbnailManager::Get().UnregisterCustomRenderer(UPCGExClusterSketch::StaticClass());
+	}
 
 	IPCGExEditorModuleInterface::ShutdownModule();
 }

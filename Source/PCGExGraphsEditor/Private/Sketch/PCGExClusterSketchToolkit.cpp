@@ -10,6 +10,7 @@
 #include "Sketch/PCGExClusterSketch.h"
 #include "Sketch/PCGExClusterSketchComponent.h"
 #include "Sketch/PCGExClusterSketchEditor.h"
+#include "Sketch/PCGExClusterSketchStyle.h"
 #include "Sketch/PCGExClusterSketchViewportClient.h"
 #include "Sketch/PCGExSketchEditController.h"
 
@@ -153,6 +154,10 @@ void FPCGExClusterSketchToolkit::PostInitAssetEditor()
 	{
 		Bounds = FBox(FVector(-300.0), FVector(300.0));
 	}
+	// Rotation FIRST: FocusViewportOnBox backs the camera along the CURRENT view direction, so this is
+	// what turns framing into the canonical three-quarter view instead of the flat default. Same angle
+	// the thumbnail projects along, so opening an asset shows what its thumbnail promised.
+	ViewportClient->SetViewRotation(UPCGExClusterSketchStyleSettings::Get()->DefaultViewRotation);
 	ViewportClient->FocusViewportOnBox(Bounds.ExpandBy(Bounds.GetExtent() * 0.25));
 
 	if (ViewportClient->Viewport)

@@ -41,7 +41,7 @@ public:
 
 	virtual TConstArrayView<FAssetCategoryPath> GetAssetCategories() const override
 	{
-		static const auto Categories = {FAssetCategoryPath(INVTEXT("PCGEx"))};
+		static const auto Categories = {FAssetCategoryPath(INVTEXT("PCGEx")) / INVTEXT("Core")};
 		return Categories;
 	}
 

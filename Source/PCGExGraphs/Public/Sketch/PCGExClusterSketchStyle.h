@@ -189,4 +189,10 @@ public:
 	/** Lattice axes drawn at the basis origin while editing. */
 	UPROPERTY(EditAnywhere, Config, Category = "Edit|Affordances")
 	FLinearColor BasisColor = FLinearColor(0.35f, 0.5f, 0.9f, 0.6f);
+
+	/** Canonical three-quarter view of a sketch: the standalone editor opens on it, and thumbnails are
+	 *  projected along it. Deliberately neither axis-aligned nor 45 degrees -- a lattice sketch is mostly
+	 *  axis-aligned, and either would collapse whole rows of edges onto a single line. */
+	UPROPERTY(EditAnywhere, Config, Category = "Edit|Viewport")
+	FRotator DefaultViewRotation = FRotator(-25.0, 145.0, 0.0);
 };
