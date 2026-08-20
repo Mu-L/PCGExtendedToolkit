@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 
 #include "Core/PCGExAssetCollection.h"
+#include "Helpers/PCGExArrayHelpers.h"
 #include "Sketch/PCGExClusterSketch.h"
 
 #include "PCGExClusterSketchCollection.generated.h"

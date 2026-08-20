@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "PCGExElementsClustersSketch.h"
@@ -18,6 +18,9 @@ void FPCGExElementsClustersSketchModule::StartupModule()
 
 void FPCGExElementsClustersSketchModule::ShutdownModule()
 {
+	// The registry outlives this module and holds closures compiled into its DLL.
+	PCGExAssetCollection::FTypeRegistry::Get().Unregister(PCGExSketch::CollectionTypeId);
+
 	IPCGExModuleInterface::ShutdownModule();
 }
 

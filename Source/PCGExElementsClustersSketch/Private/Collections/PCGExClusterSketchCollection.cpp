@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Collections/PCGExClusterSketchCollection.h"
@@ -9,9 +9,7 @@
 
 #include "Helpers/PCGExStreamingHelpers.h"
 
-// Registered from StartupModule, NOT from a static initializer -- see the header for why. Hand-built
-// FTypeInfo rather than PCGEX_REGISTER_COLLECTION_TYPE*, which all emit static auto-registrars;
-// UPCGExOmniCollection registers the same way.
+// Registered from StartupModule, not a static initializer -- see the header for why.
 void PCGExSketch::RegisterCollectionType()
 {
 	using namespace PCGExAssetCollection;
@@ -25,11 +23,7 @@ void PCGExSketch::RegisterCollectionType()
 	FTypeRegistry::Get().Register(Info);
 
 #if WITH_EDITOR
-	// Omni drag-drop ingestion, registered from HERE rather than PCGExOmniCollection.cpp so that
-	// Collections keeps no dependency on the sketch module. Must follow Register above: Customize
-	// mutates an existing entry.
-	// Priority 15 sits between Mesh/Skinned (10) and Actor (20). No detector conflict exists:
-	// UPCGExClusterSketch is a plain UDataAsset, and the PCGDataAsset detector tests UPCGDataAsset.
+	// Omni drag-drop ingestion. Must follow Register: Customize mutates an existing entry.
 	FTypeRegistry::Get().Customize(
 		PCGExSketch::CollectionTypeId,
 		[](FTypeInfo& Info)
@@ -57,6 +51,14 @@ bool FPCGExClusterSketchCollectionEntry::Validate(const UPCGExAssetCollection* P
 
 void FPCGExClusterSketchCollectionEntry::UpdateStaging(const UPCGExAssetCollection* OwningCollection, int32 InInternalIndex, bool bRecursive)
 {
+	// Authored staging carries authoritative bounds from an external system; refresh identity only.
+	if (Staging.bAuthored && !bIsSubCollection)
+	{
+		Staging.Path = Sketch.ToSoftObjectPath();
+		FPCGExAssetCollectionEntry::UpdateStaging(OwningCollection, InInternalIndex, bRecursive);
+		return;
+	}
+
 	ClearManagedSockets();
 
 	if (bIsSubCollection)
@@ -71,9 +73,21 @@ void FPCGExClusterSketchCollectionEntry::UpdateStaging(const UPCGExAssetCollecti
 
 	if (const UPCGExClusterSketch* S = Sketch.Get())
 	{
-		// Resolves lattice-bound vertices through the sketch's own basis, so staged bounds match the
-		// printed extent rather than the authored transforms.
+		// GetBounds resolves lattice-bound vertices through the snap provider's basis, and the provider
+		// may need its own soft refs resolved first (see UPCGExClusterSnapProvider::CollectAssetDependencies);
+		// without them BuildBasis fails and bounds silently fall back to the authored transforms.
+		TArray<FSoftObjectPath> NestedPaths;
+		S->CollectAssetDependencies(NestedPaths);
+
+		TSharedPtr<FStreamableHandle> NestedHandle;
+		if (!NestedPaths.IsEmpty())
+		{
+			const TSharedPtr<TSet<FSoftObjectPath>> UniqueNested = MakeShared<TSet<FSoftObjectPath>>(NestedPaths);
+			NestedHandle = PCGExHelpers::LoadBlocking_AnyThread(UniqueNested);
+		}
+
 		Staging.Bounds = S->GetBounds();
+		PCGExHelpers::SafeReleaseHandle(NestedHandle);
 	}
 	else
 	{

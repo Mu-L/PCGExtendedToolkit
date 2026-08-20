@@ -88,7 +88,7 @@ public:
 	 * Print this sketch into InVtxIO and launch its cluster compile: the asset assembles the print
 	 * request from its OWN snap provider and decorators, so a consumer just hands over an IO and gets
 	 * the finished Vtx/Edges pair. Consumers printing a loose model (a component's inline sketch) call
-	 * PCGExSketch::StagingLoadSketch directly instead.
+	 * PCGExSketch::PrintClusterSketch directly instead.
 	 *
 	 * @param OnCompiled fires from the compile end callback, after the print context's VtxIndexMap is
 	 *        filled, with the success flag.

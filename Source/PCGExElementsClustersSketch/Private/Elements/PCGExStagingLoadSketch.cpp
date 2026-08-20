@@ -26,24 +26,26 @@ namespace PCGExStagingLoadSketch
 {
 	PCGEX_CTX_STATE(State_PrintingRoots)
 
-	/**
-	 * Resolves every target's staged pick to a sketch path, deduped into UniqueSketchPaths, and leaves
-	 * SketchIdx holding indices into THAT array -- AdvanceWork swaps them for UniqueSketches indices
-	 * once the paths have loaded. Runs in Boot so RegisterAssetDependencies can register the paths.
-	 */
+	/** Resolves every target's staged pick into UniqueSketchPaths, filling SketchIdx. Runs in Boot so
+	 *  RegisterAssetDependencies, which runs after it, can hand the paths to the async load phase. */
 	bool ResolveStagedSketches(FPCGExStagingLoadSketchContext* Context, const UPCGExStagingLoadSketchSettings* Settings)
 	{
-		Context->CollectionUnpacker = MakeShared<PCGExCollections::FPickUnpacker>();
-		Context->CollectionUnpacker->UnpackPin(Context);
+		// Scoped: only FSoftObjectPath values escape, so nothing downstream needs the unpacker's
+		// collection handles pinned for the rest of the execution.
+		PCGExCollections::FPickUnpacker Unpacker;
+		Unpacker.UnpackPin(Context);
 
-		if (!Context->CollectionUnpacker->HasValidMapping())
+		if (!Unpacker.HasValidMapping())
 		{
 			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Could not rebuild a valid asset mapping from the provided map."));
 			return false;
 		}
 
+		const FName EntryIdxName = Settings->GetEntryIdxAttributeName();
+		PCGEX_VALIDATE_NAME_C(Context, EntryIdxName)
+
 		const TSharedPtr<PCGExData::TBuffer<int64>> HashGetter =
-			Context->TargetsDataFacade->GetReadable<int64>(Settings->GetEntryIdxAttributeName(), PCGExData::EIOSide::In, true);
+			Context->TargetsDataFacade->GetReadable<int64>(EntryIdxName, PCGExData::EIOSide::In, false);
 
 		if (!HashGetter)
 		{
@@ -51,7 +53,14 @@ namespace PCGExStagingLoadSketch
 			return false;
 		}
 
-		TMap<FSoftObjectPath, int32> PathToIndex;
+		// Cache verdict for a pick hash. Non-sketch and broken are distinguished because only broken
+		// counts toward the warning, but BOTH must be cached or a repeated bad pick re-resolves.
+		constexpr int32 NonSketchPick = -1;
+		constexpr int32 BrokenPick = -2;
+
+		// Keyed on the pick hash, not the resolved path: a repeated pick then costs one integer probe
+		// instead of a full entry resolve plus an FName-pair path hash.
+		TMap<int64, int32> HashToIndex;
 		const int32 NumTargets = Context->SketchIdx.Num();
 
 		for (int32 i = 0; i < NumTargets; ++i)
@@ -62,44 +71,32 @@ namespace PCGExStagingLoadSketch
 				continue;
 			}
 
-			// Ignored: secondary picks only ever come from mesh micro caches.
-			int16 SecondaryIndex = 0;
-			const FPCGExEntryAccessResult Result = Context->CollectionUnpacker->ResolveEntry(Hash, SecondaryIndex);
-			if (!Result.IsValid())
+			const int32* Cached = HashToIndex.Find(Hash);
+			if (!Cached)
 			{
-				++Context->NumUnresolvedTargets;
-				continue;
+				// Ignored: secondary picks only ever come from mesh micro caches.
+				int16 SecondaryIndex = 0;
+				const FPCGExEntryAccessResult Result = Unpacker.ResolveEntry(Hash, SecondaryIndex);
+
+				int32 Verdict = BrokenPick;
+				if (Result.IsValid())
+				{
+					if (!Result.Entry->IsType(PCGExSketch::CollectionTypeId))
+					{
+						Verdict = NonSketchPick;
+					}
+					else
+					{
+						const FSoftObjectPath Path = static_cast<const FPCGExClusterSketchCollectionEntry*>(Result.Entry)->Sketch.ToSoftObjectPath();
+						if (!Path.IsNull()) { Verdict = Context->UniqueSketchPaths.AddUnique(Path); }
+					}
+				}
+
+				Cached = &HashToIndex.Add(Hash, Verdict);
 			}
 
-			// Expected traffic in a mixed host: a staged mesh/actor/level pick flowing past a sketch
-			// node is not an error, so it is skipped without counting as unresolved.
-			if (!Result.Entry->IsType(PCGExSketch::CollectionTypeId))
-			{
-				continue;
-			}
-
-			const FSoftObjectPath Path = static_cast<const FPCGExClusterSketchCollectionEntry*>(Result.Entry)->Sketch.ToSoftObjectPath();
-			if (Path.IsNull())
-			{
-				++Context->NumUnresolvedTargets;
-				continue;
-			}
-
-			if (const int32* Existing = PathToIndex.Find(Path))
-			{
-				Context->SketchIdx[i] = *Existing;
-				continue;
-			}
-
-			const int32 NewIndex = Context->UniqueSketchPaths.Add(Path);
-			PathToIndex.Add(Path, NewIndex);
-			Context->SketchIdx[i] = NewIndex;
-		}
-
-		if (Context->UniqueSketchPaths.IsEmpty())
-		{
-			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("No Cluster Sketch entry could be resolved from the staged targets."));
-			return false;
+			if (*Cached == BrokenPick) { ++Context->NumUnresolvedTargets; }
+			else { Context->SketchIdx[i] = *Cached; }
 		}
 
 		return true;
@@ -295,27 +292,20 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 
 		if (Settings->Source == EPCGExClusterSketchSource::CollectionMap)
 		{
-			// Boot left SketchIdx indexing UniqueSketchPaths; the paths have loaded by now, so swap
-			// them for UniqueSketches indices through the same dedupe every other source uses.
-			TArray<int32> PathToSketch;
-			PathToSketch.Reserve(Context->UniqueSketchPaths.Num());
+			// UniqueSketches is built PARALLEL to UniqueSketchPaths -- null slots kept -- so the
+			// indices Boot already stored in SketchIdx stay valid and need no remap.
+			Context->UniqueSketches.Reserve(Context->UniqueSketchPaths.Num());
 			for (const FSoftObjectPath& Path : Context->UniqueSketchPaths)
 			{
-				PathToSketch.Add(ResolveIndex(TSoftObjectPtr<UPCGExClusterSketch>(Path).Get()));
+				Context->UniqueSketches.Add(TSoftObjectPtr<UPCGExClusterSketch>(Path).Get());
 			}
 
 			for (int32 i = 0; i < NumTargets; ++i)
 			{
-				const int32 PathIndex = Context->SketchIdx[i];
-				if (PathIndex == -1)
+				const int32 Index = Context->SketchIdx[i];
+				if (Index != -1 && !Context->UniqueSketches[Index])
 				{
-					// Never referenced a sketch entry -- already accounted for in Boot.
-					continue;
-				}
-
-				Context->SketchIdx[i] = PathToSketch[PathIndex];
-				if (Context->SketchIdx[i] == -1)
-				{
+					Context->SketchIdx[i] = -1;
 					++NumUnresolved;
 				}
 			}
@@ -360,9 +350,19 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 				         FText::AsNumber(NumUnresolved)));
 		}
 
+		// A staged batch that picked no sketch at all is normal in a mixed host -- stage empty outputs
+		// rather than failing. A hand-authored Asset source resolving to nothing IS a misconfiguration.
 		if (Context->UniqueSketches.IsEmpty())
 		{
-			return Context->CancelExecution(TEXT("No Cluster Sketch could be resolved from the targets."));
+			if (Settings->Source != EPCGExClusterSketchSource::CollectionMap)
+			{
+				return Context->CancelExecution(TEXT("No Cluster Sketch could be resolved from the targets."));
+			}
+
+			Context->VtxChildCollection->StageOutputs();
+			Context->EdgeChildCollection->StageOutputs();
+			Context->Done();
+			return Context->TryComplete();
 		}
 
 		// Dynamic tracking: editing a printed sketch -- or anything it references -- re-executes the
@@ -371,6 +371,7 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 		TArray<FSoftObjectPath> NestedDependencies;
 		for (const TObjectPtr<UPCGExClusterSketch>& Sketch : Context->UniqueSketches)
 		{
+			if (!Sketch) { continue; }
 			Context->EDITOR_TrackPath(FSoftObjectPath(Sketch));
 			Sketch->CollectAssetDependencies(NestedDependencies);
 		}
@@ -401,6 +402,8 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 
 		for (int32 i = 0; i < NumUnique; ++i)
 		{
+			if (!Context->UniqueSketches[i]) { continue; }
+
 			const TSharedPtr<PCGExData::FPointIO> RootIO = Context->RootVtx->Emplace_GetRef<UPCGExClusterNodesData>();
 			if (!RootIO)
 			{
@@ -432,7 +435,7 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 		for (int32 i = 0; i < NumTargets; ++i)
 		{
 			const int32 SketchIndex = Context->SketchIdx[i];
-			if (SketchIndex == -1 || !Context->GraphBuilders.IsValidIndex(SketchIndex))
+			if (SketchIndex == -1 || !Context->GraphBuilders.IsValidIndex(SketchIndex) || !Context->GraphBuilders[SketchIndex])
 			{
 				continue;
 			}

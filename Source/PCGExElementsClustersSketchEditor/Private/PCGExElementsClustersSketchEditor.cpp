@@ -5,6 +5,7 @@
 
 #include "AssetToolsModule.h"
 #include "Collections/PCGExClusterSketchCollectionActions.h"
+#include "Details/Collections/PCGExCollectionEditorTypeRegistry.h"
 #include "IAssetTools.h"
 #include "Engine/Engine.h"
 #include "Helpers/PCGExObjectNotifyHelpers.h"
@@ -94,6 +95,9 @@ void FPCGExElementsClustersSketchEditorModule::RegisterThumbnailRenderer()
 void FPCGExElementsClustersSketchEditorModule::ShutdownModule()
 {
 	PCGExSketch::GSaveSketchAsAssetFn = nullptr;
+
+	// The registry outlives this module and holds closures compiled into its DLL.
+	FCollectionEditorTypeRegistry::Get().Unregister(PCGExSketch::CollectionTypeId);
 
 	PCGExElementsClustersSketchEditor::OnPostEngineInit().Remove(OnPostEngineInitHandle);
 

@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -23,11 +23,6 @@ namespace PCGExClusterSketchCollectionActions
 	 * static initialization and crash.
 	 */
 	void RegisterEditorType();
-
-	void CreateCollectionFrom(const TArray<FAssetData>& SelectedAssets);
-	void UpdateCollectionsFrom(
-		const TArray<TObjectPtr<UPCGExClusterSketchCollection>>& SelectedCollections,
-		const TArray<FAssetData>& SelectedAssets);
 };
 
 UCLASS()

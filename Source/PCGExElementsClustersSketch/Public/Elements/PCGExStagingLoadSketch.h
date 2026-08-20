@@ -18,11 +18,6 @@
 class UPCGExClusterSketch;
 struct FPCGExClusterSketchPrintContext;
 
-namespace PCGExCollections
-{
-	class FPickUnpacker;
-}
-
 namespace PCGEx
 {
 	template <typename T>
@@ -60,8 +55,7 @@ class UPCGExStagingLoadSketchSettings : public UPCGExPointsProcessorSettings
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	// Shortname stays StagingLoadSketch: it feeds GetDefaultNodeName(), and the codebase already
-	// lets it diverge from the title (PCGDataAssetLoader -> "Staging : Load PCGData").
+	// Shortname feeds GetDefaultNodeName() and may diverge from the title (cf. PCGDataAssetLoader).
 	PCGEX_NODE_INFOS(StagingLoadSketch, "Staging : Load Sketch", "Prints Cluster Sketch assets onto staged points.");
 
 	virtual FLinearColor GetNodeTitleColor() const override
@@ -157,14 +151,8 @@ struct FPCGExStagingLoadSketchContext final : FPCGExPointsProcessorContext
 	TSharedPtr<PCGEx::TAssetLoader<UPCGExClusterSketch>> SketchLoader;
 	TObjectPtr<UPCGExClusterSketch> ConstantSketch;
 
-	/** CollectionMap source only. */
-	TSharedPtr<PCGExCollections::FPickUnpacker> CollectionUnpacker;
-
-	/**
-	 * CollectionMap source only: distinct sketch paths resolved from staged picks in Boot, so
-	 * RegisterAssetDependencies (which runs after Boot) can hand them to the normal async load phase.
-	 * SketchIdx indexes into THIS until the paths are resolved to objects, then into UniqueSketches.
-	 */
+	/** CollectionMap source only: distinct sketch paths resolved from staged picks in Boot.
+	 *  UniqueSketches is built parallel to this, so one index addresses both. */
 	TArray<FSoftObjectPath> UniqueSketchPaths;
 
 	/**
@@ -174,7 +162,8 @@ struct FPCGExStagingLoadSketchContext final : FPCGExPointsProcessorContext
 	 */
 	int32 NumUnresolvedTargets = 0;
 
-	/** Distinct sketches actually referenced, and the per-target index into them (-1 = skip). */
+	/** Distinct sketches referenced, and the per-target index into them (-1 = skip). In CollectionMap
+	 *  mode a slot is null when its path failed to load; every consumer skips null slots. */
 	TArray<TObjectPtr<UPCGExClusterSketch>> UniqueSketches;
 	TArray<int32> SketchIdx;
 
@@ -194,6 +183,8 @@ class FPCGExStagingLoadSketchElement final : public FPCGExPointsProcessorElement
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(StagingLoadSketch)
 
+	// Boot unpacks the Collection Map, whose cache-miss path marshals-and-waits on the game thread.
+	PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE()
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
