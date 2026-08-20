@@ -234,10 +234,19 @@ public:
 	virtual FBoxSphereBounds CalcBounds(const FTransform& LocalToWorld) const override;
 	virtual void OnRegister() override;
 	virtual void OnUnregister() override;
+	/** The instanced-mesh children are outered to the OWNER, and USceneComponent::DestroyComponent only
+	 *  re-parents children -- without this they survive as registered orphans, still drawing. */
+	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
 	//~ End UPrimitiveComponent
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+	virtual void PostEditUndo() override;
+
+	/** Coord/location coherence for the INLINE payload -- the same rule the asset host applies, so a
+	 *  sketch behaves identically whichever host carries it. Called by the inline snap provider. */
+	void EDITOR_OnSnapProviderChanged();
+	void EDITOR_SyncBoundVertices(bool bResnapFromLocation);
 
 	/**
 	 * Save the payload IN FORCE as a NEW Cluster Sketch asset (standard save dialog) and reference it.

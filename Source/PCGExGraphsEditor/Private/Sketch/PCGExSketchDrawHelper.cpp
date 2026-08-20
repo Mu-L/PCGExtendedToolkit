@@ -49,14 +49,17 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 	const TSet<int32>& SelectedVertices = Controller.GetSelectedVertices();
 	const TSet<int32>& SelectedEdges = Controller.GetSelectedEdges();
 
-	// Vertex locations resolved once, coord-derived for bound vertices (mirror of the print rule).
+	// Vertex locations resolved once, coord-derived for bound vertices. Model space is kept alongside
+	// world: the degeneracy test below measures against the model's own tolerance, and re-deriving a
+	// location per vertex per EDGE is what made that test cost O(E x V) every frame.
+	TArray<FVector> LocalLocations;
 	TArray<FVector> Locations;
+	LocalLocations.SetNumUninitialized(Model->Vertices.Num());
 	Locations.SetNumUninitialized(Model->Vertices.Num());
 	for (int32 i = 0; i < Model->Vertices.Num(); ++i)
 	{
-		const FPCGExClusterSketchVertex& V = Model->Vertices[i];
-		const FVector Local = (V.bLatticeBound && bHasBasis) ? Basis.CoordToWorld(V.LatticeCoord) : V.Transform.GetLocation();
-		Locations[i] = LocalToWorld.TransformPosition(Local);
+		LocalLocations[i] = FPCGExClusterSketchModel::ResolvedLocation(Model->Vertices[i], bHasBasis ? &Basis : nullptr);
+		Locations[i] = LocalToWorld.TransformPosition(LocalLocations[i]);
 	}
 
 	// Invalid-state highlight: vertices RESOLVING to the same printed location (duplicate coords,
@@ -132,7 +135,7 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		// (a cluster cannot carry it) and shouts; an edge merely CROSSING another is legitimate, and
 		// only whispers that a ghost is on offer. O(E x V), fine at sketch scale. While the host's
 		// delete modifier is held, the hovered edge reads as a delete target.
-		const bool bDegenerate = Model->FindVertexOnEdgeInterior(e, bHasBasis ? &Basis : nullptr) != INDEX_NONE;
+		const bool bDegenerate = Model->FindVertexOnEdgeInterior(e, LocalLocations) != INDEX_NONE;
 		FLinearColor Color = Style->EditEdge.Color;
 		if (CrossingEdges.Contains(e)) { Color = Style->EditVertexPhantom.Color; }
 		if (bSelected) { Color = Style->SelectedColor; }

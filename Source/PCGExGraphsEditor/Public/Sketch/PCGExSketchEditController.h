@@ -166,6 +166,15 @@ public:
 
 private:
 	//~ Internals (model space)
+	/** READ-ONLY view of the model. TSharedRef::operator-> hands back a non-const target, so every read
+	 *  path must ask for constness explicitly -- otherwise a host that is read-only for AUTHORING (a
+	 *  component instancing an asset) returns null and inspection dies along with editing. */
+	const FPCGExClusterSketchModel* GetReadModel() const;
+
+	/** Select a vertex and record it as the most recent one: gestures anchor on "last selected", which
+	 *  a TSet cannot answer (its iteration follows sparse-array slots, not selection order). */
+	void SelectVertex(int32 VertexIndex);
+
 	FRay ToLocal(const FRay& WorldRay) const;
 	FPCGExSketchHit HitTestLocal(const FRay& LocalRay) const;
 	/** Screen-constant pick cone, floored so picking is never TIGHTER than what is drawn: a mesh marker
@@ -197,6 +206,15 @@ private:
 
 	/** See GetModelRevision. */
 	int32 ModelRevision = 0;
+
+	/** Most recently selected vertex, or INDEX_NONE. */
+	int32 LastSelectedVertex = INDEX_NONE;
+
+	/** Model shape the cached Crossings were derived from. Recomputing them is O(E^2), and hovering
+	 *  cannot change the model, so the sweep only re-runs when this fingerprint moves. */
+	int32 CrossingsRevision = INDEX_NONE;
+	int32 CrossingsVertexCount = INDEX_NONE;
+	int32 CrossingsEdgeCount = INDEX_NONE;
 
 	TSet<int32> SelectedVertices;
 	TSet<int32> SelectedEdges;

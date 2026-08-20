@@ -51,14 +51,15 @@ namespace PCGExClusterSketchPrint
 		}
 	}
 
-	/** Dispatch one channel to its typed writer. bSkip lists come from the model's validation pass --
-	 *  a name that failed validation is skipped for EVERY channel carrying it (fail closed on dupes). */
+	/** Dispatch one channel to its typed writer. Issues are taken for the channel's OWN domain -- a name
+	 *  that failed validation is skipped for every channel carrying it there (fail closed on dupes),
+	 *  and never for the same name in the other domain. */
 	template <typename WriteFn>
-	void ForEachWritableChannel(const TArray<FPCGExClusterDataChannel>& Channels, const FPCGExClusterSketchValidation& Validation, WriteFn&& Write)
+	void ForEachWritableChannel(const TArray<FPCGExClusterDataChannel>& Channels, const FPCGExClusterSketchValidation::FChannelIssues& Issues, WriteFn&& Write)
 	{
 		for (const FPCGExClusterDataChannel& Channel : Channels)
 		{
-			if (Validation.InvalidChannelNames.Contains(Channel.Name) || Validation.MisalignedChannels.Contains(Channel.Name))
+			if (Issues.Rejects(Channel.Name))
 			{
 				continue;
 			}
@@ -169,7 +170,7 @@ namespace PCGExSketch
 					           FTEXT("{0} isolated sketch vertex/vertices will not be printed (clusters cannot represent them)."),
 					           FText::AsNumber(Validation.IsolatedVertices)));
 			}
-			if (!Validation.InvalidChannelNames.IsEmpty() || !Validation.MisalignedChannels.IsEmpty())
+			if (Validation.HasChannelIssues())
 			{
 				PCGE_LOG_C(Warning, GraphAndLog, InContext, FTEXT("Some sketch channels were skipped: unnamed, duplicated, reserved, or misaligned with their domain."));
 			}
@@ -286,7 +287,7 @@ namespace PCGExSketch
 		// values ride the reorder via MetadataEntry, an uncommitted buffer would flush positionally onto
 		// the reordered points.
 		PCGExClusterSketchPrint::ForEachWritableChannel(
-			Model.VertexChannels, Validation, [&](const FPCGExClusterDataChannel& Channel)
+			Model.VertexChannels, Validation.VertexChannelIssues, [&](const FPCGExClusterDataChannel& Channel)
 			{
 				switch (Channel.Type)
 				{
@@ -334,7 +335,7 @@ namespace PCGExSketch
 		{
 			const TSharedRef<PCGExData::FFacade> EdgesFacade = Data.EdgesDataFacade.ToSharedRef();
 			PCGExClusterSketchPrint::ForEachWritableChannel(
-				PrintContext->Model->EdgeChannels, ChannelValidation, [&](const FPCGExClusterDataChannel& Channel)
+				PrintContext->Model->EdgeChannels, ChannelValidation.EdgeChannelIssues, [&](const FPCGExClusterDataChannel& Channel)
 				{
 					switch (Channel.Type)
 					{

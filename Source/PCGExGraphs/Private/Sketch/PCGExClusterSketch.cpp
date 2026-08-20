@@ -155,6 +155,8 @@ void UPCGExClusterSketch::RemoveInvalidEdges()
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "RemoveInvalidEdges", "Remove Invalid Sketch Edges"));
 	Modify();
 	Model.RemoveInvalidEdges();
+	// Dropping edges can strand tool residue, same as every other edge-removing operation.
+	Model.RemoveOrphanSideEffectVertices();
 	PostEditChange();
 	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
 	PCGExEditor::NotifyObjectChanged(this);
@@ -168,8 +170,8 @@ void UPCGExClusterSketch::SplitOverlappingEdges()
 
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "SplitOverlappingEdges", "Split Overlapping Sketch Edges"));
 	Modify();
-	// Vertex-on-edge first: a crossing insertion adds vertices that the containment pass would then
-	// have to re-scan, while splitting first only ever shortens the segments crossings are found on.
+	// Order is free: materializing a crossing enforces separation around the vertex it inserts, so the
+	// second pass cannot leave containment residue behind for a third press to find.
 	Model.SplitAllOverlappingEdges(BasisPtr);
 	Model.InsertCrossingVertices(BasisPtr);
 	PostEditChange();

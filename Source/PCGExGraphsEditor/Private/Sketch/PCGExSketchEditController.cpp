@@ -89,6 +89,18 @@ bool FPCGExSketchEditController::GetBasis(FPCGExLatticeBasis& OutBasis) const
 	return Provider ? Provider->BuildBasis(OutBasis) : false;
 }
 
+const FPCGExClusterSketchModel* FPCGExSketchEditController::GetReadModel() const
+{
+	const IPCGExSketchEditTarget& ConstTarget = Target.Get();
+	return ConstTarget.GetModel();
+}
+
+void FPCGExSketchEditController::SelectVertex(const int32 VertexIndex)
+{
+	SelectedVertices.Add(VertexIndex);
+	LastSelectedVertex = VertexIndex;
+}
+
 FRay FPCGExSketchEditController::ToLocal(const FRay& WorldRay) const
 {
 	const FTransform WorldToLocal = Target->GetLocalToWorld().Inverse();
@@ -128,14 +140,24 @@ FVector FPCGExSketchEditController::VertexLocation(const FPCGExClusterSketchVert
 
 FPCGExSketchHit FPCGExSketchEditController::HitTest(const FRay& WorldRay) const
 {
-	return HitTestLocal(ToLocal(WorldRay));
+	const FRay LocalRay = ToLocal(WorldRay);
+	FPCGExSketchHit Hit = HitTestLocal(LocalRay);
+
+	// ToLocal renormalizes, so RayT comes back in MODEL space. Both consumers -- the ITF router's
+	// hit-depth arbitration and the mode's nearest-hit comparison -- read it as a WORLD depth, and a
+	// scaled host would otherwise outbid or lose against every other behaviour by its scale factor.
+	if (Hit.IsHit())
+	{
+		Hit.RayT *= Target->GetLocalToWorld().TransformVector(LocalRay.Direction).Size();
+	}
+	return Hit;
 }
 
 FPCGExSketchHit FPCGExSketchEditController::HitTestLocal(const FRay& LocalRay) const
 {
 	FPCGExSketchHit Hit;
 
-	const FPCGExClusterSketchModel* Model = Target->GetModel();
+	const FPCGExClusterSketchModel* Model = GetReadModel();
 	if (!Model)
 	{
 		return Hit;
@@ -211,8 +233,9 @@ FPCGExSketchHit FPCGExSketchEditController::HitTestLocal(const FRay& LocalRay) c
 
 void FPCGExSketchEditController::UpdateHover(const FRay& WorldRay)
 {
-	// Refreshed here so ghosts stay honest after edits the controller never saw (details panel, undo).
-	// O(E^2) per mouse move, on models that are small by design.
+	// Refreshed here so ghosts stay honest after edits the controller never saw (details panel, undo),
+	// but gated on a shape fingerprint: the sweep is O(E^2) and hovering cannot change the model.
+	// A crossing that goes stale between fingerprints is harmless -- MaterializeCrossing re-derives it.
 	RefreshCrossings();
 
 	// Connect-drag targeting lives in UpdateDrag, not here -- hover alone is too loose to pick a
@@ -252,22 +275,35 @@ void FPCGExSketchEditController::HandleClick(const FRay& WorldRay, const bool bA
 		return;
 	}
 
-	TSet<int32>& Set = Hit.IsVertex() ? SelectedVertices : SelectedEdges;
-	if (bAdditive)
+	if (Hit.IsVertex())
 	{
-		if (Set.Contains(Hit.Index))
+		if (bAdditive && SelectedVertices.Contains(Hit.Index))
 		{
-			Set.Remove(Hit.Index);
+			SelectedVertices.Remove(Hit.Index);
 		}
 		else
 		{
-			Set.Add(Hit.Index);
+			if (!bAdditive)
+			{
+				ClearSelection();
+			}
+			SelectVertex(Hit.Index);
 		}
 	}
 	else
 	{
-		ClearSelection();
-		Set.Add(Hit.Index);
+		if (bAdditive && SelectedEdges.Contains(Hit.Index))
+		{
+			SelectedEdges.Remove(Hit.Index);
+		}
+		else
+		{
+			if (!bAdditive)
+			{
+				ClearSelection();
+			}
+			SelectedEdges.Add(Hit.Index);
+		}
 	}
 	NotifyModelChanged();
 }
@@ -318,7 +354,7 @@ void FPCGExSketchEditController::BeginDrag(const FRay& WorldRay, const bool bCon
 		if (!SelectedVertices.Contains(DragVertexIndex))
 		{
 			ClearSelection();
-			SelectedVertices.Add(DragVertexIndex);
+			SelectVertex(DragVertexIndex);
 		}
 	}
 	else
@@ -389,7 +425,7 @@ void FPCGExSketchEditController::UpdateDrag(const FRay& WorldRay)
 	}
 	else if (DragMode == EDragMode::Connect)
 	{
-		const FPCGExClusterSketchModel* Model = Target->GetModel();
+		const FPCGExClusterSketchModel* Model = GetReadModel();
 		const FIntVector* SourceLayer = nullptr;
 		if (Model && Model->Vertices.IsValidIndex(DragVertexIndex) && Model->Vertices[DragVertexIndex].bLatticeBound)
 		{
@@ -441,7 +477,7 @@ void FPCGExSketchEditController::EndDrag(const FRay& WorldRay)
 			{
 				FinalVertex = Survivor;
 				ClearSelection();
-				SelectedVertices.Add(Survivor);
+				SelectVertex(Survivor);
 			}
 		}
 		// Hand-placed now: dragging a tool-inserted vertex adopts it.
@@ -520,7 +556,7 @@ void FPCGExSketchEditController::EndDrag(const FRay& WorldRay)
 			{
 				// Selecting the far end chains the gesture into a walk.
 				ClearSelection();
-				SelectedVertices.Add(FarVertex);
+				SelectVertex(FarVertex);
 			}
 			NotifyModelChanged();
 		}
@@ -573,14 +609,13 @@ void FPCGExSketchEditController::DeleteSelection()
 	}
 
 	// Edges first (their indices die with vertex removal); both descending so indices stay valid.
+	// BY INDEX: Disconnect resolves through FindEdge, which would remove the first edge sharing the
+	// pair -- a different one whenever duplicates exist.
 	TArray<int32> EdgeIndices = SelectedEdges.Array();
 	EdgeIndices.Sort([](const int32 A, const int32 B) { return A > B; });
 	for (const int32 e : EdgeIndices)
 	{
-		if (Model->Edges.IsValidIndex(e))
-		{
-			Model->Disconnect(Model->Edges[e].A, Model->Edges[e].B);
-		}
+		Model->RemoveEdgeAt(e);
 	}
 
 	TArray<int32> VertexIndices = SelectedVertices.Array();
@@ -600,12 +635,13 @@ void FPCGExSketchEditController::DeleteSelection()
 
 void FPCGExSketchEditController::SelectAll()
 {
-	const FPCGExClusterSketchModel* Model = Target->GetModel();
+	const FPCGExClusterSketchModel* Model = GetReadModel();
 	if (!Model)
 	{
 		return;
 	}
 	SelectedVertices.Reset();
+	LastSelectedVertex = INDEX_NONE;
 	SelectedEdges.Reset();
 	for (int32 i = 0; i < Model->Vertices.Num(); ++i)
 	{
@@ -621,6 +657,7 @@ void FPCGExSketchEditController::SelectAll()
 void FPCGExSketchEditController::ClearSelection()
 {
 	SelectedVertices.Reset();
+	LastSelectedVertex = INDEX_NONE;
 	SelectedEdges.Reset();
 }
 
@@ -660,8 +697,7 @@ bool FPCGExSketchEditController::DeleteAtRay(const FRay& WorldRay)
 		{
 			TransactionObject->Modify();
 		}
-		const FPCGExClusterSketchEdge Edge = Model->Edges[Hit.Index];
-		Model->Disconnect(Edge.A, Edge.B);
+		Model->RemoveEdgeAt(Hit.Index);
 		Model->RemoveOrphanSideEffectVertices();
 	}
 
@@ -684,23 +720,19 @@ int32 FPCGExSketchEditController::AddVertexAtRay(const FRay& WorldRay)
 	FPCGExLatticeBasis Basis;
 	const FPCGExLatticeBasis* BasisPtr = GetBasis(Basis) ? &Basis : nullptr;
 
-	// Anchor: last selected vertex if any, else the lattice origin, else the model's first vertex.
-	// A bound anchor also donates its hidden layer, so adding in a rank-collapsed basis stays on it.
+	// Anchor: the vertex selected LAST if it is still valid, else the lattice origin. A bound anchor
+	// also donates its hidden layer, so adding in a rank-collapsed basis stays on it.
 	FVector Anchor = BasisPtr ? BasisPtr->Origin : FVector::ZeroVector;
 	FIntVector AnchorCoord = FIntVector::ZeroValue;
 	const FIntVector* AnchorLayer = nullptr;
-	for (const int32 Selected : SelectedVertices)
+	if (SelectedVertices.Contains(LastSelectedVertex) && Model->Vertices.IsValidIndex(LastSelectedVertex))
 	{
-		if (Model->Vertices.IsValidIndex(Selected))
+		const FPCGExClusterSketchVertex& AnchorVertex = Model->Vertices[LastSelectedVertex];
+		Anchor = VertexLocation(AnchorVertex, BasisPtr);
+		if (AnchorVertex.bLatticeBound)
 		{
-			const FPCGExClusterSketchVertex& AnchorVertex = Model->Vertices[Selected];
-			Anchor = VertexLocation(AnchorVertex, BasisPtr);
-			if (AnchorVertex.bLatticeBound)
-			{
-				AnchorCoord = AnchorVertex.LatticeCoord;
-				AnchorLayer = &AnchorCoord;
-			}
-			break;
+			AnchorCoord = AnchorVertex.LatticeCoord;
+			AnchorLayer = &AnchorCoord;
 		}
 	}
 
@@ -715,7 +747,7 @@ int32 FPCGExSketchEditController::AddVertexAtRay(const FRay& WorldRay)
 	if (Existing != INDEX_NONE)
 	{
 		ClearSelection();
-		SelectedVertices.Add(Existing);
+		SelectVertex(Existing);
 		NotifyModelChanged();
 		return Existing;
 	}
@@ -743,14 +775,14 @@ int32 FPCGExSketchEditController::AddVertexAtRay(const FRay& WorldRay)
 	Model->EnforceSeparationAroundVertex(NewVertex, BasisPtr);
 
 	ClearSelection();
-	SelectedVertices.Add(NewVertex);
+	SelectVertex(NewVertex);
 	NotifyModelChanged();
 	return NewVertex;
 }
 
 int32 FPCGExSketchEditController::FindNearbyVertex(const FRay& LocalRay, const FVector& LocalPoint, const int32 IgnoreVertex, const FPCGExLatticeBasis* Basis, const FIntVector* LayerRef) const
 {
-	const FPCGExClusterSketchModel* Model = Target->GetModel();
+	const FPCGExClusterSketchModel* Model = GetReadModel();
 	if (!Model)
 	{
 		return INDEX_NONE;
@@ -845,7 +877,7 @@ FVector FPCGExSketchEditController::RayPointOnWorkPlane(const FRay& LocalRay, co
 
 void FPCGExSketchEditController::DropInvalidIndices()
 {
-	const FPCGExClusterSketchModel* Model = Target->GetModel();
+	const FPCGExClusterSketchModel* Model = GetReadModel();
 	const int32 NumVtx = Model ? Model->Vertices.Num() : 0;
 	const int32 NumEdges = Model ? Model->Edges.Num() : 0;
 	for (auto It = SelectedVertices.CreateIterator(); It; ++It)
@@ -879,7 +911,17 @@ void FPCGExSketchEditController::NotifyModelChanged()
 
 void FPCGExSketchEditController::RefreshCrossings()
 {
-	const FPCGExClusterSketchModel* Model = Target->GetModel();
+	const FPCGExClusterSketchModel* Model = GetReadModel();
+	const int32 VertexCount = Model ? Model->Vertices.Num() : 0;
+	const int32 EdgeCount = Model ? Model->Edges.Num() : 0;
+	if (CrossingsRevision == ModelRevision && CrossingsVertexCount == VertexCount && CrossingsEdgeCount == EdgeCount)
+	{
+		return;
+	}
+	CrossingsRevision = ModelRevision;
+	CrossingsVertexCount = VertexCount;
+	CrossingsEdgeCount = EdgeCount;
+
 	if (!Model)
 	{
 		Crossings.Reset();
@@ -900,7 +942,7 @@ bool FPCGExSketchEditController::MaterializeCrossingAtRay(const FRay& WorldRay)
 
 	const FPCGExClusterSketchCrossing Crossing = Crossings[Hit.Index];
 
-	const FScopedTransaction Transaction(LOCTEXT("MaterializeCrossing", "Materialize Sketch Crossing"));
+	FScopedTransaction Transaction(LOCTEXT("MaterializeCrossing", "Materialize Sketch Crossing"));
 	if (UObject* TransactionObject = Target->GetTransactionObject())
 	{
 		TransactionObject->Modify();
@@ -910,11 +952,17 @@ bool FPCGExSketchEditController::MaterializeCrossingAtRay(const FRay& WorldRay)
 	const int32 NewVertex = Model->MaterializeCrossing(Crossing.EdgeA, Crossing.EdgeB, Crossing.Location, GetBasis(Basis) ? &Basis : nullptr);
 	if (NewVertex == INDEX_NONE)
 	{
+		// The crossing no longer holds (geometry moved under the cached ghost). Modify() has already
+		// snapshotted and dirtied the target, so the transaction must be cancelled, not committed.
+		Transaction.Cancel();
+		// Stale ghosts: the rollback leaves the shape fingerprint untouched, so force the re-derive.
+		CrossingsRevision = INDEX_NONE;
+		RefreshCrossings();
 		return false;
 	}
 
 	ClearSelection();
-	SelectedVertices.Add(NewVertex);
+	SelectVertex(NewVertex);
 	ClearHover();
 	NotifyModelChanged();
 	return true;

@@ -62,6 +62,8 @@ private:
 	/** Rebuild bindings from the current actor selection (and re-apply visual suppression). */
 	void RebuildBindings();
 	void ReleaseBindings();
+	/** Hand a set of bindings' components their passive visual back. */
+	void ReleaseBindingsIn(const TArray<FPCGExSketchModeBinding>& InBindings);
 
 	/** Controller a ray addresses: nearest hit, else the one holding a selection, else the only one. */
 	TSharedPtr<FPCGExSketchEditController> ResolveController(const FRay& WorldRay) const;

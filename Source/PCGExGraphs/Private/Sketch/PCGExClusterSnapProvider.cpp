@@ -4,10 +4,28 @@
 #include "Sketch/PCGExClusterSnapProvider.h"
 
 #include "Sketch/PCGExClusterSketch.h"
+#include "Sketch/PCGExClusterSketchComponent.h"
 
 #pragma region UPCGExClusterSnapProvider
 
 #if WITH_EDITOR
+namespace PCGExClusterSnapProvider
+{
+	/** A provider is outered to whichever host owns it -- the asset or a component -- so both must be
+	 *  reached, or an inline provider's edits never re-derive the vertices they moved. */
+	void NotifyHost(UObject* InProvider)
+	{
+		if (UPCGExClusterSketch* Asset = InProvider->GetTypedOuter<UPCGExClusterSketch>())
+		{
+			Asset->EDITOR_OnSnapProviderChanged();
+		}
+		else if (UPCGExClusterSketchComponent* Component = InProvider->GetTypedOuter<UPCGExClusterSketchComponent>())
+		{
+			Component->EDITOR_OnSnapProviderChanged();
+		}
+	}
+}
+
 void UPCGExClusterSnapProvider::PostEditUndo()
 {
 	Super::PostEditUndo();
@@ -18,10 +36,7 @@ void UPCGExClusterSnapProvider::PostEditUndo()
 		return;
 	}
 
-	if (UPCGExClusterSketch* Owner = GetTypedOuter<UPCGExClusterSketch>())
-	{
-		Owner->EDITOR_OnSnapProviderChanged();
-	}
+	PCGExClusterSnapProvider::NotifyHost(this);
 }
 
 void UPCGExClusterSnapProvider::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
@@ -33,10 +48,7 @@ void UPCGExClusterSnapProvider::PostEditChangeProperty(FPropertyChangedEvent& Pr
 		return;
 	}
 
-	if (UPCGExClusterSketch* Owner = GetTypedOuter<UPCGExClusterSketch>())
-	{
-		Owner->EDITOR_OnSnapProviderChanged();
-	}
+	PCGExClusterSnapProvider::NotifyHost(this);
 }
 #endif
 

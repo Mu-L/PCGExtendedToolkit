@@ -4,6 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/ArrayView.h"
 #include "Lattice/PCGExLatticeBasis.h"
 
 #include "PCGExClusterSketchModel.generated.h"
@@ -110,10 +111,22 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchValidation
 	/** Vertices sharing an earlier vertex's lattice coord (bound) or position (free) -- clusters cannot
 	 *  carry collocated vertices; the editor merges on drop, raw edits get warned at print. */
 	int32 CollocatedVertices = 0;
-	TArray<FName> MisalignedChannels;   // channel length != domain count
-	TArray<FName> InvalidChannelNames;  // None, duplicate, or reserved cluster attribute
+	/** PER DOMAIN: a channel name is only meaningful within its own domain, so a broken edge channel
+	 *  must never suppress a healthy vertex channel that happens to share its name. */
+	struct FChannelIssues
+	{
+		TArray<FName> Misaligned;   // channel length != domain count
+		TArray<FName> InvalidNames; // None, duplicate, or reserved cluster attribute
+
+		bool IsEmpty() const { return Misaligned.IsEmpty() && InvalidNames.IsEmpty(); }
+		bool Rejects(const FName InName) const { return InvalidNames.Contains(InName) || Misaligned.Contains(InName); }
+	};
+
+	FChannelIssues VertexChannelIssues;
+	FChannelIssues EdgeChannelIssues;
 
 	bool HasEdgeIssues() const { return InvalidEdges > 0 || SelfLoops > 0 || DuplicateEdges > 0; }
+	bool HasChannelIssues() const { return !VertexChannelIssues.IsEmpty() || !EdgeChannelIssues.IsEmpty(); }
 };
 
 /** One hypothetical crossing: two edges sharing a point that is not a vertex. Offered as a ghost in the
@@ -173,6 +186,10 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 	/** Remove the undirected edge (A,B) and its channel entries. @return true if an edge was removed. */
 	bool Disconnect(int32 A, int32 B);
 
+	/** Remove one edge BY INDEX. Callers holding edge indices must use this: Disconnect resolves through
+	 *  FindEdge, which returns the first pair match and so removes the wrong duplicate. */
+	bool RemoveEdgeAt(int32 EdgeIndex);
+
 	/**
 	 * Merge InAbsorbed into InSurvivor: every edge of the absorbed vertex retargets its endpoint onto
 	 * the survivor (edges that would become self-loops or duplicates are dropped, the survivor edge's
@@ -199,6 +216,10 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 	 * cluster -- collinear A-B-C may carry A-B and B-C but never A-C.
 	 */
 	int32 FindVertexOnEdgeInterior(int32 EdgeIndex, const FPCGExLatticeBasis* Basis) const;
+
+	/** Same test against locations the caller already resolved -- for per-frame consumers, where
+	 *  re-deriving every vertex position inside the scan is the whole cost. */
+	int32 FindVertexOnEdgeInterior(int32 EdgeIndex, TConstArrayView<FVector> InLocations) const;
 
 	/**
 	 * Replace an edge that passes through vertices with the chain of segments between them (sorted along

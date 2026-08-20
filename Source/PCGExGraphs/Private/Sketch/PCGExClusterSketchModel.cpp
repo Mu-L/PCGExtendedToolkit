@@ -161,6 +161,10 @@ namespace PCGExClusterSketchModel
 			Model.SplitEdgeByContainedVertices(EdgeB, Basis, OutChainB);
 			Model.SplitEdgeByContainedVertices(EdgeA, Basis, OutChainA);
 		}
+		// A third edge concurrent at this point would still run through the new vertex: same separation
+		// rule every other vertex-inserting path applies. Chain keys are endpoint pairs, so the extra
+		// splits cannot invalidate them.
+		Model.EnforceSeparationAroundVertex(NewVertex, Basis);
 		return NewVertex;
 	}
 
@@ -312,16 +316,20 @@ int32 FPCGExClusterSketchModel::Connect(const int32 A, const int32 B, bool* bOut
 
 bool FPCGExClusterSketchModel::Disconnect(const int32 A, const int32 B)
 {
-	const int32 Index = FindEdge(A, B);
-	if (Index == INDEX_NONE)
+	return RemoveEdgeAt(FindEdge(A, B));
+}
+
+bool FPCGExClusterSketchModel::RemoveEdgeAt(const int32 EdgeIndex)
+{
+	if (!Edges.IsValidIndex(EdgeIndex))
 	{
 		return false;
 	}
 
-	Edges.RemoveAt(Index);
+	Edges.RemoveAt(EdgeIndex);
 	for (FPCGExClusterDataChannel& Channel : EdgeChannels)
 	{
-		Channel.RemoveAt(Index);
+		Channel.RemoveAt(EdgeIndex);
 	}
 	return true;
 }
@@ -430,6 +438,31 @@ void FPCGExClusterSketchModel::SyncBoundVertices(const FPCGExLatticeBasis& InBas
 		}
 		V.Transform.SetLocation(InBasis.CoordToWorld(V.LatticeCoord));
 	}
+}
+
+int32 FPCGExClusterSketchModel::FindVertexOnEdgeInterior(const int32 EdgeIndex, const TConstArrayView<FVector> InLocations) const
+{
+	if (!Edges.IsValidIndex(EdgeIndex))
+	{
+		return INDEX_NONE;
+	}
+	const FPCGExClusterSketchEdge& E = Edges[EdgeIndex];
+	if (!InLocations.IsValidIndex(E.A) || !InLocations.IsValidIndex(E.B))
+	{
+		return INDEX_NONE;
+	}
+	for (int32 i = 0; i < InLocations.Num(); ++i)
+	{
+		if (i == E.A || i == E.B)
+		{
+			continue;
+		}
+		if (PCGExClusterSketchModel::SegmentInteriorParameter(InLocations[i], InLocations[E.A], InLocations[E.B]) >= 0.0)
+		{
+			return i;
+		}
+	}
+	return INDEX_NONE;
 }
 
 int32 FPCGExClusterSketchModel::FindVertexOnEdgeInterior(const int32 EdgeIndex, const FPCGExLatticeBasis* Basis) const
@@ -652,7 +685,25 @@ int32 FPCGExClusterSketchModel::MaterializeCrossing(const int32 EdgeA, const int
 	{
 		return INDEX_NONE;
 	}
-	return PCGExClusterSketchModel::InsertCrossingVertex(*this, EdgeA, EdgeB, Location, Basis);
+
+	const FPCGExClusterSketchEdge& EA = Edges[EdgeA];
+	const FPCGExClusterSketchEdge& EB = Edges[EdgeB];
+	if (!Vertices.IsValidIndex(EA.A) || !Vertices.IsValidIndex(EA.B) || !Vertices.IsValidIndex(EB.A) || !Vertices.IsValidIndex(EB.B))
+	{
+		return INDEX_NONE;
+	}
+
+	// A cached crossing goes stale whenever geometry moves under it (an undo, a details-panel edit)
+	// while both indices stay in range -- re-derive it, or the vertex is added and neither split fires.
+	FVector Point = Location;
+	if (!PCGExSketch::SegmentsCross(
+		ResolvedLocation(Vertices[EA.A], Basis), ResolvedLocation(Vertices[EA.B], Basis),
+		ResolvedLocation(Vertices[EB.A], Basis), ResolvedLocation(Vertices[EB.B], Basis), Point))
+	{
+		return INDEX_NONE;
+	}
+
+	return PCGExClusterSketchModel::InsertCrossingVertex(*this, EdgeA, EdgeB, Point, Basis);
 }
 
 int32 FPCGExClusterSketchModel::InsertCrossingVertices(const FPCGExLatticeBasis* Basis)
@@ -866,7 +917,7 @@ void FPCGExClusterSketchModel::Validate(FPCGExClusterSketchValidation& OutSummar
 		}
 	}
 
-	auto ValidateChannels = [&OutSummary](const TArray<FPCGExClusterDataChannel>& Channels, const int32 DomainCount)
+	auto ValidateChannels = [](const TArray<FPCGExClusterDataChannel>& Channels, const int32 DomainCount, FPCGExClusterSketchValidation::FChannelIssues& OutIssues)
 	{
 		TSet<FName> Names;
 		for (const FPCGExClusterDataChannel& Channel : Channels)
@@ -875,16 +926,16 @@ void FPCGExClusterSketchModel::Validate(FPCGExClusterSketchValidation& OutSummar
 			Names.Add(Channel.Name, &bAlreadySeen);
 			if (Channel.Name.IsNone() || bAlreadySeen || PCGExClusters::Labels::ProtectedClusterAttributes.Contains(Channel.Name))
 			{
-				OutSummary.InvalidChannelNames.AddUnique(Channel.Name);
+				OutIssues.InvalidNames.AddUnique(Channel.Name);
 			}
 			if (Channel.Num() != DomainCount)
 			{
-				OutSummary.MisalignedChannels.AddUnique(Channel.Name);
+				OutIssues.Misaligned.AddUnique(Channel.Name);
 			}
 		}
 	};
-	ValidateChannels(VertexChannels, NumVtx);
-	ValidateChannels(EdgeChannels, Edges.Num());
+	ValidateChannels(VertexChannels, NumVtx, OutSummary.VertexChannelIssues);
+	ValidateChannels(EdgeChannels, Edges.Num(), OutSummary.EdgeChannelIssues);
 }
 
 #pragma endregion

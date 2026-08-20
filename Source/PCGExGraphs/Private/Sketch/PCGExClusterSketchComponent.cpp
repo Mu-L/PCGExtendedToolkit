@@ -185,24 +185,27 @@ const FPCGExSketchElementStyle& UPCGExClusterSketchComponent::ResolveEdgeStyle()
 	return EditState.bActive ? Style->EditEdge : Style->PreviewEdge;
 }
 
+// Coverage answers from what the mesh layer ACTUALLY built, never from whether a path is configured:
+// a style path that does not resolve (its plugin disabled, the asset deleted) would otherwise claim
+// coverage that the immediate-mode fallback then stands down for, and the element vanishes entirely.
 bool UPCGExClusterSketchComponent::DrawsVerticesAsMesh() const
 {
-	return bShowSketch && !ResolveVertexStyle().Mesh.IsNull();
+	return bShowSketch && VertexInstances && VertexInstances->GetStaticMesh() != nullptr;
 }
 
 bool UPCGExClusterSketchComponent::DrawsEdgesAsMesh() const
 {
-	return bShowSketch && !ResolveEdgeStyle().Mesh.IsNull();
+	return bShowSketch && EdgeInstances && EdgeInstances->GetStaticMesh() != nullptr;
 }
 
 bool UPCGExClusterSketchComponent::DrawsHoverAsMesh() const
 {
-	return bShowSketch && EditState.bActive && !UPCGExClusterSketchStyleSettings::Get()->HoverOutlineMesh.IsNull();
+	return bShowSketch && EditState.bActive && HoverOutlineInstances && HoverOutlineInstances->GetStaticMesh() != nullptr;
 }
 
 bool UPCGExClusterSketchComponent::DrawsGhostsAsMesh() const
 {
-	return bShowSketch && EditState.bActive && !ResolveGhostStyle().Mesh.IsNull();
+	return bShowSketch && EditState.bActive && GhostInstances && GhostInstances->GetStaticMesh() != nullptr;
 }
 
 FLinearColor UPCGExClusterSketchComponent::ResolveVertexColor(const int32 ModelIndex) const
@@ -295,12 +298,15 @@ void UPCGExClusterSketchComponent::BuildVisualSnapshot()
 {
 	VisualSnapshot = FPCGExClusterSketchVisualSnapshot();
 
-	// While a host edits this sketch it draws every immediate-mode element itself (it has the ghost and
-	// affordance state this component cannot see). The mesh layer keeps drawing regardless.
-	if (!bShowSketch || EditState.bActive)
+	if (!bShowSketch)
 	{
 		return;
 	}
+
+	// While a host edits this sketch it draws every immediate-mode element itself (it has the ghost and
+	// affordance state this component cannot see). The mesh layer keeps drawing regardless -- and so do
+	// BOUNDS, which drive culling and Focus Selected for as long as the actor exists.
+	const bool bHostDrawsOverlay = EditState.bActive;
 
 	const UPCGExClusterSketchStyleSettings* Style = UPCGExClusterSketchStyleSettings::Get();
 	const FPCGExClusterSketchModel& Model = GetModel();
@@ -311,8 +317,8 @@ void UPCGExClusterSketchComponent::BuildVisualSnapshot()
 
 	// Per-kind fallback: only a kind WITHOUT a mesh falls back to immediate mode, so the two paths
 	// never draw the same element twice.
-	const bool bVertexFallback = !DrawsVerticesAsMesh();
-	const bool bEdgeFallback = !DrawsEdgesAsMesh();
+	const bool bVertexFallback = !bHostDrawsOverlay && !DrawsVerticesAsMesh();
+	const bool bEdgeFallback = !bHostDrawsOverlay && !DrawsEdgesAsMesh();
 
 	TArray<FVector> Locations;
 	Locations.SetNumUninitialized(Model.Vertices.Num());
@@ -347,7 +353,10 @@ void UPCGExClusterSketchComponent::BuildVisualSnapshot()
 		for (int32 k = 0; k < Basis.NumAxes; ++k)
 		{
 			const FVector AxisEnd = Basis.Origin + Basis.AxisVecs[k];
-			VisualSnapshot.Lines.Add({Basis.Origin, AxisEnd, Style->BasisColor, 0.5f});
+			if (!bHostDrawsOverlay)
+			{
+				VisualSnapshot.Lines.Add({Basis.Origin, AxisEnd, Style->BasisColor, 0.5f});
+			}
 			VisualSnapshot.LocalBounds += AxisEnd;
 		}
 		VisualSnapshot.LocalBounds += Basis.Origin;
@@ -362,6 +371,7 @@ UInstancedStaticMeshComponent* UPCGExClusterSketchComponent::EnsureInstances(TOb
 		if (InOut)
 		{
 			InOut->ClearInstances();
+			InOut->SetStaticMesh(nullptr);
 		}
 		return nullptr;
 	}
@@ -645,8 +655,9 @@ void UPCGExClusterSketchComponent::RefreshHoverOutline()
 
 void UPCGExClusterSketchComponent::RefreshSketchVisual()
 {
-	BuildVisualSnapshot();
+	// Instances FIRST: the snapshot's per-kind fallback asks which kinds the mesh layer actually built.
 	RebuildInstances();
+	BuildVisualSnapshot();
 	UpdateBounds();
 	MarkRenderStateDirty();
 }
@@ -704,6 +715,11 @@ void UPCGExClusterSketchComponent::OnRegister()
 	// invisible on level load until something happened to call RefreshSketchVisual.
 	RebuildInstances();
 
+	// Re-run now that the mesh layer exists: the pre-Super pass could not know which kinds it covers.
+	BuildVisualSnapshot();
+	UpdateBounds();
+	MarkRenderStateDirty();
+
 #if WITH_EDITOR
 	// Editing the REFERENCED asset repaints every instance of it -- the other half of the asset's
 	// NotifyObjectChanged calls (and of the property editor's own broadcasts).
@@ -746,12 +762,75 @@ void UPCGExClusterSketchComponent::OnUnregister()
 	Super::OnUnregister();
 }
 
+void UPCGExClusterSketchComponent::OnComponentDestroyed(const bool bDestroyingHierarchy)
+{
+	for (TObjectPtr<UInstancedStaticMeshComponent>* Slot : {&VertexInstances, &EdgeInstances, &GhostInstances, &HoverOutlineInstances})
+	{
+		if (UInstancedStaticMeshComponent* Child = Slot->Get())
+		{
+			Child->DestroyComponent();
+		}
+		*Slot = nullptr;
+	}
+
+	Super::OnComponentDestroyed(bDestroyingHierarchy);
+}
+
 #if WITH_EDITOR
 void UPCGExClusterSketchComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	const FName MemberName = PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
+
+	if (MemberName == GET_MEMBER_NAME_CHECKED(UPCGExClusterSketchComponent, InlineModel))
+	{
+		// Hand-editing a vertex adopts it, and the coord/location pair must stay coherent -- the same
+		// rule the asset host applies, or a typed-in location on a bound vertex is silently dead data.
+		const int32 EditedVertex = PropertyChangedEvent.GetArrayIndex(GET_MEMBER_NAME_STRING_CHECKED(FPCGExClusterSketchModel, Vertices));
+		if (EditedVertex != INDEX_NONE)
+		{
+			InlineModel.MarkVertexAuthored(EditedVertex);
+		}
+
+		const FName LeafName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
+		const bool bCoordEdit = LeafName == GET_MEMBER_NAME_CHECKED(FPCGExClusterSketchVertex, LatticeCoord);
+		EDITOR_SyncBoundVertices(!bCoordEdit);
+	}
+
 	// Any property here can move the drawing: payload, override, provider params, display settings.
 	RefreshSketchVisual();
+}
+
+void UPCGExClusterSketchComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+
+	if (!IsValidChecked(this) || IsTemplate())
+	{
+		return;
+	}
+
+	EDITOR_SyncBoundVertices(false);
+	RefreshSketchVisual();
+}
+
+void UPCGExClusterSketchComponent::EDITOR_OnSnapProviderChanged()
+{
+	EDITOR_SyncBoundVertices(false);
+	RefreshSketchVisual();
+}
+
+void UPCGExClusterSketchComponent::EDITOR_SyncBoundVertices(const bool bResnapFromLocation)
+{
+	// Only the INLINE payload is ours to correct: a referenced asset owns its own coherence.
+	FPCGExClusterSketchModel* Mutable = GetMutableModel();
+	FPCGExLatticeBasis Basis;
+	if (!Mutable || !BuildBasis(Basis))
+	{
+		return;
+	}
+	Mutable->SyncBoundVertices(Basis, bResnapFromLocation);
 }
 
 void UPCGExClusterSketchComponent::InlineSketchAsset()

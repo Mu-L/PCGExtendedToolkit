@@ -111,15 +111,18 @@ void UPCGExSketchEditorMode::OnSelectionChanged(UObject* Object)
 
 void UPCGExSketchEditorMode::RebuildBindings()
 {
-	// Hand every previously-bound component its passive visual back before rebinding.
-	ReleaseBindings();
+	// Controllers own live editing state (vertex/edge selection, hover, cached crossings), so a
+	// component that survives the selection change KEEPS its controller. Rebinding a fresh one would
+	// silently drop the user's selection -- and Delete would then fall through to the level editor.
+	TArray<FPCGExSketchModeBinding> Previous = MoveTemp(Bindings);
+	Bindings.Reset();
 
-	if (!GEditor)
+	USelection* Selection = GEditor ? GEditor->GetSelectedActors() : nullptr;
+	if (!Selection)
 	{
+		ReleaseBindingsIn(Previous);
 		return;
 	}
-
-	USelection* Selection = GEditor->GetSelectedActors();
 	for (FSelectionIterator It(*Selection); It; ++It)
 	{
 		const AActor* Actor = Cast<AActor>(*It);
@@ -132,6 +135,17 @@ void UPCGExSketchEditorMode::RebuildBindings()
 		Actor->GetComponents<UPCGExClusterSketchComponent>(Components);
 		for (UPCGExClusterSketchComponent* Component : Components)
 		{
+			const int32 Existing = Previous.IndexOfByPredicate(
+				[Component](const FPCGExSketchModeBinding& InBinding) { return InBinding.Component.Get() == Component; });
+
+			if (Existing != INDEX_NONE)
+			{
+				// Already bound and already active: carry the controller (and its state) across.
+				Bindings.Add(MoveTemp(Previous[Existing]));
+				Previous.RemoveAt(Existing);
+				continue;
+			}
+
 			FPCGExSketchModeBinding& Binding = Bindings.AddDefaulted_GetRef();
 			Binding.Component = Component;
 			Binding.Target = MakeShared<FPCGExSketchComponentEditTarget>(Component);
@@ -145,17 +159,25 @@ void UPCGExSketchEditorMode::RebuildBindings()
 			Component->SetEditState(State);
 		}
 	}
+
+	// Whatever is left went out of selection: hand it its passive visual back.
+	ReleaseBindingsIn(Previous);
 }
 
-void UPCGExSketchEditorMode::ReleaseBindings()
+void UPCGExSketchEditorMode::ReleaseBindingsIn(const TArray<FPCGExSketchModeBinding>& InBindings)
 {
-	for (const FPCGExSketchModeBinding& Binding : Bindings)
+	for (const FPCGExSketchModeBinding& Binding : InBindings)
 	{
 		if (UPCGExClusterSketchComponent* Component = Binding.Component.Get())
 		{
 			Component->SetEditState(FPCGExClusterSketchEditState());
 		}
 	}
+}
+
+void UPCGExSketchEditorMode::ReleaseBindings()
+{
+	ReleaseBindingsIn(Bindings);
 	Bindings.Reset();
 }
 
