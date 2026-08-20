@@ -77,6 +77,10 @@ public:
 	/** Basis from the snap provider; false when there is no provider or it forms no usable lattice. */
 	bool BuildBasis(FPCGExLatticeBasis& OutBasis) const;
 
+	/** Model extent through this sketch's OWN basis -- the same resolution the print path applies, so
+	 *  staged bounds match what a consumer actually gets. */
+	FBox GetBounds() const;
+
 	/** Union of the provider's and enabled decorators' soft dependencies -- load these before printing. */
 	void CollectAssetDependencies(TArray<FSoftObjectPath>& OutPaths) const;
 
@@ -84,7 +88,7 @@ public:
 	 * Print this sketch into InVtxIO and launch its cluster compile: the asset assembles the print
 	 * request from its OWN snap provider and decorators, so a consumer just hands over an IO and gets
 	 * the finished Vtx/Edges pair. Consumers printing a loose model (a component's inline sketch) call
-	 * PCGExSketch::PrintClusterSketch directly instead.
+	 * PCGExSketch::StagingLoadSketch directly instead.
 	 *
 	 * @param OnCompiled fires from the compile end callback, after the print context's VtxIndexMap is
 	 *        filled, with the success flag.

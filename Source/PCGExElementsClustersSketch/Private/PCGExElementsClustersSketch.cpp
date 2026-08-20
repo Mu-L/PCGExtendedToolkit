@@ -3,16 +3,22 @@
 
 #include "PCGExElementsClustersSketch.h"
 
+#include "Collections/PCGExClusterSketchCollection.h"
+
 #define LOCTEXT_NAMESPACE "FPCGExElementsClustersSketchModule"
 
 void FPCGExElementsClustersSketchModule::StartupModule()
 {
-	IPCGExLegacyModuleInterface::StartupModule();
+	IPCGExModuleInterface::StartupModule();
+
+	// Out-of-module collection type: PCGExCollections flushed its registry in its own StartupModule,
+	// which runs before this module's static init -- so this cannot ride a static auto-registrar.
+	PCGExSketch::RegisterCollectionType();
 }
 
 void FPCGExElementsClustersSketchModule::ShutdownModule()
 {
-	IPCGExLegacyModuleInterface::ShutdownModule();
+	IPCGExModuleInterface::ShutdownModule();
 }
 
 #undef LOCTEXT_NAMESPACE

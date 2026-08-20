@@ -97,10 +97,10 @@ namespace PCGExSketch
 			Request.Decorators.Add(Decorator.Get());
 		}
 
-		return PrintClusterSketch(InContext, Request, InVtxIO, InTaskManager, InPrintContext);
+		return StagingLoadSketch(InContext, Request, InVtxIO, InTaskManager, InPrintContext);
 	}
 
-	TSharedPtr<PCGExGraphs::FGraphBuilder> PrintClusterSketch(
+	TSharedPtr<PCGExGraphs::FGraphBuilder> StagingLoadSketch(
 		FPCGExContext* InContext,
 		const FPrintRequest& InRequest,
 		const TSharedPtr<PCGExData::FPointIO>& InVtxIO,

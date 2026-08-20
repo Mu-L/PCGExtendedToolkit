@@ -1,9 +1,11 @@
 ﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
-#include "Elements/PCGExPrintClusterSketch.h"
+#include "Elements/PCGExStagingLoadSketch.h"
 
+#include "PCGParamData.h"
 #include "Clusters/PCGExClusterCommon.h"
+#include "Collections/PCGExClusterSketchCollection.h"
 #include "Data/PCGExClusterData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
@@ -12,21 +14,110 @@
 #include "Graphs/PCGExGraphCommon.h"
 #include "Graphs/PCGExGraphTasks.h"
 #include "Helpers/PCGExAssetLoader.h"
+#include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExStreamingHelpers.h"
 #include "Sketch/PCGExClusterSketch.h"
 #include "Sketch/PCGExClusterSketchPrint.h"
 
-#define LOCTEXT_NAMESPACE "PCGExPrintClusterSketch"
-#define PCGEX_NAMESPACE PrintClusterSketch
+#define LOCTEXT_NAMESPACE "PCGExStagingLoadSketch"
+#define PCGEX_NAMESPACE StagingLoadSketch
 
-namespace PCGExPrintClusterSketch
+namespace PCGExStagingLoadSketch
 {
 	PCGEX_CTX_STATE(State_PrintingRoots)
+
+	/**
+	 * Resolves every target's staged pick to a sketch path, deduped into UniqueSketchPaths, and leaves
+	 * SketchIdx holding indices into THAT array -- AdvanceWork swaps them for UniqueSketches indices
+	 * once the paths have loaded. Runs in Boot so RegisterAssetDependencies can register the paths.
+	 */
+	bool ResolveStagedSketches(FPCGExStagingLoadSketchContext* Context, const UPCGExStagingLoadSketchSettings* Settings)
+	{
+		Context->CollectionUnpacker = MakeShared<PCGExCollections::FPickUnpacker>();
+		Context->CollectionUnpacker->UnpackPin(Context);
+
+		if (!Context->CollectionUnpacker->HasValidMapping())
+		{
+			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Could not rebuild a valid asset mapping from the provided map."));
+			return false;
+		}
+
+		const TSharedPtr<PCGExData::TBuffer<int64>> HashGetter =
+			Context->TargetsDataFacade->GetReadable<int64>(Settings->GetEntryIdxAttributeName(), PCGExData::EIOSide::In, true);
+
+		if (!HashGetter)
+		{
+			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Missing staging hash attribute. Make sure points were staged with Collection Map output."));
+			return false;
+		}
+
+		TMap<FSoftObjectPath, int32> PathToIndex;
+		const int32 NumTargets = Context->SketchIdx.Num();
+
+		for (int32 i = 0; i < NumTargets; ++i)
+		{
+			const int64 Hash = HashGetter->Read(i);
+			if (Hash == 0 || Hash == -1)
+			{
+				continue;
+			}
+
+			// Ignored: secondary picks only ever come from mesh micro caches.
+			int16 SecondaryIndex = 0;
+			const FPCGExEntryAccessResult Result = Context->CollectionUnpacker->ResolveEntry(Hash, SecondaryIndex);
+			if (!Result.IsValid())
+			{
+				++Context->NumUnresolvedTargets;
+				continue;
+			}
+
+			// Expected traffic in a mixed host: a staged mesh/actor/level pick flowing past a sketch
+			// node is not an error, so it is skipped without counting as unresolved.
+			if (!Result.Entry->IsType(PCGExSketch::CollectionTypeId))
+			{
+				continue;
+			}
+
+			const FSoftObjectPath Path = static_cast<const FPCGExClusterSketchCollectionEntry*>(Result.Entry)->Sketch.ToSoftObjectPath();
+			if (Path.IsNull())
+			{
+				++Context->NumUnresolvedTargets;
+				continue;
+			}
+
+			if (const int32* Existing = PathToIndex.Find(Path))
+			{
+				Context->SketchIdx[i] = *Existing;
+				continue;
+			}
+
+			const int32 NewIndex = Context->UniqueSketchPaths.Add(Path);
+			PathToIndex.Add(Path, NewIndex);
+			Context->SketchIdx[i] = NewIndex;
+		}
+
+		if (Context->UniqueSketchPaths.IsEmpty())
+		{
+			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("No Cluster Sketch entry could be resolved from the staged targets."));
+			return false;
+		}
+
+		return true;
+	}
 }
 
-#pragma region UPCGExPrintClusterSketchSettings
+#pragma region UPCGExStagingLoadSketchSettings
 
-TArray<FPCGPinProperties> UPCGExPrintClusterSketchSettings::OutputPinProperties() const
+void UPCGExStagingLoadSketchSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const
+{
+	if (Source == EPCGExClusterSketchSource::CollectionMap)
+	{
+		PCGEX_PIN_PARAMS(PCGExCollections::Labels::SourceCollectionMapLabel, "Collection map information from staging nodes.", Required)
+	}
+	Super::InputPinPropertiesBeforeFilters(PinProperties);
+}
+
+TArray<FPCGPinProperties> UPCGExStagingLoadSketchSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::OutputPinProperties();
 	PCGEX_PIN_POINTS(PCGExClusters::Labels::OutputEdgesLabel, "Point data representing edges.", Required)
@@ -35,15 +126,26 @@ TArray<FPCGPinProperties> UPCGExPrintClusterSketchSettings::OutputPinProperties(
 
 #pragma endregion
 
-#pragma region FPCGExPrintClusterSketchContext
+#pragma region FPCGExStagingLoadSketchContext
 
-void FPCGExPrintClusterSketchContext::RegisterAssetDependencies()
+void FPCGExStagingLoadSketchContext::RegisterAssetDependencies()
 {
 	FPCGExPointsProcessorContext::RegisterAssetDependencies();
 
-	const UPCGExPrintClusterSketchSettings* Settings = GetInputSettings<UPCGExPrintClusterSketchSettings>();
+	const UPCGExStagingLoadSketchSettings* Settings = GetInputSettings<UPCGExStagingLoadSketchSettings>();
 	if (!Settings)
 	{
+		return;
+	}
+
+	// Runs AFTER Boot, so the CollectionMap paths Boot resolved go through the normal async load
+	// phase -- no blocking load, same as the constant path.
+	if (Settings->Source == EPCGExClusterSketchSource::CollectionMap)
+	{
+		for (const FSoftObjectPath& Path : UniqueSketchPaths)
+		{
+			AddAssetDependency(Path);
+		}
 		return;
 	}
 
@@ -62,18 +164,18 @@ void FPCGExPrintClusterSketchContext::RegisterAssetDependencies()
 
 #pragma endregion
 
-#pragma region FPCGExPrintClusterSketchElement
+#pragma region FPCGExStagingLoadSketchElement
 
-PCGEX_INITIALIZE_ELEMENT(PrintClusterSketch)
+PCGEX_INITIALIZE_ELEMENT(StagingLoadSketch)
 
-bool FPCGExPrintClusterSketchElement::Boot(FPCGExContext* InContext) const
+bool FPCGExStagingLoadSketchElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPointsProcessorElement::Boot(InContext))
 	{
 		return false;
 	}
 
-	PCGEX_CONTEXT_AND_SETTINGS(PrintClusterSketch)
+	PCGEX_CONTEXT_AND_SETTINGS(StagingLoadSketch)
 
 	if (Context->MainPoints->Pairs.IsEmpty())
 	{
@@ -99,10 +201,19 @@ bool FPCGExPrintClusterSketchElement::Boot(FPCGExContext* InContext) const
 
 	Context->TargetsForwardHandler = Settings->TargetsForwarding.GetHandler(Context->TargetsDataFacade);
 
-	// Attribute-driven sketches resolve through the shared asset loader, which discovers every unique
-	// path now and hands them to the context's normal asset-loading phase.
-	if (Settings->Sketch.Input == EPCGExInputValueType::Attribute)
+	Context->SketchIdx.Init(-1, Context->MainPoints->Pairs[0]->GetNum());
+
+	if (Settings->Source == EPCGExClusterSketchSource::CollectionMap)
 	{
+		if (!PCGExStagingLoadSketch::ResolveStagedSketches(Context, Settings))
+		{
+			return false;
+		}
+	}
+	else if (Settings->Sketch.Input == EPCGExInputValueType::Attribute)
+	{
+		// Attribute-driven sketches resolve through the shared asset loader, which discovers every unique
+		// path now and hands them to the context's normal asset-loading phase.
 		PCGEX_VALIDATE_NAME_CONSUMABLE(Settings->Sketch.Attribute)
 
 		TArray<FName> Names = {Settings->Sketch.Attribute};
@@ -117,8 +228,6 @@ bool FPCGExPrintClusterSketchElement::Boot(FPCGExContext* InContext) const
 		return Context->CancelExecution(TEXT("Invalid Cluster Sketch constant."));
 	}
 
-	Context->SketchIdx.Init(-1, Context->MainPoints->Pairs[0]->GetNum());
-
 	Context->RootVtx = MakeShared<PCGExData::FPointIOCollection>(Context); // Pinless: roots are never staged
 
 	Context->VtxChildCollection = MakeShared<PCGExData::FPointIOCollection>(Context);
@@ -130,11 +239,18 @@ bool FPCGExPrintClusterSketchElement::Boot(FPCGExContext* InContext) const
 	return true;
 }
 
-void FPCGExPrintClusterSketchElement::PostLoadAssetsDependencies(FPCGExContext* InContext) const
+void FPCGExStagingLoadSketchElement::PostLoadAssetsDependencies(FPCGExContext* InContext) const
 {
 	FPCGExPointsProcessorElement::PostLoadAssetsDependencies(InContext);
 
-	PCGEX_CONTEXT_AND_SETTINGS(PrintClusterSketch)
+	PCGEX_CONTEXT_AND_SETTINGS(StagingLoadSketch)
+
+	// CollectionMap resolves its paths in AdvanceWork; a stale Sketch constant left over from Asset
+	// mode must not be picked up here.
+	if (Settings->Source == EPCGExClusterSketchSource::CollectionMap)
+	{
+		return;
+	}
 
 	if (Context->SketchLoader)
 	{
@@ -146,11 +262,11 @@ void FPCGExPrintClusterSketchElement::PostLoadAssetsDependencies(FPCGExContext* 
 	}
 }
 
-bool FPCGExPrintClusterSketchElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
+bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExPrintClusterSketchElement::Execute);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExStagingLoadSketchElement::Execute);
 
-	PCGEX_CONTEXT_AND_SETTINGS(PrintClusterSketch)
+	PCGEX_CONTEXT_AND_SETTINGS(StagingLoadSketch)
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
@@ -160,7 +276,7 @@ bool FPCGExPrintClusterSketchElement::AdvanceWork(FPCGExContext* InContext, cons
 
 		// --- Resolve each target's sketch, deduplicated into UniqueSketches ---
 		TMap<TObjectPtr<UPCGExClusterSketch>, int32> SketchToIndex;
-		int32 NumUnresolved = 0;
+		int32 NumUnresolved = Context->NumUnresolvedTargets;
 
 		auto ResolveIndex = [&](UPCGExClusterSketch* InSketch) -> int32
 		{
@@ -177,7 +293,34 @@ bool FPCGExPrintClusterSketchElement::AdvanceWork(FPCGExContext* InContext, cons
 			return NewIndex;
 		};
 
-		if (Context->SketchLoader)
+		if (Settings->Source == EPCGExClusterSketchSource::CollectionMap)
+		{
+			// Boot left SketchIdx indexing UniqueSketchPaths; the paths have loaded by now, so swap
+			// them for UniqueSketches indices through the same dedupe every other source uses.
+			TArray<int32> PathToSketch;
+			PathToSketch.Reserve(Context->UniqueSketchPaths.Num());
+			for (const FSoftObjectPath& Path : Context->UniqueSketchPaths)
+			{
+				PathToSketch.Add(ResolveIndex(TSoftObjectPtr<UPCGExClusterSketch>(Path).Get()));
+			}
+
+			for (int32 i = 0; i < NumTargets; ++i)
+			{
+				const int32 PathIndex = Context->SketchIdx[i];
+				if (PathIndex == -1)
+				{
+					// Never referenced a sketch entry -- already accounted for in Boot.
+					continue;
+				}
+
+				Context->SketchIdx[i] = PathToSketch[PathIndex];
+				if (Context->SketchIdx[i] == -1)
+				{
+					++NumUnresolved;
+				}
+			}
+		}
+		else if (Context->SketchLoader)
 		{
 			const TSharedPtr<TArray<PCGExValueHash>> Keys = Context->SketchLoader->GetKeys(Context->CurrentIO->IOIndex);
 			for (int32 i = 0; i < NumTargets; ++i)
@@ -272,10 +415,10 @@ bool FPCGExPrintClusterSketchElement::AdvanceWork(FPCGExContext* InContext, cons
 				&Context->GraphBuilderDetails, Settings->bQuiet);
 		}
 
-		Context->SetState(PCGExPrintClusterSketch::State_PrintingRoots);
+		Context->SetState(PCGExStagingLoadSketch::State_PrintingRoots);
 	}
 
-	PCGEX_ON_ASYNC_STATE_READY(PCGExPrintClusterSketch::State_PrintingRoots)
+	PCGEX_ON_ASYNC_STATE_READY(PCGExStagingLoadSketch::State_PrintingRoots)
 	{
 		Context->SetState(PCGExGraphs::States::State_WritingClusters);
 

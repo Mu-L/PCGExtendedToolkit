@@ -11,17 +11,31 @@
 #include "Details/PCGExInputShorthandsDetails.h"
 #include "Fitting/PCGExFitting.h"
 #include "Graphs/PCGExGraphDetails.h"
+#include "PCGExCollectionsCommon.h"
 
-#include "PCGExPrintClusterSketch.generated.h"
+#include "PCGExStagingLoadSketch.generated.h"
 
 class UPCGExClusterSketch;
 struct FPCGExClusterSketchPrintContext;
+
+namespace PCGExCollections
+{
+	class FPickUnpacker;
+}
 
 namespace PCGEx
 {
 	template <typename T>
 	class TAssetLoader;
 }
+
+/** Where the node gets the sketch to print for each target point. */
+UENUM(BlueprintType)
+enum class EPCGExClusterSketchSource : uint8
+{
+	CollectionMap = 0 UMETA(DisplayName = "Collection Map", Tooltip="Resolve each target's sketch from a staged pick, through a Collection Map. Requires points staged by a distribution node."),
+	Asset         = 1 UMETA(DisplayName = "Asset", Tooltip="Resolve each target's sketch from a direct asset reference -- a constant, or a per-point path attribute."),
+};
 
 namespace PCGExData
 {
@@ -38,15 +52,17 @@ namespace PCGExGraphs
  * Prints a hand-authored Cluster Sketch onto target points: each distinct sketch is printed ONCE into a
  * shared root cluster, then duplicated onto every target referencing it.
  */
-UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters", meta=(PCGExNodeLibraryDoc="clusters/generate/print-cluster-sketch"))
-class UPCGExPrintClusterSketchSettings : public UPCGExPointsProcessorSettings
+UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category="PCGEx|Clusters", meta=(Keywords = "sketch staged spawn print cluster", PCGExNodeLibraryDoc="staging/staging-load-sketch"))
+class UPCGExStagingLoadSketchSettings : public UPCGExPointsProcessorSettings
 {
 	GENERATED_BODY()
 
 public:
 	//~Begin UPCGSettings
 #if WITH_EDITOR
-	PCGEX_NODE_INFOS(PrintClusterSketch, "Sketch : Print to Points", "Prints a Cluster Sketch asset onto each target point.");
+	// Shortname stays StagingLoadSketch: it feeds GetDefaultNodeName(), and the codebase already
+	// lets it diverge from the title (PCGDataAssetLoader -> "Staging : Load PCGData").
+	PCGEX_NODE_INFOS(StagingLoadSketch, "Staging : Load Sketch", "Prints Cluster Sketch assets onto staged points.");
 
 	virtual FLinearColor GetNodeTitleColor() const override
 	{
@@ -62,6 +78,7 @@ public:
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 
 protected:
+	virtual void InputPinPropertiesBeforeFilters(TArray<FPCGPinProperties>& PinProperties) const override;
 	virtual FPCGElementPtr CreateElement() const override;
 	//~End UPCGSettings
 
@@ -85,8 +102,18 @@ public:
 
 	//~End UPCGExPointsProcessorSettings
 
+	/** Where each target's sketch comes from. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_NotOverridable))
+	EPCGExClusterSketchSource Source = EPCGExClusterSketchSource::CollectionMap;
+
+	/** Staging layer this node reads staged picks from. None = default layer (PCGEx/CollectionEntry); otherwise the layer name is appended (PCGEx/CollectionEntry/<layer>). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition="Source == EPCGExClusterSketchSource::CollectionMap", EditConditionHides), AdvancedDisplay)
+	FName StagingLayer = NAME_None;
+
+	FName GetEntryIdxAttributeName() const { return PCGExCollections::Labels::EntryIdxName(StagingLayer); }
+
 	/** Cluster Sketch to print. Constant, or a per-point attribute path. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Cluster Sketch", AllowedClasses="/Script/PCGExElementsClustersSketch.PCGExClusterSketch"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, DisplayName="Cluster Sketch", EditCondition="Source == EPCGExClusterSketchSource::Asset", EditConditionHides, AllowedClasses="/Script/PCGExElementsClustersSketch.PCGExClusterSketch"))
 	FPCGExInputShorthandNameSoftObjectPath Sketch = FPCGExInputShorthandNameSoftObjectPath(FName("Sketch"));
 
 	/** How each printed cluster inherits its target point's transform. */
@@ -110,12 +137,12 @@ public:
 	bool bQuiet = false;
 
 private:
-	friend class FPCGExPrintClusterSketchElement;
+	friend class FPCGExStagingLoadSketchElement;
 };
 
-struct FPCGExPrintClusterSketchContext final : FPCGExPointsProcessorContext
+struct FPCGExStagingLoadSketchContext final : FPCGExPointsProcessorContext
 {
-	friend class FPCGExPrintClusterSketchElement;
+	friend class FPCGExStagingLoadSketchElement;
 
 	virtual void RegisterAssetDependencies() override;
 
@@ -126,9 +153,26 @@ struct FPCGExPrintClusterSketchContext final : FPCGExPointsProcessorContext
 
 	TSharedPtr<PCGExData::FFacade> TargetsDataFacade;
 
-	/** Attribute-driven sketch resolution; null when the sketch is a constant. */
+	/** Attribute-driven sketch resolution; null when the sketch is a constant. Asset source only. */
 	TSharedPtr<PCGEx::TAssetLoader<UPCGExClusterSketch>> SketchLoader;
 	TObjectPtr<UPCGExClusterSketch> ConstantSketch;
+
+	/** CollectionMap source only. */
+	TSharedPtr<PCGExCollections::FPickUnpacker> CollectionUnpacker;
+
+	/**
+	 * CollectionMap source only: distinct sketch paths resolved from staged picks in Boot, so
+	 * RegisterAssetDependencies (which runs after Boot) can hand them to the normal async load phase.
+	 * SketchIdx indexes into THIS until the paths are resolved to objects, then into UniqueSketches.
+	 */
+	TArray<FSoftObjectPath> UniqueSketchPaths;
+
+	/**
+	 * Targets that referenced a sketch but could not get one -- broken pick, or an asset that failed
+	 * to load. A target whose pick resolves to a NON-sketch entry is not counted: mixed hosting is the
+	 * point of Omni, so a mesh pick flowing past this node is expected, not a fault.
+	 */
+	int32 NumUnresolvedTargets = 0;
 
 	/** Distinct sketches actually referenced, and the per-target index into them (-1 = skip). */
 	TArray<TObjectPtr<UPCGExClusterSketch>> UniqueSketches;
@@ -145,10 +189,10 @@ struct FPCGExPrintClusterSketchContext final : FPCGExPointsProcessorContext
 	TSharedPtr<PCGExData::FPointIOCollection> EdgeChildCollection;
 };
 
-class FPCGExPrintClusterSketchElement final : public FPCGExPointsProcessorElement
+class FPCGExStagingLoadSketchElement final : public FPCGExPointsProcessorElement
 {
 protected:
-	PCGEX_ELEMENT_CREATE_CONTEXT(PrintClusterSketch)
+	PCGEX_ELEMENT_CREATE_CONTEXT(StagingLoadSketch)
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual void PostLoadAssetsDependencies(FPCGExContext* InContext) const override;

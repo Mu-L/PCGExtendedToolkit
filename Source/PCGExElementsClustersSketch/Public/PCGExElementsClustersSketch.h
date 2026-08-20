@@ -6,7 +6,7 @@
 #include "CoreMinimal.h"
 #include "PCGExLegacyModuleInterface.h"
 
-class FPCGExElementsClustersSketchModule final : public IPCGExLegacyModuleInterface
+class FPCGExElementsClustersSketchModule final : public IPCGExModuleInterface
 {
 	PCGEX_MODULE_BODY
 

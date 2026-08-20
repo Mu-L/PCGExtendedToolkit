@@ -30,7 +30,7 @@ namespace PCGExMT
 
 /**
  * Shared state of one print: what decorators read, and what consumers use to map model elements onto
- * the printed output. Allocated by the caller, filled by PrintClusterSketch, alive until the compile's
+ * the printed output. Allocated by the caller, filled by StagingLoadSketch, alive until the compile's
  * end callback has run.
  */
 struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchPrintContext
@@ -87,7 +87,7 @@ namespace PCGExSketch
 	/**
 	 * Assemble a request from already-resolved pieces and print it -- the shared body behind every
 	 * sketch HOST (the asset, the component). Builds the basis from InSnapProvider; the basis may be a
-	 * local, since PrintClusterSketch consumes it synchronously and copies it into the print context.
+	 * local, since StagingLoadSketch consumes it synchronously and copies it into the print context.
 	 */
 	PCGEXELEMENTSCLUSTERSSKETCH_API TSharedPtr<PCGExGraphs::FGraphBuilder> PrintResolved(
 		FPCGExContext* InContext,
@@ -101,7 +101,7 @@ namespace PCGExSketch
 		bool bQuiet = false,
 		TFunction<void(const TSharedRef<PCGExGraphs::FGraphBuilder>&, bool)> OnCompiled = nullptr);
 
-	PCGEXELEMENTSCLUSTERSSKETCH_API TSharedPtr<PCGExGraphs::FGraphBuilder> PrintClusterSketch(
+	PCGEXELEMENTSCLUSTERSSKETCH_API TSharedPtr<PCGExGraphs::FGraphBuilder> StagingLoadSketch(
 		FPCGExContext* InContext,
 		const FPrintRequest& InRequest,
 		const TSharedPtr<PCGExData::FPointIO>& InVtxIO,
