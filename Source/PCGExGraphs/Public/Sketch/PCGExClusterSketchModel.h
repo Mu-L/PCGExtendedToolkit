@@ -76,6 +76,14 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchVertex
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	bool bLatticeBound = false;
+
+#if WITH_EDITORONLY_DATA
+	/** Authoring provenance: true for vertices the TOOL inserted (edge splits at crossings) rather than
+	 *  the hand. Stays true for life; an edge removal that leaves a side-effect vertex isolated removes
+	 *  it in the same operation. Never printed. */
+	UPROPERTY(VisibleAnywhere, Category = Settings)
+	bool bSideEffect = false;
+#endif
 };
 
 /** One authored sketch edge -- a pair of vertex array indices, undirected. */
@@ -108,6 +116,16 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchValidation
 	bool HasEdgeIssues() const { return InvalidEdges > 0 || SelfLoops > 0 || DuplicateEdges > 0; }
 };
 
+/** One hypothetical crossing: two edges sharing a point that is not a vertex. Offered as a ghost in the
+ *  editor and materialized on demand -- never cut automatically, since an X-brace with no joint is
+ *  legitimate authoring. Edge indices are only valid until the model is mutated. */
+struct PCGEXGRAPHS_API FPCGExClusterSketchCrossing
+{
+	int32 EdgeA = INDEX_NONE;
+	int32 EdgeB = INDEX_NONE;
+	FVector Location = FVector::ZeroVector;
+};
+
 /**
  * The authored cluster-sketch model: vertices + undirected edges + annotation channels, all plain
  * serialized arrays. Edges reference vertices by array index; ALL mutations must go through the API
@@ -134,6 +152,10 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 	int32 NumVertices() const { return Vertices.Num(); }
 	int32 NumEdges() const { return Edges.Num(); }
 
+	/** THE location rule, in one place: a bound vertex resolves through the basis (when one exists),
+	 *  a free one through its transform. */
+	static FVector ResolvedLocation(const FPCGExClusterSketchVertex& V, const FPCGExLatticeBasis* Basis);
+
 	/** Append a free vertex. Extends every vertex channel. @return the new vertex index. */
 	int32 AddVertex(const FTransform& InTransform);
 
@@ -144,8 +166,9 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 	bool RemoveVertex(int32 Index);
 
 	/** Add the undirected edge (A,B). Idempotent: an existing edge is returned rather than duplicated.
+	 *  @param bOutCreated set true only when a NEW edge was appended (channel entries defaulted).
 	 *  @return the edge index, or INDEX_NONE for an invalid pair (out of range or self-loop). */
-	int32 Connect(int32 A, int32 B);
+	int32 Connect(int32 A, int32 B, bool* bOutCreated = nullptr);
 
 	/** Remove the undirected edge (A,B) and its channel entries. @return true if an edge was removed. */
 	bool Disconnect(int32 A, int32 B);
@@ -171,6 +194,77 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 	void SyncBoundVertices(const FPCGExLatticeBasis& InBasis, bool bResnapFromLocation);
 
 	/**
+	 * First vertex whose resolved location sits strictly INSIDE the edge's segment (endpoint-coincident
+	 * counts as collocation, not overlap), or INDEX_NONE. An edge through a vertex is degenerate for a
+	 * cluster -- collinear A-B-C may carry A-B and B-C but never A-C.
+	 */
+	int32 FindVertexOnEdgeInterior(int32 EdgeIndex, const FPCGExLatticeBasis* Basis) const;
+
+	/**
+	 * Replace an edge that passes through vertices with the chain of segments between them (sorted along
+	 * the edge), deduping against existing edges -- so retarget-created degeneracies dissolve into the
+	 * connectivity that is already there. Every NEW segment inherits the parent edge's channel values.
+	 * @return the number of edges the chain replaced the original with (0 = nothing contained, untouched).
+	 */
+	int32 SplitEdgeByContainedVertices(int32 EdgeIndex, const FPCGExLatticeBasis* Basis, TArray<uint64>* OutSegmentKeys = nullptr);
+
+	/**
+	 * Restore edge/VERTEX separation around one vertex after a gesture: split every edge passing through
+	 * it, and split the edges the gesture TOUCHED by any vertices they pass through. Runs to a fixed
+	 * point. Crossings are deliberately NOT touched here -- they are offered as ghosts and materialized
+	 * on demand (FindEdgeCrossings / MaterializeCrossing).
+	 *
+	 * Scope follows the touched edges THROUGH their own splits, tracked by endpoint-pair key: edge
+	 * indices shift on every split, vertex indices never do (this only ever appends vertices).
+	 * @return total splits performed.
+	 */
+	int32 EnforceSeparationAroundVertex(int32 VertexIndex, const FPCGExLatticeBasis* Basis);
+
+	/** Full-model sweep of SplitEdgeByContainedVertices -- the explicit cleanup. @return total splits. */
+	int32 SplitAllOverlappingEdges(const FPCGExLatticeBasis* Basis);
+
+	/**
+	 * Every hypothetical crossing in the model: pairs of edges meeting at a point that is not a vertex
+	 * (adjacent edges, sharing a vertex, never count). THE crossing enumeration -- shared by the editor
+	 * ghosts, the print warning, and the sweep below, so none of them can disagree.
+	 */
+	void FindEdgeCrossings(TArray<FPCGExClusterSketchCrossing>& OutCrossings, const FPCGExLatticeBasis* Basis) const;
+
+	/**
+	 * Materialize ONE crossing: insert a vertex at Location (side-effect provenance -- the tool placed
+	 * the geometry, the user only chose when) and split both edges through it. The user-invoked commit
+	 * behind the editor's ghost affordance.
+	 * @return the new vertex index, or INDEX_NONE if the pair is no longer valid.
+	 */
+	int32 MaterializeCrossing(int32 EdgeA, int32 EdgeB, const FVector& Location, const FPCGExLatticeBasis* Basis);
+
+	/**
+	 * Materialize every crossing (the explicit cleanup). Rescans after each one, since materializing
+	 * shifts edge indices. @return the number of crossing vertices inserted.
+	 */
+	int32 InsertCrossingVertices(const FPCGExLatticeBasis* Basis);
+
+#if WITH_EDITORONLY_DATA
+	/** Remove side-effect vertices left with no edges -- called by edge-removing operations so tool
+	 *  residue never outlives the geometry that justified it. Hand-made vertices are never touched.
+	 *  @return the number removed. */
+	int32 RemoveOrphanSideEffectVertices();
+
+	/** Clear a vertex's side-effect provenance: the user edited it deliberately, so it is theirs now.
+	 *  Called from the AUTHORING layer only (gestures, details edits) -- never from structural repair,
+	 *  whose internal Connect/split calls would otherwise promote the very vertices they insert. */
+	void MarkVertexAuthored(int32 VertexIndex);
+#endif
+
+	/**
+	 * What deleting InVertexIndex would take with it: the vertex itself, every edge touching it, and any
+	 * side-effect vertex the removal would leave with no edges (mirroring the orphan sweep every
+	 * edge-removing operation runs). Pure query -- authoring FEEDBACK, so both editing hosts advertise
+	 * exactly what the gesture does, from one implementation.
+	 */
+	void GatherVertexRemovalCascade(int32 InVertexIndex, TSet<int32>& OutVertices, TSet<int32>& OutEdges) const;
+
+	/**
 	 * Drop every structurally invalid edge -- out-of-range endpoints, self-loops, undirected duplicates
 	 * (first occurrence kept) -- with their channel entries. Out-of-range edges are DORMANT hazards:
 	 * invisible and unprintable today, they silently reactivate the moment the vertex array grows past
@@ -187,11 +281,23 @@ struct PCGEXGRAPHS_API FPCGExClusterSketchModel
 
 namespace PCGExSketch
 {
-	/** Hash/compare key for "these vertices resolve to the same printed location" (0.01 tolerance) --
-	 *  the ONE collocation definition shared by the print warning, the editor highlight, and the
-	 *  Merge Collocated cleanup, so they can never disagree about what counts as overlapping. */
+	/** The ONE geometric-coincidence tolerance: vertex collocation, vertex-on-edge-interior, and their
+	 *  quantized hash keys all share it, so no two consumers can disagree about "same place". */
+	constexpr double CoincidenceTolerance = 0.01;
+
+	/** Hash/compare key for "these vertices resolve to the same printed location" -- shared by the
+	 *  print warning, the editor highlight, and the Merge Collocated cleanup. */
 	FORCEINLINE FVector QuantizedLocationKey(const FVector& Location)
 	{
-		return FVector(FMath::RoundToDouble(Location.X * 100.0), FMath::RoundToDouble(Location.Y * 100.0), FMath::RoundToDouble(Location.Z * 100.0));
+		constexpr double Scale = 1.0 / CoincidenceTolerance;
+		return FVector(FMath::RoundToDouble(Location.X * Scale), FMath::RoundToDouble(Location.Y * Scale), FMath::RoundToDouble(Location.Z * Scale));
 	}
+
+	/**
+	 * True when two segments CROSS: closest points within the coincidence tolerance and strictly
+	 * interior on BOTH (an endpoint touching the other segment is the vertex-on-edge case, and touching
+	 * endpoints are collocation -- neither is a crossing). OutPoint = the crossing location. The ONE
+	 * crossing definition shared by insertion, the editor highlight, and the print warning.
+	 */
+	PCGEXGRAPHS_API bool SegmentsCross(const FVector& A1, const FVector& B1, const FVector& A2, const FVector& B2, FVector& OutPoint);
 }

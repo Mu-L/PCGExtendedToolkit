@@ -8,6 +8,7 @@
 
 struct FPCGExContext;
 class UPCGExClusterSketchDecorator;
+class UPCGExClusterSnapProvider;
 struct FPCGExClusterSketchModel;
 struct FPCGExGraphBuilderDetails;
 
@@ -83,6 +84,23 @@ namespace PCGExSketch
 	 * vtx IO). On ASYNC failure (bCompiledSuccessfully false) the vtx IO still holds every point but no
 	 * cluster data -- the caller must roll it back (InitializeOutput(NoInit) + Disable) when staging.
 	 */
+	/**
+	 * Assemble a request from already-resolved pieces and print it -- the shared body behind every
+	 * sketch HOST (the asset, the component). Builds the basis from InSnapProvider; the basis may be a
+	 * local, since PrintClusterSketch consumes it synchronously and copies it into the print context.
+	 */
+	PCGEXGRAPHS_API TSharedPtr<PCGExGraphs::FGraphBuilder> PrintResolved(
+		FPCGExContext* InContext,
+		const FPCGExClusterSketchModel& InModel,
+		const UPCGExClusterSnapProvider* InSnapProvider,
+		TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>> InDecorators,
+		const TSharedPtr<PCGExData::FPointIO>& InVtxIO,
+		const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
+		const TSharedPtr<FPCGExClusterSketchPrintContext>& InPrintContext,
+		const FPCGExGraphBuilderDetails* InBuilderDetails,
+		bool bQuiet = false,
+		TFunction<void(const TSharedRef<PCGExGraphs::FGraphBuilder>&, bool)> OnCompiled = nullptr);
+
 	PCGEXGRAPHS_API TSharedPtr<PCGExGraphs::FGraphBuilder> PrintClusterSketch(
 		FPCGExContext* InContext,
 		const FPrintRequest& InRequest,

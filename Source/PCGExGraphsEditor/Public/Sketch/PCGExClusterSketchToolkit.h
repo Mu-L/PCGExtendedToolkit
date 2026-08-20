@@ -6,9 +6,12 @@
 #include "CoreMinimal.h"
 #include "Tools/BaseAssetToolkit.h"
 
+class AActor;
 class FAdvancedPreviewScene;
 class FPCGExSketchAssetEditTarget;
 class FPCGExSketchEditController;
+class UPCGExClusterSketch;
+class UPCGExClusterSketchComponent;
 
 /**
  * The Cluster Sketch editor toolkit: FBaseAssetToolkit's viewport + details pair over an advanced
@@ -40,7 +43,16 @@ public:
 	TSharedPtr<FPCGExSketchEditController> GetController() const { return Controller; }
 
 private:
+	/** Give the preview scene a real sketch component, so this editor renders through the SAME mesh
+	 *  layer the in-level mode does instead of an immediate-mode lookalike. Needs an owning actor: the
+	 *  component parents its instanced-mesh children to GetOwner(). */
+	void CreatePreviewSketch(UPCGExClusterSketch* InSketch);
+
 	TSharedPtr<FAdvancedPreviewScene> ObjectScene;
 	TSharedPtr<FPCGExSketchAssetEditTarget> EditTarget;
 	TSharedPtr<FPCGExSketchEditController> Controller;
+
+	/** Owned by the preview world, which roots them; weak so teardown order cannot matter. */
+	TWeakObjectPtr<AActor> PreviewActor;
+	TWeakObjectPtr<UPCGExClusterSketchComponent> PreviewComponent;
 };

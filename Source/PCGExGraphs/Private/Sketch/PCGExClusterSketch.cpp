@@ -3,9 +3,17 @@
 
 #include "Sketch/PCGExClusterSketch.h"
 
+#include "Sketch/PCGExClusterSketchPrint.h"
+
 #if WITH_EDITOR
 #include "ScopedTransaction.h"
+#include "Helpers/PCGExObjectNotifyHelpers.h"
 #endif
+
+namespace PCGExSketch
+{
+	FSaveSketchAsAssetFn GSaveSketchAsAssetFn;
+}
 
 bool UPCGExClusterSketch::BuildBasis(FPCGExLatticeBasis& OutBasis) const
 {
@@ -27,6 +35,20 @@ void UPCGExClusterSketch::CollectAssetDependencies(TArray<FSoftObjectPath>& OutP
 	}
 }
 
+TSharedPtr<PCGExGraphs::FGraphBuilder> UPCGExClusterSketch::Print(
+	FPCGExContext* InContext,
+	const TSharedPtr<PCGExData::FPointIO>& InVtxIO,
+	const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
+	const TSharedPtr<FPCGExClusterSketchPrintContext>& InPrintContext,
+	const FPCGExGraphBuilderDetails* InBuilderDetails,
+	const bool bQuiet,
+	TFunction<void(const TSharedRef<PCGExGraphs::FGraphBuilder>&, bool)> OnCompiled) const
+{
+	return PCGExSketch::PrintResolved(
+		InContext, Model, SnapProvider, Decorators,
+		InVtxIO, InTaskManager, InPrintContext, InBuilderDetails, bQuiet, MoveTemp(OnCompiled));
+}
+
 #if WITH_EDITOR
 void UPCGExClusterSketch::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
@@ -42,6 +64,14 @@ void UPCGExClusterSketch::PostEditChangeProperty(FPropertyChangedEvent& Property
 
 	if (MemberName == GET_MEMBER_NAME_CHECKED(UPCGExClusterSketch, Model))
 	{
+		// Hand-editing a vertex adopts it: tool-inserted provenance survives only until the user
+		// deliberately touches the vertex (here, or through a gesture in the editor).
+		const int32 EditedVertex = PropertyChangedEvent.GetArrayIndex(GET_MEMBER_NAME_STRING_CHECKED(FPCGExClusterSketchModel, Vertices));
+		if (EditedVertex != INDEX_NONE)
+		{
+			Model.MarkVertexAuthored(EditedVertex);
+		}
+
 		// Coord edited -> the coord wins; anything else -> re-snap from location first. Both paths are
 		// idempotent for already-coherent vertices, so over-triggering on unrelated model edits is free.
 		const FName LeafName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
@@ -96,8 +126,7 @@ void UPCGExClusterSketch::MergeCollocatedVertices()
 		FirstAtLocation.Reserve(Model.Vertices.Num());
 		for (int32 i = 0; i < Model.Vertices.Num(); ++i)
 		{
-			const FPCGExClusterSketchVertex& V = Model.Vertices[i];
-			const FVector Location = (V.bLatticeBound && bHasBasis) ? Basis.CoordToWorld(V.LatticeCoord) : V.Transform.GetLocation();
+			const FVector Location = FPCGExClusterSketchModel::ResolvedLocation(Model.Vertices[i], bHasBasis ? &Basis : nullptr);
 			const FVector Key = PCGExSketch::QuantizedLocationKey(Location);
 			if (const int32* First = FirstAtLocation.Find(Key))
 			{
@@ -109,7 +138,16 @@ void UPCGExClusterSketch::MergeCollocatedVertices()
 		}
 	}
 
+	// Merging retargets edges, which can leave them passing THROUGH vertices (the collinear D-onto-A
+	// case) -- genuinely degenerate, so the cleanup must resolve it. Crossings it may also create are
+	// left alone: they are legitimate geometry, offered as ghosts and materialized on demand.
+	Model.SplitAllOverlappingEdges(bHasBasis ? &Basis : nullptr);
+	// Merges can also strand tool residue.
+	Model.RemoveOrphanSideEffectVertices();
+
 	PostEditChange();
+	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
+	PCGExEditor::NotifyObjectChanged(this);
 }
 
 void UPCGExClusterSketch::RemoveInvalidEdges()
@@ -118,5 +156,24 @@ void UPCGExClusterSketch::RemoveInvalidEdges()
 	Modify();
 	Model.RemoveInvalidEdges();
 	PostEditChange();
+	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
+	PCGExEditor::NotifyObjectChanged(this);
+}
+
+void UPCGExClusterSketch::SplitOverlappingEdges()
+{
+	FPCGExLatticeBasis Basis;
+	const bool bHasBasis = BuildBasis(Basis);
+	const FPCGExLatticeBasis* BasisPtr = bHasBasis ? &Basis : nullptr;
+
+	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "SplitOverlappingEdges", "Split Overlapping Sketch Edges"));
+	Modify();
+	// Vertex-on-edge first: a crossing insertion adds vertices that the containment pass would then
+	// have to re-scan, while splitting first only ever shortens the segments crossings are found on.
+	Model.SplitAllOverlappingEdges(BasisPtr);
+	Model.InsertCrossingVertices(BasisPtr);
+	PostEditChange();
+	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
+	PCGExEditor::NotifyObjectChanged(this);
 }
 #endif

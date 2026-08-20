@@ -4,27 +4,25 @@
 #include "Sketch/PCGExSketchDrawHelper.h"
 
 #include "SceneManagement.h"
+#include "Sketch/PCGExClusterSketchComponent.h"
+#include "Sketch/PCGExClusterSketchStyle.h"
 #include "Sketch/PCGExSketchEditController.h"
 
 namespace PCGExSketchDrawHelper
 {
-	const FLinearColor FreeVertexColor = FLinearColor(0.9f, 0.9f, 0.9f);
-	const FLinearColor BoundVertexColor = FLinearColor(0.15f, 0.85f, 0.8f);
-	const FLinearColor SelectedColor = FLinearColor(1.0f, 0.65f, 0.1f);
-	const FLinearColor HoverColor = FLinearColor(1.0f, 1.0f, 1.0f);
-	const FLinearColor EdgeColor = FLinearColor(0.55f, 0.55f, 0.6f);
-	const FLinearColor PreviewColor = FLinearColor(0.3f, 1.0f, 0.4f);
-	const FLinearColor MergeColor = FLinearColor(1.0f, 0.35f, 0.15f);
-	const FLinearColor BasisColor = FLinearColor(0.35f, 0.5f, 0.9f, 0.6f);
-
+	// Sizes stay local: they are immediate-mode screen-space quantities, not part of the project's
+	// world-space style vocabulary. Every COLOR comes from the shared settings object, so the
+	// standalone editor and the in-level mode restyle together.
 	constexpr float VertexSize = 10.0f;
 	constexpr float SelectedVertexSize = 14.0f;
 	constexpr float HoverBonus = 4.0f;
 	constexpr float EdgeThickness = 1.5f;
 	constexpr float SelectedEdgeThickness = 3.0f;
+	constexpr float SideEffectScale = 0.6f;
+	constexpr double GhostRingRadius = 12.0;
 }
 
-void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, FPrimitiveDrawInterface* PDI)
+void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, FPrimitiveDrawInterface* PDI, const FMeshCoverage& InCoverage)
 {
 	const FPCGExClusterSketchModel* Model = Controller.GetTarget().GetModel();
 	if (!Model || !PDI)
@@ -35,6 +33,17 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 	FPCGExLatticeBasis Basis;
 	const bool bHasBasis = Controller.GetBasis(Basis);
 	const FTransform LocalToWorld = Controller.GetTarget().GetLocalToWorld();
+
+	const UPCGExClusterSketchStyleSettings* Style = UPCGExClusterSketchStyleSettings::Get();
+
+	// Per-kind coverage comes from the host, which knows which STYLE is in force (preview and edit
+	// configure different meshes) -- deciding it here from settings would guess the wrong one.
+	const bool bMeshVertices = InCoverage.bVertices;
+	const bool bMeshEdges = InCoverage.bEdges;
+	// Hover colour is carried by the mesh layer too when it covers the kind; only a kind drawn here
+	// still needs its hover expressed here.
+	const bool bMeshHover = InCoverage.bHover;
+	const bool bMeshGhosts = InCoverage.bGhosts;
 
 	const FPCGExSketchHit& Hover = Controller.GetHover();
 	const TSet<int32>& SelectedVertices = Controller.GetSelectedVertices();
@@ -78,8 +87,27 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		const FVector Origin = LocalToWorld.TransformPosition(Basis.Origin);
 		for (int32 k = 0; k < Basis.NumAxes; ++k)
 		{
-			PDI->DrawLine(Origin, LocalToWorld.TransformPosition(Basis.Origin + Basis.AxisVecs[k]), PCGExSketchDrawHelper::BasisColor, SDPG_Foreground, 0.5f);
+			PDI->DrawLine(Origin, LocalToWorld.TransformPosition(Basis.Origin + Basis.AxisVecs[k]), Style->BasisColor, SDPG_Foreground, 0.5f);
 		}
+	}
+
+	// Ghost crossings: an OFFER, never an automatic cut. Clicking one materializes its vertex and
+	// splits both edges through it. Drawn hollow-ish and dim until hovered.
+	TSet<int32> CrossingEdges;
+	const TArray<FPCGExClusterSketchCrossing>& Crossings = Controller.GetCrossings();
+	for (const FPCGExClusterSketchCrossing& Crossing : Crossings)
+	{
+		CrossingEdges.Add(Crossing.EdgeA);
+		CrossingEdges.Add(Crossing.EdgeB);
+	}
+
+	// What the delete gesture would take if it fired right now -- the same query the mesh layer uses, so
+	// both hosts advertise the same consequence.
+	TSet<int32> DoomedVertices;
+	TSet<int32> DoomedEdges;
+	if (Controller.GetDeleteIntent() && Hover.IsVertex())
+	{
+		Model->GatherVertexRemovalCascade(Hover.Index, DoomedVertices, DoomedEdges);
 	}
 
 	// Edges under vertices.
@@ -94,16 +122,29 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 			const int32 ValidEnd = Locations.IsValidIndex(E.A) ? E.A : (Locations.IsValidIndex(E.B) ? E.B : INDEX_NONE);
 			if (ValidEnd != INDEX_NONE)
 			{
-				DrawDashedLine(PDI, Locations[ValidEnd], Locations[ValidEnd] + FVector(0, 0, StubLength), PCGExSketchDrawHelper::MergeColor, 5.0, SDPG_Foreground);
+				DrawDashedLine(PDI, Locations[ValidEnd], Locations[ValidEnd] + FVector(0, 0, StubLength), Style->MergeAffordanceColor, 5.0, SDPG_Foreground);
 			}
 			continue;
 		}
 		const bool bSelected = SelectedEdges.Contains(e);
 		const bool bHovered = Hover.Type == FPCGExSketchHit::EType::Edge && Hover.Index == e;
-		// While the host's delete modifier is held, the hovered edge reads as a delete target.
-		const FLinearColor Color = bHovered
-			                           ? (Controller.GetEdgeDeleteIntent() ? PCGExSketchDrawHelper::MergeColor : PCGExSketchDrawHelper::HoverColor)
-			                           : (bSelected ? PCGExSketchDrawHelper::SelectedColor : PCGExSketchDrawHelper::EdgeColor);
+		// Two different states, two different reads: an edge passing THROUGH a vertex is DEGENERATE
+		// (a cluster cannot carry it) and shouts; an edge merely CROSSING another is legitimate, and
+		// only whispers that a ghost is on offer. O(E x V), fine at sketch scale. While the host's
+		// delete modifier is held, the hovered edge reads as a delete target.
+		const bool bDegenerate = Model->FindVertexOnEdgeInterior(e, bHasBasis ? &Basis : nullptr) != INDEX_NONE;
+		FLinearColor Color = Style->EditEdge.Color;
+		if (CrossingEdges.Contains(e)) { Color = Style->EditVertexPhantom.Color; }
+		if (bSelected) { Color = Style->SelectedColor; }
+		if (bDegenerate) { Color = Style->MergeAffordanceColor; }
+		if (DoomedEdges.Contains(e)) { Color = Style->DeleteIntentColor; }
+		if (bHovered) { Color = Controller.GetDeleteIntent() ? Style->DeleteIntentColor : Style->HoverColor; }
+		// Meshes carry idle, selection, hover and the crossing tint; only DEGENERATE, which they have no
+		// instance for, still shouts from here.
+		if (bMeshEdges && (!bHovered || bMeshHover) && !bDegenerate)
+		{
+			continue;
+		}
 		PDI->DrawLine(Locations[E.A], Locations[E.B], Color, SDPG_Foreground, (bSelected || bHovered) ? PCGExSketchDrawHelper::SelectedEdgeThickness : PCGExSketchDrawHelper::EdgeThickness);
 	}
 
@@ -111,22 +152,64 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 	{
 		const bool bSelected = SelectedVertices.Contains(i);
 		const bool bHovered = Hover.Type == FPCGExSketchHit::EType::Vertex && Hover.Index == i;
-		FLinearColor Color = Model->Vertices[i].bLatticeBound ? PCGExSketchDrawHelper::BoundVertexColor : PCGExSketchDrawHelper::FreeVertexColor;
+		// Tool-inserted (side-effect) vertices read as secondary: dimmer and smaller than hand-made ones.
+		bool bSideEffect = false;
+#if WITH_EDITORONLY_DATA
+		bSideEffect = Model->Vertices[i].bSideEffect;
+#endif
+		// Same precedence as the mesh layer, from the same settings: provenance outranks the bound tint.
+		FLinearColor Color = Style->EditVertexIdle.Color;
+		if (Model->Vertices[i].bLatticeBound) { Color = Style->EditVertexBoundColor; }
+		if (bSideEffect) { Color = Style->EditVertexSideEffectColor; }
 		if (bSelected)
 		{
-			Color = PCGExSketchDrawHelper::SelectedColor;
+			Color = Style->SelectedColor;
 		}
 		if (Overlapping.Contains(i))
 		{
-			// Invalid state outranks selection; only hover (aiming) overrides it.
-			Color = PCGExSketchDrawHelper::MergeColor;
+			// Invalid state outranks selection; only aiming (doom, hover) overrides it.
+			Color = Style->MergeAffordanceColor;
 		}
-		if (bHovered)
+		if (DoomedVertices.Contains(i))
 		{
-			Color = PCGExSketchDrawHelper::HoverColor;
+			Color = Style->DeleteIntentColor;
 		}
-		const float Size = (bSelected ? PCGExSketchDrawHelper::SelectedVertexSize : PCGExSketchDrawHelper::VertexSize) + (bHovered ? PCGExSketchDrawHelper::HoverBonus : 0.0f);
-		PDI->DrawPoint(Locations[i], Color, Size, SDPG_Foreground);
+		// Hover outranks selection, EXCEPT where the outline mesh already carries the hover signal -- a
+		// selected vertex keeps reading as selected under the cursor. Mirrors the mesh layer's rule.
+		if (bHovered && !(bSelected && bMeshHover))
+		{
+			Color = Controller.GetDeleteIntent() ? Style->DeleteIntentColor : Style->HoverColor;
+		}
+		float Size = bSelected ? PCGExSketchDrawHelper::SelectedVertexSize : PCGExSketchDrawHelper::VertexSize;
+		if (bSideEffect && !bSelected)
+		{
+			Size *= PCGExSketchDrawHelper::SideEffectScale;
+		}
+		if (bMeshVertices && (!bHovered || bMeshHover) && !Overlapping.Contains(i))
+		{
+			continue;
+		}
+		PDI->DrawPoint(Locations[i], Color, Size + (bHovered ? PCGExSketchDrawHelper::HoverBonus : 0.0f), SDPG_Foreground);
+	}
+
+	// Ghost markers last, so they sit above the edges they offer to cut.
+	for (int32 c = 0; c < Crossings.Num(); ++c)
+	{
+		const bool bHovered = Hover.Type == FPCGExSketchHit::EType::Crossing && Hover.Index == c;
+		const FVector Pos = LocalToWorld.TransformPosition(Crossings[c].Location);
+		const FLinearColor Color = bHovered ? Style->PreviewAffordanceColor : Style->EditVertexPhantom.Color;
+		const float Size = bHovered ? PCGExSketchDrawHelper::SelectedVertexSize + PCGExSketchDrawHelper::HoverBonus : PCGExSketchDrawHelper::VertexSize;
+		if (!bMeshGhosts)
+		{
+			PDI->DrawPoint(Pos, Color, Size, SDPG_Foreground);
+		}
+		if (bHovered && !(bMeshGhosts && bMeshHover))
+		{
+			// A hovered ghost reads as "click to place a vertex here": ring it.
+			const double Radius = PCGExSketchDrawHelper::GhostRingRadius;
+			DrawCircle(PDI, Pos, FVector::XAxisVector, FVector::YAxisVector, Color, Radius, 16, SDPG_Foreground, 1.0f);
+			DrawCircle(PDI, Pos, FVector::XAxisVector, FVector::ZAxisVector, Color, Radius, 16, SDPG_Foreground, 1.0f);
+		}
 	}
 
 	// Drag affordances: move ghost or connect preview line.
@@ -135,8 +218,8 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		const FVector Start = Locations[Controller.GetDragVertex()];
 		const int32 TargetVertex = Controller.GetDragTargetVertex();
 		const FVector End = Locations.IsValidIndex(TargetVertex) ? Locations[TargetVertex] : LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal());
-		DrawDashedLine(PDI, Start, End, PCGExSketchDrawHelper::PreviewColor, 12.0, SDPG_Foreground);
-		PDI->DrawPoint(End, PCGExSketchDrawHelper::PreviewColor, PCGExSketchDrawHelper::SelectedVertexSize, SDPG_Foreground);
+		DrawDashedLine(PDI, Start, End, Style->PreviewAffordanceColor, 12.0, SDPG_Foreground);
+		PDI->DrawPoint(End, Style->PreviewAffordanceColor, PCGExSketchDrawHelper::SelectedVertexSize, SDPG_Foreground);
 	}
 	else if (Controller.GetDragMode() == FPCGExSketchEditController::EDragMode::Move)
 	{
@@ -145,12 +228,57 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		{
 			// Release here MERGES the dragged vertex into this one -- loud, warm highlight.
 			const FVector MergePos = Locations[MergeCandidate];
-			PDI->DrawPoint(MergePos, PCGExSketchDrawHelper::MergeColor, PCGExSketchDrawHelper::SelectedVertexSize + 8.0f, SDPG_Foreground);
-			DrawDashedLine(PDI, LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal()), MergePos, PCGExSketchDrawHelper::MergeColor, 8.0, SDPG_Foreground);
+			PDI->DrawPoint(MergePos, Style->MergeAffordanceColor, PCGExSketchDrawHelper::SelectedVertexSize + 8.0f, SDPG_Foreground);
+			DrawDashedLine(PDI, LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal()), MergePos, Style->MergeAffordanceColor, 8.0, SDPG_Foreground);
 		}
 		else
 		{
-			PDI->DrawPoint(LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal()), PCGExSketchDrawHelper::PreviewColor, PCGExSketchDrawHelper::VertexSize, SDPG_Foreground);
+			PDI->DrawPoint(LocalToWorld.TransformPosition(Controller.GetDragPreviewLocal()), Style->PreviewAffordanceColor, PCGExSketchDrawHelper::VertexSize, SDPG_Foreground);
 		}
 	}
+}
+
+void FPCGExSketchDrawHelper::DrawWithComponent(const FPCGExSketchEditController& Controller, UPCGExClusterSketchComponent* Component, FPrimitiveDrawInterface* PDI)
+{
+	if (!Component)
+	{
+		Draw(Controller, PDI);
+		return;
+	}
+
+	// Selection and hover live on the controller and change without notifying anyone, and a drag moves
+	// geometry every frame without a completed-operation notify -- so the whole state is pushed here
+	// rather than plumbed through callbacks. The component ignores an unchanged push.
+	FPCGExClusterSketchEditState State;
+	State.bActive = true;
+	State.ModelRevision = Controller.GetModelRevision();
+	State.SelectedVertices = Controller.GetSelectedVertices();
+	State.SelectedEdges = Controller.GetSelectedEdges();
+	State.bDeleteIntent = Controller.GetDeleteIntent();
+
+	const FPCGExSketchHit& Hover = Controller.GetHover();
+	State.HoveredVertex = Hover.Type == FPCGExSketchHit::EType::Vertex ? Hover.Index : INDEX_NONE;
+	State.HoveredEdge = Hover.Type == FPCGExSketchHit::EType::Edge ? Hover.Index : INDEX_NONE;
+	State.HoveredGhost = Hover.Type == FPCGExSketchHit::EType::Crossing ? Hover.Index : INDEX_NONE;
+
+	// Crossings are the controller's to compute, but the mesh layer expresses them: ghost markers in the
+	// phantom style, and the two participating edges tinted to match. Locations are model-local, which
+	// is the component's own frame.
+	const TArray<FPCGExClusterSketchCrossing>& Crossings = Controller.GetCrossings();
+	State.GhostLocations.Reserve(Crossings.Num());
+	for (const FPCGExClusterSketchCrossing& Crossing : Crossings)
+	{
+		State.GhostLocations.Add(Crossing.Location);
+		State.CrossingEdges.Add(Crossing.EdgeA);
+		State.CrossingEdges.Add(Crossing.EdgeB);
+	}
+
+	Component->SetEditState(State);
+
+	FMeshCoverage Coverage;
+	Coverage.bVertices = Component->DrawsVerticesAsMesh();
+	Coverage.bEdges = Component->DrawsEdgesAsMesh();
+	Coverage.bHover = Component->DrawsHoverAsMesh();
+	Coverage.bGhosts = Component->DrawsGhostsAsMesh();
+	Draw(Controller, PDI, Coverage);
 }

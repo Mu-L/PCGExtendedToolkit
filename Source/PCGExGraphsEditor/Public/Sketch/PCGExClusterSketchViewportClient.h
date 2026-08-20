@@ -5,75 +5,43 @@
 
 #include "CoreMinimal.h"
 #include "EditorViewportClient.h"
-#include "BaseBehaviors/BehaviorTargetInterfaces.h"
-#include "InputBehaviorSet.h"
 
 class FPCGExSketchEditController;
+class UPCGExClusterSketchComponent;
+class UPCGExSketchInputBinder;
 
 /**
- * Preview-scene viewport client for the Cluster Sketch editor. Hosts the ITF input behaviors DIRECTLY
- * (no UEdMode, no tools): the mode manager's always-live tools context routes input here, and every
- * gesture delegates to the shared FPCGExSketchEditController -- the client owns zero editing logic, so
- * a level-viewport host can drive the same controller from its own behavior sources.
+ * Preview-scene viewport client for the standalone Cluster Sketch editor.
  *
- * Input map: LMB click = select (Ctrl toggles / adds a vertex on empty space); LMB drag on a vertex =
- * move; Shift+drag from a vertex = connect (release on empty extrudes); Alt+click on an edge = delete
- * it; Delete = delete selection; Escape = cancel drag / clear selection. Camera navigation stays fully
- * stock -- empty-space plain clicks/drags are deliberately NOT captured, and the Alt claim is scoped to
- * presses landing exactly on an edge (an Alt-orbit started there loses one gesture, deletes nothing).
+ * Owns NO editing, input or drawing logic: the gesture vocabulary lives in UPCGExSketchInputBinder,
+ * the editing in FPCGExSketchEditController, and the render pass in FPCGExSketchDrawHelper -- all
+ * shared with the in-level editor mode, so a fix or an improvement in any of them reaches both hosts.
+ * This class only supplies host policy (one fixed controller, one preview-scene sketch component) and
+ * hosts the binder on the mode manager's always-live ITF router.
  */
-class PCGEXGRAPHSEDITOR_API FPCGExClusterSketchViewportClient final
-	: public FEditorViewportClient,
-	  public IInputBehaviorSource,
-	  public IClickBehaviorTarget,
-	  public IClickDragBehaviorTarget,
-	  public IHoverBehaviorTarget
+class PCGEXGRAPHSEDITOR_API FPCGExClusterSketchViewportClient final : public FEditorViewportClient
 {
 public:
-	FPCGExClusterSketchViewportClient(FEditorModeTools* InModeTools, FPreviewScene* InPreviewScene, const TSharedPtr<FPCGExSketchEditController>& InController);
+	FPCGExClusterSketchViewportClient(FEditorModeTools* InModeTools, FPreviewScene* InPreviewScene, const TSharedPtr<FPCGExSketchEditController>& InController, UPCGExClusterSketchComponent* InSketchComponent);
 	virtual ~FPCGExClusterSketchViewportClient() override;
 
 	//~ FEditorViewportClient
+	/** Dark preview backdrop. Overridden rather than set on the preview scene: the scene's color comes
+	 *  from the shared editor-wide UAssetViewerSettings profile, which we must not write to. */
+	virtual FLinearColor GetBackgroundColor() const override;
 	virtual void Draw(const FSceneView* View, FPrimitiveDrawInterface* PDI) override;
 	virtual bool InputKey(const FInputKeyEventArgs& EventArgs) override;
 	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
 	/** Alt+LMB never reaches the ITF router (camera tracking suppresses tools-context routing), so the
-	 *  Alt+click edge-delete rides the legacy click path instead. */
+	 *  Alt+click delete rides the legacy click path -- the level mode does the same from HandleClick. */
 	virtual void ProcessClick(FSceneView& View, HHitProxy* HitProxy, FKey Key, EInputEvent Event, uint32 HitX, uint32 HitY) override;
 
-	//~ IInputBehaviorSource
-	virtual const UInputBehaviorSet* GetInputBehaviors() const override { return InputBehaviorSet; }
-
-	//~ IClickBehaviorTarget
-	virtual FInputRayHit IsHitByClick(const FInputDeviceRay& ClickPos) override;
-	virtual void OnClicked(const FInputDeviceRay& ClickPos) override;
-
-	//~ IClickDragBehaviorTarget
-	virtual FInputRayHit CanBeginClickDragSequence(const FInputDeviceRay& PressPos) override;
-	virtual void OnClickPress(const FInputDeviceRay& PressPos) override;
-	virtual void OnClickDrag(const FInputDeviceRay& DragPos) override;
-	virtual void OnClickRelease(const FInputDeviceRay& ReleasePos) override;
-	virtual void OnTerminateDragSequence() override;
-
-	//~ IHoverBehaviorTarget
-	virtual FInputRayHit BeginHoverSequenceHitTest(const FInputDeviceRay& PressPos) override;
-	virtual void OnBeginHover(const FInputDeviceRay& DevicePos) override;
-	virtual bool OnUpdateHover(const FInputDeviceRay& DevicePos) override;
-	virtual void OnEndHover() override;
-
-	//~ IModifierToggleBehaviorTarget (one override serves every inherited interface copy)
-	virtual void OnUpdateModifierState(int ModifierID, bool bIsOn) override;
-
 private:
-	static constexpr int CtrlModifierID = 1;
-	static constexpr int ShiftModifierID = 2;
-	static constexpr int AltModifierID = 3;
-
 	TSharedPtr<FPCGExSketchEditController> Controller;
 	FEditorModeTools* OwnerModeTools = nullptr;
-	TObjectPtr<UInputBehaviorSet> InputBehaviorSet;
 
-	bool bCtrlDown = false;
-	bool bShiftDown = false;
-	bool bAltDown = false;
+	/** The mesh layer, living in the preview scene. Null degrades to pure immediate-mode drawing. */
+	TWeakObjectPtr<UPCGExClusterSketchComponent> SketchComponent;
+
+	TObjectPtr<UPCGExSketchInputBinder> InputBinder;
 };

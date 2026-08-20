@@ -5,7 +5,10 @@
 
 #include "AdvancedPreviewScene.h"
 #include "AssetEditorModeManager.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "Sketch/PCGExClusterSketch.h"
+#include "Sketch/PCGExClusterSketchComponent.h"
 #include "Sketch/PCGExClusterSketchEditor.h"
 #include "Sketch/PCGExClusterSketchViewportClient.h"
 #include "Sketch/PCGExSketchEditController.h"
@@ -40,6 +43,16 @@ FPCGExClusterSketchToolkit::FPCGExClusterSketchToolkit(UAssetEditor* InOwningAss
 		);
 
 	ObjectScene = MakeShared<FAdvancedPreviewScene>(FPreviewScene::ConstructionValues());
+
+	// Hide the HDRI backdrop sphere and the checkered floor: sketch geometry is unlit foreground
+	// drawing, so both only wash out the view. The dark clear color + ground grid (viewport client)
+	// carry orientation instead.
+	//
+	// bDirect = TRUE is load-bearing: the default path writes bShowEnvironment / bShowFloor into
+	// UAssetViewerSettings, which is shared editor-wide and saved to ini -- it would change every
+	// other asset editor's preview scene. Direct only touches OUR components.
+	ObjectScene->SetEnvironmentVisibility(false, /*bDirect*/ true);
+	ObjectScene->SetFloorVisibility(false, /*bDirect*/ true);
 }
 
 FPCGExClusterSketchToolkit::~FPCGExClusterSketchToolkit()
@@ -57,7 +70,46 @@ void FPCGExClusterSketchToolkit::CreateWidgets()
 	EditTarget = MakeShared<FPCGExSketchAssetEditTarget>(Sketch);
 	Controller = MakeShared<FPCGExSketchEditController>(EditTarget.ToSharedRef());
 
+	// Before the base builds the viewport client, which is handed the component to render through.
+	CreatePreviewSketch(Sketch);
+
 	FBaseAssetToolkit::CreateWidgets();
+}
+
+void FPCGExClusterSketchToolkit::CreatePreviewSketch(UPCGExClusterSketch* InSketch)
+{
+	UWorld* PreviewWorld = ObjectScene ? ObjectScene->GetWorld() : nullptr;
+	if (!PreviewWorld || !InSketch)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnInfo;
+	SpawnInfo.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnInfo.bNoFail = true;
+	SpawnInfo.ObjectFlags = RF_Transient;
+
+	AActor* Actor = PreviewWorld->SpawnActor<AActor>(SpawnInfo);
+	if (!Actor)
+	{
+		return;
+	}
+	Actor->SetActorEnableCollision(false);
+
+	UPCGExClusterSketchComponent* Component = NewObject<UPCGExClusterSketchComponent>(Actor, NAME_None, RF_Transient);
+	// Referencing the asset makes the component READ-ONLY by its own rule -- exactly right here: every
+	// mutation goes through the controller's asset target, and this is purely the renderer.
+	Component->SketchAsset = InSketch;
+	Actor->SetRootComponent(Component);
+	Component->RegisterComponent();
+
+	// Registration builds PREVIEW styling; declaring the edit state up front skips a frame of it.
+	FPCGExClusterSketchEditState State;
+	State.bActive = true;
+	Component->SetEditState(State);
+
+	PreviewActor = Actor;
+	PreviewComponent = Component;
 }
 
 void FPCGExClusterSketchToolkit::CreateEditorModeManager()
@@ -70,7 +122,7 @@ void FPCGExClusterSketchToolkit::CreateEditorModeManager()
 
 TSharedPtr<FEditorViewportClient> FPCGExClusterSketchToolkit::CreateEditorViewportClient() const
 {
-	return MakeShared<FPCGExClusterSketchViewportClient>(EditorModeManager.Get(), ObjectScene.Get(), Controller);
+	return MakeShared<FPCGExClusterSketchViewportClient>(EditorModeManager.Get(), ObjectScene.Get(), Controller, PreviewComponent.Get());
 }
 
 void FPCGExClusterSketchToolkit::PostInitAssetEditor()

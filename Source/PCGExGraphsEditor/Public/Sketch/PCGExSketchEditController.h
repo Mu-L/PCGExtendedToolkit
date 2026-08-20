@@ -56,7 +56,7 @@ private:
 /** What a ray hit in the sketch. */
 struct PCGEXGRAPHSEDITOR_API FPCGExSketchHit
 {
-	enum class EType : uint8 { None, Vertex, Edge };
+	enum class EType : uint8 { None, Vertex, Edge, Crossing };
 
 	EType Type = EType::None;
 	int32 Index = INDEX_NONE;
@@ -65,6 +65,7 @@ struct PCGEXGRAPHSEDITOR_API FPCGExSketchHit
 
 	bool IsHit() const { return Type != EType::None; }
 	bool IsVertex() const { return Type == EType::Vertex; }
+	bool IsCrossing() const { return Type == EType::Crossing; }
 };
 
 /**
@@ -109,8 +110,26 @@ public:
 	void SelectAll();
 	void ClearSelection();
 	int32 AddVertexAtRay(const FRay& WorldRay);
-	/** Delete the edge under the ray (the Alt+click gesture). @return true if one was removed. */
-	bool DeleteEdgeAtRay(const FRay& WorldRay);
+	/** Materialize the ghost crossing under the ray: insert its vertex and split both edges through it.
+	 *  @return true if one was materialized. */
+	bool MaterializeCrossingAtRay(const FRay& WorldRay);
+
+	/** Recompute the ghost crossings. Cheap at sketch scale; called after every mutation. */
+	void RefreshCrossings();
+
+	/** Hypothetical crossings offered as ghosts -- never cut automatically. */
+	const TArray<FPCGExClusterSketchCrossing>& GetCrossings() const { return Crossings; }
+
+	/** Bumped by every geometry mutation, INCLUDING the live per-frame ones a drag makes (which
+	 *  deliberately skip NotifyChanged -- that is the completed-operation notify, far too heavy to fire
+	 *  per mouse move). A host whose visuals are built rather than drawn per frame watches this to know
+	 *  its geometry went stale. */
+	int32 GetModelRevision() const { return ModelRevision; }
+
+	/** Delete the element under the ray -- vertex (with its edges) or edge, whichever the hit-test
+	 *  yields (the Alt+click gesture). Side-effect vertices orphaned by the removal go with it.
+	 *  @return true if something was removed. */
+	bool DeleteAtRay(const FRay& WorldRay);
 
 	//~ Snapping
 	bool IsSnapEnabled() const { return bSnapEnabled; }
@@ -122,9 +141,9 @@ public:
 	bool IsConnectToHoverEnabled() const { return bConnectToHover; }
 	void SetConnectToHoverEnabled(const bool bEnabled) { bConnectToHover = bEnabled; }
 
-	/** Host sets this while its delete modifier is held; the hovered edge draws as a delete target. */
-	void SetEdgeDeleteIntent(const bool bIntent) { bEdgeDeleteIntent = bIntent; }
-	bool GetEdgeDeleteIntent() const { return bEdgeDeleteIntent; }
+	/** Host sets this while its delete modifier is held; the hovered element draws as a delete target. */
+	void SetDeleteIntent(const bool bIntent) { bDeleteIntent = bIntent; }
+	bool GetDeleteIntent() const { return bDeleteIntent; }
 	/** Basis from the target's provider; false when there is none. Rebuilt on demand -- never cached. */
 	bool GetBasis(FPCGExLatticeBasis& OutBasis) const;
 
@@ -149,7 +168,16 @@ private:
 	//~ Internals (model space)
 	FRay ToLocal(const FRay& WorldRay) const;
 	FPCGExSketchHit HitTestLocal(const FRay& LocalRay) const;
-	double PickRadiusAt(const FRay& LocalRay, const FVector& LocalPos) const;
+	/** Screen-constant pick cone, floored so picking is never TIGHTER than what is drawn: a mesh marker
+	 *  keeps a fixed WORLD radius that the cone undercuts at close range. */
+	double PickRadiusAt(const FRay& LocalRay, const FVector& LocalPos, double InMinWorldRadius = 0.0) const;
+
+	/** World radius each kind actually draws at, or 0 when it falls back to immediate mode -- a
+	 *  screen-space dot has no world footprint to match. Read from the shared style settings, the same
+	 *  object the drawing reads: picking and drawing must never disagree about how big something is. */
+	static double VertexPickFloor();
+	static double GhostPickFloor();
+	static double EdgePickFloor();
 	FVector VertexLocation(const FPCGExClusterSketchVertex& V, const FPCGExLatticeBasis* Basis) const;
 	/** Ray point on the gesture plane: through InAnchor, lattice-plane normal for a 2-axis basis, else
 	 *  Z-up; falls back to a fixed distance along the ray when near-parallel. */
@@ -162,12 +190,20 @@ private:
 	int32 FindNearbyVertex(const FRay& LocalRay, const FVector& LocalPoint, int32 IgnoreVertex, const FPCGExLatticeBasis* Basis, const FIntVector* LayerRef = nullptr) const;
 	void DropInvalidIndices();
 	void EndTransaction();
+	/** Refresh ghosts, then tell the host. Every mutation ends here. */
+	void NotifyModelChanged();
 
 	TSharedRef<IPCGExSketchEditTarget> Target;
+
+	/** See GetModelRevision. */
+	int32 ModelRevision = 0;
 
 	TSet<int32> SelectedVertices;
 	TSet<int32> SelectedEdges;
 	FPCGExSketchHit Hover;
+
+	/** Ghost crossings, refreshed after every mutation (indices into Model.Edges, valid until then). */
+	TArray<FPCGExClusterSketchCrossing> Crossings;
 
 	EDragMode DragMode = EDragMode::None;
 	int32 DragVertexIndex = INDEX_NONE;
@@ -184,5 +220,5 @@ private:
 
 	bool bSnapEnabled = true;
 	bool bConnectToHover = true;
-	bool bEdgeDeleteIntent = false;
+	bool bDeleteIntent = false;
 };

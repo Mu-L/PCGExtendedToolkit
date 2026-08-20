@@ -15,6 +15,7 @@
 #include "Helpers/PCGExRandomHelpers.h"
 #include "Sketch/PCGExClusterSketchDecorator.h"
 #include "Sketch/PCGExClusterSketchModel.h"
+#include "Sketch/PCGExClusterSnapProvider.h"
 
 namespace PCGExClusterSketchPrint
 {
@@ -68,6 +69,36 @@ namespace PCGExClusterSketchPrint
 
 namespace PCGExSketch
 {
+	TSharedPtr<PCGExGraphs::FGraphBuilder> PrintResolved(
+		FPCGExContext* InContext,
+		const FPCGExClusterSketchModel& InModel,
+		const UPCGExClusterSnapProvider* InSnapProvider,
+		const TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>> InDecorators,
+		const TSharedPtr<PCGExData::FPointIO>& InVtxIO,
+		const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager,
+		const TSharedPtr<FPCGExClusterSketchPrintContext>& InPrintContext,
+		const FPCGExGraphBuilderDetails* InBuilderDetails,
+		const bool bQuiet,
+		TFunction<void(const TSharedRef<PCGExGraphs::FGraphBuilder>&, bool)> OnCompiled)
+	{
+		FPCGExLatticeBasis Basis;
+		const bool bHasBasis = InSnapProvider ? InSnapProvider->BuildBasis(Basis) : false;
+
+		FPrintRequest Request;
+		Request.Model = &InModel;
+		Request.Basis = bHasBasis ? &Basis : nullptr;
+		Request.BuilderDetails = InBuilderDetails;
+		Request.bQuiet = bQuiet;
+		Request.OnCompiled = MoveTemp(OnCompiled);
+		Request.Decorators.Reserve(InDecorators.Num());
+		for (const TObjectPtr<UPCGExClusterSketchDecorator>& Decorator : InDecorators)
+		{
+			Request.Decorators.Add(Decorator.Get());
+		}
+
+		return PrintClusterSketch(InContext, Request, InVtxIO, InTaskManager, InPrintContext);
+	}
+
 	TSharedPtr<PCGExGraphs::FGraphBuilder> PrintClusterSketch(
 		FPCGExContext* InContext,
 		const FPrintRequest& InRequest,
@@ -200,6 +231,34 @@ namespace PCGExSketch
 			PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(
 				           FTEXT("{0} sketch vertex/vertices print at an already-occupied location (duplicate coords, overlapping positions, or a collapsed snap basis) -- clusters cannot carry collocated vertices; use Merge Collocated Vertices on the sketch."),
 				           FText::AsNumber(CollocatedCount)));
+		}
+
+		if (!InRequest.bQuiet)
+		{
+			const FPCGExLatticeBasis* WarnBasis = bHasBasis ? InRequest.Basis : nullptr;
+			int32 OverlappingEdges = 0;
+			for (int32 e = 0; e < Model.NumEdges(); ++e)
+			{
+				if (Model.FindVertexOnEdgeInterior(e, WarnBasis) != INDEX_NONE)
+				{
+					++OverlappingEdges;
+				}
+			}
+			if (OverlappingEdges > 0)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(
+					           FTEXT("{0} sketch edge(s) pass through a vertex (collinear A-C over B) -- degenerate for a cluster; use Split Overlapping Edges on the sketch."),
+					           FText::AsNumber(OverlappingEdges)));
+			}
+
+			TArray<FPCGExClusterSketchCrossing> Crossings;
+			Model.FindEdgeCrossings(Crossings, WarnBasis);
+			if (!Crossings.IsEmpty())
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, InContext, FText::Format(
+					           FTEXT("{0} sketch edge crossing(s) with no vertex at the intersection -- materialize them in the sketch editor, or use Split Overlapping Edges."),
+					           FText::AsNumber(Crossings.Num())));
+			}
 		}
 
 		// --- Print context ---

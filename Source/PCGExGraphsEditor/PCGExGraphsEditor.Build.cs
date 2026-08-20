@@ -35,6 +35,7 @@ public class PCGExGraphsEditor : ModuleRules
 			new string[]
 			{
 				"InputCore",
+				"AssetTools",
 				"Slate",
 				"SlateCore",
 				"PropertyEditor",
