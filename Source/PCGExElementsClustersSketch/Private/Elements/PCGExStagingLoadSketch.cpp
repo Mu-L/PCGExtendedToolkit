@@ -26,26 +26,20 @@ namespace PCGExStagingLoadSketch
 {
 	PCGEX_CTX_STATE(State_PrintingRoots)
 
-	/** Resolves every target's staged pick into UniqueSketchPaths, filling SketchIdx. Runs in Boot so
-	 *  RegisterAssetDependencies, which runs after it, can hand the paths to the async load phase. */
-	bool ResolveStagedSketches(FPCGExStagingLoadSketchContext* Context, const UPCGExStagingLoadSketchSettings* Settings)
+	/** Resolves one input's staged picks into the SHARED UniqueSketchPaths, filling its SketchIdx. Runs
+	 *  in Boot so RegisterAssetDependencies, which runs after it, can hand the paths to the async load
+	 *  phase. Paths dedupe across inputs, so two inputs naming one sketch print a single root. */
+	bool ResolveStagedSketches(
+		FPCGExStagingLoadSketchContext* Context,
+		const UPCGExStagingLoadSketchSettings* Settings,
+		PCGExCollections::FPickUnpacker& Unpacker,
+		FPCGExStagingLoadSketchContext::FTargets& Target)
 	{
-		// Scoped: only FSoftObjectPath values escape, so nothing downstream needs the unpacker's
-		// collection handles pinned for the rest of the execution.
-		PCGExCollections::FPickUnpacker Unpacker;
-		Unpacker.UnpackPin(Context);
-
-		if (!Unpacker.HasValidMapping())
-		{
-			PCGE_LOG_C(Error, GraphAndLog, Context, FTEXT("Could not rebuild a valid asset mapping from the provided map."));
-			return false;
-		}
-
 		const FName EntryIdxName = Settings->GetEntryIdxAttributeName();
 		PCGEX_VALIDATE_NAME_C(Context, EntryIdxName)
 
 		const TSharedPtr<PCGExData::TBuffer<int64>> HashGetter =
-			Context->TargetsDataFacade->GetReadable<int64>(EntryIdxName, PCGExData::EIOSide::In, false);
+			Target.Facade->GetReadable<int64>(EntryIdxName, PCGExData::EIOSide::In, false);
 
 		if (!HashGetter)
 		{
@@ -61,7 +55,7 @@ namespace PCGExStagingLoadSketch
 		// Keyed on the pick hash, not the resolved path: a repeated pick then costs one integer probe
 		// instead of a full entry resolve plus an FName-pair path hash.
 		TMap<int64, int32> HashToIndex;
-		const int32 NumTargets = Context->SketchIdx.Num();
+		const int32 NumTargets = Target.SketchIdx.Num();
 
 		for (int32 i = 0; i < NumTargets; ++i)
 		{
@@ -96,7 +90,7 @@ namespace PCGExStagingLoadSketch
 			}
 
 			if (*Cached == BrokenPick) { ++Context->NumUnresolvedTargets; }
-			else { Context->SketchIdx[i] = *Cached; }
+			else { Target.SketchIdx[i] = *Cached; }
 		}
 
 		return true;
@@ -180,34 +174,51 @@ bool FPCGExStagingLoadSketchElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
-	Context->TargetsDataFacade = MakeShared<PCGExData::FFacade>(Context->MainPoints->Pairs[0].ToSharedRef());
-
 	PCGEX_FWD(GraphBuilderDetails)
 
-	PCGEX_FWD(TransformDetails)
-	if (!Context->TransformDetails.Init(Context, Context->TargetsDataFacade.ToSharedRef()))
+	// Sized once and never resized: the copy tasks hold raw pointers into these entries.
+	Context->Targets.SetNum(Context->MainPoints->Pairs.Num());
+
+	// One unpacker for the whole node -- the Map pin is read once, not per input.
+	PCGExCollections::FPickUnpacker Unpacker;
+	const bool bStaged = Settings->Source == EPCGExClusterSketchSource::CollectionMap;
+	if (bStaged)
 	{
-		return false;
+		Unpacker.UnpackPin(Context);
+		if (!Unpacker.HasValidMapping())
+		{
+			PCGE_LOG(Error, GraphAndLog, FTEXT("Could not rebuild a valid asset mapping from the provided map."));
+			return false;
+		}
 	}
 
-	PCGEX_FWD(TargetsAttributesToClusterTags)
-	if (!Context->TargetsAttributesToClusterTags.Init(Context, Context->TargetsDataFacade))
+	for (int32 i = 0; i < Context->Targets.Num(); ++i)
 	{
-		return false;
-	}
+		FPCGExStagingLoadSketchContext::FTargets& Target = Context->Targets[i];
+		Target.Facade = MakeShared<PCGExData::FFacade>(Context->MainPoints->Pairs[i].ToSharedRef());
 
-	Context->TargetsForwardHandler = Settings->TargetsForwarding.GetHandler(Context->TargetsDataFacade);
+		Target.TransformDetails = Settings->TransformDetails;
+		if (!Target.TransformDetails.Init(Context, Target.Facade.ToSharedRef()))
+		{
+			return false;
+		}
 
-	Context->SketchIdx.Init(-1, Context->MainPoints->Pairs[0]->GetNum());
+		Target.AttributesToClusterTags = Settings->TargetsAttributesToClusterTags;
+		if (!Target.AttributesToClusterTags.Init(Context, Target.Facade))
+		{
+			return false;
+		}
 
-	if (Settings->Source == EPCGExClusterSketchSource::CollectionMap)
-	{
-		if (!PCGExStagingLoadSketch::ResolveStagedSketches(Context, Settings))
+		Target.ForwardHandler = Settings->TargetsForwarding.GetHandler(Target.Facade);
+		Target.SketchIdx.Init(-1, Context->MainPoints->Pairs[i]->GetNum());
+
+		if (bStaged && !PCGExStagingLoadSketch::ResolveStagedSketches(Context, Settings, Unpacker, Target))
 		{
 			return false;
 		}
 	}
-	else if (Settings->Sketch.Input == EPCGExInputValueType::Attribute)
+
+	if (!bStaged && Settings->Sketch.Input == EPCGExInputValueType::Attribute)
 	{
 		// Attribute-driven sketches resolve through the shared asset loader, which discovers every unique
 		// path now and hands them to the context's normal asset-loading phase.
@@ -220,7 +231,7 @@ bool FPCGExStagingLoadSketchElement::Boot(FPCGExContext* InContext) const
 			return Context->CancelExecution(TEXT("Failed to find any Cluster Sketch to load."));
 		}
 	}
-	else if (!Settings->Sketch.Constant.IsValid())
+	else if (!bStaged && !Settings->Sketch.Constant.IsValid())
 	{
 		return Context->CancelExecution(TEXT("Invalid Cluster Sketch constant."));
 	}
@@ -267,11 +278,7 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 	PCGEX_EXECUTION_CHECK
 	PCGEX_ON_INITIAL_EXECUTION
 	{
-		Context->AdvancePointsIO();
-
-		const int32 NumTargets = Context->SketchIdx.Num();
-
-		// --- Resolve each target's sketch, deduplicated into UniqueSketches ---
+		// --- Resolve each target's sketch, deduplicated into UniqueSketches across ALL inputs ---
 		TMap<TObjectPtr<UPCGExClusterSketch>, int32> SketchToIndex;
 		int32 NumUnresolved = Context->NumUnresolvedTargets;
 
@@ -300,33 +307,40 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 				Context->UniqueSketches.Add(TSoftObjectPtr<UPCGExClusterSketch>(Path).Get());
 			}
 
-			for (int32 i = 0; i < NumTargets; ++i)
+			for (FPCGExStagingLoadSketchContext::FTargets& Target : Context->Targets)
 			{
-				const int32 Index = Context->SketchIdx[i];
-				if (Index != -1 && !Context->UniqueSketches[Index])
+				for (int32& Index : Target.SketchIdx)
 				{
-					Context->SketchIdx[i] = -1;
-					++NumUnresolved;
+					if (Index != -1 && !Context->UniqueSketches[Index])
+					{
+						Index = -1;
+						++NumUnresolved;
+					}
 				}
 			}
 		}
 		else if (Context->SketchLoader)
 		{
-			const TSharedPtr<TArray<PCGExValueHash>> Keys = Context->SketchLoader->GetKeys(Context->CurrentIO->IOIndex);
-			for (int32 i = 0; i < NumTargets; ++i)
+			for (int32 t = 0; t < Context->Targets.Num(); ++t)
 			{
-				UPCGExClusterSketch* Resolved = nullptr;
-				if (Keys && Keys->IsValidIndex(i))
+				FPCGExStagingLoadSketchContext::FTargets& Target = Context->Targets[t];
+				const TSharedPtr<TArray<PCGExValueHash>> Keys = Context->SketchLoader->GetKeys(Context->MainPoints->Pairs[t]->IOIndex);
+
+				for (int32 i = 0; i < Target.SketchIdx.Num(); ++i)
 				{
-					if (const TObjectPtr<UPCGExClusterSketch>* Found = Context->SketchLoader->GetAsset((*Keys)[i]))
+					UPCGExClusterSketch* Resolved = nullptr;
+					if (Keys && Keys->IsValidIndex(i))
 					{
-						Resolved = Found->Get();
+						if (const TObjectPtr<UPCGExClusterSketch>* Found = Context->SketchLoader->GetAsset((*Keys)[i]))
+						{
+							Resolved = Found->Get();
+						}
 					}
-				}
-				Context->SketchIdx[i] = ResolveIndex(Resolved);
-				if (Context->SketchIdx[i] == -1)
-				{
-					++NumUnresolved;
+					Target.SketchIdx[i] = ResolveIndex(Resolved);
+					if (Target.SketchIdx[i] == -1)
+					{
+						++NumUnresolved;
+					}
 				}
 			}
 		}
@@ -337,9 +351,9 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 			{
 				return Context->CancelExecution(TEXT("Cluster Sketch constant could not be loaded."));
 			}
-			for (int32& Index : Context->SketchIdx)
+			for (FPCGExStagingLoadSketchContext::FTargets& Target : Context->Targets)
 			{
-				Index = ConstantIndex;
+				for (int32& Index : Target.SketchIdx) { Index = ConstantIndex; }
 			}
 		}
 
@@ -431,18 +445,26 @@ bool FPCGExStagingLoadSketchElement::AdvanceWork(FPCGExContext* InContext, const
 			return Context->CancelExecution(TEXT(""));
 		}
 
-		const int32 NumTargets = Context->SketchIdx.Num();
-		for (int32 i = 0; i < NumTargets; ++i)
+		// OutIOIndex is a running counter across every input: StageOutputs sorts on it with an unstable
+		// sort, so per-input indices restarting at 0 would make output order nondeterministic.
+		int32 OutIOIndex = 0;
+		for (int32 t = 0; t < Context->Targets.Num(); ++t)
 		{
-			const int32 SketchIndex = Context->SketchIdx[i];
-			if (SketchIndex == -1 || !Context->GraphBuilders.IsValidIndex(SketchIndex) || !Context->GraphBuilders[SketchIndex])
+			FPCGExStagingLoadSketchContext::FTargets& Target = Context->Targets[t];
+			const TSharedPtr<PCGExData::FPointIO>& TargetIO = Context->MainPoints->Pairs[t];
+
+			for (int32 i = 0; i < Target.SketchIdx.Num(); ++i)
 			{
-				continue;
+				const int32 SketchIndex = Target.SketchIdx[i];
+				if (SketchIndex == -1 || !Context->GraphBuilders.IsValidIndex(SketchIndex) || !Context->GraphBuilders[SketchIndex])
+				{
+					continue;
+				}
+				PCGEX_LAUNCH(
+					PCGExGraphTask::FCopyGraphToPoint, i, TargetIO, Context->GraphBuilders[SketchIndex],
+					Context->VtxChildCollection, Context->EdgeChildCollection, &Target.TransformDetails,
+					&Target.AttributesToClusterTags, Target.ForwardHandler, OutIOIndex++)
 			}
-			PCGEX_LAUNCH(
-				PCGExGraphTask::FCopyGraphToPoint, i, Context->CurrentIO, Context->GraphBuilders[SketchIndex],
-				Context->VtxChildCollection, Context->EdgeChildCollection, &Context->TransformDetails,
-				&Context->TargetsAttributesToClusterTags, Context->TargetsForwardHandler)
 		}
 	}
 

@@ -88,12 +88,6 @@ public:
 		return PCGExClusters::Labels::OutputVerticesLabel;
 	}
 
-	/** One targets data at a time: the per-target sketch lookup and the root cache are keyed on it. */
-	virtual bool GetMainAcceptMultipleData() const override
-	{
-		return false;
-	}
-
 	//~End UPCGExPointsProcessorSettings
 
 	/** Where each target's sketch comes from. */
@@ -141,11 +135,23 @@ struct FPCGExStagingLoadSketchContext final : FPCGExPointsProcessorContext
 	virtual void RegisterAssetDependencies() override;
 
 	FPCGExGraphBuilderDetails GraphBuilderDetails;
-	FPCGExTransformDetails TransformDetails;
-	FPCGExAttributeToTagDetails TargetsAttributesToClusterTags;
-	TSharedPtr<PCGExData::FDataForwardHandler> TargetsForwardHandler;
 
-	TSharedPtr<PCGExData::FFacade> TargetsDataFacade;
+	/**
+	 * One entry per input data. FCopyGraphToPoint takes the details by RAW POINTER, so this array is
+	 * sized once in Boot and never resized -- the addresses must outlive the copy tasks.
+	 */
+	struct FTargets
+	{
+		TSharedPtr<PCGExData::FFacade> Facade;
+		FPCGExTransformDetails TransformDetails;
+		FPCGExAttributeToTagDetails AttributesToClusterTags;
+		TSharedPtr<PCGExData::FDataForwardHandler> ForwardHandler;
+
+		/** Per-point index into UniqueSketches (-1 = skip). */
+		TArray<int32> SketchIdx;
+	};
+
+	TArray<FTargets> Targets;
 
 	/** Attribute-driven sketch resolution; null when the sketch is a constant. Asset source only. */
 	TSharedPtr<PCGEx::TAssetLoader<UPCGExClusterSketch>> SketchLoader;
@@ -162,10 +168,9 @@ struct FPCGExStagingLoadSketchContext final : FPCGExPointsProcessorContext
 	 */
 	int32 NumUnresolvedTargets = 0;
 
-	/** Distinct sketches referenced, and the per-target index into them (-1 = skip). In CollectionMap
-	 *  mode a slot is null when its path failed to load; every consumer skips null slots. */
+	/** Distinct sketches referenced across ALL inputs -- two inputs naming the same sketch print one
+	 *  shared root. In CollectionMap mode a slot is null when its path failed to load. */
 	TArray<TObjectPtr<UPCGExClusterSketch>> UniqueSketches;
-	TArray<int32> SketchIdx;
 
 	/** One printed root per unique sketch, parallel to UniqueSketches. */
 	TArray<TSharedPtr<PCGExGraphs::FGraphBuilder>> GraphBuilders;
