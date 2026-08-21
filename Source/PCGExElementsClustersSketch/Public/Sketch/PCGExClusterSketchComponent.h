@@ -136,10 +136,10 @@ struct FPCGExClusterSketchEditState
 /**
  * The whole inline payload of a sketch component, in one instanced subobject.
  *
- * Instanced is what makes it survive: a construction script rebuild delta-serializes the component and
- * drops every property lacking CPF_Edit at any nesting depth, which silently erases bare members like
- * FPCGExClusterSketchVertex::DataId. An instanced subobject is duplicated whole instead, so everything
- * inside it survives regardless of specifiers -- including anything added later.
+ * A separate object is what makes it survive: a construction script rebuild delta-serializes the
+ * component and drops every property lacking CPF_Edit at any nesting depth, which would silently erase
+ * bare members like FPCGExClusterSketchVertex::DataId. Only the reference crosses that writer, so
+ * everything in here survives regardless of specifiers -- including anything added later.
  *
  * Therefore: every authored field belongs in here. Nothing authored belongs on the component itself.
  */
@@ -184,6 +184,12 @@ public:
 	 * override signal -- while it is set, both asset properties are ignored entirely. NoClear because
 	 * lifetime belongs to the two buttons: nulling it from the combo would orphan authored data with no
 	 * transaction to undo.
+	 *
+	 * Outered to the OWNING ACTOR, never to this component: FDataCachePropertyWriter duplicates any
+	 * subobject that IsIn() the component and renames the copy onto the rebuilt one
+	 * (ComponentInstanceDataCache.cpp:122), destroying the very object every undo record points at. A
+	 * construction-script component is rebuilt from its template on each reconstruction; the actor is
+	 * what actually persists, so the actor is what owns instance-only data.
 	 */
 	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (NoClear, NoResetToDefault))
 	TObjectPtr<UPCGExClusterSketchPayload> InlinePayload;

@@ -902,12 +902,14 @@ void UPCGExClusterSketchComponent::CreateInlineSketch()
 {
 	// 5.7 renders CallInEditor buttons on templates and silently no-ops them; 5.8 hides them. Guard here
 	// so the rule holds in both: a template never holds inline data.
-	if (IsTemplate() || InlinePayload) { return; }
+	AActor* Owner = GetOwner();
+	if (IsTemplate() || InlinePayload || !Owner) { return; }
 
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "CreateInlineSketch", "Create Inline Cluster Sketch"));
 	Modify();
 
-	InlinePayload = NewObject<UPCGExClusterSketchPayload>(this, TEXT("InlinePayload"), RF_Transactional);
+	// Outered to the ACTOR, and auto-named because siblings share that outer -- see the declaration.
+	InlinePayload = NewObject<UPCGExClusterSketchPayload>(Owner, NAME_None, RF_Transactional);
 
 	// Seeded from the asset in force, so authoring starts from what is on screen rather than an empty
 	// sketch. Instanced subobjects must be OURS -- duplicate rather than share the asset's.
