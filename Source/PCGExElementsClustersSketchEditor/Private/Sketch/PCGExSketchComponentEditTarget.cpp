@@ -3,6 +3,7 @@
 
 #include "Sketch/PCGExSketchComponentEditTarget.h"
 
+#include "Helpers/PCGExObjectNotifyHelpers.h"
 #include "Sketch/PCGExClusterSketchComponent.h"
 
 FPCGExSketchComponentEditTarget::FPCGExSketchComponentEditTarget(UPCGExClusterSketchComponent* InComponent)
@@ -32,7 +33,7 @@ const UPCGExClusterSnapProvider* FPCGExSketchComponentEditTarget::GetSnapProvide
 
 bool FPCGExSketchComponentEditTarget::CanEdit() const
 {
-	// Matches GetMutableModel: an asset is shared topology, and with no override there is nothing to write.
+	// Matches GetMutableModel: only an instance's own payload is writable.
 	const UPCGExClusterSketchComponent* Pinned = Component.Get();
 	return Pinned && Pinned->HasInlineSketch();
 }
@@ -41,8 +42,8 @@ void FPCGExSketchComponentEditTarget::BeginAuthoring()
 {
 	IPCGExSketchEditTarget::BeginAuthoring();
 
-	// The model lives in the payload, a SEPARATE UObject: Modify()ing the component records only a
-	// reference to it, so without this every undo restores the payload as it was at creation -- empty.
+	// The model lives in the payload, a SEPARATE UObject, and a transaction record stores only a
+	// reference to one -- so the payload has to be transacted in its own right.
 	if (const UPCGExClusterSketchComponent* Pinned = Component.Get())
 	{
 		if (UPCGExClusterSketchPayload* Payload = Pinned->InlinePayload) { Payload->Modify(); }
@@ -83,5 +84,10 @@ void FPCGExSketchComponentEditTarget::NotifyChanged()
 		// Keeps the passive snapshot current for the moment mode suppression lifts; the mode itself
 		// draws from the controller, so this is not what repaints during editing.
 		Pinned->RefreshSketchVisual();
+
+		// Authoring writes the model directly, so nothing downstream ever sees a property event -- which
+		// is why undo reaches consumers this path does not. Completed operations only; a drag bumps
+		// ModelRevision instead, so this never fires per frame.
+		PCGExEditor::NotifyObjectChanged(Pinned);
 	}
 }

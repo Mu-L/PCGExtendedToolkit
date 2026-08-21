@@ -77,11 +77,11 @@ UObject* FPCGExSketchAssetEditTarget::GetTransactionObject()
 
 void FPCGExSketchAssetEditTarget::NotifyChanged()
 {
-	// PostEditChange (empty event) refreshes any details panel showing the asset; the viewport itself
-	// is realtime and reads the model every frame.
+	// Same notification pair as the component host, so a sketch reaches downstream consumers identically
+	// whichever host carries it. The viewport itself is realtime and reads the model every frame.
 	if (UPCGExClusterSketch* Pinned = Sketch.Get())
 	{
-		Pinned->PostEditChange();
+		PCGExEditor::NotifyObjectChanged(Pinned);
 	}
 }
 
@@ -322,11 +322,6 @@ void FPCGExSketchEditController::HandleClick(const FRay& WorldRay, const bool bA
 		}
 	}
 	NotifyModelChanged();
-}
-
-bool FPCGExSketchEditController::CanBeginDrag(const FRay& WorldRay) const
-{
-	return HitTest(WorldRay).IsVertex();
 }
 
 void FPCGExSketchEditController::BeginDrag(const FRay& WorldRay, const bool bConnect)

@@ -126,7 +126,7 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchModel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExClusterSketchEdge> Edges;
 
-	/** The authored tier. Travels with the payload through Save As Asset / Inline Sketch Asset, and the
+	/** The authored tier. Travels with the model through Save To Asset / Create Inline Sketch, and the
 	 *  two sharing rules (merge-inherit, split-share) sit next to the mutations that apply them. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ShowOnlyInnerProperties))
 	FPCGExSketchData Data;

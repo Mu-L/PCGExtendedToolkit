@@ -3,7 +3,6 @@
 
 #include "Sketch/PCGExClusterSnapProvider.h"
 
-#include "GameFramework/Actor.h"
 #include "Sketch/PCGExClusterSketch.h"
 #include "Sketch/PCGExClusterSketchComponent.h"
 
@@ -13,8 +12,7 @@
 namespace PCGExClusterSnapProvider
 {
 	/** A provider's host must be reached or its edits never re-derive the vertices they moved. The asset
-	 *  is an ancestor; an inline provider's component is NOT -- the payload it lives in is outered to the
-	 *  actor, so the component is a sibling and one actor can carry several. Match by payload. */
+	 *  is an ancestor; an inline provider's component is not -- only its payload is. */
 	void NotifyHost(UObject* InProvider)
 	{
 		if (UPCGExClusterSketch* Asset = InProvider->GetTypedOuter<UPCGExClusterSketch>())
@@ -23,18 +21,10 @@ namespace PCGExClusterSnapProvider
 			return;
 		}
 
-		UPCGExClusterSketchPayload* Payload = InProvider->GetTypedOuter<UPCGExClusterSketchPayload>();
-		AActor* Actor = Payload ? Payload->GetTypedOuter<AActor>() : nullptr;
-		if (!Actor) { return; }
-
-		TInlineComponentArray<UPCGExClusterSketchComponent*> Sketches(Actor);
-		for (UPCGExClusterSketchComponent* Sketch : Sketches)
+		const UPCGExClusterSketchPayload* Payload = InProvider->GetTypedOuter<UPCGExClusterSketchPayload>();
+		if (UPCGExClusterSketchComponent* Component = Payload ? Payload->FindOwningComponent() : nullptr)
 		{
-			if (Sketch->InlinePayload == Payload)
-			{
-				Sketch->EDITOR_OnSnapProviderChanged();
-				return;
-			}
+			Component->EDITOR_OnSnapProviderChanged();
 		}
 	}
 }

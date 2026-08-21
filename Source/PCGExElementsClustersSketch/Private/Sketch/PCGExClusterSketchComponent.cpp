@@ -93,6 +93,45 @@ namespace PCGExClusterSketchComponent
 #endif // WITH_EDITOR
 }
 
+#pragma region UPCGExClusterSketchPayload
+
+UPCGExClusterSketchPayload::UPCGExClusterSketchPayload()
+{
+	// Undo records THIS object: UActorComponent::Modify redirects to the owner for construction-script
+	// components (ActorComponent.cpp:1289) and never reaches a subobject. Without the flag,
+	// SaveToTransactionBuffer bails (UObjectGlobals.cpp:3215) and every Modify() here is a silent no-op.
+	SetFlags(RF_Transactional);
+}
+
+UPCGExClusterSketchComponent* UPCGExClusterSketchPayload::FindOwningComponent() const
+{
+	AActor* Actor = GetTypedOuter<AActor>();
+	if (!Actor) { return nullptr; }
+
+	TInlineComponentArray<UPCGExClusterSketchComponent*> Sketches(Actor);
+	for (UPCGExClusterSketchComponent* Sketch : Sketches)
+	{
+		if (Sketch->InlinePayload.Get() == this) { return Sketch; }
+	}
+	return nullptr;
+}
+
+#if WITH_EDITOR
+void UPCGExClusterSketchPayload::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	if (UPCGExClusterSketchComponent* Component = FindOwningComponent())
+	{
+		Component->EDITOR_OnPayloadChanged(PropertyChangedEvent);
+	}
+}
+#endif
+
+#pragma endregion
+
+#pragma region UPCGExClusterSketchComponent
+
 UPCGExClusterSketchComponent::UPCGExClusterSketchComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -100,14 +139,6 @@ UPCGExClusterSketchComponent::UPCGExClusterSketchComponent()
 	SetGenerateOverlapEvents(false);
 	bHiddenInGame = true; // authoring aid, not gameplay geometry
 	CastShadow = false;
-}
-
-UPCGExClusterSketchPayload::UPCGExClusterSketchPayload()
-{
-	// Undo records THIS object: UActorComponent::Modify redirects to the owner for construction-script
-	// components (ActorComponent.cpp:1300) and never reaches a subobject, and the details panel's
-	// inline-create does not set the flag either. Without it every Modify() here is a silent no-op.
-	SetFlags(RF_Transactional);
 }
 
 const FPCGExClusterSketchModel& UPCGExClusterSketchComponent::GetModel() const
@@ -851,25 +882,34 @@ void UPCGExClusterSketchComponent::PostEditChangeProperty(FPropertyChangedEvent&
 
 	if (InlinePayload && MemberName == GET_MEMBER_NAME_CHECKED(UPCGExClusterSketchComponent, InlinePayload))
 	{
-		// Hand-editing a vertex adopts it, and the coord/location pair must stay coherent -- the same
-		// rule the asset host applies, or a typed-in location on a bound vertex is silently dead data.
-		const int32 EditedVertex = PropertyChangedEvent.GetArrayIndex(GET_MEMBER_NAME_STRING_CHECKED(FPCGExClusterSketchModel, Vertices));
-		if (EditedVertex != INDEX_NONE)
-		{
-			InlinePayload->Model.MarkVertexAuthored(EditedVertex);
-		}
-
-		const FName LeafName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
-		const bool bCoordEdit = LeafName == GET_MEMBER_NAME_CHECKED(FPCGExClusterSketchVertex, LatticeCoord);
-		EDITOR_SyncBoundVertices(!bCoordEdit);
-
-		// A schema edit arrives as an InlinePayload change like any other -- MemberProperty is always the
-		// object's own member -- so the gate is deliberately coarse. Idempotent, and reachable only from
-		// an editor edit hook (here, or the panel's transacted write-back).
-		InlinePayload->Model.Data.EDITOR_SyncAll();
+		EDITOR_OnPayloadChanged(PropertyChangedEvent);
+		return;
 	}
 
-	// Any property here can move the drawing: payload, override, provider params, display settings.
+	// Any property here can move the drawing: override pick, display settings.
+	RefreshSketchVisual();
+}
+
+void UPCGExClusterSketchComponent::EDITOR_OnPayloadChanged(const FPropertyChangedEvent& PropertyChangedEvent)
+{
+	if (!InlinePayload) { return; }
+
+	// Hand-editing a vertex adopts it, and the coord/location pair must stay coherent -- the same rule
+	// the asset host applies, or a typed-in location on a bound vertex is silently dead data.
+	const int32 EditedVertex = PropertyChangedEvent.GetArrayIndex(GET_MEMBER_NAME_STRING_CHECKED(FPCGExClusterSketchModel, Vertices));
+	if (EditedVertex != INDEX_NONE)
+	{
+		InlinePayload->Model.MarkVertexAuthored(EditedVertex);
+	}
+
+	const FName LeafName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
+	const bool bCoordEdit = LeafName == GET_MEMBER_NAME_CHECKED(FPCGExClusterSketchVertex, LatticeCoord);
+	EDITOR_SyncBoundVertices(!bCoordEdit);
+
+	// A schema edit arrives as a payload change like any other, so the gate is deliberately coarse.
+	// Idempotent, and reachable only from an editor edit hook (here, or the panel's transacted write-back).
+	InlinePayload->Model.Data.EDITOR_SyncAll();
+
 	RefreshSketchVisual();
 }
 
@@ -903,7 +943,6 @@ void UPCGExClusterSketchComponent::EDITOR_SyncBoundVertices(const bool bResnapFr
 	}
 	Mutable->SyncBoundVertices(Basis, bResnapFromLocation);
 }
-
 
 void UPCGExClusterSketchComponent::CreateInlineSketch()
 {
@@ -958,9 +997,7 @@ void UPCGExClusterSketchComponent::DeleteInlineSketch()
 	PostEditChange();
 	PCGExEditor::NotifyObjectChanged(this);
 }
-#endif
 
-#if WITH_EDITOR
 void UPCGExClusterSketchComponent::SaveToAsset()
 {
 	// The dialog + package creation live in the editor module; runtime reaches them through the bridge,
@@ -980,8 +1017,8 @@ void UPCGExClusterSketchComponent::SaveToAsset()
 		return; // cancelled
 	}
 
-	// Referencing the new asset AFTER it is filled: the component becomes an instance of what it just
-	// externalized, and its inline payload is preserved (read-only) behind the reference.
+	// Recorded as this instance's pick so Delete Inline Sketch lands on what was just externalized. While
+	// a payload exists it overrules this, so the component keeps drawing its own sketch either way.
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "SaveToAsset", "Save Cluster Sketch To Asset"));
 	SetSketchAsset(NewAsset);
 
@@ -990,4 +1027,6 @@ void UPCGExClusterSketchComponent::SaveToAsset()
 	PCGExEditor::NotifyObjectChanged(this);
 }
 #endif
+
+#pragma endregion
 

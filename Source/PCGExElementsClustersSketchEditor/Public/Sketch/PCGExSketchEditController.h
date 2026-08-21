@@ -123,7 +123,6 @@ public:
 	void HandleClick(const FRay& WorldRay, bool bAdditive, bool bAddOnEmpty);
 
 	//~ Drag
-	bool CanBeginDrag(const FRay& WorldRay) const;
 	void BeginDrag(const FRay& WorldRay, bool bConnect);
 	void UpdateDrag(const FRay& WorldRay);
 	void EndDrag(const FRay& WorldRay);
