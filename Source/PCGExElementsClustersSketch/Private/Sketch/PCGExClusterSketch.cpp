@@ -83,6 +83,11 @@ void UPCGExClusterSketch::PostEditChangeProperty(FPropertyChangedEvent& Property
 		const FName LeafName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 		const bool bCoordEdit = LeafName == GET_MEMBER_NAME_CHECKED(FPCGExClusterSketchVertex, LatticeCoord);
 		EDITOR_SyncBoundVertices(!bCoordEdit);
+
+		// A schema edit arrives as a Model change like any other -- MemberProperty is always the object's
+		// own member -- so the gate is deliberately coarse. Idempotent, and reachable only from an editor
+		// edit hook (here, or the panel's transacted write-back).
+		if (Model.Data) { Model.Data->EDITOR_SyncAll(); }
 	}
 }
 
@@ -120,37 +125,7 @@ void UPCGExClusterSketch::MergeCollocatedVertices()
 
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "MergeCollocated", "Merge Collocated Sketch Vertices"));
 	Modify();
-
-	// Every merge remaps indices, so rescan from scratch after each one; the guard bounds the loop by
-	// the only thing it can shrink.
-	bool bMergedAny = true;
-	int32 Guard = Model.Vertices.Num() + 1;
-	while (bMergedAny && Guard-- > 0)
-	{
-		bMergedAny = false;
-		TMap<FVector, int32> FirstAtLocation;
-		FirstAtLocation.Reserve(Model.Vertices.Num());
-		for (int32 i = 0; i < Model.Vertices.Num(); ++i)
-		{
-			const FVector Location = FPCGExClusterSketchModel::ResolvedLocation(Model.Vertices[i], bHasBasis ? &Basis : nullptr);
-			const FVector Key = PCGExSketch::QuantizedLocationKey(Location);
-			if (const int32* First = FirstAtLocation.Find(Key))
-			{
-				Model.MergeVertices(i, *First);
-				bMergedAny = true;
-				break;
-			}
-			FirstAtLocation.Add(Key, i);
-		}
-	}
-
-	// Merging retargets edges, which can leave them passing THROUGH vertices (the collinear D-onto-A
-	// case) -- genuinely degenerate, so the cleanup must resolve it. Crossings it may also create are
-	// left alone: they are legitimate geometry, offered as ghosts and materialized on demand.
-	Model.SplitAllOverlappingEdges(bHasBasis ? &Basis : nullptr);
-	// Merges can also strand tool residue.
-	Model.RemoveOrphanSideEffectVertices();
-
+	Model.MergeCollocatedVertices(bHasBasis ? &Basis : nullptr);
 	PostEditChange();
 	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
 	PCGExEditor::NotifyObjectChanged(this);
@@ -161,8 +136,6 @@ void UPCGExClusterSketch::RemoveInvalidEdges()
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "RemoveInvalidEdges", "Remove Invalid Sketch Edges"));
 	Modify();
 	Model.RemoveInvalidEdges();
-	// Dropping edges can strand tool residue, same as every other edge-removing operation.
-	Model.RemoveOrphanSideEffectVertices();
 	PostEditChange();
 	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
 	PCGExEditor::NotifyObjectChanged(this);
@@ -172,14 +145,20 @@ void UPCGExClusterSketch::SplitOverlappingEdges()
 {
 	FPCGExLatticeBasis Basis;
 	const bool bHasBasis = BuildBasis(Basis);
-	const FPCGExLatticeBasis* BasisPtr = bHasBasis ? &Basis : nullptr;
 
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "SplitOverlappingEdges", "Split Overlapping Sketch Edges"));
 	Modify();
-	// Order is free: materializing a crossing enforces separation around the vertex it inserts, so the
-	// second pass cannot leave containment residue behind for a third press to find.
-	Model.SplitAllOverlappingEdges(BasisPtr);
-	Model.InsertCrossingVertices(BasisPtr);
+	Model.SplitOverlappingEdges(bHasBasis ? &Basis : nullptr);
+	PostEditChange();
+	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
+	PCGExEditor::NotifyObjectChanged(this);
+}
+
+void UPCGExClusterSketch::PurgeUnusedDataRecords()
+{
+	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "PurgeUnusedDataRecords", "Purge Unused Sketch Data Records"));
+	Modify();
+	Model.PurgeUnreferencedRecords();
 	PostEditChange();
 	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
 	PCGExEditor::NotifyObjectChanged(this);

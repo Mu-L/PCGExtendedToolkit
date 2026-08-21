@@ -231,6 +231,9 @@ public:
 	bool DrawsGhostsAsMesh() const;
 #endif
 
+	/** Repairs the INLINE payload's invalid/duplicate data-record ids (a referenced asset repairs its
+	 *  own). Touches no schema, so it can never reach the editor-only record sync. */
+
 	//~ Begin UPrimitiveComponent
 #if WITH_EDITOR
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
@@ -244,6 +247,8 @@ public:
 	//~ End UPrimitiveComponent
 
 #if WITH_EDITOR
+	/** Coord/location coherence for the inline payload, AND the only site allowed to sync its authored
+	 *  tier to its schemas -- see UPCGExClusterSketch::PostEditChangeProperty for why that is editor-only. */
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 	virtual void PostEditUndo() override;
 

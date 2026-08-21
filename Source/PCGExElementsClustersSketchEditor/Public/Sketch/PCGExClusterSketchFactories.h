@@ -34,7 +34,7 @@ public:
 
 	virtual FText GetAssetDescription(const FAssetData& AssetData) const override
 	{
-		return INVTEXT("A hand-authored, spawnable cluster: vertices + edges + annotation channels, printed to a live Vtx/Edges pair at execute time.");
+		return INVTEXT("A hand-authored, spawnable cluster: vertices + edges + the authored data tier annotating them, printed to a live Vtx/Edges pair at execute time.");
 	}
 
 	virtual TSoftClassPtr<UObject> GetAssetClass() const override { return UPCGExClusterSketch::StaticClass(); }

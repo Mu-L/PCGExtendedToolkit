@@ -51,10 +51,10 @@ namespace PCGExSketch
 }
 
 /**
- * A hand-authored, spawnable cluster: the sketch model (vertices + edges + channels), an optional snap
- * provider, and print-time decorators. Print-on-demand by design -- the asset holds NO baked point data
- * and no derived state; a consumer prints a live Vtx/Edges pair from the model at execute time and
- * duplicates it per target.
+ * A hand-authored, spawnable cluster: the sketch model (vertices, edges, and the authored data tier
+ * annotating them), an optional snap provider, and print-time decorators. Print-on-demand by design --
+ * the asset holds NO baked point data and no derived state; a consumer prints a live Vtx/Edges pair from
+ * the model at execute time and duplicates it per target.
  */
 UCLASS(BlueprintType, ClassGroup = (Procedural), Category = "PCGEx")
 class PCGEXELEMENTSCLUSTERSSKETCH_API UPCGExClusterSketch : public UDataAsset
@@ -103,11 +103,18 @@ public:
 		bool bQuiet = false,
 		TFunction<void(const TSharedRef<PCGExGraphs::FGraphBuilder>&, bool)> OnCompiled = nullptr) const;
 
+	/** Repairs invalid/duplicate data-record ids, which load and asset duplication both produce. Runtime
+	 *  safe by construction: it touches no schema, so it can never reach the editor-only record sync. */
+
 #if WITH_EDITOR
 	/**
 	 * Coord/position coherence (the sketch's one editing rule): a bound vertex's location is derived from
 	 * its coord. Editing the COORD re-derives the location (coord wins); any other model edit re-snaps
 	 * coords from locations first, so a hand-edited transform can never dangle off-lattice.
+	 *
+	 * ALSO the authored tier's one legal sync site: FPCGExPropertyOverrides::SyncToSchema matches identity
+	 * only under WITH_EDITOR and wipes to schema defaults otherwise, so the sync may never be reached from
+	 * load, from the print path, or from any model mutation.
 	 */
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
@@ -144,5 +151,12 @@ public:
 	 */
 	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Split Overlapping Edges")
 	void SplitOverlappingEdges();
+
+	/**
+	 * Drop every data record no vertex or edge still references. Explicit and undoable -- a purge on save
+	 * would be untransacted, letting delete-vertex -> save -> undo resurrect a dangling reference.
+	 */
+	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Purge Unused Data Records")
+	void PurgeUnusedDataRecords();
 #endif
 };

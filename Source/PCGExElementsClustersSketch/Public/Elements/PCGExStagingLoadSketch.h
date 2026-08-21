@@ -116,7 +116,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Forwarding", meta = (PCG_Overridable))
 	FPCGExAttributeToTagDetails TargetsAttributesToClusterTags;
 
-	/** Which target attributes to forward onto the printed Vtx data. */
+	/** Which target attributes to forward onto the printed Vtx data. A forwarded name equal to an
+	 *  authored sketch attribute REPLACES it on that duplicate -- forwarding recreates the attribute. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Forwarding", meta = (PCG_Overridable))
 	FPCGExForwardDetails TargetsForwarding;
 

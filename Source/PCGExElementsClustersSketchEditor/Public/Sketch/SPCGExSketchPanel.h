@@ -1,0 +1,201 @@
+﻿// Copyright 2026 Timothé Lapetite and contributors
+// Released under the MIT license https://opensource.org/license/MIT/
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Sketch/PCGExClusterSketchModel.h"
+#include "Templates/Function.h"
+#include "UObject/WeakObjectPtrTemplates.h"
+#include "Widgets/SCompoundWidget.h"
+
+class FPCGExSketchEditController;
+class IDetailsView;
+class IStructureDetailsView;
+class SWidgetSwitcher;
+struct FPropertyAndParent;
+struct FPropertyChangedEvent;
+class FStructOnScope;
+class FTransactionObjectEvent;
+
+/** One selectable sketch in a multi-sketch host's header picker. */
+struct FPCGExSketchPanelEntry
+{
+	FText Label;
+	TSharedPtr<FPCGExSketchEditController> Controller;
+};
+
+/**
+ * Everything the panel needs from whichever host embeds it. The asset editor and the level mode both
+ * fill one of these and get the same panel.
+ */
+struct FPCGExSketchPanelContext
+{
+	/** LIVE, never a snapshot: the mode's active binding changes under the panel while it is up. */
+	TFunction<TSharedPtr<FPCGExSketchEditController>()> ResolveActiveController;
+
+	/** The asset or component the model belongs to -- what write-backs Modify() and PostEditChange(). */
+	TFunction<UObject*()> ResolveSketchObject;
+
+	/** Fired after the panel mutates, for whatever the host owns OUTSIDE the panel (viewport, details).
+	 *  Not a rebuild request: UpdatePrimaryModePanel pulls the panel widgets once per spawn, so the
+	 *  panel always refreshes itself. */
+	FSimpleDelegate RequestBodyRefresh;
+
+	/** Optional, and set together: hosts holding more than one live sketch. Unset hides the picker. */
+	TFunction<void(TArray<FPCGExSketchPanelEntry>&)> EnumerateSketches;
+	TFunction<void(const TSharedPtr<FPCGExSketchEditController>&)> SetActiveSketch;
+};
+
+/**
+ * The sketch authoring side panel, shared verbatim by the standalone asset editor and the in-level
+ * mode. Deliberately vends TWO widgets rather than one root: the mode host renders a pinned palette
+ * area above its own SScrollBox, and the panel's tab strip has to live up there or it scrolls away.
+ *
+ *   MakeHeader() -> tab strip + global actions + the multi-sketch picker (pinned).
+ *   MakeBody()   -> this widget, the page switcher (scrolled BY THE HOST -- never nest an SScrollBox).
+ *
+ * Every mutation the panel makes is one FScopedTransaction on the target's transaction object, and
+ * ends on FPCGExSketchEditController::NotifyModelChanged like every gesture does.
+ */
+class PCGEXELEMENTSCLUSTERSSKETCHEDITOR_API SPCGExSketchPanel : public SCompoundWidget
+{
+public:
+	enum class EPage : uint8 { Selection, Sketch };
+
+	SLATE_BEGIN_ARGS(SPCGExSketchPanel)
+		{
+		}
+
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs, const FPCGExSketchPanelContext& InContext);
+	virtual ~SPCGExSketchPanel() override;
+
+	/** Pinned strip. A host may call this more than once (the mode rebuilds its palette on every
+	 *  UpdatePrimaryModePanel); each instance drives this one panel. */
+	TSharedRef<SWidget> MakeHeader();
+
+	/** The page switcher -- this widget. The host supplies the scrolling. */
+	TSharedRef<SWidget> MakeBody();
+
+	void SetPage(EPage InPage);
+	EPage GetPage() const { return ActivePage; }
+
+	//~ Begin SWidget
+	virtual void Tick(const FGeometry& AllottedGeometry, double InCurrentTime, float InDeltaTime) override;
+	//~ End SWidget
+
+private:
+	//~ Resolution
+	TSharedPtr<FPCGExSketchEditController> ActiveController() const;
+	/** Mutable model of the active controller, or null when there is none / it is read-only. */
+	FPCGExClusterSketchModel* EditableModel() const;
+
+	/** Which authored domain the selection addresses. A selection spanning both is deliberately None:
+	 *  one record assignment cannot mean two things. */
+	enum class EDomain : uint8 { None, Vertex, Edge };
+	EDomain SelectionDomain() const;
+	/** Selected indices of the resolved domain, ascending -- a TSet iterates by slot, not by pick order,
+	 *  so the lowest index is the only deterministic "primary". */
+	void GatherDomainSelection(EDomain InDomain, TArray<int32>& OutIndices) const;
+	const FPCGExSketchDataLayer* ResolveLayer(EDomain InDomain) const;
+	FPCGExSketchDataLayer* ResolveLayerMutable(EDomain InDomain) const;
+	FGuid PrimaryDataId() const;
+
+	//~ Refresh
+	/** Deferred to the next frame: a refresh triggered from inside a widget's own event handling would
+	 *  tear down the widget mid-handler. */
+	void QueueRefresh(bool bForceReseed);
+	/** OnChanged target; silent while the panel is writing its own edit back. */
+	void RequestRefresh();
+	/** Re-seeds only when the seeded IDENTITY moved (controller, host, domain, record) unless forced --
+	 *  a value-level re-seed would drop whatever the user is mid-typing. */
+	void RefreshNow(bool bForceReseed);
+	void RebindController();
+	void SeedRecordScope();
+	void SeedDataView();
+	/** False until authoring creates the tier -- the Sketch page offers a create button in that state. */
+	bool HasAuthoredTier() const;
+	FReply OnEnableAuthoredDataClicked();
+	void RefreshValidation();
+
+	//~ Chrome (bound as attributes; never cached)
+	bool IsEditingEnabled() const;
+	/** Rebuild CachedSketches. The picker's visibility and label are bound attributes, so they must
+	 *  never enumerate (it allocates a label per binding). */
+	void RefreshSketchEntries();
+	bool HasMultipleSketches() const;
+	FText ActiveSketchLabel() const;
+	FText SelectionSummaryText() const;
+	FText CurrentRecordText() const;
+	FText SharedCountText() const;
+	FText ValidationText() const;
+	EVisibility RecordRowVisibility() const;
+	EVisibility SharedCountVisibility() const;
+	EVisibility DanglingVisibility() const;
+
+	//~ Write-back (owning FStructOnScope root: the customizations' own owner hooks are skipped, so
+	//~ Modify() / PostEditChange() are hand-wired here)
+	void OnRecordPropertyChanged(const FPropertyChangedEvent& Event);
+	void OnObjectTransacted(UObject* Object, const FTransactionObjectEvent& Event);
+	/** The host's own details view reaches the same schemas; a stale scope would revert them. */
+	void OnHostPropertyChanged(UObject* Object, FPropertyChangedEvent& Event);
+	/** Admits only the host's snap-provider and decorator properties, under either host's names. */
+	bool IsHostPropertyVisible(const FPropertyAndParent& PropertyAndParent) const;
+
+	//~ Record authoring. By value, not by reference: these are delegate payload targets, and payloads
+	//~ deduce the parameter type from the bound value.
+	void AssignRecord(FGuid InRecordId);
+	void ActivateSketch(TSharedPtr<FPCGExSketchEditController> InController);
+	FReply OnMakeUniqueClicked();
+	FReply OnBreakLinkClicked();
+	TSharedRef<SWidget> MakeRecordMenu();
+	TSharedRef<SWidget> MakeSketchMenu();
+
+	//~ Page bodies
+	TSharedRef<SWidget> BuildSelectionPage();
+	TSharedRef<SWidget> BuildSketchPage();
+
+	FPCGExSketchPanelContext Context;
+	EPage ActivePage = EPage::Selection;
+
+	TSharedPtr<SWidgetSwitcher> PageSwitcher;
+
+	/** Owning copies. The Records array carries no CPF_Edit flag, so no property handle can reach it --
+	 *  a copy fed to an IStructureDetailsView is the only binding that exists. */
+	TSharedPtr<IStructureDetailsView> RecordDetailsView;
+	TSharedPtr<FStructOnScope> RecordScope;
+	/** Object-rooted: the authored tier is a UObject, so it edits in place with real transactions and
+	 *  reconciles itself through its own PostEditChangeProperty. */
+	TSharedPtr<IDetailsView> DataDetailsView;
+
+	/** Snap provider and decorators live on the HOST, not in the model, and the mode host shows no
+	 *  details view of its own -- without this they would be unreachable while editing in-level. */
+	TSharedPtr<IDetailsView> HostDetailsView;
+
+	/** Identity the scopes were seeded from -- what RefreshNow compares against. */
+	TWeakPtr<FPCGExSketchEditController> SeededController;
+	TWeakObjectPtr<UObject> SeededObject;
+	EDomain SeededDomain = EDomain::None;
+	FGuid SeededRecordId;
+
+	TWeakPtr<FPCGExSketchEditController> BoundController;
+	FDelegateHandle BoundChangedHandle;
+	FDelegateHandle TransactedHandle;
+	FDelegateHandle PropertyChangedHandle;
+
+	/** The picker's bound attributes read this instead of enumerating the host's bindings per paint. */
+	TArray<FPCGExSketchPanelEntry> CachedSketches;
+
+	/** Validation is O(V^2) on free vertices, so it is recomputed on revision moves, never per paint. */
+	FPCGExClusterSketchValidation Validation;
+	int32 ValidatedRevision = INDEX_NONE;
+	/** Undo cannot rewind ModelRevision, so a forced reseed sets this to bypass the revision cache. */
+	bool bValidationDirty = false;
+
+	/** Suppresses the OnChanged echo of the panel's own write-back. */
+	bool bIsSyncing = false;
+	bool bRefreshQueued = false;
+	bool bForceReseedQueued = false;
+};

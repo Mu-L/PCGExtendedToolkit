@@ -146,6 +146,8 @@ void UPCGExClusterSketchComponent::CollectAssetDependencies(TArray<FSoftObjectPa
 	{
 		InlineSnapProvider->CollectAssetDependencies(OutPaths);
 	}
+	// The inline authored tier contributes nothing here: FPCGExPropertySchemaCollection::ImportedSchemas
+	// are HARD refs, already loaded with the payload that names them.
 	for (const TObjectPtr<UPCGExClusterSketchDecorator>& Decorator : InlineDecorators)
 	{
 		if (Decorator && Decorator->bEnabled)
@@ -807,6 +809,11 @@ void UPCGExClusterSketchComponent::PostEditChangeProperty(FPropertyChangedEvent&
 		const FName LeafName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 		const bool bCoordEdit = LeafName == GET_MEMBER_NAME_CHECKED(FPCGExClusterSketchVertex, LatticeCoord);
 		EDITOR_SyncBoundVertices(!bCoordEdit);
+
+		// A schema edit arrives as an InlineModel change like any other -- MemberProperty is always the
+		// object's own member -- so the gate is deliberately coarse. Idempotent, and reachable only from
+		// an editor edit hook (here, or the panel's transacted write-back).
+		if (InlineModel.Data) { InlineModel.Data->EDITOR_SyncAll(); }
 	}
 
 	// Any property here can move the drawing: payload, override, provider params, display settings.
@@ -857,6 +864,10 @@ void UPCGExClusterSketchComponent::InlineSketchAsset()
 	InlineModel = SketchAsset->Model;
 
 	// Instanced subobjects must be OURS, not shared with the asset -- duplicate rather than assign.
+	// The struct copy above carried Data as a POINTER, so without this both hosts write one object.
+	InlineModel.Data = SketchAsset->Model.Data
+		                   ? DuplicateObject<UPCGExSketchData>(SketchAsset->Model.Data, this)
+		                   : nullptr;
 	InlineSnapProvider = SketchAsset->SnapProvider
 		                     ? DuplicateObject<UPCGExClusterSnapProvider>(SketchAsset->SnapProvider, this)
 		                     : nullptr;

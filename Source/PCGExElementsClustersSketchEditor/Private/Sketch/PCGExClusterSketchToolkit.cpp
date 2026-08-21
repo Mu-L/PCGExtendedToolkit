@@ -5,6 +5,7 @@
 
 #include "AdvancedPreviewScene.h"
 #include "AssetEditorModeManager.h"
+#include "IDetailsView.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Sketch/PCGExClusterSketch.h"
@@ -13,6 +14,11 @@
 #include "Sketch/PCGExClusterSketchStyle.h"
 #include "Sketch/PCGExClusterSketchViewportClient.h"
 #include "Sketch/PCGExSketchEditController.h"
+#include "Sketch/SPCGExSketchPanel.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/Docking/SDockTab.h"
+#include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Layout/SSplitter.h"
 
 FPCGExClusterSketchToolkit::FPCGExClusterSketchToolkit(UAssetEditor* InOwningAssetEditor)
 	: FBaseAssetToolkit(InOwningAssetEditor)
@@ -111,6 +117,70 @@ void FPCGExClusterSketchToolkit::CreatePreviewSketch(UPCGExClusterSketch* InSket
 
 	PreviewActor = Actor;
 	PreviewComponent = Component;
+}
+
+void FPCGExClusterSketchToolkit::EnsurePanelCreated()
+{
+	if (Panel.IsValid()) { return; }
+
+	FPCGExSketchPanelContext Context;
+	Context.ResolveActiveController = [this]() { return Controller; };
+	Context.ResolveSketchObject = [this]() -> UObject*
+	{
+		const UPCGExClusterSketchEditor* SketchEditor = Cast<UPCGExClusterSketchEditor>(OwningAssetEditor);
+		return SketchEditor ? SketchEditor->GetSketch() : nullptr;
+	};
+	Context.RequestBodyRefresh = FSimpleDelegate::CreateLambda([this]()
+	{
+		if (ViewportClient) { ViewportClient->Invalidate(); }
+	});
+
+	// No enumerator: this host edits exactly one sketch, so the panel's picker stays collapsed.
+	SAssignNew(Panel, SPCGExSketchPanel, Context);
+}
+
+TSharedRef<SDockTab> FPCGExClusterSketchToolkit::SpawnTab_Details(const FSpawnTabArgs& Args)
+{
+	EnsurePanelCreated();
+
+	// DetailsView stays live below the panel: the base sets objects on it unguarded, and the asset's
+	// snap provider and decorators have no home in the shared panel.
+	return SNew(SDockTab)
+		.Label(INVTEXT("Details"))
+		[
+			SNew(SVerticalBox)
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				Panel->MakeHeader()
+			]
+
+			+ SVerticalBox::Slot()
+			.FillHeight(1.0f)
+			[
+				SNew(SSplitter)
+				.Orientation(Orient_Vertical)
+				.PhysicalSplitterHandleSize(4.0f)
+
+				+ SSplitter::Slot()
+				.Value(0.6f)
+				[
+					// The mode host supplies this itself; here the toolkit owns it.
+					SNew(SScrollBox)
+					+ SScrollBox::Slot()
+					[
+						Panel->MakeBody()
+					]
+				]
+
+				+ SSplitter::Slot()
+				.Value(0.4f)
+				[
+					DetailsView.ToSharedRef()
+				]
+			]
+		];
 }
 
 void FPCGExClusterSketchToolkit::CreateEditorModeManager()

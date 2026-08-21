@@ -28,7 +28,12 @@ public class PCGExElementsClustersSketchEditor : ModuleRules
 				"PCGExElementsClustersSketch",
 				// Lattice basis: the edit controller snaps against it directly.
 				"PCGExGraphs",
+				// PUBLIC: the shared panel names the schema/override types the authored tier is built from.
+				"PCGExProperties",
 				"PCGExCoreEditor",
+				// PUBLIC: SPCGExSketchPanel is an SCompoundWidget in a public header.
+				"Slate",
+				"SlateCore",
 				// Base collection toolkit + editor type registry for the sketch collection actions.
 				"PCGExCollectionsEditor",
 				"AssetDefinition"
@@ -40,8 +45,6 @@ public class PCGExElementsClustersSketchEditor : ModuleRules
 			{
 				"InputCore",
 				"AssetTools",
-				"Slate",
-				"SlateCore",
 				"PropertyEditor",
 				"ToolMenus",
 				"Projects",

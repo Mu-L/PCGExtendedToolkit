@@ -26,6 +26,10 @@ public:
 	virtual const FPCGExClusterSketchModel* GetModel() const = 0;
 	virtual const UPCGExClusterSnapProvider* GetSnapProvider() const = 0;
 
+	/** Whether authoring is allowed AT ALL. Distinct from a null GetModel(), which conflates "read-only"
+	 *  (a component instancing an asset -- alive, inspectable, never authored through) with "host died". */
+	virtual bool CanEdit() const = 0;
+
 	/** The object Modify() is called on inside every transaction (the asset / the component). */
 	virtual UObject* GetTransactionObject() = 0;
 
@@ -45,6 +49,7 @@ public:
 	virtual FPCGExClusterSketchModel* GetModel() override;
 	virtual const FPCGExClusterSketchModel* GetModel() const override;
 	virtual const UPCGExClusterSnapProvider* GetSnapProvider() const override;
+	virtual bool CanEdit() const override;
 	virtual UObject* GetTransactionObject() override;
 	virtual FTransform GetLocalToWorld() const override { return FTransform::Identity; }
 	virtual void NotifyChanged() override;
@@ -114,8 +119,26 @@ public:
 	 *  @return true if one was materialized. */
 	bool MaterializeCrossingAtRay(const FRay& WorldRay);
 
+	//~ Authored-data cleanup, shared by both hosts' panels. Each is one transaction on the target, so a
+	//~ controller with no asset gets them too -- the asset's CallInEditor twins reach only the asset.
+	/** Merge every vertex resolving onto an already-occupied printed location. @return merges performed. */
+	int32 MergeCollocatedVertices();
+	/** Drop out-of-range, self-loop and duplicate edges. @return edges removed. */
+	int32 RemoveInvalidEdges();
+	/** Split edges through vertices and materialize every crossing. @return splits + crossings. */
+	int32 SplitOverlappingEdges();
+	/** Drop records no item references, both layers. @return records removed. */
+	int32 PurgeUnusedDataRecords();
+
 	/** Recompute the ghost crossings. Cheap at sketch scale; called after every mutation. */
 	void RefreshCrossings();
+
+	/** Refresh ghosts, then tell the host. Every mutation ends here -- including one a panel made
+	 *  directly on the model (record authoring), which is why this is public. */
+	void NotifyModelChanged();
+
+	/** Fired by NotifyModelChanged, so it carries SELECTION changes as well as model mutations. */
+	FSimpleMulticastDelegate OnChanged;
 
 	/** Hypothetical crossings offered as ghosts -- never cut automatically. */
 	const TArray<FPCGExClusterSketchCrossing>& GetCrossings() const { return Crossings; }
@@ -150,6 +173,9 @@ public:
 	//~ Draw-state accessors (consumed by FPCGExSketchDrawHelper; indices may be stale after external
 	//~ edits -- consumers must IsValidIndex-guard, the controller sanitizes on its own operations)
 	const IPCGExSketchEditTarget& GetTarget() const { return Target.Get(); }
+	/** Authoring seam for panels that write the model directly (record assignment): they need the
+	 *  transaction object and the mutable model, then end on NotifyModelChanged like everything else. */
+	IPCGExSketchEditTarget& GetTarget() { return Target.Get(); }
 	const TSet<int32>& GetSelectedVertices() const { return SelectedVertices; }
 	const TSet<int32>& GetSelectedEdges() const { return SelectedEdges; }
 	const FPCGExSketchHit& GetHover() const { return Hover; }
@@ -199,8 +225,6 @@ private:
 	int32 FindNearbyVertex(const FRay& LocalRay, const FVector& LocalPoint, int32 IgnoreVertex, const FPCGExLatticeBasis* Basis, const FIntVector* LayerRef = nullptr) const;
 	void DropInvalidIndices();
 	void EndTransaction();
-	/** Refresh ghosts, then tell the host. Every mutation ends here. */
-	void NotifyModelChanged();
 
 	TSharedRef<IPCGExSketchEditTarget> Target;
 

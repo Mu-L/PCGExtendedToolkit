@@ -10,6 +10,7 @@ class AActor;
 class FAdvancedPreviewScene;
 class FPCGExSketchAssetEditTarget;
 class FPCGExSketchEditController;
+class SPCGExSketchPanel;
 class UPCGExClusterSketch;
 class UPCGExClusterSketchComponent;
 
@@ -42,7 +43,14 @@ public:
 
 	TSharedPtr<FPCGExSketchEditController> GetController() const { return Controller; }
 
+protected:
+	/** The Details tab is where the shared panel lands here. Overriding this rather than
+	 *  RegisterTabSpawners, which would trip the base's duplicate-spawner ensure. */
+	virtual TSharedRef<SDockTab> SpawnTab_Details(const FSpawnTabArgs& Args) override;
+
 private:
+	void EnsurePanelCreated();
+
 	/** Give the preview scene a real sketch component, so this editor renders through the SAME mesh
 	 *  layer the in-level mode does instead of an immediate-mode lookalike. Needs an owning actor: the
 	 *  component parents its instanced-mesh children to GetOwner(). */
@@ -51,6 +59,7 @@ private:
 	TSharedPtr<FAdvancedPreviewScene> ObjectScene;
 	TSharedPtr<FPCGExSketchAssetEditTarget> EditTarget;
 	TSharedPtr<FPCGExSketchEditController> Controller;
+	TSharedPtr<SPCGExSketchPanel> Panel;
 
 	/** Owned by the preview world, which roots them; weak so teardown order cannot matter. */
 	TWeakObjectPtr<AActor> PreviewActor;

@@ -28,6 +28,13 @@ const UPCGExClusterSnapProvider* FPCGExSketchComponentEditTarget::GetSnapProvide
 	return Pinned ? Pinned->GetSnapProvider() : nullptr;
 }
 
+bool FPCGExSketchComponentEditTarget::CanEdit() const
+{
+	// Referencing an asset makes the component read-only; the inline payload stays inspectable.
+	const UPCGExClusterSketchComponent* Pinned = Component.Get();
+	return Pinned && !Pinned->IsUsingAsset();
+}
+
 UObject* FPCGExSketchComponentEditTarget::GetTransactionObject()
 {
 	return Component.Get();

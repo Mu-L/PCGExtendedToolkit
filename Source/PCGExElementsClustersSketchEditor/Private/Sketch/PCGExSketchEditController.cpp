@@ -4,6 +4,7 @@
 #include "Sketch/PCGExSketchEditController.h"
 
 #include "ScopedTransaction.h"
+#include "Helpers/PCGExObjectNotifyHelpers.h"
 #include "Sketch/PCGExClusterSketch.h"
 #include "Sketch/PCGExClusterSketchStyle.h"
 
@@ -52,6 +53,11 @@ const UPCGExClusterSnapProvider* FPCGExSketchAssetEditTarget::GetSnapProvider() 
 {
 	const UPCGExClusterSketch* Pinned = Sketch.Get();
 	return Pinned ? Pinned->SnapProvider.Get() : nullptr;
+}
+
+bool FPCGExSketchAssetEditTarget::CanEdit() const
+{
+	return Sketch.IsValid();
 }
 
 UObject* FPCGExSketchAssetEditTarget::GetTransactionObject()
@@ -907,6 +913,82 @@ void FPCGExSketchEditController::NotifyModelChanged()
 	++ModelRevision;
 	RefreshCrossings();
 	Target->NotifyChanged();
+	OnChanged.Broadcast();
+}
+
+int32 FPCGExSketchEditController::MergeCollocatedVertices()
+{
+	FPCGExClusterSketchModel* Model = Target->GetModel();
+	if (!Model) { return 0; }
+
+	FPCGExLatticeBasis Basis;
+	const FPCGExLatticeBasis* BasisPtr = GetBasis(Basis) ? &Basis : nullptr;
+
+	const FScopedTransaction Transaction(LOCTEXT("MergeCollocated", "Merge Collocated Sketch Vertices"));
+	UObject* TransactionObject = Target->GetTransactionObject();
+	if (TransactionObject) { TransactionObject->Modify(); }
+
+	const int32 NumMerged = Model->MergeCollocatedVertices(BasisPtr);
+
+	ClearSelection();
+	ClearHover();
+	PCGExEditor::NotifyObjectChanged(TransactionObject);
+	NotifyModelChanged();
+	return NumMerged;
+}
+
+int32 FPCGExSketchEditController::RemoveInvalidEdges()
+{
+	FPCGExClusterSketchModel* Model = Target->GetModel();
+	if (!Model) { return 0; }
+
+	const FScopedTransaction Transaction(LOCTEXT("RemoveInvalidEdges", "Remove Invalid Sketch Edges"));
+	UObject* TransactionObject = Target->GetTransactionObject();
+	if (TransactionObject) { TransactionObject->Modify(); }
+
+	const int32 NumRemoved = Model->RemoveInvalidEdges();
+
+	ClearSelection();
+	ClearHover();
+	PCGExEditor::NotifyObjectChanged(TransactionObject);
+	NotifyModelChanged();
+	return NumRemoved;
+}
+
+int32 FPCGExSketchEditController::SplitOverlappingEdges()
+{
+	FPCGExClusterSketchModel* Model = Target->GetModel();
+	if (!Model) { return 0; }
+
+	FPCGExLatticeBasis Basis;
+	const FPCGExLatticeBasis* BasisPtr = GetBasis(Basis) ? &Basis : nullptr;
+
+	const FScopedTransaction Transaction(LOCTEXT("SplitOverlappingEdges", "Split Overlapping Sketch Edges"));
+	UObject* TransactionObject = Target->GetTransactionObject();
+	if (TransactionObject) { TransactionObject->Modify(); }
+
+	const int32 NumSplits = Model->SplitOverlappingEdges(BasisPtr);
+
+	ClearSelection();
+	ClearHover();
+	PCGExEditor::NotifyObjectChanged(TransactionObject);
+	NotifyModelChanged();
+	return NumSplits;
+}
+
+int32 FPCGExSketchEditController::PurgeUnusedDataRecords()
+{
+	FPCGExClusterSketchModel* Model = Target->GetModel();
+	if (!Model) { return 0; }
+
+	const FScopedTransaction Transaction(LOCTEXT("PurgeDataRecords", "Purge Unused Sketch Data Records"));
+	UObject* TransactionObject = Target->GetTransactionObject();
+	if (TransactionObject) { TransactionObject->Modify(); }
+
+	const int32 NumPurged = Model->PurgeUnreferencedRecords();
+	PCGExEditor::NotifyObjectChanged(TransactionObject);
+	NotifyModelChanged();
+	return NumPurged;
 }
 
 void FPCGExSketchEditController::RefreshCrossings()
