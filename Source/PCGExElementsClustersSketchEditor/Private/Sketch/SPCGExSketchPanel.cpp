@@ -587,6 +587,7 @@ void SPCGExSketchPanel::RefreshNow(const bool bForceReseed)
 
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
 	UObject* Host = Context.ResolveSketchObject ? Context.ResolveSketchObject() : nullptr;
+	UObject* DetailsObject = Controller ? Controller->GetTarget().GetDetailsObject() : nullptr;
 	const EDomain Domain = SelectionDomain();
 	const FGuid DataId = PrimaryDataId();
 
@@ -597,6 +598,7 @@ void SPCGExSketchPanel::RefreshNow(const bool bForceReseed)
 		bForceReseed
 		|| SeededController.Pin() != Controller
 		|| SeededObject.Get() != Host
+		|| SeededDetailsObject.Get() != DetailsObject
 		|| SeededDomain != Domain
 		|| SeededRecordId != DataId;
 
@@ -609,11 +611,13 @@ void SPCGExSketchPanel::RefreshNow(const bool bForceReseed)
 
 	SeededController = Controller;
 	SeededObject = Host;
+	SeededDetailsObject = DetailsObject;
 	SeededDomain = Domain;
 	SeededRecordId = DataId;
 
-	// The Sketch page's schema / snap provider / decorator rows all come from the host object.
-	if (HostDetailsView.IsValid()) { HostDetailsView->SetObject(Host, /*bForceRefresh*/ true); }
+	// Snap provider and decorator rows come from the details object -- the asset itself, or a component's
+	// payload, which expose the same authored properties. Schema and record rows use their own scopes.
+	if (HostDetailsView.IsValid()) { HostDetailsView->SetObject(DetailsObject, /*bForceRefresh*/ true); }
 
 	SeedRecordScope();
 	SeedDataScope();
@@ -719,10 +723,7 @@ bool SPCGExSketchPanel::IsHostCustomRowVisible(const FName InRowName, const FNam
 bool SPCGExSketchPanel::IsHostPropertyVisible(const FPropertyAndParent& PropertyAndParent) const
 {
 	// Whole subtrees the page owns.
-	static const TSet<FName> Subtrees = {
-		FName("SnapProvider"), FName("Decorators"),
-		FName("InlineSnapProvider"), FName("InlineDecorators")
-	};
+	static const TSet<FName> Subtrees = {FName("SnapProvider"), FName("Decorators")};
 
 	const FName Name = PropertyAndParent.Property.GetFName();
 	if (Subtrees.Contains(Name)) { return true; }

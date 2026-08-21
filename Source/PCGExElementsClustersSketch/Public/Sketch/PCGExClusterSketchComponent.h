@@ -153,6 +153,14 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ShowOnlyInnerProperties))
 	FPCGExClusterSketchModel Model;
+
+	/** Snap-lattice model the sketch is authored against. None = free-form. */
+	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
+	TObjectPtr<UPCGExClusterSnapProvider> SnapProvider;
+
+	/** Print-time attribute decorators, run in order. */
+	UPROPERTY(EditAnywhere, Instanced, Category = Settings)
+	TArray<TObjectPtr<UPCGExClusterSketchDecorator>> Decorators;
 };
 
 UCLASS(BlueprintType, ClassGroup = (PCGEx), meta = (BlueprintSpawnableComponent, DisplayName = "PCGEx Cluster Sketch"),
@@ -193,14 +201,6 @@ public:
 	 */
 	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (NoClear, NoResetToDefault))
 	TObjectPtr<UPCGExClusterSketchPayload> InlinePayload;
-
-	/** Snap-lattice model the inline sketch is authored against. None = free-form. */
-	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr && DefaultSketchAsset == nullptr"))
-	TObjectPtr<UPCGExClusterSnapProvider> InlineSnapProvider;
-
-	/** Print-time attribute decorators for the inline sketch, run in order. */
-	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr && DefaultSketchAsset == nullptr"))
-	TArray<TObjectPtr<UPCGExClusterSketchDecorator>> InlineDecorators;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cluster Sketch|Display")
 	bool bShowSketch = true;

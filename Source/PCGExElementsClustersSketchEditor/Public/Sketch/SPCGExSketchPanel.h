@@ -172,12 +172,14 @@ private:
 	TSharedPtr<IStructureDetailsView> DataDetailsView;
 	TSharedPtr<FStructOnScope> DataScope;
 
-	/** Snap provider and decorators are the only authored things that live ON the host. */
+	/** Rooted at the target's details object, which differs from the host: see GetDetailsObject. */
 	TSharedPtr<IDetailsView> HostDetailsView;
 
 	/** Identity the scopes were seeded from -- what RefreshNow compares against. */
 	TWeakPtr<FPCGExSketchEditController> SeededController;
 	TWeakObjectPtr<UObject> SeededObject;
+	/** Tracked separately: creating or deleting an inline sketch moves this while the host stands still. */
+	TWeakObjectPtr<UObject> SeededDetailsObject;
 	EDomain SeededDomain = EDomain::None;
 	FGuid SeededRecordId;
 

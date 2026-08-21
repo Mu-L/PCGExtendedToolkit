@@ -37,6 +37,13 @@ public:
 	virtual UObject* GetTransactionObject() = 0;
 
 	/**
+	 * The object the panel's details view is rooted at. Not the transaction object: a component keeps its
+	 * authored tier in a payload subobject, so rooting there gives both hosts the same shape -- Model,
+	 * SnapProvider, Decorators as top-level rows. Null means there is nothing authored to show.
+	 */
+	virtual UObject* GetDetailsObject() { return GetTransactionObject(); }
+
+	/**
 	 * Open an authoring edit. Transacts the host AND the authored-tier subobject (which is a separate
 	 * UObject, so a host-only Modify leaves record edits outside the transaction), and lets a host
 	 * record that its content is now its own.

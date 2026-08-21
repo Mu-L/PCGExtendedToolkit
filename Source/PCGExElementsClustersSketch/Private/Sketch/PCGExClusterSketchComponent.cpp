@@ -122,19 +122,24 @@ const FPCGExClusterSketchModel& UPCGExClusterSketchComponent::GetModel() const
 
 const UPCGExClusterSnapProvider* UPCGExClusterSketchComponent::GetSnapProvider() const
 {
+	if (InlinePayload) { return InlinePayload->SnapProvider.Get(); }
 	const UPCGExClusterSketch* Asset = ResolveSketchAsset();
-	return Asset ? Asset->SnapProvider.Get() : InlineSnapProvider.Get();
+	return Asset ? Asset->SnapProvider.Get() : nullptr;
 }
 
 TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>> UPCGExClusterSketchComponent::GetDecorators() const
 {
-	// Explicit on both branches: the asset's array is reached mutably through TObjectPtr::operator->,
+	// Explicit on every branch: the asset's array is reached mutably through TObjectPtr::operator->,
 	// so a ternary would have to reconcile two different view constnesses.
+	if (InlinePayload)
+	{
+		return TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>>(InlinePayload->Decorators);
+	}
 	if (const UPCGExClusterSketch* Asset = ResolveSketchAsset())
 	{
 		return TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>>(Asset->Decorators);
 	}
-	return TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>>(InlineDecorators);
+	return TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>>();
 }
 
 void UPCGExClusterSketchComponent::SetSketchAsset(UPCGExClusterSketch* InAsset)
@@ -163,13 +168,15 @@ void UPCGExClusterSketchComponent::CollectAssetDependencies(TArray<FSoftObjectPa
 		Asset->CollectAssetDependencies(OutPaths);
 		return;
 	}
-	if (InlineSnapProvider)
+	if (!InlinePayload) { return; }
+
+	if (InlinePayload->SnapProvider)
 	{
-		InlineSnapProvider->CollectAssetDependencies(OutPaths);
+		InlinePayload->SnapProvider->CollectAssetDependencies(OutPaths);
 	}
 	// The inline authored tier contributes nothing here: FPCGExPropertySchemaCollection::ImportedSchemas
 	// are HARD refs, already loaded with the payload that names them.
-	for (const TObjectPtr<UPCGExClusterSketchDecorator>& Decorator : InlineDecorators)
+	for (const TObjectPtr<UPCGExClusterSketchDecorator>& Decorator : InlinePayload->Decorators)
 	{
 		if (Decorator && Decorator->bEnabled)
 		{
@@ -908,23 +915,26 @@ void UPCGExClusterSketchComponent::CreateInlineSketch()
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "CreateInlineSketch", "Create Inline Cluster Sketch"));
 	Modify();
 
+	// Resolved BEFORE the payload exists: ResolveSketchAsset reports null the moment one does.
+	const UPCGExClusterSketch* Asset = ResolveSketchAsset();
+
 	// Outered to the ACTOR, and auto-named because siblings share that outer -- see the declaration.
 	InlinePayload = NewObject<UPCGExClusterSketchPayload>(Owner, NAME_None, RF_Transactional);
 
 	// Seeded from the asset in force, so authoring starts from what is on screen rather than an empty
-	// sketch. Instanced subobjects must be OURS -- duplicate rather than share the asset's.
-	if (const UPCGExClusterSketch* Asset = ResolveSketchAsset())
+	// sketch. Instanced subobjects must be the PAYLOAD's -- duplicate rather than share the asset's.
+	if (Asset)
 	{
 		InlinePayload->Model = Asset->Model;
 
-		InlineSnapProvider = Asset->SnapProvider
-			                     ? DuplicateObject<UPCGExClusterSnapProvider>(Asset->SnapProvider, this)
-			                     : nullptr;
+		InlinePayload->SnapProvider = Asset->SnapProvider
+			                              ? DuplicateObject<UPCGExClusterSnapProvider>(Asset->SnapProvider, InlinePayload)
+			                              : nullptr;
 
-		InlineDecorators.Reset(Asset->Decorators.Num());
+		InlinePayload->Decorators.Reset(Asset->Decorators.Num());
 		for (const TObjectPtr<UPCGExClusterSketchDecorator>& Decorator : Asset->Decorators)
 		{
-			InlineDecorators.Add(Decorator ? DuplicateObject<UPCGExClusterSketchDecorator>(Decorator, this) : nullptr);
+			InlinePayload->Decorators.Add(Decorator ? DuplicateObject<UPCGExClusterSketchDecorator>(Decorator, InlinePayload) : nullptr);
 		}
 	}
 
@@ -940,11 +950,9 @@ void UPCGExClusterSketchComponent::DeleteInlineSketch()
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "DeleteInlineSketch", "Delete Inline Cluster Sketch"));
 	Modify();
 
-	// Undo restores these: the actor's transaction annotation deep-copies the component's editable
-	// properties at Modify() time, so the payload is recoverable until the transaction is discarded.
+	// Only the reference goes: the payload object itself stays alive in the transaction buffer, so undo
+	// restores the whole authored tier -- provider and decorators included -- by restoring this pointer.
 	InlinePayload = nullptr;
-	InlineSnapProvider = nullptr;
-	InlineDecorators.Reset();
 
 	RefreshSketchVisual();
 	PostEditChange();

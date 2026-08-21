@@ -64,6 +64,12 @@ UObject* FPCGExSketchComponentEditTarget::GetTransactionObject()
 	return Component.Get();
 }
 
+UObject* FPCGExSketchComponentEditTarget::GetDetailsObject()
+{
+	const UPCGExClusterSketchComponent* Pinned = Component.Get();
+	return Pinned ? Pinned->InlinePayload.Get() : nullptr;
+}
+
 FTransform FPCGExSketchComponentEditTarget::GetLocalToWorld() const
 {
 	const UPCGExClusterSketchComponent* Pinned = Component.Get();

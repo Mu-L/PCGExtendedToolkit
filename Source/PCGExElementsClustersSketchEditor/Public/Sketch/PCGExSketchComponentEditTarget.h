@@ -31,6 +31,7 @@ public:
 	virtual void BeginAuthoring() override;
 	virtual FText GetReadOnlyReason() const override;
 	virtual UObject* GetTransactionObject() override;
+	virtual UObject* GetDetailsObject() override;
 	/** The component transform IS the sketch frame, so rays convert into model space through it. */
 	virtual FTransform GetLocalToWorld() const override;
 	virtual void NotifyChanged() override;
