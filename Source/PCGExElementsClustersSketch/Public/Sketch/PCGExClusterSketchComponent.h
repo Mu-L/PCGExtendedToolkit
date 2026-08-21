@@ -149,6 +149,8 @@ class PCGEXELEMENTSCLUSTERSSKETCH_API UPCGExClusterSketchPayload : public UObjec
 	GENERATED_BODY()
 
 public:
+	UPCGExClusterSketchPayload();
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ShowOnlyInnerProperties))
 	FPCGExClusterSketchModel Model;
 };
@@ -162,30 +164,37 @@ class PCGEXELEMENTSCLUSTERSSKETCH_API UPCGExClusterSketchComponent : public UPri
 public:
 	UPCGExClusterSketchComponent();
 
-	/** When set, this component INSTANCES the asset: its payload replaces the inline one wholesale. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cluster Sketch")
+	virtual void PostLoad() override;
+
+	/**
+	 * This instance's own pick, which nothing else can take away. EditInstanceOnly keeps a template's copy
+	 * permanently null, so an instance holding an asset always differs from its archetype -- and an
+	 * override that differs is one the archetype system records, propagates past, and rebuilds from.
+	 * None follows Default Sketch Asset; for an explicitly empty sketch use Create Inline Sketch.
+	 */
+	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Cluster Sketch")
 	TObjectPtr<UPCGExClusterSketch> SketchAsset;
 
-	/** Always present; a template's stays empty, since inline authoring is instance-only. */
-	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
+	/** What instances that made no pick of their own fall back to. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Cluster Sketch")
+	TObjectPtr<UPCGExClusterSketch> DefaultSketchAsset;
+
+	/**
+	 * This instance's authored sketch, created on demand by Create Inline Sketch. Its EXISTENCE is the
+	 * override signal -- while it is set, both asset properties are ignored entirely. NoClear because
+	 * lifetime belongs to the two buttons: nulling it from the combo would orphan authored data with no
+	 * transaction to undo.
+	 */
+	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (NoClear, NoResetToDefault))
 	TObjectPtr<UPCGExClusterSketchPayload> InlinePayload;
 
 	/** Snap-lattice model the inline sketch is authored against. None = free-form. */
-	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
+	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr && DefaultSketchAsset == nullptr"))
 	TObjectPtr<UPCGExClusterSnapProvider> InlineSnapProvider;
 
 	/** Print-time attribute decorators for the inline sketch, run in order. */
-	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
+	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr && DefaultSketchAsset == nullptr"))
 	TArray<TObjectPtr<UPCGExClusterSketchDecorator>> InlineDecorators;
-
-	/** Set once this instance authored its own sketch; gates the instance-data restore, exactly as
-	 *  USplineComponent::bSplineHasBeenEdited does. NOT a propagation veto -- no such hook exists. */
-	UPROPERTY(VisibleInstanceOnly, Category = "Cluster Sketch")
-	bool bSketchHasBeenEdited = false;
-
-	/** The source this instance chose -- restored after reconstruction, since propagation writes SketchAsset. */
-	UPROPERTY(VisibleInstanceOnly, Category = "Cluster Sketch")
-	TObjectPtr<UPCGExClusterSketch> AuthoredSketchAsset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cluster Sketch|Display")
 	bool bShowSketch = true;
@@ -208,13 +217,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cluster Sketch|Display", meta = (EditCondition = "bOverrideColors"))
 	FLinearColor EdgeColor = FLinearColor(0.55f, 0.55f, 0.6f);
 
-	bool IsUsingAsset() const { return SketchAsset != nullptr; }
+	bool HasInlineSketch() const { return InlinePayload != nullptr; }
 
-	/** THE write path for SketchAsset: on an instance it also records the choice, so a later template
-	 *  edit is repaired rather than obeyed. Assigning the property directly bypasses that. */
+	/** THE source in force, or null when this instance authored its own: payload, then own pick, then default. */
+	UPCGExClusterSketch* ResolveSketchAsset() const
+	{
+		if (InlinePayload) { return nullptr; }
+		return SketchAsset ? SketchAsset.Get() : DefaultSketchAsset.Get();
+	}
+
+	bool IsUsingAsset() const { return ResolveSketchAsset() != nullptr; }
+
+	/** THE write path for this instance's pick -- transacted. */
 	void SetSketchAsset(UPCGExClusterSketch* InAsset);
 
-	/** The payload in force -- the asset's when one is referenced, the inline one otherwise. */
+	/** The model in force: the inline payload's, else the asset's, else a shared empty one -- an
+	 *  unconfigured component draws and prints nothing rather than forcing 41 call sites to null-check. */
 	const FPCGExClusterSketchModel& GetModel() const;
 	const UPCGExClusterSnapProvider* GetSnapProvider() const;
 	TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>> GetDecorators() const;
@@ -290,22 +308,21 @@ public:
 
 	/**
 	 * Save the payload IN FORCE as a NEW Cluster Sketch asset (standard save dialog) and reference it.
-	 * The round trip to "Inline Sketch Asset": externalize a sketch authored in the level, or fork the
+	 * The round trip to "Create Inline Sketch": externalize a sketch authored in the level, or fork the
 	 * referenced one. Instanced subobjects are duplicated into the asset, never shared with this
 	 * component. No-op if the user cancels.
 	 */
 	UFUNCTION(CallInEditor, Category = "Cluster Sketch", DisplayName = "Save To Asset")
 	void SaveToAsset();
 
-	/** Record this instance's CURRENT source as its own choice. Must re-record on every authoring event:
-	 *  the mirror tracks the latest choice, not the first, or a later pick is repaired away. */
-	void EDITOR_RecordSketchSource();
+	/** Author on this instance: mints the payload, seeded from the asset in force so the visible sketch is
+	 *  what you start editing. Refuses if a payload already exists. */
+	UFUNCTION(CallInEditor, Category = "Cluster Sketch", DisplayName = "Create Inline Sketch")
+	void CreateInlineSketch();
 
-
-	/** Copy the referenced asset's payload inline and clear the reference -- the way to start diverging
-	 *  from a shared sketch without touching it. */
-	UFUNCTION(CallInEditor, Category = "Cluster Sketch", DisplayName = "Inline Sketch Asset")
-	void InlineSketchAsset();
+	/** Drop this instance's inline sketch and follow the asset again. Transacted; undo restores it. */
+	UFUNCTION(CallInEditor, Category = "Cluster Sketch", DisplayName = "Delete Inline Sketch")
+	void DeleteInlineSketch();
 #endif
 
 private:

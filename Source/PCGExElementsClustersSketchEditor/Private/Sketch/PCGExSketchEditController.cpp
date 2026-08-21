@@ -37,6 +37,11 @@ FPCGExSketchAssetEditTarget::FPCGExSketchAssetEditTarget(UPCGExClusterSketch* In
 {
 }
 
+FText IPCGExSketchEditTarget::GetReadOnlyReason() const
+{
+	return NSLOCTEXT("PCGExSketchEditTarget", "ReadOnlyGeneric", "Read-only: this host does not author its own sketch.");
+}
+
 void IPCGExSketchEditTarget::BeginAuthoring()
 {
 	if (UObject* Host = GetTransactionObject()) { Host->Modify(); }

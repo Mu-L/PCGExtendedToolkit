@@ -28,8 +28,9 @@ public:
 	virtual const FPCGExClusterSketchModel* GetModel() const override;
 	virtual const UPCGExClusterSnapProvider* GetSnapProvider() const override;
 	virtual bool CanEdit() const override;
-	virtual UObject* GetTransactionObject() override;
 	virtual void BeginAuthoring() override;
+	virtual FText GetReadOnlyReason() const override;
+	virtual UObject* GetTransactionObject() override;
 	/** The component transform IS the sketch frame, so rays convert into model space through it. */
 	virtual FTransform GetLocalToWorld() const override;
 	virtual void NotifyChanged() override;

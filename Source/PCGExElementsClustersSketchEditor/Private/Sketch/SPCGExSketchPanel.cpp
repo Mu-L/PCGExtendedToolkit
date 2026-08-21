@@ -312,7 +312,11 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSelectionPage()
 			SNew(STextBlock)
 			.AutoWrapText(true)
 			.ColorAndOpacity(FStyleColors::Warning)
-			.Text(LOCTEXT("ReadOnlyHost", "Read-only: this host does not author its own sketch."))
+			.Text_Lambda([this]()
+			{
+				const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
+				return Controller ? Controller->GetTarget().GetReadOnlyReason() : FText::GetEmpty();
+			})
 			.Visibility_Lambda([this]() { return (ActiveController() && !IsEditingEnabled()) ? EVisibility::Visible : EVisibility::Collapsed; })
 		]
 

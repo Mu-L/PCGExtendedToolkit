@@ -18,14 +18,6 @@ FPCGExClusterSketchModel* FPCGExSketchComponentEditTarget::GetModel()
 	return Pinned ? Pinned->GetMutableModel() : nullptr;
 }
 
-void FPCGExSketchComponentEditTarget::BeginAuthoring()
-{
-	IPCGExSketchEditTarget::BeginAuthoring();
-	// Inline authoring chooses "no asset", which is indistinguishable from the template default until
-	// it is written down.
-	if (UPCGExClusterSketchComponent* Pinned = Component.Get()) { Pinned->EDITOR_RecordSketchSource(); }
-}
-
 const FPCGExClusterSketchModel* FPCGExSketchComponentEditTarget::GetModel() const
 {
 	const UPCGExClusterSketchComponent* Pinned = Component.Get();
@@ -40,9 +32,31 @@ const UPCGExClusterSnapProvider* FPCGExSketchComponentEditTarget::GetSnapProvide
 
 bool FPCGExSketchComponentEditTarget::CanEdit() const
 {
-	// Referencing an asset makes the component read-only; the inline payload stays inspectable.
+	// Matches GetMutableModel: an asset is shared topology, and with no override there is nothing to write.
 	const UPCGExClusterSketchComponent* Pinned = Component.Get();
-	return Pinned && !Pinned->IsUsingAsset();
+	return Pinned && Pinned->HasInlineSketch();
+}
+
+void FPCGExSketchComponentEditTarget::BeginAuthoring()
+{
+	IPCGExSketchEditTarget::BeginAuthoring();
+
+	// The model lives in the payload, a SEPARATE UObject: Modify()ing the component records only a
+	// reference to it, so without this every undo restores the payload as it was at creation -- empty.
+	if (const UPCGExClusterSketchComponent* Pinned = Component.Get())
+	{
+		if (UPCGExClusterSketchPayload* Payload = Pinned->InlinePayload) { Payload->Modify(); }
+	}
+}
+
+FText FPCGExSketchComponentEditTarget::GetReadOnlyReason() const
+{
+	const UPCGExClusterSketchComponent* Pinned = Component.Get();
+	if (Pinned && Pinned->IsUsingAsset())
+	{
+		return NSLOCTEXT("PCGExSketchEditTarget", "ReadOnlyAsset", "Read-only: this component instances a Cluster Sketch asset. Edit the asset, or use Create Inline Sketch to fork it onto this instance.");
+	}
+	return NSLOCTEXT("PCGExSketchEditTarget", "ReadOnlyNoInline", "This component has no inline sketch. Use Create Inline Sketch on the component to author one.");
 }
 
 UObject* FPCGExSketchComponentEditTarget::GetTransactionObject()

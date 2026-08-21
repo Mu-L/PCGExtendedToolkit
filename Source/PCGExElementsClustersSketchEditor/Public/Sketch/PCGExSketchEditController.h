@@ -30,6 +30,9 @@ public:
 	 *  (a component instancing an asset -- alive, inspectable, never authored through) with "host died". */
 	virtual bool CanEdit() const = 0;
 
+	/** Why CanEdit() is false, for the panel's banner. Only reached when it IS false. */
+	virtual FText GetReadOnlyReason() const;
+
 	/** The object Modify() is called on inside every transaction (the asset / the component). */
 	virtual UObject* GetTransactionObject() = 0;
 
