@@ -3,6 +3,8 @@
 
 #include "Elements/PCGExGetSketchData.h"
 
+#include "Containers/PCGExManagedObjects.h"
+
 #include "GameFramework/Actor.h"
 #include "Clusters/PCGExClusterCommon.h"
 #include "Data/PCGBasePointData.h" // PCGPointDataConstants::ActorReferenceAttribute
@@ -35,6 +37,7 @@ namespace PCGExGetSketchData
 		FPCGExGetSketchDataContext::FSketchSource& Source = Context->Sources.AddDefaulted_GetRef();
 
 		Source.Model = Component->GetModel(); // copied: the print runs off-thread
+
 		Source.bHasBasis = Component->BuildBasis(Source.Basis);
 		Source.Decorators.Append(Component->GetDecorators());
 		Source.LocalToWorld = Component->GetComponentTransform();

@@ -116,28 +116,19 @@ void FPCGExSketchDataLayer::EDITOR_SyncRecordsToSchema()
 
 #pragma endregion
 
-#pragma region UPCGExSketchData
+#pragma region FPCGExSketchData
 
-void UPCGExSketchData::PostLoad()
+int32 FPCGExSketchData::RepairRecordIds()
 {
-	Super::PostLoad();
-	VertexLayer.RepairRecordIds();
-	EdgeLayer.RepairRecordIds();
+	return VertexLayer.RepairRecordIds() + EdgeLayer.RepairRecordIds();
 }
 
 #if WITH_EDITOR
-void UPCGExSketchData::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-	EDITOR_SyncAll();
-}
-
-void UPCGExSketchData::EDITOR_SyncAll()
+void FPCGExSketchData::EDITOR_SyncAll()
 {
 	// Repair before syncing: only the first holder of an id is addressable, so a duplicate must be
 	// resolved before anything resolves against it.
-	VertexLayer.RepairRecordIds();
-	EdgeLayer.RepairRecordIds();
+	RepairRecordIds();
 
 	SketchProperties.SyncAllSchemas();
 	SketchProperties.ReconcileImportOverrides();

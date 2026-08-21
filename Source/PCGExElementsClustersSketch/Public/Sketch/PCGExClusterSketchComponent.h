@@ -133,6 +133,26 @@ struct FPCGExClusterSketchEditState
  * The component transform is the sketch's model->world frame, so a printed cluster lands where the
  * component sits -- and the visual rides that transform live.
  */
+/**
+ * The whole inline payload of a sketch component, in one instanced subobject.
+ *
+ * Instanced is what makes it survive: a construction script rebuild delta-serializes the component and
+ * drops every property lacking CPF_Edit at any nesting depth, which silently erases bare members like
+ * FPCGExClusterSketchVertex::DataId. An instanced subobject is duplicated whole instead, so everything
+ * inside it survives regardless of specifiers -- including anything added later.
+ *
+ * Therefore: every authored field belongs in here. Nothing authored belongs on the component itself.
+ */
+UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced, CollapseCategories)
+class PCGEXELEMENTSCLUSTERSSKETCH_API UPCGExClusterSketchPayload : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ShowOnlyInnerProperties))
+	FPCGExClusterSketchModel Model;
+};
+
 UCLASS(BlueprintType, ClassGroup = (PCGEx), meta = (BlueprintSpawnableComponent, DisplayName = "PCGEx Cluster Sketch"),
 	HideCategories = (Physics, Collision, Lighting, Rendering, Tags, Activation, Cooking, AssetUserData, Navigation, Mobility, LOD, HLOD))
 class PCGEXELEMENTSCLUSTERSSKETCH_API UPCGExClusterSketchComponent : public UPrimitiveComponent
@@ -146,16 +166,26 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cluster Sketch")
 	TObjectPtr<UPCGExClusterSketch> SketchAsset;
 
-	UPROPERTY(EditAnywhere, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
-	FPCGExClusterSketchModel InlineModel;
+	/** Always present; a template's stays empty, since inline authoring is instance-only. */
+	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
+	TObjectPtr<UPCGExClusterSketchPayload> InlinePayload;
 
 	/** Snap-lattice model the inline sketch is authored against. None = free-form. */
-	UPROPERTY(EditAnywhere, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
+	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
 	TObjectPtr<UPCGExClusterSnapProvider> InlineSnapProvider;
 
 	/** Print-time attribute decorators for the inline sketch, run in order. */
-	UPROPERTY(EditAnywhere, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
+	UPROPERTY(EditInstanceOnly, Instanced, Category = "Cluster Sketch", meta = (EditCondition = "SketchAsset == nullptr"))
 	TArray<TObjectPtr<UPCGExClusterSketchDecorator>> InlineDecorators;
+
+	/** Set once this instance authored its own sketch; gates the instance-data restore, exactly as
+	 *  USplineComponent::bSplineHasBeenEdited does. NOT a propagation veto -- no such hook exists. */
+	UPROPERTY(VisibleInstanceOnly, Category = "Cluster Sketch")
+	bool bSketchHasBeenEdited = false;
+
+	/** The source this instance chose -- restored after reconstruction, since propagation writes SketchAsset. */
+	UPROPERTY(VisibleInstanceOnly, Category = "Cluster Sketch")
+	TObjectPtr<UPCGExClusterSketch> AuthoredSketchAsset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cluster Sketch|Display")
 	bool bShowSketch = true;
@@ -179,6 +209,10 @@ public:
 	FLinearColor EdgeColor = FLinearColor(0.55f, 0.55f, 0.6f);
 
 	bool IsUsingAsset() const { return SketchAsset != nullptr; }
+
+	/** THE write path for SketchAsset: on an instance it also records the choice, so a later template
+	 *  edit is repaired rather than obeyed. Assigning the property directly bypasses that. */
+	void SetSketchAsset(UPCGExClusterSketch* InAsset);
 
 	/** The payload in force -- the asset's when one is referenced, the inline one otherwise. */
 	const FPCGExClusterSketchModel& GetModel() const;
@@ -231,9 +265,6 @@ public:
 	bool DrawsGhostsAsMesh() const;
 #endif
 
-	/** Repairs the INLINE payload's invalid/duplicate data-record ids (a referenced asset repairs its
-	 *  own). Touches no schema, so it can never reach the editor-only record sync. */
-
 	//~ Begin UPrimitiveComponent
 #if WITH_EDITOR
 	virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
@@ -265,6 +296,11 @@ public:
 	 */
 	UFUNCTION(CallInEditor, Category = "Cluster Sketch", DisplayName = "Save To Asset")
 	void SaveToAsset();
+
+	/** Record this instance's CURRENT source as its own choice. Must re-record on every authoring event:
+	 *  the mirror tracks the latest choice, not the first, or a later pick is repaired away. */
+	void EDITOR_RecordSketchSource();
+
 
 	/** Copy the referenced asset's payload inline and clear the reference -- the way to start diverging
 	 *  from a shared sketch without touching it. */

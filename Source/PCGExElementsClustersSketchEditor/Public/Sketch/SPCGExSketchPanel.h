@@ -114,10 +114,7 @@ private:
 	void RefreshNow(bool bForceReseed);
 	void RebindController();
 	void SeedRecordScope();
-	void SeedDataView();
-	/** False until authoring creates the tier -- the Sketch page offers a create button in that state. */
-	bool HasAuthoredTier() const;
-	FReply OnEnableAuthoredDataClicked();
+	void SeedDataScope();
 	void RefreshValidation();
 
 	//~ Chrome (bound as attributes; never cached)
@@ -138,11 +135,14 @@ private:
 	//~ Write-back (owning FStructOnScope root: the customizations' own owner hooks are skipped, so
 	//~ Modify() / PostEditChange() are hand-wired here)
 	void OnRecordPropertyChanged(const FPropertyChangedEvent& Event);
+	void OnDataPropertyChanged(const FPropertyChangedEvent& Event);
 	void OnObjectTransacted(UObject* Object, const FTransactionObjectEvent& Event);
 	/** The host's own details view reaches the same schemas; a stale scope would revert them. */
 	void OnHostPropertyChanged(UObject* Object, FPropertyChangedEvent& Event);
 	/** Admits only the host's snap-provider and decorator properties, under either host's names. */
 	bool IsHostPropertyVisible(const FPropertyAndParent& PropertyAndParent) const;
+	/** Drops the component's own Transform/Sockets rows, which are custom rows the property filter misses. */
+	bool IsHostCustomRowVisible(FName InRowName, FName InParentName) const;
 
 	//~ Record authoring. By value, not by reference: these are delegate payload targets, and payloads
 	//~ deduce the parameter type from the bound value.
@@ -166,12 +166,13 @@ private:
 	 *  a copy fed to an IStructureDetailsView is the only binding that exists. */
 	TSharedPtr<IStructureDetailsView> RecordDetailsView;
 	TSharedPtr<FStructOnScope> RecordScope;
-	/** Object-rooted: the authored tier is a UObject, so it edits in place with real transactions and
-	 *  reconciles itself through its own PostEditChangeProperty. */
-	TSharedPtr<IDetailsView> DataDetailsView;
 
-	/** Snap provider and decorators live on the HOST, not in the model, and the mode host shows no
-	 *  details view of its own -- without this they would be unreachable while editing in-level. */
+	/** Rooted at the TIER itself, so its three members render flat. A host-rooted view would bury them
+	 *  under the payload/model/data rows that only exist to reach them. */
+	TSharedPtr<IStructureDetailsView> DataDetailsView;
+	TSharedPtr<FStructOnScope> DataScope;
+
+	/** Snap provider and decorators are the only authored things that live ON the host. */
 	TSharedPtr<IDetailsView> HostDetailsView;
 
 	/** Identity the scopes were seeded from -- what RefreshNow compares against. */

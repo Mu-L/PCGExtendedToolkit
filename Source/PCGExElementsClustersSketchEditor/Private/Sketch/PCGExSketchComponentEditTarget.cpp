@@ -12,8 +12,18 @@ FPCGExSketchComponentEditTarget::FPCGExSketchComponentEditTarget(UPCGExClusterSk
 
 FPCGExClusterSketchModel* FPCGExSketchComponentEditTarget::GetModel()
 {
+	// PURE READ. TSharedPtr::operator-> is non-const even on a const pointer, so Slate attributes reach
+	// this overload every prepass -- a side effect here fires on merely displaying the panel.
 	UPCGExClusterSketchComponent* Pinned = Component.Get();
 	return Pinned ? Pinned->GetMutableModel() : nullptr;
+}
+
+void FPCGExSketchComponentEditTarget::BeginAuthoring()
+{
+	IPCGExSketchEditTarget::BeginAuthoring();
+	// Inline authoring chooses "no asset", which is indistinguishable from the template default until
+	// it is written down.
+	if (UPCGExClusterSketchComponent* Pinned = Component.Get()) { Pinned->EDITOR_RecordSketchSource(); }
 }
 
 const FPCGExClusterSketchModel* FPCGExSketchComponentEditTarget::GetModel() const

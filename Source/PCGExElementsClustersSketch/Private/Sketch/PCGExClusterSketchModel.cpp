@@ -871,13 +871,11 @@ void FPCGExClusterSketchModel::Validate(FPCGExClusterSketchValidation& OutSummar
 	TArray<FGuid> LiveEdgeIds;
 	GatherLiveDataIds(LiveVertexIds, LiveEdgeIds);
 
-	if (!Data) { return; }
-
-	ValidateLayerNames(Data->SketchProperties, OutSummary.SketchLayerIssues);
-	ValidateLayerNames(Data->VertexLayer.Schema, OutSummary.VertexLayerIssues);
-	ValidateLayerNames(Data->EdgeLayer.Schema, OutSummary.EdgeLayerIssues);
-	ValidateLayerRecords(Data->VertexLayer, LiveVertexIds, OutSummary.VertexLayerIssues);
-	ValidateLayerRecords(Data->EdgeLayer, LiveEdgeIds, OutSummary.EdgeLayerIssues);
+	ValidateLayerNames(Data.SketchProperties, OutSummary.SketchLayerIssues);
+	ValidateLayerNames(Data.VertexLayer.Schema, OutSummary.VertexLayerIssues);
+	ValidateLayerNames(Data.EdgeLayer.Schema, OutSummary.EdgeLayerIssues);
+	ValidateLayerRecords(Data.VertexLayer, LiveVertexIds, OutSummary.VertexLayerIssues);
+	ValidateLayerRecords(Data.EdgeLayer, LiveEdgeIds, OutSummary.EdgeLayerIssues);
 }
 
 void FPCGExClusterSketchModel::GatherLiveDataIds(TArray<FGuid>& OutVertexIds, TArray<FGuid>& OutEdgeIds) const
@@ -910,20 +908,13 @@ int32 FPCGExClusterSketchModel::CountEdgeReferences(const FGuid& InDataId) const
 	return Count;
 }
 
-UPCGExSketchData* FPCGExClusterSketchModel::GetOrCreateData(UObject* InOuter)
-{
-	if (!Data && InOuter) { Data = NewObject<UPCGExSketchData>(InOuter, NAME_None, RF_Transactional); }
-	return Data;
-}
-
 int32 FPCGExClusterSketchModel::PurgeUnreferencedRecords()
 {
-	if (!Data) { return 0; }
 
 	TArray<FGuid> LiveVertexIds;
 	TArray<FGuid> LiveEdgeIds;
 	GatherLiveDataIds(LiveVertexIds, LiveEdgeIds);
-	return Data->VertexLayer.PurgeUnreferenced(LiveVertexIds) + Data->EdgeLayer.PurgeUnreferenced(LiveEdgeIds);
+	return Data.VertexLayer.PurgeUnreferenced(LiveVertexIds) + Data.EdgeLayer.PurgeUnreferenced(LiveEdgeIds);
 }
 
 #pragma endregion

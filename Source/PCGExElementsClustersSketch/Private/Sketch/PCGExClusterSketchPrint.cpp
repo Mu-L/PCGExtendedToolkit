@@ -252,15 +252,11 @@ namespace PCGExSketch
 			}
 		}
 
-		// Null when nothing is annotated, which is the common case -- the whole tier then costs nothing.
-		const UPCGExSketchData* SketchData = Model.Data;
+		const FPCGExSketchData& SketchData = Model.Data;
 
 		// Built before the compile starts; the edge hook and every decorator only ever read them.
-		if (SketchData)
-		{
-			InPrintContext->VertexDataProvider = MakeShared<FPCGExSketchLayerPropertyProvider>(SketchData->VertexLayer, TConstArrayView<FPCGExClusterSketchVertex>(Model.Vertices));
-			InPrintContext->EdgeDataProvider = MakeShared<FPCGExSketchLayerPropertyProvider>(SketchData->EdgeLayer, TConstArrayView<FPCGExClusterSketchEdge>(Model.Edges));
-		}
+		InPrintContext->VertexDataProvider = MakeShared<FPCGExSketchLayerPropertyProvider>(SketchData.VertexLayer, TConstArrayView<FPCGExClusterSketchVertex>(Model.Vertices));
+		InPrintContext->EdgeDataProvider = MakeShared<FPCGExSketchLayerPropertyProvider>(SketchData.EdgeLayer, TConstArrayView<FPCGExClusterSketchEdge>(Model.Edges));
 
 		// --- Vertex-domain writes: authored layer, then decorators, then ONE synchronous commit ---
 		// Point index == model vertex index here. Committing before the compile is MANDATORY: committed
@@ -270,9 +266,8 @@ namespace PCGExSketch
 
 		// Resolved once: Resolve walks the whole import tree and allocates, and @Data is one value per output.
 		TArray<FPCGExPropertyResolved> SketchProperties;
-		if (SketchData)
 		{
-			SketchData->SketchProperties.Resolve(SketchProperties);
+			SketchData.SketchProperties.Resolve(SketchProperties);
 			SketchProperties.RemoveAll([&Validation](const FPCGExPropertyResolved& Entry)
 			{
 				return Validation.SketchLayerIssues.Rejects(Entry.Source->Name);
@@ -280,7 +275,7 @@ namespace PCGExSketch
 			PCGExProperties::WriteResolvedToDataDomain(VtxFacade->GetOut(), SketchProperties);
 
 			TArray<FPCGExPropertyOutputConfig> VertexConfigs;
-			PCGExClusterSketchPrint::BuildLayerConfigs(SketchData->VertexLayer, Validation.VertexLayerIssues, VertexConfigs);
+			PCGExClusterSketchPrint::BuildLayerConfigs(SketchData.VertexLayer, Validation.VertexLayerIssues, VertexConfigs);
 
 			// This phase is serial, so one writer for the whole pass is legal here -- unlike the edge one.
 			FPCGExPropertyWriter Writer;
@@ -321,7 +316,7 @@ namespace PCGExSketch
 		const TSharedPtr<FPCGExClusterSketchPrintContext> PrintContext = InPrintContext;
 		const bool bMirrorSketchProperties = InRequest.bWriteSketchPropertiesToEdges;
 		TArray<FPCGExPropertyOutputConfig> EdgeConfigs;
-		if (SketchData) { PCGExClusterSketchPrint::BuildLayerConfigs(SketchData->EdgeLayer, Validation.EdgeLayerIssues, EdgeConfigs); }
+		{ PCGExClusterSketchPrint::BuildLayerConfigs(SketchData.EdgeLayer, Validation.EdgeLayerIssues, EdgeConfigs); }
 
 		GraphBuilder->OnPreCompile = [PrintContext, EnabledDecorators, EdgeConfigs, bMirrorSketchProperties, SketchProperties](PCGExGraphs::FSubGraphUserContext&, const PCGExGraphs::FSubGraphPreCompileData& Data)
 		{

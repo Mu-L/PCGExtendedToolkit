@@ -33,6 +33,15 @@ public:
 	/** The object Modify() is called on inside every transaction (the asset / the component). */
 	virtual UObject* GetTransactionObject() = 0;
 
+	/**
+	 * Open an authoring edit. Transacts the host AND the authored-tier subobject (which is a separate
+	 * UObject, so a host-only Modify leaves record edits outside the transaction), and lets a host
+	 * record that its content is now its own.
+	 *
+	 * Use this at EVERY mutation site instead of GetTransactionObject()->Modify().
+	 */
+	virtual void BeginAuthoring();
+
 	/** Model space -> world. Identity for the asset editor; a component host returns its transform. */
 	virtual FTransform GetLocalToWorld() const = 0;
 
@@ -119,8 +128,8 @@ public:
 	 *  @return true if one was materialized. */
 	bool MaterializeCrossingAtRay(const FRay& WorldRay);
 
-	//~ Authored-data cleanup, shared by both hosts' panels. Each is one transaction on the target, so a
-	//~ controller with no asset gets them too -- the asset's CallInEditor twins reach only the asset.
+	//~ Authored-data cleanup, and the ONLY entry point for it. Each is one transaction on the target, so
+	//~ a component's inline sketch gets them exactly as an asset does.
 	/** Merge every vertex resolving onto an already-occupied printed location. @return merges performed. */
 	int32 MergeCollocatedVertices();
 	/** Drop out-of-range, self-loop and duplicate edges. @return edges removed. */

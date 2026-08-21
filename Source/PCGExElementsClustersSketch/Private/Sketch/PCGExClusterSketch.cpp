@@ -5,11 +5,6 @@
 
 #include "Sketch/PCGExClusterSketchPrint.h"
 
-#if WITH_EDITOR
-#include "ScopedTransaction.h"
-#include "Helpers/PCGExObjectNotifyHelpers.h"
-#endif
-
 namespace PCGExSketch
 {
 	FSaveSketchAsAssetFn GSaveSketchAsAssetFn;
@@ -87,7 +82,7 @@ void UPCGExClusterSketch::PostEditChangeProperty(FPropertyChangedEvent& Property
 		// A schema edit arrives as a Model change like any other -- MemberProperty is always the object's
 		// own member -- so the gate is deliberately coarse. Idempotent, and reachable only from an editor
 		// edit hook (here, or the panel's transacted write-back).
-		if (Model.Data) { Model.Data->EDITOR_SyncAll(); }
+		Model.Data.EDITOR_SyncAll();
 	}
 }
 
@@ -116,51 +111,5 @@ void UPCGExClusterSketch::EDITOR_SyncBoundVertices(const bool bResnapFromLocatio
 		return;
 	}
 	Model.SyncBoundVertices(Basis, bResnapFromLocation);
-}
-
-void UPCGExClusterSketch::MergeCollocatedVertices()
-{
-	FPCGExLatticeBasis Basis;
-	const bool bHasBasis = BuildBasis(Basis);
-
-	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "MergeCollocated", "Merge Collocated Sketch Vertices"));
-	Modify();
-	Model.MergeCollocatedVertices(bHasBasis ? &Basis : nullptr);
-	PostEditChange();
-	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
-	PCGExEditor::NotifyObjectChanged(this);
-}
-
-void UPCGExClusterSketch::RemoveInvalidEdges()
-{
-	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "RemoveInvalidEdges", "Remove Invalid Sketch Edges"));
-	Modify();
-	Model.RemoveInvalidEdges();
-	PostEditChange();
-	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
-	PCGExEditor::NotifyObjectChanged(this);
-}
-
-void UPCGExClusterSketch::SplitOverlappingEdges()
-{
-	FPCGExLatticeBasis Basis;
-	const bool bHasBasis = BuildBasis(Basis);
-
-	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "SplitOverlappingEdges", "Split Overlapping Sketch Edges"));
-	Modify();
-	Model.SplitOverlappingEdges(bHasBasis ? &Basis : nullptr);
-	PostEditChange();
-	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
-	PCGExEditor::NotifyObjectChanged(this);
-}
-
-void UPCGExClusterSketch::PurgeUnusedDataRecords()
-{
-	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketch", "PurgeUnusedDataRecords", "Purge Unused Sketch Data Records"));
-	Modify();
-	Model.PurgeUnreferencedRecords();
-	PostEditChange();
-	// Programmatic mutation: nothing else broadcasts the pair PCG asset trackers listen to.
-	PCGExEditor::NotifyObjectChanged(this);
 }
 #endif

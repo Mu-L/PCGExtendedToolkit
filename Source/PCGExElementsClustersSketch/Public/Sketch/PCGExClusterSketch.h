@@ -103,9 +103,6 @@ public:
 		bool bQuiet = false,
 		TFunction<void(const TSharedRef<PCGExGraphs::FGraphBuilder>&, bool)> OnCompiled = nullptr) const;
 
-	/** Repairs invalid/duplicate data-record ids, which load and asset duplication both produce. Runtime
-	 *  safe by construction: it touches no schema, so it can never reach the editor-only record sync. */
-
 #if WITH_EDITOR
 	/**
 	 * Coord/position coherence (the sketch's one editing rule): a bound vertex's location is derived from
@@ -127,36 +124,5 @@ public:
 
 	/** See PostEditChangeProperty. No-op without a usable basis. */
 	void EDITOR_SyncBoundVertices(bool bResnapFromLocation);
-
-	/**
-	 * Merge every vertex that RESOLVES to an already-occupied printed location (duplicate coords,
-	 * overlapping free positions, or a rank-collapsed snap basis projecting distinct coords together)
-	 * into the earliest vertex there. Explicit and undoable -- printing warns but never does this.
-	 */
-	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Merge Collocated Vertices")
-	void MergeCollocatedVertices();
-
-	/**
-	 * Drop structurally invalid edges: out-of-range endpoints (DORMANT edges -- invisible until the
-	 * vertex array grows past their indices, then they materialize as "random" edges), self-loops, and
-	 * duplicates. The editor draws dormant edges as warning stubs; this removes them, undoably.
-	 */
-	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Remove Invalid Edges")
-	void RemoveInvalidEdges();
-
-	/**
-	 * Resolve every edge overlap, undoably: an edge passing through a vertex splits into the chain
-	 * between them (collinear A-B-C carries A-B + B-C, never A-C), and two crossing edges gain a
-	 * side-effect vertex at the crossing and split through it. Both run to a fixed point.
-	 */
-	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Split Overlapping Edges")
-	void SplitOverlappingEdges();
-
-	/**
-	 * Drop every data record no vertex or edge still references. Explicit and undoable -- a purge on save
-	 * would be untransacted, letting delete-vertex -> save -> undo resurrect a dangling reference.
-	 */
-	UFUNCTION(CallInEditor, Category = Settings, DisplayName = "Purge Unused Data Records")
-	void PurgeUnusedDataRecords();
 #endif
 };

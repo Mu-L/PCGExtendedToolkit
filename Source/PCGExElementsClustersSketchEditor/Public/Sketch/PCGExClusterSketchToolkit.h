@@ -40,6 +40,8 @@ public:
 	virtual void CreateWidgets() override;
 	virtual void CreateEditorModeManager() override;
 	virtual TSharedPtr<FEditorViewportClient> CreateEditorViewportClient() const override;
+	/** No-op: the panel is the details surface, so the base's DetailsView is never shown or populated. */
+	virtual void SetEditingObject(UObject* InObject) override;
 
 	TSharedPtr<FPCGExSketchEditController> GetController() const { return Controller; }
 

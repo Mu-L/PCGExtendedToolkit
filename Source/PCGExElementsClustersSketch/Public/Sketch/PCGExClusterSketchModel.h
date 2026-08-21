@@ -126,10 +126,10 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchModel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	TArray<FPCGExClusterSketchEdge> Edges;
 
-	/** The authored tier, or null when nothing is annotated -- which costs no storage and is the common
-	 *  case. Instanced: see UPCGExSketchData for why a subobject rather than a struct member. */
-	UPROPERTY(EditAnywhere, Instanced, BlueprintReadWrite, Category = Settings)
-	TObjectPtr<UPCGExSketchData> Data;
+	/** The authored tier. Travels with the payload through Save As Asset / Inline Sketch Asset, and the
+	 *  two sharing rules (merge-inherit, split-share) sit next to the mutations that apply them. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ShowOnlyInnerProperties))
+	FPCGExSketchData Data;
 
 	int32 NumVertices() const { return Vertices.Num(); }
 	int32 NumEdges() const { return Edges.Num(); }
@@ -287,10 +287,6 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchModel
 	 * @return chain splits plus crossing vertices inserted.
 	 */
 	int32 SplitOverlappingEdges(const FPCGExLatticeBasis* Basis);
-
-	/** The authored tier, created under InOuter on first use. AUTHORING only: the print path reads Data
-	 *  directly and treats null as "nothing annotated". */
-	UPCGExSketchData* GetOrCreateData(UObject* InOuter);
 
 	/** Every record id the model currently references, per domain -- including duplicates, so a caller
 	 *  can count shares. Invalid ids are skipped. */

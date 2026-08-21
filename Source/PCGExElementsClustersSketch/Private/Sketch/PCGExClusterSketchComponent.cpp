@@ -3,6 +3,7 @@
 
 #include "Sketch/PCGExClusterSketchComponent.h"
 
+#include "PCGExLog.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
@@ -99,11 +100,15 @@ UPCGExClusterSketchComponent::UPCGExClusterSketchComponent()
 	SetGenerateOverlapEvents(false);
 	bHiddenInGame = true; // authoring aid, not gameplay geometry
 	CastShadow = false;
+
+	// A default subobject, so the payload is never null and no call site needs a guard. Each component
+	// instance gets its own copy; a template's stays empty because inline authoring is instance-only.
+	InlinePayload = CreateDefaultSubobject<UPCGExClusterSketchPayload>(TEXT("InlinePayload"));
 }
 
 const FPCGExClusterSketchModel& UPCGExClusterSketchComponent::GetModel() const
 {
-	return SketchAsset ? SketchAsset->Model : InlineModel;
+	return SketchAsset ? SketchAsset->Model : InlinePayload->Model;
 }
 
 const UPCGExClusterSnapProvider* UPCGExClusterSketchComponent::GetSnapProvider() const
@@ -122,11 +127,24 @@ TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>> UPCGExClusterSketchCom
 	return TConstArrayView<TObjectPtr<UPCGExClusterSketchDecorator>>(InlineDecorators);
 }
 
+void UPCGExClusterSketchComponent::SetSketchAsset(UPCGExClusterSketch* InAsset)
+{
+	Modify();
+	SketchAsset = InAsset;
+
+	// A template's value IS the default, so only an instance can be said to diverge from one.
+	if (!IsTemplate())
+	{
+		bSketchHasBeenEdited = true;
+		AuthoredSketchAsset = InAsset;
+	}
+}
+
 FPCGExClusterSketchModel* UPCGExClusterSketchComponent::GetMutableModel()
 {
 	// Read-only while an asset drives this component: authoring here would rewrite topology shared by
 	// every other instance referencing it. Inline the asset first.
-	return SketchAsset ? nullptr : &InlineModel;
+	return SketchAsset ? nullptr : &InlinePayload->Model;
 }
 
 bool UPCGExClusterSketchComponent::BuildBasis(FPCGExLatticeBasis& OutBasis) const
@@ -796,24 +814,31 @@ void UPCGExClusterSketchComponent::PostEditChangeProperty(FPropertyChangedEvent&
 
 	const FName MemberName = PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
 
-	if (MemberName == GET_MEMBER_NAME_CHECKED(UPCGExClusterSketchComponent, InlineModel))
+	if (MemberName == GET_MEMBER_NAME_CHECKED(UPCGExClusterSketchComponent, SketchAsset))
 	{
+		EDITOR_RecordSketchSource();
+	}
+
+	if (MemberName == GET_MEMBER_NAME_CHECKED(UPCGExClusterSketchComponent, InlinePayload))
+	{
+		EDITOR_RecordSketchSource();
+
 		// Hand-editing a vertex adopts it, and the coord/location pair must stay coherent -- the same
 		// rule the asset host applies, or a typed-in location on a bound vertex is silently dead data.
 		const int32 EditedVertex = PropertyChangedEvent.GetArrayIndex(GET_MEMBER_NAME_STRING_CHECKED(FPCGExClusterSketchModel, Vertices));
 		if (EditedVertex != INDEX_NONE)
 		{
-			InlineModel.MarkVertexAuthored(EditedVertex);
+			InlinePayload->Model.MarkVertexAuthored(EditedVertex);
 		}
 
 		const FName LeafName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 		const bool bCoordEdit = LeafName == GET_MEMBER_NAME_CHECKED(FPCGExClusterSketchVertex, LatticeCoord);
 		EDITOR_SyncBoundVertices(!bCoordEdit);
 
-		// A schema edit arrives as an InlineModel change like any other -- MemberProperty is always the
+		// A schema edit arrives as an InlinePayload change like any other -- MemberProperty is always the
 		// object's own member -- so the gate is deliberately coarse. Idempotent, and reachable only from
 		// an editor edit hook (here, or the panel's transacted write-back).
-		if (InlineModel.Data) { InlineModel.Data->EDITOR_SyncAll(); }
+		InlinePayload->Model.Data.EDITOR_SyncAll();
 	}
 
 	// Any property here can move the drawing: payload, override, provider params, display settings.
@@ -851,6 +876,18 @@ void UPCGExClusterSketchComponent::EDITOR_SyncBoundVertices(const bool bResnapFr
 	Mutable->SyncBoundVertices(Basis, bResnapFromLocation);
 }
 
+void UPCGExClusterSketchComponent::EDITOR_RecordSketchSource()
+{
+	// A template's value IS the default, so only an instance can diverge from one.
+	if (IsTemplate()) { return; }
+	if (bSketchHasBeenEdited && AuthoredSketchAsset == SketchAsset) { return; }
+
+	Modify();
+	bSketchHasBeenEdited = true;
+	AuthoredSketchAsset = SketchAsset;
+}
+
+
 void UPCGExClusterSketchComponent::InlineSketchAsset()
 {
 	if (!SketchAsset)
@@ -858,16 +895,23 @@ void UPCGExClusterSketchComponent::InlineSketchAsset()
 		return;
 	}
 
+	// The inline payload is hidden behind the reference, not gone -- overwriting it here would destroy
+	// authored work invisibly. Clearing the asset reveals it, which is the way out of this state.
+	const FPCGExClusterSketchModel& Payload = InlinePayload->Model;
+	if (!Payload.Vertices.IsEmpty() || !Payload.Edges.IsEmpty())
+	{
+		UE_LOG(LogPCGEx, Warning,
+		       TEXT("Inline Sketch Asset refused on %s: this component already holds an inline sketch. Clear Sketch Asset to reveal it."),
+		       *GetPathName());
+		return;
+	}
+
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "InlineSketchAsset", "Inline Cluster Sketch Asset"));
 	Modify();
 
-	InlineModel = SketchAsset->Model;
+	InlinePayload->Model = SketchAsset->Model;
 
 	// Instanced subobjects must be OURS, not shared with the asset -- duplicate rather than assign.
-	// The struct copy above carried Data as a POINTER, so without this both hosts write one object.
-	InlineModel.Data = SketchAsset->Model.Data
-		                   ? DuplicateObject<UPCGExSketchData>(SketchAsset->Model.Data, this)
-		                   : nullptr;
 	InlineSnapProvider = SketchAsset->SnapProvider
 		                     ? DuplicateObject<UPCGExClusterSnapProvider>(SketchAsset->SnapProvider, this)
 		                     : nullptr;
@@ -878,7 +922,7 @@ void UPCGExClusterSketchComponent::InlineSketchAsset()
 		InlineDecorators.Add(Decorator ? DuplicateObject<UPCGExClusterSketchDecorator>(Decorator, this) : nullptr);
 	}
 
-	SketchAsset = nullptr;
+	SetSketchAsset(nullptr);
 
 	RefreshSketchVisual();
 	PostEditChange();
@@ -908,11 +952,11 @@ void UPCGExClusterSketchComponent::SaveToAsset()
 	// Referencing the new asset AFTER it is filled: the component becomes an instance of what it just
 	// externalized, and its inline payload is preserved (read-only) behind the reference.
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "SaveToAsset", "Save Cluster Sketch To Asset"));
-	Modify();
-	SketchAsset = NewAsset;
+	SetSketchAsset(NewAsset);
 
 	RefreshSketchVisual();
 	PostEditChange();
 	PCGExEditor::NotifyObjectChanged(this);
 }
 #endif
+

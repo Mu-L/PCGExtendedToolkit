@@ -102,20 +102,17 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExSketchDataLayer
 /**
  * The authored tier of a sketch: what may be annotated, and the sparse annotations themselves.
  *
- * A UObject rather than a struct member, because that is what survives component reinstancing: the
- * per-instance delta path drops every property lacking CPF_Edit at any nesting depth
- * (FDataCachePropertyWriter::ShouldSkipProperty), which would silently erase Records and every DataId
- * referencing them. An instanced subobject is preserved by full duplication instead, which consults no
- * such flag -- the same reason the sketch component's other inline payloads are instanced.
+ * A plain struct. It lives inside FPCGExClusterSketchModel, which on a component lives inside ONE
+ * instanced payload object -- that object is duplicated wholesale across reconstruction, so every
+ * field in here survives regardless of its specifiers. Nothing here needs CPF_Edit to be preserved.
  *
  * Sketch level carries no records -- there is exactly one sketch, so the schema entries ARE the values.
  */
-UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced, CollapseCategories)
-class PCGEXELEMENTSCLUSTERSSKETCH_API UPCGExSketchData : public UObject
+USTRUCT(BlueprintType)
+struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExSketchData
 {
 	GENERATED_BODY()
 
-public:
 	/** Printed to the @Data domain of the vtx output (and mirrored onto edges). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	FPCGExPropertySchemaCollection SketchProperties;
@@ -129,15 +126,9 @@ public:
 	FPCGExSketchDataLayer& GetLayer(const bool bVertexDomain) { return bVertexDomain ? VertexLayer : EdgeLayer; }
 	const FPCGExSketchDataLayer& GetLayer(const bool bVertexDomain) const { return bVertexDomain ? VertexLayer : EdgeLayer; }
 
-	//~ Begin UObject
 	/** Only the first holder of a record id is addressable, so duplicates are resolved before anything
-	 *  resolves against them. Deliberately not a schema sync -- that one is editor-only. */
-	virtual void PostLoad() override;
-#if WITH_EDITOR
-	/** The tier owns its own reconciliation, so every host that shows it gets the sync for free. */
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif
-	//~ End UObject
+	 *  resolves against them. Safe at runtime -- touches no schema. */
+	int32 RepairRecordIds();
 
 #if WITH_EDITOR
 	/** Repair ids, then bring both layers' records back into parallel structure with their schemas.

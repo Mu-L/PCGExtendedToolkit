@@ -37,6 +37,11 @@ FPCGExSketchAssetEditTarget::FPCGExSketchAssetEditTarget(UPCGExClusterSketch* In
 {
 }
 
+void IPCGExSketchEditTarget::BeginAuthoring()
+{
+	if (UObject* Host = GetTransactionObject()) { Host->Modify(); }
+}
+
 FPCGExClusterSketchModel* FPCGExSketchAssetEditTarget::GetModel()
 {
 	UPCGExClusterSketch* Pinned = Sketch.Get();
@@ -353,10 +358,7 @@ void FPCGExSketchEditController::BeginDrag(const FRay& WorldRay, const bool bCon
 		// spans the whole drag; Modify() snapshots the pre-drag state exactly once.
 		DragPlaneNormal = -LocalRay.Direction;
 		ActiveTransaction = MakeUnique<FScopedTransaction>(LOCTEXT("MoveVertex", "Move Sketch Vertex"));
-		if (UObject* TransactionObject = Target->GetTransactionObject())
-		{
-			TransactionObject->Modify();
-		}
+		Target->BeginAuthoring();
 		if (!SelectedVertices.Contains(DragVertexIndex))
 		{
 			ClearSelection();
@@ -517,10 +519,7 @@ void FPCGExSketchEditController::EndDrag(const FRay& WorldRay)
 			if (ExistingTarget != INDEX_NONE && Model->Vertices.IsValidIndex(ExistingTarget))
 			{
 				const FScopedTransaction Transaction(LOCTEXT("ConnectVertices", "Connect Sketch Vertices"));
-				if (UObject* TransactionObject = Target->GetTransactionObject())
-				{
-					TransactionObject->Modify();
-				}
+				Target->BeginAuthoring();
 				Model->Connect(Source, ExistingTarget);
 				// Deliberately wired by hand -- both ends are now authored.
 				Model->MarkVertexAuthored(Source);
@@ -534,10 +533,7 @@ void FPCGExSketchEditController::EndDrag(const FRay& WorldRay)
 			{
 				// The drafting gesture: release over nothing extrudes a new (snapped) vertex + edge.
 				const FScopedTransaction Transaction(LOCTEXT("ExtrudeVertex", "Extrude Sketch Vertex"));
-				if (UObject* TransactionObject = Target->GetTransactionObject())
-				{
-					TransactionObject->Modify();
-				}
+				Target->BeginAuthoring();
 				if (bSnapEnabled && bHasBasis)
 				{
 					// Inherit the source's unspanned components: extruding in a rank-collapsed basis
@@ -609,10 +605,7 @@ void FPCGExSketchEditController::DeleteSelection()
 	}
 
 	const FScopedTransaction Transaction(LOCTEXT("DeleteSelection", "Delete Sketch Selection"));
-	if (UObject* TransactionObject = Target->GetTransactionObject())
-	{
-		TransactionObject->Modify();
-	}
+	Target->BeginAuthoring();
 
 	// Edges first (their indices die with vertex removal); both descending so indices stay valid.
 	// BY INDEX: Disconnect resolves through FindEdge, which would remove the first edge sharing the
@@ -685,10 +678,7 @@ bool FPCGExSketchEditController::DeleteAtRay(const FRay& WorldRay)
 			return false;
 		}
 		const FScopedTransaction Transaction(LOCTEXT("DeleteVertex", "Delete Sketch Vertex"));
-		if (UObject* TransactionObject = Target->GetTransactionObject())
-		{
-			TransactionObject->Modify();
-		}
+		Target->BeginAuthoring();
 		Model->RemoveVertex(Hit.Index);
 		Model->RemoveOrphanSideEffectVertices();
 	}
@@ -699,10 +689,7 @@ bool FPCGExSketchEditController::DeleteAtRay(const FRay& WorldRay)
 			return false;
 		}
 		const FScopedTransaction Transaction(LOCTEXT("DeleteEdge", "Delete Sketch Edge"));
-		if (UObject* TransactionObject = Target->GetTransactionObject())
-		{
-			TransactionObject->Modify();
-		}
+		Target->BeginAuthoring();
 		Model->RemoveEdgeAt(Hit.Index);
 		Model->RemoveOrphanSideEffectVertices();
 	}
@@ -759,10 +746,7 @@ int32 FPCGExSketchEditController::AddVertexAtRay(const FRay& WorldRay)
 	}
 
 	const FScopedTransaction Transaction(LOCTEXT("AddVertex", "Add Sketch Vertex"));
-	if (UObject* TransactionObject = Target->GetTransactionObject())
-	{
-		TransactionObject->Modify();
-	}
+	Target->BeginAuthoring();
 
 	int32 NewVertex;
 	if (bSnapEnabled && BasisPtr)
@@ -926,7 +910,7 @@ int32 FPCGExSketchEditController::MergeCollocatedVertices()
 
 	const FScopedTransaction Transaction(LOCTEXT("MergeCollocated", "Merge Collocated Sketch Vertices"));
 	UObject* TransactionObject = Target->GetTransactionObject();
-	if (TransactionObject) { TransactionObject->Modify(); }
+	Target->BeginAuthoring();
 
 	const int32 NumMerged = Model->MergeCollocatedVertices(BasisPtr);
 
@@ -944,7 +928,7 @@ int32 FPCGExSketchEditController::RemoveInvalidEdges()
 
 	const FScopedTransaction Transaction(LOCTEXT("RemoveInvalidEdges", "Remove Invalid Sketch Edges"));
 	UObject* TransactionObject = Target->GetTransactionObject();
-	if (TransactionObject) { TransactionObject->Modify(); }
+	Target->BeginAuthoring();
 
 	const int32 NumRemoved = Model->RemoveInvalidEdges();
 
@@ -965,7 +949,7 @@ int32 FPCGExSketchEditController::SplitOverlappingEdges()
 
 	const FScopedTransaction Transaction(LOCTEXT("SplitOverlappingEdges", "Split Overlapping Sketch Edges"));
 	UObject* TransactionObject = Target->GetTransactionObject();
-	if (TransactionObject) { TransactionObject->Modify(); }
+	Target->BeginAuthoring();
 
 	const int32 NumSplits = Model->SplitOverlappingEdges(BasisPtr);
 
@@ -983,7 +967,7 @@ int32 FPCGExSketchEditController::PurgeUnusedDataRecords()
 
 	const FScopedTransaction Transaction(LOCTEXT("PurgeDataRecords", "Purge Unused Sketch Data Records"));
 	UObject* TransactionObject = Target->GetTransactionObject();
-	if (TransactionObject) { TransactionObject->Modify(); }
+	Target->BeginAuthoring();
 
 	const int32 NumPurged = Model->PurgeUnreferencedRecords();
 	PCGExEditor::NotifyObjectChanged(TransactionObject);
@@ -1025,10 +1009,7 @@ bool FPCGExSketchEditController::MaterializeCrossingAtRay(const FRay& WorldRay)
 	const FPCGExClusterSketchCrossing Crossing = Crossings[Hit.Index];
 
 	FScopedTransaction Transaction(LOCTEXT("MaterializeCrossing", "Materialize Sketch Crossing"));
-	if (UObject* TransactionObject = Target->GetTransactionObject())
-	{
-		TransactionObject->Modify();
-	}
+	Target->BeginAuthoring();
 
 	FPCGExLatticeBasis Basis;
 	const int32 NewVertex = Model->MaterializeCrossing(Crossing.EdgeA, Crossing.EdgeB, Crossing.Location, GetBasis(Basis) ? &Basis : nullptr);

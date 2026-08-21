@@ -5,7 +5,6 @@
 
 #include "AdvancedPreviewScene.h"
 #include "AssetEditorModeManager.h"
-#include "IDetailsView.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Sketch/PCGExClusterSketch.h"
@@ -18,7 +17,6 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Widgets/Layout/SScrollBox.h"
-#include "Widgets/Layout/SSplitter.h"
 
 FPCGExClusterSketchToolkit::FPCGExClusterSketchToolkit(UAssetEditor* InOwningAssetEditor)
 	: FBaseAssetToolkit(InOwningAssetEditor)
@@ -106,7 +104,7 @@ void FPCGExClusterSketchToolkit::CreatePreviewSketch(UPCGExClusterSketch* InSket
 	UPCGExClusterSketchComponent* Component = NewObject<UPCGExClusterSketchComponent>(Actor, NAME_None, RF_Transient);
 	// Referencing the asset makes the component READ-ONLY by its own rule -- exactly right here: every
 	// mutation goes through the controller's asset target, and this is purely the renderer.
-	Component->SketchAsset = InSketch;
+	Component->SetSketchAsset(InSketch);
 	Actor->SetRootComponent(Component);
 	Component->RegisterComponent();
 
@@ -143,8 +141,8 @@ TSharedRef<SDockTab> FPCGExClusterSketchToolkit::SpawnTab_Details(const FSpawnTa
 {
 	EnsurePanelCreated();
 
-	// DetailsView stays live below the panel: the base sets objects on it unguarded, and the asset's
-	// snap provider and decorators have no home in the shared panel.
+	// The panel IS this editor's details surface -- it already reaches the asset's snap provider and
+	// decorators, so the base's DetailsView would only mirror it a second time.
 	return SNew(SDockTab)
 		.Label(INVTEXT("Details"))
 		[
@@ -159,28 +157,20 @@ TSharedRef<SDockTab> FPCGExClusterSketchToolkit::SpawnTab_Details(const FSpawnTa
 			+ SVerticalBox::Slot()
 			.FillHeight(1.0f)
 			[
-				SNew(SSplitter)
-				.Orientation(Orient_Vertical)
-				.PhysicalSplitterHandleSize(4.0f)
-
-				+ SSplitter::Slot()
-				.Value(0.6f)
+				// The mode host supplies this itself; here the toolkit owns it.
+				SNew(SScrollBox)
+				+ SScrollBox::Slot()
 				[
-					// The mode host supplies this itself; here the toolkit owns it.
-					SNew(SScrollBox)
-					+ SScrollBox::Slot()
-					[
-						Panel->MakeBody()
-					]
-				]
-
-				+ SSplitter::Slot()
-				.Value(0.4f)
-				[
-					DetailsView.ToSharedRef()
+					Panel->MakeBody()
 				]
 			]
 		];
+}
+
+void FPCGExClusterSketchToolkit::SetEditingObject(UObject* /*InObject*/)
+{
+	// Deliberately empty. CreateWidgets check()s DetailsView into existence, but this editor never shows
+	// it -- left unpopulated it stops rebuilding an invisible layout on every asset change.
 }
 
 void FPCGExClusterSketchToolkit::CreateEditorModeManager()

@@ -61,22 +61,25 @@ void SPCGExSketchPanel::Construct(const FArguments& InArgs, const FPCGExSketchPa
 	DetailsArgs.bAllowSearch = false;
 	DetailsArgs.bHideSelectionTip = true;
 	DetailsArgs.bShowScrollBar = false;
+	DetailsArgs.bShowObjectLabel = false; // the panel already says which sketch this is
 
 	const FStructureDetailsViewArgs StructArgs;
 	const TSharedPtr<FStructOnScope> NullStruct;
 
 	RecordDetailsView = PropertyModule.CreateStructureDetailView(DetailsArgs, StructArgs, NullStruct);
-	DataDetailsView = PropertyModule.CreateDetailView(DetailsArgs);
 
 	// Object-rooted, unlike the two struct scopes: the host owns these properties, so its own
 	// PostEditChangeProperty runs and no write-back is needed.
+	DataDetailsView = PropertyModule.CreateStructureDetailView(DetailsArgs, StructArgs, NullStruct);
 	HostDetailsView = PropertyModule.CreateDetailView(DetailsArgs);
 	HostDetailsView->SetIsPropertyVisibleDelegate(FIsPropertyVisible::CreateSP(this, &SPCGExSketchPanel::IsHostPropertyVisible));
+	HostDetailsView->SetIsCustomRowVisibleDelegate(FIsCustomRowVisible::CreateSP(this, &SPCGExSketchPanel::IsHostCustomRowVisible));
 
 	// A read-only host still inspects; the delegate is what keeps its values from being committed.
 	const FIsPropertyEditingEnabled EditingEnabled = FIsPropertyEditingEnabled::CreateSP(this, &SPCGExSketchPanel::IsEditingEnabled);
 	if (IDetailsView* Inner = RecordDetailsView->GetDetailsView()) { Inner->SetIsPropertyEditingEnabledDelegate(EditingEnabled); }
-	DataDetailsView->SetIsPropertyEditingEnabledDelegate(EditingEnabled);
+	if (IDetailsView* Inner = DataDetailsView->GetDetailsView()) { Inner->SetIsPropertyEditingEnabledDelegate(EditingEnabled); }
+	DataDetailsView->GetOnFinishedChangingPropertiesDelegate().AddSP(this, &SPCGExSketchPanel::OnDataPropertyChanged);
 	HostDetailsView->SetIsPropertyEditingEnabledDelegate(EditingEnabled);
 
 	RecordDetailsView->GetOnFinishedChangingPropertiesDelegate().AddSP(this, &SPCGExSketchPanel::OnRecordPropertyChanged);
@@ -463,20 +466,7 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
 		.AutoHeight()
 		.Padding(0, 6, 0, 0)
 		[
-			SNew(SButton)
-			.Text(LOCTEXT("AddDataLayers", "Add Data Layers"))
-			.ToolTipText(LOCTEXT("AddDataLayersTip", "Create the authored data tier. A sketch that annotates nothing stores nothing."))
-			.HAlign(HAlign_Center)
-			.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
-			.Visibility_Lambda([this]() { return HasAuthoredTier() ? EVisibility::Collapsed : EVisibility::Visible; })
-			.OnClicked(this, &SPCGExSketchPanel::OnEnableAuthoredDataClicked)
-		]
-
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0, 6, 0, 0)
-		[
-			DataDetailsView.ToSharedRef()
+			DataDetailsView->GetWidget().ToSharedRef()
 		]
 
 		+ SVerticalBox::Slot()
@@ -533,18 +523,15 @@ void SPCGExSketchPanel::GatherDomainSelection(const EDomain InDomain, TArray<int
 const FPCGExSketchDataLayer* SPCGExSketchPanel::ResolveLayer(const EDomain InDomain) const
 {
 	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(ActiveController());
-	if (!Model || !Model->Data || InDomain == EDomain::None) { return nullptr; }
-	return &Model->Data->GetLayer(InDomain == EDomain::Vertex);
+	if (!Model || InDomain == EDomain::None) { return nullptr; }
+	return &Model->Data.GetLayer(InDomain == EDomain::Vertex);
 }
 
 FPCGExSketchDataLayer* SPCGExSketchPanel::ResolveLayerMutable(const EDomain InDomain) const
 {
 	FPCGExClusterSketchModel* Model = EditableModel();
-	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
-	if (!Model || !Controller || InDomain == EDomain::None) { return nullptr; }
-
-	UPCGExSketchData* Data = Model->GetOrCreateData(Controller->GetTarget().GetTransactionObject());
-	return Data ? &Data->GetLayer(InDomain == EDomain::Vertex) : nullptr;
+	if (!Model || InDomain == EDomain::None) { return nullptr; }
+	return &Model->Data.GetLayer(InDomain == EDomain::Vertex);
 }
 
 FGuid SPCGExSketchPanel::PrimaryDataId() const
@@ -621,8 +608,11 @@ void SPCGExSketchPanel::RefreshNow(const bool bForceReseed)
 	SeededDomain = Domain;
 	SeededRecordId = DataId;
 
+	// The Sketch page's schema / snap provider / decorator rows all come from the host object.
+	if (HostDetailsView.IsValid()) { HostDetailsView->SetObject(Host, /*bForceRefresh*/ true); }
+
 	SeedRecordScope();
-	SeedDataView();
+	SeedDataScope();
 }
 
 void SPCGExSketchPanel::RebindController()
@@ -639,6 +629,60 @@ void SPCGExSketchPanel::RebindController()
 	ValidatedRevision = INDEX_NONE;
 
 	if (Controller) { BoundChangedHandle = Controller->OnChanged.AddSP(this, &SPCGExSketchPanel::RequestRefresh); }
+}
+
+void SPCGExSketchPanel::SeedDataScope()
+{
+	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(ActiveController());
+	if (!Model)
+	{
+		DataScope.Reset();
+		if (DataDetailsView.IsValid()) { DataDetailsView->SetStructureData(nullptr); }
+		return;
+	}
+
+	UScriptStruct* DataStruct = FPCGExSketchData::StaticStruct();
+	DataScope = MakeShared<FStructOnScope>(DataStruct);
+	DataStruct->CopyScriptStruct(DataScope->GetStructMemory(), &Model->Data);
+
+	if (DataDetailsView.IsValid()) { DataDetailsView->SetStructureData(DataScope); }
+}
+
+void SPCGExSketchPanel::OnDataPropertyChanged(const FPropertyChangedEvent& Event)
+{
+	if (!DataScope.IsValid() || DataScope->GetStruct() != FPCGExSketchData::StaticStruct()) { return; }
+
+	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
+	FPCGExClusterSketchModel* Model = EditableModel();
+	if (!Controller || !Model) { return; }
+
+	UObject* Host = Controller->GetTarget().GetTransactionObject();
+	const FPCGExSketchData* Edited = reinterpret_cast<const FPCGExSketchData*>(DataScope->GetStructMemory());
+
+	{
+		TGuardValue<bool> SyncGuard(bIsSyncing, true);
+		const FScopedTransaction Transaction(LOCTEXT("EditSchemas", "Edit Sketch Data Schemas"));
+		Controller->GetTarget().BeginAuthoring();
+
+		// Schemas only: the Selection page mutates Records behind this view, so the scope's copy of them
+		// is stale the moment a record is minted or edited.
+		Model->Data.SketchProperties = Edited->SketchProperties;
+		Model->Data.VertexLayer.Schema = Edited->VertexLayer.Schema;
+		Model->Data.EdgeLayer.Schema = Edited->EdgeLayer.Schema;
+
+		Model->Data.EDITOR_SyncAll();
+
+		if (Host)
+		{
+			Host->PostEditChange();
+			PCGExEditor::NotifyObjectChanged(Host);
+		}
+		Controller->NotifyModelChanged();
+		Context.RequestBodyRefresh.ExecuteIfBound();
+	}
+
+	// EDITOR_SyncAll reshaped record overrides and schema identity: both scopes are structurally stale.
+	QueueRefresh(/*bForceReseed*/ true);
 }
 
 void SPCGExSketchPanel::SeedRecordScope()
@@ -660,66 +704,27 @@ void SPCGExSketchPanel::SeedRecordScope()
 	if (RecordDetailsView.IsValid()) { RecordDetailsView->SetStructureData(RecordScope); }
 }
 
-bool SPCGExSketchPanel::HasAuthoredTier() const
+bool SPCGExSketchPanel::IsHostCustomRowVisible(const FName InRowName, const FName InParentName) const
 {
-	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(ActiveController());
-	return Model && Model->Data != nullptr;
-}
-
-FReply SPCGExSketchPanel::OnEnableAuthoredDataClicked()
-{
-	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
-	FPCGExClusterSketchModel* Model = EditableModel();
-	if (!Controller || !Model) { return FReply::Handled(); }
-
-	UObject* Host = Controller->GetTarget().GetTransactionObject();
-	{
-		TGuardValue<bool> SyncGuard(bIsSyncing, true);
-		const FScopedTransaction Transaction(LOCTEXT("AddDataLayersTransaction", "Add Sketch Data Layers"));
-		if (Host) { Host->Modify(); }
-		Model->GetOrCreateData(Host);
-		if (Host)
-		{
-			Host->PostEditChange();
-			PCGExEditor::NotifyObjectChanged(Host);
-		}
-		Controller->NotifyModelChanged();
-	}
-	QueueRefresh(/*bForceReseed*/ true);
-	return FReply::Handled();
-}
-
-void SPCGExSketchPanel::SeedDataView()
-{
-	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(ActiveController());
-
-	if (!Model)
-	{
-		if (DataDetailsView.IsValid()) { DataDetailsView->SetObject(nullptr); }
-		return;
-	}
-
-	// Null until authoring creates it; the page offers the button below in that state.
-	if (DataDetailsView.IsValid()) { DataDetailsView->SetObject(Model->Data, /*bForceRefresh*/ true); }
-
-	if (HostDetailsView.IsValid())
-	{
-		UObject* Host = Context.ResolveSketchObject ? Context.ResolveSketchObject() : nullptr;
-		HostDetailsView->SetObject(Host, /*bForceRefresh*/ true);
-	}
+	// Denylist, not an allowlist: the schema-collection customization builds its own custom rows and an
+	// allowlist would hide them along with the engine's.
+	static const TSet<FName> Rejected = {FName("Transform"), FName("TransformCommon"), FName("Sockets")};
+	return !Rejected.Contains(InParentName) && !Rejected.Contains(InRowName);
 }
 
 bool SPCGExSketchPanel::IsHostPropertyVisible(const FPropertyAndParent& PropertyAndParent) const
 {
-	static const TSet<FName> Admitted = {
+	// Whole subtrees the page owns.
+	static const TSet<FName> Subtrees = {
 		FName("SnapProvider"), FName("Decorators"),
 		FName("InlineSnapProvider"), FName("InlineDecorators")
 	};
 
-	if (Admitted.Contains(PropertyAndParent.Property.GetFName())) { return true; }
+	const FName Name = PropertyAndParent.Property.GetFName();
+	if (Subtrees.Contains(Name)) { return true; }
 	for (const FProperty* Parent : PropertyAndParent.ParentProperties)
 	{
-		if (Parent && Admitted.Contains(Parent->GetFName())) { return true; }
+		if (Parent && Subtrees.Contains(Parent->GetFName())) { return true; }
 	}
 	return false;
 }
@@ -764,7 +769,7 @@ void SPCGExSketchPanel::OnRecordPropertyChanged(const FPropertyChangedEvent& Eve
 
 	TGuardValue<bool> SyncGuard(bIsSyncing, true);
 	const FScopedTransaction Transaction(LOCTEXT("EditRecord", "Edit Sketch Data Record"));
-	if (Host) { Host->Modify(); }
+	Controller->GetTarget().BeginAuthoring();
 
 	// Id is the key, not payload -- writing it back from a scope taken before a repair would restore a
 	// retired identity.
@@ -785,9 +790,8 @@ void SPCGExSketchPanel::OnHostPropertyChanged(UObject* Object, FPropertyChangedE
 	// bIsSyncing covers the panel's own write-backs, which already re-seed.
 	if (bIsSyncing || !Object) { return; }
 
-	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(ActiveController());
-	const bool bIsTier = Model && Model->Data == Object;
-	if (!bIsTier && Context.ResolveSketchObject && Context.ResolveSketchObject() != Object) { return; }
+	// The tier is a struct on the host's model, so a tier edit arrives as a host change like any other.
+	if (Context.ResolveSketchObject && Context.ResolveSketchObject() != Object) { return; }
 	QueueRefresh(/*bForceReseed*/ true);
 }
 
@@ -818,7 +822,7 @@ void SPCGExSketchPanel::AssignRecord(const FGuid InRecordId)
 	{
 		TGuardValue<bool> SyncGuard(bIsSyncing, true);
 		const FScopedTransaction Transaction(LOCTEXT("AssignRecord", "Assign Sketch Data Record"));
-		if (Host) { Host->Modify(); }
+		Controller->GetTarget().BeginAuthoring();
 
 		// Every selected item, deliberately: assigning one record to a multi-selection IS the sharing
 		// gesture, and duplicate ids across items are legal by design.
@@ -866,7 +870,7 @@ FReply SPCGExSketchPanel::OnMakeUniqueClicked()
 	{
 		TGuardValue<bool> SyncGuard(bIsSyncing, true);
 		const FScopedTransaction Transaction(LOCTEXT("MakeRecordUnique", "Make Sketch Data Record Unique"));
-		if (Host) { Host->Modify(); }
+		Controller->GetTarget().BeginAuthoring();
 
 		// The panel is the ONLY mint site, and it is editor-only: a GUID minted at execute time changes
 		// PCG output every run and defeats CRC caching.

@@ -69,9 +69,6 @@ void FPCGExElementsClustersSketchEditorModule::StartupModule()
 		}
 
 		NewAsset->Model = InModel;
-		// The struct copy carried Data as a POINTER; duplicate it for the same reason as below.
-		NewAsset->Model.Data = InModel.Data ? DuplicateObject<UPCGExSketchData>(InModel.Data, NewAsset) : nullptr;
-
 		// Duplicated, never shared: the source keeps its own instanced subobjects, and the asset owns
 		// copies outered to itself (a shared subobject would serialize into whichever package won).
 		NewAsset->SnapProvider = InSnapProvider ? DuplicateObject<UPCGExClusterSnapProvider>(InSnapProvider, NewAsset) : nullptr;
