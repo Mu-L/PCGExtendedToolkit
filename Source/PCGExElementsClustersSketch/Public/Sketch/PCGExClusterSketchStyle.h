@@ -112,9 +112,21 @@ public:
 #endif
 
 	//~ Begin UDeveloperSettings
-	virtual FName GetContainerName() const override { return "Editor"; }
-	virtual FName GetCategoryName() const override { return "Plugins"; }
-	virtual FName GetSectionName() const override { return FName("PCGEx | Cluster Sketch"); }
+	virtual FName GetContainerName() const override
+	{
+		return "Editor";
+	}
+
+	virtual FName GetCategoryName() const override
+	{
+		return "Plugins";
+	}
+
+	virtual FName GetSectionName() const override
+	{
+		return FName("PCGEx | Cluster Sketch");
+	}
+
 	//~ End UDeveloperSettings
 
 	// ========== Preview (unedited) ==========

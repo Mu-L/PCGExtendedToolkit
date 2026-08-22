@@ -68,11 +68,16 @@ namespace PCGExSketchDrawHelper
 	{
 		switch (Source)
 		{
-		case EPCGExSketchGuideSource::LatticeAxis: return Style->GuideAxisColor;
-		case EPCGExSketchGuideSource::LatticeWalk: return Style->GuideWalkColor;
-		case EPCGExSketchGuideSource::Complement: return Style->GuideComplementColor;
-		case EPCGExSketchGuideSource::IncidentEdge: return Style->GuideEdgeColor;
-		default: return Style->PreviewAffordanceColor;
+		case EPCGExSketchGuideSource::LatticeAxis:
+			return Style->GuideAxisColor;
+		case EPCGExSketchGuideSource::LatticeWalk:
+			return Style->GuideWalkColor;
+		case EPCGExSketchGuideSource::Complement:
+			return Style->GuideComplementColor;
+		case EPCGExSketchGuideSource::IncidentEdge:
+			return Style->GuideEdgeColor;
+		default:
+			return Style->PreviewAffordanceColor;
 		}
 	}
 }
@@ -192,11 +197,26 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		// delete modifier is held, the hovered edge reads as a delete target.
 		const bool bDegenerate = Model->FindVertexOnEdgeInterior(e, LocalLocations) != INDEX_NONE;
 		FLinearColor Color = Style->EditEdge.Color;
-		if (CrossingEdges.Contains(e)) { Color = Style->EditVertexPhantom.Color; }
-		if (bSelected) { Color = Style->SelectedColor; }
-		if (bDegenerate) { Color = Style->MergeAffordanceColor; }
-		if (DoomedEdges.Contains(e)) { Color = Style->DeleteIntentColor; }
-		if (bHovered) { Color = Controller.GetDeleteIntent() ? Style->DeleteIntentColor : Style->HoverColor; }
+		if (CrossingEdges.Contains(e))
+		{
+			Color = Style->EditVertexPhantom.Color;
+		}
+		if (bSelected)
+		{
+			Color = Style->SelectedColor;
+		}
+		if (bDegenerate)
+		{
+			Color = Style->MergeAffordanceColor;
+		}
+		if (DoomedEdges.Contains(e))
+		{
+			Color = Style->DeleteIntentColor;
+		}
+		if (bHovered)
+		{
+			Color = Controller.GetDeleteIntent() ? Style->DeleteIntentColor : Style->HoverColor;
+		}
 		// Meshes carry idle, selection, hover and the crossing tint; only DEGENERATE, which they have no
 		// instance for, still shouts from here.
 		if (bMeshEdges && (!bHovered || bMeshHover) && !bDegenerate)
@@ -217,8 +237,14 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 #endif
 		// Same precedence as the mesh layer, from the same settings: provenance outranks the bound tint.
 		FLinearColor Color = Style->EditVertexIdle.Color;
-		if (Model->Vertices[i].bLatticeBound) { Color = Style->EditVertexBoundColor; }
-		if (bSideEffect) { Color = Style->EditVertexSideEffectColor; }
+		if (Model->Vertices[i].bLatticeBound)
+		{
+			Color = Style->EditVertexBoundColor;
+		}
+		if (bSideEffect)
+		{
+			Color = Style->EditVertexSideEffectColor;
+		}
 		if (bSelected)
 		{
 			Color = Style->SelectedColor;
@@ -264,7 +290,7 @@ void FPCGExSketchDrawHelper::Draw(const FPCGExSketchEditController& Controller, 
 		if (bHovered && !(bMeshGhosts && bMeshHover))
 		{
 			// A hovered ghost reads as "click to place a vertex here": ring it.
-			const double Radius = PCGExSketchDrawHelper::GhostRingRadius;
+			constexpr double Radius = PCGExSketchDrawHelper::GhostRingRadius;
 			DrawCircle(PDI, Pos, FVector::XAxisVector, FVector::YAxisVector, Color, Radius, 16, SDPG_Foreground, 1.0f);
 			DrawCircle(PDI, Pos, FVector::XAxisVector, FVector::ZAxisVector, Color, Radius, 16, SDPG_Foreground, 1.0f);
 		}

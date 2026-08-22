@@ -37,10 +37,16 @@ public:
 	//~Begin IPCGExPropertyProvider
 	/** Unreachable, and unimplementable: records are sparse overrides, so a per-item array would have to
 	 *  be a dangling temporary. GetPropertyAt is overridden and fully bypasses this. */
-	virtual TConstArrayView<FInstancedStruct> GetProperties(int32 Index) const override { return {}; }
+	virtual TConstArrayView<FInstancedStruct> GetProperties(int32 Index) const override
+	{
+		return {};
+	}
 
 	/** Unreachable: nothing on the print path auto-populates outputs from a registry. */
-	virtual TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const override { return {}; }
+	virtual TConstArrayView<FPCGExPropertyRegistryEntry> GetPropertyRegistry() const override
+	{
+		return {};
+	}
 
 	virtual const FInstancedStruct* FindPrototypeProperty(FName PropertyName) const override;
 

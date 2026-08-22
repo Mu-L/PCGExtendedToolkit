@@ -59,7 +59,10 @@ public:
 #if PCGEX_ENGINE_VERSION >= 508
 	/** False, or the mode manager disables editor gizmos and moving the host actor becomes impossible.
 	 *  The hook only exists from 5.8; before it, nothing gated those interactions. */
-	virtual bool RequiresLegacyViewportInteractions() const override { return false; }
+	virtual bool RequiresLegacyViewportInteractions() const override
+	{
+		return false;
+	}
 #endif
 	//~ End UEdMode
 

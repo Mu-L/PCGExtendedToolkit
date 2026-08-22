@@ -56,10 +56,16 @@ TSharedPtr<SWidget> FPCGExSketchEditorModeToolkit::GetInlineContent() const
 
 void FPCGExSketchEditorModeToolkit::EnsurePanelCreated()
 {
-	if (Panel.IsValid()) { return; }
+	if (Panel.IsValid())
+	{
+		return;
+	}
 
 	UPCGExSketchEditorMode* Mode = Cast<UPCGExSketchEditorMode>(GetScriptableEditorMode().Get());
-	if (!Mode) { return; }
+	if (!Mode)
+	{
+		return;
+	}
 
 	TWeakObjectPtr<UPCGExSketchEditorMode> WeakMode = Mode;
 
@@ -76,15 +82,24 @@ void FPCGExSketchEditorModeToolkit::EnsurePanelCreated()
 	};
 	Context.EnumerateSketches = [WeakMode](TArray<FPCGExSketchPanelEntry>& OutEntries)
 	{
-		if (UPCGExSketchEditorMode* Pinned = WeakMode.Get()) { Pinned->EnumerateSketches(OutEntries); }
+		if (UPCGExSketchEditorMode* Pinned = WeakMode.Get())
+		{
+			Pinned->EnumerateSketches(OutEntries);
+		}
 	};
 	Context.SetActiveSketch = [WeakMode](const TSharedPtr<FPCGExSketchEditController>& InController)
 	{
-		if (UPCGExSketchEditorMode* Pinned = WeakMode.Get()) { Pinned->SetActiveController(InController); }
+		if (UPCGExSketchEditorMode* Pinned = WeakMode.Get())
+		{
+			Pinned->SetActiveController(InController);
+		}
 	};
 	Context.RequestBodyRefresh = FSimpleDelegate::CreateLambda([WeakMode]()
 	{
-		if (UPCGExSketchEditorMode* Pinned = WeakMode.Get()) { Pinned->RequestViewportRefresh(); }
+		if (UPCGExSketchEditorMode* Pinned = WeakMode.Get())
+		{
+			Pinned->RequestViewportRefresh();
+		}
 	});
 
 	SAssignNew(Panel, SPCGExSketchPanel, Context);

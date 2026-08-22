@@ -3,16 +3,16 @@
 
 #include "Sketch/PCGExClusterSketchComponent.h"
 
-#include "PCGExLog.h"
-#include "Components/InstancedStaticMeshComponent.h"
-#include "Engine/StaticMesh.h"
-#include "GameFramework/Actor.h"
-#include "Materials/MaterialInterface.h"
 #include "MeshElementCollector.h"
+#include "PCGExLog.h"
 #include "PrimitiveDrawingUtils.h"
 #include "PrimitiveSceneProxy.h"
 #include "PrimitiveViewRelevance.h"
 #include "SceneView.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "GameFramework/Actor.h"
+#include "Materials/MaterialInterface.h"
 #include "Sketch/PCGExClusterSketchPrint.h"
 
 #if WITH_EDITOR
@@ -22,7 +22,7 @@
 
 namespace PCGExClusterSketchComponent
 {
-	const FLinearColor BasisColor = FLinearColor(0.35f, 0.5f, 0.9f, 0.6f);
+	constexpr FLinearColor BasisColor = FLinearColor(0.35f, 0.5f, 0.9f, 0.6f);
 
 	/** Bounds fallback so an empty sketch still has a pickable, non-degenerate footprint. */
 	constexpr double EmptyBoundsExtent = 50.0;
@@ -80,7 +80,10 @@ namespace PCGExClusterSketchComponent
 			return Result;
 		}
 
-		virtual uint32 GetMemoryFootprint() const override { return sizeof(*this) + GetAllocatedSize(); }
+		virtual uint32 GetMemoryFootprint() const override
+		{
+			return sizeof(*this) + GetAllocatedSize();
+		}
 
 		uint32 GetAllocatedSize() const
 		{
@@ -106,12 +109,18 @@ UPCGExClusterSketchPayload::UPCGExClusterSketchPayload()
 UPCGExClusterSketchComponent* UPCGExClusterSketchPayload::FindOwningComponent() const
 {
 	AActor* Actor = GetTypedOuter<AActor>();
-	if (!Actor) { return nullptr; }
+	if (!Actor)
+	{
+		return nullptr;
+	}
 
 	TInlineComponentArray<UPCGExClusterSketchComponent*> Sketches(Actor);
 	for (UPCGExClusterSketchComponent* Sketch : Sketches)
 	{
-		if (Sketch->InlinePayload.Get() == this) { return Sketch; }
+		if (Sketch->InlinePayload.Get() == this)
+		{
+			return Sketch;
+		}
 	}
 	return nullptr;
 }
@@ -143,8 +152,14 @@ UPCGExClusterSketchComponent::UPCGExClusterSketchComponent()
 
 const FPCGExClusterSketchModel& UPCGExClusterSketchComponent::GetModel() const
 {
-	if (InlinePayload) { return InlinePayload->Model; }
-	if (const UPCGExClusterSketch* Asset = ResolveSketchAsset()) { return Asset->Model; }
+	if (InlinePayload)
+	{
+		return InlinePayload->Model;
+	}
+	if (const UPCGExClusterSketch* Asset = ResolveSketchAsset())
+	{
+		return Asset->Model;
+	}
 
 	// Neither authored nor referenced: a shared empty, so every caller can hold a reference unguarded.
 	static const FPCGExClusterSketchModel EmptyModel;
@@ -153,7 +168,10 @@ const FPCGExClusterSketchModel& UPCGExClusterSketchComponent::GetModel() const
 
 const UPCGExClusterSnapProvider* UPCGExClusterSketchComponent::GetSnapProvider() const
 {
-	if (InlinePayload) { return InlinePayload->SnapProvider.Get(); }
+	if (InlinePayload)
+	{
+		return InlinePayload->SnapProvider.Get();
+	}
 	const UPCGExClusterSketch* Asset = ResolveSketchAsset();
 	return Asset ? Asset->SnapProvider.Get() : nullptr;
 }
@@ -199,7 +217,10 @@ void UPCGExClusterSketchComponent::CollectAssetDependencies(TArray<FSoftObjectPa
 		Asset->CollectAssetDependencies(OutPaths);
 		return;
 	}
-	if (!InlinePayload) { return; }
+	if (!InlinePayload)
+	{
+		return;
+	}
 
 	if (InlinePayload->SnapProvider)
 	{
@@ -302,9 +323,15 @@ FLinearColor UPCGExClusterSketchComponent::ResolveVertexColor(const int32 ModelI
 	if (Model.Vertices.IsValidIndex(ModelIndex))
 	{
 #if WITH_EDITORONLY_DATA
-		if (Model.Vertices[ModelIndex].bSideEffect) { return Style->EditVertexSideEffectColor; }
+		if (Model.Vertices[ModelIndex].bSideEffect)
+		{
+			return Style->EditVertexSideEffectColor;
+		}
 #endif
-		if (Model.Vertices[ModelIndex].bLatticeBound) { return Style->EditVertexBoundColor; }
+		if (Model.Vertices[ModelIndex].bLatticeBound)
+		{
+			return Style->EditVertexBoundColor;
+		}
 	}
 	return Style->EditVertexIdle.Color;
 }
@@ -340,21 +367,39 @@ FLinearColor UPCGExClusterSketchComponent::ResolveEdgeColor(const int32 ModelInd
 
 double UPCGExClusterSketchComponent::ResolveVertexSizeScale(const int32 ModelIndex) const
 {
-	if (!EditState.bActive) { return 1.0; }
+	if (!EditState.bActive)
+	{
+		return 1.0;
+	}
 	const UPCGExClusterSketchStyleSettings* Style = UPCGExClusterSketchStyleSettings::Get();
 	// Same precedence as the colour, so size and colour always describe the SAME state.
 	const bool bSelected = EditState.SelectedVertices.Contains(ModelIndex);
-	if (EditState.HoveredVertex == ModelIndex && !(bSelected && DrawsHoverAsMesh())) { return 1.0 + Style->HoverSizeBonus; }
-	if (bSelected) { return 1.0 + Style->SelectedSizeBonus; }
+	if (EditState.HoveredVertex == ModelIndex && !(bSelected && DrawsHoverAsMesh()))
+	{
+		return 1.0 + Style->HoverSizeBonus;
+	}
+	if (bSelected)
+	{
+		return 1.0 + Style->SelectedSizeBonus;
+	}
 	return 1.0;
 }
 
 double UPCGExClusterSketchComponent::ResolveEdgeSizeScale(const int32 ModelIndex) const
 {
-	if (!EditState.bActive) { return 1.0; }
+	if (!EditState.bActive)
+	{
+		return 1.0;
+	}
 	const UPCGExClusterSketchStyleSettings* Style = UPCGExClusterSketchStyleSettings::Get();
-	if (EditState.HoveredEdge == ModelIndex) { return 1.0 + Style->HoverSizeBonus; }
-	if (EditState.SelectedEdges.Contains(ModelIndex)) { return 1.0 + Style->SelectedSizeBonus; }
+	if (EditState.HoveredEdge == ModelIndex)
+	{
+		return 1.0 + Style->HoverSizeBonus;
+	}
+	if (EditState.SelectedEdges.Contains(ModelIndex))
+	{
+		return 1.0 + Style->SelectedSizeBonus;
+	}
 	return 1.0;
 }
 
@@ -520,8 +565,14 @@ void UPCGExClusterSketchComponent::RebuildInstances()
 	TArray<FVector> Locations;
 	ResolveVertexLocations(Locations);
 
-	if (VertexISM) { VertexISM->ClearInstances(); }
-	if (EdgeISM) { EdgeISM->ClearInstances(); }
+	if (VertexISM)
+	{
+		VertexISM->ClearInstances();
+	}
+	if (EdgeISM)
+	{
+		EdgeISM->ClearInstances();
+	}
 
 	if (VertexISM && bShowSketch)
 	{
@@ -595,7 +646,10 @@ void UPCGExClusterSketchComponent::UpdateInstanceAppearance()
 		for (int32 i = 0; i < VertexInstanceToModel.Num(); ++i)
 		{
 			const int32 ModelIndex = VertexInstanceToModel[i];
-			if (!Locations.IsValidIndex(ModelIndex)) { continue; }
+			if (!Locations.IsValidIndex(ModelIndex))
+			{
+				continue;
+			}
 			const bool bLast = i == VertexInstanceToModel.Num() - 1;
 			VertexInstances->UpdateInstanceTransform(
 				i, PCGExSketchStyle::MakePointInstanceTransform(MeshBounds, Locations[ModelIndex], VertexStyle.Size * ResolveVertexSizeScale(ModelIndex)), false, bLast);
@@ -614,9 +668,15 @@ void UPCGExClusterSketchComponent::UpdateInstanceAppearance()
 		for (int32 i = 0; i < EdgeInstanceToModel.Num(); ++i)
 		{
 			const int32 ModelIndex = EdgeInstanceToModel[i];
-			if (!Model.Edges.IsValidIndex(ModelIndex)) { continue; }
+			if (!Model.Edges.IsValidIndex(ModelIndex))
+			{
+				continue;
+			}
 			const FPCGExClusterSketchEdge& E = Model.Edges[ModelIndex];
-			if (!Locations.IsValidIndex(E.A) || !Locations.IsValidIndex(E.B)) { continue; }
+			if (!Locations.IsValidIndex(E.A) || !Locations.IsValidIndex(E.B))
+			{
+				continue;
+			}
 
 			const bool bLast = i == EdgeInstanceToModel.Num() - 1;
 			EdgeInstances->UpdateInstanceTransform(
@@ -823,7 +883,8 @@ void UPCGExClusterSketchComponent::OnRegister()
 		OnObjectPropertyChangedHandle = FCoreUObjectDelegates::OnObjectPropertyChanged.AddWeakLambda(
 			this, [this](UObject* Object, FPropertyChangedEvent&)
 			{
-				if (const UPCGExClusterSketch* Asset = ResolveSketchAsset(); Object && Asset && Object == Asset)
+				if (const UPCGExClusterSketch* Asset = ResolveSketchAsset();
+					Object && Asset && Object == Asset)
 				{
 					RefreshSketchVisual();
 				}
@@ -834,7 +895,10 @@ void UPCGExClusterSketchComponent::OnRegister()
 	// to push a repaint -- nothing else would notice it.
 	if (!OnStyleChangedHandle.IsValid())
 	{
-		OnStyleChangedHandle = UPCGExClusterSketchStyleSettings::OnChanged().AddWeakLambda(this, [this] { RefreshSketchVisual(); });
+		OnStyleChangedHandle = UPCGExClusterSketchStyleSettings::OnChanged().AddWeakLambda(this, [this]
+		{
+			RefreshSketchVisual();
+		});
 	}
 #endif
 }
@@ -892,7 +956,10 @@ void UPCGExClusterSketchComponent::PostEditChangeProperty(FPropertyChangedEvent&
 
 void UPCGExClusterSketchComponent::EDITOR_OnPayloadChanged(const FPropertyChangedEvent& PropertyChangedEvent)
 {
-	if (!InlinePayload) { return; }
+	if (!InlinePayload)
+	{
+		return;
+	}
 
 	// Hand-editing a vertex adopts it, and the coord/location pair must stay coherent -- the same rule
 	// the asset host applies, or a typed-in location on a bound vertex is silently dead data.
@@ -949,7 +1016,10 @@ void UPCGExClusterSketchComponent::CreateInlineSketch()
 	// 5.7 renders CallInEditor buttons on templates and silently no-ops them; 5.8 hides them. Guard here
 	// so the rule holds in both: a template never holds inline data.
 	AActor* Owner = GetOwner();
-	if (IsTemplate() || InlinePayload || !Owner) { return; }
+	if (IsTemplate() || InlinePayload || !Owner)
+	{
+		return;
+	}
 
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "CreateInlineSketch", "Create Inline Cluster Sketch"));
 	Modify();
@@ -967,8 +1037,8 @@ void UPCGExClusterSketchComponent::CreateInlineSketch()
 		InlinePayload->Model = Asset->Model;
 
 		InlinePayload->SnapProvider = Asset->SnapProvider
-			                              ? DuplicateObject<UPCGExClusterSnapProvider>(Asset->SnapProvider, InlinePayload)
-			                              : nullptr;
+			? DuplicateObject<UPCGExClusterSnapProvider>(Asset->SnapProvider, InlinePayload)
+			: nullptr;
 
 		InlinePayload->Decorators.Reset(Asset->Decorators.Num());
 		for (const TObjectPtr<UPCGExClusterSketchDecorator>& Decorator : Asset->Decorators)
@@ -984,7 +1054,10 @@ void UPCGExClusterSketchComponent::CreateInlineSketch()
 
 void UPCGExClusterSketchComponent::DeleteInlineSketch()
 {
-	if (IsTemplate() || !InlinePayload) { return; }
+	if (IsTemplate() || !InlinePayload)
+	{
+		return;
+	}
 
 	const FScopedTransaction Transaction(NSLOCTEXT("PCGExClusterSketchComponent", "DeleteInlineSketch", "Delete Inline Cluster Sketch"));
 	Modify();
@@ -1029,4 +1102,3 @@ void UPCGExClusterSketchComponent::SaveToAsset()
 #endif
 
 #pragma endregion
-

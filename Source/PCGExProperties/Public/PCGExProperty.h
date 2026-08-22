@@ -394,7 +394,9 @@ struct PCGEXPROPERTIES_API FPCGExProperty
 	 * dependency walk (IPCGExCookDependencyProvider) and runtime resource preloading, so it is
 	 * intentionally NOT editor-gated.
 	 */
-	virtual void GatherSoftObjectPaths(TSet<FSoftObjectPath>& OutPaths) const {}
+	virtual void GatherSoftObjectPaths(TSet<FSoftObjectPath>& OutPaths) const
+	{
+	}
 
 	// --- Registry ---
 

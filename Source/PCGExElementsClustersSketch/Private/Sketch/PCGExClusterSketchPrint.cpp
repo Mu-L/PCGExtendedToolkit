@@ -28,7 +28,10 @@ namespace PCGExClusterSketchPrint
 	void BuildLayerConfigs(const FPCGExSketchDataLayer& InLayer, const FPCGExClusterSketchValidation::FLayerIssues& InIssues, TArray<FPCGExPropertyOutputConfig>& OutConfigs)
 	{
 		InLayer.BuildOutputConfigs(OutConfigs);
-		OutConfigs.RemoveAll([&InIssues](const FPCGExPropertyOutputConfig& Config) { return InIssues.Rejects(Config.PropertyName); });
+		OutConfigs.RemoveAll([&InIssues](const FPCGExPropertyOutputConfig& Config)
+		{
+			return InIssues.Rejects(Config.PropertyName);
+		});
 	}
 }
 
@@ -184,14 +187,14 @@ namespace PCGExSketch
 			// location can never reach output. Rotation/scale stay authored either way.
 			const FVector Local = (V.bLatticeBound && bHasBasis) ? InRequest.Basis->CoordToWorld(V.LatticeCoord) : V.Transform.GetLocation();
 			OutTransforms[i] = bPlaced
-				                   ? FTransform(V.Transform.GetRotation(), Local, V.Transform.GetScale3D()) * InRequest.LocalToWorld
-				                   : FTransform(V.Transform.GetRotation(), Local, V.Transform.GetScale3D());
+				? FTransform(V.Transform.GetRotation(), Local, V.Transform.GetScale3D()) * InRequest.LocalToWorld
+				: FTransform(V.Transform.GetRotation(), Local, V.Transform.GetScale3D());
 			const FVector Location = OutTransforms[i].GetLocation();
 			// Seeds ride the compile reorder as a native property, so they can be written up front.
 			OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(Location);
 
 			bool bAlreadySeen = false;
-			SeenLocations.Add(PCGExSketch::QuantizedLocationKey(Location), &bAlreadySeen);
+			SeenLocations.Add(QuantizedLocationKey(Location), &bAlreadySeen);
 			if (bAlreadySeen)
 			{
 				++CollocatedCount;
@@ -316,7 +319,9 @@ namespace PCGExSketch
 		const TSharedPtr<FPCGExClusterSketchPrintContext> PrintContext = InPrintContext;
 		const bool bMirrorSketchProperties = InRequest.bWriteSketchPropertiesToEdges;
 		TArray<FPCGExPropertyOutputConfig> EdgeConfigs;
-		{ PCGExClusterSketchPrint::BuildLayerConfigs(SketchData.EdgeLayer, Validation.EdgeLayerIssues, EdgeConfigs); }
+		{
+			PCGExClusterSketchPrint::BuildLayerConfigs(SketchData.EdgeLayer, Validation.EdgeLayerIssues, EdgeConfigs);
+		}
 
 		GraphBuilder->OnPreCompile = [PrintContext, EnabledDecorators, EdgeConfigs, bMirrorSketchProperties, SketchProperties](PCGExGraphs::FSubGraphUserContext&, const PCGExGraphs::FSubGraphPreCompileData& Data)
 		{

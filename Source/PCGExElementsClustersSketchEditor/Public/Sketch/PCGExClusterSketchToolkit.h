@@ -30,10 +30,26 @@ public:
 	virtual ~FPCGExClusterSketchToolkit() override;
 
 	//~ FAssetEditorToolkit
-	virtual FName GetToolkitFName() const override { return FName("PCGExClusterSketchEditor"); }
-	virtual FText GetBaseToolkitName() const override { return INVTEXT("Cluster Sketch Editor"); }
-	virtual FString GetWorldCentricTabPrefix() const override { return TEXT("Cluster Sketch"); }
-	virtual FLinearColor GetWorldCentricTabColorScale() const override { return FLinearColor(0.1f, 0.75f, 0.65f); }
+	virtual FName GetToolkitFName() const override
+	{
+		return FName("PCGExClusterSketchEditor");
+	}
+
+	virtual FText GetBaseToolkitName() const override
+	{
+		return INVTEXT("Cluster Sketch Editor");
+	}
+
+	virtual FString GetWorldCentricTabPrefix() const override
+	{
+		return TEXT("Cluster Sketch");
+	}
+
+	virtual FLinearColor GetWorldCentricTabColorScale() const override
+	{
+		return FLinearColor(0.1f, 0.75f, 0.65f);
+	}
+
 	virtual void PostInitAssetEditor() override;
 
 	//~ FBaseAssetToolkit
@@ -43,7 +59,10 @@ public:
 	/** No-op: the panel is the details surface, so the base's DetailsView is never shown or populated. */
 	virtual void SetEditingObject(UObject* InObject) override;
 
-	TSharedPtr<FPCGExSketchEditController> GetController() const { return Controller; }
+	TSharedPtr<FPCGExSketchEditController> GetController() const
+	{
+		return Controller;
+	}
 
 protected:
 	/** The Details tab is where the shared panel lands here. Overriding this rather than

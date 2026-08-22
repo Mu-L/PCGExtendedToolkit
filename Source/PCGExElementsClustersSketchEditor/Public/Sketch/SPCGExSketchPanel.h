@@ -62,7 +62,12 @@ class PCGEXELEMENTSCLUSTERSSKETCHEDITOR_API SPCGExSketchPanel : public SCompound
 {
 public:
 	/** Declaration order IS the switcher's slot order -- SetPage indexes it by cast. */
-	enum class EPage : uint8 { Selection, Sketch, Options };
+	enum class EPage : uint8
+	{
+		Selection,
+		Sketch,
+		Options
+	};
 
 	SLATE_BEGIN_ARGS(SPCGExSketchPanel)
 		{
@@ -81,7 +86,11 @@ public:
 	TSharedRef<SWidget> MakeBody();
 
 	void SetPage(EPage InPage);
-	EPage GetPage() const { return ActivePage; }
+
+	EPage GetPage() const
+	{
+		return ActivePage;
+	}
 
 	//~ Begin SWidget
 	virtual void Tick(const FGeometry& AllottedGeometry, double InCurrentTime, float InDeltaTime) override;
@@ -95,7 +104,13 @@ private:
 
 	/** Which authored domain the selection addresses. A selection spanning both is deliberately None:
 	 *  one record assignment cannot mean two things. */
-	enum class EDomain : uint8 { None, Vertex, Edge };
+	enum class EDomain : uint8
+	{
+		None,
+		Vertex,
+		Edge
+	};
+
 	EDomain SelectionDomain() const;
 	/** Selected indices of the resolved domain, ascending -- a TSet iterates by slot, not by pick order,
 	 *  so the lowest index is the only deterministic "primary". */

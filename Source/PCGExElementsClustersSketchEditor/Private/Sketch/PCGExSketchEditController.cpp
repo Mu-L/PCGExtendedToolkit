@@ -40,7 +40,10 @@ FText IPCGExSketchEditTarget::GetReadOnlyReason() const
 
 void IPCGExSketchEditTarget::BeginAuthoring()
 {
-	if (UObject* Host = GetTransactionObject()) { Host->Modify(); }
+	if (UObject* Host = GetTransactionObject())
+	{
+		Host->Modify();
+	}
 }
 
 FPCGExClusterSketchModel* FPCGExSketchAssetEditTarget::GetModel()
@@ -585,8 +588,8 @@ void FPCGExSketchEditController::EndDrag(const FRay& WorldRay)
 					// (which is what wired edges across unrelated layers).
 					const FPCGExClusterSketchVertex& SourceVertex = Model->Vertices[Source];
 					const FIntVector Coord = SourceVertex.bLatticeBound
-						                         ? Basis.SnapWorldToCoordPreserving(PlacePoint, SourceVertex.LatticeCoord)
-						                         : Basis.SnapWorldToCoord(PlacePoint);
+						? Basis.SnapWorldToCoordPreserving(PlacePoint, SourceVertex.LatticeCoord)
+						: Basis.SnapWorldToCoord(PlacePoint);
 					FarVertex = Model->AddLatticeVertex(Coord, Basis, InheritedVertexData);
 				}
 				else
@@ -667,14 +670,20 @@ void FPCGExSketchEditController::DeleteSelection()
 	// BY INDEX: Disconnect resolves through FindEdge, which would remove the first edge sharing the
 	// pair -- a different one whenever duplicates exist.
 	TArray<int32> EdgeIndices = SelectedEdges.Array();
-	EdgeIndices.Sort([](const int32 A, const int32 B) { return A > B; });
+	EdgeIndices.Sort([](const int32 A, const int32 B)
+	{
+		return A > B;
+	});
 	for (const int32 e : EdgeIndices)
 	{
 		Model->RemoveEdgeAt(e);
 	}
 
 	TArray<int32> VertexIndices = SelectedVertices.Array();
-	VertexIndices.Sort([](const int32 A, const int32 B) { return A > B; });
+	VertexIndices.Sort([](const int32 A, const int32 B)
+	{
+		return A > B;
+	});
 	for (const int32 v : VertexIndices)
 	{
 		Model->RemoveVertex(v);
@@ -792,8 +801,8 @@ int32 FPCGExSketchEditController::AddVertexAtRay(const FRay& WorldRay)
 	if (bSnapEnabled && BasisPtr)
 	{
 		const FIntVector Coord = AnchorLayer
-			                         ? BasisPtr->SnapWorldToCoordPreserving(PlacePoint, Placed.AnchorCoord)
-			                         : BasisPtr->SnapWorldToCoord(PlacePoint);
+			? BasisPtr->SnapWorldToCoordPreserving(PlacePoint, Placed.AnchorCoord)
+			: BasisPtr->SnapWorldToCoord(PlacePoint);
 		NewVertex = Model->AddLatticeVertex(Coord, *BasisPtr);
 	}
 	else
@@ -927,8 +936,8 @@ FPCGExSketchEditController::FAddPlacement FPCGExSketchEditController::ResolveAdd
 		// freezes -- teleporting down the ray would place a vertex nowhere near the ghost that was
 		// showing. Only a gesture that has never previewed has nothing better to fall back to.
 		Result.Point = bHasAddPreview
-			               ? AddPreviewLocal
-			               : LocalRay.Origin + LocalRay.Direction * PCGExSketchPlacement::FallbackPlaceDistance;
+			? AddPreviewLocal
+			: LocalRay.Origin + LocalRay.Direction * PCGExSketchPlacement::FallbackPlaceDistance;
 	}
 
 	if (bSnapEnabled && Basis)
@@ -1039,7 +1048,10 @@ void FPCGExSketchEditController::NotifyModelChanged()
 int32 FPCGExSketchEditController::MergeCollocatedVertices()
 {
 	FPCGExClusterSketchModel* Model = Target->GetModel();
-	if (!Model) { return 0; }
+	if (!Model)
+	{
+		return 0;
+	}
 
 	FPCGExLatticeBasis Basis;
 	const FPCGExLatticeBasis* BasisPtr = GetBasis(Basis) ? &Basis : nullptr;
@@ -1060,7 +1072,10 @@ int32 FPCGExSketchEditController::MergeCollocatedVertices()
 int32 FPCGExSketchEditController::RemoveInvalidEdges()
 {
 	FPCGExClusterSketchModel* Model = Target->GetModel();
-	if (!Model) { return 0; }
+	if (!Model)
+	{
+		return 0;
+	}
 
 	const FScopedTransaction Transaction(LOCTEXT("RemoveInvalidEdges", "Remove Invalid Sketch Edges"));
 	UObject* TransactionObject = Target->GetTransactionObject();
@@ -1078,7 +1093,10 @@ int32 FPCGExSketchEditController::RemoveInvalidEdges()
 int32 FPCGExSketchEditController::SplitOverlappingEdges()
 {
 	FPCGExClusterSketchModel* Model = Target->GetModel();
-	if (!Model) { return 0; }
+	if (!Model)
+	{
+		return 0;
+	}
 
 	FPCGExLatticeBasis Basis;
 	const FPCGExLatticeBasis* BasisPtr = GetBasis(Basis) ? &Basis : nullptr;
@@ -1099,7 +1117,10 @@ int32 FPCGExSketchEditController::SplitOverlappingEdges()
 int32 FPCGExSketchEditController::PurgeUnusedDataRecords()
 {
 	FPCGExClusterSketchModel* Model = Target->GetModel();
-	if (!Model) { return 0; }
+	if (!Model)
+	{
+		return 0;
+	}
 
 	const FScopedTransaction Transaction(LOCTEXT("PurgeDataRecords", "Purge Unused Sketch Data Records"));
 	UObject* TransactionObject = Target->GetTransactionObject();

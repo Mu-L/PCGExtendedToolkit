@@ -160,9 +160,20 @@ public:
 		TConstArrayView<FPCGExPropertyOutputConfig> EffectiveConfigs,
 		UPCGMetadata* Metadata);
 
-	int32 Num() const { return Writers.Num(); }
-	bool HasOutputs() const { return !Writers.IsEmpty(); }
-	FName GetPropertyName(int32 WriterIdx) const { return Writers[WriterIdx].PropertyName; }
+	int32 Num() const
+	{
+		return Writers.Num();
+	}
+
+	bool HasOutputs() const
+	{
+		return !Writers.IsEmpty();
+	}
+
+	FName GetPropertyName(int32 WriterIdx) const
+	{
+		return Writers[WriterIdx].PropertyName;
+	}
 
 	/** Silent no-op on script-struct mismatch -- the type-erased FPCGExProperty interface can't
 	 *  transfer values between different concrete types. */

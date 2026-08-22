@@ -52,7 +52,10 @@ void UPCGExSketchEditorMode::Enter()
 
 		InputBinder = NewObject<UPCGExSketchInputBinder>(this);
 		InputBinder->Initialize(
-			[this](const FRay& WorldRay) { return ResolveController(WorldRay); },
+			[this](const FRay& WorldRay)
+			{
+				return ResolveController(WorldRay);
+			},
 			[this](TFunctionRef<void(FPCGExSketchEditController&)> InFn)
 			{
 				for (const FPCGExSketchModeBinding& Binding : Bindings)
@@ -138,7 +141,10 @@ void UPCGExSketchEditorMode::RebuildBindings()
 		for (UPCGExClusterSketchComponent* Component : Components)
 		{
 			const int32 Existing = Previous.IndexOfByPredicate(
-				[Component](const FPCGExSketchModeBinding& InBinding) { return InBinding.Component.Get() == Component; });
+				[Component](const FPCGExSketchModeBinding& InBinding)
+				{
+					return InBinding.Component.Get() == Component;
+				});
 
 			if (Existing != INDEX_NONE)
 			{
@@ -155,7 +161,10 @@ void UPCGExSketchEditorMode::RebuildBindings()
 
 			TWeakPtr<FPCGExSketchEditController> WeakController = Binding.Controller;
 			Binding.ChangedHandle = Binding.Controller->OnChanged.AddWeakLambda(
-				this, [this, WeakController]() { LastInteracted = WeakController; });
+				this, [this, WeakController]()
+				{
+					LastInteracted = WeakController;
+				});
 
 			// The component keeps its MESH layer (recoloured to the edit palette) and stands its
 			// immediate-mode fallback down; this mode draws that plus the state chrome. A selected
@@ -201,7 +210,10 @@ const FPCGExSketchModeBinding* UPCGExSketchEditorMode::GetActiveBinding() const
 	if (const TSharedPtr<FPCGExSketchEditController> Pinned = LastInteracted.Pin())
 	{
 		if (const FPCGExSketchModeBinding* Found = Bindings.FindByPredicate(
-			[&Pinned](const FPCGExSketchModeBinding& InBinding) { return InBinding.Controller == Pinned; }))
+			[&Pinned](const FPCGExSketchModeBinding& InBinding)
+			{
+				return InBinding.Controller == Pinned;
+			}))
 		{
 			return Found;
 		}
@@ -228,7 +240,10 @@ void UPCGExSketchEditorMode::EnumerateSketches(TArray<FPCGExSketchPanelEntry>& O
 	for (const FPCGExSketchModeBinding& Binding : Bindings)
 	{
 		const UPCGExClusterSketchComponent* Component = Binding.Component.Get();
-		if (!Component || !Binding.Controller) { continue; }
+		if (!Component || !Binding.Controller)
+		{
+			continue;
+		}
 
 		FPCGExSketchPanelEntry& Entry = OutEntries.AddDefaulted_GetRef();
 		const AActor* ComponentOwner = Component->GetOwner();
@@ -247,7 +262,10 @@ void UPCGExSketchEditorMode::SetActiveController(const TSharedPtr<FPCGExSketchEd
 
 void UPCGExSketchEditorMode::RequestViewportRefresh() const
 {
-	if (GEditor) { GEditor->RedrawLevelEditingViewports(); }
+	if (GEditor)
+	{
+		GEditor->RedrawLevelEditingViewports();
+	}
 }
 
 TSharedPtr<FPCGExSketchEditController> UPCGExSketchEditorMode::ResolveController(const FRay& WorldRay) const

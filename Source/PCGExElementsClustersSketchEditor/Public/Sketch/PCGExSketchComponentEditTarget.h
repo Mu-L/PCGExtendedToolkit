@@ -22,7 +22,10 @@ class PCGEXELEMENTSCLUSTERSSKETCHEDITOR_API FPCGExSketchComponentEditTarget fina
 public:
 	explicit FPCGExSketchComponentEditTarget(UPCGExClusterSketchComponent* InComponent);
 
-	UPCGExClusterSketchComponent* GetComponent() const { return Component.Get(); }
+	UPCGExClusterSketchComponent* GetComponent() const
+	{
+		return Component.Get();
+	}
 
 	virtual FPCGExClusterSketchModel* GetModel() override;
 	virtual const FPCGExClusterSketchModel* GetModel() const override;

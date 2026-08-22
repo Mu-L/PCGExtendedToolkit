@@ -13,7 +13,10 @@ namespace PCGExClusterSketchPropertyProvider
 	template <typename TItem>
 	void BuildItemRecords(const FPCGExSketchDataLayer& InLayer, const TConstArrayView<TItem> InItems, TArray<const FPCGExSketchDataRecord*>& OutRecords)
 	{
-		if (InLayer.Records.IsEmpty()) { return; }
+		if (InLayer.Records.IsEmpty())
+		{
+			return;
+		}
 
 		TMap<FGuid, int32> RecordIndex;
 		InLayer.BuildRecordIndex(RecordIndex);
@@ -22,8 +25,14 @@ namespace PCGExClusterSketchPropertyProvider
 		for (int32 i = 0; i < InItems.Num(); ++i)
 		{
 			// An invalid id is the sparse default and must never match a record that also carries one.
-			if (!InItems[i].DataId.IsValid()) { continue; }
-			if (const int32* Found = RecordIndex.Find(InItems[i].DataId)) { OutRecords[i] = &InLayer.Records[*Found]; }
+			if (!InItems[i].DataId.IsValid())
+			{
+				continue;
+			}
+			if (const int32* Found = RecordIndex.Find(InItems[i].DataId))
+			{
+				OutRecords[i] = &InLayer.Records[*Found];
+			}
 		}
 	}
 }

@@ -37,7 +37,10 @@ namespace PCGExSketchPanel
 	 *  inspection down along with editing. */
 	const FPCGExClusterSketchModel* ReadModel(const TSharedPtr<FPCGExSketchEditController>& InController)
 	{
-		if (!InController) { return nullptr; }
+		if (!InController)
+		{
+			return nullptr;
+		}
 		const IPCGExSketchEditTarget& ConstTarget = InController->GetTarget();
 		return ConstTarget.GetModel();
 	}
@@ -78,8 +81,14 @@ void SPCGExSketchPanel::Construct(const FArguments& InArgs, const FPCGExSketchPa
 
 	// A read-only host still inspects; the delegate is what keeps its values from being committed.
 	const FIsPropertyEditingEnabled EditingEnabled = FIsPropertyEditingEnabled::CreateSP(this, &SPCGExSketchPanel::IsEditingEnabled);
-	if (IDetailsView* Inner = RecordDetailsView->GetDetailsView()) { Inner->SetIsPropertyEditingEnabledDelegate(EditingEnabled); }
-	if (IDetailsView* Inner = DataDetailsView->GetDetailsView()) { Inner->SetIsPropertyEditingEnabledDelegate(EditingEnabled); }
+	if (IDetailsView* Inner = RecordDetailsView->GetDetailsView())
+	{
+		Inner->SetIsPropertyEditingEnabledDelegate(EditingEnabled);
+	}
+	if (IDetailsView* Inner = DataDetailsView->GetDetailsView())
+	{
+		Inner->SetIsPropertyEditingEnabledDelegate(EditingEnabled);
+	}
 	DataDetailsView->GetOnFinishedChangingPropertiesDelegate().AddSP(this, &SPCGExSketchPanel::OnDataPropertyChanged);
 	HostDetailsView->SetIsPropertyEditingEnabledDelegate(EditingEnabled);
 
@@ -98,7 +107,7 @@ void SPCGExSketchPanel::Construct(const FArguments& InArgs, const FPCGExSketchPa
 	ChildSlot
 	[
 		SAssignNew(PageSwitcher, SWidgetSwitcher)
-		.WidgetIndex(static_cast<int32>(ActivePage))
+		.WidgetIndex(ActivePage)
 
 		+ SWidgetSwitcher::Slot()
 		.Padding(4.0f)
@@ -132,7 +141,8 @@ SPCGExSketchPanel::~SPCGExSketchPanel()
 	{
 		FCoreUObjectDelegates::OnObjectTransacted.Remove(TransactedHandle);
 	}
-	if (const TSharedPtr<FPCGExSketchEditController> Bound = BoundController.Pin(); Bound && BoundChangedHandle.IsValid())
+	if (const TSharedPtr<FPCGExSketchEditController> Bound = BoundController.Pin();
+		Bound && BoundChangedHandle.IsValid())
 	{
 		Bound->OnChanged.Remove(BoundChangedHandle);
 	}
@@ -185,12 +195,18 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeHeader()
 			.Padding(0, 0, 0, 4)
 			[
 				SNew(SComboButton)
-				.Visibility_Lambda([Self]() { return Self->HasMultipleSketches() ? EVisibility::Visible : EVisibility::Collapsed; })
+				.Visibility_Lambda([Self]()
+				{
+					return Self->HasMultipleSketches() ? EVisibility::Visible : EVisibility::Collapsed;
+				})
 				.OnGetMenuContent(FOnGetContent::CreateSP(Self, &SPCGExSketchPanel::MakeSketchMenu))
 				.ButtonContent()
 				[
 					SNew(STextBlock)
-					.Text_Lambda([Self]() { return Self->ActiveSketchLabel(); })
+					.Text_Lambda([Self]()
+					{
+						return Self->ActiveSketchLabel();
+					})
 				]
 			]
 
@@ -200,8 +216,14 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeHeader()
 			[
 				SNew(SSegmentedControl<EPage>)
 				.UniformPadding(FMargin(8.0f, 3.0f))
-				.Value_Lambda([Self]() { return Self->GetPage(); })
-				.OnValueChanged_Lambda([Self](const EPage InPage) { Self->SetPage(InPage); })
+				.Value_Lambda([Self]()
+				{
+					return Self->GetPage();
+				})
+				.OnValueChanged_Lambda([Self](const EPage InPage)
+				{
+					Self->SetPage(InPage);
+				})
 
 				+ SSegmentedControl<EPage>::Slot(EPage::Selection)
 				.Text(LOCTEXT("PageSelection", "Selection"))
@@ -229,10 +251,16 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeHeader()
 					SNew(SButton)
 					.Text(LOCTEXT("SelectAll", "Select All"))
 					.ContentPadding(FMargin(4, 1))
-					.IsEnabled_Lambda([Self]() { return Self->ActiveController().IsValid(); })
+					.IsEnabled_Lambda([Self]()
+					{
+						return Self->ActiveController().IsValid();
+					})
 					.OnClicked_Lambda([Self]() -> FReply
 					{
-						if (const TSharedPtr<FPCGExSketchEditController> Controller = Self->ActiveController()) { Controller->SelectAll(); }
+						if (const TSharedPtr<FPCGExSketchEditController> Controller = Self->ActiveController())
+						{
+							Controller->SelectAll();
+						}
 						return FReply::Handled();
 					})
 				]
@@ -244,7 +272,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeHeader()
 					SNew(SButton)
 					.Text(LOCTEXT("ClearSelection", "Clear"))
 					.ContentPadding(FMargin(4, 1))
-					.IsEnabled_Lambda([Self]() { return Self->ActiveController().IsValid(); })
+					.IsEnabled_Lambda([Self]()
+					{
+						return Self->ActiveController().IsValid();
+					})
 					.OnClicked_Lambda([Self]() -> FReply
 					{
 						if (const TSharedPtr<FPCGExSketchEditController> Controller = Self->ActiveController())
@@ -265,7 +296,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeHeader()
 					.Style(FAppStyle::Get(), "ToggleButtonCheckbox")
 					.Padding(FMargin(4, 1))
 					.ToolTipText(LOCTEXT("SnapTip", "Snap authored positions to the sketch's lattice basis."))
-					.IsEnabled_Lambda([Self]() { return Self->ActiveController().IsValid(); })
+					.IsEnabled_Lambda([Self]()
+					{
+						return Self->ActiveController().IsValid();
+					})
 					.IsChecked_Lambda([Self]()
 					{
 						const TSharedPtr<FPCGExSketchEditController> Controller = Self->ActiveController();
@@ -273,7 +307,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeHeader()
 					})
 					.OnCheckStateChanged_Lambda([Self](const ECheckBoxState InState)
 					{
-						if (const TSharedPtr<FPCGExSketchEditController> Controller = Self->ActiveController()) { Controller->SetSnapEnabled(InState == ECheckBoxState::Checked); }
+						if (const TSharedPtr<FPCGExSketchEditController> Controller = Self->ActiveController())
+						{
+							Controller->SetSnapEnabled(InState == ECheckBoxState::Checked);
+						}
 					})
 					[
 						SNew(STextBlock).Text(LOCTEXT("Snap", "Snap"))
@@ -301,7 +338,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeSketchMenu()
 
 void SPCGExSketchPanel::ActivateSketch(TSharedPtr<FPCGExSketchEditController> InController)
 {
-	if (Context.SetActiveSketch) { Context.SetActiveSketch(InController); }
+	if (Context.SetActiveSketch)
+	{
+		Context.SetActiveSketch(InController);
+	}
 	QueueRefresh(/*bForceReseed*/ true);
 }
 
@@ -313,100 +353,103 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSelectionPage()
 {
 	return SNew(SVerticalBox)
 
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		[
-			SNew(STextBlock)
-			.AutoWrapText(true)
-			.Text(this, &SPCGExSketchPanel::SelectionSummaryText)
-		]
-
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0, 2, 0, 0)
-		[
-			SNew(STextBlock)
-			.AutoWrapText(true)
-			.ColorAndOpacity(FStyleColors::Warning)
-			.Text_Lambda([this]()
-			{
-				const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
-				return Controller ? Controller->GetTarget().GetReadOnlyReason() : FText::GetEmpty();
-			})
-			.Visibility_Lambda([this]() { return (ActiveController() && !IsEditingEnabled()) ? EVisibility::Visible : EVisibility::Collapsed; })
-		]
-
-		// [record v] [Make Unique] [Break Link]
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0, 6, 0, 0)
-		[
-			SNew(SHorizontalBox)
-			.Visibility(this, &SPCGExSketchPanel::RecordRowVisibility)
-
-			+ SHorizontalBox::Slot()
-			.FillWidth(1.0f)
-			.Padding(0, 0, 4, 0)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
 			[
-				SNew(SComboButton)
-				.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
-				.OnGetMenuContent(FOnGetContent::CreateSP(this, &SPCGExSketchPanel::MakeRecordMenu))
-				.ButtonContent()
+				SNew(STextBlock)
+				.AutoWrapText(true)
+				.Text(this, &SPCGExSketchPanel::SelectionSummaryText)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0, 2, 0, 0)
+			[
+				SNew(STextBlock)
+				.AutoWrapText(true)
+				.ColorAndOpacity(FStyleColors::Warning)
+				.Text_Lambda([this]()
+				{
+					const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
+					return Controller ? Controller->GetTarget().GetReadOnlyReason() : FText::GetEmpty();
+				})
+				.Visibility_Lambda([this]()
+				{
+					return (ActiveController() && !IsEditingEnabled()) ? EVisibility::Visible : EVisibility::Collapsed;
+				})
+			]
+
+			// [record v] [Make Unique] [Break Link]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0, 6, 0, 0)
+			[
+				SNew(SHorizontalBox)
+				.Visibility(this, &SPCGExSketchPanel::RecordRowVisibility)
+
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.0f)
+				.Padding(0, 0, 4, 0)
 				[
-					SNew(STextBlock).Text(this, &SPCGExSketchPanel::CurrentRecordText)
+					SNew(SComboButton)
+					.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
+					.OnGetMenuContent(FOnGetContent::CreateSP(this, &SPCGExSketchPanel::MakeRecordMenu))
+					.ButtonContent()
+					[
+						SNew(STextBlock).Text(this, &SPCGExSketchPanel::CurrentRecordText)
+					]
+				]
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.Padding(0, 0, 4, 0)
+				[
+					SNew(SButton)
+					.Text(LOCTEXT("MakeUnique", "Make Unique"))
+					.ToolTipText(LOCTEXT("MakeUniqueTip", "Mint a record seeded from the current one and point the selection at it, leaving every other item on the original."))
+					.ContentPadding(FMargin(4, 1))
+					.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
+					.OnClicked(this, &SPCGExSketchPanel::OnMakeUniqueClicked)
+				]
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(SButton)
+					.Text(LOCTEXT("BreakLink", "Break Link"))
+					.ToolTipText(LOCTEXT("BreakLinkTip", "Drop the reference; the selection falls back to the layer schema's own values. The record itself stays until it is purged."))
+					.ContentPadding(FMargin(4, 1))
+					.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
+					.OnClicked(this, &SPCGExSketchPanel::OnBreakLinkClicked)
 				]
 			]
 
-			+ SHorizontalBox::Slot()
-			.AutoWidth()
-			.Padding(0, 0, 4, 0)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0, 2, 0, 0)
 			[
-				SNew(SButton)
-				.Text(LOCTEXT("MakeUnique", "Make Unique"))
-				.ToolTipText(LOCTEXT("MakeUniqueTip", "Mint a record seeded from the current one and point the selection at it, leaving every other item on the original."))
-				.ContentPadding(FMargin(4, 1))
-				.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
-				.OnClicked(this, &SPCGExSketchPanel::OnMakeUniqueClicked)
+				SNew(STextBlock)
+				.Text(this, &SPCGExSketchPanel::SharedCountText)
+				.Visibility(this, &SPCGExSketchPanel::SharedCountVisibility)
 			]
 
-			+ SHorizontalBox::Slot()
-			.AutoWidth()
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0, 2, 0, 0)
 			[
-				SNew(SButton)
-				.Text(LOCTEXT("BreakLink", "Break Link"))
-				.ToolTipText(LOCTEXT("BreakLinkTip", "Drop the reference; the selection falls back to the layer schema's own values. The record itself stays until it is purged."))
-				.ContentPadding(FMargin(4, 1))
-				.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
-				.OnClicked(this, &SPCGExSketchPanel::OnBreakLinkClicked)
+				SNew(STextBlock)
+				.AutoWrapText(true)
+				.ColorAndOpacity(FStyleColors::Error)
+				.Text(LOCTEXT("DanglingRecord", "This reference names no record -- it prints as schema defaults. Break the link, or pick a record."))
+				.Visibility(this, &SPCGExSketchPanel::DanglingVisibility)
 			]
-		]
 
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0, 2, 0, 0)
-		[
-			SNew(STextBlock)
-			.Text(this, &SPCGExSketchPanel::SharedCountText)
-			.Visibility(this, &SPCGExSketchPanel::SharedCountVisibility)
-		]
-
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0, 2, 0, 0)
-		[
-			SNew(STextBlock)
-			.AutoWrapText(true)
-			.ColorAndOpacity(FStyleColors::Error)
-			.Text(LOCTEXT("DanglingRecord", "This reference names no record -- it prints as schema defaults. Break the link, or pick a record."))
-			.Visibility(this, &SPCGExSketchPanel::DanglingVisibility)
-		]
-
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0, 4, 0, 0)
-		[
-			RecordDetailsView->GetWidget().ToSharedRef()
-		];
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0, 4, 0, 0)
+			[
+				RecordDetailsView->GetWidget().ToSharedRef()
+			];
 }
 
 TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
@@ -420,7 +463,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
 			.IsEnabled(this, &SPCGExSketchPanel::IsEditingEnabled)
 			.OnClicked_Lambda([this, InOp]() -> FReply
 			{
-				if (const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController()) { InOp(*Controller); }
+				if (const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController())
+				{
+					InOp(*Controller);
+				}
 				QueueRefresh(/*bForceReseed*/ true);
 				return FReply::Handled();
 			});
@@ -440,7 +486,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
 				MakeCleanupButton(
 					LOCTEXT("MergeCollocated", "Merge Collocated"),
 					LOCTEXT("MergeCollocatedTip", "Merge every vertex resolving onto an already-occupied printed location. Clusters cannot carry collocated vertices."),
-					[](FPCGExSketchEditController& InController) { InController.MergeCollocatedVertices(); })
+					[](FPCGExSketchEditController& InController)
+					{
+						InController.MergeCollocatedVertices();
+					})
 			]
 
 			+ SWrapBox::Slot()
@@ -448,7 +497,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
 				MakeCleanupButton(
 					LOCTEXT("RemoveInvalidEdges", "Remove Invalid Edges"),
 					LOCTEXT("RemoveInvalidEdgesTip", "Drop out-of-range, self-loop and duplicate edges. Out-of-range ones are dormant until the vertex array grows past them."),
-					[](FPCGExSketchEditController& InController) { InController.RemoveInvalidEdges(); })
+					[](FPCGExSketchEditController& InController)
+					{
+						InController.RemoveInvalidEdges();
+					})
 			]
 
 			+ SWrapBox::Slot()
@@ -456,7 +508,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
 				MakeCleanupButton(
 					LOCTEXT("SplitOverlapping", "Split Overlapping Edges"),
 					LOCTEXT("SplitOverlappingTip", "Split every edge passing through a vertex, and materialize every crossing."),
-					[](FPCGExSketchEditController& InController) { InController.SplitOverlappingEdges(); })
+					[](FPCGExSketchEditController& InController)
+					{
+						InController.SplitOverlappingEdges();
+					})
 			]
 
 			+ SWrapBox::Slot()
@@ -464,7 +519,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
 				MakeCleanupButton(
 					LOCTEXT("PurgeRecords", "Purge Unused Data Records"),
 					LOCTEXT("PurgeRecordsTip", "Drop every record no item references. Never automatic -- an untransacted purge would let delete, save then undo resurrect a broken reference."),
-					[](FPCGExSketchEditController& InController) { InController.PurgeUnusedDataRecords(); })
+					[](FPCGExSketchEditController& InController)
+					{
+						InController.PurgeUnusedDataRecords();
+					})
 			]
 		]
 
@@ -538,19 +596,28 @@ TSharedPtr<FPCGExSketchEditController> SPCGExSketchPanel::ActiveController() con
 FPCGExClusterSketchModel* SPCGExSketchPanel::EditableModel() const
 {
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
-	if (!Controller || !Controller->GetTarget().CanEdit()) { return nullptr; }
+	if (!Controller || !Controller->GetTarget().CanEdit())
+	{
+		return nullptr;
+	}
 	return Controller->GetTarget().GetModel();
 }
 
 SPCGExSketchPanel::EDomain SPCGExSketchPanel::SelectionDomain() const
 {
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
-	if (!Controller) { return EDomain::None; }
+	if (!Controller)
+	{
+		return EDomain::None;
+	}
 
 	const bool bVertices = !Controller->GetSelectedVertices().IsEmpty();
 	const bool bEdges = !Controller->GetSelectedEdges().IsEmpty();
 	// Neither, or both.
-	if (bVertices == bEdges) { return EDomain::None; }
+	if (bVertices == bEdges)
+	{
+		return EDomain::None;
+	}
 	return bVertices ? EDomain::Vertex : EDomain::Edge;
 }
 
@@ -560,12 +627,18 @@ void SPCGExSketchPanel::GatherDomainSelection(const EDomain InDomain, TArray<int
 
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
 	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(Controller);
-	if (!Model || InDomain == EDomain::None) { return; }
+	if (!Model || InDomain == EDomain::None)
+	{
+		return;
+	}
 
 	const int32 Num = InDomain == EDomain::Vertex ? Model->Vertices.Num() : Model->Edges.Num();
 	for (const int32 Index : InDomain == EDomain::Vertex ? Controller->GetSelectedVertices() : Controller->GetSelectedEdges())
 	{
-		if (Index >= 0 && Index < Num) { OutIndices.Add(Index); }
+		if (Index >= 0 && Index < Num)
+		{
+			OutIndices.Add(Index);
+		}
 	}
 	OutIndices.Sort();
 }
@@ -573,14 +646,20 @@ void SPCGExSketchPanel::GatherDomainSelection(const EDomain InDomain, TArray<int
 const FPCGExSketchDataLayer* SPCGExSketchPanel::ResolveLayer(const EDomain InDomain) const
 {
 	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(ActiveController());
-	if (!Model || InDomain == EDomain::None) { return nullptr; }
+	if (!Model || InDomain == EDomain::None)
+	{
+		return nullptr;
+	}
 	return &Model->Data.GetLayer(InDomain == EDomain::Vertex);
 }
 
 FPCGExSketchDataLayer* SPCGExSketchPanel::ResolveLayerMutable(const EDomain InDomain) const
 {
 	FPCGExClusterSketchModel* Model = EditableModel();
-	if (!Model || InDomain == EDomain::None) { return nullptr; }
+	if (!Model || InDomain == EDomain::None)
+	{
+		return nullptr;
+	}
 	return &Model->Data.GetLayer(InDomain == EDomain::Vertex);
 }
 
@@ -588,11 +667,17 @@ FGuid SPCGExSketchPanel::PrimaryDataId() const
 {
 	const EDomain Domain = SelectionDomain();
 	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(ActiveController());
-	if (!Model || Domain == EDomain::None) { return FGuid(); }
+	if (!Model || Domain == EDomain::None)
+	{
+		return FGuid();
+	}
 
 	TArray<int32> Indices;
 	GatherDomainSelection(Domain, Indices);
-	if (Indices.IsEmpty()) { return FGuid(); }
+	if (Indices.IsEmpty())
+	{
+		return FGuid();
+	}
 
 	// The primary speaks for a multi-selection: the picker shows its record, and picking assigns to all.
 	return Domain == EDomain::Vertex ? Model->Vertices[Indices[0]].DataId : Model->Edges[Indices[0]].DataId;
@@ -605,7 +690,10 @@ FGuid SPCGExSketchPanel::PrimaryDataId() const
 void SPCGExSketchPanel::QueueRefresh(const bool bForceReseed)
 {
 	bForceReseedQueued |= bForceReseed;
-	if (bRefreshQueued) { return; }
+	if (bRefreshQueued)
+	{
+		return;
+	}
 
 	bRefreshQueued = true;
 	RegisterActiveTimer(
@@ -622,7 +710,10 @@ void SPCGExSketchPanel::QueueRefresh(const bool bForceReseed)
 
 void SPCGExSketchPanel::RequestRefresh()
 {
-	if (bIsSyncing) { return; }
+	if (bIsSyncing)
+	{
+		return;
+	}
 	QueueRefresh(/*bForceReseed*/ false);
 }
 
@@ -637,7 +728,10 @@ void SPCGExSketchPanel::RefreshNow(const bool bForceReseed)
 	const EDomain Domain = SelectionDomain();
 	const FGuid DataId = PrimaryDataId();
 
-	if (bForceReseed) { bValidationDirty = true; }
+	if (bForceReseed)
+	{
+		bValidationDirty = true;
+	}
 	RefreshValidation();
 
 	const bool bIdentityMoved =
@@ -648,12 +742,18 @@ void SPCGExSketchPanel::RefreshNow(const bool bForceReseed)
 		|| SeededDomain != Domain
 		|| SeededRecordId != DataId;
 
-	if (!bIdentityMoved) { return; }
+	if (!bIdentityMoved)
+	{
+		return;
+	}
 
 	// Push any focused detail widget through its normal focus-lost path BEFORE the scopes swap under
 	// it: Slate destroying a focused widget as part of the rebuild skips its commit, and its lambdas
 	// would be left referencing the replaced scope.
-	if (FSlateApplication::IsInitialized()) { FSlateApplication::Get().ClearKeyboardFocus(EFocusCause::Cleared); }
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().ClearKeyboardFocus(EFocusCause::Cleared);
+	}
 
 	SeededController = Controller;
 	SeededObject = Host;
@@ -663,7 +763,10 @@ void SPCGExSketchPanel::RefreshNow(const bool bForceReseed)
 
 	// Snap provider and decorator rows come from the details object -- the asset itself, or a component's
 	// payload, which expose the same authored properties. Schema and record rows use their own scopes.
-	if (HostDetailsView.IsValid()) { HostDetailsView->SetObject(DetailsObject, /*bForceRefresh*/ true); }
+	if (HostDetailsView.IsValid())
+	{
+		HostDetailsView->SetObject(DetailsObject, /*bForceRefresh*/ true);
+	}
 
 	SeedRecordScope();
 	SeedDataScope();
@@ -673,16 +776,25 @@ void SPCGExSketchPanel::RebindController()
 {
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
 	const TSharedPtr<FPCGExSketchEditController> Bound = BoundController.Pin();
-	if (Controller == Bound) { return; }
+	if (Controller == Bound)
+	{
+		return;
+	}
 
-	if (Bound && BoundChangedHandle.IsValid()) { Bound->OnChanged.Remove(BoundChangedHandle); }
+	if (Bound && BoundChangedHandle.IsValid())
+	{
+		Bound->OnChanged.Remove(BoundChangedHandle);
+	}
 	BoundChangedHandle.Reset();
 
 	BoundController = Controller;
 	// Revisions are per-controller counters, so the cached validation cannot be compared across a switch.
 	ValidatedRevision = INDEX_NONE;
 
-	if (Controller) { BoundChangedHandle = Controller->OnChanged.AddSP(this, &SPCGExSketchPanel::RequestRefresh); }
+	if (Controller)
+	{
+		BoundChangedHandle = Controller->OnChanged.AddSP(this, &SPCGExSketchPanel::RequestRefresh);
+	}
 }
 
 void SPCGExSketchPanel::SeedDataScope()
@@ -691,7 +803,10 @@ void SPCGExSketchPanel::SeedDataScope()
 	if (!Model)
 	{
 		DataScope.Reset();
-		if (DataDetailsView.IsValid()) { DataDetailsView->SetStructureData(nullptr); }
+		if (DataDetailsView.IsValid())
+		{
+			DataDetailsView->SetStructureData(nullptr);
+		}
 		return;
 	}
 
@@ -699,16 +814,25 @@ void SPCGExSketchPanel::SeedDataScope()
 	DataScope = MakeShared<FStructOnScope>(DataStruct);
 	DataStruct->CopyScriptStruct(DataScope->GetStructMemory(), &Model->Data);
 
-	if (DataDetailsView.IsValid()) { DataDetailsView->SetStructureData(DataScope); }
+	if (DataDetailsView.IsValid())
+	{
+		DataDetailsView->SetStructureData(DataScope);
+	}
 }
 
 void SPCGExSketchPanel::OnDataPropertyChanged(const FPropertyChangedEvent& Event)
 {
-	if (!DataScope.IsValid() || DataScope->GetStruct() != FPCGExSketchData::StaticStruct()) { return; }
+	if (!DataScope.IsValid() || DataScope->GetStruct() != FPCGExSketchData::StaticStruct())
+	{
+		return;
+	}
 
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
 	FPCGExClusterSketchModel* Model = EditableModel();
-	if (!Controller || !Model) { return; }
+	if (!Controller || !Model)
+	{
+		return;
+	}
 
 	UObject* Host = Controller->GetTarget().GetTransactionObject();
 	const FPCGExSketchData* Edited = reinterpret_cast<const FPCGExSketchData*>(DataScope->GetStructMemory());
@@ -747,7 +871,10 @@ void SPCGExSketchPanel::SeedRecordScope()
 	if (!Record)
 	{
 		RecordScope.Reset();
-		if (RecordDetailsView.IsValid()) { RecordDetailsView->SetStructureData(nullptr); }
+		if (RecordDetailsView.IsValid())
+		{
+			RecordDetailsView->SetStructureData(nullptr);
+		}
 		return;
 	}
 
@@ -755,7 +882,10 @@ void SPCGExSketchPanel::SeedRecordScope()
 	RecordScope = MakeShared<FStructOnScope>(RecordStruct);
 	RecordStruct->CopyScriptStruct(RecordScope->GetStructMemory(), Record);
 
-	if (RecordDetailsView.IsValid()) { RecordDetailsView->SetStructureData(RecordScope); }
+	if (RecordDetailsView.IsValid())
+	{
+		RecordDetailsView->SetStructureData(RecordScope);
+	}
 }
 
 bool SPCGExSketchPanel::IsHostCustomRowVisible(const FName InRowName, const FName InParentName) const
@@ -772,10 +902,16 @@ bool SPCGExSketchPanel::IsHostPropertyVisible(const FPropertyAndParent& Property
 	static const TSet<FName> Subtrees = {FName("SnapProvider"), FName("Decorators")};
 
 	const FName Name = PropertyAndParent.Property.GetFName();
-	if (Subtrees.Contains(Name)) { return true; }
+	if (Subtrees.Contains(Name))
+	{
+		return true;
+	}
 	for (const FProperty* Parent : PropertyAndParent.ParentProperties)
 	{
-		if (Parent && Subtrees.Contains(Parent->GetFName())) { return true; }
+		if (Parent && Subtrees.Contains(Parent->GetFName()))
+		{
+			return true;
+		}
 	}
 	return false;
 }
@@ -793,7 +929,10 @@ void SPCGExSketchPanel::RefreshValidation()
 	}
 
 	const int32 Revision = Controller->GetModelRevision();
-	if (Revision == ValidatedRevision && !bValidationDirty) { return; }
+	if (Revision == ValidatedRevision && !bValidationDirty)
+	{
+		return;
+	}
 	bValidationDirty = false;
 
 	ValidatedRevision = Revision;
@@ -807,13 +946,19 @@ void SPCGExSketchPanel::RefreshValidation()
 void SPCGExSketchPanel::OnRecordPropertyChanged(const FPropertyChangedEvent& Event)
 {
 	// A scope built for another struct (a stale seed across an undo) would copy across a mismatched layout.
-	if (!RecordScope.IsValid() || RecordScope->GetStruct() != FPCGExSketchDataRecord::StaticStruct()) { return; }
+	if (!RecordScope.IsValid() || RecordScope->GetStruct() != FPCGExSketchDataRecord::StaticStruct())
+	{
+		return;
+	}
 
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
 	FPCGExSketchDataLayer* Layer = ResolveLayerMutable(SeededDomain);
 	// Re-resolved BY ID, never by a cached element pointer: the array may have moved since the seed.
 	FPCGExSketchDataRecord* Record = Layer ? Layer->FindRecordMutable(SeededRecordId) : nullptr;
-	if (!Controller || !Record) { return; }
+	if (!Controller || !Record)
+	{
+		return;
+	}
 
 	UObject* Host = Controller->GetTarget().GetTransactionObject();
 	const FPCGExSketchDataRecord* Edited = reinterpret_cast<const FPCGExSketchDataRecord*>(RecordScope->GetStructMemory());
@@ -839,17 +984,29 @@ void SPCGExSketchPanel::OnRecordPropertyChanged(const FPropertyChangedEvent& Eve
 void SPCGExSketchPanel::OnHostPropertyChanged(UObject* Object, FPropertyChangedEvent& Event)
 {
 	// bIsSyncing covers the panel's own write-backs, which already re-seed.
-	if (bIsSyncing || !Object) { return; }
+	if (bIsSyncing || !Object)
+	{
+		return;
+	}
 
 	// The tier is a struct on the host's model, so a tier edit arrives as a host change like any other.
-	if (Context.ResolveSketchObject && Context.ResolveSketchObject() != Object) { return; }
+	if (Context.ResolveSketchObject && Context.ResolveSketchObject() != Object)
+	{
+		return;
+	}
 	QueueRefresh(/*bForceReseed*/ true);
 }
 
 void SPCGExSketchPanel::OnObjectTransacted(UObject* Object, const FTransactionObjectEvent& Event)
 {
-	if (Event.GetEventType() != ETransactionObjectEventType::UndoRedo) { return; }
-	if (Context.ResolveSketchObject && Context.ResolveSketchObject() != Object) { return; }
+	if (Event.GetEventType() != ETransactionObjectEventType::UndoRedo)
+	{
+		return;
+	}
+	if (Context.ResolveSketchObject && Context.ResolveSketchObject() != Object)
+	{
+		return;
+	}
 	QueueRefresh(/*bForceReseed*/ true);
 }
 
@@ -862,11 +1019,17 @@ void SPCGExSketchPanel::AssignRecord(const FGuid InRecordId)
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
 	FPCGExClusterSketchModel* Model = EditableModel();
 	const EDomain Domain = SelectionDomain();
-	if (!Controller || !Model || Domain == EDomain::None) { return; }
+	if (!Controller || !Model || Domain == EDomain::None)
+	{
+		return;
+	}
 
 	TArray<int32> Indices;
 	GatherDomainSelection(Domain, Indices);
-	if (Indices.IsEmpty()) { return; }
+	if (Indices.IsEmpty())
+	{
+		return;
+	}
 
 	UObject* Host = Controller->GetTarget().GetTransactionObject();
 
@@ -879,8 +1042,14 @@ void SPCGExSketchPanel::AssignRecord(const FGuid InRecordId)
 		// gesture, and duplicate ids across items are legal by design.
 		for (const int32 Index : Indices)
 		{
-			if (Domain == EDomain::Vertex) { Model->Vertices[Index].DataId = InRecordId; }
-			else { Model->Edges[Index].DataId = InRecordId; }
+			if (Domain == EDomain::Vertex)
+			{
+				Model->Vertices[Index].DataId = InRecordId;
+			}
+			else
+			{
+				Model->Edges[Index].DataId = InRecordId;
+			}
 		}
 
 		if (Host)
@@ -901,11 +1070,17 @@ FReply SPCGExSketchPanel::OnMakeUniqueClicked()
 	const EDomain Domain = SelectionDomain();
 	FPCGExSketchDataLayer* Layer = ResolveLayerMutable(Domain);
 	FPCGExClusterSketchModel* Model = EditableModel();
-	if (!Controller || !Model || !Layer) { return FReply::Handled(); }
+	if (!Controller || !Model || !Layer)
+	{
+		return FReply::Handled();
+	}
 
 	TArray<int32> Indices;
 	GatherDomainSelection(Domain, Indices);
-	if (Indices.IsEmpty()) { return FReply::Handled(); }
+	if (Indices.IsEmpty())
+	{
+		return FReply::Handled();
+	}
 
 	// Copied BY VALUE first: AddRecord reallocates Records, which would dangle a source pointer.
 	FName SeedLabel = Domain == EDomain::Vertex ? FName("Vertex Data") : FName("Edge Data");
@@ -928,13 +1103,22 @@ FReply SPCGExSketchPanel::OnMakeUniqueClicked()
 		const FGuid NewId = Layer->AddRecord(SeedLabel);
 		if (!SeedOverrides.IsEmpty())
 		{
-			if (FPCGExSketchDataRecord* Minted = Layer->FindRecordMutable(NewId)) { Minted->Values.Overrides = MoveTemp(SeedOverrides); }
+			if (FPCGExSketchDataRecord* Minted = Layer->FindRecordMutable(NewId))
+			{
+				Minted->Values.Overrides = MoveTemp(SeedOverrides);
+			}
 		}
 
 		for (const int32 Index : Indices)
 		{
-			if (Domain == EDomain::Vertex) { Model->Vertices[Index].DataId = NewId; }
-			else { Model->Edges[Index].DataId = NewId; }
+			if (Domain == EDomain::Vertex)
+			{
+				Model->Vertices[Index].DataId = NewId;
+			}
+			else
+			{
+				Model->Edges[Index].DataId = NewId;
+			}
 		}
 
 		if (Host)
@@ -993,7 +1177,10 @@ bool SPCGExSketchPanel::IsEditingEnabled() const
 void SPCGExSketchPanel::RefreshSketchEntries()
 {
 	CachedSketches.Reset();
-	if (Context.EnumerateSketches) { Context.EnumerateSketches(CachedSketches); }
+	if (Context.EnumerateSketches)
+	{
+		Context.EnumerateSketches(CachedSketches);
+	}
 }
 
 bool SPCGExSketchPanel::HasMultipleSketches() const
@@ -1006,7 +1193,10 @@ FText SPCGExSketchPanel::ActiveSketchLabel() const
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
 	for (const FPCGExSketchPanelEntry& Entry : CachedSketches)
 	{
-		if (Entry.Controller == Controller) { return Entry.Label; }
+		if (Entry.Controller == Controller)
+		{
+			return Entry.Label;
+		}
 	}
 	return LOCTEXT("NoActiveSketch", "No active sketch");
 }
@@ -1014,11 +1204,17 @@ FText SPCGExSketchPanel::ActiveSketchLabel() const
 FText SPCGExSketchPanel::SelectionSummaryText() const
 {
 	const TSharedPtr<FPCGExSketchEditController> Controller = ActiveController();
-	if (!Controller) { return LOCTEXT("NoSketchBound", "No sketch is bound."); }
+	if (!Controller)
+	{
+		return LOCTEXT("NoSketchBound", "No sketch is bound.");
+	}
 
 	const int32 NumVertices = Controller->GetSelectedVertices().Num();
 	const int32 NumEdges = Controller->GetSelectedEdges().Num();
-	if (NumVertices == 0 && NumEdges == 0) { return LOCTEXT("NothingSelected", "Nothing selected."); }
+	if (NumVertices == 0 && NumEdges == 0)
+	{
+		return LOCTEXT("NothingSelected", "Nothing selected.");
+	}
 
 	return FText::Format(
 		LOCTEXT("SelectionCounts", "{0} vertices, {1} edges selected."),
@@ -1028,7 +1224,10 @@ FText SPCGExSketchPanel::SelectionSummaryText() const
 FText SPCGExSketchPanel::CurrentRecordText() const
 {
 	const FGuid DataId = PrimaryDataId();
-	if (!DataId.IsValid()) { return LOCTEXT("NoRecordShort", "<None>"); }
+	if (!DataId.IsValid())
+	{
+		return LOCTEXT("NoRecordShort", "<None>");
+	}
 
 	const FPCGExSketchDataLayer* Layer = ResolveLayer(SelectionDomain());
 	const FPCGExSketchDataRecord* Record = Layer ? Layer->FindRecord(DataId) : nullptr;
@@ -1041,7 +1240,10 @@ FText SPCGExSketchPanel::SharedCountText() const
 	const FPCGExClusterSketchModel* Model = PCGExSketchPanel::ReadModel(Controller);
 	const EDomain Domain = SelectionDomain();
 	const FGuid DataId = PrimaryDataId();
-	if (!Model || Domain == EDomain::None || !DataId.IsValid()) { return FText::GetEmpty(); }
+	if (!Model || Domain == EDomain::None || !DataId.IsValid())
+	{
+		return FText::GetEmpty();
+	}
 
 	const int32 Shares = Domain == EDomain::Vertex ? Model->CountVertexReferences(DataId) : Model->CountEdgeReferences(DataId);
 	return FText::Format(LOCTEXT("SharedByN", "Shared by {0}."), FText::AsNumber(Shares));
@@ -1053,7 +1255,10 @@ FText SPCGExSketchPanel::ValidationText() const
 
 	auto AddCount = [&Lines](const int32 InCount, const FText& InLabel)
 	{
-		if (InCount > 0) { Lines.Add(FText::Format(INVTEXT("{0}: {1}"), InLabel, FText::AsNumber(InCount))); }
+		if (InCount > 0)
+		{
+			Lines.Add(FText::Format(INVTEXT("{0}: {1}"), InLabel, FText::AsNumber(InCount)));
+		}
 	};
 
 	AddCount(Validation.InvalidEdges, LOCTEXT("VInvalidEdges", "Invalid edges"));
@@ -1076,7 +1281,10 @@ FText SPCGExSketchPanel::ValidationText() const
 	AddLayer(Validation.VertexLayerIssues, LOCTEXT("LayerVertex", "Vertex layer"));
 	AddLayer(Validation.EdgeLayerIssues, LOCTEXT("LayerEdge", "Edge layer"));
 
-	if (Lines.IsEmpty()) { return LOCTEXT("ValidationClean", "No issues found."); }
+	if (Lines.IsEmpty())
+	{
+		return LOCTEXT("ValidationClean", "No issues found.");
+	}
 	return FText::Join(INVTEXT("\n"), Lines);
 }
 
@@ -1093,7 +1301,10 @@ EVisibility SPCGExSketchPanel::SharedCountVisibility() const
 EVisibility SPCGExSketchPanel::DanglingVisibility() const
 {
 	const FGuid DataId = PrimaryDataId();
-	if (!DataId.IsValid()) { return EVisibility::Collapsed; }
+	if (!DataId.IsValid())
+	{
+		return EVisibility::Collapsed;
+	}
 
 	const FPCGExSketchDataLayer* Layer = ResolveLayer(SelectionDomain());
 	return (Layer && Layer->FindRecord(DataId)) ? EVisibility::Collapsed : EVisibility::Visible;

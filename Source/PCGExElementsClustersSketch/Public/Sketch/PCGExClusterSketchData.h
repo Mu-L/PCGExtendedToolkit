@@ -123,8 +123,15 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExSketchData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 	FPCGExSketchDataLayer EdgeLayer;
 
-	FPCGExSketchDataLayer& GetLayer(const bool bVertexDomain) { return bVertexDomain ? VertexLayer : EdgeLayer; }
-	const FPCGExSketchDataLayer& GetLayer(const bool bVertexDomain) const { return bVertexDomain ? VertexLayer : EdgeLayer; }
+	FPCGExSketchDataLayer& GetLayer(const bool bVertexDomain)
+	{
+		return bVertexDomain ? VertexLayer : EdgeLayer;
+	}
+
+	const FPCGExSketchDataLayer& GetLayer(const bool bVertexDomain) const
+	{
+		return bVertexDomain ? VertexLayer : EdgeLayer;
+	}
 
 	/** Only the first holder of a record id is addressable, so duplicates are resolved before anything
 	 *  resolves against them. Safe at runtime -- touches no schema. */

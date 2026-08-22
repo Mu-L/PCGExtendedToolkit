@@ -10,14 +10,26 @@
 const FPCGExSketchDataRecord* FPCGExSketchDataLayer::FindRecord(const FGuid& InId) const
 {
 	// An invalid id must never match a record carrying one: BuildRecordIndex admits such records.
-	if (!InId.IsValid()) { return nullptr; }
-	return Records.FindByPredicate([&InId](const FPCGExSketchDataRecord& Record) { return Record.Id == InId; });
+	if (!InId.IsValid())
+	{
+		return nullptr;
+	}
+	return Records.FindByPredicate([&InId](const FPCGExSketchDataRecord& Record)
+	{
+		return Record.Id == InId;
+	});
 }
 
 FPCGExSketchDataRecord* FPCGExSketchDataLayer::FindRecordMutable(const FGuid& InId)
 {
-	if (!InId.IsValid()) { return nullptr; }
-	return Records.FindByPredicate([&InId](const FPCGExSketchDataRecord& Record) { return Record.Id == InId; });
+	if (!InId.IsValid())
+	{
+		return nullptr;
+	}
+	return Records.FindByPredicate([&InId](const FPCGExSketchDataRecord& Record)
+	{
+		return Record.Id == InId;
+	});
 }
 
 const FInstancedStruct* FPCGExSketchDataLayer::ResolveEffectiveFrom(const FPCGExSketchDataRecord* InRecord, const FName InName) const
@@ -63,17 +75,26 @@ FGuid FPCGExSketchDataLayer::AddRecord(const FName InLabel)
 
 int32 FPCGExSketchDataLayer::PurgeUnreferenced(const TConstArrayView<FGuid> InLiveIds)
 {
-	if (Records.IsEmpty()) { return 0; }
+	if (Records.IsEmpty())
+	{
+		return 0;
+	}
 
 	TSet<FGuid> Live;
 	Live.Reserve(InLiveIds.Num());
 	for (const FGuid& Id : InLiveIds)
 	{
-		if (Id.IsValid()) { Live.Add(Id); }
+		if (Id.IsValid())
+		{
+			Live.Add(Id);
+		}
 	}
 
 	const int32 Before = Records.Num();
-	Records.RemoveAll([&Live](const FPCGExSketchDataRecord& Record) { return !Live.Contains(Record.Id); });
+	Records.RemoveAll([&Live](const FPCGExSketchDataRecord& Record)
+	{
+		return !Live.Contains(Record.Id);
+	});
 	return Before - Records.Num();
 }
 
@@ -86,9 +107,15 @@ int32 FPCGExSketchDataLayer::RepairRecordIds()
 	for (FPCGExSketchDataRecord& Record : Records)
 	{
 		bool bAlreadySeen = false;
-		if (Record.Id.IsValid()) { Seen.Add(Record.Id, &bAlreadySeen); }
+		if (Record.Id.IsValid())
+		{
+			Seen.Add(Record.Id, &bAlreadySeen);
+		}
 
-		if (Record.Id.IsValid() && !bAlreadySeen) { continue; }
+		if (Record.Id.IsValid() && !bAlreadySeen)
+		{
+			continue;
+		}
 
 		// Re-minting only breaks refs that were already unreachable: the first holder wins every lookup.
 		Record.Id = FGuid::NewGuid();
@@ -105,12 +132,18 @@ void FPCGExSketchDataLayer::EDITOR_SyncRecordsToSchema()
 	// silently drops one side's values.
 	Schema.SyncAllSchemasAndRemap([this](TConstArrayView<FPCGExHeaderIdRemap> Remaps)
 	{
-		for (FPCGExSketchDataRecord& Record : Records) { Record.Values.ApplyHeaderIdRemap(Remaps); }
+		for (FPCGExSketchDataRecord& Record : Records)
+		{
+			Record.Values.ApplyHeaderIdRemap(Remaps);
+		}
 	});
 	Schema.ReconcileImportOverrides();
 
 	const TArray<FInstancedStruct> BuiltSchema = Schema.BuildSchema();
-	for (FPCGExSketchDataRecord& Record : Records) { Record.Values.SyncToSchema(BuiltSchema); }
+	for (FPCGExSketchDataRecord& Record : Records)
+	{
+		Record.Values.SyncToSchema(BuiltSchema);
+	}
 }
 #endif
 

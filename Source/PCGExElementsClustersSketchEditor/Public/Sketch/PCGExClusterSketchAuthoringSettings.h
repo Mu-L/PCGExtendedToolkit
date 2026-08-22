@@ -26,9 +26,21 @@ public:
 	static const UPCGExClusterSketchAuthoringSettings* Get();
 
 	//~ Begin UDeveloperSettings
-	virtual FName GetContainerName() const override { return "Editor"; }
-	virtual FName GetCategoryName() const override { return "Plugins"; }
-	virtual FName GetSectionName() const override { return FName("PCGEx | Cluster Sketch Authoring"); }
+	virtual FName GetContainerName() const override
+	{
+		return "Editor";
+	}
+
+	virtual FName GetCategoryName() const override
+	{
+		return "Plugins";
+	}
+
+	virtual FName GetSectionName() const override
+	{
+		return FName("PCGEx | Cluster Sketch Authoring");
+	}
+
 	//~ End UDeveloperSettings
 
 	/** Extruding hands the new vertex the source's data record, so a drafted chain carries its authored

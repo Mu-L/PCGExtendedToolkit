@@ -345,7 +345,10 @@ namespace PCGExProperties
 		{
 			using T = decltype(DummyValue);
 			T Value{};
-			if (!InProperty.TryGetValue<T>(Value)) { return; }
+			if (!InProperty.TryGetValue<T>(Value))
+			{
+				return;
+			}
 			PCGExData::Helpers::SetDataValue<T>(OutData, OutName, Value);
 			bWritten = true;
 		});
@@ -358,7 +361,10 @@ namespace PCGExProperties
 		for (const FPCGExPropertyResolved& Entry : InResolved)
 		{
 			const FPCGExProperty* Property = Entry.GetEffectiveProperty().GetPtr<FPCGExProperty>();
-			if (!Property) { continue; }
+			if (!Property)
+			{
+				continue;
+			}
 			if (WriteDataDomainValue(OutData, PCGExMetaHelpers::SanitizeAttributeName(Entry.Source->Name), *Property))
 			{
 				++NumWritten;

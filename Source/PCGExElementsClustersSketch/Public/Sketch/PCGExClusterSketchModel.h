@@ -64,10 +64,10 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchEdge
  *  caller can warn once per issue class. */
 struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchValidation
 {
-	int32 InvalidEdges = 0;      // out-of-range vertex index
+	int32 InvalidEdges = 0; // out-of-range vertex index
 	int32 SelfLoops = 0;
-	int32 DuplicateEdges = 0;    // undirected duplicates beyond the first occurrence
-	int32 IsolatedVertices = 0;  // dropped by cluster compile (clusters cannot represent them)
+	int32 DuplicateEdges = 0;   // undirected duplicates beyond the first occurrence
+	int32 IsolatedVertices = 0; // dropped by cluster compile (clusters cannot represent them)
 	/** Vertices sharing an earlier vertex's lattice coord (bound) or position (free) -- clusters cannot
 	 *  carry collocated vertices; the editor merges on drop, raw edits get warned at print. */
 	int32 CollocatedVertices = 0;
@@ -85,16 +85,30 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchValidation
 		/** Records sharing an Id; only the first is ever addressable. */
 		int32 DuplicateRecordIds = 0;
 
-		bool IsEmpty() const { return InvalidNames.IsEmpty() && DanglingRefs == 0 && DuplicateRecordIds == 0; }
-		bool Rejects(const FName InName) const { return InvalidNames.Contains(InName); }
+		bool IsEmpty() const
+		{
+			return InvalidNames.IsEmpty() && DanglingRefs == 0 && DuplicateRecordIds == 0;
+		}
+
+		bool Rejects(const FName InName) const
+		{
+			return InvalidNames.Contains(InName);
+		}
 	};
 
 	FLayerIssues SketchLayerIssues;
 	FLayerIssues VertexLayerIssues;
 	FLayerIssues EdgeLayerIssues;
 
-	bool HasEdgeIssues() const { return InvalidEdges > 0 || SelfLoops > 0 || DuplicateEdges > 0; }
-	bool HasLayerIssues() const { return !SketchLayerIssues.IsEmpty() || !VertexLayerIssues.IsEmpty() || !EdgeLayerIssues.IsEmpty(); }
+	bool HasEdgeIssues() const
+	{
+		return InvalidEdges > 0 || SelfLoops > 0 || DuplicateEdges > 0;
+	}
+
+	bool HasLayerIssues() const
+	{
+		return !SketchLayerIssues.IsEmpty() || !VertexLayerIssues.IsEmpty() || !EdgeLayerIssues.IsEmpty();
+	}
 };
 
 /** One hypothetical crossing: two edges sharing a point that is not a vertex. Offered as a ghost in the
@@ -131,8 +145,15 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchModel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (ShowOnlyInnerProperties))
 	FPCGExSketchData Data;
 
-	int32 NumVertices() const { return Vertices.Num(); }
-	int32 NumEdges() const { return Edges.Num(); }
+	int32 NumVertices() const
+	{
+		return Vertices.Num();
+	}
+
+	int32 NumEdges() const
+	{
+		return Edges.Num();
+	}
 
 	/** THE location rule, in one place: a bound vertex resolves through the basis (when one exists),
 	 *  a free one through its transform. */

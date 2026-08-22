@@ -393,7 +393,10 @@ int32 FPCGExClusterSketchModel::SplitEdgeByContainedVertices(const int32 EdgeInd
 	{
 		return 0;
 	}
-	Contained.Sort([](const TPair<double, int32>& Lhs, const TPair<double, int32>& Rhs) { return Lhs.Key < Rhs.Key; });
+	Contained.Sort([](const TPair<double, int32>& Lhs, const TPair<double, int32>& Rhs)
+	{
+		return Lhs.Key < Rhs.Key;
+	});
 
 	// Only newly created segments take the parent's record; one deduped onto existing connectivity keeps its own.
 	const FGuid ParentDataId = Edge.DataId;
@@ -483,7 +486,10 @@ int32 FPCGExClusterSketchModel::EnforceSeparationAroundVertex(const int32 Vertex
 			{
 				ChainKeys.Reset();
 				TotalChanges += SplitEdgeByContainedVertices(e, Basis, &ChainKeys);
-				for (const uint64 Key : ChainKeys) { Touched.Add(Key); } // the chain inherits the parent's scope
+				for (const uint64 Key : ChainKeys)
+				{
+					Touched.Add(Key);
+				} // the chain inherits the parent's scope
 				bChanged = true;
 				break;
 			}
@@ -860,11 +866,17 @@ void FPCGExClusterSketchModel::Validate(FPCGExClusterSketchValidation& OutSummar
 		{
 			bool bAlreadySeen = false;
 			RecordIds.Add(Record.Id, &bAlreadySeen);
-			if (bAlreadySeen || !Record.Id.IsValid()) { ++OutIssues.DuplicateRecordIds; }
+			if (bAlreadySeen || !Record.Id.IsValid())
+			{
+				++OutIssues.DuplicateRecordIds;
+			}
 		}
 		for (const FGuid& Id : InLiveIds)
 		{
-			if (!RecordIds.Contains(Id)) { ++OutIssues.DanglingRefs; }
+			if (!RecordIds.Contains(Id))
+			{
+				++OutIssues.DanglingRefs;
+			}
 		}
 	};
 
@@ -910,27 +922,51 @@ void FPCGExClusterSketchModel::GatherLiveDataIds(TArray<FGuid>& OutVertexIds, TA
 	OutEdgeIds.Reset();
 	for (const FPCGExClusterSketchVertex& V : Vertices)
 	{
-		if (V.DataId.IsValid()) { OutVertexIds.Add(V.DataId); }
+		if (V.DataId.IsValid())
+		{
+			OutVertexIds.Add(V.DataId);
+		}
 	}
 	for (const FPCGExClusterSketchEdge& E : Edges)
 	{
-		if (E.DataId.IsValid()) { OutEdgeIds.Add(E.DataId); }
+		if (E.DataId.IsValid())
+		{
+			OutEdgeIds.Add(E.DataId);
+		}
 	}
 }
 
 int32 FPCGExClusterSketchModel::CountVertexReferences(const FGuid& InDataId) const
 {
-	if (!InDataId.IsValid()) { return 0; }
+	if (!InDataId.IsValid())
+	{
+		return 0;
+	}
 	int32 Count = 0;
-	for (const FPCGExClusterSketchVertex& V : Vertices) { if (V.DataId == InDataId) { ++Count; } }
+	for (const FPCGExClusterSketchVertex& V : Vertices)
+	{
+		if (V.DataId == InDataId)
+		{
+			++Count;
+		}
+	}
 	return Count;
 }
 
 int32 FPCGExClusterSketchModel::CountEdgeReferences(const FGuid& InDataId) const
 {
-	if (!InDataId.IsValid()) { return 0; }
+	if (!InDataId.IsValid())
+	{
+		return 0;
+	}
 	int32 Count = 0;
-	for (const FPCGExClusterSketchEdge& E : Edges) { if (E.DataId == InDataId) { ++Count; } }
+	for (const FPCGExClusterSketchEdge& E : Edges)
+	{
+		if (E.DataId == InDataId)
+		{
+			++Count;
+		}
+	}
 	return Count;
 }
 

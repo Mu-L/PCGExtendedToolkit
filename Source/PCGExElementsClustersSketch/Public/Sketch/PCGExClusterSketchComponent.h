@@ -42,7 +42,10 @@ struct FPCGExClusterSketchVisualSnapshot
 	/** Component-space bounds of everything above; drives CalcBounds. */
 	FBox LocalBounds = FBox(ForceInit);
 
-	bool IsEmpty() const { return Lines.IsEmpty() && Points.IsEmpty(); }
+	bool IsEmpty() const
+	{
+		return Lines.IsEmpty() && Points.IsEmpty();
+	}
 };
 
 /**
@@ -119,7 +122,10 @@ struct FPCGExClusterSketchEditState
 			&& SetsEqual(CrossingEdges, Other.CrossingEdges);
 	}
 
-	bool operator!=(const FPCGExClusterSketchEditState& Other) const { return !(*this == Other); }
+	bool operator!=(const FPCGExClusterSketchEditState& Other) const
+	{
+		return !(*this == Other);
+	}
 };
 
 /**
@@ -223,16 +229,25 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cluster Sketch|Display", meta = (EditCondition = "bOverrideColors"))
 	FLinearColor EdgeColor = FLinearColor(0.55f, 0.55f, 0.6f);
 
-	bool HasInlineSketch() const { return InlinePayload != nullptr; }
+	bool HasInlineSketch() const
+	{
+		return InlinePayload != nullptr;
+	}
 
 	/** THE source in force, or null when this instance authored its own: payload, then own pick, then default. */
 	UPCGExClusterSketch* ResolveSketchAsset() const
 	{
-		if (InlinePayload) { return nullptr; }
+		if (InlinePayload)
+		{
+			return nullptr;
+		}
 		return SketchAsset ? SketchAsset.Get() : DefaultSketchAsset.Get();
 	}
 
-	bool IsUsingAsset() const { return ResolveSketchAsset() != nullptr; }
+	bool IsUsingAsset() const
+	{
+		return ResolveSketchAsset() != nullptr;
+	}
 
 	/** THE write path for this instance's pick -- transacted. */
 	void SetSketchAsset(UPCGExClusterSketch* InAsset);
@@ -264,7 +279,10 @@ public:
 	 *  through anything other than the details panel (the edit controller, script). */
 	void RefreshSketchVisual();
 
-	const FPCGExClusterSketchVisualSnapshot& GetVisualSnapshot() const { return VisualSnapshot; }
+	const FPCGExClusterSketchVisualSnapshot& GetVisualSnapshot() const
+	{
+		return VisualSnapshot;
+	}
 
 	/**
 	 * Hand the component what the editing host is showing. The MESH layer keeps drawing (recoloured to

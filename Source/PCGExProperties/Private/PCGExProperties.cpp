@@ -66,58 +66,76 @@ bool FPCGExProperty::PackFloats(TArrayView<float> OutFloats) const
 	case EPCGMetadataTypes::Double:
 	case EPCGMetadataTypes::Integer32:
 	case EPCGMetadataTypes::Integer64:
+	{
+		double Value = 0;
+		if (!TryGetValue<double>(Value))
 		{
-			double Value = 0;
-			if (!TryGetValue<double>(Value)) { return false; }
-			OutFloats[0] = static_cast<float>(Value);
-			return true;
+			return false;
 		}
+		OutFloats[0] = static_cast<float>(Value);
+		return true;
+	}
 	case EPCGMetadataTypes::Vector2:
+	{
+		FVector2D Value = FVector2D::ZeroVector;
+		if (!TryGetValue<FVector2D>(Value))
 		{
-			FVector2D Value = FVector2D::ZeroVector;
-			if (!TryGetValue<FVector2D>(Value)) { return false; }
-			OutFloats[0] = static_cast<float>(Value.X);
-			OutFloats[1] = static_cast<float>(Value.Y);
-			return true;
+			return false;
 		}
+		OutFloats[0] = static_cast<float>(Value.X);
+		OutFloats[1] = static_cast<float>(Value.Y);
+		return true;
+	}
 	case EPCGMetadataTypes::Vector:
+	{
+		FVector Value = FVector::ZeroVector;
+		if (!TryGetValue<FVector>(Value))
 		{
-			FVector Value = FVector::ZeroVector;
-			if (!TryGetValue<FVector>(Value)) { return false; }
-			OutFloats[0] = static_cast<float>(Value.X);
-			OutFloats[1] = static_cast<float>(Value.Y);
-			OutFloats[2] = static_cast<float>(Value.Z);
-			return true;
+			return false;
 		}
+		OutFloats[0] = static_cast<float>(Value.X);
+		OutFloats[1] = static_cast<float>(Value.Y);
+		OutFloats[2] = static_cast<float>(Value.Z);
+		return true;
+	}
 	case EPCGMetadataTypes::Vector4:
+	{
+		FVector4 Value = FVector4::Zero();
+		if (!TryGetValue<FVector4>(Value))
 		{
-			FVector4 Value = FVector4::Zero();
-			if (!TryGetValue<FVector4>(Value)) { return false; }
-			OutFloats[0] = static_cast<float>(Value.X);
-			OutFloats[1] = static_cast<float>(Value.Y);
-			OutFloats[2] = static_cast<float>(Value.Z);
-			OutFloats[3] = static_cast<float>(Value.W);
-			return true;
+			return false;
 		}
+		OutFloats[0] = static_cast<float>(Value.X);
+		OutFloats[1] = static_cast<float>(Value.Y);
+		OutFloats[2] = static_cast<float>(Value.Z);
+		OutFloats[3] = static_cast<float>(Value.W);
+		return true;
+	}
 	case EPCGMetadataTypes::Quaternion:
+	{
+		FQuat Value = FQuat::Identity;
+		if (!TryGetValue<FQuat>(Value))
 		{
-			FQuat Value = FQuat::Identity;
-			if (!TryGetValue<FQuat>(Value)) { return false; }
-			OutFloats[0] = static_cast<float>(Value.X);
-			OutFloats[1] = static_cast<float>(Value.Y);
-			OutFloats[2] = static_cast<float>(Value.Z);
-			OutFloats[3] = static_cast<float>(Value.W);
-			return true;
+			return false;
 		}
+		OutFloats[0] = static_cast<float>(Value.X);
+		OutFloats[1] = static_cast<float>(Value.Y);
+		OutFloats[2] = static_cast<float>(Value.Z);
+		OutFloats[3] = static_cast<float>(Value.W);
+		return true;
+	}
 	case EPCGMetadataTypes::Rotator:
+	{
+		FRotator Value = FRotator::ZeroRotator;
+		if (!TryGetValue<FRotator>(Value))
 		{
-			FRotator Value = FRotator::ZeroRotator;
-			if (!TryGetValue<FRotator>(Value)) { return false; }
-			OutFloats[0] = static_cast<float>(Value.Roll);
-			OutFloats[1] = static_cast<float>(Value.Pitch);
-			OutFloats[2] = static_cast<float>(Value.Yaw);
-			return true;
+			return false;
 		}
+		OutFloats[0] = static_cast<float>(Value.Roll);
+		OutFloats[1] = static_cast<float>(Value.Pitch);
+		OutFloats[2] = static_cast<float>(Value.Yaw);
+		return true;
+	}
 	default:
 		return false;
 	}
@@ -475,7 +493,10 @@ void FPCGExPropertySchemaCollection::SyncAllSchemas(TArray<FPCGExHeaderIdRemap>&
 	auto GenerateUniqueHeaderId = [&SeenHeaderIds]() -> int32
 	{
 		int32 NewId = 0;
-		do { NewId = GetTypeHash(FGuid::NewGuid()); }
+		do
+		{
+			NewId = GetTypeHash(FGuid::NewGuid());
+		}
 		while (NewId == 0 || SeenHeaderIds.Contains(NewId));
 		return NewId;
 	};
@@ -994,10 +1015,16 @@ namespace PCGExPropertySoftPaths
 		// each one's Collection to surface its leaf soft paths.
 		for (const TObjectPtr<UPCGExPropertySchemaAsset>& Asset : Collection.ImportedSchemas)
 		{
-			if (!Asset) { continue; }
+			if (!Asset)
+			{
+				continue;
+			}
 			bool bAlreadyVisited = false;
 			Visited.Add(Asset.Get(), &bAlreadyVisited);
-			if (bAlreadyVisited) { continue; }
+			if (bAlreadyVisited)
+			{
+				continue;
+			}
 			WalkCollection(Asset->Collection, Visited, OutPaths);
 		}
 	}
@@ -1009,7 +1036,10 @@ namespace PCGExProperties
 	{
 		for (const FPCGExPropertyOverrideEntry& Entry : Overrides.Overrides)
 		{
-			if (!Entry.bEnabled) { continue; }
+			if (!Entry.bEnabled)
+			{
+				continue;
+			}
 			if (const FPCGExProperty* Prop = Entry.GetProperty())
 			{
 				Prop->GatherSoftObjectPaths(OutPaths);
@@ -1028,7 +1058,10 @@ namespace PCGExProperties
 	{
 		// Already walks locals -> ImportOverrides -> imported defaults.
 		const FInstancedStruct* SchemaEntry = InSchema.GetPropertyByName(InName);
-		if (!InOverrides || !SchemaEntry) { return SchemaEntry; }
+		if (!InOverrides || !SchemaEntry)
+		{
+			return SchemaEntry;
+		}
 
 		// A type mismatch means the schema was retyped without this override being re-synced. Every
 		// CopyValueFrom is an unchecked static_cast, so handing the override back would type-pun.

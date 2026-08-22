@@ -27,25 +27,25 @@ FPCGExClusterSketchToolkit::FPCGExClusterSketchToolkit(UAssetEditor* InOwningAss
 		->AddArea
 		(
 			FTabManager::NewPrimaryArea()->SetOrientation(Orient_Vertical)
-			->Split
-			(
-				FTabManager::NewSplitter()->SetOrientation(Orient_Horizontal)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetSizeCoefficient(0.75f)
-					->AddTab(ViewportTabID, ETabState::OpenedTab)
-					->SetHideTabWell(true)
-				)
-				->Split
-				(
-					FTabManager::NewStack()
-					->SetSizeCoefficient(0.25f)
-					->AddTab(DetailsTabID, ETabState::OpenedTab)
-					->SetHideTabWell(true)
-				)
-			)
-		);
+			                             ->Split
+			                             (
+				                             FTabManager::NewSplitter()->SetOrientation(Orient_Horizontal)
+				                                                       ->Split
+				                                                       (
+					                                                       FTabManager::NewStack()
+					                                                       ->SetSizeCoefficient(0.75f)
+					                                                       ->AddTab(ViewportTabID, ETabState::OpenedTab)
+					                                                       ->SetHideTabWell(true)
+					                                                       )
+				                                                       ->Split
+				                                                       (
+					                                                       FTabManager::NewStack()
+					                                                       ->SetSizeCoefficient(0.25f)
+					                                                       ->AddTab(DetailsTabID, ETabState::OpenedTab)
+					                                                       ->SetHideTabWell(true)
+					                                                       )
+				                             )
+			);
 
 	ObjectScene = MakeShared<FAdvancedPreviewScene>(FPreviewScene::ConstructionValues());
 
@@ -119,10 +119,16 @@ void FPCGExClusterSketchToolkit::CreatePreviewSketch(UPCGExClusterSketch* InSket
 
 void FPCGExClusterSketchToolkit::EnsurePanelCreated()
 {
-	if (Panel.IsValid()) { return; }
+	if (Panel.IsValid())
+	{
+		return;
+	}
 
 	FPCGExSketchPanelContext Context;
-	Context.ResolveActiveController = [this]() { return Controller; };
+	Context.ResolveActiveController = [this]()
+	{
+		return Controller;
+	};
 	Context.ResolveSketchObject = [this]() -> UObject*
 	{
 		const UPCGExClusterSketchEditor* SketchEditor = Cast<UPCGExClusterSketchEditor>(OwningAssetEditor);
@@ -130,7 +136,10 @@ void FPCGExClusterSketchToolkit::EnsurePanelCreated()
 	};
 	Context.RequestBodyRefresh = FSimpleDelegate::CreateLambda([this]()
 	{
-		if (ViewportClient) { ViewportClient->Invalidate(); }
+		if (ViewportClient)
+		{
+			ViewportClient->Invalidate();
+		}
 	});
 
 	// No enumerator: this host edits exactly one sketch, so the panel's picker stays collapsed.

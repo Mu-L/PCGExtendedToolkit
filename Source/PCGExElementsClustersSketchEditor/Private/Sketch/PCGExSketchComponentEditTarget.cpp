@@ -46,7 +46,10 @@ void FPCGExSketchComponentEditTarget::BeginAuthoring()
 	// reference to one -- so the payload has to be transacted in its own right.
 	if (const UPCGExClusterSketchComponent* Pinned = Component.Get())
 	{
-		if (UPCGExClusterSketchPayload* Payload = Pinned->InlinePayload) { Payload->Modify(); }
+		if (UPCGExClusterSketchPayload* Payload = Pinned->InlinePayload)
+		{
+			Payload->Modify();
+		}
 	}
 }
 
