@@ -61,7 +61,8 @@ struct FPCGExSketchPanelContext
 class PCGEXELEMENTSCLUSTERSSKETCHEDITOR_API SPCGExSketchPanel : public SCompoundWidget
 {
 public:
-	enum class EPage : uint8 { Selection, Sketch };
+	/** Declaration order IS the switcher's slot order -- SetPage indexes it by cast. */
+	enum class EPage : uint8 { Selection, Sketch, Options };
 
 	SLATE_BEGIN_ARGS(SPCGExSketchPanel)
 		{
@@ -156,6 +157,11 @@ private:
 	//~ Page bodies
 	TSharedRef<SWidget> BuildSelectionPage();
 	TSharedRef<SWidget> BuildSketchPage();
+	TSharedRef<SWidget> BuildOptionsPage();
+
+	/** UDeveloperSettings only broadcasts on edit -- the Settings Editor is what normally persists it,
+	 *  so a panel-hosted view has to write the config itself. */
+	void OnAuthoringOptionChanged(const FPropertyChangedEvent& Event);
 
 	FPCGExSketchPanelContext Context;
 	EPage ActivePage = EPage::Selection;
@@ -174,6 +180,10 @@ private:
 
 	/** Rooted at the target's details object, which differs from the host: see GetDetailsObject. */
 	TSharedPtr<IDetailsView> HostDetailsView;
+
+	/** Rooted at the authoring settings CDO. Deliberately outside the read-only gate: gesture
+	 *  preferences are the user's, not the sketch's. */
+	TSharedPtr<IDetailsView> OptionsDetailsView;
 
 	/** Identity the scopes were seeded from -- what RefreshNow compares against. */
 	TWeakPtr<FPCGExSketchEditController> SeededController;

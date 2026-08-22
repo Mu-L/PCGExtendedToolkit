@@ -142,11 +142,15 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchModel
 	 *  their transform says. Invalid (ForceInit) box when there are no vertices. */
 	FBox GetBounds(const FPCGExLatticeBasis* Basis) const;
 
-	/** Append a free vertex, referencing no record. @return the new vertex index. */
-	int32 AddVertex(const FTransform& InTransform);
+	/**
+	 * Append a free vertex. InDataId is the record it reads from, defaulting to none; it is taken BY
+	 * VALUE because the append reallocates Vertices, so a reference INTO that array would dangle.
+	 * @return the new vertex index.
+	 */
+	int32 AddVertex(const FTransform& InTransform, FGuid InDataId = FGuid());
 
-	/** Append a lattice-bound vertex at Coord; location derived through the basis. */
-	int32 AddLatticeVertex(const FIntVector& InCoord, const FPCGExLatticeBasis& InBasis);
+	/** Append a lattice-bound vertex at Coord; location derived through the basis. InDataId as AddVertex. */
+	int32 AddLatticeVertex(const FIntVector& InCoord, const FPCGExLatticeBasis& InBasis, FGuid InDataId = FGuid());
 
 	/** Remove a vertex and its edges; remaining edge indices are remapped. Records are left alone --
 	 *  an unreferenced one is purged deliberately, never as a side effect. */
@@ -287,6 +291,16 @@ struct PCGEXELEMENTSCLUSTERSSKETCH_API FPCGExClusterSketchModel
 	 * @return chain splits plus crossing vertices inserted.
 	 */
 	int32 SplitOverlappingEdges(const FPCGExLatticeBasis* Basis);
+
+	/**
+	 * Record an edge extruded FROM InVertexIndex inherits: the one its source vertex's SOLE edge holds,
+	 * so a drafted chain keeps a single description of its span. A junction (2+ edges) or a loose end
+	 * (0) has no unambiguous parent and yields an invalid id.
+	 *
+	 * Resolve against the PRE-GESTURE model: the extruded edge itself would otherwise count toward the
+	 * source's degree, and enforcement splits shift edges under any index a caller held.
+	 */
+	FGuid ResolveExtrudeEdgeDataId(int32 InVertexIndex) const;
 
 	/** Every record id the model currently references, per domain -- including duplicates, so a caller
 	 *  can count shares. Invalid ids are skipped. */

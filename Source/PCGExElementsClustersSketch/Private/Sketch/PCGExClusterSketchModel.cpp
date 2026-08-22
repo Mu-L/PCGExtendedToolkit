@@ -108,17 +108,18 @@ FBox FPCGExClusterSketchModel::GetBounds(const FPCGExLatticeBasis* Basis) const
 	return Bounds;
 }
 
-int32 FPCGExClusterSketchModel::AddVertex(const FTransform& InTransform)
+int32 FPCGExClusterSketchModel::AddVertex(const FTransform& InTransform, const FGuid InDataId)
 {
 	const int32 Index = Vertices.Num();
 	FPCGExClusterSketchVertex& V = Vertices.AddDefaulted_GetRef();
 	V.Transform = InTransform;
+	V.DataId = InDataId;
 	return Index;
 }
 
-int32 FPCGExClusterSketchModel::AddLatticeVertex(const FIntVector& InCoord, const FPCGExLatticeBasis& InBasis)
+int32 FPCGExClusterSketchModel::AddLatticeVertex(const FIntVector& InCoord, const FPCGExLatticeBasis& InBasis, const FGuid InDataId)
 {
-	const int32 Index = AddVertex(FTransform(InBasis.CoordToWorld(InCoord)));
+	const int32 Index = AddVertex(FTransform(InBasis.CoordToWorld(InCoord)), InDataId);
 	FPCGExClusterSketchVertex& V = Vertices[Index];
 	V.bLatticeBound = true;
 	V.LatticeCoord = InCoord;
@@ -876,6 +877,31 @@ void FPCGExClusterSketchModel::Validate(FPCGExClusterSketchValidation& OutSummar
 	ValidateLayerNames(Data.EdgeLayer.Schema, OutSummary.EdgeLayerIssues);
 	ValidateLayerRecords(Data.VertexLayer, LiveVertexIds, OutSummary.VertexLayerIssues);
 	ValidateLayerRecords(Data.EdgeLayer, LiveEdgeIds, OutSummary.EdgeLayerIssues);
+}
+
+FGuid FPCGExClusterSketchModel::ResolveExtrudeEdgeDataId(const int32 InVertexIndex) const
+{
+	// Guarded, not assumed: an edge defaults to A/B = -1, so INDEX_NONE would match raw-authored blanks.
+	if (!Vertices.IsValidIndex(InVertexIndex))
+	{
+		return FGuid();
+	}
+
+	int32 Sole = INDEX_NONE;
+	for (int32 e = 0; e < Edges.Num(); ++e)
+	{
+		const FPCGExClusterSketchEdge& E = Edges[e];
+		if (E.A != InVertexIndex && E.B != InVertexIndex)
+		{
+			continue;
+		}
+		if (Sole != INDEX_NONE)
+		{
+			return FGuid(); // a junction: no single parent to speak for the extrusion
+		}
+		Sole = e;
+	}
+	return Sole == INDEX_NONE ? FGuid() : Edges[Sole].DataId;
 }
 
 void FPCGExClusterSketchModel::GatherLiveDataIds(TArray<FGuid>& OutVertexIds, TArray<FGuid>& OutEdgeIds) const

@@ -13,6 +13,7 @@
 #include "Helpers/PCGExObjectNotifyHelpers.h"
 #include "Misc/TransactionObjectEvent.h"
 #include "Modules/ModuleManager.h"
+#include "Sketch/PCGExClusterSketchAuthoringSettings.h"
 #include "Sketch/PCGExClusterSketchData.h"
 #include "Sketch/PCGExSketchEditController.h"
 #include "Styling/AppStyle.h"
@@ -82,6 +83,11 @@ void SPCGExSketchPanel::Construct(const FArguments& InArgs, const FPCGExSketchPa
 	DataDetailsView->GetOnFinishedChangingPropertiesDelegate().AddSP(this, &SPCGExSketchPanel::OnDataPropertyChanged);
 	HostDetailsView->SetIsPropertyEditingEnabledDelegate(EditingEnabled);
 
+	// No editing gate and no re-seeding: this view is rooted at a CDO that outlives every sketch.
+	OptionsDetailsView = PropertyModule.CreateDetailView(DetailsArgs);
+	OptionsDetailsView->SetObject(GetMutableDefault<UPCGExClusterSketchAuthoringSettings>());
+	OptionsDetailsView->OnFinishedChangingProperties().AddSP(this, &SPCGExSketchPanel::OnAuthoringOptionChanged);
+
 	RecordDetailsView->GetOnFinishedChangingPropertiesDelegate().AddSP(this, &SPCGExSketchPanel::OnRecordPropertyChanged);
 
 	// Undo restores the model wholesale under the scopes; without a host object the customizations'
@@ -104,6 +110,12 @@ void SPCGExSketchPanel::Construct(const FArguments& InArgs, const FPCGExSketchPa
 		.Padding(4.0f)
 		[
 			BuildSketchPage()
+		]
+
+		+ SWidgetSwitcher::Slot()
+		.Padding(4.0f)
+		[
+			BuildOptionsPage()
 		]
 	];
 
@@ -198,6 +210,10 @@ TSharedRef<SWidget> SPCGExSketchPanel::MakeHeader()
 				+ SSegmentedControl<EPage>::Slot(EPage::Sketch)
 				.Text(LOCTEXT("PageSketch", "Sketch"))
 				.ToolTip(LOCTEXT("PageSketchTip", "Sketch-wide properties, the per-domain schemas, cleanup and validation."))
+
+				+ SSegmentedControl<EPage>::Slot(EPage::Options)
+				.Text(LOCTEXT("PageOptions", "Options"))
+				.ToolTip(LOCTEXT("PageOptionsTip", "How the authoring gestures behave. Personal preferences, shared by every sketch."))
 			]
 
 			+ SVerticalBox::Slot()
@@ -478,6 +494,36 @@ TSharedRef<SWidget> SPCGExSketchPanel::BuildSketchPage()
 		[
 			HostDetailsView.ToSharedRef()
 		];
+}
+
+TSharedRef<SWidget> SPCGExSketchPanel::BuildOptionsPage()
+{
+	return SNew(SVerticalBox)
+
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			SNew(SBorder)
+			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
+			.Padding(FMargin(6, 4))
+			[
+				SNew(STextBlock)
+				.AutoWrapText(true)
+				.Text(LOCTEXT("OptionsPreamble", "Saved per user, and mirrored in Editor Preferences under Plugins."))
+			]
+		]
+
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0, 6, 0, 0)
+		[
+			OptionsDetailsView.ToSharedRef()
+		];
+}
+
+void SPCGExSketchPanel::OnAuthoringOptionChanged(const FPropertyChangedEvent& Event)
+{
+	GetMutableDefault<UPCGExClusterSketchAuthoringSettings>()->SaveConfig();
 }
 
 #pragma endregion

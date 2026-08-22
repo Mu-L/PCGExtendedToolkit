@@ -36,7 +36,10 @@ public class PCGExElementsClustersSketchEditor : ModuleRules
 				"SlateCore",
 				// Base collection toolkit + editor type registry for the sketch collection actions.
 				"PCGExCollectionsEditor",
-				"AssetDefinition"
+				"AssetDefinition",
+				// PUBLIC: UPCGExClusterSketchAuthoringSettings derives from UDeveloperSettings in a
+				// public header.
+				"DeveloperSettings"
 			}
 		);
 

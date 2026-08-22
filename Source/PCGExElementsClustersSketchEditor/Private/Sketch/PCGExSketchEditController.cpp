@@ -6,6 +6,7 @@
 #include "ScopedTransaction.h"
 #include "Helpers/PCGExObjectNotifyHelpers.h"
 #include "Sketch/PCGExClusterSketch.h"
+#include "Sketch/PCGExClusterSketchAuthoringSettings.h"
 #include "Sketch/PCGExClusterSketchStyle.h"
 
 #define LOCTEXT_NAMESPACE "PCGExSketchEditController"
@@ -534,6 +535,13 @@ void FPCGExSketchEditController::EndDrag(const FRay& WorldRay)
 				// The drafting gesture: release over nothing extrudes a new (snapped) vertex + edge.
 				const FScopedTransaction Transaction(LOCTEXT("ExtrudeVertex", "Extrude Sketch Vertex"));
 				Target->BeginAuthoring();
+
+				// Resolved against the PRE-GESTURE model, BY VALUE: the adds below reallocate Vertices,
+				// and the extruded edge would otherwise count toward the source's own degree.
+				const UPCGExClusterSketchAuthoringSettings* Options = UPCGExClusterSketchAuthoringSettings::Get();
+				const FGuid InheritedVertexData = Options->bExtrudeInheritsVertexData ? Model->Vertices[Source].DataId : FGuid();
+				const FGuid InheritedEdgeData = Options->bExtrudeInheritsEdgeData ? Model->ResolveExtrudeEdgeDataId(Source) : FGuid();
+
 				if (bSnapEnabled && bHasBasis)
 				{
 					// Inherit the source's unspanned components: extruding in a rank-collapsed basis
@@ -543,13 +551,21 @@ void FPCGExSketchEditController::EndDrag(const FRay& WorldRay)
 					const FIntVector Coord = SourceVertex.bLatticeBound
 						                         ? Basis.SnapWorldToCoordPreserving(PlacePoint, SourceVertex.LatticeCoord)
 						                         : Basis.SnapWorldToCoord(PlacePoint);
-					FarVertex = Model->AddLatticeVertex(Coord, Basis);
+					FarVertex = Model->AddLatticeVertex(Coord, Basis, InheritedVertexData);
 				}
 				else
 				{
-					FarVertex = Model->AddVertex(FTransform(PlacePoint));
+					FarVertex = Model->AddVertex(FTransform(PlacePoint), InheritedVertexData);
 				}
-				Model->Connect(Source, FarVertex);
+
+				// Stamped before enforcement: a split then carries the record like any parent edge.
+				bool bEdgeCreated = false;
+				const int32 NewEdge = Model->Connect(Source, FarVertex, &bEdgeCreated);
+				if (bEdgeCreated && InheritedEdgeData.IsValid())
+				{
+					Model->Edges[NewEdge].DataId = InheritedEdgeData;
+				}
+
 				Model->MarkVertexAuthored(Source); // extruding FROM a tool-inserted vertex adopts it
 				Model->EnforceSeparationAroundVertex(FarVertex, bHasBasis ? &Basis : nullptr);
 			}
