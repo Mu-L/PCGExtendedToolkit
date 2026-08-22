@@ -325,6 +325,12 @@ bool UPCGExSketchEditorMode::InputKey(FEditorViewportClient* ViewportClient, FVi
 {
 	if (Event == IE_Pressed && InputBinder && InputBinder->HandleKeyDown(Key))
 	{
+		// A level viewport is not realtime: a key that only moves a placement guide changes nothing the
+		// viewport would repaint for on its own.
+		if (ViewportClient)
+		{
+			ViewportClient->Invalidate();
+		}
 		return true;
 	}
 	return Super::InputKey(ViewportClient, Viewport, Key, Event);

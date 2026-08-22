@@ -76,6 +76,15 @@ void UPCGExSketchInputBinder::ForEach(TFunctionRef<void(FPCGExSketchEditControll
 
 bool UPCGExSketchInputBinder::HandleKeyDown(const FKey& InKey)
 {
+	if (InKey == EKeys::Tab)
+	{
+		// Consumed ONLY while a placement gesture is live, so Tab keeps its editor-wide meaning
+		// everywhere else.
+		bool bCycled = false;
+		ForEach([&bCycled](FPCGExSketchEditController& Controller) { bCycled |= Controller.CyclePlacementGuide(); });
+		return bCycled;
+	}
+
 	if (InKey == EKeys::Delete)
 	{
 		bool bDeleted = false;
@@ -92,6 +101,14 @@ bool UPCGExSketchInputBinder::HandleKeyDown(const FKey& InKey)
 
 	if (InKey == EKeys::Escape)
 	{
+		// Least destructive first: a held guide is released before the gesture holding it is abandoned.
+		bool bReleased = false;
+		ForEach([&bReleased](FPCGExSketchEditController& Controller) { bReleased |= Controller.ReleasePlacementGuide(); });
+		if (bReleased)
+		{
+			return true;
+		}
+
 		bool bHandled = false;
 		ForEach([&bHandled](FPCGExSketchEditController& Controller)
 		{
@@ -239,9 +256,14 @@ void UPCGExSketchInputBinder::OnEndHover()
 
 void UPCGExSketchInputBinder::OnUpdateModifierState(const int ModifierID, const bool bIsOn)
 {
+	// The ITF re-reports every registered modifier on EVERY capture update, not just on change, so
+	// anything with a cost behind it has to diff first.
 	if (ModifierID == PCGExSketchInputBinder::CtrlModifierID)
 	{
+		if (bCtrlDown == bIsOn) { return; }
 		bCtrlDown = bIsOn;
+		// Ctrl on empty space ADDS: preview where, guide included, before the click commits it.
+		ForEach([bIsOn](FPCGExSketchEditController& Controller) { Controller.SetAddIntent(bIsOn); });
 	}
 	else if (ModifierID == PCGExSketchInputBinder::ShiftModifierID)
 	{
@@ -249,6 +271,7 @@ void UPCGExSketchInputBinder::OnUpdateModifierState(const int ModifierID, const 
 	}
 	else if (ModifierID == PCGExSketchInputBinder::AltModifierID)
 	{
+		if (bAltDown == bIsOn) { return; }
 		bAltDown = bIsOn;
 		// The hovered element renders as a delete target while the modifier is held.
 		ForEach([bIsOn](FPCGExSketchEditController& Controller) { Controller.SetDeleteIntent(bIsOn); });

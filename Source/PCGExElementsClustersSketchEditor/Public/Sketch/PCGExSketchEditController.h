@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "Lattice/PCGExLatticeBasis.h"
 #include "Sketch/PCGExClusterSketchModel.h"
+#include "Sketch/PCGExSketchPlacement.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 
 class FScopedTransaction;
@@ -185,6 +186,31 @@ public:
 	/** Host sets this while its delete modifier is held; the hovered element draws as a delete target. */
 	void SetDeleteIntent(const bool bIntent) { bDeleteIntent = bIntent; }
 	bool GetDeleteIntent() const { return bDeleteIntent; }
+
+	/** Host sets this while its ADD modifier is held. Hovering then previews where a vertex would land,
+	 *  guide included -- an inferred guide the user cannot see before committing is one they cannot
+	 *  steer. */
+	void SetAddIntent(bool bIntent);
+	bool GetAddIntent() const { return bAddIntent; }
+
+	//~ Placement guides
+	/** Step the active guide to the next candidate; past the last one, back to inference. Re-resolves
+	 *  against the last cursor ray, since the key that triggers this carries none. @return true when a
+	 *  gesture was live to steer. */
+	bool CyclePlacementGuide();
+	/** Drop the active guide until the next cycle. @return true when there was one to drop. */
+	bool ReleasePlacementGuide();
+	/** Re-run the live gesture against the last cursor ray. For modifier and key changes, which reach a
+	 *  drag WITHOUT a fresh ray -- the ITF hands a capture the keyboard state, whose mouse data is
+	 *  invalid, so no drag update follows on its own. */
+	void RefreshPlacement();
+
+	const FPCGExSketchPlacementSolver& GetPlacement() const { return Placement; }
+	/** True while a gesture (drag or add-intent hover) has a live placement point to draw. */
+	bool HasPlacementPreview() const { return DragMode != EDragMode::None || bHasAddPreview; }
+	/** Where the live gesture currently points, in MODEL space. A drag outranks the add ghost, so
+	 *  consumers never have to rank the two themselves and cannot disagree about which is live. */
+	const FVector& GetPlacementPoint() const { return DragMode != EDragMode::None ? DragPreviewLocal : AddPreviewLocal; }
 	/** Basis from the target's provider; false when there is none. Rebuilt on demand -- never cached. */
 	bool GetBasis(FPCGExLatticeBasis& OutBasis) const;
 
@@ -202,6 +228,10 @@ public:
 	int32 GetDragTargetVertex() const { return DragTargetVertexIndex; }
 	/** Current drag point in MODEL space (snap already applied) -- the move ghost / connect line end. */
 	const FVector& GetDragPreviewLocal() const { return DragPreviewLocal; }
+	/** Where an ADD would land right now, in MODEL space; only meaningful while GetAddIntent() and
+	 *  nothing is hovered. */
+	bool HasAddPreview() const { return bHasAddPreview; }
+	const FVector& GetAddPreviewLocal() const { return AddPreviewLocal; }
 	/** Vertex the dragged one would MERGE into on release (clusters cannot hold collocated vertices);
 	 *  INDEX_NONE when the drop point is clear. Drawn as the merge highlight. */
 	int32 GetMergeCandidate() const { return MergeCandidateVertex; }
@@ -232,9 +262,30 @@ private:
 	static double GhostPickFloor();
 	static double EdgePickFloor();
 	FVector VertexLocation(const FPCGExClusterSketchVertex& V, const FPCGExLatticeBasis* Basis) const;
-	/** Ray point on the gesture plane: through InAnchor, lattice-plane normal for a 2-axis basis, else
-	 *  Z-up; falls back to a fixed distance along the ray when near-parallel. */
-	FVector RayPointOnWorkPlane(const FRay& LocalRay, const FVector& InAnchor, const FPCGExLatticeBasis* Basis) const;
+
+	/** Which gesture the placement solver is currently anchored for. */
+	enum class EPlacementGesture : uint8 { None, Add, Move, Connect };
+
+	/** Point the solver at a gesture. Re-anchors -- which DROPS the guide latch -- only when the gesture
+	 *  or its anchor actually changed, so a hover keeps its hysteresis from frame to frame. */
+	void EnsurePlacementGesture(EPlacementGesture InGesture, int32 InAnchorVertex, const FVector& InAnchor, const FPCGExLatticeBasis* Basis, bool bPointWillSnap);
+
+	/** Everything an add gesture resolves to, previewed and committed through the same call so the two
+	 *  can never disagree about where the vertex goes. */
+	struct FAddPlacement
+	{
+		FVector Point = FVector::ZeroVector;
+		/** Anchor's lattice coord, donated to the new vertex so an add in a rank-collapsed basis stays
+		 *  on the anchor's hidden layer. Only when bHasAnchorLayer. */
+		FIntVector AnchorCoord = FIntVector::ZeroValue;
+		bool bHasAnchorLayer = false;
+		bool bResolved = false;
+	};
+	FAddPlacement ResolveAddPlacement(const FRay& LocalRay, const FPCGExLatticeBasis* Basis);
+
+	/** The drag body, against a MODEL-space ray. Split out so a modifier or key change can re-run it
+	 *  against the cached ray, which is the only one those events carry. */
+	void ApplyDrag(const FRay& LocalRay);
 	/** Nearest vertex (excluding IgnoreVertex) whose resolved location sits within merge reach of
 	 *  LocalPoint -- pick radius, capped below half a cell so it can never bridge adjacent lattice
 	 *  nodes. Drives merge-on-drop and place-reuse. LayerRef breaks projection stacks: under a
@@ -270,15 +321,28 @@ private:
 	int32 DragTargetVertexIndex = INDEX_NONE;
 	int32 MergeCandidateVertex = INDEX_NONE;
 	FVector DragPreviewLocal = FVector::ZeroVector;
-	FVector DragPlaneAnchor = FVector::ZeroVector;
-	FVector DragPlaneNormal = FVector::UpVector;
 	/** Basis snapshot for the duration of one drag, so mid-drag provider edits can't tear it. */
 	FPCGExLatticeBasis DragBasis;
 	bool bDragHasBasis = false;
 
 	TUniquePtr<FScopedTransaction> ActiveTransaction;
 
+	/** Cursor ray to work plane and guides, for every gesture. */
+	FPCGExSketchPlacementSolver Placement;
+	EPlacementGesture PlacementGesture = EPlacementGesture::None;
+	int32 PlacementAnchorVertex = INDEX_NONE;
+	FVector PlacementAnchor = FVector::ZeroVector;
+
+	/** Last cursor ray in MODEL space. A key or modifier event reaches a live gesture carrying no valid
+	 *  mouse data, so re-resolving one has nothing else to aim at. */
+	FRay LastLocalRay;
+	bool bHasLastLocalRay = false;
+
+	FVector AddPreviewLocal = FVector::ZeroVector;
+	bool bHasAddPreview = false;
+
 	bool bSnapEnabled = true;
 	bool bConnectToHover = true;
 	bool bDeleteIntent = false;
+	bool bAddIntent = false;
 };
