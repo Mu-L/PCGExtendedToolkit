@@ -2859,6 +2859,12 @@ const UScriptStruct* UPCGExAssetCollection::EDITOR_GetEntryScriptStruct(int32 Ra
 
 FPCGExAssetCollectionEntry* UPCGExAssetCollection::EDITOR_AddEntry(const UScriptStruct* EntryStruct)
 {
+	return AddEntryOfType(EntryStruct);
+}
+#endif
+
+FPCGExAssetCollectionEntry* UPCGExAssetCollection::AddEntryOfType(const UScriptStruct* EntryStruct)
+{
 	FArrayProperty* ArrayProp = CastField<FArrayProperty>(GetClass()->FindPropertyByName(FName("Entries")));
 	const FStructProperty* InnerProp = ArrayProp ? CastField<FStructProperty>(ArrayProp->Inner) : nullptr;
 
@@ -2879,4 +2885,3 @@ FPCGExAssetCollectionEntry* UPCGExAssetCollection::EDITOR_AddEntry(const UScript
 	const int32 NewIndex = ArrayHelper.AddValue();
 	return reinterpret_cast<FPCGExAssetCollectionEntry*>(ArrayHelper.GetRawPtr(NewIndex));
 }
-#endif
