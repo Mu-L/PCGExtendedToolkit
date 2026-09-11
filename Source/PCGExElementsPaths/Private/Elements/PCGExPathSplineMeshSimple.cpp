@@ -108,6 +108,22 @@ void FPCGExPathSplineMeshSimpleContext::RegisterAssetDependencies()
 	}
 }
 
+TArray<FPCGPinProperties> UPCGExPathSplineMeshSimpleSettings::InputPinProperties() const
+{
+	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
+	PCGExTangents::DeclareTangentsPins(PinProperties);
+	return PinProperties;
+}
+
+bool UPCGExPathSplineMeshSimpleSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
+{
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !PCGExTangents::WantsTangentSources(Tangents))
+	{
+		return false;
+	}
+	return Super::IsPinUsedByNodeExecution(InPin);
+}
+
 bool FPCGExPathSplineMeshSimpleElement::Boot(FPCGExContext* InContext) const
 {
 	if (!FPCGExPathProcessorElement::Boot(InContext))

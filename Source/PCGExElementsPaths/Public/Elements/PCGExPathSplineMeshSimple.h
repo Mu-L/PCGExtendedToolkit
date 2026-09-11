@@ -61,8 +61,12 @@ public:
 	virtual void PostInitProperties() override;
 #endif
 
+public:
+	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
+
 protected:
 	virtual FPCGElementPtr CreateElement() const override;
+	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	//~End UPCGSettings
 
 	virtual PCGExData::EIOInit GetMainDataInitializationPolicy() const override;

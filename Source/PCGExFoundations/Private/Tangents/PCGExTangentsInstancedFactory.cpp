@@ -3,7 +3,10 @@
 
 #include "Tangents/PCGExTangentsInstancedFactory.h"
 
+#include "PCGParamData.h"
+#include "PCGPin.h"
 #include "Core/PCGExContext.h"
+#include "Data/PCGPolyLineData.h"
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExMetaHelpers.h"
@@ -108,7 +111,7 @@ namespace PCGExTangents
 			Tangents = InDetails.Tangents->CreateOperation();
 			Tangents->bClosedLoop = bClosedLoop;
 
-			if (!Tangents->PrepareForData(InContext))
+			if (!Tangents->PrepareForData(InContext, InDataFacade))
 			{
 				return false;
 			}
@@ -117,9 +120,8 @@ namespace PCGExTangents
 			{
 				StartTangents = InDetails.StartTangents->CreateOperation();
 				StartTangents->bClosedLoop = bClosedLoop;
-				StartTangents->PrimaryDataFacade = InDataFacade;
 
-				if (!StartTangents->PrepareForData(InContext))
+				if (!StartTangents->PrepareForData(InContext, InDataFacade))
 				{
 					return false;
 				}
@@ -133,9 +135,8 @@ namespace PCGExTangents
 			{
 				EndTangents = InDetails.EndTangents->CreateOperation();
 				EndTangents->bClosedLoop = bClosedLoop;
-				EndTangents->PrimaryDataFacade = InDataFacade;
 
-				if (!EndTangents->PrepareForData(InContext))
+				if (!EndTangents->PrepareForData(InContext, InDataFacade))
 				{
 					return false;
 				}
@@ -338,5 +339,25 @@ namespace PCGExTangents
 				Tangents->ProcessPoint(PointData, Index, NextIndex, PrevIndex, InScale, Dummy, InScale, OutDir);
 			}
 		}
+	}
+
+	void DeclareTangentsPins(TArray<FPCGPinProperties>& PinProperties)
+	{
+		PCGEX_PIN_POLYLINES(SourceTangentSourcesLabel, "Reference splines read by spline-driven tangent modules (e.g. From Spline).", Normal)
+		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangents)
+		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangentsStart)
+		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangentsEnd)
+	}
+
+	bool WantsTangentSources(const UPCGExTangentsInstancedFactory* InTangents, const UPCGExTangentsInstancedFactory* InStartTangents, const UPCGExTangentsInstancedFactory* InEndTangents)
+	{
+		return (InTangents && InTangents->WantsTangentSources())
+			|| (InStartTangents && InStartTangents->WantsTangentSources())
+			|| (InEndTangents && InEndTangents->WantsTangentSources());
+	}
+
+	bool WantsTangentSources(const FPCGExTangentsDetails& InDetails)
+	{
+		return InDetails.Source == EPCGExTangentSource::InPlace && WantsTangentSources(InDetails.Tangents, InDetails.StartTangents, InDetails.EndTangents);
 	}
 }

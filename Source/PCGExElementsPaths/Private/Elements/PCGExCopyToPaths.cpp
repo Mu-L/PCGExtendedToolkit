@@ -57,6 +57,7 @@ TArray<FPCGPinProperties> UPCGExCopyToPathsSettings::InputPinProperties() const
 	PCGEX_PIN_ANY(PCGExCommon::Labels::SourceTargetsLabel, "Paths or splines to deform along", Required)
 	PCGExMatching::Helpers::DeclareMatchingRulesInputs(DataMatching, PinProperties);
 	PCGEX_PIN_POINTS(PCGExCommon::Labels::SourceBoundsLabel, "Point data that will be used as unified bounds for all inputs", Normal)
+	PCGExTangents::DeclareTangentsPins(PinProperties);
 	return PinProperties;
 }
 
@@ -72,6 +73,14 @@ bool UPCGExCopyToPathsSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) c
 	if (InPin->Properties.Label == PCGExCommon::Labels::SourceBoundsLabel)
 	{
 		return InPin->EdgeCount() > 0;
+	}
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel)
+	{
+		const bool bUsesTangents = bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
+		if (!bUsesTangents || !PCGExTangents::WantsTangentSources(Tangents))
+		{
+			return false;
+		}
 	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }

@@ -54,9 +54,7 @@ void UPCGExWriteTangentsSettings::PostInitProperties()
 TArray<FPCGPinProperties> UPCGExWriteTangentsSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	PCGEX_PIN_OPERATION_OVERRIDES(PCGExTangents::SourceOverridesTangents)
-	PCGEX_PIN_OPERATION_OVERRIDES(PCGExTangents::SourceOverridesTangentsStart)
-	PCGEX_PIN_OPERATION_OVERRIDES(PCGExTangents::SourceOverridesTangentsEnd)
+	PCGExTangents::DeclareTangentsPins(PinProperties);
 	return PinProperties;
 }
 
@@ -72,6 +70,15 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL(WriteTangents)
 FName UPCGExWriteTangentsSettings::GetPointFilterPin() const
 {
 	return PCGExFilters::Labels::SourcePointFiltersLabel;
+}
+
+bool UPCGExWriteTangentsSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
+{
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !PCGExTangents::WantsTangentSources(Tangents, StartTangents, EndTangents))
+	{
+		return false;
+	}
+	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
 UPCGExWriteTangentsSettings::UPCGExWriteTangentsSettings(const FObjectInitializer& ObjectInitializer)
@@ -173,7 +180,7 @@ namespace PCGExWriteTangents
 		Tangents = Context->Tangents->CreateOperation();
 		Tangents->bClosedLoop = bClosedLoop;
 
-		if (!Tangents->PrepareForData(Context))
+		if (!Tangents->PrepareForData(Context, PointDataFacade))
 		{
 			return false;
 		}
@@ -194,9 +201,8 @@ namespace PCGExWriteTangents
 		{
 			StartTangents = Context->StartTangents->CreateOperation();
 			StartTangents->bClosedLoop = bClosedLoop;
-			StartTangents->PrimaryDataFacade = PointDataFacade;
 
-			if (!StartTangents->PrepareForData(Context))
+			if (!StartTangents->PrepareForData(Context, PointDataFacade))
 			{
 				return false;
 			}
@@ -210,9 +216,8 @@ namespace PCGExWriteTangents
 		{
 			EndTangents = Context->EndTangents->CreateOperation();
 			EndTangents->bClosedLoop = bClosedLoop;
-			EndTangents->PrimaryDataFacade = PointDataFacade;
 
-			if (!EndTangents->PrepareForData(Context))
+			if (!EndTangents->PrepareForData(Context, PointDataFacade))
 			{
 				return false;
 			}

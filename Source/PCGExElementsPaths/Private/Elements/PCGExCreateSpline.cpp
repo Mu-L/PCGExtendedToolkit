@@ -42,6 +42,26 @@ bool UPCGExCreateSplineSettings::ShouldCache() const
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(CreateSpline)
 
+TArray<FPCGPinProperties> UPCGExCreateSplineSettings::InputPinProperties() const
+{
+	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
+	PCGExTangents::DeclareTangentsPins(PinProperties);
+	return PinProperties;
+}
+
+bool UPCGExCreateSplineSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
+{
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel)
+	{
+		const bool bUsesTangents = bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
+		if (!bUsesTangents || !PCGExTangents::WantsTangentSources(Tangents))
+		{
+			return false;
+		}
+	}
+	return Super::IsPinUsedByNodeExecution(InPin);
+}
+
 TArray<FPCGPinProperties> UPCGExCreateSplineSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;

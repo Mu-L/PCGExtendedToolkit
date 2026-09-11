@@ -108,6 +108,10 @@ bool UPCGExPathSplineMeshSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin
 	{
 		return false;
 	}
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !PCGExTangents::WantsTangentSources(Tangents))
+	{
+		return false;
+	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }
 
@@ -143,6 +147,13 @@ void UPCGExPathSplineMeshSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPi
 	}
 
 	Super::InputPinPropertiesBeforeFilters(PinProperties);
+}
+
+TArray<FPCGPinProperties> UPCGExPathSplineMeshSettings::InputPinProperties() const
+{
+	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
+	PCGExTangents::DeclareTangentsPins(PinProperties);
+	return PinProperties;
 }
 
 PCGEX_ELEMENT_BATCH_POINT_IMPL(PathSplineMesh)

@@ -43,6 +43,7 @@ protected:
 
 public:
 	virtual FName GetPointFilterPin() const override;
+	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta=(PCG_Overridable))
 	FName ArriveName = "ArriveTangent";
