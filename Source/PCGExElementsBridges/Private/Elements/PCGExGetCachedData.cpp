@@ -108,8 +108,7 @@ bool FPCGExGetCachedDataElement::Boot(FPCGExContext* InContext) const
 	// Engine mirror (FPCGDataFromActorElement::ProcessActor): data owned by an actor outside the source's persistent
 	// level is duplicated to the transient package, so the graph cache never pins that level's objects.
 	const IPCGGraphExecutionSource* Source = Context->ExecutionSource.Get();
-	const IPCGGraphExecutionSource* OriginalSource = Source ? Source->GetExecutionState().GetOriginalSource() : nullptr;
-	const UObject* SourceOwner = OriginalSource ? OriginalSource->GetExecutionState().GetTarget() : nullptr;
+	const AActor* SourceOwner = PCGExDataCache::GetSourceActor(Source ? Source->GetExecutionState().GetOriginalSource() : nullptr);
 	const ULevel* PersistentLevel = (SourceOwner && SourceOwner->GetWorld()) ? SourceOwner->GetWorld()->PersistentLevel : nullptr;
 #endif
 

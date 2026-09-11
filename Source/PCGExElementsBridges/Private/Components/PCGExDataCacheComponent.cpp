@@ -3,6 +3,7 @@
 
 #include "Components/PCGExDataCacheComponent.h"
 
+#include "Data/PCGBasePointData.h"
 #include "Data/PCGSpatialData.h"
 #include "Metadata/PCGMetadata.h"
 
@@ -11,6 +12,7 @@
 #include "UObject/Package.h"
 
 #include "PCGExLog.h"
+#include "PCGExVersion.h"
 #include "Helpers/PCGExDataCacheHelpers.h"
 
 #if WITH_EDITOR
@@ -310,8 +312,13 @@ TArray<FPCGTaggedData> UPCGExDataCacheComponent::AdoptData(TArray<FPCGTaggedData
 
 		// A fresh duplicate may still be a lazy copy of its source; only then is the (per-entry) flatten worth paying.
 		const UPCGMetadata* Metadata = Data->ConstMetadata();
-		const UPCGSpatialData* Spatial = Cast<UPCGSpatialData>(Data);
-		if ((Metadata && Metadata->GetParent()) || (Spatial && Spatial->HasSpatialDataParent())) { Data->Flatten(); }
+#if PCGEX_ENGINE_VERSION >= 508
+		const UPCGSpatialData* Parented = Cast<UPCGSpatialData>(Data);
+#else
+		// 5.7 declares HasSpatialDataParent on point data only.
+		const UPCGBasePointData* Parented = Cast<UPCGBasePointData>(Data);
+#endif
+		if ((Metadata && Metadata->GetParent()) || (Parented && Parented->HasSpatialDataParent())) { Data->Flatten(); }
 
 		if (!PCGExDataCache::IsSelfContained(Data))
 		{

@@ -165,7 +165,7 @@ bool FPCGExSetCachedDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	check(IsInGameThread());
 
 	IPCGGraphExecutionSource* Source = Context->ExecutionSource.Get();
-	const bool bPreview = Source && Source->GetExecutionState().IsInPreviewMode();
+	const bool bPreview = PCGExDataCache::IsSourceInPreviewMode(Source);
 	UObject* Writer = Cast<UObject>(Source);
 
 	bool bAppend = false;

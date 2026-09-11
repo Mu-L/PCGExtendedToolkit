@@ -12,6 +12,7 @@
 #include "PCGExDataCacheHelpers.generated.h"
 
 class AActor;
+class IPCGGraphExecutionSource;
 class UPCGData;
 struct FPCGExContext;
 
@@ -49,6 +50,12 @@ namespace PCGExDataCache
 
 	/** True when the settings live on a node whose Target Actor pin has an edge. */
 	PCGEXELEMENTSBRIDGES_API bool IsTargetPinConnected(const UPCGSettings* InSettings);
+
+	/** The actor a source executes on (its owner). 5.7's execution-state interface has no target query, hence the seam. */
+	PCGEXELEMENTSBRIDGES_API AActor* GetSourceActor(const IPCGGraphExecutionSource* InSource);
+
+	/** Whether a source generates in preview editing mode. Same 5.7 seam as GetSourceActor. */
+	PCGEXELEMENTSBRIDGES_API bool IsSourceInPreviewMode(const IPCGGraphExecutionSource* InSource);
 }
 
 /** Shared target-actor surface of Set Cached Data and Get Cached Data. */
