@@ -4,11 +4,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Metadata/PCGAttributePropertySelector.h"
+#include "PCGPin.h"
+
+#include "Data/PCGExDataTags.h" // TagSeparator
 
 #include "PCGExDataCacheHelpers.generated.h"
 
 class AActor;
+class UPCGSettings;
 struct FPCGExContext;
 
 UENUM()
@@ -25,18 +28,31 @@ namespace PCGExDataCache
 	const FName StatusPinLabel = TEXT("Status");
 
 	const FName FoundAttributeName = TEXT("Found");
-	const FName EntryCountAttributeName = TEXT("EntryCount");
+	const FName DataCountAttributeName = TEXT("DataCount");
 	const FName CacheIDAttributeName = TEXT("CacheID");
-	const FString CacheIDTagPrefix = TEXT("CacheID:");
+
+	/** 'CacheID:<id>' -- a Key:Value tag every PCGEx tag reader parses. */
+	inline FString MakeCacheIDTag(const FName InId)
+	{
+		return CacheIDAttributeName.ToString() + PCGExData::TagSeparator + InId.ToString();
+	}
 
 	/**
 	 * Game thread only (resolves soft paths, may spawn the PCG World Actor). When the Target Actor pin carries
 	 * data, every unique actor referenced by InActorReferenceAttribute is a target (a component reference resolves
-	 * to its owner); otherwise the single actor named by InTarget.
+	 * to its owner); otherwise the single actor named by InTarget. bCreateWorldActor: spawn the world actor if
+	 * missing (writers) or only find it (readers).
 	 */
 	PCGEXELEMENTSBRIDGES_API void ResolveTargetActors(
 		FPCGExContext* InContext,
 		const EPCGExDataCacheTarget InTarget,
-		const FPCGAttributePropertyInputSelector& InActorReferenceAttribute,
+		const FName InActorReferenceAttribute,
+		const bool bCreateWorldActor,
 		TArray<AActor*>& OutActors);
+
+	/** User-declared pins minus None labels, reserved labels and duplicates. Set and Get must agree on this. */
+	PCGEXELEMENTSBRIDGES_API TArray<FPCGPinProperties> SanitizePins(const TArray<FPCGPinProperties>& InPins, const TArrayView<const FName> InReservedLabels);
+
+	/** True when the settings live on a node whose Target Actor pin has an edge. */
+	PCGEXELEMENTSBRIDGES_API bool IsTargetPinConnected(const UPCGSettings* InSettings);
 }

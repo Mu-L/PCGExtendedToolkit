@@ -4,9 +4,7 @@
 #include "Elements/PCGExGetCachedData.h"
 
 #include "PCGContext.h"
-#include "PCGModule.h"
 #include "PCGGraphExecutionStateInterface.h"
-#include "PCGNode.h"
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Data/PCGBasePointData.h" // PCGPointDataConstants
@@ -26,22 +24,10 @@
 
 #pragma region UPCGExGetCachedDataSettings
 
-UPCGExGetCachedDataSettings::UPCGExGetCachedDataSettings(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
-{
-	ActorReferenceAttribute.SetAttributeName(PCGPointDataConstants::ActorReferenceAttribute);
-}
-
 #if WITH_EDITOR
 FLinearColor UPCGExGetCachedDataSettings::GetNodeTitleColor() const
 {
 	return PCGEX_NODE_COLOR_OPTIN_NAME(Action);
-}
-
-bool UPCGExGetCachedDataSettings::IsTargetPinUnconnected() const
-{
-	const UPCGNode* Node = Cast<UPCGNode>(GetOuter());
-	return !Node || !Node->IsInputPinConnected(PCGExDataCache::TargetActorPinLabel);
 }
 #endif
 
@@ -53,17 +39,8 @@ FString UPCGExGetCachedDataSettings::GetAdditionalTitleInformation() const
 
 TArray<FPCGPinProperties> UPCGExGetCachedDataSettings::GetSanitizedCustomOutputPins() const
 {
-	TArray<FPCGPinProperties> Pins;
-	TSet<FName> Seen = {PCGPinConstants::DefaultOutputLabel, PCGExDataCache::StatusPinLabel};
-
-	for (const FPCGPinProperties& Pin : CustomOutputPins)
-	{
-		if (Pin.Label.IsNone() || Seen.Contains(Pin.Label)) { continue; }
-		Seen.Add(Pin.Label);
-		Pins.Add(Pin);
-	}
-
-	return Pins;
+	const FName Reserved[] = {PCGPinConstants::DefaultOutputLabel, PCGExDataCache::StatusPinLabel};
+	return PCGExDataCache::SanitizePins(CustomOutputPins, Reserved);
 }
 
 TArray<FPCGPinProperties> UPCGExGetCachedDataSettings::InputPinProperties() const
@@ -81,7 +58,7 @@ TArray<FPCGPinProperties> UPCGExGetCachedDataSettings::OutputPinProperties() con
 	PCGEX_PIN_ANY(PCGPinConstants::DefaultOutputLabel, "Cached data whose stored pin label matches no custom output pin.", Normal)
 	if (bOutputStatus)
 	{
-		PCGEX_PIN_PARAM(PCGExDataCache::StatusPinLabel, "One row per target actor: Found, EntryCount, ActorReference, CacheID.", Normal)
+		PCGEX_PIN_PARAM(PCGExDataCache::StatusPinLabel, "One row per target actor: Found, DataCount, ActorReference, CacheID.", Normal)
 	}
 	return PinProperties;
 }
@@ -118,8 +95,9 @@ bool FPCGExGetCachedDataElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
+	// A read never spawns the PCG World Actor.
 	TArray<AActor*> Actors;
-	PCGExDataCache::ResolveTargetActors(Context, Settings->Target, Settings->ActorReferenceAttribute, Actors);
+	PCGExDataCache::ResolveTargetActors(Context, Settings->Target, Settings->ActorReferenceAttribute, /*bCreateWorldActor=*/false, Actors);
 
 	if (Actors.IsEmpty())
 	{
@@ -153,15 +131,15 @@ bool FPCGExGetCachedDataElement::Boot(FPCGExContext* InContext) const
 			continue;
 		}
 
-		TArray<TPair<FName, FPCGDataCollection>> Entries;
+		TArray<TPair<FName, TArray<FPCGTaggedData>>> Entries;
 		if (Settings->bReadAllEntries)
 		{
 			Cache->ReadAll(Entries);
 		}
 		else
 		{
-			FPCGDataCollection Collection;
-			if (Cache->Read(Settings->CacheID, Collection)) { Entries.Emplace(Settings->CacheID, MoveTemp(Collection)); }
+			TArray<FPCGTaggedData> Data;
+			if (Cache->Read(Settings->CacheID, Data)) { Entries.Emplace(Settings->CacheID, MoveTemp(Data)); }
 		}
 
 		if (Entries.IsEmpty())
@@ -177,18 +155,20 @@ bool FPCGExGetCachedDataElement::Boot(FPCGExContext* InContext) const
 		bMustDuplicate = !PersistentLevel || Actor->GetLevel() != PersistentLevel;
 #endif
 
-		for (const TPair<FName, FPCGDataCollection>& Entry : Entries)
+		for (TPair<FName, TArray<FPCGTaggedData>>& Entry : Entries)
 		{
-			for (const FPCGTaggedData& Stored : Entry.Value.TaggedData)
+			const FString CacheTag = Settings->bTagWithCacheID ? PCGExDataCache::MakeCacheIDTag(Entry.Key) : FString();
+
+			for (FPCGTaggedData& Stored : Entry.Value)
 			{
 				if (!Stored.Data) { continue; }
 
-				FPCGTaggedData& Read = Context->Reads.Emplace_GetRef(Stored);
-				if (bMustDuplicate) { Read.Data = Cast<UPCGData>(StaticDuplicateObject(Stored.Data.Get(), GetTransientPackage())); }
-				if (Settings->bTagWithCacheID) { Read.Tags.Add(PCGExDataCache::CacheIDTagPrefix + Entry.Key.ToString()); }
+				FPCGTaggedData& Read = Context->Reads.Emplace_GetRef(MoveTemp(Stored));
+				if (bMustDuplicate) { Read.Data = Cast<UPCGData>(StaticDuplicateObject(Read.Data.Get(), GetTransientPackage())); }
+				if (Settings->bTagWithCacheID) { Read.Tags.Add(CacheTag); }
 
 				Context->ReferencedObjects.Add(Read.Data.GetObjectPtr());
-				Row.EntryCount++;
+				Row.DataCount++;
 			}
 		}
 	}
@@ -203,13 +183,14 @@ bool FPCGExGetCachedDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 	// Same order as OutputPinProperties: custom pins, then Out, then Status.
 	TArray<FName> CustomLabels;
 	for (const FPCGPinProperties& Pin : Settings->GetSanitizedCustomOutputPins()) { CustomLabels.Add(Pin.Label); }
+	const TSet<FName> CustomLabelSet(CustomLabels);
 
 	TSet<FName> ActivePins;
 	Context->IncreaseStagedOutputReserve(Context->Reads.Num());
 
 	for (const FPCGTaggedData& Read : Context->Reads)
 	{
-		const FName Pin = CustomLabels.Contains(Read.Pin) ? Read.Pin : PCGPinConstants::DefaultOutputLabel;
+		const FName Pin = CustomLabelSet.Contains(Read.Pin) ? Read.Pin : PCGPinConstants::DefaultOutputLabel;
 		ActivePins.Add(Pin);
 		Context->StageOutput(const_cast<UPCGData*>(Read.Data.Get()), Pin, PCGExData::EStaging::None, Read.Tags);
 	}
@@ -229,7 +210,7 @@ bool FPCGExGetCachedDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 		UPCGMetadata* Metadata = Status->MutableMetadata();
 
 		FPCGMetadataAttribute<bool>* FoundAttr = Metadata->CreateAttribute<bool>(PCGExDataCache::FoundAttributeName, false, false, true);
-		FPCGMetadataAttribute<int32>* CountAttr = Metadata->CreateAttribute<int32>(PCGExDataCache::EntryCountAttributeName, 0, false, true);
+		FPCGMetadataAttribute<int32>* CountAttr = Metadata->CreateAttribute<int32>(PCGExDataCache::DataCountAttributeName, 0, false, true);
 		FPCGMetadataAttribute<FSoftObjectPath>* ActorAttr = Metadata->CreateAttribute<FSoftObjectPath>(PCGPointDataConstants::ActorReferenceAttribute, FSoftObjectPath(), false, true);
 		FPCGMetadataAttribute<FName>* IdAttr = Metadata->CreateAttribute<FName>(PCGExDataCache::CacheIDAttributeName, NAME_None, false, true);
 
@@ -238,7 +219,7 @@ bool FPCGExGetCachedDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 		{
 			const PCGMetadataEntryKey Key = Metadata->AddEntry();
 			FoundAttr->SetValue(Key, Row.bFound);
-			CountAttr->SetValue(Key, Row.EntryCount);
+			CountAttr->SetValue(Key, Row.DataCount);
 			ActorAttr->SetValue(Key, Row.Actor);
 			IdAttr->SetValue(Key, RowId);
 		}

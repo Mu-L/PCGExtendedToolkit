@@ -5,7 +5,6 @@
 
 #include "CoreMinimal.h"
 #include "PCGPin.h"
-#include "Metadata/PCGAttributePropertySelector.h"
 #include "UObject/SoftObjectPath.h"
 
 #include "PCGExCoreMacros.h"
@@ -20,8 +19,9 @@
  * Get Cached Data.
  * Reads data stored on the target actor's PCGEx Data Cache component by Set Cached Data. The cache is empty on
  * the first generation, so branch on the Status pin. Data pins with nothing to output are deactivated.
- * Cached data is handed out by pointer (never mutated); the target is resolved and read on the game thread
- * during preparation, staging happens off-thread.
+ * Cached data is handed out by pointer, so the cache is a hidden second consumer: a downstream node with
+ * Steal Data enabled would mutate the persisted objects in place. The target is resolved and read on the
+ * game thread during preparation, staging happens off-thread.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category = "PCGEx|Misc", meta = (Keywords = "pcgex cache read restore previous generation data", PCGExNodeLibraryDoc = "utilities/data-cache/get-cached-data"))
 class UPCGExGetCachedDataSettings : public UPCGExSettings
@@ -31,8 +31,6 @@ class UPCGExGetCachedDataSettings : public UPCGExSettings
 	friend class FPCGExGetCachedDataElement;
 
 public:
-	UPCGExGetCachedDataSettings(const FObjectInitializer& ObjectInitializer);
-
 	//~Begin UPCGSettings
 #if WITH_EDITOR
 	PCGEX_NODE_INFOS(GetCachedData, "Get Cached Data", "Reads data stored on the target actor's PCGEx Data Cache component by Set Cached Data. Empty on the first generation; branch on the Status pin.");
@@ -65,9 +63,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition = "IsTargetPinUnconnected()"))
 	EPCGExDataCacheTarget Target = EPCGExDataCacheTarget::ExecutingActor;
 
-	/** Attribute holding the actor reference on the Target Actor pin. A component reference resolves to its owner. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition = "!IsTargetPinUnconnected()"))
-	FPCGAttributePropertyInputSelector ActorReferenceAttribute;
+	/** 'FSoftObjectPath' attribute read on the Target Actor pin when it is connected. A component reference resolves to its owner. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	FName ActorReferenceAttribute = FName("ActorReference");
 
 	/** Extra output pins. Cached data whose stored pin label matches one of these exactly is routed there; anything
 	 *  else goes to Out. Copy-paste the Set node's Custom Input Pins here. Labels colliding with Out or Status are ignored. */
@@ -78,7 +76,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output")
 	bool bTagWithCacheID = false;
 
-	/** Emit a Status attribute set: one row per target actor with Found, EntryCount, ActorReference and CacheID. */
+	/** Emit a Status attribute set: one row per target actor with Found, DataCount, ActorReference and CacheID. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output")
 	bool bOutputStatus = true;
 
@@ -92,7 +90,7 @@ public:
 protected:
 #if WITH_EDITOR
 	UFUNCTION()
-	bool IsTargetPinUnconnected() const;
+	bool IsTargetPinUnconnected() const { return !PCGExDataCache::IsTargetPinConnected(this); }
 #endif
 };
 
@@ -102,7 +100,7 @@ struct FPCGExGetCachedDataContext final : FPCGExContext
 	{
 		FSoftObjectPath Actor;
 		bool bFound = false;
-		int32 EntryCount = 0;
+		int32 DataCount = 0;
 	};
 
 	/** Cached data copied out during Boot (game thread). Pin is the label it was stored with. */
@@ -122,11 +120,14 @@ class FPCGExGetCachedDataElement final : public IPCGExElement
 {
 protected:
 	PCGEX_ELEMENT_CREATE_CONTEXT(GetCachedData)
-	// Target resolution touches actors and may spawn the PCG World Actor; the read itself is a pointer copy.
+	// Target resolution touches actors; the read itself is a pointer copy.
 	PCGEX_ELEMENT_MAIN_THREAD_ONLY_IN_PREPARE()
 
 	/** The cache changes with no dependency-CRC change; a cached result would be stale. */
 	virtual bool IsCacheable(const UPCGSettings* InSettings) const override { return false; }
+
+	/** Every Set stores fresh objects; a content CRC keeps downstream cached when the data is actually unchanged. */
+	virtual bool ShouldComputeFullOutputDataCrc(FPCGContext* Context) const override { return true; }
 
 	virtual bool Boot(FPCGExContext* InContext) const override;
 	virtual bool AdvanceWork(FPCGExContext* InContext, const UPCGExSettings* InSettings) const override;
