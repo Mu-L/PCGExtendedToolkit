@@ -111,13 +111,18 @@ void FPCGExPathSplineMeshSimpleContext::RegisterAssetDependencies()
 TArray<FPCGPinProperties> UPCGExPathSplineMeshSimpleSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	PCGExTangents::DeclareTangentsPins(PinProperties);
+	PCGExTangents::DeclareTangentsInputs(PinProperties, RequiresTangentSources());
 	return PinProperties;
+}
+
+bool UPCGExPathSplineMeshSimpleSettings::RequiresTangentSources() const
+{
+	return PCGExTangents::WantsTangentSources(Tangents);
 }
 
 bool UPCGExPathSplineMeshSimpleSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !PCGExTangents::WantsTangentSources(Tangents))
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !RequiresTangentSources())
 	{
 		return false;
 	}

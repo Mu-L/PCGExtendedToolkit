@@ -102,13 +102,18 @@ void UPCGExPathSplineMeshSettings::PostInitProperties()
 }
 #endif
 
+bool UPCGExPathSplineMeshSettings::RequiresTangentSources() const
+{
+	return PCGExTangents::WantsTangentSources(Tangents);
+}
+
 bool UPCGExPathSplineMeshSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
 	if (InPin->Properties.Label == PCGExCollections::Labels::SourceSelectorLabel && SelectorMode == EPCGExSelectorMode::Legacy)
 	{
 		return false;
 	}
-	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !PCGExTangents::WantsTangentSources(Tangents))
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !RequiresTangentSources())
 	{
 		return false;
 	}
@@ -152,7 +157,7 @@ void UPCGExPathSplineMeshSettings::InputPinPropertiesBeforeFilters(TArray<FPCGPi
 TArray<FPCGPinProperties> UPCGExPathSplineMeshSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	PCGExTangents::DeclareTangentsPins(PinProperties);
+	PCGExTangents::DeclareTangentsInputs(PinProperties, RequiresTangentSources());
 	return PinProperties;
 }
 

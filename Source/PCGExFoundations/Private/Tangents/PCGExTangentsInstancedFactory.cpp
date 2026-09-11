@@ -341,9 +341,16 @@ namespace PCGExTangents
 		}
 	}
 
-	void DeclareTangentsPins(TArray<FPCGPinProperties>& PinProperties)
+	void DeclareTangentsInputs(TArray<FPCGPinProperties>& PinProperties, const bool bRequiresSources)
 	{
-		PCGEX_PIN_POLYLINES(SourceTangentSourcesLabel, "Reference splines read by spline-driven tangent modules (e.g. From Spline).", Normal)
+		if (bRequiresSources)
+		{
+			PCGEX_PIN_POLYLINES(SourceTangentSourcesLabel, "Reference splines read by spline-driven tangent modules (e.g. From Spline).", Required)
+		}
+		else
+		{
+			PCGEX_PIN_POLYLINES(SourceTangentSourcesLabel, "Reference splines read by spline-driven tangent modules (e.g. From Spline).", Advanced)
+		}
 		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangents)
 		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangentsStart)
 		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangentsEnd)

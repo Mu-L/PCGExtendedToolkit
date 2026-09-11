@@ -53,6 +53,9 @@ protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
+
+	/** Whether a selected tangents module reads the Tangent Sources pin, which is then Required instead of Advanced. */
+	bool RequiresTangentSources() const;
 	//~End UPCGSettings
 
 	//~Begin UPCGExPointsProcessorSettings

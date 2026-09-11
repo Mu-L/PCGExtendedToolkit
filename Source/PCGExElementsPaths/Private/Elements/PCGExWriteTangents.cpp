@@ -54,7 +54,7 @@ void UPCGExWriteTangentsSettings::PostInitProperties()
 TArray<FPCGPinProperties> UPCGExWriteTangentsSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	PCGExTangents::DeclareTangentsPins(PinProperties);
+	PCGExTangents::DeclareTangentsInputs(PinProperties, RequiresTangentSources());
 	return PinProperties;
 }
 
@@ -72,9 +72,14 @@ FName UPCGExWriteTangentsSettings::GetPointFilterPin() const
 	return PCGExFilters::Labels::SourcePointFiltersLabel;
 }
 
+bool UPCGExWriteTangentsSettings::RequiresTangentSources() const
+{
+	return PCGExTangents::WantsTangentSources(Tangents, StartTangents, EndTangents);
+}
+
 bool UPCGExWriteTangentsSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !PCGExTangents::WantsTangentSources(Tangents, StartTangents, EndTangents))
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !RequiresTangentSources())
 	{
 		return false;
 	}

@@ -45,19 +45,21 @@ PCGEX_ELEMENT_BATCH_POINT_IMPL_ADV(CreateSpline)
 TArray<FPCGPinProperties> UPCGExCreateSplineSettings::InputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties = Super::InputPinProperties();
-	PCGExTangents::DeclareTangentsPins(PinProperties);
+	PCGExTangents::DeclareTangentsInputs(PinProperties, RequiresTangentSources());
 	return PinProperties;
+}
+
+bool UPCGExCreateSplineSettings::RequiresTangentSources() const
+{
+	const bool bUsesTangents = bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
+	return bUsesTangents && PCGExTangents::WantsTangentSources(Tangents);
 }
 
 bool UPCGExCreateSplineSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
 {
-	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel)
+	if (InPin->Properties.Label == PCGExTangents::SourceTangentSourcesLabel && !RequiresTangentSources())
 	{
-		const bool bUsesTangents = bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
-		if (!bUsesTangents || !PCGExTangents::WantsTangentSources(Tangents))
-		{
-			return false;
-		}
+		return false;
 	}
 	return Super::IsPinUsedByNodeExecution(InPin);
 }

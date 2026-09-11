@@ -187,8 +187,8 @@ namespace PCGExTangents
 	const FName SourceOverridesTangentsEnd = TEXT("Overrides : End Tangents");
 	const FName SourceTangentSourcesLabel = TEXT("Tangent Sources");
 
-	/** Pins every tangents-hosting node exposes: Tangent Sources plus the three module override pins. */
-	PCGEXFOUNDATIONS_API void DeclareTangentsPins(TArray<FPCGPinProperties>& PinProperties);
+	/** Pins every tangents-hosting node exposes: Tangent Sources (Required when a selected module reads it, Advanced otherwise) plus the three module override pins. */
+	PCGEXFOUNDATIONS_API void DeclareTangentsInputs(TArray<FPCGPinProperties>& PinProperties, const bool bRequiresSources);
 
 	/** True when any of the given modules reads the Tangent Sources pin. */
 	PCGEXFOUNDATIONS_API bool WantsTangentSources(const UPCGExTangentsInstancedFactory* InTangents, const UPCGExTangentsInstancedFactory* InStartTangents, const UPCGExTangentsInstancedFactory* InEndTangents);
