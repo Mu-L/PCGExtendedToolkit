@@ -99,10 +99,11 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, AdvancedDisplay)
 	FPCGExAttachmentRules AttachmentRules;
 
+	/** Single source of truth for "this node computes tangents": per-point types may include Curve Custom Tangent. */
 	UFUNCTION()
 	bool GetApplyTangents() const
 	{
-		return (!bApplyCustomPointType && DefaultPointType == EPCGExSplinePointType::CurveCustomTangent);
+		return bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
 	}
 
 	virtual bool ShouldCache() const override;

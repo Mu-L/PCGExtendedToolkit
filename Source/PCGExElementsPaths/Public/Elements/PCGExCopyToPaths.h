@@ -128,9 +128,10 @@ public:
 
 #pragma endregion
 
+	/** Single source of truth for "this node computes tangents": per-point types may include Curve Custom Tangent. */
 	bool GetApplyTangents() const
 	{
-		return (!bApplyCustomPointType && DefaultPointType == EPCGExSplinePointType::CurveCustomTangent);
+		return bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
 	}
 };
 

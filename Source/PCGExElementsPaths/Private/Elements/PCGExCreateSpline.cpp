@@ -51,8 +51,7 @@ TArray<FPCGPinProperties> UPCGExCreateSplineSettings::InputPinProperties() const
 
 bool UPCGExCreateSplineSettings::RequiresTangentSources() const
 {
-	const bool bUsesTangents = bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
-	return bUsesTangents && PCGExTangents::WantsTangentSources(Tangents);
+	return GetApplyTangents() && PCGExTangents::WantsTangentSources(Tangents);
 }
 
 bool UPCGExCreateSplineSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
@@ -85,7 +84,7 @@ bool FPCGExCreateSplineElement::Boot(FPCGExContext* InContext) const
 
 	PCGEX_CONTEXT_AND_SETTINGS(CreateSpline)
 
-	if (Settings->bApplyCustomPointType || Settings->DefaultPointType == EPCGExSplinePointType::CurveCustomTangent)
+	if (Settings->GetApplyTangents())
 	{
 		if (!Context->Tangents.Init(Context, Settings->Tangents))
 		{

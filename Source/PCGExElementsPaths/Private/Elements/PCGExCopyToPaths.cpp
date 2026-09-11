@@ -70,8 +70,7 @@ TArray<FPCGPinProperties> UPCGExCopyToPathsSettings::OutputPinProperties() const
 
 bool UPCGExCopyToPathsSettings::RequiresTangentSources() const
 {
-	const bool bUsesTangents = bApplyCustomPointType || DefaultPointType == EPCGExSplinePointType::CurveCustomTangent;
-	return bUsesTangents && PCGExTangents::WantsTangentSources(Tangents);
+	return GetApplyTangents() && PCGExTangents::WantsTangentSources(Tangents);
 }
 
 bool UPCGExCopyToPathsSettings::IsPinUsedByNodeExecution(const UPCGPin* InPin) const
@@ -101,9 +100,12 @@ bool FPCGExCopyToPathsElement::Boot(FPCGExContext* InContext) const
 		return false;
 	}
 
-	if (!Context->Tangents.Init(Context, Settings->Tangents))
+	if (Settings->GetApplyTangents())
 	{
-		return false;
+		if (!Context->Tangents.Init(Context, Settings->Tangents))
+		{
+			return false;
+		}
 	}
 
 	TArray<FPCGTaggedData> UnifiedBounds = Context->InputData.GetSpatialInputsByPin(PCGExCommon::Labels::SourceBoundsLabel);
@@ -494,7 +496,7 @@ namespace PCGExCopyToPaths
 
 		TSharedPtr<PCGExTangents::FTangentsHandler> TangentsHandler = nullptr;
 
-		if (Settings->bApplyCustomPointType || Settings->DefaultPointType == EPCGExSplinePointType::CurveCustomTangent)
+		if (Settings->GetApplyTangents())
 		{
 			TangentsHandler = MakeShared<PCGExTangents::FTangentsHandler>(bClosedLoop);
 			if (!TangentsHandler->Init(Context, Context->Tangents, PathFacade))

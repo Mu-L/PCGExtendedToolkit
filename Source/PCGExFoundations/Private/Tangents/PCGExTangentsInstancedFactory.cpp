@@ -6,7 +6,7 @@
 #include "PCGParamData.h"
 #include "PCGPin.h"
 #include "Core/PCGExContext.h"
-#include "Data/PCGPolyLineData.h"
+#include "Data/PCGSplineData.h"
 #include "Data/PCGExData.h"
 #include "Details/PCGExSettingsDetails.h"
 #include "Helpers/PCGExMetaHelpers.h"
@@ -57,7 +57,8 @@ bool FPCGExTangentsDetails::Init(FPCGExContext* InContext, const FPCGExTangentsD
 		}
 		else
 		{
-			StartTangents = Tangents;
+			// Left null so consumers alias the main operation instead of preparing a second one from the same factory.
+			StartTangents = nullptr;
 		}
 
 		if (InDetails.EndTangents)
@@ -71,7 +72,7 @@ bool FPCGExTangentsDetails::Init(FPCGExContext* InContext, const FPCGExTangentsD
 		}
 		else
 		{
-			EndTangents = Tangents;
+			EndTangents = nullptr;
 		}
 	}
 	else if (Source == EPCGExTangentSource::Attribute)
@@ -343,13 +344,10 @@ namespace PCGExTangents
 
 	void DeclareTangentsInputs(TArray<FPCGPinProperties>& PinProperties, const bool bRequiresSources)
 	{
-		if (bRequiresSources)
 		{
-			PCGEX_PIN_POLYLINES(SourceTangentSourcesLabel, "Reference splines read by spline-driven tangent modules (e.g. From Spline).", Required)
-		}
-		else
-		{
-			PCGEX_PIN_POLYLINES(SourceTangentSourcesLabel, "Reference splines read by spline-driven tangent modules (e.g. From Spline).", Advanced)
+			FPCGPinProperties& Pin = PinProperties.Emplace_GetRef(SourceTangentSourcesLabel, FPCGDataTypeInfoSpline::AsId());
+			PCGEX_PIN_TOOLTIP("Reference splines read by spline-driven tangent modules (e.g. From Spline).")
+			Pin.PinStatus = bRequiresSources ? EPCGPinStatus::Required : EPCGPinStatus::Advanced;
 		}
 		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangents)
 		PCGEX_PIN_OPERATION_OVERRIDES(SourceOverridesTangentsStart)

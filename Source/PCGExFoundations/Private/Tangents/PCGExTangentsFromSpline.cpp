@@ -4,6 +4,7 @@
 #include "Tangents/PCGExTangentsFromSpline.h"
 
 #include "Core/PCGExContext.h"
+#include "Core/PCGExMTCommon.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGSplineData.h"
 PRAGMA_DISABLE_EXPERIMENTAL_WARNINGS // FPCGSplineStruct
@@ -34,19 +35,22 @@ bool FPCGExTangentsFromSpline::PrepareForData(FPCGExContext* InContext, const TS
 	}
 
 	const int32 NumPoints = InDataFacade->GetNum();
-	Samples.Init(FSample(), NumPoints);
+	NumSources = Sources.Num();
+	BestSource.Init(-1, NumPoints);
 
-	if (Sources.IsEmpty())
+	if (NumSources == 0)
 	{
 		// Nothing to sample; every point uses the neighbor fallback. The factory already warned.
 		return true;
 	}
 
+	Keys.SetNumUninitialized(NumPoints * NumSources);
+
 	TSharedPtr<PCGExDetails::TSettingValue<double>> MaxDistanceReader;
 	if (bUseMaxDistance)
 	{
 		MaxDistanceReader = MaxDistance.GetValueSetting();
-		// Whole-buffer read: this runs before any scoped fetch.
+		// Whole-buffer read: this runs before any scoped fetch, and the parallel pre-pass below reads it from any thread.
 		if (!MaxDistanceReader->Init(InDataFacade, false))
 		{
 			return false;
@@ -55,44 +59,50 @@ bool FPCGExTangentsFromSpline::PrepareForData(FPCGExContext* InContext, const TS
 
 	const TConstPCGValueRange<FTransform> InTransforms = InDataFacade->GetIn()->GetConstTransformValueRange();
 
-	for (int32 i = 0; i < NumPoints; i++)
+	// Blocks until done; each iteration owns its own Keys row and BestSource slot.
+	PCGExMT::ParallelOrSequentialScoped(NumPoints, [&](const PCGExMT::FScope& Scope)
 	{
-		const FVector Location = InTransforms[i].GetLocation();
-		double BestDistSquared = MaxDistanceReader ? FMath::Square(MaxDistanceReader->Read(i)) : TNumericLimits<double>::Max();
-		FSample& Sample = Samples[i];
-
-		for (int32 s = 0; s < Sources.Num(); s++)
+		PCGEX_SCOPE_LOOP(i)
 		{
-			const FPCGSplineStruct& Spline = *Sources[s];
-			const float Key = Spline.FindInputKeyClosestToWorldLocation(Location);
-			const double DistSquared = FVector::DistSquared(Location, Spline.GetLocationAtSplineInputKey(Key, ESplineCoordinateSpace::World));
+			const FVector Location = InTransforms[i].GetLocation();
+			double BestDistSquared = MaxDistanceReader ? FMath::Square(MaxDistanceReader->Read(i)) : TNumericLimits<double>::Max();
+			float* PointKeys = Keys.GetData() + i * NumSources;
 
-			if (DistSquared > BestDistSquared)
+			for (int32 s = 0; s < NumSources; s++)
 			{
-				continue;
-			}
+				const FPCGSplineStruct& Spline = *Sources[s];
+				const float Key = Spline.FindInputKeyClosestToWorldLocation(Location);
+				PointKeys[s] = Key;
 
-			BestDistSquared = DistSquared;
-			Sample.SourceIndex = s;
-			Sample.Key = Key;
+				const double DistSquared = FVector::DistSquared(Location, Spline.GetLocationAtSplineInputKey(Key, ESplineCoordinateSpace::World));
+				if (DistSquared > BestDistSquared)
+				{
+					continue;
+				}
+
+				BestDistSquared = DistSquared;
+				BestSource[i] = s;
+			}
 		}
-	}
+	});
 
 	return true;
 }
 
 void FPCGExTangentsFromSpline::ProcessFirstPoint(const UPCGBasePointData* InPointData, const FVector& ArriveScale, FVector& OutArrive, const FVector& LeaveScale, FVector& OutLeave) const
 {
-	const FSample& Sample = Samples[0];
-	if (Sample.SourceIndex >= 0)
+	const int32 SourceIndex = BestSource[0];
+	if (SourceIndex >= 0)
 	{
-		const FPCGSplineStruct& Spline = *Sources[Sample.SourceIndex];
-		const double Delta = KeyDelta(Spline, Sample.Key, KeyOn(Sample.SourceIndex, 1, InPointData->GetConstTransformValueRange()));
+		const TConstPCGValueRange<FTransform> InTransforms = InPointData->GetConstTransformValueRange();
+		const FPCGSplineStruct& Spline = *Sources[SourceIndex];
+		const float Key = KeyOn(SourceIndex, 0);
+		const double Delta = KeyDelta(Spline, Key, KeyOn(SourceIndex, 1), InTransforms[0].GetLocation(), InTransforms[1].GetLocation());
 
 		if (FMath::Abs(Delta) > PCGExTangentsFromSpline::KeyEpsilon)
 		{
 			// Single neighbour: both tangents span toward it.
-			const FVector Dir = Spline.GetTangentAtSplineInputKey(Sample.Key, ESplineCoordinateSpace::World) * Delta;
+			const FVector Dir = Spline.GetTangentAtSplineInputKey(Key, ESplineCoordinateSpace::World) * Delta;
 			OutArrive = Dir * ArriveScale;
 			OutLeave = Dir * LeaveScale;
 			return;
@@ -105,15 +115,17 @@ void FPCGExTangentsFromSpline::ProcessFirstPoint(const UPCGBasePointData* InPoin
 void FPCGExTangentsFromSpline::ProcessLastPoint(const UPCGBasePointData* InPointData, const FVector& ArriveScale, FVector& OutArrive, const FVector& LeaveScale, FVector& OutLeave) const
 {
 	const int32 LastIndex = InPointData->GetNumPoints() - 1;
-	const FSample& Sample = Samples[LastIndex];
-	if (Sample.SourceIndex >= 0)
+	const int32 SourceIndex = BestSource[LastIndex];
+	if (SourceIndex >= 0)
 	{
-		const FPCGSplineStruct& Spline = *Sources[Sample.SourceIndex];
-		const double Delta = KeyDelta(Spline, KeyOn(Sample.SourceIndex, LastIndex - 1, InPointData->GetConstTransformValueRange()), Sample.Key);
+		const TConstPCGValueRange<FTransform> InTransforms = InPointData->GetConstTransformValueRange();
+		const FPCGSplineStruct& Spline = *Sources[SourceIndex];
+		const float Key = KeyOn(SourceIndex, LastIndex);
+		const double Delta = KeyDelta(Spline, KeyOn(SourceIndex, LastIndex - 1), Key, InTransforms[LastIndex - 1].GetLocation(), InTransforms[LastIndex].GetLocation());
 
 		if (FMath::Abs(Delta) > PCGExTangentsFromSpline::KeyEpsilon)
 		{
-			const FVector Dir = Spline.GetTangentAtSplineInputKey(Sample.Key, ESplineCoordinateSpace::World) * Delta;
+			const FVector Dir = Spline.GetTangentAtSplineInputKey(Key, ESplineCoordinateSpace::World) * Delta;
 			OutArrive = Dir * ArriveScale;
 			OutLeave = Dir * LeaveScale;
 			return;
@@ -126,62 +138,68 @@ void FPCGExTangentsFromSpline::ProcessLastPoint(const UPCGBasePointData* InPoint
 void FPCGExTangentsFromSpline::ProcessPoint(const UPCGBasePointData* InPointData, const int32 Index, const int32 NextIndex, const int32 PrevIndex, const FVector& ArriveScale, FVector& OutArrive, const FVector& LeaveScale, FVector& OutLeave) const
 {
 	const TConstPCGValueRange<FTransform> InTransforms = InPointData->GetConstTransformValueRange();
-	const FSample& Sample = Samples[Index];
+	const int32 SourceIndex = BestSource[Index];
 
-	if (Sample.SourceIndex >= 0)
+	if (SourceIndex >= 0)
 	{
-		const FPCGSplineStruct& Spline = *Sources[Sample.SourceIndex];
-		const double DeltaArrive = KeyDelta(Spline, KeyOn(Sample.SourceIndex, PrevIndex, InTransforms), Sample.Key);
-		const double DeltaLeave = KeyDelta(Spline, Sample.Key, KeyOn(Sample.SourceIndex, NextIndex, InTransforms));
+		const FPCGSplineStruct& Spline = *Sources[SourceIndex];
+		const FVector Location = InTransforms[Index].GetLocation();
+		const float Key = KeyOn(SourceIndex, Index);
+		const double DeltaArrive = KeyDelta(Spline, KeyOn(SourceIndex, PrevIndex), Key, InTransforms[PrevIndex].GetLocation(), Location);
+		const double DeltaLeave = KeyDelta(Spline, Key, KeyOn(SourceIndex, NextIndex), Location, InTransforms[NextIndex].GetLocation());
 
 		if (FMath::Abs(DeltaArrive) > PCGExTangentsFromSpline::KeyEpsilon || FMath::Abs(DeltaLeave) > PCGExTangentsFromSpline::KeyEpsilon)
 		{
-			Resolve(Spline, Sample.Key, DeltaArrive, DeltaLeave, ArriveScale, OutArrive, LeaveScale, OutLeave);
+			Resolve(Spline, Key, DeltaArrive, DeltaLeave, ArriveScale, OutArrive, LeaveScale, OutLeave);
 			return;
 		}
 	}
 
-	// No usable reference: chord through the neighbours, same as the From Neighbors module.
+	// No usable reference: half the neighbour chord, same as the Catmull-Rom and From Neighbors modules.
 	const FVector Dir = (InTransforms[NextIndex].GetLocation() - InTransforms[PrevIndex].GetLocation()) * 0.5;
 	OutArrive = Dir * ArriveScale;
 	OutLeave = Dir * LeaveScale;
 }
 
-float FPCGExTangentsFromSpline::KeyOn(const int32 SourceIndex, const int32 PointIndex, const TConstPCGValueRange<FTransform>& InTransforms) const
+double FPCGExTangentsFromSpline::KeyDelta(const FPCGSplineStruct& InSpline, const float FromKey, const float ToKey, const FVector& FromLocation, const FVector& ToLocation) const
 {
-	const FSample& Sample = Samples[PointIndex];
-	if (Sample.SourceIndex == SourceIndex)
-	{
-		return Sample.Key;
-	}
-
-	// Neighbour snapped to another reference (or none): re-resolve it on this point's own reference.
-	return Sources[SourceIndex]->FindInputKeyClosestToWorldLocation(InTransforms[PointIndex].GetLocation());
-}
-
-double FPCGExTangentsFromSpline::KeyDelta(const FPCGSplineStruct& InSpline, const float From, const float To) const
-{
-	const double Delta = static_cast<double>(To) - static_cast<double>(From);
+	const double Delta = static_cast<double>(ToKey) - static_cast<double>(FromKey);
 	if (!InSpline.IsClosedLoop())
 	{
 		return Delta;
 	}
 
-	// Shortest signed span across the loop seam.
 	const double Span = PCGExTangentsFromSpline::LoopSpan(InSpline);
-	return PCGExMath::Tile(Delta, -Span * 0.5, Span * 0.5);
+	const double Shortest = PCGExMath::Tile(Delta, -Span * 0.5, Span * 0.5);
+	if (FMath::Abs(Shortest) <= PCGExTangentsFromSpline::KeyEpsilon)
+	{
+		return Shortest;
+	}
+
+	// Shortest way round the loop unless the path chord clearly travels the other way (sparse samples per loop).
+	const double Along = FVector::DotProduct(InSpline.GetTangentAtSplineInputKey(FromKey, ESplineCoordinateSpace::World), ToLocation - FromLocation);
+	if (FMath::IsNearlyZero(Along) || (Along > 0) == (Shortest > 0))
+	{
+		return Shortest;
+	}
+
+	return Shortest > 0 ? Shortest - Span : Shortest + Span;
 }
 
 FVector FPCGExTangentsFromSpline::Derivative(const FPCGSplineStruct& InSpline, float Key, const bool bArriveSide) const
 {
-	// The arrive side reads the left limit so a reference corner (arrive != leave) keeps both directions
-	// instead of leaking the leave tangent into the arrive one.
+	// The arrive side reads the left limit so a reference corner (arrive != leave) keeps both directions. Only a key
+	// sitting on a control point needs it; the step is relative so it stays representable at any key magnitude.
 	if (bArriveSide)
 	{
-		Key -= static_cast<float>(PCGExTangentsFromSpline::KeyEpsilon);
-		if (Key < 0)
+		const float Nearest = FMath::RoundToFloat(Key);
+		if (FMath::IsNearlyEqual(Key, Nearest, static_cast<float>(PCGExTangentsFromSpline::KeyEpsilon)))
 		{
-			Key = InSpline.IsClosedLoop() ? Key + static_cast<float>(PCGExTangentsFromSpline::LoopSpan(InSpline)) : 0;
+			Key = Nearest - FMath::Max(static_cast<float>(PCGExTangentsFromSpline::KeyEpsilon), Nearest * 1.0e-6f);
+			if (Key < 0)
+			{
+				Key = InSpline.IsClosedLoop() ? static_cast<float>(PCGExTangentsFromSpline::LoopSpan(InSpline)) : 0;
+			}
 		}
 	}
 
@@ -234,16 +252,6 @@ void UPCGExFromSplineTangents::Cleanup()
 {
 	Sources.Reset();
 	Super::Cleanup();
-}
-
-void UPCGExFromSplineTangents::CopySettingsFrom(const UPCGExInstancedFactory* Other)
-{
-	Super::CopySettingsFrom(Other);
-	if (const UPCGExFromSplineTangents* TypedOther = Cast<UPCGExFromSplineTangents>(Other))
-	{
-		bUseMaxDistance = TypedOther->bUseMaxDistance;
-		MaxDistance = TypedOther->MaxDistance;
-	}
 }
 
 TSharedPtr<FPCGExTangentsOperation> UPCGExFromSplineTangents::CreateOperation() const
