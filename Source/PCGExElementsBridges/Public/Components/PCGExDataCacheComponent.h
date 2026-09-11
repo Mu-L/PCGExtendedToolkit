@@ -14,7 +14,7 @@
 UENUM()
 enum class EPCGExDataCacheWriteMode : uint8
 {
-	Replace  = 0 UMETA(DisplayName = "Replace", Tooltip = "Replace whatever is stored under the cache ID with the input data."),
+	Replace  = 0 UMETA(DisplayName = "Replace", Tooltip = "Replace whatever is stored under the cache ID with the input data. With no cacheable input, the entry is left untouched."),
 	Append   = 1 UMETA(DisplayName = "Append", Tooltip = "Append the input data to whatever is already stored under the cache ID."),
 	Clear    = 2 UMETA(DisplayName = "Clear", Tooltip = "Remove the entry stored under the cache ID."),
 	ClearAll = 3 UMETA(DisplayName = "Clear All", Tooltip = "Remove every entry on the target cache. Cache ID is ignored."),
@@ -32,6 +32,10 @@ struct PCGEXELEMENTSBRIDGES_API FPCGExDataCacheEntry
 	/** Diagnostic: execution source (usually a PCG component) that last wrote this entry. */
 	UPROPERTY(VisibleAnywhere, Category = "Data Cache")
 	FSoftObjectPath Writer;
+
+	/** Preview map only: a preview-mode Clear of a persisted ID hides that ID without touching persisted data. */
+	UPROPERTY(Transient, VisibleAnywhere, Category = "Data Cache")
+	bool bTombstone = false;
 };
 
 /**
@@ -40,9 +44,13 @@ struct PCGEXELEMENTSBRIDGES_API FPCGExDataCacheEntry
  * Never a PCG managed resource: cleanup and regeneration leave it alone, so a refresh can read back what a
  * previous pass stored.
  *
- * Only self-contained data is cached (point, spline, volume, attribute sets...). Composites whose network
- * reaches other data objects (unions, intersections, projections) are refused: they would either steal live
- * upstream objects mid-execution or serialize with null sources.
+ * Only self-contained data is cached (point, spline, volume, attribute sets...). Data referencing other data
+ * objects (unions, intersections, projections, collision wrappers) is refused: it would either steal live
+ * upstream objects mid-execution or serialize with null operands.
+ *
+ * Preview-mode writers get a transient shadow map that never saves, plus tombstones so a preview Clear hides a
+ * persisted ID. Unlike a PCG component's output, nothing is promoted when the writer's editing mode changes:
+ * the next persistent write does that.
  *
  * Reads are safe from any thread. Writes are game-thread only: adopting data re-outers it (Rename) and
  * flattens it (Modify), neither of which is thread-safe.
@@ -71,26 +79,27 @@ public:
 	void ReadAll(TArray<TPair<FName, TArray<FPCGTaggedData>>>& OutEntries) const;
 
 	/**
-	 * Applies InMode under InId. Game thread only. For Replace / Append, every data object must be a private
-	 * duplicate outered to the transient package: it is flattened and re-outered to this component (composites
-	 * are refused, see class comment). bPreview confines the write to the transient preview map (data flagged
-	 * RF_Transient, package never dirtied); a persistent write evicts the preview shadow of the same ID.
+	 * Stores InData under InId (replacing or appending). Game thread only. Every data object must be a private
+	 * duplicate outered to the transient package: it is flattened and re-outered to this component (data that is
+	 * not self-contained is refused, see class comment). When nothing is adoptable the entry is left untouched.
+	 * bPreview confines the write to the shadow map; a persistent write evicts the shadow of the same ID.
 	 * bNotify: see NotifyChanged.
 	 */
-	void Write(const FName InId, const EPCGExDataCacheWriteMode InMode, TArray<FPCGTaggedData>&& InData, const UObject* InWriter, const bool bPreview, const bool bNotify = false);
+	void Write(const FName InId, const bool bAppend, TArray<FPCGTaggedData>&& InData, UObject* InWriter, const bool bPreview, const bool bNotify);
 
-	/** Drops the entry under InId; from the preview map only when bPreview. Game thread only. Notifies only if something was removed. */
-	void Clear(const FName InId, const UObject* InWriter, const bool bPreview, const bool bNotify);
+	/** Drops the entry under InId; a preview Clear only tombstones it. Game thread only. Notifies only on change. */
+	void Clear(const FName InId, UObject* InWriter, const bool bPreview, const bool bNotify);
 
-	/** Drops every entry; from the preview map only when bPreview. Game thread only. Notifies only if something was removed. */
-	void ClearAll(const UObject* InWriter, const bool bPreview, const bool bNotify);
+	/** Drops every entry; a preview Clear All only tombstones them. Game thread only. Notifies only on change. */
+	void ClearAll(UObject* InWriter, const bool bPreview, const bool bNotify);
 
 	/**
 	 * Editor only, no-op otherwise. Broadcasts the standard object-changed pair so PCG components tracking the
-	 * owner actor dirty and refresh. InWriter's original PCG component (if any) is bracketed with
-	 * StartIgnoringChangeOriginDuringGeneration for the synchronous dispatch, so a writer never refreshes itself.
+	 * owner actor dirty and refresh. InWriter's original PCG component (if any) is bracketed with the engine's
+	 * ignore-change-origin scope for the synchronous dispatch, so a writer never refreshes itself. Two writers
+	 * on one actor both notifying will refresh each other on every generation.
 	 */
-	void NotifyChanged(const UObject* InWriter) const;
+	void NotifyChanged(UObject* InWriter) const;
 
 #if WITH_EDITOR
 	UFUNCTION(CallInEditor, Category = "Data Cache", meta = (DisplayName = "Clear Cache", ShortToolTip = "Remove every cached entry from this component. Not undoable."))
@@ -109,8 +118,8 @@ protected:
 	/** Guards both maps. Held only around map access, never around Rename/Flatten. */
 	mutable FTransactionallySafeRWLock Lock;
 
-	/** Re-outers every data object this component owns in InData back to the transient package so GC can reclaim it. */
-	void ReleaseData(const FPCGDataCollection& InData) const;
+	/** Re-outers every data object this component owns in InEntries back to the transient package so GC can reclaim it. */
+	void ReleaseData(const TArray<FPCGExDataCacheEntry>& InEntries) const;
 
 	/** Flattens and re-outers each adoptable data object to this component. Returns the data that was adopted. */
 	TArray<FPCGTaggedData> AdoptData(TArray<FPCGTaggedData>&& InData, const bool bPreview) const;

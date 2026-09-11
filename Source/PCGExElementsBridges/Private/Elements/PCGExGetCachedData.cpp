@@ -6,7 +6,6 @@
 #include "PCGContext.h"
 #include "PCGGraphExecutionStateInterface.h"
 #include "PCGParamData.h"
-#include "PCGPin.h"
 #include "Data/PCGBasePointData.h" // PCGPointDataConstants
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttributeTpl.h"
@@ -75,7 +74,7 @@ FPCGElementPtr UPCGExGetCachedDataSettings::CreateElement() const
 void FPCGExGetCachedDataContext::AddExtraStructReferencedObjects(FReferenceCollector& Collector)
 {
 	FPCGExContext::AddExtraStructReferencedObjects(Collector);
-	Collector.AddReferencedObjects(ReferencedObjects);
+	Reads.AddReferences(Collector);
 }
 
 #pragma endregion
@@ -97,14 +96,10 @@ bool FPCGExGetCachedDataElement::Boot(FPCGExContext* InContext) const
 
 	// A read never spawns the PCG World Actor.
 	TArray<AActor*> Actors;
-	PCGExDataCache::ResolveTargetActors(Context, Settings->Target, Settings->ActorReferenceAttribute, /*bCreateWorldActor=*/false, Actors);
+	Settings->ResolveTargets(Context, /*bCreateWorldActor=*/false, Actors);
 
 	if (Actors.IsEmpty())
 	{
-		if (!Settings->bQuietMissingTargetWarning)
-		{
-			PCGE_LOG(Warning, GraphAndLog, LOCTEXT("NoTargetActor", "No target actor could be resolved."));
-		}
 		Context->StatusRows.Emplace();
 		return true;
 	}
@@ -144,7 +139,8 @@ bool FPCGExGetCachedDataElement::Boot(FPCGExContext* InContext) const
 
 		if (Entries.IsEmpty())
 		{
-			PCGE_LOG(Verbose, LogOnly, FText::Format(LOCTEXT("CacheMiss", "Actor '{0}' has no cached entry for '{1}'."), FText::FromString(Actor->GetName()), FText::FromName(Settings->CacheID)));
+			const FText What = Settings->bReadAllEntries ? LOCTEXT("AnyEntry", "any entry") : FText::Format(LOCTEXT("NamedEntry", "an entry for '{0}'"), FText::FromName(Settings->CacheID));
+			PCGE_LOG(Verbose, LogOnly, FText::Format(LOCTEXT("CacheMiss", "Actor '{0}' has no cached {1}."), FText::FromString(Actor->GetName()), What));
 			continue;
 		}
 
@@ -163,11 +159,10 @@ bool FPCGExGetCachedDataElement::Boot(FPCGExContext* InContext) const
 			{
 				if (!Stored.Data) { continue; }
 
-				FPCGTaggedData& Read = Context->Reads.Emplace_GetRef(MoveTemp(Stored));
+				FPCGTaggedData& Read = Context->Reads.TaggedData.Emplace_GetRef(MoveTemp(Stored));
 				if (bMustDuplicate) { Read.Data = Cast<UPCGData>(StaticDuplicateObject(Read.Data.Get(), GetTransientPackage())); }
 				if (Settings->bTagWithCacheID) { Read.Tags.Add(CacheTag); }
 
-				Context->ReferencedObjects.Add(Read.Data.GetObjectPtr());
 				Row.DataCount++;
 			}
 		}
@@ -180,29 +175,25 @@ bool FPCGExGetCachedDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 {
 	PCGEX_CONTEXT_AND_SETTINGS(GetCachedData)
 
-	// Same order as OutputPinProperties: custom pins, then Out, then Status.
-	TArray<FName> CustomLabels;
-	for (const FPCGPinProperties& Pin : Settings->GetSanitizedCustomOutputPins()) { CustomLabels.Add(Pin.Label); }
-	const TSet<FName> CustomLabelSet(CustomLabels);
+	// Same order as OutputPinProperties: custom pins, then Out, then Status. One label -> index map drives both routing and culling.
+	TMap<FName, int32> PinIndex;
+	for (const FPCGPinProperties& Pin : Settings->GetSanitizedCustomOutputPins()) { PinIndex.Add(Pin.Label, PinIndex.Num()); }
+	const int32 OutIndex = PinIndex.Num();
 
-	TSet<FName> ActivePins;
-	Context->IncreaseStagedOutputReserve(Context->Reads.Num());
+	uint64 ActiveMask = 0;
+	Context->IncreaseStagedOutputReserve(Context->Reads.TaggedData.Num());
 
-	for (const FPCGTaggedData& Read : Context->Reads)
+	for (const FPCGTaggedData& Read : Context->Reads.TaggedData)
 	{
-		const FName Pin = CustomLabelSet.Contains(Read.Pin) ? Read.Pin : PCGPinConstants::DefaultOutputLabel;
-		ActivePins.Add(Pin);
-		Context->StageOutput(const_cast<UPCGData*>(Read.Data.Get()), Pin, PCGExData::EStaging::None, Read.Tags);
+		const int32* CustomIndex = PinIndex.Find(Read.Pin);
+		const int32 Index = CustomIndex ? *CustomIndex : OutIndex;
+		ActiveMask |= 1ull << Index;
+		Context->StageOutput(const_cast<UPCGData*>(Read.Data.Get()), CustomIndex ? Read.Pin : PCGPinConstants::DefaultOutputLabel, PCGExData::EStaging::None, Read.Tags);
 	}
 
-	// Cull data pins that got nothing (bit j == output pin index j). Status is never culled.
-	uint64 InactiveMask = 0;
-	for (int32 i = 0; i < CustomLabels.Num(); i++)
-	{
-		if (!ActivePins.Contains(CustomLabels[i])) { InactiveMask |= 1ull << i; }
-	}
-	if (!ActivePins.Contains(PCGPinConstants::DefaultOutputLabel)) { InactiveMask |= 1ull << CustomLabels.Num(); }
-	Context->OutputData.InactiveOutputPinBitmask = InactiveMask;
+	// Cull data pins that got nothing (bit j == output pin index j). Status (OutIndex + 1) is never culled.
+	const uint64 DataPinMask = (1ull << (OutIndex + 1)) - 1;
+	Context->OutputData.InactiveOutputPinBitmask = ~ActiveMask & DataPinMask;
 
 	if (Settings->bOutputStatus)
 	{

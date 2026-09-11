@@ -3,11 +3,15 @@
 
 #include "Components/PCGExDataCacheComponent.h"
 
+#include "Data/PCGSpatialData.h"
+#include "Metadata/PCGMetadata.h"
+
 #include "GameFramework/Actor.h"
 #include "Misc/ScopeRWLock.h"
 #include "UObject/Package.h"
 
 #include "PCGExLog.h"
+#include "Helpers/PCGExDataCacheHelpers.h"
 
 #if WITH_EDITOR
 #include "PCGComponent.h"
@@ -17,20 +21,28 @@
 
 namespace PCGExDataCacheComponent
 {
-	// Moves the entry's data out of InMap under a write lock the caller already holds.
-	bool TakeEntry(TMap<FName, FPCGExDataCacheEntry>& InMap, const FName InId, FPCGDataCollection& OutData)
+	// Caller holds the write lock. Moves the entry out of InMap; false when absent.
+	bool Take(TMap<FName, FPCGExDataCacheEntry>& InMap, const FName InId, TArray<FPCGExDataCacheEntry>& OutTaken)
 	{
 		FPCGExDataCacheEntry Entry;
 		if (!InMap.RemoveAndCopyValue(InId, Entry)) { return false; }
-		OutData = MoveTemp(Entry.Data);
+		OutTaken.Add(MoveTemp(Entry));
 		return true;
 	}
 
-	// Moves every entry's data out of InMap under a write lock the caller already holds.
-	void TakeAll(TMap<FName, FPCGExDataCacheEntry>& InMap, TArray<FPCGDataCollection>& OutData)
+	// Caller holds the write lock. Moves every entry out of InMap.
+	void TakeAll(TMap<FName, FPCGExDataCacheEntry>& InMap, TArray<FPCGExDataCacheEntry>& OutTaken)
 	{
-		for (TPair<FName, FPCGExDataCacheEntry>& Pair : InMap) { OutData.Add(MoveTemp(Pair.Value.Data)); }
+		OutTaken.Reserve(OutTaken.Num() + InMap.Num());
+		for (TPair<FName, FPCGExDataCacheEntry>& Pair : InMap) { OutTaken.Add(MoveTemp(Pair.Value)); }
 		InMap.Reset();
+	}
+
+	// Caller holds the write lock. Hides a persisted ID from preview reads without touching persisted data.
+	void Tombstone(TMap<FName, FPCGExDataCacheEntry>& InPreviewMap, const FName InId, TArray<FPCGExDataCacheEntry>& OutTaken)
+	{
+		Take(InPreviewMap, InId, OutTaken);
+		InPreviewMap.Add(InId).bTombstone = true;
 	}
 }
 
@@ -86,6 +98,7 @@ bool UPCGExDataCacheComponent::Read(const FName InId, TArray<FPCGTaggedData>& Ou
 	UE::TReadScopeLock ScopedReadLock(Lock);
 
 	const FPCGExDataCacheEntry* Entry = PreviewEntries.Find(InId);
+	if (Entry && Entry->bTombstone) { return false; }
 	if (!Entry) { Entry = Entries.Find(InId); }
 	if (!Entry) { return false; }
 
@@ -98,108 +111,118 @@ void UPCGExDataCacheComponent::ReadAll(TArray<TPair<FName, TArray<FPCGTaggedData
 	UE::TReadScopeLock ScopedReadLock(Lock);
 
 	OutEntries.Reserve(OutEntries.Num() + Entries.Num() + PreviewEntries.Num());
-	for (const TPair<FName, FPCGExDataCacheEntry>& Pair : PreviewEntries) { OutEntries.Emplace(Pair.Key, Pair.Value.Data.TaggedData); }
+	for (const TPair<FName, FPCGExDataCacheEntry>& Pair : PreviewEntries)
+	{
+		if (!Pair.Value.bTombstone) { OutEntries.Emplace(Pair.Key, Pair.Value.Data.TaggedData); }
+	}
 	for (const TPair<FName, FPCGExDataCacheEntry>& Pair : Entries)
 	{
 		if (!PreviewEntries.Contains(Pair.Key)) { OutEntries.Emplace(Pair.Key, Pair.Value.Data.TaggedData); }
 	}
 }
 
-void UPCGExDataCacheComponent::Write(const FName InId, const EPCGExDataCacheWriteMode InMode, TArray<FPCGTaggedData>&& InData, const UObject* InWriter, const bool bPreview, const bool bNotify)
+void UPCGExDataCacheComponent::Write(const FName InId, const bool bAppend, TArray<FPCGTaggedData>&& InData, UObject* InWriter, const bool bPreview, const bool bNotify)
 {
 	check(IsInGameThread());
 
-	bool bReplace = false;
-	switch (InMode)
+	// Rename/Flatten happen outside the lock; the lock only brackets the map swap.
+	TArray<FPCGTaggedData> Adopted = AdoptData(MoveTemp(InData), bPreview);
+	if (Adopted.IsEmpty())
 	{
-	case EPCGExDataCacheWriteMode::Replace:
-		bReplace = true;
-		break;
-	case EPCGExDataCacheWriteMode::Append:
-		break;
-	case EPCGExDataCacheWriteMode::Clear:
-		Clear(InId, InWriter, bPreview, bNotify);
-		return;
-	case EPCGExDataCacheWriteMode::ClearAll:
-		ClearAll(InWriter, bPreview, bNotify);
-		return;
-	default:
-		UE_LOG(LogPCGEx, Error, TEXT("[Data Cache] Unresolvable write mode (%d); nothing written."), static_cast<int32>(InMode));
+		UE_LOG(LogPCGEx, Verbose, TEXT("[Data Cache] Nothing cacheable for '%s'; entry left untouched."), *InId.ToString());
 		return;
 	}
 
-	// Rename/Flatten happen outside the lock; the lock only brackets the map swap.
-	TArray<FPCGTaggedData> Adopted = AdoptData(MoveTemp(InData), bPreview);
-
-	FPCGDataCollection Released;
-	FPCGDataCollection ReleasedShadow;
+	TArray<FPCGExDataCacheEntry> Released;
 	{
 		UE::TWriteScopeLock ScopedWriteLock(Lock);
 
 		FPCGExDataCacheEntry& Entry = (bPreview ? PreviewEntries : Entries).FindOrAdd(InId);
-		if (bReplace) { Released = MoveTemp(Entry.Data); }
+		if (!bAppend || Entry.bTombstone) { Released.Add(MoveTemp(Entry)); Entry = FPCGExDataCacheEntry(); }
 
 		Entry.Data.TaggedData.Append(MoveTemp(Adopted));
 		Entry.Writer = FSoftObjectPath(InWriter);
 
-		// A persistent write supersedes the preview shadow of the same ID; otherwise reads would keep returning it.
-		if (!bPreview) { PCGExDataCacheComponent::TakeEntry(PreviewEntries, InId, ReleasedShadow); }
+		// A persistent write supersedes the preview shadow (or tombstone) of the same ID.
+		if (!bPreview) { PCGExDataCacheComponent::Take(PreviewEntries, InId, Released); }
 	}
 
 	ReleaseData(Released);
-	ReleaseData(ReleasedShadow);
 
 	if (!bPreview) { MarkPackageDirty(); }
 	if (bNotify) { NotifyChanged(InWriter); }
 }
 
-void UPCGExDataCacheComponent::Clear(const FName InId, const UObject* InWriter, const bool bPreview, const bool bNotify)
+void UPCGExDataCacheComponent::Clear(const FName InId, UObject* InWriter, const bool bPreview, const bool bNotify)
 {
 	check(IsInGameThread());
 
-	FPCGDataCollection ReleasedPersisted;
-	FPCGDataCollection ReleasedPreview;
-	bool bRemovedPersisted = false;
-	bool bRemovedPreview = false;
+	TArray<FPCGExDataCacheEntry> Released;
+	bool bChanged = false;
+	bool bDirty = false;
 	{
 		UE::TWriteScopeLock ScopedWriteLock(Lock);
-		// A preview generation never touches persisted data.
-		if (!bPreview) { bRemovedPersisted = PCGExDataCacheComponent::TakeEntry(Entries, InId, ReleasedPersisted); }
-		bRemovedPreview = PCGExDataCacheComponent::TakeEntry(PreviewEntries, InId, ReleasedPreview);
-	}
-
-	ReleaseData(ReleasedPersisted);
-	ReleaseData(ReleasedPreview);
-
-	if (bRemovedPersisted) { MarkPackageDirty(); }
-	if (bNotify && (bRemovedPersisted || bRemovedPreview)) { NotifyChanged(InWriter); }
-}
-
-void UPCGExDataCacheComponent::ClearAll(const UObject* InWriter, const bool bPreview, const bool bNotify)
-{
-	check(IsInGameThread());
-
-	TArray<FPCGDataCollection> Released;
-	bool bRemovedPersisted = false;
-	{
-		UE::TWriteScopeLock ScopedWriteLock(Lock);
-		Released.Reserve(Entries.Num() + PreviewEntries.Num());
-		// A preview generation never touches persisted data.
-		if (!bPreview)
+		if (bPreview)
 		{
-			bRemovedPersisted = !Entries.IsEmpty();
-			PCGExDataCacheComponent::TakeAll(Entries, Released);
+			// A preview generation never touches persisted data: it hides the ID instead.
+			const FPCGExDataCacheEntry* Preview = PreviewEntries.Find(InId);
+			const bool bVisible = Preview ? !Preview->bTombstone : Entries.Contains(InId);
+			if (bVisible)
+			{
+				bChanged = true;
+				if (Entries.Contains(InId)) { PCGExDataCacheComponent::Tombstone(PreviewEntries, InId, Released); }
+				else { PCGExDataCacheComponent::Take(PreviewEntries, InId, Released); }
+			}
 		}
-		PCGExDataCacheComponent::TakeAll(PreviewEntries, Released);
+		else
+		{
+			bDirty = PCGExDataCacheComponent::Take(Entries, InId, Released);
+			bChanged = PCGExDataCacheComponent::Take(PreviewEntries, InId, Released) || bDirty;
+		}
 	}
 
-	for (const FPCGDataCollection& Collection : Released) { ReleaseData(Collection); }
+	ReleaseData(Released);
 
-	if (bRemovedPersisted) { MarkPackageDirty(); }
-	if (bNotify && !Released.IsEmpty()) { NotifyChanged(InWriter); }
+	if (bDirty) { MarkPackageDirty(); }
+	if (bNotify && bChanged) { NotifyChanged(InWriter); }
 }
 
-void UPCGExDataCacheComponent::NotifyChanged(const UObject* InWriter) const
+void UPCGExDataCacheComponent::ClearAll(UObject* InWriter, const bool bPreview, const bool bNotify)
+{
+	check(IsInGameThread());
+
+	TArray<FPCGExDataCacheEntry> Released;
+	bool bChanged = false;
+	bool bDirty = false;
+	{
+		UE::TWriteScopeLock ScopedWriteLock(Lock);
+		if (bPreview)
+		{
+			// Hide every persisted ID and drop the preview shadows.
+			for (const TPair<FName, FPCGExDataCacheEntry>& Pair : PreviewEntries) { bChanged |= !Pair.Value.bTombstone; }
+			PCGExDataCacheComponent::TakeAll(PreviewEntries, Released);
+			for (const TPair<FName, FPCGExDataCacheEntry>& Pair : Entries)
+			{
+				PreviewEntries.Add(Pair.Key).bTombstone = true;
+				bChanged = true;
+			}
+		}
+		else
+		{
+			bDirty = !Entries.IsEmpty();
+			bChanged = bDirty || !PreviewEntries.IsEmpty();
+			PCGExDataCacheComponent::TakeAll(Entries, Released);
+			PCGExDataCacheComponent::TakeAll(PreviewEntries, Released);
+		}
+	}
+
+	ReleaseData(Released);
+
+	if (bDirty) { MarkPackageDirty(); }
+	if (bNotify && bChanged) { NotifyChanged(InWriter); }
+}
+
+void UPCGExDataCacheComponent::NotifyChanged(UObject* InWriter) const
 {
 #if WITH_EDITOR
 	check(IsInGameThread());
@@ -207,34 +230,36 @@ void UPCGExDataCacheComponent::NotifyChanged(const UObject* InWriter) const
 	AActor* Owner = GetOwner();
 	if (!Owner) { return; }
 
-	// FPCGActorTracker::ShouldIgnoreActor drops the PCG World Actor (and editor preview actors) before dispatch.
+	// PCGActorTracker::ShouldIgnoreActor (FPCGActorTracker::OnObjectPropertyChanged) drops the PCG World Actor.
 	if (Owner->IsA<APCGWorldActor>())
 	{
 		UE_LOG(LogPCGEx, Verbose, TEXT("[Data Cache] Change notifications on the PCG World Actor are ignored by PCG tracking."));
 		return;
 	}
 
-	// FPCGActorTracker defers actors still registering components to its Tick; that dispatch would land after the
-	// bracket below closed and re-trigger the writer. Skip rather than loop. (An unloaded level-instance hierarchy
-	// defers the same way and is not detected here.)
+	// FPCGActorTracker::ShouldDelayActor defers actors still registering components to its Tick; that dispatch would
+	// land after the scope below closed and re-trigger the writer. Skip rather than loop. (An unloaded level-instance
+	// hierarchy defers the same way and is not detected here.)
 	if (!Owner->HasActorRegisteredAllComponents())
 	{
 		UE_LOG(LogPCGEx, Verbose, TEXT("[Data Cache] '%s' is still registering components; change notification skipped."), *Owner->GetName());
 		return;
 	}
 
+	UPCGExDataCacheComponent* MutableThis = const_cast<UPCGExDataCacheComponent*>(this);
+	auto Broadcast = [MutableThis]() { PCGExEditor::NotifyObjectChanged(MutableThis); };
+
 	// The actor tracker maps this component to its owner, then FPCGComponentChangeHandler::ShouldDiscardComponent
 	// consults the tracked component's ORIGINAL component ignore list against {owner actor, this}. Dispatch is
-	// synchronous from here, so the bracket only needs to span the broadcast and stays balanced.
-	UPCGComponent* WriterOriginal = nullptr;
-	if (const UPCGComponent* WriterComponent = Cast<UPCGComponent>(InWriter))
+	// synchronous from here, so the engine's scope (Start / ON_SCOPE_EXIT Stop on the original) is enough.
+	if (UPCGComponent* WriterComponent = Cast<UPCGComponent>(InWriter))
 	{
-		WriterOriginal = WriterComponent->GetOriginalComponent();
+		WriterComponent->IgnoreChangeOriginDuringGenerationWithScope(Owner, Broadcast);
 	}
-
-	if (WriterOriginal) { WriterOriginal->StartIgnoringChangeOriginDuringGeneration(Owner); }
-	PCGExEditor::NotifyObjectChanged(const_cast<UPCGExDataCacheComponent*>(this));
-	if (WriterOriginal) { WriterOriginal->StopIgnoringChangeOriginDuringGeneration(Owner); }
+	else
+	{
+		Broadcast();
+	}
 #else
 	(void)InWriter;
 #endif
@@ -248,15 +273,18 @@ void UPCGExDataCacheComponent::EDITOR_ClearCache()
 }
 #endif
 
-void UPCGExDataCacheComponent::ReleaseData(const FPCGDataCollection& InData) const
+void UPCGExDataCacheComponent::ReleaseData(const TArray<FPCGExDataCacheEntry>& InEntries) const
 {
 	// Mirrors UPCGComponent::ClearGraphGeneratedOutput: only objects we own go back to the transient package. Any
 	// context still holding the data keeps it alive; GC reclaims it once the last reference drops.
-	for (const FPCGTaggedData& TaggedData : InData.TaggedData)
+	for (const FPCGExDataCacheEntry& Entry : InEntries)
 	{
-		if (TaggedData.Data && TaggedData.Data->GetOuter() == this)
+		for (const FPCGTaggedData& TaggedData : Entry.Data.TaggedData)
 		{
-			const_cast<UPCGData*>(TaggedData.Data.Get())->Rename(nullptr, GetTransientPackage(), REN_DoNotDirty | REN_DontCreateRedirectors | REN_NonTransactional);
+			if (TaggedData.Data && TaggedData.Data->GetOuter() == this)
+			{
+				const_cast<UPCGData*>(TaggedData.Data.Get())->Rename(nullptr, GetTransientPackage(), REN_DoNotDirty | REN_DontCreateRedirectors | REN_NonTransactional);
+			}
 		}
 	}
 }
@@ -266,7 +294,6 @@ TArray<FPCGTaggedData> UPCGExDataCacheComponent::AdoptData(TArray<FPCGTaggedData
 	TArray<FPCGTaggedData> Adopted;
 	Adopted.Reserve(InData.Num());
 
-	const ERenameFlags RenameFlags = bPreview ? REN_DoNotDirty : REN_None;
 	UPCGExDataCacheComponent* NewOuter = const_cast<UPCGExDataCacheComponent*>(this);
 
 	for (FPCGTaggedData& TaggedData : InData)
@@ -281,26 +308,21 @@ TArray<FPCGTaggedData> UPCGExDataCacheComponent::AdoptData(TArray<FPCGTaggedData
 			continue;
 		}
 
-		// A fresh duplicate may still be a lazy copy of its source; Flatten severs that link before the network check.
-		Data->Flatten();
+		// A fresh duplicate may still be a lazy copy of its source; only then is the (per-entry) flatten worth paying.
+		const UPCGMetadata* Metadata = Data->ConstMetadata();
+		const UPCGSpatialData* Spatial = Cast<UPCGSpatialData>(Data);
+		if ((Metadata && Metadata->GetParent()) || (Spatial && Spatial->HasSpatialDataParent())) { Data->Flatten(); }
 
-		// Only self-contained data is adopted. UPCGUnionData::VisitDataNetwork visits the sources and not the union,
-		// so any visited object other than Data itself means shared upstream objects we must not steal or serialize.
-		bool bSelfContained = true;
-		Data->VisitDataNetwork([Data, &bSelfContained](const UPCGData* InNetworkData)
+		if (!PCGExDataCache::IsSelfContained(Data))
 		{
-			if (InNetworkData != Data) { bSelfContained = false; }
-		});
-
-		if (!bSelfContained)
-		{
-			UE_LOG(LogPCGEx, Warning, TEXT("[Data Cache] '%s' is composite data (union, intersection, projection...) and was not cached; convert it to points first."), *Data->GetName());
+			UE_LOG(LogPCGEx, Warning, TEXT("[Data Cache] '%s' references other data (union, intersection, projection...) and was not cached; convert it to points first."), *Data->GetName());
 			continue;
 		}
 
 		if (bPreview) { Data->SetFlags(RF_Transient); }
 		else { Data->ClearFlags(RF_Transient); }
-		Data->Rename(nullptr, NewOuter, RenameFlags);
+		// Never dirtying here: Write marks the package once. Non-transactional like the release path.
+		Data->Rename(nullptr, NewOuter, REN_DoNotDirty | REN_DontCreateRedirectors | REN_NonTransactional);
 
 		Adopted.Add(MoveTemp(TaggedData));
 	}

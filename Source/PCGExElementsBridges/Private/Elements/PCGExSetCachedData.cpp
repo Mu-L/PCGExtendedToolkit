@@ -5,7 +5,6 @@
 
 #include "PCGContext.h"
 #include "PCGGraphExecutionStateInterface.h"
-#include "PCGPin.h"
 
 #include "GameFramework/Actor.h"
 
@@ -72,8 +71,9 @@ FString UPCGExSetCachedDataSettings::GetAdditionalTitleInformation() const
 	case EPCGExDataCacheWriteMode::ClearAll:
 		return TEXT("Clear All");
 	default:
-		checkNoEntry();
-		return FString();
+		// Title path: loud but survivable, so an asset with a retired enumerator can still be opened and fixed.
+		ensureMsgf(false, TEXT("Unresolvable EPCGExDataCacheWriteMode (%d)"), static_cast<int32>(Mode));
+		return TEXT("Invalid Mode");
 	}
 }
 
@@ -91,9 +91,18 @@ TArray<FPCGPinProperties> UPCGExSetCachedDataSettings::InputPinProperties() cons
 	// Clear modes: no data pins at all; the required execution dependency orders the node.
 	if (IsClearMode()) { return PinProperties; }
 
-	// Required: an unwired Set must not store an empty entry.
-	PCGEX_PIN_ANY(PCGPinConstants::DefaultInputLabel, "Data to cache. Stored under the In label; read it back from Get Cached Data's Out pin.", Required)
-	PinProperties.Append(GetSanitizedCustomInputPins());
+	// Required only while it is the sole data pin: an unwired Set is culled instead of running for nothing. With
+	// custom pins the user may wire any subset, and the component skips writes that have nothing cacheable.
+	const TArray<FPCGPinProperties> CustomPins = GetSanitizedCustomInputPins();
+	if (CustomPins.IsEmpty())
+	{
+		PCGEX_PIN_ANY(PCGPinConstants::DefaultInputLabel, "Data to cache. Stored under the In label; read it back from Get Cached Data's Out pin.", Required)
+	}
+	else
+	{
+		PCGEX_PIN_ANY(PCGPinConstants::DefaultInputLabel, "Data to cache. Stored under the In label; read it back from Get Cached Data's Out pin.", Normal)
+	}
+	PinProperties.Append(CustomPins);
 	PCGEX_PIN_ANY(PCGExDataCache::TargetActorPinLabel, "Actor references naming the actor(s) that host the cache. When connected, overrides the Target setting.", Advanced)
 	return PinProperties;
 }
@@ -142,12 +151,7 @@ bool FPCGExSetCachedDataElement::Boot(FPCGExContext* InContext) const
 
 	// Clear modes have no Target Actor pin, so this resolves through the Target setting alone.
 	TArray<AActor*> Actors;
-	PCGExDataCache::ResolveTargetActors(Context, Settings->Target, Settings->ActorReferenceAttribute, /*bCreateWorldActor=*/!Settings->IsClearMode(), Actors);
-
-	if (Actors.IsEmpty() && !Settings->bQuietMissingTargetWarning)
-	{
-		PCGE_LOG(Warning, GraphAndLog, LOCTEXT("NoTargetActor", "No target actor could be resolved; the cache was not touched."));
-	}
+	Settings->ResolveTargets(Context, /*bCreateWorldActor=*/!Settings->IsClearMode(), Actors);
 
 	Context->TargetActors.Reserve(Actors.Num());
 	for (AActor* Actor : Actors) { Context->TargetActors.Add(Actor); }
@@ -162,21 +166,31 @@ bool FPCGExSetCachedDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 
 	IPCGGraphExecutionSource* Source = Context->ExecutionSource.Get();
 	const bool bPreview = Source && Source->GetExecutionState().IsInPreviewMode();
-	const UObject* Writer = Cast<UObject>(Source);
+	UObject* Writer = Cast<UObject>(Source);
 
-	if (Settings->IsClearMode())
+	bool bAppend = false;
+	switch (Settings->Mode)
 	{
+	case EPCGExDataCacheWriteMode::Replace:
+		break;
+	case EPCGExDataCacheWriteMode::Append:
+		bAppend = true;
+		break;
+	case EPCGExDataCacheWriteMode::Clear:
+	case EPCGExDataCacheWriteMode::ClearAll:
 		// Never create a component just to find nothing in it.
 		for (const TWeakObjectPtr<AActor>& WeakActor : Context->TargetActors)
 		{
-			if (UPCGExDataCacheComponent* Cache = UPCGExDataCacheComponent::Find(WeakActor.Get()))
-			{
-				Cache->Write(Settings->CacheID, Settings->Mode, {}, Writer, bPreview, Settings->bNotifyChange);
-			}
+			UPCGExDataCacheComponent* Cache = UPCGExDataCacheComponent::Find(WeakActor.Get());
+			if (!Cache) { continue; }
+			if (Settings->Mode == EPCGExDataCacheWriteMode::Clear) { Cache->Clear(Settings->CacheID, Writer, bPreview, Settings->bNotifyChange); }
+			else { Cache->ClearAll(Writer, bPreview, Settings->bNotifyChange); }
 		}
-
 		Context->Done();
 		return Context->TryComplete();
+	default:
+		ensureMsgf(false, TEXT("Unresolvable EPCGExDataCacheWriteMode (%d)"), static_cast<int32>(Settings->Mode));
+		return Context->CancelExecution(TEXT("Unresolvable write mode."));
 	}
 
 	TSet<FName> InputLabels = {PCGPinConstants::DefaultInputLabel};
@@ -216,7 +230,7 @@ bool FPCGExSetCachedDataElement::AdvanceWork(FPCGExContext* InContext, const UPC
 			Copy.Pin = Input->Pin;
 		}
 
-		Cache->Write(Settings->CacheID, Settings->Mode, MoveTemp(Duplicates), Writer, bPreview, Settings->bNotifyChange);
+		Cache->Write(Settings->CacheID, bAppend, MoveTemp(Duplicates), Writer, bPreview, Settings->bNotifyChange);
 	}
 
 	// Pass-through, so the node can sit inline.

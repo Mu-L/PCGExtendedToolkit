@@ -6,12 +6,13 @@
 #include "CoreMinimal.h"
 #include "PCGPin.h"
 
+#include "Core/PCGExSettings.h"
 #include "Data/PCGExDataTags.h" // TagSeparator
 
 #include "PCGExDataCacheHelpers.generated.h"
 
 class AActor;
-class UPCGSettings;
+class UPCGData;
 struct FPCGExContext;
 
 UENUM()
@@ -38,17 +39,10 @@ namespace PCGExDataCache
 	}
 
 	/**
-	 * Game thread only (resolves soft paths, may spawn the PCG World Actor). When the Target Actor pin carries
-	 * data, every unique actor referenced by InActorReferenceAttribute is a target (a component reference resolves
-	 * to its owner); otherwise the single actor named by InTarget. bCreateWorldActor: spawn the world actor if
-	 * missing (writers) or only find it (readers).
+	 * True when InData references no UPCGData outside its own outer chain. Property-based (FReferenceFinder), not the
+	 * cooperative VisitDataNetwork virtual, so projection / collision-wrapper operands are caught too.
 	 */
-	PCGEXELEMENTSBRIDGES_API void ResolveTargetActors(
-		FPCGExContext* InContext,
-		const EPCGExDataCacheTarget InTarget,
-		const FName InActorReferenceAttribute,
-		const bool bCreateWorldActor,
-		TArray<AActor*>& OutActors);
+	PCGEXELEMENTSBRIDGES_API bool IsSelfContained(const UPCGData* InData);
 
 	/** User-declared pins minus None labels, reserved labels and duplicates. Set and Get must agree on this. */
 	PCGEXELEMENTSBRIDGES_API TArray<FPCGPinProperties> SanitizePins(const TArray<FPCGPinProperties>& InPins, const TArrayView<const FName> InReservedLabels);
@@ -56,3 +50,36 @@ namespace PCGExDataCache
 	/** True when the settings live on a node whose Target Actor pin has an edge. */
 	PCGEXELEMENTSBRIDGES_API bool IsTargetPinConnected(const UPCGSettings* InSettings);
 }
+
+/** Shared target-actor surface of Set Cached Data and Get Cached Data. */
+UCLASS(Abstract)
+class PCGEXELEMENTSBRIDGES_API UPCGExDataCacheSettingsBase : public UPCGExSettings
+{
+	GENERATED_BODY()
+
+public:
+	/** Which actor hosts the cache. Ignored when the Target Actor pin is connected. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition = "IsTargetPinUnconnected()"))
+	EPCGExDataCacheTarget Target = EPCGExDataCacheTarget::ExecutingActor;
+
+	/** 'FSoftObjectPath' attribute read on the Target Actor pin when it is connected. A component reference resolves to its owner. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	FName ActorReferenceAttribute = FName("ActorReference");
+
+	/** Suppress the warning when no target actor could be resolved. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors")
+	bool bQuietMissingTargetWarning = false;
+
+	/**
+	 * Game thread only (resolves soft paths, may spawn the PCG World Actor). When the Target Actor pin carries data,
+	 * every unique actor it references is a target; otherwise the single actor named by Target. Warns (unless quiet)
+	 * when nothing resolves. bCreateWorldActor: writers spawn a missing world actor, readers only find it.
+	 */
+	void ResolveTargets(FPCGExContext* InContext, const bool bCreateWorldActor, TArray<AActor*>& OutActors) const;
+
+protected:
+#if WITH_EDITOR
+	UFUNCTION()
+	bool IsTargetPinUnconnected() const { return !PCGExDataCache::IsTargetPinConnected(this); }
+#endif
+};

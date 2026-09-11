@@ -10,7 +10,6 @@
 #include "PCGExCoreMacros.h"
 #include "Core/PCGExContext.h"
 #include "Core/PCGExElement.h"
-#include "Core/PCGExSettings.h"
 #include "Helpers/PCGExDataCacheHelpers.h"
 
 #include "PCGExGetCachedData.generated.h"
@@ -24,7 +23,7 @@
  * game thread during preparation, staging happens off-thread.
  */
 UCLASS(MinimalAPI, BlueprintType, ClassGroup = (Procedural), Category = "PCGEx|Misc", meta = (Keywords = "pcgex cache read restore previous generation data", PCGExNodeLibraryDoc = "utilities/data-cache/get-cached-data"))
-class UPCGExGetCachedDataSettings : public UPCGExSettings
+class UPCGExGetCachedDataSettings : public UPCGExDataCacheSettingsBase
 {
 	GENERATED_BODY()
 
@@ -59,16 +58,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bReadAllEntries = false;
 
-	/** Which actor hosts the cache. Ignored when the Target Actor pin is connected. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable, EditCondition = "IsTargetPinUnconnected()"))
-	EPCGExDataCacheTarget Target = EPCGExDataCacheTarget::ExecutingActor;
-
-	/** 'FSoftObjectPath' attribute read on the Target Actor pin when it is connected. A component reference resolves to its owner. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
-	FName ActorReferenceAttribute = FName("ActorReference");
-
-	/** Extra output pins. Cached data whose stored pin label matches one of these exactly is routed there; anything
-	 *  else goes to Out. Copy-paste the Set node's Custom Input Pins here. Labels colliding with Out or Status are ignored. */
+	/** Extra output pins: cached data whose stored pin label matches one exactly is routed there, the rest goes to
+	 *  Out. Copy-paste the Set node's Custom Input Pins here. Out and Status are reserved. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Pins", meta = (TitleProperty = "{Label}"))
 	TArray<FPCGPinProperties> CustomOutputPins;
 
@@ -80,18 +71,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Output")
 	bool bOutputStatus = true;
 
-	/** Suppress the warning when no target actor could be resolved. A cache miss never warns. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Warnings and Errors")
-	bool bQuietMissingTargetWarning = false;
-
 	/** Custom output pins minus None labels, reserved labels and duplicates; the pins actually declared. */
 	TArray<FPCGPinProperties> GetSanitizedCustomOutputPins() const;
-
-protected:
-#if WITH_EDITOR
-	UFUNCTION()
-	bool IsTargetPinUnconnected() const { return !PCGExDataCache::IsTargetPinConnected(this); }
-#endif
 };
 
 struct FPCGExGetCachedDataContext final : FPCGExContext
@@ -103,14 +84,12 @@ struct FPCGExGetCachedDataContext final : FPCGExContext
 		int32 DataCount = 0;
 	};
 
-	/** Cached data copied out during Boot (game thread). Pin is the label it was stored with. */
-	TArray<FPCGTaggedData> Reads;
+	/** Cached data copied out during Boot (game thread), pin = the label it was stored with. Doubles as the GC root:
+	 *  StageOutput(None) does not root, and the cache may drop its own reference before we flush. */
+	FPCGDataCollection Reads;
 
 	/** One per target actor; a single not-found row when no actor resolved, so Status always has something to branch on. */
 	TArray<FStatusRow> StatusRows;
-
-	/** GC root for Reads: StageOutput(None) does not root, and the cache may drop its own reference before we flush. */
-	TSet<TObjectPtr<const UPCGData>> ReferencedObjects;
 
 protected:
 	virtual void AddExtraStructReferencedObjects(FReferenceCollector& Collector) override;
