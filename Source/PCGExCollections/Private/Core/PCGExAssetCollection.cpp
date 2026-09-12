@@ -2361,6 +2361,12 @@ void UPCGExAssetCollection::EDITOR_FinalizeStagingRebuild(bool bHasChanges)
 	EDITOR_EndPipelineSession();
 }
 
+void UPCGExAssetCollection::EDITOR_StampSchemaVersionsCurrent()
+{
+	GrammarSchemaVersion = PCGExAssetCollectionMigration::CurrentGrammarSchemaVersion;
+	FittingSchemaVersion = PCGExAssetCollectionMigration::CurrentFittingSchemaVersion;
+}
+
 void UPCGExAssetCollection::EDITOR_BakeThumbnailToPackage()
 {
 	// Needs the editor engine + thumbnail manager, so no-op in commandlets/cooks; never render mid-GC.
