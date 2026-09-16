@@ -3,6 +3,7 @@
 
 #include "Elements/PCGExWeightedLookup.h"
 
+#include "PCGParamData.h"
 #include "Data/PCGExData.h"
 #include "Data/PCGExPointIO.h"
 #include "Data/Utils/PCGExDataForward.h"
