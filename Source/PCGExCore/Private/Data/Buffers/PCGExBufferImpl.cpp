@@ -684,10 +684,11 @@ namespace PCGExData
 				return true;
 			}
 
-			bReadInitialized = true;
-
 			InAttribute = FoundAttribute;
 			InValue = Helpers::ReadDataValue<T>(FoundAttribute);
+
+			// IsReadable() is polled lock-free (TryGetBuffer): publish only after InValue is fully assigned.
+			bReadInitialized = true;
 		}
 
 		return bReadInitialized;
