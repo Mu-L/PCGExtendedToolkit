@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #include "Elements/PCGExSampleStampPoints.h"
@@ -354,7 +354,8 @@ namespace PCGExSampleStampPoints
 		}
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
-		SamplingMask.SetNumUninitialized(PointDataFacade->GetNum());
+		// Filtered-out points that are not processed as fails keep the point: mask 1, never read as garbage.
+		SamplingMask.Init(1, PointDataFacade->GetNum());
 
 		{
 			PCGExSampling::FCommonOutputConfig Config;

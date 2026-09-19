@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -36,7 +36,7 @@ namespace PCGExSampling
 		bool bNormalizeFailedDistance = true; // failed points run through the normalized-distance pass too
 	};
 
-	/** The nine writers every target sampler shares, plus their success / failure / normalization passes. */
+	/** The writers every target sampler shares, plus their success / failure / normalization passes. */
 	class PCGEXBLENDING_API FCommonOutputs
 	{
 	public:

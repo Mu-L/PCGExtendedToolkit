@@ -258,7 +258,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Weighting", meta=(PCG_NotOverridable), AdvancedDisplay)
 	bool bLegacyCurveInput = false;
 
-	/** Write whether the sampling was sucessful or not to a boolean attribute. */
+	/** Write whether the sampling was successful or not to a boolean attribute. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteSuccess = false;
 
@@ -275,11 +275,11 @@ public:
 	FName TransformAttributeName = FName("WeightedTransform");
 
 
-	/** Write the sampled transform. */
+	/** Write the look-at transform. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteLookAtTransform = false;
 
-	/** Name of the 'transform' attribute to write sampled Transform to.*/
+	/** Name of the 'transform' attribute to write the look-at transform to. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(DisplayName="LookAt", PCG_Overridable, EditCondition="bWriteLookAtTransform"))
 	FName LookAtTransformAttributeName = FName("WeightedLookAt");
 
@@ -361,7 +361,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteAngle = false;
 
-	/** Name of the 'double' attribute to write sampled Signed distance to.*/
+	/** Name of the 'double' attribute to write the sampled angle to. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Outputs", meta=(DisplayName="Angle", PCG_Overridable, EditCondition="bWriteAngle"))
 	FName AngleAttributeName = FName("WeightedAngle");
 
@@ -409,7 +409,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Additional Outputs", meta=(PCG_Overridable, DisplayName=" └─ Only if Closed Spline", EditCondition="bWriteNumInside && SampleInputs == EPCGExSplineSamplingIncludeMode::All", EditConditionHides, HideEditConditionToggle))
 	bool bOnlyIncrementInsideNumIfClosed = false;
 
-	/** Write the sampled distance. */
+	/** Write the number of sampled targets. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Additional Outputs", meta=(PCG_Overridable, InlineEditConditionToggle))
 	bool bWriteNumSamples = false;
 

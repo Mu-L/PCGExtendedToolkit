@@ -357,7 +357,8 @@ namespace PCGExSampleNearestPath
 
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
-		SamplingMask.SetNumUninitialized(PointDataFacade->GetNum());
+		// Filtered-out points that are not processed as fails keep the point: mask 1, never read as garbage.
+		SamplingMask.Init(1, PointDataFacade->GetNum());
 
 		if (Settings->SampleInputs != EPCGExPathSamplingIncludeMode::All)
 		{

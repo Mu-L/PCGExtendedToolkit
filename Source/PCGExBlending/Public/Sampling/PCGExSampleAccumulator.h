@@ -1,4 +1,4 @@
-// Copyright 2026 Timothé Lapetite and contributors
+﻿// Copyright 2026 Timothé Lapetite and contributors
 // Released under the MIT license https://opensource.org/license/MIT/
 
 #pragma once
@@ -67,17 +67,20 @@ namespace PCGExSampling
 			Count = 0;
 		}
 
-		/** Zero-total fallback: all-zero weights still blend, each entry gets 1/N. Load-bearing for attribute-weighted sampling. */
+		/** Zero-total fallback: all-zero weights still blend, sharing a total of 1 over the split mass. Load-bearing for attribute-weighted sampling. */
 		FORCEINLINE void ApplyZeroTotalFallback()
 		{
 			double Sum = 0;
+			double SplitSum = 0;
 			for (const PCGExData::FWeightedPoint& P : WeightedPoints)
 			{
 				Sum += P.Weight;
+				SplitSum += P.Split;
 			}
-			if (Sum == 0 && !WeightedPoints.IsEmpty())
+			if (Sum == 0 && SplitSum > 0)
 			{
-				const double Uniform = 1.0 / static_cast<double>(WeightedPoints.Num());
+				// Uniform over the split mass, not the count: split points (A/B of one sample) still total 1 per sample.
+				const double Uniform = 1.0 / SplitSum;
 				for (PCGExData::FWeightedPoint& P : WeightedPoints)
 				{
 					P.Weight = Uniform;

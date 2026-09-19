@@ -337,7 +337,8 @@ namespace PCGExSampleNearestPoint
 		}
 		PointDataFacade->GetOut()->AllocateProperties(AllocateFor);
 
-		SamplingMask.SetNumUninitialized(PointDataFacade->GetNum());
+		// Filtered-out points that are not processed as fails keep the point: mask 1, never read as garbage.
+		SamplingMask.Init(1, PointDataFacade->GetNum());
 
 		{
 			PCGExSampling::FCommonOutputConfig Config;
@@ -464,7 +465,7 @@ namespace PCGExSampleNearestPoint
 				continue;
 			}
 
-			// The gate squares the range, so sign never mattered; Abs keeps that true for the linear weighting.
+			// Ranges compare by magnitude: Abs both, then order.
 			double RangeMin = FMath::Abs(RangeMinGetter->Read(Index));
 			double RangeMax = FMath::Abs(RangeMaxGetter->Read(Index));
 
