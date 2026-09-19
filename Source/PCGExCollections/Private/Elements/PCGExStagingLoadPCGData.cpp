@@ -411,7 +411,7 @@ void UPCGExPCGDataAssetLoaderSettings::InputPinPropertiesBeforeFilters(TArray<FP
 TArray<FPCGPinProperties> UPCGExPCGDataAssetLoaderSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> PinProperties;
-	PCGEX_PIN_ANY(GetMainOutputPin(), "Loaded data. From points: spatial data is one per input point, other is single instance only. From attribute sets: asset contents as-is, single instance only.", Normal)
+	PCGEX_PIN_ANY(GetMainOutputPin(), "Loaded data. From points: spatial data is one per input point, other is single instance only. From attribute sets: asset contents as-is, once per asset, or once per row with Targets Forwarding.", Normal)
 
 	// Add custom output pins first
 	for (const FPCGPinProperties& CustomPin : CustomOutputPins)
