@@ -11,8 +11,8 @@
 UENUM()
 enum class EPCGExRangeType : uint8
 {
-	FullRange      = 0 UMETA(DisplayName = "Full Range", ToolTip="Normalize in the [0..1] range using [0..Max Value] range."),
-	EffectiveRange = 1 UMETA(DisplayName = "Effective Range", ToolTip="Remap the input [Min..Max] range to [0..1]."),
+	FullRange      = 0 UMETA(DisplayName = "Full Range", ToolTip="Remap the declared [Min..Max] range to [0..1]."),
+	EffectiveRange = 1 UMETA(DisplayName = "Effective Range", ToolTip="Remap the sampled [Min..Max] range to [0..1]."),
 };
 
 UENUM()
@@ -27,7 +27,7 @@ enum class EPCGExSurfaceSource : uint8
 UENUM()
 enum class EPCGExSampleMethod : uint8
 {
-	WithinRange    = 0 UMETA(DisplayName = "All (Within range)", ToolTip="Use RangeMax = 0 to include all targets"),
+	WithinRange    = 0 UMETA(DisplayName = "All (Within range)", ToolTip="Use RangeMax = 0 to include all targets (where supported)"),
 	ClosestTarget  = 1 UMETA(DisplayName = "Closest Target", ToolTip="Picks & process the closest target only"),
 	FarthestTarget = 2 UMETA(DisplayName = "Farthest Target", ToolTip="Picks & process the farthest target only"),
 	BestCandidate  = 3 UMETA(DisplayName = "Best Candidate", ToolTip="Picks & process the best candidate based on sorting rules"),
