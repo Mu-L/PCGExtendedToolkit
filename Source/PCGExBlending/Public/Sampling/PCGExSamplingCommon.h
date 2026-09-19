@@ -152,6 +152,31 @@ namespace PCGExSampling::Labels
 	const FName OutputSampledActorsLabel = TEXT("OutSampledActors");
 }
 
+// The output set every target sampler shares; a node appends its own fields after it.
+#define PCGEX_FOREACH_FIELD_SAMPLING_COMMON(MACRO)\
+MACRO(Success, bool, false)\
+MACRO(Transform, FTransform, FTransform::Identity)\
+MACRO(LookAtTransform, FTransform, FTransform::Identity)\
+MACRO(Distance, double, 0)\
+MACRO(SignedDistance, double, 0)\
+MACRO(ComponentWiseDistance, FVector, FVector::ZeroVector)\
+MACRO(Angle, double, 0)\
+MACRO(NumSamples, int32, 0)
+
+// PCGExSampling::FCommonOutputConfig fields, and their fill from a node (expects Config, Settings and Context in scope)
+#define PCGEX_OUTPUT_CONFIG_DECL(_NAME, _TYPE, _DEFAULT_VALUE) FName _NAME##AttributeName = NAME_None; bool bWrite##_NAME = false;
+#define PCGEX_OUTPUT_CONFIG_FWD(_NAME, _TYPE, _DEFAULT_VALUE) Config._NAME##AttributeName = Settings->_NAME##AttributeName; Config.bWrite##_NAME = Context->bWrite##_NAME;
+
+// Everything FCommonOutputConfig copies from a sampler's settings except the per-node failure policy
+#define PCGEX_OUTPUT_CONFIG_FWD_COMMON \
+PCGEX_FOREACH_FIELD_SAMPLING_COMMON(PCGEX_OUTPUT_CONFIG_FWD) \
+Config.DistanceScale = Settings->DistanceScale; \
+Config.SignedDistanceScale = Settings->SignedDistanceScale; \
+Config.bOutputNormalizedDistance = Settings->bOutputNormalizedDistance; \
+Config.bOutputOneMinusDistance = Settings->bOutputOneMinusDistance; \
+Config.bAbsoluteComponentWiseDistance = Settings->bAbsoluteComponentWiseDistance; \
+Config.AngleRange = Settings->AngleRange;
+
 // Declaration & use pair, boolean will be set by name validation
 #define PCGEX_OUTPUT_DECL_TOGGLE(_NAME, _TYPE, _DEFAULT_VALUE) bool bWrite##_NAME = false;
 #define PCGEX_OUTPUT_DECL(_NAME, _TYPE, _DEFAULT_VALUE) TSharedPtr<PCGExData::TBuffer<_TYPE>> _NAME##Writer;

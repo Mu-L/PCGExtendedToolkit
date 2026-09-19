@@ -22,20 +22,14 @@
 #include "Details/PCGExSettingsMacros.h"
 #include "Math/PCGExMathAxis.h"
 #include "Sampling/PCGExApplySamplingDetails.h"
+#include "Sampling/PCGExSampleOutputs.h"
 #include "Sampling/PCGExSamplingCommon.h"
 #include "Sorting/PCGExSortingCommon.h"
 
 #include "PCGExSampleStampPoints.generated.h"
 
 #define PCGEX_FOREACH_FIELD_STAMPPOINTS(MACRO)\
-MACRO(Success, bool, false)\
-MACRO(Transform, FTransform, FTransform::Identity)\
-MACRO(LookAtTransform, FTransform, FTransform::Identity)\
-MACRO(Distance, double, 0)\
-MACRO(SignedDistance, double, 0)\
-MACRO(ComponentWiseDistance, FVector, FVector::ZeroVector)\
-MACRO(Angle, double, 0)\
-MACRO(NumSamples, int32, 0)\
+PCGEX_FOREACH_FIELD_SAMPLING_COMMON(MACRO)\
 MACRO(SampledIndex, int32, -1)
 
 namespace PCGExSorting
@@ -371,16 +365,11 @@ struct FPCGExSampleStampPointsContext final : FPCGExPointsProcessorContext
 	TSharedPtr<PCGExBlending::FBlendOpsSchema> BlendOpsSchema;
 
 	TSharedPtr<PCGExMatching::FTargetsHandler> TargetsHandler;
-	TSharedPtr<PCGExMatching::FTargetsRangeIndex> RangeIndex;
+	TSharedPtr<PCGExMatching::FTargetsRangeIndex> RangeIndex; // holds the resolved per-target ranges too
 	int32 NumMaxTargets = 0;
 
 	TArray<TSharedPtr<PCGExData::TBuffer<double>>> TargetWeights;
 	TArray<TSharedPtr<PCGExDetails::TSettingValue<FVector>>> TargetLookAtUpGetters;
-
-	// Indexed by target IO; read from any thread once initialised.
-	TArray<TSharedPtr<PCGExDetails::TSettingValue<double>>> TargetMinRanges;
-	TArray<TSharedPtr<PCGExDetails::TSettingValue<double>>> TargetMaxRanges;
-	TArray<TSharedPtr<PCGExDetails::TSettingValue<double>>> TargetRangeScales;
 
 	TSharedPtr<PCGExSorting::FSorter> Sorter;
 
@@ -430,7 +419,8 @@ namespace PCGExSampleStampPoints
 
 		int8 bAnySuccess = 0;
 
-		PCGEX_FOREACH_FIELD_STAMPPOINTS(PCGEX_OUTPUT_DECL)
+		PCGExSampling::FCommonOutputs Outputs;
+		PCGEX_OUTPUT_DECL(SampledIndex, int32, -1)
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)

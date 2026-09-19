@@ -52,7 +52,7 @@ namespace PCGExMatching
 		}
 	}
 
-	void FTargetsRangeIndex::BuildTarget(const int32 IO, const EPCGExDistance TargetDistanceMode, TFunctionRef<double(int32)> RangeAt)
+	void FTargetsRangeIndex::BuildTarget(const int32 IO, const EPCGExDistance TargetDistanceMode, FRangeAt RangeAt)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(PCGExMatching::FTargetsRangeIndex::BuildTarget);
 
@@ -65,13 +65,30 @@ namespace PCGExMatching
 			return;
 		}
 
+		Entry.MinRanges.SetNumUninitialized(NumPoints);
+		Entry.MaxRanges.SetNumUninitialized(NumPoints);
+
 		// Two passes: the octree needs its root bounds before any item can be added.
 		TArray<FBox> Boxes;
 		Boxes.SetNumUninitialized(NumPoints);
 
 		for (int32 i = 0; i < NumPoints; i++)
 		{
-			const FBox Box = GetSpatializedBox(Facade->GetInPoint(i), TargetDistanceMode).ExpandBy(RangeAt(i));
+			double Min = 0;
+			double Max = 0;
+			RangeAt(i, Min, Max);
+
+			Min = FMath::Max(0.0, Min);
+			Max = FMath::Max(0.0, Max);
+			if (Min > Max)
+			{
+				Swap(Min, Max);
+			}
+
+			Entry.MinRanges[i] = Min;
+			Entry.MaxRanges[i] = Max;
+
+			const FBox Box = GetSpatializedBox(Facade->GetInPoint(i), TargetDistanceMode).ExpandBy(Max);
 			Boxes[i] = Box;
 			Entry.Bounds += Box;
 		}
@@ -108,34 +125,5 @@ namespace PCGExMatching
 				DataOctree->AddElement(PCGExOctree::FItem(i, FBoxSphereBounds(Entries[i].Bounds)));
 			}
 		}
-	}
-
-	void FTargetsRangeIndex::FindElementsWithBoundsTest(const FBoxCenterAndExtent& QueryBounds, FTargetsHandler::FPointIteratorWithData&& Func, const TSet<const UPCGData*>* Exclude) const
-	{
-		if (!DataOctree)
-		{
-			return;
-		}
-
-		const TArray<TSharedRef<PCGExData::FFacade>>& Facades = Handler->GetFacades();
-
-		DataOctree->FindElementsWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& DataItem)
-		{
-			const TSharedRef<PCGExData::FFacade>& Target = Facades[DataItem.Index];
-			if (Exclude && Exclude->Contains(Target->GetIn()))
-			{
-				return;
-			}
-
-			const FEntry& Entry = Entries[DataItem.Index];
-			check(Entry.Octree)
-
-			Entry.Octree->FindElementsWithBoundsTest(QueryBounds, [&](const PCGExOctree::FItem& PointItem)
-			{
-				PCGExData::FConstPoint Point = Target->GetInPoint(PointItem.Index);
-				Point.IO = DataItem.Index;
-				Func(Point);
-			});
-		});
 	}
 }

@@ -18,20 +18,14 @@
 #include "Details/PCGExMatchingDetails.h"
 #include "Math/PCGExMathAxis.h"
 #include "Sampling/PCGExApplySamplingDetails.h"
+#include "Sampling/PCGExSampleOutputs.h"
 #include "Sampling/PCGExSamplingCommon.h"
 #include "Sorting/PCGExSortingCommon.h"
 
 #include "PCGExSampleNearestBounds.generated.h"
 
 #define PCGEX_FOREACH_FIELD_NEARESTBOUNDS(MACRO)\
-MACRO(Success, bool, false)\
-MACRO(Transform, FTransform, FTransform::Identity)\
-MACRO(LookAtTransform, FTransform, FTransform::Identity)\
-MACRO(Distance, double, 0)\
-MACRO(SignedDistance, double, 0)\
-MACRO(ComponentWiseDistance, FVector, FVector::ZeroVector)\
-MACRO(Angle, double, 0)\
-MACRO(NumSamples, int32, 0)\
+PCGEX_FOREACH_FIELD_SAMPLING_COMMON(MACRO)\
 MACRO(SampledIndex, int32, -1)
 
 namespace PCGExMath
@@ -390,7 +384,8 @@ namespace PCGExSampleNearestBounds
 
 		int8 bAnySuccess = 0;
 
-		PCGEX_FOREACH_FIELD_NEARESTBOUNDS(PCGEX_OUTPUT_DECL)
+		PCGExSampling::FCommonOutputs Outputs;
+		PCGEX_OUTPUT_DECL(SampledIndex, int32, -1)
 
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
