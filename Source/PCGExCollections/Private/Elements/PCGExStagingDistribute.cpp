@@ -206,18 +206,6 @@ void FPCGExAssetStagingElement::DisabledPassThroughData(FPCGContext* Context) co
 	PCGExCollections::ForwardCollectionMap(Context);
 }
 
-bool FPCGExAssetStagingElement::CanExecuteOnlyOnMainThread(FPCGContext* Context) const
-{
-	if (!Context)
-	{
-		return false;
-	}
-
-	// Prep loads collections in every source mode. Off the game thread that load marshals to it and
-	// waits, and the executor's cancel waits on this task from the game thread: deadlock.
-	return Context->CurrentPhase == EPCGExecutionPhase::PrepareData;
-}
-
 bool FPCGExAssetStagingElement::Boot(FPCGExContext* InContext) const
 {
 	PCGEX_CONTEXT_AND_SETTINGS(AssetStaging)
