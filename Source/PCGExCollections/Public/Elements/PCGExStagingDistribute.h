@@ -114,6 +114,11 @@ public:
 	virtual TOptional<FPCGNodeThumbnailProxy> GetNodeThumbnail() const override;
 #endif
 
+	virtual bool UseSeed() const override
+	{
+		return true;
+	}
+
 	virtual void ApplyPreconfiguredSettings(const FPCGPreConfiguredSettingsInfo& PreconfigureInfo) override;
 	
 	virtual bool IsPinUsedByNodeExecution(const UPCGPin* InPin) const override;
