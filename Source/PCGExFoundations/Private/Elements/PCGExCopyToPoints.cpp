@@ -235,16 +235,20 @@ namespace PCGExCopyToPoints
 			return;
 		}
 
-		for (const int32 TargetIndex : MatchedIndices)
-		{
-			Context->TargetsAttributesToCopyTags.Tag(Context->TargetsDataFacade->GetInPoint(TargetIndex), MergedIO);
-		}
-
 		const int32 NumSourcePoints = PointDataFacade->GetNum();
 		if (NumSourcePoints <= 0)
 		{
 			// Nothing to replicate: the single empty output stands in for the empty per-target duplicates
+			TagMergedOutput(MergedIO);
 			return;
+		}
+
+		// Forwarded target attributes replace same-named source ones, so the merger and the forward never share a name
+		TSet<FName> ForwardedNames;
+		for (const PCGExData::FAttributeIdentity& Identity : Context->TargetsForwardHandler->GetIdentities())
+		{
+			ForwardedNames.Add(Identity.Name);
+			MergedIO->DeleteAttribute(FPCGAttributeIdentifier(Identity.Name, PCGMetadataDomainID::Elements));
 		}
 
 		MergedFacade = MakeShared<PCGExData::FFacade>(MergedIO.ToSharedRef());
@@ -258,7 +262,7 @@ namespace PCGExCopyToPoints
 		}
 
 		Merger->MergeAsync(
-			TaskManager, &Context->MergeCarryOver, nullptr, false, nullptr,
+			TaskManager, &Context->MergeCarryOver, &ForwardedNames, false, nullptr,
 			[PCGEX_ASYNC_THIS_CAPTURE]()
 			{
 				PCGEX_ASYNC_THIS
@@ -268,8 +272,12 @@ namespace PCGExCopyToPoints
 
 	void FProcessor::OnMergeComplete()
 	{
-		// Runs inside a merger task: buffers are sized, so per-element writers and native ranges can be created once here
+		// Runs once every copy is merged: buffers are sized, so per-element writers and native ranges can be created once here
 		const int32 NumSourcePoints = PointDataFacade->GetNum();
+
+		// After the merger's own source tag appends, so target tags win as they do on per-target copies
+		TagMergedOutput(MergedFacade->Source);
+
 		MergedFacade->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
 		const TSharedPtr<PCGExData::FDataForwardHandler> ForwardHandler = Settings->TargetsForwarding.TryGetHandler(Context->TargetsDataFacade, MergedFacade, PCGExData::EForwardDomain::ToElements);
 
@@ -291,6 +299,14 @@ namespace PCGExCopyToPoints
 
 		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, MergedTransformTasks)
 		MergedTransformTasks->StartTasksBatch(Tasks);
+	}
+
+	void FProcessor::TagMergedOutput(const TSharedPtr<PCGExData::FPointIO>& MergedIO) const
+	{
+		for (const int32 TargetIndex : MatchedIndices)
+		{
+			Context->TargetsAttributesToCopyTags.Tag(Context->TargetsDataFacade->GetInPoint(TargetIndex), MergedIO);
+		}
 	}
 
 	void FProcessor::Write()

@@ -60,7 +60,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExTransformDetails TransformDetails = FPCGExTransformDetails(true, true);
 
-	/** Output a single point data per input holding every copy, instead of one per matched target. Forwarded target attributes land per element; tags from all matched targets combine. */
+	/** One point data per input holding every copy, instead of one per matched target. Forwarded target
+	 *  attributes land per element, replacing same-named source ones. Value tags keep the last target's value. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bMergeCopies = false;
 
@@ -137,5 +138,6 @@ namespace PCGExCopyToPoints
 	protected:
 		void StartMerge();
 		void OnMergeComplete();
+		void TagMergedOutput(const TSharedPtr<PCGExData::FPointIO>& MergedIO) const;
 	};
 }

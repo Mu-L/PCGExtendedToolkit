@@ -57,7 +57,8 @@ namespace PCGExFitting::Tasks
 	void FTransformPointIO::ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager)
 	{
 		UPCGBasePointData* OutPointData = ToBeTransformedIO->GetOut();
-		TPCGValueRange<FTransform> OutTransforms = OutPointData->GetTransformValueRange();
+		// Ranged tasks share one pre-allocated output: an allocating getter would race on it
+		TPCGValueRange<FTransform> OutTransforms = OutPointData->GetTransformValueRange(!WriteScope.IsValid());
 		FTransform TargetTransform = FTransform::Identity;
 
 		const int32 Start = WriteScope.IsValid() ? WriteScope.Start : 0;

@@ -54,6 +54,11 @@ namespace PCGExData
 			return Identities.IsEmpty();
 		}
 
+		const TArray<FAttributeIdentity>& GetIdentities() const
+		{
+			return Identities;
+		}
+
 		void Forward(const int32 SourceIndex, const int32 TargetIndex);
 
 		// Prepared-target variant (requires the target-facade constructor): fans one source row out to many

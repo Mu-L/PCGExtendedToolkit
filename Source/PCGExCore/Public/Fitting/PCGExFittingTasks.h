@@ -26,6 +26,7 @@ namespace PCGExFitting::Tasks
 		FTransformPointIO(const int32 InTaskIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<PCGExData::FPointIO>& InToBeTransformedIO, FPCGExTransformDetails* InTransformDetails, bool bAllocate = false);
 
 		// Ranged: transforms only InWriteScope of the output, fitting against InFitBounds (the untransformed bounds of that range).
+		// The output's transforms must already be allocated.
 		FTransformPointIO(const int32 InTaskIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<PCGExData::FPointIO>& InToBeTransformedIO, FPCGExTransformDetails* InTransformDetails, const PCGExMT::FScope& InWriteScope, const FBox& InFitBounds);
 
 		TSharedPtr<PCGExData::FPointIO> PointIO;

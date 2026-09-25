@@ -125,7 +125,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bOmitEmptyData = true;
 
-	/** Output one point data per unique source datum (per input), holding every target's copy, instead of one per target. Point data only: cluster-tagged, non-point and attribute-set inputs keep one output per target. Forwarded target attributes land per element. */
+	/** One point data per asset entry (per input) holding every target's copy, instead of one per target.
+	 *  Point data only, cluster-tagged data excluded. Forwarded target attributes land per element and
+	 *  replace same-named source attributes. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bMergePointOutputs = false;
 
@@ -310,7 +312,7 @@ namespace PCGExPCGDataAssetLoader
 		}
 	};
 
-	/** bMergePointOutputs: every target of one input that resolves to the same source point datum, printed as one output */
+	/** bMergePointOutputs: every target of one input that resolves to the same asset entry, printed as one output */
 	struct FMergeGroup
 	{
 		FPCGTaggedData Source;
@@ -328,9 +330,9 @@ namespace PCGExPCGDataAssetLoader
 	protected:
 		TSharedPtr<PCGExData::TBuffer<int64>> EntryHashGetter;
 
-		// bMergePointOutputs: groups keyed by source datum UID, in first-target order
+		// bMergePointOutputs: groups keyed by asset entry (one datum listed twice stays two outputs), in first-target order
 		TArray<TSharedPtr<FMergeGroup>> MergeGroups;
-		TMap<uint32, int32> MergeGroupByUID;
+		TMap<const FPCGTaggedData*, int32> MergeGroupByEntry;
 
 		// Per-point entry hash (0 for invalid/filtered points)
 		TArray<uint64> PointEntryHashes;

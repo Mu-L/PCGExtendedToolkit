@@ -65,8 +65,8 @@ public:
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData, const PCGExMT::FScope ReadScope);
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData);
 	void Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& InData);
-	// OnMergeComplete fires (from a task) once every point and attribute range is copied into the union facade's
-	// buffers, before any bWriteUnion write is launched. It is the hook for work that must read or write those buffers.
+	// OnMergeComplete fires once every point and attribute range is copied into the union facade's buffers, before any
+	// bWriteUnion write is launched -- from a task, or inline in MergeAsync when no attribute is carried.
 	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr, const bool bWriteUnion = false, const FPCGExNameFiltersDetails* InTagsToAttributes = nullptr, PCGExMT::FSimpleCallback&& OnMergeComplete = nullptr);
 
 	bool WantsDataToElements() const

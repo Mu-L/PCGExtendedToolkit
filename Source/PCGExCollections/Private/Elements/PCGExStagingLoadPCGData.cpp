@@ -189,7 +189,9 @@ namespace PCGExPCGDataAssetLoader
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
-			TPCGValueRange<FTransform> OutTransforms = Data->GetTransformValueRange();
+			// Ranged tasks share one pre-allocated data: an allocating getter would race on it
+			const bool bAllocate = !Scope.IsValid();
+			TPCGValueRange<FTransform> OutTransforms = Data->GetTransformValueRange(bAllocate);
 
 			const int32 Start = Scope.IsValid() ? Scope.Start : 0;
 			const int32 Count = Scope.IsValid() ? Scope.Count : OutTransforms.Num();
@@ -199,7 +201,7 @@ namespace PCGExPCGDataAssetLoader
 			const auto* Settings = TaskManager->GetContext()->GetInputSettings<UPCGExPCGDataAssetLoaderSettings>();
 			if (Settings->bRefreshSeeds)
 			{
-				TPCGValueRange<int32> OutSeeds = Data->GetSeedValueRange(true);
+				TPCGValueRange<int32> OutSeeds = Data->GetSeedValueRange(bAllocate);
 				PCGEX_PARALLEL_FOR(Count, OutSeeds[Start + i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[Start + i].GetLocation());)
 			}
 		}
@@ -874,8 +876,8 @@ namespace PCGExPCGDataAssetLoader
 			return;
 		}
 
-		const uint32 UID = InTaggedData.Data->GetUniqueID();
-		if (const int32* GroupIndex = MergeGroupByUID.Find(UID))
+		// InTaggedData lives in the loaded asset's collection, so its address identifies the entry across targets
+		if (const int32* GroupIndex = MergeGroupByEntry.Find(&InTaggedData))
 		{
 			MergeGroups[*GroupIndex]->TargetIndices.Add(PointIndex);
 			return;
@@ -885,7 +887,7 @@ namespace PCGExPCGDataAssetLoader
 		Group->Source = InTaggedData;
 		Group->OutIdx = OutIdx;
 		Group->TargetIndices.Add(PointIndex);
-		MergeGroupByUID.Add(UID, MergeGroups.Add(Group));
+		MergeGroupByEntry.Add(&InTaggedData, MergeGroups.Add(Group));
 	}
 
 	void FProcessor::StartMergeGroup(const TSharedPtr<FMergeGroup>& Group)
@@ -923,6 +925,17 @@ namespace PCGExPCGDataAssetLoader
 			return;
 		}
 
+		// Forwarded target attributes replace same-named source ones, so the merger and the forward never share a name
+		TSet<FName> ForwardedNames;
+		if (ForwardHandler)
+		{
+			for (const PCGExData::FAttributeIdentity& Identity : ForwardHandler->GetIdentities())
+			{
+				ForwardedNames.Add(Identity.Name);
+				Group->MergedIO->DeleteAttribute(FPCGAttributeIdentifier(Identity.Name, PCGMetadataDomainID::Elements));
+			}
+		}
+
 		Group->MergedFacade = MakeShared<PCGExData::FFacade>(Group->MergedIO.ToSharedRef());
 		Group->Merger = MakeShared<FPCGExPointIOMerger>(Group->MergedFacade.ToSharedRef());
 
@@ -932,18 +945,22 @@ namespace PCGExPCGDataAssetLoader
 			Group->Merger->Append(Group->MergedIO, ReadScope, PCGExMT::FScope(k * NumSourcePoints, NumSourcePoints));
 		}
 
+		// Weak: the group owns the merger that stores this callback
 		Group->Merger->MergeAsync(
-			TaskManager, &Context->MergeCarryOver, nullptr, false, nullptr,
-			[PCGEX_ASYNC_THIS_CAPTURE, Group]()
+			TaskManager, &Context->MergeCarryOver, &ForwardedNames, false, nullptr,
+			[PCGEX_ASYNC_THIS_CAPTURE, WeakGroup = TWeakPtr<FMergeGroup>(Group)]()
 			{
 				PCGEX_ASYNC_THIS
-				This->OnMergeGroupComplete(Group);
+				if (const TSharedPtr<FMergeGroup> PinnedGroup = WeakGroup.Pin())
+				{
+					This->OnMergeGroupComplete(PinnedGroup);
+				}
 			});
 	}
 
 	void FProcessor::OnMergeGroupComplete(const TSharedPtr<FMergeGroup>& Group)
 	{
-		// Runs inside a merger task: buffers are sized, so per-element writers and native ranges can be created once here
+		// Runs once every copy is merged: buffers are sized, so per-element writers and native ranges can be created once here
 		UPCGBasePointData* MergedOut = Group->MergedFacade->GetOut();
 		const int32 NumSourcePoints = Group->MergedIO->GetNum();
 

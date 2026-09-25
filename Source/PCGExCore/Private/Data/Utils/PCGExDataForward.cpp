@@ -74,6 +74,12 @@ namespace PCGExData
 				{
 					// Typed path -- fast, directly typed buffers stored as IBuffer.
 					using T = decltype(DummyValue);
+					// Identity.Attribute, not Reader->InAttribute: a reader first built as a broadcaster never sets InAttribute.
+					const FPCGMetadataAttributeBase* SourceAtt = Identity.Attribute;
+					if (!SourceAtt)
+					{
+						return;
+					}
 					TSharedPtr<TBuffer<T>> Reader = SourceDataFacade->GetReadable<T>(Identity.GetIdentifier());
 					if (!Reader)
 					{
@@ -82,12 +88,12 @@ namespace PCGExData
 					TSharedPtr<TBuffer<T>> Writer = nullptr;
 					if (RedirectsDomain(Identity))
 					{
-						const T DefaultValue = Identity.InDataDomain() ? Helpers::ReadDataValue<T>(Reader->InAttribute) : Reader->InAttribute->GetValueFromItemKey<T>(PCGDefaultValueKey);
-						Writer = TargetDataFacade->GetWritable<T>(GetTargetIdentifier(Identity), DefaultValue, Reader->InAttribute->AllowsInterpolation(), EBufferInit::Inherit);
+						const T DefaultValue = Identity.InDataDomain() ? Helpers::ReadDataValue<T>(SourceAtt) : SourceAtt->GetValueFromItemKey<T>(PCGDefaultValueKey);
+						Writer = TargetDataFacade->GetWritable<T>(GetTargetIdentifier(Identity), DefaultValue, SourceAtt->AllowsInterpolation(), EBufferInit::Inherit);
 					}
 					else
 					{
-						Writer = TargetDataFacade->GetWritable<T>(Reader->InAttribute, EBufferInit::Inherit);
+						Writer = TargetDataFacade->GetWritable<T>(SourceAtt, EBufferInit::Inherit);
 					}
 					if (!Writer)
 					{
@@ -104,17 +110,35 @@ namespace PCGExData
 					{
 						return;
 					}
-					if (RedirectsDomain(Identity))
-					{
-						UE_LOG(LogPCGEx, Warning, TEXT("Domain conversion not supported on property-backed attribute '%s' -- skipped."), *Identity.Name.ToString());
-						return;
-					}
 					TSharedPtr<IBuffer> Reader = SourceDataFacade->GetReadable(Identity, EIOSide::In, false);
 					if (!Reader)
 					{
 						return;
 					}
-					TSharedPtr<IBuffer> Writer = TargetDataFacade->GetWritable(Identity.GetType(), Identity.Attribute, EBufferInit::Inherit);
+					const FPCGMetadataAttributeBase* WriterTemplate = Identity.Attribute;
+					if (RedirectsDomain(Identity))
+					{
+						// Containers of basic types resolve to typed writers (see FFacade::GetWritable), which cannot take a redirect.
+						if (static_cast<uint16>(Identity.ValueType) < static_cast<uint16>(EPCGMetadataTypes::EndLegacyTypes))
+						{
+							UE_LOG(LogPCGEx, Warning, TEXT("Domain conversion not supported on container attribute '%s' -- skipped."), *Identity.Name.ToString());
+							return;
+						}
+
+						// Property writers take their domain from the template attribute, so create the target-domain one first.
+						const FPCGAttributeIdentifier TargetIdentifier = GetTargetIdentifier(Identity);
+						WriterTemplate = TargetDataFacade->Source->FindConstAttribute(TargetIdentifier, EIOSide::Out);
+						if (!WriterTemplate)
+						{
+							WriterTemplate = TargetDataFacade->GetOut()->Metadata->CreateAttribute(TargetIdentifier, Identity.Attribute->GetAttributeDesc(), Identity.Attribute->AllowsInterpolation(), true);
+						}
+						if (!WriterTemplate || !WriterTemplate->GetAttributeDesc().IsSameType(Identity.Attribute->GetAttributeDesc()))
+						{
+							UE_LOG(LogPCGEx, Warning, TEXT("Cannot forward property-backed attribute '%s': the target holds it with another type -- skipped."), *Identity.Name.ToString());
+							return;
+						}
+					}
+					TSharedPtr<IBuffer> Writer = TargetDataFacade->GetWritable(Identity.GetType(), WriterTemplate, EBufferInit::Inherit);
 					if (!Writer)
 					{
 						return;
@@ -375,10 +399,10 @@ namespace PCGExData
 							return;
 						}
 
-						// Property-backed writers are built from the source attribute template, so the domain cannot be redirected.
-						if (RedirectsDomain(Identity))
+						// Inherit only: a second same-named forward would share or orphan the deduplicated property buffer.
+						if (Domain != EForwardDomain::Inherit)
 						{
-							UE_LOG(LogPCGEx, Warning, TEXT("Domain conversion not supported on property-backed attribute '%s' -- skipped."), *Identity.Name.ToString());
+							UE_LOG(LogPCGEx, Warning, TEXT("Property-backed attribute '%s' is only forwarded onto a facade with the Inherit domain -- skipped."), *Identity.Name.ToString());
 							return;
 						}
 
@@ -436,9 +460,10 @@ namespace PCGExData
 						return;
 					}
 
-					if (RedirectsDomain(Identity))
+					// Inherit only: deleting a same-named attribute a live property buffer caches would leave it dangling.
+					if (Domain != EForwardDomain::Inherit)
 					{
-						UE_LOG(LogPCGEx, Warning, TEXT("Domain conversion not supported on property-backed attribute '%s' -- skipped."), *Identity.Name.ToString());
+						UE_LOG(LogPCGEx, Warning, TEXT("Property-backed attribute '%s' is only forwarded onto a facade with the Inherit domain -- skipped."), *Identity.Name.ToString());
 						return;
 					}
 
