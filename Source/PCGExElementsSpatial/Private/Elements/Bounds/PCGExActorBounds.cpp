@@ -10,6 +10,7 @@
 #include "Components/BillboardComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Core/PCGExContext.h"
+#include "Core/PCGExMTCommon.h"
 #include "Data/PCGBasePointData.h"
 #include "Data/PCGSpatialData.h"
 #include "Elements/PCGActorSelector.h"
@@ -390,7 +391,8 @@ namespace PCGExActorBounds
 		TPCGValueRange<FVector> BoundsMax = InData->GetBoundsMaxValueRange(false);
 		TPCGValueRange<int32> Seeds = InData->GetSeedValueRange(false);
 
-		for (int32 i = 0; i < NumPoints; i++)
+		// Each index is written once, by one task; nothing shared is mutated.
+		PCGExMT::ParallelOrSequential(NumPoints, [&](const int32 i)
 		{
 			const FSnapshot& Snapshot = InSnapshots[i];
 			const FVector Location = Snapshot.Transform.GetLocation();
@@ -399,6 +401,6 @@ namespace PCGExActorBounds
 			BoundsMin[i] = Snapshot.LocalBounds.Min;
 			BoundsMax[i] = Snapshot.LocalBounds.Max;
 			Seeds[i] = PCGHelpers::ComputeSeed(static_cast<int>(Location.X), static_cast<int>(Location.Y), static_cast<int>(Location.Z));
-		}
+		});
 	}
 }
