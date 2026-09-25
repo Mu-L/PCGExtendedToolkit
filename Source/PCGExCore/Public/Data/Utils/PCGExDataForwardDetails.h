@@ -20,6 +20,17 @@ namespace PCGExData
 	class IAttributeBroadcaster;
 	class FDataForwardHandler;
 	class FPointIO;
+
+	/** Metadata domain forwarded attributes are written to on the target. */
+	enum class EForwardDomain : uint8
+	{
+		// Keep each source attribute's own domain.
+		Inherit,
+		// Write every forwarded attribute as @Data (one value per target data).
+		ToData,
+		// Write every forwarded attribute per element, including @Data sources (one value per target index).
+		ToElements,
+	};
 }
 
 USTRUCT(BlueprintType)
@@ -46,10 +57,10 @@ struct PCGEXCORE_API FPCGExForwardDetails : public FPCGExNameFiltersDetails
 
 	void Filter(TArray<PCGExData::FAttributeIdentity>& Identities) const;
 
-	TSharedPtr<PCGExData::FDataForwardHandler> GetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, bool bForwardToDataDomain = true) const;
-	TSharedPtr<PCGExData::FDataForwardHandler> GetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, bool bForwardToDataDomain = true, const TSet<FName>* InIgnoredAttributes = nullptr) const;
-	TSharedPtr<PCGExData::FDataForwardHandler> TryGetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, bool bForwardToDataDomain = true) const;
-	TSharedPtr<PCGExData::FDataForwardHandler> TryGetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, bool bForwardToDataDomain = true, const TSet<FName>* InIgnoredAttributes = nullptr) const;
+	TSharedPtr<PCGExData::FDataForwardHandler> GetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, PCGExData::EForwardDomain InDomain = PCGExData::EForwardDomain::ToData) const;
+	TSharedPtr<PCGExData::FDataForwardHandler> GetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, PCGExData::EForwardDomain InDomain = PCGExData::EForwardDomain::ToData, const TSet<FName>* InIgnoredAttributes = nullptr) const;
+	TSharedPtr<PCGExData::FDataForwardHandler> TryGetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, PCGExData::EForwardDomain InDomain = PCGExData::EForwardDomain::ToData) const;
+	TSharedPtr<PCGExData::FDataForwardHandler> TryGetHandler(const TSharedPtr<PCGExData::FFacade>& InSourceDataFacade, const TSharedPtr<PCGExData::FFacade>& InTargetDataFacade, PCGExData::EForwardDomain InDomain = PCGExData::EForwardDomain::ToData, const TSet<FName>* InIgnoredAttributes = nullptr) const;
 };
 
 USTRUCT(BlueprintType, meta=(PCGExNodeLibraryDoc="common-settings/data-utils/attribute-to-tag-details"))

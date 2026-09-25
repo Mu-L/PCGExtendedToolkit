@@ -14,6 +14,8 @@
 
 #include "PCGExCopyToPoints.generated.h"
 
+class FPCGExPointIOMerger;
+
 namespace PCGExMatching
 {
 	class FDataMatcher;
@@ -58,6 +60,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	FPCGExTransformDetails TransformDetails = FPCGExTransformDetails(true, true);
 
+	/** Output a single point data per input holding every copy, instead of one per matched target. Forwarded target attributes land per element; tags from all matched targets combine. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	bool bMergeCopies = false;
+
 	/** Target attributes to copy as tags onto output points. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Tagging & Forwarding")
 	FPCGExAttributeToTagDetails TargetsAttributesToCopyTags;
@@ -81,6 +87,9 @@ struct FPCGExCopyToPointsContext final : FPCGExPointsProcessorContext
 	FPCGExAttributeToTagDetails TargetsAttributesToCopyTags;
 	TSharedPtr<PCGExData::FDataForwardHandler> TargetsForwardHandler;
 
+	// Merge mode: permissive carry-over, source @Data stays @Data (identical across copies)
+	FPCGExCarryOverDetails MergeCarryOver;
+
 protected:
 	PCGEX_ELEMENT_BATCH_POINT_DECL
 };
@@ -103,6 +112,13 @@ namespace PCGExCopyToPoints
 		int32 NumCopies = 0;
 		PCGExMatching::FScope MatchScope;
 
+		// Merge mode: per-target match flags (written by index in ProcessRange), compacted in CompleteWork
+		TArray<int8> MatchedTargets;
+		TArray<int32> MatchedIndices;
+		TSharedPtr<PCGExData::FFacade> MergedFacade;
+		TSharedPtr<FPCGExPointIOMerger> Merger;
+		FBox FitBounds = FBox(ForceInit);
+
 	public:
 		explicit FProcessor(const TSharedRef<PCGExData::FFacade>& InPointDataFacade)
 			: TProcessor(InPointDataFacade)
@@ -116,5 +132,10 @@ namespace PCGExCopyToPoints
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void ProcessRange(const PCGExMT::FScope& Scope) override;
 		virtual void CompleteWork() override;
+		virtual void Write() override;
+
+	protected:
+		void StartMerge();
+		void OnMergeComplete();
 	};
 }

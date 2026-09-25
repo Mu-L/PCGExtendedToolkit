@@ -21,6 +21,7 @@ class UPCGPolyLineData;
 class UPCGSplineData;
 class UPCGDataAsset;
 class UPCGExPCGDataAssetCollection;
+class FPCGExPointIOMerger;
 struct FPCGExPCGDataAssetCollectionEntry;
 
 namespace PCGExPCGDataAssetLoader
@@ -123,6 +124,10 @@ public:
 	/** If enabled, will not output empty data, even if they have possibly meaningful @Data attributes */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bOmitEmptyData = true;
+
+	/** Output one point data per unique source datum (per input), holding every target's copy, instead of one per target. Point data only: cluster-tagged, non-point and attribute-set inputs keep one output per target. Forwarded target attributes land per element. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
+	bool bMergePointOutputs = false;
 
 	/** If enabled, only spawn data from the PCGDataAsset that matches these tags. Empty means all data. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings|Filtering", meta = (PCG_Overridable))
@@ -248,6 +253,9 @@ struct FPCGExPCGDataAssetLoaderContext final : FPCGExPointsProcessorContext
 	// Merged collection map from embedded CollectionMap entries (when bMergeEmbeddedCollectionMaps)
 	TSharedPtr<PCGExCollections::FPickPacker> MergedMapPacker;
 
+	// bMergePointOutputs: permissive carry-over, source @Data stays @Data (identical across copies)
+	FPCGExCarryOverDetails MergeCarryOver;
+
 	/** Register output data to appropriate pin */
 	void RegisterOutput(const FPCGTaggedData& InTaggedData, bool bAddPinTag, const int32 InIndex);
 
@@ -302,10 +310,27 @@ namespace PCGExPCGDataAssetLoader
 		}
 	};
 
+	/** bMergePointOutputs: every target of one input that resolves to the same source point datum, printed as one output */
+	struct FMergeGroup
+	{
+		FPCGTaggedData Source;
+		TArray<int32> TargetIndices;
+		int32 OutIdx = 0;
+
+		// In = source datum, Out = merged output
+		TSharedPtr<PCGExData::FPointIO> MergedIO;
+		TSharedPtr<PCGExData::FFacade> MergedFacade;
+		TSharedPtr<FPCGExPointIOMerger> Merger;
+	};
+
 	class FProcessor final : public PCGExPointsMT::TProcessor<FPCGExPCGDataAssetLoaderContext, UPCGExPCGDataAssetLoaderSettings>
 	{
 	protected:
 		TSharedPtr<PCGExData::TBuffer<int64>> EntryHashGetter;
+
+		// bMergePointOutputs: groups keyed by source datum UID, in first-target order
+		TArray<TSharedPtr<FMergeGroup>> MergeGroups;
+		TMap<uint32, int32> MergeGroupByUID;
 
 		// Per-point entry hash (0 for invalid/filtered points)
 		TArray<uint64> PointEntryHashes;
@@ -331,10 +356,18 @@ namespace PCGExPCGDataAssetLoader
 		virtual bool Process(const TSharedPtr<PCGExMT::FTaskManager>& InTaskManager) override;
 		virtual void ProcessPoints(const PCGExMT::FScope& Scope) override;
 		virtual void CompleteWork() override;
+		virtual void Write() override;
 
 	protected:
 		/** Check if tagged data passes tag filters */
 		bool PassesTagFilter(const FPCGTaggedData& InTaggedData) const;
+
+		/** bMergePointOutputs: point data that is merged across targets instead of duplicated per target */
+		bool ShouldMerge(const FPCGTaggedData& InTaggedData) const;
+
+		void QueueMerge(int32 PointIndex, int32 OutIdx, const FPCGTaggedData& InTaggedData);
+		void StartMergeGroup(const TSharedPtr<FMergeGroup>& Group);
+		void OnMergeGroupComplete(const TSharedPtr<FMergeGroup>& Group);
 
 		/** Process a single tagged data item for a point */
 		FSpatialTransformResult ProcessTaggedData(int32 PointIndex, const FTransform& TargetTransform, const FPCGTaggedData& InTaggedData, FClusterIdRemapper& ClusterRemapper);

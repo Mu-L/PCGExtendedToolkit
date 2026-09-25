@@ -21,6 +21,7 @@
 #include "Elements/PCGExStagingLoadProperties.h"
 #include "Helpers/PCGExCollectionsHelpers.h"
 #include "Helpers/PCGExRandomHelpers.h"
+#include "Utils/PCGExPointIOMerger.h"
 
 #define LOCTEXT_NAMESPACE "PCGExPCGDataAssetLoaderElement"
 #define PCGEX_NAMESPACE PCGDataAssetLoader
@@ -175,19 +176,31 @@ namespace PCGExPCGDataAssetLoader
 		{
 		}
 
+		// Ranged: only InScope of InData. Ranged tasks share one data, so its ranges must be allocated before they start.
+		FTransformPoints(const FTransform& InTransform, UPCGBasePointData* InData, const PCGExMT::FScope& InScope)
+			: FTransformTask(InTransform)
+			  , Data(InData)
+			  , Scope(InScope)
+		{
+		}
+
 		UPCGBasePointData* Data = nullptr;
+		PCGExMT::FScope Scope;
 
 		virtual void ExecuteTask(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager) override
 		{
 			TPCGValueRange<FTransform> OutTransforms = Data->GetTransformValueRange();
 
-			PCGEX_PARALLEL_FOR(OutTransforms.Num(), OutTransforms[i] *= Transform;)
+			const int32 Start = Scope.IsValid() ? Scope.Start : 0;
+			const int32 Count = Scope.IsValid() ? Scope.Count : OutTransforms.Num();
+
+			PCGEX_PARALLEL_FOR(Count, OutTransforms[Start + i] *= Transform;)
 
 			const auto* Settings = TaskManager->GetContext()->GetInputSettings<UPCGExPCGDataAssetLoaderSettings>();
 			if (Settings->bRefreshSeeds)
 			{
 				TPCGValueRange<int32> OutSeeds = Data->GetSeedValueRange(true);
-				PCGEX_PARALLEL_FOR(OutSeeds.Num(), OutSeeds[i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[i].GetLocation());)
+				PCGEX_PARALLEL_FOR(Count, OutSeeds[Start + i] = PCGExRandomHelpers::ComputeSpatialSeed(OutTransforms[Start + i].GetLocation());)
 			}
 		}
 	};
@@ -464,6 +477,7 @@ bool FPCGExPCGDataAssetLoaderElement::Boot(FPCGExContext* InContext) const
 	}
 
 	Context->SharedAssetPool = MakeShared<FPCGExSharedAssetPool>();
+	Context->MergeCarryOver.Init();
 	Context->CustomPinNames.Reserve(Settings->CustomOutputPins.Num());
 
 	// Build custom pin name set for fast lookup
@@ -494,6 +508,8 @@ bool FPCGExPCGDataAssetLoaderElement::AdvanceWork(FPCGExContext* InContext, cons
 			},
 			[&](const TSharedPtr<PCGExPointsMT::IBatch>& NewBatch)
 			{
+				// Merged outputs are facade-written; per-target duplicates are complete after CompleteWork.
+				NewBatch->bRequiresWriteStep = Settings->bMergePointOutputs;
 			}))
 		{
 			return Context->CancelExecution(TEXT("Could not find any points to process."));
@@ -689,6 +705,12 @@ namespace PCGExPCGDataAssetLoader
 			return FSpatialTransformResult();
 		}
 
+		if (ShouldMerge(InTaggedData))
+		{
+			QueueMerge(PointIndex, OutIdx, InTaggedData);
+			return FSpatialTransformResult();
+		}
+
 		// Spatial data: duplicate and transform for this point
 		UPCGSpatialData* DuplicatedData = Context->ManagedObjects->DuplicateData<UPCGSpatialData>(SpatialData);
 
@@ -822,11 +844,152 @@ namespace PCGExPCGDataAssetLoader
 		Context->RegisterOutput(OutputData, true, OutIdx);
 	}
 
+	// PCGEx cluster pairing tag: PCGEx/Cluster:ID
+	const FString ClusterTagPrefix = TEXT("PCGEx/Cluster:");
+
+	bool FProcessor::ShouldMerge(const FPCGTaggedData& InTaggedData) const
+	{
+		if (!Settings->bMergePointOutputs || bPassthrough || !Cast<UPCGBasePointData>(InTaggedData.Data))
+		{
+			return false;
+		}
+
+		// Concatenated Vtx copies would collide their endpoint identities with the paired Edges
+		for (const FString& Tag : InTaggedData.Tags)
+		{
+			if (Tag.StartsWith(ClusterTagPrefix))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	void FProcessor::QueueMerge(const int32 PointIndex, const int32 OutIdx, const FPCGTaggedData& InTaggedData)
+	{
+		const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InTaggedData.Data);
+		if (Settings->bOmitEmptyData && PointData->IsEmpty())
+		{
+			return;
+		}
+
+		const uint32 UID = InTaggedData.Data->GetUniqueID();
+		if (const int32* GroupIndex = MergeGroupByUID.Find(UID))
+		{
+			MergeGroups[*GroupIndex]->TargetIndices.Add(PointIndex);
+			return;
+		}
+
+		TSharedPtr<FMergeGroup> Group = MakeShared<FMergeGroup>();
+		Group->Source = InTaggedData;
+		Group->OutIdx = OutIdx;
+		Group->TargetIndices.Add(PointIndex);
+		MergeGroupByUID.Add(UID, MergeGroups.Add(Group));
+	}
+
+	void FProcessor::StartMergeGroup(const TSharedPtr<FMergeGroup>& Group)
+	{
+		const UPCGBasePointData* SourceData = Cast<UPCGBasePointData>(Group->Source.Data);
+
+		Group->MergedIO = MakeShared<PCGExData::FPointIO>(PointDataFacade->Source->GetContextHandle(), SourceData);
+		Group->MergedIO->SetInfos(0, OutputPinDefault);
+		if (!Group->MergedIO->InitializeOutput(PCGExData::EIOInit::New))
+		{
+			if (!Settings->bQuietUnsupportedTypeWarnings)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, ExecutionContext, FText::Format(FTEXT("Failed to create merged output for point data of type {0}"), FText::FromString(SourceData->GetClass()->GetName())));
+			}
+			return;
+		}
+
+		// Registered now (the batch only collects outputs once every task and the write step are done), ordered by first target
+		FPCGTaggedData OutputData;
+		OutputData.Data = Group->MergedIO->GetOut();
+		OutputData.Pin = Group->Source.Pin;
+		OutputData.Tags = Group->Source.Tags;
+
+		if (Settings->bForwardInputTags)
+		{
+			PointDataFacade->Source->Tags->DumpTo(OutputData.Tags);
+		}
+
+		Context->RegisterOutput(OutputData, true, Group->OutIdx);
+
+		const int32 NumSourcePoints = SourceData->GetNumPoints();
+		if (NumSourcePoints <= 0)
+		{
+			// One empty output stands in for the empty per-target duplicates
+			return;
+		}
+
+		Group->MergedFacade = MakeShared<PCGExData::FFacade>(Group->MergedIO.ToSharedRef());
+		Group->Merger = MakeShared<FPCGExPointIOMerger>(Group->MergedFacade.ToSharedRef());
+
+		const PCGExMT::FScope ReadScope(0, NumSourcePoints);
+		for (int32 k = 0; k < Group->TargetIndices.Num(); k++)
+		{
+			Group->Merger->Append(Group->MergedIO, ReadScope, PCGExMT::FScope(k * NumSourcePoints, NumSourcePoints));
+		}
+
+		Group->Merger->MergeAsync(
+			TaskManager, &Context->MergeCarryOver, nullptr, false, nullptr,
+			[PCGEX_ASYNC_THIS_CAPTURE, Group]()
+			{
+				PCGEX_ASYNC_THIS
+				This->OnMergeGroupComplete(Group);
+			});
+	}
+
+	void FProcessor::OnMergeGroupComplete(const TSharedPtr<FMergeGroup>& Group)
+	{
+		// Runs inside a merger task: buffers are sized, so per-element writers and native ranges can be created once here
+		UPCGBasePointData* MergedOut = Group->MergedFacade->GetOut();
+		const int32 NumSourcePoints = Group->MergedIO->GetNum();
+
+		EPCGPointNativeProperties Allocations = EPCGPointNativeProperties::Transform;
+		if (Settings->bRefreshSeeds)
+		{
+			EnumAddFlags(Allocations, EPCGPointNativeProperties::Seed);
+		}
+		MergedOut->AllocateProperties(Allocations);
+
+		const TSharedPtr<PCGExData::FDataForwardHandler> MergedForwardHandler = Settings->TargetsForwarding.TryGetHandler(PointDataFacade, Group->MergedFacade, PCGExData::EForwardDomain::ToElements);
+		const TConstPCGValueRange<FTransform> InTransforms = PointDataFacade->GetIn()->GetConstTransformValueRange();
+
+		TArray<TSharedPtr<PCGExMT::FTask>> Tasks;
+		Tasks.Reserve(Group->TargetIndices.Num());
+
+		for (int32 k = 0; k < Group->TargetIndices.Num(); k++)
+		{
+			const int32 TargetIndex = Group->TargetIndices[k];
+			const PCGExMT::FScope WriteScope(k * NumSourcePoints, NumSourcePoints);
+
+			if (MergedForwardHandler)
+			{
+				MergedForwardHandler->Forward(TargetIndex, WriteScope);
+			}
+
+			Tasks.Add(MakeShared<FTransformPoints>(InTransforms[TargetIndex], MergedOut, WriteScope));
+		}
+
+		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, MergedTransformTasks)
+		MergedTransformTasks->StartTasksBatch(Tasks);
+	}
+
+	void FProcessor::Write()
+	{
+		for (const TSharedPtr<FMergeGroup>& Group : MergeGroups)
+		{
+			if (Group->MergedFacade)
+			{
+				Group->MergedFacade->WriteFastest(TaskManager);
+			}
+		}
+	}
+
 	void FProcessor::RemapClusterTags(TSet<FString>& Tags, FClusterIdRemapper& ClusterRemapper) const
 	{
-		// Look for PCGEx cluster tags: PCGEx/Cluster:ID
-		static const FString ClusterTagPrefix = TEXT("PCGEx/Cluster:");
-
 		TArray<FString> TagsToRemove;
 		TArray<FString> TagsToAdd;
 
@@ -914,6 +1077,11 @@ namespace PCGExPCGDataAssetLoader
 					Tasks.Add(Result.Task);
 				}
 			}
+		}
+
+		for (const TSharedPtr<FMergeGroup>& Group : MergeGroups)
+		{
+			StartMergeGroup(Group);
 		}
 
 		if (!Tasks.IsEmpty())

@@ -340,11 +340,12 @@ void FPCGExPointIOMerger::Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& 
 	}
 }
 
-void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes, const bool bWriteUnion, const FPCGExNameFiltersDetails* InTagsToAttributes)
+void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes, const bool bWriteUnion, const FPCGExNameFiltersDetails* InTagsToAttributes, PCGExMT::FSimpleCallback&& OnMergeComplete)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPCGExPointIOMerger::MergeAsync);
 
 	bWriteFacade = bWriteUnion;
+	OnMergeCompleteCallback = MoveTemp(OnMergeComplete);
 	bDataDomainToElements = InCarryOverDetails->bDataDomainToElements;
 	bInitDefault = InCarryOverDetails->bPreserveAttributesDefaultValue;
 
@@ -526,6 +527,11 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 					This->UnionDataFacade->Source->Tags->Remove(This->ConvertedTagNames);
 				}
 
+				if (This->OnMergeCompleteCallback)
+				{
+					This->OnMergeCompleteCallback();
+				}
+
 				if (This->bWriteFacade)
 				{
 					This->UnionDataFacade->WriteFastest(TaskManager);
@@ -548,6 +554,11 @@ void FPCGExPointIOMerger::MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& Ta
 		CopyProperties->OnCompleteCallback = [PCGEX_ASYNC_THIS_CAPTURE, TaskManager]()
 		{
 			PCGEX_ASYNC_THIS
+			if (This->OnMergeCompleteCallback)
+			{
+				This->OnMergeCompleteCallback();
+			}
+
 			if (This->bWriteFacade)
 			{
 				This->UnionDataFacade->WriteFastest(TaskManager);

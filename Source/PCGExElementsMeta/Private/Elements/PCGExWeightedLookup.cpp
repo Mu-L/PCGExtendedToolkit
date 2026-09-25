@@ -286,7 +286,7 @@ namespace PCGExWeightedLookup
 			}
 		}
 
-		Forward = Context->ForwardDetails.GetHandler(Context->MapFacade, PointDataFacade, false, &Context->IgnoredColumns);
+		Forward = Context->ForwardDetails.GetHandler(Context->MapFacade, PointDataFacade, PCGExData::EForwardDomain::Inherit, &Context->IgnoredColumns);
 
 		if (Settings->bOutputKey)
 		{

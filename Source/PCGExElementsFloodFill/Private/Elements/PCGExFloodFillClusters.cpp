@@ -588,7 +588,7 @@ namespace PCGExClusterDiffusion
 
 		// Prepared forward handler: readers on the seeds facade, writers on this batch's vtx facade,
 		// all created here (single-threaded) so the parallel Diffuse pass never creates buffers.
-		SeedForwardHandler = Context->SeedForwardDetails.TryGetHandler(Context->SeedsDataFacade, VtxDataFacade, false);
+		SeedForwardHandler = Context->SeedForwardDetails.TryGetHandler(Context->SeedsDataFacade, VtxDataFacade, PCGExData::EForwardDomain::Inherit);
 
 		InfluencesCount = MakeShared<TArray<int8>>();
 		InfluencesCount->Init(0, VtxDataFacade->GetNum());

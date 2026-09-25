@@ -65,7 +65,9 @@ public:
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData, const PCGExMT::FScope ReadScope);
 	PCGExPointIOMerger::FMergeScope& Append(const TSharedPtr<PCGExData::FPointIO>& InData);
 	void Append(const TArray<TSharedPtr<PCGExData::FPointIO>>& InData);
-	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr, const bool bWriteUnion = false, const FPCGExNameFiltersDetails* InTagsToAttributes = nullptr);
+	// OnMergeComplete fires (from a task) once every point and attribute range is copied into the union facade's
+	// buffers, before any bWriteUnion write is launched. It is the hook for work that must read or write those buffers.
+	void MergeAsync(const TSharedPtr<PCGExMT::FTaskManager>& TaskManager, const FPCGExCarryOverDetails* InCarryOverDetails, const TSet<FName>* InIgnoredAttributes = nullptr, const bool bWriteUnion = false, const FPCGExNameFiltersDetails* InTagsToAttributes = nullptr, PCGExMT::FSimpleCallback&& OnMergeComplete = nullptr);
 
 	bool WantsDataToElements() const
 	{
@@ -81,6 +83,7 @@ public:
 
 protected:
 	bool bWriteFacade = false;
+	PCGExMT::FSimpleCallback OnMergeCompleteCallback;
 	void CopyProperties(const int32 Index);
 	PCGExPointIOMerger::FMergeScope NullScope;
 	bool bDataDomainToElements = false;
