@@ -195,10 +195,8 @@ namespace PCGExGraphs
 			AllocateProperties |= EPCGPointNativeProperties::BoundsMax;
 		}
 
-		if (ParentGraph->bRefreshEdgeSeed || InBuilder->OutputDetails->bRefreshEdgeSeed)
-		{
-			AllocateProperties |= EPCGPointNativeProperties::Seed;
-		}
+		// CompileRange writes seeds per edge, so Seed can't stay a single value even when the source edges' is uniform.
+		AllocateProperties |= EPCGPointNativeProperties::Seed;
 
 		UPCGBasePointData* OutEdgeData = EdgesDataFacade->GetOut();
 		(void)PCGExPointArrayDataHelpers::SetNumPointsAllocated(OutEdgeData, NumEdges, AllocateProperties);

@@ -504,6 +504,9 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 			}
 		}
 
+		// Every output point gets its own position, including paths with no source point (e.g. rect-clip corners).
+		Allocations |= EPCGPointNativeProperties::Transform;
+
 		// Dominant source as the output template; fall back to first relevant source when the path is all
 		// intersection points (SourceCounts empty).
 		int32 DominantSourceIdx = PCGExClipper2Processor::PickModalSource(SourceCounts);

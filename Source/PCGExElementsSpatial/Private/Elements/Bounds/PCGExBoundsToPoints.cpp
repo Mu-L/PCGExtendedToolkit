@@ -172,6 +172,9 @@ namespace PCGExBoundsToPoints
 				if (bSymmetry)
 				{
 					NewOutput->CopyToNewPoint(Index, B);
+
+					// A and B get distinct transforms even when the input's is uniform (unallocated).
+					NewOutput->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
 				}
 
 				TPCGValueRange<FTransform> Transforms = NewOutput->GetOut()->GetTransformValueRange(false);

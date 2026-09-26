@@ -342,7 +342,7 @@ namespace PCGExData
 	void FPointIO::SetPoints(const TArray<FPCGPoint>& InPCGPoints)
 	{
 		check(Out)
-		Out->SetNumPoints(InPCGPoints.Num());
+		PCGExPointArrayDataHelpers::SetNumPointsAllocated(Out, InPCGPoints.Num());
 		SetPoints(0, InPCGPoints);
 	}
 
@@ -350,13 +350,23 @@ namespace PCGExData
 	{
 		check(Out)
 
-#define PCGEX_COPYRANGEIF(_NAME, _TYPE, ...)\
-		if (EnumHasAllFlags(Properties, EPCGPointNativeProperties::_NAME)){\
-			const TPCGValueRange<_TYPE> Range = Out->Get##_NAME##ValueRange(false);\
-			for(int i = 0; i < InPCGPoints.Num(); i++){ Range[StartIndex + i] = InPCGPoints[i]._NAME;}\
-		}
+		// Non-allocating ranges exist only for properties Out has itself allocated: nothing flattens or allocates
+		// from this (possibly worker) thread, and an unallocated property is skipped instead of collapsing onto index 0.
+		FPCGPointValueRanges Ranges(Out, /*bAllocate=*/false);
+		EPCGPointNativeProperties Skipped = EPCGPointNativeProperties::None;
 
-		PCGEX_FOREACH_POINT_NATIVE_PROPERTY(PCGEX_COPYRANGEIF)
+#define PCGEX_MASK_RANGE(_NAME, _TYPE, ...) \
+		if (!EnumHasAnyFlags(Properties, EPCGPointNativeProperties::_NAME)) { Ranges._NAME##Range = TPCGValueRange<_TYPE>(); } \
+		else if (Ranges._NAME##Range.IsEmpty()) { Skipped |= EPCGPointNativeProperties::_NAME; }
+		PCGEX_FOREACH_POINT_NATIVE_PROPERTY(PCGEX_MASK_RANGE)
+#undef PCGEX_MASK_RANGE
+
+		ensureMsgf(InPCGPoints.IsEmpty() || Skipped == EPCGPointNativeProperties::None, TEXT("FPointIO::SetPoints skipped properties 0x%x: allocate them on the owning thread before writing."), static_cast<uint32>(Skipped));
+
+		for (int32 i = 0; i < InPCGPoints.Num(); i++)
+		{
+			Ranges.SetFromPoint(StartIndex + i, InPCGPoints[i]);
+		}
 	}
 
 	TArray<int32>& FPointIO::GetIdxMapping(const int32 NumElements)

@@ -1087,7 +1087,8 @@ namespace PCGExClusterMT
 		{
 			return;
 		}
-		if (VtxDataFacade->GetOut() && VtxDataFacade->GetIn() != VtxDataFacade->GetOut())
+		// Forwarded data belongs upstream, unless stolen: then processors write it in place and need it allocated here.
+		if (VtxDataFacade->GetOut() && (VtxDataFacade->GetIn() != VtxDataFacade->GetOut() || ExecutionContext->bWantsDataStealing))
 		{
 			VtxDataFacade->GetOut()->AllocateProperties(AllocateVtxProperties);
 		}

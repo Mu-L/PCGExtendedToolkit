@@ -270,6 +270,9 @@ namespace PCGExBoundsAxisToPoints
 				NewOutput->CopyToNewPoint(Index, A);
 				NewOutput->CopyToNewPoint(Index, B);
 
+				// A and B get distinct transforms even when the input's is uniform (unallocated).
+				NewOutput->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
+
 				TPCGValueRange<FTransform> Transforms = NewOutput->GetOut()->GetTransformValueRange(false);
 				TPCGValueRange<FVector> BoundsMin = NewOutput->GetOut()->GetBoundsMinValueRange(false);
 				TPCGValueRange<FVector> BoundsMax = NewOutput->GetOut()->GetBoundsMaxValueRange(false);
