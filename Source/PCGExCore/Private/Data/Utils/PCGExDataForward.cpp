@@ -268,11 +268,22 @@ namespace PCGExData
 		TArray<FPCGMetadataAttributeBase*> TargetAttributes;
 		TargetAttributes.Init(nullptr, NumAttributes);
 
+		// @Data and Elements identities sharing a name map to one Elements attribute: the later one wins, as on per-target copies.
+		TMap<FName, int32> WinnerByName;
+		WinnerByName.Reserve(NumAttributes);
+		for (int32 a = 0; a < NumAttributes; a++)
+		{
+			if (Identities[a].Attribute)
+			{
+				WinnerByName.Add(Identities[a].Name, a);
+			}
+		}
+
 		for (int32 a = 0; a < NumAttributes; a++)
 		{
 			const FAttributeIdentity& Identity = Identities[a];
 			const FPCGMetadataAttributeBase* SourceAtt = Identity.Attribute;
-			if (!SourceAtt)
+			if (!SourceAtt || WinnerByName.FindChecked(Identity.Name) != a)
 			{
 				continue;
 			}
