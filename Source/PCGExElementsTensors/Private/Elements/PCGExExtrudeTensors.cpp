@@ -455,7 +455,7 @@ namespace PCGExExtrudeTensors
 
 		// A parent stops as it spawns its only child, so (seed, generation) is unique: stage by input, seed, then lineage.
 		NewExtrusion->Generation = InGeneration;
-		NewIO->SetSortKey(PointDataFacade->Source->IOIndex, PCGExData::PackSortOrdinals(InSeedIndex, InGeneration + 1));
+		NewIO->SetSortKey(PointDataFacade->Source->IOIndex, InSeedIndex, InGeneration);
 		AttributesToPathTags.Tag(PointDataFacade->GetInPoint(InSeedIndex), Facade->Source);
 
 		// Set up shared resources

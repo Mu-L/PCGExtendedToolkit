@@ -326,10 +326,8 @@ namespace PCGExGraphs
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(CreateEdgeData)
 
-			// Edges stage in their vtx's order, then by subgraph; the key survives Add and MoveEdgesOutputs.
+			// Edges stage right after their vtx, by subgraph; the key survives Add and MoveEdgesOutputs.
 			const PCGExData::FIOSortKey VtxSortKey = NodeDataFacade->Source->GetSortKey();
-			checkf(VtxSortKey.Secondary >= 0 && VtxSortKey.Secondary <= MAX_int32, TEXT("A vtx sort secondary must fit an int32 to key its edges."));
-			const int32 VtxSortSecondary = static_cast<int32>(VtxSortKey.Secondary);
 
 			for (int i = 0; i < Graph->SubGraphs.Num(); i++)
 			{
@@ -357,7 +355,7 @@ namespace PCGExGraphs
 
 				// IOIndex seeds the subgraph's edge points (FSubGraph::CompileRange); only the key drives staging order.
 				EdgeIO->IOIndex = i;
-				EdgeIO->SetSortKey(VtxSortKey.Primary, PCGExData::PackSortOrdinals(VtxSortSecondary, i + 1));
+				EdgeIO->SetSortKey(VtxSortKey.Derived(i));
 
 				SubGraph->UID = EdgeIO->GetOut()->GetUniqueID();
 

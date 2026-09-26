@@ -532,7 +532,7 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		}
 
 		// Stable output ordering: group, then call site, then path.
-		NewPointIO->SetSortKey(Group->GroupIndex, PCGExData::PackSortOrdinals(CallSiteIndex, Jobs[JobIndex].LocalIndex + 1));
+		NewPointIO->SetSortKey(Group->GroupIndex, CallSiteIndex, Jobs[JobIndex].LocalIndex);
 
 		const int32 NumPoints = static_cast<int32>(Path.size());
 		UPCGBasePointData* OutPoints = NewPointIO->GetOut();

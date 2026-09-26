@@ -34,7 +34,7 @@ namespace PCGExGraphTask
 
 		// Copies are emplaced from concurrent tasks: stage by copy, then (edges) by subgraph.
 		VtxDupe->IOIndex = OutIOIndex;
-		VtxDupe->SetSortKey(OutIOIndex, 1);
+		VtxDupe->SetSortKey(OutIOIndex);
 
 		PCGExDataId OutId;
 		PCGExClusters::Helpers::SetClusterVtx(VtxDupe, OutId);
@@ -68,7 +68,7 @@ namespace PCGExGraphTask
 			}
 
 			EdgeDupe->IOIndex = OutIOIndex;
-			EdgeDupe->SetSortKey(OutIOIndex, ++EdgeOrdinal);
+			EdgeDupe->SetSortKey(OutIOIndex, EdgeOrdinal++);
 			PCGExClusters::Helpers::MarkClusterEdges(EdgeDupe, OutId);
 
 			if (AttributesToTags && PointIO)

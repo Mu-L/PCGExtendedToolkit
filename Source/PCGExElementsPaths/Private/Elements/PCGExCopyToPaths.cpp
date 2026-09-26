@@ -283,7 +283,7 @@ namespace PCGExCopyToPaths
 		{
 			TSharedPtr<PCGExData::FPointIO> Dupe = Context->MainPoints->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::Duplicate);
 			// After every input (unmatched ones forwarded to this pin keep their lead), then by input and deformer.
-			Dupe->SetSortKey(static_cast<int64>(Context->InitialMainPointsNum) + PointDataFacade->Source->IOIndex, static_cast<int64>(Dupes.Num()) + 1);
+			Dupe->SetSortKey(Context->InitialMainPointsNum + PointDataFacade->Source->IOIndex, Dupes.Num());
 			Dupe->GetOut()->AllocateProperties(EPCGPointNativeProperties::Transform);
 
 			FPCGExAxisDeformDetails& MainAxisDeform = MainAxisDeformDetails.Emplace_GetRef();

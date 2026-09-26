@@ -313,7 +313,7 @@ namespace PCGExClusterDiffusion
 						This->Context->SeedAttributesToPathTags,
 						This->Context->SeedsDataFacade.ToSharedRef(),
 						EdgeIOIndex,
-						++PathOrdinal);
+						PathOrdinal++);
 				}
 			};
 
@@ -482,7 +482,7 @@ namespace PCGExClusterDiffusion
 					This->Context->SeedAttributesToPathTags,
 					This->Context->SeedsDataFacade.ToSharedRef(),
 					EdgeIOIndex,
-					++PathOrdinal,
+					PathOrdinal++,
 					bCascade ? &CascadeValues : nullptr);
 			}
 		};

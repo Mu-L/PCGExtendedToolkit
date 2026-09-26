@@ -92,7 +92,7 @@ namespace PCGExBoundsAxisToPoints
 				NewOutputs[i] = Context->MainPoints->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::New);
 
 				// Inputs emplace concurrently: stage by input, then by point.
-				if (NewOutputs[i]) { NewOutputs[i]->SetSortKey(PointDataFacade->Source->IOIndex, static_cast<int64>(i) + 1); }
+				if (NewOutputs[i]) { NewOutputs[i]->SetSortKey(PointDataFacade->Source->IOIndex, i); }
 			}
 		}
 		else

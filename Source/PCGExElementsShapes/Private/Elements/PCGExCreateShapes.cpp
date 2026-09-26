@@ -320,7 +320,7 @@ namespace PCGExCreateShapes
 
 				const TSharedPtr<PCGExData::FPointIO> IO = This->Context->MainPoints->Emplace_GetRef(This->PointDataFacade->Source, PCGExData::EIOInit::New);
 				// Shapes emplace from parallel iterations and inputs: stage by input, then builder, then seed.
-				IO->SetSortKey(This->PointDataFacade->Source->IOIndex, PCGExData::PackSortOrdinals(BuilderIndex, ShapeIndex + 1));
+				IO->SetSortKey(This->PointDataFacade->Source->IOIndex, BuilderIndex, ShapeIndex);
 				PCGEX_MAKE_SHARED(IOFacade, PCGExData::FFacade, IO.ToSharedRef())
 
 				PCGExPointArrayDataHelpers::SetNumPointsAllocated(IOFacade->GetOut(), Shape->NumPoints);
