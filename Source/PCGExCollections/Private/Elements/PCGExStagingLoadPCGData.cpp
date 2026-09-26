@@ -625,6 +625,12 @@ namespace PCGExPCGDataAssetLoader
 		if (Settings->TargetsForwarding.bEnabled)
 		{
 			ForwardHandler = Settings->TargetsForwarding.GetHandler(PointDataFacade);
+
+			// Protected, every layer: a seed's staged picks would overwrite the ones spawned points carry themselves
+			ForwardHandler->ValidateIdentities([](const PCGExData::FAttributeIdentity& Identity)
+			{
+				return !PCGExCollections::Labels::IsEntryIdxName(Identity.Name);
+			});
 		}
 
 		if (Settings->bForwardInputTags)
@@ -721,9 +727,6 @@ namespace PCGExPCGDataAssetLoader
 
 	const FString ClusterTagPrefix = TEXT("PCGEx/Cluster:");
 
-	// Embedded collection maps are merged into the Map output (FBatch::OnLoadAssetsComplete), never spawned
-	const FName EmbeddedCollectionMapPin = TEXT("CollectionMap");
-
 	int32 ParseClusterId(const FString& InClusterTag)
 	{
 		return FCString::Atoi(*InClusterTag.Mid(ClusterTagPrefix.Len()));
@@ -736,7 +739,8 @@ namespace PCGExPCGDataAssetLoader
 			return ERoute::Skip;
 		}
 
-		if (Settings->bMergeEmbeddedCollectionMaps && InTaggedData.Pin == EmbeddedCollectionMapPin)
+		// Embedded collection maps are merged into the Map output (FBatch::OnLoadAssetsComplete), never spawned
+		if (Settings->bMergeEmbeddedCollectionMaps && InTaggedData.Pin == PCGExCollections::Labels::CollectionMapPin)
 		{
 			return ERoute::Skip;
 		}
@@ -1196,7 +1200,7 @@ namespace PCGExPCGDataAssetLoader
 				{
 					for (const FPCGTaggedData& TD : Asset->Data.TaggedData)
 					{
-						if (TD.Pin != EmbeddedCollectionMapPin)
+						if (TD.Pin != PCGExCollections::Labels::CollectionMapPin)
 						{
 							continue;
 						}
