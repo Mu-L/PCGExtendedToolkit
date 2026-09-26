@@ -10,6 +10,11 @@
 
 class UPCGBasePointData;
 
+namespace PCGExMT
+{
+	struct FScope;
+}
+
 namespace PCGExData
 {
 	struct FConstPoint;
@@ -44,6 +49,11 @@ namespace PCGExData
 		// InIgnoredAttributes: source attribute names never forwarded, applied before the details name filter.
 		FDataForwardHandler(const FPCGExForwardDetails& InDetails, const TSharedPtr<FFacade>& InSourceDataFacade, const TSharedPtr<FFacade>& InTargetDataFacade, const EForwardDomain InDomain = EForwardDomain::Inherit, const TSet<FName>* InIgnoredAttributes = nullptr);
 
+		// Metadata-sourced handler: identities come from InSourceMetadata (e.g. the scratch metadata an engine
+		// ProjectPoint/SamplePoint writes into), Elements domain only, writers pre-created on the target facade.
+		// Only ForwardEntry is valid on such a handler; the facade-sourced Forward overloads have no source rows.
+		FDataForwardHandler(const FPCGExForwardDetails& InDetails, const UPCGMetadata* InSourceMetadata, const TSharedPtr<FFacade>& InTargetDataFacade, const TSet<FName>* InIgnoredAttributes = nullptr);
+
 		void ValidateIdentities(FValidateFn&& Fn);
 
 		bool IsEmpty() const
@@ -53,9 +63,21 @@ namespace PCGExData
 
 		void Forward(const int32 SourceIndex, const int32 TargetIndex);
 
+		// Metadata-sourced variant: copies the source attributes' values at SourceKey onto target row TargetIndex.
+		// Safe from concurrent tasks once built; a PCGInvalidEntryKey source is a no-op.
+		void ForwardEntry(const PCGMetadataEntryKey SourceKey, const int32 TargetIndex);
+
+		// Bulk ForwardEntry: SourceKeys is indexed by target row, invalid keys are skipped. One key/value resolution per
+		// attribute instead of per row; call once after the parallel loop, before the facade write.
+		void ForwardEntries(TConstArrayView<PCGMetadataEntryKey> SourceKeys);
+
 		// Prepared-target variant (requires the target-facade constructor): fans one source row out to many
 		// target indices through the pre-created writers -- no lazy buffer creation, safe from concurrent tasks.
 		void Forward(const int32 SourceIndex, const TArray<int32>& Indices);
+
+		// Prepared-target variant: target i in Scope receives source row SourceIndexPerTarget[i]; a negative row leaves
+		// that target untouched. One type dispatch per attribute per scope, raw arrays on the Elements domain.
+		void ForwardScoped(const PCGExMT::FScope& Scope, TConstArrayView<int32> SourceIndexPerTarget);
 
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade);
 		void Forward(const int32 SourceIndex, const TSharedPtr<FFacade>& InTargetDataFacade, const TArray<int32>& Indices);
