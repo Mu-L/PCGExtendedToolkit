@@ -207,7 +207,7 @@ namespace PCGExGraphs
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(FSubGraph::Compile::BuildEdgesEntries);
 
-			const TPCGValueRange<int64> OutMetadataEntries = OutEdgeData->GetMetadataEntryValueRange(false);
+			const TPCGValueRange<int64> OutMetadataEntries = OutEdgeData->GetMetadataEntryValueRange();
 			UPCGMetadata* Metadata = OutEdgeData->MutableMetadata();
 
 			// Entry keys handed out by AddEntryPlaceholder are sequential from the current

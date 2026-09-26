@@ -28,6 +28,30 @@ namespace PCGExData
 
 namespace PCGExData
 {
+	/** Staging order within an FPointIOCollection. An IO without an explicit key sorts as {IOIndex, 0}. */
+	struct FIOSortKey
+	{
+		int64 Primary = 0;
+		int64 Secondary = 0;
+
+		FORCEINLINE bool operator<(const FIOSortKey& Other) const
+		{
+			return Primary != Other.Primary ? Primary < Other.Primary : Secondary < Other.Secondary;
+		}
+
+		FORCEINLINE bool operator==(const FIOSortKey& Other) const
+		{
+			return Primary == Other.Primary && Secondary == Other.Secondary;
+		}
+	};
+
+	/** Packs two non-negative ordinals into one sort key half, Hi-major. */
+	FORCEINLINE int64 PackSortOrdinals(const int32 Hi, const int32 Lo)
+	{
+		check(Hi >= 0 && Lo >= 0);
+		return (static_cast<int64>(Hi) << 32) | static_cast<int64>(Lo);
+	}
+
 #pragma region FPointIO
 	/**
 	 * 
@@ -70,6 +94,8 @@ namespace PCGExData
 
 		TWeakPtr<FPCGContextHandle> ContextHandle;
 
+		TOptional<FIOSortKey> SortKey;
+
 	public:
 		TSharedPtr<FTags> Tags;
 		int32 IOIndex = 0;
@@ -77,6 +103,11 @@ namespace PCGExData
 		TObjectPtr<const UPCGData> InitializationData = nullptr;
 
 		bool bAllowEmptyOutput = false;
+
+		// Staging order only, never an identity: SetInfos, Add and PruneNullEntries leave it untouched.
+		void SetSortKey(const int64 InPrimary, const int64 InSecondary) { SortKey = FIOSortKey{InPrimary, InSecondary}; }
+		bool HasSortKey() const { return SortKey.IsSet(); }
+		FIOSortKey GetSortKey() const { return SortKey.IsSet() ? SortKey.GetValue() : FIOSortKey{IOIndex, 0}; }
 
 		FORCEINLINE bool IsForwarding() const
 		{

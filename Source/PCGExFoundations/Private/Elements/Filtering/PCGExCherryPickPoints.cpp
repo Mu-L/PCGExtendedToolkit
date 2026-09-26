@@ -165,6 +165,8 @@ namespace PCGExCherryPickPoints
 			if (TSharedPtr<PCGExData::FPointIO> Discarded = Context->MainPoints->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::New))
 			{
 				Discarded->OutputPin = PCGExCommon::Labels::OutputDiscardedLabel;
+				// After every input (forwarded no-pick inputs keep their lead on this pin), then in input order.
+				Discarded->SetSortKey(static_cast<int64>(Context->InitialMainPointsNum) + PointDataFacade->Source->IOIndex, 0);
 				Discarded->InheritPoints(DiscardedIndices, 0);
 			}
 		}

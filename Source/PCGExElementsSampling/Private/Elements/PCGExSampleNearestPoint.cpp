@@ -59,6 +59,8 @@ void UPCGExSampleNearestPointSettings::PCGExApplyDeprecationBeforeUpdatePins(UPC
 		DataMatching.RenamePins(this, InOutNode);
 	}
 
+	RetireInputPin(InOutNode, PCGExFilters::Labels::SourceUseValueIfFilters);
+
 	Super::PCGExApplyDeprecationBeforeUpdatePins(InOutNode, InputPins, OutputPins);
 }
 
@@ -93,8 +95,6 @@ TArray<FPCGPinProperties> UPCGExSampleNearestPointSettings::InputPinProperties()
 	PCGExMatching::Helpers::DeclareMatchingRulesInputs(DataMatching, PinProperties);
 	PCGExBlending::DeclareBlendOpsInputs(PinProperties, EPCGPinStatus::Normal, BlendingInterface);
 	PCGExSorting::DeclareSortingRulesInputs(PinProperties, SampleMethod == EPCGExSampleMethod::BestCandidate ? EPCGPinStatus::Required : EPCGPinStatus::Advanced);
-
-	PCGEX_PIN_FILTERS(PCGExFilters::Labels::SourceUseValueIfFilters, "Filter which points values will be processed.", Advanced)
 
 	return PinProperties;
 }

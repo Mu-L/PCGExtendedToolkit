@@ -400,7 +400,7 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		return true;
 	};
 
-	// Phase 1: filter + optional simplification (cheap, sequential). LocalIndex keeps IOIndex deterministic
+	// Phase 1: filter + optional simplification (cheap, sequential). LocalIndex keeps the sort key deterministic
 	// regardless of how phase 2 is scheduled.
 	struct FPathJob
 	{
@@ -440,10 +440,8 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 		return;
 	}
 
-	// Phase 2: build one output IO per path. Paths are independent, so they run in parallel: the IO collection
-	// emplace is internally locked, IOIndex is explicit (collections sort on it before staging), and everything
-	// else is path-local. The per-point loop inside only goes wide when there's a single path, so the two levels
-	// never compete.
+	// Phase 2: one output IO per path, in parallel -- emplace is locked, the sort key is explicit, all else is
+	// path-local. The per-point loop only goes wide for a single path, so the two levels never compete.
 	TArray<TSharedPtr<PCGExData::FPointIO>> NewIOs;
 	NewIOs.SetNum(Jobs.Num());
 
@@ -533,8 +531,8 @@ void FPCGExClipper2ProcessorContext::OutputPaths64(
 			return; // Skip this path only
 		}
 
-		// Deterministic IOIndex for stable output ordering:
-		NewPointIO->IOIndex = Group->GroupIndex * 10000000 + CallSiteIndex * 100000 + Jobs[JobIndex].LocalIndex;
+		// Stable output ordering: group, then call site, then path.
+		NewPointIO->SetSortKey(Group->GroupIndex, PCGExData::PackSortOrdinals(CallSiteIndex, Jobs[JobIndex].LocalIndex + 1));
 
 		const int32 NumPoints = static_cast<int32>(Path.size());
 		UPCGBasePointData* OutPoints = NewPointIO->GetOut();
@@ -1388,7 +1386,7 @@ void FPCGExClipper2ProcessorElement::BuildProcessingGroups(
 
 		if (bDoMainMatching)
 		{
-			PCGExMatching::Helpers::GetMatchingSourcePartitions(Matcher, MainFacades, PreGroups, true);
+			PCGExMatching::Helpers::GetMatchingSourcePartitions(Matcher, PreGroups, true);
 
 			// GetMatchingSourcePartitions works in MainFacades index space; convert to AllOpData indices
 			// (Facade->Idx == ArrayIndex) so the policy pass + group building can index AllOpData directly.

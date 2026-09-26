@@ -3,6 +3,7 @@
 
 #include "Data/PCGExPointIO.h"
 
+#include "Algo/Sort.h"
 #include "PCGElement.h"
 #include "PCGExCoreMacros.h"
 #include "PCGExLog.h"
@@ -1102,10 +1103,70 @@ for (int i = 0; i < ReducedNum; i++){Range[i] = Range[InIndices[i]];}}
 	void FPointIOCollection::Sort()
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(FPointIOCollection::Sort);
-		Pairs.Sort([](const TSharedPtr<FPointIO>& A, const TSharedPtr<FPointIO>& B)
+
+		const int32 NumPairs = Pairs.Num();
+		if (NumPairs < 2)
 		{
-			return A->IOIndex < B->IOIndex;
-		});
+			return;
+		}
+
+		struct FSortEntry
+		{
+			FIOSortKey Key;
+			int32 Slot = INDEX_NONE;
+			bool bValid = false;
+		};
+
+		// Nulls sort last; the staging loops skip them.
+		auto IsLess = [](const FSortEntry& A, const FSortEntry& B)
+		{
+			if (!A.bValid || !B.bValid)
+			{
+				return A.bValid;
+			}
+
+			return A.Key < B.Key;
+		};
+
+		// Keys are read once, so comparisons never touch the scattered FPointIO objects.
+		TArray<FSortEntry, TInlineAllocator<64>> Entries;
+		Entries.SetNumUninitialized(NumPairs);
+
+		bool bStrictlyOrdered = true;
+		for (int32 i = 0; i < NumPairs; i++)
+		{
+			const TSharedPtr<FPointIO>& IO = Pairs[i];
+			FSortEntry& Entry = Entries[i];
+			Entry.Slot = i;
+			Entry.bValid = IO.IsValid();
+			Entry.Key = Entry.bValid ? IO->GetSortKey() : FIOSortKey();
+
+			if (bStrictlyOrdered && i > 0 && !IsLess(Entries[i - 1], Entry))
+			{
+				bStrictlyOrdered = false;
+			}
+		}
+
+		// Distinct keys have exactly one sorted order, so a strictly increasing collection is already final.
+		if (bStrictlyOrdered)
+		{
+			return;
+		}
+
+		// Same IntroSort, starting order and comparison outcomes as sorting Pairs directly: ties land identically.
+		Algo::Sort(Entries, IsLess);
+
+		TArray<TSharedPtr<FPointIO>, TInlineAllocator<64>> Ordered;
+		Ordered.Reserve(NumPairs);
+		for (const FSortEntry& Entry : Entries)
+		{
+			Ordered.Add(MoveTemp(Pairs[Entry.Slot]));
+		}
+
+		for (int32 i = 0; i < NumPairs; i++)
+		{
+			Pairs[i] = MoveTemp(Ordered[i]);
+		}
 	}
 
 	FBox FPointIOCollection::GetInBounds() const
@@ -1368,7 +1429,7 @@ for (int i = 0; i < ReducedNum; i++){Range[i] = Range[InIndices[i]];}}
 				PointData->Metadata->Initialize(ParamMetadata);
 				PointData->SetNumPoints(ParamItemCount);
 				PointData->AllocateProperties(EPCGPointNativeProperties::MetadataEntry);
-				TPCGValueRange<int64> MetadataEntryRange = PointData->GetMetadataEntryValueRange(/*bAllocate=*/false);
+				TPCGValueRange<int64> MetadataEntryRange = PointData->GetMetadataEntryValueRange();
 
 				for (int PointIndex = 0; PointIndex < ParamItemCount; ++PointIndex)
 				{

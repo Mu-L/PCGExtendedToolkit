@@ -118,6 +118,9 @@ namespace PCGExBoundsToPoints
 			for (int i = 0; i < NewOutputs.Num(); i++)
 			{
 				NewOutputs[i] = Context->MainPoints->Emplace_GetRef(PointDataFacade->Source, PCGExData::EIOInit::New);
+
+				// Inputs emplace concurrently: stage by input, then by point.
+				if (NewOutputs[i]) { NewOutputs[i]->SetSortKey(PointDataFacade->Source->IOIndex, static_cast<int64>(i) + 1); }
 			}
 
 			if (bSymmetry)

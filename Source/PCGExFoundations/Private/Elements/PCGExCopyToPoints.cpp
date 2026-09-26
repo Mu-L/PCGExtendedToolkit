@@ -191,6 +191,9 @@ namespace PCGExCopyToPoints
 				continue;
 			}
 
+			// Emplaced from parallel scopes and inputs: stage input-major, then by target.
+			Dupe->SetSortKey(PointDataFacade->Source->IOIndex, static_cast<int64>(i) + 1);
+
 			Copies++;
 			Context->TargetsForwardHandler->Forward(i, Dupe->GetOut()->Metadata);
 			if (bTagCopies)
@@ -239,6 +242,9 @@ namespace PCGExCopyToPoints
 		{
 			return;
 		}
+
+		// CompleteWork runs in parallel across inputs: stage in input order.
+		MergedIO->SetSortKey(PointDataFacade->Source->IOIndex, 1);
 
 		// CompleteWork can run on the calling thread of the batch; the replication itself always runs in a task.
 		PCGEX_ASYNC_GROUP_CHKD_VOID(TaskManager, ReplicateTask)

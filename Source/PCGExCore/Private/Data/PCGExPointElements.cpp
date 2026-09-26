@@ -199,7 +199,9 @@ namespace PCGExData
 
 	void FMutablePoint::SetMetadataEntry(const int64 InValue)
 	{
-		Data->GetMetadataEntryValueRange(false)[Index] = InValue;
+		// Allocating, unlike the other setters: an unallocated range keeps only index 0's write.
+		// Allocate entries before calling this from parallel code; allocation itself isn't thread-safe.
+		Data->GetMetadataEntryValueRange()[Index] = InValue;
 	}
 
 	void FMutablePoint::SetColor(const FVector4& InValue)
