@@ -56,7 +56,8 @@ namespace PCGExGraphTask
 
 		for (const TSharedPtr<PCGExData::FPointIO>& Edges : GraphBuilder->EdgesIO->Pairs)
 		{
-			// With cluster caching on, DuplicateData rebinds the builder's bound cluster, if any, onto the dupe (UPCGExClusterEdgesData::InitializeSpatialDataInternal).
+			// With cluster caching on, DuplicateData rebinds the builder's bound cluster onto the dupe
+			// (UPCGExClusterEdgesData::InitializeSpatialDataInternal).
 			TSharedPtr<PCGExData::FPointIO> EdgeDupe = EdgeCollection->Emplace_GetRef(Edges->GetOut(), PCGExData::EIOInit::Duplicate);
 			if (!EdgeDupe)
 			{

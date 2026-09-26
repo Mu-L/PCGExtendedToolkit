@@ -70,7 +70,7 @@ namespace PCGExFitting
 		return (bInheritRotation ? 2 : 0) + (bInheritScale ? 1 : 0);
 	}
 
-	/** Applies a target transform to one point transform. Single home of the inherit strategies (FTransformPointIO, point replication). */
+	/** Applies a target transform to one point transform; the one implementation of the inherit strategies. */
 	template <int32 Strategy>
 	FORCEINLINE void ApplyInheritedTransform(FTransform& InOutTransform, const FTransform& InTarget)
 	{

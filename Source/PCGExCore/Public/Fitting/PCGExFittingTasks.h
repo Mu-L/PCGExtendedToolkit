@@ -25,7 +25,7 @@ namespace PCGExFitting::Tasks
 	public:
 		FTransformPointIO(const int32 InTaskIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<PCGExData::FPointIO>& InToBeTransformedIO, FPCGExTransformDetails* InTransformDetails, bool bAllocate = false);
 
-		// Whole output, fitting against InFitBounds instead of its own bounds: outputs sharing one frame (a cluster's Vtx and Edges) must share one fit.
+		// Fits against InFitBounds, not the output's own bounds: a cluster's Vtx and Edges must share one fit.
 		FTransformPointIO(const int32 InTaskIndex, const TSharedPtr<PCGExData::FPointIO>& InPointIO, const TSharedPtr<PCGExData::FPointIO>& InToBeTransformedIO, FPCGExTransformDetails* InTransformDetails, const FBox& InFitBounds);
 
 		TSharedPtr<PCGExData::FPointIO> PointIO;

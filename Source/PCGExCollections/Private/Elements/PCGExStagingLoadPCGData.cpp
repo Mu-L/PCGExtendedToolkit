@@ -276,7 +276,7 @@ namespace PCGExPCGDataAssetLoader
 		}
 	};
 
-	/** Emptiness rule behind bOmitEmptyData, checked on the original spatial data before any copy is made */
+	/** Emptiness rule behind bOmitEmptyData. */
 	bool IsSpatialDataEmpty(const UPCGSpatialData* InData)
 	{
 		if (const UPCGBasePointData* PointData = Cast<UPCGBasePointData>(InData))
@@ -408,7 +408,6 @@ void FPCGExPCGDataAssetLoaderContext::RegisterUniqueData(const FPCGTaggedData& I
 		return;
 	}
 
-	// Goes to appropriate pin, with Pin: tag if going to default
 	FPCGTaggedData ResolvedData = ResolveOutput(InTaggedData);
 	const FName TargetPin = ResolvedData.Pin;
 
@@ -720,7 +719,6 @@ namespace PCGExPCGDataAssetLoader
 		return true;
 	}
 
-	// PCGEx cluster pairing tag: PCGEx/Cluster:ID
 	const FString ClusterTagPrefix = TEXT("PCGEx/Cluster:");
 
 	// Embedded collection maps are merged into the Map output (FBatch::OnLoadAssetsComplete), never spawned
@@ -849,7 +847,7 @@ namespace PCGExPCGDataAssetLoader
 
 		if (Route == ERoute::Unique)
 		{
-			// Non-spatial data: register once per unique asset (not per point), ordered before spatial data
+			// Non-spatial data: output once per unique data (not per point), ahead of spatial data
 			Context->RegisterUniqueData(InTaggedData, FOutputOrder{0, BatchIndex, PointIndex, DatumIndex});
 			return FSpatialTransformResult();
 		}
@@ -991,7 +989,6 @@ namespace PCGExPCGDataAssetLoader
 	{
 		const UPCGBasePointData* SourceData = Cast<UPCGBasePointData>(Group->Source.Data);
 
-		// Always point-array data: the replication writes contiguous native ranges.
 		Group->MergedIO = MakeShared<PCGExData::FPointIO>(PointDataFacade->Source->GetContextHandle(), SourceData);
 		Group->MergedIO->SetInfos(0, OutputPinDefault);
 		if (!Group->MergedIO->InitializeOutput<UPCGPointArrayData>(PCGExData::EIOInit::New))
@@ -1195,7 +1192,6 @@ namespace PCGExPCGDataAssetLoader
 					return A.GetPathName().Compare(B.GetPathName(), ESearchCase::CaseSensitive) < 0;
 				});
 
-				// Scan all loaded data assets for embedded CollectionMap entries
 				for (const UPCGDataAsset* Asset : Assets)
 				{
 					for (const FPCGTaggedData& TD : Asset->Data.TaggedData)
@@ -1216,7 +1212,6 @@ namespace PCGExPCGDataAssetLoader
 					}
 				}
 
-				// Re-pack merged map: the union of every unpacked collection, registered in unpack order
 				if (TempUnpacker.HasValidMapping())
 				{
 					UPCGParamData* MergedMapData = Context->ManagedObjects->New<UPCGParamData>();

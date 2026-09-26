@@ -211,7 +211,8 @@ namespace PCGExCopyClustersToPoints
 				break;
 			}
 
-			// With cluster caching on, DuplicateData rebinds the input's bound cluster, if any, onto the dupe (UPCGExClusterEdgesData::InitializeSpatialDataInternal).
+			// With cluster caching on, DuplicateData rebinds the input's bound cluster onto the dupe
+			// (UPCGExClusterEdgesData::InitializeSpatialDataInternal).
 			TSharedPtr<PCGExData::FPointIO> EdgeDupe = Context->MainEdges->Emplace_GetRef(EdgeDataFacade->Source, PCGExData::EIOInit::Duplicate);
 			if (!EdgeDupe)
 			{

@@ -454,7 +454,6 @@ namespace PCGExFindContours
 				continue;
 			}
 
-			// Seed is exterior
 			if (Settings->SeedPicking.WithinDistanceOfEdges(*Cluster, SeedTransforms[SeedIdx].GetLocation()))
 			{
 				CandidateSeeds.Add(SeedIdx);

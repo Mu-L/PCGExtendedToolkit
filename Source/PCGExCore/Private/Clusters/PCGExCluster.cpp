@@ -26,9 +26,8 @@ namespace PCGExClusters
 		VtxPoints = InVtxIO->GetIn();
 	}
 
-	// "Mirror" constructor: creates a cluster that shares or copies structure from another.
-	// Used when multiple operations need independent cluster state (e.g. different edge validity).
-	// When bCopyNodes/bCopyEdges are false, the arrays are shared (not duplicated), so structural reads are zero-cost.
+	// Mirror: another cluster's structure, shared or copied per bCopyNodes/bCopyEdges, so an operation gets its own
+	// cluster state (e.g. different edge validity) without a rebuild.
 	FCluster::FCluster(const TSharedRef<FCluster>& OtherCluster, const TSharedPtr<PCGExData::FPointIO>& InVtxIO, const TSharedPtr<PCGExData::FPointIO>& InEdgesIO, const TSharedPtr<PCGEx::FIndexLookup>& InNodeIndexLookup, const bool bCopyNodes, const bool bCopyEdges, const bool bCopyLookup)
 		: NodeIndexLookup(InNodeIndexLookup)
 		  , VtxIO(InVtxIO)

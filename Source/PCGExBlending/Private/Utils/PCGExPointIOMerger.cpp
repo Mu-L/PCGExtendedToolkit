@@ -243,7 +243,8 @@ namespace PCGExPointIOMerger
 						return;
 					}
 
-					// A @Data attribute gets a single-value buffer, never an FPropertyArrayBuffer: take the first carrying source's value.
+					// A @Data attribute gets a single-value buffer, never an FPropertyArrayBuffer: the first
+					// source carrying it provides the value.
 					if (RawBuffer->GetUnderlyingDomain() == PCGExData::EDomainType::Data)
 					{
 						for (const TSharedPtr<PCGExData::FPointIO>& DataSourceIO : Merger->IOSources)

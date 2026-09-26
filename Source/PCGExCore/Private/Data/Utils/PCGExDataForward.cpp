@@ -268,7 +268,7 @@ namespace PCGExData
 		TArray<FPCGMetadataAttributeBase*> TargetAttributes;
 		TargetAttributes.Init(nullptr, NumAttributes);
 
-		// @Data and Elements identities sharing a name map to one Elements attribute: the later one wins, as on per-target copies.
+		// A name on both @Data and Elements maps to one attribute: the later identity wins, as on per-target copies.
 		TMap<FName, int32> WinnerByName;
 		WinnerByName.Reserve(NumAttributes);
 		for (int32 a = 0; a < NumAttributes; a++)
@@ -371,7 +371,7 @@ namespace PCGExData
 							WriterValues[w] = SourceAtt->GetValueFromItemKey<T>(CopySourceEntries[WritingCopies[w]]);
 						}
 
-						// Accessor, not SetValues<T>: compressed types dedup through the engine's hashed path instead of AddUnique.
+						// Accessor, not SetValues<T>: compressed types dedup through a hash instead of AddUnique.
 						const TUniquePtr<IPCGAttributeAccessor> Accessor = PCGAttributeAccessorHelpers::CreateAccessor(TargetAtt, TargetDomain);
 						if (!ensure(Accessor.IsValid()))
 						{

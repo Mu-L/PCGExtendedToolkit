@@ -165,9 +165,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bOmitEmptyData = true;
 
-	/** One point data per asset entry (per input) holding every target's copy, instead of one per target.
-	 *  Point data only, cluster-tagged data excluded. Forwarded target attributes land per element and
-	 *  replace same-named source attributes. */
+	/** Merge every target's copy of an asset's point data into one output per input; cluster data is never
+	 *  merged. Forwarded target attributes land per element, replacing same-named source attributes. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bMergePointOutputs = false;
 
@@ -287,7 +286,7 @@ struct FPCGExPCGDataAssetLoaderContext final : FPCGExPointsProcessorContext
 	TMap<FName, TArray<PCGExPCGDataAssetLoader::FOutputEntry>> OutputByPin;
 	mutable FRWLock OutputLock;
 
-	// Asset-owned data forwarded as-is (non-spatial, or everything in passthrough): once per unique data, never duplicated
+	// ERoute::Unique outputs by data UID: asset-owned data is output once, never duplicated
 	TMap<uint32, PCGExPCGDataAssetLoader::FUniqueSlot> UniqueData;
 	mutable FRWLock UniqueDataLock;
 
@@ -355,7 +354,7 @@ namespace PCGExPCGDataAssetLoader
 		}
 	};
 
-	/** bMergePointOutputs: every target of one input that resolves to the same asset entry, printed as one output */
+	/** bMergePointOutputs: every target of one input that resolves to the same asset datum, replicated into one output */
 	struct FMergeGroup
 	{
 		FPCGTaggedData Source;
@@ -375,7 +374,7 @@ namespace PCGExPCGDataAssetLoader
 	protected:
 		TSharedPtr<PCGExData::TBuffer<int64>> EntryHashGetter;
 
-		// bMergePointOutputs: groups keyed by asset entry (one datum listed twice stays two outputs), in first-target order
+		// bMergePointOutputs: one group per asset datum entry, in first-target order
 		TArray<TSharedPtr<FMergeGroup>> MergeGroups;
 		TMap<const FPCGTaggedData*, int32> MergeGroupByEntry;
 

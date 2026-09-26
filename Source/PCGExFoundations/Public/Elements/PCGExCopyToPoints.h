@@ -59,7 +59,7 @@ public:
 	FPCGExTransformDetails TransformDetails = FPCGExTransformDetails(true, true);
 
 	/** One point data per input holding every copy, instead of one per matched target. Forwarded target
-	 *  attributes land per element, replacing same-named source ones. Value tags keep the last target's value. */
+	 *  attributes land per element, replacing same-named source ones. Value tags come from the last target. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Settings, meta = (PCG_Overridable))
 	bool bMergeCopies = false;
 
